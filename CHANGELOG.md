@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (narzedzie - grupa progow "szybkie") - `sprawdz_logi.py --grupa szybkie`: 12 wierszy dla A8 (udzial polki koni 40%) i A9 (amunicja AI, sufit ceny 3.0) wobec bazy W50
+
+**Mod:** narzedzie | **Galaz:** `w-toku/szybkie-wlaczenia` | **Tor:** S | **Klucze:** bez zmian | **Pliki:** `tools/sprawdz_logi.py` (`SZ_BASE`, `szybkie_main`, opis w naglowku, wywolanie w `main`)
+
+**Zmiana:** `python -I tools/sprawdz_logi.py --grupa szybkie [--do-doby 120|364] <Armoury-*.log>`. Baza `SZ_BASE` = bieg dwuletni W50 (`Armoury-2026-10-13_21-14-13.log`, klucze 25 / cien / 0) dla okna 120 i 364 dob (inne okno - najblizsza, z dopiskiem). Wiersze wiazace: SZ-A8-0 klucz 40 w linii startu sesji (nowy odcinek z `HorseCensus.SessionStart`), SZ-A8-1 jazda t3+ srednia ostatnich 30 dob >= baza - 1 pkt (18.2 / 16.4%), SZ-A8-2 konie na polkach >= 70% bazy (9 603 / 11 460), SZ-A9a-0 `[WL]` w linii E8/W w kazdej dobie, SZ-A9a-1 zeszlo > 0 i zeszlo / zeszloby 0.8-1.2 (ten sam wzor co pomiar E8/P2 - dowod, ze kod robi to, co policzyl cien), SZ-A9a-2 strzaly na polkach >= 50% bazy (4 129 / 4 453) i miasta bez strzal <= 5, SZ-A9b-0 `[WL x3.00]`, SZ-A9b-1 kupione ponad sufit 0 i p90 cena / wartosc (wiersze AiGear E8/P2) <= sufit, SZ-A9b-2 pokrycie korpusu zalog >= baza - 3 pkt (91 / 84%); INFO: SZ-A8-3 (konie kupione/d, nieudane, Dothrakowie % konnych), SZ-A9a-3 (zakupy i zrodla amunicji/d), SZ-A9b-3 (zloto zakupow brakow, zamowienia, odrzucenia, siodla/d).
+**Sprawdzone na logach (py_compile, oba logi W50):** log dwuletni, okno 120: klucze NIE (log sprzed wlaczenia - tak ma byc), reszta TAK przy wartosciach rownych bazie (jazda 18.2%, polki 9 619, strzaly 4 129, pokrycie 91%); okno 364: to samo (16.4%, 11 513, 4 453, 85%); bieg 120 dob (`_20-41-38`): jazda 18.0%, polki 9 940, strzaly 3 117 (rozrzut miedzy biegami -25% - prog 50% go miesci), pokrycie 92% - TAK. Bez wyjatku.
+**Ryzyko / co sprawdzic:** baza to jeden bieg W50 (drugi bieg tej wersji: jazda 18.0 wobec 18.2, strzaly 3 117 wobec 4 129) - progi wzgledne z zapasem na ten rozrzut.
+**Status:** DO SPRAWDZENIA (narzedzie; wiersze kluczy TAK dopiero na logu z DLL tej galezi).
+
 ## 2026-10-14 (PLAN 1.6 - Zlota Kompania 1/3 lukow, szybkie wlaczenia) - NIE WLACZONE: warunek wlaczenia (zakupy AI ze wszystkich zestawow jednostki) nie jest w kodzie - bez zmian w kodzie
 
 **Mod:** Armoury + CrashScribe | **Galaz:** `w-toku/szybkie-wlaczenia` | **Tor:** S (sam przeglad) | **Klucze:** `Army175GoldenBows` zostaje **false** (= aca89cc) | **Pliki:** tylko `CHANGELOG.md`

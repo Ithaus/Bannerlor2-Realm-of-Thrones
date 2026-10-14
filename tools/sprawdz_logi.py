@@ -521,6 +521,16 @@ Uzycie (Python 3, tylko odczyt):
                     LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO),
                     LUP-18 (L7) polki: zdjete = do taborow + spalone (0 szt.), spalone tylko przy spustoszeniu; LUP-18b ksiega towarow lup miast (L7) tylko ujscie.
                     Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
+--grupa szybkie   : (szybkie wlaczenia 14.10, inwentarz A8 i A9) jazda AI - udzial polki koni lorda 40% (AiMountMarketSharePercent), amunicja AI
+                    z cienia (AiAmmoUse) i sufit ceny zakupow brakow AI 3.0 (AiGearMaxPriceFactor). python -I tools/sprawdz_logi.py --grupa szybkie [--do-doby 120] <Armoury-*.log>
+                    Baza: bieg dwuletni W50 (Armoury-2026-10-13_21-14-13.log, klucze 25 / cien / 0) dla okna 120 albo 364 dob (inne okno - najblizsza baza).
+                    SZ-A8-0 klucz 40 w linii startu sesji, SZ-A8-1 jazda t3+ (srednia ostatnich 30 dob okna) >= baza - 1 pkt, SZ-A8-2 polki koni miast i zamkow
+                    w ostatniej dobie okna >= 70% bazy, SZ-A8-3 INFO (konie kupione lordow/d, polka zarezerwowana, Dothrakowie % konnych);
+                    SZ-A9a-0 klucz [WL] w linii E8/W, SZ-A9a-1 zeszlo > 0 i zeszlo / zeszloby (linia E8/P2) 0.8-1.2, SZ-A9a-2 strzaly na polkach >= 50% bazy
+                    i miasta bez strzal (174b) <= 5, SZ-A9a-3 INFO (zakupy i zrodla amunicji/d wobec bazy, partie bitew gracza z misja);
+                    SZ-A9b-0 klucz [WL x3.00] w linii E8/Z, SZ-A9b-1 kupione ponad sufit 0 i p90 cena / wartosc (wiersze AiGear E8/P2) <= sufit,
+                    SZ-A9b-2 pokrycie korpusu zalog (171) w ostatniej dobie okna >= baza - 3 pkt, SZ-A9b-3 INFO (zloto zakupow brakow, zamowienia, siodla/d).
+                    Log sprzed wlaczenia: wiersze kluczy NIE / INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -19194,6 +19204,211 @@ def lup_main(logp, start_arg, until=364):
     return 0
 
 
+# ---- grupa szybkie (szybkie wlaczenia 14.10: A8 jazda AI - udzial polki koni, A9 amunicja AI i sufit ceny zakupow brakow AI)
+# baza: bieg dwuletni W50 (Armoury-2026-10-13_21-14-13.log; AiMountMarketSharePercent 25, AiAmmoUse w cieniu, AiGearMaxPriceFactor 0), okno dob kampanii 1-N:
+# cav - jazda t3+ srednia ostatnich 30 dob (%), shelf - konie na polkach (zw+boj+szl) ostatniej doby, bought - konie kupione lordow/d, arrows - strzaly na
+# polkach ostatniej doby, cover - pokrycie korpusu zalog (171) ostatniej doby (%), saddles - siodla kupione lordow/d (E8/H), gapgold - zloto zakupow brakow
+# AiGear/d (E8/P2), cap3 - z tego ponad 3.0 x wartosc (zl/d), ammo_buy / ammo_src - zakupy amunicji AI (174b) i zrodla amunicji (E6/0) na dobe
+SZ_BASE = {
+    120: {"cav": 18.2, "shelf": 9603, "bought": 65.6, "arrows": 4129, "cover": 91, "saddles": 37.8, "gapgold": 79265, "cap3": 25060,
+          "ammo_buy": 432, "ammo_src": 407},
+    364: {"cav": 16.4, "shelf": 11460, "bought": 62.1, "arrows": 4453, "cover": 84, "saddles": 32.5, "gapgold": 74340, "cap3": 22831,
+          "ammo_buy": 363, "ammo_src": 329},
+}
+SZ_HORSE_START = "Armie 175 (Armoury) - wylaczniki przy starcie sesji"
+
+
+def szybkie_main(logp, start_arg, until=120):
+    """Szybkie wlaczenia 14.10 (inwentarz A8, A9): wiersze SZ-A8-0..3 (AiMountMarketSharePercent 40), SZ-A9a-0..3 (AiAmmoUse), SZ-A9b-0..3
+    (AiGearMaxPriceFactor 3.0) - opis w naglowku pliku. Okno: doby kampanii 1-until (--do-doby), start kampanii jak etap8_main. Baza W50 z SZ_BASE
+    (okno 120 albo 364; inne okno - najblizsza, dopisek w wierszu). Brak linii = INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    bk = 120 if until <= 240 else 364
+    base = SZ_BASE[bk]
+    btxt = f"baza W50 1-{bk}" + ("" if bk == until else f" (okno {until} - najblizsza baza)")
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 1-{until} | {btxt}")
+
+    def win(prefix):
+        return {d: s for d, s in by_day(lines, prefix).items() if 1 <= run_day(d, start) <= until}
+
+    def mean(v):
+        return sum(v) / len(v) if v else 0.0
+
+    # ---------------- A8: udzial polki koni lorda
+    try:
+        st = [s for s in lines if s.startswith(SZ_HORSE_START)]
+        share = num(r"AiMountMarketSharePercent (\d+)%", st[-1]) if st else None
+        if share is None:
+            rep.add("SZ-A8-0: udzial polki koni lorda w linii startu sesji", "brak liczby w linii 'wylaczniki przy starcie sesji' (log sprzed A8)",
+                    "AiMountMarketSharePercent 40", None)
+        else:
+            rep.add("SZ-A8-0: udzial polki koni lorda w linii startu sesji", f"AiMountMarketSharePercent {share}% (linii startu w logu {len(st)})",
+                    "40 (A8; 25 = przed 14.10)", share == 40)
+        cl = win("Rycerze i jazda (219): dzien")
+        cav = {d: num(r"t3\+ ([0-9.]+)% z", s, cast=float) for d, s in cl.items()}
+        cav = {d: v for d, v in cav.items() if v is not None}
+        if cav:
+            ds = sorted(cav)[-30:]
+            v = mean([cav[d] for d in ds])
+            cel = num(r"wobec celu szablonow ([0-9.]+)%", cl[ds[-1]], cast=float)
+            rep.add("SZ-A8-1: jazda wsrod ludzi t3+ partii rodow AI (Rycerze i jazda 219), srednia ostatnich 30 dob okna",
+                    f"{v:.1f}% (doby {run_day(ds[0], start)}-{run_day(ds[-1], start)}; cel szablonow {cel}%) wobec {btxt} {base['cav']}%",
+                    f">= baza - 1 pkt ({base['cav'] - 1:.1f}%); oczekiwane +1-2 pkt - celu planu 27.5% sam klucz nie da", v >= base["cav"] - 1.0)
+        else:
+            rep.add("SZ-A8-1: jazda wsrod ludzi t3+", "brak linii Rycerze i jazda (219) w oknie", "INFO", None)
+        hb = win("Konie (E6/0): dzien")
+        m = re.search(r"polki miast i zamkow (\d+)/(\d+)/(\d+)/", hb[max(hb)]) if hb else None
+        if m:
+            tot = sum(int(x) for x in m.groups())
+            rep.add("SZ-A8-2: konie na polkach miast i zamkow (zwykle + bojowe + szlachetne, Konie E6/0) w ostatniej dobie okna",
+                    f"{tot} ({m.group(1)}/{m.group(2)}/{m.group(3)}, doba {run_day(max(hb), start)}) wobec {btxt} {base['shelf']}",
+                    f">= 70% bazy ({int(0.7 * base['shelf'])}) - wiekszy udzial lorda nie oproznia targow (Jeff 15.09)", tot >= 0.7 * base["shelf"])
+        else:
+            rep.add("SZ-A8-2: konie na polkach", "brak linii Konie (E6/0) w oknie", "INFO", None)
+        ha = win("Konie AI (175): dzien")
+        if ha:
+            n = len(ha)
+            bought = sum(num(r"zakupy lordow: (\d+) koni", s, default=0) for s in ha.values())
+            resv = sum(num(r"polka zarezerwowana (\d+)", s, default=0) for s in ha.values())
+            empty = sum(num(r"pusto (\d+)", s, default=0) for s in ha.values())
+            wait = num(r"czeka na konia swojej kategorii (\d+)", ha[max(ha)])
+            dr = win("Musztra AI wedlug krolestw: dzien")
+            mm = re.search(r"Dothraki Horde: partii \d+, ludzi (\d+)[^|]*?konni (\d+)%", dr[max(dr)]) if dr else None
+            dtxt = f"{mm.group(2)}% konnych ({mm.group(1)} ludzi, doba {run_day(max(dr), start)})" if mm else "-"
+            rep.add("SZ-A8-3: konie kupione przez lordow AI, nieudane wizyty, Dothrakowie",
+                    (f"kupione {bought / n:.1f}/d wobec {btxt} {base['bought']}/d; nieudane: polka zarezerwowana {resv / n:.1f}/d, pusto {empty / n:.1f}/d; "
+                     f"czeka na konia {wait} (ostatnia doba); Dothrakowie {dtxt}"),
+                    "INFO (gorna granica A8 z logu W50: +4.8 konia/d w roku wojny; Dothrakowie - cel 60% konnych, W50 34-38% w roku wojny)", None)
+        else:
+            rep.add("SZ-A8-3: konie kupione przez lordow AI", "brak linii Konie AI (175) w oknie", "INFO", None)
+    except Exception as e:
+        rep.add("blok SZ-A8", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+
+    # ---------------- A9a: amunicja AI
+    try:
+        wl = win(E8_W_LINE)
+        on = sorted(d for d in wl if "| amunicja AI [WL]" in wl[d])
+        if not wl:
+            rep.add("SZ-A9a-0: klucz AiAmmoUse w linii Zuzycie AI (E8/W)", "brak linii w oknie", "INFO", None)
+        else:
+            rep.add("SZ-A9a-0: klucz AiAmmoUse w linii Zuzycie AI (E8/W)", f"[WL] {len(on)} z {len(wl)} dob", "[WL] w kazdej dobie okna (A9; cien = przed 14.10)",
+                    len(on) == len(wl))
+        p2 = win("Zuzycie AI - pomiary (E8/P2): dzien")
+        both = [d for d in on if d in p2]
+        if both:
+            gone = sum(num(r"amunicja AI \[[^\]]*\]: zeszlo (\d+) szt", wl[d], default=0) for d in both)
+            would = sum(num(r"Amunicja AI: zeszloby ([0-9.]+) szt", p2[d], cast=float, default=0.0) for d in both)
+            field = sum(num(r"pominieta w bitwach gracza z misja \(zuzyl DTE w misji\) (\d+) partii", wl[d], default=0) for d in both)
+            ratio = gone / would if would > 0 else None
+            rep.add("SZ-A9a-1: amunicja AI zuzyta po bitwach (zeszlo, E8/W) wobec pomiaru 'zeszloby' (E8/P2) w tych samych dobach",
+                    (f"zeszlo {gone} szt. ({gone / len(both):.0f}/d), zeszloby {would:.0f} szt.; stosunek " + (f"{ratio:.2f}" if ratio is not None else "-")
+                     + f" ({len(both)} dob); partie bitew gracza z misja pominiete {field} (zeszloby je liczy)"),
+                    "zeszlo > 0 i zeszlo / zeszloby 0.8-1.2 (ten sam wzor; nizej przy bitwach gracza z misja); W50 'zeszloby' d1-120 327/d, d1-364 471/d",
+                    gone > 0 and ratio is not None and 0.8 <= ratio <= 1.2)
+        else:
+            rep.add("SZ-A9a-1: amunicja AI zuzyta po bitwach", "klucz w cieniu albo brak linii E8/P2 w dobach z kluczem", "INFO (wlaczony: zeszlo / zeszloby 0.8-1.2)", None)
+        aw = {d: v for d, v in e8w_arrows(lines).items() if 1 <= run_day(d, start) <= until}
+        oa = win("Miasta bez rudy i strzal (174b): dzien")
+        noarr = num(r"bez strzal (\d+) \[", oa[max(oa)]) if oa else None
+        if aw:
+            d = max(aw)
+            rep.add("SZ-A9a-2: strzaly na polkach miast (Rynek broni) w ostatniej dobie okna; miasta bez strzal (174b, ostatnia linia)",
+                    f"strzaly {aw[d]} (doba {run_day(d, start)}) wobec {btxt} {base['arrows']}; miasta bez strzal " + ("-" if noarr is None else str(noarr)),
+                    f"strzaly >= 50% bazy ({int(0.5 * base['arrows'])}) i miasta bez strzal <= 5 (W50: 0-1)",
+                    aw[d] >= 0.5 * base["arrows"] and (noarr is None or noarr <= 5))
+        else:
+            rep.add("SZ-A9a-2: strzaly na polkach", "brak linii Rynek broni w oknie", "INFO", None)
+        buys = []
+        for s in win("ZakupyAI wedlug kupujacego (174b): dzien").values():
+            t = 0
+            for seg in ("lordowie", "zalogi miast", r"zalogi zamkow \(wlasna polka\)", r"zamowienia zamkow \(w miescie\)"):
+                t += num(r"(?:- |; )" + seg + r" \[[^\]]*?amunicja (\d+)/\d+ zl", s, default=0)
+            buys.append(t)
+        src = []
+        for s in win("Uzbrojenie wedlug zrodla (E6/0): dzien").values():
+            m = re.search(r"amunicja t1-2/t3-4/t5-6: stan \d+/\d+/\d+, zrodla (\d+)/(\d+)/(\d+)", s)
+            if m:
+                src.append(sum(int(x) for x in m.groups()))
+        rep.add("SZ-A9a-3: amunicja - zakupy AI (174b) i zrodla (E6/0) na dobe",
+                f"zakupy {mean(buys):.0f}/d wobec {btxt} {base['ammo_buy']}/d; zrodla {mean(src):.0f}/d wobec {base['ammo_src']}/d ({len(buys)} / {len(src)} dob)",
+                "INFO (oczekiwane: oba rosna o ok. 'zeszlo' na dobe; strzelarze W50 zajeci w 9% rak)", None)
+    except Exception as e:
+        rep.add("blok SZ-A9a", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+
+    # ---------------- A9b: sufit ceny zakupow brakow AI
+    try:
+        zl = win(E8_Z_LINE)
+        capd = {d: num(r"sufit ceny \[WL x([0-9.]+)\]", s, cast=float) for d, s in zl.items()}
+        capon = sorted(d for d, v in capd.items() if v is not None)
+        fac = max(capd[d] for d in capon) if capon else None
+        if not zl:
+            rep.add("SZ-A9b-0: klucz AiGearMaxPriceFactor w linii E8/Z", "brak linii w oknie", "INFO", None)
+        else:
+            rep.add("SZ-A9b-0: klucz AiGearMaxPriceFactor w linii Zakupy i nadwyzki AI (E8/Z)",
+                    (f"[WL x{fac:.2f}] {len(capon)} z {len(zl)} dob" if capon else f"W CIENIU {len(zl)} dob"),
+                    "[WL x3.00] w kazdej dobie okna (A9; 0 = przed 14.10)", len(capon) == len(zl) and fac is not None and abs(fac - 3.0) < 0.005)
+        if capon:
+            over = sum(num(r"kupione ponad sufit (\d+) szt", zl[d], default=0) for d in capon)
+            p2b = win(E8_P2_BUY)
+            p90 = []
+            for d in capon:
+                s = p2b.get(d)
+                if s is None:
+                    continue
+                for seg in s.split(" | ")[1:]:
+                    m = E8_P2_ROW.match(seg.strip())
+                    if m and m.group(1) in E8_Z_AIGEAR_ROWS:
+                        p90.append(float(m.group(6)))
+            p90m = max(p90) if p90 else None
+            rep.add("SZ-A9b-1: sufit ceny - kupione ponad sufit (E8/Z) i p90 cena / wartosc wierszy AiGear (E8/P2)",
+                    f"kupione ponad sufit {over} szt. w {len(capon)} dobach; p90 najwyzej " + (f"{p90m:.2f}" if p90m is not None else "- (brak linii E8/P2)"),
+                    f"kupione ponad sufit 0 i p90 <= sufit ({fac:.2f})", over == 0 and (p90m is None or p90m <= fac + 0.005))
+        else:
+            rep.add("SZ-A9b-1: sufit ceny", "klucz w cieniu", "INFO (wlaczony: kupione ponad sufit 0, p90 <= sufit)", None)
+        cov = win(E8_Z_COVER)
+        cv = None
+        for d in sorted(cov, reverse=True):
+            v = num(r"zalogi AI \(\d+ ludzi\): korpus (\d+)%", cov[d])
+            if v is not None:
+                cv = (run_day(d, start), v)
+                break
+        if cv:
+            rep.add("SZ-A9b-2: pokrycie korpusu zalog AI (Pokrycie zbrojowni AI 171) w ostatniej dobie okna",
+                    f"{cv[1]}% (doba {cv[0]}) wobec {btxt} {base['cover']}%", f">= baza - 3 pkt ({base['cover'] - 3}%)", cv[1] >= base["cover"] - 3)
+        else:
+            rep.add("SZ-A9b-2: pokrycie korpusu zalog", "brak linii Pokrycie zbrojowni AI (171) w oknie", "INFO", None)
+        gold = []
+        for s in win(E8_P2_BUY).values():
+            t = 0
+            for seg in s.split(" | ")[1:]:
+                m = E8_P2_ROW.match(seg.strip())
+                if m and m.group(1) in E8_Z_AIGEAR_ROWS:
+                    t += int(m.group(3))
+            gold.append(t)
+        orders = [num(r"na polce lezala tylko sztuka nie dla AI: (\d+)", s, default=0) for s in zl.values()]
+        rej = [num(r"sufit ceny \[[^\]]*\]: odrzucenia kandydatow (\d+)", s, default=0) for s in zl.values()]
+        sad = [num(r"zakupy lordow AI: [^|]*?kupione (\d+) szt\.", s, default=0) for s in win("Jezdzcy i uprzaz (E8/H): dzien").values()]
+        rep.add("SZ-A9b-3: zloto zakupow brakow AiGear, zamowienia dla warsztatow, odrzucenia sufitu, siodla lordow (na dobe)",
+                (f"zloto {mean(gold):.0f} zl/d wobec {btxt} {base['gapgold']} (z tego ponad 3.0 x wartosc {base['cap3']}); zamowienia 'sztuka nie dla AI' "
+                 f"{mean(orders):.1f}/d; odrzucenia kandydatow {mean(rej):.0f}/d; siodla lordow {mean(sad):.1f}/d wobec {base['saddles']}/d"),
+                "INFO (oczekiwane: zloto ok. -27% wobec bazy, zamowienia rosna; siodla prawie bez zmian - tanie siodla ok. 1 x wartosc)", None)
+    except Exception as e:
+        rep.add("blok SZ-A9b", f"wyjatek narzedzia: {e}", "bez wyjatku", False)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -19268,6 +19483,8 @@ def main(argv):
         return p2bud_main(logp, start_arg, until_arg)   # P2: lud buduje miasto - drugi platnik budow, material z polki, sufit ceny, poziomy i budowy stojace
     if group == "zbytki" and logp:
         return zbytki_main(logp, start_arg, until_arg, bdp)   # P3-P5: lista dostatku, targ widzi sakiewke, podzamcza i wsie na targu miasta (--baza-doby: bieg bez P4 do progu 18)
+    if group == "szybkie" and logp:
+        return szybkie_main(logp, start_arg, until_arg)   # szybkie wlaczenia 14.10: A8 udzial polki koni 40%, A9 amunicja AI i sufit ceny 3.0
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:
