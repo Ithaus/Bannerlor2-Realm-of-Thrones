@@ -75,7 +75,7 @@ Kolejnosc doby korony po zmianach (165): wplywy dnia -> rata Banku (186) -> dary
 - **Regula.** Po szczeblach danina -> W5b -> W6 zostaje niepokryta potrzeba U0 = potrzeba - garnek - pula W5b - pula W6. Czwarty szczebel: pula M1 = min(U0, reszta wplywow
   dnia po zwrocie i po wyplacie szczebla daniny). Poziom wyrownania liczony ta sama regula co W5 (garnek = danina + W5b + W6 + M1), gotowka = zold ludzi, ktorzy dzis
   SA w druzynach, ponad to, co rod juz dostal tej doby (`_naPaid`); reszta puli to miejsce w pulapie na krok werbunku (jak W5). Gotowka schodzi z reszty wplywow
-  (`CrownIncome.Spent`) - renty dziela to, co zostanie.
+  (`CrownIncome.Spent`) - renty dziela to, co zostanie. W 165 osobna pozycja `KDay.NeedAidRent` (obok doplaty W5, nie w niej - zamkniecie W5-1 linii W5 z 165 zostaje).
 - **Kto -> komu:** `KingdomBudgetWallet` -> kiesa glowy rodu z potrzeba W5 (najpierw skarbiec, potem glowa; wyjatek - zloto wraca).
 - **Liczby (decyzja):** bez nowego parametru - cel 60% limitu (`CrownWarAidFillTarget`) i krok 10% (`CrownWarAidRecruitStep`) te same. Wyzszego celu nie daje: rody z doplata i tak
   nie werbuja do celu (W5-4 43.4 -> 40.5% [P BD 7 nr 31]).
@@ -162,7 +162,8 @@ Kolejnosc doby korony po zmianach (165): wplywy dnia -> rata Banku (186) -> dary
 
 Zgoda Jeffa 13.10 dotyczy daniny "na czas wojny" (STAN-PRAC "DO JEFFA" 09.10). Wariant na "tak" (s2, s3): w krolestwie w pokoju >= 91 dob korona bierze z oszczednosci ludu
 ponad zapas dni **tylko tyle, ile wydala tej doby na wlasne potrzeby** (chleb M3 jej osad), najwyzej 0.5%/d - nie stala stawka do rent (PRZEPLYW: stala stawka przenioslaby ok.
-100 tys. zl/d z kies ludu do skrzyn panow, gdzie dalej leza). Pytanie z liczbami, gdy bieg pokaze lokate krolestw w pokoju > 8 mln w d728 albo przyrost > 20 tys. zl/d.
+100 tys. zl/d z kies ludu do skrzyn panow, gdzie dalej leza). Pytanie z liczbami, gdy bieg pokaze lokate krolestw w pokoju > 8 mln w d728 albo przyrost > 20 tys. zl/d. **Ten warunek juz jest spelniony:** log Z.1 (d781) - lokata W krolestw
+w pokoju 19.55 mln, w wojnie 7.45 mln [P `--grupa rok2` na logu Z.1] - pytanie idzie do Jeffa z raportem tej pracy (kodu M4 dalej nie ma).
 
 ---
 
@@ -175,7 +176,7 @@ Kod jednym DLL (jeden test roku 2 i jeden 120 dob), ale kazda regula ma wlasny k
 
 ## 5. Progi (grupa `rok2` w `tools/sprawdz_logi.py`) i plan testu
 
-**T1 - rok 2:** zapis `autotest-rok2-d780-fin24` + 60 dob (doby 781-840). Baza: ten sam zapis + 60 dob na 449d453 (`--baza-doby <log>`; bez niej - wartosci z logu Z.1 d754-781 wpisane w narzedzie).
+**T1 - rok 2:** zapis `autotest-rok2-d780-fin24` + 60 dob (doby 781-840). Baza: ten sam zapis + 60 dob na 449d453 (`--baza-doby <log>`; jesli bieg 14.10 04:50 `Modules\Armoury\Armoury-2026-10-14_04-50-35.log` ("fin28", ten sam zapis) jest na 449d453 - to on; bez bazy - wartosci z logu Z.1 d754-781 wpisane w narzedzie).
 **T2 - rok 1:** nowa kampania 120 dob. Baza: W53 `D:\Backup-Bannerlord\logs\2026-10-14-noc\Armoury-2026-10-14_03-24-46.log` (`--baza-doby`).
 
 | prog | co | T1 | T2 |
@@ -189,8 +190,8 @@ Kod jednym DLL (jeden test roku 2 i jeden 120 dob), ale kazda regula ma wlasny k
 | R2-3b | rata ponad (reszta - rezerwa) - kontrola M2b | 0 | 0 |
 | R2-4 | (A4) chleb: pan placacy ponizej R, kiesa gracza, kontrola kies r | 0 / 0 / 0 | 0 / 0 / 0 |
 | R2-4b | chleb: koszt sr. 28 dob | <= 30 tys. zl/d | 0 (d <= 120) |
-| R2-4c | miast ze stac jedzenie < 95% (Kiesa ludu, sr. 28 dob) | <= 2 (baza Z.1: 5) | <= baza + 1 |
-| R2-4d | chleb swiata (pelny koszyk W/R/P, swiat) sr. 28 dob | >= baza + 2 pkt (bez bazy >= 90.8; Z.1 88.8) | >= baza - 0.5 |
+| R2-4c | miast ze stac jedzenie < 95% (Kiesa ludu, sr. 28 dob) | <= 2 (Z.1 d754-781: 4.8) | <= baza + 1 |
+| R2-4d | chleb swiata (pelny koszyk W/R/P, swiat) sr. 28 dob | >= baza + 2 pkt (bez bazy >= 89.2; Z.1 d754-781 87.2) | >= baza - 0.5 |
 | R2-5 | (A15-1, B4) zalogi swiata ostatnia doba (balans-krolestw.csv) | >= 69 020 (NIE przy celu niewiazacym = DECYZJA) | >= baza - 1 tys. |
 | R2-5b | ludzie w partiach rodow w pokoju (166 Z.1, sr. 28 dob) | >= 0.9 x baza (bez bazy >= 11.8 tys.; Z.1 13.1) | INFO |
 | R2-6 | (A5) lokata W krolestw w wojnie (linia P1, ostatnia doba) | <= 10 mln | INFO |
