@@ -37,14 +37,14 @@ namespace Armoury
         private static int _d7Sacks;
         private static long _d7Took, _d7TookV, _d7Horses, _d7Food, _d7Arms, _d7Armory, _d7Uniq, _d7Burn, _d7BurnV, _d7Left, _d7Bal;
 
-        private static bool Walks7(ItemObject it) { return it != null && (it.HasHorseComponent || it.IsAnimal); }
+        internal static bool Walks7(ItemObject it) { return it != null && (it.HasHorseComponent || it.IsAnimal); }
         private static bool Arms7(ItemObject it) { return it != null && !it.IsFood && !Walks7(it) && (it.HasWeaponComponent || it.HasArmorComponent); }
-        private static double PerKg7(ItemObject it) { return it == null ? 0.0 : it.Value / Math.Max(0.1, (double)it.Weight); }
+        internal static double PerKg7(ItemObject it) { return it == null ? 0.0 : it.Value / Math.Max(0.1, (double)it.Weight); }
         private static long Pieces7(ItemRoster r) { long n = 0; if (r == null) return 0; for (int i = 0; i < r.Count; i++) { int a = r.GetElementCopyAtIndex(i).Amount; if (a > 0) n += a; } return n; }
-        private static double FreeKg(MobileParty mp) { try { return Math.Max(0.0, mp.InventoryCapacity - mp.TotalWeightCarried); } catch { return 0.0; } }
+        internal static double FreeKg(MobileParty mp) { try { return Math.Max(0.0, mp.InventoryCapacity - mp.TotalWeightCarried); } catch { return 0.0; } }
 
         /// <summary>Ile zwierzat druzyna jeszcze poprowadzi bez kary "Herding" gry: ludzie - (juczne + zywiec + wierzchowce ponad pieszych); 0 przy bledzie.</summary>
-        private static int HerdRoom(MobileParty mp)
+        internal static int HerdRoom(MobileParty mp)
         {
             try
             {
