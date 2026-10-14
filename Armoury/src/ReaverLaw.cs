@@ -7,6 +7,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace Armoury
 {
@@ -80,6 +81,7 @@ namespace Armoury
             for (int g = 0; g < Groups; g++) { _think[g].Clear(); _iron[g].Clear(); }
             _loot.Clear(); _dLootIn = 0; _lastLootIn = 0;   // WW2: okno lupu tylko w pamieci sesji
             _eCache.Clear(); _done.Clear(); _copy.Clear();   // WW3
+            _harb.Clear(); _harbDay = int.MinValue;          // WW4
             _rangeLogged = false; _stumbles = 0;
             lock (_err) _err.Clear();
         }
@@ -301,6 +303,74 @@ namespace Armoury
                 if (bestRaid > bestOther) t.RaidTop++;
             }
             catch (Exception e) { Stumble("AiTickPostfix", e); }
+        }
+
+        // ---------------------------------------------------------------- WW4: port korsarzy (OutlawLaw - paser, zycie w miastach, dziesiecina)
+        internal const string SeaRaidersId = "northern_pirates";   // NavalDLC + ROT spclans "Sea Raiders" (strefy kolo Pyke, Old Wyk, Flint's Finger, Wyspy Niedzwiedziej)
+        internal const float HarbourRadius = 600f;                   // Wyspa Niedzwiedzia lezy 501 od Pyke - strefy Sea Raiders koncza sie na niej; dalej port Wysp nie jest "domem"
+        /// <summary>WW4 czynne (klucz SeaRaidersIronHarbour).</summary>
+        internal static bool HarbourOn { get { var s = S; return s != null && s.SeaRaidersIronHarbour; } }
+        internal static double HarbourTithe { get { var s = S; return s == null ? 0.0 : Math.Max(0f, Math.Min(1f, s.SeaRaidersHarbourTithe)); } }
+
+        /// <summary>WW4: banda klanu Sea Raiders.</summary>
+        internal static bool IsSeaRaider(MobileParty p)
+        {
+            try { var c = p != null ? p.ActualClan : null; return c != null && c.StringId == SeaRaidersId; }
+            catch { return false; }
+        }
+
+        private static readonly List<Settlement> _harb = new List<Settlement>();
+        private static int _harbDay = int.MinValue;
+
+        /// <summary>WW4: porty Zelaznych Wysp - miasta krolestwa "sturgia" z portem (lista raz na dobe; oblezone odpadaja przy uzyciu).</summary>
+        internal static List<Settlement> Harbours()
+        {
+            int d = (int)CampaignTime.Now.ToDays;
+            if (d == _harbDay) return _harb;
+            _harbDay = d; _harb.Clear();
+            try
+            {
+                foreach (var st in Settlement.All)
+                    if (st != null && st.IsTown && st.Town != null && st.HasPort && st.MapFaction != null && st.MapFaction.StringId == IronId) _harb.Add(st);
+            }
+            catch (Exception e) { Stumble("Harbours", e); }
+            return _harb;
+        }
+
+        /// <summary>WW4: najblizszy nieoblezony port Wysp do HarbourRadius od pozycji (linia prosta - ta sama miara co promien pasera); null - brak.</summary>
+        internal static Settlement NearestHarbour(Vec2 pos, out float dist)
+        {
+            dist = float.MaxValue;
+            Settlement best = null;
+            foreach (var st in Harbours())
+            {
+                if (st == null || st.IsUnderSiege || st.Town == null) continue;
+                float d = (float)Math.Sqrt(pos.DistanceSquared(st.GetPosition2D));
+                if (d <= HarbourRadius && d < dist) { dist = d; best = st; }
+            }
+            return best;
+        }
+
+        /// <summary>WW4: dziesiecina z zaplaty pasera portu Wysp dla bandy Sea Raiders - kiesa bandy (czesc zaplaty) -> glowa rodu pana portu (gracz-pan tak samo).
+        /// Ksiega dochodu: KReaver (kosz WW2 przy kluczu; bez klucza - jednorazowe), okno lupu WW2. Zwraca dziesiecine (0 - bez pana, klucz off).</summary>
+        internal static int HarbourTitheOf(Settlement port, int pay)
+        {
+            if (port == null || pay <= 0 || !HarbourOn) return 0;
+            var owner = port.OwnerClan;
+            var head = owner != null ? owner.Leader : null;
+            if (head == null || !head.IsAlive) return 0;
+            int x = (int)Math.Floor(pay * HarbourTithe);
+            return x > 0 ? Math.Min(x, pay) : 0;
+        }
+
+        internal static void PayHarbourTithe(Settlement port, int tithe)
+        {
+            var owner = port != null ? port.OwnerClan : null;
+            var head = owner != null ? owner.Leader : null;
+            if (head == null || tithe <= 0) return;
+            head.ChangeHeroGold(tithe);
+            CirculationWindows.NoteHeroGold(head, tithe);   // paczka 169b: glowa poza swiatem - tylko licznik
+            try { ClanIncomeBook.NoteInflow(head, tithe, ClanIncomeBook.KReaver); NoteLoot(owner, tithe); } catch (Exception e) { Stumble("PayHarbourTithe(ksiega)", e); }
         }
 
         // ---------------------------------------------------------------- WW3: najazd z rachunku (AI z biezacego zysku)

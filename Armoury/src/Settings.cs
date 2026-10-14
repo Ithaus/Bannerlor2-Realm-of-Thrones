@@ -2183,6 +2183,10 @@ namespace Armoury
         // opcji nie dodaje. Off = oceny rabunku jak gra / SCAI / BK (63aaaedf)
         public bool ReaverRaidByProfit = true;             // the lords of the Iron Islands and the Free Folk weigh a raid by its gain: a village whose iron price would pay Reaver Raid Pay Days of the company's wages and food tempts them twice as much as before, a rich one up to three times, a poor one no more than before. They still raid only enemies at war and within reach, with the food the game asks for, so no new targets appear. Needs Reaver Iron Price. Off = they weigh raids as before
         public float ReaverRaidPayDays = 4f;               // with Reaver Raid By Profit: how many days of a company's wages and food the iron price of a village must pay to double the lords' wish to raid it (4 = about the days of a raid and the voyage there and back)
+        // WW4 (port korsarzy, projekt rozdz. 2.4): bandy Sea Raiders (northern_pirates) maja porty Wysp do 600 jako dom u pasera i w zyciu w miastach (OutlawLaw.Reach,
+        // LifeDay), dziesiecina z zaplaty pasera portu Wysp do glowy rodu pana portu (kosz WW2). Off = paser i zycie band jak w 63aaaedf
+        public bool SeaRaidersIronHarbour = true;          // the Sea Raiders find a harbour on the Iron Islands: a band of the Sea Raiders within 600 of an Ironborn port deals with its fence as with the town at its gates (the best terms, for selling loot and for buying gear) and spends its coin there, and gives the lord of that port Sea Raiders Harbour Tithe of what the fence pays it - in peace too, and the same for you if you hold the port. Off = the Sea Raiders deal with the nearest towns, as before
+        public float SeaRaidersHarbourTithe = 0.25f;       // with Sea Raiders Iron Harbour: the share of what an Ironborn port's fence pays a band of the Sea Raiders that goes to the lord of the port (0.25 = a quarter; the band keeps the rest)
 
         public static void Load(string moduleDataDir)
         {

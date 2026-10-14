@@ -5824,6 +5824,14 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float ReaverRaidPayDays { get; set; } = 4f;
 
+        [SettingPropertyBool("Sea Raiders Iron Harbour", HintText = "the Sea Raiders find a harbour on the Iron Islands: a band of the Sea Raiders within 600 of an Ironborn port deals with its fence as with the town at its gates (the best terms, for selling loot and for buying gear) and spends its coin there, and gives the lord of that port Sea Raiders Harbour Tithe of what the fence pays it - in peace too, and the same for you if you hold the port. Off = the Sea Raiders deal with the nearest towns, as before")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool SeaRaidersIronHarbour { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sea Raiders Harbour Tithe", 0.00f, 1.00f, "0.00", HintText = "with Sea Raiders Iron Harbour: the share of what an Ironborn port's fence pays a band of the Sea Raiders that goes to the lord of the port (0.25 = a quarter; the band keeps the rest)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public float SeaRaidersHarbourTithe { get; set; } = 0.25f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7279,6 +7287,8 @@ namespace Armoury
             s.ReaverLootToCrews = ReaverLootToCrews;
             s.ReaverRaidByProfit = ReaverRaidByProfit;
             s.ReaverRaidPayDays = ReaverRaidPayDays;
+            s.SeaRaidersIronHarbour = SeaRaidersIronHarbour;
+            s.SeaRaidersHarbourTithe = SeaRaidersHarbourTithe;
         }
 
         internal static void Apply()
