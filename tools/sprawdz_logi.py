@@ -585,6 +585,7 @@ Uzycie (Python 3, tylko odczyt):
                     przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
                     A17-6 statki do liczby idealnej stoczni (ShipPortsBuyToIdeal): dopisek TAK, zakupy ponad liczbe idealna (B5-14) <= 0.1/d, B5-5 0.
                     A17-4 unikaty nie sa towarem mieszczan (UniquesNotFolkGoods): linia CZYNNE, zdjete = odlozone, F1-3 na calym logu 0 (unikaty.log), D3 (INFO).
+                    A17-10 pojedynek z Nocnym Krolem (OthersDuelFromFallen): latka wpieta, pozycja (g) linii E4/2, wstalo <= polegli.
                     Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -20864,6 +20865,9 @@ A17_PRE = {
     "ship": "Statki (181): dzien",
     "ush": "Unikaty na polkach (A17): dzien",
     "d3": "Unikat z polki (A17 diagnoza D3)",
+    "inni": "Inni z poleglych (E4/2): dzien",
+    "odw": "OthersDuel (A17):",
+    "nkd": "Pojedynek z Nocnym Krolem (A17)",
     "err": "ERROR in ",
 }
 A17_FIN29_GONE = 344.0 / 120.0      # fin29 (Armoury-2026-10-14_05-22-14.log): "przy zniknieciu partii" 344 ludzi w 120 dobach
@@ -21022,6 +21026,28 @@ def _a17_4(rep, got, logp):
     rep.add("A17-4e: bledy UniqueShelf (ERROR in)", len(errs), "0", len(errs) == 0)
 
 
+def _a17_10(rep, got):
+    """A17-10 (poz. 10, OthersDuelFromFallen): pojedynek z Nocnym Krolem - ROT wskrzesza tylko poleglych tej bitwy (pozycja (g) linii E4/2)."""
+    st = got["odw"]
+    wired = any("latka wpieta" in s for s in st)
+    rep.add("A17-10a: latka pojedynku z Nocnym Krolem (linia startowa OthersDuel)", (st[-1][:200] if st else "brak linii"),
+            "\"latka wpieta\" (ROT ROTDuelsBehavior i MapEvent.FinalizeEventAux znalezione); log sprzed A17 - INFO", wired if st else None)
+    il = [s for s in got["inni"] if "(g) pojedynek z Nocnym Krolem (A17)" in s]
+    on = [s for s in il if "(A17): z poleglych" in s]
+    if not il:
+        rep.add("A17-10b: pozycja (g) linii \"Inni z poleglych (E4/2)\"", "brak pozycji (g)" if got["inni"] else "brak linii E4/2", "INFO (log sprzed A17)", None)
+        return
+    rep.add("A17-10b: pozycja (g) linii \"Inni z poleglych (E4/2)\" - z poleglych", f"linii {len(il)}, z poleglych {len(on)}", "kazdej doby (klucz Others Duel From Fallen)", len(on) == len(il))
+    n = sum(num(r"pojedynkow przegranych przez gracza (\d+)", s, int, 0) or 0 for s in il)
+    fa = sum(num(r"polegli tej bitwy (\d+) -> wstalo", s, int, 0) or 0 for s in il)
+    ri = sum(num(r"-> wstalo (\d+) \(kopia ROT", s, int, 0) or 0 for s in il)
+    ha = sum(num(r"\(kopia ROT (\d+),", s, int, 0) or 0 for s in il)
+    rep.add("A17-10c: wstali po pojedynku <= polegli tej bitwy", f"pojedynkow {n}: polegli {fa}, wstalo {ri}, kopia ROT {ha}" + (f"; pierwsza linia: {got['nkd'][0][:220]}" if got["nkd"] else ""),
+            "wstalo <= polegli (autotest nie walczy z Nocnym Krolem - zwykle 0 pojedynkow, INFO)", (ri <= fa) if n > 0 else None)
+    errs = [s for s in got["err"] if "OthersDuel" in s]
+    rep.add("A17-10d: bledy OthersDuel (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
 def a17_main(logp):
     """A17 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A17.md): progi napraw starych zaleglosci. Caly log, czytany strumieniowo (log 2 lat ma 280 MB).
     Log bez paczki: INFO, bez wyjatku."""
@@ -21039,6 +21065,7 @@ def a17_main(logp):
     _a17_11(rep, got)
     _a17_6(rep, got)
     _a17_4(rep, got, logp)
+    _a17_10(rep, got)
     rep.show()
     return 0
 

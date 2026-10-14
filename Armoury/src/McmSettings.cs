@@ -4556,6 +4556,10 @@ namespace Armoury
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRiseOnlyFromFallen { get; set; } = true;
 
+        [SettingPropertyBool("Others Duel From Fallen", HintText = "when you beat the Night King's host and then fail to slay him in the duel, he raises only the dead of that battle - yours and his - instead of standing his whole host up again from nothing; the duel and the battle that follows stay as in Realm of Thrones. Off = his whole host stands up again, as before")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public bool OthersDuelFromFallen { get; set; } = true;
+
         [SettingPropertyBool("Others Raid Wights", HintText = "a village raided by the Others gives them wights out of thin air (half its hearths, as Realm of Thrones does). Off (default) = a raid raises only the villagers killed in it, and only beyond the Wall or at it (needs Devastation Enabled; without it nobody rises). Works only with Others Rise Only From Fallen on; with it off, raids work as in Realm of Thrones")]
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRaidWights { get; set; } = false;
@@ -6878,6 +6882,7 @@ namespace Armoury
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;
             s.OthersRiseOnlyFromFallen = OthersRiseOnlyFromFallen;
+            s.OthersDuelFromFallen = OthersDuelFromFallen;
             s.OthersRaidWights = OthersRaidWights;
             s.OthersBandFromCorpsePool = OthersBandFromCorpsePool;
             s.NightKingCallMaxHost = NightKingCallMaxHost;

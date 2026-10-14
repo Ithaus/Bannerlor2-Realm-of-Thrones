@@ -161,6 +161,7 @@ namespace Armoury
                 try { PopulationLaw.ApplyGrowth(_harmony); } catch (Exception e) { Log.Error("PopulationLaw.ApplyGrowth", e); }
                 try { Measure40.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Measure40.ApplyAll", e); }   // E4/0 (188): pomiar ludzi, jencow i zimy - okna wpiete zawsze (U26), licza przy PeopleMeasureEnabled; gra bez zmian
                 try { OthersRise.ApplyAll(_harmony); } catch (Exception e) { Log.Error("OthersRise.ApplyAll", e); }
+                try { OthersDuel.ApplyAll(_harmony); } catch (Exception e) { Log.Error("OthersDuel.ApplyAll", e); }   // A17 (poz. 10): pojedynek z Nocnym Krolem - wstaja tylko polegli tej bitwy (prefiks First MapEvent.FinalizeEventAux)
                 // E4/7 (164b-1): ksiega pochodzenia - punkt zdjecia BK DeduceManpower, okna werbunku i przenosin, zywnosc wsi (rece); PO OthersRise (finalizer lupu jencow Last
                 // po RescueFin High) i PO PrisonerLaw (prefiks powrotu patrolu BK Low); latki wpiete zawsze (U26), licza przy PeopleOriginEnabled
                 try { PeopleBook.ApplyOrigin(_harmony); } catch (Exception e) { Log.Error("PeopleBook.ApplyOrigin", e); }   // E4/2 (190): Inni tylko z poleglych za Murem / przy Murze - latki wpiete zawsze, wylaczniki na zywo; PO Measure40 (finalizer (f) High przed W10)
