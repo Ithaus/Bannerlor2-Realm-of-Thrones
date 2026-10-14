@@ -5848,6 +5848,10 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float FreeFolkGarrisonPoolShare { get; set; } = 0.50f;
 
+        [SettingPropertyBool("Free Folk Recruit Needs Food", HintText = "a chief of the Free Folk leads only as many as he can feed: an AI company of the Free Folk takes on new men only while its food would last, with one more mouth, the days the game asks for before a raid. Food and coin come from raids, battles and the granaries of the lands they burn. Needs Free Folk Unpaid. Off = they recruit without regard to food, as before")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool FreeFolkRecruitNeedsFood { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7309,6 +7313,7 @@ namespace Armoury
             s.FreeFolkMenFromPeople = FreeFolkMenFromPeople;
             s.FreeFolkLevyShare = FreeFolkLevyShare;
             s.FreeFolkGarrisonPoolShare = FreeFolkGarrisonPoolShare;
+            s.FreeFolkRecruitNeedsFood = FreeFolkRecruitNeedsFood;
         }
 
         internal static void Apply()

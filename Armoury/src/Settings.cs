@@ -2195,6 +2195,9 @@ namespace Armoury
         public bool FreeFolkMenFromPeople = true;          // with Free Folk Unpaid: the whole host of the Free Folk is held by their people, not by gold - at most Free Folk Levy Share of the people of the lands they hold, so it shrinks when their people die or flee. Their garrisons grow only while all of them hold less than Free Folk Garrison Pool Share of the host; the rest of it goes into the field. Nobody is sent home: the limit only stops recruiting, new companies and the growth of garrisons. Off = their numbers are held by gold, as for the Night's Watch
         public float FreeFolkLevyShare = 0.018f;           // with Free Folk Men From People: the Free Folk under arms at most, as a share of the people of their lands (0.018 = about 5,000 of 280,000 - as many as they kept in their first half year, before gold began to hold them back)
         public float FreeFolkGarrisonPoolShare = 0.50f;    // with Free Folk Men From People: the garrisons of the Free Folk grow only while all of them hold less than this share of the host (0.50 = half; garrisons above it stay, they only stop growing)
+        // WL3 (werbunek z jedzeniem, projekt rozdz. 3.3): druzyna lorda AI Wolnych Ludzi werbuje (CheckRecruiting) tylko z jedzeniem na NeededFoodsInDaysThresholdForRaid
+        // dni z kolejnym czlowiekiem (ClanBudget.RecruitPrefix). Off = werbunek WL bez warunku jedzenia (63aaaedf)
+        public bool FreeFolkRecruitNeedsFood = true;       // a chief of the Free Folk leads only as many as he can feed: an AI company of the Free Folk takes on new men only while its food would last, with one more mouth, the days the game asks for before a raid. Food and coin come from raids, battles and the granaries of the lands they burn. Needs Free Folk Unpaid. Off = they recruit without regard to food, as before
 
         public static void Load(string moduleDataDir)
         {

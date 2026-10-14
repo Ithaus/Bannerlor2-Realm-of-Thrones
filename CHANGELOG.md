@@ -1,5 +1,16 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (wyspy-wolni / WL3) - WODZ WOLNYCH LUDZI PROWADZI TYLU, ILU WYZYWI: WERBUNEK TYLKO Z JEDZENIEM NA PROG NAJAZDU (8 DNI)
+
+**Mod:** Armoury | **Galaz:** `w-toku/wyspy-wolni` (po WL2) | **Tor:** L (projekt rozdz. 3.3) | **Klucze:** NOWY `FreeFolkRecruitNeedsFood` (tak; wymaga WL1); off = werbunek WL bez warunku jedzenia (63aaaedf) | **Zapis:** bez zmian | **Pliki:** `ClanBudget.cs` (`RecruitPrefix`, `FfFoodGateOn`, pomiar glodu druzyn WL w `FreeFolkNote`), `ReaverLaw.cs` (`FoodDays` - z WW0), `Settings.cs`, `McmSettings.cs`
+
+**Problem:** bez zoldu (WL1) jedynym hamulcem werbunku poza pula WL2 sa glod i dezercja z morale (DesertionLaw) - AI werbowaloby glodnych, ktorzy potem uciekaja albo gina (marnotrawstwo ludzi). Decyzja Jeffa: Wolni Ludzie "nie pobieraja, ale zyja z lupow wojennych".
+**Przyczyna:** `RecruitmentCampaignBehavior.CheckRecruiting` (dekompilacja 1.4.8) pyta tylko o glod w tej chwili (`Party.IsStarving`), zloto i limit druzyny - nie o zapas na wyprawe.
+**Zmiana:** druzyna lorda AI krolestwa `freefolk` werbuje tylko, gdy z kolejnym czlowiekiem ma jedzenie na `NeededFoodsInDaysThresholdForRaid` dni (8 - czytane z modelu, nie wpisane; jedna liczba, jedno znaczenie: wodz bierze tylu, ilu moze zabrac na najazd). Dni = zapas jedzenia / dzienne zuzycie partii przeliczone na ludzi + 1 (`ReaverLaw.FoodDays`); jedno wywolanie gry moze dobrac kilku - nastepne widzi juz ich zuzycie. Jedzenie i zloto na nie WL biora z lupu, ktory juz jest: spichlerz okregu przy rabunku (K4), zelazna cena z kiesy wsi Daru (WW1), kiesy rozbitych (3.2), lup bitew (A6), zakup jedzenia za zloto wodza (bez zoldu wodzowie maja na to pieniadze); WW3 pcha druzyny WL do najazdow na Dar. Gracz - poza (sam decyduje). Odcinek linii 166 "werbunek wstrzymany: ... jedzenie (WL3) c"; linia 4.15 "druzyny WL N: w glodzie S, jedzenie ponizej progu najazdu F (WL3 ...)" - liczona zawsze (RWL "nie wiem" 3: czy druzyny WL gloduja).
+**Sprawdzone (zasada 0):** prefiks `RecruitPrefix` wpiety juz dla Strazy (166) - przed pula; Straz i inne krolestwa bez zmian (warunek `IsFf`). Klucz off albo WL1 off - werbunek WL jak dotad. Regiony WL maja zapas 120-130 tys. i bilans +0.45 tys./d (RWL 2.1) - jedzenie w krainie jest; bramka wiaze wodzow bez zlota i bez lupu.
+**Ryzyko / co sprawdzic:** wolniejszy przyrost druzyn WL zima (od d460 jedzenie partii +42.5%) - zamierzone. Prog WL-3 (druzyny WL w glodzie <= baza; werbunek wstrzymany z braku jedzenia INFO).
+**Status:** DO SPRAWDZENIA (build kod 0; gen_mcm; bez testu w grze; nie wgrane).
+
 ## 2026-10-14 (wyspy-wolni / WL2) - WOJSKO WOLNYCH LUDZI Z LUDU, NIE ZE ZLOTA: PULA 1.8% LUDZI ICH KRAINY, ZALOGI NAJWYZEJ POLOWA PULI, RESZTA W POLU
 
 **Mod:** Armoury | **Galaz:** `w-toku/wyspy-wolni` (po WL1) | **Tor:** L (projekt rozdz. 3.2) | **Klucze:** NOWE `FreeFolkMenFromPeople` (tak; wymaga WL1), `FreeFolkLevyShare` (0.018), `FreeFolkGarrisonPoolShare` (0.50); off = przy WL1 pula ze zlota jak u Strazy, przy WL1 off - 63aaaedf | **Zapis:** bez zmian (pula liczona co dobe) | **Pliki:** `ClanBudget.cs` (`FfFromPeopleOn`, `FfPeople`, `FfPoolCap`, `GarRecruitPrefix` - udzial zalog, odcinek linii 166), `Settings.cs`, `McmSettings.cs`, `tools/gen_mcm.py` (suwaki 0..0.05 z trzema miejscami, 0..1)

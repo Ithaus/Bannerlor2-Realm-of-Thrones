@@ -121,9 +121,10 @@ namespace Armoury
             public int Cap = -1, Men, Gar, DMen, DGar, DCap = -1;
             public int RecruitBlock, GarBlock, SpawnBlock, FoodBlock, GarShareBlock;
             public long WagePar, WageGar; public int MenPar, MenGar, DueParties; public long Cut;
+            public int Parties, Starving, ShortFood;   // WL3 (pomiar): druzyny lordow WL, w glodzie (Party.IsStarving), z jedzeniem ponizej progu najazdu
             public double People = -1;
             public string Detail = "";
-            public void NewDay() { DMen = DGar = 0; DCap = -1; WagePar = WageGar = 0; MenPar = MenGar = DueParties = 0; Cut = 0; }
+            public void NewDay() { DMen = DGar = 0; DCap = -1; WagePar = WageGar = 0; MenPar = MenGar = DueParties = 0; Cut = 0; Parties = Starving = ShortFood = 0; }
         }
         private static readonly FfPool _ff = new FfPool();
         private static bool IsFf(Clan c) { return c != null && CrownGifts.IsFreeFolk(c.Kingdom); }
@@ -593,7 +594,19 @@ namespace Armoury
                             {
                                 _ff.Cut += ClanIncomeBook.CutTodayOf(c);
                                 var wpf = c.WarPartyComponents;
-                                if (wpf != null) for (int i = 0; i < wpf.Count; i++) { var mp = wpf[i] != null ? wpf[i].MobileParty : null; if (mp != null && mp.IsActive && WarLedger.UnpaidDays(mp) > 0) _ff.DueParties++; }
+                                float needF = 8f;
+                                try { needF = Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid; } catch { needF = 8f; }
+                                if (wpf != null)
+                                    for (int i = 0; i < wpf.Count; i++)
+                                    {
+                                        var mp = wpf[i] != null ? wpf[i].MobileParty : null;
+                                        if (mp == null || !mp.IsActive) continue;
+                                        if (WarLedger.UnpaidDays(mp) > 0) _ff.DueParties++;
+                                        if (!mp.IsLordParty || mp.IsMainParty) continue;
+                                        _ff.Parties++;
+                                        if (mp.Party != null && mp.Party.IsStarving) _ff.Starving++;   // WL3 (pomiar): glod druzyn WL (RWL "nie wiem" 3)
+                                        if (ReaverLaw.FoodDays(mp, 0) < needF) _ff.ShortFood++;
+                                    }
                             }
                             catch (Exception e) { Stumble("FreeFolk(pomiar)", e); }
                         }
@@ -1553,6 +1566,9 @@ namespace Armoury
 
         private static int PoolCap(bool ff) { return ff ? _ff.Cap : _watchPoolCap; }
 
+        /// <summary>WL3 czynne: klucz FreeFolkRecruitNeedsFood przy WL1.</summary>
+        internal static bool FfFoodGateOn { get { var s = Settings.Current; return s != null && s.FreeFolkRecruitNeedsFood && CrownGifts.FreeFolkUnpaidOn; } }
+
         /// <summary>WL2 czynne: klucz FreeFolkMenFromPeople przy WL1.</summary>
         internal static bool FfFromPeopleOn { get { var s = Settings.Current; return s != null && s.FreeFolkMenFromPeople && CrownGifts.FreeFolkUnpaidOn; } }
         private static double FfLevyShare(Settings s) { return Math.Max(0f, Math.Min(0.05f, s.FreeFolkLevyShare)); }
@@ -1627,6 +1643,14 @@ namespace Armoury
             {
                 if (__0 == null || !CrownGifts.IsUnpaidParty(__0)) return true;
                 var c = OwnerOf(__0);
+                // WL3 (wyspy-wolni): druzyna lorda AI Wolnych Ludzi werbuje tylko, gdy z kolejnym czlowiekiem ma jedzenie na tyle dni, ile gra wymaga do najazdu
+                // (NeededFoodsInDaysThresholdForRaid - z modelu); jedno wywolanie gry moze dobrac kilku - nastepne widzi juz ich zuzycie. Gracz - poza
+                if (FfFoodGateOn && __0.IsLordParty && !__0.IsMainParty && IsFf(c))
+                {
+                    float need = 8f;
+                    try { need = Campaign.Current.Models.MobilePartyAIModel.NeededFoodsInDaysThresholdForRaid; } catch { need = 8f; }
+                    if (ReaverLaw.FoodDays(__0, 1) < need) { _ff.FoodBlock++; return false; }
+                }
                 var b = Of(c);
                 if (b == null || !b.Zero) return true;
                 bool ff = IsFf(c); int cap = PoolCap(ff);   // WL1: pula rodu (Straz albo Wolni Ludzie)
@@ -1689,7 +1713,9 @@ namespace Armoury
             return " | WL bez zoldu (WL1, Free Folk Unpaid " + (CrownGifts.FreeFolkUnpaidOn ? "tak" : "nie") + "): zold druzyn " + _ff.WagePar + " (ludzi " + _ff.MenPar + ", "
                    + (_ff.MenPar > 0 ? ((double)_ff.WagePar / _ff.MenPar).ToString("0.00", inv) : "-") + " zl/czl), zalog " + _ff.WageGar + " (ludzi " + _ff.MenGar + ", "
                    + (_ff.MenGar > 0 ? ((double)_ff.WageGar / _ff.MenGar).ToString("0.00", inv) : "-") + " zl/czl), zalegly zold (przyciety) " + _ff.Cut
-                   + ", druzyny z zaleglym zoldem " + _ff.DueParties + " (rody bez zoldu w puli " + _ff.Clans.Count + ")";
+                   + ", druzyny z zaleglym zoldem " + _ff.DueParties + " (rody bez zoldu w puli " + _ff.Clans.Count + ")"
+                   + "; druzyny WL " + _ff.Parties + ": w glodzie " + _ff.Starving + ", jedzenie ponizej progu najazdu " + _ff.ShortFood
+                   + " (WL3 Free Folk Recruit Needs Food " + (FfFoodGateOn ? "tak" : "nie") + ")";
         }
 
         // ------------------------------------------------------------ linia "Budzet rodow (166)"
