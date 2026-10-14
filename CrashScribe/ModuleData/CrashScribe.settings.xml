@@ -316,4 +316,30 @@
        days held back by the pause, the ones rolled and let through, and the offers made. Set MarriageOffersPerYear
        to false for offers as in the base game. -->
   <MarriageOffersPerYear>true</MarriageOffersPerYear>
+
+  <!-- Banner Kings models broken by BKROTPatch (needs Banner Kings and BKROTPatch). Several BKROTPatch models are meant to add
+       the Realm of Thrones blessings on top of the Banner Kings result, but instead of asking Banner Kings they ask themselves;
+       a recursion guard then answers 0, so Banner Kings never runs and the blessings are added to zero. CrashScribe makes each
+       of them ask Banner Kings, as intended; the blessings stay on top. Banner Kings and BKROTPatch files are not touched.
+       The start-up line "BKROT self call fix: n/8" in the CrashScribe log lists every method. These switches change how the
+       realms behave, so they are meant for a NEW campaign; they are read once when the game starts. Set one to false to leave
+       that model as before (0). -->
+  <!-- Ruler legitimacy of every realm: with 0 Banner Kings sees every ruler as illegitimate - pretenders and secession groups
+       find support everywhere and crowns drift away from centralism. Fixed, legitimacy moves towards Banner Kings' target
+       (titles, faith, culture, clan tier) by 0.01 a day. -->
+  <BkrotFixLegitimacy>true</BkrotFixLegitimacy>
+  <!-- Clan influence limit and influence change as Banner Kings counts them (not the daily influence gain - the game counts
+       that itself and is not changed). With 0, proposing war, peace, annexation or expulsion costs only the base price, Banner
+       Kings armies have no influence threshold, trade pacts are never possible, and succession and title costs miss their
+       influence part. Fixed, proposals cost more (a fifth of the limit on top of the base 200 for war and 100 for peace), trade pacts become possible. -->
+  <BkrotFixInfluence>true</BkrotFixInfluence>
+  <!-- Influence cost of calling vassals to an army (Call Banners) and of merging armies in Banner Kings: with 0 every Banner
+       Kings army calls all ready vassals for free. Fixed, each called party costs influence as Banner Kings intends. -->
+  <BkrotFixArmyCost>true</BkrotFixArmyCost>
+  <!-- Spouse value in the Banner Kings marriage contract you propose: with 0 the rank of the partner does not count.
+       Fixed, the contract weighs both sides as Banner Kings intends. AI marriages are not affected. -->
+  <BkrotFixSpouseScore>true</BkrotFixSpouseScore>
+  <!-- Caravan income of the owner as Banner Kings counts it. With Banner Kings' "Realistic Caravan Income" on (the default)
+       Banner Kings gives 0 anyway, so this changes nothing then. -->
+  <BkrotFixCaravanIncome>true</BkrotFixCaravanIncome>
 </CrashScribe>

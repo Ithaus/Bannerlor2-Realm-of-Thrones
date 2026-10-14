@@ -100,6 +100,14 @@ namespace CrashScribe
         public static int MarriageTargetPerYear = 48;        // recenzja 14.10 (decyzja Jeffa "sluby - 48 slubow" na rok): REGULATOR - mnoznik doby = cel / CampaignTime.DaysInYear / srednia (28 dob) oczekiwanej liczby slubow przy mnozniku 1.0 (suma szans rzutow wolnych lordow naszej drogi), najwyzej 1.0, najmniej 0.02; staly mnoznik trzymal 48 tylko w roku 1-2 (pula wolnych lordow rosnie ok. 200 na rok - linia Z.3); dziala na kazdy rzut wolnego lorda naszej drogi (takze gdy regula MarriageOnlyViableCandidates stoi); 0 = staly MarriageChanceScale jak 13.10 (off); klucz NOWY - stary plik ustawien go nie ma, wiec dziala domyslna 48
         public static bool MarriageOffersPerYear = true;     // 14.10 (ta sama decyzja): oferty slubu dla rodu gracza (gra, MarriageOfferCampaignBehavior) na rok jak w roku gry 84 dni - caly proces rozciagniety x DaysInYear / 84: doba rodu AI przechodzi do rzutow gry z prawdopodobienstwem 84 / CampaignTime.DaysInYear (rok 364 = 0.231) i przerwa miedzy ofertami 7 x DaysInYear / 84 dob (30.3; gra 7 - recenzja 14.10); patrz MarriageOfferYear.cs; false = oferty jak w grze
 
+        // --- P2 audytu 14.10 (AM-10/11/12/15/18 + karawany): samowywolania BKROT - transpiler callvirt na sobie -> call modelu BK (patrz BkrotSelfCall.cs) ---
+        // Kazdy klucz czytany raz przy starcie gry; false = ta metoda BKROT nielatana (samowywolanie, straznik zwraca 0 - stan b47fecc3).
+        public static bool BkrotFixLegitimacy = true;        // AM-10: BKROTLegitimacyModel.CalculateKingdomLegitimacy -> BKLegitimacyModel (cel prawowitosci krolestw BK zamiast 0 + blogoslawienstwa ROT)
+        public static bool BkrotFixInfluence = true;         // AM-11: BKROTInfluenceModel.CalculateInfluenceCap i CalculateInfluenceChange -> BKInfluenceModel (limit i zmiana wplywu w rachunkach BK: koszty wnioskow, pakty handlowe, armie BK, sukcesja, tytuly)
+        public static bool BkrotFixArmyCost = true;          // AM-12: BKROTArmyModel.CalculatePartyInfluenceCost -> BKArmyManagementModel (Call Banners i laczenie armii BK kosztuja wplyw)
+        public static bool BkrotFixSpouseScore = true;       // AM-18: BKROTMarriageModel.GetSpouseScore -> BKMarriageModel (ocena malzonka w kontrakcie malzenskim BK gracza)
+        public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -174,6 +182,11 @@ namespace CrashScribe
                         case "MarriageChanceScale": MarriageChanceScale = F(v, MarriageChanceScale); break;   // zakres pilnuje MarriageFast.OnSession (tu log jeszcze nie jest otwarty)
                         case "MarriageTargetPerYear": MarriageTargetPerYear = I(v, MarriageTargetPerYear); break;   // zakres pilnuje MarriageFast.OnSession
                         case "MarriageOffersPerYear": MarriageOffersPerYear = B(v); break;
+                        case "BkrotFixLegitimacy": BkrotFixLegitimacy = B(v); break;
+                        case "BkrotFixInfluence": BkrotFixInfluence = B(v); break;
+                        case "BkrotFixArmyCost": BkrotFixArmyCost = B(v); break;
+                        case "BkrotFixSpouseScore": BkrotFixSpouseScore = B(v); break;
+                        case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
                     }
                 }
             }
