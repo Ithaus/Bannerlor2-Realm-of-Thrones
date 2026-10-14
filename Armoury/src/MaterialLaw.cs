@@ -238,6 +238,7 @@ namespace Armoury
                 // E6/R1 (214): dymarka kopalni bez drewna - w ticku produkcji tej wsi lupy najwyzej tyle, na ile starczy drewna w dymarce (sufit, nie czynnik;
                 // tylko "iron" i tylko w ticku TickGoodProduction tej wsi - podpowiedzi i magazyn wsi widza wynik bez sufitu)
                 Bloomery.Cap(village, item, ref __result);
+                RockGold.Cap(village, item, ref __result);   // 24d (14.10, klucz CasterlyGoldExhausted): kruszce Casterly Rock i ruda zlota Zachodu - sufit 0, ostatni krok przed ksiega
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
             catch { }

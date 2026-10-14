@@ -1592,6 +1592,10 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public float MineOutputMultiplier { get; set; } = 3f;
 
+        [SettingPropertyBool("Casterly Gold Exhausted", HintText = "the gold of Casterly Rock has run out, as in the books: the mine under the Rock (Rockford, the mining village of Casterly Rock) digs no more silver or gold ore, and no village of the Westerlands digs gold ore - the Lannisters live on rents, trade and loans. Their timber and every other good stay as they were. Off: the mine digs as before")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool CasterlyGoldExhausted { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Lumber Output Multiplier", 0.00f, 12.00f, "0.00", HintText = "woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)")]
         [SettingPropertyGroup("Smithing materials")]
         public float LumberOutputMultiplier { get; set; } = 3f;
@@ -6045,6 +6049,7 @@ namespace Armoury
             s.Tier6CastleSteel = Tier6CastleSteel;
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
+            s.CasterlyGoldExhausted = CasterlyGoldExhausted;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
             s.NoFreeTimberAndTools = NoFreeTimberAndTools;
             s.VillageWoodlotLoads = VillageWoodlotLoads;

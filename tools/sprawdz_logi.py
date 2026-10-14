@@ -466,7 +466,8 @@ Uzycie (Python 3, tylko odczyt):
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa jeff14    : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
-                    pokrycie lukow). Alias jeff14s. python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>
+                    pokrycie lukow), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu).
+                    Alias jeff14s. python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
 --grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
@@ -16458,8 +16459,8 @@ def drobne14_main(logp):
 
 
 def jeff14_main(logp):
-    """jeff14 (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa bez kodu): JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, GoldenKits). Caly log (bez okna dob).
-    Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    """jeff14 (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa bez kodu): JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, GoldenKits), JK-CR zloto Casterly Rock
+    wyczerpane (24d, RockGold; CSV plon-wsi.csv obok logu). Caly log (bez okna dob). Log bez paczki: wiersze INFO, nigdy wyjatek."""
     lines = read(logp)
     rep = Report()
     errs = {}
@@ -16467,6 +16468,10 @@ def jeff14_main(logp):
         if s.startswith("ERROR in "):
             k = s[9:].split(":", 1)[0]
             errs[k] = errs.get(k, 0) + 1
+
+    def nerr(prefix):
+        return sum(v for k, v in errs.items() if k.startswith(prefix))
+
     # ---- JK-GB: Zlota Kompania (PLAN 1.6)
     start = [s for s in lines if s.startswith("Armie 175 (Armoury) - wylaczniki przy starcie sesji")]
     key = None
@@ -16482,13 +16487,11 @@ def jeff14_main(logp):
         ok_k = len(kits) == 3 and all(int(n) == 3 and int(b) == 2 for _, n, b in kits)
         rep.add("JK-GB-1: zestawy trzech jednostek ZK (CS GoldenBows)", ", ".join(f"{i} {n} (luk {b})" for i, n, b in kits) or "brak",
                 "kazda z 3 jednostek: 3 zestawy, w tym 2 z lukiem (inaczej CS nie zrobil zestawow - potrzeba zostaje z 1. zestawu)", ok_k)
-        def cov(s, what):
-            v = num(r"pokrycie " + what + r" ([\d.]+)%", s, float)
-            return v
-        c0, c1 = cov(gb[days[0]], "lukow"), cov(last, "lukow")
-        a1 = cov(last, "strzal")
+        c0 = num(r"pokrycie lukow ([\d.]+)%", gb[days[0]], float)
+        c1 = num(r"pokrycie lukow ([\d.]+)%", last, float)
+        a1 = num(r"strzal ([\d.]+)%", last, float)
         men = num(r"kusznikow ZK (\d+)", last)
-        nb = num(r"potrzeba tych partii \(cala partia, jedna miara Deficit\): luki (\d+)", last)
+        nb = num(r"jedna miara Deficit\): luki (\d+)", last)
         span = days[-1] - days[0] + 1
         rep.add("JK-GB-2: potrzeba lukow w partiach z kusznikami ZK (ostatnia doba)", f"kusznikow ZK {men}, potrzeba lukow {nb} (dob z linia {len(days)}, d{days[0]}-d{days[-1]})",
                 "potrzeba lukow > 0 przy kusznikach ZK > 0 (2/3 kusznikow liczy luk)", (nb or 0) > 0 if (men or 0) > 0 else None)
@@ -16496,10 +16499,53 @@ def jeff14_main(logp):
                 "po >= 60 dobach: luki >= 50% i wiecej niz pierwszej doby (AI kupuje luki); krocej - INFO",
                 (c1 is not None and c1 >= 50.0 and (c0 is None or c1 > c0)) if span >= 60 and c1 is not None else None)
     else:
-        rep.add("JK-GB-1..3: linia \"Zlota Kompania (PLAN 1.6)\"", "brak linii", "INFO (klucz wylaczony albo log sprzed paczki)" if not key else
-                "przy kluczu TAK linia co dobe - NIE", None if not key else False)
-    rep.add("JK-GB-4: bledy GoldenKits", f"ERROR in GoldenKits.* {sum(v for k, v in errs.items() if k.startswith('GoldenKits'))}", "0",
-            sum(v for k, v in errs.items() if k.startswith("GoldenKits")) == 0)
+        rep.add("JK-GB-1..3: linia \"Zlota Kompania (PLAN 1.6)\"", "brak linii",
+                "INFO (klucz wylaczony albo log sprzed paczki); przy kluczu TAK linia co dobe - inaczej NIE", None if not key else False)
+    rep.add("JK-GB-4: bledy GoldenKits", f"ERROR in GoldenKits.* {nerr('GoldenKits')}", "0", nerr("GoldenKits") == 0)
+
+    # ---- JK-CR: zloto Casterly Rock wyczerpane (24d, RockGold)
+    cr = by_day(lines, "Zloto Casterly Rock (24d): dzien")
+    pw = os.path.join(os.path.dirname(csv_path_of(logp)), "plon-wsi.csv")
+    rock, west = {}, {}
+    if os.path.isfile(pw):
+        with open(pw, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                c = ln.rstrip("\r\n").split(";")
+                if len(c) < 15 or c[0] == "dzien" or c[3] != "silver_mine":
+                    continue
+                try:
+                    d, y = int(c[0]), float(c[14])
+                except ValueError:
+                    continue
+                if c[1] == "castle_village_V5_2":
+                    rock[d] = y
+                if c[5] == "vlandia":
+                    west[d] = west.get(d, 0.0) + y
+    rd = sorted(rock)
+    rv = (f"Rockford (CSV plon-wsi) srebro {rock[rd[0]]:.2f} (d{rd[0]}) -> {rock[rd[-1]]:.2f}/d (d{rd[-1]}); kopalnie srebra Zachodu razem "
+          f"{west.get(rd[-1], 0.0):.2f}/d") if rd else "brak CSV plon-wsi albo Rockford"
+    if cr:
+        days = sorted(cr)
+        last = cr[days[-1]]
+        before = num(r"-> 0: srebro ([\d.]+)", last, float)
+        stum = num(r"potkniecia (\d+)\.", last)
+        # tygodnie CSV po pierwszej linii 24d (+7: wiersz tygodnia sumuje 7 dob wstecz): wydobycie Rockford ma byc 0 (sufit dziala w ticku produkcji)
+        after = [rock[d] for d in rd if d > days[0] + 7]
+        rep.add("JK-CR-1: Rockford (kopalnia Casterly Rock) - srebro wydobyte (CSV) po wlaczeniu",
+                rv + f"; tygodni po d{days[0]}+7: {len(after)}, max {max(after) if after else '-'}",
+                "kazdy tydzien po pierwszej linii 24d: 0.00 szt./d (bez tygodni w CSV - INFO)", (max(after) == 0.0) if after else None)
+        rep.add("JK-CR-2: regula dziala na prawdziwym wydobyciu (model przed sufitem, ostatnia linia)",
+                f"srebro Skaly przed sufitem {before}/d; pan Skaly {num(r'pan Skaly ([^|]+) [|]', last, str)}",
+                "> 0 (kopalnia Skaly naprawde cos by wydobyla - regula nie jest pusta)", (before > 0.0) if before is not None else None)
+        rep.add("JK-CR-3: potkniecia RockGold", f"potkniecia ostatniej linii {stum}, ERROR in RockGold.* {nerr('RockGold')}", "0 i 0",
+                (stum or 0) == 0 and nerr("RockGold") == 0)
+    else:
+        rep.add("JK-CR-1..3: linia \"Zloto Casterly Rock (24d)\"", "brak linii; " + rv,
+                "INFO (klucz CasterlyGoldExhausted wylaczony albo log sprzed paczki; liczby = stan bez reguly)", None)
+    gold = [s for s in lines if s.startswith("Towary: dzien") and " - gold_ore " in s]
+    if gold:
+        rep.add("JK-CR-4: ruda zlota swiata (ostatnia linia Towary)",
+                "produkcja " + str(num(r"\| produkcja (\d+)", gold[-1])) + "/d, zapas " + str(num(r"zapas (\d+)", gold[-1])), "INFO", None)
     rep.show()
     return 0
 
@@ -19835,7 +19881,7 @@ def main(argv):
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group in ("jeff14", "jeff14s") and logp:
-        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB)
+        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "w6b" and logp:
