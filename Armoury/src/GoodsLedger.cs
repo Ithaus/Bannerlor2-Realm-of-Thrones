@@ -336,6 +336,9 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteDiscard", e); }
         }
 
+        /// <summary>A17 (A17Diag): nazwa rodzaju ramki do linii diagnozy.</summary>
+        internal static string FrameName(int kind) { return kind >= 0 && kind < KindName.Length ? KindName[kind] : "ramka " + kind; }
+
         // ------------------------------------------------------------ podsluch (ItemRoster.AddToCounts)
         /// <summary>Postfiks ItemRoster.AddToCounts(EquipmentElement, int): poza ramka konczy sie na pierwszym porownaniu. Wynik &lt; 0 =
         /// gra niczego nie zmienila (zero albo brak elementu do zdjecia).</summary>
@@ -343,6 +346,8 @@ namespace Armoury
         {
             _tapAll++;
             var f = _top;
+            // A17 (D1-D3, tylko log): konie, ryby i unikaty z polek - w ramce i poza nia; tylko watek glowny (klucz A17DiagnosticLines)
+            if (__result >= 0 && __1 != 0 && _main >= 0 && Environment.CurrentManagedThreadId == _main && A17Diag.On) A17Diag.Tap(__instance, __0.Item, __1, f != null ? f.Kind : -1);
             if (f == null) return;
             if (__result < 0 || __1 == 0) return;
             TapIn(f, __instance, __0.Item, __1);

@@ -1796,6 +1796,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerTickAuthors { get; set; } = true;
 
+        [SettingPropertyBool("A17 Diagnostic Lines", HintText = "with the goods ledger: also write where horses and fish change hands outside the known flows (by flow and by holder, a few call stacks a session) and every unique piece leaving a market (at most 20 a session) - written to the log only, changes nothing in the game; off = not traced")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool A17DiagnosticLines { get; set; } = true;
+
         [SettingPropertyBool("Goods Ledger Enabled", HintText = "write a daily ledger of every trade good and farm animal - how much villages, workshops and hidden craftsmen made, how much townsfolk, workshops, armies, builders and Banner Kings supplies used up, what carts and caravans carried, who holds the stock and what is left unexplained; each line balances yesterday's stock + made - used = today's stock - log only, changes nothing in the game")]
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerEnabled { get; set; } = true;
@@ -6192,6 +6196,7 @@ namespace Armoury
             s.FinanceLedgerPoor = FinanceLedgerPoor;
             s.FinanceLedgerPoorest = FinanceLedgerPoorest;
             s.GoodsLedgerTickAuthors = GoodsLedgerTickAuthors;
+            s.A17DiagnosticLines = A17DiagnosticLines;
             s.GoodsLedgerEnabled = GoodsLedgerEnabled;
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;

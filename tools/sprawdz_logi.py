@@ -586,6 +586,7 @@ Uzycie (Python 3, tylko odczyt):
                     A17-6 statki do liczby idealnej stoczni (ShipPortsBuyToIdeal): dopisek TAK, zakupy ponad liczbe idealna (B5-14) <= 0.1/d, B5-5 0.
                     A17-4 unikaty nie sa towarem mieszczan (UniquesNotFolkGoods): linia CZYNNE, zdjete = odlozone, F1-3 na calym logu 0 (unikaty.log), D3 (INFO).
                     A17-10 pojedynek z Nocnym Krolem (OthersDuelFromFallen): latka wpieta, pozycja (g) linii E4/2, wstalo <= polegli.
+                    A17-D1 / D2 (INFO): konie wedlug ramek i posiadaczy (juczne, K1-3), ryby poza ramkami (M6b-5a); D3 unikat z polki - w A17-4d.
                     Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -20868,6 +20869,10 @@ A17_PRE = {
     "inni": "Inni z poleglych (E4/2): dzien",
     "odw": "OthersDuel (A17):",
     "nkd": "Pojedynek z Nocnym Krolem (A17)",
+    "d1": "Konie wedlug ramek (A17 diagnoza): dzien",
+    "d1s": "Konie poza ramkami (A17 diagnoza D1",
+    "d2": "Ryby poza ramkami (A17 diagnoza): dzien",
+    "d2s": "Ryby poza ramkami (A17 diagnoza D2",
     "err": "ERROR in ",
 }
 A17_FIN29_GONE = 344.0 / 120.0      # fin29 (Armoury-2026-10-14_05-22-14.log): "przy zniknieciu partii" 344 ludzi w 120 dobach
@@ -21048,6 +21053,54 @@ def _a17_10(rep, got):
     rep.add("A17-10d: bledy OthersDuel (ERROR in)", len(errs), "0", len(errs) == 0)
 
 
+def _a17_diag(rep, got):
+    """A17-D1 / D2 (rozpoznanie A17 rozdz. 3, tylko INFO): konie wedlug ramek ksiegi towarow i posiadaczy (juczne - K1-3), ryby poza ramkami wedlug posiadacza (M6b-5a)."""
+    d1 = got["d1"]
+    if not d1:
+        rep.add("A17-D1: konie wedlug ramek i posiadaczy (diagnoza K1-3)", "brak linii", "INFO (log sprzed A17 albo klucz A17DiagnosticLines wylaczony)", None)
+    else:
+        rx = re.compile(r"([^;|]+?) (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)")
+        agg = {}
+        for s in d1:
+            parts = s.split(" | ")
+            for part in parts:
+                if part.startswith("w ramkach ksiegi towarow: "):
+                    pre, body = "ramka ", part[len("w ramkach ksiegi towarow: "):]
+                elif part.startswith("poza ramkami wedlug posiadacza: "):
+                    pre, body = "poza ramkami ", part[len("poza ramkami wedlug posiadacza: "):]
+                else:
+                    continue
+                for m in rx.finditer(body):
+                    k = pre + m.group(1).strip()
+                    v = agg.setdefault(k, [0, 0, 0, 0, 0])
+                    for c in range(5):
+                        v[c] += int(m.group(c + 2))
+        days = len(d1)
+        worst = sorted(agg.items(), key=lambda kv: kv[1][3])[:6]
+        rep.add("A17-D1: konie wedlug ramek i posiadaczy - juczne (najwiekszy ubytek na dobe)",
+                "; ".join(f"{k} {v[3] / days:+.1f}/d (wszystkie {sum(v) / days:+.1f}/d)" for k, v in worst) + f" | dob {days}, stosow {len(got['d1s'])}"
+                + (f"; pierwszy stos: {got['d1s'][0][:260]}" if got["d1s"] else ""),
+                "INFO - sprawca ok. -40 jucznych/d (K1-3: reszta ksiegi koni -52/d, 3/4 juczne); zakup do zbrojowni DTE / na bohatera to ubytek z rosteru bez przybytku", None)
+    d2 = got["d2"]
+    if not d2:
+        rep.add("A17-D2: ryby poza ramkami wedlug posiadacza (diagnoza M6b-5a)", "brak linii", "INFO (log sprzed A17 albo klucz wylaczony)", None)
+    else:
+        agg = {}
+        rx = re.compile(r"([^;|]+?) \+(\d+) / -(\d+)")
+        for s in d2:
+            seg = s.split("wedlug posiadacza (+ / -): ", 1)[-1].split(" | ", 1)[0]
+            for m in rx.finditer(seg):
+                v = agg.setdefault(m.group(1).strip(), [0, 0])
+                v[0] += int(m.group(2)); v[1] += int(m.group(3))
+        days = len(d2)
+        rep.add("A17-D2: ryby poza ramkami wedlug posiadacza (+ / - na dobe)",
+                "; ".join(f"{k} +{v[0] / days:.1f}/-{v[1] / days:.1f}" for k, v in sorted(agg.items(), key=lambda kv: -(kv[1][0] - kv[1][1]))[:6]) + f" | dob {days}, stosow {len(got['d2s'])}"
+                + (f"; pierwszy stos: {got['d2s'][0][:260]}" if got["d2s"] else ""),
+                "INFO - zrodlo ok. +34..100 ryb/d bez wyjasnienia (M6b-5a)", None)
+    errs = [s for s in got["err"] if "A17Diag" in s]
+    rep.add("A17-D9: bledy A17Diag (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
 def a17_main(logp):
     """A17 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A17.md): progi napraw starych zaleglosci. Caly log, czytany strumieniowo (log 2 lat ma 280 MB).
     Log bez paczki: INFO, bez wyjatku."""
@@ -21066,6 +21119,7 @@ def a17_main(logp):
     _a17_6(rep, got)
     _a17_4(rep, got, logp)
     _a17_10(rep, got)
+    _a17_diag(rep, got)
     rep.show()
     return 0
 
