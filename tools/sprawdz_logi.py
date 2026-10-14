@@ -685,6 +685,10 @@ Uzycie (Python 3, tylko odczyt):
                     koszt Call Banners nie 0 przy BK > 0; AB-5 (AM-15) twierdze z >= 2 kulturami "wszystkie 1.0" = 0 (bez pierwszej doby sesji), AB-5b
                     asymilacja pana, lojalnosc, zmiany kultury (INFO); AB-6 (AM-18) ocena malzonka gracza nie 0 przy BK > 0; AB-7 karawana i "poza kultura pana"
                     (INFO). Metoda wylaczona kluczem albo BRAK - jej wiersz INFO. Log bez paczki: INFO, bez wyjatku.
+                    P4 (lancuchy modeli BKROT, Armoury/src/BkrotChains.cs): ta sama grupa z logiem Armoury - python -I tools/sprawdz_logi.py --grupa audytb
+                    <Armoury-*.log>: AB-8 linia startu (wpiecia BRAK 0, lancuchy z NavalDLC / ROT), AB-9 doby i potkniecia 0, AB-10 (AM-13) predkosc na morzu
+                    teraz / bez naprawy > 1.05 i wpisy NavalDLC w probkach, AB-11 (AM-09) zold Innych 0, Nieskalani 0, cena werbunku bez zmian, ujemny zold 0,
+                    AB-11b obnizka morska > 0, AB-12 (AM-19) INFO, AB-13 wzrok na morzu teraz > bez naprawy; wiersz klucza wylaczonego - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -24984,11 +24988,156 @@ def _abf(x):
         return None
 
 
+# P4 audytu modow 14.10 (AM-13, AM-09, AM-19; Armoury/src/BkrotChains.cs): lancuchy modeli pod BKROTPatch - linie w logu Armoury
+P4_MARK = "Lancuchy modeli BKROT (P4)"
+P4_START = re.compile(r"Lancuchy modeli BKROT \(P4\): start \| klucze: (.*?) \| wpiecia (\d+)/(\d+) \(BRAK (\d+)\): (.*?) \| lancuchy: (.*?) \| Wielki Ksiaze \(AM-19\): (\S+) \| potkniecia od startu sesji (\d+)")
+P4_DAY = re.compile(r"Lancuchy modeli BKROT \(P4\): dzien (\d+) \| klucze: (.*?) \| predkosc: na morzu partii (\d+) \(ze statkami (\d+), policzone (\d+)\): srednio teraz (\S+), bez naprawy ([^;( ]+)(?: \(x[^)]*\))?; probki:(.*?); lad \(gracz\): (.*?) \| zold: Inni: partii (\d+), zold teraz (\S+), bez naprawy (\S+); Nieskalani: ludzi (\d+) w (\d+) partiach, zold jednostki teraz (\S+), bez naprawy (\S+), do ceny werbunku (\S+); na morzu partii (\d+) \(karawan (\d+)\): zold teraz (\S+), bez obnizki morskiej (\S+), roznica (\S+) na dobe; ujemny zold partii (\d+)(.*?)(?: \| wzrok na morzu: (.*?))? \| wywolania lancucha od wczoraj: (.*?); glebokosc ponad \d+: (\d+) \| potkniecia od startu sesji (\d+)")
+P4_KEYS = re.compile(r"(predkosc|mapa|bitwa|zold|morze|Wielki Ksiaze) (TAK|NIE)")
+P4_SAMPLE = re.compile(r"\[([^\]]*?): teraz (\S+) = ([^\]]*?); bez naprawy (\S+); powtorzone wpisy (\d+)\]")
+P4_SIGHT = re.compile(r"policzone (\d+), srednio teraz (\S+), bez naprawy (\S+)")
+P4_ARB = re.compile(r"Wielki Ksiaze \(AM-19\) zadzialal od wczoraj (\d+) razy")
+
+
+def _audytb_is_p4_log(logp):
+    """Czy plik to log Armoury z liniami P4 (wtedy audytb sprawdza P4; log sesji CrashScribe - P2 jak dotad)."""
+    try:
+        with open(logp, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if P4_MARK in ln:
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _audytb_p4(logp):
+    """P4 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md AM-13, AM-09, AM-19 + reszta modeli BKROT bez BaseModel): Armoury BkrotChains - glowa lancucha
+    pod BKROT. Czyta log Armoury strumieniowo: linie "Lancuchy modeli BKROT (P4): start" i "... dzien N". "teraz" = model gry z naprawa, "bez naprawy"
+    = to samo wywolanie z wylaczonymi wpieciami (b47fecc3). Wiersz klucza wylaczonego - INFO. Log bez linii - INFO, bez wyjatku."""
+    rep = Report()
+    starts, days = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if P4_MARK not in ln:
+                continue
+            s = AB_TS.sub("", ln.rstrip("\r\n"))
+            m = P4_START.search(s)
+            if m:
+                starts.append(m.groups())
+                continue
+            m = P4_DAY.search(s)
+            if m:
+                days.append(m.groups())
+    print(f"plik: {logp} | P4: linie startu {len(starts)}, linie doby {len(days)}")
+    if not starts:
+        rep.add("AB-8: (P4) linia startu 'Lancuchy modeli BKROT (P4): start'", "brak linii (albo bez BKROTPatch)", "linia przy kazdym starcie sesji", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    keys = dict(P4_KEYS.findall(st[0]))
+    on = lambda k: keys.get(k) == "TAK"
+    chains = {}
+    for part in st[5].split("; "):
+        part = part.strip()
+        if ": " in part:
+            k, v = part.split(": ", 1)
+            chains[k.strip()] = v.strip()
+    bad_chain = [k for k, v in chains.items() if v.startswith("BRAK")]
+    need = {"predkosc": "NavalDLCPartySpeedCalculationModel", "zold": "ROTPartyWageModel", "morale w bitwie": "NavalBattleMoraleModel", "wzrok": "NavalDLCMapVisibilityModel"}
+    miss = [k for k, w in need.items() if w not in chains.get(k, "")]
+    rep.add("AB-8: (P4) linia startu - wpiecia BRAK 0, lancuchy z NavalDLC / ROT (predkosc, zold, wzrok, bitwa)",
+            f"linii {len(starts)}; ostatnia: wpiecia {st[1]}/{st[2]} (BRAK {st[3]}), Wielki Ksiaze {st[6]}, lancuchy BRAK: {', '.join(bad_chain) or '-'}, bez oczekiwanego modelu: {', '.join(miss) or '-'}; klucze: {st[0]}",
+            "BRAK 0, lancuchy pelne", int(st[3]) == 0 and not bad_chain and not miss)
+    rep.add("AB-8b: (P4) lancuchy (INFO)", " / ".join(f"{k}: {v}" for k, v in chains.items()), "INFO (RBL pominiety - konczy lancuch na Default)", None)
+    if not days:
+        rep.add("AB-9: (P4) linie doby 'Lancuchy modeli BKROT (P4): dzien'", "brak linii", "kazda doba", None)
+        rep.show()
+        return 0
+    dn = [int(g[0]) for g in days]
+    span = max(dn) - min(dn) + 1
+    stl = int(days[-1][27])
+    deep = sum(int(g[26]) for g in days)
+    rep.add("AB-9: (P4) linie doby, potkniecia 0, glebokosc ponad limit 0", f"dob z linia {len(set(dn))} z {span}; potkniecia (ostatnia linia) {stl}; glebokosc ponad limit (suma) {deep}",
+            "kazda doba, 0, 0", len(set(dn)) >= span - 1 and stl == 0 and deep == 0)
+    dk = lambda g, k: dict(P4_KEYS.findall(g[1])).get(k) == "TAK"
+    # AB-10 AM-13 predkosc na morzu
+    rs, nsea, dup, open_sea, smp = [], 0, 0, 0, 0
+    for g in days:
+        if not dk(g, "predkosc"):
+            continue
+        a, b = _abf(g[5]), _abf(g[6])
+        if int(g[4]) > 0 and a is not None and b is not None and b > 0:
+            rs.append(a / b)
+            nsea += int(g[4])
+        for sm in P4_SAMPLE.finditer(g[7]):
+            smp += 1
+            dup += int(sm.group(5))
+            if "Open Sea" in sm.group(3) or "River" in sm.group(3) or "Wind" in sm.group(3):
+                open_sea += 1
+    avg = sum(rs) / len(rs) if rs else None
+    rep.add("AB-10: (AM-13) predkosc na morzu - teraz / bez naprawy srednio > 1.05; w probkach wpisy NavalDLC (Open Sea / River / Wind), powtorzone 0",
+            f"dob z partiami na morzu {len(rs)} (partio-probek {nsea}): x{avg:.2f}; probek {smp}, z wpisem NavalDLC {open_sea}, powtorzone wpisy {dup}" if avg is not None else "brak dob z partiami na morzu",
+            "> 1.05, probki z wpisem NavalDLC > 0, powtorzone 0 (klucz predkosc; inaczej INFO)",
+            ((avg > 1.05) and dup == 0 and (open_sea > 0 or smp == 0)) if (avg is not None and on("predkosc")) else None)
+    lastp = next((x for x in reversed(days) if x[7].strip() not in ("", "-")), days[-1])
+    rep.add("AB-10b: (AM-13) probki predkosci - ostatnia doba z probkami (INFO)", f"dzien {lastp[0]}: {lastp[7].strip()[:600]}; lad (gracz): {lastp[8]}",
+            "INFO (lad: teraz = bez naprawy, poza zaciagiem ROT +20% i eskorta karawan BEE)", None)
+    # AB-11 AM-09 zold
+    oth_bad, oth_n, uns_bad, price_bad, uns_n, neg = 0, 0, 0, 0, 0, 0
+    sea_sum, sea_days = 0.0, 0
+    for g in days:
+        neg += int(g[22])
+        if dk(g, "zold"):
+            if int(g[9]) > 0:
+                oth_n += 1
+                v = _abf(g[10])
+                if v is None or abs(v) > 0.5:
+                    oth_bad += 1
+            if g[14] != "-":
+                uns_n += 1
+                if g[14] != "0":
+                    uns_bad += 1
+                if g[16] != g[15]:
+                    price_bad += 1
+            if dk(g, "morze") and int(g[17]) > 0:
+                d = _abf(g[21])
+                if d is not None:
+                    sea_sum += d
+                    sea_days += 1
+    ok = (oth_bad == 0 and uns_bad == 0 and price_bad == 0 and neg == 0) if on("zold") else None
+    rep.add("AB-11: (AM-09) zold Innych 0, Nieskalani 0 (cena werbunku jak bez naprawy), ujemny zold partii 0",
+            f"dob z partiami Innych {oth_n} (zold > 0: {oth_bad}); dob z Nieskalanymi {uns_n} (zold jednostki nie 0: {uns_bad}, cena werbunku inna niz bez naprawy: {price_bad}); ujemny zold partii (suma) {neg}",
+            "0, 0, 0, 0 (klucz zold; inaczej INFO)", ok if (oth_n or uns_n or neg) else None)
+    g = days[-1]
+    rep.add("AB-11b: (AM-09) obnizka morska - roznica zoldu swiata na dobe (partie na morzu w chwili linii)",
+            f"dob z partiami na morzu {sea_days}, roznica srednio {sea_sum / sea_days:.0f} na dobe" if sea_days else "brak dob z partiami na morzu",
+            "> 0 (klucz morze; inaczej INFO)", (sea_sum > 0) if (sea_days and on("zold") and on("morze")) else None)
+    rep.add("AB-11c: (AM-09) zold - ostatnia doba (INFO)",
+            f"Inni partii {g[9]} zold teraz {g[10]} / bez naprawy {g[11]}; Nieskalani ludzi {g[12]} w {g[13]} partiach, zold jednostki {g[14]} / {g[15]}, do ceny werbunku {g[16]}; na morzu partii {g[17]} (karawan {g[18]}): {g[19]} / bez obnizki {g[20]}",
+            "INFO", None)
+    # AB-12 AM-19
+    arb = sum(int(m.group(1)) for x in days for m in [P4_ARB.search(x[23])] if m)
+    gm = re.search(r"gracz teraz (\S+), bez naprawy (\S+)", g[23])
+    rep.add("AB-12: (AM-19) Wielki Ksiaze zadzialal (INFO)", f"razy {arb}; zold partii gracza (ostatnia doba): " + (f"teraz {gm.group(1)}, bez naprawy {gm.group(2)}" if gm else "-"),
+            "INFO (tylko gracz z blogoslawienstwem Princely Arbiter; zold nigdy < 0 - AB-11)", None)
+    # AB-13 mapa: wzrok na morzu, wywolania
+    wz = [P4_SIGHT.search(x[24] or "") for x in days if dk(x, "mapa")]
+    wz = [(int(m.group(1)), _abf(m.group(2)), _abf(m.group(3))) for m in wz if m and int(m.group(1)) > 0]
+    up = sum(1 for n, a, b in wz if a is not None and b is not None and a > b)
+    rep.add("AB-13: (P4 mapa) wzrok na morzu teraz > bez naprawy (+30% NavalDLC)", f"dob z probka {len(wz)}, z tego teraz > bez naprawy {up}",
+            "wszystkie (klucz mapa; inaczej INFO)", (up == len(wz)) if (wz and on("mapa")) else None)
+    rep.add("AB-13b: (P4) wywolania lancuchow - ostatnia doba (INFO)", g[25], "INFO (0 przy kluczu TAK = lancuch nie biegnie)", None)
+    rep.show()
+    return 0
+
+
 def audytb_main(logp):
     """P2 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md AM-10, AM-11, AM-12, AM-15, AM-18 + karawany; CrashScribe BkrotSelfCall): samowywolania BKROT
     zamienione na wywolanie modelu BK. Czyta log sesji CrashScribe strumieniowo: linie startu "BKROT self call fix" i doby "BKROT self call (P2)".
     Wartosc "model" = metoda wolana jak w BK (BannerKingsConfig - obiekt BKROT), "BK" = ta sama metoda modelu BK wolana niewirtualnie (to, co BKROT
     powinien dostac od base). Bez naprawy model = 0 przy BK > 0. Wiersz metody wylaczonej kluczem albo z BRAK - INFO. Log bez paczki: INFO, bez wyjatku."""
+    if _audytb_is_p4_log(logp):
+        return _audytb_p4(logp)   # P4 audytu (lancuchy modeli BKROT) - linie w logu Armoury; log sesji CrashScribe - P2 jak nizej
     rep = Report()
     starts, days = [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
