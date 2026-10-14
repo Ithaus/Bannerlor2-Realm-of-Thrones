@@ -303,7 +303,7 @@ namespace Armoury
                 if (cap != null && cap.IsMainParty && seized > 0)
                     Log.Player("In " + Nm(st) + " your men seized " + (seized == 1 ? "an enemy caravan" : seized + " enemy caravans") + ": " + goldOn.ToString("N0", Inv) + " denars go to your purse and "
                                + (unitsOn - unitsShelf) + " items of cargo, horses and pack animals to your baggage"
-                               + (unitsShelf > 0 ? " (" + unitsShelf + " more that your men could not carry or herd are left in the market of " + Nm(st) + ")" : "") + (heroes > 0 ? "; " + heroes + (heroes == 1 ? " caravan master is your prisoner" : " caravan masters are your prisoners") : "") + ".");
+                               + (unitsShelf > 0 ? " (" + unitsShelf + " more that your men could not carry or herd are left " + (st.IsTown ? "in the market of " : "behind in ") + Nm(st) + ")" : "") + (heroes > 0 ? "; " + heroes + (heroes == 1 ? " caravan master is your prisoner" : " caravan masters are your prisoners") : "") + ".");
             }
             catch (Exception e) { Stumble("Seize(wiadomosc)", e); }
         }
