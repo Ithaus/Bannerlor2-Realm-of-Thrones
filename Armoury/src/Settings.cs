@@ -2166,6 +2166,11 @@ namespace Armoury
         // GL-B / 11c (projekt rozdz. 9 ryzyko 11 lekarstwo c; TownFolk.Skup.cs): robocizna od skupu plonu wsi - z kasy kupcow do kiesy ludu miasta TownFolkLabourVillageBuys
         // (10%) zaplaty taborom wsi (TownLive krok 2, ta sama droga co robocizna od sprzedazy). Off = stan 97dd474
         public bool FolkEarnFromVillageBuys = true;        // The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell
+        // --- Reavers and the Free Folk ---
+        // Decyzja Jeffa 14.10 (docs/wyspy-wolni/PROJEKT-WYSPY-WOLNI.md): Zelazne Wyspy maja kase z rabunku (WW1 zelazna cena, WW2 lup na zalogi, WW3 najazd z rachunku,
+        // WW4 port korsarzy), Wolni Ludzie walcza bez zoldu (WL1), wojsko z ludu (WL2), werbunek z jedzeniem (WL3); ReaverLaw.cs, FreeFolkLaw w ClanBudget.cs.
+        // WW0 (linie "Najezdzcy - decyzje AI (WW0)" i "Najezdzcy - zasieg (WW0)") bez klucza - sam pomiar. Klucze NOWE - w Armoury.json Jeffa ich nie ma
+        // (pulapka MCM z CLAUDE.md 7 nie dotyczy); wszystkie wylaczone = stan 63aaaedf.
 
         public static void Load(string moduleDataDir)
         {
