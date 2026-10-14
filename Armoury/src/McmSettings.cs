@@ -5504,6 +5504,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackScarOnlyWhenSacked { get; set; } = true;
 
+        [SettingPropertyBool("Sack Window Real Coin", HintText = "with Sack Takes Real Coin: when you take a town or castle, the hints of Devastate, Pillage and Show Mercy show the real coin - what the merchants and the townsfolk hold, what the army takes, your party's part (your men's, yours and the crown's) and what is left - and after your choice the summary says what was taken; 'Prosperity Lost' counts from this town; for thirty days 'People of this land' says how much a sacked town lost (off = the game's lines)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackWindowRealCoin { get; set; } = true;
+
         [SettingPropertyBool("Ai Sacks From Need", HintText = "how a lord who storms a town chooses its fate: a town of his own realm's culture is spared as before; a town with less to take than one day's pay of his army is spared too (nobody burns a place for nothing); a lord whose army has wages owed that his house cannot meet, or whose purse holds less than two weeks' pay for his party, pillages it - a cruel one devastates it when he can; any other lord chooses by his nature, as before (off = the game's choice by the lord's nature only)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool AiSacksFromNeed { get; set; } = true;
@@ -6891,6 +6895,7 @@ namespace Armoury
             s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
             s.SackTakesRealCoin = SackTakesRealCoin;
             s.SackScarOnlyWhenSacked = SackScarOnlyWhenSacked;
+            s.SackWindowRealCoin = SackWindowRealCoin;
             s.AiSacksFromNeed = AiSacksFromNeed;
             s.SackNoSpending = SackNoSpending;
             s.SackNoSpendingDays = SackNoSpendingDays;

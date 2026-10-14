@@ -179,7 +179,7 @@ namespace Armoury
                 if (a == main && main != null)
                 {
                     // gracz-wodz: podsumowanie w menu (L5); bez L5 albo bez menu ("Right of Pillage") - wiadomosc
-                    bool menu = false;                                         // L5: podsumowanie w menu po wyborze
+                    bool menu = WindowOn && contrib != null && contrib.Count > 0;   // L5: podsumowanie w menu po wyborze (bez menu - "Right of Pillage")
                     if (!menu && kind != KMercy && res.Pool > 0)
                         Log.Player("Your army took " + N(res.Pool) + " coins from " + town + ": " + N(res.Merch) + " from its merchants, " + N(res.Folk) + " from its townsfolk. "
                                    + "Your men's purses grew by " + N(res.PlayerMen) + "; your own part is " + N(res.PlayerLead) + ".");

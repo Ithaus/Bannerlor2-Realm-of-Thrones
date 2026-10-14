@@ -436,7 +436,7 @@ namespace Armoury
                 if (Campaign.Current == null) return;
                 Ensure();
                 int today = (int)CampaignTime.Now.ToDays;
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any))
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any || L5Any))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
@@ -447,6 +447,7 @@ namespace Armoury
                     L2Part(sb);
                     L3Part(sb);
                     L4Part(sb);
+                    L5Part(sb);
                     sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -492,6 +493,7 @@ namespace Armoury
             L2Clear();
             L3Clear();
             L4Clear();
+            L5Clear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>
@@ -501,6 +503,7 @@ namespace Armoury
             _track.Clear();
             _pending = null;
             Last = null;
+            _l5Last = null;
             _me = null; _wsSt = null; _wsOwners = null;
             _stumbles = 0; _err.Clear();
         }
@@ -517,6 +520,7 @@ namespace Armoury
                          typeof(CitySack), nameof(OwnerPre), null, nameof(OwnerFin), Priority.High, Priority.Normal, Priority.Low);
             L2Patch();
             L4Patch();
+            L5Patch();
         }
     }
 }

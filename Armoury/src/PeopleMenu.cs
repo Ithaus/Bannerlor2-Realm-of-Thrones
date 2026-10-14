@@ -159,6 +159,9 @@ namespace Armoury
                     }
                     catch (Exception e) { Log.Error("PeopleMenu.Savings", e); }
                 }
+                // lup miast L5: przez 30 dob po lupie - ile stracili kupcy i mieszczanie (tylko odczyt; klucz Sack Window Real Coin)
+                try { string sk = CitySack.MenuLine(st); if (!string.IsNullOrEmpty(sk)) sb.Append(sk).Append('\n'); }
+                catch (Exception e) { Log.Error("PeopleMenu.Sack", e); }
                 string body = sb.ToString().TrimEnd('\n');
                 // E4/11: sekcja okregu (wies) albo okregi regionu (miasto, zamek) z ksiegi wiosek - liczby na zywo, bez stanu menu
                 try { string dist = VillageBook.MenuSection(st); if (!string.IsNullOrEmpty(dist)) body += "\n\n" + dist; }
