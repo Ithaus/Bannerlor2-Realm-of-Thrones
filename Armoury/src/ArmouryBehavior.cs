@@ -700,6 +700,8 @@ namespace Armoury
             // lup miast L3: osady po nastepstwach oblezen z ostatnich 30 dob (okno lupu, pomiar, napisy) - wlasny try; wersja formatu "1"; brak klucza = pusto
             try { string sk = dataStore.IsSaving ? CitySack.Export() : null; SaveText.Sync(dataStore, "arm_sack", ref sk); if (dataStore.IsLoading) CitySack.Import(sk); }
             catch (Exception e) { Log.Error("SyncData.arm_sack", e); }
+            try { string rk = dataStore.IsSaving ? CitySack.ExportRuins() : null; SaveText.Sync(dataStore, "arm_ruins", ref rk); if (dataStore.IsLoading) CitySack.ImportRuins(rk); }   // LB lupu miast: zgliszcza budowli
+            catch (Exception e) { Log.Error("SyncData.arm_ruins", e); }
         }
 
         public override void RegisterEvents()

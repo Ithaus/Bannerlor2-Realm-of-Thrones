@@ -483,7 +483,8 @@ Uzycie (Python 3, tylko odczyt):
                     LUP-1 linie L0 = wywolania okna O10, LUP-2/3 nastepstwa bez zdobycia 0, LUP-4 ujscie garnizony 0, LUP-5/6 lup: zdjete = dopisane i <= czesc x stan,
                     LUP-7 lup z niczego / trafienia O10 / kwota gry 0, LUP-8 arytmetyka i kiesy r = 0, LUP-10 blizna przy lasce 0, LUP-11/12 chleb i zapas kupcow (INFO),
                     LUP-13 zycie i markietani w oknie lupu 0, LUP-14 sakiewki, LUP-15 wybor AI wedlug 3.4, LUP-16 okno gracza (reczny), LUP-19 wojsko (INFO, prog 85 tys.),
-                    LUP-17 (L6) ubytek ludnosci BK = ubytek ksiegi ludzi miasta +-1 pkt proc.
+                    LUP-17 (L6) ubytek ludnosci BK = ubytek ksiegi ludzi miasta +-1 pkt proc., LUP-B1 (LB) splonelo = floor(czesc x poziomy palne), laska 0, mury bez zmian,
+                    LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO).
                     Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -17750,6 +17751,50 @@ def lup_main(logp, start_arg, until=364):
     else:
         rep.add("LUP-17 (L6): ubytek ludnosci BK wobec ubytku ksiegi ludzi miasta", f"linii L6 {len(l6)} (odczytane {l6n}), miast z ubytkiem w ksiedze 0" + ("; L6 wylaczone" if l6off else ""),
                 "+-1 pkt proc." + (" - INFO (brak grabiezy miasta albo L6 wylaczone / log bez paczki)"), None)
+    # ---- LB (kierunek Jeffa - budowle plona): plan = floor(czesc x poziomy palne), laska 0, mury bez zmian; L0 budowle = LB; zgliszcza (INFO)
+    lb = [s for s in lines if s.startswith("Lup miast (LB budowle): dzien") and inwin(dayof(s))]
+    lboff = any("WYLACZONE (Sack Burns Buildings)" in s for s in dayw.values())
+    rxb = re.compile(r"Lup miast \(LB budowle\): dzien (\d+) \| osada (\S+) \((miasto|zamek)\) \| wybor (\S+) \| czesc ([\d.]+) \| poziomy palne \(bez murow i projektow dziennych\) (\d+) -> (\d+) "
+                     r"\(splonelo (\d+) z planu (\d+) = floor\(czesc x (\d+)\)\) \| mury (\d+) -> (\d+) \| koszt spalonych poziomow (\d+) pkt, odbudowa ze zgliszcz (\d+) pkt")
+    bad_b, mercy_b, wall_b, lbm = [], [], [], {}
+    for s in lb:
+        m = rxb.search(s)
+        if not m:
+            bad_b.append("nieodczytana")
+            continue
+        sh, a0, a1, n, plan = float(m.group(5)), int(m.group(6)), int(m.group(7)), int(m.group(8)), int(m.group(9))
+        lbm[(int(m.group(1)), m.group(2))] = n
+        lo, hi = int((sh - 0.0005) * a0), int((sh + 0.0005) * a0)
+        if not (lo <= plan <= hi) or n != plan or a0 - a1 != n:
+            bad_b.append(m.group(2))
+        if m.group(4) == "laska" and n:
+            mercy_b.append(m.group(2))
+        if m.group(11) != m.group(12):
+            wall_b.append(m.group(2))
+    if lb:
+        rep.add("LUP-B1 (LB): splonelo = floor(czesc x poziomy palne); laska 0; mury bez zmian", f"linii {len(lb)}; zle {len(bad_b)}, laska z pozarem {len(mercy_b)}, mury ruszone {len(wall_b)}"
+                + (f" ({(bad_b + mercy_b + wall_b)[:3]})" if bad_b or mercy_b or wall_b else ""), "bez wyjatku", not bad_b and not mercy_b and not wall_b)
+    else:
+        rep.add("LUP-B1 (LB): splonelo = floor(czesc x poziomy palne); laska 0; mury bez zmian", "brak linii LB" + (" (LB wylaczone)" if lboff else ""), "bez wyjatku - INFO bez linii", None)
+    l0b = [s for s in lines if s.startswith("Lup miast (L0 budowle): dzien") and inwin(dayof(s))]
+    mis = []
+    for s in l0b:
+        m = re.search(r"dzien (\d+) \| osada (\S+) \| wybor \S+ \| poziomy budowli \(bez projektow dziennych\) (\d+) -> (\d+) \(gra zdjela (-?\d+)\)", s)
+        if not m:
+            continue
+        k = (int(m.group(1)), m.group(2))
+        if k in lbm and int(m.group(5)) != lbm[k]:
+            mis.append((m.group(2), int(m.group(5)), lbm[k]))
+    rep.add("LUP-B2 (LB): linia L0 budowle - zdjete przy nastepstwach = splonelo LB (nikt inny nie zdejmuje poziomow)", f"par {sum(1 for s in l0b)} / LB {len(lbm)}, rozne {len(mis)}" + (f" ({mis[:3]})" if mis else ""),
+            "0 roznic", (not mis) if lbm and l0b else None)
+    rb = sum(num(r"odbudowane ze zgliszcz dzis (\d+)", s) or 0 for s in dayw.values())
+    gr = sum(num(r"postep ze zgliszcz dany (\d+) pkt", s) or 0 for s in dayw.values())
+    burnt = sum(num(r"\| LB: (?:WYLACZONE[^;]*; )?lupow z pozarem \d+, spalone poziomy (\d+)", s) or 0 for s in dayw.values())
+    last = dayw[max(dayw)] if dayw else ""
+    rl = num(r"zgliszcza: osad \d+, budowli \d+, poziomow (\d+)", last)
+    qd = sum(num(r"zgliszcza na czele (\d+)", s) or 0 for s in dayw.values())
+    rep.add("LUP-B3 (LB): zgliszcza - spalone / odbudowane / zostalo na koniec okna; postep dany; kolejka AI", f"{burnt} / {rb} / {rl if rl is not None else '-'} poziomow; {gr} pkt; ustawien kolejki {qd}",
+            "INFO (rachunek CHANGELOG LB: miasto spustoszone ok. 590 dob, zlupione ok. 300 przy mocy 5 pkt/d)", None)
     # ---- prog 19: swiat (INFO) - wojsko lordow w wojnie (miara W5-7), liczba zdobyc
     army = {}
     for kname, ser in kingdom_war_series(lines).items():

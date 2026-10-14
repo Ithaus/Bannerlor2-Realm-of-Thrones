@@ -191,6 +191,7 @@ RANGES = {
     'SackSharePillage': (0.0, 1.0, "0.000"),
     'SackShareDevastate': (0.0, 1.0, "0.000"),
     'SackNoSpendingDays': (0, 30, "0"),
+    'SackRuinRebuildShare': (0.0, 1.0, "0.000"),   # LB: odbudowa ze zgliszcz - czesc kosztu poziomu (CitySack.RuinShare przycina do 0..1)
 }
 
 def gen(module_dir, ns, display):

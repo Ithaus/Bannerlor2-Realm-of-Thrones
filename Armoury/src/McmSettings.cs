@@ -5524,6 +5524,14 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackKilledInPeopleBook { get; set; } = true;
 
+        [SettingPropertyBool("Sack Burns Buildings", HintText = "fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war only the military ones). Off = the game's random razing, which grows with the army")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackBurnsBuildings { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sack Ruin Rebuild Share", 0.000f, 1.000f, "0.000", HintText = "with Sack Burns Buildings: the part of a level's cost that rebuilding it from the ruins costs (an eighth - a devastated town of today's typical size stands again in about a year and a half, a pillaged one in about nine months; a town sacked every half year never recovers)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackRuinRebuildShare { get; set; } = 0.125f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6904,6 +6912,8 @@ namespace Armoury
             s.SackNoSpending = SackNoSpending;
             s.SackNoSpendingDays = SackNoSpendingDays;
             s.SackKilledInPeopleBook = SackKilledInPeopleBook;
+            s.SackBurnsBuildings = SackBurnsBuildings;
+            s.SackRuinRebuildShare = SackRuinRebuildShare;
         }
 
         internal static void Apply()

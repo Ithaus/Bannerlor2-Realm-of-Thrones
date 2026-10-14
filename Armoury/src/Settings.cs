@@ -1968,6 +1968,10 @@ namespace Armoury
         public int SackNoSpendingDays = 3;                 // with Sack No Spending: the days the victors spend nothing in the town they sacked (also the window the sack log measures)
         // L6 (rozdz. 1.7 D4): zabici przez BK przy zdobyciu miasta schodza z ksiegi ludzi miasta tym samym ulamkiem (CitySack.People.cs). Off = ksiega bez zmian (2c0a225)
         public bool SackKilledInPeopleBook = true;         // the townsfolk Banner Kings kills when a town is pillaged or devastated are gone from the town's own count of people as well (the same share), so they no longer eat, earn and pay as if alive (off = only Banner Kings' population loses them)
+        // LB (kierunek Jeffa 13.10 - budowle plona): przy grabiezy / spustoszeniu plonie ta sama czesc poziomow budowli co monety (bez murow i projektow dziennych), zgliszcza
+        // odbudowuje sie za SackRuinRebuildShare kosztu poziomu, osady AI maja zgliszcza na czele kolejki (CitySack.Burn.cs). Off = budowle zdejmuje gra (2c0a225)
+        public bool SackBurnsBuildings = true;             // fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war only the military ones). Off = the game's random razing, which grows with the army
+        public float SackRuinRebuildShare = 0.125f;        // with Sack Burns Buildings: the part of a level's cost that rebuilding it from the ruins costs (an eighth - a devastated town of today's typical size stands again in about a year and a half, a pillaged one in about nine months; a town sacked every half year never recovers)
 
         public static void Load(string moduleDataDir)
         {

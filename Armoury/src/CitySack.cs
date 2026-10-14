@@ -473,7 +473,8 @@ namespace Armoury
                 if (Campaign.Current == null) return;
                 Ensure();
                 int today = (int)CampaignTime.Now.ToDays;
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any || L5Any || L6Any))
+                try { RuinsDaily(); } catch (Exception e) { Stumble("RuinsDaily", e); }   // LB: zgliszcza - odbudowane poziomy, postep, kolejka AI (takze bez logu)
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any || L5Any || L6Any || LBAny))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
@@ -486,6 +487,7 @@ namespace Armoury
                     L4Part(sb);
                     L5Part(sb);
                     L6Part(sb);
+                    LBPart(sb);
                     sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -533,6 +535,7 @@ namespace Armoury
             L4Clear();
             L5Clear();
             L6Clear();
+            LBClear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>
@@ -544,6 +547,7 @@ namespace Armoury
             Last = null;
             _l5Last = null;
             _me = null; _wsSt = null; _wsOwners = null; _bSt = null; _l6St = null; _l6Pop0 = -1;
+            RuinsReset();
             _stumbles = 0; _err.Clear();
         }
 
@@ -561,6 +565,7 @@ namespace Armoury
             L4Patch();
             L5Patch();
             L6Patch();
+            LBPatch();
         }
     }
 }
