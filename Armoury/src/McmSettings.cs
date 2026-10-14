@@ -5208,7 +5208,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkSurplusSpendShare { get; set; } = 0.15f;
 
-        [SettingPropertyBool("Folk War Aid", HintText = "in war, while the crown is in need (the same weekly reckoning that sets the war tax on the people's earnings), the townsfolk and castle folk give the kingdom's treasury a part of the coin they hold above their reserve for hard times - Folk War Aid Share a day at the full war tax, less while the need is small, twice that under the War Tax policy. The reserve itself (Town Folk Reserve Days of their needs for labourers, 21 days for craftsmen, 30 for merchant families, 10 for castle folk) is never touched, so a poor town pays nothing. The crown spends the aid the same day on repaying war wages and on its rents to the houses. A besieged town or castle pays nothing, a town held outside any kingdom pays no one, in peace nothing is taken. Villages are not changed - they already pay the war subsidy. You and the AI alike: in your kingdom the aid goes to the realm's treasury, not to your purse. Needs War Tax From Folk. Off = no war aid, as before")]
+        [SettingPropertyBool("Folk War Aid", HintText = "in war, while the crown is in need (the same weekly reckoning that sets the war tax on the people's earnings), the townsfolk and castle folk give the kingdom's treasury a part of the coin they hold above their reserve for hard times - Folk War Aid Share a day at the full war tax, less while the need is small, twice that under the War Tax policy. The reserve itself (Town Folk Reserve Days of their needs for labourers, 21 days for craftsmen, 30 for merchant families, 10 for castle folk) is never touched, so a poor town pays nothing. The crown spends the aid the same day on repaying war wages and on its rents to the houses. A besieged town or castle pays nothing, a town held outside any kingdom pays no one, in peace nothing is taken (except the Folk Peace Tribute: in a long peace, only what the crown spends on bread for its hungry towns). Villages are not changed - they already pay the war subsidy. You and the AI alike: in your kingdom the aid goes to the realm's treasury, not to your purse. Needs War Tax From Folk. Off = no war aid, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool FolkWarAid { get; set; } = true;
 
@@ -5231,6 +5231,10 @@ namespace Armoury
         [SettingPropertyInteger("Folk War Aid Min Loyalty", 0, 100, "0", HintText = "with Folk War Aid Loyalty: a town or castle with loyalty at or below this pays no war aid (the game's unrest begins at 25)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public int FolkWarAidMinLoyalty { get; set; } = 30;
+
+        [SettingPropertyBool("Folk Peace Tribute", HintText = "in a long peace (the realm at war with no other realm for at least 91 days) the crown takes back from the labourers' savings in its towns - the coin they hold above their reserve for hard times - only as much as it spent the day before on bread for its own hungry towns and castles (Bread For The Poor), and never more than one part in two hundred of those savings a day. It goes the same way as the war aid: the reserve is never touched, a besieged town pays nothing, a town too close to revolt pays nothing, and the same loss of loyalty (Folk War Aid Loyalty) applies, shown as 'Peace tribute from the people's savings'. You and the AI alike: in your realm it goes to the treasury, not to your purse. Needs Folk War Aid and Bread For The Poor. Off = nothing is taken in peace, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkPeaceTribute { get; set; } = true;
 
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -7151,6 +7155,7 @@ namespace Armoury
             s.FolkWarAidLoyaltyCost = FolkWarAidLoyaltyCost;
             s.FolkWarAidLoyaltyFloor = FolkWarAidLoyaltyFloor;
             s.FolkWarAidMinLoyalty = FolkWarAidMinLoyalty;
+            s.FolkPeaceTribute = FolkPeaceTribute;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

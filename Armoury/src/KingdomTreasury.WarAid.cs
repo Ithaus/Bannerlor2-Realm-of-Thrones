@@ -69,6 +69,7 @@ namespace Armoury
             _waPlayer.Clear(); _waGone.Clear(); _waTell.Clear(); _waTellRate = 0; _waTellTop = 0; _waDawns = 0; _waKingDays = 0; _waKingSum = 0;
             LastFolkWarAid = 0;
             FolkAidLoyalty.Reset();   // P1b: migawka kary lojalnosci, liczniki i stan komunikatu gracza - razem z danina
+            PeaceTributeReset();      // M4: plan i liczniki daniny pokoju (KingdomTreasury.PeaceTribute.cs) - razem z danina
         }
 
         private static void WaClearDay()
@@ -76,6 +77,7 @@ namespace Armoury
             _waK.Clear(); _waPlaces.Clear();
             Array.Clear(_waCls, 0, WtClasses); Array.Clear(_waWhy, 0, WaWhyN);
             _waHeld = 0; _waCalls = _waHeldN = _waTowns = _waCastles = 0; _waLords = 0;
+            PtClearDay();   // M4: liczniki doby daniny pokoju
         }
 
         private static void WaStumble(string where, Exception e)
@@ -168,6 +170,16 @@ namespace Armoury
                 var s = Settings.Current;
                 Kingdom k; int why;
                 double rate = WaRate(st, s, false, out k, out why);
+                // M4 (klucz FolkPeaceTribute, KingdomTreasury.PeaceTribute.cs): krolestwo bez daniny wojennej z powodu pokoju albo s = 0 - w pokoju >= 91 dob
+                // wyrobnicy miasta oddaja tyle, ile korona wczoraj wydala na chleb M3 (najwyzej 0.5% lokaty) - ta sama droga, bramki i kara P1b
+                bool peace = false;
+                if (!(rate > 0) && why == WaNoNeed)
+                {
+                    bool gated;
+                    double pr = PtRate(st, cls, k, s, out gated);
+                    if (pr > 0) { rate = pr; peace = true; why = WaPaid; }
+                    else if (gated) _ptGate++;   // prog lojalnosci P1b - licznik linii M4 (bez komunikatu "war aid" P1b)
+                }
                 bool mine = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;
                 // stan komunikatu gracza NIE jest tu zerowany: s = 0 w trwajacej wojnie to nie nowa wojna (recenzja P1) - zeruje pokoj (WaPlayerSweep, raz na dobe)
                 if (!(rate > 0)) { _waWhy[why]++; if (why == WaLowLoy) FolkAidLoyalty.NoteGate(st); return 0; }
@@ -179,6 +191,7 @@ namespace Armoury
                 long pay = (long)Math.Floor(due);
                 long room = Math.Min((long)Math.Floor(excess), Math.Max(0, avail));   // zapas dni zostaje caly; najwyzej stan kiesy
                 if (pay > room) { pay = room; due = pay; }
+                if (peace) { long left = PtLeft(k); if (pay > left) { pay = left; due = pay; _ptCut++; } }   // M4: suma krolestwa najwyzej budzet (wczorajszy chleb korony, najwyzej 0.5% lokaty)
                 if (pay > int.MaxValue) { pay = int.MaxValue; due = pay; }
                 // R22: oblezona osada nie placi (zostaje w kiesie ludu); niezaplacona reszta czeka jak byla
                 if (BesiegedPay.Holds(st, BesiegedPay.KFolkAid, pay, true))
@@ -187,6 +200,7 @@ namespace Armoury
                     WarAidK hk;
                     if (!_waK.TryGetValue(k, out hk)) { hk = new WarAidK(); _waK[k] = hk; }
                     hk.Held += pay;
+                    if (peace) _ptHeld += pay;
                     return 0;
                 }
                 if (pay <= 0) { cr[cls] = due; _waWhy[WaWait]++; return 0; }
@@ -197,7 +211,7 @@ namespace Armoury
                 a.Taken += ip; a.Cls[cls] += ip;
                 // W5b regula 1 (sam licznik linii): czesc poboru, ktora wziela sie ze stawki ponad s korony - danina x (stawka - s) / stawka
                 var wk = WtOf(k, false);
-                if (wk != null && wk.SN > wk.S && LnOn)
+                if (!peace && wk != null && wk.SN > wk.S && LnOn)
                 {
                     double cap = WtCap(k, s), sa = Math.Min(wk.SN, cap), s0 = Math.Min(wk.S, cap);
                     if (sa > s0) { double part = ip * (sa - s0) / sa; a.Lords += part; _waLords += part; }
@@ -205,7 +219,8 @@ namespace Armoury
                 if (_waPlaces.Add(st)) { a.Places++; if (st.IsTown) _waTowns++; else _waCastles++; }
                 _waCls[cls] += ip; _waWhy[WaPaid]++;
                 long x; _waWindow.TryGetValue(k, out x); _waWindow[k] = x + ip;   // wplyw dnia 165 (CrownIncome.Begin)
-                if (mine)
+                if (peace) PtNote(k, st, ip, rate);   // M4: budzet, liczniki, osada w zbiorze (okno mieszkancow, dymek lojalnosci)
+                if (mine && !peace)   // M4 bez komunikatow "war aid" (krolestwo w pokoju)
                 {
                     Kingdom told; bool known = _waPlayer.TryGetValue(st, out told) && told == k;
                     _waPlayer[st] = k;
@@ -220,7 +235,7 @@ namespace Armoury
                         if (top > _waTellTop) _waTellTop = top;
                     }
                 }
-                if (k.RulingClan != null && k.RulingClan == Clan.PlayerClan) _waKingSum += ip;
+                if (!peace && k.RulingClan != null && k.RulingClan == Clan.PlayerClan) _waKingSum += ip;   // suma tygodnia "war aid" krola-gracza - bez M4
                 k.KingdomBudgetWallet += ip;                       // odbiorca: skarbiec krolestwa (platnik - kiesa klasy u wolajacego, to samo zloto) - OSTATNI krok
                 return ip;
             }
@@ -353,7 +368,8 @@ namespace Armoury
                     sb1.Append(k.Name != null ? k.Name.ToString() : k.StringId).Append(": s ").Append((100 * sv).ToString("0.00", WtInv)).Append('%').Append(war ? "" : " (pokoj)")
                        .Append(", stawka dnia ").Append((100 * (war && s.FolkWarAid ? share * sv / baseCap : 0)).ToString("0.000", WtInv)).Append("%, danina ").Append(at);
                     if (a != null) sb1.Append(" (W ").Append(a.Cls[WtW]).Append(" / R ").Append(a.Cls[WtR]).Append(" / P ").Append(a.Cls[WtP]).Append(" / podz. ").Append(a.Cls[WtCastle])
-                                      .Append("; osad ").Append(a.Places).Append(a.Held > 0 ? "; wstrzymane w oblezeniu " + a.Held : "").Append(')');
+                                      .Append("; osad ").Append(a.Places).Append(a.Held > 0 ? "; wstrzymane w oblezeniu " + a.Held : "")
+                                      .Append(PtTakenOf(k) > 0 ? "; w tym danina pokoju M4 " + PtTakenOf(k) : "").Append(')');   // M4: czesc daniny w pokoju (ta sama droga)
                     sb1.Append(", nadwyzka ludu po ").Append(Math.Round(ovK).ToString("0", WtInv)).Append(" (W miast ").Append(Math.Round(ovW).ToString("0", WtInv)).Append(')');
                     if (kd != null) sb1.Append(", zwrot ").Append(kd.RefundGiven).Append('/').Append(kd.RefundDue).Append(", renty ").Append(kd.Rent).Append(", kredyt186 ").Append(kd.LoanIn);
                     else sb1.Append(", 165 bez dnia");
@@ -381,6 +397,7 @@ namespace Armoury
               .Append(" | pobrano ").Append(taken).Append(" zl z ").Append(_waPlaces.Count).Append(" osad (miasta ").Append(_waTowns).Append(", zamki ").Append(_waCastles)
               .Append("): W ").Append(_waCls[WtW]).Append(", R ").Append(_waCls[WtR]).Append(", P ").Append(_waCls[WtP]).Append(", podzamcza ").Append(_waCls[WtCastle])
               .Append("; wolan poboru ").Append(_waCalls)
+              .Append("; w tym danina pokoju M4 (Folk Peace Tribute, krolestwa w pokoju >= 91 dob - linia Danina pokoju (M4)) ").Append(_ptTaken).Append(" zl z ").Append(_ptTowns).Append(" miast")
               .Append(" | klaso-osady z nadwyzka bez poboru: wylaczone ").Append(_waWhy[WaOff]).Append(", bez krolestwa ").Append(_waWhy[WaNoRealm])
               .Append(", pokoj albo s = 0 ").Append(_waWhy[WaNoNeed]).Append(", oblezenie ").Append(_waWhy[WaSiege]).Append(" (wstrzymane ").Append(_waHeld).Append(" zl, ").Append(_waHeldN)
               .Append("), ulamek ponizej 1 zl czeka ").Append(_waWhy[WaWait]).Append("; zaplacily ").Append(_waWhy[WaPaid])

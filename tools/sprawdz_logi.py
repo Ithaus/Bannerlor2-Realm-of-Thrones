@@ -636,6 +636,11 @@ Uzycie (Python 3, tylko odczyt):
                     A17-10 pojedynek z Nocnym Krolem (OthersDuelFromFallen): latka wpieta, pozycja (g) linii E4/2, wstalo <= polegli.
                     A17-D1 / D2 (INFO): konie wedlug ramek i posiadaczy (juczne, K1-3), ryby poza ramkami (M6b-5a); D3 unikat z polki - w A17-4d.
                     Log bez paczki: INFO, bez wyjatku.
+--grupa sludan    : (14.10, decyzje Jeffa "sluby - 48 slubow" i "danina - tak"; galaz w-toku/sluby-danina; po recenzji) python -I tools/sprawdz_logi.py --grupa sludan
+                    [--crashscribe <session-*.log>] <Armoury-*.log> (log czytany strumieniowo). (A) SD-A0 start Z.3 (regulator 48 / rok) i ofert (84 / rok,
+                    przerwa 30.3 doby), SD-A1 sluby AI-AI na 364 doby 38-58 (linia Sluby AI (169c); 91-299 dob - 2.6 sigma), SD-A2 Z.3 = 169c, sluby =
+                    oczekiwane, regulator 43-53 / rok, SD-A3 oferty dla rodu gracza (0.15-0.31, odstep >= 30 dob), SD-A4 INFO rody; (B) SD-B0..B5 danina
+                    pokoju M4: linia, kontrolki, wziete <= budzet (chleb, najwyzej 0.5% lokaty), pokoj >= 91 dob (wiersze i KRONIKA WOJEN), dzien do dnia, linia P1.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -23159,6 +23164,342 @@ def a16_main(logp, start_arg, until=100000, csvp=None):
     return 0
 
 
+SD_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+SD_169 = re.compile(r"^Sluby AI \(169c\): dzien (\d+) \| slubow AI-AI (\d+)")
+SD_Z3 = re.compile(r"^Swaty ROT \(Z\.3\): dzien (\d+) - klanow \d+, slubow (\d+).*?tylko kandydaci z szansa \(MarriageOnlyViableCandidates\) ([A-Z]+)")
+# hamulec w linii Z.3: liczba i tryb (regulator od recenzji 14.10 / staly MarriageChanceScale) albo NIE DZIALA; oczekiwane sluby przy 1.0 i przy mnozniku dnia
+SD_Z3B = re.compile(r"; mnoznik szansy (?:([\d.]+) \((regulator|MarriageChanceScale)[^)]*\)|NIE DZIALA)")
+SD_Z3E = re.compile(r", oczekiwane slubow dzis przy 1\.0 ([\d.]+), przy mnozniku ([\d.]+) \(rzutow wolnych lordow z hamulcem (\d+)\)(?:, jutro mnoznik ([\d.]+)( \(doba bez wpisu)?)?")
+SD_OF = re.compile(r"^Oferty slubu \(rok\): dzien (\d+) \| (?:regula CZYNNA, mnoznik doby rodu ([\d.]+) \(84 / (\d+)\)(?:, przerwa miedzy ofertami ([\d.]+) dob \(gra 7\))?|regula NIECZYNNA[^|]*)"
+                   r" \| doby rodow przepuszczone przez ROT (\d+): w przerwie (\d+), rzucone (\d+), przepuszczone (\d+) \| oferty dzis (\d+)")
+SD_M4 = re.compile(r"^Danina pokoju \(M4\): dzien (\d+) \| wylacznik Folk Peace Tribute (tak|nie)"
+                   r".*? \| dzis wziete (\d+) zl z (\d+) miast \(krolestw (\d+)\) wobec budzetu (\d+) \(chleb korony wczoraj (\d+), najwyzej 0\.5% lokaty\); wstrzymane w oblezeniu (\d+),"
+                   r" prog lojalnosci P1b (\d+) miast, przyciete do budzetu (\d+) \| krolestw w pokoju >= 91 dob (\d+): chleb korony dzis (\d+), lokata W (\d+)"
+                   r" \| budzet na jutro (\d+) zl w (\d+) krolestwach \(w tym pulap 0\.5% lokaty nizszy niz chleb (\d+)\) \| kontrola: ponad plan (\d+), stawka ponad 0\.5% (\d+), w wojnie (\d+)")
+SD_M4F = ("day", "key", "taken", "towns", "kings", "budget", "breadY", "held", "gate", "cut", "lpk", "bread", "lok", "planT", "planK", "capK", "c_over", "c_rate", "c_war")
+SD_M4K = re.compile(r"^(.*?): (WOJNA|pokoj (\d+) dob|pokoj bez daty \(nigdy w wojnie\)), wziete dzis (\d+) z (\d+) miast \(budzet (\d+)\), chleb korony dzis (\d+),"
+                    r" lokata W (\d+), budzet jutro (\d+), stawka jutro ([\d.]+)%")
+SD_P1 = re.compile(r"^Danina z oszczednosci \(P1\): dzien (\d+) .*?; w tym danina pokoju M4 \(Folk Peace Tribute[^)]*\)\) (\d+) zl z (\d+) miast")
+SD_P1K = re.compile(r"^(.*?): s [\d.]+%(?: \(pokoj\))?, stawka dnia [\d.]+%, danina (\d+) \(W (\d+) / R \d+ / P \d+ / podz\. \d+; osad \d+"
+                    r"(?:; wstrzymane w oblezeniu \d+)?(?:; w tym danina pokoju M4 (\d+))?\)")
+SD_KW = re.compile(r"^KRONIKA WOJEN \((?:dzien|po wczytaniu), Year (\d+), Day (\d+), [A-Za-z]+\): (.*)$")
+SD_RODY = re.compile(r"^Niewola lordow i okupy \(169c\): dzien (\d+) .*?\(rodow AI (\d+)\)")
+SD_LORDY = re.compile(r"^Poziomy lordow \(E8/P1\): dzien (\d+) \| lordowie AI (\d+) ")
+SD_GLOWY = re.compile(r"^Szczelnosc \(164a/31b\): dzien (\d+) .*?glowy rodow bez nastepcy -?\d+ \((\d+)\)")
+
+
+def _sd_p1_rows(s):
+    """Linia P1 (paczka sluby-danina): wiersze krolestw -> {nazwa: (danina, W, M4)}; nieczytelne - klucz "BAD" z liczba."""
+    out, bad = {}, 0
+    i = s.find("| na krolestwo: ")
+    if i < 0:
+        return out, 0
+    seg = s[i + len("| na krolestwo: "):]
+    j = seg.find(" | czas poboru ")
+    seg = seg[:j] if j >= 0 else seg
+    if seg.strip() in ("", "-"):
+        return out, 0
+    for part in seg.split(" ; "):
+        m = SD_P1K.match(part)
+        if not m:
+            bad += 1
+            continue
+        out[m.group(1)] = (int(m.group(2)), int(m.group(3)), int(m.group(4) or 0))
+    return out, bad
+
+
+def sludan_main(logp, csp=None):
+    """sludan (14.10, decyzje Jeffa "sluby - 48 slubow" i "danina - tak"; galaz w-toku/sluby-danina; poprawki po recenzji 14.10). Log Armoury czytany
+    strumieniowo; --crashscribe <session-*.log> - linie CrashScribe (swaty Z.3, oferty dla rodu gracza, KRONIKA WOJEN). Wiersze:
+    (A) SD-A0a start Z.3: PODPIETY, regula CZYNNE, regulator MarriageTargetPerYear 48 przy roku 364; SD-A0b start ofert (0.231, przerwa 30.3 dob);
+        SD-A0c plik ustawien CrashScribe z drzewa (mnoznik startowy 0.17 - stary plik ma 0.7).
+        SD-A1 sluby AI-AI na rok z linii Armoury "Sluby AI (169c)": bieg >= 300 dob 38-58 na 364 doby (cel 48 +- 10; sam rozrzut losowy roku ok. +-7), kazdy
+        pelny rok osobno; 91-299 dob - odchylenie od 48 x doby / 364 najwyzej 2.6 sigma Poissona + 1; krocej INFO.
+        SD-A2a (z CS) doby Z.3 z hamulcem regulatora; SD-A2b sluby Z.3 = sluby 169c tych samych dob +- 2; SD-A2c sluby Z.3 = suma oczekiwanych przy mnozniku
+        dnia (3 sigma + 2); SD-A2d suma oczekiwanych przy mnozniku na 364 doby (bez dob startu) 43-53 przy >= 28 dobach - regulator trzyma cel.
+        SD-A3a oferty: przepuszczone / rzucone doby rodow 0.15-0.31 przy >= 100 rzutach; SD-A3b oferty na rok INFO; SD-A3c odstep miedzy ofertami >= 30 dob.
+        SD-A4 INFO: rody AI, dorosli lordowie AI, glowy rodow zmarle bez nastepcy (wymieranie rodow - mniej slubow).
+    (B) SD-B0 linia "Danina pokoju (M4)" kazdej doby, klucz tak. SD-B1 kontrolki linii = 0 (konstrukcyjne - dzialaja jako straz regresji).
+        SD-B2a wziete <= budzet (chleb korony wczoraj, najwyzej 0.5% lokaty) w kazdej dobie; SD-B2b suma wzietych / suma budzetow 0.80-1.00 przy >= 50 000 zl.
+        SD-B3a wiersze krolestw: pobor tylko w pokoju >= 91 dob (stan z wiersza); SD-B3b stawka jutro <= 0.5%;
+        SD-B3c (z CS, niezaleznie od kodu M4) krolestwo z poborem nie ma wojny w KRONICE WOJEN w dobach d-91..d;
+        SD-B3d wiersze krolestw dzien do dnia: wziete dzis <= "budzet jutro" z wczoraj, ten budzet <= min(chleb, 0.5% lokaty) z wczoraj, "budzet" dzis = wczorajszy.
+        SD-B4 linia P1: "w tym danina pokoju M4" = "dzis wziete" M4; suma M4 z wierszy krolestw P1 = M4; M4 krolestwa <= jego W w linii P1.
+        SD-B5 INFO: M4 na dobe, chleb, lokata, krolestwa z pulapem 0.5% nizszym niz chleb, przyciete, prog lojalnosci.
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    m169, m4, m4rows, p1m4, p1rows = {}, {}, {}, {}, {}
+    rody, lordy, glowy = {}, {}, {}
+    p1bad = 0
+    keys = ("Sluby AI (169c)", "Danina pokoju (M4)", "w tym danina pokoju M4", "Niewola lordow i okupy (169c)", "Poziomy lordow (E8/P1)", "Szczelnosc (164a/31b)")
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if not any(k in ln for k in keys):
+                continue
+            s = SD_TS.sub("", ln.rstrip("\r\n"))
+            m = SD_169.match(s)
+            if m:
+                m169[int(m.group(1))] = int(m.group(2))
+                continue
+            m = SD_M4.match(s)
+            if m:
+                g = dict(zip(SD_M4F, [m.group(1), m.group(2)] + [int(x) for x in m.groups()[2:]]))
+                d = int(g["day"])
+                m4[d] = g
+                i = s.find(" | na krolestwo: ")
+                rows = []
+                if i >= 0:
+                    seg = s[i + len(" | na krolestwo: "):].rstrip(".")
+                    if seg.strip() != "-":
+                        for part in seg.split(" ; "):
+                            mk = SD_M4K.match(part)
+                            rows.append(mk.groups() if mk else ("BAD", part[:60]))
+                m4rows[d] = rows
+                continue
+            m = SD_P1.match(s)
+            if m:
+                d = int(m.group(1))
+                p1m4[d] = int(m.group(2))
+                p1rows[d], nb = _sd_p1_rows(s)
+                p1bad += nb
+                continue
+            m = SD_RODY.match(s)
+            if m:
+                rody[int(m.group(1))] = int(m.group(2))
+                continue
+            m = SD_LORDY.match(s)
+            if m:
+                lordy[int(m.group(1))] = int(m.group(2))
+                continue
+            m = SD_GLOWY.match(s)
+            if m:
+                glowy[int(m.group(1))] = int(m.group(2))
+    cs_z3, cs_of, cs_start_z3, cs_start_of, war = {}, {}, [], [], {}
+    if csp:
+        with open(csp, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if "waty ROT (Z.3)" not in ln and "ferty slubu (rok)" not in ln and "KRONIKA WOJEN" not in ln:
+                    continue
+                s = SD_TS.sub("", ln.rstrip("\r\n"))
+                if s.startswith("Mends: swaty ROT (Z.3)"):
+                    cs_start_z3.append(s)
+                    continue
+                if s.startswith("Mends: oferty slubu (rok)"):
+                    cs_start_of.append(s)
+                    continue
+                m = SD_KW.match(s)
+                if m:
+                    # doba kampanii = rok x 364 + dzien roku - 1 (kalendarz Armoury 364 doby; sprawdzone na biegu dwuletnim: Year 299, Day 2 = dzien 108837)
+                    d = int(m.group(1)) * 364 + int(m.group(2)) - 1
+                    names = set()
+                    if not m.group(3).startswith("POKOJ WSZEDZIE"):
+                        for pr in m.group(3).rstrip(".").split("; "):
+                            ab = pr.split(" vs ")
+                            if len(ab) == 2:
+                                names.update(x.strip() for x in ab)
+                    war[d] = names
+                    continue
+                m = SD_Z3.match(s)
+                if m:
+                    b = SD_Z3B.search(s)
+                    e = SD_Z3E.search(s)
+                    cs_z3[int(m.group(1))] = {"wed": int(m.group(2)), "rule": m.group(3),
+                                              "scale": (b.group(1) if b and b.group(1) else None), "mode": (b.group(2) if b and b.group(1) else None),
+                                              "e1": (float(e.group(1)) if e else None), "es": (float(e.group(2)) if e else None),
+                                              "fed": (e is not None and e.group(4) is not None and e.group(5) is None)}
+                    continue
+                m = SD_OF.match(s)
+                if m:
+                    cs_of[int(m.group(1))] = {"f": m.group(2), "gap": m.group(4), "all": int(m.group(5)), "inGap": int(m.group(6)),
+                                              "rolled": int(m.group(7)), "passed": int(m.group(8)), "offers": int(m.group(9))}
+    print(f"plik: {logp} | dob Sluby AI (169c) {len(m169)}, linii M4 {len(m4)}, linii P1 z M4 {len(p1m4)}"
+          + (f" | CrashScribe: {csp} - linii Z.3 {len(cs_z3)}, ofert {len(cs_of)}, kronik wojen {len(war)}, startow Z.3 {len(cs_start_z3)}, ofert {len(cs_start_of)}"
+             if csp else " | bez --crashscribe"))
+    # ---------------------------------------------------------------- (A)
+    if csp:
+        if cs_start_z3:
+            last = cs_start_z3[-1]
+            ok = "PODPIETY" in last and "CZYNNE" in last and "(regulator MarriageTargetPerYear 48 na rok" in last and "przy roku 364" in last
+            rep.add("SD-A0a: start swatow Z.3 (CrashScribe)", last[:160] + ("..." if len(last) > 160 else ""),
+                    "PODPIETY, regula CZYNNE, regulator MarriageTargetPerYear 48 przy roku 364", ok)
+            ms = re.search(r"mnoznik szansy ([\d.]+) ", last)
+            rep.add("SD-A0c: plik ustawien CrashScribe z paczki (mnoznik startowy)", (ms.group(1) if ms else "brak liczby") + ("" if ms and abs(float(ms.group(1)) - 0.17) < 1e-6 else " - stary plik?"),
+                    "mnoznik szansy 0.17 w linii startu (stary plik w grze: 0.7 - przez 1-2 doby po wczytaniu; regulator i tak dziala - klucz domyslny)",
+                    bool(ms) and abs(float(ms.group(1)) - 0.17) < 1e-6)
+        else:
+            rep.add("SD-A0a: start swatow Z.3 (CrashScribe)", "brak linii startu", "PODPIETY, regula CZYNNE, regulator 48", None)
+        if cs_start_of:
+            last = cs_start_of[-1]
+            ok = "PODPIETY" in last and (("0.231 = 84 / rok" in last and "przerwa miedzy ofertami 30.3 dob" in last) or "rok nie dluzszy niz 84" in last)
+            rep.add("SD-A0b: start ofert slubu dla rodu gracza (CrashScribe)", last[:160], "PODPIETY, mnoznik 0.231 = 84 / rok, przerwa 30.3 dob (rok 364)", ok)
+        else:
+            rep.add("SD-A0b: start ofert slubu dla rodu gracza (CrashScribe)", "brak linii (wersja sprzed paczki)", "PODPIETY", None)
+    else:
+        rep.add("SD-A0: start swatow Z.3 i ofert (CrashScribe)", "bez --crashscribe", "podaj --crashscribe <session-*.log>", None)
+    days = sorted(m169)
+    if days:
+        n, tot = len(days), sum(m169[d] for d in days)
+        rate = 364.0 * tot / n
+        if n >= 300:
+            ok, rule = 38 <= rate <= 58, "38-58 na 364 doby (cel 48 +- 10; rozrzut losowy roku ok. +-7 - pojedynczy rok poza progiem przy SD-A2c/A2d TAK to los)"
+        elif n >= 91:
+            mu = 48.0 * n / 364
+            ok, rule = abs(tot - mu) <= 2.6 * mu ** 0.5 + 1, f"{mu:.1f} +- {2.6 * mu ** 0.5 + 1:.1f} w {n} dobach (48 na 364 doby, 2.6 sigma Poissona + 1); regulator - SD-A2d"
+        else:
+            ok, rule = None, "INFO ponizej 91 dob"
+        rep.add("SD-A1: sluby AI-AI na rok (linia Sluby AI (169c))", f"{tot} w {n} dobach = {rate:.1f} na 364 doby (doby gry {days[0]}-{days[-1]})", rule, ok)
+        for y in range(n // 364):
+            seg = days[y * 364:(y + 1) * 364]
+            v = sum(m169[d] for d in seg)
+            rep.add(f"SD-A1{chr(97 + y)}: sluby AI-AI w roku {y + 1} biegu", f"{v} (doby gry {seg[0]}-{seg[-1]})", "38-58", 38 <= v <= 58)
+    else:
+        rep.add("SD-A1: sluby AI-AI na rok (linia Sluby AI (169c))", "brak linii", "38-58 na 364 doby", None)
+    if csp and cs_z3:
+        zd = sorted(cs_z3)
+        bad = [d for d in zd if cs_z3[d]["mode"] != "regulator"]
+        rep.add("SD-A2a: doby swatow Z.3 z hamulcem regulatora (MarriageTargetPerYear)",
+                f"{len(zd) - len(bad)} z {len(zd)}" + (f" (pierwsza inna: dzien {bad[0]}: regula {cs_z3[bad[0]]['rule']}, mnoznik {cs_z3[bad[0]]['scale']} {cs_z3[bad[0]]['mode']})" if bad else ""),
+                "wszystkie", not bad)
+        common = [d for d in zd if d in m169]
+        if common:
+            a, b = sum(cs_z3[d]["wed"] for d in common), sum(m169[d] for d in common)
+            rep.add("SD-A2b: sluby drogi Z.3 = wszystkie sluby AI-AI (169c) tych samych dob", f"Z.3 {a}, 169c {b} ({len(common)} dob)", "roznica <= 2", abs(a - b) <= 2)
+        else:
+            rep.add("SD-A2b: sluby drogi Z.3 = wszystkie sluby AI-AI (169c)", "brak wspolnych dob (inny bieg?)", "roznica <= 2", None)
+        ed = [d for d in zd if cs_z3[d]["es"] is not None]
+        if ed:
+            wed, es, e1 = sum(cs_z3[d]["wed"] for d in ed), sum(cs_z3[d]["es"] for d in ed), sum(cs_z3[d]["e1"] for d in ed)
+            rep.add("SD-A2c: sluby Z.3 = suma oczekiwanych przy mnozniku dnia (rzuty niezalezne)", f"sluby {wed}, oczekiwane {es:.1f} ({len(ed)} dob; przy 1.0 {e1:.1f})",
+                    "|sluby - oczekiwane| <= 3 sigma Poissona + 2", abs(wed - es) <= 3 * es ** 0.5 + 2)
+            fd = [d for d in ed if cs_z3[d]["fed"]]   # doby z wpisem do sredniej (bez pierwszej po wczytaniu i dob z rodami oryginalu)
+            if len(fd) >= 28:
+                per = 364.0 * sum(cs_z3[d]["es"] for d in fd) / len(fd)
+                rep.add("SD-A2d: regulator - oczekiwane sluby przy mnozniku dnia na 364 doby (doby z wpisem do sredniej)", f"{per:.1f} ({len(fd)} dob)",
+                        "43-53 (cel 48; mnoznik 1.0 nie wystarcza - mniej, wtedy INFO)", (43 <= per <= 53) if per >= 43 or any(cs_z3[d]["scale"] != "1.000" for d in fd) else None)
+            else:
+                rep.add("SD-A2d: regulator - oczekiwane sluby na 364 doby", f"{len(fd)} dob z wpisem do sredniej", "INFO ponizej 28 dob", None)
+        else:
+            rep.add("SD-A2c/d: oczekiwane sluby (regulator)", "brak liczb w linii Z.3 (wersja sprzed recenzji)", "linia Z.3 z 'oczekiwane slubow dzis'", None)
+    elif csp:
+        rep.add("SD-A2: swaty Z.3 (CrashScribe)", "brak linii doby", "regulator 48", None)
+    if csp and cs_of:
+        od = sorted(cs_of)
+        rolled, passed, offers, ingap = (sum(cs_of[d][k] for d in od) for k in ("rolled", "passed", "offers", "inGap"))
+        r = passed / rolled if rolled else None
+        rep.add("SD-A3a: oferty dla rodu gracza - przepuszczone / rzucone doby rodow", f"{passed} / {rolled}" + (f" = {r:.3f}" if r is not None else "") + f"; w przerwie {ingap}",
+                "0.15-0.31 (mnoznik 0.231) przy >= 100 rzutach; mniej - INFO", (0.15 <= r <= 0.31) if (r is not None and rolled >= 100) else None)
+        rep.add("SD-A3b: oferty slubu dla rodu gracza (INFO)", f"{offers} w {len(od)} dobach = {364.0 * offers / max(1, len(od)):.1f} na 364 doby",
+                "INFO (pomiaru sprzed zmiany nie ma; cel: tyle na 364 doby, ile gra w 84)", None)
+        od_off = [d for d in od if cs_of[d]["offers"] > 0]
+        gaps = [b - a for a, b in zip(od_off, od_off[1:])]
+        rep.add("SD-A3c: odstep miedzy ofertami (doby z oferta)", (f"najmniej {min(gaps)} dob ({len(od_off)} dob z oferta)" if gaps else f"dob z oferta {len(od_off)}"),
+                ">= 30 (przerwa 30.3 doby); mniej niz 2 oferty - INFO", (min(gaps) >= 30 and all(cs_of[d]["offers"] <= 1 for d in od_off)) if gaps else None)
+    elif csp:
+        rep.add("SD-A3: oferty dla rodu gracza", "brak linii doby (wersja sprzed paczki)", "linia Oferty slubu (rok)", None)
+    if rody or lordy:
+        rd, ld = sorted(rody), sorted(lordy)
+        rep.add("SD-A4: rody i lordowie AI (INFO - wymieranie rodow przy rzadszych slubach)",
+                (f"rodow AI {rody[rd[0]]} -> {rody[rd[-1]]} (doby {rd[0]}-{rd[-1]})" if rd else "brak linii Niewola (169c)")
+                + (f"; dorosli lordowie AI {lordy[ld[0]]} -> {lordy[ld[-1]]}" if ld else "")
+                + f"; glowy rodow zmarle bez nastepcy {sum(glowy.values())} w {len(glowy)} dobach",
+                "INFO (bieg dwuletni przy 0.7: rodow 318 -> 322, lordow 1196 -> 1910, glow bez nastepcy 1; dziedzic musi miec 18 lat - skutek slubow po latach)", None)
+    # ---------------------------------------------------------------- (B)
+    if not m4:
+        rep.add("SD-B0: linia Danina pokoju (M4)", "brak w logu", "linia kazdej doby (wersja sprzed paczki - INFO)", None)
+        rep.show()
+        return 0
+    md = sorted(m4)
+    off = [d for d in md if m4[d]["key"] != "tak"]
+    gaps = [d for d in range(md[0], md[-1] + 1) if d not in m4]
+    rep.add("SD-B0: linia Danina pokoju (M4) kazdej doby, klucz tak", f"dob {len(md)} (luk {len(gaps)}), klucz nie w {len(off)}", "bez luk, klucz tak", not gaps and not off)
+    ctl = [d for d in md if m4[d]["c_over"] or m4[d]["c_rate"] or m4[d]["c_war"]]
+    rep.add("SD-B1: kontrolki M4 (ponad plan, stawka ponad 0.5%, w wojnie)",
+            f"dob z kontrolka > 0: {len(ctl)}" + (f" (pierwsza dzien {ctl[0]})" if ctl else ""), "0 w kazdej dobie (kontrolki konstrukcyjne - straz regresji)", not ctl)
+    over = [d for d in md if m4[d]["taken"] > m4[d]["budget"]]
+    tk, pl = sum(m4[d]["taken"] for d in md), sum(m4[d]["budget"] for d in md)
+    rep.add("SD-B2a: wziete <= budzet (chleb korony wczoraj, najwyzej 0.5% lokaty) w kazdej dobie", f"dob ponad budzetem {len(over)}" + (f" (pierwsza {over[0]})" if over else ""), "0", not over)
+    rr = tk / pl if pl else None
+    rep.add("SD-B2b: suma wzietych / suma budzetow", f"{tk} / {pl}" + (f" = {rr:.3f}" if rr is not None else ""),
+            "0.80-1.00 przy budzetach >= 50 000 zl (mniej: lokata zmalala, prog lojalnosci); mniej budzetow - INFO",
+            (0.80 <= rr <= 1.0) if (rr is not None and pl >= 50000) else None)
+    badk, badrate, badparse = [], [], 0
+    rowsby = {}
+    for d in md:
+        rowsby[d] = {}
+        for row in m4rows.get(d, []):
+            if row[0] == "BAD":
+                badparse += 1
+                continue
+            name, state, pdays, taken = row[0], row[1], row[2], int(row[3])
+            rowsby[d][name] = {"taken": taken, "budget": int(row[5]), "bread": int(row[6]), "lok": int(row[7]), "budgetJ": int(row[8]), "rate": float(row[9])}
+            if taken > 0 and (state == "WOJNA" or (pdays is not None and int(pdays) < 91)):
+                badk.append(f"{name} dzien {d} ({state}, {taken} zl)")
+            if float(row[9]) > 0.5 + 1e-9:
+                badrate.append(f"{name} dzien {d} ({row[9]}%)")
+    rep.add("SD-B3a: pobor M4 tylko w krolestwie w pokoju >= 91 dob (wiersze krolestw)",
+            f"{len(badk)}" + (f" ({badk[0]})" if badk else "") + (f"; nieczytelnych wierszy {badparse}" if badparse else ""), "0", not badk and not badparse)
+    rep.add("SD-B3b: stawka jutro <= 0.5% (wiersze krolestw)", f"{len(badrate)}" + (f" ({badrate[0]})" if badrate else ""), "0", not badrate)
+    if csp and war:
+        w0 = min(war)
+        viol, full, part = [], 0, 0
+        for d in md:
+            for name, r in rowsby[d].items():
+                if r["taken"] <= 0:
+                    continue
+                hit = [x for x in range(d - 91, d + 1) if name in war.get(x, ())]
+                if hit:
+                    viol.append(f"{name} dzien {d} (wojna w kronice dnia {hit[-1]})")
+                elif d - 91 >= w0:
+                    full += 1
+                else:
+                    part += 1
+        rep.add("SD-B3c: krolestwo z poborem M4 bez wojny w KRONICE WOJEN (CrashScribe) w dobach d-91..d",
+                f"naruszen {len(viol)}" + (f" ({viol[0]})" if viol else "") + f"; sprawdzonych z pelna historia {full}, z niepelna (start sesji) {part}",
+                "0 naruszen (niezalezne od kodu M4)", (not viol) if (viol or full) else None)
+    elif csp:
+        rep.add("SD-B3c: M4 a KRONIKA WOJEN", "brak linii kroniki w logu CrashScribe", "0 naruszen", None)
+    b3d, chk = [], 0
+    for d in md:
+        y = rowsby.get(d - 1)
+        if y is None:
+            continue
+        for name, r in rowsby[d].items():
+            ry = y.get(name)
+            if ry is None:
+                if r["taken"] > 0 or r["budget"] > 0:
+                    b3d.append(f"{name} dzien {d}: pobor {r['taken']} / budzet {r['budget']} bez wiersza wczoraj")
+                continue
+            chk += 1
+            lim = min(ry["bread"], -(-ry["lok"] * 5 // 1000) + 1)   # 0.5% lokaty w gore (+1 - lokata w linii zaokraglona)
+            if r["taken"] > ry["budgetJ"] or r["budget"] != ry["budgetJ"] or ry["budgetJ"] > lim:
+                b3d.append(f"{name} dzien {d}: wziete {r['taken']}, budzet {r['budget']}, wczoraj budzet jutro {ry['budgetJ']} (chleb {ry['bread']}, lokata {ry['lok']})")
+    rep.add("SD-B3d: wiersze krolestw dzien do dnia (wziete <= wczorajszy budzet jutro <= min(chleb, 0.5% lokaty))",
+            f"sprawdzonych {chk}, niezgodnych {len(b3d)}" + (f" ({b3d[0]})" if b3d else ""), "0 niezgodnych", (not b3d) if chk or b3d else None)
+    common = [d for d in md if d in p1m4]
+    diff = [d for d in common if p1m4[d] != m4[d]["taken"]]
+    sdiff, wover = [], []
+    for d in common:
+        rows = p1rows.get(d, {})
+        if sum(v[2] for v in rows.values()) != m4[d]["taken"]:
+            sdiff.append(d)
+        wover += [f"{k} dzien {d} (M4 {v[2]} > W {v[1]})" for k, v in rows.items() if v[2] > v[1]]
+    rep.add("SD-B4: linia P1 - 'w tym danina pokoju M4' i suma z wierszy krolestw = 'dzis wziete' M4; M4 krolestwa <= jego W",
+            f"porownanych dob {len(common)}, roznych (linia) {len(diff)}, roznych (suma wierszy) {len(sdiff)}, M4 > W {len(wover)}"
+            + (f" ({wover[0]})" if wover else "") + (f"; nieczytelnych wierszy P1 {p1bad}" if p1bad else ""),
+            "0 roznic", (not diff and not sdiff and not wover and not p1bad) if common else None)
+    avg = tk / len(md)
+    mx = max(md, key=lambda d: m4[d]["taken"])
+    lastd = md[-1]
+    rep.add("SD-B5: M4 na dobe (INFO)",
+            f"srednio {avg:.0f} zl/d, najwiecej {m4[mx]['taken']} (dzien {mx}); chleb korony krolestw w dlugim pokoju srednio {sum(m4[d]['bread'] for d in md) / len(md):.0f} zl/d;"
+            f" lokata W tych krolestw w ostatniej dobie {m4[lastd]['lok'] / 1e6:.2f} mln ({m4[lastd]['lpk']} krolestw); budzet nizszy niz chleb (pulap 0.5%) w krolestwo-dobach"
+            f" {sum(m4[d]['capK'] for d in md)}; przyciete do budzetu {sum(m4[d]['cut'] for d in md)}, prog lojalnosci {sum(m4[d]['gate'] for d in md)},"
+            f" wstrzymane w oblezeniu {sum(m4[d]['held'] for d in md)} zl",
+            "INFO (M4 = chleb korony krolestw w pokoju >= 91 dob, w biednych krolestwach najwyzej 0.5% lokaty; chleb M3 bez pomiaru w zadnym logu)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -23191,6 +23532,8 @@ def main(argv):
         if a == "--baza-doby":
             bdp = args[i + 1]; i += 2; continue
         logp = a; i += 1
+    if group == "sludan" and logp:
+        return sludan_main(logp, csp)   # 14.10 sluby-danina: (A) sluby AI na rok (hamulec 0.17) i oferty dla rodu gracza (84 / rok), (B) danina pokoju M4
     if group == "a17" and logp:
         return a17_main(logp)   # A17 (14.10): stare zaleglosci - ludzie kasowanych partii (11), statki do liczby idealnej (6), unikaty (4), Nocny Krol (10), diagnozy D1-D4
     if group == "etap3" and logp:

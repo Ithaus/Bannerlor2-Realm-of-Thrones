@@ -194,13 +194,21 @@ namespace Armoury
             string who = f.Kind == 0 ? "townsfolk" : "castle folk";
             int why;
             double rate = KingdomTreasury.FolkWarAidRate(st, out why);
+            // M4 (recenzja 14.10): w pokoju (powod 3) danina pokoju o nastepnym swicie - stawka W z planu korony albo prog lojalnosci P1b (tylko odczyt)
+            bool ptGated = false;
+            double pt = why == KingdomTreasury.WaNoNeed ? KingdomTreasury.PeaceTributeRatePeek(st, out ptGated) : 0;
             log = head + " | kiesy " + purse + ", potrzeba dnia " + F2(need) + ", dni " + F1(days) + " | ponad zapas dni po daninie " + N0(f.DOver) + ", danina ostatniej doby " + f.DAid
-                  + " | stawka dnia dzis " + (100 * rate).ToString("0.000", Inv) + "% (powod " + why + ": 0 placi, 1 wylaczone, 2 bez krolestwa, 3 pokoj albo s = 0, 4 oblezenie, 6 lojalnosc na progu P1b)";
+                  + " | stawka dnia dzis " + (100 * rate).ToString("0.000", Inv) + "% (powod " + why + ": 0 placi, 1 wylaczone, 2 bez krolestwa, 3 pokoj albo s = 0, 4 oblezenie, 6 lojalnosc na progu P1b)"
+                  + (pt > 0 || ptGated ? " | danina pokoju M4 o nastepnym swicie: " + (ptGated ? "prog lojalnosci P1b - nie placi" : "stawka W " + (100 * pt).ToString("0.0000", Inv) + "%") : "");
             string s0 = "Savings: the " + who + " hold coin for " + DaysText(days) + " of living";
             if (f.DAid > 0)
-                return s0 + ". At the last dawn they gave the crown " + Coins(f.DAid) + " in war aid; " + Coins(f.DOver) + " still lie above their reserve for hard times, which is not touched.";
+                return s0 + ". At the last dawn they gave the crown " + Coins(f.DAid)
+                       + (KingdomTreasury.PeaceTributeFrom(st, _liveDay + 1) ? " in tribute toward the bread of the realm's hungry towns; " : " in war aid; ")   // M4: danina pokoju
+                       + Coins(f.DOver) + " still lie above their reserve for hard times, which is not touched.";
             if (f.DOver < 1) return s0 + " - nothing to spare.";
-            string tail = why == KingdomTreasury.WaNoNeed ? " The crown asks no war aid of them now."
+            string tail = why == KingdomTreasury.WaNoNeed ? (ptGated ? " The tax gatherers have left: the town is too close to revolt to pay the peace tribute."
+                                                           : pt > 0 ? " In this long peace the crown takes from the labourers only what it spends on bread for the realm's hungry towns."
+                                                           : " The crown asks no war aid of them now.")
                         : why == KingdomTreasury.WaSiege ? " Under siege they pay no war aid."
                         : why == KingdomTreasury.WaLowLoy ? " The tax gatherers have left: the " + (f.Kind == 0 ? "town" : "castle") + " is too close to revolt to pay the war aid." : "";
             return s0 + "; " + Coins(f.DOver) + " of it lie above their reserve for hard times." + tail;
