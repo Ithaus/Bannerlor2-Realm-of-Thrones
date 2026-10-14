@@ -100,6 +100,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOnlyWhileThere { get; set; } = true;
 
+        [SettingPropertyBool("Forge Like Town Smith", HintText = "your work at the anvil takes as long as a town smith's: the same days of work his workshop gives the piece, each a smith's day of hours (Work Hours Per Man Day) - a mail shirt is weeks, not an afternoon; the pay stays as it was, and a lord's order gives you the days of work on top of its deadline (off = the hours of the Banner Kings screen, as before)")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool ForgeLikeTownSmith { get; set; } = true;
+
         [SettingPropertyBool("Forge Takes Time", HintText = "armour is not finished the moment you order it")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeTakesTime { get; set; } = true;
@@ -5672,6 +5676,7 @@ namespace Armoury
             s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
+            s.ForgeLikeTownSmith = ForgeLikeTownSmith;
             s.ForgeTakesTime = ForgeTakesTime;
             s.DaysPerTier = DaysPerTier;
             s.TempoHastyTime = TempoHastyTime;

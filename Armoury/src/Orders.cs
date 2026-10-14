@@ -174,7 +174,7 @@ namespace Armoury
                         title = "OFFER: " + item.Name + " for " + lord.Name;
                         hint = "Pay " + pay + " gold on delivery (market worth " + item.Value + ")." +
                                "\nTier " + ((int)item.Tier + 1) + " - forge it in the CRAFT tab." +
-                               "\nOnce taken: " + (int)s.OrderDeadlineDays + " days to deliver here." +
+                               "\nOnce taken: " + (int)ForgeClock.OrderDays(item) + " days to deliver here." +   // C5: termin z dobami pracy przy kowadle
                                "\nThe offer itself stands " + Math.Max(0, (int)daysLeft) + " more days.";
                         enabled = CountAccepted() < s.MaxAcceptedOrders;
                         if (!enabled) hint += "\nYour book is full (" + s.MaxAcceptedOrders + " orders).";
@@ -228,9 +228,9 @@ namespace Armoury
             if (p[4] == "0")
             {
                 Board.Remove(line);
-                Board.Add(p[0] + "|" + p[1] + "|" + p[2] + "|" + F(Today + s.OrderDeadlineDays) + "|1");
+                Board.Add(p[0] + "|" + p[1] + "|" + p[2] + "|" + F(Today + ForgeClock.OrderDays(item)) + "|1");   // C5: termin + doby pracy przy kowadle
                 Log.Player("Taken: a " + item.Name + " for " + lord.Name + ", within " +
-                           (int)s.OrderDeadlineDays + " days. Forge it and bring it here.");
+                           (int)ForgeClock.OrderDays(item) + " days. Forge it and bring it here.");
                 Log.Info("Przyjeto: " + line);
                 return;
             }

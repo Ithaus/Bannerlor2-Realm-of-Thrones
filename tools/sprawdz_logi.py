@@ -467,6 +467,9 @@ Uzycie (Python 3, tylko odczyt):
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
+--grupa jeff14    : (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz) J5 kuznia gracza jak u kowali AI (C5, ForgeLikeTownSmith), J4 strata gracza po
+                    pojmaniu jak lorda AI (C4), J3 komplet weterana (C3). python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>. Caly log; log bez
+                    paczki albo bez kucia / pojmania gracza: INFO, bez wyjatku.
 --grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
                     i L5b-2 karawany wroga w zdobytym miescie (EnemyCaravans). python -I tools/sprawdz_logi.py --grupa lup5b [--do-doby 364] <Armoury-*.log>
                     Wiersze L5B-0..L5B-8: linie, latki, zdobycia szturmem = linie L5b-2, obieg skarbca co do zlotowki, zabrane <= czesc x nadwyzka ponad zapas
@@ -16455,6 +16458,48 @@ def drobne14_main(logp):
     return 0
 
 
+def _j14_c5(lines, rep):
+    """J5 (C5, ForgeLikeTownSmith): linia przykladow przy wycenie uzbrojenia (J5-0), kazda sztuka gracza - godziny = dni kowala x godziny dnia kowala
+    (J5-1, z linii "Kuznia jak u kowali (C5)": godzin / dni kowala = dzien kowala z linii przykladow +-0.6 h; seria amunicji liczy dni na serie),
+    plyta t6 z przykladow >= 50 dni kowala (J5-2: wzor warsztatu AI, nie godziny BK), suma godzin wobec dawnych (INFO)."""
+    ex = [s for s in lines if s.startswith("Kuznia jak u kowali (C5): CZYNNA") or s.startswith("Kuznia jak u kowali (C5): wylaczona")]
+    pieces = [s for s in lines if s.startswith("Kuznia jak u kowali (C5): ") and " x" in s and "dni kowala" in s]
+    if not ex:
+        rep.add("J5-0: kuznia jak u kowali (C5) - linia przykladow", "brak", "INFO (wersja sprzed C5)", None)
+        return
+    on = ex[-1].startswith("Kuznia jak u kowali (C5): CZYNNA")
+    per = num(r"dzien kowala ([\d.]+) h", ex[-1], float, 16.0) or 16.0
+    rep.add("J5-0: kuznia jak u kowali (C5) - linia przykladow", ex[-1][:300], "CZYNNA (klucz ForgeLikeTownSmith)", on)
+    plate = num(r"sturgian_fortified_armor ([\d.]+) d", ex[-1], float)
+    rep.add("J5-2: plyta t6 (sturgian_fortified_armor) - dni kowala", "-" if plate is None else f"{plate} d = {plate * per:.0f} h",
+            ">= 50 dni (wzor warsztatu AI: waga x (1.5 + tier - 3) + tier); brak sztuki - INFO", None if plate is None else plate >= 50)
+    if not pieces:
+        rep.add("J5-1: sztuki gracza na lawie (godziny = dni x dzien kowala)", "0 sztuk w logu", "INFO (gracz nie kul w tym biegu)", None)
+        return
+    bad = 0; h = old = 0.0
+    for s in pieces:
+        d = num(r"dni kowala ([\d.]+)", s, float, 0.0) or 0.0
+        g = num(r", godzin ([\d.]+)", s, float, 0.0) or 0.0
+        o = num(r"\(dawniej ([\d.]+)\)", s, float, 0.0) or 0.0
+        h += g; old += o
+        if d > 0 and abs(g - d * per) > 0.6 + 0.01 * g:
+            bad += 1
+    rep.add("J5-1: sztuki gracza na lawie (godziny = dni x dzien kowala)", f"sztuk {len(pieces)}, niezgodnych {bad}; godzin {h:.0f} wobec dawnych {old:.0f}",
+            "0 niezgodnych", bad == 0)
+
+
+def jeff14_main(logp):
+    """jeff14 (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5). Caly log (bez okna dob)."""
+    lines = read(logp)
+    rep = Report()
+    print(f"plik: {logp}")
+    _j14_c5(lines, rep)
+    bl = [s for s in lines if s.startswith("ERROR in ") and ("ForgeClock" in s or "ArmsPricing.Build(C5)" in s)]
+    rep.add("J14-E: bledy nowych sciezek (ForgeClock, ArmsPricing.Build(C5))", f"{len(bl)} linii" + (f"; pierwsza: {bl[0][:200]}" if bl else ""), "0", len(bl) == 0)
+    rep.show()
+    return 0
+
+
 def n7_main(logp, start_arg, until=120):
     """N7 (decyzja Jeffa 13.10 "Proporcje pasuja"; Armoury/src/StragglersRally.cs, klucz StragglersRally): rozbici z pobitej druzyny lorda - 55% pod choragiew (weterani 70,
     t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, marsz do druzyny rodu w zasiegu,
@@ -19787,6 +19832,8 @@ def main(argv):
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
+    if group == "jeff14" and logp:
+        return jeff14_main(logp)   # jeff14: decyzje Jeffa 14.10 - kuznia jak u kowali (C5), strata po pojmaniu (C4), komplet weterana (C3)
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:

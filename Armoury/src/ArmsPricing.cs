@@ -195,6 +195,15 @@ namespace Armoury
                 }
                 Log.Info("ArmsPricing: wycena uzbrojenia " + (PricingOn ? "CZYNNA" : "wylaczona") + " - bezpiecznik x" + s.ArmsPriceBand.ToString("0.0")
                          + ", praca " + s.SmithDayWage + "/dzien, zysk " + s.SmithProfitPercent + "%. Przyklady: " + string.Join("; ", sample.ToArray()));
+                // C5 (Jeff 14.10): czas kucia gracza wedlug dni kowala - te same sztuki
+                try
+                {
+                    var ex = new List<ItemObject>();
+                    foreach (var id in new[] { "ramsay_armor", "sturgian_fortified_armor", "casterly_heavy_helm", "battania_sword_5_t5", "stark_boots_1" })
+                        ex.Add(MBObjectManager.Instance.GetObject<ItemObject>(id));
+                    Log.Info(ForgeClock.Examples(ex));
+                }
+                catch (Exception e) { Log.Error("ArmsPricing.Build(C5)", e); }
             }
             catch (Exception e) { Log.Error("ArmsPricing.Build", e); }
         }
