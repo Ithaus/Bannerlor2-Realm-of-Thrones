@@ -622,6 +622,8 @@ Uzycie (Python 3, tylko odczyt):
                     wsi < 0, nabrzeze ponizej zapasu, bilans v2 = 0), WW-2 brak Wysp po M1 <= 8.0 tys. (8.0 - baza INFO -> WW-J do Jeffa, > baza NIE; T2 INFO),
                     WW-3 rabunki Wysp na dobe wojny >= 3 x baza (bez bazy >= 0.1), WW-4 lup WW2 wydany >= 0.8, kiesy Wysp >= 0.9 x baza, zold przyciety <= baza
                     + 1 tys. (CSV), WW-5 kiesy wsi Zachodu i Polnocy >= 0.5 x baza, glod E5/C2 <= baza + 1, WW-6 korsarze (INFO) i kontrolka sprzedazy w portach,
+                    WW-7 (WW-J, decyzja Jeffa 14.10 "Tak, polowa w lupie") zalogi okretow Wysp: zold w zlocie po/przed 0.48-0.52 przy kluczu (bez - 1.000),
+                    zalogi twierdz, karawany i najemnicy po = przed (kontrolka 0), potkniecia postfiksu 0, potrzeba W5 Wysp wobec bazy (INFO),
                     WL-1 zold WL <= 1.1 / 0.6 zl na czlowieka, zalegly zold 0, WL-2 ludzie <= 1.05 x pula, pula = udzial x ludzie +-1, zalogi <= max(start,
                     0.5 x pula), druzyny >= 2 x baza (T1), WL-3 glod druzyn WL <= baza, WL-4 Straz +-2% (pula, dary), twierdze Strazy (DECYZJA przy stracie),
                     WL-5 Inni (INFO). Rok 1 bez pogorszenia: --grupa rok2 --do-doby 120 (R2-T2-1/2). Log bez paczki: INFO, bez wyjatku.
@@ -22195,7 +22197,7 @@ def rok2_main(logp, start_arg, until=120, basep=None):
 # docs/wyspy-wolni/PROJEKT-WYSPY-WOLNI.md rozdz. 4. Log czytany STRUMIENIOWO (setki MB) - zostaja tylko linie z prefiksami grupy. Log bez paczki: INFO, nigdy wyjatek.
 WW_DAY = ("Najezdzcy - decyzje AI (WW0): dzien", "Zelazna cena (WW1): dzien", "Budzet rodow (166): dzien", "Doplata wedlug potrzeby (W5): dzien",
           "Paser: dzien", "Straz i Wolni Ludzie (4.15): dzien", "Dary koron (182): dzien", "Glod ludu (E5/C2): dzien", "Chleb biedoty (M3): dzien",
-          "Pieniadz swiata: dzien")
+          "Pieniadz swiata: dzien", "Zalogi okretow - pol zoldu w lupie (WW-J): dzien")
 WW_ONCE = ("Najezdzcy - zasieg (WW0)", "Najezdzcy (WW0): postfiks", "Pomiary 169c: okna")
 WW_ERR = ("ReaverLaw.", "ClanBudget.", "DistrictRaid.", "OutlawLaw.", "TownFolk.WaterfrontRoom", "ClanIncomeBook.NoteReaverEvt", "ClanIncomeBook.NoteInflow",
           "CrownGifts.", "MountedWage", "GentryService.")
@@ -22211,6 +22213,11 @@ WW_STUMB = re.compile(r"\| potkniecia (\d+)\.$")
 # recenzja R1-3 / R1-11: pulap koncowy (z W5/W7), bez drugiego "podniesienie"; stary format linii tez czytany
 WW_W2 = re.compile(r"\| lup na zalogi \(WW2, Reaver Loot To Crews (tak|nie)\): rodow (\d+), w oknie 28 dob (?:\(= podniesienie pulapu druzyn\) )?(\d+) zl/d(?:, podniesienie pulapu druzyn \d+)?, zold druzyn tych rodow (\d+) \(wobec (?:koncowego )?pulapu druzyn z lupem(?: i W5/W7)? (\d+)\)")
 WW_W5IRON = re.compile(r"Iron Islands: garnek [^;|]*?niepokryte (\d+)")
+WW_W5NEED = re.compile(r"Iron Islands: garnek \d+ \(danina \d+\), potrzeba (\d+) u (\d+) rodow")
+# WW-J (decyzja Jeffa 14.10 "Tak, polowa w lupie"): linia "Zalogi okretow - pol zoldu w lupie (WW-J)" (ReaverLaw.CrewLine)
+WW_CREW = re.compile(r"\| klucz Ironborn Half Wage In Plunder (tak|nie), czesc w zlocie ([\d.]+) \| druzyny lordow Wysp \(bez najemnikow i gracza\): partii (\d+) \(rodow (\d+), ludzi (\d+)\), "
+                     r"zold w zlocie przed (\d+), po (\d+), w lupie (-?\d+) zl/d \| gracz-wasal: partii (\d+), przed (\d+), po (\d+) \| pelny zold \(kontrolka po = przed\): "
+                     r"zalogi twierdz (\d+) \((\d+)/(\d+)\), karawany (\d+) \((\d+)/(\d+)\), najemnicy w sluzbie Wysp (\d+) \((\d+)/(\d+)\) \| potkniecia postfiksu (\d+)\.")
 WW_W4 = re.compile(r"\| korsarze Wysp \(WW4, Sea Raiders Iron Harbour (tak|nie), dziesiecina [\d.]+\): band Sea Raiders z ladunkiem (\d+), sprzedaly w portach Wysp (\d+) szt\. za (\d+) zl \(dzialka w kasach portow (-?\d+) zl\), dziesiecina (\d+) zl do panow portow \(rodow (\d+)\), zycie w portach Wysp (\d+) zl; band z ladunkiem poza \d+ od portu Wysp (\d+)")
 WW_FENCE = re.compile(r"sprzedalo \d+ w \d+ miastach - \d+ szt\. .*?\) za (\d+) zl;")
 WW_SEA = re.compile(r"northern_pirates (\d+)/(\d+)")
@@ -22347,6 +22354,24 @@ def ww_measures(path, start_arg, until, lo_arg=None):
     unc = {d: int(x.group(1)) for d, x in unc.items() if x}
     t = tail(unc)
     m["unc"] = avg([unc[d] for d in t]) if t else None
+    # WW-7 (WW-J): potrzeba W5 Wysp (sr. 28 dob) i linia zalog okretow - sumy ostatnich 28 dob okna
+    nd = {d: WW_W5NEED.search(s) for d, s in w5.items()}
+    nd = {d: int(x.group(1)) for d, x in nd.items() if x}
+    t = tail(nd)
+    m["w5need"] = avg([nd[d] for d in t]) if t else None
+    cr = {d: WW_CREW.search(s) for d, s in win("Zalogi okretow - pol zoldu w lupie (WW-J): dzien").items()}
+    cr = {d: x for d, x in cr.items() if x}
+    m["ncrew"] = len(cr)
+    t = tail(cr)
+    if t:
+        g = lambda i: sum(int(cr[d].group(i)) for d in t)
+        m["crew"] = {"on": sum(1 for d in t if cr[d].group(1) == "tak"), "days": len(t), "share": float(cr[t[-1]].group(2)),
+                     "parties": g(3) / len(t), "clans": g(4) / len(t), "men": g(5) / len(t), "before": g(6) / len(t), "after": g(7) / len(t),
+                     "pn": g(9) / len(t), "pb": g(10) / len(t), "pa": g(11) / len(t),
+                     "ctl": sum(abs(int(cr[d].group(i)) - int(cr[d].group(i + 1))) for d in t for i in (13, 16, 19)),
+                     "stumb": max(int(cr[d].group(21)) for d in t)}
+    else:
+        m["crew"] = None
     # WW4 (Paser)
     p4 = [WW_W4.search(s) for s in pas.values()]
     p4 = [x for x in p4 if x]
@@ -22555,7 +22580,7 @@ def ww_ffolk(logp, until, start):
 
 
 def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None):
-    """Grupa wyspywolni (PROJEKT-WYSPY-WOLNI rozdz. 4): WW-0..WW-6, WL-1..WL-5. T1 (okno > 240 dob): zapis d780 + 60 dob, baza - ten sam zapis na 63aaaedf
+    """Grupa wyspywolni (PROJEKT-WYSPY-WOLNI rozdz. 4, 8.5 i 9): WW-0..WW-7 (WW-7 - WW-J, pol zoldu w lupie), WL-1..WL-6. T1 (okno > 240 dob): zapis d780 + 60 dob, baza - ten sam zapis na 63aaaedf
     albo na tej DLL z kluczami off (linie WW0/WW1 pisane zawsze); T2: nowa kampania 120 dob. Log bez paczki - INFO, nigdy wyjatek."""
     t1 = until > 240
     m = ww_measures(logp, start_arg, until)
@@ -22575,7 +22600,7 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None)
     has = m["n0"] > 0 or m["n1"] > 0
     # WW-0 linie i bledy
     segs = {"WW0": m["n0"], "WW1": m["n1"], "WW2 (166)": m["n166"] if m["w2on"] or m["loot"] is not None else 0, "WW4 (Paser)": m["npas"] if m["w4"] else 0,
-            "WL1 (4.15)": m["n415"] if m["wl1"] else 0, "WL2 (166)": len(m["wl2"])}
+            "WL1 (4.15)": m["n415"] if m["wl1"] else 0, "WL2 (166)": len(m["wl2"]), "WW-J (zalogi okretow)": m["ncrew"]}
     ok0 = has and all(v > 0 for v in segs.values()) and m["err"] == 0 and m["stumb0"] == 0 and m["stumb1"] == 0
     rep.add("WW-0 linie paczki i bledy", ", ".join(f"{a} {v}" for a, v in segs.items()) + f"; ERROR (ReaverLaw, ClanBudget, DistrictRaid, OutlawLaw, ...) {m['err']}, potkniecia WW0/WW1 {m['stumb0']}/{m['stumb1']}"
             + ("; zasieg: " + m["once"]["Najezdzcy - zasieg (WW0)"].split(": ", 1)[-1][:200] if "Najezdzcy - zasieg (WW0)" in m["once"] else "; brak linii zasiegu"),
@@ -22594,6 +22619,7 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None)
                 "z morza > 0 przy >= 5 krokach przy porcie (mniej - INFO)", None if ps < 5 else (ss_ or 0) > 0)
     # WW-2 cel: brak Wysp po M1
     u, ub = m["unc"], (b["unc"] if b else None)
+    cj = m["crew"] is not None and m["crew"]["on"] > 0   # WW-J wlaczone w oknie (WW-7)
     if u is None:
         rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", "brak wiersza Iron Islands w linii W5", "<= 8.0 tys.", None)
     elif not t1:
@@ -22602,10 +22628,10 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None)
         rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)})", "<= 8.0 tys.", True)
     elif m["withraid"] == 0:
         # recenzja R2-1: bez opcji rabunku (WW0) WW1-WW3 nic nie daja - wynik nie mowi nic o regulach, przyczyna jest w WW0 (osobny krok); WW-J do Jeffa
-        rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)}) - WW1-WW3 niezmierzone: 0 mysli Wysp z opcja rabunku w oknie (WW0) - przyczyna z WW0, osobny krok; WW-J do Jeffa",
+        rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)}) - WW1-WW3 niezmierzone: 0 mysli Wysp z opcja rabunku w oknie (WW0) - przyczyna z WW0, osobny krok" + ("; WW-J wlaczone - WW-7" if cj else "; WW-J do Jeffa"),
                 "<= 8.0 TAK; bez opcji rabunku - INFO", None)
     elif ub is None or u <= ub:
-        rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)}) - cel nieosiagniety -> pytanie WW-J do Jeffa (zaloga okretow 0.5 zoldu)",
+        rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} (baza {k(ub)}) - cel nieosiagniety" + (" mimo WW-J (pol zoldu w lupie - WW-7)" if cj else " -> pytanie WW-J do Jeffa (zaloga okretow 0.5 zoldu)"),
                 "<= 8.0 TAK; 8.0 - baza INFO; > baza NIE", None)
     else:
         rep.add("WW-2 brak Wysp na zold po M1 (W5 niepokryte, sr. 28 dob)", f"{k(u)} wobec bazy {k(ub)}", "nie wiecej niz baza", False)
@@ -22667,6 +22693,29 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None)
         rep.add("WW-6 korsarze Wysp (Paser)", f"doby z kluczem {w4[0]}, bandy Sea Raiders z ladunkiem {w4[1]} (bando-dob), w portach Wysp za {w4[2]} zl (dzialka {w4[3]}), dziesiecina {w4[4]} zl, zycie {w4[5]} zl, bando-dob poza 600 od portu Wysp: {w4[6]}"
                 + (f"; Sea Raiders na mapie (sr. 28 dob) {m['sea'][0]:.1f} band / {m['sea'][1]:.0f} ludzi" if m["sea"] else ""), "INFO", None)
         rep.add("WW-6b kontrolka: sprzedaz w portach Wysp <= zaplata pasera swiata", f"dob z naruszeniem {m['fencebad']}", "0", m["fencebad"] == 0)
+    # WW-7 (WW-J, decyzja Jeffa 14.10 "Tak, polowa w lupie"): zalogi okretow Wysp biora w zlocie polowe zoldu partii - po/przed 0.5 przy kluczu (1.0 bez);
+    # zalogi twierdz, karawany i najemnicy w sluzbie Wysp - po = przed (kontrolka 0); potkniecia postfiksu 0. Skutek: potrzeba W5 Wysp wobec bazy (INFO), brak - WW-2
+    cw = m["crew"]
+    need5, need5b = m["w5need"], (b["w5need"] if b else None)
+    if cw is None:
+        rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", "brak linii WW-J" + (f"; potrzeba W5 Wysp {k(need5)} (baza {k(need5b)})" if need5 is not None else ""),
+                "po/przed 0.48-0.52 przy kluczu, kontrolka 0, potkniecia 0", None)
+    else:
+        on = cw["on"] == cw["days"]
+        r = cw["after"] / cw["before"] if cw["before"] > 0 else None
+        rp = cw["pa"] / cw["pb"] if cw["pb"] > 0 else None
+        det = (f"klucz tak w {cw['on']} z {cw['days']} dob; druzyny Wysp {cw['parties']:.1f} (rodow {cw['clans']:.1f}, ludzi {cw['men']:.0f}): zold w zlocie przed {cw['before']:.0f}, po {cw['after']:.0f}, "
+               f"w lupie {cw['before'] - cw['after']:.0f} zl/d (po/przed {'-' if r is None else f'{r:.3f}'}); gracz-wasal {cw['pn']:.1f} partii, po/przed {'-' if rp is None else f'{rp:.3f}'}; "
+               f"kontrolka po = przed (zalogi, karawany, najemnicy; suma |roznic|) {cw['ctl']}; potkniecia {cw['stumb']}; potrzeba W5 Wysp {k(need5)} (baza {k(need5b)})")
+        if r is None:
+            rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "po/przed 0.48-0.52 przy kluczu (bez druzyn Wysp - INFO)", None)
+        elif on:
+            rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "po/przed 0.48-0.52; kontrolka 0; potkniecia 0",
+                    0.48 <= r <= 0.52 and (rp is None or 0.48 <= rp <= 0.52) and cw["ctl"] == 0 and cw["stumb"] == 0)
+        elif cw["on"] == 0:
+            rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "klucz off: po/przed 1.000; kontrolka 0", abs(r - 1.0) < 0.005 and cw["ctl"] == 0 and cw["stumb"] == 0)
+        else:
+            rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "klucz zmieniony w oknie - INFO", None)
     # WL-1
     w = m["wl1"]
     if w is None:

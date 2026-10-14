@@ -592,9 +592,54 @@ namespace Armoury
                 if (!_rangeLogged) { _rangeLogged = true; try { RangeLine(); } catch (Exception e) { Stumble("RangeLine", e); } }
                 try { DecisionLine(); } catch (Exception e) { Stumble("DecisionLine", e); }
                 try { IronLine(); } catch (Exception e) { Stumble("IronLine", e); }
+                try { CrewLine(); } catch (Exception e) { Stumble("CrewLine", e); }
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { for (int g = 0; g < Groups; g++) { _think[g].Clear(); _iron[g].Clear(); } }
+        }
+
+        /// <summary>WW-J (decyzja Jeffa 14.10 "Tak, polowa w lupie"; MountedWage.TotalPostfix, CrownGifts.IsIronbornCrew) - linia doby, sam pomiar (pisana takze
+        /// przy kluczu off - baza tej samej DLL): partie krolestwa Wysp - zold w zlocie "przed" (model zoldu bez polowy w lupie) i "po" (TotalWage, ktory gra placi):
+        /// druzyny lordow AI (zalogi okretow), druzyny gracza-wasala i towarzyszy; kontrolki - zalogi twierdz, karawany i najemnicy w sluzbie Wysp maja po = przed.
+        /// Skutek w budzecie: linia "Budzet rodow (166)" (zold druzyn rodow) i wiersz Iron Islands linii W5 (potrzeba, niepokryte = brak na zold).</summary>
+        private static void CrewLine()
+        {
+            int day = (int)CampaignTime.Now.ToDays - 1;
+            int crews = 0, player = 0, gar = 0, car = 0, merc = 0; long men = 0;
+            long cB = 0, cA = 0, pB = 0, pA = 0, gB = 0, gA = 0, kB = 0, kA = 0, mB = 0, mA = 0;
+            var clans = new HashSet<Clan>();
+            foreach (var mp in MobileParty.All)
+            {
+                try
+                {
+                    if (mp == null || !mp.IsActive || GroupOf(mp.MapFaction) != GIron) continue;
+                    if (!(mp.IsLordParty || mp.IsMainParty || mp.IsGarrison || mp.IsCaravan)) continue;
+                    long after = Math.Max(0, mp.TotalWage), before = Math.Max(0, MountedWage.FullTotalWage(mp));
+                    var c = mp.IsGarrison ? null : mp.ActualClan;
+                    if (mp.IsGarrison) { gar++; gB += before; gA += after; }
+                    else if (mp.IsCaravan) { car++; kB += before; kA += after; }
+                    else if (c != null && c.IsUnderMercenaryService) { merc++; mB += before; mA += after; }
+                    else if (c != null && c == Clan.PlayerClan) { player++; pB += before; pA += after; }
+                    else
+                    {
+                        crews++; cB += before; cA += after;
+                        if (mp.MemberRoster != null) men += mp.MemberRoster.TotalRegulars;
+                        if (c != null) clans.Add(c);
+                    }
+                }
+                catch (Exception e) { Stumble("CrewLine(partia)", e); }
+            }
+            var sb = new StringBuilder(700);
+            sb.Append("Zalogi okretow - pol zoldu w lupie (WW-J): dzien ").Append(day)
+              .Append(" | klucz Ironborn Half Wage In Plunder ").Append(CrownGifts.IronbornHalfOn ? "tak" : "nie").Append(", czesc w zlocie ").Append(F(CrownGifts.IronbornHalfOn ? CrownGifts.IronbornGoldWageShare : 1.0, "0.00"))
+              .Append(" | druzyny lordow Wysp (bez najemnikow i gracza): partii ").Append(crews).Append(" (rodow ").Append(clans.Count).Append(", ludzi ").Append(men).Append(')')
+              .Append(", zold w zlocie przed ").Append(cB).Append(", po ").Append(cA).Append(", w lupie ").Append(cB - cA).Append(" zl/d")
+              .Append(" | gracz-wasal: partii ").Append(player).Append(", przed ").Append(pB).Append(", po ").Append(pA)
+              .Append(" | pelny zold (kontrolka po = przed): zalogi twierdz ").Append(gar).Append(" (").Append(gB).Append('/').Append(gA).Append(')')
+              .Append(", karawany ").Append(car).Append(" (").Append(kB).Append('/').Append(kA).Append(')')
+              .Append(", najemnicy w sluzbie Wysp ").Append(merc).Append(" (").Append(mB).Append('/').Append(mA).Append(')')
+              .Append(" | potkniecia postfiksu ").Append(MountedWage.IronStumbles).Append('.');
+            Log.Info(sb.ToString());
         }
 
         // krainy wsi do odcinka "kiesy wsi wedlug krainy" (kultura wsi ROT - CLAUDE.md 2: vlandia = Zachod, battania = Polnoc, nightswatch = Dar)

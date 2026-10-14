@@ -131,7 +131,7 @@ namespace Armoury
                         else if (!ClanBudget.ScutageCap(c, out pc, out reserve)) { _scNoBudget++; continue; }   // bez budzetu 166 w wojnie, Straz bez zoldu, najemnik, dluznik, zajecie
                         int limit, men; long wage;
                         if (!NaParties(c, out limit, out men, out wage)) { _scNoParty++; if (pl) _plWhy6 = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
-                        double perMan = men >= 20 && wage > 0 ? (double)wage / men : avgWage;
+                        double perMan = men >= 20 && wage > 0 ? (double)wage / men : avgWage * CrownGifts.GoldWageShare(c);   // WW-J: jak W5
                         // zold druzyn doprowadzonych do celu W5: ludzie, ktorzy dzis sa, + brakujacy do celu po stawce rodu (ponad cel - sam zold dzisiejszy)
                         double goal = wage + Math.Max(0, target * limit - men) * perMan;
                         double bas = pc - goal;

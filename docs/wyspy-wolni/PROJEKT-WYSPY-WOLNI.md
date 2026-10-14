@@ -472,3 +472,61 @@ Co obejrzec najpierw: WW0 (czy Wyspy maja opcje rabunku - od tego zalezy WW-2), 
 4. WL3 z cala partia jest ostrozniejsze - druzyny WL rosna wolniej; licznik pomylek WL3 pokaze, czy dawne +1 wystarczalo.
 5. Wolni Ludzie: lup ponad s w D - dwor, sprzet i budowy WL troche wieksze niz w ac50cf44 (jak w 63aaaedf).
 6. WL-2c "netto ponad znane drogi" > 0 w dobach ponad pula - jest jeszcze inna droga doplywu; nastepny krok po tescie.
+
+---
+
+## 9. WW-J wdrozone (decyzja Jeffa 14.10 "Tak, polowa w lupie") - klucz `IronbornHalfWageInPlunder`, status DO SPRAWDZENIA (build kod 0, gen_mcm; bez testu w grze; nic nie wgrane)
+
+### 9.1 Dla Jeffa - prosto
+
+1. **Zalogi okretow biora polowe zoldu w lupie.** Druzyny w polu lordow Zelaznych Wysp (i Twoje oraz Twoich towarzyszy, gdy jestes ich wasalem) kosztuja dziennie
+   polowe zoldu w zlocie; druga polowa to dola ludzi z tego, co zrabuja i zdobeda. W okienku zoldu druzyny jest linia "half paid in plunder (the iron price)".
+2. **Pelny zold dalej:** zalogi zamkow i miast, karawany, kompanie najemne w sluzbie Wysp i Ironborn sluzacy innym krolom jako najemnicy.
+3. **Ile to da (bieg dwuletni fin30, liczone na jego tabelach):** brak na zold Wysp w najgorszym kwartale (Q6) z 19.9 do ok. 5-6 tys. zl dziennie; przed skokiem
+   wplywow korony Wysp (d365-637) z 16.0 do ok. 4 tys.; caly rok 2 z 12.0 do ok. 3 tys. Cel "najwyzej 8 tys." osiagniety bez wzgledu na liczbe najazdow.
+4. **Koszt:** zolnierze Wysp dostaja do sakiewek polowe zlota (ok. 11-14 tys. zl dziennie mniej w roku 2) - mniej wydaja w miastach i mniej odkladaja na sprzet;
+   korona Wysp oddaje mniej "zwrotu zoldu" (polowa); lordowie Wysp za te same pieniadze utrzymaja wiecej ludzi.
+
+### 9.2 Regula (kod)
+
+- `CrownGifts.IsIronbornCrew` - partia lorda (takze druzyna gracza i towarzyszy) rodu krolestwa `sturgia`, nie najemnik; zalogi twierdz i karawany - nie. Ta sama
+  regula "sluzby bez zoldu w zlocie" co Straz (182) i WL1 (`IsUnpaidParty`): tam zold jednostki 0, tu polowa zoldu partii.
+- `MountedWage.TotalPostfix` (postfiks Last na `GetTotalWage` kazdego modelu zoldu, obok kontekstu 182/WL1; tylko wywolanie zewnetrzne - BKROT wola base BK):
+  `Add(-0.5 x baza)` - wynik modelu = baza x (1 + czynniki), wiec dokladnie polowa, a podpowiedz zoldu (`TotalWageExplained`) pokazuje linie. Nie zold jednostki (jak
+  Straz): stawki tieru 1-4 to 1, 2, 3, 5, a BK bierze max(stawka x 1.25, 1) - polowa jednostki dawalaby 0-67% zamiast 50%.
+- Wszystko, co czyta `TotalWage`, widzi polowe: wydatek rodu (model finansow), limity zoldu partii i pulap druzyn 166 (pulap w zlocie bez zmian - miesci wiecej ludzi),
+  zwolnienia 166, W5 (potrzeba), W6 (podstawa tarczowego), W7, kredyt 168, zwrot korony (70% zaplaconego), WW3 (koszt dnia - mnoznik rabunku rosnie), sakiewki ludzi.
+- Przeliczniki zlota na ludzi z modelu jednostki albo sredniej gry (`CrownGifts.GoldWageShare`): zwolnienia 166 (`ReleaseFrom`: kwota / 0.5 ludzi, zwrot x 0.5),
+  rod bez ludzi w W5, W6, "nowa partia" i "na miare srodkow" (srednia gry x 0.5). Rycerze 179 w druzynach Wysp - pelne 24 zl (umowa miedzy rodami, nie zold zalogi).
+- Linia doby `Zalogi okretow - pol zoldu w lupie (WW-J)` (ReaverLaw.CrewLine, zawsze - takze przy kluczu off): zold druzyn Wysp przed / po / w lupie, gracz-wasal,
+  kontrolka po = przed (zalogi twierdz, karawany, najemnicy), potkniecia postfiksu. Prog WW-7 w grupie `wyspywolni` (WW-5 jest juz zajete - kiesy wsi).
+
+### 9.3 Szacunek na biegu dwuletnim fin30 (`Armoury-2026-10-14_06-01-15.log`, `tabele-06-01-15\budzet-rodow.csv`) [S z P]
+
+Metoda: dla kazdej doby z wierszem "Iron Islands" linii W5 - rody Wysp z warunkiem rent w wojnie z CSV doby wczesniejszej (budzet z wczoraj): cel = 0.6 x limit druzyn
+x zold/ludzi, pulap wlasny = pulap - zold zalog - karawan - podniesienie W5/W7; potrzeba = suma max(0, cel - pulap wlasny) - **zgodna z logiem** (25.5 / 26.3 / 26.6 / 14.6 / 1.3
+wobec 25.2 / 26.1 / 26.5 / 15.0 / 1.3 tys. w Q4-Q8). Po WW-J: cel / 2. Zrodla (danina, skarbiec, tarczowe) = potrzeba - niepokryte z logu. A - zrodla i pulap bez zmian;
+B - pulap wlasny nizszy o 0.3 x zwrot korony rodu (D bez polowy zwrotu) i garnek wiekszy o polowe zwrotu (do daniny). Skrypt: `scratchpad\wwj\est.py` (sesja autora).
+
+| okno | potrzeba W5 Wysp (log) | brak (log) | potrzeba po WW-J | brak po WW-J A / B |
+|---|---:|---:|---:|---:|
+| Q4 (d274-364) | 25.2 | 17.1 | 11.3 | 3.2 / 3.7 |
+| Q5 | 26.1 | 18.8 | 11.8 | 4.5 / 5.0 |
+| Q6 | 26.5 | 19.9 | 11.8 | 5.2 / 5.8 |
+| Q7 | 15.0 | 9.3 | 6.1 | 2.0 / 2.2 |
+| Q8 (skok wplywow korony Wysp - rozdz. 4.1 raportu fin30) | 1.3 | 0.0 | 0 | 0 / 0 |
+| rok 2 (d365-728) | 17.2 | 12.0 | 7.4 | 2.9 / 3.3 |
+| d365-637 | 22.5 | 16.0 | 9.9 | 3.9 / 4.3 |
+
+Zold druzyn rodow Wysp (bez najemnikow): rok 2 27.7 -> ok. 13.8 tys. zl/d (d365-637: 22.4 -> 11.2); zwrot korony do rodow Wysp 10.1 -> ok. 5.1. Szacunek statyczny:
+nie liczy wiekszych druzyn (rod z luzem zwerbuje wiecej ludzi za te same pieniadze - potrzeba przy celu 60% nie rosnie, bo liczona od zoldu na czlowieka) ani M1 (renty -
+w fin30 go nie ma; obniza brak dalej). Bieg fin30 nie ma paczki wyspy-wolni (WW1-WW4 = 0 - jak przy 0 opcjach rabunku z rozdz. 8.3).
+
+### 9.4 Ryzyka i wycofanie
+
+1. Wojsko Wysp rosnie: rody z luzem w pulapie (np. Greyjoy, d665: pulap wlasny ok. 3.7 tys. zl) utrzymaja za te same pieniadze do 2 razy wiecej ludzi - wiecej ludzi
+   z puli Wysp i wiecej sily w wojnie z Polnoca i Zachodem; WW3 kusi do najazdow mocniej (koszt dnia o polowe nizszy).
+2. Zolnierze Wysp: sakiewki dostaja polowe (ok. 11-14 tys. zl/d mniej) - mniej wydatkow w miastach (kasy i lud miast, gdzie stoja druzyny Wysp), mniej oszczednosci na sprzet
+   (MenPurse - pulap oszczednosci liczony od zoldu partii). Wariant z projektu 2.6 "lup WW1 w polowie do sakiewek ludzi" NIE jest zrobiony (WW1 dzis ok. 0).
+3. WW-4 "lup wydany" moze przez pierwsze tygodnie spasc ponizej 0.8 - druzyny potrzebuja czasu, zeby zwerbowac w zwolnione miejsce.
+4. Wycofanie: `IronbornHalfWageInPlunder` off (zold jak w afbdd48e; linia WW-J dalej pisana - po/przed 1.000).

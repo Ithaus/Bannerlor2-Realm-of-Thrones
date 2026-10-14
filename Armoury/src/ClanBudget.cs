@@ -327,7 +327,7 @@ namespace Armoury
                 if (b == null || b.Zero || c.IsUnderMercenaryService) return false;
                 float gate = Campaign.Current.Models.ArmyManagementCalculationModel.AIMobilePartySizeRatioToCallToArmy;
                 if (fillMax > gate) return false;                       // gra moze te druzyne wezwac - zwykly wymog sluzby
-                double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage);
+                double perMan = men >= 20 ? (double)wage / men : Math.Max(1f, Campaign.Current.AverageWage) * CrownGifts.GoldWageShare(c);   // WW-J: rod bez ludzi - srednia gry x czesc w zlocie
                 double need = parties > 0 ? (double)gate * limit * perMan : Math.Max(0, s.MinNewPartyMen) * perMan;
                 return b.PartyCap - b.Aid < need;   // W5: pulap WLASNY (bez doplaty korony) - rod z doplata zostaje "na miare srodkow" tak, jak bylby bez niej
             }
@@ -1128,6 +1128,10 @@ namespace Armoury
             var r = mp.MemberRoster;
             if (r == null || amount <= 0) return 0;
             var wageModel = Campaign.Current.Models.PartyWageModel;
+            // WW-J: kwota jest w zoldzie partii (TotalWage), a ludzi liczymy stawka jednostki z modelu - zaloga okretu Wysp placi w zlocie polowe (CrownGifts.GoldWageShare),
+            // wiec za kwote odchodzi tylu ludzi, ile zdejmuje ja z zoldu partii (kwota / udzial), a zwracamy zdjety zold partii (zrobione x udzial); reszta partii - 1
+            double gold = menUnit ? 1.0 : CrownGifts.GoldWageShare(mp);
+            if (gold < 1.0) amount /= gold;
             var stacks = new List<TroopRosterElement>();
             for (int i = 0; i < r.Count; i++)
             {
@@ -1193,7 +1197,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("ReleaseFrom(sakiewka)", e); }
-            return done;
+            return done * gold;   // WW-J: zold partii zdjety zwolnieniem (bez zalog okretow Wysp gold = 1 - jak dotad)
         }
 
         // ------------------------------------------------------------ ludnosc BK (refleksja - wzor LosersFlee/Levy; tylko osady z danymi BK)
@@ -1533,7 +1537,7 @@ namespace Armoury
                 }
                 else
                 {
-                    double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage);
+                    double avg = b.MenPar > 0 ? (double)b.WPar / b.MenPar : Math.Max(1f, Campaign.Current.AverageWage) * CrownGifts.GoldWageShare(c);   // WW-J: jak AtMeans
                     cost = need * avg;
                     room = b.PartyCap - b.Aid - b.WPar - used >= cost;   // W5: przydzial korony nie otwiera nowych druzyn (miejsce liczone od pulapu wlasnego)
                 }

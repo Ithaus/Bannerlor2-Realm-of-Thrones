@@ -36,6 +36,9 @@ namespace Armoury
     /// klasy co latki RecruitCost); GetTotalWage modeli (BK, BKROTPatch czytaja statyczne singletony BK) - dopiero w kampanii, przy
     /// OnSessionLaunched (EnsureContextHooks), raz na klase. Linia dnia "Zold konnych (160)": sklad wojska (konni / wszyscy) i premia
     /// wedle stawek jednostek - tylko log.
+    ///
+    /// Sluzba bez zoldu w zlocie (jedna regula, CrownGifts): Straz (182) i Wolni Ludzie (WL1) - zold jednostki 0 w zoldzie partii (WagePostfix);
+    /// zalogi okretow Zelaznych Wysp (WW-J, IronbornHalfWageInPlunder) - polowa zoldu partii w zlocie (TotalPostfix na GetTotalWage).
     /// </summary>
     internal static class MountedWage
     {
@@ -103,6 +106,45 @@ namespace Armoury
         internal struct TotalCtx { public MobileParty P; public bool T; }
         public static void TotalPrefix(MobileParty __0, out TotalCtx __state) { __state = new TotalCtx { P = _party, T = _total }; _party = __0; _total = true; }
         public static Exception TotalFinalizer(Exception __exception, TotalCtx __state) { _party = __state.P; _total = __state.T; return __exception; }
+
+        // WW-J (wyspy-wolni, decyzja Jeffa 14.10 "Tak, polowa w lupie"): zalogi okretow Zelaznych Wysp (CrownGifts.IsIronbornCrew - druzyny w polu rodow krolestwa
+        // Wysp, takze gracza-wasala; nie zalogi twierdz, nie karawany, nie najemnicy) biora w zlocie polowe zoldu partii. Postfiks na GetTotalWage kazdego modelu
+        // zoldu (ten sam punkt co kontekst 182/WL1), tylko w zewnetrznym wywolaniu dla tej partii (BKROTPartyWageModel wola base BKPartyWageModel - oba latane;
+        // wewnetrzne ma w __state T = true i te sama partie). Add(-(1 - udzial) x baza): wynik modelu = baza x (1 + suma czynnikow), wiec po Add dokladnie
+        // udzial x wynik (czynniki BK - kultura, garnizon, perki - zostaja), a podpowiedz zoldu (TotalWageExplained) ma linie "half paid in plunder".
+        // Dlaczego nie zold jednostki (jak Straz): stawki sa calkowite (tier 1-4: 1, 2, 3, 5), a BK bierze max(stawka x 1.25, 1) - polowa jednostki dawalaby
+        // 0-67% zamiast 50%. Zloto nie powstaje: rod placi mniej, sakiewki ludzi dostaja mniej (SoldierPay), druga polowa to ich dola z lupu (bez przelewu).
+        [ThreadStatic] private static bool _fullGold;       // WW-J: linia doby - zold partii bez polowy w lupie ("przed")
+        private static TaleWorlds.Localization.TextObject _ironTxt;
+        private static int _ironStumbles;
+        private static bool _ironErr;
+        internal static int IronStumbles { get { return _ironStumbles; } }
+
+        public static void TotalPostfix(MobileParty __0, ref ExplainedNumber __result, TotalCtx __state)
+        {
+            if (_fullGold || (__state.T && __state.P == __0)) return;   // linia "przed" albo wywolanie wewnetrzne (base) tej samej partii
+            try
+            {
+                if (!CrownGifts.IsIronbornCrew(__0)) return;
+                float b = __result.BaseNumber;
+                if (!(b > 0f)) return;
+                if (_ironTxt == null) _ironTxt = new TaleWorlds.Localization.TextObject("{=!}half paid in plunder (the iron price)");
+                __result.Add(-(1f - CrownGifts.IronbornGoldWageShare) * b, _ironTxt);
+            }
+            catch (Exception e)
+            {
+                _ironStumbles++;   // licznik potkniec (bez globalnego wylacznika - CLAUDE.md 7); pierwszy do pliku
+                if (!_ironErr) { _ironErr = true; try { Log.Error("MountedWage.TotalPostfix (WW-J)", e); } catch { } }
+            }
+        }
+
+        /// <summary>WW-J: zold partii bez polowy w lupie (linia doby "przed"; ta sama droga modelu zoldu co TotalWage).</summary>
+        internal static int FullTotalWage(MobileParty mp)
+        {
+            bool was = _fullGold; _fullGold = true;
+            try { return mp != null ? mp.TotalWage : 0; }
+            finally { _fullGold = was; }
+        }
 
         /// <summary>Zold jednostki z modelu gry bez premii (linia dnia).</summary>
         private static int Raw(PartyWageModel m, CharacterObject c)
@@ -173,7 +215,9 @@ namespace Armoury
                                             new[] { typeof(MobileParty), typeof(TroopRoster), typeof(bool) }, null);
                         if (m == null || m.IsAbstract) continue;
                         _totalHooked.Add(t);
+                        // WW-J: postfiks Last (po czynnikach innych latek) - polowa zoldu zalog okretow Wysp; __state wspolny z prefiksem (wywolanie wewnetrzne pomijane)
                         h.Patch(m, prefix: new HarmonyMethod(typeof(MountedWage), nameof(TotalPrefix)) { priority = Priority.First },
+                                   postfix: new HarmonyMethod(typeof(MountedWage), nameof(TotalPostfix)) { priority = Priority.Last },
                                    finalizer: new HarmonyMethod(typeof(MountedWage), nameof(TotalFinalizer)));
                         now++;
                     }
@@ -185,7 +229,8 @@ namespace Armoury
                 string active = "?";
                 try { active = Campaign.Current.Models.PartyWageModel.GetType().FullName; } catch { }
                 Log.Info("MountedWage: zold partii (GetTotalWage) wpiety w " + _totalHooked.Count + " modelach (teraz " + now + "), model czynny " + active
-                         + " - premia konnego w partiach rodow i garnizonach, karawany i inne partie bez premii.");
+                         + " - premia konnego w partiach rodow i garnizonach, karawany i inne partie bez premii; zalogi okretow Wysp - polowa zoldu w lupie (WW-J, klucz Ironborn Half Wage In Plunder "
+                         + (CrownGifts.IronbornHalfOn ? "tak" : "nie") + ").");
             }
         }
 

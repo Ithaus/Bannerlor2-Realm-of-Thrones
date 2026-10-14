@@ -5836,6 +5836,10 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public float SeaRaidersHarbourTithe { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Ironborn Half Wage In Plunder", HintText = "the crews of the Iron Islands take half their pay in plunder - the iron price: the companies in the field of the Ironborn lords, and yours and your companions' as their vassal, cost half their wages in gold each day; the other half the men take from what they raid and win. Garrisons, caravans and sellswords in Ironborn pay are paid in full. The crown's war aid and the house budgets count the lower wages. Off = the Ironborn are paid like everyone else")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool IronbornHalfWageInPlunder { get; set; } = true;
+
         [SettingPropertyBool("Free Folk Unpaid", HintText = "the Free Folk fight for their people, not for coin: troops in the parties and garrisons of the Free Folk take no wages, as the brothers of the Night's Watch (only Banner Kings' least upkeep remains), and the knights who ride with their companies serve unpaid too. The crown pays them no war aid and the house budget holds their numbers in men instead of gold (one host for all the Free Folk, apart from the Watch), and nobody is sent home - the limit only stops recruiting (volunteers, prisoners taken into the ranks, new companies). Sellswords in their pay are paid by their contract, as before. The same for you as their vassal: your companies and garrisons count in their host and serve unpaid while the whole host stays within what their people can field; while it is more than that by a twentieth (your recruiting has no such limit), your men take ordinary wages. Needs Clan Budget Enabled. Off = the Free Folk are paid like everyone else")]
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool FreeFolkUnpaid { get; set; } = true;
@@ -7314,6 +7318,7 @@ namespace Armoury
             s.ReaverRaidByProfitFreeFolk = ReaverRaidByProfitFreeFolk;
             s.SeaRaidersIronHarbour = SeaRaidersIronHarbour;
             s.SeaRaidersHarbourTithe = SeaRaidersHarbourTithe;
+            s.IronbornHalfWageInPlunder = IronbornHalfWageInPlunder;
             s.FreeFolkUnpaid = FreeFolkUnpaid;
             s.FreeFolkMenFromPeople = FreeFolkMenFromPeople;
             s.FreeFolkLevyShare = FreeFolkLevyShare;

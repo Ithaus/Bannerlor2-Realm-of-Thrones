@@ -201,7 +201,7 @@ namespace Armoury
                         else if (!ClanBudget.PartyCapOwn(c, out pc0)) { row.NoBudget++; continue; }   // Straz bez zoldu, najemnik, rod bez budzetu 166 (pierwsza doba sesji)
                         int limit, men; long wage;
                         if (!NaParties(c, out limit, out men, out wage)) { if (pl) _plWhy = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
-                        var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage, Pl = pl };
+                        var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage * CrownGifts.GoldWageShare(c), Pl = pl };   // WW-J: rod bez ludzi - srednia gry x czesc w zlocie
                         row.Cand++;
                         double need = NaCost(x, target);
                         if (pl) PlNote(x, need);                                                 // W6b: do linii - zold, ludzie, limit i potrzeba gracza

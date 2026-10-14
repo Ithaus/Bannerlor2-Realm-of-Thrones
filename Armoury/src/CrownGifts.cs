@@ -112,6 +112,32 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>WW-J (wyspy-wolni, decyzja Jeffa 14.10 "Tak, polowa w lupie" - Zelazny Czlowiek bierze zelazna cene): ta sama regula "sluzby bez zoldu
+        /// w zlocie" co Straz (182) i Wolni Ludzie (WL1) - Straz i WL: zold jednostki 0 (IsUnpaidParty, MountedWage.WagePostfix); zalogi okretow Wysp: w zlocie
+        /// IronbornGoldWageShare zoldu partii (MountedWage.TotalPostfix - dokladnie polowa wyniku modelu zoldu, z linia w podpowiedzi zoldu). Klucz
+        /// IronbornHalfWageInPlunder (bez wymogu budzetu 166 - pulap w zlocie dalej trzyma liczebnosc).</summary>
+        internal const float IronbornGoldWageShare = 0.5f;
+        internal static bool IronbornHalfOn { get { var s = Settings.Current; return s != null && s.IronbornHalfWageInPlunder; } }
+
+        /// <summary>WW-J: rod krolestwa Zelaznych Wysp (takze rod gracza-wasala), nie kompania najemna w ich sluzbie (zold z umowy 185, jak najemnicy WL).</summary>
+        internal static bool IsIronbornCrewClan(Clan c)
+        {
+            try { return IronbornHalfOn && c != null && !c.IsUnderMercenaryService && c.Kingdom != null && c.Kingdom.StringId == ReaverLaw.IronId; }
+            catch { return false; }
+        }
+
+        /// <summary>WW-J: zaloga okretu - druzyna w polu (partia lorda, druzyna gracza i jego towarzyszy) rodu IsIronbornCrewClan; zalogi twierdz i karawany - nie.</summary>
+        internal static bool IsIronbornCrew(MobileParty mp)
+        {
+            try { return mp != null && (mp.IsLordParty || mp.IsMainParty) && !mp.IsGarrison && !mp.IsCaravan && IsIronbornCrewClan(mp.ActualClan); }
+            catch { return false; }
+        }
+
+        /// <summary>WW-J: czesc zoldu partii w zlocie (zaloga okretu Wysp 0.5, reszta 1) - przelicznik zlota na ludzi tam, gdzie kod liczy zold czlowieka z modelu
+        /// jednostki (zwolnienia 166) albo ze sredniej gry (rod bez ludzi: W5, W6, nowa partia, "na miare srodkow"). Straz i WL bez zoldu - 1 (pulap w ludziach).</summary>
+        internal static double GoldWageShare(MobileParty mp) { return IsIronbornCrew(mp) ? IronbornGoldWageShare : 1.0; }
+        internal static double GoldWageShare(Clan c) { return IsIronbornCrewClan(c) ? IronbornGoldWageShare : 1.0; }
+
         /// <summary>Partia Strazy (partia lorda rodu Strazy, zaloga osady Strazy, takze gracz w Strazy).</summary>
         internal static bool IsWatchParty(MobileParty mp)
         {
