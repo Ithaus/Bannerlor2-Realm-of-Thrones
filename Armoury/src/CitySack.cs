@@ -376,6 +376,7 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("AftermathPre.Track", e); }
             AftermathCoin(__instance, __0, __1, kind, __3, __4, k, t);
+            AftermathGoods(__0, __1, kind, __4);         // L7: towar, konie, zywnosc, uzbrojenie i unikaty z polek (CitySack.Goods.cs)
         }
 
         private static void MeasureLine(SiegeAftermathCampaignBehavior inst, MobileParty a, Settlement st, int kind, Dictionary<MobileParty, float> contrib, Stock k, bool captured)
@@ -474,7 +475,7 @@ namespace Armoury
                 Ensure();
                 int today = (int)CampaignTime.Now.ToDays;
                 try { RuinsDaily(); } catch (Exception e) { Stumble("RuinsDaily", e); }   // LB: zgliszcza - odbudowane poziomy, postep, kolejka AI (takze bez logu)
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any || L5Any || L6Any || LBAny))
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any || L4Any || L5Any || L6Any || LBAny || L7Any))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
@@ -488,6 +489,7 @@ namespace Armoury
                     L5Part(sb);
                     L6Part(sb);
                     LBPart(sb);
+                    L7Part(sb);
                     sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -536,6 +538,7 @@ namespace Armoury
             L5Clear();
             L6Clear();
             LBClear();
+            L7Clear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>

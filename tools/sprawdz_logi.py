@@ -484,7 +484,8 @@ Uzycie (Python 3, tylko odczyt):
                     LUP-7 lup z niczego / trafienia O10 / kwota gry 0, LUP-8 arytmetyka i kiesy r = 0, LUP-10 blizna przy lasce 0, LUP-11/12 chleb i zapas kupcow (INFO),
                     LUP-13 zycie i markietani w oknie lupu 0, LUP-14 sakiewki, LUP-15 wybor AI wedlug 3.4, LUP-16 okno gracza (reczny), LUP-19 wojsko (INFO, prog 85 tys.),
                     LUP-17 (L6) ubytek ludnosci BK = ubytek ksiegi ludzi miasta +-1 pkt proc., LUP-B1 (LB) splonelo = floor(czesc x poziomy palne), laska 0, mury bez zmian,
-                    LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO).
+                    LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO),
+                    LUP-18 (L7) polki: zdjete = do taborow + spalone (0 szt.), spalone tylko przy spustoszeniu; LUP-18b ksiega towarow lup miast (L7) tylko ujscie.
                     Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -17795,6 +17796,32 @@ def lup_main(logp, start_arg, until=364):
     qd = sum(num(r"zgliszcza na czele (\d+)", s) or 0 for s in dayw.values())
     rep.add("LUP-B3 (LB): zgliszcza - spalone / odbudowane / zostalo na koniec okna; postep dany; kolejka AI", f"{burnt} / {rb} / {rl if rl is not None else '-'} poziomow; {gr} pkt; ustawien kolejki {qd}",
             "INFO (rachunek CHANGELOG LB: miasto spustoszone ok. 590 dob, zlupione ok. 300 przy mocy 5 pkt/d)", None)
+    # ---- prog 18 (L7): polki - zdjete = do taborow + spalone; spalone tylko przy spustoszeniu; ksiega towarow: lup miast (L7) tylko jako ujscie "spalone"
+    l7 = [s for s in lines if s.startswith("Lup miast (L7): dzien") and inwin(dayof(s))]
+    l7off = any("WYLACZONE (Sack Takes Goods)" in s for s in dayw.values())
+    rx7 = re.compile(r"\| osada (\S+) \| wybor (\S+) \| czesc [\d.]+ \| polka (\d+) -> (\d+) szt\. \| do taborow (\d+) szt\. za (\d+) .*?\| spalone (\d+) szt\. za (\d+) .*?"
+                     r"\| bilans sztuk: zdjete (-?\d+) - do taborow (-?\d+) - spalone (\d+) = (-?\d+)\.")
+    b7, fire_bad, n7, t7, v7, s7, sv7 = [], [], 0, 0, 0, 0, 0
+    for s in l7:
+        m = rx7.search(s)
+        if not m:
+            continue
+        n7 += 1
+        if int(m.group(12)) != 0:
+            b7.append((m.group(1), int(m.group(12))))
+        if m.group(2) != "spustoszenie" and int(m.group(7)) > 0:
+            fire_bad.append(m.group(1))
+        t7 += int(m.group(5)); v7 += int(m.group(6)); s7 += int(m.group(7)); sv7 += int(m.group(8))
+    if n7:
+        rep.add("LUP-18 (L7): polki - zdjete = do taborow + spalone; spalone tylko przy spustoszeniu", f"lupow polek {n7} (linii {len(l7)}); rozjazdow {len(b7)}, spalone poza spustoszeniem {len(fire_bad)}"
+                + (f" ({(b7 + fire_bad)[:3]})" if b7 or fire_bad else "") + f"; do taborow {t7} szt. za {v7}, spalone {s7} szt. za {sv7}", "roznica 0 szt.; bez wyjatku",
+                not b7 and not fire_bad and n7 == len([x for x in l7 if "bilans sztuk" in x]))
+    else:
+        rep.add("LUP-18 (L7): polki - zdjete = do taborow + spalone", f"linii L7 z lupem 0 (linii {len(l7)})" + ("; L7 wylaczone" if l7off else ""), "roznica 0 szt. - INFO bez lupu / log bez paczki", None)
+    tw_bad = [s for s in lines if s.startswith("Towary: dzien") and "przybylo w ramce lupu" in s and inwin(dayof(s))]
+    tw_burn = sum(1 for s in lines if s.startswith("Towary: dzien") and "spalone przy spustoszeniu miasta" in s and inwin(dayof(s)))
+    rep.add("LUP-18b (L7): ksiega towarow - lup miast (L7) tylko jako ujscie (spalone przy spustoszeniu)", f"wierszy z przybytkiem w ramce lupu {len(tw_bad)}; wierszy ze spalonym {tw_burn}",
+            "0 przybytkow", (not tw_bad) if l7 else None)
     # ---- prog 19: swiat (INFO) - wojsko lordow w wojnie (miara W5-7), liczba zdobyc
     army = {}
     for kname, ser in kingdom_war_series(lines).items():

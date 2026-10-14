@@ -5532,6 +5532,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float SackRuinRebuildShare { get; set; } = 0.125f;
 
+        [SettingPropertyBool("Sack Takes Goods", HintText = "the sack empties the shelves too: the same part as the coin (a third under pillage, two thirds under devastation, nothing under mercy) of every stack of goods, horses and arms in the market of a stormed town or castle. Unique pieces go to the army's leader, horses and beasts walk off with the parties, food only up to ten days of rations for each party, the rest as far as the wagons can carry - most valuable by weight first; what they cannot carry stays under pillage and burns under devastation (food never burns). Lords put the arms they took in their armouries (off = the shelves are left untouched)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackTakesGoods { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6914,6 +6918,7 @@ namespace Armoury
             s.SackKilledInPeopleBook = SackKilledInPeopleBook;
             s.SackBurnsBuildings = SackBurnsBuildings;
             s.SackRuinRebuildShare = SackRuinRebuildShare;
+            s.SackTakesGoods = SackTakesGoods;
         }
 
         internal static void Apply()
