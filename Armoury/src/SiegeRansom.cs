@@ -34,9 +34,12 @@ namespace Armoury
     ///  - nigdy: pod stolica krolestwa pana osady (CapitalTreasury.IsCapital - BK albo poczatkowa siedziba; P7), w osadach fabuly ROT (StoryIds: King's Landing
     ///    town_EW4 i Red Keep ROT_castle61 - Blackwater, Winterfell town_B2 - Bastards, Harrenhal ROT_town32, Mur ROT_castle60 i Castle Black town_B5 - Wall; P8),
     ///    gdy wodz obozu albo rod pana osady to Inni (Undead), przy buncie (IsUnderRebellionAttack);
-    ///  - obronca placi (AI): w chwili decyzji mury i tak nie wytrzymaja (stosunek gry > 1 z definicji), wiec gdy jest z czego (okup >= doba zoldu);
-    ///  - AI-oblegajacy przyjmuje (P2): armia w potrzebie (ta sama NeedOf co L4) ALBO w tym oblezeniu byl juz szturm bez zdobycia ALBO szturm bylby krwawy -
-    ///    stosunek gry bez losowania (oblegajacy / obroncy x przewaga murow^w, BesiegerCamp :375-418) < SiegeRansomBloodyRatio (1.5; wartosc do kalibracji po O0).
+    ///  - obronca placi (AI i gracz-oblegajacy - jedna regula): mury nie wytrzymaja - stosunek MUROW > 1 (oblegajacy / obroncy x przewaga murow^w0, w0 = 0.8 x1.25
+    ///    bez taranu x1.25 bez wiezy - wzor gry BEZ czlonu czasu; recenzja 14.10: czlon czasu gry -0.02/h po 96 h to niecierpliwosc oblegajacych, nie sila murow -
+    ///    po ok. 136 h w = 0 i slaba druzyna wymuszalaby okup) albo pusta warownia, i jest z czego (okup >= doba zoldu);
+    ///  - AI-oblegajacy przyjmuje (P2): nigdy przy pustej warowni (gra zdobywa ja bez walki - lup 1/3 i lenno wiecej warte niz 1/4); armia w potrzebie (ta sama
+    ///    NeedOf co L4) ALBO w tym oblezeniu ta sama frakcja miala juz szturm bez zdobycia ALBO szturm bylby krwawy - stosunek murow < SiegeRansomBloodyRatio
+    ///    (1.5; wartosc do kalibracji po O0). Stosunek gry z czlonem czasu (ten, ktory decyduje o szturmie) tylko w linii O0.
     /// Pomiar przy wylaczonym SiegeRansomMeasureLog - brak linii (latka liczy tylko, gdy ktorys klucz okupu jest wlaczony). Wyjatek - licznik potkniec, bez
     /// globalnego wylacznika (CLAUDE.md 7); wynik gry przy wyjatku bez zmian.
     /// </summary>
@@ -89,6 +92,8 @@ namespace Armoury
             public bool Open; public float OpenDay; public int Trues;      // cykl decyzji o szturmie
             public int Failed; public string FailFaction;                  // szturmy bez zdobycia w tym oblezeniu (P2)
             public Judge Last;                                             // regula z ostatniego cyklu
+            public string NoDeal;                                          // recenzja 14.10: w tym oblezeniu juz bez umow (powod) - umowa AI przepadla przez bitwe
+                                                                           // albo oboz nie dal sie zwinac; dalej szturm jak w grze
         }
         private static readonly Dictionary<SiegeEvent, Siege> _sieges = new Dictionary<SiegeEvent, Siege>();
 
@@ -111,6 +116,7 @@ namespace Armoury
             public CitySack.Stock K; public readonly long[] Want = new long[5]; public long Ransom;   // 0 kupcy (kasa), 1-4 lud W, R, P, gmina
             public CitySack.Need Need; public long Wage;
             public double Ratio, Chance, Adv, W, Att, Def; public int Engines; public bool Ram, Tower, Empty;
+            public double RatioWalls, W0, Def0;                            // stosunek murow bez czlonu czasu i bez polowy gry przy graczu w osadzie (recenzja 14.10)
             public int Parties, Men, UndeadMen;
             public bool Capital, Story, Undead, Rebel; public string Excl;  // wykluczenie (null - brak)
             public bool DefPays; public string DefWhy;
@@ -162,27 +168,35 @@ namespace Armoury
                 j.Wage = j.Need.ArmyWage;
                 // stosunek gry bez losowania (P2)
                 GameRatio(camp, j);
-                // gracz
+                // gracz: "w osadzie" tylko jako strona obrony - w wojnie z oblegajacymi (kryterium gry: menu_siege_leave_on_condition; neutralny gosc to nie
+                // obronca - recenzja 14.10)
                 var main = MobileParty.MainParty;
-                j.Player = main != null && main.CurrentSettlement == st ? "w osadzie"
+                bool mainDef = false;
+                try { mainDef = main != null && main.CurrentSettlement == st && main.MapFaction != null && j.Faction != null && FactionManager.IsAtWarAgainstFaction(main.MapFaction, j.Faction); }
+                catch { mainDef = false; }
+                j.Player = mainDef ? "w osadzie"
                          : (st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan) ? "pan osady"
                          : (main != null && main.BesiegerCamp == camp) ? "w obozie" : "-";
-                // obronca (AI): placi, gdy jest z czego
+                // obronca: placi, gdy mury nie wytrzymaja (stosunek murow bez czlonu czasu > 1 albo pusta warownia) i jest z czego - jedna regula AI i gracza
                 if (j.Excl != null) { j.DefPays = false; j.DefWhy = "wykluczone (" + j.Excl + ")"; }
                 else if (j.Men <= 0) { j.DefPays = false; j.DefWhy = "oboz bez zywych (same Inni albo pusty)"; }
+                else if (!j.Empty && j.RatioWalls <= 1.0) { j.DefPays = false; j.DefWhy = "mury wytrzymaja (stosunek murow " + F(j.RatioWalls, "0.00") + " <= 1)"; }
                 else if (j.Ransom <= 0 || j.Ransom < Math.Max(1L, j.Wage)) { j.DefPays = false; j.DefWhy = "okup " + j.Ransom + " < doba zoldu " + j.Wage; }
-                else { j.DefPays = true; j.DefWhy = "mury nie wytrzymaja, okup " + j.Ransom + " >= doba zoldu " + j.Wage; }
-                // AI-oblegajacy (P2)
+                else { j.DefPays = true; j.DefWhy = "mury nie wytrzymaja (" + (j.Empty ? "pusta warownia" : "stosunek murow " + F(j.RatioWalls, "0.00")) + "), okup " + j.Ransom + " >= doba zoldu " + j.Wage; }
+                // AI-oblegajacy (P2): pusta warownia - nigdy (zdobycie bez walki); szturm bez zdobycia liczy sie tylko tej samej frakcji
+                string fid = j.Faction != null ? j.Faction.StringId : null;
                 j.AccNeed = j.Need.InNeed;
-                j.AccFailed = j.Failed > 0;
+                j.AccFailed = j.Failed > 0 && s != null && fid != null && string.Equals(s.FailFaction, fid, StringComparison.Ordinal);
                 double br = BloodyRatio;
-                j.AccBloody = br > 0 && !j.Empty && j.Ratio < br;
-                j.AiAccepts = j.AccNeed || j.AccFailed || j.AccBloody;
+                j.AccBloody = br > 0 && !j.Empty && j.RatioWalls < br;
+                j.AiAccepts = !j.Empty && (j.AccNeed || j.AccFailed || j.AccBloody);
                 var why = new List<string>(3);
                 if (j.AccNeed) why.Add("potrzeba");
                 if (j.AccFailed) why.Add("szturm bez zdobycia x" + j.Failed);
-                if (j.AccBloody) why.Add("krwawy szturm " + F(j.Ratio, "0.00") + " < " + F(br, "0.00"));
-                j.AccWhy = why.Count > 0 ? string.Join(", ", why.ToArray()) : "bez powodu (wojsko syte, " + (j.Empty ? "pusta warownia" : "stosunek " + F(j.Ratio, "0.00") + " >= " + F(br, "0.00")) + ")";
+                if (j.AccBloody) why.Add("krwawy szturm " + F(j.RatioWalls, "0.00") + " < " + F(br, "0.00"));
+                if (j.Empty) j.AccWhy = "pusta warownia - zdobycie bez walki";
+                else j.AccWhy = why.Count > 0 ? string.Join(", ", why.ToArray())
+                              : "bez powodu (wojsko syte, " + (j.Failed > 0 ? "szturm bez zdobycia innej frakcji, " : "") + "stosunek murow " + F(j.RatioWalls, "0.00") + " >= " + F(br, "0.00") + ")";
                 return j;
             }
             catch (Exception e) { Stumble("Evaluate", e); return null; }
@@ -191,19 +205,21 @@ namespace Armoury
         private static long Fl(double share, long v) { return v <= 0 || share <= 0 ? 0 : (long)Math.Floor(share * v); }
 
         /// <summary>Stosunek sil gry BEZ losowania (BesiegerCamp.StartingAssaultOnBesiegedSettlementIsLogical :375-418) i szansa na mysl po karze za maszyny
-        /// (:421-427). Pusta warownia (sila obroncow 0) - Empty, stosunek 999. Tylko odczyt.</summary>
+        /// (:421-427). Pusta warownia (sila obroncow 0) - Empty, stosunek 999. Do tego stosunek MUROW (recenzja 14.10): ten sam wzor bez czlonu czasu
+        /// (w0 = 0.8 x1.25 bez taranu x1.25 bez wiezy) i bez polowy obroncow, ktora gra liczy przy graczu w osadzie - miara "mury nie wytrzymaja". Tylko odczyt.</summary>
         internal static void GameRatio(BesiegerCamp camp, Judge j)
         {
             var ev = camp.SiegeEvent;
             var st = ev.BesiegedSettlement;
-            double def = 0, att = 0;
+            double def0 = 0, att = 0;
             float f = MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == st ? 0.5f : 1f;
             foreach (var pb in st.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
             {
                 if (pb == null || !pb.IsMobile) continue;
                 var mp = pb.MobileParty;
-                if (mp.CurrentSettlement == st && (mp.Aggressiveness > 0.01f || mp.IsMilitia || mp.IsGarrison)) def += f * pb.CalculateCurrentStrength();
+                if (mp.CurrentSettlement == st && (mp.Aggressiveness > 0.01f || mp.IsMilitia || mp.IsGarrison)) def0 += pb.CalculateCurrentStrength();
             }
+            double def = f * def0;
             foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) att += pb.CalculateCurrentStrength();
             bool ram = false, tower = false;
             int built = 0;
@@ -221,10 +237,12 @@ namespace Armoury
             double h0 = CampaignTime.HoursInDay * 4.0;
             double el = ev.SiegeStartTime.ElapsedHoursUntilNow;
             double w = 0.8 - (el > h0 ? (el - h0) * 0.02 : 0.0);
-            if (!ram) w *= 1.25;
-            if (!tower) w *= 1.25;
-            j.Def = def; j.Att = att; j.Adv = adv; j.W = w; j.Ram = ram; j.Tower = tower; j.Engines = built;
-            if (def <= 0) { j.Empty = true; j.Ratio = 999.0; j.Chance = 1.0; return; }
+            double w0 = 0.8;
+            if (!ram) { w *= 1.25; w0 *= 1.25; }
+            if (!tower) { w *= 1.25; w0 *= 1.25; }
+            j.Def = def; j.Def0 = def0; j.Att = att; j.Adv = adv; j.W = w; j.W0 = w0; j.Ram = ram; j.Tower = tower; j.Engines = built;
+            if (def <= 0) { j.Empty = true; j.Ratio = 999.0; j.RatioWalls = 999.0; j.Chance = 1.0; return; }
+            j.RatioWalls = att / (def0 * Math.Pow(adv, w0));
             double r = att / (def * Math.Pow(adv, w));
             j.Ratio = r;
             if (r > 1.0)
@@ -294,6 +312,8 @@ namespace Armoury
               .Append(" | stosunek gry ").Append(j.Empty ? "pusta warownia" : F(j.Ratio, "0.000")).Append(" (oblegajacy ").Append(F(j.Att, "0")).Append(" / obroncy ").Append(F(j.Def, "0"))
               .Append(" x przewaga ").Append(F(j.Adv, "0.000")).Append("^").Append(F(j.W, "0.000")).Append("; maszyny ").Append(j.Engines).Append(j.Ram ? ", taran" : "").Append(j.Tower ? ", wieza" : "")
               .Append("; szansa na mysl ").Append(F(j.Chance * 100.0, "0.0")).Append("%)")
+              .Append(" | mury ").Append(j.Empty ? "pusta warownia" : F(j.RatioWalls, "0.000")).Append(" (bez czlonu czasu: obroncy ").Append(F(j.Def0, "0")).Append(" x przewaga^")
+              .Append(F(j.W0, "0.000")).Append(')')
               .Append(" | potrzeba ").Append(j.Need.InNeed ? "tak" : "nie").Append(" (niezaplacony zold ").Append(j.Need.Unpaid).Append(" z ").Append(j.Need.Parties).Append(" druzyn, kiesa rodu wodza ")
               .Append(j.Need.LeadGold).Append(" = ").Append(j.Need.LeadDays >= 999 ? "-" : F(j.Need.LeadDays, "0.0")).Append(" dob)")
               .Append(" | stolica ").Append(j.Capital ? "tak" : "nie").Append(", fabula ").Append(j.Story ? "tak" : "nie").Append(", Inni ").Append(j.Undead ? "tak" : "nie")
@@ -306,14 +326,17 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ szturmy: koniec bitwy (MapEventEnded)
-        /// <summary>Nasluch MapEventEnded: koniec szturmu osady zamyka cykl decyzji; szturm bez zdobycia przy trwajacym oblezeniu - licznik P2. Nie rzuca.</summary>
+        /// <summary>Nasluch MapEventEnded: koniec szturmu osady zamyka cykl decyzji; szturm bez zdobycia przy trwajacym oblezeniu - licznik P2. Szturm w trakcie
+        /// umowy (gracz-oblegajacy po "Accept", gracz-obronca w toku, szturm inna droga niz mysl wodza) - umowa przepada: miasto nie placi po szturmie, ktory
+        /// wlasnie odparlo (recenzja 14.10). Nie rzuca.</summary>
         internal static void OnMapEventEnded(MapEvent me)
         {
             try
             {
-                if (me == null || !me.IsSiegeAssault || me.MapEventSettlement == null || _sieges.Count == 0) return;
+                if (me == null || !me.IsSiegeAssault || me.MapEventSettlement == null || (_sieges.Count == 0 && _deals.Count == 0)) return;
                 var st = me.MapEventSettlement;
                 _dAssaultEnd++;
+                if (st.SiegeEvent != null && _deals.Count > 0) DropDeals(st.SiegeEvent, "szturm w trakcie umowy", "the walls were stormed");
                 var s = StateOf(st.SiegeEvent, false);
                 if (s == null) return;
                 s.Open = false;
@@ -335,7 +358,8 @@ namespace Armoury
             {
                 if (ev == null) return;
                 _sieges.Remove(ev);
-                DropDeals(ev, "oblezenie zakonczone");
+                _refused.Remove(ev);
+                DropDeals(ev, "oblezenie zakonczone", "the siege is over");
             }
             catch (Exception e) { Stumble("OnSiegeEnded", e); }
         }
@@ -351,7 +375,8 @@ namespace Armoury
                 List<SiegeEvent> dead = null;
                 foreach (var kv in _sieges)
                     if (kv.Key == null || kv.Value.St == null || kv.Value.St.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
-                if (dead != null) foreach (var ev in dead) { _sieges.Remove(ev); DropDeals(ev, "oblezenie nieaktualne (porzadek doby)"); }
+                if (dead != null) foreach (var ev in dead) { _sieges.Remove(ev); DropDeals(ev, "oblezenie nieaktualne (porzadek doby)", "the siege is over"); }
+                if (_refused.Count > 0) _refused.RemoveWhere(ev => ev == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.SiegeEvent != ev);
                 DailyMore();                                               // O1: rozejmy - wygasle
                 var s = Settings.Current;
                 if (s != null && s.LogEnabled && (MeasureOn || AiOn || PlayerDefOn || PlayerBesOn) && (_dTrues > 0 || _dAssaultEnd > 0 || _dStumbles > 0 || DayAny))

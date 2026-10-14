@@ -19,8 +19,9 @@ namespace Armoury
     /// O3 - GRACZ-OBLEGAJACY (klucz SiegeRansomPlayerBesieger; off = stan O2: bez opcji, szturm jak w grze). Projekt rozdz. 3, 6.3, P6.
     ///  - Opcja "Demand a ransom" w menu oczekiwania gry menu_siege_strategies, wstawiona przed "Leave" (CampaignEvents.OnAfterSessionLaunchedEvent - menu gry juz
     ///    jest; drugi raz w tej samej kampanii nie dopisuje). Widoczna dla strony oblegajacej; czynna na tym samym warunku co "Lead an assault"
-    ///    (SiegeEventCampaignBehavior :430-457: gracz dowodzi oblezeniem, przygotowania gotowe) plus regula okupu dla obroncy AI: stosunek gry bez losowania > 1
-    ///    (mury nie wytrzymaja - P1), okup = 1/4 monety >= doba zoldu armii gracza (P3), bez wykluczen (stolica, fabula ROT, Inni); inaczej nieczynna z dymkiem
+    ///    (SiegeEventCampaignBehavior :430-457: gracz dowodzi oblezeniem, przygotowania gotowe) plus regula okupu dla obroncy AI: stosunek MUROW (bez czlonu czasu
+    ///    gry - recenzja 14.10) > 1 albo pusta warownia, okup = 1/4 monety >= doba zoldu armii gracza (P3), bez wykluczen (stolica, fabula ROT, Inni, bunt) i bez
+    ///    "w tym oblezeniu bez umow" (BesWhyNot - jedno miejsce dla opcji i okna); inaczej nieczynna z dymkiem
     ///    (powod). Bez bitwy przy osadzie i bez spotkania gracza w toku. Warunek liczony raz na godzine gry (gra odswieza warunki menu co klatke - regula tylko z pamieci).
     ///  - Konsekwencja opcji ustawia TYLKO flage; okno (InformationManager.ShowInquiry z pauza: ile, czesc jego ludzi i jego, korona, rozejm; "Accept" / "Refuse")
     ///    otwiera postfiks ticku tego menu (wspolny z O2), wywolanie okna tylko zapisuje wybor (umowa KBes), wykonanie w nastepnym ticku kampanii (O1 Execute:
@@ -38,13 +39,14 @@ namespace Armoury
         private static bool _besAsk, _besOpen;
         private static SiegeEvent _besEv;
         private static int _besFails;
-        private static int _dBesClick, _dBesShown, _dBesAcc, _dBesRef, _dBesFail, _dBesBlocked;
-        private static string _hookOption = "nie dodana", _hookBesiege = "nie zakladana";
+        private static int _dBesClick, _dBesShown, _dBesAcc, _dBesRef, _dBesFail, _dBesBlocked, _dBesAssaultBlocked;
+        private static string _hookOption = "nie dodana", _hookBesiege = "nie zakladana", _hookAssaultOpt = "nie zakladana";
 
         // regula dla opcji - pamiec na godzine gry (gra odswieza warunki menu oczekiwania co klatke)
         private static SiegeEvent _cEv;
         private static double _cHour = -1;
         private static Judge _cJ;
+        private static bool _cValid;                  // pamiec wazna takze dla null (blad Evaluate) - inaczej wyjatek co klatke (recenzja 14.10)
 
         private static bool BesAskPending { get { return _besAsk; } }
 
@@ -52,9 +54,9 @@ namespace Armoury
         {
             var ev = camp.SiegeEvent;
             double h = CampaignTime.Now.ToHours;
-            if (_cJ != null && ReferenceEquals(_cEv, ev) && h - _cHour < 1.0 && h >= _cHour) return _cJ;
+            if (_cValid && ReferenceEquals(_cEv, ev) && h - _cHour < 1.0 && h >= _cHour) return _cJ;
             _cJ = Evaluate(camp, StateOf(ev, true));
-            _cEv = ev; _cHour = h;
+            _cEv = ev; _cHour = h; _cValid = true;
             return _cJ;
         }
 
@@ -95,19 +97,35 @@ namespace Armoury
                 if (Campaign.Current.Models.EncounterModel.GetLeaderOfSiegeEvent(ev, BattleSideEnum.Attacker) != Hero.MainHero) return Off(args, "You are not in command of this siege.");
                 if (!camp.IsPreparationComplete) return Off(args, "You need to wait for the siege equipment to be prepared.");
                 if (DealOf(ev) != null) return Off(args, "The people of " + town + " are gathering the coin.");
-                if (PlayerEncounter.Current != null || main.MapEvent != null || (st.Party != null && st.Party.MapEvent != null)) return Off(args, "You cannot treat with them while there is fighting.");
+                if (main.MapEvent != null || (st.Party != null && st.Party.MapEvent != null)) return Off(args, "You cannot treat with them while there is fighting.");
+                if (PlayerEncounter.Current != null) return Off(args, "Your men are still caught up in the last engagement - you cannot send envoys yet.");
                 var j = BesJudge(camp);
-                if (j == null) return Off(args, "No one in " + town + " will speak to you now.");
-                if (j.Capital) return Off(args, town + " is the seat of a crown - they will fight for it, not pay.");
-                if (j.Story) return Off(args, "No ransom will be offered at " + town + ": this siege will be decided by the sword.");
-                if (j.Undead) return Off(args, "There is no bargaining with the dead.");
-                if (!j.Empty && j.Ratio <= 1.0) return Off(args, "Their walls still hold - they will not pay. (Your strength against what the walls make of the defenders: " + F(j.Ratio, "0.00") + ".)");
-                if (j.Ransom <= 0 || j.Ransom < Math.Max(1L, j.Wage))
-                    return Off(args, town + " holds too little coin to buy you off: a quarter of it is " + N(j.Ransom) + " denars, less than a day's pay of your army (" + N(j.Wage) + ").");
+                string no = BesWhyNot(ev, j, town);
+                if (no != null) return Off(args, no);
                 args.Tooltip = new TextObject("{=!}" + "The people of " + town + " would pay about " + N(j.Ransom) + " denars to see your army gone.");
                 return true;
             }
             catch (Exception e) { Stumble("OptCondition", e); return false; }
+        }
+
+        /// <summary>Powod (po angielsku), dla ktorego obronca nie zaplaci graczowi - ta sama regula co obronca AI (Judge.DefPays: wykluczenia, oboz bez zywych,
+        /// stosunek murow bez czlonu czasu, okup >= doba zoldu) plus "w tym oblezeniu bez umow". null - zaplaci. Jedno miejsce dla opcji i okna (recenzja 14.10:
+        /// dotad opcja byla czynna przy buncie, a klik nic nie dawal).</summary>
+        private static string BesWhyNot(SiegeEvent ev, Judge j, string town)
+        {
+            if (j == null) return "No one in " + town + " will speak to you now.";
+            var s = StateOf(ev, false);
+            if (s != null && s.NoDeal != null) return "No one in " + town + " will treat with you again during this siege.";
+            if (j.Capital) return town + " is the seat of a crown - they will fight for it, not pay.";
+            if (j.Story) return "No ransom will be offered at " + town + ": this siege will be decided by the sword.";
+            if (j.Undead) return "There is no bargaining with the dead.";
+            if (j.Rebel) return town + " is in revolt - there is no one to pay you.";
+            if (j.Excl != null) return "No ransom will be offered at " + town + ".";
+            if (j.Men <= 0) return "There is no one in your camp to take the coin.";
+            if (!j.Empty && j.RatioWalls <= 1.0) return "Their walls still hold - they will not pay. (Your strength against what the walls make of the defenders: " + F(j.RatioWalls, "0.00") + ".)";
+            if (j.Ransom <= 0 || j.Ransom < Math.Max(1L, j.Wage))
+                return town + " holds too little coin to buy you off: a quarter of it is " + N(j.Ransom) + " denars, less than a day's pay of your army (" + N(j.Wage) + ").";
+            return null;
         }
 
         private static bool Off(MenuCallbackArgs args, string why)
@@ -145,9 +163,10 @@ namespace Armoury
             var camp = main != null ? main.BesiegerCamp : null;
             if (!PlayerBesOn || camp == null || camp.SiegeEvent != _besEv || DealOf(_besEv) != null) { _besAsk = false; return; }   // oblezenie inne albo skonczone
             if (InformationManager.IsAnyInquiryActive() || !CanShow(true)) return;
-            _cJ = null;                                                             // regula swieza przy oknie
+            _cValid = false;                                                        // regula swieza przy oknie
             var j = BesJudge(camp);
-            if (j == null || j.Excl != null || (!j.Empty && j.Ratio <= 1.0) || j.Ransom < Math.Max(1L, j.Wage)) { _besAsk = false; return; }
+            string no = BesWhyNot(_besEv, j, Nm(_besEv.BesiegedSettlement));
+            if (no != null) { _besAsk = false; Log.Player(no, true); return; }      // stan zmienil sie od kliku - powod zamiast ciszy
             ShowBesieger(camp, j);
         }
 
@@ -178,7 +197,7 @@ namespace Armoury
             {
                 _besOpen = false; _besAsk = false;
                 var s = StateOf(ev, true);
-                if (s == null || DealOf(ev) != null) return;
+                if (s == null || DealOf(ev) != null || s.St == null || s.St.SiegeEvent != ev) return;
                 var d = NewDeal(s, j, KBes, 1);
                 _dBesAcc++;
                 ChoiceLine(d, "przyjmij");
@@ -204,7 +223,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ rozejm gracza: opcja gry "Besiege the town/castle"
-        /// <summary>Postfiks EncounterGameMenuBehavior.game_menu_town_town_besiege_on_condition: rozejm frakcji gracza z ta osada - opcja nieczynna z dymkiem. Nie rzuca.</summary>
+        /// <summary>Postfiks EncounterGameMenuBehavior.game_menu_town_town_besiege_on_condition: rozejm frakcji albo rodu gracza z ta osada - opcja nieczynna z dymkiem. Nie rzuca.</summary>
         public static void BesiegeCondPost(MenuCallbackArgs __0, ref bool __result)
         {
             if (!__result || _truce.Count == 0) return;
@@ -213,28 +232,49 @@ namespace Armoury
                 if (!ActOn || __0 == null || Hero.MainHero == null) return;
                 var st = Settlement.CurrentSettlement;
                 var f = Hero.MainHero.MapFaction;
-                if (st == null || !IsTruce(st, f)) return;
-                int left = Math.Max(1, TruceUntil(st, f) - Today);
+                if (st == null || !IsTruce(st, f, Clan.PlayerClan)) return;
+                int left = Math.Max(1, TruceUntil(st, f, Clan.PlayerClan) - Today);
                 __0.IsEnabled = false;
-                __0.Tooltip = new TextObject("{=!}" + Nm(st) + " paid your realm a ransom: you swore not to besiege it again for another " + left + (left == 1 ? " day." : " days."));
+                __0.Tooltip = new TextObject("{=!}" + Nm(st) + " paid a ransom to your banner: you swore not to besiege it again for another " + left + (left == 1 ? " day." : " days."));
                 _dBesBlocked++;
             }
             catch (Exception e) { Stumble("BesiegeCondPost", e); }
         }
 
+        // ------------------------------------------------------------ szturm gracza po "Accept"
+        /// <summary>Postfiks SiegeEventCampaignBehavior.game_menu_siege_strategies_lead_assault_on_condition i ..._order_assault_on_condition (recenzja 14.10): po
+        /// przyjeciu okupu ("Accept", umowa w toku) "Lead an assault" i "Send troops" nieczynne z dymkiem - szturm miasta, ktore placi, zerwalby umowe (i tak
+        /// przepada po szturmie - OnMapEventEnded). Tylko IsEnabled i dymek (zadnej zmiany menu). Zwykle: jedno porownanie. Nie rzuca.</summary>
+        public static void AssaultOptPost(MenuCallbackArgs __0, ref bool __result)
+        {
+            if (!__result || _deals.Count == 0) return;
+            try
+            {
+                var main = MobileParty.MainParty;
+                var ev = main != null && main.BesiegerCamp != null ? main.BesiegerCamp.SiegeEvent : null;
+                var d = ev != null ? DealOf(ev) : null;
+                if (d == null || d.Kind != KBes || d.Choice != 1 || __0 == null) return;
+                __0.IsEnabled = false;
+                __0.Tooltip = new TextObject("{=!}You have taken the ransom of " + Nm(d.St) + ". Let time run on - your army will lift the siege once the coin is handed over.");
+                _dBesAssaultBlocked++;
+            }
+            catch (Exception e) { Stumble("AssaultOptPost", e); }
+        }
+
         // ------------------------------------------------------------ doba i wpiecia
-        private static bool DayAnyBes { get { return _dBesClick + _dBesShown + _dBesAcc + _dBesRef + _dBesFail + _dBesBlocked > 0; } }
+        private static bool DayAnyBes { get { return _dBesClick + _dBesShown + _dBesAcc + _dBesRef + _dBesFail + _dBesBlocked + _dBesAssaultBlocked > 0; } }
 
         private static void DayPartBes(StringBuilder sb)
         {
             sb.Append(" | gracz-oblegajacy: opcja ").Append(_hookOption).Append(", klikniec ").Append(_dBesClick).Append(", okno ").Append(_dBesShown).Append(", przyjmij ").Append(_dBesAcc)
               .Append(", odmowa ").Append(_dBesRef).Append(", okno zamkniete bez wyboru ").Append(_dBesFail).Append("; rozejm gracza - oblezenie nieczynne ").Append(_dBesBlocked)
-              .Append(" (latka ").Append(_hookBesiege).Append(')');
+              .Append(" (latka ").Append(_hookBesiege).Append(')')
+              .Append("; szturm po Accept nieczynny (klatki menu) ").Append(_dBesAssaultBlocked).Append(" (latka ").Append(_hookAssaultOpt).Append(')');
         }
 
-        private static void ZeroDayBes() { _dBesClick = _dBesShown = _dBesAcc = _dBesRef = _dBesFail = _dBesBlocked = 0; }
+        private static void ZeroDayBes() { _dBesClick = _dBesShown = _dBesAcc = _dBesRef = _dBesFail = _dBesBlocked = _dBesAssaultBlocked = 0; }
 
-        private static void ResetBes() { _besAsk = _besOpen = false; _besEv = null; _besFails = 0; _cEv = null; _cJ = null; _cHour = -1; }
+        private static void ResetBes() { _besAsk = _besOpen = false; _besEv = null; _besFails = 0; _cEv = null; _cJ = null; _cHour = -1; _cValid = false; }
 
         private static void EnsureHooksBes()
         {
@@ -250,6 +290,20 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _hookBesiege = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooksBes", e); }
+            try
+            {
+                var wired = 0;
+                foreach (var name in new[] { "game_menu_siege_strategies_lead_assault_on_condition", "game_menu_siege_strategies_order_assault_on_condition" })
+                {
+                    var m = AccessTools.Method(typeof(SiegeEventCampaignBehavior), name);
+                    if (m == null) continue;
+                    Seal31.Patch("okup oblezenia: szturm po przyjeciu okupu (SiegeEventCampaignBehavior." + name + ")", m, typeof(SiegeRansom), null, nameof(AssaultOptPost), null,
+                                 Priority.Normal, Priority.Last);
+                    wired++;
+                }
+                _hookAssaultOpt = wired == 2 ? "wpieta" : wired == 1 ? "wpieta czesciowo (1 z 2)" : "BRAK (warunki szturmu gry nie znalezione)";
+            }
+            catch (Exception e) { _hookAssaultOpt = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooksBes.Assault", e); }
         }
     }
 }

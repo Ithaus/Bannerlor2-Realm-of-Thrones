@@ -15,7 +15,8 @@ namespace Armoury
 {
     /// <summary>
     /// O2 - GRACZ-OBRONCA (klucz SiegeRansomPlayerDefender; off = regula AI i wiadomosc, jak w O1). Projekt rozdz. 3, 6.3, P11.
-    ///  - Kto decyduje: gracz w oblezonej osadzie albo rod gracza jest jej panem. Propozycja przychodzi w chwili decyzji AI o szturmie (cykl O0), tylko gdy regula
+    ///  - Kto decyduje: gracz w oblezonej osadzie jako strona obrony (w wojnie z oblegajacymi - neutralny gosc nie decyduje o cudzej monecie; recenzja 14.10)
+    ///    albo rod gracza jest jej panem. Propozycja przychodzi w chwili decyzji AI o szturmie (cykl O0), tylko gdy regula
     ///    daje okup (obronca moze zaplacic, AI-oblegajacy przyjmuje, bez wykluczen) - umowa z wyborem "czeka", postfiks decyzji trzyma szturm (false).
     ///  - Okno: InformationManager.ShowInquiry z pauza - "Pay" / "Refuse". Otwiera je (1) postfiks ticku menu oczekiwania gry menu_siege_strategies (gracz w osadzie
     ///    - gra daje mu to menu) albo (2) tick kampanii przy czynnym MapState (gracz na mapie, w armii, w menu innej osady), bez bitwy, rozmowy i niewoli gracza.
@@ -40,8 +41,7 @@ namespace Armoury
         /// <summary>Decide (O1): gracz-obronca. null - regula AI. Odmowa w tym oblezeniu - szturm.</summary>
         private static string DecidePlayer(Siege s, Judge j)
         {
-            var old = DealOf(s.Ev);
-            if (old != null && old.Choice == 2) return "szturm (gracz-obronca odmowil w tym oblezeniu)";
+            if (_refused.Contains(s.Ev)) return "szturm (gracz-obronca odmowil w tym oblezeniu)";
             if (j.Player != "w osadzie" && j.Player != "pan osady") return null;
             if (!PlayerDefOn) return null;                                          // regula AI i wiadomosc (jak O1)
             if (AutotestActive()) return null;                                      // autotest: nikt nie odpowie na okno z pauza - od razu regula AI (bez doby zwloki)
@@ -55,7 +55,7 @@ namespace Armoury
         private static void StepAsk(Deal d)
         {
             if (d.Kind == KBes) return;                                             // O3: okno oblegajacego otwiera tylko menu oblezenia
-            if (!PlayerDefOn) { Late(d, "klucz Siege Ransom Player Defender wylaczony"); return; }
+            if (!PlayerDefOn) { Late(d, "klucz Siege Ransom Player Defender wylaczony"); return; }   // Step (KindOn): tu tylko przy wlaczonym Siege Ransom Ai
             if (Now > d.Deadline) { Late(d, "24 h bez odpowiedzi (okna nie dalo sie pokazac)"); return; }
             TryAsk(d, false);
         }
@@ -116,6 +116,7 @@ namespace Armoury
             {
                 _askOpen = false; _askDeal = null;
                 if (d.Choice != 0) return;
+                if (!_deals.Contains(d)) { Log.Player("It is too late to pay the ransom of " + town + ".", true); return; }   // umowa przepadla przy otwartym oknie
                 d.Choice = 1; d.Kind = KDefPaid; d.Agreed = Now; _dPayChosen++;
                 ChoiceLine(d, "zaplac");
             };
@@ -124,6 +125,8 @@ namespace Armoury
                 _askOpen = false; _askDeal = null;
                 if (d.Choice != 0) return;
                 d.Choice = 2; _dRefused++;
+                _deals.Remove(d);                                                   // odmowa nie jest umowa - znacznik do konca oblezenia osobno (recenzja 14.10)
+                if (d.Ev != null && d.St != null && d.St.SiegeEvent == d.Ev) _refused.Add(d.Ev);
                 ChoiceLine(d, "odmowa");
                 Log.Player("You refused the ransom. The besiegers of " + town + " will storm the walls.", true);
             };
@@ -144,12 +147,15 @@ namespace Armoury
 
         // ------------------------------------------------------------ tick menu oczekiwania gry (menu_siege_strategies)
         /// <summary>Postfiks SiegeEventCampaignBehavior.game_menu_siege_strategies_on_tick (G :259-278 - gra wola go co klatke czynnego menu oczekiwania oblezenia,
-        /// po swoim ewentualnym przelaczeniu menu). Zwykla klatka: jedno porownanie. Tylko otwiera okno (gracz-obronca; O3 - gracz-oblegajacy). Nie rzuca.</summary>
+        /// po swoim ewentualnym przelaczeniu menu). Zwykla klatka: jedno porownanie. Tylko otwiera okno (gracz-obronca; O3 - gracz-oblegajacy) i tylko, gdy po
+        /// ticku gry czynne jest nadal menu oblezenia (gra moze je w tym ticku zmienic: SwitchToMenu / ExitToLast - recenzja 14.10). Nie rzuca.</summary>
         public static void MenuTickPost()
         {
             if (_deals.Count == 0 && !BesAskPending) return;
             try
             {
+                var mc = Campaign.Current != null ? Campaign.Current.CurrentMenuContext : null;
+                if (mc == null || mc.GameMenu == null || mc.GameMenu.StringId != "menu_siege_strategies") return;
                 for (int i = 0; i < _deals.Count; i++)
                 {
                     var d = _deals[i];

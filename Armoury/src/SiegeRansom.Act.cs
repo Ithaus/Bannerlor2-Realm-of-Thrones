@@ -20,8 +20,12 @@ namespace Armoury
     ///  - W chwili decyzji gry o szturmie (cykl O0): obronca zaplacilby (okup >= doba zoldu, bez wykluczen) i AI-oblegajacy przyjmuje (potrzeba / szturm bez zdobycia
     ///    / krwawy szturm) - umowa (Deal). Od tej chwili postfiks decyzji daje false (szturm czeka), a umowe wykonuje NASTEPNY tick kampanii (CampaignEvents.TickEvent
     ///    - biegnie tylko przy plynacym czasie, wewnatrz Campaign.Tick, tam gdzie gra sama zwija oblezenia z mysli AI; P5). Nigdy z mysli AI, z opcji menu ani z okna.
-    ///  - Wykonanie tylko gdy: oblezenie to samo (osada.SiegeEvent), osada i zadna druzyna obozu nie sa w bitwie (inaczej czeka; FailedAssert gry :259), frakcja obozu
-    ///    ta sama i dalej w wojnie z osada; umowa starsza niz doba - przepada (linia "przepadl").
+    ///  - Wykonanie tylko gdy: oblezenie to samo (osada.SiegeEvent), klucz rodzaju umowy dalej wlaczony (inaczej przepada - off = 449d453), osada i zadna druzyna
+    ///    obozu nie sa w bitwie (inaczej czeka; FailedAssert gry :259), frakcja obozu ta sama i dalej w wojnie z osada; umowa starsza niz doba - przepada (linia
+    ///    "przepadl"; umowa AI przepada tak najwyzej raz w oblezeniu - potem szturm jak w grze). Bez umowy: przy bitwie w chwili decyzji, po zwinieciu, ktore
+    ///    sie nie udalo. Szturm w trakcie umowy (MapEventEnded) - umowa przepada (miasto nie placi po odpartym szturmie). Recenzja 14.10.
+    ///  - Kolejnosc wykonania (recenzja 14.10): okup teraz (min(uzgodnione, stan)) >= doba zoldu, inaczej przepada; ZWINIECIE obozu; zaplata, podzial i rozejm
+    ///    TYLKO, gdy oblezenie naprawde sie skonczylo (wyjatek gry przy zwijaniu - ERROR w logu za kazdym razem, bez zaplaty, w tym oblezeniu bez umow).
     ///  - Zdjecie: z kazdego zbiornika najwyzej to, co uzgodniono przy decyzji (Want), i najwyzej tyle, ile lezy teraz - kasa kupcow (Town.ChangeGold, ksiega
     ///    MoneyLedger NRansom - P10, osobno od lupu NSack) i kiesy ludu (TownFolk.SackTake - ksiega kies r = 0). Bez GiveGoldAction.
     ///  - Podzial (P4): wszystkie druzyny OBOZU (BesiegerCamp, takze lordowie spoza armii) wedlug ludzi - CitySack.SharePool, ten sam kod co lup L2: 2/3 sakiewki,
@@ -29,13 +33,16 @@ namespace Armoury
     ///  - Koniec oblezenia (P5): BesiegerCamp.RemoveAllSiegeParties() - ta sama akcja gry co LiftSiegeAction (i co StrategicCampaignAI przy odwrocie): kazda druzyna
     ///    BesiegerCamp = null (gra: SetMoveModeHold, rozprzezenie), przy zerze FinalizeSiegeEvent -> OnSiegeEventEnded; gracz w osadzie dostaje menu gry
     ///    "siege_attacker_left" (PlayerSiege.OnSiegeEventFinalized) - zwykla droga, jak przy odejsciu oblegajacych.
-    ///  - Rozejm (P6, P9): frakcje druzyn, ktore wziely okup, nie oblegaja tej osady TruceDays (60) dob - postfiks TargetScoreCalculatingModel.GetTargetScoreForFaction
+    ///  - Rozejm (P6, P9): frakcje druzyn, ktore wziely okup, i ich rody (klucz "c:<rod>" - rod, ktory zmieni krolestwo, dalej zwiazany; recenzja 14.10) nie oblegaja
+    ///    tej osady TruceDays (60) dob - postfiks TargetScoreCalculatingModel.GetTargetScoreForFaction
     ///    = 0 dla (osada, frakcja) przy ArmyTypes.Besieger (bazowy Default - wola go tez StrategicCampaignAI145 - i model z kampanii, jesli ma wlasne nadpisanie);
     ///    druzyny tych frakcji juz w drodze na oblezenie tej osady (DefaultBehavior BesiegeSettlement) - SetMoveModeHold (mysl od nowa, bez tej osady). Pole zapisu
-    ///    "arm_siege_ransom" (wersja 1; osobno od arm_sack, ktorego Import odrzuca nieznana wersje): rozejmy i szturmy bez zdobycia trwajacych oblezen.
+    ///    "arm_siege_ransom" (wersja 1; osobno od arm_sack, ktorego Import odrzuca nieznana wersje): rozejmy, szturmy bez zdobycia trwajacych oblezen i odmowy
+    ///    gracza-obroncy (wpis "R", recenzja 14.10). Umowy w toku nie ida do zapisu (po wczytaniu: nowa decyzja AI, gracz-oblegajacy ma znowu opcje).
     ///    Oblezenie wbrew rozejmowi (nasluch OnSiegeEventStarted) - linia "Okup oblezenia (rozejm zlamany)" (prog O-3 = 0).
     ///  - BK ArmySiegePersistence (wlaczone u Jeffa): przy okupie tylko pomiar - czy BK ma wpis armii z celem tej osady i z ostatnim marszem na oblezenie w 24 h
-    ///    (tylko wtedy BK moze ja trzymac w miejscu); BK nie jest zmieniany.
+    ///    (tylko wtedy BK moze ja trzymac w miejscu) - wodz obozu i armie zawrocone w drodze; linia doby: armie z celem w osadzie z rozejmem (BK FindArmyObjective
+    ///    nie pyta o wynik celu); BK nie jest zmieniany.
     /// Gracz: w obozie AI - wiadomosc z czescia jego druzyny (jak L2); pan osady albo w osadzie (bez O2 albo po 24 h bez odpowiedzi) - wiadomosc; osada krolestwa
     /// gracza - wiadomosc. Wyjatek - licznik potkniec; wyjatek przy podziale - reszta wraca do zbiornikow (SharePool).
     /// </summary>
@@ -60,6 +67,7 @@ namespace Armoury
             public bool Shown; public int AskFails;
         }
         private static readonly List<Deal> _deals = new List<Deal>();
+        private static readonly HashSet<SiegeEvent> _refused = new HashSet<SiegeEvent>();   // odmowy gracza-obroncy do konca oblezenia (dotad znacznik w _deals - alokacja co tick)
 
         private static Deal DealOf(SiegeEvent ev)
         {
@@ -81,6 +89,8 @@ namespace Armoury
         private static string Decide(Siege s, Judge j)
         {
             if (!ActOn) return "szturm (gra; okup wylaczony)";
+            if (s.NoDeal != null) return "szturm (bez umow w tym oblezeniu: " + s.NoDeal + ")";
+            if (BattleAt(s.Ev)) return "szturm (bitwa przy oblezeniu - bez umowy)";        // umowa czekalaby na koniec bitwy, a Hold trzymalby szturm (recenzja 14.10)
             if (j.Excl != null) return "szturm (wykluczone: " + j.Excl + ")";
             if (!j.DefPays) return "szturm (obronca nie zaplaci: " + j.DefWhy + ")";
             if (!j.AiAccepts) return "szturm (AI nie przyjmuje: " + j.AccWhy + ")";
@@ -99,7 +109,20 @@ namespace Armoury
             return d;
         }
 
-        private static void DropDeals(SiegeEvent ev, string why)
+        /// <summary>Bitwa przy oblezeniu: osada albo ktorakolwiek druzyna obozu w MapEvent (zwiniecie obozu wtedy niemozliwe - FailedAssert gry :259).</summary>
+        private static bool BattleAt(SiegeEvent ev)
+        {
+            var st = ev != null ? ev.BesiegedSettlement : null;
+            if (st == null) return false;
+            if (st.Party != null && st.Party.MapEvent != null) return true;
+            var camp = ev.BesiegerCamp;
+            if (camp == null) return false;
+            foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
+                if (pb != null && pb.MapEvent != null) return true;
+            return false;
+        }
+
+        private static void DropDeals(SiegeEvent ev, string why, string en)
         {
             if (ev == null || _deals.Count == 0) return;
             for (int i = _deals.Count - 1; i >= 0; i--)
@@ -107,13 +130,15 @@ namespace Armoury
                 var d = _deals[i];
                 if (d.Ev != ev) continue;
                 _deals.RemoveAt(i);
-                Dropped(d, why);
+                Dropped(d, why, en);
             }
         }
 
-        private static void Dropped(Deal d, string why)
+        /// <summary>Umowa przepadla: linia (pomiar) i - gdy gracz wybral "placi" / "przyjmij" - wiadomosc graczowi (recenzja 14.10: dotad przepadala po cichu).
+        /// en - powod po angielsku (null - bez powodu).</summary>
+        private static void Dropped(Deal d, string why, string en)
         {
-            if (d.Choice == 2) return;                                          // odmowa gracza - znacznik do konca oblezenia, nie umowa, ktora przepadla
+            if (d.Choice == 2) return;                                          // odmowa gracza - nie umowa, ktora przepadla
             _dDropped++;
             try
             {
@@ -122,41 +147,68 @@ namespace Armoury
                              + (d.Choice == 0 ? "czeka na gracza" : d.Choice == 1 ? "placi" : "odmowa") + " | uzgodniony dzien " + (int)d.Day0 + " | powod: " + why + ".");
             }
             catch { }
+            try
+            {
+                if (d.Choice == 1 && (d.Kind == KBes || d.Kind == KDefPaid))
+                    Log.Player("The ransom of " + Nm(d.St) + " fell through" + (string.IsNullOrEmpty(en) ? "." : ": " + en + "."), true);
+            }
+            catch { }
         }
 
         // ------------------------------------------------------------ tick kampanii: wykonanie (P5)
         /// <summary>CampaignEvents.TickEvent (ArmouryBehavior.RegisterEvents): przy braku umow - jedno porownanie. Umowa z wyborem "placi" - wykonanie, gdy oblezenie
         /// jest wolne od bitew; O2 - pytanie gracza-obroncy (okno, termin 24 h). Nie rzuca.</summary>
+        private static readonly List<Deal> _tickBuf = new List<Deal>(4);
+
         internal static void Tick()
         {
             if (_deals.Count == 0) return;
             try
             {
-                var arr = _deals.ToArray();
-                foreach (var d in arr)
+                _tickBuf.Clear();
+                _tickBuf.AddRange(_deals);                                      // bez alokacji co tick (recenzja 14.10)
+                for (int i = 0; i < _tickBuf.Count; i++)
                 {
+                    var d = _tickBuf[i];
                     if (!_deals.Contains(d)) continue;                          // zdjeta w tym ticku (koniec oblezenia innej umowy)
                     try { Step(d); }
                     catch (Exception e) { _deals.Remove(d); Stumble("Tick.Step", e); }
                 }
+                _tickBuf.Clear();
             }
-            catch (Exception e) { Stumble("Tick", e); }
+            catch (Exception e) { _tickBuf.Clear(); Stumble("Tick", e); }
+        }
+
+        /// <summary>Klucz rodzaju umowy (recenzja 14.10: umowa w toku po wylaczeniu klucza przepada - off = 449d453): AI z AI - SiegeRansomAi; gracz-oblegajacy -
+        /// SiegeRansomPlayerBesieger; gracz-obronca - SiegeRansomPlayerDefender albo SiegeRansomAi (bez klucza gracza regula AI).</summary>
+        private static bool KindOn(Deal d)
+        {
+            return d.Kind == KAi ? AiOn : d.Kind == KBes ? PlayerBesOn : (PlayerDefOn || AiOn);
         }
 
         private static void Step(Deal d)
         {
             var st = d.St;
-            if (st == null || st.SiegeEvent != d.Ev || d.Ev.BesiegerCamp == null) { _deals.Remove(d); Dropped(d, "oblezenia juz nie ma"); return; }
+            if (st == null || st.SiegeEvent != d.Ev || d.Ev.BesiegerCamp == null) { _deals.Remove(d); Dropped(d, "oblezenia juz nie ma", "the siege is over"); return; }
+            if (d.Choice == 2) { _deals.Remove(d); return; }                    // odmowa nie jest umowa (znacznik w _refused)
+            if (!KindOn(d)) { _deals.Remove(d); Dropped(d, "klucz okupu wylaczony", "ransoms are switched off"); return; }
             if (d.Choice == 0) { StepAsk(d); return; }                           // O2: pytanie gracza
-            if (d.Choice == 2) return;                                          // odmowa - umowa trzyma tylko znacznik do konca oblezenia
             var camp = d.Ev.BesiegerCamp;
-            if (camp.MapFaction != d.Fac) { _deals.Remove(d); Dropped(d, "oboz zmienil frakcje"); return; }
-            if (st.MapFaction == null || d.Fac == null || !FactionManager.IsAtWarAgainstFaction(d.Fac, st.MapFaction)) { _deals.Remove(d); Dropped(d, "nie ma juz wojny"); return; }
-            if (Now - d.Agreed > 1f) { _deals.Remove(d); Dropped(d, "doba bez wykonania (bitwa przy oblezeniu)"); return; }
-            if (st.Party != null && st.Party.MapEvent != null) { _dWaitBattle++; return; }
+            if (camp.MapFaction != d.Fac) { _deals.Remove(d); Dropped(d, "oboz zmienil frakcje", "the besiegers changed allegiance"); return; }
+            if (st.MapFaction == null || d.Fac == null || !FactionManager.IsAtWarAgainstFaction(d.Fac, st.MapFaction)) { _deals.Remove(d); Dropped(d, "nie ma juz wojny", "the war is over"); return; }
+            if (Now - d.Agreed > 1f)
+            {
+                _deals.Remove(d);
+                Dropped(d, "doba bez wykonania (bitwa przy oblezeniu)", "a day passed and the coin could not be handed over");
+                if (d.Kind != KBes)                                             // umowa AI najwyzej raz przepada przez bitwe - potem szturm jak w grze (recenzja 14.10)
+                {
+                    var s = StateOf(d.Ev, false);
+                    if (s != null) s.NoDeal = "umowa przepadla - bitwa przy oblezeniu przez dobe";
+                }
+                return;
+            }
             if (d.Kind == KBes && PlayerEncounter.Current != null) { _dWaitBattle++; return; }   // O3: gracz w spotkaniu - czekamy (zwiniecie obozu bez spotkania gry)
-            foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
-                if (pb != null && pb.MapEvent != null) { _dWaitBattle++; return; }
+            if (BattleAt(d.Ev)) { _dWaitBattle++; return; }
             _deals.Remove(d);                                                   // przed zwinieciem obozu (OnSiegeEventEnded nie znajdzie juz tej umowy)
             Execute(d, camp);
         }
@@ -174,9 +226,41 @@ namespace Armoury
             var recs = CitySack.Recipients(camp.LeaderParty, contrib, out men, out uMen);
             var live = new List<CitySack.Rec>();
             foreach (var r in recs) if (!r.Undead) live.Add(r);
-            if (men <= 0) { Dropped(d, "oboz bez zywych odbiorcow"); return; }
-            // ---- zdjecie: najwyzej uzgodnione, najwyzej to, co lezy teraz
+            if (men <= 0) { Dropped(d, "oboz bez zywych odbiorcow", "no one is left in the camp to take it"); return; }
+            // ---- okup teraz (recenzja 14.10): najwyzej uzgodnione, najwyzej to, co lezy; ponizej doby zoldu - bez przelewow i bez zwiniecia (ta sama regula P3)
             var k = CitySack.Read(st);
+            long now = Math.Max(0L, Math.Min(j.Want[0], k.Kasa));
+            for (int c = 0; c < 4; c++) now += Math.Max(0L, Math.Min(j.Want[c + 1], k.Folk[c]));
+            if (now < Math.Max(1L, j.Wage)) { Dropped(d, "okup stopnial (" + now + " < doba zoldu " + j.Wage + ")", "the coin is no longer there"); return; }
+            // ---- BK ArmySiegePersistence: tylko pomiar (wpis armii wodza z celem tej osady w 24 h); dane do linii - przed zwinieciem
+            string bk = BkStick(camp.LeaderParty, st);
+            var leaderHero = camp.LeaderParty != null ? camp.LeaderParty.LeaderHero : null;
+            var playerRec = (CitySack.Rec)null;
+            foreach (var r in live) if (r.Mp == MobileParty.MainParty) playerRec = r;
+            bool playerInCamp = MobileParty.MainParty != null && contrib.ContainsKey(MobileParty.MainParty);
+            // ---- koniec oblezenia droga gry (P5) - NAJPIERW zwiniecie, zaplata tylko, gdy oblezenie naprawde sie skonczylo (recenzja 14.10: dotad zaplata szla
+            //      przed zwinieciem, a wyjatek gry przy zwijaniu byl tylko liczony - miasto placilo i dostawalo szturm)
+            Exception liftErr = null;
+            try { camp.RemoveAllSiegeParties(); }
+            catch (Exception e) { liftErr = e; }
+            int left = 0;
+            try { if (st.SiegeEvent == d.Ev && d.Ev.BesiegerCamp != null) foreach (var pb in d.Ev.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) left++; } catch { left = -1; }
+            bool ended = st.SiegeEvent != d.Ev;
+            if (liftErr != null)
+            {
+                _stumbles++; _dStumbles++;
+                try { Log.Error("SiegeRansom.Execute.Lift (" + st.StringId + ", oblezenie zakonczone " + (ended ? "tak" : "nie") + ")", liftErr); } catch { }   // kazdy raz
+            }
+            if (!ended)
+            {
+                _dLiftFail++;
+                var sv = StateOf(d.Ev, false);
+                if (sv != null) { sv.Open = false; sv.NoDeal = "oboz nie dal sie zwinac"; }
+                Dropped(d, "oboz nie zwiniety (druzyn " + left + (liftErr != null ? ", wyjatek " + liftErr.GetType().Name : "") + ") - bez zaplaty i rozejmu", "the camp could not be broken up");
+                return;
+            }
+            // ---- zdjecie: najwyzej uzgodnione, najwyzej to, co lezy teraz (stan czytany po zwinieciu)
+            k = CitySack.Read(st);
             long[] took = new long[5];
             long w0 = Math.Min(j.Want[0], k.Kasa);
             int had = town.Gold;
@@ -190,30 +274,21 @@ namespace Armoury
             var sp = CitySack.SharePool(st, pool, live, men, took, MoneyLedger.NRansom);
             if (sp.Err != null) Stumble("Execute.Split", sp.Err);
             long diff = sp.Given - pool;
-            // ---- rozejm: frakcje druzyn, ktore wziely okup
+            // ---- rozejm: frakcje druzyn, ktore wziely okup, i ich rody (recenzja 14.10: rod, ktory zmieni krolestwo, nadal jest zwiazany - klucz "c:<rod>")
             int until = Today + TruceDays;
-            var facs = new List<string>(2);
+            var facs = new List<string>(4);
             foreach (var r in live)
             {
                 var f = r.Mp != null ? r.Mp.MapFaction : null;
-                if (f == null || f.StringId == null || facs.Contains(f.StringId)) continue;
-                facs.Add(f.StringId);
-                AddTruce(st, f.StringId, until);
+                if (f != null && f.StringId != null && !facs.Contains(f.StringId)) { facs.Add(f.StringId); AddTruce(st, f.StringId, until); }
+                var cl = r.Mp != null ? r.Mp.ActualClan : null;
+                string ck = cl != null && cl.StringId != null ? ClanKey(cl) : null;
+                if (ck != null && !facs.Contains(ck)) { facs.Add(ck); AddTruce(st, ck, until); }
             }
             if (d.Fac != null && d.Fac.StringId != null && !facs.Contains(d.Fac.StringId)) { facs.Add(d.Fac.StringId); AddTruce(st, d.Fac.StringId, until); }
-            // ---- BK ArmySiegePersistence: tylko pomiar (wpis armii wodza z celem tej osady w 24 h)
-            string bk = BkStick(camp.LeaderParty, st);
-            // ---- koniec oblezenia droga gry (P5)
-            var leaderHero = camp.LeaderParty != null ? camp.LeaderParty.LeaderHero : null;
-            var playerRec = (CitySack.Rec)null;
-            foreach (var r in live) if (r.Mp == MobileParty.MainParty) playerRec = r;
-            bool playerInCamp = MobileParty.MainParty != null && contrib.ContainsKey(MobileParty.MainParty);
-            try { camp.RemoveAllSiegeParties(); }
-            catch (Exception e) { Stumble("Execute.Lift", e); }          // zaplacone i rozejm zapisany - oboz, ktory by zostal, traci cel (wynik 0) i odchodzi z mysli AI
-            int left = 0;
-            try { if (st.SiegeEvent == d.Ev && d.Ev.BesiegerCamp != null) foreach (var pb in d.Ev.BesiegerCamp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) left++; } catch { left = -1; }
-            bool ended = st.SiegeEvent != d.Ev;
-            int turned = TurnBack(st);
+            int bkTurned;
+            int turned = TurnBack(st, out bkTurned);
+            if (bkTurned > 0) bk += "; zawrocone armie z wpisem BK (do 24 h postoju) " + bkTurned;
             // ---- liczniki doby
             _dPaid[d.Kind]++;
             _dPool += pool; _dMerch += took[0]; _dFolk += took[1] + took[2] + took[3] + took[4];
@@ -221,6 +296,7 @@ namespace Armoury
             _dDiff += Math.Abs(diff); _dTruceNew += facs.Count; _dTurned += turned;
             if (left != 0 || !ended) _dCampLeft++;
             if (bk.StartsWith("tak", StringComparison.Ordinal)) _dBk++;
+            _dBkTurned += bkTurned;
             // ---- linia O1 (zawsze przy kluczu logu - prog O-2 czyta kazdy okup)
             long tm = sp.ToMen, tl = sp.ToLead, tp = sp.ToParty, pl = playerRec != null ? playerRec.ToMen + playerRec.ToLead : 0;
             var s = Settings.Current;
@@ -276,7 +352,7 @@ namespace Armoury
                 {
                     string head = d.Kind == KDefLate ? town + " could not wait for your word: it" : town;
                     Log.Player(head + " paid a ransom of " + N(pool) + " denars" + (st.IsTown ? " from its merchants and townsfolk" : " from its treasury and castle folk")
-                               + "; the enemy has lifted the siege and swears not to return for " + TruceDays + " days.", own);
+                               + "; the enemy has lifted the siege and swears not to besiege it again for " + TruceDays + " days.", own);
                 }
             }
             catch (Exception e) { Stumble("Messages", e); }
@@ -294,20 +370,26 @@ namespace Armoury
             if (!m.TryGetValue(fac, out old) || old < until) m[fac] = until;
         }
 
-        /// <summary>Frakcja f ma rozejm z osada st (okup w ostatnich TruceDays dobach). Tylko odczyt.</summary>
-        internal static bool IsTruce(Settlement st, IFaction f)
+        /// <summary>Klucz rozejmu rodu (recenzja 14.10: rod, ktory wzial okup i zmienil krolestwo, nadal jest zwiazany) - "c:" oddziela rody od frakcji.</summary>
+        private static string ClanKey(Clan c) { return c != null && c.StringId != null ? "c:" + c.StringId : null; }
+
+        /// <summary>Frakcja f albo rod c ma rozejm z osada st (okup w ostatnich TruceDays dobach). Tylko odczyt.</summary>
+        internal static bool IsTruce(Settlement st, IFaction f, Clan c)
         {
-            if (_truce.Count == 0 || st == null || f == null || st.StringId == null || f.StringId == null) return false;
-            Dictionary<string, int> m;
-            int until;
-            return _truce.TryGetValue(st.StringId, out m) && m.TryGetValue(f.StringId, out until) && Today < until;
+            if (_truce.Count == 0) return false;
+            return TruceUntil(st, f, c) > Today;
         }
 
-        internal static int TruceUntil(Settlement st, IFaction f)
+        internal static int TruceUntil(Settlement st, IFaction f, Clan c)
         {
+            if (_truce.Count == 0 || st == null || st.StringId == null) return 0;
             Dictionary<string, int> m;
-            int until;
-            return st != null && f != null && st.StringId != null && f.StringId != null && _truce.TryGetValue(st.StringId, out m) && m.TryGetValue(f.StringId, out until) ? until : 0;
+            if (!_truce.TryGetValue(st.StringId, out m)) return 0;
+            int a = 0, b = 0;
+            if (f != null && f.StringId != null) m.TryGetValue(f.StringId, out a);
+            string ck = ClanKey(c);
+            if (ck != null) m.TryGetValue(ck, out b);
+            return Math.Max(a, b);
         }
 
         /// <summary>Postfiks GetTargetScoreForFaction (Last): rozejm - oblezenie tej osady przez te frakcje ma wynik 0 (AI wybiera inny cel). Nie rzuca.</summary>
@@ -317,21 +399,25 @@ namespace Armoury
             try
             {
                 if (!ActOn || __0 == null || __2 == null) return;
-                if (IsTruce(__0, __2.MapFaction)) { __result = 0f; _dScoreZero++; }
+                if (IsTruce(__0, __2.MapFaction, __2.ActualClan)) { __result = 0f; _dScoreZero++; }
             }
             catch (Exception e) { Stumble("ScorePost", e); }
         }
 
-        /// <summary>Po okupie: druzyny frakcji z rozejmem juz w drodze na oblezenie tej osady - SetMoveModeHold (AI mysli od nowa; wynik celu 0). Zwraca ile.</summary>
-        private static int TurnBack(Settlement st)
+        /// <summary>Po okupie: druzyny frakcji z rozejmem juz w drodze na oblezenie tej osady - SetMoveModeHold (AI mysli od nowa; wynik celu 0). Zwraca ile;
+        /// bk - ile z nich to armie ze swiezym wpisem BK ArmySiegePersistence (BK moze je trzymac w miejscu do 24 h - tylko pomiar, recenzja 14.10).</summary>
+        private static int TurnBack(Settlement st, out int bk)
         {
             int n = 0;
+            bk = 0;
             try
             {
                 foreach (var mp in MobileParty.AllLordParties)
                 {
                     if (mp == null || !mp.IsActive || mp.IsMainParty || mp.AttachedTo != null || mp.BesiegerCamp != null) continue;
-                    if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement || mp.TargetSettlement != st || !IsTruce(st, mp.MapFaction)) continue;
+                    if (mp.DefaultBehavior != AiBehavior.BesiegeSettlement || mp.TargetSettlement != st || !IsTruce(st, mp.MapFaction, mp.ActualClan)) continue;
+                    bool army = mp.Army != null && mp.Army.LeaderParty == mp;
+                    if (army && BkStick(mp, st).StartsWith("tak", StringComparison.Ordinal)) bk++;
                     mp.SetMoveModeHold();
                     n++;
                 }
@@ -349,12 +435,13 @@ namespace Armoury
                 var lp = ev.BesiegerCamp.LeaderParty;
                 var f = lp != null ? lp.MapFaction : ev.BesiegerCamp.MapFaction;
                 var st = ev.BesiegedSettlement;
-                if (!IsTruce(st, f)) return;
+                var cl = lp != null ? lp.ActualClan : null;
+                if (!IsTruce(st, f, cl)) return;
                 bool player = lp != null && lp.IsMainParty;
                 if (player) _dBrokenPlayer++; else _dBroken++;
                 Log.Info("Okup oblezenia (rozejm zlamany): dzien " + Today + " | osada " + st.StringId + " | frakcja " + (f != null ? f.StringId : "-") + " | wodz "
                          + (lp != null && lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : (lp != null ? lp.StringId : "-")) + " | gracz " + (player ? "tak" : "nie")
-                         + " | rozejm do dnia " + TruceUntil(st, f) + ".");
+                         + " | rozejm do dnia " + TruceUntil(st, f, cl) + ".");
             }
             catch (Exception e) { Stumble("OnSiegeStarted", e); }
         }
@@ -392,11 +479,12 @@ namespace Armoury
         // ------------------------------------------------------------ zapis "arm_siege_ransom" (wersja 1)
         private sealed class FailRec { public string St; public double Start; public int Failed; public string Fac; }
         private static readonly List<FailRec> _pendingFailed = new List<FailRec>();
+        private static readonly List<FailRec> _pendingRefused = new List<FailRec>();   // odmowy gracza-obroncy z zapisu (recenzja 14.10)
 
         /// <summary>Szturmy bez zdobycia z zapisu dla tego samego oblezenia (osada i chwila poczatku oblezenia) - przy pierwszym uzyciu stanu oblezenia.</summary>
         private static void RestoreFailed(Siege s)
         {
-            if (_pendingFailed.Count == 0 || s == null || s.St == null || s.Ev == null) return;
+            if ((_pendingFailed.Count == 0 && _pendingRefused.Count == 0) || s == null || s.St == null || s.Ev == null) return;
             double start = s.Ev.SiegeStartTime.ToHours;
             for (int i = _pendingFailed.Count - 1; i >= 0; i--)
             {
@@ -405,6 +493,13 @@ namespace Armoury
                 s.Failed = Math.Max(s.Failed, r.Failed);
                 s.FailFaction = r.Fac;
                 _pendingFailed.RemoveAt(i);
+            }
+            for (int i = _pendingRefused.Count - 1; i >= 0; i--)
+            {
+                var r = _pendingRefused[i];
+                if (r.St != s.St.StringId || Math.Abs(r.Start - start) > 0.05) continue;
+                _refused.Add(s.Ev);
+                _pendingRefused.RemoveAt(i);
             }
         }
 
@@ -428,12 +523,24 @@ namespace Armoury
                 if (st == null || st.SiegeEvent == null || Math.Abs(st.SiegeEvent.SiegeStartTime.ToHours - r.Start) > 0.05) continue;   // oblezenie z zapisu juz sie skonczylo
                 sb.Append(";F|").Append(r.St).Append('|').Append(r.Start.ToString("R", Inv)).Append('|').Append(r.Failed.ToString(Inv)).Append('|').Append(r.Fac ?? "");
             }
+            foreach (var ev in _refused)
+            {
+                var st = ev != null ? ev.BesiegedSettlement : null;
+                if (st == null || st.StringId == null || st.SiegeEvent != ev) continue;
+                sb.Append(";R|").Append(st.StringId).Append('|').Append(ev.SiegeStartTime.ToHours.ToString("R", Inv));
+            }
+            foreach (var r in _pendingRefused)
+            {
+                var st = Settlement.Find(r.St);
+                if (st == null || st.SiegeEvent == null || Math.Abs(st.SiegeEvent.SiegeStartTime.ToHours - r.Start) > 0.05) continue;
+                sb.Append(";R|").Append(r.St).Append('|').Append(r.Start.ToString("R", Inv));
+            }
             return sb.ToString();
         }
 
         internal static void Import(string s)
         {
-            _truce.Clear(); _pendingFailed.Clear();
+            _truce.Clear(); _pendingFailed.Clear(); _pendingRefused.Clear(); _refused.Clear();
             if (string.IsNullOrEmpty(s)) return;
             int bad = 0;
             var parts = s.Split(';');
@@ -451,6 +558,8 @@ namespace Armoury
                     }
                     else if (a.Length >= 5 && a[0] == "F")
                         _pendingFailed.Add(new FailRec { St = a[1], Start = double.Parse(a[2], NumberStyles.Float, Inv), Failed = int.Parse(a[3], Inv), Fac = a[4] });
+                    else if (a.Length >= 3 && a[0] == "R")
+                        _pendingRefused.Add(new FailRec { St = a[1], Start = double.Parse(a[2], NumberStyles.Float, Inv) });
                     else bad++;
                 }
                 catch { bad++; }
@@ -460,12 +569,13 @@ namespace Armoury
 
         // ------------------------------------------------------------ doba
         private static readonly int[] _dDeals = new int[4], _dPaid = new int[4];
-        private static int _dHeld, _dDropped, _dWaitBattle, _dTruceNew, _dTurned, _dCampLeft, _dBk, _dBroken, _dBrokenPlayer, _dScoreZero;
+        private static int _dHeld, _dDropped, _dWaitBattle, _dTruceNew, _dTurned, _dCampLeft, _dBk, _dBroken, _dBrokenPlayer, _dScoreZero, _dLiftFail, _dBkTurned, _dTruceArmies;
         private static long _dPool, _dMerch, _dFolk, _dToMen, _dToLead, _dToParty, _dCrownBase, _dDiff;
 
         private static void DailyMore()
         {
             if (_truce.Count == 0) return;
+            TruceArmies();
             int today = Today;
             List<string> emptySt = null;
             foreach (var kv in _truce)
@@ -478,12 +588,32 @@ namespace Armoury
             if (emptySt != null) foreach (var k in emptySt) _truce.Remove(k);
         }
 
+        /// <summary>Stan doby (pomiar, recenzja 14.10): armie, ktorych wodz idzie do osady z rozejmem jego frakcji albo rodu (BK BKArmyBehavior.FindArmyObjective
+        /// bierze najblizsza twierdze wroga bez wyniku celu - mozliwa petla zbierania armii pod osada po okupie; latka na BK dopiero, gdy pomiar > 0). Tylko liczy.</summary>
+        private static void TruceArmies()
+        {
+            try
+            {
+                foreach (var k in Kingdom.All)
+                {
+                    if (k == null || k.Armies == null) continue;
+                    foreach (var a in k.Armies)
+                    {
+                        var lp = a != null ? a.LeaderParty : null;
+                        if (lp == null || lp.BesiegerCamp != null || lp.TargetSettlement == null || !lp.TargetSettlement.IsFortification) continue;
+                        if (IsTruce(lp.TargetSettlement, lp.MapFaction, lp.ActualClan)) _dTruceArmies++;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("TruceArmies", e); }
+        }
+
         private static bool DayAny
         {
             get
             {
                 return _dDeals[0] + _dDeals[1] + _dDeals[2] + _dDeals[3] + _dPaid[0] + _dPaid[1] + _dPaid[2] + _dPaid[3] > 0 || _dDropped > 0 || _dBroken > 0 || _dBrokenPlayer > 0
-                       || _dScoreZero > 0 || DayAnyPlayer;
+                       || _dScoreZero > 0 || _dLiftFail > 0 || DayAnyPlayer;
             }
         }
 
@@ -500,7 +630,9 @@ namespace Armoury
               .Append("; kontrola dopisane - zdjete (prog 0) ").Append(_dDiff)
               .Append(" | rozejmy czynne ").Append(truces).Append(" (nowe ").Append(_dTruceNew).Append("), cele AI wyzerowane ").Append(_dScoreZero).Append(", zawrocone w drodze ").Append(_dTurned)
               .Append(", oblezenia wbrew rozejmowi: AI ").Append(_dBroken).Append(", gracz ").Append(_dBrokenPlayer)
-              .Append(" | oboz niepusty po okupie ").Append(_dCampLeft).Append(" | BK moze trzymac armie po okupie ").Append(_dBk)
+              .Append(" | oboz niepusty po okupie ").Append(_dCampLeft).Append(", oboz nie zwiniety (bez zaplaty) ").Append(_dLiftFail)
+              .Append(" | BK moze trzymac armie po okupie ").Append(_dBk).Append(" (zawrocone z wpisem BK ").Append(_dBkTurned).Append(')')
+              .Append(", armie z celem w osadzie z rozejmem (stan doby; BK FindArmyObjective nie pyta o wynik celu) ").Append(_dTruceArmies)
               .Append(" | latka rozejmu: ").Append(_hookScore);
             DayPartPlayer(sb);
         }
@@ -508,15 +640,15 @@ namespace Armoury
         private static void ZeroDayMore()
         {
             Array.Clear(_dDeals, 0, 4); Array.Clear(_dPaid, 0, 4);
-            _dHeld = _dDropped = _dWaitBattle = _dTruceNew = _dTurned = _dCampLeft = _dBk = _dBroken = _dBrokenPlayer = _dScoreZero = 0;
+            _dHeld = _dDropped = _dWaitBattle = _dTruceNew = _dTurned = _dCampLeft = _dBk = _dBroken = _dBrokenPlayer = _dScoreZero = _dLiftFail = _dBkTurned = _dTruceArmies = 0;
             _dPool = _dMerch = _dFolk = _dToMen = _dToLead = _dToParty = _dCrownBase = _dDiff = 0;
             ZeroDayPlayer();
         }
 
         private static void ResetMore()
         {
-            _deals.Clear();
-            _truce.Clear(); _pendingFailed.Clear();
+            _deals.Clear(); _refused.Clear(); _tickBuf.Clear();
+            _truce.Clear(); _pendingFailed.Clear(); _pendingRefused.Clear();
             ResetPlayer();
         }
 
