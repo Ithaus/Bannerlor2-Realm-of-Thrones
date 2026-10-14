@@ -1,0 +1,30 @@
+BKROTArmyModel.cs CalculatePartyInfluenceCost | guard-fail -> 0 | wywolanie siebie (bez base.): True
+BKROTBattleMoraleModel.cs GetEffectiveInitialMorale | guard-fail -> base.GetEffectiveInitialMorale(agent, baseMorale) | wywolanie siebie (bez base.): False
+BKROTClanFinanceModel.cs CalculateOwnerIncomeFromCaravan | guard-fail -> 0 | wywolanie siebie (bez base.): True
+BKROTConstructionModel.cs CalculateDailyConstructionPowerWithoutBoost | guard-fail -> 0 | wywolanie siebie (bez base.): True
+BKROTCultureModel.cs CalculateAcceptanceGain | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTCultureModel.cs CalculateCultureWeight | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTDeathModel.cs CalculateHeroDeathProbability | guard-fail -> base.CalculateHeroDeathProbability(hero) | wywolanie siebie (bez base.): True
+BKROTDiplomacyModel.cs CalculateHeroFiefScore | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTDisguiseDetectionModel.cs CalculateDisguiseDetectionProbability | guard-fail -> base.CalculateDisguiseDetectionProbability(settlement) | wywolanie siebie (bez base.): True
+BKROTInfluenceModel.cs CalculateInfluenceCap | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTInfluenceModel.cs CalculateInfluenceChange | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTLegitimacyModel.cs CalculateKingdomLegitimacy | guard-fail -> new BKExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTLoyaltyModel.cs CalculateLoyaltyChange | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTMapVisibilityModel.cs GetPartySpottingRange | guard-fail -> base.GetPartySpottingRange(party, includeDescriptions) | wywolanie siebie (bez base.): False
+BKROTMarriageModel.cs GetSpouseScore | guard-fail -> new ExplainedNumber(0f, includeDescriptions: false, null) | wywolanie siebie (bez base.): True
+BKROTPartyHealingModel.cs GetDailyHealingForRegulars | guard-fail -> base.GetDailyHealingForRegulars(party, isPrisoners, includeDescription | wywolanie siebie (bez base.): False
+BKROTPartyHealingModel.cs GetSurvivalChance | guard-fail -> base.GetSurvivalChance(party, character, damageType, canDamageKillEven | wywolanie siebie (bez base.): False
+BKROTPartyMoraleModel.cs GetEffectivePartyMorale | guard-fail -> base.GetEffectivePartyMorale(mobileParty, includeDescription) | wywolanie siebie (bez base.): False
+BKROTPartyMoraleModel.cs GetDailyStarvationMoralePenalty | guard-fail -> base.GetDailyStarvationMoralePenalty(party) | wywolanie siebie (bez base.): False
+BKROTPartySpeedModel.cs CalculateFinalSpeed | guard-fail -> base.CalculateFinalSpeed(mobileParty, finalSpeed) | wywolanie siebie (bez base.): False
+BKROTPartyWageModel.cs GetTotalWage | guard-fail -> base.GetTotalWage(mobileParty, troopRoster, includeDescriptions) | wywolanie siebie (bez base.): False
+BKROTPersuasionModel.cs GetDifficulty | guard-fail -> base.GetDifficulty(difficulty) | wywolanie siebie (bez base.): True
+BKROTPregnancyModel.cs GetDailyChanceOfPregnancyForHero | guard-fail -> base.GetDailyChanceOfPregnancyForHero(hero) | wywolanie siebie (bez base.): False
+BKROTPriceModel.cs GetTradePenalty | guard-fail -> base.GetTradePenalty(item, clientParty, merchant, isSelling, inStore,  | wywolanie siebie (bez base.): False
+BKROTProsperityModel.cs CalculateProsperityChange | guard-fail -> base.CalculateProsperityChange(fortification, includeDescriptions) | wywolanie siebie (bez base.): True
+BKROTRaidModel.cs CalculateHitDamage | guard-fail -> base.CalculateHitDamage(attackerSide, settlementHitPoints) | wywolanie siebie (bez base.): False
+BKROTRelationsModel.cs CalculateModifiers | guard-fail -> base.CalculateModifiers(heroRelations, target) | wywolanie siebie (bez base.): True
+BKROTStabilityModel.cs CalculateStabilityTarget | guard-fail -> base.CalculateStabilityTarget(settlement, descriptions) | wywolanie siebie (bez base.): True
+BKROTVillageProductionModel.cs CalculateDailyProductionAmount | guard-fail -> base.CalculateDailyProductionAmount(village, item) | wywolanie siebie (bez base.): False
+BKROTWorkshopModel.cs GetProductionQuality | guard-fail -> base.GetProductionQuality(workshop, explanations) | wywolanie siebie (bez base.): True

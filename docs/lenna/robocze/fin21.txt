@@ -1,0 +1,175 @@
+== fin21: dni 1..728 (dzien gry 108836..109563)
+
+-- Zdobycia (krolestwo zmienione, rod inny niz poprzedni) --
+dzien;osada;rodzaj;od_krol;od_rod;do_krol;rod_dnia_zdobycia;rod_po_decyzji;dzien_decyzji;twierdze_zwyciezcy_przed;twierdze_zwyciezcy_po;miasta_zwyciezcy_po
+23;Cape Wrath;zamek;Dragonstone;Seaworth;Stormlands;Baratheon,Renly;Baratheon,Renly;23;1;2;1
+42;Demongate;zamek;House Targaryen, Aegon;Qaggaz;Volantis;Vhassar;Vhassar;42;1;2;1
+49;Starfall;miasto;Dorne;Dayne;The Reach;Tyrell;Tyrell;49;1;2;2
+52;Darry;zamek;Riverlands;Darry;The Vale;Hunter;Hunter;52;1;2;0
+78;Fellwood;zamek;Dragonstone;Fell;Stormlands;Baratheon,Renly;Baratheon,Renly;78;2;3;1
+84;Blackmont;zamek;Dorne;Blackmont;The Reach;Tyrell;Tyrell;84;2;3;2
+86;Hull;miasto;Dragonstone;Velaryon;House Baratheon of King's Landing;Clegane;Clegane;86;2;3;2
+105;Dragonstone;miasto;Dragonstone;Baratheon,Stannis;House Baratheon of King's Landing;Clegane;Clegane;105;3;4;3
+119;Qamayl;zamek;Ibben;Thuk;Sarnor;Amai;Lozar;120;1;2;1
+129;Harrenhal;miasto;House Baratheon of King's Landing;Clegane;The North;Stark;Bolton;130;1;2;2
+136;Qamayl;zamek;Sarnor;Lozar;Ibben;Casat;Joth;137;1;2;1
+159;Willow Wood;zamek;Riverlands;Ryger;House Baratheon of King's Landing;Baratheon, Joffrey;Clegane;160;3;4;2
+162;Tolos;miasto;House Targaryen, Aegon;Connington, Jon;House Targaryen;Targaryen;Targaryen;162;1;2;2
+163;Haystack Hall;zamek;Stormlands;Errol;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;163;0;1;0
+166;Mantarys;miasto;House Targaryen, Aegon;Targaryen, Aegon;Volantis;Vhassar;Vhassar;166;2;3;2
+182;Oros;zamek;House Targaryen, Aegon;Strickland;Volantis;Vhassar;Vhassar;182;3;4;2
+235;City of Bones;zamek;Qarth;Qaraxos;House Targaryen;Targaryen;Targaryen;235;2;3;2
+236;Stoney Sept;miasto;House Baratheon of King's Landing;Swyft;Riverlands;Tully,Blackfish;Tully,Blackfish;236;1;2;2
+237;Haystack Hall;zamek;Dragonstone;Baratheon,Stannis;Stormlands;Baratheon,Renly;Baratheon,Renly;237;3;4;1
+256;Sweetport;zamek;Dragonstone;Sunglass;Stormlands;Baratheon,Renly;Baratheon,Renly;256;4;5;1
+270;Vaes Efe;zamek;Dothraki Horde;Heggo;House Targaryen;Targaryen;Targaryen;270;3;4;2
+275;Menetragos;miasto;Norvos;Hortyr;Qohor;Talordis;Talordis;275;1;2;2
+276;Stonedance;zamek;Dragonstone;Massey;Stormlands;Baratheon,Renly;Baratheon,Renly;276;5;6;1
+287;Pinkmaiden;zamek;Riverlands;Piper;House Baratheon of King's Landing;Baratheon, Joffrey;Lannister;288;2;3;1
+291;Sharp Point;miasto;Dragonstone;bar Emmon;Stormlands;Baratheon,Renly;Baratheon,Renly;291;6;7;2
+334;Bisa;zamek;Lorath;Eranos;Braavos;Volentin;Antaryon;335;1;2;1
+339;Sandstone;zamek;Dorne;Qorgyle;The Reach;Tyrell;Footly;340;1;2;1
+403;Sunstone;zamek;Lys;Orthys;Tyrosh;Ryndoon;Qhaedarene;404;1;2;0
+415;Wayfarer's Rest;zamek;Riverlands;Vance;House Baratheon of King's Landing;Lannister;Lannister;415;3;4;1
+433;Saltpans;miasto;Riverlands;Cox;The Vale;Corbray;Corbray;433;1;2;2
+449;Maidenpool;miasto;Riverlands;Mooton;The Vale;Corbray;Corbray;449;2;3;3
+469;Acorn Hall;zamek;Riverlands;Smallwood;House Baratheon of King's Landing;Baratheon, Joffrey;Lannister;470;4;5;1
+536;Fellwood;zamek;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+536;Cape Wrath;zamek;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+536;Sharp Point;miasto;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+536;Haystack Hall;zamek;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+536;Stonedance;zamek;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+536;Sweetport;zamek;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+536;Storm's End;miasto;Stormlands;Baratheon,Renly;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;536;0;7;2
+610;Nightsong;zamek;Dragonstone;Caron;The Reach;Tyrell;Footly;611;2;3;1
+615;Sar Mell;zamek;County of Valysar;Melane;Volantis;Maegyr;Maegyr;615;1;2;1
+627;Pinkmaiden;zamek;House Baratheon of King's Landing;Lannister;Riverlands;Tully;Frey;628;1;2;1
+632;Wayfarer's Rest;zamek;House Baratheon of King's Landing;Lannister;Riverlands;Tully;Frey;633;2;3;1
+638;Tolos;miasto;House Targaryen;Targaryen;Volantis;Maegyr;Paenymion;639;1;2;2
+654;Harvest Hall;zamek;Dragonstone;Selmy;The Reach;Footly;Footly;654;3;4;1
+676;Blackhaven;zamek;Dragonstone;Dondarrion;The Reach;Footly;Footly;676;4;5;1
+
+-- Odejscia rodow z lennami (rod ten sam, krolestwo inne) --
+Volantis -> County of Valysar rod Vhassar: 4
+County of Valysar -> Volantis rod Vhassar: 4
+Volantis -> Vhassar League (Volantis Rebels) rod Vhassar: 4
+Ibben -> Joth rod Joth: 2
+Qarth -> Qar Deeth League (Qarth Rebels) rod Mallarawan: 1
+Qarth -> Qar Deeth League (Qarth Rebels) rod Qar Deeth: 1
+Qar Deeth League (Qarth Rebels) -> Qarth rod Mallarawan: 1
+Qar Deeth League (Qarth Rebels) -> Qarth rod Qar Deeth: 1
+House Targaryen, Aegon -> Duchy of Valyria rod Duckfield: 1
+Norvos -> Quarro Conspiracy (Norvos Rebels) rod Quarro: 1
+Nights Watch -> Confederation of Snow (Nights Watch Rebels) rod Thorne: 1
+Nights Watch -> Confederation of Snow (Nights Watch Rebels) rod Tollett: 1
+Nights Watch -> Confederation of Snow (Nights Watch Rebels) rod Snow: 1
+Stormlands -> Dragonstone rod Dondarrion: 1
+Stormlands -> Dragonstone rod Caron: 1
+Stormlands -> Dragonstone rod Swann: 1
+Stormlands -> Dragonstone rod Tarth: 1
+Stormlands -> Dragonstone rod Mertyns: 1
+Stormlands -> House Baratheon of King's Landing rod Buckler: 1
+Stormlands -> Dragonstone rod Estermont: 1
+Stormlands -> Dragonstone rod Connington: 1
+Stormlands -> Dragonstone rod Selmy: 1
+Stormlands -> Dragonstone rod Wylde: 1
+Stormlands -> Dragonstone rod Whitehead: 1
+Qarth -> Emeros rod Emeros: 1
+Lorath -> County of Tolero Aeksio rod Balar: 1
+Lorath -> County of Tolero Aeksio rod Phassar: 1
+Quarro Conspiracy (Norvos Rebels) -> Quarro Empire rod Quarro: 1
+Volantis -> County of Valysar rod Melane: 1
+Norvos -> Barony of Ny Sar rod Golathis: 1
+Emeros -> Qarth rod Emeros: 1
+County of Tolero Aeksio -> Lorath rod Balar: 1
+County of Tolero Aeksio -> Lorath rod Phassar: 1
+Qarth -> Mallarawan rod Emeros: 1
+Qarth -> Mallarawan rod Mallarawan: 1
+Mallarawan -> Emeros Conspiracy (Mallarawan Rebels) rod Emeros: 1
+Ibben -> Joth rod Gasso: 1
+Volantis -> Vhassar League (Volantis Rebels) rod Qhaedar: 1
+Myr -> Barony of Chroyane rod Saldorys: 1
+Myr -> Barony of Chroyane rod Alayris: 1
+Barony of Ny Sar -> Norvos rod Golathis: 1
+
+-- Komu przypadly zdobycze, wg krolestwa --
+Dragonstone: 8 zdobyc -> Baratheon,Stannis 8
+Stormlands: 6 zdobyc -> Baratheon,Renly 6
+The Reach: 6 zdobyc -> Footly 4, Tyrell 2
+House Baratheon of King's Landing: 6 zdobyc -> Clegane 3, Lannister 3
+Volantis: 5 zdobyc -> Vhassar 3, Maegyr 1, Paenymion 1
+The Vale: 3 zdobyc -> Corbray 2, Hunter 1
+House Targaryen: 3 zdobyc -> Targaryen 3
+Riverlands: 3 zdobyc -> Frey 2, Tully,Blackfish 1
+Sarnor: 1 zdobyc -> Lozar 1
+The North: 1 zdobyc -> Bolton 1
+Ibben: 1 zdobyc -> Joth 1
+Qohor: 1 zdobyc -> Talordis 1
+Braavos: 1 zdobyc -> Antaryon 1
+Tyrosh: 1 zdobyc -> Qhaedarene 1
+
+-- Zmiany wlasciciela w obrebie krolestwa (nie w ciagu 10 dni po zdobyciu) --
+
+-- Twierdze rodow (miasta+zamki): start -> koniec, top 25 koncowych --
+Dragonstone / Baratheon,Stannis: 1 (miasta 1) -> 7 (miasta 2)
+The Reach / Footly: 1 (miasta 1) -> 5 (miasta 1)
+House Baratheon of King's Landing / Clegane: 2 (miasta 1) -> 4 (miasta 2)
+Vhassar League (Volantis Rebels) / Vhassar: 0 (miasta 0) -> 4 (miasta 2)
+House Baratheon of King's Landing / Lannister: 2 (miasta 1) -> 3 (miasta 1)
+The Reach / Tyrell: 1 (miasta 1) -> 3 (miasta 2)
+House Targaryen / Targaryen: 1 (miasta 1) -> 3 (miasta 1)
+Riverlands / Frey: 1 (miasta 1) -> 3 (miasta 1)
+The Vale / Corbray: 1 (miasta 1) -> 3 (miasta 3)
+House Baratheon of King's Landing / Baratheon, Joffrey: 2 (miasta 1) -> 2 (miasta 1)
+The North / Stark: 2 (miasta 1) -> 2 (miasta 1)
+Dothraki Horde / Pono: 2 (miasta 1) -> 2 (miasta 1)
+The Vale / Arryn: 2 (miasta 1) -> 2 (miasta 1)
+The North / Manderly: 2 (miasta 1) -> 2 (miasta 1)
+Dorne / Martell: 2 (miasta 2) -> 2 (miasta 2)
+Braavos / Antaryon: 1 (miasta 1) -> 2 (miasta 1)
+The North / Bolton: 1 (miasta 1) -> 2 (miasta 2)
+Qohor / Talordis: 1 (miasta 1) -> 2 (miasta 2)
+Tyrosh / Qhaedarene: 1 (miasta 0) -> 2 (miasta 0)
+Volantis / Maegyr: 1 (miasta 1) -> 2 (miasta 1)
+The Vale / Hunter: 1 (miasta 0) -> 2 (miasta 0)
+Riverlands / Tully,Blackfish: 1 (miasta 1) -> 2 (miasta 2)
+Volantis / Paenymion: 1 (miasta 1) -> 2 (miasta 2)
+Joth / Joth: 0 (miasta 0) -> 2 (miasta 1)
+House Baratheon of King's Landing / Swyft: 2 (miasta 1) -> 1 (miasta 0)
+
+-- Koncentracja na koniec: krolestwo: rodow z twierdza / twierdz / najwiekszy rod --
+House Baratheon of King's Landing: rodow 18, twierdz 24, top: Clegane 4, Lannister 3, Baratheon, Joffrey 2, Westerling 1
+The North: rodow 20, twierdz 23, top: Stark 2, Manderly 2, Bolton 2, Whitehill 1
+The Reach: rodow 16, twierdz 22, top: Footly 5, Tyrell 3, Tarly 1, Rowan 1
+Dragonstone: rodow 11, twierdz 17, top: Baratheon,Stannis 7, Wylde 1, Whitehead 1, Tarth 1
+The Vale: rodow 12, twierdz 16, top: Corbray 3, Hunter 2, Arryn 2, Waynwood 1
+Dorne: rodow 12, twierdz 13, top: Martell 2, Yronwood 1, Wyl 1, Vaith 1
+Iron Islands: rodow 10, twierdz 10, top: Sunderly 1, Orkwood 1, Merlyn 1, Harlaw 1
+Riverlands: rodow 7, twierdz 10, top: Frey 3, Tully,Blackfish 2, Tully 1, Paege 1
+House Targaryen: rodow 6, twierdz 8, top: Targaryen 3, Stormcrows 1, Stalwart Shields 1, Selmy, Barristan 1
+Free Folk: rodow 7, twierdz 7, top: Styr Magnar 1, Sixskins 1, Rayder 1, Giantsbane 1
+Dothraki Horde: rodow 5, twierdz 6, top: Pono 2, Moro 1, Jhago 1, Forzho 1
+Braavos: rodow 5, twierdz 6, top: Antaryon 2, Volentin 1, Prestayn 1, Fregar 1
+Qohor: rodow 5, twierdz 6, top: Talordis 2, Tendiras 1, Ostyrion 1, Lorosene 1
+Tyrosh: rodow 5, twierdz 6, top: Qhaedarene 2, Uhoris 1, Staegone 1, Ryndoon 1
+Volantis: rodow 3, twierdz 5, top: Paenymion 2, Maegyr 2, Vaelaros 1
+Pentos: rodow 5, twierdz 5, top: Sontho 1, Mopatis 1, Moharis 1, Moesia 1
+Sarnor: rodow 5, twierdz 5, top: Tymai 1, Sumai 1, Lozar 1, Amai 1
+Vhassar League (Volantis Rebels): rodow 2, twierdz 5, top: Vhassar 4, Qhaedar 1
+Lorath: rodow 4, twierdz 4, top: Phassar 1, Dimittis 1, Balar 1, Aloran 1
+Lys: rodow 4, twierdz 4, top: Vaelaro 1, Pendaerys 1, Ormollen 1, Lohar 1
+Myr: rodow 3, twierdz 3, top: Terys 1, Drahar 1, Albersan 1
+Confederation of Snow (Nights Watch Rebels): rodow 3, twierdz 3, top: Tollett 1, Thorne 1, Snow 1
+Norvos: rodow 3, twierdz 3, top: Tavellen 1, Kasgos 1, Golathis 1
+Joth: rodow 2, twierdz 3, top: Joth 2, Gasso 1
+Nights Watch: rodow 2, twierdz 2, top: Pyke 1, Mormont-Nights Watch 1
+Barony of Chroyane: rodow 2, twierdz 2, top: Saldorys 1, Alayris 1
+Quarro Empire: rodow 1, twierdz 1, top: Quarro 1
+Skagos: rodow 1, twierdz 1, top: Stane 1
+Summer Isles: rodow 1, twierdz 1, top: Xho 1
+Yi Ti Exiles: rodow 1, twierdz 1, top: Lo 1
+Emeros Conspiracy (Mallarawan Rebels): rodow 1, twierdz 1, top: Emeros 1
+Ibben: rodow 1, twierdz 1, top: Casat 1
+Duchy of Valyria: rodow 1, twierdz 1, top: Duckfield 1
+Qarth: rodow 1, twierdz 1, top: Qar Deeth 1
+Mallarawan: rodow 1, twierdz 1, top: Mallarawan 1

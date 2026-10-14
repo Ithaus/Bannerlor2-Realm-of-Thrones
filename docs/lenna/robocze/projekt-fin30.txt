@@ -1,0 +1,117 @@
+== fin30 (N): 60 zdobyc z decyzja (bez fabuly d536)
+dzien;osada;rodzaj;krolestwo;zdobywca(wodz);gra_dala;regula_daje;W_przed/pulap;3 pierwsze (ocena, tier, ciezar, miasta)
+22;Cape Wrath;zamek;Stormlands;Baratheon,Renly;Baratheon,Renly;Baratheon,Renly;2/7;Baratheon,Renly 89 (t6, W2, m1) | Selmy 80 (t5, W1, m0) | Buckler 75 (t4, W1, m0);[baza 100, domena korony 12% < 20% +25]
+39;Fellwood;zamek;Stormlands;Baratheon,Renly;Baratheon,Renly;Selmy;1/6;Selmy 80 (t5, W1, m0) | Baratheon,Renly 78 (t6, W3, m1) | Buckler 75 (t4, W1, m0);[baza 100]
+48;Starfall;miasto;The Reach;Oakheart;Footly;Oakheart;1/4;Oakheart 100 (t3, W1, m0) | Tyrell 89 (t6, W2, m1) | Crane 75 (t4, W1, m0);[baza 100, zdobywca +50]
+88;Gargos;zamek;Volantis;Qhaedar;Vhassar;Qhaedar;1/4;Qhaedar 100 (t3, W1, m0) | Melane 94 (t4, W1, m0) | Maegyr 71 (t6, W2, m1);[baza 100, zdobywca +50]
+91;Sweetport;zamek;Stormlands;Caron;Baratheon,Renly;Caron;1/5;Caron 112 (t4, W1, m0) | Baratheon,Renly 78 (t6, W3, m1) | Buckler 75 (t4, W1, m0);[baza 100, zdobywca +50]
+98;Sandstone;zamek;The Reach;Tarly;Ashford;Tarly;1/5;Tarly 112 (t4, W1, m0) | Tyrell 89 (t6, W2, m1) | Crane 75 (t4, W1, m0);[baza 100, zdobywca +50]
+106;Ar Noy;zamek;Volantis;Qhaedar;Vhassar;Melane;1/5;Melane 94 (t4, W1, m0) | Qhaedar 75 (t3, W2, m0) | Maegyr 71 (t6, W2, m1);[baza 100, domena korony 9% < 20% +25]
+116;Bloody Gate;zamek;Riverlands;Ryger;Frey;Ryger;1/5;Ryger 112 (t4, W1, m0) | Tully 89 (t6, W2, m1) | Blackwood 75 (t4, W1, m0);[baza 100, zdobywca +50]
+128;Stonedance;zamek;Stormlands;Baratheon,Renly;Baratheon,Renly;Baratheon,Renly;3/7;Baratheon,Renly 78 (t6, W3, m1) | Buckler 75 (t4, W1, m0) | Connington 75 (t4, W1, m0);[baza 100, domena korony 15% < 20% +25]
+129;Harrenhal;miasto;The North;Bolton;Bolton;Bolton;2/7;Bolton 107 (t6, W2, m1) | Stark 78 (t6, W3, m1) | Cerwyn 75 (t4, W1, m0);[baza 100, zdobywca +50]
+133;Demongate;zamek;Volantis;Melane;Vhassar;Melane;2/5;Melane 75 (t4, W2, m0) | Maegyr 71 (t6, W2, m1) | Paenymion 60 (t4, W2, m1);[baza 100, domena korony 17% < 20% +25]
+145;Lorath;miasto;Braavos;Fregar;Antaryon;Fregar;1/5;Fregar 112 (t4, W1, m0) | Volentin 75 (t4, W1, m0) | Antaryon 71 (t6, W2, m1);[baza 100, zdobywca +50]
+149;Blackmont;zamek;The Reach;Hightower;Ashford;Hightower;2/6;Hightower 100 (t5, W2, m1) | Tyrell 89 (t6, W2, m1) | Crane 75 (t4, W1, m0);[baza 100, zdobywca +50]
+176;Willow Wood;zamek;House Baratheon of King's Landing;Crakehall;Lannister;Crakehall;1/5;Crakehall 112 (t4, W1, m0) | Baratheon, Joffrey 78 (t6, W3, m1) | Lefford 75 (t4, W1, m0);[baza 100, zdobywca +50]
+193;Qamayl;zamek;Sarnor;-;Tymai;Sumai;1/5;Sumai 75 (t4, W1, m0) | Amai 71 (t6, W2, m1) | Alexi 67 (t3, W1, m0);[baza 100]
+219;Deep Den;zamek;Riverlands;Darry;Frey;Darry;1/4;Darry 100 (t3, W1, m0) | Tully 78 (t6, W3, m1) | Blackwood 75 (t4, W1, m0);[baza 100, zdobywca +50]
+220;Willow Wood;zamek;Riverlands;Mallister;Frey;Ryger;1/5;Ryger 150 (t4, W1, m0) | Mallister 100 (t5, W2, m1) | Tully 89 (t6, W2, m1);[baza 100, de jure +100]
+222;Vaes Efe;zamek;House Targaryen;Targaryen;Second Sons;Stalwart Shields (REMIS);1/5;Stalwart Shields 75 (t4, W1, m0) | Stormcrows 75 (t4, W1, m0) | Targaryen 71 (t6, W2, m1);[baza 100]
+233;Sharp Point;miasto;Stormlands;Baratheon,Renly;Tarth;Buckler (REMIS);1/5;Buckler 75 (t4, W1, m0) | Connington 75 (t4, W1, m0) | Baratheon,Renly 69 (t6, W4, m1);[baza 100]
+243;Kingsgrave;zamek;The Reach;Caswell;Footly;Caswell;1/4;Caswell 100 (t3, W1, m0) | Tyrell 89 (t6, W2, m1) | Crane 75 (t4, W1, m0);[baza 100, zdobywca +50]
+247;Totava;zamek;Antaryon League (Braavos Rebels);Antaryon;Antaryon;Antaryon;4/7;Antaryon 83 (t6, W4, m2) | Celeris 60 (t4, W2, m1);[baza 100, zdobywca +50]
+256;Deep Den;zamek;House Baratheon of King's Landing;-;Lannister;Lydden;0/5;Lydden 250 (t4, W0, m0) | Baratheon, Joffrey 78 (t6, W3, m1) | Crakehall 75 (t4, W1, m0);[baza 100, bez ziemi +50, de jure +100]
+274;Skyreach;zamek;The Reach;Bulwer;Footly;Bulwer;1/4;Bulwer 100 (t3, W1, m0) | Tyrell 89 (t6, W2, m1) | Crane 75 (t4, W1, m0);[baza 100, zdobywca +50]
+283;Iksa Calo;zamek;Lorath;Eranos;Aloran;Aloran;0/7;Aloran 150 (t6, W0, m0) | Eranos 112 (t4, W1, m0) | Balar 67 (t3, W1, m0);[baza 100, bez ziemi +50]
+291;Sunstone;zamek;Tyrosh;Ryndoon;Ryndoon;Ryndoon;2/7;Ryndoon 107 (t6, W2, m1) | Ohoros 75 (t4, W1, m0) | Staegone 75 (t4, W1, m0);[baza 100, zdobywca +50]
+300;Willow Wood;zamek;House Baratheon of King's Landing;Lannister;Lannister;Lannister;3/7;Lannister 94 (t6, W3, m1) | Baratheon, Joffrey 78 (t6, W3, m1) | Crakehall 75 (t4, W1, m0);[baza 100, zdobywca +50]
+310;Iksa Keria;zamek;Antaryon League (Braavos Rebels);Antaryon;Antaryon;Antaryon;5/7;Antaryon 75 (t6, W5, m2) | Celeris 60 (t4, W2, m1);[baza 100, zdobywca +50]
+314;Bolozo;miasto;Myr;Saldorys;Alayris;Terys;1/5;Terys 75 (t4, W1, m0) | Drahar 71 (t6, W2, m1) | Alayris 67 (t3, W1, m0);[baza 100]
+316;Pinkmaiden;zamek;House Baratheon of King's Landing;-;Lannister;Baratheon, Joffrey;3/7;Baratheon, Joffrey 78 (t6, W3, m1) | Crakehall 75 (t4, W1, m0) | Lefford 75 (t4, W1, m0);[baza 100, domena korony 11% < 20% +25]
+325;Yronwood;miasto;The Reach;Tyrell;Ashford;Tyrell;2/7;Tyrell 89 (t6, W2, m1) | Crane 75 (t4, W1, m0) | Florent 75 (t4, W1, m0);[baza 100, domena korony 7% < 20% +25]
+358;Nightsong;zamek;The Reach;Caswell;Footly;Crane (REMIS);1/5;Crane 75 (t4, W1, m0) | Florent 75 (t4, W1, m0) | Caswell 75 (t3, W2, m0);[baza 100]
+358;City of Bones;zamek;House Targaryen;Targaryen;Second Sons;Targaryen;2/7;Targaryen 89 (t6, W2, m1) | Stormcrows 75 (t4, W1, m0) | Mormont, Jorah 60 (t4, W2, m1);[baza 100, domena korony 18% < 20% +25]
+368;Wayfarer's Rest;zamek;House Baratheon of King's Landing;Crakehall;Lannister;Crakehall;1/5;Crakehall 112 (t4, W1, m0) | Lefford 75 (t4, W1, m0) | Lydden 75 (t4, W1, m0);[baza 100, zdobywca +50]
+377;Hellholt;zamek;The Reach;Tyrell;Ashford;Florent;1/5;Florent 75 (t4, W1, m0) | Tyrell 69 (t6, W4, m2) | Beesbury 67 (t3, W1, m0);[baza 100]
+403;Qamayl;zamek;Ibben;Joth;Casat;Thuk;0/6;Thuk 250 (t5, W0, m0) | Prestayn 150 (t3, W0, m0) | Joth 100 (t5, W2, m1);[baza 100, bez ziemi +50, de jure +100]
+403;Omber;miasto;Sarnor;Tymai;Amai;Tymai;1/4;Tymai 100 (t3, W1, m0) | Sumai 75 (t4, W1, m0) | Amai 71 (t6, W2, m1);[baza 100, zdobywca +50]
+410;Acorn Hall;zamek;House Baratheon of King's Landing;Kenning;Lannister;Kenning;2/5;Kenning 90 (t4, W2, m1) | Lefford 75 (t4, W1, m0) | Lydden 75 (t4, W1, m0);[baza 100, zdobywca +50]
+414;Gelona;zamek;Myr;Drahar;Alayris;Drahar;2/7;Drahar 107 (t6, W2, m1) | Alayris 67 (t3, W1, m0) | Albersan 67 (t3, W1, m0);[baza 100, zdobywca +50]
+427;Stone Hedge;zamek;House Baratheon of King's Landing;Swyft;Lannister;Lefford (REMIS);1/5;Lefford 75 (t4, W1, m0) | Lydden 75 (t4, W1, m0) | Marbrand 75 (t4, W1, m0);[baza 100]
+427;Vaes Dothrak;miasto;House Targaryen;Targaryen;Targaryen;Stormcrows;1/5;Stormcrows 75 (t4, W1, m0) | Targaryen 62 (t6, W3, m1) | Mormont, Jorah 60 (t4, W2, m1);[baza 100]
+429;Wyl;zamek;The Reach;Tarly;Ashford;Tarly;2/5;Tarly 90 (t4, W2, m0) | Tyrell 69 (t6, W4, m2) | Beesbury 67 (t3, W1, m0);[baza 100, zdobywca +50]
+442;Stone Hedge;zamek;Riverlands;Darry;Frey;Bracken;0/4;Bracken 250 (t3, W0, m0) | Piper 150 (t4, W0, m0) | Smallwood 150 (t3, W0, m0);[baza 100, bez ziemi +50, de jure +100]
+468;Wayfarer's Rest;zamek;Riverlands;Blackwood;Frey;Vance;0/4;Vance 250 (t3, W0, m0) | Piper 150 (t4, W0, m0) | Smallwood 150 (t3, W0, m0);[baza 100, bez ziemi +50, de jure +100]
+488;Acorn Hall;zamek;Riverlands;Blackwood;Frey;Smallwood;0/4;Smallwood 250 (t3, W0, m0) | Piper 150 (t4, W0, m0) | Blackwood 112 (t4, W1, m0);[baza 100, bez ziemi +50, de jure +100]
+530;Red Keep;zamek;The North;-;Stark;Stark;3/7;Stark 78 (t6, W3, m1) | Cerwyn 75 (t4, W1, m0) | Hornwood 75 (t4, W1, m0);[baza 100, domena korony 9% < 20% +25]
+530;King's Landing;miasto;The North;Stark;Bolton;Stark;4/7;Stark 69375 (t6, W4, m1) | Cerwyn 75 (t4, W1, m0) | Hornwood 75 (t4, W1, m0);[baza 100, domena korony 12% < 20% +25]
+532;Pinkmaiden;zamek;Riverlands;Mooton;Frey;Piper;0/5;Piper 250 (t4, W0, m0) | Mooton 90 (t4, W2, m1) | Tully 89 (t6, W2, m1);[baza 100, bez ziemi +50, de jure +100]
+535;Tolos;miasto;House Targaryen;Targaryen;Stormcrows;Targaryen;3/7;Targaryen 62 (t6, W3, m1) | Mormont, Jorah 60 (t4, W2, m1) | Second Sons 60 (t4, W2, m1);[baza 100]
+541;Rosby;zamek;The North;Stark;Bolton;Cerwyn (REMIS);1/5;Cerwyn 75 (t4, W1, m0) | Hornwood 75 (t4, W1, m0) | Norrey 75 (t4, W1, m0);[baza 100]
+550;Stoney Sept;miasto;Riverlands;Cox;Frey;Cox;2/5;Cox 90 (t4, W2, m1) | Tully 89 (t6, W2, m1) | Blackwood 75 (t4, W1, m0);[baza 100, zdobywca +50]
+560;Duskendale;miasto;The North;Stark;Bolton;Hornwood (REMIS);1/5;Hornwood 75 (t4, W1, m0) | Norrey 75 (t4, W1, m0) | Reed 75 (t4, W1, m0);[baza 100]
+570;Craster's Keep;zamek;Nights Watch;Mormont-Nights Watch;Snow;Mormont-Nights Watch;2/7;Mormont-Nights Watch 107 (t6, W2, m1) | Snow 83 (t6, W1, m0) | Tollett 80 (t5, W1, m0);[baza 100, zdobywca +50]
+578;Deep Den;zamek;Riverlands;Cox;Frey;Tully;2/7;Tully 89 (t6, W2, m1) | Blackwood 75 (t4, W1, m0) | Piper 75 (t4, W1, m0);[baza 100, domena korony 9% < 20% +25]
+612;Lonely Light;miasto;The North;Cerwyn;Bolton;Cerwyn;2/5;Cerwyn 90 (t4, W2, m0) | Norrey 75 (t4, W1, m0) | Reed 75 (t4, W1, m0);[baza 100, zdobywca +50]
+615;Silverhill;zamek;Riverlands;Tully;Frey;Tully;3/7;Tully 78 (t6, W3, m1) | Blackwood 75 (t4, W1, m0) | Piper 75 (t4, W1, m0);[baza 100, domena korony 12% < 20% +25]
+616;Harvest Hall;zamek;The Reach;Cuy;Ashford;Cuy;1/4;Cuy 100 (t3, W1, m0) | Tyrell 69 (t6, W4, m2) | Beesbury 67 (t3, W1, m0);[baza 100, zdobywca +50]
+618;Blackhaven;zamek;The Reach;-;Ashford;Tyrell;4/7;Tyrell 69 (t6, W4, m2) | Beesbury 67 (t3, W1, m0) | Blackbar 67 (t3, W1, m0);[baza 100, domena korony 12% < 20% +25]
+628;Odivo;zamek;Drahar Conspiracy (Myr Rebels);Drahar;Drahar;Drahar;2/7;Drahar 107 (t6, W2, m1);[baza 100, zdobywca +50]
+635;Ulentor;zamek;Kingdom of Norvos;-;Hortyr;Hortyr;2/5;Hortyr 60 (t4, W2, m1);[baza 100]
+646;Blackhaven;zamek;Dragonstone;Mertyns;Seaworth;Dondarrion;0/4;Dondarrion 250 (t3, W0, m0) | Caron 150 (t4, W0, m0) | Fell 150 (t4, W0, m0);[baza 100, bez ziemi +50, de jure +100]
+
+-- GRA (bieg): komu zdobycze, wg krolestwa --
+The Reach: 11 -> Ashford 7, Footly 4 | najwiekszy udzial 64%
+Riverlands: 10 -> Frey 10 | najwiekszy udzial 100%
+House Baratheon of King's Landing: 7 -> Lannister 7 | najwiekszy udzial 100%
+The North: 6 -> Bolton 5, Stark 1 | najwiekszy udzial 83%
+Stormlands: 5 -> Baratheon,Renly 4, Tarth 1 | najwiekszy udzial 80%
+House Targaryen: 4 -> Second Sons 2, Targaryen 1, Stormcrows 1 | najwiekszy udzial 50%
+Volantis: 3 -> Vhassar 3 | najwiekszy udzial 100%
+Sarnor: 2 -> Tymai 1, Amai 1 | najwiekszy udzial 50%
+Antaryon League (Braavos Rebels): 2 -> Antaryon 2 | najwiekszy udzial 100%
+Myr: 2 -> Alayris 2 | najwiekszy udzial 100%
+Braavos: 1 -> Antaryon 1 | najwiekszy udzial 100%
+Lorath: 1 -> Aloran 1 | najwiekszy udzial 100%
+Tyrosh: 1 -> Ryndoon 1 | najwiekszy udzial 100%
+Ibben: 1 -> Casat 1 | najwiekszy udzial 100%
+Nights Watch: 1 -> Snow 1 | najwiekszy udzial 100%
+Drahar Conspiracy (Myr Rebels): 1 -> Drahar 1 | najwiekszy udzial 100%
+Kingdom of Norvos: 1 -> Hortyr 1 | najwiekszy udzial 100%
+Dragonstone: 1 -> Seaworth 1 | najwiekszy udzial 100%
+
+-- REGULA: komu zdobycze, wg krolestwa --
+The Reach: 11 -> Tarly 2, Tyrell 2, Oakheart 1, Hightower 1, Caswell 1, Bulwer 1, Crane 1, Florent 1, Cuy 1 | najwiekszy udzial 18%
+Riverlands: 10 -> Ryger 2, Tully 2, Darry 1, Bracken 1, Vance 1, Smallwood 1, Piper 1, Cox 1 | najwiekszy udzial 20%
+House Baratheon of King's Landing: 7 -> Crakehall 2, Lydden 1, Lannister 1, Baratheon, Joffrey 1, Kenning 1, Lefford 1 | najwiekszy udzial 29%
+The North: 6 -> Stark 2, Cerwyn 2, Bolton 1, Hornwood 1 | najwiekszy udzial 33%
+Stormlands: 5 -> Baratheon,Renly 2, Selmy 1, Caron 1, Buckler 1 | najwiekszy udzial 40%
+House Targaryen: 4 -> Targaryen 2, Stalwart Shields 1, Stormcrows 1 | najwiekszy udzial 50%
+Volantis: 3 -> Melane 2, Qhaedar 1 | najwiekszy udzial 67%
+Sarnor: 2 -> Sumai 1, Tymai 1 | najwiekszy udzial 50%
+Antaryon League (Braavos Rebels): 2 -> Antaryon 2 | najwiekszy udzial 100%
+Myr: 2 -> Terys 1, Drahar 1 | najwiekszy udzial 50%
+Braavos: 1 -> Fregar 1 | najwiekszy udzial 100%
+Lorath: 1 -> Aloran 1 | najwiekszy udzial 100%
+Tyrosh: 1 -> Ryndoon 1 | najwiekszy udzial 100%
+Ibben: 1 -> Thuk 1 | najwiekszy udzial 100%
+Nights Watch: 1 -> Mormont-Nights Watch 1 | najwiekszy udzial 100%
+Drahar Conspiracy (Myr Rebels): 1 -> Drahar 1 | najwiekszy udzial 100%
+Kingdom of Norvos: 1 -> Hortyr 1 | najwiekszy udzial 100%
+Dragonstone: 1 -> Dondarrion 1 | najwiekszy udzial 100%
+
+-- najwiecej twierdz na koniec: gra vs regula (twierdze/miasta) --
+GRA:    Riverlands/Frey 9/2, The Reach/Ashford 7/2, The North/Bolton 6/5, Dragonstone/Baratheon,Stannis 6/2, The Reach/Footly 5/2, Antaryon League (Braavos Rebels)/Antaryon 4/2, Volantis/Vhassar 4/1, The North/Stark 3/1
+REGULA: Dragonstone/Baratheon,Stannis 6/2, The North/Stark 4/2, Antaryon League (Braavos Rebels)/Antaryon 4/2, Volantis/Vhassar 4/1, House Targaryen/Targaryen 3/2, Riverlands/Tully 3/1, County of Bolozo/Alayris 3/1, House Baratheon of King's Landing/Lannister 3/1
+najwiecej miast w jednym rodzie: gra 5, regula 2
+rodow z nadaniem: gra 23, regula 48
+zdobywca dostal: gra 10, regula 34 z 54 (ze znanym wodzem)
+korona dostala: gra 7, regula 13
+remisy na czele (rozstrzyga glos rady): 6
+udzial najwiekszego rodu w zdobyczach krolestw z >= 4 zdobyczami (gra): Riverlands Frey 10/10 = 100%; House Baratheon of King's Landing Lannister 7/7 = 100%; The North Bolton 5/6 = 83%; Stormlands Baratheon,Renly 4/5 = 80%; The Reach Ashford 7/11 = 64%; House Targaryen Second Sons 2/4 = 50%
+udzial najwiekszego rodu w zdobyczach krolestw z >= 4 zdobyczami (regula): House Targaryen Targaryen 2/4 = 50%; Stormlands Baratheon,Renly 2/5 = 40%; The North Stark 2/6 = 33%; House Baratheon of King's Landing Crakehall 2/7 = 29%; Riverlands Ryger 2/10 = 20%; The Reach Tarly 2/11 = 18%
+zdobywca spoza rodu krola: dostal 26 z 38 (gra 6)
+rozproszenie (rodow z nadaniem / nadan): gra 0.38, regula 0.80
+bliskie (2. ma >= 0.7 oceny 1. - rada moze przewazyc, N4): 43 z 60
+ponad pulapem przy nadaniu (regula): 0

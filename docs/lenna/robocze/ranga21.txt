@@ -1,0 +1,50 @@
+== fin21
+dzien_decyzji;osada;krolestwo;rod_dnia_zdobycia(krol);zwyciezca;pozycja_zwyciezcy;pierwsze_5_rodow_krolestwa(kolejnosc Clan.All, rody z lennem)
+23;Cape Wrath;Stormlands;Baratheon,Renly;Baratheon,Renly;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Renly, Buckler, Tarth, Selmy, Connington
+42;Demongate;Volantis;Vhassar;Vhassar;- [bez zmiany (krol zatrzymal / fabula)];Maegyr, Paenymion, Vhassar, Vaelaros, Melane
+49;Starfall;The Reach;Tyrell;Tyrell;- [bez zmiany (krol zatrzymal / fabula)];Tyrell, Footly, Ashford, Tarly, Hightower
+52;Darry;The Vale;Hunter;Hunter;- [bez zmiany (krol zatrzymal / fabula)];Royce, Corbray, Hunter, Arryn, Borrell
+78;Fellwood;Stormlands;Baratheon,Renly;Baratheon,Renly;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Renly, Buckler, Tarth, Selmy, Connington
+84;Blackmont;The Reach;Tyrell;Tyrell;- [bez zmiany (krol zatrzymal / fabula)];Tyrell, Footly, Ashford, Tarly, Hightower
+86;Hull;House Baratheon of King's Landing;Clegane;Clegane;- [bez zmiany (krol zatrzymal / fabula)];Lannister, Baratheon, Joffrey, Clegane, Lefford, Kenning
+105;Dragonstone;House Baratheon of King's Landing;Clegane;Clegane;- [bez zmiany (krol zatrzymal / fabula)];Lannister, Baratheon, Joffrey, Clegane, Lefford, Kenning
+120;Qamayl;Sarnor;Amai;Lozar;2 [glos];Amai, Lozar, Tymai, Sumai, Alexi
+130;Harrenhal;The North;Stark;Bolton;1 [glos];Bolton, Karstark, Stark, Reed, Glover
+137;Qamayl;Ibben;Casat;Joth;2 [glos];Casat, Joth, Gasso, Thuk
+160;Willow Wood;House Baratheon of King's Landing;Baratheon, Joffrey;Clegane;3 [glos];Lannister, Baratheon, Joffrey, Clegane, Lefford, Kenning
+162;Tolos;House Targaryen;Targaryen;Targaryen;- [bez zmiany (krol zatrzymal / fabula)];Second Sons, Targaryen, Stormcrows, Selmy, Barristan, Mormont, Jorah
+163;Haystack Hall;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+166;Mantarys;Volantis;Vhassar;Vhassar;- [bez zmiany (krol zatrzymal / fabula)];Maegyr, Paenymion, Vhassar, Vaelaros, Melane
+182;Oros;Volantis;Vhassar;Vhassar;- [bez zmiany (krol zatrzymal / fabula)];Maegyr, Paenymion, Vhassar, Vaelaros, Melane
+235;City of Bones;House Targaryen;Targaryen;Targaryen;- [bez zmiany (krol zatrzymal / fabula)];Second Sons, Targaryen, Stormcrows, Selmy, Barristan, Mormont, Jorah
+236;Stoney Sept;Riverlands;Tully,Blackfish;Tully,Blackfish;- [bez zmiany (krol zatrzymal / fabula)];Tully, Frey, Tully,Blackfish, Mallister, Blackwood
+237;Haystack Hall;Stormlands;Baratheon,Renly;Baratheon,Renly;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Renly, Buckler, Tarth, Selmy, Connington
+256;Sweetport;Stormlands;Baratheon,Renly;Baratheon,Renly;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Renly, Buckler, Tarth, Selmy, Connington
+270;Vaes Efe;House Targaryen;Targaryen;Targaryen;- [bez zmiany (krol zatrzymal / fabula)];Second Sons, Targaryen, Stormcrows, Selmy, Barristan, Mormont, Jorah
+275;Menetragos;Qohor;Talordis;Talordis;- [bez zmiany (krol zatrzymal / fabula)];Talordis, Adory, Ostyrion, Tendiras, Lorosene
+276;Stonedance;Stormlands;Baratheon,Renly;Baratheon,Renly;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Renly, Buckler, Tarth, Selmy, Connington
+288;Pinkmaiden;House Baratheon of King's Landing;Baratheon, Joffrey;Lannister;1 [glos];Lannister, Baratheon, Joffrey, Clegane, Lefford, Kenning
+291;Sharp Point;Stormlands;Baratheon,Renly;Baratheon,Renly;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Renly, Buckler, Tarth, Selmy, Connington
+335;Bisa;Braavos;Volentin;Antaryon;1 [glos];Antaryon, Celeris, Prestayn, Fregar, Volentin
+340;Sandstone;The Reach;Tyrell;Footly;2 [glos];Tyrell, Footly, Ashford, Tarly, Hightower
+404;Sunstone;Tyrosh;Ryndoon;Qhaedarene;3 [glos];Ryndoon, Uhoris, Qhaedarene, Staegone, Ohoros
+415;Wayfarer's Rest;House Baratheon of King's Landing;Lannister;Lannister;- [bez zmiany (krol zatrzymal / fabula)];Lannister, Baratheon, Joffrey, Clegane, Lefford, Kenning
+433;Saltpans;The Vale;Corbray;Corbray;- [bez zmiany (krol zatrzymal / fabula)];Royce, Corbray, Hunter, Arryn, Borrell
+449;Maidenpool;The Vale;Corbray;Corbray;- [bez zmiany (krol zatrzymal / fabula)];Royce, Corbray, Hunter, Arryn, Borrell
+470;Acorn Hall;House Baratheon of King's Landing;Baratheon, Joffrey;Lannister;1 [glos];Lannister, Baratheon, Joffrey, Clegane, Lefford, Kenning
+536;Fellwood;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+536;Cape Wrath;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+536;Sharp Point;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+536;Haystack Hall;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+536;Stonedance;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+536;Sweetport;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+536;Storm's End;Dragonstone;Baratheon,Stannis;Baratheon,Stannis;- [bez zmiany (krol zatrzymal / fabula)];Baratheon,Stannis, Velaryon, Seaworth, bar Emmon, Celtigar
+611;Nightsong;The Reach;Tyrell;Footly;2 [glos];Tyrell, Footly, Ashford, Tarly, Hightower
+615;Sar Mell;Volantis;Maegyr;Maegyr;- [bez zmiany (krol zatrzymal / fabula)];Maegyr, Paenymion, Vaelaros, Qhaedar
+628;Pinkmaiden;Riverlands;Tully;Frey;2 [glos];Tully, Frey, Tully,Blackfish, Mallister, Blackwood
+633;Wayfarer's Rest;Riverlands;Tully;Frey;2 [glos];Tully, Frey, Tully,Blackfish, Mallister, Blackwood
+639;Tolos;Volantis;Maegyr;Paenymion;2 [glos];Maegyr, Paenymion, Vhassar, Vaelaros, Melane
+654;Harvest Hall;The Reach;Footly;Footly;- [bez zmiany (krol zatrzymal / fabula)];Tyrell, Footly, Ashford, Tarly, Hightower
+676;Blackhaven;The Reach;Footly;Footly;- [bez zmiany (krol zatrzymal / fabula)];Tyrell, Footly, Ashford, Tarly, Hightower
+
+Pozycja zwyciezcy (tylko decyzje, gdzie rod sie zmienil): 1: 4, 2: 7, 3: 2
