@@ -478,6 +478,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa k13a      : (K1-3a krok 2, decyzja Jeffa 13.10 "razem z danina") mieszczanie kupuja tylko konie robocze w miejsce padlych; ciecie hodowli czynne.
                     python -I tools/sprawdz_logi.py --grupa k13a [--do-doby 120] <Armoury-*.log>
                     Wiersze KR-1..KR-11 (ten sam blok co w --grupa etap5) + KR-12 stado robocze swiata bez skoku (glowy po paczce A). Log bez paczki: INFO.
+--grupa p1b       : (P1b, decyzja Jeffa 13.10 "kara lojalnosci TAK") kara lojalnosci za danine z oszczednosci (latka na czynny model lojalnosci),
+                    podloga wspolna z W7 (60), prog poboru (30). python -I tools/sprawdz_logi.py --grupa p1b [--do-doby 120] <Armoury-*.log>
+                    Wiersze P1B-0..P1B-7: linia i latka, kara w granicach, kontrola progu poboru, latka liczy (wywolania doby), lojalnosc placacych
+                    (projekt prog 12 + rownowaga: srednia >= 70, najnizsza >= 50), W7 i podloga (INFO), czas i potkniecia. Log bez paczki: INFO.
 --grupa w7        : (W7, decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana") rod, ktorego druzynom W5 nie pokrylo potrzeby, bierze najwyzej 3%/d
                     nadwyzki ludu i wsi wlasnych lenn (po daninie P1 i danine wsi) na zold ludzi, ktorzy sa; koszt: lojalnosc i dobrobyt osady.
                     python -I tools/sprawdz_logi.py --grupa w7 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -17751,6 +17755,124 @@ def k13a_main(logp, start_arg, until=120):
     return 0
 
 
+def p1b_main(logp, start_arg, until=120):
+    """P1b (obieg kiesy ludu, projekt rozdz. 3.2, 8, 9 prog 12; decyzja Jeffa 13.10 "kara lojalnosci TAK"; Armoury/src/FolkAidLoyalty.cs, klucz FolkWarAidLoyalty):
+    kara lojalnosci za danine P1 (proporcjonalnie do czesci kiesy ludu zabranej, najwyzej koszt/d), podloga wspolna z W7 (kara najwyzej 0.1 x (lojalnosc - podloga)
+    minus koszt W7 tej doby), prog poboru (lojalnosc <= 30 - bez daniny). Okno: doby kampanii 2-until (--do-doby). Wiersze P1B-0..P1B-7: linia i latka, kara
+    w granicach (po podlodze <= nominalna <= koszt), kontrola progu poboru 0, latka naprawde liczy (wywolania doby z kara >= osady z kara dnia poprzedniego),
+    lojalnosc osad placacych (projekt prog 12: srednia >= 40, osad <= 25 najwyzej 2, 0 buntow; rownowaga: srednia >= 70, najnizsza >= 50 - korupcja podatku),
+    W7 i podloga (INFO), czas i potkniecia. Log bez paczki: INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    rows = by_day(lines, "Lojalnosc za danine (P1b): dzien")
+    loy = by_day(lines, "Lojalnosc osad (P1): dzien")
+    if start is None:
+        alld = sorted(set(rows) | set(loy))
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return 2 <= run_day(d, start) <= until
+    win = [d for d in sorted(rows) if inwin(d)]
+    on = [d for d in win if "| wylacznik Folk War Aid Loyalty tak" in rows[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia P1b {len(win)} (klucz czynny w {len(on)})")
+    starts = [s for s in lines if s.startswith("Lojalnosc za danine (P1b): start sesji")]
+    if not win:
+        rep.add("P1B-0: linia Lojalnosc za danine (P1b)", "brak linii w oknie (log sprzed P1b)", "codziennie od wgrania P1b", None)
+    else:
+        bad = [s for s in starts if "| latka wpieta" not in s]
+        rep.add("P1B-0: linia codziennie, klucz i latka na czynny model lojalnosci (linie startu sesji)",
+                f"dob z linia {len(win)}, klucz czynny {len(on)}; starty sesji {len(starts)}, bez latki {len(bad)}"
+                + (f" [{bad[0][:160]}]" if bad else (f" [{starts[-1].split('| latka ', 1)[-1][:120]}]" if starts else "")),
+                "linia w kazdej dobie, klucz czynny, latka wpieta w kazdej sesji (BRAK = kara nie dziala)", len(on) == len(win) and len(starts) > 0 and not bad)
+    t = {}
+    hre = re.compile(r"\| osady z danina dzis (\d+) \(miasta (\d+), zamki (\d+)\): kara nominalna razem ([\d.]+) \(srednio ([\d.]+)\), po podlodze i W7 razem ([\d.]+) "
+                     r"\(srednio ([\d.]+)\); z W7 tej doby (\d+) osad, W7 razem ([\d.]+); obciete podloga (\d+) \(do zera (\d+)\)")
+    for d in on:
+        s = rows[d]
+        h = hre.search(s)
+        if not h:
+            continue
+        g = h.groups()
+        t[d] = {"n": int(g[0]), "nom": float(g[3]), "take": float(g[5]), "nl": int(g[7]), "lord": float(g[8]), "cut": int(g[9]), "zero": int(g[10]),
+                "cost": num(r"\| koszt ([\d.]+)/d", s, float, 1.0), "ctl": num(r"kontrola - danina przy lojalnosci <= prog (\d+)", s, int, 0),
+                "gate": num(r"osad z nadwyzka bez daniny (\d+)", s, int, 0), "tick": num(r"doba \(bez opisu\) (\d+)", s, int, 0),
+                "desc": num(r"dymek \(z opisem\) (\d+)", s, int, 0), "ms": num(r"\| czas ([\d.]+) ms", s, float, 0.0),
+                "st": num(r"potkniecia (\d+)\.", s, int, 0)}
+    if on and not t:
+        rep.add("P1B-1: linia P1b czytelna", "linie z kluczem, ale bez czytelnego czlonu osad", "format linii z kodu", False)
+    if t:
+        ds = sorted(t)
+        over = [d for d in ds if t[d]["take"] > t[d]["nom"] + 1e-6 or (t[d]["n"] > 0 and t[d]["nom"] / t[d]["n"] > t[d]["cost"] + 1e-6)]
+        n = sum(t[d]["n"] for d in ds)
+        nom_avg = sum(t[d]["nom"] for d in ds) / max(1, n)
+        take_avg = sum(t[d]["take"] for d in ds) / max(1, n)
+        rep.add("P1B-1: kara w granicach - po podlodze i W7 <= nominalna, nominalna srednio <= koszt (kazda doba)",
+                f"dob ponad {len(over)}" + (f" [{', '.join('d' + str(run_day(d, start)) for d in over[:4])}]" if over else "")
+                + f"; osado-dob z danina {n}, kara nominalna srednio {nom_avg:.3f}, po podlodze i W7 {take_avg:.3f} na osade",
+                "0 dob ponad (rachunek CHANGELOG: nominalna ok. 0.4-0.5/d na osade placaca w drugiej polowie roku 1)", not over)
+        ctl = [d for d in ds if t[d]["ctl"] > 0]
+        gate_all = sum(t[d]["gate"] for d in ds)
+        rep.add("P1B-2: prog poboru - danina od osady z lojalnoscia <= prog (kontrola w linii)",
+                f"{sum(t[d]['ctl'] for d in ds)} osado-dob w {len(ctl)} dobach; osad z nadwyzka bez daniny z powodu progu: razem {gate_all} osado-dob",
+                "0 (osada na skraju buntu nie placi)", not ctl)
+        # latka naprawde liczy: wywolania doby z kara (od poprzedniej linii) >= osady z kara dnia poprzedniego (kazda osada liczy zmiane raz na dobe w Town.DailyTick)
+        pairs = [(t[d - 1]["n"] - t[d - 1]["zero"], t[d]["tick"]) for d in ds if (d - 1) in t]
+        want = sum(a for a, b in pairs if a > 0)
+        got = sum(b for a, b in pairs if a > 0)
+        desc = sum(t[d]["desc"] for d in ds)
+        rep.add("P1B-3: latka liczy - wywolania modelu bez opisu z kara (doba) wobec osad z kara dnia poprzedniego (suma okna)",
+                f"wywolania {got} / osado-dob z kara {want}" + (f" ({100.0 * got / want:.0f}%)" if want else "") + f"; dymek (z opisem) {desc}",
+                ">= 90% (kazda osada z kara liczy zmiane lojalnosci raz na dobe; wiecej = inne odczyty modelu)", (got >= 0.9 * want) if want else None)
+        lw = ds[-28:]
+        k = float(len(lw))
+        rep.add(f"P1B-6: W7 i podloga (srednio na dobe, ostatnie {len(lw)} dob okna; INFO)",
+                f"osad z danina {sum(t[d]['n'] for d in lw) / k:.0f}, z W7 tej samej doby {sum(t[d]['nl'] for d in lw) / k:.0f} (W7 razem {sum(t[d]['lord'] for d in lw) / k:.2f}/d), "
+                f"kara P1b po podlodze razem {sum(t[d]['take'] for d in lw) / k:.2f}/d, obciete podloga {sum(t[d]['cut'] for d in lw) / k:.1f} (do zera {sum(t[d]['zero'] for d in lw) / k:.1f})",
+                "INFO - rachunek: rownowaga osady o naturalnej lojalnosci L co najmniej (L + 60) / 2; srednio -4 do -9 pkt", None)
+        ms = [t[d]["ms"] for d in ds]
+        stu = sum(t[d]["st"] for d in ds)
+        err = [s for s in lines if s.startswith("ERROR in ") and "FolkAidLoyalty" in s]
+        rep.add("P1B-7: czas linii P1b (srednio) i potkniecia", f"{sum(ms) / len(ms):.3f} ms/dobe (najwiecej {max(ms):.3f}); potkniecia {stu}, ERROR {len(err)}",
+                "<= 0.5 ms/dobe, potkniecia 0", sum(ms) / len(ms) <= 0.5 and stu == 0 and not err)
+    # ---- P1B-4 / P1B-5 lojalnosc osad placacych (linia P1, projekt prog 12 + rownowaga)
+    lwin = [d for d in sorted(loy) if inwin(d)]
+    if lwin:
+        pre = re.compile(r"\| placace danine z oszczednosci dzis (\d+) \([^)]*\): srednia ([\d.]+|-), <= 30: (\d+), <= 25: (\d+), w stanie buntu (\d+)")
+        vals = []
+        for d in lwin:
+            m = pre.search(loy[d])
+            if m and m.group(2) != "-":
+                low = num(r"wsrod placacych: .* ([\d.]+) \| sam odczyt", loy[d], float)
+                vals.append((d, int(m.group(1)), float(m.group(2)), int(m.group(4)), int(m.group(5)), low))
+        if vals:
+            avg = sum(v[2] for v in vals) / len(vals)
+            m25 = max(v[3] for v in vals)
+            reb = sum(v[4] for v in vals)
+            rep.add("P1B-4: lojalnosc osad placacych - projekt prog 12 (srednia w oknie, osad <= 25 najwiecej, bunty w placacych)",
+                    f"srednia {avg:.1f}, <= 25 najwiecej {m25}, osado-dob w stanie buntu {reb} ({len(vals)} dob z placacymi)",
+                    ">= 40; <= 2 (bieg roczny kodu 43 bez kary: 0); 0" + ("" if on else " - log bez P1b: INFO (baza)"), (avg >= 40 and m25 <= 2 and reb == 0) if on else None)
+            lw2 = vals[-28:]
+            la = sum(v[2] for v in lw2) / len(lw2)
+            lows = [v[5] for v in lw2 if v[5] is not None]
+            rep.add(f"P1B-5: rownowaga - lojalnosc osad placacych w ostatnich {len(lw2)} dobach okna (srednia; najnizsza wsrod placacych)",
+                    f"srednia {la:.1f}; najnizsza {min(lows):.1f}" if lows else f"srednia {la:.1f}; najnizsza -",
+                    "srednia >= 70 (bieg roczny kodu 43 bez kary: 88-90; rachunek z kara 80-85), najnizsza >= 50 (ponizej - korupcja podatku gry)",
+                    (la >= 70 and (not lows or min(lows) >= 50)) if on else None)
+        else:
+            rep.add("P1B-4: lojalnosc osad placacych", "brak dob z osadami placacymi w oknie", "INFO", None)
+    else:
+        rep.add("P1B-4: lojalnosc osad placacych", "brak linii Lojalnosc osad (P1)", "INFO (pomiar od P1)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -17813,6 +17935,8 @@ def main(argv):
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:
         return k13a_main(logp, start_arg, until_arg)   # K1-3a krok 2: konie robocze mieszczan (blok etap5_k13a) + KR-12 stado swiata po paczce A
+    if group == "p1b" and logp:
+        return p1b_main(logp, start_arg, until_arg)   # P1b: kara lojalnosci za danine P1 - podloga wspolna z W7, prog poboru, lojalnosc osad placacych
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group != "etap2" or not logp:

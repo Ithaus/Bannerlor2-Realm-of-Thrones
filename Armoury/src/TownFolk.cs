@@ -121,6 +121,7 @@ namespace Armoury
             public double DVNeed; public long DVBuy;                  // E5/C4: wies - potrzeba zakupow i zakupy ostatniej doby (skladniki "wsie: zakupy X z Y" linii Kiesa ludu); bez zapisu
             // ---- P1 (obieg kiesy ludu, TownFolk.Savings.cs): liczby ostatniej doby i okna pomiaru - pamiec sesji, bez zapisu
             public long DAid;                                         // danina z oszczednosci oddana koronie w ostatniej dobie (wszystkie klasy)
+            public double AidFrac;                                    // P1b: czesc calej kiesy ludu osady (W+R+P; zamek podzamcze) oddana w daninie ostatniej doby - wazna tylko przy DAid > 0; bez zapisu
             public double DOver;                                      // kiesa ponad zapas dni po daninie (suma klas z nadwyzka) - zdanie "Savings", pomiary
             public readonly double[] DOvC = new double[3];            // to samo na klase (W, R, P; zamek [0])
             public long Aid7; public double Of7X, Of7B;               // okno pomiaru (do 7 dob): danina, oferta nadwyzki dopisana do budzetu, kupione z oferty

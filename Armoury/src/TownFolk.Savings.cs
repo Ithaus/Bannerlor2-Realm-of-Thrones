@@ -93,6 +93,9 @@ namespace Armoury
             {
                 double left = ov - t;
                 f.DAid += t; f.Aid7 += t; f.DOver += left; if (c >= 0 && c < 3) f.DOvC[c] = left;
+                // P1b (FolkAidLoyalty): czesc calej kiesy ludu zabrana w daninie tej doby - kiesy klas TERAZ + danina doby = stan przed danina (ostatnia klasa
+                // nadpisuje wynik pelnym rachunkiem; DAid zerowane z liczbami doby osady - przy DAid = 0 wartosc nie jest czytana)
+                if (f.DAid > 0) { long all = f.Kind == 1 ? f.KW : f.KW + f.KR + f.KP; f.AidFrac = f.DAid / Math.Max(1.0, (double)Math.Max(0, all) + f.DAid); }
                 d.Aid[cls] += t; d.Ov0[cls] += ov; d.Ov1[cls] += left;
                 var k = f.St.OwnerClan != null ? f.St.OwnerClan.Kingdom : null;
                 if (k != null)
@@ -128,6 +131,24 @@ namespace Armoury
 
         /// <summary>Czas poboru daniny w dobie kiesy `day` (ms; "-" - doba nie biegla).</summary>
         internal static string AidMs(int day) { return _aidDay == day ? MsOf(_aidTicks, "0.000") : "-"; }
+
+        /// <summary>P1b (FolkAidLoyalty): miasta i zamki, ktorych lud oddal koronie danine w ostatniej dobie kiesy (DAid > 0 i liczby tej doby - ADay), z czescia
+        /// calej kiesy ludu zabrana w daninie (0..1). Tylko odczyt; kiesa nieczynna - lista pusta. Zamek tylko przy zaworze zamkow (CastleLive).</summary>
+        internal static void AidPlaces(List<KeyValuePair<Settlement, double>> into)
+        {
+            if (into == null) return;
+            into.Clear();
+            if (!Live || _liveDay < 0) return;
+            for (int i = 0; i < _fk.Count; i++)
+            {
+                var f = _fk[i];
+                if (f == null || f.St == null || f.Kind > 1 || f.DAid <= 0 || f.ADay != _liveDay) continue;
+                if (f.Kind == 1 && !CastleLive) continue;
+                double q = f.AidFrac;
+                if (double.IsNaN(q) || double.IsInfinity(q)) q = 0;
+                into.Add(new KeyValuePair<Settlement, double>(f.St, Math.Max(0, Math.Min(1, q))));
+            }
+        }
 
         // ============================================================ B. zdanie "Savings" w oknie People of this land
         private static string DaysText(double days)
@@ -174,13 +195,14 @@ namespace Armoury
             int why;
             double rate = KingdomTreasury.FolkWarAidRate(st, out why);
             log = head + " | kiesy " + purse + ", potrzeba dnia " + F2(need) + ", dni " + F1(days) + " | ponad zapas dni po daninie " + N0(f.DOver) + ", danina ostatniej doby " + f.DAid
-                  + " | stawka dnia dzis " + (100 * rate).ToString("0.000", Inv) + "% (powod " + why + ": 0 placi, 1 wylaczone, 2 bez krolestwa, 3 pokoj albo s = 0, 4 oblezenie)";
+                  + " | stawka dnia dzis " + (100 * rate).ToString("0.000", Inv) + "% (powod " + why + ": 0 placi, 1 wylaczone, 2 bez krolestwa, 3 pokoj albo s = 0, 4 oblezenie, 6 lojalnosc na progu P1b)";
             string s0 = "Savings: the " + who + " hold coin for " + DaysText(days) + " of living";
             if (f.DAid > 0)
                 return s0 + ". At the last dawn they gave the crown " + Coins(f.DAid) + " in war aid; " + Coins(f.DOver) + " still lie above their reserve for hard times, which is not touched.";
             if (f.DOver < 1) return s0 + " - nothing to spare.";
             string tail = why == KingdomTreasury.WaNoNeed ? " The crown asks no war aid of them now."
-                        : why == KingdomTreasury.WaSiege ? " Under siege they pay no war aid." : "";
+                        : why == KingdomTreasury.WaSiege ? " Under siege they pay no war aid."
+                        : why == KingdomTreasury.WaLowLoy ? " The tax gatherers have left: the " + (f.Kind == 0 ? "town" : "castle") + " is too close to revolt to pay the war aid." : "";
             return s0 + "; " + Coins(f.DOver) + " of it lie above their reserve for hard times." + tail;
         }
 

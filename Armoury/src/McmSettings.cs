@@ -5092,6 +5092,22 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkWarAidShare { get; set; } = 0.025f;
 
+        [SettingPropertyBool("Folk War Aid Loyalty", HintText = "with Folk War Aid: a town or castle whose people gave the crown war aid at dawn grows less loyal to its lord that day - up to Folk War Aid Loyalty Cost a day, in proportion to how much of all the people's coin the aid took (the full cost when it took one part in forty of it). The loss never draws loyalty below Folk War Aid Loyalty Floor: it shrinks as loyalty nears the floor and stops there, and what the lord's own war levy (Lord War Levy) cost the town that day counts against the same limit. A town or castle with loyalty at or below Folk War Aid Min Loyalty pays no war aid at all - the tax gatherers leave a town so close to revolt. You see the loss as 'War aid from the people's savings' in the loyalty tooltip. Off = no loss of loyalty and no such limit, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkWarAidLoyalty { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk War Aid Loyalty Cost", 0.00f, 5.00f, "0.00", HintText = "with Folk War Aid Loyalty: loyalty a town or castle loses in a day when the war aid took one part in forty of all the coin its people hold (1 = about ten points lower in the long run, since the game draws loyalty back towards 50 by a tenth of the distance each day); less in proportion when the aid took less, never more")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkWarAidLoyaltyCost { get; set; } = 1.0f;
+
+        [SettingPropertyFloatingInteger("Folk War Aid Loyalty Floor", 0.00f, 100.00f, "0", HintText = "with Folk War Aid Loyalty: the war aid never draws a town's loyalty below this - it may cost at most a tenth of a point a day for each point the town stands above this floor, less what the lord's war levy cost it that day, so it stops at the floor (60 keeps towns clear of 50, below which the lord's taxes begin to slip)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkWarAidLoyaltyFloor { get; set; } = 60f;
+
+        [SettingPropertyInteger("Folk War Aid Min Loyalty", 0, 100, "0", HintText = "with Folk War Aid Loyalty: a town or castle with loyalty at or below this pays no war aid (the game's unrest begins at 25)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int FolkWarAidMinLoyalty { get; set; } = 30;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -6756,6 +6772,10 @@ namespace Armoury
             s.FolkSurplusSpendShare = FolkSurplusSpendShare;
             s.FolkWarAid = FolkWarAid;
             s.FolkWarAidShare = FolkWarAidShare;
+            s.FolkWarAidLoyalty = FolkWarAidLoyalty;
+            s.FolkWarAidLoyaltyCost = FolkWarAidLoyaltyCost;
+            s.FolkWarAidLoyaltyFloor = FolkWarAidLoyaltyFloor;
+            s.FolkWarAidMinLoyalty = FolkWarAidMinLoyalty;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

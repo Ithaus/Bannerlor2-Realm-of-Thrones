@@ -258,6 +258,7 @@ namespace Armoury
                 GentryService.SetHarmony(_harmony); // 179: tylko zapamietanie - latki BK (wezwanie rycerza, partia rycerza, majatki) w kampanii
                 Ransom178.SetHarmony(_harmony);      // 178: tylko zapamietanie - latki okupow i 1/9 w kampanii
                 CrownCallToWar.SetHarmony(_harmony); // 168 dodatek: tylko zapamietanie - latki w kampanii
+                FolkAidLoyalty.SetHarmony(_harmony); // P1b: tylko zapamietanie - latka na czynny model lojalnosci w kampanii (CLAUDE.md 7)
                 WorldTime7.SetHarmony(_harmony);     // E7/K (226): tylko zapamietanie - latki turniejow, sojuszy i rozejmu gry w kampanii
                 DebtLadder.SetHarmony(_harmony);    // 168: tylko zapamietanie - latki modelu finansow (portfele) i BK (B5) w kampanii
                 CouncilWages35.SetHarmony(_harmony); // 3.5: tylko zapamietanie - latki BK (rada: platnik i urzad radnego) w kampanii
