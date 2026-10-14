@@ -3352,6 +3352,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float WarWageShare { get; set; } = 0.6f;
 
+        [SettingPropertyFloatingInteger("Peace Chest Share", 0.00f, 1.60f, "0.00", HintText = "in peace the wage ceiling also gets this share of the war chest (the house's gold above its war reserve, spent as at war): a house at peace keeps a third of its army and half its garrisons from its savings instead of sending almost everyone home; 0 = the peace ceiling from the steady income alone")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public float PeaceChestShare { get; set; } = 0.4f;
+
         [SettingPropertyFloatingInteger("Household Share Peace", 0.00f, 1.40f, "0.00", HintText = "the court and the food in peace: this share of the steady income (the parties' food is bought by the parties; the rest goes into the seat's purse)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float HouseholdSharePeace { get; set; } = 0.35f;
@@ -6473,6 +6477,7 @@ namespace Armoury
             s.ClanBudgetStableD = ClanBudgetStableD;
             s.PeaceWageShare = PeaceWageShare;
             s.WarWageShare = WarWageShare;
+            s.PeaceChestShare = PeaceChestShare;
             s.HouseholdSharePeace = HouseholdSharePeace;
             s.HouseholdShareWar = HouseholdShareWar;
             s.GearSharePeace = GearSharePeace;

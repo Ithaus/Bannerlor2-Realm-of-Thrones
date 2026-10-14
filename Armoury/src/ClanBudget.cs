@@ -23,7 +23,8 @@ namespace Armoury
     ///  - D = D staly (169c: ziemia + korona + kontrakt + majatek; u najezdzcow - Zelazne Wyspy, Dothrakowie, Wolni Ludzie - takze lup), mieszany z D z
     ///    zapisu, dopoki pomiar ma mniej niz 28 dob (pierscienie D stalego zyja tylko w sesji); start kampanii D = G/60. G = kiesy rodziny (glowa +
     ///    dorosli). R = max(20 000; 20 x D) + 5 000 x doroslych.
-    ///  - pulap zoldu (partie + zalogi + karawany): pokoj 0.28 D, wojna 0.60 D + 0.8 (G - R)/45 przy G > R; bieda: pokoj G < 60 D -> x (1 - 0.1 (1 - G/60D)),
+    ///  - pulap zoldu (partie + zalogi + karawany): pokoj 0.28 D (+ Z.1: 0.4 x skrzynia wojenna przy G > R), wojna 0.60 D + 0.8 (G - R)/45 przy G > R;
+    ///    bieda: pokoj G < 60 D -> x (1 - 0.1 (1 - G/60D)),
     ///    wojna G < R -> x (0.8 + 0.2 G/R), G < 0.25 R -> x 0.5. Dwor i wyzywienie 0.35/0.20 D, sprzet 0.17 D (+0.2 (G-R)/45 w wojnie), budowy 0.10 D
     ///    (w wojnie tylko na mury, wieze i koszary - recenzja C1, W5).
     ///  - zalogi: w wojnie pulap gry bez zmian i finansowane pierwsze; w pokoju cel 50% zalogi wojennej (srednia z dob wojny), najwyzej 80% pulapu.
@@ -87,6 +88,8 @@ namespace Armoury
         private static long _dCourt, _dCourtTown, _dFood, _dFamily, _dRelPurse, _dBuild, _dGear, _dGearSpent, _dCapSum, _dWageSum, _dD;
         private static int _dRelMen, _dRelPar, _dRelGar, _dNoVillage, _dFamilyN, _dOver, _dStreak, _dPeace, _dWar, _dClans, _dPoor, _dVanished;
         private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
+        // Z.1 (pomiar): rody AI w pokoju (bez najemnikow) - pulap, w tym skrzynia pokoju (ile rodow), zold naliczony, ludzie w partiach i zalogach
+        private static long _dPzCap, _dPzChest, _dPzWage; private static int _dPzN, _dPzChestN, _dPzMenPar, _dPzMenGar;
         // P3/W2 (pomiar): zwolnieni 166 wedlug tieru (t1-2 / t3-4 / t5+) - ludzie i ich zold dzienny; rody w wojnie, ktorym zalogi i karawany zajely
         // caly pulap (na partie 0), i ile z nich nie ma juz ludzi w partiach
         private static readonly int[] _dRelTier = new int[3];
@@ -143,6 +146,7 @@ namespace Armoury
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dRelTavern = 0; _dRelPurseVet = 0;
+            _dPzCap = _dPzChest = _dPzWage = 0; _dPzN = _dPzChestN = _dPzMenPar = _dPzMenGar = 0;   // Z.1
             for (int i = 0; i < 3; i++) { _dRelTier[i] = 0; _dRelTierWage[i] = 0; }   // P3/W2
             _dGarEatsCap = _dGarEatsCapEmpty = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
@@ -208,7 +212,12 @@ namespace Armoury
             }
             double rp = Math.Max(0f, s.ReserveDaysPeace) * D;
             if (rp > 0 && G < rp) f = 1 - 0.1 * (1 - Math.Max(0, G) / rp);
-            return Math.Max(0f, s.PeaceWageShare) * D * f;
+            // Z.1 (bieg dwuletni 14.10, 132 rody z wojny do pokoju: ludzie w druzynach 38 125 -> 1 486, kiesy 26.4 -> 29.0 mln): w pokoju D spada do ok. 1/3
+            // (bez zwrotu 70% zoldu i z mniejszymi rentami), a pulap 0.28 D zjadaly zalogi (do 80%) i karawany - na druzyny 0. Zloto rodu ponad rezerwe wojny
+            // idzie w czesci na zold takze w pokoju: PeaceChestShare x skrzynia wojenna (ta sama formula, ta sama rezerwa R - kiesa nie schodzi przez to ponizej R).
+            // Klucz 0 = pulap pokoju jak dotad (sam udzial D).
+            if (G > R && s.PeaceChestShare > 0f) chest = Math.Max(0f, s.PeaceChestShare) * Math.Max(0f, s.WarChestToWages) * (G - R) / Math.Max(1f, s.WarChestDays);
+            return Math.Max(0f, s.PeaceWageShare) * D * f + chest;
         }
 
         /// <summary>Pulap zoldu policzony dzis w grze (dla linii na sucho - jedna liczba); false - rod bez budzetu.</summary>
@@ -601,6 +610,11 @@ namespace Armoury
                         _dGear += (long)b.Gear; _dBuild += (long)b.Build;
                         _dClans++; if (b.War) _dWar++; else _dPeace++;
                         _dCapSum += (long)b.Cap; _dWageSum += b.WPar + b.WGar + b.WCar; _dD += (long)b.D;
+                        if (!b.War && !merc)   // Z.1 (pomiar): rody w pokoju - pulap z ewentualna skrzynia pokoju (chest z Ceiling; w pokoju bez kredytu wojennego i doplat)
+                        {
+                            _dPzN++; _dPzCap += (long)b.Cap; _dPzWage += b.WPar + b.WGar + b.WCar; _dPzMenPar += b.MenPar; _dPzMenGar += b.MenGar;
+                            if (chest > 0) { _dPzChest += (long)chest; _dPzChestN++; }
+                        }
                         // kiesa rodziny, dwor, zwolnienia, limity - kazde we wlasnym try
                         try { FamilyTopUp(c, b, s); } catch (Exception e) { Stumble("FamilyTopUp", e); }
                         try { Court(c, b, s); } catch (Exception e) { Stumble("Court", e); }
@@ -1448,6 +1462,10 @@ namespace Armoury
               .Append(" | rody AI z budzetem ").Append(_dClans).Append(" (pokoj ").Append(_dPeace).Append(", wojna ").Append(_dWar).Append("; najemnicy - 185, gracz - bez budzetu)")
               .Append(" | D razem ").Append(_dD).Append(", pulap zoldu razem ").Append(_dCapSum).Append(", zold naliczony (partie + zalogi + karawany) ").Append(_dWageSum)
               .Append(" (").Append(_dCapSum > 0 ? (100.0 * _dWageSum / _dCapSum).ToString("0", Inv) + "%" : "-").Append(")")
+              .Append(" | pokoj (Z.1): rody w pokoju ").Append(_dPzN).Append(", pulap pokoju razem ").Append(_dPzCap).Append(" (")
+              .Append(s.PeaceWageShare.ToString("0.00", Inv)).Append(" D + ").Append(s.PeaceChestShare.ToString("0.00", Inv)).Append(" x skrzynia wojenna")
+              .Append(s.PeaceChestShare > 0f ? "" : " - skrzynia pokoju wylaczona").Append("), w tym skrzynia pokoju ").Append(_dPzChest).Append(" u ").Append(_dPzChestN)
+              .Append(" rodow, zold naliczony ").Append(_dPzWage).Append(", ludzie w partiach ").Append(_dPzMenPar).Append(", w zalogach ").Append(_dPzMenGar)
               .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
               .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
               .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")
