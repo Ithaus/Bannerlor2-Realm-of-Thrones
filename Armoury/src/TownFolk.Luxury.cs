@@ -29,7 +29,9 @@ namespace Armoury
     ///  P5 PODZAMCZA I WSIE NA TARGU MIASTA (klucz WardsAndVillagesShop): podzamcze (miasto najblizsze - jak material budow P2) i wies (miasto targowe) wydaja
     ///     1/60 nadwyzki ponad zapas (10 dni potrzeby / 15 dni zakupow) z tej samej listy, podzialem miasta z jego ostatniej konsumpcji, ta sama droga co zakupy
     ///     wsi (BuyGoods: zaplata kasie kupcow, sztuki z polki - najwyzej ponad 5 ostatnich; ramka ksiegi towarow F26). Wies: koszyk dnia (sol, narzedzia, len,
-    ///     garnki, piwo) bez zmian, nadwyzka idzie na liste dostatku zamiast na koszyk 15%/d.
+    ///     garnki, piwo) bez zmian; nadwyzka 15%/d (decyzja Jeffa 12.10 (3)) dalej na sol i narzedzia (towar pracy - recenzja WAZNE 2: zakupy narzedzi wsi
+    ///     >= 42/d, projekt prog 15), a len, garnki i piwo - z listy dostatku zamiast z koszyka.
+    ///  Poprawka Predict / Share (recenzja WAZNE 3) - osobny klucz FolkPredictBought (podnosi zapas dni i kiesy ludu - progi P1 licza ja osobno).
     /// Bez nowych pol zapisu (pamiec sesji w Folk). Kazda osada we wlasnym try, licznik potkniec (CLAUDE.md 7). Wylaczone klucze = stan ed74f40.
     /// </summary>
     internal static partial class TownFolk
@@ -59,7 +61,7 @@ namespace Armoury
         {
             public readonly double[] OffG = new double[4], BuyG = new double[4];
             public double Off, NoCat, Buy, COff, CBuy, PhiSum; public int Places, Over, Phi, CPlaces;
-            public int SigN, SigRoom, SigOver; public double SigOff, SigAdd, SigCut; public long Ticks;
+            public int SigN, SigRoom, SigOver, EstCalls; public double SigOff, SigAdd, SigCut; public long Ticks;
         }
         private static LxWin _lxw = new LxWin();
         // doba ludu (P5)
@@ -74,6 +76,8 @@ namespace Armoury
         private static bool SignalOn { get { var s = Settings.Current; return s != null && s.MarketSeesPurse && LadderOn; } }
         /// <summary>P5: podzamcza i wsie na targu miasta (wymaga P3).</summary>
         private static bool WardsShopOn { get { var s = Settings.Current; return s != null && s.WardsAndVillagesShop && LadderOn; } }
+        /// <summary>P3, recenzja WAZNE 3: poprawka Predict / Share (kupione, nie oferowane) - osobny klucz FolkPredictBought (wymaga P3).</summary>
+        private static bool PredictOn { get { var s = Settings.Current; return s != null && s.FolkPredictBought && LadderOn; } }
         private static double LxDays(Settings s) { double t = s != null ? s.FolkSurplusSpendDays : 60; return double.IsNaN(t) ? 60 : Math.Max(1, Math.Min(3650, t)); }
         private static double LxCeil(Settings s) { double c = s != null ? s.FolkLadderPriceCeiling : 1.5; return double.IsNaN(c) ? 1.5 : Math.Max(1.0, Math.Min(10.0, c)); }
 
@@ -207,14 +211,14 @@ namespace Armoury
         private static void OfferSpent(Folk f, out double food, out double rest)
         {
             food = f.OfferFood; rest = f.OfferRest;
-            if (!LadderOn) return;
+            if (!PredictOn) return;                                    // recenzja WAZNE 3: osobny klucz FolkPredictBought
             food = Math.Max(0, f.LxBF); rest = Math.Max(0, f.LxBR);
         }
 
         /// <summary>Anchor (poprawka Share): oferta klasy w udziale zaplaty x czesc kupiona w ostatniej konsumpcji miasta (nieznana - calosc, jak dotad).</summary>
         private static double OfferPayPart(Folk f)
         {
-            if (!LadderOn || !(f.LxPhi >= 0)) return 1.0;
+            if (!PredictOn || !(f.LxPhi >= 0)) return 1.0;            // recenzja WAZNE 3: osobny klucz FolkPredictBought
             return f.LxPhi;
         }
 
@@ -259,8 +263,16 @@ namespace Armoury
         }
 
         // ============================================================ P5: wsie
-        /// <summary>Villages: tempo nadwyzki wsi na koszyk dnia - przy P5 0 (nadwyzka idzie na liste dostatku), inaczej FolkSurplusSpendShare (jak dotad).</summary>
-        private static double VillExtraRate(Settings s) { return WardsShopOn ? 0 : SpendRate(s); }
+        /// <summary>Villages (recenzja WAZNE 2): przy P5 nadwyzka wsi na koszyk dnia (FolkSurplusSpendShare - decyzja Jeffa 12.10 (3)) idzie tylko na sol i narzedzia -
+        /// towar pracy, ktorego nie ma na liscie dostatku (te same zl na kategorie co bez P5); len, garnki i piwo wies kupuje z nadwyzki z listy dostatku.</summary>
+        private static bool VillWorkOnly() { return WardsShopOn; }
+
+        /// <summary>BuyGoods: kategoria towaru pracy wsi (sol, narzedzia) - przy P5 jej czesc nadwyzki koszyka zostaje (recenzja WAZNE 2).</summary>
+        private static bool VillWorkCat(ItemCategory c)
+        {
+            string id = c != null && c.StringId != null ? c.StringId.ToLowerInvariant() : "";
+            return id == "salt" || id == "tools";
+        }
 
         /// <summary>Villages (po koszyku dnia): wies wydaje 1/T kiesy ponad 15 dni zakupow (liczonej przed koszykiem, jak dotad nadwyzka) z listy dostatku na polce
         /// miasta targowego. `gold` - kiesa wsi przed koszykiem.</summary>
@@ -270,7 +282,8 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             try
             {
-                double want = Math.Max(0, gold - buy1 - RdV * nv) / LxDays(Settings.Current);
+                double avail = Math.Min(gold - buy1, vil.Gold);           // recenzja WAZNE 2: po koszyku dnia (sol i narzedzia z nadwyzki) - kiesa TERAZ
+                double want = Math.Max(0, avail - RdV * nv) / LxDays(Settings.Current);
                 f.DLxOff = want; f.DLxBuy = 0; f.LxSeen = _liveDay;
                 if (want < 1) return;
                 _lxVN++; _lxVWant += want;
@@ -411,6 +424,7 @@ namespace Armoury
                   .Append(" | lista dostatku (P3) ").Append(on ? "tak" : "nie").Append(", tempo 1/").Append(N0(LxDays(s))).Append(", place R/P z nadwyzki w tempie ").Append(F2(SpendRate(s)))
                   .Append(" | targ widzi sakiewke (P4) ").Append(s.MarketSeesPurse && on ? "tak" : "nie").Append(", cena graniczna ").Append(F2(ceil))
                   .Append(" | podzamcza i wsie na targu (P5) ").Append(s.WardsAndVillagesShop && on ? "tak" : "nie")
+                  .Append(" | poprawka Predict / Share (P3) ").Append(s.FolkPredictBought && on ? "tak" : "nie")
                   .Append(" | miasta: oferta ").Append(N0(w.Off)).Append(" zl w ").Append(w.Places).Append(" konsumpcjach (grupy: ");
                 for (int g = 0; g < 4; g++) sb.Append(g > 0 ? ", " : "").Append(LxGroupName[g]).Append(' ').Append(N0(w.OffG[g]));
                 sb.Append("; grupa bez kategorii do kupienia - zostaje w kiesie ").Append(N0(w.NoCat)).Append(')')
@@ -429,15 +443,53 @@ namespace Armoury
                   .Append("), bez towaru ").Append(_lxCNo).Append(", bez podzialu targu ").Append(_lxCNoSplit).Append(", bez miasta ").Append(_lxCNoTown)
                   .Append(" | wsie (P5): z nadwyzka ").Append(_lxVN).Append(", chciane ").Append(N0(_lxVWant)).Append(" zl, kupione ").Append(_lxVBuy).Append(" zl (sztuk ").Append(_lxVPcs)
                   .Append("), bez towaru ").Append(_lxVNo).Append(", bez podzialu targu ").Append(_lxVNoSplit).Append(", bez miasta targowego ").Append(_lxVNoTown)
+                  .Append(" | cena u wytworcy (indeks kategorii w miastach z warsztatem, projekt prog 20): ").Append(MakerPrices())
                   .Append(" | kiesy 31 najbiedniejszych miast ").Append(poor)
                   .Append(" | kontrola: zaplata rozna od ceny x sztuk ").Append(_lxMismatch)
                   .Append(" | latka szacunku popytu: ").Append(_lxHook).Append(" | kategorie nieznalezione: ").Append(_lxMissing)
                   .Append(" | czas: doba ").Append(MsOf(_lxDayTicks + Stopwatch.GetTimestamp() - t0, "0.000")).Append(" ms, konsumpcja i sygnal ").Append(MsOf(w.Ticks, "0.000"))
-                  .Append(" ms | potkniecia ").Append(st).Append('.');
+                  .Append(" ms (wywolan szacunku popytu ").Append(w.EstCalls).Append(") | potkniecia ").Append(st).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { LxStumble("LadderDay", e); }
             finally { _lxDayTicks = 0; }
+        }
+
+        /// <summary>Linia P3-P5 (recenzja 11, projekt prog 20): cena zbytu klejnotow i aksamitu u wytworcy - sredni indeks kategorii (cena / wartosc) w miastach
+        /// z warsztatem, ktorego linia produkcji wydaje ta kategorie. Tylko odczyt.</summary>
+        private static string MakerPrices()
+        {
+            var sb = new StringBuilder(80);
+            foreach (var id in new[] { "jewelry", "velvet" })
+            {
+                ItemCategory cat = null;
+                if (_lxCats != null) foreach (var c in _lxCats) if (c != null && c.StringId != null && c.StringId.ToLowerInvariant() == id) { cat = c; break; }
+                double sum = 0; int n = 0;
+                if (cat != null)
+                    for (int i = 0; i < _fk.Count; i++)
+                    {
+                        var f = _fk[i];
+                        if (f == null || f.Kind != 0 || f.St == null || f.St.Town == null || f.St.Town.Workshops == null) continue;
+                        bool hit = false;
+                        foreach (var w in f.St.Town.Workshops)
+                        {
+                            var type = w != null ? w.WorkshopType : null;
+                            if (type == null || type.IsHidden || type.Productions == null) continue;
+                            foreach (var pr in type.Productions)
+                            {
+                                if (pr.Outputs == null) continue;
+                                foreach (var o in pr.Outputs) if (o.Item1 == cat) { hit = true; break; }
+                                if (hit) break;
+                            }
+                            if (hit) break;
+                        }
+                        if (!hit) continue;
+                        sum += f.St.Town.GetItemCategoryPriceIndex(cat); n++;
+                    }
+                if (sb.Length > 0) sb.Append(", ");
+                sb.Append(id).Append(' ').Append(n > 0 ? F2(sum / n) : "-").Append(" w ").Append(n);
+            }
+            return sb.ToString();
         }
 
         // ============================================================ P4: oferta ludu w szacunku popytu targu
@@ -453,15 +505,15 @@ namespace Armoury
         /// </summary>
         public static void LxEstPostfix(Town __0, ItemCategory __2, ref float __result)
         {
-            if (_lxDepth != 1 || __0 == null || __2 == null) return;
-            long t0 = 0;
+            if (_lxDepth != 1 || __0 == null || __2 == null || !SignalOn) return;   // klucz wylaczony - jedno sprawdzenie, bez stopera (stan ed74f40)
+            long t0 = Stopwatch.GetTimestamp();                        // recenzja WAZNE 4: stoper od wejscia - wczesne wyjscia (kategoria bez sygnalu) tez licza
             try
             {
+                _lxw.EstCalls++;
                 var map = _lxIdx;
-                if (map == null) { if (!SignalOn) return; EnsureLx(); map = _lxIdx; if (map == null) return; }
+                if (map == null) { EnsureLx(); map = _lxIdx; if (map == null) return; }
                 int i;
-                if (!map.TryGetValue(__2, out i) || !_lxSig[i] || !SignalOn || OffMain()) return;
-                t0 = Stopwatch.GetTimestamp();
+                if (!map.TryGetValue(__2, out i) || !_lxSig[i] || OffMain()) return;
                 Folk f;
                 if (__0.Settlement == null || !_f.TryGetValue(__0.Settlement, out f) || f == null || f.Kind != 0 || f.LxFrac == null || i >= f.LxFrac.Length) return;
                 if ((int)CampaignTime.Now.ToDays - f.LxFracDay > 2) return;
@@ -482,7 +534,7 @@ namespace Armoury
                 if (model.GetBasePriceFactor(__2, cd.InStoreValue, cd.Supply, (float)(d0 + e), false, 0) > ceil)
                 {
                     double lo = 0, hi = e;
-                    for (int k = 0; k < 16; k++)
+                    for (int k = 0; k < 10; k++)                       // recenzja WAZNE 4: 10 krokow (dokladnosc 1/1024 dopisku) zamiast 16 - mniej wywolan wzoru cen
                     {
                         double mid = 0.5 * (lo + hi);
                         if (model.GetBasePriceFactor(__2, cd.InStoreValue, cd.Supply, (float)(d0 + mid), false, 0) <= ceil) lo = mid; else hi = mid;
@@ -493,7 +545,7 @@ namespace Armoury
                 if (ep > 0) { __result = (float)(d0 + ep); _lxw.SigN++; _lxw.SigAdd += ep; }
             }
             catch (Exception ex) { LxStumble("LxEstPostfix", ex); }
-            finally { if (t0 != 0) _lxw.Ticks += Stopwatch.GetTimestamp() - t0; }
+            finally { _lxw.Ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
         /// <summary>SubModuleMain (jak RawPrice - modele gry i BetterEconomy bez pol statycznych z tekstow): prefiks / postfiks / finalizer na kazdym modelu

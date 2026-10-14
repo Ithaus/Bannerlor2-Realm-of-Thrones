@@ -26,7 +26,9 @@ namespace Armoury
     ///    narzedzia lud zostawia na polce 5 sztuk (wsie i warsztaty), drewno 50 (dymarki i warsztaty), sztuki do 5 zl w wozach po 10 (jedna wycena na woz);
     ///    place najwyzej 3 x material
     ///    (BuildMaterialShare 25%) i najwyzej FolkWorksHands x glowy wyrobnikow x dniowka (pulap rak); punkty najwyzej reszta biezacego poziomu (z punktami pana
-    ///    tej doby). Brak budowy, materialu albo nadwyzki - bez robot, pieniadz zostaje. Czego budowa nie wziela z budzetu gminy - place robot publicznych W/R.
+    ///    tej doby) i najwyzej koszt poziomu / FolkWorksLevelDays (60) na dobe - recenzja: "odbudowa mozliwa, ale wolna" w KAZDEJ osadzie, najwyzej ok. 6 poziomow
+    ///    ludu rocznie. Brak budowy, materialu albo nadwyzki - bez robot, pieniadz zostaje. Czego budowa nie wziela z budzetu gminy - place robot publicznych W/R.
+    ///  - Poza kolejka AI: tylko budowla dostepna w BK (innowacje, port, murarstwo - BkAvail / BkAllows). Punkty czola: tylko gdy czolem jest dalej ta budowla (FolkHead).
     ///  - PUNKTY: ta sama funkcja co u pana (PointsFor; cena punktu cywilnego / wojskowego - mury 48). Czolo kolejki - moc budowy tej doby (_folk obok _funded,
     ///    PowerPostfix - pozycja "Town works (paid by the townsfolk)"; lenna gracza bez PaidConstructionPlayer - dopisane do mocy gry). Budowla dalej w kolejce
     ///    albo poza nia - postep wprost (poziom: Building.LevelUp jak gra, wpis wychodzi z kolejki).
@@ -42,6 +44,10 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         private static readonly Dictionary<Town, float> _folk = new Dictionary<Town, float>();   // punkty ludu na czolo kolejki - moc budowy tej doby (PowerPostfix)
+        private static readonly Dictionary<Town, Building> _folkB = new Dictionary<Town, Building>();   // recenzja (6): budowla czola, za ktora lud zaplacil tej doby
+        // recenzja (WAZNE 1): poziomy ludu = punkty ludu / koszt biezacego poziomu budowli, od startu sesji (pamiec sesji, bez zapisu) - linia P2, prog P2-3
+        private static readonly Dictionary<Settlement, double> _lvl = new Dictionary<Settlement, double>();
+        private static int _lvlDays; private static double _lvlAll;
         private static TextObject _folkTxt;
         private sealed class WorkRec { public long Mat, Wage, FromG; public float Pts; public string Bld; public int Why; public int Where; public int Day; }
         private static readonly Dictionary<Settlement, WorkRec> _rec = new Dictionary<Settlement, WorkRec>();
@@ -50,9 +56,101 @@ namespace Armoury
         private static int _stumbles;
         // licznik doby (linia)
         private static int _capLord, _capFolk;   // sztuki pominiete przez sufit ceny (pan / lud) - liczone przy przegladzie towaru
+        private static int _bkSkip;              // recenzja (5): budowle poza kolejka AI pominiete - niedostepne w BK
         private const int WhyBuilt = 0, WhyNone = 1, WhySiege = 2, WhyNoMat = 3, WhyNoCoin = 4, WhyLevel = 5, WhyMilOnly = 6, WhyOff = 7;
 
         internal static bool FolkOn { get { var s = Settings.Current; return s != null && s.FolkBuildsTown && s.PaidConstruction; } }
+
+        /// <summary>BuildFunding.Reset (nowa kampania, wczytanie): stan robot ludu tej sesji.</summary>
+        private static void FolkReset() { _folk.Clear(); _folkB.Clear(); _rec.Clear(); _lvl.Clear(); _lvlDays = 0; _lvlAll = 0; _capLord = _capFolk = 0; _bkSets.Clear(); _bkDatas.Clear(); _bkDay = -1; _bkIds = null; }
+
+        /// <summary>PowerPostfix (recenzja 6): punkty ludu na czolo kolejki - tylko gdy czolem jest dalej budowla, za ktora lud zaplacil (gracz mogl przestawic
+        /// kolejke miedzy blokiem doby a tickiem osady; wtedy punkty przepadaja, a nie ida w budowle wojskowa pana).</summary>
+        private static float FolkHead(Town town)
+        {
+            try
+            {
+                float fl; Building b;
+                if (!_folk.TryGetValue(town, out fl) || !(fl > 0f) || !_folkB.TryGetValue(town, out b) || b == null) return 0f;
+                var q = town.BuildingsInProgress;
+                return q != null && q.Count > 0 && q.Peek() == b ? fl : 0f;
+            }
+            catch { return 0f; }
+        }
+
+        // recenzja (5): budowla poza kolejka AI tylko dostepna w BK (innowacje: wodociagi, teatr; port i przystan przy porcie; mury poziomu 2-3 po murarstwie) -
+        // BK InnovationData.GetAvailableBuildings / IsBuildingUpgradeAvailable (refleksja raz na sesje, wynik w pamieci doby wedlug kultury i portu; bez BK - jak gra)
+        private static bool _bkTried;
+        private static System.Reflection.PropertyInfo _bkInst, _bkMgr;
+        private static System.Reflection.MethodInfo _bkData, _bkAvail, _bkUpg;
+        private static HashSet<string> _bkIds;
+        // pamiec doby: dostepne typy wedlug (kultura, port) - BK buduje liste z refleksji przy kazdym wolaniu; dane innowacji wedlug kultury
+        private static readonly Dictionary<string, HashSet<string>> _bkSets = new Dictionary<string, HashSet<string>>();
+        private static readonly Dictionary<string, object> _bkDatas = new Dictionary<string, object>();
+        private static int _bkDay = -1;
+
+        /// <summary>Dane innowacji BK dla osady (kultura osady - jak okno budowy BK) i zbior dostepnych typow w _bkIds; null - bez BK albo bez danych (wszystko wolno).</summary>
+        private static object BkAvail(Settlement st)
+        {
+            if (!_bkTried)
+            {
+                _bkTried = true;
+                try
+                {
+                    var tCfg = HarmonyLib.AccessTools.TypeByName("BannerKings.BannerKingsConfig");
+                    var tMgr = HarmonyLib.AccessTools.TypeByName("BannerKings.Managers.InnovationsManager");
+                    var tData = HarmonyLib.AccessTools.TypeByName("BannerKings.Managers.Innovations.InnovationData");
+                    if (tCfg != null && tMgr != null && tData != null)
+                    {
+                        _bkInst = tCfg.GetProperty("Instance", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                        _bkMgr = tCfg.GetProperty("InnovationsManager", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        _bkData = tMgr.GetMethod("GetInnovationData", new[] { typeof(CultureObject) });
+                        _bkAvail = tData.GetMethod("GetAvailableBuildings", new[] { typeof(Settlement) });
+                        _bkUpg = tData.GetMethod("IsBuildingUpgradeAvailable", new[] { typeof(BuildingType), typeof(int) });
+                    }
+                }
+                catch (Exception e) { FolkStumble("BkAvail(refleksja)", e); }
+            }
+            if (st == null || st.Culture == null || _bkInst == null || _bkMgr == null || _bkData == null || _bkAvail == null) return null;
+            int day = (int)CampaignTime.Now.ToDays;
+            if (day != _bkDay) { _bkSets.Clear(); _bkDatas.Clear(); _bkDay = day; }
+            string ck = st.Culture.StringId ?? "?";
+            object data;
+            if (!_bkDatas.TryGetValue(ck, out data))
+            {
+                var cfg = _bkInst.GetValue(null, null);
+                var mgr = cfg != null ? _bkMgr.GetValue(cfg, null) : null;
+                data = mgr != null ? _bkData.Invoke(mgr, new object[] { st.Culture }) : null;
+                _bkDatas[ck] = data;
+            }
+            if (data == null) return null;
+            string key = ck + (st.HasPort ? "|port" : "|-");   // GetAvailableBuildings zalezy tylko od innowacji kultury i HasPort (dekompilacja BK)
+            HashSet<string> ids;
+            if (!_bkSets.TryGetValue(key, out ids))
+            {
+                var list = _bkAvail.Invoke(data, new object[] { st }) as System.Collections.IEnumerable;
+                if (list != null)
+                {
+                    ids = new HashSet<string>();
+                    foreach (var o in list) { var bt = o as BuildingType; if (bt != null && bt.StringId != null) ids.Add(bt.StringId); }
+                }
+                _bkSets[key] = ids;
+            }
+            if (ids == null) return null;
+            _bkIds = ids;
+            return data;
+        }
+
+        /// <summary>Budowla dostepna wedlug BK (data z BkAvail; null - wolno): typ na liscie dostepnych i nastepny poziom dozwolony.</summary>
+        private static bool BkAllows(object data, Building b)
+        {
+            if (data == null) return true;
+            string id = b.BuildingType.StringId ?? "";
+            if (_bkIds != null && !_bkIds.Contains(id)) return false;
+            if (_bkUpg == null || Array.IndexOf(WallIds, id) < 0) return true;   // BK ogranicza poziomy tylko murom (Masonry / AdvancedMasonry - dekompilacja)
+            var ok = _bkUpg.Invoke(data, new object[] { b.BuildingType, b.CurrentLevel + 1 });
+            return !(ok is bool) || (bool)ok;
+        }
 
         private static void FolkStumble(string where, Exception e)
         {
@@ -93,9 +191,12 @@ namespace Armoury
             }
             if (!ai || t.Buildings == null) return null;
             Building best = null; double key = -1;
+            object bk = null;
+            try { bk = BkAvail(t.Settlement); } catch (Exception e) { FolkStumble("FolkTarget(BK)", e); return null; }   // recenzja (5): blad BK - bez celu poza kolejka
             foreach (var b in t.Buildings)
             {
                 if (b == null || b.BuildingType == null || b.CurrentLevel >= 3 || !FolkPays(b.BuildingType) || q.Contains(b)) continue;
+                if (!BkAllows(bk, b)) { _bkSkip++; continue; }   // recenzja (5): niedostepna w BK (innowacja, port, murarstwo) - lud jej nie stawia
                 int cost = b.GetConstructionCost();
                 if (cost <= 0) continue;
                 double k = b.BuildingProgress / cost + (3 - b.CurrentLevel) * 1e-3;
@@ -171,11 +272,11 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             var s = Settings.Current;
             int day = (int)CampaignTime.Now.ToDays;
-            _folk.Clear(); _rec.Clear();
+            _folk.Clear(); _folkB.Clear(); _rec.Clear();
             int towns = 0, castles = 0, built = 0, atHead = 0, behind = 0, offQ = 0, done = 0;
-            int nNone = 0, nSiege = 0, nNoMat = 0, nNoCoin = 0, nLevel = 0, nMil = 0, nHands = 0, nOff = 0;
+            int nNone = 0, nSiege = 0, nNoMat = 0, nNoCoin = 0, nLevel = 0, nMil = 0, nHands = 0, nOff = 0, nSlow = 0, overN = 0;
             long fromG = 0, fromC = 0, mat = 0, wage = 0, unpaid = 0, valSum = 0, gmRest = 0; int gmRestN = 0;
-            double pts = 0;
+            double pts = 0, overPts = 0, dayLvl = 0;
             var pieces = new int[MatIds.Length];
             var doneNames = new List<string>();
             bool on = FolkOn;
@@ -183,6 +284,8 @@ namespace Armoury
             {
                 double share = Math.Max(0, Math.Min(1, s.FolkWorksShare)), hands = Math.Max(0, Math.Min(1, s.FolkWorksHands)), wageDay = Math.Max(0, s.WorkshopWagePerDay);
                 double ms = Math.Max(0.01, Math.Min(1.0, s.BuildMaterialShare)), r = (1 - ms) / ms;
+                double ld = double.IsNaN(s.FolkWorksLevelDays) ? 60 : Math.Max(0, Math.Min(3650, s.FolkWorksLevelDays));   // recenzja (WAZNE 1): najmniej dob na poziom z robot ludu
+                _lvlDays++;
                 foreach (var st in Settlement.All)
                 {
                     if (st == null || st.Town == null || (!st.IsTown && !st.IsCastle) || st.OwnerClan == null) continue;
@@ -209,16 +312,22 @@ namespace Armoury
                         double idx = WageIdx(market);
                         double ppp = b.BuildingType.IsMilitaryProject ? Math.Max(1f, s.BuildPencePerPointMilitary) : Math.Max(1f, s.BuildPencePerPointCivil);
                         double H = hands * _pay.Heads * wageDay * idx;
-                        double rem = b.GetConstructionCost() - b.BuildingProgress;
+                        int costL = b.GetConstructionCost();
+                        double rem = costL - b.BuildingProgress;
                         if (where == 0) { float cp = 0f; try { cp = t.Construction; } catch { cp = 0f; } rem -= Math.Max(0f, cp); }   // czolo: punkty pana (i mocy gry) tej doby
                         if (rem < 1) { rec.Why = WhyLevel; nLevel++; continue; }
-                        double mFor = rem * ppp / (1 + r / idx);
+                        // recenzja (WAZNE 1, Jeff: "odbudowa mozliwa, ale wolna"): lud daje dzis najwyzej koszt poziomu / FolkWorksLevelDays punktow (60 dob na poziom =
+                        // najwyzej ok. 6 poziomow rocznie na osade, takze w najwiekszym miescie, ktoremu pulap rak pozwalalby na ok. 12); pan bez tego limitu
+                        double capD = ld > 0 && costL > 0 ? costL / ld : double.MaxValue;
+                        double remD = Math.Min(rem, capD);
+                        double mFor = remD * ppp / (1 + r / idx);
                         double mT = Math.Min(B * ms, Math.Min(r > 0 ? H / r : double.MaxValue, mFor));
                         if (r > 0 && H / r <= Math.Min(B * ms, mFor)) nHands++;
+                        else if (capD < rem && mFor <= B * ms) nSlow++;
                         if (mT < 1) { rec.Why = H < 1 ? WhyNoCoin : WhyLevel; if (H < 1) nNoCoin++; else nLevel++; continue; }
                         int m = FolkBuy(market, mT, pieces);
                         if (m <= 0) { rec.Why = WhyNoMat; nNoMat++; continue; }
-                        double w = Math.Min(Math.Min(r * m, H), Math.Min(B - m, Math.Max(0, (rem * ppp - m) * idx)));
+                        double w = Math.Min(Math.Min(r * m, H), Math.Min(B - m, Math.Max(0, (remD * ppp - m) * idx)));
                         long wl = Math.Max(0, (long)Math.Floor(w));
                         long got = TownFolk.WorksSpend(st, market, m, wl, _pay);
                         if (got < m) unpaid += m - got;   // kontrola: material bez zaplaty (oczekiwane 0)
@@ -229,7 +338,9 @@ namespace Armoury
                         rec.Mat = mPaid; rec.Wage = wPaid; rec.FromG = _pay.UsedG; rec.Pts = p; rec.Why = WhyBuilt;
                         built++; if (st.IsTown) towns++; else castles++;
                         mat += mPaid; wage += wPaid; fromG += _pay.UsedG; fromC += _pay.UsedC[0] + _pay.UsedC[1] + _pay.UsedC[2]; pts += p;
-                        if (where == 0) { atHead++; float x; _folk.TryGetValue(t, out x); _folk[t] = x + p; }
+                        if (p > remD + 0.01) { overN++; overPts += p - remD; }   // kontrola (projekt prog 14): punkty ponad reszte poziomu i pulap dnia (oczekiwane 0)
+                        if (costL > 0) { double le = p / costL, lo; _lvl.TryGetValue(st, out lo); _lvl[st] = lo + le; dayLvl += le; }   // poziomy ludu (rownowazne)
+                        if (where == 0) { atHead++; float x; _folk.TryGetValue(t, out x); _folk[t] = x + p; _folkB[t] = b; }
                         else
                         {
                             if (where == 1) behind++; else offQ++;
@@ -251,12 +362,30 @@ namespace Armoury
                 }
             }
             try { TownFolk.WorksGminaSweep(ref gmRest, ref gmRestN); } catch (Exception e) { FolkStumble("FolkWorks(sweep)", e); }
+            _lvlAll += dayLvl;
             for (int k = 0; k < MatIds.Length; k++)
             {
                 var it = MBObjectManager.Instance.GetObject<ItemObject>(MatIds[k]);
                 if (it != null) valSum += (long)pieces[k] * Math.Max(1, it.Value);
             }
-            if (s == null || !s.LogEnabled) { _capLord = _capFolk = 0; _stumbles = 0; return; }
+            if (s == null || !s.LogEnabled) { _capLord = _capFolk = 0; _bkSkip = 0; _stumbles = 0; return; }
+            // recenzja (WAZNE 1): poziomy ludu sesji - najwiecej na osade (prog P2-3b <= ok. 6 na rok); narzedzia na polkach miast (projekt prog 15, INFO)
+            double lvlMax = 0; string lvlName = "-";
+            foreach (var kv in _lvl) if (kv.Value > lvlMax && kv.Key != null) { lvlMax = kv.Value; lvlName = kv.Key.Name != null ? kv.Key.Name.ToString() : kv.Key.StringId; }
+            int toolsLow = 0, townsN = 0;
+            try
+            {
+                var tools = MBObjectManager.Instance.GetObject<ItemObject>("tools");
+                if (tools != null)
+                    foreach (var st in Settlement.All)
+                    {
+                        if (st == null || !st.IsTown || st.ItemRoster == null) continue;
+                        townsN++;
+                        if (st.ItemRoster.GetItemNumber(tools) < ToolsKeep) toolsLow++;
+                    }
+            }
+            catch (Exception e) { FolkStumble("FolkWorks(narzedzia)", e); }
+            double yr = _lvlDays > 0 ? 364.0 / _lvlDays : 0;
             try
             {
                 var sb = new StringBuilder(1200);
@@ -279,11 +408,18 @@ namespace Armoury
                   .Append(" | gmina - reszta budzetu robot na place robot publicznych ").Append(gmRest).Append(" w ").Append(gmRestN).Append(" miastach")
                   .Append(" | sufit ceny - towar pominiety: pan ").Append(_capLord).Append(", lud ").Append(_capFolk)
                   .Append(" | kontrola: material bez zaplaty ").Append(unpaid)
+                  .Append(" | tempo ludu: najwyzej koszt poziomu / ").Append(on ? s.FolkWorksLevelDays.ToString("0", Inv) : "-").Append(" na dobe (wolna odbudowa), osad na tym pulapie ").Append(nSlow)
+                  .Append("; poza kolejka pominiete (niedostepne w BK) ").Append(_bkSkip)
+                  .Append(" | poziomy ludu (punkty ludu / koszt poziomu): dzis ").Append(dayLvl.ToString("0.00", Inv)).Append("; sesja ").Append(_lvlDays).Append(" dob: swiat ")
+                  .Append(_lvlAll.ToString("0.0", Inv)).Append(" (").Append((_lvlAll * yr).ToString("0", Inv)).Append(" na rok), najwiecej na osade ").Append(lvlMax.ToString("0.00", Inv))
+                  .Append(" (").Append((lvlMax * yr).ToString("0.0", Inv)).Append(" na rok, ").Append(lvlName).Append(')')
+                  .Append(" | kontrola: punkty ponad reszte poziomu ").Append(overN).Append(" (").Append(overPts.ToString("0.0", Inv)).Append(" pkt)")
+                  .Append(" | narzedzia na polkach miast: ponizej ").Append(ToolsKeep).Append(" szt. w ").Append(toolsLow).Append(" z ").Append(townsN).Append(" miast")
                   .Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { FolkStumble("FolkWorks(linia)", e); }
-            _capLord = _capFolk = 0; _stumbles = 0;
+            _capLord = _capFolk = 0; _bkSkip = 0; _stumbles = 0;
         }
 
         /// <summary>P2: zdanie "Works: ..." w oknie "People of this land" (liczby ostatniej doby osady; null - bez zdania).</summary>

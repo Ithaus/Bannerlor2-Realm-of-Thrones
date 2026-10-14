@@ -973,7 +973,8 @@ namespace Armoury
                     double nv = pph * VillHeads(f, true);
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nv, Math.Max(0, gold));
-                    double extra = VillExtraRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    double wx = VillWorkOnly() ? extra : 0;            // P5 (zbytki, recenzja WAZNE 2): nadwyzka na koszyk tylko dla soli i narzedzi (len, garnki, piwo - lista)
                     double want = buy1 + extra;
                     d.VNeed += nv; d.VWant += want;
                     f.DVNeed = nv; f.ADay = _liveDay;                  // E5/C4
@@ -982,7 +983,7 @@ namespace Armoury
                     if (mk == null || mk.Town == null) { d.NoTrade++; continue; }
                     List<EquipmentElement> list;
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
-                    long spent = BuyGoods(vil, mk, list, want, d);
+                    long spent = BuyGoods(vil, mk, list, want - wx, d, wx);
                     f.DVBuy = Math.Max(0, spent);                      // E5/C4
                     VillageLadder(f, vil, mk, gold, buy1, nv);         // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian)
                     if (spent <= 0) { d.VNoGoods++; continue; }
@@ -1009,17 +1010,18 @@ namespace Armoury
         }
 
         /// <summary>Zakup wsi w miescie targowym: budzet po rowno na kategorie obecne, cena targu, najwyzej sztuki ponad 5; najpierw zloto (wies -> kasa), potem towar z polki.</summary>
-        private static long BuyGoods(Village vil, Settlement mk, List<EquipmentElement> list, double want, LDay d)
+        private static long BuyGoods(Village vil, Settlement mk, List<EquipmentElement> list, double want, LDay d, double workExtra = 0)
         {
             if (list.Count == 0) return 0;
             var town = mk.Town; var roster = mk.ItemRoster;
             var cats = new List<ItemCategory>();
             foreach (var e in list) { var c = e.Item.ItemCategory; if (!cats.Contains(c)) cats.Add(c); }
             double per = want / cats.Count;
+            double perW = workExtra > 0 ? workExtra / cats.Count : 0;  // P5 (recenzja WAZNE 2): nadwyzka wsi - sol i narzedzia tyle samo zl na kategorie co bez P5
             long spent = 0;
             foreach (var c in cats)
             {
-                double left = per;
+                double left = per + (perW > 0 && VillWorkCat(c) ? perW : 0);
                 foreach (var e in list)
                 {
                     if (left < 1) break;
@@ -1455,13 +1457,13 @@ namespace Armoury
               .Append(", 5% zaworu ").Append(w.ValveT).Append(", w tym praca niewolnych do wlascicieli ").Append(w.SlaveW)
               .Append("; dzis z kas: robocizna ").Append(d.LabT).Append(", obrot P ").Append(d.TurnT).Append(", doplata do 35% ").Append(d.TopT).Append(" (miast przycietych do stanu kasy ").Append(d.Cut).Append(")")
               .Append(" | wewnatrz ludu: czynsz ").Append(d.Rent).Append(", leczenie ").Append(d.Heal).Append(", sluzba ").Append(d.Serv).Append(", place z nadwyzki R/P ").Append(d.SurpWage)
-              .Append(", roboty gminy (place) ").Append(d.GmWage)
+              .Append(", roboty gminy (place) ").Append(d.GmWage).Append(WorksRoute ? " (P2: place robot gminy w linii Roboty ludu)" : "")
               .Append(" | podatki panu: W ").Append(d.TaxW).Append(" / R ").Append(d.TaxR).Append(" / P ").Append(d.TaxP).Append(", cech ").Append(d.Guild).Append(", farma gmin ").Append(d.Farm)
               .Append(", wstrzymane w oblezeniu ").Append(d.Held).Append(", bez zywego pana (do gminy) ").Append(d.NoLord)
               .Append(" | kiesy ").Append(d.KW + d.KR + d.KP).Append(" (W ").Append(d.KW).Append(" / R ").Append(d.KR).Append(" / P ").Append(d.KP).Append("), gminy ").Append(d.KG)
               .Append(", zapas dni W ").Append(F1(d.NW > 0 ? d.KW / d.NW : double.NaN)).Append(" / R ").Append(F1(d.NR > 0 ? d.KR / d.NR : double.NaN)).Append(" / P ").Append(F1(d.NP > 0 ? d.KP / d.NP : double.NaN))
               .Append(", lokata (kiesa W ponad zapas dni) ").Append(N0(d.Lokata)).Append(", oferta nadwyzki na jutro ").Append(d.OffT)
-              .Append(" (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)")
+              .Append(" (tempo ").Append(F2(SpendRate(Settings.Current))).Append("/d ponad zapas)").Append(LadderOn ? " (P3: oferta W 1/60, R i P 0.3/60 - linia Zbytki)" : "")
               .Append(" | stac jedzenie W/R/P ").Append(Pct(d.AFW, d.NFW)).Append(" / ").Append(Pct(d.AFR, d.NFR)).Append(" / ").Append(Pct(d.AFP, d.NFP))
               .Append(", pelny W/R/P ").Append(Pct(d.AW, d.NW)).Append(" / ").Append(Pct(d.AR, d.NR)).Append(" / ").Append(Pct(d.AP, d.NP))
               .Append(" (swiat ").Append(Pct(d.AW + d.AR + d.AP, d.NW + d.NR + d.NP)).Append(")")   // recenzja B1 (1-6): prog B1-T8 "swiat >= 98%" (waga potrzeb)

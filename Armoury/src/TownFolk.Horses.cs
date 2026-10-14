@@ -210,7 +210,7 @@ namespace Armoury
                 long bought = packT + plainT + packC + plainC;
                 double ctl = owed1 - (owed0 + accrT + accrC - bought - lost);
                 var sb = new StringBuilder(900);
-                sb.Append("Konie robocze (K1-3a): dzien ").Append(day).Append(" | CZYNNE | miasta ").Append(towns).Append(": ludzie BK ").Append(N0(peopleT))
+                sb.Append("Konie robocze (K1-3a): dzien ").Append(day).Append(" | CZYNNE | miasta ").Append(towns).Append(": glowy kiesy ludu (wedlug ludzi rynku) ").Append(N0(peopleT))
                   .Append(", zamki ").Append(castles).Append(": podzamcza ").Append(N0(peopleC))
                   .Append(" | stado robocze (1 kon na ").Append(WhPeople.ToString("0", Inv)).Append(" ludzi, zyje ").Append(WhYears.ToString("0", Inv)).Append(" lat) ")
                   .Append(N0((peopleT + peopleC) / WhPeople))

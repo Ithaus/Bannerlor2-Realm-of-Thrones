@@ -1844,6 +1844,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public float BuildMaterialPriceCap { get; set; } = 2.0f;
 
+        [SettingPropertyFloatingInteger("Folk Works Level Days", 0.00f, 365.00f, "0", HintText = "with Folk Builds Town: the townsfolk's own works never raise a stage of a building faster than in this many days (each day they put in at most the cost of the stage divided by this; 60 = at most about six stages a year in any town or castle, so a sacked town rebuilds slowly; 0 = no limit); the lord's works are not limited by this")]
+        [SettingPropertyGroup("Army purchases")]
+        public float FolkWorksLevelDays { get; set; } = 60f;
+
         [SettingPropertyBool("Build Wages By Town", HintText = "the masons and labourers are paid the day wage of the market town they come from: a penny of wages buys less work in a rich town and more in a poor one (materials at the market price either way; off = a penny of wages is a penny of work everywhere)")]
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWagesByTown { get; set; } = true;
@@ -5096,7 +5100,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TitheVillageShare { get; set; } = 0.05f;
 
-        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before). With Folk Luxury List on, only the wages of craftsmen and merchant families follow this share (and with Wards And Villages Shop off, the villages' spending)")]
+        [SettingPropertyFloatingInteger("Folk Surplus Spend Share", 0.00f, 1.00f, "0.00", HintText = "share of their coin above their reserve that townsfolk and villages spend each day - labourers on better food, ale and cloth, craftsmen and merchant families mostly as wages, villages in their market town; the reserve is Town Folk Reserve Days for labourers, 21 days for craftsmen, 30 for merchant families and 15 days of purchases for a village (castle folk spend 7% as before; 0.07 = as before). With Folk Luxury List on, only the wages of craftsmen and merchant families and the villages' spending on their usual goods follow this share (with Wards And Villages Shop on, the villages spend it only on salt and tools)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkSurplusSpendShare { get; set; } = 0.15f;
 
@@ -5212,7 +5216,11 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkLadderPriceCeiling { get; set; } = 1.5f;
 
-        [SettingPropertyBool("Wards And Villages Shop", HintText = "with Folk Luxury List: castle folk (in the nearest town) and villagers (in their market town) spend what they hold above their reserve (10 days of needs for castle folk, 15 days of purchases for a village) the same way - one part in Folk Surplus Spend Days a day on the same goods, from the shelves of that town, leaving the last five pieces of each for its people. A village keeps buying its salt, tools, linen, pots and ale for its daily needs as before. Off = castle folk spend their share in the castle itself and villages spend Folk Surplus Spend Share a day on their usual goods, as before")]
+        [SettingPropertyBool("Folk Predict Bought", HintText = "with Folk Luxury List: the townsfolk reckon their reserve for hard times from what their spare coin actually bought the day before, not from what they offered (an offer that found no goods is not part of their living) - so towns whose people live well keep a full reserve; their share of the bill likewise counts only the part of the offer that found goods. Off = the reserve and the share count the whole offer, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkPredictBought { get; set; } = true;
+
+        [SettingPropertyBool("Wards And Villages Shop", HintText = "with Folk Luxury List: castle folk (in the nearest town) and villagers (in their market town) spend what they hold above their reserve (10 days of needs for castle folk, 15 days of purchases for a village) the same way - one part in Folk Surplus Spend Days a day on the same goods, from the shelves of that town, leaving the last five pieces of each for its people. A village keeps buying its salt, tools, linen, pots and ale for its daily needs as before, and still spends Folk Surplus Spend Share of its spare coin a day on salt and tools. Off = castle folk spend their share in the castle itself and villages spend Folk Surplus Spend Share a day on all their usual goods, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool WardsAndVillagesShop { get; set; } = true;
 
@@ -5996,6 +6004,7 @@ namespace Armoury
             s.FolkWorksShare = FolkWorksShare;
             s.FolkWorksHands = FolkWorksHands;
             s.BuildMaterialPriceCap = BuildMaterialPriceCap;
+            s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
@@ -6838,6 +6847,7 @@ namespace Armoury
             s.FolkSurplusSpendDays = FolkSurplusSpendDays;
             s.MarketSeesPurse = MarketSeesPurse;
             s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
+            s.FolkPredictBought = FolkPredictBought;
             s.WardsAndVillagesShop = WardsAndVillagesShop;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;

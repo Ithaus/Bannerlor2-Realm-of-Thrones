@@ -29,7 +29,7 @@ namespace Armoury
         private static readonly string[] MatIds = { "limestone", "hardwood", "clay", "tools", "marble", "planks" };
         internal static bool On { get { var s = Settings.Current; return s != null && s.PaidConstruction; } }
 
-        internal static void Reset() { _funded.Clear(); _near.Clear(); }
+        internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs)
 
         // ------------------------------------------------------------ moc budowy = oplacona praca
         [ThreadStatic] private static int _depth;
@@ -66,7 +66,7 @@ namespace Armoury
             {
                 // P2 (BuildFunding.Folk.cs): punkty robot ludu na czolo kolejki tej doby - druga pozycja dymku; lenno gracza bez PaidConstructionPlayer - dopisane
                 // do mocy gry (projekt B rozdz. 6), reszta jak dotad
-                float fl; _folk.TryGetValue(town, out fl);
+                float fl = FolkHead(town);   // recenzja (6): tylko gdy czolem jest dalej budowla, za ktora lud zaplacil
                 if (fl > 0f && _folkTxt == null) _folkTxt = new TextObject("{=!}Town works (paid by the townsfolk)");
                 if (!Covered(town)) { if (fl > 0f) __result.Add(fl, _folkTxt); return; }
                 float f; _funded.TryGetValue(town, out f);
@@ -81,7 +81,7 @@ namespace Armoury
         public static void PowerIntPostfix(Town town, ref int __result)
         {
             if (_depth > 1 || !On || town == null) return;
-            float fl; _folk.TryGetValue(town, out fl);   // P2: punkty robot ludu (jak wyzej)
+            float fl = FolkHead(town);   // P2: punkty robot ludu (jak wyzej; recenzja 6 - tylko na budowle, za ktora lud zaplacil)
             if (!Covered(town)) { if (fl > 0f) __result += (int)fl; return; }
             float f; _funded.TryGetValue(town, out f); __result = (int)(f + fl);
         }

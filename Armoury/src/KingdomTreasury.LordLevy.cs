@@ -346,7 +346,8 @@ namespace Armoury
                 {
                     double q = Math.Min(1.0, f.Took / (rate * f.Room));
                     float l0 = f.T.Loyalty, p0 = f.T.Prosperity;
-                    if (lc > 0) f.T.Loyalty = Math.Max(0f, l0 - (float)(lc * q));
+                    // P1b recenzja (9): przy kluczu FolkWarAidLoyalty koszt W7 tez najwyzej 0.1 x (lojalnosc - podloga 60) - wspolna podloga obu kar (klucz wylaczony - jak dotad)
+                    if (lc > 0) f.T.Loyalty = Math.Max(0f, l0 - (float)FolkAidLoyalty.W7Cost(f.T, lc * q));
                     if (pc > 0) f.T.Prosperity = Math.Max(0f, p0 - (float)(pc * q));
                     double dl = l0 - f.T.Loyalty, dp = p0 - f.T.Prosperity;
                     _lvLoy += dl; _lvPros += dp;

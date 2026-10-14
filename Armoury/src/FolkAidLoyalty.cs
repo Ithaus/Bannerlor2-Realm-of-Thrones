@@ -22,8 +22,9 @@ namespace Armoury
     ///    co karalo pelna kara takze za grosze). Dryf gry i BK ciagnie lojalnosc do 50 o 0.1 x odleglosc na dobe, wiec stala kara x daje trwale -10x (do -10).
     ///  - PODLOGA WSPOLNA Z W7 (stawka wojenna pana zdejmuje lojalnosc wprost - KingdomTreasury.LordLevy.cs): kara P1b tej doby najwyzej
     ///    0.1 x (lojalnosc - FolkWarAidLoyaltyFloor) minus lojalnosc zdjeta przez W7 tej osadzie tej doby, najmniej 0. Przy podlodze (60) kara P1b znika, wiec
-    ///    danina sama nie sprowadzi lojalnosci ponizej 60, a razem z W7 rownowaga osady o naturalnej lojalnosci L wynosi co najmniej (L + 60) / 2 (przy W7 0.5
-    ///    - L - 5, gdy to mniej); korupcja podatku gry zaczyna sie ponizej 50.
+    ///    danina sama nie sprowadzi lojalnosci ponizej 60. Recenzja (9): przy kluczu ta sama granica obejmuje koszt W7 (W7Cost - W7 zdejmuje najwyzej
+    ///    0.1 x (lojalnosc - podloga)), wiec razem rownowaga osady o naturalnej lojalnosci L wynosi co najmniej (L + 60) / 2, a osada z L < 60 nie traci nic
+    ///    (dotad sam W7 dawal L - 5); korupcja podatku gry zaczyna sie ponizej 50. Klucz wylaczony - W7 jak dotad.
     ///  - PROG POBORU: osada z lojalnoscia <= FolkWarAidMinLoyalty (30) nie placi daniny (KingdomTreasury.WaRate - powod WaLowLoy), wiec i kary nie ma.
     ///  - GDZIE: postfiks na CalculateLoyaltyChange(Town, bool) CZYNNEGO modelu lojalnosci (u Jeffa BannerKings BKLoyaltyModel), zakladany dopiero w kampanii
     ///    (EnsureHooks z OnSessionLaunched - BKLoyaltyModel ma pola statyczne z GameTexts, CLAUDE.md rozdz. 7); pozycja "War aid from the people's savings"
@@ -49,6 +50,7 @@ namespace Armoury
         private static Dictionary<Town, Row> _snap = new Dictionary<Town, Row>();   // migawka doby - podmieniana w calosci (watek glowny), czytana z dowolnego
 
         private static int _cTick, _cDesc;                                           // wywolania modelu z kara od poprzedniej linii (Interlocked)
+        private static int _w7Cut; private static double _w7CutPts;                   // recenzja (9): koszt W7 obciety podloga tej doby (osady, punkty)
         private static readonly HashSet<Settlement> _gate = new HashSet<Settlement>(); // osady z nadwyzka, ktorych danine zatrzymal prog lojalnosci (pobor tej doby)
         private static int _gateN;                                                    // to samo w klaso-osadach
         private static readonly HashSet<Settlement> _told = new HashSet<Settlement>(); // gracz: osady, o ktorych komunikat "poborcy wyszli" juz byl
@@ -64,7 +66,7 @@ namespace Armoury
         internal static void Reset()
         {
             _snap = new Dictionary<Town, Row>();
-            _cTick = _cDesc = 0; _gate.Clear(); _gateN = 0; _told.Clear(); _buf.Clear();
+            _cTick = _cDesc = 0; _gate.Clear(); _gateN = 0; _told.Clear(); _buf.Clear(); _w7Cut = 0; _w7CutPts = 0;
             lock (_lock) { _stumbles = 0; _err.Clear(); }
         }
 
@@ -104,6 +106,22 @@ namespace Armoury
             double allow = Drift * (loy - Floor(s)) - r.Lord;
             double x = Math.Min(r.Nom, allow);
             return x > 0 ? x : 0;
+        }
+
+        /// <summary>KingdomTreasury.LvCollect (W7, watek glowny, przed Daily tej doby) - recenzja (9): koszt lojalnosci W7 przy kluczu FolkWarAidLoyalty najwyzej
+        /// 0.1 x (lojalnosc - podloga), najmniej 0 (wspolna podloga z P1b - rownowaga >= (L + 60) / 2); klucz wylaczony - want bez zmian (stan sprzed P1b).</summary>
+        internal static double W7Cost(Town t, double want)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!(want > 0) || t == null || !On(s)) return want;
+                double room = Math.Max(0, Drift * (t.Loyalty - Floor(s)));
+                if (want <= room) return want;
+                _w7Cut++; _w7CutPts += want - room;
+                return room;
+            }
+            catch (Exception e) { Stumble("W7Cost", e); return want; }
         }
 
         // ------------------------------------------------------------ latka (kampania)
@@ -219,6 +237,7 @@ namespace Armoury
                       .Append(take.ToString("0.00", Inv)).Append(" (srednio ").Append((n > 0 ? take / n : 0).ToString("0.000", Inv)).Append(")")
                       .Append("; z W7 tej doby ").Append(nLord).Append(" osad, W7 razem ").Append(lord.ToString("0.00", Inv))
                       .Append("; obciete podloga ").Append(nCut).Append(" (do zera ").Append(nZero).Append(')')
+                      .Append("; W7 obciety ta sama podloga ").Append(_w7Cut).Append(" osad (").Append(_w7CutPts.ToString("0.00", Inv)).Append(" pkt)")
                       .Append(" | lojalnosc osad z danina: srednio ").Append(n > 0 ? (loySum / n).ToString("0.0", Inv) : "-")
                       .Append(", najnizsza ").Append(double.IsNaN(loyMin) ? "-" : lowName + " " + loyMin.ToString("0.0", Inv))
                       .Append(" | prog poboru: osad z nadwyzka bez daniny ").Append(_gate.Count).Append(" (klaso-osad ").Append(_gateN).Append(")")
@@ -230,7 +249,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Daily(linia)", e); }
             }
-            _gate.Clear(); _gateN = 0;
+            _gate.Clear(); _gateN = 0; _w7Cut = 0; _w7CutPts = 0;
         }
 
         /// <summary>Komunikat gracza (po angielsku): poborcy wyszli z jego osady na skraju buntu - raz, do powrotu lojalnosci ponad prog albo utraty osady.</summary>

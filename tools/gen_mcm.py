@@ -145,6 +145,8 @@ RANGES = {
     'FolkWorksShare': (0.0, 0.2, "0.000"),
     'FolkWorksHands': (0.0, 0.2, "0.000"),
     'BuildMaterialPriceCap': (0.0, 5.0, "0.0"),
+    # P2 recenzja: najmniej dob na poziom budowli z robot ludu - kod przycina do 0..3650 (0 = bez limitu)
+    'FolkWorksLevelDays': (0.0, 365.0, "0"),
     # P3-P5 (zbytki): tempo listy dostatku w dniach - kod przycina do 1..3650; cena graniczna jako wielokrotnosc ceny zwyklej - kod przycina do 1..10
     'FolkSurplusSpendDays': (10.0, 365.0, "0"),
     'FolkLadderPriceCeiling': (1.0, 5.0, "0.00"),
