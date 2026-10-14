@@ -145,6 +145,12 @@ RANGES = {
     # W5b: prog braku wojska u panow jako czesc naleznego zwrotu zoldu - kod przycina do 0..1 (KingdomTreasury.WarTax); tempo skarbca ponad zapas wojny w dobach - kod: co najmniej 1 (KingdomTreasury.CrownSurplus)
     'WarAidLordsShortfallShare': (0.0, 0.5, "0.00"),
     'CrownSurplusAidDays': (1, 360, "0"),
+    # W7 (stawka wojenna pana): stawka nadwyzki na dobe - kod przycina do 0..0.2, suwak 0..0.1 z trzema miejscami; koszt lojalnosci 0..10 i dobrobytu 0..50
+    # na dobe przy pelnej stawce (kod przycina tak samo); prog lojalnosci 0..100 (KingdomTreasury.LordLevy)
+    'LordWarLevyRate': (0.0, 0.1, "0.000"),
+    'LordWarLevyLoyalty': (0.0, 5.0, "0.00"),
+    'LordWarLevyProsperity': (0.0, 10.0, "0.00"),
+    'LordWarLevyMinLoyalty': (0, 100, "0"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
     # E6/K2 (212): luz zapasu koni jako udzial jezdzcow kategorii (kod przycina do 0..1, Stables.Reserve)

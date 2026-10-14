@@ -5132,6 +5132,30 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int CrownSurplusAidDays { get; set; } = 30;
 
+        [SettingPropertyBool("Lord War Levy", HintText = "in war a lord whose own wage ceiling cannot keep his field companies up to Crown War Aid Fill Target of their size, and whom the crown's war aid by need (the people's war aid, the spare treasure and the shield money) did not fully help that day, raises a war levy in his own towns, castles and villages: up to Lord War Levy Rate a day of the coin the townsfolk, castle folk and villagers still hold above their reserve after the crown's war aid and war subsidy. The coin goes to his purse for the wages of the men already in his companies and raises his wage ceiling by as much; for men he has yet to recruit he gets only room in his ceiling, as with the crown's aid. Never more than the house still lacks, never from the reserve, never in peace, and these wages are not repaid by the crown a second time. Each fief pays in loyalty and prosperity in proportion to how hard it is taxed; a town or castle with loyalty under Lord War Levy Min Loyalty, in revolt or under siege pays nothing (nor do its villages), nor does a looted village. Not your house - see Player War Levy. Needs Crown War Aid By Need and the people's purses (Town Folk Live). Off = no war levy, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool LordWarLevy { get; set; } = true;
+
+        [SettingPropertyBool("Player War Levy", HintText = "Levy a war tax in your own fiefs on the same terms as the lords: in war, while your lands cannot keep your companies up to Crown War Aid Fill Target of their size and the crown's war aid falls short, your towns, castles and villages give you up to Lord War Levy Rate a day of the coin they hold above their reserve, toward the wages of the men in your companies - at a loyalty and prosperity cost to each fief, as for the lords. Works only while the crown measures your house for war aid (Scutage Player Clan: a vassal holding a town or a castle, not the ruler). Off = your fiefs pay you no war levy (default)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool PlayerWarLevy { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Lord War Levy Rate", 0.000f, 0.100f, "0.000", HintText = "with Lord War Levy: the part of the coin above their reserve that a lord's townsfolk, castle folk and villagers give him each day of war at the full rate (0.03 = three parts in a hundred a day; less when the house lacks less)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float LordWarLevyRate { get; set; } = 0.03f;
+
+        [SettingPropertyFloatingInteger("Lord War Levy Loyalty", 0.00f, 5.00f, "0.00", HintText = "with Lord War Levy: loyalty a town or castle loses each day it is taxed at the full rate, its villages included (less in proportion when taxed less; with the game's drift of loyalty towards 50, half a point a day settles about five points lower)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float LordWarLevyLoyalty { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Lord War Levy Prosperity", 0.00f, 10.00f, "0.00", HintText = "with Lord War Levy: prosperity a town or castle loses each day it is taxed at the full rate, its villages included (1 = what the War Tax policy costs a day; less in proportion when taxed less)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float LordWarLevyProsperity { get; set; } = 1.0f;
+
+        [SettingPropertyInteger("Lord War Levy Min Loyalty", 0, 100, "0", HintText = "with Lord War Levy: a town or castle with loyalty below this pays no war levy, nor do its villages")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int LordWarLevyMinLoyalty { get; set; } = 40;
+
         [SettingPropertyBool("People Menu Shows Savings", HintText = "'People of this land' also tells for how many days of living the people of the town, castle or village you are in hold coin, how much of it lies above their reserve for hard times and how much war aid they gave the crown at the last dawn (off = no such line, as before)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool PeopleMenuShowsSavings { get; set; } = true;
@@ -6706,6 +6730,12 @@ namespace Armoury
             s.WarAidLordsShortfallShare = WarAidLordsShortfallShare;
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
+            s.LordWarLevy = LordWarLevy;
+            s.PlayerWarLevy = PlayerWarLevy;
+            s.LordWarLevyRate = LordWarLevyRate;
+            s.LordWarLevyLoyalty = LordWarLevyLoyalty;
+            s.LordWarLevyProsperity = LordWarLevyProsperity;
+            s.LordWarLevyMinLoyalty = LordWarLevyMinLoyalty;
             s.PeopleMenuShowsSavings = PeopleMenuShowsSavings;
             s.FolkLadderMeasureLog = FolkLadderMeasureLog;
             s.Stage6MeasureLog = Stage6MeasureLog;

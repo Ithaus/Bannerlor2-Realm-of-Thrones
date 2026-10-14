@@ -87,6 +87,7 @@ namespace Armoury
             NaClearMeasure();
             ScutageReset();   // W6: stan doby tarczowego (drugie zrodlo garnka) czyszczony razem z W5
             CrownSurplusReset();   // W5b regula 2: stan doby skarbca ponad zapas wojny czyszczony razem z W5
+            LordLevyReset();       // W7: plan doby, gotowka wczoraj i sumy tygodnia stawki wojennej pana czyszczone razem z W5
         }
 
         private static void NaClearMeasure()
@@ -210,6 +211,7 @@ namespace Armoury
                 // (0 przy wylaczonym kluczu CrownSurplusFeedsNeedAid, bez nadwyzki skarbca albo bez niepokrytej potrzeby po daninie)
                 long crown = CrownSurplusPlan(k, s, row, cand.Count);
                 row.Uncov = Math.Max(0, row.Need - row.Pot);
+                LvPlan(k, row.Name, cand, 0);   // W7 (KingdomTreasury.LordLevy.cs): rody z potrzeba tej doby - poziom 0, dopoki szczeble W5 nizej go nie podniosa (bez zlota)
                 if (cand.Count == 0 || (row.Pot <= 0 && crown <= 0 && (sc == null || sc.Due <= 0))) return 0;
                 // poziom wyrownania: najwyzszy f <= cel, przy ktorym suma kosztow miesci sie w garnku (koszt rosnie z f; przy f = 0 jest 0)
                 double level = target;
@@ -276,6 +278,7 @@ namespace Armoury
                 // ktora W5 wyplaca przy poziomie z garnkiem danina + tarczowe ponad szczebel daniny; wlasny try i wlasne ksiegowanie (nie wchodzi do wplywow dnia)
                 if (sc != null && sc.Due > 0) ScutageStep(k, cand, row, sc, level, target, step, today);
                 row.Uncov = Math.Max(0, row.Need - row.Pot - row.Crown - (sc != null ? sc.Room : 0));   // W5b regula 1: brak po wszystkich zrodlach garnka
+                LvPlan(k, row.Name, cand, sc != null ? Math.Max(level, sc.Level1) : level);   // W7: poziom wyrownania po ostatnim szczeblu W5 (danina, skarbiec, tarczowe)
             }
             catch (Exception e) { NaStumble("NeedAidKingdom", e); }
             finally

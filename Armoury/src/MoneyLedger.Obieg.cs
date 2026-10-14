@@ -572,6 +572,8 @@ namespace Armoury
               .Append(", gotowka korony na zold druzyn (W5) ").Append(KingdomTreasury.LastNeedAid)   // recenzja W5: ta sama kwota co po stronie korony (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn ze skarbca ponad zapas wojny (W5b) ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: szczebel skarbca doplaty W5 (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn z tarczowego (W6) ").Append(KingdomTreasury.LastScutageOut)   // W6: szczebel tarczowego doplaty W5 (skarbce -> glowy rodow)
+              .Append(", stawka wojenna pana (W7) kiesy ludu i wsi -> glowy rodow ").Append(KingdomTreasury.LastLordLevy)   // W7: pobor z wlasnych lenn na zold druzyn
+              .Append(" (z ludu ").Append(KingdomTreasury.LastLordLevyFolk).Append(", ze wsi ").Append(KingdomTreasury.LastLordLevyVill).Append(')')
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod modelu gry (naliczony, do D) ").Append(Opt(ClanIncomeBook.LastModelIncomeSum))
               .Append(" | sakiewki ludzi [P]: stan ").Append(Dl(now, last, HPurses)).Append(", zold wplynal ").Append(SoldierPay.LastToPurse)

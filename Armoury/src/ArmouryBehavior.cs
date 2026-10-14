@@ -1698,6 +1698,9 @@ namespace Armoury
             try { CrownBorrow.Report(); } catch (Exception e) { Log.Error("CrownBorrow.Report", e); } DayProfile.Lap("CrownBorrow.Report");                  // 186: linia "Kredyt korony (186)" (zlota nie rusza)
             try { KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomLedger.Daily", e); } DayProfile.Lap("KingdomLedger.Daily");                // linia "Skarbce:"
             try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
+            // W7: stawka wojenna pana - rody, ktorym W5 (danina, skarbiec, tarczowe) nie pokrylo potrzeby, biora z nadwyzki ludu i wsi wlasnych lenn (po P1 i danine wsi);
+            // po bloku korony (plan z kroku W5 w CrownRents.Daily; poza pozycja "korona" ksiegi osad), przed budzetem rodow 166 (podniesienie pulapu tej doby)
+            try { KingdomTreasury.LordLevyDay(); } catch (Exception e) { Log.Error("KingdomTreasury.LordLevyDay", e); } DayProfile.Lap("KingdomTreasury.LordLevyDay");
             try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); } DayProfile.Lap("SoldierPay.Daily");   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
             try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); } DayProfile.Lap("ArmyClothing.Daily");   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); } DayProfile.Lap("OutlawLaw.Daily");   // wyrzutki: bieda, powroty, werbunek band
