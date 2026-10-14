@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (C5 - decyzja Jeffa po liczbach) - KUZNIA GRACZA SZYBKO JAK DAWNIEJ: `ForgeLikeTownSmith` domyslnie false
+
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** `ForgeLikeTownSmith` true -> false (w Armoury.json Jeffa klucza nie ma - zadziala domyslna) | **Pliki:** `Armoury/src/Settings.cs`, `Armoury/src/McmSettings.cs` (gen_mcm)
+
+**Problem:** C5 ("kucie jak u kowali AI", Jeff 14.10 rano) dawal kolczuge t3 ok. 45 dob, plyte t6 ok. 128 dob siedzenia w osadzie (kuznia kuje tylko przy graczu - zasada 05.10). Jeff: "kucie kolczugi bede musial czekac w zamku 45 dni". Policzony wariant z pomocnikami z miasta (`docs/pytania-2026-10-14/KUZNIA-POMOCNICY.md`: kolczuga 6-8 dob, plyta 21 dob, stawka jak w warsztacie AI) - Jeff wybral "szybko jak dawniej".
+**Zmiana:** domyslna klucza `ForgeLikeTownSmith` = false - wszystkie sciezki kuzni gracza wracaja do czasu sprzed C5 (ekran BK: stamina / 6; kolczuga t3 ok. 12.5 h, luk z menu Forge 96 h); kod C5 zostaje pod kluczem (recenzja: off = stan 449d453). Warsztaty AI i miast bez zmian.
+**Linia logu / prog:** "Kuznia jak u kowali (C5): wylaczona (ForgeLikeTownSmith)" w linii przykladow; `--grupa jeff14g` J5-0 / J5-2 pokaza INFO / wylaczone.
+**Status:** DO SPRAWDZENIA (test 120 dob nastepnej wersji).
+
 ## 2026-10-14 (recenzja C3/C4/C5, galaz w-toku/jeff-tak-gracz) - KOMPLET WETERANA TAKZE Z DRUZYNY GRACZA; rozbici H3 bez podwojnego odjecia potrzeby
 
 **Mod:** Armoury | **Galaz:** `w-toku/jeff-tak-gracz` (po C3 1940a4d) | **Tor:** S (recenzja z poprawka) | **Klucze:** bez nowych - pod `VeteranTakesKit` (false = stan 449d453) | **Pliki:** `Armoury/src/VetKit.cs` (TakePlayer, Take z `inRoster`, linia doby), `PeopleBook.Veterans.cs` (VetCommit), `tools/sprawdz_logi.py` (`--grupa jeff14`, J3-6)

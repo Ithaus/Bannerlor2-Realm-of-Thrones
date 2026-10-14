@@ -38,7 +38,8 @@ namespace Armoury
         public bool ForgeOneClock = true;                  // one forge clock: Craft puts the piece on the smith's bench for the hours the Banner Kings screen shows (stamina spent / 6); pieces come off one by one when done - no lump wait afterwards
         public bool ForgeOnlyWhileThere = true;            // your own work at the anvil goes on only while you stay in that settlement - ride away and the bench waits for you
         // C5 (Jeff 14.10 "jak u kowali AI"): czas kucia gracza = dni pracy kowala w warsztacie AI x WorkHoursPerManDay; zaplata bez zmian; termin zamowien + doby pracy
-        public bool ForgeLikeTownSmith = true;             // your work at the anvil takes as long as a town smith's: the same days of work his workshop gives the piece, each a smith's day of hours (Work Hours Per Man Day) - a mail shirt is weeks, not an afternoon; the pay stays as it was, and a lord's order gives you the days of work on top of its deadline (off = the hours of the Banner Kings screen, as before)
+        // Jeff 14.10 po liczbach (kolczuga 45 dob, plyta 128 dob, pomocnicy z miasta - docs/pytania-2026-10-14/KUZNIA-POMOCNICY.md): "szybko jak dawniej" - domyslnie WYLACZONE
+        public bool ForgeLikeTownSmith = false;            // your work at the anvil takes as long as a town smith's: the same days of work his workshop gives the piece, each a smith's day of hours (Work Hours Per Man Day) - a mail shirt is weeks, not an afternoon; the pay stays as it was, and a lord's order gives you the days of work on top of its deadline (off = the hours of the Banner Kings screen, as before)
         public bool ForgeTakesTime = true;                 // armour is not finished the moment you order it
         public float DaysPerTier = 1f;                     // days per tier - 1 means a tier 5 plate takes five days (Jeff 14.09: halved)
         public float TempoHastyTime = 0.5f;                // in haste: this share of the time
