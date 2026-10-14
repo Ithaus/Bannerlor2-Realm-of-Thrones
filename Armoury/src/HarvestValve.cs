@@ -78,6 +78,9 @@ namespace Armoury
     /// co towary. Zwierze nowe w stanie (klucz wlaczony w biegu pomiaru) startuje z SA/SB = -1 (stos nieznany - spis przed wlaczeniem go nie liczyl), nie
     /// z "stos 0" towaru nowego w swiecie: pierwsza decyzja po pelnym oknie od nastepnej granicy kubelka. Klucz wylaczony - zwierzeta usuniete ze stanu
     /// (AnimalKeyState, mnozniki 1; Factor dla zwierzat 1 od razu), Eligible jak 6e6313c5.
+    /// Recenzja T3: stan zwierzat w OSOBNYM kluczu zapisu arm_harvestvalve_zw (ExportBeasts / ImportBeasts), nie w arm_harvestvalve - DLL bez T3-K2 (6e6313c5)
+    /// tego klucza nie zna, wiec po cofnieciu DLL zwierzeta wracaja do hodowli jak model (mnozniki 1), zamiast zostac na zawsze z mnoznikiem regulatora
+    /// (stary Factor bez straznika klucza, stary Close pomija towar bez produkcji). Zapis starej DLL tego klucza nie ma - powrot do nowej: pomiar zwierzat od nowa.
     /// </summary>
     internal static class HarvestValve
     {
@@ -1111,11 +1114,80 @@ namespace Armoury
               .Append(';').Append(_shift.ToString("R", inv));   // E6/K4 (220): 7. pole naglowka - udzial przesuniecia zwykle -> bojowe (brak - 0)
             foreach (var g in _goods.Values)
             {
-                sb.Append('|').Append(g.Id).Append(',').Append(g.M.ToString("R", inv)).Append(',').Append(g.P0.ToString("R", inv)).Append(',').Append(g.P1.ToString("R", inv))
-                  .Append(',').Append(g.D0.ToString("R", inv)).Append(',').Append(g.D1.ToString("R", inv)).Append(',').Append(g.SA).Append(',').Append(g.SB)
-                  .Append(',').Append(g.Dir).Append(',').Append(g.Flips).Append(',').Append(g.MA.ToString("R", inv));
+                if (BeastGood(g)) continue;                 // recenzja T3: zwierzeta rzezne w osobnym kluczu (ExportBeasts) - DLL 6e6313c5 ich nie zobaczy
+                AppendGood(sb, g, inv);
             }
             return sb.ToString();
+        }
+
+        /// <summary>Recenzja T3 (T3-K2): stan zwierzat rzeznych do osobnego klucza zapisu arm_harvestvalve_zw (naglowek: start pomiaru i granica kubelka -
+        /// ImportBeasts przyjmuje je tylko do tego samego pomiaru). Brak zwierzat w stanie - pusty napis.</summary>
+        internal static string ExportBeasts()
+        {
+            if (_start < 0) return "";
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            sb.Append("z1;").Append(_start).Append(';').Append(_bucketStart);
+            int n = 0;
+            foreach (var g in _goods.Values) { if (!BeastGood(g)) continue; AppendGood(sb, g, inv); n++; }
+            return n > 0 ? sb.ToString() : "";
+        }
+
+        /// <summary>Recenzja T3 (T3-K2): po Import - zwierzeta z klucza arm_harvestvalve_zw do stanu, gdy naglowek (start pomiaru, granica kubelka) zgadza sie
+        /// ze stanem wczytanym z arm_harvestvalve; inaczej (inny pomiar, napis nieczytelny) nic - pomiar zwierzat od nowa (Get: stos nieznany). Wpis o tym samym
+        /// id juz w stanie (zapis sprzed recenzji: zwierzeta w kluczu glownym) zostaje. Wszystko albo nic: wyjatek nie zostawia polowy zwierzat.</summary>
+        internal static void ImportBeasts(string s)
+        {
+            if (string.IsNullOrEmpty(s) || _start < 0) return;
+            try
+            {
+                var inv = CultureInfo.InvariantCulture;
+                var parts = s.Split('|');
+                var h = parts[0].Split(';');
+                if (h.Length < 3 || h[0] != "z1" || int.Parse(h[1], inv) != _start || int.Parse(h[2], inv) != _bucketStart)
+                {
+                    Log.Info("Regulator wsi (221): stan zwierzat rzeznych z zapisu z innego pomiaru albo nieczytelny - pomiar zwierzat od nowa (pierwsza decyzja po pelnym oknie).");
+                    return;
+                }
+                var add = new List<Good>();
+                for (int i = 1; i < parts.Length; i++) { var g = ParseGood(parts[i], inv); if (g != null && !_goods.ContainsKey(g.Id)) add.Add(g); }
+                foreach (var g in add) _goods[g.Id] = g;
+                if (add.Count > 0) Rebuild();
+            }
+            catch (Exception e) { Log.Error("HarvestValve.ImportBeasts", e); }
+        }
+
+        /// <summary>Recenzja T3: wpis stanu to zwierze rzezne (przedmiot ze stanu albo z menedzera obiektow, gdy jeszcze nie przypisany); konie "#kon:N" - nie.</summary>
+        private static bool BeastGood(Good g)
+        {
+            if (g == null || IsH(g.Id)) return false;
+            var it = g.Item;
+            if (it == null) { try { var mgr = MBObjectManager.Instance; it = mgr != null ? mgr.GetObject<ItemObject>(g.Id) : null; } catch { it = null; } }
+            return Beast(it);
+        }
+
+        private static void AppendGood(StringBuilder sb, Good g, IFormatProvider inv)
+        {
+            sb.Append('|').Append(g.Id).Append(',').Append(g.M.ToString("R", inv)).Append(',').Append(g.P0.ToString("R", inv)).Append(',').Append(g.P1.ToString("R", inv))
+              .Append(',').Append(g.D0.ToString("R", inv)).Append(',').Append(g.D1.ToString("R", inv)).Append(',').Append(g.SA).Append(',').Append(g.SB)
+              .Append(',').Append(g.Dir).Append(',').Append(g.Flips).Append(',').Append(g.MA.ToString("R", inv));
+        }
+
+        /// <summary>Jeden wpis stanu z zapisu (pola jak AppendGood); za malo pol - null. Wyjatek parsowania idzie do wolajacego (jak dotad w Import).</summary>
+        private static Good ParseGood(string entry, IFormatProvider inv)
+        {
+            var p = entry.Split(',');
+            if (p.Length < 10 || p[0].Length == 0) return null;
+            var g = new Good
+            {
+                Id = p[0], M = float.Parse(p[1], inv), P0 = double.Parse(p[2], inv), P1 = double.Parse(p[3], inv),
+                D0 = double.Parse(p[4], inv), D1 = double.Parse(p[5], inv), SA = long.Parse(p[6], inv), SB = long.Parse(p[7], inv),
+                Dir = int.Parse(p[8], inv), Flips = int.Parse(p[9], inv)
+            };
+            if (!(g.M > 0f) || g.M > MaxM) g.M = 1f;   // N5-A: sufit braku do MaxM (dotad 2 - zwykly sufit); wylaczony klucz cofa nadwyzke przy najblizszej decyzji
+            g.MA = p.Length >= 11 ? float.Parse(p[10], inv) : g.M;   // recenzja 221: pole 11 (mnoznik kubelka starszego); brak - jak M
+            if (!(g.MA > 0f) || g.MA > MaxM) g.MA = g.M;
+            return g;
         }
 
         internal static void Import(string s)
@@ -1134,17 +1206,8 @@ namespace Armoury
                 if (h.Length >= 7 && float.TryParse(h[6], NumberStyles.Float, inv, out sh) && sh > 0f && sh <= ShiftMax) _shift = sh;   // E6/K4 (220)
                 for (int i = 1; i < parts.Length; i++)
                 {
-                    var p = parts[i].Split(',');
-                    if (p.Length < 10 || p[0].Length == 0) continue;
-                    var g = new Good
-                    {
-                        Id = p[0], M = float.Parse(p[1], inv), P0 = double.Parse(p[2], inv), P1 = double.Parse(p[3], inv),
-                        D0 = double.Parse(p[4], inv), D1 = double.Parse(p[5], inv), SA = long.Parse(p[6], inv), SB = long.Parse(p[7], inv),
-                        Dir = int.Parse(p[8], inv), Flips = int.Parse(p[9], inv)
-                    };
-                    if (!(g.M > 0f) || g.M > MaxM) g.M = 1f;   // N5-A: sufit braku do MaxM (dotad 2 - zwykly sufit); wylaczony klucz cofa nadwyzke przy najblizszej decyzji
-                    g.MA = p.Length >= 11 ? float.Parse(p[10], inv) : g.M;   // recenzja 221: pole 11 (mnoznik kubelka starszego); brak - jak M
-                    if (!(g.MA > 0f) || g.MA > MaxM) g.MA = g.M;
+                    var g = ParseGood(parts[i], inv);
+                    if (g == null) continue;
                     _goods[g.Id] = g;
                 }
                 Rebuild();

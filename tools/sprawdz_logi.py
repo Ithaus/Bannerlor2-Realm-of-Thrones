@@ -584,8 +584,9 @@ Uzycie (Python 3, tylko odczyt):
                     (log czytany strumieniowo). Srednie z ostatnich 30 dob okna (domyslnie d91-120). T3-K1 (SutlerClothing - markietani przywoza odziez):
                     T3-K1-0 dopisek w "Odziez wojska (150)", T3-K1-1 plotno do wojska >= 85 szt./d, T3-K1-2 skora do wojska >= 75 szt./d, T3-K1-3 druzyny kupuja
                     >= 85% narosnietego plotna, T3-K1-4 kolejka plotna <= 1200 i bez wzrostu, T3-K1-5 kolejka skory <= 1000 i bez wzrostu, T3-K1-6 straz zalog
-                    (plotno >= 22, skora >= 26 szt./d), T3-K1-7 straz warsztatow (cykle bez skory <= 65/d), T3-K1-8 INFO (plotno swiata, tkacze, len, zloto),
-                    T3-K1-9 INFO (warunek T3-K4). T3-K2 (AnimalsUnderValve - zwierzeta rzezne pod regulatorem wsi): T3-K2-0 wieprze, krowy, owce w linii
+                    (wziete >= 93% potrzeby narosnietej w zalogach - plotno i skora; recenzja: dawniej 22 / 26 szt./d), T3-K1-7 straz warsztatow (cykle bez skory
+                    <= 65/d), T3-K1-8 INFO (plotno swiata, tkacze, len, zloto), T3-K1-9 INFO (warunek T3-K4), T3-K1-10 koszt petli markietanow z zakupem odziezy
+                    (srednia <= 50, najwiecej <= 90 ms/dobe - prog A3-7). T3-K2 (AnimalsUnderValve - zwierzeta rzezne pod regulatorem wsi): T3-K2-0 wieprze, krowy, owce w linii
                     decyzji (klucz tak), T3-K2-1 skory surowe >= 530 szt./d, T3-K2-2 skora zrobiona >= 200 szt./d, T3-K2-3 straz: stos zwierzat <= 30 dni
                     zuzycia (mieso INFO), T3-K2-4 garbarze "brak surowca" <= 25 miast. Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
                     T3-N (bez klucza - mierza swiat; zamiast mylacych T2-K2-5 / PL-4, T2-K3-4 i polowy T2-K1-6): T3-N-1 len >= x1.00 po kazdej decyzji regulatora,
@@ -20784,7 +20785,7 @@ def towary2_main(logp, start_arg, until=120):
 
 
 T3_PREF = ("Pomiary 169c: okna", "Odziez wojska (150): dzien", "Towary: dzien", "Warsztaty: dzien", "Rzemioslo miasta (148): dzien",
-           "Regulator wsi (221): dzien", "Ceny surowcow: dzien")
+           "Regulator wsi (221): dzien", "Ceny surowcow: dzien", "Markietani (E5/A3): dzien")
 
 
 def towary3_main(logp, start_arg, until=120):
@@ -20902,7 +20903,9 @@ def towary3_main(logp, start_arg, until=120):
                     f"d-until <= {cap} i bez wzrostu (<= +2%; {base})" + tail1, g1(b2 <= cap and b2 <= a * 1.02 + 0.5))
         else:
             rep.add(rid, "za krotkie okno albo brak linii", f"<= {cap} i bez wzrostu d{lo - 1} -> until (gdy okno siega d{lo + 1})", None)
-    gl, gs = [], []
+    # recenzja T3: straz zalog wzgledem ICH potrzeby z dopisku (rozbicie "potrzeba narosla wedlug odbiorcy ... zalogi") - prog w sztukach (22 / 26) zalezal od
+    # liczby ludzi w zalogach (inna kampania, wojna) i dawalby NIE bez winy markietanow; ta sama granica co dawniej wzgledem potrzeby fin29 (22/23.4, 26/28.05 ~ 93%)
+    gl, gs, zl, zs, nz = [], [], 0.0, 0.0, 0
     for k in sorted(od):
         if not inwin(k):
             continue
@@ -20912,11 +20915,24 @@ def towary3_main(logp, start_arg, until=120):
             continue
         gs.append((t[0] if t else 0) + (c[0] if c else 0))
         gl.append((t[2] if t else 0) + (c[2] if c else 0))
+        z = three(r"; zalogi skora ([\d.]+), sukno ([\d.]+), plotno ([\d.]+)", od[k])
+        if z is not None:
+            nz += 1
+            zs += z[0]
+            zl += z[2]
     vl = sum(gl) / len(gl) if gl else None
     vs = sum(gs) / len(gs) if gs else None
-    rep.add("T3-K1-6: straz zalog - plotno / skora (miasta bez zlota + zamki, srednia)", f"plotno {fx_(vl)}, skora {fx_(vs)} szt./d ({len(gl)} dob)",
-            "plotno >= 22 i skora >= 26 szt./d (fin29 23.5 / 28.4 = 100% potrzeby zalog)" + tail1,
-            g1(vl >= 22 and vs >= 26) if (vl is not None and vs is not None) else None)
+    if gl and nz == len(gl) and zl > 0 and zs > 0:
+        rl, rs = sum(gl) / zl, sum(gs) / zs
+        rep.add("T3-K1-6: straz zalog - wziete / narosle w zalogach (miasta bez zlota + zamki, sumy okna)",
+                f"plotno {100 * rl:.0f}% ({vl:.1f} z {zl / nz:.1f} szt./d), skora {100 * rs:.0f}% ({vs:.1f} z {zs / nz:.1f}) ({nz} dob)",
+                ">= 93% potrzeby zalog - plotno i skora (fin29 23.5 z 23.4, 28.4 z 28.05 = 100%; dawny prog 22 / 26 szt./d ta sama granica)" + tail1,
+                g1(rl >= 0.93 and rs >= 0.93))
+    else:
+        rep.add("T3-K1-6: straz zalog - plotno / skora (miasta bez zlota + zamki, srednia)", f"plotno {fx_(vl)}, skora {fx_(vs)} szt./d ({len(gl)} dob)"
+                + ("" if nz else "; brak rozbicia potrzeby na zalogi (log sprzed T3-K1)"),
+                ">= 93% potrzeby zalog z dopisku (bez dopisku: fin29 23.5 / 28.4 szt./d = 100% potrzeby zalog)" + tail1,
+                g1(vl >= 22 and vs >= 26) if (vl is not None and vs is not None) else None)
     v, n = avg(ws, r"brak surowca \d+ \[ruda \d+, drewno \d+, skora (\d+)")
     rep.add("T3-K1-7: straz warsztatow - cykle bez skory (Warsztaty, srednia)", f"{fx_(v)}/d ({n} dob)", "<= 65/d (fin29 52.6, N 108.1)" + tail1,
             g1(v <= 65) if v is not None else None)
@@ -20953,6 +20969,17 @@ def towary3_main(logp, start_arg, until=120):
             f"warunek T3-K4 {'SPELNIONY' if k4 else 'nie'}" + ("" if on1 else " (klucz wylaczony)"),
             "INFO (T3-K4 - CaravanBulk.Use liczy odziez wojska - tylko gdy miast bez plotna > 20, bez skory > 25 albo bez towaru w > 30% prob; fin29: 12.6 / 18.3)",
             None)
+    # recenzja T3: koszt czasu doby - zakup odziezy biegnie w petli markietanow (Sutlers.One, przeglad polki miasta na sztuke), wiec jej koszt ("| koszt X ms"
+    # linii "Markietani (E5/A3)") obejmuje tez T3-K1; prog jak A3-7 grupy etap5 (wzorzec W33 + ok. 30%)
+    smk = by_day(lines, "Markietani (E5/A3): dzien")
+    mss = [num(r"\| koszt ([\d.]+) ms", smk[k], float) for k in sorted(smk) if inwin(k)]
+    mss = [x for x in mss if x is not None]
+    if mss:
+        mm_, mx_ = sum(mss) / len(mss), max(mss)
+        rep.add("T3-K1-10: koszt petli markietanow z zakupem odziezy (Markietani E5/A3, srednia / najwiecej)", f"{mm_:.1f} / {mx_:.1f} ms ({len(mss)} dob)",
+                "srednia <= 50 i najwiecej <= 90 ms/dobe (prog A3-7 etapu 5; fin29 bez zakupu 21.9 / 42.3)" + tail1, g1(mm_ <= 50.0 and mx_ <= 90.0))
+    else:
+        rep.add("T3-K1-10: koszt petli markietanow z zakupem odziezy", "brak linii Markietani (E5/A3) w oknie", "srednia <= 50 i najwiecej <= 90 ms/dobe" + tail1, None)
 
     # ---- T3-K2 = K5: zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve) - dopisek linii decyzji "Regulator wsi (221)"
     dk = [k for k in sorted(rg) if run_day(k, start) <= until and " - CZYNNY, decyzja " in rg[k]]
