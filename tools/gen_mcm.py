@@ -229,6 +229,9 @@ RANGES = {
     'SeaRaidersHarbourTithe': (0.0, 1.0, "0.00"),
     'FreeFolkLevyShare': (0.0, 0.05, "0.000"),
     'FreeFolkGarrisonPoolShare': (0.0, 1.0, "0.00"),
+    # PROJEKT-LENNA (14.10): punkty zdobywcy i zapas pulapu ponad przydzial - kod przycina do 0..200 i 0..10 (FiefGrants.ConquerorBonus / CapExtra)
+    'FairFiefConquerorBonus': (0, 200, "0"),
+    'FairFiefCapExtra': (0, 10, "0"),
 }
 
 def gen(module_dir, ns, display):
