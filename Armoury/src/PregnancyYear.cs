@@ -33,7 +33,8 @@ namespace Armoury
     ///     poczeciu - ciaze juz trwajace w zapisie koncza sie wedlug starego terminu (po zmianie klucza w trakcie gry tak samo w druga strone).
     ///     Ten sam getter czytaja wpisy dziennika gry (PregnancyLogEntry / ChildbirthLogEntry: jak dlugo wpis zostaje w historii) - bez wplywu na gre;
     ///  2) postfiks DefaultPregnancyModel.GetDailyChanceOfPregnancyForHero: wynik x 84 / CampaignTime.DaysInYear (rok kalendarza z modelu czasu;
-    ///     364 -> 0,2308), tylko gdy rok jest dluzszy niz 84 doby - krotszy rok (tryb Fast, mniej tygodni) zostaje przy szansie gry (x1).
+    ///     364 -> 0,2308), tylko gdy rok jest dluzszy niz 84 doby - krotszy rok (mniej tygodni; tryb Fast bez dlugiego roku: 24 doby) zostaje
+    ///     przy szansie gry (x1). Tryb Fast Z dlugim rokiem: 3 x 13 x 4 = 156 dob -> x0,54 (punkt odniesienia zostaje 84; u Jeffa Fast wylaczony).
     /// Sluby AI bez zmian (decyzja Jeffa 13.10: MarriageChanceScale CrashScribe 0.7).
     ///
     /// Log: linia wpiecia (menu glowne), "start sesji" (klucze, rok i mnoznik, czynny model, czas ciazy czynnego modelu, ciaze w toku) i linia
