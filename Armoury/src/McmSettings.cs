@@ -4956,6 +4956,10 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public float StragglersRallyReachDays { get; set; } = 5f;
 
+        [SettingPropertyBool("Player Armory Like Ai Lord", HintText = "when you are taken captive your company's armoury (Dynamic Troop Equipment) goes to your captor, as a beaten lord's armoury goes to his victors: a lord's company takes it into its own armoury, a settlement's men into their garrison's armoury or the settlement's stores, a band into its packs; the rest of what you lose is set in Realistic Captivity (Player Loses Like Ai Lord) (off = the armoury stays yours, as before)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool PlayerArmoryLikeAiLord { get; set; } = true;
+
         [SettingPropertyBool("War Tax From Folk", HintText = "in war the crown also taxes the townsfolk's and castle folk's earnings, on top of the war subsidy from the merchants' and villages' spare coin - up to 3%, up to 6% under the War Tax policy, raised each week while the crown has to borrow or spend its old hoard to repay the war wages, lowered when it no longer has to; the higher it is, the less the people buy and the slower prosperity grows. Labourers pay half the rate, craftsmen the full rate, patricians one and a half; a besieged town or castle pays nothing. In peace nothing is taken and the rate falls back to nothing within four weeks. Only while the townsfolk's purse is live and the crown pays from its current income. You and the AI alike. Off = no war tax on the people, as before")]
         [SettingPropertyGroup("The war tax on the people (stage 5)")]
         public bool WarTaxFromFolk { get; set; } = true;
@@ -6890,6 +6894,7 @@ namespace Armoury
             s.StragglersRally = StragglersRally;
             s.StragglersRallyWaitDays = StragglersRallyWaitDays;
             s.StragglersRallyReachDays = StragglersRallyReachDays;
+            s.PlayerArmoryLikeAiLord = PlayerArmoryLikeAiLord;
             s.WarTaxFromFolk = WarTaxFromFolk;
             s.WarTaxMax = WarTaxMax;
             s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;

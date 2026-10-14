@@ -16488,14 +16488,33 @@ def _j14_c5(lines, rep):
             "0 niezgodnych", bad == 0)
 
 
+def _j14_c4(lines, rep):
+    """J4 (C4, PlayerArmoryLikeAiLord + RC PlayerLosesLikeAiLord): zbrojownia DTE gracza po pojmaniu do zdobywcy (J4-0, INFO bez pojmania), sztuki,
+    ktorych nikt nie przyjal = 0 (J4-1), zloto zabrane graczowi przez RC przy pojmaniu = 0 (J4-2, "zaliczone wodzom ... (w tym gracz N)" w linii A6 -
+    od C4 gracz placi tylko lup bitwy jak kazdy wodz: "wodzowie zdjeci z partii ... (w tym gracz N)" - INFO)."""
+    ev = [s for s in lines if s.startswith("Zbrojownia gracza po pojmaniu (C4")]
+    moved = sum(num(r": (\d+) szt\. do ", s, int, 0) or 0 for s in ev)
+    kept = sum(num(r"zostalo u gracza (\d+)", s, int, 0) or 0 for s in ev)
+    rep.add("J4-0: zbrojownia gracza po pojmaniu (C4) - do zdobywcy", f"pojman {len(ev)}, oddane {moved} szt." if ev else "0 pojman gracza w logu",
+            "INFO (sztuki przechodza do zdobywcy, jak zbrojownia pokonanego lorda AI)", None)
+    rep.add("J4-1: sztuki zbrojowni bez odbiorcy (zostaly u gracza)", f"{kept}" if ev else "-", "0 (bez pojmania - INFO)", (kept == 0) if ev else None)
+    a6 = [s for s in lines if s.startswith("Lup w bitwie (A6): dzien")]
+    pre = sum(num(r"zaliczone wodzom pokonanych \(zloto zabrane im przy pojmaniu - RealisticCaptivity\) \d+ \(w tym gracz (\d+)\)", s, int, 0) or 0 for s in a6)
+    paid = sum(num(r"wodzowie zdjeci z partii \(A6 - niewola, ucieczka\) \d+ \(w tym gracz (\d+)\)", s, int, 0) or 0 for s in a6)
+    rep.add("J4-2: zloto gracza zabrane przy pojmaniu przez RC (zaliczka A6)", f"{pre} (lup bitwy z kiesy gracza A6: {paid})" if a6 else "brak linii A6",
+            "0 przy PlayerLosesLikeAiLord (gracz placi tylko lup bitwy, jak lord AI); bez pojmania - INFO", (pre == 0) if (a6 and ev) else None)
+
+
 def jeff14_main(logp):
-    """jeff14 (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5). Caly log (bez okna dob)."""
+    """jeff14 (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5), J4 strata gracza po pojmaniu jak lorda AI (C4).
+    Caly log (bez okna dob)."""
     lines = read(logp)
     rep = Report()
     print(f"plik: {logp}")
     _j14_c5(lines, rep)
-    bl = [s for s in lines if s.startswith("ERROR in ") and ("ForgeClock" in s or "ArmsPricing.Build(C5)" in s)]
-    rep.add("J14-E: bledy nowych sciezek (ForgeClock, ArmsPricing.Build(C5))", f"{len(bl)} linii" + (f"; pierwsza: {bl[0][:200]}" if bl else ""), "0", len(bl) == 0)
+    _j14_c4(lines, rep)
+    bl = [s for s in lines if s.startswith("ERROR in ") and ("ForgeClock" in s or "ArmsPricing.Build(C5)" in s or "CaptiveArmory" in s)]
+    rep.add("J14-E: bledy nowych sciezek (ForgeClock, ArmsPricing.Build(C5), CaptiveArmory)", f"{len(bl)} linii" + (f"; pierwsza: {bl[0][:200]}" if bl else ""), "0", len(bl) == 0)
     rep.show()
     return 0
 

@@ -173,7 +173,7 @@ namespace Armoury
             return all != null && mp != null && all.TryGetValue(mp.Id, out a) ? a : null;
         }
 
-        private static ItemRoster PlayerArmory()
+        internal static ItemRoster PlayerArmory()   // C4: takze CaptiveArmory (zbrojownia gracza do zdobywcy)
         {
             try
             {
