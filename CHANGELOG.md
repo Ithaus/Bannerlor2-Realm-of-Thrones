@@ -1,5 +1,21 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (Unikaty: odejscie po klotni / reset perkow; licznik religii) - TEN SAM CZLOWIEK PRZENOSI SIE DO MIASTA; AUDYT RELIGII LICZY WIARY
+
+**Mod:** CrashScribe | **Galaz:** `w-toku/zbior-e8` (po 92951f2f) | **Tor:** S | **Klucze:** bez nowych (UniqueCompanionsMove) | **Status:** DO SPRAWDZENIA
+
+**Problem:** (1) uwaga recenzji unikatow: towarzysz unikat, ktory odchodzi po klotni (gra `CompanionRolesCampaignBehavior.OnHeroRelationChanged` - relacja z graczem < -10)
+albo ktorego gra zabiera przy resecie perkow (`PerkResetCampaignBehavior.RemoveACompanionFromPlayerParty`), byl usuwany (`KillCharacterAction.ApplyByRemove`, Lost) jeszcze
+w rodzie gracza - po 40 dobach ROT robil nowego (Jeff 14.10: "to ten sam karzel"). (2) linia CrashScribe `AUDYT RELIGII` pisala 'brak Faith' i 0 duchownych
+przy dzialajacej religii: `ReligionsManager.Religions` to slownik (element KeyValuePair, religia w Key), a `Religion.Clergy` to MBReadOnlyDictionary (nie ICollection).
+
+**Zmiana:** (1) znacznik `_inLeave` (prefiks + finalizer na obu metodach gry); w `KillPrefix` unikat najpierw odchodzi z rodu jak przy zwolnieniu
+(`RemoveCompanionAction.ApplyByFire`: z druzyny, zbieg albo ucieczka z niewoli, zdjecie z namiestnika), potem przenosi sie do miasta swojej kultury (jak TryKillCompanion
+i zwolnienie). Linia wpiecia: "odejscia po klotni / reset perkow 2/2 PODPIETE" (UN-0 sprawdza brak BRAK). (2) licznik bierze Key ze slownika i Count z Clergy.
+
+**Do sprawdzenia w tescie:** UN-0 TAK; przy klotni z unikatem linia "przeprowadzka ... (towarzysz odszedl po klotni / zabrany przy resecie perkow"; AUDYT RELIGII z nazwami wiar
+i liczba duchownych (przy EnableReligion = true w BannerKings.json).
+
 ## 2026-10-14 (Recenzja bitwy szturmu SZ1-SZ4, po ffda22e1, recenzja z poprawka) - SZ1 A ODWROT OB2: SZTURM AI NIE COFA SIE PRZED GARSTKA NA MURACH (PONIZEJ PROGU GRY TRZEBA CWIERCI OBRONCOW ZE STARTU SZTURMU); PRZYKLADY PRZELICZONE; GRUPA szturm SZ-5b
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/bitwa-szturmu` (po ffda22e1) | **Tor:** L (recenzja z poprawka) | **Klucze:** bez nowych; straz garstki jest czescia `SiegeWallsAnyGarrison` (SZ1; wylaczony = prog gry > 100 / > 30, jak b47fecc3) - stala `SiegeWalls.ManShare` 0.25; podpowiedz klucza dopisana (gen_mcm 1503) | **Zapis:** nic | **Pliki:** `Armoury/src/SiegeWalls.cs`, `Armoury/src/Settings.cs` + `McmSettings.cs` (tylko podpowiedz SZ1), `tools/sprawdz_logi.py` (tylko `szturm_main`, `SZ_OB2D`, `SZ_PUSH`, pomoc)

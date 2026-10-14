@@ -329,8 +329,9 @@
        UniqueCompanionsMove: when the base game would remove a free unique companion (no clan, no party, not a
        prisoner), it moves him or her to a random town of his or her culture instead - the same person, so nobody
        disappears from the taverns for good; a companion you dismiss ("I no longer have need of your services" - the
-       base game removed him or her at once) goes back to a tavern the same way. A companion who leaves you after a
-       quarrel is still removed as in the base game (Realm of Thrones makes a new one some 40 days later).
+       base game removed him or her at once) goes back to a tavern the same way, and so does a companion who leaves you
+       after a quarrel or whom the game takes away when you reset perks (the base game removed them, and Realm of Thrones
+       made a new one some 40 days later).
        UniqueCompanionsDuplicateGuard: once a day, should two living unique companions ever share a template (the
        game's code gives no way to it, so this should never act), the free one is removed and the log says so.
        Their children are left out (they share the parent's template).

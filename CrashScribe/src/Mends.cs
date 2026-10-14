@@ -3106,9 +3106,13 @@ namespace CrashScribe
                 int nRel = 0, clergyTotal = 0;
                 if (rels != null)
                 {
-                    foreach (var rel in rels)
+                    foreach (var relItem in rels)
                     {
-                        if (rel == null) continue;
+                        if (relItem == null) continue;
+                        // ReligionsManager.Religions to slownik Religion -> wierni: element to KeyValuePair, religia jest w Key (14.10: bez tego
+                        // licznik pisal 'brak Faith' i 0 duchownych przy dzialajacej religii)
+                        object rel = relItem;
+                        try { var key = Traverse.Create(relItem).Property("Key").GetValue(); if (key != null) rel = key; } catch { }
                         nRel++;
                         string name = "?";
                         try
@@ -3119,7 +3123,13 @@ namespace CrashScribe
                         }
                         catch { }
                         int clergy = 0;
-                        try { var cl = Traverse.Create(rel).Property("Clergy").GetValue() as System.Collections.ICollection; clergy = cl != null ? cl.Count : 0; } catch { }
+                        try
+                        {
+                            var clo = Traverse.Create(rel).Property("Clergy").GetValue();   // MBReadOnlyDictionary<Settlement, Clergyman> - liczba przez Count
+                            if (clo is System.Collections.ICollection cl) clergy = cl.Count;
+                            else if (clo != null) { var cnt = Traverse.Create(clo).Property("Count").GetValue(); clergy = cnt is int ci ? ci : 0; }
+                        }
+                        catch { }
                         clergyTotal += clergy;
                         if (sb.Length > 0) sb.Append(", ");
                         sb.Append(name).Append(" (duchownych ").Append(clergy).Append(')');
