@@ -1,5 +1,27 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (A17 - podsumowanie) - 11 STARYCH ZALEGLOSCI: co zrobione kodem, co bez kodu (cecha / juz naprawione), co NIE zrobione i komu przekazane
+
+**Mod:** - (tylko dziennik) | **Galaz:** `w-toku/a17-zaleglosci` (od 79a8d89) | **Zrodlo:** `docs/reszta-2026-10-14/ROZPOZNANIE-A17.md` (repo glowne), logi `D:\Backup-Bannerlord\logs\2026-10-14-noc` (fin29 `Armoury-2026-10-14_05-22-14.log` - najnowszy pelny bieg 120 dob; sesje 05-52-43 i 06-01-15 maja tylko CSV, bez logu glownego), bieg dwuletni `Armoury-2026-10-13_21-14-13.log`, rok 2 + 60 `..._04-50-35`.
+
+**ZROBIONE kodem (wpisy wyzej, od najwiekszego skutku; kazde pod kluczem MCM, wylaczone = 79a8d89; `--grupa a17`):** poz. 11 ludzie partii kasowanej po bitwie (`DestroyedPartyMenRouted`, + diagnoza D4); poz. 6 statki do liczby idealnej stoczni (`ShipPortsBuyToIdeal`); poz. 4 unikat nie jest towarem mieszczan (`UniquesNotFolkGoods`); poz. 10 pojedynek z Nocnym Krolem - wstaja polegli tej bitwy (`OthersDuelFromFallen`); linie diagnozy D1 konie, D2 ryby, D3 unikat z polki (`A17DiagnosticLines`, tylko log).
+
+**BEZ KODU - werdykty z dowodem:**
+- poz. 2 port Saath i Lordsport bez nadwyzki - CECHA (regula 181: porty placa tylko z nadwyzki - B5-5 0 w obu biegach); male porty rzadko ponizej zapasu (Lordsport 3/120 dob fin29, Saath 37/120). Dlugie serie wielkich portow (B5-7 NIE: Volantis 632/728 dob ponizej zapasu, Braavos 525, Tolos 259) - przez tabory wsi i kiese ludu (Volantis: tabory -6.20 mln, nasz tick -1.59 mln, do lordow -0.05 mln) - PRZEKAZANE do A4/A12 "pieniadze w roku 2" (razem z rabatem AI 0.01 przy kupnie statku 181d); odplyw na statki maleje przez poz. 6.
+- poz. 5 2.8% przejsc obok mostu Bliznakow - JUZ NAPRAWIONE (pomiar): F8-2 TAK fin29 4 z 595 = 0.7%, dwuletni 24 z 3 959 = 0.6% (prog 2%); 2.8% (W34) bylo przed poprawka licznika F8. PRZEKAZANE do myta B3 (galaz tb): partie "zmiana strony poza strefa" doliczyc do przejsc mostem i do myta.
+- poz. 8 Thenn - kasa placi taborom wiecej, niz zarabia - JUZ NAPRAWIONE (objaw): ponizej zapasu kupcow 12/120 dob fin29, 122/728 dwuletni, nigdy < 1 000 zl (raport roczny: 38 dob < 1 000); ktora paczka to poprawila - nie ustalone. Linia "Kasy zaulkow (m6b)" zostaje jako INFO.
+- poz. 9 rynsztunek gracza u zywego lorda bez odkupu - JUZ NAPRAWIONE (C4 14.10, RC `PlayerLosesLikeAiLord` true - rynsztunek zostaje na graczu; u Jeffa brak pliku MCM RC - dziala domyslna). 0 pojman gracza w biegach (autotest tej drogi nie cwiczy).
+
+**NIE ZROBIONE (i dlaczego):**
+- poz. 1 kolejka odziezy wojska (W1-7, N1-6 NIE: fin29 czeka 8 697 -> 10 747 szt. d90-120, dostarczone 59% potrzeby; sukno 55/133 szt./d) - BLAD podazy, nie kodu kolejki: 88% wizyt z potrzeba konczy sie "bez towaru na polce"; sukno: produkcja 221/d, mieszczanie 147/d, wojsko 56/d, 80% zapasu w karawanach. Regula (jedna dla trzech tkanin): niezaspokojona kolejka wojska liczona jako popyt w regulatorze surowca i ceny - praca towary-3 robi to dla plotna i skory; sukno/welna musza wejsc do TEJ SAMEJ reguly (drugi regulator w A17 liczylby to samo drugi raz - zasada 0). PRZEKAZANE do towary-3 (`docs/przekazanie/wf-towary-3.js` ZAKRES pkt 1-3: dopisac welne/sukno).
+- poz. 3 reszta koni (K1-3 NIE: -51.9 konia/d fin29, juczne -3 461 w d31-120) i poz. 7 ryby bez zrodla (M6b-5a NIE: +33.5/d fin29, +72.2/d dwuletni) - NIE WIEM: przyczyny nie ustalone; tylko linie diagnozy D1 / D2. Naprawa po jednym biegu 120 dob (A17-D1: ramka albo posiadacz z ok. -40 jucznych/d; A17-D2: posiadacz z dodatnim netto ryb + stos).
+- poz. 4 renly_armor (dwuletni d197, targ Celtigar Keep; A17-4c na dwuletnim: "dzien 109032 renly_armor: targ Celtigar Keep -> ubylo") - NIE WIEM: zbroja, budzet konsumpcji 0, kasowanie 5% pomija uzbrojenie - inna droga niz suknia; linia diagnozy D3 (ramka + stos, 20 na sesje).
+- poz. 9 opcja dla sciezki wylaczonej (RC `PlayerLosesLikeAiLord` false: rynsztunek w liscie RC `_storedGear` poza swiatem, odkup tylko dialogiem u pojmujacego) - NIE zrobione: werdykt JUZ NAPRAWIONE przy kluczu wlaczonym (domyslnym), sciezka off to stan sprzed C4 z wyboru gracza; przeniesienie rynsztunku do taboru pojmujacego to zmiana RC (zapis, odkup, paser) - wieksza niz 3 h, bez dowodu potrzeby.
+- poz. 11 droga C (pobity oblegajacy N3, ktorego rannych gra nie wziela - Daeron Vaith 27) - regula juz ich obejmuje (do niewoli wszyscy pozostawieni przez H3), ale DLACZEGO gra ich nie wziela - nie ustalone; linia D4 (BattleState, RetreatingSide, notatka H3) pokaze warunek.
+- Do wiadomosci (poza A17): darmowa produkcja statkow stoczni NavalDLC do limitu (statki z niczego) - na zakonczenie (D).
+
+**Status:** DO SPRAWDZENIA (cztery naprawy i diagnozy zbudowane, kod 0; test 120 dob z `python -I tools/sprawdz_logi.py --grupa a17 <log>`).
+
 ## 2026-10-14 (A17 poz. 3, 7, 4 - NIE WIEM) - LINIE DIAGNOZY D1-D3: konie wedlug ramek i posiadaczy, ryby poza ramkami, unikat schodzacy z polki (tylko log)
 
 **Mod:** Armoury | **Galaz:** `w-toku/a17-zaleglosci` | **Tor:** S (tylko log) | **Klucze:** nowy `A17DiagnosticLines` true (grupa ksiegi towarow, obok `GoodsLedgerTickAuthors`; wylaczony = bez linii i bez kosztu; w `Armoury.json` Jeffa go nie ma) | **Pliki:** `Armoury/src/A17Diag.cs` (nowy), `GoodsLedger.cs` (Tap - wolanie, FrameName), `ArmouryBehavior.cs` (Daily po ksiedze towarow, Reset), `Settings.cs`, `McmSettings.cs` (gen_mcm 1434), `tools/sprawdz_logi.py` (`--grupa a17`, A17-D1, A17-D2, A17-4d)
