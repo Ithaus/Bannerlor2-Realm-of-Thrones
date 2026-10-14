@@ -386,6 +386,74 @@ namespace CrashScribe
             try { return mp.MapEvent != null || mp.SiegeEvent != null; } catch { return true; }
         }
 
+        // --- B5 (PLAN 1.15, audyt 2026-10-09 raport 06 N3): limit hordy Zewu ---
+        // Zew trzymal najsilniejsza bande pelna w 85% (wantLimit = ludzie / 0.85) bez gornej granicy - kazda wygrana i nekromancja do wolnego miejsca
+        // dawaly nastepnego dnia znow 15% miejsca (kula sniezna: 1 609 -> 3 001 w dobach 108-123 logu rocznego audytu 09.10, 5 000+ w roku). Klucz MCM Armoury NightKingCallMaxHost
+        // (dom. 1140; 0 = bez limitu, jak dotad; brak pola w Armoury - 0): Zew NIE PODNOSI wspolnej premii (_partySizeGrowth) ponad te, przy ktorej limit
+        // partii gospodarza z ZYWEGO modelu (PartySizeLimitModel - z mnoznikiem BK i +250 Nocnego Krola) siega limitu hordy. Nie obniza premii z powodu limitu:
+        // miejsce, ktore ROT daje sam (OthersPartySizeLimitGrowth 3/dobe, w biegu dwuletnim 2 184 w d728) i horda juz wieksza od limitu zostaja (bez dezercji
+        // z naszej reguly). Obnizanie premii przy malejacej hordzie - jak dotad (R3, osobno).
+        private static int MaxHost()
+        {
+            try { return Math.Max(0, (int)Math.Round(Mends.ArmouryFloat("NightKingCallMaxHost", 0f))); }
+            catch { return 0; }
+        }
+
+        private static int LiveLimit(MobileParty mp)
+        {
+            try
+            {
+                var m = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.PartySizeLimitModel : null;
+                return m != null && mp != null && mp.Party != null ? (int)m.GetPartyMemberSizeLimit(mp.Party).ResultNumber : 0;
+            }
+            catch { return 0; }
+        }
+
+        /// <summary>B5: limit partii z zywego modelu przy premii b0 (l0) i nachylenie k (limit na punkt premii: pomiar przy b0 i b0 + 100) - BK mnozy premie ROT,
+        /// wiec baza "limit - premia" z pamieci podrecznej jest falszywa (R3). Premia wraca do wartosci sprzed pomiaru (finally). false - pomiar nieudany.</summary>
+        private static bool Slope(object beh, MobileParty mp, int b0, out int l0, out double k)
+        {
+            l0 = 0; k = 1.0;
+            object old = null;
+            try
+            {
+                old = _fGrowth.GetValue(beh);
+                _fGrowth.SetValue(beh, (float)b0);
+                l0 = LiveLimit(mp);
+                _fGrowth.SetValue(beh, (float)(b0 + 100));
+                int l1 = LiveLimit(mp);
+                k = (l1 - l0) / 100.0;
+                return l0 > 0 && k > 0.01;
+            }
+            catch { return false; }
+            finally { try { if (old != null) _fGrowth.SetValue(beh, old); } catch { } }
+        }
+
+        /// <summary>B5: najwieksza banda Innych w polu (ludzie, zdrowi, limit z pamieci gry), liczba band i trupow razem - do linii dobowej, takze gdy Zew spi.</summary>
+        private static string HostNote(Clan ww)
+        {
+            try
+            {
+                MobileParty big = null; int n = 0; long all = 0;
+                foreach (var wp in ww.WarPartyComponents)
+                {
+                    var mp = wp != null ? wp.MobileParty : null;
+                    if (mp == null || !mp.IsActive || mp.MemberRoster == null) continue;
+                    n++; all += mp.MemberRoster.TotalManCount;
+                    if (big == null || mp.MemberRoster.TotalManCount > big.MemberRoster.TotalManCount) big = mp;
+                }
+                int cap = MaxHost();
+                string capS = cap > 0 ? "limit hordy Zewu " + cap + " (Night King Call Max Host)" : "limit hordy Zewu: brak (0 - jak dotad)";
+                if (big == null) return " Horda (B5): Inni bez bandy w polu; " + capS + ".";
+                string who = big.LeaderHero != null ? big.LeaderHero.Name.ToString() : big.Name.ToString();
+                int lim = 0;
+                try { lim = big.Party.PartySizeLimit; } catch { }
+                return " Horda (B5): najwieksza banda " + who + " - " + big.MemberRoster.TotalManCount + " ludzi (zdrowych " + big.MemberRoster.TotalHealthyCount
+                       + "), limit partii " + lim + "; band w polu " + n + ", trupow razem " + all + "; " + capS + ".";
+            }
+            catch { return " Horda (B5): blad odczytu band."; }
+        }
+
         /// <summary>Zdrowi NIE-bohaterowie dawcy przechodza do gospodarza; dawca zostawia
         /// sobie <paramref name="keep"/> zdrowych. Zwraca liczbe przeniesionych.</summary>
         private static int Transfer(MobileParty from, MobileParty to, int keep, int need)
@@ -658,7 +726,9 @@ namespace CrashScribe
                     double day = Day();
                     int early = TurnBack(ww, day, false);
                     if (early > 0 && NightKingGate.Active) _breakPending = true;   // recenzja T2c: oblezenie w bitwie - co godzine do skutku
-                    Scribe.Line(CalendarState(day, early));
+                    // B5: gdy Zew spi (albo jest wylaczony) - liczebnosc najwiekszej bandy i limit w linii kalendarza (pomiar przed obudzeniem Zewu)
+                    bool quiet = !Config.NightKingCallEnabled || day < Config.NightKingCallFromDay;
+                    Scribe.Line(CalendarState(day, early) + (quiet ? HostNote(ww) : ""));
                     if (NightKingGate.Active)
                     {
                         gateLined = true;
@@ -679,7 +749,8 @@ namespace CrashScribe
                     _greeted = true;
                     Scribe.Line("Zew Nocnego Krola: czynny - cel " + target + " zdrowych w jednej bandzie, dawca zostawia sobie "
                                 + Config.NightKingCallKeep + " (Nocny Krol " + Config.NightKingCallKeepNk + "), horda pelna w "
-                                + (int)(full * 100) + "%.");
+                                + (int)(full * 100) + "%; " + (MaxHost() > 0 ? "limit hordy Zewu " + MaxHost() + " ludzi (B5, Night King Call Max Host)"
+                                                                         : "limit hordy Zewu: brak (B5 - Night King Call Max Host 0)") + ".");
                 }
 
                 // bandy Innych
@@ -735,12 +806,41 @@ namespace CrashScribe
                         int leadMen = lead.MemberRoster.TotalManCount;
                         int wantLimit = Math.Max(baseLimit + 50, (int)(leadMen / full));
                         int wantBonus = Math.Max(0, wantLimit - baseLimit);
+                        // B5: limit hordy - Zew nie podnosi premii ponad te, przy ktorej limit gospodarza (zywy model) siega NightKingCallMaxHost; nie obniza z powodu limitu
+                        int cap = MaxHost();
+                        string capNote = "";
+                        if (cap > 0 && wantBonus > bonusNow)
+                        {
+                            int l0; double k;
+                            int allowed;
+                            if (Slope(beh, lead, bonusNow, out l0, out k))
+                            {
+                                int capBonus = bonusNow + (int)Math.Floor((cap - l0) / k);
+                                allowed = Math.Max(bonusNow, capBonus);
+                                capNote = "; limit hordy Zewu " + cap + ": limit partii przy premii " + bonusNow + " = " + l0 + " (model, " + k.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)
+                                          + " na punkt premii)";
+                            }
+                            else
+                            {
+                                allowed = bonusNow;   // bez pomiaru modelu - ostroznie: bez podnoszenia
+                                capNote = "; limit hordy Zewu " + cap + ": pomiar modelu nieudany - bez podnoszenia premii";
+                            }
+                            if (wantBonus > allowed)
+                            {
+                                capNote += " - Zew NIE podnosi premii ponad " + allowed + " (chcial " + wantBonus + ")";
+                                wantBonus = allowed;
+                            }
+                        }
+                        else if (cap > 0) capNote = "; limit hordy Zewu " + cap;
+                        else capNote = "; limit hordy Zewu: brak (Night King Call Max Host 0 - jak dotad)";
                         if (Math.Abs(bonusNow - wantBonus) > 5)
                         {
                             _fGrowth.SetValue(beh, (float)wantBonus);
                             limitNote = "; premia limitu hordy " + bonusNow + " -> " + wantBonus + " (baza " + baseLimit + ", limit " + (baseLimit + wantBonus) + ")";
                         }
                         else limitNote = "; premia limitu " + bonusNow + " (limit " + limitNow + ")";
+                        // B5: liczebnosc hordy i limit partii z zywego modelu PO decyzji (do progu D2-10)
+                        limitNote += capNote + "; horda " + leadMen + " ludzi (zdrowych " + lead.MemberRoster.TotalHealthyCount + "), limit partii (model) " + LiveLimit(lead);
                     }
                     catch (Exception e) { try { Scribe.Report("CrashScribe", e, "NightKingCall.limit", null); } catch { } }
                 }
@@ -753,7 +853,7 @@ namespace CrashScribe
                                 + host.MemberRoster.TotalHealthyCount + " zdrowych z " + host.MemberRoster.TotalManCount + " (cel " + target
                                 + ", band w polu " + bands.Count + ")" + limitNote + ".");
                 else
-                    Scribe.Line("Zew Nocnego Krola: wszystkie " + bands.Count + " bandy w walce albo oblezeniu - dzis bez przemarszu.");
+                    Scribe.Line("Zew Nocnego Krola: wszystkie " + bands.Count + " bandy w walce albo oblezeniu - dzis bez przemarszu." + HostNote(ww));   // recenzja B5: horda i limit takze w tej dobie
 
                 March(beh, ww, lead);   // Pochod: gotowa horda dostaje cel za Murem
             }

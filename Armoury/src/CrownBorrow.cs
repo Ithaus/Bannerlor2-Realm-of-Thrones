@@ -56,6 +56,7 @@ namespace Armoury
         // liczniki doby
         internal static long LastLent, LastRepaid, LastLost; internal static int LastLentN;
         private static long _dLent, _dRepaid, _dDue, _dInterest, _dFees, _dLost, _dNeed, _dPool, _dBankCut, _dLimitCut;
+        private static long _dFallPaid; private static int _dFallPaidN;   // A14 / G14 (drobne2): splata dlugu ze skarbca upadajacego krolestwa (FallenCrown)
         private static int _dLentN, _dNeedN, _dNoArrears, _dNoWarmup, _dNoLimit, _dNoBank, _dDueN, _dShortN, _dNewArr, _dEndArr, _dLostN;
         private static int _stumbles, _importN = -1, _importBad;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -73,6 +74,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dLent = _dRepaid = _dDue = _dInterest = _dFees = _dLost = _dNeed = _dPool = _dBankCut = _dLimitCut = 0;
+            _dFallPaid = 0; _dFallPaidN = 0;
             _dLentN = _dNeedN = _dNoArrears = _dNoWarmup = _dNoLimit = _dNoBank = _dDueN = _dShortN = _dNewArr = _dEndArr = _dLostN = 0;
             foreach (var kv in _loans) { kv.Value.DLent = 0; kv.Value.DDue = 0; kv.Value.DPaid = 0; }
         }
@@ -158,6 +160,26 @@ namespace Armoury
         {
             try { Loan l; return k != null && k.StringId != null && _loans.TryGetValue(k.StringId, out l) ? Math.Max(0, l.Principal) : 0; }
             catch { return 0; }
+        }
+
+        /// <summary>A14 / G14 (drobne2): krolestwo upada (KingdomDestroyedEvent, FallenCrown) - dlug korony w Banku splacony ze skarbca, najwyzej `avail`, ZANIM skarbiec
+        /// wypadnie ze swiata. Kapital Banku += splata, dlug -= splata; skarbiec zmniejsza wolajacy (o zwrocona kwote). Reszta dlugu (skarbiec nie starczyl) przepada
+        /// jak dotad (Instalments: "zniszczone - dlug w Banku N zl przepada"). Zwraca splate (0 - brak dlugu, blad).</summary>
+        internal static long RepayOnFall(Kingdom k, long avail)
+        {
+            try
+            {
+                Loan l;
+                if (k == null || k.StringId == null || avail <= 0 || !_loans.TryGetValue(k.StringId, out l) || l.Principal < 1) return 0;
+                long pay = Math.Min(avail, (long)Math.Ceiling(l.Principal));
+                int ip = (int)Math.Min(int.MaxValue, pay);
+                if (ip <= 0) return 0;
+                IronBank.CapitalAdd(ip);
+                l.Principal = Math.Max(0, l.Principal - ip); l.Repaid += ip;
+                _dFallPaid += ip; _dFallPaidN++;
+                return ip;
+            }
+            catch (Exception e) { Stumble("RepayOnFall", e); return 0; }
         }
 
         /// <summary>E5/B2 (184): korona krolestwa w zaleglosci wobec Banku (linia 184 - prog "bez zaleglosci przy s ponizej pulapu"). Tylko odczyt.</summary>
@@ -418,6 +440,7 @@ namespace Armoury
                   .Append("; nowe zaleglosci dzis ").Append(_dNewArr).Append(", koniec zaleglosci ").Append(_dEndArr)
                   .Append(" | Bank: kapital ").Append((long)cap).Append(", prog kredytu koron ").Append(Math.Max(0, s.CrownLoanBankFloor))
                   .Append(", Bank stracil (krolestwa zniszczone) dzis ").Append(_dLost).Append(" (").Append(_dLostN).Append("), razem ").Append(_lost)
+                  .Append(", splata ze skarbcow upadajacych krolestw (G14) dzis ").Append(_dFallPaid).Append(" (").Append(_dFallPaidN).Append(')')
                   .Append(" | od poczatku: pozyczono ").Append(borrowed).Append(", splacono ").Append(repaid)
                   .Append(" | na krolestwo (dlug/limit, oprocentowanie, rata zaplacona/nalezna, +pozyczone dzis, raty 28 dob): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
                   .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');

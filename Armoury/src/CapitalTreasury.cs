@@ -147,6 +147,13 @@ namespace Armoury
             return __exception;
         }
 
+        /// <summary>A14 / G14 (drobne2, FallenCrown): w oknie KingdomManager.SiegeCompleted ze zdobyciem twierdzy krolestwa `k` - frakcja zdobywcy (krolestwo upada
+        /// razem z ta twierdza); poza oknem albo inna frakcja osady - null. Tylko odczyt.</summary>
+        internal static IFaction SiegeWinnerOf(Kingdom k)
+        {
+            return _depth > 0 && k != null && ReferenceEquals(_oldF, k) ? _winF : null;
+        }
+
         // ------------------------------------------------------------ stolica krolestwa
         /// <summary>Stolica krolestwa: BK (BKCapitalBehavior.GetCapital) albo - bez BK lub bez wpisu BK - Kingdom.InitialHomeSettlement. src: "BK" / "siedziba" / "-".</summary>
         private static Settlement CapitalOf(Kingdom k, out string src)

@@ -66,7 +66,8 @@ namespace Armoury
         private static readonly Dictionary<string, LvWk> _lvWeek = new Dictionary<string, LvWk>();
         private static int _lvWeekStart = -1, _lvPlWeekStart = -1;
         private static long _lvPlWeek;
-        private static bool _lvPlTold;
+        // poprawka po audycie (gracz 10, drobne2): wyjasnienie W7 gracza jak W6b/W5 - najwyzej raz na PlToldEvery (30) dob gry tej kampanii w procesie
+        // (PlTellDue, KingdomTreasury.ScutagePlayer.cs; pamiec procesu, bez pola zapisu - dotad po kazdym wczytaniu, _lvPlTold czyszczone w LordLevyReset)
         /// <summary>"Obieg" (rody dostaly): stawka wojenna pana tej doby - kiesy ludu i wsi -> glowy rodow (razem, z ludu, ze wsi).</summary>
         internal static long LastLordLevy, LastLordLevyFolk, LastLordLevyVill;
 
@@ -80,7 +81,7 @@ namespace Armoury
         private static void LordLevyReset()
         {
             _lvPlan.Clear(); _lvPlanDay = int.MinValue; _lvCash.Clear(); _lvPaid.Clear(); _lvBoost.Clear(); _lvDay = int.MinValue;
-            _lvErr.Clear(); _lvStumbles = 0; LvClearDay(); _lvWeek.Clear(); _lvWeekStart = -1; _lvPlWeekStart = -1; _lvPlWeek = 0; _lvPlTold = false;
+            _lvErr.Clear(); _lvStumbles = 0; LvClearDay(); _lvWeek.Clear(); _lvWeekStart = -1; _lvPlWeekStart = -1; _lvPlWeek = 0;
             LastLordLevy = LastLordLevyFolk = LastLordLevyVill = 0;
         }
 
@@ -435,9 +436,9 @@ namespace Armoury
                 if (c == null || !on || !s.PlayerWarLevy) { _lvPlWeek = 0; _lvPlWeekStart = -1; return; }
                 long got;
                 _lvPaid.TryGetValue(c, out got);
-                if (got > 0 && !_lvPlTold)
+                if (got > 0 && PlTellDue(ref _plToldLevyDay, today))
                 {
-                    _lvPlTold = true;
+                    Log.Info("Stawka wojenna pana (W7): dzien " + today + " | wyjasnienie gracza pokazane (najwyzej raz na " + PlToldEvery + " dob tej kampanii w procesie).");
                     Log.Player("War levy: while your lands cannot pay for your companies and the crown's war aid falls short, your towns, castles and villages give you up to "
                                + (100 * LvRate(s)).ToString("0.#", WtInv) + "% a day of the coin they hold above their reserve, toward the wages of the men in your companies. "
                                + "Their loyalty and prosperity suffer in proportion. A fief with loyalty under " + LvMinLoy(s).ToString("0", WtInv)
@@ -447,7 +448,7 @@ namespace Armoury
                 if (today - _lvPlWeekStart >= 7)
                 {
                     long w = _lvPlWeek - got;
-                    if (w > 0) Log.Player("War levy: your fiefs gave you " + w.ToString("N0", WtInv) + " coins this week toward your soldiers' wages.");
+                    if (w > 0) Log.Player("War levy: your fiefs gave you " + w.ToString("N0", WtInv) + " denars this week toward your soldiers' wages.");   // gracz 7: "denars" jak reszta
                     _lvPlWeek = got; _lvPlWeekStart = today;
                 }
             }

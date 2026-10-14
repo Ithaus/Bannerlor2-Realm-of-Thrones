@@ -248,7 +248,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ blizna w chwili wyboru (postfiks OnSiegeAftermathApplied - po karze gry)
-        public static void AftermathPost(Settlement __1, SiegeAftermathAction.SiegeAftermath __2)
+        public static void AftermathPost(Settlement __1, SiegeAftermathAction.SiegeAftermath __2, Clan __3)
         {
             try
             {
@@ -273,9 +273,22 @@ namespace Armoury
                 town.Prosperity = Math.Max(0f, town.Prosperity * (1f - cut));
                 town.Loyalty = Math.Max(0f, town.Loyalty - Math.Max(0, s.SackLoyaltyHit));
                 _dScar++;
+                // poprawka po audycie (gracz 6, drobne2): ostrzezenie "is yours - but the sack has left it bleeding" w chwili blizny, gdy osada JUZ jest rodu gracza
+                // (gracz-wodz: gra zmienia pana PRZED wyborem w menu, wiec OwnerChangedScarSkipped nie widzial jeszcze lupu); u AI blizna jest przed zmiana pana -
+                // tu pan to jeszcze przegrany (__3), wiec gracz-przegrany nie dostaje tego zdania (ma "has been sacked" z Messages), a gracz-krol dostaje je przy zmianie pana
+                bool told = false;
+                try
+                {
+                    if (__1.OwnerClan != null && __1.OwnerClan == Clan.PlayerClan && __3 != Clan.PlayerClan)
+                    {
+                        Log.Player(__1.Name + " is yours - but the sack has left it bleeding: prosperity and loyalty are down.", true);
+                        told = true;
+                    }
+                }
+                catch (Exception e) { Stumble("AftermathPost(gracz)", e); }
                 if (MeasureOn)
                     Log.Info("Lup miast (L2 blizna): dzien " + (int)CampaignTime.Now.ToDays + " | osada " + __1.StringId + " | " + KName[kind] + " - dobrobyt " + (int)before + " -> "
-                             + (int)town.Prosperity + ", lojalnosc -" + s.SackLoyaltyHit + ".");
+                             + (int)town.Prosperity + ", lojalnosc -" + s.SackLoyaltyHit + (told ? " | komunikat gracza 'is yours' (osada juz rodu gracza)" : "") + ".");
             }
             catch (Exception e) { Stumble("AftermathPost", e); }
         }
@@ -291,8 +304,12 @@ namespace Armoury
                 bool sacked = st != null && _track.TryGetValue(st, out t) && t != null && t.Kind != KMercy && Now - t.Day0 < 1f;
                 Log.Info("WarLedger: " + (st != null ? st.StringId : "?") + " wziete obleczeniem - blizna w chwili wyboru zdobywcy (Sack Scar Only When Sacked): "
                          + (sacked ? "zlupione dzis" : "laska albo wybor gracza jeszcze nie zapadl") + ".");
+                // poprawka po audycie (gracz 6, drobne2): bez "Rebuild what you broke" - tu osade zlupil ktos inny (AI przed zmiana pana; gracz-wodz dostaje zdanie w AftermathPost)
                 if (sacked && newOwner != null && newOwner.Clan == Clan.PlayerClan)
-                    Log.Player(st.Name + " is yours - but the sack has left it bleeding: prosperity and loyalty are down. Rebuild what you broke.", true);
+                {
+                    Log.Player(st.Name + " is yours - but the sack has left it bleeding: prosperity and loyalty are down.", true);
+                    Log.Info("WarLedger: " + st.StringId + " - komunikat gracza 'is yours' (nowy pan = rod gracza, lup przed zmiana pana).");
+                }
             }
             catch (Exception e) { Stumble("OwnerChangedScarSkipped", e); }
         }

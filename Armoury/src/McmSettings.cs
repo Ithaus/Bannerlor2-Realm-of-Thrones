@@ -2541,31 +2541,31 @@ namespace Armoury
         public bool OutlawNoUndead { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Enabled", HintText = "battles fought without you: the beaten side mostly flees instead of dying - the slain follow the situation (horse to pursue, river or marsh behind, odds, seasoned men against levies), 5-65%; a few are taken; the rest go home or to the woods. The winner loses at most a few slain - the rest of his fallen are wounded. Your own battles fought on the field are not touched (auto-resolved ones: Losers Flee Player Auto)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleeEnabled { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Player Auto", HintText = "your own battles decided without you on the field (send troops / auto-resolve) follow the same rule as battles fought without you: the beaten side - theirs or yours - mostly flees, a few are taken, the slain follow the situation; the winner, you too, loses at most a few slain. Battles you fight on the field yourself, even in part, are not touched (needs Losers Flee Enabled)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleePlayerAuto { get; set; } = true;
 
         [SettingPropertyBool("Losers Flee Besiegers", HintText = "the same rule under the walls, in battles fought without you: a besieging host beaten by a sally from the fortress, or beaten in the open under the walls by the defenders and a relief force, and a relief force beaten by the besiegers' camp, mostly flees like a host beaten in the field instead of being slain or taken to the last man; the winner there, a garrison too, loses at most a few slain. The siege still ends and the beaten host is still scattered; the men who flee go home or to the woods. Storming the walls, the defenders of a fortress when they are beaten, and battles at sea are not touched. Your own battles under the walls: fought on the field - not touched; auto-resolved - as Losers Flee Player Auto says (needs Losers Flee Enabled; off = as before)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public bool LosersFleeBesiegers { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float WinnerDeathCapPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Loser Captive Veteran Percent", 0.00f, 120.00f, "0.00", HintText = "of the beaten men who live, this share of seasoned troops (tier 4 and up) is taken - they were worth a ransom")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float LoserCaptiveVeteranPercent { get; set; } = 30f;
 
         [SettingPropertyFloatingInteger("Loser Captive Common Percent", 0.00f, 20.00f, "0.00", HintText = "of the beaten men who live, this share of the rest is taken")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float LoserCaptiveCommonPercent { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Non Combatant Death Percent", 0.00f, 20.00f, "0.00", HintText = "villagers and fishermen beaten on the road: share slain; the rest run back to their own village (a few are taken only by peoples who keep slaves). Caravan guards fight and are judged like soldiers")]
-        [SettingPropertyGroup("Iron Bank")]
+        [SettingPropertyGroup("The law of the battlefield")]
         public float NonCombatantDeathPercent { get; set; } = 5f;
 
         [SettingPropertyBool("Prisoner Law Enabled", HintText = "captives sold in a town or castle, or set free, in a land that keeps no slaves no longer become slaves: common men and soldiers go back to their own land, and in Westeros bandits and outlaws are sent to the Wall to take the black. Westeros but the Iron Islands, and Braavos, Pentos, Lorath and the other free lands, keep no slaves; Slaver's Bay, Qarth (with New Ghys, Qarkash and the City of Bones), Volantis, Lys, Myr, Tyrosh, Qohor, Norvos, Valyria, the Dothraki and the Iron Islands (thralls) do: there captives sold, by the lords or by you at the ransom broker, become slaves of that town or castle, and captives you set free or leave behind after your battles go home. A land follows the present culture of its town or castle. In every land the criminal policy of the town or castle (yours to choose in your own fiefs) rules alike for the lords' sales and yours: Execution - the captives are put to death, Forgiveness - none are enslaved and they go home")]
@@ -4540,6 +4540,10 @@ namespace Armoury
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersBandFromCorpsePool { get; set; } = true;
 
+        [SettingPropertyInteger("Night King Call Max Host", 0, 6000, "0", HintText = "the Call of the Night King (from day 728) gathers the Others into one host and makes room in it for the slain it raises; it never makes room for a host larger than this many men - about 1,140: a host of 520 able to take a castle of 450 men, with room to grow. Room that Realm of Thrones itself gives its hosts as the days pass (Others Party Size Limit Growth) is not taken away, so a host that has already grown past this is not cut down - the Call only stops adding. As before, the Call also takes back the room a host no longer fills, so a host that loses men in battle shrinks toward this limit and the Call gives it no room back past it. 0 = no limit, as before (the Call keeps every victorious host 15% short of full, so it grows without end). Applied by CrashScribe, takes effect the next day")]
+        [SettingPropertyGroup("The Others rise from the fallen")]
+        public int NightKingCallMaxHost { get; set; } = 1140;
+
         [SettingPropertyBool("Others Rescued Are Fallen", HintText = "captives the Others free from a beaten party do not join the host as living men: each one is slain - he rises as a wight beyond or at the Wall (up to the room in the host, the rest wait as bodies), elsewhere he is burnt. Off = freed captives march with the Others alive, as before")]
         [SettingPropertyGroup("The Others rise from the fallen")]
         public bool OthersRescuedAreFallen { get; set; } = true;
@@ -5496,6 +5500,10 @@ namespace Armoury
         [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
         public bool StateHygieneEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Mid Day Load Keeps Day", HintText = "a save loaded in the middle of a day keeps what that day already paid for: the building work lords and townsfolk paid for this morning still goes up in the towns and castles that have not yet built today, and the crown still leaves out of tomorrow's wage refund the wages it already helped to pay (war aid, scutage, war levy). Off = as before: after loading, the rest of the day builds nothing that was paid for, and the next refund counts that aid a second time")]
+        [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
+        public bool MidDayLoadKeepsDay { get; set; } = true;
+
         [SettingPropertyBool("Stage8 Measure Log", HintText = "Writes daily lines that measure the AI's gear for stage 8: wear and repairs of garrisons and lords' parties and why repairs wait, arrows the AI would have used up, the prices the AI pays against the worth of the piece, loot copied to victors while the beaten keep it, and the crown's workshop monopolies (diagnostics only; nothing in the game changes).")]
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8MeasureLog { get; set; } = true;
@@ -5624,6 +5632,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float CapitalTreasuryShare { get; set; } = 0.333f;
 
+        [SettingPropertyBool("Fallen Crown Treasury", HintText = "when a realm falls and is no more, its royal treasury does not vanish with it: first the crown's debt to the Iron Bank is paid out of it, then what is left goes to whoever brought the realm down - the realm that stormed its last stronghold, or the realm it had just made peace with when it was ended at the peace table (to that realm's treasury; a conqueror with no realm - to the head of his house); when the realm ended some other way (its ruler's death, a rebellion that came to nothing) it goes to the head of the house that ruled it, which carries the treasury away into exile. If no one is left to take it, it goes to the Iron Bank. Off = as before: the treasury of a fallen realm is lost and its debt to the Bank written off")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool FallenCrownTreasury { get; set; } = true;
+
         [SettingPropertyBool("Enemy Caravans Seized", HintText = "caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool EnemyCaravansSeized { get; set; } = true;
@@ -5667,6 +5679,10 @@ namespace Armoury
         [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign). Turned off during a campaign, only the salt pans go back to their old yield; the flax villages stay.")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool GoodsRatesByPattern { get; set; } = true;
+
+        [SettingPropertyBool("Flax Villages Without Climate Fix", HintText = "in a campaign begun with Goods Rates By Pattern, the flax villages stay flax villages even when Village Climate Fix is turned off: five of them (Berrybush, Lanthas, Sagora, Shirosi, Port Yhos) were cotton growers only because of that fix, and with it off they used to fall back to cattle, sheep and woodcutting for good - while the harvest of the world was still reckoned with them growing flax. Takes effect the next time a save is loaded. Off = as before (with Village Climate Fix off those five go back to the map's trade)")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool FlaxVillagesWithoutClimateFix { get; set; } = true;
 
         [SettingPropertyBool("Folk Earn From Village Buys", HintText = "The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
@@ -6806,6 +6822,7 @@ namespace Armoury
             s.OthersRiseOnlyFromFallen = OthersRiseOnlyFromFallen;
             s.OthersRaidWights = OthersRaidWights;
             s.OthersBandFromCorpsePool = OthersBandFromCorpsePool;
+            s.NightKingCallMaxHost = NightKingCallMaxHost;
             s.OthersRescuedAreFallen = OthersRescuedAreFallen;
             s.SameRaceOnly = SameRaceOnly;
             s.MapVillagesEnabled = MapVillagesEnabled;
@@ -7045,6 +7062,7 @@ namespace Armoury
             s.BurnedVillageLabels = BurnedVillageLabels;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.StateHygieneEnabled = StateHygieneEnabled;
+            s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
             s.Stage8WorldLog = Stage8WorldLog;
@@ -7077,6 +7095,7 @@ namespace Armoury
             s.SackTakesGoods = SackTakesGoods;
             s.CapitalTreasurySeized = CapitalTreasurySeized;
             s.CapitalTreasuryShare = CapitalTreasuryShare;
+            s.FallenCrownTreasury = FallenCrownTreasury;
             s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
@@ -7088,6 +7107,7 @@ namespace Armoury
             s.LevyByPeople = LevyByPeople;
             s.MilitiaByPeople = MilitiaByPeople;
             s.GoodsRatesByPattern = GoodsRatesByPattern;
+            s.FlaxVillagesWithoutClimateFix = FlaxVillagesWithoutClimateFix;
             s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
         }
 

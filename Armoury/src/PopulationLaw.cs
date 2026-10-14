@@ -99,9 +99,30 @@ namespace Armoury
             _gStumbles = 0; _floorStumbles = 0; _errGrowth = false; _errGrowthLog = false; _errFloor = false; _modelLogged = false;
         }
 
+        /// <summary>A14 / G21 (audyt zapis 3, drobne2): kalibracja biegnie leniwie - w nowej kampanii w tickach startowych OnNewGameCreated, PRZED McmSettings.Apply
+        /// (OnSessionLaunched), czyli z Armoury.settings.xml i domyslnych pol, nie z MCM. Trzy klucze czytane TU (Sarnor People Raised, Population Scale,
+        /// Population Max Per Hearth) bierzemy z MCM wprost - te same wartosci, ktore McmSettings.Apply nalozy chwile pozniej; reszty ustawien nie ruszamy.
+        /// Zwraca napis do linii kalibracji. Bez MCM (Instance null) albo blad - jak dotad.</summary>
+        private static string McmFirst()
+        {
+            try
+            {
+                var i = McmSettings.Instance;
+                var s = Settings.Current;
+                if (i == null || s == null) return "brak MCM - z ustawien startowych";
+                bool ch = s.SarnorPeopleRaised != i.SarnorPeopleRaised || s.PopulationScale != i.PopulationScale || s.PopulationMaxPerHearth != i.PopulationMaxPerHearth;
+                s.SarnorPeopleRaised = i.SarnorPeopleRaised; s.PopulationScale = i.PopulationScale; s.PopulationMaxPerHearth = i.PopulationMaxPerHearth;
+                return ch ? "z MCM (inne niz startowe - nalozone przed kalibracja)" : "z MCM (zgodne ze startowymi)";
+            }
+            catch (Exception e) { Log.Error("PopulationLaw.McmFirst", e); return "blad odczytu MCM - z ustawien startowych"; }
+        }
+
         private static void Calibrate()
         {
             if (_k.Count > 0) return;
+            string mcm;   // G21: klucze kalibracji z MCM, zanim McmSettings.Apply (OnSessionLaunched) nalozy reszte
+            // recenzja drobne2: bez biblioteki MCM blad ladowania typu McmSettings leci przy wywolaniu McmFirst (poza jego try) - kalibracja jak dotad
+            try { mcm = McmFirst(); } catch (Exception e) { mcm = "MCM niedostepne (" + e.GetType().Name + ") - z ustawien startowych"; }
             float scale = Math.Max(0f, Settings.Current.PopulationScale);
             // E4/3 (projekt 4.10, "Pogodzone"): pulap gestosci wsi - zaden punkt mapy nie znaczy wiecej ludzi niz najgesciej zaludniona kraina (Qarth 629
             // ludzi na hearth); kraina ponad pulapem (Wyspy Letnie: 3 wsie po 50 hearth = 4 500/hearth) traci nadwyzke tabeli "poza mape", udzial miast zostaje
@@ -149,7 +170,8 @@ namespace Armoury
                      + (cut.Count > 0 ? " | obcieto (pulap " + (int)cap + " ludzi na punkt hearth wsi, E4/3): " + string.Join(", ", cut.ToArray()) + "; poza mapa razem "
                                         + (offMap / 1e6).ToString("0.00", CultureInfo.InvariantCulture) + " mln"
                                       : " | pulap gestosci wsi (E4/3): " + (cap > 0f ? (int)cap + " ludzi na hearth - bez obciec" : "wylaczony"))
-                     + " | Sarnor (GL-1 P6, Sarnor People Raised): " + (Settings.Current != null && Settings.Current.SarnorPeopleRaised ? "tak" : "nie") + ".");   // recenzja kodu D4: stan klucza dla progu GL1-6
+                     + " | Sarnor (GL-1 P6, Sarnor People Raised): " + (Settings.Current != null && Settings.Current.SarnorPeopleRaised ? "tak" : "nie")
+                     + " | ustawienia kalibracji (G21): " + mcm + ".");   // recenzja kodu D4: stan klucza dla progu GL1-6; drobne2 G21: skad ustawienia
             // E4/3 (U3): k na osade z dnia kalibracji - do ksiegi ludzi (PeopleBook "v:"); zapis z "v:" zostaje
             try { PeopleBook.SetUnitsFromCalibration(); } catch (Exception e) { Log.Error("PopulationLaw.Calibrate(k na osade)", e); }
             // E4/4 (9a): ludzie miast zapisani jako stan od razu, z dobrobytu tej samej chwili co kalibracja - suma miast krainy to jej udzial miejski z tabeli

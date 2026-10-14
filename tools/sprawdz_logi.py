@@ -547,6 +547,12 @@ Uzycie (Python 3, tylko odczyt):
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
                     PL-3 plotno wywiezione kontraktami 174 i wozami kupcow >= 30 szt./d, PL-4 regulator lnu >= 1.2, PL-5 potkniecia 0; PL-6..PL-10 INFO (tkane na wywoz,
                     mieszczanie, oferta obcieta progiem, plotno zrobione i na polkach, warsztaty zbrojne). Log bez paczki: INFO, bez wyjatku.
+--grupa drobne2   : (14.10, galaz drobne2-gracz: A13 reszta, A14, B5) python -I tools/sprawdz_logi.py --grupa drobne2 [--do-doby N] [--crashscribe <session-*.log>]
+                    [--baza-doby <log biegu bez paczki>] <Armoury-*.log>. D2-1 komunikat 'is yours' (gracz 6, INFO), D2-2 podpowiedz L5 z towarem L7 (gracz 9, INFO),
+                    D2-4 wyjasnienie W7 gracza najwyzej raz na 30 dob (gracz 10), D2-5 doba po wczytaniu (G20): bledne wpisy 0 (D2-5b: zwrot doby po wczytaniu zdejmuje gotowke W5), D2-6 ustawienia kalibracji ludnosci
+                    z MCM (G21), D2-7 wsie lniane z tabeli GL5 16 z 16 w kampanii zaczetej z kluczem (G22), D2-8 skarbiec upadlego krolestwa: kontrola 0 i "skarbce
+                    upadlych krolestw" 0 w dobach upadku z kluczem (G14), D2-9 miara W5-7 wobec biegu z tego samego okna dob (Z7), D2-10 Zew nie podnosi premii
+                    ponad limit hordy (B5; log CrashScribe przez --crashscribe). Log bez paczki: INFO, bez wyjatku.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
                     Z1-0 dopisek "pokoj (Z.1)" w linii "Budzet rodow (166)", Z1-1 druzyny lordow krolestw w pokoju (linie Skarbce bez "(WOJNA)", srednia
@@ -708,6 +714,71 @@ def kingdom_war_series(lines):
             continue
         out.setdefault(m.group(2), []).append((int(m.group(1)), bool(m.group(3)), int(m.group(4)), int(m.group(5))))
     return out
+
+
+# ------------------------------------------------------------ Z7 (audyt obieg 14.10, drobne2): miara W5-7 wobec biegu z TEGO SAMEGO okna dob kampanii
+# Dotad L5B-8, W7-7 i LUP-19 porownywaly srednia ostatnich 28 dob biegu 120 dob (d93-120) z "bieg roczny kodu 43: 101.4 tys. d337-364" - inne okno (koniec
+# roku), wiec 101.3 tys. biegu koncowego wygladalo jak "bez zmian", choc piec biegow 120 dob tego samego okna mialo 105.7-116.5 (obieg Z1 schowane).
+ARMY_W57_REF = [   # (ostatnia doba okna kampanii +-3, odniesienie z biegow tego okna)
+    (120, "piec biegow 120 dob 13.10 (16-21-05, 16-58-06, 17-32-32, 18-04-21, 18-49-17): 105.7 / 116.5 / 113.9 / 112.6 / 109.5 tys."),
+    (364, "bieg roczny kodu 43: 101.4 tys.; bieg dwuletni W50: 108.9 tys."),
+    (728, "bieg dwuletni W50 (21-14-13): 55.3 tys. (fala pokojow roku 2)"),
+]
+
+
+def army_w57(lines, inwin):
+    """Miara W5-7: suma "wojsko rodow" krolestw w wojnie (linie Skarbce) na dobe; srednia ostatnich 28 dob okna -> (doby, srednia, slownik)."""
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, men in ser:
+            if war and inwin(d):
+                army[d] = army.get(d, 0) + men
+    if not army:
+        return [], None, army
+    ds = sorted(army)[-28:]
+    return ds, sum(army[d] for d in ds) / len(ds), army
+
+
+def log_start(lines):
+    for s in lines:
+        if s.startswith("Pomiary 169c: okna"):
+            v = num(r"start kampanii dzien (\d+)", s)
+            if v is not None:
+                return v
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    return alld[0] if alld else 0
+
+
+def army_w57_row(rep, code, lines, start, inwin, bdp=None, extra="", note="", ds_v=None):
+    """Z7: wiersz miary W5-7 z odniesieniem z tego samego okna dob: --baza-doby <log> (te same doby kampanii; prog: nie mniej niz baza - 3 tys.)
+    albo znane biegi z tabeli ARMY_W57_REF (INFO); inne okno - INFO z prosba o baze. Log bez linii Skarbce - INFO."""
+    ds, v, _ = ds_v if ds_v is not None else army_w57(lines, inwin)
+    if not ds:
+        rep.add(f"{code}: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+        return
+    a, z = run_day(ds[0], start), run_day(ds[-1], start)
+    name = f"{code}: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {a}-{z})"
+    if bdp:
+        bv = None
+        try:
+            bl = read(bdp)
+            bs = log_start(bl)
+            _, bv, _ = army_w57(bl, lambda d: d is not None and a <= run_day(d, bs) <= z)
+        except Exception as e:
+            bv = None
+            extra += f"; baza nieczytelna ({e})"
+        if bv:
+            rep.add(name, f"{v / 1e3:.1f} tys. ludzi; baza (--baza-doby, te same doby {a}-{z}) {bv / 1e3:.1f} tys." + extra,
+                    "nie mniej niz baza z tego samego okna minus 3 tys. (Z7); prog Jeffa 85 tys. w biegu rocznym" + note, v >= bv - 3000)
+            return
+        extra += "; baza bez linii Skarbce w tych dobach"
+    ref = None
+    for end, txt in ARMY_W57_REF:
+        if abs(z - end) <= 3:
+            ref = txt
+    rep.add(name, f"{v / 1e3:.1f} tys. ludzi" + extra,
+            "INFO - odniesienie z TEGO SAMEGO okna dob (Z7): " + (ref if ref else f"brak znanego biegu z okna d{a}-{z} - podaj --baza-doby <log biegu bez paczki>")
+            + "; prog Jeffa 85 tys. w biegu rocznym" + note, None)
 
 
 def last_window(days, n=28):
@@ -16251,7 +16322,7 @@ L5B2_EV = re.compile(r"^Karawany w zdobytym miescie \(L5b-2\): dzien (\d+) \| os
                      r".*?\| nie zniknely (\d+) \| gracz: karawan zajetych (\d+)")
 
 
-def lup5b_main(logp, start_arg, until=364):
+def lup5b_main(logp, start_arg, until=364, bdp=None):
     """Lup 5b (decyzja Jeffa 13.10 "5 tak, i tak"; Armoury/src/CapitalTreasury.cs, EnemyCaravans.cs; klucze CapitalTreasurySeized, EnemyCaravansSeized). Okno: doby kampanii
     1-until. Wiersze L5B-0..L5B-8: linie i latki (L5B-0: kazde zdobycie twierdzy widza obie latki - linie L5b-2 = zdobycia szturmem z linii doby L5b-1),
     obieg skarbca co do zlotowki (L5B-1), granica: zabrane <= czesc x nadwyzka ponad zapas wojny i dlug Banku, skarbiec przegranego nie ponizej zapasu (L5B-2),
@@ -16384,19 +16455,8 @@ def lup5b_main(logp, start_arg, until=364):
                 f"karawan gracza {sum(int(m.group(24)) for m in ev2)}", "INFO - szacunek z biegu kodu 43: ok. 1-3 karawan wroga w murach na rok", None)
     else:
         rep.add("L5B-7b: karawany w zdobytych twierdzach (INFO)", "brak linii L5b-2", "INFO", None)
-    # ---- L5B-8 wojsko lordow w wojnie (miara W5-7), srednia ostatnich 28 dob okna
-    army = {}
-    for kname, ser in kingdom_war_series(lines).items():
-        for d, war, wallet, men in ser:
-            if war and inwin(d):
-                army[d] = army.get(d, 0) + men
-    if army:
-        ds = sorted(army)[-28:]
-        v = sum(army[d] for d in ds) / len(ds)
-        rep.add(f"L5B-8: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})", f"{v / 1e3:.1f} tys. ludzi",
-                "INFO - prog Jeffa 85 tys. w biegu rocznym (bieg roczny kodu 43: 101.4 tys. d337-364); skarbiec przegranego nie schodzi ponizej zapasu wojny (L5B-2)", None)
-    else:
-        rep.add("L5B-8: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- L5B-8 wojsko lordow w wojnie (miara W5-7), srednia ostatnich 28 dob okna - Z7 (drobne2): odniesienie z tego samego okna dob
+    army_w57_row(rep, "L5B-8", lines, start, inwin, bdp, note="; skarbiec przegranego nie schodzi ponizej zapasu wojny (L5B-2)")
     rep.show()
     return 0
 
@@ -16753,6 +16813,137 @@ def jeff14s_main(logp):
             f"wykutych {len(made)}, linii ceny VS {len(vs_price)}, niezgodnych {len(bad_p)}" + (f" (pierwszy: {bad_p[0]})" if bad_p else ""),
             "kazdy wykuty: wartosc w kronice = cena z linii HistoricalPrices (ceny historyczne wylaczone albo bez zlecen - INFO)",
             (len(bad_p) == 0) if made and not hp_off else None)
+    rep.show()
+    return 0
+
+
+def drobne2_main(logp, start_arg, until=100000, csp=None, bdp=None):
+    """drobne2 (14.10, galaz w-toku/drobne2-gracz; CHANGELOG "drobne2"): A13 reszta (gracz 3, 6, 9, 10), A14 (G14, G20, G21, G22, Z7), B5 (limit hordy Zewu).
+    Okno: doby kampanii 1-until (domyslnie caly log). Log bez paczki: wiersze INFO, nigdy wyjatek. B5 wymaga --crashscribe <session-*.log>.
+    Gracz 3 (grupy MCM) nie ma progu - nie widac go w logu (sprawdzenie: diff McmSettings.cs - 7 kluczy bitew w "The law of the battlefield")."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg if start_arg is not None else log_start(lines)
+
+    def inwin(d):
+        return d is not None and 1 <= run_day(d, start) <= until
+    print(f"plik: {logp} | start kampanii {start} | okno dob 1-{until}" + (f" | CrashScribe: {csp}" if csp else "") + (f" | baza: {bdp}" if bdp else ""))
+    # D2-1 gracz 6
+    yours = [s for s in lines if ("komunikat gracza 'is yours'" in s) and (s.startswith("Lup miast (L2 blizna)") or s.startswith("WarLedger: "))]
+    rep.add("D2-1: komunikat 'is yours - but the sack has left it bleeding' (gracz 6)", f"linii {len(yours)}" + (f"; pierwsza: {yours[0][:200]}" if yours else ""),
+            "INFO (gracz-wodz: w chwili blizny, gdy osada juz jego; gracz-krol: przy zmianie pana po lupie AI; bez 'Rebuild what you broke')", None)
+    # D2-2 gracz 9
+    l5 = [s for s in lines if s.startswith("Lup miast (L5): dzien")]
+    l5g = [s for s in l5 if "towar polek" in s]
+    rep.add("D2-2: podpowiedz L5 z towarem z polek L7 (gracz 9)", f"linii L5 {len(l5)}, z towarem {len(l5g)}" + (f"; pierwsza: {l5g[0][:220]}" if l5g else ""),
+            "INFO (sciezka gracza - okno lupu po szturmie; podpowiedz grabiezy i spustoszenia z towarem przy Sack Takes Goods)", None)
+    # D2-4 gracz 10
+    told = [num(r"dzien (\d+)", s) for s in lines if s.startswith("Stawka wojenna pana (W7): dzien") and "wyjasnienie gracza pokazane" in s]
+    told = [d for d in told if d is not None]
+    gaps = [y - x for x, y in zip(told, told[1:])]
+    rep.add("D2-4: wyjasnienie W7 gracza (gracz 10)", f"pokazane {len(told)} razy" + (f", najkrotszy odstep {min(gaps)} dob" if gaps else ""),
+            "odstep >= 30 dob w jednym procesie (log jednej sesji); 0-1 - INFO", (min(gaps) >= 30) if gaps else None)
+    # D2-5 G20
+    dh = [s for s in lines if s.startswith("Doba po wczytaniu (G20)")]
+    if dh:
+        bad = sum(num(r"bledne wpisy (\d+)", s, int, 0) or 0 for s in dh) + sum(num(r"W7 z doby [-\d]+ u \d+ rodow \(-?\d+ zl\), bledne (\d+)", s, int, 0) or 0 for s in dh)
+        on = [s for s in dh if "Mid Day Load Keeps Day tak" in s]
+        rep.add("D2-5: doba po wczytaniu ze srodka doby (G20)", f"wczytan {len(dh)} (z kluczem {len(on)}); bledne wpisy {bad}; ostatnia: {dh[-1][:260]}",
+                "bledne 0; budowy 'odtworzone' przy tej samej dobie, gotowka W5/W7 'odtworzone' (zwrot 70% nastepnej doby bez oplaconego zoldu)", bad == 0)
+    else:
+        rep.add("D2-5: doba po wczytaniu ze srodka doby (G20)", "brak linii (nowa kampania, stary zapis albo log sprzed drobne2)", "INFO - test: zapis w srodku doby i wczytanie", None)
+    # D2-5b G20 (recenzja): dowod skutku - zwrot 70% doby po wczytaniu zdejmuje odtworzona gotowke W5 (bez odtworzenia "poza podstawa zwrotu" tej doby = 0)
+    w5cut = {}
+    for s in lines:
+        if s.startswith("Doplata wedlug potrzeby (W5): dzien"):
+            d, c = num(r"dzien (\d+)", s), num(r"poza podstawa zwrotu 70% \(dzis\) (\d+)", s)
+            if d is not None and c is not None:
+                w5cut[d] = c
+    chk = []
+    for s in dh:
+        m = re.search(r"gotowka W5 z doby (\d+) u \d+ rodow \((\d+) zl\)", s)
+        if "Mid Day Load Keeps Day tak" in s and m and int(m.group(2)) > 0 and "- odtworzone (zwrot" in s and int(m.group(1)) + 1 in w5cut:
+            chk.append((int(m.group(1)) + 1, int(m.group(2)), w5cut[int(m.group(1)) + 1]))
+    if chk:
+        rep.add("D2-5b: zwrot 70% doby po wczytaniu bez zoldu oplaconego W5 (G20)", f"wczytan z odtworzona gotowka W5 {len(chk)}; poza podstawa zwrotu nastepnej doby: "
+                + ", ".join(f"d{d} {c} zl (gotowka {g} zl)" for d, g, c in chk[:5]),
+                "> 0 po kazdym takim wczytaniu (bez odtworzenia 0 - korona zwracalaby oplacony zold drugi raz)", all(c > 0 for _, _, c in chk))
+    else:
+        rep.add("D2-5b: zwrot 70% doby po wczytaniu (G20)", "brak wczytania z odtworzona gotowka W5 i linii W5 nastepnej doby", "INFO - test: zapis w srodku doby wojny i wczytanie", None)
+    # D2-6 G21
+    cal = [s for s in lines if s.startswith("PopulationLaw: kalibracja ludnosci")]
+    g21 = [num(r"ustawienia kalibracji \(G21\): ([^.|]+)", s, str) for s in cal]
+    g21 = [x for x in g21 if x]
+    rep.add("D2-6: ustawienia kalibracji ludnosci z MCM (G21)", "; ".join(g21[:3]) if g21 else ("linia kalibracji bez dopisku G21 (log sprzed drobne2)" if cal else "brak linii kalibracji (zapis z kalibracja)"),
+            "'z MCM' (Sarnor People Raised, Population Scale, Population Max Per Hearth czytane przed McmSettings.Apply)",
+            (all(x.startswith("z MCM") for x in g21)) if g21 else None)
+    # D2-7 G22
+    gl5 = [s for s in lines if s.startswith("Stawki towarow (GL5): start sesji")]
+    if gl5:
+        s = gl5[-1]
+        n = num(r"z tabeli z lnem (\d+) z \d+", s)
+        tot = num(r"z tabeli z lnem \d+ z (\d+)", s)
+        fm = num(r"z typu mapy \(G22, Village Climate Fix wylaczone\): (\d+)", s)
+        swap = "bez podmian (typy z mapy)" not in s
+        rep.add("D2-7: wsie lniane z tabeli GL5 w kampanii zaczetej z kluczem (G22)",
+                f"z lnem {n} z {tot}; z typu mapy (T8 wylaczone) {fm if fm is not None else 'brak dopisku (log sprzed drobne2)'}" + ("" if swap else "; kampania bez podmian"),
+                "16 z 16 w kampanii zaczetej z GL-5, takze przy wylaczonym Village Climate Fix", (n == tot) if (swap and n is not None and fm is not None) else None)
+    else:
+        rep.add("D2-7: wsie lniane GL5 (G22)", "brak linii GL5", "INFO", None)
+    # D2-8 G14
+    g14 = [s for s in lines if s.startswith("Skarbiec upadlego krolestwa (G14)") and inwin(num(r"dzien (\d+)", s))]
+    live = [s for s in g14 if "W CIENIU" not in s]
+    ctl = [num(r"kontrola: zdjete -?\d+ - dopisane -?\d+ = (-?\d+)", s) for s in live]
+    ctl_bad = [c for c in ctl if c is None or c != 0]
+    gone = {}
+    for s in lines:
+        if s.startswith("Pieniadz swiata (bilans - przyczyny): dzien"):
+            d = num(r"dzien (\d+)", s)
+            v = num(r"skarbce upadlych krolestw ([-+]?\d+)", s)
+            if d is not None and v is not None and inwin(d):
+                gone[d] = v
+    lived = {num(r"dzien (\d+)", s) for s in live}
+    vanished = sum(-v for d, v in gone.items() if d in lived and v < 0)
+    allv = sum(-v for v in gone.values() if v < 0)
+    if g14:
+        paid = sum(num(r"splacone Bankowi (\d+)", s, int, 0) or 0 for s in live)
+        moved = sum(num(r"\| reszta (\d+) ->", s, int, 0) or 0 for s in live)
+        rep.add("D2-8: skarbiec upadlego krolestwa (G14)", f"upadkow z linia {len(g14)} (z kluczem {len(live)}, w cieniu {len(g14) - len(live)}); Bankowi {paid}, reszta {moved}; "
+                f"kontrola rozjazdow {len(ctl_bad)}; 'skarbce upadlych krolestw' w dobach upadku z kluczem {vanished} (w calym oknie {allv})",
+                "kontrola 0 i 0 zl ujscia 'skarbce upadlych krolestw' w dobach upadku z kluczem (skarbiec oprozniony przed ksiega obiegu)",
+                (not ctl_bad and vanished == 0) if live else None)
+    else:
+        rep.add("D2-8: skarbiec upadlego krolestwa (G14)", f"brak linii G14; 'skarbce upadlych krolestw' w oknie {allv} zl", "INFO (bez upadku krolestwa albo log sprzed drobne2)", None)
+    # D2-9 Z7
+    army_w57_row(rep, "D2-9 (Z7)", lines, start, inwin, bdp)
+    # D2-10 B5
+    if csp:
+        try:
+            cl = read(csp)
+        except Exception as e:
+            cl = []
+            print(f"log CrashScribe nieczytelny ({e})")
+        zew = [s for s in cl if s.startswith("Zew Nocnego Krola:") and "limit hordy Zewu" in s and "premia limitu" in s]
+        over = []
+        capped = 0
+        for s in zew:
+            cap = num(r"limit hordy Zewu (\d+)", s)
+            m = re.search(r"premia limitu hordy (\d+) -> (\d+)", s)
+            lim = num(r"limit partii \(model\) (\d+)", s)
+            if "Zew NIE podnosi premii" in s:
+                capped += 1
+            if cap and m and int(m.group(2)) > int(m.group(1)) and lim is not None and lim > cap + 30:
+                over.append(s[:200])
+        sleep = [s for s in cl if "Horda (B5): najwieksza banda" in s]
+        last = zew[-1] if zew else (sleep[-1] if sleep else "")
+        h = re.search(r"horda (\d+) ludzi \(zdrowych (\d+)\), limit partii \(model\) (\d+)", last) or re.search(r"najwieksza banda .*? - (\d+) ludzi \(zdrowych (\d+)\), limit partii (\d+)", last)
+        rep.add("D2-10: limit hordy Zewu (B5) - Zew nie podnosi premii ponad limit hordy",
+                f"linii Zewu z limitem {len(zew)}, wstrzymanych podniesien {capped}, podniesien ponad limit {len(over)}" + (f" ({over[0]})" if over else "")
+                + (f"; ostatnio horda {h.group(1)} ludzi (zdrowych {h.group(2)}), limit partii {h.group(3)}" if h else "; brak liczebnosci hordy w liniach (log sprzed drobne2)"),
+                "0 podniesien premii, po ktorych limit partii gospodarza (model) > limit hordy + 30; Zew spi do d728 - wtedy INFO z linii kalendarza",
+                (not over) if zew else None)
+    else:
+        rep.add("D2-10: limit hordy Zewu (B5)", "bez logu CrashScribe", "INFO - podaj --crashscribe <session-*.log> (Zew budzi sie w dobie 728)", None)
     rep.show()
     return 0
 
@@ -18136,7 +18327,7 @@ W7_CUT = re.compile(r"poza podstawa zwrotu 70% \(dzis\) (\d+) \(wpisow (\d+)\)")
 W7_OBG = re.compile(r"stawka wojenna pana \(W7\) kiesy ludu i wsi -> glowy rodow (\d+) \(z ludu (\d+), ze wsi (\d+)\)")
 
 
-def w7_main(logp, start_arg, until=120, csvp=None):
+def w7_main(logp, start_arg, until=120, csvp=None, bdp=None):
     """W7 (decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana"; Armoury/src/KingdomTreasury.LordLevy.cs, TownFolk.LordLevy.cs, klucze LordWarLevy, PlayerWarLevy):
     rod, ktorego druzynom W5 (danina, skarbiec, tarczowe) nie pokrylo potrzeby do celu 60% limitu, bierze najwyzej 3% na dobe nadwyzki ludu i wsi WLASNYCH lenn
     (po daninie P1 i danine wsi) - gotowka do glowy rodu za ludzi, ktorzy sa, podniesienie pulapu tej doby; koszt: lojalnosc i dobrobyt osady.
@@ -18274,21 +18465,11 @@ def w7_main(logp, start_arg, until=120, csvp=None):
         rep.add("W7-9: zold oplacony poborem poza podstawa zwrotu 70% - najwyzej wczorajszy pobor",
                 f"odjete razem {cut_sum} przy poborze dob poprzednich {x_sum} ({(100.0 * cut_sum / x_sum if x_sum else 0):.1f}%), dob ponad wczorajszy pobor {len(cut_bad)}",
                 "0 dob ponad; udzial bliski 100% = korona nie zwraca zoldu oplaconego podatkiem pana", not cut_bad)
-    # ---- W7-7 wojsko (miara W5-7: linie Skarbce krolestw w wojnie), srednia ostatnich 28 dob okna
-    army = {}
-    for kname, ser in kingdom_war_series(lines).items():
-        for d, war, wallet, men in ser:
-            if war and inwin(d):
-                army[d] = army.get(d, 0) + men
-    if army:
-        ds = sorted(army)[-28:]
-        v = sum(army[d] for d in ds) / len(ds)
-        w7m = [tot[d] for d in ds if d in tot and "men" in tot[d]]
-        extra = (f"; rody z W7: {sum(t['men'] for t in w7m) / len(w7m):.0f} ludzi / limit {sum(t['lim'] for t in w7m) / len(w7m):.0f} na dobe") if w7m else ""
-        rep.add(f"W7-7: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})", f"{v / 1e3:.1f} tys. ludzi" + extra,
-                "INFO - prog 85 tys. w biegu rocznym (bieg roczny kodu 43 bez W7: 101.4 tys. d337-364); rachunek W7: +2 do +3.5 tys. na koniec roku 1", None)
-    else:
-        rep.add("W7-7: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- W7-7 wojsko (miara W5-7: linie Skarbce krolestw w wojnie), srednia ostatnich 28 dob okna - Z7 (drobne2): odniesienie z tego samego okna dob
+    dsv = army_w57(lines, inwin)
+    w7m = [tot[d] for d in dsv[0] if d in tot and "men" in tot[d]]
+    extra = (f"; rody z W7: {sum(t['men'] for t in w7m) / len(w7m):.0f} ludzi / limit {sum(t['lim'] for t in w7m) / len(w7m):.0f} na dobe") if w7m else ""
+    army_w57_row(rep, "W7-7", lines, start, inwin, bdp, extra=extra, note="; rachunek W7: +2 do +3.5 tys. na koniec roku 1", ds_v=dsv)
     # ---- W7-8 liczby paczki (INFO) i krolestwa z ostatniej linii tygodnia
     if tot:
         ds = sorted(tot)[-28:]
@@ -19369,7 +19550,7 @@ def plotno_main(logp, start_arg, until=120):
     return 0
 
 
-def lup_main(logp, start_arg, until=364):
+def lup_main(logp, start_arg, until=364, bdp=None):
     """Lup miast (L0-L5). Wiersze LUP-1..LUP-19 wedlug tabeli progow rozdz. 6 projektu (numer progu projektu w nazwie). Okno: doby kampanii 1-until.
     Log bez paczki (brak linii "Lup miast") - wiersze INFO z liczbami tego, co juz jest (okno O10, lup gry, garnizony), nigdy wyjatek."""
     lines = read(logp)
@@ -19680,20 +19861,9 @@ def lup_main(logp, start_arg, until=364):
     tw_burn = sum(1 for s in lines if s.startswith("Towary: dzien") and "spalone przy spustoszeniu miasta" in s and inwin(dayof(s)))
     rep.add("LUP-18b (L7): ksiega towarow - lup miast (L7) tylko jako ujscie (spalone przy spustoszeniu)", f"wierszy z przybytkiem w ramce lupu {len(tw_bad)}; wierszy ze spalonym {tw_burn}",
             "0 przybytkow", (not tw_bad) if l7 else None)
-    # ---- prog 19: swiat (INFO) - wojsko lordow w wojnie (miara W5-7), liczba zdobyc
-    army = {}
-    for kname, ser in kingdom_war_series(lines).items():
-        for d, war, wallet, menn in ser:
-            if war and inwin(d):
-                army[d] = army.get(d, 0) + menn
-    if army:
-        ds = sorted(army)[-28:]
-        v = sum(army[d] for d in ds) / len(ds)
-        caps = sum(1 for s in lines if s.startswith("WarLedger: ") and "wziete obleczeniem" in s)
-        rep.add(f"LUP-19: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})",
-                f"{v / 1e3:.1f} tys. ludzi; zdobyc w logu {caps}", "INFO - prog Jeffa 85 tys. w biegu rocznym (bieg kodu 43 bez paczki: 101.4 tys. d337-364)", None)
-    else:
-        rep.add("LUP-19: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- prog 19: swiat (INFO) - wojsko lordow w wojnie (miara W5-7), liczba zdobyc - Z7 (drobne2): odniesienie z tego samego okna dob
+    caps = sum(1 for s in lines if s.startswith("WarLedger: ") and "wziete obleczeniem" in s)
+    army_w57_row(rep, "LUP-19", lines, start, inwin, bdp, extra=f"; zdobyc w logu {caps}")
     rep.show()
     return 0
 
@@ -20086,9 +20256,11 @@ def main(argv):
     if group == "m6a" and logp:
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "lup5b" and logp:
-        return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
+        return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group == "jeff14s" and logp:
         return jeff14s_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
+    if group == "drobne2" and logp:
+        return drobne2_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp)   # drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "jeff14" and logp:
@@ -20098,9 +20270,9 @@ def main(argv):
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:
-        return w7_main(logp, start_arg, until_arg, csvp)   # W7: stawka wojenna pana - pobor z nadwyzki ludu i wsi wlasnych lenn na brak, ktorego W5 nie pokrylo
+        return w7_main(logp, start_arg, until_arg, csvp, bdp)   # W7: stawka wojenna pana - pobor z nadwyzki ludu i wsi wlasnych lenn na brak, ktorego W5 nie pokrylo
     if group == "lup" and logp:
-        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
+        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
     if group == "plotno" and logp:
         return plotno_main(logp, start_arg, until_arg)   # plotno 14.10: zbytki ludu ponad zapas polki (FolkClothAboveReserve), tkacz na wywoz (WeaverExportPrice)
     if group == "n7" and logp:

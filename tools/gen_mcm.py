@@ -33,6 +33,8 @@ RANGES = {
     'DothrakiRidingBonus': (0, 50, "0"),
     # 175c: zasada stali Innych
     'OthersCastleSteelPercent': (15, 100, "0"),
+    # B5 (PLAN 1.15): limit hordy Zewu Nocnego Krola w ludziach (0 = bez limitu; CrashScribe NightKingCall)
+    'NightKingCallMaxHost': (0, 6000, "0"),
     # 114: udzial pana w zaworze zamku (kod przycina do 0..1; regula ogolna dalaby 0..2.68)
     'CastleDuesLordShare': (0.0, 1.0, "0.00"),
     # 165 (C1): udzialy przycinane w kodzie do 0..1; doby oddawania zapasu korony

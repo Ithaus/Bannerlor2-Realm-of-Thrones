@@ -67,6 +67,33 @@ namespace Armoury
 
         private sealed class Lot { public EquipmentElement El; public int Want; }
 
+        /// <summary>Poprawka po audycie (gracz 9, drobne2): podglad L7 do podpowiedzi L5 - ile sztuk i za ile wynioslaby czesc `share` polki osady (wartosc
+        /// oczekiwana, bez losowania; unikaty w gore jak w SackGoods), konie i zwierzeta osobno. Tylko odczyt; false - brak polki albo blad.</summary>
+        internal static bool GoodsPreview(Settlement st, double share, out long pieces, out long value, out long walk)
+        {
+            pieces = 0; value = 0; walk = 0;
+            try
+            {
+                var roster = st != null ? st.ItemRoster : null;
+                if (roster == null || share <= 0) return false;
+                double p = 0, v = 0, w = 0;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || el.Amount <= 0) continue;
+                    bool u = false;
+                    try { u = UniqueSpoils.Is(it); } catch { u = false; }
+                    double want = u ? Math.Min(el.Amount, Math.Ceiling(share * el.Amount)) : share * el.Amount;
+                    p += want; v += want * it.Value;
+                    if (Walks7(it)) w += want;
+                }
+                pieces = (long)Math.Round(p); value = (long)Math.Round(v); walk = (long)Math.Round(w);
+                return true;
+            }
+            catch (Exception e) { Stumble("GoodsPreview", e); return false; }
+        }
+
         private static void AftermathGoods(MobileParty a, Settlement st, int kind, Dictionary<MobileParty, float> contrib)
         {
             if (!GoodsOn) return;
