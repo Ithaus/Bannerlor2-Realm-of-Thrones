@@ -46,6 +46,10 @@ namespace CrashScribe
     /// a stan BK liczony z tych metod jest dobowy (prawowitosc idzie do celu 0.01 na dobe, asymilacja liczona od nowa co dobe), wiec pierwsza doba
     /// liczy juz dobrze. Klucze (CrashScribe.settings.xml, czytane raz przy starcie gry): BkrotFixLegitimacy, BkrotFixInfluence (obie metody),
     /// BkrotFixArmyCost, BkrotFixCulture (obie metody), BkrotFixSpouseScore, BkrotFixCaravanIncome - false = metoda nielatana (stan b47fecc3).
+    /// AM-15 drugi klucz BkrotCultureBlessingsOwnerOnly (tylko przy naprawionej kulturze): BKROT dokleja blogoslawienstwa pana (Trios, GodsBlood,
+    /// Harpy: wagi +25 / +25 / +50, akceptacja +0.04 / +0.04 / +0.08) do KAZDEJ kultury osady, co rozmywa premie kultury pana; z kluczem prefiks
+    /// oddaje dla kultury innej niz kultura pana sam wynik modelu BK (to samo, co BKROT liczy przed doklejeniem), a dla kultury pana kod BKROT
+    /// biegnie bez zmian. Blogoslawienstwa ma w praktyce tylko gracz (AddBlessing w rozmowie z kaplanem - raport AM-14).
     /// Linia startu sesji "BKROT self call fix: n/8 metod ..." (stan kazdej metody, GetPatchInfo).
     /// </summary>
     internal static class BkrotSelfCall
@@ -80,6 +84,10 @@ namespace CrashScribe
                       BkType = "BannerKings.Models.Vanilla.BKInfluenceModel", Name = "CalculateInfluenceChange", Argc = 2 },
             new Fix { Key = "BkrotFixArmyCost", Label = "Army.CalculatePartyInfluenceCost", BkrotType = "BKROTPatch.Models.BKROTArmyModel",
                       BkType = "BannerKings.Models.Vanilla.BKArmyManagementModel", Name = "CalculatePartyInfluenceCost", Argc = 2 },
+            new Fix { Key = "BkrotFixCulture", Label = "Culture.CalculateAcceptanceGain", BkrotType = "BKROTPatch.Models.BKROTCultureModel",
+                      BkType = "BannerKings.Models.BKModels.BKCultureModel", Name = "CalculateAcceptanceGain", Argc = 1 },
+            new Fix { Key = "BkrotFixCulture", Label = "Culture.CalculateCultureWeight", BkrotType = "BKROTPatch.Models.BKROTCultureModel",
+                      BkType = "BannerKings.Models.BKModels.BKCultureModel", Name = "CalculateCultureWeight", Argc = 3 },
             new Fix { Key = "BkrotFixSpouseScore", Label = "Marriage.GetSpouseScore", BkrotType = "BKROTPatch.Models.BKROTMarriageModel",
                       BkType = "BannerKings.Models.Vanilla.BKMarriageModel", Name = "GetSpouseScore", Argc = 2 },
             new Fix { Key = "BkrotFixCaravanIncome", Label = "ClanFinance.CalculateOwnerIncomeFromCaravan", BkrotType = "BKROTPatch.Models.BKROTClanFinanceModel",
@@ -90,6 +98,14 @@ namespace CrashScribe
         private static bool _hooksTried;
         private static int _sStumbles;
 
+        // AM-15 klucz 2 (BkrotCultureBlessingsOwnerOnly): blogoslawienstwa ROT tylko dla kultury pana osady
+        private static string _ownerOnlyState = "nie wpinane";
+        private static bool _ownerOnly;
+        private static PropertyInfo _pCdcSettlement, _pCdcCulture;                          // CultureDataClass.Settlement / .Culture
+        private static Func<object, object, ExplainedNumber> _acceptBase;                   // BKCultureModel.CalculateAcceptanceGain niewirtualnie
+        private static Func<object, Settlement, object, float, ExplainedNumber> _weightBase; // BKCultureModel.CalculateCultureWeight niewirtualnie
+        private static int _dOwnerOnly, _sOwnerOnly;                                        // wyniki BK bez blogoslawienstw (kultura inna niz pana)
+
         private static bool KeyOn(string key)
         {
             switch (key)
@@ -97,6 +113,7 @@ namespace CrashScribe
                 case "BkrotFixLegitimacy": return Config.BkrotFixLegitimacy;
                 case "BkrotFixInfluence": return Config.BkrotFixInfluence;
                 case "BkrotFixArmyCost": return Config.BkrotFixArmyCost;
+                case "BkrotFixCulture": return Config.BkrotFixCulture;
                 case "BkrotFixSpouseScore": return Config.BkrotFixSpouseScore;
                 case "BkrotFixCaravanIncome": return Config.BkrotFixCaravanIncome;
             }
@@ -129,6 +146,115 @@ namespace CrashScribe
                 try { Hook(f, tr); }
                 catch (Exception e) { f.State = "wyjatek " + e.GetType().Name + " - NIE wpiete"; Stumble("Hook(" + f.Label + ")", e); }
             }
+            try { HookOwnerOnly(); }
+            catch (Exception e) { _ownerOnlyState = "wyjatek " + e.GetType().Name + " - NIE wpiete"; Stumble("HookOwnerOnly", e); }
+        }
+
+        private static Fix FixByName(string name)
+        {
+            foreach (var f in _fixes) if (f.Name == name) return f;
+            return null;
+        }
+
+        /// <summary>AM-15 klucz 2: prefiksy "blogoslawienstwa tylko dla kultury pana" - tylko gdy obie metody kultury sa naprawione (bez naprawy
+        /// wynik BK i tak jest 0, wiec reguly nie ma do czego stosowac).</summary>
+        private static void HookOwnerOnly()
+        {
+            var fa = FixByName("CalculateAcceptanceGain");
+            var fw = FixByName("CalculateCultureWeight");
+            if (!Config.BkrotCultureBlessingsOwnerOnly) { _ownerOnlyState = "wyl. (BkrotCultureBlessingsOwnerOnly=false) - blogoslawienstwa ROT dla kazdej kultury osady (jak BKROT)"; return; }
+            if (fa == null || fw == null || !fa.Patched || !fw.Patched) { _ownerOnlyState = "nieczynne - naprawa kultury (BkrotFixCulture) nie stoi"; return; }
+            var tData = fa.Target.GetParameters()[0].ParameterType;
+            _pCdcSettlement = AccessTools.Property(tData, "Settlement");
+            _pCdcCulture = AccessTools.Property(tData, "Culture");
+            _acceptBase = Caller(fa.Base, typeof(Func<object, object, ExplainedNumber>)) as Func<object, object, ExplainedNumber>;
+            _weightBase = Caller(fw.Base, typeof(Func<object, Settlement, object, float, ExplainedNumber>)) as Func<object, Settlement, object, float, ExplainedNumber>;
+            if (_pCdcSettlement == null || _pCdcCulture == null || _acceptBase == null || _weightBase == null)
+            { _ownerOnlyState = "BRAK - skladowe BK (CultureDataClass.Settlement / Culture albo wywolanie modelu BK) - blogoslawienstwa jak BKROT"; return; }
+            _harmony.Patch(fa.Target, prefix: new HarmonyMethod(typeof(BkrotSelfCall), nameof(AcceptOwnerOnly)));
+            _harmony.Patch(fw.Target, prefix: new HarmonyMethod(typeof(BkrotSelfCall), nameof(WeightOwnerOnly)));
+            int n = (HasOur(fa.Target, nameof(AcceptOwnerOnly), false) ? 1 : 0) + (HasOur(fw.Target, nameof(WeightOwnerOnly), false) ? 1 : 0);
+            _ownerOnly = n == 2;
+            _ownerOnlyState = _ownerOnly ? "TAK (2/2)" : "BRAK - prefiksow w GetPatchInfo " + n + " z 2";
+        }
+
+        /// <summary>Kultura inna niz kultura pana osady (wodza rodu wlasciciela - tego samego bohatera, ktorego blogoslawienstwa sprawdza BKROT).</summary>
+        private static bool NotOwnerCulture(Settlement st, CultureObject cul)
+        {
+            var leader = st != null && st.OwnerClan != null ? st.OwnerClan.Leader : null;
+            return leader != null && cul != null && cul != leader.Culture;
+        }
+
+        /// <summary>AM-15 klucz 2: BKROTCultureModel.CalculateAcceptanceGain dla kultury innej niz kultura pana - sam wynik modelu BK (to, co BKROT
+        /// liczy przed doklejeniem blogoslawienstw); kultura pana - kod BKROT bez zmian (BK + blogoslawienstwa). Wyjatek BK leci jak z BKROT.</summary>
+        internal static bool AcceptOwnerOnly(object __instance, object __0, ref ExplainedNumber __result)
+        {
+            if (!_ownerOnly || __0 == null) return true;
+            try
+            {
+                if (!NotOwnerCulture(_pCdcSettlement.GetValue(__0, null) as Settlement, _pCdcCulture.GetValue(__0, null) as CultureObject)) return true;
+            }
+            catch (Exception e) { Stumble("AcceptOwnerOnly", e); return true; }
+            Interlocked.Increment(ref _dOwnerOnly);
+            __result = _acceptBase(__instance, __0);
+            return false;
+        }
+
+        /// <summary>AM-15 klucz 2: to samo dla BKROTCultureModel.CalculateCultureWeight (+25 / +25 / +50 blogoslawienstw tylko do wagi kultury pana).</summary>
+        internal static bool WeightOwnerOnly(object __instance, Settlement __0, object __1, float __2, ref ExplainedNumber __result)
+        {
+            if (!_ownerOnly || __1 == null) return true;
+            try
+            {
+                if (!NotOwnerCulture(__0, _pCdcCulture.GetValue(__1, null) as CultureObject)) return true;
+            }
+            catch (Exception e) { Stumble("WeightOwnerOnly", e); return true; }
+            Interlocked.Increment(ref _dOwnerOnly);
+            __result = _weightBase(__instance, __0, __1, __2);
+            return false;
+        }
+
+        /// <summary>Delegat wolajacy metode modelu BK NIEWIRTUALNIE (jak base.M) na podanym obiekcie: pierwszy parametr delegata to obiekt modelu
+        /// (object), dalej argumenty (object dla typow BK - rzutowane); wynik jak metoda albo float z ResultNumber (BKExplainedNumber).
+        /// Null, gdy sygnatury sie nie zgadzaja.</summary>
+        private static Delegate Caller(MethodInfo m, Type del)
+        {
+            if (m == null) return null;
+            var inv = del.GetMethod("Invoke");
+            var dps = inv.GetParameters().Select(p => p.ParameterType).ToArray();
+            var mps = m.GetParameters();
+            if (dps.Length != mps.Length + 1 || dps[0] != typeof(object)) return null;
+            MethodInfo result = null;
+            if (inv.ReturnType != m.ReturnType)
+            {
+                result = inv.ReturnType == typeof(float) ? AccessTools.PropertyGetter(m.ReturnType, "ResultNumber") : null;
+                if (result == null || result.ReturnType != typeof(float)) return null;
+            }
+            for (int i = 0; i < mps.Length; i++)
+            {
+                var want = mps[i].ParameterType;
+                var have = dps[i + 1];
+                if (have != want && (have != typeof(object) || want.IsValueType)) return null;
+            }
+            var dm = new DynamicMethod("cs_bkrot_base_" + m.DeclaringType.Name + "_" + m.Name, inv.ReturnType, dps, typeof(BkrotSelfCall).Module, true);
+            var il = dm.GetILGenerator();
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(OpCodes.Castclass, m.DeclaringType);
+            for (int i = 0; i < mps.Length; i++)
+            {
+                il.Emit(OpCodes.Ldarg, (short)(i + 1));
+                if (dps[i + 1] != mps[i].ParameterType) il.Emit(OpCodes.Castclass, mps[i].ParameterType);
+            }
+            il.Emit(OpCodes.Call, m);
+            if (result != null)
+            {
+                var loc = il.DeclareLocal(m.ReturnType);
+                il.Emit(OpCodes.Stloc, loc);
+                il.Emit(OpCodes.Ldloca, loc);
+                il.Emit(OpCodes.Call, result);
+            }
+            il.Emit(OpCodes.Ret);
+            return dm.CreateDelegate(del);
         }
 
         private static void Hook(Fix f, MethodInfo tr)
@@ -238,6 +364,7 @@ namespace CrashScribe
                 sb.Append(sb.Length > 0 ? "; " : "").Append(f.Label).Append(' ').Append(f.State);
             }
             return "BKROT self call fix: " + ok + "/" + _fixes.Length + " metod (kluczem wlaczonych " + on + ", BRAK " + miss + ") | " + sb
+                   + " | blogoslawienstwa kultury tylko dla kultury pana (AM-15): " + _ownerOnlyState
                    + " | wylaczona metoda = samowywolanie BKROT jak dotad (wynik 0 w rachunkach BK); pliki BK i BKROT nietkniete.";
         }
     }

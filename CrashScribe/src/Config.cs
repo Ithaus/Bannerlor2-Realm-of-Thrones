@@ -105,6 +105,8 @@ namespace CrashScribe
         public static bool BkrotFixLegitimacy = true;        // AM-10: BKROTLegitimacyModel.CalculateKingdomLegitimacy -> BKLegitimacyModel (cel prawowitosci krolestw BK zamiast 0 + blogoslawienstwa ROT)
         public static bool BkrotFixInfluence = true;         // AM-11: BKROTInfluenceModel.CalculateInfluenceCap i CalculateInfluenceChange -> BKInfluenceModel (limit i zmiana wplywu w rachunkach BK: koszty wnioskow, pakty handlowe, armie BK, sukcesja, tytuly)
         public static bool BkrotFixArmyCost = true;          // AM-12: BKROTArmyModel.CalculatePartyInfluenceCost -> BKArmyManagementModel (Call Banners i laczenie armii BK kosztuja wplyw)
+        public static bool BkrotFixCulture = true;           // AM-15: BKROTCultureModel.CalculateAcceptanceGain i CalculateCultureWeight -> BKCultureModel (asymilacja i akceptacja kultur BK zamiast 1.0 / stoi; lojalnosc z asymilacji -4..+4 zamiast stale +4; kultura osady moze przejsc na kulture pana) - OD NOWEJ KAMPANII
+        public static bool BkrotCultureBlessingsOwnerOnly = true; // AM-15 klucz 2 (tylko przy BkrotFixCulture): blogoslawienstwa ROT pana (wagi +25/+25/+50, akceptacja +0.04/+0.04/+0.08) tylko dla kultury pana, nie dla kazdej kultury osady; false = jak BKROT
         public static bool BkrotFixSpouseScore = true;       // AM-18: BKROTMarriageModel.GetSpouseScore -> BKMarriageModel (ocena malzonka w kontrakcie malzenskim BK gracza)
         public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
 
@@ -185,6 +187,8 @@ namespace CrashScribe
                         case "BkrotFixLegitimacy": BkrotFixLegitimacy = B(v); break;
                         case "BkrotFixInfluence": BkrotFixInfluence = B(v); break;
                         case "BkrotFixArmyCost": BkrotFixArmyCost = B(v); break;
+                        case "BkrotFixCulture": BkrotFixCulture = B(v); break;
+                        case "BkrotCultureBlessingsOwnerOnly": BkrotCultureBlessingsOwnerOnly = B(v); break;
                         case "BkrotFixSpouseScore": BkrotFixSpouseScore = B(v); break;
                         case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
                     }
