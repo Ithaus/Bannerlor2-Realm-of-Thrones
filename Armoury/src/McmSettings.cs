@@ -5604,6 +5604,18 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool EnemyCaravansSeized { get; set; } = true;
 
+        [SettingPropertyBool("Siege Ransom Measure Log", HintText = "Writes a log line each time a besieging lord decides to storm a town or castle: the coin lying in it, the ransom it could pay, his army's daily pay, the besiegers' strength against what the walls make of the defenders, whether his army is short of pay, and whether the town would pay and the lord would take it. Log only - nothing in the game changes")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomMeasureLog { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Ransom Share", 0.000f, 1.000f, "0.000", HintText = "the ransom a besieged town or castle pays to see the besiegers gone: this part of every coin lying in it - the merchants' coin and the townsfolk's purses alike (a quarter; a sack takes a third or two thirds). No ransom when it would be less than one day's pay of the besieging army")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SiegeRansomShare { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Siege Ransom Bloody Ratio", 0.00f, 5.00f, "0.00", HintText = "a besieging lord takes a ransom instead of storming when the assault would be bloody: his strength is less than this many times what the walls make of the defenders (the game's own reckoning, without its dice; 0 = this reason never counts). He also takes it when his army is short of pay or an assault on these walls has already failed")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SiegeRansomBloodyRatio { get; set; } = 1.5f;
+
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool PeopleScaleDryRun { get; set; } = true;
@@ -7048,6 +7060,9 @@ namespace Armoury
             s.CapitalTreasurySeized = CapitalTreasurySeized;
             s.CapitalTreasuryShare = CapitalTreasuryShare;
             s.EnemyCaravansSeized = EnemyCaravansSeized;
+            s.SiegeRansomMeasureLog = SiegeRansomMeasureLog;
+            s.SiegeRansomShare = SiegeRansomShare;
+            s.SiegeRansomBloodyRatio = SiegeRansomBloodyRatio;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;

@@ -210,6 +210,9 @@ RANGES = {
     'SackShareDevastate': (0.0, 1.0, "0.000"),
     'SackNoSpendingDays': (0, 30, "0"),
     'SackRuinRebuildShare': (0.0, 1.0, "0.000"),   # LB: odbudowa ze zgliszcz - czesc kosztu poziomu (CitySack.RuinShare przycina do 0..1)
+    # okup zamiast szturmu (SiegeRansom): czesc monety przycinana do 0..1 (SiegeRansom.Share), prog krwawego szturmu >= 0 (BloodyRatio; 0 = powod wylaczony)
+    'SiegeRansomShare': (0.0, 1.0, "0.000"),
+    'SiegeRansomBloodyRatio': (0.0, 5.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

@@ -472,6 +472,10 @@ Uzycie (Python 3, tylko odczyt):
                     Wiersze L5B-0..L5B-8: linie, latki, zdobycia szturmem = linie L5b-2, obieg skarbca co do zlotowki, zabrane <= czesc x nadwyzka ponad zapas
                     wojny i dlug Banku (skarbiec przegranego nie ponizej zapasu), tylko szturm / blizniak ROT, kontrola i cien linii doby, karawany zdjete =
                     dopisane i nie zniknely 0, potkniecia i ERROR 0, liczby (INFO), wojsko lordow w wojnie (INFO, prog 85 tys.). Log bez paczki: INFO.
+--grupa okup      : (okup zamiast szturmu, decyzja Jeffa 13.10 pyt. 5b - docs/lup-miast/OKUP-ZAMIAST-SZTURMU-PROJEKT.md rozdz. 6) SiegeRansom:
+                    O0 pomiar w chwili decyzji gry o szturmie. python -I tools/sprawdz_logi.py --grupa okup [--do-doby 364] [--baza-doby <log bazy>] <Armoury-*.log>
+                    (bitwy.log czytany z Logs/<znacznik>/ obok logu). Wiersze OKP-0 (linie, pola, latka), OKP-1 (kazdy szturm AI z bitwy.log ma linie O0),
+                    OKP-2 (regula w chwili decyzji - INFO), OKP-3 (szturmy i zdobycia - INFO), OKP-9 (potkniecia i ERROR 0). Log bez paczki: INFO.
 --grupa w6b       : (W6b, decyzja Jeffa 13.10 "rod gracza tez dotyczy, ale pod warunkiem, ze mam ziemie i sluze jakiemus krolowi") rod gracza w
                     tarczowym W6 i doplacie W5 na zasadach rodu AI (miasto albo zamek, wasal - nie wladca, nie najemnik, wojna).
                     python -I tools/sprawdz_logi.py --grupa w6b [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -16393,6 +16397,150 @@ def lup5b_main(logp, start_arg, until=364):
     return 0
 
 
+OKP_O0 = re.compile(
+    r"Okup oblezenia \(O0\): dzien (?P<d>\d+) \| osada (?P<st>\S+) \((?P<name>.*?), (?P<kind>miasto|zamek), krolestwo (?P<kd>\S+), rod (?P<clan>\S+)\)"
+    r" \| oblegajacy: frakcja (?P<fac>\S+), wodz (?P<lead>.*?) \(armia (?P<army>tak|nie)\), druzyn (?P<parties>\d+) \(ludzi (?P<men>\d+), Inni (?P<umen>\d+)\),"
+    r" oblezenie (?P<days>[\d.]+) dob, szturmow bez zdobycia (?P<failed>\d+)"
+    r" \| moneta: kupcy (?P<kasa>\d+), lud W (?P<w>\d+) R (?P<r>\d+) P (?P<p>\d+) gmina (?P<g>\d+) \(kiesa (?P<live>czynna|nieczynna)\), razem (?P<coin>\d+)"
+    r" \| okup (?P<ransom>\d+) \(czesc (?P<share>[\d.]+); kupcy (?P<wm>\d+), lud (?P<wf>\d+)\) \| zold armii (?P<wage>\d+)/d, okup = (?P<rdays>[\d.]+|-) dob zoldu"
+    r" \| stosunek gry (?P<ratio>pusta warownia|[\d.]+) \(.*?\) \| potrzeba (?P<need>tak|nie) \(.*?\)"
+    r" \| stolica (?P<cap>tak|nie), fabula (?P<story>tak|nie), Inni (?P<und>tak|nie), bunt (?P<rebel>tak|nie), gracz (?P<player>.*?)"
+    r" \| obronca zaplacilby (?P<def>tak|nie) \((?P<dwhy>.*?)\) \| AI przyjalby (?P<acc>tak|nie) \((?P<awhy>.*?)\) \| wynik (?P<out>.*?)\.$")
+OKP_DAY = re.compile(r"Okup oblezenia \(doba\): dzien (\d+) \| klucze: pomiar (tak|nie), AI (tak|nie), gracz-obronca (tak|nie), gracz-oblegajacy (tak|nie), czesc ([\d.]+),"
+                     r" prog krwawego szturmu ([\d.]+), rozejm (\d+) dob \| decyzje gry o szturmie \(true\) (\d+), cykli (\d+) \(linii O0 (\d+)\)")
+OKP_B175 = re.compile(r"Bitwa: B175 dzien (\d+)( \[GRACZ\])? \| Siege( morze)? \|.*\| osada (\S+) \(zdobyta (tak|nie)\)\.$")
+
+
+def okup_bitwy_path(logp):
+    """<katalog>/Armoury-<znacznik>.log -> <katalog>/Logs/<znacznik>/bitwy.log (uklad archiwum D:\\Backup i gry); brak - None."""
+    d, f = os.path.split(logp)
+    stem = os.path.splitext(f)[0].replace("Armoury-", "")
+    for p in (os.path.join(d, "Logs", stem, "bitwy.log"), os.path.join(d, stem, "bitwy.log")):
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def okup_main(logp, start_arg, until=364, bdp=None):
+    """Okup zamiast szturmu (decyzja Jeffa 13.10 pyt. 5b; Armoury/src/SiegeRansom*.cs; projekt docs/lup-miast/OKUP-ZAMIAST-SZTURMU-PROJEKT.md rozdz. 5-6).
+    Okno: doby kampanii 1-until. Wiersze OKP-0..: linie, latki i pola (OKP-0), kazdy szturm AI z bitwy.log (B175 Siege, bez [GRACZ]) ma wczesniej linie O0 tej
+    osady (OKP-1 = O-1 po P13), rozklad reguly w chwili decyzji (OKP-2 INFO: stosunek gry, obronca zaplacilby, AI przyjalby, powody, wykluczenia), szturmy
+    i zdobycia wobec decyzji (OKP-3 INFO), potkniecia i ERROR in SiegeRansom (OKP-9). Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return d is not None and 1 <= run_day(d, start) <= until
+
+    o0raw = [s for s in lines if s.startswith("Okup oblezenia (O0): dzien") and inwin(num(r"dzien (\d+)", s))]
+    o0 = [m for m in (OKP_O0.match(s) for s in o0raw) if m]
+    dayraw = [s for s in lines if s.startswith("Okup oblezenia (doba): dzien") and inwin(num(r"dzien (\d+)", s))]
+    days = [m for m in (OKP_DAY.match(s) for s in dayraw) if m]
+    errs = [s for s in lines if s.startswith("ERROR in SiegeRansom.")]
+    hooks = [s for s in lines if s.startswith("Szczelnosc (164a): latki w kampanii")]
+    bp = okup_bitwy_path(logp)
+    assaults = []
+    if bp:
+        for s in read(bp):
+            if not s.startswith("Bitwa: B175 dzien"):
+                continue
+            m = OKP_B175.match(s)
+            if m and inwin(int(m.group(1))):
+                assaults.append((int(m.group(1)), bool(m.group(2)), m.group(4), m.group(5) == "tak"))
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until} | linii O0 {len(o0raw)} (odczytane {len(o0)}), linii doby {len(dayraw)} (odczytane {len(days)}), "
+          f"ERROR {len(errs)} | bitwy.log: {bp or 'BRAK'} (szturmow w oknie {len(assaults)})")
+    on = bool(o0raw or dayraw)
+    # ---- OKP-0 linie, latki, pola
+    wired = None
+    if hooks:
+        h = hooks[-1]
+        w = h.split("wpiete:", 1)[1].split("; BRAK:", 1)[0] if "wpiete:" in h else ""
+        wired = "okup oblezenia: decyzja gry o szturmie" in w
+    if not on:
+        rep.add("OKP-0: linie okupu (O0, doba) i latka decyzji", "brak linii w oknie" + (f"; latka decyzji wpieta {wired}" if wired is not None else "; brak linii Szczelnosc (164a) w kampanii"),
+                "INFO (log bez paczki albo bez oblezen ze szturmem)", None)
+    else:
+        bad_parse = (len(o0raw) - len(o0)) + (len(dayraw) - len(days))
+        # jak lup5b: pary na calym logu - linia doby "dzien P" liczy linie O0 z dob <= P (ostatni tick nosi dobe poprzednia)
+        dall = [m for m in (OKP_DAY.match(s) for s in lines if s.startswith("Okup oblezenia (doba): dzien")) if m]
+        last_tick = max((int(m.group(1)) for m in dall), default=None)
+        n_day_lines = sum(int(m.group(11)) for m in dall)
+        n_o0_all = sum(1 for s in lines if s.startswith("Okup oblezenia (O0): dzien") and last_tick is not None and (num(r"dzien (\d+)", s) or 0) <= last_tick)
+        hook_bad = sum(1 for s in dayraw if "latka decyzji: wpieta" not in s)
+        ok0 = bad_parse == 0 and hook_bad == 0 and (wired is None or wired) and n_day_lines == n_o0_all
+        rep.add("OKP-0: linie O0 i doby - pola, latka decyzji, linii O0 (caly log do ostatniego ticku) = suma 'linii O0' z linii doby",
+                f"O0 {n_o0_all}, w liniach doby {n_day_lines}, pola nieodczytane {bad_parse}, doby bez latki {hook_bad}" + (f", latka w 164a {wired}" if wired is not None else ""),
+                "rowne; pola wszystkie; latka wpieta", ok0)
+    # ---- OKP-1 (O-1 po P13): szturm AI z bitwy.log ma wczesniej linie O0 tej osady (doba d-2..d)
+    if not bp:
+        rep.add("OKP-1: kazdy szturm AI (bitwy.log B175 Siege) ma linie O0 tej osady w dobach d-2..d", "brak bitwy.log obok logu (Logs/<znacznik>/bitwy.log)", "INFO", None)
+    elif not o0raw:
+        rep.add("OKP-1: kazdy szturm AI ma linie O0", f"szturmow {len(assaults)}, linii O0 0", "INFO (log bez paczki - pomiar nieczynny)", None)
+    else:
+        seen = {}
+        for m in o0:
+            seen.setdefault(m.group("st"), []).append(int(m.group("d")))
+        ai = [a for a in assaults if not a[1]]
+        miss = [f"d{run_day(d, start)} {st}" for d, pl, st, cap in ai if not any(d - 2 <= x <= d for x in seen.get(st, []))]
+        rep.add("OKP-1: kazdy szturm AI (bitwy.log B175 Siege, bez [GRACZ]) ma linie O0 tej osady w dobach d-2..d",
+                f"szturmow AI {len(ai)} (z graczem {len(assaults) - len(ai)}), bez linii O0 {len(miss)}" + (f" ({miss[:5]})" if miss else ""), "0", not miss)
+    # ---- OKP-2 rozklad reguly w chwili decyzji (INFO)
+    if o0:
+        n = len(o0)
+        rat = sorted(float(m.group("ratio")) for m in o0 if m.group("ratio") != "pusta warownia")
+        empty = sum(1 for m in o0 if m.group("ratio") == "pusta warownia")
+        def q(v, p):
+            return v[min(len(v) - 1, int(p * (len(v) - 1) + 0.5))] if v else float("nan")
+        dp = sum(1 for m in o0 if m.group("def") == "tak")
+        ac = sum(1 for m in o0 if m.group("acc") == "tak")
+        both = sum(1 for m in o0 if m.group("def") == "tak" and m.group("acc") == "tak")
+        why_need = sum(1 for m in o0 if "potrzeba" in m.group("awhy") and m.group("acc") == "tak")
+        why_fail = sum(1 for m in o0 if "szturm bez zdobycia" in m.group("awhy"))
+        why_blood = sum(1 for m in o0 if "krwawy szturm" in m.group("awhy"))
+        excl = {}
+        for m in o0:
+            for k in ("cap", "story", "und", "rebel"):
+                if m.group(k) == "tak":
+                    excl[k] = excl.get(k, 0) + 1
+        small = sum(1 for m in o0 if m.group("dwhy").startswith("okup ") and "< doba zoldu" in m.group("dwhy"))
+        rd = sorted(float(m.group("rdays")) for m in o0 if m.group("rdays") != "-")
+        rep.add("OKP-2a: stosunek gry bez losowania w chwili decyzji o szturmie (INFO; P2 - prog krwawego szturmu)",
+                f"decyzji {n} (pusta warownia {empty}); p25 {q(rat, 0.25):.2f}, mediana {q(rat, 0.5):.2f}, p75 {q(rat, 0.75):.2f}; < 1.25: {sum(1 for x in rat if x < 1.25)}, "
+                f"< 1.5: {sum(1 for x in rat if x < 1.5)}, < 2.0: {sum(1 for x in rat if x < 2.0)}",
+                "INFO - wartosc progu SiegeRansomBloodyRatio (1.5) do decyzji po pierwszym biegu: celem okupy w ok. 1/3-1/2 decyzji", None)
+        rep.add("OKP-2b: regula w chwili decyzji (INFO)",
+                f"obronca zaplacilby {dp}/{n}, AI przyjalby {ac}/{n} (potrzeba {why_need}, szturm bez zdobycia {why_fail}, krwawy {why_blood}), oba {both}/{n}; "
+                f"wykluczone: stolica {excl.get('cap', 0)}, fabula {excl.get('story', 0)}, Inni {excl.get('und', 0)}, bunt {excl.get('rebel', 0)}; okup < doba zoldu {small}; "
+                f"okup w dobach zoldu mediana {q(rd, 0.5):.1f}",
+                "INFO - sprawdzenie 14.10 (39 zdobyc): okup ponizej doby zoldu 5/39, armia w potrzebie 1/39, stolice 3/39", None)
+    else:
+        rep.add("OKP-2: regula w chwili decyzji (INFO)", "brak linii O0", "INFO", None)
+    # ---- OKP-3 szturmy i zdobycia (INFO)
+    if assaults:
+        ai = [a for a in assaults if not a[1]]
+        rep.add("OKP-3: szturmy i zdobycia z bitwy.log w oknie (INFO; baza O-4)",
+                f"szturmow {len(assaults)} (AI {len(ai)}), zdobytych {sum(1 for a in assaults if a[3])} (AI {sum(1 for a in ai if a[3])}), decyzji gry (cykli O0) {len(o0raw)}",
+                "INFO - bieg dwuletni W50: 67 szturmow, 38 zdobyc; W52 120 dob: 13 / 8", None)
+    else:
+        rep.add("OKP-3: szturmy i zdobycia (INFO)", "brak szturmow albo bitwy.log", "INFO", None)
+    # ---- OKP-9 potkniecia i bledy
+    st_sum = sum(num(r"\| potkniecia (\d+) \(od wczytania", s) or 0 for s in dayraw)
+    rep.add("OKP-9: potkniecia SiegeRansom (suma okna) i ERROR in SiegeRansom", f"potkniecia {st_sum}, ERROR {len(errs)}" + (f" ({errs[0][:120]})" if errs else ""),
+            "0", (st_sum == 0 and not errs) if (on or errs) else None)
+    rep.show()
+    return 0
+
+
 def drobne14_main(logp):
     """drobne14 (14.10; CHANGELOG "drobne bledy etapu 8 i audytu"): pomiary dopisane do diagnozy spraw bez przyczyny. Caly log (bez okna dob).
     D14-1 L5b-2: karawany w murach na poczatku oblezenia wobec zajetych przy zdobyciu (spis z OnSiegeEventStarted) - NIE, gdy karawany wroga staly
@@ -19785,6 +19933,8 @@ def main(argv):
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
+    if group == "okup" and logp:
+        return okup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # okup zamiast szturmu (SiegeRansom): O0 pomiar, O1 AI z AI, O2 gracz-obronca, O3 gracz-oblegajacy
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "w6b" and logp:
