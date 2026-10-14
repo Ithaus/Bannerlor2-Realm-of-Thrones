@@ -91,14 +91,22 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var ch = el.Character;
                     if (ch == null || ch.IsHero || el.Number <= 0) continue;
-                    Equipment eq = null; try { eq = ch.Equipment; } catch { }
-                    if (eq == null) continue;
-                    for (int sl = 0; sl < last; sl++)
+                    // PLAN 1.6 (recenzja 14.10, GoldenKits): dorobek wedlug tej samej potrzeby co AiGear - kusznicy ZK przy Army175GoldenBows ze wszystkich
+                    // zestawow, ludzie po rowno (1/3 kusze, 2/3 luki); inni - 1. zestaw (kn = 1, jak dotad). Bez tego nowa partia ZK dostawala kusze dla
+                    // wszystkich, a AI sprzedawalo 2/3 z nich i kupowalo luki (fala kup-sprzedaj w nowej kampanii i u nowych wodzow jej pierwszych dob)
+                    int kn = GoldenKits.Count(ch);
+                    for (int q = 0; q < kn; q++)
                     {
-                        var it = eq[(EquipmentIndex)sl].Item;
-                        if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                        if (sl == 11 && eq[EquipmentIndex.Horse].Item == null) continue;
-                        int k = AiGear.Bucket(it); int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
+                        Equipment eq = GoldenKits.Kit(ch, q, kn);
+                        int num = GoldenKits.Men(el.Number, q, kn);
+                        if (eq == null || num <= 0) continue;
+                        for (int sl = 0; sl < last; sl++)
+                        {
+                            var it = eq[(EquipmentIndex)sl].Item;
+                            if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                            if (sl == 11 && eq[EquipmentIndex.Horse].Item == null) continue;
+                            int k = AiGear.Bucket(it); int n; need.TryGetValue(k, out n); need[k] = n + num;
+                        }
                     }
                 }
                 Dictionary<ItemObject, int> arm;
@@ -114,17 +122,22 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var ch = el.Character;
                     if (ch == null || ch.IsHero || el.Number <= 0) continue;
-                    Equipment eq = null; try { eq = ch.Equipment; } catch { }
-                    if (eq == null) continue;
-                    for (int sl = 0; sl < last; sl++)
+                    int kn = GoldenKits.Count(ch);   // PLAN 1.6 (recenzja 14.10): jak wyzej - zestawy kusznikow ZK po rowno, inni 1. zestaw
+                    for (int q = 0; q < kn; q++)
                     {
-                        var it = eq[(EquipmentIndex)sl].Item;
-                        if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                        if (sl == 11 && eq[EquipmentIndex.Horse].Item == null) continue;
-                        int k = AiGear.Bucket(it); int d;
-                        if (!need.TryGetValue(k, out d) || d <= 0) continue;
-                        int n = Math.Min(d, el.Number);
-                        if (AiGear.AddToArmory(mp, it, n)) { need[k] = d - n; added += n; }
+                        Equipment eq = GoldenKits.Kit(ch, q, kn);
+                        int num = GoldenKits.Men(el.Number, q, kn);
+                        if (eq == null || num <= 0) continue;
+                        for (int sl = 0; sl < last; sl++)
+                        {
+                            var it = eq[(EquipmentIndex)sl].Item;
+                            if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                            if (sl == 11 && eq[EquipmentIndex.Horse].Item == null) continue;
+                            int k = AiGear.Bucket(it); int d;
+                            if (!need.TryGetValue(k, out d) || d <= 0) continue;
+                            int n = Math.Min(d, num);
+                            if (AiGear.AddToArmory(mp, it, n)) { need[k] = d - n; added += n; }
+                        }
                     }
                 }
                 return added;

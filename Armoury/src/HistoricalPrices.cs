@@ -346,6 +346,31 @@ namespace Armoury
             catch (Exception e) { Log.Error("HistoricalPrices.PriceOne", e); }
         }
 
+        /// <summary>177-2 wariant B (recenzja 14.10): wlasny miecz z Qohoru powstaje W TRAKCIE sesji - Apply przy starcie go nie widzial, a PriceOne
+        /// (OnNewItemCrafted) wycenil go jak zwykly wykuty miecz i zablokowal te cene (_target). Ta sama wycena co petla stali valyrianskiej w Apply:
+        /// miary x HistValyrianPerMeasure, na polce wazy koszt wykonania. Bez tego do konca sesji klinga szla za cene zwyklego miecza (sprzedaz za
+        /// bezcen, lord kupowal ja z polki jak zwykly miecz). Klucz HistValyrianPerMeasure 0 / ceny historyczne wylaczone - nic (jak w Apply).</summary>
+        internal static void PriceValyrianOne(ItemObject it)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!On || !_applied || it == null || s == null || s.HistValyrianPerMeasure <= 0f || !ValyrianBlades.Is(it)) return;
+                var setter = AccessTools.PropertySetter(typeof(ItemObject), "Value");
+                if (setter == null) return;
+                int was = it.Value;
+                int making = Math.Max(1, was);
+                int m = Math.Max(1, ValyrianBlades.Measures(it));
+                if (!_orig.ContainsKey(it)) _orig[it] = MaterialLaw.Orig(it);
+                _ourSet = true; try { setter.Invoke(it, new object[] { Math.Max(1, (int)Math.Round(m * s.HistValyrianPerMeasure)) }); } finally { _ourSet = false; }
+                _target[it] = it.Value;
+                if (!_shelfWorth.ContainsKey(it)) _vsShelf++;
+                _shelfWorth[it] = making;
+                Log.Info("HistoricalPrices: stal valyrianska (wlasny miecz z Qohoru) " + it.StringId + " " + was + " -> " + it.Value + " d (miar " + m + "; na polce wazy " + making + ").");
+            }
+            catch (Exception e) { Log.Error("HistoricalPrices.PriceValyrianOne", e); }
+        }
+
         // ------------------------------------------------------------ E8/C (253, PLAN 8.5g): konie wedlug kategorii
         // Odpowiedz Jeffa 12.10 nr 2: TAK. Dump 12.10: zwykly kon pod siodlo t3 kategorii "horse" (empire / battania / aserai_horse, camel) 929-1 177 d przy
         // rounceyu 160-480 d (2.2-6.6x), rumak t4 kategorii "war_horse" (t2_*) 1 221-2 380 d przy koniu zbrojnego 1 820-3 940 d (dolna granica); juczne (99-140),

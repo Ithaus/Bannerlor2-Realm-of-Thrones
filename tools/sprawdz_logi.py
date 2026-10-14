@@ -466,9 +466,9 @@ Uzycie (Python 3, tylko odczyt):
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa jeff14    : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
-                    pokrycie lukow), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
+                    pokrycie lukow, GB-5 dorobek nowej kampanii z lukami), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
                     jedza owce (24c, DragonsEatHerds: linia "Smoki (24c)" = ujscie ksiegi towarow doba po dobie, smok syty, potkniecia), JK-QS wlasny
-                    miecz z Qohoru (177-2 B, QohorOwnDesign: miary 1 -> 1, zlecenia bez wykucia 0, baza miar stali valyrianskiej stala, bledy).
+                    miecz z Qohoru (177-2 B, QohorOwnDesign: miary 1 -> 1, zlecenia bez wykucia 0, baza miar stali valyrianskiej stala, bledy, QS-5 cena stali valyrianskiej przy wydaniu).
                     Alias jeff14s. python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
@@ -16504,6 +16504,15 @@ def jeff14_main(logp):
         rep.add("JK-GB-1..3: linia \"Zlota Kompania (PLAN 1.6)\"", "brak linii",
                 "INFO (klucz wylaczony albo log sprzed paczki); przy kluczu TAK linia co dobe - inaczej NIE", None if not key else False)
     rep.add("JK-GB-4: bledy GoldenKits", f"ERROR in GoldenKits.* {nerr('GoldenKits')}", "0", nerr("GoldenKits") == 0)
+    # recenzja 14.10: dorobek stuleci (ColdStart.FillToTemplate) liczy zestawy ZK jak AiGear - w nowej kampanii luki sa w zbrojowniach od pierwszej doby
+    cs_new = any(s.startswith("ColdStart: zbrojownie - ") for s in lines)
+    if gb and cs_new:
+        d0 = min(gb)
+        c_first = num(r"pokrycie lukow ([\d.]+)%", gb[d0], float)
+        rep.add("JK-GB-5: nowa kampania - pokrycie lukow ZK pierwszej doby (dorobek stuleci wedlug zestawow)", f"d{d0}: {c_first}%",
+                ">= 80% (dorobek daje luki 2/3 kusznikow ZK; nizej - dorobek liczy tylko 1. zestaw)", (c_first >= 80.0) if c_first is not None else None)
+    else:
+        rep.add("JK-GB-5: nowa kampania - pokrycie lukow ZK pierwszej doby", "brak linii ColdStart (nie nowa kampania) albo brak linii PLAN 1.6", "INFO", None)
 
     # ---- JK-CR: zloto Casterly Rock wyczerpane (24d, RockGold)
     cr = by_day(lines, "Zloto Casterly Rock (24d): dzien")
@@ -16614,6 +16623,23 @@ def jeff14_main(logp):
             "jedna wartosc (przekucie, takze we wlasny projekt, nie zmienia sumy miar)", (len(base) == 1) if base else None)
     rep.add("JK-QS-4: bledy ValyrianBlades / QohorMasters", f"ERROR in ValyrianBlades.* {nerr('ValyrianBlades')}, QohorMasters.* {nerr('QohorMasters')}", "0 i 0",
             nerr("ValyrianBlades") == 0 and nerr("QohorMasters") == 0)
+    # recenzja 14.10: wlasny miecz wyceniony jak stal valyrianska od razu (HistoricalPrices.PriceValyrianOne), nie jak zwykly wyrob kuzni
+    vs_price = {}
+    for s in lines:
+        m = re.match(r"HistoricalPrices: stal valyrianska \(wlasny miecz z Qohoru\) (\S+) \d+ -> (\d+) d", s)
+        if m:
+            vs_price[m.group(1)] = int(m.group(2))
+    hp_off = any(s.startswith("HistoricalPrices: ceny historyczne WYLACZONE") for s in lines)
+    bad_p = []
+    for s in made:
+        mi = re.search(r"przekuty na wlasny projekt gracza (\S+) ", s)
+        mv = num(r"wartosc (\d+)\)", s)
+        if mi and (mi.group(1) not in vs_price or vs_price[mi.group(1)] != mv):
+            bad_p.append(f"{mi.group(1)} wartosc {mv}, cena VS {vs_price.get(mi.group(1), 'brak linii')}")
+    rep.add("JK-QS-5: wlasny miecz wyceniony jak stal valyrianska (miary x HistValyrianPerMeasure) przy wydaniu",
+            f"wykutych {len(made)}, linii ceny VS {len(vs_price)}, niezgodnych {len(bad_p)}" + (f" (pierwszy: {bad_p[0]})" if bad_p else ""),
+            "kazdy wykuty: wartosc w kronice = cena z linii HistoricalPrices (ceny historyczne wylaczone albo bez zlecen - INFO)",
+            (len(bad_p) == 0) if made and not hp_off else None)
     rep.show()
     return 0
 

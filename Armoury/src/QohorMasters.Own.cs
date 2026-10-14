@@ -324,6 +324,8 @@ namespace Armoury
                 return;
             }
             ValyrianBlades.AddOwn(it.StringId, Hero.MainHero != null ? Hero.MainHero.StringId : "");
+            // recenzja 14.10: cena stali valyrianskiej od razu (PriceOne z OnNewItemCrafted wycenil go jak zwykly miecz i zablokowal te cene do konca sesji)
+            HistoricalPrices.PriceValyrianOne(it);
             MobileParty.MainParty.ItemRoster.AddToCounts(new EquipmentElement(it), 1);
             _orders.Remove(o);
             ValyrianBlades.RegistryMove(o.InIds, new[] { it.StringId });
