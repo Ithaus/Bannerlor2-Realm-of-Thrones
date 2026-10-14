@@ -583,6 +583,7 @@ Uzycie (Python 3, tylko odczyt):
 --grupa a17       : (A17, 14.10 - stare zaleglosci; docs/reszta-2026-10-14/ROZPOZNANIE-A17.md) python -I tools/sprawdz_logi.py --grupa a17 <Armoury-*.log>
                     (caly log, czytany strumieniowo). A17-11 ludzie partii kasowanej po bitwie (DestroyedPartyMenRouted): linia doby CZYNNE, kontrola
                     przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
+                    A17-6 statki do liczby idealnej stoczni (ShipPortsBuyToIdeal): dopisek TAK, zakupy ponad liczbe idealna (B5-14) <= 0.1/d, B5-5 0.
                     Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -20859,6 +20860,7 @@ A17_PRE = {
     "dpm": "Ludzie kasowanych partii (A17): dzien",
     "d4": "Partia kasowana z ludzmi (A17 diagnoza D4)",
     "poc": "Pochodzenie (E4/7): dzien",
+    "ship": "Statki (181): dzien",
     "err": "ERROR in ",
 }
 A17_FIN29_GONE = 344.0 / 120.0      # fin29 (Armoury-2026-10-14_05-22-14.log): "przy zniknieciu partii" 344 ludzi w 120 dobach
@@ -20934,6 +20936,40 @@ def _a17_11(rep, got):
     rep.add("A17-11g: bledy DoomedPartyMen (ERROR in)", len(errs), "0", len(errs) == 0)
 
 
+def _a17_6(rep, got):
+    """A17-6 (poz. 6, B5-14, ShipPortsBuyToIdeal): port kupuje statki tylko do liczby idealnej stoczni NavalDLC (limit - 2)."""
+    sl = got["ship"]
+    if not sl:
+        rep.add("A17-6a: kupno statkow do liczby idealnej stoczni (linia Statki 181)", "brak linii", "INFO", None)
+        return
+    mk = [s for s in sl if "kupno do liczby idealnej stoczni (A17" in s]
+    on = [s for s in mk if "Ship Ports Buy To Ideal): TAK" in s]
+    rep.add("A17-6a: kupno statkow do liczby idealnej stoczni (dopisek A17 w linii Statki 181)", f"linii {len(sl)}, z dopiskiem {len(mk)}, TAK {len(on)}",
+            "TAK kazdej doby (klucz Ship Ports Buy To Ideal); log sprzed A17 - INFO", (len(on) == len(sl)) if mk else None)
+    ov = [(num(r"liczbe idealna stoczni .*?: naprawde (\d+) / (\d+)", s), num(r"liczbe idealna stoczni .*?: naprawde \d+ / (\d+)", s)) for s in sl]
+    ov = [x for x in ov if x[0] is not None]
+    if ov:
+        n = sum(x[0] for x in ov); g = sum(x[1] or 0 for x in ov)
+        rep.add("A17-6b: zakupy portow ponad liczbe idealna stoczni (B5-14, statki kasowane nastepnej doby)", f"{n / len(ov):.2f} statku / {g / len(ov):.0f} zl na dobe ({n} / {g} w {len(ov)} dobach)",
+                "<= 0.1 statku na dobe przy TAK (fin29 przed A17: 4.2 / 33 186 zl na dobe w ostatnich 28, srednio 2.7 / 21 921)", (n / len(ov) <= 0.1) if (mk and len(on) == len(sl)) else None)
+    sk = sum(num(r"porty pelne pominiete przy wyborze portu (\d+)", s, int, 0) or 0 for s in mk)
+    ga = sum(num(r"odmowy kupna od AI (\d+)", s, int, 0) or 0 for s in mk)
+    gg = sum(num(r"odmowy kupna od AI \d+ \((\d+) zl\)", s, int, 0) or 0 for s in mk)
+    gp = sum(num(r"od gracza (\d+)", s.split("kupno do liczby idealnej stoczni (A17")[-1], int, 0) or 0 for s in mk)
+    sp = [num(r"kasy portow wydaly \(181\) (\d+)", s) for s in sl]
+    sp = [x for x in sp if x is not None]
+    rp = [num(r"w \d+ portach, przyjely (\d+)", s) for s in sl]
+    rp = [x for x in rp if x is not None]
+    rep.add("A17-6c: porty pelne - pominiete i odmowy kupna; wydatki i przychody portow (INFO)",
+            (f"pominiete {sk}, odmowy AI {ga} ({gg} zl), gracz {gp}; " if mk else "") + (f"porty wydaly {sum(sp) / len(sp):.0f}/d, przyjely {sum(rp) / max(1, len(rp)):.0f}/d" if sp else "brak liczb"),
+            "INFO (fin29 przed A17: wydaly 72 101/d, przyjely 12 642/d; zmiana wyplat do panow - przekazac pracy 'pieniadze w roku 2')", None)
+    ovs = [num(r"wyplaty ponad nadwyzke (\d+)", s) for s in sl]
+    ovs = [x for x in ovs if x is not None]
+    rep.add("A17-6d: wyplaty portow ponad nadwyzke (B5-5)", f"{sum(ovs)} w {len(ovs)} dobach" if ovs else "brak liczb", "0 (regula 181 bez zmian)", (sum(ovs) == 0) if ovs else None)
+    errs = [s for s in got["err"] if "ShipsToPort181" in s]
+    rep.add("A17-6e: bledy ShipsToPort181 (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
 def a17_main(logp):
     """A17 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A17.md): progi napraw starych zaleglosci. Caly log, czytany strumieniowo (log 2 lat ma 280 MB).
     Log bez paczki: INFO, bez wyjatku."""
@@ -20949,6 +20985,7 @@ def a17_main(logp):
                     break
     print(f"plik: {logp} | " + ", ".join(f"{k} {len(v)}" for k, v in got.items()))
     _a17_11(rep, got)
+    _a17_6(rep, got)
     rep.show()
     return 0
 

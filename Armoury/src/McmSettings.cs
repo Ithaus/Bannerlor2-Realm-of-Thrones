@@ -5052,6 +5052,10 @@ namespace Armoury
         [SettingPropertyGroup("Ships and the ports (stage 3)")]
         public bool ShipPrizesToPort { get; set; } = true;
 
+        [SettingPropertyBool("Ship Ports Buy To Ideal", HintText = "a port buys ships only while its shipyard keeps fewer than it wants (two below its limit) - beyond that the shipyard breaks up the extra hulls the next day, so the port no longer pays for ships it will scrap: an AI captain keeps the ship he wanted to sell, the ships of a beaten or disbanded host go to another port with room or are lost, and you too cannot sell to a full port. Off = ports buy up to the shipyard's limit, as before")]
+        [SettingPropertyGroup("Ships and the ports (stage 3)")]
+        public bool ShipPortsBuyToIdeal { get; set; } = true;
+
         [SettingPropertyInteger("Town Folk Mode", 0, 1, "0", HintText = "0 off; 1 = the townsfolk's purse is counted every day from the real flows (wages, services, the basket by the people of each town) and written to the log only - it changes nothing in the game unless Town Folk Live is on (then the purse is real coin); 0 also turns the live purse off")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public int TownFolkMode { get; set; } = 1;
@@ -6994,6 +6998,7 @@ namespace Armoury
             s.ShipSalePortsTried = ShipSalePortsTried;
             s.ShipTradeThroughPort = ShipTradeThroughPort;
             s.ShipPrizesToPort = ShipPrizesToPort;
+            s.ShipPortsBuyToIdeal = ShipPortsBuyToIdeal;
             s.TownFolkMode = TownFolkMode;
             s.TownFolkLive = TownFolkLive;
             s.TownFolkServiceShare = TownFolkServiceShare;
