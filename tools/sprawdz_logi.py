@@ -543,6 +543,9 @@ Uzycie (Python 3, tylko odczyt):
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). K1 (BuildWoodAboveCraftStock - budowy biora drewno tylko ponad zapas rzemiosla):
                     T2-K1-0 dopisek w "Roboty ludu (P2)", T2-K1-1 cykle warsztatow bez drewna <= 100/d, T2-K1-2 miast bez drewna <= 20, T2-K1-3 budowa idzie
                     >= 80 osad, T2-K1-4 zbroja korpusu t3+t4 >= 27.6/d (warsztaty.log), T2-K1-5 INFO, T2-K1-6 straz narzedzi (budowy <= 41.6/d, wsie >= 66.7/d).
+                    K2 (VillageClothAboveReserve - koszyk dnia wsi bierze plotno tylko ponad prog polki): T2-K2-0 dopisek w "Kiesa ludu", T2-K2-1 wsie <= 60 szt./d,
+                    T2-K2-2 plotno do wojska >= 75 szt./d, T2-K2-3 kolejka plotna wojska d90 -> until bez wzrostu, T2-K2-4 miast bez plotna <= 50, T2-K2-5 regulator
+                    lnu >= 1.2, T2-K2-6 INFO.
                     Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
@@ -19173,6 +19176,54 @@ def towary2_main(logp, start_arg, until=120):
     rep.add("T2-K1-6: narzedzia - budowy i wsie (Towary tools, srednia)", f"budowy {fx_(t1)}/d, wsie {fx_(t2)}/d ({n} dob); miast z < 5 narzedziami {fx_(t3)}",
             "budowy <= 41.6/d i wsie >= 66.7/d (N: budowy 20.8, wsie 83.3, miast z < 5 narzedziami 81.5)" + tail1,
             g1((t1 is None or t1 <= 41.6) and (t2 is None or t2 >= 66.7)) if (t1 is not None or t2 is not None) else None)
+
+    # ---- K2: wies kupuje plotno dopiero ponad zapas polki (VillageClothAboveReserve; TownFolk.Live.cs BuyGoods, dopisek linii "Kiesa ludu")
+    kl = by_day(lines, "Kiesa ludu: dzien")
+    ce = by_day(lines, "Ceny surowcow: dzien")
+    ln_ = {}
+    for x in lines:
+        if x.startswith("Towary: dzien") and " - linen (" in x:
+            k = num(r"dzien (\d+)", x)
+            if k is not None:
+                ln_[k] = x
+    k2n = [k for k in kl if inwin(k) and "plotno wsi ponad zapas polki (VillageClothAboveReserve)" in kl[k]]
+    k2on = [k for k in k2n if "(VillageClothAboveReserve) tak:" in kl[k]]
+    on2 = bool(k2on)
+    tail2 = "" if on2 else " - klucz wylaczony albo log bez dopisku: INFO"
+
+    def g2(ok):
+        return ok if on2 else None
+    rep.add("T2-K2-0: dopisek plotna wsi (Kiesa ludu)", f"dob z dopiskiem {len(k2n)}, klucz tak {len(k2on)}", "codziennie, klucz tak" + tail2, (len(k2on) > 0) if k2n else None)
+    v, n = avg(ln_, r"wsie \(zakupy w miescie, E5/B1\) (\d+)")
+    rep.add("T2-K2-1: plotno kupione przez wsie (Towary linen, srednia)", f"{fx_(v)} szt./d ({n} dob)", "<= 60 szt./d (N 148.3, B 22.3)" + tail2, g2(v <= 60) if v is not None else None)
+    v, n = avg(ln_, r"odziez wojska \(150\) (\d+)")
+    rep.add("T2-K2-2: plotno do wojska (Towary linen, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 75 szt./d (N 53.0, potrzeba ok. 96)" + tail2, g2(v >= 75) if v is not None else None)
+    od = {}
+    for d, x in by_day(lines, "Odziez wojska (150): dzien").items():
+        i = x.find("| czeka: ")
+        w = x[i + 9:x.find(" (", i)] if i >= 0 else ""
+        q = num(r"plotno (\d+(?:\.\d+)?)", w, float)
+        if q is not None:
+            od[run_day(d, start)] = q
+    wd = sorted(k for k in od if 90 <= k <= until)
+    if len(wd) >= 2 and wd[-1] >= 92:
+        a, b2 = od[wd[0]], od[wd[-1]]
+        rep.add("T2-K2-3: kolejka plotna wojska (Odziez wojska 150, czeka)", f"d{wd[0]} {a:.0f} -> d{wd[-1]} {b2:.0f}", "bez wzrostu (<= +2%; N d90 3109 -> d120 3720, +20/d)" + tail2,
+                g2(b2 <= a * 1.02 + 0.5))
+    else:
+        rep.add("T2-K2-3: kolejka plotna wojska (Odziez wojska 150, czeka)", "za krotkie okno albo brak linii", "bez wzrostu d90 -> until (gdy okno siega d92)", None)
+    v, n = avg(ce, r"plotno \(wartosc \d+ d\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast")
+    rep.add("T2-K2-4: miast bez plotna (Ceny surowcow, srednia)", f"{fx_(v)} ({n} dob)", "<= 50 z 97 (N 50.2, B 88.0)" + tail2, g2(v <= 50) if v is not None else None)
+    rk2 = [k for k in sorted(rg) if inwin(k)]
+    fl2 = num(r"flax: (?:x[\d.]+ -> )?x([\d.]+)", rg[rk2[-1]], float) if rk2 else None
+    rep.add("T2-K2-5: regulator lnu (ostatnia doba okna)", f"x{fl2:.2f}" if fl2 is not None else "brak linii", ">= 1.20 (N x1.30; jak PL-4)" + tail2,
+            g2(fl2 >= 1.2) if fl2 is not None else None)
+    c1, _ = avg(kl, r"\(VillageClothAboveReserve\) \w+: wierszy zatrzymanych progiem (\d+)")
+    c2, _ = avg(kl, r"\(VillageClothAboveReserve\) \w+: wierszy zatrzymanych progiem \d+, zostalo w kiesach wsi (\d+) zl")
+    c3, _ = avg(kl, r"\(VillageClothAboveReserve\) \w+: [^;|]*kupione plotno (\d+) szt\.")
+    c4, _ = avg(kl, r"\(VillageClothAboveReserve\) \w+: [^;|]*\(prog polki srednio ([\d.]+) szt\.\)")
+    rep.add("T2-K2-6: koszyk wsi a plotno (dopisek)", f"wierszy zatrzymanych progiem {fx_(c1)}/d, zostalo w kiesach wsi {fx_(c2, 0)} zl/d, kupione plotno {fx_(c3)} szt./d, prog polki srednio {fx_(c4)} szt.",
+            "INFO (ZB-12 kiesy najbiedniejszych - --grupa zbytki; wywoz plotna z karawanami - PL-3 w --grupa plotno)", None)
     rep.show()
     return 0
 

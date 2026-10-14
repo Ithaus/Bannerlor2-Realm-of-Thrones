@@ -5228,6 +5228,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool WardsAndVillagesShop { get; set; } = true;
 
+        [SettingPropertyBool("Village Cloth Above Reserve", HintText = "villagers who shop for their daily basket in their market town (salt, tools, linen, pots, beer) buy linen only from what lies on the stall above what the town keeps for its soldiers, armourers and for towns that lack it (the same mark as Folk Cloth Above Reserve); what they meant to spend on linen and could not stays in the village purse, the rest of the basket is bought as before. Off = they buy linen down to the last five pieces on the stall, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool VillageClothAboveReserve { get; set; } = true;
+
         [SettingPropertyBool("Folk Cloth Above Reserve", HintText = "linen and leather are what the soldiers' clothing and the armourers' workshops use, so the townsfolk (and the castle folk and villagers who shop in town) buy them from their savings only from what lies on the stall above what the town keeps for itself and for towns that lack it (what the town will not sell to other towns, and as much again - at least one cart load - for carrying out), and never above Folk Ladder Price Ceiling times the usual price, like the other fine goods; and the part of the cloth meant for velvet, cotton, fur or felt that are too dear does not go to linen and leather. What they do not buy stays in their purses. Their everyday buying for their homes is not touched. Off = they buy linen and leather from their savings down to the last pieces on the stall, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool FolkClothAboveReserve { get; set; } = true;
@@ -6958,6 +6962,7 @@ namespace Armoury
             s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
             s.FolkPredictBought = FolkPredictBought;
             s.WardsAndVillagesShop = WardsAndVillagesShop;
+            s.VillageClothAboveReserve = VillageClothAboveReserve;
             s.FolkClothAboveReserve = FolkClothAboveReserve;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;
