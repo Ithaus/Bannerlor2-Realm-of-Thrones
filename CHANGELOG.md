@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## GL-4 poprawka: pobor od ludzi (LevyByPeople) domyslnie WYLACZONY - DECYZJA (pelne uprawnienia), 14.10
+
+**Problem:** test 120 dob paczki B (Armoury-2026-10-13_18-49-17.log, baza 18-04-21): GLB-P4-6 suma swiata ochotnikow x0.659 (prog 0.9-1.1), GLB-P4-2 rekruci na 1000 ludzi p90/p10 9.14 (baza 5.17, prog 3) - regula nie wyrownala werbunku, tylko zabrala trzecia czesc ochotnikow.
+**Przyczyna:** miejsca u notabli sa stale (6 na notabla) i w ludnych krainach stoja pelne (ok. 90% - rachunek na sucho, pobor/RAPORT.md); wyzsza szansa tam nic nie dodaje, a nizsza w pustych krainach odbiera. Norma (srednia wazona czynnika = 1.000) tego nie widzi.
+**Zmiana:** domyslna wartosc LevyByPeople false; milicja od ludzi (MilitiaByPeople) zostaje - GLB-P4-4 milicja swiata x0.955 (TAK). Prawdziwy "pobor od ludzi" wymaga skalowania liczby miejsc / notabli wedlug ludzi - osobna paczka na pozniej.
+**Ryzyko / co sprawdzic:** w nastepnym tescie linia GL4 z "pobor: wylaczony", ochotnicy swiata jak przed P4. Wojsko lordow w wojnie d93-120 w tescie z P4: 109.5 tys. (bez wplywu, werbunek wiaze pieniadz).
+**Status:** DO SPRAWDZENIA.
+
 ## GL-2 poprawka: zloto startowe kies wsi bez ubytku (14.10, po tescie 120 dob paczki A)
 
 **Problem:** test 120 dob paczki A (Armoury-2026-10-13_17-32-32.log): linia "Zloto startowe wedlug ludzi (GL2)" - kiesy wsi przed 1 082 432 = po 1 079 524, suma swiata ROZJAZD (-2 908 zl), potkniecie "StartGold(wies niepelna)"; prog GL2-S1 NIE.
