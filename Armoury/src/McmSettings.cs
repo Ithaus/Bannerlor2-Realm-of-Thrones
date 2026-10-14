@@ -5816,6 +5816,14 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool ReaverLootToCrews { get; set; } = true;
 
+        [SettingPropertyBool("Reaver Raid By Profit", HintText = "the lords of the Iron Islands and the Free Folk weigh a raid by its gain: a village whose iron price would pay Reaver Raid Pay Days of the company's wages and food tempts them twice as much as before, a rich one up to three times, a poor one no more than before. They still raid only enemies at war and within reach, with the food the game asks for, so no new targets appear. Needs Reaver Iron Price. Off = they weigh raids as before")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool ReaverRaidByProfit { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Reaver Raid Pay Days", 1.00f, 28.00f, "0", HintText = "with Reaver Raid By Profit: how many days of a company's wages and food the iron price of a village must pay to double the lords' wish to raid it (4 = about the days of a raid and the voyage there and back)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public float ReaverRaidPayDays { get; set; } = 4f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7269,6 +7277,8 @@ namespace Armoury
             s.ReaverIronPriceShare = ReaverIronPriceShare;
             s.ReaverWaterfrontShare = ReaverWaterfrontShare;
             s.ReaverLootToCrews = ReaverLootToCrews;
+            s.ReaverRaidByProfit = ReaverRaidByProfit;
+            s.ReaverRaidPayDays = ReaverRaidPayDays;
         }
 
         internal static void Apply()

@@ -2179,6 +2179,10 @@ namespace Armoury
         // WW2 (lup na zalogi, projekt rozdz. 2.2): okno 28 dob zelaznej ceny ponad s, nabrzeza i dziesieciny korsarzy rodu podnosi pulap druzyn 1:1 po zalogach
         // i karawanach (ClanBudget.Daily), poza D (ClanIncomeBook QReaver). Off = przyrost idzie do jednorazowych i D (W-1) jak caly lup w 63aaaedf
         public bool ReaverLootToCrews = true;              // the iron price pays the crews: the gold an Ironborn house takes as the iron price beyond the share of the people struck, from the waterfronts and as the corsairs' tithe raises, coin for coin, what the house may spend on the wages of its companies in the field - spread over 28 days - and goes neither to its garrisons nor to its court, equipment or buildings, so the crown's war aid for that house falls by as much. The Free Folk take no wages (Free Folk Unpaid), so it does not touch them. Your house as their vassal is measured the same way for the crown's war aid. Needs Reaver Iron Price and Clan Budget Enabled. Off = the iron price counts like any other loot in the house's income, as before
+        // WW3 (najazd z rachunku, projekt rozdz. 2.3): postfiks AiHourlyTick (ReaverLaw.Profit) mnozy opcje rabunku lordow AI najezdzcow x M = 1 + min(2, E / (C x T));
+        // opcji nie dodaje. Off = oceny rabunku jak gra / SCAI / BK (63aaaedf)
+        public bool ReaverRaidByProfit = true;             // the lords of the Iron Islands and the Free Folk weigh a raid by its gain: a village whose iron price would pay Reaver Raid Pay Days of the company's wages and food tempts them twice as much as before, a rich one up to three times, a poor one no more than before. They still raid only enemies at war and within reach, with the food the game asks for, so no new targets appear. Needs Reaver Iron Price. Off = they weigh raids as before
+        public float ReaverRaidPayDays = 4f;               // with Reaver Raid By Profit: how many days of a company's wages and food the iron price of a village must pay to double the lords' wish to raid it (4 = about the days of a raid and the voyage there and back)
 
         public static void Load(string moduleDataDir)
         {

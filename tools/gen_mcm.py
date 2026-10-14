@@ -225,6 +225,7 @@ RANGES = {
     # pula Wolnych Ludzi 0..0.05 ludzi krainy (trzy miejsca - 0.018), udzial zalog 0..1 (ClanBudget.FfPool)
     'ReaverIronPriceShare': (0.0, 1.0, "0.00"),
     'ReaverWaterfrontShare': (0.0, 1.0, "0.00"),
+    'ReaverRaidPayDays': (1.0, 28.0, "0"),
 }
 
 def gen(module_dir, ns, display):

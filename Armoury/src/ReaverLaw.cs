@@ -45,11 +45,12 @@ namespace Armoury
         // ---------------------------------------------------------------- WW0: liczniki decyzji AI (od ostatniej linii doby)
         private sealed class Think
         {
-            public int Thinks, WithRaid, Options, RaidTop;
+            public int Thinks, WithRaid, Options, RaidTop, RaidTop0, Multiplied, X3;   // RaidTop0 - rabunek na gorze przed WW3 (wyniki gry)
+            public readonly List<float> Mult = new List<float>();                       // WW3: mnozniki opcji
             public readonly HashSet<MobileParty> PartiesWithRaid = new HashSet<MobileParty>();
             public readonly HashSet<Settlement> Villages = new HashSet<Settlement>();
             public readonly List<float> RaidBest = new List<float>(), OtherBest = new List<float>();
-            public void Clear() { Thinks = WithRaid = Options = RaidTop = 0; PartiesWithRaid.Clear(); Villages.Clear(); RaidBest.Clear(); OtherBest.Clear(); }
+            public void Clear() { Thinks = WithRaid = Options = RaidTop = RaidTop0 = Multiplied = X3 = 0; PartiesWithRaid.Clear(); Villages.Clear(); RaidBest.Clear(); OtherBest.Clear(); Mult.Clear(); }
         }
         private static readonly Think[] _think = { new Think(), new Think() };
         private const int MaxSamples = 4096;
@@ -78,6 +79,7 @@ namespace Armoury
         {
             for (int g = 0; g < Groups; g++) { _think[g].Clear(); _iron[g].Clear(); }
             _loot.Clear(); _dLootIn = 0; _lastLootIn = 0;   // WW2: okno lupu tylko w pamieci sesji
+            _eCache.Clear(); _done.Clear(); _copy.Clear();   // WW3
             _rangeLogged = false; _stumbles = 0;
             lock (_err) _err.Clear();
         }
@@ -293,9 +295,126 @@ namespace Armoury
                 if (nRaid <= 0) return;
                 t.WithRaid++; t.Options += nRaid; t.PartiesWithRaid.Add(party);
                 if (t.RaidBest.Count < MaxSamples) { t.RaidBest.Add(bestRaid); t.OtherBest.Add(bestOther == float.MinValue ? -1f : bestOther); }
+                if (bestRaid > bestOther) t.RaidTop0++;
+                // WW3: opcje rabunku z rachunku (po pomiarze WW0 - wyniki gry wyzej sa surowe); "rabunek na gorze" - po mnozniku (to wybiera petla gry)
+                if (ProfitOn) bestRaid = Profit(party, partyThinkParams, t, bestRaid);
                 if (bestRaid > bestOther) t.RaidTop++;
             }
             catch (Exception e) { Stumble("AiTickPostfix", e); }
+        }
+
+        // ---------------------------------------------------------------- WW3: najazd z rachunku (AI z biezacego zysku)
+        /// <summary>WW3 czynne: klucz ReaverRaidByProfit, wymaga WW1 (E = lup zelaznej ceny).</summary>
+        internal static bool ProfitOn { get { var s = S; return s != null && s.ReaverRaidByProfit && s.ReaverIronPrice; } }
+        private static double PayDays { get { var s = S; return s == null ? 4.0 : Math.Max(1f, Math.Min(28f, s.ReaverRaidPayDays)); } }
+        private const double MaxExtra = 2.0;   // M = 1 + min(2, E / (C x T)): najwyzej x3 - AI nie porzuca obrony wlasnych twierdz dla bogatej wsi
+
+        private struct ECache { public int Hour; public double Base; }
+        private static readonly Dictionary<Settlement, ECache> _eCache = new Dictionary<Settlement, ECache>();
+        private static readonly HashSet<AIBehaviorData> _done = new HashSet<AIBehaviorData>();
+        private static readonly List<(AIBehaviorData, float)> _copy = new List<(AIBehaviorData, float)>(64);
+
+        /// <summary>WW3: kazda opcja RaidSettlement z wynikiem > 0 dostaje wynik x M = 1 + min(2, E / (C x T)); E - lup, ktory WW1 dalby dzis z tej wsi (Q x kiesa
+        /// wsi + Q x wartosc magazynu; partia na morzu przy wsi portu - + Qw x nadwyzka nabrzeza), C - koszt dnia partii (zold z rycerzami 179 + jedzenie: zuzycie
+        /// x cena zboza najblizszego miasta), T = ReaverRaidPayDays. Opcji nie dodaje (wojna, zasieg, 8 dni jedzenia, prog sily - z gry); M >= 1 (nigdy kara);
+        /// raz na opcje (lista swieza co mysl - mnoznik nie narasta). Zwraca najlepszy wynik rabunku po mnozniku.</summary>
+        private static float Profit(MobileParty party, PartyThinkParams p, Think t, float bestRaid)
+        {
+            float best = bestRaid;
+            try
+            {
+                double cost = DayCost(party) * PayDays;
+                if (!(cost > 1.0)) cost = 1.0;
+                _copy.Clear(); _done.Clear();
+                foreach (var it in p.AIBehaviorScores) _copy.Add(it);
+                best = float.MinValue;
+                for (int i = 0; i < _copy.Count; i++)
+                {
+                    var it = _copy[i];
+                    if (it.Item1.AiBehavior != AiBehavior.RaidSettlement) continue;
+                    float sc = it.Item2;
+                    if (sc > 0f && _done.Add(it.Item1))
+                    {
+                        var st = it.Item1.Party as Settlement;
+                        double e = LootEstimate(st, party);
+                        double m = 1.0 + Math.Min(MaxExtra, Math.Max(0.0, e) / cost);
+                        if (m > 1.0 + 1e-6)
+                        {
+                            var d = it.Item1;
+                            float ns = (float)(sc * m);
+                            p.SetBehaviorScore(in d, ns);
+                            sc = ns;
+                            t.Multiplied++;
+                            if (m >= 1.0 + MaxExtra - 1e-6) t.X3++;
+                        }
+                        if (t.Mult.Count < MaxSamples) t.Mult.Add((float)m);
+                    }
+                    if (sc > best) best = sc;
+                }
+            }
+            catch (Exception e) { Stumble("Profit", e); return bestRaid; }
+            return best == float.MinValue ? bestRaid : best;
+        }
+
+        /// <summary>WW3: lup zelaznej ceny z wsi teraz (E). Kiesa i magazyn wsi - pamiec na godzine gry (wiele partii mysli o tych samych wsiach).</summary>
+        private static double LootEstimate(Settlement st, MobileParty party)
+        {
+            var v = st != null ? st.Village : null;
+            if (v == null) return 0.0;
+            int hour = (int)CampaignTime.Now.ToHours;
+            ECache c;
+            if (!_eCache.TryGetValue(st, out c) || c.Hour != hour)
+            {
+                double stock = 0;
+                var r = st.ItemRoster;
+                if (r != null)
+                    for (int i = 0; i < r.Count; i++)
+                    {
+                        var el = r.GetElementCopyAtIndex(i);
+                        if (el.Amount > 0 && el.EquipmentElement.Item != null) stock += (double)el.Amount * el.EquipmentElement.Item.Value;
+                    }
+                c = new ECache { Hour = hour, Base = Math.Max(0, v.Gold) + stock };
+                _eCache[st] = c;
+            }
+            double e = Q * c.Base;
+            try
+            {
+                var port = v.Bound;
+                if (party != null && party.IsCurrentlyAtSea && port != null && port.HasPort)
+                {
+                    long room = TownFolk.WaterfrontRoom(port);
+                    if (room > 0) e += Qw * room;
+                }
+            }
+            catch (Exception ex) { Stumble("LootEstimate(nabrzeze)", ex); }
+            return e;
+        }
+
+        /// <summary>WW3: koszt dnia partii - zold (TotalWage + rycerze 179) + jedzenie (dzienne zuzycie x cena zboza w najblizszym miescie albo wartosc zboza).</summary>
+        private static double DayCost(MobileParty mp)
+        {
+            double wage = Math.Max(0, mp.TotalWage) + GentryService.KnightWage(mp);
+            double use = Math.Max(0f, -mp.FoodChange);
+            double price = 0;
+            var grain = DefaultItems.Grain;
+            if (grain != null && use > 0)
+            {
+                price = grain.Value;
+                try
+                {
+                    var pos = mp.GetPosition2D;
+                    Town best = null; float bd = float.MaxValue;
+                    foreach (var tw in Town.AllTowns)
+                    {
+                        if (tw == null || tw.Settlement == null) continue;
+                        float d = pos.DistanceSquared(tw.Settlement.GetPosition2D);
+                        if (d < bd) { bd = d; best = tw; }
+                    }
+                    if (best != null) price = best.GetItemPrice(grain, null, false);
+                }
+                catch { price = grain.Value; }
+            }
+            return wage + use * Math.Max(0, price);
         }
 
         /// <summary>Dni jedzenia partii (jak MobileParty.GetNumDaysForFoodToLast, bez dzielenia przez 0) przy `more` ludziach wiecej niz teraz (zuzycie na
@@ -441,8 +560,11 @@ namespace Armoury
                   .Append(", mysli ").Append(t.Thinks).Append(", z opcja rabunku ").Append(t.WithRaid).Append(" (partii ").Append(t.PartiesWithRaid.Count)
                   .Append(", opcji ").Append(t.Options).Append(", wsi ").Append(t.Villages.Count).Append(')')
                   .Append(", wynik rabunku/innej (mediana) ").Append(double.IsNaN(mr) ? "-" : F(mr, "0.000")).Append('/').Append(double.IsNaN(mo) ? "-" : F(mo, "0.000"))
-                  .Append(", rabunek na gorze ").Append(t.RaidTop)
+                  .Append(", rabunek na gorze ").Append(t.RaidTop).Append(" (przed WW3 ").Append(t.RaidTop0).Append(')')
                   .Append("; wrogow w wojnie ").Append(enemies);
+                double mm = Median(t.Mult);
+                sb.Append(" | WW3 (").Append(GName[g]).Append(", Reaver Raid By Profit ").Append(ProfitOn ? "tak" : "nie").Append("): mnoznik mediana ").Append(double.IsNaN(mm) ? "-" : F(mm, "0.00"))
+                  .Append(", x3 ").Append(t.X3).Append(", opcji pomnozonych ").Append(t.Multiplied).Append(" z ").Append(t.Mult.Count);
             }
             sb.Append(" | postfiks ").Append(_patched ? "wpiety" : "BRAK").Append(" | potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
