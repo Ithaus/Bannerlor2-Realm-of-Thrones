@@ -212,6 +212,9 @@ RANGES = {
     'SackShareDevastate': (0.0, 1.0, "0.000"),
     'SackNoSpendingDays': (0, 30, "0"),
     'SackRuinRebuildShare': (0.0, 1.0, "0.000"),   # LB: odbudowa ze zgliszcz - czesc kosztu poziomu (CitySack.RuinShare przycina do 0..1)
+    # RP (decyzja Jeffa 14.10): co ile poziomow punkt cechy (0 = gra) i dodatkowe skupienie (0 = wylaczone); kod przycina do 0..62 (LevelPoints.Every)
+    'AttributePointEveryLevels': (0, 12, "0"),
+    'ExtraFocusEveryLevels': (0, 12, "0"),
 }
 
 def gen(module_dir, ns, display):

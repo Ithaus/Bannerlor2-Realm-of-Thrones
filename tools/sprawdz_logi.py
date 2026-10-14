@@ -479,6 +479,9 @@ Uzycie (Python 3, tylko odczyt):
                     Czesc grupy jeff14 (= jeff14g + jeff14s). python -I tools/sprawdz_logi.py --grupa jeff14s <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
+--grupa rozwoj    : (RP, decyzja Jeffa 14.10, LevelPoints.cs) punkt cechy co AttributePointEveryLevels (3), dodatkowe skupienie co ExtraFocusEveryLevels (4).
+                    python -I tools/sprawdz_logi.py --grupa rozwoj <Armoury-*.log>. RP-0 wpiecie, RP-1 czynny model liczy klucz, RP-2/RP-3 awanse gracza wedlug
+                    regul, RP-4 ten sam poziom dwa razy w sesji 0, RP-5/RP-6 INFO (BK co 5, pule bohaterow przy tworzeniu), RP-7 bledy 0. Log bez paczki: INFO.
 --grupa jeff14g   : (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz) J5 kuznia gracza jak u kowali AI (C5, ForgeLikeTownSmith), J4 strata gracza po
                     pojmaniu jak lorda AI (C4), J3 komplet weterana (C3). python -I tools/sprawdz_logi.py --grupa jeff14g <Armoury-*.log>. Caly log; log bez
                     paczki albo bez kucia / pojmania gracza: INFO, bez wyjatku.
@@ -16481,6 +16484,94 @@ def lup5b_main(logp, start_arg, until=364, bdp=None):
     return 0
 
 
+def rozwoj_main(logp):
+    """rozwoj (RP, decyzja Jeffa 14.10, Armoury/src/LevelPoints.cs): punkt cechy co AttributePointEveryLevels (0 = gra, co 4), dodatkowy punkt
+    skupienia co ExtraFocusEveryLevels (0 = wylaczone). Caly log, sesje rozdzielone linia "Rozwoj postaci (RP): start sesji".
+    RP-0 linia wpiecia: getter >= 1, awans i pula NPC "tak"; RP-1 w kazdej sesji czynny model ma LevelsPerAttributePoint = klucz (klucz 0 -> 4);
+    RP-2 awanse gracza: Armoury +1 skupienia dokladnie na poziomach podzielnych przez klucz skupienia i caly przyrost puli = gra + Armoury + BK co 5
+    (recenzja RP: bez podwojnego punktu), RP-3 cechy +1 dokladnie na poziomach
+    podzielnych przez LevelsPerAttributePoint (inne +0); RP-4 ten sam poziom gracza dwa razy w jednej sesji = 0 (punkt raz na poziom);
+    RP-5 skupienie "inne" (BK +1 co 5) - INFO; RP-6 pule bohaterow przy tworzeniu od poprzedniej linii - INFO (nowa kampania przy kluczu > 0: > 0);
+    RP-7 linie "ERROR in LevelPoints." = 0. Log bez paczki: INFO, bez wyjatku."""
+    lines = read(logp)
+    rep = Report()
+    hook = [s for s in lines if s.startswith("Rozwoj postaci (RP): wpiete")]
+    print(f"plik: {logp} | linii wpiecia {len(hook)}, startow sesji {sum(1 for s in lines if s.startswith('Rozwoj postaci (RP): start sesji'))}, "
+          f"awansow gracza {sum(1 for s in lines if s.startswith('Rozwoj postaci (RP): awans gracza'))}")
+    if not hook:
+        rep.add("RP-0: wpiecie latek (getter, awans, pula NPC)", "brak linii", "INFO (wersja sprzed RP)", None)
+        rep.show()
+        return 0
+    g = num(r"getter LevelsPerAttributePoint (\d+)", hook[-1], int, 0) or 0
+    ok0 = g >= 1 and "awans tak" in hook[-1] and "pula NPC tak" in hook[-1]
+    rep.add("RP-0: wpiecie latek (getter, awans, pula NPC)", hook[-1][:200], "getter >= 1, awans tak, pula NPC tak", ok0)
+    sessions = []   # (klucz cechy, klucz skupienia, model LPA, linia)
+    cur = None
+    bad1 = []
+    ups = []        # (sesja, poziom, df, fpl, F, ex, inne, da, lpa)
+    errs = 0
+    for s in lines:
+        if s.startswith("ERROR in LevelPoints."):
+            errs += 1
+            continue
+        if s.startswith("Rozwoj postaci (RP): start sesji"):
+            a = num(r"AttributePointEveryLevels (\d+)", s, int, 0) or 0
+            f = num(r"ExtraFocusEveryLevels (\d+)", s, int, 0) or 0
+            lpa = num(r"LevelsPerAttributePoint (\d+)", s, int, 0) or 0
+            sessions.append((a, f, lpa, s, "BK +1 skupienia co 5" in s))
+            cur = len(sessions) - 1
+            if lpa != (a if a > 0 else 4):
+                bad1.append(f"sesja {cur + 1}: klucz {a}, model {lpa}")
+            continue
+        if s.startswith("Rozwoj postaci (RP): awans gracza na L"):
+            m = re.search(r"awans gracza na L(\d+) \| skupienie \+(-?\d+) \(gra (\d+), Armoury co (\d+) \+(\d+), inne (-?\d+).*?\| cechy \+(-?\d+) \(co (\d+)", s)
+            if m:
+                ups.append((cur, int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5)), int(m.group(6)), int(m.group(7)), int(m.group(8))))
+    if sessions:
+        rep.add("RP-1: czynny model liczy klucz cechy (LevelsPerAttributePoint)",
+                f"sesji {len(sessions)}; ostatnia: klucze {sessions[-1][0]} / {sessions[-1][1]}, model {sessions[-1][2]}" + (f"; zle: {', '.join(bad1[:5])}" if bad1 else ""),
+                "w kazdej sesji model = klucz (klucz 0 -> 4 jak gra)", not bad1)
+    else:
+        rep.add("RP-1: czynny model liczy klucz cechy (LevelsPerAttributePoint)", "brak linii startu sesji", "INFO (gra nie doszla do mapy)", None)
+    if ups:
+        # recenzja RP: RP-2 liczy CALY przyrost puli skupienia przy awansie (nie tylko znacznik +1): gra FocusPointsPerLevel + Armoury (poziom / klucz)
+        # + BK co 5 (gdy linia startu sesji mowi o BK) - kazdy inny przyrost (podwojny punkt, obcy sluchacz zdarzenia) = NIE
+        def exp_ex(u):
+            return 1 if u[4] > 0 and u[1] % u[4] == 0 else 0
+        def exp_bk(u):
+            bk = sessions[u[0]][4] if u[0] is not None and u[0] < len(sessions) else True
+            return 1 if bk and u[1] % 5 == 0 else 0
+        bad2 = [u for u in ups if u[5] != exp_ex(u) or u[2] != u[3] + exp_ex(u) + exp_bk(u)]
+        bad3 = [u for u in ups if u[7] != (1 if u[8] > 0 and u[1] % u[8] == 0 else 0)]
+        rep.add("RP-2: awans gracza - przyrost skupienia (gra + Armoury + BK co 5)",
+                f"awansow {len(ups)}, z +1 Armoury {sum(1 for u in ups if u[5])}"
+                + (f"; zle poziomy: {', '.join('L%d +%d' % (u[1], u[2]) for u in bad2[:8])}" if bad2 else ""),
+                "przyrost = gra + 1 (Armoury, poziom podzielny przez ExtraFocusEveryLevels; 0 = nigdy) + 1 (BK, poziom podzielny przez 5)", not bad2)
+        rep.add("RP-3: awans gracza - punkt cechy",
+                f"awansow {len(ups)}, z cecha {sum(1 for u in ups if u[7] > 0)}" + (f"; zle poziomy: {', '.join('L%d' % u[1] for u in bad3[:8])}" if bad3 else ""),
+                "+1 dokladnie na poziomach podzielnych przez LevelsPerAttributePoint z linii awansu, inne +0", not bad3)
+        seen = {}
+        dup = 0
+        for u in ups:
+            k = (u[0], u[1])
+            seen[k] = seen.get(k, 0) + 1
+            if seen[k] == 2:
+                dup += 1
+        rep.add("RP-4: ten sam poziom gracza dwa razy w jednej sesji", f"{dup}", "0 (punkt raz na poziom)", dup == 0)
+        other = [u for u in ups if u[6] != 0]
+        bk5 = sum(1 for u in other if u[6] == 1 and u[1] % 5 == 0)
+        rep.add("RP-5: skupienie 'inne' przy awansie gracza (BK +1 co 5)", f"awansow z 'inne' {len(other)}, z tego BK na poziomie /5: {bk5}", "INFO (BK +1 na poziomach 5, 10 ... 60)", None)
+    else:
+        rep.add("RP-2/RP-3: awanse gracza", "0 linii awansu gracza", "INFO (gracz nie awansowal w tym biegu)", None)
+    pools = [(num(r"pule bohaterow od poprzedniej linii: (\d+)", x[3], int, 0) or 0, num(r"pule bohaterow od poprzedniej linii: \d+, \+(\d+) skupienia", x[3], int, 0) or 0) for x in sessions]
+    rep.add("RP-6: pule bohaterow przy tworzeniu (od poprzedniej linii startu)",
+            "; ".join(f"sesja {i + 1}: {p[0]} bohaterow, +{p[1]} skupienia" for i, p in enumerate(pools[:6])) if pools else "brak linii startu sesji",
+            "INFO (nowa kampania przy kluczu skupienia > 0: > 0; po wczytaniu zwykle 0)", None)
+    rep.add("RP-7: bledy LevelPoints", f"{errs}", "0 linii 'ERROR in LevelPoints.'", errs == 0)
+    rep.show()
+    return 0
+
+
 def drobne14_main(logp):
     """drobne14 (14.10; CHANGELOG "drobne bledy etapu 8 i audytu"): pomiary dopisane do diagnozy spraw bez przyczyny. Caly log (bez okna dob).
     D14-1 L5b-2: karawany w murach na poczatku oblezenia wobec zajetych przy zdobyciu (spis z OnSiegeEventStarted) - NIE, gdy karawany wroga staly
@@ -20914,6 +21005,8 @@ def main(argv):
         return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
+    if group == "rozwoj" and logp:
+        return rozwoj_main(logp)   # RP (decyzja Jeffa 14.10): punkt cechy co 3 poziomy, dodatkowe skupienie co 4 (LevelPoints)
     if group == "jeff14" and logp:
         return max(jeff14g_main(logp), jeff14s_main(logp))   # jeff14 = jeff14g (C3-C5, gracz) + jeff14s (swiat: ZK, Casterly Rock, smoki, Qohor)
     if group == "jeff14g" and logp:
