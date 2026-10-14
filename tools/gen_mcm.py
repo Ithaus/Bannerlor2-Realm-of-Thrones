@@ -122,6 +122,7 @@ RANGES = {
     'TownFolkLabourFood': (0.0, 1.0, "0.00"),
     'TownFolkLabourGoods': (0.0, 1.0, "0.00"),
     'TownFolkLabourArms': (0.0, 1.0, "0.00"),
+    'TownFolkLabourVillageBuys': (0.0, 0.5, "0.00"),   # GL-B / 11c: robocizna od skupu plonu wsi (TownFolk.Unit przycina do 0..1)
     'TownFolkCraftWageShare': (0.0, 1.0, "0.00"),
     'TownFolkMerchantDraw': (0.0, 0.2, "0.000"),
     'TownFolkMerchantProfitShare': (0.0, 1.0, "0.00"),

@@ -86,7 +86,7 @@ namespace Armoury
             public int Towns, Castles, Villages, NFood, NFull, MLow, FacLow, NoTrade, VNoGoods, VNoCal, NoLordN, CNoCourt;
             public double HW, HR, HP, HS, People, B, Wg, Wf, Wp, G0, G0a, MSum, MMin = double.NaN, FfSum, FrSum, FfMin = double.NaN, FrMin = double.NaN; public int MN;
             public long TaxW, TaxR, TaxP, TaxC, Guild, Farm, Held, NoLord, Player;
-            public long LabT, TurnT, TopT, LabC, Cut; public double BaseFolk, BaseVill, BaseLife, BaseCourt, BaseSale, BaseCar, BaseGm, LabF, LabG, LabA;
+            public long LabT, TurnT, TopT, LabC, Cut, LabS, Skup; public double BaseFolk, BaseVill, BaseLife, BaseCourt, BaseSale, BaseCar, BaseGm, LabF, LabG, LabA;
             public long Rent, Heal, Serv, GmWage, GmMat, SurpWage; public long OffT, OffC;
             public long KW, KR, KP, KG, KC, CCr; public double NW, NR, NP, AW, AR, AP, NFW, NFR, NFP, AFW, AFR, AFP, CNeed, CAff, Lokata;
             public double CInc, CWg, CHeads;
@@ -794,6 +794,11 @@ namespace Armoury
             lg += f.GmMatWin;
             double car = f.CarBuy + f.CarSell;
             double lab = lf * rf + lg * rg + la * ra + CaravanLab * car;
+            // GL-B / 11c (klucz FolkEarnFromVillageBuys): robocizna od SKUPU plonu wsi - zaplata kasy taborom wsi w oknie x TownFolkLabourVillageBuys (wyladunek, miara,
+            // przechowanie, przemial); koszt skupu - ta sama droga i to samo przyciecie do stanu kasy co robocizna od sprzedazy. Klucz wylaczony: okno 0, lab bez zmian
+            double skupLab = 0;
+            if (f.SkupWin > 0) { skupLab = f.SkupWin * (double)Unit(s.TownFolkLabourVillageBuys); d.Skup += f.SkupWin; lab += skupLab; }
+            f.SkupWin = 0;
             double turnBase = (1 - svc) * life + (1 - cs) * court + sale + fp + f.VillWin + f.GmMatWin + f.CarBuy;
             double turn = Math.Max(0f, Math.Min(0.2f, s.TownFolkMerchantDraw)) * turnBase;
             double top = Math.Max(0, Unit(s.TownFolkCraftWageShare) * f.ProdV - f.Win[KCraftPaid]);
@@ -804,6 +809,7 @@ namespace Armoury
             long gold = Math.Max(0, town.Gold);
             if (all > gold && all > 0) { k = gold / all; d.Cut++; }
             d.LabT += FromCoffer(f, (long)(lab * k), ELabour);
+            if (skupLab > 0) d.LabS += (long)(skupLab * k);              // 11c: czesc robocizny od skupu (po przycieciu do kasy) - do linii
             d.TurnT += FromCoffer(f, (long)(turn * k), ETurn);
             d.TopT += FromCoffer(f, (long)(top * k), ETopUp);
             // ---- 3. wewnatrz ludu z wczorajszych zakupow: czynsz W 8% / R 13% wydatku (x 1/keep) -> P (plan pkt 0.14), leczenie -> R, sluzba P -> W
@@ -1437,7 +1443,7 @@ namespace Armoury
               .Append(", bandy ").Append(w.Earn[KLifeBand]).Append(", zalogi ").Append(w.Earn[KGarrison]).Append("), dwor ").Append(w.Earn[KCourt])
               .Append(", budowy ").Append(w.Earn[KBuildLabour]).Append(", kopalnie ").Append(w.Earn[KMine]).Append(", place warsztatow ").Append(w.Earn[KCraftPaid]).Append(" (z kiesy gracza ").Append(w.FromTown).Append(")")
               .Append(", 5% zaworu ").Append(w.ValveT).Append(", w tym praca niewolnych do wlascicieli ").Append(w.SlaveW)
-              .Append("; dzis z kas: robocizna ").Append(d.LabT).Append(", obrot P ").Append(d.TurnT).Append(", doplata do 35% ").Append(d.TopT).Append(" (miast przycietych do stanu kasy ").Append(d.Cut).Append(")")
+              .Append("; dzis z kas: robocizna ").Append(d.LabT).Append(SkupText(d.LabS, d.Skup)).Append(", obrot P ").Append(d.TurnT).Append(", doplata do 35% ").Append(d.TopT).Append(" (miast przycietych do stanu kasy ").Append(d.Cut).Append(")")
               .Append(" | wewnatrz ludu: czynsz ").Append(d.Rent).Append(", leczenie ").Append(d.Heal).Append(", sluzba ").Append(d.Serv).Append(", place z nadwyzki R/P ").Append(d.SurpWage)
               .Append(", roboty gminy (place) ").Append(d.GmWage)
               .Append(" | podatki panu: W ").Append(d.TaxW).Append(" / R ").Append(d.TaxR).Append(" / P ").Append(d.TaxP).Append(", cech ").Append(d.Guild).Append(", farma gmin ").Append(d.Farm)

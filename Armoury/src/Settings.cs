@@ -1659,6 +1659,7 @@ namespace Armoury
         public float TownFolkLabourFood = 0.2f;            // of every sale of food and drink by the merchants, this share is paid to the people who mill, bake, brew and carry
         public float TownFolkLabourGoods = 0.1f;           // of every sale of cloth, tools, salt and pots by the merchants, this share is paid to the people who carry, sell and finish
         public float TownFolkLabourArms = 0.04f;           // of every sale of arms, armour, horses and luxuries by the merchants, this share is paid to the people who carry and sell
+        public float TownFolkLabourVillageBuys = 0.1f;     // with Folk Earn From Village Buys: of what the merchants pay the village carts for their produce, this share is paid to the people who unload, measure, store and mill it
         public float TownFolkCraftWageShare = 0.35f;       // the people's wages in every workshop's goods - the merchants pay the rest up to this share of their worth
         public float TownFolkMerchantDraw = 0.03f;         // the merchant families' living out of their trade - a share of the merchants' daily sales
         public float TownFolkMerchantProfitShare = 0.05f;  // of what a town purse gives up each day above the merchants' working coin, this share first goes to its clerks, coopers and the merchant families; the lord and the crown share the rest
@@ -1946,6 +1947,9 @@ namespace Armoury
         // ludnych krain bez lnu (ryby, srebro, drwale) dostaje typ flax_plant jak klimat wsi T8 (start sesji, bez zapisu typu; klasa BK wyrownana) - TYLKO kampania zaczeta
         // z kluczem (flaga arm_goodsrates; P1 trzyma g typow z kalibracji). Off = stan 97dd474 (typy z mapy od nastepnego wczytania)
         public bool GoodsRatesByPattern = true;            // Salt pans yield twice what they did, and sixteen villages of the crowded lands that had no flax - fishers, silver miners and woodcutters of the Reach, Volantis, Qarth, King's Landing, Braavos, Pentos and the Stormlands - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The new flax villages come with a new campaign only; a campaign already under way keeps its villages (the salt rate applies at once). Off = salt and flax as before (villages keep the map's own trade from the next load)
+        // GL-B / 11c (projekt rozdz. 9 ryzyko 11 lekarstwo c; TownFolk.Skup.cs): robocizna od skupu plonu wsi - z kasy kupcow do kiesy ludu miasta TownFolkLabourVillageBuys
+        // (10%) zaplaty taborom wsi (TownLive krok 2, ta sama droga co robocizna od sprzedazy). Off = stan 97dd474
+        public bool FolkEarnFromVillageBuys = true;        // The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring, storing and milling it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell
 
         public static void Load(string moduleDataDir)
         {
