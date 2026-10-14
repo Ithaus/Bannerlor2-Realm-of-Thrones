@@ -2304,6 +2304,11 @@ namespace Armoury
         public bool FixBkrotWageSeaCut = true;             // With Fix Bkrot Wage Chain: the War Sails wage cut at sea counts again - a company at sea pays a fifth less, a caravan at sea pays nothing, and the boatswain perks count. No company's wage goes below zero. Off = the same wage at sea as on land
         public bool FixPrincelyArbiterWage = true;         // The Princely Arbiter blessing lowers your party's wages by 15%, as its description says. The patch took 15% for every kind of troop in the party, so from about seven kinds on your men paid you. No party's wage goes below zero. Off = as before
 
+        // --- Banner Kings gentry ---
+        // Trop gentry z audytu modow 14.10 (RAPORT-AUDYT-MODOW.md rozdz. 7; GentryNames.cs): BK daje rodowi gentry pierwsza nazwe z listy kultury wolna tylko
+        // wsrod rodow tej kultury, gra odrzuca nazwe noszona przez jakikolwiek rod, a ROT dzieli jedna liste miedzy wiele kultur. Off = b47fecc3 (nazwa BK)
+        public bool GentryNamesFallback = true;            // New gentry houses (locals who take up a vacant estate) rise in every realm again. Banner Kings names a new house with the first name on its culture's list that no house of the SAME culture bears, and the game then refuses a name any house bears. Realm of Thrones gives one list to many cultures, so the realm that founded the first house took that name for good and no gentry ever rose again in Braavos, Lys, Myr, Tyrosh, Norvos, Qohor, Volantis, the Reach, the Riverlands, the Stormlands, Dragonstone and others; the short lists of the North, the Vale, Dorne, the Free Folk and the Ghiscari ran out too. On = the first name on the list that no house in the world bears; when the list is used up, a name from the village (the village itself, or a name from the list of the village). A knight founding his house gets a free name the same way, but only where Banner Kings would have given him one. Lorath, Ibben, Qarth, the Night's Watch and the Summer Isles still have no gentry (Banner Kings has no gentry for their cultures). Off = as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

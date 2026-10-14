@@ -689,6 +689,11 @@ Uzycie (Python 3, tylko odczyt):
                     <Armoury-*.log>: AB-8 linia startu (wpiecia BRAK 0, lancuchy z NavalDLC / ROT), AB-9 doby i potkniecia 0, AB-10 (AM-13) predkosc na morzu
                     teraz / bez naprawy > 1.05 i wpisy NavalDLC w probkach, AB-11 (AM-09) zold Innych 0, Nieskalani 0, cena werbunku bez zmian, ujemny zold 0,
                     AB-11b obnizka morska > 0, AB-12 (AM-19) INFO, AB-13 wzrok na morzu teraz > bez naprawy; wiersz klucza wylaczonego - INFO.
+                    Trop gentry (Armoury/src/GentryNames.cs, klucz GentryNamesFallback): ta sama grupa, ten sam log Armoury - linie "Nazwy gentry BK":
+                    AB-14 linia startu (wpiete 3/3, BRAK -), AB-15 doby i potkniecia 0, AB-16 gentry bez nazwy 0, AB-17 (nowa kampania - rody przed
+                    pierwsza doba >= 20) krolestwa z >= 6 wsiami kultur z wzorcem gentry BK i bez gentry = 0 (b47fecc3: 88 rodow w 9 krolestwach),
+                    AB-17b rody i krolestwa z gentry (INFO), AB-18 powtorzone nazwy rodow gentry / rycerzy BK nie rosna, AB-19 nowe rody wedlug krolestwa
+                    i nazwy (INFO); klucz wylaczony - INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -25131,13 +25136,126 @@ def _audytb_p4(logp):
     return 0
 
 
+GN_MARK = "Nazwy gentry BK:"
+GN_START = re.compile(r"Nazwy gentry BK: start \| Gentry Names Fallback (TAK|NIE)[^|]*\| latki: wpiete (\d+)/(\d+) \((.*?)\); BRAK: (.*?) \| rody gentry przed pierwsza doba sesji \(tworzenie swiata albo od wczytania\) (\d+) \| kultury wsi bez wzorca gentry BK \(latka nie pomoze\): (.*?) \| wspolne listy nazw rodow: (.*)\.$")
+GN_DAY = re.compile(r"Nazwy gentry BK: dzien (\d+) \| Gentry Names Fallback (TAK|NIE) \| nowe rody gentry dzis (\d+) \((.*?)\) \| od startu sesji (\d+) \((.*?)\) \| nazwy dla gentry dzis: (.*?); od startu sesji: (.*?) \| inne \(rycerz BK, bunt\) od startu sesji: (.*?) \| rody gentry zywe (\d+) w (\d+) z (\d+) krolestw z wsiami: (.*?) \| krolestwa z wsiami bez gentry: z wzorcem (\d+) \((.*?)\), tylko bez wzorca (\d+) \((.*?)\) \| powtorzone nazwy rodow gentry / rycerzy BK (\d+) \| potkniecia (\d+)\.$")
+GN_COUNTS = re.compile(r"prosby (\d+), BK dal wolna (\d+), z listy zamiast zajetej (\d+), z listy zamiast braku (\d+), z nazwy wsi (\d+), bez nazwy (\d+)")
+GN_NOTPL = re.compile(r"(?:^|, )(.+?) \(wsi (\d+), z wzorcem (\d+): ([^)]*)\)")
+
+
+def _audytb_has_gentry(logp):
+    """Czy plik to log Armoury z liniami "Nazwy gentry BK" (trop gentry, GentryNames)."""
+    try:
+        with open(logp, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if GN_MARK in ln:
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _audytb_gentry(logp):
+    """Trop gentry z audytu modow 14.10 (RAPORT-AUDYT-MODOW.md rozdz. 7; Armoury GentryNames, klucz GentryNamesFallback): nazwa nowego rodu gentry BK
+    wolna w calym swiecie, zapas z nazwy wsi. Czyta log Armoury strumieniowo: linie "Nazwy gentry BK: start" (raz na sesje) i "... dzien N".
+    Sesja = od linii startu. Klucz wylaczony - wiersze INFO. Log bez linii - INFO, bez wyjatku."""
+    rep = Report()
+    sess = []   # [start, [doby]]
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if GN_MARK not in ln:
+                continue
+            s = AB_TS.sub("", ln.rstrip("\r\n"))
+            m = GN_START.search(s)
+            if m:
+                sess.append([m.groups(), []])
+                continue
+            m = GN_DAY.search(s)
+            if m:
+                if not sess:
+                    sess.append([None, []])
+                sess[-1][1].append(m.groups())
+    days = [d for _, ds in sess for d in ds]
+    print(f"plik: {logp} | gentry: sesji {len(sess)}, linie doby {len(days)}")
+    starts = [st for st, _ in sess if st]
+    if not starts:
+        rep.add("AB-14: (gentry) linia startu 'Nazwy gentry BK: start'", "brak linii", "linia przy pierwszej dobie sesji", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    rep.add("AB-14: (gentry) linia startu - wpiete 3/3, BRAK -",
+            f"sesji {len(starts)}; ostatnia: klucz {st[0]}, wpiete {st[1]}/{st[2]} ({st[3]}), BRAK {st[4]}; rody przed pierwsza doba {st[5]}; kultury bez wzorca: {st[6]}",
+            "3/3, BRAK -", int(st[1]) == int(st[2]) and st[4].strip() == "-")
+    rep.add("AB-14b: (gentry) wspolne listy nazw rodow kultur wsi (INFO)", st[7], "INFO (przyczyna blokady bez latki)", None)
+    if not days:
+        rep.add("AB-15: (gentry) linie doby 'Nazwy gentry BK: dzien'", "brak linii", "kazda doba", None)
+        rep.show()
+        return 0
+    dn = [int(g[0]) for g in days]
+    span = max(dn) - min(dn) + 1
+    stl = max(int(g[18]) for g in days)
+    rep.add("AB-15: (gentry) linie doby, potkniecia 0", f"dob z linia {len(set(dn))} z {span}; potkniecia (najwiecej w sesji) {stl}",
+            "kazda doba, 0", len(set(dn)) >= span - 1 and stl == 0)
+    # AB-16: gentry bez nazwy (ostatnia linia kazdej sesji - liczniki od startu sesji)
+    none_o = 0
+    sums = [0] * 6
+    for _, ds in sess:
+        if not ds:
+            continue
+        mg = GN_COUNTS.search(ds[-1][7])
+        mo = GN_COUNTS.search(ds[-1][8])
+        if mg:
+            sums = [a + int(b) for a, b in zip(sums, mg.groups())]
+        if mo:
+            none_o += int(mo.group(6))
+    key_on = all(g[1] == "TAK" for g in days)
+    rep.add("AB-16: (gentry) prosby BK o nazwe gentry bez nazwy = 0",
+            f"prosby {sums[0]}: BK dal wolna {sums[1]}, z listy zamiast zajetej {sums[2]}, z listy zamiast braku {sums[3]}, z nazwy wsi {sums[4]}, bez nazwy {sums[5]}; inne (rycerz BK, bunt) - wynik BK zostawiony {none_o}",
+            "0 (klucz TAK; inaczej INFO)", (sums[5] == 0) if (key_on and sums[0] > 0) else None)
+    # AB-17: nowa kampania - pierwsza doba sesji z tworzeniem swiata
+    newc = [(stx, ds) for stx, ds in sess if stx and int(stx[5]) >= 20 and ds]
+    if newc:
+        stx, ds = newc[-1]
+        g = ds[0]
+        big = [(m.group(1).strip(), int(m.group(2)), int(m.group(3)), m.group(4)) for m in GN_NOTPL.finditer(g[14])]
+        bad = [x for x in big if x[2] >= 6]
+        rep.add("AB-17: (gentry) nowa kampania - krolestwa z >= 6 wsiami kultur z wzorcem gentry BK i bez rodu gentry = 0",
+                f"dzien {g[0]}: rody gentry {g[9]} w {g[10]} z {g[11]} krolestw z wsiami; bez gentry z wzorcem {g[13]} (z >= 6 wsiami z wzorcem {len(bad)}: {', '.join(f'{k} {t}/{w} {c}' for k, w, t, c in bad) or '-'}), tylko bez wzorca {g[15]} ({g[16]})",
+                "0 (klucz TAK; b47fecc3: 88 rodow w 9 krolestwach)", (len(bad) == 0) if stx[0] == "TAK" else None)
+    else:
+        rep.add("AB-17: (gentry) nowa kampania - krolestwa bez gentry", "brak sesji z tworzeniem swiata (rody przed pierwsza doba < 20 - wczytany zapis)",
+                "INFO (prog tylko dla nowej kampanii)", None)
+    a, z = days[0], days[-1]
+    rep.add("AB-17b: (gentry) rody gentry zywe i krolestwa z gentry - pierwsza / ostatnia doba (INFO)",
+            f"dzien {a[0]}: {a[9]} w {a[10]} z {a[11]}; dzien {z[0]}: {z[9]} w {z[10]} z {z[11]}; bez gentry (ostatnia): z wzorcem {z[13]} ({z[14][:400]}), tylko bez wzorca {z[15]} ({z[16]})",
+            "INFO (b47fecc3: 88 -> 89 w 9 krolestwach w 728 dobach)", None)
+    d0, d1 = int(a[17]), int(z[17])
+    rep.add("AB-18: (gentry) powtorzone nazwy rodow gentry / rycerzy BK nie rosna", f"pierwsza doba {d0}, ostatnia {d1}",
+            "ostatnia <= pierwsza (klucz TAK; inaczej INFO)", (d1 <= d0) if key_on else None)
+    tot = {}
+    for _, ds in sess:
+        if not ds:
+            continue
+        for mm in re.finditer(r"(.+?) (\d+)(?:, |$)", ds[-1][5].strip()):   # nazwy krolestw moga miec przecinek ("House Targaryen, Aegon")
+            tot[mm.group(1)] = tot.get(mm.group(1), 0) + int(mm.group(2))
+    rep.add("AB-19: (gentry) nowe rody gentry wedlug krolestwa od startu sesji (INFO)",
+            f"razem {sum(tot.values())}: " + (", ".join(f"{k} {v}" for k, v in sorted(tot.items(), key=lambda x: -x[1])) or "-"),
+            "INFO (nowa kampania: takze tworzenie swiata)", None)
+    rep.show()
+    return 0
+
+
 def audytb_main(logp):
     """P2 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md AM-10, AM-11, AM-12, AM-15, AM-18 + karawany; CrashScribe BkrotSelfCall): samowywolania BKROT
     zamienione na wywolanie modelu BK. Czyta log sesji CrashScribe strumieniowo: linie startu "BKROT self call fix" i doby "BKROT self call (P2)".
     Wartosc "model" = metoda wolana jak w BK (BannerKingsConfig - obiekt BKROT), "BK" = ta sama metoda modelu BK wolana niewirtualnie (to, co BKROT
     powinien dostac od base). Bez naprawy model = 0 przy BK > 0. Wiersz metody wylaczonej kluczem albo z BRAK - INFO. Log bez paczki: INFO, bez wyjatku."""
-    if _audytb_is_p4_log(logp):
-        return _audytb_p4(logp)   # P4 audytu (lancuchy modeli BKROT) - linie w logu Armoury; log sesji CrashScribe - P2 jak nizej
+    p4, gn = _audytb_is_p4_log(logp), _audytb_has_gentry(logp)
+    if p4 or gn:
+        rc = _audytb_p4(logp) if p4 else 0   # P4 audytu (lancuchy modeli BKROT) - linie w logu Armoury; log sesji CrashScribe - P2 jak nizej
+        if gn:
+            rc = _audytb_gentry(logp) or rc   # trop gentry (GentryNames) - ten sam log Armoury
+        return rc
     rep = Report()
     starts, days = [], []
     with open(logp, encoding="utf-8", errors="replace") as f:
