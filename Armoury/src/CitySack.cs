@@ -221,9 +221,11 @@ namespace Armoury
         // ------------------------------------------------------------ migawka bitwy (OnMapEventEnded gry)
         private static MapEvent _me;
 
-        public static void MapEndPre(MapEvent __0)
+        /// <summary>Prefiks OnMapEventEnded gry: migawka bitwy dla linii L0; L1 (D2) - bitwa pod murami bez zdobycia: false = metoda gry pominieta.</summary>
+        public static bool MapEndPre(MapEvent __0)
         {
             _me = __0;
+            return !SkipOutside(__0);
         }
 
         public static void MapEndFin()
@@ -411,14 +413,15 @@ namespace Armoury
             {
                 if (Campaign.Current == null) return;
                 int today = (int)CampaignTime.Now.ToDays;
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0))
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
                       .Append(_dGame[KMercy]).Append(", grabiez ").Append(_dGame[KPillage]).Append(", spustoszenie ").Append(_dGame[KDevastate])
                       .Append(" | warsztaty przy zmianie pana oblezeniem: ").Append(_dWsSeen).Append(", zmienily wlasciciela (BK) ").Append(_dWsMoved)
-                      .Append(_dWsTowns.Count > 0 ? " (" + string.Join(", ", _dWsTowns.ToArray()) + ")" : "")
-                      .Append(" | potkniecia ").Append(_stumbles).Append('.');
+                      .Append(_dWsTowns.Count > 0 ? " (" + string.Join(", ", _dWsTowns.ToArray()) + ")" : "");
+                    L1Part(sb);
+                    sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
                 TrackLine(today);
@@ -459,6 +462,7 @@ namespace Armoury
         {
             _dCalls = _dLines = 0; Array.Clear(_dGame, 0, 3);
             _dWsSeen = _dWsMoved = 0; _dWsTowns.Clear();
+            L1Clear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>
@@ -474,7 +478,7 @@ namespace Armoury
         internal static void ApplyAll()
         {
             var t = typeof(SiegeAftermathCampaignBehavior);
-            Seal31.Patch("lup miast L0: migawka bitwy (SiegeAftermath OnMapEventEnded)", AccessTools.Method(t, "OnMapEventEnded"), typeof(CitySack),
+            Seal31.Patch("lup miast L0/L1: migawka bitwy i bez zdobycia bez nastepstw (SiegeAftermath OnMapEventEnded)", AccessTools.Method(t, "OnMapEventEnded"), typeof(CitySack),
                          nameof(MapEndPre), null, nameof(MapEndFin), Priority.High, Priority.Normal, Priority.Low);
             Seal31.Patch("lup miast L0: nastepstwa (OnSiegeAftermathApplied)", AccessTools.Method(t, "OnSiegeAftermathApplied"), typeof(CitySack),
                          nameof(AftermathPre), null, null, Priority.High);

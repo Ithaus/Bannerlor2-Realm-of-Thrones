@@ -5488,6 +5488,14 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float SackShareDevastate { get; set; } = 0.667f;
 
+        [SettingPropertyBool("No Sack Without Capture", HintText = "a battle won by the besiegers outside the walls, after which the town or castle does not fall, brings no sack: the game no longer burns its prosperity, buildings and loyalty, nobody is paid plunder and Banner Kings kills nobody there - only a stormed town is sacked (off = the game's rule: such a battle sacks the place it did not take)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool NoSackWithoutCapture { get; set; } = true;
+
+        [SettingPropertyBool("Beaten Garrison Purse To Victor", HintText = "a garrison broken in battle - outside the walls, in a sally or on the walls - leaves its pay chest to the victor, as any beaten party without a lord does: to the victorious lord (a vassal at war owes his crown a ninth of it), or to a victorious party without a lord; when no victor can carry it (the Others, a militia) the chest stays in the garrison's own town (off = the chest vanished with the garrison)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool BeatenGarrisonPurseToVictor { get; set; } = true;
+
         [SettingPropertyInteger("Sack No Spending Days", 0, 30, "0", HintText = "for this many days after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing: their pay stays in their purses (spent later in other towns), neither their days in town nor their camp followers leave coin there")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public int SackNoSpendingDays { get; set; } = 3;
@@ -6863,6 +6871,8 @@ namespace Armoury
             s.SackMeasureLog = SackMeasureLog;
             s.SackSharePillage = SackSharePillage;
             s.SackShareDevastate = SackShareDevastate;
+            s.NoSackWithoutCapture = NoSackWithoutCapture;
+            s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
             s.SackNoSpendingDays = SackNoSpendingDays;
         }
 

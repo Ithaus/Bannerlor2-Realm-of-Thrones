@@ -793,6 +793,8 @@ namespace Armoury
             // 3.2: reszta kiesy rozbitej karawany albo bandy do niszczyciela (jego osady, najblizszego miasta) - dopisana PO VillageTakings, wiec biegnie przed nim,
             // przed OutlawLaw (licznik kies band, ktore znikaja) i przed ksiega obiegu (dopisana pierwsza)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("BeatenPurse.OnPartyDestroyed", BeatenPurse.OnPartyDestroyed));
+            // lup miast L1 (D3): kiesa zalogi rozbitej przez wroga do zwyciezcy - przed ksiega obiegu (dopisana pierwsza, biegnie ostatnia)
+            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("CitySack.OnPartyDestroyed", CitySack.OnPartyDestroyed));
             CampaignEvents.BanditPartyRecruited.AddNonSerializedListener(this, BeatenPurse.OnBanditRecruited);   // D11-2: banda przylaczana do gracza (gra wola to tuz przed DestroyPartyAction.Apply(MainParty, banda))
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, VillageTakings.OnGoldTraded);       // 112: wyplaty majatkow BK w oknie powrotu taboru (tylko odczyt)
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("VillageClogDiag.OnPartyDestroyed", VillageClogDiag.OnPartyDestroyed));   // diagnoza zatkanych wsi: kiedy wies stracila woz (tylko log)
