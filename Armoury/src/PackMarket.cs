@@ -70,6 +70,9 @@ namespace Armoury
         // liczniki doby
         private static long _calls, _new, _given, _removed, _target, _bought, _paid, _short, _start, _startN, _off, _offN, _orphan, _orphanN;
         private static long _full, _part, _none, _naval, _navalN, _zeroCap, _noTown, _emptyShelf, _dte, _dteN;
+        // A16 (ROZPOZNANIE-A16 poz. 11, tylko pomiar): brak przy zakupie wedlug przyczyny konca zakupu - polka (zadnego jucznego na polce), budzet (najtansze juczne
+        // drozsze niz reszta 1/2 kapitalu albo ShelfBuy nie dal sztuki w budzecie), limit petli (8 rodzajow); karawany i sztuki
+        private static long _wShelfK, _wShelfN, _wBudgetK, _wBudgetN, _wLoopK, _wLoopN;
         private static int _stumbles, _stumblesDay;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static string _hooks = "nie wpiete";
@@ -86,6 +89,7 @@ namespace Armoury
         {
             _calls = _new = _given = _removed = _target = _bought = _paid = _short = _start = _startN = _off = _offN = _orphan = _orphanN = 0;
             _full = _part = _none = _naval = _navalN = _zeroCap = _noTown = _emptyShelf = _dte = _dteN = 0;
+            _wShelfK = _wShelfN = _wBudgetK = _wBudgetN = _wLoopK = _wLoopN = 0;
             _stumblesDay = 0;
         }
 
@@ -181,8 +185,14 @@ namespace Armoury
                 else if (st == null || !st.IsTown || st.Town == null || st.ItemRoster == null || st.SiegeEvent != null || (st.Party != null && st.Party.MapEvent != null)) _noTown++;
                 else
                 {
-                    bought = Buy(mp, st, target, (int)Math.Min(int.MaxValue, (long)(gold * BudgetShare)), out paid);
+                    int why;
+                    bought = Buy(mp, st, target, (int)Math.Min(int.MaxValue, (long)(gold * BudgetShare)), out paid, out why);
                     if (bought <= 0) _emptyShelf++;
+                    if (bought < target)
+                    {
+                        long sh = target - bought;
+                        if (why == 1) { _wShelfK++; _wShelfN += sh; } else if (why == 2) { _wBudgetK++; _wBudgetN += sh; } else { _wLoopK++; _wLoopN += sh; }
+                    }
                 }
                 if (bought >= target) _full++; else if (bought > 0) _part++; else _none++;
                 _bought += bought; _paid += paid; _short += target - bought;
@@ -191,9 +201,10 @@ namespace Armoury
         }
 
         /// <summary>Zakup jucznych z polki miasta: najtansze najpierw, kazda sztuka po swojej cenie (ShelfBuy), zaplata z kasy karawany do kasy miasta.</summary>
-        private static int Buy(MobileParty mp, Settlement st, int need, int budget, out int paid)
+        private static int Buy(MobileParty mp, Settlement st, int need, int budget, out int paid, out int why)
         {
             paid = 0;
+            why = 0;                                  // A16: 1 polka, 2 budzet, 3 limit petli (tylko pomiar)
             int bought = 0;
             var shelf = st.ItemRoster;
             var town = st.Town;
@@ -207,14 +218,16 @@ namespace Armoury
                     int pr = town.GetItemPrice(el.EquipmentElement, mp, false);
                     if (pr > 0 && pr < bestPrice) { bestPrice = pr; best = i; }
                 }
-                if (best < 0 || bestPrice > budget - paid) break;
+                if (best < 0) { why = 1; break; }
+                if (bestPrice > budget - paid) { why = 2; break; }
                 var cel = shelf.GetElementCopyAtIndex(best).EquipmentElement;
                 int cost, first, last;
                 int took = ShelfBuy.Take(shelf, cel, need, budget - paid, () => town.GetItemPrice(cel, mp, false), out cost, out first, out last, bestPrice, false);
-                if (took <= 0) break;
+                if (took <= 0) { why = 2; break; }
                 mp.ItemRoster.AddToCounts(cel, took);
                 paid += cost; bought += took; need -= took;
             }
+            if (need > 0 && why == 0) why = budget - paid > 0 ? 3 : 2;
             if (paid > 0) GiveGoldAction.ApplyForPartyToSettlement(mp.Party, st, paid, true);
             return bought;
         }
@@ -358,7 +371,8 @@ namespace Armoury
                      + " kupily " + _bought + " za " + _paid.ToString(inv) + " (cel " + _target + "; pelne " + _full + ", czesciowo " + _part + ", bez jucznych " + _none + ")"
                      + ", z niczego " + left + " (gra dala " + _given + ", zdjete " + _removed + "; poza CreateCaravanParty " + _orphan + " partii, " + _orphanN + " sztuk)"
                      + ", brak " + _short + " (kapital 0 przy tworzeniu - karawany gracza " + _zeroCap + "; nie miasto albo oblezone " + _noTown + "; polka bez jucznych w budzecie " + _emptyShelf
-                     + "; dokupi gra przy handlu z targu) | morskie " + _naval + " (zdjete " + _navalN + " bez zakupu) | konwoje DTE " + _dte + " - juczne gry zostaja " + _dteN + " (poza K5)"
+                     + "; dokupi gra przy handlu z targu; A16 - koniec zakupu z brakiem: polka bez jucznych " + _wShelfK + " karawan " + _wShelfN + " szt., budzet 1/2 kapitalu " + _wBudgetK
+                     + " karawan " + _wBudgetN + " szt., limit petli " + _wLoopK + " karawan " + _wLoopN + " szt.) | morskie " + _naval + " (zdjete " + _navalN + " bez zakupu) | konwoje DTE " + _dte + " - juczne gry zostaja " + _dteN + " (poza K5)"
                      + " | udzwig (Spare Horse Carry Kg " + s.SpareHorseCarryKg + "): luzakow pod jukami " + under + " (+" + extra + " kg = " + (under * extra).ToString(inv) + " kg, partii " + parties + ")"
                      + ", pod piechurem albo jencem " + foot + " (20 kg gry)" + (k0 ? "" : " - bez wolnych koni zbrojowni (K0 wylaczone)")
                      + " | poza K5: BK GiveMounts/GivePackAnimals (3.11), ladunek konwojow DTE | wpiecia: " + _hooks

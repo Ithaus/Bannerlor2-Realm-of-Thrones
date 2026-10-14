@@ -2033,6 +2033,24 @@ namespace Armoury
         // zrodla i ujscia BK bez platnika (dopisek do linii "BK i Diplomacy (E5/A8)"), wsie Normal bez wozu ponad 7 dob, rozkazy partii ze statkami po switcie; gra bez zmian
         public bool Stage8WorldLog = true;                 // Writes daily lines that measure the world for stage 8: the village production model, caravan stays in towns, mercenary clans, sheep villages, villages without a cart (diagnostics only).
 
+        // --- Signals from the long runs (A16) ---
+        // A16 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A16.md poz. 1): RBL "Extended Peace" (+PeaceProsperityBonus dobrobytu na dobe) wymaga 30 dob od ostatniego
+        // ataku, ale RBL GetDaysSinceLastAttack zwraca 999, gdy Settlement.LastAttackerParty == null - a gra zeruje ja po 1 dobie (SettlementVariablesBehavior),
+        // wiec premia szla prawie kazdej warowni przez cala wojne. Latka (A16Signals.PeacePrefix): doby od LastThreatTime warowni i jej wsi (oblezenie = 0).
+        // Off = RBL jak w 79a8d89
+        public bool RblPeaceNeedsQuiet = true;             // Realistic Bannerlord's 'Extended Peace' prosperity bonus goes only to a town or castle that has seen no attack on itself or on any of its villages for 30 days (as Realistic Bannerlord means it); off = as before, when it reached almost every town and castle all through a war, because the game forgets the last attacker a day after the attack
+        // A16 poz. 1: postfiks warstwy BK (BKEconomyLayerInstaller.CalculateProsperityChangePostfix: delty BK, sila 0.5, mnoznik wzrostu 0.3) siedzi na RBL i na
+        // DefaultSettlementProsperityModel, a RBL wola base - warstwa liczy sie dwa razy. Wylacznik zdejmuje dubel z modelu, ktory wola base (wzor BkTradePenaltyOnce).
+        // DOMYSLNIE false: mnoznik BK 0.3 liczony dwa razy HAMUJE wzrost - zdjecie dubla podnosi wzrost dobrobytu (rachunek w CHANGELOG A16); decyzja po linii
+        // "Dobrobyt (skladniki A16)". Off = 79a8d89
+        public bool BkProsperityLayerOnce = false;         // Banner Kings' prosperity layer (its population, stability and food deltas and its prosperity growth multiplier) counts once instead of twice when Realistic Bannerlord's prosperity model is in play (off = as before: twice, which slows prosperity growth more than Banner Kings means)
+        // A16 poz. 9: zolnierz rozbity, uwolniony albo zwolniony (166, W4c, 179, dlug) z ZNANYM pochodzeniem wraca do ludnosci BK tej samej wsi (albo miasta), do
+        // ktorej ksiega ludzi oddaje go do DOM (PeopleBook.HomeKnown) - dotad ludnosc BK dostawala go w najblizszej bitwie osadzie swojej frakcji i kultury (takze
+        // zamku i miescie; LosersFlee.FindHome) albo we wsi rodu (ClanBudget.VillageFor). Ta sama liczba ludzi, to samo miejsce w obu ksiegach. Off = 79a8d89
+        public bool BkReturnsToOriginVillage = true;       // A soldier of known origin who comes home - fled from a lost battle, freed, or dismissed for want of pay - goes back to the same village (or town) in Banner Kings' population that he returns to in the mod's own count of people; off = as before: in Banner Kings he joined the nearest settlement of his realm and culture to the battle, a castle or town among them, or a village of his lord's house
+        // A16: linie "Dobrobyt (skladniki A16)", "Bohaterowie (A16)", "Ludnosc BK (A16)" raz na dobe (tylko log; latki pomiaru na BK wpinane zawsze, licza przy kluczu)
+        public bool A16SignalsLog = true;                  // Writes daily lines that measure what drives town and castle prosperity, the births, deaths and coming of age of lords, and every change of Banner Kings' population by kind of settlement (diagnostics only)
+
         // --- Goods after the yearly run (N5) ---
         // N5 (poprawka 5 po biegu rocznym 364 doby, decyzja Jeffa 13.10; RAPORT-ROCZNY-2026-10-13 niespojnosci 8, 9, 11, 12, 13) - piec spraw, kazda z wlasnym kluczem.
         // N5-A (plotno): len stal na suficie regulatora wsi x1.30 od doby 85 do konca roku (zuzycie = produkcja, stos 12-13 dni, 58-70 miast bez lnu, 88-91 bez plotna,

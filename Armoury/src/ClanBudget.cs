@@ -1128,7 +1128,9 @@ namespace Armoury
             {
                 var pd = _getPopData.Invoke(_popMgr, new object[] { town });
                 if (pd == null) return false;
-                _fromSoldiers.Invoke(pd, new object[] { ch, n });
+                A16Signals.Ours++;                            // A16: pomiar ludnosci BK - weterani naszej reki
+                try { _fromSoldiers.Invoke(pd, new object[] { ch, n }); }
+                finally { A16Signals.Ours--; }
                 return true;
             }
             catch (Exception e) { Stumble("BkPopAdd(E4/10)", e); return false; }
@@ -1145,13 +1147,25 @@ namespace Armoury
             int vsrc = cause == PeopleBook.M166 ? PeopleBook.V166 : (cause == PeopleBook.MW4c || cause == PeopleBook.MDebt) ? PeopleBook.VW4c : cause == PeopleBook.M179 ? PeopleBook.V179 : -1;
             try { if (vsrc >= 0 && PeopleBook.VetLive && v != null) vt = PeopleBook.VetPlan(party, ch, n, v.GetPosition2D, vsrc); } catch { vt = null; }
             int t = vt != null && vt.Reason == PeopleBook.VROk ? vt.T : 0;
+            int known = cause == PeopleBook.M166 ? PeopleBook.MBack166 : cause == PeopleBook.MW4c ? PeopleBook.MBackW4c : cause == PeopleBook.M179 ? PeopleBook.MBack179
+                        : cause == PeopleBook.MDebt ? PeopleBook.MBackDebt : -1;     // E4/9 (DLUG 4): dluznicy do domu - z pochodzeniem z hearth
+            // A16 (BkReturnsToOriginVillage, ROZPOZNANIE-A16 poz. 9): czesc znana pochodzeniem idzie do ludnosci BK TEJ SAMEJ osady, do ktorej ksiega oddaje ja do DOM
+            // (dotad: BK - wies v rodu, ksiega - wies regionu pochodzenia). Wies v nadal musi miec dane BK (false PRZED weteranami - jak dotad); dopisanie BK po
+            // ksiedze (lustro HomeOrNoteMirror); reszta (bez pochodzenia, bez wsi w regionie, osada bez BK, zaokraglenie) - BK wsi v jak dotad. Udzial Strazy - jak dotad.
+            bool mirror = org != null && known >= 0 && A16Signals.ReturnsToOrigin && org.Known > 0.0 && !(org.W > 0.0) && PeopleBook.LevyLive;
+            object pdv = null;
             if (n - t > 0)
             {
                 try
                 {
-                    var pd = _getPopData.Invoke(_popMgr, new object[] { v });
-                    if (pd == null) return false;
-                    _fromSoldiers.Invoke(pd, new object[] { ch, n - t });
+                    pdv = _getPopData.Invoke(_popMgr, new object[] { v });
+                    if (pdv == null) return false;
+                    if (!mirror)
+                    {
+                        A16Signals.Ours++;                    // A16: pomiar ludnosci BK - powrot naszej reki
+                        try { _fromSoldiers.Invoke(pdv, new object[] { ch, n - t }); }
+                        finally { A16Signals.Ours--; }
+                    }
                 }
                 catch (Exception e) { Stumble("ToVillage", e); return false; }
             }
@@ -1163,20 +1177,43 @@ namespace Armoury
                 // E5/B6 (201): miasto karczmy tego zwolnienia (tylko w ReleaseFrom - 179 i W4c nie niosa sakiewki)
                 try { if (_relTavOn && put > 0 && vt.Town != null && vt.Town.Settlement != null) _relTav.Add(new KeyValuePair<Settlement, int>(vt.Town.Settlement, put)); } catch { }
             }
-            if (put < t)
+            if (put < t && !mirror)
             {
                 // pula nie przyjela (wyjatek - potkniecie E4/10) - ci ludzie do ludnosci BK wsi jak dotad (nikt nie znika)
-                try { var pd = _getPopData.Invoke(_popMgr, new object[] { v }); if (pd != null) _fromSoldiers.Invoke(pd, new object[] { ch, t - put }); }
+                try
+                {
+                    var pd = _getPopData.Invoke(_popMgr, new object[] { v });
+                    if (pd != null) { A16Signals.Ours++; try { _fromSoldiers.Invoke(pd, new object[] { ch, t - put }); } finally { A16Signals.Ours--; } }
+                }
                 catch (Exception e) { Stumble("ToVillage(E4/10 zwrot)", e); }
             }
             int home = n - put;
             if (home <= 0) return true;
+            if (mirror)
+            {
+                // A16: ksiega najpierw (DOM pochodzenia z lustrem osad), potem ludnosc BK tych samych osad; BK dostaje razem home ludzi - tyle co dotad (n - t + t - put)
+                var places = new List<KeyValuePair<Settlement, double>>(2);
+                PeopleBook.HomeOrNoteMirror(org, home, known, cause, places);
+                int total;
+                int ok = LosersFlee.BkAddPlaces(ch, places, home, 0, false, out total);
+                int restBk = home - ok;
+                if (restBk > 0)
+                {
+                    bool given = false;
+                    try
+                    {
+                        if (pdv == null) pdv = _getPopData.Invoke(_popMgr, new object[] { v });
+                        if (pdv != null) { A16Signals.Ours++; try { _fromSoldiers.Invoke(pdv, new object[] { ch, restBk }); given = true; } finally { A16Signals.Ours--; } }
+                    }
+                    catch (Exception e) { Stumble("ToVillage(A16 reszta)", e); }
+                    if (!given) A16Signals.NoteMirrorLost(restBk);    // recenzja A16: ludnosc BK nie dostala reszty - licznik rozjazdu ksiag (prog A16-9c)
+                }
+                return true;
+            }
             // E4/3: wlasny try w ksiedze (U24) - po dopisaniu, nie miedzy zdjeciem a dopisaniem. E4/7: czesc znana pochodzeniem - DOM regionu pochodzenia z hearth
             // (MBack166/MBackW4c/MBack179), reszta - jak w E4/3 (tylko liczona); ludnosc BK dostaje ich tam, gdzie dotad
             if (org != null)
             {
-                int known = cause == PeopleBook.M166 ? PeopleBook.MBack166 : cause == PeopleBook.MW4c ? PeopleBook.MBackW4c : cause == PeopleBook.M179 ? PeopleBook.MBack179
-                            : cause == PeopleBook.MDebt ? PeopleBook.MBackDebt : -1;     // E4/9 (DLUG 4): dluznicy do domu - z pochodzeniem z hearth
                 if (known >= 0) PeopleBook.HomeOrNote(org, home, known, cause); else PeopleBook.Note(home, cause, 0.0);
             }
             else PeopleBook.Note(home, cause, 0.0);

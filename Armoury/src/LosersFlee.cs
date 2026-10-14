@@ -560,8 +560,95 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>
+        /// A16 (BkReturnsToOriginVillage, ROZPOZNANIE-A16 poz. 9): ludzie umieszczeni przez ksiege w DOM osad `places` (PeopleBook.HomeKnownMirror / HomeOrNoteMirror)
+        /// dopisani do ludnosci BK TYCH SAMYCH osad (werbunek BK na odwrot, jak AddBk). Liczba calkowita: suma zaokraglona (najwyzej cap), podzial najwiekszych reszt.
+        /// h3 - liczniki linii "Przegrani (H3)" (do domu BK, wedlug zrodla src) jak przy AddBk; false - bez nich (ClanBudget: 166, W4c, 179, dlug).
+        /// Zwraca, ilu BK przyjal; total - ilu przydzielono osadom (total - wynik = osada bez danych BK albo BK nie przyjal: wolajacy daje ich BK jak dotad). Nie rzuca.
+        /// </summary>
+        internal static int BkAddPlaces(CharacterObject troop, List<KeyValuePair<Settlement, double>> places, int cap, int src, bool h3, out int total)
+        {
+            total = 0;
+            if (troop == null || places == null || places.Count == 0 || cap <= 0) return 0;
+            int ok = 0;
+            try
+            {
+                double sum = 0.0;
+                foreach (var p in places) if (p.Value > 0.0) sum += p.Value;
+                total = Math.Max(0, Math.Min(cap, (int)Math.Round(sum)));
+                if (total <= 0) return 0;
+                // podzial najwiekszych reszt: czesci calkowite, potem po 1 czlowieku osadom z najwieksza reszta
+                var cnt = new int[places.Count];
+                var rem = new double[places.Count];
+                int given = 0;
+                for (int i = 0; i < places.Count; i++)
+                {
+                    double want = places[i].Value > 0.0 ? places[i].Value * total / sum : 0.0;
+                    cnt[i] = (int)Math.Floor(want); rem[i] = want - cnt[i]; given += cnt[i];
+                }
+                while (given < total)
+                {
+                    int best = -1; double br = -1.0;
+                    for (int i = 0; i < places.Count; i++) if (rem[i] > br) { br = rem[i]; best = i; }
+                    if (best < 0) break;
+                    cnt[best]++; rem[best] = -1.0; given++;
+                }
+                if (!BkResolve()) return 0;
+                Homes();
+                for (int i = 0; i < places.Count; i++)
+                {
+                    if (cnt[i] <= 0) continue;
+                    var st = places[i].Key;
+                    Home h = null;
+                    if (st == null || _homeOf == null || !_homeOf.TryGetValue(st, out h) || h == null) { A16Signals.NoteMirror(st, 0, cnt[i]); continue; }
+                    int got = h3 ? AddBk(h, troop, cnt[i], src) : AddBkQuiet(h, troop, cnt[i]);
+                    ok += got;
+                    A16Signals.NoteMirror(st, got, cnt[i] - got);
+                }
+            }
+            catch (Exception e)
+            {
+                _stumbleHome++;
+                if (!_errHome) { _errHome = true; Log.Error("LosersFlee.BkAddPlaces", e); }
+            }
+            return ok;
+        }
+
+        /// <summary>A16: n ludzi do ludnosci BK osady home bez licznikow H3 (ClanBudget.ToVillage przez lustro) - ta sama droga co AddBk (zastepczo chlopi).</summary>
+        private static int AddBkQuiet(Home home, CharacterObject troop, int n)
+        {
+            int before = TotalPop(home.Pd);
+            bool threw = false;
+            A16Signals.Ours++;
+            try { _fromSoldiers.Invoke(home.Pd, new object[] { troop, n }); }
+            catch { threw = true; }
+            finally { A16Signals.Ours--; }
+            if (threw && _updateType != null && _serfs != null && TotalPop(home.Pd) == before)
+            {
+                A16Signals.Ours++;
+                try { _updateType.Invoke(home.Pd, new object[] { _serfs, n, false }); } catch { }
+                finally { A16Signals.Ours--; }
+            }
+            return Math.Max(0, Math.Min(n, TotalPop(home.Pd) - before));
+        }
+
         private static int ToBk(CharacterObject troop, int n, Vec2 pos, IFaction fac, int src, PeopleBook.Shares org = null)
         {
+            // A16 (BkReturnsToOriginVillage): czesc znana pochodzeniem - najpierw DOM pochodzenia (HomeKnown) i ludnosc BK TEJ SAMEJ osady (dotad BK dostawal ich
+            // w najblizszej bitwie osadzie FindHome - takze zamku i miescie, a ksiega oddawala ich do wsi pochodzenia). Reszta (bez pochodzenia, bez wsi w regionie,
+            // osada bez danych BK) - jak dotad. Udzial Strazy (W > 0) - droga sprzed A16 (Mur). Off - jak w 79a8d89.
+            int pre = 0, preMiss = 0;
+            if (org != null && A16Signals.ReturnsToOrigin && org.Known > 0.0 && !(org.W > 0.0) && PeopleBook.LevyLive && BkResolve())
+            {
+                var part = org.Cut(n);
+                var places = new List<KeyValuePair<Settlement, double>>(2);
+                try { PeopleBook.HomeKnownMirror(part, KnownCause(src), places); } catch (Exception e) { _stumbleHome++; if (!_errHome) { _errHome = true; Log.Error("LosersFlee.ToBk(A16)", e); } }
+                int total;
+                int ok = BkAddPlaces(troop, places, n, src, true, out total);
+                pre = total; preMiss = total - ok;
+                org.AddAll(part);                   // nieumieszczeni (bez pochodzenia, bez wsi w regionie) - z powrotem do udzialow wolajacego
+                if (pre >= n && preMiss == 0) return n;
+            }
             Dictionary<string, Home> cache = _battleHome;
             string where = "";
             if (src == SrcPool)
@@ -580,8 +667,21 @@ namespace Armoury
                 where = PosKey(pos);
             }
             var home = FindHome(pos, fac, troop.Culture, cache, where);
-            if (home == null) return 0;
-            int got = AddBk(home, troop, n, src);
+            if (home == null)
+            {
+                // A16: umieszczeni w DOM pochodzenia zostaja (pre); reszta wraca do wolajacego (pula) jak dotad. Recenzja: preMiss (osada pochodzenia bez danych BK)
+                // przy braku osady zastepczej - ksiega ma ich w DOM, ludnosc BK nigdzie: licznik rozjazdu (linia "A16 Ludnosc BK", prog A16-9c)
+                A16Signals.NoteMirrorLost(preMiss);
+                return pre;
+            }
+            if (preMiss > 0)
+            {
+                int gotMiss = AddBk(home, troop, preMiss, src);  // A16: w DOM juz sa, osada pochodzenia bez danych BK - BK dostaje ich tu, jak dotad (bez drugiego zapisu w ksiedze)
+                A16Signals.NoteMirrorLost(preMiss - gotMiss);    // recenzja: BK nie przyjal i tu - rozjazd ksiag (licznik)
+            }
+            int rest = n - pre;
+            if (rest <= 0) return pre;
+            int got = AddBk(home, troop, rest, src);
             // E4/3: pierwszy punkt powrotu (R0) - zolnierz wraca do ludnosci BK (sklad BK bez zmiany geografii). E4/7: czesc znana pochodzeniem - DOM regionu pochodzenia
             // z hearth (werbunek zdjal go z DOM: MLevyVillage); czesc bez pochodzenia - jak w E4/3 (tylko liczona)
             if (got > 0)
@@ -589,7 +689,7 @@ namespace Armoury
                 if (org != null) PeopleBook.HomeOrNote(org.Cut(got), got, KnownCause(src), PeopleBook.MSoldier);
                 else PeopleBook.Note(got, PeopleBook.MSoldier, 0.0);
             }
-            return got;
+            return pre + got;
         }
 
         /// <summary>n ludzi typu troop do ludnosci BK osady home (werbunek BK na odwrot; zastepczo chlopi) - wspolne dla ToBk i ToWall.</summary>
@@ -599,14 +699,18 @@ namespace Armoury
             bool retinue = IsRetinue(troop);
             int nob0 = retinue ? 0 : TypeCount(home.Pd, _nobles);
             bool threw = false, fallback = false;
+            A16Signals.Ours++;                      // A16: pomiar ludnosci BK - powrot naszej reki
             try { _fromSoldiers.Invoke(home.Pd, new object[] { troop, n }); }
             catch { threw = true; }
+            finally { A16Signals.Ours--; }
             // BK nie przyjal (KeyNotFound w Manpowers, brak klasy) - zastepczo klasa chlopow (bez manpower); tylko gdy ludnosc sie
             // nie ruszyla - wyjatek w srodku dopisywania (po zmianie klasy) nie moze dac drugiego dopisania tych samych ludzi
             if (threw && _updateType != null && _serfs != null && TotalPop(home.Pd) == before)
             {
                 fallback = true;
+                A16Signals.Ours++;
                 try { _updateType.Invoke(home.Pd, new object[] { _serfs, n, false }); } catch { }
+                finally { A16Signals.Ours--; }
             }
             int delta = TotalPop(home.Pd) - before;
             int got = Math.Max(0, Math.Min(n, delta));
@@ -696,12 +800,14 @@ namespace Armoury
             try { pd = _getPopData.Invoke(_popMgr, new object[] { st }); } catch { return -1; }
             if (pd == null) return 0;
             int before = TypeCount(pd, _slavesT);
+            A16Signals.Ours++;                      // A16: pomiar ludnosci BK - niewolnicy naszej reki
             try { _updateType.Invoke(pd, new object[] { _slavesT, n, false }); return n; }
             catch
             {
                 int d = TypeCount(pd, _slavesT) - before;       // wyjatek po dopisaniu (most BK do innej ekonomii) - BK nie moze dopisac drugi raz
                 return d > 0 ? d : -1;
             }
+            finally { A16Signals.Ours--; }
         }
 
         // ------------------------------------------------------------ plan bitwy

@@ -580,6 +580,12 @@ Uzycie (Python 3, tylko odczyt):
                     Myto B3 (TwinsToll, TwinsCrossing.cs): TB-B3-0 linia 'Myto Bliznakow (B3)' z [WL] w kazdej dobie licznika E7/B, TB-B3-1 roznica obiegu 0
                     w kazdej dobie, TB-B3-2 zaplacone > 0 i <= 1.05 x 'myto gdyby bylo', TB-B3-3 INFO kto placi / Frey % D (budzet-rodow.csv),
                     TB-B3-4 INFO przejsc na dobe, TB-B3-5 potkniecia 0, TB-B3-6 INFO komunikaty gracza (reczny). Log bez galezi: INFO, bez wyjatku.
+--grupa a16       : (A16, 14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A16.md) 13 sygnalow z logow + 2 alarmy fin28 - progi po rozpoznaniu (log strumieniowo, noc.log
+                    wpleciony): A16-1 dobrobyt miast wobec ludzi miast (+-5 pkt na 364 doby), premia pokoju RBL, skladniki; A16-2 uchodzcy <= 0.5% ludzi wsi;
+                    A16-3 bandy <= 1 600 / 26 tys., pula <= 10 tys., bandyci + las +-10% w oknach 182 dob od d364; A16-4 dlug koron <= 40% kapitalu Banku, kapital
+                    >= 60%; A16-5 notable < 4 500 <= 12%, spadek kies <= 15 tys./d; A16-7 ruch noca <= 2.5 / 2.0; A16-8 bohaterowie (kontrola zgonow); A16-9 BK wsi
+                    wobec ksiegi +-3 pkt na 364 doby, rozjazd lustra <= 1%; A16-10 W5 >= 0.9 x min(f, 60%); A16-11 karawany bez jucznych <= 25%; A16-12 Straz (+ bunt Strazy);
+                    A16-14 F9 mediana <= 22% rent; A16-15 najemnicy >= 1 600 i kiesy kompanii >= 1 mln. python -I tools/sprawdz_logi.py --grupa a16 [--do-doby N] [--csv <budzet-rodow.csv>] <Armoury-*.log>
 --grupa plotno    : (plotno 14.10, docs/pytania-2026-10-14/RAPORT-plotno.md poprawki 1 i 2; klucze FolkClothAboveReserve, WeaverExportPrice) zbytki ludu nie kupuja
                     plotna ani skory ponizej zapasu polki, tkacz tka tez na wywoz. python -I tools/sprawdz_logi.py --grupa plotno [--do-doby 120] <Armoury-*.log>
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
@@ -22636,6 +22642,523 @@ def a17_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ A16 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A16.md): 13 sygnalow z logow + 2 alarmy fin28
+# Progi zmienione po rozpoznaniu (poz. 3, 4, 7, 10, 11, 12, 14, 15) i progi nowych linii (poz. 1, 2, 8, 9). Log czytany STRUMIENIOWO (bieg dwuletni 278 MB),
+# noc.log (linie "AiNightCamp: ruch") wplatany po znaczniku czasu jak w E7/O1. Stare wiersze innych grup (E4/3, P1-8, E7/O1 T3, W5-4, M6b-4e, E4/9 K7,
+# P3W1-3, P3W3-3) zostaja w swoich grupach - progi A16 ich nie zastepuja w kodzie (inne galezie dopisuja swoje grupy), tylko obok nich.
+A16_WATCH_BASE = 8691          # baza K7 (z31A, d120) - ta sama co E49_WATCH_BASE
+A16_RX = {
+    "dob": re.compile(r"Dobrobyt \(E4/0\): dzien (\d+) \| miasta (\d+): dobrobyt (\d+).*?ludzie miast ksiegi to stan \((\d+)\).*?\| zamki (\d+): dobrobyt (\d+)"),
+    "uch": re.compile(r"E4/5 konto UCHODZCY: ([\d.]+) ludzi w \d+ wsiach.*?(?:nowi ([\d.]+) - powrot ([\d.]+)|\(nowi ([\d.]+), powrot ([\d.]+))"),
+    "dom": re.compile(r"konto DOM: wsie (\d+) ludzi"),
+    "wyr": re.compile(r"Wyrzutki: dzien (\d+) \| pula (\d+) ludzi.*?\| band (\d+), ludzi (\d+)"),
+    "kre": re.compile(r"Kredyt korony \(186\): dzien (\d+) .*?\| dlug razem (\d+) u \d+ krolestw; w zaleglosci (\d+)(.*?)\| Bank: kapital (-?\d+)"),
+    "not": re.compile(r"Warsztaty towarowe: dzien (\d+) .*?kiesy notabli .*?: notabli (\d+), w kiesach (\d+), ponizej 4500 (\d+)"),
+    "bud": re.compile(r"Budzet rodow \(na sucho\): dzien (\d+).*?zalegly zold: (\d+) partii i zalog z (\d+)"),
+    "w5": re.compile(r"Doplata wedlug potrzeby \(W5\): dzien (\d+) .*?rody z doplata dzis (\d+): (\d+) ludzi / limit (\d+)"),
+    "w5k": re.compile(r"; ?([^;:|]+?): garnek \d+ \(danina \d+\), potrzeba \d+ u \d+ rodow, poziom ([\d.]+)%, wyplacono \d+ \(rodow (\d+)\)"),
+    "juc": re.compile(r"Juczne \(213\): dzien (\d+) .*?\(cel (\d+); pelne (\d+), czesciowo (\d+), bez jucznych (\d+)\).*?brak (\d+) \("),
+    "jucA": re.compile(r"A16 - koniec zakupu z brakiem: polka bez jucznych (\d+) karawan (\d+) szt\., budzet 1/2 kapitalu (\d+) karawan (\d+) szt\., limit petli (\d+) karawan (\d+) szt\."),
+    "str": re.compile(r"Straz i Wolni Ludzie \(4\.15\): dzien (\d+) \| Nocna Straz: stan (\d+)"),
+    "skb": re.compile(r"Skarbce: dzien (\d+) - (.+?)( \(WOJNA\))?: skarbiec (-?\d+).*?wojsko rodow (\d+) ludzi"),
+    "r180": re.compile(r"Renty korony \(180\): dzien (\d+) .*?= renty (\d+) .*?Crown Rent Held To Serving\): (\d+)"),
+    "k185": re.compile(r"Kontrakty najemnikow \(185\): dzien (\d+).*?ludzie najemnikow AI (\d+) / z umowy"),
+    "aPro": re.compile(r"A16 Dobrobyt \(skladniki\): dzien (\d+) .*?\| miasta (\d+): dobrobyt (\d+), wynik modelu ([-+][\d.]+)/d = (.*?) \| premia pokoju RBL - warunek spelniony: z latka A16 \(30 dob spokoju warowni i wsi\) (\d+), bez latki \(RBL: brak zapamietanego napastnika\) (\d+), oblezone (\d+) \| zamki (\d+): dobrobyt (\d+), wynik modelu ([-+][\d.]+)/d = .*?z latka A16 \(30 dob spokoju warowni i wsi\) (\d+), bez latki \(RBL: brak zapamietanego napastnika\) (\d+)"),
+    "aHer": re.compile(r"A16 Bohaterowie: dzien (\d+) \| dorosli zywi lordowie AI \(bez rodu gracza\) (\d+)(.*)"),
+    "aBk": re.compile(r"A16 Ludnosc BK: dzien (\d+)"),
+    "move": re.compile(r"^AiNightCamp: ruch .*BEZ WPISU POWODU (\d+):.*wyjazd z osady / po bitwie (\d+)"),
+}
+
+
+def _a16_abs_iter(path, start_dt):
+    """Strumien (chwila bezwzgledna, tekst) - jak _abs_lines, bez wczytywania pliku do pamieci."""
+    import datetime as dt
+    day, prev = 0, None
+    base = dt.datetime(start_dt.year, start_dt.month, start_dt.day)
+    with open(path, encoding="utf-8-sig", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.strip())
+            if not m:
+                continue
+            hh, mi, ss = (int(x) for x in m.group(1).split(":"))
+            t = hh * 3600 + mi * 60 + ss
+            if prev is not None and t < prev - 3600:
+                day += 1
+            prev = t
+            yield base + dt.timedelta(days=day, seconds=t), m.group(2)
+
+
+def a16_main(logp, start_arg, until=100000, csvp=None):
+    """A16: progi sygnalow z logow (ROZPOZNANIE-A16 rozdz. 1, kolumna "regula naprawy"). Okno: doby kampanii 1-until (domyslnie caly log)."""
+    import bisect
+    import datetime as dt
+    rep = Report()
+    R = A16_RX
+    if not os.path.exists(logp):
+        print(f"brak pliku {logp}")
+        return 2
+    t0 = _start_dt_of(logp, fallback=dt.datetime(2000, 1, 1))
+    start = start_arg
+    first_day = None
+    S = {k: {} for k in ("dob", "uch", "dom", "wyr", "kre", "not", "bud", "w5", "w5k", "juc", "jucA", "str", "r180", "k185", "aPro", "aProTxt", "aHer", "aBk", "aW5")}
+    reb = {}            # krolestwa z buntu Strazy: doba -> ludzie
+    anchors = []        # (chwila, dzien) z "Pieniadz swiata: dzien"
+    swit = []           # chwile "NightRest swit"
+    n_lines = 0
+    for tt, s in _a16_abs_iter(logp, t0):
+        n_lines += 1
+        c = s[:1]
+        if c == "P":
+            if s.startswith("Pieniadz swiata: dzien"):
+                k = num(r"dzien (\d+)", s)
+                if k is not None:
+                    anchors.append((tt, k))
+                    if first_day is None:
+                        first_day = k
+                continue
+            if start is None and s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                continue
+        if s.startswith("NightRest swit "):
+            swit.append(tt)
+            continue
+        for key, pref in (("dob", "Dobrobyt (E4/0): dzien"), ("wyr", "Wyrzutki: dzien"), ("kre", "Kredyt korony (186): dzien"), ("not", "Warsztaty towarowe: dzien"),
+                          ("bud", "Budzet rodow (na sucho): dzien"), ("juc", "Juczne (213): dzien"), ("str", "Straz i Wolni Ludzie (4.15): dzien"),
+                          ("r180", "Renty korony (180): dzien"), ("k185", "Kontrakty najemnikow (185): dzien"), ("aPro", "A16 Dobrobyt (skladniki): dzien"),
+                          ("aHer", "A16 Bohaterowie: dzien")):
+            if s.startswith(pref):
+                m = R[key].search(s)
+                if m:
+                    S[key][int(m.group(1))] = m.groups()
+                    if key == "juc":
+                        ma = R["jucA"].search(s)
+                        if ma:
+                            S["jucA"][int(m.group(1))] = ma.groups()
+                    if key == "aPro":
+                        S["aProTxt"][int(m.group(1))] = m.group(5)
+                break
+        else:
+            if s.startswith("Doplata wedlug potrzeby (W5): dzien"):
+                m = R["w5"].search(s)
+                if m:
+                    d = int(m.group(1))
+                    S["w5"][d] = m.groups()
+                    S["w5k"][d] = [(x.group(1).strip(), float(x.group(2)), int(x.group(3))) for x in R["w5k"].finditer(s.split("| na krolestwo:", 1)[-1])]
+            elif s.startswith("Ludzie (ksiega): dzien"):
+                d = num(r"dzien (\d+)", s)
+                mu, md = R["uch"].search(s), R["dom"].search(s)
+                if d is not None and mu:
+                    a, b = (mu.group(2), mu.group(3)) if mu.group(2) is not None else (mu.group(4), mu.group(5))
+                    S["uch"][d] = (float(mu.group(1)), float(a or 0), float(b or 0))
+                if d is not None and md:
+                    S["dom"][d] = int(md.group(1))
+            elif s.startswith("Skarbce: dzien"):
+                m = R["skb"].match(s)
+                if m and REB.match(m.group(2)) and "watch" in m.group(2).lower():
+                    d = int(m.group(1))
+                    reb[d] = reb.get(d, 0) + int(m.group(5))
+            elif s.startswith("A16 Ludnosc BK: dzien"):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    S["aBk"][d] = s
+            elif s.startswith("A16 W5 miejsce: dzien"):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    S["aW5"][d] = s
+    if start is None:
+        start = first_day
+    if start is None:
+        print(f"plik: {logp} | brak linii 'Pieniadz swiata' - nie ma dob")
+        return 2
+    def rd(d):
+        return d - start + 1
+    def inwin(d):
+        return 1 <= rd(d) <= until
+    alld = sorted(d for _, d in anchors if inwin(d))
+    last = alld[-1] if alld else start
+    span = rd(last)
+    print(f"plik: {logp} | linii {n_lines} | start kampanii {start} | doby kampanii 1-{span} (okno do {until})")
+
+    def win(dd):
+        return {d: v for d, v in dd.items() if inwin(d)}
+
+    # ---- A16-0 linie A16
+    rep.add("A16-0: linie A16 (Dobrobyt skladniki / Bohaterowie / Ludnosc BK)", f"{len(win(S['aPro']))} / {len(win(S['aHer']))} / {len(win(S['aBk']))} dob",
+            "INFO - sa od wgrania A16 (A16SignalsLog)", None)
+    # ---- A16-1 dobrobyt miast wobec ludzi miast (stan E4/4)
+    dob = win(S["dob"])
+    if len(dob) >= 2:
+        d0, d1 = min(dob), max(dob)
+        p0, p1, h0, h1 = int(dob[d0][2]), int(dob[d1][2]), int(dob[d0][3]), int(dob[d1][3])
+        c0, c1 = int(dob[d0][5]), int(dob[d1][5])
+        dp, dh = 100.0 * (p1 - p0) / max(1, p0), 100.0 * (h1 - h0) / max(1, h0)
+        days = max(1, d1 - d0)
+        lim = max(2.0, 5.0 * days / 364.0)
+        rep.add(f"A16-1a: dobrobyt miast wobec ludzi miast ksiegi (d{rd(d0)} -> d{rd(d1)})",
+                f"dobrobyt {p0} -> {p1} ({dp:+.1f}%), ludzie miast {h0} -> {h1} ({dh:+.1f}%), roznica {dp - dh:+.1f} pkt",
+                f"|roznica| <= {lim:.1f} pkt (5 pkt na 364 doby, najmniej 2; rozpoznanie: dwuletni +31.5% wobec -1.5% w roku)", abs(dp - dh) <= lim)
+        rep.add(f"A16-1b: dobrobyt zamkow (d{rd(d0)} -> d{rd(d1)})", f"{c0} -> {c1} ({100.0 * (c1 - c0) / max(1, c0):+.1f}%)",
+                "INFO - zamki bez ludzi w ksiedze; pulap BK zamku = ... + dobrobyt/5 (poz. 9)", None)
+    else:
+        rep.add("A16-1a: dobrobyt miast wobec ludzi miast", "brak linii Dobrobyt (E4/0)", "|roznica| <= 5 pkt na 364 doby", None)
+    ap = win(S["aPro"])
+    if ap:
+        ks = sorted(ap)
+        n = len(ks)
+        q_t = sum(int(ap[d][5]) for d in ks) / n
+        v_t = sum(int(ap[d][6]) for d in ks) / n
+        q_c = sum(int(ap[d][11]) for d in ks) / n
+        v_c = sum(int(ap[d][12]) for d in ks) / n
+        rt = sum(float(ap[d][3]) for d in ks) / n
+        rc = sum(float(ap[d][10]) for d in ks) / n
+        rep.add("A16-1c: premia pokoju RBL - warowni z warunkiem (srednio na dobe): z latka A16 / bez latki",
+                f"miasta {q_t:.0f} / {v_t:.0f} z {ap[ks[-1]][1]}, zamki {q_c:.0f} / {v_c:.0f} z {ap[ks[-1]][8]}; wynik modelu srednio miasta {rt:+.0f}/d, zamki {rc:+.0f}/d",
+                "INFO - latka zabiera premie warowniom zagrozonym w ostatnich 30 dobach (z latka < bez latki w wojnie)", None)
+        rep.add(f"A16-1d: skladniki dobrobytu miast (d{rd(ks[-1])}; dodatki przed mnoznikiem, mnoznik = baza x czynnik)", S["aProTxt"][ks[-1]][:600],
+                "INFO - z tego wybor kolejnego kroku (premia pokoju, warstwa BK, reszta modelu)", None)
+    # ---- A16-2 uchodzcy
+    uch, dom = win(S["uch"]), win(S["dom"])
+    if uch and dom:
+        sh = [(100.0 * uch[d][0] / dom[d], d) for d in uch if d in dom and dom[d] > 0]
+        if sh:
+            mx = max(sh)
+            rep.add("A16-2a: uchodzcy poza domem - najwiecej (udzial ludzi wsi)", f"{mx[0]:.2f}% (d{rd(mx[1])}, {uch[mx[1]][0]} ludzi)",
+                    "<= 0.5% (dwuletni szczyt 0.38%)", mx[0] <= 0.5)
+        w28 = [d for d in uch if 701 <= rd(d) <= 728]
+        if len(w28) >= 20:
+            nw, bk = sum(uch[d][1] for d in w28), sum(uch[d][2] for d in w28)
+            rep.add("A16-2b: uchodzcy d701-728 - powrot wobec naplywu", f"powrot {bk / len(w28):.0f}/d, nowi {nw / len(w28):.0f}/d", "powrot > nowi (okno pokoju roku 2)", bk > nw)
+        else:
+            rep.add("A16-2b: uchodzcy - powrot wobec naplywu w oknie pokoju", "bieg krotszy niz 728 dob", "INFO - prog dla biegu dwuletniego (d701-728)", None)
+    else:
+        rep.add("A16-2a: uchodzcy poza domem", "brak linii Ludzie (ksiega)", "<= 0.5% ludzi wsi", None)
+    # ---- A16-3 wyrzutki i bandy
+    wyr = win(S["wyr"])
+    if wyr:
+        bmax = max(wyr, key=lambda d: int(wyr[d][2]))
+        lmax = max(wyr, key=lambda d: int(wyr[d][3]))
+        pmax = max(wyr, key=lambda d: int(wyr[d][1]))
+        rep.add("A16-3a: bandy na mapie - najwiecej band / ludzi band", f"{wyr[bmax][2]} (d{rd(bmax)}) / {wyr[lmax][3]} (d{rd(lmax)})",
+                "band <= 1 600 i ludzi band <= 26 000 (pulap gry bez modow)", int(wyr[bmax][2]) <= 1600 and int(wyr[lmax][3]) <= 26000)
+        rep.add("A16-3b: pula wyrzutkow (las) - najwiecej", f"{wyr[pmax][1]} (d{rd(pmax)})", "<= 10 000 (dwuletni szczyt 9 889)", int(wyr[pmax][1]) <= 10000)
+        bl = {rd(d): int(v[1]) + int(v[3]) for d, v in wyr.items()}
+        pts = [p for p in (364, 546, 728) if p in bl]
+        if len(pts) >= 2:
+            ch = [(pts[i], pts[i + 1], 100.0 * (bl[pts[i + 1]] - bl[pts[i]]) / max(1, bl[pts[i]])) for i in range(len(pts) - 1)]
+            rep.add("A16-3c: bandyci + las w oknach 182 dob od d364", ", ".join(f"d{a}->d{b} {c:+.1f}%" for a, b, c in ch),
+                    "kazde okno +-10% (rok 1 rosnie od startu - poza progiem)", all(abs(c) <= 10.0 for _, _, c in ch))
+        else:
+            k = sorted(bl)
+            rep.add("A16-3c: bandyci + las", f"d{k[0]} {bl[k[0]]} -> d{k[-1]} {bl[k[-1]]}", "INFO - prog +-10% w oknach 182 dob od d364 (bieg roczny i dluzszy)", None)
+    else:
+        rep.add("A16-3: wyrzutki i bandy", "brak linii Wyrzutki", "band <= 1 600, ludzi <= 26 tys., pula <= 10 tys.", None)
+    # ---- A16-4 dlug koron w Banku
+    kre = win(S["kre"])
+    if kre:
+        ks = sorted(kre)
+        cap0 = int(kre[ks[0]][4])
+        dmax = max(ks, key=lambda d: int(kre[d][1]))
+        cmin = min(ks, key=lambda d: int(kre[d][4]))
+        best, bestk, bestd = 0, "-", None
+        for d in ks:
+            for kn, od in re.findall(r"([^:,;]+?) \(od dnia (\d+)\)", kre[d][3]):
+                if d - int(od) > best:
+                    best, bestk, bestd = d - int(od), kn.strip(), int(od)
+        rep.add("A16-4a: dlug koron w Banku - najwiecej wobec kapitalu startowego", f"{int(kre[dmax][1]) / 1e6:.2f} mln (d{rd(dmax)}) = {100.0 * int(kre[dmax][1]) / max(1, cap0):.0f}% z {cap0 / 1e6:.2f} mln",
+                "<= 40% kapitalu startowego Banku (dwuletni szczyt 27%)", int(kre[dmax][1]) <= 0.4 * cap0)
+        rep.add("A16-4b: kapital Banku - najmniej wobec startu", f"{int(kre[cmin][4]) / 1e6:.2f} mln (d{rd(cmin)}) = {100.0 * int(kre[cmin][4]) / max(1, cap0):.0f}%",
+                ">= 60% startu (dwuletni min 71%)", int(kre[cmin][4]) >= 0.6 * cap0)
+        rep.add("A16-4c: najdluzsza zaleglosc krolestwa w Banku (doba - 'od dnia')", f"{best} dob ({bestk}" + (f", od d{rd(bestd)})" if bestd else ")"),
+                "< 14 dob dla kazdego krolestwa (zaleglosc w roku 2 - sprawa pieniadze-rok-2, A5)", best < 14)
+        if span >= 700:
+            d728 = max(ks)
+            rep.add("A16-4d: dlug koron na koncu biegu wobec szczytu", f"{int(kre[d728][1]) / 1e6:.2f} mln wobec szczytu {int(kre[dmax][1]) / 1e6:.2f} mln (d{rd(dmax)})",
+                    "w pokoju dlug spada (koniec < szczyt; dwuletni 0.35 wobec 1.37)", int(kre[d728][1]) < int(kre[dmax][1]))
+        rep.add("A16-4e: P1-8b korona pozycza mimo lokaty", "odsylacz", "pieniadze-rok-2 (A5) - poza A16", None)
+    else:
+        rep.add("A16-4: dlug koron w Banku", "brak linii Kredyt korony (186)", "dlug <= 40% kapitalu, kapital >= 60%", None)
+    # ---- A16-5 notable
+    nt = win(S["not"])
+    if len(nt) >= 2:
+        ks = sorted(nt)
+        # recenzja A16: bez doby 1 - stan startowy gry przed pierwsza doba kies (11.0-11.2% w kazdym biegu, d2 ok. 0.5%) zaslanial dynamike
+        k2 = [d for d in ks if rd(d) >= 2] or ks
+        low = max(k2, key=lambda d: int(nt[d][3]) / max(1, int(nt[d][1])))
+        rep.add("A16-5a: notable ponizej 4 500 - najwiekszy udzial (od d2)", f"{nt[low][3]} z {nt[low][1]} ({100.0 * int(nt[low][3]) / max(1, int(nt[low][1])):.1f}%, d{rd(low)})",
+                "<= 12% (bez stanu startowego d1 ok. 11%: 120 dob 7.4%, roczny 8.3%, dwuletni 10.5%)", int(nt[low][3]) <= 0.12 * int(nt[low][1]))
+        segs, a = [], ks[0]
+        for d in ks:
+            if d - a >= 182 or d == ks[-1]:
+                if d > a:
+                    segs.append((a, d, (int(nt[d][2]) - int(nt[a][2])) / (d - a)))
+                a = d
+        full = [x for x in segs if x[1] - x[0] >= 150]
+        worst = (full or segs)[-1] if segs else None
+        if worst:
+            rep.add("A16-5b: kiesy notabli - zmiana na dobe w ostatnim oknie 182 dob", f"{worst[2] / 1e3:+.1f} tys. zl/d (d{rd(worst[0])}-d{rd(worst[1])}); okna: "
+                    + ", ".join(f"d{rd(a)}-{rd(b)} {v / 1e3:+.1f}" for a, b, v in segs),
+                    ">= -15 tys. zl/d w ostatnim oknie >= 150 dob - tempo maleje (dwuletni: rok 1 -17.8, rok 2 -8.5); krotszy bieg - INFO (120 dob -23.8)",
+                    (worst[2] >= -15000) if full else None)
+    else:
+        rep.add("A16-5: notable", "brak linii Warsztaty towarowe", "ponizej 4 500 <= 12%, spadek <= 15 tys. zl/d", None)
+    # ---- A16-6 zalegly zold (odsylacz)
+    bud = win(S["bud"])
+    if bud:
+        k28 = sorted(bud)[-28:]
+        pc = [100.0 * int(bud[d][1]) / int(bud[d][2]) for d in k28 if int(bud[d][2]) > 0]
+        rep.add("A16-6: zalegly zold w partiach (ostatnie 28 dob okna)", f"{sum(pc) / max(1, len(pc)):.2f}%",
+                "INFO - rok 1 ponizej 2%; rok 2 - pieniadze-rok-2 (A3), tam prog <= 2% w d701-728", None)
+    # ---- A16-7 lordowie ruszajacy noca (noc.log)
+    nocp = session_file_find(logp, "noc.log")
+    if os.path.exists(nocp) and anchors:
+        at = [a for a, _ in anchors]
+        def day_at(tt):
+            i = bisect.bisect_right(at, tt) - 1
+            return anchors[i][1] if i >= 0 else None
+        nights = {}
+        for tt in swit:
+            d = day_at(tt)
+            if d is not None:
+                nights[d] = nights.get(d, 0) + 1
+        nr = {}
+        a7 = [0, 0, 0, 0]     # A16 (NightMarch): samotni bez powodu, w nastepnym takcie postoj / dalej w ruchu / znikneli
+        t0n = t0
+        try:
+            first_n = next(_a16_abs_iter(nocp, t0n))[0]
+            if anchors and first_n < anchors[0][0] - dt.timedelta(hours=1):
+                t0n = t0 + dt.timedelta(days=1)
+        except StopIteration:
+            pass
+        for tt, s in _a16_abs_iter(nocp, t0n):
+            if not s.startswith("AiNightCamp: ruch"):
+                continue
+            m = R["move"].match(s)
+            if not m:
+                continue
+            d = day_at(tt)
+            if d is None:
+                continue
+            att = num(r"Inni/doczepieni (\d+)", s, default=0) or 0
+            if 31 <= rd(d) <= until:
+                ma7 = re.search(r"A16 samotni bez powodu \(bez Inni/doczepieni\) (\d+).*?w nastepnym postoj \(oboz, osada, sen dlugu\) (\d+), dalej w ruchu (\d+), znikneli z listy (\d+)", s)
+                if ma7:
+                    for i7 in range(4):
+                        a7[i7] += int(ma7.group(i7 + 1))
+            a = nr.setdefault(d, [0, 0])
+            a[0] += int(m.group(1)) - att
+            a[1] += int(m.group(2))
+        dd = [d for d in nights if 31 <= rd(d) <= until]
+        nn = sum(nights[d] for d in dd)
+        if nn:
+            t3 = sum(nr.get(d, [0, 0])[0] for d in dd) / nn
+            ex = sum(nr.get(d, [0, 0])[1] for d in dd) / nn
+            rep.add("A16-7: lordowie w ruchu bez wpisu powodu w oknie obozu (d31-okno, na noc)", f"{t3:.1f}, w tym wyjazd z osady / po bitwie {ex:.1f} ({nn} nocy)",
+                    "<= 2.5 na noc i wyjazd / po bitwie <= 2.0 (najwyzszy pomiar 2.0 / 1.9 + ok. 25% rozrzutu; E7/O1 T3 zostaje jak byl)", t3 <= 2.5 and ex <= 2.0)
+        else:
+            rep.add("A16-7: lordowie w ruchu noca", "brak nocy d31+", "<= 2.5 / 2.0", None)
+        if a7[0]:
+            rep.add("A16-7b: samotni bez powodu - los w nastepnym takcie (d31-okno)", f"{a7[0]} zapisanych: postoj (oboz, osada, sen dlugu) {a7[1]}, dalej w ruchu {a7[2]}, znikneli {a7[3]}",
+                    "INFO - kod tylko wtedy, gdy wiekszosc idzie dalej bez obozu dluzej niz 1 takt (ROZPOZNANIE-A16 poz. 7)", None)
+    else:
+        rep.add("A16-7: lordowie w ruchu noca", f"brak noc.log ({nocp})", "<= 2.5 na noc, wyjazd <= 2.0", None)
+    # ---- A16-8 bohaterowie
+    hr = win(S["aHer"])
+    if hr:
+        ks = sorted(hr)
+        ev = gd = notY = 0
+        dead = birth = aged = made = other = gone_o = 0
+        for d in ks:
+            tail_s = hr[d][2]
+            mk = re.search(r"\| kontrola zgonow: z wydarzenia lordow AI (\d+) = ubyli przez zgon (\d+) \+ bez wczorajszego wpisu (\d+)", tail_s)
+            if mk:
+                ev += int(mk.group(1)); gd += int(mk.group(2)); notY += int(mk.group(3))
+            dead += num(r"zgony lordow doroslych (\d+)", tail_s, default=0) or 0
+            birth += num(r"porody: dzieci (\d+)", tail_s, default=0) or 0
+            aged += num(r"dorosli z dzieci (\d+)", tail_s, default=0) or 0
+            made += num(r"stworzeni doroslymi (\d+)", tail_s, default=0) or 0
+            other += num(r"inna droga - zawod, rod, z rodu gracza (\d+)", tail_s, default=0) or 0
+            gone_o += num(r"inna droga - do rodu gracza, utrata zawodu (\d+)", tail_s, default=0) or 0
+        # recenzja A16: dawna "kontrola" (wczoraj + nowi - ubyli - dzis) byla zawsze 0 z budowy zbiorow; teraz zgony z wydarzenia wobec ubylych przez zgon
+        rep.add("A16-8a: bohaterowie - kontrola zgonow (zgony lordow AI z wydarzenia wobec ubylych ze zbioru przez zgon)",
+                f"z wydarzenia {ev} = ubyli przez zgon {gd} + bez wczorajszego wpisu {notY} ({len(ks)} dob)",
+                "bez wczorajszego wpisu <= 2% zgonow z wydarzenia (najmniej 1) - inaczej 'ubyli przez zgon' zaniza zgony", notY <= max(1, 0.02 * ev) if ev or notY else None)
+        rep.add(f"A16-8b: lordowie AI d{rd(ks[0])}->d{rd(ks[-1])}: dorosli {hr[ks[0]][1]} -> {hr[ks[-1]][1]}",
+                f"zgony doroslych {dead}, porody {birth}, dorosli z dzieci {aged}, stworzeni doroslymi {made}, inna droga +{other} / -{gone_o}",
+                "INFO - prog po pomiarze (rozpoznanie: smierc ze starosci jak w ROT, dorosli w 2 latach +-15% od samego dorastania)", None)
+    else:
+        rep.add("A16-8: bohaterowie", "brak linii A16 Bohaterowie", "kontrola zgonow (bez wczorajszego wpisu <= 2%)", None)
+    # ---- A16-9 ludnosc BK wsi wobec ksiegi wsi
+    bkl = win(S["aBk"])
+    vil = {}
+    for d, s in bkl.items():
+        m = re.search(r"\| wsie \d+: (\d+)", s)
+        if m:
+            vil[d] = int(m.group(1))
+    src9 = "linia A16 Ludnosc BK"
+    if len(vil) < 2:
+        csvb = session_file_find(logp, "ludnosc-bk.csv")
+        if os.path.exists(csvb):
+            src9 = "ludnosc-bk.csv"
+            vil = {}
+            with open(csvb, encoding="utf-8", errors="replace", newline="") as f:
+                for r in csv.DictReader(f, delimiter=";"):
+                    if r.get("rodzaj") != "wies":
+                        continue
+                    try:
+                        d = int(r["dzien"])
+                        vil[d] = vil.get(d, 0) + int(r["razem_bk"])
+                    except (KeyError, ValueError):
+                        pass
+            vil = {d: v for d, v in vil.items() if inwin(d)}
+    dom = win(S["dom"])
+    common = sorted(d for d in vil if d in dom)
+    if len(common) >= 2:
+        d0, d1 = common[0], common[-1]
+        a = 100.0 * (vil[d1] - vil[d0]) / max(1, vil[d0])
+        b = 100.0 * (dom[d1] - dom[d0]) / max(1, dom[d0])
+        lim = max(1.5, 3.0 * (d1 - d0) / 364.0)
+        rep.add(f"A16-9a: ludnosc BK wsi wobec ksiegi wsi (d{rd(d0)} -> d{rd(d1)}; {src9})", f"BK {vil[d0]} -> {vil[d1]} ({a:+.1f}%), ksiega {dom[d0]} -> {dom[d1]} ({b:+.1f}%)",
+                f"|roznica| <= {lim:.1f} pkt (3 pkt na 364 doby, najmniej 1.5)", abs(a - b) <= lim)
+    else:
+        rep.add("A16-9a: ludnosc BK wsi wobec ksiegi wsi", "brak danych BK wsi (linia A16 albo ludnosc-bk.csv)", "+-3 pkt na 364 doby", None)
+    if bkl:
+        acc = {}
+        rx9 = re.compile(r"\| (wsie|zamki|miasta) \d+: \d+ .*?(?=\| (?:wsie|zamki|miasta|powrot) )")
+        for d, s in bkl.items():
+            for seg in rx9.finditer(s + " | powrot "):
+                kind = seg.group(1)
+                body = seg.group(0)
+                a = acc.setdefault(kind, {})
+                for nm in ("pobor BK", "powroty naszej reki", "powroty BK", "jency BK do osady (UpdatePopulation)", "nasze inne (niewolni, chlopi zastepczo)", "inne BK"):
+                    mm9 = re.search(r", " + re.escape(nm) + r" \+(\d+)/-(\d+)", body)
+                    if mm9:
+                        v = a.setdefault(nm, [0, 0])
+                        v[0] += int(mm9.group(1)); v[1] += int(mm9.group(2))
+                r = num(r"\+ reszta ([-+]?\d+)\)", body)
+                if r is not None:
+                    a.setdefault("reszta", [0, 0])[0] += r
+                mo = re.search(r"lustro A16 do tej osady: BK przyjal (\d+), nie przyjal (\d+)", body)
+                if mo:
+                    v = a.setdefault("lustro", [0, 0]); v[0] += int(mo.group(1)); v[1] += int(mo.group(2))
+        txt = []
+        for kind in ("wsie", "zamki", "miasta"):
+            a = acc.get(kind, {})
+            txt.append(kind + ": " + ", ".join(f"{k} +{v[0]}/-{v[1]}" for k, v in a.items() if k not in ("reszta", "lustro"))
+                       + f", reszta {a.get('reszta', [0])[0]:+d}, lustro {a.get('lustro', [0, 0])[0]}/{a.get('lustro', [0, 0])[1]}")
+        rep.add(f"A16-9b: przeplywy ludnosci BK wedlug rodzaju osady (suma {len(bkl)} dob)", " | ".join(txt)[:900],
+                "INFO - skad ubytek BK wsi (pobor, powroty, reszta = wzrost i spadek klas z BetterEconomy) i dokad wracaja nasi (powroty naszej reki wsie / zamki / miasta)", None)
+        lost = sum(num(r"\| lustro A16 - BK nie dostal nigdzie \(ksiega liczy ich jako powrot\) (\d+)", s, default=0) or 0 for s in bkl.values())
+        mir_ok = sum(v.get("lustro", [0, 0])[0] for v in acc.values())
+        rep.add("A16-9c: lustro A16 - ludzie, ktorych ludnosc BK nie dostala nigdzie (rozjazd ksiag)", f"{lost} wobec przyjetych przez lustro {mir_ok}",
+                "<= 1% przyjetych przez lustro (najmniej 10) - osada pochodzenia bez danych BK i brak osady zastepczej", lost <= max(10, 0.01 * mir_ok))
+    # ---- A16-10 rody z doplata W5
+    w5, w5k = win(S["w5"]), win(S["w5k"])
+    if w5:
+        k7 = sorted(w5)[-7:]
+        fills, tgts = [], []
+        for d in k7:
+            g = w5[d]
+            if int(g[3]) <= 0:
+                continue
+            fills.append(100.0 * int(g[2]) / int(g[3]))
+            ks = [(min(60.0, f), n) for _, f, n in w5k.get(d, []) if n > 0]
+            tgts.append(sum(f * n for f, n in ks) / sum(n for _, n in ks) if ks else 60.0)
+        if fills:
+            fa, ta = sum(fills) / len(fills), sum(tgts) / len(tgts)
+            rep.add("A16-10: wypelnienie rodow z doplata W5 wobec poziomu wyrownania (srednia 7 ostatnich dob okna)",
+                    f"{fa:.1f}% limitu wobec 0.9 x {ta:.1f}% = {0.9 * ta:.1f}%", ">= 0.9 x min(f krolestwa, 60%) (f wazone rodami z wyplata; biedne krolestwa / rok 2 - A3)", fa >= 0.9 * ta)
+        else:
+            rep.add("A16-10: wypelnienie rodow z doplata W5", "brak rodow z doplata w 7 ostatnich dobach", ">= 0.9 x min(f, 60%)", None)
+    else:
+        rep.add("A16-10: wypelnienie rodow z doplata W5", "brak linii W5", ">= 0.9 x min(f, 60%)", None)
+    aw5 = win(S["aW5"])
+    if aw5:
+        t = [0] * 8
+        for s9 in aw5.values():
+            m = re.search(r"\| wczoraj (\d+): dzis wiecej ludzi (\d+) \(\+(\d+)\), bez zmiany (\d+), mniej (\d+), rod zniknal \d+ \| bez werbunku \(bez zmiany albo mniej\): wodz w niewoli (\d+), bez partii wojennej (\d+), partie w cudzej armii (\d+)", s9)
+            if m:
+                for i9 in range(8):
+                    t[i9] += int(m.group(i9 + 1))
+        rep.add(f"A16-10b: W5 - rody z miejscem ponad gotowke nastepnej doby (suma {len(aw5)} dob)",
+                f"rodo-dob {t[0]}: wiecej ludzi {t[1]} (+{t[2]}), bez zmiany {t[3]}, mniej {t[4]}; bez werbunku: wodz w niewoli {t[5]}, bez partii {t[6]}, w cudzej armii {t[7]}",
+                "INFO - wykorzystanie miejsca (ROZPOZNANIE-A16 poz. 10 'nie wiem')", None)
+    # ---- A16-11 karawany bez jucznych
+    jc = {d: v for d, v in win(S["juc"]).items() if rd(d) >= 31}
+    if jc:
+        full = sum(int(v[2]) for v in jc.values()); part = sum(int(v[3]) for v in jc.values()); none = sum(int(v[4]) for v in jc.values())
+        nk = full + part + none
+        rep.add("A16-11a: nowe karawany bez zadnego jucznego (d31-okno, karawany)", f"{none} z {nk} ({100.0 * none / max(1, nk):.0f}%); czesciowo {part}, pelne {full}",
+                "<= 25% nowych karawan (M6b-4e liczy sztuki - zostaje INFO)", none <= 0.25 * nk if nk else None)
+        ja = {d: v for d, v in win(S["jucA"]).items() if rd(d) >= 31}
+        if ja:
+            t = [sum(int(v[i]) for v in ja.values()) for i in range(6)]
+            rep.add("A16-11b: koniec zakupu z brakiem wedlug przyczyny (karawany / sztuki)", f"polka {t[0]} / {t[1]}, budzet 1/2 kapitalu {t[2]} / {t[3]}, limit petli {t[4]} / {t[5]}",
+                    "INFO - polka przewaza = juczne do pracy 'towary' (hodowla, nie z niczego)", None)
+    else:
+        rep.add("A16-11: karawany bez jucznych", "brak linii Juczne (213) d31+", "<= 25% nowych karawan", None)
+    # ---- A16-12 Straz
+    stz = win(S["str"])
+    if stz:
+        ks = sorted(stz)
+        w120 = [d for d in ks if rd(d) == 120]
+        if span <= 130 and w120:
+            v = int(stz[w120[0]][1])
+            rep.add("A16-12: Nocna Straz w d120", f"{v} wobec bazy {A16_WATCH_BASE}", f">= {int(0.85 * A16_WATCH_BASE)} (85%; tylko w d120)", v >= 0.85 * A16_WATCH_BASE)
+        else:
+            dl = ks[-1]
+            v = int(stz[dl][1])
+            rb = reb.get(dl, 0)
+            ok = v + rb >= 0.85 * A16_WATCH_BASE
+            rep.add(f"A16-12: Nocna Straz + krolestwa z jej buntu w d{rd(dl)}", f"{v} + {rb} = {v + rb} wobec bazy {A16_WATCH_BASE}"
+                    + (" (bunt Strazy w biegu - wojna domowa Diplomacy)" if any(reb.values()) else ""),
+                    f">= {int(0.85 * A16_WATCH_BASE)} (85%); ponizej przy buncie Strazy - INFO 'bunt Strazy'", True if ok else (None if any(reb.values()) else False))
+    else:
+        rep.add("A16-12: Nocna Straz", "brak linii Straz i Wolni Ludzie (4.15)", ">= 85% bazy", None)
+    # ---- A16-14 renty korony trzymane (F9) - mediana dob
+    r180 = win(S["r180"])
+    if r180:
+        k28 = sorted(r180)[-28:]
+        shs = sorted(100.0 * int(r180[d][2]) / int(r180[d][1]) for d in k28 if int(r180[d][1]) > 0)
+        if shs:
+            med = st.median(shs)
+            rep.add("A16-14: udzial F9 (renty trzymane i oddane sluzacym) w rentach - mediana dob (28 ostatnich dob okna)",
+                    f"{med:.1f}% (srednia F9 {sum(int(r180[d][2]) for d in k28) / len(k28):.0f} zl/d)",
+                    "<= 22% (biegi 120 dob 13-14.10: 2.0-17.7%, najwiecej 13.10 16:58; fin29 z drobne-2 7.9%; +25% rozrzutu jak A16-7; mediana odporna na dobe wielkiego okupu)", med <= 22.0)
+    else:
+        rep.add("A16-14: udzial F9 w rentach", "brak linii Renty korony (180)", "<= 18%", None)
+    # ---- A16-15 najemnicy AI
+    k185 = win(S["k185"])
+    if k185:
+        k28 = sorted(k185)[-28:]
+        mn = sum(int(k185[d][1]) for d in k28) / len(k28)
+        g_txt, g_ok = "brak CSV", None
+        cp = csvp or csv_path_of(logp)
+        if cp and os.path.isfile(cp):
+            lastd, gsum = None, {}
+            with open(cp, encoding="utf-8", errors="replace", newline="") as f:
+                for r in csv.DictReader(f, delimiter=";"):
+                    if r.get("rodzaj") != "najemnik":
+                        continue
+                    try:
+                        d = int(r.get("dzien") or 0)
+                        if not inwin(d):
+                            continue
+                        gsum[d] = gsum.get(d, 0) + int(float(r.get("G") or 0))
+                    except ValueError:
+                        pass
+            if gsum:
+                lastd = max(gsum)
+                g_txt = f"kiesy kompanii w sluzbie d{rd(lastd)} {gsum[lastd] / 1e6:.2f} mln"
+                g_ok = gsum[lastd] >= 1e6
+        rep.add("A16-15: ludzie najemnikow AI (sr28) i kiesy kompanii", f"{mn:.0f}; {g_txt}", ">= 1 600 (najnizszy bieg 1 685) i kiesy kompanii >= 1 mln",
+                (mn >= 1600) and (g_ok if g_ok is not None else True))
+    else:
+        rep.add("A16-15: ludzie najemnikow AI", "brak linii Kontrakty najemnikow (185)", ">= 1 600", None)
+    rep.add("A16-13: rozbici ponad budzet zoldu", "kod bez zmian", "INFO - hipoteza obalona (ROZPOZNANIE-A16 poz. 13)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -22698,6 +23221,8 @@ def main(argv):
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group == "jeff14s" and logp:
         return jeff14s_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
+    if group == "a16" and logp:
+        return a16_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csvp)   # A16: progi sygnalow z logow (ROZPOZNANIE-A16; log strumieniowo)
     if group == "drobne2" and logp:
         return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
     if group == "okup" and logp:
