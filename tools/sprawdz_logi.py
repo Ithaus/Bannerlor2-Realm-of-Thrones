@@ -16680,8 +16680,8 @@ def jeff14s_main(logp):
         rep.add("JK-GB-2: potrzeba lukow w partiach z kusznikami ZK (ostatnia doba)", f"kusznikow ZK {men}, potrzeba lukow {nb} (dob z linia {len(days)}, d{days[0]}-d{days[-1]})",
                 "potrzeba lukow > 0 przy kusznikach ZK > 0 (2/3 kusznikow liczy luk)", (nb or 0) > 0 if (men or 0) > 0 else None)
         rep.add("JK-GB-3: pokrycie lukow / strzal (pierwsza -> ostatnia doba)", f"luki {c0}% -> {c1}%, strzaly ostatniej doby {a1}% ({span} dob)",
-                "po >= 60 dobach: luki >= 50% i wiecej niz pierwszej doby (AI kupuje luki); krocej - INFO",
-                (c1 is not None and c1 >= 50.0 and (c0 is None or c1 > c0)) if span >= 60 and c1 is not None else None)
+                "po >= 60 dobach: luki >= 50% i wiecej niz pierwszej doby (AI kupuje luki); gdy dorobek startu juz dal >= 80% (JK-GB-5, nowa kampania) - luki >= 80% (trzyma); krocej - INFO",
+                (c1 is not None and ((c0 is not None and c0 >= 80.0 and c1 >= 80.0) or (c1 >= 50.0 and (c0 is None or c1 > c0)))) if span >= 60 and c1 is not None else None)
     else:
         rep.add("JK-GB-1..3: linia \"Zlota Kompania (PLAN 1.6)\"", "brak linii",
                 "INFO (klucz wylaczony albo log sprzed paczki); przy kluczu TAK linia co dobe - inaczej NIE", None if not key else False)
