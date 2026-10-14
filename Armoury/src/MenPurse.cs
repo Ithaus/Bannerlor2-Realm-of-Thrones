@@ -312,6 +312,7 @@ namespace Armoury
                     if (mp.IsMainParty && saved > 0) Log.Player("Your men put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ").");
                     return;
                 }
+                if (CitySack.NoSpend(st, mp, life)) return;   // lup miast L3: w lupionym miescie wojsko krolestwa zdobywcy nie placi - zold zostaje w sakiewce (wlasny try)
                 Take(mp, life);
                 int folk = TownFolk.EarnService(st, life, TownFolk.KLife);   // E5/B1 (R9, 75/25): uslugi do kiesy ludu (arytmetyka - nie rzuca); kupcy reszte
                 st.Town.ChangeGold(life - folk);    // karczma, jedzenie, gra, kobiety - pieniadze zostaja w miescie

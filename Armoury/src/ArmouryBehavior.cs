@@ -697,6 +697,9 @@ namespace Armoury
             // brak klucza (zapis sprzed paczki) = pula pusta; obiekty (rod, osada, typy) rozwiazuje pierwsza doba (StragglersRally.Resolve)
             try { string sr = dataStore.IsSaving ? StragglersRally.Export() : null; SaveText.Sync(dataStore, "arm_n7_rally", ref sr); if (dataStore.IsLoading) StragglersRally.Import(sr); }
             catch (Exception e) { Log.Error("SyncData.arm_n7_rally", e); }
+            // lup miast L3: osady po nastepstwach oblezen z ostatnich 30 dob (okno lupu, pomiar, napisy) - wlasny try; wersja formatu "1"; brak klucza = pusto
+            try { string sk = dataStore.IsSaving ? CitySack.Export() : null; SaveText.Sync(dataStore, "arm_sack", ref sk); if (dataStore.IsLoading) CitySack.Import(sk); }
+            catch (Exception e) { Log.Error("SyncData.arm_sack", e); }
         }
 
         public override void RegisterEvents()

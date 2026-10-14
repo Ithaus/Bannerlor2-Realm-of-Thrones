@@ -220,6 +220,7 @@ namespace Armoury
             _planned = true; _dLordSaved += kept;
             _dParties++; _dReserve += reserve; _dKept += kept;
             if (want <= 0) return;
+            if (CitySack.NoSpend(town, mp, want, true)) return;   // lup miast L3: markietani nie kieruja pieniadza do lupionej osady (zostaje w sakiewce; wlasny try)
             bool wantVill = (int)(want * (double)(1f - townShare)) > 0;
             var vill = wantVill ? NearestVillage(p, f) : null;              // wies szukana tylko, gdy jest co jej dac (koszt: ok. 570 wsi na partie)
             if (vill != null && vill.SettlementComponent == null) vill = null;

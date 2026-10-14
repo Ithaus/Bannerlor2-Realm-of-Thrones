@@ -266,7 +266,9 @@ namespace Armoury
         {
             try
             {
-                if (st == null || amount <= 0 || _track.Count == 0) return;
+                if (st == null || amount <= 0) return;
+                Ensure();
+                if (_track.Count == 0) return;
                 Track t;
                 if (!_track.TryGetValue(st, out t)) return;
                 bool sacker = mp != null && mp.MapFaction != null && mp.MapFaction.StringId == t.Faction;
@@ -282,7 +284,9 @@ namespace Armoury
         {
             try
             {
-                if (st == null || pay <= 0 || _track.Count == 0) return;
+                if (st == null || pay <= 0) return;
+                Ensure();
+                if (_track.Count == 0) return;
                 Track t;
                 if (_track.TryGetValue(st, out t)) t.Pris += pay;
             }
@@ -356,6 +360,7 @@ namespace Armoury
             Track t = null;
             try
             {
+                Ensure();
                 t = new Track { St = __1, Day0 = Now, Faction = __0 != null && __0.MapFaction != null ? __0.MapFaction.StringId : "", Kind = kind, Captured = captured,
                                 Kasa0 = k != null ? k.Kasa : 0, Folk0 = k != null ? k.FolkSum : 0 };
                 _track[__1] = t;
@@ -421,8 +426,9 @@ namespace Armoury
             try
             {
                 if (Campaign.Current == null) return;
+                Ensure();
                 int today = (int)CampaignTime.Now.ToDays;
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any))
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any || L3Any))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
@@ -431,6 +437,7 @@ namespace Armoury
                       .Append(_dWsTowns.Count > 0 ? " (" + string.Join(", ", _dWsTowns.ToArray()) + ")" : "");
                     L1Part(sb);
                     L2Part(sb);
+                    L3Part(sb);
                     sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -474,6 +481,7 @@ namespace Armoury
             _dWsSeen = _dWsMoved = 0; _dWsTowns.Clear();
             L1Clear();
             L2Clear();
+            L3Clear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>
@@ -481,6 +489,7 @@ namespace Armoury
         {
             ClearDay();
             _track.Clear();
+            _pending = null;
             Last = null;
             _me = null; _wsSt = null; _wsOwners = null;
             _stumbles = 0; _err.Clear();

@@ -5504,7 +5504,11 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackScarOnlyWhenSacked { get; set; } = true;
 
-        [SettingPropertyInteger("Sack No Spending Days", 0, 30, "0", HintText = "for this many days after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing: their pay stays in their purses (spent later in other towns), neither their days in town nor their camp followers leave coin there")]
+        [SettingPropertyBool("Sack No Spending", HintText = "after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing for Sack No Spending Days: their pay stays in their purses and is spent later in other towns - neither their days in town nor their camp followers leave coin there. Mercy - they pay as in any town (off = they pay there as anywhere, so a sacked town grew richer the day after)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackNoSpending { get; set; } = true;
+
+        [SettingPropertyInteger("Sack No Spending Days", 0, 30, "0", HintText = "with Sack No Spending: the days the victors spend nothing in the town they sacked (also the window the sack log measures)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public int SackNoSpendingDays { get; set; } = 3;
 
@@ -6883,6 +6887,7 @@ namespace Armoury
             s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
             s.SackTakesRealCoin = SackTakesRealCoin;
             s.SackScarOnlyWhenSacked = SackScarOnlyWhenSacked;
+            s.SackNoSpending = SackNoSpending;
             s.SackNoSpendingDays = SackNoSpendingDays;
         }
 
