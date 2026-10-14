@@ -20445,8 +20445,6 @@ def plotno_main(logp, start_arg, until=120):
         return "-" if x is None else f"{x:.{k}f}"
 
     nz = len([k for k in zb if inwin(k) and "ponad zapas polki (FolkClothAboveReserve)" in zb[k]])
-    if group == "okup" and logp:
-        return okup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # okup zamiast szturmu (SiegeRansom): O0 pomiar, O1 AI z AI, O2 gracz-obronca, O3 gracz-oblegajacy
     nc = len([k for k in cr if inwin(k) and "plotno na wywoz (WeaverExportPrice)" in cr[k]])
     rep.add("PL-0: linie i klucze", f"zbytki: dob z dopiskiem {nz} (klucz tak {len(zon)}), rzemioslo: {nc} (klucz tak {len(con)})",
             "oba dopiski codziennie, klucze tak" + tail, (len(zon) > 0 and len(con) > 0) if (nz or nc) else None)
@@ -21486,6 +21484,8 @@ def main(argv):
         return jeff14s_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
     if group == "drobne2" and logp:
         return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
+    if group == "okup" and logp:
+        return okup_main(logp, start_arg, until_arg if "--do-doby" in args else 364, bdp)   # okup zamiast szturmu (SiegeRansom): O0 pomiar, O1 AI z AI, O2 gracz-obronca, O3 gracz-oblegajacy
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "rozwoj" and logp:
