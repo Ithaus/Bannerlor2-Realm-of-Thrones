@@ -1022,7 +1022,8 @@ namespace Armoury
                   .Append(" | DLUG 4 (E4/9): rodow w zajeciu ").Append(nSeize + nSale).Append(", z odchodzacymi do domu ").Append(OverflowHome.LastDebtClans)
                   .Append(", odeszli do domu ").Append(OverflowHome.LastDebtLimit + OverflowHome.LastDebtArrears).Append(" (limit zoldu ").Append(OverflowHome.LastDebtLimit)
                   .Append(", zalegly zold ").Append(OverflowHome.LastDebtArrears).Append("; bez wsi z danymi BK - do lasu ").Append(OverflowHome.LastDebtNoVillage)
-                  .Append("), zwolnieni 166 rodow w zajeciu ").Append(ClanBudget.LastReleasedSeized).Append(s.DebtorDisbandsHome ? "" : " [Debtor Disbands Home wylaczone]")
+                  .Append(")").Append(s.DebtorHomeNearestVillage ? ", w tym do najblizszej wsi (rod bez twierdzy, wsi i krolestwa; drobne2) " + OverflowHome.LastDebtNearest : ", do najblizszej wsi [Debtor Home Nearest Village wylaczone]")
+                  .Append(", zwolnieni 166 rodow w zajeciu ").Append(ClanBudget.LastReleasedSeized).Append(s.DebtorDisbandsHome ? "" : " [Debtor Disbands Home wylaczone]")
                   .Append(" | Bank: kapital ").Append((long)IronBank.FreeCapital).Append(", prog wolnego kapitalu ").Append(s.BankFreeCapitalFloor).Append(", zysk do kasy Braavos ").Append(_dProfit)
                   .Append(" | latki: ").Append(_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-").Append("; BRAK: ").Append(_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
                   .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');

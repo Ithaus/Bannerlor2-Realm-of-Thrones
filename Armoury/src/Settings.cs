@@ -934,6 +934,9 @@ namespace Armoury
         public int IronIslandsStartThralls = 27000;        // thralls already working the Iron Islands when a new campaign begins - counted out of the islands' people, not added to them. Takes effect only in a new campaign
         public bool RaidCaptivesFromVillage = true;        // captives carried off in a raid are villagers taken from the plundered village - a tenth of those the raid struck - and only raiders whose realm keeps slaves take them; the Banner Kings captives out of thin air end (your own Take or Leave choice stays)
         public bool DebtorDisbandsHome = true;             // a house whose creditors hold its villages sends the men it can no longer pay home to their own lands instead of letting them desert to the woods
+        // drobne2 (K20, bieg dwuletni: 47 z 94 do lasu - Bright Banners d261-265, najemnicy miedzy kontraktami bez lenna i krolestwa): rod bez twierdzy, wsi i krolestwa
+        // odsyla dluznikow do najblizszej wsi z danymi BK zamiast do lasu; off = stan 449d453 (bez wsi rodu i krolestwa - do puli wyrzutkow)
+        public bool DebtorHomeNearestVillage = true;       // a landless house with no realm (sellswords between contracts) that its creditors hold sends the men it cannot pay to the nearest village instead of to the woods
         public int OutlawMinBand = 6;                      // fewest men needed nearby before a new band can form
         public int OutlawNeighbourRegions = 4;             // a new band gathers men from its own region and this many nearest ones
         public float OutlawBandSizeScale = 1f;             // size of a new band against the game's usual size (still only as many as there are men)
@@ -1881,6 +1884,10 @@ namespace Armoury
         // produkcji i stos > ValveStockDaysHigh dni -> mnoznik 0.95 x zuzycie / produkcja bazowa, najwyzej x0.5 na decyzje, podloga 0.1); wylaczony - ciecie tylko
         // w logu ("ciecie na sucho"), a mnozniki ponizej 1 wracaja do 1
         public bool HorseBreedingCutLive = true;           // the stud farms also breed fewer horses of a kind the world does not use up (down to a tenth of normal, at most halved every four weeks) instead of only reporting it; works only with Horse Breeding By Demand and Harvest Valve on (off = breeding never falls below what the game says)
+        // drobne2 (KR-8, bieg dwuletni): ciecie hodowli reaguje tylko na zuzycie < 90% produkcji, wiec stos ponad gornym progiem (ValveStockDaysHigh) przy zuzyciu
+        // 90-98% produkcji stoi albo rosnie (konie zwykle d253: 8242 -> 8684 szt. przy 125 dniach zuzycia, x0.46 'bez zmian'); z kluczem przy nadmiarze stosu
+        // ciecie juz od zuzycia < 98% (ten sam cel 0.95 x zuzycie, ten sam krok i podloga); off = stan 449d453
+        public bool HorseBreedingCutOverStock = true;      // when a kind of horse already piles up past the upper stock band, the stud farms trim its breeding as soon as the world uses fewer than they breed, not only when it uses under nine in ten (off = they trim only below nine in ten)
         // E6/K3 (219, PLAN 6.14, R12): jazda wedlug szablonu partii (175) - cel partii lorda AI = udzial konnych (IsMounted) w stosach t3+ szablonu rodu wodza
         // (Clan.DefaultPartyTemplate, wagi MaxValue - jak ROT GetTemplateComposition); przy rozwidleniu awansu pieszy/konny zostaje strona, ktora przybliza partie
         // do celu (Stables.FilterTargets; konny bez konia czeka i Stajnia kupuje). Rycerz (linia szlachecka kultury albo linia wlasnego szablonu rodu) - kon od rodu:

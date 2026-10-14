@@ -143,6 +143,8 @@ namespace Armoury
 
         /// <summary>K1-3a krok 2 (c): ciecie hodowli ponizej bazy gry czynne (klucz HorseBreedingCutLive; dziala tylko z hodowla wedlug popytu).</summary>
         private static bool HorseCutLive { get { var s = Settings.Current; return s != null && s.HorseBreedingCutLive; } }
+        // drobne2 (KR-8): przy stosie ponad gornym progiem ciecie od zuzycia < 98% produkcji (StepAbove), nie dopiero < 90% (CutBelow)
+        private static bool HorseCutOverStock { get { var s = Settings.Current; return s != null && s.HorseBreedingCutOverStock; } }
 
         /// <summary>E6/K4 (220): hodowla wedlug popytu dziala - klucz i regulator wsi.</summary>
         internal static bool HorseOn { get { return On && HorseKey; } }
@@ -889,6 +891,7 @@ namespace Armoury
             var dry = new List<string>();
             var cuts = new List<string>();              // K1-3a krok 2 (c): ciecia czynne tej decyzji (ponizej x1)
             bool cutLive = HorseCutLive;
+            bool overStock = HorseCutOverStock;      // drobne2 (KR-8)
             var want = new bool[HCats]; var over = new bool[HCats]; var lowS = new bool[HCats]; var done = new bool[HCats];
             int flips = 0;
             for (int c = 0; c < HCats; c++)
@@ -911,7 +914,9 @@ namespace Armoury
                         want[c] = cDay > 0.0 && C >= StepAbove * P && n < low * cDay;
                         lowS[c] = cDay > 0.0 && n < low * cDay;
                         done[c] = true;
-                        if (P > 0.0 && C < CutBelow * P && over[c])
+                        // drobne2 (KR-8): stos ponad gornym progiem - prog ciecia 0.98 zamiast 0.90 (pas 0.90-0.98 zostawial nadmiar bez ruchu)
+                        bool byStock = overStock && over[c] && P > 0.0 && C >= CutBelow * P;
+                        if (P > 0.0 && C < (overStock && over[c] ? StepAbove : CutBelow) * P && over[c])
                         {
                             // ta sama regula co towary (cel 0.95 x zuzycie / produkcja bazowa okna, najwyzej x0.5, podloga 0.1); ponizej x1 - czynne tylko z kluczem ciecia
                             double baseP = (g.MA > 0f ? g.P0 / g.MA : g.P0) + (m0 > 0f ? g.P1 / m0 : g.P1);
@@ -950,7 +955,7 @@ namespace Armoury
                         parts.Add(HNames[c] + ": x" + m0.ToString("0.00", inv) + (dir != 0 ? " -> x" + m1.ToString("0.00", inv) : "")
                                   + ", zuzycie/produkcja " + (P > 0.0 ? (C / P).ToString("0.00", inv) : "-") + " (" + C.ToString("0", inv) + "/" + P.ToString("0", inv) + ")"
                                   + ", stos " + n + " = " + (cDay > 0.0 ? (n / cDay).ToString("0", inv) + " dni zuzycia" : "bez odbiorcy") + ", "
-                                  + (dir < 0 ? (m1 < 1f - 1e-4f ? "w dol (ciecie czynne)" : "w dol (cofniecie kroku)") : dir > 0 ? "w gore" : "bez zmian") + (want[c] ? ", chciane" : "")
+                                  + (dir < 0 ? (m1 < 1f - 1e-4f ? "w dol (ciecie czynne" + (byStock ? ", nadmiar stosu - drobne2" : "") + ")" : "w dol (cofniecie kroku)") : dir > 0 ? "w gore" : "bez zmian") + (want[c] ? ", chciane" : "")
                                   + (dr.Length > 0 ? ", ciecie na sucho: mnoznik by byl " + dr : ""));
                     }
                     catch (Exception e) { Stumble("HorseDecide", e); }

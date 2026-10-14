@@ -2928,6 +2928,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool DebtorDisbandsHome { get; set; } = true;
 
+        [SettingPropertyBool("Debtor Home Nearest Village", HintText = "a landless house with no realm (sellswords between contracts) that its creditors hold sends the men it cannot pay to the nearest village instead of to the woods")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool DebtorHomeNearestVillage { get; set; } = true;
+
         [SettingPropertyInteger("Outlaw Min Band", 0, 24, "0", HintText = "fewest men needed nearby before a new band can form")]
         [SettingPropertyGroup("Iron Bank")]
         public int OutlawMinBand { get; set; } = 6;
@@ -5416,6 +5420,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HorseBreedingCutLive { get; set; } = true;
 
+        [SettingPropertyBool("Horse Breeding Cut Over Stock", HintText = "when a kind of horse already piles up past the upper stock band, the stud farms trim its breeding as soon as the world uses fewer than they breed, not only when it uses under nine in ten (off = they trim only below nine in ten)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorseBreedingCutOverStock { get; set; } = true;
+
         [SettingPropertyBool("Cavalry Share By Template", HintText = "an AI lord's party grows its horse to the share of riders in the army its realm fields by the books - all riders among the Dothraki, almost none on the Iron Islands, about one in five in most realms - and upgrades men on foot once it has enough; a man bound for the saddle waits for his horse and the lord buys it. Works only with Ai Sells Spare Horses on; your own parties are not touched (off = the game picks the upgrade path, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool CavalryShareByTemplate { get; set; } = true;
@@ -6435,6 +6443,7 @@ namespace Armoury
             s.IronIslandsStartThralls = IronIslandsStartThralls;
             s.RaidCaptivesFromVillage = RaidCaptivesFromVillage;
             s.DebtorDisbandsHome = DebtorDisbandsHome;
+            s.DebtorHomeNearestVillage = DebtorHomeNearestVillage;
             s.OutlawMinBand = OutlawMinBand;
             s.OutlawNeighbourRegions = OutlawNeighbourRegions;
             s.OutlawBandSizeScale = OutlawBandSizeScale;
@@ -7057,6 +7066,7 @@ namespace Armoury
             s.HorseBreedingByDemand = HorseBreedingByDemand;
             s.TownsfolkBuyOnlyWorkHorses = TownsfolkBuyOnlyWorkHorses;
             s.HorseBreedingCutLive = HorseBreedingCutLive;
+            s.HorseBreedingCutOverStock = HorseBreedingCutOverStock;
             s.CavalryShareByTemplate = CavalryShareByTemplate;
             s.KnightHorseFromHouse = KnightHorseFromHouse;
             s.KnightHorseMarketShare = KnightHorseMarketShare;

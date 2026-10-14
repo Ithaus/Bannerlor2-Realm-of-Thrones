@@ -467,6 +467,10 @@ Uzycie (Python 3, tylko odczyt):
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa jeff14s   : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
                     pokrycie lukow, GB-5 dorobek nowej kampanii z lukami), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
+--grupa drobne2   : (14.10) ksiegi i drobne bledy biegu dwuletniego: D2K-1 K39 bankruci tylko bez lenna i <= 28 dob, D2K-2 K20 do lasu <= 5%,
+                    D2K-3 G5 jedno okno ksiegi wiosek, D2K-4 ludzie przy zniknieciu partii (INFO), D2K-5 GL2-9 bez zaworu przy kasie ponad zapasem <= 14 dob,
+                    D2K-6 H-4b uprzaz wedlug miejsca (INFO), D2K-7 KR-8 ciecie stoi mimo nadmiaru = 0, D2K-8 Q-3 <= 4 zawrocen na dobe.
+                    python -I tools/sprawdz_logi.py --grupa drobne2 <Armoury-*.log> (log czytany strumieniowo)
 --grupa drobne2   : (14.10, druga paczka drobnych) czesc swiat: D2-A10-1/2 dobytek z domu wedlug rodzaju (szt. na czlowieka bez zakupu >= 1.0),
                     D2-A11-1/2 karawany wyprowadzone z murow w ostatniej dobie oblezenia (zajete jawnie), D2-B6-1..3 winnice / gaje / palmy (29/19/8),
                     plon i zapas daktyli; czesci gracz i ksiegi - w swoich galeziach. python -I tools/sprawdz_logi.py --grupa drobne2 <log>
@@ -17078,6 +17082,247 @@ def drobne2_czesci_main(logp):
     return 0
 
 
+def drobne2k_main(logp):
+    """drobne2k (14.10; CHANGELOG "ksiegi i drobne bledy z biegu dwuletniego"): male progi spraw A12 (reszta) - czytane strumieniowo (log 2 lat ma 280 MB).
+    D2K-1 K39 bankrut: kazda seria >= 7 dob tylko u rodu bez lenna / najemnika i <= 28 dob (budzet-rodow.csv; cecha: najemnik miedzy kontraktami);
+    D2K-2 K20 DLUG 4: do lasu <= 5% odchodzacych (klucz DebtorHomeNearestVillage; log sprzed drobne2 - INFO);
+    D2K-3 G5: r3 + nadmiar + bez ksiegi = 0 w oknie ksiegi wiosek (po drobne2 wprost; log sprzed - po odjeciu spoznionych z poprzedniej doby);
+    D2K-4 rownanie krain: przy zniknieciu partii (suma, najgorsza doba) i linie diagnozy (INFO);
+    D2K-5 GL2-9: najdluzsza seria dob bez zaworu przy kasie miasta ponad zapasem kupcow (kasy-miast.csv) <= 14 (seria przy kasie ponizej zapasu - cecha, INFO);
+    D2K-6 H-4b: uprzaz wedlug miejsca (INFO - diagnoza);
+    D2K-7 KR-8: stos rosnie > 5% przy > 60 dniach zuzycia, mnozniku w mocy ponad podloga x0.10 i decyzji "bez zmian" = 0 (ciecie stoi mimo nadmiaru);
+    D2K-8 Q-3: najwiecej zawrocen jednej partii na dobe <= 4 (przerwa 3 h dziala - bez wibracji), najdluzsza seria dob z >= 3 (INFO) i cel AI (INFO)."""
+    rep = Report()
+    pre = {"dlugi": "Dlugi (168): dzien", "kw": "Ksiega wiosek (E4/11): dzien", "dev": "Ludzie (spustoszenie): dzien",
+           "late": "Ludzie (spustoszenie): uderzenie po linii ksiegi wiosek", "kb": "Ludzie (ksiega): dzien", "poc": "Pochodzenie (E4/7): dzien",
+           "gone": "Ludzie przy zniknieciu partii (E4/7, diagnoza drobne2)", "arms": "Uzbrojenie wedlug zrodla (E6/0): dzien",
+           "hod": "Hodowla (220): dzien", "q": E8_Q_DAY, "qev": "CrossingLaw: AI "}
+    got = {k: [] for k in pre}
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            for k, p in pre.items():
+                if s.startswith(p):
+                    if k == "qev" and "cel AI" not in s:
+                        break
+                    got[k].append(s)
+                    break
+    print(f"plik: {logp} | " + ", ".join(f"{k} {len(v)}" for k, v in got.items()))
+
+    def day_of(s):
+        return num(r"dzien (\d+)", s)
+
+    # ---------------- D2K-1 K39
+    cp = csv_path_of(logp)
+    if os.path.isfile(cp):
+        ser, cur = [], {}
+        with open(cp, encoding="utf-8-sig", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                try:
+                    dd, bd = int(r["dzien"]), int(r.get("dni_bankruta") or 0)
+                except (ValueError, KeyError, TypeError):
+                    continue
+                cid = r.get("rod_id") or r.get("rod")
+                if bd >= 7:
+                    c = cur.get(cid)
+                    if c is None:
+                        c = cur[cid] = {"rod": r.get("rod"), "rodzaj": r.get("rodzaj"), "od": dd, "do": dd, "max": bd}
+                    c["do"] = dd; c["max"] = max(c["max"], bd)
+                elif cid in cur:
+                    ser.append(cur.pop(cid))
+        ser.extend(cur.values())
+        bad = [x for x in ser if x["rodzaj"] not in ("bez lenna", "najemnik") or x["max"] > 28]
+        rep.add("D2K-1: K39 bankruci - serie >= 7 dob (budzet-rodow.csv)",
+                f"serii {len(ser)}" + ("; " + "; ".join(f"{x['rod']} ({x['rodzaj']}) d{x['od']}-{x['do']} najdluzej {x['max']} dob" for x in ser[:5]) if ser else ""),
+                "kazda seria tylko u rodu bez lenna / najemnika i <= 28 dob (cecha: najemnik miedzy kontraktami - drabina dlugu 168, ludzie odchodza; bieg dwuletni: Wild Hares 18 dob)",
+                len(bad) == 0)
+    else:
+        rep.add("D2K-1: K39 bankruci", "brak budzet-rodow.csv (" + cp + ")", "INFO", None)
+
+    # ---------------- D2K-2 K20
+    rx4 = re.compile(r"DLUG 4 \(E4/9\): rodow w zajeciu (\d+), z odchodzacymi do domu (\d+), odeszli do domu (\d+) \(limit zoldu (\d+), zalegly zold (\d+); bez wsi z danymi BK - do lasu (\d+)\)")
+    home = woods = near = 0
+    marker = False
+    for s in got["dlugi"]:
+        m = rx4.search(s)
+        if m:
+            home += int(m.group(3)); woods += int(m.group(6))
+        n = num(r"w tym do najblizszej wsi \(rod bez twierdzy, wsi i krolestwa; drobne2\) (\d+)", s)
+        if n is not None:
+            marker = True; near += n
+    tot_ = home + woods
+    rep.add("D2K-2: K20 DLUG 4 - do lasu / odchodzacy (dluznicy)",
+            f"do lasu {woods} / {tot_}" + (f", w tym do najblizszej wsi {near}" if marker else " (log sprzed drobne2 - bez odcinka najblizszej wsi)"),
+            "do lasu <= 5% odchodzacych (klucz Debtor Home Nearest Village: rod bez twierdzy, wsi i krolestwa - do najblizszej wsi z danymi BK)",
+            (woods <= 0.05 * tot_) if (marker and tot_ > 0) else None)
+
+    # ---------------- D2K-3 G5
+    dv = {}
+    for s in got["dev"]:
+        d = day_of(s); h = fnum(r"\| trafieni " + F_ + r" = zabici", s)
+        if d is not None and h is not None:
+            dv[d] = h
+    rows = {}
+    for s in got["kw"]:
+        d = day_of(s)
+        r3 = fnum(r"trafieni dzis r3 " + SF, s)
+        if d is None or r3 is None:
+            continue
+        rows[d] = (r3, fnum(r"\(trafieni " + F_, s) or 0.0, fnum(r"nadmiar ludzi " + F_, s) or 0.0, fnum(r"bez ksiegi " + F_, s) or 0.0,
+                   "w tym po linii ksiegi poprzedniej doby (drobne2)" in s)
+    new = any(v[4] for v in rows.values())
+    bad_raw, bad_fix = [], []
+    for d in sorted(rows):
+        r3, h, ov, sk, _ = rows[d]
+        tol = max(0.01, 0.001 * h)
+        if abs(r3 + ov + sk) > tol:
+            bad_raw.append(d)
+        p = rows.get(d - 1)
+        late = (dv[d - 1] - p[1]) if (not new and p is not None and (d - 1) in dv) else 0.0
+        if abs(r3 + ov + sk - late) > tol:
+            bad_fix.append(d)
+    lt = got["late"]
+    rep.add("D2K-3: G5 trafieni Devastation w oknie ksiegi wiosek" + ("" if new else " (log sprzed drobne2: po odjeciu spoznionych z poprzedniej doby)"),
+            f"dob {len(rows)}: poza tolerancja {len(bad_fix)}" + (f" (d{', d'.join(str(x) for x in bad_fix[:5])})" if bad_fix else "")
+            + ("" if new else f"; bez odjecia {len(bad_raw)}" + (f" (d{', d'.join(str(x) for x in bad_raw[:5])})" if bad_raw else ""))
+            + f"; linie diagnozy spoznionych uderzen {len(lt)}" + (f" - pierwsza: {lt[0][:300]}" if lt else ""),
+            "|r3 + nadmiar + bez ksiegi| <= max(0.01, 0.1% trafionych) kazdej doby (jedno okno: VillageBook od swojego zerowania)",
+            len(bad_fix) == 0 if rows else None)
+
+    # ---------------- D2K-4 rownanie krain / przy zniknieciu partii
+    gone = []
+    for s in got["poc"]:
+        d = day_of(s); g = num(r"przy zniknieciu partii (\d+)\)", s)
+        if d is not None and g is not None:
+            gone.append((g, d))
+    worst = None
+    for s in got["kb"]:
+        m = re.search(r"rownanie krain: najgorsza kraina (\S+) reszta " + SF + r" \(" + SF + r"% ludzi krainy\)", s)
+        if m:
+            worst = (m.group(1), float(m.group(2)), float(m.group(3)), day_of(s))
+    gl = got["gone"]
+    big = sorted(gone, reverse=True)[:3]
+    rep.add("D2K-4: rownanie krain - ludzie przy zniknieciu partii (w nicosc bez licznika regionu)",
+            f"suma {sum(g for g, _ in gone)} w {len(gone)} dobach; najwiecej: " + ", ".join(f"d{d} {g}" for g, d in big)
+            + (f"; najgorsza kraina na koniec: {worst[0]} {worst[2]:+.3f}% ({worst[1]:+.0f})" if worst else "")
+            + f"; linie diagnozy {len(gl)}" + (f" - pierwsza: {gl[0][:350]}" if gl else " (log sprzed drobne2)"),
+            "INFO (diagnoza drobne2: kto usuwa partie z ludzmi - linia ze stosem; naprawa po nastepnym biegu)", None)
+
+    # ---------------- D2K-5 GL2-9 (kasy-miast.csv)
+    kp = cp.replace("budzet-rodow.csv", "kasy-miast.csv")
+    if os.path.isfile(kp):
+        per = {}
+        with open(kp, encoding="utf-8-sig", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                try:
+                    dd = int(r["dzien"]); kasa = float(r["kasa"] or 0); zap = float(r["zapas_kupcow"] or 0); z = float(r["zawor_do_pana"] or 0)
+                    pob = float(r["pobrane"] or 0)
+                except (ValueError, KeyError, TypeError):
+                    continue
+                per.setdefault(r.get("miasto"), []).append((dd, kasa, zap, z, pob))
+        best_hi, best_lo = (0, "-", None), (0, "-", None)
+        for town, xs in per.items():
+            xs.sort()
+            run_hi = run_lo = 0
+            rsum = 0.0
+            for dd, kasa, zap, z, pob in xs:
+                if z > 0:
+                    run_hi = run_lo = 0; rsum = 0.0
+                    continue
+                # oblezone miasto nie placi nic (Besieged Pay Nothing, E5/A4: renta i zawor zostaja w kasie) - doba bez poboru i bez zaworu nie przerywa ani nie wydluza serii
+                if pob <= 0 and kasa > 1.02 * zap:
+                    continue
+                if kasa > 1.02 * zap:
+                    run_hi += 1
+                    if run_hi > best_hi[0]:
+                        best_hi = (run_hi, town, dd)
+                else:
+                    run_hi = 0
+                run_lo += 1; rsum += kasa / zap if zap > 0 else 0.0
+                if run_lo > best_lo[0]:
+                    best_lo = (run_lo, town, dd, rsum / run_lo)
+        rep.add("D2K-5: GL2-9 zawor kas miast - najdluzsza seria dob bez zaworu przy kasie ponad zapasem kupcow",
+                f"{best_hi[0]} dob ({best_hi[1]}" + (f", do d{best_hi[2]})" if best_hi[2] else ")")
+                + (f"; seria bez zaworu w ogole (kasa ponizej zapasu - zawor z definicji 0): {best_lo[0]} dob ({best_lo[1]}, kasa/zapas srednio {best_lo[3]:.2f})" if len(best_lo) > 3 else ""),
+                "<= 14 dob przy kasie > 1.02 x zapas i poborze renty > 0 (doby bez poboru i zaworu - oblezenie, Besieged Pay Nothing - pominiete; seria przy kasie ponizej zapasu"
+                " - cecha zaworu: oddaje tylko nadwyzke; bieg dwuletni Braavos 220 dob, kasa/zapas 0.14)",
+                best_hi[0] <= 14)
+    else:
+        rep.add("D2K-5: GL2-9 zawor kas miast", "brak kasy-miast.csv (" + kp + ")", "INFO", None)
+
+    # ---------------- D2K-6 H-4b uprzaz wedlug miejsca
+    acc = {}
+    nh = 0
+    for s in got["arms"]:
+        m = re.search(r"uprzaz wedlug miejsca \(H-4b, diagnoza drobne2\): (.*?)(?: \| |$)", s)
+        if not m:
+            continue
+        nh += 1
+        for name, val, dlt in re.findall(r"([a-z][a-z DTE]+?) (\d+)(?: \(([+-]\d+)\))?(?:, |$)", m.group(1)):
+            if dlt:
+                acc[name.strip()] = acc.get(name.strip(), 0) + int(dlt)
+    rest = 0
+    for s in got["arms"]:
+        m = re.search(r"uprzaz t1-2/t3-4/t5-6: stan [\d/-]+, zrodla \d+/\d+/\d+, reszta (-?\d+)/(-?\d+)/(-?\d+)", s)
+        if m:
+            rest += sum(int(x) for x in m.groups())
+    rep.add("D2K-6: H-4b uprzaz wedlug miejsca - suma zmian okna",
+            (", ".join(f"{k} {v:+d}" for k, v in acc.items()) + f" ({nh} dob)" if nh else "brak odcinka (log sprzed drobne2)") + f"; reszta uprzezy w ksiedze {rest:+d}",
+            "INFO (diagnoza: w ktorym miejscu znika uprzaz; spadek w zbrojowniach DTE bez zakupow E8/H = rozliczenie bitew DTE)", None)
+
+    # ---------------- D2K-7 KR-8
+    dec = {}
+    for s in got["hod"]:
+        if " - decyzja " in s:
+            d = day_of(s)
+            if d is not None:
+                dec[d] = s
+    flagged, seen = [], 0
+    for name in ("zwykly", "bojowy"):
+        prev_st, prev_m = None, None
+        for d in sorted(dec):
+            m = re.search(name + r": x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja [\d.]+ \(\d+/\d+\), stos (\d+) = (\d+) dni zuzycia, ([a-z ]+?)(?: \(|;|\])", dec[d])
+            if not m:
+                prev_st = prev_m = None
+                continue
+            seen += 1
+            m_after = float(m.group(2) or m.group(1)); st_ = int(m.group(3)); days = int(m.group(4)); what = m.group(5).strip()
+            if prev_st is not None and days > 60 and st_ > 1.05 * prev_st and prev_m is not None and prev_m > 0.1001 and what == "bez zmian":
+                flagged.append(f"{name} d{d}: {prev_st} -> {st_} ({days} dni, x{prev_m:.2f} bez zmian)")
+            prev_st, prev_m = st_, m_after
+    rep.add("D2K-7: KR-8 stos rosnie ponad 60 dni zuzycia, a ciecie stoi (mnoznik ponad podloga x0.10, 'bez zmian')",
+            f"{len(flagged)}" + (f" [{'; '.join(flagged[:4])}]" if flagged else "") + f" (decyzji x rodzajow {seen})",
+            "0 (wzrost przy cieciu w toku albo na podlodze x0.10 - cecha: w pokoju konie bojowe sie nie zuzywaja; bieg dwuletni 3 397 dni przy 48 zuzytych na 56 dob)",
+            (len(flagged) == 0) if seen else None)
+
+    # ---------------- D2K-8 Q-3
+    mx, per_party = 0, {}
+    for s in got["q"]:
+        d = day_of(s)
+        m = re.search(r"najwiecej zawrocen jednej partii (\d+) \((.*?)\)", s)
+        if d is None or not m:
+            continue
+        k = int(m.group(1)); mx = max(mx, k)
+        if k >= 3:
+            per_party.setdefault(m.group(2), []).append(d)
+    streak, who = 0, "-"
+    for p, ds in per_party.items():
+        ds.sort()
+        run = 0
+        for i in range(len(ds)):
+            run = run + 1 if i > 0 and ds[i] == ds[i - 1] + 1 else 1
+            if run > streak:
+                streak, who = run, p
+    qe = got["qev"]
+    rep.add("D2K-8: Q-3 zawrocenia jednej partii na dobe (przerwa 3 h)",
+            f"najwiecej {mx}; najdluzsza seria dob z >= 3: {streak} ({who}); linie z celem AI {len(qe)}" + (f" - pierwsza: {qe[0][:300]}" if qe else " (log sprzed drobne2)"),
+            "<= 4 na dobe (24 h / (3 h przerwy + droga z powrotem) - petla ponownej decyzji AI, nie wibracja na granicy; seria i cel AI - INFO do decyzji)",
+            mx <= 4 if got["q"] else None)
+    rep.show()
+    return 0
+
+
 def n7_main(logp, start_arg, until=120):
     """N7 (decyzja Jeffa 13.10 "Proporcje pasuja"; Armoury/src/StragglersRally.cs, klucz StragglersRally): rozbici z pobitej druzyny lorda - 55% pod choragiew (weterani 70,
     t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, marsz do druzyny rodu w zasiegu,
@@ -20390,7 +20635,7 @@ def main(argv):
     if group == "jeff14s" and logp:
         return jeff14s_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
     if group == "drobne2" and logp:
-        return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp))   # gracz + czesci swiat / ksiegi; drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
+        return max(drobne2g_main(logp, start_arg, until_arg if "--do-doby" in args else 100000, csp, bdp), drobne2_czesci_main(logp), drobne2k_main(logp))   # gracz + swiat + ksiegi (K39, K20, G5, rownanie krain, GL2-9, H-4b, KR-8, Q-3); drobne2: A13 reszta, A14 (G14, G20-G22, Z7), B5 (limit hordy Zewu)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "jeff14" and logp:

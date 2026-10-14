@@ -69,13 +69,18 @@ namespace Armoury
         private static readonly long[,] _src = new long[Sources, Slots], _sink = new long[Sinks, Slots], _xfer = new long[Transfers, Slots];
         private static long[] _prev;
         internal static double LastCostMs;
+        // drobne2 (H-4b, diagnoza): uprzaz wedlug miejsca - polki osad, schowki, tabory, zbrojownie DTE, w drodze wozem, pule weteranow (stan i zmiana doby);
+        // bieg dwuletni: reszta uprzezy -18 979 przy zrodlach 23 295 (-81%), t1-2 -18 228 - nie wiadomo, w ktorym miejscu znika (tylko log)
+        private const int HKind = 9, HPlaces = 6;
+        private static readonly string[] HPlaceNames = { "polki osad", "schowki", "tabory", "zbrojownie DTE", "w drodze wozem", "pule weteranow" };
+        private static long[] _hPrev;
         private static int _stumbles;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
         internal static void Reset()
         {
             Array.Clear(_src, 0, _src.Length); Array.Clear(_sink, 0, _sink.Length); Array.Clear(_xfer, 0, _xfer.Length);
-            _prev = null; LastCostMs = 0; _stumbles = 0; _errSites.Clear();
+            _prev = null; _hPrev = null; LastCostMs = 0; _stumbles = 0; _errSites.Clear();
         }
 
         private static void Stumble(string where, Exception e)
@@ -138,11 +143,26 @@ namespace Armoury
         private static long Sum(long[,] a, int row) { long s = 0; for (int i = 0; i < Slots; i++) s += a[row, i]; return s; }
         private static long SumAll(long[,] a, int slot) { long s = 0; for (int r = 0; r < a.GetLength(0); r++) s += a[r, slot]; return s; }
 
+        /// <summary>drobne2 (H-4b, diagnoza): odcinek "uprzaz wedlug miejsca" - stan i zmiana doby w kazdym miejscu stanu ksiegi (bez zmiany rachunku reszty).</summary>
+        private static string HarnessPlaces(long[] hz, long[] prev)
+        {
+            var sb = new System.Text.StringBuilder(260);
+            sb.Append(" | uprzaz wedlug miejsca (H-4b, diagnoza drobne2): ");
+            for (int i = 0; i < HPlaces; i++)
+            {
+                if (i > 0) sb.Append(", ");
+                sb.Append(HPlaceNames[i]).Append(' ').Append(hz[i]);
+                if (prev != null) { long d = hz[i] - prev[i]; sb.Append(" (").Append(d >= 0 ? "+" : "").Append(d).Append(')'); }
+            }
+            return sb.ToString();
+        }
+
         internal static void Daily()
         {
-            if (!On) { _prev = null; Array.Clear(_src, 0, _src.Length); Array.Clear(_sink, 0, _sink.Length); Array.Clear(_xfer, 0, _xfer.Length); return; }
+            if (!On) { _prev = null; _hPrev = null; Array.Clear(_src, 0, _src.Length); Array.Clear(_sink, 0, _sink.Length); Array.Clear(_xfer, 0, _xfer.Length); return; }
             int day = (int)CampaignTime.Now.ToDays;
             var now = new long[Slots];
+            var hz = new long[HPlaces];      // drobne2 (H-4b): uprzaz wedlug miejsca
             long shelves = 0, parties = 0, armories = 0;
             Stage6Measure.ForEachRoster((r, kind) =>
             {
@@ -154,6 +174,7 @@ namespace Armoury
                     if (sl < 0) continue;
                     now[sl] += el.Amount;
                     if (kind == 3) parties += el.Amount; else shelves += el.Amount;
+                    if (sl / Bands == HKind) hz[kind == 3 ? 2 : kind == 2 ? 1 : 0] += el.Amount;
                 }
             });
             try
@@ -169,23 +190,25 @@ namespace Armoury
                             int sl = Slot(kv.Key);
                             if (sl < 0) continue;
                             now[sl] += kv.Value; armories += kv.Value;
+                            if (sl / Bands == HKind) hz[3] += kv.Value;
                         }
                     }
             }
             catch (Exception e) { Stumble("Armories", e); }
             // E6/R3 (215): hurt kupcow wozem - sztuki w drodze sa czescia stanu (zeszly z polki zrodla, na polke celu jeszcze nie weszly)
             long road = 0;
-            try { TradeCarts.ForEachInTransit((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; road += n; } }); }
+            try { TradeCarts.ForEachInTransit((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; road += n; if (sl / Bands == HKind) hz[4] += n; } }); }
             catch (Exception e) { Stumble("TradeCarts", e); }
             // E8/H (271): uprzaz weteranow w pulach karczm - czesc stanu (zbrojownia partii -> pula miasta -> zbrojownia najemcy albo polka: przeniesienie)
             long vetPool = 0;
-            try { HorseFate.VetPoolHarness((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; vetPool += n; } }); }
+            try { HorseFate.VetPoolHarness((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; vetPool += n; if (sl / Bands == HKind) hz[5] += n; } }); }
             catch (Exception e) { Stumble("VetPool", e); }
             // C3 (Jeff 14.10): komplety weteranow w pulach karczm - czesc stanu (zbrojownia partii -> pula miasta -> zbrojownia najemcy albo polka: przeniesienie)
             long vetKit = 0;
             try { VetKit.ForEach((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; vetKit += n; } }); }
             catch (Exception e) { Stumble("VetKit", e); }
             long total = shelves + parties + armories + road + vetPool + vetKit;
+            var hPrev = _hPrev; _hPrev = hz;
             if (_prev == null)
             {
                 _prev = now;
@@ -219,7 +242,7 @@ namespace Armoury
                      + ", zalogi " + Sum(_xfer, TGarrison) + " | stan " + total + " (polki i schowki osad " + shelves + ", tabory " + parties + ", zbrojownie DTE " + armories + ", w drodze wozem (215) " + road + "), zmiana " + (total - prevTotal)
                      + " | reszta " + rest + (den > 0 ? " (" + (100.0 * rest / den).ToString("0.0", CultureInfo.InvariantCulture) + "% zrodel + ujsc)" : "")
                      + " | w stanie takze pule weteranow (E8/H) " + vetPool + " szt. uprzezy, komplety weteranow (C3) " + vetKit + " szt. | nie podpiete (w reszcie): zuzycie do wraku, przecieki 174, netto lupu DTE, kuznia gracza, komplety z niczego, handel gry | koszt pomiaru E6/0 " + LastCostMs.ToString("0.0", CultureInfo.InvariantCulture) + " ms (poprzednia doba)"
-                     + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + " | [" + string.Join("; ", kinds.ToArray()) + "].");
+                     + (_stumbles > 0 ? " | potkniecia " + _stumbles : "") + HarnessPlaces(hz, hPrev) + " | [" + string.Join("; ", kinds.ToArray()) + "].");
             _prev = now;
             Array.Clear(_src, 0, _src.Length); Array.Clear(_sink, 0, _sink.Length); Array.Clear(_xfer, 0, _xfer.Length);
         }
