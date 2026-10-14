@@ -614,6 +614,8 @@ namespace Armoury
               .Append(", dary (182) skarbce dawcow -> glowy rodow Strazy ").Append(CrownGifts.LastToWatch).Append(" i Dothrakow ").Append(CrownGifts.LastToDothraki)
               .Append(" (ze skarbcow dawcow ").Append(CrownGifts.LastNorth + CrownGifts.LastFree).Append(", reszta w skarbcach odbiorcow ").Append(CrownGifts.LastKept).Append(")")
               .Append(", raty reparacji skarbiec -> skarbiec ").Append(CrownIncome.LastRepOut).Append(" (przyjete ").Append(CrownIncome.LastRepIn).Append(")")
+              .Append(", skarbce zdobytych stolic (L5b-1) skarbiec -> skarbiec ").Append(CapitalTreasury.LastToCrowns).Append(" i skarbiec -> glowa rodu bez krolestwa ")
+              .Append(CapitalTreasury.LastToHeads).Append(" (upadkow stolic ").Append(CapitalTreasury.LastFalls).Append(")")
               .Append(", kontrakty najemnikow AI (185) skarbce -> glowy kompanii ").Append(MercContract.LastPaid).Append(" (nalezne ").Append(MercContract.LastDue)
               .Append("; gra dla AI: za tier wylaczone ").Append(MercContract.LastTierOff).Append(", kontrakt gry wylaczony ").Append(MercContract.LastGameOff).Append(")")
               .Append(", wezwania do wojny (168) skarbce wzywajacych -> portfele wezwanych ").Append(CrownCallToWar.LastPaid).Append(" (zerwane z braku wplywow ").Append(CrownCallToWar.LastEndedN)
@@ -708,6 +710,8 @@ namespace Armoury
               .Append(Sm[CW.ICaravanCapAfter]).Append(" - reszta to przelewy tej samej chwili: dochod BK do wlasciciela, oplaty BK do licznika cel, werbunek, juczne z targu E6/K5 (do kasy miasta),")
               .Append(" oraz najem eskorty i awanse zalogi BetterEconomy - te znikaja, pozycja ujsc)")
               .Append(" | karawany, ktore zniknely z mapy: ").Append(Sm[CW.IPartyGoneCaravanN]).Append(", ich kiesy przepadly ").Append(Neg(Sm[CW.UPartyCaravan]))
+              .Append(" | karawany wroga zajete w zdobytych miastach (L5b-2): ").Append(EnemyCaravans.LastSeized).Append(" przy ").Append(EnemyCaravans.LastCaps)
+              .Append(" zdobyciach, kiesy karawana -> wodz zdobywcow (przelew) ").Append(EnemyCaravans.LastGold).Append(", ladunek do taborow ").Append(EnemyCaravans.LastUnits).Append(" szt.")
               .Append(" | zmarli notable: ").Append(Sm[CW.IHeroesLeftNotableN]).Append(", zloto przepadlo ").Append(Neg(Sm[CW.IHeroesLeftNotableGold]))
               .Append(" (zmarli lordowie ").Append(Sm[CW.IHeroesLeftLordN]).Append(": zloto oddane nastepcom przed smiercia, przy zgonie ").Append(Sm[CW.IHeroesLeftLordGold]).Append(").");
             return sb.ToString();

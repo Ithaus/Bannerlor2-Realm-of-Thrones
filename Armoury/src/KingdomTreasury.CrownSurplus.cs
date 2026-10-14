@@ -68,6 +68,13 @@ namespace Armoury
             return Math.Max(floor, (long)(WtClamp(s.WarTaxReserveDays, 0, 728) * ((double)dsum / w.F28)));
         }
 
+        /// <summary>L5b-1 (skarbiec stolicy, CapitalTreasury): zapas wojny krolestwa - ta sama liczba co W5b i 184 (tylko odczyt). -1 = nieczytelny (wolajacy nic nie bierze).</summary>
+        internal static long WarReserveFor(Kingdom k)
+        {
+            try { var s = Settings.Current; return s != null && k != null ? WarReserveOf(k, s) : -1; }
+            catch (Exception e) { CsStumble("WarReserveFor", e); return -1; }
+        }
+
         /// <summary>
         /// Pula ze skarbca ponad zapas wojny dla krolestwa tej doby - SAM RACHUNEK, bez zlota. Wola NeedAidKingdom po policzeniu potrzeby i garnka daniny, przed
         /// jakakolwiek wyplata (skarbiec i reszta wplywow dnia sa wtedy jeszcze nieruszone przez krok W5). Zapisuje w wierszu zapas wojny i nadwyzke.

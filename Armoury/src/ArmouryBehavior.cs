@@ -766,6 +766,10 @@ namespace Armoury
                 delegate { try { McmSettings.Apply(); } catch { } try { AmmoTracer.HourlyCheck(); } catch { } }));
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, WarLedger.OnOwnerChanged);
             CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, KingdomBalance.OnOwnerChanged);   // 175.0: twierdze zdobyte i stracone oblezeniem (tylko log)
+            // L5b (decyzja Jeffa 13.10 "5 tak, i tak"): skarbiec korony przy zdobyciu stolicy (zmiana pana BySiege i blizniak ROT w oknie szturmu) - po KingdomBalance;
+            // stan doby obu regul L5b od zera przy nowej kampanii / wczytaniu (nic w zapisie)
+            CapitalTreasury.Reset(); EnemyCaravans.Reset();
+            CampaignEvents.OnSettlementOwnerChangedEvent.AddNonSerializedListener(this, CapitalTreasury.OnOwnerChanged);
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
@@ -1730,6 +1734,9 @@ namespace Armoury
             try { LordsEvenUp.Daily(); } catch (Exception e) { Log.Error("LordsEvenUp.Daily", e); } DayProfile.Lap("LordsEvenUp.Daily");                  // E5/B3 (Z15-5): linia "Wyrownanie panow zamkow (E5/B3)" - stan, udzial zaworu i wagi rent czynne, zawor i renty dnia wedlug rodzaju rodu (zlota nie rusza)
             try { KingdomTreasury.WarTaxDaily(); } catch (Exception e) { Log.Error("KingdomTreasury.WarTaxDaily", e); } DayProfile.Lap("KingdomTreasury.WarTaxDaily");   // E5/B2 (184): potrzeba korony z tej doby (kredyt 186, zwrot ponad wplywy, zapas wojny), krok stawki co 7 dob, linia - przed CrownIncome.End (DayOf czynne)
             try { TownFolk.CrownProbe(); } catch (Exception e) { Log.Error("TownFolk.CrownProbe", e); } DayProfile.Lap("TownFolk.CrownProbe");   // E5/0 (195): sonda korony - CrownIncome.DayOf czynne tylko do End (tylko odczyt)
+            // L5b: liczby doby skarbcow stolic (linia 165 i "Obieg" czytaja Last*) i karawan zajetych w zdobytych miastach ("Obieg: notable i karawany") - przed End
+            try { CapitalTreasury.DayRoll(); } catch (Exception e) { Log.Error("CapitalTreasury.DayRoll", e); }
+            try { EnemyCaravans.DayRoll(); } catch (Exception e) { Log.Error("EnemyCaravans.DayRoll", e); }
             try { CrownIncome.End(); } catch (Exception e) { Log.Error("CrownIncome.End", e); } DayProfile.Lap("CrownIncome.End");                        // migawka skarbcow i linia "Korona: wplywy dnia (165)"
             try { CrownBorrow.Report(); } catch (Exception e) { Log.Error("CrownBorrow.Report", e); } DayProfile.Lap("CrownBorrow.Report");                  // 186: linia "Kredyt korony (186)" (zlota nie rusza)
             try { KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomLedger.Daily", e); } DayProfile.Lap("KingdomLedger.Daily");                // linia "Skarbce:"

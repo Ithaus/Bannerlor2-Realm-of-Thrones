@@ -1512,6 +1512,18 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int SackLoyaltyHit { get; set; } = 15;
 
+        [SettingPropertyBool("Capital Treasury Seized", HintText = "when an enemy storms the capital of a realm (the seat of its court in Banner Kings; without Banner Kings its first seat), the conquerors carry off part of the royal treasury kept there - Capital Treasury Share of what it holds above its war reserve and its debt to the Iron Bank - into the treasury of their own realm (a conqueror without a realm takes it into his own purse); a capital lost by peace, gift or revolt gives nothing; off = the treasury stays untouched")]
+        [SettingPropertyGroup("The marching column")]
+        public bool CapitalTreasurySeized { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Capital Treasury Share", 0.000f, 1.000f, "0.000", HintText = "with Capital Treasury Seized: the part of a fallen capital's royal treasury - above the realm's war reserve and its Iron Bank debt - that the conquerors carry off (a third)")]
+        [SettingPropertyGroup("The marching column")]
+        public float CapitalTreasuryShare { get; set; } = 0.333f;
+
+        [SettingPropertyBool("Enemy Caravans Seized", HintText = "caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool EnemyCaravansSeized { get; set; } = true;
+
         [SettingPropertyBool("March Pace Ai Too", HintText = "the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)")]
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceAiToo { get; set; } = true;
@@ -6001,6 +6013,9 @@ namespace Armoury
             s.SackScarEnabled = SackScarEnabled;
             s.SackProsperityCutPercent = SackProsperityCutPercent;
             s.SackLoyaltyHit = SackLoyaltyHit;
+            s.CapitalTreasurySeized = CapitalTreasurySeized;
+            s.CapitalTreasuryShare = CapitalTreasuryShare;
+            s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;

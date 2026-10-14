@@ -465,6 +465,11 @@ Uzycie (Python 3, tylko odczyt):
                     M6a-2b/2c (zloto u rodzin, okupy tej samej osoby w 56 dobach - INFO), M6a-3a (zamkniecie odlozonych pokojow), M6a-3b (uwolnieni
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
+--grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
+                    i L5b-2 karawany wroga w zdobytym miescie (EnemyCaravans). python -I tools/sprawdz_logi.py --grupa lup5b [--do-doby 364] <Armoury-*.log>
+                    Wiersze L5B-0..L5B-8: linie, latki, zdobycia szturmem = linie L5b-2, obieg skarbca co do zlotowki, zabrane <= czesc x nadwyzka ponad zapas
+                    wojny i dlug Banku (skarbiec przegranego nie ponizej zapasu), tylko szturm / blizniak ROT, kontrola i cien linii doby, karawany zdjete =
+                    dopisane i nie zniknely 0, potkniecia i ERROR 0, liczby (INFO), wojsko lordow w wojnie (INFO, prog 85 tys.). Log bez paczki: INFO.
 --grupa w6b       : (W6b, decyzja Jeffa 13.10 "rod gracza tez dotyczy, ale pod warunkiem, ze mam ziemie i sluze jakiemus krolowi") rod gracza w
                     tarczowym W6 i doplacie W5 na zasadach rodu AI (miasto albo zamek, wasal - nie wladca, nie najemnik, wojna).
                     python -I tools/sprawdz_logi.py --grupa w6b [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -16200,6 +16205,169 @@ def n7_waiting(lines):
     return out
 
 
+# ------------------------------------------------------------ lup 5b (L5b-1 skarbiec korony przy zdobyciu stolicy, L5b-2 karawany wroga w zdobytym miescie)
+L5B1_EV = re.compile(r"^Skarbiec stolicy \(L5b-1\): dzien (\d+) \| stolica (.*) \((\S+)\) krolestwa (.*) \((\S+), wedlug (BK|poczatkowej siedziby)\) \| zdobycie (szturm|blizniak), "
+                     r"zdobywca (.*) \((skarbiec krolestwa|kiesa glowy rodu bez krolestwa|Inni)(.*)\) \| skarbiec (-?\d+), zapas wojny (-?\d+), dlug Banku (-?\d+), nadwyzka (-?\d+) \| "
+                     r"czesc ([\d.]+) -> zabrane (-?\d+) \((.*)\) \| skarbiec przegranego (-?\d+) -> (-?\d+), odbiorca (-?\d+) -> (-?\d+) \| "
+                     r"zdjete (-?\d+) - dopisane (-?\d+) = (-?\d+) \| gracz (\S+)\.$")
+L5B1_DAY = re.compile(r"^Skarbce stolic \(L5b-1\): dzien (\d+) \| klucz Capital Treasury Seized (tak|nie), czesc ([\d.]+) \| zdobycia twierdz (\d+) \(szturm (\d+), blizniak ROT (\d+)\) "
+                      r"\| upadki stolic (\d+) .*?\| zabrane (\d+): .*?\| w cieniu (\d+) na (\d+) \| kontrola: zdjete - dopisane = (-?\d+) \| latka okna: (.*?) \| potkniecia (\d+) ")
+L5B2_EV = re.compile(r"^Karawany w zdobytym miescie \(L5b-2\): dzien (\d+) \| osada (.*) \((\S+)\) zdobyta przez .*? \| karawan w murach (\d+): wroga (\d+), niewrogich (\d+), "
+                     r"ze statkami \(odplywaja\) (\d+), w bitwie (\d+) \| zajete (\d+), poddani nowego pana \(zostaja\) (?P<subj>\d+), pominiete (\d+)(.*?) \| kiesy: zdjete (\d+) - dopisane (\d+) = (-?\d+) \| "
+                     r"ladunek: zdjete (\d+) - dopisane (\d+) = (-?\d+) szt\. \(wartosc (\d+), konie i juczne (\d+)\) \| bohaterowie do niewoli (\d+), eskorta do domu (\d+) "
+                     r".*?\| nie zniknely (\d+) \| gracz: karawan zajetych (\d+)")
+
+
+def lup5b_main(logp, start_arg, until=364):
+    """Lup 5b (decyzja Jeffa 13.10 "5 tak, i tak"; Armoury/src/CapitalTreasury.cs, EnemyCaravans.cs; klucze CapitalTreasurySeized, EnemyCaravansSeized). Okno: doby kampanii
+    1-until. Wiersze L5B-0..L5B-8: linie i latki (L5B-0: kazde zdobycie twierdzy widza obie latki - linie L5b-2 = zdobycia szturmem z linii doby L5b-1),
+    obieg skarbca co do zlotowki (L5B-1), granica: zabrane <= czesc x nadwyzka ponad zapas wojny i dlug Banku, skarbiec przegranego nie ponizej zapasu (L5B-2),
+    tylko szturm / blizniak ROT, Inni bez zabrania (L5B-3), linia doby: kontrola 0, w cieniu 0 przy kluczu (L5B-4), karawany: zloto i sztuki zdjete = dopisane,
+    nie zniknely 0 (L5B-5), potkniecia i ERROR 0 (L5B-6), liczby (L5B-7 INFO), wojsko lordow w wojnie - miara W5-7 (L5B-8 INFO, prog 85 tys. w biegu rocznym).
+    Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return d is not None and 1 <= run_day(d, start) <= until
+
+    ev1raw = [s for s in lines if s.startswith("Skarbiec stolicy (L5b-1): dzien") and inwin(num(r"dzien (\d+)", s))]
+    ev1 = [m for m in (L5B1_EV.match(s) for s in ev1raw) if m]
+    day1raw = [s for s in lines if s.startswith("Skarbce stolic (L5b-1): dzien") and inwin(num(r"dzien (\d+)", s))]
+    day1 = [m for m in (L5B1_DAY.match(s) for s in day1raw) if m]
+    ev2raw = [s for s in lines if s.startswith("Karawany w zdobytym miescie (L5b-2): dzien") and inwin(num(r"dzien (\d+)", s))]
+    ev2 = [m for m in (L5B2_EV.match(s) for s in ev2raw) if m]
+    errs = [s for s in lines if s.startswith("ERROR in CapitalTreasury.") or s.startswith("ERROR in EnemyCaravans.")]
+    hooks = [s for s in lines if s.startswith("Szczelnosc (164a): latki w kampanii")]
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until} | linii L5b-1 upadek stolicy {len(ev1raw)} (odczytane {len(ev1)}), L5b-1 doby {len(day1raw)} "
+          f"(odczytane {len(day1)}), L5b-2 {len(ev2raw)} (odczytane {len(ev2)}), ERROR {len(errs)}")
+    on = bool(ev1raw or day1raw or ev2raw)
+    # ---- L5B-0 linie, latki, spojnosc dwoch latek (OnSettlementOwnerChanged BySiege i KingdomManager.SiegeCompleted)
+    wired = None
+    if hooks:
+        h = hooks[-1]
+        w = h.split("wpiete:", 1)[1].split("; BRAK:", 1)[0] if "wpiete:" in h else ""
+        wired = ("L5b-1: okno zdobycia" in w, "L5b-2: karawany wroga" in w)
+    bad_parse = (len(ev1raw) - len(ev1)) + (len(day1raw) - len(day1)) + (len(ev2raw) - len(ev2))
+    if not on:
+        rep.add("L5B-0: linie lupu 5b (L5b-1, L5b-2) i latki", "brak linii w oknie" + (f"; latki wpiete: okno {wired[0]}, karawany {wired[1]}" if wired else "; brak linii Szczelnosc (164a) w kampanii"),
+                "INFO (log bez paczki albo bez zdobycia twierdzy)", None)
+    else:
+        # recenzja L5b: pary liczone na calym logu, nie w oknie - zdobycie z doby d raportuje linia doby d+1 (na koncu okna para by sie rozjechala);
+        # "Pieniadz swiata: dzien P" w ostatnim ticku nosi doba poprzednia, wiec zdobycia z dob <= P sa juz w liniach doby (dawne "< P" gubilo ostatnia dobe)
+        last_tick = max(alld) if alld else None
+        day1all = [m for m in (L5B1_DAY.match(s) for s in lines if s.startswith("Skarbce stolic (L5b-1): dzien")) if m]
+        ev2all = [m for m in (L5B2_EV.match(s) for s in lines if s.startswith("Karawany w zdobytym miescie (L5b-2): dzien")) if m]
+        n_siege = sum(int(m.group(5)) for m in day1all)
+        n_ev2 = sum(1 for m in ev2all if last_tick is None or int(m.group(1)) <= last_tick)
+        ok0 = bad_parse == 0 and n_siege == n_ev2 and (wired is None or all(wired))
+        rep.add("L5B-0: linie, pola, latki; zdobycia szturmem (linie doby L5b-1, caly log) = linie L5b-2 (doby do ostatniego ticku)",
+                f"zdobycia szturmem {n_siege}, linii L5b-2 {n_ev2}, pola nieodczytane {bad_parse}" + (f", latki wpiete: okno {wired[0]}, karawany {wired[1]}" if wired else ", brak linii Szczelnosc (164a)"),
+                "rowne; pola wszystkie; obie latki wpiete", ok0)
+    # ---- L5B-1 obieg skarbca
+    if ev1:
+        bad = []
+        for m in ev1:
+            x, mode = int(m.group(16)), m.group(17)
+            w0, w1, v0, v1 = int(m.group(18)), int(m.group(19)), int(m.group(20)), int(m.group(21))
+            z1, z2, zz = int(m.group(22)), int(m.group(23)), int(m.group(24))
+            ok = zz == 0 and z1 == x and z2 == z1 and w0 - w1 == x and ((v1 - v0 == x) if mode == "przelew" else (x == 0 and w1 == w0))
+            if not ok:
+                bad.append(f"d{run_day(int(m.group(1)), start)} {m.group(2)}")
+        rep.add("L5B-1: upadek stolicy - zdjete ze skarbca przegranego = dopisane zdobywcy, skarbce przed / po", f"{len(ev1)} upadkow, niezgodnych {len(bad)}" + (f" ({bad[:4]})" if bad else ""),
+                "0 niezgodnych (obieg zamkniety co do zlotowki)", not bad)
+    else:
+        rep.add("L5B-1: upadek stolicy - zdjete = dopisane", "0 upadkow stolic w oknie", "INFO (bieg roczny kodu 43: 1 stolica pewna - Mantarys d291, do 3 przy stolicy BK)", None)
+    # ---- L5B-2 granica: zabrane <= floor(czesc x nadwyzka), skarbiec po >= zapas wojny + dlug Banku
+    if ev1:
+        bad = []
+        for m in ev1:
+            w0, r, b, s_, share, x, w1 = int(m.group(11)), int(m.group(12)), int(m.group(13)), int(m.group(14)), float(m.group(15)), int(m.group(16)), int(m.group(19))
+            cap = int(share * s_ + 1e-6) if s_ >= 1 else 0     # +1 nizej: czesc w kodzie to float (0.333f), w linii 6 miejsc po przecinku
+            if x > cap + 1 or x < 0 or (x > 0 and w1 < r + b) or s_ != w0 - r - b:
+                bad.append(f"d{run_day(int(m.group(1)), start)} {m.group(2)}: zabrane {x}, czesc x nadwyzka {cap}, po {w1} wobec zapasu {r} + dlug {b}")
+        rep.add("L5B-2: zabrane <= czesc x (skarbiec - zapas wojny - dlug Banku); skarbiec przegranego po nie ponizej zapasu wojny i dlugu", f"niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""),
+                "0 (prog 85 tys.: przegrany zachowuje zapas na zwrot zoldu)", not bad)
+    else:
+        rep.add("L5B-2: granica zabrania", "0 upadkow stolic w oknie", "INFO", None)
+    # ---- L5B-3 tylko szturm / blizniak; Inni bez zabrania
+    if ev1:
+        twin = sum(1 for m in ev1 if m.group(7) == "blizniak")
+        und = [m for m in ev1 if m.group(9) == "Inni"]
+        und_bad = sum(1 for m in und if int(m.group(16)) != 0)
+        rep.add("L5B-3: upadek stolicy tylko przez zdobycie (szturm, blizniak ROT w oknie szturmu); Inni nic nie biora",
+                f"szturm {len(ev1) - twin}, blizniak {twin}; zdobywca Inni {len(und)} (z zabraniem {und_bad}); wedlug BK {sum(1 for m in ev1 if m.group(6) == 'BK')}, "
+                f"wedlug poczatkowej siedziby {sum(1 for m in ev1 if m.group(6) != 'BK')}", "Inni z zabraniem 0 (pokoj, dar, bunt - kod nie wola; brak linii)", und_bad == 0)
+    else:
+        rep.add("L5B-3: tylko zdobycie; Inni nic", "0 upadkow stolic", "INFO", None)
+    # ---- L5B-4 linia doby: kontrola 0, w cieniu 0 przy kluczu wlaczonym
+    if day1:
+        diff = sum(abs(int(m.group(11))) for m in day1)
+        shadow_on = sum(int(m.group(9)) for m in day1 if m.group(2) == "tak")
+        off = sum(1 for m in day1 if m.group(2) == "nie")
+        hook_bad = sum(1 for m in day1 if not m.group(12).startswith("wpieta"))
+        rep.add("L5B-4: linia doby L5b-1 - kontrola zdjete - dopisane, w cieniu przy kluczu, latka okna",
+                f"dob {len(day1)} (klucz wylaczony w {off}), kontrola razem {diff}, w cieniu przy kluczu {shadow_on}, latka okna niewpieta w {hook_bad}",
+                "kontrola 0, w cieniu przy kluczu 0, latka wpieta; klucz wylaczony - INFO", (diff == 0 and shadow_on == 0 and hook_bad == 0) if off == 0 else None)
+    else:
+        rep.add("L5B-4: linia doby L5b-1", "brak w oknie", "INFO (tylko w dobach ze zdobyciem twierdzy)", None)
+    # ---- L5B-5 karawany: zloto i sztuki zdjete = dopisane, nie zniknely 0
+    if ev2:
+        gd = sum(abs(int(m.group(15))) for m in ev2)
+        ud = sum(abs(int(m.group(18))) for m in ev2)
+        surv = sum(int(m.group(23)) for m in ev2)
+        rep.add("L5B-5: karawany zajete - kiesy i ladunek zdjete = dopisane, karawany, ktore nie zniknely",
+                f"zdobyc {len(ev2)}, roznica kies {gd}, roznica sztuk {ud}, nie zniknely {surv}", "0 / 0 / 0", gd == 0 and ud == 0 and surv == 0)
+    else:
+        rep.add("L5B-5: karawany zajete - zdjete = dopisane", "brak linii L5b-2", "INFO", None)
+    # ---- L5B-6 potkniecia i bledy
+    st1 = sum(int(m.group(13)) for m in day1)
+    st2 = sum(num(r"\| potkniecia (\d+) \(od wczytania", s) or 0 for s in ev2raw)
+    rep.add("L5B-6: potkniecia L5b-1 i L5b-2 (suma okna) i ERROR in CapitalTreasury / EnemyCaravans", f"potkniecia {st1} / {st2}, ERROR {len(errs)}" + (f" ({errs[0][:120]})" if errs else ""),
+            "0", (st1 == 0 and st2 == 0 and not errs) if (on or errs) else None)
+    # ---- L5B-7 liczby (INFO)
+    if ev1:
+        tot = sum(int(m.group(16)) for m in ev1)
+        lst = "; ".join(f"d{run_day(int(m.group(1)), start)} {m.group(2)} ({m.group(4)} -> {m.group(8)}): {int(m.group(16))} z nadwyzki {int(m.group(14))}" for m in ev1[:6])
+        rep.add("L5B-7a: upadki stolic i zabrane ze skarbcow (INFO)", f"{len(ev1)} upadkow, razem {tot} zl; {lst}",
+                "INFO - rachunek z biegu kodu 43: 2-3 upadki/rok, 0.30-0.39 mln zl (Mantarys 212 tys. z nadwyzki 638 tys.); 120 dob - 0-1", None)
+    else:
+        rep.add("L5B-7a: upadki stolic (INFO)", "0", "INFO", None)
+    if ev2:
+        rep.add("L5B-7b: karawany w zdobytych twierdzach (INFO)",
+                f"zdobyc {len(ev2)}, karawan w murach {sum(int(m.group(4)) for m in ev2)} (wroga {sum(int(m.group(5)) for m in ev2)}, ze statkami {sum(int(m.group(7)) for m in ev2)}), "
+                f"zajete {sum(int(m.group(9)) for m in ev2)}, poddani nowego pana {sum(int(m.group('subj')) for m in ev2)}, kiesy {sum(int(m.group(14)) for m in ev2)} zl, ladunek {sum(int(m.group(17)) for m in ev2)} szt. (wartosc {sum(int(m.group(19)) for m in ev2)}, "
+                f"konie i juczne {sum(int(m.group(20)) for m in ev2)}), bohaterowie do niewoli {sum(int(m.group(21)) for m in ev2)}, eskorta do domu {sum(int(m.group(22)) for m in ev2)}, "
+                f"karawan gracza {sum(int(m.group(24)) for m in ev2)}", "INFO - szacunek z biegu kodu 43: ok. 1-3 karawan wroga w murach na rok", None)
+    else:
+        rep.add("L5B-7b: karawany w zdobytych twierdzach (INFO)", "brak linii L5b-2", "INFO", None)
+    # ---- L5B-8 wojsko lordow w wojnie (miara W5-7), srednia ostatnich 28 dob okna
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, men in ser:
+            if war and inwin(d):
+                army[d] = army.get(d, 0) + men
+    if army:
+        ds = sorted(army)[-28:]
+        v = sum(army[d] for d in ds) / len(ds)
+        rep.add(f"L5B-8: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})", f"{v / 1e3:.1f} tys. ludzi",
+                "INFO - prog Jeffa 85 tys. w biegu rocznym (bieg roczny kodu 43: 101.4 tys. d337-364); skarbiec przegranego nie schodzi ponizej zapasu wojny (L5B-2)", None)
+    else:
+        rep.add("L5B-8: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    rep.show()
+    return 0
+
+
 def n7_main(logp, start_arg, until=120):
     """N7 (decyzja Jeffa 13.10 "Proporcje pasuja"; Armoury/src/StragglersRally.cs, klucz StragglersRally): rozbici z pobitej druzyny lorda - 55% pod choragiew (weterani 70,
     t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, marsz do druzyny rodu w zasiegu,
@@ -19077,6 +19245,8 @@ def main(argv):
         return m6b_main(logp, start_arg, until_arg)   # m6b (poprawka 6): konie juczne z niczego, zboze i ryby bez zrodla, kasy zaulkow i karawana bez zysku
     if group == "m6a" and logp:
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
+    if group == "lup5b" and logp:
+        return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:
