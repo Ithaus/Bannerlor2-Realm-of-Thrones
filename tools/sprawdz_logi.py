@@ -585,7 +585,9 @@ Uzycie (Python 3, tylko odczyt):
                     T3-K1-0 dopisek w "Odziez wojska (150)", T3-K1-1 plotno do wojska >= 85 szt./d, T3-K1-2 skora do wojska >= 75 szt./d, T3-K1-3 druzyny kupuja
                     >= 85% narosnietego plotna, T3-K1-4 kolejka plotna <= 1200 i bez wzrostu, T3-K1-5 kolejka skory <= 1000 i bez wzrostu, T3-K1-6 straz zalog
                     (plotno >= 22, skora >= 26 szt./d), T3-K1-7 straz warsztatow (cykle bez skory <= 65/d), T3-K1-8 INFO (plotno swiata, tkacze, len, zloto),
-                    T3-K1-9 INFO (warunek T3-K4). Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
+                    T3-K1-9 INFO (warunek T3-K4). T3-K2 (AnimalsUnderValve - zwierzeta rzezne pod regulatorem wsi): T3-K2-0 wieprze, krowy, owce w linii
+                    decyzji (klucz tak), T3-K2-1 skory surowe >= 530 szt./d, T3-K2-2 skora zrobiona >= 200 szt./d, T3-K2-3 straz: stos zwierzat <= 30 dni
+                    zuzycia (mieso INFO), T3-K2-4 garbarze "brak surowca" <= 25 miast. Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
 --grupa drobne2   : (14.10, galaz drobne2-gracz: A13 reszta, A14, B5) python -I tools/sprawdz_logi.py --grupa drobne2 [--do-doby N] [--crashscribe <session-*.log>]
                     [--baza-doby <log biegu bez paczki>] <Armoury-*.log>. D2-1 komunikat 'is yours' (gracz 6, INFO), D2-2 podpowiedz L5 z towarem L7 (gracz 9, INFO),
                     D2-4 wyjasnienie W7 gracza najwyzej raz na 30 dob (gracz 10), D2-5 doba po wczytaniu (G20): bledne wpisy 0 (D2-5b: zwrot doby po wczytaniu zdejmuje gotowke W5), D2-6 ustawienia kalibracji ludnosci
@@ -20785,7 +20787,7 @@ T3_PREF = ("Pomiary 169c: okna", "Odziez wojska (150): dzien", "Towary: dzien", 
 
 def towary3_main(logp, start_arg, until=120):
     """Towary 3 (docs/towary-2/ROZPOZNANIE-TOWARY-3.md rozdz. 3): T3-K1 markietani przywoza odziez (SutlerClothing; ArmyClothing.FromSutlers, dopisek linii
-    "Odziez wojska (150)"). Okno: srednie z ostatnich 30 dob kampanii do until (--do-doby, domyslnie d91-120; "fin29" w progach = bieg
+    "Odziez wojska (150)"), T3-K2 zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve; HarvestValve.Eligible, dopisek linii decyzji "Regulator wsi (221)"). Okno: srednie z ostatnich 30 dob kampanii do until (--do-doby, domyslnie d91-120; "fin29" w progach = bieg
     Armoury-2026-10-14_05-22-14.log z towary-2 K1-K4, ta sama doba). Wiersz pozycji wiaze tylko przy kluczu "tak" w jej dopisku; log bez dopisku albo z kluczem
     wylaczonym - INFO z liczbami, nigdy wyjatek. Log czytany strumieniowo - w pamieci tylko linie z prefiksami T3_PREF."""
     lines = []
@@ -20948,6 +20950,58 @@ def towary3_main(logp, start_arg, until=120):
             f"warunek T3-K4 {'SPELNIONY' if k4 else 'nie'}" + ("" if on1 else " (klucz wylaczony)"),
             "INFO (T3-K4 - CaravanBulk.Use liczy odziez wojska - tylko gdy miast bez plotna > 20, bez skory > 25 albo bez towaru w > 30% prob; fin29: 12.6 / 18.3)",
             None)
+
+    # ---- T3-K2 = K5: zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve) - dopisek linii decyzji "Regulator wsi (221)"
+    dk = [k for k in sorted(rg) if run_day(k, start) <= until and " - CZYNNY, decyzja " in rg[k]]
+    k2n = [k for k in dk if "; zwierzeta rzezne (AnimalsUnderValve) " in rg[k]]
+    k2on = [k for k in k2n if "; zwierzeta rzezne (AnimalsUnderValve) tak:" in rg[k]]
+    on2 = bool(k2on) and k2on[-1] == (k2n[-1] if k2n else None)
+    tail2 = "" if on2 else " - klucz wylaczony albo log bez dopisku: INFO"
+
+    def g2(ok):
+        return ok if on2 else None
+    if k2on:
+        s = rg[k2on[-1]]
+        m1 = re.search(r"\(AnimalsUnderValve\) tak: w decyzji \d+ \[([^\]]*)\], pomiar w toku [^\[]*\[([^\]]*)\]", s)
+        seen = set((m1.group(1) + ", " + m1.group(2)).replace("-", "").replace(" ", "").split(",")) if m1 else set()
+        mul = []
+        for a in ("hog", "cow", "sheep"):
+            mm = re.search(r"\b%s: x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja ([\d.]+) \(\d+/\d+\), stos -?\d+ = (-?\d+|bez odbiorcy)" % a, s)
+            mul.append(f"{a} " + (f"x{mm.group(2) or mm.group(1)} ({mm.group(3)}, {mm.group(4)} dni)" if mm else ("pomiar w toku" if a in seen else "brak")))
+        ok0 = all(a in seen for a in ("hog", "cow", "sheep"))
+        rep.add("T3-K2-0: zwierzeta w linii decyzji regulatora (ostatnia decyzja do until)", f"decyzji z dopiskiem {len(k2n)}, klucz tak {len(k2on)}; d{run_day(k2on[-1], start)}: " + "; ".join(mul),
+                "wieprze, krowy, owce w decyzji albo w pomiarze, klucz tak" + tail2, g2(ok0))
+    else:
+        rep.add("T3-K2-0: zwierzeta w linii decyzji regulatora", f"decyzji do until {len(dk)}, z dopiskiem {len(k2n)}, klucz tak 0",
+                "wieprze, krowy, owce w decyzji (klucz tak)" + tail2, None)
+    hid = tw.get("hides", {})
+    v, n = avg(hid, r"\| produkcja (\d+)")
+    rep.add("T3-K2-1: skory surowe - produkcja (Towary hides, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 530 szt./d (fin29 493)" + tail2, g2(v >= 530) if v is not None else None)
+    v, n = avg(lea, r"\| produkcja (\d+)")
+    rep.add("T3-K2-2: skora zrobiona (Towary leather, produkcja, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 200 szt./d (fin29 187)" + tail2, g2(v >= 200) if v is not None else None)
+    days, txt = [], []
+    for a in ("hog", "cow", "sheep"):
+        d = tw.get(a, {})
+        ks = [k for k in sorted(d) if inwin(k)]
+        u, _ = avg(d, r"\| zuzycie (\d+)")
+        p_, _ = avg(d, r"\| produkcja (\d+)")
+        z = num(r"zapas (\d+)", d[ks[-1]]) if ks else None
+        dd = (z / u) if (z is not None and u) else None
+        if dd is not None:
+            days.append(dd)
+        txt.append(f"{a} {fx_(dd)} dni (zapas {z}, produkcja {fx_(p_, 0)}, zuzycie {fx_(u, 0)}/d)")
+    mt = tw.get("meat", {})
+    mks = [k for k in sorted(mt) if inwin(k)]
+    mp1, _ = avg(mt, r"\| produkcja (\d+)")
+    mu1, _ = avg(mt, r"\| zuzycie (\d+)")
+    mz = num(r"zapas (\d+)", mt[mks[-1]]) if mks else None
+    txt.append(f"mieso INFO: zapas {mz}, produkcja {fx_(mp1, 0)}, zuzycie {fx_(mu1, 0)}/d")
+    rep.add("T3-K2-3: straz - stos zwierzat w dniach zuzycia (Towary, zapas d-until / srednie zuzycie okna)", "; ".join(txt),
+            "kazde <= 30 dni (fin29 wieprze 7, krowy 19, owce 7; mieso INFO: fin29 zapas 4171, 1.06 x produkcji)" + tail2,
+            g2(len(days) == 3 and max(days) <= 30) if days else None)
+    v, n = avg(cr, r"skory -> skora \d+/(\d+)/\d+")
+    rep.add("T3-K2-4: garbarze - koniec przerobu 'brak surowca' (Rzemioslo miasta 148, srednia)", f"{fx_(v)} miast ({n} dob)", "<= 25 miast (fin29 34.5)" + tail2,
+            g2(v <= 25) if v is not None else None)
     rep.show()
     return 0
 
@@ -21686,7 +21740,7 @@ def main(argv):
     if group == "towary2" and logp:
         return towary2_main(logp, start_arg, until_arg)   # Towary 2 (K1-K4): drewno dla rzemiosla, plotno wsi ponad zapas, garbarz na wywoz, narzedzie
     if group == "towary3" and logp:
-        return towary3_main(logp, start_arg, until_arg)   # Towary 3: T3-K1 markietani przywoza odziez (SutlerClothing)
+        return towary3_main(logp, start_arg, until_arg)   # Towary 3: T3-K1 markietani przywoza odziez (SutlerClothing), T3-K2 zwierzeta pod regulatorem (AnimalsUnderValve)
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:

@@ -5420,7 +5420,7 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool WorkshopRecipesByValue { get; set; } = true;
 
-        [SettingPropertyBool("Harvest Valve", HintText = "every four weeks a village makes less of a good the world does not use up and more of a good it does - instead of the stock rotting away on the stalls; the stock stays between one and two months of use (food and livestock are not touched; off = villages make what the game says and unsold stock rots as before)")]
+        [SettingPropertyBool("Harvest Valve", HintText = "every four weeks a village makes less of a good the world does not use up and more of a good it does - instead of the stock rotting away on the stalls; the stock stays between one and two months of use (food is not touched, livestock for slaughter only with Animals Under Valve; off = villages make what the game says and unsold stock rots as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HarvestValve { get; set; } = true;
 
@@ -5575,6 +5575,10 @@ namespace Armoury
         [SettingPropertyBool("Valve Step Follows Use", HintText = "a village good raised above its normal output is brought back to what the world really uses once a full eight-week window shows it is made faster than it is used - without waiting for two months of stock to pile up - and close to the lower stock limit it is raised by small steps instead of a third at once (timber piled up all year after one such step). Never below normal output: the woodcutters go back to the village's other work. Off = a raised good stays raised until the stock exceeds Valve Stock Days High, as before")]
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
         public bool ValveStepFollowsUse { get; set; } = true;
+
+        [SettingPropertyBool("Animals Under Valve", HintText = "the village regulator (Harvest Valve) also looks after the hogs, cattle and sheep raised for slaughter: when the world slaughters every animal the villages raise and the herds on the market hold less than Valve Stock Days Low days of use, the villages raise more of them, up to Village Output Step - more meat for the towns and more hides for the tanners; a step that proves too large is taken back as for any other good. Horses, mules and camels are not touched (see Horse Breeding By Demand). Works only with Harvest Valve on. Off = villages raise the animals the game says, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool AnimalsUnderValve { get; set; } = true;
 
         [SettingPropertyBool("Slaughter Keeps Hides", HintText = "the town craftsmen who slaughter a sheep or a pig for meat alone keep its hide as well, as the other butchers do: one raw hide from every animal, sold on the town's stall like the meat (about a fifth of all livestock was slaughtered with the hide thrown away while the tanners stood idle). Takes effect at the next load. Off = the game's recipes, as before")]
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
@@ -7169,6 +7173,7 @@ namespace Armoury
             s.ValveRaiseWhileShort = ValveRaiseWhileShort;
             s.ValveShortCeiling = ValveShortCeiling;
             s.ValveStepFollowsUse = ValveStepFollowsUse;
+            s.AnimalsUnderValve = AnimalsUnderValve;
             s.SlaughterKeepsHides = SlaughterKeepsHides;
             s.WorkshopHandsStep = WorkshopHandsStep;
             s.CivilWorksAwayFromFront = CivilWorksAwayFromFront;
