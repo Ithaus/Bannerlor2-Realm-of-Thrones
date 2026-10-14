@@ -403,4 +403,42 @@
        character has a faith yet - hands out faiths to Lorathi characters once, the same way Banner Kings does at the start of
        a campaign. Files of BKROTPatch are not changed. Set to false to leave Lorath without a faith. -->
   <LorathFaithFix>true</LorathFaithFix>
+  <!-- Banner Kings models broken by BKROTPatch (needs Banner Kings and BKROTPatch). Several BKROTPatch models are meant to add
+       the Realm of Thrones blessings on top of the Banner Kings result, but instead of asking Banner Kings they ask themselves;
+       a recursion guard then answers 0, so Banner Kings never runs and the blessings are added to zero. CrashScribe makes each
+       of them ask Banner Kings, as intended; the blessings stay on top. Banner Kings and BKROTPatch files are not touched.
+       The start-up line "BKROT self call fix: n/8" in the CrashScribe log lists every method. These switches change how the
+       realms behave, so they are meant for a NEW campaign; they are read once when the game starts. Set one to false to leave
+       that model as before (0). -->
+  <!-- Ruler legitimacy of every realm: with 0 Banner Kings sees every ruler as illegitimate - pretenders and secession groups
+       find support everywhere and crowns drift away from centralism. Fixed, legitimacy moves towards Banner Kings' target
+       (titles, faith, culture, clan tier) by 0.01 a day. -->
+  <BkrotFixLegitimacy>true</BkrotFixLegitimacy>
+  <!-- Clan influence limit and influence change as Banner Kings counts them (not the daily influence gain - the game counts
+       that itself and is not changed). With 0, proposing war, peace, annexation or expulsion costs only the base price, Banner
+       Kings armies have no influence threshold, trade pacts are never possible, and succession and title costs miss their
+       influence part. Fixed, proposals cost more (a fifth of the limit on top of the base 200 for war and 100 for peace), trade pacts become possible. -->
+  <BkrotFixInfluence>true</BkrotFixInfluence>
+  <!-- Influence cost of calling vassals to an army (Call Banners) and of merging armies in Banner Kings: with 0 every Banner
+       Kings army calls all ready vassals for free. Fixed, each called party costs influence as Banner Kings intends. -->
+  <BkrotFixArmyCost>true</BkrotFixArmyCost>
+  <!-- Culture in Banner Kings towns, castles and villages: with 0 every culture of a settlement counts as fully assimilated
+       (1.0), so a settlement never changes culture, acceptance never moves, and loyalty gets the full +4 a day for "Cultural
+       Assimilation" everywhere - also in a town just taken from a foreign realm. Fixed, Banner Kings weighs the cultures (local
+       notables, villages, governor, the owner's culture, acceptance) every day: in a conquered town of a foreign culture the
+       assimilation term goes towards -4 a day instead of +4, so loyalty there falls and unrest becomes possible until the new
+       owner wins the people over (a governor of his culture, peace, stability); a settlement whose people come to share the
+       owner's culture (55% or more) takes that culture. Meant for a NEW campaign: on an old save the loyalty of conquered
+       settlements drops at once. -->
+  <BkrotFixCulture>true</BkrotFixCulture>
+  <!-- With the culture fix above: the Realm of Thrones blessings of a settlement's owner (Trios, God's Blood, Harpy) raise
+       only the owner's own culture in that settlement, as intended. BKROTPatch adds them to every culture present, which
+       waters down the owner's advantage. Set to false to add them to every culture as BKROTPatch does. -->
+  <BkrotCultureBlessingsOwnerOnly>true</BkrotCultureBlessingsOwnerOnly>
+  <!-- Spouse value in the Banner Kings marriage contract you propose: with 0 the rank of the partner does not count.
+       Fixed, the contract weighs both sides as Banner Kings intends. AI marriages are not affected. -->
+  <BkrotFixSpouseScore>true</BkrotFixSpouseScore>
+  <!-- Caravan income of the owner as Banner Kings counts it. With Banner Kings' "Realistic Caravan Income" on (the default)
+       Banner Kings gives 0 anyway, so this changes nothing then. -->
+  <BkrotFixCaravanIncome>true</BkrotFixCaravanIncome>
 </CrashScribe>

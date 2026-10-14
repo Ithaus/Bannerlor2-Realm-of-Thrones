@@ -116,6 +116,15 @@ namespace CrashScribe
         public static bool CultureTemplateRepair = true;      // AM-29: przy kazdym starcie sesji z list wzorcow kultur (lord / notable / rebel) wylatuja wpisy niegotowe z ROT-Content (np. spc_brotherhood_2 w lord_templates Westerlands - ok. 16% szansy na wywrotke przy zakladaniu rodu towarzysza) + siatka na CreateNewHeroForNewCompanionClan; false = listy jak dotad (b47fecc3)
         public static bool StopBkrotProsperityReset = true;   // AM-01: zdjete 3 prefiksy BKROT EarlyHeal (getter Town.Prosperity, CalculateLoyaltyChange, CalculateSecurityChange) - twierdza ponizej 100 dobrobytu nie dostaje juz 2000 / 4000 z niczego; w zamian straz NaN / Inf na Town.set_Prosperity, NaN w zapisie -> 0 przy starcie sesji; linia doby (NaN, czy prefiks BKROT wrocil); false = BKROT EarlyHeal jak dotad (b47fecc3)
         public static bool LorathFaithFix = true;             // AM-28: postfiks BKROT CultureHelpers.IsCultureEssosi - kultura nord (Lorath w ROT 8.1.8; BKROT zna stara 'lorathi') jest kultura Essos dla wiar BKROT; null w kulturach ulubionych wiary Pattern -> nord; w kampanii sprzed naprawy (zaden bohater nord bez wiary) jednorazowe nadanie wiary jak BK przy starcie gry; false = Lorath bez wiary BK (b47fecc3)
+        // --- P2 audytu 14.10 (AM-10/11/12/15/18 + karawany): samowywolania BKROT - transpiler callvirt na sobie -> call modelu BK (patrz BkrotSelfCall.cs) ---
+        // Kazdy klucz czytany raz przy starcie gry; false = ta metoda BKROT nielatana (samowywolanie, straznik zwraca 0 - stan b47fecc3).
+        public static bool BkrotFixLegitimacy = true;        // AM-10: BKROTLegitimacyModel.CalculateKingdomLegitimacy -> BKLegitimacyModel (cel prawowitosci krolestw BK zamiast 0 + blogoslawienstwa ROT)
+        public static bool BkrotFixInfluence = true;         // AM-11: BKROTInfluenceModel.CalculateInfluenceCap i CalculateInfluenceChange -> BKInfluenceModel (limit i zmiana wplywu w rachunkach BK: koszty wnioskow, pakty handlowe, armie BK, sukcesja, tytuly)
+        public static bool BkrotFixArmyCost = true;          // AM-12: BKROTArmyModel.CalculatePartyInfluenceCost -> BKArmyManagementModel (Call Banners i laczenie armii BK kosztuja wplyw)
+        public static bool BkrotFixCulture = true;           // AM-15: BKROTCultureModel.CalculateAcceptanceGain i CalculateCultureWeight -> BKCultureModel (asymilacja i akceptacja kultur BK zamiast 1.0 / stoi; lojalnosc z asymilacji -4..+4 zamiast stale +4; kultura osady moze przejsc na kulture pana) - OD NOWEJ KAMPANII
+        public static bool BkrotCultureBlessingsOwnerOnly = true; // AM-15 klucz 2 (tylko przy BkrotFixCulture): blogoslawienstwa ROT pana (wagi +25/+25/+50, akceptacja +0.04/+0.04/+0.08) tylko dla kultury pana, nie dla kazdej kultury osady; false = jak BKROT
+        public static bool BkrotFixSpouseScore = true;       // AM-18: BKROTMarriageModel.GetSpouseScore -> BKMarriageModel (ocena malzonka w kontrakcie malzenskim BK gracza)
+        public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
 
         internal static void Load(string moduleDataDir)
         {
@@ -203,6 +212,13 @@ namespace CrashScribe
                         case "CultureTemplateRepair": CultureTemplateRepair = B(v); break;
                         case "StopBkrotProsperityReset": StopBkrotProsperityReset = B(v); break;
                         case "LorathFaithFix": LorathFaithFix = B(v); break;
+                        case "BkrotFixLegitimacy": BkrotFixLegitimacy = B(v); break;
+                        case "BkrotFixInfluence": BkrotFixInfluence = B(v); break;
+                        case "BkrotFixArmyCost": BkrotFixArmyCost = B(v); break;
+                        case "BkrotFixCulture": BkrotFixCulture = B(v); break;
+                        case "BkrotCultureBlessingsOwnerOnly": BkrotCultureBlessingsOwnerOnly = B(v); break;
+                        case "BkrotFixSpouseScore": BkrotFixSpouseScore = B(v); break;
+                        case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
                     }
                 }
             }

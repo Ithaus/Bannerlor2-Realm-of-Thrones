@@ -6032,6 +6032,34 @@ namespace Armoury
         [SettingPropertyGroup("Clans changing realms")]
         public bool ClanLeaveLog { get; set; } = true;
 
+        [SettingPropertyBool("Fix Bkrot Model Chains", HintText = "Fleets sail by the rules of War Sails again. The Banner Kings - Realm of Thrones patch puts its own party speed on top and counts every party, at sea too, by the land formula: no speed from ships and crew, no open sea, river or wind bonus, no penalty for too few sailors or too many ships. On = its blessings stay, and beneath them the speed rules of Realm of Thrones, War Sails and Living Economy run again (ships, crew, wind and sea; an enlisted party +20%; a caravan's mounted escort) and the Banner Kings sea perks with them. Realistic Bannerlord's speed is left out, as now (its seasons are off and it would cut the chain again). Each rule counts once. Off = as before")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool FixBkrotModelChains { get; set; } = true;
+
+        [SettingPropertyBool("Fix Bkrot Map Model Chains", HintText = "The smaller rules of War Sails on the campaign map run again under the patch's blessings: sight at sea (+30%, storms -40%, sea perks), raids (the Nord feat, sea perks), healing at sea and morale in port (boatswain perks), and the Banner Kings sea perks on them. Realistic Bannerlord's healing and morale stay left out, as now. Off = as before")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool FixBkrotMapModelChains { get; set; } = true;
+
+        [SettingPropertyBool("Fix Bkrot Battle Morale Chain", HintText = "The War Sails starting morale in battle runs again under the patch's blessings: the Lion figurehead and the Commodore perk, the sea perks in naval battles, and +20% for realms with the Fraternal Fleet Doctrine policy (on land too). Off = as before")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool FixBkrotBattleMoraleChain { get; set; } = true;
+
+        [SettingPropertyBool("Fix Bkrot Wage Chain", HintText = "Wages by the rules of Realm of Thrones again (the patch's wage model cut them off): the Unsullied take no wage (only Banner Kings' least upkeep of 1 is left), troops of the Others cost their tier, and the companies and garrisons of the Others are paid nothing. The price of hiring stays as before - the Unsullied are still bought at their full price. Living Economy's guard against broken wage sums works again. Off = as before")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool FixBkrotWageChain { get; set; } = true;
+
+        [SettingPropertyBool("Fix Bkrot Wage Sea Cut", HintText = "With Fix Bkrot Wage Chain: the War Sails wage cut at sea counts again - a company at sea pays a fifth less, a caravan at sea pays nothing, and the boatswain perks count. No company's wage goes below zero. Off = the same wage at sea as on land")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool FixBkrotWageSeaCut { get; set; } = true;
+
+        [SettingPropertyBool("Fix Princely Arbiter Wage", HintText = "The Princely Arbiter blessing lowers your party's wages by 15%, as its description says. The patch took 15% for every kind of troop in the party, so from about seven kinds on your men paid you. No party's wage goes below zero. Off = as before")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool FixPrincelyArbiterWage { get; set; } = true;
+
+        [SettingPropertyBool("Gentry Names Fallback", HintText = "New gentry houses (locals who take up a vacant estate) rise in every realm again. Banner Kings names a new house with the first name on its culture's list that no house of the SAME culture bears, and the game then refuses a name any house bears. Realm of Thrones gives one list to many cultures, so the realm that founded the first house took that name for good and no gentry ever rose again in Braavos, Lys, Myr, Tyrosh, Norvos, Qohor, Volantis, the Reach, the Riverlands, the Stormlands, Dragonstone and others; the short lists of the North, the Vale, Dorne, the Free Folk and the Ghiscari ran out too. On = the first name on the list that no house in the world bears; when the list is used up, a name from the village (the village itself, or a name from the list of the village). A knight founding his house gets a free name the same way, but only where Banner Kings would have given him one. Lorath, Ibben, Qarth, the Night's Watch and the Summer Isles still have no gentry (Banner Kings has no gentry for their cultures). Off = as before")]
+        [SettingPropertyGroup("Banner Kings gentry")]
+        public bool GentryNamesFallback { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7539,6 +7567,13 @@ namespace Armoury
             s.BesiegedReliefCastleForce = BesiegedReliefCastleForce;
             s.BesiegedReliefKingsArmy = BesiegedReliefKingsArmy;
             s.ClanLeaveLog = ClanLeaveLog;
+            s.FixBkrotModelChains = FixBkrotModelChains;
+            s.FixBkrotMapModelChains = FixBkrotMapModelChains;
+            s.FixBkrotBattleMoraleChain = FixBkrotBattleMoraleChain;
+            s.FixBkrotWageChain = FixBkrotWageChain;
+            s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
+            s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
+            s.GentryNamesFallback = GentryNamesFallback;
         }
 
         internal static void Apply()

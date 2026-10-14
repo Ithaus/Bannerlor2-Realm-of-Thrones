@@ -677,6 +677,25 @@ Uzycie (Python 3, tylko odczyt):
                     oczekiwane, regulator 43-53 / rok, SD-A3 oferty dla rodu gracza (0.15-0.31, odstep >= 30 dob), SD-A4 INFO rody; (B) SD-B0..B5 danina
                     pokoju M4: linia, kontrolki, wziete <= budzet (chleb, najwyzej 0.5% lokaty), pokoj >= 91 dob (wiersze i KRONIKA WOJEN), dzien do dnia, linia P1.
 --grupa lenna     : (PROJEKT-LENNA 14.10, docs/lenna/PROJEKT-LENNA.md rozdz. 6; Armoury/src/FiefGrants.cs) python -I tools/sprawdz_logi.py --grupa lenna
+--grupa audytb    : (P2 audytu modow 14.10, docs/audyt-modow-2026-10-14/RAPORT-AUDYT-MODOW.md AM-10/11/12/15/18; CrashScribe/src/BkrotSelfCall.cs)
+                    python -I tools/sprawdz_logi.py --grupa audytb <CrashScribe session-*.log> (log czytany strumieniowo). AB-0 linia startu
+                    "BKROT self call fix: n/8" - latane = wlaczone kluczem, BRAK 0, kazda latana z oslona wyjatkow (recenzja P2), blogoslawienstwa
+                    kultury TAK (2/2) przy naprawionej kulturze; AB-1 linie doby i potkniecia 0; AB-1b wyjatki w naprawionych metodach (finalizer, wynik 0)
+                    = 0; AB-2 (AM-10) cel prawowitosci modelu >= BK i nie 0 przy BK > 0, AB-2b L wobec celu (INFO); AB-3 (AM-11) limit
+                    modelu >= BK (blogoslawienstwo +15% tylko w gore) i nie 0 przy BK > 0, koszt wniosku pokoju > 100 przy limicie BK >= 500 (perki
+                    obnizaja koszt), pakty handlowe (INFO); AB-4 (AM-12)
+                    koszt Call Banners nie 0 przy BK > 0; AB-5 (AM-15) twierdze z >= 2 kulturami "wszystkie 1.0" = 0 (bez pierwszej doby sesji), AB-5b
+                    asymilacja pana, lojalnosc, zmiany kultury (INFO); AB-6 (AM-18) ocena malzonka gracza nie 0 przy BK > 0; AB-7 karawana i "poza kultura pana"
+                    (INFO). Metoda wylaczona kluczem albo BRAK - jej wiersz INFO. Log bez paczki: INFO, bez wyjatku.
+                    P4 (lancuchy modeli BKROT, Armoury/src/BkrotChains.cs): ta sama grupa z logiem Armoury - python -I tools/sprawdz_logi.py --grupa audytb
+                    <Armoury-*.log>: AB-8 linia startu (wpiecia BRAK 0, lancuchy z NavalDLC / ROT), AB-9 doby i potkniecia 0, AB-10 (AM-13) predkosc na morzu
+                    teraz / bez naprawy > 1.05 i wpisy NavalDLC w probkach, AB-11 (AM-09) zold Innych 0, Nieskalani 0, cena werbunku bez zmian, ujemny zold 0,
+                    AB-11b obnizka morska > 0, AB-12 (AM-19) INFO, AB-13 wzrok na morzu teraz > bez naprawy; wiersz klucza wylaczonego - INFO.
+                    Trop gentry (Armoury/src/GentryNames.cs, klucz GentryNamesFallback): ta sama grupa, ten sam log Armoury - linie "Nazwy gentry BK":
+                    AB-14 linia startu (wpiete 3/3, BRAK -), AB-15 doby i potkniecia 0, AB-16 gentry bez nazwy 0, AB-17 (nowa kampania - rody przed
+                    pierwsza doba >= 20) krolestwa z >= 6 wsiami kultur z wzorcem gentry BK i bez gentry = 0 (b47fecc3: 88 rodow w 9 krolestwach),
+                    AB-17b rody i krolestwa z gentry (INFO), AB-18 powtorzone nazwy rodow gentry / rycerzy BK nie rosna, AB-19 nowe rody wedlug krolestwa
+                    i nazwy (INFO); klucz wylaczony - INFO.
 --grupa audyta    : (audyt modow 14.10, RAPORT-AUDYT-MODOW.md rozdz. 5, pakiet P1; CrashScribe/src/BkTitles.cs) python -I tools/sprawdz_logi.py --grupa audyta
                     <session-*.log CrashScribe> (strumieniowo). Tytuly BK na mapie ROT: AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany),
                     AUD-P1-1 (AM-26) kazde ustawienie sciezki = plik ROT 8.1.8, AUD-P1-2 retrofit BK przy wczytaniu z plikiem ROT 8.1.8 i 0 przepietych
@@ -25766,6 +25785,459 @@ def audyta_p3_arm(rep, armp):
         rep.add("AUD-P3-30: bledy WorkshopInputsFix w logu", f"{errs}", "0", False)
 
 
+AB_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+AB_START = re.compile(r"BKROT self call fix: (\d+)/(\d+) metod \(kluczem wlaczonych (\d+), BRAK (\d+)\) \| (.*?) \| blogoslawienstwa kultury tylko dla kultury pana \(AM-15\): ([^|]*?) \|")
+AB_METH = re.compile(r"(Legitimacy|Influence|Army|Culture|Marriage|ClanFinance)\.(\w+) (TAK|wyl\.|BRAK|brak|wyjatek|nie wpinane)")
+AB_DAY = re.compile(r"BKROT self call \(P2\): dzien (\d+) \| prawowitosc: (.*?) \| wplyw: (.*?) \| call banners: (.*?) \| osady: (.*?) \| swiat: (.*?) \| malzonek gracza (\S+) \(BK (\S+)\) \| karawana (\S+) \(BK (\S+)\) \| poza kultura pana (\d+) \(sesja (\d+)\)(?: \| wyjatki naprawy \(wynik 0\) (\d+) \(sesja (\d+)\))? \| bledy probki (\d+) \(sesja (\d+)\) \| potkniecia od startu gry (\d+)\.")
+AB_LEG = re.compile(r"(.+?) L (\S+) cel (\S+) \(BK (\S+)\)$")
+AB_INF = re.compile(r"(.+?) limit (\S+) \(BK (\S+)\) zmiana (\S+) \(BK (\S+)\) wplyw (\S+) koszt pokoju (\S+) wojny (\S+)$")
+AB_PACT = re.compile(r"pakty handlowe \(wpisy krolestw\) (\S+)$")
+AB_CB = re.compile(r"(.+?) <- (.+?) koszt (\S+) \(BK (\S+)\)$")
+AB_WORLD = re.compile(r"twierdz (\d+) wszystkie kultury 1\.0 (\d+) z (\d+) asym\. pana sr\. (\S+) <0\.5 (\d+) lojalnosc sr\. (\S+) <25 (\d+) zmiany kultury osad (\S+) \(sesja (\d+)\)")
+
+
+def _abf(x):
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+# P4 audytu modow 14.10 (AM-13, AM-09, AM-19; Armoury/src/BkrotChains.cs): lancuchy modeli pod BKROTPatch - linie w logu Armoury
+P4_MARK = "Lancuchy modeli BKROT (P4)"
+P4_START = re.compile(r"Lancuchy modeli BKROT \(P4\): start \| klucze: (.*?) \| wpiecia (\d+)/(\d+) \(BRAK (\d+)\): (.*?) \| lancuchy: (.*?) \| Wielki Ksiaze \(AM-19\): (\S+) \| potkniecia od startu sesji (\d+)")
+P4_DAY = re.compile(r"Lancuchy modeli BKROT \(P4\): dzien (\d+) \| klucze: (.*?) \| predkosc: na morzu partii (\d+) \(ze statkami (\d+), policzone (\d+)\): srednio teraz (\S+), bez naprawy ([^;( ]+)(?: \(x[^)]*\))?; probki:(.*?); lad \(gracz\): (.*?) \| zold: Inni: partii (\d+), zold teraz (\S+), bez naprawy (\S+); Nieskalani: ludzi (\d+) w (\d+) partiach, zold jednostki teraz (\S+), bez naprawy (\S+), do ceny werbunku (\S+); na morzu partii (\d+) \(karawan (\d+)\): zold teraz (\S+), bez obnizki morskiej (\S+), roznica (\S+) na dobe; ujemny zold partii (\d+)(.*?)(?: \| wzrok na morzu: (.*?))? \| wywolania lancucha od wczoraj: (.*?); glebokosc ponad \d+: (\d+) \| potkniecia od startu sesji (\d+)")
+P4_KEYS = re.compile(r"(predkosc|mapa|bitwa|zold|morze|Wielki Ksiaze) (TAK|NIE)")
+P4_SAMPLE = re.compile(r"\[([^\]]*?): teraz (\S+) = ([^\]]*?); bez naprawy (\S+); powtorzone wpisy (\d+)\]")
+P4_SIGHT = re.compile(r"policzone (\d+), srednio teraz (\S+), bez naprawy (\S+)")
+P4_ARB = re.compile(r"Wielki Ksiaze \(AM-19\) zadzialal od wczoraj (\d+) razy")
+P4_WNAN = re.compile(r"zold nieliczbowy z lancucha \(policzony jak dotad\) od wczoraj (\d+)")
+
+
+def _audytb_is_p4_log(logp):
+    """Czy plik to log Armoury z liniami P4 (wtedy audytb sprawdza P4; log sesji CrashScribe - P2 jak dotad)."""
+    try:
+        with open(logp, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if P4_MARK in ln:
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _audytb_p4(logp):
+    """P4 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md AM-13, AM-09, AM-19 + reszta modeli BKROT bez BaseModel): Armoury BkrotChains - glowa lancucha
+    pod BKROT. Czyta log Armoury strumieniowo: linie "Lancuchy modeli BKROT (P4): start" i "... dzien N". "teraz" = model gry z naprawa, "bez naprawy"
+    = to samo wywolanie z wylaczonymi wpieciami (b47fecc3). Wiersz klucza wylaczonego - INFO. Log bez linii - INFO, bez wyjatku."""
+    rep = Report()
+    starts, days = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if P4_MARK not in ln:
+                continue
+            s = AB_TS.sub("", ln.rstrip("\r\n"))
+            m = P4_START.search(s)
+            if m:
+                starts.append(m.groups())
+                continue
+            m = P4_DAY.search(s)
+            if m:
+                days.append(m.groups())
+    print(f"plik: {logp} | P4: linie startu {len(starts)}, linie doby {len(days)}")
+    if not starts:
+        rep.add("AB-8: (P4) linia startu 'Lancuchy modeli BKROT (P4): start'", "brak linii (albo bez BKROTPatch)", "linia przy kazdym starcie sesji", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    keys = dict(P4_KEYS.findall(st[0]))
+    on = lambda k: keys.get(k) == "TAK"
+    chains = {}
+    for part in st[5].split("; "):
+        part = part.strip()
+        if ": " in part:
+            k, v = part.split(": ", 1)
+            chains[k.strip()] = v.strip()
+    bad_chain = [k for k, v in chains.items() if v.startswith("BRAK")]
+    need = {"predkosc": "NavalDLCPartySpeedCalculationModel", "zold": "ROTPartyWageModel", "morale w bitwie": "NavalBattleMoraleModel", "wzrok": "NavalDLCMapVisibilityModel"}
+    miss = [k for k, w in need.items() if w not in chains.get(k, "")]
+    rep.add("AB-8: (P4) linia startu - wpiecia BRAK 0, lancuchy z NavalDLC / ROT (predkosc, zold, wzrok, bitwa)",
+            f"linii {len(starts)}; ostatnia: wpiecia {st[1]}/{st[2]} (BRAK {st[3]}), Wielki Ksiaze {st[6]}, lancuchy BRAK: {', '.join(bad_chain) or '-'}, bez oczekiwanego modelu: {', '.join(miss) or '-'}; klucze: {st[0]}",
+            "BRAK 0, lancuchy pelne", int(st[3]) == 0 and not bad_chain and not miss)
+    rep.add("AB-8b: (P4) lancuchy (INFO)", " / ".join(f"{k}: {v}" for k, v in chains.items()), "INFO (RBL pominiety - konczy lancuch na Default)", None)
+    if not days:
+        rep.add("AB-9: (P4) linie doby 'Lancuchy modeli BKROT (P4): dzien'", "brak linii", "kazda doba", None)
+        rep.show()
+        return 0
+    dn = [int(g[0]) for g in days]
+    span = max(dn) - min(dn) + 1
+    stl = int(days[-1][27])
+    deep = sum(int(g[26]) for g in days)
+    rep.add("AB-9: (P4) linie doby, potkniecia 0, glebokosc ponad limit 0", f"dob z linia {len(set(dn))} z {span}; potkniecia (ostatnia linia) {stl}; glebokosc ponad limit (suma) {deep}",
+            "kazda doba, 0, 0", len(set(dn)) >= span - 1 and stl == 0 and deep == 0)
+    dk = lambda g, k: dict(P4_KEYS.findall(g[1])).get(k) == "TAK"
+    # AB-10 AM-13 predkosc na morzu
+    rs, nsea, dup, open_sea, smp = [], 0, 0, 0, 0
+    for g in days:
+        if not dk(g, "predkosc"):
+            continue
+        a, b = _abf(g[5]), _abf(g[6])
+        if int(g[4]) > 0 and a is not None and b is not None and b > 0:
+            rs.append(a / b)
+            nsea += int(g[4])
+        for sm in P4_SAMPLE.finditer(g[7]):
+            smp += 1
+            dup += int(sm.group(5))
+            if "Open Sea" in sm.group(3) or "River" in sm.group(3) or "Wind" in sm.group(3):
+                open_sea += 1
+    avg = sum(rs) / len(rs) if rs else None
+    rep.add("AB-10: (AM-13) predkosc na morzu - teraz / bez naprawy srednio > 1.05; w probkach wpisy NavalDLC (Open Sea / River / Wind), powtorzone 0",
+            f"dob z partiami na morzu {len(rs)} (partio-probek {nsea}): x{avg:.2f}; probek {smp}, z wpisem NavalDLC {open_sea}, powtorzone wpisy {dup}" if avg is not None else "brak dob z partiami na morzu",
+            "> 1.05, probki z wpisem NavalDLC > 0, powtorzone 0 (klucz predkosc; inaczej INFO)",
+            ((avg > 1.05) and dup == 0 and (open_sea > 0 or smp == 0)) if (avg is not None and on("predkosc")) else None)
+    lastp = next((x for x in reversed(days) if x[7].strip() not in ("", "-")), days[-1])
+    rep.add("AB-10b: (AM-13) probki predkosci - ostatnia doba z probkami (INFO)", f"dzien {lastp[0]}: {lastp[7].strip()[:600]}; lad (gracz): {lastp[8]}",
+            "INFO (lad: teraz = bez naprawy, poza zaciagiem ROT +20% i eskorta karawan BEE)", None)
+    # AB-11 AM-09 zold
+    oth_bad, oth_n, uns_bad, price_bad, uns_n, neg = 0, 0, 0, 0, 0, 0
+    sea_sum, sea_days = 0.0, 0
+    for g in days:
+        neg += int(g[22])
+        if dk(g, "zold"):
+            if int(g[9]) > 0:
+                oth_n += 1
+                v = _abf(g[10])
+                if v is None or abs(v) > 0.5:
+                    oth_bad += 1
+            if g[14] != "-":
+                uns_n += 1
+                if g[14] != "0":
+                    uns_bad += 1
+                if g[16] != g[15]:
+                    price_bad += 1
+            if dk(g, "morze") and int(g[17]) > 0:
+                d = _abf(g[21])
+                if d is not None:
+                    sea_sum += d
+                    sea_days += 1
+    ok = (oth_bad == 0 and uns_bad == 0 and price_bad == 0 and neg == 0) if on("zold") else None
+    rep.add("AB-11: (AM-09) zold Innych 0, Nieskalani 0 (cena werbunku jak bez naprawy), ujemny zold partii 0",
+            f"dob z partiami Innych {oth_n} (zold > 0: {oth_bad}); dob z Nieskalanymi {uns_n} (zold jednostki nie 0: {uns_bad}, cena werbunku inna niz bez naprawy: {price_bad}); ujemny zold partii (suma) {neg}",
+            "0, 0, 0, 0 (klucz zold; inaczej INFO)", ok if (oth_n or uns_n or neg) else None)
+    g = days[-1]
+    rep.add("AB-11b: (AM-09) obnizka morska - roznica zoldu swiata na dobe (partie na morzu w chwili linii)",
+            f"dob z partiami na morzu {sea_days}, roznica srednio {sea_sum / sea_days:.0f} na dobe" if sea_days else "brak dob z partiami na morzu",
+            "> 0 (klucz morze; inaczej INFO)", (sea_sum > 0) if (sea_days and on("zold") and on("morze")) else None)
+    rep.add("AB-11c: (AM-09) zold - ostatnia doba (INFO)",
+            f"Inni partii {g[9]} zold teraz {g[10]} / bez naprawy {g[11]}; Nieskalani ludzi {g[12]} w {g[13]} partiach, zold jednostki {g[14]} / {g[15]}, do ceny werbunku {g[16]}; na morzu partii {g[17]} (karawan {g[18]}): {g[19]} / bez obnizki {g[20]}",
+            "INFO", None)
+    # recenzja P4: wynik lancucha zoldu NaN / nieskonczony (NavalDLC dzieli przez BaseNumber 0 BK - najemnicy bez krolestwa na morzu z perkiem bosmana)
+    nan = sum(int(m.group(1)) for x in days for m in [P4_WNAN.search(x[23])] if m)
+    nan_lines = sum(1 for x in days if P4_WNAN.search(x[23]))
+    rep.add("AB-11d: (recenzja P4) zold nieliczbowy z lancucha - policzony stara droga (INFO)",
+            f"razy {nan} (dob z polem {nan_lines})" if nan_lines else "brak pola w liniach doby (DLL sprzed recenzji P4)",
+            "INFO (> 0: NavalDLC dzielil przez zero - wynik jak dotad, bez zlota z niczego)", None)
+    # AB-12 AM-19
+    arb = sum(int(m.group(1)) for x in days for m in [P4_ARB.search(x[23])] if m)
+    gm = re.search(r"gracz teraz (\S+), bez naprawy (\S+)", g[23])
+    rep.add("AB-12: (AM-19) Wielki Ksiaze zadzialal (INFO)", f"razy {arb}; zold partii gracza (ostatnia doba): " + (f"teraz {gm.group(1)}, bez naprawy {gm.group(2)}" if gm else "-"),
+            "INFO (tylko gracz z blogoslawienstwem Princely Arbiter; zold nigdy < 0 - AB-11)", None)
+    # AB-13 mapa: wzrok na morzu, wywolania
+    wz = [P4_SIGHT.search(x[24] or "") for x in days if dk(x, "mapa")]
+    wz = [(int(m.group(1)), _abf(m.group(2)), _abf(m.group(3))) for m in wz if m and int(m.group(1)) > 0]
+    up = sum(1 for n, a, b in wz if a is not None and b is not None and a > b)
+    rep.add("AB-13: (P4 mapa) wzrok na morzu teraz > bez naprawy (+30% NavalDLC)", f"dob z probka {len(wz)}, z tego teraz > bez naprawy {up}",
+            "wszystkie (klucz mapa; inaczej INFO)", (up == len(wz)) if (wz and on("mapa")) else None)
+    rep.add("AB-13b: (P4) wywolania lancuchow - ostatnia doba (INFO)", g[25], "INFO (0 przy kluczu TAK = lancuch nie biegnie)", None)
+    rep.show()
+    return 0
+
+
+GN_MARK = "Nazwy gentry BK:"
+GN_START = re.compile(r"Nazwy gentry BK: start \| Gentry Names Fallback (TAK|NIE)[^|]*\| latki: wpiete (\d+)/(\d+) \((.*?)\); BRAK: (.*?) \| rody gentry przed pierwsza doba sesji \(tworzenie swiata albo od wczytania\) (\d+) \| kultury wsi bez wzorca gentry BK \(latka nie pomoze\): (.*?) \| wspolne listy nazw rodow: (.*)\.$")
+GN_DAY = re.compile(r"Nazwy gentry BK: dzien (\d+) \| Gentry Names Fallback (TAK|NIE) \| nowe rody gentry dzis (\d+) \((.*?)\) \| od startu sesji (\d+) \((.*?)\) \| nazwy dla gentry dzis: (.*?); od startu sesji: (.*?) \| inne \(rycerz BK, bunt\) od startu sesji: (.*?) \| rody gentry zywe (\d+) w (\d+) z (\d+) krolestw z wsiami: (.*?) \| krolestwa z wsiami bez gentry: z wzorcem (\d+) \((.*?)\), tylko bez wzorca (\d+) \((.*?)\) \| powtorzone nazwy rodow gentry / rycerzy BK (\d+) \| potkniecia (\d+)\.$")
+GN_COUNTS = re.compile(r"prosby (\d+), BK dal wolna (\d+), z listy zamiast zajetej (\d+), z listy zamiast braku (\d+), z nazwy wsi (\d+), bez nazwy (\d+)")
+GN_NOTPL = re.compile(r"(?:^|, )(.+?) \(wsi (\d+), z wzorcem (\d+): ([^)]*)\)")
+
+
+def _audytb_has_gentry(logp):
+    """Czy plik to log Armoury z liniami "Nazwy gentry BK" (trop gentry, GentryNames)."""
+    try:
+        with open(logp, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if GN_MARK in ln:
+                    return True
+    except OSError:
+        return False
+    return False
+
+
+def _audytb_gentry(logp):
+    """Trop gentry z audytu modow 14.10 (RAPORT-AUDYT-MODOW.md rozdz. 7; Armoury GentryNames, klucz GentryNamesFallback): nazwa nowego rodu gentry BK
+    wolna w calym swiecie, zapas z nazwy wsi. Czyta log Armoury strumieniowo: linie "Nazwy gentry BK: start" (raz na sesje) i "... dzien N".
+    Sesja = od linii startu. Klucz wylaczony - wiersze INFO. Log bez linii - INFO, bez wyjatku."""
+    rep = Report()
+    sess = []   # [start, [doby]]
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if GN_MARK not in ln:
+                continue
+            s = AB_TS.sub("", ln.rstrip("\r\n"))
+            m = GN_START.search(s)
+            if m:
+                sess.append([m.groups(), []])
+                continue
+            m = GN_DAY.search(s)
+            if m:
+                if not sess:
+                    sess.append([None, []])
+                sess[-1][1].append(m.groups())
+    days = [d for _, ds in sess for d in ds]
+    print(f"plik: {logp} | gentry: sesji {len(sess)}, linie doby {len(days)}")
+    starts = [st for st, _ in sess if st]
+    if not starts:
+        rep.add("AB-14: (gentry) linia startu 'Nazwy gentry BK: start'", "brak linii", "linia przy pierwszej dobie sesji", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    rep.add("AB-14: (gentry) linia startu - wpiete 3/3, BRAK -",
+            f"sesji {len(starts)}; ostatnia: klucz {st[0]}, wpiete {st[1]}/{st[2]} ({st[3]}), BRAK {st[4]}; rody przed pierwsza doba {st[5]}; kultury bez wzorca: {st[6]}",
+            "3/3, BRAK -", int(st[1]) == int(st[2]) and st[4].strip() == "-")
+    rep.add("AB-14b: (gentry) wspolne listy nazw rodow kultur wsi (INFO)", st[7], "INFO (przyczyna blokady bez latki)", None)
+    if not days:
+        rep.add("AB-15: (gentry) linie doby 'Nazwy gentry BK: dzien'", "brak linii", "kazda doba", None)
+        rep.show()
+        return 0
+    dn = [int(g[0]) for g in days]
+    span = max(dn) - min(dn) + 1
+    stl = max(int(g[18]) for g in days)
+    rep.add("AB-15: (gentry) linie doby, potkniecia 0", f"dob z linia {len(set(dn))} z {span}; potkniecia (najwiecej w sesji) {stl}",
+            "kazda doba, 0", len(set(dn)) >= span - 1 and stl == 0)
+    # AB-16: gentry bez nazwy (ostatnia linia kazdej sesji - liczniki od startu sesji)
+    none_o = 0
+    sums = [0] * 6
+    for _, ds in sess:
+        if not ds:
+            continue
+        mg = GN_COUNTS.search(ds[-1][7])
+        mo = GN_COUNTS.search(ds[-1][8])
+        if mg:
+            sums = [a + int(b) for a, b in zip(sums, mg.groups())]
+        if mo:
+            none_o += int(mo.group(6))
+    key_on = all(g[1] == "TAK" for g in days)
+    rep.add("AB-16: (gentry) prosby BK o nazwe gentry bez nazwy = 0",
+            f"prosby {sums[0]}: BK dal wolna {sums[1]}, z listy zamiast zajetej {sums[2]}, z listy zamiast braku {sums[3]}, z nazwy wsi {sums[4]}, bez nazwy {sums[5]}; inne (rycerz BK, bunt) - wynik BK zostawiony {none_o}",
+            "0 (klucz TAK; inaczej INFO)", (sums[5] == 0) if (key_on and sums[0] > 0) else None)
+    # AB-17: nowa kampania - pierwsza doba sesji z tworzeniem swiata
+    newc = [(stx, ds) for stx, ds in sess if stx and int(stx[5]) >= 20 and ds]
+    if newc:
+        stx, ds = newc[-1]
+        g = ds[0]
+        big = [(m.group(1).strip(), int(m.group(2)), int(m.group(3)), m.group(4)) for m in GN_NOTPL.finditer(g[14])]
+        bad = [x for x in big if x[2] >= 6]
+        rep.add("AB-17: (gentry) nowa kampania - krolestwa z >= 6 wsiami kultur z wzorcem gentry BK i bez rodu gentry = 0",
+                f"dzien {g[0]}: rody gentry {g[9]} w {g[10]} z {g[11]} krolestw z wsiami; bez gentry z wzorcem {g[13]} (z >= 6 wsiami z wzorcem {len(bad)}: {', '.join(f'{k} {t}/{w} {c}' for k, w, t, c in bad) or '-'}), tylko bez wzorca {g[15]} ({g[16]})",
+                "0 (klucz TAK; b47fecc3: 88 rodow w 9 krolestwach)", (len(bad) == 0) if stx[0] == "TAK" else None)
+    else:
+        rep.add("AB-17: (gentry) nowa kampania - krolestwa bez gentry", "brak sesji z tworzeniem swiata (rody przed pierwsza doba < 20 - wczytany zapis)",
+                "INFO (prog tylko dla nowej kampanii)", None)
+    a, z = days[0], days[-1]
+    rep.add("AB-17b: (gentry) rody gentry zywe i krolestwa z gentry - pierwsza / ostatnia doba (INFO)",
+            f"dzien {a[0]}: {a[9]} w {a[10]} z {a[11]}; dzien {z[0]}: {z[9]} w {z[10]} z {z[11]}; bez gentry (ostatnia): z wzorcem {z[13]} ({z[14][:400]}), tylko bez wzorca {z[15]} ({z[16]})",
+            "INFO (b47fecc3: 88 -> 89 w 9 krolestwach w 728 dobach)", None)
+    d0, d1 = int(a[17]), int(z[17])
+    rep.add("AB-18: (gentry) powtorzone nazwy rodow gentry / rycerzy BK nie rosna", f"pierwsza doba {d0}, ostatnia {d1}",
+            "ostatnia <= pierwsza (klucz TAK; inaczej INFO)", (d1 <= d0) if key_on else None)
+    tot = {}
+    for _, ds in sess:
+        if not ds:
+            continue
+        for mm in re.finditer(r"(.+?) (\d+)(?:, |$)", ds[-1][5].strip()):   # nazwy krolestw moga miec przecinek ("House Targaryen, Aegon")
+            tot[mm.group(1)] = tot.get(mm.group(1), 0) + int(mm.group(2))
+    rep.add("AB-19: (gentry) nowe rody gentry wedlug krolestwa od startu sesji (INFO)",
+            f"razem {sum(tot.values())}: " + (", ".join(f"{k} {v}" for k, v in sorted(tot.items(), key=lambda x: -x[1])) or "-"),
+            "INFO (nowa kampania: takze tworzenie swiata)", None)
+    rep.show()
+    return 0
+
+
+def audytb_main(logp):
+    """P2 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md AM-10, AM-11, AM-12, AM-15, AM-18 + karawany; CrashScribe BkrotSelfCall): samowywolania BKROT
+    zamienione na wywolanie modelu BK. Czyta log sesji CrashScribe strumieniowo: linie startu "BKROT self call fix" i doby "BKROT self call (P2)".
+    Wartosc "model" = metoda wolana jak w BK (BannerKingsConfig - obiekt BKROT), "BK" = ta sama metoda modelu BK wolana niewirtualnie (to, co BKROT
+    powinien dostac od base). Bez naprawy model = 0 przy BK > 0. Wiersz metody wylaczonej kluczem albo z BRAK - INFO. Log bez paczki: INFO, bez wyjatku."""
+    p4, gn = _audytb_is_p4_log(logp), _audytb_has_gentry(logp)
+    if p4 or gn:
+        rc = _audytb_p4(logp) if p4 else 0   # P4 audytu (lancuchy modeli BKROT) - linie w logu Armoury; log sesji CrashScribe - P2 jak nizej
+        if gn:
+            rc = _audytb_gentry(logp) or rc   # trop gentry (GentryNames) - ten sam log Armoury
+        return rc
+    rep = Report()
+    starts, days = [], []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        sess = 0
+        first_in_sess = True
+        for ln in f:
+            if "BKROT self call" not in ln:
+                continue
+            s = AB_TS.sub("", ln.rstrip("\r\n"))
+            m = AB_START.search(s)
+            if m:
+                meth = {}
+                for mm in AB_METH.finditer(m.group(5)):
+                    meth.setdefault(mm.group(1) + "." + mm.group(2), mm.group(3))
+                starts.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), meth, m.group(6).strip(), m.group(5)))
+                sess += 1
+                first_in_sess = True
+                continue
+            m = AB_DAY.search(s)
+            if m:
+                days.append((sess, first_in_sess, m.groups()))
+                first_in_sess = False
+    print(f"plik: {logp} | linie startu {len(starts)}, linie doby {len(days)}")
+    if not starts:
+        rep.add("AB-0: linia startu 'BKROT self call fix'", "brak linii", "linia przy kazdym starcie sesji", None)
+        rep.show()
+        return 0
+    bad = [x for x in starts if x[0] != x[2] or x[3] != 0]
+    on = {}
+    for x in starts:
+        for k, v in x[4].items():
+            on[k] = on.get(k, True) and v == "TAK"
+    cult = on.get("Culture.CalculateAcceptanceGain") and on.get("Culture.CalculateCultureWeight")
+    oo_bad = [x for x in starts if cult and not x[5].startswith("TAK") and not x[5].startswith("wyl.")]
+    nofin = [x for x in starts if "BEZ oslony" in x[6]]   # recenzja P2: naprawiona metoda bez finalizera oslony wyjatkow
+    rep.add("AB-0: linia startu - latane = wlaczone kluczem, BRAK 0, kazda latana z oslona wyjatkow; blogoslawienstwa kultury tylko dla pana TAK albo wyl.",
+            f"linii {len(starts)}: ostatnia {starts[-1][0]}/{starts[-1][1]} (wlaczonych {starts[-1][2]}, BRAK {starts[-1][3]}), kultura pana: {starts[-1][5]}; zlych {len(bad) + len(oo_bad) + len(nofin)}"
+            + f" (bez oslony wyjatkow {len(nofin)})"
+            + "; metody: " + ", ".join(f"{k} {'TAK' if v else 'nie'}" for k, v in sorted(on.items())),
+            "latane = wlaczone, BRAK 0, bez oslony 0", not bad and not oo_bad and not nofin)
+    if not days:
+        rep.add("AB-1: linie doby 'BKROT self call (P2)'", "brak linii", "kazda doba", None)
+        rep.show()
+        return 0
+    dnums = [int(g[0]) for _, _, g in days]
+    span = max(dnums) - min(dnums) + 1
+    st_last = int(days[-1][2][16])
+    err = sum(int(g[14]) for _, _, g in days)
+    rep.add("AB-1: linie doby i potkniecia", f"dob z linia {len(set(dnums))} z {span}; potkniecia (od startu gry, ostatnia linia) {st_last}; bledy probki (wyjatki BK w probce) {err}",
+            "kazda doba, potkniecia 0 (bledy probki INFO)", len(set(dnums)) >= span - 1 and st_last == 0)
+    # recenzja P2: wyjatki z naprawionych metod zlapane finalizerem (wynik 0 jak przed naprawa) - kazdy to miejsce, gdzie naprawa nie dziala
+    exd = [(int(g[0]), int(g[12])) for _, _, g in days if g[12] is not None]
+    exc = sum(v for _, v in exd)
+    rep.add("AB-1b: wyjatki w naprawionych metodach (finalizer: wynik 0 jak przed naprawa)",
+            (f"suma {exc} w {sum(1 for _, v in exd if v)} dobach z {len(exd)}" + (f"; pierwsza doba z wyjatkiem {next(d for d, v in exd if v)}" if exc else "")) if exd else "brak pola w linii (DLL sprzed recenzji P2)",
+            "0 (> 0: blok ERROR 'BkrotSelfCall: wyjatek w naprawionej metodzie' w logu - sprawdzic przyczyne)", (exc == 0) if exd else None)
+    # AB-2 AM-10
+    zero, lower, n, gaps = 0, 0, 0, []
+    for _, _, g in days:
+        for part in g[1].split("; "):
+            m = AB_LEG.match(part.strip())
+            if not m:
+                continue
+            l, mo, b = _abf(m.group(2)), _abf(m.group(3)), _abf(m.group(4))
+            if mo is None or b is None:
+                continue
+            n += 1
+            if b > 0.001 and abs(mo) < 1e-6:
+                zero += 1
+            if mo < b - 0.001:
+                lower += 1
+            if l is not None:
+                gaps.append((int(g[0]), m.group(1), l, mo))
+    ok = (zero == 0 and lower == 0) if on.get("Legitimacy.CalculateKingdomLegitimacy") else None
+    rep.add("AB-2: (AM-10) cel prawowitosci modelu >= BK, nie 0 przy BK > 0", f"probek {n}: 0 przy BK > 0 {zero}, ponizej BK {lower}",
+            "0 i 0 (naprawa wlaczona; inaczej INFO)", ok if n else None)
+    if gaps:
+        last = [x for x in gaps if x[0] == gaps[-1][0]]
+        rep.add("AB-2b: (AM-10) prawowitosc L wobec celu - ostatnia doba (INFO)", "; ".join(f"{x[1]} L {x[2]:.3f} cel {x[3]:.3f}" for x in last),
+                "INFO (L idzie do celu 0.01 na dobe, od 0)", None)
+    # AB-3 AM-11
+    zero, lower, n, cheap, ncost, pacts = 0, 0, 0, 0, 0, []
+    for _, _, g in days:
+        parts = g[2].split("; ")
+        for part in parts:
+            part = part.strip()
+            mp = AB_PACT.match(part)
+            if mp:
+                pacts.append(mp.group(1))
+                continue
+            m = AB_INF.match(part)
+            if not m:
+                continue
+            cap, capb, peace = _abf(m.group(2)), _abf(m.group(3)), _abf(m.group(7))
+            if cap is None or capb is None:
+                continue
+            n += 1
+            if capb > 0.5 and abs(cap) < 1e-6:
+                zero += 1
+            if cap < capb * 0.99 - 0.5:
+                lower += 1
+            # recenzja P2: koszt = (100 + 0.2 x limit) x perki / cechy (BKDiplomacyModel - LOG06 '75' przy limicie 0), wiec "> 100" pewne dopiero przy
+            # duzym limicie: przy limicie >= 500 czlon limitu daje >= 200, a z 0 (bez naprawy) koszt <= 100; mniejszy limit - nie liczony
+            if peace is not None and capb >= 500:
+                ncost += 1
+                if peace <= 100:
+                    cheap += 1
+    ok = (zero == 0 and lower == 0 and cheap == 0) if on.get("Influence.CalculateInfluenceCap") else None
+    rep.add("AB-3: (AM-11) limit wplywu modelu >= BK, nie 0 przy BK > 0; koszt wniosku pokoju > 100 (przy limicie BK >= 500)",
+            f"probek {n}: 0 przy BK > 0 {zero}, ponizej BK {lower}; koszt pokoju <= 100 w {cheap} z {ncost}; pakty handlowe (ostatnia doba) {pacts[-1] if pacts else '-'}",
+            "0, 0, 0 (naprawa wlaczona; inaczej INFO)", ok if n else None)
+    # AB-4 AM-12
+    zero, n, nopair = 0, 0, 0
+    for _, _, g in days:
+        m = AB_CB.match(g[3].strip())
+        if not m:
+            nopair += 1
+            continue
+        c, b = _abf(m.group(3)), _abf(m.group(4))
+        if c is None or b is None:
+            continue
+        n += 1
+        if b > 0 and c == 0:
+            zero += 1
+    ok = (zero == 0) if on.get("Army.CalculatePartyInfluenceCost") else None
+    rep.add("AB-4: (AM-12) koszt Call Banners (krol <- wasal) nie 0 przy BK > 0", f"probek {n}: 0 przy BK > 0 {zero}; dob bez pary {nopair}",
+            "0 (naprawa wlaczona; inaczej INFO)", ok if n else None)
+    # AB-5 AM-15
+    bad1, n, lastw = 0, 0, None
+    for _, first, g in days:
+        m = AB_WORLD.search(g[5])
+        if not m:
+            continue
+        lastw = m.groups()
+        if first:
+            continue
+        n += 1
+        if int(m.group(2)) > 0:
+            bad1 += 1
+    ok = (bad1 == 0) if cult else None
+    rep.add("AB-5: (AM-15) twierdze z >= 2 kulturami, wszystkie asymilacje 1.0 = 0 (bez pierwszej doby sesji)",
+            f"dob {n}, dob z takimi twierdzami {bad1}" + (f"; ostatnia: {lastw[1]} z {lastw[2]}" if lastw else ""), "0 (naprawa wlaczona; inaczej INFO)", ok if n else None)
+    if lastw:
+        rep.add("AB-5b: (AM-15) kultura i lojalnosc - ostatnia doba (INFO)",
+                f"twierdz {lastw[0]}, asymilacja pana srednio {lastw[3]}, ponizej 0.5: {lastw[4]}; lojalnosc srednio {lastw[5]}, ponizej 25: {lastw[6]}; zmiany kultury osad: doba {lastw[7]}, sesja {lastw[8]}",
+                "INFO (bez naprawy: asymilacja 1.0 i lojalnosc +4/d wszedzie, 0 zmian kultury)", None)
+    # AB-6 AM-18
+    zero, n = 0, 0
+    for _, _, g in days:
+        sp, spb = _abf(g[6]), _abf(g[7])
+        if sp is None or spb is None:
+            continue
+        n += 1
+        if spb > 0.5 and abs(sp) < 1e-6:
+            zero += 1
+    ok = (zero == 0) if on.get("Marriage.GetSpouseScore") else None
+    rep.add("AB-6: (AM-18) ocena malzonka gracza nie 0 przy BK > 0", f"probek {n}: 0 przy BK > 0 {zero}", "0 (naprawa wlaczona; inaczej INFO)", ok if n else None)
+    # AB-7
+    g = days[-1][2]
+    rep.add("AB-7: karawana (model / BK) i wyniki 'poza kultura pana' (INFO)", f"karawana {g[8]} (BK {g[9]}); poza kultura pana: sesja {g[11]}",
+            "INFO (RealisticCaravanIncome = true -> 0 i 0; poza kultura pana > 0 tylko przy blogoslawienstwach pana - w praktyce gracz)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -25804,6 +26276,8 @@ def main(argv):
         if a == "--tabele":
             tabp = args[i + 1]; i += 2; continue
         logp = a; i += 1
+    if group == "audytb" and logp:
+        return audytb_main(logp)   # P2 audytu modow 14.10 (AM-10/11/12/15/18): samowywolania BKROT -> model BK (CrashScribe BkrotSelfCall), progi AB-0..AB-7
     if group == "lenna" and logp:
         return lenna_main(logp, tabp)   # PROJEKT-LENNA (14.10): regula N - komu krol daje zdobyty zamek / miasto (FiefGrants), progi LN-0..LN-13
     if group == "audyta" and logp:

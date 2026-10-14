@@ -267,6 +267,7 @@ namespace Armoury
                 try { NotableGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NotableGold.ApplyAll", e); }   // E5/A3 (164c): zloto notabli przez kase miasta handlu - PO oknach ksiegi (O03/O04 First) i PO Seal31
                 try { SmallGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("SmallGold.ApplyAll", e); }   // E5/A7: drobne zrodla gry (rabunek z kiesy wsi, kiesa nowej zalogi, perki AI) - PO NotableGold (prefiksy Low na GiveGoldAction)
                 try { BkDipGold.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkDipGold.ApplyAll", e); }   // E5/A8: BK i Diplomacy bez platnika albo odbiorcy (rod szlachty, herszt, uczta BK, koszt paktu Diplomacy) - PO SmallGold
+                try { GentryNames.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GentryNames.ApplyAll", e); }   // trop gentry (audyt modow 14.10, rozdz. 7): nazwa rodu BK wolna w calym swiecie, zapas z nazwy wsi - przy starcie gry, PRZED tworzeniem gentry w nowej kampanii
                 try { Stage8World.ApplyAll(_harmony); } catch (Exception e) { Log.Error("Stage8World.ApplyAll", e); }   // E8/P3 (245): pomiary swiata (tylko log) - postfiksy DTE (kara Underequipped), prefiksy / postfiksy BK (GiveFood, FinancialCompromise, DrainGold, BuyGoods); niczego nie zmieniaja
                 try { CaravanFlow.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CaravanFlow.ApplyAll", e); }   // E8/G1 (260): postfiks na prefiksie BKROT (dlawik karawan tylko w drodze), pomiar tiku BK, postfiks BK ShouldHaveCaravan (lord nie kupuje karawany bez statkow w slepym zaulku); klucze czytane na zywo
                 try { MercFeast.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MercFeast.ApplyAll", e); }   // E8/G2 (261): najemnicy i uczta BK - bez nowych latek (okna SpoilsCompany i BkDipGold), odczyt metody szansy BK i linia "wpiete N/M"; PO SpoilsCompany i BkDipGold
@@ -282,6 +283,7 @@ namespace Armoury
                 DebtLadder.SetHarmony(_harmony);    // 168: tylko zapamietanie - latki modelu finansow (portfele) i BK (B5) w kampanii
                 CouncilWages35.SetHarmony(_harmony); // 3.5: tylko zapamietanie - latki BK (rada: platnik i urzad radnego) w kampanii
                 FiefGrants.SetHarmony(_harmony);     // PROJEKT-LENNA (14.10): tylko zapamietanie - latki modelu BK / BKROT i decyzji "Owner of X" w kampanii
+                BkrotChains.SetHarmony(_harmony);    // P4 audytu (AM-13, AM-09, AM-19): tylko zapamietanie - lancuchy modeli pod BKROT wpina EnsureHooks w kampanii (BKROTPatch laduje sie po Armoury)
                 EstateIncome187.SetHarmony(_harmony); // 3.1/3.3 (31b) E3/2: tylko zapamietanie - latki majatkow BK w kampanii
                 Seal31B.SetHarmony(_harmony);        // 3.1/3.3 (31b) E3/4, E3/8, E3/9: tylko zapamietanie - latki gry i BK w kampanii
                 MercTenure.SetHarmony(_harmony);    // M6a-1: tylko zapamietanie - latki najmu gry i BK w kampanii
