@@ -316,4 +316,33 @@
        days held back by the pause, the ones rolled and let through, and the offers made. Set MarriageOffersPerYear
        to false for offers as in the base game. -->
   <MarriageOffersPerYear>true</MarriageOffersPerYear>
+
+  <!-- Realm of Thrones unique companions (Tyrion, Jaime, Bronn, Brienne and the other 59 wanderers you can hire in a
+       tavern): a dead companion stays dead, and there is only ever one of each.
+       Realm of Thrones creates such a companion every day for which nobody - living or dead - with that companion's
+       template exists. The base game wipes dead wanderers off its list of the dead (at once when you never met them,
+       otherwise after 40 days) and now and then removes a free wanderer outright, so a dead Tyrion came back to a
+       tavern as a new man with the same face, and a removed one turned up somewhere else as a new person.
+       UniqueCompanionsStayDead: a unique companion who really died (in battle, executed, of old age...; your own
+       companions too) stays on the list of the dead, and Realm of Thrones does not create a new one - CrashScribe
+       also keeps its own list of these deaths in the save.
+       UniqueCompanionsMove: when the base game would remove a free unique companion (no clan, no party, not a
+       prisoner), it moves him or her to a random town of his or her culture instead - the same person, so nobody
+       disappears from the taverns for good; a companion you dismiss ("I no longer have need of your services" - the
+       base game removed him or her at once) goes back to a tavern the same way. A companion who leaves you after a
+       quarrel is still removed as in the base game (Realm of Thrones makes a new one some 40 days later).
+       UniqueCompanionsDuplicateGuard: once a day, should two living unique companions ever share a template (the
+       game's code gives no way to it, so this should never act), the free one is removed and the log says so.
+       Their children are left out (they share the parent's template).
+       UniqueCompanionsChildren: a child of a unique companion gets an ordinary name of its culture instead of the
+       parent's full name (the game named it "Tyrion Lannister" too), and at birth it does not get copies of the
+       parent's own outfit (it gets its culture's child clothes); things it inherits later are kept.
+       UniqueCompanionsLog: one daily "Unikaty ROT (UC)" line in the CrashScribe log - every unique companion: alive
+       or dead, where, clan and occupation, plus their children and counters (duplicates, comebacks, moves).
+       Set any of them to false to restore the old behaviour of that part. Changes take effect after a game restart. -->
+  <UniqueCompanionsStayDead>true</UniqueCompanionsStayDead>
+  <UniqueCompanionsMove>true</UniqueCompanionsMove>
+  <UniqueCompanionsDuplicateGuard>true</UniqueCompanionsDuplicateGuard>
+  <UniqueCompanionsChildren>true</UniqueCompanionsChildren>
+  <UniqueCompanionsLog>true</UniqueCompanionsLog>
 </CrashScribe>

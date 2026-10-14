@@ -681,6 +681,11 @@ Uzycie (Python 3, tylko odczyt):
                     linie nadania (z --tabele: zmiany rodu po zdobyciu +- 2), LN-2 ponad pulapem przy kims w pulapie 0, LN-3 rada wybiera 1. albo >= 0.7 x 1.
                     (>= 95%), LN-4 najwiekszy rod krolestwa <= 40%, LN-5 rody / nadania >= 0.60, LN-6 miasta ponad pulap 0, LN-7 rod krola <= 35%,
                     LN-8 wodz spoza korony dostaje >= 50%, LN-9 anulowane 0, LN-10 uczestnicy szturmu >= 80%, LN-11 oddane w 60 dob (DECYZJA), LN-12 potkniecia 0.
+--grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
+                    --grupa unikaty --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). UN-0 wpiecie latek PODPIETE, UN-2 linie doby
+                    "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
+                    wolnych w miastach tylko przez zgony / najecie / rody / niewole, UN-7 bez miejsca nie rosnie, UN-9 dzieci z imieniem wzoru 0, UN-11
+                    potkniecia 0; UN-1, UN-8, UN-10, UN-12 INFO. Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -16583,6 +16588,98 @@ def lup5b_main(logp, start_arg, until=364, bdp=None):
     return 0
 
 
+UC_DAY = re.compile(
+    r"Unikaty ROT \(UC\): dzien (?P<d>\d+) \| wzorow (?P<w>\d+), zywych (?P<alive>\d+) \(wolnych w miastach (?P<town>\d+), bez miejsca (?P<nowhere>\d+),"
+    r" towarzyszy (?P<comp>\d+), w rodach (?P<clan>\d+), jencow (?P<pris>\d+)\), martwych (?P<dead>\d+), znikniete (?P<lost>\d+), brak (?P<none>\d+)"
+    r" \| duplikaty (?P<dup>\d+) \(usuniete dzis (?P<duprem>\d+), nie do usuniecia (?P<dupleft>\d+)\)"
+    r" \| odrodzenia dzis (?P<resp>\d+) \(od wczytania \d+\)"
+    r" \| przeprowadzki dzis (?P<moved>\d+) \(od wczytania \d+\), usuniete przez gre dzis (?P<lostgame>\d+), inne usuniecia dzis (?P<lostother>\d+)"
+    r" \| zmarli zostaja: na liscie CS (?P<list>\d+), blokad wymazania dzis (?P<kept>\d+), blokad ROT dzis (?P<spawnblk>\d+)"
+    r" \| dzieci unikatow (?P<kids>\d+), z imieniem wzoru (?P<kidsnamed>\d+) \(dzis imie (?P<kidname>\d+), stroj (?P<kidgear>\d+)\)"
+    r" \| klucze SD/MV/DG/CH (?P<sd>tak|nie)/(?P<mv>tak|nie)/(?P<dg>tak|nie)/(?P<ch>tak|nie)(?: \| POTKNIECIA (?P<stum>\d+) \(razem \d+\))?")
+
+
+def unikaty_main(logp):
+    """unikaty (decyzja Jeffa 14.10 "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs; rozpoznanie
+    docs/pytania-2026-10-14/TOWARZYSZE-DUPLIKATY.md rozdz. 5 i 7). Wejscie: log sesji CrashScribe (session-*.log; --crashscribe P albo sciezka).
+    UN-0 linia wpiecia latek (kazda czynna latka PODPIETA), UN-1 linie startu sesji (INFO), UN-2 linie doby >= 1, UN-3 duplikaty 0 w kazdej dobie,
+    UN-4 odrodzenia 0 (przy kluczach StayDead i Move), UN-5 brak (wzor bez bohatera) 0 ostatniej doby, UN-6 spadek wolnych w miastach wyjasniony
+    zgonami, najeciem, rodami i niewola (unikaty nie znikaja z karczm), UN-7 "bez miejsca" nie rosnie, UN-8 przeprowadzki (INFO), UN-9 dzieci
+    z imieniem wzoru 0, UN-10 zmarli zostaja (INFO), UN-11 potkniecia i raporty bledow UniqueCompanions 0, UN-12 usuniecia Lost (INFO).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("UN-0: log sesji CrashScribe", f"brak pliku {logp}", "podaj --crashscribe <session-*.log>", None)
+        rep.show()
+        return 0
+    lines = read(logp)
+    hook = [s for s in lines if s.startswith("Unikaty ROT (UC): wpiecie")]
+    starts = [s for s in lines if s.startswith("Unikaty ROT (UC): start sesji")]
+    days = []
+    bad_fmt = 0
+    for s in lines:
+        if s.startswith("Unikaty ROT (UC): dzien "):
+            m = UC_DAY.search(s)
+            if m:
+                days.append({k: (int(v) if v is not None and v.isdigit() else v) for k, v in m.groupdict().items()})
+            else:
+                bad_fmt += 1
+    print(f"plik: {logp} | linii wpiecia {len(hook)}, startow sesji {len(starts)}, linii doby {len(days)} (nieczytelnych {bad_fmt})")
+    if not hook:
+        rep.add("UN-0: wpiecie latek (UC)", "brak linii", "INFO (wersja sprzed paczki unikatow)", None)
+        rep.show()
+        return 0
+    h = hook[-1]
+    rep.add("UN-0: wpiecie latek (UC)", h[len("Unikaty ROT (UC): wpiecie | "):][:240], "kazda czynna latka PODPIETE / PODPIETA (bez BRAK i wyjatku)",
+            "BRAK" not in h and "wyjatek" not in h)
+    rep.add("UN-1: start sesji (klucze, zmarli na liscie CS)", (starts[-1][len("Unikaty ROT (UC): start sesji | "):][:240] if starts else "brak linii"), "INFO", None)
+    if not days:
+        rep.add("UN-2: linie doby", f"0 (nieczytelnych {bad_fmt})", ">= 1 (klucz UniqueCompanionsLog)", None if bad_fmt == 0 else False)
+        rep.show()
+        return 0
+    rep.add("UN-2: linie doby", f"{len(days)} (dni {days[0]['d']}-{days[-1]['d']}, nieczytelnych {bad_fmt})", ">= 1 i 0 nieczytelnych", bad_fmt == 0)
+    dup_days = [d for d in days if d["dup"] > 0]
+    dup_lines = sum(1 for s in lines if s.startswith("Unikaty ROT (UC): DUPLIKAT"))
+    rep.add("UN-3: dwa zywe unikaty z jednym wzorem (bez dzieci)",
+            f"dob z duplikatem {len(dup_days)}, max {max(d['dup'] for d in days)}, usuniete przez straznika {sum(d['duprem'] for d in days)}, "
+            f"nie do usuniecia {sum(d['dupleft'] for d in days)}, linii DUPLIKAT {dup_lines}", "0 w kazdej dobie (po strazniku)", not dup_days)
+    keys_on = all(d["sd"] == "tak" and d["mv"] == "tak" for d in days)
+    resp = sum(d["resp"] for d in days)
+    resp_lines = [s for s in lines if s.startswith("Unikaty ROT (UC): ODRODZENIE")]
+    rep.add("UN-4: odrodzenia unikatow (nowy bohater z wzoru po starcie sesji)",
+            f"{resp} (linii ODRODZENIE {len(resp_lines)})" + (f"; pierwsza: {resp_lines[0][len('Unikaty ROT (UC): '):][:160]}" if resp_lines else ""),
+            "0 przy kluczach StayDead i Move (inaczej INFO)", (resp == 0) if keys_on else None)
+    first, last = days[0], days[-1]
+    rep.add("UN-5: wzory bez bohatera (brak)", f"ostatnia doba {last['none']}, max {max(d['none'] for d in days)}, znikniete (Lost) ostatniej doby {last['lost']}",
+            "0 ostatniej doby (kazdy wzor ma bohatera zywego albo zmarlego)", last["none"] == 0)
+    drop = first["town"] - last["town"]
+    why = max(0, last["dead"] - first["dead"]) + max(0, last["comp"] - first["comp"]) + max(0, last["clan"] - first["clan"]) + max(0, last["pris"] - first["pris"])
+    rep.add("UN-6: wolni unikaty w miastach (karczmy)",
+            f"doba {first['d']}: {first['town']} -> doba {last['d']}: {last['town']} (spadek {drop}); zgony +{last['dead'] - first['dead']}, towarzysze +{last['comp'] - first['comp']}, "
+            f"w rodach +{last['clan'] - first['clan']}, jency +{last['pris'] - first['pris']}",
+            "spadek <= przyrost zmarlych + towarzyszy + rodow + jencow (nikt nie znika z karczm)", drop <= why)
+    rep.add("UN-7: unikaty bez miejsca (zbiegowie, bez miasta)", f"doba {first['d']}: {first['nowhere']} -> doba {last['d']}: {last['nowhere']}, max {max(d['nowhere'] for d in days)}",
+            "ostatnia doba <= pierwsza", last["nowhere"] <= first["nowhere"])
+    moved = sum(d["moved"] for d in days)
+    span = max(1, last["d"] - first["d"] + 1)
+    rep.add("UN-8: przeprowadzki zamiast usuniecia (TryKillCompanion, zwolnienie towarzysza)", f"{moved} w {span} dob ({moved / span:.3f} na dobe)",
+            "INFO (gra losuje 10% na dobe jeden wzor z zywych wedrowcow - w dlugim biegu > 0)", None)
+    kn = max(d["kidsnamed"] for d in days)
+    rep.add("UN-9: dzieci unikatow z imieniem wzoru (np. syn 'Tyrion Lannister')",
+            f"max {kn}; dzieci ostatniej doby {last['kids']}, imie poprawione {sum(d['kidname'] for d in days)}, stroj {sum(d['kidgear'] for d in days)}",
+            "0 w kazdej dobie (klucz Children)", (kn == 0) if all(d["ch"] == "tak" for d in days) else None)
+    rep.add("UN-10: zmarli unikaty zostaja martwi", f"na liscie CS ostatniej doby {last['list']}, martwych {last['dead']}, blokad wymazania {sum(d['kept'] for d in days)}, "
+            f"blokad ROT {sum(d['spawnblk'] for d in days)}, linii UNIKAT ZGINAL {sum(1 for s in lines if s.startswith('Unikaty ROT (UC): UNIKAT ZGINAL'))}",
+            "INFO (blokady ROT > 0 = gra wymazala zmarlego mimo latki - patrz linia 'ROT chcial odtworzyc')", None)
+    stum = sum(d["stum"] or 0 for d in days)
+    errs = sum(1 for s in lines if s.startswith("WHERE   : UniqueCompanions") or "CrashScribe.UniqueCompanions." in s)   # blok raportu (WHERE) albo ramka stosu
+    rep.add("UN-11: potkniecia i bledy UniqueCompanions", f"potkniecia {stum}, linii raportow (WHERE / ramka stosu UniqueCompanions) {errs}", "0 i 0", stum == 0 and errs == 0)
+    rep.add("UN-12: unikaty usuniete (Lost) - nie smierc", f"przez gre (nie do przeniesienia) {sum(d['lostgame'] for d in days)}, inne {sum(d['lostother'] for d in days)}",
+            "INFO (po wymazaniu ROT odtworzy - to licza UN-4 odrodzenia)", None)
+    rep.show()
+    return 0
+
+
 def rozwoj_main(logp):
     """rozwoj (RP, decyzja Jeffa 14.10, Armoury/src/LevelPoints.cs): punkt cechy co AttributePointEveryLevels (0 = gra, co 4), dodatkowy punkt
     skupienia co ExtraFocusEveryLevels (0 = wylaczone). Caly log, sesje rozdzielone linia "Rozwoj postaci (RP): start sesji".
@@ -25231,6 +25328,8 @@ def main(argv):
         return odsiecz_main(logp, csp, until_arg if "--do-doby" in args else 100000)   # 14.10 odsiecz-bunty: OB5 odsiecz z pierwszenstwem, S9 BK bez krolestw z buntu, S11 rody z lennem
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
+    if group == "unikaty" and (csp or logp):
+        return unikaty_main(csp or logp)   # 14.10 unikaty ROT (CrashScribe UniqueCompanions): zmarly zostaje martwy, przeprowadzki, duplikaty, dzieci - log sesji CrashScribe
     if group == "rozwoj" and logp:
         return rozwoj_main(logp)   # RP (decyzja Jeffa 14.10): punkt cechy co 3 poziomy, dodatkowe skupienie co 4 (LevelPoints)
     if group == "ciaza" and logp:
