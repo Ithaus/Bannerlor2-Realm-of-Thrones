@@ -620,6 +620,10 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public float SutlerTownShare { get; set; } = 0.85f;
 
+        [SettingPropertyBool("Sutler Clothing", HintText = "the sutlers who follow the men in the field also bring them the leather, felt and linen they wear out on the march: once a day, from the stalls of the town the sutlers trade with (the nearest town not at war with them; nothing while it is under siege or was sacked by their realm in the last days), at that market's price, paid from the men's purse after the coin kept for mending and before the rest goes to the sutlers - you and the AI alike. A party in a town still buys when it leaves, as before. Needs Sutlers Enabled and Army Clothing Enabled. Off = the men buy clothes only when they leave a town, as before")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SutlerClothing { get; set; } = true;
+
         [SettingPropertyInteger("Sutler Ramp Days", 0, 112, "0", HintText = "when the sutlers first come to a save whose parties hold more than 15 days of pay in their purses, their share rises from 1% to the full share over this many days (0 = the full share at once)")]
         [SettingPropertyGroup("The finished piece")]
         public int SutlerRampDays { get; set; } = 28;
@@ -5926,6 +5930,7 @@ namespace Armoury
             s.SutlersEnabled = SutlersEnabled;
             s.SutlerDailyShare = SutlerDailyShare;
             s.SutlerTownShare = SutlerTownShare;
+            s.SutlerClothing = SutlerClothing;
             s.SutlerRampDays = SutlerRampDays;
             s.MenUpgradeMinGainPercent = MenUpgradeMinGainPercent;
             s.MenUpgradeMaxPerVisit = MenUpgradeMaxPerVisit;

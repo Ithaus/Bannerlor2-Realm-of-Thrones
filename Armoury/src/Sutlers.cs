@@ -29,6 +29,8 @@ namespace Armoury
     /// Bez rozruchu pierwsza doba zabralaby ok. 2 mln naraz, a pierwszy tydzien ok. 10-15 mln (projekt rozdz. 3 E5/A3).
     /// Hak B1 (KL 1.3: uslugi 75% kupcy / 25% lud) - E5/B1: czesc miejska dzielona w One przy wplacie (TownFolk.EarnService KLife); kiesa nieczynna - calosc do kasy miasta.
     /// Zloto nie powstaje i nie znika: sakiewka ludzi -> kasa miasta / kiesa wsi (posiadacze "Pieniadz swiata"). Wyjatek per partia - licznik potkniec.
+    /// T3-K1 (klucz SutlerClothing): przed czescia markietanow partia kupuje z polki miasta markietanow cale sztuki odziezy wojska (150) - ArmyClothing.FromSutlers;
+    /// zwolniona rezerwa odziezy (PendingCost) wchodzi w czesc markietanow tej samej doby. Liczniki zakupow - linia "Odziez wojska (150)" nastepnej doby.
     /// </summary>
     internal static class Sutlers
     {
@@ -213,8 +215,17 @@ namespace Armoury
             var town = NearestTown(p, f);
             if (town == null) { town = NearestTown(p, null); noTown = town != null; }
             if (town == null || town.Town == null) { _dEmpty++; return; }   // swiat bez miast - nic nie schodzi
+            // T3-K1 (SutlerClothing): markietani przywoza odziez z miasta, do ktorego wplacaja - PRZED ich czescia (jak w OnLeft: odziez przed "zyciem"),
+            // z sakiewki ponad zalegle naprawy; naprawy liczone raz (F6) i podane do CampPlan. Klucz wylaczony - mend -1, CampPlan liczy je jak dotad
+            long mend = -1L;
+            if (ArmyClothing.SutlerOn)
+            {
+                mend = MenPurse.CampMend(mp);
+                int cloth = ArmyClothing.FromSutlers(mp, town, !noTown, mend);   // wlasny try; zloto juz w kasie miasta
+                if (cloth > 0) MenPurse.NoteCampCloth(cloth);
+            }
             int reserve, kept;
-            int want = MenPurse.CampPlan(mp, rate, out reserve, out kept);
+            int want = MenPurse.CampPlan(mp, rate, mend, out reserve, out kept);
             // F6: kept z CampPlan to ta sama liczba, ktora dawal odczyt MenPurse.KeptFor (ta sama CampReserve na tej samej sakiewce; 0 <= kept <= sakiewka) -
             // rezerwa napraw (AiWear.OutstandingCost) liczona raz na partie w polu, nie dwa
             _planned = true; _dLordSaved += kept;
