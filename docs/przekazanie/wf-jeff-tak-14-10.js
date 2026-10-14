@@ -1,0 +1,33 @@
+export const meta = {
+  name: 'jeff-tak-14-10',
+  description: 'Decyzje Jeffa 14.10 (C2-C5) i jego dawne TAK bez kodu: weteran zabiera komplet, strata gracza jak lord AI, kuznia jak kowal AI; miecz z Qohoru, smoki jedza owce, zloto Casterly Rock, luki Zlotej Kompanii; liczby do niebezpieczenstwa okolicy (4.20)',
+  phases: [ { title: 'Kod i liczby' }, { title: 'Recenzja' } ],
+}
+const S3 = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad`
+const LIBS = S3 + String.raw`\lancuch\libs`
+const SC = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bannerlor2-Realm-of-Thrones\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\scratchpad`
+const REPO = String.raw`C:\Users\GAME\Bannerlor2-Realm-of-Thrones`
+const LOGS = String.raw`D:\Backup-Bannerlord\logs\2026-10-14-noc`
+const INW = REPO + String.raw`\docs\CO-ZOSTALO-DO-KONCA-MODA-2026-10-14.md`
+const BASE = '449d453'
+const envF = (DZ, BR) => String.raw`Mody Bannerlorda 1.4.8 (Realm of Thrones + BannerKings + DTE + nasze Armoury / RealisticCaptivity / CrashScribe). Przeczytaj ${REPO}\CLAUDE.md (caly; zasada 0, obieg zamkniety, pulapki rozdz. 7). Katalog roboczy = folder gry: NIC tam nie zapisuj, gry NIE uruchamiaj, niczego nie wgrywaj.
+DRZEWO: ${DZ} (galaz ${BR}, od w-toku/zbior-e8 ${BASE}). Pracuj TYLKO w nim. Napisy po angielsku, komentarze po polsku bez polskich znakow, .cs z CRLF, kazda zmiana pod kluczem MCM (off = ${BASE}); Jeffa Armoury.json (Documents\Mount and Blade II Bannerlord\Configs\ModSettings\Global\Armoury\Armoury.json - TYLKO ODCZYT): jesli klucz tam jest, zmiana domyslnej nie zadziala - opisz. Po Settings.cs "python tools/gen_mcm.py" ("python3" to atrapa). Build kazdego ruszonego moda: cd "${DZ}\<Mod>" && dotnet build <Mod>.csproj -c Release -v q --nologo "-p:GameLibs=${LIBS}" > build.log 2>&1; echo rc=$? (kod 0). Dekompilacje: gra ${SC}\dec32\cs_full, BK ${SC}\e4tools\bkfull, DTE ${SC}\..\..\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\dbc3d3d1-6a1e-4825-afe7-38583389c73c\scratchpad\dte (jesli jest). Commit konczy sie "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Nie uzywaj spawn_task. ZWRACAJ KROTKO (max 25 linii).
+ZRODLA: inwentarz ${INW} (pozycje C2-C5, B-lista, P4-P6, 1.6 - z odsylaczami do STAN-PRAC / PLAN / projektow); ${REPO}\docs\STAN-PRAC.md (szukaj: "177-2", "24c", "24d", "Zlota Kompania", "weteran", "strata po klesce", "szybkosc kuzni", "4.20"); logi ${LOGS}\Armoury-2026-10-13_21-14-13.log (dwuletni) i _20-41-38 (120 dob). Kazda zmiana: przyczyna, regula, liczby skutku, linia logu, maly prog w tools/sprawdz_logi.py (grupa jeff14), wpis CHANGELOG (wzor CLAUDE.md rozdz. 9, Status DO SPRAWDZENIA), commit. NIE wypychaj.`
+const DA = SC + String.raw`\zb\jt1`, BA = 'w-toku/jeff-tak-gracz'
+const DB = SC + String.raw`\zb\jt2`, BB = 'w-toku/jeff-tak-swiat'
+const zA = String.raw`DECYZJE JEFFA 14.10 (wiazace): C3 "tak" - zwolniony weteran zabiera swoj komplet ze zbrojowni (dzis bierze pieniadze i konia; projekt etapu 4: docs/etap4/PLAN-KODU-E410.md, PRZEKAZANIE rozdz. 25) - takze u AI; obieg: sprzet z zbrojowni rodu / DTE do weterana, potem do domu (ksiega uzbrojenia), nie znika; C4 "tak samo jak pokonany lord AI" - strata gracza po klesce (pojmanie): sprawdz w kodzie, co traci pokonany lord AI (zloto, sprzet, zbrojownia DTE, konie, jency) i zrob graczowi DOKLADNIE to samo (jedna regula); C5 "jak u kowali AI" - czas kucia gracza w kuzni Armoury taki jak praca kowala w warsztacie AI (SmithHours / Forge / ForgeClock - sprawdz, co juz liczy czas), zaplata bez zmian; komunikat po angielsku przy kuciu.`
+const zB = String.raw`DAWNE TAK JEFFA BEZ KODU (inwentarz P4-P6 i 1.6): (a) wlasny miecz z Qohoru (paczka 177-2 - STAN-PRAC; mistrzowie Qohoru QohorMasters.cs) - zrob wedlug zapisanej decyzji; (b) smoki jedza owce (24c - STAN-PRAC) - smoki (ROT-Dragon) zjadaja stada wsi / owce z okolicy, obieg: zwierzeta znikaja jawnie w ksiedze (zjedzone przez smoka), wies traci; (c) zloto Casterly Rock wyczerpane (24d - STAN-PRAC) - kopalnia zlota Casterly Rock wedlug decyzji; (d) PLAN 1.6 luki Zlotej Kompanii (Army175GoldenBows) - dokonczyc: AiGear.Deficit / NeedBuckets czytaja tylko 1. zestaw jednostki - obsluz wszystkie zestawy (albo zestaw z lukiem), zeby AI kupowalo luki; potem wlacz klucz. Jesli ktoras decyzja w STAN-PRAC jest niejasna - zrob wariant najprostszy zgodny z zapisem i opisz.`
+const zC = String.raw`TYLKO LICZBY (bez kodu, bez commitow; pisz do ${REPO}\docs\pytania-2026-10-14\LICZBY-4-20-NIEBEZPIECZENSTWO-OKOLICY.md): PLAN 4.20 (Jeff 11.10: decyzja po liczbach; 14.10: "przygotuj liczby") - czy niebezpieczenstwo okolicy (bandy, napady, ceny, ruch) ma liczyc sie wedlug tego, ile osad wokol opustoszalo (ksiega ludzi, uchodzcy), zamiast stanu "spladrowana" gry. Policz na biegu dwuletnim: ile osad i ludzi jest pustych / wyludnionych wedlug regionow i w czasie, jak dzis dziala "niebezpieczenstwo" (kod gry i nasz: OutlawLaw, Devastation, bandy), co by sie zmienilo (ile regionow, gdzie, ile wiecej band / napadow - szacunek), ryzyka; rozdz. 0 dla Jeffa prostym jezykiem z rada (tak / nie) i jednym pytaniem.`
+phase('Kod i liczby')
+const [a, b, c] = await parallel([
+  () => agent(`${envF(DA, BA)}\n\nJESTES AUTOREM.\n${zA}\n\nZwroc: HEAD, kazda decyzja (zrobione / nie + dlaczego), klucze, liczby, ryzyka.`, { label: 'autor-gracz', phase: 'Kod i liczby' }),
+  () => agent(`${envF(DB, BB)}\n\nJESTES AUTOREM.\n${zB}\n\nZwroc: HEAD, kazda pozycja (zrobione / nie + dlaczego), klucze, liczby, ryzyka.`, { label: 'autor-swiat', phase: 'Kod i liczby' }),
+  () => agent(`${envF(SC + String.raw`\zb\int`, 'w-toku/zbior-e8 (TYLKO ODCZYT - nic nie zmieniaj w tym drzewie)')}\n\n${zC}\n\nZwroc: sciezka pliku + 10 linii.`, { label: 'liczby-4-20', phase: 'Kod i liczby' }),
+])
+phase('Recenzja')
+const rv = (DZ, BR, z, opis) => `${envF(DZ, BR)}\n\nJESTES RECENZENTEM Z POPRAWKA.\n${z}\n\nDiff: "git -C ${DZ} diff ${BASE}..HEAD". Sprawdz: zgodnosc z decyzja Jeffa, obieg (sprzet, zloto, zwierzeta nie znikaja bez sladu, nic z niczego), gracz nie traci wiecej niz lord AI, klucze off = ${BASE}, Armoury.json Jeffa, build kod 0, gen_mcm, progi (--grupa jeff14) na logu dwuletnim (py_compile kopii). Popraw (commit). Na koniec wypchnij DWOMA OSOBNYMI poleceniami: "git -C ${DZ} push origin ${BR}" i "git -C ${REPO} push origin ${BR}". Zwroc: HEAD, co poprawiles, co sprawdzic w tescie, ryzyka.\n\nOpis autora:\n${opis}`
+const [ra, rb] = await parallel([
+  () => agent(rv(DA, BA, zA, a), { label: 'rec-gracz', phase: 'Recenzja' }),
+  () => agent(rv(DB, BB, zB, b), { label: 'rec-swiat', phase: 'Recenzja' }),
+])
+return { a, b, c, ra, rb }
