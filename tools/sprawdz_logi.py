@@ -467,6 +467,9 @@ Uzycie (Python 3, tylko odczyt):
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
+--grupa drobne2   : (14.10, druga paczka drobnych) czesc swiat: D2-A10-1/2 dobytek z domu wedlug rodzaju (szt. na czlowieka bez zakupu >= 1.0),
+                    D2-A11-1/2 karawany wyprowadzone z murow w ostatniej dobie oblezenia (zajete jawnie), D2-B6-1..3 winnice / gaje / palmy (29/19/8),
+                    plon i zapas daktyli; czesci gracz i ksiegi - w swoich galeziach. python -I tools/sprawdz_logi.py --grupa drobne2 <log>
 --grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
                     i L5b-2 karawany wroga w zdobytym miescie (EnemyCaravans). python -I tools/sprawdz_logi.py --grupa lup5b [--do-doby 364] <Armoury-*.log>
                     Wiersze L5B-0..L5B-8: linie, latki, zdobycia szturmem = linie L5b-2, obieg skarbca co do zlotowki, zabrane <= czesc x nadwyzka ponad zapas
@@ -16405,7 +16408,7 @@ def drobne14_main(logp):
     left = [s for s in lines if s.startswith("Karawana wyszla z oblezonej osady (L5b-2, diagnoza)")]
     c4 = [s for s in lines if s.startswith("Kasa miasta ponizej zapasu (C-4b, diagnoza)")]
     print(f"plik: {logp} | linii L5b-2 {len(ev)}, wyjazdow z oblezonych (linie) {len(left)}, C-4b diagnoza {len(c4)}")
-    st0 = st_in = st_out = st_gone = nosp = seized = 0
+    st0 = st_in = st_out = st_gone = nosp = seized = trz = 0
     diag = 0
     for s in ev:
         m = re.search(r"na poczatku oblezenia w murach (\d+): teraz w murach (\d+), poza murami (\d+).*?, zniknely (\d+)", s)
@@ -16416,12 +16419,14 @@ def drobne14_main(logp):
         elif "brak spisu" in s:
             nosp += 1
         seized += num(r"\| zajete (\d+)", s, int, 0) or 0
+        trz += num(r"wroga poza osadami \d+ \(zajete (\d+)", s, int, 0) or 0   # A11 (drobne2): zajete wyprowadzone z murow w ostatniej dobie
     if diag:
         rep.add("D14-1: L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu",
-                f"zdobyc {len(ev)} (z diagnoza {diag}, bez spisu {nosp}); na poczatku {st0}: w murach przy zdobyciu {st_in}, poza murami {st_out}, zniknely {st_gone}; zajete {seized}",
+                f"zdobyc {len(ev)} (z diagnoza {diag}, bez spisu {nosp}); na poczatku {st0}: w murach przy zdobyciu {st_in}, poza murami {st_out}, zniknely {st_gone}; zajete {seized}"
+                + (f" (w tym wyprowadzone z murow A11 {trz})" if trz else ""),
                 "przy karawanach w murach na poczatku oblezenia (> 0): w murach przy zdobyciu > 0 (inaczej droga zajecia martwa - patrz D14-2;"
-                " DECYZJA, nie NIE: drobne14 to tylko diagnoza, naprawa po stosie D14-2)",
-                (st_in > 0) if st0 > 0 else None, decide=True)
+                " DECYZJA, nie NIE: drobne14 to tylko diagnoza, naprawa po stosie D14-2; drobne2 A11: zajete wyprowadzone > 0 = droga zajecia dziala)",
+                (st_in > 0 or trz > 0) if st0 > 0 else None, decide=True)
     else:
         rep.add("D14-1: L5b-2 karawany na poczatku oblezenia", f"linii L5b-2 {len(ev)}, bez dopisku diagnozy" if ev else "brak linii L5b-2", "INFO (wersja sprzed drobne14 albo brak zdobyc)", None)
     if left:
@@ -16451,6 +16456,116 @@ def drobne14_main(logp):
     rep.add("D14-4: P3-2 najdluzej zatkana wies Normal bez wozu (doby w wierszu)",
             ", ".join(f"{k} {v}" for k, v in sorted(names.items(), key=lambda x: -x[1])[:6]) if names else "brak nazw (wersja sprzed drobne14 albo 0 zatkanych)",
             "INFO (ta sama wies wiele dob z rzedu = do rozpoznania)", None)
+    rep.show()
+    return 0
+
+
+def drobne2_swiat(lines, rep):
+    """drobne2 czesc B - swiat (14.10; CHANGELOG "drobne2 - swiat"): A10 dobytek z domu wedlug rodzaju (RecruitOwnByKind), A11 karawany wyprowadzone
+    z murow w ostatniej dobie oblezenia (EnemyCaravansSiegeTrapped), B6 winnice, gaje i palmy poludnia (VineOliveByClimate). Caly log (bez okna dob).
+    Log bez paczki (bez dopiskow / linii): INFO, bez wyjatku."""
+    # ---- A10: dopisek linii "Komplet rekruta: dzien"
+    kom = [s for s in lines if s.startswith("Komplet rekruta: dzien")]
+    on = [s for s in kom if "dobytek z domu (A10, wedlug rodzaju: tak)" in s]
+    off = [s for s in kom if "dobytek z domu (A10, wedlug rodzaju: nie" in s]
+    if on:
+        nb = sum(num(r"\(bez zakupu notabla (\d+): szt\.", s, int, 0) or 0 for s in on)
+        nbp = sum(num(r"\(bez zakupu notabla \d+: szt\. (\d+)", s, int, 0) or 0 for s in on)
+        same = sum(num(r"szt\. ten sam przedmiot (\d+)", s, int, 0) or 0 for s in on)
+        kind = sum(num(r", ten sam rodzaj (\d+) \(tyle", s, int, 0) or 0 for s in on)
+        val = sum(num(r"\(tyle dodaje regula rodzaju\), wartosc (\d+) zl", s, int, 0) or 0 for s in on)
+        cov = sum(num(r"sloty kupione przez notabla \(bez dobytku\) (\d+)", s, int, 0) or 0 for s in on)
+        per = nbp / nb if nb else 0.0
+        rep.add("D2-A10-1: dobytek z domu bez zakupu notabla (ochotnik bez zapisu, najemnik, zaloga, gracz) - sztuk na czlowieka",
+                f"{per:.2f} ({nbp} szt. u {nb} ludzi w {len(on)} dobach)",
+                ">= 1.0 (wzorce po zamianie 175: wedlug rodzaju 2.36 szt. na linie, po id 0.22; bieg 120 dob 02-50-28 po id 0.007)", (per >= 1.0) if nb else None)
+        rep.add("D2-A10-2: dobytek z domu - sztuki (ten sam przedmiot / ten sam rodzaj), wartosc na dobe, sloty kupione przez notabla (INFO)",
+                f"{same} / {kind}; {val / max(1, len(on)):.0f} zl/d; sloty kupione {cov}",
+                "INFO - rzeczy przodka t1 (tanie); zakupy notabli VolunteerKit bez zmian (slot kupiony nie dostaje dobytku)", None)
+    else:
+        rep.add("D2-A10-1: dobytek z domu wedlug rodzaju", f"linii Komplet rekruta {len(kom)}, z kluczem wylaczonym {len(off)}, bez dopisku A10 {len(kom) - len(off)}",
+                "INFO (klucz RecruitOwnByKind wylaczony albo log sprzed A10)", None)
+    # ---- A11: dopisek linii L5b-2
+    ev = [s for s in lines if s.startswith("Karawany w zdobytym miescie (L5b-2): dzien")]
+    a11 = [s for s in ev if "| wyprowadzone z murow (A11, " in s]
+    if a11:
+        act = [s for s in a11 if "| wyprowadzone z murow (A11, czynne)" in s]
+        exits = sum(num(r"wyjsc z murow w oblezeniu (\d+)", s, int, 0) or 0 for s in a11)
+        cand = sum(num(r"w ostatniej dobie wroga poza osadami (\d+) \(zajete", s, int, 0) or 0 for s in a11)
+        tseiz = sum(num(r"poza osadami \d+ \(zajete (\d+), pominiete", s, int, 0) or 0 for s in a11)
+        tskip = sum(num(r"poza osadami \d+ \(zajete \d+, pominiete (\d+)\)", s, int, 0) or 0 for s in a11)
+        old = sum(num(r", starsze niz \d+ h (\d+)", s, int, 0) or 0 for s in a11)
+        oth = sum(num(r", w innej osadzie (\d+)", s, int, 0) or 0 for s in a11)
+        bad = []
+        for s in a11:
+            c = num(r"w ostatniej dobie wroga poza osadami (\d+) \(zajete", s, int, 0) or 0
+            z = num(r"poza osadami \d+ \(zajete (\d+), pominiete", s, int, 0) or 0
+            p = num(r"poza osadami \d+ \(zajete \d+, pominiete (\d+)\)", s, int, 0) or 0
+            gd = num(r"\| kiesy: zdjete \d+ - dopisane \d+ = (-?\d+)", s, int, 0) or 0
+            ud = num(r"\| ladunek: zdjete \d+ - dopisane \d+ = (-?\d+)", s, int, 0) or 0
+            sv = num(r"\| nie zniknely (\d+)", s, int, 0) or 0
+            if z + p > c or (z > 0 and (gd != 0 or ud != 0 or sv != 0)):
+                bad.append("d%s kand %d zaj %d pom %d zl %d szt %d ost %d" % (num(r"dzien (\d+)", s, int, 0), c, z, p, gd, ud, sv))
+        first = next((s.split("(pierwsza: ", 1)[1].split(")", 1)[0] for s in a11 if "(pierwsza: " in s), "-")
+        rep.add("D2-A11-1: L5b-2 karawany wyprowadzone z murow w ostatniej dobie oblezenia - zajete jawnie (kiesy i ladunek zdjete = dopisane, nie zniknely 0)",
+                f"zdobyc {len(a11)} (czynne {len(act)}); wyjsc z murow w oblezeniu {exits}: kandydatow {cand}, zajete {tseiz}, pominiete {tskip}, starszych niz doba {old}, "
+                f"w innej osadzie {oth}; niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""),
+                "zajete + pominiete <= kandydaci (reszta: poddani nowego pana); przy zajeciu roznica kies 0, sztuk 0, nie zniknely 0", len(bad) == 0)
+        rep.add("D2-A11-2: L5b-2 pierwsza wyprowadzona karawana (godziny przed zdobyciem, odleglosc od murow, bitwa osady, zachowanie AI)", first[:300],
+                "INFO - bieg dwuletni 21-14-13: 0 karawan w murach w 39 zdobyciach; zajete wyprowadzone przy zdobyciu z karawanami na poczatku oblezenia"
+                " (D14-1) = naprawa dziala; odleglosc duza (> 30 jedn.) = karawany odjezdzaja - zawezic okno", None)
+    else:
+        rep.add("D2-A11-1: L5b-2 karawany wyprowadzone z murow", f"linii L5b-2 {len(ev)}, bez dopisku A11", "INFO (log sprzed A11 albo brak zdobyc)", None)
+    # ---- B6: linia startu sesji i Towary (winogrona, oliwki, daktyle)
+    st = [s for s in lines if s.startswith("Winnice i gaje (B6): start sesji")]
+    act6 = bool(st) and "CZYNNE na stale" in st[-1]
+    if st:
+        s = st[-1]
+        v = num(r"na mapie winnice (\d+)", s, int, None)
+        o = num(r", gaje oliwne (\d+)", s, int, None)
+        d = num(r", palmy daktylowe (\d+)", s, int, None)
+        tb = num(r"z tabeli podmienione (\d+) z \d+", s, int, None)
+        rep.add("D2-B6-1: winnice / gaje / palmy na mapie po starcie sesji (kampania zaczeta z kluczem; T8 i GL-5 czynne)",
+                f"{v} / {o} / {d}; z tabeli {tb} z 8; " + ("CZYNNE" if act6 else "bez podmian (stary zapis albo klucz wylaczony przy starcie)"),
+                "29 / 19 / 8 i 8 z 8 (mapa ROT po T8: 23 / 19 / 14)", (v == 29 and o == 19 and d == 8 and tb == 8) if act6 else None)
+    else:
+        rep.add("D2-B6-1: winnice i gaje (B6)", "brak linii startu sesji", "INFO (log sprzed B6)", None)
+    tow = {}
+    for s in lines:
+        if not s.startswith("Towary: dzien "):
+            continue
+        m = re.match(r"Towary: dzien (\d+) - (grape|olives|date_fruit) \([^)]*\): zapas (\d+).*?\| produkcja (\d+) \[wsie (\d+)", s)
+        if m:
+            tow.setdefault(m.group(2), []).append((int(m.group(1)), int(m.group(3)), int(m.group(5))))
+    if tow:
+        parts = []
+        for k, base, exp in (("grape", "271", "ok. 340"), ("olives", "260", "bez zmian"), ("date_fruit", "109", "ok. 62")):
+            ser = tow.get(k, [])
+            if not ser:
+                continue
+            last = ser[-28:]
+            parts.append(f"{k} wsie {sum(x[2] for x in last) / len(last):.0f}/d (bieg 02-50-28 {base}, oczekiwane z B6 {exp}), zapas {ser[0][1]} -> {ser[-1][1]}")
+        rep.add("D2-B6-2: plon wsi (srednia 28 ostatnich dob) i zapas swiata - winogrona, oliwki, daktyle (INFO)", "; ".join(parts),
+                "INFO - zywnosc, regulator wsi jej nie rusza; bieg 02-50-28 zapas d1 -> d120: winogrona 20.3 -> 11.0 tys., oliwki 18.1 -> 13.6, daktyle 7.8 -> 10.5", None)
+        ds = tow.get("date_fruit", [])
+        if ds and act6:
+            z0, z1 = ds[0][1], ds[-1][1]
+            rep.add("D2-B6-3: zapas daktyli swiata na koncu logu wobec pierwszej doby (palm 14 -> 8)", f"{z0} -> {z1} ({z1 / max(1, z0):.2f})",
+                    ">= 0.50 (bieg 120 dob bez B6: 7.8 -> 10.5 tys., +23/d; z B6 ok. -24/d - w 120 dobach ok. -2.9 tys.)", z1 >= 0.5 * z0)
+    else:
+        rep.add("D2-B6-2: Towary - winogrona, oliwki, daktyle", "brak linii Towary", "INFO", None)
+
+
+def drobne2_main(logp):
+    """drobne2 (14.10, druga paczka drobnych z inwentarza; docs/przekazanie/wf-drobne-2.js): czesci gracz / swiat / ksiegi - kazda czesc to funkcja
+    drobne2_<czesc>(lines, rep); grupa liczy te, ktore sa w narzedziu (po scaleniu galezi drobne2-* wszystkie trzy)."""
+    lines = read(logp)
+    rep = Report()
+    print(f"plik: {logp}")
+    for part in ("drobne2_gracz", "drobne2_swiat", "drobne2_ksiegi"):
+        fn = globals().get(part)
+        if fn is not None:
+            fn(lines, rep)
     rep.show()
     return 0
 
@@ -19787,6 +19902,8 @@ def main(argv):
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
+    if group == "drobne2" and logp:
+        return drobne2_main(logp)   # drobne2: czesci gracz / swiat (A10 dobytek po rodzaju, A11 karawany wyprowadzone z murow, B6 winnice) / ksiegi
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:

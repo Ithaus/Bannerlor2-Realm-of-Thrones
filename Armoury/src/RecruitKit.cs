@@ -32,6 +32,8 @@ namespace Armoury
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.KitFromNotable && s.VolunteerKitEnabled; } }
         internal static bool FreshOn { get { return On && Settings.Current.FreshVolunteerKit; } }
+        // A10 / PLAN 1.5: dobytek wedlug rodzaju sprzetu (klucz RecruitOwnByKind; off = po id, stan 449d453)
+        internal static bool ByKind { get { var s = Settings.Current; return s != null && s.RecruitOwnByKind; } }
 
         private class Kit
         {
@@ -49,6 +51,9 @@ namespace Armoury
         private static int _dGarPaid, _dGarPaidGold, _dGarUnpaid, _daySoldFree, _dEchoKnown;
         private static int _dGarPaidPurse, _dGarPaidLord;   // poprawki sklad7: z tego z sakiewki zalogi / od pana
         private static long _dEchoGap;
+        // A10: dobytek wedlug rodzaju - wyliczenia (wszystkie / bez zakupu notabla), sztuki: ten sam przedmiot, ten sam rodzaj; sloty pokryte zakupem; wartosc
+        private static int _dKindCalls, _dKindNoBuy, _dKindNoBuyPcs, _dKindSame, _dKindKind, _dKindCovered;
+        private static long _dKindValue;
         private static readonly HashSet<Settlement> _dGarTowns = new HashSet<Settlement>();
         private static readonly HashSet<string> _errWhere = new HashSet<string>();
         private static readonly int[] _tRec = new int[7], _tOwn = new int[7], _tPrisoner = new int[7], _tEcho = new int[7];
@@ -74,6 +79,7 @@ namespace Armoury
             _dFreshBought = _dFreshOwn = _dFreshPcs = _dSwap = _dSwapNoKit = 0;
             _dGarMen = _dGarRec = _dGarOwn = _dGarT1 = _dGarPcs = _dGarT1Pcs = _dGarPlayer = 0;
             _dGarPaid = _dGarPaidGold = _dGarUnpaid = _daySoldFree = _dEchoKnown = 0; _dEchoGap = 0; _dGarPaidPurse = _dGarPaidLord = 0;
+            _dKindCalls = _dKindNoBuy = _dKindNoBuyPcs = _dKindSame = _dKindKind = _dKindCovered = 0; _dKindValue = 0;
             _dGarTowns.Clear();
             Array.Clear(_tRec, 0, 7); Array.Clear(_tOwn, 0, 7); Array.Clear(_tPrisoner, 0, 7); Array.Clear(_tEcho, 0, 7);
         }
@@ -184,12 +190,78 @@ namespace Armoury
             return l;
         }
 
-        /// <summary>Dobytek wolnego czlowieka (Z3, regula wpisu 92): rzeczy przodka tieru 1 jego linii, ktore oddzial y tez nosi.</summary>
+        /// <summary>Dobytek wolnego czlowieka (Z3, regula wpisu 92): rzeczy przodka tieru 1 jego linii, ktore oddzial y tez nosi
+        /// (A10: przy RecruitOwnByKind - tego samego rodzaju, OwnByKind).</summary>
         private static List<EquipmentElement> OwnOf(CharacterObject y)
         {
             if (y == null) return new List<EquipmentElement>();
-            var root = Tier1Root(y) ?? (y.Culture != null ? y.Culture.BasicTroop : null);
-            return Shared(root, y);
+            var root = RootOf(y);
+            return ByKind ? OwnByKind(root, y, null) : Shared(root, y);
+        }
+
+        private static CharacterObject RootOf(CharacterObject y) { return y == null ? null : (Tier1Root(y) ?? (y.Culture != null ? y.Culture.BasicTroop : null)); }
+
+        /// <summary>
+        /// A10 / PLAN 1.5 (projekt 175 rozdz. 1.9 "171": dobytek po RODZAJU zamiast po id): rodzaj sprzetu jak w zamianie 175 (CrashScribe Army175Gear.WKey) -
+        /// bron i tarcza: typ + klasa broni glownej; pancerz, amunicja: typ. Zamiana 175 daje przodkowi t1 i oddzialowi rozne zamienniki tego samego rodzaju,
+        /// wiec czesc wspolna po id spadla 366 -> 239 sztuk wzorcow (wartosc -58%; w biegu 120 dob 0.007 sztuki na czlowieka "z tym co ma").
+        /// </summary>
+        private static int KindOf(ItemObject it)
+        {
+            var t = it.ItemType;
+            bool weapon = t == ItemObject.ItemTypeEnum.OneHandedWeapon || t == ItemObject.ItemTypeEnum.TwoHandedWeapon || t == ItemObject.ItemTypeEnum.Polearm
+                || t == ItemObject.ItemTypeEnum.Bow || t == ItemObject.ItemTypeEnum.Crossbow || t == ItemObject.ItemTypeEnum.Sling || t == ItemObject.ItemTypeEnum.Thrown
+                || t == ItemObject.ItemTypeEnum.Pistol || t == ItemObject.ItemTypeEnum.Musket || t == ItemObject.ItemTypeEnum.Shield;
+            if (!weapon) return (int)t * 1000;
+            int wc = 0;
+            try { wc = it.PrimaryWeapon != null ? (int)it.PrimaryWeapon.WeaponClass : 0; } catch { wc = 0; }
+            return (int)t * 1000 + 1 + wc;
+        }
+
+        /// <summary>
+        /// A10: dobytek po rodzaju. Kazdy slot wzorca y (bez koni i rzedow) dostaje najwyzej jedna rzecz: kupiona przez notabla (bought - slot pokryty, bez
+        /// dobytku; zakupy VolunteerKit bez zmian) albo rzecz przodka t1 z domu - najpierw ten sam przedmiot (jak regula po id), potem ten sam rodzaj
+        /// (KindOf). Rzecz z domu to przedmiot PRZODKA (czlowiek przynosi swoja kurte, nie kurte oddzialu); kazda rzecz przodka najwyzej raz.
+        /// </summary>
+        private static List<EquipmentElement> OwnByKind(CharacterObject root, CharacterObject y, List<EquipmentElement> bought)
+        {
+            var l = new List<EquipmentElement>();
+            if (root == null || y == null || root == y) return l;
+            Day();   // liczniki A10 do tej doby (awanse w puli przychodza przed pierwszym werbunkiem doby)
+            var pool = new List<EquipmentElement>();
+            var rootItems = new HashSet<ItemObject>();
+            foreach (var e in TemplateItems(root)) if (!MenPurse.HorseKind(e.Item)) { pool.Add(e); rootItems.Add(e.Item); }
+            var need = new List<ItemObject>();
+            foreach (var e in TemplateItems(y)) if (!MenPurse.HorseKind(e.Item)) need.Add(e.Item);
+            int covered = 0;
+            if (bought != null)
+                foreach (var b in bought)
+                {
+                    if (b.Item == null) continue;
+                    int at = need.IndexOf(b.Item);
+                    // zakup tego samego typu pokrywa slot; najpierw slot, ktorego przodek nie ma (regula po id i tak go nie dawala)
+                    if (at < 0) for (int i = 0; i < need.Count; i++) if (need[i].ItemType == b.Item.ItemType && !rootItems.Contains(need[i])) { at = i; break; }
+                    if (at < 0) for (int i = 0; i < need.Count; i++) if (need[i].ItemType == b.Item.ItemType) { at = i; break; }
+                    if (at >= 0) { need.RemoveAt(at); covered++; }
+                }
+            int same = 0, kind = 0;
+            var rest = new List<ItemObject>();
+            foreach (var it in need)
+            {
+                int at = -1;
+                for (int i = 0; i < pool.Count; i++) if (pool[i].Item == it) { at = i; break; }
+                if (at >= 0) { l.Add(pool[at]); pool.RemoveAt(at); same++; } else rest.Add(it);
+            }
+            foreach (var it in rest)
+            {
+                int k = KindOf(it), at = -1;
+                for (int i = 0; i < pool.Count; i++) if (KindOf(pool[i].Item) == k) { at = i; break; }
+                if (at >= 0) { l.Add(pool[at]); pool.RemoveAt(at); kind++; }
+            }
+            _dKindCalls++; _dKindSame += same; _dKindKind += kind; _dKindCovered += covered;
+            if (bought == null) { _dKindNoBuy++; _dKindNoBuyPcs += l.Count; }
+            foreach (var e in l) if (e.Item != null) _dKindValue += Math.Max(0, e.Item.Value);
+            return l;
         }
 
         // ------------------------------------------------------------ pule ochotnikow
@@ -210,7 +282,8 @@ namespace Armoury
             {
                 // 171 B4: dobytek tieru 1 linii X, ktory Y tez nosi (dla X tieru 1 - jak dotad, tylko jako dobytek)
                 var root = x.Tier <= 1 ? x : (Tier1Root(x) ?? (x.Culture != null ? x.Culture.BasicTroop : null));
-                k.Own.AddRange(Shared(root, y));
+                // A10: po rodzaju - sloty, ktorych notabl nie kupil (dodatki bez towaru), rzecz przodka z domu
+                k.Own.AddRange(ByKind ? OwnByKind(root, y, bought) : Shared(root, y));
             }
             if (bought != null) k.Items.AddRange(bought);
             Push(n, k);
@@ -245,7 +318,7 @@ namespace Armoury
             if (!FreshOn || n == null || y == null) return;
             Day();
             var k = new Kit { Troop = y };
-            k.Own.AddRange(OwnOf(y));
+            k.Own.AddRange(ByKind ? OwnByKind(RootOf(y), y, bought) : OwnOf(y));   // A10: sloty kupione przez notabla bez dobytku
             if (bought != null) k.Items.AddRange(bought);
             Push(n, k);
             if (bought != null) { _dFreshBought++; _dFreshPcs += bought.Count; } else _dFreshOwn++;
@@ -652,6 +725,13 @@ namespace Armoury
                   .Append(PeopleBook.VetLive ? ", konie konnych weteranow z karczmy (167) " : ", konie i rzedy najemnikow z wzorca (160) ").Append(_dMercHorsePcs)
                   .Append("; konni bez konia (do 167) ").Append(_dMountedNoHorse)
                   .Append("; rzeczy ochotnikow, ktorzy odeszli, sprzedane ").Append(_daySold).Append(" szt. (na polke bez zaplaty - kasa miasta pusta ").Append(_daySoldFree).Append(")");
+                // A10 (dopisek NA KONCU - pola wyzej czyta narzedzie): dobytek z domu wedlug rodzaju
+                if (s != null && s.RecruitOwnByKind)
+                    sb.Append(" | dobytek z domu (A10, wedlug rodzaju: tak): wyliczen ").Append(_dKindCalls).Append(" (bez zakupu notabla ").Append(_dKindNoBuy)
+                      .Append(": szt. ").Append(_dKindNoBuyPcs).Append(", na czlowieka ").Append((_dKindNoBuy > 0 ? (double)_dKindNoBuyPcs / _dKindNoBuy : 0.0).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture))
+                      .Append("), szt. ten sam przedmiot ").Append(_dKindSame).Append(", ten sam rodzaj ").Append(_dKindKind)
+                      .Append(" (tyle dodaje regula rodzaju), wartosc ").Append(_dKindValue).Append(" zl; sloty kupione przez notabla (bez dobytku) ").Append(_dKindCovered);
+                else sb.Append(" | dobytek z domu (A10, wedlug rodzaju: nie - po id, jak 449d453)");
                 Log.Info(sb.ToString());
                 // 2. tiery
                 Log.Info("Komplet rekruta (tiery): dzien " + _dayStamp + " - z zapisu " + Tiers(_tRec, 2) + " | z tym co ma " + Tiers(_tOwn, 2)

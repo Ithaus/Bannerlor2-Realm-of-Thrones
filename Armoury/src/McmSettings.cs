@@ -4560,6 +4560,10 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool RecruitBringsWhatHeHas { get; set; } = true;
 
+        [SettingPropertyBool("Recruit Own By Kind", HintText = "a volunteer or recruit brings from home every piece of his line's first-rank gear of the same kind as a piece his troop wears (a peasant's padded coat where his troop wears a coat, his spear where it carries a spear, his shield where it carries a shield) - his own, plainer piece, and only for what nobody bought him; off = only the very same pieces as his troop wears, which since the kingdoms' armies wear gear of their own rank is almost nothing")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool RecruitOwnByKind { get; set; } = true;
+
         [SettingPropertyBool("Fresh Volunteer Kit", HintText = "a volunteer who appears above the first rank (a noble youth) has his notable buy his key gear on the town market, as for a promotion; if the stall or the purse fails, he keeps what he owns and still waits in the pool (off = as before: no record, his kit is decided at recruitment)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool FreshVolunteerKit { get; set; } = true;
@@ -5604,6 +5608,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool EnemyCaravansSeized { get; set; } = true;
 
+        [SettingPropertyBool("Enemy Caravans Siege Trapped", HintText = "with Enemy Caravans Seized: an enemy caravan that was shut inside the besieged walls and was pushed out of the town during the last day of the siege - the storming - is taken as well, as long as it has not reached another town, castle or village; off = only caravans still inside the walls at the moment of capture are taken")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool EnemyCaravansSiegeTrapped { get; set; } = true;
+
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool PeopleScaleDryRun { get; set; } = true;
@@ -5643,6 +5651,10 @@ namespace Armoury
         [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign). Turned off during a campaign, only the salt pans go back to their old yield; the flax villages stay.")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool GoodsRatesByPattern { get; set; } = true;
+
+        [SettingPropertyBool("Vine Olive By Climate", HintText = "Vineyards, olive groves and date palms of the south stand where their climate and the old tales put them: two olive groves of the Reach (Dunstonbury, inland in the north where frost kills the olive, and Redwyne Bay) become vineyards - the Reach is wine country, olives come chiefly from Dorne; the date palms high in the passes of the Red Mountains (Boneway, Vulture's Roost) become Dornish vineyards, and the palms of the Free Cities give way to the vineyards of Lys (Mussum) and Volantis (Krysaro), where they press their sweet wines, and to olive groves (Asmait in Lys, Waltas in Tyrosh). 29 vineyards instead of 23, as many olive groves as before (19), 8 palm orchards instead of 14. Like the flax villages, this comes with a new campaign begun with the option and stays for that whole campaign; a campaign already under way keeps its villages. Off = the villages of the map")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool VineOliveByClimate { get; set; } = true;
 
         [SettingPropertyBool("Folk Earn From Village Buys", HintText = "The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
@@ -6787,6 +6799,7 @@ namespace Armoury
             s.VillageTipHeldBy = VillageTipHeldBy;
             s.RotSwapSameMan = RotSwapSameMan;
             s.RecruitBringsWhatHeHas = RecruitBringsWhatHeHas;
+            s.RecruitOwnByKind = RecruitOwnByKind;
             s.FreshVolunteerKit = FreshVolunteerKit;
             s.HouseLeviesKeepKit = HouseLeviesKeepKit;
             s.VolunteerKitCastles = VolunteerKitCastles;
@@ -7048,6 +7061,7 @@ namespace Armoury
             s.CapitalTreasurySeized = CapitalTreasurySeized;
             s.CapitalTreasuryShare = CapitalTreasuryShare;
             s.EnemyCaravansSeized = EnemyCaravansSeized;
+            s.EnemyCaravansSiegeTrapped = EnemyCaravansSiegeTrapped;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;
@@ -7058,6 +7072,7 @@ namespace Armoury
             s.LevyByPeople = LevyByPeople;
             s.MilitiaByPeople = MilitiaByPeople;
             s.GoodsRatesByPattern = GoodsRatesByPattern;
+            s.VineOliveByClimate = VineOliveByClimate;
             s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
         }
 

@@ -57,6 +57,14 @@ namespace Armoury
     ///    oblezenia, ile jest jeszcze w murach, ile stoi poza murami (pierwsza: gdzie i jak daleko), ile zniknelo;
     ///  - wyjazd karawany z OBLEGANEJ osady (OnSettlementLeftEvent przy IsUnderSiege) - licznik i pierwsze 5 na sesje z kim, skad i stosem wywolan
     ///    (linia "Karawana wyszla z oblezonej osady (L5b-2, diagnoza)") - stos wskaze sciezke, ktora je wyprowadza. Naprawa po pierwszym biegu z ta linia.
+    ///
+    /// A11 (naprawa, klucz EnemyCaravansSiegeTrapped; off = 449d453): kto wyprowadza karawany - dalej nieznane (stos z linii diagnozy pokaze nastepny bieg),
+    /// ale FAKT jest z logu: karawany staja w oblezonym miescie na doby (gra i BK - SetMoveModeHold), w dobie zdobycia z niego wychodza, a przy zdobyciu w murach
+    /// nie ma zadnej (39 z 39). Regula: karawana, ktora wyszla z murow OBLEZONEJ twierdzy (OnSettlementLeftEvent przy IsUnderSiege - pamiec: osada, godzina,
+    /// bitwa osady) najwyzej TrappedHours (24 h) przed zdobyciem tej twierdzy, jest czynna, nie stoi w innej osadzie, nie jest w bitwie, jej frakcja jest w wojnie ze
+    /// zdobywca i nie ma statkow - jest zajeta jak stojaca w murach (ta sama droga Seize: kiesa, ladunek, konie, przewodnik, eskorta - jawnie w linii). Pamiec
+    /// wyjsc: czyszczona przy wczytaniu i przy koncu oblezenia tej osady (odstapienie - karawany sa wolne; zdobycie - po prefiksie). Starsze wyjscia, karawany w
+    /// innej osadzie, w bitwie, niewrogie, ze statkami i znikniete - tylko liczone w linii (pierwsza: godziny przed zdobyciem, odleglosc od murow, zachowanie AI).
     /// </summary>
     internal static class EnemyCaravans
     {
@@ -73,7 +81,17 @@ namespace Armoury
             // diagnoza drobne14: spis z poczatku oblezenia (-1 - brak spisu: oblezenie sprzed wczytania)
             public int AtStart = -1, StillIn, Outside, Gone;
             public string OutEx;
+            // A11: karawany wyprowadzone z murow w ostatniej dobie oblezenia (kandydaci do zajecia) i reszta wyjsc z tej osady (tylko licznik)
+            public readonly List<MobileParty> Trapped = new List<MobileParty>();
+            public int TrExits, TrOld, TrOther, TrBattle, TrFriendly, TrNaval, TrGone;
+            public string TrEx;
         }
+
+        // A11: wyjscie karawany z murow oblezonej osady - osada, godzina kampanii, bitwa osady w tej chwili
+        private sealed class Exit { public Settlement St; public double Hour; public bool Battle; }
+        private static readonly Dictionary<MobileParty, Exit> _leftAt = new Dictionary<MobileParty, Exit>();
+        internal const double TrappedHours = 24.0;   // A11: okno "ostatniej doby oblezenia" (szturm; Maidenpool d109284 - karawany wyszly ok. 10 h przed zdobyciem)
+        internal static bool TrappedOn { get { var s = Settings.Current; return s != null && s.EnemyCaravansSiegeTrapped; } }
 
         // diagnoza drobne14: karawany w murach przy OnSiegeEventStarted (osada -> lista); wyjazdy karawan z oblezanych osad
         private static readonly Dictionary<Settlement, List<MobileParty>> _atStart = new Dictionary<Settlement, List<MobileParty>>();
@@ -94,6 +112,7 @@ namespace Armoury
             _dCaps = _dSeized = 0; _dGold = _dUnits = 0; LastCaps = LastSeized = 0; LastGold = LastUnits = 0;
             _stumbles = _dStumbles = 0; _err.Clear();
             _atStart.Clear(); _leftSiege = _dLeftSiege = _stackLines = 0;
+            _leftAt.Clear();
         }
 
         // ------------------------------------------------------------ diagnoza drobne14 (tylko pamiec i log - zachowanie gry bez zmian)
@@ -116,7 +135,21 @@ namespace Armoury
         /// <summary>Sluchacz OnSiegeEventEndedEvent: koniec oblezenia (zdobycie - po linii L5b-2, odstapienie) - spis znika.</summary>
         internal static void OnSiegeEnded(SiegeEvent se)
         {
-            try { if (se != null && se.BesiegedSettlement != null) _atStart.Remove(se.BesiegedSettlement); }
+            try
+            {
+                if (se != null && se.BesiegedSettlement != null)
+                {
+                    var st = se.BesiegedSettlement;
+                    _atStart.Remove(st);
+                    // A11: koniec oblezenia tej osady - wyjscia z jej murow zapomniane (odstapienie: karawany wolne; zdobycie: prefiks juz je przeczytal)
+                    if (_leftAt.Count > 0)
+                    {
+                        List<MobileParty> drop = null;
+                        foreach (var kv in _leftAt) if (kv.Value == null || kv.Value.St == st || kv.Key == null || !kv.Key.IsActive) { if (drop == null) drop = new List<MobileParty>(); drop.Add(kv.Key); }
+                        if (drop != null) foreach (var k in drop) _leftAt.Remove(k);
+                    }
+                }
+            }
             catch (Exception e) { Stumble("OnSiegeEnded", e); }
         }
 
@@ -127,6 +160,9 @@ namespace Armoury
             try
             {
                 _leftSiege++; _dLeftSiege++;
+                // A11: pamiec wyjscia (zawsze - takze przy wylaczonym kluczu: linia pokaze, co regula by zajela)
+                try { _leftAt[mp] = new Exit { St = st, Hour = CampaignTime.Now.ToHours, Battle = st.Party != null && st.Party.MapEvent != null }; }
+                catch (Exception e) { Stumble("OnLeft(pamiec)", e); }
                 if (_stackLines >= StackLinesMax) return;
                 _stackLines++;
                 IFaction bf = null;
@@ -234,6 +270,31 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { Stumble("SiegePre(spis z poczatku)", e); }
+                // A11: karawany wyprowadzone z murow tej osady w trakcie oblezenia - w ostatniej dobie, poza osadami, wrogowie zdobywcy: do zajecia
+                try
+                {
+                    double now = CampaignTime.Now.ToHours;
+                    foreach (var kv in _leftAt)
+                    {
+                        var c = kv.Key; var x = kv.Value;
+                        if (x == null || x.St != settlement) continue;
+                        sn.TrExits++;
+                        if (c == null || !c.IsActive) { sn.TrGone++; continue; }
+                        if (c.CurrentSettlement == settlement) continue;                  // wrocila do murow - jest juz w spisie wyzej
+                        double ago = now - x.Hour;
+                        if (ago > TrappedHours) { sn.TrOld++; continue; }
+                        if (c.CurrentSettlement != null) { sn.TrOther++; continue; }      // dotarla do innej osady - uszla
+                        if (c.MapEvent != null) { sn.TrBattle++; continue; }               // w bitwie - rozstrzyga gra
+                        var f = c.MapFaction;
+                        if (f == null || sn.WinF == null || !f.IsAtWarWith(sn.WinF)) { sn.TrFriendly++; continue; }
+                        if (c.Ships != null && c.Ships.Count > 0) { sn.TrNaval++; continue; }
+                        sn.Trapped.Add(c);
+                        if (sn.TrEx == null)
+                            sn.TrEx = c.StringId + " " + ago.ToString("0.0", Inv) + " h przed zdobyciem, " + c.GetPosition2D.Distance(settlement.GetPosition2D).ToString("0.0", Inv)
+                                      + " jedn. od murow, bitwa osady przy wyjsciu " + (x.Battle ? "TAK" : "nie") + ", " + c.DefaultBehavior + "/" + c.ShortTermBehavior;
+                    }
+                }
+                catch (Exception e) { Stumble("SiegePre(wyprowadzone)", e); }
                 __state = sn;
             }
             catch (Exception e) { Stumble("SiegePre", e); }
@@ -267,12 +328,21 @@ namespace Armoury
             else if (undead) why = "zdobywca Inni - karawany wyjezdzaja jak w grze";
             else if (cap == null || !cap.IsActive) why = "druzyna zdobywcy nieczynna - karawany wyjezdzaja jak w grze";
             else if (!On) why = "W CIENIU (klucz wylaczony) - karawany wyjezdzaja jak w grze";
-            foreach (var c in sn.Enemy)
+            // A11: kandydaci z murow (Enemy) i wyprowadzeni w ostatniej dobie oblezenia (Trapped, tylko przy EnemyCaravansSiegeTrapped) - ta sama regula zajecia
+            bool trOn = TrappedOn;
+            int trSeized = 0, trSkipped = 0;
+            var all = new List<MobileParty>(sn.Enemy);
+            int nIn = all.Count;
+            all.AddRange(sn.Trapped);
+            for (int ci = 0; ci < all.Count; ci++)
             {
-                if (why != null) { skipped++; continue; }
+                var c = all[ci];
+                bool trapped = ci >= nIn;
+                if (trapped && !trOn) { trSkipped++; continue; }                    // klucz A11 wylaczony: jak 449d453 (tylko licznik)
+                if (why != null) { skipped++; if (trapped) trSkipped++; continue; }
                 try
                 {
-                    if (c == null || !c.IsActive || c.MapEvent != null) { skipped++; continue; }
+                    if (c == null || !c.IsActive || c.MapEvent != null) { skipped++; if (trapped) trSkipped++; continue; }
                     // po zmianie pana: karawana kupca tej osady (i jej wsi) ma frakcje osady - jest juz poddana zdobywcy i zostaje (gra tez jej nie wyprowadza);
                     // jej pan i jej kupcy placa przez lup osady (L2) wedlug wyboru zdobywcy - laska zostaje laska
                     var fNow = c.MapFaction;
@@ -381,7 +451,7 @@ namespace Armoury
                     try { mp0 = MenPurse.Get(c); } catch { mp0 = 0; }
                     if (c.IsActive) DestroyPartyAction.Apply(null, c);   // recenzja: partia usunieta przez cudzy nasluch (np. przy niewoli przewodnika) - bez drugiego zdarzenia zniszczenia
                     if (c.IsActive) { survived++; continue; }
-                    seized++; men += m; menPurse += mp0;
+                    seized++; men += m; menPurse += mp0; if (trapped) trSeized++;
                     if (player) { playerN++; playerGold += g; playerUnits += uAll; }
                     if (ex.Count < 4) ex.Add(owner + ": kiesa " + g + ", sztuk " + uAll + (uAll != u ? " (wodzowi " + u + ")" : "") + ", ludzie " + m + (hs.Count > 0 ? ", bohaterow " + hs.Count : ""));
                 }
@@ -406,6 +476,12 @@ namespace Armoury
               .Append(" | na poczatku oblezenia w murach ").Append(sn.AtStart < 0 ? "- (brak spisu: oblezenie sprzed wczytania)"
                       : sn.AtStart + ": teraz w murach " + sn.StillIn + ", poza murami " + sn.Outside + (sn.OutEx != null ? " (" + sn.OutEx + ")" : "") + ", zniknely " + sn.Gone)
               .Append(", wyjazdy karawan z oblezonych osad dzis ").Append(_dLeftSiege).Append(" (od wczytania ").Append(_leftSiege).Append(')')
+              // A11 (dopisek za diagnoza drobne14 - pola wyzej czyta narzedzie): wyprowadzone z murow w ostatniej dobie oblezenia (w "zajete" i kiesach wyzej)
+              .Append(" | wyprowadzone z murow (A11, ").Append(trOn ? "czynne" : "W CIENIU - klucz wylaczony").Append("): wyjsc z murow w oblezeniu ").Append(sn.TrExits)
+              .Append(", w ostatniej dobie wroga poza osadami ").Append(sn.Trapped.Count).Append(" (zajete ").Append(trSeized).Append(", pominiete ").Append(trSkipped).Append(")")
+              .Append(", starsze niz ").Append(((int)TrappedHours).ToString(Inv)).Append(" h ").Append(sn.TrOld).Append(", w innej osadzie ").Append(sn.TrOther)
+              .Append(", w bitwie ").Append(sn.TrBattle).Append(", niewrogie ").Append(sn.TrFriendly).Append(", ze statkami ").Append(sn.TrNaval).Append(", zniknely ").Append(sn.TrGone)
+              .Append(sn.TrEx != null ? " (pierwsza: " + sn.TrEx + ")" : "")
               .Append(_dStumbles > 0 ? " | potkniecia " + _dStumbles + " (od wczytania " + _stumbles + ")" : "").Append('.');
             Log.Info(sb.ToString());
             try

@@ -122,7 +122,7 @@ namespace Armoury
                 else if (it.Lore != null && it.Lore.KnightBanner != null) { b = it.Lore.KnightBanner; _dLore++; }
                 else if (lord != null) { b = lord.Banner; if (b != null) _dLord++; }
                 if (it.Knight != null) hint.Add(it.Knight);
-                if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(GoodsRates.Livelihood(st, r.Uid, it.Lore.Livelihood));   // GL-5 (P5): wies lniana - zdanie lnu
+                if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(VineOlive.Livelihood(st, GoodsRates.Livelihood(st, r.Uid, it.Lore.Livelihood)));   // GL-5 (P5): wies lniana - zdanie lnu
                 string mem = Memory(r, it.Lore);
                 if (mem != null) hint.Add(mem);
             }
@@ -157,7 +157,7 @@ namespace Armoury
                 var more = new List<string>(5);
                 if (row != null)
                 {
-                    if (row.Livelihood.Length > 0) more.Add(GoodsRates.Livelihood(st, it.R.Uid, row.Livelihood));   // GL-5 (P5): wies lniana - zdanie lnu
+                    if (row.Livelihood.Length > 0) more.Add(VineOlive.Livelihood(st, GoodsRates.Livelihood(st, it.R.Uid, row.Livelihood)));   // GL-5 (P5): wies lniana - zdanie lnu
                     if (faith != null && row.Faith.Length > 0 && row.FaithMatches(bkId)) more.Add(row.Faith);
                     if (row.History.Length > 0) more.Add(row.History);
                     if (holder == null && row.Knight.Length > 0 && row.House.Length > 0 && row.Arms.Length > 0)
