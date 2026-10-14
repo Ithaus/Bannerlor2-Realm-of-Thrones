@@ -975,15 +975,22 @@ namespace Armoury
 
         public static void DemandPrefix() { _demandDepth++; }
         public static Exception DemandFinalizer(Exception __exception) { if (_demandDepth > 0) _demandDepth--; return __exception; }
-        public static void DemandPostfix(ItemCategory __1, ref float __result)
+        public static void DemandPostfix(Town __0, ItemCategory __1, ref float __result)
         {
-            if (_demandDepth > 1 || !_applied || __1 == null) return;
-            try
+            if (_demandDepth > 1 || __1 == null) return;
+            if (_applied)
             {
-                float r;
-                if (Settings.Current.HistDemandScaling && _catRatio.TryGetValue(__1, out r) && r > 0f) __result /= r;
+                try
+                {
+                    float r;
+                    if (Settings.Current.HistDemandScaling && _catRatio.TryGetValue(__1, out r) && r > 0f) __result /= r;
+                }
+                catch { }
             }
-            catch { }
+            // GL-2 (P2 b): popyt u ZRODLA x m_t (miasto) / x skala podzamcza (zamek) - jeden wynik karmi slownik budzetu dnia (UpdateDemandShift), popyt wzoru ceny
+            // (GetEstimatedDemandForCategory) i czesc domowa RawPrice.UseDemand; zewnetrzne wywolanie (zagniezdzone - wyzej) raz; 1 = klucz MarketByPeople wylaczony
+            float k = PeopleMarket.DemandScale(__0);
+            if (k != 1f) __result *= k;
         }
 
         // ------------------------------------------------------------ zakupy mieszczan (wpis 53, docs/BILANS-ZUZYCIA.md)

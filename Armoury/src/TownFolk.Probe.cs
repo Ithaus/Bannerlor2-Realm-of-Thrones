@@ -207,6 +207,7 @@ namespace Armoury
                     if (sat != null && sat.Length >= 4) { for (int i = 0; i < 4; i++) f.Sat0[i] = sat[i]; f.Sat0Ok = true; }
                     // E5/B1: kotwica raz na (osade, kategorie, dobe) - slownik x czynnik grupy i oferta nadwyzki ludu, PO pomiarze (G0, Idx, Sat0 - przed kotwica)
                     if (LiveKey) { try { AnchorDict(f, __0, __1, sum); } catch (Exception e) { _brAnchor = false; Stumble("AnchorDict", e); } }
+                    PeopleMarket.NoteBracket(__0, sum, _brFacFood, _brFacRest);   // GL-2 (P2 b): budzet dnia po skali m i czynniki kotwicy (linia "Rynek od ludzi (GL2)"; tylko liczniki)
                 }
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }

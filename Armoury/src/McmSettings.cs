@@ -5424,6 +5424,34 @@ namespace Armoury
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
         public bool CivilWorksNeedWageRoom { get; set; } = true;
 
+        [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool PeopleScaleDryRun { get; set; } = true;
+
+        [SettingPropertyBool("Watch Keeps Flat Output", HintText = "The Night's Watch stands outside the rules that tie goods to the number of people: the villages of the Gift keep today's output, and Castle Black and the Watch's castles keep a market of ordinary size, although only some twenty thousand people live there - the Watch lives on the men and gifts of all Westeros. Off = the Watch's lands are measured by their people like any other")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool WatchKeepsFlatOutput { get; set; } = true;
+
+        [SettingPropertyBool("Village Output By People", HintText = "Each village on the map stands for all the villages of its district: its fields, herds, mines and woods yield by the number of people living there - a village of a crowded land brings forth several times what a village of an empty land does, while the world as a whole makes as much of every good as before (the hearth no longer sets the yield; winter, raids, war and the world's demand still do). The village tooltip shows 'People of this land' and the village's 'People of this land' window tells why it yields more or less. Off = village output follows the hearth thresholds, as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool VillageOutputByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Sarnor People Raised", HintText = "Sarnor counts a quarter of a million people instead of a hundred thousand - as thickly settled as the Iron Islands - so its villages and towns are not left almost empty once goods follow the people. Takes effect in a new campaign only (a campaign already begun keeps the people it was reckoned with). Off = a hundred thousand, as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool SarnorPeopleRaised { get; set; } = true;
+
+        [SettingPropertyBool("Market By People", HintText = "A town is the market of its whole district: the number of townsfolk who buy (and their purses' needs), what they eat and use each day, the working coin its merchants keep and the hands in the notables' workshops all follow the people of the town and of the villages that trade there, compared with the average market of the world (a castle's folk follow the people of its villages). The food stores of the keep count the townsfolk's purchases as before. Off = every town buys and keeps coin as today, by its prosperity")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool MarketByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Village Heads By People", HintText = "The fixed dues a village pays its lord and the salt, tools, cloth, pots and ale it buys in its market town follow the number of people of the village's district, and the folk below a castle follow the people of the castle's villages. Off = every village and castle counts its heads as today")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool VillageHeadsByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Start Gold By People", HintText = "New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool StartGoldByPeople { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6779,6 +6807,13 @@ namespace Armoury
             s.CivilWorksCalmDays = CivilWorksCalmDays;
             s.CivilWorksFrontRange = CivilWorksFrontRange;
             s.CivilWorksNeedWageRoom = CivilWorksNeedWageRoom;
+            s.PeopleScaleDryRun = PeopleScaleDryRun;
+            s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
+            s.VillageOutputByPeople = VillageOutputByPeople;
+            s.SarnorPeopleRaised = SarnorPeopleRaised;
+            s.MarketByPeople = MarketByPeople;
+            s.VillageHeadsByPeople = VillageHeadsByPeople;
+            s.StartGoldByPeople = StartGoldByPeople;
         }
 
         internal static void Apply()

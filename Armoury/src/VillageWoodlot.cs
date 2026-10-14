@@ -188,7 +188,9 @@ namespace Armoury
         {
             float kg = wood != null && wood.Weight > 0.05f ? wood.Weight : LoadKg;
             float d = Rate * LoadKg / kg;
-            return v != null ? d * ClimateFactor(v) * HarvestValve.Factor(wood) : d;   // E6/W3 (221): x mnoznik regulatora wsi dla drewna (tick lasu i magazyn wsi)
+            // E6/W3 (221): x mnoznik regulatora wsi dla drewna (tick lasu i magazyn wsi); GL-1 (P1): x u_v x g(las) - las wsi od ludzi, klimat zostaje (1 przy
+            // wylaczonym kluczu VillageOutputByPeople i dla wsi poza regula)
+            return v != null ? d * ClimateFactor(v) * HarvestValve.Factor(wood) * VillageByPeople.WoodFactor(v) : d;
         }
 
         /// <summary>Postfiks VillageGoodProductionCampaignBehavior.TickGoodProduction(Village, bool): gra wola go raz na dobe dla wsi

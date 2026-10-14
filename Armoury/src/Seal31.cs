@@ -97,7 +97,14 @@ namespace Armoury
         private static readonly Dictionary<Settlement, long> _spent = new Dictionary<Settlement, long>();
 
         /// <summary>Zapas kupcow miasta = cel regulatora gry (10 000 + 12 x dobrobyt).</summary>
-        internal static long TownReserve(Town t) { return t == null ? 0 : 10000L + (long)(12f * t.Prosperity); }
+        internal static long TownReserve(Town t)
+        {
+            if (t == null) return 0;
+            long r = 10000L + (long)(12f * t.Prosperity);
+            float m;
+            if (PeopleMarket.ReserveScale(t, out m)) r = (long)(r * (double)m);   // GL-2 (P2 c): zapas kupcow x m_t (ta sama skala co TownPurse.Reserve)
+            return r;
+        }
 
         /// <summary>Nadwyzka osady na nasze wyplaty, z zywej kasy (miasto: kasa - zapas kupcow - tarcza zoldu - tarcza dworu; zamek: CastlePurse.Spendable).
         /// Wies i inne - 0. Wyplaty juz obnizyly kase - "wydane dzis" NIE jest odejmowane drugi raz (poprawka po recenzji).</summary>

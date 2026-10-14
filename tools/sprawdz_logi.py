@@ -418,6 +418,12 @@ Uzycie (Python 3, tylko odczyt):
                     <= pula <= 1/tempo nadwyzki i <= niepokryta potrzeba po daninie), W5b-2 skarbiec nigdy ponizej zapasu wojny przez te regule,
                     W5b-3 brak ponad prog (pomiar >= 4 doby) -> stawka daniny rosnie o jeden krok; 0 krolestw z brakiem w 4 ostatnich krokach i stawka 0, W5b-4 ile dala regula 1 i 2
                     na krolestwo (INFO), W5b-5 skarbce ponad zapas wojny i powod S (INFO). Log bez paczki: jeden wiersz INFO, bez wyjatku.
+--grupa gl2       : (GL-2 / GL-3, projekt docs/gospodarka-od-ludzi rozdz. 8) rynek miasta od ludzi (MarketByPeople), glowy wsi i podzamcza od ludzi
+                    (VillageHeadsByPeople), zloto startowe wedlug ludzi (StartGoldByPeople - tylko nowa kampania).
+                    python -I tools/sprawdz_logi.py --grupa gl2 [--do-doby 120] [--baza-doby <log biegu bazowego z kluczami GL wylaczonymi>] <Armoury-*.log>
+                    Wiersze GL2-0..GL2-11 (kazdy, P1 + P2, [R] P1 + P2 dopisane; GL2-11 wyroby linii towarowych w miastach m_t > 1.5), GL3-1..3 (P3),
+                    GL2-S1 (zloto startowe: suma kazdej puli przed = po, takze kiesy podzamczy); GL2-8/8b/11 wobec biegu bazowego z --baza-doby (bez - INFO
+                    albo prog projektu). Log bez paczki: INFO, bez wyjatku.
 --grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
                     zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
                     python -I tools/sprawdz_logi.py --grupa w6 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -427,6 +433,13 @@ Uzycie (Python 3, tylko odczyt):
                     paczki, zloto rodow z luzem i zbiornik platnikow, krolestwa bez pomocy (W6-5..7, INFO). Log bez paczki: INFO, bez wyjatku.
                     Recenzja: W6-3b liczy rezerwe z kolumny nadwyzka_ponad_rezerwe_w6 (rezerwa BUDZETU 166 przed poborem), nie z kolumny R
                     (R w CSV = rezerwa od dochodu z 28 dob ksiegi, zwykle wyzsza - na biegu rocznym 3.7% platnikow mialoby kiese pod nia).
+--grupa gl1       : (GL-1, P1 plon wsi od ludzi + P6 krainy szczegolne - docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md rozdz. 8)
+                    python -I tools/sprawdz_logi.py --grupa gl1 [--do-doby 120] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
+                    Wiersze GL1-0..GL1-8: linia doby i kalibracja g, suma swiata kazdego surowca, typu wsi i lasu wsi w dobach 2-29 wobec kalibracji 0.95-1.05,
+                    stosunek plonu wsi zboza Reach : Polnoc wobec stosunku ich ludzi 0.90-1.10 (tabela krolestw; plon faktyczny z plon-wsi.csv INFO), korelacja plonu faktycznego wsi
+                    z ludzmi w obrebie typu >= 0.95 (plon-wsi.csv), potkniecia 0, Straz / dymek (INFO), Sarnor 0.25 mln w kalibracji ludnosci, produkcja
+                    faktyczna wsi (linie Towary) w dobach 2-29 wobec biegu bazowego 0.95-1.05 (z --baza-doby; bez - INFO), regulator od nowa (INFO).
+                    Log bez paczki: INFO, bez wyjatku.
 --grupa m6b       : (m6b, poprawka 6 po raporcie rocznym 13.10, wiersze 22-24) konie juczne z niczego, zboze i ryby bez zrodla, Thenn bez pieniedzy.
                     python -I tools/sprawdz_logi.py --grupa m6b [--do-doby 364] <Armoury-*.log>
                     Wiersze M6b-0..M6b-7: linie i klucze; tabory wsi - juczne gry zdjete co do sztuki i skad nowe (stado wsi / brak);
@@ -16714,6 +16727,589 @@ def m6b_main(logp, start_arg, until=120):
     return 0
 
 
+# ============================================================ GL-1 (P1 plon wsi od ludzi + P6 krainy szczegolne): grupa --grupa gl1
+
+
+def _gl1_ratios(s, head, stop):
+    """Pary 'id liczba' po naglowku head az do separatora stop -> {id: float}."""
+    i = s.find(head)
+    if i < 0:
+        return {}
+    i += len(head)
+    j = s.find(stop, i)
+    body = s[i:j if j >= 0 else len(s)]
+    out = {}
+    for part in body.split(","):
+        m = re.match(r"\s*([^\s,;:]+) (-?\d+(?:\.\d+)?)\s*$", part)
+        if m:
+            out[m.group(1)] = float(m.group(2))
+    return out
+
+
+def _gl1_pearson(xs, ys):
+    n = len(xs)
+    if n < 3:
+        return None
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx <= 0 or syy <= 0:
+        return None
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / (sxx * syy) ** 0.5
+
+
+def _gl1_towary(lines, start, d0, d1):
+    """Linie 'Towary: dzien D - item (...)': srednia produkcji wsi (pole 'wsie N'; drewno + 'las wsi (126) N') w dobach kampanii d0-d1 -> {item: szt./d}."""
+    rx = re.compile(r"^Towary: dzien (\d+) - (\S+) \(")
+    acc, days = {}, {}
+    for s in lines:
+        if not s.startswith("Towary: dzien "):
+            continue
+        m = rx.match(s)
+        if not m:
+            continue
+        d = int(m.group(1)) + 1             # linia Towary drukuje dzien zakonczony
+        if not (d0 <= run_day(d, start) <= d1):
+            continue
+        it = m.group(2)
+        w = num(r"\| produkcja -?\d+ \[(?:[^\]]*?; )?wsie (\d+)", s) or 0
+        if it == "hardwood":
+            w += num(r"las wsi \(126\) (\d+)", s) or 0
+        acc[it] = acc.get(it, 0) + w
+        days.setdefault(it, set()).add(d)
+    return {k: v / max(1, len(days[k])) for k, v in acc.items()}
+
+
+def _gl1_rows(csvp, start, until):
+    rows = []
+    if os.path.isfile(csvp):
+        with open(csvp, encoding="utf-8-sig", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                try:
+                    d = int(r["dzien"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if 2 <= run_day(d, start) <= until:
+                    rows.append(r)
+    return rows
+
+
+def _gl1_week_ok(r):
+    try:
+        return int(r.get("dni_pomiaru") or 0) >= 7 and r.get("plon_glowny_dzien", "") != ""
+    except ValueError:
+        return False
+
+
+def gl1_main(logp, start_arg, until=120, bdp=None):
+    """GL-1 (P1 + P6, projekt docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md rozdz. 8 "Progi testu 120 dob" P1): plon wsi od ludzi
+    (Armoury/src/VillageByPeople.cs) i wyjatek Strazy / Sarnor 0.25 mln. Okno: doby kampanii 2-until (--do-doby); progi sumy surowcow - doby 2-29.
+    Wiersze GL1-0..GL1-8: linia i kalibracja, suma swiata kazdego surowca i typu wsi wobec kalibracji 0.95-1.05 (baza modelu z linii doby), las wsi,
+    stosunek plonu wsi zboza Reach : Polnoc wobec stosunku ich ludzi 0.90-1.10 (tabela krolestw; plon faktyczny z plon-wsi.csv - INFO), korelacja plonu faktycznego wsi z ludzmi
+    w obrebie typu >= 0.95 (plon-wsi.csv, wiersze z >= 7 dobami pomiaru), potkniecia 0, Straz przy wzorze gry, Sarnor w kalibracji ludnosci, produkcja
+    faktyczna wsi z linii "Towary:" w dobach 2-29 wobec biegu bazowego (--baza-doby <log bazowy>; bez niego INFO), regulator wsi od nowa.
+    Log bez paczki (bez linii albo klucz wylaczony): wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    day_l = by_day(lines, "Plon wsi od ludzi (GL1): dzien")
+    kr_l = by_day(lines, "Plon wsi od ludzi wedlug krolestw (GL1): dzien")
+    cal_l = [s for s in lines if s.startswith("Plon wsi od ludzi (GL1): kalibracja")]
+    off_l = [s for s in lines if s.startswith("Plon wsi od ludzi (GL1):") and "WYLACZON" in s]
+    if start is None:
+        alld = sorted(day_l) or sorted(by_day(lines, "Pieniadz swiata: dzien"))
+        start = alld[0] if alld else 0
+    win = [d for d in sorted(day_l) if 2 <= run_day(d, start) <= until]
+    early = [d for d in win if run_day(d, start) <= 29]
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 2-{until}, dob z linia GL1 {len(win)} (doby 2-29: {len(early)})")
+    on = bool(win)
+    # ---- GL1-0 linia, kalibracja
+    if not on:
+        rep.add("GL1-0: linia Plon wsi od ludzi (GL1) i kalibracja g", "brak linii doby" + (f"; linie WYLACZONY: {len(off_l)}" if off_l else ""),
+                "jest od wgrania P1 przy kluczu Village Output By People; bez niej wiersze paczki = INFO (bieg odniesienia)", None)
+    else:
+        last = max(run_day(d, start) for d in win)
+        expect = min(until, last) - 1
+        how = re.search(r"kalibracja \(([^)]*)", cal_l[0]).group(1) if cal_l else "-"
+        gm = re.search(r"po wsiach typu pod regula \(suma swiata kazdego typu w tym dniu = wzor gry co do sztuki, przed zima, budowlami i regulatorem\): ([^;]*)", cal_l[0]) if cal_l else None
+        ntyp = len(gm.group(1).split(", ")) if gm else 0
+        rep.add("GL1-0: linia doby GL1 w kazdej dobie okna, kalibracja g", f"dob z linia {len(win)} z {expect}, linii kalibracji {len(cal_l)} (pierwsza: {how}; typow z g {ntyp})"
+                + (f"; linii WYLACZONY {len(off_l)}" if off_l else ""),
+                ">= 1 kalibracja, linia doby w kazdej dobie okna", bool(cal_l) and len(win) >= expect)
+    # ---- GL1-1 surowce i typy wobec kalibracji (doby 2-29)
+    if early:
+        lo, hi, n = {}, {}, 0
+        tlo, thi = {}, {}
+        wl = []
+        for d in early:
+            s = day_l[d]
+            it = _gl1_ratios(s, "przed zima, budowlami i regulatorem):", ";")
+            m = re.search(r"wobec kalibracji \(dzien \d+\):([^;]*);", s)
+            ty = _gl1_ratios(m.group(1), "", ";") if m else {}
+            m = re.search(r"; las wsi (\d+\.\d+)", s)
+            if m:
+                wl.append(float(m.group(1)))
+            if it:
+                n += 1
+            for k, v in it.items():
+                lo[k] = min(lo.get(k, v), v); hi[k] = max(hi.get(k, v), v)
+            for k, v in ty.items():
+                tlo[k] = min(tlo.get(k, v), v); thi[k] = max(thi.get(k, v), v)
+        bad = sorted(k for k in lo if lo[k] < 0.95 or hi[k] > 1.05)
+        tbad = sorted(k for k in tlo if tlo[k] < 0.95 or thi[k] > 1.05)
+        wbad = [x for x in wl if x < 0.95 or x > 1.05]
+        rng = (f"{min(lo.values()):.3f}-{max(hi.values()):.3f}" if lo else "-")
+        trng = (f"{min(tlo.values()):.3f}-{max(thi.values()):.3f}" if tlo else "-")
+        wrng = (f"{min(wl):.3f}-{max(wl):.3f}" if wl else "-")
+        rep.add("GL1-1: suma swiata kazdego surowca, typu wsi i lasu wsi w dobach 2-29 wobec kalibracji (baza modelu: stawka x u_v x g)",
+                f"dob {n}, surowcow {len(lo)} (zakres {rng}; poza progiem: {', '.join(f'{k} {lo[k]:.3f}-{hi[k]:.3f}' for k in bad[:8]) or 'brak'})"
+                f"; typow wsi {len(tlo)} (zakres {trng}, poza progiem {len(tbad)}); las wsi {wrng}",
+                "0.95-1.05 kazdy surowiec, kazdy typ wsi i las wsi (regula zmienia podzial, nie sume)", (n > 0 and not bad and not tbad and not wbad) if lo else None)
+    else:
+        rep.add("GL1-1: suma swiata kazdego surowca wsi w dobach 2-29 wobec kalibracji", "brak linii GL1 w dobach 2-29", "0.95-1.05", None)
+    # ---- GL1-2 Reach : Polnoc (tabela krolestw) + plon faktyczny z CSV
+    kw = [d for d in sorted(kr_l) if 2 <= run_day(d, start) <= until]
+    d_, f_ = os.path.split(logp)
+    stem_ = os.path.splitext(f_)[0].replace("Armoury-", "")
+    csvp = next((c for c in (os.path.join(d_, stem_, "plon-wsi.csv"), os.path.join(d_, "Logs", stem_, "plon-wsi.csv")) if os.path.isfile(c)),
+                os.path.join(d_, "Logs", stem_, "plon-wsi.csv"))
+    rows = _gl1_rows(csvp, start, until)
+    act = ""
+    if rows:
+        acc = {}
+        for r in rows:
+            if r.get("typ") != "wheat_farm" or not _gl1_week_ok(r):
+                continue
+            a = acc.setdefault(r.get("krolestwo", ""), [0.0, 0])
+            a[0] += float(r["plon_glowny_dzien"]); a[1] += 1
+
+        def avg(name):
+            for k, a in acc.items():
+                if k == name and a[1]:
+                    return a[0] / a[1]
+            return None
+        ra, rn = avg("The Reach"), avg("The North")
+        act = (f"; plon faktyczny wsi zboza (plon-wsi.csv, srednia tygodni): Reach {ra:.1f}, Polnoc {rn:.1f}, stosunek {ra / rn:.2f}" if ra and rn
+               else "; plon faktyczny: brak wierszy The Reach / The North z >= 7 dobami w CSV")
+    if kw:
+        s = kr_l[kw[-1]]
+
+        def wheat(name):
+            m = re.search(r"(?:^|\| |- )" + re.escape(name) + r": wsi \d+ [^|]*?, wsi zboza (\d+) po (\d+\.\d+)/(\d+\.\d+)(?: \(ludzie sr\. ([\d.]+) tys\.\))?", s)
+            return (int(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4)) if m.group(4) else None) if m else None
+        a, b = wheat("The Reach"), wheat("The North")
+        if a and b and b[1] > 0:
+            r1, r0 = a[1] / b[1], (a[2] / b[2] if b[2] > 0 else float("nan"))
+            # recenzja obiegu GL (D5): staly prog 2.9-3.5 byl z biegu rocznego (ludzie 3.2); w 1. dobie nowej kampanii stosunek ludzi wsi zboza to 3.75 -
+            # prog = stosunek plonu wobec stosunku ludzi TYCH SAMYCH wsi (srednie ludzi z tabeli krolestw) +-10%; log bez ludzi w tabeli - INFO
+            pr = (a[3] / b[3]) if (a[3] and b[3]) else None
+            rep.add("GL1-2: stosunek plonu wsi zboza Reach : Polnoc wobec stosunku ich ludzi (tabela krolestw, baza modelu)",
+                    f"dzien {kw[-1]}: Reach {a[0]} wsi po {a[1]:.1f}, Polnoc {b[0]} wsi po {b[1]:.1f} -> {r1:.2f} (wzor gry {r0:.2f})"
+                    + (f"; ludzie na wies zboza {a[3]:.1f} / {b[3]:.1f} tys. -> {pr:.2f}, plon / ludzie {r1 / pr:.3f}" if pr else "; brak ludzi w tabeli (log sprzed poprawki)") + act,
+                    "plon / ludzie 0.90-1.10 (te same wsie; projekt: stosunek ludzi 3.2 w biegu rocznym; dzis plon ok. 1.0)", (0.9 <= r1 / pr <= 1.1) if pr else None)
+        else:
+            rep.add("GL1-2: stosunek plonu wsi zboza Reach : Polnoc", "brak wierszy The Reach / The North w tabeli krolestw" + act, "plon / ludzie 0.90-1.10", None)
+    else:
+        rep.add("GL1-2: stosunek plonu wsi zboza Reach : Polnoc", "brak tabeli krolestw GL1 w oknie" + act, "plon / ludzie 0.90-1.10", None)
+    # ---- GL1-3 korelacja plonu faktycznego z ludzmi w obrebie typu (CSV; srednia tygodni na wies)
+    if rows:
+        per = {}
+        for r in rows:
+            note = r.get("uwagi", "")
+            if "straz" in note or "poza_regula" in note or not _gl1_week_ok(r):
+                continue
+            v = per.setdefault(r["wies_id"], {"typ": r["typ"], "L": [], "P": [], "B": []})
+            v["L"].append(float(r["ludzie"] or 0)); v["P"].append(float(r["plon_glowny_dzien"])); v["B"].append(float(r["baza_reguly"] or 0))
+        bytype = {}
+        for v in per.values():
+            t = bytype.setdefault(v["typ"], ([], [], []))
+            t[0].append(sum(v["L"]) / len(v["L"])); t[1].append(sum(v["P"]) / len(v["P"])); t[2].append(sum(v["B"]) / len(v["B"]))
+        cs, cb, worst = [], [], []
+        for t, (L, P, B) in bytype.items():
+            if len(L) < 5:
+                continue
+            c = _gl1_pearson(L, P)
+            c2 = _gl1_pearson(L, B)
+            if c is not None:
+                cs.append((c, len(L))); worst.append((c, t, len(L)))
+            if c2 is not None:
+                cb.append((c2, len(L)))
+        if cs:
+            wm = sum(c * n for c, n in cs) / sum(n for _, n in cs)
+            bm = sum(c * n for c, n in cb) / sum(n for _, n in cb) if cb else float("nan")
+            worst.sort()
+            rep.add("GL1-3: korelacja plonu faktycznego wsi (towar glowny, plon-wsi.csv) z ludzmi wsi w obrebie typu",
+                    f"typow (>= 5 wsi) {len(cs)}, srednia wazona wsiami {wm:.3f}; najnizsze: " + ", ".join(f"{t} {c:.2f} ({n})" for c, t, n in worst[:4])
+                    + f"; baza modelu (kontrola wzoru) {bm:.3f}",
+                    ">= 0.95 (dzis ok. 0)", wm >= 0.95)
+        else:
+            rep.add("GL1-3: korelacja plonu wsi z ludzmi w obrebie typu", "plon-wsi.csv bez wierszy z >= 7 dobami pomiaru", ">= 0.95", None)
+    else:
+        rep.add("GL1-3: korelacja plonu wsi z ludzmi w obrebie typu", f"brak {csvp}" if not os.path.isfile(csvp) else "brak wierszy w oknie", ">= 0.95", None)
+    # ---- GL1-4 potkniecia, GL1-5 Straz / dymek
+    if win:
+        st_ = [num(r"; potkniecia (\d+)", day_l[d]) or 0 for d in win]
+        cap = [num(r"wsie na suficie \d+\.\d: (\d+)", day_l[d]) or 0 for d in win]
+        rep.add("GL1-4: potkniecia reguly (spis, odczyt z watkow AI)", f"razem {sum(st_)} w {sum(1 for x in st_ if x)} dobach; wsie na suficie 6.0: najwiecej {max(cap)}",
+                "0 potkniec", sum(st_) == 0)
+        wat = [x for x in (num(r"Straz przy wzorze gry \(Watch Keeps Flat Output\) (\d+)", day_l[d]) for d in win) if x is not None]
+        nos = [num(r"bez skali \(k = 0 albo potkniecie uslugi\) (\d+)", day_l[d]) or 0 for d in win]
+        tips = sum(num(r"dymek People of this land: (\d+)", day_l[d]) or 0 for d in win)
+        rep.add("GL1-5: Straz przy wzorze gry (P6), wsie bez skali, dymek (INFO)",
+                f"wsi Daru przy wzorze gry {min(wat) if wat else '-'}-{max(wat) if wat else '-'}; bez skali najwiecej {max(nos)}; linii dymka {tips}",
+                "Watch Keeps Flat Output tak: wsie Daru przy wzorze gry (bieg roczny 11); bez skali 0", None)
+    # ---- GL1-6 Sarnor w kalibracji ludnosci (P6)
+    pl = next((s for s in lines if s.startswith("PopulationLaw: kalibracja ludnosci")), None)
+    if pl:
+        m = re.search(r"sarnor (\d+\.\d+)M", pl)
+        v = float(m.group(1)) if m else None
+        # recenzja kodu GL (D4): stan klucza z linii kalibracji (od poprawki); wylaczony albo log bez stanu klucza - INFO, nie falszywe NIE
+        mk = re.search(r"Sarnor \(GL-1 P6, Sarnor People Raised\): (tak|nie)", pl)
+        key = mk.group(1) if mk else None
+        rep.add("GL1-6: Sarnor w kalibracji ludnosci (P6, nowa kampania)", (f"{v} mln" if v is not None else "brak sarnor w linii kalibracji") + f"; klucz Sarnor People Raised: {key or 'brak w linii (log sprzed poprawki)'}",
+                "0.25 mln przy Sarnor People Raised tak (0.10 - klucz wylaczony: INFO)", (abs(v - 0.25) < 0.005) if (v is not None and key == "tak") else None)
+    else:
+        rep.add("GL1-6: Sarnor w kalibracji ludnosci (P6)", "brak linii kalibracji ludnosci (stary zapis - k z zapisu)", "0.25 mln w nowej kampanii", None)
+    # ---- GL1-7 produkcja faktyczna wsi (Towary) w dobach 2-29 wobec biegu bazowego
+    now = _gl1_towary(lines, start, 2, 29)
+    if bdp and os.path.isfile(bdp):
+        bl = read(bdp)
+        bstart = None
+        for s in bl:
+            if s.startswith("Pomiary 169c: okna"):
+                bstart = num(r"start kampanii dzien (\d+)", s)
+                if bstart is not None:
+                    break
+        base = _gl1_towary(bl, bstart if bstart is not None else start, 2, 29)
+        cmp_ = {k: now[k] / base[k] for k in base if k in now and base[k] >= 5}
+        bad = sorted(k for k, x in cmp_.items() if x < 0.95 or x > 1.05)
+        rep.add("GL1-7: produkcja faktyczna wsi (linie Towary, wsie + las wsi) w dobach 2-29 wobec biegu bazowego",
+                f"surowcow (baza >= 5 szt./d) {len(cmp_)}; " + (f"zakres {min(cmp_.values()):.3f}-{max(cmp_.values()):.3f}; poza progiem: " if cmp_ else "")
+                + (", ".join(f"{k} {cmp_[k]:.3f}" for k in bad[:8]) or "brak"),
+                "0.95-1.05 (regula zmienia podzial, nie sume); log bez paczki - INFO", (not bad) if (cmp_ and on) else None)
+    else:
+        top = sorted(now.items(), key=lambda x: -x[1])[:10]
+        rep.add("GL1-7: produkcja faktyczna wsi (linie Towary) w dobach 2-29 (INFO bez biegu bazowego)",
+                ", ".join(f"{k} {v:.0f}" for k, v in top) if top else "brak linii Towary w dobach 2-29",
+                "0.95-1.05 biegu bazowego - podaj --baza-doby <log biegu bazowego z kluczami wylaczonymi>", None)
+    # ---- GL1-9 zatkane magazyny wsi, GL1-10 kopalnie bez wegla - wobec biegu bazowego (doby 2-until)
+    def _mean_of(ls, st0, prefix, pat):
+        xs = []
+        for d0, s0 in by_day(ls, prefix).items():
+            if 2 <= run_day(d0 + 1, st0) <= until:
+                v0 = num(pat, s0)
+                if v0 is not None:
+                    xs.append(v0)
+        return (sum(xs) / len(xs), len(xs)) if xs else (None, 0)
+    cl, ncl = _mean_of(lines, start, "Zatkane wsie (diagnoza): dzien", r"zatkanych \(zapas >= 1\.5 W\) (\d+) z")
+    mi, nmi = _mean_of(lines, start, "Zelazo (lupy) (214): dzien", r"kopalnia bez wegla (\d+)")
+    if bdp and os.path.isfile(bdp):
+        if 'bl' not in locals():
+            bl = read(bdp)
+        bst = None
+        for s0 in bl:
+            if s0.startswith("Pomiary 169c: okna"):
+                bst = num(r"start kampanii dzien (\d+)", s0)
+                if bst is not None:
+                    break
+        bst = bst if bst is not None else start
+        bcl, _ = _mean_of(bl, bst, "Zatkane wsie (diagnoza): dzien", r"zatkanych \(zapas >= 1\.5 W\) (\d+) z")
+        bmi, _ = _mean_of(bl, bst, "Zelazo (lupy) (214): dzien", r"kopalnia bez wegla (\d+)")
+        rep.add("GL1-9: wsie z zatkanym magazynem (srednia dob 2-%d) wobec biegu bazowego" % until, f"{cl if cl is None else round(cl, 1)} ({ncl} dob), baza {bcl if bcl is None else round(bcl, 1)}",
+                "nie wiecej niz baza + 10", (cl <= bcl + 10) if (cl is not None and bcl is not None and on) else None)
+        rep.add("GL1-10: kopalnie bez wegla w dymarce (srednia dob 2-%d) wobec biegu bazowego" % until, f"{mi if mi is None else round(mi, 1)} ({nmi} dob), baza {bmi if bmi is None else round(bmi, 1)}",
+                "nie wiecej niz baza (+ 1 na rozrzut)", (mi <= bmi + 1) if (mi is not None and bmi is not None and on) else None)
+    else:
+        rep.add("GL1-9/10: wsie z zatkanym magazynem, kopalnie bez wegla (INFO bez biegu bazowego)",
+                f"zatkane srednio {cl if cl is None else round(cl, 1)} ({ncl} dob), kopalnie bez wegla srednio {mi if mi is None else round(mi, 1)} ({nmi} dob)",
+                "zatkane <= baza + 10, kopalnie bez wegla <= baza - podaj --baza-doby", None)
+    # ---- GL1-8 regulator wsi od nowa (INFO)
+    rv = [s for s in lines if s.startswith("Regulator wsi (221): dzien") and "POMIAR OD NOWA" in s and "GL1" in s]
+    rep.add("GL1-8: regulator wsi - pomiar od nowa przy zmianie stanu reguly (INFO)", f"linii {len(rv)}" + (f"; pierwsza: {rv[0][:140]}" if rv else ""),
+            "nowa kampania: 0-1 (regulator bez stanu albo dzien 1); stary zapis: 1 przy wlaczeniu", None)
+    rep.show()
+    return 0
+
+
+def _gl2_kingdoms(s):
+    """Tabela tygodnia "Rynek od ludzi wedlug krolestw (GL2)" -> ({krolestwo: {...}}, {m>1.5}, r korelacji, miast w korelacji)."""
+    out, big, r, rn = {}, None, None, None
+    body = s.split(" - ", 1)[1] if " - " in s else s
+    parts = body.split(" || ")
+    pk = re.compile(r"^(.*?): miast (\d+), m_t sr\. ([\d.]+), wydatki ludu (\d+) zl/d, stac na koszyk ([\d-]+)%, dni oszczednosci ([\d-]+)"
+                    r", zapas kupcow / kasa (\d+) / (\d+) \(([\d.-]+)\), jedzenie na polkach ([\d.-]+) dob")
+    for seg in parts[0].split(" | "):
+        m = pk.match(seg.strip())
+        if not m:
+            continue
+        f = lambda x: None if x in ("-", "") else float(x)
+        out[m.group(1)] = {"miast": int(m.group(2)), "m": float(m.group(3)), "wyd": float(m.group(4)), "stac": f(m.group(5)), "dni": f(m.group(6)),
+                           "zapas": float(m.group(7)), "kasa": float(m.group(8)), "jedz": f(m.group(10))}
+    for seg in parts[1:]:
+        m = re.search(r"miasta o m_t > [\d.]+: (\d+), stac na koszyk ([\d-]+)%, dni oszczednosci ([\d-]+)", seg)
+        if m:
+            big = {"miast": int(m.group(1)), "stac": None if m.group(2) == "-" else float(m.group(2)), "dni": None if m.group(3) == "-" else float(m.group(3))}
+        m = re.search(r"korelacja wydatkow ludu z ludzmi rynku r = ([\d.-]+) \(miast (\d+)\)", seg)
+        if m:
+            r = None if m.group(1) == "-" else float(m.group(1))
+            rn = int(m.group(2))
+    return out, big, r, rn
+
+
+def _gl2_wares(s):
+    """Tabela tygodnia GL2, segment wyrobow linii towarowych (recenzja obiegu GL W3): {'big': (puste pary, wszystkie pary, miast), 'small': (...)} albo {}."""
+    out = {}
+    m = re.search(r"miasta o m_t > [\d.]+ \((\d+)\): bez towaru \(par miasto x wyrob\) (\d+) z (\d+)", s)
+    if m:
+        out["big"] = (int(m.group(2)), int(m.group(3)), int(m.group(1)))
+    m = re.search(r"miasta o m_t < 0\.5 \((\d+)\): bez towaru (\d+) z (\d+)", s)
+    if m:
+        out["small"] = (int(m.group(2)), int(m.group(3)), int(m.group(1)))
+    return out
+
+
+def _gl2_last30(logp, start_arg, until):
+    """Bieg (albo bieg bazowy): tabele tygodnia GL2 w ostatnich 30 dobach okna -> (dni m>1.5 [], stac m>1.5 [], puste pary wyrobow m>1.5 [], pary [], start)."""
+    lines = read(logp)
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    wk = by_day(lines, "Rynek od ludzi wedlug krolestw (GL2): dzien")
+    if start is None:
+        start = min(wk) if wk else 0
+    ds = [d for d in sorted(wk) if until - 30 < run_day(d, start) <= until]
+    dn, sc, em, pa = [], [], [], []
+    for d in ds:
+        _k, b, _r, _n = _gl2_kingdoms(wk[d])
+        if b and b["dni"] is not None:
+            dn.append(b["dni"])
+        if b and b["stac"] is not None:
+            sc.append(b["stac"])
+        w = _gl2_wares(wk[d])
+        if "big" in w:
+            em.append(w["big"][0]); pa.append(w["big"][1])
+    return dn, sc, em, pa, start
+
+
+def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
+    """GL-2 / GL-3 (projekt docs/gospodarka-od-ludzi rozdz. 8: "kazdy", "P1 + P2", "[R] P1 + P2, dopisane", "P3") - rynek miasta od ludzi (MarketByPeople),
+    glowy wsi i podzamcza od ludzi (VillageHeadsByPeople), zloto startowe wedlug ludzi (StartGoldByPeople). Okno: doby kampanii 2-until (--do-doby); "d91-120" =
+    ostatnie 30 dob okna. Progi liczone z logu (linie "Rynek od ludzi (GL2)", tabela tygodnia krolestw, "Zloto startowe wedlug ludzi (GL2)", "Glod ludu (E5/C2)",
+    "Warsztaty:", "Przeplywy osad", "Prawa panskie (E5/B1)") i z kasy-miast.csv (zawor do panow); progi wobec biegu bazowego = INFO z liczba (porownac recznie).
+    Log bez paczki (bez linii albo klucz wylaczony): wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    gl = by_day(lines, "Rynek od ludzi (GL2): dzien")
+    wk = by_day(lines, "Rynek od ludzi wedlug krolestw (GL2): dzien")
+    c2 = by_day(lines, "Glod ludu (E5/C2): dzien")
+    ws = by_day(lines, "Warsztaty: dzien")
+    pr = by_day(lines, "Prawa panskie (E5/B1): dzien")
+    fl = by_day(lines, "Przeplywy osad: dzien")
+    sg = [s for s in lines if s.startswith("Zloto startowe wedlug ludzi (GL2): dzien")]
+    sgc = [s for s in lines if s.startswith("Zloto startowe wedlug ludzi (GL2): kiesy podzamczy")]
+    if start is None:
+        alld = sorted(set(gl) | set(c2))
+        start = alld[0] if alld else 0
+    win = [d for d in sorted(gl) if 2 <= run_day(d, start) <= until]
+    on = [d for d in win if "MarketByPeople tak" in gl[d]]
+    hon = [d for d in win if "VillageHeadsByPeople tak" in gl[d]]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia GL2 {len(win)} (MarketByPeople tak w {len(on)}, VillageHeadsByPeople tak w {len(hon)})")
+    # ---- kazdy: linia, klucze, potkniecia, praca nowej galezi, bledy
+    if not win:
+        rep.add("GL2-0: linia Rynek od ludzi (GL2) kazdej doby", "brak w logu", "jest od wgrania GL-2; bez niej wiersze paczki = INFO (bieg odniesienia)", None)
+    else:
+        span = until - 1
+        rep.add("GL2-0: linia GL2 kazdej doby okna i klucze", f"dob z linia {len(win)} z {span}, MarketByPeople tak w {len(on)}, VillageHeadsByPeople tak w {len(hon)}",
+                f"{span}/{span} dob z linia, klucze tak przez caly bieg (projekt rozdz. 8 'kazdy')", (len(win) >= span and len(on) == len(win) and len(hon) == len(win)) if on else None)
+        st_ = [num(r"\| potkniecia (\d+)\.", gl[d]) for d in win]
+        st_ = [x for x in st_ if x is not None]
+        rep.add("GL2-1: potkniecia paczki (suma okna)", f"{sum(st_)} w {sum(1 for x in st_ if x)} dobach", "0 (projekt rozdz. 8 'kazdy')", (sum(st_) == 0) if st_ else None)
+        tms = [fnum(r"czlon dobrobytu wiersza x m: wywolan \d+, czas ([\d.]+) ms", gl[d]) for d in on]
+        tms = [x for x in tms if x is not None]
+        calls = [num(r"czlon dobrobytu wiersza x m: wywolan (\d+)", gl[d]) for d in on]
+        calls = [x for x in calls if x is not None]
+        rep.add("GL2-1b: praca nowej galezi czlonu dobrobytu wiersza (zasada 4)", (f"srednio {st.mean(calls):.0f} wywolan i {st.mean(tms):.1f} ms na dobe (max {max(tms):.1f} ms)") if tms else "brak liczb",
+                "INFO - czas doby wobec bazy nie gorszy o wiecej niz 0.3 s (projekt 'kazdy'; porownac DayProfile z biegiem bazowym)", None)
+    errs = [s for s in lines if s.startswith("ERROR in ")]
+    rep.add("GL2-1c: bledy Armoury (ERROR in)", len(errs), "0 (projekt 'kazdy')", len(errs) == 0)
+    # ---- liczby paczki (INFO)
+    if on:
+        def ratio(pat, d):
+            m = re.search(pat, gl[d])
+            if not m:
+                return None
+            a, b = float(m.group(1)), float(m.group(2))
+            return b / a if a > 0 else None
+        dem = [x for x in (ratio(r"popyt x m_t \(budzet dnia z nawiasu konsumpcji\): swiat przed (\d+) / po (\d+)", d) for d in on) if x is not None]
+        res = [x for x in (ratio(r"zapas kupcow x m_t: swiat przed (\d+) / po (\d+)", d) for d in on) if x is not None]
+        up = [num(r"kotwica w gore (\d+) miast", gl[d]) for d in on]
+        up = [x for x in up if x is not None]
+        rep.add("GL2-I1: popyt swiata po / przed skala m (budzet dnia z nawiasu konsumpcji)", f"srednio x{st.mean(dem):.3f} (min {min(dem):.3f}, max {max(dem):.3f})" if dem else "brak liczb",
+                "INFO - regula zmienia podzial popytu miedzy miasta; suma swiata idzie za korelacja dobrobytu z ludzmi rynku", None)
+        rep.add("GL2-I2: zapas kupcow swiata po / przed skala m", f"srednio x{st.mean(res):.3f}" if res else "brak liczb", "INFO - projekt rozdz. 5: suma zapasow swiata ok. +3% [S]", None)
+        rep.add("GL2-I3: kotwica w gore (miast z m x czynnik kotwicy > 1, nowa galaz)", f"srednio {st.mean(up):.1f} miast na dobe" if up else "brak liczb", "INFO (zasada 4: nowy kod, dotad martwy)", None)
+    # ---- P1 + P2
+    wkon = [d for d in sorted(wk) if 2 <= run_day(d, start) <= until and d in gl and "MarketByPeople tak" in gl[d]] if wk else []
+    wlast = [d for d in wkon if run_day(d, start) > until - 30]
+    rs = []
+    for d in (wlast or wkon[-4:]):
+        _k, _b, r, rn = _gl2_kingdoms(wk[d])
+        if r is not None:
+            rs.append(r)
+    rep.add("GL2-2: korelacja wydatkow ludu miasta z ludzmi rynku (tabela tygodnia, d91-120)", f"r = {st.mean(rs):.2f} (probek {len(rs)})" if rs else "brak tabeli tygodnia przy kluczu",
+            ">= 0.8 (projekt rozdz. 8 'P1 + P2'; dzis 0.20 z ludzmi regionu)", (st.mean(rs) >= 0.8) if rs else None)
+    bz = [num(r"brak zlota/kupca (\d+)", ws[d]) for d in sorted(ws) if 2 <= run_day(d, start) <= until]
+    bz = [x for x in bz if x is not None]
+    rep.add("GL2-3: cykle warsztatow 'brak zlota / kupca' na dobe", f"srednio {st.mean(bz):.1f}" if bz else "brak pola", "INFO - nie wiecej niz baza (projekt: 288/d [P RK]); porownac z biegiem bazowym", None)
+    c2w = [d for d in sorted(c2) if 2 <= run_day(d, start) <= until]
+    early = [num(r"Food 0 warowni (\d+)", c2[d]) for d in c2w if run_day(d, start) < 30]
+    early = [x for x in early if x is not None]
+    rep.add("GL2-4: warownie z Food 0 przed 30. doba (glod warowni AI)", f"dob z Food 0 > 0: {sum(1 for x in early if x)} z {len(early)} (max {max(early) if early else '-'})" if early else "brak linii Glod ludu (E5/C2)",
+            "0 (projekt 'P1 + P2': zadna warownia AI nie gloduje przed 30. doba; oblezenia licza sie tu tez - sprawdzic linie w razie NIE)", (max(early) == 0) if (early and on) else None)
+    f0 = [num(r"Food 0 warowni (\d+)", c2[d]) for d in c2w]
+    f0 = [x for x in f0 if x is not None]
+    mon = [num(r"brak pieniedzy \([^)]*\): (\d+)", c2[d]) for d in c2w]
+    mon = [x for x in mon if x is not None]
+    rep.add("GL2-5: warownie z Food 0 i warownie z kara glodu C2 (srednio na dobe)", (f"Food 0 {st.mean(f0):.1f}, C2 brak pieniedzy {st.mean(mon):.1f}") if f0 and mon else "brak linii",
+            "INFO - nie wiecej niz baza (Food 0) i baza + 5 (C2); porownac z biegiem bazowym", None)
+    jd = {}
+    for d in wlast:
+        ks, _b, _r, _n = _gl2_kingdoms(wk[d])
+        for name in ("Qarth", "Volantis", "Braavos"):
+            if name in ks and ks[name]["jedz"] is not None:
+                jd.setdefault(name, []).append(ks[name]["jedz"])
+    if jd:
+        txt = ", ".join(f"{k} min {min(v):.1f}" for k, v in sorted(jd.items()))
+        rep.add("GL2-6: Qarth, Volantis, Braavos - jedzenie na polkach w dobach spozycia (d91-120, tabela tygodnia)", txt, ">= 7 dob (projekt 'P1 + P2')",
+                all(min(v) >= 7 for v in jd.values()) and len(jd) == 3)
+    else:
+        rep.add("GL2-6: Qarth, Volantis, Braavos - jedzenie na polkach (d91-120)", "brak tabeli tygodnia przy kluczu w d91-120", ">= 7 dob", None)
+    rep.add("GL2-7: wywoz zywnosci z Reach (karawany + wozy poza krolestwo, d91-120)", "brak miary w logu", "INFO - projekt: >= 500 szt./d", None)
+    # ---- [R] P1 + P2 dopisane
+    bd, bs = [], []
+    for d in wlast:
+        _k, b, _r, _n = _gl2_kingdoms(wk[d])
+        if b and b["dni"] is not None:
+            bd.append(b["dni"])
+        if b and b["stac"] is not None:
+            bs.append(b["stac"])
+    # recenzja obiegu GL (W2): bieg bazowy (--baza-doby: ten sam kod, klucze GL wylaczone - grupa m_t > 1.5 liczona ze skali uslugi takze bez klucza).
+    # Miara "dni" = suma kies W/R/P / suma potrzeby dziennej grupy; w biegu W43 BEZ reguly te same miasta mialy w d90-120 51 dni (stac 98%) - prog 60
+    # projektu nie wychodzi nawet bez reguly (zapas ludu to 10/21/30 dni potrzeby, nadwyzka ponad niego schodzi 15%/d - TownFolk.Live.cs krok 5)
+    bdn = bsc = bem = bpa = None
+    if bdp and os.path.isfile(bdp):
+        bdn, bsc, bem, bpa, _bs = _gl2_last30(bdp, None, until)
+    bdm = st.mean(bdn) if bdn else None
+    bsm = st.mean(bsc) if bsc else None
+    ok8 = (min(bd) >= 60) if bd else None
+    rep.add("GL2-8: lud miast o m_t > 1.5 - dni oszczednosci (d91-120, tabela tygodnia)", (f"min {min(bd):.0f} (srednio {st.mean(bd):.0f}, probek {len(bd)})" if bd else "brak probek")
+            + (f"; baza {bdm:.0f}" if bdm is not None else ("; baza bez tabeli tygodnia GL2 (bieg sprzed paczki?)" if bdp else "; bez biegu bazowego (--baza-doby)")),
+            ">= 60 (projekt [R]); ponizej, ale srednio >= 0.9 x baza = DECYZJA (baza W43 bez reguly: 51 - prog nieosiagalny przy zapasie ludu 10/21/30 dni)",
+            ok8, decide=bool(bd) and bdm is not None and st.mean(bd) >= 0.9 * bdm)
+    rep.add("GL2-8b: lud miast o m_t > 1.5 - stac na pelny koszyk (d91-120)", (f"srednio {st.mean(bs):.0f}%" if bs else "brak probek") + (f"; baza {bsm:.0f}%" if bsm is not None else ("; baza bez tabeli tygodnia GL2" if bdp else "; bez biegu bazowego")),
+            "nie nizej niz bieg bazowy minus 5 pkt (projekt [R]; bez --baza-doby INFO; baza W43: 98%)", (st.mean(bs) >= bsm - 5) if (bs and bsm is not None) else None)
+    # recenzja obiegu GL (W3): rece x m_t tylko w planie linii uzbrojenia - piekarnie, browary, winiarnie, tkalnie (cykl gry) plaskie przy popycie x m_t
+    wem, wpa = [], []
+    for d in wlast:
+        w = _gl2_wares(wk[d])
+        if "big" in w:
+            wem.append(w["big"][0]); wpa.append(w["big"][1])
+    rm = st.mean(wem) if wem else None
+    bm = st.mean(bem) if bem else None
+    rep.add("GL2-11: miasta o m_t > 1.5 - wyroby linii towarowych cyklu gry bez towaru na polce (pary miasto x wyrob, d91-120)",
+            (f"srednio {rm:.1f} z {st.mean(wpa):.0f} par" if rm is not None else "brak segmentu wyrobow w tabeli tygodnia") + (f"; baza {bm:.1f}" if bm is not None else ("; baza bez segmentu wyrobow GL2" if bdp else "; bez biegu bazowego (--baza-doby)")),
+            "<= baza x 1.25 + 2 (recenzja obiegu W3; bez --baza-doby INFO)", (rm <= bm * 1.25 + 2) if (rm is not None and bm is not None) else None)
+    ludne = set()
+    if wkon:
+        ks, _b, _r, _n = _gl2_kingdoms(wk[wkon[0]])
+        ludne = {k for k, v in ks.items() if v["m"] >= 1.5}
+    kp = csv_path_of(logp).replace("budzet-rodow.csv", "kasy-miast.csv")
+    if ludne and os.path.isfile(kp):
+        per = {}
+        with open(kp, encoding="utf-8-sig", errors="replace", newline="") as f:
+            for r in csv.DictReader(f, delimiter=";"):
+                k = merge_rebels(r.get("krolestwo"))
+                if k not in ludne:
+                    continue
+                try:
+                    dd = int(r["dzien"])
+                    z = float(r["zawor_do_pana"] or 0)
+                except (ValueError, KeyError, TypeError):
+                    continue
+                if not (2 <= run_day(dd, start) <= until):
+                    continue
+                per.setdefault(k, {}).setdefault(dd, 0.0)
+                per[k][dd] += z
+        worst = {}
+        for k, days in per.items():
+            run = mx = 0
+            for dd in sorted(days):
+                run = run + 1 if days[dd] <= 0 else 0
+                mx = max(mx, run)
+            worst[k] = mx
+        txt = ", ".join(f"{k} {v}" for k, v in sorted(worst.items(), key=lambda x: -x[1])) or "-"
+        rep.add("GL2-9: zawor kas do panow w krolestwach ludnych (m_t sr. >= 1.5) - najdluzsza seria dob bez zaworu", txt,
+                "<= 14 dob z rzedu (projekt [R] 'P1 + P2, dopisane')", (max(worst.values()) <= 14) if worst else None)
+    else:
+        rep.add("GL2-9: zawor kas do panow w krolestwach ludnych - seria dob bez zaworu", "brak tabeli tygodnia przy kluczu albo kasy-miast.csv (" + kp + ")", "<= 14 dob z rzedu", None)
+    un = [re.search(r"towar niesprzedany po wizycie: w miastach (\d+) szt\. \((\d+) wizyt\)", fl[d]) for d in sorted(fl) if 2 <= run_day(d, start) <= until]
+    un = [(int(m.group(1)), int(m.group(2))) for m in un if m]
+    rep.add("GL2-10: tabory wsi z towarem niesprzedanym w miastach (kasa nie starcza)", f"{sum(v for _, v in un)} wizyt w {sum(1 for _, v in un if v)} dobach ({sum(p for p, _ in un)} szt.)" if un else "brak linii Przeplywy osad",
+            "INFO - projekt: miast, w ktorych kasa nie starcza na zaplate taborom, 0 (miara obejmuje tez inne przyczyny; baza 120 dob W43: 21 wizyt w 18 dobach)", None)
+    # ---- P3
+    if hon:
+        hv = []
+        for d in hon:
+            m = re.search(r"glowy przed / po: miasta \d+ / \d+, wsie (\d+) / (\d+)", gl[d])
+            if m and float(m.group(1)) > 0:
+                hv.append(float(m.group(2)) / float(m.group(1)))
+        rep.add("GL3-1: glowy wsi swiata (oplata stala, zakupy) po / przed regula", f"srednio x{st.mean(hv):.3f} (min {min(hv):.3f}, max {max(hv):.3f})" if hv else "brak liczb",
+                "0.9-1.1 (projekt 'P3': oplaty stale wsi swiata 0.9-1.1 bazy - oplata liniowa w glowach)", (0.9 <= min(hv) and max(hv) <= 1.1) if hv else None)
+    else:
+        rep.add("GL3-1: glowy wsi swiata po / przed regula", "klucz VillageHeadsByPeople nie w oknie", "0.9-1.1", None)
+    fee = [num(r"oplaty stale wsi (\d+) \(", pr[d]) for d in sorted(pr) if 2 <= run_day(d, start) <= until]
+    fee = [x for x in fee if x is not None]
+    rep.add("GL3-2: oplaty stale wsi swiata (srednio na dobe)", f"{st.mean(fee):.0f} zl/d" if fee else "brak linii Prawa panskie", "INFO - projekt 'P3': 0.9-1.1 bazy (9.9 tys. zl/d w biegu rocznym)", None)
+    rep.add("GL3-3: kiesy wsi nie ujemne, zadna wies z zalegloscia ponad 28 dob", "brak miary zaleglosci w logu (kiesa wsi gry nie schodzi ponizej 0)", "INFO (projekt 'P3')", None)
+    # ---- zloto startowe
+    if sg:
+        s0 = sg[0]
+        ok_all = "(zgodne)" in s0
+        pools = re.findall(r"przed (\d+) = po (\d+)", s0)
+        cls = re.findall(r"[WRP] (\d+) = (\d+)", s0)
+        bad = [p for p in pools + cls if p[0] != p[1]]
+        m = re.search(r"skarbce koron: .*?na podlodze (\d+): (\d+)", s0)
+        skip = re.findall(r"\| ([^|:]+): POMINIETE", s0)
+        cbad = [c for c in sgc if "(zgodne)" not in c]
+        rep.add("GL2-S1: zloto startowe wedlug ludzi - suma kazdej puli i swiata przed = po", f"linii {len(sg)}, pul {len(pools) + len(cls)}, rozjazdow {len(bad)}, swiat {'zgodny' if ok_all else 'ROZJAZD'}"
+                + (f"; skarbce na podlodze {m.group(1)}: {m.group(2)}" if m else "") + (f"; pominiete (klucze): {', '.join(skip)}" if skip else "")
+                + f"; kiesy podzamczy: linii {len(sgc)}, rozjazdow {len(cbad)}",
+                "1 linia w nowej kampanii (+ 1 linia podzamczy przy VillageHeadsByPeople), 0 rozjazdow (przelewy, nie mnozenie)", len(sg) == 1 and not bad and ok_all and not cbad and len(sgc) <= 1)
+    else:
+        stt = [re.search(r"zloto startowe: ([^|]*?) \|", gl[d]) for d in win[:1]]
+        txt = stt[0].group(1) if stt and stt[0] else "brak linii"
+        rep.add("GL2-S1: zloto startowe wedlug ludzi", txt, "1 linia w nowej kampanii (stary zapis albo klucz wylaczony - INFO)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -16760,6 +17356,10 @@ def main(argv):
         return w5_main(logp, start_arg, until_arg, csvp)   # W5: doplata korony do zoldu wedlug potrzeby (z daniny P1, przed rentami 180)
     if group == "w6" and logp:
         return w6_main(logp, start_arg, until_arg, csvp)   # W6: tarczowe - drugie zrodlo garnka doplaty W5 (rody z wolnym pulapem -> skarbiec -> rody na pulapie)
+    if group == "gl1" and logp:
+        return gl1_main(logp, start_arg, until_arg, bdp)   # GL-1: plon wsi od ludzi (P1) + krainy szczegolne (P6) - progi rozdz. 8 projektu "gospodarka od ludzi"
+    if group == "gl2" and logp:
+        return gl2_main(logp, start_arg, until_arg, csvp, bdp)   # GL-2/GL-3: rynek miasta od ludzi, glowy wsi i podzamcza, zloto startowe wedlug ludzi (--baza-doby: GL2-8/8b/11 wobec bazy)
     if group == "m6b" and logp:
         return m6b_main(logp, start_arg, until_arg)   # m6b (poprawka 6): konie juczne z niczego, zboze i ryby bez zrodla, kasy zaulkow i karawana bez zysku
     if group == "m6a" and logp:

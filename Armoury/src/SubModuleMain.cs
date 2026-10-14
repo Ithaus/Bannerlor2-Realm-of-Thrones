@@ -70,6 +70,9 @@ namespace Armoury
                 SupplyDemand.ApplyAll(_harmony); // prawo podazy i popytu dla uzbrojenia - PO MarketGlut (Jeff 04.10)
                 MaterialLaw.ApplyAll(_harmony);  // surowce: przetopy, XP przetopu, wydobycie (Jeff 04.10)
                 MineralOnce.ApplyAll(_harmony);  // lista produkcji wsi BK bez powtorzen: mineral wsi gorniczej dopisywany raz (Jeff 05.10); MUSI isc po MaterialLaw.ApplyAll (zdjety wpis oddaje jego postfix modelu)
+                // GL-1 (P1): linia "People of this land" w dymku osady (wies) - postfiks dymka gry i NavalDLC (ten rejestruje dymek osady od nowa); wlasny try,
+                // linia dziala tylko przy kluczu VillageOutputByPeople
+                try { VillageByPeople.ApplyTip(_harmony); } catch (Exception e) { Log.Error("VillageByPeople.ApplyTip", e); }
                 MarketRoad.ApplyAll(_harmony);   // wpis 100: wsie zamkowe woza plon na targ miasta, nie do zamku
                 MarketCarts.ApplyAll(_harmony);  // poprawka 119: cena ladunku taboru sztuka po sztuce (wybor miasta wola MarketRoad.RoutePrefix)
                 try { CastleMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CastleMarket.ApplyAll", e); }   // E5/B4 (199): targ przy zamku - sprzedaz w zamku (prefiks High po 119) i straz przed BK VillagersCastleTick
@@ -175,6 +178,7 @@ namespace Armoury
                 // (E4/7 - ksiega pochodzenia) i PO Measure40 (okna W1/W2 - nasz postfiks milicji biegnie przed ich finalizerami); latki wpiete zawsze (U26), licza przy kluczach
                 try { ArmsFromPeople.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ArmsFromPeople.ApplyAll", e); }
                 try { VillageBook.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageBook.ApplyAll", e); }   // E4/11 (193): zywnosc warowni od ludzi (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu (U26)
+                try { PeopleMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleMarket.ApplyAll", e); }   // GL-2 (P2 e): neutralizacja licznika Food warowni (postfiks DefaultSettlementFoodModel) - wpiety zawsze, liczy przy kluczu MarketByPeople
                 // E4/9 (192): Straz nie pali wsi (postfiks Low na CampaignEventDispatcher.AiHourlyTick) i jency z rabunku z ludzi wsi (prefiks bool First na BK ExecuteCapture -
                 // PO prefiksie okna W11 Measure40 (ten sam priorytet, wpiety wczesniej; W11 przy czynnym prawie nie liczy - BkCapPre), PRZED O12 CirculationWindows i RealPayer
                 // (prefiksy void z parametrem referencyjnym - po naszym false pominiete, ich finalizery obsluguja stan domyslny); wpiete zawsze (U26), dzialaja przy kluczach; kazde we wlasnym try

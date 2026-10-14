@@ -117,6 +117,13 @@ namespace Armoury
                     if (c != null && c.L < 1.0) sb.Append("Harvest of the fields: ").Append(P(c.L)).Append('\n');
                     if (PeopleBook.VetLive) sb.Append("Veterans of this land waiting in taverns: ").Append(N(v.Vet)).Append('\n');
                 }
+                // GL-1 (P1, projekt "gospodarka od ludzi" rozdz. 9 "Pominiete"): we wsi jedno zdanie, dlaczego wies daje mniej albo wiecej niz dawniej (czynnik reguly,
+                // ludzie okregu i skala wobec sredniej wsi swiata; Straz - jawny wyjatek). Tylko odczyt pamieci doby; klucz wylaczony - bez zdania
+                if (st.IsVillage)
+                {
+                    try { string pl = VillageByPeople.MenuLine(st); if (!string.IsNullOrEmpty(pl)) sb.Append(pl).Append('\n'); }
+                    catch (Exception e) { Log.Error("PeopleMenu.GoodsByPeople", e); }
+                }
                 // E4/10: karczma tego miasta - weterani z calego swiata, ktorzy staneli tu najblizej (ta sama liczba co linia dzienna "Weterani (E4/10)")
                 if (st.IsTown && PeopleBook.VetLive)
                 {
