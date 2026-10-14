@@ -132,7 +132,7 @@ BK (7 klas):
 | 7 | `VanillaModelTweakPatches+BKBattleRewardTweakPatches` | postfiks `CalculateInfluenceGain` ma `party`, `influenceValueOfBattle`, `contributionShare`; w 1.4.8 `winnerParty`, `influenceValueOfBattleForWinnerSide`, `contributionShareOfWinnerParty` (`DefaultBattleRewardModel.cs:73`; `:48` Renown - te same nazwy) | `CalculateInfluenceGain` pada, `CalculateRenownGain` nie zostaje juz nalozony (przerwanie; padlby i tak). `GetLootedItemFromTroop` (pierwsze zadanie) DZIALA | atuty BK bez dzialania: CommanderWarband +25% wplywu z bitwy, MercenaryFamousSellswords +20% slawy, styl zycia Cataphract +12% slawy (drugie efekty tych atutow z innych klas dzialaja). Lup: `LootScale: 0.5` w BannerKings.json -> ok. 50% lupionych przedmiotow znika w calym swiecie (dziala dzis i dzialalo w z31; wniosek z kolejnosci zadan, bez bezposredniego dowodu w logu) |
 
 Decyzje i zasady:
-- **B10b - przywrocenie atutow z klasy 7: DECYZJA JEFFA, otwarte.** Zmienia ekonomie wplywu i slawy AI w calym
+- **B10b - przywrocenie atutow z klasy 7: ZROBIONE 14.10 (decyzja Jeffa "tak napraw") - CrashScribe `BkBattlePerks.cs` (galaz w-toku/zbior-e8 e0b2ccb1), klucz BkBattlePerksFix, grupa progow b10b.** Dawny opis: Zmienia ekonomie wplywu i slawy AI w calym
   swiecie, wiec nie robic tego przy okazji.
 - Gdyby latka w CrashScribe Mends: TYLKO postfiksy na `DefaultBattleRewardModel.CalculateInfluenceGain` /
   `CalculateRenownGain` z nazwami `winnerParty` / `contributionShareOfWinnerParty` albo pozycyjnymi `__0` / `__2`.
