@@ -465,6 +465,8 @@ Uzycie (Python 3, tylko odczyt):
                     M6a-2b/2c (zloto u rodzin, okupy tej samej osoby w 56 dobach - INFO), M6a-3a (zamkniecie odlozonych pokojow), M6a-3b (uwolnieni
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
+--grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
+                    karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
 --grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
                     i L5b-2 karawany wroga w zdobytym miescie (EnemyCaravans). python -I tools/sprawdz_logi.py --grupa lup5b [--do-doby 364] <Armoury-*.log>
                     Wiersze L5B-0..L5B-8: linie, latki, zdobycia szturmem = linie L5b-2, obieg skarbca co do zlotowki, zabrane <= czesc x nadwyzka ponad zapas
@@ -16368,6 +16370,58 @@ def lup5b_main(logp, start_arg, until=364):
     return 0
 
 
+def drobne14_main(logp):
+    """drobne14 (14.10; CHANGELOG "drobne bledy etapu 8 i audytu"): pomiary dopisane do diagnozy spraw bez przyczyny. Caly log (bez okna dob).
+    D14-1 L5b-2: karawany w murach na poczatku oblezenia wobec zajetych przy zdobyciu (spis z OnSiegeEventStarted) - NIE, gdy karawany wroga staly
+    w murach na poczatku oblezenia, a przy zdobyciu w murach nie bylo zadnej (droga zajecia martwa); D14-2 wyjazdy karawan z oblezanych osad -
+    pierwszy stos wywolan (kto je wyprowadza, INFO); D14-3 C-4b: linie "Kasa miasta ponizej zapasu (C-4b, diagnoza)" = 0 (po jednym wzorze
+    zapasu); D14-4 P3-2: najdluzej zatkana wies bez wozu (INFO - nazwa do rozpoznania). Log bez paczki: INFO, bez wyjatku."""
+    lines = read(logp)
+    rep = Report()
+    ev = [s for s in lines if s.startswith("Karawany w zdobytym miescie (L5b-2): dzien")]
+    left = [s for s in lines if s.startswith("Karawana wyszla z oblezonej osady (L5b-2, diagnoza)")]
+    c4 = [s for s in lines if s.startswith("Kasa miasta ponizej zapasu (C-4b, diagnoza)")]
+    print(f"plik: {logp} | linii L5b-2 {len(ev)}, wyjazdow z oblezonych (linie) {len(left)}, C-4b diagnoza {len(c4)}")
+    st0 = st_in = st_out = st_gone = nosp = seized = 0
+    diag = 0
+    for s in ev:
+        m = re.search(r"na poczatku oblezenia w murach (\d+): teraz w murach (\d+), poza murami (\d+).*?, zniknely (\d+)", s)
+        if "na poczatku oblezenia w murach" in s:
+            diag += 1
+        if m:
+            st0 += int(m.group(1)); st_in += int(m.group(2)); st_out += int(m.group(3)); st_gone += int(m.group(4))
+        elif "brak spisu" in s:
+            nosp += 1
+        seized += num(r"\| zajete (\d+)", s, int, 0) or 0
+    if diag:
+        rep.add("D14-1: L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu",
+                f"zdobyc {len(ev)} (z diagnoza {diag}, bez spisu {nosp}); na poczatku {st0}: w murach przy zdobyciu {st_in}, poza murami {st_out}, zniknely {st_gone}; zajete {seized}",
+                "przy karawanach w murach na poczatku oblezenia (> 0): w murach przy zdobyciu > 0 (inaczej droga zajecia martwa - patrz D14-2)",
+                (st_in > 0) if st0 > 0 else None)
+    else:
+        rep.add("D14-1: L5b-2 karawany na poczatku oblezenia", f"linii L5b-2 {len(ev)}, bez dopisku diagnozy" if ev else "brak linii L5b-2", "INFO (wersja sprzed drobne14 albo brak zdobyc)", None)
+    if left:
+        first = left[0]
+        stack = first.split("| stos: ", 1)[1] if "| stos: " in first else "-"
+        rep.add("D14-2: wyjazdy karawan z oblezanych osad (kto je wyprowadza)", f"linii {len(left)}; pierwszy stos: {stack[:400]}", "INFO (sciezka do naprawy L5b-2)", None)
+    else:
+        rep.add("D14-2: wyjazdy karawan z oblezanych osad", "0 linii", "INFO", None)
+    rep.add("D14-3: C-4b kasa miasta ponizej zapasu przez nasza sciezke (diagnoza)",
+            f"{len(c4)} linii" + (f"; pierwsza: {c4[0][:300]}" if c4 else ""), "0 (jeden wzor zapasu: Seal31.TownReserve = TownPurse.Reserve)", len(c4) == 0)
+    names = {}
+    for s in lines:
+        if s.startswith("Wsie bez wozu (E8/P3): dzien"):
+            m = re.search(r"najdluzej [\d.]+ \(([^)]*\))\) dob", s)
+            if m:
+                k = m.group(1).split(" (")[0]
+                names[k] = names.get(k, 0) + 1
+    rep.add("D14-4: P3-2 najdluzej zatkana wies Normal bez wozu (doby w wierszu)",
+            ", ".join(f"{k} {v}" for k, v in sorted(names.items(), key=lambda x: -x[1])[:6]) if names else "brak nazw (wersja sprzed drobne14 albo 0 zatkanych)",
+            "INFO (ta sama wies wiele dob z rzedu = do rozpoznania)", None)
+    rep.show()
+    return 0
+
+
 def n7_main(logp, start_arg, until=120):
     """N7 (decyzja Jeffa 13.10 "Proporcje pasuja"; Armoury/src/StragglersRally.cs, klucz StragglersRally): rozbici z pobitej druzyny lorda - 55% pod choragiew (weterani 70,
     t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, marsz do druzyny rodu w zasiegu,
@@ -19252,6 +19306,8 @@ def main(argv):
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
+    if group == "drobne14" and logp:
+        return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:

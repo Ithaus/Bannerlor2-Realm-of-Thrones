@@ -162,7 +162,7 @@ namespace Armoury
                   + ", korona " + r.PlayerCrown);
             return Dot + "Your army took " + N(r.Pool) + " denars from " + town + ": " + N(r.Merch) + (castle ? " from its treasury, " : " from its merchants, ") + N(r.Folk)
                    + (castle ? " from its castle folk. " : " from its townsfolk. ")
-                   + "Your men's purses grew by " + N(r.PlayerMen) + "; your own part is " + N(r.PlayerLead) + (r.PlayerCrown > 0 ? " (the crown will claim " + N(r.PlayerCrown) + " of it)" : "") + ".";
+                   + PartText(r.PlayerMen, r.PlayerLead, r.PlayerCrown);
         }
 
         private static void L5Log(string key)

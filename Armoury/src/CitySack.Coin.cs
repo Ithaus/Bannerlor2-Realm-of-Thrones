@@ -185,6 +185,28 @@ namespace Armoury
 
         private static string N(long v) { return v.ToString("N0", Inv); }
 
+        /// <summary>Poprawka po audycie (gracz 12, drobne14): dopisek do komunikatu gracza o kiesie wzietej z bitwy/zdobycia (karawany wroga L5b-2, kiesa zalogi L1) -
+        /// korona bierze nastepnego ranka 1/9 tej kwoty od wasala w wojnie (Ransom178.NoteBeatenGold -> Ninth x CrownThirdsShare). Pusty napis, gdy korona nic nie wezmie.</summary>
+        internal static string CrownNinthText(Hero h, long x)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (h == null || x <= 0 || s == null || !Ransom178.WouldTax(h)) return "";
+                long c = (long)(x * Math.Max(0f, Math.Min(1f, s.CrownThirdsShare)));
+                return c > 0 ? " (the crown will claim " + N(c) + " of it)" : "";
+            }
+            catch { return ""; }
+        }
+
+        /// <summary>Poprawka po audycie (gracz 12, drobne14): czesc druzyny gracza w lupie L2 - zdanie o sakiewkach ludzi tylko, gdy cos do nich trafilo
+        /// (MenPurse wylaczony - calosc wodzowi i dotad bylo "Your men's purses grew by 0"); korona jak w podsumowaniu L5.</summary>
+        internal static string PartText(long men, long lead, long crown)
+        {
+            return (men > 0 ? "Your men's purses grew by " + N(men) + "; your own part is " : "Your own part is ") + N(lead)
+                   + (crown > 0 ? " (the crown will claim " + N(crown) + " of it)" : "") + ".";
+        }
+
         private static void Messages(MobileParty a, Settlement st, int kind, Clan prev, Dictionary<MobileParty, float> contrib, List<Rec> live, Result res)
         {
             try
@@ -199,14 +221,16 @@ namespace Armoury
                     if (!menu && kind != KMercy && res.Pool > 0)
                         Log.Player("Your army took " + N(res.Pool) + " denars from " + town + ": " + N(res.Merch) + (castle ? " from its treasury, " : " from its merchants, ") + N(res.Folk)
                                    + (castle ? " from its castle folk. " : " from its townsfolk. ")
-                                   + "Your men's purses grew by " + N(res.PlayerMen) + "; your own part is " + N(res.PlayerLead) + ".");
+                                   + PartText(res.PlayerMen, res.PlayerLead, res.PlayerCrown));
                 }
                 else if (main != null && contrib != null && contrib.ContainsKey(main))
                 {
                     string lead = a != null && a.LeaderHero != null ? a.LeaderHero.Name.ToString() : "The army's leader";
                     if (kind == KMercy) Log.Player(lead + " spared " + town + ". There is no plunder.");
                     else if (res.PlayerMen + res.PlayerLead > 0)
-                        Log.Player(lead + " let the army sack " + town + ". Your party's part: " + N(res.PlayerMen + res.PlayerLead) + " denars (your men " + N(res.PlayerMen) + ", you " + N(res.PlayerLead) + ").");
+                        Log.Player(lead + " let the army sack " + town + ". Your party's part: " + N(res.PlayerMen + res.PlayerLead) + " denars"
+                                   + (res.PlayerMen > 0 ? " (your men " + N(res.PlayerMen) + ", you " + N(res.PlayerLead) + ")" : "")
+                                   + (res.PlayerCrown > 0 ? "; the crown will claim " + N(res.PlayerCrown) + " of your part" : "") + ".");
                 }
                 if (prev != null && prev == Clan.PlayerClan && kind != KMercy && res.Pool > 0)
                     Log.Player(town + (castle ? " has been sacked: its treasury lost " : " has been sacked: its merchants lost ") + N(res.Merch)

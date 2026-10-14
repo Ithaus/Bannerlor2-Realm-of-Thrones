@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 
 namespace Armoury
@@ -45,6 +46,17 @@ namespace Armoury
     /// OBIEG ZAMKNIETY: zloto partia -> bohater (swiat bez zmian), sztuki roster -> roster (ksiega towarow: przewoz, zero), ludzie do DOM (ksiega ludzi), bohaterowie
     /// do niewoli. Kontrola w linii: zdjete z karawan = dopisane (zloto i sztuki), karawany, ktore nie zniknely - 0.
     /// Linia "Karawany w zdobytym miescie (L5b-2): dzien" przy kazdym zdobyciu twierdzy (takze bez karawan - pomiar "ile karawan stoi w murach"). Stan tylko w pamieci.
+    ///
+    /// DIAGNOZA (drobne14, inwentarz A11 / BD 7 "L5b-2 karawany wroga 0 w 39 zdobyciach"): bieg dwuletni - 39 linii, w kazdej "karawan w murach 0" (takze
+    /// niewrogich), choc karawany STOJA w oblezonych miastach (linia E8/G1 "w oblezonym miescie": 1 744 tikow, ok. 76 karawano-dob; gra i BK trzymaja je
+    /// SetMoveModeHold od OnSiegeEventStarted) i w dobie zdobycia z miast wyjezdzaja karawany po 3-7 i 7+ dobach postoju (Harrenhal d108964: 4, Maidenpool
+    /// d109284: 2; linia "Postoj karawan (E8/P3)"). Kod zajecia jest poprawny (warunek zdobycia jak w grze, prefiks biegnie - 39 linii), ale w chwili
+    /// prefiksu KingdomManager.SiegeCompleted karawan juz nie ma w osadzie - wychodza wczesniej, a dekompilacja gry 1.4.8 nie pokazuje, kto je wyprowadza
+    /// (MapEvent.AddInsideSettlementParties i PartyDiplomaticHandler pomijaja karawany tej frakcji). Dlatego tylko pomiar, bez zmiany zachowania:
+    ///  - spis karawan w murach przy OnSiegeEventStarted (pamiec, czyszczona przy OnSiegeEventEnded i wczytaniu) - w linii L5b-2: ile ich bylo na poczatku
+    ///    oblezenia, ile jest jeszcze w murach, ile stoi poza murami (pierwsza: gdzie i jak daleko), ile zniknelo;
+    ///  - wyjazd karawany z OBLEGANEJ osady (OnSettlementLeftEvent przy IsUnderSiege) - licznik i pierwsze 5 na sesje z kim, skad i stosem wywolan
+    ///    (linia "Karawana wyszla z oblezonej osady (L5b-2, diagnoza)") - stos wskaze sciezke, ktora je wyprowadza. Naprawa po pierwszym biegu z ta linia.
     /// </summary>
     internal static class EnemyCaravans
     {
@@ -58,7 +70,15 @@ namespace Armoury
             public Settlement St; public MobileParty Cap; public IFaction WinF;
             public readonly List<MobileParty> Enemy = new List<MobileParty>();
             public int All, Naval, Friendly, InBattle;
+            // diagnoza drobne14: spis z poczatku oblezenia (-1 - brak spisu: oblezenie sprzed wczytania)
+            public int AtStart = -1, StillIn, Outside, Gone;
+            public string OutEx;
         }
+
+        // diagnoza drobne14: karawany w murach przy OnSiegeEventStarted (osada -> lista); wyjazdy karawan z oblezanych osad
+        private static readonly Dictionary<Settlement, List<MobileParty>> _atStart = new Dictionary<Settlement, List<MobileParty>>();
+        private static int _leftSiege, _dLeftSiege, _stackLines;
+        private const int StackLinesMax = 5;
 
         // liczniki doby (Last* dla "Obieg: notable i karawany")
         private static int _dCaps, _dSeized;
@@ -73,6 +93,77 @@ namespace Armoury
         {
             _dCaps = _dSeized = 0; _dGold = _dUnits = 0; LastCaps = LastSeized = 0; LastGold = LastUnits = 0;
             _stumbles = _dStumbles = 0; _err.Clear();
+            _atStart.Clear(); _leftSiege = _dLeftSiege = _stackLines = 0;
+        }
+
+        // ------------------------------------------------------------ diagnoza drobne14 (tylko pamiec i log - zachowanie gry bez zmian)
+
+        /// <summary>Sluchacz OnSiegeEventStartedEvent: spis karawan w murach oblezanej twierdzy.</summary>
+        internal static void OnSiegeStarted(SiegeEvent se)
+        {
+            try
+            {
+                var st = se != null ? se.BesiegedSettlement : null;
+                if (st == null || !st.IsFortification) return;
+                List<MobileParty> l = null;
+                foreach (var mp in st.Parties)
+                    if (mp != null && mp.IsActive && mp.IsCaravan) { if (l == null) l = new List<MobileParty>(); l.Add(mp); }
+                _atStart[st] = l ?? new List<MobileParty>();
+            }
+            catch (Exception e) { Stumble("OnSiegeStarted", e); }
+        }
+
+        /// <summary>Sluchacz OnSiegeEventEndedEvent: koniec oblezenia (zdobycie - po linii L5b-2, odstapienie) - spis znika.</summary>
+        internal static void OnSiegeEnded(SiegeEvent se)
+        {
+            try { if (se != null && se.BesiegedSettlement != null) _atStart.Remove(se.BesiegedSettlement); }
+            catch (Exception e) { Stumble("OnSiegeEnded", e); }
+        }
+
+        /// <summary>Sluchacz OnSettlementLeftEvent: karawana wyszla z osady, ktora jest jeszcze oblegana (gra i BK trzymaja je w murach) - licznik i stos.</summary>
+        internal static void OnLeft(MobileParty mp, Settlement st)
+        {
+            if (mp == null || st == null || !mp.IsCaravan || !st.IsUnderSiege) return;
+            try
+            {
+                _leftSiege++; _dLeftSiege++;
+                if (_stackLines >= StackLinesMax) return;
+                _stackLines++;
+                IFaction bf = null;
+                try { bf = st.SiegeEvent != null && st.SiegeEvent.BesiegerCamp != null ? st.SiegeEvent.BesiegerCamp.MapFaction : null; } catch { bf = null; }
+                bool inStart = false;
+                List<MobileParty> l;
+                if (_atStart.TryGetValue(st, out l) && l != null) inStart = l.Contains(mp);
+                Log.Info("Karawana wyszla z oblezonej osady (L5b-2, diagnoza): dzien " + (int)CampaignTime.Now.ToDays + " godz. " + CampaignTime.Now.GetHourOfDay
+                         + " | karawana " + mp.StringId + " (" + Nm(mp.MapFaction) + ", wlasciciel " + Nm(mp.Owner) + ")"
+                         + " | osada " + Nm(st) + " (" + st.StringId + ", " + Nm(st.MapFaction) + "; oblega " + Nm(bf) + (bf != null && mp.MapFaction != null ? (bf.IsAtWarWith(mp.MapFaction) ? " - wrog karawany" : " - nie wrog karawany") : "") + ")"
+                         + " | bitwa osady " + (st.Party != null && st.Party.MapEvent != null ? "TAK" : "nie") + ", w spisie z poczatku oblezenia " + (inStart ? "TAK" : "nie")
+                         + " | wyjazdow z oblezonych od wczytania " + _leftSiege + " (linia " + _stackLines + "/" + StackLinesMax + ")"
+                         + " | stos: " + StackText(2) + ".");
+            }
+            catch (Exception e) { Stumble("OnLeft", e); }
+        }
+
+        /// <summary>Stos wywolan do linii diagnozy (skip: 0 - od tej metody; 2 - od wolajacego metode, ktora tu wola). Tylko do rzadkich linii (koszt).</summary>
+        internal static string StackText(int skip)
+        {
+            try
+            {
+                var frames = new System.Diagnostics.StackTrace(Math.Max(0, skip), false).GetFrames();
+                if (frames == null) return "-";
+                var sb = new StringBuilder(400);
+                int n = 0;
+                foreach (var f in frames)
+                {
+                    var m = f != null ? f.GetMethod() : null;
+                    if (m == null) continue;
+                    if (n > 0) sb.Append(" <- ");
+                    sb.Append(m.DeclaringType != null ? m.DeclaringType.Name : "?").Append('.').Append(m.Name);
+                    if (++n >= 12) break;
+                }
+                return n > 0 ? sb.ToString() : "-";
+            }
+            catch { return "?"; }
         }
 
         private static void Stumble(string where, Exception e)
@@ -123,6 +214,26 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("SiegePre(karawana)", e); }
                 }
+                // diagnoza drobne14: gdzie sa karawany, ktore staly w murach na poczatku oblezenia
+                try
+                {
+                    List<MobileParty> l0;
+                    if (_atStart.TryGetValue(settlement, out l0) && l0 != null)
+                    {
+                        sn.AtStart = l0.Count;
+                        foreach (var c in l0)
+                        {
+                            if (c == null || !c.IsActive) { sn.Gone++; continue; }
+                            if (c.CurrentSettlement == settlement) { sn.StillIn++; continue; }
+                            sn.Outside++;
+                            if (sn.OutEx == null)
+                                sn.OutEx = c.StringId + (c.CurrentSettlement != null ? " w " + Nm(c.CurrentSettlement)
+                                                         : " na mapie " + c.GetPosition2D.Distance(settlement.GetPosition2D).ToString("0.0", Inv) + " jedn. od murow")
+                                           + (c.MapEvent != null ? ", w bitwie" : "") + ", " + c.DefaultBehavior + "/" + c.ShortTermBehavior;
+                        }
+                    }
+                }
+                catch (Exception e) { Stumble("SiegePre(spis z poczatku)", e); }
                 __state = sn;
             }
             catch (Exception e) { Stumble("SiegePre", e); }
@@ -292,6 +403,9 @@ namespace Armoury
               .Append(" | nie zniknely ").Append(survived)
               .Append(" | gracz: karawan zajetych ").Append(playerN).Append(cap != null && cap.IsMainParty ? ", zdobywca" : "")
               .Append(ex.Count > 0 ? " | " + string.Join("; ", ex.ToArray()) : "")
+              .Append(" | na poczatku oblezenia w murach ").Append(sn.AtStart < 0 ? "- (brak spisu: oblezenie sprzed wczytania)"
+                      : sn.AtStart + ": teraz w murach " + sn.StillIn + ", poza murami " + sn.Outside + (sn.OutEx != null ? " (" + sn.OutEx + ")" : "") + ", zniknely " + sn.Gone)
+              .Append(", wyjazdy karawan z oblezonych osad dzis ").Append(_dLeftSiege).Append(" (od wczytania ").Append(_leftSiege).Append(')')
               .Append(_dStumbles > 0 ? " | potkniecia " + _dStumbles + " (od wczytania " + _stumbles + ")" : "").Append('.');
             Log.Info(sb.ToString());
             try
@@ -301,7 +415,8 @@ namespace Armoury
                                + playerGold.ToString("N0", Inv) + " denars and " + playerUnits + " items of cargo and pack animals are lost"
                                + (playerLeaders.Count > 0 ? "; " + string.Join(", ", playerLeaders.ToArray()) + (playerLeaders.Count == 1 ? " is" : " are") + " now held prisoner" : "") + ".", true);
                 if (cap != null && cap.IsMainParty && seized > 0)
-                    Log.Player("In " + Nm(st) + " your men seized " + (seized == 1 ? "an enemy caravan" : seized + " enemy caravans") + ": " + goldOn.ToString("N0", Inv) + " denars go to your purse and "
+                    Log.Player("In " + Nm(st) + " your men seized " + (seized == 1 ? "an enemy caravan" : seized + " enemy caravans") + ": " + goldOn.ToString("N0", Inv) + " denars go to your purse"
+                               + CitySack.CrownNinthText(lead, goldOn) + " and "
                                + (unitsOn - unitsShelf) + " items of cargo, horses and pack animals to your baggage"
                                + (unitsShelf > 0 ? " (" + unitsShelf + " more that your men could not carry or herd are left " + (st.IsTown ? "in the market of " : "behind in ") + Nm(st) + ")" : "") + (heroes > 0 ? "; " + heroes + (heroes == 1 ? " caravan master is your prisoner" : " caravan masters are your prisoners") : "") + ".");
             }
@@ -319,7 +434,7 @@ namespace Armoury
         internal static void DayRoll()
         {
             LastCaps = _dCaps; LastSeized = _dSeized; LastGold = _dGold; LastUnits = _dUnits;
-            _dCaps = _dSeized = 0; _dGold = _dUnits = 0; _dStumbles = 0;
+            _dCaps = _dSeized = 0; _dGold = _dUnits = 0; _dStumbles = 0; _dLeftSiege = 0;
         }
     }
 }

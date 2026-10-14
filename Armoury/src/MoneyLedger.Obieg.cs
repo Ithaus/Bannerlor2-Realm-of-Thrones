@@ -193,6 +193,7 @@ namespace Armoury
             try
             {
                 TownFolk.OnTownCoin(st, amount, src);   // E5/0 (195): nasze sciezki zakupu kas miast (src: BOurs, zwroty i likwidacje - BBack) - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
+                if (amount < 0 && src == TownFolk.BOurs) C4Probe(kind >= 0 && kind < N169 ? "169: " + N169Name[kind] : "Note169 " + kind, st, amount);   // drobne14: diagnoza C-4b
                 if (_inBlock || amount == 0 || kind < 0 || kind >= N169 || !CW.On) return;
                 int c = ClassOf(st);
                 if (c < 0) return;

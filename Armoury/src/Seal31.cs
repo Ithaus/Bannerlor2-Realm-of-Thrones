@@ -100,6 +100,11 @@ namespace Armoury
         internal static long TownReserve(Town t)
         {
             if (t == null) return 0;
+            // drobne14 (BD 7 NIE nr 6, C-4b "kasy miast ponizej zapasu przez nasze sciezki" 9 zl w 5 dobach): przy czynnym TownPurse jeden wzor - TownPurse.Reserve,
+            // ta sama liczba, ktorej pilnuje regula A1 (TownPurse.Spare) i zawor. Dotad tu 12f x dobrobyt w float, tam 12.0 w double - obciecie roznilo sie o 1 zl,
+            // a po skali m_t (do x6) o 1-6 zl: pomiar widzial "ponizej zapasu", choc wyplata stanela dokladnie na zapasie. Czytaja to tylko pomiary (RealPayer,
+            // PlayerFees8, TownFolk, Measure169c, MoneyLedger) - Spare i CitySack biora TownReserve tylko przy wylaczonym TownPurse (bez zmian)
+            if (TownPurse.On) return TownPurse.Reserve(t);
             long r = 10000L + (long)(12f * t.Prosperity);
             float m;
             if (PeopleMarket.ReserveScale(t, out m)) r = (long)(r * (double)m);   // GL-2 (P2 c): zapas kupcow x m_t (ta sama skala co TownPurse.Reserve)

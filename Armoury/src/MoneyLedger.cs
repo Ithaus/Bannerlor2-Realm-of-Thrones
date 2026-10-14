@@ -213,7 +213,7 @@ namespace Armoury
         {
             _first = true; _modelsLogged = false; _lastSnap = null; _lastHold = null; _blockSnap = null; _inBlock = false;
             _winParty = null; _winVillage = false; _shelfTown = null; _regExpect = null; _regModel = null; _regDecl = null;
-            _clanNow = null; _clanErrLogged = false;
+            _clanNow = null; _clanErrLogged = false; _c4Lines = 0;
             ClearDay();
             Reset169();                                     // paczka 169: pierscien reszty 28 dob, zloto swiata na poczatku bloku
         }
@@ -465,6 +465,29 @@ namespace Armoury
             Log.Error(where, e);
         }
 
+        // ------------------------------------------------------------ drobne14: diagnoza C-4b
+        // BD rozdz. 7 NIE nr 6: "C-4b kasy miast ponizej zapasu przez nasze sciezki" - 9 zl w 5 dobach biegu dwuletniego (1-4 zl naraz przy 127-506 tys. zl
+        // zakupow doby; po regule A1 ma byc 0). Linia E5/0 podaje tylko sume, nie sciezke. Pierwsze C4Max zdarzen na sesje: nazwa sciezki (licznik Note /
+        // Note169), miasto, kwoty i stos wywolan - linia "Kasa miasta ponizej zapasu (C-4b, diagnoza)". Tylko log (zachowanie bez zmian).
+        private const int C4Max = 8;
+        private static int _c4Lines;
+
+        private static void C4Probe(string path, Settlement st, int amount)
+        {
+            try
+            {
+                if (_c4Lines >= C4Max || st == null || !st.IsTown || st.Town == null) return;
+                long r = Seal31.TownReserve(st.Town), g = st.Town.Gold;
+                long below = Math.Max(0L, Math.Min(-(long)amount, r - g));
+                if (below <= 0) return;
+                _c4Lines++;
+                Log.Info("Kasa miasta ponizej zapasu (C-4b, diagnoza): dzien " + (int)CampaignTime.Now.ToDays + " | sciezka " + path + " | " + (st.Name != null ? st.Name.ToString() : "-")
+                         + " (" + st.StringId + ") zaplacila " + (-(long)amount) + ", ponizej zapasu " + below + " (kasa po przelewie " + g + ", zapas kupcow " + r + ")"
+                         + " | linia " + _c4Lines + "/" + C4Max + " na sesje | stos: " + EnemyCaravans.StackText(2) + ".");
+            }
+            catch { }
+        }
+
         // ------------------------------------------------------------ nasze moduly: wywolania-liczniki
         /// <summary>Nasz modul zmienil kase osady poza tickiem dobowym (kwota ze znakiem: + do kasy, - z kasy). Tylko licznik.</summary>
         internal static void Note(int kind, Settlement st, int amount, int src = TownFolk.BOurs)
@@ -472,6 +495,7 @@ namespace Armoury
             try
             {
                 TownFolk.OnTownCoin(st, amount, src);   // E5/0 (195): nasze sciezki zakupu kas miast (src: BOurs, zwroty i likwidacje - BBack) - czesc ponizej zapasu kupcow (tylko ujemne kwoty miast; wlasny try)
+                if (amount < 0 && src == TownFolk.BOurs) C4Probe(kind >= 0 && kind < Notes ? NName[kind] : "Note " + kind, st, amount);
                 if (_inBlock || amount == 0 || kind < 0 || kind >= Notes) return;
                 int c = ClassOf(st);
                 if (c < 0) return;
