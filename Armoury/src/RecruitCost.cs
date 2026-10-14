@@ -89,7 +89,8 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 if (s == null || !s.HistoricalRecruitCost || __0 == null || __0.IsHero) return;
-                int wage = Campaign.Current.Models.PartyWageModel.GetCharacterWage(__0);
+                // P4 (BkrotChains): zold bez reguly ROT (Nieskalani 0) - cena werbunku jak dotad, nie 1 za Nieskalanego
+                int wage = BkrotChains.PriceWage(__0);
                 float days = Math.Max(0f, s.RecruitCostDays);
                 bool merc = __0.Occupation == Occupation.Mercenary || __0.Occupation == Occupation.Gangster || __0.Occupation == Occupation.CaravanGuard;
                 if (merc) days *= 2f;

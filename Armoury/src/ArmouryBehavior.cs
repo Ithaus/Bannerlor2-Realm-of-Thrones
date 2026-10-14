@@ -1419,6 +1419,7 @@ namespace Armoury
             try { EstateIncome187.EnsureHooks(); } catch (Exception e) { Log.Error("EstateIncome187.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { FiefGrants.EnsureHooks(); } catch (Exception e) { Log.Error("FiefGrants.EnsureHooks", e); }   // PROJEKT-LENNA (14.10): regula N nadan zdobytych twierdz - latki na model BK / BKROT i decyzje gry w kampanii (raz na proces), linia "Nadania lenn (N)"
+            try { BkrotChains.EnsureHooks(); } catch (Exception e) { Log.Error("BkrotChains.EnsureHooks", e); }   // P4 audytu (AM-13, AM-09, AM-19): lancuchy modeli pod BKROT (predkosc, mapa, morale w bitwie, zold) - latki raz na proces, linia "Lancuchy modeli BKROT (P4): start"
             try { ShipsToPort181.Reset(); } catch (Exception e) { Log.Error("ShipsToPort181.Reset", e); }   // 3.1/3.3 (33) 181: statki do portu - stan dzienny i konteksty od zera w kazdej kampanii (latki wpiete przy starcie gry)
             try { PeopleScale.SessionStart(); } catch (Exception e) { Log.Error("PeopleScale.SessionStart", e); }   // GL-0: pamiec skal od pierwszej godziny sesji (po wczytaniu; stary zapis - kalibracja tu) - PO McmSettings.Apply i ksiegach z zapisu, PRZED RawPrice.SeedNewCampaign (recenzja kodu GL W1: pamiec popytu nowej kampanii z m_t od pierwszej doby)
             try { VillageByPeople.SessionStart(); } catch (Exception e) { Log.Error("VillageByPeople.SessionStart", e); }   // GL-1 (P1): plon wsi od ludzi - g z zapisu albo kalibracja (stary zapis), przejscie stanu (regulator wsi od nowa) - PO PeopleScale.SessionStart
@@ -1695,6 +1696,7 @@ namespace Armoury
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); } DayProfile.Lap("WesterosClimate.Daily");   // biale kruki: koniec pory roku
             try { StateHygiene.Daily(); } catch (Exception e) { Log.Error("StateHygiene.Daily", e); } DayProfile.Lap("StateHygiene.Daily");   // E8/S (246): linia "Porzadek stanu (E8/S)" - PO WesterosClimate.Daily (stan klimatu po ponowieniu tej doby); tylko log
             try { FoodChain.Daily(); } catch (Exception e) { Log.Error("FoodChain.Daily", e); } DayProfile.Lap("FoodChain.Daily");   // E4/6a: raz na kampanie linia "Lancuch modelu jedzenia (E4/6a)"
+            try { BkrotChains.Daily(); } catch (Exception e) { Log.Error("BkrotChains.Daily", e); } DayProfile.Lap("BkrotChains.Daily");   // P4 audytu: linia "Lancuchy modeli BKROT (P4): dzien N" (predkosc na morzu, zold Innych / Nieskalanych / na morzu, wzrok)
             try { WinterBite.OnDaily(); } catch (Exception e) { Log.Error("WinterBite", e); } DayProfile.Lap("WinterBite.OnDaily");
             var gfForage = GoodsLedger.Begin(GoodsLedger.FForage);   // paczka 146: ksiega towarow - zboze z furazu armii (tylko licznik)
             try { ScorchedEarth.OnDaily(); } catch (Exception e) { Log.Error("ScorchedEarth", e); }
