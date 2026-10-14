@@ -25003,6 +25003,7 @@ P4_KEYS = re.compile(r"(predkosc|mapa|bitwa|zold|morze|Wielki Ksiaze) (TAK|NIE)"
 P4_SAMPLE = re.compile(r"\[([^\]]*?): teraz (\S+) = ([^\]]*?); bez naprawy (\S+); powtorzone wpisy (\d+)\]")
 P4_SIGHT = re.compile(r"policzone (\d+), srednio teraz (\S+), bez naprawy (\S+)")
 P4_ARB = re.compile(r"Wielki Ksiaze \(AM-19\) zadzialal od wczoraj (\d+) razy")
+P4_WNAN = re.compile(r"zold nieliczbowy z lancucha \(policzony jak dotad\) od wczoraj (\d+)")
 
 
 def _audytb_is_p4_log(logp):
@@ -25122,6 +25123,12 @@ def _audytb_p4(logp):
     rep.add("AB-11c: (AM-09) zold - ostatnia doba (INFO)",
             f"Inni partii {g[9]} zold teraz {g[10]} / bez naprawy {g[11]}; Nieskalani ludzi {g[12]} w {g[13]} partiach, zold jednostki {g[14]} / {g[15]}, do ceny werbunku {g[16]}; na morzu partii {g[17]} (karawan {g[18]}): {g[19]} / bez obnizki {g[20]}",
             "INFO", None)
+    # recenzja P4: wynik lancucha zoldu NaN / nieskonczony (NavalDLC dzieli przez BaseNumber 0 BK - najemnicy bez krolestwa na morzu z perkiem bosmana)
+    nan = sum(int(m.group(1)) for x in days for m in [P4_WNAN.search(x[23])] if m)
+    nan_lines = sum(1 for x in days if P4_WNAN.search(x[23]))
+    rep.add("AB-11d: (recenzja P4) zold nieliczbowy z lancucha - policzony stara droga (INFO)",
+            f"razy {nan} (dob z polem {nan_lines})" if nan_lines else "brak pola w liniach doby (DLL sprzed recenzji P4)",
+            "INFO (> 0: NavalDLC dzielil przez zero - wynik jak dotad, bez zlota z niczego)", None)
     # AB-12 AM-19
     arb = sum(int(m.group(1)) for x in days for m in [P4_ARB.search(x[23])] if m)
     gm = re.search(r"gracz teraz (\S+), bez naprawy (\S+)", g[23])

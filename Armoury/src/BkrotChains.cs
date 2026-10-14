@@ -137,7 +137,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki i potkniecia (bez globalnego wylacznika - CLAUDE.md 7)
         private static readonly long[] _calls = new long[KN * 2];   // [k*2] pomocnik transpilera, [k*2+1] prefiks metody niezadeklarowanej
-        private static long _deep, _arbiter;
+        private static long _deep, _arbiter, _wageNaN;
         private static int _stumbles;
         private static readonly Dictionary<string, int> _stumbleAt = new Dictionary<string, int>();
         private static readonly object Gate = new object();
@@ -381,7 +381,11 @@ namespace Armoury
 
         /// <summary>Zold partii: lancuch ROT -> NavalDLC -> BEE -> BK. Roster null (BKROT ma domyslny null; BK go nie czyta) - roster partii (NavalDLC
         /// liczy z niego perki). Wynik ponizej 0 przyciety do 0: BK nie stawia LimitMin (gra stawia), a NavalDLC na morzu -0.2 i konwoj -0.8 obok
-        /// "Caravan" -0.25 BK zrobilby zold ujemny (zloto z niczego).</summary>
+        /// "Caravan" -0.25 BK zrobilby zold ujemny (zloto z niczego).
+        /// Recenzja P4: wynik nieliczbowy (NaN / nieskonczonosc) - stara droga (BK, jak dotad) + licznik. Dowod: BK GetTotalWage oddaje
+        /// new ExplainedNumber(0) dla partii rodu najemnikow bez krolestwa, a NavalDLC na morzu przy perku bosmana Optimization (NavalHorde) dzieli
+        /// zold nie-marynarzy przez totalWage.BaseNumber = 0 -> AddFactor(+-Inf) -> 0 * Inf = NaN; MathF.Clamp NaN przepuszcza, a MobileParty.TotalWage
+        /// = (int)NaN = int.MinValue - rod dostalby ok. 2 mld zlota z niczego. Dotad NavalDLC pod BKROT nie biegl.</summary>
         public static ExplainedNumber WageTotal(DefaultPartyWageModel self, MobileParty party, TroopRoster roster, bool desc)
         {
             var head = party != null ? Head(K.Wage, self) as PartyWageModel : null;
@@ -391,9 +395,14 @@ namespace Armoury
                 try
                 {
                     var r = head.GetTotalWage(party, roster ?? party.MemberRoster, desc);
-                    if (r.LimitMinValue < 0f) r.LimitMin(0f);
-                    Count(K.Wage, 0);
-                    return r;
+                    float v = r.ResultNumber;
+                    if (float.IsNaN(v) || float.IsInfinity(v)) Interlocked.Increment(ref _wageNaN);   // nizej: stara droga (BK), jak dotad
+                    else
+                    {
+                        if (r.LimitMinValue < 0f) r.LimitMin(0f);
+                        Count(K.Wage, 0);
+                        return r;
+                    }
                 }
                 catch (Exception e) { Stumble("zold partii", e); }
                 finally { _inWage--; Exit(K.Wage); }
@@ -780,7 +789,7 @@ namespace Armoury
         // ------------------------------------------------------------ linia doby (tylko odczyt)
         private static int _lastDay = -1;
         private static readonly long[] _callsAt = new long[KN * 2];
-        private static long _arbiterAt, _deepAt;
+        private static long _arbiterAt, _deepAt, _wageNaNAt;
 
         private static string F(float v) { return float.IsNaN(v) || float.IsInfinity(v) ? "-" : v.ToString("0.00", Inv); }
         private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "?" : s.Replace("|", "/").Replace(";", ",").Replace("[", "(").Replace("]", ")"); }
@@ -932,6 +941,9 @@ namespace Armoury
             sb.Append("; na morzu partii ").Append(seaW).Append(" (karawan ").Append(seaCar).Append("): zold teraz ").Append(seaNow.ToString("0", Inv))
               .Append(", bez obnizki morskiej ").Append(seaFull.ToString("0", Inv)).Append(", roznica ").Append((seaFull - seaNow).ToString("0", Inv)).Append(" na dobe");
             sb.Append("; ujemny zold partii ").Append(neg);
+            long wn = Interlocked.Read(ref _wageNaN);   // recenzja P4: wynik lancucha NaN / nieskonczony (NavalDLC / 0) - policzony stara droga
+            sb.Append("; zold nieliczbowy z lancucha (policzony jak dotad) od wczoraj ").Append(wn - _wageNaNAt);
+            _wageNaNAt = wn;
             try
             {
                 var main = MobileParty.MainParty;
