@@ -251,7 +251,7 @@ namespace Armoury
             // recenzja E4/7 R2-2: BK tworzy przy kazdym wczytaniu i nowej kampanii nowy PopulationManager kluczowany obiektami Settlement (wzor ClanBudget.Reset) -
             // stary menedzer nie zna osad nowej kampanii (A5 z klasa BK po cichu bez zdjecia). BkResolve jest leniwe - podepnie sie do nowego.
             _bkTried = false; _popMgr = null; _getPopData = null;
-            _goneLines = 0;     // drobne2: linie diagnozy "Ludzie przy zniknieciu partii" - limit na sesje
+            _goneLines = _goneBig = 0;     // drobne2: linie diagnozy "Ludzie przy zniknieciu partii" - limit na sesje
             OriginNewDay();
             try { FreeHands.Reset(); } catch (Exception e) { Stumble("ResetOrigin(FreeHands)", e); }
         }
@@ -1265,17 +1265,24 @@ namespace Armoury
         // ludzie slownika partii usunietej z ludzmi, bez bitwy i bez drogi do DOM, nie maja licznika w rownaniu regionu): KTO usuwa partie z ludzmi - tylko log
         private const double GoneDiagMen = 20.0;
         private const int GoneLinesMax = 40, GoneStackMax = 5;
-        private static int _goneLines;
+        // recenzja drobne2: duze znikniecie (>= 100 ludzi) - zawsze ze stosem i z wlasnym limitem 20 linii na sesje (bieg dwuletni: d130 921, d248 815, d424 786
+        // ludzi w dobie; 40 zwyklych linii i 5 stosow zjadaja wczesniej male bandy i bitwy, a o rownaniu krain decyduja te duze)
+        private const double GoneStackMen = 100.0;
+        private const int GoneBigMax = 20;
+        private static int _goneLines, _goneBig;
 
         /// <summary>drobne2 (diagnoza): linia "Ludzie przy zniknieciu partii (E4/7, diagnoza drobne2)" dla slownika >= 20 ludzi - nazwa, rodzaj, rod, sklad teraz, bitwa,
-        /// 3 najwieksze regiony z kraina, pierwsze 5 na sesje ze stosem; najwyzej 40 na sesje. Nie zmienia ksiegi.</summary>
+        /// oblezenie (te same warunki co ArmsPartyGone: niszczyciel, bitwa, oblezenie, rodzaj - kazdy zostawia resztke w nicosc), 3 najwieksze regiony z kraina,
+        /// pierwsze 5 na sesje ze stosem; najwyzej 40 na sesje; >= 100 ludzi - osobno, zawsze ze stosem, najwyzej 20 na sesje. Nie zmienia ksiegi.</summary>
         private static void GoneDiag(PartyBase pb, Org o, bool destroyed)
         {
-            if (_goneLines >= GoneLinesMax) return;
-            _goneLines++;
+            bool big = o.Sum >= GoneStackMen;
+            if (big) { if (_goneBig >= GoneBigMax) return; _goneBig++; }
+            else { if (_goneLines >= GoneLinesMax) return; _goneLines++; }
             var mp = pb.MobileParty;
             string nm = "?", id = "?", clan = "-", kind = "?";
-            int men = -1; bool battle = false;
+            int men = -1; bool battle = false, siege = false;
+            try { siege = mp != null && mp.SiegeEvent != null; } catch { }
             try { nm = pb.Name != null ? pb.Name.ToString() : "-"; } catch { }
             try { id = mp != null ? mp.StringId : (pb.Settlement != null ? pb.Settlement.StringId : "-"); } catch { }
             try { var c = mp != null ? mp.ActualClan : null; clan = c != null && c.Name != null ? c.Name.ToString() : "-"; } catch { }
@@ -1283,8 +1290,8 @@ namespace Armoury
             try { men = pb.MemberRoster != null ? pb.MemberRoster.TotalManCount : -1; battle = pb.MapEvent != null; } catch { }
             var sb = new StringBuilder(500);
             sb.Append("Ludzie przy zniknieciu partii (E4/7, diagnoza drobne2): ").Append(nm).Append(" (").Append(id).Append(", ").Append(kind).Append(", rod ").Append(clan)
-              .Append(") - ze slownika w nicosc ").Append(o.Sum.ToString("0.#", Inv)).Append(" ludzi; ").Append(destroyed ? "MobilePartyDestroyed z niszczycielem" : "bez niszczyciela (RemoveParty albo sprzatanie doby)")
-              .Append(", sklad teraz ").Append(men).Append(", bitwa ").Append(battle ? "TAK" : "nie").Append(" | regiony: ");
+              .Append(") - ze slownika w nicosc ").Append(o.Sum.ToString("0.#", Inv)).Append(" ludzi; ").Append(destroyed ? "MobilePartyDestroyed z niszczycielem" : "bez niszczyciela (MobilePartyDestroyed bez niszczyciela, RemoveParty albo sprzatanie doby - patrz stos)")
+              .Append(", sklad teraz ").Append(men).Append(", bitwa ").Append(battle ? "TAK" : "nie").Append(", oblezenie ").Append(siege ? "TAK" : "nie").Append(" | regiony: ");
             int n = 0;
             foreach (var kv in o.M.OrderByDescending(x => x.Value))
             {
@@ -1294,8 +1301,8 @@ namespace Armoury
                 sb.Append(n > 0 ? ", " : "").Append(kv.Key.Length > 0 ? kv.Key : "\"\"").Append(" (").Append(realm).Append(") ").Append(kv.Value.ToString("0.#", Inv));
                 n++;
             }
-            sb.Append(" | linia ").Append(_goneLines).Append('/').Append(GoneLinesMax);
-            if (_goneLines <= GoneStackMax) sb.Append(" | stos: ").Append(EnemyCaravans.StackText(3));
+            if (big) sb.Append(" | duza linia ").Append(_goneBig).Append('/').Append(GoneBigMax); else sb.Append(" | linia ").Append(_goneLines).Append('/').Append(GoneLinesMax);
+            if (big || _goneLines <= GoneStackMax) sb.Append(" | stos: ").Append(EnemyCaravans.StackText(3));
             Log.Info(sb.Append('.').ToString());
         }
 
