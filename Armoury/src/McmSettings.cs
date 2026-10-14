@@ -1500,30 +1500,6 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool WarLedgerToOutlaws { get; set; } = true;
 
-        [SettingPropertyBool("Sack Scar Enabled", HintText = "a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild")]
-        [SettingPropertyGroup("The marching column")]
-        public bool SackScarEnabled { get; set; } = true;
-
-        [SettingPropertyInteger("Sack Prosperity Cut Percent", 0, 60, "0", HintText = "prosperity lost when a settlement falls to siege")]
-        [SettingPropertyGroup("The marching column")]
-        public int SackProsperityCutPercent { get; set; } = 15;
-
-        [SettingPropertyInteger("Sack Loyalty Hit", 0, 60, "0", HintText = "loyalty lost when a settlement falls to siege")]
-        [SettingPropertyGroup("The marching column")]
-        public int SackLoyaltyHit { get; set; } = 15;
-
-        [SettingPropertyBool("Capital Treasury Seized", HintText = "when an enemy storms the capital of a realm (the seat of its court in Banner Kings; without Banner Kings its first seat), the conquerors carry off part of the royal treasury kept there - Capital Treasury Share of what it holds above its war reserve and its debt to the Iron Bank - into the treasury of their own realm (a conqueror without a realm takes it into his own purse); a capital lost by peace, gift or revolt gives nothing; off = the treasury stays untouched")]
-        [SettingPropertyGroup("The marching column")]
-        public bool CapitalTreasurySeized { get; set; } = true;
-
-        [SettingPropertyFloatingInteger("Capital Treasury Share", 0.000f, 1.000f, "0.000", HintText = "with Capital Treasury Seized: the part of a fallen capital's royal treasury - above the realm's war reserve and its Iron Bank debt - that the conquerors carry off (a third)")]
-        [SettingPropertyGroup("The marching column")]
-        public float CapitalTreasuryShare { get; set; } = 0.333f;
-
-        [SettingPropertyBool("Enemy Caravans Seized", HintText = "caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game")]
-        [SettingPropertyGroup("The marching column")]
-        public bool EnemyCaravansSeized { get; set; } = true;
-
         [SettingPropertyBool("March Pace Ai Too", HintText = "the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)")]
         [SettingPropertyGroup("The marching column")]
         public bool MarchPaceAiToo { get; set; } = true;
@@ -2555,18 +2531,6 @@ namespace Armoury
         [SettingPropertyBool("Losers Flee Besiegers", HintText = "the same rule under the walls, in battles fought without you: a besieging host beaten by a sally from the fortress, or beaten in the open under the walls by the defenders and a relief force, and a relief force beaten by the besiegers' camp, mostly flees like a host beaten in the field instead of being slain or taken to the last man; the winner there, a garrison too, loses at most a few slain. The siege still ends and the beaten host is still scattered; the men who flee go home or to the woods. Storming the walls, the defenders of a fortress when they are beaten, and battles at sea are not touched. Your own battles under the walls: fought on the field - not touched; auto-resolved - as Losers Flee Player Auto says (needs Losers Flee Enabled; off = as before)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool LosersFleeBesiegers { get; set; } = true;
-
-        [SettingPropertyBool("Stragglers Rally", HintText = "of the men who flee when a lord's host is beaten (in battles where the beaten mostly flee, and in your own field battles - your host or the lords you beat), most fear being hanged as deserters and come back: 55% go back to the banner, 30% go home, 15% take to the woods (seasoned men of tier 4 and up 70% back, tier 3 55%, green levies 45%; beaten in their own land more go home, in a foreign land more stay with the banner or turn outlaw; each week of unpaid wages sends 10 points of them to the woods instead, never below 20% back; the Night's Watch 80% back, none home). Those coming back gather at the nearest castle or town of their house (else of their realm) after 3-10 days and wait there for their lord or any host of the house; when one is within reach they march to it (if their castle or town falls, they make for another one); a host takes only as many as it has room for in its size limit and its wage limit. Waiting men draw no pay. Those not taken after the waiting time scatter, half home and half to the woods. Off = as before: the men who flee go home or to the woods")]
-        [SettingPropertyGroup("Iron Bank")]
-        public bool StragglersRally { get; set; } = true;
-
-        [SettingPropertyInteger("Stragglers Rally Wait Days", 5, 90, "0", HintText = "days the gathered stragglers wait at their castle or town for a host of their house before they scatter (half home, half to the woods)")]
-        [SettingPropertyGroup("Iron Bank")]
-        public int StragglersRallyWaitDays { get; set; } = 30;
-
-        [SettingPropertyFloatingInteger("Stragglers Rally Reach Days", 0.50f, 15.00f, "0.0", HintText = "the gathered stragglers go to a host of their house when it is within this many days of march of the place where they gathered")]
-        [SettingPropertyGroup("Iron Bank")]
-        public float StragglersRallyReachDays { get; set; } = 5f;
 
         [SettingPropertyFloatingInteger("Winner Death Cap Percent", 0.00f, 20.00f, "0.00", HintText = "the winner of a battle fought without you loses at most this share of his men slain; the rest of his fallen live, wounded (history: 1-5%)")]
         [SettingPropertyGroup("Iron Bank")]
@@ -4968,6 +4932,18 @@ namespace Armoury
         [SettingPropertyGroup("Defeats and payers (D11)")]
         public bool BattlePlunderFromLoserOnly { get; set; } = true;
 
+        [SettingPropertyBool("Stragglers Rally", HintText = "of the men who flee when a lord's host is beaten (in battles where the beaten mostly flee, and in your own field battles - your host or the lords you beat), most fear being hanged as deserters and come back: 55% go back to the banner, 30% go home, 15% take to the woods (seasoned men of tier 4 and up 70% back, tier 3 55%, green levies 45%; beaten in their own land more go home, in a foreign land more stay with the banner or turn outlaw; each week of unpaid wages sends 10 points of them to the woods instead, never below 20% back; the Night's Watch 80% back, none home). Those coming back gather at the nearest castle or town of their house (else of their realm) after 3-10 days and wait there for their lord or any host of the house; when one is within reach they march to it (if their castle or town falls, they make for another one); a host takes only as many as it has room for in its size limit and its wage limit. Waiting men draw no pay. Those not taken after the waiting time scatter, half home and half to the woods. Off = as before: the men who flee go home or to the woods Turned off during a campaign, the stragglers still waiting scatter the next morning, as if their waiting time were over.")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public bool StragglersRally { get; set; } = true;
+
+        [SettingPropertyInteger("Stragglers Rally Wait Days", 5, 90, "0", HintText = "days the gathered stragglers wait at their castle or town for a host of their house before they scatter (half home, half to the woods)")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public int StragglersRallyWaitDays { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Stragglers Rally Reach Days", 0.50f, 15.00f, "0.0", HintText = "the gathered stragglers go to a host of their house when it is within this many days of march of the place where they gathered")]
+        [SettingPropertyGroup("Defeats and payers (D11)")]
+        public float StragglersRallyReachDays { get; set; } = 5f;
+
         [SettingPropertyBool("War Tax From Folk", HintText = "in war the crown also taxes the townsfolk's and castle folk's earnings, on top of the war subsidy from the merchants' and villages' spare coin - up to 3%, up to 6% under the War Tax policy, raised each week while the crown has to borrow or spend its old hoard to repay the war wages, lowered when it no longer has to; the higher it is, the less the people buy and the slower prosperity grows. Labourers pay half the rate, craftsmen the full rate, patricians one and a half; a besieged town or castle pays nothing. In peace nothing is taken and the rate falls back to nothing within four weeks. Only while the townsfolk's purse is live and the crown pays from its current income. You and the AI alike. Off = no war tax on the people, as before")]
         [SettingPropertyGroup("The war tax on the people (stage 5)")]
         public bool WarTaxFromFolk { get; set; } = true;
@@ -5512,6 +5488,26 @@ namespace Armoury
         [SettingPropertyGroup("Goods after the yearly run (N5)")]
         public bool SlaughterKeepsHides { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Workshop Hands Step", 1.00f, 3.00f, "0.00", HintText = "further step of arms craftsmen on top of Workshop Hands Per 1000 People, now that ore and timber are plentiful: every town has this many times the armourers, weaponsmiths, bowyers and saddlers (and with them its weavers, tanners and fletchers) - still below medieval Europe. Needs Workshop Hands By People. 1 = off, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public float WorkshopHandsStep { get; set; } = 1.3f;
+
+        [SettingPropertyBool("Civil Works Away From Front", HintText = "in a kingdom at war, civil buildings are built again in towns and castles the war does not reach: no siege, no enemy lord's party, no battle between lords and no raid within Civil Works Front Range, and none of its own villages raided or burned, for Civil Works Calm Days. Near the front only walls, barracks and other military works go on, as before, and a house with a military work in hand finishes it first. The lord pays from his building allowance as always. Off = no civil building anywhere in a kingdom at war, as before")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool CivilWorksAwayFromFront { get; set; } = true;
+
+        [SettingPropertyInteger("Civil Works Calm Days", 1, 60, "0", HintText = "days without any sign of war near a town or castle before civil building may go on there (needs Civil Works Away From Front)")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public int CivilWorksCalmDays { get; set; } = 14;
+
+        [SettingPropertyFloatingInteger("Civil Works Front Range", 10.00f, 300.00f, "0", HintText = "how near (map distance) a siege, an enemy lord's party, a battle between lords or a raid must be to stop civil building in a town or castle - about a day's ride, the town's own villages and its nearest neighbours")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public float CivilWorksFrontRange { get; set; } = 60f;
+
+        [SettingPropertyBool("Civil Works Need Wage Room", HintText = "with Civil Works Away From Front: a lord pays for civil works in wartime only while his troops' wages stay under 95% of what his house can afford - a house that cannot pay more soldiers keeps its gold for them (your own works are yours to decide). Off = every lord away from the front builds")]
+        [SettingPropertyGroup("Goods after the yearly run (N5)")]
+        public bool CivilWorksNeedWageRoom { get; set; } = true;
+
         [SettingPropertyBool("Sack Measure Log", HintText = "Writes a log line each time a siege ends in mercy, pillage or devastation: what lay in the town (the merchants' coin and their reserve, the townsfolk's purses, goods and horses on the shelves), what the sack would take under each choice, how many men won it, whether their army was short of pay, and for thirty days after: the town's coin, its people's bread, the pay and camp followers' coin it received and the prisoners it bought. Log only - nothing in the game changes")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackMeasureLog { get; set; } = true;
@@ -5540,6 +5536,18 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackScarOnlyWhenSacked { get; set; } = true;
 
+        [SettingPropertyBool("Sack Scar Enabled", HintText = "a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackScarEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Sack Prosperity Cut Percent", 0, 60, "0", HintText = "prosperity lost when a settlement falls to siege")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public int SackProsperityCutPercent { get; set; } = 15;
+
+        [SettingPropertyInteger("Sack Loyalty Hit", 0, 60, "0", HintText = "loyalty lost when a settlement falls to siege")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public int SackLoyaltyHit { get; set; } = 15;
+
         [SettingPropertyBool("Sack Window Real Coin", HintText = "with Sack Takes Real Coin: when you take a town or castle, the hints of Devastate, Pillage and Show Mercy show the real coin - what the merchants and the townsfolk hold, what the army takes, your party's part (your men's, yours and the crown's) and what is left - and after your choice the summary says what was taken; 'Prosperity Lost' counts from this town; for thirty days 'People of this land' says how much a sacked town lost (off = the game's lines)")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackWindowRealCoin { get; set; } = true;
@@ -5560,7 +5568,7 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackKilledInPeopleBook { get; set; } = true;
 
-        [SettingPropertyBool("Sack Burns Buildings", HintText = "fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war its civil ruins only away from the front, as for any civil work). Off = the game's random razing, which grows with the army")]
+        [SettingPropertyBool("Sack Burns Buildings", HintText = "fire in a sacked town or castle: under pillage a third, under devastation two thirds of its building levels burn (the same share as the coin), mercy burns nothing; the walls stand - stone does not burn and the conqueror means to hold them. A burnt level leaves its foundations and stone: rebuilding it costs only Sack Ruin Rebuild Share of the work, and a lord's town puts its ruins first in the building queue (in war its civil ruins only away from the front, as for any civil work). Off = the game's random razing, which grows with the army Turned off during a campaign, what has burnt stays burnt and its ruins give no more help - rebuilding costs the full price and lords no longer put them first - until it is turned on again.")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackBurnsBuildings { get; set; } = true;
 
@@ -5572,25 +5580,17 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SackTakesGoods { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Workshop Hands Step", 1.00f, 3.00f, "0.00", HintText = "further step of arms craftsmen on top of Workshop Hands Per 1000 People, now that ore and timber are plentiful: every town has this many times the armourers, weaponsmiths, bowyers and saddlers (and with them its weavers, tanners and fletchers) - still below medieval Europe. Needs Workshop Hands By People. 1 = off, as before")]
+        [SettingPropertyBool("Capital Treasury Seized", HintText = "when an enemy storms the capital of a realm (the seat of its court in Banner Kings; without Banner Kings its first seat), the conquerors carry off part of the royal treasury kept there - Capital Treasury Share of what it holds above its war reserve and its debt to the Iron Bank - into the treasury of their own realm (a conqueror without a realm takes it into his own purse); a capital lost by peace, gift or revolt gives nothing; off = the treasury stays untouched")]
         [SettingPropertyGroup("The sack of towns and castles")]
-        public float WorkshopHandsStep { get; set; } = 1.3f;
+        public bool CapitalTreasurySeized { get; set; } = true;
 
-        [SettingPropertyBool("Civil Works Away From Front", HintText = "in a kingdom at war, civil buildings are built again in towns and castles the war does not reach: no siege, no enemy lord's party, no battle between lords and no raid within Civil Works Front Range, and none of its own villages raided or burned, for Civil Works Calm Days. Near the front only walls, barracks and other military works go on, as before, and a house with a military work in hand finishes it first. The lord pays from his building allowance as always. Off = no civil building anywhere in a kingdom at war, as before")]
+        [SettingPropertyFloatingInteger("Capital Treasury Share", 0.000f, 1.000f, "0.000", HintText = "with Capital Treasury Seized: the part of a fallen capital's royal treasury - above the realm's war reserve and its Iron Bank debt - that the conquerors carry off (a third)")]
         [SettingPropertyGroup("The sack of towns and castles")]
-        public bool CivilWorksAwayFromFront { get; set; } = true;
+        public float CapitalTreasuryShare { get; set; } = 0.333f;
 
-        [SettingPropertyInteger("Civil Works Calm Days", 1, 60, "0", HintText = "days without any sign of war near a town or castle before civil building may go on there (needs Civil Works Away From Front)")]
+        [SettingPropertyBool("Enemy Caravans Seized", HintText = "caravans of the conqueror's enemies that stand inside a town or castle when it is stormed are seized instead of riding away: their coin goes to the victorious commander (the crown takes its ninth from a vassal, as with any beaten caravan), their goods, horses and pack animals into his baggage, their master into captivity, and their guards go home; caravans with ships in harbour still sail away; off = they leave with everything, as in the game")]
         [SettingPropertyGroup("The sack of towns and castles")]
-        public int CivilWorksCalmDays { get; set; } = 14;
-
-        [SettingPropertyFloatingInteger("Civil Works Front Range", 10.00f, 300.00f, "0", HintText = "how near (map distance) a siege, an enemy lord's party, a battle between lords or a raid must be to stop civil building in a town or castle - about a day's ride, the town's own villages and its nearest neighbours")]
-        [SettingPropertyGroup("The sack of towns and castles")]
-        public float CivilWorksFrontRange { get; set; } = 60f;
-
-        [SettingPropertyBool("Civil Works Need Wage Room", HintText = "with Civil Works Away From Front: a lord pays for civil works in wartime only while his troops' wages stay under 95% of what his house can afford - a house that cannot pay more soldiers keeps its gold for them (your own works are yours to decide). Off = every lord away from the front builds")]
-        [SettingPropertyGroup("The sack of towns and castles")]
-        public bool CivilWorksNeedWageRoom { get; set; } = true;
+        public bool EnemyCaravansSeized { get; set; } = true;
 
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
@@ -5600,7 +5600,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool WatchKeepsFlatOutput { get; set; } = true;
 
-        [SettingPropertyBool("Village Output By People", HintText = "Each village on the map stands for all the villages of its district: its fields, herds, mines and woods yield by the number of people living there - a village of a crowded land brings forth several times what a village of an empty land does, while the world as a whole makes as much of every good as before (the hearth no longer sets the yield; winter, raids, war and the world's demand still do). The village tooltip shows 'People of this land' and the village's 'People of this land' window tells why it yields more or less. Off = village output follows the hearth thresholds, as before")]
+        [SettingPropertyBool("Village Output By People", HintText = "Each village on the map stands for all the villages of its district: its fields, herds, mines and woods yield by the number of people living there - a village of a crowded land brings forth several times what a village of an empty land does, while the world as a whole makes as much of every good as before (the hearth no longer sets the yield; winter, raids, war and the world's demand still do). The village tooltip shows 'People of this land' and the village's 'People of this land' window tells why it yields more or less. Off = village output follows the hearth thresholds, as before Turned off during a campaign, villages yield by the hearth again (the regulator of village output starts measuring anew); turned back on, the measure taken at the start of the campaign is used again.")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool VillageOutputByPeople { get; set; } = true;
 
@@ -5616,7 +5616,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool VillageHeadsByPeople { get; set; } = true;
 
-        [SettingPropertyBool("Start Gold By People", HintText = "New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched")]
+        [SettingPropertyBool("Start Gold By People", HintText = "New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched Turning it off later changes nothing: the coin already moved stays where it went.")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool StartGoldByPeople { get; set; } = true;
 
@@ -5628,7 +5628,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool MilitiaByPeople { get; set; } = true;
 
-        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign)")]
+        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign) Turned off during a campaign, only the salt pans go back to their old yield; the flax villages stay.")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool GoodsRatesByPattern { get; set; } = true;
 
@@ -6010,12 +6010,6 @@ namespace Armoury
             s.WarLedgerMinMen = WarLedgerMinMen;
             s.WarLedgerMinMenPlayer = WarLedgerMinMenPlayer;
             s.WarLedgerToOutlaws = WarLedgerToOutlaws;
-            s.SackScarEnabled = SackScarEnabled;
-            s.SackProsperityCutPercent = SackProsperityCutPercent;
-            s.SackLoyaltyHit = SackLoyaltyHit;
-            s.CapitalTreasurySeized = CapitalTreasurySeized;
-            s.CapitalTreasuryShare = CapitalTreasuryShare;
-            s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.MarchPaceAiToo = MarchPaceAiToo;
             s.MarchFootPace = MarchFootPace;
             s.MarchTrainPace = MarchTrainPace;
@@ -6274,9 +6268,6 @@ namespace Armoury
             s.LosersFleeEnabled = LosersFleeEnabled;
             s.LosersFleePlayerAuto = LosersFleePlayerAuto;
             s.LosersFleeBesiegers = LosersFleeBesiegers;
-            s.StragglersRally = StragglersRally;
-            s.StragglersRallyWaitDays = StragglersRallyWaitDays;
-            s.StragglersRallyReachDays = StragglersRallyReachDays;
             s.WinnerDeathCapPercent = WinnerDeathCapPercent;
             s.LoserCaptiveVeteranPercent = LoserCaptiveVeteranPercent;
             s.LoserCaptiveCommonPercent = LoserCaptiveCommonPercent;
@@ -6877,6 +6868,9 @@ namespace Armoury
             s.RotSwapPayToPurse = RotSwapPayToPurse;
             s.LordPurseOnlyToVictor = LordPurseOnlyToVictor;
             s.BattlePlunderFromLoserOnly = BattlePlunderFromLoserOnly;
+            s.StragglersRally = StragglersRally;
+            s.StragglersRallyWaitDays = StragglersRallyWaitDays;
+            s.StragglersRallyReachDays = StragglersRallyReachDays;
             s.WarTaxFromFolk = WarTaxFromFolk;
             s.WarTaxMax = WarTaxMax;
             s.WarTaxMaxWithPolicy = WarTaxMaxWithPolicy;
@@ -7013,6 +7007,11 @@ namespace Armoury
             s.ValveShortCeiling = ValveShortCeiling;
             s.ValveStepFollowsUse = ValveStepFollowsUse;
             s.SlaughterKeepsHides = SlaughterKeepsHides;
+            s.WorkshopHandsStep = WorkshopHandsStep;
+            s.CivilWorksAwayFromFront = CivilWorksAwayFromFront;
+            s.CivilWorksCalmDays = CivilWorksCalmDays;
+            s.CivilWorksFrontRange = CivilWorksFrontRange;
+            s.CivilWorksNeedWageRoom = CivilWorksNeedWageRoom;
             s.SackMeasureLog = SackMeasureLog;
             s.SackSharePillage = SackSharePillage;
             s.SackShareDevastate = SackShareDevastate;
@@ -7020,6 +7019,9 @@ namespace Armoury
             s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
             s.SackTakesRealCoin = SackTakesRealCoin;
             s.SackScarOnlyWhenSacked = SackScarOnlyWhenSacked;
+            s.SackScarEnabled = SackScarEnabled;
+            s.SackProsperityCutPercent = SackProsperityCutPercent;
+            s.SackLoyaltyHit = SackLoyaltyHit;
             s.SackWindowRealCoin = SackWindowRealCoin;
             s.AiSacksFromNeed = AiSacksFromNeed;
             s.SackNoSpending = SackNoSpending;
@@ -7028,11 +7030,9 @@ namespace Armoury
             s.SackBurnsBuildings = SackBurnsBuildings;
             s.SackRuinRebuildShare = SackRuinRebuildShare;
             s.SackTakesGoods = SackTakesGoods;
-            s.WorkshopHandsStep = WorkshopHandsStep;
-            s.CivilWorksAwayFromFront = CivilWorksAwayFromFront;
-            s.CivilWorksCalmDays = CivilWorksCalmDays;
-            s.CivilWorksFrontRange = CivilWorksFrontRange;
-            s.CivilWorksNeedWageRoom = CivilWorksNeedWageRoom;
+            s.CapitalTreasurySeized = CapitalTreasurySeized;
+            s.CapitalTreasuryShare = CapitalTreasuryShare;
+            s.EnemyCaravansSeized = EnemyCaravansSeized;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;
