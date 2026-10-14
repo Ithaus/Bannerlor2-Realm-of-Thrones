@@ -5172,6 +5172,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float WarAidLordsShortfallShare { get; set; } = 0.05f;
 
+        [SettingPropertyBool("Need Aid From Rents", HintText = "in war, when the day's war aid, the crown's spare treasure and the shield money still leave houses of the realm short of wages for their field companies (Crown War Aid By Need), the crown pays those wages from the rest of its daily income before it shares out rents by fiefs - only for men who stand in the companies today; the rents get what is left. Off = the rest of the day's income goes out as rents, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool NeedAidFromRents { get; set; } = true;
+
         [SettingPropertyBool("Crown Surplus Feeds Need Aid", HintText = "in war, when the day's war aid from the people does not cover the wages of the houses the crown helps (Crown War Aid By Need), the crown adds coin from its own treasury - but only from what it holds above its war reserve (the larger of Crown Reserve Gold and War Tax Reserve Days of wage refunds) and above what it owes the Iron Bank, never more in a day than one part in Crown Surplus Aid Days of that surplus and never more than is still lacking. The crown pays before the rich houses are asked for shield money and, like the rest of that aid, only for men who stand in the companies today. A treasury at or below its war reserve gives nothing. You and the AI alike: in your kingdom the coin comes from the realm's treasury, not from your purse. Needs Crown War Aid By Need. Off = the aid by need is paid from the day's war aid and shield money only, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownSurplusFeedsNeedAid { get; set; } = true;
@@ -6952,6 +6956,7 @@ namespace Armoury
             s.ScutagePlayerClan = ScutagePlayerClan;
             s.WarAidFollowsLordsShortfall = WarAidFollowsLordsShortfall;
             s.WarAidLordsShortfallShare = WarAidLordsShortfallShare;
+            s.NeedAidFromRents = NeedAidFromRents;
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
             s.LordWarLevy = LordWarLevy;

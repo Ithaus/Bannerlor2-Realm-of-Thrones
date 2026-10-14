@@ -576,7 +576,7 @@ namespace Armoury
                         {
                             var okW5 = new bool[list.Count];
                             for (int i = 0; i < list.Count; i++) okW5[i] = rowsK[i].GarOk && rowsK[i].SvcOk;
-                            if (KingdomTreasury.NeedAidKingdom(k, list, okW5) > 0) pool = CrownIncome.LeftFor(k);
+                            if (KingdomTreasury.NeedAidKingdom(k, list, okW5) > 0) pool = CrownIncome.LeftFor(k);   // M1: zwraca tez gotowke z reszty wplywow (RentAidStep)
                         }
                         catch (Exception e) { Stumble("Daily(W5)", e); }
                         bool pay = pool > 0;

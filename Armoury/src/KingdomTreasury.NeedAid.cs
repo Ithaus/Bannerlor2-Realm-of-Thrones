@@ -17,7 +17,9 @@ namespace Armoury
     ///  - W5b regula 2 (KingdomTreasury.CrownSurplus.cs, klucz CrownSurplusFeedsNeedAid): MIEDZY danina a tarczowym - skarbiec PONAD ZAPAS WOJNY doklada do
     ///    garnka najwyzej 1/CrownSurplusAidDays nadwyzki na dobe i najwyzej niepokryta potrzebe po daninie (gotowka poza wplywami dnia, osobna pozycja ksiegi).
     ///    Kolejnosc zrodel: danina -> skarbiec ponad zapas wojny -> tarczowe. Szczebel daniny nizej bez zmian co do zlotowki; klucz wylaczony = jak przed paczka.
-    ///    W5b regula 1 (KingdomTreasury.WarTax.cs): to, czego nie pokrylo zadne zrodlo (NaK.Uncov -> NeedAidMeasure), podnosi stawke daniny z oszczednosci.
+    ///    W5b regula 1 (KingdomTreasury.WarTax.cs): to, czego nie pokrylo zadne zrodlo (NaK.UncovPre -> NeedAidMeasure), podnosi stawke daniny z oszczednosci.
+    ///  - M1 (KingdomTreasury.RentAid.cs, klucz NeedAidFromRents; pieniadze roku 2): CZWARTY szczebel po W6 - reszta wplywow dnia przed rentami 180 (korona w wojnie
+    ///    placi najpierw zold, potem renty). W5b regula 1 i rezerwa wezwan M2b czytaja brak SPRZED M1 (UncovPre), W7 - poziom PO M1; NaK.Uncov = brak po M1 (linia).
     ///  - GARNEK krolestwa = danina z oszczednosci ludu P1 tej doby (CrownIncome.KDay.WarAid), najwyzej reszta wplywow dnia po zwrocie zoldu (CrownIncome.LeftFor).
     ///    Bez daniny (P1 wylaczone, pokoj, s = 0, lud bez nadwyzki) garnek = 0 i szczebel daniny nie robi nic. Szczebel daniny nigdy z zapasu skarbca, nigdy z kredytu.
     ///  - KOLEJNOSC DOBY: danina wplywa (TownFolk.Daily) -> ... -> zwrot zoldu (WageRefund) -> DOPLATA (z CrownRents.Daily, po warunkach rodow) -> renty 180
@@ -62,6 +64,9 @@ namespace Armoury
             // W5b regula 2 (KingdomTreasury.CrownSurplus.cs): pula dolozona ze skarbca ponad zapas wojny, gotowka z niej wyplacona, nadwyzka skarbca i zapas
             // wojny w chwili rachunku, poziom wyrownania po tym szczeblu, podniesienie pulapu ponad szczebel daniny
             public long Crown, CrownPaid, CrownSur, CrownRes; public int CrownN; public double LevelC = -1, CrownBoost;
+            // M1 (KingdomTreasury.RentAid.cs): brak SPRZED M1 (W5b regula 1, rezerwa wezwan M2b), pula z reszty wplywow dnia, gotowka, reszta wplywow w chwili
+            // rachunku, poziom po M1; RentAll - cala reszta wplywow poszla do puli (brak po M1 = "bez platnika" w krolestwie)
+            public double UncovPre; public long Rent, RentPaid, RentAvail; public int RentN; public double LevelR = -1, RentBoost; public bool RentAll;
         }
         private sealed class NaFirst { public int Day, Men, Limit, Last; }
 
@@ -83,7 +88,7 @@ namespace Armoury
         private static void NeedAidReset()
         {
             _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naFirst.Clear(); _naRows.Clear(); _naGone.Clear(); _naErr.Clear();
-            _naDay = int.MinValue; _naStumbles = 0; _naCut = 0; _naCutN = 0; _naNotAtCap = 0; LastNeedAid = 0;
+            _naDay = int.MinValue; _naStumbles = 0; _naCut = 0; _naCutN = 0; _naNotAtCap = 0; LastNeedAid = 0; LastNeedAidRent = 0; _raNotAtCap = 0;
             NaClearMeasure();
             ScutageReset();   // W6: stan doby tarczowego (drugie zrodlo garnka) czyszczony razem z W5
             CrownSurplusReset();   // W5b regula 2: stan doby skarbca ponad zapas wojny czyszczony razem z W5
@@ -106,7 +111,7 @@ namespace Armoury
         {
             if (_naDay == today) return;
             _naDay = today;
-            _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naRows.Clear(); _naNotAtCap = 0;
+            _naCash.Clear(); _naPaid.Clear(); _naBoost.Clear(); _naRows.Clear(); _naNotAtCap = 0; _raNotAtCap = 0;
             NaClearMeasure();
             ScClearDay();     // W6: platnicy, podstawy i gotowka tarczowego poprzedniej doby
             CsClearDay();     // W5b regula 2: gotowka ze skarbca ponad zapas wojny i kontrole poprzedniej doby
@@ -158,7 +163,7 @@ namespace Armoury
         /// </summary>
         internal static long NeedAidKingdom(Kingdom k, List<Clan> list, bool[] ok)
         {
-            long paidK = 0;
+            long paidK = 0, paidR = 0;   // M1: gotowka szczebla reszty wplywow (ksiegowana w RentAidStep; zwracana razem - CrownRents odswieza pule rent)
             try
             {
                 var s = Settings.Current;
@@ -211,8 +216,11 @@ namespace Armoury
                 // (0 przy wylaczonym kluczu CrownSurplusFeedsNeedAid, bez nadwyzki skarbca albo bez niepokrytej potrzeby po daninie)
                 long crown = CrownSurplusPlan(k, s, row, cand.Count);
                 row.Uncov = Math.Max(0, row.Need - row.Pot);
+                row.UncovPre = row.Uncov;
                 LvPlan(k, row.Name, cand, 0);   // W7 (KingdomTreasury.LordLevy.cs): rody z potrzeba tej doby - poziom 0, dopoki szczeble W5 nizej go nie podniosa (bez zlota)
-                if (cand.Count == 0 || (row.Pot <= 0 && crown <= 0 && (sc == null || sc.Due <= 0))) return 0;
+                // M1: bez daniny, skarbca i tarczowego krok biegnie dalej, gdy jest reszta wplywow dnia (szczeble nizej przy garnku 0 nic nie wyplacaja - poziom 0)
+                bool m1 = RentAidOn && CrownIncome.LeftFor(k) > 0;
+                if (cand.Count == 0 || (row.Pot <= 0 && crown <= 0 && (sc == null || sc.Due <= 0) && !m1)) return 0;
                 // poziom wyrownania: najwyzszy f <= cel, przy ktorym suma kosztow miesci sie w garnku (koszt rosnie z f; przy f = 0 jest 0)
                 double level = target;
                 if (row.Need > row.Pot)
@@ -278,7 +286,15 @@ namespace Armoury
                 // ktora W5 wyplaca przy poziomie z garnkiem danina + tarczowe ponad szczebel daniny; wlasny try i wlasne ksiegowanie (nie wchodzi do wplywow dnia)
                 if (sc != null && sc.Due > 0) ScutageStep(k, cand, row, sc, level, target, step, today);
                 row.Uncov = Math.Max(0, row.Need - row.Pot - row.Crown - (sc != null ? sc.Room : 0));   // W5b regula 1: brak po wszystkich zrodlach garnka
-                LvPlan(k, row.Name, cand, sc != null ? Math.Max(level, sc.Level1) : level);   // W7: poziom wyrownania po ostatnim szczeblu W5 (danina, skarbiec, tarczowe)
+                row.UncovPre = row.Uncov;                                                                  // M1: brak sprzed reszty wplywow (W5b regula 1, M2b)
+                double lvl = sc != null ? Math.Max(level, sc.Level1) : level;
+                // M1 (NeedAidFromRents): czwarty szczebel - reszta wplywow dnia przed rentami; brak po nim tylko do linii (niepokryte "po M1")
+                if (m1 && row.UncovPre >= 1)
+                {
+                    lvl = RentAidStep(k, cand, row, sc != null ? sc.Room : 0, paidK, lvl, target, step, today, out paidR);
+                    row.Uncov = Math.Max(0, row.UncovPre - row.Rent);
+                }
+                LvPlan(k, row.Name, cand, lvl);   // W7: poziom wyrownania po ostatnim szczeblu W5 (danina, skarbiec, tarczowe, M1)
             }
             catch (Exception e) { NaStumble("NeedAidKingdom", e); }
             finally
@@ -296,7 +312,7 @@ namespace Armoury
                     catch (Exception e) { NaStumble("NeedAidKingdom(ksiega)", e); }
                 }
             }
-            return paidK;
+            return paidK + paidR;
         }
 
         /// <summary>Pomiar linii W5: stan druzyn rodu w dniu pierwszej doplaty (przerwa ponad 28 dob = nowy poczatek) i dzis - rod z przydzialem tej doby
@@ -349,7 +365,7 @@ namespace Armoury
                 var r = _naRows[i];
                 if (r.K != k) continue;
                 if (!r.Known) return false;
-                uncovered = r.Uncov; need = r.Need; pot = r.Pot; aid = r.Aid;
+                uncovered = r.UncovPre; need = r.Need; pot = r.Pot; aid = r.Aid;   // M1: brak sprzed reszty wplywow (danina z ludu rosnie jak bez M1)
                 return true;
             }
             return false;
@@ -362,7 +378,7 @@ namespace Armoury
             try
             {
                 if (k == null || Campaign.Current == null || _naDay != (int)CampaignTime.Now.ToDays - 1) return 0;
-                for (int i = 0; i < _naRows.Count; i++) { var r = _naRows[i]; if (r.K == k) return r.Known ? (long)Math.Floor(Math.Max(0, r.Uncov)) : 0; }
+                for (int i = 0; i < _naRows.Count; i++) { var r = _naRows[i]; if (r.K == k) return r.Known ? (long)Math.Floor(Math.Max(0, r.UncovPre)) : 0; }
                 return 0;
             }
             catch (Exception e) { NaStumble("NeedAidUncovYesterday", e); return 0; }
@@ -406,7 +422,7 @@ namespace Armoury
         // ------------------------------------------------------------ doba: linia "Doplata wedlug potrzeby (W5)" - z ArmouryBehavior, zaraz po rentach 180
         internal static void NeedAidDay()
         {
-            LastNeedAid = 0; LastCrownSurplusAid = 0;
+            LastNeedAid = 0; LastCrownSurplusAid = 0; LastNeedAidRent = 0;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             int today = (int)CampaignTime.Now.ToDays;
@@ -417,6 +433,8 @@ namespace Armoury
                 int kWar = 0, kPot = 0, kNeed = 0, needN = 0, paidN = 0, boostN = 0, cand = 0, needMen = 0, needLim = 0, noBudget = 0, shortK = 0;
                 // W5b: regula 2 (skarbiec ponad zapas wojny) i brak po wszystkich zrodlach (regula 1); dopisek wiersza krolestwa tylko przy czynnej paczce
                 long cPool = 0, cPaid = 0, cSur = 0; double cBoost = 0, uncAll = 0; int cSurK = 0, cPoolK = 0, cN = 0, uncK = 0;
+                // M1: pula i gotowka z reszty wplywow dnia, brak przed M1, brak po M1 "z platnikiem" (M1 nie wzial calej reszty - kontrola, oczekiwane 0) i "bez platnika"
+                long rPool = 0, rPaid = 0; double rBoost = 0, uncPre = 0, uncPay = 0, uncNoPay = 0; int rK = 0, rN = 0, uncPayK = 0; var noPay = new List<string>();
                 bool w5b = CrownSurplusOn || LnOn;
                 var parts = new List<KeyValuePair<double, string>>();
                 for (int i = 0; i < _naRows.Count; i++)
@@ -428,6 +446,13 @@ namespace Armoury
                     if (r.CrownSur > 0) { cSurK++; cSur += r.CrownSur; }
                     if (r.Crown > 0) cPoolK++;
                     if (r.Uncov >= 1) uncK++;
+                    rPool += r.Rent; rPaid += r.RentPaid; rN += r.RentN; rBoost += r.RentBoost; uncPre += Math.Floor(r.UncovPre);
+                    if (r.Rent > 0) rK++;
+                    if (r.Uncov >= 1)
+                    {
+                        if (r.RentAll || !RentAidOn) { uncNoPay += Math.Floor(r.Uncov); noPay.Add(r.Name + " " + Math.Floor(r.Uncov).ToString("0", WtInv)); }
+                        else { uncPay += Math.Floor(r.Uncov); uncPayK++; }
+                    }
                     if (r.Pot > 0) kPot++;
                     if (r.NeedN > 0) kNeed++;
                     if (r.NeedN > 0 && r.Need > r.Pot) shortK++;
@@ -436,9 +461,11 @@ namespace Armoury
                               + " rodow, poziom " + (r.Pot > 0 && r.NeedN > 0 ? (100 * r.Level).ToString("0.0", WtInv) + "%" : "-") + ", wyplacono " + r.Paid + " (rodow " + r.PaidN
                               + "), reszta " + (r.Pot - r.Paid)
                               + (w5b ? ", ze skarbca ponad zapas " + r.CrownPaid + " z puli " + r.Crown + " (nadwyzka " + r.CrownSur + ", zapas wojny " + r.CrownRes + "), niepokryte "
-                                       + Math.Floor(r.Uncov).ToString("0", WtInv) : "")));
+                                       + Math.Floor(r.Uncov).ToString("0", WtInv) : "")
+                              + (r.Rent > 0 || r.UncovPre >= 1 ? ", z rent M1 " + r.RentPaid + " (pula " + r.Rent + ", reszta wplywow " + r.RentAvail + ", przed M1 niepokryte "
+                                       + Math.Floor(r.UncovPre).ToString("0", WtInv) + ")" : "")));
                 }
-                LastNeedAid = paid; LastCrownSurplusAid = cPaid;
+                LastNeedAid = paid; LastCrownSurplusAid = cPaid; LastNeedAidRent = rPaid;
                 // rody, ktore odeszly (pomiar pierwszej doplaty)
                 _naGone.Clear();
                 foreach (var kv in _naFirst) if (kv.Key == null || kv.Key.IsEliminated || today - kv.Value.Last > 56) _naGone.Add(kv.Key);
@@ -473,6 +500,13 @@ namespace Armoury
                       .Append("; kontrola skarbca: ponizej zapasu wojny po wyplacie ").Append(_csBelow).Append(", gotowka przy zoldzie druzyn w pulapie wlasnym ").Append(_csNotAtCap)
                       .Append(" (oczekiwane 0), potkniecia skarbca ").Append(_csStumbles)
                       .Append(" | niepokryte po wszystkich zrodlach (danina, skarbiec, tarczowe) ").Append(Math.Round(uncAll).ToString("0", WtInv)).Append(" w ").Append(uncK).Append(" krolestwach")
+                      // M1 (pieniadze roku 2): czwarty szczebel - reszta wplywow dnia przed rentami 180; "niepokryte po wszystkich zrodlach" wyzej jest juz PO M1
+                      .Append(" | z reszty wplywow dnia (M1, Need Aid From Rents ").Append(s.NeedAidFromRents ? "tak" : "nie").Append("): pula ").Append(rPool).Append(" w ").Append(rK)
+                      .Append(" krolestwach, wyplacono ").Append(rPaid).Append(" (rodow ").Append(rN).Append("), podniesienie pulapu ").Append(Math.Round(rBoost).ToString("0", WtInv))
+                      .Append("; niepokryte przed M1 ").Append(Math.Round(uncPre).ToString("0", WtInv)).Append(", po M1 ").Append(Math.Round(uncAll).ToString("0", WtInv))
+                      .Append(" - z platnikiem (M1 nie wzial calej reszty wplywow; oczekiwane 0) ").Append(Math.Round(uncPay).ToString("0", WtInv)).Append(" w ").Append(uncPayK)
+                      .Append(" krolestwach, bez platnika (cala reszta wplywow w puli) ").Append(Math.Round(uncNoPay).ToString("0", WtInv)).Append(" [").Append(noPay.Count > 0 ? string.Join(", ", noPay.ToArray()) : "-").Append(']')
+                      .Append("; kontrola: gotowka M1 przy zoldzie w pulapie wlasnym ").Append(_raNotAtCap).Append(" (oczekiwane 0)")
                       .Append(" | kontrola: gotowka rodom, ktorych zold druzyn miesci sie w pulapie wlasnym ").Append(_naNotAtCap).Append(" (oczekiwane 0)")
                       .Append(" | podniesienie pulapu druzyn ").Append(Math.Round(boost).ToString("0", WtInv)).Append(" u ").Append(boostN)
                       .Append(" rodow (gotowka + miejsce na krok werbunku ").Append(Math.Round(Math.Max(0, boost - paid)).ToString("0", WtInv)).Append(')')
