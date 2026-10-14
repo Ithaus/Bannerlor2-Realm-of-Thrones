@@ -5012,6 +5012,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownFolkLabourArms { get; set; } = 0.04f;
 
+        [SettingPropertyFloatingInteger("Town Folk Labour Village Buys", 0.00f, 0.50f, "0.00", HintText = "with Folk Earn From Village Buys: of what the merchants pay the village carts for their produce, this share is paid to the people who unload, measure and store it (as for goods off a caravan's wagons; milling and baking are paid from the food sales)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownFolkLabourVillageBuys { get; set; } = 0.1f;
+
         [SettingPropertyFloatingInteger("Town Folk Craft Wage Share", 0.00f, 1.00f, "0.00", HintText = "the people's wages in every workshop's goods - the merchants pay the rest up to this share of their worth")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownFolkCraftWageShare { get; set; } = 0.35f;
@@ -5475,6 +5479,22 @@ namespace Armoury
         [SettingPropertyBool("Start Gold By People", HintText = "New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool StartGoldByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Levy By People", HintText = "Volunteers come forward by the number of people: an empty place at a notable fills faster in a crowded land and slower in an empty one (from a tenth to three times, never above certain), and warrior peoples - the ironborn, the Free Folk and the Dothraki - send more of their men; the world as a whole gets as many volunteers as before. Off = every notable's empty places fill as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool LevyByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Militia By People", HintText = "The militia of a village, town or castle grows, and is capped, by the number of people of its land and by how many of them bear arms - more defenders in crowded lands and among the warrior peoples, fewer in empty ones; the world keeps as many militiamen as before. Off = every settlement raises its militia as before")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool MilitiaByPeople { get; set; } = true;
+
+        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign)")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool GoodsRatesByPattern { get; set; } = true;
+
+        [SettingPropertyBool("Folk Earn From Village Buys", HintText = "The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool FolkEarnFromVillageBuys { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -6728,6 +6748,7 @@ namespace Armoury
             s.TownFolkLabourFood = TownFolkLabourFood;
             s.TownFolkLabourGoods = TownFolkLabourGoods;
             s.TownFolkLabourArms = TownFolkLabourArms;
+            s.TownFolkLabourVillageBuys = TownFolkLabourVillageBuys;
             s.TownFolkCraftWageShare = TownFolkCraftWageShare;
             s.TownFolkMerchantDraw = TownFolkMerchantDraw;
             s.TownFolkMerchantProfitShare = TownFolkMerchantProfitShare;
@@ -6844,6 +6865,10 @@ namespace Armoury
             s.MarketByPeople = MarketByPeople;
             s.VillageHeadsByPeople = VillageHeadsByPeople;
             s.StartGoldByPeople = StartGoldByPeople;
+            s.LevyByPeople = LevyByPeople;
+            s.MilitiaByPeople = MilitiaByPeople;
+            s.GoodsRatesByPattern = GoodsRatesByPattern;
+            s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
         }
 
         internal static void Apply()

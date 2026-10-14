@@ -132,10 +132,15 @@ namespace Armoury
                     __result = 0f;
                     return;
                 }
-                if (!On) return;                                       // Levy Enabled wylacza tylko mnoznik checi
-                float w = Willingness(__2);
-                __result *= w;
-                _calls++; _sumW += w;
+                if (On)                                                // Levy Enabled wylacza tylko mnoznik checi
+                {
+                    float w = Willingness(__2);
+                    __result *= w;
+                    _calls++; _sumW += w;
+                }
+                // GL-4 / P4 (klucz LevyByPeople): szansa pustego miejsca x czynnik ludzi osady (skala x udzial zbrojnych / norma rodzaju, 0.1-3), wynik najwyzej 1;
+                // klucz wylaczony - nic (stan 97dd474: przy Levy Enabled off tu byl return, wynik ten sam)
+                PeopleLevy.LevyStep(__2, ref __result);
             }
             catch { }
         }

@@ -1351,6 +1351,22 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>GL-5 (P5, dymek lore wsi lnianej): czy przysiolek ma obrazek rybacki (kolumna model = fishing pliku wiosek). false - ksiega bez ukladu, nieznany uid.</summary>
+        internal static bool FishingHamlet(string uid)
+        {
+            if (uid == null) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    KeyValuePair<Dist, int> kv;
+                    if (!_byUid.TryGetValue(uid, out kv) || kv.Key == null || kv.Key.Fish == null || kv.Value < 0 || kv.Value >= kv.Key.Fish.Length) return false;
+                    return kv.Key.Fish[kv.Value];
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.FishingHamlet", e); return false; }
+        }
+
         /// <summary>Pamiec wojny wioski po uid (dymek W2). false - ksiega nieczynna, wioska nieznana albo bez pamieci.</summary>
         internal static bool MemoryOf(string uid, out WarMemory wm)
         {

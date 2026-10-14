@@ -127,6 +127,25 @@ namespace Armoury
             return share;
         }
 
+        /// <summary>GL-4 / P4 (decyzja Jeffa pyt. 2 "lup i milicja bez wyjatku"; projekt 3.3 "Udzial zbrojnych ludu"): udzial zbrojnych ludu krainy = prog wolnych rak
+        /// krainy (bez okna zniw) / FreeHandsShare - zwykla kraina 1, Zelazne Wyspy 2 (40%), Wolni Ludzie 5 (bez hamulca). Dothrakowie - DECYZJA (pelne uprawnienia):
+        /// lud zbrojny, udzial 3 (jak prog 60%), ale TYLKO tu - w poborze i milicji P4; ich prog wolnych rak (FOf) zostaje 20%: chec do sluzby, hamulec i plon
+        /// jak w zwyklej krainie ("bez wyjatku w produkcji"; recenzja GL-B: prog 60% w FOf dawal chec x2.7-3 i plon poza regula, takze przy samym kluczu milicji).
+        /// Wolany tylko z PeopleLevy.Build (klucz P4 wlaczony). Nocna Straz - wolajacy pomija (WatchLaw). Watek glowny.</summary>
+        internal const double DothrakiArmedShare = 3.0;
+
+        internal static double ArmedShare(string realm)
+        {
+            if (realm == "khuzait") return DothrakiArmedShare;
+            var s = S;
+            double share = s != null ? Math.Max(0.0, Math.Min(1.0, s.FreeHandsShare)) : 0.2;
+            if (!(share > 0.0)) return 1.0;
+            bool brake, yieldOnly;
+            double f = FOf(realm, out brake, out yieldOnly);
+            double a = f / share;
+            return double.IsNaN(a) || double.IsInfinity(a) || a <= 0.0 ? 1.0 : a;
+        }
+
         // ------------------------------------------------------------ doba (PeopleBook.OriginDaily, po uzgodnieniu)
         internal static void Update(Dictionary<string, PeopleBook.RegionView> views)
         {

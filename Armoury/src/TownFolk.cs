@@ -105,6 +105,7 @@ namespace Armoury
             public readonly long[] PaidG = new long[3];               // zaplacone za towar w oknie (czynsz, leczenie, sluzba - w dobie)
             public readonly long[] Offer = new long[3];               // nadwyzka oferowana na towar jutro (nie przelew - budzet "lepszych" kategorii)
             public long PaidKeep, VillWin, GmMatWin;                  // okno: zaplata ludu do kasy, zakupy wsi w tym miescie, material robot gminy (podstawa robocizny)
+            public long SkupWin;                                      // GL-B / 11c: okno - zaplata kasy taborom wsi za plon (skup netto; podstawa robocizny od skupu, TownFolk.Skup.cs)
             public readonly double[] Need = new double[3];            // potrzeba dzienna klas (towar / keep) z kotwicy - zapas dni
             public readonly double[] Share = new double[3];           // udzialy klas w zaplacie za towar (towar x Afford + oferta)
             public double FacFood = 1, FacRest = 1, AffFood = 1, AffRest = 1, MAnc = 1; public bool FacOk;
@@ -155,6 +156,7 @@ namespace Armoury
                 _f.Clear(); _fk.Clear(); _calDone = false; _sessionDay = -1; _calDay = -1;
                 _lineSession = null; _lineFolk = null; _lineFolkPartial = false;
                 _stumbles = _stumbleSess = _offThread = 0; _err.Clear();
+                _skupN = 0; _skupStumbles = 0;                        // GL-B / 11c
                 _patchTicks = _dayTicks = 0;
                 Array.Clear(_vc, 0, _vc.Length); Array.Clear(_vcTrans, 0, _vcTrans.Length); Array.Clear(_vcRel, 0, _vcRel.Length);
                 ResetProbe();

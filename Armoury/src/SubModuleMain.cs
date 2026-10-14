@@ -121,6 +121,7 @@ namespace Armoury
                 try { PeopleUnit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleUnit.ApplyAll", e); }
                 MapClock.ApplyAll(_harmony);
                 Levy.ApplyAll(_harmony);
+                try { PeopleLevy.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleLevy.ApplyAll", e); }   // GL-4 (P4): tylko Harmony - latki modelu milicji gry i BK zaklada PeopleLevy.EnsureHooks W KAMPANII (CLAUDE.md 7: pole statyczne GameTexts w modelu gry)
                 VolunteerKit.ApplyAll(_harmony);
                 LevyGold.ApplyAll(_harmony);
                 try { GarrisonRecruitFee.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll", e); }   // E5 decyzja 9: oplata za werbunek zalog do sprzedajacego
@@ -133,6 +134,7 @@ namespace Armoury
                 try { FixedSums38.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FixedSums38.ApplyAll", e); }   // 3.8: okna wartosci w starej monecie (nagroda turnieju gry i TXP)
                 RawPrice.ApplyAll(_harmony);     // cena surowcow od niedoboru: stala wzoru ceny w nowej monecie, popyt z prawdziwego zuzycia miasta
                 try { TownFolk.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplyAll", e); }   // E5/0 (195): okna pomiaru kiesy ludu - tylko odczyt (budzet dnia, wiersze polki BK, konsumpcja, bitwy, notable)
+                try { TownFolk.ApplySkup(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplySkup", e); }   // GL-B / 11c: robocizna od skupu plonu wsi (zaplata kasy taborom wsi; klucz FolkEarnFromVillageBuys czytany na zywo)
                 AmmoRecovery.ApplyAll(_harmony);
                 RecruitCost.ApplyAll(_harmony);
                 try { RecruitSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RecruitSources.ApplyAll", e); }   // 171: echo werbunku ROT, jency, autowerbunek zalog
