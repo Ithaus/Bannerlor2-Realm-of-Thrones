@@ -31,6 +31,7 @@ namespace Armoury
         private static AccessTools.FieldRef<SiegeAftermathCampaignBehavior, float> _cacheRef;
         private static bool _refsTried;
         private static string _l5Last;
+        private static readonly HashSet<string> _l5Seen = new HashSet<string>();   // napisy juz w logu tej doby (podpowiedzi trzech opcji liczone przy kazdym odswiezeniu menu)
         private static int _dL5;
 
         private static void Refs()
@@ -161,7 +162,7 @@ namespace Armoury
 
         private static void L5Log(string key)
         {
-            if (key == _l5Last) return;
+            if (key == _l5Last || _l5Seen.Count > 200 || !_l5Seen.Add(key)) return;
             _l5Last = key;
             _dL5++;
             if (MeasureOn) Log.Info("Lup miast (L5): dzien " + (int)CampaignTime.Now.ToDays + " | " + key + ".");
@@ -189,7 +190,7 @@ namespace Armoury
             if (!WindowOn) sb.Append(" [WYLACZONE Sack Window Real Coin / Sack Takes Real Coin]");
         }
 
-        private static void L5Clear() { _dL5 = 0; }
+        private static void L5Clear() { _dL5 = 0; _l5Seen.Clear(); }
 
         private static bool L5Any { get { return _dL5 > 0; } }
 
