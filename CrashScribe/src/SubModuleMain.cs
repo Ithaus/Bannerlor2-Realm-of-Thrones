@@ -158,6 +158,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new BkTitlesBehavior());   // P1 (AM-26/AM-27): linia kontrolna tytulow BK w pierwszej godzinie sesji
                 if (cgs != null) cgs.AddBehavior(new AuditP3Behavior());   // P3 audytu 14.10: start sesji i doba (AM-29 wzorce kultur, AM-01 dobrobyt, AM-28 wiara Lorath)
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
+                if (cgs != null) cgs.AddBehavior(new BkBattlePerksBehavior());   // B10b (decyzja Jeffa 14.10): atuty BK z bitew - postfiksy na DefaultBattleRewardModel, linia "BK atuty bitew (B10b)"
                 if (cgs != null) cgs.AddBehavior(new BkrotSelfCallBehavior());   // P2 audytu 14.10: samowywolania BKROT (wpiecie raz na proces przy starcie sesji, linia "BKROT self call fix")
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }

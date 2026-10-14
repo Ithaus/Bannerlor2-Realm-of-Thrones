@@ -1,5 +1,17 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (B10b - atuty BK z bitew, decyzja Jeffa "tak napraw") - WARBAND +25% WPLYWU, FAMOUS SELLSWORDS +20% I CATAPHRACT +12% SLAWY ZNOW DZIALAJA
+
+**Mod:** CrashScribe + narzedzie | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** BkBattlePerksFix (true) | **Status:** DO SPRAWDZENIA | **Zmiana ekonomii / polityki:** tak (wplyw i slawa z bitew u gracza i AI)
+
+**Problem (docs/ERRORS.md A7 klasa 7):** klasa BK `VanillaModelTweakPatches+BKBattleRewardTweakPatches` pada w 1.4.8 na postfiksie `CalculateInfluenceGain` (nazwy parametrow
+sprzed 1.4.8), przerwanie klasy zabiera tez postfiks `CalculateRenownGain`; lup (`GetLootedItemFromTroop`) dziala. Atuty BK bez dzialania od poczatku 1.4.8.
+
+**Zmiana:** `CrashScribe/src/BkBattlePerks.cs` - te same postfiksy co BK (wartosci i warunki 1:1, `VanillaModelTweakPatches.cs`) z parametrem pozycyjnym `__0`
+na `DefaultBattleRewardModel` (lancuch NavalDLCBattleRewardModel -> BaseModel Default), typy BK przez refleksje (leniwie). Wpiecie raz na proces przy pierwszym
+OnSessionLaunched, kontrola `Harmony.GetPatchInfo`: postfiks wlasciciela "BannerKings" juz jest - nie wpinamy (premia 2 razy). Lupu BK nie ruszamy (ponowne
+CreateClassProcessor podwoiloby postfiks lupu). Linie: "BK atuty bitew (B10b): wpiete 2/2 ..." i doba z licznikami. Grupa progow `b10b` (B10-0..3).
+
 ## 2026-10-14 (Unikaty: odejscie po klotni / reset perkow; licznik religii) - TEN SAM CZLOWIEK PRZENOSI SIE DO MIASTA; AUDYT RELIGII LICZY WIARY
 
 **Mod:** CrashScribe | **Galaz:** `w-toku/zbior-e8` (po 92951f2f) | **Tor:** S | **Klucze:** bez nowych (UniqueCompanionsMove) | **Status:** DO SPRAWDZENIA

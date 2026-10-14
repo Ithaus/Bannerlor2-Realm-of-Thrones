@@ -124,6 +124,9 @@ namespace CrashScribe
         public static bool BkrotFixCulture = true;           // AM-15: BKROTCultureModel.CalculateAcceptanceGain i CalculateCultureWeight -> BKCultureModel (asymilacja i akceptacja kultur BK zamiast 1.0 / stoi; lojalnosc z asymilacji -4..+4 zamiast stale +4; kultura osady moze przejsc na kulture pana) - OD NOWEJ KAMPANII
         public static bool BkrotCultureBlessingsOwnerOnly = true; // AM-15 klucz 2 (tylko przy BkrotFixCulture): blogoslawienstwa ROT pana (wagi +25/+25/+50, akceptacja +0.04/+0.04/+0.08) tylko dla kultury pana, nie dla kazdej kultury osady; false = jak BKROT
         public static bool BkrotFixSpouseScore = true;       // AM-18: BKROTMarriageModel.GetSpouseScore -> BKMarriageModel (ocena malzonka w kontrakcie malzenskim BK gracza)
+        // B10b (ERRORS.md A7 klasa 7; decyzja Jeffa 14.10 "tak napraw"): atuty BK z bitew (Warband +25% wplywu, Famous Sellswords +20% slawy,
+        // Cataphract +12% slawy) - postfiksy na DefaultBattleRewardModel (BkBattlePerks.cs); false = atuty bez dzialania jak dotad.
+        public static bool BkBattlePerksFix = true;
         public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
 
         internal static void Load(string moduleDataDir)
@@ -219,6 +222,7 @@ namespace CrashScribe
                         case "BkrotCultureBlessingsOwnerOnly": BkrotCultureBlessingsOwnerOnly = B(v); break;
                         case "BkrotFixSpouseScore": BkrotFixSpouseScore = B(v); break;
                         case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
+                        case "BkBattlePerksFix": BkBattlePerksFix = B(v); break;
                     }
                 }
             }

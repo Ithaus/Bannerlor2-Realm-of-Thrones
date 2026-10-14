@@ -714,6 +714,8 @@ Uzycie (Python 3, tylko odczyt):
                     linie nadania (z --tabele: zmiany rodu po zdobyciu +- 2), LN-2 ponad pulapem przy kims w pulapie 0, LN-3 rada wybiera 1. albo >= 0.7 x 1.
                     (>= 95%), LN-4 najwiekszy rod krolestwa <= 40%, LN-5 rody / nadania >= 0.60, LN-6 miasta ponad pulap 0, LN-7 rod krola <= 35%,
                     LN-8 wodz spoza korony dostaje >= 50%, LN-9 anulowane 0, LN-10 uczestnicy szturmu >= 80%, LN-11 oddane w 60 dob (DECYZJA), LN-12 potkniecia 0.
+--grupa b10b      : (14.10, ERRORS.md A7 klasa 7, decyzja Jeffa "tak napraw"; CrashScribe/src/BkBattlePerks.cs) python -I tools/sprawdz_logi.py --grupa b10b
+                    --crashscribe <session-*.log>. B10-0 linia startu wpiete 2/2, B10-1 linie doby i potkniecia 0, B10-2 premie (INFO), B10-3 typy BK 0 BRAK.
 --grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
                     --grupa unikaty --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). UN-0 wpiecie latek PODPIETE, UN-2 linie doby
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
@@ -16632,6 +16634,44 @@ UC_DAY = re.compile(
     r" \| klucze SD/MV/DG/CH (?P<sd>tak|nie)/(?P<mv>tak|nie)/(?P<dg>tak|nie)/(?P<ch>tak|nie)(?: \| POTKNIECIA (?P<stum>\d+) \(razem \d+\))?")
 
 
+def b10b_main(logp):
+    """b10b (ERRORS.md A7 klasa 7, decyzja Jeffa 14.10 "tak napraw"; CrashScribe/src/BkBattlePerks.cs): atuty BK z bitew. Wejscie: log sesji
+    CrashScribe. B10-0 linia startu "BK atuty bitew (B10b): wpiete 2/2" (albo WYLACZONE kluczem - INFO; "BK ma juz postfiks" - INFO),
+    B10-1 linie doby i potkniecia 0, B10-2 liczba premii od startu sesji (INFO), B10-3 brak linii "BRAK typow / atutow BK"."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("B10-0: log sesji CrashScribe", f"brak pliku {logp}", "podaj --crashscribe <session-*.log>", None)
+        rep.show()
+        return 0
+    lines = read(logp)
+    starts = [s for s in lines if s.startswith("BK atuty bitew (B10b): ") and " dzien " not in s[:40] and "BRAK typow" not in s]
+    days = [s for s in lines if s.startswith("BK atuty bitew (B10b): dzien ")]
+    miss = [s for s in lines if s.startswith("BK atuty bitew (B10b): BRAK typow")]
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)}")
+    if not starts:
+        rep.add("B10-0: linia startu (atuty BK z bitew)", "brak linii", "INFO (wersja sprzed B10b)", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    if "WYLACZONE" in st or "BK ma juz postfiks" in st:
+        rep.add("B10-0: linia startu (atuty BK z bitew)", st[len("BK atuty bitew (B10b): "):][:200], "INFO (klucz wylaczony albo BK sam naprawil)", None)
+    else:
+        rep.add("B10-0: linia startu (atuty BK z bitew)", st[len("BK atuty bitew (B10b): "):][:200], "wpiete 2/2", "wpiete 2/2" in st)
+    stum = 0
+    tot = (0, 0, 0)
+    for s in days:
+        m = re.search(r"od startu sesji (\d+) / (\d+) / (\d+) \| potkniecia (\d+)", s)
+        if m:
+            tot = (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            stum = max(stum, int(m.group(4)))
+    rep.add("B10-1: linie doby, potkniecia", f"dob {len(days)}, potkniecia {stum}", ">= 1 i 0", len(days) >= 1 and stum == 0)
+    rep.add("B10-2: premie od startu sesji (INFO)", f"Warband wplyw x1.25: {tot[0]}, Famous Sellswords slawa x1.20: {tot[1]}, Cataphract x1.12: {tot[2]}",
+            "INFO (zalezy od tego, ilu dowodcow ma te atuty BK)", None)
+    rep.add("B10-3: typy / atuty BK znalezione", f"linii BRAK {len(miss)}", "0", len(miss) == 0)
+    rep.show()
+    return 0
+
+
 def unikaty_main(logp):
     """unikaty (decyzja Jeffa 14.10 "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs; rozpoznanie
     docs/pytania-2026-10-14/TOWARZYSZE-DUPLIKATY.md rozdz. 5 i 7). Wejscie: log sesji CrashScribe (session-*.log; --crashscribe P albo sciezka).
@@ -26330,6 +26370,8 @@ def main(argv):
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "unikaty" and (csp or logp):
         return unikaty_main(csp or logp)   # 14.10 unikaty ROT (CrashScribe UniqueCompanions): zmarly zostaje martwy, przeprowadzki, duplikaty, dzieci - log sesji CrashScribe
+    if group == "b10b" and (csp or logp):
+        return b10b_main(csp or logp)   # B10b (decyzja Jeffa 14.10): atuty BK z bitew (CrashScribe BkBattlePerks) - log sesji CrashScribe
     if group == "rozwoj" and logp:
         return rozwoj_main(logp)   # RP (decyzja Jeffa 14.10): punkt cechy co 3 poziomy, dodatkowe skupienie co 4 (LevelPoints)
     if group == "ciaza" and logp:

@@ -441,4 +441,10 @@
   <!-- Caravan income of the owner as Banner Kings counts it. With Banner Kings' "Realistic Caravan Income" on (the default)
        Banner Kings gives 0 anyway, so this changes nothing then. -->
   <BkrotFixCaravanIncome>true</BkrotFixCaravanIncome>
+  <!-- Banner Kings battle perks (needs Banner Kings). In this game version a Banner Kings patch fails at start-up, so three of its
+       bonuses from won battles never worked: the Commander perk "Warband" (+25% influence from a battle), the Mercenary perk "Famous
+       Sellswords" (+20% renown) and the Cataphract lifestyle (+12% renown). CrashScribe adds them back exactly as Banner Kings meant,
+       for you and for AI lords. Banner Kings loot from battles is not touched. If Banner Kings itself gets fixed later, CrashScribe sees
+       it and stays out (so a bonus never counts twice). Set to false to leave the three bonuses inactive. -->
+  <BkBattlePerksFix>true</BkBattlePerksFix>
 </CrashScribe>
