@@ -316,4 +316,21 @@
        days held back by the pause, the ones rolled and let through, and the offers made. Set MarriageOffersPerYear
        to false for offers as in the base game. -->
   <MarriageOffersPerYear>true</MarriageOffersPerYear>
+  <!-- BannerKings titles on the Realm of Thrones map (mod audit 14.10, AM-26). BannerKings reads its title file (kingdoms,
+       duchies, counties, baronies) when a new campaign starts AND again every time a save is loaded. BKROTPatch points it
+       to the Realm of Thrones file only for a new campaign, so a save loaded after a game restart was read against the
+       Calradian title file: 30 Calradian duchies were added to Westeros and Essos, and counties were pulled out of their
+       own duchies (a dying house's castle could then pass to a "duke" from another realm). With this on, the Realm of
+       Thrones title file is used every time BannerKings reads titles. Files of BannerKings and BKROTPatch are not changed.
+       Set to false for the old behaviour. -->
+  <BkTitlesUseRotFile>true</BkTitlesUseRotFile>
+  <!-- A full title file for the Realm of Thrones 8.1.8 map (mod audit 14.10, AM-27; works only with BkTitlesUseRotFile).
+       The file BKROTPatch uses is from Realm of Thrones 6: 14 towns and 11 castles had no title at all (Harrenhal, Seagard,
+       Lordsport, Mormont Keep, Widow's Watch, Driftwood Hall and others), and Lorath, Ibben and Qarth had no royal title.
+       CrashScribe carries its own file in which every town is a county and every castle a barony (each with its villages);
+       the missing ones are placed in the duchy and realm of their starting owner, castles numbered wrongly in the old file
+       go to the nearest county of their realm, and rightful holders are the lords of Realm of Thrones 8.1.8. It is written at
+       start-up to Documents\Mount and Blade II Bannerlord\CrashScribe\bk_titles_rot818.xml. Takes effect for a new
+       campaign; set to false to use the BKROTPatch file. -->
+  <BkTitlesRot818>true</BkTitlesRot818>
 </CrashScribe>

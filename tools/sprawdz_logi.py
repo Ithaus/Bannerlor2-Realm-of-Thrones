@@ -677,6 +677,12 @@ Uzycie (Python 3, tylko odczyt):
                     linie nadania (z --tabele: zmiany rodu po zdobyciu +- 2), LN-2 ponad pulapem przy kims w pulapie 0, LN-3 rada wybiera 1. albo >= 0.7 x 1.
                     (>= 95%), LN-4 najwiekszy rod krolestwa <= 40%, LN-5 rody / nadania >= 0.60, LN-6 miasta ponad pulap 0, LN-7 rod krola <= 35%,
                     LN-8 wodz spoza korony dostaje >= 50%, LN-9 anulowane 0, LN-10 uczestnicy szturmu >= 80%, LN-11 oddane w 60 dob (DECYZJA), LN-12 potkniecia 0.
+--grupa audyta    : (audyt modow 14.10, RAPORT-AUDYT-MODOW.md rozdz. 5, pakiet P1; CrashScribe/src/BkTitles.cs) python -I tools/sprawdz_logi.py --grupa audyta
+                    <session-*.log CrashScribe> (strumieniowo). Tytuly BK na mapie ROT: AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany),
+                    AUD-P1-1 (AM-26) kazde ustawienie sciezki = plik ROT 8.1.8, AUD-P1-2 retrofit BK przy wczytaniu z plikiem ROT 8.1.8 i 0 przepietych
+                    (test: nowa kampania -> zapis -> NOWY proces -> wczytanie), linia pierwszej godziny sesji: AUD-P1-3 twierdz bez tytulu 0, AUD-P1-4
+                    krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0, AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
+                    i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -24958,6 +24964,137 @@ def odsiecz_main(logp, csp=None, until=100000):
     return 0
 
 
+# ------------------------------------------------------------ audyta (audyt modow 14.10, pakiet P1: AM-26 / AM-27 / AM-04; CrashScribe BkTitles)
+AU_START = re.compile(r"Mends: tytuly BK \(AM-26\) - latki sciezki wpiete (TAK|NIE[^(]*)\s*\(.*plik ROT 8\.1\.8 \(AM-27, BkTitlesRot818=(true|false)\): (.*)$")
+AU_APPLY = re.compile(r"Mends: tytuly BK \(AM-26\) - (InitializeTitles|RetrofitOrphanedTitles) \([^)]*\): (.*)$")
+AU_RETRO = re.compile(r"Mends: tytuly BK \(AM-26\) - retrofit BK przy wczytaniu: przepietych powiazan (\d+) \(plik (.*?)\);")
+AU_SESS = re.compile(r"Mends: tytuly BK \(AM-26/AM-27\) - pierwsza godzina sesji: plik (.*?) \| twierdz bez tytulu (\d+) z (\d+)(.*?) \| wsi bez tytulu przy twierdzach"
+                     r" z tytulem (\d+) z (\d+) \| krolestw bez tytulu krolewskiego (\d+) z (\d+)(.*?) \| (?:ksiestw (\d+), spoza pliku (\d+)(.*?)|ksiestw \?[^|]*)"
+                     r" \| retrofit przy wczytaniu: (.*?) \| potkniec (\d+)\.")
+AU_ROT = "ROT 8.1.8 (CrashScribe)"
+
+
+def audyta_bkfc(rep, logp):
+    """AUD-P1-8 (AM-04, INFO): wpisy 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log obok katalogu logu CrashScribe."""
+    fc = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(logp)), "..", "Configs", "ModLogs", "bk-firstchance.log"))
+    if os.path.isfile(fc):
+        n = 0
+        with open(fc, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if "GetIdealCapital" in ln:
+                    n += 1
+        rep.add("AUD-P1-8 (AM-04): wpisy GetIdealCapital w bk-firstchance.log", f"{n} ({fc})",
+                "INFO (cel 0 po P1; plik BK bez dat - sprawdzic, czy jest z tego biegu)", None)
+    else:
+        rep.add("AUD-P1-8 (AM-04): bk-firstchance.log", f"brak pliku ({fc})", "INFO", None)
+
+
+def audyta_main(logp):
+    """audyta (audyt modow 14.10, docs/audyt-modow-2026-10-14/RAPORT-AUDYT-MODOW.md rozdz. 5, pakiet P1; CrashScribe/src/BkTitles.cs). Log sesji
+    CrashScribe (session-*.log), czytany strumieniowo. AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany); AUD-P1-1 (AM-26)
+    kazde ustawienie sciezki przed odczytem BK (InitializeTitles / RetrofitOrphanedTitles) = plik ROT 8.1.8; AUD-P1-2 (AM-26, wczytanie) retrofit BK
+    z plikiem ROT 8.1.8 i 0 przepietych (kampania zaczeta z P1; stary zapis z ksiestwami Calradii daje wiecej - wtedy NIE z opisem); linia pierwszej
+    godziny sesji: AUD-P1-3 (AM-27) twierdz bez tytulu 0, AUD-P1-4 krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu przy twierdzach
+    z tytulem 0, AUD-P1-6 (AM-26 w grze, zamiast savescan3) ksiestw spoza pliku 0, AUD-P1-7 potkniecia i bledy BkTitles 0; AUD-P1-8 (AM-04, INFO)
+    wpisy 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log obok katalogu logu (plik BK bez dat - porownac z biegiem sprzed P1).
+    Test AM-26: nowa kampania -> zapis -> wyjscie -> NOWY proces gry -> wczytanie -> log tej drugiej sesji (AUD-P1-2 i AUD-P1-6).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    start, off, warn, apply, retro, sess, errs = [], 0, [], [], [], [], 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "tytuly BK" not in ln and "BkTitles." not in ln:
+                continue
+            s = ln.rstrip("\r\n")
+            m = TS.match(s)
+            if m:
+                s = m.group(2)
+            if "BkTitles." in s and "tytuly BK" not in s:
+                errs += 1
+                continue
+            m = AU_START.search(s)
+            if m:
+                start.append(m.groups())
+                continue
+            if "Mends: tytuly BK (AM-26) wylaczone" in s:
+                off += 1
+                continue
+            if "Mends: tytuly BK (AM-26) - OSTRZEZENIE" in s or "nieobecny" in s:
+                warn.append(s)
+                continue
+            m = AU_APPLY.search(s)
+            if m:
+                apply.append((m.group(1), m.group(2)))
+                continue
+            m = AU_RETRO.search(s)
+            if m:
+                retro.append((int(m.group(1)), m.group(2)))
+                continue
+            m = AU_SESS.search(s)
+            if m:
+                sess.append(m.groups())
+    print(f"plik: {logp} | linie P1: start {len(start)}, sciezka {len(apply)}, retrofit {len(retro)}, sesja {len(sess)}, wylaczone {off}, ostrzezen {len(warn)}")
+    if not (start or apply or retro or sess or off or warn):
+        rep.add("AUD-P1: linie tytulow BK (CrashScribe BkTitles)", "brak linii (log bez paczki P1)", "INFO", None)
+        audyta_bkfc(rep, logp)
+        rep.show()
+        return 0
+    if off and not start:
+        rep.add("AUD-P1-0: latki sciezki tytulow BK", f"wylaczone (BkTitlesUseRotFile=false) w {off} liniach", "INFO (klucz off = zachowanie b47fecc3)", None)
+    elif start:
+        hook, rot818, note = start[-1]
+        ok = hook == "TAK" and rot818 == "true" and note.startswith("plik ")
+        rep.add("AUD-P1-0: linia startu - latki sciezki wpiete, plik ROT 8.1.8 zapisany",
+                f"wpiete {hook.strip()}, BkTitlesRot818={rot818}, {note[:160]}" + (f"; ostrzezen {len(warn)}" if warn else ""),
+                "TAK i 'plik <sciezka> (...)'", ok)
+    else:
+        rep.add("AUD-P1-0: linia startu", f"brak; ostrzezenia: {' / '.join(w[:120] for w in warn[:2])}", "linia 'latki sciezki wpiete TAK'", False)
+    if apply:
+        bad = [a for a in apply if not a[1].startswith("plik " + AU_ROT)]
+        rep.add("AUD-P1-1 (AM-26): sciezka przed odczytem BK = plik ROT 8.1.8",
+                f"ustawien {len(apply)} (InitializeTitles {sum(1 for a in apply if a[0] == 'InitializeTitles')}, RetrofitOrphanedTitles "
+                f"{sum(1 for a in apply if a[0] == 'RetrofitOrphanedTitles')}), inny plik {len(bad)}" + (f": {bad[0][1][:140]}" if bad else ""),
+                "kazde 'plik ROT 8.1.8 (CrashScribe)'", len(bad) == 0)
+    else:
+        rep.add("AUD-P1-1 (AM-26): sciezka przed odczytem BK", "brak linii ustawienia", "INFO (BK nie czytal tytulow albo latka nie wpieta)", None)
+    if retro:
+        badf = [r for r in retro if not r[1].startswith(AU_ROT)]
+        moved = [r[0] for r in retro]
+        rep.add("AUD-P1-2 (AM-26): retrofit BK przy wczytaniu - plik ROT 8.1.8, przepietych 0",
+                f"wczytan {len(retro)}, przepietych {moved}, inny plik {len(badf)}" + (f" ({badf[0][1]})" if badf else ""),
+                "plik ROT 8.1.8 i 0 (kampania zaczeta z P1; stary zapis z ksiestwami Calradii daje wiecej - nie naprawiamy)",
+                len(badf) == 0 and all(x == 0 for x in moved))
+    else:
+        rep.add("AUD-P1-2 (AM-26): retrofit BK przy wczytaniu", "brak wczytania w tym logu",
+                "INFO (test: nowa kampania -> zapis -> NOWY proces -> wczytanie; log drugiej sesji)", None)
+    if sess:
+        kinds = [x[0] for x in sess]
+        nt = [int(x[1]) for x in sess]
+        nk = [int(x[6]) for x in sess]
+        nv = [int(x[4]) for x in sess]
+        nd = [int(x[10]) if x[10] is not None else None for x in sess]
+        st_ = [int(x[13]) for x in sess]
+        notrot = [k for k in kinds if not k.startswith(AU_ROT)]
+        rep.add("AUD-P1-3 (AM-27): twierdz bez tytulu BK", f"{nt} z {[int(x[2]) for x in sess]}" + (f"; np.{sess[0][3][:160]}" if nt[0] else "")
+                + (f"; plik inny niz ROT 8.1.8 w {len(notrot)} liniach" if notrot else ""), "0 (plik ROT 8.1.8)", not notrot and all(v == 0 for v in nt))
+        rep.add("AUD-P1-4 (AM-27): krolestw bez tytulu krolewskiego", f"{nk} z {[int(x[7]) for x in sess]}" + (f"; {sess[0][8][:160]}" if nk[0] else ""),
+                "0 (w dlugiej kampanii nowe krolestwa z buntow moga byc bez tytulu - patrz nazwy)", all(v == 0 for v in nk))
+        rep.add("AUD-P1-5 (AM-27): wsi bez tytulu przy twierdzach z tytulem", f"{nv} z {[int(x[5]) for x in sess]}", "0", all(v == 0 for v in nv))
+        if any(v is None for v in nd):
+            rep.add("AUD-P1-6 (AM-26): ksiestwa spoza pliku tytulow", "brak liczby (BK bez AllTitles albo pliku)", "INFO", None)
+        else:
+            rep.add("AUD-P1-6 (AM-26): ksiestwa spoza pliku tytulow (w grze zamiast savescan3)",
+                    f"{nd} (ksiestw razem {[int(x[9]) for x in sess]})" + (f"; {sess[0][11][:160]}" if nd[0] else ""),
+                    "0 (stary zapis: ksiestwa Calradii zostaja - opcja B nie robiona)", all(v == 0 for v in nd))
+        rep.add("AUD-P1-7: potkniecia linii sesji i bledy BkTitles", f"potkniec {st_}, raportow bledow BkTitles {errs}", "0", all(v == 0 for v in st_) and errs == 0)
+    else:
+        rep.add("AUD-P1-3..7: linia pierwszej godziny sesji", "brak (czas gry nie ruszyl albo latka nie wpieta)" + (f"; bledy BkTitles {errs}" if errs else ""),
+                "INFO", None if errs == 0 else False)
+    audyta_bkfc(rep, logp)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -24998,6 +25135,8 @@ def main(argv):
         logp = a; i += 1
     if group == "lenna" and logp:
         return lenna_main(logp, tabp)   # PROJEKT-LENNA (14.10): regula N - komu krol daje zdobyty zamek / miasto (FiefGrants), progi LN-0..LN-13
+    if group == "audyta" and logp:
+        return audyta_main(logp)   # audyt modow 14.10, pakiet P1 (AM-26 / AM-27 / AM-04): log sesji CrashScribe, tytuly BK
     if group == "sludan" and logp:
         return sludan_main(logp, csp)   # 14.10 sluby-danina: (A) sluby AI na rok (hamulec 0.17) i oferty dla rodu gracza (84 / rok), (B) danina pokoju M4
     if group == "a17" and logp:

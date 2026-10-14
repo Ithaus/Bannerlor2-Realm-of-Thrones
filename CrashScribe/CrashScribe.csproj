@@ -18,6 +18,10 @@
     <Compile Include="src\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
+    <!-- P1 (AM-27): plik tytulow BK dla mapy ROT 8.1.8 z tools/bk_titles_rot818.py; w grze zapisywany do Documents\...\CrashScribe -->
+    <EmbeddedResource Include="res\bk_titles_rot818.xml" LogicalName="CrashScribe.bk_titles_rot818.xml" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="MCMv5"><HintPath>$(GameLibs)/MCMv5.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(GameLibs)/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.dll</HintPath><Private>false</Private></Reference>
