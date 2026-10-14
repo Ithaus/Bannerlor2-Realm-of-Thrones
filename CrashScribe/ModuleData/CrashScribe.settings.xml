@@ -342,4 +342,12 @@
        the new lord's culture once, as BannerKings intends. Volunteers in every settlement still come from the settlement's own
        culture, whatever the notable's culture is. Set to false to give every notable the culture of the settlement each day. -->
   <LocalLeviesPreachersOnly>true</LocalLeviesPreachersOnly>
+  <!-- Broken character templates of Realm of Thrones (mod audit 14.10, AM-29). Some cultures of Realm of Thrones list lord, notable
+       or rebel templates that do not exist (the game log says 'Null object reference found', e.g. spc_brotherhood_2 among the
+       Westerlands lords). The game keeps an empty stand-in in the list, and when such a stand-in is drawn - for example when you,
+       as a ruler, give a fief to a companion from the Westerlands and the game creates the members of the new clan (about one
+       time in six) - the game crashes or leaves a half-made clan in the save. With this on, CrashScribe removes the broken
+       entries from these lists every time a campaign starts or a save is loaded, and replaces a broken template with a working
+       lord template of the same culture when a companion's clan is created. Set to false to leave the lists as they are. -->
+  <CultureTemplateRepair>true</CultureTemplateRepair>
 </CrashScribe>

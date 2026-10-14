@@ -684,7 +684,8 @@ Uzycie (Python 3, tylko odczyt):
                     krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0, AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
                     i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
                     P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, tylko kaplani:
-                    linia doby z ogonem TAK, 0 prostowanych Artisan / Merchant, 0 petli >= 3 razy, zostawieni BK INFO).
+                    linia doby z ogonem TAK, 0 prostowanych Artisan / Merchant, 0 petli >= 3 razy, zostawieni BK INFO), AUD-P3-29a..c (AM-29, wzorce kultur:
+                    siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -25113,36 +25114,66 @@ AU3_LEVY = re.compile(r"Mends: werbunek miejscowy - poprawionych notabli (\d+), 
 AU3_LEVY20 = re.compile(r"\| AM-20 tylko kaplani (TAK|NIE[^:]*): prostowani wedlug zawodu \[(.*?)\], kaplani pominieci \(kultura pana\) (\d+),"
                         r" inni notable z kultura inna niz osady \(nawroceni przez BK, zostawieni\) (\d+) \[(.*?)\]\.")
 AU3_FIX = re.compile(r"Mends: (.*) w (.*) byl (\S+), jest (\S+) \(([^)]*)\)\.$")
+AU3_T_START = re.compile(r"Mends: wzorce kultur \(AM-29\) - siatka na rod towarzysza \(CreateNewHeroForNewCompanionClan\) (wpieta|NIE wpieta[^;]*);")
+AU3_T_SESS = re.compile(r"Mends: wzorce kultur \(AM-29\) - start sesji: wzorcow sprawdzonych (\d+), usunietych (\d+)(.*?); list zostawionych bez zmian"
+                        r" \(same zepsute\) (\d+), pozostalo zepsutych (\d+), siatka rodu towarzysza (wpieta|NIE) \(podmian w procesie (\d+), bez zastepcy (\d+)\),"
+                        r" potkniec (\d+)\.")
+
+
+def audyta_p3_cs(csp):
+    """Jedno przejscie po logu sesji CrashScribe: linie paczki P3 wedlug pozycji."""
+    d = {"levy": [], "levy20": [], "fixes": [], "t_start": [], "t_off": 0, "t_sess": [], "t_net": 0, "errs": 0}
+    with open(csp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "Mends: " not in ln and "AuditP3." not in ln:
+                continue
+            s = ln.rstrip("\r\n")
+            m = TS.match(s)
+            if m:
+                s = m.group(2)
+            if "AuditP3." in s and "Mends: " not in s:
+                d["errs"] += 1
+                continue
+            m = AU3_LEVY.search(s)
+            if m:
+                d["levy"].append(m.groups())
+                m2 = AU3_LEVY20.search(m.group(4))
+                if m2:
+                    d["levy20"].append(m2.groups())
+                continue
+            if "(AM-29)" in s:
+                m = AU3_T_START.search(s)
+                if m:
+                    d["t_start"].append(m.group(1))
+                elif "wzorce kultur (AM-29) wylaczone" in s:
+                    d["t_off"] += 1
+                elif "- siatka: zepsuty wzorzec" in s:
+                    d["t_net"] += 1
+                else:
+                    m = AU3_T_SESS.search(s)
+                    if m:
+                        d["t_sess"].append(m.groups())
+                continue
+            m = AU3_FIX.search(s)
+            if m and " w " in s and ", jest " in s:
+                d["fixes"].append(m.groups())
+    return d
 
 
 def audyta_p3(rep, csp, armp):
     """Pakiet P3 audytu modow 14.10 (wiersze AUD-P3-*). csp = log sesji CrashScribe (session-*.log), armp = log Armoury (Armoury-*.log) albo None.
     AM-20 (LocalLeviesPreachersOnly): AUD-P3-20a linia doby 'werbunek miejscowy' z ogonem 'AM-20 tylko kaplani TAK'; AUD-P3-20b 0 linii 'Mends: X w Y
     byl A, jest B (zawod)' dla notabli innych niz kaplani (Artisan, Merchant, ...); AUD-P3-20c 0 notabli prostowanych 3 i wiecej razy (petla);
-    AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba). Brak linii = INFO."""
+    AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba).
+    AM-29 (CultureTemplateRepair): AUD-P3-29a siatka rodu towarzysza wpieta; AUD-P3-29b kazdy start sesji: pozostalo zepsutych 0 i potkniec 0
+    (usuniete z jakich kultur - w wierszu); AUD-P3-29c siatka bez zastepcy 0 (podmiany INFO).
+    Brak linii = INFO."""
     from collections import Counter
     if not csp or not os.path.isfile(csp):
         rep.add("AUD-P3 (CrashScribe): log sesji", f"brak ({csp})", "INFO (podaj session-*.log jako log albo --crashscribe)", None)
     else:
-        levy, levy20, fixes = [], [], []
-        with open(csp, encoding="utf-8", errors="replace") as f:
-            for ln in f:
-                if "Mends: " not in ln:
-                    continue
-                s = ln.rstrip("\r\n")
-                m = TS.match(s)
-                if m:
-                    s = m.group(2)
-                m = AU3_LEVY.search(s)
-                if m:
-                    levy.append(m.groups())
-                    m2 = AU3_LEVY20.search(m.group(4))
-                    if m2:
-                        levy20.append(m2.groups())
-                    continue
-                m = AU3_FIX.search(s)
-                if m and " w " in s and ", jest " in s:
-                    fixes.append(m.groups())
+        d = audyta_p3_cs(csp)
+        levy, levy20, fixes = d["levy"], d["levy20"], d["fixes"]
         on = [x for x in levy20 if x[0] == "TAK"]
         if not levy20:
             rep.add("AUD-P3-20a (AM-20): linia doby 'werbunek miejscowy' z ogonem AM-20", f"linii doby {len(levy)}, z ogonem AM-20 0",
@@ -25162,6 +25193,27 @@ def audyta_p3(rep, csp, armp):
             last = on[-1]
             rep.add("AUD-P3-20d (AM-20): ostatnia doba - prostowani / pominieci kaplani / zostawieni BK",
                     f"prostowani [{last[1]}], kaplani pominieci {last[2]}, zostawieni {last[3]} [{last[4]}]", "INFO", None)
+        # AM-29
+        if d["t_off"] and not d["t_start"]:
+            rep.add("AUD-P3-29a (AM-29): wzorce kultur", "wylaczone (CultureTemplateRepair=false)", "INFO (klucz off = b47fecc3)", None)
+        elif d["t_start"]:
+            rep.add("AUD-P3-29a (AM-29): siatka rodu towarzysza wpieta", d["t_start"][-1], "wpieta", d["t_start"][-1] == "wpieta")
+        else:
+            rep.add("AUD-P3-29a (AM-29): linia startu wzorcow kultur", "brak", "INFO (log bez paczki P3)", None)
+        if d["t_sess"]:
+            left = [int(x[4]) for x in d["t_sess"]]
+            st_ = [int(x[8]) for x in d["t_sess"]]
+            last = d["t_sess"][-1]
+            rep.add("AUD-P3-29b (AM-29): start sesji - pozostalo zepsutych wzorcow / potkniecia",
+                    f"startow {len(d['t_sess'])}, pozostalo {left}, potkniec {st_}; ostatni: sprawdzonych {last[0]}, usunietych {last[1]}{last[2][:300]}",
+                    "0 i 0 (usuniete: ROT 8.1.8 m.in. vlandia lord 12->11 spc_brotherhood_2)", all(v == 0 for v in left) and all(v == 0 for v in st_))
+            miss = int(last[7])
+            rep.add("AUD-P3-29c (AM-29): siatka rodu towarzysza - bez zastepcy", f"podmian {last[6]} (linii {d['t_net']}), bez zastepcy {miss}",
+                    "0 bez zastepcy (podmiany INFO - po filtrze zwykle 0)", miss == 0)
+        elif d["t_start"]:
+            rep.add("AUD-P3-29b (AM-29): linia startu sesji", "brak (kampania nie wystartowala)", "INFO", None)
+        if d["errs"]:
+            rep.add("AUD-P3: bledy AuditP3 w logu", f"{d['errs']}", "0", False)
 
 
 def main(argv):

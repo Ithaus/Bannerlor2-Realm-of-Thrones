@@ -92,6 +92,7 @@ namespace CrashScribe
                 Quiet.Install(_harmony);
                 Mends.Install(_harmony);
                 BkTitles.Install(_harmony);       // P1 audytu 14.10 (AM-26/AM-27): sciezka tytulow BK ROT przy kazdym odczycie, plik ROT 8.1.8
+                AuditP3.Install(_harmony);        // P3 audytu 14.10 (AM-29 wzorce kultur, AM-01 dobrobyt BKROT, AM-28 wiara Lorath) - kazda naprawa pod wlasnym kluczem
                 NameplateGhosts.Install(_harmony);   // 10.10: ikony-duchy partii nad osadami
                 Fabula.Install(_harmony);
                 OthersGrowth.Install(_harmony);   // T2b: Inni bez dosypki z niczego (Jeff 07.10 H2)
@@ -153,6 +154,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new MarriageFastBehavior());   // Z.3: swaty ROT szybciej (straze i latka przy starcie sesji, linia doby "Swaty ROT (Z.3)")
                 if (cgs != null) cgs.AddBehavior(new MarriageOfferYearBehavior());   // 14.10: oferty slubu dla rodu gracza na rok (84 / rok; linia doby "Oferty slubu (rok)")
                 if (cgs != null) cgs.AddBehavior(new BkTitlesBehavior());   // P1 (AM-26/AM-27): linia kontrolna tytulow BK w pierwszej godzinie sesji
+                if (cgs != null) cgs.AddBehavior(new AuditP3Behavior());   // P3 audytu 14.10: start sesji (wzorce kultur AM-29)
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }
