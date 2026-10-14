@@ -1553,9 +1553,42 @@ namespace Armoury
 
         private static int PoolCap(bool ff) { return ff ? _ff.Cap : _watchPoolCap; }
 
-        /// <summary>WL1: pula Wolnych Ludzi w ludziach na dzis - ze zlota (suma pulapow rodow w ludziach, jak Straz).</summary>
+        /// <summary>WL2 czynne: klucz FreeFolkMenFromPeople przy WL1.</summary>
+        internal static bool FfFromPeopleOn { get { var s = Settings.Current; return s != null && s.FreeFolkMenFromPeople && CrownGifts.FreeFolkUnpaidOn; } }
+        private static double FfLevyShare(Settings s) { return Math.Max(0f, Math.Min(0.05f, s.FreeFolkLevyShare)); }
+        private static double FfGarShare(Settings s) { return Math.Max(0f, Math.Min(1f, s.FreeFolkGarrisonPoolShare)); }
+
+        /// <summary>WL2: ludzie regionow krolestwa Wolnych Ludzi (warownia + jej wsie, region nalezy do krolestwa freefolk - ta sama liczba co "ludzie" w
+        /// ludzie-regiony.csv: PopulationLaw.PeopleOf); -1 przed kalibracja ludnosci (sami jej nie wolamy) albo bez regionow.</summary>
+        private static double FfPeople()
+        {
+            if (!PopulationLaw.Calibrated) return -1;
+            double p = 0; int n = 0;
+            foreach (var st in OutlawLaw.RegionNodes())
+            {
+                try
+                {
+                    if (st == null || !CrownGifts.IsFreeFolk(st.MapFaction)) continue;
+                    n++;
+                    p += PopulationLaw.PeopleOf(st);
+                    if (st.BoundVillages != null) foreach (var v in st.BoundVillages) if (v != null && v.Settlement != null) p += PopulationLaw.PeopleOf(v.Settlement);
+                }
+                catch (Exception e) { Stumble("FfPeople", e); }
+            }
+            return n > 0 ? p : -1;
+        }
+
+        /// <summary>WL1/WL2: pula Wolnych Ludzi w ludziach na dzis - WL2: FreeFolkLevyShare x ludzie regionow WL (pula idzie za ludem); bez WL2 albo bez liczby ludzi -
+        /// ze zlota (suma pulapow rodow w ludziach, jak Straz).</summary>
         private static int FfPoolCap(Settings s)
         {
+            _ff.People = -1;
+            if (FfFromPeopleOn)
+            {
+                double people = FfPeople();
+                _ff.People = people;
+                if (people > 0) return (int)Math.Round(FfLevyShare(s) * people);
+            }
             return Math.Max(0, _ff.DCap);
         }
 
@@ -1615,7 +1648,15 @@ namespace Armoury
                 if (b == null || !b.Zero) return true;
                 bool ff = IsFf(st.OwnerClan); int cap = PoolCap(ff);   // WL1: pula rodu (Straz albo Wolni Ludzie)
                 if (cap < 0) return true;
-                if (PoolLiveMen(ff) < cap) return true;   // 2: pula calej Strazy
+                if (PoolLiveMen(ff) < cap)   // 2: pula calej Strazy
+                {
+                    // WL2: zalogi Wolnych Ludzi rosna tylko, dopoki wszystkie razem < FreeFolkGarrisonPoolShare puli ([L] walcza w polu, nie w murach); ponad - stoja (bez zwolnien)
+                    if (!ff || !FfFromPeopleOn) return true;
+                    var s = Settings.Current;
+                    if (s == null || FfLiveGarrisons() < FfGarShare(s) * cap) return true;
+                    _ff.GarShareBlock++;
+                    return false;
+                }
                 if (ff) _ff.GarBlock++; else _dGarBlock++;
                 return false;
             }
@@ -1628,7 +1669,10 @@ namespace Armoury
             var sb = new StringBuilder(400);
             sb.Append(" | Wolni Ludzie bez zoldu (WL1, Free Folk Unpaid ").Append(CrownGifts.FreeFolkUnpaidOn ? "tak" : "nie").Append("): w ludziach ").Append(_ff.Men)
               .Append(" (zalogi ").Append(_ff.Gar).Append(") / pula ").Append(_ff.Cap < 0 ? "-" : _ff.Cap.ToString(Inv))
-              .Append(" (ze zlota ").Append(_ff.DCap < 0 ? "-" : _ff.DCap.ToString(Inv)).Append(')')
+              .Append(" (").Append(FfFromPeopleOn && _ff.People > 0 ? "z ludu (WL2, Free Folk Men From People tak): " + (100.0 * FfLevyShare(s)).ToString("0.0", Inv) + "% x ludzie "
+                      + Math.Round(_ff.People).ToString("0", Inv) + "; " : "WL2 nie; ")
+              .Append("ze zlota ").Append(_ff.DCap < 0 ? "-" : _ff.DCap.ToString(Inv)).Append(')')
+              .Append(", zalogi ").Append(_ff.Cap > 0 ? (100.0 * _ff.Gar / _ff.Cap).ToString("0", Inv) + "% puli" : "-").Append(" (rosna do ").Append((100.0 * FfGarShare(s)).ToString("0", Inv)).Append("%)")
               .Append("; werbunek wstrzymany: pula ").Append(_ff.RecruitBlock).Append(", jedzenie (WL3) ").Append(_ff.FoodBlock)
               .Append("; przyrost zalog wstrzymany: pula ").Append(_ff.GarBlock).Append(", zalogi ponad udzial puli (WL2) ").Append(_ff.GarShareBlock)
               .Append("; nowe partie wstrzymane ").Append(_ff.SpawnBlock)

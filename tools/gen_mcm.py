@@ -227,6 +227,8 @@ RANGES = {
     'ReaverWaterfrontShare': (0.0, 1.0, "0.00"),
     'ReaverRaidPayDays': (1.0, 28.0, "0"),
     'SeaRaidersHarbourTithe': (0.0, 1.0, "0.00"),
+    'FreeFolkLevyShare': (0.0, 0.05, "0.000"),
+    'FreeFolkGarrisonPoolShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

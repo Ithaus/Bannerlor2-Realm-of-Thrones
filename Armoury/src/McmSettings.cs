@@ -5836,6 +5836,18 @@ namespace Armoury
         [SettingPropertyGroup("Reavers and the Free Folk")]
         public bool FreeFolkUnpaid { get; set; } = true;
 
+        [SettingPropertyBool("Free Folk Men From People", HintText = "with Free Folk Unpaid: the whole host of the Free Folk is held by their people, not by gold - at most Free Folk Levy Share of the people of the lands they hold, so it shrinks when their people die or flee. Their garrisons grow only while all of them hold less than Free Folk Garrison Pool Share of the host; the rest of it goes into the field. Nobody is sent home: the limit only stops recruiting, new companies and the growth of garrisons. Off = their numbers are held by gold, as for the Night's Watch")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public bool FreeFolkMenFromPeople { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Free Folk Levy Share", 0.000f, 0.050f, "0.000", HintText = "with Free Folk Men From People: the Free Folk under arms at most, as a share of the people of their lands (0.018 = about 5,000 of 280,000 - as many as they kept in their first half year, before gold began to hold them back)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public float FreeFolkLevyShare { get; set; } = 0.018f;
+
+        [SettingPropertyFloatingInteger("Free Folk Garrison Pool Share", 0.00f, 1.00f, "0.00", HintText = "with Free Folk Men From People: the garrisons of the Free Folk grow only while all of them hold less than this share of the host (0.50 = half; garrisons above it stay, they only stop growing)")]
+        [SettingPropertyGroup("Reavers and the Free Folk")]
+        public float FreeFolkGarrisonPoolShare { get; set; } = 0.50f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7294,6 +7306,9 @@ namespace Armoury
             s.SeaRaidersIronHarbour = SeaRaidersIronHarbour;
             s.SeaRaidersHarbourTithe = SeaRaidersHarbourTithe;
             s.FreeFolkUnpaid = FreeFolkUnpaid;
+            s.FreeFolkMenFromPeople = FreeFolkMenFromPeople;
+            s.FreeFolkLevyShare = FreeFolkLevyShare;
+            s.FreeFolkGarrisonPoolShare = FreeFolkGarrisonPoolShare;
         }
 
         internal static void Apply()
