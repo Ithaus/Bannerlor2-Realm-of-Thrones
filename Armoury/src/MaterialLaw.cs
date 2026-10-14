@@ -221,7 +221,7 @@ namespace Armoury
                     float sum = 1f + __result.SumOfFactors;
                     if (sum > 0f) __result.AddFactor((war - 1f) * sum, FreeHands.HandsText);
                 }
-                // E6/W3 (221): regulator wsi - mnoznik towaru (bez zywnosci i zwierzat) wedlug zuzycia swiata, decyzja co 28 dob (HarvestValve); ten sam wzor
+                // E6/W3 (221): regulator wsi - mnoznik towaru (bez zywnosci; zwierzeta rzezne tylko z AnimalsUnderValve - T3-K2) wedlug zuzycia swiata, decyzja co 28 dob (HarvestValve); ten sam wzor
                 // (czynnik x suma po E4), przemienny z R1/K4, PRZED W2 (ostatni krok) i sufitem dymarki R1; 1 = nic nie dopisujemy
                 float valve = HarvestValve.Factor(item);
                 if (valve != 1f)

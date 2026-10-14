@@ -695,6 +695,10 @@ namespace Armoury
             // E6/W3 (221): regulator wsi - mnozniki, kubelki produkcji i skasowanych, stosy na granicach kubelkow - wlasny try; brak klucza (stary zapis) = pomiar od pierwszej doby
             try { string hv = dataStore.IsSaving ? HarvestValve.Export() : null; SaveText.Sync(dataStore, "arm_harvestvalve", ref hv); if (dataStore.IsLoading) HarvestValve.Import(hv); }
             catch (Exception e) { Log.Error("SyncData.arm_harvestvalve", e); }
+            // recenzja T3 (T3-K2): zwierzeta rzezne regulatora w osobnym kluczu - PO arm_harvestvalve (Import czysci stan); DLL bez T3-K2 klucza nie zna (cofniecie DLL:
+            // zwierzeta jak model); brak klucza (stary zapis, zapis starej DLL) = pomiar zwierzat od nowa
+            try { string hz = dataStore.IsSaving ? HarvestValve.ExportBeasts() : null; SaveText.Sync(dataStore, "arm_harvestvalve_zw", ref hz); if (dataStore.IsLoading) HarvestValve.ImportBeasts(hz); }
+            catch (Exception e) { Log.Error("SyncData.arm_harvestvalve_zw", e); }
             // E5/B4 (199, recenzja uwaga 1): targ przy zamku - wozy w drodze do zamku (rezerwacje jedzenia), znaczniki "byl w zamku", straz BK - wlasny try;
             // brak klucza (zapis sprzed paczki) = stan pusty; rozwiazanie na wozy w OnSessionLaunched (w SyncData partii jeszcze nie ma)
             try { string cm = dataStore.IsSaving ? CastleMarket.Export() : null; SaveText.Sync(dataStore, "arm_castlemarket", ref cm); if (dataStore.IsLoading) CastleMarket.Import(cm); }

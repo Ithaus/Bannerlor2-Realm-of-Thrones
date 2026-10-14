@@ -39,10 +39,22 @@ namespace Armoury
     /// Sztuki znikaja (zdarte ubranie zastepuje nowe - nic nie trafia do jukow). Zloto tylko miedzy posiadaczami (sakiewki ludzi ->
     /// kasy miast, kasy zamkow -> kasy miast) - "Pieniadz swiata" bez zmian sumy; MoneyLedger widzi to jako pozycje "odziez wojska".
     /// Wylaczone: nic nie narasta i nic nie jest kupowane (zapisana potrzeba zostaje w zapisie), BK tekstylia jak dotad.
+    ///
+    /// T3-K1 (klucz SutlerClothing, docs/towary-2/ROZPOZNANIE-TOWARY-3.md T3-2/T3-3) - MARKIETANI PRZYWOZA ODZIEZ. Bieg fin29 (d91-120): zalogi dostaja 100%
+    /// narosnietej potrzeby (plotno 23.5 z 23.4, skora 28.4 z 28.05), partie tylko 63% plotna i 58% skory, bo kupuja wylacznie przy wyjezdzie z miasta
+    /// (44.5 wizyt z potrzeba na dobe przy 627 partiach, w polu 556), choc plotna i skory na polkach nie brakuje (kolejka plotna i skory po ok. 34 doby potrzeby).
+    /// Regula: partia rodu w polu (te same, ktore obsluguja markietani - Sutlers.One: poza osada, bez bitwy, nie na morzu) raz na dobe kupuje cale sztuki
+    /// swojej potrzeby z polki miasta, do ktorego markietani wplacaja (najblizsze miasto niebedace w wojnie z partia), ta sama metoda co przy wyjezdzie
+    /// (Buy: najtansza sztuka, cena targu tego miasta dla tej partii), z sakiewki ponad zalegle naprawy, PRZED czescia markietanow (jak w OnLeft: odziez
+    /// przed "zyciem"); zloto sakiewka -> kasa miasta (te same liczniki co przy wyjezdzie). Bez niewrogiego miasta, miasto oblezone albo w oknie lupu L3
+    /// (CitySack.NoSpendCloth) - nic, potrzeba czeka. Wyjazd z miasta - bez zmian. Klucz wylaczony - jak 6e6313c5 (liczniki dopisku tylko licza).
     /// </summary>
     internal static class ArmyClothing
     {
         internal static bool On { get { var s = Settings.Current; return s != null && s.ArmyClothingEnabled; } }
+
+        /// <summary>T3-K1: markietani przywoza odziez (klucz SutlerClothing i odziez wojska wlaczona; markietani biegna tylko z SutlersEnabled i sakiewka).</summary>
+        internal static bool SutlerOn { get { var s = Settings.Current; return s != null && s.ArmyClothingEnabled && s.SutlerClothing; } }
 
         internal const int Leather = 0, Cloth = 1, Linen = 2, Goods = 3;
         private static readonly string[] Ids = { "leather", "felt", "linen" };
@@ -65,6 +77,13 @@ namespace Armoury
         private static readonly HashSet<string> _dCastleMarkets = new HashSet<string>(), _dRaggedKeys = new HashSet<string>();
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
         internal static int BkClothZeroed;                // BkSupplyTemper: zapisana potrzeba tekstyliow BK wyzerowana (partii dzis)
+        // T3-K1 (dopisek linii): potrzeba narosla w partiach (reszta - zalogi), wyjazd z miasta - wizyt z potrzeba towaru bez niego na polce (wedlug towaru);
+        // markietani (SutlerClothing) - zakupy od poprzedniej linii (Sutlers.Daily biegnie po ArmyClothing.Daily w tej samej dobie)
+        private static readonly float[] _dAccField = new float[Goods];
+        private static readonly int[] _dLackG = new int[Goods], _dSut = new int[Goods], _dSutLack = new int[Goods];
+        private static long _dSutGold;
+        private static int _dSutNeedN, _dSutTry, _dSutBuyN, _dSutPlayer, _dSutPoor, _dSutNoTown, _dSutSiege, _dSutSack;
+        private static readonly HashSet<string> _dSutTowns = new HashSet<string>();
 
         internal static void Reset()
         {
@@ -81,6 +100,8 @@ namespace Armoury
             _dVisits = _dPlayerVisits = _dNoGoods = _dNoPurse = _dCastleNoGold = _dCastleWait = _dCastleNoTown = 0; _dStumbles = 0; _dGarUndead = 0;
             _dCastleMarkets.Clear(); _dRaggedKeys.Clear();
             BkClothZeroed = 0;
+            Array.Clear(_dAccField, 0, Goods); Array.Clear(_dLackG, 0, Goods); Array.Clear(_dSut, 0, Goods); Array.Clear(_dSutLack, 0, Goods);   // T3-K1
+            _dSutGold = 0; _dSutNeedN = _dSutTry = _dSutBuyN = _dSutPlayer = _dSutPoor = _dSutNoTown = _dSutSiege = _dSutSack = 0; _dSutTowns.Clear();
         }
 
         /// <summary>Wyjatek przy jednej partii albo osadzie: pierwszy z danego miejsca do pliku, kazdy liczony w linii dnia (regula dziala dalej).</summary>
@@ -131,6 +152,7 @@ namespace Armoury
                 float day = PerDay(Rate(s, g, field), men, Weight(g));
                 float add = day * share;
                 need[g] += add; _dAccrued[g] += add;
+                if (field) _dAccField[g] += add;                // T3-K1: rozbicie "potrzeba narosla" na partie i zalogi (tylko licznik)
                 float cap = day * wait;
                 if (need[g] > cap) { _dRagged[g] += need[g] - cap; need[g] = cap; ragged = true; }
             }
@@ -179,7 +201,36 @@ namespace Armoury
         /// MenPurse.OnLeft: partia wyjezdza z miasta - kupuje cale sztuki potrzeby z polki miasta po cenie targu, z sakiewki ludzi,
         /// najwyzej `budget` (sakiewka ponad rezerwe na naprawy). Zwraca wydane zloto (juz zdjete z sakiewki i wplacone kasie miasta).
         /// </summary>
-        internal static int BuyForParty(MobileParty mp, Settlement st, int budget)
+        internal static int BuyForParty(MobileParty mp, Settlement st, int budget) { return PartyBuy(mp, st, budget, false); }
+
+        /// <summary>
+        /// T3-K1 (SutlerClothing): Sutlers.One - partia w polu (poza osada, bez bitwy, nie na morzu), raz na dobe, PRZED czescia markietanow: cale sztuki
+        /// potrzeby z polki miasta, do ktorego markietani wplacaja (`friendly` - najblizsze miasto niebedace w wojnie z partia; false - Sutlers wzial
+        /// najblizsze miasto w ogole), ta sama metoda co przy wyjezdzie z miasta, z sakiewki ponad zalegle naprawy `mend` (robocizna bez szacunku materialu -
+        /// ta sama liczba co w rezerwie markietanow, MenPurse.CampMend). Bez niewrogiego miasta, miasto oblezone albo okno lupu L3 - nic (licznik), potrzeba
+        /// czeka. Zwraca wydane zloto (juz zdjete z sakiewki i wplacone kasie miasta).
+        /// </summary>
+        internal static int FromSutlers(MobileParty mp, Settlement town, bool friendly, long mend)
+        {
+            try
+            {
+                if (!SutlerOn || mp == null || mp.StringId == null || town == null || town.Town == null) return 0;
+                float[] need;
+                if (!_need.TryGetValue(mp.StringId, out need) || need == null || !Wants(need)) return 0;
+                _dSutNeedN++;
+                if (!friendly) { _dSutNoTown++; return 0; }
+                if (town.IsUnderSiege) { _dSutSiege++; return 0; }
+                if (CitySack.NoSpendCloth(town, mp)) { _dSutSack++; return 0; }   // lup miast L3: w oknie lupu bez zakupu z polki lupionej osady (jak OnLeft)
+                long budget = (long)MenPurse.Get(mp) - Math.Max(0L, mend);
+                if (budget <= 0) { _dSutPoor++; return 0; }
+                return PartyBuy(mp, town, (int)Math.Min(int.MaxValue, budget), true);
+            }
+            catch (Exception e) { Stumble("ArmyClothing.FromSutlers", e); return 0; }
+        }
+
+        /// <summary>Zakup partii z polki miasta: przy wyjezdzie (MenPurse.OnLeft) albo u markietanow w polu (T3-K1, `sutler`). Ta sama metoda, ten sam platnik
+        /// (sakiewka ludzi) i odbiorca (kasa miasta), te same liczniki ksiag; osobne liczniki linii.</summary>
+        private static int PartyBuy(MobileParty mp, Settlement st, int budget, bool sutler)
         {
             try
             {
@@ -188,27 +239,49 @@ namespace Armoury
                 if (!_need.TryGetValue(mp.StringId, out need) || !Wants(need) || !Items()) return 0;
                 var got = new int[Goods];
                 bool lacked, poor;
-                int spent = Buy(st, mp, need, budget, got, false, out lacked, out poor);
-                _dVisits++;
-                if (lacked) _dNoGoods++;
-                if (poor) _dNoPurse++;
+                int spent = Buy(st, mp, need, budget, got, false, out lacked, out poor, sutler ? _dSutLack : _dLackG);
+                if (sutler) { _dSutTry++; if (poor) _dSutPoor++; }
+                else
+                {
+                    _dVisits++;
+                    if (lacked) _dNoGoods++;
+                    if (poor) _dNoPurse++;
+                }
                 if (spent <= 0) return 0;
                 int taken = MenPurse.Take(mp, spent);                            // spent <= budget <= sakiewka - taken == spent
                 st.Town.ChangeGold(taken);                                      // kupcy miasta dostaja zloto, ktore inaczej poszloby "na zycie"
                 MoneyLedger.Note(MoneyLedger.NCloth, st, taken);                // ksiega przeplywow osad (tylko licznik)
                 try { TownFolk.Sale(st, taken, TownFolk.MixCloth); } catch { }   // E5/0 (195): odziez z sakiewek (tylko licznik)
                 SoldierPay.Hold(st, taken);                                     // tarcza zoldu: jak wydatek "na zycie"
-                for (int g = 0; g < Goods; g++) _dParty[g] += got[g];
-                _dPartyGold += taken;
+                if (sutler)
+                {
+                    for (int g = 0; g < Goods; g++) _dSut[g] += got[g];
+                    _dSutGold += taken; _dSutBuyN++;
+                    if (st.StringId != null) _dSutTowns.Add(st.StringId);
+                }
+                else
+                {
+                    for (int g = 0; g < Goods; g++) _dParty[g] += got[g];
+                    _dPartyGold += taken;
+                }
                 if (mp.IsMainParty)
                 {
-                    _dPlayerVisits++;
-                    Log.Player("Your men bought " + List(got) + " in " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
-                    Log.Info("Odziez wojska (150): gracz w " + st.Name + " - kupili " + Pl(got) + " za " + taken + " z sakiewki ludzi; czeka " + Pl(need) + ".");
+                    if (sutler)
+                    {
+                        _dSutPlayer++;
+                        Log.Player("The sutlers brought your men " + List(got) + " from " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
+                        Log.Info("Odziez wojska (150): gracz w polu - markietani przywiezli z " + st.Name + " " + Pl(got) + " za " + taken + " z sakiewki ludzi (T3-K1); czeka " + Pl(need) + ".");
+                    }
+                    else
+                    {
+                        _dPlayerVisits++;
+                        Log.Player("Your men bought " + List(got) + " in " + st.Name + " for " + taken + " denars from their purse - shoes, clothes and tents worn out on the march.");
+                        Log.Info("Odziez wojska (150): gracz w " + st.Name + " - kupili " + Pl(got) + " za " + taken + " z sakiewki ludzi; czeka " + Pl(need) + ".");
+                    }
                 }
                 return taken;
             }
-            catch (Exception e) { Stumble("ArmyClothing.BuyForParty", e); return 0; }
+            catch (Exception e) { Stumble(sutler ? "ArmyClothing.BuyFromSutlers" : "ArmyClothing.BuyForParty", e); return 0; }
         }
 
         // ------------------------------------------------------------ garnizony (SoldierPay.Route - zold zaloga juz w kasie osady)
@@ -293,8 +366,9 @@ namespace Armoury
         /// Cale sztuki z polki miasta `st`: po jednej z kazdego towaru po kolei (skora, sukno, plotno), najtansza sztuka tego towaru,
         /// cena targu liczona od nowa przed kazda sztuka. `free` = garnizon swojego miasta (bez zlota; wynik = wartosc wedlug cen targu,
         /// tylko do logu). Zwraca zaplacone zloto (albo wartosc przy `free`); `lacked` - towaru zabraklo na polce, `poor` - pieniedzy.
+        /// T3-K1: `lackG` (moze byc null) - licznik wedlug towaru: +1 za towar, ktorego partia potrzebowala, a na polce zabraklo (tylko licznik).
         /// </summary>
-        private static int Buy(Settlement st, MobileParty buyer, float[] need, int budget, int[] got, bool free, out bool lacked, out bool poor)
+        private static int Buy(Settlement st, MobileParty buyer, float[] need, int budget, int[] got, bool free, out bool lacked, out bool poor, int[] lackG = null)
         {
             lacked = false; poor = false;
             var shelf = st.ItemRoster;
@@ -313,7 +387,7 @@ namespace Armoury
                         if (stop[g]) continue;
                         if (need[g] < 1f || _items[g] == null) { stop[g] = true; continue; }
                         EquipmentElement el; int price;
-                        if (!Cheapest(shelf, _items[g], town, st, buyer, out el, out price)) { stop[g] = true; lacked = true; continue; }
+                        if (!Cheapest(shelf, _items[g], town, st, buyer, out el, out price)) { stop[g] = true; lacked = true; if (lackG != null) lackG[g]++; continue; }
                         if (!free && price > budget - spent) { stop[g] = true; poor = true; continue; }
                         shelf.AddToCounts(el, -1);                              // zdarte ubranie zastapione - sztuka znika
                         need[g] -= 1f; got[g]++;
@@ -419,6 +493,9 @@ namespace Armoury
                   .Append(", w garnizonie ").Append(F(s.ArmyClothingGarrisonLeatherKg)).Append('/').Append(F(s.ArmyClothingGarrisonClothKg)).Append('/').Append(F(s.ArmyClothingGarrisonLinenKg))
                   .Append("); potrzeba czeka najwyzej ").Append(Math.Max(1, s.ArmyClothingMaxWaitDays)).Append(" dob")
                   .Append("; partie kupuja przy wyjezdzie z miasta z sakiewki ludzi ").Append(s.MenPurseEnabled ? "(sakiewka wlaczona)" : "- SAKIEWKA LUDZI WYLACZONA w MCM: partie nic nie kupia, potrzeba przepadnie po sufit")
+                  .Append(s.SutlerClothing ? (s.SutlersEnabled && s.MenPurseEnabled ? ", w polu raz na dobe u markietanow z miasta, do ktorego wplacaja (SutlerClothing tak)"
+                                                                                    : ", markietani w polu NIE (SutlerClothing tak, ale Sutlers Enabled / Men Purse Enabled wylaczone)")
+                                            : ", w polu nic (SutlerClothing nie)")
                   .Append("; garnizony na zoldzie zaplaconym do kasy osady ").Append(s.GarrisonPayToCoffers ? "(wlaczony)" : "- ZOLD GARNIZONOW DO KAS WYLACZONY w MCM: garnizony nie zuzywaja odziezy")
                   .Append("; zaopatrzenie BK w tekstylia: ").Append(BkSupplyTemper.ClothHooked ? "0 (wpiete" + (BkSupplyTemper.ClothResetReady ? ", zapisana potrzeba BK zerowana" : ", BEZ zerowania zapisanej potrzeby BK") + ")" : "BRAK latki - BK kupuje tekstylia jak dotad");
                 if (miss.Count > 0) sb.Append("; BRAK przedmiotow ").Append(string.Join(", ", miss.ToArray())).Append(" - ten towar pominiety");
@@ -462,6 +539,19 @@ namespace Armoury
                   .Append(" | braki przy zakupie: wizyt bez towaru na polce ").Append(_dNoGoods).Append(", za chuda sakiewka ").Append(_dNoPurse)
                   .Append(", zamek bez zlota ").Append(_dCastleNoGold).Append(", zamek albo miasto oblezone ").Append(_dCastleWait).Append(", zamek bez miasta ").Append(_dCastleNoTown)
                   .Append(" | zaopatrzenie BK w tekstylia: zapisana potrzeba wyzerowana w ").Append(BkClothZeroed).Append(" partiach");
+                // T3-K1: markietani (zakupy od poprzedniej linii - Sutlers.Daily biegnie po tej linii), rozbicie narastania i braki przy wyjezdzie wedlug towaru
+                var gar = new float[Goods];
+                for (int g = 0; g < Goods; g++) gar[g] = Math.Max(0f, _dAccrued[g] - _dAccField[g]);
+                sb.Append(" | markietani (SutlerClothing) ").Append(SutlerOn ? "tak" : "nie");
+                if (SutlerOn || _dSutNeedN > 0)
+                    sb.Append(": partii w polu z cala sztuka do kupienia ").Append(_dSutNeedN).Append(", z zakupem ").Append(_dSutBuyN).Append(" (gracz ").Append(_dSutPlayer).Append(")")
+                      .Append(", kupily ").Append(Pl(_dSut)).Append(" za ").Append(_dSutGold).Append(" zl w ").Append(_dSutTowns.Count).Append(" miastach")
+                      .Append("; prob w miescie markietanow ").Append(_dSutTry).Append(", bez towaru na polce: ").Append(Pl(_dSutLack))
+                      .Append("; za chuda sakiewka ").Append(_dSutPoor).Append("; pominiete: bez niewrogiego miasta ").Append(_dSutNoTown)
+                      .Append(", miasto oblezone ").Append(_dSutSiege).Append(", okno lupu ").Append(_dSutSack);
+                else sb.Append(" - odziez partii tylko przy wyjezdzie z miasta");
+                sb.Append(" | potrzeba narosla wedlug odbiorcy: partie ").Append(Pl(_dAccField)).Append("; zalogi ").Append(Pl(gar))
+                  .Append(" | wyjazd z miasta, bez towaru na polce wedlug towaru: ").Append(Pl(_dLackG));
                 if (_dGarUndead > 0) sb.Append(" | zalogi nieumarlych pominiete (trup nie zdziera butow): ").Append(_dGarUndead);
                 if (gone > 0) sb.Append(" | potrzeby po zniklych partiach i osadach usuniete: ").Append(gone);
                 sb.Append(" | potkniecia ").Append(_dStumbles).Append('.');

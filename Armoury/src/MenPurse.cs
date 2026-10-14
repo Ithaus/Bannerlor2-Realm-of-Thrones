@@ -38,7 +38,7 @@ namespace Armoury
         private static readonly Dictionary<string, int> _saved = new Dictionary<string, int>();
         private static int _daySold, _dayGold, _dayLord, _dayLife, _dayGear, _dayStamp = -1;
         private static int _daySaved, _dayGarSold, _dayGarGold;   // K1: odlozone na lepszy sprzet przy wyjazdach (A3), nadwyzki zalog (A9)
-        private static long _dayCloth;         // 150: odziez wojska kupiona z sakiewek przy wyjezdzie z miasta (ArmyClothing.BuyForParty)
+        private static long _dayCloth;         // 150: odziez wojska kupiona z sakiewek przy wyjezdzie z miasta (ArmyClothing.BuyForParty) i u markietanow w polu (T3-K1, NoteCampCloth)
         private static long _dayWage;          // zold wplacony do sakiewek (SoldierPay)
         private static int _dayWageN;
         private static long _dayIn, _dayOut;   // ruch wszystkich sakiewek w dobie: kazda wplata i kazdy wydatek ida przez Add
@@ -342,18 +342,30 @@ namespace Armoury
         /// (kasa miasta, kiesa wsi) i liczniki daje Sutlers (recenzja E5/A3 2-2: odbiorcy wyznaczeni PRZED zdjeciem, zeby wyjatek nie gubil zlota).
         /// Bez wlasnego catch - wyjatek liczy Sutlers (potkniecie na partie).
         /// </summary>
-        internal static int CampPlan(MobileParty mp, float rate, out int reserve, out int kept)
+        internal static int CampPlan(MobileParty mp, float rate, out int reserve, out int kept) { return CampPlan(mp, rate, -1L, out reserve, out kept); }
+
+        /// <summary>To samo z zaleglymi naprawami policzonymi juz przez wolajacego (`mend` >= 0 - T3-K1: Sutlers.One liczy je raz, do odziezy i do rezerwy;
+        /// -1 - liczone tutaj, jak dotad).</summary>
+        internal static int CampPlan(MobileParty mp, float rate, long mend, out int reserve, out int kept)
         {
             reserve = 0; kept = 0;
             if (!On || mp == null || rate <= 0f) return 0;
             int purse = Get(mp);
             if (purse <= 0) return 0;
             long res;
-            CampReserve(mp, purse, out res, out kept);
+            CampReserve(mp, purse, mend, out res, out kept);
             reserve = (int)Math.Min(int.MaxValue, res);
             int avail = (int)Math.Max(0L, purse - res);
             return Math.Max(0, (int)((avail - kept) * (double)Math.Min(1f, rate)));
         }
+
+        /// <summary>E5/A3 i T3-K1: zalegle naprawy partii w polu (robocizna, bez szacunku materialu - poza miastem nie ma polki) - rezerwa markietanow
+        /// i budzet odziezy u markietanow liczone z tej samej liczby. Bez wlasnego catch (wyjatek liczy Sutlers).</summary>
+        internal static long CampMend(MobileParty mp) { return Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(null) : AiWear.OutstandingCost(mp, null)); }
+
+        /// <summary>T3-K1 (SutlerClothing): odziez kupiona u markietanow w polu (ArmyClothing.FromSutlers - zloto juz zdjete z sakiewki) do pozycji
+        /// "na odziez wojska (150)" linii "Sakiewka ludzi" (jak przy wyjezdzie z miasta).</summary>
+        internal static void NoteCampCloth(int n) { if (n <= 0) return; Day(); _dayCloth += n; }
 
         /// <summary>E5/A3: zdjecie kwoty z CampPlan z sakiewki (licznik linii "Sakiewka ludzi"); zwraca zdjete.</summary>
         internal static int CampTake(MobileParty mp, int n)
@@ -371,9 +383,11 @@ namespace Armoury
         /// zostaje (przycina ja OnLeft przy wyjezdzie) - po stratach w polu (mniejszy zold) albo przy rosnacych naprawach markietani nie chronia nadwyzki
         /// ponad limit. Odziez nie zmniejsza limitu - w OnLeft kupowana jest przed odlozeniem, a limit liczy sie od samej rezerwy napraw.
         /// </summary>
-        private static void CampReserve(MobileParty mp, int purse, out long res, out int kept)
+        private static void CampReserve(MobileParty mp, int purse, out long res, out int kept) { CampReserve(mp, purse, -1L, out res, out kept); }
+
+        private static void CampReserve(MobileParty mp, int purse, long mendIn, out long res, out int kept)
         {
-            long mend = Math.Max(0, mp.IsMainParty ? TroopSelfMend.OutstandingCost(null) : AiWear.OutstandingCost(mp, null));
+            long mend = mendIn >= 0 ? mendIn : CampMend(mp);
             res = mend + Math.Max(0, ArmyClothing.PendingCost(mp));
             kept = 0;
             var s = Settings.Current;

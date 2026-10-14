@@ -590,6 +590,17 @@ Uzycie (Python 3, tylko odczyt):
                     T2-K3-5 INFO. K4 (GoodsLedgerTickAuthors - sama diagnoza): T2-K4-1 INFO - kto dopisuje piwo, chleb, mieso, ser, maslo w tickach osad i miast
                     (linia "Towary (inne ticki dobowe)"); PL-3 w --grupa plotno liczy tez karawany.
                     Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
+--grupa towary3   : (Towary 3, docs/towary-2/ROZPOZNANIE-TOWARY-3.md rozdz. 3) python -I tools/sprawdz_logi.py --grupa towary3 [--do-doby 120] <Armoury-*.log>
+                    (log czytany strumieniowo). Srednie z ostatnich 30 dob okna (domyslnie d91-120). T3-K1 (SutlerClothing - markietani przywoza odziez):
+                    T3-K1-0 dopisek w "Odziez wojska (150)", T3-K1-1 plotno do wojska >= 85 szt./d, T3-K1-2 skora do wojska >= 75 szt./d, T3-K1-3 druzyny kupuja
+                    >= 85% narosnietego plotna, T3-K1-4 kolejka plotna <= 1200 i bez wzrostu, T3-K1-5 kolejka skory <= 1000 i bez wzrostu, T3-K1-6 straz zalog
+                    (wziete >= 93% potrzeby narosnietej w zalogach - plotno i skora; recenzja: dawniej 22 / 26 szt./d), T3-K1-7 straz warsztatow (cykle bez skory
+                    <= 65/d), T3-K1-8 INFO (plotno swiata, tkacze, len, zloto), T3-K1-9 INFO (warunek T3-K4), T3-K1-10 koszt petli markietanow z zakupem odziezy
+                    (srednia <= 50, najwiecej <= 90 ms/dobe - prog A3-7). T3-K2 (AnimalsUnderValve - zwierzeta rzezne pod regulatorem wsi): T3-K2-0 wieprze, krowy, owce w linii
+                    decyzji (klucz tak), T3-K2-1 skory surowe >= 530 szt./d, T3-K2-2 skora zrobiona >= 200 szt./d, T3-K2-3 straz: stos zwierzat <= 30 dni
+                    zuzycia (mieso INFO), T3-K2-4 garbarze "brak surowca" <= 25 miast. Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
+                    T3-N (bez klucza - mierza swiat; zamiast mylacych T2-K2-5 / PL-4, T2-K3-4 i polowy T2-K1-6): T3-N-1 len >= x1.00 po kazdej decyzji regulatora,
+                    T3-N-2 skory surowe zuzycie / produkcja >= 0.90, T3-N-3 narzedzia budowy / produkcja <= 25%.
 --grupa drobne2   : (14.10, galaz drobne2-gracz: A13 reszta, A14, B5) python -I tools/sprawdz_logi.py --grupa drobne2 [--do-doby N] [--crashscribe <session-*.log>]
                     [--baza-doby <log biegu bez paczki>] <Armoury-*.log>. D2-1 komunikat 'is yours' (gracz 6, INFO), D2-2 podpowiedz L5 z towarem L7 (gracz 9, INFO),
                     D2-4 wyjasnienie W7 gracza najwyzej raz na 30 dob (gracz 10), D2-5 doba po wczytaniu (G20): bledne wpisy 0 (D2-5b: zwrot doby po wczytaniu zdejmuje gotowke W5), D2-6 ustawienia kalibracji ludnosci
@@ -20787,6 +20798,294 @@ def towary2_main(logp, start_arg, until=120):
     return 0
 
 
+T3_PREF = ("Pomiary 169c: okna", "Odziez wojska (150): dzien", "Towary: dzien", "Warsztaty: dzien", "Rzemioslo miasta (148): dzien",
+           "Regulator wsi (221): dzien", "Ceny surowcow: dzien", "Markietani (E5/A3): dzien")
+
+
+def towary3_main(logp, start_arg, until=120):
+    """Towary 3 (docs/towary-2/ROZPOZNANIE-TOWARY-3.md rozdz. 3): T3-K1 markietani przywoza odziez (SutlerClothing; ArmyClothing.FromSutlers, dopisek linii
+    "Odziez wojska (150)"), T3-K2 zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve; HarvestValve.Eligible, dopisek linii decyzji "Regulator wsi (221)"),
+    T3-N trzy miary narzedzia zamiast mylacych (bez klucza). Okno: srednie z ostatnich 30 dob kampanii do until (--do-doby, domyslnie d91-120; "fin29" w progach = bieg
+    Armoury-2026-10-14_05-22-14.log z towary-2 K1-K4, ta sama doba). Wiersz pozycji wiaze tylko przy kluczu "tak" w jej dopisku; log bez dopisku albo z kluczem
+    wylaczonym - INFO z liczbami, nigdy wyjatek. Log czytany strumieniowo - w pamieci tylko linie z prefiksami T3_PREF."""
+    lines = []
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            ln = ln.rstrip("\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if s.startswith(T3_PREF):
+                lines.append(s)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for x in lines:
+            if x.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", x)
+                if start is not None:
+                    break
+    od = by_day(lines, "Odziez wojska (150): dzien")
+    ws = by_day(lines, "Warsztaty: dzien")
+    cr = by_day(lines, "Rzemioslo miasta (148): dzien")
+    rg = by_day(lines, "Regulator wsi (221): dzien")
+    ce = by_day(lines, "Ceny surowcow: dzien")
+    tw = {}
+    for x in lines:
+        if x.startswith("Towary: dzien"):
+            m = re.match(r"Towary: dzien (\d+) - (\w+) \(", x)
+            if m:
+                tw.setdefault(m.group(2), {})[int(m.group(1))] = x
+    if start is None:
+        alld = sorted(set(od) | set(ws) | set(cr))
+        start = alld[0] if alld else 0
+    lo = max(2, until - 29)
+
+    def inwin(d):
+        return lo <= run_day(d, start) <= until
+
+    def avg(d, pat, cast=float):
+        v = [num(pat, d[k], cast) for k in sorted(d) if inwin(k)]
+        v = [a for a in v if a is not None]
+        return (sum(v) / len(v), len(v)) if v else (None, 0)
+
+    def fx_(x, k=1):
+        return "-" if x is None else f"{x:.{k}f}"
+
+    def three(pat, s):
+        m = re.search(pat, s)
+        return tuple(float(m.group(i)) for i in (1, 2, 3)) if m else None
+
+    print(f"plik: {logp} | start kampanii {start} | okno srednich: doby kampanii {lo}-{until} | linii w pamieci {len(lines)}")
+    lin, lea = tw.get("linen", {}), tw.get("leather", {})
+
+    # ---- T3-K1: markietani przywoza odziez (SutlerClothing) - dopisek linii "Odziez wojska (150)"
+    k1n = [k for k in od if inwin(k) and "| markietani (SutlerClothing) " in od[k]]
+    k1on = [k for k in k1n if "| markietani (SutlerClothing) tak:" in od[k]]
+    on1 = bool(k1on)
+    tail1 = "" if on1 else " - klucz wylaczony albo log bez dopisku: INFO"
+
+    def g1(ok):
+        return ok if on1 else None
+    rep.add("T3-K1-0: dopisek markietanow (Odziez wojska 150)", f"dob z dopiskiem {len(k1n)}, klucz tak {len(k1on)}", "codziennie, klucz tak" + tail1,
+            (len(k1on) > 0) if k1n else None)
+    v, n = avg(lin, r"odziez wojska \(150\) (\d+)")
+    rep.add("T3-K1-1: plotno do wojska (Towary linen, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 85 szt./d (fin29 69.0, potrzeba ok. 95)" + tail1,
+            g1(v >= 85) if v is not None else None)
+    v, n = avg(lea, r"odziez wojska \(150\) (\d+)")
+    rep.add("T3-K1-2: skora do wojska (Towary leather, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 75 szt./d (fin29 61.9, potrzeba ok. 85)" + tail1,
+            g1(v >= 75) if v is not None else None)
+    # druzyny: kupione (wyjazd z miasta + markietani) wobec narosnietego w partiach - sumy okna (zakupy markietanow wchodza do linii nastepnej doby)
+    acc, buy, sut = [0.0] * 3, [0.0] * 3, [0.0] * 3
+    nacc = 0
+    for k in sorted(od):
+        if not inwin(k):
+            continue
+        s = od[k]
+        a = three(r"potrzeba narosla wedlug odbiorcy: partie skora ([\d.]+), sukno ([\d.]+), plotno ([\d.]+)", s)
+        b = three(r"\| partie kupily: skora (\d+), sukno (\d+), plotno (\d+) za", s)
+        c = three(r"\(SutlerClothing\) tak: [^|]*?kupily skora (\d+), sukno (\d+), plotno (\d+) za", s)
+        if a is None:
+            continue
+        nacc += 1
+        for i in range(3):
+            acc[i] += a[i]
+            buy[i] += b[i] if b else 0.0
+            sut[i] += c[i] if c else 0.0
+    if nacc:
+        r = [((buy[i] + sut[i]) / acc[i]) if acc[i] > 0 else None for i in range(3)]
+        rep.add("T3-K1-3: druzyny - kupione / narosle (Odziez wojska 150, sumy okna)",
+                f"plotno {fx_(None if r[2] is None else 100 * r[2])}% (wyjazd {buy[2] / nacc:.1f} + markietani {sut[2] / nacc:.1f} z {acc[2] / nacc:.1f} szt./d); "
+                f"skora {fx_(None if r[0] is None else 100 * r[0])}% (wyjazd {buy[0] / nacc:.1f} + markietani {sut[0] / nacc:.1f} z {acc[0] / nacc:.1f}); "
+                f"sukno {fx_(None if r[1] is None else 100 * r[1])}% ({nacc} dob)",
+                "plotno >= 85% (fin29 63%, skora 58%, sukno 23%)" + tail1, g1(r[2] >= 0.85) if r[2] is not None else None)
+    else:
+        rep.add("T3-K1-3: druzyny - kupione / narosle (Odziez wojska 150)", "brak rozbicia 'potrzeba narosla wedlug odbiorcy' (log sprzed T3-K1)",
+                "plotno >= 85% (fin29 63%)" + tail1, None)
+    qd = {}
+    for d, x in od.items():
+        i = x.find("| czeka: ")
+        w = x[i + 9:x.find(" (", i)] if i >= 0 else ""
+        q = three(r"skora (\d+(?:\.\d+)?), sukno (\d+(?:\.\d+)?), plotno (\d+(?:\.\d+)?)", w)
+        if q is not None:
+            qd[run_day(d, start)] = q
+    wd = sorted(k for k in qd if lo - 1 <= k <= until)
+    for rid, gi, cap, base in (("T3-K1-4: kolejka plotna wojska (Odziez wojska 150, czeka)", 2, 1200, "fin29 d90 2103 -> d120 2417, +15%"),
+                               ("T3-K1-5: kolejka skory wojska (Odziez wojska 150, czeka)", 0, 1000, "fin29 d90 1695 -> d120 1965, +16%")):
+        if len(wd) >= 2 and wd[-1] >= lo + 1:
+            a, b2 = qd[wd[0]][gi], qd[wd[-1]][gi]
+            rep.add(rid, f"d{wd[0]} {a:.0f} -> d{wd[-1]} {b2:.0f} ({100.0 * (b2 - a) / a if a > 0 else 0.0:+.0f}%)",
+                    f"d-until <= {cap} i bez wzrostu (<= +2%; {base})" + tail1, g1(b2 <= cap and b2 <= a * 1.02 + 0.5))
+        else:
+            rep.add(rid, "za krotkie okno albo brak linii", f"<= {cap} i bez wzrostu d{lo - 1} -> until (gdy okno siega d{lo + 1})", None)
+    # recenzja T3: straz zalog wzgledem ICH potrzeby z dopisku (rozbicie "potrzeba narosla wedlug odbiorcy ... zalogi") - prog w sztukach (22 / 26) zalezal od
+    # liczby ludzi w zalogach (inna kampania, wojna) i dawalby NIE bez winy markietanow; ta sama granica co dawniej wzgledem potrzeby fin29 (22/23.4, 26/28.05 ~ 93%)
+    gl, gs, zl, zs, nz = [], [], 0.0, 0.0, 0
+    for k in sorted(od):
+        if not inwin(k):
+            continue
+        t = three(r"garnizony miast wziely z polki bez zlota: skora (\d+), sukno (\d+), plotno (\d+)", od[k])
+        c = three(r"garnizony zamkow kupily: skora (\d+), sukno (\d+), plotno (\d+)", od[k])
+        if t is None and c is None:
+            continue
+        gs.append((t[0] if t else 0) + (c[0] if c else 0))
+        gl.append((t[2] if t else 0) + (c[2] if c else 0))
+        z = three(r"; zalogi skora ([\d.]+), sukno ([\d.]+), plotno ([\d.]+)", od[k])
+        if z is not None:
+            nz += 1
+            zs += z[0]
+            zl += z[2]
+    vl = sum(gl) / len(gl) if gl else None
+    vs = sum(gs) / len(gs) if gs else None
+    if gl and nz == len(gl) and zl > 0 and zs > 0:
+        rl, rs = sum(gl) / zl, sum(gs) / zs
+        rep.add("T3-K1-6: straz zalog - wziete / narosle w zalogach (miasta bez zlota + zamki, sumy okna)",
+                f"plotno {100 * rl:.0f}% ({vl:.1f} z {zl / nz:.1f} szt./d), skora {100 * rs:.0f}% ({vs:.1f} z {zs / nz:.1f}) ({nz} dob)",
+                ">= 93% potrzeby zalog - plotno i skora (fin29 23.5 z 23.4, 28.4 z 28.05 = 100%; dawny prog 22 / 26 szt./d ta sama granica)" + tail1,
+                g1(rl >= 0.93 and rs >= 0.93))
+    else:
+        rep.add("T3-K1-6: straz zalog - plotno / skora (miasta bez zlota + zamki, srednia)", f"plotno {fx_(vl)}, skora {fx_(vs)} szt./d ({len(gl)} dob)"
+                + ("" if nz else "; brak rozbicia potrzeby na zalogi (log sprzed T3-K1)"),
+                ">= 93% potrzeby zalog z dopisku (bez dopisku: fin29 23.5 / 28.4 szt./d = 100% potrzeby zalog)" + tail1,
+                g1(vl >= 22 and vs >= 26) if (vl is not None and vs is not None) else None)
+    v, n = avg(ws, r"brak surowca \d+ \[ruda \d+, drewno \d+, skora (\d+)")
+    rep.add("T3-K1-7: straz warsztatow - cykle bez skory (Warsztaty, srednia)", f"{fx_(v)}/d ({n} dob)", "<= 65/d (fin29 52.6, N 108.1)" + tail1,
+            g1(v <= 65) if v is not None else None)
+    zk = [k for k in sorted(lin) if lo - 1 <= run_day(k, start) <= until]
+    z0 = num(r"zapas (\d+)", lin[zk[0]]) if zk else None
+    z9 = num(r"zapas (\d+)", lin[zk[-1]]) if zk else None
+    wv, _ = avg(cr, r"len -> plotno (\d+)/\d+/\d+")
+    rk = [k for k in sorted(rg) if run_day(k, start) <= until and " - CZYNNY, decyzja " in rg[k]]
+    fm = re.search(r"flax: (?:x[\d.]+ -> )?x([\d.]+), zuzycie/produkcja ([\d.]+)", rg[rk[-1]]) if rk else None
+    sg, _ = avg(od, r"\(SutlerClothing\) tak: [^|]*? za (\d+) zl w \d+ miastach")
+    rep.add("T3-K1-8: plotno swiata, tkacze, len, zloto markietanow na odziez",
+            f"zapas plotna d{run_day(zk[0], start) if zk else '-'} {z0} -> d{run_day(zk[-1], start) if zk else '-'} {z9}; tkacze 'bez zysku' {fx_(wv)} miast; "
+            f"len w ostatniej decyzji " + (f"x{fm.group(1)}, zuzycie/produkcja {fm.group(2)}" if fm else "brak decyzji") + f"; markietani na odziez {fx_(sg, 0)} zl/d",
+            "INFO (fin29: plotno 3491 -> 3791, tkacze 30.3, len x1.00 przy 0.84; po T3-K1 zuzycie lnu ma rosnac - regulator podniesie len sam)", None)
+    # warunek T3-K4 (po biegu z T3-K1): miast bez plotna > 20 albo bez skory > 25, albo markietani bez towaru w > 30% prob
+    tries, lack = 0, [0, 0, 0]
+    for k in sorted(od):
+        if not inwin(k):
+            continue
+        s = od[k]
+        t = num(r"\(SutlerClothing\) tak: [^|]*?prob w miescie markietanow (\d+)", s)
+        l3 = three(r"\(SutlerClothing\) tak: [^|]*?bez towaru na polce: skora (\d+), sukno (\d+), plotno (\d+)", s)
+        if t is None or l3 is None:
+            continue
+        tries += t
+        for i in range(3):
+            lack[i] += l3[i]
+    mp_, _ = avg(ce, r"plotno \(wartosc \d+ d\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast")
+    ms_, _ = avg(ce, r"\bskora \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast")
+    pct = [100.0 * x / tries if tries else None for x in lack]
+    k4 = (mp_ is not None and mp_ > 20) or (ms_ is not None and ms_ > 25) or any(p is not None and p > 30 for p in (pct[0], pct[2]))
+    rep.add("T3-K1-9: markietani bez towaru i miasta bez plotna / skory (warunek T3-K4)",
+            f"prob {tries}: bez towaru skora {fx_(pct[0])}%, sukno {fx_(pct[1])}%, plotno {fx_(pct[2])}%; miast bez plotna {fx_(mp_)}, bez skory {fx_(ms_)} -> "
+            f"warunek T3-K4 {'SPELNIONY' if k4 else 'nie'}" + ("" if on1 else " (klucz wylaczony)"),
+            "INFO (T3-K4 - CaravanBulk.Use liczy odziez wojska - tylko gdy miast bez plotna > 20, bez skory > 25 albo bez towaru w > 30% prob; fin29: 12.6 / 18.3)",
+            None)
+    # recenzja T3: koszt czasu doby - zakup odziezy biegnie w petli markietanow (Sutlers.One, przeglad polki miasta na sztuke), wiec jej koszt ("| koszt X ms"
+    # linii "Markietani (E5/A3)") obejmuje tez T3-K1; prog jak A3-7 grupy etap5 (wzorzec W33 + ok. 30%)
+    smk = by_day(lines, "Markietani (E5/A3): dzien")
+    mss = [num(r"\| koszt ([\d.]+) ms", smk[k], float) for k in sorted(smk) if inwin(k)]
+    mss = [x for x in mss if x is not None]
+    if mss:
+        mm_, mx_ = sum(mss) / len(mss), max(mss)
+        rep.add("T3-K1-10: koszt petli markietanow z zakupem odziezy (Markietani E5/A3, srednia / najwiecej)", f"{mm_:.1f} / {mx_:.1f} ms ({len(mss)} dob)",
+                "srednia <= 50 i najwiecej <= 90 ms/dobe (prog A3-7 etapu 5; fin29 bez zakupu 21.9 / 42.3)" + tail1, g1(mm_ <= 50.0 and mx_ <= 90.0))
+    else:
+        rep.add("T3-K1-10: koszt petli markietanow z zakupem odziezy", "brak linii Markietani (E5/A3) w oknie", "srednia <= 50 i najwiecej <= 90 ms/dobe" + tail1, None)
+
+    # ---- T3-K2 = K5: zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve) - dopisek linii decyzji "Regulator wsi (221)"
+    dk = [k for k in sorted(rg) if run_day(k, start) <= until and " - CZYNNY, decyzja " in rg[k]]
+    k2n = [k for k in dk if "; zwierzeta rzezne (AnimalsUnderValve) " in rg[k]]
+    k2on = [k for k in k2n if "; zwierzeta rzezne (AnimalsUnderValve) tak:" in rg[k]]
+    on2 = bool(k2on) and k2on[-1] == (k2n[-1] if k2n else None)
+    tail2 = "" if on2 else " - klucz wylaczony albo log bez dopisku: INFO"
+
+    def g2(ok):
+        return ok if on2 else None
+    if k2on:
+        s = rg[k2on[-1]]
+        m1 = re.search(r"\(AnimalsUnderValve\) tak: w decyzji \d+ \[([^\]]*)\], pomiar w toku [^\[]*\[([^\]]*)\]", s)
+        seen = set((m1.group(1) + ", " + m1.group(2)).replace("-", "").replace(" ", "").split(",")) if m1 else set()
+        mul = []
+        for a in ("hog", "cow", "sheep"):
+            mm = re.search(r"\b%s: x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja ([\d.]+) \(\d+/\d+\), stos -?\d+ = (-?\d+|bez odbiorcy)" % a, s)
+            mul.append(f"{a} " + (f"x{mm.group(2) or mm.group(1)} ({mm.group(3)}, {mm.group(4)} dni)" if mm else ("pomiar w toku" if a in seen else "brak")))
+        ok0 = all(a in seen for a in ("hog", "cow", "sheep"))
+        rep.add("T3-K2-0: zwierzeta w linii decyzji regulatora (ostatnia decyzja do until)", f"decyzji z dopiskiem {len(k2n)}, klucz tak {len(k2on)}; d{run_day(k2on[-1], start)}: " + "; ".join(mul),
+                "wieprze, krowy, owce w decyzji albo w pomiarze, klucz tak" + tail2, g2(ok0))
+    else:
+        rep.add("T3-K2-0: zwierzeta w linii decyzji regulatora", f"decyzji do until {len(dk)}, z dopiskiem {len(k2n)}, klucz tak 0",
+                "wieprze, krowy, owce w decyzji (klucz tak)" + tail2, None)
+    hid = tw.get("hides", {})
+    v, n = avg(hid, r"\| produkcja (\d+)")
+    rep.add("T3-K2-1: skory surowe - produkcja (Towary hides, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 530 szt./d (fin29 493)" + tail2, g2(v >= 530) if v is not None else None)
+    v, n = avg(lea, r"\| produkcja (\d+)")
+    rep.add("T3-K2-2: skora zrobiona (Towary leather, produkcja, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 200 szt./d (fin29 187)" + tail2, g2(v >= 200) if v is not None else None)
+    days, txt = [], []
+    for a in ("hog", "cow", "sheep"):
+        d = tw.get(a, {})
+        ks = [k for k in sorted(d) if inwin(k)]
+        u, _ = avg(d, r"\| zuzycie (\d+)")
+        p_, _ = avg(d, r"\| produkcja (\d+)")
+        z = num(r"zapas (\d+)", d[ks[-1]]) if ks else None
+        dd = (z / u) if (z is not None and u) else None
+        if dd is not None:
+            days.append(dd)
+        txt.append(f"{a} {fx_(dd)} dni (zapas {z}, produkcja {fx_(p_, 0)}, zuzycie {fx_(u, 0)}/d)")
+    mt = tw.get("meat", {})
+    mks = [k for k in sorted(mt) if inwin(k)]
+    mp1, _ = avg(mt, r"\| produkcja (\d+)")
+    mu1, _ = avg(mt, r"\| zuzycie (\d+)")
+    mz = num(r"zapas (\d+)", mt[mks[-1]]) if mks else None
+    txt.append(f"mieso INFO: zapas {mz}, produkcja {fx_(mp1, 0)}, zuzycie {fx_(mu1, 0)}/d")
+    rep.add("T3-K2-3: straz - stos zwierzat w dniach zuzycia (Towary, zapas d-until / srednie zuzycie okna)", "; ".join(txt),
+            "kazde <= 30 dni (fin29 wieprze 7, krowy 19, owce 7; mieso INFO: fin29 zapas 4171, 1.06 x produkcji)" + tail2,
+            g2(len(days) == 3 and max(days) <= 30) if days else None)
+    v, n = avg(cr, r"skory -> skora \d+/(\d+)/\d+")
+    rep.add("T3-K2-4: garbarze - koniec przerobu 'brak surowca' (Rzemioslo miasta 148, srednia)", f"{fx_(v)} miast ({n} dob)", "<= 25 miast (fin29 34.5)" + tail2,
+            g2(v <= 25) if v is not None else None)
+
+    # ---- T3-N: trzy miary zamiast mylacych (rozpoznanie rozdz. 3; bez klucza - mierza swiat): len >= x1.00 zamiast T2-K2-5 / PL-4 (>= 1.20),
+    # skory surowe zuzyte zamiast T2-K3-4 (garbarze "bez zysku" - to podzial za malej ilosci skor surowych), budowy / produkcja narzedzi zamiast polowy
+    # "wsie >= 66.7" w T2-K1-6 (wsie kupuja tyle, ile kuznie zrobia)
+    fl = []
+    for k in dk:
+        mm = re.search(r"\bflax: x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja ([\d.]+)", rg[k])
+        if mm:
+            fl.append((run_day(k, start), float(mm.group(2) or mm.group(1)), mm.group(3)))
+    rep.add("T3-N-1: regulator lnu - mnoznik po kazdej decyzji do until (Regulator wsi 221)",
+            "; ".join(f"d{a} x{b:.2f} ({c})" for a, b, c in fl) if fl else "brak decyzji",
+            ">= x1.00 w kazdej decyzji (len nie ciety ponizej bazy; zamiast T2-K2-5 / PL-4 >= 1.20 - krok w gore wymaga zuzycia >= 98% produkcji; fin29 x1.00 przy 0.90/0.87/0.84)",
+            all(b >= 1.0 - 1e-6 for _, b, _ in fl) if fl else None)
+    hp, hu = [], []
+    for k in sorted(hid):
+        if not inwin(k):
+            continue
+        a = num(r"\| produkcja (\d+)", hid[k])
+        b = num(r"\| zuzycie (\d+)", hid[k])
+        if a is not None and b is not None:
+            hp.append(a)
+            hu.append(b)
+    r2 = (sum(hu) / float(sum(hp))) if hp and sum(hp) > 0 else None
+    rep.add("T3-N-2: skory surowe - zuzycie / produkcja (Towary hides, sumy okna)",
+            f"{fx_(r2, 2)} ({sum(hu) / len(hu):.0f} z {sum(hp) / len(hp):.0f} szt./d, {len(hp)} dob)" if r2 is not None else "brak linii",
+            ">= 0.90 (skory surowe przerabiane - zamiast T2-K3-4 garbarze 'bez zysku' <= 50: to podzial za malej ilosci skor surowych; fin29 0.94)",
+            (r2 >= 0.90) if r2 is not None else None)
+    tl = tw.get("tools", {})
+    tb, n = avg(tl, r"\| zuzycie \d+ \[[^\]]*?\bbudowy (\d+)")
+    tp, _ = avg(tl, r"\| produkcja (\d+)")
+    tv, _ = avg(tl, r"wsie \(zakupy w miescie, E5/B1\) (\d+)")
+    r3 = (tb / tp) if (tb is not None and tp) else None
+    rep.add("T3-N-3: narzedzia - budowy / produkcja (Towary tools, srednie)",
+            f"{fx_(None if r3 is None else 100 * r3)}% (budowy {fx_(tb)} z {fx_(tp)} szt./d; wsie {fx_(tv)}/d INFO; {n} dob)" if r3 is not None else "brak linii",
+            "<= 25% (budowy nie zjadaja narzedzi wsi - zamiast polowy 'wsie >= 66.7' w T2-K1-6, ktora mierzy prace kuzni; fin29 19%, N 14%)",
+            (r3 <= 0.25) if r3 is not None else None)
+    rep.show()
+    return 0
+
+
 def lup_main(logp, start_arg, until=364, bdp=None):
     """Lup miast (L0-L5). Wiersze LUP-1..LUP-19 wedlug tabeli progow rozdz. 6 projektu (numer progu projektu w nazwie). Okno: doby kampanii 1-until.
     Log bez paczki (brak linii "Lup miast") - wiersze INFO z liczbami tego, co juz jest (okno O10, lup gry, garnizony), nigdy wyjatek."""
@@ -21960,6 +22259,8 @@ def main(argv):
         return plotno_main(logp, start_arg, until_arg)   # plotno 14.10: zbytki ludu ponad zapas polki (FolkClothAboveReserve), tkacz na wywoz (WeaverExportPrice)
     if group == "towary2" and logp:
         return towary2_main(logp, start_arg, until_arg)   # Towary 2 (K1-K4): drewno dla rzemiosla, plotno wsi ponad zapas, garbarz na wywoz, narzedzie
+    if group == "towary3" and logp:
+        return towary3_main(logp, start_arg, until_arg)   # Towary 3: T3-K1 markietani przywoza odziez (SutlerClothing), T3-K2 zwierzeta pod regulatorem (AnimalsUnderValve), T3-N miary
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:

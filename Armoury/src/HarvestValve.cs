@@ -69,6 +69,18 @@ namespace Armoury
     ///    nowym mnozniku): stos < dolny prog i zuzycie < 90% produkcji -> 1.05 x zuzycie / produkcja bazowa okna; stos >= dolny prog i zuzycie < 98% -> zuzycie /
     ///    produkcja bazowa; nie ponizej 1, tylko gdy zmiana >= 2%. Krok w gore od bazy wzwyz: x (1 + brak stosu do dolnego progu), w granicach 1.05-1.3, i nie
     ///    w decyzji zaraz po przycieciu. Cel przyciecia zalezy tylko od zuzycia i produkcji bazowej (powtorzony daje ten sam mnoznik), wiec bez kolysania.
+    ///
+    /// T3-K2 = K5 (klucz AnimalsUnderValve, docs/towary-2/ROZPOZNANIE-TOWARY-3.md T3-5) - ZWIERZETA RZEZNE POD REGULATOREM. Bieg fin29 (d91-120): skory surowe
+    /// zuzyte w 94-100% (produkcja 493/d, zapas 6-7 dni, indeks 1.41-1.53), skora powstaje tyle, ile jest skor surowych; wieprze (zuzycie 1.02 produkcji, stos
+    /// 7 dni), owce (1.00, 7 dni) i krowy (0.98, 19 dni) spelniaja wlasna regule kroku regulatora, ale Eligible je pomijal (!IsAnimal), a garbarze koncza
+    /// "brak surowca" w 34.5 miastach. Teraz przy kluczu Eligible dopuszcza tez zwierze rzezne (Beast: IsAnimal i IsLiveStock - nie wierzchowiec, nie juczne;
+    /// ta sama definicja co ksiega towarow 146) - ten sam pomiar (produkcja wsi z ticku, stos swiata ze spisu, zuzycie okna) i ta sama regula decyzji
+    /// co towary. Zwierze nowe w stanie (klucz wlaczony w biegu pomiaru) startuje z SA/SB = -1 (stos nieznany - spis przed wlaczeniem go nie liczyl), nie
+    /// z "stos 0" towaru nowego w swiecie: pierwsza decyzja po pelnym oknie od nastepnej granicy kubelka. Klucz wylaczony - zwierzeta usuniete ze stanu
+    /// (AnimalKeyState, mnozniki 1; Factor dla zwierzat 1 od razu), Eligible jak 6e6313c5.
+    /// Recenzja T3: stan zwierzat w OSOBNYM kluczu zapisu arm_harvestvalve_zw (ExportBeasts / ImportBeasts), nie w arm_harvestvalve - DLL bez T3-K2 (6e6313c5)
+    /// tego klucza nie zna, wiec po cofnieciu DLL zwierzeta wracaja do hodowli jak model (mnozniki 1), zamiast zostac na zawsze z mnoznikiem regulatora
+    /// (stary Factor bez straznika klucza, stary Close pomija towar bez produkcji). Zapis starej DLL tego klucza nie ma - powrot do nowej: pomiar zwierzat od nowa.
     /// </summary>
     internal static class HarvestValve
     {
@@ -172,14 +184,22 @@ namespace Armoury
             if (_errSites.Add(where)) Log.Error("HarvestValve." + where, e);
         }
 
-        private static bool Eligible(ItemObject it) { return it != null && it.IsTradeGood && !it.IsFood && !it.IsAnimal; }
+        private static bool Eligible(ItemObject it) { return it != null && ((it.IsTradeGood && !it.IsFood && !it.IsAnimal) || (AnimalsKey && Beast(it))); }
 
-        /// <summary>Mnoznik produkcji wsi dla towaru (1 = bez zmian). Model wsi i las wsi; czytane z kazdego watku.</summary>
+        /// <summary>T3-K2: zwierzeta rzezne pod regulatorem (klucz AnimalsUnderValve).</summary>
+        private static bool AnimalsKey { get { var s = Settings.Current; return s != null && s.AnimalsUnderValve; } }
+
+        /// <summary>T3-K2: zwierze rzezne - zywy inwentarz (IsAnimal i IsLiveStock: nie wierzchowiec, nie juczne), ta sama definicja co ksiega towarow 146
+        /// i LordDiscard. W grze wieprze, krowy, owce (wsie je hoduja) oraz kot, pies, ges, kura z SandBoxCore (zadna wies ich nie robi - bez decyzji).</summary>
+        internal static bool Beast(ItemObject it) { return it != null && it.IsAnimal && it.HorseComponent != null && it.HorseComponent.IsLiveStock; }
+
+        /// <summary>Mnoznik produkcji wsi dla towaru (1 = bez zmian). Model wsi i las wsi; czytane z kazdego watku.
+        /// T3-K2: zwierze z mnoznikiem w stanie, a klucz wylaczony - 1 od razu (stan zwierzat usuwa AnimalKeyState w najblizszej dobie).</summary>
         internal static float Factor(ItemObject item)
         {
             var d = _factors;
             float f;
-            return d != null && item != null && On && d.TryGetValue(item, out f) ? f : 1f;
+            return d != null && item != null && On && d.TryGetValue(item, out f) && (AnimalsKey || !Beast(item)) ? f : 1f;
         }
 
         private static Good Get(ItemObject item)
@@ -190,8 +210,11 @@ namespace Armoury
             if (string.IsNullOrEmpty(id)) return null;
             if (!_goods.TryGetValue(id, out g))
             {
-                // spis stosu obejmuje kazdy towar z zakresu obecny w swiecie - towar bez stanu nie byl w zadnym spisie, wiec jego stos tam byl 0
-                g = new Good { Id = id, SB = _bucketStart >= 0 ? 0 : -1, SA = _buckets >= 1 ? 0 : -1 };
+                // spis stosu obejmuje kazdy towar z zakresu obecny w swiecie - towar bez stanu nie byl w zadnym spisie, wiec jego stos tam byl 0.
+                // T3-K2: zwierze rzezne nie - przed wlaczeniem klucza spis go nie liczyl (stos nieznany, -1): pierwsza decyzja po pelnym oknie (jak konie
+                // wlaczone w biegu); przy starcie pomiaru (Begin) SB nadpisuje spis
+                bool beast = Beast(item);
+                g = new Good { Id = id, SB = !beast && _bucketStart >= 0 ? 0 : -1, SA = !beast && _buckets >= 1 ? 0 : -1 };
                 _goods[id] = g;
             }
             g.Item = item;
@@ -395,6 +418,7 @@ namespace Armoury
                     return;
                 }
                 if (_dirty) Rebuild();
+                AnimalKeyState(day);                        // T3-K2: klucz zwierzat wylaczony - zwierzeta ze stanu usuniete (po Rebuild: przedmioty znane)
                 if (_start < 0)
                 {
                     Begin(today);
@@ -428,12 +452,35 @@ namespace Armoury
             catch (Exception e) { Stumble("RestartMeasurement", e); return false; }
         }
 
+        /// <summary>T3-K2: doba z wylaczonym kluczem zwierzat - zwierzeta rzezne ze stanu (mnozniki, kubelki, stosy) usuniete, slownik mnoznikow od nowa;
+        /// wlaczenie zacznie ich pomiar od nowa (Get: stos nieznany, pierwsza decyzja po pelnym oknie). Klucz wlaczony albo zwierzat w stanie brak - nic.</summary>
+        private static void AnimalKeyState(int day)
+        {
+            if (AnimalsKey || _goods.Count == 0) return;
+            List<string> gone = null;
+            foreach (var kv in _goods)
+            {
+                var g = kv.Value;
+                if (IsH(kv.Key) || g == null || g.Item == null || !Beast(g.Item)) continue;
+                if (gone == null) gone = new List<string>();
+                gone.Add(kv.Key);
+            }
+            if (gone == null) return;
+            var inv = CultureInfo.InvariantCulture;
+            var parts = new List<string>();
+            foreach (var id in gone) { parts.Add(id + " x" + _goods[id].M.ToString("0.00", inv)); _goods.Remove(id); }
+            Rebuild();                                      // _byItem i slownik mnoznikow bez zwierzat
+            Log.Info("Regulator wsi (221): dzien " + day + " - zwierzeta rzezne WYLACZONE (Animals Under Valve = off) - usuniete ze stanu regulatora: " + string.Join(", ", parts.ToArray())
+                     + "; mnozniki 1 (hodowla jak model); wlaczenie zacznie ich pomiar od nowa (pierwsza decyzja po pelnym oknie " + (2 * Bucket) + " dob).");
+        }
+
         private static void Begin(int today)
         {
             _start = today; _bucketStart = today; _buckets = 0; _decisions = 0; _firstDecisionDay = -1;
             var c = Census();
             foreach (var kv in c) { var g = Get(kv.Key); if (g != null) g.SB = kv.Value; }
-            Log.Info("Regulator wsi (221): dzien " + (today - 1) + " - CZYNNY, start pomiaru: spis stosu swiata " + c.Count + " towarow (bez zywnosci i zwierzat); okno "
+            Log.Info("Regulator wsi (221): dzien " + (today - 1) + " - CZYNNY, start pomiaru: spis stosu swiata " + c.Count + " towarow ("
+                     + (AnimalsKey ? "bez zywnosci; zwierzeta rzezne w pomiarze - AnimalsUnderValve tak" : "bez zywnosci i zwierzat") + "); okno "
                      + (2 * Bucket) + " dob, decyzja co " + Bucket + " dob, pierwsza za " + (2 * Bucket) + " dob; do niej mnozniki 1 i gnicie BK jak 174.3; potkniecia " + _stumbles + ".");
             if (HorseKey)
             {
@@ -457,6 +504,7 @@ namespace Armoury
             var ids = new List<string>(_goods.Keys); ids.Sort(StringComparer.Ordinal);
             foreach (var id in ids) { var g = _goods[id]; if (g.M != 1f && !IsH(id)) { sb.Append(' ').Append(id).Append(" x").Append(g.M.ToString("0.00", inv)).Append(';'); n++; } }
             if (n == 0) sb.Append(" brak;");
+            if (AnimalsKey) sb.Append(" zwierzeta rzezne w regulatorze (AnimalsUnderValve tak);");   // T3-K2
             sb.Append(" potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
         }
@@ -506,6 +554,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("Close.bezpiecznik", e); holdReady = false; }
             }
             var parts = new List<string>();
+            var beastDecided = new List<string>(); var beastWait = new List<string>();   // T3-K2: zwierzeta w decyzji / czekajace na pelne okno
             var ids = new List<string>(_goods.Keys); ids.Sort(StringComparer.Ordinal);
             var f = new Dictionary<ItemObject, float>(new RefEq());
             foreach (var id in ids)
@@ -599,10 +648,12 @@ namespace Armoury
                                       + (D > 0.0 ? ", skasowane " + D.ToString("0", inv) : "") + "), stos " + now + " = "
                                       + (cDay > 0.0 ? (now / cDay).ToString("0", inv) + " dni zuzycia" : "bez odbiorcy") + ", "
                                       + (dir < 0 ? "w dol" : dir > 0 ? "w gore" : "bez zmian") + (holdNote ?? ""));
+                            if (Beast(g.Item)) beastDecided.Add(id);   // T3-K2: zwierze w tej decyzji (tylko licznik dopisku)
                         }
                     }
                     catch (Exception e) { Stumble("Decide", e); }
                 }
+                else if (decide && g.Item != null && Beast(g.Item)) beastWait.Add(id);   // T3-K2: zwierze bez pelnego okna (wlaczone w biegu pomiaru)
                 g.P0 = g.P1; g.P1 = 0.0; g.D0 = g.D1; g.D1 = 0.0; g.SA = g.SB; g.SB = now; g.MA = mBucket;
                 if (g.Item != null && g.M != 1f) f[g.Item] = g.M;
                 if (g.M > ceil + 1e-4f) n5Above.Add(id + " x" + g.M.ToString("0.00", inv));   // N5-A: towary ponad zwyklym sufitem (do linii decyzji)
@@ -652,6 +703,11 @@ namespace Armoury
             sb.Append("; N5-D krok wedlug zuzycia: ");
             if (!followKey) sb.Append("WYLACZONY (Valve Step Follows Use)");
             else sb.Append("CZYNNY, przyciecia ").Append(n5Trim).Append(", przyciecia czekajace na pelne okno ").Append(n5TrimWait).Append(", kroki w gore czekajace po przycieciu ").Append(n5UpWait);
+            // T3-K2: stan klucza zwierzat i ktore zwierzeta weszly do decyzji (wpisy w nawiasie kwadratowym wyzej)
+            sb.Append("; zwierzeta rzezne (AnimalsUnderValve) ");
+            if (!AnimalsKey) sb.Append("nie - poza regulatorem");
+            else sb.Append("tak: w decyzji ").Append(beastDecided.Count).Append(" [").Append(beastDecided.Count > 0 ? string.Join(", ", beastDecided.ToArray()) : "-")
+                   .Append("], pomiar w toku (pelne okno po dwoch granicach kubelka od wlaczenia) ").Append(beastWait.Count).Append(" [").Append(beastWait.Count > 0 ? string.Join(", ", beastWait.ToArray()) : "-").Append(']');
             sb.Append("; potkniecia ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
             if (hl != null) Log.Info(hl);
@@ -1058,11 +1114,80 @@ namespace Armoury
               .Append(';').Append(_shift.ToString("R", inv));   // E6/K4 (220): 7. pole naglowka - udzial przesuniecia zwykle -> bojowe (brak - 0)
             foreach (var g in _goods.Values)
             {
-                sb.Append('|').Append(g.Id).Append(',').Append(g.M.ToString("R", inv)).Append(',').Append(g.P0.ToString("R", inv)).Append(',').Append(g.P1.ToString("R", inv))
-                  .Append(',').Append(g.D0.ToString("R", inv)).Append(',').Append(g.D1.ToString("R", inv)).Append(',').Append(g.SA).Append(',').Append(g.SB)
-                  .Append(',').Append(g.Dir).Append(',').Append(g.Flips).Append(',').Append(g.MA.ToString("R", inv));
+                if (BeastGood(g)) continue;                 // recenzja T3: zwierzeta rzezne w osobnym kluczu (ExportBeasts) - DLL 6e6313c5 ich nie zobaczy
+                AppendGood(sb, g, inv);
             }
             return sb.ToString();
+        }
+
+        /// <summary>Recenzja T3 (T3-K2): stan zwierzat rzeznych do osobnego klucza zapisu arm_harvestvalve_zw (naglowek: start pomiaru i granica kubelka -
+        /// ImportBeasts przyjmuje je tylko do tego samego pomiaru). Brak zwierzat w stanie - pusty napis.</summary>
+        internal static string ExportBeasts()
+        {
+            if (_start < 0) return "";
+            var inv = CultureInfo.InvariantCulture;
+            var sb = new StringBuilder();
+            sb.Append("z1;").Append(_start).Append(';').Append(_bucketStart);
+            int n = 0;
+            foreach (var g in _goods.Values) { if (!BeastGood(g)) continue; AppendGood(sb, g, inv); n++; }
+            return n > 0 ? sb.ToString() : "";
+        }
+
+        /// <summary>Recenzja T3 (T3-K2): po Import - zwierzeta z klucza arm_harvestvalve_zw do stanu, gdy naglowek (start pomiaru, granica kubelka) zgadza sie
+        /// ze stanem wczytanym z arm_harvestvalve; inaczej (inny pomiar, napis nieczytelny) nic - pomiar zwierzat od nowa (Get: stos nieznany). Wpis o tym samym
+        /// id juz w stanie (zapis sprzed recenzji: zwierzeta w kluczu glownym) zostaje. Wszystko albo nic: wyjatek nie zostawia polowy zwierzat.</summary>
+        internal static void ImportBeasts(string s)
+        {
+            if (string.IsNullOrEmpty(s) || _start < 0) return;
+            try
+            {
+                var inv = CultureInfo.InvariantCulture;
+                var parts = s.Split('|');
+                var h = parts[0].Split(';');
+                if (h.Length < 3 || h[0] != "z1" || int.Parse(h[1], inv) != _start || int.Parse(h[2], inv) != _bucketStart)
+                {
+                    Log.Info("Regulator wsi (221): stan zwierzat rzeznych z zapisu z innego pomiaru albo nieczytelny - pomiar zwierzat od nowa (pierwsza decyzja po pelnym oknie).");
+                    return;
+                }
+                var add = new List<Good>();
+                for (int i = 1; i < parts.Length; i++) { var g = ParseGood(parts[i], inv); if (g != null && !_goods.ContainsKey(g.Id)) add.Add(g); }
+                foreach (var g in add) _goods[g.Id] = g;
+                if (add.Count > 0) Rebuild();
+            }
+            catch (Exception e) { Log.Error("HarvestValve.ImportBeasts", e); }
+        }
+
+        /// <summary>Recenzja T3: wpis stanu to zwierze rzezne (przedmiot ze stanu albo z menedzera obiektow, gdy jeszcze nie przypisany); konie "#kon:N" - nie.</summary>
+        private static bool BeastGood(Good g)
+        {
+            if (g == null || IsH(g.Id)) return false;
+            var it = g.Item;
+            if (it == null) { try { var mgr = MBObjectManager.Instance; it = mgr != null ? mgr.GetObject<ItemObject>(g.Id) : null; } catch { it = null; } }
+            return Beast(it);
+        }
+
+        private static void AppendGood(StringBuilder sb, Good g, IFormatProvider inv)
+        {
+            sb.Append('|').Append(g.Id).Append(',').Append(g.M.ToString("R", inv)).Append(',').Append(g.P0.ToString("R", inv)).Append(',').Append(g.P1.ToString("R", inv))
+              .Append(',').Append(g.D0.ToString("R", inv)).Append(',').Append(g.D1.ToString("R", inv)).Append(',').Append(g.SA).Append(',').Append(g.SB)
+              .Append(',').Append(g.Dir).Append(',').Append(g.Flips).Append(',').Append(g.MA.ToString("R", inv));
+        }
+
+        /// <summary>Jeden wpis stanu z zapisu (pola jak AppendGood); za malo pol - null. Wyjatek parsowania idzie do wolajacego (jak dotad w Import).</summary>
+        private static Good ParseGood(string entry, IFormatProvider inv)
+        {
+            var p = entry.Split(',');
+            if (p.Length < 10 || p[0].Length == 0) return null;
+            var g = new Good
+            {
+                Id = p[0], M = float.Parse(p[1], inv), P0 = double.Parse(p[2], inv), P1 = double.Parse(p[3], inv),
+                D0 = double.Parse(p[4], inv), D1 = double.Parse(p[5], inv), SA = long.Parse(p[6], inv), SB = long.Parse(p[7], inv),
+                Dir = int.Parse(p[8], inv), Flips = int.Parse(p[9], inv)
+            };
+            if (!(g.M > 0f) || g.M > MaxM) g.M = 1f;   // N5-A: sufit braku do MaxM (dotad 2 - zwykly sufit); wylaczony klucz cofa nadwyzke przy najblizszej decyzji
+            g.MA = p.Length >= 11 ? float.Parse(p[10], inv) : g.M;   // recenzja 221: pole 11 (mnoznik kubelka starszego); brak - jak M
+            if (!(g.MA > 0f) || g.MA > MaxM) g.MA = g.M;
+            return g;
         }
 
         internal static void Import(string s)
@@ -1081,17 +1206,8 @@ namespace Armoury
                 if (h.Length >= 7 && float.TryParse(h[6], NumberStyles.Float, inv, out sh) && sh > 0f && sh <= ShiftMax) _shift = sh;   // E6/K4 (220)
                 for (int i = 1; i < parts.Length; i++)
                 {
-                    var p = parts[i].Split(',');
-                    if (p.Length < 10 || p[0].Length == 0) continue;
-                    var g = new Good
-                    {
-                        Id = p[0], M = float.Parse(p[1], inv), P0 = double.Parse(p[2], inv), P1 = double.Parse(p[3], inv),
-                        D0 = double.Parse(p[4], inv), D1 = double.Parse(p[5], inv), SA = long.Parse(p[6], inv), SB = long.Parse(p[7], inv),
-                        Dir = int.Parse(p[8], inv), Flips = int.Parse(p[9], inv)
-                    };
-                    if (!(g.M > 0f) || g.M > MaxM) g.M = 1f;   // N5-A: sufit braku do MaxM (dotad 2 - zwykly sufit); wylaczony klucz cofa nadwyzke przy najblizszej decyzji
-                    g.MA = p.Length >= 11 ? float.Parse(p[10], inv) : g.M;   // recenzja 221: pole 11 (mnoznik kubelka starszego); brak - jak M
-                    if (!(g.MA > 0f) || g.MA > MaxM) g.MA = g.M;
+                    var g = ParseGood(parts[i], inv);
+                    if (g == null) continue;
                     _goods[g.Id] = g;
                 }
                 Rebuild();
