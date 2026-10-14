@@ -7,6 +7,10 @@ defs=collections.Counter(re.match(r'def (\w+)\(',l).group(1) for l in t if re.ma
 dup=[k for k,v in defs.items() if v>1]
 grp=collections.Counter(m.group(1) for l in t for m in [re.match(r'\s+if group == "(\w+)" and logp:',l)] if m)
 dg=[k for k,v in grp.items() if v>1]
+ms=[k for k,l in enumerate(t) if l.startswith('def main(')]
+ms=ms[0] if ms else -1
+me=next((k for k in range(ms+1,len(t)) if t[k].startswith('def ')),len(t))
+poza=[(k+1,l.strip()[:60]) for k,l in enumerate(t) if re.match(r'\s+if group (==|in) ',l) and not (ms<k<me)]
 d=tempfile.mkdtemp(); q=os.path.join(d,'x.py'); shutil.copy(p,q); py_compile.compile(q,doraise=True)
-print('zle wstawki',bad,'| zdublowane def',dup,'| zdublowane grupy',dg,'| kompilacja ok')
-sys.exit(1 if bad or dup or dg else 0)
+print('dispatch poza main',poza,'| zle wstawki',bad,'| zdublowane def',dup,'| zdublowane grupy',dg,'| kompilacja ok')
+sys.exit(1 if bad or dup or dg or poza else 0)
