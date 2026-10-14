@@ -4276,9 +4276,9 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiSkipTownsfolkDress { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Ai Gear Max Price Factor", 0.00f, 5.00f, "0.0", HintText = "TEST (0 = off): the most the lords' men and the garrisons pay for a piece of kit they lack, as a multiple of what that very piece is worth in its condition (2 = at most twice its worth; a value below 1 counts as 1); a dearer piece stays on the shelf and the want goes to the town's workshops as an order. While off, the daily log line counts what a ceiling of 2 would have stopped")]
+        [SettingPropertyFloatingInteger("Ai Gear Max Price Factor", 0.00f, 5.00f, "0.0", HintText = "the most the lords' men and the garrisons pay for a piece of kit they lack, as a multiple of what that very piece is worth in its condition (3 = at most three times its worth; a value below 1 counts as 1); a dearer piece stays on the shelf and the want goes to the town's workshops as an order. Saddles for riders follow the same ceiling (0 = off, as before: they pay whatever the shelf asks; the daily log line counts what a ceiling of 2 would have stopped)")]
         [SettingPropertyGroup("Time at the forge")]
-        public float AiGearMaxPriceFactor { get; set; } = 0f;
+        public float AiGearMaxPriceFactor { get; set; } = 3f;
 
         [SettingPropertyBool("Ai Harness Surplus Sell", HintText = "horse harness lying in a lord's or a garrison's armoury beyond what its riders need - the riders, the men ready to be raised to horse and a tenth to spare, then half as much again - is sold to the merchants of the town or castle like other spare kit: the merchants pay from their coffer, the lord takes his third and the rest goes to the men's purse; the cheapest pieces go first (off = as before: the harness of fallen riders lies in the armoury for ever)")]
         [SettingPropertyGroup("Time at the forge")]
