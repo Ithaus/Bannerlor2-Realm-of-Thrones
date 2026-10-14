@@ -1,5 +1,13 @@
 # DZIENNIK ZMIAN
 
+## GL-2 poprawka: zloto startowe kies wsi bez ubytku (14.10, po tescie 120 dob paczki A)
+
+**Problem:** test 120 dob paczki A (Armoury-2026-10-13_17-32-32.log): linia "Zloto startowe wedlug ludzi (GL2)" - kiesy wsi przed 1 082 432 = po 1 079 524, suma swiata ROZJAZD (-2 908 zl), potkniecie "StartGold(wies niepelna)"; prog GL2-S1 NIE.
+**Przyczyna:** PeopleMarket.StartGold - przelew kies wsi w dwoch przejsciach (zdjecia, potem dopisania) liczyl dopisania z celu, nie z tego, co faktycznie zdjeto; gdy wies nie przyjela calej kwoty (ChangeGold przyciete), reszta znikala.
+**Zmiana:** pula przelewu = faktycznie zdjete; dopisania najwyzej do puli; co nie weszlo, wraca do wsi, z ktorych zdjeto; potkniecie "StartGold(wies pula N)", gdy cos zostanie.
+**Ryzyko / co sprawdzic:** w nastepnym tescie GL2-S1 TAK (kiesy wsi przed = po). Kasy miast maja ten sam uklad, ale w tescie zgadzaly sie co do zlotowki (kasa miasta nie ma przyciecia) - bez zmian.
+**Status:** DO SPRAWDZENIA.
+
 ## 2026-10-13 (W7 - recenzja z poprawka) - STAWKA WOJENNA PANA sprawdzona niezaleznie: obieg co do zlotowki, P1 i W7 bez podwojnego poboru, D i podstawa zwrotu 70% bez W7, droga zlota do ludzi (pulap 166 przejsciem po trzech rodach), koszt lojalnosci / dobrobytu, gracz, klucz off = 79664cf i progi na obu logach - bez zarzutu w regule i zlocie; poprawione: (1) rod z luzem w pulapie dostawal od W7 samo miejsce w pulapie (regula "rod z luzem - NIE" nie byla w kodzie, kontrola "gotowka rodom z luzem" byla pusta z definicji), (2) przydzial W7 przy przelewie ponizej planu podnosil pulap o niezaplacona gotowke, (3) linia "Gotowka wsi (E5/0)" liczyla pobor W7 ze wsi jako "wies (zostalo w kiesie)"
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/w7-stawka-wojenna-pana` (autor 1f757a8) | **Tor:** M (recenzja) | **Pliki:** `Armoury/src/KingdomTreasury.LordLevy.cs` (LvKingdom: rod z luzem, przelew ponizej planu, linia), `Armoury/src/MoneyLedger.Obieg.cs` (VillageCashLine), `tools/sprawdz_logi.py` (W7_NEED / W7_CTL, W7-4, W7-6), `CHANGELOG.md`.
 

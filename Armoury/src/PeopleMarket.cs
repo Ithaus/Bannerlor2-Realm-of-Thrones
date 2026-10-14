@@ -658,21 +658,40 @@ namespace Armoury
                 }
                 var tg = Spread(cur.ToArray(), w.ToArray());
                 long b0 = 0, b1 = 0, moved = 0;
+                // pula przelewu: najpierw zdjete z wsi ponad udzial (faktycznie zdjete), potem dane wsiom ponizej udzialu - najwyzej tyle, ile jest
+                // w puli; co nie weszlo (wies nie przyjela calosci albo zabraklo puli), wraca do wsi, z ktorych zdjeto - suma kies wsi przed = po
+                long pool = 0;
+                var taken = new long[vs.Count];
                 for (int pass = 0; pass < 2; pass++)
                     for (int i = 0; i < vs.Count; i++)
                     {
                         long d = tg[i] - cur[i];
                         if ((pass == 0) != (d < 0) || d == 0) continue;
+                        if (pass == 1) d = Math.Min(d, pool);
+                        if (d == 0) continue;
                         try
                         {
                             int had = vs[i].Gold;
                             vs[i].ChangeGold((int)d);
                             long real = (long)vs[i].Gold - had;
                             if (real != d) Stumble("StartGold(wies niepelna)", null);
-                            if (d > 0) moved += real;
+                            if (pass == 0) { taken[i] = -real; pool += -real; }
+                            else { moved += real; pool -= real; }
                         }
                         catch (Exception e) { Stumble("StartGold(wies przelew)", e); }
                     }
+                for (int i = 0; i < vs.Count && pool > 0; i++)
+                {
+                    if (taken[i] <= 0) continue;
+                    try
+                    {
+                        int had = vs[i].Gold;
+                        vs[i].ChangeGold((int)Math.Min(pool, taken[i]));
+                        pool -= (long)vs[i].Gold - had;
+                    }
+                    catch (Exception e) { Stumble("StartGold(wies zwrot)", e); }
+                }
+                if (pool != 0) Stumble("StartGold(wies pula " + pool + ")", null);
                 for (int i = 0; i < vs.Count; i++)
                 {
                     long g = Math.Max(0, vs[i].Gold);
