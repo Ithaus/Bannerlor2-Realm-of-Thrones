@@ -683,6 +683,8 @@ Uzycie (Python 3, tylko odczyt):
                     (test: nowa kampania -> zapis -> NOWY proces -> wczytanie), linia pierwszej godziny sesji: AUD-P1-3 twierdz bez tytulu 0, AUD-P1-4
                     krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0, AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
                     i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
+                    P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, tylko kaplani:
+                    linia doby z ogonem TAK, 0 prostowanych Artisan / Merchant, 0 petli >= 3 razy, zostawieni BK INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -24989,7 +24991,7 @@ def audyta_bkfc(rep, logp):
         rep.add("AUD-P1-8 (AM-04): bk-firstchance.log", f"brak pliku ({fc})", "INFO", None)
 
 
-def audyta_main(logp):
+def audyta_main(logp, csp=None):
     """audyta (audyt modow 14.10, docs/audyt-modow-2026-10-14/RAPORT-AUDYT-MODOW.md rozdz. 5, pakiet P1; CrashScribe/src/BkTitles.cs). Log sesji
     CrashScribe (session-*.log), czytany strumieniowo. AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany); AUD-P1-1 (AM-26)
     kazde ustawienie sciezki przed odczytem BK (InitializeTitles / RetrofitOrphanedTitles) = plik ROT 8.1.8; AUD-P1-2 (AM-26, wczytanie) retrofit BK
@@ -24998,8 +25000,17 @@ def audyta_main(logp):
     z tytulem 0, AUD-P1-6 (AM-26 w grze, zamiast savescan3) ksiestw spoza pliku 0, AUD-P1-7 potkniecia i bledy BkTitles 0; AUD-P1-8 (AM-04, INFO)
     wpisy 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log obok katalogu logu (plik BK bez dat - porownac z biegiem sprzed P1).
     Test AM-26: nowa kampania -> zapis -> wyjscie -> NOWY proces gry -> wczytanie -> log tej drugiej sesji (AUD-P1-2 i AUD-P1-6).
-    Log bez paczki: INFO, bez wyjatku."""
+    Log bez paczki: INFO, bez wyjatku.
+    P3 (audyta_p3): log Armoury (Armoury-*.log) jako log + --crashscribe <session-*.log>, albo sam log sesji (wtedy wiersze Armoury INFO)."""
+    armp = None
+    if logp and os.path.basename(logp).lower().startswith("armoury"):
+        armp, logp = logp, csp   # P3: Armoury-*.log jako log, log sesji CrashScribe z --crashscribe
     rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("AUD-P1: log sesji CrashScribe", f"brak ({logp})", "INFO (--crashscribe <session-*.log>)", None)
+        audyta_p3(rep, None, armp)
+        rep.show()
+        return 0
     start, off, warn, apply, retro, sess, errs = [], 0, [], [], [], [], 0
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
@@ -25037,6 +25048,7 @@ def audyta_main(logp):
     if not (start or apply or retro or sess or off or warn):
         rep.add("AUD-P1: linie tytulow BK (CrashScribe BkTitles)", "brak linii (log bez paczki P1)", "INFO", None)
         audyta_bkfc(rep, logp)
+        audyta_p3(rep, logp, armp)
         rep.show()
         return 0
     if off and not start:
@@ -25091,8 +25103,65 @@ def audyta_main(logp):
         rep.add("AUD-P1-3..7: linia pierwszej godziny sesji", "brak (czas gry nie ruszyl albo latka nie wpieta)" + (f"; bledy BkTitles {errs}" if errs else ""),
                 "INFO", None if errs == 0 else False)
     audyta_bkfc(rep, logp)
+    audyta_p3(rep, logp, armp)
     rep.show()
     return 0
+
+
+# ------------------------------------------------------------ audyta, pakiet P3 (audyt modow 14.10, RAPORT-AUDYT-MODOW.md rozdz. 3 i 5: AM-20, AM-29, AM-01, AM-30, AM-28)
+AU3_LEVY = re.compile(r"Mends: werbunek miejscowy - poprawionych notabli (\d+), wyrzuconych obcych ochotnikow (\d+) u (\d+) ludzi\.(.*)$")
+AU3_LEVY20 = re.compile(r"\| AM-20 tylko kaplani (TAK|NIE[^:]*): prostowani wedlug zawodu \[(.*?)\], kaplani pominieci \(kultura pana\) (\d+),"
+                        r" inni notable z kultura inna niz osady \(nawroceni przez BK, zostawieni\) (\d+) \[(.*?)\]\.")
+AU3_FIX = re.compile(r"Mends: (.*) w (.*) byl (\S+), jest (\S+) \(([^)]*)\)\.$")
+
+
+def audyta_p3(rep, csp, armp):
+    """Pakiet P3 audytu modow 14.10 (wiersze AUD-P3-*). csp = log sesji CrashScribe (session-*.log), armp = log Armoury (Armoury-*.log) albo None.
+    AM-20 (LocalLeviesPreachersOnly): AUD-P3-20a linia doby 'werbunek miejscowy' z ogonem 'AM-20 tylko kaplani TAK'; AUD-P3-20b 0 linii 'Mends: X w Y
+    byl A, jest B (zawod)' dla notabli innych niz kaplani (Artisan, Merchant, ...); AUD-P3-20c 0 notabli prostowanych 3 i wiecej razy (petla);
+    AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba). Brak linii = INFO."""
+    from collections import Counter
+    if not csp or not os.path.isfile(csp):
+        rep.add("AUD-P3 (CrashScribe): log sesji", f"brak ({csp})", "INFO (podaj session-*.log jako log albo --crashscribe)", None)
+    else:
+        levy, levy20, fixes = [], [], []
+        with open(csp, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                if "Mends: " not in ln:
+                    continue
+                s = ln.rstrip("\r\n")
+                m = TS.match(s)
+                if m:
+                    s = m.group(2)
+                m = AU3_LEVY.search(s)
+                if m:
+                    levy.append(m.groups())
+                    m2 = AU3_LEVY20.search(m.group(4))
+                    if m2:
+                        levy20.append(m2.groups())
+                    continue
+                m = AU3_FIX.search(s)
+                if m and " w " in s and ", jest " in s:
+                    fixes.append(m.groups())
+        on = [x for x in levy20 if x[0] == "TAK"]
+        if not levy20:
+            rep.add("AUD-P3-20a (AM-20): linia doby 'werbunek miejscowy' z ogonem AM-20", f"linii doby {len(levy)}, z ogonem AM-20 0",
+                    "INFO (log bez paczki P3 albo LocalRecruits wylaczone)", None)
+        else:
+            rep.add("AUD-P3-20a (AM-20): tylko kaplani (LocalLeviesPreachersOnly)", f"linii z ogonem {len(levy20)}, TAK {len(on)}",
+                    "wszystkie TAK (NIE = klucz wylaczony, b47fecc3)", len(on) == len(levy20))
+        if on:
+            other = [x for x in fixes if x[4] != "Preacher"]
+            occ = Counter(x[4] for x in other)
+            rep.add("AUD-P3-20b (AM-20): prostowani notable inni niz kaplani", f"{len(other)} {dict(occ)}" + (f"; np. {other[0][0]} w {other[0][1]}" if other else ""),
+                    "0 (Artisan / Merchant zostaja przy kulturze nadanej przez BK)", len(other) == 0)
+            per = Counter((x[0], x[1]) for x in fixes)
+            loop = [(k, v) for k, v in per.items() if v >= 3]
+            rep.add("AUD-P3-20c (AM-20): ten sam notabl prostowany >= 3 razy (petla z BK)", f"{len(loop)}" + (f"; np. {loop[0][0][0]} w {loop[0][0][1]} x{loop[0][1]}" if loop else ""),
+                    "0", len(loop) == 0)
+            last = on[-1]
+            rep.add("AUD-P3-20d (AM-20): ostatnia doba - prostowani / pominieci kaplani / zostawieni BK",
+                    f"prostowani [{last[1]}], kaplani pominieci {last[2]}, zostawieni {last[3]} [{last[4]}]", "INFO", None)
 
 
 def main(argv):
@@ -25136,7 +25205,7 @@ def main(argv):
     if group == "lenna" and logp:
         return lenna_main(logp, tabp)   # PROJEKT-LENNA (14.10): regula N - komu krol daje zdobyty zamek / miasto (FiefGrants), progi LN-0..LN-13
     if group == "audyta" and logp:
-        return audyta_main(logp)   # audyt modow 14.10, pakiet P1 (AM-26 / AM-27 / AM-04): log sesji CrashScribe, tytuly BK
+        return audyta_main(logp, csp)   # audyt modow 14.10, pakiet P1 (AM-26 / AM-27 / AM-04): log sesji CrashScribe, tytuly BK; P3 (AM-20/29/01/30/28): + log Armoury
     if group == "sludan" and logp:
         return sludan_main(logp, csp)   # 14.10 sluby-danina: (A) sluby AI na rok (hamulec 0.17) i oferty dla rodu gracza (84 / rok), (B) danina pokoju M4
     if group == "a17" and logp:
