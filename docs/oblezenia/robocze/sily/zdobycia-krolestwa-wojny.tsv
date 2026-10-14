@@ -1,0 +1,58 @@
+d	osada	obronca	obr_partie	obr_zalogi	obr_twierdze	wrogowie_obroncy	zdobywca	zdob_partie	wrogowie_zdobywcy	sila_partii_zdob/obr
+23	Cape Wrath	Dragonstone	3751	2730	9	1	Stormlands	5516	1	1.5	Stormlands
+40	Fellwood	Dragonstone	4063	3099	8	1	Stormlands	5988	1	1.5	Stormlands
+48	Starfall	Dorne	6626	4071	15	1	The Reach	7999	1	1.2	The Reach
+88	Gargos	Qohor	2819	1649	5	2	Volantis	3322	2	1.2	Norvos; Volantis
+91	Sweetport	Dragonstone	4402	3430	8	1	Stormlands	6473	1	1.5	Stormlands
+98	Sandstone	Dorne	6836	5307	14	1	The Reach	8558	1	1.3	The Reach
+106	Ar Noy	Qohor	2641	1525	3	2	Volantis	3014	2	1.1	Norvos; Volantis
+116	Bloody Gate	The Vale	5495	3859	13	2	Riverlands	7681	2	1.4	Iron Islands; Riverlands
+128	Harrenhal	House Baratheon of King's Landing	8536	8327	21	1	The North	9200	1	1.1	The North
+128	Stonedance	Dragonstone	4604	3250	7	1	Stormlands	6658	1	1.4	Stormlands
+132	Demongate	House Targaryen, Aegon	2036	1723	5	2	Volantis	3555	2	1.7	Norvos; Volantis
+145	Lorath	Lorath	2306	1568	5	1	Braavos	3109	1	1.3	Braavos
+149	Blackmont	Dorne	6490	5049	14	1	The Reach	7958	1	1.2	The Reach
+175	Willow Wood	Riverlands	6985	5370	15	1	House Baratheon of King's Landing	8163	3	1.2	House Baratheon of King's Landing
+193	Qamayl	Ibben	1517	1370	3	1	Sarnor	2644	1	1.7	Sarnor
+218	Deep Den	House Baratheon of King's Landing	6810	6672	21	3	Riverlands	7902	1	1.2	Iron Islands; Riverlands; The North
+219	Willow Wood	House Baratheon of King's Landing	7078	6581	20	3	Riverlands	7694	1	1.1	Iron Islands; Riverlands; The North
+222	Vaes Efe	Dothraki Horde	2157	2007	6	1	House Targaryen	3622	2	1.7	House Targaryen
+233	Sharp Point	Dragonstone	2524	2236	5	1	Stormlands	5556	1	2.2	Stormlands
+244	Kingsgrave	Dorne	6965	5100	12	1	The Reach	10081	1	1.4	The Reach
+247	Totava	Braavos	1028	478	3	2	Antaryon League (Braavos Rebels)	-	1	-	Antaryon League (Braavos Rebels); Lorath
+273	Skyreach	Dorne	4963	4688	12	1	The Reach	8914	1	1.8	The Reach
+283	Iksa Calo	Braavos	660	294	2	2	Lorath	1666	1	2.5	Antaryon League (Braavos Rebels); Lorath
+291	Sunstone	Lys	1214	1622	5	1	Tyrosh	2341	1	1.9	Tyrosh
+299	Willow Wood	Riverlands	8851	4877	15	1	House Baratheon of King's Landing	9849	2	1.1	House Baratheon of King's Landing
+310	Iksa Keria	Braavos	1146	68	1	2	Antaryon League (Braavos Rebels)	-	1	-	Antaryon League (Braavos Rebels); Lorath
+313	Bolozo	Pentos	1218	1918	5	1	Myr	2810	1	2.3	Myr
+315	Pinkmaiden	Riverlands	6017	4839	14	1	House Baratheon of King's Landing	9076	2	1.5	House Baratheon of King's Landing
+324	Yronwood	Dorne	4508	4567	11	1	The Reach	10086	1	2.2	The Reach
+357	City of Bones	Qarth	3310	2056	4	1	House Targaryen	3359	2	1.0	House Targaryen
+357	Nightsong	Stormlands	5263	6574	18	2	The Reach	9561	2	1.8	Dragonstone; The Reach
+368	Wayfarer's Rest	Riverlands	7317	4807	13	1	House Baratheon of King's Landing	9446	2	1.3	House Baratheon of King's Landing
+377	Hellholt	Dorne	4591	4123	10	1	The Reach	10512	2	2.3	The Reach
+403	Omber	Ibben	1737	1210	3	1	Sarnor	2358	1	1.4	Sarnor
+404	Qamayl	Sarnor	2082	2316	6	1	Ibben	1642	1	0.8	Ibben
+410	Acorn Hall	Riverlands	8758	4697	12	3	House Baratheon of King's Landing	8050	3	0.9	Dorne; House Baratheon of King's Landing; Stormlands
+413	Gelona	Pentos	1869	1413	4	1	Myr	3099	1	1.7	Myr
+427	Stone Hedge	Riverlands	9487	4910	11	3	House Baratheon of King's Landing	8125	3	0.9	Dorne; House Baratheon of King's Landing; Stormlands
+428	Vaes Dothrak	Dothraki Horde	3624	1962	5	1	House Targaryen	2963	2	0.8	House Targaryen
+429	Wyl	Dorne	4907	3634	8	2	The Reach	7360	2	1.5	Riverlands; The Reach
+442	Stone Hedge	House Baratheon of King's Landing	8179	8255	25	3	Riverlands	9155	3	1.1	Dragonstone; Riverlands; The North
+468	Wayfarer's Rest	House Baratheon of King's Landing	9252	7963	23	3	Riverlands	8848	3	1.0	Dragonstone; Riverlands; The North
+488	Acorn Hall	House Baratheon of King's Landing	8875	7906	23	3	Riverlands	9011	3	1.0	Dragonstone; Riverlands; The North
+530	King's Landing	House Baratheon of King's Landing	6344	7398	22	3	The North	10624	2	1.7	Dragonstone; Riverlands; The North
+532	Pinkmaiden	House Baratheon of King's Landing	5932	6831	19	3	Riverlands	8111	3	1.4	Dragonstone; Riverlands; The North
+535	Tolos	House Targaryen, Aegon	2212	1333	3	1	House Targaryen	3450	1	1.6	House Targaryen
+541	Rosby	House Baratheon of King's Landing	6937	6933	19	2	The North	9863	2	1.4	Riverlands; The North
+549	Stoney Sept	House Baratheon of King's Landing	6697	6694	19	2	Riverlands	7792	2	1.2	Riverlands; The North
+559	Duskendale	House Baratheon of King's Landing	6456	6348	18	2	The North	9226	2	1.4	Riverlands; The North
+570	Craster's Keep	Free Folk	1039	2147	7	1	Nights Watch	3419	1	3.3	Nights Watch
+578	Deep Den	House Baratheon of King's Landing	5654	5647	16	2	Riverlands	8493	2	1.5	Riverlands; The North
+612	Lonely Light	Iron Islands	4456	4041	9	1	The North	9160	2	2.1	The North
+615	Silverhill	House Baratheon of King's Landing	2943	5193	16	3	Riverlands	8546	2	2.9	Dragonstone; Riverlands; The North
+617	Harvest Hall	Dragonstone	6483	5497	20	2	The Reach	9162	2	1.4	House Baratheon of King's Landing; The Reach
+618	Blackhaven	Dragonstone	6555	5373	19	2	The Reach	8931	2	1.4	House Baratheon of King's Landing; The Reach
+628	Odivo	Myr	511	279	2	2	Drahar Conspiracy (Myr Rebels)	-	1	-	County of Myrth; Drahar Conspiracy (Myr Rebels)
+646	Blackhaven	The Reach	9321	9906	27	2	Dragonstone	7784	2	0.8	Dragonstone; Riverlands

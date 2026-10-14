@@ -1,0 +1,44 @@
+hazard dzienny (doba: h, narazone): 1:0.015/206 2:0.074/203 3:0.048/188 4:0.039/179 5:0.081/172 6:0.083/157 7:0.092/141 8:0.057/123 9:0.028/108 10:0.022/90 11:0.058/69 12:0.113/53 13:0.000/33 14:0.080/25 15:0.154/13 16:0.200/5 17:0.667/3
+hazard pozny (doby 8-17) = 0.064
+decyzji 113 klasy {'zamek': 78, 'miasto': 25, 'stolica': 10}
+fstar >= 2 (szturm od razu): 13 | mury<1 (bez szturmu): 22
+WALLS_X 1.25 REPULSE 0.333
+  zdob                   15.9
+  odparte                3.5
+  okup                   2.6
+  inne_dotrwalo          5.7
+  przerwane              63.4
+  bez_szturmu_mury<1     22.0
+  zdobycie (doba oblezenia) zamek    n=15.1 mediana 15 min 8 max 33
+  zdobycie (doba oblezenia) miasto   n=0.8 mediana 41 min 31 max 54
+  zdobycie (doba oblezenia) stolica  n=0.0 mediana 87 min 87 max 87
+szturmy zdobyte w fin30 z O0: 54 | odparte wg O3+O4 (bez zmian czasu): 19
+   WALLS_X 1.00 REPULSE 0.250 -> odparte 19 z 54
+   WALLS_X 1.00 REPULSE 0.333 -> odparte 11 z 54
+   WALLS_X 1.00 REPULSE 0.400 -> odparte 8 z 54
+   WALLS_X 1.25 REPULSE 0.250 -> odparte 32 z 54
+   WALLS_X 1.25 REPULSE 0.333 -> odparte 19 z 54
+   WALLS_X 1.25 REPULSE 0.400 -> odparte 12 z 54
+   WALLS_X 1.50 REPULSE 0.250 -> odparte 39 z 54
+   WALLS_X 1.50 REPULSE 0.333 -> odparte 29 z 54
+   WALLS_X 1.50 REPULSE 0.400 -> odparte 19 z 54
+   WALLS_X 2.00 REPULSE 0.250 -> odparte 44 z 54
+   WALLS_X 2.00 REPULSE 0.333 -> odparte 39 z 54
+   WALLS_X 2.00 REPULSE 0.400 -> odparte 32 z 54
+wymiana e (A_straty/O_straty) mediana 1.50
+ludzie A/D mediana 6.1
+  Cape Wrath     zamek   start  10 mury 2.35 f* 1.70 O0 10.4 -> 22  A 1237 D 229 e 1.14 odparty 0
+  Starfall       miasto  start  37 mury 2.06 f* 1.50 O0 6.1 -> 42  A 3947 D 465 e 2.19 odparty 0
+  Lorath         stolica start 130 mury 1.93 f* 1.61 O0 10.1 -> 62  A 3229 D 689 e 1.58 odparty 1
+  Willow Wood    zamek   start 167 mury 9.04 f* 2.52 O0 6.4 -> 6  A 4469 D 183 e 1.19 odparty 0
+  Willow Wood    zamek   start 212 mury 2.08 f* 1.39 O0 5.6 -> 31  A 1605 D 164 e 1.84 odparty 0
+  Willow Wood    zamek   start 290 mury 2.81 f* 1.71 O0 7.2 -> 22  A 2249 D 231 e 1.24 odparty 0
+  Yronwood       miasto  start 307 mury 2.23 f* 1.75 O0 7.7 -> 32  A 6547 D 851 e 1.74 odparty 0
+  Vaes Dothrak   stolica start 415 mury 0.99 f* 0.99 O0 9.1 -> nigdy  A 1545 D 1320 e 0.04 odparty 0
+  King's Landing stolica start 516 mury 1.50 f* 1.34 O0 8.0 -> 81  A 2994 D 882 e 0.03 odparty 0
+  Rosby          zamek   start 532 mury 4.84 f* 2.35 O0 5.7 -> 6  A 3532 D 299 e 0.81 odparty 0
+  Duskendale     miasto  start 543 mury 2.35 f* 1.95 O0 8.3 -> 23  A 6272 D 599 e 0.98 odparty 0
+  Lonely Light   miasto  start 598 mury 1.91 f* 1.51 O0 9.0 -> 42  A 3134 D 562 e 1.42 odparty 0
+  rok: [zdobyte w fin30 z decyzja dopuszczona, z tego odparte wg O3+O4] {1: [25, 8.0], 2: [21, 5.0]}
+  doby oblezen fin30: 1768; dodatkowe doby: gorna granica 3385 (mury<1: 22 do konca cierpliwosci), oczekiwane wg hazardu 1202
+  srednio oblezonych naraz: fin30 2.43 -> 7.1 (gorna) / 4.1 (hazard)

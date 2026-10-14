@@ -1,0 +1,58 @@
+d	osada	rodzaj	bylo_krol	byl_rod	zdobywca_krol	zdobywca	oblezenie_od	dni_oblezenia_przy_O0	dni_glodu	zal_d1	mil_d1	zal_start	mil_start	zal_przed	mil_przed	dzien_wiersza_przed	szturm_d	atak_ludzi	atak_partii	obrona_ludzi	obrona_partii	O0_druzyn	O0_ludzi	O0_sila_obl	O0_sila_obr
+23	Cape Wrath	zamek	Dragonstone	Seaworth	Stormlands	Renly Baratheon, King of Stormlands' Party	10	10.4	0	124	216	138	98	102	64	21	23	1242	3	206	3	3	1246	1417	177
+40	Fellwood	zamek	Dragonstone	Fell	Stormlands	Renly Baratheon, King of Stormlands' Party	28	8.5	0	124	151	138	74	0	115	38	40	2092	11	108	2	11	2284	2607	306
+48	Starfall	miasto	Dorne	Dayne	The Reach	Arwyn Oakheart, Lady of Old Oak	36	6.1	0	328	250	281	179	161	109	46	48	3950	13	432	3	13	3950	4543	519
+88	Gargos	zamek	Qohor	Lorosene	Volantis	Alios Qhaedar, Baron of Aleni Naka	75	8.3	0	125	191	215	216	92	144	87	88	2620	14	359	3	14	2620	3338	379
+91	Sweetport	zamek	Dragonstone	Sunglass	Stormlands	Bryce Caron, Lord of Nightsong	75	10.1	0	125	151	300	87	126	48	90	91	4353	22	496	4	22	4353	5774	529
+98	Sandstone	zamek	Dorne	Qorgyle	The Reach	Randyll Tarly, Lord of Hornhill	87	6.7	0	124	185	260	134	140	74	96	98	4456	23	385	3	23	4456	5545	424
+106	Ar Noy	zamek	Qohor	Ostyrion	Volantis	Alios Qhaedar, Baron of Aleni Naka	92	9.1	0	125	193	251	189	140	138	104	106	2129	14	397	3	14	2129	2817	421
+116	Bloody Gate	zamek	The Vale	Arryn	Riverlands	Tristan Ryger, Lord of Willow Wood	106	7.6	0	125	198	274	327	0	162	115	116	4239	28	94	2	28	4607	5809	517
+128	Harrenhal	miasto	House Baratheon of King's Landing	Clegane	The North	Roose Bolton	-	-	0	335	256	-	-	247	330	127	128	9708	52	6545	5	-	-	-	-
+128	Stonedance	zamek	Dragonstone	Massey	Stormlands	Renly Baratheon, King of Stormlands' Party	115	8.2	0	124	168	330	106	196	77	127	128	2065	10	429	3	10	2137	2882	446
+132	Demongate	zamek	House Targaryen, Aegon	Qaggaz	Volantis	Toromo Melane, Baron of Sar Mell	121	8.5	0	125	181	218	416	0	245	131	132	1911	12	92	2	12	2208	2824	482
+145	Lorath	miasto	Lorath	Aloran	Braavos	Tormo Fregar, Baron of Totava	129	10.1	0	423	289	439	244	179	150	144	145	3286	15	639	3	15	3286	4451	789
+149	Blackmont	zamek	Dorne	Blackmont	The Reach	Baelor Hightower, Lord Paramount of Oldtown	137	8.6	0	124	155	292	101	0	67	148	149	1834	10	106	2	10	2141	2950	476
+175	Willow Wood	zamek	Riverlands	Ryger	House Baratheon of King's Landing	Roland Crakehall, Lord of Crakehall	166	6.4	0	87	90	110	66	37	56	174	175	4469	24	169	3	24	4469	4811	125
+193	Qamayl	zamek	Ibben	Thuk	Sarnor	Tomar Sumai, Baron of Rathylar	180	11.8	0	86	74	120	22	120	22	191	-	-	-	-	-	7	1293	1758	511
+218	Deep Den	zamek	House Baratheon of King's Landing	Lydden	Riverlands	Raymun Darry, Lord of Darry	206	7.3	0	125	159	267	278	0	142	217	218	2270	20	102	2	20	3607	4635	500
+219	Willow Wood	zamek	House Baratheon of King's Landing	Lannister	Riverlands	Jason Mallister, Lord of The Crag	211	5.6	0	87	90	101	65	63	47	218	219	1605	8	172	3	8	1605	1761	131
+222	Vaes Efe	zamek	Dothraki Horde	Heggo	House Targaryen	Daenerys Targaryen, Queen of House Targaryen	212	5.9	0	124	240	244	248	143	158	220	222	3221	18	656	5	18	3221	6390	692
+233	Sharp Point	miasto	Dragonstone	bar Emmon	Stormlands	Renly Baratheon, King of Stormlands' Party	223	4.2	0	334	309	533	181	325	113	231	233	3576	15	732	3	14	3448	5444	894
+244	Kingsgrave	zamek	Dorne	Manwoody	The Reach	Lorent Caswell, Lord of Bitterbridge	229	9.5	0	124	197	302	144	156	76	242	244	4263	20	419	3	20	4263	6175	530
+247	Totava	zamek	Braavos	Fregar	Antaryon League (Braavos Rebels)	Ferrego Antaryon, King of Braavos' Party	233	9.8	0	130	186	185	329	49	129	246	247	1400	6	506	3	6	1400	1919	445
+273	Skyreach	zamek	Dorne	Fowler	The Reach	Victaria Bulwer, Lady of Blackcrown	262	7.5	0	130	186	344	143	0	125	272	273	2732	17	110	2	16	3275	4552	574
+283	Iksa Calo	zamek	Braavos	Volentin	Lorath	Belynno Eranos, Baron of Bisa	268	9.1	0	130	186	276	409	121	243	282	283	1680	8	611	3	8	1680	2405	685
+291	Sunstone	zamek	Lys	Orthys	Tyrosh	Racallo Ryndoon, King of Tyrosh	279	9.4	0	130	191	170	171	46	94	290	291	1353	7	264	3	7	1353	2035	288
+299	Willow Wood	zamek	Riverlands	Frey	House Baratheon of King's Landing	Tywin Lannister, Lord Paramount of Casterly Rock	289	7.2	0	87	90	160	64	70	49	298	299	2249	9	239	3	9	2249	2545	212
+310	Iksa Keria	zamek	Braavos	Prestayn	Antaryon League (Braavos Rebels)	Ferrego Antaryon, King of Braavos' Party	296	8.4	0	125	177	207	274	68	130	309	310	1881	7	583	4	7	1881	2797	721
+313	Bolozo	miasto	Pentos	Moharis	Myr	Morosh Saldorys, King of Myr	299	7.4	0	262	344	596	392	280	190	312	313	2995	14	924	3	14	2995	4449	1166
+315	Pinkmaiden	zamek	Riverlands	Piper	House Baratheon of King's Landing	Tywin Lannister, Lord Paramount of Casterly Rock	-	-	0	125	204	-	-	71	316	314	-	-	-	-	-	-	-	-	-
+324	Yronwood	miasto	Dorne	Yronwood	The Reach	Mace Tyrell, King of The Reach	307	7.7	0	323	276	613	234	372	158	323	324	6722	33	1195	4	32	6505	8923	1369
+357	City of Bones	zamek	Qarth	Qaraxos	House Targaryen	Daenerys Targaryen, Queen of House Targaryen	345	7.4	0	125	204	360	644	203	502	356	357	1982	9	832	3	9	1982	3916	921
+357	Nightsong	zamek	Stormlands	Caron	The Reach	Lorent Caswell, Lord of Bitterbridge	345	6.9	0	125	166	320	185	143	86	356	357	4073	17	594	4	16	3957	5381	594
+368	Wayfarer's Rest	zamek	Riverlands	Vance	House Baratheon of King's Landing	Roland Crakehall, Lord of Crakehall	357	6.4	0	86	93	174	75	61	48	367	368	4770	22	423	3	20	4389	6205	263
+377	Hellholt	zamek	Dorne	Uller	The Reach	Mace Tyrell, King of The Reach	367	5.7	0	124	148	315	93	164	63	376	377	4915	23	418	3	23	4915	7104	500
+403	Omber	miasto	Ibben	Gasso	Sarnor	Saskir Tymai, Baron of Mardosh	389	10.0	0	292	150	498	108	190	59	402	403	1806	8	609	4	8	1809	2151	613
+404	Qamayl	zamek	Sarnor	Tymai	Ibben	Gorn Joth	392	9.2	0	86	74	147	14	83	9	402	404	1349	5	195	4	5	1349	1773	210
+410	Acorn Hall	zamek	Riverlands	Smallwood	House Baratheon of King's Landing	Terrence Kenning, Lord Paramount of Castamere	396	7.1	0	145	244	276	417	98	176	409	410	4384	22	588	3	22	4384	6286	625
+413	Gelona	zamek	Pentos	Sontho	Myr	Trego Drahar, King of Myr	399	9.7	0	125	162	336	225	125	90	412	413	2394	11	569	3	11	2394	3476	629
+427	Stone Hedge	zamek	Riverlands	Bracken	House Baratheon of King's Landing	Harys Swyft, Lord Paramount of The Stoney Sept	413	8.0	0	124	186	352	248	91	114	426	427	3857	17	544	3	17	3857	5160	587
+428	Vaes Dothrak	miasto	Dothraki Horde	Pono	House Targaryen	Daenerys Targaryen, Queen of House Targaryen	414	9.1	0	366	489	625	688	482	625	426	428	1545	13	94	2	13	2586	4986	1720
+429	Wyl	zamek	Dorne	Wyl	The Reach	Randyll Tarly, Lord of Hornhill	414	9.2	0	129	181	335	153	203	81	427	429	2343	10	586	4	10	2343	3767	668
+442	Stone Hedge	zamek	House Baratheon of King's Landing	Lannister	Riverlands	Raymun Darry, Lord of Darry	430	7.8	0	124	186	188	148	61	118	441	442	6312	32	288	3	32	6414	8382	327
+468	Wayfarer's Rest	zamek	House Baratheon of King's Landing	Lannister	Riverlands	Tytos Blackwood, Lord of Raventree Hall	456	4.9	0	86	93	220	93	84	52	466	468	5913	31	585	4	29	5574	7575	665
+488	Acorn Hall	zamek	House Baratheon of King's Landing	Lannister	Riverlands	Tytos Blackwood, Lord of Raventree Hall	473	7.5	0	145	244	350	293	116	165	487	488	5142	32	599	3	32	5142	7283	689
+530	King's Landing	miasto	House Baratheon of King's Landing	Baratheon, Joffrey	The North	Robb Stark, King of The North	516	8.0	0	436	766	538	343	271	234	529	530	2994	18	92	2	18	4484	7700	1556
+532	Pinkmaiden	zamek	House Baratheon of King's Landing	Lannister	Riverlands	William Mooton, High Lord of Maidenpool	520	6.8	0	125	204	213	212	92	142	530	532	2949	12	394	3	11	2776	3362	412
+535	Tolos	miasto	House Targaryen, Aegon	Connington, Jon	House Targaryen	Daenerys Targaryen, Queen of House Targaryen	521	9.3	0	319	293	547	224	350	134	533	535	2488	12	873	4	12	2488	5277	1125
+541	Rosby	zamek	House Baratheon of King's Landing	Rosby	The North	Robb Stark, King of The North	532	5.7	0	127	142	258	45	144	34	539	541	3532	18	298	3	18	3532	6222	399
+549	Stoney Sept	miasto	House Baratheon of King's Landing	Swyft	Riverlands	Quincy Cox, High Lord of Saltpans' Party	535	6.9	0	319	297	469	231	170	143	548	549	4894	23	899	5	23	4894	7173	965
+559	Duskendale	miasto	House Baratheon of King's Landing	Rykker	The North	Robb Stark, King of The North	543	8.3	0	334	169	501	100	230	71	558	559	6410	32	1292	6	28	5589	10133	1765
+570	Craster's Keep	zamek	Free Folk	Sixskins	Nights Watch	Jeor Mormont, Lord Commander of Nights Watch	557	9.5	0	125	245	334	281	100	155	569	570	1650	7	585	5	6	1540	2895	499
+578	Deep Den	zamek	House Baratheon of King's Landing	Lannister	Riverlands	Quincy Cox, High Lord of Saltpans' Party	565	8.2	0	125	159	337	311	0	232	576	578	3476	20	96	2	20	3944	6007	552
+612	Lonely Light	miasto	Iron Islands	Farwynd	The North	Medger Cerwyn, Lord of Cerwin	598	9.0	0	181	181	445	114	253	98	610	612	3161	17	500	3	16	3014	4617	683
+615	Silverhill	zamek	House Baratheon of King's Landing	Serrett	Riverlands	Edmure Tully, King of Riverlands' Party	602	7.1	0	124	213	304	474	0	194	614	615	2921	26	102	2	26	5372	6610	845
+617	Harvest Hall	zamek	Dragonstone	Selmy	The Reach	Branston Cuy, Lord of Sunhouse	605	6.6	0	181	236	195	301	97	147	615	617	4542	24	457	3	24	4549	6145	522
+618	Blackhaven	zamek	Dragonstone	Dondarrion	The Reach	Phillip Footly, Lord Paramount of Tumbleton	-	-	0	125	177	-	-	144	270	616	-	-	-	-	-	-	-	-	-
+628	Odivo	zamek	Myr	Albersan	Drahar Conspiracy (Myr Rebels)	Trego Drahar, King of Myr	615	9.7	0	125	165	213	151	91	94	627	628	1192	5	348	3	5	1197	1727	419
+646	Blackhaven	zamek	The Reach	Ashford	Dragonstone	Mary Mertyns, Lady of Mistwood	633	7.7	0	125	177	240	316	112	166	645	646	3836	25	480	3	25	3836	5298	480

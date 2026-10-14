@@ -1,0 +1,58 @@
+osada	start	rodzaj	dob	wynik	stolica	fabula	mury_O0	doba_O0	R1_doba_szturmu	straty_A_szturm	S1_straty_A_szac
+Cape Wrath	10	zamek	12	zdobyte szturmem	0	0	2.352	10.4	10.4	0.189	
+Fellwood	29	zamek	10	zdobyte szturmem	0	0	2.641	8.5	8.5	0.044	
+Starfall	37	miasto	10	zdobyte szturmem	0	0	2.058	6.1	6.1	0.247	
+Gargos	76	zamek	12	zdobyte szturmem	0	0	2.587	8.3	8.3	0.241	
+Sweetport	76	zamek	15	zdobyte szturmem	0	0	3.737	10.1	10.1	0.21	
+Sandstone	87	zamek	10	zdobyte szturmem	0	0	5.345	6.7	6.7	0.137	
+Ar Noy	93	zamek	12	zdobyte szturmem	0	0	1.966	9.1	9.1	0.302	
+Bloody Gate	106	zamek	10	zdobyte szturmem	0	0	3.846	7.6	7.6	0.032	
+Stonedance	116	zamek	12	zdobyte szturmem	0	0	1.899	8.2	8.2	0.235	
+Harrenhal	118	miasto	10	zdobyte szturmem	0	1			0.0	0.252	
+Demongate	122	zamek	10	zdobyte szturmem	0	0	1.72	8.5	8.5	0.059	0.398
+Lorath	130	miasto	15	zdobyte szturmem	1	0	1.93	10.1	10.1	0.32	
+Blackmont	137	zamek	12	zdobyte szturmem	0	0	1.82	8.6	8.6	0.082	
+Willow Wood	167	zamek	8	zdobyte szturmem	0	0	9.044	6.4	6.4	0.046	
+Qamayl	180	zamek	12	zdobyte szturmem	0	0	0.809	11.8	18.4	0.0	
+Deep Den	206	zamek	12	zdobyte szturmem	0	0	2.724	7.3	7.3	0.059	
+Willow Wood	212	zamek	7	zdobyte szturmem	0	0	2.085	5.6	5.6	0.197	
+Vaes Efe	212	zamek	9	zdobyte szturmem	0	0	2.171	5.9	5.9	0.215	
+Sharp Point	223	miasto	9	zdobyte szturmem	0	0	0.943	4.2	17.6	0.297	
+Kingsgrave	229	zamek	14	zdobyte szturmem	0	0	4.767	9.5	9.5	0.172	
+Totava	233	zamek	14	zdobyte szturmem	1	0	1.266	9.8	9.8	0.5	
+Skyreach	262	zamek	11	zdobyte szturmem	0	0	1.864	7.5	7.5	0.054	
+Iksa Calo	268	zamek	15	zdobyte szturmem	1	0	1.031	9.1	9.1	0.649	
+Sunstone	279	zamek	12	zdobyte szturmem	0	0	1.658	9.4	9.4	0.304	
+Willow Wood	290	zamek	9	zdobyte szturmem	0	0	2.815	7.2	7.2	0.134	
+Iksa Keria	297	zamek	13	zdobyte szturmem	1	0	1.14	8.4	8.4	0.542	
+Bolozo	299	miasto	14	zdobyte szturmem	0	0	0.897	7.4	17.9	0.697	
+Yronwood	307	miasto	17	zdobyte szturmem	0	0	2.23	7.7	7.7	0.319	
+Pinkmaiden	310	zamek	5	zdobyte po wypadzie	0	0			0.0	0.0	
+Nightsong	345	zamek	12	zdobyte szturmem	0	0	2.661	6.9	6.9	0.21	
+City of Bones	346	zamek	11	zdobyte szturmem	0	0	0.833	7.4	18.1	0.529	
+Wayfarer's Rest	357	zamek	11	zdobyte szturmem	0	0	5.535	6.4	6.4	0.175	
+Hellholt	367	zamek	10	zdobyte szturmem	0	0	4.172	5.7	5.7	0.141	
+Omber	389	miasto	14	zdobyte szturmem	0	0	0.824	10.0	18.3	0.635	
+Qamayl	392	zamek	11	zdobyte szturmem	0	0	2.476	9.2	9.2	0.267	
+Acorn Hall	397	zamek	13	zdobyte szturmem	0	0	2.954	7.1	7.1	0.202	
+Gelona	399	zamek	14	zdobyte szturmem	0	0	1.89	9.7	9.7	0.473	
+Stone Hedge	413	zamek	14	zdobyte szturmem	0	0	2.58	8.0	8.0	0.199	
+Wyl	415	zamek	13	zdobyte szturmem	0	0	2.306	9.2	9.2	0.248	
+Vaes Dothrak	415	miasto	12	zdobyte szturmem	1	0	0.991	9.1	17.4	0.003	0.883
+Stone Hedge	430	zamek	12	zdobyte szturmem	0	0	10.485	7.8	7.8	0.073	
+Wayfarer's Rest	456	zamek	11	zdobyte szturmem	0	0	2.828	4.9	4.9	0.224	
+Acorn Hall	474	zamek	14	zdobyte szturmem	0	0	3.618	7.5	7.5	0.23	
+King's Landing	516	miasto	14	zdobyte szturmem	1	0	1.497	8.0	8.0	0.001	0.378
+Pinkmaiden	520	zamek	11	zdobyte szturmem	0	0	1.918	6.8	6.8	0.278	
+Tolos	521	miasto	13	zdobyte szturmem	0	0	1.604	9.3	9.3	0.353	
+Rosby	532	zamek	8	zdobyte szturmem	0	0	4.845	5.7	5.7	0.07	
+Stoney Sept	535	miasto	14	zdobyte szturmem	0	0	1.747	6.9	6.9	0.33	
+Duskendale	543	miasto	16	zdobyte szturmem	0	0	2.348	8.3	8.3	0.201	
+Craster's Keep	557	zamek	13	zdobyte szturmem	0	0	1.703	9.5	9.5	0.242	
+Deep Den	566	zamek	11	zdobyte szturmem	0	0	2.556	8.2	8.2	0.038	0.328
+Lonely Light	598	miasto	13	zdobyte szturmem	0	0	1.905	9.0	9.0	0.228	
+Silverhill	603	zamek	12	zdobyte szturmem	1	0	3.201	7.1	7.1	0.052	0.267
+Harvest Hall	605	zamek	11	zdobyte szturmem	0	0	2.769	6.6	6.6	0.224	
+Blackhaven	610	zamek	7	zdobyte po wypadzie	0	0			0.0	0.0	
+Odivo	615	zamek	13	zdobyte szturmem	0	0	0.969	9.7	17.5	0.527	
+Blackhaven	634	zamek	12	zdobyte szturmem	0	0	2.782	7.7	7.7	0.241	

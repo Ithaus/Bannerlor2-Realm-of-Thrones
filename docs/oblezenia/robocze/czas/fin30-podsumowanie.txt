@@ -1,0 +1,25 @@
+== fin30 doby 108836 - 109563 ( 728 )
+epizodow oblezen (migawka doby): 206  zdobyc z L0: 57  zdobycia bez epizodu (oblezenie < 1 doby): 0
+ miasto   odstapione bez bitwy                       n=  8  dob: mediana 5.0 p90 6.6 max 8 suma 43
+ miasto   okup (O1)                                  n=  8  dob: mediana 8.5 p90 10.3 max 11 suma 68
+ miasto   pod murami - pobity oblegajacy             n=  3  dob: mediana 15.0 p90 16.6 max 17 suma 44
+ miasto   szturm bez zdobycia, potem odstapione      n=  7  dob: mediana 11.0 p90 13.8 max 15 suma 78
+ miasto   wypad - pobity oblegajacy                  n=  1  dob: mediana 6.0 p90 6.0 max 6 suma 6
+ miasto   zdobyte szturmem                           n= 13  dob: mediana 14.0 p90 15.8 max 17 suma 171
+ zamek    odstapione bez bitwy                       n= 39  dob: mediana 4.0 p90 8.0 max 17 suma 178
+ zamek    okup (O1)                                  n= 18  dob: mediana 9.0 p90 10.0 max 11 suma 162
+ zamek    pod murami - pobity oblegajacy             n= 11  dob: mediana 12.0 p90 15.0 max 16 suma 139
+ zamek    szturm bez zdobycia, potem odstapione      n= 11  dob: mediana 10.0 p90 15.0 max 15 suma 123
+ zamek    trwa na koncu biegu                        n=  2  dob: mediana 6.0 p90 6.0 max 6 suma 12
+ zamek    wypad - pobity oblegajacy                  n= 41  dob: mediana 6.0 p90 9.0 max 11 suma 244
+ zamek    zdobyte po wypadzie                        n=  2  dob: mediana 6.0 p90 6.8 max 7 suma 12
+ zamek    zdobyte szturmem                           n= 42  dob: mediana 12.0 p90 14.0 max 15 suma 488
+ miasto: n=40 mediana 10.0 p90 15.0 max 17 suma dob 410
+ zamek: n=166 mediana 8.0 p90 13.0 max 17 suma dob 1358
+ wszystkie: n=206 mediana 9.0 p75 12.0 p90 14.0 max 17
+ zdobyte: n=57  dob do konca: mediana 12.0 p90 14.0 max 17
+ pierwszy szturm (doba od startu migawki): n=73 mediana 12.0 p10 9.2 p90 15.0 min 7 max 17
+ szturmy B175 Siege: 73  wygrywa: {'A': 55, 'O': 0, 'brak': 18}
+ wypady: 44 {'A': 42, 'O': 2, 'brak': 0}
+ pod murami: 60 {'A': 17, 'O': 43, 'brak': 0}
+ O0 linii 113  O1 okupow 26  CampFever zaraza wstaje 90

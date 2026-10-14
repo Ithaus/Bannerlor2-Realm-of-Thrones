@@ -1,0 +1,114 @@
+d	osada	rodzaj	stolica	wynik_fin30_10dob	zaloga	milicja*	norma	sila_obr	sila_obr_nowa	sila_obl	stosunek_nowy	mury_nowe	wynik_model_bez_zmian	dni_bez_zmian	wynik_model_nowy	dni_nowe	strata_ataku_nowa
+21	Cape Wrath	zamek	False	zdobyte	136.0	86.0	360	177.0	463	1417.0	3.06	0.9	zdobyte	12.8	zdobyte	16.3	869
+37	Fellwood	zamek	False	zdobyte	172.0	64.0	360	306.0	543	2607.0	4.8	1.49	zdobyte	12.5	okup		0
+43	Starfall	miasto	False	zdobyte	285.0	181.0	720	519.0	1080	4543.0	4.21	0.99	zdobyte	11.3	zdobyte	16.6	2427
+44	Saltpans	miasto	False	inne	372.0	161.0	720	683.0	1138	2326.0	2.04	0.48	inne		nie zaczete		0
+48	Demongate	zamek	False	okup	135.0	353.0	560	358.0	974	2123.0	2.18	0.51	okup		nie zaczete		0
+56	Wickenden	miasto	False	okup	301.0	173.0	720	581.0	1121	3233.0	2.88	0.72	okup		zdobyte	16.4	1891
+59	Blackmont	zamek	False	inne	195.0	102.0	360	698.0	924	4167.0	4.51	1.06	inne		inne		0
+72	Sandstone	zamek	False	inne	230.0	123.0	360	386.0	580	2821.0	4.86	1.43	inne		inne		0
+73	Bloody Gate	zamek	False	inne	195.0	290.0	465	726.0	1142	2949.0	2.58	0.76	inne		nie zaczete		0
+84	Gargos	zamek	False	zdobyte	217.0	218.0	433	379.0	706	3338.0	4.72	1.39	zdobyte	12.8	okup		0
+86	Sweetport	zamek	False	zdobyte	306.0	87.0	360	529.0	623	5774.0	9.26	3.17	zdobyte	15.9	zdobyte	16.8	1068
+94	Sandstone	zamek	False	zdobyte	250.0	118.0	360	424.0	594	5545.0	9.34	3.82	zdobyte	11.8	zdobyte	13.4	907
+96	Saltpans	miasto	False	inne	462.0	163.0	720	623.0	977	2527.0	2.59	0.61	inne		nie zaczete		0
+102	Ar Noy	zamek	False	zdobyte	253.0	189.0	433	421.0	697	2817.0	4.04	1.19	zdobyte	13.9	okup		0
+103	Blackmont	zamek	False	inne	214.0	92.0	360	311.0	511	3319.0	6.49	1.53	inne		inne		0
+114	Bloody Gate	zamek	False	zdobyte	273.0	332.0	465	517.0	861	5809.0	6.74	2.31	zdobyte	11.6	zdobyte	24.8	3779
+115	Sunstone	zamek	False	okup	296.0	185.0	360	500.0	643	2439.0	3.79	1.11	okup		okup		0
+124	Stonedance	zamek	False	zdobyte	328.0	116.0	360	446.0	527	2882.0	5.47	1.61	zdobyte	13.2	zdobyte	13.9	783
+127	Mhysa Faer	miasto	False	okup	500.0	167.0	785	708.0	1094	3466.0	3.17	0.74	okup		zdobyte	17.6	2009
+130	Demongate	zamek	False	zdobyte	220.0	426.0	560	482.0	1030	2824.0	2.74	0.81	zdobyte	12.5	nie zaczete		0
+140	Lorath	miasto	True	zdobyte	441.0	256.0	1440	789.0	2016	4451.0	2.21	0.76	zdobyte	17.1	nie zaczete		0
+143	Bolozo	miasto	False	inne	613.0	412.0	937	1123.0	1648	3578.0	2.17	0.51	inne		nie zaczete		0
+146	Blackmont	zamek	False	zdobyte	227.0	73.0	360	476.0	654	2950.0	4.51	1.32	zdobyte	12.6	okup		0
+160	Sharp Point	miasto	False	okup	606.0	233.0	720	1013.0	1231	4545.0	3.69	0.87	okup		zdobyte	16.6	2154
+162	Bisa	zamek	False	okup	322.0	207.0	360	717.0	839	3091.0	3.68	0.87	okup		zdobyte	16.8	1459
+163	Sandstone	zamek	False	inne	247.0	120.0	360	386.0	560	3650.0	6.52	1.53	inne		inne		0
+173	Willow Wood	zamek	False	zdobyte	114.0	72.0	360	125.0	431	4811.0	11.17	2.63	zdobyte	8.2	zdobyte	12.1	1057
+177	Stoney Sept	miasto	False	okup	418.0	207.0	720	619.0	1040	2825.0	2.72	0.84	okup		nie zaczete		0
+185	City of Bones	zamek	False	inne	239.0	552.0	560	743.0	1318	2328.0	1.77	0.42	inne		nie zaczete		0
+188	Sandstone	zamek	False	inne	215.0	83.0	360	341.0	537	3674.0	6.85	1.61	inne		inne		0
+190	Sunstone	zamek	False	inne	282.0	201.0	360	489.0	654	2047.0	3.13	0.73	inne		inne		0
+192	Qamayl	zamek	False	zdobyte	120.0	22.0	360	511.0	791	1758.0	2.22	0.52	zdobyte	15.8	nie zaczete		0
+201	City of Bones	zamek	False	okup	30.0	187.0	560	190.0	861	2270.0	2.64	0.31	okup		nie zaczete		0
+201	Pinkmaiden	zamek	False	inne	225.0	235.0	459	364.0	718	2794.0	3.89	1.14	inne		inne		0
+203	Sunstone	zamek	False	inne	181.0	179.0	360	481.0	752	2039.0	2.71	0.64	inne		nie zaczete		0
+208	Kingsgrave	zamek	False	inne	326.0	147.0	360	592.0	687	6934.0	10.1	2.37	inne		inne		0
+209	Vaes Efe	zamek	False	inne	295.0	271.0	360	787.0	965	6270.0	6.5	1.53	inne		inne		0
+214	Deep Den	zamek	False	zdobyte	264.0	272.0	410	500.0	769	4635.0	6.02	1.77	zdobyte	11.3	odparty	20.9	3607
+217	Willow Wood	zamek	False	zdobyte	101.0	62.0	360	131.0	447	1761.0	3.94	0.61	zdobyte	7.4	zdobyte	11.5	1121
+218	Vaes Efe	zamek	False	zdobyte	244.0	246.0	360	692.0	918	6390.0	6.96	1.64	zdobyte	11.4	zdobyte	12.8	1017
+218	Mhysa Faer	miasto	False	inne	500.0	208.0	785	825.0	1227	3368.0	2.74	0.54	inne		nie zaczete		0
+227	Iksa Keria	zamek	False	okup	206.0	295.0	529	492.0	970	2115.0	2.18	0.64	okup		nie zaczete		0
+228	Sharp Point	miasto	False	zdobyte	532.0	179.0	720	894.0	1175	5444.0	4.63	0.72	zdobyte	11.2	zdobyte	13.2	1788
+239	Kingsgrave	zamek	False	zdobyte	297.0	134.0	360	530.0	653	6175.0	9.46	3.87	zdobyte	15.0	zdobyte	16.1	818
+243	Totava	zamek	True	zdobyte	186.0	359.0	1070	445.0	1582	1919.0	1.21	0.36	zdobyte	14.8	nie zaczete		0
+244	Draconys	miasto	False	okup	554.0	504.0	909	940.0	1534	2994.0	1.95	0.67	okup		nie zaczete		0
+245	Mhysa Faer	miasto	False	inne	577.0	205.0	785	1049.0	1363	3420.0	2.51	0.49	inne		nie zaczete		0
+245	Omber	miasto	False	inne	297.0	75.0	720	375.0	882	1565.0	1.77	0.42	inne		nie zaczete		0
+246	Hull	miasto	False	okup	628.0	98.0	720	1484.0	1626	4860.0	2.99	1.02	okup		okup		0
+248	Iksa Keria	zamek	False	okup	205.0	273.0	529	519.0	990	2113.0	2.13	0.63	okup		nie zaczete		0
+262	Sunstone	zamek	False	inne	142.0	179.0	360	390.0	705	1459.0	2.07	0.49	inne		nie zaczete		0
+268	Vaes Dothrak	miasto	True	inne	541.0	680.0	1440	1610.0	2887	4536.0	1.57	0.54	inne		nie zaczete		0
+270	Skyreach	zamek	False	zdobyte	337.0	156.0	360	574.0	660	4552.0	6.9	1.62	zdobyte	11.5	zdobyte	20.6	2772
+273	Stoney Sept	miasto	False	inne	541.0	191.0	720	767.0	1043	5732.0	5.5	1.71	inne		inne		0
+278	Iksa Calo	zamek	True	zdobyte	269.0	431.0	1099	685.0	1789	2405.0	1.34	0.39	zdobyte	16.0	nie zaczete		0
+289	Sunstone	zamek	False	zdobyte	115.0	152.0	360	288.0	623	2035.0	3.27	0.77	zdobyte	12.6	zdobyte	15.6	985
+292	Hellholt	zamek	False	okup	257.0	97.0	360	845.0	999	4324.0	4.33	1.02	okup		okup		0
+297	Willow Wood	zamek	False	zdobyte	161.0	79.0	360	212.0	467	2545.0	5.45	1.28	zdobyte	10.1	zdobyte	13.1	1078
+297	City of Bones	zamek	False	inne	326.0	578.0	560	877.0	1363	3799.0	2.79	1.14	inne		nie zaczete		0
+305	Iksa Keria	zamek	True	zdobyte	210.0	280.0	1058	721.0	1786	2797.0	1.57	0.46	zdobyte	15.4	nie zaczete		0
+307	Bolozo	miasto	False	zdobyte	596.0	368.0	937	1166.0	1693	4449.0	2.63	0.62	zdobyte	16.9	nie zaczete		0
+315	Yronwood	miasto	False	zdobyte	613.0	230.0	720	1369.0	1578	8923.0	5.65	1.93	zdobyte	19.0	zdobyte	20.5	2620
+316	Sombazmion	zamek	False	okup	275.0	151.0	360	406.0	560	2113.0	3.77	0.89	okup		zdobyte	15.3	929
+327	Gelona	zamek	False	okup	234.0	219.0	374	441.0	684	2471.0	3.61	0.85	okup		zdobyte	16.6	1036
+327	Alnor	zamek	False	okup	313.0	199.0	360	479.0	609	2134.0	3.51	0.82	okup		zdobyte	15.2	1004
+339	Maidenpool	miasto	False	okup	443.0	159.0	720	584.0	958	2904.0	3.03	0.71	okup		zdobyte	17.1	1560
+352	Nightsong	zamek	False	zdobyte	322.0	143.0	370	594.0	704	5381.0	7.65	2.25	zdobyte	13.2	zdobyte	14.2	1064
+353	Mantarys	miasto	True	inne	459.0	537.0	1734	1202.0	2849	4128.0	1.45	0.5	inne		nie zaczete		0
+353	City of Bones	zamek	False	zdobyte	320.0	683.0	560	921.0	1454	3916.0	2.69	0.53	zdobyte	14.4	nie zaczete		0
+364	Wayfarer's Rest	zamek	False	zdobyte	163.0	83.0	360	263.0	517	6205.0	11.99	2.81	zdobyte	9.4	zdobyte	11.9	880
+370	Vaes Efe	zamek	False	okup	310.0	277.0	360	617.0	780	2715.0	3.48	0.82	okup		zdobyte	16.2	1628
+373	Hellholt	zamek	False	zdobyte	315.0	97.0	360	500.0	588	7104.0	12.08	3.55	zdobyte	10.9	zdobyte	11.7	805
+391	Wayfarer's Rest	zamek	False	inne	256.0	72.0	360	413.0	558	6128.0	10.98	2.58	inne		inne		0
+395	Sombazmion	zamek	False	okup	247.0	146.0	360	374.0	558	1648.0	2.95	0.69	okup		zdobyte	16.2	897
+399	Omber	miasto	False	zdobyte	497.0	96.0	720	613.0	902	2151.0	2.39	0.56	zdobyte	16.2	nie zaczete		0
+402	Qamayl	zamek	False	zdobyte	132.0	14.0	360	210.0	473	1773.0	3.75	1.1	zdobyte	11.8	okup		0
+403	Harvest Hall	zamek	False	okup	237.0	290.0	486	580.0	973	2318.0	2.38	0.7	okup		nie zaczete		0
+404	Acorn Hall	zamek	False	zdobyte	278.0	319.0	519	625.0	1020	6286.0	6.17	1.81	zdobyte	13.5	zdobyte	16.6	1462
+409	Gelona	zamek	False	zdobyte	321.0	222.0	374	629.0	774	3476.0	4.49	1.54	zdobyte	16.0	zdobyte	17.2	1192
+421	Stone Hedge	zamek	False	zdobyte	337.0	247.0	422	587.0	778	5160.0	6.63	1.95	zdobyte	14.3	zdobyte	16.1	1214
+424	Vaes Dothrak	miasto	True	zdobyte	625.0	689.0	1440	1720.0	2906	4986.0	1.72	0.59	zdobyte	13.1	nie zaczete		0
+424	Wyl	zamek	False	zdobyte	329.0	125.0	360	668.0	751	3767.0	5.02	2.05	zdobyte	15.4	zdobyte	16.1	822
+428	Ghoyan Drohe	zamek	False	inne	334.0	214.0	388	716.0	860	2783.0	3.24	1.11	inne		inne		0
+438	Stone Hedge	zamek	False	zdobyte	156.0	192.0	422	327.0	702	8382.0	11.94	4.89	zdobyte	11.7	zdobyte	15.3	1021
+451	Tolos	miasto	False	okup	578.0	215.0	858	1257.0	1656	3781.0	2.28	0.78	okup		nie zaczete		0
+461	Rook's Rest	zamek	False	inne	293.0	121.0	360	436.0	558	5281.0	9.46	2.78	inne		inne		0
+461	Wayfarer's Rest	zamek	False	zdobyte	218.0	95.0	360	665.0	862	7575.0	8.79	2.18	zdobyte	11.9	zdobyte	13.5	1536
+468	Sar Mell	zamek	False	inne	311.0	376.0	560	621.0	1047	2137.0	2.04	0.48	inne		nie zaczete		0
+471	Vaes Athjikhari	zamek	False	okup	325.0	438.0	360	617.0	825	3809.0	4.62	1.09	okup		okup		0
+481	Acorn Hall	zamek	False	zdobyte	351.0	259.0	519	689.0	978	7283.0	7.45	2.55	zdobyte	14.5	zdobyte	16.8	1583
+485	Vaes Leisi	zamek	False	okup	304.0	485.0	360	808.0	1058	3857.0	3.65	0.86	okup		zdobyte	14.9	1045
+501	Pinkmaiden	zamek	False	inne	355.0	303.0	459	613.0	847	5613.0	6.63	1.56	inne		inne		0
+524	Banefort	zamek	False	inne	275.0	474.0	548	666.0	1156	2438.0	2.11	0.5	inne		nie zaczete		0
+524	King's Landing	miasto	True	zdobyte	541.0	348.0	1594	1556.0	2879	7700.0	2.67	0.81	zdobyte	12.0	nie zaczete		0
+527	Pinkmaiden	zamek	False	zdobyte	213.0	219.0	459	412.0	774	3362.0	4.34	1.02	zdobyte	11.9	zdobyte	15.4	1699
+531	Tolos	miasto	False	zdobyte	527.0	208.0	858	1125.0	1579	5277.0	3.34	1.14	zdobyte	16.4	okup		0
+538	Rosby	zamek	False	zdobyte	256.0	50.0	360	399.0	536	6222.0	11.61	3.61	zdobyte	9.4	zdobyte	10.5	524
+542	Stoney Sept	miasto	False	zdobyte	471.0	232.0	720	965.0	1335	7173.0	5.37	1.26	zdobyte	14.9	okup		0
+544	Tolerrol	zamek	False	inne	236.0	198.0	360	401.0	617	1631.0	2.64	0.62	inne		nie zaczete		0
+552	Duskendale	miasto	False	zdobyte	491.0	98.0	720	1765.0	2061	10133.0	4.92	2.01	zdobyte	19.9	zdobyte	21.5	1928
+567	Craster's Keep	zamek	False	zdobyte	314.0	275.0	360	499.0	657	2895.0	4.41	1.29	zdobyte	13.8	okup		0
+570	Banefort	zamek	False	okup	177.0	331.0	548	493.0	1039	2239.0	2.15	0.51	okup		nie zaczete		0
+574	Deep Den	zamek	False	zdobyte	335.0	313.0	410	552.0	757	6007.0	7.94	1.86	zdobyte	12.2	zdobyte	18.0	1809
+597	Blacktyde	miasto	False	inne	595.0	97.0	720	1006.0	1184	5970.0	5.04	0.99	inne		inne		0
+607	Lonely Light	miasto	False	zdobyte	447.0	117.0	720	683.0	1036	4617.0	4.45	1.26	zdobyte	14.6	okup		0
+610	Silverhill	zamek	True	zdobyte	306.0	475.0	1084	845.0	1907	6610.0	3.47	1.42	zdobyte	11.1	odparty	23.7	5372
+612	Harvest Hall	zamek	False	zdobyte	195.0	266.0	486	522.0	953	6145.0	6.45	1.52	zdobyte	12.3	zdobyte	16.0	1812
+625	Odivo	zamek	False	zdobyte	213.0	153.0	360	419.0	644	1727.0	2.68	0.63	zdobyte	14.2	nie zaczete		0
+626	Goldengrove	zamek	False	inne	275.0	515.0	560	679.0	1199	6370.0	5.31	2.17	inne		inne		0
+633	Bronzegate	zamek	False	okup	335.0	207.0	410	550.0	714	1932.0	2.7	0.79	okup		nie zaczete		0
+637	Tolerrol	zamek	True	inne	188.0	191.0	720	407.0	1082	1470.0	1.36	0.32	inne		nie zaczete		0
+641	Silverhill	zamek	False	okup	225.0	188.0	542	451.0	882	2339.0	2.65	0.62	okup		nie zaczete		0
+641	Blackhaven	zamek	False	zdobyte	240.0	290.0	396	480.0	768	5298.0	6.9	1.74	zdobyte	12.9	zdobyte	15.5	1318

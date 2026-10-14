@@ -1,0 +1,114 @@
+dzien;osada;nazwa;typ;krolestwo_obroncy;frakcja_oblegajaca;dni_oblezenia;szturmow_bez_zdobycia;oblegajacy_sila;obroncy_sila;przewaga_murow;wykladnik;maszyny;taran;wieza;szansa_mysli_pct;stosunek_gry;stosunek_z_pelnymi_murami;wynik_w_10_dobach
+108856;ROT_castle18;Cape Wrath;zamek;dragonstone;stormlands;10.4;0;1417;177;3.404;-2.855;2;1;0;100.0;264.427;2.352;zdobyte
+108872;ROT_castle17;Fellwood;zamek;dragonstone;stormlands;8.5;0;2607;306;3.221;-1.687;3;1;0;100.0;61.219;2.641;zdobyte
+108878;ROT_town9;Starfall;miasto;aserai;empire_w;6.1;0;4543;519;4.255;-0.277;2;1;0;6.4;13.075;2.058;zdobyte
+108879;town_EN3;Saltpans;miasto;riverlands;empire;7.9;0;2326;683;4.255;-1.364;2;1;0;9.9;24.549;0.800;inne
+108883;ROT_castle38;Demongate;zamek;valyrian;volantis;8.6;0;2123;358;4.255;-1.766;2;1;0;33.3;76.458;1.392;okup
+108891;ROT_town18;Wickenden;miasto;empire;riverlands;6.6;0;3233;581;4.027;-0.561;3;1;0;41.9;12.162;1.383;okup
+108894;ROT_castle24;Blackmont;zamek;aserai;empire_w;6.9;0;4167;698;4.255;-0.721;2;1;0;6.3;16.960;1.404;inne
+108907;ROT_castle27;Sandstone;zamek;aserai;empire_w;8.9;0;2821;386;3.404;-1.964;2;1;0;40.5;81.061;2.147;inne
+108908;castle_EN2;Bloody Gate;zamek;empire;riverlands;8.4;0;2949;726;3.404;-1.617;2;1;0;8.7;29.446;1.193;inne
+108919;ROT_castle53;Gargos;zamek;qohor;volantis;8.3;0;3338;379;3.404;-1.601;2;1;0;28.9;62.626;2.587;zdobyte
+108921;castle_EW8;Sweetport;zamek;dragonstone;stormlands;10.1;0;5774;529;3.822;-2.117;3;1;1;100.0;186.753;3.737;zdobyte
+108929;ROT_castle27;Sandstone;zamek;aserai;empire_w;6.7;0;5545;424;3.057;-0.487;3;1;1;78.3;22.516;5.345;zdobyte
+108931;town_EN3;Saltpans;miasto;riverlands;empire;8.9;0;2527;623;4.255;-1.970;2;1;0;32.8;70.343;0.953;inne
+108937;castle_ES3;Ar Noy;zamek;qohor;volantis;9.1;0;2817;421;3.404;-2.051;2;1;0;40.5;82.606;1.966;zdobyte
+108938;ROT_castle24;Blackmont;zamek;aserai;empire_w;9.3;0;3319;311;4.255;-2.158;2;1;0;100.0;243.268;2.512;inne
+108949;castle_EN2;Bloody Gate;zamek;empire;riverlands;7.6;0;5809;517;3.822;-0.934;3;1;1;100.0;39.345;3.846;zdobyte
+108950;ROT_castle29;Sunstone;zamek;lys;tyrosh;9.1;0;2439;500;3.404;-2.048;2;1;0;29.4;59.907;1.431;okup
+108959;castle_EW5;Stonedance;zamek;dragonstone;stormlands;8.2;0;2882;446;3.404;-1.528;2;1;0;21.0;42.038;1.899;zdobyte
+108962;ROT_town10;Mhysa Faer;miasto;tyrosh;myr;7.9;0;3466;708;4.255;-1.353;2;1;0;15.5;34.739;1.151;okup
+108965;ROT_castle38;Demongate;zamek;valyrian;volantis;8.5;0;2824;482;3.404;-1.691;2;1;0;21.3;46.436;1.720;zdobyte
+108975;town_EN6;Lorath;miasto;nord;bravos;10.1;0;4451;789;3.822;-2.151;3;1;1;100.0;100.831;1.930;zdobyte
+108978;ROT_town13;Bolozo;miasto;pentos;myr;8.0;0;3578;1123;4.255;-1.380;2;1;0;7.6;23.507;0.749;inne
+108981;ROT_castle24;Blackmont;zamek;aserai;empire_w;8.6;0;2950;476;3.404;-1.774;2;1;0;25.0;54.409;1.820;zdobyte
+108995;ROT_town31;Sharp Point;miasto;dragonstone;stormlands;6.3;0;4545;1013;4.255;-0.373;2;1;0;3.2;7.701;1.055;okup
+108997;ROT_castle33;Bisa;zamek;nord;bravos;8.7;0;3091;717;4.255;-1.793;2;1;0;27.8;57.827;1.013;okup
+108998;ROT_castle27;Sandstone;zamek;empire_w;aserai;7.2;0;3650;386;4.255;-0.931;2;1;0;7.8;36.407;2.221;inne
+109008;ROT_castle68;Willow Wood;zamek;riverlands;vlandia;6.4;0;4811;125;4.255;-0.421;2;1;0;33.5;70.824;9.044;zdobyte
+109012;town_V3;Stoney Sept;miasto;vlandia;riverlands;7.0;0;2825;619;3.221;-0.798;3;1;0;40.2;11.607;1.416;okup
+109020;ROT_castle70;City of Bones;zamek;qarth;empire_s;11.9;0;2328;743;4.255;-3.768;2;1;0;100.0;733.905;0.736;inne
+109023;ROT_castle27;Sandstone;zamek;empire_w;aserai;8.6;0;3674;341;4.255;-1.741;2;1;0;64.2;133.842;2.529;inne
+109025;ROT_castle29;Sunstone;zamek;lys;tyrosh;9.0;0;2047;489;4.255;-2.020;2;1;0;34.6;78.017;0.983;inne
+109027;ROT_castle69;Qamayl;zamek;ibb;sarnor;11.8;0;1758;511;4.255;-3.707;2;1;0;100.0;738.784;0.809;zdobyte
+109036;ROT_castle70;City of Bones;zamek;qarth;empire_s;8.5;0;2270;190;5.556;-2.143;2;0;0;100.0;469.809;1.397;okup
+109036;castle_N9;Pinkmaiden;zamek;riverlands;vlandia;7.3;0;2794;364;3.404;-0.972;2;1;0;4.9;25.240;2.254;inne
+109038;ROT_castle29;Sunstone;zamek;lys;tyrosh;9.2;0;2039;481;4.255;-2.096;2;1;0;43.3;88.213;0.997;inne
+109043;castle_A4;Kingsgrave;zamek;aserai;empire_w;6.3;0;6934;592;4.255;-0.351;2;1;0;6.1;19.474;2.751;inne
+109044;castle_K7;Vaes Efe;zamek;khuzait;empire_s;9.0;0;6270;787;4.255;-1.974;2;1;0;61.0;138.948;1.872;inne
+109049;castle_B4;Deep Den;zamek;vlandia;riverlands;7.3;0;4635;500;3.404;-0.954;2;1;0;14.9;29.836;2.724;zdobyte
+109052;ROT_castle68;Willow Wood;zamek;vlandia;riverlands;5.6;0;1761;131;4.444;0.068;2;0;0;5.6;12.161;2.085;zdobyte
+109053;castle_K7;Vaes Efe;zamek;khuzait;empire_s;5.9;0;6390;692;4.255;-0.135;2;1;0;3.2;11.228;2.171;zdobyte
+109053;ROT_town10;Mhysa Faer;miasto;tyrosh;myr;8.2;0;3368;825;5.106;-1.522;2;1;0;20.6;48.781;0.799;inne
+109062;castle_ES6;Iksa Keria;zamek;bravos;new_kingdom;9.8;0;2115;492;3.404;-2.489;2;1;0;40.6;90.680;1.263;okup
+109063;ROT_town31;Sharp Point;miasto;dragonstone;stormlands;4.2;0;5444;894;4.444;1.077;2;0;0;0.5;1.221;0.943;zdobyte
+109074;castle_A4;Kingsgrave;zamek;aserai;empire_w;9.5;0;6175;530;3.057;-1.836;3;1;1;100.0;90.715;4.767;zdobyte
+109078;castle_B5;Totava;zamek;bravos;new_kingdom;9.8;0;1919;445;3.404;-2.457;2;1;0;43.7;87.406;1.266;zdobyte
+109079;ROT_town17;Draconys;miasto;qohor;volantis;10.7;0;2994;940;3.822;-2.393;3;1;1;100.0;78.780;1.089;okup
+109080;ROT_town10;Mhysa Faer;miasto;tyrosh;myr;8.5;0;3420;1049;5.106;-1.696;2;1;0;16.6;51.771;0.638;inne
+109080;ROT_town40;Omber;miasto;ibb;sarnor;11.1;0;1565;375;4.255;-3.269;2;1;0;100.0;475.027;0.982;inne
+109081;town_S5;Hull;miasto;dragonstone;stormlands;9.9;0;4860;1484;3.822;-2.020;3;1;1;100.0;49.124;1.120;okup
+109083;castle_ES6;Iksa Keria;zamek;bravos;nord;9.4;0;2113;519;3.404;-2.257;2;1;0;31.7;64.621;1.195;okup
+109097;ROT_castle29;Sunstone;zamek;lys;tyrosh;11.0;0;1459;390;4.255;-3.176;2;1;0;100.0;371.947;0.879;inne
+109103;town_K3;Vaes Dothrak;miasto;khuzait;empire_s;9.9;0;4536;1610;3.822;-2.046;3;1;1;100.0;43.761;0.964;inne
+109105;ROT_castle57;Skyreach;zamek;aserai;empire_w;7.5;0;4552;574;4.255;-1.112;2;1;0;17.3;39.675;1.864;zdobyte
+109108;town_V3;Stoney Sept;miasto;vlandia;riverlands;5.9;0;5732;767;3.221;-0.156;3;1;0;31.2;8.970;2.321;inne
+109113;ROT_castle32;Iksa Calo;zamek;bravos;nord;9.1;0;2405;685;3.404;-2.064;2;1;0;20.9;43.996;1.031;zdobyte
+109124;ROT_castle29;Sunstone;zamek;lys;tyrosh;9.4;0;2035;288;4.255;-2.269;2;1;0;94.2;188.450;1.658;zdobyte
+109127;castle_A1;Hellholt;zamek;aserai;empire_w;11.1;0;4324;845;4.255;-3.254;2;1;0;100.0;569.756;1.203;okup
+109132;ROT_castle68;Willow Wood;zamek;riverlands;vlandia;7.2;0;2545;212;4.255;-0.950;2;1;0;22.6;47.394;2.815;zdobyte
+109132;ROT_castle70;City of Bones;zamek;qarth;empire_s;11.2;0;3799;877;3.057;-2.652;3;1;1;100.0;83.862;1.772;inne
+109140;castle_ES6;Iksa Keria;zamek;bravos;new_kingdom;8.4;0;2797;721;3.404;-1.656;2;1;0;13.9;29.500;1.140;zdobyte
+109142;ROT_town13;Bolozo;miasto;pentos;myr;7.4;0;4449;1166;4.255;-1.023;2;1;0;8.2;16.798;0.897;zdobyte
+109150;ROT_town30;Yronwood;miasto;aserai;empire_w;7.7;0;8923;1369;3.822;-0.996;3;1;1;85.3;24.765;2.230;zdobyte
+109151;ROT_castle50;Sombazmion;zamek;lys;tyrosh;9.5;0;2113;406;4.255;-2.277;2;1;0;70.3;140.689;1.223;okup
+109162;ROT_castle31;Gelona;zamek;pentos;myr;10.1;0;2471;441;4.255;-2.666;2;1;0;100.0;266.359;1.317;okup
+109162;castle_A2;Alnor;zamek;lys;tyrosh;9.0;0;2134;479;4.255;-1.996;2;1;0;33.9;80.116;1.046;okup
+109174;town_EW6;Maidenpool;miasto;riverlands;vlandia;8.9;0;2904;584;4.255;-1.912;2;1;0;29.6;79.285;1.169;okup
+109187;ROT_castle63;Nightsong;zamek;stormlands;empire_w;6.9;0;5381;594;3.404;-0.715;2;1;0;9.5;21.736;2.661;zdobyte
+109188;town_K2;Mantarys;miasto;valyrian;volantis;11.6;0;4128;1202;3.822;-2.848;3;1;1;100.0;156.398;1.175;inne
+109188;ROT_castle70;City of Bones;zamek;qarth;empire_s;7.4;0;3916;921;5.106;-1.027;2;1;0;7.6;22.694;0.833;zdobyte
+109199;ROT_castle39;Wayfarer's Rest;zamek;riverlands;vlandia;6.4;0;6205;263;4.255;-0.461;2;1;0;22.6;45.940;5.535;zdobyte
+109205;castle_K7;Vaes Efe;zamek;empire_s;khuzait;7.7;0;2715;617;4.255;-1.245;2;1;0;7.4;26.708;1.035;okup
+109208;castle_A1;Hellholt;zamek;aserai;empire_w;5.7;0;7104;500;3.404;-0.031;2;1;0;6.3;14.755;4.172;zdobyte
+109226;ROT_castle39;Wayfarer's Rest;zamek;vlandia;riverlands;6.9;0;6128;413;4.255;-0.749;2;1;0;18.6;43.956;3.490;inne
+109230;ROT_castle50;Sombazmion;zamek;lys;tyrosh;10.5;0;1648;374;4.255;-2.925;2;1;0;100.0;304.502;1.036;okup
+109234;ROT_town40;Omber;miasto;ibb;sarnor;10.0;0;2151;613;4.255;-2.618;2;1;0;77.7;155.319;0.824;zdobyte
+109237;ROT_castle69;Qamayl;zamek;sarnor;ibb;9.2;0;1773;210;3.404;-2.148;2;1;0;57.5;117.012;2.476;zdobyte
+109238;castle_EW7;Harvest Hall;zamek;stormlands;empire_w;8.0;0;2318;580;3.404;-1.382;2;1;0;10.0;21.741;1.175;okup
+109239;castle_EN5;Acorn Hall;zamek;riverlands;vlandia;7.1;0;6286;625;3.404;-0.879;2;1;0;14.8;29.518;2.954;zdobyte
+109244;ROT_castle31;Gelona;zamek;pentos;myr;9.7;0;3476;629;3.822;-1.949;3;1;1;100.0;75.381;1.890;zdobyte
+109256;castle_EN8;Stone Hedge;zamek;riverlands;vlandia;8.0;0;5160;587;3.404;-1.394;2;1;0;18.9;48.457;2.580;zdobyte
+109259;town_K3;Vaes Dothrak;miasto;khuzait;empire_s;9.1;0;4986;1720;3.822;-1.643;3;1;1;91.1;26.237;0.991;zdobyte
+109259;castle_A7;Wyl;zamek;aserai;empire_w;9.2;0;3767;668;3.057;-1.704;3;1;1;100.0;37.865;2.306;zdobyte
+109263;castle_ES1;Ghoyan Drohe;zamek;pentos;myr;11.3;0;2783;716;3.822;-2.691;3;1;1;100.0;143.215;1.329;inne
+109273;castle_EN8;Stone Hedge;zamek;vlandia;riverlands;7.8;0;8382;327;3.057;-1.021;3;1;1;100.0;80.252;10.485;zdobyte
+109286;ROT_town21;Tolos;miasto;valyrian;empire_s;10.9;0;3781;1257;3.822;-2.514;3;1;1;100.0;87.493;1.029;okup
+109296;castle_EW2;Rook's Rest;zamek;dragonstone;vlandia;7.0;0;5281;436;3.404;-0.809;2;1;0;16.3;32.634;3.557;inne
+109296;ROT_castle39;Wayfarer's Rest;zamek;vlandia;riverlands;4.9;0;7575;665;4.027;0.431;3;1;0;21.3;6.246;2.828;zdobyte
+109303;castle_A9;Sar Mell;zamek;volantis;new_kingdom2;10.6;0;2137;621;4.255;-2.931;2;1;0;100.0;239.930;0.808;inne
+109306;castle_K3;Vaes Athjikhari;zamek;khuzait;empire_s;7.6;0;3809;617;4.255;-1.142;2;1;0;16.1;32.287;1.451;okup
+109316;castle_EN5;Acorn Hall;zamek;vlandia;riverlands;7.5;0;7283;689;3.822;-0.858;3;1;1;100.0;33.398;3.618;zdobyte
+109320;castle_K4;Vaes Leisi;zamek;khuzait;empire_s;7.6;0;3857;808;4.255;-1.176;2;1;0;10.9;26.209;1.122;okup
+109336;castle_N9;Pinkmaiden;zamek;vlandia;riverlands;5.7;0;5613;613;4.255;-0.009;2;1;0;3.8;9.271;2.152;inne
+109359;ROT_castle20;Banefort;zamek;vlandia;riverlands;8.4;0;2438;666;4.255;-1.662;2;1;0;17.0;40.609;0.860;inne
+109359;town_EW4;King's Landing;miasto;vlandia;battania;8.0;0;7700;1556;4.459;-1.141;3;1;1;93.7;27.258;1.497;zdobyte
+109362;castle_N9;Pinkmaiden;zamek;vlandia;riverlands;6.8;0;3362;412;4.255;-0.693;2;1;0;8.9;22.266;1.918;zdobyte
+109366;ROT_town21;Tolos;miasto;valyrian;empire_s;9.3;0;5277;1125;3.822;-1.720;3;1;1;100.0;47.062;1.604;zdobyte
+109373;ROT_castle15;Rosby;zamek;vlandia;battania;5.7;0;6222;399;3.221;-0.049;3;1;0;57.5;16.527;4.845;zdobyte
+109377;town_V3;Stoney Sept;miasto;vlandia;riverlands;6.9;0;7173;965;4.255;-0.737;2;1;0;4.4;21.623;1.747;zdobyte
+109379;ROT_castle30;Tolerrol;zamek;myr;new_kingdom7;12.3;0;1631;401;4.255;-3.966;2;1;0;100.0;1268.366;0.956;inne
+109387;town_EW5;Duskendale;miasto;vlandia;battania;8.3;0;10133;1765;3.057;-1.266;3;1;1;81.3;23.629;2.348;zdobyte
+109402;castle_S5;Craster's Keep;zamek;freefolk;nightswatch;9.5;0;2895;499;3.404;-2.327;2;1;0;38.2;100.258;1.703;zdobyte
+109405;ROT_castle20;Banefort;zamek;vlandia;riverlands;9.0;0;2239;493;4.255;-2.010;2;1;0;40.2;83.551;1.068;okup
+109409;castle_B4;Deep Den;zamek;vlandia;riverlands;8.2;0;6007;552;4.255;-1.501;2;1;0;39.4;95.652;2.556;zdobyte
+109432;ROT_town7;Blacktyde;miasto;sturgia;battania;7.9;0;5970;1006;5.106;-1.346;2;1;0;23.7;53.256;1.162;inne
+109442;town_N3;Lonely Light;miasto;sturgia;battania;9.0;0;4617;683;3.546;-2.011;2;1;0;40.2;86.114;1.905;zdobyte
+109445;ROT_castle21;Silverhill;zamek;vlandia;riverlands;7.1;0;6610;845;3.057;-0.686;3;1;1;57.0;16.845;3.201;zdobyte
+109447;castle_EW7;Harvest Hall;zamek;dragonstone;empire_w;6.6;0;6145;522;4.255;-0.572;2;1;0;10.9;26.974;2.769;zdobyte
+109460;ROT_castle51;Odivo;zamek;myr;new_kingdom11;9.7;0;1727;419;4.255;-2.403;2;1;0;62.0;133.732;0.969;zdobyte
+109461;castle_V8;Goldengrove;zamek;empire_w;riverlands;7.7;0;6370;679;3.057;-0.986;3;1;1;97.6;28.253;3.838;inne
+109468;castle_EW3;Bronzegate;zamek;vlandia;dragonstone;9.2;0;1932;550;3.404;-2.145;2;1;0;23.7;48.646;1.032;okup
+109472;ROT_castle30;Tolerrol;zamek;myr;new_kingdom7;12.7;0;1470;407;4.255;-4.216;2;1;0;100.0;1620.044;0.849;inne
+109476;ROT_castle21;Silverhill;zamek;riverlands;empire_w;8.0;0;2339;451;4.255;-1.378;2;1;0;17.1;38.146;1.219;okup
+109476;ROT_castle19;Blackhaven;zamek;empire_w;dragonstone;7.7;0;5298;480;3.972;-1.196;2;1;0;23.9;57.500;2.782;zdobyte

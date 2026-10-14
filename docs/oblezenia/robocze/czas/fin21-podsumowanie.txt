@@ -1,0 +1,24 @@
+== fin21 doby 108836 - 109563 ( 728 )
+epizodow oblezen (migawka doby): 235  zdobyc z L0: 39  zdobycia bez epizodu (oblezenie < 1 doby): 0
+ miasto   odstapione bez bitwy                       n= 20  dob: mediana 5.5 p90 8.0 max 9 suma 104
+ miasto   pod murami - pobity oblegajacy             n=  6  dob: mediana 12.0 p90 14.5 max 16 suma 71
+ miasto   szturm bez zdobycia, potem odstapione      n=  9  dob: mediana 11.0 p90 14.0 max 14 suma 96
+ miasto   trwa na koncu biegu                        n=  1  dob: mediana 10.0 p90 10.0 max 10 suma 10
+ miasto   wypad - pobity oblegajacy                  n=  4  dob: mediana 5.5 p90 6.0 max 6 suma 22
+ miasto   zdobyte szturmem                           n= 12  dob: mediana 12.0 p90 13.9 max 15 suma 147
+ miasto   zmiana pana bez szturmu                    n=  1  dob: mediana 1.0 p90 1.0 max 1 suma 1
+ zamek    odstapione bez bitwy                       n= 52  dob: mediana 4.5 p90 8.0 max 11 suma 232
+ zamek    pod murami - pobity oblegajacy             n= 10  dob: mediana 12.0 p90 15.0 max 15 suma 122
+ zamek    szturm bez zdobycia, potem odstapione      n= 20  dob: mediana 12.0 p90 16.1 max 24 suma 232
+ zamek    wypad - pobity oblegajacy                  n= 73  dob: mediana 5.0 p90 8.0 max 12 suma 396
+ zamek    zdobyte po wypadzie                        n=  1  dob: mediana 7.0 p90 7.0 max 7 suma 7
+ zamek    zdobyte szturmem                           n= 26  dob: mediana 13.0 p90 15.5 max 23 suma 341
+ miasto: n=53 mediana 8.0 p90 13.0 max 16 suma dob 451
+ zamek: n=182 mediana 6.0 p90 13.9 max 24 suma dob 1330
+ wszystkie: n=235 mediana 7.0 p75 11.0 p90 13.6 max 24
+ zdobyte: n=39  dob do konca: mediana 13.0 p90 15.0 max 23
+ pierwszy szturm (doba od startu migawki): n=67 mediana 12.0 p10 8.0 p90 15.0 min 0 max 18
+ szturmy B175 Siege: 67  wygrywa: {'A': 38, 'O': 0, 'brak': 29}
+ wypady: 78 {'A': 77, 'O': 1, 'brak': 0}
+ pod murami: 52 {'A': 10, 'O': 42, 'brak': 0}
+ O0 linii 0  O1 okupow 0  CampFever zaraza wstaje 76

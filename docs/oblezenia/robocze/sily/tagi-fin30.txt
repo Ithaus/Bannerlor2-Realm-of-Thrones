@@ -1,0 +1,496 @@
+  34944 Towary
+  23234 Skarbce
+  11651 Dozbrajanie
+   4371 Korona
+   4119 Okupy 
+   2914 Karawany 
+   2913 Zatkane wsie 
+   2908 Przeplywy osad 
+   2908 Pieniadz swiata 
+   2908 Obieg
+   2345 NocnyMarsz
+   2184 Towary 
+   2179 Ludzie 
+   1689 Dlugi 
+   1460 Szczelnosc 
+   1458 Notable 
+   1457 Ludzie
+   1457 Budzet rodow 
+   1456 Ochotnicy 
+   1456 Dowoz 
+   1170 IronBank
+   1100 Kontrakty najemnikow 
+   1081 Komplet rekruta
+   1019 Lup miast 
+    844 Wojna i pokoj 
+    832 Stawka wojenna pana 
+    809 WarLedger
+    809 Pokoj a jency 
+    801 Musztra 
+    783 Kredyt korony 
+    754 Hodowla 
+    743 Weterani 
+    743 Pochodzenie 
+    742 Rabunek osada po osadzie 
+    741 Zlom z nadmiaru 
+    741 Zbrojownie zalog 
+    741 Wioski - wiesci 
+    733 Stal valyrianska
+    731 Skale ludzi 
+    731 Plon wsi od ludzi 
+    731 Log 
+    731 Ksiega wiosek 
+    731 Dymek wioski 
+    730 Wojsko z ludzi 
+    730 Statki 
+    730 Prawo jenca 
+    730 Pobor i milicja od ludzi 
+    730 Kuznia 
+    730 Drobne zrodla 
+    730 Drobne z niczego 
+    730 Ciaza i plodnosc 
+    730 BK i Diplomacy 
+    729 Zbytki ludu 
+    729 Wyrzutki
+    729 Wydatki gracza 
+    729 Wozy w miastach
+    729 Winnice i gaje 
+    729 Utarg wsi 
+    729 Strzelarze 
+    729 Stawki towarow 
+    729 Spichlerze 
+    729 Rzemioslo miasta 
+    729 Rzemieslnicy BK 
+    729 Rynek od ludzi 
+    729 Rycerze 
+    729 Rada 
+    729 ROT szczelnosc 
+    729 Przeprawa Bliznaki 
+    729 Przegrani 
+    729 Porzadek stanu 
+    729 Pomiary swiata 
+    729 Pomiary 169c
+    729 Odziez wojska 
+    729 Oblezone 
+    729 Niewolni 
+    729 Najemnicy i uczta BK 
+    729 Najemnicy - sluzba 
+    729 Nagrody zadan 
+    729 Markietani 
+    729 Majatki BK 
+    729 Lup i dary 
+    729 Lojalnosc za danine 
+    729 Kowadlo i drobne 
+    729 Kiesy rozbitych 
+    729 Karawany bez amunicji 
+    729 Kara za przegrana 
+    729 Jezdzcy i uprzaz 
+    729 Inni z poleglych 
+    729 Dary koron 
+    728 Zuzycie AI - pomiary 
+    728 Zuzycie AI 
+    728 Zuzycie AI
+    728 Zold konnych 
+    728 Zold
+    728 Zloto Casterly Rock 
+    728 Zlota Kompania 
+    728 Zima 
+    728 Zelazo wedlug ladow 
+    728 Zelazo 
+    728 Zbroja na polkach 
+    728 Zbiorka 
+    728 Zawor zamkow 
+    728 Zaopatrzenie zamkow 
+    728 Zaopatrzenie BK - kara morale 
+    728 Zalogi
+    728 ZakupyAI wedlug kupujacego 
+    728 ZakupyAI cena do wartosci 
+    728 ZakupyAI
+    728 Zakupy i nadwyzki AI 
+    728 Zadowolenie ludu 
+    728 Zadowolenie BK 
+    728 Wzrost Innych 
+    728 Wywoz kupcow 
+    728 Wyspy i drogi 
+    728 Wyrownanie panow zamkow 
+    728 Wyroby uboczne 
+    728 Wydatki rycerzy 
+    728 Wsie bez wozu 
+    728 Wolne rece 
+    728 Wioski wedlug rodzaju 
+    728 Wierzchowce kanonu 
+    728 Weterani - pieniadze 
+    728 Werbunek
+    728 Wedrowcy BK - towar 
+    728 Wedrowcy BK - prawdziwy towar 
+    728 Wedrowcy BK
+    728 Warsztaty wedlug krainy 
+    728 Warsztaty towarowe
+    728 Warsztaty bez powtorzen 
+    728 Warsztaty
+    728 WPLYW
+    728 Uzbrojenie wedlug zrodla 
+    728 Uzbrojenie 
+    728 Uprzaz 
+    728 Turnieje 
+    728 Towar wedrowcow BK 
+    728 Targ przy zamku 
+    728 Tarczowe 
+    728 Szczelnosc BK 
+    728 Straz z Westeros 
+    728 Straz przeprawy 
+    728 Straz i Wolni Ludzie 
+    728 Stajnia AI 
+    728 Spoils of War 
+    728 Spoils - naprawa u kwatermistrza
+    728 Spoils - klan najemnikow
+    728 Smoki 
+    728 Sluby AI 
+    728 Skup sprzetu 
+    728 Sakiewka ludzi
+    728 Rynek surowcow
+    728 Rynek i korona 
+    728 Rynek broni
+    728 Rycerze i jazda 
+    728 Rozkazy morskie 
+    728 Rozbici wracaja 
+    728 Rody z luzem pulapu 
+    728 Roboty ludu 
+    728 Rezerwa napraw AI - pamiec dopasowania 
+    728 Renty korony 
+    728 Pule ochotnikow 
+    728 Pula wyrzutkow 
+    728 Przewoz kupcow wozem 
+    728 Przeplywy osad
+    728 Przegrani pod murami 
+    728 Profil doby 
+    728 Prawa panskie 
+    728 Postoj karawan 
+    728 Polka i delegaty 
+    728 Podstawa robocizny 
+    728 PodazPopyt
+    728 Pobor
+    728 Pieniadz swiata
+    728 Paser
+    728 Partie 
+    728 Papirus wedlug klimatu 
+    728 Owce 
+    728 Oplata za werbunek zalog 
+    728 Okupy powtorne 
+    728 Ochotnicy
+    728 Niewola lordow i okupy 
+    728 Narzedzia wedlug zuzycia 
+    728 Najemnicy BK 
+    728 Nadwyzki zalog po godzinach 
+    728 Nadwyzka kas 
+    728 Musztra AI
+    728 Morale AI 
+    728 Monopole korony 
+    728 Mineraly 
+    728 Miasta bez strzal - powod 
+    728 Miasta 
+    728 Miara historyczna cz. 2 
+    728 Miara
+    728 Marza kupcow z karawan 
+    728 Marsz - konie partii 
+    728 Lup w bitwie 
+    728 Lup DTE - kopie 
+    728 Ludnosc BK 
+    728 Ludnosc
+    728 Lojalnosc osad 
+    728 Las wsi 
+    728 Kupione z oferty 
+    728 Krainy 
+    728 Kontrakty surowca 
+    728 Konie robocze 
+    728 Konie rekrutow 
+    728 Konie AI 
+    728 Konie - smierc, lup, dobytek 
+    728 Konie 
+    728 Komplet weterana 
+    728 Komplet rekruta 
+    728 Kiesa ludu
+    728 Kasy zaulkow 
+    728 Kasy miast 
+    728 Kary terenu 
+    728 Karawany
+    728 Juczne z niczego 
+    728 Juczne 
+    728 Jency 
+    728 Jedzenie z targu 
+    728 HouseLevies
+    728 Hearth 
+    728 Glod ludu 
+    728 Dziesiecina 
+    728 Drewno
+    728 Dowoz
+    728 Dosypka z niczego 
+    728 Doplata wedlug potrzeby 
+    728 Dobrobyt 
+    728 Dezercja AI wedlug przyczyny 
+    728 Dezercja AI 
+    728 Danina z oszczednosci 
+    728 D staly 
+    728 Cwiczenia 
+    728 Ceny surowcow
+    728 Ceny hurtu 
+    728 Budowy oplacone
+    728 Budowy
+    728 Bitwy 
+    728 Bitwy
+    728 Balans krolestw 
+    728 BK gnicie surowcow 
+    728 Audyt predkosci 
+    727 XP wojska 
+    727 Umiejetnosci 
+    727 NightRest swit 6
+    727 Koszt 171-174 
+    727 Gotowka wsi 
+    727 Doswiadczenie 
+    722 Okup oblezenia 
+    707 Lup miast
+    695 LegendaryLaw
+    557 Licznik podatku osady
+    529 Wezwania do wojny 
+    490 ValyrianBlades
+    445 WarLedger doba
+    372 CampFever
+    180 ElephantQuarantine
+    146 Miasta bez rudy i strzal 
+    145 Pokrycie zbrojowni AI 
+    145 Musztra AI wedlug krolestw
+    143 Unikaty 
+    105 Zbytki na sucho 
+    105 Warsztaty zbytkow 
+    105 Sklad zarobku miast 
+    105 Skale ludzi wedlug krolestw 
+    105 Rynek od ludzi wedlug krolestw 
+    105 Poziomy lordow 
+    105 Pobor i milicja od ludzi wedlug krolestw 
+    105 Plon wsi od ludzi wedlug krolestw 
+    105 Lokata a budowy 
+    103 Rachunek koni 
+    101 Zima wedlug krain 
+     79 CrossingLaw
+     72 Data na pasku 
+     65 Wioski
+     57 Karawany w zdobytym miescie 
+     53 Skarbce stolic 
+     34 Warsztaty wedlug surowca 
+     29 Wioski - wyglad 
+     27 Karawany BK przy koncu oblezenia 
+     26 Regulator wsi 
+     23 Straz K8 
+     21 HistoricalPrices
+     15 Musztra
+     15 Ludzie przy zniknieciu partii 
+     13 Warsztaty 
+     12 HungerLaw
+      9 BattlefieldLaw
+      8 Skarbiec upadlego krolestwa 
+      7 Skarbiec stolicy 
+      7 PopulationLaw
+      6 Kiesa ludu 
+      6 BkSupplyTemper
+      5 TrueArmourCost
+      5 Dorobek startowy 
+      4 StartStock
+      4 StartKit
+      4 Rozwoj postaci 
+      4 Proporczyki 
+      4 Harness niewoli 
+      4 ColdStart
+      3 Zloto startowe wedlug ludzi 
+      3 Z16
+      3 WorkshopTrade
+      3 WorkshopLaw
+      3 Obieg 
+      3 Klimat
+      3 KingdomTreasury
+      3 KingdomBalance 
+      3 HorseState 
+      3 DesertionLaw
+      3 CraftRealm 
+      2 Wiedza rzemieslnicza
+      2 UniqueLaw 
+      2 UniqueLaw
+      2 TownPurse 
+      2 Sufit XP za bron
+      2 SoldierPay
+      2 SlowHealing
+      2 RecruitCost
+      2 RawPrice
+      2 Rasy
+      2 Pomiar ludzi 
+      2 PeopleMenu 
+      2 NorthHomeEdge 
+      2 Nocleg
+      2 MountedWage
+      2 Misja gracza 
+      2 MaterialLaw
+      2 MarketRoad
+      2 LosersFlee 
+      2 Karawana wyszla z oblezonej osady 
+      2 Kara handlowa BK
+      2 HarvestValve 
+      2 GarrisonRecruitFee 
+      2 FletchForge
+      2 CrownIncome 
+      2 CastleSteel
+      2 CastlePurse 
+      2 CaravanBulk
+      2 BuildFunding
+      2 Bloomery 
+      2 BkArmourList
+      2 BEE domkniecie 
+      2 ArmsLeaks 
+      2 ArmsDrill
+      1 Zbroja z kuzni
+      1 Zapis
+      1 Z16 samotest
+      1 Wzrok za sloncem
+      1 WorldPace
+      1 WorkshopInputs 
+      1 WinterSource
+      1 WinterRealm
+      1 WinterBite
+      1 WesterosClimate
+      1 Wegiel drzewny
+      1 WearKeep
+      1 WearGroups
+      1 Wayfinder
+      1 VolunteerKit
+      1 VillageWoodlot
+      1 VillageTakings 
+      1 VillageBook 
+      1 VetPurse 
+      1 Ustawienia wczytane. CraftingEnabled=True WearEnabled=True
+      1 TroopFit
+      1 TravellerTrade36b 
+      1 TravellerGoods36
+      1 TownFletchers 
+      1 Tarcze
+      1 Surowce
+      1 Start kampanii 
+      1 Stare zbrojownie 
+      1 Stale kwoty 
+      1 Stajnia
+      1 Stables
+      1 SpoilsSeal
+      1 SpoilsCompany
+      1 SpeedDepth
+      1 SpareHorses 
+      1 SmithAudit
+      1 SmeltTab
+      1 SlowMuster
+      1 SleepGate 
+      1 Skup sprzetu
+      1 Skora z uboju 
+      1 SkillsDecide
+      1 ScorchedEarth
+      1 SHIELDS
+      1 RoadMemoryFix
+      1 Rekrut gracza 
+      1 RecruitSources
+      1 Receptury 
+      1 Rece 
+      1 RawNoRot 
+      1 Rations
+      1 QuartermasterLaw
+      1 QualityRich
+      1 QohorMasters
+      1 Przeglad stadnin 
+      1 Produkcja wsi - model 
+      1 Probka nowe-karawany 
+      1 Proba zimy 
+      1 PeopleUnit 
+      1 Partie Twojego rodu 
+      1 Pamiec drog mapy 
+      1 Pamiec drog mapy
+      1 PackSources 
+      1 PackMarket 
+      1 OverflowHome 
+      1 OutlawLaw
+      1 Okienko rabunku gracza 
+      1 NightRest
+      1 MusterOut
+      1 MountMeshGuard
+      1 MoneyLedger
+      1 MineralOnce
+      1 Menu okregu 
+      1 Menu kowala dodane.
+      1 MaterialOrders 
+      1 MarketGlut
+      1 MarketCarts
+      1 MarchPace
+      1 MapRoadsProbe
+      1 MapClock
+      1 ManLedger
+      1 LordDiscard 
+      1 LootPrices
+      1 LevyGold
+      1 Levy
+      1 Las wsi wedlug klimatu 
+      1 Lancuch modelu jedzenia 
+      1 LEG ARMOUR
+      1 Kwatermistrz
+      1 Kuznia jak u kowali 
+      1 Kuznia
+      1 Ksiega umiejetnosci 
+      1 Krainy kanonu 
+      1 Klimat wsi 
+      1 Kary terenu po naszemu
+      1 Kalendarz
+      1 Jedna skala czasu 
+      1 IslandRoads
+      1 HorseCensus 
+      1 HideoutSpotter
+      1 Harmony
+      1 HELMETS
+      1 GoodsLedger
+      1 GarrisonKit
+      1 GarrisonArmory
+      1 GAUNTLETS
+      1 FreeSupplies
+      1 ForgeClock
+      1 FoodChain 
+      1 FixedSums38 
+      1 Famine 
+      1 FairXp 
+      1 FairXp
+      1 Drobne 
+      1 Drill
+      1 DressCode
+      1 DragonUnmount
+      1 DonationXpLaw
+      1 Devastation 
+      1 DefeatMorale 
+      1 Data 
+      1 Czas swiata 
+      1 CraftPopup
+      1 ChargeTemper
+      1 Cennik 
+      1 CastleMarket 
+      1 CartTownExit
+      1 CaravanAmmo 
+      1 CaptiveRags
+      1 CampScene 
+      1 CROSSBOWS
+      1 CLOAKS
+      1 Budzet rodow
+      1 BowStats
+      1 BkSupplyMarket 
+      1 BkSeal34 
+      1 Behavior dodany do kampanii.
+      1 BeatenPurse 
+      1 BattleWind
+      1 BattlePlunder 
+      1 BOWS
+      1 BODY ARMOUR
+      1 BARDING
+      1 ArmsPricing
+      1 Armie 175 
+      1 AmmoRecovery
+      1 AlleyProbe 
+      1 AiGear
+      1 === Armoury 10/14/2026 06

@@ -1,0 +1,26 @@
+czynnik ludzi P (sqrt, 0.9-1.4): miasta med 0.90, zamki med 0.90
+V0 model bez zmian                 zdobyte  54 | odparte   0 | okup  26 | inne  33 | czeka   0 | nie zaczete   0 | dni do zdobycia med 12.9 p90 16.0 | strata ataku na zdobycie med 807 | obrona sila med 580
+V0+S6 (odsiecz za murami)          zdobyte  51 | odparte   3 | okup  26 | inne  33 | czeka   0 | nie zaczete   0 | dni do zdobycia med 14.3 p90 18.9 | strata ataku na zdobycie med 892 | obrona sila med 580
+S1 300/600                         zdobyte  55 | odparte   0 | okup  19 | inne  26 | czeka   0 | nie zaczete  13 | dni do zdobycia med 14.1 p90 16.8 | strata ataku na zdobycie med 950 | obrona sila med 680
+S1 400/800                         zdobyte  53 | odparte   1 | okup  12 | inne  21 | czeka   0 | nie zaczete  26 | dni do zdobycia med 14.8 p90 16.6 | strata ataku na zdobycie med 1018 | obrona sila med 823
+S1 500/1000                        zdobyte  40 | odparte   0 | okup  12 | inne  17 | czeka   0 | nie zaczete  44 | dni do zdobycia med 15.6 p90 17.5 | strata ataku na zdobycie med 1250 | obrona sila med 947
+S1 400/800 +S5                     zdobyte  44 | odparte   0 | okup  13 | inne  16 | czeka   0 | nie zaczete  40 | dni do zdobycia med 15.4 p90 16.8 | strata ataku na zdobycie med 1078 | obrona sila med 882
+S1 400/800 +S5 +S6                 zdobyte  42 | odparte   2 | okup  13 | inne  16 | czeka   0 | nie zaczete  40 | dni do zdobycia med 16.1 p90 17.6 | strata ataku na zdobycie med 1156 | obrona sila med 882
+S1 400/800 x0.8 +S5 +S6            zdobyte  52 | odparte   2 | okup  13 | inne  23 | czeka   0 | nie zaczete  23 | dni do zdobycia med 15.5 p90 19.1 | strata ataku na zdobycie med 1168 | obrona sila med 785
+S1 500/1000 +S5 +S6                zdobyte  38 | odparte   2 | okup  11 | inne  15 | czeka   0 | nie zaczete  47 | dni do zdobycia med 16.6 p90 20.1 | strata ataku na zdobycie med 1348 | obrona sila med 1019
+S1 400/800 +S5+S6 prog 3.3         zdobyte  36 | odparte   2 | okup  12 | inne  14 | czeka   0 | nie zaczete  49 | dni do zdobycia med 15.8 p90 18.0 | strata ataku na zdobycie med 1156 | obrona sila med 882
+V0 + CZAS (mury<=1 czeka)          zdobyte  47 | odparte   0 | okup  26 | inne  33 | czeka   7 | nie zaczete   0 | dni do zdobycia med 12.6 p90 16.0 | strata ataku na zdobycie med 771 | obrona sila med 580
+S1 400/800 +S5+S6 + CZAS           zdobyte  26 | odparte   2 | okup  13 | inne  16 | czeka  16 | nie zaczete  40 | dni do zdobycia med 15.8 p90 20.5 | strata ataku na zdobycie med 1135 | obrona sila med 882
+glowny, AI zaczyna wszystkie       zdobyte  52 | odparte  15 | okup  13 | inne  33 | czeka   0 | nie zaczete   0 | dni do zdobycia med 16.2 p90 20.6 | strata ataku na zdobycie med 1302 | obrona sila med 882
+glowny, wszystkie + CZAS           zdobyte  26 | odparte   2 | okup  13 | inne  33 | czeka  39 | nie zaczete   0 | dni do zdobycia med 15.8 p90 20.5 | strata ataku na zdobycie med 1135 | obrona sila med 882
+Dorne V0 model bez zmian             decyzji 13, zdobyte 8, nie zaczete 0, okup 1
+Dorne S1 400/800 +S5 +S6             decyzji 13, zdobyte 7, nie zaczete 0, okup 2
+nie zaczete 40: armia ma >= 2.8 x typowy zamek po normie (sila 631): 34
+mury <= 1 (AI czekalaby przy regule CZAS): dzis 22, po S1+S5 57 z 113
+S7 King's Landing  atak 4484 ludzi (sila 7700) | dzis obrona sila 1556 -> zdobyte po 10.9 dobach szturmu, strata ataku 2173 | S1+S5 i 1323 ludzi w murach: sila 4598, stosunek 1.67 -> odparty po 14.3 dobach, strata ataku 4484
+S7 Yronwood        atak 6722 ludzi (sila 8923) | dzis obrona sila 1369 -> zdobyte po 11.3 dobach szturmu, strata ataku 2234 | S1+S5 i 2085 ludzi w murach: sila 4288, stosunek 2.08 -> odparty po 23.5 dobach, strata ataku 6722
+S7 Skyreach        atak 3275 ludzi (sila 4552) | dzis obrona sila 574 -> zdobyte po 6.0 dobach szturmu, strata ataku 1006 | S1+S5 i 2007 ludzi w murach: sila 3269, stosunek 1.39 -> odparty po 10.1 dobach, strata ataku 3275
+S7 Wyl             atak 2343 ludzi (sila 3767) | dzis obrona sila 668 -> zdobyte po 6.2 dobach szturmu, strata ataku 724 | S1+S5 i 1050 ludzi w murach: sila 2116, stosunek 1.78 -> odparty po 14.5 dobach, strata ataku 2343
+koszt normy 300/600: ludzie w zalogach swiata przy pelnej normie 113487
+koszt normy 400/800: ludzie w zalogach swiata przy pelnej normie 151316
+koszt normy 500/1000: ludzie w zalogach swiata przy pelnej normie 189145

@@ -1,0 +1,63 @@
+House Baratheon of King's Landing d516-d530: bitew druzyn lordow 59
+  Riverrun: bitew 42 (wygranych 39), najwiekszy oddzial 514, dowodcow 12
+  King's Landing: bitew 7 (wygranych 7), najwiekszy oddzial 1323, dowodcow 6
+  Wayfarer's Rest: bitew 3 (wygranych 3), najwiekszy oddzial 437, dowodcow 3
+  Acorn Hall: bitew 3 (wygranych 3), najwiekszy oddzial 399, dowodcow 3
+  Willow Wood: bitew 2 (wygranych 1), najwiekszy oddzial 80, dowodcow 2
+  Stoney Sept: bitew 1 (wygranych 1), najwiekszy oddzial 538, dowodcow 1
+  Rosby: bitew 1 (wygranych 1), najwiekszy oddzial 276, dowodcow 1
+The North d516-d530: bitew druzyn lordow 1
+  Widow's Watch: bitew 1 (wygranych 1), najwiekszy oddzial 99, dowodcow 1
+Dorne d36-d48: bitew druzyn lordow 5
+  Vaith: bitew 2 (wygranych 2), najwiekszy oddzial 150, dowodcow 2
+  Planky Town: bitew 1 (wygranych 1), najwiekszy oddzial 86, dowodcow 1
+  Wyl: bitew 1 (wygranych 1), najwiekszy oddzial 85, dowodcow 1
+  Skyreach: bitew 1 (wygranych 1), najwiekszy oddzial 115, dowodcow 1
+Dorne d87-d98: bitew druzyn lordow 10
+  Vaith: bitew 3 (wygranych 3), najwiekszy oddzial 462, dowodcow 3
+  Blackmont: bitew 3 (wygranych 2), najwiekszy oddzial 262, dowodcow 2
+  Starfall: bitew 2 (wygranych 2), najwiekszy oddzial 182, dowodcow 2
+  Godsgrace: bitew 1 (wygranych 1), najwiekszy oddzial 414, dowodcow 1
+  Hellholt: bitew 1 (wygranych 1), najwiekszy oddzial 332, dowodcow 1
+Dorne d137-d149: bitew druzyn lordow 36
+  Skyreach: bitew 13 (wygranych 4), najwiekszy oddzial 405, dowodcow 12
+  Blackmont: bitew 7 (wygranych 5), najwiekszy oddzial 414, dowodcow 6
+  Vaith: bitew 6 (wygranych 6), najwiekszy oddzial 134, dowodcow 4
+  Hellholt: bitew 4 (wygranych 4), najwiekszy oddzial 89, dowodcow 2
+  Kingsgrave: bitew 2 (wygranych 0), najwiekszy oddzial 96, dowodcow 2
+  Sandstone: bitew 1 (wygranych 1), najwiekszy oddzial 294, dowodcow 1
+  Ashford: bitew 1 (wygranych 1), najwiekszy oddzial 114, dowodcow 1
+  Saltshore: bitew 1 (wygranych 1), najwiekszy oddzial 51, dowodcow 1
+  Yronwood: bitew 1 (wygranych 1), najwiekszy oddzial 58, dowodcow 1
+Dorne d229-d244: bitew druzyn lordow 19
+  Skyreach: bitew 3 (wygranych 3), najwiekszy oddzial 285, dowodcow 3
+  Vaith: bitew 3 (wygranych 3), najwiekszy oddzial 110, dowodcow 3
+  Starfall: bitew 2 (wygranych 2), najwiekszy oddzial 45, dowodcow 1
+  Blackmont: bitew 2 (wygranych 0), najwiekszy oddzial 183, dowodcow 2
+  Saltshore: bitew 2 (wygranych 2), najwiekszy oddzial 164, dowodcow 2
+  Godsgrace: bitew 2 (wygranych 2), najwiekszy oddzial 44, dowodcow 2
+  Kingsgrave: bitew 1 (wygranych 1), najwiekszy oddzial 23, dowodcow 1
+  Sandstone: bitew 1 (wygranych 1), najwiekszy oddzial 41, dowodcow 1
+  Hellholt: bitew 1 (wygranych 0), najwiekszy oddzial 51, dowodcow 1
+  Nightsong: bitew 1 (wygranych 0), najwiekszy oddzial 183, dowodcow 1
+  Planky Town: bitew 1 (wygranych 1), najwiekszy oddzial 202, dowodcow 1
+Dorne d262-d273: bitew druzyn lordow 21
+  Skyreach: bitew 12 (wygranych 6), najwiekszy oddzial 2007, dowodcow 12
+  Yronwood: bitew 3 (wygranych 3), najwiekszy oddzial 97, dowodcow 3
+  Blackmont: bitew 1 (wygranych 1), najwiekszy oddzial 23, dowodcow 1
+  Sandstone: bitew 1 (wygranych 1), najwiekszy oddzial 112, dowodcow 1
+  Hellholt: bitew 1 (wygranych 1), najwiekszy oddzial 40, dowodcow 1
+  Nightsong: bitew 1 (wygranych 0), najwiekszy oddzial 51, dowodcow 1
+  Godsgrace: bitew 1 (wygranych 1), najwiekszy oddzial 51, dowodcow 1
+  Vaith: bitew 1 (wygranych 1), najwiekszy oddzial 50, dowodcow 1
+Dorne d307-d324: bitew druzyn lordow 3
+  Vaith: bitew 2 (wygranych 2), najwiekszy oddzial 287, dowodcow 2
+  Yronwood: bitew 1 (wygranych 1), najwiekszy oddzial 2085, dowodcow 1
+Dorne d367-d377: bitew druzyn lordow 7
+  Vaith: bitew 4 (wygranych 4), najwiekszy oddzial 274, dowodcow 3
+  Hellholt: bitew 2 (wygranych 1), najwiekszy oddzial 86, dowodcow 2
+  Yronwood: bitew 1 (wygranych 0), najwiekszy oddzial 51, dowodcow 1
+Dorne d414-d429: bitew druzyn lordow 8
+  Yronwood: bitew 5 (wygranych 5), najwiekszy oddzial 670, dowodcow 4
+  Wyl: bitew 2 (wygranych 2), najwiekszy oddzial 1050, dowodcow 2
+  The Tor: bitew 1 (wygranych 1), najwiekszy oddzial 33, dowodcow 1

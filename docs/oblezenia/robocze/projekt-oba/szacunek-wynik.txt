@@ -1,0 +1,18 @@
+zdobycia fin30 57 | wymiana E (mediana obl./obronce) 1.58 z 44 | hazard konca bez szturmu 0.061 /dobe | powrot po porazce sila (<=120 dob) 30 / 67 = 0.45
+stolice zdobyte 7 | S1 (zaloga >= 50% obrony w bitwie ze szturmu) 5
+fA zdobyc: kwartyle [0.071, 0.213, 0.301]
+   wariant +T1: zdobyc 11.3 + powrot 4.1 = 15.3, czas zdobycia mediana 14.3
+L=0.15: zdobyc zostaje 14.7 (+ powrot 4.9 = 19.5) | odparte zdobycia 42 + bez rozstrzygniecia -> odparte 11/18 | R1 zatrzymuje 3.6 (pozniej 6) | czas zdobycia mediana 10.0 p90 14.6
+   wariant +T1: zdobyc 12.8 + powrot 4.5 = 17.3, czas zdobycia mediana 14.3
+L=0.18: zdobyc zostaje 16.7 (+ powrot 5.3 = 22.0) | odparte zdobycia 40 + bez rozstrzygniecia -> odparte 9/18 | R1 zatrzymuje 3.6 (pozniej 6) | czas zdobycia mediana 10.0 p90 14.9
+   wariant +T1: zdobyc 15.1 + powrot 5.0 = 20.1, czas zdobycia mediana 14.3
+L=0.20: zdobyc zostaje 19.7 (+ powrot 5.8 = 25.4) | odparte zdobycia 37 + bez rozstrzygniecia -> odparte 7/18 | R1 zatrzymuje 3.6 (pozniej 6) | czas zdobycia mediana 10.0 p90 14.0
+   wariant +T1: zdobyc 19.0 + powrot 5.7 = 24.6, czas zdobycia mediana 15.3
+L=0.22: zdobyc zostaje 24.7 (+ powrot 6.3 = 30.9) | odparte zdobycia 32 + bez rozstrzygniecia -> odparte 7/18 | R1 zatrzymuje 3.6 (pozniej 6) | czas zdobycia mediana 11.0 p90 15.4
+   wariant +T1: zdobyc 26.7 + powrot 6.4 = 33.0, czas zdobycia mediana 16.3
+L=0.25: zdobyc zostaje 34.7 (+ powrot 6.1 = 40.8) | odparte zdobycia 22 + bez rozstrzygniecia -> odparte 5/18 | R1 zatrzymuje 3.6 (pozniej 6) | czas zdobycia mediana 12.0 p90 14.4
+L=0.15: stolice zdobyte nadal: []
+L=0.18: stolice zdobyte nadal: []
+L=0.20: stolice zdobyte nadal: []
+L=0.22: stolice zdobyte nadal: []
+L=0.25: stolice zdobyte nadal: []
