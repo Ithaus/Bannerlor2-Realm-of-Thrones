@@ -14,7 +14,8 @@ namespace Armoury
     ///  - KTO: rod z planu doby W5 (KingdomTreasury.NeedAid.cs - ta sama miara potrzeby, NIE liczona drugi raz): krolestwo w wojnie, rod z warunkiem rent
     ///    i budzetem 166, ktorego WLASNY pulap druzyn nie starcza na druzyny do celu W5 (CrownWarAidFillTarget, 60% limitu) - i ktoremu wszystkie zrodla W5
     ///    (danina P1, skarbiec ponad zapas wojny W5b, tarczowe W6) nie pokryly potrzeby: niepokryte rodu = koszt przy celu - koszt przy poziomie wyrownania
-    ///    W5 po ostatnim szczeblu (NaCost - ten sam wzor). Rod z luzem w pulapie nie ma potrzeby - nie wchodzi. Gracz tylko z kluczem PlayerWarLevy i tylko
+    ///    W5 po ostatnim szczeblu (NaCost - ten sam wzor). Rod z luzem w pulapie (zold druzyn ponizej 95% pulapu wlasnego druzyn - ta sama miara "na pulapie"
+    ///    co ClanBudget.SlackGold) jest ponizej celu nie z powodu pulapu - bez poboru i bez miejsca W7 (recenzja W7). Gracz tylko z kluczem PlayerWarLevy i tylko
     ///    wtedy, gdy W5 go mierzy (W6b: wasal z miastem albo zamkiem) - bez klucza nic nie placi i nic nie dostaje.
     ///  - SKAD (prawdziwe zloto): z WLASNYCH lenn rodu (miasta i zamki wlasciciela) i ich wsi: kiesa ludu (W/R/P, podzamcze) ponad zapas dni PO daninie P1 tej
     ///    doby i ponad oferte nadwyzki na jutro (TownFolk.LevyRoom - ta sama miara "ponad zapas" co P1), kiesa wsi ponad 15 dni zakupow (TownFolk.VillageFloor -
@@ -57,7 +58,8 @@ namespace Armoury
         // licznik doby (linia)
         private static long _lvFolk, _lvVill, _lvHeads, _lvCut; private static double _lvUnc, _lvBoostSum, _lvLoy, _lvPros, _lvLoySum, _lvLoyMin;
         private static int _lvCutN, _lvNeedN, _lvPaidN, _lvRoomN, _lvNoSrcN, _lvPlOff, _lvPlanK, _lvPeaceK, _lvLowLoy, _lvRebel, _lvSiege, _lvLooted, _lvLoyN;
-        private static int _lvOverAid, _lvBelowRes, _lvAtLowLoy, _lvSlack, _lvOverNeed, _lvInPeace, _lvMen, _lvLim;
+        private static int _lvOverAid, _lvBelowRes, _lvAtLowLoy, _lvSlack, _lvOverNeed, _lvInPeace, _lvMen, _lvLim, _lvSlackSkip, _lvShortN;
+        private const double LvAtCap = 0.95;   // recenzja W7: rod "na pulapie" - zold druzyn co najmniej 95% pulapu wlasnego druzyn (ta sama granica co ClanBudget.SlackGold)
         private static readonly HashSet<Settlement> _lvPlaces = new HashSet<Settlement>();
         // tydzien na krolestwo (linia co 7 dob) i gracz (komunikat)
         private static readonly Dictionary<string, LvWk> _lvWeek = new Dictionary<string, LvWk>();
@@ -85,7 +87,7 @@ namespace Armoury
         {
             _lvFolk = _lvVill = _lvHeads = 0; _lvUnc = _lvBoostSum = _lvLoy = _lvPros = _lvLoySum = 0; _lvLoyMin = double.NaN;
             _lvNeedN = _lvPaidN = _lvRoomN = _lvNoSrcN = _lvPlOff = _lvPlanK = _lvPeaceK = _lvLowLoy = _lvRebel = _lvSiege = _lvLooted = _lvLoyN = 0;
-            _lvOverAid = _lvBelowRes = _lvAtLowLoy = _lvSlack = _lvOverNeed = _lvInPeace = _lvMen = _lvLim = 0;
+            _lvOverAid = _lvBelowRes = _lvAtLowLoy = _lvSlack = _lvOverNeed = _lvInPeace = _lvMen = _lvLim = _lvSlackSkip = _lvShortN = 0;
             _lvPlaces.Clear();
         }
 
@@ -168,7 +170,10 @@ namespace Armoury
                     if (x == null || x.C == null || x.C.IsEliminated || x.C.Leader == null || !x.C.Leader.IsAlive || x.C.Kingdom != k) continue;
                     if (x.Pl && !s.PlayerWarLevy) { _lvPlOff++; continue; }   // gracz bez klucza - nic nie placi i nic nie dostaje
                     double c0 = NaCost(x, f0), ct = NaCost(x, target), unc = ct - c0;
-                    if (!(unc >= 1)) continue;                                // W5 pokryl potrzebe rodu (albo rod z luzem - nie ma go w planie)
+                    if (!(unc >= 1)) continue;                                // W5 pokryl potrzebe rodu (rod stac na cel z wlasnego pulapu - nie ma go w planie)
+                    // recenzja W7: rod z luzem w pulapie (zold druzyn ponizej 95% pulapu wlasnego) jest ponizej celu nie z powodu pulapu zoldu - werbuje z wlasnego
+                    // miejsca; W7 nie bierze dla niego i nie daje mu miejsca (W5 daje swoje jak dotad). Dotad dostawal samo miejsce W7, gdy poziom W7 byl wyzszy od W5
+                    if (x.W < LvAtCap * x.Pc0) { _lvSlackSkip++; continue; }
                     _lvNeedN++; _lvUnc += unc;
                     if (wk == null) wk = LvWeekOf(p.Name);
                     wk.Unc += unc;
@@ -196,13 +201,16 @@ namespace Armoury
                     if (got > 0)
                     {
                         _lvPaid[x.C] = got; _lvCash[x.C] = got; _lvPaidN++;
-                        if (x.W <= x.Pc0) _lvSlack++;                         // kontrola: gotowka tylko rodom, ktorych zold druzyn przekracza pulap wlasny (oczekiwane 0)
                         if (got > unc + 1) _lvOverNeed++;                     // kontrola: nigdy ponad niepokryta potrzebe (oczekiwane 0)
                         wk.Clans.Add(x.C);
                         if (x.Pl) _lvPlWeek += got;
                     }
                     // przydzial w pulapie: gotowka + miejsce na krok werbunku przy poziomie W7, ponad przydzial W5 tej doby (gracz - bez pulapu 166, sama gotowka)
-                    double nb = Math.Max(b7, paid5 + got), add = x.Pl ? 0 : Math.Max(0, nb - boost5);
+                    // recenzja W7: przydzial liczony przy poziomie W7 zaklada gotowke `want`; gdy przelew wzial mniej (potkniecie zrodla), niezaplacona czesc
+                    // nie podnosi pulapu - inaczej rod placilby ten zold z wlasnej kiesy ponad pulap wlasny (pulap bez zlota)
+                    if (got < want) _lvShortN++;
+                    double nb = Math.Max(b7 - Math.Max(0, want - got), paid5 + got), add = x.Pl ? 0 : Math.Max(0, nb - boost5);
+                    if ((got > 0 || add > 0) && x.W < LvAtCap * x.Pc0) _lvSlack++;   // kontrola: przydzial (gotowka albo miejsce) rodowi z luzem w pulapie (oczekiwane 0)
                     if (add > 0) { _lvBoost[x.C] = add; _lvBoostSum += add; if (got <= 0) _lvRoomN++; }
                     if (got > 0 || add > 0) { _lvMen += x.M; _lvLim += x.L; }
                 }
@@ -461,14 +469,15 @@ namespace Armoury
                   .Append(", rody z niepokryta potrzeba po W5 ").Append(_lvNeedN).Append(" (niepokryte ").Append(LvF(Math.Floor(_lvUnc), "0")).Append(")")
                   .Append(", z poborem ").Append(_lvPaidN).Append(", z samym miejscem w pulapie ").Append(_lvRoomN)
                   .Append(", bez nadwyzki w lennach ").Append(_lvNoSrcN).Append(", gracz bez klucza ").Append(_lvPlOff)
+                  .Append(", z luzem w pulapie (bez W7) ").Append(_lvSlackSkip)
                   .Append(" | do glow rodow ").Append(_lvHeads).Append(" (roznica obiegu ").Append(_lvHeads - all).Append(")")
                   .Append(", podniesienie pulapu ").Append(LvF(Math.Round(_lvBoostSum), "0")).Append(" (gotowka ").Append(_lvHeads)
                   .Append(" + miejsce na krok werbunku ").Append(LvF(Math.Round(Math.Max(0, _lvBoostSum - _lvHeads)), "0")).Append(")")
                   .Append(" | osady pominiete: lojalnosc < prog ").Append(_lvLowLoy).Append(", bunt ").Append(_lvRebel).Append(", oblezenie ").Append(_lvSiege)
                   .Append(", wsie spladrowane ").Append(_lvLooted)
                   .Append(" | kontrola: lud ponad nadwyzke po P1 ").Append(_lvOverAid).Append(", ponizej zapasu po poborze ").Append(_lvBelowRes)
-                  .Append(", pobor w osadzie z lojalnoscia < prog ").Append(_lvAtLowLoy).Append(", gotowka rodom z luzem ").Append(_lvSlack)
-                  .Append(", gotowka ponad niepokryta potrzebe ").Append(_lvOverNeed).Append(", pobor w pokoju ").Append(_lvInPeace).Append(" (oczekiwane 0)")
+                  .Append(", pobor w osadzie z lojalnoscia < prog ").Append(_lvAtLowLoy).Append(", przydzial rodom z luzem ").Append(_lvSlack)
+                  .Append(", gotowka ponad niepokryta potrzebe ").Append(_lvOverNeed).Append(", pobor w pokoju ").Append(_lvInPeace).Append(", przelew ponizej planu (potkniecie zrodla) ").Append(_lvShortN).Append(" (oczekiwane 0)")
                   .Append(" | wojsko rodow z W7 dzis: ").Append(_lvMen).Append(" ludzi / limit ").Append(_lvLim).Append(" (").Append(NaPct(_lvMen, _lvLim)).Append(')')
                   .Append(" | lojalnosc osad z poborem po koszcie: srednio ").Append(_lvLoyN > 0 ? LvF(_lvLoySum / _lvLoyN, "0.0") : "-")
                   .Append(", najnizsza ").Append(double.IsNaN(_lvLoyMin) ? "-" : LvF(_lvLoyMin, "0.0"))

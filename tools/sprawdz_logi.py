@@ -462,7 +462,8 @@ Uzycie (Python 3, tylko odczyt):
                     nadwyzki ludu i wsi wlasnych lenn (po daninie P1 i danine wsi) na zold ludzi, ktorzy sa; koszt: lojalnosc i dobrobyt osady.
                     python -I tools/sprawdz_logi.py --grupa w7 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
                     Wiersze W7-0..W7-9: linia i klucz, zamkniecie co do zlotowki (lud + wsie = pobrano = do glow, Obieg, kolumna CSV pobor_wojenny_w7,
-                    kiesy ludu r = 0), P1 i W7 bez podwojnego poboru, bez poboru w osadzie z lojalnoscia < 40, rody z luzem 0, pokoj 0, potkniecia,
+                    kiesy ludu r = 0), P1 i W7 bez podwojnego poboru, bez poboru w osadzie z lojalnoscia < 40, rody z luzem 0 (bez poboru i bez miejsca W7),
+                    pokoj 0, potkniecia (i przelew ponizej planu),
                     zold poza podstawa zwrotu <= wczorajszy pobor, wojsko (INFO z miara W5-7), liczby paczki i krolestwa (INFO). Log bez paczki: INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -16726,10 +16727,12 @@ def m6b_main(logp, start_arg, until=120):
 # pobor_wojenny_w7, podniesienie_pulapu_w7.
 W7_PREFIX = "Stawka wojenna pana (W7): dzien"
 W7_HEAD = re.compile(r"- rodow (\d+), osad (\d+), pobrano (\d+) \(z ludu (\d+) / ze wsi (\d+)\), lojalnosc -([\d.]+), dobrobyt -([\d.]+), potkniecia (\d+)")
-W7_NEED = re.compile(r"rody z niepokryta potrzeba po W5 (\d+) \(niepokryte (\d+)\), z poborem (\d+), z samym miejscem w pulapie (\d+), bez nadwyzki w lennach (\d+), gracz bez klucza (\d+)")
+W7_NEED = re.compile(r"rody z niepokryta potrzeba po W5 (\d+) \(niepokryte (\d+)\), z poborem (\d+), z samym miejscem w pulapie (\d+), bez nadwyzki w lennach (\d+), gracz bez klucza (\d+)"
+                     r"(?:, z luzem w pulapie \(bez W7\) (\d+))?")
 W7_HEADS = re.compile(r"\| do glow rodow (\d+) \(roznica obiegu (-?\d+)\), podniesienie pulapu (\d+)")
-W7_CTL = re.compile(r"\| kontrola: lud ponad nadwyzke po P1 (\d+), ponizej zapasu po poborze (\d+), pobor w osadzie z lojalnoscia < prog (\d+), gotowka rodom z luzem (\d+)"
-                    r", gotowka ponad niepokryta potrzebe (\d+), pobor w pokoju (\d+)")
+# recenzja W7: "przydzial rodom z luzem" (gotowka albo miejsce; dotad "gotowka rodom z luzem" - kontrola pusta z definicji) i "przelew ponizej planu" (opcjonalny)
+W7_CTL = re.compile(r"\| kontrola: lud ponad nadwyzke po P1 (\d+), ponizej zapasu po poborze (\d+), pobor w osadzie z lojalnoscia < prog (\d+), (?:gotowka|przydzial) rodom z luzem (\d+)"
+                    r", gotowka ponad niepokryta potrzebe (\d+), pobor w pokoju (\d+)(?:, przelew ponizej planu \(potkniecie zrodla\) (\d+))?")
 W7_SKIP = re.compile(r"osady pominiete: lojalnosc < prog (\d+), bunt (\d+), oblezenie (\d+), wsie spladrowane (\d+)")
 W7_ARMY = re.compile(r"\| wojsko rodow z W7 dzis: (\d+) ludzi / limit (\d+)")
 W7_CUT = re.compile(r"poza podstawa zwrotu 70% \(dzis\) (\d+) \(wpisow (\d+)\)")
@@ -16774,10 +16777,11 @@ def w7_main(logp, start_arg, until=120, csvp=None):
         if h and hd and c:
             tot[d] = {"rody": int(h.group(1)), "osad": int(h.group(2)), "x": int(h.group(3)), "lud": int(h.group(4)), "wsie": int(h.group(5)),
                       "loy": float(h.group(6)), "pros": float(h.group(7)), "st": int(h.group(8)), "heads": int(hd.group(1)), "diff": int(hd.group(2)),
-                      "boost": int(hd.group(3)), "ctl": [int(x) for x in c.groups()]}
+                      "boost": int(hd.group(3)), "ctl": [int(x) if x is not None else 0 for x in c.groups()]}
             n = W7_NEED.search(w7[d])
             if n:
-                tot[d].update({"needn": int(n.group(1)), "unc": int(n.group(2)), "room": int(n.group(4)), "nosrc": int(n.group(5))})
+                tot[d].update({"needn": int(n.group(1)), "unc": int(n.group(2)), "room": int(n.group(4)), "nosrc": int(n.group(5)),
+                               "slack": int(n.group(7)) if n.group(7) is not None else 0})
             a = W7_ARMY.search(w7[d])
             if a:
                 tot[d].update({"men": int(a.group(1)), "lim": int(a.group(2))})
@@ -16847,14 +16851,17 @@ def w7_main(logp, start_arg, until=120, csvp=None):
         rep.add("W7-3: nikt nie bierze w osadzie z lojalnoscia ponizej progu (40)",
                 f"pobor w takiej osadzie {sum(x[2] for x in c0)}; pominiete (osado-doby): lojalnosc < prog {sum(x[0] for x in sk)}, bunt {sum(x[1] for x in sk)}"
                 f", oblezenie {sum(x[2] for x in sk)}, wsie spladrowane {sum(x[3] for x in sk)}", "0", sum(x[2] for x in c0) == 0)
-        rep.add("W7-4: rody z luzem 0 - gotowka rodom, ktorych zold druzyn miesci sie w pulapie wlasnym / gotowka ponad niepokryta potrzebe W5",
-                f"{sum(x[3] for x in c0)} / {sum(x[4] for x in c0)} w {len(c0)} dobach", "0 / 0 (pan bierze tylko na brak, ktorego W5 nie pokrylo)",
+        rep.add("W7-4: rody z luzem 0 - przydzial W7 (gotowka albo miejsce) rodom z zoldem druzyn ponizej 95% pulapu wlasnego / gotowka ponad niepokryta potrzebe W5",
+                f"{sum(x[3] for x in c0)} / {sum(x[4] for x in c0)} w {len(c0)} dobach (rodow z luzem pominietych: {sum(t.get('slack', 0) for t in tot.values())} rodo-dob)",
+                "0 / 0 (pan bierze tylko na brak z powodu pulapu, ktorego W5 nie pokrylo)",
                 sum(x[3] + x[4] for x in c0) == 0)
         rep.add("W7-5: pokoj 0 - pobor u rodu krolestwa, ktore nie jest w wojnie (kontrola niezalezna od planu W5)",
                 f"{sum(x[5] for x in c0)} rodo-dob", "0", sum(x[5] for x in c0) == 0)
         st_ = [t["st"] for t in tot.values()]
         err = [s for s in lines if s.startswith("ERROR in ") and "LordLevy" in s]
-        rep.add("W7-6: potkniecia kroku W7", f"razem {sum(st_)} w {len(st_)} dobach (ERROR {len(err)})", "0", sum(st_) == 0 and not err)
+        short_ = sum(x[6] for x in c0 if len(x) > 6)
+        rep.add("W7-6: potkniecia kroku W7 (i przelew ponizej planu)", f"razem {sum(st_)} w {len(st_)} dobach (ERROR {len(err)}), przelew ponizej planu {short_}", "0 / 0",
+                sum(st_) == 0 and not err and short_ == 0)
         # ---- W7-9 zold poza podstawa zwrotu <= wczorajszy pobor
         cut_bad, cut_sum, x_sum = [], 0, 0
         for d in sorted(tot):

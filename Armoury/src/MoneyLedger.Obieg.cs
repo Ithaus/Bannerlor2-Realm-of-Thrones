@@ -664,12 +664,14 @@ namespace Armoury
             long trans = _fromNothing[CVill] - _toNothing[CVill];
             for (int p = 0; p < Sides; p++) trans += _goldIn[CVill, p] - _goldOut[CVill, p];
             long rel = ClanBudget.LastReleasedPurse, rent = PopulationLaw.DayVillageRent, crown = -_mark[CVill, MCrown];
-            long g = _vHanded + trans + rel, lord = _vTax + rent, rest = g - lord - _vEstates - crown;
+            // recenzja W7: stawka wojenna pana ze wsi (krok po znaczniku MCrown, KingdomTreasury.LordLevyDay) - kiesa wsi -> glowa rodu; bez tego szla do "wies (zostalo)"
+            long w7 = KingdomTreasury.LastLordLevyVill;
+            long g = _vHanded + trans + rel, lord = _vTax + rent, rest = g - lord - _vEstates - crown - w7;
             long ph, pt, pr;
             string split = TownFolk.VillagePolicySplit(out ph, out pt, out pr);
             return "Gotowka wsi (E5/0): dzien " + day + " | wplynelo " + g + " = utarg " + _vHanded + " + przelewy gry " + trans + " + sakiewki zwolnionych " + rel
                    + " | pan (licznik podatku wsi " + _vTax + " + renta " + rent + ") " + Pct(lord, g) + ", majatki BK " + _vEstates + " (" + Pct(_vEstates, g) + "), korona " + crown + " (" + Pct(crown, g)
-                   + "), wies (zostalo w kiesie) " + rest + " (" + Pct(rest, g) + ")"
+                   + "), pan - stawka wojenna (W7) " + w7 + " (" + Pct(w7, g) + "), wies (zostalo w kiesie) " + rest + " (" + Pct(rest, g) + ")"
                    + " | wedlug polityki BK: " + split
                    + " | kontrola podzialu: utarg " + ph + " wobec " + _vHanded + ", przelewy " + pt + " wobec " + trans + ", sakiewki " + pr + " wobec " + rel + ".";
         }
