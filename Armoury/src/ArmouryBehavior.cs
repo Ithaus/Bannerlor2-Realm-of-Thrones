@@ -908,6 +908,7 @@ namespace Armoury
             WarFront.RegisterEvents(this);      // N5-E: te same zdarzenia z miejscem - warownie przy froncie (budowle cywilne z dala od frontu)
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
             Measure169c.RegisterEvents(this);   // 169c: niewola lordow, dezercja, sluby AI, Bliznaki - same liczniki (tylko log)
+            ArmyCohesionYear.RegisterEvents(this);   // AC (Jeff 14.10): armie zalozone / rozwiazane - wiek armii i przyczyny do linii doby
             PregnancyYear.RegisterEvents(this);   // CR (zasada Jeffa 14.10): poczecia i porody (OnChildConceived / OnGivenBirth) - same liczniki do linii doby
             FiefGrants.RegisterEvents(this);   // PROJEKT-LENNA (14.10): uczestnicy zwycieskiego szturmu (MapEventEnded), rodzaj zmiany pana twierdzy, decyzje "Owner of X" rozstrzygniete / anulowane
             // M6a: najkrotsza sluzba kompanii (pole gry przy najmie, pomiar konca sluzby), pamiec okupow (kazda droga okupu), rozstrzygniecie pokoju po 24 h
@@ -1380,6 +1381,7 @@ namespace Armoury
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
             try { PregnancyYear.SessionStart(); } catch (Exception e) { Log.Error("PregnancyYear.SessionStart", e); }   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): start sesji" - klucze z MCM (PO McmSettings.Apply), rok i mnoznik, czynny model, ciaze w toku
+            try { ArmyCohesionYear.SessionStart(); } catch (Exception e) { Log.Error("ArmyCohesionYear.SessionStart", e); }   // AC (Jeff 14.10): spojnosc armii x 84 / rok - postfiks na metode czynnego modelu armii (raz na proces), linia "Spojnosc armii (AC): start sesji"
             try { DayHeld.SessionStart(); } catch (Exception e) { Log.Error("DayHeld.SessionStart", e); }   // A14 / G20 (drobne2): doba po wczytaniu ze srodka doby - PO McmSettings.Apply (klucz z MCM), przed pierwszym tickiem osad
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
             try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem, potem na stale) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
@@ -1709,6 +1711,7 @@ namespace Armoury
             try { DefeatMorale.Daily(); } catch (Exception e) { Log.Error("DefeatMorale.Daily", e); } DayProfile.Lap("DefeatMorale.Daily");   // D11-1: linia "Kara za przegrana (D11-1)" zaraz po liniach wojny (dezercja AI 183) - tylko log
             try { RaceLaw.Daily(); } catch (Exception e) { Log.Error("RaceLaw.Daily", e); } DayProfile.Lap("RaceLaw.Daily");   // Jeff 10.10: linia "Rasy: dzien N" - tylko gdy cos zablokowano
             try { PregnancyYear.Daily(); } catch (Exception e) { Log.Error("PregnancyYear.Daily", e); } DayProfile.Lap("PregnancyYear.Daily");   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): dzien N" - ciaze w toku, poczecia, porody, rzuty szansy (tylko log)
+            try { ArmyCohesionYear.Daily(); } catch (Exception e) { Log.Error("ArmyCohesionYear.Daily", e); } DayProfile.Lap("ArmyCohesionYear.Daily");   // AC: linia "Spojnosc armii (AC): dzien N"
             try { FiefGrants.Daily(); } catch (Exception e) { Log.Error("FiefGrants.Daily", e); } DayProfile.Lap("FiefGrants.Daily");   // PROJEKT-LENNA (14.10): linia "Nadania lenn (N) doba N" (gdy cos sie dzialo albo co 28 dob), pamiec szturmow i nadan 60 dob
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); } DayProfile.Lap("Orders.DailyTick");

@@ -1563,6 +1563,9 @@ namespace Armoury
         public bool Army175MinorLore = true;               // the Free Folk with fewer horsemen, and Dragonstone, Velaryon and Celtigar with horse at about a tenth of their men. Applied by CrashScribe, takes effect on the next load
         // PLAN 1.6 (14.10, w-toku/jeff-tak-swiat): WLACZONE - warunek z wpisu 175/K1 jest w kodzie (GoldenKits: potrzeba AI ze wszystkich zestawow tych trzech
         // jednostek, waga 1/n - AiGear.Deficit / NeedBuckets, GarrisonArmory.AddNeed i dopasowanie, MenUpgrade.Buckets); false = 449d453
+        // AC (Jeff 14.10 "rozpad armii powinien byc wolniejszy, bo teraz 1 dzien to 1 dzien"; ArmyCohesionYear.cs): dzienny spadek spojnosci armii
+        // x 84 / rok kalendarza (0,2308 przy roku 364) - postfiks CalculateDailyCohesionChange czynnego modelu (SCA); false = gra
+        public bool ArmyCohesionYearScale = true;          // An army's cohesion falls each day at the pace the game meant for its 84-day year, scaled to the long year (84 / 364 = 0.23): a lord's army of five parties holds together about 80 days instead of about 19, and about 45 days instead of 12 deep in enemy land; your own army likewise. Starving, low-morale and weak parties still drain it faster, and a commander can still spend influence to restore it. Off = the game's daily loss
         public bool Army175GoldenBows = true;              // Golden Company crossbowmen split into thirds as in the books - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Their lords buy, keep and train with bows and arrows for two thirds of these men and crossbows and bolts for one third (only these three Golden Company crossbow troops; every other troop counts its first kit, as before). The kits are made by CrashScribe on the next load; the Armoury part acts at once. Off: one kit of crossbows for all of them
 
         // --- The Others and Valyrian steel (175c) ---

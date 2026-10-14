@@ -1,5 +1,20 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (AC - spojnosc armii pod rok 364 dob, Jeff "rozpad armii powinien byc wolniejszy, bo 1 dzien to 1 dzien") - ARMIE TRZYMAJA SIE OK. 4,3 RAZA DLUZEJ
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** ArmyCohesionYearScale (TAK) | **Status:** DO SPRAWDZENIA | **Zmiana wojny:** tak
+
+**Dzis (gra 1.4.8 + SCA):** spadek spojnosci -2 na dobe, -1 za kazda druzyne i kary za glod / morale / male druzyny (armia AI x0,25), SCA -3,5 na dobe po 5 dobach
+na ziemi wroga; armia AI rozwiazuje sie ponizej 30 (poza bitwa i oblezeniem), gracza przy 0. Armia AI z 5 druzynami ok. 19 dob, na ziemi wroga ok. 12; gracza ok. 12.
+Wszystko dobrane pod rok gry 84 doby.
+
+**Zmiana:** `Armoury/src/ArmyCohesionYear.cs` - postfiks CalculateDailyCohesionChange czynnego modelu (SCA StrategicArmyManagementModel; metoda bazowa nie latana, wiec bez
+podwojenia) x 84 / rok (0,2308) przez AddFactor((f - 1) x (1 + SumOfFactors)) z linia w objasnieniu. Armia AI z 5 druzynami ok. 80 dob, na ziemi wroga ok. 45; gracz
+podobnie. Kupno spojnosci za wplyw bez zmian (rzadziej potrzebne). Linie: "Spojnosc armii (AC): start sesji" i doba (armie, srednia spojnosc, zmiana teraz / bez skali,
+rozwiazane wedlug przyczyny, wiek przy rozwiazaniu). Grupa progow `spojnosc` (AC-0..3).
+
+**Do sprawdzenia:** AC-2 = 0,23; wiek armii przy rozwiazaniu; liczba zdobyc (dluzsze kampanie - wiecej dokonczonych oblezen), jedzenie armii (glod skraca), wplyw rodow.
+
 ## 2026-10-14 (B10b - atuty BK z bitew, decyzja Jeffa "tak napraw") - WARBAND +25% WPLYWU, FAMOUS SELLSWORDS +20% I CATAPHRACT +12% SLAWY ZNOW DZIALAJA
 
 **Mod:** CrashScribe + narzedzie | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** BkBattlePerksFix (true) | **Status:** DO SPRAWDZENIA | **Zmiana ekonomii / polityki:** tak (wplyw i slawa z bitew u gracza i AI)

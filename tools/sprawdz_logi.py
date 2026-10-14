@@ -714,6 +714,8 @@ Uzycie (Python 3, tylko odczyt):
                     linie nadania (z --tabele: zmiany rodu po zdobyciu +- 2), LN-2 ponad pulapem przy kims w pulapie 0, LN-3 rada wybiera 1. albo >= 0.7 x 1.
                     (>= 95%), LN-4 najwiekszy rod krolestwa <= 40%, LN-5 rody / nadania >= 0.60, LN-6 miasta ponad pulap 0, LN-7 rod krola <= 35%,
                     LN-8 wodz spoza korony dostaje >= 50%, LN-9 anulowane 0, LN-10 uczestnicy szturmu >= 80%, LN-11 oddane w 60 dob (DECYZJA), LN-12 potkniecia 0.
+--grupa spojnosc  : (14.10, Jeff "rozpad armii wolniejszy - 1 dzien to 1 dzien"; Armoury/src/ArmyCohesionYear.cs) python -I tools/sprawdz_logi.py --grupa spojnosc
+                    <Armoury-*.log>. AC-0 start (klucz, latka, mnoznik), AC-1 doby i potkniecia 0, AC-2 zmiana teraz / bez skali = mnoznik +- 0.02, AC-3 INFO.
 --grupa b10b      : (14.10, ERRORS.md A7 klasa 7, decyzja Jeffa "tak napraw"; CrashScribe/src/BkBattlePerks.cs) python -I tools/sprawdz_logi.py --grupa b10b
                     --crashscribe <session-*.log>. B10-0 linia startu wpiete 2/2, B10-1 linie doby i potkniecia 0, B10-2 premie (INFO), B10-3 typy BK 0 BRAK.
 --grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
@@ -16634,6 +16636,69 @@ UC_DAY = re.compile(
     r" \| klucze SD/MV/DG/CH (?P<sd>tak|nie)/(?P<mv>tak|nie)/(?P<dg>tak|nie)/(?P<ch>tak|nie)(?: \| POTKNIECIA (?P<stum>\d+) \(razem \d+\))?")
 
 
+def spojnosc_main(logp):
+    """spojnosc (AC, Jeff 14.10 "rozpad armii wolniejszy - 1 dzien to 1 dzien"; Armoury/src/ArmyCohesionYear.cs). Wejscie: log Armoury.
+    AC-0 linia startu sesji: klucz TAK, latka wpieta (bez BRAK / wyjatku), mnoznik = 84 / rok; AC-1 linie doby i potkniecia 0;
+    AC-2 srednia zmiana spojnosci teraz / bez skali = mnoznik (+- 0.02) w dobach z armiami; AC-3 rozwiazane wedlug przyczyny i sredni
+    wiek armii przy rozwiazaniu (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("AC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    lines = read(logp)
+    starts = [s for s in lines if s.startswith("Spojnosc armii (AC): start sesji")]
+    days = [s for s in lines if s.startswith("Spojnosc armii (AC): dzien ")]
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)}")
+    if not starts:
+        rep.add("AC-0: linia startu (spojnosc armii)", "brak linii", "INFO (wersja sprzed AC)", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    m = re.search(r"mnoznik x([0-9.]+)", st)
+    fac = float(m.group(1)) if m else None
+    on = "klucz ArmyCohesionYearScale TAK" in st
+    ok0 = ("latka: wpieta" in st) and on and fac is not None
+    rep.add("AC-0: linia startu (spojnosc armii)", st[len("Spojnosc armii (AC): start sesji | "):][:220],
+            "klucz TAK, latka wpieta, mnoznik podany", ok0 if on else None)
+    stum = 0
+    ratios = []
+    reasons = {}
+    ages = []
+    for s in days:
+        mm = re.search(r"potkniecia (\d+)", s)
+        if mm:
+            stum = max(stum, int(mm.group(1)))
+        mm = re.search(r"zmiana na dobe srednio teraz (-?[0-9.]+), bez skali (-?[0-9.]+)", s)
+        if mm:
+            a, b = float(mm.group(1)), float(mm.group(2))
+            if abs(b) > 0.05:
+                ratios.append(a / b)
+        mm = re.search(r"rozwiazane dzis \d+ \(([^)]*)\)", s)
+        if mm:
+            for part in mm.group(1).split(", "):
+                p2 = part.rsplit(" ", 1)
+                if len(p2) == 2 and p2[1].isdigit():
+                    reasons[p2[0]] = reasons.get(p2[0], 0) + int(p2[1])
+        mm = re.search(r"wiek przy rozwiazaniu srednio ([0-9.]+) dob \((\d+) armii", s)
+        if mm:
+            ages.append((float(mm.group(1)), int(mm.group(2))))
+    rep.add("AC-1: linie doby, potkniecia", f"dob {len(days)}, potkniecia {stum}", ">= 1 i 0", len(days) >= 1 and stum == 0)
+    if on and fac is not None and ratios:
+        avg = sum(ratios) / len(ratios)
+        rep.add("AC-2: zmiana spojnosci teraz / bez skali", f"srednio {avg:.3f} w {len(ratios)} dobach (mnoznik {fac:.4f})", "= mnoznik +- 0.02",
+                abs(avg - fac) <= 0.02)
+    else:
+        rep.add("AC-2: zmiana spojnosci teraz / bez skali", f"dob z armiami {len(ratios)}", "INFO (klucz wylaczony albo brak armii)", None)
+    n_age = sum(k for _, k in ages)
+    avg_age = (sum(a * k for a, k in ages) / n_age) if n_age else None
+    rep.add("AC-3: rozwiazane armie wedlug przyczyny, wiek przy rozwiazaniu (INFO)",
+            f"{dict(sorted(reasons.items(), key=lambda kv: -kv[1]))}; wiek srednio {avg_age:.1f} dob ({n_age} armii)" if avg_age is not None else f"{reasons}; wiek -",
+            "INFO", None)
+    rep.show()
+    return 0
+
+
 def b10b_main(logp):
     """b10b (ERRORS.md A7 klasa 7, decyzja Jeffa 14.10 "tak napraw"; CrashScribe/src/BkBattlePerks.cs): atuty BK z bitew. Wejscie: log sesji
     CrashScribe. B10-0 linia startu "BK atuty bitew (B10b): wpiete 2/2" (albo WYLACZONE kluczem - INFO; "BK ma juz postfiks" - INFO),
@@ -26370,6 +26435,8 @@ def main(argv):
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "unikaty" and (csp or logp):
         return unikaty_main(csp or logp)   # 14.10 unikaty ROT (CrashScribe UniqueCompanions): zmarly zostaje martwy, przeprowadzki, duplikaty, dzieci - log sesji CrashScribe
+    if group == "spojnosc" and logp:
+        return spojnosc_main(logp)   # AC (Jeff 14.10): spojnosc armii x 84 / rok (Armoury ArmyCohesionYear) - log Armoury
     if group == "b10b" and (csp or logp):
         return b10b_main(csp or logp)   # B10b (decyzja Jeffa 14.10): atuty BK z bitew (CrashScribe BkBattlePerks) - log sesji CrashScribe
     if group == "rozwoj" and logp:

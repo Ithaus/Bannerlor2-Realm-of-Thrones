@@ -4660,6 +4660,10 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175MinorLore { get; set; } = true;
 
+        [SettingPropertyBool("Army Cohesion Year Scale", HintText = "An army's cohesion falls each day at the pace the game meant for its 84-day year, scaled to the long year (84 / 364 = 0.23): a lord's army of five parties holds together about 80 days instead of about 19, and about 45 days instead of 12 deep in enemy land; your own army likewise. Starving, low-morale and weak parties still drain it faster, and a commander can still spend influence to restore it. Off = the game's daily loss")]
+        [SettingPropertyGroup("Armies of the realms (175)")]
+        public bool ArmyCohesionYearScale { get; set; } = true;
+
         [SettingPropertyBool("Army175 Golden Bows", HintText = "Golden Company crossbowmen split into thirds as in the books - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Their lords buy, keep and train with bows and arrows for two thirds of these men and crossbows and bolts for one third (only these three Golden Company crossbow troops; every other troop counts its first kit, as before). The kits are made by CrashScribe on the next load; the Armoury part acts at once. Off: one kit of crossbows for all of them")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175GoldenBows { get; set; } = true;
@@ -7224,6 +7228,7 @@ namespace Armoury
             s.Army175NorthFoot = Army175NorthFoot;
             s.Army175VolantisNorvos = Army175VolantisNorvos;
             s.Army175MinorLore = Army175MinorLore;
+            s.ArmyCohesionYearScale = ArmyCohesionYearScale;
             s.Army175GoldenBows = Army175GoldenBows;
             s.OthersSteelRule = OthersSteelRule;
             s.OthersCastleSteelPercent = OthersCastleSteelPercent;
