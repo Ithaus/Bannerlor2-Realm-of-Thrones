@@ -44,7 +44,7 @@ namespace Armoury
     {
         /// <summary>Nowa gra/wczytanie: stare przedmioty i pule z poprzedniej kampanii (audyt 04.10 - ryzyko zepsucia save).</summary>
         internal static void Reset() { _pending = null; _market.Clear(); _marketDay = -1; _handsStart = -1f; _handsDay = -1; _ore = _wood = _leather = _linen = _wool = null; _owed.Clear(); _labor.Clear(); _rank.Clear(); _wip.Clear(); _plans.Clear(); _wipBasket.Clear(); NewDay174(); _soldierItems = null; _madeByType.Clear(); _dayStamp = -1; _made = _skipLoss = _skipMat = _skipLabor = _skipGold = _skipFletch = 0; _dayRevenue = _dayCost = 0; Array.Clear(_skipMatBy, 0, _skipMatBy.Length);
-            _plFree = _plHeld = _plStumbles = 0; _plErrLogged = false;
+            _plFree = _plHeld = _plStumbles = 0; _plErrLogged = false; _freeRawByType.Clear();   // AM-30
             WorkshopTrade.Reset();   // warsztaty towarowe w nowej monecie: stan czyszczony razem z warsztatami zbrojnymi (ta metoda idzie z konstruktora ArmouryBehavior)
             TownCrafts.Reset();      // paczka 148: rzemioslo miasta - dlugi wsadu i rak, srednie zuzycia (przed SyncData wczytania)
             TownFletchers.Reset();   // paczka 172: strzelarze miasta - dlugi surowca i rak, kandydaci, liczniki (przed SyncData wczytania)
@@ -230,6 +230,7 @@ namespace Armoury
                     // tylko garbuja skory surowe i tkaja len z wlasnego targu (1 -> 1)
                     if (TanOrWeave(production, workshop)) { __result = true; return false; }
                     _freeRawBlocked++;
+                    NoteFreeRaw(workshop, false);   // AM-30: licznik wedlug typu
                     __result = false;
                     return false;
                 }
@@ -1405,6 +1406,15 @@ namespace Armoury
                          + " | warsztaty gracza (poprawka 174b, jedna regula" + (Settings.Current != null && Settings.Current.PlayerWorkshopsSameRule ? "" : " - WYLACZONA") + "): cykle linii bez wsadu (zbroja, strzaly) zamkniete "
                          + _plFree + ", czeka na strzelarzy " + _plHeld + (_plStumbles > 0 ? ", potkniecia " + _plStumbles : "") + ".");
             }
+            if (_freeRawByType.Count > 0)   // AM-30 (audyt 14.10): zablokowane cykle linii bez wsadu wedlug typu warsztatu
+            {
+                var fr = new List<string>();
+                foreach (var kv in _freeRawByType) fr.Add(kv.Key + " " + kv.Value);
+                fr.Sort(StringComparer.Ordinal);
+                Log.Info("Warsztaty bez wsadu (AM-30): dzien " + _dayStamp + " - zablokowane cykle linii bez wsadu wedlug typu [" + string.Join(", ", fr.ToArray())
+                         + "] (wszystkie typy " + (Settings.Current != null && Settings.Current.WorkshopNoFreeRawAllTypes ? "TAK" : "NIE - tylko ukryci rzemieslnicy") + ").");
+                _freeRawByType.Clear();
+            }
             FlushDiag();
             DiagShort();   // 174.1: najwiekszy brak swiata (koszyki)
             NewDay174();
@@ -1490,20 +1500,48 @@ namespace Armoury
         private static int _freeRawBlocked, _swappedSmith;
         private static readonly HashSet<string> FreeRawCats = new HashSet<string> { "hardwood", "iron", "hides", "meat", "leather", "linen" };
 
-        /// <summary>Linia ukrytego "artisans" bez wsadu, ktora robi surowiec z powietrza.</summary>
+        // AM-30 (audyt modow 14.10, regula A): typy, w ktorych linia bez wsadu to wydobycie, nie "z niczego" - kopalnia BK (ruda ze ziemi; ma wlasne
+        // reguly: Bloomery.TownMineBlocked, BulkLineSkip). Reszta typow z linia bez wsadu i surowcem jako wyrobem - zablokowana jak ukryci rzemieslnicy.
+        private static readonly HashSet<string> FreeRawExtraction = new HashSet<string> { "mines" };
+        private static readonly Dictionary<string, int> _freeRawByType = new Dictionary<string, int>();   // AM-30: zablokowane cykle doby wedlug typu (gracz z "gracz:")
+
+        /// <summary>Linia bez wsadu, ktora robi surowiec z powietrza: ukryty "artisans" (b47fecc3), a przy WorkshopNoFreeRawAllTypes (AM-30) kazdy typ
+        /// poza wydobyciem (kopalnia) - np. rzeznik BK, ktorego wsadu (chicken / goose - id przedmiotow, nie kategorie) gra nie przeczytala.</summary>
         private static bool FreeRawLine(WorkshopType.Production p, Workshop w)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !s.WorkshopNoFreeRaw || w == null || w.WorkshopType == null) return false;
-                if (w.WorkshopType.StringId != "artisans") return false;
+                return FreeRawRecipe(p, w.WorkshopType.StringId, s);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Sama receptura (bez warsztatu) - takze do linii startu sesji AM-30 (WorkshopInputsFix).</summary>
+        internal static bool FreeRawRecipe(WorkshopType.Production p, string typeId, Settings s)
+        {
+            try
+            {
+                if (s == null || !s.WorkshopNoFreeRaw) return false;
+                if (typeId != "artisans" && (!s.WorkshopNoFreeRawAllTypes || typeId == null || FreeRawExtraction.Contains(typeId))) return false;
                 if (p.Inputs != null && p.Inputs.Count > 0) return false;
                 if (p.Outputs == null || p.Outputs.Count == 0) return false;
                 foreach (var o in p.Outputs) if (o.Item1 == null || !FreeRawCats.Contains(o.Item1.StringId)) return false;
                 return true;
             }
             catch { return false; }
+        }
+
+        /// <summary>AM-30: licznik zablokowanego cyklu wedlug typu warsztatu (linia "Warsztaty bez wsadu (AM-30)" w Flush).</summary>
+        private static void NoteFreeRaw(Workshop w, bool player)
+        {
+            try
+            {
+                string k = (player ? "gracz:" : "") + (w != null && w.WorkshopType != null ? w.WorkshopType.StringId : "?");
+                int n; _freeRawByType.TryGetValue(k, out n); _freeRawByType[k] = n + 1;
+            }
+            catch { }
         }
 
         /// <summary>Losowanie wyrobu z kategorii: wegiel (kategoria drewna) i sztabki (kategoria zelaza)
@@ -1565,6 +1603,8 @@ namespace Armoury
                 if (Bloomery.TownMineBlocked(__0, __1, true)) { __result = false; return false; }
                 bool noInput = __0.Inputs == null || __0.Inputs.Count == 0;   // Production to struct
                 if (ToolsByUse.Held(__0, __1, true)) { __result = false; return false; }   // E6/R3 (215): linia narzedzi gracza - ta sama regula co u notabli (licznik w ToolsByUse)
+                // AM-30 (regula A): linia bez wsadu z surowcem (np. rzeznik BK: kura / ges, ktorych gra nie przeczytala) - ta sama regula co u notabli
+                if (s.WorkshopNoFreeRawAllTypes && FreeRawLine(__0, __1)) { RollDay(); NoteFreeRaw(__1, true); __result = false; return false; }
                 if (!TownFletchers.ClosesLine(__0, __1) && !(noInput && On && AllOutputsArms(__0))) return true;
                 RollDay();
                 _plFree++;

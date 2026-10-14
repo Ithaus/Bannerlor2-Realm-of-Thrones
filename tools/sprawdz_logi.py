@@ -686,7 +686,9 @@ Uzycie (Python 3, tylko odczyt):
                     P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, tylko kaplani:
                     linia doby z ogonem TAK, 0 prostowanych Artisan / Merchant, 0 petli >= 3 razy, zostawieni BK INFO), AUD-P3-29a..c (AM-29, wzorce kultur:
                     siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0), AUD-P3-01a..d (AM-01, BKROT EarlyHeal: zdjety 3/3
-                    i straz NaN wpieta, prefiks nie wrocil w zadnej dobie, NaN i twierdze ponizej 100 INFO).
+                    i straz NaN wpieta, prefiks nie wrocil w zadnej dobie, NaN i twierdze ponizej 100 INFO); z logiem Armoury (Armoury-*.log jako log,
+                    --crashscribe <session-*.log>): AUD-P3-30a..d (AM-30, warsztaty bez wsadu: regula A na wszystkie typy z rzeznikiem na liscie,
+                    cykle rzeznika zablokowane > 0, (B) BK Workshop Inputs Fix NIE albo 4 dopisane linie, suma wedlug typu INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -25189,6 +25191,7 @@ def audyta_p3(rep, csp, armp):
     AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba).
     AM-29 (CultureTemplateRepair): AUD-P3-29a siatka rodu towarzysza wpieta; AUD-P3-29b kazdy start sesji: pozostalo zepsutych 0 i potkniec 0
     (usuniete z jakich kultur - w wierszu); AUD-P3-29c siatka bez zastepcy 0 (podmiany INFO).
+    AM-30 (Armoury; audyta_p3_arm): AUD-P3-30a..d.
     AM-01 (StopBkrotProsperityReset): AUD-P3-01a linia startu 'BKROT EarlyHeal zdjety 3/3' i straz NaN wpieta; AUD-P3-01b kazda doba: prefiks
     EarlyHeal BKROT brak (GetPatchInfo); AUD-P3-01c INFO NaN/Inf zablokowanych (lacznie) i w zapisie; AUD-P3-01d INFO twierdz ponizej 100 (najwiecej).
     Brak linii = INFO."""
@@ -25260,6 +25263,72 @@ def audyta_p3(rep, csp, armp):
             rep.add("AUD-P3-01b (AM-01): linia doby dobrobytu", "brak (czas gry nie ruszyl)", "INFO", None)
         if d["errs"]:
             rep.add("AUD-P3: bledy AuditP3 w logu", f"{d['errs']}", "0", False)
+    audyta_p3_arm(rep, armp)   # AM-30: log Armoury
+
+
+AU3_W_START = re.compile(r"Warsztaty bez wsadu \(AM-30\): \(A\) Workshop No Free Raw (TAK|NIE), wszystkie typy \(Workshop No Free Raw All Types\) (TAK|NIE)"
+                         r" - linie bez wsadu zablokowane (\d+) \[(.*?)\], bez wsadu poza ta regula .*? \| \(B\) BK Workshop Inputs Fix"
+                         r" (TAK - dopisane (\d+) \[(.*?)\]|NIE[^;]*); potkniecia (\d+)\.")
+AU3_W_DAY = re.compile(r"Warsztaty bez wsadu \(AM-30\): dzien (\d+) - zablokowane cykle linii bez wsadu wedlug typu \[(.*?)\] \(wszystkie typy (TAK|NIE[^)]*)\)\.")
+
+
+def audyta_p3_arm(rep, armp):
+    """AM-30 (log Armoury): AUD-P3-30a linia startu sesji - regula A na wszystkie typy TAK i rzeznik (butcher) na liscie zablokowanych linii;
+    AUD-P3-30b cykle rzeznika bez wsadu zablokowane > 0 (po >= 7 dobach linii); AUD-P3-30c (B) BK Workshop Inputs Fix - NIE (domyslnie) albo
+    TAK z 4 dopisanymi liniami (2 piekarni + 2 rzeznika); AUD-P3-30d INFO suma zablokowanych cykli wedlug typu."""
+    if not armp or not os.path.isfile(armp):
+        rep.add("AUD-P3-30 (AM-30, Armoury)", "brak logu Armoury", "INFO (Armoury-*.log jako log + --crashscribe <session-*.log>)", None)
+        return
+    start, days, errs = [], [], 0
+    with open(armp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "AM-30" not in ln and "WorkshopInputsFix" not in ln:
+                continue
+            s = ln.rstrip("\r\n")
+            m = TS.match(s)
+            if m:
+                s = m.group(2)
+            m = AU3_W_START.search(s)
+            if m:
+                start.append(m.groups())
+                continue
+            m = AU3_W_DAY.search(s)
+            if m:
+                days.append(m.groups())
+                continue
+            if "WorkshopInputsFix" in s:
+                errs += 1
+    if not start:
+        rep.add("AUD-P3-30a (AM-30): linia startu 'Warsztaty bez wsadu'", "brak", "INFO (log bez paczki P3)", None)
+    else:
+        a_on, all_on, nb, lst, b, nadd, padd, stum = start[-1]
+        if a_on != "TAK" or all_on != "TAK":
+            rep.add("AUD-P3-30a (AM-30): regula A na wszystkie typy", f"Workshop No Free Raw {a_on}, All Types {all_on}", "INFO (klucz off = b47fecc3)", None)
+        else:
+            but = [x for x in lst.split("; ") if x.startswith("butcher:")]
+            rep.add("AUD-P3-30a (AM-30): regula A na wszystkie typy - rzeznik bez wsadu na liscie", f"zablokowanych linii {nb}, rzeznika {len(but)} ({'; '.join(but)[:160]}); potkniec {stum}",
+                    ">= 1 linia butcher i 0 potkniec", len(but) >= 1 and stum == "0")
+        if b.startswith("TAK"):
+            rep.add("AUD-P3-30c (AM-30): (B) BK Workshop Inputs Fix", f"TAK, dopisane {nadd} [{(padd or '')[:200]}]", "4 (2 piekarni + 2 rzeznika)", nadd == "4")
+        else:
+            rep.add("AUD-P3-30c (AM-30): (B) BK Workshop Inputs Fix", "NIE (domyslnie)", "INFO (do testu z bilansem ciast)", None)
+    if days:
+        from collections import Counter
+        tot = Counter()
+        for x in days:
+            for part in x[1].split(", "):
+                k, _, v = part.rpartition(" ")
+                if k and v.isdigit():
+                    tot[k] += int(v)
+        bt = tot.get("butcher", 0) + tot.get("gracz:butcher", 0)
+        if start and start[-1][0] == "TAK" and start[-1][1] == "TAK":
+            rep.add("AUD-P3-30b (AM-30): cykle rzeznika bez wsadu zablokowane", f"{bt} w {len(days)} liniach doby",
+                    "> 0 (dotad ok. 33 miesa dziennie z niczego)", bt > 0 if len(days) >= 7 else (True if bt > 0 else None))
+        rep.add("AUD-P3-30d (AM-30): zablokowane cykle wedlug typu (suma)", ", ".join(f"{k} {v}" for k, v in sorted(tot.items())), "INFO", None)
+    elif start:
+        rep.add("AUD-P3-30b (AM-30): linie doby 'Warsztaty bez wsadu'", "brak", "INFO (0 zablokowanych cykli albo czas gry nie ruszyl)", None)
+    if errs:
+        rep.add("AUD-P3-30: bledy WorkshopInputsFix w logu", f"{errs}", "0", False)
 
 
 def main(argv):
