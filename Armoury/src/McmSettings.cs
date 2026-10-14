@@ -3464,9 +3464,9 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int MinNewPartyMen { get; set; } = 30;
 
-        [SettingPropertyFloatingInteger("Garrison Peace Share", 0.00f, 2.00f, "0.00", HintText = "in peace a garrison is held at this share of its average war strength (in wages)")]
+        [SettingPropertyFloatingInteger("Garrison Peace Share", 0.00f, 2.80f, "0.00", HintText = "in peace a garrison is held at this share of its average war strength (in wages), paid from the house's own peace ceiling; the crown pays nothing towards it. 0.5 = as before 14.10")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
-        public float GarrisonPeaceShare { get; set; } = 0.5f;
+        public float GarrisonPeaceShare { get; set; } = 0.7f;
 
         [SettingPropertyBool("Garrison War Full", HintText = "at war garrisons keep the game's own limit and are paid first; the parties get the rest of the ceiling. Off = garrisons are held at the peace target in war too")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -3687,6 +3687,18 @@ namespace Armoury
         [SettingPropertyBool("Call To War Break Restores Wallet", HintText = "with Crown Pays Call To War: when a crown can no longer pay a day's part and the agreement is broken, the unpaid rest of the price is struck off the calling realm's call-to-war purse at once - nobody owes it and nobody is paid it. Before, the rest came back the next day as an 'old debt' and the treasury paid it off into nothing, a day's part at a time. A debt from before the mod is looked for only once, after loading a save made without this rule. Off = as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CallToWarBreakRestoresWallet { get; set; } = true;
+
+        [SettingPropertyBool("Call To War Pays For War", HintText = "with Crown Pays Call To War: the calling crown pays an ally's daily part only for days the ally is really at war with the enemy it was called against. An ally that has not been at war with that enemy for seven days in a row (after three days' grace from the agreement) is released: the agreement ends without any peace and the rest of the price is struck off. Off = the crown pays every day's part while it can, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CallToWarPaysForWar { get; set; } = true;
+
+        [SettingPropertyBool("Call To War No Break", HintText = "with Crown Pays Call To War: when the calling crown has too little of the day's income left for an ally's daily part, that part is simply lost - the agreement goes on and the ally stays in the war; it is never broken off and the ally is never forced into peace because of it. After seven days of war in a row without a part (here or under Call To War After Own Wages), the agreement ends without any peace, so the unpaid ally is free to make peace on its own. A crown that keeps missing its parts cannot call new allies until its call-to-war purse recovers. Off = the agreement is broken and the ally leaves that war, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CallToWarNoBreak { get; set; } = true;
+
+        [SettingPropertyBool("Call To War After Own Wages", HintText = "with Crown Pays Call To War: the calling crown pays an ally's daily part only from what is left of the day's income after it has set aside what its own soldiers needed from the day's income yesterday - the wage refund due to its houses, the war aid pot and the wages its field companies still lacked. A day the crown cannot afford it this way, the ally gets no part, the agreement goes on and the unpaid part is not carried over; after seven such days of war in a row the agreement ends without any peace. Off = the crown pays the ally first while the day's income allows, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CallToWarAfterOwnWages { get; set; } = true;
 
         [SettingPropertyBool("Crown Borrows", HintText = "with Crown Current Income and Iron Bank Enabled: a crown at war whose day's income cannot cover the wage refunds it owes its houses borrows the missing part from the Iron Bank - only for the refunds, never for gifts or rents; no new loans in peace. The crown owes at most Crown Loan Limit Days of its average taxes and pays the Bank first each day, before any other expense: one part in Crown Loan Repay Days of its largest debt, at most Crown Loan Max Income Share of its taxes, at the Bank's usual interest (like a king: 20% a year, 30% on a running debt, 2% fee). A crown that pays less than half of its instalments over 28 days falls into arrears: the Bank lends nothing more to it or to its houses and lends more to the houses of the realms at war with it, until it has paid in full for 28 days. The debt of a realm that is destroyed is lost to the Bank. You as king borrow by the same rule. Off = no crown borrows, as before")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -5128,6 +5140,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkSatisfactionFromBasket { get; set; } = true;
 
+        [SettingPropertyBool("Bread For The Poor", HintText = "when the townsfolk or castle folk have been unable to afford their food for a week (the same hunger that hurts their contentment; it can start from day 120 of the campaign), the realm's crown tops up the purses of the poor to two days of food, out of the rest of its daily income after the wage refunds and before the rents; if the crown has nothing left, the lord of the place pays from his gold above his war reserve, but only from the part of his war chest that does not go to wages (at war this comes out of his equipment money), so in all he spends no faster than his war chest; a lord in debt never pays. The poor spend their purse as always - food first, then the rest of their basket - so in effect the bread covers what their earnings lack. Your own purse is never used. A place leaves the bread after a week of affording two days of food on its own. Off = the poor buy only what their purse allows, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool BreadForThePoor { get; set; } = true;
+
         [SettingPropertyBool("Town Folk Hunger Hurts", HintText = "when the townsfolk cannot afford their bread for a week, their contentment with food falls - not in the first 120 days of a campaign and only while there is food in the market; a town with no food at all is already punished by its empty granary, so its contentment is not cut twice. Off = as before: contentment with food follows what they could buy every day (needs Town Folk Satisfaction From Basket)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool TownFolkHungerHurts { get; set; } = true;
@@ -5219,6 +5235,10 @@ namespace Armoury
         [SettingPropertyFloatingInteger("War Aid Lords Shortfall Share", 0.00f, 0.50f, "0.00", HintText = "with War Aid Follows Lords Shortfall: the lords' lack of wages counts once it is larger than this part of the wage refunds the crown owes in a day (0.05 = one part in twenty), and never while it is under 250 coins a day")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float WarAidLordsShortfallShare { get; set; } = 0.05f;
+
+        [SettingPropertyBool("Need Aid From Rents", HintText = "in war, when the day's war aid, the crown's spare treasure and the shield money still leave houses of the realm short of wages for their field companies (Crown War Aid By Need), the crown pays those wages from the rest of its daily income before it shares out rents by fiefs - only for men who stand in the companies today; the rents get what is left. Off = the rest of the day's income goes out as rents, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool NeedAidFromRents { get; set; } = true;
 
         [SettingPropertyBool("Crown Surplus Feeds Need Aid", HintText = "in war, when the day's war aid from the people does not cover the wages of the houses the crown helps (Crown War Aid By Need), the crown adds coin from its own treasury - but only from what it holds above its war reserve (the larger of Crown Reserve Gold and War Tax Reserve Days of wage refunds) and above what it owes the Iron Bank, never more in a day than one part in Crown Surplus Aid Days of that surplus and never more than is still lacking. The crown pays before the rich houses are asked for shield money and, like the rest of that aid, only for men who stand in the companies today. A treasury at or below its war reserve gives nothing. You and the AI alike: in your kingdom the coin comes from the realm's treasury, not from your purse. Needs Crown War Aid By Need. Off = the aid by need is paid from the day's war aid and shield money only, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -6693,6 +6713,9 @@ namespace Armoury
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
+            s.CallToWarPaysForWar = CallToWarPaysForWar;
+            s.CallToWarNoBreak = CallToWarNoBreak;
+            s.CallToWarAfterOwnWages = CallToWarAfterOwnWages;
             s.CrownBorrows = CrownBorrows;
             s.CrownLoanLimitDays = CrownLoanLimitDays;
             s.CrownLoanRepayDays = CrownLoanRepayDays;
@@ -7053,6 +7076,7 @@ namespace Armoury
             s.TownFolkAnchorBasket = TownFolkAnchorBasket;
             s.TownFolkCastleCourtFeeds = TownFolkCastleCourtFeeds;
             s.TownFolkSatisfactionFromBasket = TownFolkSatisfactionFromBasket;
+            s.BreadForThePoor = BreadForThePoor;
             s.TownFolkHungerHurts = TownFolkHungerHurts;
             s.TownFolkStartReserves = TownFolkStartReserves;
             s.VillageLordScale = VillageLordScale;
@@ -7076,6 +7100,7 @@ namespace Armoury
             s.ScutagePlayerClan = ScutagePlayerClan;
             s.WarAidFollowsLordsShortfall = WarAidFollowsLordsShortfall;
             s.WarAidLordsShortfallShare = WarAidLordsShortfallShare;
+            s.NeedAidFromRents = NeedAidFromRents;
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
             s.LordWarLevy = LordWarLevy;

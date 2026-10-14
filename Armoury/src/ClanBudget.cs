@@ -90,6 +90,8 @@ namespace Armoury
         private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
         // Z.1 (pomiar): rody AI w pokoju (bez najemnikow) - pulap, w tym skrzynia pokoju (ile rodow), zold naliczony, ludzie w partiach i zalogach
         private static long _dPzCap, _dPzChest, _dPzWage; private static int _dPzN, _dPzChestN, _dPzMenPar, _dPzMenGar;
+        // B4 (pomiar, pieniadze roku 2): zalogi z celem pokojowym - ile, na celu (zold >= 95% celu) / ponizej, zold wobec celu, rody z celem przycietym do limitu pulapu
+        private static long _dB4Wage, _dB4Tgt; private static int _dB4N, _dB4At, _dB4Below, _dB4Scaled;
         // P3/W2 (pomiar): zwolnieni 166 wedlug tieru (t1-2 / t3-4 / t5+) - ludzie i ich zold dzienny; rody w wojnie, ktorym zalogi i karawany zajely
         // caly pulap (na partie 0), i ile z nich nie ma juz ludzi w partiach
         private static readonly int[] _dRelTier = new int[3];
@@ -147,6 +149,7 @@ namespace Armoury
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dRelTavern = 0; _dRelPurseVet = 0;
             _dPzCap = _dPzChest = _dPzWage = 0; _dPzN = _dPzChestN = _dPzMenPar = _dPzMenGar = 0;   // Z.1
+            _dB4Wage = _dB4Tgt = 0; _dB4N = _dB4At = _dB4Below = _dB4Scaled = 0;                     // B4
             for (int i = 0; i < 3; i++) { _dRelTier[i] = 0; _dRelTierWage[i] = 0; }   // P3/W2
             _dGarEatsCap = _dGarEatsCapEmpty = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
@@ -303,6 +306,22 @@ namespace Armoury
                 return true;
             }
             catch (Exception e) { Stumble("PartyCapOwn", e); return false; }
+        }
+
+        /// <summary>M3 (chleb biedoty, TownFolk.BreadRest): zloto rodziny G, rezerwa wojny R i stan wojny z budzetu 166 (krok korony biegnie przed budzetem doby - budzet
+        /// z wczoraj, jak ScutageCap). false - rod bez budzetu, Straz bez zoldu, kompania najemna (pulap z umowy 185, bez skrzyni), dluznik albo rod w zajeciu (168 - jego
+        /// kiese bierze wierzyciel; recenzja - jak ScutageCap i W5). Tylko odczyt.</summary>
+        internal static bool ChestOf(Clan c, out double G, out double R, out bool war)
+        {
+            G = 0; R = 0; war = false;
+            try
+            {
+                var b = Of(c);
+                if (b == null || b.Zero || b.Debtor || b.Seized || c.IsUnderMercenaryService) return false;
+                G = b.G; R = b.R; war = b.War;
+                return true;
+            }
+            catch (Exception e) { Stumble("ChestOf", e); return false; }
         }
 
         /// <summary>W6 (KingdomTreasury.Scutage.cs - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu do podstawy
@@ -500,7 +519,9 @@ namespace Armoury
                         if (merc && !MercContract.CapOf(c, b.War, out mcap)) { b.Today = false; continue; }   // najemnik bez umowy (185) - bez budzetu
                         double shareF = f;   // te same mnozniki biedy dla wszystkich udzialow
                         b.Household = (b.War ? s.HouseholdShareWar : s.HouseholdSharePeace) * b.D * shareF;
-                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) : 0);
+                        // recenzja M3: chleb, ktory pan zaplacil dzis za swoje glodne miasto (TownFolk.BreadRest - przed budzetem doby), schodzi ze skrzyni sprzetu tej doby -
+                        // w wojnie pan w sumie nie szybciej niz skrzynia (G - R) / WarChestDays (0.8 zold + 0.2 sprzet); klucz BreadForThePoor wylaczony - 0, jak dotad
+                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && G > R ? Math.Max(0, 0.2 * (G - R) / Math.Max(1f, s.WarChestDays) - TownFolk.BreadLordToday(c)) : 0);
                         // recenzja C1 (W5): budowy takze w wojnie (odstepstwo od tabeli 166 "0") - Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; BuildFunding
                         // w wojnie i tak odcina budowy cywilne, wiec wojenny przydzial idzie tylko na mury, wieze i koszary. Dopelnienie ponad 120 D - tylko w pokoju.
                         b.Build = Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;
@@ -671,6 +692,7 @@ namespace Armoury
             var fiefs = c.Fiefs;
             if (fiefs == null) return;
             var tgt = new List<KeyValuePair<Settlement, double>>();
+            var curs = new List<float>();   // B4 (pomiar): zold zalogi dzis obok celu
             double sum = 0;
             for (int i = 0; i < fiefs.Count; i++)
             {
@@ -684,12 +706,18 @@ namespace Armoury
                 else if (b.War) { wr += (cur - wr) / Days28; _warGar[st.StringId] = wr; }                 // srednia z dob wojny (28 dob)
                 if (full) continue;
                 double t = Math.Max(0f, s.GarrisonPeaceShare) * wr;
-                tgt.Add(new KeyValuePair<Settlement, double>(st, t)); sum += t;
+                tgt.Add(new KeyValuePair<Settlement, double>(st, t)); curs.Add(cur); sum += t;
             }
             if (full || tgt.Count == 0) return;
             double lim = Math.Max(0f, s.GarrisonMaxShareOfBudgetPeace) * b.Cap;
             double k = sum > lim && sum > 0 ? lim / sum : 1.0;
-            foreach (var kv in tgt) { int t = (int)(kv.Value * k); _garTarget[kv.Key] = t; b.GarTarget += t; }
+            if (k < 1.0) _dB4Scaled++;
+            for (int i = 0; i < tgt.Count; i++)
+            {
+                var kv = tgt[i];
+                int t = (int)(kv.Value * k); _garTarget[kv.Key] = t; b.GarTarget += t;
+                if (t > 0) { _dB4N++; _dB4Tgt += t; _dB4Wage += (long)curs[i]; if (curs[i] >= 0.95f * t) _dB4At++; else _dB4Below++; }
+            }
         }
 
         // ------------------------------------------------------------ limity zoldu partii i zalog (stosowane tez w rozliczeniu rodu - postfiksy)
@@ -1487,6 +1515,10 @@ namespace Armoury
               .Append(s.PeaceWageShare.ToString("0.00", Inv)).Append(" D + ").Append(s.PeaceChestShare.ToString("0.00", Inv)).Append(" x skrzynia wojenna")
               .Append(s.PeaceChestShare > 0f ? "" : " - skrzynia pokoju wylaczona").Append("), w tym skrzynia pokoju ").Append(_dPzChest).Append(" u ").Append(_dPzChestN)
               .Append(" rodow, zold naliczony ").Append(_dPzWage).Append(", ludzie w partiach ").Append(_dPzMenPar).Append(", w zalogach ").Append(_dPzMenGar)
+              // B4 (pieniadze roku 2): czy w pokoju wiaze cel zalogi (zold na celu), czy tempo werbunku zalog gry (ponizej celu)
+              .Append(" | zalogi w pokoju (B4): udzial ").Append(s.GarrisonPeaceShare.ToString("0.00", Inv)).Append(" zalogi wojennej, zalog z celem ").Append(_dB4N)
+              .Append(", na celu (zold >= 95% celu) ").Append(_dB4At).Append(", ponizej celu ").Append(_dB4Below).Append("; zold zalog ").Append(_dB4Wage).Append(" wobec celu ").Append(_dB4Tgt)
+              .Append("; rodow z celem przycietym do ").Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu ").Append(_dB4Scaled)
               .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
               .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
               .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")

@@ -116,6 +116,9 @@ namespace Armoury
             public bool BkCal;                                        // R5: klasy BK odczytane przed kalibracja ksiegi (faza a D1)
             public long LDayPaid, LDayUnpaid, LDayCourt, LDayIn, LDayOut;   // ostatnia doba (CSV)
             public double G0a;                                        // budzet gry po kotwicy i ofercie nadwyzki (okno - linia)
+            // M3 (chleb biedoty, TownFolk.Bread.cs; pamiec sesji - nie w zapisie): stan "na chlebie", kotwice z rzedu bez luki, luka doby (razem i klasy W/R/P;
+            // podzamcze w [0]), doba luki, zaplacone dzis (razem / korona / pan)
+            public bool BreadOn; public int BreadZero, BreadDay = -1; public long BreadGap, BreadPaid, BreadCrown, BreadLord; public readonly long[] BreadGapC = new long[3];
             public int HungerDays;                                    // E5/C2: doby z rzedu z Afford jedzenia na jutro < 0.95 (zapis arm_townfolk, pole 17)
             public bool C2Hit;                                        // E5/C2: korekta jedzenia R14 w oknie doby (kontrola "obie kary tej samej doby")
             public int ADay = -1;                                     // E5/C4: doba ostatniego liczenia kiesy czynnej tej osady (DAff/DAffF albo zakupy wsi) - okno People of this land; bez zapisu

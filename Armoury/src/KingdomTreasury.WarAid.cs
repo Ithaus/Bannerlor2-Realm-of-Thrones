@@ -367,7 +367,7 @@ namespace Armoury
             }
             parts.Sort((x, y) => y.Key.CompareTo(x.Key));
             var txt = new List<string>(); foreach (var p in parts) txt.Add(p.Value);
-            long other = Math.Max(0, kSpend - kGiven - kRent - kLeft + kLoan);   // rata 186, dary, reparacje, kontrakty, wezwania (zwrot z kredytu 186 nie schodzi z wplywow dnia)
+            long other = Math.Max(0, kSpend - kGiven - kRent - kLeft + kLoan);   // rata 186, dary, reparacje, kontrakty, wezwania, doplata W5 i M1, chleb M3 (zwrot z kredytu 186 nie schodzi z wplywow dnia)
             var sb = new StringBuilder(2048);
             sb.Append("Danina z oszczednosci (P1): dzien ").Append(today)
               .Append(" | wylacznik Folk War Aid ").Append(s.FolkWarAid ? "tak" : "nie (pobor 0 - jak przed paczka)")
@@ -403,7 +403,7 @@ namespace Armoury
               .Append(") ").Append(Math.Round(_waLords).ToString("0", WtInv))
               .Append(" | skarbce krolestw z danina: wplywy dnia ").Append(kMeas).Append(" + 1/360 zapasu ").Append(kRel).Append(" (w tym danina ").Append(kAid)
               .Append(", podatek 184 ").Append(kTax).Append("); wydane tej doby: zwrot zoldu ").Append(kGiven).Append(" z naleznego ").Append(kDue)
-              .Append(", renty (180) ").Append(kRent).Append(", pozostale (rata 186, dary, reparacje, kontrakty, wezwania, doplata wedlug potrzeby W5) ").Append(other)
+              .Append(", renty (180) ").Append(kRent).Append(", pozostale (rata 186, dary, reparacje, kontrakty, wezwania, doplata wedlug potrzeby W5 z daniny i z reszty wplywow M1, chleb M3) ").Append(other)
               .Append(", zostalo z wplywow ").Append(kLeft).Append("; kredyt Banku (186) na zwrot ").Append(kLoan)
               .Append(" | wszystkie krolestwa: zwrot zoldu ").Append(aGiven).Append(" z naleznego ").Append(aDue).Append(", renty (180) ").Append(aRent)
               .Append(" | na krolestwo: ").Append(txt.Count > 0 ? string.Join(" ; ", txt.ToArray()) : "-")

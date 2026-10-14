@@ -442,6 +442,10 @@ namespace Armoury
               .Append(" | dlug wobec korony w trakcie rozliczen: nowy +").Append(_debtNew).Append(" (").Append(_debtNewN).Append(" rodow), splacony ").Append(Neg(_debtPaid))
               .Append(" (").Append(_debtPaidN).Append(" rodow), razem u ").Append(debtClans).Append(" rodow ").Append(debtAll)
               .Append(" | skarbce krolestw w trakcie rozliczen ").Append(S(_walletInClan)).Append(" (podatek BK minus zapomoga i inne)")
+              // L2 (pieniadze roku 2, A15-5): zmiana zlota swiata rozbita - rody, ktorych glowa skonczyla rozliczenie z pusta kiesa (zold naliczony, ktorego kiesa nie
+              // oddala), i pozostale; kiesy glow przeniesione w rozliczeniach netto obok kwot naliczonych wyzej (tylko pomiar)
+              .Append(" | L2 rozbicie zmiany zlota swiata: rozliczenia z pusta kiesa glowy po rozliczeniu ").Append(S(_clanEmptyD)).Append(" (").Append(_clanEmptyN)
+              .Append(" rozliczen), pozostale ").Append(S(_clanRestD)).Append("; kiesy glow przeniesione w rozliczeniach netto ").Append(S(_clanHeadMoved))
               .Append(" | kontrola: model=").Append(ml ? M[CW.MClansRead].ToString(Inv) : "-").Append(" rozliczenia=").Append(settled).Append('.');
             return sb.ToString();
         }
@@ -573,6 +577,7 @@ namespace Armoury
               .Append(", gotowka korony na zold druzyn (W5) ").Append(KingdomTreasury.LastNeedAid)   // recenzja W5: ta sama kwota co po stronie korony (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn ze skarbca ponad zapas wojny (W5b) ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: szczebel skarbca doplaty W5 (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn z tarczowego (W6) ").Append(KingdomTreasury.LastScutageOut)   // W6: szczebel tarczowego doplaty W5 (skarbce -> glowy rodow)
+              .Append(", gotowka korony na zold druzyn z reszty wplywow przed rentami (M1) ").Append(KingdomTreasury.LastNeedAidRent)   // M1: czwarty szczebel W5 (skarbce -> glowy rodow)
               .Append(", stawka wojenna pana (W7) kiesy ludu i wsi -> glowy rodow ").Append(KingdomTreasury.LastLordLevy)   // W7: pobor z wlasnych lenn na zold druzyn
               .Append(" (z ludu ").Append(KingdomTreasury.LastLordLevyFolk).Append(", ze wsi ").Append(KingdomTreasury.LastLordLevyVill).Append(')')
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
@@ -637,6 +642,8 @@ namespace Armoury
               .Append(", tarczowe (W6) glowy rodow -> skarbce ").Append(KingdomTreasury.LastScutageIn)   // W6: pobrane tej doby i tej samej doby wyplacone (poza wplywami dnia)
               .Append(" i skarbce -> glowy rodow z doplata W5 ").Append(KingdomTreasury.LastScutageOut)
               .Append(", doplata ze skarbcow ponad zapas wojny (W5b) skarbce -> glowy rodow ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: z zapasu skarbca, poza wplywami dnia
+              .Append(", doplata z reszty wplywow dnia przed rentami (M1) skarbce -> glowy rodow ").Append(KingdomTreasury.LastNeedAidRent)   // M1: z wplywow dnia, przed rentami 180
+              .Append(", chleb biedoty (M3) skarbce -> kiesy ludu ").Append(TownFolk.LastBreadCrown).Append(" i glowy rodow -> kiesy ludu ").Append(TownFolk.LastBreadLord)   // M3: przelew miedzy posiadaczami
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)
               .Append(" | Bank [P]: pozyczki ").Append(IronBank.LastLent).Append(" na ").Append(IronBank.LastLentSum).Append(" zl, splaty ").Append(IronBank.LastPaidN)
               .Append(" na ").Append(IronBank.LastPaidSum).Append(" zl, spoznienia ").Append(IronBank.LastMissed).Append(", bankructwa ").Append(IronBank.LastDefaults)

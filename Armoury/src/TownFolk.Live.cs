@@ -122,6 +122,7 @@ namespace Armoury
             ResetP1();   // P1: danina z oszczednosci i pomiary obiegu kiesy (pamiec sesji)
             ResetHorses();   // K1-3a krok 2: liczniki linii koni roboczych (licznik osady jest w Folk - czysci go Reset)
             ResetLadder();   // P3-P5 (zbytki): kategorie listy dostatku, liczniki linii (podzial osady jest w Folk - czysci go Reset)
+            ResetBread();    // M3: indeks doby, liczniki linii i komunikatu gracza (stan osady jest w Folk - pamiec sesji)
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -888,6 +889,7 @@ namespace Armoury
             f.DBook = f.PeopleCal * (PeopleMarket.MarketOn ? BookScale(f) : r);   // GL-2: ludzie ksiegi osady (linia, CSV) - glowy moga isc od ludzi rynku
             Anchor(f, wf, wr);
             NoteHungerDay(f);                                          // E5/C2: doby z rzedu bez chleba z braku pieniedzy
+            BreadAnchor(f);                                            // M3: stan "na chlebie" i luka na 2 dni jedzenia (platnosc w kroku korony)
             // ---- liczby swiata
             double hW = f.HW * r, hR = f.HR * r, hP = f.HP * r, hS = f.HS * r, idx = f.Idx > 0 && !double.IsNaN(f.Idx) ? f.Idx : 1.0;
             double B = (hW * BW + hR * BR + hP * BP + (f.Slave ? hS * BS : 0)) * idx;
@@ -925,6 +927,7 @@ namespace Armoury
                 // zawor zamku 110 wylaczony przy kiesie czynnej: kiesa podzamcza wraca do kasy zamku (stan sprzed B1 dla zamkow), kredyt dworu 0; ponowne wlaczenie - z nadwyzki
                 if (f.KW > 0) { town.ChangeGold((int)Math.Min(int.MaxValue, f.KW)); _ctlOut += f.KW; f.KW = 0; _seedC = 0; }
                 f.CourtCr = 0; Array.Clear(f.EarnWin, 0, 3); f.Offer[0] = 0; f.FacOk = false; f.HungerDays = 0;   // E5/C2: kiesa nieczynna - licznik glodu od zera
+                f.BreadOn = false; f.BreadZero = 0; f.BreadGap = 0;    // M3: bez kiesy podzamcza - bez chleba
                 return;
             }
             // ---- 1. pan 3% od zarobku okna; E5/B2 korona 184 na wierzch (scalenie B)
@@ -953,6 +956,7 @@ namespace Armoury
             double wf, wr; Predict(f, out wf, out wr);
             Anchor(f, wf, wr);
             NoteHungerDay(f);                                          // E5/C2
+            BreadAnchor(f);                                            // M3
             if (f.CourtCr <= 0) d.CNoCourt++;
             double ch = CastleHeads(f);                                // GL-3 (P3)
             d.CHeads += ch; d.KC += f.KW; d.CCr += f.CourtCr; d.CNeed += f.Need[0]; d.CAff += f.AffC[0] * f.Need[0]; d.CWg += f.SpendGame;
