@@ -1,5 +1,15 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (pieniadze roku 2, narzedzie) - `--grupa rok2` w `tools/sprawdz_logi.py`; wiersz krolestwa W5 czyta dopisek M1
+
+**Mod:** narzedzie (bez DLL) | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** brak | **Pliki:** `tools/sprawdz_logi.py` (`rok2_main`, `r2_measures`, `_w5_kingdoms`, opis w naglowku) | **Projekt:** `PROJEKT-WYBRANY.md` rozdz. 5
+
+**Problem:** reguly M1, M2a/b/c, M3, B4, L1/L2 potrzebuja progow z alarmow roku 2 (rachunek 85 tys. rozdz. 7.6, BD 2.6) i "rok 1 bez pogorszenia"; istniejacy czytnik wiersza krolestwa linii W5 (`_w5_kingdoms`, regex z `$`) uznalby wiersz z dopiskiem M1 za nieodczytany (W5-0 / W5b-0 / W5b-1 - falszywe NIE).
+**Zmiana:** (1) `--grupa rok2`: T1 (okno > 240 dob - zapis `autotest-rok2-d780-fin24` + 60 dob, `--start-kampanii 108836 --do-doby 840`) i T2 (nowa kampania 120 dob, `--baza-doby` W53). Wiersze: R2-0 odcinki nowych regul i bledy; R2-1 niepokryte po M1 (T1 <= 0.85 x baza; bez bazy - log Z.1 d754-781 37.1 tys. zl/d); R2-1b "z platnikiem" 0 i kontrolka M1; R2-1c "bez platnika" INFO; R2-2 rata w dobie bez wojny 0; R2-3 zerwania i pokoj sojusznika 0; R2-3b rata ponad reszte - rezerwe 0; R2-4 chleb: pan ponizej R / kiesa gracza / kontrola kies r = 0; R2-4b koszt chleba (T1 <= 30 tys. zl/d, T2 0); R2-4c miast < 95% (T1 <= 2; T2 <= baza + 1); R2-4d chleb swiata (T1 >= baza + 2 pkt, Z.1 87.2%; T2 >= baza - 0.5); R2-5 zalogi swiata z `balans-krolestw.csv` (T1 >= 69 020, DECYZJA gdy wiecej zalog ponizej celu B4 niz na celu; T2 >= baza - 1 tys.); R2-5b partie rodow w pokoju (T1 >= 0.9 x baza, Z.1 13 070); R2-6 lokata W krolestw w wojnie <= 10 mln (T1), R2-6b w pokoju INFO; R2-7 Zelazne Wyspy >= 2.5 tys. (T1); R2-T2-1 miara W5-7 d93-120 >= W53 - 2 tys.; R2-T2-2 danina d91-120 >= 0.97 x W53; R2-8 L2 INFO. (2) `_w5_kingdoms`: opcjonalny dopisek `, z rent M1 X (pula P, reszta wplywow R, przed M1 niepokryte U)`.
+**Sprawdzenie na logach (bez nowej wersji - same INFO / NIE tam, gdzie regul nie ma):** log Z.1 (`Armoury-2026-10-14_02-30-30.log`, d721-781) jako T1: R2-1 37.1 tys. (NIE - brak M1), R2-4c 4.8, R2-4d 87.2% (NIE), R2-5 64 345 (NIE), R2-5b 13 070 (TAK), R2-6 lokata W w wojnie 7.45 mln (TAK), **R2-6b w pokoju 19.55 mln** (prog pytania M4 > 8 mln - spelniony juz w d781), R2-7 2 750 (TAK); log W53 jako T2 wobec siebie: R2-T2-1 111.9 = 111.9 tys., R2-T2-2 169.4 tys. zl/d, chleb 100%, miast < 95% 0. `--grupa w5` na logu Z.1: W5-0, W5-1, W5b-1 TAK (regex bez regresji); dopisek M1 czytany (test na wierszu syntetycznym).
+**Ryzyko / co sprawdzic:** narzedzie tylko czyta; balans-krolestw.csv szukany w `<katalog logu>/Logs/<znacznik>/` i `<katalog logu>/<znacznik>/` (logi na D: bez CSV - R2-5 INFO).
+**Status:** DO SPRAWDZENIA (narzedzie przetestowane na logach bazowych; na logach nowej wersji - po tescie).
+
 ## 2026-10-14 (pieniadze roku 2, kontrola calosci M1 / M2a) - istniejace progi W5-1 i P3W4-2 bez falszywego NIE
 
 **Mod:** Armoury | **Galaz:** `w-toku/pieniadze-rok2` | **Tor:** L | **Klucz:** brak (poprawka ksiegowania linii M1 i M2a) | **Pliki:** `KingdomTreasury.RentAid.cs`, `CrownIncome.cs`, `CrownCallToWar.cs`

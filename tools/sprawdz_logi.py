@@ -539,6 +539,16 @@ Uzycie (Python 3, tylko odczyt):
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
                     PL-3 plotno wywiezione kontraktami 174 i wozami kupcow >= 30 szt./d, PL-4 regulator lnu >= 1.2, PL-5 potkniecia 0; PL-6..PL-10 INFO (tkane na wywoz,
                     mieszczanie, oferta obcieta progiem, plotno zrobione i na polkach, warsztaty zbrojne). Log bez paczki: INFO, bez wyjatku.
+--grupa rok2      : (pieniadze roku 2, docs/pieniadze-rok-2/PROJEKT-WYBRANY.md rozdz. 5) M1 NeedAidFromRents, M2a/M2b/M2c (wezwania 168), M3 BreadForThePoor,
+                    B4 GarrisonPeaceShare 0.70, L1/L2. T1 (okno > 240 dob - zapis autotest-rok2-d780-fin24 + 60 dob):
+                    python -I tools/sprawdz_logi.py --grupa rok2 --start-kampanii 108836 --do-doby 840 [--baza-doby <ten sam zapis na 449d453>] <log>
+                    T2 (nowa kampania): python -I tools/sprawdz_logi.py --grupa rok2 --do-doby 120 --baza-doby <log W53> <log>
+                    R2-0 odcinki i bledy, R2-1 niepokryte po M1 (T1 <= 0.85 x baza; bez bazy - Z.1 37.1 tys.), R2-1b "z platnikiem" 0, R2-1c INFO, R2-2 rata
+                    w dobie bez wojny 0, R2-3 zerwania / pokoj sojusznika 0, R2-3b rata ponad reszte - rezerwe 0, R2-4 chleb: pan ponizej R / kiesa gracza / r 0,
+                    R2-4b koszt (T1 <= 30 tys. zl/d, T2 0), R2-4c miast < 95% (T1 <= 2, T2 <= baza + 1), R2-4d chleb swiata (T1 >= baza + 2 pkt, T2 >= baza - 0.5),
+                    R2-5 zalogi (T1 >= 69 020, DECYZJA gdy cel nie wiaze; T2 >= baza - 1 tys.), R2-5b partie rodow w pokoju (T1 >= 0.9 x baza), R2-6 lokata W
+                    w wojnie <= 10 mln (T1), R2-6b w pokoju INFO, R2-7 Zelazne Wyspy >= 2.5 tys. (T1), R2-T2-1 W5-7 d93-120 >= W53 - 2 tys., R2-T2-2 danina
+                    d91-120 >= 0.97 x W53, R2-8 L2 INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
                     Z1-0 dopisek "pokoj (Z.1)" w linii "Budzet rodow (166)", Z1-1 druzyny lordow krolestw w pokoju (linie Skarbce bez "(WOJNA)", srednia
@@ -15516,7 +15526,8 @@ def _w5_kingdoms(s):
         return []
     # W5b: dopisek na koncu wiersza (gotowka ze skarbca ponad zapas wojny, pula, nadwyzka skarbca, zapas wojny, niepokryte po wszystkich zrodlach) - opcjonalny
     kre = re.compile(r"^(.*?): garnek (\d+) \(danina (\d+)\), potrzeba (\d+) u (\d+) rodow, poziom ([\d.]+%|-), wyplacono (\d+) \(rodow (\d+)\), reszta (-?\d+)"
-                     r"(?:, ze skarbca ponad zapas (\d+) z puli (\d+) \(nadwyzka (\d+), zapas wojny (\d+)\), niepokryte (\d+))?$")
+                     r"(?:, ze skarbca ponad zapas (\d+) z puli (\d+) \(nadwyzka (\d+), zapas wojny (\d+)\), niepokryte (\d+))?"
+                     r"(?:, z rent M1 (\d+) \(pula (\d+), reszta wplywow (\d+), przed M1 niepokryte (\d+)\))?$")   # M1 (pieniadze roku 2): dopisek opcjonalny
     out = []
     for part in seg.split(" ; "):
         m = kre.match(part)
@@ -19727,6 +19738,337 @@ def szybkie_main(logp, start_arg, until=120):
     return 0
 
 
+# ---- grupa rok2 (pieniadze roku 2, docs/pieniadze-rok-2/PROJEKT-WYBRANY.md rozdz. 5): M1 (NeedAidFromRents), M2a/M2b/M2c (CallToWarPaysForWar,
+# CallToWarAfterOwnWages, CallToWarNoBreak), M3 (BreadForThePoor), B4 (GarrisonPeaceShare 0.70), L1/L2 (linie). T1 = zapis autotest-rok2-d780-fin24 + 60 dob
+# (okno dluzsze niz 240 dob kampanii), T2 = nowa kampania 120 dob. Baza (--baza-doby): T1 - ten sam zapis + 60 dob na 449d453 (bez niej - liczby z logu Z.1
+# d754-781, ponizej), T2 - W53 (Armoury-2026-10-14_03-24-46.log).
+R2_Z1 = {"unc": 37107, "bread": 87.2, "n95": 4.8, "peacepar": 13070, "iron": 2750}   # log Z.1 d754-781 (ta sama miara grupy rok2)
+R2_W5 = re.compile(r"\| niepokryte po wszystkich zrodlach \(danina, skarbiec, tarczowe\) (\d+) w (\d+) krolestwach")
+R2_M1 = re.compile(r"\| z reszty wplywow dnia \(M1, Need Aid From Rents (tak|nie)\): pula (\d+) w (\d+) krolestwach, wyplacono (\d+) \(rodow (\d+)\), podniesienie pulapu (\d+)"
+                   r"; niepokryte przed M1 (\d+), po M1 (\d+) - z platnikiem \(M1 nie wzial calej reszty wplywow; oczekiwane 0\) (\d+) w (\d+) krolestwach"
+                   r", bez platnika \(cala reszta wplywow w puli\) (\d+) \[(.*?)\]; kontrola: gotowka M1 przy zoldzie w pulapie wlasnym (\d+)")
+R2_M2A = re.compile(r"M2a za wojne \(Call To War Pays For War (tak|nie)\): porozumien bez wojny wezwanego dzis (\d+), wygasle bez wojny \(\d+ doby laski \+ \d+ dob bez wojny\) (\d+)"
+                    r" \(reszta ceny skreslona (\d+)\), rata zaplacona w dobie bez wojny (\d+)")
+R2_M2B = re.compile(r"M2b po wlasnych zolnierzach \(Call To War After Own Wages (tak|nie)\): wstrzymane dzis (\d+) zl \(czesci (\d+)\) u (\d+) koron.*?"
+                    r", rata ponad reszte wplywow minus rezerwe (\d+)")
+R2_M2C = re.compile(r"M2c bez zerwan \(Call To War No Break (tak|nie)\): przepadlo dzis z braku wplywow (\d+) zl \(czesci (\d+)\)")
+R2_BRK = re.compile(r"zerwane z braku wplywow dnia (\d+) \(reszta ceny skreslona (\d+), pokoj sojusznika (\d+)\)")
+R2_PAID = re.compile(r"zaplacone dzis ze skarbcow wzywajacych do portfeli wezwanych (\d+)")
+R2_M3 = re.compile(r"Bread For The Poor (tak|nie).*?\| osad na chlebie (\d+) \(miasta (\d+) / podzamcza (\d+)\), weszlo dzis (\d+), wyszlo dzis (\d+) \| luka (\d+) zl w (\d+) osadach"
+                   r" \| zaplacono (\d+): korona (\d+) \(krolestw (\d+), [^)]*\), pan zastepczo (\d+) \(panow (\d+); najnizsze G/R placacego pana ([\d.]+|-)\)"
+                   r", nie stac nikogo (\d+) zl w (\d+) osadach \| kontrola: pan po wyplacie ponizej rezerwy wojny (\d+) \(oczekiwane 0\), kiesa gracza (\d+)")
+R2_B4 = re.compile(r"\| zalogi w pokoju \(B4\): udzial ([\d.]+) zalogi wojennej, zalog z celem (\d+), na celu \(zold >= 95% celu\) (\d+), ponizej celu (\d+); zold zalog (\d+)"
+                   r" wobec celu (\d+); rodow z celem przycietym do [\d.]+ pulapu (\d+)")
+R2_ZP = re.compile(r"\| pokoj \(Z\.1\): rody w pokoju (\d+), .*?ludzie w partiach (\d+), w zalogach (\d+)")
+R2_ERR = ("CrownCallToWar", "KingdomTreasury.NeedAid", "KingdomTreasury.RentAid", "TownFolk.Bread", "TownFolk.BreadRest", "CrownIncome.End", "ClanBudget.ChestOf")
+
+
+def r2_measures(logp, start, lo, hi):
+    """Liczby grupy rok2 z logu w oknie dob kampanii lo-hi (srednie - ostatnie 28 dob okna z linia). Brak linii = None, nigdy wyjatek."""
+    lines = read(logp)
+    out = {"lines": lines}
+
+    def win(prefix, shift=0):
+        return {d: s for d, s in by_day(lines, prefix).items() if lo <= run_day(d + shift, start) <= hi}
+
+    def tail28(dct):
+        return sorted(dct)[-28:]
+
+    def avg(vals):
+        vals = [v for v in vals if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    w5 = win("Doplata wedlug potrzeby (W5): dzien")
+    out["w5n"] = len(w5)
+    unc = {d: num(R2_W5.pattern, s) for d, s in w5.items()}
+    unc = {d: v for d, v in unc.items() if v is not None}
+    out["unc"] = avg([unc[d] for d in tail28(unc)]) if unc else None
+    m1 = {d: R2_M1.search(s) for d, s in w5.items()}
+    m1 = {d: m for d, m in m1.items() if m}
+    out["m1n"] = len(m1)
+    out["m1on"] = sum(1 for m in m1.values() if m.group(1) == "tak")
+    t = tail28(m1)
+    out["m1pre"] = avg([int(m1[d].group(7)) for d in t]) if t else None
+    out["m1post"] = avg([int(m1[d].group(8)) for d in t]) if t else None
+    out["m1paid"] = avg([int(m1[d].group(4)) for d in t]) if t else None
+    out["m1pool"] = avg([int(m1[d].group(2)) for d in t]) if t else None
+    out["m1pay"] = sum(int(m.group(9)) for m in m1.values())
+    out["m1ctl"] = sum(int(m.group(13)) for m in m1.values())
+    out["m1nopay"] = m1[t[-1]].group(12) if t else "-"
+    c168 = win("Wezwania do wojny (168): dzien")
+    out["c168n"] = len(c168)
+    agg = {"nowar": 0, "nowarpaid": 0, "exp": 0, "held": 0, "overres": 0, "lapsed": 0, "brk": 0, "peace": 0, "paid": 0, "m2an": 0, "m2bn": 0, "m2cn": 0}
+    for s in c168.values():
+        m = R2_M2A.search(s)
+        if m:
+            agg["m2an"] += 1; agg["nowar"] += int(m.group(2)); agg["exp"] += int(m.group(3)); agg["nowarpaid"] += int(m.group(5))
+        m = R2_M2B.search(s)
+        if m:
+            agg["m2bn"] += 1; agg["held"] += int(m.group(2)); agg["overres"] += int(m.group(5))
+        m = R2_M2C.search(s)
+        if m:
+            agg["m2cn"] += 1; agg["lapsed"] += int(m.group(2))
+        m = R2_BRK.search(s)
+        if m:
+            agg["brk"] += int(m.group(1)); agg["peace"] += int(m.group(3))
+        agg["paid"] += num(R2_PAID.pattern, s, default=0) or 0
+    out["c168"] = agg
+    br = win("Chleb biedoty (M3): dzien")
+    bm = {d: R2_M3.search(s) for d, s in br.items()}
+    bm = {d: m for d, m in bm.items() if m}
+    out["brn"] = len(bm)
+    t = tail28(bm)
+    out["brcost"] = avg([int(bm[d].group(9)) for d in t]) if t else None
+    out["brnone"] = avg([int(bm[d].group(16)) for d in t]) if t else None
+    out["bron"] = int(bm[t[-1]].group(2)) if t else None
+    out["brbelow"] = sum(int(m.group(18)) for m in bm.values())
+    out["brplayer"] = sum(int(m.group(19)) for m in bm.values())
+    gr = [float(m.group(15)) for m in bm.values() if m.group(15) != "-"]
+    out["brmingr"] = min(gr) if gr else None
+    out["brcostall"] = sum(int(m.group(9)) for m in bm.values())
+    kie = win("Kiesa ludu: dzien", 1)
+    t = tail28(kie)
+    out["bread"] = avg([fnum(r"pelny W/R/P [^,|]*\(swiat ([\d.]+)%\)", kie[d]) for d in t]) if t else None
+    out["n95"] = avg([num(r"miast ze stac jedzenie < 95%: (\d+)", kie[d]) for d in t]) if t else None
+    rr = [num(r", r = (-?\d+)", s) for s in kie.values()]
+    out["kier"] = [v for v in rr if v is not None and v != 0]
+    b166 = win("Budzet rodow (166): dzien")
+    z = {d: R2_ZP.search(s) for d, s in b166.items()}
+    z = {d: m for d, m in z.items() if m}
+    t = tail28(z)
+    out["peacepar"] = avg([int(z[d].group(2)) for d in t]) if t else None
+    out["peacegar"] = avg([int(z[d].group(3)) for d in t]) if t else None
+    b4 = {d: R2_B4.search(s) for d, s in b166.items()}
+    b4 = {d: m for d, m in b4.items() if m}
+    out["b4"] = b4[max(b4)].groups() if b4 else None
+    out["b4n"] = len(b4)
+    # zalogi swiata - balans-krolestw.csv (ostatnia doba okna)
+    d, f = os.path.split(logp)
+    stem = os.path.splitext(f)[0].replace("Armoury-", "")
+    balp = None
+    for cand in (os.path.join(d, "Logs", stem, "balans-krolestw.csv"), os.path.join(d, stem, "balans-krolestw.csv")):
+        if os.path.isfile(cand):
+            balp = cand
+            break
+    out["balp"] = balp
+    gar = {}
+    if balp:
+        try:
+            with open(balp, encoding="utf-8", errors="replace", newline="") as fh:
+                for r in csv.DictReader(fh, delimiter=";"):
+                    try:
+                        day = int(r.get("dzien") or 0)
+                        men = int(r.get("ludzie_zalogi") or 0)
+                    except ValueError:
+                        continue
+                    if lo <= run_day(day, start) <= hi:
+                        gar[day] = gar.get(day, 0) + men
+        except OSError:
+            gar = {}
+    out["gar"] = (run_day(max(gar), start), gar[max(gar)]) if gar else None
+    # lokata W krolestw w wojnie / w pokoju (linia P1, wiersze krolestw; ostatnia doba okna)
+    dan = win("Danina z oszczednosci (P1): dzien")
+    out["lokw"] = out["lokp"] = None
+    if dan:
+        ks = _k1_kingdoms(dan[max(dan)])
+        if ks and all("bad" not in k for k in ks) and all(k.get("overw") is not None for k in ks):
+            out["lokw"] = sum(k["overw"] for k in ks if not k["peace"])
+            out["lokp"] = sum(k["overw"] for k in ks if k["peace"])
+    dd = [num(r"\| pobrano (\d+) zl z", s) for dd_, s in dan.items() if 91 <= run_day(dd_, start) <= 120]
+    out["dan91"] = avg(dd) if dd else None
+    # wojsko: miara W5-7 (Skarbce w wojnie) - srednia d93-120 i ostatnie 28 dob okna; Zelazne Wyspy - minimum okna
+    army, iron = {}, {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for dd_, war, wallet, men in ser:
+            if not (lo <= run_day(dd_, start) <= hi):
+                continue
+            if war:
+                army[dd_] = army.get(dd_, 0) + men
+            if kname.lower() == "iron islands":
+                iron[dd_] = men
+    a93 = [army[x] for x in army if 93 <= run_day(x, start) <= 120]
+    out["w57_93"] = avg(a93) if a93 else None
+    out["w57"] = avg([army[x] for x in tail28(army)]) if army else None
+    out["iron"] = min(iron.values()) if iron else None
+    out["errs"] = [s for s in lines if s.startswith("ERROR in ") and any(x in s for x in R2_ERR)]
+    return out
+
+
+def rok2_main(logp, start_arg, until=120, basep=None):
+    """Pieniadze roku 2 (PROJEKT-WYBRANY rozdz. 5): progi R2-0..R2-8 i R2-T2-1/2. T1 (okno > 240 dob) - rok 2 z zapisu, T2 - nowa kampania 120 dob.
+    basep (--baza-doby): log bazy (T1: ten sam zapis na 449d453; T2: W53). Log bez paczki - INFO, nigdy wyjatek."""
+    lines0 = read(logp)
+    start = start_arg
+    if start is None:
+        for s in lines0:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines0, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+    t1 = until > 240
+    lo = 1
+    rep = Report()
+    m = r2_measures(logp, start, lo, until)
+    b = None
+    if basep:
+        try:
+            bs = start                                      # T1: ten sam zapis - ten sam start kampanii
+            if not t1:
+                # T2: baza to inna kampania - jej wlasny start (linia Pomiary 169c albo pierwsza doba)
+                bl = read(basep)
+                bs = None
+                for s in bl:
+                    if s.startswith("Pomiary 169c: okna"):
+                        bs = num(r"start kampanii dzien (\d+)", s)
+                        if bs is not None:
+                            break
+                if bs is None:
+                    bd = sorted(by_day(bl, "Pieniadz swiata: dzien"))
+                    bs = bd[0] if bd else 0
+            b = r2_measures(basep, bs, lo, until)
+        except OSError as e:
+            print(f"--baza-doby: nie da sie czytac {basep} ({e})")
+    test = "T1 (rok 2 z zapisu)" if t1 else "T2 (nowa kampania)"
+    print(f"plik: {logp} | start kampanii {start} | okno dob kampanii {lo}-{until} | {test} | baza: {basep or 'brak (T1: liczby logu Z.1 d754-781)'}")
+
+    def fm(v, k=1e3, f=".1f", unit=" tys."):
+        return "-" if v is None else f"{v / k:{f}}{unit}"
+
+    # ---- R2-0 odcinki nowych regul i bledy
+    c = m["c168"]
+    have = {"W5 M1": m["m1n"] > 0, "168 M2a/b/c": (c["m2an"] > 0 and c["m2bn"] > 0 and c["m2cn"] > 0) or m["c168n"] == 0,
+            "Chleb biedoty (M3)": m["brn"] > 0, "166 B4": m["b4n"] > 0}
+    rep.add("R2-0: odcinki nowych regul w liniach i bledy (ERROR in 168 / W5 / M1 / M3)",
+            ", ".join(f"{k} {'tak' if v else 'BRAK'}" for k, v in have.items()) + f"; dob z linia W5 {m['w5n']} (M1 tak w {m['m1on']}), 168 {m['c168n']}, M3 {m['brn']}, B4 {m['b4n']}"
+            + f"; bledy {len(m['errs'])}" + (f" (pierwszy: {m['errs'][0][:140]})" if m["errs"] else ""),
+            "wszystkie odcinki, bledy 0", all(have.values()) and not m["errs"] if m["w5n"] else None)
+    # ---- R2-1 niepokryte po wszystkich zrodlach (po M1)
+    if m["unc"] is not None:
+        base = b["unc"] if (b and b["unc"] is not None) else (R2_Z1["unc"] if t1 else None)
+        src = "baza" if (b and b["unc"] is not None) else "Z.1 d754-781"
+        if t1:
+            rep.add("R2-1: (A3) niepokryte po wszystkich zrodlach (danina, W5b, W6, M1), sr. ostatnich 28 dob",
+                    f"{fm(m['unc'])} zl/d (przed M1 {fm(m['m1pre'])}; M1 pula {fm(m['m1pool'])}, wyplacono {fm(m['m1paid'])}) wobec {src} {fm(base)}",
+                    f"<= 0.85 x {src} ({fm(0.85 * base)})", m["unc"] <= 0.85 * base)
+        else:
+            rep.add("R2-1: (A3) niepokryte po wszystkich zrodlach, sr. 28 dob (INFO w T2)",
+                    f"{fm(m['unc'])} zl/d (przed M1 {fm(m['m1pre'])}, M1 wyplacono {fm(m['m1paid'])})" + (f" wobec bazy {fm(base)}" if base is not None else ""),
+                    "INFO (rok 1: M1 d93-120 ok. 0.9 tys. zl/d)", None)
+    else:
+        rep.add("R2-1: niepokryte po wszystkich zrodlach", "brak linii W5", "INFO", None)
+    rep.add("R2-1b: niepokryte 'z platnikiem' (M1 nie wzial calej reszty wplywow) - suma okna; kontrolka gotowki M1 w pulapie wlasnym",
+            f"{m['m1pay']} zl; kontrolka {m['m1ctl']}" if m["m1n"] else "brak odcinka M1", "0 / 0 (kontrola kodu)",
+            (m["m1pay"] == 0 and m["m1ctl"] == 0) if m["m1on"] else None)
+    rep.add("R2-1c: niepokryte 'bez platnika' wedlug krolestw (ostatnia doba z odcinkiem M1)", m["m1nopay"], "INFO (Wyspy, Wolni Ludzie - nikt w krolestwie nie ma pieniedzy)", None)
+    # ---- R2-2 / R2-3 wezwania
+    rep.add("R2-2: (A15-2) rata zaplacona w dobie bez wojny wezwanego z celem (suma okna)",
+            f"{c['nowarpaid']} zl; porozumien bez wojny (doby) {c['nowar']}, wygasle bez wojny {c['exp']}; zaplacone razem {c['paid']} zl",
+            "0", (c["nowarpaid"] == 0) if c["m2an"] else None)
+    rep.add("R2-3: zerwania z braku wplywow i pokoj sojusznika z 168 (suma okna)", f"{c['brk']} / {c['peace']}; przepadlo czesci dnia (M2c) {c['lapsed']} zl",
+            "0 / 0", (c["brk"] == 0 and c["peace"] == 0) if c["m2cn"] else None)
+    rep.add("R2-3b: rata ponad (reszta wplywow - rezerwa) - kontrola M2b; wstrzymane po wlasnych zolnierzach (suma okna)",
+            f"{c['overres']} zl; wstrzymane {c['held']} zl", "0", (c["overres"] == 0) if c["m2bn"] else None)
+    # ---- R2-4 chleb
+    rep.add("R2-4: (A4) chleb - pan po wyplacie ponizej R, kiesa gracza, kontrola kies ludu r != 0 (doby)",
+            f"{m['brbelow']} / {m['brplayer']} / {len(m['kier'])}" + (f"; najnizsze G/R placacego pana {m['brmingr']:.2f}" if m["brmingr"] is not None else ""),
+            "0 / 0 / 0", (m["brbelow"] == 0 and m["brplayer"] == 0 and not m["kier"]) if m["brn"] else None)
+    if m["brn"]:
+        rule = "<= 30 tys. zl/d (rok 2)" if t1 else "0 (glod liczy sie od doby 120 + 7 dob)"
+        ok = (m["brcost"] or 0) <= 30000 if t1 else m["brcostall"] == 0
+        rep.add("R2-4b: chleb - koszt (zaplacono, sr. 28 dob); osad na chlebie (ostatnia doba); nie stac nikogo (sr. 28 dob)",
+                f"{fm(m['brcost'])} zl/d (cale okno {m['brcostall']} zl); osad {m['bron']}; nie stac nikogo {fm(m['brnone'])} zl/d", rule, ok)
+    else:
+        rep.add("R2-4b: chleb - koszt", "brak linii Chleb biedoty (M3)", "INFO", None)
+    if m["n95"] is not None:
+        if t1:
+            rep.add("R2-4c: miast ze stac jedzenie < 95% (Kiesa ludu, sr. 28 dob)", f"{m['n95']:.1f}" + (f" wobec bazy {b['n95']:.1f}" if b and b["n95"] is not None else f" (Z.1: {R2_Z1['n95']:.1f})"),
+                    "<= 2", m["n95"] <= 2.0)
+        else:
+            bn = b["n95"] if b else None
+            rep.add("R2-4c: miast ze stac jedzenie < 95% (Kiesa ludu, sr. 28 dob)", f"{m['n95']:.1f}" + (f" wobec W53 {bn:.1f}" if bn is not None else ""),
+                    "<= baza + 1", (m["n95"] <= bn + 1.0) if bn is not None else None)
+    else:
+        rep.add("R2-4c: miast ze stac jedzenie < 95%", "brak linii Kiesa ludu", "INFO", None)
+    if m["bread"] is not None:
+        bb = b["bread"] if (b and b["bread"] is not None) else (R2_Z1["bread"] if t1 else None)
+        if t1:
+            rep.add("R2-4d: chleb swiata (pelny koszyk W/R/P, swiat), sr. 28 dob", f"{m['bread']:.1f}% wobec {'bazy' if b and b['bread'] is not None else 'Z.1'} {bb:.1f}%",
+                    f">= baza + 2 pkt ({bb + 2:.1f}%)", m["bread"] >= bb + 2.0)
+        else:
+            rep.add("R2-4d: chleb swiata, sr. 28 dob", f"{m['bread']:.1f}%" + (f" wobec W53 {bb:.1f}%" if bb is not None else ""), ">= baza - 0.5 pkt",
+                    (m["bread"] >= bb - 0.5) if bb is not None else None)
+    else:
+        rep.add("R2-4d: chleb swiata", "brak linii Kiesa ludu", "INFO", None)
+    # ---- R2-5 zalogi (B4)
+    if m["gar"]:
+        g = m["gar"][1]
+        b4 = m["b4"]
+        notbind = b4 is not None and int(b4[1]) > 0 and int(b4[3]) > int(b4[2])   # wiecej zalog ponizej celu niz na celu - wiaze werbunek, nie budzet
+        b4t = f"; B4: udzial {b4[0]}, zalog z celem {b4[1]}, na celu {b4[2]}, ponizej {b4[3]}, zold {b4[4]} wobec celu {b4[5]}" if b4 else "; brak dopisku B4"
+        if t1:
+            rep.add(f"R2-5: (A15-1) zalogi swiata (balans-krolestw.csv, doba {m['gar'][0]})", f"{g}{b4t}",
+                    ">= 69 020 (N4); NIE przy celu niewiazacym (wiecej zalog ponizej celu niz na celu) = DECYZJA - tempo werbunku zalog gry, nie budzet",
+                    g >= 69020, decide=notbind)
+        else:
+            bg = b["gar"][1] if (b and b["gar"]) else None
+            rep.add(f"R2-5: zalogi swiata (balans-krolestw.csv, doba {m['gar'][0]})", f"{g}" + (f" wobec W53 {bg}" if bg is not None else "") + b4t,
+                    ">= baza - 1 000", (g >= bg - 1000) if bg is not None else None)
+    else:
+        rep.add("R2-5: zalogi swiata", "brak balans-krolestw.csv obok logu", "INFO", None)
+    if m["peacepar"] is not None:
+        bp = b["peacepar"] if (b and b["peacepar"] is not None) else (R2_Z1["peacepar"] if t1 else None)
+        if t1:
+            rep.add("R2-5b: ludzie w partiach rodow w pokoju (166 Z.1, sr. 28 dob); zalogi rodow w pokoju (INFO)",
+                    f"{m['peacepar']:.0f} (zalogi {m['peacegar']:.0f}) wobec {'bazy' if b and b['peacepar'] is not None else 'Z.1'} {bp:.0f}", f">= 0.9 x baza ({0.9 * bp:.0f})",
+                    m["peacepar"] >= 0.9 * bp)
+        else:
+            rep.add("R2-5b: ludzie w partiach rodow w pokoju (INFO w T2)", f"{m['peacepar']:.0f} (zalogi {m['peacegar']:.0f})" + (f" wobec W53 {bp:.0f}" if bp is not None else ""),
+                    "INFO", None)
+    else:
+        rep.add("R2-5b: ludzie w partiach rodow w pokoju", "brak dopisku Z.1 w linii 166", "INFO", None)
+    # ---- R2-6 lokata
+    if m["lokw"] is not None:
+        rep.add("R2-6: (A5) lokata W krolestw w wojnie (linia P1, ostatnia doba okna)", fm(m["lokw"], 1e6, ".2f", " mln"),
+                "<= 10 mln" if t1 else "INFO w T2", (m["lokw"] <= 10e6) if t1 else None)
+        rep.add("R2-6b: lokata W krolestw w pokoju (INFO - pytanie do Jeffa o M4 przy > 8 mln)", fm(m["lokp"], 1e6, ".2f", " mln"), "INFO", None)
+    else:
+        rep.add("R2-6: lokata W wedlug wojny / pokoju", "brak pola W miast w wierszach krolestw linii P1", "INFO", None)
+    # ---- R2-7 Zelazne Wyspy
+    if m["iron"] is not None:
+        rep.add("R2-7: Zelazne Wyspy - wojsko rodow (Skarbce), minimum okna", str(m["iron"]) + (f" (baza {b['iron']})" if b and b["iron"] is not None else ""),
+                ">= 2 500 (Z.1: 2 750)" if t1 else "INFO w T2", (m["iron"] >= 2500) if t1 else None)
+    # ---- R2-T2 rok 1 bez pogorszenia
+    if not t1:
+        if m["w57_93"] is not None and b and b["w57_93"] is not None:
+            rep.add("R2-T2-1: rok 1 bez pogorszenia - miara W5-7 (Skarbce w wojnie) sr. d93-120", f"{fm(m['w57_93'])} wobec W53 {fm(b['w57_93'])}",
+                    ">= W53 - 2.0 tys.; NIE - wylaczac po kolei M2c, M2b, M2a, M1", m["w57_93"] >= b["w57_93"] - 2000)
+        else:
+            rep.add("R2-T2-1: rok 1 - miara W5-7 d93-120", fm(m["w57_93"]), ">= W53 - 2.0 tys. (podaj --baza-doby W53)", None)
+        if m["dan91"] is not None and b and b["dan91"] is not None:
+            rep.add("R2-T2-2: danina P1 sr. d91-120", f"{fm(m['dan91'])} zl/d wobec W53 {fm(b['dan91'])}", ">= 0.97 x W53", m["dan91"] >= 0.97 * b["dan91"])
+        else:
+            rep.add("R2-T2-2: danina P1 d91-120", fm(m["dan91"]), ">= 0.97 x W53 (podaj --baza-doby W53)", None)
+    else:
+        rep.add("R2-W57: miara W5-7 (Skarbce w wojnie), sr. ostatnich 28 dob okna", fm(m["w57"]) + (f" wobec bazy {fm(b['w57'])}" if b and b["w57"] is not None else ""),
+                "INFO (85 tys. rozstrzyga mapa wojen - Z.1 i /4.33; reguly roku 2 daja ok. +1-2 tys.)", None)
+    # ---- R2-8 L2 (INFO)
+    pr = by_day(m["lines"], "Pieniadz swiata (rody - przyczyny): dzien")
+    l2 = [re.search(r"\| L2 rozbicie zmiany zlota swiata: rozliczenia z pusta kiesa glowy po rozliczeniu ([+-]?\d+) \((\d+) rozliczen\), pozostale ([+-]?\d+); kiesy glow przeniesione w rozliczeniach netto ([+-]?\d+)", s)
+          for d_, s in pr.items() if lo <= run_day(d_, start) <= until]
+    l2 = [x for x in l2 if x]
+    if l2:
+        e = sum(int(x.group(1)) for x in l2); r_ = sum(int(x.group(3)) for x in l2); hm = sum(int(x.group(4)) for x in l2)
+        rep.add("R2-8: (A15-5) L2 - zmiana zlota swiata w rozliczeniach rodow: z pusta kiesa glowy / pozostale; kiesy glow przeniesione (suma okna)",
+                f"{e:+d} / {r_:+d}; przeniesione {hm:+d} ({len(l2)} dob)", "INFO (diagnoza '+373 tys.'; zrodla bez platnika - grupa etap3 / ksiega)", None)
+    else:
+        rep.add("R2-8: L2 rozbicie rozliczen rodow", "brak dopisku L2", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -19809,6 +20151,8 @@ def main(argv):
         return szybkie_main(logp, start_arg, until_arg)   # szybkie wlaczenia 14.10: A8 udzial polki koni 40%, A9 amunicja AI i sufit ceny 3.0
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
+    if group == "rok2" and logp:
+        return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
     if group != "etap2" or not logp:
