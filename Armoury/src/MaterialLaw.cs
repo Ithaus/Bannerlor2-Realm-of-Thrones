@@ -203,6 +203,8 @@ namespace Armoury
                 // po mnozniku wydobycia i powtorzen BK, PRZED rekami spustoszenia, regulatorem, W2 i sufitem dymarki; klucz wylaczony / wies poza regula - nic
                 // nie dopisuje (wlasny try w VillageByPeople - wyjatek nie zabiera dalszych krokow)
                 VillageByPeople.ProdStep(village, ref __result);
+                // GL-5 (P5, klucz GoodsRatesByPattern): sol x2.0 - stawka wsi solnych (kopalina), tym samym wzorem (czynnik x suma), po czynniku ludzi P1, przed rekami i regulatorem
+                GoodsRates.ProdStep(village, item, ref __result);
                 // E4/5 (R9a): plon i wydobycie x (ludzie w domu / ludzie wsi) ^ elastycznosc. Dokladnie 1, gdy wies nie ma uchodzcow albo spustoszenie jest
                 // wylaczone - wtedy nic nie dopisujemy. Mnozy tak samo jak wyzej (czynnik x suma dotychczasowych), po mnozniku wydobycia i powtorzen BK, po zimie
                 // i sufitach BK z modelu Default (najbardziej zewnetrzny model - _depth 1); E4/7 (b) dolozy czynnik rak TUTAJ - jeden wspolny mnoznik (P 5.1)

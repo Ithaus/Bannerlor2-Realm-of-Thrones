@@ -362,7 +362,7 @@ namespace Armoury
         }
 
         /// <summary>Klasa wsi BK (LandData.VillageClass) przez refleksje - tylko przy starcie sesji, wsie z tabeli i wycofane. Bez BK nic nie robi.</summary>
-        private sealed class BkClass
+        internal sealed class BkClass
         {
             private readonly object _pm;
             private readonly MethodInfo _getPop, _getClass;

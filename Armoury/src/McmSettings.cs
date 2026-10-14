@@ -5460,6 +5460,10 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool MilitiaByPeople { get; set; } = true;
 
+        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands that had no flax - fishers, silver miners and woodcutters of the Reach, Volantis, Qarth, King's Landing, Braavos, Pentos and the Stormlands - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The new flax villages come with a new campaign only; a campaign already under way keeps its villages (the salt rate applies at once). Off = salt and flax as before (villages keep the map's own trade from the next load)")]
+        [SettingPropertyGroup("Goods follow the people (GL)")]
+        public bool GoodsRatesByPattern { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6824,6 +6828,7 @@ namespace Armoury
             s.StartGoldByPeople = StartGoldByPeople;
             s.LevyByPeople = LevyByPeople;
             s.MilitiaByPeople = MilitiaByPeople;
+            s.GoodsRatesByPattern = GoodsRatesByPattern;
         }
 
         internal static void Apply()

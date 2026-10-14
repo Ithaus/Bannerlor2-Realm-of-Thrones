@@ -1942,6 +1942,10 @@ namespace Armoury
         // GL-4 / P4: przyrost milicji gry (DefaultSettlementMilitiaModel :104-120) i limit milicji BK x ten sam czynnik (norma wazona przyrostem gry); ubytek 2.5% bez zmian.
         // Dothrakowie: prog wolnych rak 60% (udzial zbrojnych 3) przy ktoryms z kluczy P4. Off = stan 97dd474
         public bool MilitiaByPeople = true;                // The militia of a village, town or castle grows, and is capped, by the number of people of its land and by how many of them bear arms - more defenders in crowded lands and among the warrior peoples, fewer in empty ones; the world keeps as many militiamen as before. Off = every settlement raises its militia as before
+        // GL-5 / P5 (projekt rozdz. 4A, 8 P5; decyzja Jeffa pyt. 6; GoodsRates.cs): sol x2.0 - stawka wsi solnych (MaterialLaw.ProdPostfix, kazda kampania); len - 16 wsi
+        // ludnych krain bez lnu (ryby, srebro, drwale) dostaje typ flax_plant jak klimat wsi T8 (start sesji, bez zapisu typu; klasa BK wyrownana) - TYLKO kampania zaczeta
+        // z kluczem (flaga arm_goodsrates; P1 trzyma g typow z kalibracji). Off = stan 97dd474 (typy z mapy od nastepnego wczytania)
+        public bool GoodsRatesByPattern = true;            // Salt pans yield twice what they did, and sixteen villages of the crowded lands that had no flax - fishers, silver miners and woodcutters of the Reach, Volantis, Qarth, King's Landing, Braavos, Pentos and the Stormlands - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The new flax villages come with a new campaign only; a campaign already under way keeps its villages (the salt rate applies at once). Off = salt and flax as before (villages keep the map's own trade from the next load)
 
         public static void Load(string moduleDataDir)
         {
