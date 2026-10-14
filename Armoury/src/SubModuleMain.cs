@@ -94,6 +94,7 @@ namespace Armoury
                 try { BattlePlunder.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BattlePlunder.ApplyAll", e); }
                 try { DefeatMorale.ApplyAll(_harmony); } catch (Exception e) { Log.Error("DefeatMorale.ApplyAll", e); }   // D11-1: kara morale za przegrana bitwe i runde o polowe (postfiksy modeli Default)
                 try { ArmsLeaks.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ArmsLeaks.ApplyAll", e); }   // paczka 174.0: kasowanie 5% stosow bez uzbrojenia (prefiks DeleteOverproducedItems; postfiks MoneyLedger biegnie dalej)
+                try { UniqueShelf.ApplyAll(_harmony); } catch (Exception e) { Log.Error("UniqueShelf.ApplyAll", e); }   // A17 (poz. 4): unikaty zdjete z polki na czas konsumpcji osady (prefiks First / finalizer Last MakeConsumptionInTown)
                 try { MaterialOrders.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MaterialOrders.ApplyAll", e); }   // 174.2: BK ReleaseCaravanFromHold nie zmienia celu karawany z kontraktem
                 AiGear.ApplyAll(_harmony);       // zakupy armii AI zamiast darmowego sprzetu DTE (Jeff 04.10)
                 WorkshopLaw.ApplyAll(_harmony);  // warsztaty uzbrojenia jako firmy (Jeff 04.10)

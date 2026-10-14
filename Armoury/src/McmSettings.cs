@@ -1720,6 +1720,10 @@ namespace Armoury
         [SettingPropertyGroup("Valyrian steel")]
         public bool UniqueNeverLost { get; set; } = true;
 
+        [SettingPropertyBool("Uniques Not Folk Goods", HintText = "a renowned piece lying on a market (Cersei's red dress, Renly's armour, a Valyrian blade...) is not used up by the townsfolk's daily wants nor cleared away by the game with the market's worn stock - it leaves the shelf only when someone buys it or a merchant's cart takes it. Off = the townsfolk wear it out like any garment, as before")]
+        [SettingPropertyGroup("Valyrian steel")]
+        public bool UniquesNotFolkGoods { get; set; } = true;
+
         [SettingPropertyBool("No Conjured Legends", HintText = "reinforcement caravans of Dynamic Troop Equipment and tournament prizes (also Tournaments XPanded) no longer conjure legendary or named pieces: each becomes an ordinary piece of the same kind")]
         [SettingPropertyGroup("Valyrian steel")]
         public bool NoConjuredLegends { get; set; } = true;
@@ -6165,6 +6169,7 @@ namespace Armoury
             s.ValyrianNoSmelt = ValyrianNoSmelt;
             s.UniqueInheritance = UniqueInheritance;
             s.UniqueNeverLost = UniqueNeverLost;
+            s.UniquesNotFolkGoods = UniquesNotFolkGoods;
             s.NoConjuredLegends = NoConjuredLegends;
             s.HistValyrianPerMeasure = HistValyrianPerMeasure;
             s.QohorReworkEnabled = QohorReworkEnabled;

@@ -584,6 +584,7 @@ Uzycie (Python 3, tylko odczyt):
                     (caly log, czytany strumieniowo). A17-11 ludzie partii kasowanej po bitwie (DestroyedPartyMenRouted): linia doby CZYNNE, kontrola
                     przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
                     A17-6 statki do liczby idealnej stoczni (ShipPortsBuyToIdeal): dopisek TAK, zakupy ponad liczbe idealna (B5-14) <= 0.1/d, B5-5 0.
+                    A17-4 unikaty nie sa towarem mieszczan (UniquesNotFolkGoods): linia CZYNNE, zdjete = odlozone, F1-3 na calym logu 0 (unikaty.log), D3 (INFO).
                     Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -20861,6 +20862,8 @@ A17_PRE = {
     "d4": "Partia kasowana z ludzmi (A17 diagnoza D4)",
     "poc": "Pochodzenie (E4/7): dzien",
     "ship": "Statki (181): dzien",
+    "ush": "Unikaty na polkach (A17): dzien",
+    "d3": "Unikat z polki (A17 diagnoza D3)",
     "err": "ERROR in ",
 }
 A17_FIN29_GONE = 344.0 / 120.0      # fin29 (Armoury-2026-10-14_05-22-14.log): "przy zniknieciu partii" 344 ludzi w 120 dobach
@@ -20970,6 +20973,55 @@ def _a17_6(rep, got):
     rep.add("A17-6e: bledy ShipsToPort181 (ERROR in)", len(errs), "0", len(errs) == 0)
 
 
+def _a17_4(rep, got, logp):
+    """A17-4 (poz. 4, F1-3, UniquesNotFolkGoods): unikat nie jest towarem mieszczan - zdjety z polki na czas konsumpcji osady; F1-3 na calym logu (unikaty.log)."""
+    ul = got["ush"]
+    on = [s for s in ul if "| CZYNNE |" in s]
+    rep.add("A17-4a: unikaty zdejmowane z polki na czas konsumpcji osad (linia doby A17)", f"linii {len(ul)}, CZYNNE {len(on)}" if ul else "brak linii",
+            "CZYNNE kazdej doby (klucz Uniques Not Folk Goods); log sprzed A17 - INFO", (len(on) == len(ul)) if ul else None)
+    bad = [s for s in ul if (num(r"zdjete - odlozone = (-?\d+)", s, int, 0) or 0) != 0]
+    hid = sum(num(r"zdjete na czas konsumpcji osad (\d+) szt", s, int, 0) or 0 for s in ul)
+    rep.add("A17-4b: kontrola zdjete = odlozone (kazda doba)", f"dob z roznica {len(bad)} z {len(ul)}; zdjete razem {hid} szt. ({hid / max(1, len(ul)):.1f}/d)" if ul else "brak linii",
+            "0 dob z roznica", (len(bad) == 0) if ul else None)
+    up = session_file_find(logp, "unikaty.log") if logp else None
+    if not up or not os.path.exists(up):
+        rep.add("A17-4c: F1-3 unikat z targu albo z wozu bez nowego miejsca (kronika unikatow, caly log)", f"brak pliku unikaty.log ({up or '-'})", "0 przy CZYNNE", None)
+    else:
+        kre = re.compile(r"^Kronika unikatow: dzien (\d+) - (stan swiata \(\d+ unikatow w obiegu\): |zmiany: )(.*)$")
+        state, hits, nl = {}, [], 0
+        with open(up, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                m0 = TS.match(ln.rstrip("\n"))
+                x = m0.group(2) if m0 else ln.rstrip("\n")
+                m = kre.match(x)
+                if not m:
+                    continue
+                nl += 1
+                first = m.group(2).startswith("stan")
+                txt = m.group(3)[:-1] if m.group(3).endswith(".") else m.group(3)
+                if first:
+                    state = {}
+                for ent in txt.split(" | "):
+                    if ": " not in ent:
+                        continue
+                    uid, place = ent.split(": ", 1)
+                    comp = set() if place.startswith("nigdzie") else set(place.split("; "))
+                    old = state.get(uid)
+                    if not first and old:
+                        lost = [c for c in old - comp if c.startswith("targ ") or c.startswith("w drodze wozem ")]
+                        if lost and not (comp - old):
+                            hits.append(f"dzien {m.group(1)} {uid}: {sorted(lost)[0]} -> " + ("nigdzie" if not comp else "ubylo"))
+                    state[uid] = comp
+        rep.add("A17-4c: F1-3 unikat z targu albo z wozu bez nowego miejsca (kronika unikatow, caly log)",
+                f"{len(hits)} w {nl} liniach kroniki" + (" [" + "; ".join(hits[:5]) + "]" if hits else ""),
+                "0 przy CZYNNE (fin27 / fin28 / W53 przed A17: 1 - cersei_red_dress; inna droga niz konsumpcja - linia D3)", (len(hits) == 0) if (nl and ul and len(on) == len(ul)) else None)
+    d3 = got["d3"]
+    rep.add("A17-4d: diagnoza D3 - unikat schodzi z polki (ramka / stos)", (f"linii {len(d3)}; pierwsza: {d3[0][:300]}" if d3 else "0 linii"),
+            "INFO (renly_armor w biegu dwuletnim - droga do ustalenia)", None)
+    errs = [s for s in got["err"] if "UniqueShelf" in s]
+    rep.add("A17-4e: bledy UniqueShelf (ERROR in)", len(errs), "0", len(errs) == 0)
+
+
 def a17_main(logp):
     """A17 (14.10, docs/reszta-2026-10-14/ROZPOZNANIE-A17.md): progi napraw starych zaleglosci. Caly log, czytany strumieniowo (log 2 lat ma 280 MB).
     Log bez paczki: INFO, bez wyjatku."""
@@ -20986,6 +21038,7 @@ def a17_main(logp):
     print(f"plik: {logp} | " + ", ".join(f"{k} {len(v)}" for k, v in got.items()))
     _a17_11(rep, got)
     _a17_6(rep, got)
+    _a17_4(rep, got, logp)
     rep.show()
     return 0
 
