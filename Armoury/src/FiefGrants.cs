@@ -27,7 +27,7 @@ namespace Armoury
     ///
     /// Regula N (jedna dla AI i gracza; kazda decyzja SettlementClaimantDecision - po zdobyciu i po aneksji; liczona z biezacego stanu):
     ///  N1 ocena rodu C do twierdzy X: S = (100 + Z + U + B + J + K) x P / (P + W)
-    ///     W = 2 x miasta + 1 x zamki rodu (bez X), P = max(1, tier - 1);
+    ///     W = 2 x miasta + 1 x zamki rodu (bez X i bez twierdz czekajacych na nadanie - IsOwnerUnassigned), P = max(1, tier - 1);
     ///     Z = FairFiefConquerorBonus (50) - rod wodza armii, ktora zdobyla (Town.LastCapturedBy), tylko po zdobyciu (IsOwnerUnassigned), nie rod krola;
     ///     U = 25 - inny rod z druzyna lorda po stronie zdobywcy w zwycieskim szturmie (zapis z MapEventEnded do nadania, najwyzej 60 dob), nie rod krola, nie razem z Z;
     ///     B = 50 - rod bez twierdzy (W = 0); J = 100 - czlonek rodu jest posiadaczem de jure tytulu X w BK (deJure.Clan == C);
@@ -99,10 +99,11 @@ namespace Armoury
         // liczniki: d* - od poprzedniej linii doby, s* - od startu sesji
         private static int _dConcluded, _sConcluded, _dLines, _sLines, _dCancelled, _sCancelled, _dOver, _dOverWithIn, _sOverWithIn;
         private static int _dMoved, _sMoved, _dCaptures, _dNoMax, _dStumbles, _sStumbles;
+        private static Settlement _applying;   // twierdza nadawana wlasnie przez KingdomElection.ApplyChosenOutcome (H6 prefiks -> postfiks)
 
         internal static void Reset()
         {
-            _captures.Clear(); _lastChange.Clear(); _granted.Clear();
+            _captures.Clear(); _lastChange.Clear(); _granted.Clear(); _applying = null;
             _pass = new ConditionalWeakTable<KingdomDecision, Pass>();
             _abstain = new ConditionalWeakTable<KingdomElection, Flag>();
             _dipBeh = null; _dipTried = false;
@@ -258,7 +259,10 @@ namespace Armoury
             cl.Cap = cl.P + CapExtra;
             foreach (var f in c.Fiefs)
             {
-                if (f == null || f == town) continue;
+                // recenzja 14.10: twierdza czekajaca na nadanie (IsOwnerUnassigned - po szturmie i odejsciu rodu trzyma ja krol, po wymarciu rodu rod dziedzic,
+                // do decyzji "Owner of X"; naraz jedna decyzja na krolestwo, w krolestwie gracza kazda po 48 h) nie jest posiadaniem - inaczej krol po kazdej
+                // wojnie "mial" wszystkie zdobycze naraz (pulap, czynnik, udzial < 20%)
+                if (f == null || f == town || f.IsOwnerUnassigned) continue;
                 if (f.IsTown) { cl.Towns++; cl.W += 2; }
                 else if (f.IsCastle) { cl.Castles++; cl.W += 1; }
             }
@@ -455,7 +459,9 @@ namespace Armoury
                 _lastChange[s] = new Change { Day = now, Detail = detail };
                 Grant g;
                 if (!_granted.TryGetValue(s, out g)) return;
-                if (detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByKingDecision) return;   // nowe nadanie - postfiks H6 je zapisze
+                // nowe nadanie z glosowania - postfiks H6 je zapisze; ByKingDecision spoza glosowania (BK: prawo petycji z kontraktu, ROT: Harrenhal
+                // dla Roose'a) to zmiana pana nadanej twierdzy - liczona jak kazda inna (recenzja 14.10, LN-11)
+                if (detail == ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.ByKingDecision && s == _applying) return;
                 var nc = newOwner != null ? newOwner.Clan : null;
                 var nk = nc != null ? nc.Kingdom : null;
                 if (nc == null || now - g.Day > GrantWatchDays || nk != g.Kingdom) { _granted.Remove(s); return; }
@@ -496,6 +502,22 @@ namespace Armoury
             return n;
         }
 
+        /// <summary>Wplyw, ktory rody zaplaca za glosy na kandydata (jak KingdomElection.HandleInfluenceCosts: koszt 20/60/100 wedlug sily glosu,
+        /// glosujacy na przegranego placi polowe; bez wyjatku cechy Good Natured i rady jednego rodu) - recenzja 14.10: glos N4 ma ok. 100 dla
+        /// 1. w ocenie u kazdego rodu, wiec rody moga placic za glosy wiecej niz dotad (tylko log).</summary>
+        private static int Paid(KingdomDecision d, DecisionOutcome o, bool chosen)
+        {
+            int n = 0;
+            if (o == null || o.SupporterList == null) return 0;
+            foreach (var s in o.SupporterList)
+            {
+                if (s == null || s.Clan == null || s.Clan.Leader == null) continue;
+                int c = d.GetInfluenceCost(o, s.Clan, s.SupportWeight);
+                n += chosen ? c : c / 2;
+            }
+            return n;
+        }
+
         private static string Holdings(Claim cl) { return cl.Towns + "m/" + cl.Castles + "z = " + cl.W + " pkt"; }
 
         private static string Parts(Claim cl)
@@ -517,6 +539,7 @@ namespace Armoury
             __state = null;
             var d = ____decision as SettlementClaimantDecision;
             if (d == null) return;
+            _applying = d.Settlement;
             try
             {
                 var x = d.Settlement;
@@ -592,7 +615,10 @@ namespace Armoury
                         float r = (o.InitialMerit - (o.InitialMerit >= 11f ? Tie(x, o.Clan, d, 99f) : 0f)) / cl.S;
                         if (r > 1.5f) sb.Append("; ROT x").Append(((int)Math.Round(r)).ToString(Inv));
                     }
-                    sb.Append("; BK domena ").Append(BkDemesne(o.Clan)).Append("] glosy ").Append(Points(o)).Append(" (rodow ").Append(o.SupporterList != null ? o.SupporterList.Count : 0).Append(")");
+                    int paid = 0;
+                    try { paid = Paid(d, o, o == win); } catch (Exception e) { Stumble("ApplyPrefix(wplyw)", e); }
+                    sb.Append("; BK domena ").Append(BkDemesne(o.Clan)).Append("] glosy ").Append(Points(o)).Append(" (rodow ").Append(o.SupporterList != null ? o.SupporterList.Count : 0)
+                      .Append(", wplyw ").Append(paid).Append(")");
                 }
                 bool first = top != null && top == win;
                 float ratio = top != null && top.InitialMerit > 0f ? win.InitialMerit / top.InitialMerit : (first ? 1f : 0f);
@@ -625,6 +651,7 @@ namespace Armoury
 
         public static void ApplyPostfix(object __state)
         {
+            _applying = null;
             var st = __state as GrantState;
             if (st == null) return;
             try

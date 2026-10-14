@@ -23507,7 +23507,7 @@ def sludan_main(logp, csp=None):
 
 LN_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
 LN_CAND = re.compile(r"^(\d)\. (.+?) (-?[\d.]+) \(S (-?[\d.]+)\) \[t(-?\d+) (\d+)m/(\d+)z = (\d+) pkt, przydzial (\d+), pulap (\d+); (.+?); x([\d.]+)"
-                     r"(?:; ROT x(\d+))?; BK domena ([^\]]*)\] glosy (\d+) \(rodow (\d+)\)$")
+                     r"(?:; ROT x(\d+))?; BK domena ([^\]]*)\] glosy (\d+) \(rodow (\d+)(?:, wplyw (\d+))?\)$")   # wplyw - recenzja 14.10 (starsze linie bez)
 LN_WIN = re.compile(r"\| zwyciezca (.+?) \(1\. w ocenie: (tak|nie), ocena ([\d.]+) x 1\., ponad pulapem: (tak|nie), w pulapie byl ktos: (tak|nie)"
                     r", rod krola: (tak|nie), gracz: (tak|nie)\) -> (\d+)m/(\d+)z = (\d+) pkt \(pulap (\d+)\)( - NIE DOSTAL[^|]*)?")
 LN_CONQ = re.compile(r"\| zdobywca: (?:-|(.+?) \(rod krola: (tak|nie), kandydat: (tak|nie), w pulapie: (tak|nie|-), dostal: (tak|nie)\))")
@@ -23542,7 +23542,7 @@ def lenna_parse_grant(s):
             return None
         c = mc.groups()
         cands.append(dict(pos=int(c[0]), clan=c[1], m=float(c[2]), s=float(c[3]), tier=int(c[4]), towns=int(c[5]), castles=int(c[6]), w=int(c[7]),
-                          p=int(c[8]), cap=int(c[9]), parts=c[10], fac=float(c[11]), rot=c[12], bk=c[13], votes=int(c[14]), voters=int(c[15])))
+                          p=int(c[8]), cap=int(c[9]), parts=c[10], fac=float(c[11]), rot=c[12], bk=c[13], votes=int(c[14]), voters=int(c[15]), paid=int(c[16]) if c[16] else None))
     g["cands"] = cands
     mw = LN_WIN.search(s)
     if not mw:
@@ -23796,8 +23796,12 @@ def lenna_main(logp, tabp=None):
     else:
         rep.add("LN-10: nadania z lista uczestnikow", "brak nadan po zdobyciu", "INFO", None)
     # ---- LN-11
-    rep.add("LN-11: nadana twierdza zmienia pana w krolestwie w 60 dob", f"{len(moved)}" + (": " + " ; ".join(m[31:150] for m in moved[:3]) if moved else ""),
-            "0; > 0 = DECYZJA (limit domeny BK przeczy pulapowi - krok 2: limit BK zamiast tieru)", True if not moved else False, decide=bool(moved))
+    # recenzja 14.10: ByKingDecision spoza glosowania (BK: prawo petycji z kontraktu, ROT: Harrenhal dla Roose'a) - nie limit domeny BK, tylko INFO
+    mk = [m for m in moved if "(ByKingDecision)" in m]
+    mo = [m for m in moved if "(ByKingDecision)" not in m]
+    rep.add("LN-11: nadana twierdza zmienia pana w krolestwie w 60 dob", f"{len(mo)}" + (": " + " ; ".join(m[31:150] for m in mo[:3]) if mo else "")
+            + (f" | ByKingDecision (petycja BK / fabula ROT, INFO) {len(mk)}: " + " ; ".join(m[31:150] for m in mk[:2]) if mk else ""),
+            "0; > 0 = DECYZJA (limit domeny BK przeczy pulapowi - krok 2: limit BK zamiast tieru)", True if not mo else False, decide=bool(mo))
     # ---- LN-12
     st = sum(d["st"] for d in days)
     rep.add("LN-12: potkniecia latek", f"z linii doby {st}, linii 'ERROR in FiefGrants.' {errs}" + (f", glos bez M_max {sum(d['nomax'] for d in days)}" if days else ""),
@@ -23808,6 +23812,14 @@ def lenna_main(logp, tabp=None):
             "INFO", None)
     if on:
         rep.add("LN-INFO: nadania wedlug krolestw (bez KP i Czerwonej Twierdzy)", "; ".join(f"{b[0]} {b[1]} -> rodow {b[4]}, najwiecej {b[2]} {b[3]}" for b in big[:8]), "INFO", None)
+    # recenzja 14.10: wplyw za glosy (glos N4 ok. 100 dla 1. w ocenie u kazdego rodu - rody moga placic wiecej niz przy glosie BK); porownanie z biegiem
+    # wylaczonym (regula N: nie) albo z `wplyw_doby` w budzet-rodow.csv - INFO
+    for lab, gs in (("regula N tak", on), ("regula N nie", [g for g in grants if g["rule"] == "nie"])):
+        pd = [sum(c["paid"] for c in g["cands"]) for g in gs if g["cands"] and all(c["paid"] is not None for c in g["cands"])]
+        if pd:
+            vt = [sum(c["voters"] for c in g["cands"]) for g in gs if g["cands"] and all(c["paid"] is not None for c in g["cands"])]
+            rep.add(f"LN-INFO: wplyw za glosy na nadanie ({lab})", f"nadan {len(pd)}, razem {sum(pd)}, srednio {sum(pd) / len(pd):.0f} na nadanie,"
+                    f" {sum(pd) / max(1, sum(vt)):.0f} na glosujacy rod, najwiecej {max(pd)}", "INFO (koszt 20/60/100, przegrany polowa)", None)
     rep.show()
     return 0
 
