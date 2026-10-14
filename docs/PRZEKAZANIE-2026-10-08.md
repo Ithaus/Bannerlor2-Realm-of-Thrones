@@ -1187,3 +1187,28 @@ Odpowiedzi dla Jeffa w `docs/pytania-2026-10-14/` (bandy, rozwoj postaci, starze
 3. wf_4f263ed1-c8a **DP15** - skok wplywow Zelaznych Wysp w Q7-Q8 (mozliwe zloto z niczego) -> `docs/test-zbiorczy/DP15-ZLOTO-WYSP.md`.
 4. test 120 dob fin31 (7bc5dd0b) w grze -> progi grup: rok2, towary3, a16, a17, tb, sludan, okup, rozwoj, ciaza, drobne2, jeff14, szybkie + regresja.
 **Dalej (Jeff "najpierw wszystko"):** po oblezeniach i wyspach: scalenie, test 120 + zapis + rok2 (T1: base 449d453 i nowa wersja na zapisie roku 2), WGRANIE 54; potem DP z raportu (pulapka pokoju - czemu krolestwa nie wracaja do wojny, zalogi, Z.1 skrzynia, dlug KP), zakonczenie D1-D10 (strojenie, wydajnosc, logi, MCM - wyciac probe drog, test Innych, test 4-letni, dokumenty, instrukcja), raport koncowy "wszystko zrobione, mozesz grac" z lista sprawdzonego. Limity: tydzien 69% o 16:25 UTC 14.10 (reset 20.10 18:00) - przy 99% przekazanie na drugie konto.
+
+
+## 32. Stan na noc 14/15.10 (dla nastepnego konta - limit tygodnia 94% o 22:25 UTC)
+
+**Jeff spi; polecenie: "dokoncz wszystko tak, aby rano mod byl gotowy; zrob w nocy test 6-letni; ostatni test i rano zobaczymy, co wychodzi".**
+
+Kod: `w-toku/zbior-e8` = **b9cb462e** (zb/int; wypchniete do repo i GitHub). Od rozdz. 31 doszlo (wszystko scalone, build kod 0, gen_mcm 1513):
+- bitwa szturmu SZ1-SZ4 (42bdb402), unikaty ROT (2026915d) + odejscie po klotni / reset perkow (12274b18), licznik religii naprawiony;
+- audyt miedzy modami: raport `docs/audyt-modow-2026-10-14/RAPORT-AUDYT-MODOW.md`; pakiet A (audyt-a 1e1c1192: tytuly BK z pliku ROT + nasz plik ROT 8.1.8,
+  AM-20 DROGA B Jeffa - notable zawsze w kulturze osady, wzorce ROT, bez resetu dobrobytu BKROT, warsztaty bez wsadu, wiara Lorath) i pakiet B (audyt-b 3c8f930a:
+  8 samowywolan BKROT -> BK, lancuchy modeli ROT/NavalDLC/BEE, zold ROT i morski, gentry - nazwa wolna w swiecie);
+- RELIGIA BK WLACZONA (BannerKings.json EnableReligion true; kopia .bak-2026-10-14-przed-religia i D:/Backup-Bannerlord/bk-2026-10-14) - decyzja Jeffa;
+- B10b atuty BK z bitew (e0b2ccb1, decyzja Jeffa "tak napraw"); AC spojnosc armii x 84/364 (b9cb462e, Jeff "rozpad armii wolniejszy").
+
+Testy: fin32 (92d20d1d) 120/120, 0 ERROR Armoury, 23 znane wpisy startu (ERRORS A5-A7), progi audyta/audytb/unikaty/szturm/oblezenia/odsiecz/lenna bez NIE
+poza AUD-P1-5 (2 z 571 wsi bez tytulu - do poprawy w generatorze tools/bk_titles_rot818.py) i AB-10 (predkosc na morzu x0.93 - prog zakladal przyspieszenie;
+to prawdziwy wzor War Sails - prog do zmiany na INFO); test wczytania w nowym procesie OK (retrofit z plikiem ROT, 0 przepietych, 0 ksiestw Calradii);
+fin33 30 dob (B10b) OK. W TOKU: fin34 120 dob (b9cb462e).
+
+**Plan nocy:** fin34 120 dob OK -> WGRANIE 54 (`wgraj.ps1 -DllDir test/fin34 -Tree zb/int -Tag 2026-10-14-noc54`, galaz noc/wgranie-54; DLL do wgrania
+= fin34 BEZ autotestu) -> **test 6-letni (2184 doby) na fin34** (bieg.ps1 -Days 2184, CrashScribe-at-e0b2.dll) -> rano raport dla Jeffa (progi z --do-doby 364 / 728 /
+2184, krolestwa i podboje, wojsko, pieniadze, ludzie, religia, oblezenia, armie AC, czas doby, ERROR).
+**Otwarte (nie zrobione - nie pisac "gotowe"):** strojenie z fin31 (CR-5, budowy, skora, strzaly AI 52%, A17-11h znikajacy ludzie, W5-5, parser SD-B4), pulapka pokoju,
+liczba zdobyc po OB1-OB5 (fin32: 3 zamki w 120 dob, 0 trebuszy AI - mury nigdy nie rozbite), AUD-P1-5, AB-10 prog, D1-D10 (wydajnosc, logi, porzadki MCM - wyciac
+probe drog, test Innych, dokumenty, instrukcja), drobne z audytu (AM-02/03/07/08/23/24/25, AM-17 SCA, AM-30 B po bilansie ciast), AM-28 wzorce craftsman/noble nord.
