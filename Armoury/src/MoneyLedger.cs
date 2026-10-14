@@ -1124,6 +1124,8 @@ namespace Armoury
             try
             {
                 if (Campaign.Current == null) return;
+                // straz licznikow podatku osad (przepelnienie int o 2^31) - przed migawka, zeby "Pieniadz swiata" nie liczyl zlota, ktorego nikt nie wplacil
+                try { TaxCounterGuard.Sweep(); } catch (Exception e) { Log.Error("TaxCounterGuard.Sweep", e); }
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var end = Snap();
                 if (_inBlock && _blockSnap != null)

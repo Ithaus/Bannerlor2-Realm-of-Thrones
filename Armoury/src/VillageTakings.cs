@@ -481,6 +481,19 @@ namespace Armoury
             catch (Exception e) { miss.Add("powrot taboru do wsi (" + e.Message + ")"); Log.Error("VillageTakings.ApplyAll(tabor)", e); }
             try
             {
+                // straz licznika podatku wsi (przepelnienie o 2^31 z majatku BK z proporcja NaN): postfiks PIERWSZY - zaraz po latce BK,
+                // przed postfiksem 112 (Last) i przed nasluchem ksiegi pieniadza; zawsze, niezaleznie od klucza 112
+                var enterG = AccessTools.Method(typeof(VillagerCampaignBehavior), "OnSettlementEntered", new[] { typeof(MobileParty), typeof(Settlement), typeof(Hero) });
+                if (enterG != null && enterG.ReturnType == typeof(void))
+                {
+                    h.Patch(enterG, postfix: new HarmonyMethod(typeof(TaxCounterGuard), nameof(TaxCounterGuard.EnterGuardPostfix)) { priority = Priority.First });
+                    done.Add("straz licznika podatku wsi");
+                }
+                else miss.Add("straz licznika podatku wsi (brak VillagerCampaignBehavior.OnSettlementEntered)");
+            }
+            catch (Exception e) { miss.Add("straz licznika podatku wsi (" + e.Message + ")"); Log.Error("VillageTakings.ApplyAll(straz)", e); }
+            try
+            {
                 var sell = AccessTools.Method(typeof(SellItemsAction), "ApplyInternal");
                 var ps = sell != null ? sell.GetParameters() : null;
                 if (sell != null && sell.IsStatic && ps.Length >= 2 && ps[0].ParameterType == typeof(PartyBase) && ps[1].ParameterType == typeof(PartyBase))
