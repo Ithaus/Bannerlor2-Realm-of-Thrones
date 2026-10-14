@@ -537,7 +537,8 @@ Uzycie (Python 3, tylko odczyt):
 --grupa plotno    : (plotno 14.10, docs/pytania-2026-10-14/RAPORT-plotno.md poprawki 1 i 2; klucze FolkClothAboveReserve, WeaverExportPrice) zbytki ludu nie kupuja
                     plotna ani skory ponizej zapasu polki, tkacz tka tez na wywoz. python -I tools/sprawdz_logi.py --grupa plotno [--do-doby 120] <Armoury-*.log>
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
-                    PL-3 plotno wywiezione kontraktami 174 i wozami kupcow >= 30 szt./d, PL-4 regulator lnu >= 1.2, PL-5 potkniecia 0; PL-6..PL-10 INFO (tkane na wywoz,
+                    PL-3 plotno wywiezione kontraktami 174, wozami kupcow i karawanami do miast z brakiem (K4 14.10) >= 60 szt./d, PL-4 regulator lnu >= 1.2,
+                    PL-5 potkniecia 0; PL-6..PL-10 INFO (tkane na wywoz,
                     mieszczanie, oferta obcieta progiem, plotno zrobione i na polkach, warsztaty zbrojne). Log bez paczki: INFO, bez wyjatku.
 --grupa towary2   : (Towary 2, docs/towary-2/ROZPOZNANIE-TOWARY-2.md rozdz. 2, pozycje K1-K4) python -I tools/sprawdz_logi.py --grupa towary2 [--do-doby 120] <Armoury-*.log>
                     Srednie z ostatnich 30 dob okna (domyslnie d91-120). K1 (BuildWoodAboveCraftStock - budowy biora drewno tylko ponad zapas rzemiosla):
@@ -547,7 +548,8 @@ Uzycie (Python 3, tylko odczyt):
                     T2-K2-2 plotno do wojska >= 75 szt./d, T2-K2-3 kolejka plotna wojska d90 -> until bez wzrostu, T2-K2-4 miast bez plotna <= 50, T2-K2-5 regulator
                     lnu >= 1.2, T2-K2-6 INFO. K3 (TannerExportPrice - garbarz garbuje tez na wywoz): T2-K3-0 dopisek w "Rzemioslo miasta (148)", T2-K3-1 miast
                     bez skory <= 20, T2-K3-2 skora do wojska >= 75 szt./d, T2-K3-3 cykle warsztatow bez skory <= 50/d, T2-K3-4 garbarze "bez zysku" <= 50 miast,
-                    T2-K3-5 INFO.
+                    T2-K3-5 INFO. K4 (GoodsLedgerTickAuthors - sama diagnoza): T2-K4-1 INFO - kto dopisuje piwo, chleb, mieso, ser, maslo w tickach osad i miast
+                    (linia "Towary (inne ticki dobowe)"); PL-3 w --grupa plotno liczy tez karawany.
                     Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
@@ -19021,20 +19023,30 @@ def plotno_main(logp, start_arg, until=120):
     v, n = avg(tw, r"odziez wojska \(150\) (\d+)")
     rep.add("PL-2: plotno do wojska (Towary linen, srednia)", f"{v:.1f} szt./d ({n} dob)" if v is not None else "brak linii",
             ">= 50 szt./d (rok 1 bez paczki 16, potrzeba 70-90)" + tail, gate(v >= 50) if v is not None else None)
-    ex = []
+    # Towary 2 / K4 (ROZPOZNANIE-TOWARY-2.md A2-1): wywoz to tez karawany CaravanBulk (linia "Karawany": "sprzedane miastom z brakiem ... plotno N") - dotad PL-3
+    # liczyl tylko kontrakty i wozy (N d91-120: 10.3 + 21.4 = 31.7, a karawany sprzedaly miastom z brakiem 52.4 - razem 84.1 szt./d)
+    ka = by_day(lines, "Karawany: dzien")
+    ex, exk, exw, exc = [], [], [], []
     for k in sorted(mo):
         if not inwin(k):
             continue
-        t = 0
+        tk = tw_ = 0
         m1 = re.search(r"Kontrakty surowca \(174\): dzien \d+ - zawarto \d+ \[([^\]]*)\]", mo[k])
         m2 = re.search(r"wozem kupcow \(P3/Z1\): CZYNNE - zawarto \d+ \[([^\]]*)\]", mo[k])
-        for m in (m1, m2):
-            if m:
-                t += num(r"plotno (\d+)", m.group(1)) or 0
-        ex.append(t)
+        if m1:
+            tk = num(r"plotno (\d+)", m1.group(1)) or 0
+        if m2:
+            tw_ = num(r"plotno (\d+)", m2.group(1)) or 0
+        tc = (num(r"sprzedane miastom z brakiem: [^;]*?\bplotno (\d+)", ka[k]) or 0) if k in ka else 0
+        exk.append(tk); exw.append(tw_); exc.append(tc); ex.append(tk + tw_ + tc)
     v = sum(ex) / len(ex) if ex else None
-    rep.add("PL-3: plotno wywiezione (kontrakty 174 + wozy kupcow P3/Z1, srednia)", f"{v:.1f} szt./d ({len(ex)} dob)" if v is not None else "brak linii",
-            ">= 30 szt./d (bez paczki 0)" + tail, gate(v >= 30) if v is not None else None)
+    vk = sum(exk) / len(exk) if exk else None
+    vw = sum(exw) / len(exw) if exw else None
+    vc = sum(exc) / len(exc) if exc else None
+    rep.add("PL-3: plotno wywiezione (kontrakty 174 + wozy kupcow P3/Z1 + karawany do miast z brakiem, srednia)",
+            f"{v:.1f} szt./d ({len(ex)} dob): kontrakty {vk:.1f}, wozy {vw:.1f}, karawany {vc:.1f} (kontrakty + wozy {vk + vw:.1f})" if v is not None else "brak linii",
+            ">= 60 szt./d (K4 14.10: z karawanami; N d91-120 81.3 = kontrakty 9.8 + wozy 19.8 + karawany 51.7; dawny prog >= 30 liczyl same kontrakty i wozy; bez paczki 0)" + tail,
+            gate(v >= 60) if v is not None else None)
     rk = [k for k in sorted(rg) if inwin(k)]
     # recenzja: linia decyzji pisze "flax: x1.00 -> x1.30" (stary -> nowy) albo "flax: x1.30" (bez zmian) - bierzemy mnoznik PO decyzji
     fx = num(r"flax: (?:x[\d.]+ -> )?x([\d.]+)", rg[rk[-1]], float) if rk else None
@@ -19280,6 +19292,43 @@ def towary2_main(logp, start_arg, until=120):
             f"skora zrobiona {fx_(p1)}/d; skora wywieziona kontraktami i wozami {fx_(vx)} szt./d; skory surowe zapas srednio {fx_(h1, 0)} (d{run_day(ks[0], start) if ks else '-'} {h0} -> "
             f"d{run_day(ks[-1], start) if ks else '-'} {h9})",
             "INFO (N: skora 179/d, wywoz skory 0 - brak zrodla z nadwyzka w 83-87 miastach, skory surowe 7 471 i +17/d; zima - K5 / A6-5)", None)
+
+    # ---- K4: ksiega towarow - autorzy "innych tickow dobowych" osad i miast (GoodsLedgerTickAuthors; linia "Towary (inne ticki dobowe)")
+    au = by_day(lines, "Towary (inne ticki dobowe): dzien")
+    aw = [k for k in sorted(au) if inwin(k)]
+    tops = {}
+    tr, ms = [], []
+    for k in aw:
+        s = au[k]
+        tr.append(num(r"sladow stosu (\d+)", s) or 0)
+        q = num(r"czas ([\d.]+) ms\.", s, float)
+        if q is not None:
+            ms.append(q)
+        for good in ("beer", "bread", "meat", "cheese", "butter"):
+            m = re.search(r"(?:^|; |: )%s \[([^\]]*)\]" % good, s)
+            if not m:
+                continue
+            for seg in m.group(1).split("; "):   # "osady +175: Zestaw:Typ +150, Zestaw:Typ.Metoda +25"
+                i2 = seg.find(": ")
+                if i2 < 0:
+                    continue
+                for part in seg[i2 + 2:].split(", "):
+                    nm, _, val = part.strip().rpartition(" ")
+                    if not nm or nm.startswith("inni") or not re.match(r"^[+-]\d+$", val):
+                        continue
+                    tops.setdefault(good, {})
+                    tops[good][nm] = tops[good].get(nm, 0) + int(val)
+    txt = []
+    for good in ("beer", "bread", "meat", "cheese", "butter"):
+        d = tops.get(good)
+        if not d:
+            continue
+        best = sorted(d.items(), key=lambda x: -abs(x[1]))[:3]
+        txt.append(good + " " + ", ".join(f"{a} {b / max(1, len(aw)):+.1f}/d" for a, b in best))
+    rep.add("T2-K4-1: inne ticki dobowe - kto dopisuje (Towary (inne ticki dobowe))",
+            (f"dob z linia {len(aw)}; sladow srednio {sum(tr) / len(tr):.0f}/d, czas srednio {fx_(sum(ms) / len(ms) if ms else None)} ms/d; " if aw else "brak linii (klucz wylaczony albo log sprzed K4); ")
+            + ("; ".join(txt) if txt else "-"),
+            "INFO (N: piwo 141/d = 20%, chleb 90 (9%), mieso / ser / maslo 11-12% z innych tickow, w tym stale 'miasta 34' - zrodla nie znamy; koszt <= ok. 50 ms/d)", None)
     rep.show()
     return 0
 

@@ -1772,6 +1772,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public int FinanceLedgerPoorest { get; set; } = 5;
 
+        [SettingPropertyBool("Goods Ledger Tick Authors", HintText = "with the goods ledger: for goods that appear or vanish in the daily ticks of villages, castles and towns without a known cause, also write which game or mod behaviour did it (read from the call stack, at most 1,500 times a day) - written to the log only, changes nothing in the game; off = not traced")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool GoodsLedgerTickAuthors { get; set; } = true;
+
         [SettingPropertyBool("Goods Ledger Enabled", HintText = "write a daily ledger of every trade good and farm animal - how much villages, workshops and hidden craftsmen made, how much townsfolk, workshops, armies, builders and Banner Kings supplies used up, what carts and caravans carried, who holds the stock and what is left unexplained; each line balances yesterday's stock + made - used = today's stock - log only, changes nothing in the game")]
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerEnabled { get; set; } = true;
@@ -6102,6 +6106,7 @@ namespace Armoury
             s.FinanceLedgerEnabled = FinanceLedgerEnabled;
             s.FinanceLedgerPoor = FinanceLedgerPoor;
             s.FinanceLedgerPoorest = FinanceLedgerPoorest;
+            s.GoodsLedgerTickAuthors = GoodsLedgerTickAuthors;
             s.GoodsLedgerEnabled = GoodsLedgerEnabled;
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
