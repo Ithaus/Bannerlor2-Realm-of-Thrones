@@ -2021,6 +2021,9 @@ namespace Armoury
         // O2 (SiegeRansom.Player.cs): gracz-obronca (w osadzie albo pan osady) - okno "Pay / Refuse" z ticku menu oblezenia albo ticku kampanii, wykonanie w ticku;
         // 24 h bez odpowiedzi - regula AI i wiadomosc. Off = regula AI i wiadomosc (stan O1)
         public bool SiegeRansomPlayerDefender = true;      // when besiegers are about to storm a town or castle of yours, or one you are in, and would take a ransom, you are asked first: pay them a quarter of the town's coin (its merchants' and townsfolk's, not yours) to lift the siege for Siege Ransom Truce Days, or refuse and face the assault. If you cannot answer within a day (in battle, in a conversation, in captivity), the town decides as any other would and you get word of it. Off = your towns decide like the others and you only get word
+        // O3 (SiegeRansom.Besieger.cs): gracz-oblegajacy - opcja "Demand a ransom" w menu oblezenia (przed "Leave"), okno z ticku menu, wykonanie w ticku;
+        // rozejm gracza - opcja "Besiege" nieczynna dla osady, od ktorej jego frakcja wziela okup. Off = stan O2 (bez opcji, oblezenie jak w grze)
+        public bool SiegeRansomPlayerBesieger = true;      // when you command a siege and your engines are ready, you may demand a ransom instead of storming: if the walls would not hold against you and a quarter of the town's coin is worth at least a day's pay of your army, its people offer it - your men put two thirds in their purses, you take a third (the crown claims its third of yours) - and you lift the siege and may not besiege that place again for Siege Ransom Truce Days. Never at a realm's capital or the places of the great sieges of the story. Off = no such option
 
         // --- Goods follow the people (GL) ---
         // GL-0 (projekt docs/gospodarka-od-ludzi, P0): wspolna usluga skal "ludzie okregu" (PeopleScale.cs) - skala wsi u_v, skala rynku miasta m_t, skala podzamcza;

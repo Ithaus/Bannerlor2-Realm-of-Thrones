@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -151,6 +152,7 @@ namespace Armoury
             if (st.MapFaction == null || d.Fac == null || !FactionManager.IsAtWarAgainstFaction(d.Fac, st.MapFaction)) { _deals.Remove(d); Dropped(d, "nie ma juz wojny"); return; }
             if (Now - d.Day0 > 1f) { _deals.Remove(d); Dropped(d, "doba bez wykonania (bitwa przy oblezeniu)"); return; }
             if (st.Party != null && st.Party.MapEvent != null) { _dWaitBattle++; return; }
+            if (d.Kind == KBes && PlayerEncounter.Current != null) { _dWaitBattle++; return; }   // O3: gracz w spotkaniu - czekamy (zwiniecie obozu bez spotkania gry)
             foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
                 if (pb != null && pb.MapEvent != null) { _dWaitBattle++; return; }
             _deals.Remove(d);                                                   // przed zwinieciem obozu (OnSiegeEventEnded nie znajdzie juz tej umowy)
