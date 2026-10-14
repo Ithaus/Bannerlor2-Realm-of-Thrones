@@ -103,6 +103,7 @@ namespace Armoury
                 if (c.Payer != null) { __1 = c.Payer.Party; Seal31.NoteSpent(c.Payer, pay); }
                 else if (c.PayerParty != null) __1 = c.PayerParty.Party;
                 __4 = (int)pay;
+                if (pris && c.Payer != null) CitySack.NotePrisoners(c.Payer, pay);   // lup miast (L0): jency kupieni przez osade po nastepstwach oblezenia (tylko licznik)
                 _due[c.Kind] += due; _paid[c.Kind] += pay; _n[c.Kind]++;
                 if (ReferenceEquals(__2, Hero.MainHero) || (__3 != null && ReferenceEquals(__3, PartyBase.MainParty))) { c.PlDue += due; c.PlPaid += pay; }
                 if (c.Payer != null && c.Payer.IsTown && c.Payer.Town != null && c.Payer.Town.Gold - pay < Seal31.TownReserve(c.Payer.Town) && c.Payer.Town.Gold >= Seal31.TownReserve(c.Payer.Town)) _belowReserve++;

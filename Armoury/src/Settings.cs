@@ -1945,6 +1945,13 @@ namespace Armoury
         // GL-2 (decyzja Jeffa 13.10, pyt. 7): TYLKO nowa kampania - po darach startowych (TownPurse.TrimStartGift z kiesami ludu i wsi) zloto kas kupcow miast, kies ludu, kies wsi
         // i skarbcow koron przelane wedlug ludzi przy tej samej sumie swiata (podloga skarbca 1.0 mln); flaga w zapisie (arm_peoplemarket) - nigdy na starym zapisie
         public bool StartGoldByPeople = true;              // New campaigns only: once the starting gifts are handed out, the coin of the town merchants, of the townsfolk's and the villagers' purses and of the royal treasuries is moved from place to place so that each lies where the people are (the world's sum stays the same; every crown keeps at least one million). A saved game already under way is never touched
+        // --- The sack of towns and castles ---
+        // L0 (projekt docs/lup-miast/LUP-ZDOBYTEGO-MIASTA-2026-10-13.md rozdz. 6, CitySack.cs): pomiar na sucho - linia przy kazdych nastepstwach oblezenia, 30 dob osady po nich,
+        // przejecia warsztatow przez BK. Gra bez zmian. Off = bez linii (stan 2c0a225)
+        public bool SackMeasureLog = true;                 // Writes a log line each time a siege ends in mercy, pillage or devastation: what lay in the town (the merchants' coin and their reserve, the townsfolk's purses, goods and horses on the shelves), what the sack would take under each choice, how many men won it, whether their army was short of pay, and for thirty days after: the town's coin, its people's bread, the pay and camp followers' coin it received and the prisoners it bought. Log only - nothing in the game changes
+        public float SackSharePillage = 0.333f;            // the part of all coin in a stormed town or castle that the victors take when they pillage it - from the merchants' coin and from the townsfolk's purses alike, their reserves included (a third; mercy takes nothing)
+        public float SackShareDevastate = 0.667f;          // the part of all coin in a stormed town or castle that the victors take when they devastate it (two thirds)
+        public int SackNoSpendingDays = 3;                 // for this many days after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing: their pay stays in their purses (spent later in other towns), neither their days in town nor their camp followers leave coin there
 
         public static void Load(string moduleDataDir)
         {

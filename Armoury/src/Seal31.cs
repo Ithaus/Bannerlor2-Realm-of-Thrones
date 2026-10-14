@@ -178,6 +178,7 @@ namespace Armoury
             try { CaravanCapital.ApplyAll(); } catch (Exception e) { Stumble("CaravanCapital.ApplyAll", e); }
             try { RealPayer.ApplyAll(); } catch (Exception e) { Stumble("RealPayer.ApplyAll", e); }
             try { CasualtyLoot.ApplyAll(); } catch (Exception e) { Stumble("CasualtyLoot.ApplyAll", e); }
+            try { CitySack.ApplyAll(); } catch (Exception e) { Stumble("CitySack.ApplyAll", e); }   // lup miast (L0-L5): nastepstwa oblezen - PO RealPayer i oknie O10
             Log.Info("Szczelnosc (164a): latki przy starcie gry - wpiete: " + (Wired.Count > 0 ? string.Join(", ", Wired.ToArray()) : "-")
                      + "; BRAK: " + (Missing.Count > 0 ? string.Join(", ", Missing.ToArray()) : "-") + ".");
             Wired.Clear(); Missing.Clear();

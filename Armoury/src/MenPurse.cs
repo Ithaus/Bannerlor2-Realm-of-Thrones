@@ -322,6 +322,7 @@ namespace Armoury
                 try { TownFolk.Note(st, life, TownFolk.KLife); } catch { }   // E5/0 (195): zycie zolnierzy w miescie - okno kiesy ludu (calosc; E5/B1: podstawa robocizny 75%)
                 SoldierPay.Hold(st, life);          // tarcza zoldu (gdy wlaczona): regulator kasy nie skasuje tych pieniedzy, zanim zawor renty odda je panu
                 _dayLife += life;
+                CitySack.NoteSpend(st, mp, life);   // lup miast (L0): zycie zostawione w osadzie po nastepstwach oblezenia (tylko licznik, wlasny try)
                 if (mp.IsMainParty)
                     Log.Player("Your men spent " + life + " denars in " + st.Name + " - food, drink, dice and company." + (reserve > 0 ? " They kept " + Math.Min(purse, reserve) + " for mending their kit." : "")
                                + (saved > 0 ? " They put by " + saved + " for better kit (saved " + (kept + saved) + ", purse " + Get(mp) + ")." : ""));

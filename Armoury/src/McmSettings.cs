@@ -5476,6 +5476,22 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool StartGoldByPeople { get; set; } = true;
 
+        [SettingPropertyBool("Sack Measure Log", HintText = "Writes a log line each time a siege ends in mercy, pillage or devastation: what lay in the town (the merchants' coin and their reserve, the townsfolk's purses, goods and horses on the shelves), what the sack would take under each choice, how many men won it, whether their army was short of pay, and for thirty days after: the town's coin, its people's bread, the pay and camp followers' coin it received and the prisoners it bought. Log only - nothing in the game changes")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackMeasureLog { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Sack Share Pillage", 0.000f, 1.000f, "0.000", HintText = "the part of all coin in a stormed town or castle that the victors take when they pillage it - from the merchants' coin and from the townsfolk's purses alike, their reserves included (a third; mercy takes nothing)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackSharePillage { get; set; } = 0.333f;
+
+        [SettingPropertyFloatingInteger("Sack Share Devastate", 0.000f, 1.000f, "0.000", HintText = "the part of all coin in a stormed town or castle that the victors take when they devastate it (two thirds)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public float SackShareDevastate { get; set; } = 0.667f;
+
+        [SettingPropertyInteger("Sack No Spending Days", 0, 30, "0", HintText = "for this many days after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing: their pay stays in their purses (spent later in other towns), neither their days in town nor their camp followers leave coin there")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public int SackNoSpendingDays { get; set; } = 3;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -6844,6 +6860,10 @@ namespace Armoury
             s.MarketByPeople = MarketByPeople;
             s.VillageHeadsByPeople = VillageHeadsByPeople;
             s.StartGoldByPeople = StartGoldByPeople;
+            s.SackMeasureLog = SackMeasureLog;
+            s.SackSharePillage = SackSharePillage;
+            s.SackShareDevastate = SackShareDevastate;
+            s.SackNoSpendingDays = SackNoSpendingDays;
         }
 
         internal static void Apply()
