@@ -269,6 +269,7 @@ namespace Armoury
         /// <summary>Przed wejsciem taboru wsi do osady: zloto taboru, kiesa i licznik podatku jego wsi.</summary>
         internal static void OnBeforeEntered(MobileParty mp, Settlement st, Hero hero)
         {
+            TaxCounterGuard.BeforeEnter(mp, st);           // straz licznika podatku wsi: okna ksiegi i 112 otwieraja sie na naprawionym liczniku (wlasny try)
             try
             {
                 if (mp == null || st == null || !mp.IsVillager || !Live) return;
@@ -1124,6 +1125,8 @@ namespace Armoury
             try
             {
                 if (Campaign.Current == null) return;
+                // straz licznikow podatku osad (przepelnienie int o 2^31) - przed migawka, zeby "Pieniadz swiata" nie liczyl zlota, ktorego nikt nie wplacil
+                try { TaxCounterGuard.Sweep(); } catch (Exception e) { Log.Error("TaxCounterGuard.Sweep", e); }
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var end = Snap();
                 if (_inBlock && _blockSnap != null)
