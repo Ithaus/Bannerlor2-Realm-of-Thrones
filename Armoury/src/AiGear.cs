@@ -483,14 +483,19 @@ namespace Armoury
                 var el = roster.GetElementCopyAtIndex(i);
                 var ch = el.Character;
                 if (ch == null || ch.IsHero || el.Number <= 0) continue;
-                Equipment eq = null;
-                try { eq = ch.Equipment; } catch { }
-                if (eq == null) continue;
-                for (int sl = 0; sl < 10; sl++)
+                // PLAN 1.6 (GoldenKits): kusznicy Zlotej Kompanii przy Army175GoldenBows - wszystkie zestawy bojowe, ludzie po rowno; inni - 1. zestaw (kn = 1)
+                int kn = GoldenKits.Count(ch);
+                for (int q = 0; q < kn; q++)
                 {
-                    var it = eq[(EquipmentIndex)sl].Item;
-                    if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                    int k = Bucket(it); int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
+                    Equipment eq = GoldenKits.Kit(ch, q, kn);
+                    int num = GoldenKits.Men(el.Number, q, kn);
+                    if (eq == null || num <= 0) continue;
+                    for (int sl = 0; sl < 10; sl++)
+                    {
+                        var it = eq[(EquipmentIndex)sl].Item;
+                        if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                        int k = Bucket(it); int n; need.TryGetValue(k, out n); need[k] = n + num;
+                    }
                 }
             }
             return need;
@@ -527,9 +532,13 @@ namespace Armoury
                 var el = roster.GetElementCopyAtIndex(i);
                 var ch = el.Character;
                 if (ch == null || ch.IsHero || el.Number <= 0) continue;
-                Equipment eq = null;
-                try { eq = ch.Equipment; } catch { }
-                if (eq == null) continue;
+                // PLAN 1.6 (GoldenKits): kusznicy Zlotej Kompanii przy Army175GoldenBows - wszystkie zestawy bojowe, ludzie po rowno; inni - 1. zestaw (kn = 1)
+                int kn = GoldenKits.Count(ch);
+                for (int q = 0; q < kn; q++)
+                {
+                Equipment eq = GoldenKits.Kit(ch, q, kn);
+                int num = GoldenKits.Men(el.Number, q, kn);
+                if (eq == null || num <= 0) continue;
                 // K1c (przeglad K1b, Jeff 09.10 P1): brak kupowany najwyzej do sufitu jednostki - koszyk wzorca ponad sufit liczy sie jako koszyk sufitu.
                 // Dotad t4 z tarcza t6 we wzorcu (przed paczka 175) kupowal na brak t6. Ten sam tier w potrzebie i w pokryciu zapasem, wiec bez petli
                 // "tier nizej" z wpisu 89 (sztuka sufitu pokrywa koszyk sufitu nazajutrz).
@@ -538,13 +547,14 @@ namespace Armoury
                     var it = eq[(EquipmentIndex)sl].Item;
                     if (it == null || !SupplyDemand.Equipmentish(it)) continue;
                     int k = NeedKey(ch, it, oneUp);
-                    int n; need.TryGetValue(k, out n); need[k] = n + el.Number;
+                    int n; need.TryGetValue(k, out n); need[k] = n + num;
                     if (liftersOut != null)
                     {
                         List<CharacterObject> lt;
                         if (!liftersOut.TryGetValue(k, out lt)) liftersOut[k] = lt = new List<CharacterObject>();
                         if (!lt.Contains(ch)) lt.Add(ch);
                     }
+                }
                 }
             }
             if (needOut != null) foreach (var kv in need) { int v; needOut.TryGetValue(kv.Key, out v); needOut[kv.Key] = v + kv.Value; }

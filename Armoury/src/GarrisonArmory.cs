@@ -104,13 +104,19 @@ namespace Armoury
         private static void AddNeed(Dictionary<int, int> need, CharacterObject ch, int n)
         {
             if (ch == null || ch.IsHero || n <= 0) return;
-            Equipment eq = null; try { eq = ch.Equipment; } catch { }
-            if (eq == null) return;
-            for (int sl = 0; sl < (int)EquipmentIndex.NumEquipmentSetSlots; sl++)
+            // PLAN 1.6 (GoldenKits): kusznicy Zlotej Kompanii przy Army175GoldenBows - wszystkie zestawy bojowe, ludzie po rowno; inni - 1. zestaw (kn = 1)
+            int kn = GoldenKits.Count(ch);
+            for (int q = 0; q < kn; q++)
             {
-                var it = eq[(EquipmentIndex)sl].Item;
-                if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                int k = (int)it.ItemType; int v; need.TryGetValue(k, out v); need[k] = v + n;
+                Equipment eq = GoldenKits.Kit(ch, q, kn);
+                int num = GoldenKits.Men(n, q, kn);
+                if (eq == null || num <= 0) continue;
+                for (int sl = 0; sl < (int)EquipmentIndex.NumEquipmentSetSlots; sl++)
+                {
+                    var it = eq[(EquipmentIndex)sl].Item;
+                    if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                    int k = (int)it.ItemType; int v; need.TryGetValue(k, out v); need[k] = v + num;
+                }
             }
         }
 
@@ -222,15 +228,22 @@ namespace Armoury
             var wanted = new Dictionary<int, List<KeyValuePair<ItemObject, int>>>();
             foreach (var kv in moved)
             {
-                Equipment eq = null; try { eq = kv.Key != null ? kv.Key.Equipment : null; } catch { }
-                if (eq == null || kv.Value <= 0) continue;
-                for (int sl = 0; sl < (int)EquipmentIndex.NumEquipmentSetSlots; sl++)
+                if (kv.Key == null || kv.Value <= 0) continue;
+                // PLAN 1.6 (GoldenKits): jak AddNeed - kusznicy ZK przy Army175GoldenBows ze wszystkich zestawow, ludzie po rowno; inni - 1. zestaw
+                int kn = GoldenKits.Count(kv.Key);
+                for (int q = 0; q < kn; q++)
                 {
-                    var it = eq[(EquipmentIndex)sl].Item;
-                    if (it == null || !SupplyDemand.Equipmentish(it)) continue;
-                    int t = (int)it.ItemType;
-                    List<KeyValuePair<ItemObject, int>> l; if (!wanted.TryGetValue(t, out l)) wanted[t] = l = new List<KeyValuePair<ItemObject, int>>();
-                    l.Add(new KeyValuePair<ItemObject, int>(it, kv.Value));
+                    Equipment eq = GoldenKits.Kit(kv.Key, q, kn);
+                    int num = GoldenKits.Men(kv.Value, q, kn);
+                    if (eq == null || num <= 0) continue;
+                    for (int sl = 0; sl < (int)EquipmentIndex.NumEquipmentSetSlots; sl++)
+                    {
+                        var it = eq[(EquipmentIndex)sl].Item;
+                        if (it == null || !SupplyDemand.Equipmentish(it)) continue;
+                        int t = (int)it.ItemType;
+                        List<KeyValuePair<ItemObject, int>> l; if (!wanted.TryGetValue(t, out l)) wanted[t] = l = new List<KeyValuePair<ItemObject, int>>();
+                        l.Add(new KeyValuePair<ItemObject, int>(it, num));
+                    }
                 }
             }
             foreach (var nk in needMoved)

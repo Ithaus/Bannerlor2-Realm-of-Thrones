@@ -465,10 +465,15 @@ Uzycie (Python 3, tylko odczyt):
                     M6a-2b/2c (zloto u rodzin, okupy tej samej osoby w 56 dobach - INFO), M6a-3a (zamkniecie odlozonych pokojow), M6a-3b (uwolnieni
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
+--grupa jeff14s   : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
+                    pokrycie lukow, GB-5 dorobek nowej kampanii z lukami), JK-CR zloto Casterly Rock wyczerpane (24d, CasterlyGoldExhausted: Rockford 0 w CSV plon-wsi obok logu), JK-SM smoki
+                    jedza owce (24c, DragonsEatHerds: linia "Smoki (24c)" = ujscie ksiegi towarow doba po dobie, smok syty, potkniecia), JK-QS wlasny
+                    miecz z Qohoru (177-2 B, QohorOwnDesign: miary 1 -> 1, zlecenia bez wykucia 0, baza miar stali valyrianskiej stala, bledy, QS-5 cena stali valyrianskiej przy wydaniu).
+                    Czesc grupy jeff14 (= jeff14g + jeff14s). python -I tools/sprawdz_logi.py --grupa jeff14s <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
---grupa jeff14    : (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz) J5 kuznia gracza jak u kowali AI (C5, ForgeLikeTownSmith), J4 strata gracza po
-                    pojmaniu jak lorda AI (C4), J3 komplet weterana (C3). python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>. Caly log; log bez
+--grupa jeff14g   : (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz) J5 kuznia gracza jak u kowali AI (C5, ForgeLikeTownSmith), J4 strata gracza po
+                    pojmaniu jak lorda AI (C4), J3 komplet weterana (C3). python -I tools/sprawdz_logi.py --grupa jeff14g <Armoury-*.log>. Caly log; log bez
                     paczki albo bez kucia / pojmania gracza: INFO, bez wyjatku.
 --grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
                     i L5b-2 karawany wroga w zdobytym miescie (EnemyCaravans). python -I tools/sprawdz_logi.py --grupa lup5b [--do-doby 364] <Armoury-*.log>
@@ -16553,8 +16558,8 @@ def _j14_c3(lines, rep):
             "INFO (zbiegli z bitew gracza; po pojmaniu 0 - zbrojownia u zdobywcy, C4)", None)
 
 
-def jeff14_main(logp):
-    """jeff14 (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5), J4 strata gracza po pojmaniu jak lorda AI (C4),
+def jeff14g_main(logp):
+    """jeff14g (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz): J5 kuznia jak u kowali AI (C5), J4 strata gracza po pojmaniu jak lorda AI (C4),
     J3 komplet weterana (C3). Caly log (bez okna dob)."""
     lines = read(logp)
     rep = Report()
@@ -16564,6 +16569,190 @@ def jeff14_main(logp):
     _j14_c3(lines, rep)
     bl = [s for s in lines if s.startswith("ERROR in ") and ("ForgeClock" in s or "ArmsPricing.Build(C5)" in s or "CaptiveArmory" in s or "VetKit" in s)]
     rep.add("J14-E: bledy nowych sciezek (ForgeClock, ArmsPricing.Build(C5), CaptiveArmory, VetKit)", f"{len(bl)} linii" + (f"; pierwsza: {bl[0][:200]}" if bl else ""), "0", len(bl) == 0)
+    rep.show()
+    return 0
+
+
+def jeff14s_main(logp):
+    """jeff14s (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa bez kodu): JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, GoldenKits), JK-CR zloto Casterly Rock
+    wyczerpane (24d, RockGold; CSV plon-wsi.csv obok logu), JK-SM smoki jedza owce (24c, DragonFeed), JK-QS wlasny miecz z Qohoru (177-2 B). Caly log (bez okna dob). Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    errs = {}
+    for s in lines:
+        if s.startswith("ERROR in "):
+            k = s[9:].split(":", 1)[0]
+            errs[k] = errs.get(k, 0) + 1
+
+    def nerr(prefix):
+        return sum(v for k, v in errs.items() if k.startswith(prefix))
+
+    # ---- JK-GB: Zlota Kompania (PLAN 1.6)
+    start = [s for s in lines if s.startswith("Armie 175 (Armoury) - wylaczniki przy starcie sesji")]
+    key = None
+    if start:
+        key = "Zlota Kompania Army175GoldenBows TAK" in start[-1]
+    gb = by_day(lines, "Zlota Kompania (PLAN 1.6): dzien")
+    rep.add("JK-GB-0: klucz Army175GoldenBows (linia startu 175)", "brak linii startu" if key is None else ("TAK" if key else "NIE"),
+            "INFO (TAK = paczka wlaczona)", None)
+    if gb:
+        days = sorted(gb)
+        last = gb[days[-1]]
+        kits = re.findall(r"(golden_\w+) (\d+) \(z lukiem (\d+)\)", last)
+        ok_k = len(kits) == 3 and all(int(n) == 3 and int(b) == 2 for _, n, b in kits)
+        rep.add("JK-GB-1: zestawy trzech jednostek ZK (CS GoldenBows)", ", ".join(f"{i} {n} (luk {b})" for i, n, b in kits) or "brak",
+                "kazda z 3 jednostek: 3 zestawy, w tym 2 z lukiem (inaczej CS nie zrobil zestawow - potrzeba zostaje z 1. zestawu)", ok_k)
+        c0 = num(r"pokrycie lukow ([\d.]+)%", gb[days[0]], float)
+        c1 = num(r"pokrycie lukow ([\d.]+)%", last, float)
+        a1 = num(r"strzal ([\d.]+)%", last, float)
+        men = num(r"kusznikow ZK (\d+)", last)
+        nb = num(r"jedna miara Deficit\): luki (\d+)", last)
+        span = days[-1] - days[0] + 1
+        rep.add("JK-GB-2: potrzeba lukow w partiach z kusznikami ZK (ostatnia doba)", f"kusznikow ZK {men}, potrzeba lukow {nb} (dob z linia {len(days)}, d{days[0]}-d{days[-1]})",
+                "potrzeba lukow > 0 przy kusznikach ZK > 0 (2/3 kusznikow liczy luk)", (nb or 0) > 0 if (men or 0) > 0 else None)
+        rep.add("JK-GB-3: pokrycie lukow / strzal (pierwsza -> ostatnia doba)", f"luki {c0}% -> {c1}%, strzaly ostatniej doby {a1}% ({span} dob)",
+                "po >= 60 dobach: luki >= 50% i wiecej niz pierwszej doby (AI kupuje luki); krocej - INFO",
+                (c1 is not None and c1 >= 50.0 and (c0 is None or c1 > c0)) if span >= 60 and c1 is not None else None)
+    else:
+        rep.add("JK-GB-1..3: linia \"Zlota Kompania (PLAN 1.6)\"", "brak linii",
+                "INFO (klucz wylaczony albo log sprzed paczki); przy kluczu TAK linia co dobe - inaczej NIE", None if not key else False)
+    rep.add("JK-GB-4: bledy GoldenKits", f"ERROR in GoldenKits.* {nerr('GoldenKits')}", "0", nerr("GoldenKits") == 0)
+    # recenzja 14.10: dorobek stuleci (ColdStart.FillToTemplate) liczy zestawy ZK jak AiGear - w nowej kampanii luki sa w zbrojowniach od pierwszej doby
+    cs_new = any(s.startswith("ColdStart: zbrojownie - ") for s in lines)
+    if gb and cs_new:
+        d0 = min(gb)
+        c_first = num(r"pokrycie lukow ([\d.]+)%", gb[d0], float)
+        rep.add("JK-GB-5: nowa kampania - pokrycie lukow ZK pierwszej doby (dorobek stuleci wedlug zestawow)", f"d{d0}: {c_first}%",
+                ">= 80% (dorobek daje luki 2/3 kusznikow ZK; nizej - dorobek liczy tylko 1. zestaw)", (c_first >= 80.0) if c_first is not None else None)
+    else:
+        rep.add("JK-GB-5: nowa kampania - pokrycie lukow ZK pierwszej doby", "brak linii ColdStart (nie nowa kampania) albo brak linii PLAN 1.6", "INFO", None)
+
+    # ---- JK-CR: zloto Casterly Rock wyczerpane (24d, RockGold)
+    cr = by_day(lines, "Zloto Casterly Rock (24d): dzien")
+    pw = os.path.join(os.path.dirname(csv_path_of(logp)), "plon-wsi.csv")
+    rock, west = {}, {}
+    if os.path.isfile(pw):
+        with open(pw, encoding="utf-8", errors="replace") as f:
+            for ln in f:
+                c = ln.rstrip("\r\n").split(";")
+                if len(c) < 15 or c[0] == "dzien" or c[3] != "silver_mine":
+                    continue
+                try:
+                    d, y = int(c[0]), float(c[14])
+                except ValueError:
+                    continue
+                if c[1] == "castle_village_V5_2":
+                    rock[d] = y
+                if c[5] == "vlandia":
+                    west[d] = west.get(d, 0.0) + y
+    rd = sorted(rock)
+    rv = (f"Rockford (CSV plon-wsi) srebro {rock[rd[0]]:.2f} (d{rd[0]}) -> {rock[rd[-1]]:.2f}/d (d{rd[-1]}); kopalnie srebra Zachodu razem "
+          f"{west.get(rd[-1], 0.0):.2f}/d") if rd else "brak CSV plon-wsi albo Rockford"
+    if cr:
+        days = sorted(cr)
+        last = cr[days[-1]]
+        before = num(r"-> 0: srebro ([\d.]+)", last, float)
+        stum = num(r"potkniecia (\d+)\.", last)
+        # tygodnie CSV po pierwszej linii 24d (+7: wiersz tygodnia sumuje 7 dob wstecz): wydobycie Rockford ma byc 0 (sufit dziala w ticku produkcji)
+        after = [rock[d] for d in rd if d > days[0] + 7]
+        rep.add("JK-CR-1: Rockford (kopalnia Casterly Rock) - srebro wydobyte (CSV) po wlaczeniu",
+                rv + f"; tygodni po d{days[0]}+7: {len(after)}, max {max(after) if after else '-'}",
+                "kazdy tydzien po pierwszej linii 24d: 0.00 szt./d (bez tygodni w CSV - INFO)", (max(after) == 0.0) if after else None)
+        rep.add("JK-CR-2: regula dziala na prawdziwym wydobyciu (model przed sufitem, ostatnia linia)",
+                f"srebro Skaly przed sufitem {before}/d; pan Skaly {num(r'pan Skaly ([^|]+) [|]', last, str)}",
+                "> 0 (kopalnia Skaly naprawde cos by wydobyla - regula nie jest pusta)", (before > 0.0) if before is not None else None)
+        rep.add("JK-CR-3: potkniecia RockGold", f"potkniecia ostatniej linii {stum}, ERROR in RockGold.* {nerr('RockGold')}", "0 i 0",
+                (stum or 0) == 0 and nerr("RockGold") == 0)
+    else:
+        rep.add("JK-CR-1..3: linia \"Zloto Casterly Rock (24d)\"", "brak linii; " + rv,
+                "INFO (klucz CasterlyGoldExhausted wylaczony albo log sprzed paczki; liczby = stan bez reguly)", None)
+    gold = [s for s in lines if s.startswith("Towary: dzien") and " - gold_ore " in s]
+    if gold:
+        rep.add("JK-CR-4: ruda zlota swiata (ostatnia linia Towary)",
+                "produkcja " + str(num(r"\| produkcja (\d+)", gold[-1])) + "/d, zapas " + str(num(r"zapas (\d+)", gold[-1])), "INFO", None)
+
+    # ---- JK-SM: smoki jedza owce (24c, DragonFeed)
+    sm = by_day(lines, "Smoki (24c): dzien")
+    if sm:
+        led = {}
+        for s in lines:
+            if not s.startswith("Towary: dzien"):
+                continue
+            m = re.match(r"Towary: dzien (\d+) - (sheep|hog|cow) ", s)
+            if not m:
+                continue
+            v = num(r"zjedzone przez smoka \(24c\) (\d+)", s) or 0
+            led.setdefault(int(m.group(1)), {})[m.group(2)] = v
+        bad, tot_line, tot_led, dd, hungry, idle = [], 0, 0, 0, 0, 0
+        for d in sorted(sm):
+            s = sm[d]
+            mh = re.search(r"z taborow: owce (\d+), swinie (\d+), krowy (\d+)", s)
+            mv = re.search(r"ze stad wsi: owce (\d+), swinie (\d+), krowy (\d+)", s)
+            if not mh or not mv:
+                continue
+            eat = [int(mh.group(k)) + int(mv.group(k)) for k in (1, 2, 3)]
+            tot_line += sum(eat)
+            dd += num(r"smokow jedzacych (\d+)", s) or 0
+            hungry += num(r"glodne smokodoby (\d+)", s) or 0
+            idle += num(r"bez partii albo w niewoli (\d+)", s) or 0
+            if d in led:
+                lv = [led[d].get(a, 0) for a in ("sheep", "hog", "cow")]
+                tot_led += sum(lv)
+                if lv != eat:
+                    bad.append(f"d{d} linia {eat} ksiega {lv}")
+        last = sm[max(sm)]
+        rep.add("JK-SM-0: smoki na mapie (ostatnia linia)", (num(r"smokow jedzacych (\d+[^|]*)", last, str) or "?").strip(), "INFO", None)
+        rep.add("JK-SM-1: ksiega towarow - zjedzone przez smoka = linia 24c (owce, swinie, krowy, doba po dobie)",
+                f"dob {len(sm)}, zjedzone wedlug linii {tot_line}, wedlug ksiegi {tot_led}; niezgodnych dob {len(bad)}" + (f" (pierwsza: {bad[0]})" if bad else ""),
+                "0 niezgodnych dob (obieg: kazde zjedzone zwierze jawnie w ujsciu ksiegi)", len(bad) == 0 if dd > 0 else None)
+        rep.add("JK-SM-2: smok syty (smokodoby glodne / jedzace)", f"glodne {hungry} z {dd} smokodob; bez partii albo w niewoli {idle}",
+                "<= 50% (wiecej: wokol jezdzca brak stad - stan swiata, DECYZJA, nie blad)", (hungry <= 0.5 * dd) if dd > 0 else None, decide=True)
+        st_sm = num(r"potkniecia (\d+)\.", last)
+        rep.add("JK-SM-3: potkniecia DragonFeed", f"potkniecia ostatniej linii {st_sm}, ERROR in DragonFeed.* {nerr('DragonFeed')}", "0 i 0",
+                (st_sm or 0) == 0 and nerr("DragonFeed") == 0)
+    else:
+        rep.add("JK-SM-0..3: linia \"Smoki (24c)\"", "brak linii", "INFO (klucz DragonsEatHerds wylaczony albo log sprzed paczki)", None)
+
+    # ---- JK-QS: wlasny miecz z Qohoru (177-2 wariant B, QohorMasters.Own)
+    menu = [s for s in lines if s.startswith("QohorMasters: menu w ")]
+    own_on = None
+    if menu:
+        own_on = "wlasny projekt gracza (177-2 B) TAK" in menu[-1] if "wlasny projekt gracza" in menu[-1] else None
+    rep.add("JK-QS-0: klucz QohorOwnDesign (linia menu Qohoru)", "brak linii menu" if not menu else ("brak znacznika (log sprzed paczki)" if own_on is None else ("TAK" if own_on else "NIE")),
+            "INFO (TAK = paczka wlaczona)", None)
+    made = [s for s in lines if s.startswith("Kronika unikatow: Qohor - ") and "przekuty na wlasny projekt gracza" in s]
+    placed = failed = 0
+    for s in lines:
+        if s.startswith("QohorMasters: dzien ") and "wlasne projekty gracza:" in s:
+            placed += num(r"wlasne projekty gracza: zlecone (\d+)", s) or 0
+            failed += num(r"oddane bez wykucia (\d+)", s) or 0
+    bad_m = [s for s in made if not re.search(r"miary 1 -> 1,", s)]
+    rep.add("JK-QS-1: wlasne miecze - miary wejscia = wyniku (1 -> 1)", f"wykutych {len(made)}, z inna miara {len(bad_m)}" + (f"; pierwszy: {made[0][:220]}" if made else ""),
+            "kazdy wykuty: miary 1 -> 1 (stal ani nie przybywa, ani nie ubywa); bez zlecen (autotest nie gra w Qohorze) - INFO", (len(bad_m) == 0) if made else None)
+    rep.add("JK-QS-2: zlecenia wlasnego projektu oddane bez wykucia", f"zlecone {placed}, oddane bez wykucia {failed}",
+            "0 (przy zleceniach); bez zlecen - INFO", (failed == 0) if (placed + len(made)) > 0 else None)
+    base = sorted(set(num(r"baza (\d+) miar", s) for s in lines if s.startswith("Stal valyrianska: dzien") and "baza " in s) - {None})
+    rep.add("JK-QS-3: stal valyrianska - baza miar stala przez caly log", ", ".join(str(b) for b in base) or "brak linii spisu",
+            "jedna wartosc (przekucie, takze we wlasny projekt, nie zmienia sumy miar)", (len(base) == 1) if base else None)
+    rep.add("JK-QS-4: bledy ValyrianBlades / QohorMasters", f"ERROR in ValyrianBlades.* {nerr('ValyrianBlades')}, QohorMasters.* {nerr('QohorMasters')}", "0 i 0",
+            nerr("ValyrianBlades") == 0 and nerr("QohorMasters") == 0)
+    # recenzja 14.10: wlasny miecz wyceniony jak stal valyrianska od razu (HistoricalPrices.PriceValyrianOne), nie jak zwykly wyrob kuzni
+    vs_price = {}
+    for s in lines:
+        m = re.match(r"HistoricalPrices: stal valyrianska \(wlasny miecz z Qohoru\) (\S+) \d+ -> (\d+) d", s)
+        if m:
+            vs_price[m.group(1)] = int(m.group(2))
+    hp_off = any(s.startswith("HistoricalPrices: ceny historyczne WYLACZONE") for s in lines)
+    bad_p = []
+    for s in made:
+        mi = re.search(r"przekuty na wlasny projekt gracza (\S+) ", s)
+        mv = num(r"wartosc (\d+)\)", s)
+        if mi and (mi.group(1) not in vs_price or vs_price[mi.group(1)] != mv):
+            bad_p.append(f"{mi.group(1)} wartosc {mv}, cena VS {vs_price.get(mi.group(1), 'brak linii')}")
+    rep.add("JK-QS-5: wlasny miecz wyceniony jak stal valyrianska (miary x HistValyrianPerMeasure) przy wydaniu",
+            f"wykutych {len(made)}, linii ceny VS {len(vs_price)}, niezgodnych {len(bad_p)}" + (f" (pierwszy: {bad_p[0]})" if bad_p else ""),
+            "kazdy wykuty: wartosc w kronice = cena z linii HistoricalPrices (ceny historyczne wylaczone albo bez zlecen - INFO)",
+            (len(bad_p) == 0) if made and not hp_off else None)
     rep.show()
     return 0
 
@@ -19898,10 +20087,14 @@ def main(argv):
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
+    if group == "jeff14s" and logp:
+        return jeff14s_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB), zloto Casterly Rock (JK-CR), smoki jedza owce (JK-SM), wlasny miecz z Qohoru (JK-QS)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "jeff14" and logp:
-        return jeff14_main(logp)   # jeff14: decyzje Jeffa 14.10 - kuznia jak u kowali (C5), strata po pojmaniu (C4), komplet weterana (C3)
+        return max(jeff14g_main(logp), jeff14s_main(logp))   # jeff14 = jeff14g (C3-C5, gracz) + jeff14s (swiat: ZK, Casterly Rock, smoki, Qohor)
+    if group == "jeff14g" and logp:
+        return jeff14g_main(logp)   # jeff14: decyzje Jeffa 14.10 - kuznia jak u kowali (C5), strata po pojmaniu (C4), komplet weterana (C3)
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
     if group == "w7" and logp:

@@ -1596,6 +1596,14 @@ namespace Armoury
         [SettingPropertyGroup("Smithing materials")]
         public float MineOutputMultiplier { get; set; } = 3f;
 
+        [SettingPropertyBool("Casterly Gold Exhausted", HintText = "the gold of Casterly Rock has run out, as in the books: the mine under the Rock (Rockford, the mining village of Casterly Rock) digs no more silver or gold ore, and no village of the Westerlands digs gold ore - the Lannisters live on rents, trade and loans. Their timber and every other good stay as they were. Off: the mine digs as before")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool CasterlyGoldExhausted { get; set; } = true;
+
+        [SettingPropertyBool("Dragons Eat Herds", HintText = "dragons are not free: every dragon eats two sheep a day (a hog counts as two, a cow as four) - first from the herd its rider's party drives, and with none there it takes the animals the nearest villages (within a day's flight) are sending to market; the village loses them and gets nothing. A burning or looted village is spared. With nothing within reach the dragon goes hungry. Applies to Daenerys and to you alike. Off: dragons eat nothing")]
+        [SettingPropertyGroup("Smithing materials")]
+        public bool DragonsEatHerds { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Lumber Output Multiplier", 0.00f, 12.00f, "0.00", HintText = "woodcutters fell this many times the old output - charcoal burners need wood by the cartload (a forge burns ~5 loads of wood per load of ore)")]
         [SettingPropertyGroup("Smithing materials")]
         public float LumberOutputMultiplier { get; set; } = 3f;
@@ -1723,6 +1731,10 @@ namespace Armoury
         [SettingPropertyBool("Qohor Rework Enabled", HintText = "the masters of Qohor rework Valyrian steel - the only way to a new Valyrian sword: bring a blade from your baggage to Qohor, pay the guild and wait; a blade of one measure becomes one sword of a new shape, a greatsword of two measures (such as Ice) becomes two swords; nothing is added and nothing is lost (off = no new orders; collecting and taking back still work)")]
         [SettingPropertyGroup("Valyrian steel")]
         public bool QohorReworkEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Qohor Own Design", HintText = "the masters of Qohor can also forge a Valyrian blade of one measure to a design of your own: pick one of your forge designs (or a sword you forged and carry) - they keep its guard, grip and pommel, make the blade of Valyrian steel close to its length - and give it the name you choose. The same fee, days and charcoal as any reforging; the new sword is Valyrian steel of one measure and the only one of its kind. Off: only the patterns of the realm")]
+        [SettingPropertyGroup("Valyrian steel")]
+        public bool QohorOwnDesign { get; set; } = true;
 
         [SettingPropertyBool("Qohor Ai Rework", HintText = "a lord whose party stands in Qohor and who bears a Valyrian greatsword won from another house may have it reforged into two swords by the same rule - the same fee to Qohor's treasury, the same days (as Tywin Lannister did with Ice); the masters send the finished swords to him, or to his heir; lords of your own house never order it on their own")]
         [SettingPropertyGroup("Valyrian steel")]
@@ -4504,9 +4516,9 @@ namespace Armoury
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175MinorLore { get; set; } = true;
 
-        [SettingPropertyBool("Army175 Golden Bows", HintText = "waits for the armoury restocking package: Golden Company crossbowmen split into thirds - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. The kits are made by CrashScribe on the next load; the Armoury part (the drawn kit decides, only for the three Golden Company crossbow troops) acts at once")]
+        [SettingPropertyBool("Army175 Golden Bows", HintText = "Golden Company crossbowmen split into thirds as in the books - crossbows, recurve bows and yew longbows - and in battle each man takes the missile weapon of his drawn kit. Their lords buy, keep and train with bows and arrows for two thirds of these men and crossbows and bolts for one third (only these three Golden Company crossbow troops; every other troop counts its first kit, as before). The kits are made by CrashScribe on the next load; the Armoury part acts at once. Off: one kit of crossbows for all of them")]
         [SettingPropertyGroup("Armies of the realms (175)")]
-        public bool Army175GoldenBows { get; set; } = false;
+        public bool Army175GoldenBows { get; set; } = true;
 
         [SettingPropertyBool("Others Steel Rule", HintText = "As in the books: the Others - the White Walkers and the Night King - take full damage only from Valyrian steel, dragonglass and dragonfire; castle-forged steel of tier 6 (the best any smith can make) deals Others Castle Steel Percent of its damage, everything else 15%. A thrown weapon counts by itself, an arrow or bolt by its own tier (the bow or crossbow does not matter); sling stones, thrown stones, boulders, fire pots, shield bashes and anything shot by a siege engine always deal 15%. Common wights still fall to anything. Works in your battles and in auto-resolved ones, both by the gear the troops carry after the Army175 Tier Gear fix (in auto-resolve a troop type counts by its best weapon, or by its best arrows or bolts if it has the bow or crossbow for them). The first time in a battle you or your men strike one of them with steel that only bites, a message says so. Nobody in the world carries dragonglass yet (the only piece, the Dragonglass Axe, has no owner). Off = the old rule on the same gear: any tier 6 weapon deals full damage (in auto-resolve tier 6 ammunition too), the rest 15% - auto-resolve still uses the gear after the Army175 Tier Gear fix, so turning this off does not bring back the old auto-resolve strength against the Others. Dragonfire burns them fully either way. Applied by CrashScribe, takes effect the next day or in the next battle")]
         [SettingPropertyGroup("The Others and Valyrian steel (175c)")]
@@ -6058,6 +6070,8 @@ namespace Armoury
             s.Tier6CastleSteel = Tier6CastleSteel;
             s.MineralsCountedOnce = MineralsCountedOnce;
             s.MineOutputMultiplier = MineOutputMultiplier;
+            s.CasterlyGoldExhausted = CasterlyGoldExhausted;
+            s.DragonsEatHerds = DragonsEatHerds;
             s.LumberOutputMultiplier = LumberOutputMultiplier;
             s.NoFreeTimberAndTools = NoFreeTimberAndTools;
             s.VillageWoodlotLoads = VillageWoodlotLoads;
@@ -6090,6 +6104,7 @@ namespace Armoury
             s.NoConjuredLegends = NoConjuredLegends;
             s.HistValyrianPerMeasure = HistValyrianPerMeasure;
             s.QohorReworkEnabled = QohorReworkEnabled;
+            s.QohorOwnDesign = QohorOwnDesign;
             s.QohorAiRework = QohorAiRework;
             s.QohorDays = QohorDays;
             s.QohorCrew = QohorCrew;

@@ -349,21 +349,26 @@ namespace Armoury
                     var el = roster.GetElementCopyAtIndex(i);
                     var c = el.Character;
                     if (c == null || c.IsHero || el.Number <= 0) continue;
-                    Equipment eq = null;
-                    try { eq = c.Equipment; } catch { }
-                    if (eq == null) continue;
-                    for (int sl = 0; sl < 10; sl++)
+                    // PLAN 1.6 (GoldenKits): kusznicy Zlotej Kompanii przy Army175GoldenBows - wszystkie zestawy bojowe, ludzie po rowno; inni - 1. zestaw (kn = 1)
+                    int kn = GoldenKits.Count(c);
+                    for (int q = 0; q < kn; q++)
                     {
-                        var it = eq[(EquipmentIndex)sl].Item;
-                        if (it == null || it.ItemType != type) continue;
-                        int g;
-                        if (!idx.TryGetValue(c, out g)) { g = troops.Count; troops.Add(c); idx[c] = g; }
-                        int t = AiGear.TierOf(it);
-                        SwapMath.Bucket b;
-                        if (!byTier.TryGetValue(t, out b)) byTier[t] = b = new SwapMath.Bucket { Tier = t };
-                        b.Men.Add(new KeyValuePair<int, int>(g, el.Number));
-                        b.Size += el.Number;
-                        if (c.IsMounted) b.Mounted = true;
+                        Equipment eq = GoldenKits.Kit(c, q, kn);
+                        int num = GoldenKits.Men(el.Number, q, kn);
+                        if (eq == null || num <= 0) continue;
+                        for (int sl = 0; sl < 10; sl++)
+                        {
+                            var it = eq[(EquipmentIndex)sl].Item;
+                            if (it == null || it.ItemType != type) continue;
+                            int g;
+                            if (!idx.TryGetValue(c, out g)) { g = troops.Count; troops.Add(c); idx[c] = g; }
+                            int t = AiGear.TierOf(it);
+                            SwapMath.Bucket b;
+                            if (!byTier.TryGetValue(t, out b)) byTier[t] = b = new SwapMath.Bucket { Tier = t };
+                            b.Men.Add(new KeyValuePair<int, int>(g, num));
+                            b.Size += num;
+                            if (c.IsMounted) b.Mounted = true;
+                        }
                     }
                 }
             }
