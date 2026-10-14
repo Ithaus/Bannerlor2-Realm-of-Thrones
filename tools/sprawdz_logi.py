@@ -521,6 +521,12 @@ Uzycie (Python 3, tylko odczyt):
                     LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO),
                     LUP-18 (L7) polki: zdjete = do taborow + spalone (0 szt.), spalone tylko przy spustoszeniu; LUP-18b ksiega towarow lup miast (L7) tylko ujscie.
                     Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
+--grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
+                    skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] <Armoury-*.log>
+                    Z1-0 dopisek "pokoj (Z.1)" w linii "Budzet rodow (166)", Z1-1 druzyny lordow krolestw w pokoju (linie Skarbce bez "(WOJNA)", srednia
+                    ostatnich 28 dob okna; INFO z celem: 30-40 tys. swiata w pokoju wobec 85-100 tys. w wojnie = 0.30-0.47 wojska tych krolestw z ich
+                    ostatnich 28 dob wojny), Z1-2 rody w pokoju z linii 166 (pulap, skrzynia pokoju, zold, ludzie - INFO), Z1-3 miara W5-7 (INFO, 85 tys.),
+                    Z1-4 bledy ClanBudget 0. Log bez paczki: INFO, bez wyjatku. Domyslne okno 728 dob; --do-doby N zmienia.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -19194,6 +19200,96 @@ def lup_main(logp, start_arg, until=364):
     return 0
 
 
+def z1_main(logp, start_arg, until=728):
+    """Z.1 (kalibracja "zold w pokoju", Armoury/src/ClanBudget.cs Ceiling; klucz PeaceChestShare): wojsko krolestw w pokoju po paczce. Okno: doby kampanii
+    1-until. Z1-0 dopisek linii 166, Z1-1 druzyny lordow krolestw w pokoju (Skarbce) wobec celu planu, Z1-2 rody w pokoju z linii 166, Z1-3 miara W5-7,
+    Z1-4 bledy ClanBudget. Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    alld = sorted(by_day(lines, "Pieniadz swiata: dzien"))
+    if start is None:
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return d is not None and 1 <= run_day(d, start) <= until
+
+    b166 = {d: s for d, s in by_day(lines, "Budzet rodow (166): dzien").items() if inwin(d)}
+    errs = [s for s in lines if s.startswith("ERROR in ClanBudget.")]
+    print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until} | linii 166 w oknie {len(b166)}, ERROR ClanBudget {len(errs)}")
+    zre = re.compile(r"\| pokoj \(Z\.1\): rody w pokoju (\d+), pulap pokoju razem (\d+) \(([\d.]+) D \+ ([\d.]+) x skrzynia wojenna[^)]*\), w tym skrzynia pokoju (\d+) u (\d+)"
+                     r" rodow, zold naliczony (\d+), ludzie w partiach (\d+), w zalogach (\d+)")
+    zd = {d: m for d, m in ((d, zre.search(s)) for d, s in b166.items()) if m}
+    # ---- Z1-0 dopisek linii 166
+    if zd:
+        m = zd[max(zd)]
+        rep.add("Z1-0: dopisek \"pokoj (Z.1)\" w linii Budzet rodow (166)", f"{len(zd)} z {len(b166)} dob; pulap pokoju {m.group(3)} D + {m.group(4)} x skrzynia wojenna",
+                "kazda doba linii 166 z dopiskiem", len(zd) == len(b166))
+    else:
+        rep.add("Z1-0: dopisek \"pokoj (Z.1)\" w linii Budzet rodow (166)", f"brak (linii 166 w oknie {len(b166)})", "INFO - log bez paczki Z.1", None)
+    # ---- Z1-1 druzyny lordow krolestw w pokoju (Skarbce), srednia ostatnich 28 dob okna, wobec wojska tych krolestw z ich ostatnich 28 dob wojny
+    ser = kingdom_war_series(lines)
+    peace, war, npk = {}, {}, {}
+    for kname, rows in ser.items():
+        for d, w, wallet, menn in rows:
+            if not inwin(d):
+                continue
+            if w:
+                war[d] = war.get(d, 0) + menn
+            else:
+                peace[d] = peace.get(d, 0) + menn
+                npk[d] = npk.get(d, 0) + 1
+    days = sorted(set(peace) | set(war))[-28:]
+    if days:
+        pv = sum(peace.get(d, 0) for d in days) / len(days)
+        nk = sum(npk.get(d, 0) for d in days) / len(days)
+        last = days[-1]
+        base, names = 0.0, []
+        for kname, rows in ser.items():
+            rw = [r for r in rows if inwin(r[0])]
+            if not rw or rw[-1][0] != last or rw[-1][1]:
+                continue                                    # krolestwo w wojnie albo bez linii w ostatniej dobie okna
+            wr = [r[3] for r in rw if r[1]][-28:]
+            if wr:
+                base += sum(wr) / len(wr)
+                names.append(kname)
+        lo, hi = 30.0 / 100.0 * base, 40.0 / 85.0 * base
+        val = (f"{pv / 1e3:.1f} tys. ludzi (krolestw w pokoju srednio {nk:.1f}; doby {run_day(days[0], start)}-{run_day(days[-1], start)}); te krolestwa w ostatnich"
+               f" 28 dobach swojej wojny {base / 1e3:.1f} tys. ({len(names)} krolestw) -> cel {lo / 1e3:.1f}-{hi / 1e3:.1f} tys.")
+        rep.add("Z1-1: druzyny lordow krolestw w pokoju (linie Skarbce)", val,
+                "INFO z celem planu (rozdz. 4: 30-40 tys. swiata w pokoju wobec 85-100 tys. w wojnie = 0.30-0.47 wojska tych krolestw w wojnie; "
+                "bieg dwuletni bez paczki: d701-728 ok. 2 tys.)", None)
+    else:
+        rep.add("Z1-1: druzyny lordow krolestw w pokoju", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- Z1-2 rody w pokoju z linii 166 (srednia ostatnich 28 dob z dopiskiem)
+    if zd:
+        ds = sorted(zd)[-28:]
+        av = lambda g: sum(int(zd[d].group(g)) for d in ds) / len(ds)
+        rep.add(f"Z1-2: rody AI w pokoju (linia 166, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})",
+                f"rodow {av(1):.0f}, pulap {av(2):.0f} zl/d (skrzynia pokoju {av(5):.0f} u {av(6):.0f} rodow), zold {av(7):.0f}, ludzie w partiach {av(8):.0f}, w zalogach {av(9):.0f}",
+                "INFO (bez paczki: 132 rody z wojny do pokoju - partie 1.5 tys., zalogi 6.5 tys., pulap ok. 35 tys. zl/d)", None)
+    else:
+        rep.add("Z1-2: rody AI w pokoju (linia 166)", "brak dopisku Z.1", "INFO", None)
+    # ---- Z1-3 miara W5-7 (wojsko krolestw w wojnie)
+    if war:
+        ds = sorted(war)[-28:]
+        v = sum(war[d] for d in ds) / len(ds)
+        rep.add(f"Z1-3: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})", f"{v / 1e3:.1f} tys. ludzi",
+                "INFO - prog Jeffa 85 tys. (bieg dwuletni bez paczki: d337-364 108.9, d701-728 55.3)", None)
+    else:
+        rep.add("Z1-3: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- Z1-4 bledy ClanBudget
+    rep.add("Z1-4: bledy ClanBudget (ERROR in ClanBudget.*) w logu", str(len(errs)), "0", len(errs) == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -19270,6 +19366,8 @@ def main(argv):
         return zbytki_main(logp, start_arg, until_arg, bdp)   # P3-P5: lista dostatku, targ widzi sakiewke, podzamcza i wsie na targu miasta (--baza-doby: bieg bez P4 do progu 18)
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
+    if group == "z1" and logp:
+        return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

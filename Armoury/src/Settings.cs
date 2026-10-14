@@ -1046,6 +1046,8 @@ namespace Armoury
         public bool ClanBudgetStableD = true;              // the budget reckons on the house's steady income (land of the fiefs it holds today, crown, contract, workshops and caravans); off = the plain 28-day average of all its income
         public float PeaceWageShare = 0.28f;               // wage ceiling in peace: this share of the steady income a day (parties, garrisons and caravans together)
         public float WarWageShare = 0.6f;                  // wage ceiling at war: this share of the steady income a day, plus the war chest below
+        // Z.1 (kalibracja "zold w pokoju", bieg dwuletni 14.10): w pokoju pulap = PeaceWageShare x D + ta czesc skrzyni wojennej (0.8 (G - R)/45); 0 = sam udzial D (stan sprzed)
+        public float PeaceChestShare = 0.4f;               // in peace the wage ceiling also gets this share of the war chest (the house's gold above its war reserve, spent as at war): a house at peace keeps a third of its army and half its garrisons from its savings instead of sending almost everyone home; 0 = the peace ceiling from the steady income alone
         public float HouseholdSharePeace = 0.35f;          // the court and the food in peace: this share of the steady income (the parties' food is bought by the parties; the rest goes into the seat's purse)
         public float HouseholdShareWar = 0.2f;             // the court and the food at war
         public float GearSharePeace = 0.17f;               // arms, armour and horses bought by the lord in peace: at most this share of the steady income a day, kept up to AI Gear Days Cap days
