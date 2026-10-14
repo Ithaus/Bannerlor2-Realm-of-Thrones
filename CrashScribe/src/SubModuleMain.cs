@@ -150,6 +150,7 @@ namespace CrashScribe
                 if (cgs != null) cgs.AddBehavior(new StorylineReparationsBehavior());   // T9: linie "Reparacje (T9)" (pokoj + doba)
                 if (cgs != null) cgs.AddBehavior(new PovertyPeaceBehavior());   // E1: linie "Pokoj z biedy (E1)" (decyzje + doba)
                 if (cgs != null) cgs.AddBehavior(new MarriageFastBehavior());   // Z.3: swaty ROT szybciej (straze i latka przy starcie sesji, linia doby "Swaty ROT (Z.3)")
+                if (cgs != null) cgs.AddBehavior(new MarriageOfferYearBehavior());   // 14.10: oferty slubu dla rodu gracza na rok (84 / rok; linia doby "Oferty slubu (rok)")
                 if (cgs != null) cgs.AddBehavior(new EconomyAudit());    // audyt ekonomii rodow (Jeff 04.10), tylko odczyt
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "OnGameStart.WarReport", null); } catch { } }

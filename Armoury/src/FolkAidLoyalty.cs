@@ -32,6 +32,8 @@ namespace Armoury
     ///    z ArmouryBehavior zaraz po kroku W7) trzyma kare nominalna i koszt W7 kazdej osady do nastepnego bloku doby; kara liczona przy kazdym wywolaniu od
     ///    biezacej lojalnosci (podloga). Migawka to nowy slownik co dobe (odczyt z dowolnego watku bez zamka). Pierwsza doba po wczytaniu - bez kary (pamiec sesji).
     ///  - Gracz: te same reguly w jego osadach; komunikat, gdy poborcy wyszli z jego osady (raz, do powrotu lojalnosci ponad prog).
+    ///  - M4 (danina pokoju, KingdomTreasury.PeaceTribute.cs, klucz FolkPeaceTribute): ta sama kara i podloga dla osady, ktora oddala danine pokoju - w dymku
+    ///    "Peace tribute from the people's savings"; prog poboru M4 liczy linia M4 (bez komunikatu "war aid" ponizej).
     /// Zapis gry: nic nowego. Wyjatek per osada / per wywolanie - licznik potkniec (CLAUDE.md 7). Linia doby "Lojalnosc za danine (P1b): dzien N".
     /// </summary>
     internal static class FolkAidLoyalty
@@ -45,8 +47,9 @@ namespace Armoury
         private static bool _wired;
         private static string _model = "-";
         private static TextObject _txt;     // leniwie (bez TextObject w konstruktorze statycznym)
+        private static TextObject _txtPeace; // M4: danina pokoju - napis w dymku lojalnosci
 
-        private sealed class Row { public float Nom; public float Lord; }
+        private sealed class Row { public float Nom; public float Lord; public bool Peace; }   // Peace - M4: danina pokoju (ta sama kara, inny napis w dymku)
         private static Dictionary<Town, Row> _snap = new Dictionary<Town, Row>();   // migawka doby - podmieniana w calosci (watek glowny), czytana z dowolnego
 
         private static int _cTick, _cDesc;                                           // wywolania modelu z kara od poprzedniej linii (Interlocked)
@@ -168,8 +171,16 @@ namespace Armoury
                 if (!On(s)) return;
                 double x = Take(r, __0.Loyalty, s);
                 if (!(x > 0)) return;
-                if (_txt == null) _txt = new TextObject("War aid from the people's savings");
-                __result.Add((float)-x, _txt);
+                if (r.Peace)
+                {
+                    if (_txtPeace == null) _txtPeace = new TextObject("Peace tribute from the people's savings");
+                    __result.Add((float)-x, _txtPeace);
+                }
+                else
+                {
+                    if (_txt == null) _txt = new TextObject("War aid from the people's savings");
+                    __result.Add((float)-x, _txt);
+                }
                 if (__1) Interlocked.Increment(ref _cDesc); else Interlocked.Increment(ref _cTick);
             }
             catch (Exception e) { Stumble("LoyaltyPostfix", e); }
@@ -201,7 +212,7 @@ namespace Armoury
                             var t = st != null ? st.Town : null;
                             if (t == null) continue;
                             double q = share > 0 ? _buf[i].Value / share : 0;
-                            var r = new Row { Nom = (float)(cost * Math.Min(1.0, q)), Lord = (float)Math.Max(0, KingdomTreasury.LordLevyLoyaltyAt(st)) };
+                            var r = new Row { Nom = (float)(cost * Math.Min(1.0, q)), Lord = (float)Math.Max(0, KingdomTreasury.LordLevyLoyaltyAt(st)), Peace = KingdomTreasury.PeaceTributeFrom(st, day) };
                             snap[t] = r;
                             double loy = t.Loyalty, x = Take(r, loy, s);
                             n++; if (t.IsCastle) nC++; else nT++;

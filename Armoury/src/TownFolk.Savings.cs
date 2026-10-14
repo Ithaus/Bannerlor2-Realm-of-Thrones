@@ -198,7 +198,9 @@ namespace Armoury
                   + " | stawka dnia dzis " + (100 * rate).ToString("0.000", Inv) + "% (powod " + why + ": 0 placi, 1 wylaczone, 2 bez krolestwa, 3 pokoj albo s = 0, 4 oblezenie, 6 lojalnosc na progu P1b)";
             string s0 = "Savings: the " + who + " hold coin for " + DaysText(days) + " of living";
             if (f.DAid > 0)
-                return s0 + ". At the last dawn they gave the crown " + Coins(f.DAid) + " in war aid; " + Coins(f.DOver) + " still lie above their reserve for hard times, which is not touched.";
+                return s0 + ". At the last dawn they gave the crown " + Coins(f.DAid)
+                       + (KingdomTreasury.PeaceTributeFrom(st, _liveDay + 1) ? " in tribute toward the bread of the realm's hungry towns; " : " in war aid; ")   // M4: danina pokoju
+                       + Coins(f.DOver) + " still lie above their reserve for hard times, which is not touched.";
             if (f.DOver < 1) return s0 + " - nothing to spare.";
             string tail = why == KingdomTreasury.WaNoNeed ? " The crown asks no war aid of them now."
                         : why == KingdomTreasury.WaSiege ? " Under siege they pay no war aid."

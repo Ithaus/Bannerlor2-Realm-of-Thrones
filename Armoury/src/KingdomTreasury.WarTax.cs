@@ -409,6 +409,8 @@ namespace Armoury
             catch (Exception e) { WtStumble("WarTaxDaily", e); }
             // P1: linia doby daniny z oszczednosci i komunikaty gracza - po rentach 180, przed CrownIncome.End (DayOf czynne), przed zerowaniem licznikow doby
             try { WarAidDay(); } catch (Exception e) { WaStumble("WarAidDay", e); }
+            // M4: plan daniny pokoju na jutro (chleb korony tej doby - po BreadRest) i linia "Danina pokoju (M4)" - przed zerowaniem licznikow doby
+            try { PeaceTributeDay(); } catch (Exception e) { WaStumble("PeaceTributeDay", e); }
             finally { WtClearDay(); }
         }
 

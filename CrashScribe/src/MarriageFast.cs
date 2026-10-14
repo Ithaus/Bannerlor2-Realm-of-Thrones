@@ -93,16 +93,23 @@ namespace CrashScribe
     ///
     /// HAMULEC (MarriageChanceScale, decyzja Jeffa 13.10: "Przyhamuj, aby sluby zawieraly sie rzadziej") - ZMIANA ROZGRYWKI.
     /// Pomiar roczny (364 doby): 113 slubow AI-AI przed regula "tylko kandydaci z szansa", 215 z nia (ok. 0.59 na dobe, prawie liniowo) -
-    /// wolni szlachcice, takze kandydatki dla gracza, koncza sie ok. 2 razy szybciej. Mnoznik (domyslnie 0.7, zakres 0.1-1.0) obniza prog
+    /// wolni szlachcice, takze kandydatki dla gracza, koncza sie ok. 2 razy szybciej. Mnoznik (13.10 domyslnie 0.7, od 14.10 0.17 - nizej; zakres 0.1-1.0) obniza prog
     /// rzutu "RandomFloat &lt; szansa" - TYLKO dla wolnego lorda przy CZYNNEJ regule (sciezka PickViable -> rzut w Decide). Kandydat jest
     /// wybierany jak dotad (sposrod tych z szansa > 0, bez mnoznika), rzut zuzywa ten sam jeden krok generatora. Szansa pary jest rzedu
     /// 0.001 na probe, wiec liczba slubow idzie w przyblizeniu wprost za mnoznikiem: 0.7 = ok. 150 na rok (szacunek, nie pomiar),
     /// 0.5 = mniej wiecej jak przed regula, 1.0 = prog bez zmian (dokladnie zachowanie sprzed hamulca). Lord z zyjacym malzonkiem, regula
     /// wylaczona / stojaca, bieg cienia i rod oddany oryginalowi po potknieciu - bez mnoznika (droga ROT bez zmian).
     /// Wartosc spoza zakresu: przyciecie i jedna linia w logu (raz na proces); mnoznik w linii startu i w linii doby ("mnoznik szansy X").
+    /// DECYZJA JEFFA 14.10 ("sluby - 48 slubow" na rok, zasada "1 dzien = 1 dzien"; rozpoznanie docs/pytania-2026-10-14/STARZENIE-I-CZAS-ZYCIA.md
+    /// rozdz. 3 pkt 3): domyslna 0.7 -> 0.17. Pomiar przy 0.7 (bieg dwuletni 13/14.10): 291 slubow AI-AI w 728 dob (159 + 132) - wszystkie ta droga
+    /// (linia Armoury "Sluby AI (169c)", ktora liczy kazdy slub spoza rodu gracza, daje te sama sume 291; zonaty lord ma szanse 0, a ROT wylacza swaty gry -
+    /// innej drogi slubow AI-AI w tym zestawie modow nie ma; BK x1.25 siedzi w szansie, ktora hamulec mnozy). Liniowo 0.7 x 48 / 146 = 0.23 (= 84 / 364),
+    /// ale przy rzadszych slubach pula wolnych lordow rosnie (kazdy niezawarty slub = 2 wolnych, ktorzy dalej probuja) - model z dob biegu dwuletniego
+    /// (ten sam model przewiduje dla 1.0 212-220 slubow w roku 1, pomiar 13.10: 215) daje przy 0.23 55-66 na rok, przy 0.17 42-52 (rok 1 i 2) - stad 0.17.
+    /// Oferty slubu dla rodu gracza (gra, MarriageOfferCampaignBehavior) - osobno, mnoznik kalendarza 84 / rok (MarriageOfferYear.cs).
     ///
     /// Wylaczniki: MarriageFast (true; false = oryginal ROT bez latki - wtedy nie dziala tez regula wyzej), MarriageFastShadow (false),
-    /// MarriageOnlyViableCandidates (true), MarriageChanceScale (0.7; 1.0 = bez hamulca) w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
+    /// MarriageOnlyViableCandidates (true), MarriageChanceScale (0.17; 1.0 = bez hamulca) w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
     /// </summary>
     internal static class MarriageFast
     {
@@ -148,7 +155,7 @@ namespace CrashScribe
         private static bool _scaleWarned;      // linia o przycieciu juz wypisana (raz na proces - ustawienia czytane raz na proces)
 
         // hamulec: dozwolony zakres MarriageChanceScale i wartosc, gdy w pliku stoi cos, co nie jest liczba (NaN)
-        private const float ScaleMin = 0.1f, ScaleMax = 1f, ScaleDefault = 0.7f;
+        private const float ScaleMin = 0.1f, ScaleMax = 1f, ScaleDefault = 0.17f;   // domyslna jak w Config.cs (decyzja Jeffa 14.10 - ok. 48 slubow AI na rok)
 
         // ---- bufory (jeden watek kampanii; _busy pilnuje ponownego wejscia) ----
         private static bool _busy;
@@ -445,7 +452,7 @@ namespace CrashScribe
         private static string Num(float v) { return v.ToString("0.0##", CultureInfo.InvariantCulture); }
 
         /// <summary>
-        /// Hamulec (MarriageChanceScale): wartosc z ustawien przycieta do zakresu 0.1-1.0 (nie-liczba = domyslne 0.7). Przyciecie = jedna
+        /// Hamulec (MarriageChanceScale): wartosc z ustawien przycieta do zakresu 0.1-1.0 (nie-liczba = domyslne 0.17). Przyciecie = jedna
         /// linia w logu, raz na proces (ustawienia czytane raz, przy starcie gry - tam log nie jest jeszcze otwarty, stad kontrola tutaj).
         /// </summary>
         private static float ScaleFromConfig()

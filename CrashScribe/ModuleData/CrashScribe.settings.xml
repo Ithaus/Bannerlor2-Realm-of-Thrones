@@ -249,28 +249,40 @@
        as they are. On its own this rule about doubles AI weddings: a one-year test campaign (364 days) had 215 of
        them, against about 113 before the rule. Side effect: unmarried nobles, including the ones the player could
        marry, are then taken about twice as fast. That is why the brake below (MarriageChanceScale) slows the
-       weddings down again: with its default of 0.7 expect about 150 AI weddings in the first year - more than
-       before the rule, fewer than with the rule alone.
+       weddings down again: with its default of 0.17 expect about 48 AI weddings a year.
        Needs MarriageFast above; it is paused while MarriageFastShadow is
        on (the original decides then) and when another mod changes the marriage chance (one line in the CrashScribe
        log says so). The daily "Swaty ROT (Z.3)" log line ends with the attempts of unmarried lords, how many of
        them the old rule would have wasted, the brake value in use, and the weddings of the day and since loading.
        Set MarriageOnlyViableCandidates to false to draw from the whole list as Realm of Thrones does (old behaviour). -->
   <MarriageOnlyViableCandidates>true</MarriageOnlyViableCandidates>
-  <!-- Brake on AI weddings: how often an unmarried AI lord's daily marriage attempt succeeds. The rule above
-       (MarriageOnlyViableCandidates) on its own made weddings about twice as frequent, so unmarried nobles -
-       also the ones the player could marry - were running out about twice as fast. This number multiplies the
-       marriage chance in the daily roll of an unmarried lord; the candidate is still picked exactly as above.
-       AI weddings in the first year of a campaign (364 days):
+  <!-- Brake on AI weddings: how often an unmarried AI lord's daily marriage attempt succeeds. Realm of Thrones
+       sets the chance of a wedding per day for its own year of 84 days; with Armoury's year of 364 days the same
+       daily chance gave far more weddings a year, and the rule above (MarriageOnlyViableCandidates) about doubled
+       them again. This number multiplies the marriage chance in the daily roll of an unmarried lord; the candidate
+       is still picked exactly as above.
+       AI weddings a year (a year of 364 days):
          before the rule above     - about 113 (measured)
          1.0 = no brake            - 215 (measured)
-         0.7 = default             - about 150 (expected)
-         0.5                       - about as many as before the rule (expected)
+         0.7                       - 159 in the first year, 132 in the second (measured in a two-year test)
+         0.17 = default            - about 48 (expected, 42 to 52 in each of the first two years)
+       The default follows the rule "a day in the game is a day": a year of the game now holds about as many AI
+       weddings as a year of Realm of Thrones did. It is lower than 84 / 364 = 0.23 because with fewer weddings
+       more lords stay unmarried, and every one of them keeps trying each day (0.23 would give about 55 to 66).
        Allowed values: 0.1 to 1.0. A value outside that range is cut to the nearest limit, and the CrashScribe
        log says so in one line. The brake works only while MarriageOnlyViableCandidates is on and active; when
        that rule is off or paused, and in the MarriageFastShadow test, the marriage chance is not changed at all.
        The start-up line "Mends: swaty ROT (Z.3)" and the daily "Swaty ROT (Z.3)" line in the CrashScribe log show
-       the value in use ("mnoznik szansy 0.7").
+       the value in use ("mnoznik szansy 0.17").
        Set MarriageChanceScale to 1.0 to switch the brake off. -->
-  <MarriageChanceScale>0.7</MarriageChanceScale>
+  <MarriageChanceScale>0.17</MarriageChanceScale>
+  <!-- Marriage offers for your own clan, a year as long as the game's own: the base game sends you marriage offers
+       for the members of your clan from AI clans, with a chance per day meant for its year of 84 days. With
+       Armoury's year of 364 days that came to about four times as many offers a year. With this on, each AI clan's
+       daily chance to make you an offer is multiplied by 84 / days in the year (0.23 with a 364-day year; 1, that
+       is no change, with a year of 84 days or shorter), so a year brings about as many offers as a year of the
+       base game did. Everything else stays as it is: who may be offered, the clan's distance, the 7 days between
+       offers, and the offers you make yourself. The daily "Oferty slubu (rok)" line in the CrashScribe log counts
+       the clans let through and the offers made. Set MarriageOffersPerYear to false for offers as in the base game. -->
+  <MarriageOffersPerYear>true</MarriageOffersPerYear>
 </CrashScribe>

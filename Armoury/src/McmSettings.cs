@@ -5232,6 +5232,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int FolkWarAidMinLoyalty { get; set; } = 30;
 
+        [SettingPropertyBool("Folk Peace Tribute", HintText = "in a long peace (the realm at war with no other realm for at least 91 days) the crown takes back from the labourers' savings in its towns - the coin they hold above their reserve for hard times - only as much as it spent the day before on bread for its own hungry towns and castles (Bread For The Poor), and never more than one part in two hundred of those savings a day. It goes the same way as the war aid: the reserve is never touched, a besieged town pays nothing, a town too close to revolt pays nothing, and the same loss of loyalty (Folk War Aid Loyalty) applies, shown as 'Peace tribute from the people's savings'. You and the AI alike: in your realm it goes to the treasury, not to your purse. Needs Folk War Aid and Bread For The Poor. Off = nothing is taken in peace, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkPeaceTribute { get; set; } = true;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -7151,6 +7155,7 @@ namespace Armoury
             s.FolkWarAidLoyaltyCost = FolkWarAidLoyaltyCost;
             s.FolkWarAidLoyaltyFloor = FolkWarAidLoyaltyFloor;
             s.FolkWarAidMinLoyalty = FolkWarAidMinLoyalty;
+            s.FolkPeaceTribute = FolkPeaceTribute;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
