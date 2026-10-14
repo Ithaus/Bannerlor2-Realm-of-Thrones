@@ -475,6 +475,11 @@ namespace Armoury
         public bool SackScarEnabled = true;                // a settlement taken by siege loses prosperity and loyalty - conquest is a ruin you must rebuild
         public int SackProsperityCutPercent = 15;          // prosperity lost when a settlement falls to siege
         public int SackLoyaltyHit = 15;                    // loyalty lost when a settlement falls to siege
+        // L5b-1 (decyzja Jeffa 13.10 "5 tak, i tak" - skarbiec korony w stolicy; docs/lup-miast rozdz. 8 pyt. 5b; CapitalTreasury.cs): krolestwo, ktore traci STOLICE
+        // (wedlug BK - BKCapitalBehavior; bez BK poczatkowa siedziba) przez zdobycie, oddaje skarbcowi zdobywcy CapitalTreasuryShare skarbca ponad zapas wojny i dlug Banku.
+        // Off = stan a913a58 (zostaje tylko linia pomiaru "w cieniu")
+        public bool CapitalTreasurySeized = true;          // when an enemy storms the capital of a realm (the seat of its court in Banner Kings; without Banner Kings its first seat), the conquerors carry off part of the royal treasury kept there - Capital Treasury Share of what it holds above its war reserve and its debt to the Iron Bank - into the treasury of their own realm (a conqueror without a realm takes it into his own purse); a capital lost by peace, gift or revolt gives nothing; off = the treasury stays untouched
+        public float CapitalTreasuryShare = 0.333f;        // with Capital Treasury Seized: the part of a fallen capital's royal treasury - above the realm's war reserve and its Iron Bank debt - that the conquerors carry off (a third)
         public bool MarchPaceAiToo = true;                 // the same law binds lords, bandits and patrols (villagers and caravans keep their own pace either way)
         public float MarchFootPace = 4.0f;                 // map speed cap while anyone walks - footmen without a spare mount, or prisoners on the rope
         public float MarchTrainPace = 4.2f;                // map speed cap for an all-riding party that still drags a baggage train (pack animals, livestock)

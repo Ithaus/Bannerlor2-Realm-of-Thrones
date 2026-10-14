@@ -614,6 +614,8 @@ namespace Armoury
               .Append(", dary (182) skarbce dawcow -> glowy rodow Strazy ").Append(CrownGifts.LastToWatch).Append(" i Dothrakow ").Append(CrownGifts.LastToDothraki)
               .Append(" (ze skarbcow dawcow ").Append(CrownGifts.LastNorth + CrownGifts.LastFree).Append(", reszta w skarbcach odbiorcow ").Append(CrownGifts.LastKept).Append(")")
               .Append(", raty reparacji skarbiec -> skarbiec ").Append(CrownIncome.LastRepOut).Append(" (przyjete ").Append(CrownIncome.LastRepIn).Append(")")
+              .Append(", skarbce zdobytych stolic (L5b-1) skarbiec -> skarbiec ").Append(CapitalTreasury.LastToCrowns).Append(" i skarbiec -> glowa rodu bez krolestwa ")
+              .Append(CapitalTreasury.LastToHeads).Append(" (upadkow stolic ").Append(CapitalTreasury.LastFalls).Append(")")
               .Append(", kontrakty najemnikow AI (185) skarbce -> glowy kompanii ").Append(MercContract.LastPaid).Append(" (nalezne ").Append(MercContract.LastDue)
               .Append("; gra dla AI: za tier wylaczone ").Append(MercContract.LastTierOff).Append(", kontrakt gry wylaczony ").Append(MercContract.LastGameOff).Append(")")
               .Append(", wezwania do wojny (168) skarbce wzywajacych -> portfele wezwanych ").Append(CrownCallToWar.LastPaid).Append(" (zerwane z braku wplywow ").Append(CrownCallToWar.LastEndedN)

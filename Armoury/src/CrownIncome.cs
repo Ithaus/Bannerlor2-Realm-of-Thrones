@@ -362,6 +362,8 @@ namespace Armoury
                       .Append(", doplata do zoldu wedlug potrzeby (W5, przed rentami) ").Append(naid)
                       .Append(", tarczowe (W6, poza wplywami dnia): pobrane od rodow do skarbcow ").Append(scIn).Append(", wyplacone tej samej doby rodom z doplata W5 ").Append(scOut)
                       .Append(", doplata ze skarbcow ponad zapas wojny (W5b, poza wplywami dnia - z zapasu) ").Append(cAid)
+                      .Append(", skarbce zdobytych stolic (L5b-1, poza wplywami dnia - migawka przesunieta): ze skarbcow przegranych ").Append(CapitalTreasury.LastTaken)
+                      .Append(" do skarbcow zdobywcow ").Append(CapitalTreasury.LastToCrowns).Append(" i kies glow rodow bez krolestwa ").Append(CapitalTreasury.LastToHeads)
                       .Append(" | zostalo z wplywow dnia w skarbcach ").Append(left)
                       .Append(" | dlugi reparacji: ").Append(_debts.Count).Append(" na ").Append(debtSum).Append(" zl, nowe dzis ").Append(LastNewDebtN).Append(" na ").Append(LastNewDebt)
                       .Append(", przepadly (krolestwa nie ma) ").Append(_dDroppedN).Append(" na ").Append(_dDropped)

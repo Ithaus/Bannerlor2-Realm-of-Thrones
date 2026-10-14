@@ -51,6 +51,8 @@ RANGES = {
     'RansomCashShare': (0.0, 1.0, "0.00"),
     'CrownGreatCaptiveReward': (0.0, 1.0, "0.00"),
     'CrownThirdsShare': (0.0, 0.5, "0.000"),
+    # L5b-1 (skarbiec stolicy): czesc przycinana w kodzie do 0..1 (CapitalTreasury.Fall)
+    'CapitalTreasuryShare': (0.0, 1.0, "0.000"),
     'RansomHeadYears': (0.0, 3.0, "0.00"),
     # 186: korona pozycza w Banku - udzial przycinany w kodzie do 0..1, mnoznik >= 1, doby >= 1
     'CrownLoanMaxIncomeShare': (0.0, 1.0, "0.00"),
