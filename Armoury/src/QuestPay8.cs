@@ -339,7 +339,9 @@ namespace Armoury
             {
                 var mp = MobileParty.MainParty;
                 if (mp == null) return FallbackRate;
-                float r = mp.TotalWage / (float)PartyMen();
+                // recenzja WW-J: stawka robocizny z PELNEGO zoldu partii (bez polowy "w lupie" zalog okretow Wysp - na zadaniu nie ma lupu; zleceniodawca placi
+                // za prace ludzi, nie za uklad pana Wysp z zaloga); bez WW-J FullTotalWage == TotalWage
+                float r = MountedWage.FullTotalWage(mp) / (float)PartyMen();
                 return r > 0.01f ? r : FallbackRate;
             }
             catch (Exception e) { Stumble("Rate", e); return FallbackRate; }

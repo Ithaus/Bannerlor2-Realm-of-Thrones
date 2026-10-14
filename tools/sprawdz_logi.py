@@ -22711,7 +22711,10 @@ def wyspywolni_main(logp, start_arg, until=120, basep=None, csp=None, cspb=None)
             rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "po/przed 0.48-0.52 przy kluczu (bez druzyn Wysp - INFO)", None)
         elif on:
             rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "po/przed 0.48-0.52; kontrolka 0; potkniecia 0",
-                    0.48 <= r <= 0.52 and (rp is None or 0.48 <= rp <= 0.52) and cw["ctl"] == 0 and cw["stumb"] == 0)
+                    # recenzja WW-J: gracz-wasal ma mala druzyne - TotalWage to int (obciecie polowy do 1 zl na partie na dobe), wiec przy zoldzie < ok. 25 zl/d
+                    # sam stosunek wypada poza 0.48-0.52; dopuszczalne |po - 0.5 x przed| <= partii + 0.5
+                    0.48 <= r <= 0.52 and (rp is None or 0.48 <= rp <= 0.52 or abs(cw["pa"] - cw["share"] * cw["pb"]) <= cw["pn"] + 0.5)
+                    and cw["ctl"] == 0 and cw["stumb"] == 0)
         elif cw["on"] == 0:
             rep.add("WW-7 zalogi okretow Wysp - pol zoldu w lupie (WW-J, sr. 28 dob)", det, "klucz off: po/przed 1.000; kontrolka 0", abs(r - 1.0) < 0.005 and cw["ctl"] == 0 and cw["stumb"] == 0)
         else:

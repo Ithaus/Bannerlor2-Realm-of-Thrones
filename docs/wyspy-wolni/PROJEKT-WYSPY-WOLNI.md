@@ -498,6 +498,8 @@ Co obejrzec najpierw: WW0 (czy Wyspy maja opcje rabunku - od tego zalezy WW-2), 
   zwolnienia 166, W5 (potrzeba), W6 (podstawa tarczowego), W7, kredyt 168, zwrot korony (70% zaplaconego), WW3 (koszt dnia - mnoznik rabunku rosnie), sakiewki ludzi.
 - Przeliczniki zlota na ludzi z modelu jednostki albo sredniej gry (`CrownGifts.GoldWageShare`): zwolnienia 166 (`ReleaseFrom`: kwota / 0.5 ludzi, zwrot x 0.5),
   rod bez ludzi w W5, W6, "nowa partia" i "na miare srodkow" (srednia gry x 0.5). Rycerze 179 w druzynach Wysp - pelne 24 zl (umowa miedzy rodami, nie zold zalogi).
+- Recenzja: nagroda zadan gracza (`QuestPay8.Rate`, N x D x zold na czlowieka x 1.25) liczy od PELNEGO zoldu (`MountedWage.FullTotalWage`) - na zadaniu nie ma lupu,
+  zleceniodawca placi robocizne; gracz-wasal Wysp nie traci polowy nagrod. WW-7: gracz-wasal z tolerancja obciecia int (|po - 0.5 x przed| <= partii + 0.5).
 - Linia doby `Zalogi okretow - pol zoldu w lupie (WW-J)` (ReaverLaw.CrewLine, zawsze - takze przy kluczu off): zold druzyn Wysp przed / po / w lupie, gracz-wasal,
   kontrolka po = przed (zalogi twierdz, karawany, najemnicy), potkniecia postfiksu. Prog WW-7 w grupie `wyspywolni` (WW-5 jest juz zajete - kiesy wsi).
 
