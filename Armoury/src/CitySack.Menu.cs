@@ -111,7 +111,8 @@ namespace Armoury
             long pShare = me != null ? me.Share : 0;
             long pLead = MenPurse.On ? pShare / 3 : pShare, pMen = pShare - pLead;
             long pCrown = me != null && me.Lead != null ? CrownPart(me.Lead, pLead) : 0;
-            var sb = new StringBuilder(600);
+            var sb = new StringBuilder(800);
+            string goodsKey = "";
             Track t;
             if (_track.TryGetValue(st, out t) && t != null && t.Kind != KMercy && Now - t.Day0 < TrackDays)
             {
@@ -139,9 +140,20 @@ namespace Armoury
                 if (k.FolkLive) sb.Append(castle ? ", the castle folk " : ", the townsfolk ").Append(N(k.FolkSum - f));
                 sb.Append('.');
                 if (NoSpendOn && WindowDays > 0) sb.Append(" For ").Append(DaysWords(WindowDays)).Append(" your men will take what they want here and pay for nothing.");
+                // poprawka po audycie (gracz 9, drobne2): towar z polek (L7) - ta sama czesc co moneta; liczby z tego samego planu co SackGoods (tylko odczyt)
+                long gp, gv, gw;
+                if (GoodsOn && GoodsPreview(st, share, out gp, out gv, out gw))
+                {
+                    goodsKey = "; towar polek " + gp + " szt. za " + gv + " (konie i zwierzeta " + gw + ")";
+                    sb.Append(Dot).Append("Goods: ").Append(ShareWords(share)).Append(castle ? " of what lies in the castle's stores - about " : " of what lies on the shelves - about ")
+                      .Append(N(gp)).Append(" pieces worth about ").Append(N(gv)).Append(" denars");
+                    if (gw > 0) sb.Append(", ").Append(N(gw)).Append(" of them horses and beasts");
+                    sb.Append(". Horses go only as far as your army can lead them, food only up to ten days' rations, the rest as much as your men can carry")
+                      .Append(kind == KDevastate ? " - what they cannot carry burns." : " - what they cannot carry stays.");
+                }
             }
             string key = "okno gracza - " + KName[kind] + " " + st.StringId + ": kupcy " + k.Kasa + " -> armia " + m + "; lud " + k.FolkSum + " -> armia " + f
-                         + "; druzyna gracza " + pShare + " (ludzie " + pMen + ", gracz " + pLead + ", korona " + pCrown + "); ludzie " + (me != null ? me.Men : 0) + " z " + men;
+                         + "; druzyna gracza " + pShare + " (ludzie " + pMen + ", gracz " + pLead + ", korona " + pCrown + "); ludzie " + (me != null ? me.Men : 0) + " z " + men + goodsKey;
             L5Log(key);
             return sb.ToString();
         }
