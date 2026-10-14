@@ -63,7 +63,7 @@ namespace Armoury
         private static void Late(Deal d, string why)
         {
             if (d.Choice != 0) return;
-            d.Kind = KDefLate; d.Choice = 1;
+            d.Kind = KDefLate; d.Choice = 1; d.Agreed = Now;
             _dLate++;
             if (ReferenceEquals(_askDeal, d)) { _askDeal = null; _askOpen = false; }
             ChoiceLine(d, "bez odpowiedzi - regula AI (" + why + ")");
@@ -116,7 +116,7 @@ namespace Armoury
             {
                 _askOpen = false; _askDeal = null;
                 if (d.Choice != 0) return;
-                d.Choice = 1; d.Kind = KDefPaid; _dPayChosen++;
+                d.Choice = 1; d.Kind = KDefPaid; d.Agreed = Now; _dPayChosen++;
                 ChoiceLine(d, "zaplac");
             };
             Action refuse = delegate

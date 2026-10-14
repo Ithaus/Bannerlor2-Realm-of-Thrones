@@ -1,5 +1,15 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (okup zamiast szturmu - poprawki z przegladu autora po O3) - doba na wykonanie liczona od wyboru "placi" (dotad od decyzji o szturmie); odmowa gracza nie liczy sie jako umowa, ktora przepadla
+
+**Mod:** Armoury | **Galaz:** `w-toku/okup` (na O3) | **Tor:** S | **Klucze:** bez nowych | **Pliki:** `SiegeRansom.Act.cs`, `SiegeRansom.Player.cs`
+
+**Problem:** przeglad kodu po O3 (bez testu w grze): (1) umowa gracza-obroncy po 24 h bez odpowiedzi przechodzi na regule AI, ale `Step` odrzucal umowy starsze niz doba od DECYZJI o szturmie (`Day0`) - regula AI po terminie nigdy by sie nie wykonala (linia "przepadl: doba bez wykonania"), a "Pay" w 23. godzinie przepadalby przy pierwszej bitwie pod murami; (2) odmowa gracza (znacznik do konca oblezenia) przy koncu oblezenia dawala linie "przepadl" z rodzajem "gracz-obronca zaplacil" - zawyzalaby "przepadle gracza" w progu OKP-12.
+**Przyczyna:** jedno pole czasu na dwie rzeczy; `Dropped` bez rozroznienia odmowy.
+**Zmiana:** nowe pole umowy `Agreed` - chwila wyboru "placi" (AI: przy decyzji; gracz: odpowiedz "Pay" albo koniec terminu 24 h); doba na wykonanie od niej. `Dropped` pomija umowy z odmowa (bez linii i licznika).
+**Ryzyko / co sprawdzic (8.0):** tylko czas wygasania umowy i licznik linii; AI z AI bez zmian (Agreed = Day0).
+**Status:** DO SPRAWDZENIA (build Armoury kod 0; bez testu w grze; nie wgrane).
+
 ## 2026-10-14 (okup zamiast szturmu O3 - gracz-oblegajacy) - W MENU OBLEZENIA NOWA OPCJA "Demand a ransom": okno z kwota, Accept - zloto do sakiewek i do ciebie, oboz zwiniety droga gry, 60 dob bez oblegania tej osady
 
 **Mod:** Armoury | **Galaz:** `w-toku/okup` (na poprawkach O1/O2) | **Tor:** L (paczka O3 projektu, tor M) | **Klucze:** nowy `SiegeRansomPlayerBesieger` (wlaczony; off = stan O2 - bez opcji); w `Armoury.json` Jeffa go nie ma | **Zapis:** bez nowych pol (rozejm gracza w `arm_siege_ransom` z O1) | **Pliki:** `SiegeRansom.Besieger.cs` (O3 zamiast pustych miejsc), `SiegeRansom.Act.cs` (wykonanie umowy gracza czeka, gdy gracz jest w spotkaniu), `ArmouryBehavior.cs` (nasluch OnAfterSessionLaunched), `Settings.cs`, `McmSettings.cs` (gen_mcm 1416)

@@ -53,7 +53,8 @@ namespace Armoury
         internal sealed class Deal
         {
             public SiegeEvent Ev; public Settlement St; public IFaction Fac; public Judge J; public int Kind;
-            public float Day0;                    // chwila uzgodnienia (dni kampanii)
+            public float Day0;                    // chwila decyzji o szturmie (dni kampanii)
+            public float Agreed;                  // chwila wyboru "placi" (AI - przy decyzji; gracz - odpowiedz albo koniec terminu): od niej doba na wykonanie
             public int Choice;                    // 0 czeka na gracza, 1 placi / przyjmuje, 2 odmowa
             public float Deadline;                // gracz-obronca: do kiedy czekamy (24 h), potem regula AI
             public bool Shown; public int AskFails;
@@ -92,7 +93,7 @@ namespace Armoury
 
         private static Deal NewDeal(Siege s, Judge j, int kind, int choice)
         {
-            var d = new Deal { Ev = s.Ev, St = s.St, Fac = j.Faction, J = j, Kind = kind, Day0 = Now, Choice = choice };
+            var d = new Deal { Ev = s.Ev, St = s.St, Fac = j.Faction, J = j, Kind = kind, Day0 = Now, Agreed = Now, Choice = choice };
             _deals.Add(d);
             _dDeals[kind]++;
             return d;
@@ -112,6 +113,7 @@ namespace Armoury
 
         private static void Dropped(Deal d, string why)
         {
+            if (d.Choice == 2) return;                                          // odmowa gracza - znacznik do konca oblezenia, nie umowa, ktora przepadla
             _dDropped++;
             try
             {
@@ -150,7 +152,7 @@ namespace Armoury
             var camp = d.Ev.BesiegerCamp;
             if (camp.MapFaction != d.Fac) { _deals.Remove(d); Dropped(d, "oboz zmienil frakcje"); return; }
             if (st.MapFaction == null || d.Fac == null || !FactionManager.IsAtWarAgainstFaction(d.Fac, st.MapFaction)) { _deals.Remove(d); Dropped(d, "nie ma juz wojny"); return; }
-            if (Now - d.Day0 > 1f) { _deals.Remove(d); Dropped(d, "doba bez wykonania (bitwa przy oblezeniu)"); return; }
+            if (Now - d.Agreed > 1f) { _deals.Remove(d); Dropped(d, "doba bez wykonania (bitwa przy oblezeniu)"); return; }
             if (st.Party != null && st.Party.MapEvent != null) { _dWaitBattle++; return; }
             if (d.Kind == KBes && PlayerEncounter.Current != null) { _dWaitBattle++; return; }   // O3: gracz w spotkaniu - czekamy (zwiniecie obozu bez spotkania gry)
             foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
