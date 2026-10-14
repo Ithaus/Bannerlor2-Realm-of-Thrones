@@ -16475,7 +16475,8 @@ def rozwoj_main(logp):
     """rozwoj (RP, decyzja Jeffa 14.10, Armoury/src/LevelPoints.cs): punkt cechy co AttributePointEveryLevels (0 = gra, co 4), dodatkowy punkt
     skupienia co ExtraFocusEveryLevels (0 = wylaczone). Caly log, sesje rozdzielone linia "Rozwoj postaci (RP): start sesji".
     RP-0 linia wpiecia: getter >= 1, awans i pula NPC "tak"; RP-1 w kazdej sesji czynny model ma LevelsPerAttributePoint = klucz (klucz 0 -> 4);
-    RP-2 awanse gracza: Armoury +1 skupienia dokladnie na poziomach podzielnych przez klucz skupienia, RP-3 cechy +1 dokladnie na poziomach
+    RP-2 awanse gracza: Armoury +1 skupienia dokladnie na poziomach podzielnych przez klucz skupienia i caly przyrost puli = gra + Armoury + BK co 5
+    (recenzja RP: bez podwojnego punktu), RP-3 cechy +1 dokladnie na poziomach
     podzielnych przez LevelsPerAttributePoint (inne +0); RP-4 ten sam poziom gracza dwa razy w jednej sesji = 0 (punkt raz na poziom);
     RP-5 skupienie "inne" (BK +1 co 5) - INFO; RP-6 pule bohaterow przy tworzeniu od poprzedniej linii - INFO (nowa kampania przy kluczu > 0: > 0);
     RP-7 linie "ERROR in LevelPoints." = 0. Log bez paczki: INFO, bez wyjatku."""
@@ -16504,7 +16505,7 @@ def rozwoj_main(logp):
             a = num(r"AttributePointEveryLevels (\d+)", s, int, 0) or 0
             f = num(r"ExtraFocusEveryLevels (\d+)", s, int, 0) or 0
             lpa = num(r"LevelsPerAttributePoint (\d+)", s, int, 0) or 0
-            sessions.append((a, f, lpa, s))
+            sessions.append((a, f, lpa, s, "BK +1 skupienia co 5" in s))
             cur = len(sessions) - 1
             if lpa != (a if a > 0 else 4):
                 bad1.append(f"sesja {cur + 1}: klucz {a}, model {lpa}")
@@ -16520,11 +16521,19 @@ def rozwoj_main(logp):
     else:
         rep.add("RP-1: czynny model liczy klucz cechy (LevelsPerAttributePoint)", "brak linii startu sesji", "INFO (gra nie doszla do mapy)", None)
     if ups:
-        bad2 = [u for u in ups if u[5] != (1 if u[4] > 0 and u[1] % u[4] == 0 else 0)]
+        # recenzja RP: RP-2 liczy CALY przyrost puli skupienia przy awansie (nie tylko znacznik +1): gra FocusPointsPerLevel + Armoury (poziom / klucz)
+        # + BK co 5 (gdy linia startu sesji mowi o BK) - kazdy inny przyrost (podwojny punkt, obcy sluchacz zdarzenia) = NIE
+        def exp_ex(u):
+            return 1 if u[4] > 0 and u[1] % u[4] == 0 else 0
+        def exp_bk(u):
+            bk = sessions[u[0]][4] if u[0] is not None and u[0] < len(sessions) else True
+            return 1 if bk and u[1] % 5 == 0 else 0
+        bad2 = [u for u in ups if u[5] != exp_ex(u) or u[2] != u[3] + exp_ex(u) + exp_bk(u)]
         bad3 = [u for u in ups if u[7] != (1 if u[8] > 0 and u[1] % u[8] == 0 else 0)]
-        rep.add("RP-2: awans gracza - dodatkowe skupienie Armoury",
-                f"awansow {len(ups)}, z +1 Armoury {sum(1 for u in ups if u[5])}" + (f"; zle poziomy: {', '.join('L%d' % u[1] for u in bad2[:8])}" if bad2 else ""),
-                "+1 dokladnie na poziomach podzielnych przez ExtraFocusEveryLevels (0 = nigdy), inne +0", not bad2)
+        rep.add("RP-2: awans gracza - przyrost skupienia (gra + Armoury + BK co 5)",
+                f"awansow {len(ups)}, z +1 Armoury {sum(1 for u in ups if u[5])}"
+                + (f"; zle poziomy: {', '.join('L%d +%d' % (u[1], u[2]) for u in bad2[:8])}" if bad2 else ""),
+                "przyrost = gra + 1 (Armoury, poziom podzielny przez ExtraFocusEveryLevels; 0 = nigdy) + 1 (BK, poziom podzielny przez 5)", not bad2)
         rep.add("RP-3: awans gracza - punkt cechy",
                 f"awansow {len(ups)}, z cecha {sum(1 for u in ups if u[7] > 0)}" + (f"; zle poziomy: {', '.join('L%d' % u[1] for u in bad3[:8])}" if bad3 else ""),
                 "+1 dokladnie na poziomach podzielnych przez LevelsPerAttributePoint z linii awansu, inne +0", not bad3)

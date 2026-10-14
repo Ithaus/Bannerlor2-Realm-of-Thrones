@@ -73,8 +73,10 @@ namespace Armoury
             catch (Exception e) { if (_errors++ < 5) Log.Error("LevelPoints.GainPrefix", e); }
         }
 
-        /// <summary>(2) Postfiks awansu: liczniki AI i linia przy awansie gracza (tylko w trakcie gry - nie przy tworzeniu kampanii).</summary>
-        public static void GainPostfix(HeroDeveloper __instance, GainState __state)
+        /// <summary>(2) Postfiks awansu: liczniki AI i linia przy awansie gracza (tylko w trakcie gry - nie przy tworzeniu kampanii).
+        /// Recenzja RP: liczniki AI tylko przy shouldNotify - InitializeHeroDeveloper (tworzenie bohatera w trakcie gry: wedrowcy, notable, gentry BK,
+        /// dzieci) wola CheckLevel(false) i te poziomy nadpisuje potem SetupDefaultPoints; bez tego warunku zawyzaly "AI od startu sesji".</summary>
+        public static void GainPostfix(HeroDeveloper __instance, GainState __state, bool shouldNotify)
         {
             try
             {
@@ -85,6 +87,7 @@ namespace Armoury
                 int da = __instance.UnspentAttributePoints - __state.Attr;
                 if (h != Hero.MainHero)
                 {
+                    if (!shouldNotify) return;
                     _aiLevels++;
                     if (__state.Extra) _aiFocus++;
                     if (da > 0) _aiAttr += da;
@@ -135,27 +138,34 @@ namespace Armoury
             }
             catch (Exception e) { Log.Error("LevelPoints.Patch(DefaultCharacterDevelopmentModel)", e); }
             // modele z modow, ktore same deklaruja getter (NavalDLC wola BaseModel - przypisanie daje ten sam wynik)
-            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            // recenzja RP: caly skan we wlasnym try, filtr typu w try per typ - wywrotka skanu nie moze zabrac latek awansu i puli NPC ponizej;
+            // klasa abstrakcyjna tez (moze deklarowac gotowy getter, ktory dziedziczy model czynny) - pomijany tylko getter abstrakcyjny
+            try
             {
-                if (!RefersCampaign(asm)) continue;
-                Type[] types;
-                try { types = asm.GetTypes(); }
-                catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
-                catch { continue; }
-                foreach (var t in types)
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
-                    if (t == null || t.IsAbstract || t == typeof(DefaultCharacterDevelopmentModel) || !typeof(CharacterDevelopmentModel).IsAssignableFrom(t)) continue;
-                    try
+                    if (!RefersCampaign(asm)) continue;
+                    Type[] types;
+                    try { types = asm.GetTypes(); }
+                    catch (ReflectionTypeLoadException rtle) { types = rtle.Types; }
+                    catch { continue; }
+                    if (types == null) continue;
+                    foreach (var t in types)
                     {
-                        var p = t.GetProperty("LevelsPerAttributePoint", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
-                        var g = p != null ? p.GetGetMethod(true) : null;
-                        if (g == null || g.IsAbstract) continue;
-                        harmony.Patch(g, postfix: post);
-                        _getters++;
+                        try
+                        {
+                            if (t == null || t == typeof(DefaultCharacterDevelopmentModel) || !typeof(CharacterDevelopmentModel).IsAssignableFrom(t)) continue;
+                            var p = t.GetProperty("LevelsPerAttributePoint", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+                            var g = p != null ? p.GetGetMethod(true) : null;
+                            if (g == null || g.IsAbstract) continue;
+                            harmony.Patch(g, postfix: post);
+                            _getters++;
+                        }
+                        catch (Exception e) { Log.Error("LevelPoints.Patch(" + (t != null ? t.FullName : "?") + ")", e); }
                     }
-                    catch (Exception e) { Log.Error("LevelPoints.Patch(" + t.FullName + ")", e); }
                 }
             }
+            catch (Exception e) { Log.Error("LevelPoints.Patch(skan modeli)", e); }
             try
             {
                 var gain = AccessTools.Method(typeof(HeroDeveloper), "OnGainLevel", new[] { typeof(bool) });
