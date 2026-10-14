@@ -1,0 +1,23 @@
+export const meta = {
+  name: 'co-zostalo-do-konca-moda',
+  description: 'Zestawienie dla Jeffa: co jeszcze zostalo do zrobienia w modzie - kazda pozycja PLANU DO KONCA MODA (etapy 1-8, decyzje, zakonczenie Z.1-Z.9) sprawdzona wobec STAN-PRAC / CHANGELOG / PRZEKAZANIE + otwarte sprawy z nocy 13/14.10',
+  phases: [ { title: 'Inwentarz' }, { title: 'Zestawienie' } ],
+}
+const REPO = String.raw`C:\Users\GAME\Bannerlor2-Realm-of-Thrones`
+const SC = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bannerlor2-Realm-of-Thrones\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\scratchpad`
+const INT = SC + String.raw`\zb\int`
+const OUT = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\c36b73ca-1de0-4b1b-80ce-71bd02afe545\scratchpad\inwentarz`
+const env = String.raw`Mody Bannerlorda (Realm of Thrones). Przeczytaj ${REPO}\CLAUDE.md. Katalog roboczy = folder gry: NIC tam nie zapisuj, gry nie uruchamiaj, bez zmian kodu i bez commitow - tylko czytanie dokumentow. Pisz do ${OUT}\<podkatalog>\.
+ZRODLA: plan ${REPO}\docs\PLAN-DO-KONCA-MODA-2026-10-09.md (etapy 1-8 z tabelami pozycji, rozdz. 2 decyzje, 3 pomysly, 4 zakonczenie Z.1-Z.9); dziennik ${REPO}\docs\STAN-PRAC.md (caly - kolejne WGRANIA 4..51 i decyzje Jeffa; szukaj numerow pozycji planu typu "1.13", "5.7", "8.5", "E5/", "E6/", "E7/", nazw paczek); dziennik zmian kodu ${INT}\CHANGELOG.md (wersja w grze, WGRANIE 51); przekazania ${REPO}\docs\PRZEKAZANIE-2026-10-08.md (rozdz. 20-30 - kolejki zadan, "ZATWIERDZONE, NIE ZACZETE", "OTWARTE"); projekty etapow ${REPO}\docs\etap*\ i raport roczny ${REPO}\docs\test-zbiorczy\RAPORT-ROCZNY-2026-10-13.md (rozdz. 0 (g) i tabela napraw ok. l. 940-970); bieg dwuletni ${REPO}\docs\test-zbiorczy\BIEG-DWULETNI-2026-10-14.md (rozdz. 0, 9).
+Dla KAZDEJ pozycji: status ZROBIONE (wgranie / commit - podaj dowod: numer WGRANIA albo wpis) / CZESCIOWO / OTWARTE / CZEKA NA JEFFA / ODRZUCONE PRZEZ JEFFA / NIEAKTUALNE; wielkosc (S/M/L/D wedlug planu). Nie zgaduj - gdy brak sladu, napisz "brak sladu w dziennikach". ZWRACAJ KROTKO (max 20 linii) - pelna tabela w pliku.`
+const SCHEMA = { type: 'object', properties: { plik: { type: 'string' }, otwarte: { type: 'array', items: { type: 'string' }, description: 'pozycje OTWARTE / CZESCIOWO / CZEKA NA JEFFA: "nr - co - status - wielkosc - dowod/uwaga"' }, zrobione_ile: { type: 'integer' } }, required: ['plik', 'otwarte', 'zrobione_ile'] }
+phase('Inwentarz')
+const parts = [
+  { key: 'etapy1-4', p: 'Twoja czesc: PLAN etapy 1, 2, 3, 4 (wszystkie pozycje z tabel) oraz rozdz. 2 "Czeka na Twoja decyzje" (A-P i starsze z audytu).' },
+  { key: 'etapy5-8', p: 'Twoja czesc: PLAN etapy 5, 6, 7, 8 (wszystkie pozycje z tabel, takze 8.16 testy Jeffa i 8.17-8.18) oraz rozdz. 4 Zakonczenie Z.1-Z.9 i rozdz. 3 pomysly (tylko te, na ktore Jeff powiedzial "tak" / "pozniej" - szukaj w STAN-PRAC i PRZEKAZANIE).' },
+  { key: 'noc', p: 'Twoja czesc: sprawy OTWARTE spoza planu - z PRZEKAZANIE rozdz. 25-30 (kolejki "ZATWIERDZONE, NIE ZACZETE", "OTWARTE"), raportu rocznego 13.10 (tabela napraw - ktore nie zostaly zrobione), biegu dwuletniego 14.10 (rozdz. 0 pkt 8-9, lista NIE), audytu integracji (docs/test-zbiorczy/audyt-integracji-2026-10-14/), wpisow STAN-PRAC 13-14.10 ("do decyzji Jeffa", "na pozniej", "nie zrobione"), pamieci pomyslow Jeffa (dlugi i podatki miast, pozyczka miejska, karta miejska, sakiewka turniejowa). Kazda sprawa z dowodem.' },
+]
+const res = await parallel(parts.map(t => () => agent(env + '\n\nTWOJ PODKATALOG: ' + t.key + '.\n' + t.p, { label: 'inw-' + t.key, phase: 'Inwentarz', schema: SCHEMA })))
+phase('Zestawienie')
+const z = await agent(env + '\n\nJESTES ZESTAWIAJACYM. Trzy inwentarze (pliki w ' + OUT + '\\{etapy1-4,etapy5-8,noc}\\):\n' + JSON.stringify(res) + '\n\nNapisz ' + REPO + '\\docs\\CO-ZOSTALO-DO-KONCA-MODA-2026-10-14.md (bez commita): rozdz. 0 dla Jeffa PROSTYM JEZYKIEM (bez skrotow wewnetrznych tam, gdzie da sie powiedziec slowami): ile pozycji zrobionych, ile zostalo; potem LISTA TEGO, CO ZOSTALO, pogrupowana: (A) bledy i braki do naprawy, (B) rzeczy, ktore Jeff zatwierdzil, a nie sa zrobione, (C) czeka na decyzje Jeffa (z krotka rada), (D) zakonczenie (kalibracja, wydajnosc, test 4-letni, dokumenty, instrukcja), (E) testy reczne Jeffa, (F) pomysly na pozniej (tylko te zaakceptowane jako "pozniej"). Przy kazdej pozycji: jedno zdanie co to, wielkosc (godziny), od czego zalezy. Usun duplikaty miedzy inwentarzami. Na koncu proponowana kolejnosc. Zwroc: sciezka + streszczenie 25 linii (grupy z liczbami pozycji i 10 najwazniejszych pozycji).', { label: 'zestawienie', phase: 'Zestawienie' })
+return { res, z }
