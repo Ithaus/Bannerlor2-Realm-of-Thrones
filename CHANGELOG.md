@@ -1,5 +1,15 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-14 (PLAN 1.6 - Zlota Kompania 1/3 lukow, szybkie wlaczenia) - NIE WLACZONE: warunek wlaczenia (zakupy AI ze wszystkich zestawow jednostki) nie jest w kodzie - bez zmian w kodzie
+
+**Mod:** Armoury + CrashScribe | **Galaz:** `w-toku/szybkie-wlaczenia` | **Tor:** S (sam przeglad) | **Klucze:** `Army175GoldenBows` zostaje **false** (= aca89cc) | **Pliki:** tylko `CHANGELOG.md`
+
+**Problem (PLAN 1.6 "wlaczyc", status zdecyd.; inwentarz B4: "nic juz nie blokuje, dozbrajanie jest w grze od WGRANIA 10"):** kusznicy Zlotej Kompanii (`golden_crossbowman` t3, `golden_veteran_crossbowman` t4, `golden_master_crossbowman` t5) maja dostac 3 zestawy (kusza / luk dwukrzywy / luk cisowy - CS `Army175Gear.GoldenBows`), a w bitwie bron dystansowa z wylosowanego zestawu (`SkillsDecide.RearmBySkill` :115-123).
+**Przyczyna, dla ktorej nie wlaczam (przejscie kodu):** projekt 175 (rozdz. "Zlota Kompania", PROJEKT-175-ARMIE :397-405) i CHANGELOG (wpis 175, punkt K1) stawiaja warunek: "wlaczac dopiero z koszykami K1 ze wszystkich zestawow (waga 1/n)". Tego nie ma: `AiGear.Deficit` (:519, odczyt :531) i `AiGear.NeedBuckets` (:477, odczyt :487) licza potrzebe z `ch.Equipment` - tylko 1. zestawu (kusza + belty); dopasowanie "co nosza ludzie" (`GarrisonArmory` :107, :225) tez czyta `ch.Equipment`. Po wlaczeniu AI nigdy nie kupi lukow ani strzal dla 2/3 tych ludzi (a lup z lukami liczylby sie jako nadwyzka do sprzedazy [S]), wiec w bitwie z graczem (misja DTE, "wojsko tylko z wlasnym sprzetem") strzelec z wylosowanym zestawem lukowym stoi bez broni dystansowej. Autobitwy to nie dotyczy. Zgoda Jeffa na wyjatek od zasady 28.08 jest w statusie PLAN 1.6 "zdecyd." - blokuje tylko kod.
+**DECYZJA (pelne uprawnienia):** nie wlaczam; inwentarz B4 ma tu blad ("nic juz nie blokuje"). Zeby wlaczyc: koszyki potrzeby i dopasowanie z wszystkich zestawow bojowych z waga 1/n - tylko dla 3 jednostek `SkillsDecide.GoldenXbow` przy wlaczonym kluczu (inaczej zmiana zakupow wszystkich jednostek ROT z 2+ zestawami), w `Deficit`, `NeedBuckets` i `GarrisonArmory.FitRoster`/plan nadwyzek; tor M (jeden workflow z recenzja) + autotest z bitwa gracza przeciw Kompanii. Szacunek 2-4 h.
+**Ryzyko / co sprawdzic:** brak - nic sie nie zmienia. Liczby: kod CS i Armoury 175.G sprawdzony tylko czytaniem (bez biegu z kluczem).
+**Status:** NIE WLACZONE (kod niegotowy; decyzja w tym wpisie).
+
 ## 2026-10-14 (A9 - sufit ceny zakupow AI z cienia, szybkie wlaczenia) - AI NIE PLACI ZA BRAKUJACA SZTUKE WIECEJ NIZ 3 x JEJ WARTOSC (`AiGearMaxPriceFactor` 0 -> 3.0); drozsza zostaje na polce, brak idzie do warsztatow jako zamowienie
 
 **Mod:** Armoury | **Galaz:** `w-toku/szybkie-wlaczenia` | **Tor:** S | **Klucze:** `AiGearMaxPriceFactor` 0 -> **3.0** (off = 0 = aca89cc); nowych pol zapisu brak | **Pliki:** `Settings.cs`, `McmSettings.cs` (gen_mcm 1406; suwak 0-5 bez zmian)
