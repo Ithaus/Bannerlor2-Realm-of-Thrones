@@ -46,7 +46,8 @@ namespace Armoury
     /// NAJWYZEJ dzien kosztu partii = zold dnia (PartyWageModel), a bez zoldu 1 zl od czlowieka (dniowka wyrobnika). Decyzja z biezacego zysku: Bliznaki to
     /// jedyna przeprawa przez Zielone Widly na wiele mil, droga okrezna to co najmniej dzien marszu wiecej - partia placi, gdy myto <= tego dnia (zawsze, bo
     /// pan bierze najwyzej tyle - wiecej, a kupiec poszedlby dookola); nikt nie jest zawracany (bez ruszania sciezek AI). Zwolnieni: rody krolestwa pana
-    /// (powinnosc lenna - jak dotad w porownaniu), karawany i wozy wsi rodu samego pana (swoich nie myci), bandy i Inni (nie staja przy bramce). Gracz: komunikat przy
+    /// (powinnosc lenna - jak dotad w porownaniu), karawany i wozy wsi rodu samego pana (swoich nie myci), bandy i Inni (nie staja przy bramce), a od recenzji tb
+    /// takze partie w wojnie z frakcja Bliznakow (wrog przechodzi sila albo oblega - przelewu do wroga nie ma; dwuletni W50: 23 wrogich lordow przez most). Gracz: komunikat przy
     /// przejsciu; gracz panem Bliznakow - komunikat dobowy z mytem. Linia doby "Myto Bliznakow (B3)" (zaraz po E7/B) z kontrola obiegu (kiesy platnikow = kiesa pana).
     /// </summary>
     internal static class TwinsCrossing
@@ -89,7 +90,7 @@ namespace Armoury
         private static readonly string[] KName = { "karawany", "wozy wsi", "obce rody", "gracz", "inne" };
         private static readonly int[] _tN = new int[Kinds];
         private static readonly long[] _tPaid = new long[Kinds];
-        private static int _tRealm, _tOwn, _tBand, _tCut, _tShort, _tLost, _tZero;
+        private static int _tRealm, _tOwn, _tBand, _tWar, _tCut, _tShort, _tLost, _tZero;   // _tWar - recenzja tb: w wojnie z panem Bliznakow
         private static long _tAsk, _tCutFrom, _tCutTo, _tShortBy, _tOut, _tIn, _tSession;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.TwinsCrossingCount; } }
@@ -116,7 +117,7 @@ namespace Armoury
             _offBridge = _lostSide = 0; _farMax = 0f;
             _ticks = 0;
             Array.Clear(_tN, 0, Kinds); Array.Clear(_tPaid, 0, Kinds);
-            _tRealm = _tOwn = _tBand = _tCut = _tShort = _tLost = _tZero = 0;
+            _tRealm = _tOwn = _tBand = _tWar = _tCut = _tShort = _tLost = _tZero = 0;
             _tAsk = _tCutFrom = _tCutTo = _tShortBy = _tOut = _tIn = 0;
         }
 
@@ -375,6 +376,15 @@ namespace Armoury
             {
                 var oc = _twins.OwnerClan;
                 if (mp.IsBandit || Undead.Party(mp)) { _tBand++; return; }   // banda i umarli (Inni) nie staja przy bramce myta
+                // recenzja tb: wrog pana Bliznakow (wojna frakcji) tez nie staje przy bramce - przechodzi sila albo stoi pod murami (oblezenie wolno - CrossingLaw);
+                // CrossingLaw zawraca tylko czesc wrogow (dwuletni W50: "wrogich lordow przez most" 23 w 728 dobach) - bez tego wrog placilby myto panu,
+                // z ktorym walczy (przelew do wroga, takze od oblegajacych Bliznaki)
+                if (AtWar(mp))
+                {
+                    _tWar++;
+                    if (mp.IsMainParty) Log.Player("Toll at the Twins: none - you are at war with " + PayeeName(oc) + ", and no toll-keeper stops an enemy host.");
+                    return;
+                }
                 if (mp.IsCaravan || mp.IsVillager)
                 {
                     // karawana rodu pana albo woz jego wsi - swoich pan nie myci
@@ -420,6 +430,14 @@ namespace Armoury
             catch (Exception e) { Stumble("Toll", e); }
         }
 
+        /// <summary>Recenzja tb: frakcja partii w wojnie z frakcja Bliznakow (bandy liczone osobno, wczesniej).</summary>
+        private static bool AtWar(MobileParty mp)
+        {
+            var of = _twins != null ? _twins.MapFaction : null;
+            var f = mp.MapFaction;
+            return of != null && f != null && f != of && FactionManager.IsAtWarAgainstFaction(f, of);
+        }
+
         private static string PayeeName(Clan oc)
         {
             try
@@ -447,7 +465,7 @@ namespace Armoury
                   .Append(" | zaplacilo ").Append(n).Append(" partii: ").Append(paid.ToString(Inv)).Append(" zl (");
                 for (int k = 0; k < Kinds; k++) { if (k > 0) sb.Append(", "); sb.Append(KName[k]).Append(' ').Append(_tN[k]).Append('/').Append(_tPaid[k].ToString(Inv)).Append(" zl"); }
                 sb.Append("); w tym przejscia miedzy probkami ").Append(_tLost)
-                  .Append(" | zwolnieni: rody krolestwa pana ").Append(_tRealm).Append(", karawany i wozy rodu pana ").Append(_tOwn).Append(", bandy i umarli ").Append(_tBand)
+                  .Append(" | zwolnieni: rody krolestwa pana ").Append(_tRealm).Append(", karawany i wozy rodu pana ").Append(_tOwn).Append(", bandy i umarli ").Append(_tBand).Append(", w wojnie z panem ").Append(_tWar)
                   .Append(" | uciete do dnia kosztu ").Append(_tCut).Append(" razy (z ").Append(_tCutFrom.ToString(Inv)).Append(" do ").Append(_tCutTo.ToString(Inv)).Append(" zl)")
                   .Append(" | nie stac na cale ").Append(_tShort).Append(" razy (brakowalo ").Append(_tShortBy.ToString(Inv)).Append(" zl; pusta kiesa ").Append(_tZero).Append(")")
                   .Append(" | kontrola obiegu: z kies platnikow ").Append(_tOut.ToString(Inv)).Append(" zl, do ").Append(payee != null ? "kiesy pana" : "kasy miasta (pan bez zywej glowy)")

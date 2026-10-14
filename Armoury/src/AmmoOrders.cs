@@ -26,6 +26,8 @@ namespace Armoury
     /// amunicja schodzi w kazdej bitwie). Wylaczony klucz = 10 jak przed tb.
     /// Linia doby "Amunicja AI - zamowienia (tb)": lordowie AI / zalogi miast / zamowienia zamkow - wizyty z brakiem amunicji po zakupach, brak, czy na polce zostala
     /// sztuka (budzet albo limit sztuk wizyty) czy polka byla pusta (zamowienie), otwarte zamowienia amunicji w miastach (tylko licznik).
+    /// Recenzja tb: w tej samej linii "weterani C3" - strzaly i belty, ktore weterani wzieli ze zbrojowni (partie rodow AI / inne), najem z puli, z puli na polki
+    /// i stan pul karczm (tylko licznik) - wplyw C3 na pokrycie strzal policzony, nie szacowany.
     /// </summary>
     internal static class AmmoOrders
     {
@@ -40,6 +42,11 @@ namespace Armoury
         private static readonly int[] _visits = new int[Who], _visitsShort = new int[Who], _emptyB = new int[Who], _leftB = new int[Who], _ordered = new int[Who], _repeat = new int[Who];
         private static readonly long[] _short = new long[Who], _emptyPcs = new long[Who], _leftPcs = new long[Who], _orderedPcs = new long[Who], _over10 = new long[Who];
         private static int _stumbles;
+        // recenzja tb (14.10): C3 VetKit - amunicja w kompletach weteranow, tylko licznik. Autor szacowal wplyw C3 z udzialu amunicji w uzbrojeniu swiata (linia
+        // "Komplet weterana (C3)" nie dzieli sztuk na typy) - teraz liczba z kodu: [rodzaj][0 strzaly, 1 belty]; rodzaje: VetLord - weteran wzial ze zbrojowni
+        // partii rodu AI, VetOther - z innej zbrojowni (zaloga, druzyna gracza), VetHire - najemnik wzial z puli karczmy, VetHome - z puli na polke miasta
+        internal const int VetLord = 0, VetOther = 1, VetHire = 2, VetHome = 3, VetKinds = 4;
+        private static readonly long[,] _vet = new long[VetKinds, 2];
 
         internal static void Reset() { ClearDay(); _stumbles = 0; }
 
@@ -47,7 +54,21 @@ namespace Armoury
         {
             Array.Clear(_visits, 0, Who); Array.Clear(_visitsShort, 0, Who); Array.Clear(_emptyB, 0, Who); Array.Clear(_leftB, 0, Who); Array.Clear(_ordered, 0, Who); Array.Clear(_repeat, 0, Who);
             Array.Clear(_short, 0, Who); Array.Clear(_emptyPcs, 0, Who); Array.Clear(_leftPcs, 0, Who); Array.Clear(_orderedPcs, 0, Who); Array.Clear(_over10, 0, Who);
+            Array.Clear(_vet, 0, _vet.Length);
         }
+
+        /// <summary>Recenzja tb: sztuki amunicji w ruchu kompletow weteranow C3 (VetKit.Take / TakePlayer / Hire / Daily) - tylko licznik linii doby.</summary>
+        internal static void NoteVet(int kind, ItemObject it, int n)
+        {
+            try
+            {
+                if (it == null || n <= 0 || kind < 0 || kind >= VetKinds || !IsAmmo(it.ItemType)) return;
+                _vet[kind, it.ItemType == ItemObject.ItemTypeEnum.Arrows ? 0 : 1] += n;
+            }
+            catch (Exception e) { _stumbles++; if (_stumbles == 1) Log.Error("AmmoOrders.NoteVet", e); }
+        }
+
+        private static string VetPair(int kind) { return (_vet[kind, 0] + _vet[kind, 1]) + " szt. (strzaly " + _vet[kind, 0] + ", belty " + _vet[kind, 1] + ")"; }
 
         /// <summary>Ile zamowic przy braku towaru na polce: strzaly i belty przy kluczu - caly brak (najwyzej SupplyDemandOrderCap); reszta i klucz wylaczony - najwyzej 10 (wpis 67).</summary>
         internal static float Amount(ItemObject.ItemTypeEnum ty, int deficit)
@@ -105,7 +126,15 @@ namespace Armoury
                 int ba, bb;
                 float oa = SupplyDemand.OpenOrders(ItemObject.ItemTypeEnum.Arrows, out ba), ob = SupplyDemand.OpenOrders(ItemObject.ItemTypeEnum.Bolts, out bb);
                 sb.Append(" | otwarte zamowienia w osadach: strzaly ").Append((long)Math.Round(oa)).Append(" szt. (").Append(ba).Append(" koszykow), belty ")
-                  .Append((long)Math.Round(ob)).Append(" szt. (").Append(bb).Append(" koszykow) | potkniecia ").Append(_stumbles).Append('.');
+                  .Append((long)Math.Round(ob)).Append(" szt. (").Append(bb).Append(" koszykow)");
+                // recenzja tb: weterani C3 - amunicja z kompletow (tylko licznik); w pulach karczm - stan teraz (VetKit.ForEach, ta sama pula co ksiega E6/0)
+                long pa = 0, pb = 0;
+                try { VetKit.ForEach((it, c) => { if (it.ItemType == ItemObject.ItemTypeEnum.Arrows) pa += c; else if (it.ItemType == ItemObject.ItemTypeEnum.Bolts) pb += c; }); }
+                catch (Exception e) { _stumbles++; if (_stumbles == 1) Log.Error("AmmoOrders.Daily(VetKit)", e); }
+                sb.Append(" | weterani C3 (tylko licznik): amunicja ze zbrojowni partii rodow AI ").Append(VetPair(VetLord)).Append(", z innych zbrojowni ").Append(VetPair(VetOther))
+                  .Append(", najem z puli ").Append(VetPair(VetHire)).Append(", z puli na polki ").Append(VetPair(VetHome))
+                  .Append("; w pulach karczm teraz ").Append(pa + pb).Append(" szt. (strzaly ").Append(pa).Append(", belty ").Append(pb).Append(")");
+                sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { _stumbles++; Log.Error("AmmoOrders.Daily", e); }

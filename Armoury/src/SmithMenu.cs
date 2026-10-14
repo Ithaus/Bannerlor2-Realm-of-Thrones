@@ -2053,11 +2053,13 @@ namespace Armoury
         }
 
         /// <summary>Niezaspokojona potrzeba = zamowienie w miescie (SupplyDemand) - jak lord, ktory nie znalazl towaru (AiGear):
-        /// najwyzej 10 na rodzaj z jednej wizyty i raz na SupplyDemandOrderRepeatDays (zamowienie to potrzeba, nie licznik prob).</summary>
+        /// najwyzej 10 na rodzaj z jednej wizyty (strzaly i belty przy AiAmmoOrderFull - caly brak, jak u lorda) i raz na SupplyDemandOrderRepeatDays (zamowienie to potrzeba, nie licznik prob).</summary>
         private static void NoteOrderUnmet(Settlement st, ItemObject.ItemTypeEnum type, int tier, int missing)
         {
             if (st == null || missing <= 0) return;
-            SupplyDemand.NoteUnmetOnce(MobileParty.MainParty, st, type, tier, Math.Min(10, missing));
+            // recenzja tb (jedna regula z AiGear, klucz AiAmmoOrderFull): strzaly i belty - zamowienie na caly brak (najwyzej SupplyDemandOrderCap), reszta i klucz
+            // wylaczony - najwyzej 10 jak dotad
+            SupplyDemand.NoteUnmetOnce(MobileParty.MainParty, st, type, tier, AmmoOrders.Amount(type, missing));
         }
 
         /// <summary>Jedna linia logu na zamowienie: miasto, typ i tier, co przyniosl, towar + chodzenie, ile niezaspokojone.</summary>

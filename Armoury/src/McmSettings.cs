@@ -4308,7 +4308,7 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoUse { get; set; } = true;
 
-        [SettingPropertyBool("Ai Ammo Order Full", HintText = "when a lord's men or a garrison leave a market still short of arrows or bolts and none of the right kind is left on the stall, the order they leave with the town's fletchers is for all they still lack (up to Supply Demand Order Cap), not just 10 - the fletchers see what the armies really need and work their idle hands while it pays (off = at most 10 of a kind from one visit, as before)")]
+        [SettingPropertyBool("Ai Ammo Order Full", HintText = "when a lord's men, a garrison or your own smith leave a market still short of arrows or bolts and none of the right kind is left on the stall, the order they leave with the town's fletchers is for all they still lack (up to Supply Demand Order Cap), not just 10 - the fletchers see what the armies really need and work their idle hands while it pays (off = at most 10 of a kind from one visit, as before)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoOrderFull { get; set; } = true;
 
@@ -5496,7 +5496,7 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsCrossingCount { get; set; } = true;
 
-        [SettingPropertyBool("Twins Toll", HintText = "the lord of the Twins takes a toll at his bridge: 2 denars a man (prisoners too) and 1 a beast, never more than one day of that party's wages - what the long way round would cost it; merchants, village carts, lords of other realms and you pay it into his purse, while lords of his own realm, his own caravans and carts and outlaws cross free. Needs Twins Crossing Count (off = nobody pays, the toll is only counted)")]
+        [SettingPropertyBool("Twins Toll", HintText = "the lord of the Twins takes a toll at his bridge: 2 denars a man (prisoners too) and 1 a beast, never more than one day of that party's wages - what the long way round would cost it; merchants, village carts, lords of other realms and you pay it into his purse, while lords of his own realm, his own caravans and carts and outlaws cross free, and no toll is asked of those at war with him. Needs Twins Crossing Count (off = nobody pays, the toll is only counted)")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool TwinsToll { get; set; } = true;
 

@@ -553,7 +553,7 @@ Uzycie (Python 3, tylko odczyt):
                     Strzaly AI (AiAmmoOrderFull, AmmoOrders.cs): TB-A-0 linia 'Amunicja AI - zamowienia (tb)' z [WL] w kazdej dobie, TB-A-1 pokrycie strzal
                     partii rodow AI (171) w ostatniej linii okna >= W50 - 15 pkt (59%), TB-A-2 INFO zakupy amunicji lordow i zuzycie wobec fin27 / W53,
                     TB-A-3 mediana indeksu ceny strzal srednio <= 1.5 i najwyzej <= 2.5, TB-A-4 strzaly na polkach >= 50% W50 i miasta bez strzal <= 5,
-                    TB-A-5 zamowienia ponad dawne 10 > 0, TB-A-6 INFO rece strzelarzy, TB-A-7 potkniecia 0.
+                    TB-A-5 zamowienia ponad dawne 10 > 0, TB-A-6 INFO rece strzelarzy, TB-A-7 potkniecia 0, TB-A-8 INFO amunicja weteranow C3 wobec zuzycia AI.
                     Myto B3 (TwinsToll, TwinsCrossing.cs): TB-B3-0 linia 'Myto Bliznakow (B3)' z [WL] w kazdej dobie licznika E7/B, TB-B3-1 roznica obiegu 0
                     w kazdej dobie, TB-B3-2 zaplacone > 0 i <= 1.05 x 'myto gdyby bylo', TB-B3-3 INFO kto placi / Frey % D (budzet-rodow.csv),
                     TB-B3-4 INFO przejsc na dobe, TB-B3-5 potkniecia 0, TB-B3-6 INFO komunikaty gracza (reczny). Log bez galezi: INFO, bez wyjatku.
@@ -20958,6 +20958,20 @@ def tb_main(logp, start_arg, until=120):
             rep.add("TB-A-7: potkniecia AmmoOrders (ostatnia linia okna)", str(st), "0", st == 0)
         else:
             rep.add("TB-A-5: zamowienia amunicji ponad 10", "klucz w cieniu albo brak linii", "INFO", None)
+        # recenzja tb: TB-A-8 INFO - amunicja w kompletach weteranow C3 (linia tb, "weterani C3"): wzieta ze zbrojowni partii rodow AI na dobe wobec zuzycia AI (E8/W)
+        vet = [d for d in al if "weterani C3 (tylko licznik)" in al[d]]
+        if vet:
+            vl = mean([num(r"weterani C3 \(tylko licznik\): amunicja ze zbrojowni partii rodow AI (\d+) szt", al[d], default=0) for d in vet])
+            vh = mean([num(r"najem z puli (\d+) szt", al[d], default=0) for d in vet])
+            vm = mean([num(r"z puli na polki (\d+) szt", al[d], default=0) for d in vet])
+            vp = num(r"w pulach karczm teraz (\d+) szt", al[max(vet)], default=0)
+            um = mean([used[d] for d in vet if d in used]) if used else 0.0
+            rep.add("TB-A-8: weterani C3 - strzaly i belty ze zbrojowni partii rodow AI na dobe (linia tb) wobec zuzycia AI po bitwach (E8/W)",
+                    f"wzieli {vl:.1f}/d, najem z puli {vh:.1f}/d, z puli na polki {vm:.1f}/d, w pulach karczm na koniec {vp}; zuzycie AI {um:.0f}/d"
+                    + (f" (C3 = {100.0 * vl / um:.0f}% zuzycia)" if um > 0 else ""),
+                    "INFO (autor tb szacowal ok. 15/d = ok. 1/10 zuzycia; powyzej 1/3 zuzycia - C3 do rozpatrzenia: amunicja jako zapas pana)", None)
+        else:
+            rep.add("TB-A-8: weterani C3 - amunicja", "brak licznika w linii tb (log sprzed recenzji tb)", "INFO", None)
         busy = [v for v in (num(r"rece: zajete [0-9.]+ z [0-9.]+ roboczodni \((\d+)%\)", s) for s in fl.values()) if v is not None]
         rep.add("TB-A-6: rece strzelarzy zajete (Strzelarze 172), srednia okna", f"{mean(busy):.1f}% ({len(busy)} dob); fin27 {TB_REF['fin27']['busy']}%, W53 {TB_REF['W53']['busy']}%",
                 "INFO (oczekiwane: wiecej niz fin27 - strzelarze robia na zamowienia armii)", None)
@@ -20992,7 +21006,8 @@ def tb_main(logp, start_arg, until=120):
                 kinds[kname] = (sum(num(kname + r" (\d+)/\d+ zl", tl[d], default=0) for d in on), sum(num(kname + r" \d+/(\d+) zl", tl[d], default=0) for d in on))
             cut = sum(num(r"uciete do dnia kosztu (\d+) razy", tl[d], default=0) for d in on)
             short = sum(num(r"nie stac na cale (\d+) razy", tl[d], default=0) for d in on)
-            ex = [sum(num(p, tl[d], default=0) for d in on) for p in (r"rody krolestwa pana (\d+)", r"karawany i wozy rodu pana (\d+)", r"bandy i umarli (\d+) \|")]
+            ex = [sum(num(p, tl[d], default=0) for d in on) for p in (r"rody krolestwa pana (\d+)", r"karawany i wozy rodu pana (\d+)", r"bandy i umarli (\d+)[ ,]",
+                                                                  r"w wojnie z panem (\d+)")]
             lost = sum(num(r"w tym przejscia miedzy probkami (\d+)", tl[d], default=0) for d in on)
             frey = ""
             try:
@@ -21005,7 +21020,7 @@ def tb_main(logp, start_arg, until=120):
                 frey = ""
             rep.add("TB-B3-3: kto placi (partii / zl w oknie), ucinanie do dnia kosztu, puste kiesy, zwolnieni",
                     ("; ".join(f"{k} {v[0]}/{v[1]} zl" for k, v in kinds.items()) + f" | uciete {cut}, nie stac {short}, przejscia miedzy probkami {lost}"
-                     + f" | zwolnieni: krolestwo pana {ex[0]}, karawany i wozy pana {ex[1]}, bandy i umarli {ex[2]}" + frey),
+                     + f" | zwolnieni: krolestwo pana {ex[0]}, karawany i wozy pana {ex[1]}, bandy i umarli {ex[2]}, w wojnie z panem {ex[3]} (recenzja tb)" + frey),
                     "INFO (projekt: karawany ok. 60-80 zl za przejscie, wozy wsi ok. 1 zl od czlowieka, obce rody rzadko)", None)
         else:
             rep.add("TB-B3-1: kontrola obiegu myta", "klucz w cieniu albo brak linii", "INFO", None)

@@ -137,6 +137,7 @@ namespace Armoury
                     Put(p, kv.Key, "", k - wn);
                     if (c - k > 0) arm[kv.Key] = c - k; else arm.Remove(kv.Key);
                     pcs += k;
+                    AmmoOrders.NoteVet(party.IsLordParty ? AmmoOrders.VetLord : AmmoOrders.VetOther, kv.Key, k);   // recenzja tb: amunicja weteranow (tylko licznik)
                 }
                 if (p.Count == 0) _pool.Remove(town.StringId);
                 _dIn += pcs;
@@ -184,6 +185,7 @@ namespace Armoury
                     var el = QuartermasterLaw.ElOf(pc);
                     armory.AddToCounts(el, -k);
                     Put(p, kv.Key, el.ItemModifier != null ? el.ItemModifier.StringId : "", k);
+                    AmmoOrders.NoteVet(AmmoOrders.VetOther, kv.Key, k);   // recenzja tb: amunicja weteranow (tylko licznik linii "Amunicja AI - zamowienia (tb)")
                     left -= k; pcs += k;
                 }
             }
@@ -206,6 +208,7 @@ namespace Armoury
                 var taken = GarrisonArmory.KitFor(avail, troop, 1, null);
                 var got = new List<EquipmentElement>();
                 foreach (var kv in taken) if (kv.Key != null && kv.Value > 0) got.AddRange(Pull(p, kv.Key, kv.Value));
+                foreach (var e in got) AmmoOrders.NoteVet(AmmoOrders.VetHire, e.Item, 1);   // recenzja tb: amunicja z puli do najemnika (tylko licznik)
                 if (p.Count == 0) _pool.Remove(town.StringId);
                 if (got.Count == 0) { _dHireNoKit++; return; }
                 var types = new HashSet<ItemObject.ItemTypeEnum>();
@@ -269,6 +272,7 @@ namespace Armoury
                             if (ex <= 0) continue;
                             int k = Math.Min(ex, Count(kv.Value[it]));
                             foreach (var e in Pull(kv.Value, it, k)) m.ItemRoster.AddToCounts(e, 1);
+                            AmmoOrders.NoteVet(AmmoOrders.VetHome, it, k);   // recenzja tb: amunicja z puli na polke (tylko licznik)
                             have[g] -= k; _dHome += k; moved = true;
                         }
                         if (moved) _dTowns++;
