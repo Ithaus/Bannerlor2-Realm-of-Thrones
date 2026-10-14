@@ -427,7 +427,8 @@ Uzycie (Python 3, tylko odczyt):
 --grupa glb       : (GL-B, projekt docs/gospodarka-od-ludzi rozdz. 8 progi P4 i P5, rozdz. 9 ryzyko 11 lekarstwo c) pobor i milicja od ludzi (LevyByPeople,
                     MilitiaByPeople), stawki towarow - sol x2 i wsie lniane (GoodsRatesByPattern), lud zarabia od skupu plonu wsi (FolkEarnFromVillageBuys).
                     python -I tools/sprawdz_logi.py --grupa glb [--do-doby 120] [--baza-doby <log biegu bazowego z kluczami GL-B wylaczonymi>] <Armoury-*.log>
-                    Wiersze GLB-P4-*, GLB-P5-*, GLB-11c-* (ludzie-regiony.csv i kasy-miast.csv z katalogu sesji). Log bez paczki: INFO, bez wyjatku.
+                    Wiersze GLB-P4-0..6, GLB-P5-0..5, GLB-11c-0..3 (ludzie-regiony.csv i kasy-miast.csv z katalogu sesji). Progi wobec bazy (P4-3, P4-4, P5-5,
+                    11c-2) bez --baza-doby: INFO (wyjatek - regula wlaczona w kampanii w toku: 7 dob przed wlaczeniem). Log bez paczki: INFO, bez wyjatku.
 --grupa w6        : (W6, decyzja Jeffa 13.10, kierunek 2 "tarczowe") rod z wolnym pulapem zoldu i kiesa ponad rezerwe wojenna placi koronie czesc
                     zaoszczedzonego zoldu; korona tej samej doby dopelnia nim garnek doplaty wedlug potrzeby W5.
                     python -I tools/sprawdz_logi.py --grupa w6 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
@@ -16991,9 +16992,10 @@ def gl1_main(logp, start_arg, until=120, bdp=None):
                 if bstart is not None:
                     break
         base = _gl1_towary(bl, bstart if bstart is not None else start, 2, 29)
-        # GL-5 (P5): sol x2 i 16 wsi lnianych (z rybakow, kopalni srebra i drwali) zmieniaja SUME tych towarow celowo - poza progiem GL1-7 (progi P5: --grupa glb)
+        # GL-5 (P5): sol x2 i 16 wsi lnianych (z wsi bawelny, kopalni srebra - BK: takze marmur i ruda zlota - i rybakow) zmieniaja SUME tych towarow celowo -
+        # poza progiem GL1-7 (progi P5: --grupa glb)
         p5 = any(x.startswith("Stawki towarow (GL5): dzien") and "Goods Rates By Pattern tak" in x for x in lines)
-        p5g = ("flax", "salt", "fish", "silver", "hardwood") if p5 else ()
+        p5g = ("flax", "salt", "fish", "silver", "marble", "gold_ore", "cotton") if p5 else ()
         cmp_ = {k: now[k] / base[k] for k in base if k in now and base[k] >= 5 and k not in p5g}
         bad = sorted(k for k, x in cmp_.items() if x < 0.95 or x > 1.05)
         rep.add("GL1-7: produkcja faktyczna wsi (linie Towary, wsie + las wsi) w dobach 2-29 wobec biegu bazowego",
@@ -17397,7 +17399,20 @@ def glb_p4(rep, lines, start, until, logp, base):
                 mw += [float(a), float(b)]
         dev = max([abs(x - 1.0) for x in mw]) if mw else None
         rep.add("GLB-P4-1b: norma - srednia wazona czynnika w kazdym rodzaju osad", f"najwieksze odchylenie od 1: {dev:.4f}" if dev is not None else "brak",
-                "<= 0.01 (granice 0.1-3 licza sie w sredniej; suma swiata ochotnikow i przyrostu milicji jak bez reguly)", None if dev is None else dev <= 0.01)
+                "<= 0.01 (granice 0.1-3 licza sie w sredniej - kontrola rachunku normy, nie sumy swiata: suma ochotnikow - GLB-P4-6)", None if dev is None else dev <= 0.01)
+        # ---- GLB-P4-6 (recenzja GL-B): norma wazy liczba notabli, nie szansa, i tnie p x c do 1 - suma swiata szans pustych miejsc z czynnikiem / bez czynnika
+        w1 = w0 = 0.0
+        nd = 0
+        for d in on:
+            if not (last30[0] <= run_day(d, start) <= last30[1]):
+                continue
+            m = re.search(r"ochotnicy oczekiwani ([\d.]+)/d \(bez czynnika ([\d.]+)/d", gl[d])
+            if m:
+                w1 += float(m.group(1)); w0 += float(m.group(2)); nd += 1
+        lv = "Levy By People tak" in gl[max(on)]
+        rep.add("GLB-P4-6: suma swiata ochotnikow (szanse pustych miejsc) z czynnikiem / bez czynnika",
+                (f"d{last30[0]}-{last30[1]} ({nd} dob): {w1 / max(1, nd):.1f} / {w0 / max(1, nd):.1f} na dobe = x{w1 / w0:.3f}" if w0 > 0 else "brak liczb w oknie (linia GL4 sprzed pomiaru albo pobor wylaczony)"),
+                "0.9-1.1 (podaz ochotnikow swiata jak bez reguly; zmienia sie podzial)", (0.9 <= w1 / w0 <= 1.1) if (w0 > 0 and lv) else None)
     # ---- rekruci na 1000 ludzi (ludzie-regiony.csv)
     kr = _glb_regions(logp, start, *last30)
     big = [(k, v[1] / v[0] * 1000.0) for k, v in kr.items() if v[0] > 400000 and v[1] > 0]
@@ -17428,23 +17443,25 @@ def glb_p4(rep, lines, start, until, logp, base):
     bmil = bref = None
     if base:
         bmil, bref, _bn = _glb_p4_series(base[2], base[1], *last30)
+    # baza zastepcza (bez --baza-doby) tylko, gdy regule wlaczono w kampanii w toku (doba > 30): 7 dob przed wlaczeniem. W nowej kampanii doba 1 nie jest
+    # baza (recenzja GL-B: odmowy przed siewem 0-18/d wobec 314/d w d91-120, milicja doby 1 x1.056 do d91-120 bez paczki) - wtedy INFO "podaj --baza-doby"
     first = min(on) if on else None
-    if bref is None and first is not None:
-        bl = [num(r"odmowione przez ksiege \(a >= f\) (\d+) losowan", s, int, 0) for d, s in sorted(by_day(lines, "Pobor: dzien").items()) if d <= first]
-        bref = bl[-1] if bl else None
+    late = first is not None and run_day(first, start) > 30
+    btxt = "bieg bazowy" if base else ""
+    if base is None and late:
+        pre = (run_day(first, start) - 7, run_day(first, start) - 1)
+        bmil, bref, _pn = _glb_p4_series(lines, start, *pre)
+        btxt = f"7 dob przed wlaczeniem reguly (d{pre[0]}-{pre[1]})"
+    nob = "bez bazy - podaj --baza-doby <bieg z kluczami GL-B wylaczonymi> (nowa kampania: doba wlaczenia to nie baza)"
     val = f"odmowy hamulca wolnych rak d{last30[0]}-{last30[1]} srednio {ref:.1f}/d" if ref is not None else "brak linii Pobor"
-    val += f"; baza {bref:.1f}/d" if bref is not None else ""
+    val += f"; {btxt} {bref:.1f}/d" if bref is not None else "; " + nob
     ok = None if (not on or ref is None or bref is None) else ref <= max(bref * 1.2, bref + 5)
-    rep.add("GLB-P4-3: odmowy hamulca wolnych rak", val, "<= baza x 1.2 (+5 dla malych liczb; baza = bieg bazowy --baza-doby albo doba wlaczenia reguly)", ok)
-    btxt = "bieg bazowy"
-    if bmil is None and first is not None:
-        fm = [num(r"\| milicja (\d+)", s) for d, s in by_day(lines, "Zalogi: przyrost bez werbunku (169c): dzien").items() if d == first]
-        bmil = fm[0] if fm and fm[0] else None
-        btxt = f"doba wlaczenia reguly (d{run_day(first, start)})"
+    rep.add("GLB-P4-3: odmowy hamulca wolnych rak", val, "<= baza x 1.2 (+5 dla malych liczb; baza = --baza-doby albo 7 dob przed wlaczeniem w kampanii w toku; inaczej INFO)", ok)
     val = f"milicja swiata d{last30[0]}-{last30[1]} srednio {mil:.0f}" if mil is not None else "brak linii Zalogi (169c)"
-    val += f"; {btxt} {bmil:.0f} (x{mil / bmil:.3f})" if (bmil and mil is not None) else ""
+    val += f"; {btxt} {bmil:.0f} (x{mil / bmil:.3f})" if (bmil and mil is not None) else "; " + nob
     ok = None if (not on or mil is None or not bmil) else 0.9 <= mil / bmil <= 1.1
-    rep.add("GLB-P4-4: milicja swiata wobec bazy", val, "0.9-1.1 (rachunek: x0.99 przy limicie BK x czynnik)", ok)
+    rep.add("GLB-P4-4: milicja swiata wobec bazy", val,
+            "0.9-1.1 (rachunek: x0.99 w rownowadze przy limicie BK x czynnik; przejscie - puste osady oddaja milicje ponad limit w 1-3 tyg., ludne rosna 40-80 dob: pierwsze 1-2 miesiace ok. 0.75-0.9)", ok)
     if on:
         wk = by_day(lines, "Pobor i milicja od ludzi wedlug krolestw (GL4): dzien")
         ds = [d for d in sorted(wk) if run_day(d, start) <= until]
@@ -17478,6 +17495,39 @@ def _glb_towary(lines, start, d0, d1):
     return {k: (v[0] / max(1, len(v[3])), v[1] / max(1, len(v[3])), v[2] / max(1, len(v[3]))) for k, v in acc.items()}
 
 
+def _glb_flax_norm(lines, start, d0, d1):
+    """Len wsi swiata na x1.0 regulatora: na dobe produkcja (linia Towary flax, 'wsie N') / mnoznik regulatora lnu tej doby (decyzje 'Regulator wsi (221)';
+    przed pierwsza decyzja - jej wartosc 'przed', bez decyzji - 1.0) -> (srednia na x1.0, sredni mnoznik) albo (None, None)."""
+    dec = []
+    for d, s in sorted(by_day(lines, "Regulator wsi (221): dzien").items()):
+        if " - CZYNNY, decyzja " not in s:
+            continue
+        g = re.search(r"\bflax: x([\d.]+)(?: -> x([\d.]+))?,", s)
+        if g:
+            dec.append((run_day(d, start), float(g.group(1)), float(g.group(2) or g.group(1))))
+    rx = re.compile(r"^Towary: dzien (\d+) - flax \(")
+    xs, vs = [], []
+    for s in lines:
+        if not s.startswith("Towary: dzien "):
+            continue
+        m = rx.match(s)
+        if not m:
+            continue
+        rd = run_day(int(m.group(1)) + 1, start)
+        if not (d0 <= rd <= d1):
+            continue
+        p = num(r"\| produkcja -?\d+ \[(?:[^\]]*?; )?wsie (\d+)", s)
+        if p is None:
+            continue
+        v = dec[0][1] if dec else 1.0
+        for dd, a, b in dec:
+            if dd <= rd:
+                v = b
+        if v > 0:
+            xs.append(p / v); vs.append(v)
+    return (_glb_mean(xs), _glb_mean(vs)) if xs else (None, None)
+
+
 def glb_p5(rep, lines, start, until, logp, base):
     """P5 (projekt rozdz. 8 progi P5, 4A): sol x2 i nowe wsie lniane - klucz GoodsRatesByPattern (Armoury/src/GoodsRates.cs)."""
     st = [s for s in lines if s.startswith("Stawki towarow (GL5): start sesji")]
@@ -17494,12 +17544,20 @@ def glb_p5(rep, lines, start, until, logp, base):
         val = f"linii doby {len(dl)}, z kluczem {len(on)}; start sesji: " + (f"wsie lniane z tabeli {swaps[0]} z {swaps[1]}" if swaps else "brak linii startu") + ("; kampania z kluczem od startu" if fresh else "; stary zapis albo kampania bez klucza - tylko sol")
         bad = [d for d in on if num(r"potkniecia (\d+)\.", dl[d]) not in (0, None)] + [1 for s in st if num(r"potkniecia (\d+)\.", s) not in (0, None)]
         rep.add("GLB-P5-0: stawki towarow (GL5) - sol x2 i wsie lniane", val + f"; dob / startow z potknieciem {len(bad)}",
-                "nowa kampania z kluczem: 16 z 16 wsi lnianych, potkniecia 0 (stary zapis - INFO, tylko sol)", (not bad and swaps is not None and swaps[0] == swaps[1]) if fresh else (False if bad else None))
+                "nowa kampania z kluczem: 16 z 16 wsi lnianych (6 wsi bawelny z tabeli to wsie T8 - przy wylaczonym VillageClimateFix mniej), potkniecia 0 (stary zapis - INFO, tylko sol)", (not bad and swaps is not None and swaps[0] == swaps[1]) if fresh else (False if bad else None))
     last30 = (max(2, until - 29), until)
     tw = _glb_towary(lines, start, 30, until)
     fl = tw.get("flax", (None,))[0]
-    rep.add("GLB-P5-1: len swiata (produkcja wsi) d30-" + str(until), (f"{fl:.0f} szt./d" if fl is not None else "brak linii Towary flax") + " (bieg 43 bez paczki d93-120: 522)",
-            ">= 750 szt./d (wzorzec 870: plotno cywilne + wojsko + warsztaty zbrojne)", None if (not on or fl is None or not fresh) else fl >= 750)
+    fn, fv = _glb_flax_norm(lines, start, 30, until)
+    bfn = None
+    if base:
+        bfn, _bfv = _glb_flax_norm(base[2], base[1], 30, until)
+    goal = 1.7 * bfn if bfn else 680.0
+    rep.add("GLB-P5-1: len swiata (produkcja wsi) d30-" + str(until) + " na x1.0 regulatora lnu",
+            (f"{fl:.0f} szt./d przy srednim mnozniku regulatora x{fv:.2f} = {fn:.0f} szt./d na x1.0" if (fl is not None and fn is not None) else "brak linii Towary flax")
+            + (f"; bieg bazowy {bfn:.0f} na x1.0 (x{fn / bfn:.2f})" if (bfn and fn) else "") + " (bieg 43 bez paczki: 399 na x1.0 - d30-84 398 przy x1.0, d85-120 519 przy x1.3)",
+            f">= {goal:.0f} szt./d na x1.0 (1.7 x {'bieg bazowy' if bfn else 'bieg 43'}; rachunek x1.78: ok. 710 na x1.0, 925 na suficie x1.3, wzorzec 870; surowe 750 projektu wymaga regulatora >= x1.06, a ten rosnie tylko przy braku lnu - stad prog na x1.0)",
+            None if (not on or fn is None or not fresh) else fn >= goal)
     ceny = {d: s for d, s in by_day(lines, "Ceny surowcow: dzien").items() if last30[0] <= run_day(d, start) <= last30[1]}
     nl = _glb_mean([num(r"plotno \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast", s) for s in ceny.values()])
     rep.add(f"GLB-P5-2: miast bez plotna d{last30[0]}-{last30[1]}", (f"srednio {nl:.1f}" if nl is not None else "brak linii Ceny surowcow") + " (bieg 43 bez paczki: 84-89)",
@@ -17530,7 +17588,7 @@ def glb_p5(rep, lines, start, until, logp, base):
         f1 = sum(nt[k][0] for k in GLB_FOOD if k in nt)
         r = f1 / f0 if f0 > 0 else None
         rep.add("GLB-P5-5: zywnosc wsi swiata d2-29 wobec biegu bazowego", (f"{f1:.0f} / {f0:.0f} szt./d = x{r:.3f}" if r is not None else "brak linii Towary") + " (zboze, ryby, sery, maslo, oliwki, daktyle, jaja, miod pitny)",
-                ">= 0.97 (rachunek: -2.6% - ryby 10 wsi rybakow)", None if (not on or r is None or not fresh) else r >= 0.97)
+                ">= 0.97 (rachunek: -1.5% - ryby 5 z 66 wsi rybakow; zaden targ bez wsi z jedzeniem)", None if (not on or r is None or not fresh) else r >= 0.97)
     else:
         nt = _glb_towary(lines, start, 2, 29)
         f1 = sum(nt[k][0] for k in GLB_FOOD if k in nt)
@@ -17585,8 +17643,18 @@ def glb_11c(rep, lines, start, until, logp, base):
     if on and v is not None:
         if v >= 60 or (bv and v >= 1.5 * bv):
             ok = True
+    mins = []
+    for d in on:
+        if not (last30[0] <= run_day(d, start) <= last30[1]):
+            continue
+        m = re.search(r"miasta m_t > 1\.5: (\d+), dni oszczednosci min (\d+) \(([^)]*)\), ponizej 60: (\d+)", kl[d])
+        if m:
+            mins.append((int(m.group(2)), m.group(3), int(m.group(4)), int(m.group(1))))
+    if mins:
+        lo = min(mins, key=lambda x: x[0])
+        val += f"; miasto najnizej: srednio {_glb_mean([x[0] for x in mins]):.0f} dni, najmniej {lo[0]} ({lo[1]}); ponizej 60 dni srednio {_glb_mean([x[2] for x in mins]):.1f} z {mins[-1][3]} miast"
     rep.add("GLB-11c-1: lud ludnych miast (m_t > 1.5) - dni oszczednosci", val,
-            ">= 60 albo >= 1.5 x bieg bez 11c (TAK); ponizej - INFO z celem (rachunek: 8 miast z recenzji GL x1.12-1.37, 4 z 8 >= 60: Braavos 69, Qarkash 77, Heart's Home 71, Hornvale 61; Ashford 25, Qarth 28, Valysar 45, Oldtown 47)",
+            ">= 60 albo >= 1.5 x bieg bez 11c (TAK); ponizej - INFO z celem (rachunek [S]: 8 miast z recenzji GL x1.04-1.37, 4 z 8 >= 60 - Braavos 66-69, Qarkash 71-77, Heart's Home 71-77, Hornvale 61-62; ponizej Ashford 25-26, Qarth 26-28, Valysar 43-45, Oldtown 47-50)",
             ok)
     # ---- kasy miast < 1 000 zl
     pt = _glb_poor_towns(logp, start, *last30)

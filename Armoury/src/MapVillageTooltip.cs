@@ -237,7 +237,9 @@ namespace Armoury
             var more = new List<string>(4);
             if (row != null)
             {
-                if (row.Livelihood.Length > 0) more.Add(row.Livelihood);
+                // GL-5 (P5): wies podmieniona na len w tej sesji - zdanie zajecia starego typu (plik lore z typow mapy) -> len (GoodsRates.Livelihood; inne bez zmian)
+                string live = row.Livelihood.Length > 0 ? GoodsRates.Livelihood(district, uid, row.Livelihood) : row.Livelihood;
+                if (!string.IsNullOrEmpty(live)) more.Add(live);
                 if (faith != null && row.Faith.Length > 0 && row.FaithMatches(bkId)) more.Add(row.Faith);
                 if (row.History.Length > 0) more.Add(row.History);
             }

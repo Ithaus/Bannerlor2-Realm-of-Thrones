@@ -12,8 +12,10 @@ namespace Armoury
     /// GL-B / 11c (projekt docs/gospodarka-od-ludzi/PROJEKT-GOSPODARKA-OD-LUDZI-2026-10-13.md rozdz. 9 ryzyko 11 lekarstwo (c)) - LUD ZARABIA OD SKUPU PLONU WSI.
     /// Robocizna handlu (TownLive krok 2: 20% jedzenia / 10% towaru / 4% broni) liczyla sie tylko od SPRZEDAZY kasy kupcow; kiedy kasa KUPUJE plon od wozu wsi,
     /// nikt w miescie nie pracowal. Teraz od zaplaty kasy wozowi wsi (SellGoodsForTradeAction - tabor wsi sprzedaje w miescie; po zwrocie nadplaty MarketCarts,
-    /// czyli zaplata netto) TownFolkLabourVillageBuys (10%) idzie jutro z kasy do kiesy ludu tego miasta jako robocizna (wyladunek, miara, przechowanie,
-    /// przemial) - ta sama droga co robocizna handlu (FromCoffer, ELabour; kasa placi najwyzej tyle, ile ma - wspolne przyciecie k calej robocizny i obrotu).
+    /// czyli zaplata netto) TownFolkLabourVillageBuys (10%) idzie jutro z kasy do kiesy ludu tego miasta jako robocizna (wyladunek, miara, skladowanie - BEZ
+    /// przemialu i wypieku: te placi robocizna jedzenia 20% od sprzedazy) - ta sama droga co robocizna handlu (FromCoffer, ELabour; kasa placi najwyzej tyle,
+    /// ile ma - wspolne przyciecie k calej robocizny i obrotu). Stawka 10% = CaravanLab (TownFolk.cs: robocizna od towaru z wozu karawany) - ten sam
+    /// wyladunek i skladowanie towaru z wozu, tylko woz jest wiejski (recenzja GL-B: uzasadnienie "przemial" dublowalo robocizne jedzenia; liczby bez zmian).
     /// Zarobek ludu rosnie wiec z plonem okregu (P1 - plon idzie za ludzmi). Klucz FolkEarnFromVillageBuys; tylko miasta (zamek kupuje z kasy zamku - bez zmian).
     /// Obieg: zloto kasa miasta -> kiesa ludu (jak robocizna), nic nie powstaje; kontrola kies i ksiega obiegu bez zmian (ten sam przelew). Klucz wylaczony:
     /// latka nic nie zapisuje, okno 0 - robocizna bit w bit jak 97dd474.
@@ -68,14 +70,36 @@ namespace Armoury
             catch (Exception e) { Log.Error("TownFolk.ApplySkup", e); }
         }
 
-        /// <summary>Linia "Kiesa ludu": dopisek 11c do "robocizna" (pusty przy kluczu wylaczonym).</summary>
+        private const double SkupBig = 1.5, SkupDaysGoal = 60;      // prog projektu rozdz. 8 [R] (jak PeopleMarket.BigMarket) i cel 11c: 60 dni oszczednosci
+
+        /// <summary>Linia "Kiesa ludu": dopisek 11c do "robocizna" (pusty przy kluczu wylaczonym) + miasta m_t > 1.5: najmniej dni oszczednosci (kiesy W/R/P / potrzeba
+        /// dzienna, jak tabela tygodnia GL2) i ile ponizej 60 (recenzja GL-B: srednia grupy chowa Ashford i Qarth). m_t z pamieci doby PeopleScale.</summary>
         private static string SkupText(long labS, long skup)
         {
             var s = Settings.Current;
             if (s == null || !s.FolkEarnFromVillageBuys) return "";
             long n = Interlocked.Exchange(ref _skupN, 0), st = Interlocked.Exchange(ref _skupStumbles, 0);
+            int big = 0, low = 0; double min = double.NaN; string minName = "-";
+            try
+            {
+                foreach (var f in _f.Values)
+                {
+                    if (f == null || f.Kind != 0 || !f.Cal || f.St == null || f.St.Town == null) continue;
+                    float m;
+                    if (!PeopleScale.TryMarket(f.St.Town, out m) || !(m > SkupBig)) continue;
+                    double need = f.Need[0] + f.Need[1] + f.Need[2];
+                    if (!(need > 0)) continue;
+                    double days = (f.KW + f.KR + f.KP) / need;
+                    big++;
+                    if (days < SkupDaysGoal) low++;
+                    if (double.IsNaN(min) || days < min) { min = days; minName = f.St.Name != null ? f.St.Name.ToString() : f.St.StringId; }
+                }
+            }
+            catch (Exception e) { st++; Stumble("SkupText", e); }
+            // potkniecia PRZED nawiasem z nazwa miasta (sprawdz_logi GLB-11c-0 czyta "(11c) ... potkniecia N" bez nawiasow po drodze)
             return " (w tym od skupu plonu wsi (11c) " + labS + " = " + Unit(s.TownFolkLabourVillageBuys).ToString("0.00", Inv) + " x skup kas od taborow wsi " + skup + ", sprzedazy " + n
-                   + (st > 0 ? ", potkniecia " + st : "") + ")";
+                   + (st > 0 ? ", potkniecia " + st : "")
+                   + "; miasta m_t > 1.5: " + big + ", dni oszczednosci min " + (double.IsNaN(min) ? "-" : min.ToString("0", Inv)) + " (" + minName + "), ponizej 60: " + low + ")";
         }
     }
 }

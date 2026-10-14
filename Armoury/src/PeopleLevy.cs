@@ -16,7 +16,8 @@ namespace Armoury
     ///
     /// Czynnik osady c = min(3, max(0.1, s x a / N)): s = skala ludzi z pamieci doby GL-0 (wies u_v - PeopleScale.TryVillage, miasto m_t - TryMarket,
     /// zamek skala podzamcza - TryCastleWard), a = udzial zbrojnych ludu krainy = prog wolnych rak krainy / FreeHandsShare (FreeHands.ArmedShare: zwykla
-    /// kraina 1, Zelazne Wyspy 2 przy progu 40%, Wolni Ludzie 5 - tnie gorna granica 3, Dothrakowie 3 przy progu 60% - DECYZJA pyt. 2),
+    /// kraina 1, Zelazne Wyspy 2 przy progu 40%, Wolni Ludzie 5 - tnie gorna granica 3; Dothrakowie 3 - DECYZJA pyt. 2, poprawka po recenzji: SAM udzial
+    /// zbrojnych w poborze i milicji, prog wolnych rak Dothrakow zostaje 20% - chec do sluzby, hamulec i plon jak w zwyklej krainie, "bez wyjatku w produkcji"),
     /// N = norma rodzaju osady (wsie / miasta / zamki osobno), dobrana co dobe tak, ze srednia wazona czynnika = 1.000 (bisekcja; granice 0.1-3 licza sie
     /// w sredniej). Wagi: pobor - liczba notabli osady (losowania pustych miejsc idzie od notabli); milicja - przyrost modelu gry z :104-120 (2 + dobrobyt /
     /// 1000 w warowni, 0.5 + hearth / 400 we wsi). Suma swiata ochotnikow i milicji zostaje wiec przy dzisiejszej (projekt: prog 0.9-1.1), zmienia sie podzial.
@@ -33,6 +34,12 @@ namespace Armoury
     /// Obieg: zloto nie rusza; ludzie ida z DOM do milicji i do ochotnikow ta sama droga co dzis (ArmsFromPeople, PeopleBook.TakeLevy) - wiecej w ludnych,
     /// mniej w pustych krainach. Odczyt z postfiksow (watek glowny i ewentualne watki AI): jedna referencja pamieci doby, slownik niezmienny po publikacji.
     /// Klucze wylaczone: postfiksy nic nie dopisuja (stan 97dd474); linia doby raz na sesje "WYLACZONE".
+    /// LATKI MODELU MILICJI (gry i BK) - W KAMPANII, raz na proces (EnsureHooks z ArmouryBehavior.OnSessionLaunched; CLAUDE.md 7, recenzja GL-B KRYTYCZNE):
+    /// DefaultSettlementMilitiaModel ma pole statyczne CultureText = GameTexts.FindText (czyta GameTextManager - w menu null); latka w SubModuleMain
+    /// kompilowalaby metode z polami statycznymi klasy, konstruktor statyczny rzucilby wyjatek i model milicji gry oraz BKMilitiaModel (podklasa) zginelyby
+    /// na caly proces - pulapka GarrisonRecruitFee 12.10. SubModuleMain tylko oddaje Harmony (ApplyAll).
+    /// Pomiar sumy swiata (recenzja GL-B): w linii doby suma szans pustych miejsc z czynnikiem i bez niego (ochotnicy oczekiwani) - norma wazy liczba notabli,
+    /// nie szansa, i tnie p x c do 1, wiec stosunek sum mierzymy (prog GLB-P4-6 0.9-1.1).
     /// </summary>
     internal static class PeopleLevy
     {
@@ -43,8 +50,6 @@ namespace Armoury
 
         internal static bool LevyOn { get { var s = Settings.Current; return s != null && s.LevyByPeople; } }
         internal static bool MilitiaOn { get { var s = Settings.Current; return s != null && s.MilitiaByPeople; } }
-        /// <summary>FreeHands.FOf: Dothrakowie lud zbrojny (prog wolnych rak 60%, udzial zbrojnych 3) - przy ktoryms z kluczy P4 (DECYZJA pyt. 2).</summary>
-        internal static bool DothrakiArmed { get { var s = Settings.Current; return s != null && (s.LevyByPeople || s.MilitiaByPeople); } }
 
         private sealed class Cell { public float L = 1f, M = 1f; public char Kind; public string Kingdom; }
         private sealed class Memory { public int Day; public Dictionary<Settlement, Cell> Map; }
@@ -52,16 +57,19 @@ namespace Armoury
 
         // ------------------------------------------------------------ liczniki (postfiksy: watek glowny gry; Interlocked na wszelki wypadek)
         private static int _lvN, _lvCut, _milN, _limN, _readStumbles, _stumbles;
-        private static double _lvSum, _milAdd, _milSub;
+        private static double _lvSum, _milAdd, _milSub, _lvP0, _lvP1;   // _lvP0 / _lvP1: suma szans pustych miejsc bez czynnika / z czynnikiem (pod _kLock)
         private static readonly object _kLock = new object();
         private static readonly Dictionary<string, double> _expect = new Dictionary<string, double>(StringComparer.Ordinal);   // krolestwo -> suma szans pustych miejsc (oczekiwani ochotnicy)
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _offLogged, _weekDone;
         private static string _wired = "nie wpiete", _report = "";
+        private static Harmony _h;                                   // z SubModuleMain (ApplyAll) - latki modelu milicji zaklada EnsureHooks w kampanii
+        private static bool _hooksTried;                             // raz na proces
 
         internal static void Reset()
         {
-            _mem = null; _lvN = _lvCut = _milN = _limN = _readStumbles = _stumbles = 0; _lvSum = _milAdd = _milSub = 0.0;
+            _mem = null; _lvN = _lvCut = _milN = _limN = _readStumbles = _stumbles = 0;
+            lock (_kLock) { _lvSum = _milAdd = _milSub = _lvP0 = _lvP1 = 0.0; }
             lock (_kLock) _expect.Clear();
             _err.Clear(); _offLogged = false; _weekDone = false; _report = "";
         }
@@ -96,7 +104,7 @@ namespace Armoury
             try
             {
                 Cell c;
-                float f = 1f;
+                float f = 1f, p0 = p;
                 if (TryCell(s, out c)) f = c.L;
                 if (f != 1f)
                 {
@@ -109,6 +117,7 @@ namespace Armoury
                 lock (_kLock)
                 {
                     _lvSum += f;
+                    if (p0 >= 0f && p >= 0f) { _lvP0 += p0; _lvP1 += p; }   // suma swiata przed i po czynniku (GLB-P4-6)
                     string k = c != null ? c.Kingdom : KingdomOf(s);
                     double e; _expect.TryGetValue(k, out e); _expect[k] = e + p;
                 }
@@ -305,15 +314,16 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Flush(osada)", e); }
                 }
-                double milAdd, milSub, lvSum; Dictionary<string, double> exp;
-                lock (_kLock) { milAdd = _milAdd; milSub = _milSub; lvSum = _lvSum; exp = new Dictionary<string, double>(_expect, StringComparer.Ordinal); _expect.Clear(); _milAdd = _milSub = _lvSum = 0; }
+                double milAdd, milSub, lvSum, p0, p1; Dictionary<string, double> exp;
+                lock (_kLock) { milAdd = _milAdd; milSub = _milSub; lvSum = _lvSum; p0 = _lvP0; p1 = _lvP1; exp = new Dictionary<string, double>(_expect, StringComparer.Ordinal); _expect.Clear(); _milAdd = _milSub = _lvSum = _lvP0 = _lvP1 = 0; }
                 int lvN = Interlocked.Exchange(ref _lvN, 0), lvCut = Interlocked.Exchange(ref _lvCut, 0), milN = Interlocked.Exchange(ref _milN, 0), limN = Interlocked.Exchange(ref _limN, 0);
                 int rs = Interlocked.Exchange(ref _readStumbles, 0);
                 double expAll = 0; foreach (var v in exp.Values) expAll += v;
                 Log.Info("Pobor i milicja od ludzi (GL4): dzien " + day + " - Levy By People " + (LevyOn ? "tak" : "nie") + ", Militia By People " + (MilitiaOn ? "tak" : "nie")
                          + ", pamiec skal dnia " + PeopleScale.MemoryDay + " | " + (mem != null ? _report : "czekam na usluge skal ludzi (GL0) - czynniki 1")
                          + " | pobor: losowan pustych miejsc " + lvN + " (czynnik srednio x" + (lvN > 0 ? (lvSum / lvN).ToString("0.000", Inv) : "-") + ", szansa przycieta do 1: " + lvCut
-                         + "), ochotnicy oczekiwani " + expAll.ToString("0.0", Inv) + "/d"
+                         + "), ochotnicy oczekiwani " + expAll.ToString("0.0", Inv) + "/d (bez czynnika " + p0.ToString("0.0", Inv) + "/d, suma swiata x"
+                         + (p0 > 0 ? (p1 / p0).ToString("0.000", Inv) : "-") + ")"
                          + " | milicja swiata " + (milW + milT + milC).ToString("0", Inv) + " (wsie " + milW.ToString("0", Inv) + ", miasta " + milT.ToString("0", Inv) + ", zamki " + milC.ToString("0", Inv)
                          + "), przyrost modelu x czynnik: wywolan " + milN + ", dopisane +" + milAdd.ToString("0.0", Inv) + " / -" + milSub.ToString("0.0", Inv) + ", limit BK x czynnik: wywolan " + limN
                          + " | wpiete: " + _wired + " | potkniecia " + (_stumbles + rs) + ".");
@@ -342,10 +352,22 @@ namespace Armoury
             catch (Exception e) { Stumble("Flush", e); }
         }
 
-        // ============================================================ latki (raz na proces)
+        // ============================================================ latki (raz na proces, W KAMPANII)
 
+        /// <summary>SubModuleMain (menu): tylko zapamietuje Harmony - latek na modelu milicji gry NIE zakladamy przed Game.Initialize (CLAUDE.md 7).</summary>
         internal static void ApplyAll(Harmony h)
         {
+            _h = h;
+            _wired = "czeka na kampanie (EnsureHooks)";
+            Log.Info("Pobor i milicja od ludzi (GL4): latki modelu milicji (gry i BK) zakladane w kampanii - OnSessionLaunched, raz na proces; szansa ochotnika przez Levy.ProbabilityPostfix.");
+        }
+
+        /// <summary>ArmouryBehavior.OnSessionLaunched: latki przyrostu milicji gry i limitu milicji BK - raz na proces, gdy gra juz istnieje (GameTexts gotowe).</summary>
+        internal static void EnsureHooks()
+        {
+            if (_hooksTried || _h == null || Campaign.Current == null) return;
+            _hooksTried = true;
+            var h = _h;
             var got = new List<string>();
             try
             {
@@ -359,7 +381,7 @@ namespace Armoury
                     else got.Add("BRAK modelu milicji gry");
                 }
             }
-            catch (Exception e) { got.Add("BLAD modelu milicji gry"); Log.Error("PeopleLevy.ApplyAll(milicja)", e); }
+            catch (Exception e) { got.Add("BLAD modelu milicji gry"); Log.Error("PeopleLevy.EnsureHooks(milicja)", e); }
             try
             {
                 var bk = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKMilitiaModel");
@@ -367,10 +389,10 @@ namespace Armoury
                 if (ml != null) { h.Patch(ml, postfix: new HarmonyMethod(typeof(PeopleLevy), nameof(LimitPostfix))); got.Add("limit milicji BK (GetMilitiaLimit)"); }
                 else got.Add("limit milicji BK: brak (bez BannerKings)");
             }
-            catch (Exception e) { got.Add("BLAD limitu milicji BK"); Log.Error("PeopleLevy.ApplyAll(limit BK)", e); }
+            catch (Exception e) { got.Add("BLAD limitu milicji BK"); Log.Error("PeopleLevy.EnsureHooks(limit BK)", e); }
             got.Add("szansa ochotnika (Levy.ProbabilityPostfix)");
             _wired = string.Join(", ", got.ToArray());
-            Log.Info("Pobor i milicja od ludzi (GL4): latki - " + _wired + ".");
+            Log.Info("Pobor i milicja od ludzi (GL4): latki w kampanii (raz na proces) - " + _wired + ".");
         }
     }
 }

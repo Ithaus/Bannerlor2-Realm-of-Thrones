@@ -124,17 +124,19 @@ namespace Armoury
             if (realm == "freefolk") { brake = false; return 1.0; }
             if (realm == "nightswatch") { brake = false; yieldOnly = true; return share; }
             if (realm == "sturgia") return Math.Min(1.0, _ironF);
-            // GL-4 / P4 (decyzja Jeffa pyt. 2 "lup i milicja bez wyjatku" - ludy walczace z wiekszym udzialem zbrojnych; DECYZJA (pelne uprawnienia), projekt 3.3):
-            // Dothrakowie - lud zbrojny, prog wolnych rak 3 x zwykly (60%), czyli udzial zbrojnych 3 w poborze i milicji; tylko przy kluczu LevyByPeople albo
-            // MilitiaByPeople (oba wylaczone - 20%, stan 97dd474). Ten sam prog dla hamulca, plonu i checi - jedna zasada, jak Zelazne Wyspy (40%)
-            if (realm == "khuzait" && PeopleLevy.DothrakiArmed) return Math.Min(1.0, 3.0 * share);
             return share;
         }
 
-        /// <summary>GL-4 / P4: udzial zbrojnych ludu krainy = prog wolnych rak krainy (bez okna zniw) / FreeHandsShare - zwykla kraina 1, Zelazne Wyspy 2 (40%),
-        /// Wolni Ludzie 5 (bez hamulca), Dothrakowie 3 (przy kluczach P4). Nocna Straz - wolajacy pomija (WatchLaw). Watek glowny.</summary>
+        /// <summary>GL-4 / P4 (decyzja Jeffa pyt. 2 "lup i milicja bez wyjatku"; projekt 3.3 "Udzial zbrojnych ludu"): udzial zbrojnych ludu krainy = prog wolnych rak
+        /// krainy (bez okna zniw) / FreeHandsShare - zwykla kraina 1, Zelazne Wyspy 2 (40%), Wolni Ludzie 5 (bez hamulca). Dothrakowie - DECYZJA (pelne uprawnienia):
+        /// lud zbrojny, udzial 3 (jak prog 60%), ale TYLKO tu - w poborze i milicji P4; ich prog wolnych rak (FOf) zostaje 20%: chec do sluzby, hamulec i plon
+        /// jak w zwyklej krainie ("bez wyjatku w produkcji"; recenzja GL-B: prog 60% w FOf dawal chec x2.7-3 i plon poza regula, takze przy samym kluczu milicji).
+        /// Wolany tylko z PeopleLevy.Build (klucz P4 wlaczony). Nocna Straz - wolajacy pomija (WatchLaw). Watek glowny.</summary>
+        internal const double DothrakiArmedShare = 3.0;
+
         internal static double ArmedShare(string realm)
         {
+            if (realm == "khuzait") return DothrakiArmedShare;
             var s = S;
             double share = s != null ? Math.Max(0.0, Math.Min(1.0, s.FreeHandsShare)) : 0.2;
             if (!(share > 0.0)) return 1.0;

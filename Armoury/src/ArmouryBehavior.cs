@@ -1316,7 +1316,7 @@ namespace Armoury
             try { QuestPay8.SessionStart(this); } catch (Exception e) { Log.Error("QuestPay8.SessionStart", e); }   // E8/D1 (256): nagrody i wyplaty w zadaniach - nasluchy przyjecia zadan; skan metod zadan i latki raz na proces, W KAMPANII (CLAUDE.md 7)
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
-            try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
+            try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem, potem na stale) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
@@ -1330,6 +1330,7 @@ namespace Armoury
             try { Measure169c.EnsureHooks(); } catch (Exception e) { Log.Error("Measure169c.EnsureHooks", e); }
             try { CrownIncome.EnsureHooks(); } catch (Exception e) { Log.Error("CrownIncome.EnsureHooks", e); }
             try { GarrisonRecruitFee.EnsureHooks(); } catch (Exception e) { Log.Error("GarrisonRecruitFee.EnsureHooks", e); }   // E5 decyzja 9 - latka na DefaultClanFinanceModel dopiero w kampanii
+            try { PeopleLevy.EnsureHooks(); } catch (Exception e) { Log.Error("PeopleLevy.EnsureHooks", e); }   // GL-4 (P4): latki przyrostu milicji gry i limitu milicji BK - w kampanii, raz na proces (pole statyczne GameTexts w DefaultSettlementMilitiaModel)
             try { Leaks310.EnsureHooks(); } catch (Exception e) { Log.Error("Leaks310.EnsureHooks", e); }   // 3.10: zold zaciagu ROT od pana (latka modelu finansow ROT - w kampanii)
             try { ClanBudget.EnsureHooks(); } catch (Exception e) { Log.Error("ClanBudget.EnsureHooks", e); }
             try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)

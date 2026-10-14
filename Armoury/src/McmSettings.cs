@@ -5012,7 +5012,7 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownFolkLabourArms { get; set; } = 0.04f;
 
-        [SettingPropertyFloatingInteger("Town Folk Labour Village Buys", 0.00f, 0.50f, "0.00", HintText = "with Folk Earn From Village Buys: of what the merchants pay the village carts for their produce, this share is paid to the people who unload, measure, store and mill it")]
+        [SettingPropertyFloatingInteger("Town Folk Labour Village Buys", 0.00f, 0.50f, "0.00", HintText = "with Folk Earn From Village Buys: of what the merchants pay the village carts for their produce, this share is paid to the people who unload, measure and store it (as for goods off a caravan's wagons; milling and baking are paid from the food sales)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownFolkLabourVillageBuys { get; set; } = 0.1f;
 
@@ -5464,11 +5464,11 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool MilitiaByPeople { get; set; } = true;
 
-        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands that had no flax - fishers, silver miners and woodcutters of the Reach, Volantis, Qarth, King's Landing, Braavos, Pentos and the Stormlands - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The new flax villages come with a new campaign only; a campaign already under way keeps its villages (the salt rate applies at once). Off = salt and flax as before (villages keep the map's own trade from the next load)")]
+        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool GoodsRatesByPattern { get; set; } = true;
 
-        [SettingPropertyBool("Folk Earn From Village Buys", HintText = "The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring, storing and milling it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell")]
+        [SettingPropertyBool("Folk Earn From Village Buys", HintText = "The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool FolkEarnFromVillageBuys { get; set; } = true;
 

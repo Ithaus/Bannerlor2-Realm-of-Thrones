@@ -92,7 +92,7 @@ namespace Armoury
                 Clan lord = st.Village != null && st.Village.Bound != null ? st.Village.Bound.OwnerClan : null;   // pan jak dymek W2 (HeldLine)
                 Hero holder = MapVillageLore.BkHolder(st, lord);                                                  // jeden odczyt tytulu BK na okno (tytul jest na wies gry)
                 var list = new List<InquiryElement>(rows.Count);
-                foreach (var r in rows) list.Add(Element(r, lord, holder));
+                foreach (var r in rows) list.Add(Element(st, r, lord, holder));
                 if (list.Count == 0)
                 {
                     InformationManager.ShowInquiry(new InquiryData(title, head ?? "", true, false, leave, null, delegate { }, null), true);
@@ -109,7 +109,7 @@ namespace Armoury
         }
 
         /// <summary>Wiersz okna: krotki tytul (stan z ksiegi), herb rycerza, dymek (pelny wiersz menu z udzialem w plonie, rycerz, zajecie, pamiec wojny).</summary>
-        private static InquiryElement Element(VillageBook.DistRow r, Clan lord, Hero holder)
+        private static InquiryElement Element(Settlement st, VillageBook.DistRow r, Clan lord, Hero holder)
         {
             var it = new Item { R = r };
             Banner b = null;
@@ -122,7 +122,7 @@ namespace Armoury
                 else if (it.Lore != null && it.Lore.KnightBanner != null) { b = it.Lore.KnightBanner; _dLore++; }
                 else if (lord != null) { b = lord.Banner; if (b != null) _dLord++; }
                 if (it.Knight != null) hint.Add(it.Knight);
-                if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(it.Lore.Livelihood);
+                if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(GoodsRates.Livelihood(st, r.Uid, it.Lore.Livelihood));   // GL-5 (P5): wies lniana - zdanie lnu
                 string mem = Memory(r, it.Lore);
                 if (mem != null) hint.Add(mem);
             }
@@ -157,7 +157,7 @@ namespace Armoury
                 var more = new List<string>(5);
                 if (row != null)
                 {
-                    if (row.Livelihood.Length > 0) more.Add(row.Livelihood);
+                    if (row.Livelihood.Length > 0) more.Add(GoodsRates.Livelihood(st, it.R.Uid, row.Livelihood));   // GL-5 (P5): wies lniana - zdanie lnu
                     if (faith != null && row.Faith.Length > 0 && row.FaithMatches(bkId)) more.Add(row.Faith);
                     if (row.History.Length > 0) more.Add(row.History);
                     if (holder == null && row.Knight.Length > 0 && row.House.Length > 0 && row.Arms.Length > 0)
