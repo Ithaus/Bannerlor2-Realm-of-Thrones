@@ -65,8 +65,8 @@ namespace Armoury
             // 168: pulap bez kredytu wojennego, miejsce KW w pulapie i wyplata dnia; dluznik (dwor -50%, budowy 0); zajecie (D bez dochodu wsi)
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
-            public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap
-            public double AidCash;  // W5 (recenzja): w tym GOTOWKA korony tej doby - zold druzyn, ktorego rod nie placi sam (dwor i niewydany sprzet mu nie ustepuja)
+            public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap; W7 - razem z podniesieniem z poboru stawki wojennej pana
+            public double AidCash;  // W5 (recenzja): w tym GOTOWKA korony tej doby - zold druzyn, ktorego rod nie placi sam (dwor i niewydany sprzet mu nie ustepuja); W7 - razem z gotowka poboru pana
         }
 
         private static readonly Dictionary<Clan, B> _b = new Dictionary<Clan, B>();
@@ -589,8 +589,10 @@ namespace Armoury
                         b.Aid = 0; b.AidCash = 0;
                         if (!b.Zero && !merc && b.War)
                         {
-                            double aid = KingdomTreasury.NeedAidBoostOf(c);
-                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)KingdomTreasury.NeedAidCashOf(c))); }
+                            // W7 (KingdomTreasury.LordLevy.cs): pobor stawki wojennej pana z wlasnych lenn - ten sam przydzial znaczony na druzyny (podniesienie
+                            // pulapu ponad W5 i gotowka za ludzi, ktorzy sa); klucz LordWarLevy wylaczony albo rod bez poboru = 0 i budzet jak przed paczka
+                            double aid = KingdomTreasury.NeedAidBoostOf(c) + KingdomTreasury.LordLevyBoostOf(c);
+                            if (aid > 0) { b.Aid = aid; b.PartyCap += aid; b.Cap += aid; b.AidCash = Math.Max(0, Math.Min(Math.Min(aid, (double)b.WPar), (double)(KingdomTreasury.NeedAidCashOf(c) + KingdomTreasury.LordLevyCashOf(c)))); }
                         }
                         b.Today = true;
                         // przydzial sprzetu: niewydany z dni od ostatnich zakupow, najwyzej AiGearDaysCap dni

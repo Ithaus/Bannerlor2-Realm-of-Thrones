@@ -246,6 +246,8 @@ namespace Armoury
                     int v = kv.Value;
                     // W5: zold oplacony wczorajsza doplata korony wedlug potrzeby nie jest podstawa zwrotu (korona nie placi za tego samego czlowieka 100% i 70%)
                     if (cur) { long cutN = NeedAidRefundCut(c, v); if (cutN > 0) { v -= (int)cutN; if (v <= 0) continue; } }
+                    // W7: zold oplacony wczorajszym poborem stawki wojennej pana tez nie jest podstawa zwrotu (bez wczorajszego poboru - 0, jak przed paczka)
+                    if (cur) { long cutL = LordLevyRefundCut(c, v); if (cutL > 0) { v -= (int)cutL; if (v <= 0) continue; } }
                     long own;
                     // E5/A1 (E5K1-08b): przy czynnym zaworze kas miast do pana wraca tylko jego udzial (TownPurse.LordShare: TownRentLordShare, z wyrownaniem
                     // E5/B3 TownRentLordShareWithFolk) - tyle tniemy; korona swojej czesci nie oddaje drugi raz

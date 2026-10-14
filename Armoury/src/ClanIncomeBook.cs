@@ -632,6 +632,7 @@ namespace Armoury
                     csv.Append(KingdomTreasury.NeedAidCsv(c));   // W5: doplata do zoldu wedlug potrzeby tej doby i przydzial w pulapie (za kolumnami 180)
                     csv.Append(KingdomTreasury.ScutageCsv(c));   // W6: tarczowe zaplacone, podstawa, gotowka W5 z tarczowego i nadwyzka platnika ponad rezerwe budzetu (za kolumnami W5)
                     csv.Append(KingdomTreasury.CrownSurplusCsv(c));   // W5b regula 2: czesc gotowki W5 ze skarbca ponad zapas wojny (za kolumnami W6)
+                    csv.Append(KingdomTreasury.LordLevyCsv(c));       // W7: pobor stawki wojennej pana tej doby i podniesienie pulapu ponad W5 (za kolumna W5b)
                     csv.Append(Environment.NewLine);
                 }
                 catch (Exception e) { csv.Length = rowStart; Stumble("Report(rod)", e); }
@@ -642,7 +643,7 @@ namespace Armoury
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
             long tcsv = Stopwatch.GetTimestamp();
-            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader + KingdomTreasury.CrownSurplusCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader + KingdomTreasury.CrownSurplusCsvHeader + KingdomTreasury.LordLevyCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
             _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);

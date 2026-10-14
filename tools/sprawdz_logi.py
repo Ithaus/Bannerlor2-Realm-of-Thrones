@@ -471,6 +471,13 @@ Uzycie (Python 3, tylko odczyt):
                     Wiersze N7-0..N7-7: linia i klucz, podzial wobec reguly (<= 2 pkt), ksiega ludzi zamknieta (kontrola 0, udzialy = ludzie, dopisek H3),
                     odebrani / (odebrani + rozeszli sie po czasie czekania) >= 50%, pula wyrzutkow d120 <= 4 tys. (cel 3 tys.), potkniecia 0,
                     rozmiar zapisu i przyczyny czekania (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa w7        : (W7, decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana") rod, ktorego druzynom W5 nie pokrylo potrzeby, bierze najwyzej 3%/d
+                    nadwyzki ludu i wsi wlasnych lenn (po daninie P1 i danine wsi) na zold ludzi, ktorzy sa; koszt: lojalnosc i dobrobyt osady.
+                    python -I tools/sprawdz_logi.py --grupa w7 [--do-doby 364] [--csv <budzet-rodow.csv>] <Armoury-*.log>
+                    Wiersze W7-0..W7-9: linia i klucz, zamkniecie co do zlotowki (lud + wsie = pobrano = do glow, Obieg, kolumna CSV pobor_wojenny_w7,
+                    kiesy ludu r = 0), P1 i W7 bez podwojnego poboru, bez poboru w osadzie z lojalnoscia < 40, rody z luzem 0 (bez poboru i bez miejsca W7),
+                    pokoj 0, potkniecia (i przelew ponizej planu),
+                    zold poza podstawa zwrotu <= wczorajszy pobor, wojsko (INFO z miara W5-7), liczby paczki i krolestwa (INFO). Log bez paczki: INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -17310,6 +17317,199 @@ def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
     return 0
 
 
+# ============================================================ W7 (decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana") - grupa --grupa w7
+# Linia doby "Stawka wojenna pana (W7): dzien D - rodow K, osad O, pobrano X (z ludu M / ze wsi V), lojalnosc -L, dobrobyt -P, potkniecia N | ..." (dzien gry jak W5/W6),
+# co 7 dob "Stawka wojenna pana (W7) - krolestwa: dzien D (...) | <krolestwo>: ...", dopisek linii "Obieg" (rody dostaly) i kolumny budzet-rodow.csv
+# pobor_wojenny_w7, podniesienie_pulapu_w7.
+W7_PREFIX = "Stawka wojenna pana (W7): dzien"
+W7_HEAD = re.compile(r"- rodow (\d+), osad (\d+), pobrano (\d+) \(z ludu (\d+) / ze wsi (\d+)\), lojalnosc -([\d.]+), dobrobyt -([\d.]+), potkniecia (\d+)")
+W7_NEED = re.compile(r"rody z niepokryta potrzeba po W5 (\d+) \(niepokryte (\d+)\), z poborem (\d+), z samym miejscem w pulapie (\d+), bez nadwyzki w lennach (\d+), gracz bez klucza (\d+)"
+                     r"(?:, z luzem w pulapie \(bez W7\) (\d+))?")
+W7_HEADS = re.compile(r"\| do glow rodow (\d+) \(roznica obiegu (-?\d+)\), podniesienie pulapu (\d+)")
+# recenzja W7: "przydzial rodom z luzem" (gotowka albo miejsce; dotad "gotowka rodom z luzem" - kontrola pusta z definicji) i "przelew ponizej planu" (opcjonalny)
+W7_CTL = re.compile(r"\| kontrola: lud ponad nadwyzke po P1 (\d+), ponizej zapasu po poborze (\d+), pobor w osadzie z lojalnoscia < prog (\d+), (?:gotowka|przydzial) rodom z luzem (\d+)"
+                    r", gotowka ponad niepokryta potrzebe (\d+), pobor w pokoju (\d+)(?:, przelew ponizej planu \(potkniecie zrodla\) (\d+))?")
+W7_SKIP = re.compile(r"osady pominiete: lojalnosc < prog (\d+), bunt (\d+), oblezenie (\d+), wsie spladrowane (\d+)")
+W7_ARMY = re.compile(r"\| wojsko rodow z W7 dzis: (\d+) ludzi / limit (\d+)")
+W7_CUT = re.compile(r"poza podstawa zwrotu 70% \(dzis\) (\d+) \(wpisow (\d+)\)")
+W7_OBG = re.compile(r"stawka wojenna pana \(W7\) kiesy ludu i wsi -> glowy rodow (\d+) \(z ludu (\d+), ze wsi (\d+)\)")
+
+
+def w7_main(logp, start_arg, until=120, csvp=None):
+    """W7 (decyzja Jeffa 13.10 "tak, stawka wojenna podatku pana"; Armoury/src/KingdomTreasury.LordLevy.cs, TownFolk.LordLevy.cs, klucze LordWarLevy, PlayerWarLevy):
+    rod, ktorego druzynom W5 (danina, skarbiec, tarczowe) nie pokrylo potrzeby do celu 60% limitu, bierze najwyzej 3% na dobe nadwyzki ludu i wsi WLASNYCH lenn
+    (po daninie P1 i danine wsi) - gotowka do glowy rodu za ludzi, ktorzy sa, podniesienie pulapu tej doby; koszt: lojalnosc i dobrobyt osady.
+    Okno: doby kampanii 2-until (--do-doby). Wiersze W7-0..W7-9: linia i klucz, ZAMKNIECIE co do zlotowki (z ludu + ze wsi = pobrano = do glow rodow, roznica
+    obiegu 0; ta sama kwota w linii Obieg; suma kolumny pobor_wojenny_w7 budzet-rodow.csv = linia; kontrola kies ludu r = 0), P1 i W7 bez podwojnego poboru (lud
+    ponad nadwyzke po P1 0, ponizej zapasu 0), nikt nie bierze w osadzie z lojalnoscia < progu, rody z luzem 0 (gotowka rodom z zoldem w pulapie wlasnym 0
+    i ponad niepokryta potrzebe 0), pokoj 0, potkniecia 0, zold poza podstawa zwrotu <= wczorajszy pobor, wojsko (INFO z miara W5-7), liczby paczki i krolestwa
+    (INFO). Log bez paczki (bez linii albo klucz wylaczony): wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for s in lines:
+            if s.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", s)
+                if start is not None:
+                    break
+    w7 = e4_series(lines, W7_PREFIX, 1)
+    obg = by_day(lines, "Obieg: dzien")
+    kl = by_day(lines, "Kiesa ludu: dzien")
+    alld = sorted(set(w7) | set(obg))
+    if start is None:
+        start = alld[0] if alld else 0
+
+    def inwin(d):
+        return 2 <= run_day(d, start) <= until
+    win = [d for d in sorted(w7) if inwin(d)]
+    on = [d for d in win if re.search(r"\| wylacznik Lord War Levy tak, gracz", w7[d])]
+    print(f"plik: {logp} | start kampanii {start} | okno progow: doby kampanii 2-{until}, dob z linia W7 {len(win)} (klucz czynny w {len(on)})")
+    tot = {}
+    for d in on:
+        h = W7_HEAD.search(w7[d])
+        hd = W7_HEADS.search(w7[d])
+        c = W7_CTL.search(w7[d])
+        if h and hd and c:
+            tot[d] = {"rody": int(h.group(1)), "osad": int(h.group(2)), "x": int(h.group(3)), "lud": int(h.group(4)), "wsie": int(h.group(5)),
+                      "loy": float(h.group(6)), "pros": float(h.group(7)), "st": int(h.group(8)), "heads": int(hd.group(1)), "diff": int(hd.group(2)),
+                      "boost": int(hd.group(3)), "ctl": [int(x) if x is not None else 0 for x in c.groups()]}
+            n = W7_NEED.search(w7[d])
+            if n:
+                tot[d].update({"needn": int(n.group(1)), "unc": int(n.group(2)), "room": int(n.group(4)), "nosrc": int(n.group(5)),
+                               "slack": int(n.group(7)) if n.group(7) is not None else 0})
+            a = W7_ARMY.search(w7[d])
+            if a:
+                tot[d].update({"men": int(a.group(1)), "lim": int(a.group(2))})
+            cu = W7_CUT.search(w7[d])
+            if cu:
+                tot[d]["cut"] = int(cu.group(1))
+    # ---- W7-0 linia i klucz
+    if not win:
+        rep.add("W7-0: linia Stawka wojenna pana (W7)", "brak w logu", "jest od wgrania W7 (LogEnabled); bez niej wiersze paczki = INFO (bieg odniesienia)", None)
+    else:
+        unread = [run_day(d, start) for d in on if d not in tot]
+        m = re.search(r"\| stawka ([\d.]+)% nadwyzki .*?koszt przy pelnej stawce: lojalnosc ([\d.]+) / dobrobyt ([\d.]+) na dobe; bez poboru przy lojalnosci < (\d+)", w7[win[-1]])
+        rep.add("W7-0: linia W7 kazdej doby, klucz czynny (W5 i kiesa ludu), pola odczytane",
+                f"dob z linia {len(win)}, klucz czynny w {len(on)}, pola nieodczytane w {len(unread)}"
+                + (f"; stawka {m.group(1)}%, koszt lojalnosc {m.group(2)} / dobrobyt {m.group(3)} na dobe przy pelnej stawce, prog lojalnosci {m.group(4)}" if m else ""),
+                "klucz czynny przez caly bieg W7, wszystkie pola odczytane", (len(on) == len(win) and not unread) if on else None)
+    if not tot:
+        for name in ("W7-1: zamkniecie co do zlotowki", "W7-2: P1 i W7 bez podwojnego poboru", "W7-3: bez poboru w osadzie z lojalnoscia < progu",
+                     "W7-4: rody z luzem 0", "W7-5: pokoj 0", "W7-6: potkniecia W7", "W7-9: zold poza podstawa zwrotu"):
+            rep.add(name, "brak linii W7 z kluczem czynnym (log bez paczki albo klucz wylaczony)", "INFO", None)
+    else:
+        # ---- W7-1 zamkniecie
+        bad_sum = [run_day(d, start) for d, t in tot.items() if t["x"] != t["lud"] + t["wsie"] or t["heads"] != t["x"] or t["diff"] != 0]
+        bad_obg, nobg = [], 0
+        for d, t in tot.items():
+            if d in obg:
+                mm = W7_OBG.search(obg[d])
+                if mm:
+                    nobg += 1
+                    if int(mm.group(1)) != t["x"] or int(mm.group(2)) != t["lud"] or int(mm.group(3)) != t["wsie"]:
+                        bad_obg.append(run_day(d, start))
+        if csvp is None:
+            csvp = csv_path_of(logp)
+        rows = read_csv(csvp)
+        has_col = bool(rows) and "pobor_wojenny_w7" in rows[0]
+        bad_csv, ncsv = [], 0
+        if has_col:
+            pd_ = {}
+            for r in rows + read_csv_player(csvp):
+                try:
+                    d = int(r.get("dzien") or 0)
+                    pd_[d] = pd_.get(d, 0.0) + float(r.get("pobor_wojenny_w7") or 0)
+                except ValueError:
+                    continue
+            for d, t in tot.items():
+                if d in pd_ or t["x"] == 0:
+                    ncsv += 1
+                    if int(round(pd_.get(d, 0.0))) != t["x"]:
+                        bad_csv.append(run_day(d, start))
+        rz = [num(r", r = (-?\d+)", kl[d]) for d in sorted(kl) if inwin(d) and min(tot) <= d]
+        rz = [x for x in rz if x is not None]
+        bad_r = sum(1 for x in rz if x != 0)
+        ok1 = not bad_sum and not bad_obg and not bad_csv and nobg > 0 and bad_r == 0
+        rep.add("W7-1: zamkniecie - z ludu + ze wsi = pobrano = do glow rodow (roznica 0); ta sama kwota w linii Obieg; suma kolumny pobor_wojenny_w7 = linia; kiesy ludu r = 0",
+                f"dob {len(tot)}: rozjazd w linii {len(bad_sum)}, wobec Obieg {len(bad_obg)} z {nobg}, wobec CSV {len(bad_csv)} z {ncsv}"
+                + ("" if has_col else f" (CSV bez kolumny pobor_wojenny_w7: {csvp})") + f", kontrola kies ludu r != 0 w {bad_r} z {len(rz)} dob"
+                + f"; pobrano razem {sum(t['x'] for t in tot.values())} zl (lud {sum(t['lud'] for t in tot.values())} / wsie {sum(t['wsie'] for t in tot.values())})"
+                + (f"; pierwsze doby: {(bad_sum + bad_obg + bad_csv)[:5]}" if bad_sum or bad_obg or bad_csv else ""),
+                "0 rozjazdow, co do zlotowki (nic z niczego, nic w nicosc)", ok1 if (has_col or not rows) else None)
+        # ---- W7-2 .. W7-6 kontrole linii
+        c0 = [t["ctl"] for t in tot.values()]
+        rep.add("W7-2: P1 i W7 bez podwojnego poboru - lud ponad nadwyzke po danine P1 / ponizej zapasu dni (lud i wsie) po poborze",
+                f"{sum(x[0] for x in c0)} / {sum(x[1] for x in c0)} w {len(c0)} dobach", "0 / 0 (W7 bierze tylko to, co P1 i danina wsi zostawily ponad zapas)",
+                sum(x[0] + x[1] for x in c0) == 0)
+        sk = [W7_SKIP.search(w7[d]) for d in tot]
+        sk = [[int(x) for x in m.groups()] for m in sk if m]
+        rep.add("W7-3: nikt nie bierze w osadzie z lojalnoscia ponizej progu (40)",
+                f"pobor w takiej osadzie {sum(x[2] for x in c0)}; pominiete (osado-doby): lojalnosc < prog {sum(x[0] for x in sk)}, bunt {sum(x[1] for x in sk)}"
+                f", oblezenie {sum(x[2] for x in sk)}, wsie spladrowane {sum(x[3] for x in sk)}", "0", sum(x[2] for x in c0) == 0)
+        rep.add("W7-4: rody z luzem 0 - przydzial W7 (gotowka albo miejsce) rodom z zoldem druzyn ponizej 95% pulapu wlasnego / gotowka ponad niepokryta potrzebe W5",
+                f"{sum(x[3] for x in c0)} / {sum(x[4] for x in c0)} w {len(c0)} dobach (rodow z luzem pominietych: {sum(t.get('slack', 0) for t in tot.values())} rodo-dob)",
+                "0 / 0 (pan bierze tylko na brak z powodu pulapu, ktorego W5 nie pokrylo)",
+                sum(x[3] + x[4] for x in c0) == 0)
+        rep.add("W7-5: pokoj 0 - pobor u rodu krolestwa, ktore nie jest w wojnie (kontrola niezalezna od planu W5)",
+                f"{sum(x[5] for x in c0)} rodo-dob", "0", sum(x[5] for x in c0) == 0)
+        st_ = [t["st"] for t in tot.values()]
+        err = [s for s in lines if s.startswith("ERROR in ") and "LordLevy" in s]
+        short_ = sum(x[6] for x in c0 if len(x) > 6)
+        rep.add("W7-6: potkniecia kroku W7 (i przelew ponizej planu)", f"razem {sum(st_)} w {len(st_)} dobach (ERROR {len(err)}), przelew ponizej planu {short_}", "0 / 0",
+                sum(st_) == 0 and not err and short_ == 0)
+        # ---- W7-9 zold poza podstawa zwrotu <= wczorajszy pobor
+        cut_bad, cut_sum, x_sum = [], 0, 0
+        for d in sorted(tot):
+            cu = tot[d].get("cut")
+            if cu is None:
+                continue
+            prev = tot.get(d - 1)
+            if prev is not None:
+                cut_sum += cu
+                x_sum += prev["x"]
+                if cu > prev["x"]:
+                    cut_bad.append(run_day(d, start))
+        rep.add("W7-9: zold oplacony poborem poza podstawa zwrotu 70% - najwyzej wczorajszy pobor",
+                f"odjete razem {cut_sum} przy poborze dob poprzednich {x_sum} ({(100.0 * cut_sum / x_sum if x_sum else 0):.1f}%), dob ponad wczorajszy pobor {len(cut_bad)}",
+                "0 dob ponad; udzial bliski 100% = korona nie zwraca zoldu oplaconego podatkiem pana", not cut_bad)
+    # ---- W7-7 wojsko (miara W5-7: linie Skarbce krolestw w wojnie), srednia ostatnich 28 dob okna
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for d, war, wallet, men in ser:
+            if war and inwin(d):
+                army[d] = army.get(d, 0) + men
+    if army:
+        ds = sorted(army)[-28:]
+        v = sum(army[d] for d in ds) / len(ds)
+        w7m = [tot[d] for d in ds if d in tot and "men" in tot[d]]
+        extra = (f"; rody z W7: {sum(t['men'] for t in w7m) / len(w7m):.0f} ludzi / limit {sum(t['lim'] for t in w7m) / len(w7m):.0f} na dobe") if w7m else ""
+        rep.add(f"W7-7: druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})", f"{v / 1e3:.1f} tys. ludzi" + extra,
+                "INFO - prog 85 tys. w biegu rocznym (bieg roczny kodu 43 bez W7: 101.4 tys. d337-364); rachunek W7: +2 do +3.5 tys. na koniec roku 1", None)
+    else:
+        rep.add("W7-7: druzyny lordow krolestw w wojnie", "brak linii Skarbce w oknie", "INFO", None)
+    # ---- W7-8 liczby paczki (INFO) i krolestwa z ostatniej linii tygodnia
+    if tot:
+        ds = sorted(tot)[-28:]
+        n = len(ds)
+
+        def av(k):
+            return sum(tot[d].get(k, 0) for d in ds) / n
+        rep.add(f"W7-8: liczby paczki (srednia ostatnich {n} dob okna; INFO)",
+                f"pobrano {av('x') / 1e3:.1f} tys. zl/d (lud {av('lud') / 1e3:.1f} / wsie {av('wsie') / 1e3:.1f}), rodow z poborem {av('rody'):.0f}, osad {av('osad'):.0f}"
+                f", niepokryte po W5 {av('unc') / 1e3:.1f} tys. zl/d u {av('needn'):.0f} rodow (pokrycie {(100.0 * av('x') / av('unc') if av('unc') else 0):.0f}%)"
+                f", z samym miejscem w pulapie {av('room'):.0f}, bez nadwyzki w lennach {av('nosrc'):.0f}, podniesienie pulapu {av('boost') / 1e3:.1f} tys."
+                f", lojalnosc -{av('loy'):.2f} / dobrobyt -{av('pros'):.1f} na dobe (suma osad)",
+                "INFO - rachunek CHANGELOG (koniec roku 1, kod 43): pobor ok. 24 tys. zl/d przy niepokrytym 41 tys. (ok. 58%)", None)
+        wk = [s for s in lines if s.startswith("Stawka wojenna pana (W7) - krolestwa: dzien")]
+        rep.add("W7-8b: krolestwa - ostatni wiersz tygodnia (INFO)", (wk[-1].split(" | ", 1)[1][:600] if wk and " | " in wk[-1] else "brak linii tygodnia"),
+                "INFO - Zelazne Wyspy, Wolni Ludzie, Targaryen, male Essos: pobor; Polnoc i Dorne do konca roku 1 ok. 0 (W5 pokrywa)", None)
+    else:
+        rep.add("W7-8: liczby paczki", "brak linii W7 z kluczem czynnym", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -17366,6 +17566,8 @@ def main(argv):
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "w6b" and logp:
         return w6b_main(logp, start_arg, until_arg, csvp)   # W6b: rod gracza w tarczowym W6 i doplacie W5 (miasto albo zamek, wasal, wojna)
+    if group == "w7" and logp:
+        return w7_main(logp, start_arg, until_arg, csvp)   # W7: stawka wojenna pana - pobor z nadwyzki ludu i wsi wlasnych lenn na brak, ktorego W5 nie pokrylo
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "kiesa1" and logp:
