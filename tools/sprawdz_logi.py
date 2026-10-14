@@ -482,6 +482,10 @@ Uzycie (Python 3, tylko odczyt):
 --grupa rozwoj    : (RP, decyzja Jeffa 14.10, LevelPoints.cs) punkt cechy co AttributePointEveryLevels (3), dodatkowe skupienie co ExtraFocusEveryLevels (4).
                     python -I tools/sprawdz_logi.py --grupa rozwoj <Armoury-*.log>. RP-0 wpiecie, RP-1 czynny model liczy klucz, RP-2/RP-3 awanse gracza wedlug
                     regul, RP-4 ten sam poziom dwa razy w sesji 0, RP-5/RP-6 INFO (BK co 5, pule bohaterow przy tworzeniu), RP-7 bledy 0. Log bez paczki: INFO.
+--grupa ciaza     : (CR, zasada Jeffa 14.10 "1 rok w grze to 1 rok starzenia, 1 dzien to 1 dzien", PregnancyYear.cs) czas ciazy PregnancyDays (273),
+                    szansa poczecia x 84 / rok (FertilityYearScale). python -I tools/sprawdz_logi.py --grupa ciaza <Armoury-*.log>. CR-0 wpiecie, CR-1 czynny
+                    model i mnoznik wedlug kluczy, CR-2 czas ciazy z terminu gry = klucz, CR-3 porody po kluczu, CR-4 droga szansy (poczecia / suma szans),
+                    CR-5 poczecia na zamezna 18-45 na rok <= 0.25, CR-6 najdalszy termin w toku, CR-7 porody (INFO), CR-8 bledy 0. Log bez paczki: INFO.
 --grupa jeff14g   : (decyzje Jeffa 14.10, galaz w-toku/jeff-tak-gracz) J5 kuznia gracza jak u kowali AI (C5, ForgeLikeTownSmith), J4 strata gracza po
                     pojmaniu jak lorda AI (C4), J3 komplet weterana (C3). python -I tools/sprawdz_logi.py --grupa jeff14g <Armoury-*.log>. Caly log; log bez
                     paczki albo bez kucia / pojmania gracza: INFO, bez wyjatku.
@@ -16572,6 +16576,167 @@ def rozwoj_main(logp):
     return 0
 
 
+def ciaza_main(logp):
+    """ciaza (CR, zasada Jeffa 14.10 "1 rok w grze to 1 rok starzenia, 1 dzien to 1 dzien"; Armoury/src/PregnancyYear.cs; rozpoznanie
+    docs/pytania-2026-10-14/STARZENIE-I-CZAS-ZYCIA.md): czas ciazy PregnancyDays (0 = gra 36) i szansa poczecia na dobe x 84 / rok kalendarza
+    (FertilityYearScale). Caly log; sesje rozdzielone linia "Ciaza i plodnosc (CR): start sesji", linie doby "Ciaza i plodnosc (CR): dzien N".
+    CR-0 linia wpiecia: getter czasu i szansa "tak"; CR-1 w kazdej sesji: czynny model z modelu gry, bez wlasnego gettera czasu, czas ciazy
+    czynnego modelu = klucz (0 -> 36, tryb Fast 18), mnoznik = 84 / rok przy kluczu i roku > 84 (inaczej 1); CR-2 czas ciazy z terminu zapisanego
+    przez gre dla poczec tej sesji = klucz (+-0.05 doby; klucz 0 -> gra); CR-3 porody poczec tej sesji: od poczecia klucz - 0.05 .. klucz + 2.05
+    doby (porod przy dobowym ticku ciezarnej; ticker bohaterow rozklada ich na dobe - zapas) - INFO, gdy bieg krotszy niz ciaza; CR-4 droga szansy: przy poczeciach > 0 rzuty > 0, a przy sumie
+    szans (po mnozniku) >= 50: poczecia / suma szans 0.7-1.6 (BKROT x1.25 za blogoslawienstwa jest poza postfiksem); CR-5 poczecia na zamezna
+    18-45 na rok <= 0.25 (symulacja wzoru gry SC\\plodnosc.py, porody / lata malzenstwa do 45 lat: gra przy roku 84 0.16-0.25, TERAZ bez zmiany
+    0.28-0.42, po zmianie 0.15-0.24), liczone przy >= 84 liniach doby i >= 50 latach-kobiet, przy FertilityYearScale we wszystkich sesjach;
+    obok to samo z sumy szans gry (bez mnoznika) - INFO; CR-6 najdalszy termin ciazy w toku <= max(klucz, 36) + 0.05 doby; CR-7 porody, dzieci,
+    martwe, porody na rok - INFO; CR-8 linie "ERROR in PregnancyYear." = 0. Log bez paczki: INFO, bez wyjatku."""
+    lines = read(logp)
+    rep = Report()
+    hook = [s for s in lines if s.startswith("Ciaza i plodnosc (CR): wpiete")]
+    starts = [s for s in lines if s.startswith("Ciaza i plodnosc (CR): start sesji")]
+    days = [s for s in lines if s.startswith("Ciaza i plodnosc (CR): dzien ")]
+    print(f"plik: {logp} | linii wpiecia {len(hook)}, startow sesji {len(starts)}, linii doby {len(days)}")
+    if not hook and not starts:
+        rep.add("CR-0: wpiecie latek (czas ciazy, szansa poczecia)", "brak linii", "INFO (wersja sprzed CR)", None)
+        rep.show()
+        return 0
+    if hook:
+        ok0 = "getter czasu ciazy tak" in hook[-1] and "szansa poczecia tak" in hook[-1]
+        rep.add("CR-0: wpiecie latek (czas ciazy, szansa poczecia)", hook[-1][:200], "getter czasu ciazy tak, szansa poczecia tak", ok0)
+    else:
+        rep.add("CR-0: wpiecie latek (czas ciazy, szansa poczecia)", "brak linii wpiecia (log od srodka procesu?)", "INFO", None)
+    rx_day = re.compile(r"dzien (\d+) \| w toku (-|\d+)(?: \(najdalszy termin za (-?[\d.]+) dob, dalej niz 36 dob (\d+)\))?"
+                        r" \| zamezne 18-45 (\d+) \(w ciazy (\d+)\) \| poczecia (\d+) \(sesja (\d+)\)"
+                        r" \| porody (\d+): dzieci (\d+), martwe (\d+) \(sesja (\d+)\)"
+                        r" \| rzuty (\d+), suma szans ([\d.]+) \(gra ([\d.]+)\)"
+                        r" \| czas ciazy z terminu gry: poczec tej sesji (\d+)(?:, (-?[\d.]+)-(-?[\d.]+) dob)?"
+                        r" \| porody poczec tej sesji (\d+)(?:, (-?[\d.]+)-(-?[\d.]+) dob od poczecia)?")
+    sessions = []   # dict: klucze, rok, mnoznik, model, ostatnia linia doby
+    cur = None
+    errs = 0
+    bad_parse = 0
+    tot = dict(lines=0, conc=0, births=0, alive=0, still=0, rolls=0, snow=0.0, sgame=0.0, wy=0.0, maxleft=None)
+    for s in lines:
+        if s.startswith("ERROR in PregnancyYear."):
+            errs += 1
+            continue
+        if s.startswith("Ciaza i plodnosc (CR): start sesji"):
+            key = num(r"PregnancyDays (\d+)", s, int, 0) or 0
+            scale = "FertilityYearScale True" in s
+            year = num(r"\| rok (\d+) dob", s, int, 0) or 0
+            fac = num(r"mnoznik szansy poczecia ([\d.]+)", s, float, None)
+            mdur = num(r"czas ciazy czynnego modelu ([\d.]+) dob", s, float, None)
+            gdur = num(r"czas ciazy czynnego modelu [\d.]+ dob \(gra (\d+)", s, int, 36) or 36
+            sessions.append(dict(key=key, scale=scale, year=year, fac=fac, mdur=mdur, gdur=gdur, line=s,
+                                 derived="z modelu gry tak" in s, owndur="wlasny getter czasu brak" not in s, last=None))
+            cur = sessions[-1]
+            continue
+        if s.startswith("Ciaza i plodnosc (CR): dzien "):
+            m = rx_day.search(s)
+            if not m:
+                bad_parse += 1
+                continue
+            g = m.groups()
+            year = cur["year"] if cur and cur["year"] else 364
+            tot["lines"] += 1
+            tot["conc"] += int(g[6]); tot["births"] += int(g[8]); tot["alive"] += int(g[9]); tot["still"] += int(g[10])
+            tot["rolls"] += int(g[12]); tot["snow"] += float(g[13]); tot["sgame"] += float(g[14])
+            tot["wy"] += int(g[4]) / float(year)
+            if g[2] is not None:
+                v = float(g[2])
+                tot["maxleft"] = v if tot["maxleft"] is None else max(tot["maxleft"], v)
+            if cur is not None:
+                cur["last"] = g
+    # ---- CR-1 czynny model i mnoznik wedlug kluczy
+    if sessions:
+        bad1 = []
+        for i, x in enumerate(sessions):
+            want_dur = x["key"] if x["key"] > 0 else x["gdur"]
+            want_fac = (84.0 / x["year"]) if (x["scale"] and x["year"] > 84) else 1.0
+            if not x["derived"] or x["owndur"]:
+                bad1.append(f"sesja {i + 1}: model nie z modelu gry albo wlasny getter czasu")
+            if x["mdur"] is None or abs(x["mdur"] - want_dur) > 0.01:
+                bad1.append(f"sesja {i + 1}: czas modelu {x['mdur']} zamiast {want_dur}")
+            if x["fac"] is None or abs(x["fac"] - want_fac) > 0.00051:
+                bad1.append(f"sesja {i + 1}: mnoznik {x['fac']} zamiast {want_fac:.4f}")
+        last = sessions[-1]
+        rep.add("CR-1: czynny model - czas ciazy i mnoznik szansy wedlug kluczy",
+                f"sesji {len(sessions)}; ostatnia: PregnancyDays {last['key']}, FertilityYearScale {last['scale']}, rok {last['year']}, czas modelu {last['mdur']}, mnoznik {last['fac']}"
+                + (f"; zle: {'; '.join(bad1[:4])}" if bad1 else ""),
+                "w kazdej sesji: model z modelu gry bez wlasnego gettera czasu, czas = klucz (0 -> gra 36), mnoznik = 84 / rok (klucz wlaczony, rok > 84), inaczej 1", not bad1)
+    else:
+        rep.add("CR-1: czynny model - czas ciazy i mnoznik", "brak linii startu sesji", "INFO (gra nie doszla do mapy)", None)
+    # ---- CR-2 / CR-3 czas ciazy z terminu gry i porody poczec z sesji
+    d2 = []; d3 = []; bad2 = []; bad3 = []
+    for i, x in enumerate(sessions):
+        g = x["last"]
+        if g is None:
+            continue
+        want = x["key"] if x["key"] > 0 else x["gdur"]
+        n2 = int(g[15])
+        if n2 > 0:
+            lo, hi = float(g[16]), float(g[17])
+            d2.append(f"sesja {i + 1}: {n2} poczec, {lo}-{hi} dob (klucz {want})")
+            if abs(lo - want) > 0.05 or abs(hi - want) > 0.05:
+                bad2.append(i + 1)
+        n3 = int(g[18])
+        if n3 > 0:
+            lo, hi = float(g[19]), float(g[20])
+            d3.append(f"sesja {i + 1}: {n3} porodow, {lo}-{hi} dob od poczecia (klucz {want})")
+            if lo < want - 0.05 or hi > want + 2.05:
+                bad3.append(i + 1)
+    if d2:
+        rep.add("CR-2: czas ciazy z terminu zapisanego przez gre (poczecia tej sesji)", "; ".join(d2[:4]), "min i max = klucz (+-0.05 doby; klucz 0 -> 36)", not bad2)
+    else:
+        rep.add("CR-2: czas ciazy z terminu gry", "0 poczec z odczytanym terminem", "INFO (brak poczec w biegu)", None)
+    if d3:
+        rep.add("CR-3: porody poczec tej sesji - doby od poczecia", "; ".join(d3[:4]), "klucz - 0.05 .. klucz + 2.05 doby (porod przy dobowym ticku ciezarnej, zapas na ticker bohaterow)", not bad3)
+    else:
+        rep.add("CR-3: porody poczec tej sesji", "0 porodow z poczeciem w sesji", "INFO (bieg krotszy niz ciaza - przy 273 porody od ok. doby 274)", None)
+    # ---- CR-4 droga szansy
+    if tot["lines"]:
+        ratio = tot["conc"] / tot["snow"] if tot["snow"] > 0 else None
+        val = (f"poczec {tot['conc']}, rzutow {tot['rolls']}, suma szans po mnozniku {tot['snow']:.2f} (gra {tot['sgame']:.2f})"
+               + (f", poczecia / suma szans {ratio:.2f}" if ratio is not None else ""))
+        if tot["conc"] > 0 and tot["rolls"] == 0:
+            rep.add("CR-4: droga szansy (poczecia przez postfiks modelu gry)", val, "rzuty > 0, gdy sa poczecia", False)
+        elif tot["snow"] >= 50:
+            rep.add("CR-4: droga szansy (poczecia przez postfiks modelu gry)", val, "poczecia / suma szans 0.7-1.6 (suma >= 50)", 0.7 <= ratio <= 1.6)
+        else:
+            rep.add("CR-4: droga szansy (poczecia przez postfiks modelu gry)", val, "INFO (suma szans < 50 - za malo do progu)", None)
+    else:
+        rep.add("CR-4: droga szansy", "brak linii doby", "INFO", None)
+    # ---- CR-5 poczecia na zamezna 18-45 na rok
+    if tot["lines"] and tot["wy"] > 0:
+        rate = tot["conc"] / tot["wy"]
+        rate_game = tot["sgame"] / tot["wy"]
+        rate_now = tot["snow"] / tot["wy"]
+        val = (f"{rate:.3f} poczecia na zamezna na rok ({tot['conc']} poczec / {tot['wy']:.1f} lat-kobiet, {tot['lines']} dob); "
+               f"z sumy szans: po mnozniku {rate_now:.3f}, gra bez mnoznika {rate_game:.3f}")
+        all_scale = bool(sessions) and all(x["scale"] and x["year"] > 84 for x in sessions)
+        if all_scale and tot["lines"] >= 84 and tot["wy"] >= 50:
+            rep.add("CR-5: poczecia na zamezna 18-45 na rok", val, "<= 0.25 (symulacja: gra przy roku 84 0.16-0.25, bez zmiany 0.28-0.42, po zmianie 0.15-0.24)", rate <= 0.25)
+        else:
+            rep.add("CR-5: poczecia na zamezna 18-45 na rok", val, "INFO (prog przy >= 84 dobach, >= 50 latach-kobiet i FertilityYearScale przy roku > 84)", None)
+    else:
+        rep.add("CR-5: poczecia na zamezna 18-45 na rok", "brak linii doby", "INFO", None)
+    # ---- CR-6 najdalszy termin ciazy w toku
+    if tot["maxleft"] is not None and sessions:
+        cap = max(max(x["key"] for x in sessions), 36) + 0.05
+        rep.add("CR-6: najdalszy termin ciazy w toku", f"{tot['maxleft']:.1f} dob", f"<= {cap:.2f} (max(klucz, 36))", tot["maxleft"] <= cap)
+    else:
+        rep.add("CR-6: najdalszy termin ciazy w toku", "brak ciaz w toku w liniach doby", "INFO", None)
+    # ---- CR-7 porody (INFO)
+    if tot["lines"]:
+        year = sessions[-1]["year"] if sessions and sessions[-1]["year"] else 364
+        rep.add("CR-7: porody (zdarzenie gry OnGivenBirth)",
+                f"porodow {tot['births']}, dzieci zywych {tot['alive']}, martwych {tot['still']}; na rok {tot['births'] / tot['lines'] * year:.0f} ({tot['lines']} dob)"
+                + (f"; linii doby nieczytelnych {bad_parse}" if bad_parse else ""),
+                "INFO (przy ciazy 273 porody poczec nowej kampanii od ok. doby 274)", None)
+    rep.add("CR-8: bledy PregnancyYear", f"{errs}", "0 linii 'ERROR in PregnancyYear.'", errs == 0)
+    rep.show()
+    return 0
+
+
 def drobne14_main(logp):
     """drobne14 (14.10; CHANGELOG "drobne bledy etapu 8 i audytu"): pomiary dopisane do diagnozy spraw bez przyczyny. Caly log (bez okna dob).
     D14-1 L5b-2: karawany w murach na poczatku oblezenia wobec zajetych przy zdobyciu (spis z OnSiegeEventStarted) - NIE, gdy karawany wroga staly
@@ -21007,6 +21172,8 @@ def main(argv):
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "rozwoj" and logp:
         return rozwoj_main(logp)   # RP (decyzja Jeffa 14.10): punkt cechy co 3 poziomy, dodatkowe skupienie co 4 (LevelPoints)
+    if group == "ciaza" and logp:
+        return ciaza_main(logp)   # CR (zasada Jeffa 14.10): czas ciazy 273 doby, szansa poczecia x 84 / rok (PregnancyYear)
     if group == "jeff14" and logp:
         return max(jeff14g_main(logp), jeff14s_main(logp))   # jeff14 = jeff14g (C3-C5, gracz) + jeff14s (swiat: ZK, Casterly Rock, smoki, Qohor)
     if group == "jeff14g" and logp:

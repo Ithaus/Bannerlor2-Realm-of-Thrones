@@ -878,6 +878,7 @@ namespace Armoury
             WarFront.RegisterEvents(this);      // N5-E: te same zdarzenia z miejscem - warownie przy froncie (budowle cywilne z dala od frontu)
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
             Measure169c.RegisterEvents(this);   // 169c: niewola lordow, dezercja, sluby AI, Bliznaki - same liczniki (tylko log)
+            PregnancyYear.RegisterEvents(this);   // CR (zasada Jeffa 14.10): poczecia i porody (OnChildConceived / OnGivenBirth) - same liczniki do linii doby
             // M6a: najkrotsza sluzba kompanii (pole gry przy najmie, pomiar konca sluzby), pamiec okupow (kazda droga okupu), rozstrzygniecie pokoju po 24 h
             CampaignEvents.OnClanChangedKingdomEvent.AddNonSerializedListener(this, MercTenure.OnClanChangedKingdom);
             CampaignEvents.WarDeclared.AddNonSerializedListener(this, MercTenure.OnWarDeclared);   // M6a-1: pole gry od wypowiedzenia wojny (nie od nastepnej doby)
@@ -1347,6 +1348,7 @@ namespace Armoury
             try { QuestPay8.SessionStart(this); } catch (Exception e) { Log.Error("QuestPay8.SessionStart", e); }   // E8/D1 (256): nagrody i wyplaty w zadaniach - nasluchy przyjecia zadan; skan metod zadan i latki raz na proces, W KAMPANII (CLAUDE.md 7)
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
+            try { PregnancyYear.SessionStart(); } catch (Exception e) { Log.Error("PregnancyYear.SessionStart", e); }   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): start sesji" - klucze z MCM (PO McmSettings.Apply), rok i mnoznik, czynny model, ciaze w toku
             try { DayHeld.SessionStart(); } catch (Exception e) { Log.Error("DayHeld.SessionStart", e); }   // A14 / G20 (drobne2): doba po wczytaniu ze srodka doby - PO McmSettings.Apply (klucz z MCM), przed pierwszym tickiem osad
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
             try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem, potem na stale) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
@@ -1671,6 +1673,7 @@ namespace Armoury
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); } DayProfile.Lap("WarLedger.OnDaily");
             try { DefeatMorale.Daily(); } catch (Exception e) { Log.Error("DefeatMorale.Daily", e); } DayProfile.Lap("DefeatMorale.Daily");   // D11-1: linia "Kara za przegrana (D11-1)" zaraz po liniach wojny (dezercja AI 183) - tylko log
             try { RaceLaw.Daily(); } catch (Exception e) { Log.Error("RaceLaw.Daily", e); } DayProfile.Lap("RaceLaw.Daily");   // Jeff 10.10: linia "Rasy: dzien N" - tylko gdy cos zablokowano
+            try { PregnancyYear.Daily(); } catch (Exception e) { Log.Error("PregnancyYear.Daily", e); } DayProfile.Lap("PregnancyYear.Daily");   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): dzien N" - ciaze w toku, poczecia, porody, rzuty szansy (tylko log)
             try { Orders.DailyTick(); }
             catch (Exception e) { Log.Error("OnDailyTick", e); } DayProfile.Lap("Orders.DailyTick");
             // wpis 86 (audyt pkt 18): kazdy system we wlasnym try - wyjatek jednego nie zatrzymuje reszty dnia

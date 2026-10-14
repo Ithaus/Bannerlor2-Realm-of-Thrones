@@ -215,6 +215,8 @@ RANGES = {
     # RP (decyzja Jeffa 14.10): co ile poziomow punkt cechy (0 = gra) i dodatkowe skupienie (0 = wylaczone); kod przycina do 0..62 (LevelPoints.Every)
     'AttributePointEveryLevels': (0, 12, "0"),
     'ExtraFocusEveryLevels': (0, 12, "0"),
+    # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
+    'PregnancyDays': (0, 364, "0"),
 }
 
 def gen(module_dir, ns, display):
