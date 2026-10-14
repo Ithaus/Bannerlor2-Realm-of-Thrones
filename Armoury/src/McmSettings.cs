@@ -1908,6 +1908,10 @@ namespace Armoury
         [SettingPropertyGroup("Workshops")]
         public bool WeaverExportPrice { get; set; } = true;
 
+        [SettingPropertyBool("Tanner Export Price", HintText = "the town's tanners also tan for the towns that lack leather, like the weavers do for linen (Weaver Export Price): while their own stall holds less leather than the town keeps for itself and for carrying out, a leather is worth to them what the best town short of leather within reach of a hired caravan or a merchants' cart pays for it, less the carriage - not only what their own market pays, which fell once the townsfolk stopped buying leather from their savings. The leather then leaves by the existing caravan contracts and merchants' carts. Off = they tan only as much as their own market pays for, as before")]
+        [SettingPropertyGroup("Workshops")]
+        public bool TannerExportPrice { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Town Craft Hands Per Arms Hand", 0.00f, 8.00f, "0.00", HintText = "hands of a town's cloth and leather trades for each hand of its arms craftsmen (Workshop Prosperity Per Hand), so they grow with the town's prosperity - weaving, fulling and tanning kept about twice as many people as the arms guilds (Paris 1292, Ghent 1356, estimate); 0 = town crafts off, the one-for-one tanning and weaving as before")]
         [SettingPropertyGroup("Workshops")]
         public float TownCraftHandsPerArmsHand { get; set; } = 2f;
@@ -6132,6 +6136,7 @@ namespace Armoury
             s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
             s.TownCraftsEnabled = TownCraftsEnabled;
             s.WeaverExportPrice = WeaverExportPrice;
+            s.TannerExportPrice = TannerExportPrice;
             s.TownCraftHandsPerArmsHand = TownCraftHandsPerArmsHand;
             s.TownFletchersEnabled = TownFletchersEnabled;
             s.TownFletcherHandsPerArmsHand = TownFletcherHandsPerArmsHand;

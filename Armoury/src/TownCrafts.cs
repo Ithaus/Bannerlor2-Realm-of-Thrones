@@ -55,6 +55,9 @@ namespace Armoury
     /// najlepsze miasto z brakiem w zasiegu kontraktu 174 / wozu kupcow minus droga (MaterialOrders.ExportNet), poki polka plotna ponizej progu polki
     /// (MaterialOrders.ShelfReserve: czego miasto nie sprzedaje innym + pas wywozu - w pasie biora kontrakty, wozy i karawany). Ponad progiem - jak dotad cena
     /// wlasnego miasta. Koszt wsadu i pracy bez zmian; droga liczona raz (w cenie wywozu). Bez zlota jak dotad - zaplate za wywoz daje kontrakt / woz.
+    /// Towary 2 / K3 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A6-2, klucz TannerExportPrice): garbarz tak samo - skora warta tyle, ile da za nia najlepsze miasto z brakiem
+    /// skory w zasiegu minus droga, poki polka skory ponizej progu polki; garbarze stali "bez zysku" w 77 miastach przy 7.5 tys. skor surowych, bo skora potaniala
+    /// (indeks 2.7 -> 1.1) po zdjeciu zakupow ludu, a zamowienia wojska i warsztatow z innych miast ceny tu nie podnosza.
     /// </summary>
     internal static class TownCrafts
     {
@@ -93,9 +96,10 @@ namespace Armoury
         private static int[] _dMade, _dTaken, _dActive, _dNoProfit, _dNoInput, _dNoHands;
         private static double[] _dWanted;              // suma wsadu wedle proporcji (sztuki x Ratio) - kontrola dlugu
         // plotno 14.10 (poprawka 2): tkane tylko dzieki cenie wywozu (sztuki, miasta), suma ceny wywozu tych sztuk, miasta z lnem: z cena wywozu / bez celu / polka juz przy progu,
-        // suma celow w zasiegu i progu polki (srednie)
-        private static int _dExp, _dExpTowns, _dExpPriced, _dExpNoDest, _dExpFull;
-        private static double _dExpPrice, _dExpDests, _dExpCap;
+        // suma celow w zasiegu i progu polki (srednie). Towary 2 / K3: tablice [0 plotno (WeaverExportPrice), 1 skora (TannerExportPrice)] - ta sama regula, osobne liczniki
+        private const int XKinds = 2;
+        private static readonly int[] _dExp = new int[XKinds], _dExpTowns = new int[XKinds], _dExpPriced = new int[XKinds], _dExpNoDest = new int[XKinds], _dExpFull = new int[XKinds];
+        private static readonly double[] _dExpPrice = new double[XKinds], _dExpDests = new double[XKinds], _dExpCap = new double[XKinds];
 
         // recenzja: suwak rak 0 = rzemioslo wylaczone jak wlacznikiem (wraca TanOrWeave 1:1) - wczesniej 0 gasil rzemioslo, a TanOrWeave
         // zostawal wylaczony: zadne miasto nie garbowalo ani nie tkalo
@@ -107,6 +111,18 @@ namespace Armoury
         /// <summary>Plotno 14.10 (poprawka 2): tkacz tka tez na wywoz (klucz WeaverExportPrice).</summary>
         private static bool ExportOn { get { var s = Settings.Current; return s != null && s.WeaverExportPrice; } }
         private const string ExportOut = "linen";      // wyrob tkany tez na wywoz (raport plotna 14.10 - tylko tkacz)
+        /// <summary>Towary 2 / K3 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A6-2): garbarz garbuje tez na wywoz (klucz TannerExportPrice) - ta sama regula co tkacz.</summary>
+        private static bool TannerOn { get { var s = Settings.Current; return s != null && s.TannerExportPrice; } }
+        private const string TannerOut = "leather";    // K3: wyrob garbowany tez na wywoz
+
+        /// <summary>Rodzaj wyrobu na wywoz: 0 plotno (WeaverExportPrice), 1 skora (TannerExportPrice), -1 bez ceny wywozu (wyrob spoza listy albo klucz wylaczony).</summary>
+        private static int ExportKind(ItemObject outIt)
+        {
+            string id = outIt != null ? outIt.StringId : null;
+            if (id == ExportOut) return ExportOn ? 0 : -1;
+            if (id == TannerOut) return TannerOn ? 1 : -1;
+            return -1;
+        }
 
         /// <summary>Nowa gra / wczytanie (z WorkshopLaw.Reset, czyli z konstruktora ArmouryBehavior - przed SyncData).</summary>
         internal static void Reset()
@@ -122,7 +138,7 @@ namespace Armoury
             _dTowns = 0; _dStumbles = 0; _dGuard = 0; _dHands = _dUsedHands = _dIdle = _dDebt = 0f;
             _dMade = new int[n]; _dTaken = new int[n]; _dActive = new int[n]; _dNoProfit = new int[n]; _dNoInput = new int[n]; _dNoHands = new int[n];
             _dWanted = new double[n];
-            _dExp = _dExpTowns = _dExpPriced = _dExpNoDest = _dExpFull = 0; _dExpPrice = _dExpDests = _dExpCap = 0;
+            for (int k = 0; k < XKinds; k++) { _dExp[k] = _dExpTowns[k] = _dExpPriced[k] = _dExpNoDest[k] = _dExpFull[k] = 0; _dExpPrice[k] = _dExpDests[k] = _dExpCap[k] = 0; }
         }
 
         private static void Stumble(string where, Exception e)
@@ -300,21 +316,23 @@ namespace Armoury
                 var labor = new float[n];                // praca na sztuke przy dzisiejszej dniowce (suwak MCM dziala od razu)
                 for (int i = 0; i < n; i++) { acc[i] = st.Of(pairs[i].Key); labor[i] = LaborShare * pairs[i].Out.Value / wage; }
                 // plotno 14.10 (poprawka 2): cena wywozu plotna i prog polki - raz na miasto i dobe, tylko gdy na polce jest len, a plotna mniej niz prog
-                var expP = new float[n]; var expCap = new int[n];
-                if (ExportOn)
-                    for (int i = 0; i < n; i++)
-                    {
-                        var p = pairs[i];
-                        if (p.Out.StringId != ExportOut || shelf.GetItemNumber(p.In) < 1) continue;
-                        int cap = MaterialOrders.ShelfReserve(town, p.Out);
-                        _dExpCap += cap;
-                        if (shelf.GetItemNumber(p.Out) >= cap) { _dExpFull++; continue; }
-                        int dn;
-                        int net = MaterialOrders.ExportNet(town, p.Out, out dn);
-                        if (net <= 0) { _dExpNoDest++; continue; }
-                        expP[i] = net; expCap[i] = cap; _dExpPriced++; _dExpDests += dn;
-                    }
-                int exMade = 0;
+                // Towary 2 / K3: to samo dla skory (garbarz, TannerExportPrice) - ExportKind; liczniki osobno
+                var expP = new float[n]; var expCap = new int[n]; var expK = new int[n];
+                for (int i = 0; i < n; i++)
+                {
+                    var p = pairs[i];
+                    int k = ExportKind(p.Out);
+                    expK[i] = k;
+                    if (k < 0 || shelf.GetItemNumber(p.In) < 1) continue;
+                    int cap = MaterialOrders.ShelfReserve(town, p.Out);
+                    _dExpCap[k] += cap;
+                    if (shelf.GetItemNumber(p.Out) >= cap) { _dExpFull[k]++; continue; }
+                    int dn;
+                    int net = MaterialOrders.ExportNet(town, p.Out, out dn);
+                    if (net <= 0) { _dExpNoDest[k]++; continue; }
+                    expP[i] = net; expCap[i] = cap; _dExpPriced[k]++; _dExpDests[k] += dn;
+                }
+                var exMade = new int[XKinds];
                 int steps = 0;
                 while (hands > MinHands && steps < MaxSteps)
                 {
@@ -343,11 +361,11 @@ namespace Armoury
                     a[0] = a[0] + best.Ratio - bestTake;
                     hands -= labor[best.Ix];
                     made[best.Ix]++; taken[best.Ix] += bestTake;
-                    if (bestEx) { exMade++; _dExp++; _dExpPrice += expP[best.Ix]; }
+                    if (bestEx && expK[best.Ix] >= 0) { int k = expK[best.Ix]; exMade[k]++; _dExp[k]++; _dExpPrice[k] += expP[best.Ix]; }
                     steps++;
                 }
                 if (steps >= MaxSteps) _dGuard++;
-                if (exMade > 0) _dExpTowns++;
+                for (int k = 0; k < XKinds; k++) if (exMade[k] > 0) _dExpTowns[k]++;
                 // przerob, ktory do konca mial surowiec i zysk, skonczyl sie na rekach (albo na bezpieczniku petli)
                 for (int i = 0; i < n; i++) if (reason[i] == 0) reason[i] = 3;
                 // dzisiejsze rece: splacily wczorajszy dlug, poszly w robote albo staly (bez roboty sie nie odkladaja)
@@ -441,13 +459,21 @@ namespace Armoury
                 if (_dGuard > 0) sb.Append(" (bezpiecznik petli w ").Append(_dGuard).Append(" miastach)");
                 Stocks(sb);
                 // plotno 14.10 (poprawka 2): dopisek wywozu (na koncu - stare wzorce linii bez zmian)
-                int asked = _dExpPriced + _dExpNoDest + _dExpFull;
-                sb.Append("; plotno na wywoz (WeaverExportPrice) ").Append(ExportOn ? "tak" : "nie").Append(": tkane tylko dzieki cenie wywozu ").Append(_dExp).Append(" szt. w ")
-                  .Append(_dExpTowns).Append(" miastach (cena wywozu netto srednio ").Append(_dExp > 0 ? (_dExpPrice / _dExp).ToString("0", CultureInfo.InvariantCulture) : "-")
-                  .Append(" d); miast z lnem: z cena wywozu ").Append(_dExpPriced).Append(" (celow w zasiegu srednio ")
-                  .Append(_dExpPriced > 0 ? (_dExpDests / _dExpPriced).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest)
-                  .Append(", polka plotna juz przy progu ").Append(_dExpFull).Append(" (prog polki srednio ")
-                  .Append(asked > 0 ? (_dExpCap / asked).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" szt.)");
+                int asked = _dExpPriced[0] + _dExpNoDest[0] + _dExpFull[0];
+                sb.Append("; plotno na wywoz (WeaverExportPrice) ").Append(ExportOn ? "tak" : "nie").Append(": tkane tylko dzieki cenie wywozu ").Append(_dExp[0]).Append(" szt. w ")
+                  .Append(_dExpTowns[0]).Append(" miastach (cena wywozu netto srednio ").Append(_dExp[0] > 0 ? (_dExpPrice[0] / _dExp[0]).ToString("0", CultureInfo.InvariantCulture) : "-")
+                  .Append(" d); miast z lnem: z cena wywozu ").Append(_dExpPriced[0]).Append(" (celow w zasiegu srednio ")
+                  .Append(_dExpPriced[0] > 0 ? (_dExpDests[0] / _dExpPriced[0]).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest[0])
+                  .Append(", polka plotna juz przy progu ").Append(_dExpFull[0]).Append(" (prog polki srednio ")
+                  .Append(asked > 0 ? (_dExpCap[0] / asked).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" szt.)");
+                // Towary 2 / K3: dopisek garbarza na wywoz (po dopisku plotna - wzorce plotna bez zmian)
+                int askedT = _dExpPriced[1] + _dExpNoDest[1] + _dExpFull[1];
+                sb.Append("; skora na wywoz (TannerExportPrice) ").Append(TannerOn ? "tak" : "nie").Append(": garbowane tylko dzieki cenie wywozu ").Append(_dExp[1]).Append(" szt. w ")
+                  .Append(_dExpTowns[1]).Append(" miastach (cena wywozu netto srednio ").Append(_dExp[1] > 0 ? (_dExpPrice[1] / _dExp[1]).ToString("0", CultureInfo.InvariantCulture) : "-")
+                  .Append(" d); miast ze skorami: z cena wywozu ").Append(_dExpPriced[1]).Append(" (celow w zasiegu srednio ")
+                  .Append(_dExpPriced[1] > 0 ? (_dExpDests[1] / _dExpPriced[1]).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest[1])
+                  .Append(", polka skory juz przy progu ").Append(_dExpFull[1]).Append(" (prog polki srednio ")
+                  .Append(askedT > 0 ? (_dExpCap[1] / askedT).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" szt.)");
                 sb.Append("; potkniecia ").Append(_dStumbles).Append(" (od startu ").Append(_stumblesAll).Append(").");
                 Log.Info(sb.ToString());
             }

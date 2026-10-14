@@ -545,7 +545,9 @@ Uzycie (Python 3, tylko odczyt):
                     >= 80 osad, T2-K1-4 zbroja korpusu t3+t4 >= 27.6/d (warsztaty.log), T2-K1-5 INFO, T2-K1-6 straz narzedzi (budowy <= 41.6/d, wsie >= 66.7/d).
                     K2 (VillageClothAboveReserve - koszyk dnia wsi bierze plotno tylko ponad prog polki): T2-K2-0 dopisek w "Kiesa ludu", T2-K2-1 wsie <= 60 szt./d,
                     T2-K2-2 plotno do wojska >= 75 szt./d, T2-K2-3 kolejka plotna wojska d90 -> until bez wzrostu, T2-K2-4 miast bez plotna <= 50, T2-K2-5 regulator
-                    lnu >= 1.2, T2-K2-6 INFO.
+                    lnu >= 1.2, T2-K2-6 INFO. K3 (TannerExportPrice - garbarz garbuje tez na wywoz): T2-K3-0 dopisek w "Rzemioslo miasta (148)", T2-K3-1 miast
+                    bez skory <= 20, T2-K3-2 skora do wojska >= 75 szt./d, T2-K3-3 cykle warsztatow bez skory <= 50/d, T2-K3-4 garbarze "bez zysku" <= 50 miast,
+                    T2-K3-5 INFO.
                     Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
 --grupa z1        : (Z.1, kalibracja "zold w pokoju" po biegu dwuletnim 14.10; klucz PeaceChestShare) wojsko krolestw w pokoju: pulap pokoju 0.28 D + 0.4 x
                     skrzynia wojenna. python -I tools/sprawdz_logi.py --grupa z1 [--do-doby 728] [--baza-doby <log biegu bazowego>] <Armoury-*.log>
@@ -19224,6 +19226,60 @@ def towary2_main(logp, start_arg, until=120):
     c4, _ = avg(kl, r"\(VillageClothAboveReserve\) \w+: [^;|]*\(prog polki srednio ([\d.]+) szt\.\)")
     rep.add("T2-K2-6: koszyk wsi a plotno (dopisek)", f"wierszy zatrzymanych progiem {fx_(c1)}/d, zostalo w kiesach wsi {fx_(c2, 0)} zl/d, kupione plotno {fx_(c3)} szt./d, prog polki srednio {fx_(c4)} szt.",
             "INFO (ZB-12 kiesy najbiedniejszych - --grupa zbytki; wywoz plotna z karawanami - PL-3 w --grupa plotno)", None)
+
+    # ---- K3: garbarz garbuje tez na wywoz (TannerExportPrice; TownCrafts.Work, MaterialOrders.ExportNet; dopisek linii "Rzemioslo miasta (148)")
+    cr = by_day(lines, "Rzemioslo miasta (148): dzien")
+    lea, hid = {}, {}
+    for x in lines:
+        if x.startswith("Towary: dzien") and (" - leather (" in x or " - hides (" in x):
+            k = num(r"dzien (\d+)", x)
+            if k is not None:
+                (lea if " - leather (" in x else hid)[k] = x
+    k3n = [k for k in cr if inwin(k) and "skora na wywoz (TannerExportPrice)" in cr[k]]
+    k3on = [k for k in k3n if "(TannerExportPrice) tak:" in cr[k]]
+    on3 = bool(k3on)
+    tail3 = "" if on3 else " - klucz wylaczony albo log bez dopisku: INFO"
+
+    def g3(ok):
+        return ok if on3 else None
+    rep.add("T2-K3-0: dopisek garbarza na wywoz (Rzemioslo miasta 148)", f"dob z dopiskiem {len(k3n)}, klucz tak {len(k3on)}", "codziennie, klucz tak" + tail3,
+            (len(k3on) > 0) if k3n else None)
+    v, n = avg(ce, r"\bskora \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast")
+    rep.add("T2-K3-1: miast bez skory (Ceny surowcow, srednia)", f"{fx_(v)} ({n} dob)", "<= 20 z 97 (N 25.8, B 85.4)" + tail3, g3(v <= 20) if v is not None else None)
+    v, n = avg(lea, r"odziez wojska \(150\) (\d+)")
+    rep.add("T2-K3-2: skora do wojska (Towary leather, srednia)", f"{fx_(v)} szt./d ({n} dob)", ">= 75 szt./d (N 54.7, potrzeba ok. 86)" + tail3, g3(v >= 75) if v is not None else None)
+    v, n = avg(ws, r"brak surowca \d+ \[ruda \d+, drewno \d+, skora (\d+)")
+    rep.add("T2-K3-3: warsztaty - cykle bez skory (Warsztaty, srednia)", f"{fx_(v)}/d ({n} dob)", "<= 50/d (N 108.1, B 329.5)" + tail3, g3(v <= 50) if v is not None else None)
+    v, n = avg(cr, r"skory -> skora (\d+)/\d+/\d+")
+    rep.add("T2-K3-4: garbarze - koniec przerobu bez zysku (Rzemioslo miasta, srednia)", f"{fx_(v)} miast ({n} dob)", "<= 50 miast (N 76.9, B 48.8)" + tail3,
+            g3(v <= 50) if v is not None else None)
+    e1, _ = avg(cr, r"garbowane tylko dzieki cenie wywozu (\d+) szt\.")
+    e2, _ = avg(cr, r"garbowane tylko dzieki cenie wywozu \d+ szt\. w (\d+) miastach")
+    e3, _ = avg(cr, r"miast ze skorami: z cena wywozu (\d+)")
+    e4, _ = avg(cr, r"miast ze skorami: [^;]*bez celu w zasiegu (\d+)")
+    e5, _ = avg(cr, r"polka skory juz przy progu (\d+)")
+    p1, _ = avg(lea, r"\| produkcja (\d+)")
+    h1, _ = avg(hid, r"zapas (\d+)")
+    ks = [k for k in sorted(hid) if inwin(k)]
+    h0 = num(r"zapas (\d+)", hid[ks[0]]) if ks else None
+    h9 = num(r"zapas (\d+)", hid[ks[-1]]) if ks else None
+    mo = by_day(lines, "Kontrakty surowca (174): dzien")
+    ex = []
+    for k in sorted(mo):
+        if not inwin(k):
+            continue
+        t = 0
+        for pat in (r"Kontrakty surowca \(174\): dzien \d+ - zawarto \d+ \[([^\]]*)\]", r"wozem kupcow \(P3/Z1\): CZYNNE - zawarto \d+ \[([^\]]*)\]"):
+            m = re.search(pat, mo[k])
+            if m:
+                t += num(r"\bskora (\d+)", m.group(1)) or 0
+        ex.append(t)
+    vx = sum(ex) / len(ex) if ex else None
+    rep.add("T2-K3-5: skora na wywoz i skory surowe (dopisek, Towary, kontrakty)",
+            f"garbowane tylko dzieki cenie wywozu {fx_(e1)} szt./d w {fx_(e2)} miastach; miast ze skorami: z cena wywozu {fx_(e3)}, bez celu {fx_(e4)}, polka skory przy progu {fx_(e5)}; "
+            f"skora zrobiona {fx_(p1)}/d; skora wywieziona kontraktami i wozami {fx_(vx)} szt./d; skory surowe zapas srednio {fx_(h1, 0)} (d{run_day(ks[0], start) if ks else '-'} {h0} -> "
+            f"d{run_day(ks[-1], start) if ks else '-'} {h9})",
+            "INFO (N: skora 179/d, wywoz skory 0 - brak zrodla z nadwyzka w 83-87 miastach, skory surowe 7 471 i +17/d; zima - K5 / A6-5)", None)
     rep.show()
     return 0
 

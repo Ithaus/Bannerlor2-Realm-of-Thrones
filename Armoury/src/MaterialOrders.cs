@@ -152,7 +152,7 @@ namespace Armoury
             _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0; _keepDay.Clear();
             MaterialCarts.Reset(M); _cartRoad.Clear(); for (int k = 0; k < M; k++) _cartSrc[k] = null;   // P3/Z1
             _oreWhy.Clear(); _dstOreCartSince.Clear(); _srcOreCartSince.Clear();
-            _expDay = int.MinValue; _expMat = -1; _expDest.Clear();   // plotno 14.10 (poprawka 2): cele wywozu tkacza
+            for (int k = 0; k < M; k++) { _expDay[k] = int.MinValue; _expDest[k].Clear(); }   // plotno 14.10 (poprawka 2): cele wywozu tkacza; K3: osobno dla kazdego surowca
             NewDay(); _stumblesAll = 0; _errSites.Clear();
         }
 
@@ -990,8 +990,12 @@ namespace Armoury
 
         // ------------------------------------------------------------ plotno 14.10 (docs/pytania-2026-10-14/RAPORT-plotno.md, poprawki 1 i 2)
         private sealed class ExpDest { public Settlement St; public int Price, Spare; }
-        private static int _expDay = int.MinValue, _expMat = -1;
-        private static readonly List<ExpDest> _expDest = new List<ExpDest>();
+        // Towary 2 / K3: pamiec celow raz na dobe OSOBNO dla kazdego surowca (dotad jedna lista - przy tkaczu i garbarzu w tej samej dobie liczylaby cele od nowa
+        // przy kazdym wywolaniu na przemian); dla samego plotna wynik bez zmian
+        private static readonly int[] _expDay = NewExpDays();
+        private static readonly List<ExpDest>[] _expDest = NewExpLists();
+        private static int[] NewExpDays() { var a = new int[M]; for (int k = 0; k < M; k++) a[k] = int.MinValue; return a; }
+        private static List<ExpDest>[] NewExpLists() { var a = new List<ExpDest>[M]; for (int k = 0; k < M; k++) a[k] = new List<ExpDest>(); return a; }
 
         /// <summary>
         /// Plotno 14.10 (poprawki 1 i 2): prog polki surowca z tabeli kontraktow, do ktorego miasto trzyma towar dla siebie i na wywoz - zbytki ludu
@@ -1037,7 +1041,7 @@ namespace Armoury
                 var from = src.Settlement;
                 if (from == null || from.IsUnderSiege) return 0;
                 int day = (int)CampaignTime.Now.ToDays;
-                if (day != _expDay || m != _expMat) ExpDests(m, day);
+                if (day != _expDay[m]) ExpDests(m, day);
                 float range = Math.Max(1f, s.TownMaterialOrderRange);
                 float carter = Math.Max(0f, s.CarterPencePerKgPer100), sea = MBMath.ClampFloat(s.SeaFreightShare, 0f, 1f);
                 float kg = Kg(item);
@@ -1047,7 +1051,7 @@ namespace Armoury
                 float seaLine = sea > 0f ? Math.Min(seaMax, range / sea) : seaMax;   // rejs >= linia prosta
                 var pos = from.GetPosition2D;
                 int best = 0;
-                foreach (var e in _expDest)
+                foreach (var e in _expDest[m])
                 {
                     var dest = e.St;
                     if (dest == from || dest.IsUnderSiege) continue;
@@ -1075,7 +1079,7 @@ namespace Armoury
         /// (polki celow w ciagu doby sie zmieniaja; tkacz ocenia z rana, jak cena zbytu karawan CaravanBulk).</summary>
         private static void ExpDests(int m, int day)
         {
-            _expDay = day; _expMat = m; _expDest.Clear();
+            _expDay[m] = day; _expDest[m].Clear();
             var item = _items[m];
             if (item == null) return;
             foreach (var t in Town.AllTowns)
@@ -1092,7 +1096,7 @@ namespace Armoury
                     // recenzja: kasa celu ponad zapas kupcow (TownPurse.BuyFloor bez licznika 169c) - woz kupcow placi z niej zrodlu, karawana kontraktu dostaje z niej
                     // przy dostawie; cel bez kasy nie kupi i nie moze podnosic ceny wywozu tkacza (ExportNet sprawdza ladunek minimalny po cenie netto)
                     int spare = Math.Max(0, t.Gold - TownPurse.BuyFloorPeek(t, (int)Math.Max(0f, Settings.Current.TownRentFloorGold)));
-                    if (p > 0 && spare > 0) _expDest.Add(new ExpDest { St = st, Price = p, Spare = spare });
+                    if (p > 0 && spare > 0) _expDest[m].Add(new ExpDest { St = st, Price = p, Spare = spare });
                 }
                 catch (Exception e) { Stumble("ExpDests", e); }
             }
