@@ -255,7 +255,7 @@ namespace Armoury
                 if (ev == null || ev.BesiegedSettlement == null || ev.BesiegedSettlement.Town == null) return;
                 var s = StateOf(ev, true);
                 _dTrues++;
-                if (Hold(s)) { __result = false; return; }                  // O1-O3: okup uzgodniony albo pytanie gracza w toku - szturm czeka
+                if (Hold(s, true)) { __result = false; return; }            // O1-O3: okup uzgodniony albo pytanie gracza w toku - szturm czeka
                 s.Trues++;
                 if (s.Open && Now - s.OpenDay < 1f) return;                // cykl juz rozstrzygniety - gra szturmuje jak dotad
                 s.Open = true; s.OpenDay = Now; s.Trues = 1;
@@ -269,7 +269,7 @@ namespace Armoury
                 if (j.DefPays && j.AiAccepts) _dBoth++;
                 if (j.Player != "-") _dPlayerSide++;
                 string outcome = Decide(s, j);                             // O1-O3 (wylaczone - "szturm (gra)")
-                if (Hold(s)) __result = false;
+                if (Hold(s, false)) __result = false;
                 if (MeasureOn) MeasureLine(j, outcome);
             }
             catch (Exception e) { Stumble("AssaultPost", e); }

@@ -5616,6 +5616,14 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float SiegeRansomBloodyRatio { get; set; } = 1.5f;
 
+        [SettingPropertyBool("Siege Ransom Ai", HintText = "a town or castle about to be stormed may buy the besiegers off: when the walls will not hold and a quarter of all its coin (Siege Ransom Share) is worth at least a day's pay of the besieging army, the town offers it, and a lord takes it when his army is short of pay, when an assault on these walls has already failed, or when the assault would be bloody (Siege Ransom Bloody Ratio). The ransom is shared like plunder - two thirds to the soldiers' purses, a third to the captains, of which the crown claims its third - and the besiegers leave and do not besiege that place again for Siege Ransom Truce Days. Never at a realm's capital, at the places of the great sieges of the story, by or against the Others. Off = every assault goes ahead as before")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomAi { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Ransom Truce Days", 0, 364, "0", HintText = "with Siege Ransom Ai: the days a realm whose army took a ransom will not besiege that town or castle again (0-364)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public int SiegeRansomTruceDays { get; set; } = 60;
+
         [SettingPropertyBool("People Scale Dry Run", HintText = "Writes a daily line with how many people stand behind each village, each town's market and each castle's villages compared with the average of the world (the measure the coming rules - goods follow the people - will use), every seventh day a table by kingdom and the file skale-ludzi.csv (diagnostics only; nothing in the game changes)")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool PeopleScaleDryRun { get; set; } = true;
@@ -7063,6 +7071,8 @@ namespace Armoury
             s.SiegeRansomMeasureLog = SiegeRansomMeasureLog;
             s.SiegeRansomShare = SiegeRansomShare;
             s.SiegeRansomBloodyRatio = SiegeRansomBloodyRatio;
+            s.SiegeRansomAi = SiegeRansomAi;
+            s.SiegeRansomTruceDays = SiegeRansomTruceDays;
             s.PeopleScaleDryRun = PeopleScaleDryRun;
             s.WatchKeepsFlatOutput = WatchKeepsFlatOutput;
             s.VillageOutputByPeople = VillageOutputByPeople;

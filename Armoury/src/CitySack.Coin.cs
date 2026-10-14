@@ -81,61 +81,11 @@ namespace Armoury
                 if (took[0] > 0) MoneyLedger.Note(MoneyLedger.NSack, st, -(int)Math.Min(int.MaxValue, took[0]), -1);
                 for (int c = 0; c < 4; c++) took[c + 1] = want[c + 1] > 0 ? TownFolk.SackTake(st, c, want[c + 1]) : 0;
                 for (int i = 0; i < 5; i++) pool += took[i];
-                // ---- podzial wedlug ludzi; reszta z zaokraglen do najwiekszej druzyny
-                try
-                {
-                    long split = 0;
-                    foreach (var r in live)
-                    {
-                        r.Share = pool * r.Men / men;
-                        split += r.Share;
-                        if (big == null || r.Men > big.Men) big = r;
-                    }
-                    if (big != null) big.Share += pool - split;
-                    foreach (var r in live)
-                    {
-                        if (r.Share <= 0) continue;
-                        if (MenPurse.On) { r.ToLead = r.Share / 3; r.ToMen = r.Share - r.ToLead; }
-                        else { r.ToLead = r.Share; r.ToMen = 0; }
-                        if (r.ToMen > 0) { MenPurse.Add(r.Mp, (int)Math.Min(int.MaxValue, r.ToMen)); given += r.ToMen; _dToMen += r.ToMen; }
-                        if (r.ToLead > 0)
-                        {
-                            int lead = (int)Math.Min(int.MaxValue, r.ToLead);
-                            if (r.Lead != null)
-                            {
-                                r.Lead.ChangeHeroGold(lead);
-                                given += lead; _dToLead += lead;
-                                // prawo trzecich (decyzja 2): trzecia wodza w podstawie - korona w wojnie bierze jej 1/3 jutro. Recenzja (obieg 9): przy wylaczonej
-                                // ksiedze dochodow rodow (ClanIncomeBook) AI tez wprost (dotad tylko gracz); licznik podstawy - tylko obciazeni (bez najemnikow, krola-gracza)
-                                if (r.Lead == Hero.MainHero || !ClanIncomeBook.On) Ransom178.NoteThird(r.Lead, lead);
-                                else ClanIncomeBook.NoteInflow(r.Lead, lead, ClanIncomeBook.KThird);
-                                if (Ransom178.WouldTax(r.Lead)) { _dCrownBase += lead; crownBase += lead; }
-                            }
-                            else
-                            {
-                                r.Mp.PartyTradeGold += lead;                // druzyna bez wodza - jej kiesa (jak gra :169)
-                                given += lead; _dToParty += lead;
-                            }
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Stumble("Sack.Split", e);
-                    // czego nie podzielono - wraca tam, skad zeszlo (recenzja: kazda klasa ludu swoja czesc, wedlug udzialu w puli; reszta - kasa kupcow); nic nie znika
-                    long back = pool - given;
-                    if (back > 0)
-                    {
-                        long rest = back;
-                        for (int c = 1; c <= 4 && rest > 0; c++)
-                        {
-                            long x = Math.Min(rest, Math.Min(took[c], pool > 0 ? (long)Math.Floor((double)back * took[c] / pool) : 0));
-                            if (x > 0) { TownFolk.SackBack(st, c - 1, x); rest -= x; }
-                        }
-                        if (rest > 0) { int g0 = town.Gold; town.ChangeGold((int)Math.Min(int.MaxValue, rest)); MoneyLedger.Note(MoneyLedger.NSack, st, town.Gold - g0, -1); }
-                        given += back;
-                    }
-                }
+                // ---- podzial wedlug ludzi i prawo trzecich - wspolna funkcja lupu i okupu oblezenia (SharePool; okup P4 - jeden kod)
+                var sp = SharePool(st, pool, live, men, took, MoneyLedger.NSack);
+                if (sp.Err != null) Stumble("Sack.Split", sp.Err);
+                given = sp.Given; big = sp.Big; crownBase = sp.CrownBase;
+                _dToMen += sp.ToMen; _dToLead += sp.ToLead; _dToParty += sp.ToParty; _dCrownBase += sp.CrownBase;
             }
             else if (share > 0 && uMen > 0) _dNoTaker++;
             long diff = given - pool;
@@ -169,6 +119,84 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             Messages(a, st, kind, prev, contrib, live, res);
+        }
+
+        /// <summary>Wynik wspolnego podzialu puli (lup L2, okup oblezenia): dopisane razem, sakiewki ludzi, wodzowie, kiesy druzyn bez wodza, podstawa prawa trzecich,
+        /// druzyna z reszta zaokraglen; Err - wyjatek przy podziale (niepodzielona reszta juz zwrocona do zbiornikow i doliczona do Given).</summary>
+        internal sealed class Split { public long Given, ToMen, ToLead, ToParty, CrownBase; public Rec Big; public Exception Err; }
+
+        /// <summary>
+        /// Wspolny podzial puli zdjetej z osady - lup L2 (Sack) i okup oblezenia (SiegeRansom, P4 projektu okupu: jeden kod). Pula wedlug ludzi druzyn `live`
+        /// (zdrowi i ranni), reszta z zaokraglen do najwiekszej - nic nie przepada. W druzynie prawo trzecich (MenPurse 2/3 / 1/3): 2/3 do sakiewki ludzi, 1/3 wodzowi
+        /// (druzyna bez wodza - jej kiesa); sakiewki wylaczone (MenPurseEnabled) - calosc wodzowi. Korona: trzecia wodza do podstawy prawa trzecich (ClanIncomeBook
+        /// KThird -> Ransom178.NoteThird; gracz i AI przy wylaczonej ksiedze - Ransom178.NoteThird wprost) - korona krolestwa w wojnie bierze jej 1/3 nastepnego ranka.
+        /// Wyjatek przy podziale - niepodzielona reszta wraca tam, skad zeszla (kiesy ludu wedlug udzialu w puli, reszta - kasa kupcow z pozycja ksiegi ledgerKind),
+        /// liczona jako dopisana (kontrola dopisane - zdjete = 0). took[0..4] - zdjete z kasy kupcow i kies W, R, P, gmina. Nie rzuca.
+        /// </summary>
+        internal static Split SharePool(Settlement st, long pool, List<Rec> live, int men, long[] took, int ledgerKind)
+        {
+            var sp = new Split();
+            if (men <= 0 || live == null || st == null || st.Town == null) return sp;   // pula 0 - petla bez przelewow (reszta zaokraglen do najwiekszej - jak dotad w linii L2)
+            try
+            {
+                long split = 0;
+                foreach (var r in live)
+                {
+                    r.Share = pool * r.Men / men;
+                    split += r.Share;
+                    if (sp.Big == null || r.Men > sp.Big.Men) sp.Big = r;
+                }
+                if (sp.Big != null) sp.Big.Share += pool - split;
+                foreach (var r in live)
+                {
+                    if (r.Share <= 0) continue;
+                    if (MenPurse.On) { r.ToLead = r.Share / 3; r.ToMen = r.Share - r.ToLead; }
+                    else { r.ToLead = r.Share; r.ToMen = 0; }
+                    if (r.ToMen > 0) { MenPurse.Add(r.Mp, (int)Math.Min(int.MaxValue, r.ToMen)); sp.Given += r.ToMen; sp.ToMen += r.ToMen; }
+                    if (r.ToLead > 0)
+                    {
+                        int lead = (int)Math.Min(int.MaxValue, r.ToLead);
+                        if (r.Lead != null)
+                        {
+                            r.Lead.ChangeHeroGold(lead);
+                            sp.Given += lead; sp.ToLead += lead;
+                            // prawo trzecich (decyzja 2): trzecia wodza w podstawie - korona w wojnie bierze jej 1/3 jutro. Recenzja (obieg 9): przy wylaczonej
+                            // ksiedze dochodow rodow (ClanIncomeBook) AI tez wprost (dotad tylko gracz); licznik podstawy - tylko obciazeni (bez najemnikow, krola-gracza)
+                            if (r.Lead == Hero.MainHero || !ClanIncomeBook.On) Ransom178.NoteThird(r.Lead, lead);
+                            else ClanIncomeBook.NoteInflow(r.Lead, lead, ClanIncomeBook.KThird);
+                            if (Ransom178.WouldTax(r.Lead)) sp.CrownBase += lead;
+                        }
+                        else
+                        {
+                            r.Mp.PartyTradeGold += lead;                // druzyna bez wodza - jej kiesa (jak gra :169)
+                            sp.Given += lead; sp.ToParty += lead;
+                        }
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                sp.Err = e;
+                // czego nie podzielono - wraca tam, skad zeszlo (recenzja: kazda klasa ludu swoja czesc, wedlug udzialu w puli; reszta - kasa kupcow); nic nie znika
+                try
+                {
+                    long back = pool - sp.Given;
+                    if (back > 0)
+                    {
+                        var town = st.Town;
+                        long rest = back;
+                        for (int c = 1; c <= 4 && rest > 0; c++)
+                        {
+                            long x = Math.Min(rest, Math.Min(took[c], pool > 0 ? (long)Math.Floor((double)back * took[c] / pool) : 0));
+                            if (x > 0) { TownFolk.SackBack(st, c - 1, x); rest -= x; }
+                        }
+                        if (rest > 0) { int g0 = town.Gold; town.ChangeGold((int)Math.Min(int.MaxValue, rest)); MoneyLedger.Note(ledgerKind, st, town.Gold - g0, -1); }
+                        sp.Given += back;
+                    }
+                }
+                catch { }
+            }
+            return sp;
         }
 
         /// <summary>Czesc trzeciej wodza, ktora korona wezmie jutro (tylko do napisu): prawo trzecich czynne i bohater obciazony (Ransom178.Taxed).</summary>

@@ -705,6 +705,10 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_sack", e); }
             try { string rk = dataStore.IsSaving ? CitySack.ExportRuins() : null; SaveText.Sync(dataStore, "arm_ruins", ref rk); if (dataStore.IsLoading) CitySack.ImportRuins(rk); }   // LB lupu miast: zgliszcza budowli
             catch (Exception e) { Log.Error("SyncData.arm_ruins", e); }
+            // okup zamiast szturmu (O1, P9): rozejmy (osada, frakcja, doba konca) i szturmy bez zdobycia trwajacych oblezen - wlasny klucz (nie arm_sack: jego Import
+            // odrzuca nieznana wersje w calosci); wersja formatu "1"; brak klucza (zapis sprzed paczki) = bez rozejmow
+            try { string sr = dataStore.IsSaving ? SiegeRansom.Export() : null; SaveText.Sync(dataStore, "arm_siege_ransom", ref sr); if (dataStore.IsLoading) SiegeRansom.Import(sr); }
+            catch (Exception e) { Log.Error("SyncData.arm_siege_ransom", e); }
         }
 
         public override void RegisterEvents()
@@ -777,6 +781,9 @@ namespace Armoury
             // okup zamiast szturmu (decyzja Jeffa 13.10 pyt. 5b; SiegeRansom*.cs): koniec oblezenia czysci stan i okup w toku; koniec szturmu zamyka cykl decyzji
             // (szturm bez zdobycia - powod P2). Stan doby i pamiec od zera przy nowej kampanii / wczytaniu (konstruktor)
             CampaignEvents.OnSiegeEventEndedEvent.AddNonSerializedListener(this, SiegeRansom.OnSiegeEnded);
+            // O1: oblezenie wbrew rozejmowi po okupie - tylko linia i licznik; wykonanie umow okupu w ticku kampanii (plynacy czas, wewnatrz Campaign.Tick - P5)
+            CampaignEvents.OnSiegeEventStartedEvent.AddNonSerializedListener(this, SiegeRansom.OnSiegeStarted);
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeRansom.Tick(); });
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });

@@ -16409,6 +16409,17 @@ OKP_O0 = re.compile(
 OKP_DAY = re.compile(r"Okup oblezenia \(doba\): dzien (\d+) \| klucze: pomiar (tak|nie), AI (tak|nie), gracz-obronca (tak|nie), gracz-oblegajacy (tak|nie), czesc ([\d.]+),"
                      r" prog krwawego szturmu ([\d.]+), rozejm (\d+) dob \| decyzje gry o szturmie \(true\) (\d+), cykli (\d+) \(linii O0 (\d+)\)")
 OKP_B175 = re.compile(r"Bitwa: B175 dzien (\d+)( \[GRACZ\])? \| Siege( morze)? \|.*\| osada (\S+) \(zdobyta (tak|nie)\)\.$")
+OKP_O1 = re.compile(
+    r"Okup oblezenia \(O1\): dzien (?P<d>\d+) \| osada (?P<st>\S+) \((?P<name>.*?), (?P<kind>miasto|zamek)\) \| rodzaj (?P<rodzaj>.*?)"
+    r" \| placi: krolestwo (?P<kd>\S+), rod (?P<clan>\S+) \| bierze: frakcja (?P<fac>\S+), wodz (?P<lead>.*?) \| powod: (?P<why>.*?)"
+    r" \| przy decyzji: okup (?P<agreed>\d+), doba zoldu (?P<wage>\d+)"
+    r" \| zdjete: kupcy (?P<m>\d+) z (?P<m0>\d+), W (?P<w>\d+) z (?P<w0>\d+), R (?P<r>\d+) z (?P<r0>\d+), P (?P<p>\d+) z (?P<p0>\d+), gmina (?P<g>\d+) z (?P<g0>\d+)"
+    r" \(kiesa (?P<live>czynna|nieczynna)\) \| razem (?P<pool>\d+) \| odbiorcy (?P<n>\d+) druzyn \(ludzie (?P<men>\d+); Inni (?P<umen>\d+) - bez udzialu\)"
+    r" \| zolnierze (?P<tm>\d+), wodzowie (?P<tl>\d+) \(gracz razem (?P<pl>\d+)\), kiesy druzyn bez wodza (?P<tp>\d+), reszta zaokraglen do (?P<big>\S+)"
+    r" \| korona: trzecie wodzow w podstawie prawa trzecich (?P<cb>\d+) \| dopisane (?P<given>\d+) - zdjete (?P<took>\d+) = (?P<diff>-?\d+)"
+    r" \| rozejm: (?P<facs>.*?) do dnia (?P<until>\d+) \((?P<tdays>\d+) dob\) \| oboz po okupie: druzyn (?P<left>-?\d+), oblezenie zakonczone (?P<ended>tak|nie)"
+    r" \| zawrocone w drodze (?P<turned>\d+) \| BK SIEGE-STICK: (?P<bk>.*?) \| stolica (?P<cap>tak|nie), fabula (?P<story>tak|nie), Inni (?P<und>tak|nie) \| gracz: (?P<player>.*?)\.$")
+OKP_BROKEN = re.compile(r"Okup oblezenia \(rozejm zlamany\): dzien (\d+) \| osada (\S+) \| frakcja (\S+) \| wodz (.*?) \| gracz (tak|nie) \| rozejm do dnia (\d+)\.$")
 
 
 def okup_bitwy_path(logp):
@@ -16447,6 +16458,10 @@ def okup_main(logp, start_arg, until=364, bdp=None):
     dayraw = [s for s in lines if s.startswith("Okup oblezenia (doba): dzien") and inwin(num(r"dzien (\d+)", s))]
     days = [m for m in (OKP_DAY.match(s) for s in dayraw) if m]
     errs = [s for s in lines if s.startswith("ERROR in SiegeRansom.")]
+    o1raw = [s for s in lines if s.startswith("Okup oblezenia (O1): dzien") and inwin(num(r"dzien (\d+)", s))]
+    o1 = [m for m in (OKP_O1.match(s) for s in o1raw) if m]
+    brk = [m for m in (OKP_BROKEN.match(s) for s in lines if s.startswith("Okup oblezenia (rozejm zlamany): dzien")) if m and inwin(int(m.group(1)))]
+    lost = [s for s in lines if s.startswith("Okup oblezenia (przepadl): dzien") and inwin(num(r"dzien (\d+)", s))]
     hooks = [s for s in lines if s.startswith("Szczelnosc (164a): latki w kampanii")]
     bp = okup_bitwy_path(logp)
     assaults = []
@@ -16458,8 +16473,8 @@ def okup_main(logp, start_arg, until=364, bdp=None):
             if m and inwin(int(m.group(1))):
                 assaults.append((int(m.group(1)), bool(m.group(2)), m.group(4), m.group(5) == "tak"))
     print(f"plik: {logp} | start kampanii {start} | okno: doby kampanii 1-{until} | linii O0 {len(o0raw)} (odczytane {len(o0)}), linii doby {len(dayraw)} (odczytane {len(days)}), "
-          f"ERROR {len(errs)} | bitwy.log: {bp or 'BRAK'} (szturmow w oknie {len(assaults)})")
-    on = bool(o0raw or dayraw)
+          f"okupow O1 {len(o1raw)} (odczytane {len(o1)}), rozejm zlamany {len(brk)}, przepadle {len(lost)}, ERROR {len(errs)} | bitwy.log: {bp or 'BRAK'} (szturmow w oknie {len(assaults)})")
+    on = bool(o0raw or dayraw or o1raw)
     # ---- OKP-0 linie, latki, pola
     wired = None
     if hooks:
@@ -16533,6 +16548,103 @@ def okup_main(logp, start_arg, until=364, bdp=None):
                 "INFO - bieg dwuletni W50: 67 szturmow, 38 zdobyc; W52 120 dob: 13 / 8", None)
     else:
         rep.add("OKP-3: szturmy i zdobycia (INFO)", "brak szturmow albo bitwy.log", "INFO", None)
+    # ---- OKP-4 (O-2): obieg kazdego okupu co do zlota
+    if o1raw:
+        bad = []
+        tot_took = tot_given = 0
+        for m in o1:
+            g = lambda k: int(m.group(k))
+            took = g("m") + g("w") + g("r") + g("p") + g("g")
+            ok = (took == g("pool") == g("took") and g("given") - g("took") == g("diff") == 0 and g("tm") + g("tl") + g("tp") == g("given")
+                  and g("pool") <= g("agreed") and g("m") <= g("m0") and g("w") <= g("w0") and g("r") <= g("r0") and g("p") <= g("p0") and g("g") <= g("g0"))
+            tot_took += g("pool"); tot_given += g("given")
+            if not ok:
+                bad.append(f"d{run_day(g('d'), start)} {m.group('st')}")
+        bad_parse = len(o1raw) - len(o1)
+        rep.add("OKP-4 (O-2): kazdy okup - zdjete z kasy i kies = razem = dopisane sakiewkom, wodzom i kiesom druzyn; zdjete <= uzgodnione i <= stan zbiornika",
+                f"okupow {len(o1)}, niezgodnych {len(bad)}" + (f" ({bad[:4]})" if bad else "") + f", pola nieodczytane {bad_parse}; razem zaplacone {tot_took}, otrzymane {tot_given}",
+                "0 niezgodnych; zaplacone = otrzymane co do zlota", not bad and bad_parse == 0 and tot_took == tot_given)
+    else:
+        rep.add("OKP-4 (O-2): obieg okupu co do zlota", "brak linii O1 w oknie", "INFO (bez okupu albo klucz Siege Ransom Ai wylaczony)", None)
+    # ---- OKP-5 (O-3): 0 oblezen tej osady przez frakcje z rozejmem (linie zlamania + krzyzowo linie O0)
+    if o1raw:
+        viol = []
+        for m in o1:
+            facs = [f.strip() for f in m.group("facs").split(",") if f.strip()]
+            d0, u = int(m.group("d")), int(m.group("until"))
+            for x in o0:
+                if x.group("st") == m.group("st") and x.group("fac") in facs and d0 < int(x.group("d")) < u:
+                    viol.append(f"{m.group('st')} {x.group('fac')} d{run_day(int(x.group('d')), start)}")
+        ai_brk = [m for m in brk if m.group(5) == "nie"]
+        rep.add(f"OKP-5 (O-3): oblezenia osady przez frakcje z rozejmem po okupie (linie 'rozejm zlamany' AI + decyzje O0 w czasie rozejmu)",
+                f"rozejm zlamany AI {len(ai_brk)} (gracz {len(brk) - len(ai_brk)}), decyzje O0 w rozejmie {len(viol)}" + (f" ({viol[:4]})" if viol else ""),
+                "0 i 0 (gracz - INFO: jego opcja oblezenia jest nieczynna dopiero z O3)", not ai_brk and not viol)
+    else:
+        rep.add("OKP-5 (O-3): oblezenia wbrew rozejmowi", f"brak okupow; linie 'rozejm zlamany' {len(brk)}", "INFO", None if not brk else False)
+    # ---- OKP-6 (O-6): okup pod stolica, w fabule ROT, Inni
+    if o1raw:
+        bad = [f"{m.group('st')}" for m in o1 if "tak" in (m.group("cap"), m.group("story"), m.group("und"))]
+        rep.add("OKP-6 (O-6): okup pod stolica krolestwa, w osadzie fabuly ROT, przez Innych albo od Innych", f"{len(bad)}" + (f" ({bad[:4]})" if bad else ""), "0", not bad)
+        # ---- OKP-7: oboz pusty po okupie
+        left = [f"{m.group('st')} (druzyn {m.group('left')}, zakonczone {m.group('ended')})" for m in o1 if m.group("left") != "0" or m.group("ended") != "tak"]
+        rep.add("OKP-7: oboz pusty po okupie (RemoveAllSiegeParties - druzyn 0, oblezenie zakonczone)", f"niepustych {len(left)}" + (f" ({left[:3]})" if left else ""), "0", not left)
+        # ---- OKP-8 liczby (INFO)
+        kinds = {}
+        for m in o1:
+            kinds[m.group("rodzaj")] = kinds.get(m.group("rodzaj"), 0) + 1
+        bk = sum(1 for m in o1 if m.group("bk").startswith("tak"))
+        towns = [int(m.group("pool")) for m in o1 if m.group("kind") == "miasto"]
+        cas = [int(m.group("pool")) for m in o1 if m.group("kind") == "zamek"]
+        why = {}
+        for m in o1:
+            for w in ("potrzeba", "szturm bez zdobycia", "krwawy szturm", "wybor gracza"):
+                if w in m.group("why"):
+                    why[w] = why.get(w, 0) + 1
+        rep.add("OKP-8: okupy (INFO)",
+                f"{len(o1)} ({', '.join(f'{k} {v}' for k, v in kinds.items())}); miasta {len(towns)} za {sum(towns)} zl, zamki {len(cas)} za {sum(cas)} zl; powody {why}; "
+                f"zawrocone w drodze {sum(int(m.group('turned')) for m in o1)}; BK moze trzymac armie {bk}; przepadle umowy {len(lost)}",
+                "INFO - skala ze sprawdzenia 14.10: gorna granica ok. 0.9 mln zl/rok (gdyby kazde zdobycie bylo okupem); lup L2 1.92 mln w 2 lata", None)
+    else:
+        rep.add("OKP-6..8: okupy - stolica / fabula / Inni, oboz pusty, liczby", "brak linii O1", "INFO", None)
+    # ---- OKP-10 (O-4 po P13): zdobycia wobec okupow na tym samym biegu (z --baza-doby: wobec zdobyc biegu bez paczki)
+    if assaults:
+        caps = sum(1 for a in assaults if a[3] and not a[1])
+        ai_assaults = sum(1 for a in assaults if not a[1])
+        ai_ransoms = sum(1 for m in o1 if m.group("rodzaj") != "gracz-oblegajacy")
+        rate = caps / ai_assaults if ai_assaults else 0.0
+        est = caps / (caps + ai_ransoms * rate) if caps + ai_ransoms * rate > 0 else 1.0
+        base_caps = None
+        if bdp:
+            bb = okup_bitwy_path(bdp)
+            if bb:
+                base_caps = 0
+                for s2 in read(bb):
+                    mm = OKP_B175.match(s2) if s2.startswith("Bitwa: B175 dzien") else None
+                    if mm and not mm.group(2) and mm.group(5) == "tak" and 1 <= run_day(int(mm.group(1)), start) <= until:
+                        base_caps += 1
+        if base_caps:
+            v = caps / base_caps
+            rep.add("OKP-10 (O-4): zdobycia twierdz (AI) wobec biegu bazowego (--baza-doby)", f"{caps} wobec {base_caps} = {v:.0%} (okupow AI {ai_ransoms})",
+                    ">= 50% (ponizej - DECYZJA: rzadziej okup - prog krwawego szturmu w dol)", True if v >= 0.5 else False, decide=v < 0.5)
+        else:
+            rep.add("OKP-10 (O-4 po P13): zdobycia zachowane na tym samym biegu = zdobycia / (zdobycia + okupy AI x skutecznosc szturmu)",
+                    f"zdobyc {caps} z {ai_assaults} szturmow AI (skutecznosc {rate:.0%}), okupow AI {ai_ransoms} -> {est:.0%}",
+                    ">= 50% (ponizej - DECYZJA); dwuletni W50 bez paczki: 38 zdobyc", (True if est >= 0.5 else False) if o1raw else None, decide=bool(o1raw) and est < 0.5)
+    else:
+        rep.add("OKP-10 (O-4): zdobycia wobec okupow", "brak bitwy.log albo szturmow", "INFO", None)
+    # ---- OKP-11 (O-5): wojsko lordow krolestw w wojnie (INFO; prog 85 tys. w biegu rocznym)
+    army = {}
+    for kname, ser in kingdom_war_series(lines).items():
+        for dd, war, wallet, men in ser:
+            if war and inwin(dd):
+                army[dd] = army.get(dd, 0) + men
+    if army:
+        ds = sorted(army)[-28:]
+        v = sum(army[x] for x in ds) / len(ds)
+        rep.add(f"OKP-11 (O-5): druzyny lordow krolestw w wojnie (miara W5-7, srednia dob {run_day(ds[0], start)}-{run_day(ds[-1], start)})", f"{v / 1e3:.1f} tys. ludzi",
+                "INFO - prog Jeffa 85 tys. w biegu rocznym (okup to zold dla oblegajacych - wojska nie ubywa)", None)
+    else:
+        rep.add("OKP-11 (O-5): druzyny lordow w wojnie", "brak linii Skarbce w oknie", "INFO", None)
     # ---- OKP-9 potkniecia i bledy
     st_sum = sum(num(r"\| potkniecia (\d+) \(od wczytania", s) or 0 for s in dayraw)
     rep.add("OKP-9: potkniecia SiegeRansom (suma okna) i ERROR in SiegeRansom", f"potkniecia {st_sum}, ERROR {len(errs)}" + (f" ({errs[0][:120]})" if errs else ""),
