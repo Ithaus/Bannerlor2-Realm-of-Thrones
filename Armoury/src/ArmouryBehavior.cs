@@ -705,11 +705,11 @@ namespace Armoury
             // N7 (decyzja Jeffa 13.10): rozbici czekajacy w osadach zbiorki (rod, osada, doba, gotowi, typy, udzialy pochodzenia) - wlasny try; wersja formatu "1";
             // brak klucza (zapis sprzed paczki) = pula pusta; obiekty (rod, osada, typy) rozwiazuje pierwsza doba (StragglersRally.Resolve)
             try { string sr = dataStore.IsSaving ? StragglersRally.Export() : null; SaveText.Sync(dataStore, "arm_n7_rally", ref sr); if (dataStore.IsLoading) StragglersRally.Import(sr); }
+            catch (Exception e) { Log.Error("SyncData.arm_n7_rally", e); }
             // okup zamiast szturmu (O1, P9): rozejmy (osada, frakcja, doba konca) i szturmy bez zdobycia trwajacych oblezen - wlasny klucz (nie arm_sack: jego Import
             // odrzuca nieznana wersje w calosci); wersja formatu "1"; brak klucza (zapis sprzed paczki) = bez rozejmow
             try { string sr = dataStore.IsSaving ? SiegeRansom.Export() : null; SaveText.Sync(dataStore, "arm_siege_ransom", ref sr); if (dataStore.IsLoading) SiegeRansom.Import(sr); }
             catch (Exception e) { Log.Error("SyncData.arm_siege_ransom", e); }
-            catch (Exception e) { Log.Error("SyncData.arm_n7_rally", e); }
             // lup miast L3: osady po nastepstwach oblezen z ostatnich 30 dob (okno lupu, pomiar, napisy) - wlasny try; wersja formatu "1"; brak klucza = pusto
             try { string sk = dataStore.IsSaving ? CitySack.Export() : null; SaveText.Sync(dataStore, "arm_sack", ref sk); if (dataStore.IsLoading) CitySack.Import(sk); }
             catch (Exception e) { Log.Error("SyncData.arm_sack", e); }
