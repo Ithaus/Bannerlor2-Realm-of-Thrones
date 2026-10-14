@@ -1436,7 +1436,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeCapitalPrepFactor { get; set; } = 2.5f;
 
-        [SettingPropertyBool("Siege Walls Any Garrison", HintText = "the walls fight for any garrison, however small: in every assault - AI lords' and your own auto-resolved ones - a handful of men on the walls fights from them, where the game let only more than 100 men in a town or 30 in a castle do so and below that fought the assault as a battle in the open field. Also counts for breaking off an AI assault (Siege Assault Repel Loss) and for a relief force fighting from the walls. Off = as in the game")]
+        [SettingPropertyBool("Siege Walls Any Garrison", HintText = "the walls fight for any garrison, however small: in every assault - AI lords' and your own auto-resolved ones - a handful of men on the walls fights from them, where the game let only more than 100 men in a town or 30 in a castle do so and below that fought the assault as a battle in the open field. Also counts for breaking off an AI assault (Siege Assault Repel Loss) - for a small garrison only while at least a quarter of the defenders who began the assault still stand on the walls - and for a relief force fighting from the walls. Off = as in the game")]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsAnyGarrison { get; set; } = true;
 

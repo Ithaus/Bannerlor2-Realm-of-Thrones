@@ -62,7 +62,8 @@ namespace Armoury
     ///   bez Innych, skryptu fabuly i morza). Gra (DefaultCombatSimulationModel.cs:251-256) liczy tury rundy szturmu "z murow" tylko przy obroncach > 100
     ///   (miasto) / > 30 (zamek): obrona 2 x round(0.5 + max(1 + D^0.3 x 0.7 x przewaga, (D+1)/(A+1))), atak 2 x round(1.5 + D^0.3) - waski front, ciosy
     ///   szturmujacych rosna tylko z liczba obroncow; ponizej progu - wzor bitwy w polu (D^0.6 wobec A^0.6), mala zaloga traci mury.
-    ///   SZ1 (SiegeWallsAnyGarrison): wzor murow dla kazdej zalogi (D >= 1), takze warunek "mury pracuja" OB2 i OB3.
+    ///   SZ1 (SiegeWallsAnyGarrison): wzor murow dla kazdej zalogi (D >= 1), takze warunek "mury pracuja" OB2 i OB3; odwrot OB2 przy obroncach <= 100 / 30
+    ///   tylko, dopoki na murach stoi co najmniej cwierc obroncow z poczatku szturmu (ManShare, recenzja - bez tego "odparcia" przy 1-3 obroncach).
     ///   SZ2 kolejnosc przewagi: drabiny przy calych murach x SiegeLadderWallsFactor (2; z jedna machina z dwoch polowa); taran i wieza x1 (dzielnik gry 1.57);
     ///   wyrwa - jeden rozbity odcinek liczy sie jak wyrwa gry (SiegeBreachOneSection: baza murow x0.25 w GetSettlementAdvantage - decyzja, bitwa, slawa).
     ///   SZ3 morale: obroncy Md = 50 + jedzenie (glod -25, < 7 dob do -10, >= 28 dob albo bez ubytku +10) + lojalnosc (L - 50) x 0.4 + zold zalogi
@@ -72,8 +73,9 @@ namespace Armoury
     ///   odwrotu OB2 w pasmie L +- r: 0.7 x (Ma - 70) / 30 + 0.3 x los (morale druzyn w samym ciosie liczy gra - CalculateSimulationMoraleEffects).
     ///   SZ4 front: taran i wieza otwieraja brame i most - SiegeMachinesFront (0.1) rundy to bitwa w polu (liczba ludzi obu stron), wyrwa - SiegeBreachFront
     ///   (0.75); w czesci "w polu" obronca ma tylko to, co zostaje z murow w wyrwie (0.7 x przewaga przy wyrwie x morale).
-    ///   Przyklady (symulacja rund gry, rowne wojska, OB2 0.22): zamek 30 vs 600 - drabiny: odparte 78% (wysokie morale obroncow 99%, niskie 0%), taran
-    ///   i wieza: zdobyty, straty 7%, wyrwa 1%; miasto 300 vs 3000 - drabiny odparte 100%, taran i wieza zdobyte przy stratach 13%, wyrwa 2%.
+    ///   Przyklady (symulacja rund gry, rowne wojska, prog OB2 w pasmie, po recenzji - z cwiercia obroncow): zamek 30 vs 600 - drabiny: odparte 34% przy
+    ///   morale obroncow 50, 66% przy 65, 93% przy 91, 0% przy niskim; taran i wieza: zdobyty, straty 7%; wyrwa 1%; miasto 300 vs 3000 - drabiny odparte
+    ///   100% (niskie morale 39%), taran i wieza zdobyte przy stratach 13%, wyrwa 2%.
     /// Wyjatek per obiekt = licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7). Kazdy klucz wylaczony = zachowanie 7bc5dd0b (SZ: b47fecc3).
     /// </summary>
     internal static class SiegeWalls
@@ -114,6 +116,10 @@ namespace Armoury
         /// <summary>Morale armii AI, przy ktorym prog odwrotu OB2 lezy w srodku pasma: srednie morale druzyn lordow AI 69.7-72.0 [P log 14.10 "Morale AI (183d)"],
         /// zarazem "wysokie morale" gry (DefaultPartyMoraleModel.HighMoraleValue = 70).</summary>
         private const double MoraleMid = 70.0;
+        /// <summary>SZ1 a odwrot OB2 (recenzja): przy obroncach <= 100 (miasto) / <= 30 (zamek) szturm AI moze sie zalamac tylko, dopoki na murach stoi co najmniej
+        /// tyle obroncow z poczatku szturmu (cwierc) - garstka po stracie trzech czwartych ludzi nie obsadzi murow (St. Elmo 1565 odpieral szturmy resztka zalogi,
+        /// ale to maly fort, nie cale mury). Ponad progiem gry - jak dotad (b47fecc3).</summary>
+        private const double ManShare = 0.25;
 
         // ------------------------------------------------------------ potkniecia
         private static int _stumbles, _dStumbles;
@@ -488,7 +494,7 @@ namespace Armoury
         private sealed class Assault
         {
             public Settlement St; public float Start; public float Thr, U; public bool ThrMorale; public int Men0, Def0, LastCas = -1; public double Loss;   // U - los progu (SZ3: morale ustawia prog w pasmie)
-            public string Fac, Leader; public bool Capital, Repelled, Outside, FromWalls, Off; public int WallRounds, FieldRounds; public int Fort = -1, Side = -1;   // Off - odparcie nie wyszlo (wyjatek), dalej jak w grze
+            public string Fac, Leader; public bool Capital, Repelled, Outside, FromWalls, Off, Pushed; public int WallRounds, FieldRounds; public int Fort = -1, Side = -1;   // Off - odparcie nie wyszlo (wyjatek), dalej jak w grze; Pushed - SZ1: prog strat osiagniety przy garstce na murach (szturm idzie dalej)
         }
         private static readonly Dictionary<MapEvent, Assault> _assaults = new Dictionary<MapEvent, Assault>();
         private static int _dAssaults, _dWon, _dRepelled, _dDefWon, _dNone, _dOutside, _dFromWalls, _dFromWallsHeld, _dScripted;
@@ -547,6 +553,9 @@ namespace Armoury
                 if (!__instance.IsSiegeAssault && !__instance.IsSiegeOutside) return;
                 var lpb = att.LeaderParty;
                 if (lpb == null || !lpb.IsMobile || lpb.MobileParty == null) return;
+                // SZ1 (recenzja): ponizej progu gry mury sa obsadzone, dopoki stoi na nich co najmniej ManShare obroncow z poczatku szturmu - inaczej szturmujacy
+                // widza puste mury i ida dalej (bez tego AI "odpieral" garnizon z 1-3 ludzmi: miasto 300 wobec 2000 z taranem i wieza - 89% odparc przy <= 30 obroncach)
+                if (dmen <= (st.IsTown ? 100 : 30) && dmen < ManShare * a.Def0) { if (!a.Pushed) { a.Pushed = true; _dSzPushed++; } return; }
                 Repel(__instance, a, left, dmen);
             }
             catch (Exception e) { Stumble("UpdatePost", e); }
@@ -625,7 +634,7 @@ namespace Armoury
         private static readonly Dictionary<MapEvent, Bat> _bats = new Dictionary<MapEvent, Bat>();
         private static readonly string[] ModeName = { "drabiny", "jedna machina (taran albo wieza)", "taran i wieza", "wyrwa" };
         // licznik doby: bitwy, tryb pierwszej rundy, wynik i straty wedlug trybu, mala zaloga, morale srednio, tury SZ wobec gry
-        private static int _dSz, _dSzPlayer, _dSzExcl, _dSzSmall, _dSzSmallHeld, _dSzEnded;
+        private static int _dSz, _dSzPlayer, _dSzExcl, _dSzSmall, _dSzSmallHeld, _dSzEnded, _dSzPushed;
         private static readonly int[] _dSzMode = new int[4], _dSzWon = new int[4], _dSzRep = new int[4], _dSzDef = new int[4], _dSzNone = new int[4];
         private static readonly long[] _dSzCasA = new long[4], _dSzCasD = new long[4];
         private static double _dSzMd, _dSzMa; private static long _dSzDefT, _dSzAttT, _dSzGDefT, _dSzGAttT;
@@ -954,7 +963,8 @@ namespace Armoury
                 var sb = new StringBuilder(900);
                 sb.Append("Bitwa szturmu (SZ doba): dzien ").Append(Today).Append(" | klucze: ").Append(SzKeys())
                   .Append(" | bitwy szturmu ").Append(_dSz).Append(" (gracz ").Append(_dSzPlayer).Append(", wykluczone ").Append(_dSzExcl).Append("), skonczone ").Append(_dSzEnded)
-                  .Append(", mala zaloga ").Append(_dSzSmall).Append(" (utrzymana ").Append(_dSzSmallHeld).Append(')');
+                  .Append(", mala zaloga ").Append(_dSzSmall).Append(" (utrzymana ").Append(_dSzSmallHeld).Append(')')
+                  .Append(", odwrot OB2 wstrzymany (garstka na murach) ").Append(_dSzPushed);
                 for (int i = 0; i < 4; i++)
                     sb.Append(" | ").Append(ModeName[i]).Append(": bitew ").Append(_dSzMode[i]).Append(" (zdobyte ").Append(_dSzWon[i]).Append(", odparte ").Append(_dSzRep[i])
                       .Append(", obronca wygral ").Append(_dSzDef[i]).Append(", bez rozstrzygniecia ").Append(_dSzNone[i]).Append("), straty atak / obrona ").Append(_dSzCasA[i])
@@ -1187,7 +1197,7 @@ namespace Armoury
             _dLossSum = _dThrSum = _dPauseSum = 0;
             _dEngWall = _dEngAnti = _dEngRam = _dEngTower = _dEngPlayer = _dWallHits = _dWallBroken = _dSiegesNew = 0;
             _dDispersed.Clear(); _dPrepAi.Clear(); _dPrepPlayer.Clear(); _dPrepExcl.Clear(); _vetoLogged.Clear(); _dStumbles = 0;
-            _dSz = _dSzPlayer = _dSzExcl = _dSzSmall = _dSzSmallHeld = _dSzEnded = 0; _dSzMd = _dSzMa = 0; _dSzDefT = _dSzAttT = _dSzGDefT = _dSzGAttT = 0;
+            _dSz = _dSzPlayer = _dSzExcl = _dSzSmall = _dSzSmallHeld = _dSzEnded = _dSzPushed = 0; _dSzMd = _dSzMa = 0; _dSzDefT = _dSzAttT = _dSzGDefT = _dSzGAttT = 0;
             for (int i = 0; i < 4; i++) { _dSzMode[i] = _dSzWon[i] = _dSzRep[i] = _dSzDef[i] = _dSzNone[i] = 0; _dSzCasA[i] = _dSzCasD[i] = 0; }
         }
 

@@ -661,8 +661,8 @@ Uzycie (Python 3, tylko odczyt):
                     (bez dob wojny krolestw w pokoju): --baza-doby <log biegu, z ktorego jest zapis> - baza wojenna z niego (Z1-1).
 --grupa szturm    : (14.10, decyzje Jeffa o samej bitwie szturmu; galaz w-toku/bitwa-szturmu) python -I tools/sprawdz_logi.py --grupa szturm <Armoury-*.log>
                     (log czytany strumieniowo). SZ-0 linia startowa (latki wpiete), SZ-1 linia doby, SZ-2 skladniki bitwy (morale obu stron, W, drabiny, front -
-                    konstrukcyjne), SZ-3 mala zaloga bije sie z murow, SZ-4 kolejnosc przewagi drabiny > taran i wieza > wyrwa, SZ-5 brak absurdow, SZ-6 prog OB2
-                    wedlug morale, SZ-7 wyniki (INFO), SZ-8 potkniecia i bledy. Log bez paczki: INFO, bez wyjatku.
+                    konstrukcyjne), SZ-3 mala zaloga bije sie z murow, SZ-4 kolejnosc przewagi drabiny > taran i wieza > wyrwa, SZ-5 brak absurdow, SZ-5b odwrot OB2
+                    nie przy garstce na murach, SZ-6 prog OB2 wedlug morale, SZ-7 wyniki (INFO), SZ-8 potkniecia i bledy. Log bez paczki: INFO, bez wyjatku.
 --grupa a17       : (A17, 14.10 - stare zaleglosci; docs/reszta-2026-10-14/ROZPOZNANIE-A17.md) python -I tools/sprawdz_logi.py --grupa a17 <Armoury-*.log>
                     (caly log, czytany strumieniowo). A17-11 ludzie partii kasowanej po bitwie (DestroyedPartyMenRouted): linia doby CZYNNE, kontrola
                     przeniesionych 0, w nicosc przy regule 0, "przy zniknieciu partii" (linia Pochodzenie E4/7) <= 10% fin29 na dobe, diagnoza D4 (INFO).
@@ -24979,6 +24979,9 @@ SZ_BAT = re.compile(r"^Bitwa szturmu \(SZ\): dzien (?P<d>\d+) \| osada (?P<st>\S
                     r" \| straty: atakujacy (?P<ca>\d+) \(\d+%\), obroncy (?P<cd>\d+) \(\d+%\), wymiana [\d.]+ \| wynik (?P<res>zdobyte|odparty \(OB2\)|obronca wygral|bez rozstrzygniecia)\.")
 SZ_OB2 = re.compile(r"^Szturm odparty \(OB2\): dzien (\d+) \|.*?\| prog armii ([\d.]+)%, straty ([\d.]+)%.*?\| morale szturmu (-?[\d.]+) \(.*?\) - prog (wedlug morale|losowy)")
 SZ_MODES = ("drabiny", "jedna machina (taran albo wieza)", "taran i wieza", "wyrwa")
+# SZ-5b (recenzja): obroncy w linii OB2 i licznik odwrotow wstrzymanych przy garstce na murach (SiegeWalls.ManShare 0.25)
+SZ_OB2D = re.compile(r"^Szturm odparty \(OB2\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|zamek), stolica (?:tak|nie)\) .*?; obroncow bylo (\d+), zostalo (\d+) \|")
+SZ_PUSH = re.compile(r", odwrot OB2 wstrzymany \(garstka na murach\) (\d+)")
 
 
 def szturm_main(logp):
@@ -24989,10 +24992,11 @@ def szturm_main(logp):
     SZ-3 mala zaloga (obroncow <= 100 miasto / <= 30 zamek) bije sie z murow: przy SZ1 tak - zadnej rundy "w polu - prog gry", stosunek ciosow obrona / atak
     SZ wobec gry > 1 (mediana, >= 3 bitwy przy calych murach; mniej - INFO); SZ-4 kolejnosc przewagi: wymiana (straty atak / obrona) drabiny > taran i wieza >
     wyrwa (tryby z >= 3 bitwami; mniej - INFO); SZ-5 brak absurdow: rund > 200 = 0, atakujacy >= 50% strat przy 0 strat obroncow = 0, ciosy ataku 0 przy rundach = 0;
+    SZ-5b odwrot OB2 nie przy garstce: linia OB2 z obroncami zostalo <= 100 / 30 i < 1/4 obroncow ze startu = 0 (konstrukcyjne, SZ1 i bez SZ1);
     SZ-6 prog OB2 wedlug morale: sredni prog armii przy morale szturmu < 60 <= przy > 75 (po >= 3 linie OB2; mniej - INFO); SZ-7 wyniki wedlug trybu, gracz,
     mala zaloga utrzymana (INFO); SZ-8 potkniecia z linii doby 0 i ERROR in SiegeWalls. 0. Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
-    starts, days, bats, ob2 = [], {}, [], []
+    starts, days, bats, ob2, ob2d = [], {}, [], [], []
     errs = 0
     keys = ("Bitwa szturmu (", "Szturm odparty (OB2)", "ERROR in SiegeWalls.")
     with open(logp, encoding="utf-8", errors="replace") as f:
@@ -25018,6 +25022,9 @@ def szturm_main(logp):
             if s.startswith("Bitwa szturmu (SZ):"):
                 bats.append(None)          # linia, ktorej regex nie czyta - blad formatu (SZ-2)
                 continue
+            m = SZ_OB2D.match(s)
+            if m:
+                ob2d.append((m.group(2), m.group(3), int(m.group(1)), int(m.group(4)), int(m.group(5))))
             m = SZ_OB2.match(s)
             if m:
                 ob2.append(dict(d=int(m.group(1)), thr=float(m.group(2)) / 100.0, loss=float(m.group(3)) / 100.0, ma=float(m.group(4)), src=m.group(5)))
@@ -25108,6 +25115,12 @@ def szturm_main(logp):
     noatk = [b for b in good if int(b["R"]) > 0 and int(b["at"]) == 0]
     rep.add("SZ-5: brak absurdow (rund > 200 / atak >= 50% strat przy 0 obroncow / ciosy ataku 0)", f"{len(long_r)} / {len(zero)} / {len(noatk)}"
             + (f"; np. {(long_r + zero + noatk)[0]['st']}" if (long_r or zero or noatk) else ""), "0 / 0 / 0", not (long_r or zero or noatk) if good else None)
+    # SZ-5b (recenzja): odwrot OB2 przy garstce na murach - ponizej progu gry tylko, gdy stoi co najmniej cwierc obroncow ze startu szturmu
+    few = [r for r in ob2d if r[4] <= (100 if r[1] == "miasto" else 30) and r[4] < 0.25 * r[3]]
+    pushes = sum(int(p.group(1)) for p in (SZ_PUSH.search(m.string) for m in days.values()) if p)
+    rep.add("SZ-5b: odwrot OB2 nie przy garstce na murach (zostalo <= 100 / 30 i < 1/4 obroncow ze startu)", f"{len(few)} z {len(ob2d)} linii OB2"
+            + (f"; np. {few[0][0]} dzien {few[0][2]}: {few[0][4]} z {few[0][3]}" if few else "") + f"; odwrotow wstrzymanych (linie doby) {pushes}",
+            "0 (konstrukcyjne)", not few if ob2d else None)
     # SZ-6
     lo = [r["thr"] for r in ob2 if r["src"] == "wedlug morale" and r["ma"] < 60]
     hi = [r["thr"] for r in ob2 if r["src"] == "wedlug morale" and r["ma"] > 75]
