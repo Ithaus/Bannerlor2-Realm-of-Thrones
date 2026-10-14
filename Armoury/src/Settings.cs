@@ -2276,6 +2276,24 @@ namespace Armoury
         public int FairFiefConquerorBonus = 50;            // With Fair Fief Grants: claim points for the house whose lord led the army that took the fief (participants in the assault get half).
         public int FairFiefCapExtra = 2;                   // With Fair Fief Grants: a house may hold at most (tier - 1 + this) points of castles and towns from grants (town 2, castle 1).
 
+        // --- Relief of besieged towns ---
+        // OB5 (decyzja Jeffa 14.10: "stolicy i miast trzeba bronic za wszelka cene, jak idzie obca armia"; BesiegedRelief.cs): twierdza krolestwa oblegana przez wroga
+        // (nie Innych) - ocena obrony gry (DefendSettlement) druzyn lordow i wodzow armii tego krolestwa, ktore gra widzi w zasiegu (8.02 doby marszu), podniesiona
+        // ponad kazdy inny cel (P klasy x max(najlepszy inny cel, 0.5); P: stolica 1.5, miasto 1.3, zamek 1.1), dopoki zebrana odsiecz (druzyny i armie krolestwa
+        // z celem obrony tej osady) jest mniejsza niz mnoznik klasy x sila obozu; druzyna glodujaca - najpierw jedzenie; druzyna gracza nigdy; druzyna oblegajaca
+        // twierdze wroga nie zwija obozu dla odsieczy zamku (recenzja 14.10 - petla odsieczy), dla stolicy i miasta tak. Off = 7bc5dd0b (ocena gry)
+        public bool BesiegedReliefFirst = true;            // When an enemy army besieges a town or castle of a realm, the lords of that realm within the game's own reach of it (about eight days' march) put its relief above every other aim - raiding, plundering, chasing parties, patrolling, visiting towns, and for a capital or a town also their own sieges elsewhere (a lord besieging an enemy fortress is not called off it for a castle) - until the lords and armies already marching to its relief are strong enough (Besieged Relief Capital, Town or Castle Force times the besiegers' strength). The capital comes first, then the towns, then the castles. They gather near the walls and fall on the siege camp once together they are stronger than it, as the game does. A lord whose men are starving goes for food first. The same rule for every realm, yours included; your own party is never moved. Off = the game's own judgement, in which a lone lord rarely rides against a large army
+        public float BesiegedReliefCapitalForce = 2.0f;    // with Besieged Relief First: the relief a besieged capital calls for, as a multiple of the besiegers' strength (2 = twice their strength, the most the game's own reckoning of a fight rewards); 0 = capitals are left to the game
+        public float BesiegedReliefTownForce = 1.5f;       // with Besieged Relief First: the relief a besieged town calls for, as a multiple of the besiegers' strength; 0 = towns are left to the game
+        public float BesiegedReliefCastleForce = 1.2f;     // with Besieged Relief First: the relief a besieged castle calls for, as a multiple of the besiegers' strength (1.2 = just enough for the relief to attack the siege camp, by the game's own rule); 0 = castles are left to the game
+        // OB5: wladca krolestwa (wolny, poza armia, w zasiegu, z druzynami do wezwania) dostaje opcje "zbierz armie i bron" (WillGatherArmy + DefendSettlement -
+        // gra zaklada armie Defender, zwykly koszt wplywu), chyba ze armia krolestwa juz zbiera sie albo idzie na odsiecz tej osady. Off = tylko armie gry i BK
+        public bool BesiegedReliefKingsArmy = true;        // with Besieged Relief First: the ruler of a realm whose town or castle is besieged, when he is free, within reach and has lords he can call, raises an army to relieve it - the same call to arms as for a siege, at the same cost of influence - unless an army of the realm is already gathering for it or marching to it. Off = only the armies the game and Banner Kings raise on their own
+
+        // --- Clans changing realms ---
+        // S11 (projekt oblezen 14.10, rozdz. 2; KingdomBalance.OnClanChangedKingdom): linia przy kazdej zmianie krolestwa rodu z miastem albo zamkiem - pomiar, bez reguly
+        public bool ClanLeaveLog = true;                   // Writes a log line each time a clan holding a town or castle leaves or joins a realm: the clan, the old and the new realm, the reason the game gives, its leader's relation with both rulers, its coin and its fiefs. Log only - nothing in the game changes
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

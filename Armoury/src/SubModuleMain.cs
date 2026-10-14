@@ -199,6 +199,9 @@ namespace Armoury
                 try { WatchLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WatchLaw.ApplyAll", e); }
                 // WW0/WW3 (wyspy-wolni): decyzje AI najezdzcow (Zelazne Wyspy, Wolni Ludzie) - postfiks Low na tym samym AiHourlyTick co H1 (inna frakcja); wpiety zawsze, liczy zawsze, mnozy przy kluczu
                 try { ReaverLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ReaverLaw.ApplyAll", e); }
+                // OB5 (decyzja Jeffa 14.10, odsiecz z pierwszenstwem): postfiks Low na CampaignEventDispatcher.AiHourlyTick PO WatchLaw (widzi rabunek Strazy z wynikiem -1);
+                // wpiety zawsze, dziala przy kluczu BesiegedReliefFirst
+                try { BesiegedRelief.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BesiegedRelief.ApplyAll", e); }
                 try { ThrallLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("ThrallLaw.ApplyAll", e); }
                 Leaks310.ApplyAll(_harmony);   // 3.10: herszt kryjowki z wlasnych ludzi (latka metody gry); zold zaciagu ROT - w kampanii
                 Wayfinder.ApplyAll(_harmony);
@@ -411,6 +414,7 @@ namespace Armoury
                 starter.AddBehavior(new TownFletchersBehavior());   // paczka 172: strzelarze miasta - stan w zapisie (doba miasta przez latke po warsztatach)
                 starter.AddBehavior(new HeroGearBehavior());        // Z16: samotest ekranu przy wczytaniu (tylko log, bez zapisu)
                 starter.AddBehavior(new A16Behavior());             // A16: linie dobrobytu, bohaterow i ludnosci BK; start sesji - wylacznik warstwy BK
+                starter.AddBehavior(new ReliefBehavior());          // OB5 odsiecz oblezonych twierdz (linie, stan oblezen) i S11 rody z lennem zmieniajace krolestwo (linia)
                 Log.Info("Behavior dodany do kampanii.");
             }
             catch (Exception e) { Log.Error("OnGameStart", e); }

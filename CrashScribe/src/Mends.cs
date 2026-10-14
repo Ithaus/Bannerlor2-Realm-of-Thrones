@@ -2762,6 +2762,199 @@ namespace CrashScribe
         private static MethodInfo _bkGetEdu, _bkHasPerk;
         private static int _bkRewardStumbles;         // potkniecia per wywolanie (bez globalnego wylacznika)
 
+        // ------------------------------------------------------------ S9 (projekt oblezen 14.10, rozdz. 2): BK bez nowych krolestw z rodow odchodzacych z lennem
+        // BK ma DWIE drogi do nowego krolestwa z rodu z lennem (dekompilacja e4tools/bkfull):
+        //  (a) SECESJA GRUPY RADYKALNEJ (BK Diplomacy): zadanie grupy odrzucone przez wladce -> Demand.Fulfill -> RadicalGroup.TriggerRevolt
+        //      -> RebellionActions.CreateRebelKingdom(lider, rody grupy, stare krolestwo) -> KingdomManager.CreateKingdom (nazwa = najwyzszy tytul lidera:
+        //      "County / Barony / Kingdom of X") + DeclareWarAction.ApplyByKingdomCreation(stare, nowe); zadanie przyjete (SecessionDemand.PositiveAnswer)
+        //      -> CreateRebelKingdom bez wojny ze starym. Bramki nie ma. TO jest droga fin30 [P]: nowe panstwa "County / Barony / Kingdom of" (Bisa d452 -
+        //      rod Eranos z Lorath, Ulentor d540 - dwa rody Norvos naraz, Rhyos d451 ...) to rody szlacheckie, ktore same trzymaly lenno
+        //      (robocze/sily/zmiany-krolestwa-osad.tsv: rod bez zmian, BEZ oblezenia), a wojna w linii E7/0 ma kolejnosc "stare - nowe" (ApplyByKingdomCreation
+        //      z TriggerRevolt; CreateKingdom gry wypowiada "nowe - x").
+        //  (b) BUNT CHLOPSKI: nasluch RebelliousClanDisbandedAtSettlement (gra: rod buntownikow po 30 dobach) -> BKClanBehavior.MakeRebelKingdom; bramka
+        //      public static bool _disableRebelKingdom (BK przelacza ja tylko cheatem). Druga droga do MakeRebelKingdom (DailyClanTickImpl) martwa
+        //      (wyjscie przy Kingdom == null, MakeRebelKingdom - przy Kingdom != null). W fin30 0 panstw ta droga (zadna osada nie przeszla do buntownikow).
+        // S9 (BkRebelKingdoms=false): (b) - pole na true przy kazdym starcie / wczytaniu; (a) - prefiksy na TriggerRevolt i CreateRebelKingdom: rody grupy
+        // wychodza z krolestwa z lennem jako rody NIEZALEZNE (ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom - droga gry: wojna ze starym
+        // krolestwem i jego wrogami, tak jak BK dawal nowemu krolestwu); po ustapieniu wladcy - do tego pokoj ze starym (bez wojny, jak w BK). Ta sama
+        // regula dla rodu gracza w grupie. Latki wpiete raz na proces tylko przy S9; pliki BK nietkniete. Brak pola i metod = linia ostrzezenia, droga BK.
+        private static FieldInfo _bkRebelField;
+        private static bool _bkRebelResolved;
+        private static int _bkRebelClans;
+        private static bool _bkSecTried, _bkSecPatched;
+        private static string _bkSecState = "nie wpinane";
+        private static PropertyInfo _bkGrpLeader, _bkGrpMembers, _bkGrpDipl, _bkDiplKingdom;
+        private static int _bkSecEvents, _bkSecClans, _bkSecStumbles;
+
+        /// <summary>S9: przelacznik BK przy OnSessionLaunched (nowa gra i wczytanie) i wpiecie latek secesji (raz na proces). Nie rzuca.</summary>
+        internal static void BkRebelKingdoms()
+        {
+            try
+            {
+                if (!_bkRebelResolved)
+                {
+                    _bkRebelResolved = true;
+                    var t = AccessTools.TypeByName("BannerKings.Behaviours.BKClanBehavior");
+                    _bkRebelField = t != null ? AccessTools.Field(t, "_disableRebelKingdom") : null;
+                    if (_bkRebelField != null && (!_bkRebelField.IsStatic || _bkRebelField.FieldType != typeof(bool))) _bkRebelField = null;
+                }
+                if (Config.BkRebelKingdoms)
+                {
+                    Scribe.Line("Mends: BK rebel kingdoms on (S9 wylaczone, BkRebelKingdoms=true) - BK robi krolestwa z secesji i z buntow jak dotad; pole _disableRebelKingdom = "
+                                + (_bkRebelField != null ? Convert.ToString(_bkRebelField.GetValue(null)) : "brak") + ", latki secesji nie wpiete.");
+                    return;
+                }
+                BkSecessionHooks();
+                string field;
+                if (_bkRebelField == null) field = "brak pola BKClanBehavior._disableRebelKingdom (bunt chlopski - droga BK)";
+                else
+                {
+                    object was = _bkRebelField.GetValue(null);
+                    _bkRebelField.SetValue(null, true);
+                    field = "BKClanBehavior._disableRebelKingdom " + Convert.ToString(was) + " -> " + Convert.ToString(_bkRebelField.GetValue(null));
+                }
+                if (_bkRebelField == null && !_bkSecPatched)
+                {
+                    Scribe.Line("Mends: BK rebel kingdoms - OSTRZEZENIE: " + field + "; secesja BK: " + _bkSecState + " (BK nieobecny albo inna wersja) - S9 nie dziala, nic nie zmienione.");
+                    return;
+                }
+                Scribe.Line("Mends: BK rebel kingdoms off (S9) - secesja BK (RadicalGroup.TriggerRevolt, RebellionActions.CreateRebelKingdom) wpieta " + (_bkSecPatched ? "TAK" : "NIE (" + _bkSecState + ")")
+                            + "; " + field + "; rody odchodzace z lennem zostaja rodami bez krolestwa (droga gry), pliki BK nietkniete; od startu procesu: secesji przejetych "
+                            + _bkSecEvents + " (rodow " + _bkSecClans + ", potkniec " + _bkSecStumbles + "), rodow buntownikow po 30 dobach " + _bkRebelClans + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.BkRebelKingdoms", null); } catch { } }
+        }
+
+        /// <summary>S9 (a): wpiecie prefiksow na secesje BK (raz na proces). Wolane tylko przy S9.</summary>
+        private static void BkSecessionHooks()
+        {
+            if (_bkSecTried) return;
+            _bkSecTried = true;
+            try
+            {
+                if (_lateHarmony == null) { _bkSecState = "brak Harmony CrashScribe"; return; }
+                var tRa = AccessTools.TypeByName("BannerKings.Actions.RebellionActions");
+                var tRg = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.RadicalGroup");
+                var tDg = AccessTools.TypeByName("BannerKings.Behaviours.Diplomacy.Groups.DiplomacyGroup");
+                var mCreate = tRa != null ? AccessTools.Method(tRa, "CreateRebelKingdom", new[] { typeof(Clan), typeof(System.Collections.Generic.List<Clan>), typeof(Kingdom) }) : null;
+                var mRevolt = tRg != null ? AccessTools.Method(tRg, "TriggerRevolt", Type.EmptyTypes) : null;
+                _bkGrpLeader = tDg != null ? AccessTools.Property(tDg, "Leader") : null;
+                _bkGrpMembers = tDg != null ? AccessTools.Property(tDg, "Members") : null;
+                _bkGrpDipl = tDg != null ? AccessTools.Property(tDg, "KingdomDiplomacy") : null;
+                _bkDiplKingdom = _bkGrpDipl != null ? AccessTools.Property(_bkGrpDipl.PropertyType, "Kingdom") : null;
+                var miss = new System.Collections.Generic.List<string>();
+                if (mCreate == null || mCreate.ReturnType != typeof(Kingdom)) miss.Add("RebellionActions.CreateRebelKingdom");
+                if (mRevolt == null) miss.Add("RadicalGroup.TriggerRevolt");
+                if (_bkGrpLeader == null || _bkGrpMembers == null || _bkGrpDipl == null || _bkDiplKingdom == null) miss.Add("DiplomacyGroup.Leader/Members/KingdomDiplomacy.Kingdom");
+                if (miss.Count > 0) { _bkSecState = "brak " + string.Join(", ", miss.ToArray()); return; }
+                _lateHarmony.Patch(mRevolt, prefix: new HarmonyMethod(typeof(Mends), nameof(BkRevoltPrefix)) { priority = Priority.First });
+                _lateHarmony.Patch(mCreate, prefix: new HarmonyMethod(typeof(Mends), nameof(BkCreateRebelPrefix)) { priority = Priority.First });
+                _bkSecPatched = true;
+                _bkSecState = "TAK";
+            }
+            catch (Exception e)
+            {
+                _bkSecState = "wyjatek " + e.GetType().Name;
+                try { Scribe.Report("CrashScribe", e, "Mends.BkSecessionHooks", null); } catch { }
+            }
+        }
+
+        /// <summary>S9 (a): prefiks RadicalGroup.TriggerRevolt (zadanie odrzucone) - zamiast nowego krolestwa rody grupy wychodza z buntem jako niezalezne.
+        /// Przy S9 droga BK nie rusza nigdy (jej dalszy kod uzywa nowego krolestwa); grupa bez lidera albo krolestwa = bunt pominiety z linia.</summary>
+        public static bool BkRevoltPrefix(object __instance)
+        {
+            if (Config.BkRebelKingdoms) return true;
+            try
+            {
+                var leader = _bkGrpLeader.GetValue(__instance, null) as Hero;
+                var dipl = _bkGrpDipl.GetValue(__instance, null);
+                var k = dipl != null ? _bkDiplKingdom.GetValue(dipl, null) as Kingdom : null;
+                var clans = new System.Collections.Generic.List<Clan>();
+                var members = _bkGrpMembers.GetValue(__instance, null) as System.Collections.IEnumerable;
+                if (members != null) foreach (var o in members) { var h = o as Hero; if (h != null && h.Clan != null) clans.Add(h.Clan); }
+                if (leader == null || leader.Clan == null || k == null)
+                {
+                    _bkSecStumbles++;
+                    Scribe.Line("Mends: S9 secesja BK - grupa bez lidera albo krolestwa (lider " + (leader != null ? leader.StringId : "brak") + ", krolestwo " + (k != null ? k.StringId : "brak")
+                                + ") - bunt BK pominiety, nic nie zmienione.");
+                    return false;
+                }
+                BkSecede(leader.Clan, clans, k, false, "bunt grupy radykalnej (zadanie odrzucone, RadicalGroup.TriggerRevolt)");
+            }
+            catch (Exception e) { _bkSecStumbles++; try { Scribe.Report("CrashScribe", e, "Mends.BkRevoltPrefix", null); } catch { } }
+            return false;
+        }
+
+        /// <summary>S9 (a): prefiks RebellionActions.CreateRebelKingdom (zadanie secesji przyjete - SecessionDemand; z TriggerRevolt tu nie dochodzi, bo ten jest
+        /// przejety wyzej) - rody niezalezne z lennem i pokoj ze starym krolestwem; wynik null (wolajacy w BK go nie uzywa).</summary>
+        public static bool BkCreateRebelPrefix(Clan __0, System.Collections.Generic.List<Clan> __1, Kingdom __2, ref Kingdom __result)
+        {
+            if (Config.BkRebelKingdoms) return true;
+            __result = null;
+            try { BkSecede(__0, __1, __2, true, "ustapienie wladcy (zadanie secesji przyjete, RebellionActions.CreateRebelKingdom)"); }
+            catch (Exception e) { _bkSecStumbles++; try { Scribe.Report("CrashScribe", e, "Mends.BkCreateRebelPrefix", null); } catch { } }
+            return false;
+        }
+
+        /// <summary>S9 (a): rody grupy (lider pierwszy) wychodza ze starego krolestwa z lennem - droga gry LeaveWithRebellion (rod niezalezny, wojna ze starym i jego
+        /// wrogami; armie zdejmuje gra - Clan.LeaveKingdomInternal); przy ustapieniu pokoj ze starym. Jak BK TriggerRevolt: przy buncie druzyny tych rodow
+        /// wychodza z osad starego krolestwa. Wladca starego krolestwa i rody spoza niego - bez zmian. Potkniecie per rod, bez globalnego wylacznika.</summary>
+        private static void BkSecede(Clan leader, System.Collections.Generic.IEnumerable<Clan> clans, Kingdom original, bool peace, string how)
+        {
+            var all = new System.Collections.Generic.List<Clan>();
+            if (leader != null) all.Add(leader);
+            if (clans != null) foreach (var c in clans) if (c != null && !all.Contains(c)) all.Add(c);
+            var done = new System.Collections.Generic.List<Clan>();
+            var sb = new System.Text.StringBuilder(400);
+            int skipped = 0, st = 0;
+            foreach (var c in all)
+            {
+                try
+                {
+                    if (original == null || c.IsEliminated || c.Kingdom != original || c == original.RulingClan) { skipped++; continue; }
+                    int fiefs = c.Fiefs.Count;
+                    ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(c, true);
+                    if (peace && c.Kingdom == null && FactionManager.IsAtWarAgainstFaction(c, original)) MakePeaceAction.Apply(c, original);
+                    done.Add(c);
+                    if (sb.Length > 0) sb.Append(", ");
+                    sb.Append(c.Name != null ? c.Name.ToString() : c.StringId).Append(" (").Append(c.StringId).Append(c == Clan.PlayerClan ? ", rod gracza" : "").Append(", lenn ").Append(fiefs).Append(")");
+                }
+                catch (Exception e) { st++; _bkSecStumbles++; try { Scribe.Report("CrashScribe", e, "Mends.BkSecede", null); } catch { } }
+            }
+            if (!peace)
+                foreach (var c in done)
+                    foreach (var wpc in new System.Collections.Generic.List<TaleWorlds.CampaignSystem.Party.PartyComponents.WarPartyComponent>(c.WarPartyComponents))
+                    {
+                        try
+                        {
+                            var mp = wpc != null ? wpc.MobileParty : null;
+                            if (mp != null && mp.MapEvent == null && mp.CurrentSettlement != null && mp.CurrentSettlement.MapFaction == original) LeaveSettlementAction.ApplyForParty(mp);
+                        }
+                        catch (Exception e) { st++; _bkSecStumbles++; try { Scribe.Report("CrashScribe", e, "Mends.BkSecede.party", null); } catch { } }
+                    }
+            _bkSecEvents++;
+            _bkSecClans += done.Count;
+            Scribe.Line("Mends: S9 secesja BK bez nowego krolestwa: dzien " + (int)CampaignTime.Now.ToDays + " | krolestwo " + (original != null && original.Name != null ? original.Name.ToString() : "?")
+                        + " | " + how + " | rody niezalezne z lennem: " + done.Count + (done.Count > 0 ? " (" + sb + ")" : "") + ", pominiete " + skipped
+                        + " | " + (peace ? "pokoj ze starym krolestwem" : "wojna ze starym krolestwem (bunt)") + " | potkniecia " + st + ".");
+        }
+
+        /// <summary>S9 (pomiar): nasluch RebelliousClanDisbandedAtSettlement - rod buntownikow staje sie zwyklym rodem z lennem; linia, czy BK zrobi z niego krolestwo. Nie rzuca.</summary>
+        internal static void BkRebelClanDisbanded(Settlement st, Clan clan)
+        {
+            try
+            {
+                _bkRebelClans++;
+                bool gate = false;
+                try { gate = _bkRebelField != null && (bool)_bkRebelField.GetValue(null); } catch { }
+                Scribe.Line("Mends: S9 rod buntownikow po 30 dobach: " + (clan != null && clan.Name != null ? clan.Name.ToString() : "?") + " (" + (clan != null ? clan.StringId : "?")
+                            + "), osada " + (st != null && st.Name != null ? st.Name.ToString() : "?") + " (" + (st != null ? st.StringId : "?") + "), lenn " + (clan != null ? clan.Settlements.Count : 0)
+                            + ", krolestwo rodu " + (clan != null && clan.Kingdom != null ? clan.Kingdom.Name.ToString() : "brak")
+                            + " | " + (gate ? "krolestwo BK NIE powstaje (S9, _disableRebelKingdom = true) - rod zostaje bez krolestwa" : "BK zrobi krolestwo (S9 nieczynne: BkRebelKingdoms=true albo brak pola BK)") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.BkRebelClanDisbanded", null); } catch { } }
+        }
+
         /// <summary>Decyzja 4: sprawdzenie latek BK na nagrodzie za bitwe i wpiecie brakujacych postfiksow (OnSessionLaunched).</summary>
         internal static void BkRewardPerks()
         {
@@ -6009,7 +6202,9 @@ namespace CrashScribe
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this,
                 delegate (TaleWorlds.CampaignSystem.MapEvents.MapEvent m, PartyBase a, PartyBase d) { OthersSteel.OnMapEventStarted(m); });
             CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this,
-                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); });   // decyzja 4: atuty BK po OnGameStart BK
+                delegate (CampaignGameStarter s) { Mends.DragonPurge(true); Mends.MeltDeadArmory("po wczytaniu"); OthersSteel.OnSession(); Mends.BkRewardPerks(); Mends.BkRebelKingdoms(); });   // decyzja 4: atuty BK po OnGameStart BK; S9: BK bez krolestw z buntu
+            // S9 (pomiar): rod buntownikow po 30 dobach - linia (BK MakeRebelKingdom slucha tego samego zdarzenia)
+            CampaignEvents.RebelliousClanDisbandedAtSettlement.AddNonSerializedListener(this, delegate (Settlement st, Clan c) { Mends.BkRebelClanDisbanded(st, c); });
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this,
                 delegate
                 {

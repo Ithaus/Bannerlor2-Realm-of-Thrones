@@ -317,6 +317,50 @@ namespace Armoury
             catch { _stumbles++; }
         }
 
+        // ------------------------------------------------------------ S11 (projekt oblezen 14.10): rody z lennem zmieniajace krolestwo - tylko linia
+        /// <summary>Nasluch OnClanChangedKingdomEvent (ReliefBehavior): rod z miastem albo zamkiem wchodzi do krolestwa albo z niego wychodzi - jedna linia
+        /// (rod, stare i nowe krolestwo, ChangeKingdomActionDetail, relacja glowy rodu z wladcami, kiesa, lenna). Przyczyny nie zakladamy - linia ja mierzy
+        /// (projekt rozdz. 7: "dlaczego rody odchodza z lennem w roku 2"). Klucz ClanLeaveLog; nic w grze nie zmienia. Nie rzuca.</summary>
+        internal static void OnClanChangedKingdom(Clan clan, Kingdom oldK, Kingdom newK, ChangeKingdomAction.ChangeKingdomActionDetail detail, bool showNotification)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !s.ClanLeaveLog || clan == null) return;
+                int towns = 0, castles = 0;
+                var names = new List<string>();
+                foreach (var t in clan.Fiefs)
+                {
+                    if (t == null || t.Settlement == null) continue;
+                    if (t.IsTown) towns++; else castles++;
+                    if (names.Count < 8) names.Add(t.Settlement.Name != null ? t.Settlement.Name.ToString() : t.Settlement.StringId);
+                }
+                if (towns + castles == 0) return;
+                var lead = clan.Leader;
+                var sb = new StringBuilder(500);
+                sb.Append("Rod z lennem zmienia krolestwo (S11): dzien ").Append((int)CampaignTime.Now.ToDays)
+                  .Append(" | rod ").Append(clan.Name != null ? clan.Name.ToString() : "?").Append(" (").Append(clan.StringId).Append("), glowa ").Append(lead != null && lead.Name != null ? lead.Name.ToString() : "-")
+                  .Append(clan == Clan.PlayerClan ? " (rod gracza)" : "").Append(clan.IsUnderMercenaryService ? " (najemnik)" : "")
+                  .Append(" | ").Append(oldK != null ? oldK.Name.ToString() : "bez krolestwa").Append(" -> ").Append(newK != null ? newK.Name.ToString() : "bez krolestwa")
+                  .Append(" | przyczyna ").Append(detail.ToString());
+                AppendRel(sb, "starego", lead, oldK);
+                AppendRel(sb, "nowego", lead, newK);
+                sb.Append(" | kiesa ").Append(clan.Gold).Append(" | lenna ").Append(towns + castles).Append(" (miasta ").Append(towns).Append(", zamki ").Append(castles).Append("): ")
+                  .Append(string.Join(", ", names.ToArray())).Append(towns + castles > names.Count ? ", ..." : "").Append('.');
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { _stumbles++; if (_stumbles <= 3) Log.Error("KingdomBalance.OnClanChangedKingdom", e); }
+        }
+
+        private static void AppendRel(StringBuilder sb, string tag, Hero lead, Kingdom k)
+        {
+            if (k == null) return;
+            var r = k.Leader;
+            sb.Append(" | wladca ").Append(tag).Append(" ").Append(r != null && r.Name != null ? r.Name.ToString() : "-");
+            if (r != null && lead != null && !ReferenceEquals(r, lead)) sb.Append(", relacja glowy rodu ").Append(lead.GetRelation(r));
+            else if (r != null && ReferenceEquals(r, lead)) sb.Append(" (glowa rodu)");
+        }
+
         private static void CountForts(bool start)
         {
             foreach (var r in _rows.Values) { r.Forts = 0; r.GarrMen = 0; r.GarrRegs = 0; r.GarrTiers = 0; r.PartyMen = 0; r.PartyRegs = 0; r.PartyTiers = 0; }

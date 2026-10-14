@@ -216,6 +216,18 @@
        never counted twice). Set BkBattleRewardPerks to false to leave these perks without effect (old behaviour). -->
   <BkBattleRewardPerks>true</BkBattleRewardPerks>
 
+  <!-- New realms from clans leaving with their fiefs (needs Banner Kings). Banner Kings makes a new realm ("County of ...",
+       "Barony of ...", "Kingdom of ...") in two ways: when a radical group of lords demands independence and the ruler refuses
+       (or grants it), its lords leave the realm with their towns and castles as a new realm - this is how the dozen new realms of
+       a two-year campaign in Essos came about; and when the rebels of a town that rose in revolt settle down after 30 days.
+       With false (the default), Banner Kings makes no new realm: the lords of a refused group leave the realm with their fiefs
+       as clans of no realm, at war with their old realm, as in the base game (if the ruler grants independence, they leave at
+       peace with it), and rebels keep their town as a clan of no realm. The same holds for your own clan if it is in such a group.
+       Banner Kings' own files are not touched; the start-up line "Mends: BK rebel kingdoms off" in the CrashScribe log says it
+       is done, and a line "Mends: S9 secesja BK" is written each time a group leaves. Set BkRebelKingdoms to true for new realms
+       as before. -->
+  <BkRebelKingdoms>false</BkRebelKingdoms>
+
   <!-- Banner Kings player education: BK's CorrectPlayerEducation throws once at character creation
        (a BK language without cultures); BKROTPatch already swallows it and BK gives the player the
        language of their culture on the first daily tick. With this on, that one known error becomes a
