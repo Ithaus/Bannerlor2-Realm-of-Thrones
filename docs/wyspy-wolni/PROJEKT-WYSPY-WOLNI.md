@@ -336,3 +336,20 @@ bez globalnych wylacznikow.
 6. **Ile ze "z wojska" ludu WL to zold** (RWL 7.8) - skutek WL1 dla ludu WL; pomiar: `kiesa-obieg.csv` z_wojska WL wobec bazy.
 7. **Czy M1 naprawde zmniejsza brak Wysp o 3.5 tys.** (PW rec. 8.3 - nie zmierzone) - punkt wyjscia 20.4 jest [S]; T1 z baza 63aaaedf daje prawdziwy punkt.
 8. **Czy wieksze druzyny WL zaczna oblegac Straz** - AI WL nigdy nie oblegalo; WL-4 i KRONIKA WOJEN.
+
+---
+
+## 7. Wdrozenie (kod, 14.10) - galaz `w-toku/wyspy-wolni`, tor L, status DO SPRAWDZENIA (build kod 0, gen_mcm; bez testu w grze; nic nie wgrane)
+
+Commity (od 63aaaedf): WW0 pomiar, WW1, WW2, WW3, WW4, WL1, WL2, WL3, narzedzie (`--grupa wyspywolni`). Kazda regula z kluczem (off = 63aaaedf), wpis CHANGELOG.
+Klucze (wszystkie nowe, w `Armoury.json` Jeffa ich nie ma - domyslne zadzialaja): `ReaverIronPrice` (tak), `ReaverIronPriceShare` 0.50, `ReaverWaterfrontShare` 0.10,
+`ReaverLootToCrews` (tak), `ReaverRaidByProfit` (tak), `ReaverRaidPayDays` 4, `SeaRaidersIronHarbour` (tak), `SeaRaidersHarbourTithe` 0.25, `FreeFolkUnpaid` (tak),
+`FreeFolkMenFromPeople` (tak), `FreeFolkLevyShare` 0.018, `FreeFolkGarrisonPoolShare` 0.50, `FreeFolkRecruitNeedsFood` (tak). WW-J - bez kodu (pytanie do Jeffa).
+
+Odstepstwa od tekstu projektu (z powodem):
+1. Nabrzeze WW1: zdjecie z kiesy ludu ksiegowane w `_ctlOut` (wydatek kies - jak lup L2 i pobor W7), nie `_ctlIn`; miara zapasu takze bez oferty nadwyzki na jutro (jak `LevyRoom` W7 - najazd nie bierze tego, co lud juz postanowil wydac).
+2. WW2 wymaga WW1, WW3 wymaga WW1 (E i kosz to zelazna cena). Kredyt wojenny 168 pozycza tylko brak ponad pulap i lup; `OnceToday` (168) bez kosza WW2; gracz-wasal (W6b) - pulap W5/W6 z jego oknem lupu (ta sama regula). Dwor i niewydany sprzet licza zold bez czesci z lupu (dwor jak bez lupu).
+3. WW4: porty Wysp sa "domem" korsarza w obie strony pasera (sprzedaz lupu i zakup sprzetu - `Reach` jest wspolny). Rozbicie band na klan bandycki - w linii "Paser:" (nie "Wyrzutki:").
+4. WL3: "po werbunku" = z kolejnym czlowiekiem (gra nie mowi z gory, ilu dobierze; jedno wywolanie moze dobrac kilku, nastepne widzi ich zuzycie).
+5. WW0 "w zasiegu" = rozne wsie w opcjach rabunku (gra daje opcje tylko w zasiegu 5x).
+6. Narzedzie: WW-5 glod E5/C2 - liczba miast swiata (linia nie ma rozbicia na krainy); WL-2b - ludzie w druzynach lordow WL z `budzet-rodow.csv` (`ludzi_partie` - jest tez w 63aaaedf); WL-5 - tylko INFO z `--crashscribe`.

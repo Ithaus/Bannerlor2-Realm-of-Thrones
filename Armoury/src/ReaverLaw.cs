@@ -22,6 +22,13 @@ namespace Armoury
     ///    miast - AiMilitaryBehavior.GetDistanceScoreForRaiding) i odleglosci Pyke -> Flint's Finger, Seagard, Lannisport, Greenshield (Wyspy Tarczowe).
     ///    Linie: "Najezdzcy - decyzje AI (WW0)" (doba) i "Najezdzcy - zasieg (WW0)" (raz na sesje). Po co: dlaczego Wyspy po d405 i Wolni Ludzie po Q1 nie
     ///    rabuja - przyczyn nie zakladamy, poprawka dopiero po tescie.
+    ///  - WW1 (ReaverIronPrice): zelazna cena - udzial lupu najezdzcow max(s, Q x postep kroku) z kiesy i magazynu wsi (DistrictRaid.Loot, osobny przelew ponad s
+    ///    tym samym platnikiem SmallGold.PayRaidLoot); z morza wsi portu - Qw nadwyzki kiesy W portu (Waterfront, TownFolk.WaterfrontRoom/LevyTake). Linia "Zelazna cena (WW1)".
+    ///  - WW2 (ReaverLootToCrews): lup ponad s, nabrzeze i dziesiecina korsarzy -> okno 28 dob rodu (NoteLoot/Roll/Window) -> ClanBudget podnosi pulap druzyn 1:1,
+    ///    ksiega dochodu poza D (ClanIncomeBook KReaver/QReaver). Kolumna lup_na_zaloge_ww2.
+    ///  - WW3 (ReaverRaidByProfit): opcje rabunku lordow AI x M = 1 + min(2, E / (C x T)) w tym samym postfiksie co WW0 (Profit).
+    ///  - WW4 (SeaRaidersIronHarbour): porty Wysp jako dom band Sea Raiders u pasera i w zyciu (OutlawLaw), dziesiecina panu portu (HarbourTitheOf/PayHarbourTithe).
+    /// WL1-WL3 (Wolni Ludzie) - CrownGifts.IsUnpaidParty, ClanBudget (pula _ff, RecruitPrefix, GarRecruitPrefix). Projekt: docs/wyspy-wolni/PROJEKT-WYSPY-WOLNI.md.
     /// Wyjatek per partia - licznik potkniec (bez globalnych wylacznikow, CLAUDE.md 7). Stan tylko w pamieci sesji; Reset w konstruktorze ArmouryBehavior.
     /// </summary>
     internal static class ReaverLaw
@@ -267,7 +274,8 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Postfiks Low (po wszystkich odbiorcach zdarzenia - opcje gry, BK, ROT, NavalDLC sa juz na liscie): partie lordow AI najezdzcow. WW0 - tylko liczy.
+        /// Postfiks Low (po wszystkich odbiorcach zdarzenia - opcje gry, BK, ROT, NavalDLC sa juz na liscie): partie lordow AI najezdzcow. WW0 - liczy surowe
+        /// wyniki gry; WW3 (przy kluczu) - potem mnozy opcje rabunku (Profit).
         /// </summary>
         public static void AiTickPostfix(MobileParty party, PartyThinkParams partyThinkParams)
         {
