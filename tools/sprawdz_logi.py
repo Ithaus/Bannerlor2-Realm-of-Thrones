@@ -465,6 +465,8 @@ Uzycie (Python 3, tylko odczyt):
                     M6a-2b/2c (zloto u rodzin, okupy tej samej osoby w 56 dobach - INFO), M6a-3a (zamkniecie odlozonych pokojow), M6a-3b (uwolnieni
                     przez pokoj w doby pokoju fabularnego <= 1.0 na dobe, bez uwolnien M6a-3 po dobie), M6a-3c (INFO), M6a-4 (recenzja: miara progu
                     85 tys. i lordowie w niewoli, srednia ostatnich 28 dob okna - INFO do porownania z biegiem bez paczki). Log bez paczki: INFO, bez wyjatku.
+--grupa jeff14    : (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa) JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, Army175GoldenBows: zestawy, potrzeba,
+                    pokrycie lukow). Alias jeff14s. python -I tools/sprawdz_logi.py --grupa jeff14 <Armoury-*.log>
 --grupa drobne14  : (14.10) diagnozy drobnych bledow: D14-1 L5b-2 karawany w murach na poczatku oblezenia -> przy zdobyciu, D14-2 kto wyprowadza
                     karawany z oblezanych osad (stos), D14-3 C-4b linie diagnozy = 0, D14-4 P3-2 nazwy wsi. python -I tools/sprawdz_logi.py --grupa drobne14 <log>
 --grupa lup5b     : (lup 5b, decyzja Jeffa 13.10 "5 tak, i tak" - docs/lup-miast rozdz. 8 pyt. 5b) L5b-1 skarbiec korony przy zdobyciu stolicy (CapitalTreasury)
@@ -16455,6 +16457,53 @@ def drobne14_main(logp):
     return 0
 
 
+def jeff14_main(logp):
+    """jeff14 (14.10, w-toku/jeff-tak-swiat; dawne "tak" Jeffa bez kodu): JK-GB Zlota Kompania 1/3 lukow (PLAN 1.6, GoldenKits). Caly log (bez okna dob).
+    Log bez paczki: wiersze INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    errs = {}
+    for s in lines:
+        if s.startswith("ERROR in "):
+            k = s[9:].split(":", 1)[0]
+            errs[k] = errs.get(k, 0) + 1
+    # ---- JK-GB: Zlota Kompania (PLAN 1.6)
+    start = [s for s in lines if s.startswith("Armie 175 (Armoury) - wylaczniki przy starcie sesji")]
+    key = None
+    if start:
+        key = "Zlota Kompania Army175GoldenBows TAK" in start[-1]
+    gb = by_day(lines, "Zlota Kompania (PLAN 1.6): dzien")
+    rep.add("JK-GB-0: klucz Army175GoldenBows (linia startu 175)", "brak linii startu" if key is None else ("TAK" if key else "NIE"),
+            "INFO (TAK = paczka wlaczona)", None)
+    if gb:
+        days = sorted(gb)
+        last = gb[days[-1]]
+        kits = re.findall(r"(golden_\w+) (\d+) \(z lukiem (\d+)\)", last)
+        ok_k = len(kits) == 3 and all(int(n) == 3 and int(b) == 2 for _, n, b in kits)
+        rep.add("JK-GB-1: zestawy trzech jednostek ZK (CS GoldenBows)", ", ".join(f"{i} {n} (luk {b})" for i, n, b in kits) or "brak",
+                "kazda z 3 jednostek: 3 zestawy, w tym 2 z lukiem (inaczej CS nie zrobil zestawow - potrzeba zostaje z 1. zestawu)", ok_k)
+        def cov(s, what):
+            v = num(r"pokrycie " + what + r" ([\d.]+)%", s, float)
+            return v
+        c0, c1 = cov(gb[days[0]], "lukow"), cov(last, "lukow")
+        a1 = cov(last, "strzal")
+        men = num(r"kusznikow ZK (\d+)", last)
+        nb = num(r"potrzeba tych partii \(cala partia, jedna miara Deficit\): luki (\d+)", last)
+        span = days[-1] - days[0] + 1
+        rep.add("JK-GB-2: potrzeba lukow w partiach z kusznikami ZK (ostatnia doba)", f"kusznikow ZK {men}, potrzeba lukow {nb} (dob z linia {len(days)}, d{days[0]}-d{days[-1]})",
+                "potrzeba lukow > 0 przy kusznikach ZK > 0 (2/3 kusznikow liczy luk)", (nb or 0) > 0 if (men or 0) > 0 else None)
+        rep.add("JK-GB-3: pokrycie lukow / strzal (pierwsza -> ostatnia doba)", f"luki {c0}% -> {c1}%, strzaly ostatniej doby {a1}% ({span} dob)",
+                "po >= 60 dobach: luki >= 50% i wiecej niz pierwszej doby (AI kupuje luki); krocej - INFO",
+                (c1 is not None and c1 >= 50.0 and (c0 is None or c1 > c0)) if span >= 60 and c1 is not None else None)
+    else:
+        rep.add("JK-GB-1..3: linia \"Zlota Kompania (PLAN 1.6)\"", "brak linii", "INFO (klucz wylaczony albo log sprzed paczki)" if not key else
+                "przy kluczu TAK linia co dobe - NIE", None if not key else False)
+    rep.add("JK-GB-4: bledy GoldenKits", f"ERROR in GoldenKits.* {sum(v for k, v in errs.items() if k.startswith('GoldenKits'))}", "0",
+            sum(v for k, v in errs.items() if k.startswith("GoldenKits")) == 0)
+    rep.show()
+    return 0
+
+
 def n7_main(logp, start_arg, until=120):
     """N7 (decyzja Jeffa 13.10 "Proporcje pasuja"; Armoury/src/StragglersRally.cs, klucz StragglersRally): rozbici z pobitej druzyny lorda - 55% pod choragiew (weterani 70,
     t3 55, rekruci 45), 30% do domu, 15% do lasu, poprawki kraju, zaleglego zoldu i Strazy; pod choragiew - zbiorka 3-10 dob w twierdzy rodu, marsz do druzyny rodu w zasiegu,
@@ -19785,6 +19834,8 @@ def main(argv):
         return m6a_main(logp, start_arg, until_arg)   # M6a: najemnicy (sluzba), okup powtorny, pokoj a jency
     if group == "lup5b" and logp:
         return lup5b_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup 5b: skarbiec korony przy zdobyciu stolicy (L5b-1), karawany wroga w zdobytym miescie (L5b-2)
+    if group in ("jeff14", "jeff14s") and logp:
+        return jeff14_main(logp)   # jeff14 (w-toku/jeff-tak-swiat): Zlota Kompania 1/3 lukow (JK-GB)
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "w6b" and logp:
