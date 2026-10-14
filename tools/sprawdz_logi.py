@@ -24979,21 +24979,61 @@ AU_SESS = re.compile(r"Mends: tytuly BK \(AM-26/AM-27\) - pierwsza godzina sesji
                      r" z tytulem (\d+) z (\d+) \| krolestw bez tytulu krolewskiego (\d+) z (\d+)(.*?) \| (?:ksiestw (\d+), spoza pliku (\d+)(.*?)|ksiestw \?[^|]*)"
                      r" \| retrofit przy wczytaniu: (.*?) \| potkniec (\d+)\.")
 AU_ROT = "ROT 8.1.8 (CrashScribe)"
+AU_FC_MARK = re.compile(r"=== BK FirstChance logger installed at (\d{4}-\d\d-\d\d)T(\d\d:\d\d:\d\d)")
+AU_LOG_T0 = re.compile(r"session-(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)-(\d\d)\.log$", re.I)
 
 
-def audyta_bkfc(rep, logp):
-    """AUD-P1-8 (AM-04, INFO): wpisy 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log obok katalogu logu CrashScribe."""
+def audyta_bkfc(rep, logp, active=False):
+    """AUD-P1-8 (AM-04): wpisy 'GetIdealCapital' (NRE BKCapitalBehavior - miasto rodu panujacego bez tytulu) w Configs/ModLogs/bk-firstchance.log
+    obok katalogu logu CrashScribe. Recenzja P1: BK dopisuje ten plik przez WSZYSTKIE procesy (BKDiagnostics: AppendAllText, przy 4 MB zostaje
+    ostatni 1 MB), a kazdy proces zaczyna linia '=== BK FirstChance logger installed at <czas startu> ===' - czas jak w nazwie session-*.log
+    (06:01:14 / 09:07:14 co do sekundy). Liczone w odcinku procesu tej sesji (znacznik od -2 do +15 min od startu logu, najblizszy); caly plik
+    tylko informacyjnie (przed P1: 13 903 linii w calym pliku, 528 w procesie 06:01, 89 w 09:07). Prog 0 tylko przy czynnej paczce P1 (active),
+    inaczej INFO."""
+    import datetime
     fc = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(logp)), "..", "Configs", "ModLogs", "bk-firstchance.log"))
-    if os.path.isfile(fc):
-        n = 0
-        with open(fc, encoding="utf-8", errors="replace") as f:
-            for ln in f:
-                if "GetIdealCapital" in ln:
-                    n += 1
-        rep.add("AUD-P1-8 (AM-04): wpisy GetIdealCapital w bk-firstchance.log", f"{n} ({fc})",
-                "INFO (cel 0 po P1; plik BK bez dat - sprawdzic, czy jest z tego biegu)", None)
-    else:
+    if not os.path.isfile(fc):
         rep.add("AUD-P1-8 (AM-04): bk-firstchance.log", f"brak pliku ({fc})", "INFO", None)
+        return
+    t0 = None
+    m = AU_LOG_T0.search(os.path.basename(logp))
+    if m:
+        try:
+            t0 = datetime.datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}:{m.group(4)}", "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            t0 = None
+    segs, total = [], 0   # odcinki procesow: [czas startu, linie GetIdealCapital]
+    with open(fc, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            mm = AU_FC_MARK.search(ln)
+            if mm:
+                try:
+                    ts = datetime.datetime.strptime(f"{mm.group(1)} {mm.group(2)}", "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    ts = None
+                segs.append([ts, 0])
+                continue
+            if "GetIdealCapital" in ln:
+                total += 1
+                if segs:
+                    segs[-1][1] += 1
+    best, bestd = None, None
+    if t0 is not None:
+        for sg in segs:
+            if sg[0] is None:
+                continue
+            d = (sg[0] - t0).total_seconds()
+            if -120 <= d <= 900 and (bestd is None or abs(d) < bestd):
+                best, bestd = sg, abs(d)
+    if best is None:
+        rep.add("AUD-P1-8 (AM-04): GetIdealCapital w bk-firstchance.log - proces tej sesji",
+                f"brak odcinka procesu tej sesji (start logu {t0 if t0 else '? (nazwa logu nie session-*.log)'}, odcinkow {len(segs)});"
+                f" caly plik {total} ({fc})", "INFO (plik BK z innego biegu albo log skopiowany)", None)
+        return
+    rep.add("AUD-P1-8 (AM-04): GetIdealCapital w bk-firstchance.log - proces tej sesji",
+            f"{best[1]} (odcinek od {best[0]}; caly plik {total}, odcinkow {len(segs)}; {fc})",
+            "0 (przed P1: 528 w procesie 06:01, 89 w 09:07)" if active else "INFO (paczka P1 nieczynna w tym logu)",
+            (best[1] == 0) if active else None)
 
 
 def audyta_main(logp, csp=None):
@@ -25107,7 +25147,8 @@ def audyta_main(logp, csp=None):
     else:
         rep.add("AUD-P1-3..7: linia pierwszej godziny sesji", "brak (czas gry nie ruszyl albo latka nie wpieta)" + (f"; bledy BkTitles {errs}" if errs else ""),
                 "INFO", None if errs == 0 else False)
-    audyta_bkfc(rep, logp)
+    # AM-04: prog tylko przy czynnej paczce P1 (latki wpiete i nasz plik ROT 8.1.8) - recenzja P1
+    audyta_bkfc(rep, logp, active=bool(start) and start[-1][0].strip() == "TAK" and start[-1][1] == "true")
     audyta_p3(rep, logp, armp)
     rep.show()
     return 0
