@@ -1523,6 +1523,11 @@ namespace Armoury
         // --- Blood and race ---
         // Jeff 10.10 (wiazace): olbrzymy tylko z olbrzymami, ludzie z ludzmi - zadnego slubu ani ciazy roznych ras (RaceLaw.cs)
         public bool SameRaceOnly = true;                   // giants wed and bear children only with giants, men only with men (likewise wights and the Others): no marriage and no child across races. Mixed couples wed before the war stay married, but no child is born to them - a pregnancy across races ends without a birth
+        // CR (zasada Jeffa 14.10 "1 rok w grze to 1 rok starzenia, 1 dzien to 1 dzien"; PregnancyYear.cs, docs/pytania-2026-10-14/STARZENIE-I-CZAS-ZYCIA.md):
+        // czas ciazy w dobach (postfiks gettera DefaultPregnancyModel.PregnancyDurationInDays; 0 = gra 36) i szansa poczecia na dobe x 84 / rok kalendarza
+        // (postfiks DefaultPregnancyModel.GetDailyChanceOfPregnancyForHero - obie drogi poczecia: gra i drudzy malzonkowie BK); sluby AI bez zmian
+        public int PregnancyDays = 273;                    // A pregnancy lasts this many days - 273 is nine months, as in life (the long year has 364 days). It holds for every pregnancy that begins from now on; one already under way keeps the day of birth it was given. 0 = as in the game: 36 days.
+        public bool FertilityYearScale = true;             // The daily chance of a married couple conceiving a child is scaled to the length of the year (84 / 364 = 0.23 with the long year), so a couple has as many children a year as the game meant for its 84-day year - under one child in the first year of marriage instead of two to four. Perks, Banner Kings doctrines and Realm of Thrones blessings still raise the chance as before; marriages are not affected. Off = the game's daily chance, made for an 84-day year.
 
         // --- Map villages ---
         public bool MapVillagesEnabled = true;             // named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save

@@ -219,6 +219,8 @@ RANGES = {
     'SiegeRansomShare': (0.0, 1.0, "0.000"),
     'SiegeRansomBloodyRatio': (0.0, 5.0, "0.00"),
     'SiegeRansomTruceDays': (0, 364, "0"),   # rozejm po okupie - kod przycina do 0..364 (SiegeRansom.TruceDays)
+    # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
+    'PregnancyDays': (0, 364, "0"),
 }
 
 def gen(module_dir, ns, display):

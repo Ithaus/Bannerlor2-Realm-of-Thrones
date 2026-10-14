@@ -4576,6 +4576,14 @@ namespace Armoury
         [SettingPropertyGroup("Blood and race")]
         public bool SameRaceOnly { get; set; } = true;
 
+        [SettingPropertyInteger("Pregnancy Days", 0, 364, "0", HintText = "A pregnancy lasts this many days - 273 is nine months, as in life (the long year has 364 days). It holds for every pregnancy that begins from now on; one already under way keeps the day of birth it was given. 0 = as in the game: 36 days.")]
+        [SettingPropertyGroup("Blood and race")]
+        public int PregnancyDays { get; set; } = 273;
+
+        [SettingPropertyBool("Fertility Year Scale", HintText = "The daily chance of a married couple conceiving a child is scaled to the length of the year (84 / 364 = 0.23 with the long year), so a couple has as many children a year as the game meant for its 84-day year - under one child in the first year of marriage instead of two to four. Perks, Banner Kings doctrines and Realm of Thrones blessings still raise the chance as before; marriages are not affected. Off = the game's daily chance, made for an 84-day year.")]
+        [SettingPropertyGroup("Blood and race")]
+        public bool FertilityYearScale { get; set; } = true;
+
         [SettingPropertyBool("Map Villages Enabled", HintText = "named villages on the campaign map between the game's own villages, castles and towns - each one a cluster of its district's settlements, standing where a village had reason to stand (bridge, ford, crossroads, road, river, coast); off = none drawn. Nothing is written to the save")]
         [SettingPropertyGroup("Map villages")]
         public bool MapVillagesEnabled { get; set; } = true;
@@ -6907,6 +6915,8 @@ namespace Armoury
             s.NightKingCallMaxHost = NightKingCallMaxHost;
             s.OthersRescuedAreFallen = OthersRescuedAreFallen;
             s.SameRaceOnly = SameRaceOnly;
+            s.PregnancyDays = PregnancyDays;
+            s.FertilityYearScale = FertilityYearScale;
             s.MapVillagesEnabled = MapVillagesEnabled;
             s.MapVillagesHideAboveCameraHeight = MapVillagesHideAboveCameraHeight;
             s.MapVillageNamesOnHover = MapVillageNamesOnHover;

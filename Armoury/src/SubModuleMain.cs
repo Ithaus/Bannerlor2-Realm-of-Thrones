@@ -58,6 +58,9 @@ namespace Armoury
                 ThrownWobblePatch.ApplyAll(_harmony);
                 FairXpPatch.ApplyAll(_harmony);
                 try { RaceLaw.ApplyAll(_harmony); } catch (Exception e) { Log.Error("RaceLaw.ApplyAll", e); }   // Jeff 10.10: sluby i ciaze tylko w obrebie rasy (olbrzymy z olbrzymami) - model slubu, MarriageAction, ciaza, porod
+                // CR (zasada Jeffa 14.10 "1 rok = 1 rok, 1 dzien = 1 dzien"): czas ciazy PregnancyDays (getter modelu gry) i szansa poczecia x 84 / rok
+                // (FertilityYearScale) - postfiksy na DefaultPregnancyModel (czynny BKROTPregnancyModel dziedziczy, metode szansy gry wola niewirtualnie); wlasny try
+                try { PregnancyYear.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PregnancyYear.ApplyAll", e); }
                 DonationXpLaw.ApplyAll(_harmony);   // audyt 13 Z1 (Jeff 09.10): oddany sprzet nie uczy - XP perkow Giving Hands / Paid in Promise = 0, migawka handlu BK przy kazdym otwarciu handlu
                 // RP (decyzja Jeffa 14.10): punkt cechy co AttributePointEveryLevels, dodatkowe skupienie co ExtraFocusEveryLevels - getter modelu rozwoju,
                 // HeroDeveloper.OnGainLevel i SetupDefaultPoints (prywatne - TU, w menu glownym, zanim JIT skompiluje wolajacych); klucze na zywo; wlasny try
