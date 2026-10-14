@@ -683,8 +683,9 @@ Uzycie (Python 3, tylko odczyt):
                     (test: nowa kampania -> zapis -> NOWY proces -> wczytanie), linia pierwszej godziny sesji: AUD-P1-3 twierdz bez tytulu 0, AUD-P1-4
                     krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0, AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
                     i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
-                    P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, tylko kaplani:
-                    linia doby z ogonem TAK, 0 prostowanych Artisan / Merchant, 0 petli >= 3 razy, zostawieni BK INFO), AUD-P3-29a..c (AM-29, wzorce kultur:
+                    P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, droga B domyslna:
+                    wpiete 3/3 i ogon doby 'kultura osady TAK', od 4. doby 0 prostowanych Artisan / Merchant, 0 petli >= 2 razy, zablokowane BK INFO;
+                    przy B wylaczonej i LocalLeviesPreachersOnly - wiersze drogi A: tylko kaplani TAK, 0 prostowanych poza kaplanami, 0 petli >= 3 razy), AUD-P3-29a..c (AM-29, wzorce kultur:
                     siatka wpieta, po starcie sesji 0 zepsutych i 0 potkniec, siatka bez zastepcy 0), AUD-P3-01a..d (AM-01, BKROT EarlyHeal: zdjety 3/3
                     i straz NaN wpieta, prefiks nie wrocil w zadnej dobie, NaN i twierdze ponizej 100 INFO); z logiem Armoury (Armoury-*.log jako log,
                     --crashscribe <session-*.log>): AUD-P3-30a..d (AM-30, warsztaty bez wsadu: regula A na wszystkie typy z rzeznikiem na liscie,
@@ -25159,6 +25160,10 @@ AU3_LEVY = re.compile(r"Mends: werbunek miejscowy - poprawionych notabli (\d+), 
 AU3_LEVY20 = re.compile(r"\| AM-20 tylko kaplani (TAK|NIE[^:]*): prostowani wedlug zawodu \[(.*?)\], kaplani pominieci \(kultura pana\) (\d+),"
                         r" inni notable z kultura inna niz osady \(nawroceni przez BK, zostawieni\) (\d+) \[(.*?)\]\.")
 AU3_FIX = re.compile(r"Mends: (.*) w (.*) byl (\S+), jest (\S+) \(([^)]*)\)\.$")
+# AM-20 droga B (recenzja P3, decyzja Jeffa 14.10 - notable zawsze w kulturze osady; NotablesKeepSettlementCulture)
+AU3_B_START = re.compile(r"Mends: kultura notabli \(AM-20\) - notable w kulturze osady \(droga B\) wpiete (\d+)/3: (.*)$")
+AU3_LEVYB = re.compile(r"\| AM-20 kultura osady (TAK|NIE[^:]*): zablokowane nawrocenia BK (\d+) \(gracz (\d+)\), zadanie rady PromoteCulture pominiete (\d+),"
+                       r" w procesie (\d+)")
 AU3_T_START = re.compile(r"Mends: wzorce kultur \(AM-29\) - siatka na rod towarzysza \(CreateNewHeroForNewCompanionClan\) (wpieta|NIE wpieta[^;]*);")
 AU3_T_SESS = re.compile(r"Mends: wzorce kultur \(AM-29\) - start sesji: wzorcow sprawdzonych (\d+), usunietych (\d+)(.*?); list zostawionych bez zmian"
                         r" \(same zepsute\) (\d+), pozostalo zepsutych (\d+), siatka rodu towarzysza (wpieta|NIE) \(podmian w procesie (\d+), bez zastepcy (\d+)\),"
@@ -25177,7 +25182,8 @@ AU3_P_DAY = re.compile(r"Mends: dobrobyt \(AM-01\) doba: NaN/Inf zablokowanych (
 def audyta_p3_cs(csp):
     """Jedno przejscie po logu sesji CrashScribe: linie paczki P3 wedlug pozycji."""
     d = {"levy": [], "levy20": [], "fixes": [], "t_start": [], "t_off": 0, "t_sess": [], "t_net": 0, "errs": 0,
-         "p_start": [], "p_off": 0, "p_sess": [], "p_day": [], "l_start": [], "l_off": 0, "l_sess": [], "l_day": []}
+         "p_start": [], "p_off": 0, "p_sess": [], "p_day": [], "l_start": [], "l_off": 0, "l_sess": [], "l_day": [],
+         "b_start": [], "b_off": 0, "levyb": [], "fix_day": []}
     with open(csp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             if "Mends: " not in ln and "AuditP3." not in ln:
@@ -25195,6 +25201,16 @@ def audyta_p3_cs(csp):
                 m2 = AU3_LEVY20.search(m.group(4))
                 if m2:
                     d["levy20"].append(m2.groups())
+                m3 = AU3_LEVYB.search(m.group(4))
+                if m3:
+                    d["levyb"].append(m3.groups())
+                continue
+            if "(AM-20)" in s:
+                m = AU3_B_START.search(s)
+                if m:
+                    d["b_start"].append(m.groups())
+                elif "kultura notabli (AM-20) wylaczone" in s:
+                    d["b_off"] += 1
                 continue
             if "(AM-29)" in s:
                 m = AU3_T_START.search(s)
@@ -25242,12 +25258,13 @@ def audyta_p3_cs(csp):
             m = AU3_FIX.search(s)
             if m and " w " in s and ", jest " in s:
                 d["fixes"].append(m.groups())
+                d["fix_day"].append(len(d["levyb"]))   # AM-20 B: ile linii doby z ogonem B bylo przed ta linia prostowania
     return d
 
 
 def audyta_p3(rep, csp, armp):
     """Pakiet P3 audytu modow 14.10 (wiersze AUD-P3-*). csp = log sesji CrashScribe (session-*.log), armp = log Armoury (Armoury-*.log) albo None.
-    AM-20 (LocalLeviesPreachersOnly): AUD-P3-20a linia doby 'werbunek miejscowy' z ogonem 'AM-20 tylko kaplani TAK'; AUD-P3-20b 0 linii 'Mends: X w Y
+    AM-20 droga B (NotablesKeepSettlementCulture, domyslna): audyta_p3_b. Droga A (LocalLeviesPreachersOnly, tylko przy B wylaczonej): AUD-P3-20a linia doby 'werbunek miejscowy' z ogonem 'AM-20 tylko kaplani TAK'; AUD-P3-20b 0 linii 'Mends: X w Y
     byl A, jest B (zawod)' dla notabli innych niz kaplani (Artisan, Merchant, ...); AUD-P3-20c 0 notabli prostowanych 3 i wiecej razy (petla);
     AUD-P3-20d INFO zostawieni BK wedlug zawodu (ostatnia doba).
     AM-29 (CultureTemplateRepair): AUD-P3-29a siatka rodu towarzysza wpieta; AUD-P3-29b kazdy start sesji: pozostalo zepsutych 0 i potkniec 0
@@ -25265,12 +25282,15 @@ def audyta_p3(rep, csp, armp):
         d = audyta_p3_cs(csp)
         levy, levy20, fixes = d["levy"], d["levy20"], d["fixes"]
         on = [x for x in levy20 if x[0] == "TAK"]
-        if not levy20:
+        b_on = audyta_p3_b(rep, d)   # AM-20 droga B (domyslna): wiersze AUD-P3-20a..d; False = B wylaczona albo log bez niej - wtedy wiersze drogi A ponizej
+        if b_on:
+            pass
+        elif not levy20:
             rep.add("AUD-P3-20a (AM-20): linia doby 'werbunek miejscowy' z ogonem AM-20", f"linii doby {len(levy)}, z ogonem AM-20 0",
                     "INFO (log bez paczki P3 albo LocalRecruits wylaczone)", None)
         else:
             rep.add("AUD-P3-20a (AM-20): tylko kaplani (LocalLeviesPreachersOnly)", f"linii z ogonem {len(levy20)}, TAK {len(on)}",
-                    "wszystkie TAK (NIE = klucz wylaczony, b47fecc3)", len(on) == len(levy20))
+                    "wszystkie TAK; zadna TAK = droga A wylaczona (domyslnie, b47fecc3) - INFO", (len(on) == len(levy20)) if on else None)
         if on:
             other = [x for x in fixes if x[4] != "Preacher"]
             occ = Counter(x[4] for x in other)
@@ -25343,6 +25363,58 @@ def audyta_p3(rep, csp, armp):
         if d["errs"]:
             rep.add("AUD-P3: bledy AuditP3 w logu", f"{d['errs']}", "0", False)
     audyta_p3_arm(rep, armp)   # AM-30: log Armoury
+
+
+def audyta_p3_b(rep, d):
+    """AM-20 droga B (recenzja P3; decyzja Jeffa 14.10, STAN-PRAC 19:20 - notable zawsze w kulturze osady; NotablesKeepSettlementCulture):
+    AUD-P3-20a linia startu 'wpiete 3/3' (prefiks BK ApplyNotableCultureConversion, rozmowa, zadanie rady) i ogon 'AM-20 kultura osady TAK'
+    w kazdej linii doby; AUD-P3-20b od 4. linii doby 0 prostowan Artisan / Merchant przez LocalLevies (BK juz ich nie nawraca; wyjatek:
+    osada zmienila kulture przez asymilacje BK - wtedy jej notable raz, patrz nazwy); AUD-P3-20c ten sam notabl (poza kaplanami) prostowany
+    >= 2 razy = 0 (petla BK / CrashScribe); AUD-P3-20d INFO zablokowane nawrocenia BK (gracz), zadanie rady pominiete, ostatnia doba.
+    Zwraca True, gdy wiersze drogi B zostaly dodane (B czynna albo jej linia startu jest w logu)."""
+    from collections import Counter
+    tails = d["levyb"]
+    on = [x for x in tails if x[0] == "TAK"]
+    if not d["b_start"]:
+        # klucz off: linia startu 'wylaczone' albo same ogony 'kultura osady NIE' (TwentyDayTail pisze ogon zawsze)
+        if d["b_off"] or (tails and all(x[0] == "NIE" for x in tails)):
+            rep.add("AUD-P3-20 (AM-20): droga B 'notable w kulturze osady'", "wylaczona (NotablesKeepSettlementCulture=false)",
+                    "INFO (klucz off = b47fecc3; ponizej wiersze drogi A)", None)
+            return False
+        if not tails:
+            return False
+    if d["b_start"]:
+        n, desc = d["b_start"][-1]
+        rep.add("AUD-P3-20a (AM-20): droga B wpieta 3/3, ogon doby 'kultura osady TAK'",
+                f"wpiete {n}/3 ({desc[:150]}); linie doby z ogonem {len(tails)}, TAK {len(on)}",
+                "3/3 i wszystkie TAK", n == "3" and len(on) == len(tails))
+    else:
+        rep.add("AUD-P3-20a (AM-20): droga B - linia startu", f"brak; linie doby z ogonem {len(tails)}, TAK {len(on)}",
+                "linia 'wpiete 3/3'", False)
+    if not on:
+        return True
+    late = [x for x, k in zip(d["fixes"], d["fix_day"]) if k >= 3 and x[4] != "Preacher"]
+    am = [x for x in late if x[4] in ("Artisan", "Merchant")]
+    occ = Counter(x[4] for x in late)
+    if len(tails) < 4:
+        rep.add("AUD-P3-20b (AM-20): prostowani Artisan / Merchant od 4. doby", f"za malo dob ({len(tails)} linii doby)", "INFO (>= 4 doby)", None)
+    else:
+        rep.add("AUD-P3-20b (AM-20): prostowani Artisan / Merchant od 4. doby (BK juz nie nawraca)",
+                f"{len(am)}; inni poza kaplanami {dict(occ)}" + (f"; np. {am[0][0]} w {am[0][1]} {am[0][2]}->{am[0][3]}" if am else ""),
+                "0 (wyjatek: osada zmienila kulture - asymilacja BK, wtedy jej notable raz)", len(am) == 0)
+    per = Counter((x[0], x[1]) for x in d["fixes"] if x[4] != "Preacher")
+    loop = [(k, v) for k, v in per.items() if v >= 2]
+    rep.add("AUD-P3-20c (AM-20): ten sam notabl (poza kaplanami) prostowany >= 2 razy (petla BK / CrashScribe)",
+            f"{len(loop)}" + (f"; np. {loop[0][0][0]} w {loop[0][0][1]} x{loop[0][1]}" if loop else ""), "0", len(loop) == 0)
+    blocked = sum(int(x[1]) for x in tails)
+    player = sum(int(x[2]) for x in tails)
+    council = sum(int(x[3]) for x in tails)
+    last = d["levy20"][-1] if d["levy20"] else None
+    rep.add("AUD-P3-20d (AM-20): zablokowane nawrocenia BK / zadanie rady pominiete / ostatnia doba",
+            f"zablokowane {blocked} (gracz {player}), rada pominieta {council}, w procesie {tails[-1][4]}"
+            + (f"; ostatnia doba prostowani [{last[1]}]" if last else ""),
+            "INFO (dotad ok. 1 nawrocenie na dobe w swiecie, bez kosztu wplywu)", None)
+    return True
 
 
 AU3_W_START = re.compile(r"Warsztaty bez wsadu \(AM-30\): \(A\) Workshop No Free Raw (TAK|NIE), wszystkie typy \(Workshop No Free Raw All Types\) (TAK|NIE)"

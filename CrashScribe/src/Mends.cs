@@ -5637,14 +5637,16 @@ namespace CrashScribe
             try
             {
                 if (!Config.LocalRecruits) return;
-                // AM-20 (audyt modow 14.10, P3a; decyzja: "jak w BannerKings" - rzemieslnicy i kupcy podbitego miasta moga raz przyjac kulture
-                // nowego pana): jedynym miejscem, ktore daje notablowi kulture pana, jest BK BKNotableBehavior.ApplyNotableCultureConversion
+                // AM-20 (audyt modow 14.10, P3a): jedynym miejscem, ktore daje notablowi kulture pana, jest BK BKNotableBehavior.ApplyNotableCultureConversion
                 // (co dobe HandleCultureConversions, rada PromoteCulture, rozmowa gracza; pan placi wplywem, relacja -8). Krok 1 ponizej cofal to
-                // nazajutrz u WSZYSTKICH notabli (bieg dwuletni 06:01: 675 Artisan + 24 Merchant, pan placil za nic). Przy LocalLeviesPreachersOnly
-                // krok 1 prostuje tylko kaplanow (BK robi ich z presetu wiary - obca kultura z urodzenia) i pomija kaplana z kultura glowy rodu pana
-                // (to nawrocenie BK, nie preset - bez tego petla wrocilaby na kaplanach). Krok 2 (obcy ochotnicy do kosza) bez zmian dla wszystkich;
-                // werbunek i tak idzie wedlug kultury osady (LocalRecruitsPrefix). false = jak b47fecc3 (kazdy notabl dostaje kulture osady).
-                bool preachersOnly = Config.LocalLeviesPreachersOnly;
+                // nazajutrz u WSZYSTKICH notabli (bieg dwuletni 06:01: 675 Artisan + 24 Merchant, pan placil za nic).
+                // Droga B (domyslna, decyzja Jeffa 14.10 - notable zawsze w kulturze osady; NotablesKeepSettlementCulture, AuditP3.TwentyInstall): BK juz
+                // nie nawraca (prefiks blokuje cala akcje, bez kosztu), a krok 1 dalej prostuje WSZYSTKICH notabli - jak b47fecc3 (kaplani z presetu wiary,
+                // notable osady, ktora zmienila kulture przez asymilacje BK).
+                // Droga A (alternatywa, LocalLeviesPreachersOnly - tylko przy wylaczonej B, nigdy obie naraz): krok 1 prostuje tylko kaplanow (BK robi ich
+                // z presetu wiary) i pomija kaplana z kultura glowy rodu pana; rzemieslnicy i kupcy raz nawroceni przez BK zostaja.
+                // Krok 2 (obcy ochotnicy do kosza) bez zmian dla wszystkich; werbunek i tak idzie wedlug kultury osady (LocalRecruitsPrefix).
+                bool preachersOnly = Config.LocalLeviesPreachersOnly && !Config.NotablesKeepSettlementCulture;
                 int slots = 0, people = 0, cultures = 0, ownerSkip = 0, leftBk = 0;
                 var fixedByOcc = new System.Collections.Generic.SortedDictionary<string, int>(StringComparer.Ordinal);
                 var leftByOcc = new System.Collections.Generic.SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -5713,7 +5715,7 @@ namespace CrashScribe
                 if (only == null || slots > 0 || cultures > 0)
                     Scribe.Line("Mends: werbunek miejscowy - poprawionych notabli " + cultures
                                 + ", wyrzuconych obcych ochotnikow " + slots + " u " + people + " ludzi."
-                                + (only != null ? "" : AmTwentyTail(preachersOnly, fixedByOcc, ownerSkip, leftBk, leftByOcc)));
+                                + (only != null ? "" : AuditP3.TwentyDayTail() + AmTwentyTail(preachersOnly, fixedByOcc, ownerSkip, leftBk, leftByOcc)));
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "Mends.LocalLevies", null); } catch { } }
         }
@@ -5728,7 +5730,7 @@ namespace CrashScribe
                 foreach (var kv in fixedByOcc) fx.Add(kv.Key + " " + kv.Value);
                 var lf = new System.Collections.Generic.List<string>();
                 foreach (var kv in leftByOcc) lf.Add(kv.Key + " " + kv.Value);
-                return " | AM-20 tylko kaplani " + (preachersOnly ? "TAK" : "NIE (wszyscy notable, b47fecc3)")
+                return " | AM-20 tylko kaplani " + (preachersOnly ? "TAK" : (Config.NotablesKeepSettlementCulture ? "NIE (wszyscy notable - droga B" + (Config.LocalLeviesPreachersOnly ? ", LocalLeviesPreachersOnly pominiete" : "") + ")" : "NIE (wszyscy notable, b47fecc3)"))
                        + ": prostowani wedlug zawodu [" + string.Join(", ", fx.ToArray()) + "]"
                        + ", kaplani pominieci (kultura pana) " + ownerSkip
                        + ", inni notable z kultura inna niz osady (nawroceni przez BK, zostawieni) " + leftBk

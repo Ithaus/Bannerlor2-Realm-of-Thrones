@@ -333,15 +333,22 @@
        start-up to Documents\Mount and Blade II Bannerlord\CrashScribe\bk_titles_rot818.xml. Takes effect for a new
        campaign; set to false to use the BKROTPatch file. -->
   <BkTitlesRot818>true</BkTitlesRot818>
-  <!-- Notables and the culture of a new lord (mod audit 14.10, AM-20; works only with LocalRecruits). BannerKings lets a lord win
-       the artisans and merchants of his towns over to his own culture: he pays influence for it and the notable likes him a little
-       less. CrashScribe used to turn every notable back to the culture of the settlement the next morning, so the lord paid for
-       nothing and the same notable was won over again and again (about 700 times in two years). With this on, CrashScribe only
-       sets the culture of the settlement for priests (BannerKings creates them with the culture of their faith), and leaves a
-       priest alone once he has taken the culture of the settlement's lord. Artisans and merchants of a conquered town can take
-       the new lord's culture once, as BannerKings intends. Volunteers in every settlement still come from the settlement's own
-       culture, whatever the notable's culture is. Set to false to give every notable the culture of the settlement each day. -->
-  <LocalLeviesPreachersOnly>true</LocalLeviesPreachersOnly>
+  <!-- Notables keep the culture of their settlement (mod audit 14.10, AM-20). BannerKings lets a lord win the artisans and
+       merchants of his towns over to his own culture: he pays influence for it and the notable likes him a little less.
+       CrashScribe turns every notable back to the culture of the settlement the next morning (volunteers come from the
+       notable's culture), so the lord paid for nothing and the same notable was won over again and again (about 700 times in
+       two years). With this on, BannerKings no longer converts notables at all: no lord pays influence or loses the notable's
+       favour for it, the "convert to my culture" option in a conversation with your own notable is greyed out ("Notables keep
+       the culture of their settlement"), and the council task Promote Culture no longer converts anyone. The culture of a whole
+       town or village still changes slowly through BannerKings assimilation, and its notables follow it. Set to false to let
+       BannerKings convert notables as before. -->
+  <NotablesKeepSettlementCulture>true</NotablesKeepSettlementCulture>
+  <!-- The other way for AM-20, off by default; it works only when NotablesKeepSettlementCulture is false (never both). With this
+       on, CrashScribe sets the culture of the settlement only for priests (BannerKings creates them with the culture of their
+       faith) and leaves a priest alone once he has taken the culture of the settlement's lord, so artisans and merchants of a
+       conquered town can take the new lord's culture once, as BannerKings intends. Volunteers still come from the settlement's
+       own culture. Set to false to give every notable the culture of the settlement each day. -->
+  <LocalLeviesPreachersOnly>false</LocalLeviesPreachersOnly>
   <!-- Broken character templates of Realm of Thrones (mod audit 14.10, AM-29). Some cultures of Realm of Thrones list lord, notable
        or rebel templates that do not exist (the game log says 'Null object reference found', e.g. spc_brotherhood_2 among the
        Westerlands lords). The game keeps an empty stand-in in the list, and when such a stand-in is drawn - for example when you,

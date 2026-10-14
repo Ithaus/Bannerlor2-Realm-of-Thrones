@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 
 namespace CrashScribe
@@ -24,12 +25,14 @@ namespace CrashScribe
     /// AM-01 (StopBkrotProsperityReset): 3 prefiksy BKROT EarlyHeal zdjete (dobrobyt twierdzy &lt; 100 -> 2000 / 4000 z niczego), straz NaN / Inf
     /// na Town.set_Prosperity - opis przy ProsperityInstall.
     /// AM-28 (LorathFaithFix): BKROT zna stara kulture 'lorathi' (w ROT 8.1.8 Lorath = 'nord') - postfiks IsCultureEssosi, kultura ulubiona wiary Pattern,
-    /// jednorazowe nadanie wiary jak BK - opis przy LorathInstall.</summary>
+    /// jednorazowe nadanie wiary jak BK - opis przy LorathInstall.
+    /// AM-20 (NotablesKeepSettlementCulture, droga B - decyzja Jeffa 14.10): BK nie nawraca notabli na kulture pana - opis przy TwentyInstall.</summary>
     internal static class AuditP3
     {
         /// <summary>Start procesu (OnBeforeInitialModuleScreenSetAsRoot, po Mends.Install i BkTitles.Install). Nie rzuca.</summary>
         internal static void Install(Harmony harmony)
         {
+            TwentyInstall(harmony);
             TemplatesInstall(harmony);
             ProsperityInstall(harmony);
             LorathInstall(harmony);
@@ -55,6 +58,125 @@ namespace CrashScribe
         {
             ProsperityDaily();
             LorathDaily();
+        }
+
+        // ------------------------------------------------------------------ AM-20: notable zawsze w kulturze osady (droga B, decyzja Jeffa 14.10)
+        // Jedyne miejsce, ktore daje notablowi kulture pana: BK BKNotableBehavior.ApplyNotableCultureConversion(notable, converter, councilConversion)
+        // - notable.Culture = converter.Culture, converter.Clan.Influence -= CultureModel.GetConversionCost, bez councilConversion relacja -8 i (dla
+        // gracza) komunikat. Wolaja ja: HandleCultureConversions (doba osady, rod AI: pierwszy notabl z kultura inna niz pan, 5%, wplyw >= 1.5 x koszt),
+        // BKClanBehavior.RunCouncilTasks (zadanie rady PromoteCulture, 2% x kompetencja, takze rod gracza - potem komunikat zarzadcy "has converted")
+        // i rozmowa gracza z wlasnym notablem (CultureConversionAcceptedConsequence). Nasz Mends.LocalLevies nazajutrz cofal kazde nawrocenie
+        // (bieg dwuletni 06:01: 675 Artisan + 24 Merchant) - pan placil wplywem za nic. Klucz NotablesKeepSettlementCulture: (1) prefiks na
+        // ApplyNotableCultureConversion zwraca false - cala akcja (kultura, wplyw, relacja) nie dzieje sie, ktokolwiek ja wola; (2) postfiks
+        // CultureConversionOnClickable - opcja rozmowy wyszarzona z opisem 'Notables keep the culture of their settlement.'; (3) postfiks
+        // CourtManager.HasCurrentTask(CouncilData, CouncilTask, out float) - dla zadania 'PromoteCulture' false (PromoteCulture czyta tylko
+        // RunCouncilTasks, wiec zadanie nic nie losuje i zarzadca nie oglasza nawrocenia, ktorego nie bylo). LocalLevies dalej prostuje wszystkich
+        // notabli do kultury osady (b47fecc3); kultura calej osady zmienia sie przez asymilacje BK (Settlement.Culture = DominantCulture), notable
+        // ida za nia. Linia doby: ogon linii "werbunek miejscowy" (TwentyDayTail). Klucz off = zadnej latki (b47fecc3).
+        private static bool _twOn, _twClick, _twTask;
+        private static int _twBlockedDay, _twBlockedPlayerDay, _twCouncilDay, _twBlockedAll;
+
+        private static void TwentyInstall(Harmony harmony)
+        {
+            try
+            {
+                if (!Config.NotablesKeepSettlementCulture)
+                {
+                    Scribe.Line("Mends: kultura notabli (AM-20) wylaczone (NotablesKeepSettlementCulture=false) - BK nawraca notabli jak dotad; LocalLevies tylko kaplani "
+                                + (Config.LocalLeviesPreachersOnly ? "TAK (droga A)" : "NIE (wszyscy notable, b47fecc3)") + ".");
+                    return;
+                }
+                var tNb = AccessTools.TypeByName("BannerKings.Behaviours.BKNotableBehavior");
+                var mApply = tNb != null ? AccessTools.Method(tNb, "ApplyNotableCultureConversion") : null;
+                var mClick = tNb != null ? AccessTools.Method(tNb, "CultureConversionOnClickable") : null;
+                var tCm = AccessTools.TypeByName("BannerKings.Managers.CourtManager");
+                var tCd = AccessTools.TypeByName("BannerKings.Managers.Court.CouncilData");
+                MethodInfo mTask = null;
+                if (tCm != null && tCd != null)
+                    foreach (var m in tCm.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+                    {
+                        if (m.Name != "HasCurrentTask" || m.ReturnType != typeof(bool)) continue;
+                        var ps = m.GetParameters();
+                        if (ps.Length == 3 && ps[0].ParameterType == tCd) { mTask = m; break; }
+                    }
+                var pa = mApply != null ? mApply.GetParameters() : null;
+                if (pa != null && pa.Length >= 2 && pa[0].ParameterType == typeof(Hero) && pa[1].ParameterType == typeof(Hero))
+                {
+                    harmony.Patch(mApply, prefix: new HarmonyMethod(typeof(AuditP3), nameof(TwentyApplyPrefix)));
+                    _twOn = true;
+                }
+                // rozmowa i rada - kazda latka osobno (blad jednej nie zdejmuje drugiej ani linii startu; prefiks i tak blokuje koszt)
+                if (_twOn && mClick != null && mClick.ReturnType == typeof(bool) && mClick.GetParameters().Length == 1)
+                    try { harmony.Patch(mClick, postfix: new HarmonyMethod(typeof(AuditP3), nameof(TwentyClickPostfix))); _twClick = true; }
+                    catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AuditP3.TwentyInstall(rozmowa)", null); } catch { } }
+                if (_twOn && mTask != null)
+                    try { harmony.Patch(mTask, postfix: new HarmonyMethod(typeof(AuditP3), nameof(TwentyTaskPostfix))); _twTask = true; }
+                    catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AuditP3.TwentyInstall(rada)", null); } catch { } }
+                int n = (_twOn ? 1 : 0) + (_twClick ? 1 : 0) + (_twTask ? 1 : 0);
+                Scribe.Line("Mends: kultura notabli (AM-20) - notable w kulturze osady (droga B) wpiete " + n + "/3: BK ApplyNotableCultureConversion "
+                            + (_twOn ? "zablokowane (bez wplywu i relacji)" : "NIE wpiete (" + (tNb == null ? "brak BannerKings" : "brak metody albo inne parametry") + ")")
+                            + ", rozmowa 'convert to my culture' " + (_twClick ? "wyszarzona" : "NIE") + ", zadanie rady PromoteCulture " + (_twTask ? "wylaczone" : "NIE")
+                            + "; LocalLevies prostuje wszystkich notabli" + (Config.LocalLeviesPreachersOnly ? " (LocalLeviesPreachersOnly pominiete - nigdy obie drogi naraz)" : "") + ".");
+            }
+            catch (Exception e) { try { Scribe.Report("CrashScribe", e, "AuditP3.TwentyInstall", null); } catch { } }
+        }
+
+        /// <summary>Prefiks AM-20 na BK ApplyNotableCultureConversion: cala akcja nie dzieje sie (kultura, wplyw, relacja). Gracz (gdy wyszarzenie
+        /// rozmowy albo wylaczenie zadania rady nie weszlo) dostaje komunikat.</summary>
+        public static bool TwentyApplyPrefix(Hero __0, Hero __1)
+        {
+            if (!_twOn) return true;
+            _twBlockedDay++; _twBlockedAll++;
+            if (__1 != null && __1 == Hero.MainHero)
+            {
+                _twBlockedPlayerDay++;
+                try
+                {
+                    string who = __0 != null && __0.Name != null ? __0.Name.ToString() : "The notable";
+                    InformationManager.DisplayMessage(new InformationMessage("Notables keep the culture of their settlement: " + who + " did not change culture and no influence was spent."));
+                }
+                catch { }
+            }
+            return false;
+        }
+
+        /// <summary>Postfiks AM-20 na BK CultureConversionOnClickable (opcja rozmowy z wlasnym notablem): wyszarzona z opisem.</summary>
+        public static void TwentyClickPostfix(ref bool __result, ref TextObject hintText)
+        {
+            try
+            {
+                if (!_twOn) return;
+                __result = false;
+                hintText = new TextObject("{=!}Notables keep the culture of their settlement.");
+            }
+            catch { }
+        }
+
+        /// <summary>Postfiks AM-20 na BK CourtManager.HasCurrentTask(CouncilData, CouncilTask, out float): zadanie 'PromoteCulture' nieczynne.
+        /// Tanio: tylko gdy gra odpowiedziala true (inne zadania - jedno porownanie napisu).</summary>
+        public static void TwentyTaskPostfix(object __1, ref bool __result)
+        {
+            if (!__result || !_twOn) return;
+            try
+            {
+                var task = __1 as MBObjectBase;
+                if (task != null && task.StringId == "PromoteCulture") { __result = false; _twCouncilDay++; }
+            }
+            catch { }
+        }
+
+        /// <summary>AM-20: ogon linii doby "werbunek miejscowy" (Mends.LocalLevies) - nawrocenia BK zablokowane od poprzedniej takiej linii; liczniki od nowa.</summary>
+        internal static string TwentyDayTail()
+        {
+            try
+            {
+                string s = " | AM-20 kultura osady " + (_twOn ? "TAK" : (Config.NotablesKeepSettlementCulture ? "NIE WPIETE" : "NIE"))
+                           + ": zablokowane nawrocenia BK " + _twBlockedDay + " (gracz " + _twBlockedPlayerDay + "), zadanie rady PromoteCulture pominiete " + _twCouncilDay
+                           + ", w procesie " + _twBlockedAll;
+                _twBlockedDay = 0; _twBlockedPlayerDay = 0; _twCouncilDay = 0;
+                return s;
+            }
+            catch { return " | AM-20 kultura osady ?"; }
         }
 
         // ------------------------------------------------------------------ AM-28: wiara Lorath (BKROT zna kulture 'lorathi', w ROT 8.1.8 Lorath to 'nord')
