@@ -482,7 +482,7 @@ namespace Armoury
 
         private sealed class KAcc
         {
-            public string Name; public int V, Under, WheatN; public double People, FSum, WheatRule, WheatGame, WoodRule, WoodGame;
+            public string Name; public int V, Under, WheatN; public double People, FSum, WheatRule, WheatGame, WoodRule, WoodGame, WheatPeople;
             public double[] Rule = new double[10], Game = new double[10];
         }
 
@@ -506,7 +506,7 @@ namespace Armoury
                         if (rate <= 0f) continue;
                         k.Rule[i] += rate * rule; k.Game[i] += rate * r.Lvl;
                     }
-                    if (r.V.VillageType.StringId == "wheat_farm") { float g0 = Rate(r.V.VillageType, "grain"); k.WheatN++; k.WheatRule += g0 * rule; k.WheatGame += g0 * r.Lvl; }
+                    if (r.V.VillageType.StringId == "wheat_farm") { float g0 = Rate(r.V.VillageType, "grain"); k.WheatN++; k.WheatRule += g0 * rule; k.WheatGame += g0 * r.Lvl; k.WheatPeople += r.People; }
                     if (!r.Lumber) { k.WoodRule += r.Clim * (r.Under ? r.U * m.GWood : 1.0); k.WoodGame += r.Clim; }
                 }
                 catch (Exception e) { Stumble("Raport(krolestwo)", e); }
@@ -524,7 +524,8 @@ namespace Armoury
                 for (int j = 0; j < KItems.Length; j++)
                     if (k.Game[j] > 0.0 || k.Rule[j] > 0.0) sb.Append(", ").Append(KNames[j]).Append(' ').Append(F(k.Rule[j], "0.0")).Append('/').Append(F(k.Game[j], "0.0"));
                 sb.Append(", las wsi ").Append(F(k.WoodRule, "0.0")).Append('/').Append(F(k.WoodGame, "0.0"));
-                if (k.WheatN > 0) sb.Append(", wsi zboza ").Append(k.WheatN).Append(" po ").Append(F(k.WheatRule / k.WheatN, "0.0")).Append('/').Append(F(k.WheatGame / k.WheatN, "0.0"));
+                if (k.WheatN > 0) sb.Append(", wsi zboza ").Append(k.WheatN).Append(" po ").Append(F(k.WheatRule / k.WheatN, "0.0")).Append('/').Append(F(k.WheatGame / k.WheatN, "0.0"))
+                                    .Append(" (ludzie sr. ").Append(F(k.WheatPeople / k.WheatN / 1000.0, "0.0")).Append(" tys.)");   // recenzja obiegu GL (D5): prog GL1-2 = stosunek plonu wobec stosunku ludzi tych samych wsi
             }
             sb.Append(" (krolestwo = wlasciciel wsi dzis; plik ").Append(CsvName).Append(").");
             Log.Info(sb.ToString());

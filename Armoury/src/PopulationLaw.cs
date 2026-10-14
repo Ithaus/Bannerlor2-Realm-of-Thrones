@@ -148,7 +148,8 @@ namespace Armoury
             Log.Info("PopulationLaw: kalibracja ludnosci - " + string.Join("; ", parts.ToArray())
                      + (cut.Count > 0 ? " | obcieto (pulap " + (int)cap + " ludzi na punkt hearth wsi, E4/3): " + string.Join(", ", cut.ToArray()) + "; poza mapa razem "
                                         + (offMap / 1e6).ToString("0.00", CultureInfo.InvariantCulture) + " mln"
-                                      : " | pulap gestosci wsi (E4/3): " + (cap > 0f ? (int)cap + " ludzi na hearth - bez obciec" : "wylaczony")) + ".");
+                                      : " | pulap gestosci wsi (E4/3): " + (cap > 0f ? (int)cap + " ludzi na hearth - bez obciec" : "wylaczony"))
+                     + " | Sarnor (GL-1 P6, Sarnor People Raised): " + (Settings.Current != null && Settings.Current.SarnorPeopleRaised ? "tak" : "nie") + ".");   // recenzja kodu D4: stan klucza dla progu GL1-6
             // E4/3 (U3): k na osade z dnia kalibracji - do ksiegi ludzi (PeopleBook "v:"); zapis z "v:" zostaje
             try { PeopleBook.SetUnitsFromCalibration(); } catch (Exception e) { Log.Error("PopulationLaw.Calibrate(k na osade)", e); }
             // E4/4 (9a): ludzie miast zapisani jako stan od razu, z dobrobytu tej samej chwili co kalibracja - suma miast krainy to jej udzial miejski z tabeli

@@ -19,8 +19,8 @@ namespace Armoury
     /// odczyt z dowolnego watku); Try* = false (usluga nie gotowa, wies bez przelicznika, potkniecie, wyjatek Strazy) = dzisiejszy wzor gry.
     ///
     /// P2 (klucz MarketByPeople) - jedna skala m_t na jedno zjawisko "ile ludzi kupuje w tym miescie", w pieciu miejscach:
-    ///  (a) glowy kiesy ludu = srednia swiata glow BK miast x m_t, w proporcjach klas BK z kalibracji (TownFolk.Scale -> PeopleHeads); suma swiata glow
-    ///      w dniu kalibracji = srednia x suma m_t (= liczba miast z dokladnoscia granic 0.05-4 i wyjatku Strazy);
+    ///  (a) glowy kiesy ludu = srednia swiata glow BK miast x m_t / mianownik (PeopleScale.HeadNorm), w proporcjach klas BK z kalibracji (TownFolk.Scale ->
+    ///      PeopleHeads); suma swiata glow w dniu kalibracji = glowy BK miast pod regula (mianownik = srednie m_t pod regula z tego dnia);
     ///  (b) popyt u ZRODLA: wynik GetDailyDemandForCategory x m_t (HistoricalPrices.DemandPostfix; zamek x skala podzamcza) - karmi slownik budzetu dnia
     ///      (UpdateDemandShift), popyt wzoru ceny (GetEstimatedDemandForCategory, wygladzany co dobe) i czesc domowa RawPrice.UseDemand; czlon dobrobytu
     ///      wiersza BK (dobrobyt / 1000 / indeks) x m_t w TownFolk.AnchorBudgetPostfix - takze poza nawiasem konsumpcji (prognoza targu zamku, RawPrice.HouseBudget).
@@ -33,12 +33,15 @@ namespace Armoury
     ///      DefaultSettlementFoodModel :82-91; model BK wola model gry - BKFoodModel :46-59) x (1 / m - 1) dopisany postfiksem - licznik zostaje w swoich
     ///      jednostkach. Bez korekty (sztuki 1:1 jak w grze): oblezona warownia (gra dopisuje wtedy do SoldItems jedzenie z polki do zapasu) i warownia z zapasem
     ///      <= 10% (BK dokupuje jedzenie na brak wedlug FoodChange, nie popytu) - korekta x 1/m robilaby z tych sztuk jedzenie z niczego.
-    /// P3 (klucz VillageHeadsByPeople): glowy wsi (oplata stala panu, zakupy wsi w miescie targowym, prog daniny wsi) = srednia swiata glow BK wsi x u_v
-    ///  (TownFolk.VillHeads); glowy podzamcza = srednia glow podzamczy x skala podzamcza (TownFolk.CastleHeads).
+    /// P3 (klucz VillageHeadsByPeople): glowy wsi (oplata stala panu, zakupy wsi w miescie targowym, prog daniny wsi) = srednia swiata glow BK wsi x skala DOMU
+    ///  wsi (bez uchodzcow - recenzja kodu D2) / mianownik (TownFolk.VillHeads); glowy podzamcza = srednia glow podzamczy x skala podzamcza / mianownik (TownFolk.CastleHeads).
     /// Zloto startowe (klucz StartGoldByPeople, TYLKO nowa kampania - flaga w zapisie arm_peoplemarket): po darach startowych (TownPurse.TrimStartGift
-    ///  z kiesami ludu i wsi, ArmouryBehavior: zaraz po TownPurse.BeforeRents, przed zaworem) cztery pule przelane PRAWDZIWYM zlotem miedzy posiadaczami
-    ///  tego samego rodzaju, suma kazdej puli co do zlotowki ta sama: kasy kupcow miast wedlug zapasu plaskiego x m_t, kiesy ludu W/R/P wedlug koszyka
-    ///  klasy x m_t, kiesy wsi wedlug u_v, skarbce koron wedlug ludzi krolestwa z podloga CrownFloor. Ksiega pieniadza nie widzi przelewow (te same klasy
+    ///  z kiesami ludu i wsi, ArmouryBehavior: zaraz po TownPurse.BeforeRents, przed zaworem) pule przelane PRAWDZIWYM zlotem miedzy posiadaczami
+    ///  tego samego rodzaju, suma kazdej puli co do zlotowki ta sama: kasy kupcow miast wedlug zapasu plaskiego x m_t i kiesy ludu W/R/P wedlug koszyka
+    ///  klasy x m_t (TYLKO przy MarketByPeople - zapas kupcow i glowy miast ida wtedy x m_t), kiesy wsi wedlug skali domu wsi (TYLKO przy VillageHeadsByPeople -
+    ///  glowy wsi), skarbce koron wedlug ludzi krolestwa z podloga CrownFloor (zawsze przy StartGoldByPeople); kiesy podzamczy wedlug skali podzamcza (TYLKO
+    ///  przy VillageHeadsByPeople) - osobny krok tej samej doby PO darze zamkow (StartGoldCastles, po CastlePurse.Daily). Recenzja obiegu GL W1: bez kluczy
+    ///  P2/P3 przelew wedlug ludzi rozjechalby zloto z plaskim zapasem i glowami (Oldtown ok. 14 x zapas, zawor oddalby to panom). Ksiega pieniadza nie widzi przelewow (te same klasy
     ///  posiadaczy); migawka skarbcow korony (CrownIncome) i okno udzialu kupcow (TownPurse) dostaja przesuniecie, zeby przelew nie byl "wplywem dnia".
     /// Wyjatki per osada (licznik potkniec), zadnych globalnych wylacznikow; odczyt skal bez liczenia ksiegi.
     /// </summary>
@@ -60,7 +63,7 @@ namespace Armoury
         // ------------------------------------------------------------ stan
         private static int _start = -1;                     // zloto startowe: -1 nieznane, 0 do zrobienia (nowa kampania), 1 zrobione, 2 stary zapis, 3 wylaczone przy starcie, 4 nie zdazylo
         private static int _startDay = -1;
-        private static bool _startWaitLogged, _foodPatched;
+        private static bool _startWaitLogged, _foodPatched, _castlePending;
         private static string _startLine;
         // liczniki okna doby (watek glowny - nawias konsumpcji TownFolk)
         private static double _bT0, _bT1, _bC0, _bC1; private static int _bN, _upT, _upC;
@@ -72,7 +75,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _start = -1; _startDay = -1; _startWaitLogged = false; _startLine = null;
+            _start = -1; _startDay = -1; _startWaitLogged = false; _startLine = null; _castlePending = false;
             _bT0 = _bT1 = _bC0 = _bC1 = 0; _bN = _upT = _upC = 0;
             _stumbles = 0; _readStumbles = 0; _anchorTicks = 0; _anchorN = 0; _err.Clear(); _weekDone = false;
         }
@@ -314,7 +317,13 @@ namespace Armoury
 
         private sealed class KAcc { public string Name; public int Towns; public double M, Spend, Need, Aff, Purse, Gold, Reserve, Shelf, Sold; }
 
-        private static int ShelfFood(Town t)
+        // recenzja obiegu GL W3 (pomiar, bez zmiany gry): wyroby linii towarowych cyklu gry (piekarnie, browary, winiarnie, tlocznie, tkalnie, garbarnie, kuznie
+        // narzedzi) - rece x m_t dzialaja tylko w planie linii uzbrojenia (WorkshopLaw.Hands), te cykle zostaja plaskie, a popyt na ich wyroby idzie x m_t
+        private static readonly string[] Wares = { "bread", "pie", "beer", "wine", "oil", "felt", "linen", "leather", "tools" };
+        private sealed class WAcc { public int Towns, Empty; public double Units; public readonly int[] EmptyBy = new int[Wares.Length]; }
+
+        /// <summary>Jedzenie na polce miasta (sztuki z BonusToFoodStores); `ware` - sztuki wyrobow Wares (ten sam przebieg po polce).</summary>
+        private static int ShelfFood(Town t, int[] ware)
         {
             var r = t.Owner != null ? t.Owner.ItemRoster : null;
             if (r == null) return 0;
@@ -322,10 +331,21 @@ namespace Armoury
             for (int i = 0; i < r.Count; i++)
             {
                 var el = r.GetElementCopyAtIndex(i);
-                var c = el.EquipmentElement.Item != null ? el.EquipmentElement.Item.ItemCategory : null;
+                var it = el.EquipmentElement.Item;
+                var c = it != null ? it.ItemCategory : null;
                 if (c != null && c.Properties == ItemCategory.Property.BonusToFoodStores && el.Amount > 0) n += el.Amount;
+                if (ware != null && it != null && el.Amount > 0) { int j = Array.IndexOf(Wares, it.StringId); if (j >= 0) ware[j] += el.Amount; }
             }
             return n;
+        }
+
+        private static string WareText(WAcc a)
+        {
+            var sb = new StringBuilder(200);
+            sb.Append(a.Empty).Append(" z ").Append(a.Towns * Wares.Length).Append(" [");
+            for (int j = 0; j < Wares.Length; j++) { if (j > 0) sb.Append(", "); sb.Append(Wares[j]).Append(' ').Append(a.EmptyBy[j]); }
+            sb.Append("], sztuk tych wyrobow na polce na miasto ").Append(a.Towns > 0 ? F(a.Units / a.Towns, "0") : "-");
+            return sb.ToString();
         }
 
         private static void WeekLine(int day)
@@ -333,6 +353,7 @@ namespace Armoury
             var rows = TownFolk.MarketTowns();
             var acc = new Dictionary<string, KAcc>();
             var big = new KAcc { Name = "m_t > 1.5" };
+            var wBig = new WAcc(); var wSmall = new WAcc();
             var xs = new List<double>(); var ys = new List<double>();
             foreach (var r in rows)
             {
@@ -344,14 +365,23 @@ namespace Armoury
                     string id = f != null && f.StringId != null ? f.StringId : "-";
                     KAcc k;
                     if (!acc.TryGetValue(id, out k)) { k = new KAcc { Name = KName(f) }; acc[id] = k; }
+                    // m_t uslugi skal NIEZALEZNIE od klucza (recenzja obiegu GL: ten sam podzial miast w biegu bazowym z kluczami wylaczonymi - progi GL2-8/8b/11
+                    // wobec bazy); Straz i miasto bez skali - 1. Tylko log.
                     float m = 1f;
-                    bool rule = MarketOn && PeopleScale.TryMarket(t, out m);
-                    if (!rule) m = 1f;
+                    bool svc = PeopleScale.TryMarket(t, out m);
+                    if (!svc) m = 1f;
+                    var ware = new int[Wares.Length];
                     k.Towns++; k.M += m; k.Spend += r.Spend; k.Need += r.Need; k.Aff += r.Aff * r.Need; k.Purse += r.Purse;
-                    k.Gold += Math.Max(0, t.Gold); k.Reserve += TownPurse.Reserve(t); k.Shelf += ShelfFood(t); k.Sold += SoldFood(t);
-                    if (rule && m > BigMarket) { big.Towns++; big.Need += r.Need; big.Aff += r.Aff * r.Need; big.Purse += r.Purse; }
+                    k.Gold += Math.Max(0, t.Gold); k.Reserve += TownPurse.Reserve(t); k.Shelf += ShelfFood(t, ware); k.Sold += SoldFood(t);
+                    if (svc && m > BigMarket) { big.Towns++; big.Need += r.Need; big.Aff += r.Aff * r.Need; big.Purse += r.Purse; }
+                    var wa = svc && m > BigMarket ? wBig : (svc && m < 0.5f ? wSmall : null);
+                    if (wa != null)
+                    {
+                        wa.Towns++;
+                        for (int j = 0; j < Wares.Length; j++) { wa.Units += ware[j]; if (ware[j] <= 0) { wa.Empty++; wa.EmptyBy[j]++; } }
+                    }
                     float p;
-                    if (rule && PeopleScale.TryPeople(r.St, out p)) { xs.Add(r.Spend); ys.Add(p); }
+                    if (svc && PeopleScale.TryPeople(r.St, out p)) { xs.Add(r.Spend); ys.Add(p); }
                 }
                 catch (Exception e) { Stumble("WeekLine(miasto)", e); }
             }
@@ -372,7 +402,9 @@ namespace Armoury
             sb.Append(" || miasta o m_t > ").Append(BigMarket.ToString("0.0", Inv)).Append(": ").Append(big.Towns).Append(", stac na koszyk ").Append(big.Need > 0 ? F(100.0 * big.Aff / big.Need, "0") : "-").Append('%')
               .Append(", dni oszczednosci ").Append(big.Need > 0 ? F(big.Purse / big.Need, "0") : "-")
               .Append(" || korelacja wydatkow ludu z ludzmi rynku r = ").Append(xs.Count >= 3 ? F(Pearson(xs, ys), "0.00") : "-").Append(" (miast ").Append(xs.Count).Append(")")
-              .Append(" (wydatki ludu = wydatek gry w konsumpcji doby, stac = kiesa wobec pelnej potrzeby, dni = kiesy W/R/P / potrzeba dzienna, jedzenie = sztuki na polkach / sprzedane mieszczanom w dobie).");
+              .Append(" || wyroby linii towarowych cyklu gry na polkach - miasta o m_t > ").Append(BigMarket.ToString("0.0", Inv)).Append(" (").Append(wBig.Towns).Append("): bez towaru (par miasto x wyrob) ").Append(WareText(wBig))
+              .Append("; miasta o m_t < 0.5 (").Append(wSmall.Towns).Append("): bez towaru ").Append(WareText(wSmall))
+              .Append(" (m_t = skala uslugi takze przy wylaczonym kluczu; wydatki ludu = wydatek gry w konsumpcji doby, stac = kiesa wobec pelnej potrzeby, dni = kiesy W/R/P / potrzeba dzienna, jedzenie = sztuki na polkach / sprzedane mieszczanom w dobie).");
             Log.Info(sb.ToString());
         }
 
@@ -447,8 +479,28 @@ namespace Armoury
                 return;
             }
             _start = 1; _startDay = (int)CampaignTime.Now.ToDays;
+            _castlePending = HeadsOn;                       // pula podzamczy: ta sama doba, po darze zamkow (StartGoldCastles)
             try { DoStart(age); }
             catch (Exception e) { Stumble("StartGold", e); }
+        }
+
+        /// <summary>
+        /// Recenzja obiegu GL D4: pula podzamczy zlota startowego - kiesy podzamczy (dar zamkow SeedCastle w CastlePurse.Daily) przelane miedzy zamkami wedlug
+        /// skali podzamcza, suma co do zlotowki ta sama. Z OnDailyTickBody zaraz po CastlePurse.Daily, tylko w dobie, w ktorej StartGold zrobil pozostale pule
+        /// (pamiec, bez zapisu - obie metody w jednym ticku doby), tylko przy VillageHeadsByPeople (glowy podzamczy x skala podzamcza).
+        /// </summary>
+        internal static void StartGoldCastles()
+        {
+            if (!_castlePending) return;
+            _castlePending = false;
+            try
+            {
+                long c0, c1, moved; int n;
+                TownFolk.StartCastleShift(out c0, out c1, out moved, out n);
+                Log.Info("Zloto startowe wedlug ludzi (GL2): kiesy podzamczy - dzien " + (int)CampaignTime.Now.ToDays + ": przed " + c0 + " = po " + c1 + (c0 == c1 ? " (zgodne)" : " (ROZJAZD)")
+                         + " (przelano " + moved + ", zamkow " + n + "; waga skala podzamcza; dar zamkow " + (TownFolk.SeedCastlesDue ? "jeszcze NIE rozliczony - kiesy bez daru" : "rozliczony") + ").");
+            }
+            catch (Exception e) { Stumble("StartGoldCastles", e); }
         }
 
         /// <summary>Podzial `cur` wedlug wag `w` przy tej samej sumie (co do zlotowki): czesci calkowite, reszta zaokraglen do najwiekszej wagi. Wagi 0 - cel 0.</summary>
@@ -530,7 +582,10 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays;
             long all0 = 0, all1 = 0;
             sb.Append("Zloto startowe wedlug ludzi (GL2): dzien ").Append(day).Append(" (doba kampanii ").Append(F(age, "0.00")).Append(")");
-            // ---- (1) kasy kupcow miast: waga zapas plaski x m_t
+            bool mk = MarketOn, hd = HeadsOn;
+            // ---- (1) kasy kupcow miast: waga zapas plaski x m_t - tylko przy MarketByPeople (zapas kupcow x m_t; bez klucza zapas plaski - kasy jak w grze)
+            if (!mk) sb.Append(" | kasy kupcow miast: POMINIETE (MarketByPeople wylaczone - zapas kupcow plaski, kasy jak w grze)");
+            else
             {
                 var towns = new List<Town>(); var cur = new List<long>(); var w = new List<double>();
                 foreach (var t in Town.AllTowns)
@@ -574,8 +629,9 @@ namespace Armoury
                 sb.Append(" | kasy kupcow miast: przed ").Append(b0).Append(" = po ").Append(b1).Append(" (przelano ").Append(moved).Append(", miast ").Append(towns.Count)
                   .Append("; waga zapas plaski x m_t - kasa / zapas kupcow x ").Append(sw > 0 ? F(b1 / sw, "0.00") : "-").Append(" w kazdym miescie)");
             }
-            // ---- (2) kiesy ludu W/R/P: waga koszyk klasy x m_t (TownFolk)
-            try
+            // ---- (2) kiesy ludu W/R/P: waga koszyk klasy x m_t (TownFolk) - tylko przy MarketByPeople (glowy miast x m_t)
+            if (!mk) sb.Append(" | kiesy ludu: POMINIETE (MarketByPeople wylaczone - glowy miast jak dotad)");
+            else try
             {
                 long[] f0, f1; long fm; int fn;
                 var per = TownFolk.StartFolkShift(out f0, out f1, out fm, out fn);
@@ -585,7 +641,9 @@ namespace Armoury
                   .Append(" (przelano ").Append(fm).Append(", miast ").Append(fn).Append("; waga koszyk klasy x m_t)");
             }
             catch (Exception e) { Stumble("StartGold(kiesy ludu)", e); sb.Append(" | kiesy ludu: BLAD (bez przelewu)"); }
-            // ---- (3) kiesy wsi: waga u_v
+            // ---- (3) kiesy wsi: waga skala domu wsi (glowy wsi P3) - tylko przy VillageHeadsByPeople
+            if (!hd) sb.Append(" | kiesy wsi: POMINIETE (VillageHeadsByPeople wylaczone - glowy wsi jak dotad)");
+            else
             {
                 var vs = new List<Village>(); var cur = new List<long>(); var w = new List<double>();
                 foreach (var v in Village.All)
@@ -593,7 +651,7 @@ namespace Armoury
                     try
                     {
                         float u;
-                        if (v == null || v.Settlement == null || !PeopleScale.TryVillage(v, out u)) continue;   // bez przelicznika i Straz - kiesa zostaje
+                        if (v == null || v.Settlement == null || !PeopleScale.TryVillageHome(v, out u)) continue;   // bez przelicznika i Straz - kiesa zostaje
                         vs.Add(v); cur.Add(Math.Max(0, v.Gold)); w.Add(u);
                     }
                     catch (Exception e) { Stumble("StartGold(wies)", e); }
@@ -622,7 +680,7 @@ namespace Armoury
                     var k = KOf(kd, vs[i].Settlement.MapFaction); k.V0 += cur[i]; k.V1 += g;
                 }
                 all0 += b0; all1 += b1;
-                sb.Append(" | kiesy wsi: przed ").Append(b0).Append(" = po ").Append(b1).Append(" (przelano ").Append(moved).Append(", wsi ").Append(vs.Count).Append("; waga u_v)");
+                sb.Append(" | kiesy wsi: przed ").Append(b0).Append(" = po ").Append(b1).Append(" (przelano ").Append(moved).Append(", wsi ").Append(vs.Count).Append("; waga skala domu wsi)");
             }
             // ---- (4) skarbce koron: ludzie krolestwa (ksiega: wsie + miasta), podloga CrownFloor
             {

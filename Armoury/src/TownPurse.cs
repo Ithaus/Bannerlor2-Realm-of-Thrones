@@ -381,7 +381,7 @@ namespace Armoury
                 else if (mode == 2 || creating) { cut = wanted; result = 0; }
                 else
                 {
-                    long room = (long)Reserve(town) - town.Gold;
+                    long room = (long)ReserveFlat(town) - town.Gold;   // GL-2 (recenzja kodu D3): dosypka z niczego tylko do zapasu PLASKIEGO - nie wieksza w ludnych miastach (x m_t)
                     if (room < 0) room = 0;
                     if (wanted > room) { cut = wanted - room; result = (int)room; }
                 }

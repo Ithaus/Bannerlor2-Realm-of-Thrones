@@ -1316,13 +1316,13 @@ namespace Armoury
             try { EstateIncome187.EnsureHooks(); } catch (Exception e) { Log.Error("EstateIncome187.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { ShipsToPort181.Reset(); } catch (Exception e) { Log.Error("ShipsToPort181.Reset", e); }   // 3.1/3.3 (33) 181: statki do portu - stan dzienny i konteksty od zera w kazdej kampanii (latki wpiete przy starcie gry)
+            try { PeopleScale.SessionStart(); } catch (Exception e) { Log.Error("PeopleScale.SessionStart", e); }   // GL-0: pamiec skal od pierwszej godziny sesji (po wczytaniu; stary zapis - kalibracja tu) - PO McmSettings.Apply i ksiegach z zapisu, PRZED RawPrice.SeedNewCampaign (recenzja kodu GL W1: pamiec popytu nowej kampanii z m_t od pierwszej doby)
+            try { VillageByPeople.SessionStart(); } catch (Exception e) { Log.Error("VillageByPeople.SessionStart", e); }   // GL-1 (P1): plon wsi od ludzi - g z zapisu albo kalibracja (stary zapis), przejscie stanu (regulator wsi od nowa) - PO PeopleScale.SessionStart
             try { RawPrice.SeedNewCampaign(); } catch (Exception e) { Log.Error("RawPrice.SeedNewCampaign", e); }   // cena surowcow: w nowej kampanii pamiec rynku z tickow startowych na nowa monete - PO HistoricalPrices.Apply i StartStock.Run
             try { TownCrafts.SessionStart(); } catch (Exception e) { Log.Error("TownCrafts.SessionStart", e); }   // paczka 148: proporcje rzemiosla miasta z wartosci - PO HistoricalPrices.Apply (linia startowa)
             try { CaravanAmmo.SessionStart(); } catch (Exception e) { Log.Error("CaravanAmmo.SessionStart", e); }   // paczka 172b: kategorie amunicji i stan latek (linia startowa)
             try { ArmsLeaks.SessionStart(); } catch (Exception e) { Log.Error("ArmsLeaks.SessionStart", e); }   // paczka 174.0: linia startowa (ujscia uzbrojenia zamkniete, BK bron i tarcze, konserwacja zapasu)
             try { WorkshopLaw.HandsStartLine(); } catch (Exception e) { Log.Error("WorkshopLaw.HandsStartLine", e); }   // 174.3: linia "Rece (174)" - po ColdStart (ten liczy dawnymi rekami)
-            try { PeopleScale.SessionStart(); } catch (Exception e) { Log.Error("PeopleScale.SessionStart", e); }   // GL-0: pamiec skal od pierwszej godziny sesji (po wczytaniu; stary zapis - kalibracja tu) - PO McmSettings.Apply i ksiegach z zapisu
-            try { VillageByPeople.SessionStart(); } catch (Exception e) { Log.Error("VillageByPeople.SessionStart", e); }   // GL-1 (P1): plon wsi od ludzi - g z zapisu albo kalibracja (stary zapis), przejscie stanu (regulator wsi od nowa) - PO PeopleScale.SessionStart
             try { TownFletchers.SessionStart(); } catch (Exception e) { Log.Error("TownFletchers.SessionStart", e); }   // paczka 172: kandydaci strzelarzy, koszyki wzorcow, linia startowa - PO HistoricalPrices.Apply i ColdStart
             try { PriceList8.StartLine(); } catch (Exception e) { Log.Error("PriceList8.StartLine", e); }   // E8/C (253): linie startu cennika (tylko log) - PO HistoricalPrices.Apply i ClearCostCache
             try { Recipes.AmmoStartLine(); } catch (Exception e) { Log.Error("Recipes.AmmoStartLine", e); }   // sklad8-s S1: kwity amunicji kuzni gracza (tylko log) - PO HistoricalPrices.Apply (wartosci sztabek w pensach)
@@ -1612,6 +1612,7 @@ namespace Armoury
             // 110 (projekt etapu 2 krok B): zawor kasy zamku - 7% nadwyzki ponad zapas kupcow do pana zamku, linia "Zawor zamkow (110)";
             // zaraz PO rentach (dopisuje sie do dziennych rent rodu), PRZED budowami i powinnosciami, ktore licza od dzisiejszego dochodu
             try { CastlePurse.Daily(); } catch (Exception e) { Log.Error("CastlePurse.Daily", e); } DayProfile.Lap("CastlePurse.Daily");
+            try { PeopleMarket.StartGoldCastles(); } catch (Exception e) { Log.Error("PeopleMarket.StartGoldCastles", e); } DayProfile.Lap("PeopleMarket.StartGoldCastles");   // GL-2 (recenzja obiegu D4): pula podzamczy zlota startowego - w dobie StartGold, PO darze zamkow (CastlePurse.TrimStartGift / SeedCastle)
             try { MoneyLedger.Mark(MoneyLedger.MCastle); } catch { }
             // E5/0 (195): kiesa ludu na sucho (tylko log) - po rentach i zaworze zamkow (RentOf, CastlePurse.DuesOf czytelne), przed budowami; E5/B1 (173): przy kiesie
             // czynnej prawdziwe przelewy (podatki panu -> RentToday przed budowami i powinnosciami, place z kas, zakupy wsi z polki - ramka ksiegi towarow F26) i migawka M18

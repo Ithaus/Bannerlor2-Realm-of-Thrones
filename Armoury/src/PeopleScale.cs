@@ -20,7 +20,8 @@ namespace Armoury
     ///                  (wies to symbol - czysta proporcja), gorna VillageMax = 6.0 (bezpiecznik przelicznika; kazda wies ponad nim w linii doby).
     ///  m_t  (miasto) = ludzie rynku / sredni rynek swiata. Ludzie rynku = ludzie miasta (stan ksiegi, PopulationLaw.TownPeople) + ludzie W DOMU wsi
     ///                  przypisanych do tego targu - ta sama definicja co WorkshopLaw.MarketPeople, ale z przypisaniem ZAMROZONYM (nizej). Rynek liczy
-    ///                  dom bez uchodzcow: kto uciekl, nie kupuje w tym miescie (projekt rozdz. 6, "region spustoszony"). Granice MarketMin-MarketMax = 0.05-4.0.
+    ///                  dom bez uchodzcow: kto uciekl, nie kupuje w tym miescie (projekt rozdz. 6, "region spustoszony"). Granice MarketMin-MarketMax = 0.05-6.0
+    ///                  (gora 6.0 jak dla wsi - recenzja obiegu GL D2: 4.0 obcinalo Oldtown, surowe 4.92, juz w 1. dobie).
     ///  podzamcze     = ludzie w domu wsi zamku (BoundVillages) / srednie podzamcze swiata (srednia po WSZYSTKICH zamkach, takze bez wsi - suma skal
     ///                  podzamczy w dniu kalibracji = liczba zamkow). Granice jak m_t; zamek bez wsi = 0.05 (projekt rozdz. 6).
     /// Odniesienia (srednia wies, sredni rynek, srednie podzamcze) liczone RAZ, przy kalibracji kampanii - pierwszy spis po kalibracji ludnosci
@@ -50,8 +51,9 @@ namespace Armoury
 
         /// <summary>u_v gorna (projekt 3.5): najwieksza wies biegu rocznego 4.18.</summary>
         internal const float VillageMax = 6f;
-        /// <summary>m_t i podzamcze (projekt 3.5): miasto musi dzialac jako rynek (dol), bezpiecznik przelicznika (gora; najwiekszy rynek ok. 2.4-3).</summary>
-        internal const float MarketMin = 0.05f, MarketMax = 4f;
+        /// <summary>m_t i podzamcze (projekt 3.5): miasto musi dzialac jako rynek (dol), bezpiecznik przelicznika (gora). DECYZJA (pelne uprawnienia, recenzja
+        /// obiegu GL D2): gora 4.0 -> 6.0 jak dla wsi - w nowej kampanii W43 najwiekszy rynek (Oldtown) ma surowe 4.92, najwieksze podzamcze 3.76 (City of Bones).</summary>
+        internal const float MarketMin = 0.05f, MarketMax = 6f;
 
         private const string Version = "1";
         private const string WatchRealm = "nightswatch";
@@ -64,6 +66,10 @@ namespace Armoury
         private static int _calDay = -1, _calV, _calT, _calC;       // dzien kalibracji, ile wsi / miast / zamkow weszlo do srednich
         private static string _calHow = "";
         private static readonly Dictionary<string, string> _bound = new Dictionary<string, string>();   // id wsi -> id miasta (targ zamrozony)
+        // recenzja obiegu GL D1: srednia skala osad POD REGULA (bez Strazy przy kluczu) z pierwszej pamieci po kalibracji - mianownik glow P2/P3
+        // (glowy = srednia glow BK x skala / norma), zeby suma swiata glow w dniu kalibracji byla rowna glowom BK (wsie: Dar z u ok. 0.02 poza regula dawal +1.9%);
+        // zamrozone (w zapisie) - swiat, ktory sie wyludnia, ma mniej glow (projekt 3.4). 0 = jeszcze nie policzone
+        private static double _normT, _normV, _normC;
         private static string _loadNote;                            // null = nie wczytywano (nowa kampania); inaczej skad odniesienia po wczytaniu
 
         // ------------------------------------------------------------ pamiec sesji (bez zapisu)
@@ -80,6 +86,7 @@ namespace Armoury
             public float Scale;     // skala po granicach - to oddaja Try*
             public float Raw;       // ludzie / odniesienie, bez granic
             public float People;    // wies: dom + uchodzcy; miasto: ludzie rynku; zamek: ludzie w domu wsi zamku
+            public float HomeScale; // wies: sam DOM / srednia wies (bez uchodzcow; gora VillageMax) - glowy wsi P3 (kto uciekl, nie placi i nie kupuje); miasto, zamek = Scale
             public bool Watch;      // osada krainy Strazy (z dnia kalibracji)
         }
 
@@ -112,7 +119,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _mem = null; _cal = false; _refV = _refM = _refC = 0.0; _calDay = -1; _calV = _calT = _calC = 0; _calHow = "";
+            _mem = null; _cal = false; _refV = _refM = _refC = 0.0; _calDay = -1; _calV = _calT = _calC = 0; _calHow = ""; _normT = _normV = _normC = 0.0;
             _bound.Clear(); _loadNote = null;
             _gameBound.Clear(); _movesSession = 0; _stumbles = 0; _readStumbles = 0; _err.Clear();
             _waitLogged = false; _calFailLogged = false; _weekDone = false; _last = null;
@@ -180,7 +187,7 @@ namespace Armoury
 
         /// <summary>
         /// Skala rynku miasta m_t = ludzie rynku (miasto + ludzie w domu wsi przypisanych do targu przy kalibracji) / sredni rynek swiata z kalibracji;
-        /// granice 0.05-4.0. false (m = 1) = usluga nie gotowa, potkniecie przy spisie albo wyjatek Strazy (Castle Black). Nie rzuca.
+        /// granice 0.05-6.0. false (m = 1) = usluga nie gotowa, potkniecie przy spisie albo wyjatek Strazy (Castle Black). Nie rzuca.
         /// </summary>
         internal static bool TryMarket(Town t, out float m)
         {
@@ -200,7 +207,7 @@ namespace Armoury
         }
 
         /// <summary>
-        /// Skala podzamcza zamku = ludzie w domu wsi zamku / srednie podzamcze swiata z kalibracji; granice 0.05-4.0 (zamek bez wsi 0.05). false (w = 1)
+        /// Skala podzamcza zamku = ludzie w domu wsi zamku / srednie podzamcze swiata z kalibracji; granice 0.05-6.0 (zamek bez wsi 0.05). false (w = 1)
         /// = to nie zamek, usluga nie gotowa, potkniecie albo wyjatek Strazy. Nie rzuca.
         /// </summary>
         internal static bool TryCastleWard(Settlement castle, out float w)
@@ -216,6 +223,36 @@ namespace Armoury
                 return true;
             }
             catch (Exception ex) { ReadStumble(ex); w = 1f; return false; }
+        }
+
+        /// <summary>
+        /// GL-3 (glowy wsi): skala SAMEGO DOMU wsi = ludzie w domu / srednia wsi swiata (bez uchodzcow; gora 6.0) - glowy wsi (oplata stala, zakupy w miescie)
+        /// licza tylko tych, ktorzy sa na miejscu, jak rynek miasta (recenzja kodu GL D2). Plon (P1) zostaje przy u_v z uchodzcami (YieldFactor zdejmuje
+        /// brakujace rece). false jak TryVillage. Nie rzuca.
+        /// </summary>
+        internal static bool TryVillageHome(Village v, out float uh)
+        {
+            uh = 1f;
+            try
+            {
+                var m = _mem;
+                if (m == null || v == null) return false;
+                var s = v.Settlement;
+                Entry e;
+                if (s == null || !m.Map.TryGetValue(s, out e)) return false;
+                if (e.Watch && WatchExceptionOn) return false;
+                uh = e.HomeScale;
+                return true;
+            }
+            catch (Exception ex) { ReadStumble(ex); uh = 1f; return false; }
+        }
+
+        /// <summary>Mianownik glow (recenzja obiegu GL D1): srednia skala osad pod regula z pierwszej pamieci po kalibracji - 't' miasta (m_t), 'w' wsie (skala domu),
+        /// 'z' podzamcza; 1 = jeszcze nie policzone. Tylko odczyt.</summary>
+        internal static double HeadNorm(char kind)
+        {
+            double n = kind == 't' ? _normT : (kind == 'w' ? _normV : _normC);
+            return n > 0.0 && !double.IsInfinity(n) ? n : 1.0;
         }
 
         /// <summary>u_v albo 1 (patrz TryVillage).</summary>
@@ -292,14 +329,39 @@ namespace Armoury
                         double raw = r.People / rf;
                         if (double.IsNaN(raw) || double.IsInfinity(raw) || raw < 0.0) { Stumble("Skala(" + (r.S != null ? r.S.StringId : "?") + ")", null); continue; }
                         float sc = r.Kind == 'w' ? (float)Math.Min(raw, VillageMax) : (float)Math.Max(MarketMin, Math.Min(MarketMax, raw));
-                        map[r.S] = new Entry { Scale = sc, Raw = (float)raw, People = (float)r.People, Watch = r.Watch };
+                        float hs = sc;
+                        if (r.Kind == 'w') { double h = r.Home / rf; hs = double.IsNaN(h) || double.IsInfinity(h) || h < 0.0 ? sc : (float)Math.Min(h, VillageMax); }
+                        map[r.S] = new Entry { Scale = sc, Raw = (float)raw, People = (float)r.People, HomeScale = hs, Watch = r.Watch };
                     }
                     catch (Exception e) { Stumble("Pamiec(osada)", e); }
                 }
                 _mem = new Memory { Day = day, Map = map };        // jedna referencja na dobe
                 _last = c;
+                if (!(_normT > 0.0) || !(_normV > 0.0) || !(_normC > 0.0)) { try { Norms(map); } catch (Exception e) { Stumble("Normy glow", e); } }
             }
             catch (Exception e) { Stumble("Refresh", e); }          // pamiec wczorajsza zostaje
+        }
+
+        /// <summary>Recenzja obiegu GL D1: srednie skale osad pod regula (bez Strazy przy kluczu) - mianowniki glow P2/P3; raz po kalibracji (albo po wczytaniu
+        /// zapisu bez nich - wtedy ze stanu dnia wczytania), potem w zapisie.</summary>
+        private static void Norms(Dictionary<Settlement, Entry> map)
+        {
+            double sT = 0, sV = 0, sC = 0; int nT = 0, nV = 0, nC = 0;
+            bool watch = WatchExceptionOn;
+            foreach (var kv in map)
+            {
+                var e = kv.Value;
+                if (e == null || (e.Watch && watch)) continue;
+                if (kv.Key.IsVillage) { sV += e.HomeScale; nV++; }
+                else if (kv.Key.IsTown) { sT += e.Scale; nT++; }
+                else if (kv.Key.IsCastle) { sC += e.Scale; nC++; }
+            }
+            if (!(_normT > 0.0) && nT > 0 && sT > 0) _normT = sT / nT;
+            if (!(_normV > 0.0) && nV > 0 && sV > 0) _normV = sV / nV;
+            if (!(_normC > 0.0) && nC > 0 && sC > 0) _normC = sC / nC;
+            Log.Info("Skale ludzi (GL0): mianowniki glow (srednia skala osad pod regula" + (watch ? ", bez Strazy" : "") + "; " + (_loadNote == null ? "nowa kampania" : _loadNote)
+                     + ") - miasta " + _normT.ToString("0.0000", Inv) + " (" + nT + "), wsie (sam dom) " + _normV.ToString("0.0000", Inv) + " (" + nV + "), podzamcza "
+                     + _normC.ToString("0.0000", Inv) + " (" + nC + "); glowy kiesy = srednia glow BK x skala / mianownik (suma swiata glow w tej dobie = glowy BK), w zapisie.");
         }
 
         // kraina z dnia kalibracji bez zadnej pamieci podrecznej (FreeHands.RealmOf zapamietuje - tu nie wolno nic zmieniac w cudzym stanie)
@@ -615,7 +677,8 @@ namespace Armoury
 
         // ============================================================ zapis (arm_peoplescale)
 
-        /// <summary>Zapis: "1|srednia wies|sredni rynek|srednie podzamcze|dzien kalibracji|wsi|miast|zamkow|wies=miasto;wies=miasto;...". Pusty przed kalibracja.</summary>
+        /// <summary>Zapis: "1|srednia wies|sredni rynek|srednie podzamcze|dzien kalibracji|wsi|miast|zamkow|wies=miasto;wies=miasto;...|norma miast|norma wsi|norma podzamczy".
+        /// Pusty przed kalibracja.</summary>
         internal static string Export()
         {
             if (!_cal) return "";
@@ -629,13 +692,15 @@ namespace Armoury
                 first = false;
                 sb.Append(kv.Key).Append('=').Append(kv.Value);
             }
+            // recenzja obiegu GL D1: mianowniki glow (pola 9-11; starszy zapis bez nich - policzone od nowa przy pierwszej pamieci po wczytaniu)
+            sb.Append('|').Append(_normT.ToString("R", Inv)).Append('|').Append(_normV.ToString("R", Inv)).Append('|').Append(_normC.ToString("R", Inv));
             return sb.ToString();
         }
 
         /// <summary>Wczytanie: brak pola (stary zapis), inny format albo blad - kalibracja od nowa przy pierwszym spisie (z linia w logu).</summary>
         internal static void Import(string v)
         {
-            _cal = false; _refV = _refM = _refC = 0.0; _calDay = -1; _calV = _calT = _calC = 0; _bound.Clear(); _calHow = "";
+            _cal = false; _refV = _refM = _refC = 0.0; _calDay = -1; _calV = _calT = _calC = 0; _bound.Clear(); _calHow = ""; _normT = _normV = _normC = 0.0;
             if (string.IsNullOrEmpty(v)) { _loadNote = "zapis bez pola arm_peoplescale - kalibracja przy pierwszym wczytaniu"; return; }
             try
             {
@@ -664,6 +729,13 @@ namespace Armoury
                 _refV = rv; _refM = rm; _refC = rc;
                 _calDay = int.Parse(p[4], Inv); _calV = int.Parse(p[5], Inv); _calT = int.Parse(p[6], Inv); _calC = int.Parse(p[7], Inv);
                 foreach (var kv in map) _bound[kv.Key] = kv.Value;
+                if (p.Length >= 12)
+                {
+                    double nt, nv, nc;
+                    if (double.TryParse(p[9], NumberStyles.Float, Inv, out nt) && nt > 0.0 && !double.IsInfinity(nt)) _normT = nt;
+                    if (double.TryParse(p[10], NumberStyles.Float, Inv, out nv) && nv > 0.0 && !double.IsInfinity(nv)) _normV = nv;
+                    if (double.TryParse(p[11], NumberStyles.Float, Inv, out nc) && nc > 0.0 && !double.IsInfinity(nc)) _normC = nc;
+                }
                 _loadNote = "z zapisu";
                 _calHow = "z zapisu";
                 _cal = true;

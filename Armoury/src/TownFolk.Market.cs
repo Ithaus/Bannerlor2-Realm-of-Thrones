@@ -8,10 +8,13 @@ namespace Armoury
     /// <summary>
     /// GL-2 (P2 a) i GL-3 (P3) - GLOWY KIESY LUDU OD LUDZI (projekt docs/gospodarka-od-ludzi rozdz. 3.3; klucze MarketByPeople, VillageHeadsByPeople - PeopleMarket.cs).
     /// Glowy BK z kalibracji (HW/HR/HP/HS, w zapisie arm_townfolk) zostaja - zmienia sie tylko mnoznik:
-    ///  - miasto: glowy = srednia swiata glow BK miast x m_t, w proporcjach klas BK tego miasta (Scale = srednia x m_t / glowy BK miasta); dotad r = ludzie
-    ///    WLASNI osady dzis / przy kalibracji (BookScale) - miasto bez ludzi wlasnych mialo glowy BK bez zmian;
-    ///  - wies: glowy (oplata stala, zakupy w miescie targowym, prog daniny) = srednia swiata glow BK wsi x u_v;
-    ///  - zamek (podzamcze): glowy = srednia glow podzamczy x skala podzamcza (ludzie w domu wsi zamku).
+    ///  - miasto: glowy = srednia swiata glow BK miast x m_t / mianownik, w proporcjach klas BK tego miasta (Scale = srednia x m_t / mianownik / glowy BK miasta);
+    ///    dotad r = ludzie WLASNI osady dzis / przy kalibracji (BookScale) - miasto bez ludzi wlasnych mialo glowy BK bez zmian;
+    ///  - wies: glowy (oplata stala, zakupy w miescie targowym, prog daniny) = srednia swiata glow BK wsi x skala DOMU wsi (bez uchodzcow - recenzja kodu D2:
+    ///    kto uciekl, nie placi i nie kupuje, jak w rynku miasta) / mianownik;
+    ///  - zamek (podzamcze): glowy = srednia glow podzamczy x skala podzamcza (ludzie w domu wsi zamku) / mianownik.
+    /// Mianownik (recenzja obiegu D1) = srednia skala osad pod regula z pierwszej pamieci po kalibracji (PeopleScale.HeadNorm, w zapisie) - suma swiata glow
+    /// w dniu kalibracji = glowy BK osad pod regula (wsie bez tego +1.9%: Dar poza regula, a w odniesieniu sredniej wsi).
     /// Srednie liczone raz na dobe z osad pod regula (Try* = true) - glowy BK sa zamrozone od kalibracji, wiec srednie stoja; suma swiata glow w dniu kalibracji
     /// skal = srednia x suma skal (= liczba osad, z dokladnoscia granic i wyjatku Strazy). Try* = false (Straz, wies bez przelicznika, brak pamieci skal) -
     /// dzisiejszy wzor. Tylko watek glowny (jak cala kiesa).
@@ -67,7 +70,7 @@ namespace Armoury
                 if (t == null || !(h > 0) || !PeopleScale.TryMarket(t, out m)) return false;
                 HeadMeans();
                 if (!(_hT > 0)) return false;
-                r = _hT * m / h;
+                r = _hT * m / PeopleScale.HeadNorm('t') / h;
                 return !(double.IsNaN(r) || double.IsInfinity(r));
             }
             if (f.Kind == 2)
@@ -80,20 +83,20 @@ namespace Armoury
             return false;
         }
 
-        /// <summary>GL-3 (P3): glowy wsi = srednia swiata glow BK wsi x u_v. false - dzisiejszy wzor (klucz wylaczony, Straz, wies bez przelicznika).</summary>
+        /// <summary>GL-3 (P3): glowy wsi = srednia swiata glow BK wsi x skala domu wsi / mianownik. false - dzisiejszy wzor (klucz wylaczony, Straz, wies bez przelicznika).</summary>
         private static bool VillPeopleHeads(Folk f, out double heads)
         {
             heads = 0;
             if (f == null || f.Kind != 2 || !PeopleMarket.HeadsOn || f.St == null || f.St.Village == null) return false;
             float u;
-            if (!PeopleScale.TryVillage(f.St.Village, out u)) return false;
+            if (!PeopleScale.TryVillageHome(f.St.Village, out u)) return false;
             HeadMeans();
             if (!(_hV > 0)) return false;
-            heads = _hV * u;
+            heads = _hV * u / PeopleScale.HeadNorm('w');
             return !(double.IsNaN(heads) || double.IsInfinity(heads));
         }
 
-        /// <summary>GL-3 (P3): glowy podzamcza = srednia glow podzamczy x skala podzamcza; inaczej glowy BK z kalibracji (f.HW) jak dotad.</summary>
+        /// <summary>GL-3 (P3): glowy podzamcza = srednia glow podzamczy x skala podzamcza / mianownik; inaczej glowy BK z kalibracji (f.HW) jak dotad.</summary>
         private static double CastleHeads(Folk f)
         {
             if (f == null) return 0;
@@ -102,7 +105,7 @@ namespace Armoury
             if (!PeopleScale.TryCastleWard(f.St, out w)) return f.HW;
             HeadMeans();
             if (!(_hC > 0)) return f.HW;
-            double h = _hC * w;
+            double h = _hC * w / PeopleScale.HeadNorm('z');
             return double.IsNaN(h) || double.IsInfinity(h) ? f.HW : h;
         }
 
@@ -191,6 +194,39 @@ namespace Armoury
                 }
             }
             for (int i = 0; i < fs.Count; i++) per[fs[i].St] = new[] { before[i], fs[i].KW + fs[i].KR + fs[i].KP };
+            return per;
+        }
+
+        /// <summary>
+        /// Zloto startowe wedlug ludzi, pula podzamczy (recenzja obiegu GL D4; PeopleMarket.StartGoldCastles, ta sama doba co pozostale pule, PO darze zamkow
+        /// CastlePurse.TrimStartGift / SeedCastle): kiesy podzamczy (KW) pod regula przelane miedzy zamkami wedlug glow podzamcza (skala podzamcza - ten sam wzor
+        /// co dar startowy SeedCastle: dni x glowy x koszyk), suma co do zlotowki ta sama. Zwraca na zamek [kiesa przed, po]; c0/c1 - sumy.
+        /// </summary>
+        internal static Dictionary<Settlement, long[]> StartCastleShift(out long c0, out long c1, out long moved, out int castles)
+        {
+            c0 = c1 = moved = 0; castles = 0;
+            var per = new Dictionary<Settlement, long[]>();
+            if (_pending != null) EnsureImported();
+            var fs = new List<Folk>(); var ws = new List<double>();
+            foreach (var f in _f.Values)
+            {
+                if (f == null || f.Kind != 1 || f.NoBk || !(f.Cal || f.BkCal) || f.St == null || !f.St.IsCastle) continue;
+                float w;
+                if (!PeopleScale.TryCastleWard(f.St, out w)) continue;   // Straz i zamek bez skali - kiesa zostaje
+                fs.Add(f); ws.Add(Math.Max(0f, w));
+            }
+            castles = fs.Count;
+            if (fs.Count == 0) return per;
+            var cur = new long[fs.Count];
+            for (int i = 0; i < fs.Count; i++) cur[i] = fs[i].KW;
+            var t = PeopleMarket.Spread(cur, ws.ToArray());
+            for (int i = 0; i < fs.Count; i++)
+            {
+                c0 += cur[i]; c1 += t[i];
+                if (t[i] > cur[i]) moved += t[i] - cur[i];
+                fs[i].KW = t[i];
+                per[fs[i].St] = new[] { cur[i], t[i] };
+            }
             return per;
         }
     }
