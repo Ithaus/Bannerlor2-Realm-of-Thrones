@@ -40,6 +40,8 @@ namespace CrashScribe
     /// prawdziwego wyniku BK. Kotwica: w oryginalnym IL dokladnie 1 trafienie (callvirt metody o tej nazwie i tych typach parametrow, poprzedzone
     /// ldarg.0..ldarg.n); inna liczba = metoda NIE latana, "BRAK" w linii startu (zachowanie jak dotad). Transpiler, nie prefiks: zostaje kod BKROT
     /// (blogoslawienstwa, pomiar BkrotPerf, straznik), a klucze straznika sa rozne dla Cap i Change, wiec zagniezdzony Cap w Change nie wraca do 0.
+    /// Recenzja P2: na kazdej naprawionej metodzie takze finalizer - wyjatek z kodu BK (przed naprawa martwego) daje wynik 0 jak dotad i licznik
+    /// "wyjatki naprawy" w linii doby, zamiast wyjsc do wolajacego BK (doba BKDiplomacyBehavior nie lapie nic, CultureData.Update tylko NRE).
     ///
     /// Wpinane raz na proces przy pierwszym OnSessionLaunched (typy BK / BKROT pewnie zaladowane; BKROTClanFinanceModel dziedziczy po
     /// DefaultClanFinanceModel - CLAUDE.md rozdz. 7: latki tej rodziny tylko w kampanii). Do tej chwili w nowej kampanii nie biegnie zadna doba,
@@ -75,6 +77,7 @@ namespace CrashScribe
             public int Pre = -1;        // samowywolania w oryginalnym IL
             public int Hits = -1;       // trafienia transpilera przy wpieciu
             public bool Patched;        // transpiler stoi (GetPatchInfo)
+            public bool Guarded;        // recenzja P2: finalizer oslony wyjatkow stoi (GetPatchInfo)
             public string State = "nie wpinane";
         }
 
@@ -177,7 +180,7 @@ namespace CrashScribe
             { _ownerOnlyState = "BRAK - skladowe BK (CultureDataClass.Settlement / Culture albo wywolanie modelu BK) - blogoslawienstwa jak BKROT"; return; }
             _harmony.Patch(fa.Target, prefix: new HarmonyMethod(typeof(BkrotSelfCall), nameof(AcceptOwnerOnly)));
             _harmony.Patch(fw.Target, prefix: new HarmonyMethod(typeof(BkrotSelfCall), nameof(WeightOwnerOnly)));
-            int n = (HasOur(fa.Target, nameof(AcceptOwnerOnly), false) ? 1 : 0) + (HasOur(fw.Target, nameof(WeightOwnerOnly), false) ? 1 : 0);
+            int n = (HasOur(fa.Target, nameof(AcceptOwnerOnly), 0) ? 1 : 0) + (HasOur(fw.Target, nameof(WeightOwnerOnly), 0) ? 1 : 0);
             _ownerOnly = n == 2;
             _ownerOnlyState = _ownerOnly ? "TAK (2/2)" : "BRAK - prefiksow w GetPatchInfo " + n + " z 2";
         }
@@ -287,17 +290,48 @@ namespace CrashScribe
                 f.State = "BRAK - transpiler trafil " + f.Hits + " (oczekiwane 1) - zdjety, jak dotad";
                 return;
             }
-            f.Patched = HasOur(f.Target, nameof(SelfCallTranspiler), true);
-            f.State = f.Patched ? "TAK (1/1 -> call " + bt.Name + ")" : "BRAK - transpiler niewidoczny w GetPatchInfo";
+            f.Patched = HasOur(f.Target, nameof(SelfCallTranspiler), 2);
+            if (!f.Patched) { f.State = "BRAK - transpiler niewidoczny w GetPatchInfo"; return; }
+            // recenzja P2: oslona wyjatkow - kod BK tej metody w b47fecc3 nie biegl wcale (straznik oddawal 0), a czesc wolajacych go nie lapie
+            // (KingdomDiplomacy.Update w dobie BKDiplomacyBehavior - TickTrace.Wrap ma tylko finally; CultureData.Update lapie tylko NRE i pokazuje
+            // graczowi komunikat bledu BK). Wyjatek z naprawionej metody = wynik 0 jak dotad + licznik, nie nowa droga wywrotki doby.
+            try { _harmony.Patch(f.Target, finalizer: new HarmonyMethod(typeof(BkrotSelfCall), nameof(SelfCallFinalizer))); }
+            catch (Exception e) { Stumble("Finalizer(" + f.Label + ")", e); }
+            f.Guarded = HasOur(f.Target, nameof(SelfCallFinalizer), 3);
+            f.State = "TAK (1/1 -> call " + bt.Name + (f.Guarded ? ", wyjatek -> 0)" : "; BEZ oslony wyjatkow)");
         }
 
-        /// <summary>Czy na metodzie stoi nasza latka (wlasciciel CrashScribe, ta metoda latki).</summary>
-        private static bool HasOur(MethodBase m, string patchName, bool transpiler)
+        /// <summary>Czy na metodzie stoi nasza latka (wlasciciel CrashScribe, ta metoda latki); rodzaj: 0 prefiks, 2 transpiler, 3 finalizer.</summary>
+        private static bool HasOur(MethodBase m, string patchName, int kind)
         {
             var info = Harmony.GetPatchInfo(m);
             if (info == null) return false;
-            var list = transpiler ? info.Transpilers : info.Prefixes;
+            var list = kind == 2 ? info.Transpilers : kind == 3 ? info.Finalizers : info.Prefixes;
             return list != null && list.Any(p => p != null && p.owner == HarmonyId && p.PatchMethod != null && p.PatchMethod.Name == patchName);
+        }
+
+        // recenzja P2: wyjatki w naprawionych metodach (doba / sesja / proces - raporty pierwszych 5 procesu z pelnym stosem)
+        private static int _dExc, _sExc, _pExc;
+
+        /// <summary>Finalizer na kazdej naprawionej metodzie BKROT (recenzja P2): wyjatek z kodu BK, ktory przed naprawa nie biegl, albo z prefiksu
+        /// kultury pana nie wychodzi do wolajacego - metoda oddaje wynik domyslny Harmony (int 0, ExplainedNumber / BKExplainedNumber 0 bez granic),
+        /// czyli to samo, co oddawal straznik BKROT w b47fecc3. Liczony (linia doby "wyjatki naprawy"), nie gasi naprawy (CLAUDE.md rozdz. 7).</summary>
+        internal static Exception SelfCallFinalizer(Exception __exception, MethodBase __originalMethod)
+        {
+            if (__exception == null) return null;
+            Interlocked.Increment(ref _dExc);
+            Interlocked.Increment(ref _sExc);
+            int n = Interlocked.Increment(ref _pExc);
+            if (n <= 5 || n % 1000 == 0)
+            {
+                try
+                {
+                    string where = __originalMethod != null && __originalMethod.DeclaringType != null ? __originalMethod.DeclaringType.Name + "." + __originalMethod.Name : "?";
+                    Scribe.Report("CrashScribe", __exception, "BkrotSelfCall: wyjatek w naprawionej metodzie " + where + " - wynik 0 jak przed naprawa (wyjatek " + n + " od startu gry)", null);
+                }
+                catch { }
+            }
+            return null;
         }
 
         private static Fix FixOf(MethodBase original)
@@ -380,6 +414,7 @@ namespace CrashScribe
             _cultSnap = new Dictionary<Settlement, CultureObject>();
             _sCultChanges = 0; _dSmpErr = 0; _sSmpErr = 0;
             Interlocked.Exchange(ref _dOwnerOnly, 0); _sOwnerOnly = 0;
+            Interlocked.Exchange(ref _dExc, 0); Interlocked.Exchange(ref _sExc, 0);
         }
 
         private static bool ResolveSample()
@@ -628,6 +663,8 @@ namespace CrashScribe
                 int oo = Interlocked.Exchange(ref _dOwnerOnly, 0);
                 _sOwnerOnly += oo;
                 sb.Append(" | poza kultura pana ").Append(oo).Append(" (sesja ").Append(_sOwnerOnly).Append(')');
+                // recenzja P2: wyjatki z naprawionych metod zlapane finalizerem (wynik 0 jak przed naprawa); probka wyzej tez przez nie przechodzi
+                sb.Append(" | wyjatki naprawy (wynik 0) ").Append(Interlocked.Exchange(ref _dExc, 0)).Append(" (sesja ").Append(Volatile.Read(ref _sExc)).Append(')');
                 sb.Append(" | bledy probki ").Append(_dSmpErr).Append(" (sesja ").Append(_sSmpErr).Append(") | potkniecia od startu gry ").Append(_sStumbles).Append('.');
                 _dSmpErr = 0;
                 Scribe.Line(sb.ToString());

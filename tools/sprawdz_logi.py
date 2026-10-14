@@ -679,9 +679,11 @@ Uzycie (Python 3, tylko odczyt):
                     LN-8 wodz spoza korony dostaje >= 50%, LN-9 anulowane 0, LN-10 uczestnicy szturmu >= 80%, LN-11 oddane w 60 dob (DECYZJA), LN-12 potkniecia 0.
 --grupa audytb    : (P2 audytu modow 14.10, docs/audyt-modow-2026-10-14/RAPORT-AUDYT-MODOW.md AM-10/11/12/15/18; CrashScribe/src/BkrotSelfCall.cs)
                     python -I tools/sprawdz_logi.py --grupa audytb <CrashScribe session-*.log> (log czytany strumieniowo). AB-0 linia startu
-                    "BKROT self call fix: n/8" - latane = wlaczone kluczem, BRAK 0, blogoslawienstwa kultury TAK (2/2) przy naprawionej kulturze; AB-1 linie
-                    doby i potkniecia 0; AB-2 (AM-10) cel prawowitosci modelu >= BK i nie 0 przy BK > 0, AB-2b L wobec celu (INFO); AB-3 (AM-11) limit
-                    modelu >= BK (blogoslawienstwo +15% tylko w gore) i nie 0 przy BK > 0, koszt wniosku pokoju > 100, pakty handlowe (INFO); AB-4 (AM-12)
+                    "BKROT self call fix: n/8" - latane = wlaczone kluczem, BRAK 0, kazda latana z oslona wyjatkow (recenzja P2), blogoslawienstwa
+                    kultury TAK (2/2) przy naprawionej kulturze; AB-1 linie doby i potkniecia 0; AB-1b wyjatki w naprawionych metodach (finalizer, wynik 0)
+                    = 0; AB-2 (AM-10) cel prawowitosci modelu >= BK i nie 0 przy BK > 0, AB-2b L wobec celu (INFO); AB-3 (AM-11) limit
+                    modelu >= BK (blogoslawienstwo +15% tylko w gore) i nie 0 przy BK > 0, koszt wniosku pokoju > 100 przy limicie BK >= 500 (perki
+                    obnizaja koszt), pakty handlowe (INFO); AB-4 (AM-12)
                     koszt Call Banners nie 0 przy BK > 0; AB-5 (AM-15) twierdze z >= 2 kulturami "wszystkie 1.0" = 0 (bez pierwszej doby sesji), AB-5b
                     asymilacja pana, lojalnosc, zmiany kultury (INFO); AB-6 (AM-18) ocena malzonka gracza nie 0 przy BK > 0; AB-7 karawana i "poza kultura pana"
                     (INFO). Metoda wylaczona kluczem albo BRAK - jej wiersz INFO. Log bez paczki: INFO, bez wyjatku.
@@ -24978,7 +24980,7 @@ def odsiecz_main(logp, csp=None, until=100000):
 AB_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
 AB_START = re.compile(r"BKROT self call fix: (\d+)/(\d+) metod \(kluczem wlaczonych (\d+), BRAK (\d+)\) \| (.*?) \| blogoslawienstwa kultury tylko dla kultury pana \(AM-15\): ([^|]*?) \|")
 AB_METH = re.compile(r"(Legitimacy|Influence|Army|Culture|Marriage|ClanFinance)\.(\w+) (TAK|wyl\.|BRAK|brak|wyjatek|nie wpinane)")
-AB_DAY = re.compile(r"BKROT self call \(P2\): dzien (\d+) \| prawowitosc: (.*?) \| wplyw: (.*?) \| call banners: (.*?) \| osady: (.*?) \| swiat: (.*?) \| malzonek gracza (\S+) \(BK (\S+)\) \| karawana (\S+) \(BK (\S+)\) \| poza kultura pana (\d+) \(sesja (\d+)\) \| bledy probki (\d+) \(sesja (\d+)\) \| potkniecia od startu gry (\d+)\.")
+AB_DAY = re.compile(r"BKROT self call \(P2\): dzien (\d+) \| prawowitosc: (.*?) \| wplyw: (.*?) \| call banners: (.*?) \| osady: (.*?) \| swiat: (.*?) \| malzonek gracza (\S+) \(BK (\S+)\) \| karawana (\S+) \(BK (\S+)\) \| poza kultura pana (\d+) \(sesja (\d+)\)(?: \| wyjatki naprawy \(wynik 0\) (\d+) \(sesja (\d+)\))? \| bledy probki (\d+) \(sesja (\d+)\) \| potkniecia od startu gry (\d+)\.")
 AB_LEG = re.compile(r"(.+?) L (\S+) cel (\S+) \(BK (\S+)\)$")
 AB_INF = re.compile(r"(.+?) limit (\S+) \(BK (\S+)\) zmiana (\S+) \(BK (\S+)\) wplyw (\S+) koszt pokoju (\S+) wojny (\S+)$")
 AB_PACT = re.compile(r"pakty handlowe \(wpisy krolestw\) (\S+)$")
@@ -25270,7 +25272,7 @@ def audytb_main(logp):
                 meth = {}
                 for mm in AB_METH.finditer(m.group(5)):
                     meth.setdefault(mm.group(1) + "." + mm.group(2), mm.group(3))
-                starts.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), meth, m.group(6).strip()))
+                starts.append((int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4)), meth, m.group(6).strip(), m.group(5)))
                 sess += 1
                 first_in_sess = True
                 continue
@@ -25290,20 +25292,28 @@ def audytb_main(logp):
             on[k] = on.get(k, True) and v == "TAK"
     cult = on.get("Culture.CalculateAcceptanceGain") and on.get("Culture.CalculateCultureWeight")
     oo_bad = [x for x in starts if cult and not x[5].startswith("TAK") and not x[5].startswith("wyl.")]
-    rep.add("AB-0: linia startu - latane = wlaczone kluczem, BRAK 0; blogoslawienstwa kultury tylko dla pana TAK albo wyl.",
-            f"linii {len(starts)}: ostatnia {starts[-1][0]}/{starts[-1][1]} (wlaczonych {starts[-1][2]}, BRAK {starts[-1][3]}), kultura pana: {starts[-1][5]}; zlych {len(bad) + len(oo_bad)}"
+    nofin = [x for x in starts if "BEZ oslony" in x[6]]   # recenzja P2: naprawiona metoda bez finalizera oslony wyjatkow
+    rep.add("AB-0: linia startu - latane = wlaczone kluczem, BRAK 0, kazda latana z oslona wyjatkow; blogoslawienstwa kultury tylko dla pana TAK albo wyl.",
+            f"linii {len(starts)}: ostatnia {starts[-1][0]}/{starts[-1][1]} (wlaczonych {starts[-1][2]}, BRAK {starts[-1][3]}), kultura pana: {starts[-1][5]}; zlych {len(bad) + len(oo_bad) + len(nofin)}"
+            + f" (bez oslony wyjatkow {len(nofin)})"
             + "; metody: " + ", ".join(f"{k} {'TAK' if v else 'nie'}" for k, v in sorted(on.items())),
-            "latane = wlaczone, BRAK 0", not bad and not oo_bad)
+            "latane = wlaczone, BRAK 0, bez oslony 0", not bad and not oo_bad and not nofin)
     if not days:
         rep.add("AB-1: linie doby 'BKROT self call (P2)'", "brak linii", "kazda doba", None)
         rep.show()
         return 0
     dnums = [int(g[0]) for _, _, g in days]
     span = max(dnums) - min(dnums) + 1
-    st_last = int(days[-1][2][14])
-    err = sum(int(g[12]) for _, _, g in days)
+    st_last = int(days[-1][2][16])
+    err = sum(int(g[14]) for _, _, g in days)
     rep.add("AB-1: linie doby i potkniecia", f"dob z linia {len(set(dnums))} z {span}; potkniecia (od startu gry, ostatnia linia) {st_last}; bledy probki (wyjatki BK w probce) {err}",
             "kazda doba, potkniecia 0 (bledy probki INFO)", len(set(dnums)) >= span - 1 and st_last == 0)
+    # recenzja P2: wyjatki z naprawionych metod zlapane finalizerem (wynik 0 jak przed naprawa) - kazdy to miejsce, gdzie naprawa nie dziala
+    exd = [(int(g[0]), int(g[12])) for _, _, g in days if g[12] is not None]
+    exc = sum(v for _, v in exd)
+    rep.add("AB-1b: wyjatki w naprawionych metodach (finalizer: wynik 0 jak przed naprawa)",
+            (f"suma {exc} w {sum(1 for _, v in exd if v)} dobach z {len(exd)}" + (f"; pierwsza doba z wyjatkiem {next(d for d, v in exd if v)}" if exc else "")) if exd else "brak pola w linii (DLL sprzed recenzji P2)",
+            "0 (> 0: blok ERROR 'BkrotSelfCall: wyjatek w naprawionej metodzie' w logu - sprawdzic przyczyne)", (exc == 0) if exd else None)
     # AB-2 AM-10
     zero, lower, n, gaps = 0, 0, 0, []
     for _, _, g in days:
@@ -25349,12 +25359,14 @@ def audytb_main(logp):
                 zero += 1
             if cap < capb * 0.99 - 0.5:
                 lower += 1
-            if peace is not None and capb > 0.5:
+            # recenzja P2: koszt = (100 + 0.2 x limit) x perki / cechy (BKDiplomacyModel - LOG06 '75' przy limicie 0), wiec "> 100" pewne dopiero przy
+            # duzym limicie: przy limicie >= 500 czlon limitu daje >= 200, a z 0 (bez naprawy) koszt <= 100; mniejszy limit - nie liczony
+            if peace is not None and capb >= 500:
                 ncost += 1
                 if peace <= 100:
                     cheap += 1
     ok = (zero == 0 and lower == 0 and cheap == 0) if on.get("Influence.CalculateInfluenceCap") else None
-    rep.add("AB-3: (AM-11) limit wplywu modelu >= BK, nie 0 przy BK > 0; koszt wniosku pokoju > 100",
+    rep.add("AB-3: (AM-11) limit wplywu modelu >= BK, nie 0 przy BK > 0; koszt wniosku pokoju > 100 (przy limicie BK >= 500)",
             f"probek {n}: 0 przy BK > 0 {zero}, ponizej BK {lower}; koszt pokoju <= 100 w {cheap} z {ncost}; pakty handlowe (ostatnia doba) {pacts[-1] if pacts else '-'}",
             "0, 0, 0 (naprawa wlaczona; inaczej INFO)", ok if n else None)
     # AB-4 AM-12
