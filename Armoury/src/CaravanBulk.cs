@@ -299,6 +299,17 @@ namespace Armoury
             return 0;
         }
 
+        /// <summary>Towary 2 / K1 (BuildWoodAboveCraftStock): zapas docelowy miasta (Target - ten sam, ktory karawany dopelniaja: CaravanBulkStockDays dob zuzycia
+        /// rzemieslnikow, dymarek, linii towarowych i domow, bez budow; nie mniej niz Good.Floor) - ponizej niego budowy nie biora drewna z polki.
+        /// 0 = spoza tabeli, zamek albo przedmioty jeszcze nie wczytane. Sam odczyt; nie zalezy od tego, czy regula karawan jest wlaczona.</summary>
+        internal static int TargetFor(Town town, ItemObject item)
+        {
+            var s = Settings.Current;
+            if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0;
+            foreach (var g in _goods) if (g.Item == item) return Target(town, g, s);
+            return 0;
+        }
+
         /// <summary>Kategorie surowcow masowych z tabeli (dla ceny surowcow i jej logu), w kolejnosci tabeli. Pusta = przedmioty nie wczytane.</summary>
         internal static List<ItemObject> Items()
         {

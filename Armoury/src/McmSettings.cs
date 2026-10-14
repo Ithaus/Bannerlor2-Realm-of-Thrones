@@ -1788,6 +1788,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public int FinanceLedgerPoorest { get; set; } = 5;
 
+        [SettingPropertyBool("Goods Ledger Tick Authors", HintText = "with the goods ledger: for goods that appear or vanish in the daily ticks of villages, castles and towns without a known cause, also write which game or mod behaviour did it (read from the call stack, at most 1,500 times a day) - written to the log only, changes nothing in the game; off = not traced")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool GoodsLedgerTickAuthors { get; set; } = true;
+
         [SettingPropertyBool("Goods Ledger Enabled", HintText = "write a daily ledger of every trade good and farm animal - how much villages, workshops and hidden craftsmen made, how much townsfolk, workshops, armies, builders and Banner Kings supplies used up, what carts and caravans carried, who holds the stock and what is left unexplained; each line balances yesterday's stock + made - used = today's stock - log only, changes nothing in the game")]
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerEnabled { get; set; } = true;
@@ -1856,6 +1860,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool BuildWagesByTown { get; set; } = true;
 
+        [SettingPropertyBool("Build Wood Above Craft Stock", HintText = "building works (the lord's and the townsfolk's) take timber off the market only above the stock the town keeps for its own smiths, bloomeries, workshops and households, never less than 40 loads (the same stock caravans fill for it - Caravan Bulk Stock Days of their use, building works not counted); below it the works buy the other materials or wait, so the armourers and fletchers are not left without wood. Off = the works buy timber down to the last piece (the townsfolk's works leave 50), as before")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool BuildWoodAboveCraftStock { get; set; } = true;
+
         [SettingPropertyBool("Ai Recruits Bring Kit", HintText = "a fresh recruit still arrives with his own kit (levies came armed); turn off and lords must buy for every new man")]
         [SettingPropertyGroup("Army purchases")]
         public bool AiRecruitsBringKit { get; set; } = true;
@@ -1919,6 +1927,10 @@ namespace Armoury
         [SettingPropertyBool("Weaver Export Price", HintText = "the town's weavers also weave for the towns that lack linen: while their own stall holds less linen than the town keeps for itself and for carrying out (what it will not sell to other towns, and as much again - at least one cart load), a bolt is worth to them what the best town short of linen within reach of a hired caravan or a merchants' cart (Town Material Order Range, by road or by sea) pays for it, less the carriage - not only what their own market pays. The linen then leaves by the existing caravan contracts and merchants' carts. Off = they weave only as much as their own market pays for, as before")]
         [SettingPropertyGroup("Workshops")]
         public bool WeaverExportPrice { get; set; } = true;
+
+        [SettingPropertyBool("Tanner Export Price", HintText = "the town's tanners also tan for the towns that lack leather, like the weavers do for linen (Weaver Export Price): while their own stall holds less leather than the town keeps for itself and for carrying out, a leather is worth to them what the best town short of leather within reach of a hired caravan or a merchants' cart pays for it, less the carriage - not only what their own market pays, which fell once the townsfolk stopped buying leather from their savings. The leather then leaves by the existing caravan contracts and merchants' carts. Off = they tan only as much as their own market pays for, as before")]
+        [SettingPropertyGroup("Workshops")]
+        public bool TannerExportPrice { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Town Craft Hands Per Arms Hand", 0.00f, 8.00f, "0.00", HintText = "hands of a town's cloth and leather trades for each hand of its arms craftsmen (Workshop Prosperity Per Hand), so they grow with the town's prosperity - weaving, fulling and tanning kept about twice as many people as the arms guilds (Paris 1292, Ghent 1356, estimate); 0 = town crafts off, the one-for-one tanning and weaving as before")]
         [SettingPropertyGroup("Workshops")]
@@ -5256,6 +5268,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool WardsAndVillagesShop { get; set; } = true;
 
+        [SettingPropertyBool("Village Cloth Above Reserve", HintText = "villagers who shop for their daily basket in their market town (salt, tools, linen, pots, beer) buy linen only from what lies on the stall above what the town keeps for its soldiers, armourers and for towns that lack it (the same mark as Folk Cloth Above Reserve); what they meant to spend on linen and could not stays in the village purse, the rest of the basket is bought as before. Off = they buy linen down to the last five pieces on the stall, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool VillageClothAboveReserve { get; set; } = true;
+
         [SettingPropertyBool("Folk Cloth Above Reserve", HintText = "linen and leather are what the soldiers' clothing and the armourers' workshops use, so the townsfolk (and the castle folk and villagers who shop in town) buy them from their savings only from what lies on the stall above what the town keeps for itself and for towns that lack it (what the town will not sell to other towns, and as much again - at least one cart load - for carrying out), and never above Folk Ladder Price Ceiling times the usual price, like the other fine goods; and the part of the cloth meant for velvet, cotton, fur or felt that are too dear does not go to linen and leather. What they do not buy stays in their purses. Their everyday buying for their homes is not touched. Off = they buy linen and leather from their savings down to the last pieces on the stall, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool FolkClothAboveReserve { get; set; } = true;
@@ -6158,6 +6174,7 @@ namespace Armoury
             s.FinanceLedgerEnabled = FinanceLedgerEnabled;
             s.FinanceLedgerPoor = FinanceLedgerPoor;
             s.FinanceLedgerPoorest = FinanceLedgerPoorest;
+            s.GoodsLedgerTickAuthors = GoodsLedgerTickAuthors;
             s.GoodsLedgerEnabled = GoodsLedgerEnabled;
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
@@ -6175,6 +6192,7 @@ namespace Armoury
             s.BuildMaterialPriceCap = BuildMaterialPriceCap;
             s.FolkWorksLevelDays = FolkWorksLevelDays;
             s.BuildWagesByTown = BuildWagesByTown;
+            s.BuildWoodAboveCraftStock = BuildWoodAboveCraftStock;
             s.AiRecruitsBringKit = AiRecruitsBringKit;
             s.KitFromNotable = KitFromNotable;
             s.PlayerRecruitNoFreeKit = PlayerRecruitNoFreeKit;
@@ -6191,6 +6209,7 @@ namespace Armoury
             s.ArtisanTanWeavePerCycle = ArtisanTanWeavePerCycle;
             s.TownCraftsEnabled = TownCraftsEnabled;
             s.WeaverExportPrice = WeaverExportPrice;
+            s.TannerExportPrice = TannerExportPrice;
             s.TownCraftHandsPerArmsHand = TownCraftHandsPerArmsHand;
             s.TownFletchersEnabled = TownFletchersEnabled;
             s.TownFletcherHandsPerArmsHand = TownFletcherHandsPerArmsHand;
@@ -7025,6 +7044,7 @@ namespace Armoury
             s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
             s.FolkPredictBought = FolkPredictBought;
             s.WardsAndVillagesShop = WardsAndVillagesShop;
+            s.VillageClothAboveReserve = VillageClothAboveReserve;
             s.FolkClothAboveReserve = FolkClothAboveReserve;
             s.Stage6MeasureLog = Stage6MeasureLog;
             s.WorkshopCraftByRealm = WorkshopCraftByRealm;

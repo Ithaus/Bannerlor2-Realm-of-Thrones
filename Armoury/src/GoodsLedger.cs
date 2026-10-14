@@ -191,6 +191,7 @@ namespace Armoury
         internal static void Reset()
         {
             _items = null; _idx = null; _acc = null; _top = null; _depth = 0; _lines.Clear();
+            _tickAuth.Clear(); _authNames.Clear(); _authIx.Clear(); _authCache.Clear(); _authTraces = 0; _authCapped = 0; _authTicks = 0;   // K4 (Towary 2): autorzy zmian w tickach
             for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
             _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _stumbles = _offThread = 0;
             _woodLeft = 0; _armsLeft = 0; _wagonGold = 0; _wagonSales = 0;
@@ -359,8 +360,126 @@ namespace Armoury
                 if (it == null || _idx == null || !_idx.TryGetValue(it, out i)) return;
                 _tapRec++;
                 f.Rec(r, i, n);
+                if ((f.Kind == FTickSettle || f.Kind == FTickTown) && AuthorsOn) NoteAuthor(f.Kind, i, n);   // K4 (Towary 2): kto dopisal towar w ticku osady / miasta (tylko log)
             }
             catch (Exception e) { Stumble("Tap", e); }
+        }
+
+        // ------------------------------------------------------------ Towary 2 / K4 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A7-2): kto dopisuje towar w tickach osad i miast
+        // "Inne ticki dobowe" (ramki DailyTickSettlement / DailyTickTown dyspozytora gry) - piwo 20%, chleb 9%, mieso, ser, maslo 11-12% produkcji, w tym stale "miasta 34"
+        // kazdego z tych towarow - zrodla nie znalismy. Dla zmiany sledzonego towaru, ktora trafia wprost do ramki ticku osady albo miasta (zadna ramka wewnetrzna jej
+        // nie zlapala), slad stosu: pierwsza metoda poza ItemRoster, ksiega, Harmony i System - zachowanie kampanii (CampaignBehaviorBase, z typu zewnetrznego dla
+        // lambd) albo typ.metoda, z nazwa zestawu (mod). Najwyzej AuthCap sladow na dobe (reszta "(limit sladow doby)"), czas w linii. TYLKO LOG - klucz
+        // GoodsLedgerTickAuthors (wylaczony = bez sladow, jak 449d453). Ticki partii (BK ser i jaja w partiach - znane) nie sa liczone (koszt).
+        private const int AuthCap = 1500;   // ok. 10-30 us na slad - najwyzej ok. 50 ms na dobe
+        private static readonly Dictionary<long, long> _tickAuth = new Dictionary<long, long>();   // (autor << 24 | miasto << 23 | towar) -> zmiana sztuk netto doby
+        private static readonly List<string> _authNames = new List<string>();
+        private static readonly Dictionary<string, int> _authIx = new Dictionary<string, int>();
+        private static readonly Dictionary<MethodBase, string> _authCache = new Dictionary<MethodBase, string>();   // null = pomin ramke, "!" + nazwa = zachowanie (koniec), reszta = kandydat
+        private static int _authTraces, _authCapped; private static long _authTicks;
+        private static bool AuthorsOn { get { var s = Settings.Current; return s != null && s.GoodsLedgerTickAuthors; } }
+
+        private static void NoteAuthor(int kind, int i, int n)
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                string who;
+                if (_authTraces >= AuthCap) { who = "(limit sladow doby)"; _authCapped++; }
+                else { _authTraces++; who = AuthorOf(new StackTrace(2, false)); }
+                int ai;
+                if (!_authIx.TryGetValue(who, out ai)) { ai = _authNames.Count; _authNames.Add(who); _authIx[who] = ai; }
+                long key = ((long)ai << 24) | ((long)(kind == FTickTown ? 1 : 0) << 23) | (long)(i & 0x7FFFFF);
+                long v; _tickAuth.TryGetValue(key, out v); _tickAuth[key] = v + n;
+            }
+            catch (Exception e) { Stumble("NoteAuthor", e); }
+            finally { _authTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        private static string AuthorOf(StackTrace st)
+        {
+            string first = null;
+            int n = st.FrameCount;
+            for (int k = 0; k < n && k < 48; k++)
+            {
+                var fr = st.GetFrame(k);
+                var m = fr != null ? fr.GetMethod() : null;
+                if (m == null) continue;
+                string c;
+                if (!_authCache.TryGetValue(m, out c)) { c = Classify(m); _authCache[m] = c; }
+                if (c == null) continue;
+                if (c == "#") break;                        // dyspozytor zdarzen gry - dalej juz tylko petla kampanii
+                if (c[0] == '!') return c.Substring(1);
+                if (first == null) first = c;
+            }
+            return first ?? "(nieznany)";
+        }
+
+        private static string Classify(MethodBase m)
+        {
+            var t = m.DeclaringType;
+            if (t == null) return null;                     // metoda dynamiczna (Harmony) - wolajacy jest wyzej
+            if (m.Name.StartsWith("DMD<", StringComparison.Ordinal) || t.Name.Contains("DMD<")) return null;   // metoda zalatana przez Harmony (MonoMod) - zrodlo wyzej albo w latce
+            try { if (t.Assembly.IsDynamic) return null; } catch { return null; }
+            if (t == typeof(GoodsLedger) || t == typeof(ItemRoster)) return null;
+            string ns = t.Namespace ?? "";
+            if (ns.StartsWith("System", StringComparison.Ordinal) || ns.StartsWith("HarmonyLib", StringComparison.Ordinal) || ns.StartsWith("MonoMod", StringComparison.Ordinal)) return null;
+            if (t == typeof(CampaignEventDispatcher) || t.Name.StartsWith("MbEvent", StringComparison.Ordinal) || t == typeof(CampaignEvents)) return "#";
+            var top = t;
+            while (top.DeclaringType != null) top = top.DeclaringType;   // lambdy i klasy zagniezdzone - typ zewnetrzny
+            string asm = top.Assembly != null ? top.Assembly.GetName().Name : "?";
+            if (typeof(CampaignBehaviorBase).IsAssignableFrom(top)) return "!" + asm + ":" + top.Name;
+            return asm + ":" + top.Name + "." + m.Name;
+        }
+
+        /// <summary>K4: linia "Towary (inne ticki dobowe)" - towary ze zmiana w tickach osad / miast, najwiekszych autorow (zmiana netto doby) - null, gdy klucz wylaczony.</summary>
+        private static string AuthorsLine(int day)
+        {
+            if (!AuthorsOn) return null;
+            var inv = CultureInfo.InvariantCulture;
+            var per = new SortedDictionary<int, List<KeyValuePair<long, long>>>();   // towar -> [(klucz, zmiana)]
+            foreach (var kv in _tickAuth)
+            {
+                if (kv.Value == 0) continue;
+                int i = (int)(kv.Key & 0x7FFFFF);
+                List<KeyValuePair<long, long>> l;
+                if (!per.TryGetValue(i, out l)) { l = new List<KeyValuePair<long, long>>(); per[i] = l; }
+                l.Add(kv);
+            }
+            var sb = new StringBuilder(1024);
+            sb.Append("Towary (inne ticki dobowe): dzien ").Append(day).Append(" - autorzy zmian w tickach osad i miast (K4, Goods Ledger Tick Authors; zmiana netto doby, najwyzej 4 na towar i rodzaj): ");
+            int items = 0;
+            foreach (var kv in per)
+            {
+                int i = kv.Key;
+                if (_items == null || i < 0 || i >= _items.Length) continue;
+                if (items > 0) sb.Append("; ");
+                sb.Append(_items[i].StringId).Append(" [");
+                bool firstSub = true;
+                for (int town = 0; town <= 1; town++)
+                {
+                    var l = kv.Value.FindAll(x => ((x.Key >> 23) & 1) == town);
+                    if (l.Count == 0) continue;
+                    l.Sort((x, y) => Math.Abs(y.Value).CompareTo(Math.Abs(x.Value)));
+                    long sum = 0; foreach (var x in l) sum += x.Value;
+                    if (!firstSub) sb.Append("; ");
+                    sb.Append(town == 1 ? "miasta " : "osady ").Append(Signed(sum)).Append(": ");
+                    for (int k = 0; k < l.Count && k < 4; k++)
+                    {
+                        if (k > 0) sb.Append(", ");
+                        int ai = (int)(l[k].Key >> 24);
+                        sb.Append(ai >= 0 && ai < _authNames.Count ? _authNames[ai] : "?").Append(' ').Append(Signed(l[k].Value));
+                    }
+                    if (l.Count > 4) sb.Append(", inni ").Append(l.Count - 4);
+                    firstSub = false;
+                }
+                sb.Append(']');
+                items++;
+            }
+            if (items == 0) sb.Append("brak zmian");
+            sb.Append(" | sladow stosu ").Append(_authTraces).Append(" (limit ").Append(AuthCap).Append(", ponad limit ").Append(_authCapped).Append("), czas ")
+              .Append((_authTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", inv)).Append(" ms.");
+            return sb.ToString();
         }
 
         // ------------------------------------------------------------ ksiegowanie
@@ -1122,6 +1241,10 @@ namespace Armoury
                 // 174.0: linia "Uzbrojenie (ujscia 174)" - te same ramki, ta sama doba
                 string arms = ArmsLeaks.DailyLine(day, armsStacks, armsPieces, KindName, FCons, FDecay, FSupplyUse, new[] { FTickParty, FTickSettle, FTickTown });
                 if (arms != null) all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(arms);
+                // K4 (Towary 2): autorzy zmian w tickach osad i miast - osobna linia (linie "Towary:" bez zmian)
+                string auth = null;
+                try { auth = AuthorsLine(day); } catch (Exception e) { Stumble("AuthorsLine", e); }
+                if (auth != null) all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(auth);
                 Log.Info(all.ToString());
 
                 // ---- nowa doba
@@ -1134,6 +1257,7 @@ namespace Armoury
                 for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
                 _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _offThread = _stumbles = 0; _woodLeft = 0; _armsLeft = 0;
                 _wagonGold = 0; _wagonSales = 0;
+                _tickAuth.Clear(); _authTraces = 0; _authCapped = 0; _authTicks = 0;   // K4: autorzy doby (nazwy i pamiec metod zostaja na sesje)
                 _lastDay = day; _wasOn = true;
             }
             catch (Exception e) { Stumble("Daily", e); }

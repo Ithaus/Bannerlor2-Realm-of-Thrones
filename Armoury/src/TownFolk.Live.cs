@@ -91,6 +91,9 @@ namespace Armoury
             public long KW, KR, KP, KG, KC, CCr; public double NW, NR, NP, AW, AR, AP, NFW, NFR, NFP, AFW, AFR, AFP, CNeed, CAff, Lokata;
             public double CInc, CWg, CHeads;
             public long VBuy, VPieces; public double VNeed, VWant;
+            // Towary 2 / K2 (VillageClothAboveReserve): plotno w koszyku dnia wsi - wiersze zatrzymane progiem polki, budzet plotna niewydany przez prog (zostaje w kiesach wsi),
+            // kupione sztuki plotna, suma progu i liczba wierszy plotna (srednia progu)
+            public long VClHeld, VClKept, VClPcs, VClCap, VClRows;
             public long Seed, Orphan;
             // dziesiecina (E5/C3, TownFolk.Tithe.cs): wsie (nalezne / zaplacone), lud miast W/R/P, jalmuzna miast / wsi, place i material septow, bez kaplana, bez miasta targowego
             public long TiVDue, TiV, TiW, TiR, TiP, TiAlmsT, TiAlmsV, TiWage, TiMat, TiNoPriestT, TiNoPriestV, TiNoMarket; public int TiPriestN, TiNoPriestN, TiVN;
@@ -1023,11 +1026,19 @@ namespace Armoury
             return l;
         }
 
-        /// <summary>Zakup wsi w miescie targowym: budzet po rowno na kategorie obecne, cena targu, najwyzej sztuki ponad 5; najpierw zloto (wies -> kasa), potem towar z polki.</summary>
+        /// <summary>Towary 2 / K2 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A2-1, klucz VillageClothAboveReserve): koszyk dnia wsi bierze plotno tylko ponad prog polki miasta
+        /// targowego (MaterialOrders.ShelfReserve - ten sam prog co FolkClothAboveReserve dla zbytkow ludu, podzamczy i wsi P5). Wylaczony - 5 sztuk jak dotad.</summary>
+        private static bool VillClothOn { get { var s = Settings.Current; return s != null && s.VillageClothAboveReserve; } }
+
+        /// <summary>Zakup wsi w miescie targowym: budzet po rowno na kategorie obecne, cena targu, najwyzej sztuki ponad 5; najpierw zloto (wies -> kasa), potem towar z polki.
+        /// K2 (VillageClothAboveReserve): plotno najwyzej ponad prog polki miasta (MaterialOrders.ShelfReserve); podzial budzetu na kategorie bez zmian (plotno na polce ponad 5
+        /// sztuk dalej ma swoja czesc), czesc plotna niewydana przez prog zostaje w kiesie wsi - reszta koszyka dostaje dokladnie tyle co dotad (jak udzial wypadlych kategorii
+        /// w FolkClothAboveReserve).</summary>
         private static long BuyGoods(Village vil, Settlement mk, List<EquipmentElement> list, double want, LDay d, double workExtra = 0)
         {
             if (list.Count == 0) return 0;
             var town = mk.Town; var roster = mk.ItemRoster;
+            bool clOn = VillClothOn;
             var cats = new List<ItemCategory>();
             foreach (var e in list) { var c = e.Item.ItemCategory; if (!cats.Contains(c)) cats.Add(c); }
             double per = want / cats.Count;
@@ -1036,18 +1047,22 @@ namespace Armoury
             foreach (var c in cats)
             {
                 double left = per + (perW > 0 && VillWorkCat(c) ? perW : 0);
+                bool cloth = clOn && c.StringId == "linen", held = false;   // K2: plotno tylko ponad prog polki
                 foreach (var e in list)
                 {
                     if (left < 1) break;
                     if (e.Item.ItemCategory != c) continue;
                     int ix = roster.FindIndexOfElement(e);
                     if (ix < 0) continue;
-                    int have = roster.GetElementNumber(ix) - ShelfKeep;
-                    if (have <= 0) continue;
+                    int keepRow = ShelfKeep;
+                    if (cloth) { int r = MaterialOrders.ShelfReserve(town, e.Item); if (r > ShelfKeep) keepRow = r; d.VClCap += keepRow; d.VClRows++; }
+                    int have = roster.GetElementNumber(ix) - keepRow;
+                    if (have <= 0) { if (keepRow > ShelfKeep && roster.GetElementNumber(ix) > ShelfKeep) { d.VClHeld++; held = true; } continue; }
                     int price = town.MarketData.GetPrice(e);
                     if (price <= 0) continue;
                     int n = (int)Math.Min(have, Math.Floor(left / price));
                     if (n <= 0) continue;
+                    if (keepRow > ShelfKeep && n == have) held = true;   // K2: zakup skonczyl sie na progu polki, nie na budzecie
                     int cost = n * price;
                     int had = vil.Gold;
                     if (cost > had) { n = had / price; cost = n * price; if (n <= 0) return spent; }
@@ -1056,7 +1071,9 @@ namespace Armoury
                     town.ChangeGold(got);
                     roster.AddToCounts(e, -n);
                     spent += got; left -= got; d.VBuy += got; d.VPieces += n;
+                    if (cloth) d.VClPcs += n;
                 }
+                if (held && left >= 1) d.VClKept += (long)left;   // K2: czesc plotna niewydana przez prog polki - zostaje w kiesie wsi (licznik)
             }
             return spent;
         }
@@ -1489,6 +1506,10 @@ namespace Armoury
               .Append(" | wsie ").Append(d.Villages).Append(": zakupy ").Append(d.VBuy).Append(" z ").Append(N0(d.VNeed)).Append(" (").Append(P1(d.VBuy, d.VNeed)).Append("; chciane z nadwyzka ").Append(N0(d.VWant))
               .Append("; sztuk ").Append(d.VPieces).Append(", wsi bez towaru ").Append(d.VNoGoods).Append(", bez miasta targowego ").Append(d.NoTrade).Append(", nieskalibrowanych ").Append(d.VNoCal).Append(")")
               .Append(", oplaty stale ").Append(w.VFee).Append(" (").Append(w.VFeeN).Append(" wsi)")
+              // K2 (Towary 2): plotno w koszyku dnia wsi tylko ponad prog polki miasta targowego
+              .Append(", plotno wsi ponad zapas polki (VillageClothAboveReserve) ").Append(VillClothOn ? "tak" : "nie").Append(": wierszy zatrzymanych progiem ").Append(d.VClHeld)
+              .Append(", zostalo w kiesach wsi ").Append(d.VClKept).Append(" zl, kupione plotno ").Append(d.VClPcs).Append(" szt. (prog polki srednio ")
+              .Append(d.VClRows > 0 ? ((double)d.VClCap / d.VClRows).ToString("0.0", Inv) : "-").Append(" szt.)")
               .Append(" | zapasy z nadwyzki dzis ").Append(d.Seed).Append(d.Orphan > 0 ? ", kiesy osad nieznanych do kasy " + d.Orphan : "")
               // P1: nowy rodzaj wydatku kies (w kontroli nizej siedzi w "wydatki") - danina z oszczednosci do skarbcow krolestw; kiesa ponad zapas dni przed / po daninie
               .Append(" | danina z oszczednosci do korony (P1) ").Append(d.Aid[0] + d.Aid[1] + d.Aid[2] + d.Aid[3]).Append(" (W ").Append(d.Aid[0]).Append(" / R ").Append(d.Aid[1])
