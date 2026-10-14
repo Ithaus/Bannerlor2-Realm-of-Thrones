@@ -49,7 +49,15 @@ namespace Armoury
             Log.Info("UniqueShelf (A17): unikaty zdejmowane z polki na czas konsumpcji osady - latka wpieta (klucz Uniques Not Folk Goods czytany na zywo).");
         }
 
-        public static void Pre(Town town, out List<ItemRosterElement> __state)
+        /// <summary>Zdjete z polki: roster i sztuki faktycznie zdjete (recenzja A17 (2): stan ustawiony PRZED pierwszym zdjeciem - wyjatek w polowie
+        /// zdejmowania nie gubi sztuk juz zdjetych; finalizer odklada do tego samego rosteru, kazda sztuke osobno).</summary>
+        internal sealed class Hidden
+        {
+            public ItemRoster R;
+            public readonly List<ItemRosterElement> L = new List<ItemRosterElement>();
+        }
+
+        public static void Pre(Town town, out Hidden __state)
         {
             __state = null;
             if (!On || town == null) return;
@@ -68,31 +76,40 @@ namespace Armoury
                     keep.Add(el);
                 }
                 if (keep == null) return;
+                var h = new Hidden { R = r };
+                __state = h;
+                _towns++;
                 Busy = true;
                 try
                 {
                     foreach (var el in keep)
                     {
                         r.AddToCounts(el.EquipmentElement, -el.Amount);
+                        h.L.Add(el);
                         _hidden += el.Amount;
                         int v; _ids.TryGetValue(el.EquipmentElement.Item.StringId, out v); _ids[el.EquipmentElement.Item.StringId] = v + el.Amount;
                     }
                 }
                 finally { Busy = false; }
-                __state = keep;
-                _towns++;
             }
             catch (Exception e) { Stumble("Pre", e); }
         }
 
-        public static Exception Fin(Exception __exception, Town town, List<ItemRosterElement> __state)
+        public static Exception Fin(Exception __exception, Hidden __state)
         {
-            if (__state == null || town == null) return __exception;
+            if (__state == null || __state.R == null || __state.L.Count == 0) return __exception;
             try
             {
-                var r = town.Owner.ItemRoster;
+                var r = __state.R;
                 Busy = true;
-                try { foreach (var el in __state) { r.AddToCounts(el.EquipmentElement, el.Amount); _restored += el.Amount; } }
+                try
+                {
+                    foreach (var el in __state.L)
+                    {
+                        try { r.AddToCounts(el.EquipmentElement, el.Amount); _restored += el.Amount; }
+                        catch (Exception e) { Stumble("Fin(sztuka)", e); }
+                    }
+                }
                 finally { Busy = false; }
             }
             catch (Exception e) { Stumble("Fin", e); }

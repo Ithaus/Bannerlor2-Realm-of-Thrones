@@ -79,6 +79,10 @@ namespace Armoury
             try
             {
                 bool act = On && h3;
+                // recenzja A17 (1): pamiec osad domowych BK (LosersFlee._battleHome, klucz bez miejsca) jest na JEDNA bitwe - bez czyszczenia uwolnieni jency
+                // skasowanej partii (FreedHome, SrcFreed) szli do osady BK wybranej dla poprzedniej bitwy (ten sam blad co recenzja fixA (1) przy ucieczkach);
+                // RoutedH3Body i tak czysci ja na swoim starcie (po nas)
+                if (act) LosersFlee.BeginBattle();
                 var bs = me.BattleState;
                 bool victory = bs == BattleState.AttackerVictory || bs == BattleState.DefenderVictory;
                 foreach (var side in new[] { me.AttackerSide, me.DefenderSide })
