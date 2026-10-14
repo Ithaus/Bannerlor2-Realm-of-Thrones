@@ -1,101 +1,37 @@
 export const meta = {
-  name: 'lup-zdobytego-miasta',
-  description: 'Jak dzis dziala lup po zdobyciu miasta (gra, BannerKings, ROT, nasz mod, pomiar z biegu rocznego) i propozycja: lupi sie prawdziwe bogactwo miasta - bez kodu',
-  phases: [
-    { title: 'Rozpoznanie', detail: 'kod gry i modow, kod Armoury, pomiar z biegu rocznego' },
-    { title: 'Podwazenie', detail: 'niezalezne sprawdzenie ustalen' },
-    { title: 'Propozycja', detail: 'jedna regula w obiegu zamknietym, rozdzial prostym jezykiem i pytania o kierunek' },
-  ],
+  name: 'lup-miast',
+  description: 'Lup zdobytego miasta (Jeff 13.10: 5 x TAK + budowle plona przy spustoszeniu, odbudowa wolna): L0-L5 rdzen monety, potem L6 ludzie, niszczenie budowli, L7 towar i konie; 2 recenzje, poprawki',
+  phases: [ { title: 'Kod rdzen' }, { title: 'Kod reszta' }, { title: 'Recenzja' }, { title: 'Poprawki' } ],
 }
-
-const REPO = String.raw`C:\Users\GAME\Bannerlor2-Realm-of-Thrones`
+const S3 = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\3cf3e0ac-5529-4b68-a794-0edec69cfda7\scratchpad`
+const LIBS = S3 + String.raw`\lancuch\libs`
 const SC = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Users-GAME-Bannerlor2-Realm-of-Thrones\ae222cb7-a7c2-473a-8fc1-1dc1d6f688e3\scratchpad`
-const INT = SC + String.raw`\zb\int`
-const SP = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\dbc3d3d1-6a1e-4825-afe7-38583389c73c\scratchpad`
-const LOGDIR = String.raw`D:\Backup-Bannerlord\logs\2026-10-13-noc34-35`
-const OUT = SP + String.raw`\lup-miast`
-
-const WSP = String.raw`
-Pracujesz przy modach do gry Mount & Blade II Bannerlord (Realm of Thrones + BannerKings + nasze mody Armoury i CrashScribe). Wlasciciel: Jeff - gracz, nie programista.
-NAJPIERW przeczytaj zasady pracy: ${REPO}\CLAUDE.md (obowiazuja cie: zasada 0 - kazda zmiana to sprawdzenie calego systemu; obieg zamkniety - nic z niczego i nic w nicosc, zadnych sztucznych doplat; prosty jezyk; napisy w grze po angielsku).
-TO JEST PRACA TYLKO DO ODCZYTU I PROJEKTU: nie uruchamiaj gry, nie buduj, nie zmieniaj kodu, ustawien ani zapisow, zadnych commitow. Pisz wylacznie do katalogu ${OUT} (istnieje), chyba ze polecenie mowi inaczej.
-PYTANIE JEFFA (13.10): "A co, jak miasto zostanie zdobyte - jak dziala pladrowanie? Bo powinno dac sie pladrowac to, co jest prawdziwym bogactwem miasta. I jak to dziala teraz?"
-ZRODLA: kod gry (dekompilacja) ${SC}\dec32\cs_full ; BannerKings ${SC}\e4tools\bkfull ; Realm of Thrones ${SC}\dec37\rot (inne dekompilacje modow szukaj w ${SC}) ; nasz kod ${INT}\Armoury\src (galaz w-toku/zbior-e8) ; dokumenty ${REPO}\docs (STAN-PRAC.md, CHANGELOG, audyty obiegu zlota - szukaj "O10", "lup z oblezen", "SiegeAftermath", "ujscia").
-Bieg roczny do pomiaru (364 doby, nowa kampania, sam swiat AI): log ${LOGDIR}\Armoury-2026-10-13_06-24-10.log (119 MB - nie czytaj w calosci, uzywaj Grep i python -I), log CrashScribe ${LOGDIR}\session-2026-10-13_06-24-09.log, tabele ${LOGDIR}\Logs\2026-10-13_06-24-10\ (bitwy.log, kasy-miast.csv, kiesa-ludu.csv, ludnosc-bk.csv, balans-krolestw.csv, finanse.log ...).
-Kazde twierdzenie o kodzie: plik i numer linii. Kazda liczba: zrodlo i znacznik [P] pomiar / [S] szacunek. Czego nie wiesz - napisz "nie wiem". Pliki po polsku BEZ polskich znakow diakrytycznych.
-`
-
-const R_SCHEMA = {
-  type: 'object',
-  properties: {
-    streszczenie: { type: 'string' },
-    ustalenia: { type: 'array', items: { type: 'object', properties: { twierdzenie: { type: 'string' }, dowod: { type: 'string' } }, required: ['twierdzenie', 'dowod'] } },
-    plik: { type: 'string' },
-  },
-  required: ['streszczenie', 'ustalenia', 'plik'],
-}
-
-phase('Rozpoznanie')
-const READERS = [
-  { key: 'gra-i-mody', p: String.raw`
-TWOJE ZADANIE: jak dziala zdobycie miasta / zamku w SILNIKU i w cudzych modach - krok po kroku, co do zlota i towaru.
-1. Gra: SiegeAftermathCampaignBehavior, SiegeAftermathAction, model lupow po oblezeniu (DefaultSiegeAftermathModel albo podobny), ChangeOwnerOfSettlementAction, lup z bitwy o mury (garnizon, milicja - PlayerEncounter / MapEvent / LootCollector), jency. Trzy wybory zdobywcy (Devastate / Pillage / Show Mercy): co kazdy robi z dobrobytem, lojalnoscia, bezpieczenstwem, ludnoscia, budowami w toku, zapasem zywnosci; ILE zlota dostaje zdobywca i jego armia, SKAD ono pochodzi (czy jest zdejmowane z kogokolwiek - Town.Gold czyli kasa kupcow, kiesa pana, skarbiec - czy powstaje z niczego wedlug wzoru od dobrobytu); jak wybiera AI; co widzi gracz (okno, napisy).
-2. Co przy zmianie pana dzieje sie z: towarem na polkach targu (ItemRoster miasta), kasa kupcow (Town.Gold), warsztatami i ich wlascicielami, karawanami w miescie, garnizonem, budowami, notablami, jencami w lochu, skladem / stash poprzedniego pana.
-3. BannerKings: co dodaje przy zdobyciu (BKSettlementBehavior, BKGentryBehavior, BKReligionsBehavior i inne sluchajace OnSiegeAftermathApplied / OnSettlementOwnerChanged): ludnosc i klasy, niewolnicy, tytuly, stabilnosc, zloto.
-4. Realm of Thrones i BKROTPatch: czy cos zmieniaja w tym miejscu.
-5. Napad na wies (raid) dla porownania - w dwoch zdaniach, co silnik robi z lupem wsi.
-Zapisz ${OUT}\rozpoznanie-gra-i-mody.md.` },
-  { key: 'armoury', p: String.raw`
-TWOJE ZADANIE: co przy zdobyciu miasta / zamku robi dzis NASZ mod Armoury i jakie jest w nim "prawdziwe bogactwo miasta".
-1. Wszystko, co slucha zdobycia albo zmiany pana: ArmouryBehavior.cs (OnSettlementOwnerChangedEvent ok. linii 727-728 i inne zdarzenia oblezen), CirculationWindows.cs (okno O10 "lup z oblezen" ok. linii 619 i 1822 - co dokladnie robi z lupem silnika: skad bierze zloto, komu daje, czy zamyka obieg), BattlePlunder.cs, CasualtyLoot.cs, LootPrices.cs, SpoilsCompany.cs, SpoilsSeal.cs, UniqueSpoils.cs, BesiegedPay.cs, Devastation.cs (czy dotyczy tylko wsi), DistrictRaid, oraz latki na SiegeAftermath* jesli sa. Opisz krok po kroku, co sie dzieje z kazda moneta i kazda sztuka towaru w chwili zdobycia - dzis.
-2. SPIS BOGACTWA MIASTA w naszym modelu - kazdy zbiornik osobno: kiesy ludu (klasy wyrobnicy / rzemieslnicy / rodziny kupieckie; zapas i lokata ponad zapas), kasa kupcow (Town.Gold), kasa gminy / akcyza, towar na polkach targu, spichlerz i zapasy zywnosci, sklady warsztatow, zbrojownia i zapas zalogi, skarbiec / kiesa pana i korony trzymana w miescie (jesli jest), notable, karawany stojace w miescie, bank (jesli ma oddzial), ludzie (ksiega ludzi - jency, niewolnicy), unikaty. Dla kazdego: gdzie w kodzie, co sie z nim dzieje przy zmianie pana DZIS (zostaje? przechodzi? znika?), i ile to jest zlota w skali swiata na koniec biegu rocznego (z logu / csv; np. kiesy ludu miast razem ok. 36 mln, kasy kupcow - sprawdz).
-3. Dziury obiegu w tym miejscu dzis: czy cos powstaje z niczego (lup silnika?) albo znika (spalony dobrobyt, wyczyszczone budowy) - co mowia nasze kontrole bilansu w dniach zdobyc.
-4. Co juz zdecydowano w docs o lupie miast (STAN-PRAC, projekty etapow 7-8, "Spoils", okienko rabunku R2 dla wsi) - zeby propozycja nie dublowala i nie lamala wczesniejszych decyzji Jeffa.
-Zapisz ${OUT}\rozpoznanie-armoury.md.` },
-  { key: 'pomiar', p: String.raw`
-TWOJE ZADANIE: POMIAR z biegu rocznego - co naprawde stalo sie przy kazdym zdobyciu miasta i zamku.
-1. Lista wszystkich zdobyc (miasta i zamki osobno): doba, osada, kto zdobyl (rod, krolestwo, armia - ilu ludzi), od kogo, czy szturm czy glod / poddanie, jaki wybor po oblezeniu (jesli widac). Zrodla: bitwy.log, balans-krolestw.csv (szturmy_zdobyte), linie logu o zmianie pana i o lupie z oblezen (okno "oblezenie" w liniach obiegu), KRONIKA w logu CrashScribe.
-2. Dla kazdego zdobytego MIASTA (i 10 przykladowych zamkow): stan 3 doby przed i 3, 14, 30 dob po - kasa kupcow (kasy-miast.csv), kiesy ludu (kiesa-ludu.csv), ludnosc i dobrobyt (ludnosc-bk.csv), zapas zywnosci, liczba sztuk na polkach jesli jest. Ile zlota dostal zdobywca jako lup (linia okna oblezenia / finanse.log / budzet-rodow.csv zdobywcy w tej dobie - kolumny lupow) i czy ta kwota zostala komus zdjeta.
-3. Suma roczna: ile zlota lupu z oblezen wyplacono, skad pochodzilo, ile "bogactwa miasta" lezalo w zdobytych miastach w chwili zdobycia (kiesy + kasa + wartosc towaru, jesli da sie policzyc) - czyli ile daloby sie zlupic naprawde.
-4. Czy miasto po zdobyciu biednieje naprawde (ceny, glod, ludnosc), czy tylko zmienia flage.
-Skrypty w ${OUT}\skrypty\. Zapisz ${OUT}\pomiar-zdobycia.md.` },
+const SD = String.raw`C:\Users\GAME\AppData\Local\Temp\claude\C--Program-Files--x86--Steam-steamapps-common-Mount---Blade-II-Bannerlord\dbc3d3d1-6a1e-4825-afe7-38583389c73c\scratchpad`
+const REPO = String.raw`C:\Users\GAME\Bannerlor2-Realm-of-Thrones`
+const NEW = String.raw`D:\Backup-Bannerlord\logs\2026-10-14-noc`
+const OLD = String.raw`D:\Backup-Bannerlord\logs\2026-10-13-noc34-35`
+const DZ = SC + String.raw`\zb\lup`
+const BR = 'w-toku/lup-miast'
+const BASE = '2c0a225'
+const LP = REPO + String.raw`\docs\lup-miast\LUP-ZDOBYTEGO-MIASTA-2026-10-13.md`
+const env = String.raw`Mody Bannerlorda 1.4.8 (Realm of Thrones + BannerKings.Redux + nasze Armoury). NAJPIERW przeczytaj ${REPO}\CLAUDE.md (caly; zasada 0; OBIEG ZAMKNIETY - nic z niczego, nic w nicosc: zloto, towar, konie, ludzie; rozdz. 7 pulapki: NIE wolac GameMenu.SwitchToMenu z wnetrza opcji menu oczekiwania - uzywac GameMenu.ExitToLast; globalne wylaczniki zabijaja wszystko). Katalog roboczy sesji = folder gry: NIC tam nie zapisuj, gry NIE uruchamiaj (biegnie test), niczego nie wgrywaj.
+DRZEWO: ${DZ} (galaz ${BR}, od w-toku/zbior-e8 ${BASE} = to, co w grze (WGRANIE 46: N7 rozbici wracaja, W6b, male poprawki, gospodarka od ludzi paczka A - zapas kupcow x m_t, glowy kiesy ludu wedlug ludzi rynku, zloto startowe) + W7 stawka wojenna pana. Rownolegle inne zespoly robia: paczke B gospodarki (TownFolk.Live.cs - robocizna ludu od skupu, Levy.cs, milicja, typy wsi) i reszte kiesy ludu (k13a konie robocze, P1b lojalnosc za danine, P2 lud buduje miasto - BuildFunding, zbytki P3-P5). Te miejsca czytaj, zmieniaj oszczednie i opisuj gdzie (scalanie bedzie pozniej).
+PROJEKT (specyfikacja): ${LP} (rozdz. 0-7; paczki L0-L7 i progi w rozdz. 6). DECYZJE JEFFA (13.10, wiazace): 1 TAK (lup z kazdej monety, takze z zapasu kupcow i zapasu ludu); 2 TAK (podzial miedzy druzyny wedlug ludzi, w druzynie: zolnierze 2/3 do sakiewek, wodz 1/3, z czego korona w wojnie 1/3); 3 TAK (3 doby bez zoldu wydawanego w lupionym miescie przez wojsko zdobywcy); 4 TAK (laska = laska, bez naszej blizny; AI lupi z potrzeby, swoich oszczedza, pustej nie lupi); 5a TAK (towar i konie z polek - drugi etap). KIERUNEK DODANY PRZEZ JEFFA: "lupienie miasta to straszna rzecz, miasto traci dobrobyt, kase, ludzi - trzeba to oddac; ale w grze wojny i lupienie sa czestsze niz normalnie, wiec miasto musi potrafic sie odbudowac - nie za szybko, rozsadnie; ciagle lupione miasto nigdy sie nie odbuduje; BUDYNKI TEZ MAJA BYC NISZCZONE - przy spustoszeniu masa budynkow splonie i trzeba budowac od nowa" (laska 0 / grabiez czesc / spustoszenie duzo; sprawdz, co juz robi gra i BK z poziomami budowli; odbudowa: budowy panow + "lud buduje miasto" P2 - rozsadne tempo, policz). Ludzie: zabici przez BK takze w naszej ksiedze ludzi (L6). Jeff spi; PELNE UPRAWNIENIA ma Claude - decyzje sam, "DECYZJA (pelne uprawnienia)" w CHANGELOG z liczba. Prog Jeffa: 85 tys. wojska lordow w wojnie (miara W5-7) - nie obnizac (policz).
+Zasady kodu: napisy w grze po ANGIELSKU (okno gracza L5 - podpowiedzi trzech opcji z prawdziwymi kwotami), komentarze po polsku bez polskich znakow, .cs z CRLF, kazda paczka = wlasny klucz MCM domyslnie WLACZONY (off = stan ${BASE}), potkniecia per obiekt, pola zapisu tylko przez SaveText.Sync. Po Settings.cs "python tools/gen_mcm.py" ("python3" to atrapa). Progi w tools/sprawdz_logi.py (grupa lup) wedlug tabeli progow rozdz. 6; na logu bez paczki INFO; py_compile na kopii poza repo.
+Build: cd "${DZ}\Armoury" && dotnet build Armoury.csproj -c Release -v q --nologo "-p:GameLibs=${LIBS}" > build.log 2>&1; echo rc=$?  (kod 0). Dekompilacje: gra ${SC}\dec32\cs_full (SiegeAftermathCampaignBehavior.cs), BK ${SC}\e4tools\bkfull, ROT ${SC}\dec37\rot (jesli jest). Robocze rozpoznania lupu: ${SD}\lup-miast\. Commit konczy sie "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>". Nie uzywaj spawn_task. ZWRACAJ KROTKO (max 30 linii).
+DANE: bieg roczny kodu 43 ${NEW}\Armoury-2026-10-13_15-02-59.log + ${NEW}\Logs\2026-10-13_15-02-59\ (kasy-miast.csv, kiesa-ludu.csv, bitwy.log, budowy.log); bieg roczny W37 ${OLD}\Armoury-2026-10-13_06-24-10.log (14 zdobyc - projekt rozdz. 1.6).`
+const zR = String.raw`TWOJA CZESC (RDZEN, po kolei, osobne commity): L0 pomiar na sucho (linia przy kazdych nastepstwach), L1 bez zdobycia nie ma grabiezy + kiesa rozbitej zalogi do zwyciezcow, L2 lup z monety (rdzen 3.1-3.3: kasa kupcow, kiesy W / R / P, gmina; czesc: laska 0, grabiez 1/3, spustoszenie 2/3 - parametry z rozdz. 3.2; kwota gry 15 x dobrobyt wylaczona; "Right of Pillage" ta sama droga; podzial wedlug decyzji 2), L3 3 doby bez zoldu w lupionym miescie, L4 AI lupi z potrzeby, L5 okno gracza (podpowiedzi i podsumowanie z prawdziwymi kwotami po angielsku; OSTROZNIE z menu - pulapka SwitchToMenu). NIE wypychaj.`
+const zS = String.raw`TWOJA CZESC (RESZTA, rdzen L0-L5 jest juz w drzewie - przeczytaj jego wpisy w CHANGELOG): (a) L6 jedno liczydlo ludzi (zabici przez BK przy zdobyciu schodza z naszej ksiegi ludzi miasta; projekt rozdz. 6 L6 - najpierw rozpoznaj, jak ksiega liczy ludzi samego miasta); (b) BUDOWLE PLONA (kierunek Jeffa): przy wyborze gracza / AI - laska 0, grabiez czesc, spustoszenie duzo poziomow budowli miasta / zamku (Town.Buildings - sprawdz, co juz robi gra i BK; nie niszcz budowli "domyslnych" / poziomu 0; mury - zdecyduj i uzasadnij), odbudowa: istniejace budowy panow + P2 "lud buduje miasto" (inny zespol) - policz tempo odbudowy (ile dob do stanu sprzed spustoszenia przy typowym miescie; "nie za szybko, rozsadnie"; miasto lupione co pol roku nie odbuduje sie); (c) L7 towar i konie z polek (ta sama czesc co moneta, do udzwigu taborow / partii zdobywcy, zywnosc do 10 dni racji, ogien przy spustoszeniu - spalony towar znika jawnie w ksiedze towarow jako "spalone", unikaty z polki, bron i zbroja do zbrojowni druzyn). Kazda: klucz, linia logu, progi, CHANGELOG, commit. NIE wypychaj.`
+phase('Kod rdzen')
+const a = await agent(`${env}\n\nJESTES AUTOREM RDZENIA.\n${zR}\n\nZwroc: HEAD, kazda paczka w 3 zdaniach, klucze, poczatki linii logu, grupa progow, rachunek (ile zlota w roku, ile dla zolnierzy / wodzow / koron), czego nie zrobiles, watpliwosci.`, { label: 'autor-lup-rdzen', phase: 'Kod rdzen' })
+phase('Kod reszta')
+const b = await agent(`${env}\n\nJESTES AUTOREM RESZTY.\n${zS}\n\nOpis rdzenia:\n${a}\n\nZwroc: HEAD, kazda czesc w 3 zdaniach, klucze, poczatki linii logu, rachunek (ile poziomow budowli plonie, tempo odbudowy), czego nie zrobiles, watpliwosci.`, { label: 'autor-lup-reszta', phase: 'Kod reszta' })
+phase('Recenzja')
+const LENSES = [
+  { key: 'obieg', p: 'SOCZEWKA: OBIEG I SKUTEK - kazda zlotowka lupu: zdjete osadzie = dopisane odbiorcom (zolnierze 2/3 sakiewki, wodz, korona 1/3 czesci wodza) co do zlotowki; kontrola kies ludu r = 0, linie Obieg / Pieniadz swiata / 165; L3 sakiewki: wplynelo - wyszlo = zmiana; L7 towar: zdjete = dopisane + spalone; konie; L6 ksiega ludzi zamknieta; budowle: zniszczone poziomy - czy nie znika zloto / material budowy w toku; laska = 0; "stac na jedzenie" w zlupionej osadzie 7 i 14 dob po (prog 0.95) - policz na danych; prog 85 tys. wojska (lup w sakiewkach zolnierzy, 3 doby bez zoldu w miescie) - policz.' },
+  { key: 'kod', p: 'SOCZEWKA: KOD, MENU, ZAPIS, AI - pulapka GameMenu (ExitToLast zamiast SwitchToMenu w menu oczekiwania), okno gracza: kwoty z zywych zbiornikow = kwoty w logu, napisy po angielsku; latki na SiegeAftermathCampaignBehavior - kolejnosc wobec BK / ROT / Diplomacy (dekompilacja), wybor AI (L4) bez wywrotki przy null-ach (osada bez wlasciciela, krolestwo zniknelo, armia rozwiazana); zapis (L3 pole, budowle) przez SaveText.Sync; klucze off = BASE; potkniecia per obiekt; progi grupy lup na logu (uruchom; py_compile kopii); build kod 0; gen_mcm.' },
 ]
-const recon = (await parallel(READERS.map(r => () => agent(WSP + r.p + '\nZwroc strukture (plik = pelna sciezka).', { label: 'rozpoznanie:' + r.key, phase: 'Rozpoznanie', schema: R_SCHEMA })))).filter(Boolean)
-log('rozpoznan: ' + recon.length + ' z 3')
-
-phase('Podwazenie')
-const V_SCHEMA = {
-  type: 'object',
-  properties: {
-    obalone: { type: 'array', items: { type: 'object', properties: { twierdzenie: { type: 'string' }, dlaczego: { type: 'string' }, poprawka: { type: 'string' } }, required: ['twierdzenie', 'dlaczego', 'poprawka'] } },
-    potwierdzone_kluczowe: { type: 'array', items: { type: 'string' } },
-    braki: { type: 'array', items: { type: 'string' } },
-    plik: { type: 'string' },
-  },
-  required: ['obalone', 'potwierdzone_kluczowe', 'braki', 'plik'],
-}
-const ver = await agent(String.raw`${WSP}
-JESTES WERYFIKATOREM. Trzy pliki rozpoznania: ${OUT}\rozpoznanie-gra-i-mody.md, ${OUT}\rozpoznanie-armoury.md, ${OUT}\pomiar-zdobycia.md. Nie ufaj im.
-Sprawdz w kodzie i danych SAM kazde twierdzenie, od ktorego zalezy odpowiedz na pytanie Jeffa: (1) skad pochodzi zloto lupu po oblezeniu i komu jest zdejmowane (czy z niczego), (2) co sie dzieje z kasa kupcow, kiesami ludu i towarem przy zmianie pana, (3) co robi nasze okno "lup z oblezen", (4) co robia trzy wybory zdobywcy i jak wybiera AI, (5) co dodaje BannerKings, (6) 5 najwazniejszych liczb pomiaru (policz wlasnym skryptem). Szukaj tez rzeczy pominietych: innej latki na te same metody (Harmony w cudzych modach), przypadku zamku, przypadku gracza-obroncy, miasta przejetego bez szturmu (bunt, traktat, wymiana), miasta zbuntowanego.
-Streszczenia: ${JSON.stringify(recon.map(r => r.streszczenie))}
-Zapisz ${OUT}\weryfikacja.md i zwroc strukture.`, { label: 'podwazenie', phase: 'Podwazenie', schema: V_SCHEMA })
-
-phase('Propozycja')
-const P_SCHEMA = {
-  type: 'object',
-  properties: {
-    rozdzial0: { type: 'string', description: 'pelny tekst rozdzialu 0 dla Jeffa: jak jest dzis + propozycja, prostym jezykiem' },
-    pytania: { type: 'array', items: { type: 'string' } },
-    plik: { type: 'string' },
-  },
-  required: ['rozdzial0', 'pytania', 'plik'],
-}
-const prop = await agent(String.raw`${WSP}
-JESTES AUTOREM ODPOWIEDZI I PROPOZYCJI (bez kodu). Wyjatek od zasady "tylko OUT": zapisz JEDEN plik w repo: ${REPO}\docs\lup-miast\LUP-ZDOBYTEGO-MIASTA-2026-10-13.md (utworz katalog; bez commita).
-Materialy: ${OUT}\rozpoznanie-gra-i-mody.md, ${OUT}\rozpoznanie-armoury.md, ${OUT}\pomiar-zdobycia.md, ${OUT}\weryfikacja.md (gdzie weryfikator cos obalil - obowiazuje jego wersja: ${JSON.stringify(ver ? ver.obalone : 'BRAK WERYFIKACJI - sprawdz sam kluczowe twierdzenia')}). Przeczytaj tez projekt obiegu kiesy ludu ${REPO}\docs\kiesa-ludu\PROJEKT-OBIEG-KIESY-LUDU-2026-10-13.md (Jeff zgodzil sie 13.10 na danine wojenna z oszczednosci ludu, budowe miasta przez lud i zbytki) - lup ma do niego pasowac: to te same zbiorniki.
-UKLAD PLIKU:
-0. "Dla Jeffa - prostym jezykiem" (najwyzej 45 linii): CZESC A - jak to dziala DZIS, krok po kroku: co dostaje zdobywca, skad to zloto jest, co traci miasto, co robia trzy wybory, co z kupcami, ludem, towarem; uczciwie: co jest prawdziwe, a co "z niczego" albo "tylko flaga". CZESC B - propozycja: JEDNA regula "lupi sie to, co w miescie naprawde lezy": z ktorych zbiornikow i ile przy kazdym z trzech wyborow (lagodnosc / grabiez / spustoszenie), kto dostaje (wodz, rody w armii wedlug ludzi, zolnierze - a przez nich miasta, w ktorych wydaja), co widzi gracz (okno z prawdziwymi kwotami - napisy po angielsku), jak wybiera AI (z biezacej potrzeby, np. zalegly zold), co potem z miastem (biedniejsze naprawde: kupcy bez kasy, lud bez oszczednosci, ceny, lojalnosc, czas odbudowy), ile to zlota w skali swiata (z pomiaru). CZESC C - czego nie wiemy.
-1. Jak jest dzis - z dowodami (plik:linia, liczby z biegu). 2. Spis bogactwa miasta i co sie z nim dzieje przy zdobyciu dzis. 3. Regula - szczegoly, parametry z rachunkiem (parametry wybierasz ty - Jeffa pytamy tylko o kierunek), dowod zamknietego obiegu (tabela: platnik / odbiorca / towar). 4. Sto procent przypadkow (miasto, zamek, AI-AI, gracz zdobywa, gracz broni, miasto przejete bez szturmu, bunt, miasto juz zlupione miesiac temu, wies - odniesienie do istniejacego rabunku wsi, obrona odparta). 5. Zgodnosc z innymi regulami (danina wojenna, kiesa ludu, kasy miast, BannerKings: ludnosc i stabilnosc, okno "lup z oblezen", lupy z bitwy). 6. Paczki wdrozenia (tor S / M / L wedlug ryzyka), progi testu. 7. Ryzyka. 8. Pytania do Jeffa - TYLKO kierunek, najwyzej 5, kazde z rada.
-Zwroc: rozdzial0 (pelny tekst), pytania, plik.`, { label: 'propozycja', phase: 'Propozycja', schema: P_SCHEMA })
-
-return { prop, obalone: ver ? ver.obalone : null, braki: ver ? ver.braki : null, rozpoznanie: recon.map(r => r.streszczenie) }
+const revs = await parallel(LENSES.map(l => () => agent(`${env}\n\nJESTES RECENZENTEM (${l.key}). NIE commituj kodu - tylko raport (skrypty poza repo, w ${DZ}\\..\\lup-rec-${l.key}\\). Diff: "git -C ${DZ} diff ${BASE}..HEAD".\n${zR}\n${zS}\n\n${l.p}\nZwroc liste: [KRYTYCZNE / WAZNE / DROBNE] plik:linia - co zle - jak naprawic; oraz liczby.\n\nOpis rdzenia:\n${a}\n\nOpis reszty:\n${b}`, { label: `lup-rec-${l.key}`, phase: 'Recenzja' })))
+phase('Poprawki')
+const fix = await agent(`${env}\n\nJESTES AUTOREM POPRAWEK w ${DZ}. Diff: "git -C ${DZ} diff ${BASE}..HEAD". Popraw WSZYSTKIE KRYTYCZNE i WAZNE (DROBNE - jesli tanie); gdy recenzent sie myli - sprawdz i napisz dlaczego. Build kod 0, gen_mcm, progi (py_compile kopii), CHANGELOG uzupelniony, commit. Na koniec wypchnij DWOMA OSOBNYMI poleceniami: "git -C ${DZ} push origin ${BR}" i "git -C ${REPO} push origin ${BR}". Zwroc: HEAD, co poprawiles (i czego nie), klucze, poczatki linii logu, polecenie progow, oczekiwane liczby w 120 dobach (liczba zdobyc losowa - progi na zdarzenie), 3 punkty do recznego testu Jeffa (okno gracza), ryzyka.\n\n${zR}\n${zS}\n\nRECENZJA OBIEG:\n${revs[0]}\n\nRECENZJA KOD:\n${revs[1]}`, { label: 'lup-poprawki', phase: 'Poprawki' })
+return { a, b, revs, fix }
