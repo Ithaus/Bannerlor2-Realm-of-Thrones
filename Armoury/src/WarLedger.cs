@@ -306,6 +306,7 @@ namespace Armoury
                 if (detail != ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege) return;
                 var town = st != null ? st.Town : null;
                 if (town == null) return;
+                if (CitySack.ScarAtChoice) { CitySack.OwnerChangedScarSkipped(st, newOwner); return; }   // lup miast L2: blizna tylko przy grabiezy i spustoszeniu, w chwili wyboru
                 float cut = MBMath.ClampFloat(Math.Max(0, s.SackProsperityCutPercent) / 100f, 0f, 0.6f);
                 float before = town.Prosperity;
                 town.Prosperity = Math.Max(0f, town.Prosperity * (1f - cut));

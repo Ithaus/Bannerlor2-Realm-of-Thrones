@@ -625,6 +625,9 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>Lup miast (CitySack, L2/L5): czy korona wezmie 1/9 od tego bohatera (ta sama regula co podstawa doby) - tylko odczyt do napisu.</summary>
+        internal static bool WouldTax(Hero h) { try { return Taxed(h); } catch { return false; } }
+
         /// <summary>ClanIncomeBook.NoteInflow(KThird): trzecia lorda AI (nadwyzki ludzi, sakwy) - korona bierze jej 1/3.</summary>
         internal static void NoteThird(Hero h, long x) { try { if (x > 0 && Taxed(h)) { AccOf(h).Third += x; _dBaseThird += x; } } catch (Exception e) { Stumble("NoteThird", e); } }
 

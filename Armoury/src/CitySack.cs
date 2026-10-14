@@ -340,26 +340,38 @@ namespace Armoury
         {
             if (!Live) return;
             _dCalls++;
+            if (__1 == null || __1.Town == null) return;
+            int kind = KindOf(__2);
+            Stock k = null;
+            bool captured = false;
             try
             {
-                if (!MeasureOn || __1 == null || __1.Town == null) return;
-                MeasureLine(__instance, __0, __1, KindOf(__2), __4);
+                k = Read(__1);                              // stan PRZED kara gry i PRZED lupem (prefiks)
+                captured = _me != null ? (_me.IsSiegeAssault || _me.IsSallyOut || _me.IsBlockadeSallyOut) : (__0 != null && __1.MapFaction == __0.MapFaction);
+                _dGame[kind]++;
+                if (MeasureOn) MeasureLine(__instance, __0, __1, kind, __4, k, captured);
             }
             catch (Exception e) { Stumble("AftermathPre", e); }
+            // osada po nastepstwach (pomiar 30 dob, okno lupu L3, napisy L5) - ostatnie nastepstwa nadpisuja
+            Track t = null;
+            try
+            {
+                t = new Track { St = __1, Day0 = Now, Faction = __0 != null && __0.MapFaction != null ? __0.MapFaction.StringId : "", Kind = kind, Captured = captured,
+                                Kasa0 = k != null ? k.Kasa : 0, Folk0 = k != null ? k.FolkSum : 0 };
+                _track[__1] = t;
+            }
+            catch (Exception e) { Stumble("AftermathPre.Track", e); }
+            AftermathCoin(__instance, __0, __1, kind, __3, __4, k, t);
         }
 
-        private static void MeasureLine(SiegeAftermathCampaignBehavior inst, MobileParty a, Settlement st, int kind, Dictionary<MobileParty, float> contrib)
+        private static void MeasureLine(SiegeAftermathCampaignBehavior inst, MobileParty a, Settlement st, int kind, Dictionary<MobileParty, float> contrib, Stock k, bool captured)
         {
-            var k = Read(st);
             int men, uMen;
             var recs = Recipients(a, contrib, out men, out uMen);
             var need = NeedOf(a);
             string why;
             int rule = Rule34(inst, a, st, k, need, out why);
             string battle = BattleOf(_me, contrib);
-            bool captured = _me != null ? (_me.IsSiegeAssault || _me.IsSallyOut || _me.IsBlockadeSallyOut)
-                                        : (a != null && st.MapFaction == a.MapFaction);
-            _dGame[kind]++;
             // polki: towar bez zywnosci, zywnosc, konie (ceny bazowe)
             long gN = 0, gV = 0, fN = 0, hN = 0, hV = 0;
             try
@@ -401,9 +413,6 @@ namespace Armoury
               .Append(" | gracz ").Append(player).Append('.');
             Log.Info(sb.ToString());
             _dLines++;
-            // pomiar 30 dob: osada po nastepstwach (ostatnie nastepstwa nadpisuja)
-            var t = new Track { St = st, Day0 = Now, Faction = a != null && a.MapFaction != null ? a.MapFaction.StringId : "", Kind = kind, Captured = captured, Kasa0 = k.Kasa, Folk0 = k.FolkSum };
-            _track[st] = t;
         }
 
         // ------------------------------------------------------------ raz na dobe (ArmouryBehavior, po kronice bitew)
@@ -413,7 +422,7 @@ namespace Armoury
             {
                 if (Campaign.Current == null) return;
                 int today = (int)CampaignTime.Now.ToDays;
-                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any))
+                if (MeasureOn && (_dCalls > 0 || _dWsSeen > 0 || _dLines > 0 || L1Any || L2Any))
                 {
                     var sb = new StringBuilder(600);
                     sb.Append("Lup miast: dzien ").Append(today).Append(" | L0: nastepstw ").Append(_dCalls).Append(" (linii ").Append(_dLines).Append("), wybor gry: laska ")
@@ -421,6 +430,7 @@ namespace Armoury
                       .Append(" | warsztaty przy zmianie pana oblezeniem: ").Append(_dWsSeen).Append(", zmienily wlasciciela (BK) ").Append(_dWsMoved)
                       .Append(_dWsTowns.Count > 0 ? " (" + string.Join(", ", _dWsTowns.ToArray()) + ")" : "");
                     L1Part(sb);
+                    L2Part(sb);
                     sb.Append(" | potkniecia ").Append(_stumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
@@ -463,6 +473,7 @@ namespace Armoury
             _dCalls = _dLines = 0; Array.Clear(_dGame, 0, 3);
             _dWsSeen = _dWsMoved = 0; _dWsTowns.Clear();
             L1Clear();
+            L2Clear();
         }
 
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie).</summary>
@@ -470,6 +481,7 @@ namespace Armoury
         {
             ClearDay();
             _track.Clear();
+            Last = null;
             _me = null; _wsSt = null; _wsOwners = null;
             _stumbles = 0; _err.Clear();
         }
@@ -484,6 +496,7 @@ namespace Armoury
                          nameof(AftermathPre), null, null, Priority.High);
             Seal31.Patch("lup miast L0: warsztaty przy zmianie pana (ChangeOwnerOfSettlementAction.ApplyInternal)", AccessTools.Method(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal"),
                          typeof(CitySack), nameof(OwnerPre), null, nameof(OwnerFin), Priority.High, Priority.Normal, Priority.Low);
+            L2Patch();
         }
     }
 }

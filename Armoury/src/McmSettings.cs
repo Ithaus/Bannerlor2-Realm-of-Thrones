@@ -5496,6 +5496,14 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool BeatenGarrisonPurseToVictor { get; set; } = true;
 
+        [SettingPropertyBool("Sack Takes Real Coin", HintText = "the sack takes what really lies in a stormed town or castle: under pillage a third, under devastation two thirds of every coin there - the merchants' coin and the townsfolk's purses alike, their reserves included (Sack Share Pillage / Devastate); mercy takes nothing. The plunder is shared among the victorious parties by their men; in each party the soldiers put two thirds in their purses and the captain takes one third, of which a crown at war claims a third the next morning. The game's sum of 15 coins per point of burnt prosperity is gone, and so is all gold from nowhere (off = the game's sum, paid by the town from what it holds above its reserve)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackTakesRealCoin { get; set; } = true;
+
+        [SettingPropertyBool("Sack Scar Only When Sacked", HintText = "with Sack Scar Enabled: the scar of the sack (Sack Prosperity Cut Percent of the prosperity left and Sack Loyalty Hit loyalty) falls only on a town that is pillaged or devastated, at the moment of that choice - mercy is mercy, the town keeps only the game's own loss (off = the scar falls on every town taken by siege, also when spared, when its lord changes)")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SackScarOnlyWhenSacked { get; set; } = true;
+
         [SettingPropertyInteger("Sack No Spending Days", 0, 30, "0", HintText = "for this many days after a pillage or devastation the soldiers of the conquering realm take what they want in the sacked town and pay for nothing: their pay stays in their purses (spent later in other towns), neither their days in town nor their camp followers leave coin there")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public int SackNoSpendingDays { get; set; } = 3;
@@ -6873,6 +6881,8 @@ namespace Armoury
             s.SackShareDevastate = SackShareDevastate;
             s.NoSackWithoutCapture = NoSackWithoutCapture;
             s.BeatenGarrisonPurseToVictor = BeatenGarrisonPurseToVictor;
+            s.SackTakesRealCoin = SackTakesRealCoin;
+            s.SackScarOnlyWhenSacked = SackScarOnlyWhenSacked;
             s.SackNoSpendingDays = SackNoSpendingDays;
         }
 
