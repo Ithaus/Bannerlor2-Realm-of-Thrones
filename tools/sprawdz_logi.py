@@ -642,7 +642,8 @@ Uzycie (Python 3, tylko odczyt):
                     oczekiwane, regulator 43-53 / rok, SD-A3 oferty dla rodu gracza (0.15-0.31, odstep >= 30 dob), SD-A4 INFO rody; (B) SD-B0..B5 danina
                     pokoju M4: linia, kontrolki, wziete <= budzet (chleb, najwyzej 0.5% lokaty), pokoj >= 91 dob (wiersze i KRONIKA WOJEN), dzien do dnia, linia P1.
 --grupa oblezenia : (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia) python -I tools/sprawdz_logi.py --grupa oblezenia <Armoury-*.log>
-                    (log czytany strumieniowo). OB-0 linia startowa i OB0 kazdej doby, OB-1a decyzja AI przy s OB1 <= 1 = 0, OB-1b weta (INFO), OB-1c AI bije
+                    (log czytany strumieniowo). OB-0 linia startowa i OB0 kazdej doby, OB-1a decyzja AI przy s OB1 <= 1 = 0, OB-1d decyzja AI bez taranu
+                    i wiezy i bez wyrwy = 0 (brama), OB-1b weta (INFO), OB-1c AI bije
                     mury (trebusze, trafienia), OB-2a odparte (W-2), OB-2b przerwa / prog (konstrukcyjne), OB-2c brak decyzji w przerwie, OB-3 bitwy z murow
                     (W-6), OB-4 obozy spowolnione (AI i gracz), W-1 zdobycia, W-3 czas zdobycia, W-5 stolice, W-8 blokada, W-9 rozwiazane armie, W-16 bledy.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -23510,6 +23511,7 @@ OB0_KEYS = re.compile(r"OB2 prog ([\d.]+) \+- ([\d.]+), przerwa ([\d.]+) dob")
 OB0_NUMS = {
     "true": re.compile(r"decyzje AI: gra true (\d+), przepuszczone (\d+)"),
     "walls": re.compile(r"OB1 wstrzymane: mury (\d+), losowanie (\d+), przerwa po odparciu (\d+)"),
+    "gate": re.compile(r"bez taranu i wiezy \(brama\) (\d+)"),
     "breach": re.compile(r"zmiana strategii na lamanie murow (\d+)"),
     "prep": re.compile(r"OB4: obozy AI (\d+), z graczem (\d+), bez zmian (\d+)"),
     "ass": re.compile(r"szturmy AI: rozpoczete (\d+) \(skrypt fabuly (\d+)\), zdobyte (\d+), odparte (\d+)"),
@@ -23526,16 +23528,18 @@ OB2_RE = re.compile(r"^Szturm odparty \(OB2\): dzien (\d+) \| osada (\S+) \(.*?,
                     r".*?\| przerwa ([\d.]+) dob do dnia ([\d.]+) \(podstawa ([\d.]+)")
 OB3_RE = re.compile(r"^Bitwa ze szturmu \(OB3\): dzien (\d+) \| osada (\S+) .*?\| rundy z murow (\d+), w polu (\d+) \| wynik (.*?), twierdza (utrzymana|nie)\.")
 OB4_RE = re.compile(r"^Mury oblezen \(OB4\): dzien (\d+) \| osada (\S+) \(.*?, (zamek|miasto|stolica)\) .*?\| gracz (tak|nie) \| tempo budowy obozu i machin oblegajacych x([\d.]+)( \(wykluczone)?")
-OB1_RE = re.compile(r"^Mury oblezen \(OB1\): dzien (\d+) \| osada (\S+) .*?\| powod: (mury trzymaja|przerwa po odparciu)(?:.*?\| HP murow (\d+)%)?")
+OB1_RE = re.compile(r"^Mury oblezen \(OB1\): dzien (\d+) \| osada (\S+) .*?\| powod: (mury trzymaja|przerwa po odparciu|bez taranu i wiezy)(?:.*?\| HP murow (\d+)%)?")
 O0_RE = re.compile(r"^Okup oblezenia \(O0\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|zamek),.*?oblezenie ([\d.]+) dob.*?\| stolica (tak|nie)")
-O0_OB1 = re.compile(r"\| OB1 (tak|nie): HP murow (\d+)%, taran (tak|nie), wieza (tak|nie), w ([\d.]+) \(gra (-?[\d.]+)\), s OB1 (pusta warownia|[\d.]+)")
+O0_OB1 = re.compile(r"\| OB1 (tak|nie|wykluczone): HP murow (\d+)%, taran (tak|nie), wieza (tak|nie), w ([\d.]+) \(gra (-?[\d.]+)\), s OB1 (pusta warownia|[\d.]+)")
+O0_GAP = re.compile(r"\), wyrwa (tak|nie) \(najslabszy odcinek (\d+)%\)")
 L5B2_RE = re.compile(r"^Karawany w zdobytym miescie \(L5b-2\): dzien (\d+) \| osada .*? \((\S+)\) zdobyta")
 
 
 def oblezenia_main(logp):
     """oblezenia (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia; SiegeWalls.cs). Log Armoury czytany strumieniowo.
     OB-0 linia startowa (latki: przewaga osady, MapEvent.Update, bitwa z murow - wpiete) i linia OB0 kazdej doby; OB-1a decyzje AI przepuszczone przy
-    s OB1 <= 1 = 0 (linie O0, konstrukcyjne); OB-1b weta OB1 (mury / przerwa) i HP murow przy wecie (INFO); OB-1c AI bije mury: zmiany strategii na
+    s OB1 <= 1 = 0 (linie O0 z "OB1 tak", konstrukcyjne); OB-1d decyzje AI przepuszczone bez taranu i wiezy i bez wyrwy = 0 (brama, recenzja 14.10);
+    OB-1b weta OB1 (brama / mury / losowanie / przerwa) i HP murow przy wecie (INFO); OB-1c AI bije mury: zmiany strategii na
     trebusze, trebusze AI zbudowane, trafienia w mury (INFO; > 0 przy wetach murow w biegu >= 120 dob); OB-2a odparte szturmy AI (W-2 projektu:
     >= 8 na 364 doby, udzial 35-70% - bieg >= 300 dob; krocej INFO); OB-2b przerwa w [3/7, 4] x podstawa, straty >= prog, prog w L +- r
     (konstrukcyjne); OB-2c zadnej decyzji AI (O0) o szturmie tej osady przed koncem przerwy; OB-3 (W-6) bitwy ze szturmu z murow >= 1 i twierdza
@@ -23590,8 +23594,10 @@ def oblezenia_main(logp):
             m = O0_RE.match(s)
             if m:
                 mo = O0_OB1.search(s)
+                mg = O0_GAP.search(s)
                 o0.append(dict(d=int(m.group(1)), st=m.group(2), kind=m.group(3), age=float(m.group(4)), cap=m.group(5) == "tak",
                                on=(mo.group(1) == "tak") if mo else None, hp=int(mo.group(2)) if mo else None,
+                               ready=((mo.group(3) == "tak" and mo.group(4) == "tak") or (mg is not None and mg.group(1) == "tak")) if mo else None,
                                s1=(None if not mo or mo.group(7) == "pusta warownia" else float(mo.group(7)))))
                 continue
             m = L5B2_RE.match(s)
@@ -23624,12 +23630,18 @@ def oblezenia_main(logp):
     trues, passed = tot("true", 1), tot("true", 2)
     vw, vr, vp = tot("walls", 1), tot("walls", 2), tot("walls", 3)
     # OB-1
+    # OB-1a/1d: tylko linie O0 z "OB1 tak" (decyzje skryptu fabuly i Innych Veto przepuszcza bez OB1 - "OB1 wykluczone")
     bad = [r for r in o0 if r["on"] and r["s1"] is not None and r["s1"] <= 1.0]
     rep.add("OB-1a: decyzja AI przepuszczona przy s OB1 <= 1 (linie O0)", f"{len(bad)} z {sum(1 for r in o0 if r['on'])} linii O0 z OB1"
             + (f"; np. {bad[0]['st']} dzien {bad[0]['d']} s {bad[0]['s1']}" if bad else ""), "0 (konstrukcyjne: weto przed okupem)", not bad if o0 else None)
+    badg = [r for r in o0 if r["on"] and r["s1"] is not None and r["ready"] is False]
+    rep.add("OB-1d: decyzja AI przepuszczona bez taranu i wiezy i bez wyrwy (linie O0, brama)", f"{len(badg)} z {sum(1 for r in o0 if r['on'])} linii O0 z OB1"
+            + (f"; np. {badg[0]['st']} dzien {badg[0]['d']}" if badg else ""), "0 (konstrukcyjne: brama przed stosunkiem)", not badg if o0 else None)
+    vg = tot("gate", 1)
     hp = [x[3] for x in ob1 if x[2] == "mury trzymaja" and x[3] is not None]
-    rep.add("OB-1b: weta OB1 (INFO)", f"decyzje gry true {trues}, przepuszczone {passed}; wstrzymane: mury {vw}, losowanie {vr}, przerwa po odparciu {vp}; linii OB1 {len(ob1)}"
-            f" (mury {sum(1 for x in ob1 if x[2] == 'mury trzymaja')}, przerwa {sum(1 for x in ob1 if x[2] != 'mury trzymaja')}); HP murow przy wecie: "
+    rep.add("OB-1b: weta OB1 (INFO)", f"decyzje gry true {trues}, przepuszczone {passed}; wstrzymane: brama (bez taranu i wiezy, bez wyrwy) {vg}, mury {vw}, losowanie {vr},"
+            f" przerwa po odparciu {vp}; linii OB1 {len(ob1)} (brama {sum(1 for x in ob1 if x[2] == 'bez taranu i wiezy')}, mury {sum(1 for x in ob1 if x[2] == 'mury trzymaja')},"
+            f" przerwa {sum(1 for x in ob1 if x[2] == 'przerwa po odparciu')}); HP murow przy wecie murow: "
             + (f"mediana {st.median(hp):.0f}%, min {min(hp)}%, 0% w {sum(1 for h in hp if h == 0)}" if hp else "-"), "INFO", None)
     br, ew, ea, er, et, ep = tot("breach", 1), tot("eng", 1), tot("eng", 2), tot("eng", 3), tot("eng", 4), tot("eng", 5)
     hits, broken = tot("hits", 1), tot("hits", 2)

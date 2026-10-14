@@ -19,9 +19,15 @@ namespace Armoury
     /// OB1 - decyzja AI o szturmie (postfiks BesiegerCamp.StartingAssaultOnBesiegedSettlementIsLogical, wolany z SiegeRansom.AssaultPost PRZED okupem).
     ///   Jeff 14.10: "czas nie ma znaczenia; mury licza sie w pelni, chyba ze zostana rozbite albo postawiono machiny obleznicze lub tarany". Wykladnik
     ///   przewagi murow bez czlonu czasu gry (-0.02/h po 96 h): w = 0.8 x (srednie HP odcinkow murow 0..1) x 1.25 bez taranu x 1.25 bez wiezy (mnozniki
-    ///   gry, BesiegerCamp.cs:408-418), nigdy ponizej 0. Stolica i ostatnia twierdza - ta sama regula. Latka tylko ODRZUCA "true" gry: s = sila
-    ///   oblegajacych / (obroncy x przewaga^w) <= 1 -> "false"; inaczej "true" z prawdopodobienstwem min(1, 0.1 s kara) / min(1, 0.1 s_gry kara) - wzor
-    ///   szansy gry z naszym w. Gracz decyduje sam (jego oboz gra nie pyta; drabiny po przygotowaniach jak w grze).
+    ///   gry, BesiegerCamp.cs:408-418), nigdy ponizej 0. Stolica i ostatnia twierdza - ta sama regula. Latka tylko ODRZUCA "true" gry:
+    ///   (1) brama (recenzja 14.10, slowa Jeffa "AI musi najpierw zbudowac machiny i rozbic mury albo podstawic taran i wieze, a dopiero potem oplaca mu
+    ///   sie szturm - gracz moze szturmowac wczesniej samymi drabinami"): bez zbudowanego taranu I wiezy i bez wyrwy w murach (zaden odcinek nie ma
+    ///   HP 0 - wyrwa, ktora gra przekazuje do bitwy, PlayerSiege.cs:172) -> "false"; w fin30 90 ze 113 decyzji AI zapadlo bez wiezy (87 z samym
+    ///   taranem), 68 z nich przeszloby przez sam stosunek (2) - bez bramy AI dalej szturmowaloby z drabinami i taranem przy pelnych murach;
+    ///   (2) s = sila oblegajacych / (obroncy w pelni x przewaga^w) <= 1 -> "false" (obroncy bez polowy, ktora gra liczy przy graczu w osadzie - jedna
+    ///   regula dla twierdz AI i gracza, ta sama miara co "mury" okupu GameRatio.RatioWalls); (3) inaczej "true" z prawdopodobienstwem
+    ///   min(1, 0.1 s kara) / min(1, 0.1 s_gry kara) - wzor szansy gry z naszym w. Gracz decyduje sam (jego oboz gra nie pyta; drabiny po
+    ///   przygotowaniach jak w grze).
     ///   Lamanie murow: RBM (RBMCombat_siege_engines.xml) daje katapultom, onagerom i bricole is_anti_personnel="true", a gra nie celuje nimi w mury
     ///   (BesiegerCamp.FindAttackableWallSectionWithHighestPriority wychodzi przy IsAntiPersonnel) - mury bije tylko trebusz (1200 x 5 strzalow na dobe).
     ///   AI losuje strategie (DefaultSiegeEventModel.GetSiegeStrategyScore: RandomFloat) - trebusze ma tylko WearOutDefenders (ok. 1/3 obozow). Gdy
@@ -122,6 +128,20 @@ namespace Armoury
             catch { return 1.0; }
         }
 
+        /// <summary>Najslabszy odcinek murow 0..1 (0 = wyrwa; brak odcinkow = 1).</summary>
+        internal static double WallHpMin(Settlement st)
+        {
+            try
+            {
+                var l = st != null ? st.SettlementWallSectionHitPointsRatioList : null;
+                if (l == null || l.Count == 0) return 1.0;
+                double mn = 1.0;
+                for (int i = 0; i < l.Count; i++) if (l[i] < mn) mn = l[i];
+                return Clamp(mn, 0.0, 1.0);
+            }
+            catch { return 1.0; }
+        }
+
         /// <summary>Machiny dystansowe obroncow (zbudowane, jak gra liczy machiny oblegajacych): x(1 + 0.08 n + 0.12 n_ogniowe).</summary>
         private static float EnginesFactor(Settlement st, out int n, out int nf)
         {
@@ -158,8 +178,10 @@ namespace Armoury
         // ------------------------------------------------------------ miara OB1 (tylko odczyt)
         internal sealed class Meas
         {
-            public double Att, Def, Adv, Hp, W, WGame, S, SGame, Pen, POurs, PGame, Div, Base, Perks, CapF, EngF;
-            public bool Ram, Tower, Empty, Breach, Capital; public int Eq, Level, DefN, DefNf;
+            public double Att, Def, Def0, Adv, Hp, HpMin, W, WGame, S, SGame, Pen, POurs, PGame, Div, Base, Perks, CapF, EngF;
+            public bool Ram, Tower, Empty, Breach, Gap, Half, Capital; public int Eq, Level, DefN, DefNf;
+            /// <summary>Brama OB1: zbudowany taran i wieza albo wyrwa w murach (odcinek z HP 0).</summary>
+            public bool Ready { get { return (Ram && Tower) || Gap; } }
         }
 
         /// <summary>Wzor gry (BesiegerCamp.cs:375-428) z naszym w i skladnikami przewagi (DefaultCombatSimulationModel.GetSettlementAdvantage :172-227).</summary>
@@ -169,11 +191,17 @@ namespace Armoury
             var st = ev.BesiegedSettlement;
             var m = new Meas();
             float f = MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == st ? 0.5f : 1f;
+            m.Half = f < 1f;
             foreach (var pb in st.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
             {
                 if (pb == null || !pb.IsMobile) continue;
                 var mp = pb.MobileParty;
-                if (mp.CurrentSettlement == st && (mp.Aggressiveness > 0.01f || mp.IsMilitia || mp.IsGarrison)) m.Def += f * pb.CalculateCurrentStrength();
+                if (mp.CurrentSettlement == st && (mp.Aggressiveness > 0.01f || mp.IsMilitia || mp.IsGarrison))
+                {
+                    double sv = pb.CalculateCurrentStrength();
+                    m.Def0 += sv;                                            // OB1: obroncy w pelni (jedna regula dla twierdz AI i gracza)
+                    m.Def += f * sv;                                         // gra: polowa przy graczu w osadzie (s_gry i szansa gry)
+                }
             }
             foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) m.Att += pb.CalculateCurrentStrength();
             bool impRam = false; int towers = 0, ranged = 0, fire = 0;
@@ -191,6 +219,8 @@ namespace Armoury
             var csm = Campaign.Current.Models.CombatSimulationModel;
             m.Adv = csm.GetSettlementAdvantage(st);
             m.Hp = WallHp(st);
+            m.HpMin = WallHpMin(st);
+            m.Gap = m.HpMin <= 0.0;
             double h0 = CampaignTime.HoursInDay * 4.0, el = ev.SiegeStartTime.ElapsedHoursUntilNow;
             m.WGame = 0.8 - (el > h0 ? (el - h0) * 0.02 : 0.0);
             m.W = 0.8 * m.Hp;
@@ -214,7 +244,7 @@ namespace Armoury
             }
             catch { }
             if (m.Def <= 0) { m.Empty = true; m.S = m.SGame = 999.0; m.POurs = m.PGame = 1.0; return m; }
-            m.S = m.Att / (m.Def * Math.Pow(m.Adv, m.W));
+            m.S = m.Att / (Math.Max(m.Def, m.Def0) * Math.Pow(m.Adv, m.W));    // OB1: obroncy w pelni - ta sama miara co "mury" okupu (GameRatio.RatioWalls)
             m.SGame = m.Att / (m.Def * Math.Pow(m.Adv, m.WGame));
             m.Eq = csm.GetNumberOfEquipmentsBuilt(st);
             double p = csm.GetMaximumSiegeEquipmentProgress(st) + 0.25 * (5 - m.Eq);
@@ -263,11 +293,12 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ OB1: weto decyzji AI (z SiegeRansom.AssaultPost)
-        private static int _dTrue, _dPass, _dWalls, _dRoll, _dPause, _dExcl, _dBreach, _dEmpty;
+        private static int _dTrue, _dPass, _dWalls, _dRoll, _dPause, _dExcl, _dBreach, _dEmpty, _dGate;
         private static readonly HashSet<SiegeEvent> _vetoLogged = new HashSet<SiegeEvent>();
         private static BesiegerCamp _lastCamp; private static Meas _last; private static float _lastAt = -1f;
 
-        /// <summary>true = szturm AI wstrzymany (przerwa po odparciu albo mury trzymaja albo losowanie wzoru gry z naszym w). Wolane tylko przy "true" gry.
+        /// <summary>true = szturm AI wstrzymany (przerwa po odparciu albo brama - bez taranu i wiezy i bez wyrwy - albo mury trzymaja albo losowanie wzoru gry
+        /// z naszym w). Wolane tylko przy "true" gry.
         /// Wyjatek - false (wynik gry bez zmian).</summary>
         internal static bool Veto(BesiegerCamp camp)
         {
@@ -292,6 +323,14 @@ namespace Armoury
                 var m = Measure(camp);
                 _lastCamp = camp; _last = m; _lastAt = Now;
                 if (m.Empty) { _dEmpty++; _dPass++; return false; }
+                if (!m.Ready)
+                {
+                    // brama: AI nie szturmuje samymi drabinami - najpierw taran i wieza albo wyrwa w murach (strategie gry buduja taran i wieze jako pierwsze)
+                    _dGate++;
+                    if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, m, "bez taranu i wiezy, mury bez wyrwy (taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie")
+                                                                 + ", najslabszy odcinek " + F(m.HpMin * 100.0, "0") + "%)", null);
+                    return true;
+                }
                 if (m.S <= 1.0)
                 {
                     _dWalls++;
@@ -335,8 +374,10 @@ namespace Armoury
                   .Append("), ludzi ").Append(men).Append(", oblezenie ").Append(F(camp.SiegeEvent.SiegeStartTime.ElapsedDaysUntilNow, "0.0")).Append(" dob | powod: ").Append(why);
                 if (m != null)
                     sb.Append(" | HP murow ").Append(F(m.Hp * 100.0, "0")).Append("%, taran ").Append(m.Ram ? "tak" : "nie").Append(", wieza ").Append(m.Tower ? "tak" : "nie")
+                      .Append(", wyrwa ").Append(m.Gap ? "tak" : "nie").Append(" (najslabszy odcinek ").Append(F(m.HpMin * 100.0, "0")).Append("%)")
                       .Append(" | w OB1 ").Append(F(m.W, "0.000")).Append(" (gra ").Append(F(m.WGame, "0.000")).Append(") | ").Append(AdvText(m))
-                      .Append(" | sila oblegajacy ").Append(F(m.Att, "0")).Append(" / obroncy ").Append(F(m.Def, "0")).Append(" | s OB1 ").Append(F(m.S, "0.000")).Append(" (gra ").Append(F(m.SGame, "0.000")).Append(')');
+                      .Append(" | sila oblegajacy ").Append(F(m.Att, "0")).Append(" / obroncy ").Append(F(m.Def0, "0")).Append(m.Half ? " (gra liczy " + F(m.Def, "0") + " - gracz w osadzie)" : "")
+                      .Append(" | s OB1 ").Append(F(m.S, "0.000")).Append(" (gra ").Append(F(m.SGame, "0.000")).Append(')');
                 try { sb.Append(" | strategia ").Append(camp.SiegeStrategy != null ? camp.SiegeStrategy.StringId : "-"); } catch { }
                 if (sw != null) sb.Append(" | ZMIANA: ").Append(sw);
                 sb.Append(" | ").Append(DefenceText(st)).Append('.');
@@ -352,9 +393,12 @@ namespace Armoury
             {
                 if (camp == null || camp.SiegeEvent == null) return "";
                 Meas m = (_lastCamp == camp && _last != null && Math.Abs(Now - _lastAt) < 0.01f) ? _last : Measure(camp);
-                return " | OB1 " + (Ob1On ? "tak" : "nie") + ": HP murow " + F(m.Hp * 100.0, "0") + "%, taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie")
+                var lp = camp.LeaderParty;
+                bool excl = lp != null && (Scripted(lp) || Und(lp, camp.SiegeEvent.BesiegedSettlement));   // te decyzje Veto przepuszcza bez OB1
+                return " | OB1 " + (!Ob1On ? "nie" : excl ? "wykluczone" : "tak") + ": HP murow " + F(m.Hp * 100.0, "0") + "%, taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie")
                      + ", w " + F(m.W, "0.000") + " (gra " + F(m.WGame, "0.000") + "), s OB1 " + (m.Empty ? "pusta warownia" : F(m.S, "0.000")) + " (gra " + (m.Empty ? "-" : F(m.SGame, "0.000"))
-                     + "), szansa na mysl " + F(m.POurs * 100.0, "0.0") + "% (gra " + F(m.PGame * 100.0, "0.0") + "%) | " + AdvText(m) + " | " + DefenceText(camp.SiegeEvent.BesiegedSettlement);
+                     + "), wyrwa " + (m.Gap ? "tak" : "nie") + " (najslabszy odcinek " + F(m.HpMin * 100.0, "0") + "%), obroncy " + F(m.Def0, "0") + (m.Half ? " (gra " + F(m.Def, "0") + " - gracz w osadzie)" : "")
+                     + ", szansa na mysl " + F(m.POurs * 100.0, "0.0") + "% (gra " + F(m.PGame * 100.0, "0.0") + "%) | " + AdvText(m) + " | " + DefenceText(camp.SiegeEvent.BesiegedSettlement);
             }
             catch (Exception e) { Stumble("O0Part", e); return ""; }
         }
@@ -730,6 +774,7 @@ namespace Armoury
                   .Append(", stolica x").Append(s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-").Append(')')
                   .Append(" | decyzje AI: gra true ").Append(_dTrue).Append(", przepuszczone ").Append(_dPass).Append(" (pusta warownia ").Append(_dEmpty).Append(")")
                   .Append(", OB1 wstrzymane: mury ").Append(_dWalls).Append(", losowanie ").Append(_dRoll).Append(", przerwa po odparciu ").Append(_dPause)
+                  .Append(", bez taranu i wiezy (brama) ").Append(_dGate)
                   .Append("; wykluczone (skrypt, Inni) ").Append(_dExcl).Append("; zmiana strategii na lamanie murow ").Append(_dBreach)
                   .Append(" | przewaga podniesiona (wywolan) ").Append(_dAdv)
                   .Append(" | OB4: obozy AI ").Append(_dPrepAi.Count).Append(", z graczem ").Append(_dPrepPlayer.Count).Append(", bez zmian ").Append(_dPrepExcl.Count)
@@ -755,7 +800,7 @@ namespace Armoury
 
         private static void ZeroDay()
         {
-            _dTrue = _dPass = _dWalls = _dRoll = _dPause = _dExcl = _dBreach = _dEmpty = _dAdv = 0;
+            _dTrue = _dPass = _dWalls = _dRoll = _dPause = _dExcl = _dBreach = _dEmpty = _dAdv = _dGate = 0;
             _dAssaults = _dWon = _dRepelled = _dDefWon = _dNone = _dOutside = _dFromWalls = _dFromWallsHeld = _dScripted = 0;
             _dLossSum = _dThrSum = _dPauseSum = 0;
             _dEngWall = _dEngAnti = _dEngRam = _dEngTower = _dEngPlayer = _dWallHits = _dWallBroken = _dSiegesNew = 0;
@@ -816,13 +861,27 @@ namespace Armoury
         // ------------------------------------------------------------ latki w kampanii (z SiegeRansom.EnsureHooks, raz na proces)
         private static string _hookAdv = "nie zakladana", _hookUpdate = "nie zakladana", _hookTicks = "nie zakladana";
 
+        /// <summary>Stan latki po Seal31.Patch (ten lyka wyjatki i tylko dopisuje BRAK do linii "Szczelnosc"): "wpieta" tylko, gdy nasz postfiks jest w Harmony.</summary>
+        private static string Wired(System.Reflection.MethodBase m, string post)
+        {
+            try
+            {
+                var info = m != null ? Harmony.GetPatchInfo(m) : null;
+                if (info != null && info.Postfixes != null)
+                    foreach (var p in info.Postfixes)
+                        if (p != null && p.PatchMethod != null && p.PatchMethod.DeclaringType == typeof(SiegeWalls) && p.PatchMethod.Name == post) return "wpieta";
+            }
+            catch { }
+            return "BRAK (latka nie weszla - linia 'Szczelnosc (164a)')";
+        }
+
         internal static void EnsureHooks()
         {
             try
             {
                 var ma = AccessTools.Method(typeof(DefaultCombatSimulationModel), "GetSettlementAdvantage", new[] { typeof(Settlement) });
                 if (ma == null) _hookAdv = "BRAK (DefaultCombatSimulationModel.GetSettlementAdvantage)";
-                else { Seal31.Patch("mury oblezen: przewaga osady (DefaultCombatSimulationModel.GetSettlementAdvantage)", ma, typeof(SiegeWalls), null, nameof(AdvPost), null, Priority.Normal, Priority.Low); _hookAdv = "wpieta"; }
+                else { Seal31.Patch("mury oblezen: przewaga osady (DefaultCombatSimulationModel.GetSettlementAdvantage)", ma, typeof(SiegeWalls), null, nameof(AdvPost), null, Priority.Normal, Priority.Low); _hookAdv = Wired(ma, nameof(AdvPost)); }
             }
             catch (Exception e) { _hookAdv = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Adv", e); }
             try
@@ -830,14 +889,14 @@ namespace Armoury
                 var mu = AccessTools.Method(typeof(MapEvent), "Update", Type.EmptyTypes);
                 var mk = AccessTools.Method(typeof(MapEvent), "FinishBattleAndKeepSiegeEvent", Type.EmptyTypes);
                 if (mu == null || mk == null) _hookUpdate = "BRAK (MapEvent.Update / FinishBattleAndKeepSiegeEvent)";
-                else { Seal31.Patch("mury oblezen: odparcie szturmu (MapEvent.Update)", mu, typeof(SiegeWalls), null, nameof(UpdatePost), null, Priority.Normal, Priority.Low); _hookUpdate = "wpieta"; }
+                else { Seal31.Patch("mury oblezen: odparcie szturmu (MapEvent.Update)", mu, typeof(SiegeWalls), null, nameof(UpdatePost), null, Priority.Normal, Priority.Low); _hookUpdate = Wired(mu, nameof(UpdatePost)); }
             }
             catch (Exception e) { _hookUpdate = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Update", e); }
             try
             {
                 var mt = AccessTools.Method(typeof(DefaultCombatSimulationModel), "GetSimulationTicksForBattleRound", new[] { typeof(MapEvent) });
                 if (mt == null) _hookTicks = "BRAK (DefaultCombatSimulationModel.GetSimulationTicksForBattleRound)";
-                else { Seal31.Patch("mury oblezen: bitwa ze szturmu z murow (DefaultCombatSimulationModel.GetSimulationTicksForBattleRound)", mt, typeof(SiegeWalls), null, nameof(TicksPost), null, Priority.Normal, Priority.Low); _hookTicks = "wpieta"; }
+                else { Seal31.Patch("mury oblezen: bitwa ze szturmu z murow (DefaultCombatSimulationModel.GetSimulationTicksForBattleRound)", mt, typeof(SiegeWalls), null, nameof(TicksPost), null, Priority.Normal, Priority.Low); _hookTicks = Wired(mt, nameof(TicksPost)); }
             }
             catch (Exception e) { _hookTicks = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Ticks", e); }
         }

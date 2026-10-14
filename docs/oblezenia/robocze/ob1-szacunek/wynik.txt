@@ -11,6 +11,9 @@ B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu muro
    miasta / zamki 0 / 0 ; stolice 0
    s_rt tych:  []
    ludzie obozu tych (mediana) -
+G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze 90 z 113 | w tym przepuszczone przez sam stosunek A (s_now > 1): 70
+   wedlug wyniku fin30: {'inne': 28, 'okup': 23, 'zdobyte': 39} | taran bez wiezy 87 , bez taranu 3
+   razem wstrzymane w chwili decyzji fin30 (brama albo A): 92 z 113 ; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B): 0
    stolica Lorath miasto L 2 s_now 1.93 s_rt 2.01 mury_fin30 1.93 wynik zdobyte
    stolica Totava zamek L 1 s_now 1.27 s_rt 1.78 mury_fin30 1.27 wynik zdobyte
    stolica Vaes Dothrak miasto L 2 s_now 0.96 s_rt 1.00 mury_fin30 0.96 wynik inne
@@ -42,6 +45,9 @@ B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu muro
    miasta / zamki 2 / 0 ; stolice 2
    s_rt tych:  [0.84, 0.86]
    ludzie obozu tych (mediana) 2395.0
+G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze 90 z 113 | w tym przepuszczone przez sam stosunek A (s_now > 1): 68
+   wedlug wyniku fin30: {'inne': 28, 'okup': 23, 'zdobyte': 39} | taran bez wiezy 87 , bez taranu 3
+   razem wstrzymane w chwili decyzji fin30 (brama albo A): 93 z 113 ; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B): 2
    stolica Lorath miasto L 2 s_now 1.61 s_rt 1.68 mury_fin30 1.93 wynik zdobyte
    stolica Totava zamek L 1 s_now 1.01 s_rt 1.49 mury_fin30 1.27 wynik zdobyte
    stolica Vaes Dothrak miasto L 2 s_now 0.81 s_rt 0.84 mury_fin30 0.96 wynik inne
@@ -73,6 +79,9 @@ B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu muro
    miasta / zamki 3 / 1 ; stolice 4
    s_rt tych:  [0.73, 0.75, 0.88, 0.93]
    ludzie obozu tych (mediana) 2395.0
+G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze 90 z 113 | w tym przepuszczone przez sam stosunek A (s_now > 1): 67
+   wedlug wyniku fin30: {'inne': 28, 'okup': 23, 'zdobyte': 39} | taran bez wiezy 87 , bez taranu 3
+   razem wstrzymane w chwili decyzji fin30 (brama albo A): 93 z 113 ; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B): 4
    stolica Lorath miasto L 2 s_now 1.40 s_rt 1.45 mury_fin30 1.93 wynik zdobyte
    stolica Totava zamek L 1 s_now 0.84 s_rt 1.28 mury_fin30 1.27 wynik zdobyte
    stolica Vaes Dothrak miasto L 2 s_now 0.70 s_rt 0.73 mury_fin30 0.96 wynik inne
@@ -104,6 +113,9 @@ B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu muro
    miasta / zamki 4 / 0 ; stolice 3
    s_rt tych:  [0.79, 0.81, 0.96, 0.96]
    ludzie obozu tych (mediana) 2447.0
+G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze 90 z 113 | w tym przepuszczone przez sam stosunek A (s_now > 1): 60
+   wedlug wyniku fin30: {'inne': 28, 'okup': 23, 'zdobyte': 39} | taran bez wiezy 87 , bez taranu 3
+   razem wstrzymane w chwili decyzji fin30 (brama albo A): 94 z 113 ; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B): 4
    stolica Lorath miasto L 2 s_now 1.52 s_rt 1.58 mury_fin30 1.93 wynik zdobyte
    stolica Totava zamek L 1 s_now 0.94 s_rt 1.40 mury_fin30 1.27 wynik zdobyte
    stolica Vaes Dothrak miasto L 2 s_now 0.76 s_rt 0.79 mury_fin30 0.96 wynik inne
@@ -135,6 +147,9 @@ B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu muro
    miasta / zamki 5 / 2 ; stolice 4
    s_rt tych:  [0.75, 0.77, 0.91, 0.91, 0.95, 0.96, 0.99]
    ludzie obozu tych (mediana) 2204
+G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze 90 z 113 | w tym przepuszczone przez sam stosunek A (s_now > 1): 58
+   wedlug wyniku fin30: {'inne': 28, 'okup': 23, 'zdobyte': 39} | taran bez wiezy 87 , bez taranu 3
+   razem wstrzymane w chwili decyzji fin30 (brama albo A): 96 z 113 ; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B): 7
    stolica Lorath miasto L 2 s_now 1.43 s_rt 1.49 mury_fin30 1.93 wynik zdobyte
    stolica Totava zamek L 1 s_now 0.87 s_rt 1.32 mury_fin30 1.27 wynik zdobyte
    stolica Vaes Dothrak miasto L 2 s_now 0.72 s_rt 0.75 mury_fin30 0.96 wynik inne
@@ -166,6 +181,9 @@ B) po taranie i wiezy (w 0.8, HP 1): nadal <= 1 (szturm dopiero po rozbiciu muro
    miasta / zamki 9 / 5 ; stolice 5
    s_rt tych:  [0.67, 0.69, 0.82, 0.82, 0.86, 0.86, 0.89, 0.91, 0.91, 0.93, 0.97, 0.97, 0.98, 0.98]
    ludzie obozu tych (mediana) 2124.0
+G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze 90 z 113 | w tym przepuszczone przez sam stosunek A (s_now > 1): 47
+   wedlug wyniku fin30: {'inne': 28, 'okup': 23, 'zdobyte': 39} | taran bez wiezy 87 , bez taranu 3
+   razem wstrzymane w chwili decyzji fin30 (brama albo A): 96 z 113 ; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B): 14
    stolica Lorath miasto L 2 s_now 1.29 s_rt 1.35 mury_fin30 1.93 wynik zdobyte
    stolica Totava zamek L 1 s_now 0.77 s_rt 1.19 mury_fin30 1.27 wynik zdobyte
    stolica Vaes Dothrak miasto L 2 s_now 0.65 s_rt 0.67 mury_fin30 0.96 wynik inne

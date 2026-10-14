@@ -1,7 +1,7 @@
 # Szacunek OB1 (SiegeWalls, 14.10) na 113 decyzjach AI o szturmie z biegu fin30. Wejscie: linie "Okup oblezenia (O0)" wyciagniete grepem z
 # D:/Backup-Bannerlord/logs/2026-10-14-noc/Armoury-2026-10-14_06-01-15.log oraz docs/oblezenia/robocze/mody/fin30-decyzje-szturmu-O0-wynik.csv.
 # Argumenty 3-4: mnoznik stolicy i zalozony mnoznik machin obroncow (log fin30 ich nie ma). A) weto w chwili decyzji fin30 (HP murow 1, machiny z logu),
-# B) po taranie i wiezy (w 0.8) - nadal <= 1 = szturm dopiero po rozbiciu murow. Na koncu czas budowy przy tempie OB4 (x0.125 gry / klasa) i doby do murow 0
+# B) po taranie i wiezy (w 0.8) - nadal <= 1 = szturm dopiero po rozbiciu murow, G) brama (recenzja 14.10): bez taranu i wiezy (fin30 bez wyrw) - czeka. Na koncu czas budowy przy tempie OB4 (x0.125 gry / klasa) i doby do murow 0
 # (trebusze RBM 1200 x 5 strzalow = 6000 na dobe kazdy, budowane po kolei, bez machin obroncow). Uruchamiac: python -I.
 import re, sys, csv, statistics as st
 # szacunek OB1 (mury w pelni, w = 0.8 x HP x 1.25 bez taranu x 1.25 bez wiezy) na 113 decyzjach O0 fin30
@@ -47,6 +47,14 @@ print("   wedlug wyniku fin30:", {k: sum(1 for r in veto_rt if r["wynik"] == k) 
 print("   miasta / zamki", sum(1 for r in veto_rt if r["kind"] == "miasto"), "/", sum(1 for r in veto_rt if r["kind"] == "zamek"), "; stolice", sum(1 for r in veto_rt if r["cap"] == "tak"))
 print("   s_rt tych: ", sorted(round(r["s_rt"], 2) for r in veto_rt))
 print("   ludzie obozu tych (mediana)", st.median([r["men"] for r in veto_rt]) if veto_rt else "-")
+# G) brama (recenzja 14.10, slowa Jeffa "AI musi najpierw zbudowac machiny i rozbic mury albo podstawic taran i wieze"): bez taranu i wiezy, bez wyrwy -> czeka
+gate = [r for r in rows if not (r["ram"] and r["tow"])]
+print("G) brama OB1 (taran i wieza albo wyrwa; fin30 bez wyrw - HP 1): czeka na taran i wieze", len(gate), "z", len(rows),
+      "| w tym przepuszczone przez sam stosunek A (s_now > 1):", sum(1 for r in gate if r["s_now"] > 1))
+print("   wedlug wyniku fin30:", {k: sum(1 for r in gate if r["wynik"] == k) for k in sorted(set(r["wynik"] for r in rows))},
+      "| taran bez wiezy", sum(1 for r in gate if r["ram"]), ", bez taranu", sum(1 for r in gate if not r["ram"]))
+both = [r for r in rows if not (r["ram"] and r["tow"]) or r["s_now"] <= 1]
+print("   razem wstrzymane w chwili decyzji fin30 (brama albo A):", len(both), "z", len(rows), "; po taranie i wiezy dalej potrzeba wyrwy / zbicia murow (B):", len(veto_rt))
 for r in rows:
     if r["cap"] == "tak":
         print("   stolica", r["nm"], r["kind"], "L", r["L"], "s_now %.2f s_rt %.2f mury_fin30 %.2f wynik %s" % (r["s_now"], r["s_rt"], r["mury"], r["wynik"]))

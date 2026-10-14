@@ -1388,7 +1388,7 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public int SiegeSicknessMedicineMax { get; set; } = 50;
 
-        [SettingPropertyBool("Siege Walls Hold Until Breached", HintText = "AI lords storm a town or castle only when their strength beats what its walls make of the defenders, and the walls count in full however long the siege lasts - until engines batter them down or a ram and a siege tower stand ready (the game let the walls count for less every hour after the fourth day and after the sixth for nothing). You decide your own assaults as before - with ladders as soon as the camp is ready. Off = the game's waning patience")]
+        [SettingPropertyBool("Siege Walls Hold Until Breached", HintText = "AI lords never storm a town or castle with ladders alone: first a battering ram and a siege tower must stand ready, or their engines must batter a breach in the walls - and even then only when their strength beats what the walls make of the defenders. The walls count in full however long the siege lasts and weaken only as engines batter them down (the game let them count for less every hour after the fourth day and after the sixth for nothing). You decide your own assaults as before - with ladders as soon as the camp is ready. Off = the game's waning patience")]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsHoldUntilBreached { get; set; } = true;
 
