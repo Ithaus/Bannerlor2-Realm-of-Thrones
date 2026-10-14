@@ -5308,9 +5308,17 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int ValveStockDaysHigh { get; set; } = 60;
 
-        [SettingPropertyBool("Horse Breeding By Demand", HintText = "every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal is only reported for now; works only with Harvest Valve on (off = stud farms breed what the game says)")]
+        [SettingPropertyBool("Horse Breeding By Demand", HintText = "every four weeks the stud farms breed more of a kind of horse the world is short of (up to the same step as other village goods), and while war horses are short and plain horses pile up they put up to a quarter of their plain-horse breeding to war horses; breeding below normal needs Horse Breeding Cut Live; works only with Harvest Valve on (off = stud farms breed what the game says)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool HorseBreedingByDemand { get; set; } = true;
+
+        [SettingPropertyBool("Townsfolk Buy Only Work Horses", HintText = "townsfolk and castle folk no longer buy horses of every kind out of their daily basket: a town or castle keeps one work horse for every 25 people, a work horse lives about 15 years, and its people buy only the cheapest pack horse on their own market (a plain riding horse when there is none) to replace one that died; war horses and noble horses stay on the market for the armies; needs the live townsfolk purse; turn on together with Horse Breeding Cut Live (off = the people buy horses of every kind as before)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool TownsfolkBuyOnlyWorkHorses { get; set; } = true;
+
+        [SettingPropertyBool("Horse Breeding Cut Live", HintText = "the stud farms also breed fewer horses of a kind the world does not use up (down to a tenth of normal, at most halved every four weeks) instead of only reporting it; works only with Horse Breeding By Demand and Harvest Valve on (off = breeding never falls below what the game says)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool HorseBreedingCutLive { get; set; } = true;
 
         [SettingPropertyBool("Cavalry Share By Template", HintText = "an AI lord's party grows its horse to the share of riders in the army its realm fields by the books - all riders among the Dothraki, almost none on the Iron Islands, about one in five in most realms - and upgrades men on foot once it has enough; a man bound for the saddle waits for his horse and the lord buys it. Works only with Ai Sells Spare Horses on; your own parties are not touched (off = the game picks the upgrade path, as before)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
@@ -6803,6 +6811,8 @@ namespace Armoury
             s.ValveStockDaysLow = ValveStockDaysLow;
             s.ValveStockDaysHigh = ValveStockDaysHigh;
             s.HorseBreedingByDemand = HorseBreedingByDemand;
+            s.TownsfolkBuyOnlyWorkHorses = TownsfolkBuyOnlyWorkHorses;
+            s.HorseBreedingCutLive = HorseBreedingCutLive;
             s.CavalryShareByTemplate = CavalryShareByTemplate;
             s.KnightHorseFromHouse = KnightHorseFromHouse;
             s.KnightHorseMarketShare = KnightHorseMarketShare;

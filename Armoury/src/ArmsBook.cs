@@ -247,6 +247,10 @@ namespace Armoury
         private static int _folkBr, _folkPart;
         private static readonly long[] _disc = new long[Cats];
         private static long _discHerd, _discWeight;
+        // K1-3a krok 2: konie robocze kupione przez ludnosc miasta [0] / zamku [1] w miejsce padlych ze starosci (TownFolk.WorkHorsesDaily) - kon schodzi
+        // z polki i znika ze swiata z nazwanym ujsciem "starosc koni roboczych"; wedlug kategorii ksiegi (juczny 3, zwykly 0, juczny wielblad 4)
+        private static readonly long[,] _workN = new long[2, Cats];
+        private static readonly long[] _workGold = new long[2];
 
         internal static void Reset()
         {
@@ -259,6 +263,7 @@ namespace Armoury
         {
             Array.Clear(_folkN, 0, _folkN.Length); Array.Clear(_folkGold, 0, _folkGold.Length); _folkBr = _folkPart = 0;
             Array.Clear(_disc, 0, Cats); _discHerd = _discWeight = 0;
+            Array.Clear(_workN, 0, _workN.Length); _workGold[0] = _workGold[1] = 0;
             ArmsLeaks.TakeFolkHorses();   // licznik kontrolny tej samej doby - zeby stara liczba nie wrocila po przerwie w pomiarze
         }
 
@@ -333,6 +338,21 @@ namespace Armoury
             if (cat < 0 || cat >= Cats || n <= 0 || !On) return;
             _disc[cat] += n;
             if (herd) _discHerd += n; else _discWeight += n;
+        }
+
+        /// <summary>TownFolk.WorkHorsesDaily (K1-3a krok 2): kon roboczy kupiony z polki osady w miejsce padlego ze starosci - UJSCIE ksiegi koni.</summary>
+        internal static void NoteWork(bool town, int cat, int n, long gold)
+        {
+            if (cat < 0 || cat >= Cats || n <= 0 || !On) return;
+            int k = town ? 0 : 1;
+            _workN[k, cat] += n; _workGold[k] += gold;
+        }
+
+        private static string WorkRow(int k)
+        {
+            var p = new string[Cats];
+            for (int i = 0; i < Cats; i++) p[i] = _workN[k, i].ToString(CultureInfo.InvariantCulture);
+            return string.Join("/", p);
         }
 
         private static string FolkRow(long[,] a, int k)
@@ -417,10 +437,12 @@ namespace Armoury
             var nDte = new long[Cats]; var nBk = new long[Cats]; var gone = new long[Cats]; var removed = new long[Cats];
             try { PackSources.TakeBook(nDte, nBk, gone, removed); } catch (Exception e) { Stumble("PackSources", e); }
             var rest = new long[Cats]; long rs = 0, src = 0, sink = 0;
+            // K1-3a krok 2: starosc koni roboczych (wymiana padlych - sztuka zdjeta z polki przez TownFolk.WorkHorsesDaily) - UJSCIE jak mieszczanie F3
             for (int i = 0; i < Cats; i++)
             {
-                rest[i] = (now[i] - _prev[i]) - _prod[i] - nDte[i] - nBk[i] + dead[i] + folk[i] + _disc[i] + gone[i] + removed[i];
-                rs += rest[i]; src += _prod[i] + nDte[i] + nBk[i]; sink += dead[i] + folk[i] + _disc[i] + gone[i] + removed[i];
+                long work = _workN[0, i] + _workN[1, i];
+                rest[i] = (now[i] - _prev[i]) - _prod[i] - nDte[i] - nBk[i] + dead[i] + folk[i] + _disc[i] + gone[i] + removed[i] + work;
+                rs += rest[i]; src += _prod[i] + nDte[i] + nBk[i]; sink += dead[i] + folk[i] + _disc[i] + gone[i] + removed[i] + work;
             }
             Log.Info("Konie (E6/0): dzien " + day + " | kategorie " + string.Join("/", CatNames) + " | " + state + " | zrodla: stadniny wsi " + Row(_prod)
                      + " | ujscia: " + k1
@@ -431,6 +453,7 @@ namespace Armoury
                      + "), porzucone przez gre u lordow " + Row(_disc) + " (nadmiar stada " + _discHerd + ", ponad udzwig " + _discWeight + ")"
                      + " | zrodla nazwane z niczego (m6b): konwoje DTE " + Row(nDte) + ", partie BK " + Row(nBk)
                      + " | ujscia (m6b): konie przepadle przy RemoveParty - po zniszczeniu " + Row(gone) + ", bez zniszczenia (konwoje DTE) " + Row(removed)
+                     + " | starosc koni roboczych (K1-3a): miasta " + WorkRow(0) + " szt. za " + _workGold[0] + " zl, zamki " + WorkRow(1) + " szt. za " + _workGold[1] + " zl"
                      + " | wielblady wyprodukowane: w Qarthu " + _camelQarth + ", poza Qarthem " + _camelElse
                      + " | reszta niewyjasniona " + Row(rest) + " (razem " + rs + ", mianownik zrodla + ujscia " + (src + sink)
                      + (src + sink > 0 ? ", " + (100.0 * rs / (src + sink)).ToString("0", CultureInfo.InvariantCulture) + "%" : "")

@@ -126,6 +126,7 @@ namespace Armoury
             public long Aid7; public double Of7X, Of7B;               // okno pomiaru (do 7 dob): danina, oferta nadwyzki dopisana do budzetu, kupione z oferty
             public readonly long[] EarnK = new long[16];              // okno pomiaru: zarobek ludu osady wedlug rodzaju (Credit; K* 0-10, E* 11-15)
             public int BQ, BMat, LuxShops;                            // pomiar tygodnia: czolo kolejki budow (0 brak, 1 cywilna, 2 wojskowa), sztuki materialu na polce targu, warsztaty zbytkow
+            public double HorseOwed;                                  // K1-3a krok 2: licznik koni roboczych do wymiany (ulamek; miasto i zamek; zapis arm_townfolk, pole 18; sufit WhMax)
         }
 
         private static readonly Dictionary<Settlement, Folk> _f = new Dictionary<Settlement, Folk>();
