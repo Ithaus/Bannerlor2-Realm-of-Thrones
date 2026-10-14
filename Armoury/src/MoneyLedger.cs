@@ -269,6 +269,7 @@ namespace Armoury
         /// <summary>Przed wejsciem taboru wsi do osady: zloto taboru, kiesa i licznik podatku jego wsi.</summary>
         internal static void OnBeforeEntered(MobileParty mp, Settlement st, Hero hero)
         {
+            TaxCounterGuard.BeforeEnter(mp, st);           // straz licznika podatku wsi: okna ksiegi i 112 otwieraja sie na naprawionym liczniku (wlasny try)
             try
             {
                 if (mp == null || st == null || !mp.IsVillager || !Live) return;

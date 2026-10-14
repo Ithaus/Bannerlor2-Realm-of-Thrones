@@ -20,7 +20,8 @@ namespace Armoury
     /// odwrocenie bitu znaku oddaje prawdziwy licznik (podatek z sakwy taboru minus udzialy majatkow) - bierzemy go, jesli jest w granicach
     /// 0..1 mln (zwykly licznik wsi to setki denarow); inaczej licznik idzie do 0 (to nie jest prawdziwe zloto - nikt go nie wplacil).
     /// Dwa miejsca: (1) postfiks Priority.First na VillagerCampaignBehavior.OnSettlementEntered - zaraz po latce BK, przed naszymi pomiarami
-    /// (112, ksiega pieniadza) i przed jakakolwiek wyplata; (2) przeglad wszystkich wsi i miast raz na dobe przed "Pieniadz swiata".
+    /// (112, ksiega pieniadza) i przed jakakolwiek wyplata; (2) przeglad wszystkich wsi i miast raz na dobe przed "Pieniadz swiata";
+    /// (3, recenzja) BeforeSettlementEntered (z MoneyLedger.OnBeforeEntered) - licznik bledny juz przed oknem ksiegi naprawiony przed odczytem.
     /// Wyjatek przy jednej osadzie: liczony, nie gasi strazy. Bez pol zapisu (liczniki tylko na sesje).
     /// </summary>
     internal static class TaxCounterGuard
@@ -30,8 +31,14 @@ namespace Armoury
         private const int LogCap = 40;               // pelne linie logu na sesje; potem co setna
 
         private static int _trips, _flipped, _zeroed, _stumbles;
+        // recenzja: doba - liczba napraw i korekta licznikow (now - was); linia dobowa w Sweep, poza bilansem "Pieniadz swiata"
+        private static int _dayN, _dayFlip, _dayZero;
+        private static long _dayFix;
 
         internal static int Trips { get { return _trips; } }
+
+        /// <summary>Nowa sesja (konstruktor ArmouryBehavior): liczniki potkniec od zera.</summary>
+        internal static void Reset() { _trips = _flipped = _zeroed = _stumbles = 0; _dayN = _dayFlip = _dayZero = 0; _dayFix = 0; }
 
         internal static bool Bad(int v) { return v < 0 || v > Max; }
 
@@ -49,6 +56,8 @@ namespace Armoury
         {
             _trips++;
             if (flipped) _flipped++; else _zeroed++;
+            _dayN++; if (flipped) _dayFlip++; else _dayZero++;
+            _dayFix += (long)now - was;
             if (_trips > LogCap && _trips % 100 != 0) return;
             string name = "?";
             try { name = st != null && st.Name != null ? st.Name.ToString() : "?"; } catch { }
@@ -104,12 +113,36 @@ namespace Armoury
             catch (Exception e) { _stumbles++; if (_stumbles == 1) Log.Error("TaxCounterGuard.EnterGuardPostfix", e); }
         }
 
-        /// <summary>Raz na dobe, przed migawka "Pieniadz swiata": wszystkie wsie i miasta/zamki.</summary>
+        /// <summary>Recenzja: BeforeSettlementEntered (pierwsza instrukcja MoneyLedger.OnBeforeEntered) - naprawa PRZED otwarciem okien ksiegi
+        /// i 112. Bledny licznik sprzed okna (np. wczytany zapis z dawnym skokiem) bylby inaczej zmierzony w oknie jako "utarg zniknal" / "nadwyzka"
+        /// rzedu 2 mld (ujscie zlota, ktorego nie bylo). Po pierwszej dobie Sweep i postfiks nie zostawiaja blednych licznikow - tu zwykle nic.</summary>
+        internal static void BeforeEnter(MobileParty mp, Settlement st)
+        {
+            try
+            {
+                if (mp == null || st == null || !mp.IsVillager || !st.IsVillage) return;
+                FixVillage(st.Village, "przed powrotem taboru");
+                var hs = mp.HomeSettlement;
+                if (hs != null && !ReferenceEquals(hs, st)) FixVillage(hs.Village, "przed powrotem taboru - wies macierzysta");
+            }
+            catch (Exception e) { _stumbles++; if (_stumbles == 1) Log.Error("TaxCounterGuard.BeforeEnter", e); }
+        }
+
+        /// <summary>Raz na dobe, przed migawka "Pieniadz swiata": wszystkie wsie i miasta/zamki; potem jedna linia doby, gdy byly naprawy.</summary>
         internal static void Sweep()
         {
             if (Campaign.Current == null) return;
             foreach (var v in Village.All) FixVillage(v, "przeglad doby");
             foreach (var t in Town.AllFiefs) FixTown(t, "przeglad doby");
+            if (_dayN > 0)
+            {
+                // korekta licznika, nie ujscie ani zrodlo zlota: okna ksiegi (utarg wsi, 112) i migawki "Pieniadz swiata" widza juz naprawione
+                // liczniki, wiec falszywe +-2^31 nie wchodzi do bilansu; ta linia tylko pokazuje, ile falszu cofnieto
+                Log.Info("Licznik podatku osady: doba | napraw " + _dayN + " (odwrocone " + _dayFlip + ", zerowane " + _dayZero + ") | korekta licznikow "
+                         + (_dayFix >= 0 ? "+" : "") + _dayFix + " - falszywe zloto spoza obiegu (nikt go nie wplacil), poza bilansem 'Pieniadz swiata': nie jest ujsciem ani zrodlem"
+                         + " | potkniecia w sesji " + _trips + ", wyjatki " + _stumbles + ".");
+                _dayN = _dayFlip = _dayZero = 0; _dayFix = 0;
+            }
         }
     }
 }
