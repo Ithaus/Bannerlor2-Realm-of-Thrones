@@ -173,6 +173,8 @@ RANGES = {
     'AiSpareHorseShare': (0.0, 1.0, "0.00"),
     # E8/Z (251): sufit ceny zakupow brakow AI jako mnoznik wartosci sztuki (0 = wylaczony; kod liczy wartosci miedzy 0 a 1 jako 1 - AiBuyRules.CapFactor)
     'AiGearMaxPriceFactor': (0.0, 5.0, "0.0"),
+    # A8 (14.10): odsetek polki przycinany w kodzie do 0..100 (Stables: ClampFloat 0..1) - regula ogolna dalaby przy domyslnej 40 suwak 0..160
+    'AiMountMarketSharePercent': (0, 100, "0"),
     # E8/C (253): waga uprzezy do kosztu w kg na punkt pancerza konia (0 = waga gry) i dni pracy helmu plytowego t4-6 na kg (0 = wzor napiersnika)
     'HarnessKgPerArmor': (0.0, 1.0, "0.00"),
     'HelmDaysPerKg': (0.0, 3.0, "0.00"),

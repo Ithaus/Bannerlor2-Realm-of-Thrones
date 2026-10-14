@@ -1260,9 +1260,9 @@ namespace Armoury
         [SettingPropertyGroup("A knight needs a horse")]
         public float MountedWageFactor { get; set; } = 1.5f;
 
-        [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere)")]
+        [SettingPropertyInteger("Ai Mount Market Share Percent", 0, 100, "0", HintText = "a lord may take at most this share of the horses on a town's shelf in one visit - the rest he orders from the breeder, so markets are not stripped bare (Jeff 15.09: no horses to buy anywhere); the last few head always stay (Ai Mount Shelf Floor). Was 25 until 14.10")]
         [SettingPropertyGroup("A knight needs a horse")]
-        public int AiMountMarketSharePercent { get; set; } = 25;
+        public int AiMountMarketSharePercent { get; set; } = 40;
 
         [SettingPropertyInteger("Ai Mount Shelf Floor", 0, 16, "0", HintText = "and never buys the last few: this many head always stay on the shelf for other buyers")]
         [SettingPropertyGroup("A knight needs a horse")]

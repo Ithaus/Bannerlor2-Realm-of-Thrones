@@ -540,7 +540,8 @@ namespace Armoury
                          + " | przewaga Polnocy NorthHomeEdgePercent " + NorthHomeEdge.Percent + "%"
                          + " | wzorzec bitwy DTE w granicy tieru (CS TierGearApplied): " + CsMarks.Describe("TierGearApplied")
                          + " | Zlota Kompania Army175GoldenBows " + yn(s.Army175GoldenBows)
-                         + " | CavalryNeedsMounts " + yn(s.CavalryNeedsMounts) + ", AiBuysMounts " + yn(s.AiBuysMounts) + ".");
+                         + " | CavalryNeedsMounts " + yn(s.CavalryNeedsMounts) + ", AiBuysMounts " + yn(s.AiBuysMounts)
+                         + " | udzial polki koni lorda AiMountMarketSharePercent " + s.AiMountMarketSharePercent + "% (podloga AiMountShelfFloor " + s.AiMountShelfFloor + ").");   // A8 (14.10): stan klucza dla grupy progow "szybkie"
             }
             catch (Exception e) { Log.Error("HorseCensus.SessionStart", e); }
         }
