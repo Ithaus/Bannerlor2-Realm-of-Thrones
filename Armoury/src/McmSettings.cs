@@ -3432,9 +3432,9 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int MinNewPartyMen { get; set; } = 30;
 
-        [SettingPropertyFloatingInteger("Garrison Peace Share", 0.00f, 2.00f, "0.00", HintText = "in peace a garrison is held at this share of its average war strength (in wages)")]
+        [SettingPropertyFloatingInteger("Garrison Peace Share", 0.00f, 2.80f, "0.00", HintText = "in peace a garrison is held at this share of its average war strength (in wages), paid from the house's own peace ceiling; the crown pays nothing towards it. 0.5 = as before 14.10")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
-        public float GarrisonPeaceShare { get; set; } = 0.5f;
+        public float GarrisonPeaceShare { get; set; } = 0.7f;
 
         [SettingPropertyBool("Garrison War Full", HintText = "at war garrisons keep the game's own limit and are paid first; the parties get the rest of the ceiling. Off = garrisons are held at the peace target in war too")]
         [SettingPropertyGroup("The crown's income (stage 2)")]

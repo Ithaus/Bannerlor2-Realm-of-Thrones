@@ -90,6 +90,8 @@ namespace Armoury
         private static int _dRelTavern;     // E4/10 (W1): zwolnieni 166, ktorzy staneli w karczmie (z _dRelMen)
         // Z.1 (pomiar): rody AI w pokoju (bez najemnikow) - pulap, w tym skrzynia pokoju (ile rodow), zold naliczony, ludzie w partiach i zalogach
         private static long _dPzCap, _dPzChest, _dPzWage; private static int _dPzN, _dPzChestN, _dPzMenPar, _dPzMenGar;
+        // B4 (pomiar, pieniadze roku 2): zalogi z celem pokojowym - ile, na celu (zold >= 95% celu) / ponizej, zold wobec celu, rody z celem przycietym do limitu pulapu
+        private static long _dB4Wage, _dB4Tgt; private static int _dB4N, _dB4At, _dB4Below, _dB4Scaled;
         // P3/W2 (pomiar): zwolnieni 166 wedlug tieru (t1-2 / t3-4 / t5+) - ludzie i ich zold dzienny; rody w wojnie, ktorym zalogi i karawany zajely
         // caly pulap (na partie 0), i ile z nich nie ma juz ludzi w partiach
         private static readonly int[] _dRelTier = new int[3];
@@ -147,6 +149,7 @@ namespace Armoury
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dRelTavern = 0; _dRelPurseVet = 0;
             _dPzCap = _dPzChest = _dPzWage = 0; _dPzN = _dPzChestN = _dPzMenPar = _dPzMenGar = 0;   // Z.1
+            _dB4Wage = _dB4Tgt = 0; _dB4N = _dB4At = _dB4Below = _dB4Scaled = 0;                     // B4
             for (int i = 0; i < 3; i++) { _dRelTier[i] = 0; _dRelTierWage[i] = 0; }   // P3/W2
             _dGarEatsCap = _dGarEatsCapEmpty = 0;
             _dGarLimited = _dPartyLimited = 0; _dWatchMen = 0; _dWatchCap = -1;
@@ -686,6 +689,7 @@ namespace Armoury
             var fiefs = c.Fiefs;
             if (fiefs == null) return;
             var tgt = new List<KeyValuePair<Settlement, double>>();
+            var curs = new List<float>();   // B4 (pomiar): zold zalogi dzis obok celu
             double sum = 0;
             for (int i = 0; i < fiefs.Count; i++)
             {
@@ -699,12 +703,18 @@ namespace Armoury
                 else if (b.War) { wr += (cur - wr) / Days28; _warGar[st.StringId] = wr; }                 // srednia z dob wojny (28 dob)
                 if (full) continue;
                 double t = Math.Max(0f, s.GarrisonPeaceShare) * wr;
-                tgt.Add(new KeyValuePair<Settlement, double>(st, t)); sum += t;
+                tgt.Add(new KeyValuePair<Settlement, double>(st, t)); curs.Add(cur); sum += t;
             }
             if (full || tgt.Count == 0) return;
             double lim = Math.Max(0f, s.GarrisonMaxShareOfBudgetPeace) * b.Cap;
             double k = sum > lim && sum > 0 ? lim / sum : 1.0;
-            foreach (var kv in tgt) { int t = (int)(kv.Value * k); _garTarget[kv.Key] = t; b.GarTarget += t; }
+            if (k < 1.0) _dB4Scaled++;
+            for (int i = 0; i < tgt.Count; i++)
+            {
+                var kv = tgt[i];
+                int t = (int)(kv.Value * k); _garTarget[kv.Key] = t; b.GarTarget += t;
+                if (t > 0) { _dB4N++; _dB4Tgt += t; _dB4Wage += (long)curs[i]; if (curs[i] >= 0.95f * t) _dB4At++; else _dB4Below++; }
+            }
         }
 
         // ------------------------------------------------------------ limity zoldu partii i zalog (stosowane tez w rozliczeniu rodu - postfiksy)
@@ -1481,6 +1491,10 @@ namespace Armoury
               .Append(s.PeaceWageShare.ToString("0.00", Inv)).Append(" D + ").Append(s.PeaceChestShare.ToString("0.00", Inv)).Append(" x skrzynia wojenna")
               .Append(s.PeaceChestShare > 0f ? "" : " - skrzynia pokoju wylaczona").Append("), w tym skrzynia pokoju ").Append(_dPzChest).Append(" u ").Append(_dPzChestN)
               .Append(" rodow, zold naliczony ").Append(_dPzWage).Append(", ludzie w partiach ").Append(_dPzMenPar).Append(", w zalogach ").Append(_dPzMenGar)
+              // B4 (pieniadze roku 2): czy w pokoju wiaze cel zalogi (zold na celu), czy tempo werbunku zalog gry (ponizej celu)
+              .Append(" | zalogi w pokoju (B4): udzial ").Append(s.GarrisonPeaceShare.ToString("0.00", Inv)).Append(" zalogi wojennej, zalog z celem ").Append(_dB4N)
+              .Append(", na celu (zold >= 95% celu) ").Append(_dB4At).Append(", ponizej celu ").Append(_dB4Below).Append("; zold zalog ").Append(_dB4Wage).Append(" wobec celu ").Append(_dB4Tgt)
+              .Append("; rodow z celem przycietym do ").Append(s.GarrisonMaxShareOfBudgetPeace.ToString("0.00", Inv)).Append(" pulapu ").Append(_dB4Scaled)
               .Append(" | w wojnie dwor ustepuje zoldowi: udzial dworu w pulapie ").Append(_dCourtRoom).Append(" u ").Append(_dCourtRoomN)
               .Append(" rodow, zold go zajal (dwor nie dostal) ").Append(_dCourtYield).Append(" u ").Append(_dCourtYieldN).Append(" rodow")
               .Append(s.WarCourtYieldsToWages ? "" : " (wylaczone)")

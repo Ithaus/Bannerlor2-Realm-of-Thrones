@@ -1073,7 +1073,8 @@ namespace Armoury
         // 5.27 -> 8.22 zl; zwalniany kosztowal 3.65 zl przy sredniej partii 9.28 zl): zwolnienia losowo z calej partii zamiast od najnizszego tieru
         public bool ReleaseAcrossTiers = true;             // men sent home for lack of budget are drawn evenly from the whole party or garrison (every man has the same chance), not lowest tier first - for the same wages fewer men leave, and a poor house keeps more heads instead of a few veterans; tavern mercenaries still go first. Off = lowest tier first, as before
         public int MinNewPartyMen = 30;                    // a house raises a new party only when its ceiling has room for this many more men (a house with no party at all may always raise one)
-        public float GarrisonPeaceShare = 0.5f;            // in peace a garrison is held at this share of its average war strength (in wages)
+        // B4 (pieniadze roku 2, PROJEKT-WYBRANY 3.6): 0.50 -> 0.70 - zalogi krolestw w pokoju z pulapu rodu (korona 0); bieg dwuletni d728 zalogi 58.2 tys. przy N4 69 020
+        public float GarrisonPeaceShare = 0.7f;            // in peace a garrison is held at this share of its average war strength (in wages), paid from the house's own peace ceiling; the crown pays nothing towards it. 0.5 = as before 14.10
         public bool GarrisonWarFull = true;                // at war garrisons keep the game's own limit and are paid first; the parties get the rest of the ceiling. Off = garrisons are held at the peace target in war too
         public float GarrisonMaxShareOfBudgetPeace = 0.8f; // in peace all garrisons of a house together take at most this share of its wage ceiling
         public float AiGearDaysCap = 30f;                  // unspent arms shares are kept for at most this many days
