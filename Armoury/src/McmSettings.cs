@@ -4308,6 +4308,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the forge")]
         public bool AiAmmoUse { get; set; } = true;
 
+        [SettingPropertyBool("Ai Ammo Order Full", HintText = "when a lord's men or a garrison leave a market still short of arrows or bolts and none of the right kind is left on the stall, the order they leave with the town's fletchers is for all they still lack (up to Supply Demand Order Cap), not just 10 - the fletchers see what the armies really need and work their idle hands while it pays (off = at most 10 of a kind from one visit, as before)")]
+        [SettingPropertyGroup("Time at the forge")]
+        public bool AiAmmoOrderFull { get; set; } = true;
+
         [SettingPropertyBool("Ai Skip Fine Goods", HintText = "the lords' men and the garrisons, buying the kit they lack, leave the finer-than-usual pieces on the shelf (Fine, Masterwork and the like): their armoury keeps no record of such quality, so the piece would turn ordinary the moment they paid the higher price for it; those pieces stay for you and for the heroes (off = as before: they buy them and the quality is lost)")]
         [SettingPropertyGroup("Time at the forge")]
         public bool AiSkipFineGoods { get; set; } = true;
@@ -6804,6 +6808,7 @@ namespace Armoury
             s.AiWearByIntensity = AiWearByIntensity;
             s.AiMendQueueContinue = AiMendQueueContinue;
             s.AiAmmoUse = AiAmmoUse;
+            s.AiAmmoOrderFull = AiAmmoOrderFull;
             s.AiSkipFineGoods = AiSkipFineGoods;
             s.AiSkipTownsfolkDress = AiSkipTownsfolkDress;
             s.AiGearMaxPriceFactor = AiGearMaxPriceFactor;
