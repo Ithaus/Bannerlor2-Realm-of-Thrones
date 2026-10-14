@@ -39,7 +39,7 @@ namespace Armoury
         // zapisu i bez czyszczenia przy wczytaniu (PlReset jej nie rusza); inna kampania (Campaign.UniqueGameId) - od nowa
         private const int PlToldEvery = 30;
         private static string _plToldGame;
-        private static int _plToldScutDay = int.MinValue, _plToldAidDay = int.MinValue;
+        private static int _plToldScutDay = int.MinValue, _plToldAidDay = int.MinValue, _plToldLevyDay = int.MinValue;   // drobne2: + W7 (LvPlayer)
 
         internal static bool PlayerClanOn { get { var s = Settings.Current; return s != null && s.ScutagePlayerClan; } }
 
@@ -61,7 +61,7 @@ namespace Armoury
         {
             string gid = null;
             try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId : null; } catch { gid = null; }
-            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = int.MinValue; }
+            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = _plToldLevyDay = int.MinValue; }
             if (last != int.MinValue && Math.Abs((long)today - last) < PlToldEvery) return false;
             last = today;
             return true;
