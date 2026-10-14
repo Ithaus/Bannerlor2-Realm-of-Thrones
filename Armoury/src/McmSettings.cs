@@ -5848,6 +5848,18 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool FolkEarnFromVillageBuys { get; set; } = true;
 
+        [SettingPropertyBool("Fair Fief Grants", HintText = "Fair Fief Grants: a conquered castle or town goes to the house that earned it - the one whose lord led the army that took it (+50), houses that fought in the assault (+25), houses that lost all their lands (+50), the rightful de jure holder (+100) - and a house's claim halves once it holds as much as its tier allows (tier - 1 points; a town counts 2, a castle 1). No house is granted a fief beyond tier + 1 points. The king's house gets no conqueror's share and only a small bonus (+25) while the crown holds less than a fifth of the realm; King's Landing stays with the crown. Council votes follow these claims, and the king can no longer cancel the vote. A human king still chooses from the three best claims. Off = as before (every claim scored 0, so the first three houses on the realm's list always stand).")]
+        [SettingPropertyGroup("Grants of conquered fiefs")]
+        public bool FairFiefGrants { get; set; } = true;
+
+        [SettingPropertyInteger("Fair Fief Conqueror Bonus", 0, 200, "0", HintText = "With Fair Fief Grants: claim points for the house whose lord led the army that took the fief (participants in the assault get half).")]
+        [SettingPropertyGroup("Grants of conquered fiefs")]
+        public int FairFiefConquerorBonus { get; set; } = 50;
+
+        [SettingPropertyInteger("Fair Fief Cap Extra", 0, 10, "0", HintText = "With Fair Fief Grants: a house may hold at most (tier - 1 + this) points of castles and towns from grants (town 2, castle 1).")]
+        [SettingPropertyGroup("Grants of conquered fiefs")]
+        public int FairFiefCapExtra { get; set; } = 2;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7309,6 +7321,9 @@ namespace Armoury
             s.FlaxVillagesWithoutClimateFix = FlaxVillagesWithoutClimateFix;
             s.VineOliveByClimate = VineOliveByClimate;
             s.FolkEarnFromVillageBuys = FolkEarnFromVillageBuys;
+            s.FairFiefGrants = FairFiefGrants;
+            s.FairFiefConquerorBonus = FairFiefConquerorBonus;
+            s.FairFiefCapExtra = FairFiefCapExtra;
         }
 
         internal static void Apply()

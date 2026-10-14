@@ -641,6 +641,11 @@ Uzycie (Python 3, tylko odczyt):
                     przerwa 30.3 doby), SD-A1 sluby AI-AI na 364 doby 38-58 (linia Sluby AI (169c); 91-299 dob - 2.6 sigma), SD-A2 Z.3 = 169c, sluby =
                     oczekiwane, regulator 43-53 / rok, SD-A3 oferty dla rodu gracza (0.15-0.31, odstep >= 30 dob), SD-A4 INFO rody; (B) SD-B0..B5 danina
                     pokoju M4: linia, kontrolki, wziete <= budzet (chleb, najwyzej 0.5% lokaty), pokoj >= 91 dob (wiersze i KRONIKA WOJEN), dzien do dnia, linia P1.
+--grupa lenna     : (PROJEKT-LENNA 14.10, docs/lenna/PROJEKT-LENNA.md rozdz. 6; Armoury/src/FiefGrants.cs) python -I tools/sprawdz_logi.py --grupa lenna
+                    [--tabele <katalog tabel biegu>] <Armoury-*.log> (log strumieniowo). Regula N nadan zdobytych twierdz: LN-0 linia startu, LN-1 decyzje =
+                    linie nadania (z --tabele: zmiany rodu po zdobyciu +- 2), LN-2 ponad pulapem przy kims w pulapie 0, LN-3 rada wybiera 1. albo >= 0.7 x 1.
+                    (>= 95%), LN-4 najwiekszy rod krolestwa <= 40%, LN-5 rody / nadania >= 0.60, LN-6 miasta ponad pulap 0, LN-7 rod krola <= 35%,
+                    LN-8 wodz spoza korony dostaje >= 50%, LN-9 anulowane 0, LN-10 uczestnicy szturmu >= 80%, LN-11 oddane w 60 dob (DECYZJA), LN-12 potkniecia 0.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -23500,6 +23505,313 @@ def sludan_main(logp, csp=None):
     return 0
 
 
+LN_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+LN_CAND = re.compile(r"^(\d)\. (.+?) (-?[\d.]+) \(S (-?[\d.]+)\) \[t(-?\d+) (\d+)m/(\d+)z = (\d+) pkt, przydzial (\d+), pulap (\d+); (.+?); x([\d.]+)"
+                     r"(?:; ROT x(\d+))?; BK domena ([^\]]*)\] glosy (\d+) \(rodow (\d+)\)$")
+LN_WIN = re.compile(r"\| zwyciezca (.+?) \(1\. w ocenie: (tak|nie), ocena ([\d.]+) x 1\., ponad pulapem: (tak|nie), w pulapie byl ktos: (tak|nie)"
+                    r", rod krola: (tak|nie), gracz: (tak|nie)\) -> (\d+)m/(\d+)z = (\d+) pkt \(pulap (\d+)\)( - NIE DOSTAL[^|]*)?")
+LN_CONQ = re.compile(r"\| zdobywca: (?:-|(.+?) \(rod krola: (tak|nie), kandydat: (tak|nie), w pulapie: (tak|nie|-), dostal: (tak|nie)\))")
+LN_DAY = re.compile(r"^Nadania lenn \(N\) doba (\d+): FairFiefGrants (tak|nie) \| rozstrzygniete dzis (\d+) \(od startu sesji \d+\), z linia (\d+) \(od startu \d+\)"
+                    r" \| anulowane \"Owner of X\" (\d+) \(od startu \d+\) \| zwyciezca ponad pulapem (\d+) \(przy kims w pulapie (\d+), od startu \d+\)"
+                    r" \| zmiany pana nadanych w \d+ dob (\d+) \(od startu \d+\) \| szturmy zapisane (\d+), w pamieci \d+, nadane w obserwacji \d+"
+                    r" \| glos bez M_max (\d+) \| potkniecia (\d+)")
+LN_KP = ("town_EW4", "ROT_castle61")   # Krolewska Przystan i Czerwona Twierdza (ROT x999 i blizniak fabuly ROT) - poza LN-4 / LN-7
+
+
+def lenna_parse_grant(s):
+    """Linia "Nadanie lenna (N): ..." -> dict albo None (nieczytelna)."""
+    g = {}
+    m = re.search(r"^Nadanie lenna \(N\): dzien (\d+) \| (.+?) \[([^\]]+)\] \((miasto|zamek), \d pkt\) \| regula N: (tak|nie)"
+                  r" \| krolestwo (.+?), krol (.+?) \(domena ([^)]*)\) \| decyzja: (.+?), wybral: (.+?) \| zdobyl (.+?), w szturmie: (.+?)"
+                  r" \| kandydatow (\d+), w pulapie (\d+) \| ", s)
+    if not m:
+        return None
+    (g["day"], g["name"], g["id"], g["kind"], g["rule"], g["kingdom"], g["king"], g["dom"], g["dec"], g["who"], g["conq"], g["part"],
+     g["n"], g["nin"]) = m.groups()
+    g["day"], g["n"], g["nin"] = int(g["day"]), int(g["n"]), int(g["nin"])
+    rest = s[m.end():]
+    i = rest.find(" | zwyciezca ")
+    if i < 0:
+        return None
+    cands = []
+    for part in rest[:i].split(" ; "):
+        if not part.strip():
+            continue
+        mc = LN_CAND.match(part.strip())
+        if not mc:
+            return None
+        c = mc.groups()
+        cands.append(dict(pos=int(c[0]), clan=c[1], m=float(c[2]), s=float(c[3]), tier=int(c[4]), towns=int(c[5]), castles=int(c[6]), w=int(c[7]),
+                          p=int(c[8]), cap=int(c[9]), parts=c[10], fac=float(c[11]), rot=c[12], bk=c[13], votes=int(c[14]), voters=int(c[15])))
+    g["cands"] = cands
+    mw = LN_WIN.search(s)
+    if not mw:
+        return None
+    w = mw.groups()
+    g.update(win=w[0], first=w[1] == "tak", ratio=float(w[2]), over=w[3] == "tak", anyin=w[4] == "tak", winking=w[5] == "tak", winplayer=w[6] == "tak",
+             atowns=int(w[7]), acastles=int(w[8]), aw=int(w[9]), acap=int(w[10]), notgot=bool(w[11]))
+    mq = LN_CONQ.search(s)
+    g["cq"] = None
+    if mq and mq.group(1):
+        g["cq"] = dict(clan=mq.group(1), king=mq.group(2) == "tak", cand=mq.group(3) == "tak", incap=mq.group(4) == "tak", got=mq.group(5) == "tak")
+    mp = re.search(r"\| gracz: (.+)$", s)
+    g["player"] = mp.group(1).strip() if mp else "-"
+    g["ago"] = num(r"zdobyte dnia \d+, (\d+) dob temu", g["dec"], int, None)
+    return g
+
+
+def lenna_tables(tabp):
+    """ludzie-regiony.csv (strumieniowo): zdobycia (zmiana krolestwa) i pierwsza zmiana rodu w tym samym krolestwie do 10 dob po nich;
+    miasta rodow (bez gracza) w pierwszej i ostatniej dobie tabeli."""
+    path = os.path.join(tabp, "ludzie-regiony.csv")
+    if not os.path.isfile(path):
+        return None
+    hist = {}
+    first_day = last_day = None
+    towns_first, towns_last, cur = {}, {}, {}
+    cur_day = None
+    with open(path, encoding="utf-8", errors="replace") as f:
+        hdr = f.readline().rstrip("\n").split(";")
+        ix = {h: i for i, h in enumerate(hdr)}
+        need = ("dzien", "region_id", "rodzaj", "krolestwo", "rod")
+        if any(k not in ix for k in need):
+            return None
+        ig = ix.get("gracz")
+        for ln in f:
+            p = ln.rstrip("\n").split(";")
+            try:
+                d = int(p[ix["dzien"]])
+            except (ValueError, IndexError):
+                continue
+            if cur_day is not None and d != cur_day:
+                if first_day == cur_day:
+                    towns_first = cur
+                cur = {}
+            if first_day is None:
+                first_day = d
+            cur_day = d
+            last_day = d
+            sid, kind, kr, rod = p[ix["region_id"]], p[ix["rodzaj"]], p[ix["krolestwo"]], p[ix["rod"]]
+            if kind == "miasto" and not (ig is not None and ig < len(p) and p[ig] == "1"):
+                cur[(kr, rod)] = cur.get((kr, rod), 0) + 1
+            h = hist.setdefault(sid, [])
+            if not h or h[-1][1:] != (kr, rod):
+                h.append((d, kr, rod))
+    if first_day == cur_day:
+        towns_first = cur
+    towns_last = cur
+    inner = 0
+    for sid, h in hist.items():
+        for i in range(1, len(h)):
+            d, kr, rod = h[i]
+            if kr == h[i - 1][1]:
+                continue
+            if i + 1 < len(h):
+                d2, kr2, rod2 = h[i + 1]
+                if kr2 == kr and rod2 != rod and d2 - d <= 10:
+                    inner += 1
+    return dict(first=first_day, last=last_day, inner=inner, towns_first=towns_first, towns_last=towns_last)
+
+
+def lenna_main(logp, tabp=None):
+    """lenna (PROJEKT-LENNA 14.10, docs/lenna/PROJEKT-LENNA.md rozdz. 6; Armoury/src/FiefGrants.cs; klucze FairFiefGrants, FairFiefConquerorBonus,
+    FairFiefCapExtra): komu krol daje zdobyty zamek / miasto - regula N. Log Armoury czytany strumieniowo; --tabele <katalog tabel biegu>
+    (ludzie-regiony.csv) - porownanie z wlascicielami twierdz co dobe. Wiersze (linie nadania tylko z "regula N: tak", chyba ze napisano inaczej):
+    LN-0 linia startu (kazda sesja): CZYNNE, prefiks oceny wpiety w typ modelu BK z linii, glos - nasz postfiks ostatni, ROT KP x999 jest,
+    anulowanie wylaczone (N5), BRAK: -. LN-1a rozstrzygniete "Owner of X" (linie doby) = linie nadania (linie doby); LN-1b (z --tabele) zmiany rodu
+    w obrebie krolestwa <= 10 dob po zdobyciu = linie nadania po zdobyciu dla rodu spoza rodu krola +- 2 (fabula ROT osobno). LN-2 zwyciezca ponad
+    pulapem, gdy ktos byl w pulapie = 0. LN-3 decyzje rady: zwyciezca = 1. w ocenie albo ocena >= 0.7 x 1. - >= 95% (>= 10 decyzji; gracz-krol INFO).
+    LN-4 udzial najwiekszego rodu w nadaniach krolestwa (bez KP i Czerwonej Twierdzy), krolestwa z >= 6 nadaniami <= 40%. LN-5 rody z nadaniem /
+    nadania >= 0.60 (>= 15 nadan). LN-6a nadanie miasta rodowi AI ponad pulap = 0; LN-6b nadania, po ktorych rod AI ma > 3 miasta = 0 (z --tabele
+    lista rodow AI z > 3 miastami na koniec i na starcie - INFO). LN-7 nadania dla rodu krola (bez KP i Czerwonej Twierdzy) <= 35% (>= 10 nadan).
+    LN-8 wodz spoza rodu krola, kandydat w pulapie: dostal / przypadki >= 50% (>= 5 przypadkow). LN-9 anulowane "Owner of X" przy FairFiefGrants
+    tak = 0; doby od zdobycia do decyzji - INFO. LN-10 nadania po zdobyciu z lista uczestnikow (nie "brak") >= 80% (>= 5). LN-11 nadana twierdza
+    zmienia pana w obrebie krolestwa w 60 dob: 0 = TAK, > 0 = DECYZJA (limit domeny BK przeczy pulapowi - krok 2). LN-12 potkniecia (linie doby
+    i "ERROR in FiefGrants.") = 0. LN-13 decyzje z graczem - INFO. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    starts, grants, days, moved = [], [], [], []
+    bad_grant = bad_day = errs = 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if "lenn" not in ln and "FiefGrants" not in ln:
+                continue
+            s = LN_TS.sub("", ln.rstrip("\r\n"))
+            if s.startswith("ERROR in FiefGrants."):
+                errs += 1
+            elif s.startswith("Nadania lenn (N): "):
+                starts.append(s)
+            elif s.startswith("Nadanie lenna (N): dzien "):
+                g = lenna_parse_grant(s)
+                if g is None:
+                    bad_grant += 1
+                else:
+                    grants.append(g)
+            elif s.startswith("Nadania lenn (N) doba "):
+                m = LN_DAY.match(s)
+                if m:
+                    days.append(dict(day=int(m.group(1)), on=m.group(2) == "tak", conc=int(m.group(3)), lines=int(m.group(4)), canc=int(m.group(5)),
+                                     over=int(m.group(6)), overin=int(m.group(7)), moved=int(m.group(8)), caps=int(m.group(9)), nomax=int(m.group(10)),
+                                     st=int(m.group(11))))
+                else:
+                    bad_day += 1
+            elif s.startswith("Nadanie lenna (N) zmiana pana:"):
+                moved.append(s)
+    on = [g for g in grants if g["rule"] == "tak"]
+    print(f"plik: {logp} | linii startu {len(starts)}, nadan {len(grants)} (regula N tak {len(on)}, nieczytelnych {bad_grant}), linii doby {len(days)}"
+          f" (nieczytelnych {bad_day}), zmian pana nadanych {len(moved)}" + (f" | tabele: {tabp}" if tabp else ""))
+    if not starts and not grants and not days:
+        rep.add("LN-0: linia startu regule N", "brak linii", "INFO (wersja sprzed PROJEKT-LENNA)", None)
+        rep.show()
+        return 0
+    # ---- LN-0
+    if starts:
+        bad0 = []
+        for i, s in enumerate(starts):
+            why = []
+            if "Nadania lenn (N): CZYNNE" not in s:
+                why.append("nie CZYNNE")
+            mm = re.search(r"ocena: prefiks na (.+?)\.CalculateHeroFiefScore \(model BK: ([^)]+)\)", s)
+            if not mm or mm.group(2) == "-" or mm.group(2) not in mm.group(1).split(" + "):
+                why.append("prefiks oceny nie w typie modelu BK")
+            if "postfiks DetermineSupport ostatni: tak" not in s:
+                why.append("glos nie ostatni")
+            if "postfiks ROT KP x999 (jest)" not in s:
+                why.append("brak ROT KP x999")
+            if "anulowanie przez krola: wylaczone (N5)" not in s:
+                why.append("anulowanie nie wylaczone")
+            if "| BRAK: -" not in s:
+                why.append("BRAK latek")
+            if why:
+                bad0.append(f"sesja {i + 1}: " + ", ".join(why))
+        rep.add("LN-0: linia startu (kazda sesja)", f"sesji {len(starts)}; ostatnia: {starts[-1][:230]}" + (f" | zle: {'; '.join(bad0[:3])}" if bad0 else ""),
+                "CZYNNE, prefiks w typie modelu BK, glos ostatni, ROT KP x999 jest, anulowanie wylaczone, BRAK: -", not bad0)
+    else:
+        rep.add("LN-0: linia startu", "brak linii startu (log od srodka procesu?)", "INFO", None)
+    # ---- LN-1
+    if days:
+        sc, sl = sum(d["conc"] for d in days), sum(d["lines"] for d in days)
+        rep.add("LN-1a: rozstrzygniete \"Owner of X\" = linie nadania (linie doby)", f"rozstrzygniete {sc}, z linia {sl}; linii nadania w logu {len(grants)}",
+                "rowne (licznik zdarzenia gry = linie postfiksu)", sc == sl)
+    else:
+        rep.add("LN-1a: rozstrzygniete = linie nadania", "brak linii doby", "INFO", None)
+    tb = lenna_tables(tabp) if tabp else None
+    if tb:
+        exp = sum(1 for g in grants if g["dec"].startswith("po zdobyciu") and not g["winking"] and not g["notgot"])
+        rep.add("LN-1b: (tabele) zmiany rodu w krolestwie <= 10 dob po zdobyciu wobec nadan po zdobyciu spoza rodu krola",
+                f"tabela {tb['inner']} (doby {tb['first']}-{tb['last']}), linie {exp}", "rowne +- 2 (fabula ROT osobno)", abs(tb["inner"] - exp) <= 2)
+    elif tabp:
+        rep.add("LN-1b: (tabele) zmiany rodu po zdobyciu", f"brak {os.path.join(tabp, 'ludzie-regiony.csv')}", "INFO", None)
+    # ---- LN-2
+    if on:
+        n2 = sum(1 for g in on if g["over"] and g["anyin"])
+        rep.add("LN-2: zwyciezca ponad pulapem, gdy ktos byl w pulapie", f"{n2} z {len(on)} nadan (ponad pulapem razem {sum(1 for g in on if g['over'])})", "0", n2 == 0)
+    else:
+        rep.add("LN-2: zwyciezca ponad pulapem", "brak nadan z regula N", "INFO", None)
+    # ---- LN-3
+    ai = [g for g in on if g["who"].startswith("rada")]
+    pk = [g for g in on if g["who"].startswith("gracz-krol")]
+    if ai:
+        ok3 = sum(1 for g in ai if g["first"] or g["ratio"] >= 0.7)
+        sh = ok3 / len(ai)
+        firsts = sum(1 for g in ai if g["first"])
+        rep.add("LN-3: decyzje rady - zwyciezca 1. w ocenie albo >= 0.7 x 1.", f"{ok3} z {len(ai)} ({sh:.0%}; 1. w ocenie {firsts})"
+                + (f"; gracz-krol {len(pk)} (INFO)" if pk else ""), ">= 95% (przy >= 10 decyzjach)", sh >= 0.95 if len(ai) >= 10 else None)
+    else:
+        rep.add("LN-3: decyzje rady", "brak", "INFO", None)
+    # ---- LN-4 / LN-5 / LN-7
+    core = [g for g in on if g["id"] not in LN_KP and not g["notgot"]]
+    byk = {}
+    for g in core:
+        byk.setdefault(g["kingdom"], []).append(g["win"])
+    big = []
+    for kr, ws in sorted(byk.items(), key=lambda x: -len(x[1])):
+        cnt = {}
+        for w in ws:
+            cnt[w] = cnt.get(w, 0) + 1
+        top = max(cnt.items(), key=lambda x: x[1])
+        big.append((kr, len(ws), top[0], top[1], len(cnt)))
+    k6 = [b for b in big if b[1] >= 6]
+    if k6:
+        worst = max(k6, key=lambda b: b[3] / b[1])
+        rep.add("LN-4: najwiekszy rod w nadaniach krolestwa (>= 6 nadan, bez KP i Czerwonej Twierdzy)",
+                "; ".join(f"{b[0]}: {b[2]} {b[3]}/{b[1]} ({b[3] / b[1]:.0%}), rodow {b[4]}" for b in k6[:6]),
+                "<= 40% w kazdym (sym. fin30 18-33%, gra 64-100%)", worst[3] / worst[1] <= 0.40)
+    else:
+        rep.add("LN-4: najwiekszy rod w nadaniach krolestwa", "; ".join(f"{b[0]}: {b[2]} {b[3]}/{b[1]}" for b in big[:6]) or "brak nadan",
+                "INFO (zadne krolestwo z >= 6 nadaniami)", None)
+    okg = [g for g in on if not g["notgot"]]
+    if okg:
+        r5 = len({(g["kingdom"], g["win"]) for g in okg}) / len(okg)
+        rep.add("LN-5: rody z nadaniem / nadania", f"{len({(g['kingdom'], g['win']) for g in okg})} / {len(okg)} = {r5:.2f}",
+                ">= 0.60 przy >= 15 nadaniach (sym. 0.80 / 0.90; gra 0.38 / 0.51)", r5 >= 0.60 if len(okg) >= 15 else None)
+    else:
+        rep.add("LN-5: rody z nadaniem / nadania", "brak nadan", "INFO", None)
+    if core:
+        nk = sum(1 for g in core if g["winking"])
+        r7 = nk / len(core)
+        rep.add("LN-7: nadania dla rodu krola (bez KP i Czerwonej Twierdzy)", f"{nk} z {len(core)} ({r7:.0%})", "<= 35% przy >= 10 nadaniach (sym. 19% / 28%)",
+                r7 <= 0.35 if len(core) >= 10 else None)
+    else:
+        rep.add("LN-7: nadania dla rodu krola", "brak nadan", "INFO", None)
+    # ---- LN-6
+    if on:
+        n6a = [g for g in on if g["kind"] == "miasto" and g["over"] and not g["winplayer"]]
+        rep.add("LN-6a: miasto nadane rodowi AI ponad pulap", f"{len(n6a)}" + (": " + ", ".join(f"{g['name']} -> {g['win']}" for g in n6a[:5]) if n6a else ""), "0", not n6a)
+        n6b = [g for g in on if g["atowns"] > 3 and not g["winplayer"] and not g["notgot"]]
+        rep.add("LN-6b: nadania, po ktorych rod AI ma > 3 miasta", f"{len(n6b)}" + (": " + ", ".join(f"{g['name']} -> {g['win']} {g['atowns']}m" for g in n6b[:5]) if n6b else ""),
+                "0", not n6b)
+    else:
+        rep.add("LN-6: miasta ponad pulap", "brak nadan z regula N", "INFO", None)
+    if tb:
+        endbig = sorted(((k, v) for k, v in tb["towns_last"].items() if v > 3), key=lambda x: -x[1])
+        rep.add("LN-6c: (tabele) rody AI z > 3 miastami na koniec (start w nawiasie)",
+                "; ".join(f"{k[1]} ({k[0]}) {v} (start {tb['towns_first'].get(k, 0)})" for k, v in endbig[:8]) or "brak",
+                "INFO (> 3 miasta tylko ze startu / fabuly / odejscia rodu - LN-6b)", None)
+    # ---- LN-8
+    c8 = [g for g in on if g["dec"].startswith("po zdobyciu") and g["cq"] and not g["cq"]["king"] and g["cq"]["cand"] and g["cq"]["incap"]]
+    if c8:
+        got = sum(1 for g in c8 if g["cq"]["got"])
+        rep.add("LN-8: wodz spoza rodu krola (kandydat w pulapie) dostal", f"{got} z {len(c8)} ({got / len(c8):.0%})",
+                ">= 50% przy >= 5 przypadkach (sym. 68% / 74%; gra 16% / 22%)", got / len(c8) >= 0.5 if len(c8) >= 5 else None)
+    else:
+        rep.add("LN-8: wodz spoza rodu krola dostal", "brak przypadkow", "INFO", None)
+    # ---- LN-9
+    if days:
+        con = [d for d in days if d["on"]]
+        nc = sum(d["canc"] for d in con)
+        rep.add("LN-9: anulowane \"Owner of X\" (FairFiefGrants tak)", f"{nc} (linii doby z regula {len(con)}; przy regule wylaczonej {sum(d['canc'] for d in days if not d['on'])})",
+                "0 (N5)", nc == 0 if con else None)
+    else:
+        rep.add("LN-9: anulowane \"Owner of X\"", "brak linii doby", "INFO", None)
+    ago = [g["ago"] for g in on if g["ago"] is not None and g["who"].startswith("rada (krol AI)")]
+    if ago:
+        rep.add("LN-9b: doby od zdobycia do nadania (krolestwa AI)", f"<= 2 dob {sum(1 for a in ago if a <= 2)} z {len(ago)}, najwiecej {max(ago)}", "INFO", None)
+    # ---- LN-10
+    c10 = [g for g in on if g["dec"].startswith("po zdobyciu")]
+    if c10:
+        wl = sum(1 for g in c10 if g["part"] != "brak")
+        rep.add("LN-10: nadania po zdobyciu z lista uczestnikow szturmu (nie 'brak')", f"{wl} z {len(c10)} ({wl / len(c10):.0%}); z innymi rodami w szturmie "
+                f"{sum(1 for g in c10 if g['part'] not in ('brak', 'tylko zdobywca', '-'))}", ">= 80% przy >= 5 (INFO ponizej, gdy byly wczytania)",
+                wl / len(c10) >= 0.80 if len(c10) >= 5 else None)
+    else:
+        rep.add("LN-10: nadania z lista uczestnikow", "brak nadan po zdobyciu", "INFO", None)
+    # ---- LN-11
+    rep.add("LN-11: nadana twierdza zmienia pana w krolestwie w 60 dob", f"{len(moved)}" + (": " + " ; ".join(m[31:150] for m in moved[:3]) if moved else ""),
+            "0; > 0 = DECYZJA (limit domeny BK przeczy pulapowi - krok 2: limit BK zamiast tieru)", True if not moved else False, decide=bool(moved))
+    # ---- LN-12
+    st = sum(d["st"] for d in days)
+    rep.add("LN-12: potkniecia latek", f"z linii doby {st}, linii 'ERROR in FiefGrants.' {errs}" + (f", glos bez M_max {sum(d['nomax'] for d in days)}" if days else ""),
+            "0", st == 0 and errs == 0)
+    # ---- LN-13
+    pl = [g for g in grants if g["who"].startswith("gracz-krol") or g["player"] != "-" or g["winplayer"]]
+    rep.add("LN-13: decyzje z graczem", f"{len(pl)}" + (": " + " ; ".join(f"d{g['day']} {g['name']} -> {g['win']} ({g['who']}; gracz: {g['player']})" for g in pl[:4]) if pl else ""),
+            "INFO", None)
+    if on:
+        rep.add("LN-INFO: nadania wedlug krolestw (bez KP i Czerwonej Twierdzy)", "; ".join(f"{b[0]} {b[1]} -> rodow {b[4]}, najwiecej {b[2]} {b[3]}" for b in big[:8]), "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -23508,6 +23820,7 @@ def main(argv):
     until_arg = 120
     final = False
     horses = False   # P1 (kiesa1): progi dla biegu z regula koni roboczych
+    tabp = None      # PROJEKT-LENNA (grupa lenna): katalog tabel biegu (ludzie-regiony.csv)
     i = 0
     while i < len(args):
         a = args[i]
@@ -23531,7 +23844,11 @@ def main(argv):
             csp = args[i + 1]; i += 2; continue
         if a == "--baza-doby":
             bdp = args[i + 1]; i += 2; continue
+        if a == "--tabele":
+            tabp = args[i + 1]; i += 2; continue
         logp = a; i += 1
+    if group == "lenna" and logp:
+        return lenna_main(logp, tabp)   # PROJEKT-LENNA (14.10): regula N - komu krol daje zdobyty zamek / miasto (FiefGrants), progi LN-0..LN-13
     if group == "sludan" and logp:
         return sludan_main(logp, csp)   # 14.10 sluby-danina: (A) sluby AI na rok (hamulec 0.17) i oferty dla rodu gracza (84 / rok), (B) danina pokoju M4
     if group == "a17" and logp:

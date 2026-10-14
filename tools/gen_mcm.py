@@ -221,6 +221,9 @@ RANGES = {
     'SiegeRansomTruceDays': (0, 364, "0"),   # rozejm po okupie - kod przycina do 0..364 (SiegeRansom.TruceDays)
     # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
     'PregnancyDays': (0, 364, "0"),
+    # PROJEKT-LENNA (14.10): punkty zdobywcy i zapas pulapu ponad przydzial - kod przycina do 0..200 i 0..10 (FiefGrants.ConquerorBonus / CapExtra)
+    'FairFiefConquerorBonus': (0, 200, "0"),
+    'FairFiefCapExtra': (0, 10, "0"),
 }
 
 def gen(module_dir, ns, display):

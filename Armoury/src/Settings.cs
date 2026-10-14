@@ -2209,6 +2209,14 @@ namespace Armoury
         // (10%) zaplaty taborom wsi (TownLive krok 2, ta sama droga co robocizna od sprzedazy). Off = stan 97dd474
         public bool FolkEarnFromVillageBuys = true;        // The townsfolk also earn when the merchants buy the villages' produce - unloading, measuring and storing it (a tenth of what the carts are paid, by Town Folk Labour Village Buys) - so a town whose district brings in more grain, wool and ore feeds more of its people's wages. Off = they earn only from what the merchants sell
 
+        // --- Grants of conquered fiefs ---
+        // PROJEKT-LENNA (14.10, slowa Jeffa "w kolko dostaje jedna, max dwie postacie"; FiefGrants.cs, docs/lenna/PROJEKT-LENNA.md): ocena kandydata do zdobytej
+        // twierdzy S = (100 + Z + U + B + J + K) x P / (P + W), pulap P + FairFiefCapExtra, glos rady wedlug oceny, krol nie anuluje "Owner of X" (N1-N6).
+        // Off = stan 7bc5dd0b (ocena BKROTPatch 0 - lista = 3 pierwsze rody krolestwa, glos BK, anulowanie gry); linie logu "Nadani* lenn* (N)" zostaja
+        public bool FairFiefGrants = true;                 // Fair Fief Grants: a conquered castle or town goes to the house that earned it - the one whose lord led the army that took it (+50), houses that fought in the assault (+25), houses that lost all their lands (+50), the rightful de jure holder (+100) - and a house's claim halves once it holds as much as its tier allows (tier - 1 points; a town counts 2, a castle 1). No house is granted a fief beyond tier + 1 points. The king's house gets no conqueror's share and only a small bonus (+25) while the crown holds less than a fifth of the realm; King's Landing stays with the crown. Council votes follow these claims, and the king can no longer cancel the vote. A human king still chooses from the three best claims. Off = as before (every claim scored 0, so the first three houses on the realm's list always stand).
+        public int FairFiefConquerorBonus = 50;            // With Fair Fief Grants: claim points for the house whose lord led the army that took the fief (participants in the assault get half).
+        public int FairFiefCapExtra = 2;                   // With Fair Fief Grants: a house may hold at most (tier - 1 + this) points of castles and towns from grants (town 2, castle 1).
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");
