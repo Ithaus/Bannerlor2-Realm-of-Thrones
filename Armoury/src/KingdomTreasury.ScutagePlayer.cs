@@ -20,7 +20,8 @@ namespace Armoury
     ///  - DOPLATA W5 gracza: jak AI w kolejce "od najslabszych", ale SAMA GOTOWKA za ludzi, ktorzy sa w druzynach ponad pulap wlasny - bez "miejsca w pulapie" na
     ///    brakujacych (gracz nie ma pulapu 166 - werbuje sam). Skarbiec -> kiesa gracza; zwrot 70% nastepnej doby bez tej czesci (NeedAidRefundCut - jak AI).
     ///  - PLATNIK I ODBIORCA NIGDY NARAZ: podstawa > 0 znaczy, ze pulap bez dworu starcza na cel - z dworem tym bardziej, wiec potrzeby W5 nie ma (jak AI).
-    ///  - KOMUNIKATY (po angielsku, kolor Armoury): wyjasnienie raz na sesje (pierwsza doba z poborem / z doplata; bez pola zapisu - po wczytaniu jeszcze raz),
+    ///  - KOMUNIKATY (po angielsku, kolor Armoury): wyjasnienie przy pierwszej dobie z poborem / z doplata, potem najwyzej raz na 30 dob gry w procesie (po audycie
+    ///    13/14.10; bez pola zapisu - pamiec procesu kluczowana kampania, wczytanie jej nie czysci),
     ///    sumy raz na 7 dob na rodzaj (jak renty 180). Linie: segment " | gracz: ..." w liniach "Doplata wedlug potrzeby (W5)" i "Tarczowe (W6)".
     /// Zapis gry: nic nowego (stan doby i tydzien komunikatow w pamieci sesji). Wyjatek - licznik potkniec W6 (pierwszy do pliku), bez globalnych wylacznikow.
     /// </summary>
@@ -32,9 +33,13 @@ namespace Armoury
         private static double _plCapW5, _plCapW6, _plCapRes, _plD, _plNeed, _plBase = double.NaN, _plSur = double.NaN;
         private static long _plWage, _plDue; private static int _plMen, _plLim;
         private static string _plWhy, _plWhy6;
-        // komunikaty: suma 7 dob (jak renty 180) i wyjasnienie raz na sesje
+        // komunikaty: suma 7 dob (jak renty 180) i wyjasnienie
         private static long _plWeekPaid, _plWeekGot; private static int _plWeekStart = -1; private static string _plWeekK;
-        private static bool _plToldScut, _plToldAid;
+        // poprawka po audycie (gracz 10): wyjasnienie nie czesciej niz raz na PlToldEvery dob gry w sesji (dotad po kazdym wczytaniu). Pamiec PROCESU - bez pola
+        // zapisu i bez czyszczenia przy wczytaniu (PlReset jej nie rusza); inna kampania (Campaign.UniqueGameId) - od nowa
+        private const int PlToldEvery = 30;
+        private static string _plToldGame;
+        private static int _plToldScutDay = int.MinValue, _plToldAidDay = int.MinValue;
 
         internal static bool PlayerClanOn { get { var s = Settings.Current; return s != null && s.ScutagePlayerClan; } }
 
@@ -48,7 +53,18 @@ namespace Armoury
         private static void PlReset()
         {
             PlClearDay();
-            _plWeekPaid = _plWeekGot = 0; _plWeekStart = -1; _plWeekK = null; _plToldScut = _plToldAid = false;
+            _plWeekPaid = _plWeekGot = 0; _plWeekStart = -1; _plWeekK = null;   // wyjasnienia (_plTold*) - pamiec procesu, patrz PlTellDue
+        }
+
+        /// <summary>Wyjasnienie W6b/W5 gracza: true najwyzej raz na PlToldEvery dob gry tej kampanii w tym procesie (takze po wczytaniu, takze wczesniejszego zapisu).</summary>
+        private static bool PlTellDue(ref int last, int today)
+        {
+            string gid = null;
+            try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId : null; } catch { gid = null; }
+            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = int.MinValue; }
+            if (last != int.MinValue && Math.Abs((long)today - last) < PlToldEvery) return false;
+            last = today;
+            return true;
         }
 
         /// <summary>Warunki 1-3 decyzji Jeffa dla krolestwa k (null - krolestwo gracza): miasto albo zamek, wasal tego krolestwa (nie wladca, nie najemnik),
@@ -184,16 +200,14 @@ namespace Armoury
                 long got = 0, paid = 0;
                 if (_naDay == today) { _naPaid.TryGetValue(c, out got); _scPaid.TryGetValue(c, out paid); }
                 var s = Settings.Current;
-                if (paid > 0 && !_plToldScut)
+                if (paid > 0 && PlTellDue(ref _plToldScutDay, today))
                 {
-                    _plToldScut = true;
                     Log.Player("Scutage: in war a vassal whose lands could pay for more soldiers than he keeps in the field pays the crown "
                                + (100 * (s != null ? ScRate(s) : 0.25)).ToString("0", WtInv) + "% of the wages he spares, and the crown gives it the same day to the lords who cannot pay their men. "
                                + "It is taken only from coin above your war reserve and only while the crown's war aid still falls short. Field more men and you pay less.");
                 }
-                if (got > 0 && !_plToldAid)
+                if (got > 0 && PlTellDue(ref _plToldAidDay, today))
                 {
-                    _plToldAid = true;
                     Log.Player("War aid: in war the crown helps pay the wages of vassals whose lands cannot keep their companies at "
                                + (100 * (s != null ? NaTarget(s) : 0.6)).ToString("0", WtInv) + "% of their size. It pays only for men already in your companies, and only while you keep the crown's terms for rents (garrisons and service).");
                 }

@@ -281,6 +281,7 @@ namespace Armoury
             public Settlement St; public float Day0; public string Faction; public int Kind; public bool Captured;
             public long Kasa0, Folk0, Merch, FolkTaken;
             public long InWinSacker, InWinOther, AfterSacker, AfterOther, Pris;
+            public bool PlayerIn;   // poprawka po audycie (L3): druzyna gracza brala udzial w tym lupie - tylko pamiec sesji (bez pola zapisu; po wczytaniu false - napis neutralny)
         }
         private static readonly Dictionary<Settlement, Track> _track = new Dictionary<Settlement, Track>();
         private const int TrackDays = 30;
@@ -397,7 +398,8 @@ namespace Armoury
                     // gracza ("@" + id druzyny), nie dla calego jego krolestwa
                     bool own = __4 != null && __4.Count == 0 && __0 != null && __0 == MobileParty.MainParty;
                     t = new Track { St = __1, Day0 = Now, Faction = own ? "@" + __0.StringId : (__0 != null && __0.MapFaction != null ? __0.MapFaction.StringId : ""), Kind = kind,
-                                    Captured = captured, Kasa0 = k != null ? k.Kasa : 0, Folk0 = k != null ? k.FolkSum : 0 };
+                                    Captured = captured, Kasa0 = k != null ? k.Kasa : 0, Folk0 = k != null ? k.FolkSum : 0,
+                                    PlayerIn = MobileParty.MainParty != null && (__0 == MobileParty.MainParty || (__4 != null && __4.ContainsKey(MobileParty.MainParty))) };
                     _track[__1] = t;
                 }
                 catch (Exception e) { Stumble("AftermathPre.Track", e); }

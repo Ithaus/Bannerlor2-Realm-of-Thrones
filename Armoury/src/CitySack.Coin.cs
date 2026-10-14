@@ -76,6 +76,9 @@ namespace Armoury
                 int had = town.Gold;
                 if (want[0] > 0) town.ChangeGold(-(int)Math.Min(int.MaxValue, want[0]));
                 took[0] = Math.Max(0, had - town.Gold);
+                // poprawka po audycie (obieg Z3): nazwana pozycja "Przeplywy osad" (bez niej lup ladowal w "reszta - inne niezmierzone"); src -1 - to nie zakup
+                // kas (licznik zakupow ponizej zapasu kupcow TownFolk.OnTownCoin bez zmian)
+                if (took[0] > 0) MoneyLedger.Note(MoneyLedger.NSack, st, -(int)Math.Min(int.MaxValue, took[0]), -1);
                 for (int c = 0; c < 4; c++) took[c + 1] = want[c + 1] > 0 ? TownFolk.SackTake(st, c, want[c + 1]) : 0;
                 for (int i = 0; i < 5; i++) pool += took[i];
                 // ---- podzial wedlug ludzi; reszta z zaokraglen do najwiekszej druzyny
@@ -129,7 +132,7 @@ namespace Armoury
                             long x = Math.Min(rest, Math.Min(took[c], pool > 0 ? (long)Math.Floor((double)back * took[c] / pool) : 0));
                             if (x > 0) { TownFolk.SackBack(st, c - 1, x); rest -= x; }
                         }
-                        if (rest > 0) town.ChangeGold((int)Math.Min(int.MaxValue, rest));
+                        if (rest > 0) { int g0 = town.Gold; town.ChangeGold((int)Math.Min(int.MaxValue, rest)); MoneyLedger.Note(MoneyLedger.NSack, st, town.Gold - g0, -1); }
                         given += back;
                     }
                 }
@@ -188,12 +191,14 @@ namespace Armoury
             {
                 var main = MobileParty.MainParty;
                 string town = st.Name != null ? st.Name.ToString() : st.StringId;
+                bool castle = !st.IsTown;                   // poprawka po audycie (gracz 7, 8): zamek - skarbiec i ludzie podzamcza; pieniadz zawsze "denars"
                 if (a == main && main != null)
                 {
                     // gracz-wodz: podsumowanie w menu (L5); bez L5 albo bez menu ("Right of Pillage") - wiadomosc
                     bool menu = WindowOn && contrib != null && contrib.Count > 0;   // L5: podsumowanie w menu po wyborze (bez menu - "Right of Pillage")
                     if (!menu && kind != KMercy && res.Pool > 0)
-                        Log.Player("Your army took " + N(res.Pool) + " coins from " + town + ": " + N(res.Merch) + " from its merchants, " + N(res.Folk) + " from its townsfolk. "
+                        Log.Player("Your army took " + N(res.Pool) + " denars from " + town + ": " + N(res.Merch) + (castle ? " from its treasury, " : " from its merchants, ") + N(res.Folk)
+                                   + (castle ? " from its castle folk. " : " from its townsfolk. ")
                                    + "Your men's purses grew by " + N(res.PlayerMen) + "; your own part is " + N(res.PlayerLead) + ".");
                 }
                 else if (main != null && contrib != null && contrib.ContainsKey(main))
@@ -201,10 +206,11 @@ namespace Armoury
                     string lead = a != null && a.LeaderHero != null ? a.LeaderHero.Name.ToString() : "The army's leader";
                     if (kind == KMercy) Log.Player(lead + " spared " + town + ". There is no plunder.");
                     else if (res.PlayerMen + res.PlayerLead > 0)
-                        Log.Player(lead + " let the army sack " + town + ". Your party's part: " + N(res.PlayerMen + res.PlayerLead) + " coins (your men " + N(res.PlayerMen) + ", you " + N(res.PlayerLead) + ").");
+                        Log.Player(lead + " let the army sack " + town + ". Your party's part: " + N(res.PlayerMen + res.PlayerLead) + " denars (your men " + N(res.PlayerMen) + ", you " + N(res.PlayerLead) + ").");
                 }
                 if (prev != null && prev == Clan.PlayerClan && kind != KMercy && res.Pool > 0)
-                    Log.Player(town + " has been sacked: its merchants lost " + N(res.Merch) + " coins, its townsfolk " + N(res.Folk) + ".", true);
+                    Log.Player(town + (castle ? " has been sacked: its treasury lost " : " has been sacked: its merchants lost ") + N(res.Merch)
+                               + (castle ? " denars, its castle folk " : " denars, its townsfolk ") + N(res.Folk) + ".", true);
             }
             catch (Exception e) { Stumble("Messages", e); }
         }

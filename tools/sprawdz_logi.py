@@ -17709,12 +17709,17 @@ def gl2_main(logp, start_arg, until=120, csvp=None, bdp=None):
         pools = re.findall(r"przed (\d+) = po (\d+)", s0)
         cls = re.findall(r"[WRP] (\d+) = (\d+)", s0)
         bad = [p for p in pools + cls if p[0] != p[1]]
+        # poprawka po audycie (GL2 Z6): kiesy wsi "po" liczone z przelewow - odczyt kies inny ("odczyt kies po N") to rozjazd; linia "wies niepelna" - INFO
+        rd = re.search(r"\(odczyt kies po (\d+)\)", s0)
+        if rd:
+            bad.append(("po z przelewow", "odczyt " + rd.group(1)))
+        wn = sum(1 for s in lines if s.startswith("Zloto startowe wedlug ludzi (GL2): wies niepelna"))
         m = re.search(r"skarbce koron: .*?na podlodze (\d+): (\d+)", s0)
         skip = re.findall(r"\| ([^|:]+): POMINIETE", s0)
         cbad = [c for c in sgc if "(zgodne)" not in c]
         rep.add("GL2-S1: zloto startowe wedlug ludzi - suma kazdej puli i swiata przed = po", f"linii {len(sg)}, pul {len(pools) + len(cls)}, rozjazdow {len(bad)}, swiat {'zgodny' if ok_all else 'ROZJAZD'}"
                 + (f"; skarbce na podlodze {m.group(1)}: {m.group(2)}" if m else "") + (f"; pominiete (klucze): {', '.join(skip)}" if skip else "")
-                + f"; kiesy podzamczy: linii {len(sgc)}, rozjazdow {len(cbad)}",
+                + f"; kiesy podzamczy: linii {len(sgc)}, rozjazdow {len(cbad)}; linii 'wies niepelna' {wn}" + (f" (odczyt kies wsi po {rd.group(1)})" if rd else ""),
                 "1 linia w nowej kampanii (+ 1 linia podzamczy przy VillageHeadsByPeople), 0 rozjazdow (przelewy, nie mnozenie)", len(sg) == 1 and not bad and ok_all and not cbad and len(sgc) <= 1)
     else:
         stt = [re.search(r"zloto startowe: ([^|]*?) \|", gl[d]) for d in win[:1]]

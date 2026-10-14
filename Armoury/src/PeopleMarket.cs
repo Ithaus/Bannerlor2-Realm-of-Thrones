@@ -646,35 +646,50 @@ namespace Armoury
             else
             {
                 var vs = new List<Village>(); var cur = new List<long>(); var w = new List<double>();
+                // poprawka po audycie (obieg Z6, ubytek ok. 4 000 zl w dobie 1): suma kies przed = po wymaga, zeby kazda wies byla na liscie raz i miala kiese >= 0
+                // (gra tnie ChangeGold tylko ponizej 0; cudzej latki na ChangeGold nie ma - BK, BetterEconomy i reszta modulow sprawdzone). Wies drugi raz na liscie
+                // albo z kiesa ujemna - pominieta (kiesa zostaje), liczona w linii
+                var seenV = new HashSet<Village>();
+                int dupV = 0, negV = 0; long negG = 0;
                 foreach (var v in Village.All)
                 {
                     try
                     {
                         float u;
                         if (v == null || v.Settlement == null || !PeopleScale.TryVillageHome(v, out u)) continue;   // bez przelicznika i Straz - kiesa zostaje
-                        vs.Add(v); cur.Add(Math.Max(0, v.Gold)); w.Add(u);
+                        if (!seenV.Add(v)) { dupV++; continue; }
+                        if (v.Gold < 0) { negV++; negG += v.Gold; continue; }
+                        vs.Add(v); cur.Add(v.Gold); w.Add(u);
                     }
                     catch (Exception e) { Stumble("StartGold(wies)", e); }
                 }
                 var tg = Spread(cur.ToArray(), w.ToArray());
-                long b0 = 0, b1 = 0, moved = 0;
+                long b0 = 0, b1 = 0, moved = 0, sumReal = 0;
                 // pula przelewu: najpierw zdjete z wsi ponad udzial (faktycznie zdjete), potem dane wsiom ponizej udzialu - najwyzej tyle, ile jest
                 // w puli; co nie weszlo (wies nie przyjela calosci albo zabraklo puli), wraca do wsi, z ktorych zdjeto - suma kies wsi przed = po
                 long pool = 0;
                 var taken = new long[vs.Count];
+                int badN = 0;
+                var bad = new StringBuilder();
                 for (int pass = 0; pass < 2; pass++)
                     for (int i = 0; i < vs.Count; i++)
                     {
                         long d = tg[i] - cur[i];
                         if ((pass == 0) != (d < 0) || d == 0) continue;
                         if (pass == 1) d = Math.Min(d, pool);
-                        if (d == 0) continue;
+                        if (d <= 0 && pass == 1) continue;              // pula pusta (albo ujemna po niepelnym zdjeciu) - wsi ponizej udzialu nic nie zabieramy
                         try
                         {
                             int had = vs[i].Gold;
                             vs[i].ChangeGold((int)d);
                             long real = (long)vs[i].Gold - had;
-                            if (real != d) Stumble("StartGold(wies niepelna)", null);
+                            sumReal += real;
+                            if (real != d)
+                            {
+                                Stumble("StartGold(wies niepelna)", null);
+                                if (++badN <= 20) bad.Append(badN > 1 ? "; " : "").Append(vs[i].Settlement.StringId).Append(" przejscie ").Append(pass).Append(": d ").Append(d)
+                                                     .Append(", real ").Append(real).Append(", Gold przed ").Append(had).Append(" / po ").Append(vs[i].Gold).Append(", stan z listy ").Append(cur[i]);
+                            }
                             if (pass == 0) { taken[i] = -real; pool += -real; }
                             else { moved += real; pool -= real; }
                         }
@@ -686,20 +701,33 @@ namespace Armoury
                     try
                     {
                         int had = vs[i].Gold;
-                        vs[i].ChangeGold((int)Math.Min(pool, taken[i]));
-                        pool -= (long)vs[i].Gold - had;
+                        long want = Math.Min(pool, taken[i]);
+                        vs[i].ChangeGold((int)want);
+                        long real = (long)vs[i].Gold - had;
+                        sumReal += real;
+                        pool -= real;
+                        if (real != want && ++badN <= 20)
+                            bad.Append(badN > 1 ? "; " : "").Append(vs[i].Settlement.StringId).Append(" zwrot: d ").Append(want).Append(", real ").Append(real)
+                               .Append(", Gold przed ").Append(had).Append(" / po ").Append(vs[i].Gold);
                     }
                     catch (Exception e) { Stumble("StartGold(wies zwrot)", e); }
                 }
                 if (pool != 0) Stumble("StartGold(wies pula " + pool + ")", null);
+                long read1 = 0;
                 for (int i = 0; i < vs.Count; i++)
                 {
-                    long g = Math.Max(0, vs[i].Gold);
-                    b0 += cur[i]; b1 += g;
+                    long g = vs[i].Gold;
+                    b0 += cur[i]; read1 += g;
                     var k = KOf(kd, vs[i].Settlement.MapFaction); k.V0 += cur[i]; k.V1 += g;
                 }
+                b1 = b0 + sumReal;                                  // po audycie: "po" z faktycznych przelewow (odczyt kies obok, gdy sie rozni)
+                if (badN > 0 || dupV > 0 || negV > 0 || read1 != b1)
+                    Log.Info("Zloto startowe wedlug ludzi (GL2): wies niepelna - dzien " + day + " | przelewow niepelnych " + badN + (bad.Length > 0 ? " (" + bad + (badN > 20 ? "; ..." : "") + ")" : "")
+                             + " | wsi drugi raz na liscie (pominiete) " + dupV + ", z kiesa ujemna (pominiete) " + negV + " (razem " + negG + ")"
+                             + " | kiesy wsi przed " + b0 + ", po z przelewow " + b1 + ", po z odczytu " + read1 + " (roznica " + (read1 - b1) + "), pula na koniec " + pool + ".");
                 all0 += b0; all1 += b1;
-                sb.Append(" | kiesy wsi: przed ").Append(b0).Append(" = po ").Append(b1).Append(" (przelano ").Append(moved).Append(", wsi ").Append(vs.Count).Append("; waga skala domu wsi)");
+                sb.Append(" | kiesy wsi: przed ").Append(b0).Append(" = po ").Append(b1).Append(read1 != b1 ? " (odczyt kies po " + read1 + ")" : "").Append(" (przelano ").Append(moved).Append(", wsi ").Append(vs.Count)
+                  .Append(dupV > 0 || negV > 0 ? ", pominiete: drugi raz " + dupV + ", kiesa ujemna " + negV : "").Append("; waga skala domu wsi)");
             }
             // ---- (4) skarbce koron: ludzie krolestwa (ksiega: wsie + miasta), podloga CrownFloor
             {

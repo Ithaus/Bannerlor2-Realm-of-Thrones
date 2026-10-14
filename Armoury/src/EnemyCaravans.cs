@@ -34,7 +34,8 @@ namespace Armoury
     ///  1. przewodnik i kazdy bohater karawany -> niewola zdobywcy (TakePrisonerAction - jak wrog zlapany w zdobytych murach);
     ///  2. kiesa karawany (PartyTradeGold) -> wodz zdobywcow (GiveGoldAction partia -> bohater, zdarzenie gry - ksiega widzi przelew), korona 1/9 od wodza-wasala
     ///     w wojnie (Ransom178.NoteBeatenGold - ta sama podstawa co 3.2); wodza brak - kiesa jego druzyny (partia z kiesa) albo kasa zdobytej osady;
-    ///  3. caly ladunek (towar, zywnosc, konie, juczne, bron) -> tabor druzyny zdobywcy (sztuka zdjeta = sztuka dopisana; juczne niosa to, co niosly). AI sprzedaje
+    ///  3. caly ladunek (towar, zywnosc, konie, juczne, bron) -> tabor druzyny zdobywcy (sztuka zdjeta = sztuka dopisana; juczne niosa to, co niosly) - po audycie
+    ///     integracji 13/14.10 miara L7: zwierzeta do granicy stada bez kary "Herding", reszta najcenniejsze na kg do wolnego udzwigu; nadmiar na polke zdobytej osady. AI sprzedaje
     ///     to w nastepnym miescie droga gry (PartiesSellLootCampaignBehavior - zloto z kasy miasta, korona 1/9 przez Ransom178.LootPostfix), zywnosc zjada;
     ///  4. pusta karawana -> DestroyPartyAction.Apply(null, karawana): CZYNNE reguly partii rozwiazanej bez bitwy - eskorta do domu (PeopleBook.ArmsPartyGone, E4/8;
     ///     warunek: bez niszczyciela, bez bitwy i oblezenia - dlatego null), sakiewki eskorty do kasy najblizszego miasta (MenPurse, wpis 89). Kiesa (0) i dobytek
@@ -147,7 +148,7 @@ namespace Armoury
             _dCaps++;
             Hero lead = cap != null && cap.IsActive ? cap.LeaderHero : null;
             int seized = 0, survived = 0, skipped = 0, subjects = 0, heroes = 0, men = 0, horses = 0, playerN = 0;
-            long goldOff = 0, goldOn = 0, unitsOff = 0, unitsOn = 0, value = 0, menPurse = 0, playerGold = 0, playerUnits = 0;
+            long goldOff = 0, goldOn = 0, unitsOff = 0, unitsOn = 0, unitsShelf = 0, value = 0, menPurse = 0, playerGold = 0, playerUnits = 0;
             string why = null;
             var ex = new List<string>();
             var playerLeaders = new List<string>();
@@ -207,9 +208,13 @@ namespace Armoury
                         }
                         goldOn += gotG;
                     }
-                    // 3. ladunek -> tabor zdobywcy (sztuka po sztuce: zdjeta z karawany = dopisana zdobywcy)
-                    int u = 0;
+                    // 3. ladunek -> tabor wodza (sztuka po sztuce: zdjeta z karawany = dopisana wodzowi albo polce osady). Poprawka po audycie (obieg Z5, gracz 1):
+                    //    ta sama miara co L7 - zwierzeta (konie, juczne, zywiec) najpierw, do granicy stada bez kary "Herding" gry; reszta najcenniejsze na kg do
+                    //    wolnego udzwigu PO zwierzetach (juczne niosa). Czego wodz nie uniesie albo nie poprowadzi - na polke zdobytej osady (nie znika, nie plonie);
+                    //    osada bez polki - wszystko do wodza, jak dotad
+                    int u = 0, uAll = 0;
                     var pack = c.ItemRoster;
+                    var shelf = st.ItemRoster;
                     if (pack != null)
                     {
                         var els = new List<ItemRosterElement>();
@@ -219,22 +224,44 @@ namespace Armoury
                             if (el.Amount <= 0 || el.EquipmentElement.Item == null || el.EquipmentElement.IsQuestItem) continue;
                             els.Add(el);
                         }
+                        els.Sort((x, y) =>
+                        {
+                            bool wx = CitySack.Walks7(x.EquipmentElement.Item), wy = CitySack.Walks7(y.EquipmentElement.Item);
+                            if (wx != wy) return wx ? -1 : 1;
+                            return CitySack.PerKg7(y.EquipmentElement.Item).CompareTo(CitySack.PerKg7(x.EquipmentElement.Item));
+                        });
+                        int herd = CitySack.HerdRoom(cap);
+                        double free = double.NaN;                       // wolny udzwig liczony po zwierzetach
                         foreach (var el in els)
                         {
                             var ee = el.EquipmentElement;
                             int at = pack.FindIndexOfElement(ee);
                             int n = at >= 0 ? pack.GetElementNumber(at) : 0;
                             if (n <= 0) continue;
-                            int dst0 = CountOf(cap.ItemRoster, ee);
+                            bool walks = CitySack.Walks7(ee.Item);
+                            double w = Math.Max(0f, ee.Item.Weight);
+                            int fit;
+                            if (shelf == null) fit = n;
+                            else if (walks) fit = Math.Min(n, Math.Max(0, herd));
+                            else
+                            {
+                                if (double.IsNaN(free)) free = CitySack.FreeKg(cap);
+                                fit = w > 1e-6 ? (int)Math.Min(n, Math.Floor(Math.Max(0.0, free) / w)) : n;
+                            }
+                            int dst0 = CountOf(cap.ItemRoster, ee), sh0 = CountOf(shelf, ee);
                             pack.AddToCounts(ee, -n);
                             int at2 = pack.FindIndexOfElement(ee);
                             int off = n - (at2 >= 0 ? pack.GetElementNumber(at2) : 0);
                             if (off <= 0) continue;
-                            cap.ItemRoster.AddToCounts(ee, off);
+                            int toCap = Math.Min(fit, off), toShelf = off - toCap;
+                            if (toCap > 0) cap.ItemRoster.AddToCounts(ee, toCap);
+                            if (toShelf > 0) shelf.AddToCounts(ee, toShelf);
                             int on = CountOf(cap.ItemRoster, ee) - dst0;
-                            unitsOff += off; unitsOn += on; u += on;
+                            int onShelf = toShelf > 0 ? CountOf(shelf, ee) - sh0 : 0;
+                            unitsOff += off; unitsOn += on + onShelf; u += on; uAll += on + onShelf; unitsShelf += onShelf;
                             value += (long)on * Math.Max(0, ee.ItemValue);
                             if (ee.Item.HasHorseComponent) horses += on;
+                            if (walks) herd -= on; else if (!double.IsNaN(free)) free -= on * w;
                         }
                     }
                     // 4. pusta karawana - rozwiazana bez niszczyciela (eskorta do domu, sakiewki eskorty do kasy najblizszego miasta)
@@ -244,8 +271,8 @@ namespace Armoury
                     if (c.IsActive) DestroyPartyAction.Apply(null, c);   // recenzja: partia usunieta przez cudzy nasluch (np. przy niewoli przewodnika) - bez drugiego zdarzenia zniszczenia
                     if (c.IsActive) { survived++; continue; }
                     seized++; men += m; menPurse += mp0;
-                    if (player) { playerN++; playerGold += g; playerUnits += u; }
-                    if (ex.Count < 4) ex.Add(owner + ": kiesa " + g + ", sztuk " + u + ", ludzie " + m + (hs.Count > 0 ? ", bohaterow " + hs.Count : ""));
+                    if (player) { playerN++; playerGold += g; playerUnits += uAll; }
+                    if (ex.Count < 4) ex.Add(owner + ": kiesa " + g + ", sztuk " + uAll + (uAll != u ? " (wodzowi " + u + ")" : "") + ", ludzie " + m + (hs.Count > 0 ? ", bohaterow " + hs.Count : ""));
                 }
                 catch (Exception e) { Stumble("Seize(karawana)", e); survived++; }
             }
@@ -261,6 +288,7 @@ namespace Armoury
               .Append(" | ladunek: zdjete ").Append(unitsOff).Append(" - dopisane ").Append(unitsOn).Append(" = ").Append(unitsOff - unitsOn)
               .Append(" szt. (wartosc ").Append(value).Append(", konie i juczne ").Append(horses).Append(')')
               .Append(" | bohaterowie do niewoli ").Append(heroes).Append(", eskorta do domu ").Append(men).Append(" (sakiewki eskorty ").Append(menPurse).Append(" do kasy najblizszego miasta)")
+              .Append(" | z dopisanych na polke osady ").Append(unitsShelf).Append(" szt. (ponad udzwig i stado wodza; wartosc i konie wyzej - tylko tabor wodza)")
               .Append(" | nie zniknely ").Append(survived)
               .Append(" | gracz: karawan zajetych ").Append(playerN).Append(cap != null && cap.IsMainParty ? ", zdobywca" : "")
               .Append(ex.Count > 0 ? " | " + string.Join("; ", ex.ToArray()) : "")
@@ -274,7 +302,8 @@ namespace Armoury
                                + (playerLeaders.Count > 0 ? "; " + string.Join(", ", playerLeaders.ToArray()) + (playerLeaders.Count == 1 ? " is" : " are") + " now held prisoner" : "") + ".", true);
                 if (cap != null && cap.IsMainParty && seized > 0)
                     Log.Player("In " + Nm(st) + " your men seized " + (seized == 1 ? "an enemy caravan" : seized + " enemy caravans") + ": " + goldOn.ToString("N0", Inv) + " denars go to your purse and "
-                               + unitsOn + " items of cargo, horses and pack animals to your baggage" + (heroes > 0 ? "; " + heroes + (heroes == 1 ? " caravan master is your prisoner" : " caravan masters are your prisoners") : "") + ".");
+                               + (unitsOn - unitsShelf) + " items of cargo, horses and pack animals to your baggage"
+                               + (unitsShelf > 0 ? " (" + unitsShelf + " more that your men could not carry or herd are left " + (st.IsTown ? "in the market of " : "behind in ") + Nm(st) + ")" : "") + (heroes > 0 ? "; " + heroes + (heroes == 1 ? " caravan master is your prisoner" : " caravan masters are your prisoners") : "") + ".");
             }
             catch (Exception e) { Stumble("Seize(wiadomosc)", e); }
         }

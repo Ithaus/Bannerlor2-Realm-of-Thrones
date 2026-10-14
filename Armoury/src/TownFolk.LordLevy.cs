@@ -90,7 +90,7 @@ namespace Armoury
                 long x = Math.Min(amount, Math.Max(0, PurseOf(f, c)));
                 if (x <= 0) return 0;
                 AddPurse(f, c, -x);
-                _ctlOut += x;
+                _ctlOut += x; f.LDayOut += x;   // poprawka po audycie (obieg Z8): wiersz osady w kiesa-ludu.csv bilansuje sie w dobie poboru (jak lup, konie, P1, P2)
                 return x;
             }
             catch (Exception e) { Stumble("LevyTake", e); return 0; }
@@ -104,7 +104,7 @@ namespace Armoury
                 Folk f;
                 if (st == null || amount <= 0 || c < 0 || c > 2 || !_f.TryGetValue(st, out f) || f == null || f.Kind > 1) return;
                 AddPurse(f, c, amount);
-                _ctlOut -= amount;
+                _ctlOut -= amount; f.LDayOut -= amount;
             }
             catch (Exception e) { Stumble("LevyBack", e); }
         }
