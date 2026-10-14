@@ -396,12 +396,20 @@ namespace Armoury
             if (!(sum > 0)) { OfferNoCat(off); return 0; }             // P1 (pomiar): cala oferta bez kategorii w slowniku (pieniadz zostaje w kiesie)
             double added = 0;
             int bi = -1;
+            bool cl = ClothOn;                                           // plotno 14.10 (poprawka 1c): plotno z oferty tylko ponad prog polki (TownFolk.Luxury.cs ClothRoom)
             foreach (var c in _better)
             {
                 float v;
                 bi++;
                 if (!dict.TryGetValue(c, out v) || !(v > 0)) continue;
                 double x = off * v / sum;
+                if (cl && IsClothCat(c))
+                {
+                    double room = ClothRoom(f, town, c, v);
+                    if (x > room) { if (f.Kind == 0) { _lxw.ClCut += x - room; _lxw.ClCutN++; } x = room; }
+                    if (f.Kind == 0) _lxw.ClOff += x;
+                    if (!(x >= 1)) continue;
+                }
                 double idx = Math.Max(0.01, town.GetItemCategoryPriceIndex(c));
                 double hs = Math.Max(0.05, HistoricalPrices.HouseShare(c));
                 double add = x / (Math.Pow(idx, OfferIdxPow) * hs);

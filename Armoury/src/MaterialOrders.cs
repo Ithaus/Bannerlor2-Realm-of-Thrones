@@ -152,6 +152,7 @@ namespace Armoury
             _missOreSince.Clear(); _srcOreSince.Clear(); _dstOreSince.Clear(); _namesSince = -1; _trip.Clear(); _auditAll = 0; _keepDay.Clear();
             MaterialCarts.Reset(M); _cartRoad.Clear(); for (int k = 0; k < M; k++) _cartSrc[k] = null;   // P3/Z1
             _oreWhy.Clear(); _dstOreCartSince.Clear(); _srcOreCartSince.Clear();
+            _expDay = int.MinValue; _expMat = -1; _expDest.Clear();   // plotno 14.10 (poprawka 2): cele wywozu tkacza
             NewDay(); _stumblesAll = 0; _errSites.Clear();
         }
 
@@ -985,6 +986,110 @@ namespace Armoury
                 return SourceKeepDay(t, m);
             }
             catch (Exception e) { Stumble("SourceKeepFor", e); return int.MaxValue; }
+        }
+
+        // ------------------------------------------------------------ plotno 14.10 (docs/pytania-2026-10-14/RAPORT-plotno.md, poprawki 1 i 2)
+        private sealed class ExpDest { public Settlement St; public int Price; }
+        private static int _expDay = int.MinValue, _expMat = -1;
+        private static readonly List<ExpDest> _expDest = new List<ExpDest>();
+
+        /// <summary>
+        /// Plotno 14.10 (poprawki 1 i 2): prog polki surowca z tabeli kontraktow, do ktorego miasto trzyma towar dla siebie i na wywoz - zbytki ludu
+        /// (FolkClothAboveReserve) kupuja plotno i skore z oferty tylko ponad nim, a tkacz (WeaverExportPrice) tka na wywoz najwyzej do niego.
+        /// = prog nadwyzki zrodla kontraktow (SourceKeepDay: prog karawan - 20 dni zuzycia rzemieslnikow, warsztatow i domow, 10 dob zuzycia zmierzonego,
+        /// punkt zamowienia - czego miasto nie sprzedaje innym miastom) + pas wywozu tej samej wielkosci, nie mniejszy niz ladunek minimalny
+        /// (TownMaterialOrderMinLoadKg - woz i karawana nie jada z mniejszym). Ponizej progu zrodla kupuja wojsko, warsztaty, domy (budzet gry), w pasie -
+        /// kontrakty 174, wozy kupcow P3/Z1 i karawany (CaravanBulk), ponad - tez zbytki ludu. Przedmiot spoza tabeli - prog karawan (CaravanBulk.KeepFor);
+        /// zamek i miasto bez danych - 0. Wyjatek - 0 (lud kupuje jak dotad; licznik potkniec).
+        /// </summary>
+        internal static int ShelfReserve(Town t, ItemObject item)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || t == null || item == null || !t.IsTown) return 0;
+                int m;
+                int sk = Ready() && _ix.TryGetValue(item, out m) ? SourceKeepDay(t, m) : SafeKeep(t, item);
+                int load = (int)Math.Ceiling(Math.Max(0f, s.TownMaterialOrderMinLoadKg) / Kg(item));
+                return Math.Max(0, sk) + Math.Max(Math.Max(0, sk), load);
+            }
+            catch (Exception e) { Stumble("ShelfReserve", e); return 0; }
+        }
+
+        /// <summary>
+        /// Plotno 14.10 (poprawka 2, klucz WeaverExportPrice): ile warta jest sztuka wyrobu z miasta src na wywoz - najwyzsza cena po miastach, ktore przy dzisiejszej
+        /// polce zamowilyby ten surowiec (zapas na max(10, D + 4) dob zuzycia celu minus polka minus w drodze > 0 - ta sama ilosc co Order / OrderByCart),
+        /// niewrogich, nieoblezonych, w zasiegu kontraktu i wozu (TownMaterialOrderRange: droga ladem; bez niej ladem i morzem jak woz; rejs port-port x SeaFreightShare):
+        /// cena srodkowej sztuki braku celu (PriceAt - ta sama co marza kontraktu) minus droga sztuki (CarterPencePerKgPer100 x kg x odleglosc / 100, morze x udzial).
+        /// Droga liczona tylko tu - koszt wsadu i pracy liczy tkacz, kontrakt i woz sprawdzaja swoja marze od ceny zrodla jak dotad. Cele z cenami raz na dobe
+        /// (ExpDests), drogi par z pamieci kampanii (CartRoads, CartRoadMixed - te same co wozy). 0 = kontrakty wylaczone (TownMaterialOrders), brak celu albo blad.
+        /// dests - celow w zasiegu.
+        /// </summary>
+        internal static int ExportNet(Town src, ItemObject item, out int dests)
+        {
+            dests = 0;
+            try
+            {
+                var s = Settings.Current;
+                int m;
+                if (s == null || !On || src == null || item == null || !src.IsTown || !Ready() || !_ix.TryGetValue(item, out m)) return 0;
+                var from = src.Settlement;
+                if (from == null || from.IsUnderSiege) return 0;
+                int day = (int)CampaignTime.Now.ToDays;
+                if (day != _expDay || m != _expMat) ExpDests(m, day);
+                float range = Math.Max(1f, s.TownMaterialOrderRange);
+                float carter = Math.Max(0f, s.CarterPencePerKgPer100), sea = MBMath.ClampFloat(s.SeaFreightShare, 0f, 1f);
+                float kg = Kg(item);
+                bool seaAll = s.TownMaterialOrderBySea;
+                float seaMax = Math.Max(1f, s.TownMaterialOrderSeaMaxRoute);
+                float seaLine = sea > 0f ? Math.Min(seaMax, range / sea) : seaMax;   // rejs >= linia prosta
+                var pos = from.GetPosition2D;
+                int best = 0;
+                foreach (var e in _expDest)
+                {
+                    var dest = e.St;
+                    if (dest == from || dest.IsUnderSiege) continue;
+                    if (from.MapFaction != null && dest.MapFaction != null && FactionManager.IsAtWarAgainstFaction(from.MapFaction, dest.MapFaction)) continue;
+                    float line = pos.Distance(dest.GetPosition2D);
+                    bool landTry = line <= range, seaTry = seaAll && dest.HasPort && from.HasPort && line <= seaLine;
+                    if (!landTry && !seaTry) continue;
+                    float dL, dS;
+                    CartRoads(from, dest, landTry, seaTry, out dL, out dS);
+                    if (landTry && !(dL > 0f) && seaAll) dL = CartRoadMixed(from, dest);
+                    bool landOk = dL > 0f && dL <= range, seaOk = dS > 0f && dS <= seaMax && dS * sea <= range;
+                    if (!landOk && !seaOk) continue;
+                    float d = seaOk && (!landOk || dS * sea < dL) ? dS * sea : dL;   // tansza droga, jak kontrakt i woz
+                    dests++;
+                    int net = e.Price - (int)Math.Ceiling(carter * kg * d / 100f);
+                    if (net > best) best = net;
+                }
+                return best;
+            }
+            catch (Exception e) { Stumble("ExportNet", e); return 0; }
+        }
+
+        /// <summary>ExportNet: miasta, ktore przy dzisiejszej polce zamowilyby surowiec m (ilosc jak w Order), z cena srodkowej sztuki braku - raz na dobe
+        /// (polki celow w ciagu doby sie zmieniaja; tkacz ocenia z rana, jak cena zbytu karawan CaravanBulk).</summary>
+        private static void ExpDests(int m, int day)
+        {
+            _expDay = day; _expMat = m; _expDest.Clear();
+            var item = _items[m];
+            if (item == null) return;
+            foreach (var t in Town.AllTowns)
+            {
+                try
+                {
+                    var st = t != null ? t.Settlement : null;
+                    if (st == null || !t.IsTown || t.Owner == null || t.Owner.ItemRoster == null) continue;
+                    float use = UseDest(t, m);
+                    if (use <= 0f) continue;
+                    int want = (int)Math.Ceiling(Math.Max(10f, TravelDays(t, m) + 4f) * use) - t.Owner.ItemRoster.GetItemNumber(item) - InTransit(st, m);
+                    if (want <= 0) continue;
+                    int p = PriceAt(t, item, true, Math.Max(0, want - 1) / 2);
+                    if (p > 0) _expDest.Add(new ExpDest { St = st, Price = p });
+                }
+                catch (Exception e) { Stumble("ExpDests", e); }
+            }
         }
 
         private static bool Eligible(MobileParty p, Settlement dest)

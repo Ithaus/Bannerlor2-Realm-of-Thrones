@@ -521,6 +521,11 @@ Uzycie (Python 3, tylko odczyt):
                     LUP-B2 (LB) linia L0 budowle: zdjete przy nastepstwach = splonelo LB, LUP-B3 zgliszcza i odbudowa (INFO),
                     LUP-18 (L7) polki: zdjete = do taborow + spalone (0 szt.), spalone tylko przy spustoszeniu; LUP-18b ksiega towarow lup miast (L7) tylko ujscie.
                     Log bez paczki: INFO, bez wyjatku. Domyslne okno 364 doby (bieg roczny); --do-doby N zmienia.
+--grupa plotno    : (plotno 14.10, docs/pytania-2026-10-14/RAPORT-plotno.md poprawki 1 i 2; klucze FolkClothAboveReserve, WeaverExportPrice) zbytki ludu nie kupuja
+                    plotna ani skory ponizej zapasu polki, tkacz tka tez na wywoz. python -I tools/sprawdz_logi.py --grupa plotno [--do-doby 120] <Armoury-*.log>
+                    Srednie z ostatnich 30 dob okna (domyslnie d91-120). PL-0 linie i klucze, PL-1 miast bez plotna <= 60 z 97, PL-2 plotno do wojska >= 50 szt./d,
+                    PL-3 plotno wywiezione kontraktami 174 i wozami kupcow >= 30 szt./d, PL-4 regulator lnu >= 1.2, PL-5 potkniecia 0; PL-6..PL-10 INFO (tkane na wywoz,
+                    mieszczanie, oferta obcieta progiem, plotno zrobione i na polkach, warsztaty zbrojne). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -18865,6 +18870,120 @@ LUP_TRACK = re.compile(r" \| (\S+) d\+(\d+) (\S+)( \(bez zdobycia\))?: kasa (\d+
                        r"jency kupione (\d+)")
 
 
+def plotno_main(logp, start_arg, until=120):
+    """Plotno 14.10 (docs/pytania-2026-10-14/RAPORT-plotno.md, poprawki 1 i 2; Armoury/src/TownFolk.Luxury.cs ClothRoom, TownCrafts.cs, MaterialOrders.cs
+    ShelfReserve / ExportNet; klucze FolkClothAboveReserve, WeaverExportPrice). Okno: ostatnie 30 dob kampanii do until (--do-doby). Log bez paczki
+    (brak dopiskow "plotno i skora ponad zapas polki" / "plotno na wywoz" albo klucze wylaczone): INFO, nigdy wyjatek."""
+    lines = read(logp)
+    rep = Report()
+    start = start_arg
+    if start is None:
+        for x in lines:
+            if x.startswith("Pomiary 169c: okna"):
+                start = num(r"start kampanii dzien (\d+)", x)
+                if start is not None:
+                    break
+    zb = by_day(lines, "Zbytki ludu (P3-P5): dzien")
+    cr = by_day(lines, "Rzemioslo miasta (148): dzien")
+    ce = by_day(lines, "Ceny surowcow: dzien")
+    mo = by_day(lines, "Kontrakty surowca (174): dzien")
+    rg = by_day(lines, "Regulator wsi (221): dzien")
+    tw = {}
+    for x in lines:
+        if x.startswith("Towary: dzien") and " - linen (" in x:
+            k = num(r"dzien (\d+)", x)
+            if k is not None:
+                tw[k] = x
+    if start is None:
+        alld = sorted(set(zb) | set(cr) | set(tw))
+        start = alld[0] if alld else 0
+    lo = max(2, until - 29)
+
+    def inwin(d):
+        return lo <= run_day(d, start) <= until
+
+    def avg(d, pat, cast=float):
+        v = [num(pat, d[k], cast) for k in sorted(d) if inwin(k)]
+        v = [a for a in v if a is not None]
+        return (sum(v) / len(v), len(v)) if v else (None, 0)
+
+    zon = [k for k in zb if inwin(k) and "ponad zapas polki (FolkClothAboveReserve) tak:" in zb[k]]
+    con = [k for k in cr if inwin(k) and "plotno na wywoz (WeaverExportPrice) tak:" in cr[k]]
+    pkg = bool(zon) and bool(con)
+    tail = "" if pkg else " - log bez paczki: INFO"
+    print(f"plik: {logp} | start kampanii {start} | okno srednich: doby kampanii {lo}-{until} | dob z dopiskiem zbytkow (klucz tak) {len(zon)}, rzemiosla (klucz tak) {len(con)}")
+
+    def gate(ok):
+        return ok if pkg else None
+
+    def fx_(x, k=1):
+        return "-" if x is None else f"{x:.{k}f}"
+
+    nz = len([k for k in zb if inwin(k) and "ponad zapas polki (FolkClothAboveReserve)" in zb[k]])
+    nc = len([k for k in cr if inwin(k) and "plotno na wywoz (WeaverExportPrice)" in cr[k]])
+    rep.add("PL-0: linie i klucze", f"zbytki: dob z dopiskiem {nz} (klucz tak {len(zon)}), rzemioslo: {nc} (klucz tak {len(con)})",
+            "oba dopiski codziennie, klucze tak" + tail, (len(zon) > 0 and len(con) > 0) if (nz or nc) else None)
+    v, n = avg(ce, r"plotno \(wartosc \d+ d\): indeks min/mediana/max [\d.]+/[\d.]+/[\d.]+, bez towaru (\d+) miast")
+    rep.add("PL-1: miast bez plotna (Ceny surowcow, srednia)", f"{v:.1f} ({n} dob)" if v is not None else "brak linii",
+            "<= 60 z 97 (rok 1 bez paczki 79.7)" + tail, gate(v <= 60) if v is not None else None)
+    v, n = avg(tw, r"odziez wojska \(150\) (\d+)")
+    rep.add("PL-2: plotno do wojska (Towary linen, srednia)", f"{v:.1f} szt./d ({n} dob)" if v is not None else "brak linii",
+            ">= 50 szt./d (rok 1 bez paczki 16, potrzeba 70-90)" + tail, gate(v >= 50) if v is not None else None)
+    ex = []
+    for k in sorted(mo):
+        if not inwin(k):
+            continue
+        t = 0
+        m1 = re.search(r"Kontrakty surowca \(174\): dzien \d+ - zawarto \d+ \[([^\]]*)\]", mo[k])
+        m2 = re.search(r"wozem kupcow \(P3/Z1\): CZYNNE - zawarto \d+ \[([^\]]*)\]", mo[k])
+        for m in (m1, m2):
+            if m:
+                t += num(r"plotno (\d+)", m.group(1)) or 0
+        ex.append(t)
+    v = sum(ex) / len(ex) if ex else None
+    rep.add("PL-3: plotno wywiezione (kontrakty 174 + wozy kupcow P3/Z1, srednia)", f"{v:.1f} szt./d ({len(ex)} dob)" if v is not None else "brak linii",
+            ">= 30 szt./d (bez paczki 0)" + tail, gate(v >= 30) if v is not None else None)
+    rk = [k for k in sorted(rg) if inwin(k)]
+    fx = num(r"flax: x([\d.]+)", rg[rk[-1]], float) if rk else None
+    rep.add("PL-4: regulator lnu (ostatnia doba okna)", f"x{fx:.2f}" if fx is not None else "brak linii", ">= 1.20 (len nie ciety po zmianie kupujacego)" + tail,
+            gate(fx >= 1.2) if fx is not None else None)
+    st_ = 0
+    seen = False
+    for d, pat in ((zb, r"potkniecia (\d+)\."), (cr, r"potkniecia (\d+) \(od startu"), (mo, r"potkniecia (\d+) \(od wczytania")):
+        for k in d:
+            if inwin(k):
+                q = num(pat, d[k])
+                if q is not None:
+                    st_ += q
+                    seen = True
+    rep.add("PL-5: potkniecia (zbytki, rzemioslo, kontrakty)", f"{st_}" if seen else "brak linii", "0" + tail, gate(st_ == 0) if seen else None)
+    v, n = avg(cr, r"tkane tylko dzieki cenie wywozu (\d+) szt\.")
+    v2, _ = avg(cr, r"tkane tylko dzieki cenie wywozu \d+ szt\. w (\d+) miastach")
+    v3, _ = avg(cr, r"bez celu w zasiegu (\d+)")
+    v4, _ = avg(cr, r"polka plotna juz przy progu (\d+)")
+    rep.add("PL-6: plotno tkane na wywoz (srednia)", f"{v:.1f} szt./d w {fx_(v2)} miastach; miast z lnem bez celu {fx_(v3)}, polka przy progu {fx_(v4)}" if v is not None else "brak dopisku",
+            "INFO", None)
+    v, n = avg(tw, r"mieszczanie (\d+)")
+    v2, _ = avg(zb, r"obcieta progiem polki (-?\d+) zl")
+    v3, _ = avg(zb, r"oferta miast na plotno i skore po progu (-?\d+) zl")
+    v4, _ = avg(zb, r"prog srednio (\d+) szt\.")
+    v5, _ = avg(zb, r"udzial grupy dawniej na plotno i skore, teraz w kiesach (-?\d+) zl")
+    rep.add("PL-7: mieszczanie (Towary linen) i oferta ludu na plotno i skore",
+            (f"mieszczanie {v:.1f} szt./d" if v is not None else "mieszczanie: brak linii")
+            + (f"; udzial dawniej na plotno i skore w kiesach {fx_(v5, 0)} zl/d, oferta po progu {fx_(v3, 0)} zl/d, obcieta progiem {fx_(v2, 0)} zl/d, prog polki srednio {fx_(v4, 0)} szt." if v2 is not None else "; brak dopisku"),
+            "INFO (rok 1 bez paczki: mieszczanie 182 szt./d, oferta na plotno 81-114 tys. zl/d)", None)
+    v, n = avg(tw, r"\| produkcja (\d+)")
+    v2, _ = avg(tw, r"zapas (\d+)")
+    rep.add("PL-8: plotno zrobione i na polkach (Towary linen)", f"zrobione {v:.1f} szt./d, zapas {fx_(v2, 0)} szt." if v is not None else "brak linii",
+            "INFO (rok 1 bez paczki: 273 szt./d, zapas ok. 93-150)", None)
+    v, n = avg(tw, r"warsztaty zbrojne (\d+)")
+    rep.add("PL-9: warsztaty zbrojne (Towary linen)", f"{v:.1f} szt./d" if v is not None else "brak linii", "INFO (rok 1 bez paczki 38 szt./d)", None)
+    v, n = avg(tw, r"wsie \(zakupy w miescie, E5/B1\) (\d+)")
+    rep.add("PL-10: wsie w miescie (Towary linen)", f"{v:.1f} szt./d" if v is not None else "brak linii", "INFO (rok 1 bez paczki 36 szt./d)", None)
+    rep.show()
+    return 0
+
+
 def lup_main(logp, start_arg, until=364):
     """Lup miast (L0-L5). Wiersze LUP-1..LUP-19 wedlug tabeli progow rozdz. 6 projektu (numer progu projektu w nazwie). Okno: doby kampanii 1-until.
     Log bez paczki (brak linii "Lup miast") - wiersze INFO z liczbami tego, co juz jest (okno O10, lup gry, garnizony), nigdy wyjatek."""
@@ -19257,7 +19376,9 @@ def main(argv):
     if group == "w7" and logp:
         return w7_main(logp, start_arg, until_arg, csvp)   # W7: stawka wojenna pana - pobor z nadwyzki ludu i wsi wlasnych lenn na brak, ktorego W5 nie pokrylo
     if group == "lup" and logp:
-        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
+        return lup_main(logp, start_arg, until_arg if "--do-doby" in args else 364)
+    if group == "plotno" and logp:
+        return plotno_main(logp, start_arg, until_arg)   # plotno 14.10: zbytki ludu ponad zapas polki (FolkClothAboveReserve), tkacz na wywoz (WeaverExportPrice)   # lup miast L0-L5 (CitySack): progi rozdz. 6 projektu lupu miast
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:
