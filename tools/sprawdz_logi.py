@@ -588,6 +588,8 @@ Uzycie (Python 3, tylko odczyt):
                     T3-K1-9 INFO (warunek T3-K4). T3-K2 (AnimalsUnderValve - zwierzeta rzezne pod regulatorem wsi): T3-K2-0 wieprze, krowy, owce w linii
                     decyzji (klucz tak), T3-K2-1 skory surowe >= 530 szt./d, T3-K2-2 skora zrobiona >= 200 szt./d, T3-K2-3 straz: stos zwierzat <= 30 dni
                     zuzycia (mieso INFO), T3-K2-4 garbarze "brak surowca" <= 25 miast. Wiersz wiaze tylko przy kluczu "tak" w dopisku swojej pozycji, inaczej INFO.
+                    T3-N (bez klucza - mierza swiat; zamiast mylacych T2-K2-5 / PL-4, T2-K3-4 i polowy T2-K1-6): T3-N-1 len >= x1.00 po kazdej decyzji regulatora,
+                    T3-N-2 skory surowe zuzycie / produkcja >= 0.90, T3-N-3 narzedzia budowy / produkcja <= 25%.
 --grupa drobne2   : (14.10, galaz drobne2-gracz: A13 reszta, A14, B5) python -I tools/sprawdz_logi.py --grupa drobne2 [--do-doby N] [--crashscribe <session-*.log>]
                     [--baza-doby <log biegu bez paczki>] <Armoury-*.log>. D2-1 komunikat 'is yours' (gracz 6, INFO), D2-2 podpowiedz L5 z towarem L7 (gracz 9, INFO),
                     D2-4 wyjasnienie W7 gracza najwyzej raz na 30 dob (gracz 10), D2-5 doba po wczytaniu (G20): bledne wpisy 0 (D2-5b: zwrot doby po wczytaniu zdejmuje gotowke W5), D2-6 ustawienia kalibracji ludnosci
@@ -20787,7 +20789,8 @@ T3_PREF = ("Pomiary 169c: okna", "Odziez wojska (150): dzien", "Towary: dzien", 
 
 def towary3_main(logp, start_arg, until=120):
     """Towary 3 (docs/towary-2/ROZPOZNANIE-TOWARY-3.md rozdz. 3): T3-K1 markietani przywoza odziez (SutlerClothing; ArmyClothing.FromSutlers, dopisek linii
-    "Odziez wojska (150)"), T3-K2 zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve; HarvestValve.Eligible, dopisek linii decyzji "Regulator wsi (221)"). Okno: srednie z ostatnich 30 dob kampanii do until (--do-doby, domyslnie d91-120; "fin29" w progach = bieg
+    "Odziez wojska (150)"), T3-K2 zwierzeta rzezne pod regulatorem wsi (AnimalsUnderValve; HarvestValve.Eligible, dopisek linii decyzji "Regulator wsi (221)"),
+    T3-N trzy miary narzedzia zamiast mylacych (bez klucza). Okno: srednie z ostatnich 30 dob kampanii do until (--do-doby, domyslnie d91-120; "fin29" w progach = bieg
     Armoury-2026-10-14_05-22-14.log z towary-2 K1-K4, ta sama doba). Wiersz pozycji wiaze tylko przy kluczu "tak" w jej dopisku; log bez dopisku albo z kluczem
     wylaczonym - INFO z liczbami, nigdy wyjatek. Log czytany strumieniowo - w pamieci tylko linie z prefiksami T3_PREF."""
     lines = []
@@ -21002,6 +21005,42 @@ def towary3_main(logp, start_arg, until=120):
     v, n = avg(cr, r"skory -> skora \d+/(\d+)/\d+")
     rep.add("T3-K2-4: garbarze - koniec przerobu 'brak surowca' (Rzemioslo miasta 148, srednia)", f"{fx_(v)} miast ({n} dob)", "<= 25 miast (fin29 34.5)" + tail2,
             g2(v <= 25) if v is not None else None)
+
+    # ---- T3-N: trzy miary zamiast mylacych (rozpoznanie rozdz. 3; bez klucza - mierza swiat): len >= x1.00 zamiast T2-K2-5 / PL-4 (>= 1.20),
+    # skory surowe zuzyte zamiast T2-K3-4 (garbarze "bez zysku" - to podzial za malej ilosci skor surowych), budowy / produkcja narzedzi zamiast polowy
+    # "wsie >= 66.7" w T2-K1-6 (wsie kupuja tyle, ile kuznie zrobia)
+    fl = []
+    for k in dk:
+        mm = re.search(r"\bflax: x([\d.]+)(?: -> x([\d.]+))?, zuzycie/produkcja ([\d.]+)", rg[k])
+        if mm:
+            fl.append((run_day(k, start), float(mm.group(2) or mm.group(1)), mm.group(3)))
+    rep.add("T3-N-1: regulator lnu - mnoznik po kazdej decyzji do until (Regulator wsi 221)",
+            "; ".join(f"d{a} x{b:.2f} ({c})" for a, b, c in fl) if fl else "brak decyzji",
+            ">= x1.00 w kazdej decyzji (len nie ciety ponizej bazy; zamiast T2-K2-5 / PL-4 >= 1.20 - krok w gore wymaga zuzycia >= 98% produkcji; fin29 x1.00 przy 0.90/0.87/0.84)",
+            all(b >= 1.0 - 1e-6 for _, b, _ in fl) if fl else None)
+    hp, hu = [], []
+    for k in sorted(hid):
+        if not inwin(k):
+            continue
+        a = num(r"\| produkcja (\d+)", hid[k])
+        b = num(r"\| zuzycie (\d+)", hid[k])
+        if a is not None and b is not None:
+            hp.append(a)
+            hu.append(b)
+    r2 = (sum(hu) / float(sum(hp))) if hp and sum(hp) > 0 else None
+    rep.add("T3-N-2: skory surowe - zuzycie / produkcja (Towary hides, sumy okna)",
+            f"{fx_(r2, 2)} ({sum(hu) / len(hu):.0f} z {sum(hp) / len(hp):.0f} szt./d, {len(hp)} dob)" if r2 is not None else "brak linii",
+            ">= 0.90 (skory surowe przerabiane - zamiast T2-K3-4 garbarze 'bez zysku' <= 50: to podzial za malej ilosci skor surowych; fin29 0.94)",
+            (r2 >= 0.90) if r2 is not None else None)
+    tl = tw.get("tools", {})
+    tb, n = avg(tl, r"\| zuzycie \d+ \[[^\]]*?\bbudowy (\d+)")
+    tp, _ = avg(tl, r"\| produkcja (\d+)")
+    tv, _ = avg(tl, r"wsie \(zakupy w miescie, E5/B1\) (\d+)")
+    r3 = (tb / tp) if (tb is not None and tp) else None
+    rep.add("T3-N-3: narzedzia - budowy / produkcja (Towary tools, srednie)",
+            f"{fx_(None if r3 is None else 100 * r3)}% (budowy {fx_(tb)} z {fx_(tp)} szt./d; wsie {fx_(tv)}/d INFO; {n} dob)" if r3 is not None else "brak linii",
+            "<= 25% (budowy nie zjadaja narzedzi wsi - zamiast polowy 'wsie >= 66.7' w T2-K1-6, ktora mierzy prace kuzni; fin29 19%, N 14%)",
+            (r3 <= 0.25) if r3 is not None else None)
     rep.show()
     return 0
 
@@ -21740,7 +21779,7 @@ def main(argv):
     if group == "towary2" and logp:
         return towary2_main(logp, start_arg, until_arg)   # Towary 2 (K1-K4): drewno dla rzemiosla, plotno wsi ponad zapas, garbarz na wywoz, narzedzie
     if group == "towary3" and logp:
-        return towary3_main(logp, start_arg, until_arg)   # Towary 3: T3-K1 markietani przywoza odziez (SutlerClothing), T3-K2 zwierzeta pod regulatorem (AnimalsUnderValve)
+        return towary3_main(logp, start_arg, until_arg)   # Towary 3: T3-K1 markietani przywoza odziez (SutlerClothing), T3-K2 zwierzeta pod regulatorem (AnimalsUnderValve), T3-N miary
     if group == "n7" and logp:
         return n7_main(logp, start_arg, until_arg)   # N7: rozbici wracaja pod choragiew (StragglersRally) - podzial, ksiega, odbior, pula wyrzutkow
     if group == "k13a" and logp:
