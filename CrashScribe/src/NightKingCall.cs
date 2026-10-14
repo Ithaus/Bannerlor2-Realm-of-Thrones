@@ -853,7 +853,7 @@ namespace CrashScribe
                                 + host.MemberRoster.TotalHealthyCount + " zdrowych z " + host.MemberRoster.TotalManCount + " (cel " + target
                                 + ", band w polu " + bands.Count + ")" + limitNote + ".");
                 else
-                    Scribe.Line("Zew Nocnego Krola: wszystkie " + bands.Count + " bandy w walce albo oblezeniu - dzis bez przemarszu.");
+                    Scribe.Line("Zew Nocnego Krola: wszystkie " + bands.Count + " bandy w walce albo oblezeniu - dzis bez przemarszu." + HostNote(ww));   // recenzja B5: horda i limit takze w tej dobie
 
                 March(beh, ww, lead);   // Pochod: gotowa horda dostaje cel za Murem
             }

@@ -541,7 +541,7 @@ Uzycie (Python 3, tylko odczyt):
                     mieszczanie, oferta obcieta progiem, plotno zrobione i na polkach, warsztaty zbrojne). Log bez paczki: INFO, bez wyjatku.
 --grupa drobne2   : (14.10, galaz drobne2-gracz: A13 reszta, A14, B5) python -I tools/sprawdz_logi.py --grupa drobne2 [--do-doby N] [--crashscribe <session-*.log>]
                     [--baza-doby <log biegu bez paczki>] <Armoury-*.log>. D2-1 komunikat 'is yours' (gracz 6, INFO), D2-2 podpowiedz L5 z towarem L7 (gracz 9, INFO),
-                    D2-4 wyjasnienie W7 gracza najwyzej raz na 30 dob (gracz 10), D2-5 doba po wczytaniu (G20): bledne wpisy 0, D2-6 ustawienia kalibracji ludnosci
+                    D2-4 wyjasnienie W7 gracza najwyzej raz na 30 dob (gracz 10), D2-5 doba po wczytaniu (G20): bledne wpisy 0 (D2-5b: zwrot doby po wczytaniu zdejmuje gotowke W5), D2-6 ustawienia kalibracji ludnosci
                     z MCM (G21), D2-7 wsie lniane z tabeli GL5 16 z 16 w kampanii zaczetej z kluczem (G22), D2-8 skarbiec upadlego krolestwa: kontrola 0 i "skarbce
                     upadlych krolestw" 0 w dobach upadku z kluczem (G14), D2-9 miara W5-7 wobec biegu z tego samego okna dob (Z7), D2-10 Zew nie podnosi premii
                     ponad limit hordy (B5; log CrashScribe przez --crashscribe). Log bez paczki: INFO, bez wyjatku.
@@ -16550,6 +16550,24 @@ def drobne2_main(logp, start_arg, until=100000, csp=None, bdp=None):
                 "bledne 0; budowy 'odtworzone' przy tej samej dobie, gotowka W5/W7 'odtworzone' (zwrot 70% nastepnej doby bez oplaconego zoldu)", bad == 0)
     else:
         rep.add("D2-5: doba po wczytaniu ze srodka doby (G20)", "brak linii (nowa kampania, stary zapis albo log sprzed drobne2)", "INFO - test: zapis w srodku doby i wczytanie", None)
+    # D2-5b G20 (recenzja): dowod skutku - zwrot 70% doby po wczytaniu zdejmuje odtworzona gotowke W5 (bez odtworzenia "poza podstawa zwrotu" tej doby = 0)
+    w5cut = {}
+    for s in lines:
+        if s.startswith("Doplata wedlug potrzeby (W5): dzien"):
+            d, c = num(r"dzien (\d+)", s), num(r"poza podstawa zwrotu 70% \(dzis\) (\d+)", s)
+            if d is not None and c is not None:
+                w5cut[d] = c
+    chk = []
+    for s in dh:
+        m = re.search(r"gotowka W5 z doby (\d+) u \d+ rodow \((\d+) zl\)", s)
+        if "Mid Day Load Keeps Day tak" in s and m and int(m.group(2)) > 0 and "- odtworzone (zwrot" in s and int(m.group(1)) + 1 in w5cut:
+            chk.append((int(m.group(1)) + 1, int(m.group(2)), w5cut[int(m.group(1)) + 1]))
+    if chk:
+        rep.add("D2-5b: zwrot 70% doby po wczytaniu bez zoldu oplaconego W5 (G20)", f"wczytan z odtworzona gotowka W5 {len(chk)}; poza podstawa zwrotu nastepnej doby: "
+                + ", ".join(f"d{d} {c} zl (gotowka {g} zl)" for d, g, c in chk[:5]),
+                "> 0 po kazdym takim wczytaniu (bez odtworzenia 0 - korona zwracalaby oplacony zold drugi raz)", all(c > 0 for _, _, c in chk))
+    else:
+        rep.add("D2-5b: zwrot 70% doby po wczytaniu (G20)", "brak wczytania z odtworzona gotowka W5 i linii W5 nastepnej doby", "INFO - test: zapis w srodku doby wojny i wczytanie", None)
     # D2-6 G21
     cal = [s for s in lines if s.startswith("PopulationLaw: kalibracja ludnosci")]
     g21 = [num(r"ustawienia kalibracji \(G21\): ([^.|]+)", s, str) for s in cal]

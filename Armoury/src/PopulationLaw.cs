@@ -120,7 +120,9 @@ namespace Armoury
         private static void Calibrate()
         {
             if (_k.Count > 0) return;
-            string mcm = McmFirst();   // G21: klucze kalibracji z MCM, zanim McmSettings.Apply (OnSessionLaunched) nalozy reszte
+            string mcm;   // G21: klucze kalibracji z MCM, zanim McmSettings.Apply (OnSessionLaunched) nalozy reszte
+            // recenzja drobne2: bez biblioteki MCM blad ladowania typu McmSettings leci przy wywolaniu McmFirst (poza jego try) - kalibracja jak dotad
+            try { mcm = McmFirst(); } catch (Exception e) { mcm = "MCM niedostepne (" + e.GetType().Name + ") - z ustawien startowych"; }
             float scale = Math.Max(0f, Settings.Current.PopulationScale);
             // E4/3 (projekt 4.10, "Pogodzone"): pulap gestosci wsi - zaden punkt mapy nie znaczy wiecej ludzi niz najgesciej zaludniona kraina (Qarth 629
             // ludzi na hearth); kraina ponad pulapem (Wyspy Letnie: 3 wsie po 50 hearth = 4 500/hearth) traci nadwyzke tabeli "poza mape", udzial miast zostaje
