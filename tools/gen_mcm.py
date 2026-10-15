@@ -232,6 +232,13 @@ RANGES = {
     'SiegeLadderWallsFactor': (1.0, 4.0, "0.00"),
     'SiegeMachinesFront': (0.0, 1.0, "0.00"),
     'SiegeBreachFront': (0.0, 1.0, "0.00"),
+    # oblezenia 2 (SiegeWalls2): zakresy zgodne z przycieciem w kodzie (CastleDays 0..60, LossPct 0..20, Share 0..0.5, Men 0..200, LadderDays 0..364, Ratio 2..20)
+    'SiegeTrebuchetCastleDays': (0, 60, "0"),
+    'SiegeStarveLossPercent': (0.0, 20.0, "0.0"),
+    'SiegeSurrenderShare': (0.0, 0.5, "0.00"),
+    'SiegeSurrenderMen': (0, 200, "0"),
+    'SiegeLadderMinDays': (0, 364, "0"),
+    'SiegeLadderMinRatio': (2.0, 20.0, "0.0"),
     # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
     'PregnancyDays': (0, 364, "0"),
     # wyspy-wolni (decyzja Jeffa 14.10): udzialy przycinane w kodzie do 0..1 (ReaverLaw.Q / Qw), doby zaplaty 1..28 (ReaverLaw.PayDays), dziesiecina 0..1,

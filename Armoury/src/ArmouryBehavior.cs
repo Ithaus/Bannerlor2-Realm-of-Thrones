@@ -814,6 +814,8 @@ namespace Armoury
             CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, SiegeWalls.OnArmyDispersed);
             CampaignEvents.SiegeEngineBuiltEvent.AddNonSerializedListener(this, SiegeWalls.OnEngineBuilt);
             CampaignEvents.OnSiegeBombardmentWallHitEvent.AddNonSerializedListener(this, SiegeWalls.OnWallHit);
+            // oblezenia 2 (SiegeWalls2.cs): trebusze AI zniszczone przez obroncow (licznik linii "Oblezenia 2 (doba)")
+            CampaignEvents.OnSiegeEngineDestroyedEvent.AddNonSerializedListener(this, SiegeWalls2.OnEngineDestroyed);
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
             CampaignEvents.OnTroopGivenToSettlementEvent.AddNonSerializedListener(this, delegate (Hero g, Settlement st, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopGiven(g, st, r); } catch { } });
             CampaignEvents.OnTroopsDesertedEvent.AddNonSerializedListener(this, delegate (MobileParty mp, TaleWorlds.CampaignSystem.Roster.TroopRoster r) { try { HorseCensus.OnTroopsDeserted(mp, r); } catch { } });
@@ -1723,6 +1725,7 @@ namespace Armoury
             try { CitySack.Daily(); } catch (Exception e) { Log.Error("CitySack.Daily", e); } DayProfile.Lap("CitySack.Daily");   // lup miast (L0-L4): linia doby i osady 30 dob po nastepstwach oblezen
             try { SiegeRansom.Daily(); } catch (Exception e) { Log.Error("SiegeRansom.Daily", e); } DayProfile.Lap("SiegeRansom.Daily");   // okup zamiast szturmu: linia doby, porzadek pamieci, rozejmy
             try { SiegeWalls.Daily(); } catch (Exception e) { Log.Error("SiegeWalls.Daily", e); } DayProfile.Lap("SiegeWalls.Daily");   // mury oblezen OB0: linia doby, porzadek pamieci
+            try { SiegeWalls2.Daily(); } catch (Exception e) { Log.Error("SiegeWalls2.Daily", e); } DayProfile.Lap("SiegeWalls2.Daily");   // oblezenia 2: glod oblezenia (smierc, kapitulacja), linia "Oblezenia 2 (doba)"
             // N7 (decyzja Jeffa 13.10): rozbici pod choragiew - gotowosc, odbior przez druzyny rodu (limit i zold z budzetu wczoraj, jak W5), rozejscie po czasie czekania;
             // PRZED H3 i wyrzutkami: ci, ktorzy sie rozeszli, wchodza do linii "Przegrani (H3)" (domy) i "Pula wyrzutkow (E4/3)" (naplyw) tej samej doby
             try { StragglersRally.Daily(); } catch (Exception e) { Log.Error("StragglersRally.Daily", e); } DayProfile.Lap("StragglersRally.Daily");

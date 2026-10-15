@@ -649,6 +649,12 @@ Uzycie (Python 3, tylko odczyt):
                     (INFO wedlug przyczyny); S9: OD-8 krolestwa BK z buntu 0 i nowe panstwa <= 1 na 364 doby (W-13; werdykt tylko z --crashscribe i linia S9),
                     OD-9 linia "Mends: BK rebel kingdoms off" z latkami secesji BK "wpieta TAK", secesje przejete (rody niezalezne z lennem, potkniecia 0)
                     i rody buntownikow bez krolestwa BK (recenzja 14.10: panstwa fin30 to secesje grup radykalnych BK, nie bunty). Log bez paczki: INFO, bez wyjatku.
+--grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
+                    (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
+                    O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
+                    GL glod: O2-2a bilans uciety (INFO), O2-2b zmarli = p%, O2-2c kapitulacja tylko ponizej progu, O2-2d zdobycie po kapitulacji, O2-2e RB (INFO);
+                    O2-3 DR drabiny tylko po progu dob i przewagi; O2-4 CEL (bieg dwuletni): miasta 4-12, stolice <= 1, zamki >= 0.75 x baza, najdluzsze
+                    oblezenie <= 150 dob; O2-5 potkniecia i ERROR 0. Log bez paczki: INFO, bez wyjatku.
 --grupa oblezenia : (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia) python -I tools/sprawdz_logi.py --grupa oblezenia <Armoury-*.log>
                     (log czytany strumieniowo). OB-0 linia startowa i OB0 kazdej doby, OB-1a decyzja AI przy s OB1 <= 1 = 0, OB-1d decyzja AI bez taranu
                     i wiezy i bez wyrwy = 0 (brama), OB-1b weta (INFO), OB-1c AI bije
@@ -26415,6 +26421,211 @@ def audytb_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ oblezenia2 (15.10, Jeff "napraw oblezenia": TB trebusze AI, GL glod oblezenia, DR drabiny AI; SiegeWalls2.cs)
+O2_TS = re.compile(r"^\[\d\d:\d\d:\d\d\] ")
+O2_START = re.compile(r"^Oblezenia 2 \(start\): latki - plan machin AI (\S+).*?, druga ekipa budowy \(SiegeEvent\.ConstructionTick\) (\S+).*?, bilans jedzenia w oblezeniu (\S+)"
+                      r".*?, straty RB przy zapasie 0 (.+?) \| modele:.*?\| klucze: trebusze (tak|nie) \(zamek po (\d+) dob\), glod (tak|nie) \(([\d.]+)%/d, kapitulacja < (\d+)% / < (\d+)\),"
+                      r" drabiny (tak|nie) \(>= (\d+) dob, >= ([\d.]+) : 1\)")
+O2_DAY = re.compile(r"^Oblezenia 2 \(doba\): dzien (\d+) \|")
+O2_D = {
+    "tb": re.compile(r"\| TB: obozy z trebuszami (\d+) \(miasta (\d+), stolice (\d+), zamki (\d+)\), nowe dzis: miasta (\d+), stolice (\d+), zamki (\d+), zmiany strategii (\d+),"
+                     r" zdjete \(gracz, skrypt, Inni\) (\d+); druga ekipa: zaczete trebusze (\d+), taran / wieza (\d+), ukonczone (\d+); trebusze AI zbudowane (\d+), zniszczone (\d+)"),
+    "gl": re.compile(r"\| GL: oblezone twierdze (\d+), z zapasem 0: (\d+) \(najdluzej ([\d.]+) dob glodu - (\S+)\), bilans dodatni uciety: (\d+) twierdz \(\+([\d.]+)/d\),"
+                     r" zmarli z glodu (\d+), kapitulacje (\d+) \(jencow (\d+), bez niewoli (\d+)\), wstrzymane: (.*?), straty RB pominiete (\d+)"),
+    "rot": re.compile(r", ziemie wokol ROT odjete (\d+)"),   # recenzja: dopisek ROT "ziemie wokol" (town_EW4 / ROT_castle61) odjety w oblezeniu
+    "dr": re.compile(r"\| DR: przepuszczone (\d+) \(brama (\d+), mury (\d+), losowanie (\d+)\)"),
+    "capt": re.compile(r"\| zdobyte dzis: miasta (\d+), stolice (\d+), zamki (\d+) \(po kapitulacji (\d+)\)"),
+    "sieges": re.compile(r"\| oblezenia trwajace (\d+), najdluzsze ([\d.]+) dob \((\S+)\), ponad 150 dob: (.*?) \| w pamieci"),
+    "stum": re.compile(r"\| potkniecia (\d+) \(od wczytania (\d+)\)"),
+}
+O2_TB = re.compile(r"^Trebusze AI \(TB\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|stolica|zamek)\) \| wodz .*? ludzi (\d+) \| powod: (.*?) \| strategia (\S+)")
+O2_TB_CASTLE = re.compile(r"^([\d.]+) dob po gotowym obozie bez .*? \(prog (\d+)\)$")
+O2_GL = re.compile(r"^Glod oblezenia \(GL\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|stolica|zamek)\) \| .*?\| glod od ([\d.]+) dob \| zaloga i milicja: bylo (\d+) \(zdrowi (\d+),"
+                   r" ranni (\d+)\), zmarli dzis (\d+) \(([\d.]+)%\), zostalo (\d+) \| na starcie oblezenia (\d+), prog kapitulacji (\d+) \| wynik: (.*)\.$")
+O2_DR = re.compile(r"^Drabiny AI \(DR\): dzien (\d+) \| osada (\S+) \(.*?\) \| .*?\| oblezenie ([\d.]+) dob \(prog (\d+)\) \| sila oblegajacy (\d+) / obroncy (\d+) = ([\d.]+)"
+                   r" \(prog ([\d.]+)\) \|.*?\| OB1 wstrzymalby: (brama|mury|losowanie)")
+O2_CAPT = re.compile(r"^Oblezenia 2 \(zdobycie\): dzien (\d+) \| osada (\S+) \(.*?, (miasto|stolica|zamek)\) \| .*?\| gracz (tak|nie) \| oblezenie ([\d.]+|-) dob .*?\| po kapitulacji z glodu (tak|nie)\.")
+O2_OB4 = re.compile(r"^Mury oblezen \(OB4\): dzien (\d+) \| osada (\S+) \(.*?, (zamek|miasto|stolica)\) .*?\| gracz (tak|nie) \| tempo budowy obozu i machin oblegajacych x[\d.]+( \(wykluczone)?")
+O2_O0DR = re.compile(r"^Okup oblezenia \(O0\): dzien (\d+) \| osada (\S+) .*?\| OB1 drabiny \(DR\):")
+
+
+def oblezenia2_main(logp):
+    """oblezenia2 (15.10, Jeff "napraw oblezenia" - TB trebusze AI, GL glod oblezenia, DR drabiny AI; SiegeWalls2.cs, galaz w-toku/oblezenia-2). Log Armoury strumieniowo.
+    O2-0 linia startowa: latki planu, drugiej ekipy i bilansu jedzenia wpiete (przy wlaczonych kluczach), RB wpieta albo bez RB; linia doby co dobe.
+    O2-1a obozy AI pod miastem / stolica (linie OB4 bez gracza i wykluczen) ze znacznikiem TB >= 90% (konstrukcyjne: znacznik przy pierwszej decyzji planu);
+    O2-1b zamek dostaje TB dopiero po progu dob od gotowego obozu (konstrukcyjne); O2-1c druga ekipa zaczyna trebusze (> 0 przy obozach TB, bieg >= 30 dob);
+    O2-1d trebusze AI zbudowane > 0 i trafienia w mury > 0 (OB0; bieg >= 120 dob przy >= 3 obozach TB); O2-1e trebusze zniszczone / zbudowane (INFO).
+    O2-2a bilans dodatni uciety (INFO); O2-2b zmarli z glodu = p% zalogi i milicji (+-3 na zaokraglenia trzech rosterow; konstrukcyjne); O2-2c kapitulacja i
+    "wstrzymana" tylko ponizej progu (konstrukcyjne); O2-2d po kapitulacji zdobycie tej twierdzy w 3 doby (>= 50% przy >= 2 kapitulacjach, inaczej INFO);
+    O2-2e straty RB pominiete przy glodzie (INFO). O2-3 DR tylko przy oblezeniu >= prog i sile >= prog (konstrukcyjne). O2-4 CEL Jeffa (bieg dwuletni >= 600 dob,
+    krocej INFO): zdobyte miasta (ze stolicami) 4-12, stolice <= 1, zamki >= 0.75 x baza (16 na 767 dob biegu b1cb26a8, liczone na dlugosc biegu),
+    najdluzsze oblezenie <= 150 dob (linia doby). O2-5 potkniecia SiegeWalls2 0 i ERROR 0. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    starts, days, tbl, gll, drl, capl, ob4, o0dr = [], {}, [], [], [], [], [], 0
+    errs = 0
+    keys = ("Oblezenia 2 (", "Trebusze AI (TB)", "Glod oblezenia (GL)", "Drabiny AI (DR)", "Mury oblezen (OB4)", "Mury oblezen (OB0)", "OB1 drabiny (DR)", "ERROR in SiegeWalls2.")
+    ob0_eng, ob0_hits = 0, 0
+    with open(logp, encoding="utf-8", errors="replace") as f:
+        for ln in f:
+            if not any(k in ln for k in keys):
+                continue
+            s = O2_TS.sub("", ln.rstrip("\r\n"))
+            if s.startswith("ERROR in SiegeWalls2."):
+                errs += 1
+                continue
+            m = O2_START.match(s)
+            if m:
+                starts.append(m.groups())
+                continue
+            m = O2_DAY.match(s)
+            if m:
+                days[int(m.group(1))] = s
+                continue
+            m = O2_TB.match(s)
+            if m:
+                tbl.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(3), men=int(m.group(4)), why=m.group(5), strat=m.group(6)))
+                continue
+            m = O2_GL.match(s)
+            if m:
+                gll.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(3), hunger=float(m.group(4)), n0=int(m.group(5)), dead=int(m.group(8)), p=float(m.group(9)),
+                                left=int(m.group(10)), start=int(m.group(11)), thr=int(m.group(12)), res=m.group(13)))
+                continue
+            m = O2_DR.match(s)
+            if m:
+                drl.append(dict(d=int(m.group(1)), st=m.group(2), age=float(m.group(3)), dmin=int(m.group(4)), att=int(m.group(5)), dfn=int(m.group(6)), r=float(m.group(7)),
+                                rmin=float(m.group(8)), would=m.group(9)))
+                continue
+            m = O2_CAPT.match(s)
+            if m:
+                capl.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(3), player=m.group(4) == "tak", age=None if m.group(5) == "-" else float(m.group(5)), surr=m.group(6) == "tak"))
+                continue
+            m = O2_OB4.match(s)
+            if m:
+                ob4.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(3), player=m.group(4) == "tak", excl=bool(m.group(5))))
+                continue
+            if s.startswith("Okup oblezenia (O0)") and O2_O0DR.match(s):
+                o0dr += 1
+                continue
+            if s.startswith("Mury oblezen (OB0)"):
+                me = OB0_NUMS["eng"].search(s)
+                if me:
+                    ob0_eng += int(me.group(1))
+                mh = OB0_NUMS["hits"].search(s)
+                if mh:
+                    ob0_hits += int(mh.group(1))
+    if not starts and not days:
+        rep.add("O2-0: linie oblezen 2 w logu", "brak linii 'Oblezenia 2 (start)' i '(doba)'", "log z paczka oblezenia-2 (SiegeWalls2)", None)
+        rep.show()
+        return 0
+    st0 = starts[-1] if starts else None
+    tb_on = st0 is not None and st0[4] == "tak"
+    gl_on = st0 is not None and st0[6] == "tak"
+    dr_on = st0 is not None and st0[10] == "tak"
+    if st0:
+        bad = []
+        if tb_on and st0[0] != "wpieta":
+            bad.append("plan " + st0[0])
+        if tb_on and st0[1] != "wpieta":
+            bad.append("druga ekipa " + st0[1])
+        if gl_on and st0[2] != "wpieta":
+            bad.append("bilans " + st0[2])
+        if gl_on and not (st0[3].startswith("wpieta") or st0[3].startswith("bez RealisticBannerlord")):
+            bad.append("RB " + st0[3])
+        rep.add("O2-0: linia startowa - latki wpiete (wlaczone klucze)", f"linii {len(starts)}; plan {st0[0]}, ekipa {st0[1]}, bilans {st0[2]}, RB {st0[3]}; klucze: trebusze {st0[4]}"
+                f" (zamek {st0[5]} dob), glod {st0[6]} ({st0[7]}%/d, < {st0[8]}% / < {st0[9]}), drabiny {st0[10]} (>= {st0[11]} dob, >= {st0[12]} : 1)", "wpieta przy kazdym wlaczonym kluczu", not bad)
+    else:
+        rep.add("O2-0: linia startowa", "brak (log od srodka sesji?)", "jest", None)
+    dl = sorted(days)
+    span = (dl[-1] - dl[0] + 1) if dl else 0
+    rep.add("O2-0b: linia doby co dobe", f"{len(dl)} linii na {span} dob", ">= 90% dob", (len(dl) >= 0.9 * span) if span >= 5 else None)
+
+    def tot(key, g):
+        n = 0
+        for d in dl:
+            mm = O2_D[key].search(days[d])
+            if mm:
+                n += int(mm.group(g))
+        return n
+
+    # O2-1 TB
+    ai_town = {(x["st"]) for x in ob4 if x["cls"] in ("miasto", "stolica") and not x["player"] and not x["excl"]}
+    tb_town = {x["st"] for x in tbl if x["cls"] in ("miasto", "stolica")}
+    miss = sorted(ai_town - tb_town)
+    cov = (len(ai_town & tb_town) / len(ai_town)) if ai_town else None
+    rep.add("O2-1a: TB - obozy AI pod miastem / stolica ze znacznikiem (osady z linii OB4)", f"{len(ai_town & tb_town)} z {len(ai_town)}" + (f"; bez TB np. {', '.join(miss[:5])}" if miss else ""),
+            ">= 90% (konstrukcyjne)", (cov >= 0.9) if (tb_on and cov is not None and len(ai_town) >= 2) else None)
+    badc = []
+    for x in tbl:
+        if x["cls"] != "zamek":
+            continue
+        mm = O2_TB_CASTLE.match(x["why"])
+        if not mm or float(mm.group(1)) + 1e-6 < float(mm.group(2)):
+            badc.append(f"{x['st']} dzien {x['d']} ({x['why']})")
+    n_castle = sum(1 for x in tbl if x["cls"] == "zamek")
+    rep.add("O2-1b: TB zamek dopiero po progu dob od gotowego obozu", f"zamkow z TB {n_castle}, zle {len(badc)}" + (f"; np. {badc[0]}" if badc else ""), "0 zlych (konstrukcyjne)",
+            not badc if n_castle else None)
+    par_t, par_m, par_done = tot("tb", 10), tot("tb", 11), tot("tb", 12)
+    marked = len(tbl)
+    rep.add("O2-1c: TB druga ekipa - trebusze zaczete rownolegle z taranem / wieza", f"zaczete trebusze {par_t}, taran / wieza {par_m}, ukonczone rownolegle {par_done}; obozow TB {marked};"
+            f" zmiany strategii {tot('tb', 8)}", "> 0 trebuszy zaczetych (bieg >= 30 dob, obozy TB)", (par_t > 0) if (tb_on and span >= 30 and marked >= 1) else None)
+    built, lost = tot("tb", 13), tot("tb", 14)
+    rep.add("O2-1d: trebusze AI zbudowane i trafienia w mury (linia doby i OB0)", f"trebusze zbudowane {built} (OB0 na mury {ob0_eng}), trafienia w mury {ob0_hits}",
+            "> 0 i > 0 (bieg >= 120 dob, >= 3 obozy TB)", (built > 0 and ob0_hits > 0) if (tb_on and span >= 120 and marked >= 3) else None)
+    rep.add("O2-1e: trebusze AI zniszczone przez obroncow (INFO)", f"zniszczone {lost} z {built} zbudowanych" + (f" ({lost / built:.0%})" if built else ""), "INFO", None)
+    # O2-2 GL
+    clamp_n = tot("gl", 5)
+    rep.add("O2-2a: GL - bilans dodatni w oblezeniu uciety (INFO)", f"{clamp_n} twierdzo-dob; oblezonych twierdzo-dob {tot('gl', 1)}, z zapasem 0: {tot('gl', 2)};"
+            f" ziemie wokol ROT odjete {tot('rot', 1)} twierdzo-dob", "INFO", None)
+    badd = [x for x in gll if not (x["p"] / 100.0 * x["n0"] - 3.0 <= x["dead"] <= x["p"] / 100.0 * x["n0"] + 3.0)]
+    rep.add("O2-2b: GL - zmarli z glodu = p% zalogi i milicji (+-3)", f"linii glodu {len(gll)}, zmarlych {sum(x['dead'] for x in gll)}, poza widelkami {len(badd)}"
+            + (f"; np. {badd[0]['st']} dzien {badd[0]['d']}: bylo {badd[0]['n0']}, zmarli {badd[0]['dead']}" if badd else ""), "0 poza widelkami (konstrukcyjne)", not badd if gll else None)
+    bads = [x for x in gll if (x["res"].startswith("KAPITULACJA") or x["res"].startswith("kapitulacja wstrzymana")) and not x["left"] < x["thr"]]
+    surr = [x for x in gll if x["res"].startswith("KAPITULACJA")]
+    held = [x for x in gll if x["res"].startswith("kapitulacja wstrzymana")]
+    whys = {}
+    for x in held:
+        k = x["res"][len("kapitulacja wstrzymana ("):-1]
+        whys[k] = whys.get(k, 0) + 1
+    rep.add("O2-2c: GL - kapitulacja tylko ponizej progu (garstka)", f"kapitulacje {len(surr)}, wstrzymane {len(held)} ({whys}), ponad progiem {len(bads)}", "0 ponad progiem (konstrukcyjne)",
+            not bads if (surr or held) else None)
+    taken = 0
+    for x in surr:
+        if any(c["st"] == x["st"] and x["d"] <= c["d"] <= x["d"] + 3 for c in capl):
+            taken += 1
+    rep.add("O2-2d: GL - po kapitulacji zdobycie tej twierdzy w 3 doby (pusta warownia)", f"{taken} z {len(surr)}", ">= 50% (przy >= 2 kapitulacjach)",
+            (taken >= 0.5 * len(surr)) if len(surr) >= 2 else None)
+    rep.add("O2-2e: GL - straty RB pominiete przy glodzie (INFO)", f"{tot('gl', 12)} (twierdzo-dob z zapasem 0: {tot('gl', 2)}), najdluzszy glod {max([x['hunger'] for x in gll] or [0]):.1f} dob", "INFO", None)
+    # O2-3 DR
+    badr = [x for x in drl if x["age"] + 1e-6 < x["dmin"] or x["r"] + 1e-6 < x["rmin"]]
+    rep.add("O2-3: DR - drabiny tylko po progu dob i przy przewadze >= prog", f"linii DR {len(drl)} (brama {sum(1 for x in drl if x['would'] == 'brama')}, mury {sum(1 for x in drl if x['would'] == 'mury')},"
+            f" losowanie {sum(1 for x in drl if x['would'] == 'losowanie')}), O0 z 'OB1 drabiny (DR)' {o0dr}, przepuszczone (doba) {tot('dr', 1)}, zle {len(badr)}"
+            + (f"; np. {badr[0]['st']} dzien {badr[0]['d']}" if badr else ""), "0 zlych (konstrukcyjne)", not badr if drl else None)
+    # O2-4 CEL
+    ct = sum(1 for c in capl if c["cls"] in ("miasto", "stolica"))
+    cc = sum(1 for c in capl if c["cls"] == "stolica")
+    cz = sum(1 for c in capl if c["cls"] == "zamek")
+    cs = sum(1 for c in capl if c["surr"] and c["cls"] in ("miasto", "stolica"))
+    csz = sum(1 for c in capl if c["surr"] and c["cls"] == "zamek")
+    two = span >= 600
+    rep.add("O2-4a: CEL - zdobyte miasta (ze stolicami)", f"{ct} (stolice {cc}; po kapitulacji z glodu {cs}) na {span} dob", "4-12 na bieg dwuletni", (4 <= ct <= 12) if two else None)
+    rep.add("O2-4b: CEL - zdobyte stolice", f"{cc}", "<= 1 na bieg dwuletni", (cc <= 1) if two else None)
+    base = 16.0 * span / 767.0
+    rep.add("O2-4c: CEL - zdobyte zamki (wobec biegu b1cb26a8)", f"{cz} (po kapitulacji z glodu {csz}; baza na {span} dob {base:.1f})", ">= 0.75 x baza (bieg dwuletni)", (cz >= 0.75 * base) if two else None)
+    longest, lst = 0.0, "-"
+    for d in dl:
+        mm = O2_D["sieges"].search(days[d])
+        if mm and float(mm.group(2)) > longest:
+            longest, lst = float(mm.group(2)), mm.group(3)
+    ages = sorted(c["age"] for c in capl if c["age"] is not None)
+    rep.add("O2-4d: CEL - najdluzsze oblezenie (linia doby)", f"{longest:.1f} dob ({lst}); oblezenie przy zdobyciu: mediana {ages[len(ages) // 2]:.1f} dob" if ages else f"{longest:.1f} dob ({lst})",
+            "<= 150 dob (bieg >= 300 dob)", (longest <= 150.0) if span >= 300 else None)
+    # O2-5
+    stum = tot("stum", 1)
+    rep.add("O2-5: potkniecia SiegeWalls2 / ERROR", f"potkniecia {stum}, ERROR in SiegeWalls2. {errs}", "0 / 0", stum == 0 and errs == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -26503,6 +26714,8 @@ def main(argv):
         return szturm_main(logp)   # 14.10 bitwa szturmu SZ1-SZ4 (SiegeWalls): mury dla malej zalogi, drabiny > taran i wieza > wyrwa, morale obu stron, front
     if group == "odsiecz" and logp:
         return odsiecz_main(logp, csp, until_arg if "--do-doby" in args else 100000)   # 14.10 odsiecz-bunty: OB5 odsiecz z pierwszenstwem, S9 BK bez krolestw z buntu, S11 rody z lennem
+    if group == "oblezenia2" and logp:
+        return oblezenia2_main(logp)   # 15.10 oblezenia 2 (SiegeWalls2): TB trebusze AI (plan, druga ekipa), GL glod oblezenia (bilans, smierc, kapitulacja), DR drabiny AI, CEL Jeffa
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "unikaty" and (csp or logp):

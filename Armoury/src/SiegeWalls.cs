@@ -76,7 +76,10 @@ namespace Armoury
     ///   Przyklady (symulacja rund gry, rowne wojska, prog OB2 w pasmie, po recenzji - z cwiercia obroncow): zamek 30 vs 600 - drabiny: odparte 34% przy
     ///   morale obroncow 50, 66% przy 65, 93% przy 91, 0% przy niskim; taran i wieza: zdobyty, straty 7%; wyrwa 1%; miasto 300 vs 3000 - drabiny odparte
     ///   100% (niskie morale 39%), taran i wieza zdobyte przy stratach 13%, wyrwa 2%.
-    /// Wyjatek per obiekt = licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7). Kazdy klucz wylaczony = zachowanie 7bc5dd0b (SZ: b47fecc3).
+    /// OBLEZENIA 2 (Jeff 15.10, SiegeWalls2.cs): trebusze AI (TB - plan i druga ekipa budowy), glod oblezenia (GL - bilans, smierc, kapitulacja), drabiny AI
+    ///   przy miazdzacej przewadze (DR - tu w Veto: po SiegeLadderMinDays i przy sile >= SiegeLadderMinRatio x obroncy OB1 przepuszcza brame, mury i losowanie;
+    ///   w linii O0 pole "OB1 drabiny (DR)").
+    /// Wyjatek per obiekt = licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7). Kazdy klucz wylaczony = zachowanie 7bc5dd0b (SZ: b47fecc3; oblezenia 2: b1cb26a8).
     /// </summary>
     internal static class SiegeWalls
     {
@@ -353,6 +356,7 @@ namespace Armoury
         private static int _dTrue, _dPass, _dWalls, _dRoll, _dPause, _dExcl, _dBreach, _dEmpty, _dGate;
         private static readonly HashSet<SiegeEvent> _vetoLogged = new HashSet<SiegeEvent>();
         private static BesiegerCamp _lastCamp; private static Meas _last; private static float _lastAt = -1f;
+        private static BesiegerCamp _lastDrCamp; private static float _lastDrAt = -1f;   // DR (SiegeWalls2): decyzja przepuszczona przy miazdzacej przewadze - pole OB1 linii O0
 
         /// <summary>true = szturm AI wstrzymany (przerwa po odparciu albo brama - bez taranu i wiezy i bez wyrwy - albo mury trzymaja albo losowanie wzoru gry
         /// z naszym w). Wolane tylko przy "true" gry.
@@ -370,7 +374,7 @@ namespace Armoury
                 if (Scripted(lp) || Und(lp, st)) { _dExcl++; return false; }
                 _dTrue++;
                 var pz = PauseOf(ev, false);
-                if (pz != null && Now < pz.Until)
+                if (pz != null && Now < pz.Until && !SiegeWalls2.Surrendered(st))   // GL: twierdza po kapitulacji z glodu (pusta) - bez przerwy po odparciu
                 {
                     _dPause++;
                     if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, null, "przerwa po odparciu do dnia " + F(pz.Until, "0.0") + " (odparc w tym oblezeniu " + pz.Repels + ")", null);
@@ -380,8 +384,11 @@ namespace Armoury
                 var m = Measure(camp);
                 _lastCamp = camp; _last = m; _lastAt = Now;
                 if (m.Empty) { _dEmpty++; _dPass++; return false; }
+                // DR (oblezenia 2, SiegeWalls2): po dlugim oblezeniu miazdzaca przewaga sil przepuszcza decyzje gry, ktora OB1 by wstrzymal (drabiny drogo - SZ)
+                bool dr = SiegeWalls2.LadderOk(camp, m);
                 if (!m.Ready)
                 {
+                    if (dr) { SiegeWalls2.LadderPass(camp, m, "brama"); _lastDrCamp = camp; _lastDrAt = Now; _dPass++; return false; }
                     // brama: AI nie szturmuje samymi drabinami - najpierw taran i wieza albo wyrwa w murach (strategie gry buduja taran i wieze jako pierwsze)
                     _dGate++;
                     if (LogOn && _vetoLogged.Add(ev)) VetoLine(camp, m, "bez taranu i wiezy, mury bez wyrwy (taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie")
@@ -390,12 +397,17 @@ namespace Armoury
                 }
                 if (m.S <= 1.0)
                 {
+                    if (dr) { SiegeWalls2.LadderPass(camp, m, "mury"); _lastDrCamp = camp; _lastDrAt = Now; _dPass++; return false; }
                     _dWalls++;
                     string sw = TryBreach(camp, m);
                     if (LogOn && (_vetoLogged.Add(ev) || sw != null)) VetoLine(camp, m, "mury trzymaja (s OB1 " + F(m.S, "0.000") + " <= 1)", sw);
                     return true;
                 }
-                if (m.PGame > 0 && m.POurs < m.PGame && MBRandom.RandomFloat >= m.POurs / m.PGame) { _dRoll++; return true; }
+                if (m.PGame > 0 && m.POurs < m.PGame && MBRandom.RandomFloat >= m.POurs / m.PGame)
+                {
+                    if (dr) { SiegeWalls2.LadderPass(camp, m, "losowanie"); _lastDrCamp = camp; _lastDrAt = Now; _dPass++; return false; }
+                    _dRoll++; return true;
+                }
                 _dPass++;
                 return false;
             }
@@ -452,7 +464,8 @@ namespace Armoury
                 Meas m = (_lastCamp == camp && _last != null && Math.Abs(Now - _lastAt) < 0.01f) ? _last : Measure(camp);
                 var lp = camp.LeaderParty;
                 bool excl = lp != null && (Scripted(lp) || Und(lp, camp.SiegeEvent.BesiegedSettlement));   // te decyzje Veto przepuszcza bez OB1
-                return " | OB1 " + (!Ob1On ? "nie" : excl ? "wykluczone" : "tak") + ": HP murow " + F(m.Hp * 100.0, "0") + "%, taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie")
+                bool dr = _lastDrCamp == camp && Math.Abs(Now - _lastDrAt) < 0.01f;                     // DR: przepuszczone mimo bramy / murow / losowania (grupa oblezenia2)
+                return " | OB1 " + (!Ob1On ? "nie" : excl ? "wykluczone" : dr ? "drabiny (DR)" : "tak") + ": HP murow " + F(m.Hp * 100.0, "0") + "%, taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie")
                      + ", w " + F(m.W, "0.000") + " (gra " + F(m.WGame, "0.000") + "), s OB1 " + (m.Empty ? "pusta warownia" : F(m.S, "0.000")) + " (gra " + (m.Empty ? "-" : F(m.SGame, "0.000"))
                      + "), wyrwa " + (m.Gap ? "tak" : "nie") + " (najslabszy odcinek " + F(m.HpMin * 100.0, "0") + "%), obroncy " + F(m.Def0, "0") + (m.Half ? " (gra " + F(m.Def, "0") + " - gracz w osadzie)" : "")
                      + ", szansa na mysl " + F(m.POurs * 100.0, "0.0") + "% (gra " + F(m.PGame * 100.0, "0.0") + "%) | " + AdvText(m) + " | " + DefenceText(camp.SiegeEvent.BesiegedSettlement);
@@ -987,6 +1000,7 @@ namespace Armoury
         /// <summary>Nasluch MapEventEnded: wynik szturmu AI (zdobyty / odparty / obronca wygral / bez rozstrzygniecia) i linia OB3. Nie rzuca.</summary>
         internal static void OnMapEventEnded(MapEvent me)
         {
+            SiegeWalls2.OnMapEventEnded(me);                                   // oblezenia 2: zdobycia wedlug klasy twierdzy (pomiar celu), przed wyjsciem bez rejestru
             try
             {
                 if (me == null || (_assaults.Count == 0 && _bats.Count == 0)) return;
@@ -1097,6 +1111,7 @@ namespace Armoury
                 if (ev == null || t == null || side != BattleSideEnum.Attacker) return;
                 var camp = ev.BesiegerCamp;
                 if (camp != null && camp.LeaderParty != null && camp.LeaderParty.IsMainParty) { _dEngPlayer++; return; }
+                SiegeWalls2.OnEngineBuilt(ev, side, t);                          // oblezenia 2: trebusze AI zbudowane (takze z drugiej ekipy)
                 if (t == DefaultSiegeEngineTypes.Ram || t == DefaultSiegeEngineTypes.ImprovedRam) _dEngRam++;
                 else if (t == DefaultSiegeEngineTypes.SiegeTower) _dEngTower++;
                 else if (t.IsRanged && !t.IsAntiPersonnel) _dEngWall++;
@@ -1111,7 +1126,7 @@ namespace Armoury
             if (broken) _dWallBroken++;
         }
 
-        internal static void OnSiegeStarted(SiegeEvent ev) { _dSiegesNew++; }
+        internal static void OnSiegeStarted(SiegeEvent ev) { _dSiegesNew++; SiegeWalls2.OnSiegeStarted(ev); }   // oblezenia 2: ludzie twierdzy na starcie (prog kapitulacji)
 
         internal static void OnSiegeEnded(SiegeEvent ev)
         {
@@ -1121,6 +1136,7 @@ namespace Armoury
                 _pauses.Remove(ev);
                 _prep.Remove(ev);
                 _vetoLogged.Remove(ev);
+                SiegeWalls2.OnSiegeEnded(ev);                                    // oblezenia 2: pamiec obozu (trebusze) i glodu
             }
             catch (Exception e) { Stumble("OnSiegeEnded", e); }
         }
@@ -1205,7 +1221,8 @@ namespace Armoury
         internal static void Reset()
         {
             _assaults.Clear(); _pauses.Clear(); _pendingPauses.Clear(); _prep.Clear(); _capDay.Clear(); _bats.Clear();   // zapis (Import) przychodzi PO konstruktorze
-            _lastCamp = null; _last = null; _lastAt = -1f;
+            _lastCamp = null; _last = null; _lastAt = -1f; _lastDrCamp = null; _lastDrAt = -1f;
+            SiegeWalls2.Reset();                                                 // oblezenia 2: trebusze, glod, drabiny - pamiec od zera
             ZeroDay();
             _stumbles = 0; _err.Clear();
         }
@@ -1293,6 +1310,7 @@ namespace Armoury
                 else { Seal31.Patch("mury oblezen: bitwa ze szturmu z murow (DefaultCombatSimulationModel.GetSimulationTicksForBattleRound)", mt, typeof(SiegeWalls), null, nameof(TicksPost), null, Priority.Normal, Priority.Low); _hookTicks = Wired(mt, nameof(TicksPost)); }
             }
             catch (Exception e) { _hookTicks = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Ticks", e); }
+            try { SiegeWalls2.EnsureHooks(); } catch (Exception e) { Stumble("EnsureHooks.Oblezenia2", e); }   // oblezenia 2: plan machin AI, druga ekipa, bilans jedzenia, straty RB
         }
 
         private static string Owners(System.Reflection.MethodBase m)
@@ -1336,6 +1354,7 @@ namespace Armoury
                          + (s != null ? F(s.SiegeTownPrepFactor, "0.00") : "-") + ", stolica x" + (s != null ? F(s.SiegeCapitalPrepFactor, "0.00") : "-") + "), log " + (LogOn ? "tak" : "nie") + ".");
                 Log.Info("Bitwa szturmu (SZ start): latka tur rundy (GetSimulationTicksForBattleRound) " + _hookTicks + ", przewaga osady " + _hookAdv + " | klucze: " + SzKeys()
                          + " | regula: " + (SzAny ? "czynna - szturm AI i autobitwa gracza (bez Innych, skryptu fabuly, morza)" : "wylaczona - tury rundy gry") + ".");
+                SiegeWalls2.SessionStart();                                      // oblezenia 2: linia startowa (latki, modele, klucze)
             }
             catch (Exception e) { Stumble("SessionStart", e); }
         }
