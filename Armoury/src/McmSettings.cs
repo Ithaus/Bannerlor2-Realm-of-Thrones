@@ -5364,6 +5364,22 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool FolkPeaceTribute { get; set; } = true;
 
+        [SettingPropertyBool("Folk Hoard Tax", HintText = "the lords tax the townsfolk's hoard: whatever the labourers, craftsmen, merchant families and castle folk hold above the normal level of their savings (Folk Hoard Normal Times their reserve for hard times - about what they held at the start of a campaign), part of it goes each day to the lord of the town or castle and to its purse, in peace and in war alike - coin that finds nothing to buy goes back to the lords and the towns instead of piling up. The crown's war aid or peace tribute paid the same day counts towards it, so nobody pays twice. A besieged place pays nothing. You and the AI alike: the lord's share from your own towns and castles goes to your purse. Off = the people's savings pile up as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkHoardTax { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Hoard Tax Rate", 0.000f, 0.050f, "0.000", HintText = "with Folk Hoard Tax: the part of the hoard above the normal level that goes to the lord and the purse each day (0.01 = one part in a hundred a day: a hoard halves in about ten weeks and the people then keep about two months of living)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkHoardTaxRate { get; set; } = 0.01f;
+
+        [SettingPropertyFloatingInteger("Folk Hoard Normal Times", 1.00f, 10.00f, "0.0", HintText = "with Folk Hoard Tax: the normal level of the people's savings, as a multiple of their reserve for hard times (3 = 30 days of their needs for labourers and castle folk, 63 for craftsmen, 90 for merchant families); nothing below it is taxed")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkHoardNormalTimes { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Folk Hoard Tax Lord Share", 0.00f, 1.00f, "0.00", HintText = "with Folk Hoard Tax: of the hoard tax the lord of the town or castle takes this share and the town's or castle's purse the rest (a place with no living lord - all to its purse)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkHoardTaxLordShare { get; set; } = 0.67f;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -7440,6 +7456,10 @@ namespace Armoury
             s.FolkWarAidLoyaltyFloor = FolkWarAidLoyaltyFloor;
             s.FolkWarAidMinLoyalty = FolkWarAidMinLoyalty;
             s.FolkPeaceTribute = FolkPeaceTribute;
+            s.FolkHoardTax = FolkHoardTax;
+            s.FolkHoardTaxRate = FolkHoardTaxRate;
+            s.FolkHoardNormalTimes = FolkHoardNormalTimes;
+            s.FolkHoardTaxLordShare = FolkHoardTaxLordShare;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

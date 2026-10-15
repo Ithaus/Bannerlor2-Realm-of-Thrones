@@ -580,6 +580,7 @@ namespace Armoury
               .Append(", gotowka korony na zold druzyn z reszty wplywow przed rentami (M1) ").Append(KingdomTreasury.LastNeedAidRent)   // M1: czwarty szczebel W5 (skarbce -> glowy rodow)
               .Append(", stawka wojenna pana (W7) kiesy ludu i wsi -> glowy rodow ").Append(KingdomTreasury.LastLordLevy)   // W7: pobor z wlasnych lenn na zold druzyn
               .Append(" (z ludu ").Append(KingdomTreasury.LastLordLevyFolk).Append(", ze wsi ").Append(KingdomTreasury.LastLordLevyVill).Append(')')
+              .Append(", podatek od nadwyzki ludu (kiesa2) kiesy ludu -> glowy rodow ").Append(TownFolk.LastHoardLord)   // kiesa2: przelew miedzy posiadaczami (kiesa ludu -> glowa)
               .Append(", zelazna cena z nabrzeza (WW1) kiesy ludu -> wodzowie najezdzcow ").Append(ReaverLaw.DayWaterfront)   // WW1: przelew miedzy posiadaczami (kiesa ludu -> glowa)
               .Append(", dziesiecina korsarzy (WW4) kiesy band -> glowy rodow panow portow Wysp ").Append(OutlawLaw.LastHarbourTithe)   // WW4: przelew miedzy posiadaczami
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
@@ -593,9 +594,11 @@ namespace Armoury
               .Append(" | kasy miast [P]: stan ").Append(Dl(now, last, HTowns)).Append(", zapas kupcow ").Append(reserve).Append(", nadwyzka ponad zapas ").Append(over).Append(" w ")
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)
+              .Append(", podatek od nadwyzki ludu (kiesa2) z kies ludu ").Append(TownFolk.LastHoardTown)   // kiesa2: kiesa ludu -> kasa miasta
               .Append(", utarg taborow wsi zaplacony ").Append(_vPaid[CTown]).Append(" (").Append(_vVisits[CTown]).Append(" wizyt; towar niesprzedany ").Append(_vUnsold[CTown])
               .Append(" szt.), dosypka regulatora ").Append(_regIn[CTown]).Append(" (tryb ").Append(TownPurse.On ? TownPurse.Mode.ToString(Inv) : "0").Append("), bezpiecznik korony -")
               .Append(" | kasy zamkow [P]: stan ").Append(Dl(now, last, HCastles)).Append(", zold zalog do kas ").Append(SoldierPay.LastToCastles)
+              .Append(", podatek od nadwyzki ludu (kiesa2) z kies podzamczy ").Append(TownFolk.LastHoardCastle)   // kiesa2: kiesa podzamcza -> kasa zamku
               .Append(", zawor do panow ").Append(CastlePurse.LastLordPaid).Append(", do skarbcow (114) ").Append(CastlePurse.LastCrownPaid)
               .Append(", regulator: kasowanie zablokowane (110) ").Append(CastlePurse.LastRegDown).Append(", dosypka do zapasu (tryb 1) ").Append(CastlePurse.LastRegUp)
               .Append(", \"zakupy\" z niczego cofniete ").Append(CastlePurse.LastConsBack)

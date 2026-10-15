@@ -123,6 +123,7 @@ namespace Armoury
             ResetHorses();   // K1-3a krok 2: liczniki linii koni roboczych (licznik osady jest w Folk - czysci go Reset)
             ResetLadder();   // P3-P5 (zbytki): kategorie listy dostatku, liczniki linii (podzial osady jest w Folk - czysci go Reset)
             ResetBread();    // M3: indeks doby, liczniki linii i komunikatu gracza (stan osady jest w Folk - pamiec sesji)
+            ResetHoard();    // kiesa2: liczniki doby i linia startu sesji podatku od nadwyzki
         }
 
         // ============================================================ wejscie do ludu (Earn)
@@ -677,6 +678,7 @@ namespace Armoury
             try { TitheBegin(); } catch (Exception e) { Stumble("TitheBegin", e); }
             try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
             AidBegin();                                                // P1: liczniki doby daniny z oszczednosci (czas poboru, nadwyzka po daninie wedlug krolestw)
+            HoardBegin();                                              // kiesa2: liczniki doby podatku od nadwyzki (zeruje tez Last* dla linii Obieg)
             LadderBegin();                                             // P3-P5: liczniki doby zakupow podzamczy i wsi z listy dostatku, oferta kupujacych z zewnatrz (P4) od zera
             for (int pass = 0; pass < 2; pass++)
             {
@@ -690,6 +692,7 @@ namespace Armoury
             try { Villages(d); } catch (Exception e) { Stumble("Villages", e); }
             try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
+            try { HoardDay(day); } catch (Exception e) { HoardStumble("HoardDay", e); }   // kiesa2: linia doby i liczby dla "Obieg" (po miastach i zamkach)
             // kontrola zamknieta (kiesy miast, podzamczy, gminy): zmiana stanu = wplywy - wydatki
             long stock = TotalTown() + TotalCastle() + TotalGmina();
             if (_ctlStock0 != long.MinValue) { _lastDStock = stock - _ctlStock0; _lastIn = _ctlIn; _lastOut = _ctlOut; _lastR = _lastDStock - (_ctlIn - _ctlOut); }
@@ -864,18 +867,27 @@ namespace Armoury
             // P1 (szczebel 4 drabiny nadwyzki): w wojnie i przy potrzebie korony klasa oddaje skarbcowi krolestwa czesc kiesy PONAD zapas dni (PayAid - po robotach gminy,
             // przed oferta na jutro i placami z nadwyzki, ktore licza sie od reszty); wylaczone, pokoj, s = 0 - PayAid zwraca 0 i krok jest co do monety jak przed paczka
             f.DAid = 0; f.DOver = 0; f.DOvC[0] = f.DOvC[1] = f.DOvC[2] = 0;
-            if (f.Need[0] > 0) { double ov = f.KW - rdW * f.Need[0]; if (ov > 0) { ov -= PayAid(f, 0, KingdomTreasury.WtW, ov, d); f.Offer[0] = (long)(sr * ov); } d.Lokata += Math.Max(0, ov); }
+            // kiesa2 (TownFolk.Hoard.cs): zaraz po daninie P1 tej klasy podatek pana od kiesy ponad poziom normalny (PayHoard; danina tej doby wliczona) - oferta,
+            // place z nadwyzki i W7 licza sie od reszty; klucz FolkHoardTax wylaczony - PayHoard zwraca 0 i krok jest co do monety jak przed paczka
+            if (f.Need[0] > 0)
+            {
+                double ov = f.KW - rdW * f.Need[0]; long hx = 0;
+                if (ov > 0) { long a0 = PayAid(f, 0, KingdomTreasury.WtW, ov, d); ov -= a0; hx = PayHoard(f, 0, 0, ov, a0, rdW); ov -= hx; f.Offer[0] = (long)(sr * ov); }
+                d.Lokata += Math.Max(0, ov);
+                HoardW(f, rdW, hx);                                    // kiesa2: kiesa W wobec poziomu normalnego (linia doby)
+            }
             if (f.Need[1] > 0)
             {
                 double ov = f.KR - RdR * f.Need[1];
-                if (ov > 0) { ov -= PayAid(f, 1, KingdomTreasury.WtR, ov, d); long lv = (long)(sr * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
+                if (ov > 0) { long a1 = PayAid(f, 1, KingdomTreasury.WtR, ov, d); ov -= a1; ov -= PayHoard(f, 1, 1, ov, a1, RdR); long lv = (long)(sr * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
             }
             if (f.Need[2] > 0)
             {
                 double ov = f.KP - RdP * f.Need[2];
                 if (ov > 0)
                 {
-                    ov -= PayAid(f, 2, KingdomTreasury.WtP, ov, d);
+                    long a2 = PayAid(f, 2, KingdomTreasury.WtP, ov, d); ov -= a2;
+                    ov -= PayHoard(f, 2, 2, ov, a2, RdP);
                     long lv = (long)(sr * ov), wp = (long)(SurpWage * lv), toW = (long)(wp * 0.6);
                     long moved = Move(f, 2, 0, toW) + Move(f, 2, 1, wp - toW);
                     d.SurpWage += moved; f.Offer[2] = lv - moved;
@@ -949,7 +961,12 @@ namespace Armoury
             // ---- 5. nadwyzka ponad 10 dni potrzeby: 7% na towar jutro (konsumpcja zamku)
             f.Offer[0] = 0;
             f.DAid = 0; f.DOver = 0; f.DOvC[0] = 0;                    // P1: danina podzamcza z kiesy ponad 10 dni potrzeby - przed oferta (jak w miescie)
-            if (f.Need[0] > 0) { double ov = f.KW - RdC * f.Need[0]; if (ov > 0) { ov -= PayAid(f, 0, KingdomTreasury.WtCastle, ov, d); f.Offer[0] = (long)(SurplusRate * ov); } }
+            if (f.Need[0] > 0)
+            {
+                double ov = f.KW - RdC * f.Need[0]; long hx = 0;
+                if (ov > 0) { long a0 = PayAid(f, 0, KingdomTreasury.WtCastle, ov, d); ov -= a0; hx = PayHoard(f, 0, 3, ov, a0, RdC); ov -= hx; f.Offer[0] = (long)(SurplusRate * ov); }
+                HoardW(f, RdC, hx);                                    // kiesa2: podzamcze po daninie (jak w miescie)
+            }
             CastleLadder(f, d);                                        // P3/P5 (zbytki): podzamcze 1/60 nadwyzki - oferta w konsumpcji zamku albo zakup w miescie najblizszym
             d.OffC += f.Offer[0];
             // ---- 6. kotwica (z kredytem dworu)
@@ -1627,6 +1644,7 @@ namespace Armoury
             foreach (var x in new[] { _lineState, _lineSeed, _lineRet, _lineLab, _lineRights, _lineR14, _lineC2, _lineTithe }) if (x != null) l.Add(x);
             _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = _lineC2 = null;
             TakeP1Lines(l);   // P1: linie pomiarow obiegu kiesy tej doby
+            TakeHoardLines(l);   // kiesa2: linia startu sesji i linia doby podatku od nadwyzki
             return l;
         }
     }

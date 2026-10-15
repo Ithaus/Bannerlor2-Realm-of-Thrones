@@ -401,6 +401,7 @@ namespace Armoury
         {
             long t0 = Stopwatch.GetTimestamp();
             _lineFolk = null; _lineFolkPartial = false;
+            LastHoardLord = LastHoardTown = LastHoardCastle = 0;   // kiesa2: "Obieg" tej doby - zero, gdy doba kiesy czynnej nie biegnie
             try
             {
                 if (Campaign.Current == null) return;
