@@ -76,14 +76,21 @@ namespace Armoury
         }
 
         /// <summary>Postfiks GetSmithingCostsForWeaponDesign czynnego modelu: drewno = ladunki do otwarcia (0 albo wiecej), nie sztuki czesci.</summary>
+        private static int _diagN;
         public static void CostPostfix(WeaponDesign weaponDesign, ref int[] __result)
         {
             try
             {
                 if (!On || __result == null || __result.Length <= (int)CraftingMaterials.Wood) return;
                 int raw = RawWood(weaponDesign);
-                if (raw <= 0) return;
-                __result[(int)CraftingMaterials.Wood] = -LoadsFor(raw * PerPiece);
+                int before = __result[(int)CraftingMaterials.Wood];
+                if (raw > 0) __result[(int)CraftingMaterials.Wood] = -LoadsFor(raw * PerPiece);
+                if (_diagN < 12 && (raw > 0 || before != 0))
+                {
+                    _diagN++;
+                    Log.Info("Drewno w kuzni (kg) - koszt: " + (weaponDesign != null && weaponDesign.Template != null ? weaponDesign.Template.StringId : "-") + " | drewno czesci " + raw
+                             + ", gra " + before + " -> " + __result[(int)CraftingMaterials.Wood] + " | zapas " + OpenKg.ToString("0.##", Inv) + " kg (proba " + _diagN + ").");
+                }
             }
             catch (Exception e) { Stumble("CostPostfix", e); }
         }
@@ -109,6 +116,27 @@ namespace Armoury
             Use(__state[0], (int)__state[1], string.IsNullOrEmpty(name) ? "the handle" : name);
         }
 
+        /// <summary>Samosprawdzenie przy starcie: koszt drewna pierwszej wykutej broni z gry przy zapasie 50 kg (zapas potem jak byl).</summary>
+        private static void SelfCheck()
+        {
+            float keep = OpenKg;
+            try
+            {
+                var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SmithingModel : null;
+                if (model == null) return;
+                TaleWorlds.Core.ItemObject probe = null;
+                foreach (var it in TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObjectTypeList<TaleWorlds.Core.ItemObject>())
+                    if (it != null && it.WeaponDesign != null && RawWood(it.WeaponDesign) > 0) { probe = it; break; }
+                if (probe == null) { Log.Info("Drewno w kuzni (kg) - samosprawdzenie: brak broni z drewnem w czesciach."); return; }
+                OpenKg = 50f;
+                var c = model.GetSmithingCostsForWeaponDesign(probe.WeaponDesign);
+                Log.Info("Drewno w kuzni (kg) - samosprawdzenie: model " + model.GetType().FullName + ", " + probe.StringId + " drewno czesci " + RawWood(probe.WeaponDesign)
+                         + " -> koszt drewna przy zapasie 50 kg " + (c != null && c.Length > 7 ? c[7].ToString() : "?") + " (oczekiwane 0).");
+            }
+            catch (Exception e) { Stumble("SelfCheck", e); }
+            finally { OpenKg = keep; }
+        }
+
         /// <summary>Start sesji (po McmSettings.Apply): wpiecie na metode czynnego modelu kosztow i SpendMaterials (raz na proces).</summary>
         internal static void SessionStart()
         {
@@ -131,6 +159,8 @@ namespace Armoury
                 _hook = string.Join(", ", parts.ToArray());
             }
             catch (Exception e) { _hook = "wyjatek " + e.GetType().Name; Stumble("SessionStart", e); }
+            _diagN = 0;
+            SelfCheck();
             Log.Info("Drewno w kuzni (kg): start sesji | klucz SmithWoodKg " + (On ? "TAK" : "NIE") + ", kg na sztuke drewna czesci " + PerPiece.ToString("0.##", Inv)
                      + ", ladunek " + LoadKg.ToString("0", Inv) + " kg | zapas otwartego ladunku " + OpenKg.ToString("0.##", Inv) + " kg | latki: " + _hook + ".");
         }
