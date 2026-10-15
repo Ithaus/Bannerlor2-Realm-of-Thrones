@@ -92,6 +92,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeWorksWithoutYou { get; set; } = true;
 
+        [SettingPropertyBool("Tourney Prize Commissioned", HintText = "when the town has no piece of your tournament prize in its stores, it has its craftsmen make it and pays them from its treasury - you get the prize itself, not its price. Off = the town pays you the price instead")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool TourneyPrizeCommissioned { get; set; } = true;
+
         [SettingPropertyBool("Smelt No Wood", HintText = "smelting a weapon gives back its metal but not the wood of its handle - wood burns in the crucible (the game handed back 1-3 hardwood from an axe). Off = as in the game")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool SmeltNoWood { get; set; } = true;
@@ -6226,6 +6230,7 @@ namespace Armoury
             s.CharcoalPerIron = CharcoalPerIron;
             s.StaminaPerTier = StaminaPerTier;
             s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
+            s.TourneyPrizeCommissioned = TourneyPrizeCommissioned;
             s.SmeltNoWood = SmeltNoWood;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;

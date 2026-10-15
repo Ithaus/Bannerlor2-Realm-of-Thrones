@@ -35,6 +35,7 @@ namespace Armoury
         public int StaminaPerTier = 25;                    // crafting stamina burned per tier
         // --- Time at the anvil ---
         public bool ForgeWorksWithoutYou = true;           // the smith and his lads keep at your project while you ride - the finished piece waits at that forge for collection; off = the clock only runs while you stay in that settlement
+        public bool TourneyPrizeCommissioned = true;       // when the town has no piece of your tournament prize in its stores, it has its craftsmen make it and pays them from its treasury - you get the prize itself, not its price. Off = the town pays you the price instead
         public bool SmeltNoWood = true;                    // smelting a weapon gives back its metal but not the wood of its handle - wood burns in the crucible (the game handed back 1-3 hardwood from an axe). Off = as in the game
         public bool ForgeOneClock = true;                  // one forge clock: Craft puts the piece on the smith's bench for the hours the Banner Kings screen shows (stamina spent / 6); pieces come off one by one when done - no lump wait afterwards
         public bool ForgeOnlyWhileThere = true;            // your own work at the anvil goes on only while you stay in that settlement - ride away and the bench waits for you

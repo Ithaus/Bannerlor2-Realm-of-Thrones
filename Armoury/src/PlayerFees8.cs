@@ -552,6 +552,27 @@ namespace Armoury
                     Log.Player("Your prize, " + item + ", came out of the stores of " + NameOf(st) + " - as it lay there.");
                     return;
                 }
+            // Jeff 15.10 ("wygralem turniej i nie dostalem nagrody, dostalem tylko kase, nagroda byl pancerz"): nagrody nie ma na polce - miasto
+            // zamawia ja u swoich rzemieslnikow: przedmiot zostaje u gracza, kasa miasta placi jego cene ludowi miasta (robota rzemieslnikow, KCraftPaid).
+            // Pieniadz bez zrodla z niczego (kasa -> kiesa ludu); gdy kasy brak - rzemieslnicy dostaja, ile jest, przedmiot i tak (obiecany w szrankach).
+            if (Settings.Current != null && Settings.Current.TourneyPrizeCommissioned)
+            {
+                int paidC = 0;
+                try
+                {
+                    if (worth > 0 && st.IsTown && st.Town != null)
+                    {
+                        int t0 = st.Town.Gold;
+                        TownFolk.EarnFromTown(st, worth, TownFolk.KCraftPaid);
+                        paidC = Math.Max(0, t0 - st.Town.Gold);
+                    }
+                }
+                catch (Exception e) { Stumble("PrizeCommission", e); }
+                _pzShelf++;
+                Log.Info("Wydatki gracza (E8/D2): nagroda turnieju - " + el.Item.StringId + " nie ma na polce " + NameOf(st) + ": zamowiona u rzemieslnikow miasta, przedmiot u gracza; kasa miasta zaplacila ludowi " + paidC + " z ceny " + worth + ".");
+                Log.Player(NameOf(st) + " had no " + item + " in its stores - the town had its craftsmen make your prize.");
+                return;
+            }
             // nie ma jej na polce: zamiast przedmiotu cena z kasy miasta z nadwyzki (jak u AI)
             mine.AddToCounts(el, -1);
             int pay = CapOf(st, worth, 0);
