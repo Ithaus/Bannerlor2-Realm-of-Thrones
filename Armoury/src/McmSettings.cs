@@ -5398,11 +5398,11 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Folk Guard Max Times", 1.00f, 10.00f, "0.0", HintText = "with Folk Circulation Guard: the hoard tax never rises above this many times Folk Hoard Tax Rate")]
         [SettingPropertyGroup("The townsfolk's purse")]
-        public float FolkGuardMaxTimes { get; set; } = 5f;
+        public float FolkGuardMaxTimes { get; set; } = 10f;
 
         [SettingPropertyFloatingInteger("Folk Guard Crown Share", 0.00f, 0.50f, "0.00", HintText = "with Folk Circulation Guard: the part of every hoard tax (towns, castles and villages) that goes to the treasury of the realm the place belongs to; the lord and the purse share the rest as before (a place outside any realm - nothing to a treasury)")]
         [SettingPropertyGroup("The townsfolk's purse")]
-        public float FolkGuardCrownShare { get; set; } = 0.15f;
+        public float FolkGuardCrownShare { get; set; } = 0.35f;
 
         [SettingPropertyBool("Folk Loans", HintText = "the lords borrow from their own people: an AI house at war whose coin has run below its reserve for war may borrow, before it goes to the Iron Bank, from what the townsfolk, castle folk and villagers of its own towns, castles and villages hold above their normal level of savings - at most Folk Loan Max Share Of Income of its daily income a day, at most Folk Loan Limit Days of its daily income plus 20000 for a town and 10000 for a castle in all. The people earn Folk Loan Rate Year a year on it. In war the house pays only the interest; in peace it repays Folk Loan Repay Share Of Income of its daily income a day (at least a year's share) back into the purses it borrowed from. A house that cannot pay in peace for Folk Loan Default Days days running defaults: the rest of the debt is lost to the people, every town and castle of that house that lent to it loses 10 loyalty, and it may not borrow from its people for half a year. Not your house. Off = the lords borrow only from the Iron Bank, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -5414,11 +5414,11 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Folk Loan Max Share Of Income", 0.00f, 1.00f, "0.00", HintText = "with Folk Loans: the most a house may borrow from its people in a day, as a part of its daily income")]
         [SettingPropertyGroup("The townsfolk's purse")]
-        public float FolkLoanMaxShareOfIncome { get; set; } = 0.40f;
+        public float FolkLoanMaxShareOfIncome { get; set; } = 0.60f;
 
         [SettingPropertyFloatingInteger("Folk Loan Limit Days", 0.00f, 120.00f, "0", HintText = "with Folk Loans: the most a house may owe its people, in days of its daily income (plus 20000 for each town and 10000 for each castle it holds)")]
         [SettingPropertyGroup("The townsfolk's purse")]
-        public float FolkLoanLimitDays { get; set; } = 30f;
+        public float FolkLoanLimitDays { get; set; } = 60f;
 
         [SettingPropertyFloatingInteger("Folk Loan Repay Share Of Income", 0.00f, 0.50f, "0.00", HintText = "with Folk Loans: the part of its daily income a house at peace repays its people each day, on top of the interest")]
         [SettingPropertyGroup("The townsfolk's purse")]

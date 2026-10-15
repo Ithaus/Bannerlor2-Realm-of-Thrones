@@ -43,7 +43,7 @@ namespace Armoury
         private static double GdHi(Settings s) { return Math.Max(GdLo(s), HdClamp(s.FolkGuardBandHigh, 1.0, 5.0)); }
         private static double GdMax(Settings s) { return HdClamp(s.FolkGuardMaxTimes, 1.0, 10.0); }
         private static double GuardCrownShare(Settings s) { return GuardOn ? HdClamp(s.FolkGuardCrownShare, 0, 0.5) : 0; }
-        private const double GdStep = 0.03, GdMin = 0.25, GdCapWorld = 0.0015, GdCapInflow = 2.0, GdCover = 0.8, GdEmaDays = 28;
+        private const double GdStep = 0.03, GdMin = 0.25, GdCapWorld = 0.005,   /* 15.10 test C: 0.0015 nie przegonilo doplywu do ludu (lud 9.9 -> 13% swiata, korony 24.9 -> 18.9% w 160 dob przy mnozniku 5) */ GdCapInflow = 2.0, GdCover = 0.8, GdEmaDays = 28;
 
         /// <summary>Skarbiec korony na czesc korony podatku od nadwyzki: krolestwo rodu pana osady (nie zniszczone). null - straznik wylaczony, udzial 0, rod bez krolestwa.</summary>
         private static Kingdom GuardCrownOf(Clan clan)
