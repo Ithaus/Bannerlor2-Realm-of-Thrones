@@ -1464,6 +1464,42 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeBreachFront { get; set; } = 0.75f;
 
+        [SettingPropertyBool("Siege Ai Trebuchets", HintText = "AI lords besieging a town or a realm's capital build trebuchets from the start - the only engines that batter walls with Realistic Battle Mod - with a second crew, alongside the battering ram and siege tower instead of after them. A castle siege goes as before unless the camp still has no ram and tower Siege Trebuchet Castle Days after its siege camp stood ready - then it turns to trebuchets the same way. Off = the AI draws its siege plan by chance and builds one engine at a time, as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAiTrebuchets { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Trebuchet Castle Days", 0, 60, "0", HintText = "with Siege Ai Trebuchets: days after the siege camp stands ready that an AI camp before a castle may go without both a ram and a siege tower before it turns to trebuchets (a camp of 1000 men has both in about 9 days)")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeTrebuchetCastleDays { get; set; } = 10;
+
+        [SettingPropertyBool("Siege Starvation", HintText = "a besieged town or castle gets no food from outside: its food stock can only fall. Once it is empty the garrison and militia die of hunger every day (Siege Starve Loss Percent, the wounded first) and a handful left (under Siege Surrender Share of the men at the start of the siege or under Siege Surrender Men) lays down its arms to the besiegers, who then take the empty fortress as the game does. Not when lords with their men still hold the walls, not to a camp weaker than what is left, never to a siege you lead (you storm it yourself). Off = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeStarvation { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Siege Starve Loss Percent", 0.00f, 20.00f, "0.0", HintText = "with Siege Starvation: share of the garrison and militia that dies of hunger every day once the food stock of a besieged fortress is empty (5 = half in two weeks, a tenth left after about six weeks)")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeStarveLossPercent { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Siege Surrender Share", 0.00f, 0.50f, "0.00", HintText = "with Siege Starvation: a starving fortress surrenders when fewer men than this share of its garrison and militia at the start of the siege are left")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeSurrenderShare { get; set; } = 0.1f;
+
+        [SettingPropertyInteger("Siege Surrender Men", 0, 200, "0", HintText = "with Siege Starvation: a starving fortress surrenders when fewer men than this are left in its garrison and militia, whatever it started with")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeSurrenderMen { get; set; } = 20;
+
+        [SettingPropertyBool("Siege Ladder Overwhelm", HintText = "after a long siege (Siege Ladder Min Days) an AI host at least Siege Ladder Min Ratio times stronger than the defenders storms the walls even without a ram and a siege tower - with ladders, paying dearly in the assault. Off = AI lords storm only with a ram and a tower or through a breach")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeLadderOverwhelm { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Ladder Min Days", 0, 364, "0", HintText = "with Siege Ladder Overwhelm: days the siege must have lasted")]
+        [SettingPropertyGroup("The marching column")]
+        public int SiegeLadderMinDays { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Siege Ladder Min Ratio", 2.00f, 20.00f, "0.0", HintText = "with Siege Ladder Overwhelm: how many times stronger than the defenders the besiegers must be (twice the three to one the game asks to begin a siege)")]
+        [SettingPropertyGroup("The marching column")]
+        public float SiegeLadderMinRatio { get; set; } = 6f;
+
         [SettingPropertyBool("Siege Walls Log", HintText = "writes log lines about these siege rules: a daily summary, each assault held back by the walls, each repelled assault with the pause before the next, each assault joined by a relief force, each siege camp slowed (log only - nothing in the game changes)")]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsLog { get; set; } = true;
@@ -6429,6 +6465,15 @@ namespace Armoury
             s.SiegeAttackerMorale = SiegeAttackerMorale;
             s.SiegeMachinesFront = SiegeMachinesFront;
             s.SiegeBreachFront = SiegeBreachFront;
+            s.SiegeAiTrebuchets = SiegeAiTrebuchets;
+            s.SiegeTrebuchetCastleDays = SiegeTrebuchetCastleDays;
+            s.SiegeStarvation = SiegeStarvation;
+            s.SiegeStarveLossPercent = SiegeStarveLossPercent;
+            s.SiegeSurrenderShare = SiegeSurrenderShare;
+            s.SiegeSurrenderMen = SiegeSurrenderMen;
+            s.SiegeLadderOverwhelm = SiegeLadderOverwhelm;
+            s.SiegeLadderMinDays = SiegeLadderMinDays;
+            s.SiegeLadderMinRatio = SiegeLadderMinRatio;
             s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;
