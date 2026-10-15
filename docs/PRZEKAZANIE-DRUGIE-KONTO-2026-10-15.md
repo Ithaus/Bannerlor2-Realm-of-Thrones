@@ -113,6 +113,10 @@ Logi Jeffa: `Modules\Armoury\Armoury-*.log`, `Modules\Armoury\Logs\<sesja>\ludzi
 16. Kryjowka (Jeff 15.10): log 12:10:41-49 "HideoutPurge: przeszukanie 17.5 h (14 ludzi) ... zloto 0, renown 5, osad z wdziecznoscia 3" - przeszukanie bylo,
     kryjowka byla pusta (wszystkie kryjowki swiata maja razem ok. 2 tys. zlota - bandy sprzedaja lup paserom, zloto idzie do miast; kiesy band przechodza na
     zwyciezce w samej bitwie). Mozliwa poprawa: komunikat dla gracza wprost "kryjowka pusta / znaleziono X" (dzis tylko log).
+    Dowod (log 10-56-30, "Kiesy rozbitych (3.2)" doba 108945): tego dnia pokonana 1 banda (kryjowka Jeffa), w kiesie 362 zl - wyplacone zwyciezcy w bitwie
+    ("do wodzow 488" = bandy 362 + karawany 126). Jeff 15.10: "bandyci sprzedaja rzeczy - gdzie trzymaja zloto? to podstawowa logika" - PROPOZYCJA (czeka na tak):
+    banda z kryjowka odklada czesc kiesy (np. po sprzedazy paserowi) do skarbca kryjowki; przeszukanie kryjowki daje ten skarbiec; komunikat gracza po bitwie
+    "the band carried X" i po przeszukaniu "the hideout held Y". Dzis bandy sa biedne: paser placi im ok. 1/3 wartosci (doba 108945: 713 z 1992), reszta zostaje w kasach miast.
 
 ## 7. Pulapki techniczne (z doswiadczenia)
 
