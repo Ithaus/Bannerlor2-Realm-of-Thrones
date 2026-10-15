@@ -124,6 +124,16 @@ Logi Jeffa: `Modules\Armoury\Armoury-*.log`, `Modules\Armoury\Logs\<sesja>\ludzi
     banda z kryjowka odklada czesc kiesy (np. po sprzedazy paserowi) do skarbca kryjowki; przeszukanie kryjowki daje ten skarbiec; komunikat gracza po bitwie
     "the band carried X" i po przeszukaniu "the hideout held Y". Dzis bandy sa biedne: paser placi im ok. 1/3 wartosci (doba 108945: 713 z 1992), reszta zostaje w kasach miast.
 
+## 6a. Kolejnosc na start drugiego konta (propozycja)
+
+1. Przeczytac log ostatniej sesji Jeffa: samosprawdzenie drewna (pkt 1) - 0 = dziala; -1 = latka dalej nie wolana.
+2. Pulapka Harmony (pkt 2) - przejrzec wszystkie latki "czynnego modelu"; jesli ktoras nie dziala, to bledy w grze od dawna.
+3. Rekruci ze sprzetem bez umiejetnosci (pkt 14) - prosta poprawka, Jeff zglosil jako blad.
+4. Zbrojownia wedlug decyzji Jeffa (pkt 15) - wieksza robota (UI + wlasnosc sprzetu zolnierzy + wymiana przy dozbrajaniu).
+5. Skarbiec kryjowki i komunikaty o zlocie band (pkt 16) - czeka na "tak" Jeffa.
+6. Kusze (pkt 4), placek/marchew (pkt 5) - czekaja na "tak" Jeffa.
+7. Obserwacja kampanii: kiesa ludu (6), bandyci (7), armie (8), oblezenia (9), Joffrey (11), dlug snu AI (3).
+
 ## 7. Pulapki techniczne (z doswiadczenia)
 
 - Bash: komenda > 8 KB sie ucina - dluzsze skrypty pisz plikiem (Write) i uruchamiaj.
