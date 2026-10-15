@@ -1212,3 +1212,43 @@ fin33 30 dob (B10b) OK. W TOKU: fin34 120 dob (b9cb462e).
 **Otwarte (nie zrobione - nie pisac "gotowe"):** strojenie z fin31 (CR-5, budowy, skora, strzaly AI 52%, A17-11h znikajacy ludzie, W5-5, parser SD-B4), pulapka pokoju,
 liczba zdobyc po OB1-OB5 (fin32: 3 zamki w 120 dob, 0 trebuszy AI - mury nigdy nie rozbite), AUD-P1-5, AB-10 prog, D1-D10 (wydajnosc, logi, porzadki MCM - wyciac
 probe drog, test Innych, dokumenty, instrukcja), drobne z audytu (AM-02/03/07/08/23/24/25, AM-17 SCA, AM-30 B po bilansie ciast), AM-28 wzorce craftsman/noble nord.
+
+
+## 33. Rano 15.10 - PRZEKAZANIE NA DRUGIE KONTO (limit tygodnia 97%) - START TUTAJ
+
+**W grze: WGRANIE 54** (fin34 = zbior-e8 b9cb462e; kopie *.bak-2026-10-14-noc54-przed i D:/Backup-Bannerlord/wgrane/2026-10-14-noc54-przed).
+**Religia BK WYLACZONA** w BannerKings.json (EnableReligion false; kopia z ON: BannerKings.json.bak-2026-10-15-religia-ON-test) - wlaczyc z powrotem
+dopiero po tescie poprawki RotStoryArmies (Jeff chce religii: "napraw religie").
+Raport 4 lat: `docs/test-zbiorczy/RAPORT-4-LATA-2026-10-15.md` (Jeff go dostal). Skrypt tabeli krolestw: `tools/raporty/krolestwa.py`.
+
+### Galezie do scalenia (wszystkie od zbior-e8, wypchniete, build kod 0, recenzja zrobiona, NIETESTOWANE w grze)
+1. `w-toku/zbior-e8` **b1cb26a8** (juz w zbior-e8 na zb/int): RotStoryArmies - wywrotka d767 (Blackwater ROT: NRE GatherArmyLogEntry, gdy
+   Kingdom.CreateArmy nie utworzyl armii Stannisa); klucz RotStoryArmyGuard.
+2. `w-toku/daenerys` **3a980d6a** (zb/dany): CrashScribe StoryThrone.cs, klucz StoryThroneGuard - BK zmienil ustroj Targaryenow na Republic i coroczne wybory
+   BK daly tron Barristanowi (d366); ochrona 20 monarchii ROT (blokada wyborow republiki BK i abdykacji Diplomacy dla wladcy ze startu, powrot na tron,
+   S9 nie wypycha jego rodu; RotHandover - Nocna Straz / Polnoc zostaja jak w fabule). Grupa progow `daenerys`.
+3. `w-toku/oblezenia-2` **afbe5fb2** (zb/obl2): Armoury SiegeWalls2.cs - trebusze AI pod miastem i stolica (druga ekipa rownolegle; zamek po 10 dobach bez
+   taranu i wiezy), glod (bilans jedzenia oblezonej twierdzy nigdy dodatni, przy zapasie 0 ginie 5%/dobe, kapitulacja ponizej max(20, 10% startu) droga
+   'pusta warownia'), drabiny AI po >= 30 dobach przy przewadze >= 6:1. Klucze SiegeAiTrebuchets, SiegeTrebuchetCastleDays 10, SiegeStarvation,
+   SiegeStarveLossPercent 5, SiegeSurrenderShare 0.1, SiegeSurrenderMen 20, SiegeLadderOverwhelm, SiegeLadderMinDays 30, SiegeLadderMinRatio 6; gen_mcm 1522;
+   grupa `oblezenia2` (O2-0..5; cel 2 lat: miasta 4-12, stolice <= 1, zamki >= 0.75 x dzis, najdluzsze oblezenie <= 150).
+   PRZYCZYNY z dowodem: budowa machin AI to 9,4% (zamek) / 6,3% (miasto) / 3,8% (stolica) tempa gry (BK LongerSieges 0.5 x RB 0.75 x SiegePace 0.5 x OB4) -
+   trebusz 40 osobodni, oboz 3000 ludzi: pierwszy trebusz po 18 / 27 / 45 dobach, a oblezenia trwaly mediana 9 dob; gra buduje 1 machine naraz w kolejnosci
+   listy; glod: castle_B8 bez jedzenia od 141. doby, gra rani tylko 10%/dobe, milicja nie gloduje, dobrobyt 0 -> bilans jedzenia dodatni z targu,
+   ROT dopisuje 'ziemie wokol'; gra nie ma kapitulacji. NIEROZWIAZANE: oboz-widmo (sila 0) pod castle_B8 nie odchodzi - do decyzji / zbadania;
+   mozliwe, ze trzeba tez zlagodzic skumulowane spowolnienie budowy (4 mnozniki).
+
+### Kolejnosc pracy (Jeff: "dokoncz wszystko"; decyzje Jeffa: religia ON, oblezenia wedlug propozycji 1-4, Daenerys krolowa, raport konczy sie na 4 latach)
+1. Scalic daenerys i oblezenia-2 do zbior-e8 na zb/int (`bash tools/scalanie/scal.sh <galaz> b1cb26a8`; konflikty Config.cs / CrashScribe.settings.xml /
+   Settings.cs / McmSettings.cs / sprawdz_logi.py - suma obu stron jak przy audyt-a/b; potem gen_mcm, build obu, sprawdz_narzedzie, metody.py).
+2. DLL autotestu CrashScribe: worktree na nowym HEAD + `git apply -3 .../7016f733-.../scratchpad/test/at1-cs.diff` (konflikty csproj i SubModuleMain - suma),
+   build; zestaw test/fin35 (Armoury + CrashScribe bez autotestu z zb/int; ForgeView, GrandTourney, RealisticCaptivity z fin34).
+3. Test A: religia ON (przywrocic BannerKings.json z .bak-2026-10-15-religia-ON-test), `bieg.ps1 -LoadSave autotest-6lat-d720 -Days 55` - Blackwater bez
+   wywrotki (linia "Armie fabuly ROT"), Daenerys wraca na tron w 1. dobie (grupa daenerys), grupy audyta/audytb/unikaty/b10b/spojnosc bez nowych NIE.
+4. Test B: nowa kampania 2 lata (728 dob, ok. 2,7 h) - grupa oblezenia2 (cele O2-4), oblezenia, szturm, odsiecz, w5, ekonomia.
+5. WGRANIE 55 (wgraj.ps1 -Tag 2026-10-1x-55, galaz noc/wgranie-55) tylko po udanych testach; religia ON zostaje, jesli test A przeszedl.
+6. Dalsze (z raportu 4 lat): JOFFREY zyje po Purpurowych Godach (ROT JoffreyEvent.DailyTickEvent ma zabic Joffreya dobe po oknie - nie wykonal sie;
+   sprawdzic, czy inne wydarzenia tez gubia skutki: ROTEventBehavior, nasze rozciaganie fabuly CrashScribe Fabula x4.33 / rozrusznik); EKONOMIA - zloto osiada
+   w kiesie ludu (37 -> 51 mln w 2 lata), wojsko w wojnie 64 -> 38 tys. (cel 85) - przepływ ludu z powrotem do obiegu; armie rozpadaja sie przez odejscie
+   druzyn (NotEnoughParty), nie spojnosc; AUD-P1-5 (2 wsie bez tytulu), prog AB-10 (predkosc morza x0.93 to wzor War Sails - prog na INFO);
+   D1-D10 (wydajnosc, logi, porzadki MCM - wyciac probe drog, test Innych, dokumenty, instrukcja); drobne z audytu.
