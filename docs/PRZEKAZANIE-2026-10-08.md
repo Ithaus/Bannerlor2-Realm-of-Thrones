@@ -1293,3 +1293,14 @@ Test nowej kampanii 12 dob: 2 rozwiazane, obie w dniu zalozenia [P]. Test fin41 
 Starfall (7103 vs 992): MB przepuscil, szturmu brak w logu, oblezenie zdjete bitwa z odsiecza 78% - do zbadania na zapisie Jeffa.
 MONITORING (Jeff gra - NIC nie wgrywac ani testowac, gdy gra dziala): Armoury-*.log - MB, "Oblezenia 2 (zdobycie)", AC wiek, udzialy zlota (korony spadaly ok. 0.6 pkt/mies. w tescie F).
 Otwarte: Daenerys StoryThrone po wczytaniu, Joffrey po Purpurowych Godach, odparcie OB2 przy rozbitej zalodze (czy prog 22% nie za niski), AUD-P1-5, AB-10, D1-D10; prog oblezenia2 w sprawdz_logi bez MB.
+
+### 36. WGRANIE 57 (15.10 ok. 05:30 UTC) - START TUTAJ
+W grze: `w-toku/zbior-e8` **6cf8c7f0** = 56 + tron Daenerys (CrashScribe md5 a8e0904d; kopia *.bak-2026-10-15-wgranie57-przed i D:\Backup-Bannerlord\wgrane\2026-10-15-wgranie57-przed).
+TRON (StoryThrone): MBObjectManager.GetObject<Kingdom> dawal null w KAZDEJ kampanii (linia DY "krolestwo upadlo 20" takze na nowej kampanii) - ochrona nie dzialala nigdy;
+teraz Kingdom.All + Hero.FindFirst (pamiec bohatera czyszczona w ResetSession). Test zapis F d240, 10 dob: 20/20 rozpoznane, Daenerys rzadzi, zmiany ustroju BK pominiete 20/d, 0 potkniec, Armoury 0 ERROR
+(wywrotka silnika przy wyjsciu - znana, po KONIEC OK).
+JOFFREY: bez zmian w kodzie. [K] ROT JoffreyEvent.DailyTickEvent: po >= 1 dobie zabija Joffreya (KillCharacterAction.ApplyByMurder) i dopiero wtedy CompleteEvent;
+w tescie 4 lat wydarzenie bylo "odpalone" (TotalEvents > 0) = zabojstwo wywolane; CanHeroDie veto ma tylko ROTOthers (Biali Wedrowcy). Wczesniejsze "Joffrey zyje"
+to najpewniej nazwa rodu "Baratheon, Joffrey" (zostaje po smierci) w tabelach - sprawdzic na zapisie Jeffa po Purpurowych Godach.
+Czeka na slowo Jeffa: odparcie OB2 tylko gdy na murach stoi >= 1/4 obroncow ze startu szturmu dla KAZDEJ zalogi (dzis tylko <= 100 miasto / <= 30 zamek; Sweetport 2033 vs 186 odparty przy ok. 22 obroncach).
+Drobne z audytu (gra bez wplywu): AUD-P1-5 (2 z 571 wsi bez tytulu BK - tytuly powstaja na starcie kampanii), AB-10 (prog narzedzia), D1-D10 (koniec projektu).
