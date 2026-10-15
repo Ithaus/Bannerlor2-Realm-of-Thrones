@@ -2174,3 +2174,9 @@ Swiat Jeffa d9: wojny FreeFolk-NW, Dragonstone-Stormlands; 0 oblezen; Daenerys r
   (drugi z 1.0 h). Przyczyna [K]: NightRest.OnHourly rozlicza swit przy kazdym ticku z h == dawn; tick nadrabiany w klatce ma te sama godzine (AI ma straznik T10-R R7, gracz nie mial).
   Naprawa `w-toku/sen-gracza` b1585e17 (swit gracza raz na 12 h gry), build 0, test/fin46 (Armoury 8b1570bb) - CZEKA na przerwe w grze (krotki test + wgranie 59).
   Do zbadania: tego samego switu 108858 AI dostalo dlug naraz 203 partie (108859: 60) - nadrabianie tickow w nocy (szybki czas / sen w menu) a ksiega AI (campPast = InCamp(h-1)).
+
+### 38. WGRANIE 59 (15.10 ok. 08:15 UTC) - START TUTAJ
+W grze: `w-toku/zbior-e8` **52896aca** (Armoury 9462e17e) = 58 + sen gracza (swit raz na 12 h gry, b1585e17) + nagroda turnieju (52896aca: brak na polce -> miasto
+zamawia u rzemieslnikow, kasa -> lud KCraftPaid, gracz dostaje przedmiot od razu; klucz TourneyPrizeCommissioned). Test zapis F d240 8 dob OK, swity gracza 5 = swity AI 5, 0 ERROR.
+Jeff dostal za vargo_armor w Duskendale 253 zl zamiast pancerza (przed poprawka). Otwarte: dlug snu AI (203 partie jednego switu - nadrabianie tickow nocy), ceny placka/marchwi,
+AUD-P1-5 (2 wsie), zawieszenie w kreatorze postaci (nie powtorzylo sie).
