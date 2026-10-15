@@ -22,6 +22,7 @@ namespace Armoury
         internal struct Recipe
         {
             public List<Part> Parts;
+            public float WoodKg;     // SmithWood (Jeff 15.10): drewno przepisu w kg - kuznia otwiera ladunek dopiero, gdy zapas otwartego nie starcza
             public int Stamina;
             public int SkillNeeded;  // PROG: od ilu Smithing wolno sie zabrac (SmithingSkillPerTier) - kucie, naprawa wlasnoreczna
             public int Difficulty;   // TRUDNOSC dla kosci (SmithingDifficultyPerTier): jakosc, pekniecie, XP, odczyt wzoru (pokretla Jeffa 07.10)
@@ -113,7 +114,14 @@ namespace Armoury
         internal static Recipe For(ItemObject item)
         {
             var r = BuildRecipe(item);
+            float wkg = _woodKgBuild;
+            _woodKgBuild = 0f;
             try { if (IsLegendary(item)) r = Legendize(r); } catch { }
+            if (wkg > 0f && SmithWood.On)
+            {
+                r.WoodKg = wkg;
+                Add(r, _wood, SmithWood.LoadsFor(wkg));   // 0, gdy zapas otwartego ladunku starcza - wtedy przepis nie zada drewna
+            }
             return r;
         }
 
@@ -255,6 +263,7 @@ namespace Armoury
             var s = Settings.Current;
             var r = new Recipe();
             r.Parts = new List<Part>();
+            _woodKgBuild = 0f;
             try
             {
                 int tier = Grade(item);
@@ -340,7 +349,7 @@ namespace Armoury
                         // PRAWO WAGI (Jeff 01.09): 75% wagi w drewnie, 25% wagi
                         // w metalu SWOJEGO tieru ("t6 = iron6"), kazdy skladnik
                         // minimum 1 sztuka. Kusza liczy sie tak samo.
-                        Add(r, _wood, MathF.Max(1, MathF.Ceiling(weight * 0.75f / WoodKg())));
+                        AddWood(r, weight * 0.75f, MathF.Max(1, MathF.Ceiling(weight * 0.75f / WoodKg())));
                         Add(r, MaterialItem(IronForTier(tier)),
                             MathF.Max(1, MathF.Ceiling(weight * 0.25f / IngotKg(tier))));
                         Add(r, bowstring, 1);
@@ -359,7 +368,7 @@ namespace Armoury
                         {
                             int heads = Math.Max(1, (int)Math.Ceiling(cost.MetalKg * batch / MatKg(cost.Grade) - 1e-4));
                             Add(r, MaterialItem(cost.Grade), heads);
-                            Add(r, _wood, 1);
+                            AddWood(r, 1f, 1);
                         }
                         else
                         {
@@ -375,7 +384,7 @@ namespace Armoury
                             float quiverKg = perShaft * stack;
                             int heads = Math.Max(1, (int)MathF.Floor(quiverKg / IngotKg(tier))) * batch;
                             Add(r, MaterialItem(IronForTier(tier)), heads);
-                            Add(r, _wood, 1);
+                            AddWood(r, 1f, 1);
                         }
                     }
                     bool ammo = tt == ItemObject.ItemTypeEnum.Arrows || tt == ItemObject.ItemTypeEnum.Bolts;
@@ -440,7 +449,7 @@ namespace Armoury
                     item.ItemType == ItemObject.ItemTypeEnum.Crossbow ||
                     item.ItemType == ItemObject.ItemTypeEnum.Arrows ||
                     item.ItemType == ItemObject.ItemTypeEnum.Bolts)
-                    Add(r, _wood, MathF.Max(1, MathF.Ceiling(weight / WoodKg())));   // wpis 50: sztuka drewna to ladunek, nie kilogram
+                    AddWood(r, weight, MathF.Max(1, MathF.Ceiling(weight / WoodKg())));   // wpis 50: sztuka drewna to ladunek, nie kilogram
 
                 float fiddly = IsFiddly(item.ItemType) ? (1f + s.FiddlyStaminaBonus) : 1f;
                 r.Stamina = MathF.Max(5, (int)(tier * s.StaminaPerTier * fiddly));
@@ -494,6 +503,22 @@ namespace Armoury
         internal static bool IsFiddly(ItemObject.ItemTypeEnum t)
         {
             return t == ItemObject.ItemTypeEnum.HandArmor || t == ItemObject.ItemTypeEnum.HeadArmor;
+        }
+
+        [ThreadStatic] private static float _woodKgBuild;
+
+        /// <summary>Drewno przepisu: przy SmithWood w kg (ladunek dopiero w For), inaczej po staremu w ladunkach.</summary>
+        private static void AddWood(Recipe r, float kg, int legacyLoads)
+        {
+            if (!SmithWood.On) { Add(r, _wood, legacyLoads); return; }
+            _woodKgBuild += Math.Max(0.1f, kg);
+        }
+
+        private static int WoodLoads(Recipe r)
+        {
+            if (r.Parts == null) return 0;
+            foreach (var p in r.Parts) if (p.Item == _wood) return p.Count;
+            return 0;
         }
 
         private static void Add(Recipe r, ItemObject item, int count)
@@ -605,6 +630,7 @@ namespace Armoury
             {
                 var roster = MobileParty.MainParty.ItemRoster;
                 foreach (var p in r.Parts) Take(roster, p.Item, p.Count);
+                if (r.WoodKg > 0f) SmithWood.Use(r.WoodKg, WoodLoads(r), null);
                 return true;
             }
             catch (Exception e) { Log.Error("TakeMaterials", e); return false; }
@@ -635,6 +661,7 @@ namespace Armoury
             {
                 var roster = MobileParty.MainParty.ItemRoster;
                 foreach (var p in r.Parts) Take(roster, p.Item, MathF.Max(1, (int)(p.Count * share)));
+                if (r.WoodKg > 0f) { int wl = WoodLoads(r); SmithWood.Use(r.WoodKg * share, wl > 0 ? MathF.Max(1, (int)(wl * share)) : 0, null); }
             }
             catch (Exception e) { Log.Error("TakePartial", e); }
         }

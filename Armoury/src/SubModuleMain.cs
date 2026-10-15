@@ -403,6 +403,7 @@ namespace Armoury
                 TierDesertionModel.Install(starter);   // prawo dezercji (Jeff 17.09) - patrz DesertionLaw.cs
                 starter.AddBehavior(new ArmouryBehavior());
                 starter.AddBehavior(new Uniques());
+                starter.AddBehavior(new SmithWoodBehavior());   // Jeff 15.10: drewno w kuzni w kg - zapas otwartego ladunku w zapisie
                 starter.AddBehavior(new HideoutPurge());
                 starter.AddBehavior(new BattleMuster());
                 starter.AddBehavior(new LegendaryLaw());

@@ -92,6 +92,14 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeWorksWithoutYou { get; set; } = true;
 
+        [SettingPropertyBool("Smith Wood Kg", HintText = "at your anvil wood counts in kilograms: a handle takes 1-3 kg, a bow its own weight - not a whole 100 kg load of hardwood each time. The anvil opens a new load only when the open one runs out. Off = every piece takes whole loads, as before")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmithWoodKg { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Smith Wood Kg Per Piece", 0.00f, 4.00f, "0.00", HintText = "with Smith Wood Kg: kilograms of wood for each piece of wood a weapon part of the game's smithing asks for (a hammer handle that asked for 3 takes 3 kg)")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public float SmithWoodKgPerPiece { get; set; } = 1f;
+
         [SettingPropertyBool("Tourney Prize Commissioned", HintText = "when the town has no piece of your tournament prize in its stores, it has its craftsmen make it and pays them from its treasury - you get the prize itself, not its price. Off = the town pays you the price instead")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool TourneyPrizeCommissioned { get; set; } = true;
@@ -6230,6 +6238,8 @@ namespace Armoury
             s.CharcoalPerIron = CharcoalPerIron;
             s.StaminaPerTier = StaminaPerTier;
             s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
+            s.SmithWoodKg = SmithWoodKg;
+            s.SmithWoodKgPerPiece = SmithWoodKgPerPiece;
             s.TourneyPrizeCommissioned = TourneyPrizeCommissioned;
             s.SmeltNoWood = SmeltNoWood;
             s.ForgeOneClock = ForgeOneClock;
