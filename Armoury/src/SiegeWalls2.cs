@@ -704,6 +704,7 @@ namespace Armoury
                 bool eng = (ram && tower) || SiegeWalls.WallHpMin(st) <= 0.0;
                 bool lad = LadderOn && ev.SiegeStartTime.ElapsedDaysUntilNow >= LadderDays;
                 if (!eng && !lad) return false;
+                if (SiegeWalls.InRepelPause(ev)) return false;                           // przerwa po odparciu (OB2) - Veto i tak wstrzyma
                 int hour = (int)CampaignTime.Now.ToHours, last;
                 if (_unHour.TryGetValue(ev, out last) && last == hour) return false;       // jedno losowanie na godzine i oboz
                 _unHour[ev] = hour;

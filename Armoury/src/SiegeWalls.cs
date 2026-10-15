@@ -478,6 +478,13 @@ namespace Armoury
         private static readonly Dictionary<SiegeEvent, Pause> _pauses = new Dictionary<SiegeEvent, Pause>();
         private static readonly List<Pause> _pendingPauses = new List<Pause>();
 
+        /// <summary>MB (SiegeWalls2.Unblock): oboz w przerwie po odparciu (OB2) - Veto i tak wstrzyma szturm.</summary>
+        internal static bool InRepelPause(SiegeEvent ev)
+        {
+            try { var pz = PauseOf(ev, false); return pz != null && Now < pz.Until && !SiegeWalls2.Surrendered(ev.BesiegedSettlement); }
+            catch (Exception e) { Stumble("InRepelPause", e); return false; }
+        }
+
         private static Pause PauseOf(SiegeEvent ev, bool create)
         {
             if (ev == null) return null;
