@@ -1424,9 +1424,9 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float SiegeReliefWallsShare { get; set; } = 0.5f;
 
-        [SettingPropertyInteger("Siege Besieger Prep Percent", 10, 100, "0", HintText = "besiegers - AI lords and you alike - build their siege camp and engines at this percent of the speed set by Siege Pace Percent: preparing a siege takes weeks (100 = as fast as before)")]
+        [SettingPropertyInteger("Siege Besieger Prep Percent", 10, 100, "0", HintText = "besiegers - AI lords and you alike - build their siege camp and engines at this percent of the speed set by Siege Pace Percent (towns and capitals still take longer by Siege Town / Capital Prep Factor). 100 = Siege Pace Percent alone (a town camp of 3000 men has its camp, ram and tower in about 8 days); 50 = twice as long")]
         [SettingPropertyGroup("The marching column")]
-        public int SiegeBesiegerPrepPercent { get; set; } = 50;
+        public int SiegeBesiegerPrepPercent { get; set; } = 100;
 
         [SettingPropertyFloatingInteger("Siege Town Prep Factor", 1.00f, 4.00f, "0.00", HintText = "preparing the siege of a town takes this many times longer than of a castle")]
         [SettingPropertyGroup("The marching column")]
@@ -1492,13 +1492,17 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeLadderOverwhelm { get; set; } = true;
 
-        [SettingPropertyInteger("Siege Ladder Min Days", 0, 364, "0", HintText = "with Siege Ladder Overwhelm: days the siege must have lasted")]
+        [SettingPropertyInteger("Siege Ladder Min Days", 0, 364, "0", HintText = "with Siege Ladder Overwhelm: days the siege must have lasted (three weeks)")]
         [SettingPropertyGroup("The marching column")]
-        public int SiegeLadderMinDays { get; set; } = 30;
+        public int SiegeLadderMinDays { get; set; } = 21;
 
-        [SettingPropertyFloatingInteger("Siege Ladder Min Ratio", 2.00f, 20.00f, "0.0", HintText = "with Siege Ladder Overwhelm: how many times stronger than the defenders the besiegers must be (twice the three to one the game asks to begin a siege)")]
+        [SettingPropertyFloatingInteger("Siege Ladder Min Ratio", 2.00f, 20.00f, "0.0", HintText = "with Siege Ladder Overwhelm: how many times stronger than the defenders the besiegers must be (the game asks three to one to begin a siege)")]
         [SettingPropertyGroup("The marching column")]
-        public float SiegeLadderMinRatio { get; set; } = 6f;
+        public float SiegeLadderMinRatio { get; set; } = 4f;
+
+        [SettingPropertyBool("Siege Engines In Progress Dont Hold", HintText = "AI lords whose battering ram and siege tower stand ready (or whose engines have battered a breach) storm the walls without waiting for the trebuchets still being built - the game held every assault while any engine was half done, so a camp building trebuchets never stormed. Also lets Siege Ladder Overwhelm work when no engine is built at all (the game never storms without one). Off = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeEnginesInProgressDontHold { get; set; } = true;
 
         [SettingPropertyBool("Siege Walls Log", HintText = "writes log lines about these siege rules: a daily summary, each assault held back by the walls, each repelled assault with the pause before the next, each assault joined by a relief force, each siege camp slowed (log only - nothing in the game changes)")]
         [SettingPropertyGroup("The marching column")]
@@ -6570,6 +6574,7 @@ namespace Armoury
             s.SiegeLadderOverwhelm = SiegeLadderOverwhelm;
             s.SiegeLadderMinDays = SiegeLadderMinDays;
             s.SiegeLadderMinRatio = SiegeLadderMinRatio;
+            s.SiegeEnginesInProgressDontHold = SiegeEnginesInProgressDontHold;
             s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;

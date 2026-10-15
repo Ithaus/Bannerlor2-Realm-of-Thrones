@@ -265,7 +265,11 @@ namespace Armoury
         /// pierwszy raz w cyklu regula i linia O0; O1-O3 moga wynik zmienic na false (okup w toku). Wyjatek - wynik gry bez zmian.</summary>
         public static void AssaultPost(BesiegerCamp __instance, ref bool __result)
         {
-            if (!__result) return;
+            if (!__result)
+            {
+                if (!SiegeWalls2.Unblock(__instance)) return;
+                __result = true;                                           // MB (SiegeWalls2.Unblock): gra wstrzymala szturm przez machine w budowie albo brak machin - dalej OB1 i okup jak zwykle
+            }
             try
             {
                 if (SiegeWalls.Veto(__instance)) { __result = false; return; }   // OB1 / przerwa OB2 (SiegeWalls.cs) - PRZED okupem: okup liczy tylko po naszym "tak"

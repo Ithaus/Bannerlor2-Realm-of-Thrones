@@ -66,7 +66,18 @@ namespace Armoury
     /// DR - DRABINY AI (klucz SiegeLadderOverwhelm, w SiegeWalls.Veto): oblezenie >= SiegeLadderMinDays (30 - dluzsze niz 9 na 10 oblezen, p90 25 dob)
     ///   i sila oblegajacych >= SiegeLadderMinRatio (6 = dwa razy 3:1 gry do rozpoczecia oblezenia) x obroncy w pelni (miara OB1) -> OB1 przepuszcza
     ///   decyzje gry (brama, mury, losowanie); bitwa wedlug SZ1-SZ4 (drabiny x2 mury). Gra sama chce szturmu tylko z co najmniej jedna gotowa machina
-    ///   (GetNumberOfEquipmentsBuilt, BesiegerCamp :424) - "drabiny" = bez taranu i wiezy.
+    ///   (GetNumberOfEquipmentsBuilt, BesiegerCamp :424) - "drabiny" = bez taranu i wiezy. Jeff 15.10 ("3. tak"): progi 21 dob i 4:1 (bylo 30 i 6).
+    ///
+    /// MB - MACHINA W BUDOWIE NIE WSTRZYMUJE SZTURMU (klucz SiegeEnginesInProgressDontHold; Jeff 15.10 "2. tak"). Przyczyna [K gra]: BesiegerCamp
+    ///   .StartingAssaultOnBesiegedSettlementIsLogical :424-427 mnozy szanse szturmu przez min(3, gotowe) / 3 x (1 - 0.85 p^2), p = najwiekszy postep
+    ///   NIEGOTOWEJ machiny + 0.25 x (5 - gotowe) (DefaultCombatSimulationModel.GetMaximumSiegeEquipmentProgress). Z gotowym taranem i wieza (2) trebusz
+    ///   drugiej ekipy (TB) po ok. 1/3 budowy daje p >= 1.09 - kara <= 0 i gra nie szturmuje az do konca budowy (trebusz 40 osobodni, do 4 sztuk) -
+    ///   w tescie F (d272) miasta 0 z ok. 17 mimo przewag 2.8-5.4:1. Bez zadnej gotowej machiny gra nie szturmuje nigdy (min(3, 0) = 0), wiec DR
+    ///   (drabiny) nie mial czego przepuscic.
+    ///   Zmiana: postfiks decyzji gry (z SiegeRansom.AssaultPost przy "false"), oboz AI po przygotowaniach (bez gracza, skryptu, Innych):
+    ///   (a) gotowy taran i wieza albo wyrwa - szansa wzorem gry, ale p liczone tylko z taranow i wiez w budowie (machiny dystansowe - trebusze -
+    ///   nie czekaja); (b) DR (LadderOk: >= SiegeLadderMinDays i sila >= SiegeLadderMinRatio x obroncy) - szansa 0.1 x s gry bez kary machin.
+    ///   Losowanie raz na godzine i oboz, warunkowo tak, by razem z losowaniem gry szansa byla ta wyliczona; potem OB1 (brama, mury, DR) i okup jak zwykle.
     /// Wyjatek per obiekt = licznik potkniec (CLAUDE.md 7). Stan tylko w pamieci (po wczytaniu: licznik dob zamku i ludzie z poczatku oblezenia od wczytania).
     /// </summary>
     internal static class SiegeWalls2
@@ -663,6 +674,72 @@ namespace Armoury
             catch (Exception e) { Stumble("LadderPass", e); }
         }
 
+        // ============================================================ MB: machina w budowie nie wstrzymuje szturmu (Jeff 15.10 "2. tak", "3. tak")
+        internal static bool UnblockOn { get { var s = Settings.Current; return s != null && s.SiegeEnginesInProgressDontHold; } }
+        private static readonly Dictionary<SiegeEvent, int> _unHour = new Dictionary<SiegeEvent, int>();
+        private static readonly HashSet<SiegeEvent> _unLogged = new HashSet<SiegeEvent>();
+        private static int _dUnEng, _dUnLad, _dUnRolls;
+
+        /// <summary>Z SiegeRansom.AssaultPost przy "false" gry. true = szturm (dalej OB1 i okup). Szybkie wyjscie: klucz, oboz niegotowy, brak bramy i DR.</summary>
+        internal static bool Unblock(BesiegerCamp camp)
+        {
+            try
+            {
+                if (!UnblockOn || camp == null) return false;
+                var ev = camp.SiegeEvent;
+                var st = ev != null ? ev.BesiegedSettlement : null;
+                if (st == null || st.Town == null || !st.IsFortification || !camp.IsPreparationComplete) return false;
+                var lp = camp.LeaderParty;
+                if (lp == null || lp.IsMainParty || Scripted(lp) || Und(lp, st)) return false;
+                var side = ev.GetSiegeEventSide(BattleSideEnum.Attacker);
+                if (side == null || side.SiegeEngines == null) return false;
+                bool ram = false, tower = false; double prog = 0.0;
+                foreach (var x in side.SiegeEngines.AllSiegeEngines())
+                {
+                    if (x == null || x.SiegeEngine == null) continue;
+                    var t = x.SiegeEngine;
+                    if (x.IsConstructed) { if (t == DefaultSiegeEngineTypes.Ram || t == DefaultSiegeEngineTypes.ImprovedRam) ram = true; else if (t == DefaultSiegeEngineTypes.SiegeTower) tower = true; }
+                    else if (!t.IsRanged && x.Progress > prog) prog = x.Progress;      // taran / wieza w budowie - kara gry zostaje, trebusze nie
+                }
+                bool eng = (ram && tower) || SiegeWalls.WallHpMin(st) <= 0.0;
+                bool lad = LadderOn && ev.SiegeStartTime.ElapsedDaysUntilNow >= LadderDays;
+                if (!eng && !lad) return false;
+                int hour = (int)CampaignTime.Now.ToHours, last;
+                if (_unHour.TryGetValue(ev, out last) && last == hour) return false;       // jedno losowanie na godzine i oboz
+                _unHour[ev] = hour;
+                var m = SiegeWalls.Measure(camp);
+                if (m.Empty || m.SGame <= 1.0) return false;                             // gra: sila / (obroncy x przewaga^w) <= 1 - bez szturmu
+                double pGame = m.PGame, pt = 0.0; string why = null;                      // pGame: szansa gry tej chwili (z kara machin w budowie)
+                if (eng)
+                {
+                    double p = prog + 0.25 * (5 - m.Eq);
+                    double pen = Math.Min(3, m.Eq) / 3.0 * (1.0 - 0.85 * p * p);
+                    double pe = pen > 0 ? Clamp(0.1 * m.SGame * pen, 0.0, 1.0) : 0.0;
+                    if (pe > pt) { pt = pe; why = "machiny"; }
+                }
+                if (lad && LadderOk(camp, m))
+                {
+                    double pl = Clamp(0.1 * m.SGame, 0.0, 1.0);
+                    if (pl > pt) { pt = pl; why = "drabiny"; }
+                }
+                if (why == null || pGame >= 1.0 || pt <= pGame) return false;            // kara gry nie byla przeszkoda
+                _dUnRolls++;
+                if (MBRandom.RandomFloat >= (pt - pGame) / (1.0 - pGame)) return false;  // razem z losowaniem gry: szansa pt
+                if (why == "machiny") _dUnEng++; else _dUnLad++;
+                if (LogOn && _unLogged.Add(ev))
+                {
+                    double def = Math.Max(m.Def, m.Def0);
+                    Log.Info("Szturm bez czekania na machiny (MB): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | wodz " + Hn(lp) + " (frakcja "
+                             + (lp.MapFaction != null ? lp.MapFaction.StringId : "-") + ") | oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob | powod: " + why
+                             + " | taran " + (m.Ram ? "tak" : "nie") + ", wieza " + (m.Tower ? "tak" : "nie") + ", wyrwa " + (m.Gap ? "tak" : "nie") + ", gotowe machiny " + m.Eq
+                             + ", taran / wieza w budowie " + F(prog * 100.0, "0") + "%, kara gry " + F(m.Pen, "0.000") + " | sila oblegajacy " + F(m.Att, "0") + " / obroncy " + F(def, "0")
+                             + " = " + F(def > 0 ? m.Att / def : 0.0, "0.00") + ", s gry " + F(m.SGame, "0.000") + " | szansa gry " + F(pGame, "0.000") + " -> " + F(pt, "0.000") + " | dalej OB1 i okup.");
+                }
+                return true;
+            }
+            catch (Exception e) { Stumble("Unblock", e); return false; }
+        }
+
         // ============================================================ zdobycia (pomiar celu: miasta, stolice, zamki)
         private static int _dCaptTown, _dCaptCap, _dCaptCastle, _dCaptAfterSurr;
 
@@ -703,6 +780,9 @@ namespace Armoury
                 dead = null;
                 foreach (var kv in _gl) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
                 if (dead != null) foreach (var ev in dead) _gl.Remove(ev);
+                dead = null;
+                foreach (var kv in _unHour) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
+                if (dead != null) foreach (var ev in dead) _unHour.Remove(ev);
                 _surrendered.RemoveWhere(s => s == null || s.SiegeEvent == null);
                 int mk = 0, mTown = 0, mCap = 0, mCastle = 0;
                 foreach (var kv in _treb) if (kv.Value.On) { mk++; if (kv.Value.Cls == "stolica") mCap++; else if (kv.Value.Cls == "miasto") mTown++; else mCastle++; }
@@ -743,6 +823,7 @@ namespace Armoury
                 int nRot; lock (Gate) { nRot = _dRotSt.Count; }
                 sb.Append(", straty RB pominiete ").Append(_dRbSkip).Append(", ziemie wokol ROT odjete ").Append(nRot)
                   .Append(" | DR: przepuszczone ").Append(_dDrGate + _dDrWalls + _dDrRoll).Append(" (brama ").Append(_dDrGate).Append(", mury ").Append(_dDrWalls).Append(", losowanie ").Append(_dDrRoll).Append(')')
+                  .Append(" | MB: ").Append(UnblockOn ? "tak" : "nie").Append(", szturmy bez czekania: machiny ").Append(_dUnEng).Append(", drabiny ").Append(_dUnLad).Append(" (losowan ").Append(_dUnRolls).Append(')')
                   .Append(" | zdobyte dzis: miasta ").Append(_dCaptTown).Append(", stolice ").Append(_dCaptCap).Append(", zamki ").Append(_dCaptCastle).Append(" (po kapitulacji ").Append(_dCaptAfterSurr).Append(')')
                   .Append(" | oblezenia trwajace ").Append(going).Append(", najdluzsze ").Append(F(longest, "0.0")).Append(" dob (").Append(longestSt).Append("), ponad 150 dob: ")
                   .Append(over.Count == 0 ? "-" : string.Join(", ", over.ToArray()))
@@ -760,6 +841,7 @@ namespace Armoury
             _dBesieged = _dStarving = _dDead = _dSurr = _dSurrMen = _dRbSkip = _dNoPrison = 0;
             _dLongestHunger = 0; _dLongestHungerSt = "-"; _dSurSkip.Clear();
             _dDrGate = _dDrWalls = _dDrRoll = 0; _drLogged.Clear();
+            _dUnEng = _dUnLad = _dUnRolls = 0; _unLogged.Clear();
             _dCaptTown = _dCaptCap = _dCaptCastle = _dCaptAfterSurr = 0;
             lock (Gate) { _dClampSt.Clear(); _dRotSt.Clear(); _dClampSum = 0; _dStumbles = 0; }
         }
@@ -767,7 +849,7 @@ namespace Armoury
         /// <summary>Z SiegeWalls.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
         internal static void Reset()
         {
-            _treb.Clear(); _gl.Clear(); _surrendered.Clear(); _marked = 0;
+            _treb.Clear(); _gl.Clear(); _surrendered.Clear(); _marked = 0; _unHour.Clear();
             ZeroDay();
             lock (Gate) { _stumbles = 0; _err.Clear(); }
         }
