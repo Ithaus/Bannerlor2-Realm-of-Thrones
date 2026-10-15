@@ -1278,3 +1278,18 @@ po zmianie miasto: oboz+taran+wieza ok. 8 dob, trebusz ok. 9 przy 3000 ludziach;
 (4) PYTANIE JEFFA: "czemu armia sie rozchodzi?" - zbadac: w tescie 4 lat rozwiazania armii gl. NotEnoughParty (ok. 4450 w 2 lata), Inactivity 225, LeaderPartyRemoved 106, ArmyLeaderIsDead 106, FoodProblem 77, sredni wiek armii ok. 28 dob;
 spojnosc (AC) juz x0.23 - armie rozpadaja sie przez ODCHODZENIE DRUZYN (kod gry: kiedy druzyna AI opuszcza armie - glod, morale, ranni, nasze NightRest / budzet rodow 166 / pobor?), linie AC "Spojnosc armii (AC): dzien N" maja przyczyny.
 Do zrobienia potem: Daenerys StoryThrone (nie rozpoznaje krolestw po wczytaniu), Joffrey po Purpurowych Godach, AUD-P1-5, AB-10, D1-D10. Potem WGRANIE 56 po tescie.
+
+### 35. WGRANIE 56 + JEFF GRA (15.10 ok. 05:20 UTC) - START TUTAJ
+Jeff: "1. tak 2. tak 3. tak", "przerwij test i wprowadz zmiany", "zaczynam nowa kampanie ... bedziemy monitorowac moj save". Test F przerwany na d291 (Configs przywrocone).
+**W grze: WGRANIE 56** = `w-toku/zbior-e8` **1c450657** (Armoury md5 91489e46; reszta jak 55; kopia *.bak-2026-10-15-wgranie56-przed i D:\Backup-Bannerlord\wgrane6-10-15-wgranie56-przed).
+Zmiany od 55: kiesa-ludu, obieg-swiata, strojenie, czesc korony, pozyczki koron (test F do d291: 0 ERROR) + galaz `w-toku/oblezenia-3`:
+(1) SiegeBesiegerPrepPercent 50 -> 100 (budowa obozu i machin x2 szybciej; miasto 3000 ludzi: oboz+taran+wieza ok. 8 dob);
+(2) MB SiegeEnginesInProgressDontHold: gra (BesiegerCamp :424-427) mnozy szanse szturmu przez 1 - 0.85 (postep NIEGOTOWEJ machiny + 0.25 x (5 - gotowe))^2 -
+trebusz drugiej ekipy po 1/3 budowy zerowal szturm; teraz z gotowym taranem i wieza (albo wyrwa) liczy sie tylko taran/wieza w budowie; bez odblokowania w przerwie OB2;
+(3) DR drabiny 4:1 po 21 dobach (bylo 6:1 / 30) i dziala tez bez zadnej machiny (gra bez gotowej machiny nie szturmuje nigdy: min(3, 0) / 3 = 0).
+AC-W: linia "Spojnosc armii (AC wiek)" - rozwiazane armie wedlug przyczyny z wiekiem (Army._creationTime). PRZYCZYNA "rozpadu" [K]: StrategicCampaignAI145
+OnArmyCreated kasuje armie od razu (NotEnoughParty), gdy wodz < 22 zdrowych / sila < 80 / 0.75 doby po poprzedniej armii; BK ma tylko slad (army_disband.txt przy diagnostyce).
+Test nowej kampanii 12 dob: 2 rozwiazane, obie w dniu zalozenia [P]. Test fin41 (zapis F d240, 25 dob): MB 6 linii, DR 1, szturm Sweetport (3092 vs 186) ODPARTY OB2 (atak stracil 22%), potem odsiecz 101% -> koniec;
+Starfall (7103 vs 992): MB przepuscil, szturmu brak w logu, oblezenie zdjete bitwa z odsiecza 78% - do zbadania na zapisie Jeffa.
+MONITORING (Jeff gra - NIC nie wgrywac ani testowac, gdy gra dziala): Armoury-*.log - MB, "Oblezenia 2 (zdobycie)", AC wiek, udzialy zlota (korony spadaly ok. 0.6 pkt/mies. w tescie F).
+Otwarte: Daenerys StoryThrone po wczytaniu, Joffrey po Purpurowych Godach, odparcie OB2 przy rozbitej zalodze (czy prog 22% nie za niski), AUD-P1-5, AB-10, D1-D10; prog oblezenia2 w sprawdz_logi bez MB.
