@@ -186,6 +186,10 @@ RANGES = {
     'FolkLoanLimitDays': (0.0, 120.0, "0"),
     'FolkLoanRepayShareOfIncome': (0.0, 0.5, "0.00"),
     'FolkLoanDefaultDays': (7, 364, "0"),
+    # korona2 (15.10): pozyczki koron od miast - zakresy zgodne z przycieciem w kodzie (TownFolk.CrownLoans.cs: KlRate 0..0.5, KlLimitDays 0..364, KlDefault 7..364)
+    'CrownTownLoanRateYear': (0.0, 0.5, "0.00"),
+    'CrownTownLoanLimitDays': (0.0, 364.0, "0"),
+    'CrownTownLoanDefaultDays': (7, 364, "0"),
     'FolkLadderCeilingMax': (1.0, 10.0, "0.0"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),

@@ -44,7 +44,8 @@ namespace Armoury
         private static double GdMax(Settings s) { return HdClamp(s.FolkGuardMaxTimes, 1.0, 10.0); }
         // 15.10 test D (d30-180: korony 24.9 -> 16.9% zlota swiata, lordowie 36.9 -> 40.2%, lud w pasmie): czesc korony zmienna - gdy udzial koron w zlocie
         // swiata (wczorajszy pomiar straznika) spada ponizej FolkGuardCrownTarget, czesc korony = podstawa + 5 x brak, najwyzej 0.8 (reszta jak dotad pan / kasa).
-        // Decyzja Jeffa: zwrotu zoldu z korony do rodow NIE ruszamy i bez pozyczek koron od miast - korona dostaje wiecej tylko z obiegu ludu.
+        // Decyzja Jeffa: zwrotu zoldu z korony do rodow NIE ruszamy. korona2 (Jeff 15.10 "korony pozyczaja od miast"): czesc korony idzie
+        // do ZAPASU korony (GuardCrownReserve - bez tego 165 oddawal ja tego samego dnia w rentach 180), korony pozyczaja od miast (TownFolk.CrownLoans.cs).
         private static double GuardCrownShare(Settings s)
         {
             if (!GuardOn) return 0;
@@ -57,6 +58,34 @@ namespace Armoury
             return b;
         }
         private const double GdStep = 0.03, GdMin = 0.25, GdCapWorld = 0.005,   /* 15.10 test C: 0.0015 nie przegonilo doplywu do ludu (lud 9.9 -> 13% swiata, korony 24.9 -> 18.9% w 160 dob przy mnozniku 5) */ GdCapInflow = 2.0, GdCover = 0.8, GdEmaDays = 28;
+
+        /// <summary>
+        /// korona2 (A, klucz FolkGuardCrownToReserve; test D: czesc korony wplywala w dobie ludu przed CrownIncome.Begin, 165 liczyl ja jako "inne wplywy dnia" i tego
+        /// samego dnia oddawal w rentach 180 - inne 42 tys./d bez straznika, 185 tys./d przy czesci korony 129.5 tys./d): czesc korony jest ZAPASEM korony - tak, jak
+        /// zamierzal obieg2 ("zapas korony, wydawany jej droga 165/W5b"). Zawsze przy czynnym strazniku i kluczu (bez progu udzialu: bez skokow rent rodow z doby na dobe);
+        /// udzial koron reguluje dalej czesc zmienna (FolkGuardCrownTarget). Rownowaga przy czesci 35% i podstawie testu D: ok. 23% zlota swiata.
+        /// </summary>
+        private static bool CrownToReserveNow
+        {
+            get
+            {
+                var s = Settings.Current;
+                return s != null && s.FolkGuardCrownToReserve && GuardOn;
+            }
+        }
+
+        /// <summary>korona2 (A): po wplacie czesci korony do skarbca migawka 165 przesunieta o nia (CrownIncome.ShiftSnapshot): nie wplyw
+        /// dnia, wiec nie renty 180 tego dnia; zapas korony oddawany jak caly zapas (1/360 na dobe). Nie rzuca.</summary>
+        private static void GuardCrownReserve(Kingdom kd, long cp)
+        {
+            try
+            {
+                if (kd == null || cp <= 0 || !CrownToReserveNow) return;
+                CrownIncome.ShiftSnapshot(kd, cp);
+                _gdResT += cp;
+            }
+            catch (Exception e) { GuardStumble("GuardCrownReserve", e); }
+        }
 
         /// <summary>Skarbiec korony na czesc korony podatku od nadwyzki: krolestwo rodu pana osady (nie zniszczone). null - straznik wylaczony, udzial 0, rod bez krolestwa.</summary>
         private static Kingdom GuardCrownOf(Clan clan)
@@ -79,6 +108,7 @@ namespace Armoury
         private static long _gdWorld, _gdFolk, _gdLords, _gdCrowns, _gdTicks;
         private static bool _gdShares;
         private static long _gdCrownT; private static int _gdCrownTN;  // czesc korony z miast i zamkow (PayHoard) - doba
+        private static long _gdResT;                                    // korona2 (A): czesc korony podatku od nadwyzki do zapasu korony (miasta, zamki, wsie) - doba
         // ---- podatek od nadwyzki wsi (doba)
         private static long _vhTake, _vhLord, _vhTown, _vhCastle, _vhCrown, _vhPlayer, _vhHeld, _vhNoLord, _vhTicks;
         private static int _vhN, _vhUnder, _vhRaided, _vhHeldN, _vhNoBound, _vhBelow, _vhVill, _gdStumbles, _gdStumbleSess;
@@ -87,6 +117,8 @@ namespace Armoury
         private static string _lineGuard, _lineGuardStart, _lineVill;
         /// <summary>"Obieg" tej doby: podatek od nadwyzki wsi do glow rodow, kas miast i kas zamkow; czesc korony podatku od nadwyzki (miasta, zamki, wsie).</summary>
         internal static long LastVillHoardLord, LastVillHoardTown, LastVillHoardCastle, LastVillHoardTake, LastHoardCrown;
+        /// <summary>korona2 (A): "Obieg" - czesc korony podatku od nadwyzki tej doby, ktora weszla do zapasu korony (nie do wplywow dnia 165).</summary>
+        internal static long LastHoardCrownReserve;
 
         private static void ResetGuard()
         {
@@ -100,7 +132,7 @@ namespace Armoury
         {
             _gdN = _gdP = _gdE = _gdCapAbs = _gdNT = _gdNC = _gdNV = _gdPT = _gdPC = _gdPV = _gdWorldUsed = 0; _gdIn = double.NaN;
             _gdCovT = _gdAllT = 0; _gdMove = "-"; _gdWorld = _gdFolk = _gdLords = _gdCrowns = _gdTicks = 0; _gdShares = false;
-            _gdCrownT = 0; _gdCrownTN = 0;
+            _gdCrownT = 0; _gdCrownTN = 0; _gdResT = 0; LastHoardCrownReserve = 0;
             _vhTake = _vhLord = _vhTown = _vhCastle = _vhCrown = _vhPlayer = _vhHeld = _vhNoLord = _vhTicks = 0;
             _vhN = _vhUnder = _vhRaided = _vhHeldN = _vhNoBound = _vhBelow = _vhVill = _gdStumbles = 0;
             _vhGold0 = _vhGold1 = _vhNorm = _vhE0 = _vhE1 = 0;
@@ -263,6 +295,7 @@ namespace Armoury
                 {
                     try { kd.KingdomBudgetWallet += (int)cp; }
                     catch (Exception e) { vil.ChangeGold((int)cp); x -= cp; cp = 0; GuardStumble("PayHoardVillage(korona)", e); }
+                    if (cp > 0) GuardCrownReserve(kd, cp);   // korona2 (A): zapas korony, nie wplyw dnia (nie renty 180 tego dnia)
                 }
                 _vhTake += x; _vhE1 += room - x; _vhGold1 += vil.Gold;
                 if (x > 0) _vhN++;
@@ -303,6 +336,7 @@ namespace Armoury
             if (s == null) return;
             long t0 = Stopwatch.GetTimestamp();
             LastVillHoardLord = _vhLord; LastVillHoardTown = _vhTown; LastVillHoardCastle = _vhCastle; LastVillHoardTake = _vhTake; LastHoardCrown = _gdCrownT + _vhCrown;
+            LastHoardCrownReserve = _gdResT;   // korona2 (A)
             long folkEnd = 0;
             try { folkEnd = FolkAll(); _gdPEnd = folkEnd; } catch (Exception e) { GuardStumble("GuardDay(kiesy)", e); }
             double times = HoardTimes(s);

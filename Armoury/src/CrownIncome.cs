@@ -209,7 +209,7 @@ namespace Armoury
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
                         d.Measured = Math.Max(0, d.Own + d.Other);     // netto: wydatki skarbca spoza nas (Diplomacy, gra) zmniejszaja wplywy dnia
                         d.Stock = Math.Max(0, w - d.Measured);
-                        d.Release = (long)(Math.Max(0, d.Stock - reserve) / days);
+                        d.Release = (long)(Math.Max(0, d.Stock - reserve - TownFolk.CrownTownDebt(k)) / days);   // korona2: zloto pozyczone od miast to zapas trzymany, nie do rozdania (klucz wylaczony - 0)
                         d.Spend = Math.Max(0, Math.Min(Math.Max(0, w), d.Measured + d.Release));
                         d.Left = d.Spend;
                         _day[k] = d;
