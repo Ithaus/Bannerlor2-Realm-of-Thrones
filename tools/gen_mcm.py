@@ -169,6 +169,11 @@ RANGES = {
     'LordWarLevyLoyalty': (0.0, 5.0, "0.00"),
     'LordWarLevyProsperity': (0.0, 10.0, "0.00"),
     'LordWarLevyMinLoyalty': (0, 100, "0"),
+    # kiesa2 (podatek od nadwyzki ludu): stawka na dobe - kod przycina do 0..0.1, suwak 0..0.05 z trzema miejscami; poziom normalny jako wielokrotnosc
+    # zapasu dni - kod przycina do 1..20; udzial pana - kod przycina do 0..1 (TownFolk.Hoard.cs)
+    'FolkHoardTaxRate': (0.0, 0.05, "0.000"),
+    'FolkHoardNormalTimes': (1.0, 10.0, "0.0"),
+    'FolkHoardTaxLordShare': (0.0, 1.0, "0.00"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
     # E6/K2 (212): luz zapasu koni jako udzial jezdzcow kategorii (kod przycina do 0..1, Stables.Reserve)

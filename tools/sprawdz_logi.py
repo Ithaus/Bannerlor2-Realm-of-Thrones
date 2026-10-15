@@ -649,6 +649,12 @@ Uzycie (Python 3, tylko odczyt):
                     (INFO wedlug przyczyny); S9: OD-8 krolestwa BK z buntu 0 i nowe panstwa <= 1 na 364 doby (W-13; werdykt tylko z --crashscribe i linia S9),
                     OD-9 linia "Mends: BK rebel kingdoms off" z latkami secesji BK "wpieta TAK", secesje przejete (rody niezalezne z lennem, potkniecia 0)
                     i rody buntownikow bez krolestwa BK (recenzja 14.10: panstwa fin30 to secesje grup radykalnych BK, nie bunty). Log bez paczki: INFO, bez wyjatku.
+--grupa kiesa2    : (15.10, decyzja Jeffa "napraw to, najwyzej zwieksz podatki"; galaz w-toku/kiesa-ludu, TownFolk.Hoard.cs) python -I tools/sprawdz_logi.py
+                    --grupa kiesa2 <Armoury-*.log> (log czytany strumieniowo). Podatek pana od nadwyzki oszczednosci ludu: K2-0 linia startu (klucz tak),
+                    K2-1 linia doby w kazdej dobie kiesy czynnej, K2-2 potkniecia i ERROR 0, K2-3a kiesa W / poziom normalny (srednia 28 dob) <= 3.0 (bieg >= 182 dob),
+                    K2-3b rok do roku +-10% (bieg >= 392 dob), K2-3c przebieg (INFO), K2-4 pobrany podatek > 0, K2-5 ksiega (pobrano = do panow + do kas,
+                    nic ponizej poziomu normalnego, Obieg = linia doby, kontrola kies r = 0), K2-6 komu i ile (INFO), K2-7 miara W5-7 (INFO).
+                    Log bez paczki: INFO, bez wyjatku.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -26626,6 +26632,168 @@ def oblezenia2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ kiesa2 (15.10, decyzja Jeffa "napraw to, najwyzej zwieksz podatki"; Armoury/src/TownFolk.Hoard.cs)
+K2_HEAD = "Podatek od nadwyzki ludu (kiesa2): "
+K2_DAY = re.compile(r"Podatek od nadwyzki ludu \(kiesa2\): dzien (\d+) \| stawka ([\d.]+)%/d .*?\| pobrano (\d+) z (\d+) osad \(miasta (\d+), zamki (\d+); rodow (\d+)\): "
+                    r"W (\d+) / R (\d+) / P (\d+) / podzamcza (\d+) \| do glow rodow (\d+) \(w tym gracz (\d+)\), do kas miast (\d+), do kas zamkow (\d+) "
+                    r"\(w tym bez zywego pana (\d+)\)")
+K2_W = re.compile(r"kiesa W \(miasta (\d+) i podzamcza (\d+)\) przed / po (\d+) / (\d+), poziom normalny W (\d+)")
+K2_CTL = re.compile(r"kontrola: pobrano - do panow - do kas (-?\d+), ponizej poziomu normalnego po poborze (\d+)")
+K2_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.?$")
+K2_HELD = re.compile(r"wstrzymane w oblezeniu (\d+) \((\d+)\)")
+K2_COV = re.compile(r"danina P1 / M4 pokryla stawke: (\d+) klaso-osad")
+K2_OBG = (re.compile(r"podatek od nadwyzki ludu \(kiesa2\) kiesy ludu -> glowy rodow (\d+)"),
+          re.compile(r"podatek od nadwyzki ludu \(kiesa2\) z kies ludu (\d+)"),
+          re.compile(r"podatek od nadwyzki ludu \(kiesa2\) z kies podzamczy (\d+)"))
+K2_KL = re.compile(r"kontrola: zmiana kies (-?\d+) = wplywy (\d+) - wydatki (\d+), r = (-?\d+|-)")
+K2_SKARB = re.compile(r"Skarbce: dzien (\d+) - (.+?)( \(WOJNA\))?: skarbiec (-?\d+).*?wojsko rodow (\d+) ludzi")
+
+
+def kiesa2_main(logp):
+    """kiesa2 (15.10, decyzja Jeffa "napraw to, najwyzej zwieksz podatki"; Armoury/src/TownFolk.Hoard.cs): podatek pana od nadwyzki oszczednosci ludu.
+    Wejscie: log Armoury (czytany strumieniowo). K2-0 linia startu sesji (klucz tak), K2-1 linia doby w kazdej dobie kiesy czynnej, K2-2 potkniecia
+    i ERROR in TownFolk.Hoard 0, K2-3 kiesa W wobec poziomu normalnego: a) srednia ostatnich 28 dob <= 3.0 x poziom normalny (bieg >= 182 dob),
+    b) ostatnie 28 dob wobec 28 dob sprzed 364 dob +-10% (bieg >= 392 dob), c) przebieg (INFO); K2-4 pobrany podatek > 0, K2-5 ksiega bez rozjazdu:
+    pobrano = do panow + do kas, nic ponizej poziomu normalnego, "Obieg" (glowy rodow, kasy miast, kasy zamkow) = linia doby, kontrola kies "Kiesa ludu"
+    r = 0; K2-6 komu i ile na dobe (INFO), K2-7 miara W5-7 - druzyny lordow krolestw w wojnie, srednia ostatnich 28 dob (INFO).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("K2-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, kl, obg, errs = [], {}, {}, {}, 0
+    war = {}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(K2_HEAD):
+                if s.startswith(K2_HEAD + "start sesji"):
+                    starts.append(s)
+                else:
+                    d = num(r"dzien (\d+)", s)
+                    if d is not None:
+                        days[d] = s
+            elif s.startswith("Kiesa ludu: dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None and "| CZYNNA |" in s:
+                    mm = K2_KL.search(s)
+                    kl[d] = mm.group(4) if mm else None
+            elif s.startswith("Obieg: dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None and "(kiesa2)" in s:
+                    obg[d] = tuple((int(p.search(s).group(1)) if p.search(s) else None) for p in K2_OBG)
+            elif s.startswith("Skarbce: dzien "):
+                mm = K2_SKARB.match(s)
+                if mm and mm.group(3):
+                    dd = int(mm.group(1))
+                    war[dd] = war.get(dd, 0) + int(mm.group(5))
+            elif s.startswith("ERROR in TownFolk.Hoard"):
+                errs += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)}, dob kiesy czynnej {len(kl)}, linii Obieg z kiesa2 {len(obg)}")
+    if not starts and not days:
+        rep.add("K2-0: linia startu (podatek od nadwyzki ludu)", "brak linii", "INFO (wersja sprzed kiesa2)", None)
+        rep.show()
+        return 0
+    st = starts[-1] if starts else ""
+    on = "klucz Folk Hoard Tax tak" in st
+    rep.add("K2-0: linia startu (podatek od nadwyzki ludu)", st[len(K2_HEAD):][:240] if st else "brak linii startu (sa linie doby)",
+            "linia jest, klucz tak", (bool(st) and on) if (on or not st) else None)
+    if not on and not days:
+        rep.add("K2-1..K2-7", "klucz Folk Hoard Tax wylaczony - bez linii doby", "INFO", None)
+        rep.show()
+        return 0
+    # K2-1 doby
+    miss = sorted(d for d in kl if d not in days and d > min(kl))
+    rep.add("K2-1: linia doby w kazdej dobie kiesy czynnej", f"dob {len(days)}, dob kiesy czynnej {len(kl)}, brak linii w {len(miss)}" + (f" (np. {miss[:5]})" if miss else ""),
+            "0 brakow (poza pierwsza doba logu)", len(miss) == 0 and len(days) > 0)
+    # K2-2 potkniecia
+    stum = 0
+    for s in days.values():
+        mm = K2_STUM.search(s)
+        if mm:
+            stum += int(mm.group(1))
+    rep.add("K2-2: potkniecia kiesa2 / ERROR in TownFolk.Hoard", f"potkniecia {stum}, ERROR {errs}", "0 / 0", stum == 0 and errs == 0)
+    # liczby doby
+    rows = {}
+    for d, s in sorted(days.items()):
+        a = K2_DAY.search(s)
+        w = K2_W.search(s)
+        c = K2_CTL.search(s)
+        h = K2_HELD.search(s)
+        cv = K2_COV.search(s)
+        if not a or not w or not c:
+            continue
+        rows[d] = dict(rate=float(a.group(2)), take=int(a.group(3)), places=int(a.group(4)), clans=int(a.group(7)),
+                       cls=[int(a.group(i)) for i in range(8, 12)], lord=int(a.group(12)), player=int(a.group(13)), town=int(a.group(14)),
+                       castle=int(a.group(15)), nolord=int(a.group(16)), w0=int(w.group(3)), w1=int(w.group(4)), norm=int(w.group(5)),
+                       diff=int(c.group(1)), below=int(c.group(2)), held=int(h.group(1)) if h else 0, cov=int(cv.group(1)) if cv else 0)
+    if not rows:
+        rep.add("K2-3..K2-6: liczby linii doby", f"linii doby {len(days)}, rozpoznanych 0", "format linii doby", False)
+        rep.show()
+        return 0
+    ds = sorted(rows)
+    span = ds[-1] - ds[0] + 1
+    ratio = {d: (rows[d]["w1"] / rows[d]["norm"]) if rows[d]["norm"] > 0 else None for d in ds}
+
+    def avg_ratio(lo, hi):
+        v = [ratio[d] for d in ds if lo <= d <= hi and ratio[d] is not None]
+        return (sum(v) / len(v)) if v else None
+    last = avg_ratio(ds[-1] - 27, ds[-1])
+    first = avg_ratio(ds[0], ds[0] + 27)
+    rep.add("K2-3a: kiesa W / poziom normalny - srednia ostatnich 28 dob", f"{last:.2f} (pierwsze 28 dob {first:.2f}; dob {span})" if last is not None and first is not None else "-",
+            "<= 3.0 (bieg >= 182 dob)", (last <= 3.0) if (last is not None and span >= 182) else None)
+    if span >= 392:
+        prev = avg_ratio(ds[-1] - 364 - 27, ds[-1] - 364)
+        ch = (last / prev - 1) if (prev and last is not None) else None
+        rep.add("K2-3b: kiesa W / poziom normalny - ostatnie 28 dob wobec 28 dob sprzed 364 dob", f"{last:.2f} wobec {prev:.2f} ({ch * 100:+.1f}%)" if ch is not None else "-",
+                "+-10%", (abs(ch) <= 0.10) if ch is not None else None)
+    else:
+        rep.add("K2-3b: kiesa W / poziom normalny - stabilnosc rok do roku", f"bieg {span} dob", "INFO (bieg < 392 dob)", None)
+    step = max(1, len(ds) // 8)
+    path = ", ".join(f"d{d - ds[0] + 1}: W {rows[d]['w1'] / 1e6:.2f} mln = {ratio[d]:.2f}x" for d in ds[::step] if ratio[d] is not None)
+    rep.add("K2-3c: przebieg kiesy W (miasta i podzamcza) wobec poziomu normalnego", path[:400], "INFO", None)
+    # K2-4 pobrany podatek
+    tot = sum(rows[d]["take"] for d in ds)
+    paid = sum(1 for d in ds if rows[d]["take"] > 0)
+    rep.add("K2-4: pobrany podatek od nadwyzki", f"razem {tot} w {paid} z {len(ds)} dob ({tot / len(ds):.0f}/d)", "> 0", tot > 0)
+    # K2-5 ksiega
+    bad = [d for d in ds if rows[d]["diff"] != 0]
+    below = sum(rows[d]["below"] for d in ds)
+    om, on_ = [], 0
+    for d in ds:
+        o = obg.get(d)
+        if o is None or None in o:
+            continue
+        on_ += 1
+        if o != (rows[d]["lord"], rows[d]["town"], rows[d]["castle"]):
+            om.append(d)
+    rbad = [d for d in ds if kl.get(d) not in (None, "0", "-")]
+    rep.add("K2-5: ksiega - pobrano = do panow + do kas, nic ponizej poziomu normalnego, Obieg = linia doby, kontrola kies r = 0",
+            f"rozjazd w {len(bad)} dobach, ponizej poziomu {below}, Obieg rozny w {len(om)} z {on_} dob" + (f" {om[:3]}" if om else "")
+            + f", r != 0 w {len(rbad)} dobach" + (f" {rbad[:3]}" if rbad else ""),
+            "0 / 0 / 0 / 0", not bad and below == 0 and not om and not rbad and on_ > 0)
+    # K2-6 komu i ile
+    n = len(ds)
+    lord = sum(rows[d]["lord"] for d in ds); town = sum(rows[d]["town"] for d in ds); castle = sum(rows[d]["castle"] for d in ds)
+    cls = [sum(rows[d]["cls"][i] for d in ds) for i in range(4)]
+    rep.add("K2-6: komu i ile na dobe (INFO)", f"panowie {lord / n:.0f}/d (gracz {sum(rows[d]['player'] for d in ds) / n:.0f}), kasy miast {town / n:.0f}/d, kasy zamkow {castle / n:.0f}/d"
+            f" (bez zywego pana {sum(rows[d]['nolord'] for d in ds) / n:.0f}); od klas W {cls[0] / n:.0f} / R {cls[1] / n:.0f} / P {cls[2] / n:.0f} / podzamcza {cls[3] / n:.0f};"
+            f" pierwsza doba {rows[ds[0]]['take']}, ostatnia {rows[ds[-1]]['take']}; wstrzymane w oblezeniu {sum(rows[d]['held'] for d in ds)}; danina pokryla stawke"
+            f" srednio {sum(rows[d]['cov'] for d in ds) / n:.1f} klaso-osad/d", "INFO", None)
+    # K2-7 W5-7
+    wd = sorted(d for d in war if ds[0] <= d <= ds[-1])
+    if wd:
+        w28 = wd[-28:]
+        rep.add("K2-7: miara W5-7 - druzyny lordow krolestw w wojnie (INFO)", f"{sum(war[d] for d in w28) / len(w28) / 1e3:.1f} tys. (srednia ostatnich {len(w28)} dob)",
+                "INFO (cel Jeffa 85 tys.)", None)
+    else:
+        rep.add("K2-7: miara W5-7 (INFO)", "brak linii Skarbce w oknie", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -26762,6 +26930,8 @@ def main(argv):
         return tb_main(logp, start_arg, until_arg)   # tb (w-toku/strzaly-myto): strzaly AI - zamowienie amunicji na caly brak (AiAmmoOrderFull), B3 myto na Bliznakach (TwinsToll)
     if group == "kiesa1" and logp:
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
+    if group == "kiesa2" and logp:
+        return kiesa2_main(logp)   # kiesa2 (15.10, Jeff "napraw to, najwyzej zwieksz podatki"): podatek pana od nadwyzki oszczednosci ludu (TownFolk.Hoard.cs)
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "wyspywolni" and logp:
