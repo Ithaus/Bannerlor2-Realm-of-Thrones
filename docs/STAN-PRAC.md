@@ -2194,3 +2194,17 @@ AccessTools.Method(BKSmithingModel, ...) zwraca metode bazowa z ReflectedType = 
 przy starcie: koszt -1 przy zapasie 50 kg, zero linii postfiksu). Ekran kuzni pokazywal 1 drewno mimo zapasu 99 kg. Samosprawdzenie i 12 linii diagnostyki kosztu zostaja w logu.
 UWAGA na przyszlosc: ten sam wzorzec (model.GetType() + metoda z klasy bazowej) moze byc gdzie indziej - sprawdzic latki "czynnego modelu" (SiegeWalls2 ActionPost/FoodPost,
 ArmyCohesionYear) czy metoda jest DECLARED w typie modelu.
+
+### 41. NOC 15/16.10 - DRUGIE KONTO (sesja 6ba92574; start 16:05 zegara komp. = 23:05 UTC; Jeff spi, raport rano ok. 02:00 zegara komp.)
+Jeff (16:05): lista na noc - (1) wszystko z przekazania (PRZEKAZANIE-DRUGIE-KONTO rozdz. 6); (2) sprzet WSZYSTKICH jednostek zgodny z umiejetnoscia i kultura
+(przy poborze oddaja sprzet do zbrojowni, bo nie moga uzywac, i walcza piesciami); (3) bledy sesji: alarm w kryjowce, rozbici, ucieczka z pola; (4) kusze drozsze - TAK;
+(5) zloto bandytow / skarbiec kryjowki - TAK; (6) placek i marchew - TAK; (7) werbunek towarzyszy wobec cen; (8) oboz - czasem nie nocuje, a nie ma kary ani obozu;
+(9) optymalizacja; (10) oblezenia - czy dzialaja; (11) NA KONIEC audyt ekonomii i surowcow (produkcja, warsztaty, jednostki np. drewno 1 kg zamiast 100 kg, ceny wobec masy,
+gromadzenie zlota, na co wydawac). "Jesli bedziesz mial pytania zastosuj swoje sugerowane rady, rano napisz co zdecydowales." Decyzje = "DECYZJA CLAUDE (noc 15/16.10)" z wylacznikiem MCM.
+Sprawdzone przed praca (log 10-56-30, WGRANIE 61): drewno w kuzni DZIALA - samosprawdzenie 0 (oczekiwane 0), 12 kuc, 14.8 kg, zapas 99 -> 84.25 kg, 0 nowych ladunkow.
+Nowe bledy w tej sesji (31 ERROR, zlapane): HideoutAlarm.AlarmAround NRE 9x (12:10), BrokenMen.OnMissionTick NRE 14x (Team.UpdateCachedEnemyDataForFleeing, 12:10), FieldCraft.FleeTheField NRE 8x (11:10).
+Godziny w tych dokumentach podpisane "UTC" (15.10) to zegar komputera (PDT, UTC-7).
+Kopia zapisu Jeffa: D:/Backup-Bannerlord/zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-15-1212-noc-przed.sav (md5 31199349).
+W TOKU: workflow wf_698dd431-d80 (rozpoznanie 10 tematow -> kod -> recenzja -> poprawki); galezie od 39f8fe72 w drzewach zb/n-<klucz>:
+w-toku/noc-misje, noc-harmony, noc-sprzet (filtr sprzetu + zbrojownia gracza), noc-oboz, noc-ceny (kusze, placek/marchew, towarzysze), noc-skarbiec, noc-oblezenia (+ armie), noc-drobne
+(AUD-P1-5, Joffrey, obserwacje, AB-10, D1-D10); wydajnosc - tylko rozpoznanie, kod po scaleniu. Potem: scalenie do zbior-e8 (tools/scalanie/scal.sh), autotest, WGRANIE 62.
