@@ -1335,3 +1335,10 @@ goldenheart 3000, giant_bow 2000, ravens_teeth_arrows 60, qarth_longbow 18 - prz
 zapas otwartego ladunku w zapisie arm_smith_wood_kg; bron gry = sztuki drewna czesci x 1 kg - postfiks DefaultSmithingModel.GetSmithingCostsForWeaponDesign + Spend
 Materials; Recipes: waga drewna przedmiotu, ladunek dopiero gdy zapas nie starcza). Testy zapis F d240 (8 i 5 dob) OK, 0 ERROR. Nie sprawdzone w grze: ekran kuzni (0/1 drewna).
 Propozycja czeka na Jeffa: kusze 1.5-2 x cena luku o podobnej sile (dzis najmocniejsza kusza 27, najlepszy dlugi luk 45-48).
+
+### 40. WGRANIE 61 (15.10 ok. 11:05 UTC, bez autotestu - Jeff: "przetestuje, tylko wgraj") - START TUTAJ
+W grze: `w-toku/zbior-e8` **39f8fe72** (Armoury 3599e049) = 60 + SmithWood: latka kosztu drewna wpieta na metode z klasy deklarujacej (DefaultSmithingModel). Przyczyna [P]:
+AccessTools.Method(BKSmithingModel, ...) zwraca metode bazowa z ReflectedType = BKSmithingModel - Harmony wpial bez bledu, ale postfiks NIE byl wolany (samosprawdzenie
+przy starcie: koszt -1 przy zapasie 50 kg, zero linii postfiksu). Ekran kuzni pokazywal 1 drewno mimo zapasu 99 kg. Samosprawdzenie i 12 linii diagnostyki kosztu zostaja w logu.
+UWAGA na przyszlosc: ten sam wzorzec (model.GetType() + metoda z klasy bazowej) moze byc gdzie indziej - sprawdzic latki "czynnego modelu" (SiegeWalls2 ActionPost/FoodPost,
+ArmyCohesionYear) czy metoda jest DECLARED w typie modelu.
