@@ -127,6 +127,8 @@ namespace CrashScribe
         // B10b (ERRORS.md A7 klasa 7; decyzja Jeffa 14.10 "tak napraw"): atuty BK z bitew (Warband +25% wplywu, Famous Sellswords +20% slawy,
         // Cataphract +12% slawy) - postfiksy na DefaultBattleRewardModel (BkBattlePerks.cs); false = atuty bez dzialania jak dotad.
         public static bool BkBattlePerksFix = true;
+        // 15.10 (wywrotka d767 testu 6-letniego, Blackwater ROT): armia wydarzenia ROT tworzona, gdy Kingdom.CreateArmy jej nie utworzyl; GatherArmyAction bez armii pomijany (RotStoryArmies.cs)
+        public static bool RotStoryArmyGuard = true;
         public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
 
         internal static void Load(string moduleDataDir)
@@ -223,6 +225,7 @@ namespace CrashScribe
                         case "BkrotFixSpouseScore": BkrotFixSpouseScore = B(v); break;
                         case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
                         case "BkBattlePerksFix": BkBattlePerksFix = B(v); break;
+                        case "RotStoryArmyGuard": RotStoryArmyGuard = B(v); break;
                     }
                 }
             }
