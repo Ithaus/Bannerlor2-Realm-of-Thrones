@@ -61,6 +61,7 @@ namespace Armoury
             _lineHoard = _lineHoardStart = null; _hdStartDone = false;
             ResetGuard();    // obieg2: straznik obiegu i podatek od nadwyzki wsi (stan z zapisu arm_obieg2 wczytuje Import po Reset)
             ResetLoans();    // obieg2: pozyczki od ludu (zapis arm_obieg2)
+            ResetCrownLoans();   // korona2: pozyczki koron od miast i mieszczan (zapis arm_korona2 wczytuje Import po Reset)
         }
 
         private static void HoardBegin()
@@ -137,6 +138,7 @@ namespace Armoury
                 {
                     try { kd.KingdomBudgetWallet += (int)cp; }
                     catch (Exception e) { AddPurse(f, c, cp); x -= cp; cp = 0; HoardStumble("PayHoard(korona)", e); }
+                    if (cp > 0) GuardCrownReserve(kd, cp);   // korona2 (A): zapas korony, nie wplyw dnia (nie renty 180 tego dnia)
                 }
                 if (x <= 0) { _hdE0 += room; _hdE1 += room; return 0; }
                 _ctlOut += x; f.LDayOut += x;                          // ksiega kies: wydatek (kontrola zamknieta, wiersz kiesa-ludu.csv)

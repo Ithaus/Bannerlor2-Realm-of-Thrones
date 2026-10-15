@@ -443,6 +443,15 @@ namespace Armoury
                 if (dataStore.IsLoading) TownFolk.ImportObieg2(obieg2);
             }
             catch (Exception e) { Log.Error("SyncData.Obieg2", e); }
+            // korona2 (TownFolk.CrownLoans.cs): dlugi koron u miast i mieszczan (krolestwo + osada + rodzaj), zakazy po niesplacie, srednie wplywy - wlasny try
+            // (starszy DLL ignoruje klucz - cofniecie DLL w trakcie gry = dlugi przepadaja, zloto zostaje w skarbcach, CHANGELOG)
+            try
+            {
+                string korona2 = dataStore.IsSaving ? TownFolk.ExportKorona2() : null;
+                SaveText.Sync(dataStore, "arm_korona2", ref korona2);
+                if (dataStore.IsLoading) TownFolk.ImportKorona2(korona2);
+            }
+            catch (Exception e) { Log.Error("SyncData.Korona2", e); }
             // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
             // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
             try
@@ -1810,6 +1819,7 @@ namespace Armoury
             // 165 (projekt etapu 2, 2.0b): wplywy dnia i 1/360 zapasu -> rata kredytu w Banku (186) -> dary (182) -> raty reparacji -> kontrakty najemnikow (185) -> zwrot zoldu -> renty (180); kazdy krok we wlasnym try
             try { CrownIncome.Begin(); } catch (Exception e) { Log.Error("CrownIncome.Begin", e); } DayProfile.Lap("CrownIncome.Begin");                    // wplywy dnia krolestw (po powinnosciach, daninie, cle i 1/3 zaworu zamkow)
             try { CrownBorrow.Instalments(); } catch (Exception e) { Log.Error("CrownBorrow.Instalments", e); } DayProfile.Lap("CrownBorrow.Instalments");        // 186: sredni podatek, odsetki i rata kredytu korony w Banku - pierwszy wydatek z wplywow dnia
+            try { TownFolk.CrownLoansPay(); } catch (Exception e) { Log.Error("TownFolk.CrownLoansPay", e); } DayProfile.Lap("TownFolk.CrownLoansPay");          // korona2: odsetki i raty pozyczek koron od miast (po racie Banku 186, przed darami 182)
             try { CrownGifts.Daily(); } catch (Exception e) { Log.Error("CrownGifts.Daily", e); } DayProfile.Lap("CrownGifts.Daily");                      // 182: Polnoc -> Straz, Wolne Miasta -> Dothrakowie (linia "Dary koron (182)")
             try { CrownIncome.Reparations(); } catch (Exception e) { Log.Error("CrownIncome.Reparations", e); } DayProfile.Lap("CrownIncome.Reparations");        // raty reparacji korona -> korona
             try { MercContract.Daily(); } catch (Exception e) { Log.Error("MercContract.Daily", e); } DayProfile.Lap("MercContract.Daily");                  // 185: kontrakty najemnikow AI z wplywow dnia (linia "Kontrakty najemnikow (185)")
@@ -1828,6 +1838,7 @@ namespace Armoury
             try { EnemyCaravans.DayRoll(); } catch (Exception e) { Log.Error("EnemyCaravans.DayRoll", e); }
             try { CrownIncome.End(); } catch (Exception e) { Log.Error("CrownIncome.End", e); } DayProfile.Lap("CrownIncome.End");                        // migawka skarbcow i linia "Korona: wplywy dnia (165)"
             try { CrownBorrow.Report(); } catch (Exception e) { Log.Error("CrownBorrow.Report", e); } DayProfile.Lap("CrownBorrow.Report");                  // 186: linia "Kredyt korony (186)" (zlota nie rusza)
+            try { TownFolk.CrownLoansLend(); } catch (Exception e) { Log.Error("TownFolk.CrownLoansLend", e); } DayProfile.Lap("TownFolk.CrownLoansLend");        // korona2: pozyczki koron od miast do zapasu wojny (po End - migawka 165 przesunieta), linia "Pozyczki koron (korona2)"; przed "Skarbce:" i MCrown
             try { KingdomLedger.Daily(); } catch (Exception e) { Log.Error("KingdomLedger.Daily", e); } DayProfile.Lap("KingdomLedger.Daily");                // linia "Skarbce:"
             try { MoneyLedger.Mark(MoneyLedger.MCrown); } catch { }
             // W7: stawka wojenna pana - rody, ktorym W5 (danina, skarbiec, tarczowe) nie pokrylo potrzeby, biora z nadwyzki ludu i wsi wlasnych lenn (po P1 i danine wsi);

@@ -241,7 +241,7 @@ namespace Armoury
             long reserve = KingdomTreasury.WarReserveFor(loser);
             long debt = (long)Math.Ceiling(CrownBorrow.DebtOf(loser));
             if (reserve < 0) { Stumble("Fall(zapas wojny)", new InvalidOperationException("zapas wojny nieczytelny - " + loser.StringId)); return; }   // bez zapasu nic nie bierzemy
-            long surplus = w0 - reserve - debt;
+            long surplus = w0 - reserve - debt - TownFolk.CrownTownDebt(loser);   // korona2: zloto winne miastom tez nie jest skarbem korony (klucz wylaczony - 0)
             float share = s != null ? Math.Max(0f, Math.Min(1f, s.CapitalTreasuryShare)) : 0f;
             long take = surplus >= 1 ? (long)Math.Floor((double)share * surplus) : 0;          // double: float x long tracilby zlotowki przy duzych skarbcach
             take = Math.Max(0, Math.Min(take, w0));

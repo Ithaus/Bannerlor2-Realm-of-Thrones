@@ -90,7 +90,7 @@ namespace Armoury
                 long wallet = k.KingdomBudgetWallet;
                 long left = CrownIncome.LeftFor(k);                       // reszta wplywow dnia: pojdzie dzis w doplate z daniny i renty 180 - to nie zapas
                 double free = (double)wallet - left - reserve;
-                double sur = Math.Floor(free - CrownBorrow.DebtOf(k));    // nigdy z kredytu: zloto winne Bankowi (186) nie jest nadwyzka korony
+                double sur = Math.Floor(free - CrownBorrow.DebtOf(k) - TownFolk.CrownTownDebt(k));    // nigdy z kredytu: zloto winne Bankowi (186) i miastom (korona2) nie jest nadwyzka korony
                 if (!(sur >= 1)) { if (free >= 1) _csDebtK++; return 0; }
                 row.CrownSur = (long)sur;
                 double unc = row.Need - row.Pot;

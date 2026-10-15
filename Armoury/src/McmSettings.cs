@@ -5432,6 +5432,26 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int FolkLoanDefaultDays { get; set; } = 90;
 
+        [SettingPropertyBool("Folk Guard Crown To Reserve", HintText = "with Folk Circulation Guard: the treasury's part of the hoard tax is laid by in the treasury's reserve instead of being spent with the day's income - the crown pays it out slowly, like the rest of its reserve, instead of handing it to the houses the same day. Off = the treasury's part is spent with the day's income, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkGuardCrownToReserve { get; set; } = true;
+
+        [SettingPropertyBool("Crown Town Loans", HintText = "the crowns borrow from their towns: a realm at war whose treasury has fallen below its reserve for war (60 days of the wages it pays back to its houses, at least 500000) borrows what it lacks from the towns of the realm - at most half of what a town's purse holds above the merchants' stock and of what its labourers, craftsmen and merchant families hold above their normal savings, the richest first (not besieged towns, not your towns). The borrowed coin is kept in the treasury, not handed out. The towns earn Crown Town Loan Rate Year a year on it. In war the crown pays only the interest; in peace it repays the debt within about half a year, and it pays back early whenever its treasury is above its reserve for war. A crown that cannot pay in peace for Crown Town Loan Default Days days running defaults: the rest is lost to the towns, every town that lent loses 10 loyalty and the crown may not borrow from its towns for half a year. Off = the crowns do not borrow from their towns, as before (a debt already owed waits in the save)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownTownLoans { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Town Loan Rate Year", 0.00f, 0.50f, "0.00", HintText = "with Crown Town Loans: the interest a year the towns and townsfolk earn on what their crown borrowed (0.10 = ten parts in a hundred a year - less than a house pays its people, far less than the Iron Bank asks of a king)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float CrownTownLoanRateYear { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Crown Town Loan Limit Days", 0.00f, 364.00f, "0", HintText = "with Crown Town Loans: the most a crown may owe its towns, in days of its own daily income (dues, war levies, tolls, its share of the purses), plus 50000 for each town of the realm")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float CrownTownLoanLimitDays { get; set; } = 90f;
+
+        [SettingPropertyInteger("Crown Town Loan Default Days", 7, 364, "0", HintText = "with Crown Town Loans: days in a row in peace without the full instalment after which a crown defaults on its debt to its towns")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int CrownTownLoanDefaultDays { get; set; } = 90;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -7533,6 +7553,11 @@ namespace Armoury
             s.FolkLoanLimitDays = FolkLoanLimitDays;
             s.FolkLoanRepayShareOfIncome = FolkLoanRepayShareOfIncome;
             s.FolkLoanDefaultDays = FolkLoanDefaultDays;
+            s.FolkGuardCrownToReserve = FolkGuardCrownToReserve;
+            s.CrownTownLoans = CrownTownLoans;
+            s.CrownTownLoanRateYear = CrownTownLoanRateYear;
+            s.CrownTownLoanLimitDays = CrownTownLoanLimitDays;
+            s.CrownTownLoanDefaultDays = CrownTownLoanDefaultDays;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

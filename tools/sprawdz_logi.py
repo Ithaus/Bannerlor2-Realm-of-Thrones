@@ -662,6 +662,11 @@ Uzycie (Python 3, tylko odczyt):
                     wzrostu (+10% na 182 doby), OB2-4b kiesy wsi / poziom <= 3.0, OB2-5 ksiega (wsie, Obieg = linie, kontrola dlugu, Kiesa ludu r = 0), OB2-6a zakupy
                     zbytku > przed (baza albo 79.1 tys./d z testu 4 lata), OB2-6b kupione dzieki cenie wedlug zasobnosci > 0, OB2-7 pozyczki od ludu > 0 przy rodach
                     z miejscem, OB2-8 podatek doby <= sufit straznika, OB2-9 komu i ile (INFO), OB2-10 W5-7 (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa korona2   : (15.10, Jeff "korony pozyczaja od miast czemu nie"; galaz w-toku/pozyczki-koron, TownFolk.CrownLoans.cs, TownFolk.Guard.cs) python -I
+                    tools/sprawdz_logi.py --grupa korona2 <Armoury-*.log> (strumieniowo). KR2-0 linia startu (klucze tak), KR2-1 linia doby w kazdej dobie 165,
+                    KR2-2 potkniecia i ERROR 0, KR2-3 ksiega (kontrola dlugu |r| <= 1, skarbiec po pozyczce nie ponad zapas wojny, Obieg = linia), KR2-4 dlug / limit
+                    <= 1.05 i dlug <= 5% zlota swiata, KR2-5 udzial koron >= 18% (28 dob, bieg >= 182), KR2-6 pozyczki i splaty (INFO), KR2-7 czesc korony do
+                    zapasu (INFO), KR2-8 przebieg (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -27095,6 +27100,138 @@ def obieg2_main(logp, basep=None):
     return 0
 
 
+# ------------------------------------------------------------ korona2 (15.10, Jeff "korony pozyczaja od miast czemu nie" - 'Tak, dodaj'; Armoury/src/TownFolk.CrownLoans.cs,
+# TownFolk.Guard.cs GuardCrownReserve): pozyczki koron od miast i mieszczan do zapasu wojny + czesc korony podatku od nadwyzki do zapasu korony
+KR2_START = "Pozyczki koron (korona2): start sesji"
+KR2_HEAD = "Pozyczki koron (korona2): dzien "
+KR2_DAY = re.compile(r"Pozyczki koron \(korona2\): dzien (?P<d>\d+) \| pozyczki (?P<on>CZYNNE|wylaczone): zawarte (?P<lent>\d+) zl u (?P<lentN>\d+) krolestw .*?;"
+                     r" krolestw w wojnie (?P<war>\d+), ze skarbcem ponizej zapasu wojny (?P<cand>\d+) \(luka razem (?P<gap>-?\d+|-)\); bez pozyczki: zakaz po niesplacie"
+                     r" (?P<ban>\d+), pomiar wplywow < \d+ dob (?P<warm>\d+), limit (?P<lim>\d+), miasta bez nadwyzki (?P<nosrc>\d+) \| splaty: z wplywow dnia (?P<pinc>\d+),"
+                     r" z wolnego zlota ponad zapas wojny i dlugi (?P<pstock>\d+), razem (?P<paid>\d+) .*?\| niesplacone \(umorzone po \d+ dobach w pokoju\) (?P<wr>\d+) zl u"
+                     r" (?P<wrN>\d+) krolestw .*?\| dlug koron u miast (?P<debt>-?\d+) \(krolestw (?P<debtK>\d+), .*?\), limit krolestw z dlugiem (?P<limAll>-?\d+|-),"
+                     r" dlug / limit najwyzej (?P<worst>[\d.]+), zakazow (?P<bans>\d+) \| kontrola: dlug - \(wczoraj \+ zawarte \+ odsetki - splacone - umorzone - przepadle\)"
+                     r" (?P<ctl>-?\d+|-), skarbiec po pozyczce ponad zapas wojny (?P<above>\d+) .*?\| czesc korony podatku od nadwyzki do zapasu \(A, Folk Guard Crown To Reserve"
+                     r" (?P<res>tak|nie)\): dzis (?P<resT>\d+) z (?P<crownT>\d+) zl .*?\| potkniecia (?P<st>\d+) \(sesja (?P<sts>\d+)\)")
+KR2_OBG = re.compile(r"pozyczki koron od miast \(korona2\) kasy miast i kiesy mieszczan -> skarbce (\d+), splaty pozyczek koron \(korona2\) skarbce -> kasy miast i kiesy mieszczan (\d+)")
+KR2_GUARD = re.compile(r"Straznik obiegu \(obieg2\): dzien (\d+) \| swiat wczoraj (\d+): .*?, korony (\d+) \(")
+KR2_ERR = ("ERROR in TownFolk.CrownLoans", "ERROR in TownFolk.Guard.GuardCrownReserve", "ERROR in SyncData.Korona2", "ERROR in TownFolk.ExportKorona2",
+           "ERROR in TownFolk.ImportKorona2")
+KR2_SHARE_MIN = 0.18     # udzial koron w zlocie swiata po >= 182 dobach (cel FolkGuardCrownTarget 0.22 minus 4 pkt luzu)
+KR2_DEBT_WORLD = 0.05    # dlug koron u miast najwyzej 5% zlota swiata (wolne zloto miast i mieszczan ponad zapasy to ok. 4% - test D)
+
+
+def korona2_main(logp):
+    """korona2 (15.10, Jeff "korony pozyczaja od miast czemu nie"; Armoury/src/TownFolk.CrownLoans.cs, TownFolk.Guard.cs): pozyczki koron od miast i mieszczan
+    i czesc korony podatku od nadwyzki do zapasu korony. Wejscie: log Armoury (strumieniowo). KR2-0 linia startu (klucze tak), KR2-1 linia doby w kazdej dobie
+    korony (165), KR2-2 potkniecia i ERROR 0, KR2-3 ksiega bez rozjazdu (kontrola dlugu |r| <= 1, skarbiec po pozyczce nie ponad zapas wojny, Obieg = linia),
+    KR2-4 dlug ograniczony (dlug / limit <= 1.05, dlug <= 5% zlota swiata), KR2-5 udzial koron >= 18% (srednia ostatnich 28 dob, bieg >= 182 dob),
+    KR2-6 pozyczki i splaty (INFO), KR2-7 czesc korony do zapasu (INFO), KR2-8 przebieg udzialu koron i dlugu (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("KR2-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, kd, bad, obg, gs, k165, errs = [], {}, [], {}, {}, set(), 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(KR2_START):
+                starts.append(s)
+            elif s.startswith(KR2_HEAD):
+                a = KR2_DAY.search(s)
+                if a:
+                    g = a.groupdict()
+                    x = {k: _o2i(v) for k, v in g.items() if k not in ("on", "res", "worst")}
+                    x.update(on=g["on"] == "CZYNNE", res=g["res"] == "tak", worst=float(g["worst"]))
+                    x["gap"] = x["gap"] or 0
+                    kd[x["d"]] = x
+                else:
+                    bad.append(s[:120])
+            elif s.startswith("Straznik obiegu (obieg2): dzien "):
+                a = KR2_GUARD.search(s)
+                if a:
+                    gs[int(a.group(1))] = (int(a.group(2)), int(a.group(3)))
+            elif s.startswith("Korona: wplywy dnia (165): dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    k165.add(d)
+            elif s.startswith("Obieg: dzien "):
+                a = KR2_OBG.search(s)
+                if a:
+                    d = num(r"dzien (\d+)", s)
+                    if d is not None:
+                        obg[d] = (int(a.group(1)), int(a.group(2)))
+            elif s.startswith(KR2_ERR):
+                errs += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(kd)} (nierozpoznanych {len(bad)}), dob 165 {len(k165)}, Obieg z korona2 {len(obg)},"
+          f" linii straznika {len(gs)}")
+    if not starts and not kd:
+        rep.add("KR2-0: linia startu korona2", "brak linii", "INFO (wersja sprzed korona2)", None)
+        rep.show()
+        return 0
+    st = starts[-1] if starts else ""
+    keys = {k: (f"({k}) tak" in st) for k in ("Crown Town Loans", "Folk Guard Crown To Reserve")}
+    rep.add("KR2-0: linia startu (klucze Crown Town Loans, Folk Guard Crown To Reserve)", (st[len(KR2_START):][:240] if st else "brak linii startu (sa linie doby)"),
+            "linia jest, klucze tak", bool(st) and all(keys.values()))
+    ds = sorted(kd)
+    if k165:
+        d0 = min(k165)
+        miss = sorted(d for d in k165 if d > d0 and d not in kd)
+        rep.add("KR2-1: linia doby korona2 w kazdej dobie korony (165)", f"brak {len(miss)} z {len(k165)}" + (f" np. {miss[:4]}" if miss else "")
+                + (f"; nierozpoznanych linii {len(bad)} np. {bad[0]}" if bad else ""), "0 (poza pierwsza doba logu), nierozpoznanych 0", not miss and not bad)
+    else:
+        rep.add("KR2-1: linia doby", f"linii doby {len(kd)}, brak linii 165", "INFO", None)
+    stum = sum(x["st"] for x in kd.values())
+    rep.add("KR2-2: potkniecia korona2 / ERROR (TownFolk.CrownLoans, GuardCrownReserve, zapis)", f"potkniecia {stum}, ERROR {errs}", "0 / 0", stum == 0 and errs == 0)
+    if ds:
+        ctl = [(d, kd[d]["ctl"]) for d in ds if kd[d]["ctl"] is not None]
+        badc = [(d, c) for d, c in ctl if abs(c) > 1]
+        above = sum(kd[d]["above"] for d in ds)
+        od = [d for d in ds if d - 1 in obg]   # "Obieg: dzien d" niesie liczby tiku, w ktorym linie 165 i korona2 maja dzien d + 1
+        bado = [d for d in od if obg[d - 1] != (kd[d]["lent"], kd[d]["paid"])]
+        rep.add("KR2-3: ksiega bez rozjazdu (kontrola dlugu, skarbiec po pozyczce ponad zapas wojny, Obieg = linia)",
+                f"dob z kontrola {len(ctl)}, |r| > 1: {len(badc)}" + (f" np. {badc[:3]}" if badc else "") + f"; ponad zapas wojny {above}; Obieg rozny od linii {len(bado)} z {len(od)}"
+                + (f" np. d{bado[0]} Obieg {obg[bado[0] - 1]} linia {(kd[bado[0]]['lent'], kd[bado[0]]['paid'])}" if bado else ""),
+                "0 / 0 / 0", not badc and above == 0 and not bado)
+        worst = max(kd[d]["worst"] for d in ds)
+        agg = [kd[d]["debt"] / kd[d]["limAll"] for d in ds if kd[d]["limAll"] and kd[d]["limAll"] > 0]
+        aggm = max(agg) if agg else 0.0
+        dmax = max(ds, key=lambda d: kd[d]["debt"])
+        wd = gs.get(dmax + 1, gs.get(dmax, (0, 0)))[0]
+        frac = kd[dmax]["debt"] / wd if wd else None
+        rep.add("KR2-4: dlug koron u miast ograniczony (dlug razem / limit krolestw z dlugiem, dlug / zloto swiata)",
+                f"dlug / limit razem najwyzej {aggm:.3f} (jedno krolestwo najwyzej {worst:.3f} - odsetki w wojnie i utrata miast podnosza, INFO); najwiekszy dlug"
+                f" {kd[dmax]['debt']} (d{dmax}, krolestw {kd[dmax]['debtK']})" + (f" = {100 * frac:.2f}% zlota swiata" if frac is not None else ""),
+                f"<= 1.05 i <= {100 * KR2_DEBT_WORLD:.0f}% swiata", aggm <= 1.05 and (frac is None or frac <= KR2_DEBT_WORLD))
+    gd = sorted(gs)
+    if gd:
+        span = gd[-1] - gd[0] + 1
+        last = [gs[d][1] / gs[d][0] for d in gd[-28:] if gs[d][0] > 0]
+        avg = sum(last) / len(last) if last else None
+        rep.add("KR2-5: udzial koron w zlocie swiata - srednia ostatnich 28 dob", (f"{100 * avg:.1f}% (dob {span})" if avg is not None else "-"),
+                f">= {100 * KR2_SHARE_MIN:.0f}% (bieg >= 182 dob)", (avg >= KR2_SHARE_MIN) if (avg is not None and span >= 182) else None)
+    else:
+        rep.add("KR2-5: udzial koron", "brak linii straznika obiegu", "INFO", None)
+    if ds:
+        n = len(ds)
+        cd = [d for d in ds if kd[d]["cand"] > 0]
+        rep.add("KR2-6: pozyczki i splaty koron (INFO)",
+                f"zawarte {sum(kd[d]['lent'] for d in ds)} zl w {sum(1 for d in ds if kd[d]['lent'] > 0)} dobach; splacone {sum(kd[d]['paid'] for d in ds)} (z wplywow"
+                f" {sum(kd[d]['pinc'] for d in ds)}, z wolnego zlota {sum(kd[d]['pstock'] for d in ds)}); umorzone {sum(kd[d]['wr'] for d in ds)}; dob z kandydatami {len(cd)}"
+                f" (luka srednio {sum(kd[d]['gap'] for d in cd) / max(1, len(cd)):.0f}); bez pozyczki (sumy dob): zakaz {sum(kd[d]['ban'] for d in ds)}, pomiar"
+                f" {sum(kd[d]['warm'] for d in ds)}, limit {sum(kd[d]['lim'] for d in ds)}, miasta bez nadwyzki {sum(kd[d]['nosrc'] for d in ds)}", "INFO", None)
+        rep.add("KR2-7: czesc korony podatku od nadwyzki do zapasu korony (INFO)",
+                f"do zapasu {sum(kd[d]['resT'] for d in ds)} z {sum(kd[d]['crownT'] for d in ds)} zl czesci korony ({sum(1 for d in ds if kd[d]['resT'] > 0)} z {n} dob),"
+                f" srednio {sum(kd[d]['resT'] for d in ds) / n:.0f}/d", "INFO", None)
+        step = max(1, n // 8)
+        path = "; ".join(f"d{d - ds[0] + 1}: dlug {kd[d]['debt'] / 1e3:.0f} tys. ({kd[d]['debtK']} kr.)"
+                         + (f", korony {100 * gs[d][1] / gs[d][0]:.1f}%" if d in gs and gs[d][0] else "") for d in ds[::step])
+        rep.add("KR2-8: przebieg dlugu koron i udzialu koron (INFO)", path[:600], "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -27235,6 +27372,8 @@ def main(argv):
         return kiesa2_main(logp)   # kiesa2 (15.10, Jeff "napraw to, najwyzej zwieksz podatki"): podatek pana od nadwyzki oszczednosci ludu (TownFolk.Hoard.cs)
     if group == "obieg2" and logp:
         return obieg2_main(logp, bdp)   # obieg2 (15.10, Jeff "kasa zbiera sie u ludu" + "pamietaj o pozyczkach"): wsie, straznik obiegu, pozyczki od ludu, zbytki wedlug zasobnosci
+    if group == "korona2" and logp:
+        return korona2_main(logp)   # korona2 (15.10, Jeff "korony pozyczaja od miast"): pozyczki koron od miast i mieszczan, czesc korony podatku do zapasu korony
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "wyspywolni" and logp:

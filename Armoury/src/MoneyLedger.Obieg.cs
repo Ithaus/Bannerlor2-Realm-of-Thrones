@@ -619,6 +619,9 @@ namespace Armoury
               .Append(", podatek wojenny ludu (184) kiesy ludu -> skarbce ").Append(KingdomTreasury.LastFolkWarTax)   // E5/B2: pobor raz na dobe od zarobku okna (TownFolk.PayCrown, scalenie B)
               .Append(", danina z oszczednosci ludu (P1) kiesy ludu -> skarbce ").Append(KingdomTreasury.LastFolkWarAid)   // P1: pobor raz na dobe od kiesy ponad zapas dni (TownFolk.PayAid)
               .Append(", czesc korony podatku od nadwyzki (obieg2) kiesy ludu i wsi -> skarbce ").Append(TownFolk.LastHoardCrown)   // obieg2 (3): straznik obiegu
+              .Append(" (w tym do zapasu korony - korona2 ").Append(TownFolk.LastHoardCrownReserve).Append(')')   // korona2 (A): zapas, nie wplyw dnia 165
+              .Append(", pozyczki koron od miast (korona2) kasy miast i kiesy mieszczan -> skarbce ").Append(TownFolk.LastCrownLoanLent)   // korona2 (B): przelew miedzy posiadaczami
+              .Append(", splaty pozyczek koron (korona2) skarbce -> kasy miast i kiesy mieszczan ").Append(TownFolk.LastCrownLoanRepaid)
               .Append(", udzial z zaworu zamkow (114) ").Append(CastlePurse.LastCrownPaid)
               .Append(", udzial z zaworu kas miast (E5/A1) ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", clo: z licznika cel zdjeto ").Append(KingdomTreasury.LastCustomsTaken).Append(" (w nicosc w calosci - licznik jest posiadaczem), skarbce dostaly ")
