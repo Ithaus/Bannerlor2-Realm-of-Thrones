@@ -5400,9 +5400,13 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkGuardMaxTimes { get; set; } = 10f;
 
-        [SettingPropertyFloatingInteger("Folk Guard Crown Share", 0.00f, 0.50f, "0.00", HintText = "with Folk Circulation Guard: the part of every hoard tax (towns, castles and villages) that goes to the treasury of the realm the place belongs to; the lord and the purse share the rest as before (a place outside any realm - nothing to a treasury)")]
+        [SettingPropertyFloatingInteger("Folk Guard Crown Share", 0.00f, 0.80f, "0.00", HintText = "")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkGuardCrownShare { get; set; } = 0.35f;
+
+        [SettingPropertyFloatingInteger("Folk Guard Crown Target", 0.00f, 0.50f, "0.00", HintText = "with Folk Circulation Guard: when the realms' treasuries together hold less than this part of all the gold in the world, the treasury's part of every hoard tax grows (by five times the shortfall, up to 0.8), so the crowns win back what they pay out - the lords and the town and castle purses share the rest; the crowns' own payments to the houses are not touched          // with Folk Circulation Guard: the part of every hoard tax (towns, castles and villages) that goes to the treasury of the realm the place belongs to; the lord and the purse share the rest as before (a place outside any realm - nothing to a treasury)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkGuardCrownTarget { get; set; } = 0.22f;
 
         [SettingPropertyBool("Folk Loans", HintText = "the lords borrow from their own people: an AI house at war whose coin has run below its reserve for war may borrow, before it goes to the Iron Bank, from what the townsfolk, castle folk and villagers of its own towns, castles and villages hold above their normal level of savings - at most Folk Loan Max Share Of Income of its daily income a day, at most Folk Loan Limit Days of its daily income plus 20000 for a town and 10000 for a castle in all. The people earn Folk Loan Rate Year a year on it. In war the house pays only the interest; in peace it repays Folk Loan Repay Share Of Income of its daily income a day (at least a year's share) back into the purses it borrowed from. A house that cannot pay in peace for Folk Loan Default Days days running defaults: the rest of the debt is lost to the people, every town and castle of that house that lent to it loses 10 loyalty, and it may not borrow from its people for half a year. Not your house. Off = the lords borrow only from the Iron Bank, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -7522,6 +7526,7 @@ namespace Armoury
             s.FolkGuardBandHigh = FolkGuardBandHigh;
             s.FolkGuardMaxTimes = FolkGuardMaxTimes;
             s.FolkGuardCrownShare = FolkGuardCrownShare;
+            s.FolkGuardCrownTarget = FolkGuardCrownTarget;
             s.FolkLoans = FolkLoans;
             s.FolkLoanRateYear = FolkLoanRateYear;
             s.FolkLoanMaxShareOfIncome = FolkLoanMaxShareOfIncome;

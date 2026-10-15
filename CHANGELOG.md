@@ -1,5 +1,14 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-15 (obieg2 - strojenie po testach C i D) - STRAZNIK MOCNIEJSZY, CZESC KORONY ZMIENNA
+
+**Mod:** Armoury | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** FolkGuardCrownTarget (0.22, nowy), FolkGuardCrownShare 0.35 (do 0.8), FolkGuardMaxTimes 10, sufit doby 0.5% swiata, pozyczki 0.6 D / 60 D | **Status:** DO SPRAWDZENIA
+
+Test C (d30-162): lud 9.9 -> 13% zlota swiata, korony 24.9 -> 18.9% (sufit 0.15% i mnoznik 5 za slabe) - 3a30c79d. Test D (d30-180, po 3a30c79d): lud 10 -> 8.4% (w pasmie),
+lordowie 36.9 -> 40.2%, korony 24.9 -> 16.9% (ok. -117 tys./dobe). Decyzja Jeffa: zwrotu zoldu z korony do rodow nie ruszamy, bez pozyczek koron od miast.
+Zmiana: czesc korony w podatku od nadwyzki = FolkGuardCrownShare + 5 x (FolkGuardCrownTarget - udzial koron), najwyzej 0.8, gdy udzial koron ponizej celu; linia straznika
+pokazuje "czesc korony teraz X% (cel udzialu koron Y%)".
+
 ## 2026-10-15 (obieg2 - Jeff "kasa zbiera sie u ludu lub mieszczan ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach - lordowie moga pozyczac od bankow i od mieszczan", test 4-letni wersja 54) - PODATEK OD NADWYZKI KIES WSI, STRAZNIK CALEGO OBIEGU (STAWKA WEDLUG TEGO, ILE LUD TRZYMA WOBEC POZIOMU NORMALNEGO, 15% DO SKARBCOW KORON), POZYCZKI LORDOW OD WLASNEGO LUDU, CENA GRANICZNA ZBYTKOW WEDLUG ZASOBNOSCI
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/obieg-swiata` (od `w-toku/zbior-e8` e2a422ec = WGRANIE 55 + kiesa-ludu) | **Tor:** M/L (jeden autor z kontrola recenzenta; zmiana ekonomii calego swiata) | **Klucze (NOWE - w `Armoury.json` Jeffa ich nie ma, dzialaja domyslne):** `FolkHoardVillages` true, `FolkCirculationGuard` true, `FolkGuardBandLow` 1.25, `FolkGuardBandHigh` 1.75, `FolkGuardMaxTimes` 5, `FolkGuardCrownShare` 0.15, `FolkLoans` true, `FolkLoanRateYear` 0.12, `FolkLoanMaxShareOfIncome` 0.40, `FolkLoanLimitDays` 30, `FolkLoanRepayShareOfIncome` 0.10, `FolkLoanDefaultDays` 90, `FolkLadderCeilingByWealth` true, `FolkLadderCeilingMax` 4; wszystkie cztery klucze bool wylaczone = e2a422ec co do monety (poza tekstem linii) | **Zmiana ekonomii:** tak | **Status:** DO SPRAWDZENIA | **Zapis:** NOWY klucz `arm_obieg2` (dlugi rodow u ludu, zakazy po niesplacie, mnoznik straznika, doplyw EMA) | **Pliki:** `Armoury/src/TownFolk.Guard.cs` (nowy), `TownFolk.Loans.cs` (nowy), `TownFolk.Hoard.cs` (stawka straznika, czesc korony), `TownFolk.Live.cs` (wpiecia doby, wsie), `TownFolk.Luxury.cs` (cena graniczna wedlug zasobnosci), `TownFolk.cs`, `ClanBudget.cs` (pozyczka od ludu przed KW 168), `DebtLadder.cs` (`FolkLoanBlocked`), `MoneyLedger.cs` (`LastShares`), `MoneyLedger.Obieg.cs` (dopiski "Obieg"), `ArmouryBehavior.cs` (zapis), `Settings.cs` + `McmSettings.cs` (gen_mcm 1540), `tools/gen_mcm.py`, `tools/sprawdz_logi.py` (nowa grupa `obieg2`)

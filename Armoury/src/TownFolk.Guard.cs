@@ -42,7 +42,20 @@ namespace Armoury
         private static double GdLo(Settings s) { return HdClamp(s.FolkGuardBandLow, 1.0, 3.0); }
         private static double GdHi(Settings s) { return Math.Max(GdLo(s), HdClamp(s.FolkGuardBandHigh, 1.0, 5.0)); }
         private static double GdMax(Settings s) { return HdClamp(s.FolkGuardMaxTimes, 1.0, 10.0); }
-        private static double GuardCrownShare(Settings s) { return GuardOn ? HdClamp(s.FolkGuardCrownShare, 0, 0.5) : 0; }
+        // 15.10 test D (d30-180: korony 24.9 -> 16.9% zlota swiata, lordowie 36.9 -> 40.2%, lud w pasmie): czesc korony zmienna - gdy udzial koron w zlocie
+        // swiata (wczorajszy pomiar straznika) spada ponizej FolkGuardCrownTarget, czesc korony = podstawa + 5 x brak, najwyzej 0.8 (reszta jak dotad pan / kasa).
+        // Decyzja Jeffa: zwrotu zoldu z korony do rodow NIE ruszamy i bez pozyczek koron od miast - korona dostaje wiecej tylko z obiegu ludu.
+        private static double GuardCrownShare(Settings s)
+        {
+            if (!GuardOn) return 0;
+            double b = HdClamp(s.FolkGuardCrownShare, 0, 0.8);
+            if (_gdShares && _gdWorld > 0)
+            {
+                double now = (double)_gdCrowns / _gdWorld, tgt = HdClamp(s.FolkGuardCrownTarget, 0, 0.5);
+                if (now < tgt) b = Math.Min(0.8, b + 5.0 * (tgt - now));
+            }
+            return b;
+        }
         private const double GdStep = 0.03, GdMin = 0.25, GdCapWorld = 0.005,   /* 15.10 test C: 0.0015 nie przegonilo doplywu do ludu (lud 9.9 -> 13% swiata, korony 24.9 -> 18.9% w 160 dob przy mnozniku 5) */ GdCapInflow = 2.0, GdCover = 0.8, GdEmaDays = 28;
 
         /// <summary>Skarbiec korony na czesc korony podatku od nadwyzki: krolestwo rodu pana osady (nie zniszczone). null - straznik wylaczony, udzial 0, rod bez krolestwa.</summary>
@@ -325,7 +338,7 @@ namespace Armoury
                       .Append(N0(_gdNC)).Append(" / wsie ").Append(N0(_gdNV)).Append("), kiesy z potrzeba ").Append(N0(_gdP)).Append(" (miasta ").Append(N0(_gdPT)).Append(" / podzamcza ")
                       .Append(N0(_gdPC)).Append(" / wsie ").Append(N0(_gdPV)).Append(") = ").Append(_gdN > 0 ? (_gdP / _gdN).ToString("0.000", Inv) : "-").Append(" x poziom normalny")
                       .Append("; pasmo ").Append(F2(GdLo(s))).Append("-").Append(F2(GdHi(s))).Append(" x (").Append(Pct(GdLo(s) * _gdN, w)).Append(" - ").Append(Pct(GdHi(s) * _gdN, w)).Append(" swiata)")
-                      .Append(" | mnoznik ").Append(_gdM.ToString("0.000", Inv)).Append(" (").Append(_gdMove).Append("; granice ").Append(GdMin.ToString("0.00", Inv)).Append("-").Append(F2(GdMax(s))).Append(')')
+                      .Append(" | czesc korony teraz ").Append((100 * GuardCrownShare(s)).ToString("0.0", Inv)).Append("% (cel udzialu koron ").Append((100 * HdClamp(s.FolkGuardCrownTarget, 0, 0.5)).ToString("0.0", Inv)).Append("%)").Append(" | mnoznik ").Append(_gdM.ToString("0.000", Inv)).Append(" (").Append(_gdMove).Append("; granice ").Append(GdMin.ToString("0.00", Inv)).Append("-").Append(F2(GdMax(s))).Append(')')
                       .Append(" | stawka doby ").Append((100 * _gdRate).ToString("0.000", Inv)).Append("%/d (baza ").Append((100 * HoardRate(s)).ToString("0.00", Inv)).Append("% x mnoznik")
                       .Append(", sufit doby ").Append(N0(_gdCapAbs)).Append(" = max(").Append((100 * GdCapWorld).ToString("0.00", Inv)).Append("% swiata ").Append(N0(_gdWorldUsed))
                       .Append("; 2 x doplyw EMA), nadwyzka ponad poziom normalny ").Append(N0(_gdE)).Append(')')
