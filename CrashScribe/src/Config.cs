@@ -129,6 +129,10 @@ namespace CrashScribe
         public static bool BkBattlePerksFix = true;
         // 15.10 (wywrotka d767 testu 6-letniego, Blackwater ROT): armia wydarzenia ROT tworzona, gdy Kingdom.CreateArmy jej nie utworzyl; GatherArmyAction bez armii pomijany (RotStoryArmies.cs)
         public static bool RotStoryArmyGuard = true;
+        // 15.10 (test 6-letni, "Denerys napraw"): tron fabularny ROT (StoryThrone.cs) - monarchie ROT (ustroj w pliku tytulow inny niz Republic), dopoki wladca
+        // ze startu zyje i rzadzi: bez zmian ustroju / uzurpacji BK i bez wyboru wladcy (wybory republiki BK, abdykacja Diplomacy); zywy i wolny wladca ze startu
+        // w swoim krolestwie wraca na tron; jego rod nie odchodzi w secesji S9. false = jak dotad (BK moze zmienic ustroj i co rok wybierac innego wladce).
+        public static bool StoryThroneGuard = true;
         public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
 
         internal static void Load(string moduleDataDir)
@@ -226,6 +230,7 @@ namespace CrashScribe
                         case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
                         case "BkBattlePerksFix": BkBattlePerksFix = B(v); break;
                         case "RotStoryArmyGuard": RotStoryArmyGuard = B(v); break;
+                        case "StoryThroneGuard": StoryThroneGuard = B(v); break;
                     }
                 }
             }

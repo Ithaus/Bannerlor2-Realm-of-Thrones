@@ -31,7 +31,7 @@ namespace CrashScribe
     internal static class BkTitles
     {
         internal const string FileName = "bk_titles_rot818.xml";
-        private const string Resource = "CrashScribe.bk_titles_rot818.xml";
+        internal const string Resource = "CrashScribe.bk_titles_rot818.xml";   // tez StoryThrone (ustroj krolestw z pliku)
 
         private static PropertyInfo _pInst, _pPath, _pTm, _pAll, _pType, _pShort;
         private static MethodInfo _mGetTitle, _mGetSov;

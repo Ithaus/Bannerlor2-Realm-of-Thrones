@@ -2912,6 +2912,7 @@ namespace CrashScribe
                 try
                 {
                     if (original == null || c.IsEliminated || c.Kingdom != original || c == original.RulingClan) { skipped++; continue; }
+                    if (StoryThrone.ShieldsClan(c, original)) { skipped++; continue; }   // 15.10: rod zywego wladcy ze startu zostaje w swoim krolestwie (StoryThroneGuard)
                     int fiefs = c.Fiefs.Count;
                     ChangeKingdomAction.ApplyByLeaveWithRebellionAgainstKingdom(c, true);
                     if (peace && c.Kingdom == null && FactionManager.IsAtWarAgainstFaction(c, original)) MakePeaceAction.Apply(c, original);
