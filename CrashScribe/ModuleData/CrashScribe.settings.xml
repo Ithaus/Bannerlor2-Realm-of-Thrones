@@ -452,6 +452,9 @@
        is not available - Realm of Thrones went on with no army and the game crashed. With this on, CrashScribe raises that army the way the game
        does, so the story goes on, and a gathering order for a party with no army is skipped instead of crashing. Set to false for the old behaviour. -->
   <RotStoryArmyGuard>true</RotStoryArmyGuard>
+  <!-- Banner Kings piety on the map bar: Banner Kings added a new piety icon every time the bar refreshed, so it showed twice or more.
+       With this on, CrashScribe keeps one. Set to false for the old behaviour. -->
+  <BkPietyBarOnce>true</BkPietyBarOnce>
   <!-- Realm of Thrones story rulers (found in the 6-year test: Barristan Selmy took Daenerys' throne for a year, twice, and later her house left
        her own realm in a revolt). Banner Kings can turn a story monarchy into a republic and then elect a new ruler every year, leaving out the
        one on the throne; Diplomacy can force an abdication after a lost civil war. With this on, in every story monarchy (the Free Cities stay

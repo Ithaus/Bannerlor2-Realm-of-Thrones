@@ -129,6 +129,8 @@ namespace CrashScribe
         public static bool BkBattlePerksFix = true;
         // 15.10 (wywrotka d767 testu 6-letniego, Blackwater ROT): armia wydarzenia ROT tworzona, gdy Kingdom.CreateArmy jej nie utworzyl; GatherArmyAction bez armii pomijany (RotStoryArmies.cs)
         public static bool RotStoryArmyGuard = true;
+        // 15.10 (Jeff: "czemu ma dwa razy piety?"): BK MapInfoPietyPatches dodaje nowa pozycje poboznosci przy kazdym odswiezeniu paska mapy (BkPietyBar.cs)
+        public static bool BkPietyBarOnce = true;
         // 15.10 (test 6-letni, "Denerys napraw"): tron fabularny ROT (StoryThrone.cs) - monarchie ROT (ustroj w pliku tytulow inny niz Republic), dopoki wladca
         // ze startu zyje i rzadzi: bez zmian ustroju / uzurpacji BK i bez wymuszonego wyboru wladcy (wybory republiki BK, abdykacja Diplomacy; sukcesja po smierci
         // jak dotad); zywy i wolny wladca ze startu w swoim krolestwie wraca na tron (poza tronem oddanym fabula ROT - Nocna Straz) i wychodzi z frakcji buntu
@@ -231,6 +233,7 @@ namespace CrashScribe
                         case "BkrotFixCaravanIncome": BkrotFixCaravanIncome = B(v); break;
                         case "BkBattlePerksFix": BkBattlePerksFix = B(v); break;
                         case "RotStoryArmyGuard": RotStoryArmyGuard = B(v); break;
+                        case "BkPietyBarOnce": BkPietyBarOnce = B(v); break;
                         case "StoryThroneGuard": StoryThroneGuard = B(v); break;
                     }
                 }
