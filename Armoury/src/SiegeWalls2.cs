@@ -58,6 +58,10 @@ namespace Armoury
     ///   :420-428 - obroncy 0 = "true"; OB1 przepuszcza pusta warownie), wodz od razu przelicza zamiar (RecalculateShortTermBehavior) - szturm bez obroncow
     ///   i zdobycie jak w grze (SiegeCompleted, lup, nadania). Bez kapitulacji: lordowie z ludzmi w murach, oboz niegotowy, oboz slabszy od reszty zalogi,
     ///   oblezenie gracza (szturmuje sam), gracz w murach, skrypt fabuly, bitwa w toku. Bez Innych (CrashScribe T2c) i twierdz Bialych Wedrowcow.
+    ///   Recenzja: (a) obroncy w bitwie (szturm, wypad) - tej doby bez smierci z glodu (rostery w MapEvent; gra tak samo - PartyHealCampaignBehavior
+    ///   tylko przy MapEvent == null); (b) dopisek ROT "ziemie wokol" (+100 town_EW4, +120 ROT_castle61 - ROT dodaje go takze w oblezeniu) odejmowany
+    ///   w oblezeniu zawsze, nie tylko gdy bilans dodatni; (c) pusta twierdza po kapitulacji nie "kapituluje" drugi raz co dobe; (d) TB wylaczony w MCM
+    ///   w trakcie sesji gasi tez druga ekipe obozow oznaczonych wczesniej.
     ///
     /// DR - DRABINY AI (klucz SiegeLadderOverwhelm, w SiegeWalls.Veto): oblezenie >= SiegeLadderMinDays (30 - dluzsze niz 9 na 10 oblezen, p90 25 dob)
     ///   i sila oblegajacych >= SiegeLadderMinRatio (6 = dwa razy 3:1 gry do rozpoczecia oblezenia) x obroncy w pelni (miara OB1) -> OB1 przepuszcza
@@ -263,7 +267,8 @@ namespace Armoury
         public static void BuildPre(SiegeEvent __instance, ISiegeEventSide __0, out SiegeEvent.SiegeEngineConstructionProgress __state)
         {
             __state = null;
-            if (_marked <= 0 || __0 == null || __0.BattleSide != BattleSideEnum.Attacker) return;
+            // recenzja: klucz wylaczony w MCM w trakcie sesji - obozy oznaczone wczesniej tez bez drugiej ekipy (wylaczony = b1cb26a8)
+            if (_marked <= 0 || !TrebOn || __0 == null || __0.BattleSide != BattleSideEnum.Attacker) return;
             try
             {
                 Treb t;
@@ -336,6 +341,8 @@ namespace Armoury
         private static readonly Dictionary<SiegeEvent, Gl> _gl = new Dictionary<SiegeEvent, Gl>();
         private static readonly HashSet<Settlement> _surrendered = new HashSet<Settlement>();   // twierdze po kapitulacji (do linii zdobycia)
         private static readonly HashSet<string> _dClampSt = new HashSet<string>();
+        private static readonly HashSet<string> _dRotSt = new HashSet<string>();                 // recenzja: twierdze z odjetymi "ziemiami wokol" ROT w oblezeniu (doba)
+        private static bool _rotFood;                                                            // czynny model jedzenia = ROTSettlementFoodModel (z EnsureHooks)
         private static readonly Dictionary<string, int> _dSurSkip = new Dictionary<string, int>(StringComparer.Ordinal);
         private static double _dClampSum, _dLongestHunger;
         private static string _dLongestHungerSt = "-";
@@ -347,11 +354,25 @@ namespace Armoury
         {
             try
             {
-                if (__0 == null || !__0.IsUnderSiege) return;
-                float v = __result.ResultNumber;
-                if (!(v > 0f) || !StarveOn) return;
+                if (__0 == null || !__0.IsUnderSiege || !StarveOn) return;
                 var st = __0.Settlement;
                 if (st == null) return;
+                // recenzja: ROT (ROTSettlementFoodModel.CalculateTownFoodStocksChange, dec37 = a6dec) dopisuje "ziemie wokol" +100 town_EW4 i +120 ROT_castle61
+                // BEZ warunku oblezenia (gra pomija ziemie wokol przy IsUnderSiege - DefaultSettlementFoodModel :68-81); sam uciety plus nie wystarcza, gdy bilans
+                // z ta dostawa jest ujemny (twierdza dalej jadlaby 100-120 dziennie zza murow). Odejmujemy dokladnie dopisek ROT (Add w BaseNumber, bez czynnikow),
+                // tylko gdy czynny model to ROT i ROT go dodal (nie dla rodu Bialych Wedrowcow bez krolestwa - ROT zwraca wtedy 0).
+                if (_rotFood)
+                {
+                    float rot = st.StringId == "town_EW4" ? 100f : st.StringId == "ROT_castle61" ? 120f : 0f;
+                    var cl = __0.MapFaction as Clan;
+                    if (rot > 0f && !(cl != null && OthersRise.IsWhiteWalkerClan(cl)))
+                    {
+                        __result.Add(-rot, _txtNoSupply);
+                        lock (Gate) { _dRotSt.Add(st.StringId); }
+                    }
+                }
+                float v = __result.ResultNumber;
+                if (!(v > 0f)) return;
                 __result.Add(-v, _txtNoSupply);
                 lock (Gate) { if (_dClampSt.Add(st.StringId)) _dClampSum += v; }
             }
@@ -488,6 +509,18 @@ namespace Armoury
         /// <summary>Twierdza, ktorej zaloga skapitulowala z glodu, a szturmu (pustej warowni) jeszcze nie bylo - SiegeWalls.Veto nie trzyma jej w przerwie OB2.</summary>
         internal static bool Surrendered(Settlement st) { return st != null && _surrendered.Count > 0 && _surrendered.Contains(st); }
 
+        /// <summary>Recenzja: obroncy osady w bitwie (szturm, wypad, bitwa pod murami) - rostery w MapEvent (MapEventParty liczy straty na rosterze), wiec glod
+        /// i kapitulacja czekaja do konca bitwy; tak samo gra - PartyHealCampaignBehavior.TryHealOrWoundParty tylko przy MapEvent == null.</summary>
+        private static bool InBattle(Settlement st)
+        {
+            if (st.Party != null && st.Party.MapEvent != null) return true;
+            var g = st.Town != null ? st.Town.GarrisonParty : null;
+            if (g != null && g.MapEvent != null) return true;
+            var mc = st.MilitiaPartyComponent;
+            var m = mc != null ? mc.MobileParty : null;
+            return m != null && m.MapEvent != null;
+        }
+
         private static void StarveDaily()
         {
             var mgr = Campaign.Current != null ? Campaign.Current.SiegeEventManager : null;
@@ -519,7 +552,9 @@ namespace Armoury
             if (g.HungerFrom < 0f) g.HungerFrom = now;
             double days = now - g.HungerFrom;
             if (days > _dLongestHunger) { _dLongestHunger = days; _dLongestHungerSt = st.StringId; }
-            double p = LossPct / 100.0;
+            bool battle = InBattle(st);                                                // recenzja: rostery w bitwie - bez smierci tej doby (jak gra)
+            double pct = battle ? 0.0 : LossPct;
+            double p = pct / 100.0;
             int dead = 0;
             if (p > 0.0)
                 foreach (var r in Rosters(st)) { int rw; dead += Kill(r, MBRandom.RoundRandomized((float)(p * Regulars(r, out rw)))); }
@@ -527,8 +562,10 @@ namespace Armoury
             int h1, w1;
             int left = MenOf(st, out h1, out w1);
             int thr = Math.Max(SurMen, (int)Math.Ceiling(SurShare * g.Start));
-            string res = "glod trwa";
-            if (left < thr) res = TrySurrender(st, camp, lp, left, g);
+            string res = battle ? "glod trwa (bitwa w toku - bez smierci dzis)" : "glod trwa";
+            // recenzja: twierdza juz skapitulowala i jest pusta - czeka na zajecie (bez drugiej "kapitulacji" z 0 jencow co dobe)
+            if (left == 0 && _surrendered.Contains(st)) res = "po kapitulacji - pusta, czeka na zajecie";
+            else if (left < thr) res = TrySurrender(st, camp, lp, left, g);
             if (!LogOn) return;
             try
             {
@@ -536,7 +573,7 @@ namespace Armoury
                 if (camp != null) foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege)) if (pb != null) campMen += pb.NumberOfHealthyMembers;
                 Log.Info("Glod oblezenia (GL): dzien " + Today + " | osada " + st.StringId + " (" + Nm(st) + ", " + Cls(st) + ") | oblegajacy " + (lp != null && lp.MapFaction != null ? lp.MapFaction.StringId : "-")
                          + ", wodz " + Hn(lp) + ", ludzi " + campMen + ", oboz gotowy " + (camp != null && camp.IsPreparationComplete ? "tak" : "nie") + ", oblezenie " + F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0") + " dob"
-                         + " | glod od " + F(days, "0.0") + " dob | zaloga i milicja: bylo " + n0 + " (zdrowi " + h + ", ranni " + w + "), zmarli dzis " + dead + " (" + F(LossPct, "0.0") + "%), zostalo " + left
+                         + " | glod od " + F(days, "0.0") + " dob | zaloga i milicja: bylo " + n0 + " (zdrowi " + h + ", ranni " + w + "), zmarli dzis " + dead + " (" + F(pct, "0.0") + "%), zostalo " + left
                          + " | na starcie oblezenia " + g.Start + ", prog kapitulacji " + thr + " | wynik: " + res + ".");
             }
             catch (Exception e) { Stumble("StarveLine", e); }
@@ -550,7 +587,7 @@ namespace Armoury
             else if (Scripted(lp)) why = "skrypt fabuly";
             else if (MobileParty.MainParty != null && MobileParty.MainParty.CurrentSettlement == st) why = "gracz w murach";
             else if (!camp.IsPreparationComplete) why = "oboz niegotowy";
-            else if ((st.Party != null && st.Party.MapEvent != null) || lp.MapEvent != null) why = "bitwa w toku";
+            else if (InBattle(st) || lp.MapEvent != null) why = "bitwa w toku";
             else
             {
                 int lords = 0, lordMen = 0;
@@ -703,7 +740,8 @@ namespace Armoury
                   .Append(", wstrzymane: ");
                 if (_dSurSkip.Count == 0) sb.Append('0');
                 else { bool f1 = true; foreach (var kv in _dSurSkip) { if (!f1) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); f1 = false; } }
-                sb.Append(", straty RB pominiete ").Append(_dRbSkip)
+                int nRot; lock (Gate) { nRot = _dRotSt.Count; }
+                sb.Append(", straty RB pominiete ").Append(_dRbSkip).Append(", ziemie wokol ROT odjete ").Append(nRot)
                   .Append(" | DR: przepuszczone ").Append(_dDrGate + _dDrWalls + _dDrRoll).Append(" (brama ").Append(_dDrGate).Append(", mury ").Append(_dDrWalls).Append(", losowanie ").Append(_dDrRoll).Append(')')
                   .Append(" | zdobyte dzis: miasta ").Append(_dCaptTown).Append(", stolice ").Append(_dCaptCap).Append(", zamki ").Append(_dCaptCastle).Append(" (po kapitulacji ").Append(_dCaptAfterSurr).Append(')')
                   .Append(" | oblezenia trwajace ").Append(going).Append(", najdluzsze ").Append(F(longest, "0.0")).Append(" dob (").Append(longestSt).Append("), ponad 150 dob: ")
@@ -723,7 +761,7 @@ namespace Armoury
             _dLongestHunger = 0; _dLongestHungerSt = "-"; _dSurSkip.Clear();
             _dDrGate = _dDrWalls = _dDrRoll = 0; _drLogged.Clear();
             _dCaptTown = _dCaptCap = _dCaptCastle = _dCaptAfterSurr = 0;
-            lock (Gate) { _dClampSt.Clear(); _dClampSum = 0; _dStumbles = 0; }
+            lock (Gate) { _dClampSt.Clear(); _dRotSt.Clear(); _dClampSum = 0; _dStumbles = 0; }
         }
 
         /// <summary>Z SiegeWalls.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
@@ -786,6 +824,7 @@ namespace Armoury
                 {
                     Seal31.Patch("oblezenia 2: bilans jedzenia w oblezeniu (" + mf.DeclaringType.Name + ".CalculateTownFoodStocksChange)", mf, typeof(SiegeWalls2), null, nameof(FoodPost), null, Priority.Normal, Priority.Last);
                     _hookFood = Wired(mf, nameof(FoodPost), false) + " (" + mf.DeclaringType.FullName + ")";
+                    _rotFood = mf.DeclaringType != null && mf.DeclaringType.FullName == "ROT.Models.ROTSettlementFoodModel";   // recenzja: dopisek ROT "ziemie wokol" w lancuchu
                 }
             }
             catch (Exception e) { _hookFood = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Food", e); }
@@ -815,7 +854,8 @@ namespace Armoury
                 var mods = Campaign.Current.Models;
                 Log.Info("Oblezenia 2 (start): latki - plan machin AI " + _hookAction + ", druga ekipa budowy (SiegeEvent.ConstructionTick) " + _hookBuild
                          + ", bilans jedzenia w oblezeniu " + _hookFood + ", straty RB przy zapasie 0 " + _hookRb
-                         + " | modele: plan " + TypeOf(mods.SiegeStrategyActionModel) + ", jedzenie " + TypeOf(mods.SettlementFoodModel) + ", oblezenie " + TypeOf(mods.SiegeEventModel)
+                         + " | modele: plan " + TypeOf(mods.SiegeStrategyActionModel) + ", jedzenie " + TypeOf(mods.SettlementFoodModel)
+                         + " (ziemie wokol ROT w oblezeniu odejmowane: " + (_rotFood ? "tak" : "nie") + "), oblezenie " + TypeOf(mods.SiegeEventModel)
                          + " | klucze: trebusze " + (TrebOn ? "tak" : "nie") + " (zamek po " + CastleDays + " dob), glod " + (StarveOn ? "tak" : "nie") + " (" + F(LossPct, "0.0")
                          + "%/d, kapitulacja < " + F(SurShare * 100.0, "0") + "% / < " + SurMen + "), drabiny " + (LadderOn ? "tak" : "nie") + " (>= " + LadderDays + " dob, >= "
                          + F(LadderRatio, "0.0") + " : 1), log " + (LogOn ? "tak" : "nie") + ".");

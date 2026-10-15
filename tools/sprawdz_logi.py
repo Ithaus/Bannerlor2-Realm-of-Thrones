@@ -26360,6 +26360,7 @@ O2_D = {
                      r" zdjete \(gracz, skrypt, Inni\) (\d+); druga ekipa: zaczete trebusze (\d+), taran / wieza (\d+), ukonczone (\d+); trebusze AI zbudowane (\d+), zniszczone (\d+)"),
     "gl": re.compile(r"\| GL: oblezone twierdze (\d+), z zapasem 0: (\d+) \(najdluzej ([\d.]+) dob glodu - (\S+)\), bilans dodatni uciety: (\d+) twierdz \(\+([\d.]+)/d\),"
                      r" zmarli z glodu (\d+), kapitulacje (\d+) \(jencow (\d+), bez niewoli (\d+)\), wstrzymane: (.*?), straty RB pominiete (\d+)"),
+    "rot": re.compile(r", ziemie wokol ROT odjete (\d+)"),   # recenzja: dopisek ROT "ziemie wokol" (town_EW4 / ROT_castle61) odjety w oblezeniu
     "dr": re.compile(r"\| DR: przepuszczone (\d+) \(brama (\d+), mury (\d+), losowanie (\d+)\)"),
     "capt": re.compile(r"\| zdobyte dzis: miasta (\d+), stolice (\d+), zamki (\d+) \(po kapitulacji (\d+)\)"),
     "sieges": re.compile(r"\| oblezenia trwajace (\d+), najdluzsze ([\d.]+) dob \((\S+)\), ponad 150 dob: (.*?) \| w pamieci"),
@@ -26501,7 +26502,8 @@ def oblezenia2_main(logp):
     rep.add("O2-1e: trebusze AI zniszczone przez obroncow (INFO)", f"zniszczone {lost} z {built} zbudowanych" + (f" ({lost / built:.0%})" if built else ""), "INFO", None)
     # O2-2 GL
     clamp_n = tot("gl", 5)
-    rep.add("O2-2a: GL - bilans dodatni w oblezeniu uciety (INFO)", f"{clamp_n} twierdzo-dob; oblezonych twierdzo-dob {tot('gl', 1)}, z zapasem 0: {tot('gl', 2)}", "INFO", None)
+    rep.add("O2-2a: GL - bilans dodatni w oblezeniu uciety (INFO)", f"{clamp_n} twierdzo-dob; oblezonych twierdzo-dob {tot('gl', 1)}, z zapasem 0: {tot('gl', 2)};"
+            f" ziemie wokol ROT odjete {tot('rot', 1)} twierdzo-dob", "INFO", None)
     badd = [x for x in gll if not (x["p"] / 100.0 * x["n0"] - 3.0 <= x["dead"] <= x["p"] / 100.0 * x["n0"] + 3.0)]
     rep.add("O2-2b: GL - zmarli z glodu = p% zalogi i milicji (+-3)", f"linii glodu {len(gll)}, zmarlych {sum(x['dead'] for x in gll)}, poza widelkami {len(badd)}"
             + (f"; np. {badd[0]['st']} dzien {badd[0]['d']}: bylo {badd[0]['n0']}, zmarli {badd[0]['dead']}" if badd else ""), "0 poza widelkami (konstrukcyjne)", not badd if gll else None)
@@ -26639,9 +26641,9 @@ def main(argv):
     if group == "szturm" and logp:
         return szturm_main(logp)   # 14.10 bitwa szturmu SZ1-SZ4 (SiegeWalls): mury dla malej zalogi, drabiny > taran i wieza > wyrwa, morale obu stron, front
     if group == "odsiecz" and logp:
-        return odsiecz_main(logp, csp, until_arg if "--do-doby" in args else 100000)
+        return odsiecz_main(logp, csp, until_arg if "--do-doby" in args else 100000)   # 14.10 odsiecz-bunty: OB5 odsiecz z pierwszenstwem, S9 BK bez krolestw z buntu, S11 rody z lennem
     if group == "oblezenia2" and logp:
-        return oblezenia2_main(logp)   # 15.10 oblezenia 2 (SiegeWalls2): TB trebusze AI (plan, druga ekipa), GL glod oblezenia (bilans, smierc, kapitulacja), DR drabiny AI, CEL Jeffa   # 14.10 odsiecz-bunty: OB5 odsiecz z pierwszenstwem, S9 BK bez krolestw z buntu, S11 rody z lennem
+        return oblezenia2_main(logp)   # 15.10 oblezenia 2 (SiegeWalls2): TB trebusze AI (plan, druga ekipa), GL glod oblezenia (bilans, smierc, kapitulacja), DR drabiny AI, CEL Jeffa
     if group == "drobne14" and logp:
         return drobne14_main(logp)   # drobne14: diagnozy L5b-2 (karawany w oblezeniu), C-4b (zapas kupcow), P3-2 (nazwa wsi)
     if group == "unikaty" and (csp or logp):
