@@ -673,6 +673,29 @@ namespace Armoury
                     Log.Info("HistoricalPrices: stal valyrianska - " + _vsShelf + " wzorow wyceniona jako skonczony zasob (" + s.HistValyrianPerMeasure.ToString("0", CultureInfo.InvariantCulture)
                              + " d za miare; na polce wazy koszt wykonania): " + string.Join(", ", vs.ToArray()) + (rebuilt > 0 ? "; dane rynku przeliczone w " + rebuilt + " miastach z klinga na polce" : "") + ".");
                 }
+                // Jeff 15.10 ("tier 6 luk, najlepszy luk w grze, kosztuje grosze"): LUKI Z RZADKIEGO MATERIALU - wycena jak stal valyrianska (skonczony zasob),
+                // nie z dni pracy lukarza (wychodzilo 6 d): czardrzewo (swiete, nie scina sie go), smocza kosc (smokow nie ma), zlotoserce (Wyspy Letnie),
+                // luk olbrzyma. Wartosc z klucza HistExoticBows (id=wartosc); na polce wazy koszt wykonania (_shelfWorth), jak klinga.
+                if (!string.IsNullOrEmpty(s.HistExoticBows))
+                {
+                    var eb = new List<string>();
+                    foreach (var pair in s.HistExoticBows.Split(','))
+                    {
+                        var kv = pair.Split('=');
+                        if (kv.Length != 2) continue;
+                        float v;
+                        if (!float.TryParse(kv[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out v) || v <= 0f) continue;
+                        ItemObject it = null;
+                        try { it = MBObjectManager.Instance.GetObject<ItemObject>(kv[0].Trim()); } catch { }
+                        if (it == null) continue;
+                        int making = Math.Max(1, it.Value);
+                        set(it, v);
+                        _target[it] = it.Value;
+                        _shelfWorth[it] = making;
+                        eb.Add(it.StringId + " " + making + " -> " + it.Value);
+                    }
+                    Log.Info("HistoricalPrices: luki z rzadkiego materialu (HistExoticBows) - " + eb.Count + " wycenione jak skonczony zasob (na polce wazy koszt wykonania): " + string.Join(", ", eb.ToArray()) + ".");
+                }
                 // E8/K (255, PLAN 8.3; rozpoznanie B 1.1): KSIAZKI BK. BK definiuje 24 ksiazki po 750 (opowiesci) i 1000 (umiejetnosci) przez BKItems.InitializeTradeGood,
                 // a prefiks BKROTPatch (BKItemsInitializePatch) dzieli wartosc kazdego towaru BK przez 100 (liczby calkowite) - ksiazki maja 7 i 10, obok 36 ksiazek
                 // ROT po 1000 i 1500 w TEJ SAMEJ kategorii "book" (BKROT definiuje swoje wlasna metoda, bez dzielenia). Regula: ksiazka kategorii "book" warta mniej
