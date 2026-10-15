@@ -722,7 +722,8 @@ Uzycie (Python 3, tylko odczyt):
                     --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). DY-0 start: wpiete 2/2, klucz TAK, monarchii 20; DY-1 linie doby
                     i potkniecia 0; DY-2 Daenerys (empire_s) zywa i wolna, rod w krolestwie, a nie rzadzi - 0 linii doby; DY-3 powroty na tron (INFO),
                     NIEUDANE i WSTRZYMANE (przepychanka, limit 3 na sesje) 0; DY-4 secesja S9 rodu clan_empire_south_1 z House Targaryen 0; DY-5 zywy wolny wladca ze startu w swoim krolestwie bez
-                    tronu (ostatnia doba) 0; DY-6 zablokowane wybory / abdykacje, pominiete zmiany ustroju, S9 (INFO). Log bez paczki: INFO.
+                    tronu (ostatnia doba; tron oddany fabula ROT - Nocna Straz / Polnoc - poza lista) 0; DY-6 zablokowane wybory / abdykacje, pominiete zmiany
+                    ustroju, S9 (INFO). Log bez paczki: INFO.
 --grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
                     --grupa unikaty --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). UN-0 wpiecie latek PODPIETE, UN-2 linie doby
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek

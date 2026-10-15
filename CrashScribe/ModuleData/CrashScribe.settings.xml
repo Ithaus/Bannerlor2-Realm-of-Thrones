@@ -456,8 +456,9 @@
        her own realm in a revolt). Banner Kings can turn a story monarchy into a republic and then elect a new ruler every year, leaving out the
        one on the throne; Diplomacy can force an abdication after a lost civil war. With this on, in every story monarchy (the Free Cities stay
        republics) the ruler the campaign starts with keeps the throne while alive: no change of government or usurpation by Banner Kings, no
-       election or abdication. If that ruler is alive, free and still in the realm but someone else sits on the throne (an older save), the
-       throne goes back to them; their house never leaves their own realm in a Banner Kings revolt. Once the story ruler dies, succession and
-       Realm of Thrones events work as before. Your own house is never removed from a throne. Set to false for the old behaviour. -->
+       yearly election and no forced abdication. If that ruler is alive, free and still in the realm but someone else sits on the throne (an older
+       save), the throne goes back to them and their house leaves any Diplomacy rebel faction of that realm; their house never leaves their own
+       realm in a Banner Kings revolt. Succession when the story ruler dies, and thrones handed over by Realm of Thrones events (the Night's Watch,
+       the North), work as before. Your own house is never removed from a throne. Set to false for the old behaviour. -->
   <StoryThroneGuard>true</StoryThroneGuard>
 </CrashScribe>

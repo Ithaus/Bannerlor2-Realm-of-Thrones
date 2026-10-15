@@ -32,10 +32,14 @@ namespace CrashScribe
     /// Naprawa (klucz StoryThroneGuard, domyslnie true) - monarchie ROT (ustroj w naszym pliku tytulow inny niz Republic; wladca ze startu = owner
     /// krolestwa z XML ROT, ten sam odczyt co tools/bk_titles_rot818.py), dopoki wladca ze startu zyje i rzadzi:
     ///  (1) prefiks BKDiplomacyBehavior.ConsiderGovernmentTransition - bez zmian ustroju i uzurpacji BK (Imperial -> Republic, UsurpRealm);
-    ///  (2) prefiks Kingdom.AddDecision - bez KingSelectionKingdomDecision (wybory republiki BK, abdykacja po wojnie domowej Diplomacy), chyba ze
-    ///      wnioskuje rod gracza;
+    ///  (2) prefiks Kingdom.AddDecision - bez wymuszonego wyboru wladcy: BK RepublicElectionDecision (wybory republiki) i KingSelectionKingdomDecision
+    ///      z wnioskiem rodu innego niz panujacy (abdykacja po wojnie domowej Diplomacy), chyba ze wnioskuje rod gracza. Wybor zglaszany przez rod panujacy
+    ///      przechodzi - to sukcesja po smierci wladcy (BK SuccessionHelper.ResolveSuccession w BeforeHeroKilledEvent i gra KillCharacterAction wola
+    ///      AddDecision, zanim bohater jest martwy - recenzja 15.10);
     ///  (3) doba: wladca ze startu zywy, wolny, glowa rodu, rod w swoim krolestwie, a tron ma inny rod (stary zapis, droga spoza 1-2) - powrot na tron
-    ///      przez BK KingdomActions.SetRulerWithTitle (z tytulem), bez BK - ChangeRulingClanAction; rodu gracza na tronie nie ruszamy;
+    ///      przez BK KingdomActions.SetRulerWithTitle (z tytulem), bez BK - ChangeRulingClanAction; rodu gracza na tronie nie ruszamy; tronu oddanego
+    ///      przez fabule ROT nie cofamy (RotHandover: JonEvent daje Nocna Straz Halfhandowi bez zabicia Jeora); nowy wladca wychodzi z frakcji buntu
+    ///      Diplomacy swojego krolestwa (jak Diplomacy CivilWarBehavior.NewKing po wyborze krola);
     ///  (4) S9: rod wladcy ze startu nie odchodzi ze swojego krolestwa w secesji BK (Mends.BkSecede).
     /// Republiki z pliku (Wolne Miasta, Qohor) - bez zmian (wybory co rok to zamysl BK i pliku tytulow). Bez zapisu w save.
     /// </summary>
@@ -62,6 +66,33 @@ namespace CrashScribe
         private const int MaxBackPerSession = 3;   // powrotow na tron na krolestwo w sesji - straz przed przepychanka z inna droga (potem linia i spokoj)
         private static readonly Dictionary<string, int> _backTries = new Dictionary<string, int>();
         private static bool _bkSetRulerResolved;
+        private static bool _dipResolved;
+        private static MethodInfo _dipGet, _dipRemove;
+        private static PropertyInfo _dipClans;
+
+        // Recenzja 15.10: ROT sam oddaje tron innemu rodowi (ROT.Events, ChangeRulingClanAction): Nocna Straz - JeorMutinyEvent -> Thorne (ROTclan_125, Jeor
+        // ginie w tej samej chwili), JonEvent -> Halfhand (clan_nord_3) BEZ zabicia Jeora (gdy JeorMutiny nie doszlo); Polnoc - JonEvent -> Snow (clan_battania_6,
+        // warunek: Robb martwy). Taki tron zostaje - powrot na tron go nie cofa (fabula ROT), linia doby liczy go osobno.
+        private static readonly Dictionary<string, string[]> RotHandover = new Dictionary<string, string[]>
+        {
+            { "nightswatch", new[] { "clan_nord_3", "ROTclan_125" } },
+            { "battania", new[] { "clan_battania_6" } },
+        };
+
+        private static bool IsRotHandover(Kingdom k)
+        {
+            string[] ids;
+            if (k == null || k.RulingClan == null || !RotHandover.TryGetValue(k.StringId, out ids)) return false;
+            return Array.IndexOf(ids, k.RulingClan.StringId) >= 0;
+        }
+
+        /// <summary>BK RepublicElectionDecision (BKRepublicBehavior, dzien roku 1) - po nazwie typu, bez odwolania do BK.</summary>
+        private static bool IsBkRepublicVote(KingdomDecision d)
+        {
+            for (var t = d.GetType(); t != null; t = t.BaseType)
+                if (t.FullName == "BannerKings.Managers.Kingdoms.Succession.RepublicElectionDecision") return true;
+            return false;
+        }
 
         private static void Stumble(string where, Exception e)
         {
@@ -146,7 +177,7 @@ namespace CrashScribe
             Seat s;
             if (!_byKingdom.TryGetValue(k.StringId, out s)) return null;
             var h = HeroOf(s);
-            if (h == null || !h.IsAlive || h.Clan == null) return null;
+            if (h == null || !h.IsAlive || h.Clan == null || h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None) return null;
             if (h.Clan.Kingdom != k || k.RulingClan != h.Clan || h.Clan.Leader != h) return null;
             return h;
         }
@@ -220,7 +251,8 @@ namespace CrashScribe
             catch (Exception e) { Stumble("GovPrefix", e); return true; }
         }
 
-        /// <summary>Prefiks Kingdom.AddDecision: wybor wladcy w monarchii ROT, w ktorej rzadzi zywy wladca ze startu - pominiety (poza wnioskiem rodu gracza).</summary>
+        /// <summary>Prefiks Kingdom.AddDecision: wymuszony wybor wladcy w monarchii ROT, w ktorej rzadzi zywy wladca ze startu - pominiety (wybory republiki BK,
+        /// wniosek rodu innego niz panujacy, np. abdykacja Diplomacy; nie: wniosek rodu gracza i rodu panujacego - sukcesja po smierci wladcy).</summary>
         public static bool AddDecisionPrefix(Kingdom __instance, KingdomDecision __0)
         {
             try
@@ -231,8 +263,11 @@ namespace CrashScribe
                 if (h == null) return true;
                 var prop = __0.ProposerClan;
                 if (prop != null && prop == Clan.PlayerClan) return true;
+                bool republic = IsBkRepublicVote(__0);
+                if (!republic && prop != null && prop == k.RulingClan) return true;   // recenzja: sukcesja po smierci wladcy (BK BeforeHeroKilled, gra KillCharacterAction) - jak dotad
                 _dVote++; _tVote++;
-                Scribe.Line("Tron fabularny (DY): wybor wladcy zablokowany - dzien " + Day() + " | " + Txt(k.Name) + " (" + k.StringId + ") | " + __0.GetType().Name + ", wnioskuje "
+                Scribe.Line("Tron fabularny (DY): wybor wladcy zablokowany - dzien " + Day() + " | " + Txt(k.Name) + " (" + k.StringId + ") | " + __0.GetType().Name
+                            + (republic ? " (wybory republiki BK)" : " (wniosek rodu spoza tronu, np. abdykacja Diplomacy)") + ", wnioskuje "
                             + (prop != null ? Txt(prop.Name) + " (" + prop.StringId + ")" : "-") + " | wladca ze startu " + Txt(h.Name) + " (" + h.StringId + ") zostaje na tronie.");
                 return false;
             }
@@ -263,9 +298,11 @@ namespace CrashScribe
                     var k = KingdomOf(s);
                     var h = HeroOf(s);
                     if (k == null || k.IsEliminated || h == null || !h.IsAlive || h.IsPrisoner || h.Clan == null || h.Clan.IsEliminated) continue;
+                    if (h.DeathMark != KillCharacterAction.KillCharacterActionDetail.None) continue;
                     if (h.Clan.Kingdom != k || h.Clan.Leader != h || h.Clan.IsUnderMercenaryService) continue;
                     if (k.RulingClan == h.Clan) continue;
                     if (k.RulingClan == Clan.PlayerClan || h.Clan == Clan.PlayerClan) continue;
+                    if (IsRotHandover(k)) continue;   // recenzja: tron oddany przez fabule ROT (JonEvent - Halfhand w Nocnej Strazy) zostaje
                     int tries;
                     _backTries.TryGetValue(s.Kingdom, out tries);
                     if (tries >= MaxBackPerSession)
@@ -282,7 +319,7 @@ namespace CrashScribe
                     var prevClan = k.RulingClan;
                     string how = SetRuler(h, k);
                     bool done = k.RulingClan == h.Clan;
-                    if (done) { _dBack++; _tBack++; }
+                    if (done) { _dBack++; _tBack++; how += "; " + DropFromRebelFactions(k, h.Clan); }
                     Scribe.Line("Tron fabularny (DY): " + (done ? "powrot na tron" : "powrot na tron NIEUDANY") + " - dzien " + Day() + " | " + Txt(k.Name) + " (" + k.StringId + ") | "
                                 + (prev != null ? Txt(prev.Name) + " (" + prev.StringId + ")" : "-") + ", rod " + (prevClan != null ? prevClan.StringId : "-") + " -> wladca ze startu "
                                 + Txt(h.Name) + " (" + h.StringId + ", rod " + h.Clan.StringId + ") | " + how + ".");
@@ -318,6 +355,47 @@ namespace CrashScribe
             return note;
         }
 
+        /// <summary>Recenzja 15.10: jak Diplomacy CivilWarBehavior.NewKing po wyborze krola (RemoveClan nowego wladcy z frakcji buntu jego krolestwa).
+        /// Diplomacy nie pozwala wladcy zakladac ani wstepowac do frakcji, a powrot na tron to nie decyzja krolestwa - bez tego rod wracajacy na tron, ktory
+        /// byl w frakcji (np. sponsor abdykacji przeciw poprzednikowi), przy wybuchu wojny domowej wyszedlby z wlasnego krolestwa (StartRebellionAction).</summary>
+        private static string DropFromRebelFactions(Kingdom k, Clan c)
+        {
+            try
+            {
+                if (!_dipResolved)
+                {
+                    _dipResolved = true;
+                    var tm = AccessTools.TypeByName("Diplomacy.CivilWar.RebelFactionManager");
+                    var tf = AccessTools.TypeByName("Diplomacy.CivilWar.Factions.RebelFaction");
+                    _dipGet = tm != null ? AccessTools.Method(tm, "GetRebelFaction", new[] { typeof(Kingdom) }) : null;
+                    _dipRemove = tf != null ? AccessTools.Method(tf, "RemoveClan", new[] { typeof(Clan) }) : null;
+                    _dipClans = tf != null ? AccessTools.Property(tf, "Clans") : null;
+                }
+                if (_dipGet == null || _dipRemove == null || _dipClans == null) return "frakcje Diplomacy: brak typow";
+                int seen = 0, left = 0;
+                var list = _dipGet.Invoke(null, new object[] { k }) as System.Collections.IEnumerable;   // kopia listy - RemoveClan / DestroyRebelFaction jej nie zmienia
+                if (list != null)
+                    foreach (var f in list)
+                    {
+                        if (f == null) continue;
+                        seen++;
+                        bool member = false;
+                        var cl = _dipClans.GetValue(f, null) as System.Collections.IEnumerable;
+                        if (cl != null) foreach (var o in cl) if (o == c) { member = true; break; }
+                        if (!member) continue;
+                        _dipRemove.Invoke(f, new object[] { c });
+                        left++;
+                    }
+                return "frakcje Diplomacy: " + seen + ", rod wyszedl z " + left;
+            }
+            catch (Exception e)
+            {
+                var ie = e is TargetInvocationException && e.InnerException != null ? e.InnerException : e;
+                Stumble("DropFromRebelFactions", ie);
+                return "frakcje Diplomacy: wyjatek " + ie.GetType().Name;
+            }
+        }
+
         private const string ProbeKingdom = "empire_s";   // wglad do testu: House Targaryen (Daenerys)
 
         /// <summary>Wglad do testu: kto rzadzi House Targaryen i co z wladczynia ze startu (Daenerys).</summary>
@@ -343,7 +421,7 @@ namespace CrashScribe
         private static string Census()
         {
             if (_seats == null) return "brak listy";
-            int rules = 0, dead = 0, away = 0, notHead = 0, fallen = 0, captive = 0;
+            int rules = 0, dead = 0, away = 0, notHead = 0, fallen = 0, captive = 0, rot = 0;
             var off = new StringBuilder();
             foreach (var s in _seats)
             {
@@ -359,12 +437,13 @@ namespace CrashScribe
                     if (h.IsPrisoner) captive++;
                     continue;
                 }
+                if (IsRotHandover(k)) { rot++; continue; }   // tron oddany przez fabule ROT - nie liczy sie jako utrata tronu
                 if (off.Length > 0) off.Append("; ");
                 off.Append(s.Kingdom).Append(": start ").Append(Txt(h.Name)).Append(" (").Append(h.StringId).Append(h.IsPrisoner ? ", w niewoli" : ", na wolnosci")
                    .Append("), teraz ").Append(k.Leader != null ? Txt(k.Leader.Name) + " (" + k.Leader.StringId + ")" : "-");
             }
             return "monarchii ROT " + _seats.Count + ": rzadzi wladca ze startu " + rules + " (w niewoli " + captive + "), zmarl " + dead + ", rod poza krolestwem " + away
-                   + ", nie glowa rodu " + notHead + ", krolestwo upadlo " + fallen + ", nie rzadzi [" + off + "]";
+                   + ", nie glowa rodu " + notHead + ", krolestwo upadlo " + fallen + ", tron oddany fabula ROT " + rot + ", nie rzadzi [" + off + "]";
         }
     }
 
