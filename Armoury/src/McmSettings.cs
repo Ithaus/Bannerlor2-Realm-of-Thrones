@@ -92,6 +92,10 @@ namespace Armoury
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeWorksWithoutYou { get; set; } = true;
 
+        [SettingPropertyBool("Smelt No Wood", HintText = "smelting a weapon gives back its metal but not the wood of its handle - wood burns in the crucible (the game handed back 1-3 hardwood from an axe). Off = as in the game")]
+        [SettingPropertyGroup("Time at the anvil")]
+        public bool SmeltNoWood { get; set; } = true;
+
         [SettingPropertyBool("Forge One Clock", HintText = "one forge clock: Craft puts the piece on the smith's bench for the hours the Banner Kings screen shows (stamina spent / 6); pieces come off one by one when done - no lump wait afterwards")]
         [SettingPropertyGroup("Time at the anvil")]
         public bool ForgeOneClock { get; set; } = true;
@@ -6222,6 +6226,7 @@ namespace Armoury
             s.CharcoalPerIron = CharcoalPerIron;
             s.StaminaPerTier = StaminaPerTier;
             s.ForgeWorksWithoutYou = ForgeWorksWithoutYou;
+            s.SmeltNoWood = SmeltNoWood;
             s.ForgeOneClock = ForgeOneClock;
             s.ForgeOnlyWhileThere = ForgeOnlyWhileThere;
             s.ForgeLikeTownSmith = ForgeLikeTownSmith;

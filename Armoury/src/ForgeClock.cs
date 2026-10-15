@@ -72,8 +72,14 @@ namespace Armoury
         }
 
         /// <summary>C5: napis dla gracza przy odlozeniu sztuki na lawe (po angielsku) i linia logu; oldHours - czas wedlug dawnej reguly (ekran BK).</summary>
+        // Jeff 15.10 ("smeltowalem rzeczy, niby ma trwac 5 h, wychodze z kuzni i nie uruchamia sie czas"): BK StartCraftingMenu(totalHours) sumuje godziny
+        // WSZYSTKICH czynnosci ekranu (stamina / 6: kucie, przetop, rafinacja). Kolejka bierze tylko kute sztuki - reszta godzin przepadala.
+        // Licznik godzin BK sztuk wzietych do kolejki od ostatniego zamkniecia ekranu; SkipBkWait odejmuje je i zostawia BK odsiadke za reszte.
+        private static float _bkQueued;
+
         internal static void NoteQueued(ItemObject item, int count, float hours, float oldHours)
         {
+            _bkQueued += Math.Max(0f, oldHours);
             if (!LikeTown || item == null || TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement == null || ArmouryBehavior.Instance == null) return;   // bez osady Queue daje sztuke od razu
             try
             {
@@ -186,11 +192,21 @@ namespace Armoury
         }
 
         /// <summary>BK StartCraftingMenu: zamiast odsiadki wszystkich godzin naraz - nasze czekanie przy kowadle.</summary>
-        public static bool SkipBkWait()
+        public static bool SkipBkWait(ref float totalHours)
         {
             if (!On) return true;
+            float queued = _bkQueued;
+            _bkQueued = 0f;
             try
             {
+                float rest = totalHours - queued;
+                if (rest > 0.05f)
+                {
+                    // przetop / rafinacja (poza kolejka): odsiadka BK tylko za ich godziny; kute sztuki ida dalej w kolejce (kuja sie, gdy jestes w osadzie)
+                    Log.Info("Jeden zegar kuzni: ekran BK " + totalHours.ToString("0.0") + " h, z tego w kolejce " + queued.ToString("0.0") + " h - odsiadka BK za przetop / rafinacje " + rest.ToString("0.0") + " h.");
+                    totalHours = rest;
+                    return true;
+                }
                 var b = ArmouryBehavior.Instance;
                 var here = TaleWorlds.CampaignSystem.Settlements.Settlement.CurrentSettlement;
                 if (b != null && b.HasProjectsHere(here)) GameMenu.SwitchToMenu("arm_project_wait");

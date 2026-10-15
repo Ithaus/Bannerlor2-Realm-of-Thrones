@@ -104,7 +104,18 @@ namespace Armoury
         {
             try
             {
-                if (item == null || item.WeaponDesign != null || __result == null) return;
+                if (item == null || __result == null) return;
+                if (item.WeaponDesign != null)
+                {
+                    // Jeff 15.10 ("za duzo drewna - z topora 2-3 drewna"): gra oddaje z przetopu broni materialy czesci projektu, takze drewno trzonka
+                    // jak nowy material (1-3 sztuki). Drewno sie nie przetapia - spala sie w tyglu (jak luki, 03.09). Metal i wegiel bez zmian.
+                    if (Settings.Current != null && Settings.Current.SmeltNoWood)
+                    {
+                        int w = (int)CraftingMaterials.Wood;
+                        if (w >= 0 && w < __result.Length && __result[w] > 0) __result[w] = 0;
+                    }
+                    return;
+                }
                 if (!OurSmeltable(item)) return;
                 foreach (var p in YieldFor(item))
                 {
