@@ -2156,3 +2156,8 @@ w tescie 4 lat wydarzenie bylo "odpalone" (TotalEvents > 0) = zabojstwo wywolane
 to najpewniej nazwa rodu "Baratheon, Joffrey" (zostaje po smierci) w tabelach - sprawdzic na zapisie Jeffa po Purpurowych Godach.
 Czeka na slowo Jeffa: odparcie OB2 tylko gdy na murach stoi >= 1/4 obroncow ze startu szturmu dla KAZDEJ zalogi (dzis tylko <= 100 miasto / <= 30 zamek; Sweetport 2033 vs 186 odparty przy ok. 22 obroncach).
 Drobne z audytu (gra bez wplywu): AUD-P1-5 (2 z 571 wsi bez tytulu BK - tytuly powstaja na starcie kampanii), AB-10 (prog narzedzia), D1-D10 (koniec projektu).
+
+- (05:45 UTC 15.10) Jeff o progu OB2 22%: "szturm jest dopoki chociaz jeden obronca zyje, poczekaja do nastepnego szturmu i pokonaja 22 zolnierzy chyba ze przybedzie odsiecz"
+  -> odczyt: OB2 zostaje BEZ ZMIAN (cwierc obroncow nie rozszerzana). AUD-P1-5: [K] BK TitleGenerator.CreateLandedTitle zaklada lordship dla kazdej settlement.BoundVillages,
+  FeudalTitle.Equals po Fief - duplikat nazwy nie jest przyczyna; ktore 2 wsie - nieznane (linia BkTitles.cs:337 liczy, nie nazywa). Naprawa: (1) nazwy w linii, (2) dorobka
+  lordship w biegnacej kampanii (TitleManager.ExecuteAddTitle + vassals tytulu twierdzy) - dziala tez w kampanii Jeffa, wiec nie wstrzymuje gry. Ok. 1 h + krotki test.
