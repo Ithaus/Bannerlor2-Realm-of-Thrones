@@ -2180,3 +2180,10 @@ W grze: `w-toku/zbior-e8` **52896aca** (Armoury 9462e17e) = 58 + sen gracza (swi
 zamawia u rzemieslnikow, kasa -> lud KCraftPaid, gracz dostaje przedmiot od razu; klucz TourneyPrizeCommissioned). Test zapis F d240 8 dob OK, swity gracza 5 = swity AI 5, 0 ERROR.
 Jeff dostal za vargo_armor w Duskendale 253 zl zamiast pancerza (przed poprawka). Otwarte: dlug snu AI (203 partie jednego switu - nadrabianie tickow nocy), ceny placka/marchwi,
 AUD-P1-5 (2 wsie), zawieszenie w kreatorze postaci (nie powtorzylo sie).
+
+### 39. WGRANIE 60 (15.10 ok. 09:50 UTC) - START TUTAJ
+W grze: `w-toku/zbior-e8` **09caf1f7** (Armoury 7203772e) = 59 + luki z rzadkiego materialu (HistExoticBows: dragonbone 20000, weirwood 6000, ravens_teeth_longbow 5000,
+goldenheart 3000, giant_bow 2000, ravens_teeth_arrows 60, qarth_longbow 18 - przeglad 42 lukow/kusz i 71 amunicji z items-dump.csv) + drewno w kuzni w kg (SmithWood.cs:
+zapas otwartego ladunku w zapisie arm_smith_wood_kg; bron gry = sztuki drewna czesci x 1 kg - postfiks DefaultSmithingModel.GetSmithingCostsForWeaponDesign + Spend
+Materials; Recipes: waga drewna przedmiotu, ladunek dopiero gdy zapas nie starcza). Testy zapis F d240 (8 i 5 dob) OK, 0 ERROR. Nie sprawdzone w grze: ekran kuzni (0/1 drewna).
+Propozycja czeka na Jeffa: kusze 1.5-2 x cena luku o podobnej sile (dzis najmocniejsza kusza 27, najlepszy dlugi luk 45-48).
