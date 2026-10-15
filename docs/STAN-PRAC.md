@@ -2169,3 +2169,8 @@ kute sztuki - przetop/rafinacja przepadaly; teraz odsiadka BK za reszte godzin (
 Test zapis F d240 8 dob OK, Armoury 0 ERROR. NIE testowac na zapisie Jeffa (Ironman zapisuje sie sam - nadpisalby kampanie).
 Zawieszenie 05:43 w kreatorze postaci (AppHangB1, brak sladu); drugie podejscie przeszlo. Ceny placka/marchwi x8 = niedobor (piekarnie wsi BK) - propozycja wyrownania czeka.
 Swiat Jeffa d9: wojny FreeFolk-NW, Dragonstone-Stormlands; 0 oblezen; Daenerys rzadzi (DY 20/20); zloto: lud 5.5%, lordowie 36.4%, korony 25.8%.
+
+- (07:55 UTC 15.10) Jeff "zle liczy nieprzespane noce": log Armoury-2026-10-15_07-16-10 - swit gracza 108858 rozliczony 2x (dlug 0->1->2 w jednej sekundzie), 108859 2x
+  (drugi z 1.0 h). Przyczyna [K]: NightRest.OnHourly rozlicza swit przy kazdym ticku z h == dawn; tick nadrabiany w klatce ma te sama godzine (AI ma straznik T10-R R7, gracz nie mial).
+  Naprawa `w-toku/sen-gracza` b1585e17 (swit gracza raz na 12 h gry), build 0, test/fin46 (Armoury 8b1570bb) - CZEKA na przerwe w grze (krotki test + wgranie 59).
+  Do zbadania: tego samego switu 108858 AI dostalo dlug naraz 203 partie (108859: 60) - nadrabianie tickow w nocy (szybki czas / sen w menu) a ksiega AI (campPast = InCamp(h-1)).
