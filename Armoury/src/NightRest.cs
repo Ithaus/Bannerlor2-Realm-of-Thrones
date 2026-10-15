@@ -38,6 +38,7 @@ namespace Armoury
         // MUSZTRA-j (decyzja Jeffa 09.10 07:10 pkt 2, "noc bez snu = nastepny dzien bez cwiczen", od switu): dlug gracza zaraz po ostatnim swicie
         // (koniec SettleNight) - czyta tylko musztra (DawnDebtOf); predkosc i morale licza dlug biezacy (Debt). Jak AiSleep.DawnDebt w ksiedze AI.
         internal static int DawnDebt;
+        private static double _playerDawnH = -1;   // chwila ostatniego rozliczenia switu gracza (godziny gry; tylko pamiec - po wczytaniu od nowa)
         private static float _restTonight;
         private static bool _credited;                  // dzisiejszy sen juz rozliczony (od reki, nie o swicie)
         private static Vec2 _lastPos;
@@ -168,8 +169,13 @@ namespace Armoury
                     else NightfallAsk();
                 }
 
-                if (h == dawn)
+                // Jeff 15.10 ("cos zle liczy nieprzespane noce"): swit gracza rozliczal sie 2 razy tej samej doby (log 108858: dlug 0 -> 1 -> 2 w jednej sekundzie,
+                // 108859: drugi raz godzine pozniej z 1.0 h odpoczynku) - tick godzinowy nadrabiany przy szybkim czasie ma te sama godzine doby. Jak u AI (T10-R R7):
+                // swit raz na 12 h gry.
+                double nowAbsH = CampaignTime.Now.ToHours;
+                if (h == dawn && (_playerDawnH < 0 || nowAbsH - _playerDawnH > 12.0 || nowAbsH < _playerDawnH))
                 {
+                    _playerDawnH = nowAbsH;
                     // T10 (uwaga krytyki 5, P10): linia ksiegi gracza o swicie - sam log, SettleNight bez zmian
                     int debtBefore = Debt; float restBefore = _restTonight; bool sleepingNow = _sleeping, creditedBefore = _credited;
                     SettleNight(s);
