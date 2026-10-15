@@ -269,7 +269,15 @@ namespace Armoury
                 _skipHits = 0; _skipShots = 0;
             }
             catch { }
+            try { MissionTeams.Flush(Mission); } catch { }   // NM: linia "Druzyny w misji (NM)" raz na misje
             base.OnEndMission();
+        }
+
+        // NM: liczniki misji od poczatku misji (rodzaj misji i bitwa na mapie liczone raz)
+        public override void AfterStart()
+        {
+            try { MissionTeams.Begin(Mission); } catch { }
+            base.AfterStart();
         }
 
         private static int ArmorSlotFor(BoneBodyPartType part, Agent a)
@@ -713,12 +721,13 @@ namespace Armoury
                                 else agent.Health = nh;
                             }
                         }
-                        if (broken && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked)
+                        // NM: FleeHere na koncu warunku - poza bitwa na mapie (turniej, arena, bojka) st.Panicked zostaje false
+                        if (broken && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked && FleeHere(agent))
                         {
                             st.Panicked = true;
                             FleeTheField(agent);
                         }
-                        else if (st.Panicked && !agent.IsMainAgent && agent.IsAIControlled && !agent.IsRetreating())
+                        else if (st.Panicked && !agent.IsMainAgent && agent.IsAIControlled && !agent.IsRetreating() && FleeHere(agent))
                         {
                             // odwrot mu wygasl (zderzyl sie z kims, silnik go zawrocil) -
                             // przypominamy trupowi ze mial uciekac, nie boksowac
@@ -728,6 +737,20 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("FieldCraft.Tick", e); }
+        }
+
+        // NM (klucz WoundedFleeBattlesOnly): zlamany ucieka tylko w bitwie na mapie (MissionTeams.IsBattle, raz na misje) - w turnieju, na arenie
+        // i w bojce walczy do nokautu, jak chce gra (TournamentFightMissionController.CanAgentRout = false). Wylaczenie klucza = jak dotad.
+        private int _fleeHere = -1;               // -1 nie sprawdzone, 0 misja poza bitwa na mapie, 1 bitwa
+
+        private bool FleeHere(Agent agent)
+        {
+            var c = Settings.Current;
+            if (c == null || !c.WoundedFleeBattlesOnly) return true;
+            if (_fleeHere < 0) _fleeHere = MissionTeams.IsBattle(Mission) ? 1 : 0;
+            if (_fleeHere == 1) return true;
+            MissionTeams.Held(MissionTeams.Flee, agent);
+            return false;
         }
 
         /// <summary>
@@ -743,6 +766,8 @@ namespace Armoury
             {
                 var mission = TaleWorlds.MountAndBlade.Mission.Current;
                 if (mission == null || agent == null || !agent.IsActive()) return;
+                // NM: czlowiek bez druzyny (Team.Invalid) nie ucieka - przed Panic, zeby nie zostal w panice bez odwrotu
+                if (!MissionTeams.Valid(agent.Team)) { MissionTeams.Skip(agent, MissionTeams.Flee); return; }
                 try { var cai = agent.CommonAIComponent; if (cai != null) cai.Panic(); } catch { }
 
                 Vec2 my = agent.Position.AsVec2;
@@ -750,7 +775,8 @@ namespace Armoury
                 foreach (var a in mission.Agents)
                 {
                     if (a == null || !a.IsActive() || !a.IsHuman) continue;
-                    if (a.Team == null || agent.Team == null || !a.Team.IsEnemyOf(agent.Team)) continue;
+                    // NM: wrog tylko z wazna druzyna (natywne IsEnemy na Team.Invalid sie wywraca)
+                    if (MissionTeams.Skip(a, MissionTeams.Flee) || !MissionTeams.Enemies(a.Team, agent.Team)) continue;
                     float d = a.Position.AsVec2.DistanceSquared(my);
                     if (d < best) { best = d; foe = a; }
                 }
@@ -766,9 +792,10 @@ namespace Armoury
                 try { edge = mission.GetClosestBoundaryPosition(far); }           // przyciecie do granicy mapy
                 catch { edge = far; }
                 var wp = new WorldPosition(mission.Scene, new Vec3(edge.x, edge.y, agent.Position.z));
+                MissionTeams.Pushed(MissionTeams.Flee);
                 agent.Retreat(wp);
             }
-            catch (Exception e) { Log.Error("FleeTheField", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Flee, "FleeTheField", e); }
         }
     }
 }

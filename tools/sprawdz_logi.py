@@ -753,6 +753,11 @@ Uzycie (Python 3, tylko odczyt):
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
                     wolnych w miastach tylko przez zgony / najecie / rody / niewole, UN-7 bez miejsca nie rosnie, UN-9 dzieci z imieniem wzoru 0, UN-11
                     potkniecia 0; UN-1, UN-8, UN-10, UN-12 INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa nmisje    : (noc 15/16.10, bledy misji z sesji Jeffa 15.10; galaz w-toku/noc-misje, MissionTeams.cs) python -I tools/sprawdz_logi.py
+                    --grupa nmisje <Armoury-*.log> (log czytany strumieniowo). Druzyny w misji i ucieczka rannych tylko w bitwie: NM-0 linia startu
+                    (klucz WoundedFleeBattlesOnly TAK), NM-1 ERROR in HideoutAlarm / BrokenMen / FleeTheField / GuardMaster.Tick / BattlefieldLaw.CountKill 0,
+                    NM-2 linie misji rozpoznane (brak = INFO, autotest nie gra misji), NM-3 potkniecia 0, NM-4 kryjowka (INFO), NM-5 poza bitwa na mapie
+                    przy kluczu TAK odwroty 0, NM-6 bitwa na mapie wstrzymani 0, NM-7 agenci bez druzyny wedlug misji (INFO). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -27232,6 +27237,119 @@ def korona2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nmisje (noc 15/16.10, bledy misji z sesji Jeffa 15.10; Armoury/src/MissionTeams.cs)
+NM_HEAD = "Druzyny w misji (NM): "
+NM_LINE = re.compile(r"Druzyny w misji \(NM\): misja (\w+) \(bitwa na mapie (TAK|NIE)\) \| agenci bez druzyny \(Team\.Invalid\) pominieci: "
+                     r"alarm (\d+), rozbici (\d+), ucieczka (\d+), blok (\d+), zabicia (\d+) \(roznych ludzi (\d+)(?:, pierwszy (.*?))?\) "
+                     r"\| ucieczka tylko w bitwie \(WoundedFleeBattlesOnly (TAK|NIE)\): wstrzymani rozbici (\d+), ucieczka (\d+) "
+                     r"\| odwroty wyslane: rozbici (\d+), ucieczka (\d+) "
+                     r"\| potkniecia: alarm (\d+), rozbici (\d+), ucieczka (\d+), blok (\d+), zabicia (\d+) \(sesja (\d+), linia misji (\d+)\)\.$")
+NM_ERR = ("ERROR in HideoutAlarm", "ERROR in BrokenMen", "ERROR in FleeTheField", "ERROR in GuardMaster.Tick", "ERROR in BattlefieldLaw.CountKill")
+
+
+def nmisje_main(logp):
+    """nmisje (noc 15/16.10; Armoury/src/MissionTeams.cs, HideoutAlarm, BrokenMen, FieldCraft, GuardMaster, BattlefieldLaw.CountKill): druzyny w misji
+    (agenci z Team.Invalid pomijani, potkniecia liczone) i ucieczka rannych tylko w bitwie na mapie (klucz WoundedFleeBattlesOnly).
+    Wejscie: log Armoury (czytany strumieniowo). NM-0 linia startu (klucz TAK), NM-1 ERROR in HideoutAlarm / BrokenMen / FleeTheField /
+    GuardMaster.Tick / BattlefieldLaw.CountKill = 0, NM-2 linie misji rozpoznane (brak linii = INFO: autotest nie gra misji), NM-3 potkniecia w liniach
+    misji = 0, NM-4 kryjowka - widzowie pojedynku pominieci (INFO), NM-5 misja poza bitwa na mapie przy kluczu TAK - odwroty wyslane 0, NM-6 bitwa na
+    mapie - wstrzymani 0 (ranni dalej uciekaja), NM-7 pierwszy agent bez druzyny wedlug rodzaju misji (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NM-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, rows, bad, notes = [], [], [], []
+    errs = {k: 0 for k in NM_ERR}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NM_HEAD):
+                if s.startswith(NM_HEAD + "start sesji"):
+                    starts.append(s)
+                elif s.startswith(NM_HEAD + "misja "):
+                    mm = NM_LINE.match(s)
+                    if mm:
+                        g = mm.groups()
+                        rows.append(dict(kind=g[0], battle=g[1] == "TAK", skip=[int(x) for x in g[2:7]], people=int(g[7]), first=g[8] or "",
+                                         key=g[9] == "TAK", held=(int(g[10]), int(g[11])), pushed=(int(g[12]), int(g[13])),
+                                         stum=[int(x) for x in g[14:19]], sess=int(g[19])))
+                    else:
+                        bad.append(s)
+                else:
+                    notes.append(s)
+            elif s.startswith("ERROR in "):
+                for k in NM_ERR:
+                    if s.startswith(k):
+                        errs[k] += 1
+                        break
+    print(f"plik: {logp} | linii startu {len(starts)}, linii misji {len(rows) + len(bad)} (rozpoznanych {len(rows)}), innych linii NM {len(notes)}")
+    # NM-0 start
+    st = starts[-1] if starts else ""
+    on = "klucz WoundedFleeBattlesOnly TAK" in st
+    if st:
+        rep.add("NM-0: linia startu (druzyny w misji)", st[len(NM_HEAD):][:240], "linia jest, klucz WoundedFleeBattlesOnly TAK", True if on else None)
+    else:
+        rep.add("NM-0: linia startu (druzyny w misji)", "brak linii", "INFO (wersja sprzed nmisje albo log bez kampanii)", None)
+    # NM-1 bledy
+    n_err = sum(errs.values())
+    rep.add("NM-1: ERROR w miejscach z pytaniem 'czy wrog'", ", ".join(f"{k[len('ERROR in '):]} {v}" for k, v in errs.items()), "0 (log 15.10 10-56-30: 31)",
+            n_err == 0)
+    # NM-2 linie misji
+    if not rows and not bad:
+        rep.add("NM-2: linie misji 'Druzyny w misji (NM)'", "brak linii", "INFO (autotest nie gra misji - sprawdzenie w grze: kryjowka z pojedynkiem, turniej)", None)
+        rep.show()
+        return 0
+    kinds = {}
+    for r in rows:
+        kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
+    rep.add("NM-2: linie misji rozpoznane", f"{len(rows)} z {len(rows) + len(bad)} (" + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) + ")"
+            + (f"; nierozpoznana np.: {bad[0][:160]}" if bad else ""), "wszystkie rozpoznane", len(bad) == 0)
+    # NM-3 potkniecia
+    stum = [0] * 5
+    for r in rows:
+        for i in range(5):
+            stum[i] += r["stum"][i]
+    rep.add("NM-3: potkniecia w liniach misji", f"alarm {stum[0]}, rozbici {stum[1]}, ucieczka {stum[2]}, blok {stum[3]}, zabicia {stum[4]}"
+            + (f"; linii '3. potkniecie' {len(notes)}" if notes else ""), "0", sum(stum) == 0)
+    # NM-4 kryjowka
+    hide = [r for r in rows if r["kind"] == "kryjowka"]
+    if hide:
+        hp = sum(r["people"] for r in hide)
+        rep.add("NM-4: kryjowka - agenci bez druzyny pominieci", f"misji {len(hide)}, roznych ludzi razem {hp}, alarm {sum(r['skip'][0] for r in hide)}"
+                f", rozbici {sum(r['skip'][1] for r in hide)}", "INFO (pojedynek z hersztem: widzowie pominieci, potkniecia 0 w NM-3)", None)
+    else:
+        rep.add("NM-4: kryjowka - agenci bez druzyny pominieci", "brak misji kryjowki", "INFO", None)
+    # NM-5 poza bitwa na mapie przy kluczu TAK
+    out = [r for r in rows if not r["battle"] and r["key"]]
+    if out:
+        push = sum(r["pushed"][0] + r["pushed"][1] for r in out)
+        held = (sum(r["held"][0] for r in out), sum(r["held"][1] for r in out))
+        rep.add("NM-5: poza bitwa na mapie (turniej, arena, bojka) - odwroty wyslane", f"misji {len(out)}, odwroty {push}; wstrzymani rozbici {held[0]}, ucieczka {held[1]}",
+                "odwroty 0 (klucz WoundedFleeBattlesOnly TAK)", push == 0)
+    else:
+        rep.add("NM-5: poza bitwa na mapie - odwroty wyslane", "brak misji poza bitwa z kluczem TAK", "INFO", None)
+    # NM-6 bitwa na mapie
+    bat = [r for r in rows if r["battle"]]
+    if bat:
+        held = sum(r["held"][0] + r["held"][1] for r in bat)
+        push = (sum(r["pushed"][0] for r in bat), sum(r["pushed"][1] for r in bat))
+        rep.add("NM-6: bitwa na mapie - wstrzymani", f"misji {len(bat)}, wstrzymani {held}; odwroty rozbici {push[0]}, ucieczka {push[1]}",
+                "wstrzymani 0 (w bitwie ranni uciekaja jak dotad)", held == 0)
+    else:
+        rep.add("NM-6: bitwa na mapie - wstrzymani", "brak misji bitwy", "INFO", None)
+    # NM-7 kto jest bez druzyny
+    firsts = {}
+    for r in rows:
+        if r["people"] > 0:
+            firsts.setdefault(r["kind"], []).append(f"{r['people']} ({r['first']})")
+    rep.add("NM-7: agenci bez druzyny wedlug rodzaju misji", "; ".join(f"{k}: " + ", ".join(v[:3]) for k, v in sorted(firsts.items())) or "0",
+            "INFO (turniej > 0 - 'pierwszy' wskaze zrodlo agenta bez druzyny)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -27380,6 +27498,8 @@ def main(argv):
         return wyspywolni_main(logp, start_arg, until_arg, bdp, csp, cspb)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
+    if group == "nmisje" and logp:
+        return nmisje_main(logp)   # NM (noc 15/16.10): druzyny w misji (Team.Invalid pominiety, potkniecia liczone), ucieczka rannych tylko w bitwie na mapie
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

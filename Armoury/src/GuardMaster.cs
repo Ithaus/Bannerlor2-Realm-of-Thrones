@@ -70,7 +70,8 @@ namespace Armoury
                 foreach (var a in Mission.Agents)
                 {
                     if (a == null || a == me || !a.IsActive() || !a.IsHuman) continue;
-                    if (a.Team == null || me.Team == null || !a.Team.IsEnemyOf(me.Team)) continue;
+                    // NM: wrog tylko z wazna druzyna - czlowiek z Team.Invalid wywracal caly takt i pomoc w bloku znikala
+                    if (MissionTeams.Skip(a, MissionTeams.Parry) || !MissionTeams.Enemies(a.Team, me.Team)) continue;
                     var act = a.GetCurrentActionType(1);
                     if (act != Agent.ActionCodeType.ReadyMelee && act != Agent.ActionCodeType.ReleaseMelee)
                     {
@@ -144,7 +145,20 @@ namespace Armoury
                 }
                 me.MovementFlags = (flags & ~Agent.MovementControlFlag.DefendMask) | block;
             }
-            catch (Exception e) { Log.Error("GuardMaster.Tick", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Parry, "GuardMaster.Tick", e); }
+        }
+
+        // NM: liczniki misji od poczatku misji; jedna linia "Druzyny w misji (NM)" po misji
+        public override void AfterStart()
+        {
+            try { MissionTeams.Begin(Mission); } catch { }
+            base.AfterStart();
+        }
+
+        protected override void OnEndMission()
+        {
+            try { MissionTeams.Flush(Mission); } catch { }
+            base.OnEndMission();
         }
 
         private static int SkillOf(Agent a, ItemObject weapon)
