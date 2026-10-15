@@ -655,6 +655,13 @@ Uzycie (Python 3, tylko odczyt):
                     K2-3b rok do roku +-10% (bieg >= 392 dob), K2-3c przebieg (INFO), K2-4 pobrany podatek > 0, K2-5 ksiega (pobrano = do panow + do kas,
                     nic ponizej poziomu normalnego, Obieg = linia doby, kontrola kies r = 0), K2-6 komu i ile (INFO), K2-7 miara W5-7 (INFO).
                     Log bez paczki: INFO, bez wyjatku.
+--grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
+                    TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
+                    (strumieniowo). OB2-0 linia startu (klucze tak), OB2-1 linie doby straznika / wsi / pozyczek, OB2-2 potkniecia i ERROR 0, OB2-3a lud / poziom
+                    normalny nie ponad pasmem (28 dob, bieg >= 182), OB2-3b lordowie + korony >= lud, OB2-3c przebieg udzialow (INFO), OB2-4a kiesy wsi bez trwalego
+                    wzrostu (+10% na 182 doby), OB2-4b kiesy wsi / poziom <= 3.0, OB2-5 ksiega (wsie, Obieg = linie, kontrola dlugu, Kiesa ludu r = 0), OB2-6a zakupy
+                    zbytku > przed (baza albo 79.1 tys./d z testu 4 lata), OB2-6b kupione dzieki cenie wedlug zasobnosci > 0, OB2-7 pozyczki od ludu > 0 przy rodach
+                    z miejscem, OB2-8 podatek doby <= sufit straznika, OB2-9 komu i ile (INFO), OB2-10 W5-7 (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -26794,6 +26801,300 @@ def kiesa2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ obieg2 (15.10, decyzja Jeffa "kasa sie zbiera u ludu ... lordowie i krolestwa zostana bez kasy";
+# "pamietaj o pozyczkach"; Armoury/src/TownFolk.Guard.cs, TownFolk.Loans.cs, TownFolk.Luxury.cs)
+O2_START = "Obieg ludu (obieg2): start sesji"
+O2_GUARD = "Straznik obiegu (obieg2): dzien "
+O2_VILL = "Podatek od nadwyzki wsi (obieg2): dzien "
+O2_LOANS = "Pozyczki od ludu (obieg2): dzien "
+O2_G = re.compile(r"swiat wczoraj (\d+|-): lud (\d+|-) \(([\d.]+%|-);.*?lordowie (\d+|-) \(([\d.]+%|-);.*?korony (\d+|-) \(([\d.]+%|-)\)"
+                  r" \| poziom normalny ludu (\d+) .*?kiesy z potrzeba (\d+) .*?= ([\d.]+|-) x poziom normalny; pasmo ([\d.]+)-([\d.]+) x"
+                  r".*?\| mnoznik ([\d.]+) \(([^;]*);.*?\| stawka doby ([\d.]+)%/d .*?sufit doby (\d+|-) = max\([\d.]+% swiata (\d+|-);")
+O2_GTAX = re.compile(r"podatek od nadwyzki dzis: miasta i zamki (\d+) \(kiesa2 (\d+) \+ korony (\d+)\), wsie (\d+), razem (\d+); do glow rodow (\d+), do kas miast (\d+),"
+                     r" do kas zamkow (\d+), do skarbcow koron (\d+)")
+O2_GIN = re.compile(r"doplyw ludu od konca poprzedniej doby (-?\d+|-), EMA (-?\d+|-)")
+O2_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.?$")
+O2_V = re.compile(r"\| pobrano (\d+): do glow rodow (\d+) \(w tym gracz (\d+)\), do kas miast (\d+), do kas zamkow (\d+) \(w tym bez zywego pana (\d+)\), do skarbcow koron (\d+)")
+O2_VK = re.compile(r"kiesy wsi przed / po (\d+) / (\d+), poziom normalny (\d+) \(kiesy / poziom ([\d.]+|-)\)")
+O2_VCTL = re.compile(r"kontrola: pobrano - do panow - do kas - do koron (-?\d+), ponizej poziomu normalnego po poborze (\d+)")
+O2_VSKIP = re.compile(r"wies w rabunku albo spladrowana (\d+), osada macierzysta oblezona (\d+) \((\d+)\), bez osady macierzystej (\d+)")
+O2_L = re.compile(r"zawarte w dobie (-?\d+) \([^)]*\): (\d+) zl u (\d+) rodow \(z kies miast (\d+), podzamczy (\d+), wsi (\d+)\); kandydaci \(wojna, kiesa rodziny ponizej rezerwy\) (\d+),"
+                  r" z miejscem w pulapie (\d+)")
+O2_LBLK = re.compile(r"bez pozyczki: zakaz po niesplacie (\d+), zaleglosc albo zajecie w Banku (\d+), limit (\d+), lud lenn bez nadwyzki (\d+)")
+O2_LD = re.compile(r"\| dzis: odsetki (\d+|-) .*?splacone (\d+) .*?rody z niepelna rata w pokoju (\d+), niesplacone \(umorzone po \d+ dobach\) (\d+) zl u (\d+) rodow")
+O2_LDEBT = re.compile(r"\| dlug rodow u ludu (\d+|-) \(rodow (\d+), osad (\d+).*?\| dlug rodow w Banku (\d+|-) \(rodow (\d+)\)")
+O2_LCTL = re.compile(r"kontrola: dlug - \(wczoraj \+ zawarte \+ odsetki - splacone - umorzone - przepadle\) (-?\d+|-)")
+O2_OBG = {"vlord": re.compile(r"podatek od nadwyzki wsi \(obieg2\) kiesy wsi -> glowy rodow (\d+)"),
+          "lent": re.compile(r"pozyczki od ludu \(obieg2\) kiesy ludu i wsi -> glowy rodow (\d+)"),
+          "repaid": re.compile(r"splaty pozyczek od ludu \(obieg2\) glowy rodow -> kiesy ludu i wsi (\d+)"),
+          "crown": re.compile(r"czesc korony podatku od nadwyzki \(obieg2\) kiesy ludu i wsi -> skarbce (\d+)"),
+          "vtake": re.compile(r"podatek od nadwyzki wsi \(obieg2\) do panow, kas i koron (\d+)")}
+O2_OBG_VTC = re.compile(r"podatek od nadwyzki wsi \(obieg2\) z kies wsi (\d+)")
+O2_ZB = re.compile(r", kupione z oferty (\d+) zl \(")
+O2_ZBC = re.compile(r"podzamcza \(P5\): z nadwyzka \d+, chciane \d+ zl, kupione (\d+) zl")
+O2_ZBV = re.compile(r"wsie \(P5\): z nadwyzka \d+, chciane \d+ zl, kupione (\d+) zl")
+O2_ZBW = re.compile(r"cena graniczna wedlug zasobnosci ludu \(obieg2\) (tak|nie).*?oferta w kategoriach ponad bazowa (\d+) zl w (\d+) wierszach, kupione z niej (\d+) zl;"
+                    r" podzamcza i wsie \(P5\) kupily ponad bazowa (\d+) zl")
+O2_BASE_LUX = 79100   # test 4 lata wersja 54 (d1100-1458): kupione z oferty miast 56.6 tys./d + podzamcza 1.8 tys./d + wsie P5 20.8 tys./d
+
+
+def _o2i(s):
+    try:
+        return int(s)
+    except (TypeError, ValueError):
+        return None
+
+
+def obieg2_main(logp, basep=None):
+    """obieg2 (15.10, decyzja Jeffa "kasa sie zbiera u ludu lub mieszczan ... ekonomia sie zawali", "pamietaj o pozyczkach"; Armoury/src/TownFolk.Guard.cs,
+    TownFolk.Loans.cs, TownFolk.Luxury.cs): podatek od nadwyzki kies wsi, straznik calego obiegu, pozyczki od ludu, cena graniczna zbytkow wedlug zasobnosci.
+    Wejscie: log Armoury (strumieniowo); --baza-doby <log Armoury biegu bazowego> - zakupy zbytku przed (bez - stala z testu 4 lata wersja 54, 79.1 tys./d).
+    OB2-0 linia startu (klucze tak), OB2-1 linie doby (straznik, wsie, pozyczki) w kazdej dobie kiesy czynnej, OB2-2 potkniecia i ERROR 0,
+    OB2-3a lud / poziom normalny nie ponad pasmem (srednia ostatnich 28 dob, bieg >= 182 doby; ponizej pasma - INFO w wartosci), OB2-3b lordowie + korony >= lud (to samo okno), OB2-3c przebieg udzialow (INFO),
+    OB2-4a kiesy wsi bez trwalego wzrostu (ostatnie 28 dob wobec 28 dob sprzed 182 dob <= +10%, bieg >= 210 dob), OB2-4b kiesy wsi / poziom normalny wsi <= 3.0,
+    OB2-5 ksiega bez rozjazdu (wsie: pobrano = do panow + kas + koron, nic ponizej poziomu; Obieg = linie; pozyczki: Obieg = linia, kontrola dlugu 0; Kiesa ludu r = 0),
+    OB2-6a zakupy zbytku (miasta + podzamcza + wsie) > przed, OB2-6b kupione dzieki cenie wedlug zasobnosci > 0, OB2-7 pozyczki od ludu w wojnie (kandydaci > 0 -> zawarte > 0),
+    OB2-8 sufit doby straznika (podatek doby <= sufit + 1%) - brak wstrzasu, OB2-9 komu i ile (INFO), OB2-10 miara W5-7 (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("OB2-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, gl, vl, ll, obg, kl, zb, errs = [], {}, {}, {}, {}, {}, {}, 0
+    k2c = {}
+    war = {}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(O2_START):
+                starts.append(s)
+            elif s.startswith(O2_GUARD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    gl[d] = s
+            elif s.startswith(O2_VILL):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    vl[d] = s
+            elif s.startswith(O2_LOANS):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    ll[d] = s
+            elif s.startswith("Obieg: dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None and "(obieg2)" in s:
+                    o = {k: (int(p.search(s).group(1)) if p.search(s) else None) for k, p in O2_OBG.items()}
+                    vt = O2_OBG_VTC.findall(s)
+                    o["vtown"] = int(vt[0]) if len(vt) > 0 else None
+                    o["vcastle"] = int(vt[1]) if len(vt) > 1 else None
+                    obg[d] = o
+            elif s.startswith("Kiesa ludu: dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None and "| CZYNNA |" in s:
+                    mm = K2_KL.search(s)
+                    kl[d] = mm.group(4) if mm else None
+            elif s.startswith("Zbytki ludu (P3-P5): dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    a, c, v, w = O2_ZB.search(s), O2_ZBC.search(s), O2_ZBV.search(s), O2_ZBW.search(s)
+                    zb[d] = (int(a.group(1)) if a else 0, int(c.group(1)) if c else 0, int(v.group(1)) if v else 0,
+                             (int(w.group(4)) + int(w.group(5))) if w else None, (int(w.group(2)) if w else None))
+            elif s.startswith("Podatek od nadwyzki ludu (kiesa2): dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    k2c[d] = num(r"do skarbcow koron z miast i zamkow (\d+)", s, int, 0)
+            elif s.startswith("Skarbce: dzien "):
+                mm = K2_SKARB.match(s)
+                if mm and mm.group(3):
+                    dd = int(mm.group(1))
+                    war[dd] = war.get(dd, 0) + int(mm.group(5))
+            elif s.startswith("ERROR in TownFolk.Guard") or s.startswith("ERROR in TownFolk.Loans") or s.startswith("ERROR in ClanBudget.FolkLoan"):
+                errs += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, straznika {len(gl)}, wsi {len(vl)}, pozyczek {len(ll)}, dob kiesy czynnej {len(kl)}, Obieg z obieg2 {len(obg)}")
+    if not starts and not gl and not vl and not ll:
+        rep.add("OB2-0: linia startu obieg2", "brak linii", "INFO (wersja sprzed obieg2)", None)
+        rep.show()
+        return 0
+    st = starts[-1] if starts else ""
+    keys = {k: (f"({k}) tak" in st) for k in ("Folk Hoard Villages", "Folk Circulation Guard", "Folk Loans", "Folk Ladder Ceiling By Wealth", "Folk Hoard Tax")}
+    allon = all(keys.values())
+    rep.add("OB2-0: linia startu (klucze obieg2)", (st[len(O2_START):][:260] if st else "brak linii startu (sa linie doby)"),
+            "linia jest, klucze tak", bool(st) and allon)
+    # OB2-1 linie doby
+    if kl:
+        d0 = min(kl)
+        mg = sorted(d for d in kl if d > d0 and keys["Folk Circulation Guard"] and d not in gl)
+        mv = sorted(d for d in kl if d > d0 and keys["Folk Hoard Villages"] and d not in vl)
+        ml = sorted(d for d in kl if d > d0 and keys["Folk Loans"] and d not in ll)
+        rep.add("OB2-1: linie doby (straznik / wsie / pozyczki) w kazdej dobie kiesy czynnej",
+                f"brak: straznik {len(mg)}, wsie {len(mv)}, pozyczki {len(ml)} (dob kiesy {len(kl)})" + (f" np. {(mg + mv + ml)[:4]}" if mg or mv or ml else ""),
+                "0 / 0 / 0 (poza pierwsza doba logu)", not mg and not mv and not ml)
+    else:
+        rep.add("OB2-1: linie doby", "brak linii 'Kiesa ludu' CZYNNA", "INFO", None)
+    # OB2-2 potkniecia
+    sg = sum(int(O2_STUM.search(s).group(1)) for s in (gl.values() if gl else vl.values()) if O2_STUM.search(s))
+    sl = sum(int(O2_STUM.search(s).group(1)) for s in ll.values() if O2_STUM.search(s))
+    rep.add("OB2-2: potkniecia obieg2 / ERROR (TownFolk.Guard, TownFolk.Loans, ClanBudget.FolkLoan)", f"straznik i wsie {sg}, pozyczki {sl}, ERROR {errs}", "0 / 0 / 0",
+            sg == 0 and sl == 0 and errs == 0)
+    # OB2-3 udzialy
+    g = {}
+    for d, s in gl.items():
+        a = O2_G.search(s)
+        t = O2_GTAX.search(s)
+        if not a or not t:
+            continue
+        world = _o2i(a.group(1))
+        g[d] = dict(world=world, folk=_o2i(a.group(2)), lords=_o2i(a.group(4)), crowns=_o2i(a.group(6)), N=int(a.group(8)), P=int(a.group(9)),
+                    ratio=float(a.group(10)) if a.group(10) != "-" else None, lo=float(a.group(11)), hi=float(a.group(12)), m=float(a.group(13)), move=a.group(14),
+                    rate=float(a.group(15)), cap=_o2i(a.group(16)), tax=int(t.group(5)), lord=int(t.group(6)), town=int(t.group(7)), castle=int(t.group(8)),
+                    crown=int(t.group(9)), vtake=int(t.group(4)), k2=int(t.group(2)), k2c=int(t.group(3)))
+    ds = sorted(g)
+    if ds:
+        span = ds[-1] - ds[0] + 1
+        last = [g[d] for d in ds[-28:] if g[d]["ratio"] is not None]
+        lo, hi = g[ds[-1]]["lo"], g[ds[-1]]["hi"]
+        avg = sum(x["ratio"] for x in last) / len(last) if last else None
+        pos = "-" if avg is None else ("w pasmie" if lo <= avg <= hi else ("ponizej pasma - lud nie gromadzi, straznik schodzi do 0.25 x" if avg < lo else "PONAD pasmem"))
+        rep.add("OB2-3a: lud / poziom normalny ludu - srednia ostatnich 28 dob (pasmo straznika)", f"{avg:.3f} - {pos} (pasmo {lo:.2f}-{hi:.2f}; dob {span})" if avg is not None else "-",
+                "nie ponad pasmo: <= gorna granica + 5% (bieg >= 182 dob)", (avg <= hi * 1.05) if (avg is not None and span >= 182) else None)
+        sh = [x for x in (g[d] for d in ds[-28:]) if x["world"] and x["folk"] is not None and x["lords"] is not None and x["crowns"] is not None]
+        if sh:
+            fl = sum(x["folk"] / x["world"] for x in sh) / len(sh)
+            lc = sum((x["lords"] + x["crowns"]) / x["world"] for x in sh) / len(sh)
+            rep.add("OB2-3b: lordowie + korony wobec ludu - udzial w zlocie swiata, srednia ostatnich 28 dob", f"lordowie + korony {100 * lc:.1f}%, lud {100 * fl:.1f}%",
+                    ">= (bieg >= 182 dob)", (lc >= fl) if span >= 182 else None)
+        step = max(1, len(ds) // 8)
+        path = "; ".join(f"d{d - ds[0] + 1}: lud {100 * g[d]['folk'] / g[d]['world']:.1f}% lordowie {100 * g[d]['lords'] / g[d]['world']:.1f}% korony {100 * g[d]['crowns'] / g[d]['world']:.1f}%"
+                         f" (x{g[d]['ratio'] if g[d]['ratio'] is not None else 0:.2f}, m {g[d]['m']:.2f})"
+                         for d in ds[::step] if g[d]["world"] and g[d]["folk"] is not None and g[d]["lords"] is not None and g[d]["crowns"] is not None)
+        rep.add("OB2-3c: przebieg udzialow (lud / lordowie / korony, lud wobec poziomu normalnego, mnoznik)", path[:600], "INFO", None)
+    else:
+        rep.add("OB2-3: udzialy", f"linii straznika {len(gl)}, rozpoznanych 0", "format linii straznika", False if gl else None)
+    # OB2-4 wsie
+    v = {}
+    for d, s in vl.items():
+        a, k, c = O2_V.search(s), O2_VK.search(s), O2_VCTL.search(s)
+        if not a or not k or not c:
+            continue
+        v[d] = dict(take=int(a.group(1)), lord=int(a.group(2)), town=int(a.group(4)), castle=int(a.group(5)), crown=int(a.group(7)), g1=int(k.group(2)),
+                    norm=int(k.group(3)), ratio=float(k.group(4)) if k.group(4) != "-" else None, diff=int(c.group(1)), below=int(c.group(2)))
+    vd = sorted(v)
+    if vd:
+        vspan = vd[-1] - vd[0] + 1
+
+        def vavg(a_, b_, key):
+            xs = [v[d][key] for d in vd if a_ <= d <= b_ and v[d][key] is not None]
+            return sum(xs) / len(xs) if xs else None
+        if vspan >= 210:
+            now = vavg(vd[-1] - 27, vd[-1], "g1")
+            before = vavg(vd[-1] - 182 - 27, vd[-1] - 182, "g1")
+            ch = (now / before - 1) if (now is not None and before) else None
+            rep.add("OB2-4a: kiesy wsi - ostatnie 28 dob wobec 28 dob sprzed 182 dob", f"{now / 1e6:.2f} mln wobec {before / 1e6:.2f} mln ({100 * ch:+.1f}%)" if ch is not None else "-",
+                    "<= +10%", (ch <= 0.10) if ch is not None else None)
+        else:
+            rep.add("OB2-4a: kiesy wsi - trwaly wzrost", f"bieg {vspan} dob", "INFO (bieg < 210 dob)", None)
+        rv = vavg(vd[-1] - 27, vd[-1], "ratio")
+        rep.add("OB2-4b: kiesy wsi / poziom normalny wsi - srednia ostatnich 28 dob", f"{rv:.2f} (pierwsza doba {v[vd[0]]['ratio']})" if rv is not None else "-",
+                "<= 3.0 (bieg >= 182 dob)", (rv <= 3.0) if (rv is not None and vspan >= 182) else None)
+    else:
+        rep.add("OB2-4: kiesy wsi", f"linii wsi {len(vl)}, rozpoznanych 0", "format linii wsi", False if vl else None)
+    # OB2-5 ksiega
+    bad = []
+    vbad = [d for d in vd if v[d]["diff"] != 0]
+    vbelow = sum(v[d]["below"] for d in vd)
+    om = []
+    for d in vd:
+        o = obg.get(d)
+        if not o:
+            continue
+        if (o["vlord"], o["vtake"], o["vtown"], o["vcastle"]) != (v[d]["lord"], v[d]["take"], v[d]["town"], v[d]["castle"]):
+            om.append(("wsie", d))
+    for d in ds:
+        o = obg.get(d)
+        if o and o["crown"] is not None and o["crown"] != g[d]["crown"]:
+            om.append(("korony", d))
+        if d in k2c and k2c[d] != g[d]["k2c"]:
+            om.append(("kiesa2-korony", d))
+    lrows = {}
+    for d, s in ll.items():
+        a, b_, c, e = O2_L.search(s), O2_LD.search(s), O2_LCTL.search(s), O2_LDEBT.search(s)
+        if not a or not b_:
+            continue
+        lrows[d] = dict(lday=int(a.group(1)), lent=int(a.group(2)), clans=int(a.group(3)), cand=int(a.group(7)), roomn=int(a.group(8)), repaid=int(b_.group(2)),
+                        missed=int(b_.group(3)), written=int(b_.group(4)), defaults=int(b_.group(5)), ctl=c.group(1) if c else None,
+                        debt=_o2i(e.group(1)) if e else None, bank=_o2i(e.group(4)) if e else None)
+    lm = []
+    for d, r in lrows.items():
+        o = obg.get(r["lday"])
+        if o and o["lent"] is not None and o["lent"] != r["lent"]:
+            lm.append(("zawarte", r["lday"]))
+        o2 = obg.get(d)
+        if o2 and o2["repaid"] is not None and o2["repaid"] != r["repaid"]:
+            lm.append(("splacone", d))
+    lctl = [d for d, r in lrows.items() if r["ctl"] not in (None, "-", "0", "-0") and abs(int(r["ctl"])) > 1]
+    rbad = [d for d in sorted(kl) if kl.get(d) not in (None, "0", "-")]
+    rep.add("OB2-5: ksiega obieg2 - wsie (pobrano = panowie + kasy + korony, nic ponizej poziomu), Obieg = linie (wsie, korony, pozyczki), kontrola dlugu, Kiesa ludu r = 0",
+            f"wsie rozjazd {len(vbad)} dob, ponizej poziomu {vbelow}; Obieg rozny {len(om) + len(lm)} (linii Obieg z obieg2 {len(obg)})" + (f" {(om + lm)[:3]}" if om or lm else "")
+            + f"; kontrola dlugu != 0 w {len(lctl)} dobach; r != 0 w {len(rbad)} dobach" + (f" {rbad[:3]}" if rbad else ""),
+            "0 / 0 / 0 / 0 / 0", not vbad and vbelow == 0 and not om and not lm and not lctl and not rbad)
+    # OB2-6 zbytki
+    zd = sorted(zb)
+    if zd:
+        tot = [zb[d][0] + zb[d][1] + zb[d][2] for d in zd]
+        avg = sum(tot) / len(tot)
+        base, bsrc = O2_BASE_LUX, "stala z testu 4 lata wersja 54 (d1100-1458)"
+        if basep and os.path.isfile(basep):
+            bt = []
+            with open(basep, encoding="utf-8", errors="replace") as fh:
+                for ln in fh:
+                    mm = TS.match(ln.rstrip("\n"))
+                    s = mm.group(2) if mm else ln.rstrip("\n")
+                    if s.startswith("Zbytki ludu (P3-P5): dzien "):
+                        a, c, vv = O2_ZB.search(s), O2_ZBC.search(s), O2_ZBV.search(s)
+                        bt.append((int(a.group(1)) if a else 0) + (int(c.group(1)) if c else 0) + (int(vv.group(1)) if vv else 0))
+            if bt:
+                base, bsrc = sum(bt) / len(bt), f"bieg bazowy {os.path.basename(basep)} ({len(bt)} dob)"
+        rep.add("OB2-6a: zakupy zbytku z oszczednosci (miasta + podzamcza + wsie) na dobe", f"{avg:.0f} wobec przed {base:.0f} ({bsrc})", "> przed", avg > base)
+        wide = [zb[d][3] for d in zd if zb[d][3] is not None]
+        rep.add("OB2-6b: kupione dzieki cenie granicznej wedlug zasobnosci (miasta + P5)", f"{sum(wide)} zl w {len(wide)} dobach ({sum(wide) / max(1, len(wide)):.0f}/d)" if wide else "brak pola w linii",
+                "> 0", (sum(wide) > 0) if wide else None)
+    else:
+        rep.add("OB2-6: zakupy zbytku", "brak linii 'Zbytki ludu (P3-P5)'", "INFO", None)
+    # OB2-7 pozyczki
+    if lrows:
+        ld = sorted(lrows)
+        lent = sum(lrows[d]["lent"] for d in ld); cand = sum(lrows[d]["cand"] for d in ld)
+        roomn = sum(lrows[d]["roomn"] for d in ld)
+        rep.add("OB2-7: pozyczki od ludu w wojnie (kandydaci z miejscem -> zawarte)", f"zawarte {lent} zl ({lent / len(ld):.0f}/d), kandydaci {cand}, z miejscem {roomn},"
+                f" splacone {sum(lrows[d]['repaid'] for d in ld)}, umorzone {sum(lrows[d]['written'] for d in ld)} u {sum(lrows[d]['defaults'] for d in ld)} rodow;"
+                f" dlug u ludu na koniec {lrows[ld[-1]]['debt']}, w Banku {lrows[ld[-1]]['bank']}",
+                "> 0, gdy rody z miejscem w pulapie", (lent > 0) if roomn > 0 else None)
+    else:
+        rep.add("OB2-7: pozyczki od ludu", "brak linii", "INFO", None)
+    # OB2-8 sufit doby
+    if ds:
+        over = [d for d in ds if g[d]["cap"] and g[d]["tax"] > 1.01 * g[d]["cap"] + 1]
+        first = next((d for d in ds if g[d]["tax"] > 0), None)
+        rep.add("OB2-8: podatek doby <= sufit straznika (bez wstrzasu)", f"ponad sufit {len(over)} dob" + (f" {over[:3]}" if over else "")
+                + (f"; pierwsza doba z podatkiem d{first - ds[0] + 1}: {g[first]['tax']} przy suficie {g[first]['cap']}" if first else "; podatku brak"),
+                "0 dob", not over)
+        n = len(ds)
+        rep.add("OB2-9: komu i ile na dobe (INFO)", f"razem {sum(g[d]['tax'] for d in ds) / n:.0f}/d (miasta i zamki {sum(g[d]['k2'] + g[d]['k2c'] for d in ds) / n:.0f}, wsie "
+                f"{sum(g[d]['vtake'] for d in ds) / n:.0f}): glowy rodow {sum(g[d]['lord'] for d in ds) / n:.0f}, kasy miast {sum(g[d]['town'] for d in ds) / n:.0f}, kasy zamkow "
+                f"{sum(g[d]['castle'] for d in ds) / n:.0f}, skarbce koron {sum(g[d]['crown'] for d in ds) / n:.0f}; mnoznik pierwszy {g[ds[0]]['m']:.2f}, ostatni {g[ds[-1]]['m']:.2f};"
+                f" stawka ostatnia {g[ds[-1]]['rate']:.3f}%/d", "INFO", None)
+    wd = sorted(d for d in war if (not ds) or ds[0] <= d <= ds[-1])
+    if wd:
+        w28 = wd[-28:]
+        rep.add("OB2-10: miara W5-7 - druzyny lordow krolestw w wojnie (INFO)", f"{sum(war[d] for d in w28) / len(w28) / 1e3:.1f} tys. (srednia ostatnich {len(w28)} dob)",
+                "INFO (cel Jeffa 85 tys.)", None)
+    else:
+        rep.add("OB2-10: miara W5-7 (INFO)", "brak linii Skarbce w oknie", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -26932,6 +27233,8 @@ def main(argv):
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group == "kiesa2" and logp:
         return kiesa2_main(logp)   # kiesa2 (15.10, Jeff "napraw to, najwyzej zwieksz podatki"): podatek pana od nadwyzki oszczednosci ludu (TownFolk.Hoard.cs)
+    if group == "obieg2" and logp:
+        return obieg2_main(logp, bdp)   # obieg2 (15.10, Jeff "kasa zbiera sie u ludu" + "pamietaj o pozyczkach"): wsie, straznik obiegu, pozyczki od ludu, zbytki wedlug zasobnosci
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "wyspywolni" and logp:

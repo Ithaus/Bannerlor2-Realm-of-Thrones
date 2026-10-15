@@ -565,6 +565,7 @@ namespace Armoury
               .Append("), kiesa rodziny czlonek -> glowa ").Append(ClanBudget.LastFamily).Append(", zold rycerzy (179) pan -> rycerz ").Append(GentryService.LastPaid)
               .Append(", tarczowe do korony (W6) ").Append(KingdomTreasury.LastScutageIn)   // W6: glowy rodow z wolnym pulapem -> skarbce (ta sama kwota co po stronie korony)
               .Append(", sprzet i werbunek -")
+              .Append(", splaty pozyczek od ludu (obieg2) glowy rodow -> kiesy ludu i wsi ").Append(TownFolk.LastLoanRepaid)   // obieg2 (3b): przelew miedzy posiadaczami
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
               .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
               .Append(", zwrot zoldu od korony ").Append(KingdomTreasury.LastRefundGiven).Append(" (nalezny ").Append(KingdomTreasury.LastRefundDue).Append(')')
@@ -581,6 +582,8 @@ namespace Armoury
               .Append(", stawka wojenna pana (W7) kiesy ludu i wsi -> glowy rodow ").Append(KingdomTreasury.LastLordLevy)   // W7: pobor z wlasnych lenn na zold druzyn
               .Append(" (z ludu ").Append(KingdomTreasury.LastLordLevyFolk).Append(", ze wsi ").Append(KingdomTreasury.LastLordLevyVill).Append(')')
               .Append(", podatek od nadwyzki ludu (kiesa2) kiesy ludu -> glowy rodow ").Append(TownFolk.LastHoardLord)   // kiesa2: przelew miedzy posiadaczami (kiesa ludu -> glowa)
+              .Append(", podatek od nadwyzki wsi (obieg2) kiesy wsi -> glowy rodow ").Append(TownFolk.LastVillHoardLord)   // obieg2 (1): przelew miedzy posiadaczami
+              .Append(", pozyczki od ludu (obieg2) kiesy ludu i wsi -> glowy rodow ").Append(TownFolk.LastLoanLent)   // obieg2 (3b): wyplaty ClanBudget tej doby
               .Append(", zelazna cena z nabrzeza (WW1) kiesy ludu -> wodzowie najezdzcow ").Append(ReaverLaw.DayWaterfront)   // WW1: przelew miedzy posiadaczami (kiesa ludu -> glowa)
               .Append(", dziesiecina korsarzy (WW4) kiesy band -> glowy rodow panow portow Wysp ").Append(OutlawLaw.LastHarbourTithe)   // WW4: przelew miedzy posiadaczami
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
@@ -595,10 +598,12 @@ namespace Armoury
               .Append(overN).Append(" miastach, ponizej polowy zapasu ").Append(lowN).Append(" miast, zawor do pana ").Append(PopulationLaw.DayTownRent).Append(", do korony ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", zold zalog do kas miast ").Append(SoldierPay.LastToTowns)
               .Append(", podatek od nadwyzki ludu (kiesa2) z kies ludu ").Append(TownFolk.LastHoardTown)   // kiesa2: kiesa ludu -> kasa miasta
+              .Append(", podatek od nadwyzki wsi (obieg2) z kies wsi ").Append(TownFolk.LastVillHoardTown)   // obieg2 (1): kiesa wsi -> kasa miasta macierzystego
               .Append(", utarg taborow wsi zaplacony ").Append(_vPaid[CTown]).Append(" (").Append(_vVisits[CTown]).Append(" wizyt; towar niesprzedany ").Append(_vUnsold[CTown])
               .Append(" szt.), dosypka regulatora ").Append(_regIn[CTown]).Append(" (tryb ").Append(TownPurse.On ? TownPurse.Mode.ToString(Inv) : "0").Append("), bezpiecznik korony -")
               .Append(" | kasy zamkow [P]: stan ").Append(Dl(now, last, HCastles)).Append(", zold zalog do kas ").Append(SoldierPay.LastToCastles)
               .Append(", podatek od nadwyzki ludu (kiesa2) z kies podzamczy ").Append(TownFolk.LastHoardCastle)   // kiesa2: kiesa podzamcza -> kasa zamku
+              .Append(", podatek od nadwyzki wsi (obieg2) z kies wsi ").Append(TownFolk.LastVillHoardCastle)   // obieg2 (1): kiesa wsi -> kasa zamku macierzystego
               .Append(", zawor do panow ").Append(CastlePurse.LastLordPaid).Append(", do skarbcow (114) ").Append(CastlePurse.LastCrownPaid)
               .Append(", regulator: kasowanie zablokowane (110) ").Append(CastlePurse.LastRegDown).Append(", dosypka do zapasu (tryb 1) ").Append(CastlePurse.LastRegUp)
               .Append(", \"zakupy\" z niczego cofniete ").Append(CastlePurse.LastConsBack)
@@ -609,9 +614,11 @@ namespace Armoury
               .Append(", sakwy taborow: wsiom ").Append(VillageTakings.CartToVillages).Append(", wodzom zwyciezcow ").Append(VillageTakings.CartToLords)
               .Append(", bandom ").Append(VillageTakings.CartToBands).Append(", zapasowemu odbiorcy ").Append(VillageTakings.CartToSpare)
               .Append(", bez odbiorcy (prog 0) ").Append(VillageTakings.Unrouted)
+              .Append(", podatek od nadwyzki wsi (obieg2) do panow, kas i koron ").Append(TownFolk.LastVillHoardTake)   // obieg2 (1): kiesy wsi -> glowy rodow, kasy osad, skarbce
               .Append(" | korona [P]: wplywy - powinnosci ").Append(KingdomTreasury.LastDues).Append(", danina wojenna ").Append(KingdomTreasury.LastSubsidy)
               .Append(", podatek wojenny ludu (184) kiesy ludu -> skarbce ").Append(KingdomTreasury.LastFolkWarTax)   // E5/B2: pobor raz na dobe od zarobku okna (TownFolk.PayCrown, scalenie B)
               .Append(", danina z oszczednosci ludu (P1) kiesy ludu -> skarbce ").Append(KingdomTreasury.LastFolkWarAid)   // P1: pobor raz na dobe od kiesy ponad zapas dni (TownFolk.PayAid)
+              .Append(", czesc korony podatku od nadwyzki (obieg2) kiesy ludu i wsi -> skarbce ").Append(TownFolk.LastHoardCrown)   // obieg2 (3): straznik obiegu
               .Append(", udzial z zaworu zamkow (114) ").Append(CastlePurse.LastCrownPaid)
               .Append(", udzial z zaworu kas miast (E5/A1) ").Append(TownPurse.On ? TownPurse.LastCrownPaid.ToString(Inv) : "-")
               .Append(", clo: z licznika cel zdjeto ").Append(KingdomTreasury.LastCustomsTaken).Append(" (w nicosc w calosci - licznik jest posiadaczem), skarbce dostaly ")

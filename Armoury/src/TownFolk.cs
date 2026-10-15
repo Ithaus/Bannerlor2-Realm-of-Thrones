@@ -135,6 +135,7 @@ namespace Armoury
             public double HorseOwed;                                  // K1-3a krok 2: licznik koni roboczych do wymiany (ulamek; miasto i zamek; zapis arm_townfolk, pole 18; sufit WhMax)
             // ---- P3-P5 (zbytki, TownFolk.Luxury.cs): pamiec sesji, bez zapisu
             public double[] LxFrac; public int LxFracDay = -1;        // podzial oferty na liste dostatku z ostatniej konsumpcji (miasto: takze sygnal popytu P4 i zakupy podzamczy i wsi P5)
+            public bool[] LxWide;                                     // obieg2 (2): kategoria w podziale tylko dzieki cenie granicznej wedlug zasobnosci (indeks ponad bazowa) - licznik kupionych
             public double LxBF, LxBR;                                 // okno: kupione z oferty listy - jedzenie / reszta (poprawka Predict)
             public double LxPhi = -1;                                 // ostatnia konsumpcja: kupione z oferty / oferta (poprawka Share); -1 nieznane
             public double LxOut;                                      // miasto targowe: oferta podzamczy i wsi z listy ostatniej doby ludu (sygnal popytu P4)
@@ -402,6 +403,8 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             _lineFolk = null; _lineFolkPartial = false;
             LastHoardLord = LastHoardTown = LastHoardCastle = 0;   // kiesa2: "Obieg" tej doby - zero, gdy doba kiesy czynnej nie biegnie
+            LastVillHoardLord = LastVillHoardTown = LastVillHoardCastle = LastVillHoardTake = LastHoardCrown = 0; LastLoanRepaid = 0;   // obieg2: "Obieg" tej doby (jak kiesa2)
+            if (!Live) LoansWinZero();                                 // obieg2: bez doby ludu okno pozyczek nie jest czytane - zero (pozyczek i tak nie ma bez kiesy czynnej)
             try
             {
                 if (Campaign.Current == null) return;

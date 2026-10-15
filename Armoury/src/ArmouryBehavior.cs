@@ -434,6 +434,15 @@ namespace Armoury
                 if (dataStore.IsLoading) TownFolk.Import(townFolk);
             }
             catch (Exception e) { Log.Error("SyncData.TownFolk", e); }
+            // obieg2 (TownFolk.Guard.cs / TownFolk.Loans.cs): dlugi rodow u ludu (rod + osada), zakazy po niesplacie, mnoznik straznika obiegu i doplyw EMA - wlasny try
+            // (zgubiony dlug = zloto u glow rodow bez roszczenia ludu; starszy DLL ignoruje klucz - cofniecie DLL w trakcie gry = dlugi przepadaja, CHANGELOG)
+            try
+            {
+                string obieg2 = dataStore.IsSaving ? TownFolk.ExportObieg2() : null;
+                SaveText.Sync(dataStore, "arm_obieg2", ref obieg2);
+                if (dataStore.IsLoading) TownFolk.ImportObieg2(obieg2);
+            }
+            catch (Exception e) { Log.Error("SyncData.Obieg2", e); }
             // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
             // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
             try

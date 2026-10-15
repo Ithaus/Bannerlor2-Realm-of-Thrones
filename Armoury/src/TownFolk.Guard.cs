@@ -1,0 +1,375 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace Armoury
+{
+    /// <summary>
+    /// obieg2 (decyzja Jeffa 15.10: "napraw tez to, ze kasa sie zbiera u ludu lub mieszczan, bo w dlugim okresie lordowie i krolestwa zostana bez kasy ... ci, co
+    /// powinni byc najbogatsi, stana sie najbiedniejsi"; wczesniej "najwyzej zwieksz podatki") - PODATEK OD NADWYZKI KIES WSI i STRAZNIK CALEGO OBIEGU.
+    ///  - DOWOD (test 4 lata wersja 54, linie "Pieniadz swiata", "Gotowka wsi (E5/0)", "Kiesa ludu", "Zbytki ludu (P3-P5)", "Towary"): udzial ludu w zlocie swiata
+    ///    (kiesy ludu miast, podzamczy, gmin i wsi) 3.7% (d0) -> 25.9% (d720) -> 40.8% (d1458); glowy rodow i lordowie 34.2% -> 25.4%, skarbce koron 26.4% -> 6.8%.
+    ///    Kiesy wsi 1.1 -> 16.8 -> 35.6 mln: wies zatrzymuje z utargu 61 tys./d (d1100-1458; d0-719 18 tys./d, gdy korona brala z kies wsi 134 tys./d, po pokoju
+    ///    62 tys./d), a wydaje: koszyk dnia 8.3 tys./d z potrzeby 71.8 tys./d (480 z 571 wsi bez towaru - sol, narzedzia, len, garnki i piwo: produkcja swiata ok.
+    ///    29 tys./d po cenie zwyklej), zbytki P5 20.8 tys./d z chcianych 531 tys./d (378 z 472 wsi bez towaru). Towaru nie ma - zakupy nie oddadza zlota; jedyna droga
+    ///    powrotu kiesy wsi to podatek.
+    ///  - (1) WSIE (klucz FolkHoardVillages, wymaga FolkHoardTax): ten sam regulator co kiesa2 - poziom normalny = FolkHoardNormalTimes (3) x 15 dni zakupow wsi
+    ///    (RdV x VillagePurchasePerHead x wolne glowy; na starcie kampanii wsie mialy 15 dni), co dobe stawka x kiesa ponad poziom normalny PO koszyku dnia i zakupach
+    ///    P5 (wies najpierw kupuje, podatek od reszty). Odbiorcy jak kiesa2: glowa rodu pana wsi (FolkHoardTaxLordShare, RentToday - dochod ziemi D) i kasa osady
+    ///    macierzystej (Bound - miasto albo zamek); bez zywego pana - calosc do kasy osady. Wies w rabunku / spladrowana i wies oblezonej osady (BesiegedPay
+    ///    KFolkHoard) - nic. Pozniej tej doby W7 i danina wsi korony licza sie od reszty (ta sama zlotowka nie dwa razy).
+    ///  - (3) STRAZNIK OBIEGU (klucz FolkCirculationGuard): na poczatku doby ludu P = kiesy ludu z potrzeba (miasta W/R/P, podzamcza, wsie) i N = ich poziom normalny.
+    ///    P > FolkGuardBandHigh (1.75) x N - mnoznik stawki x1.03 na dobe (najwyzej FolkGuardMaxTimes 5); P < FolkGuardBandLow (1.25) x N - x0.97 (najmniej 0.25);
+    ///    w pasmie bez zmian (sprzezenie zwrotne z sufitem - calkujacy regulator). Pasmo w udziale swiata = 1.25-1.75 x udzial poziomu normalnego (start kampanii: lud
+    ///    trzyma ok. poziomu normalnego - 2.6-2.8 x zapas dni). Stawka doby = FolkHoardTaxRate x mnoznik, ale podatek doby najwyzej max(0.15% zlota swiata, 2 x doplyw
+    ///    ludu EMA 28 dob) - stary zapis z wielkimi kiesami oddaje nagromadzone w miesiacach, nie w tygodniach (bez wstrzasu pulapow 166); doplyw ludu = kiesy
+    ///    na poczatku doby ludu minus na koncu poprzedniej (wszystko, co do ludu wplynelo i nie wyszlo poza naszym podatkiem). Pierwsza doba po wczytaniu - potrzeba
+    ///    nieznana, mnoznik czeka (bez ruchu, gdy potrzeba znana w < 80% miast). Czesc korony FolkGuardCrownShare (15%) kazdego podatku od nadwyzki (miasta, zamki,
+    ///    wsie) do skarbca krolestwa rodu pana osady (KingdomBudgetWallet - zapas korony, wydawany jej droga 165/W5b); pan i kasa dziela reszte jak dotad.
+    ///  - Udzialy w linii: z ksiegi "Pieniadz swiata" poprzedniej doby (MoneyLedger.LastShares) - lud / lordowie (glowy rodow, pozostali lordowie, gracz) / korony.
+    ///  - Zapis (arm_obieg2, razem z pozyczkami - TownFolk.Loans.cs): mnoznik i doplyw EMA. Linie: "Obieg ludu (obieg2): start sesji", "Straznik obiegu (obieg2):
+    ///    dzien N", "Podatek od nadwyzki wsi (obieg2): dzien N"; "Obieg" - dopiski (MoneyLedger.Obieg.cs). Klucze wylaczone = e2a422ec co do monety.
+    /// Wyjatek per wies - licznik potkniec, bez globalnych wylacznikow (CLAUDE.md 7); przelew w kolejnosci kiesa -> pan -> kasa -> skarbiec, wyjatek oddaje zloto wsi.
+    /// </summary>
+    internal static partial class TownFolk
+    {
+        // ---- klucze i granice (zakresy jak w tools/gen_mcm.py)
+        private static bool GuardOn { get { var s = Settings.Current; return s != null && s.FolkHoardTax && s.FolkCirculationGuard; } }
+        private static bool HoardVillOn { get { var s = Settings.Current; return s != null && s.FolkHoardTax && s.FolkHoardVillages; } }
+        private static double GdLo(Settings s) { return HdClamp(s.FolkGuardBandLow, 1.0, 3.0); }
+        private static double GdHi(Settings s) { return Math.Max(GdLo(s), HdClamp(s.FolkGuardBandHigh, 1.0, 5.0)); }
+        private static double GdMax(Settings s) { return HdClamp(s.FolkGuardMaxTimes, 1.0, 10.0); }
+        private static double GuardCrownShare(Settings s) { return GuardOn ? HdClamp(s.FolkGuardCrownShare, 0, 0.5) : 0; }
+        private const double GdStep = 0.03, GdMin = 0.25, GdCapWorld = 0.0015, GdCapInflow = 2.0, GdCover = 0.8, GdEmaDays = 28;
+
+        /// <summary>Skarbiec korony na czesc korony podatku od nadwyzki: krolestwo rodu pana osady (nie zniszczone). null - straznik wylaczony, udzial 0, rod bez krolestwa.</summary>
+        private static Kingdom GuardCrownOf(Clan clan)
+        {
+            if (clan == null || !GuardOn) return null;
+            if (!(GuardCrownShare(Settings.Current) > 0)) return null;
+            var k = clan.Kingdom;
+            return k != null && !k.IsEliminated ? k : null;
+        }
+
+        // ---- stan straznika (zapis arm_obieg2) i pamiec sesji
+        private static double _gdM = 1.0, _gdInEma = double.NaN;
+        private static long _gdPEnd = long.MinValue;                 // kiesy ludu i wsi na koniec doby ludu (pomiar doplywu; po wczytaniu - od drugiej doby)
+        private static bool _gdReady, _gdStartDone;
+        private static double _gdRate;
+        // ---- liczby doby straznika
+        private static double _gdN, _gdP, _gdE, _gdCapAbs, _gdIn = double.NaN, _gdNT, _gdNC, _gdNV, _gdPT, _gdPC, _gdPV, _gdWorldUsed;
+        private static int _gdCovT, _gdAllT;
+        private static string _gdMove = "-";
+        private static long _gdWorld, _gdFolk, _gdLords, _gdCrowns, _gdTicks;
+        private static bool _gdShares;
+        private static long _gdCrownT; private static int _gdCrownTN;  // czesc korony z miast i zamkow (PayHoard) - doba
+        // ---- podatek od nadwyzki wsi (doba)
+        private static long _vhTake, _vhLord, _vhTown, _vhCastle, _vhCrown, _vhPlayer, _vhHeld, _vhNoLord, _vhTicks;
+        private static int _vhN, _vhUnder, _vhRaided, _vhHeldN, _vhNoBound, _vhBelow, _vhVill, _gdStumbles, _gdStumbleSess;
+        private static double _vhGold0, _vhGold1, _vhNorm, _vhE0, _vhE1;
+        private static readonly HashSet<Clan> _vhClans = new HashSet<Clan>();
+        private static string _lineGuard, _lineGuardStart, _lineVill;
+        /// <summary>"Obieg" tej doby: podatek od nadwyzki wsi do glow rodow, kas miast i kas zamkow; czesc korony podatku od nadwyzki (miasta, zamki, wsie).</summary>
+        internal static long LastVillHoardLord, LastVillHoardTown, LastVillHoardCastle, LastVillHoardTake, LastHoardCrown;
+
+        private static void ResetGuard()
+        {
+            _gdM = 1.0; _gdInEma = double.NaN; _gdPEnd = long.MinValue; _gdReady = false; _gdStartDone = false; _gdRate = 0;
+            GuardDayZero();
+            _gdStumbleSess = 0;
+            _lineGuard = _lineGuardStart = _lineVill = null;
+        }
+
+        private static void GuardDayZero()
+        {
+            _gdN = _gdP = _gdE = _gdCapAbs = _gdNT = _gdNC = _gdNV = _gdPT = _gdPC = _gdPV = _gdWorldUsed = 0; _gdIn = double.NaN;
+            _gdCovT = _gdAllT = 0; _gdMove = "-"; _gdWorld = _gdFolk = _gdLords = _gdCrowns = _gdTicks = 0; _gdShares = false;
+            _gdCrownT = 0; _gdCrownTN = 0;
+            _vhTake = _vhLord = _vhTown = _vhCastle = _vhCrown = _vhPlayer = _vhHeld = _vhNoLord = _vhTicks = 0;
+            _vhN = _vhUnder = _vhRaided = _vhHeldN = _vhNoBound = _vhBelow = _vhVill = _gdStumbles = 0;
+            _vhGold0 = _vhGold1 = _vhNorm = _vhE0 = _vhE1 = 0;
+            _vhClans.Clear();
+            LastVillHoardLord = LastVillHoardTown = LastVillHoardCastle = LastVillHoardTake = LastHoardCrown = 0;
+        }
+
+        private static void GuardStumble(string where, Exception e)
+        {
+            _gdStumbles++; _gdStumbleSess++;
+            Stumble("Guard." + where, e);
+        }
+
+        private static long VillGoldAll()
+        {
+            long t = 0;
+            foreach (var v in Village.All) if (v != null) t += Math.Max(0, v.Gold);
+            return t;
+        }
+
+        /// <summary>Kiesy ludu i wsi razem (miasta W/R/P, gminy, podzamcza, wsie) - pomiar doplywu i linia doby.</summary>
+        private static long FolkAll() { return TotalTown() + TotalCastle() + TotalGmina() + VillGoldAll(); }
+
+        /// <summary>
+        /// DailyLive, przed miastami (po HoardBegin): liczniki doby, miara ludu wobec poziomu normalnego (P, N - tylko kiesy ze znana potrzeba), nadwyzka ponad poziom
+        /// normalny (sufit doby), doplyw ludu od konca poprzedniej doby ludu (EMA 28 dob), ruch mnoznika i stawka doby. Straznik wylaczony - stawka FolkHoardTaxRate.
+        /// </summary>
+        private static void GuardBegin()
+        {
+            GuardDayZero();
+            _gdReady = false;
+            var s = Settings.Current;
+            if (s == null) return;
+            _gdRate = HoardRate(s);
+            if (!s.FolkHoardTax || (!s.FolkCirculationGuard && !s.FolkHoardVillages)) return;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                double times = HoardTimes(s), rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays));
+                double pph = Math.Max(0f, Math.Min(1f, s.VillagePurchasePerHead));
+                bool vill = s.FolkHoardVillages, castle = CastleLive;
+                foreach (var f in _f.Values)
+                {
+                    if (f == null) continue;
+                    if (f.Kind == 0)
+                    {
+                        _gdAllT++;
+                        if (f.Need[0] > 0) _gdCovT++;
+                        for (int c = 0; c < 3; c++)
+                        {
+                            double need = f.Need[c];
+                            if (!(need > 0)) continue;
+                            double rd = c == 0 ? rdW : c == 1 ? RdR : RdP, nl = times * rd * need, pu = PurseOf(f, c);
+                            _gdNT += nl; _gdPT += pu; _gdE += Math.Max(0, pu - nl);
+                        }
+                    }
+                    else if (f.Kind == 1)
+                    {
+                        if (!castle || !(f.Need[0] > 0)) continue;
+                        double nl = times * RdC * f.Need[0];
+                        _gdNC += nl; _gdPC += f.KW; _gdE += Math.Max(0, f.KW - nl);
+                    }
+                    else if (f.Kind == 2 && vill)
+                    {
+                        var v = f.St != null ? f.St.Village : null;
+                        if (!f.Cal || v == null) continue;
+                        double nv = pph * VillHeads(f, true);
+                        if (!(nv > 0)) continue;
+                        double nl = times * RdV * nv;
+                        _gdNV += nl; _gdPV += v.Gold; _gdE += Math.Max(0, v.Gold - nl);
+                    }
+                }
+                _gdN = _gdNT + _gdNC + _gdNV; _gdP = _gdPT + _gdPC + _gdPV;
+                long folk = FolkAll();
+                if (_gdPEnd != long.MinValue)
+                {
+                    _gdIn = folk - _gdPEnd;
+                    _gdInEma = double.IsNaN(_gdInEma) ? _gdIn : _gdInEma + (_gdIn - _gdInEma) / GdEmaDays;
+                }
+                _gdShares = MoneyLedger.LastShares(out _gdWorld, out _gdFolk, out _gdLords, out _gdCrowns);
+                if (!s.FolkCirculationGuard) return;                   // same wsie: stawka FolkHoardTaxRate (jak kiesa2)
+                double world = _gdShares ? _gdWorld : MoneyLedger.WorldNow();
+                _gdWorldUsed = world;
+                double lo = GdLo(s), hi = GdHi(s), mx = GdMax(s);
+                if (_gdN > 0 && _gdAllT > 0 && _gdCovT >= GdCover * _gdAllT)
+                {
+                    if (_gdP > hi * _gdN) { _gdM = _gdM * (1 + GdStep); _gdMove = "w gore"; }
+                    else if (_gdP < lo * _gdN) { _gdM = _gdM * (1 - GdStep); _gdMove = "w dol"; }
+                    else _gdMove = "bez zmian (w pasmie)";
+                }
+                else _gdMove = "wstrzymany (potrzeba ludu znana w " + _gdCovT + " z " + _gdAllT + " miast)";
+                if (double.IsNaN(_gdM) || double.IsInfinity(_gdM)) _gdM = 1.0;
+                _gdM = Math.Max(GdMin, Math.Min(mx, _gdM));
+                double r = HoardRate(s) * _gdM;
+                _gdCapAbs = Math.Max(GdCapWorld * Math.Max(0, world), GdCapInflow * (double.IsNaN(_gdInEma) ? 0 : Math.Max(0, _gdInEma)));
+                if (_gdE >= 1 && _gdCapAbs > 0) r = Math.Min(r, _gdCapAbs / _gdE);
+                _gdRate = HdClamp(r, 0, 0.1);
+                _gdReady = true;
+            }
+            catch (Exception e) { GuardStumble("GuardBegin", e); _gdRate = HoardRate(s); _gdReady = false; }
+            finally { _gdTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>
+        /// Villages (po koszyku dnia i zakupach P5 tej wsi): podatek od kiesy wsi ponad poziom normalny (FolkHoardNormalTimes x 15 dni zakupow). `nv` - zakupy dnia
+        /// wsi (VillagePurchasePerHead x wolne glowy - ta sama liczba co koszyk). Odbiorcy: skarbiec korony (straznik), glowa rodu pana wsi, kasa osady macierzystej.
+        /// Nie rzuca.
+        /// </summary>
+        private static void PayHoardVillage(Folk f, Village vil, double nv)
+        {
+            if (!HoardVillOn || f == null || vil == null) return;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                var s = Settings.Current;
+                if (!(nv > 0)) return;
+                double norm = HoardTimes(s) * RdV * nv;
+                int gold = vil.Gold;
+                _vhVill++; _vhGold0 += gold; _vhNorm += norm;
+                double room = gold - norm;
+                if (!(room >= 1)) { _vhUnder++; _vhGold1 += gold; return; }
+                _vhE0 += room;
+                if (vil.VillageState != Village.VillageStates.Normal) { _vhRaided++; _vhE1 += room; _vhGold1 += gold; return; }
+                var st = f.St; var bound = vil.Bound;
+                if (st == null || bound == null || bound.Town == null) { _vhNoBound++; _vhE1 += room; _vhGold1 += gold; return; }
+                double due = HoardRateNow(s) * room;
+                long x = (long)Math.Floor(Math.Min(due, room));
+                x = Math.Min(x, (long)gold);
+                if (x <= 0) { _vhE1 += room; _vhGold1 += gold; return; }
+                if (BesiegedPay.Holds(bound, BesiegedPay.KFolkHoard, x, true)) { _vhHeld += x; _vhHeldN++; _vhE1 += room; _vhGold1 += gold; return; }
+                var clan = st.OwnerClan;
+                var lord = clan != null ? clan.Leader : null;
+                bool lordOk = lord != null && lord.IsAlive;
+                var kd = GuardCrownOf(clan);
+                // przelew: kiesa wsi -> glowa rodu -> kasa osady macierzystej -> skarbiec korony; wyjatek oddaje zloto wsi (nic z niczego, nic w nicosc)
+                int had = vil.Gold;
+                vil.ChangeGold(-(int)x);
+                long got = had - vil.Gold;
+                if (got <= 0) { _vhE1 += room; _vhGold1 += vil.Gold; return; }
+                x = got;
+                long cp = kd != null ? (long)Math.Round(x * GuardCrownShare(s), MidpointRounding.AwayFromZero) : 0;
+                if (cp > x) cp = x;
+                if (cp < 0) cp = 0;
+                long rest = x - cp;
+                long lp = lordOk ? (long)Math.Round(rest * HoardLordShare(s), MidpointRounding.AwayFromZero) : 0;
+                if (lp > rest) lp = rest;
+                if (lp < 0) lp = 0;
+                long tp = rest - lp;
+                if (lp > 0)
+                {
+                    try { lord.ChangeHeroGold((int)lp); }
+                    catch (Exception e) { vil.ChangeGold((int)x); GuardStumble("PayHoardVillage(pan)", e); _vhE1 += room; _vhGold1 += vil.Gold; return; }
+                }
+                if (tp > 0)
+                {
+                    try { bound.Town.ChangeGold((int)tp); }
+                    catch (Exception e) { vil.ChangeGold((int)tp); x -= tp; tp = 0; GuardStumble("PayHoardVillage(kasa)", e); }
+                }
+                if (cp > 0)
+                {
+                    try { kd.KingdomBudgetWallet += (int)cp; }
+                    catch (Exception e) { vil.ChangeGold((int)cp); x -= cp; cp = 0; GuardStumble("PayHoardVillage(korona)", e); }
+                }
+                _vhTake += x; _vhE1 += room - x; _vhGold1 += vil.Gold;
+                if (x > 0) _vhN++;
+                try
+                {
+                    if (lp > 0)
+                    {
+                        int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0);
+                        PopulationLaw.RentToday[clan] = (int)Math.Min(int.MaxValue, (long)r0 + lp);   // dochod ziemi D rodu (jak kiesa2 i podatki panu PayLord)
+                        CirculationWindows.NoteHeroGold(lord, lp);
+                        _vhLord += lp; _vhClans.Add(clan);
+                        if (lord == Hero.MainHero) _vhPlayer += lp;
+                    }
+                    if (tp > 0) { if (bound.IsTown) _vhTown += tp; else _vhCastle += tp; if (!lordOk) _vhNoLord += tp; }
+                    if (cp > 0) _vhCrown += cp;
+                    if (vil.Gold + 0.5 < norm) _vhBelow++;                // kontrola: nic ponizej poziomu normalnego (oczekiwane 0)
+                }
+                catch (Exception e) { GuardStumble("PayHoardVillage(liczniki)", e); }
+            }
+            catch (Exception e) { GuardStumble("PayHoardVillage", e); }
+            finally { _vhTicks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>Dopisek linii kiesa2 (przed "czas"): czesc korony z miast i zamkow i stawka straznika. Klucze straznika i wsi wylaczone - pusty (linia jak w kiesa2).</summary>
+        private static string GuardHoardNote()
+        {
+            var s = Settings.Current;
+            if (s == null || !(s.FolkCirculationGuard || s.FolkHoardVillages)) return "";
+            return " | obieg2: straznik obiegu " + (GuardOn ? "tak" : "nie") + ", do skarbcow koron z miast i zamkow " + _gdCrownT + " (" + _gdCrownTN
+                   + " klaso-osad; poza 'pobrano' wyzej), stawka bazowa " + (100 * HoardRate(s)).ToString("0.00", Inv) + "%/d x mnoznik " + _gdM.ToString("0.000", Inv)
+                   + " (sufit doby " + N0(_gdCapAbs) + ")";
+        }
+
+        /// <summary>Koniec doby ludu (DailyLive, po HoardDay): liczby "Obieg", kiesy na koniec (pomiar doplywu jutro), linia startu sesji (raz), linia straznika i linia wsi.</summary>
+        private static void GuardDay(int day)
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            long t0 = Stopwatch.GetTimestamp();
+            LastVillHoardLord = _vhLord; LastVillHoardTown = _vhTown; LastVillHoardCastle = _vhCastle; LastVillHoardTake = _vhTake; LastHoardCrown = _gdCrownT + _vhCrown;
+            long folkEnd = 0;
+            try { folkEnd = FolkAll(); _gdPEnd = folkEnd; } catch (Exception e) { GuardStumble("GuardDay(kiesy)", e); }
+            double times = HoardTimes(s);
+            if (!_gdStartDone)
+            {
+                _gdStartDone = true;
+                _lineGuardStart = "Obieg ludu (obieg2): start sesji | klucze: podatek od nadwyzki wsi (Folk Hoard Villages) " + (s.FolkHoardVillages ? "tak" : "nie")
+                                  + ", straznik obiegu (Folk Circulation Guard) " + (s.FolkCirculationGuard ? "tak" : "nie") + ", pozyczki od ludu (Folk Loans) " + (s.FolkLoans ? "tak" : "nie")
+                                  + ", cena graniczna wedlug zasobnosci (Folk Ladder Ceiling By Wealth) " + (s.FolkLadderCeilingByWealth ? "tak" : "nie")
+                                  + "; podatek od nadwyzki (Folk Hoard Tax) " + (s.FolkHoardTax ? "tak" : "nie") + " (wymagany przez wsie i straznika)"
+                                  + " | regula wsi: poziom normalny " + times.ToString("0.0#", Inv) + " x " + RdV.ToString("0", Inv) + " dni zakupow, stawka jak miasta, po koszyku dnia i P5"
+                                  + " | straznik: pasmo " + F2(GdLo(s)) + "-" + F2(GdHi(s)) + " x poziom normalny ludu, mnoznik x" + (1 + GdStep).ToString("0.00", Inv) + " / x"
+                                  + (1 - GdStep).ToString("0.00", Inv) + " na dobe w granicach " + GdMin.ToString("0.00", Inv) + "-" + F2(GdMax(s)) + ", sufit doby max("
+                                  + (100 * GdCapWorld).ToString("0.00", Inv) + "% swiata; " + GdCapInflow.ToString("0", Inv) + " x doplyw ludu EMA " + GdEmaDays.ToString("0", Inv)
+                                  + " dob), czesc korony " + (100 * HdClamp(s.FolkGuardCrownShare, 0, 0.5)).ToString("0", Inv) + "%"
+                                  + " | stan z zapisu: mnoznik " + _gdM.ToString("0.000", Inv) + ", doplyw EMA " + N0(_gdInEma) + LoansStateNote()
+                                  + " | klucze wylaczone = e2a422ec.";
+            }
+            if (!s.FolkHoardTax) { _lineGuard = _lineVill = null; return; }
+            try
+            {
+                if (s.FolkCirculationGuard)
+                {
+                    double w = _gdShares ? _gdWorld : 0;
+                    long hoardT = _hdTake[0] + _hdTake[1] + _hdTake[2] + _hdTake[3];
+                    var sb = new StringBuilder(1600);
+                    sb.Append("Straznik obiegu (obieg2): dzien ").Append(day)
+                      .Append(" | swiat wczoraj ").Append(_gdShares ? _gdWorld.ToString(Inv) : "-")
+                      .Append(": lud ").Append(_gdShares ? _gdFolk.ToString(Inv) : "-").Append(" (").Append(Pct(_gdFolk, w)).Append("; kiesy ludu miast, podzamczy, gmin i wsi)")
+                      .Append(", lordowie ").Append(_gdShares ? _gdLords.ToString(Inv) : "-").Append(" (").Append(Pct(_gdLords, w)).Append("; glowy rodow, pozostali lordowie, gracz)")
+                      .Append(", korony ").Append(_gdShares ? _gdCrowns.ToString(Inv) : "-").Append(" (").Append(Pct(_gdCrowns, w)).Append(')')
+                      .Append(" | poziom normalny ludu ").Append(N0(_gdN)).Append(" (").Append(Pct(_gdN, w)).Append(" swiata; miasta ").Append(N0(_gdNT)).Append(" / podzamcza ")
+                      .Append(N0(_gdNC)).Append(" / wsie ").Append(N0(_gdNV)).Append("), kiesy z potrzeba ").Append(N0(_gdP)).Append(" (miasta ").Append(N0(_gdPT)).Append(" / podzamcza ")
+                      .Append(N0(_gdPC)).Append(" / wsie ").Append(N0(_gdPV)).Append(") = ").Append(_gdN > 0 ? (_gdP / _gdN).ToString("0.000", Inv) : "-").Append(" x poziom normalny")
+                      .Append("; pasmo ").Append(F2(GdLo(s))).Append("-").Append(F2(GdHi(s))).Append(" x (").Append(Pct(GdLo(s) * _gdN, w)).Append(" - ").Append(Pct(GdHi(s) * _gdN, w)).Append(" swiata)")
+                      .Append(" | mnoznik ").Append(_gdM.ToString("0.000", Inv)).Append(" (").Append(_gdMove).Append("; granice ").Append(GdMin.ToString("0.00", Inv)).Append("-").Append(F2(GdMax(s))).Append(')')
+                      .Append(" | stawka doby ").Append((100 * _gdRate).ToString("0.000", Inv)).Append("%/d (baza ").Append((100 * HoardRate(s)).ToString("0.00", Inv)).Append("% x mnoznik")
+                      .Append(", sufit doby ").Append(N0(_gdCapAbs)).Append(" = max(").Append((100 * GdCapWorld).ToString("0.00", Inv)).Append("% swiata ").Append(N0(_gdWorldUsed))
+                      .Append("; 2 x doplyw EMA), nadwyzka ponad poziom normalny ").Append(N0(_gdE)).Append(')')
+                      .Append(" | doplyw ludu od konca poprzedniej doby ").Append(N0(_gdIn)).Append(", EMA ").Append(N0(_gdInEma))
+                      .Append(" | podatek od nadwyzki dzis: miasta i zamki ").Append(hoardT + _gdCrownT).Append(" (kiesa2 ").Append(hoardT).Append(" + korony ").Append(_gdCrownT)
+                      .Append("), wsie ").Append(_vhTake).Append(", razem ").Append(hoardT + _gdCrownT + _vhTake).Append("; do glow rodow ").Append(_hdLord + _vhLord)
+                      .Append(", do kas miast ").Append(_hdTown + _vhTown).Append(", do kas zamkow ").Append(_hdCastle + _vhCastle).Append(", do skarbcow koron ").Append(_gdCrownT + _vhCrown)
+                      .Append(" | kiesy ludu i wsi na koniec doby ").Append(folkEnd)
+                      .Append(" | czas ").Append(Ms(_gdTicks + Stopwatch.GetTimestamp() - t0)).Append(" ms | potkniecia ").Append(_gdStumbles).Append(" (sesja ").Append(_gdStumbleSess).Append(").");
+                    _lineGuard = sb.ToString();
+                }
+                else _lineGuard = null;
+                if (s.FolkHoardVillages)
+                {
+                    long diff = _vhTake - _vhLord - _vhTown - _vhCastle - _vhCrown;
+                    var sb = new StringBuilder(1200);
+                    sb.Append("Podatek od nadwyzki wsi (obieg2): dzien ").Append(day)
+                      .Append(" | stawka ").Append((100 * HoardRateNow(s)).ToString("0.000", Inv)).Append("%/d kiesy wsi ponad poziom normalny ").Append(times.ToString("0.0#", Inv))
+                      .Append(" x ").Append(RdV.ToString("0", Inv)).Append(" dni zakupow (po koszyku dnia i P5); pan ").Append((100 * HoardLordShare(s)).ToString("0", Inv))
+                      .Append("% / kasa osady macierzystej reszty").Append(GuardOn ? ", korona " + (100 * GuardCrownShare(s)).ToString("0", Inv) + "% najpierw" : "")
+                      .Append(" | wsi z potrzeba ").Append(_vhVill).Append(", ponizej poziomu normalnego ").Append(_vhUnder).Append(", oplacily ").Append(_vhN).Append(" (rodow ").Append(_vhClans.Count).Append(')')
+                      .Append(" | pobrano ").Append(_vhTake).Append(": do glow rodow ").Append(_vhLord).Append(" (w tym gracz ").Append(_vhPlayer).Append("), do kas miast ").Append(_vhTown)
+                      .Append(", do kas zamkow ").Append(_vhCastle).Append(" (w tym bez zywego pana ").Append(_vhNoLord).Append("), do skarbcow koron ").Append(_vhCrown)
+                      .Append(" | bez poboru: wies w rabunku albo spladrowana ").Append(_vhRaided).Append(", osada macierzysta oblezona ").Append(_vhHeld).Append(" (").Append(_vhHeldN)
+                      .Append("), bez osady macierzystej ").Append(_vhNoBound)
+                      .Append(" | kiesy wsi przed / po ").Append(N0(_vhGold0)).Append(" / ").Append(N0(_vhGold1)).Append(", poziom normalny ").Append(N0(_vhNorm)).Append(" (kiesy / poziom ")
+                      .Append(_vhNorm > 0 ? F2(_vhGold1 / _vhNorm) : "-").Append("), ponad poziom normalny przed / po ").Append(N0(_vhE0)).Append(" / ").Append(N0(_vhE1))
+                      .Append(" | kontrola: pobrano - do panow - do kas - do koron ").Append(diff).Append(", ponizej poziomu normalnego po poborze ").Append(_vhBelow).Append(" (oczekiwane 0 / 0)")
+                      .Append(" | czas ").Append(Ms(_vhTicks)).Append(" ms | potkniecia ").Append(_gdStumbles).Append(" (sesja ").Append(_gdStumbleSess).Append(").");
+                    _lineVill = sb.ToString();
+                }
+                else _lineVill = null;
+            }
+            catch (Exception e) { GuardStumble("GuardDay", e); }
+        }
+
+        /// <summary>TakeLiveLines: linia startu sesji obieg2, straznika, wsi (i pozyczek - TownFolk.Loans.cs) - zeruje.</summary>
+        private static void TakeGuardLines(List<string> l)
+        {
+            if (_lineGuardStart != null) l.Add(_lineGuardStart);
+            if (_lineGuard != null) l.Add(_lineGuard);
+            if (_lineVill != null) l.Add(_lineVill);
+            if (_lineLoans != null) l.Add(_lineLoans);
+            _lineGuardStart = _lineGuard = _lineVill = _lineLoans = null;
+        }
+    }
+}

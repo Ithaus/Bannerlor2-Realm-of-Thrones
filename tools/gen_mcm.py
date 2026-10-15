@@ -174,6 +174,18 @@ RANGES = {
     'FolkHoardTaxRate': (0.0, 0.05, "0.000"),
     'FolkHoardNormalTimes': (1.0, 10.0, "0.0"),
     'FolkHoardTaxLordShare': (0.0, 1.0, "0.00"),
+    # obieg2 (straznik obiegu, pozyczki od ludu, cena graniczna wedlug zasobnosci): zakresy zgodne z przycieciem w kodzie (TownFolk.Hoard.cs GdLo/GdHi/GdMax/GdCrown,
+    # TownFolk.Loans.cs LnRate/LnShare/LnDays/LnRepay/LnDefault, TownFolk.Luxury.cs LxCeilFor)
+    'FolkGuardBandLow': (1.0, 3.0, "0.00"),
+    'FolkGuardBandHigh': (1.0, 5.0, "0.00"),
+    'FolkGuardMaxTimes': (1.0, 10.0, "0.0"),
+    'FolkGuardCrownShare': (0.0, 0.5, "0.00"),
+    'FolkLoanRateYear': (0.0, 0.5, "0.00"),
+    'FolkLoanMaxShareOfIncome': (0.0, 1.0, "0.00"),
+    'FolkLoanLimitDays': (0.0, 120.0, "0"),
+    'FolkLoanRepayShareOfIncome': (0.0, 0.5, "0.00"),
+    'FolkLoanDefaultDays': (7, 364, "0"),
+    'FolkLadderCeilingMax': (1.0, 10.0, "0.0"),
     # E5/B4 (199): targ przy zamku - dni jedzenia podzamcza na polce zamku (kod przycina do 1..30, CastleMarket.Days)
     'CastleMarketFoodDays': (1.0, 30.0, "0"),
     # E6/K2 (212): luz zapasu koni jako udzial jezdzcow kategorii (kod przycina do 0..1, Stables.Reserve)

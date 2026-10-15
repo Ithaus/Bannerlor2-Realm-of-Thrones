@@ -49,6 +49,8 @@ namespace Armoury
         private static bool HoardKey { get { var s = Settings.Current; return s != null && s.FolkHoardTax; } }
         private static double HdClamp(double v, double lo, double hi) { return double.IsNaN(v) ? lo : (v < lo ? lo : (v > hi ? hi : v)); }
         private static double HoardRate(Settings s) { return HdClamp(s.FolkHoardTaxRate, 0, 0.1); }
+        /// <summary>obieg2: stawka doby - przy strazniku obiegu stawka policzona na poczatku doby ludu (GuardBegin), inaczej FolkHoardTaxRate jak w kiesa2.</summary>
+        private static double HoardRateNow(Settings s) { return GuardOn && _gdReady ? _gdRate : HoardRate(s); }
         private static double HoardTimes(Settings s) { return HdClamp(s.FolkHoardNormalTimes, 1, 20); }
         private static double HoardLordShare(Settings s) { return HdClamp(s.FolkHoardTaxLordShare, 0, 1); }
 
@@ -57,6 +59,8 @@ namespace Armoury
             HoardBegin();
             _hdStumbleSess = 0; _hdErr.Clear();
             _lineHoard = _lineHoardStart = null; _hdStartDone = false;
+            ResetGuard();    // obieg2: straznik obiegu i podatek od nadwyzki wsi (stan z zapisu arm_obieg2 wczytuje Import po Reset)
+            ResetLoans();    // obieg2: pozyczki od ludu (zapis arm_obieg2)
         }
 
         private static void HoardBegin()
@@ -94,7 +98,7 @@ namespace Armoury
                 double room = ov - (HoardTimes(s) - 1) * rd * need;    // kiesa ponad poziom normalny TERAZ (po daninie tej doby)
                 if (!(room >= 1)) { _hdUnder++; return 0; }
                 _hdOver++;
-                double due = HoardRate(s) * (room + Math.Max(0, aid)) - Math.Max(0, aid);   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza
+                double due = HoardRateNow(s) * (room + Math.Max(0, aid)) - Math.Max(0, aid);   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza (obieg2: stawka straznika)
                 if (!(due >= 1)) { if (aid > 0) _hdCovered++; _hdE0 += room; _hdE1 += room; return 0; }
                 long x = (long)Math.Floor(Math.Min(due, room));
                 x = Math.Min(x, Math.Max(0, PurseOf(f, c)));
@@ -107,11 +111,17 @@ namespace Armoury
                 var clan = st.OwnerClan;
                 var lord = clan != null ? clan.Leader : null;
                 bool lordOk = lord != null && lord.IsAlive;
-                long lp = lordOk ? (long)Math.Round(x * HoardLordShare(s), MidpointRounding.AwayFromZero) : 0;
-                if (lp > x) lp = x;
+                // obieg2 (straznik obiegu): czesc korony najpierw (skarbiec krolestwa rodu pana osady), reszta jak w kiesa2; klucz wylaczony - cp = 0 i podzial co do monety jak dotad
+                var kd = GuardCrownOf(clan);
+                long cp = kd != null ? (long)Math.Round(x * GuardCrownShare(s), MidpointRounding.AwayFromZero) : 0;
+                if (cp > x) cp = x;
+                if (cp < 0) cp = 0;
+                long rest = x - cp;
+                long lp = lordOk ? (long)Math.Round(rest * HoardLordShare(s), MidpointRounding.AwayFromZero) : 0;
+                if (lp > rest) lp = rest;
                 if (lp < 0) lp = 0;
-                long tp = x - lp;
-                // przelew: kiesa klasy -> glowa rodu -> kasa osady; wyjatek przy przelewie oddaje zloto do kiesy (nic z niczego, nic w nicosc)
+                long tp = rest - lp;
+                // przelew: kiesa klasy -> glowa rodu -> kasa osady -> skarbiec korony; wyjatek przy przelewie oddaje zloto do kiesy (nic z niczego, nic w nicosc)
                 AddPurse(f, c, -x);
                 if (lp > 0)
                 {
@@ -123,10 +133,16 @@ namespace Armoury
                     try { town.ChangeGold((int)tp); }
                     catch (Exception e) { AddPurse(f, c, tp); x -= tp; tp = 0; HoardStumble("PayHoard(kasa)", e); }
                 }
+                if (cp > 0)
+                {
+                    try { kd.KingdomBudgetWallet += (int)cp; }
+                    catch (Exception e) { AddPurse(f, c, cp); x -= cp; cp = 0; HoardStumble("PayHoard(korona)", e); }
+                }
                 if (x <= 0) { _hdE0 += room; _hdE1 += room; return 0; }
                 _ctlOut += x; f.LDayOut += x;                          // ksiega kies: wydatek (kontrola zamknieta, wiersz kiesa-ludu.csv)
                 f.DOver -= x; if (c >= 0 && c < 3) f.DOvC[c] = Math.Max(0, f.DOvC[c] - x);   // oferta, place z nadwyzki i W7 od reszty
-                _hdTake[slot] += x; _hdE0 += room; _hdE1 += room - x;
+                _hdTake[slot] += x - cp; _hdE0 += room; _hdE1 += room - x;   // obieg2: "pobrano" linii kiesa2 = do panow + do kas (czesc korony osobno - _gdCrownT)
+                if (cp > 0) { _gdCrownT += cp; _gdCrownTN++; }
                 try
                 {
                     _hdPlaces.Add(st);
@@ -190,7 +206,7 @@ namespace Armoury
             long diff = take - _hdLord - _hdTown - _hdCastle;
             var sb = new StringBuilder(1536);
             sb.Append("Podatek od nadwyzki ludu (kiesa2): dzien ").Append(day)
-              .Append(" | stawka ").Append((100 * rate).ToString("0.00", Inv)).Append("%/d nadwyzki ponad poziom normalny ").Append(times.ToString("0.0#", Inv)).Append(" x zapas dni (")
+              .Append(" | stawka ").Append((100 * HoardRateNow(s)).ToString("0.00", Inv)).Append("%/d nadwyzki ponad poziom normalny ").Append(times.ToString("0.0#", Inv)).Append(" x zapas dni (")   // obieg2: stawka doby (przy strazniku obiegu - stawka straznika)
               .Append(levels).Append("), pan ").Append((100 * share).ToString("0", Inv)).Append("% / kasa osady ").Append((100 * (1 - share)).ToString("0", Inv)).Append("%; danina P1 / M4 tej doby wliczona")
               .Append(" | pobrano ").Append(take).Append(" z ").Append(towns + castles).Append(" osad (miasta ").Append(towns).Append(", zamki ").Append(castles)
               .Append("; rodow ").Append(_hdClans.Count).Append("): W ").Append(_hdTake[0]).Append(" / R ").Append(_hdTake[1]).Append(" / P ").Append(_hdTake[2])
@@ -203,6 +219,7 @@ namespace Armoury
               .Append(" | ponad poziom normalny (klasy ponad zapas dni) przed / po ").Append(N0(_hdE0)).Append(" / ").Append(N0(_hdE1))
               .Append(", klaso-osad ponad poziom normalny ").Append(_hdOver).Append(", ponad zapas dni, nie ponad poziom normalny ").Append(_hdUnder)
               .Append(" | kontrola: pobrano - do panow - do kas ").Append(diff).Append(", ponizej poziomu normalnego po poborze ").Append(_hdBelow).Append(" (oczekiwane 0 / 0)")
+              .Append(GuardHoardNote())   // obieg2: czesc korony z miast i zamkow (poza "pobrano" wyzej) i stawka straznika - przed "czas" (narzedzie kiesa2 czyta pola wyzej)
               .Append(" | czas ").Append(Ms(_hdTicks)).Append(" ms | potkniecia ").Append(_hdStumbles).Append(" (sesja ").Append(_hdStumbleSess).Append(").");
             _lineHoard = sb.ToString();
         }
