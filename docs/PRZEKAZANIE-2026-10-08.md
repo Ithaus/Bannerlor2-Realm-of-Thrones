@@ -1252,3 +1252,6 @@ Raport 4 lat: `docs/test-zbiorczy/RAPORT-4-LATA-2026-10-15.md` (Jeff go dostal).
    w kiesie ludu (37 -> 51 mln w 2 lata), wojsko w wojnie 64 -> 38 tys. (cel 85) - przepływ ludu z powrotem do obiegu; armie rozpadaja sie przez odejscie
    druzyn (NotEnoughParty), nie spojnosc; AUD-P1-5 (2 wsie bez tytulu), prog AB-10 (predkosc morza x0.93 to wzor War Sails - prog na INFO);
    D1-D10 (wydajnosc, logi, porzadki MCM - wyciac probe drog, test Innych, dokumenty, instrukcja); drobne z audytu.
+
+### Korekta (08:35 UTC)
+- (08:35 UTC 15.10) **KOREKTA testu A: StoryThrone (Daenerys) NIE DZIALA na wczytanym zapisie** - linia 'Tron fabularny (DY)': 'monarchii ROT 20: rzadzi wladca ze startu 0 ... krolestwo upadlo 20', wglad empire_s 'krolestwo upadlo' (a House Targaryen istnieje) - straz nie znajduje krolestw (dopasowanie id krolestwa / wladcy z XML ROT do obiektow gry po wczytaniu?), wiec Daenerys nie wraca; grupa daenerys dala 0 NIE tylko dlatego, ze wiersze sa INFO - DO NAPRAWY przed wgraniem 55 (CrashScribe/src/StoryThrone.cs; session-2026-10-15 rano na D:/Backup-Bannerlord/logs/2026-10-15-6lat) i prog daenerys ma dawac NIE przy 'krolestwo upadlo' dla istniejacego krolestwa.
