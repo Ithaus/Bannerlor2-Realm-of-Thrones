@@ -110,6 +110,12 @@ Logi Jeffa: `Modules\Armoury\Armoury-*.log`, `Modules\Armoury\Logs\<sesja>\ludzi
 15. **Zbrojownia gracza - czyje co jest** (Jeff 15.10): nie widac, ktory sprzet jest gracza, a ktory zolnierzy (wlasnosc zolnierza - placi sie za niego).
     Jeff chce: "zabierz wszystko" - pierwsze klikniecie zabiera sprzet GRACZA, drugie caly sprzet zolnierzy (z cena); pojedyncza rzecz - pokazuje cene.
     Do rozpoznania: gdzie jest ekran/menu zbrojowni (Armoury src: grep "zbrojowni gracza", PlayerArmory, schowek) i jak liczona jest cena.
+    **DECYZJA JEFFA 15.10 (zastepuje pomysl z dwoma kliknieciami) - ZADANIE:**
+    (a) zbrojownia pokazuje TYLKO sprzet gracza (do wziecia za darmo); lup i sprzet bedacy wlasnoscia zolnierzy NIE sa w niej widoczne;
+    (b) zolnierze sami sprzedaja swoj lup w pierwszym miescie i, jesli ich stac, dokupuja sobie lepszy sprzet, a stary sprzedaja (jak lordowie AI - Dozbrajanie);
+    (c) gracz moze dozbroic zolnierzy lepszym sprzetem ze swojej zbrojowni - WYMIANA: jego lepszy pancerz idzie do zolnierza (znika ze zbrojowni),
+        a na jego miejsce do zbrojowni gracza trafia stary, gorszy pancerz zolnierza (o ile zolnierz jakis mial).
+    Do sprawdzenia przed praca: obecna wlasnosc sprzetu zolnierza (Konie rekrutow 160 "kon wlasnoscia zolnierza", sakiewka ludzi, Dozbrajanie gracza 0/0 w logu).
 16. Kryjowka (Jeff 15.10): log 12:10:41-49 "HideoutPurge: przeszukanie 17.5 h (14 ludzi) ... zloto 0, renown 5, osad z wdziecznoscia 3" - przeszukanie bylo,
     kryjowka byla pusta (wszystkie kryjowki swiata maja razem ok. 2 tys. zlota - bandy sprzedaja lup paserom, zloto idzie do miast; kiesy band przechodza na
     zwyciezce w samej bitwie). Mozliwa poprawa: komunikat dla gracza wprost "kryjowka pusta / znaleziono X" (dzis tylko log).
