@@ -51,6 +51,7 @@ namespace CrashScribe
         {
             public string Kingdom;
             public string Ruler;
+            public Hero HeroRef;   // pamiec bohatera w tej kampanii (czyszczona w ResetSession - po wczytaniu obiekty sa nowe)
             public string Gov;
         }
 
@@ -100,7 +101,11 @@ namespace CrashScribe
             if (_stumbles <= 5 || _stumbles % 100 == 0) { try { Scribe.Report("CrashScribe", e, "StoryThrone." + where + " (potkniecie " + _stumbles + ")", null); } catch { } }
         }
 
-        internal static void ResetSession() { _dGov = _dVote = _dBack = _dS9 = 0; _tGov = _tVote = _tBack = _tS9 = 0; _backTries.Clear(); }
+        internal static void ResetSession()
+        {
+            _dGov = _dVote = _dBack = _dS9 = 0; _tGov = _tVote = _tBack = _tS9 = 0; _backTries.Clear();
+            if (_seats != null) foreach (var s in _seats) s.HeroRef = null;
+        }
 
         private static int Day() { return (int)CampaignTime.Now.ToDays; }
 
@@ -160,14 +165,30 @@ namespace CrashScribe
                          + "; XML ROT: plikow " + files + ", wladcow " + owner.Count;
         }
 
+        // 15.10 (Jeff "tron Daenerys napraw"): MBObjectManager.GetObject<Kingdom> dawal null w kazdej kampanii (linia doby: "krolestwo upadlo 20" z 20,
+        // takze w nowej kampanii fin42) - ochrona nie dzialala wcale. Szukamy jak gra: Kingdom.All po StringId, bohater Hero.FindFirst (z pamiecia na kampanie).
         private static Kingdom KingdomOf(Seat s)
         {
-            try { return MBObjectManager.Instance.GetObject<Kingdom>(s.Kingdom); } catch { return null; }
+            try
+            {
+                var all = Kingdom.All;
+                if (all != null) foreach (var k in all) if (k != null && k.StringId == s.Kingdom) return k;
+            }
+            catch { }
+            return null;
         }
 
         private static Hero HeroOf(Seat s)
         {
-            try { return MBObjectManager.Instance.GetObject<Hero>(s.Ruler); } catch { return null; }
+            try
+            {
+                if (s.HeroRef != null && s.HeroRef.StringId == s.Ruler) return s.HeroRef;
+                var id = s.Ruler;
+                var h = Hero.FindFirst(x => x != null && x.StringId == id);
+                s.HeroRef = h;
+                return h;
+            }
+            catch { return null; }
         }
 
         /// <summary>Wladca ze startu tego krolestwa, gdy zyje i rzadzi (glowa rodu panujacego, rod w krolestwie); inaczej null.</summary>
