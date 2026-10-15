@@ -1,5 +1,58 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-15 (Daenerys - "Denerys napraw", test 6-letni) - WLADCY ZE STARTU W MONARCHIACH ROT ZOSTAJA NA TRONIE: BEZ ZMIANY USTROJU I WYBOROW BK, BEZ ABDYKACJI DIPLOMACY; POWROT NA TRON; ROD NIE ODCHODZI W S9
+
+**Mod:** CrashScribe + narzedzie | **Galaz:** `w-toku/daenerys` (od `w-toku/zbior-e8` b1cb26a8) | **Tor:** M | **Klucze:** StoryThroneGuard (true) | **Status:** DO SPRAWDZENIA | **Zmiana polityki:** tak
+
+**Problem (test 6-letni 14.10):** log Armoury "Skarbce": House Targaryen krol Targaryen -> Selmy, Barristan w dobie 109202 (d366) i z powrotem w 109566 (d730) - w tej
+samej dobie zmienilo wladce wszystkie 8 republik (Lorath, Volantis, Braavos, Pentos, Norvos, Myr, Lys, Tyrosh); w d2 (108838) tylko republiki. Okna Diplomacy
+"A Monarch Abdicates ... With the election of a new monarch" w d2, d366 i d730 - dla republik (Myr, Lys, Volantis, Pentos; CivilWarBehavior.NewKing po
+KingSelectionKingdomDecision, gdy w krolestwie byla frakcja abdykacji) - dowod, ze to wybory przez decyzje krolestwa; dla House Targaryen okna nie bylo. Cz. 3 (wczytanie d720):
+Barristan rzadzi do konca, w d1243 (110079) S9 "secesja BK bez nowego krolestwa ... Targaryen (clan_empire_south_1, lenn 2), Stormcrows" (bunt grupy radykalnej),
+S11 Armoury: rod Daenerys -> bez krolestwa (LeaveWithRebellion, Meereen, Vaes Efe), d110091 -> House Targaryen, Aegon (JoinKingdom).
+
+**Przyczyna (kod + zapis):** BK (EnablePoliticsRework = true) `BKDiplomacyBehavior.ConsiderGovernmentTransition` -> `ChangeRealmGovernment` zmienil ustroj House Targaryen
+z Imperial (nasz plik tytulow: Imperial / Dictatorship / Seniority / Cognatic) na Republic (sukcesja Republic) w pierwszym roku - zapis `autotest-6lat-d720`: kontraktow
+Republic/Republic/Seniority/Cognatic 9 (plik: 8), Imperial/Dictatorship/Seniority 0; dokladnej doby nie ma (BK LogPolitics wylaczony). Potem `BKRepublicBehavior` w dniu
+roku 1 (rok 364 dob) dodaje kazdej republice `RepublicElectionDecision(RulingClan, clanToExclude: RulingClan)`; kandydaci (SuccessionRegistry "Republic") - glowy rodow z
+pelnym parostwem BEZ obecnego wladcy, wynik `BKKingElectionDecision` -> `KingdomActions.SetRulerWithTitle` (tron i tytul krolestwa). Stad co rok na zmiane Daenerys /
+Barristan; powrot w d730 to kolejny wybor BK, NIE fabula ROT (ROT nie ma regencji Barristana ani zniknecia Daenerys; DanyInvasion czeka; ROT premiuje rod panujacy x999
+w `KingSelectionKingdomDecision.CalculateMeritOfOutcomeForClan`, czego decyzja BK nie wola; wydarzenia ROT zmieniaja wladce tylko po smierci wladcy ze startu - Jon/Robb,
+Jeor, Bastards). Cz. 3: po wczytaniu BK nie robi wyborow w ZADNEJ republice (tez sesja 19:32 z d720) - `government != DefaultGovernments.Instance.Republic` porownuje
+referencje, a ustroj z zapisu to nowy obiekt (BK bez operatora ==) - Barristan zostal; jako wasal rod Daenerys wszedl w bunt grupy radykalnej -> S9.
+
+**Zmiana:** `CrashScribe/src/StoryThrone.cs` (klucz StoryThroneGuard). Monarchie ROT = krolestwa z naszego pliku tytulow z ustrojem innym niz Republic (20; Wolne Miasta
+i Qohor bez zmian - wybory co rok to zamysl BK i pliku), wladca ze startu = owner krolestwa z XML ROT (ten sam odczyt co `tools/bk_titles_rot818.py`). Dopoki wladca ze
+startu zyje i rzadzi: (1) prefiks `BKDiplomacyBehavior.ConsiderGovernmentTransition` - bez zmian ustroju i uzurpacji BK; (2) prefiks `Kingdom.AddDecision` - bez
+`KingSelectionKingdomDecision` (wybory republiki BK, abdykacja po wojnie domowej Diplomacy), chyba ze wnioskuje rod gracza. (3) Doba: wladca ze startu zywy, wolny, glowa
+rodu, rod w swoim krolestwie, a tron ma inny rod (stary zapis) - powrot przez BK `KingdomActions.SetRulerWithTitle` (z tytulem; bez BK `ChangeRulingClanAction`); rodu
+gracza z tronu nie zdejmujemy; najwyzej 3 powroty na krolestwo w sesji (potem linia WSTRZYMANY). (4) `Mends.BkSecede` (S9): rod zywego wladcy ze startu nie odchodzi ze
+swojego krolestwa. `BkTitles.Resource` internal (odczyt ustroju z zasobu). Linie: "Tron fabularny (DY): start sesji", doba (wglad empire_s, stan 20 monarchii, liczniki),
+"wybor wladcy zablokowany", "powrot na tron", "secesja S9 pominieta". Grupa progow `daenerys` (DY-0..6).
+
+**Ryzyko / co sprawdzic:** wczytanie d720 - w pierwszej dobie linia "powrot na tron ... House Targaryen ... Barristan Selmy ... -> Daenerys Targaryen" (DY-3), potem
+wglad "rzadzi" (DY-2), S9 bez clan_empire_south_1 (DY-4). Na starym zapisie ustroj House Targaryen zostaje Republic (nie cofamy kontraktu BK; wybory i zmiany ustroju
+zablokowane). Okno Diplomacy po wygranej wojnie o abdykacje dalej mowi "will abdicate", a tron zostaje (tekst). Powrot wola OnRulingClanChanged (ubieranie wladcy - latka
+strojow Mends juz to oslania, jak 19:08:36). Imperial: lojalnosc legionow BK dalej obciaza fiefy i grupy (bez zmiany ustroju). Kontrola calosci: S9 juz pomijal rod
+panujacy; Diplomacy wyklucza rod wladcy z frakcji; nikt poza nami nie lata AddDecision / ConsiderGovernmentTransition (BK, Diplomacy, ROT, BKROT, SCA). Po smierci
+wladcy ze startu - sukcesja i wydarzenia ROT jak dotad. Osobno (nie ruszane): po wczytaniu BK nie robi wyborow republik (porownanie referencji).
+
+**Recenzja (15.10, poprawki w tym samym wpisie):** (a) prefiks AddDecision blokowal KAZDY KingSelectionKingdomDecision przy "zywym" wladcy ze startu - a BK
+`BKTitleBehavior.OnHeroKilled` jest na `BeforeHeroKilledEvent` (przed AddDeathMark / MakeDead) i przy sukcesji wybieralnej z < 3 kandydatami wola
+`SuccessionHelper.ResolveSuccession` -> `AddDecision(KingSelectionKingdomDecision(victim.Clan))`, a gra `KillCharacterAction` (rod bez innych doroslych lordow) dodaje
+wybor przed MakeDead - oba zablokowane (BK, sukcesje elected="true" - Nocna Straz i valyrian FeudalElective, plemienne TribalElective: glosowanie BK
+przepadalo; gra, kazda monarchia: tron losowemu rodowi bez glosowania). Teraz blokowane tylko: BK `RepublicElectionDecision` (po nazwie typu) i wybor z wnioskiem rodu innego niz panujacy
+(abdykacja Diplomacy - wnioskuje sponsor buntu); wniosek rodu panujacego (sukcesja po smierci) przechodzi; wladca z pietnem smierci (DeathMark) nie jest chroniony.
+(b) Powrot na tron cofnalby fabule ROT: `JonEvent` daje Nocna Straz rodowi Halfhand (clan_nord_3) BEZ zabicia Jeora (lord_5_3; gdy JeorMutiny nie doszlo - np.
+pominiete przez rozrusznik) - nastepnego dnia Jeor wracalby na tron. Tabela `RotHandover` (nightswatch: Halfhand, Thorne; battania: Snow) - taki tron zostaje,
+linia doby liczy go jako "tron oddany fabula ROT" (poza lista "nie rzadzi", DY-5). (c) Powrot na tron to nie decyzja krolestwa, wiec Diplomacy nie robi swojego
+`NewKing` (RemoveClan nowego wladcy z frakcji buntu); rod wracajacy na tron, ktory byl we frakcji (np. sponsor abdykacji przeciw Barristanowi), przy wybuchu wojny
+domowej wyszedlby z wlasnego krolestwa (`StartRebellionAction` - CreateKingdom ze sponsorem). Teraz po udanym powrocie rod wychodzi z frakcji Diplomacy swojego
+krolestwa (refleksja, `RebelFaction.RemoveClan` jak Diplomacy), linia powrotu: "frakcje Diplomacy: N, rod wyszedl z M". Sprawdzone w kodzie: ROT zmienia wladce
+tylko w JeorMutiny (Thorne, Jeor ginie w tej chwili), JonEvent (Snow przy martwym Robbie; Halfhand), BastardsEvent (Stark - rod startowy); DanyInvasion zaklada
+Daenerys w rodzie Targaryen i daje jej Dragonstone / wplyw - powrot Daenerys jest z nim zgodny. Build CrashScribe i Armoury kod 0, sprawdz_narzedzie czysty,
+grupa daenerys na logach 15:55 i 20:17 (INFO - wersja sprzed paczki) i na logu syntetycznym bez wywrotki.
+
 ## 2026-10-14 (AC - spojnosc armii pod rok 364 dob, Jeff "rozpad armii powinien byc wolniejszy, bo 1 dzien to 1 dzien") - ARMIE TRZYMAJA SIE OK. 4,3 RAZA DLUZEJ
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/zbior-e8` | **Tor:** S | **Klucze:** ArmyCohesionYearScale (TAK) | **Status:** DO SPRAWDZENIA | **Zmiana wojny:** tak

@@ -718,6 +718,12 @@ Uzycie (Python 3, tylko odczyt):
                     <Armoury-*.log>. AC-0 start (klucz, latka, mnoznik), AC-1 doby i potkniecia 0, AC-2 zmiana teraz / bez skali = mnoznik +- 0.02, AC-3 INFO.
 --grupa b10b      : (14.10, ERRORS.md A7 klasa 7, decyzja Jeffa "tak napraw"; CrashScribe/src/BkBattlePerks.cs) python -I tools/sprawdz_logi.py --grupa b10b
                     --crashscribe <session-*.log>. B10-0 linia startu wpiete 2/2, B10-1 linie doby i potkniecia 0, B10-2 premie (INFO), B10-3 typy BK 0 BRAK.
+--grupa daenerys  : (15.10, test 6-letni "Denerys napraw"; CrashScribe/src/StoryThrone.cs) python -I tools/sprawdz_logi.py --grupa daenerys
+                    --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). DY-0 start: wpiete 2/2, klucz TAK, monarchii 20; DY-1 linie doby
+                    i potkniecia 0; DY-2 Daenerys (empire_s) zywa i wolna, rod w krolestwie, a nie rzadzi - 0 linii doby; DY-3 powroty na tron (INFO),
+                    NIEUDANE i WSTRZYMANE (przepychanka, limit 3 na sesje) 0; DY-4 secesja S9 rodu clan_empire_south_1 z House Targaryen 0; DY-5 zywy wolny wladca ze startu w swoim krolestwie bez
+                    tronu (ostatnia doba; tron oddany fabula ROT - Nocna Straz / Polnoc - poza lista) 0; DY-6 zablokowane wybory / abdykacje, pominiete zmiany
+                    ustroju, S9 (INFO). Log bez paczki: INFO.
 --grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
                     --grupa unikaty --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). UN-0 wpiecie latek PODPIETE, UN-2 linie doby
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
@@ -16737,6 +16743,72 @@ def b10b_main(logp):
     return 0
 
 
+DY_DAY = re.compile(r"^Tron fabularny \(DY\): dzien (\d+) \| wglad empire_s: (?P<probe>[^|]*)\| monarchii ROT (\d+): .*?nie rzadzi \[(?P<off>[^\]]*)\]"
+                    r".*?od wczytania: (?P<g>\d+) / (?P<v>\d+) / (?P<b>\d+) / (?P<s>\d+) \| potkniecia (?P<st>\d+)")
+
+
+def daenerys_main(logp):
+    """daenerys (15.10, test 6-letni "Denerys napraw"; CrashScribe/src/StoryThrone.cs, klucz StoryThroneGuard): tron fabularny ROT. Wejscie: log sesji
+    CrashScribe. DY-0 linia startu "Tron fabularny (DY): start sesji" (wpiete 2/2, klucz TAK, monarchii z wladca ROT 20), DY-1 linie doby >= 1 i
+    potkniecia 0, DY-2 linie doby, w ktorych Daenerys (empire_s) zyje, jest na wolnosci, jej rod jest w krolestwie, a tron ma ktos inny - 0 (powrot na
+    tron w tej samej dobie przed linia), DY-3 powroty na tron (INFO), NIEUDANE i WSTRZYMANE 0, DY-4 linie S9 "secesja BK bez nowego krolestwa" z House Targaryen
+    i rodem clan_empire_south_1 - 0, DY-5 ostatnia doba: zywy wolny wladca ze startu w swoim krolestwie bez tronu - 0, DY-6 liczniki (INFO)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("DY-0: log sesji CrashScribe", f"brak pliku {logp}", "podaj --crashscribe <session-*.log>", None)
+        rep.show()
+        return 0
+    lines = read(logp)
+    starts = [s for s in lines if s.startswith("Tron fabularny (DY): start sesji")]
+    days, bad_fmt = [], 0
+    for s in lines:
+        if s.startswith("Tron fabularny (DY): dzien "):
+            m = DY_DAY.search(s)
+            if m:
+                days.append(m)
+            else:
+                bad_fmt += 1
+    back = [s for s in lines if s.startswith("Tron fabularny (DY): powrot na tron")]
+    back_bad = [s for s in back if "NIEUDANY" in s or "WSTRZYMANY" in s]
+    back = [s for s in back if s not in back_bad]
+    votes = [s for s in lines if s.startswith("Tron fabularny (DY): wybor wladcy zablokowany")]
+    s9skip = [s for s in lines if s.startswith("Tron fabularny (DY): secesja S9 pominieta")]
+    s9dany = [s for s in lines if s.startswith("Mends: S9 secesja BK bez nowego krolestwa") and "krolestwo House Targaryen |" in s
+              and "(clan_empire_south_1," in s.split("rody niezalezne z lennem:", 1)[-1].split("| ", 1)[0]]
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)} (zly format {bad_fmt}), powrotow {len(back)}, zablokowanych wyborow {len(votes)}")
+    if not starts:
+        rep.add("DY-0: linia startu (tron fabularny)", "brak linii", "INFO (wersja sprzed StoryThrone)", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    body = st[len("Tron fabularny (DY): start sesji | "):]
+    if "WYLACZONE" in st or "klucz StoryThroneGuard NIE" in st:
+        rep.add("DY-0: linia startu (tron fabularny)", body[:220], "INFO (klucz wylaczony)", None)
+        rep.show()
+        return 0
+    seats = num(r"monarchii z wladca ROT (\d+)", st)
+    rep.add("DY-0: linia startu (tron fabularny)", body[:220], "wpiete 2/2, klucz TAK, monarchii z wladca ROT 20",
+            "wpiete 2/2" in st and "klucz StoryThroneGuard TAK" in st and seats == 20)
+    stum = max([int(m.group("st")) for m in days] + [0])
+    rep.add("DY-1: linie doby, potkniecia", f"dob {len(days)}, zly format {bad_fmt}, potkniecia {stum}", ">= 1, 0 i 0", len(days) >= 1 and bad_fmt == 0 and stum == 0)
+    dany_off = [m for m in days if m.group("probe").strip().endswith("nie rzadzi (na wolnosci)")]
+    last_probe = days[-1].group("probe").strip() if days else "-"
+    ex = (" | pierwsza: dzien " + dany_off[0].group(1)) if dany_off else ""
+    rep.add("DY-2: Daenerys zywa, wolna, w krolestwie - a nie rzadzi", f"linii doby {len(dany_off)}{ex} | ostatnia doba: {last_probe[:160]}", "0", len(dany_off) == 0)
+    rep.add("DY-3: powroty na tron (INFO) / NIEUDANE, WSTRZYMANE", f"powrotow {len(back)}, NIEUDANYCH / WSTRZYMANYCH {len(back_bad)}"
+            + (" | " + (back_bad or back)[0][len("Tron fabularny (DY): "):][:200] if (back or back_bad) else ""), "NIEUDANE i WSTRZYMANE 0", len(back_bad) == 0)
+    rep.add("DY-4: secesja S9 rodu Daenerys z House Targaryen", f"linii {len(s9dany)}" + (" | " + s9dany[0][:160] if s9dany else ""), "0", len(s9dany) == 0)
+    off_last = days[-1].group("off") if days else ""
+    free_off = [x.strip() for x in off_last.split(";") if "na wolnosci" in x]
+    rep.add("DY-5: ostatnia doba - zywy wolny wladca ze startu bez tronu", f"{len(free_off)}" + (" | " + "; ".join(free_off)[:200] if free_off else ""), "0", len(free_off) == 0)
+    tot = days[-1] if days else None
+    rep.add("DY-6: od wczytania (INFO)", (f"zmiany ustroju BK pominiete (wywolania) {tot.group('g')}, wybory zablokowane {tot.group('v')}, powroty {tot.group('b')}, "
+                                          f"S9 pominiete {tot.group('s')}" if tot else "-") + (f" | wybory: " + "; ".join(v[len("Tron fabularny (DY): wybor wladcy zablokowany - "):][:90] for v in votes[:3]) if votes else "")
+            + (f" | S9: {len(s9skip)}" if s9skip else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
 def unikaty_main(logp):
     """unikaty (decyzja Jeffa 14.10 "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs; rozpoznanie
     docs/pytania-2026-10-14/TOWARZYSZE-DUPLIKATY.md rozdz. 5 i 7). Wejscie: log sesji CrashScribe (session-*.log; --crashscribe P albo sciezka).
@@ -26437,6 +26509,8 @@ def main(argv):
         return unikaty_main(csp or logp)   # 14.10 unikaty ROT (CrashScribe UniqueCompanions): zmarly zostaje martwy, przeprowadzki, duplikaty, dzieci - log sesji CrashScribe
     if group == "spojnosc" and logp:
         return spojnosc_main(logp)   # AC (Jeff 14.10): spojnosc armii x 84 / rok (Armoury ArmyCohesionYear) - log Armoury
+    if group == "daenerys" and (csp or logp):
+        return daenerys_main(csp or logp)   # 15.10 (test 6-letni "Denerys napraw"): tron fabularny ROT (CrashScribe StoryThrone) - log sesji CrashScribe
     if group == "b10b" and (csp or logp):
         return b10b_main(csp or logp)   # B10b (decyzja Jeffa 14.10): atuty BK z bitew (CrashScribe BkBattlePerks) - log sesji CrashScribe
     if group == "rozwoj" and logp:

@@ -452,4 +452,13 @@
        is not available - Realm of Thrones went on with no army and the game crashed. With this on, CrashScribe raises that army the way the game
        does, so the story goes on, and a gathering order for a party with no army is skipped instead of crashing. Set to false for the old behaviour. -->
   <RotStoryArmyGuard>true</RotStoryArmyGuard>
+  <!-- Realm of Thrones story rulers (found in the 6-year test: Barristan Selmy took Daenerys' throne for a year, twice, and later her house left
+       her own realm in a revolt). Banner Kings can turn a story monarchy into a republic and then elect a new ruler every year, leaving out the
+       one on the throne; Diplomacy can force an abdication after a lost civil war. With this on, in every story monarchy (the Free Cities stay
+       republics) the ruler the campaign starts with keeps the throne while alive: no change of government or usurpation by Banner Kings, no
+       yearly election and no forced abdication. If that ruler is alive, free and still in the realm but someone else sits on the throne (an older
+       save), the throne goes back to them and their house leaves any Diplomacy rebel faction of that realm; their house never leaves their own
+       realm in a Banner Kings revolt. Succession when the story ruler dies, and thrones handed over by Realm of Thrones events (the Night's Watch,
+       the North), work as before. Your own house is never removed from a throne. Set to false for the old behaviour. -->
+  <StoryThroneGuard>true</StoryThroneGuard>
 </CrashScribe>
