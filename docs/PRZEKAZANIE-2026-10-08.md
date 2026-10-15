@@ -1281,7 +1281,7 @@ Do zrobienia potem: Daenerys StoryThrone (nie rozpoznaje krolestw po wczytaniu),
 
 ### 35. WGRANIE 56 + JEFF GRA (15.10 ok. 05:20 UTC) - START TUTAJ
 Jeff: "1. tak 2. tak 3. tak", "przerwij test i wprowadz zmiany", "zaczynam nowa kampanie ... bedziemy monitorowac moj save". Test F przerwany na d291 (Configs przywrocone).
-**W grze: WGRANIE 56** = `w-toku/zbior-e8` **1c450657** (Armoury md5 91489e46; reszta jak 55; kopia *.bak-2026-10-15-wgranie56-przed i D:\Backup-Bannerlord\wgrane6-10-15-wgranie56-przed).
+**W grze: WGRANIE 56** = `w-toku/zbior-e8` **1c450657** (Armoury md5 91489e46; reszta jak 55; kopia *.bak-2026-10-15-wgranie56-przed i D:\Backup-Bannerlord\wgrane\2026-10-15-wgranie56-przed).
 Zmiany od 55: kiesa-ludu, obieg-swiata, strojenie, czesc korony, pozyczki koron (test F do d291: 0 ERROR) + galaz `w-toku/oblezenia-3`:
 (1) SiegeBesiegerPrepPercent 50 -> 100 (budowa obozu i machin x2 szybciej; miasto 3000 ludzi: oboz+taran+wieza ok. 8 dob);
 (2) MB SiegeEnginesInProgressDontHold: gra (BesiegerCamp :424-427) mnozy szanse szturmu przez 1 - 0.85 (postep NIEGOTOWEJ machiny + 0.25 x (5 - gotowe))^2 -
