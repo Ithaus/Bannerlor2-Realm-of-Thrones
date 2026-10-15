@@ -27,6 +27,10 @@ namespace Armoury
     /// Log: linia startu sesji (wpieta metoda, mnoznik) i linia doby: armie (AI / gracz), srednia spojnosc, srednia zmiana na dobe teraz i bez
     /// skali, rozwiazane wedlug przyczyny i sredni wiek armii przy rozwiazaniu (ArmyCreated / ArmyDispersed). Bez zapisu (wiek armii z zapisu
     /// nieznany - liczone tylko armie zalozone w tej sesji).
+    /// AC-W (Jeff 15.10 "czemu sie rozchodzi?"): linia "Spojnosc armii (AC wiek)" - od startu sesji rozwiazane armie wedlug przyczyny z wiekiem z pola gry
+    /// Army._creationTime (takze armie z zapisu i te rozwiazane, zanim nasz nasluch ArmyCreated je zobaczyl) i liczba rozwiazanych w dniu zalozenia.
+    /// Powod pomiaru [K]: NotEnoughParty wola nie tylko gra (Army.RemoveParty - odeszla ostatnia druzyna), ale i StrategicCampaignAI145
+    /// (OnArmyCreated: wodz z < 22 zdrowymi albo sila < 80, albo 0.75 doby po poprzedniej armii - armia kasowana od razu po zalozeniu).
     /// </summary>
     internal static class ArmyCohesionYear
     {
@@ -41,6 +45,10 @@ namespace Armoury
         private static readonly Dictionary<Army, double> _born = new Dictionary<Army, double>();
         private static readonly Dictionary<string, int> _dReasons = new Dictionary<string, int>();
         private static int _dDisp, _dAgedN, _tDisp;
+        // AC-W: od startu sesji, przyczyna -> [rozwiazane, w dniu zalozenia (< 1 doby), suma wieku w dobach]
+        private static readonly SortedDictionary<string, double[]> _sAge = new SortedDictionary<string, double[]>(StringComparer.Ordinal);
+        private static AccessTools.FieldRef<Army, CampaignTime> _ctRef;
+        private static bool _ctFail;
         private static double _dAgeSum;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.ArmyCohesionYearScale; } }
@@ -84,6 +92,22 @@ namespace Armoury
                 _dReasons.TryGetValue(r, out int n);
                 _dReasons[r] = n + 1;
                 _dDisp++; _tDisp++;
+                if (a != null && !_ctFail)
+                {
+                    try
+                    {
+                        if (_ctRef == null) _ctRef = AccessTools.FieldRefAccess<Army, CampaignTime>("_creationTime");
+                        var ct = _ctRef(a);
+                        if (ct != default(CampaignTime))
+                        {
+                            double age = CampaignTime.Now.ToDays - ct.ToDays;
+                            double[] v;
+                            if (!_sAge.TryGetValue(r, out v)) _sAge[r] = v = new double[3];
+                            v[0]++; if (age < 1.0) v[1]++; v[2] += age;
+                        }
+                    }
+                    catch (Exception e) { _ctFail = true; Stumble("OnDispersed.CreationTime", e); }
+                }
                 if (a != null && _born.TryGetValue(a, out double d0))
                 {
                     _dAgeSum += CampaignTime.Now.ToDays - d0; _dAgedN++;
@@ -98,7 +122,7 @@ namespace Armoury
         {
             if (_h == null) _h = new Harmony("com.jeff.armoury.armycohesionyear");
             var harmony = _h;
-            _born.Clear(); _dReasons.Clear(); _dDisp = _dAgedN = _tDisp = 0; _dAgeSum = 0;
+            _born.Clear(); _dReasons.Clear(); _dDisp = _dAgedN = _tDisp = 0; _dAgeSum = 0; _sAge.Clear();
             try
             {
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.ArmyManagementCalculationModel : null;
@@ -157,6 +181,18 @@ namespace Armoury
                          + " | rozwiazane dzis " + _dDisp + (sb.Length > 0 ? " (" + sb + ")" : "")
                          + " | wiek przy rozwiazaniu srednio " + (_dAgedN > 0 ? (_dAgeSum / _dAgedN).ToString("0.0", Inv) + " dob (" + _dAgedN + " armii z tej sesji)" : "-")
                          + " | od startu sesji rozwiazanych " + _tDisp + " | potkniecia " + _errors + ".");
+                if (_sAge.Count > 0)
+                {
+                    var sw = new System.Text.StringBuilder();
+                    foreach (var kv in _sAge)
+                    {
+                        if (sw.Length > 0) sw.Append("; ");
+                        sw.Append(kv.Key).Append(' ').Append((int)kv.Value[0]).Append(" (w dniu zalozenia ").Append((int)kv.Value[1])
+                          .Append(", srednio ").Append((kv.Value[2] / Math.Max(1.0, kv.Value[0])).ToString("0.0", Inv)).Append(" dob)");
+                    }
+                    Log.Info("Spojnosc armii (AC wiek): dzien " + (int)CampaignTime.Now.ToDays + " | od startu sesji rozwiazane wedlug przyczyny (wiek z daty zalozenia w grze): " + sw
+                             + " | 'w dniu zalozenia' = armia skasowana zaraz po zalozeniu (np. StrategicCampaignAI: wodz < 22 zdrowych albo sila < 80, albo 0.75 doby po poprzedniej armii) - to nie rozpad.");
+                }
             }
             catch (Exception e) { Stumble("Daily", e); }
             _dReasons.Clear(); _dDisp = 0; _dAgedN = 0; _dAgeSum = 0;
