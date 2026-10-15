@@ -1309,3 +1309,11 @@ Drobne z audytu (gra bez wplywu): AUD-P1-5 (2 z 571 wsi bez tytulu BK - tytuly p
   -> odczyt: OB2 zostaje BEZ ZMIAN (cwierc obroncow nie rozszerzana). AUD-P1-5: [K] BK TitleGenerator.CreateLandedTitle zaklada lordship dla kazdej settlement.BoundVillages,
   FeudalTitle.Equals po Fief - duplikat nazwy nie jest przyczyna; ktore 2 wsie - nieznane (linia BkTitles.cs:337 liczy, nie nazywa). Naprawa: (1) nazwy w linii, (2) dorobka
   lordship w biegnacej kampanii (TitleManager.ExecuteAddTitle + vassals tytulu twierdzy) - dziala tez w kampanii Jeffa, wiec nie wstrzymuje gry. Ok. 1 h + krotki test.
+
+### 37. WGRANIE 58 (15.10 ok. 06:55 UTC) - START TUTAJ (Jeff gra kampanie Ironman IronmanjCg6MOpv28iN.sav; kopia D:\Backup-Bannerlord\zapisy-jeffa)
+W grze: `w-toku/zbior-e8` **68a98cb5** = 57 + (a) jeden zegar kuzni: BK StartCraftingMenu(totalHours) liczy godziny wszystkich czynnosci ekranu, kolejka brala tylko
+kute sztuki - przetop/rafinacja przepadaly; teraz odsiadka BK za reszte godzin (ForgeClock._bkQueued); (b) SmeltNoWood: przetop broni bez drewna trzonka (gra dawala 1-3);
+(c) BkPietyBar: BK MapInfoPietyPatches dodawal nowa poboznosc przy kazdym RefreshValues (porownanie referencji) - zostaje jedna (klucz BkPietyBarOnce).
+Test zapis F d240 8 dob OK, Armoury 0 ERROR. NIE testowac na zapisie Jeffa (Ironman zapisuje sie sam - nadpisalby kampanie).
+Zawieszenie 05:43 w kreatorze postaci (AppHangB1, brak sladu); drugie podejscie przeszlo. Ceny placka/marchwi x8 = niedobor (piekarnie wsi BK) - propozycja wyrownania czeka.
+Swiat Jeffa d9: wojny FreeFolk-NW, Dragonstone-Stormlands; 0 oblezen; Daenerys rzadzi (DY 20/20); zloto: lud 5.5%, lordowie 36.4%, korony 25.8%.
