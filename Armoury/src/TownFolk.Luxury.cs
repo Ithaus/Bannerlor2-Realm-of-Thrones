@@ -51,6 +51,9 @@ namespace Armoury
 
         private static List<ItemCategory> _lxCats; private static int[] _lxGroup; private static bool[] _lxSig;
         private static bool[] _lxCloth;                              // plotno 14.10 (poprawka 1): plotno i skora (LxNoSignal) - prog polki i cena graniczna przy FolkClothAboveReserve
+        private static bool[] _lxArmy;                               // obieg2 (2): towar wojska (filc - odziez wojska 150; plotno i skora - zbrojownie) - zawsze cena graniczna bazowa
+        private static readonly string[] LxArmyIds = { "felt", "linen", "leather" };
+        private static long _lxWideP5;                               // obieg2 (2): zakupy podzamczy i wsi (P5) w kategoriach ponad bazowa cena graniczna (doba)
         private static Dictionary<ItemCategory, int> _lxIdx; private static string _lxMissing = "-";
         private static double[] _lxW = new double[0];
         private static readonly double[] _lxGs = new double[4];
@@ -67,6 +70,8 @@ namespace Armoury
             public int SigN, SigRoom, SigOver, EstCalls; public double SigOff, SigAdd, SigCut; public long Ticks;
             // plotno 14.10 (poprawka 1): oferta miast na plotno i skore po progu polki, obciete progiem, konsumpcje z polka ponad / nie wyzej niz prog, suma progu, ponad cena graniczna
             public double ClOff, ClCut, ClShare; public int ClCutN, ClAbove, ClLow, ClKeepN, ClOver; public long ClKeep;
+            // obieg2 (2): oferta i kupione w kategoriach ponad bazowa cena graniczna (dopuszczone cena wedlug zasobnosci), miasta z cena graniczna ponad bazowa, suma ich cen
+            public double WideOff, WideBuy, CeilSum; public int WideN, CeilN;
         }
         private static LxWin _lxw = new LxWin();
         // doba ludu (P5)
@@ -89,12 +94,30 @@ namespace Armoury
         internal static bool ClothOn { get { var s = Settings.Current; return s != null && s.FolkClothAboveReserve; } }
         private static double LxDays(Settings s) { double t = s != null ? s.FolkSurplusSpendDays : 60; return double.IsNaN(t) ? 60 : Math.Max(1, Math.Min(3650, t)); }
         private static double LxCeil(Settings s) { double c = s != null ? s.FolkLadderPriceCeiling : 1.5; return double.IsNaN(c) ? 1.5 : Math.Max(1.0, Math.Min(10.0, c)); }
+        /// <summary>obieg2 (2): cena graniczna wedlug zasobnosci czynna (klucz FolkLadderCeilingByWealth).</summary>
+        private static bool WealthCeilOn { get { var s = Settings.Current; return s != null && s.FolkLadderCeilingByWealth; } }
+        /// <summary>
+        /// obieg2 (2): cena graniczna kategorii `li` dla ludu miasta `f`: bazowa x pierwiastek z (dni zapasu kiesy W / poziom normalny W = FolkHoardNormalTimes x zapas
+        /// dni W), nie mniej niz bazowa, najwyzej FolkLadderCeilingMax. Towar wojska (filc, plotno, skora), miasto bez potrzeby W, klucz wylaczony - bazowa.
+        /// </summary>
+        private static double LxCeilFor(Folk f, int li, double baseCeil)
+        {
+            if (!WealthCeilOn || f == null || f.Kind != 0 || _lxArmy == null || li < 0 || li >= _lxArmy.Length || _lxArmy[li]) return baseCeil;
+            double need = f.Need[0];
+            if (!(need > 0)) return baseCeil;
+            var s = Settings.Current;
+            double norm = HoardTimes(s) * Math.Max(1, Math.Min(60, s.TownFolkReserveDays));
+            double k = Math.Sqrt(Math.Max(1.0, Math.Max(0, f.KW) / need / norm));
+            double mx = Math.Max(baseCeil, Math.Min(10.0, double.IsNaN(s.FolkLadderCeilingMax) ? baseCeil : s.FolkLadderCeilingMax));
+            double c = baseCeil * k;
+            return double.IsNaN(c) ? baseCeil : Math.Min(mx, c);
+        }
 
         private static void LxStumble(string where, Exception e) { _lxSt++; Stumble(where, e); }
 
         private static void ResetLadder()
         {
-            _lxCats = null; _lxGroup = null; _lxSig = null; _lxCloth = null; _lxIdx = null; _lxMissing = "-"; _lxW = new double[0];
+            _lxCats = null; _lxGroup = null; _lxSig = null; _lxCloth = null; _lxArmy = null; _lxIdx = null; _lxMissing = "-"; _lxW = new double[0]; _lxWideP5 = 0;
             _lxw = new LxWin(); _lxShelf.Clear();
             _lxCN = _lxCNo = _lxCNoSplit = _lxCNoTown = _lxVN = _lxVNo = _lxVNoSplit = _lxVNoTown = _lxMismatch = _lxSt = _lxClP5 = 0;
             _lxCWant = _lxVWant = 0; _lxCBuy = _lxVBuy = _lxCPcs = _lxVPcs = _lxDayTicks = 0;
@@ -104,7 +127,7 @@ namespace Armoury
         private static void EnsureLx()
         {
             if (_lxCats != null) return;
-            var cats = new List<ItemCategory>(); var grp = new List<int>(); var sig = new List<bool>(); var cloth = new List<bool>(); var seen = new HashSet<string>();
+            var cats = new List<ItemCategory>(); var grp = new List<int>(); var sig = new List<bool>(); var cloth = new List<bool>(); var army = new List<bool>(); var seen = new HashSet<string>();
             try
             {
                 foreach (var c in ItemCategories.All)
@@ -113,14 +136,14 @@ namespace Armoury
                     string id = c.StringId.ToLowerInvariant();
                     for (int g = 0; g < LxIds.Length; g++)
                         if (Array.IndexOf(LxIds[g], id) >= 0 && seen.Add(id) && OfLx + cats.Count < OfMax)
-                        { cats.Add(c); grp.Add(g); sig.Add(g != LxTable && Array.IndexOf(LxNoSignal, id) < 0); cloth.Add(Array.IndexOf(LxNoSignal, id) >= 0); }
+                        { cats.Add(c); grp.Add(g); sig.Add(g != LxTable && Array.IndexOf(LxNoSignal, id) < 0); cloth.Add(Array.IndexOf(LxNoSignal, id) >= 0); army.Add(Array.IndexOf(LxArmyIds, id) >= 0); }
                 }
             }
             catch (Exception e) { LxStumble("EnsureLx", e); }
             var miss = new List<string>();
             foreach (var arr in LxIds) foreach (var id in arr) if (!seen.Contains(id)) miss.Add(id);
             _lxMissing = miss.Count > 0 ? string.Join(", ", miss.ToArray()) : "-";
-            _lxGroup = grp.ToArray(); _lxSig = sig.ToArray(); _lxCloth = cloth.ToArray(); _lxW = new double[cats.Count];
+            _lxGroup = grp.ToArray(); _lxSig = sig.ToArray(); _lxCloth = cloth.ToArray(); _lxArmy = army.ToArray(); _lxW = new double[cats.Count];
             var idx = new Dictionary<ItemCategory, int>();
             for (int i = 0; i < cats.Count; i++) idx[cats[i]] = i;
             _lxIdx = idx;
@@ -158,19 +181,28 @@ namespace Armoury
                 bool sig = s.MarketSeesPurse; double ceil = LxCeil(s);
                 bool cl = ClothOn;                                       // plotno 14.10 (poprawka 1)
                 if (f.LxFrac == null || f.LxFrac.Length != n) f.LxFrac = new double[n];
+                if (f.LxWide == null || f.LxWide.Length != n) f.LxWide = new bool[n];   // obieg2 (2)
+                double myCeil = 0; int myCeilN = 0;
                 var w = _lxW; if (w.Length != n) { w = new double[n]; _lxW = w; }
                 Array.Clear(_lxGs, 0, 4); Array.Clear(_lxGa, 0, 4); Array.Clear(_lxGc, 0, 4);
                 int over = 0;
                 for (int i = 0; i < n; i++)
                 {
-                    w[i] = 0;
+                    w[i] = 0; f.LxWide[i] = false;
                     float v;
                     if (!dict.TryGetValue(_lxCats[i], out v) || !(v > 0)) continue;
                     int g = _lxGroup[i];
                     bool c = cl && _lxCloth[i];
                     _lxGa[g] += v;                                       // (b) suma grupy razem z kategoriami, ktore wypadna ponad cena graniczna
-                    if (sig && (_lxSig[i] || c) && town.GetItemCategoryPriceIndex(_lxCats[i]) > ceil)   // (a) plotno i skora tez (przy kluczu)
-                    { over++; if (c) { _lxGc[g] += v; if (f.Kind == 0) _lxw.ClOver++; } continue; }
+                    if (sig && (_lxSig[i] || c))
+                    {
+                        double ix = town.GetItemCategoryPriceIndex(_lxCats[i]);
+                        double ceilI = LxCeilFor(f, i, ceil);            // obieg2 (2): cena graniczna wedlug zasobnosci (klucz wylaczony - bazowa)
+                        if (ceilI > ceil) { myCeil = ceilI; myCeilN = 1; }
+                        if (ix > ceilI)   // (a) plotno i skora tez (przy kluczu)
+                        { over++; if (c) { _lxGc[g] += v; if (f.Kind == 0) _lxw.ClOver++; } continue; }
+                        if (ix > ceil) f.LxWide[i] = true;              // obieg2 (2): w podziale tylko dzieki cenie wedlug zasobnosci
+                    }
                     w[i] = v; _lxGs[g] += v;
                 }
                 double alloc = 0, clKept = 0;
@@ -189,7 +221,7 @@ namespace Armoury
                     f.LxFrac[i] = q; alloc += q;
                 }
                 f.LxFracDay = (int)CampaignTime.Now.ToDays;
-                if (f.Kind == 0) _lxw.Over += over;
+                if (f.Kind == 0) { _lxw.Over += over; if (myCeilN > 0) { _lxw.CeilN++; _lxw.CeilSum += myCeil; } }
                 if (off <= 0) return 0;
                 double added = 0;
                 for (int i = 0; i < n; i++)
@@ -211,6 +243,7 @@ namespace Armoury
                     double add = x / (Math.Pow(idx, OfferIdxPow) * hs);
                     dict[c] = (float)(v + add); added += add;
                     OfferNote(OfLx + i, c, x, add, v);                   // licznik kupionego z oferty (OfferClose) - takze bez pomiaru P1 (poprawka Predict / Share)
+                    if (f.Kind == 0 && f.LxWide[i]) { _lxw.WideOff += x; _lxw.WideN++; }   // obieg2 (2)
                     if (GroupOf(c) == 0) f.OfferFood += x; else f.OfferRest += x;
                     if (f.Kind == 0) _lxw.OffG[_lxGroup[i]] += x;
                 }
@@ -268,6 +301,7 @@ namespace Armoury
             if (f == null || _lxGroup == null || li < 0 || li >= _lxGroup.Length || !(bought > 0)) return;
             if (c != null && GroupOf(c) == 0) f.LxBF += bought; else f.LxBR += bought;
             if (f.Kind == 0) _lxw.BuyG[_lxGroup[li]] += bought; else _lxw.CBuy += bought;
+            if (f.Kind == 0 && f.LxWide != null && li < f.LxWide.Length && f.LxWide[li]) _lxw.WideBuy += bought;   // obieg2 (2): kupione dzieki cenie wedlug zasobnosci
         }
 
         /// <summary>OfferClose: oferta listy tej konsumpcji i ile z niej kupiono - czesc kupiona (poprawka Share), liczby okna People of this land.</summary>
@@ -416,7 +450,13 @@ namespace Armoury
                 var list = shelf[i];
                 if (!(q > 0) || list == null) continue;
                 bool c = cl && _lxCloth[i];
-                if (sig && (_lxSig[i] || c) && town.GetItemCategoryPriceIndex(_lxCats[i]) > ceil) continue;
+                bool wide = false;
+                if (sig && (_lxSig[i] || c))
+                {
+                    double ix = town.GetItemCategoryPriceIndex(_lxCats[i]);
+                    if (ix > LxCeilFor(mf, i, ceil)) continue;             // obieg2 (2): cena graniczna wedlug zasobnosci ludu miasta targowego (klucz wylaczony - bazowa)
+                    wide = ix > ceil;
+                }
                 double left = want * q;
                 foreach (var e in list)
                 {
@@ -441,6 +481,7 @@ namespace Armoury
                     town.ChangeGold(got);
                     roster.AddToCounts(e, -n);
                     spent += got; left -= got; pieces += n;
+                    if (wide) _lxWideP5 += got;                          // obieg2 (2): zakup P5 ponad bazowa cena graniczna
                 }
             }
             if (spent > 0) mf.VillWin += spent;                          // podstawa robocizny targu (jak zakupy wsi)
@@ -452,7 +493,7 @@ namespace Armoury
         private static void LadderBegin()
         {
             _lxCN = _lxCNo = _lxCNoSplit = _lxCNoTown = _lxVN = _lxVNo = _lxVNoSplit = _lxVNoTown = _lxMismatch = _lxClP5 = 0;
-            _lxCWant = _lxVWant = 0; _lxCBuy = _lxVBuy = _lxCPcs = _lxVPcs = 0;
+            _lxCWant = _lxVWant = 0; _lxCBuy = _lxVBuy = _lxCPcs = _lxVPcs = 0; _lxWideP5 = 0;
             _lxShelf.Clear();
             for (int i = 0; i < _fk.Count; i++) if (_fk[i] != null) _fk[i].LxOut = 0;
         }
@@ -530,6 +571,11 @@ namespace Armoury
                   .Append(w.ClCutN).Append(" konsumpcjach (polka ponad progiem ").Append(w.ClAbove).Append(", nie wyzej niz prog ").Append(w.ClLow).Append(", prog srednio ")
                   .Append(w.ClKeepN > 0 ? N0((double)w.ClKeep / w.ClKeepN) : "-").Append(" szt.), par plotno / skora ponad cena graniczna ").Append(w.ClOver)
                   .Append(", wierszy zakupu podzamczy i wsi zatrzymanych progiem ").Append(_lxClP5)
+                  // obieg2 (2): cena graniczna wedlug zasobnosci ludu miasta - oferta i kupione w kategoriach ponad bazowa (dopuszczone ta regula)
+                  .Append(" | cena graniczna wedlug zasobnosci ludu (obieg2) ").Append(s.FolkLadderCeilingByWealth ? "tak" : "nie").Append(", najwyzej ")
+                  .Append(F2(Math.Max(ceil, Math.Min(10.0, s.FolkLadderCeilingMax)))).Append(" (filc, plotno, skora - bazowa): miast z cena ponad bazowa ").Append(w.CeilN)
+                  .Append(" (srednio ").Append(w.CeilN > 0 ? F2(w.CeilSum / w.CeilN) : "-").Append("), oferta w kategoriach ponad bazowa ").Append(N0(w.WideOff)).Append(" zl w ")
+                  .Append(w.WideN).Append(" wierszach, kupione z niej ").Append(N0(w.WideBuy)).Append(" zl; podzamcza i wsie (P5) kupily ponad bazowa ").Append(_lxWideP5).Append(" zl")
                   .Append(" | czas: doba ").Append(MsOf(_lxDayTicks + Stopwatch.GetTimestamp() - t0, "0.000")).Append(" ms, konsumpcja i sygnal ").Append(MsOf(w.Ticks, "0.000"))
                   .Append(" ms (wywolan szacunku popytu ").Append(w.EstCalls).Append(") | potkniecia ").Append(st).Append('.');
                 Log.Info(sb.ToString());
@@ -608,7 +654,7 @@ namespace Armoury
                 var md = __0.MarketData;
                 if (model == null || md == null) return;
                 var cd = md.GetCategoryData(__2);
-                double ceil = LxCeil(Settings.Current);
+                double ceil = LxCeilFor(f, i, LxCeil(Settings.Current));   // obieg2 (2): cena graniczna wedlug zasobnosci (klucz wylaczony - bazowa)
                 float d0 = Math.Max(0f, __result);
                 _lxw.SigOff += e;
                 float i0 = model.GetBasePriceFactor(__2, cd.InStoreValue, cd.Supply, d0, false, 0);

@@ -65,6 +65,7 @@ namespace Armoury
             public double CapBase, CourtRoom, Food; public Settlement Seat;
             // 168: pulap bez kredytu wojennego, miejsce KW w pulapie i wyplata dnia; dluznik (dwor -50%, budowy 0); zajecie (D bez dochodu wsi)
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
+            public double FolkRoom; public long FolkLent;   // obieg2 (3b): miejsce pozyczki od ludu w pulapie i wyplata dnia (TownFolk.Loans.cs) - jak KW, przed Bankiem
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
             public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap; W7 - razem z podniesieniem z poboru stawki wojennej pana
             public double Loot;     // WW2 (wyspy-wolni): lup na zalogi - okno 28 dob zelaznej ceny i dziesieciny korsarzy (zl/d), JUZ doliczony do Cap i PartyCap (po zalogach i karawanach)
@@ -378,7 +379,7 @@ namespace Armoury
             {
                 var b = Of(c);
                 if (b == null || b.Zero || !b.War || c.IsUnderMercenaryService || b.Debtor || b.Seized) return false;
-                partyCap = Math.Max(0, b.PartyCap - b.Aid - b.CourtRoom - b.KwRoom);
+                partyCap = Math.Max(0, b.PartyCap - b.Aid - b.CourtRoom - b.KwRoom - b.FolkRoom);   // obieg2: bez miejsca pozyczki od ludu (jak KW)
                 reserve = b.R;
                 return true;
             }
@@ -670,7 +671,25 @@ namespace Armoury
                         // 0.40 D dziennie w granicy limitu; Bank wyplaca dzis do kiesy glowy brak do zoldu naliczonego ponad pulap bez kredytu (kapital Banku -> glowa)
                         // WW2 (wyspy-wolni): lup na zalogi tej doby liczony przed kredytem wojennym - zold, ktory pokrywa lup, nie jest brakiem do pozyczki
                         double lootNow = !b.Zero && !merc && ReaverLaw.WindowClan(c) ? Math.Max(0, ReaverLaw.Window(c)) : 0;
-                        b.CapNoKw = b.Cap; b.KwRoom = 0; b.KwLent = 0;
+                        b.CapNoKw = b.Cap; b.KwRoom = 0; b.KwLent = 0; b.FolkRoom = 0; b.FolkLent = 0;
+                        // obieg2 (3b, Jeff 15.10 "lordowie moga pozyczac od bankow i od mieszczan"): POZYCZKA OD LUDU wlasnych lenn - pierwsza droga przed Bankiem: ten sam
+                        // warunek co KW (wojna, G < R), miejsce w pulapie najwyzej 0.40 D w granicy limitu i nadwyzki ludu ponad poziom normalny; wyplata - brak do zoldu ponad
+                        // pulap bez kredytu (kiesy ludu -> glowa); KW Banku dostaje reszte braku. Klucz FolkLoans wylaczony - 0 i budzet co do zlotowki jak dotad
+                        double folkLent = 0;
+                        if (!merc && !b.Zero)
+                        {
+                            try
+                            {
+                                double fr = TownFolk.FolkLoanRoom(c, b.D, b.G, b.R, b.War);
+                                if (fr > 0)
+                                {
+                                    b.FolkRoom = fr; b.Cap += fr;
+                                    double gap0 = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow;
+                                    if (gap0 >= 1) { folkLent = TownFolk.FolkLoanLend(c, Math.Min(gap0, fr)); b.FolkLent = (long)folkLent; }
+                                }
+                            }
+                            catch (Exception e) { Stumble("FolkLoan", e); }
+                        }
                         if (DebtLadder.On && !merc && !b.Zero)
                         {
                             try
@@ -679,7 +698,7 @@ namespace Armoury
                                 if (kw > 0)
                                 {
                                     b.KwRoom = kw; b.Cap += kw; _dKwRoom += (long)kw; _dKwRoomN++;
-                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad)
+                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad); obieg2: bez czesci pozyczonej od ludu (0 - jak dotad)
                                     if (gap >= 1)
                                     {
                                         int lent = DebtLadder.LendWar(c, (int)Math.Min(gap, kw));
@@ -1442,6 +1461,8 @@ namespace Armoury
 
         /// <summary>168: miejsce kredytu wojennego w dzisiejszym pulapie rodu (0 - bez KW albo bez budzetu) - kolumna kandydat_pozyczki.</summary>
         internal static double KwRoomOf(Clan c) { var b = Of(c); return b != null ? b.KwRoom : 0; }
+        /// <summary>obieg2 (pozyczki od ludu, TownFolk.Loans.cs): D rodu z ostatniego budzetu 166; -1 - rod bez budzetu. Tylko odczyt.</summary>
+        internal static double DOf(Clan c) { try { var b = Of(c); return b != null ? b.D : -1; } catch { return -1; } }
 
         /// <summary>168 (B5): zakup karawany i warsztatu BK tylko przy G >= 60 D i bez dlugu - true = zablokowany (rod z budzetem).</summary>
         internal static bool PropertyBlocked(Clan c)

@@ -243,6 +243,19 @@ namespace Armoury
             return Math.Max(0, Math.Min(Math.Min(Math.Max(0f, Math.Min(1f, s.WarCreditMaxShareD)) * D, room), free));
         }
 
+        /// <summary>obieg2 (pozyczki od ludu, TownFolk.Loans.cs): rod w zaleglosci albo zajeciu (drabina 168) albo bankrut Banku - lud mu nie pozycza. Tylko odczyt.</summary>
+        internal static bool FolkLoanBlocked(Clan c)
+        {
+            try
+            {
+                if (c == null) return false;
+                if (On) { var l = Of(c, false); if (l != null && (l.Seized || l.Missed > 0)) return true; }
+                var d = IronBank.DebtOf(c, false);
+                return d != null && d.Defaulted;
+            }
+            catch { return false; }
+        }
+
         /// <summary>Wyplata KW dzis: kapital Banku -> kiesa glowy (IronBank.LendKw); czesc KW w ksiedze rodu (splata z lupow najpierw na KW).</summary>
         internal static int LendWar(Clan c, int amount)
         {

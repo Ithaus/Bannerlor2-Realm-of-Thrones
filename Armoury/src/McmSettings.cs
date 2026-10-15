@@ -5380,6 +5380,54 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkHoardTaxLordShare { get; set; } = 0.67f;
 
+        [SettingPropertyBool("Folk Hoard Villages", HintText = "with Folk Hoard Tax: the villages pay the same tax on their hoard - what a village holds above Folk Hoard Normal Times its fifteen days of purchases goes, one part in a hundred a day (Folk Hoard Tax Rate), to the lord of the village and to the purse of its town or castle. A village that is being raided or lies looted pays nothing, nor one whose town or castle is besieged. Off = the villages' coin piles up as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkHoardVillages { get; set; } = true;
+
+        [SettingPropertyBool("Folk Circulation Guard", HintText = "with Folk Hoard Tax: a steward of the realm's coin watches each day how much all the common folk - townsfolk, castle folk and villagers - hold against their normal level of savings. While they hold more than Folk Guard Band High times it, the hoard tax rises a little each day (up to Folk Guard Max Times the usual rate); while they hold less than Folk Guard Band Low times it, it falls a little each day (down to a quarter). It never takes more in a day than about one part in seven hundred of all the coin in the world, or twice what flows into the people's purses in a day, whichever is more, so an old hoard comes back slowly. Folk Guard Crown Share of every hoard tax goes to the treasury of the realm the place belongs to. Off = the hoard tax stays at Folk Hoard Tax Rate and goes only to the lord and the purse, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkCirculationGuard { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Guard Band Low", 1.00f, 3.00f, "0.00", HintText = "with Folk Circulation Guard: below this many times their normal level of savings the common folk pay less hoard tax each day")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkGuardBandLow { get; set; } = 1.25f;
+
+        [SettingPropertyFloatingInteger("Folk Guard Band High", 1.00f, 5.00f, "0.00", HintText = "with Folk Circulation Guard: above this many times their normal level of savings the common folk pay more hoard tax each day")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkGuardBandHigh { get; set; } = 1.75f;
+
+        [SettingPropertyFloatingInteger("Folk Guard Max Times", 1.00f, 10.00f, "0.0", HintText = "with Folk Circulation Guard: the hoard tax never rises above this many times Folk Hoard Tax Rate")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkGuardMaxTimes { get; set; } = 5f;
+
+        [SettingPropertyFloatingInteger("Folk Guard Crown Share", 0.00f, 0.50f, "0.00", HintText = "with Folk Circulation Guard: the part of every hoard tax (towns, castles and villages) that goes to the treasury of the realm the place belongs to; the lord and the purse share the rest as before (a place outside any realm - nothing to a treasury)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkGuardCrownShare { get; set; } = 0.15f;
+
+        [SettingPropertyBool("Folk Loans", HintText = "the lords borrow from their own people: an AI house at war whose coin has run below its reserve for war may borrow, before it goes to the Iron Bank, from what the townsfolk, castle folk and villagers of its own towns, castles and villages hold above their normal level of savings - at most Folk Loan Max Share Of Income of its daily income a day, at most Folk Loan Limit Days of its daily income plus 20000 for a town and 10000 for a castle in all. The people earn Folk Loan Rate Year a year on it. In war the house pays only the interest; in peace it repays Folk Loan Repay Share Of Income of its daily income a day (at least a year's share) back into the purses it borrowed from. A house that cannot pay in peace for Folk Loan Default Days days running defaults: the rest of the debt is lost to the people, every town and castle of that house that lent to it loses 10 loyalty, and it may not borrow from its people for half a year. Not your house. Off = the lords borrow only from the Iron Bank, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkLoans { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Loan Rate Year", 0.00f, 0.50f, "0.00", HintText = "with Folk Loans: the interest a year the people earn on what their lord borrowed (0.12 = twelve parts in a hundred a year)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLoanRateYear { get; set; } = 0.12f;
+
+        [SettingPropertyFloatingInteger("Folk Loan Max Share Of Income", 0.00f, 1.00f, "0.00", HintText = "with Folk Loans: the most a house may borrow from its people in a day, as a part of its daily income")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLoanMaxShareOfIncome { get; set; } = 0.40f;
+
+        [SettingPropertyFloatingInteger("Folk Loan Limit Days", 0.00f, 120.00f, "0", HintText = "with Folk Loans: the most a house may owe its people, in days of its daily income (plus 20000 for each town and 10000 for each castle it holds)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLoanLimitDays { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Folk Loan Repay Share Of Income", 0.00f, 0.50f, "0.00", HintText = "with Folk Loans: the part of its daily income a house at peace repays its people each day, on top of the interest")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLoanRepayShareOfIncome { get; set; } = 0.10f;
+
+        [SettingPropertyInteger("Folk Loan Default Days", 7, 364, "0", HintText = "with Folk Loans: days in a row in peace without the full instalment after which a house defaults on its debt to its people")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public int FolkLoanDefaultDays { get; set; } = 90;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -5471,6 +5519,14 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Folk Ladder Price Ceiling", 1.00f, 5.00f, "0.00", HintText = "with Market Sees Purse: the highest price, as a multiple of the usual one, the people's offer may lift fine goods to and that they will pay from their savings (1.5 = half again the usual price)")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public float FolkLadderPriceCeiling { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Folk Ladder Ceiling By Wealth", HintText = "with Market Sees Purse: townsfolk who hold far more than their normal level of savings will pay more for fine goods - the price they accept rises with the square root of how many times over their normal level they hold (four times the normal level - twice Folk Ladder Price Ceiling), up to Folk Ladder Ceiling Max, so a rich town bids for the jewels, velvet, silk, furs, silver and spice that reach the market. Felt, linen and leather, which the armies need, keep Folk Ladder Price Ceiling. Off = one ceiling for all towns, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool FolkLadderCeilingByWealth { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Folk Ladder Ceiling Max", 1.00f, 10.00f, "0.0", HintText = "with Folk Ladder Ceiling By Wealth: the highest price, as a multiple of the usual one, the richest townsfolk will pay for fine goods from their savings")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float FolkLadderCeilingMax { get; set; } = 4f;
 
         [SettingPropertyBool("Folk Predict Bought", HintText = "with Folk Luxury List: the townsfolk reckon their reserve for hard times from what their spare coin actually bought the day before, not from what they offered (an offer that found no goods is not part of their living) - so towns whose people live well keep a full reserve; their share of the bill likewise counts only the part of the offer that found goods. Off = the reserve and the share count the whole offer, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -7460,6 +7516,18 @@ namespace Armoury
             s.FolkHoardTaxRate = FolkHoardTaxRate;
             s.FolkHoardNormalTimes = FolkHoardNormalTimes;
             s.FolkHoardTaxLordShare = FolkHoardTaxLordShare;
+            s.FolkHoardVillages = FolkHoardVillages;
+            s.FolkCirculationGuard = FolkCirculationGuard;
+            s.FolkGuardBandLow = FolkGuardBandLow;
+            s.FolkGuardBandHigh = FolkGuardBandHigh;
+            s.FolkGuardMaxTimes = FolkGuardMaxTimes;
+            s.FolkGuardCrownShare = FolkGuardCrownShare;
+            s.FolkLoans = FolkLoans;
+            s.FolkLoanRateYear = FolkLoanRateYear;
+            s.FolkLoanMaxShareOfIncome = FolkLoanMaxShareOfIncome;
+            s.FolkLoanLimitDays = FolkLoanLimitDays;
+            s.FolkLoanRepayShareOfIncome = FolkLoanRepayShareOfIncome;
+            s.FolkLoanDefaultDays = FolkLoanDefaultDays;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;
@@ -7483,6 +7551,8 @@ namespace Armoury
             s.FolkSurplusSpendDays = FolkSurplusSpendDays;
             s.MarketSeesPurse = MarketSeesPurse;
             s.FolkLadderPriceCeiling = FolkLadderPriceCeiling;
+            s.FolkLadderCeilingByWealth = FolkLadderCeilingByWealth;
+            s.FolkLadderCeilingMax = FolkLadderCeilingMax;
             s.FolkPredictBought = FolkPredictBought;
             s.WardsAndVillagesShop = WardsAndVillagesShop;
             s.VillageClothAboveReserve = VillageClothAboveReserve;

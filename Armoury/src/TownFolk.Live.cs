@@ -679,6 +679,8 @@ namespace Armoury
             try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
             AidBegin();                                                // P1: liczniki doby daniny z oszczednosci (czas poboru, nadwyzka po daninie wedlug krolestw)
             HoardBegin();                                              // kiesa2: liczniki doby podatku od nadwyzki (zeruje tez Last* dla linii Obieg)
+            GuardBegin();                                              // obieg2: straznik obiegu - lud wobec poziomu normalnego, mnoznik i stawka doby; liczniki wsi (TownFolk.Guard.cs)
+            try { LoansDay(day); } catch (Exception e) { Stumble("LoansDay", e); }   // obieg2: pozyczki od ludu - odsetki, raty, niesplata (TownFolk.Loans.cs), przed miastami
             LadderBegin();                                             // P3-P5: liczniki doby zakupow podzamczy i wsi z listy dostatku, oferta kupujacych z zewnatrz (P4) od zera
             for (int pass = 0; pass < 2; pass++)
             {
@@ -693,6 +695,7 @@ namespace Armoury
             try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             try { HoardDay(day); } catch (Exception e) { HoardStumble("HoardDay", e); }   // kiesa2: linia doby i liczby dla "Obieg" (po miastach i zamkach)
+            try { GuardDay(day); } catch (Exception e) { Stumble("GuardDay", e); }   // obieg2: linie straznika i wsi, liczby "Obieg", kiesy ludu na koniec doby (doplyw jutro)
             // kontrola zamknieta (kiesy miast, podzamczy, gminy): zmiana stanu = wplywy - wydatki
             long stock = TotalTown() + TotalCastle() + TotalGmina();
             if (_ctlStock0 != long.MinValue) { _lastDStock = stock - _ctlStock0; _lastIn = _ctlIn; _lastOut = _ctlOut; _lastR = _lastDStock - (_ctlIn - _ctlOut); }
@@ -1001,6 +1004,7 @@ namespace Armoury
             foreach (var f in _f.Values)
             {
                 if (f.Kind != 2) continue;
+                Village vilTax = null; double nvTax = 0;               // obieg2: podatek od nadwyzki wsi po koszyku dnia i P5 (finally - takze przy "continue" bez zakupow)
                 try
                 {
                     f.DVNeed = 0; f.DVBuy = 0;                         // E5/C4: zakupy tej doby (okno People of this land)
@@ -1009,6 +1013,7 @@ namespace Armoury
                     if (!f.Cal) { d.VNoCal++; continue; }
                     d.Villages++;
                     double nv = pph * VillHeads(f, true);
+                    vilTax = vil; nvTax = nv;
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nv, Math.Max(0, gold));
                     double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
@@ -1028,6 +1033,7 @@ namespace Armoury
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
                 catch (Exception e) { f.ADay = -1; Stumble("Villages(wies)", e); }   // E5/C4: liczby wsi z tej doby niepewne - okno bez liczby
+                finally { if (vilTax != null && nvTax > 0) PayHoardVillage(f, vilTax, nvTax); }   // obieg2: klucz FolkHoardVillages wylaczony - nic (nie rzuca)
             }
         }
 
@@ -1645,6 +1651,7 @@ namespace Armoury
             _lineState = _lineSeed = _lineRet = _lineLab = _lineRights = _lineR14 = _lineTithe = _lineC2 = null;
             TakeP1Lines(l);   // P1: linie pomiarow obiegu kiesy tej doby
             TakeHoardLines(l);   // kiesa2: linia startu sesji i linia doby podatku od nadwyzki
+            TakeGuardLines(l);   // obieg2: linie startu sesji, straznika obiegu, podatku od nadwyzki wsi i pozyczek od ludu
             return l;
         }
     }

@@ -900,6 +900,20 @@ namespace Armoury
             }
         }
 
+        /// <summary>obieg2 (TownFolk.Guard.cs, straznik obiegu): posiadacze z konca poprzedniej doby ksiegi - swiat razem, lud (kiesy ludu miast, podzamczy, gminy
+        /// i kiesy wsi), lordowie (glowy rodow, pozostali lordowie, gracz), skarbce koron. false - pierwsza doba ksiegi po wczytaniu (brak stanu). Tylko odczyt.</summary>
+        internal static bool LastShares(out long world, out long folk, out long lords, out long crowns)
+        {
+            world = folk = lords = crowns = 0;
+            var h = _lastHold;
+            if (h == null || h.Length < Holders) return false;
+            for (int i = 0; i < Holders; i++) world += h[i];
+            folk = h[HFolkTown] + h[HFolkCastle] + h[HGmina] + h[HVillages];
+            lords = h[HLeaders] + h[HLords] + h[HPlayer];
+            crowns = h[HKingdoms];
+            return true;
+        }
+
         private static long WorldTotal()
         {
             var h = ReadHolders(Snap());
