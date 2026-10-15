@@ -104,6 +104,15 @@ Logi Jeffa: `Modules\Armoury\Armoury-*.log`, `Modules\Armoury\Logs\<sesja>\ludzi
 11. Joffrey: wg kodu ROT zabity na Purpurowych Godach (wczesniejsze "zyje" to nazwa rodu "Baratheon, Joffrey") - sprawdzic w kampanii Jeffa.
 12. Zawieszenie w kreatorze postaci (05:43, AppHangB1, brak sladu) - nie powtorzylo sie.
 13. Porzadki koncowe D1-D10 (wydajnosc, logi, MCM, instrukcja) - na koniec projektu.
+14. **Rekruci ze sprzetem, ktorego nie umieja uzyc** (Jeff 15.10 ok. 12:15: "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac, bo nie maja umiejetnosci - oddaj bron").
+    [K] RecruitKit.cs i VolunteerKit.cs nie sprawdzaja trudnosci przedmiotu (Difficulty / GetSkillValue) wobec umiejetnosci zolnierza.
+    Do zrobienia: przy wyborze kompletu tylko rzeczy, ktorych zolnierz moze uzyc; rzecz juz nieuzywalna - oddana (Jeff: "oddaj bron") do zbrojowni gracza albo sprzedana.
+15. **Zbrojownia gracza - czyje co jest** (Jeff 15.10): nie widac, ktory sprzet jest gracza, a ktory zolnierzy (wlasnosc zolnierza - placi sie za niego).
+    Jeff chce: "zabierz wszystko" - pierwsze klikniecie zabiera sprzet GRACZA, drugie caly sprzet zolnierzy (z cena); pojedyncza rzecz - pokazuje cene.
+    Do rozpoznania: gdzie jest ekran/menu zbrojowni (Armoury src: grep "zbrojowni gracza", PlayerArmory, schowek) i jak liczona jest cena.
+16. Kryjowka (Jeff 15.10): log 12:10:41-49 "HideoutPurge: przeszukanie 17.5 h (14 ludzi) ... zloto 0, renown 5, osad z wdziecznoscia 3" - przeszukanie bylo,
+    kryjowka byla pusta (wszystkie kryjowki swiata maja razem ok. 2 tys. zlota - bandy sprzedaja lup paserom, zloto idzie do miast; kiesy band przechodza na
+    zwyciezce w samej bitwie). Mozliwa poprawa: komunikat dla gracza wprost "kryjowka pusta / znaleziono X" (dzis tylko log).
 
 ## 7. Pulapki techniczne (z doswiadczenia)
 
