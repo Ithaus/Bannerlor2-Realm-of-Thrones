@@ -812,6 +812,7 @@ namespace Armoury
         public bool HistBowDaysNew = true;                 // a bowyer makes a bow in one and a half to two and a half days, as a war bow sold for 12 to 18 pence says, instead of 2 to 12 days - bows of tier 3 to 6 cost a half to a third of what they did, and workshops make more of them in a day's work
         public bool HistThrownOwnDays = true;              // javelins, throwing axes and throwing knives are priced by their own days of work; before, they also carried the eightfold fletcher's work of a sheaf of arrows
         public bool HistHorsePrices = true;                // horses by their kind: a common riding horse (tier 3, a rouncey) costs four tenths of the game's worth, a man-at-arms' war horse (tier 4) half as much again; pack horses, palfreys, chargers and noble horses keep their worth. Town demand for horses is counted in the new coin, so townsfolk buy as many of these horses as before
+        // --- Crossbows by draw strength ---
         // KUSZE WEDLUG LUKU (XbowPrice.cs) - DECYZJA CLAUDE (noc 15/16.10), decyzja Jeffa 15.10 TAK ("cena kuszy 1.5-2 x luk o podobnej sile"): kusza = 1.75 x cena
         // luku tej samej energii naciagu (RBM); cena rosnie przez dni i dniowke kusznika (jedna wycena: wartosc, warsztat, naprawa, zegar kuzni), kuznia gracza wymaga
         // umiejetnosci i staminy tieru rownowaznego, AI kupuje kusze wedlug skutecznosc^2 / cena. Wylaczone = kusze jak dotad (zmiana od nastepnego wczytania)
@@ -819,6 +820,7 @@ namespace Armoury
         public float XbowPriceVsBow = 1.75f;               // a crossbow's price as a multiple of the price of a bow of the same draw strength (a crossbow of a draw stronger than any bow is priced in proportion to its strength)
         public bool XbowForgeEquivTier = true;             // at your forge a strong crossbow asks the smithing skill and stamina of a bow of the same strength (the 330 lb crossbow those of a tier 6 bow), not those of its low game tier - otherwise it would be the cheapest way to make money in the game. Metal and materials stay as before
         public bool XbowBuyByPower = true;                 // AI lords, garrisons and your men pick a crossbow on the stall by its power: effectiveness squared over price instead of effectiveness over price, so they buy the strong crossbow when they can pay for it and a lighter one when the purse is short, instead of light 80-100 lb crossbows (all crossbows but one sit in the same tier basket)
+        // --- Iron Bank ---
         public bool TownHouseholdUse = true;               // townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)
         public float TownUseFlax = 0.02f;                  // share of the townsfolk's old appetite for raw flax they keep (home spinning)
         public float TownUseWool = 0.02f;                  // share kept for raw wool
@@ -852,6 +854,7 @@ namespace Armoury
         // AM-30 (audyt modow 14.10): linie BK z wsadem, ktorego gra nie przeczytala (workshops.xml: chicken, goose, carrot, orange - id przedmiotow zamiast kategorii)
         public bool WorkshopNoFreeRawAllTypes = true;      // with Workshop No Free Raw: the same rule for every workshop, not only the hidden town artisans - a workshop line left with no input at all (the Banner Kings butcher's chicken and goose lines, whose input the game cannot read: about 33 meat a day out of nothing) no longer makes meat, hides, timber, ore, leather or linen; mines still dig ore. Off = only the hidden artisans, as before
         public bool BkWorkshopInputsFix = false;           // TEST FIRST: the Banner Kings workshop lines whose second input the game cannot read get a real one - the bakery's grain-and-carrot and grain-and-orange pies take fruit (the apple goods) besides the grain, and the butcher's chicken and goose lines take two small animals (the animal goods) for one meat. Fewer pies until fruit reaches the towns (about 59% of all pies are made from grain alone today). Takes effect at the next load. Off = the lines as the game reads them
+        // --- Fruit and food on the stalls ---
         // PLACEK I MARCHEW (VillageFruit.cs, FoodSubstitute.cs, FoodThrift.cs) - DECYZJA CLAUDE (noc 15/16.10), decyzja Jeffa 15.10 TAK: owoce i miod we wsiach wedlug
         // projektu BK (gra liczyla je jako 0), mieszczanie przy pustym straganie kupuja zamiennik (polowa niewydanego budzetu, najblizszy najpierw), syty lord AI
         // nie kupuje jedzenia drozszego niz 2.5 x wartosc, gdy obok lezy tansze. Wylaczone = jak dotad
@@ -860,13 +863,16 @@ namespace Armoury
         public float FoodSubstituteShare = 0.5f;           // the share of the townsfolk's unmet money for a missing food that goes to a substitute (the rest stays in their purse, as before)
         public bool AiFoodSkipsDear = true;                // an AI party that is not starving does not buy food dearer than Ai Food Dear Index times its worth when cheaper food lies on the same stall - it picks among the cheaper ones (by value for money). A starving party still buys at any price
         public float AiFoodDearIndex = 2.5f;               // price over worth above which a fed AI party looks for cheaper food on the same stall
+        // --- Iron Bank ---
         public bool HistoricalRecruitCost = true;          // a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level
         public float RecruitCostDays = 10f;                // days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)
+        // --- Hiring companions ---
         // TOWARZYSZE (CompanionPay.cs) - DECYZJA CLAUDE (noc 15/16.10), decyzja Jeffa 15.10 TAK: umiejetnosci morskie NavalDLC w regule BK jak sila ciala i role w druzynie
         // (3 / 10 / 10 zamiast 15 - dowodzenie), cena werbunku wedrowca = polowa sprzetu + 20 dni jego zoldu (zaciag najemnika: 10 dni x 2). Wylaczone = BK jak dotad
         public bool CompanionNavalSkillsPriced = true;     // a wanderer's sailing skills count like body skills and party roles in his price and pay (Mariner like Riding, Boatswain and Shipmaster like Scouting or Engineering), not like command as Banner Kings counted them - about two fifths of a Realm of Thrones companion's skill premium came from the sea. The same rule sets the pay of heroes in every party and of your own mercenary contract
         public bool CompanionHireByWage = true;            // a wanderer asks half the worth of his gear plus Companion Hire Days of his daily pay to join you, like the prest of a sell-sword, instead of the Banner Kings skill premium (a Realm of Thrones companion asked about 15 000, five times your purse; now about 2 600). His daily pay does not change
         public float CompanionHireDays = 20f;              // days of a wanderer's daily pay in his hiring price (a sell-sword's prest: Recruit Cost Days 10 x 2)
+        // --- Iron Bank ---
         public bool AmmoRecoveryEnabled = true;            // arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot
         public float AmmoRecoverPercent = 45f;             // share of shot arrows the winner picks up whole (estimate from Poitiers, Towton and the 1343 Breton shipment)
         public float AmmoRepairPercent = 20f;              // share of shot arrows mended by the army's fletchers (new fletching, heads) - the rest are broken or lost
