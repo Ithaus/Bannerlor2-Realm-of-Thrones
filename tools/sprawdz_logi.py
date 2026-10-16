@@ -29428,7 +29428,7 @@ def nekon2_rows(rep, st0, coin, coinBad, pumps, cars, errs2):
         return
     keys2 = {k: (st0 is not None and f"{k} TAK" in st0) for k in NE_KEYS2}
     rep.add("NE-13: klucze cz. 2 w linii startu (Folk Craft Wage On Sale, Sutlers By Purse, Folk Guard No Memory, Folk Loan Before Guard)",
-            ", ".join(f"{k} {'TAK' if v else 'NIE'}" for k, v in keys2.items()) if st0 else "brak linii startu", "wszystkie TAK", bool(st0) and all(keys2.values()))
+            ", ".join(f"{k} {'TAK' if v else 'NIE'}" for k, v in keys2.items()) if st0 else "brak linii startu", "wszystkie TAK poza Folk Guard No Memory (DECYZJA CLAUDE noc 16.10: N7 domyslnie NIE)", bool(st0) and all(v for k, v in keys2.items() if k != "Folk Guard No Memory"))
     # NE-14 pompy
     pd = sorted(pumps)
     if pd:
@@ -29742,7 +29742,7 @@ def nwyd_main(logp, csp=None):
             sx = sum(dx)
             rel = abs(parts - sx) / sx if sx > 0 else 0.0
             rep.add("NW-8b: LegendaryLaw czesci = 'LegendaryLaw (czystki, ValyrianBlades)' z Profilu doby +-10% (suma okna bez pierwszej i ostatniej)",
-                    f"czesci {parts:.0f} ms ({len(ll) - 2} dob), Profil doby {sx:.0f} ms ({len(dx)} dob), roznica {100 * rel:.0f}%", "+-10%", rel <= 0.10 if sx > 0 else None)
+                    f"czesci {parts:.0f} ms ({len(ll) - 2} dob), Profil doby {sx:.0f} ms ({len(dx)} dob), roznica {100 * rel:.0f}%", "+-10% (INFO, gdy liczba dob okien rozna)", (rel <= 0.10 if sx > 0 else None) if len(dx) == len(ll) - 2 else None)
     else:
         rep.add("NW-8: linia 'LegendaryLaw (doba, NW)'", "brak", "INFO (Stage8ProfileLog wylaczony, brak DTE albo log bez paczki)", None)
     # CrashScribe
