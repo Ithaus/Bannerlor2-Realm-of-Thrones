@@ -331,9 +331,10 @@ namespace Armoury
               .Append(BattleCries.MaxPerSecond).Append(" glosow na s)")
               // czesc 3 (16.10): kaluze krwi na ziemi
               .Append(" | Ground Blood Pools ").Append(c.GroundBloodPools ? "TAK" : "NIE").Append(" (decale ").Append(BloodPools.DecalSet).Append(" z materialem ")
-              .Append(BloodPools.MaterialPrefix).Append("0..").Append(BloodPools.Materials - 1).Append(", zgon / nokaut 1-3 kaluze, kon 1-2, plama od ")
-              .Append(BloodPools.SplatMinDamage).Append(" obrazen ciecia / klucia; najwyzej ").Append(BloodPools.MaxPerMission).Append(" na misje, ")
-              .Append(BloodPools.PerSecond).Append(" na s)")
+              .Append(BloodPools.MaterialPrefix).Append("0..").Append(BloodPools.Materials - 1).Append(", zgon 1-3 kaluze po upadku ciala, nokaut obuchem plama, kon 1-2, plama od ")
+              .Append(BloodPools.SplatMinDamage).Append(" obrazen ciecia / klucia / strzaly ").Append(BloodPools.SplatsPerSecond).Append(" na s; ziemia, woda i pudlo sceny sprawdzane; najwyzej ")
+              .Append(BloodPools.MaxPerMission).Append(" na misje, ").Append(BloodPools.PerSecond).Append(" na s, ").Append(BloodPools.PoolsPerCell)
+              .Append(" kaluze na komorke ").Append(BloodPools.CellSize.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(" m)")
               .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }

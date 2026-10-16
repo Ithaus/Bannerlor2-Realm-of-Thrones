@@ -878,6 +878,8 @@ Uzycie (Python 3, tylko odczyt):
                     NBW-10 weterani wedlug tieru, NBW-11 krew przez pancerz, NBW-12 okrzyki i jeki.
                     Czesc 3 (16.10; BloodPools.cs - kaluze krwi na ziemi): NBW-0 takze Ground Blood Pools TAK; NBW-1 takze ERROR in BloodPools 0;
                     NBW-7 takze potkniecia 'kaluze'; INFO: NBW-13 kaluze krwi (decale z materialem, limity 600 na misje / 20 na s, materialy 12/12).
+                    Poprawki po recenzji (16.10): NBW-13 z nowymi polami (zgony z krwia, w wodzie, po zamknieciu; pominiete: zageszczenie, bez ziemi,
+                    w wodzie, poza polem, zle wspolrzedne, bez renderera); NBW-13b TAK / NIE - materialy 12/12, bez materialu 0 i decali > 0 przy zgonach.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -31686,9 +31688,11 @@ NBW_LINE = re.compile(
     # 16.10 ForeignVoices: stan obcych modow glosow (BA / IB) - grupa opcjonalna
     r"(?:\| obce glosy: [^|]+ )?"
     # czesc 3 (16.10, BloodPools.cs): kaluze krwi na ziemi - grupa opcjonalna (starsze linie dalej rozpoznane)
-    r"(?:\| kaluze krwi (TAK|NIE): decali (\d+) z (\d+) \(kaluze (\d+), plamy (\d+), bez materialu (\d+)\), zgonow (\d+) \(ludzi (\d+), "
-    r"nieprzytomnych (\d+), koni (\d+), nieumarli pominieci (\d+)\), pominiete decale: limit misji (\d+), kolejka (\d+), koniec bitwy (\d+); "
-    r"materialy (\d+)/(\d+), renderer decali (TAK|NIE), MoreBlood (TAK|NIE) )?"
+    # poprawki po recenzji (16.10): zgony wszystkie i z krwia, zgony w wodzie / po zamknieciu misji osobno od decali, nowe przyczyny pominiec
+    r"(?:\| kaluze krwi (TAK|NIE): decali (\d+) z (\d+) \(kaluze (\d+), plamy (\d+), bez materialu (\d+)\), zgonow (\d+) \(z krwia (\d+): "
+    r"ludzi (\d+), nieprzytomnych (\d+), koni (\d+); nieumarli (\d+), w wodzie (\d+), po zamknieciu misji (\d+)\), pominiete decale: "
+    r"limit misji (\d+), kolejka (\d+), zageszczenie (\d+), bez ziemi (\d+), w wodzie (\d+), poza polem (\d+), zle wspolrzedne (\d+), "
+    r"bez renderera (\d+), przy zamknieciu misji (\d+); materialy (\d+)/(\d+), renderer decali (TAK|NIE), MoreBlood (TAK|NIE) )?"
     r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))?(?:, kaluze (\d+))? "
     r"\(sesja (\d+), linia misji (\d+)\)\.$")
 NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
@@ -31702,8 +31706,10 @@ NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic",
             "gore", "g_rbm", "g_bryzgi", "g_pancerz", "g_smiertelne", "g_limit", "g_kosc",
             "glosy", "v_szarze", "v_okrzyki", "v_ludzi", "v_jeki", "v_rannych", "v_limit",
             # czesc 3 (16.10): kaluze krwi
-            "kal", "p_decali", "p_max", "p_kaluze", "p_plamy", "p_bez_mat", "p_zgonow", "p_ludzi", "p_nieprz", "p_koni", "p_nieumarli",
-            "p_limit", "p_kolejka", "p_koniec", "p_mat", "p_mat_all", "p_renderer", "p_moreblood",
+            "kal", "p_decali", "p_max", "p_kaluze", "p_plamy", "p_bez_mat", "p_zgonow", "p_z_krwia", "p_ludzi", "p_nieprz", "p_koni", "p_nieumarli",
+            "p_woda_zg", "p_koniec_zg",
+            "p_limit", "p_kolejka", "p_gesto", "p_bez_ziemi", "p_woda", "p_poza", "p_zle", "p_bez_rend", "p_koniec",
+            "p_mat", "p_mat_all", "p_renderer", "p_moreblood",
             "st_panika", "st_kierunek", "st_postura", "st_taktyka", "st_weteran", "st_krew", "st_glosy", "st_kaluze", "st_sesja", "linia")
 NBW_ERR = ("ERROR in RoutHold", "ERROR in RoutKeeper", "ERROR in BattleWind.PostureInit",
            # poprawka 16.10 (recenzja): wyjatek przy wpinaniu latki postury (bez tego NBW-0b pokazywal tylko 'brak linii')
@@ -31759,8 +31765,9 @@ def nbw_part2(rep, rows, tot):
 
 
 def nbw_part3(rep, rows, tot):
-    """nbitwa czesc 3 (16.10, BloodPools.cs): NBW-13 kaluze krwi na ziemi - INFO (autotest gra bitwy z bandytami: decale z materialem,
-    materialy 12/12, renderer TAK, bez materialu 0, najwyzej 600 na misje). Linie bez segmentu kaluz - INFO 'brak pol czesci 3'."""
+    """nbitwa czesc 3 (16.10, BloodPools.cs): NBW-13 kaluze krwi na ziemi - INFO (liczby); NBW-13b (poprawka po recenzji 16.10) - TAK / NIE:
+    w misjach z kluczem TAK, rendererem TAK i bez MoreBlood materialy 12/12, bez materialu 0, a przy zgonach, ktore mogly krwawic (zgony bez
+    nieumarlych, w wodzie i po zamknieciu misji) > 0 - decali > 0. Bez takiej misji - INFO. Linie bez segmentu kaluz - INFO 'brak pol czesci 3'."""
     p3 = [r for r in rows if r.get("kal") is not None]
     if not p3:
         rep.add("NBW-13: kaluze krwi (Ground Blood Pools)", "brak pol czesci 3 w liniach misji", "INFO (wersja sprzed kaluz)", None)
@@ -31769,12 +31776,44 @@ def nbw_part3(rep, rows, tot):
     mats = sorted(set(f"{r.get('p_mat')}/{r.get('p_mat_all')}" for r in on)) or ["-"]
     over = sum(1 for r in p3 if isinstance(r.get("p_decali"), int) and isinstance(r.get("p_max"), int) and r["p_decali"] > r["p_max"])
     rep.add("NBW-13: kaluze krwi (Ground Blood Pools)", f"decali {tot('p_decali')} (kaluze {tot('p_kaluze')}, plamy {tot('p_plamy')}, bez materialu"
-            f" {tot('p_bez_mat')}); zgonow z kaluza {tot('p_zgonow')} (ludzi {tot('p_ludzi')}, nieprzytomnych {tot('p_nieprz')}, koni {tot('p_koni')},"
-            f" nieumarli pominieci {tot('p_nieumarli')}); pominiete decale: limit misji {tot('p_limit')}, kolejka {tot('p_kolejka')}, koniec bitwy"
-            f" {tot('p_koniec')}; misji z kluczem {len(on)} z {len(p3)}, materialy {', '.join(mats)}, renderer TAK w"
+            f" {tot('p_bez_mat')}); zgonow {tot('p_zgonow')} (z krwia {tot('p_z_krwia')}: ludzi {tot('p_ludzi')}, nieprzytomnych {tot('p_nieprz')},"
+            f" koni {tot('p_koni')}; nieumarli {tot('p_nieumarli')}, w wodzie {tot('p_woda_zg')}, po zamknieciu misji {tot('p_koniec_zg')});"
+            f" pominiete decale: limit misji {tot('p_limit')}, kolejka {tot('p_kolejka')}, zageszczenie {tot('p_gesto')}, bez ziemi {tot('p_bez_ziemi')},"
+            f" w wodzie {tot('p_woda')}, poza polem {tot('p_poza')}, zle wspolrzedne {tot('p_zle')}, bez renderera {tot('p_bez_rend')}, przy zamknieciu"
+            f" misji {tot('p_koniec')}; misji z kluczem {len(on)} z {len(p3)}, materialy {', '.join(mats)}, renderer TAK w"
             f" {sum(1 for r in on if r.get('p_renderer') == 'TAK')}, MoreBlood w {sum(1 for r in p3 if r.get('p_moreblood') == 'TAK')};"
             f" ponad pulap {over}; potkniecia 'kaluze' {tot('st_kaluze')}",
-            "INFO (materialy 12/12, renderer TAK, bez materialu 0, decali <= 600 na misje, potkniecia 0; kolejka i limit rzadko)", None)
+            "INFO (materialy 12/12, renderer TAK, bez materialu 0, decali <= 600 na misje, potkniecia 0; zle wspolrzedne i poza polem 0;"
+            " bez ziemi to drabiny / mury / wieze; kolejka, limit i zageszczenie w duzych bitwach)", None)
+
+    def ival(r, k):
+        v = r.get(k)
+        return v if isinstance(v, int) else 0
+
+    # NBW-13b: czy kaluze w ogole dzialaja (cichy wynik 'materialy 0/12' / 'decali 0' przeszedlby na zielono w samym INFO)
+    act = [r for r in on if r.get("p_renderer") == "TAK" and r.get("p_moreblood") != "TAK"]
+    if not act:
+        rep.add("NBW-13b: kaluze krwi dzialaja (decale z materialem przy zgonach)", f"brak misji z kluczem TAK, rendererem TAK i bez MoreBlood"
+                f" (misji z kluczem {len(on)}, renderer NIE w {sum(1 for r in on if r.get('p_renderer') != 'TAK')})",
+                "INFO (bez bitwy z rendererem decali nie ma czego sprawdzic)", None)
+        return
+    bad = []
+    for r in act:
+        bleed = ival(r, "p_zgonow") - ival(r, "p_nieumarli") - ival(r, "p_woda_zg") - ival(r, "p_koniec_zg")
+        why = []
+        if ival(r, "p_mat") < ival(r, "p_mat_all") or ival(r, "p_mat_all") == 0:
+            why.append(f"materialy {r.get('p_mat')}/{r.get('p_mat_all')}")
+        if ival(r, "p_bez_mat") > 0:
+            why.append(f"bez materialu {ival(r, 'p_bez_mat')}")
+        if bleed > 0 and ival(r, "p_decali") == 0:
+            why.append(f"decali 0 przy {bleed} zgonach")
+        if why:
+            bad.append(f"misja {r.get('bitwa')}: " + ", ".join(why))
+    withd = sum(1 for r in act if ival(r, "p_decali") > 0)
+    rep.add("NBW-13b: kaluze krwi dzialaja (decale z materialem przy zgonach)", f"misji sprawdzonych {len(act)}, z decalami {withd}"
+            + (f"; zle {len(bad)}: " + "; ".join(bad[:3]) if bad else ""),
+            "TAK, gdy w kazdej misji z kluczem, rendererem i bez MoreBlood: materialy 12/12, bez materialu 0, decali > 0 przy zgonach > 0"
+            " (po autotescie takze recznie: wyjscie z bitwy bez crasha - RemoveDecalInstance setek decali)", not bad)
 
 
 def nbitwa_main(logp):

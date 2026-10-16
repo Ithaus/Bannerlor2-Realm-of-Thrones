@@ -1148,7 +1148,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool BloodThroughArmour { get; set; } = true;
 
-        [SettingPropertyBool("Ground Blood Pools", HintText = "blood pools spread on the ground under men who fall in battle (killed or knocked out) and under dead horses, and a small splat lands where a cut or thrust of 30 damage or more strikes home; they stay until you leave the battlefield. Field battles, sieges and hideouts only - not tournaments, the arena, training or sea battles. At most 600 per battle and 20 a second. Off = only the blood of the game and other mods, as before")]
+        [SettingPropertyBool("Ground Blood Pools", HintText = "blood pools spread on the ground a moment after a man falls in battle, killed or knocked out by a blade or an arrow (a crushing blow leaves less blood than a cut, an arrow less than a blade, a head wound more; a man stunned by a mace or club only a small spot), and under dead horses; a small splat lands where a cut, stab or arrow wound of 30 damage or more gets through armour. They stay until you leave the battlefield. Field battles, sieges and hideouts only - not tournaments, the arena, training or sea battles; none in water, on ladders or on siege towers. At most 600 per battle, 20 a second and 3 pools on the same spot. Off = only the blood of the game and other mods, as before")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool GroundBloodPools { get; set; } = true;
 
