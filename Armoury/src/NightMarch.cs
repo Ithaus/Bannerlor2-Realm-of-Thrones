@@ -291,7 +291,8 @@ namespace Armoury
             if (e == null) return;
             e.State = state; e.StateStamp = HourStamp();
             if (state == StAlarm) e.AlarmEnd = 0;
-            if (state == StReason && r != NReason.None && InCamp(CampaignTime.Now.GetHourOfDay)) e.NightFlags |= 1 << (int)r;
+            // noc 15/16.10 (NightLedgerClock): godzina ksiegi biezacego ticku (Mark wolany tylko z ticku godzinowego), nie zegar gry
+            if (state == StReason && r != NReason.None && InCamp(NightClock.Hour)) e.NightFlags |= 1 << (int)r;
         }
 
         private static void AiStumble(string where, MobileParty mp, Exception e)
@@ -625,7 +626,8 @@ namespace Armoury
             // dwa wywolania w tej samej chwili gry to nadrabianie w jednej klatce - ksiega powtarza wtedy stan odpoczynku poprzedniej godziny
             _hourTick++;
             double nowH = NowH();
-            bool catchUp = _lastTickH >= 0 && nowH >= _lastTickH && nowH - _lastTickH < 0.5;
+            // noc 15/16.10: ten sam warunek (zegar < 0.5 h od poprzedniego ticku) liczy NightClock raz na tick - jedno zrodlo dla gracza i AI
+            bool catchUp = NightClock.CatchUp;
             _lastTickH = nowH;
             if (catchUp) _day.CatchUps++;
             try { AiSleepLedger(s, h, catchUp); } catch (Exception e) { Log.Error("NightRest.AiSleepLedger", e); }
@@ -979,8 +981,10 @@ namespace Armoury
             bool campPast = InCamp(h - 1);                         // godzina, ktora wlasnie minela, byla godzina obozu
             double nowH = NowH();
             // T10-R (R7): swit rozlicza sie raz - tick nadrabiany w tej samej klatce ma te sama godzine doby
-            bool isDawn = h == dawn && (_lastDawnH < 0 || nowH - _lastDawnH > 12.0);
-            if (isDawn) _lastDawnH = nowH;
+            // noc 15/16.10 (NightLedgerClock): h to godzina terminu ticku (kazda godzina doby raz - swit codziennie), odstep tez w godzinach ksiegi
+            double nomH = NightClock.NomH;
+            bool isDawn = h == dawn && (_lastDawnH < 0 || nomH - _lastDawnH > 12.0);
+            if (isDawn) _lastDawnH = nomH;
             int maxF = MaxForced(s);
             var mt = campPast ? new MoveTally() : null;
             bool changed = imported;   // wczytane dlugi - kary od pierwszego ticku
@@ -1273,6 +1277,7 @@ namespace Armoury
               .Append(d.MoveExit).Append(", obudzeni cudza reka ").Append(d.MoveWoken).Append(", alarm bez ucieczki ").Append(d.MoveAlarmStay)
               .Append(", dluznicy obudzeni ").Append(d.MoveDebtWoken).Append(", inne ").Append(d.MoveOther).Append("); wodzowie armii ")
               .Append(d.MoveLead).Append(" (bez powodu ").Append(d.MoveLeadNoReason).Append("); na morzu (W2, poza P2) ").Append(d.SeaMove)
+              .Append(NightClock.DawnText())   // noc 15/16.10: zrodlo godziny ksiegi, tick switu (termin / zegar), godziny pomieszane przez zegar, doby bez switu
               .Append(" | stoper ksiegi: sr. ").Append((_ledgerCalls > 0 ? _ledgerMsSum / _ledgerCalls : 0).ToString("0.000", ci))
               .Append(" ms, maks. ").Append(_ledgerMsMax.ToString("0.000", ci)).Append(" ms (").Append(_ledgerCalls).Append(" tikow)")
               .Append("; oboz swiata (petla AiNightCamp): sr. ").Append((d.CampCalls > 0 ? d.CampMsSum / d.CampCalls : 0).ToString("0.000", ci))
@@ -1388,19 +1393,26 @@ namespace Armoury
             Log.Info(sb.ToString());
         }
 
-        /// <summary>Linia ksiegi gracza o swicie (P10): sam log, SettleNight bez zmian; sprawdza wzor dlugu.</summary>
-        private static void LogPlayerDawn(Settings s, float rest, int before, bool sleeping, bool credited)
+        /// <summary>Linia ksiegi gracza o swicie (P10): sam log, SettleNight bez zmian; sprawdza wzor dlugu.
+        /// Noc 15/16.10: do linii stan nocy gracza - godziny marszu w godzinach obozu, oboz automatyczny, tryb zmierzchu, sny przerwane poza menu,
+        /// dlug odlozony do pobudki (sen przez swit, PlayerSleepGuard) i tresc komunikatow switu (MsgLog); wzor uwzglednia dlug odlozony z poprzedniego
+        /// switu w tym samym snie (_dawnDeferredUp).</summary>
+        private static void LogPlayerDawn(Settings s, float rest, int before, bool sleeping, bool credited, int marchH, int autoCamps, int cuts)
         {
             try
             {
                 float baza = Math.Max(1f, s.SleepHoursNeeded);
                 bool enlisted = RotEnlisted();
-                int expect = enlisted ? 0 : ((sleeping || rest >= baza) ? before : Math.Min(3, before + 1));
+                int expect = enlisted ? 0 : ((sleeping || rest >= baza) ? Math.Min(3, before + _dawnDeferredUp) : Math.Min(3, before + 1));
                 Log.Info("NocnyMarsz: gracz o swicie - odpoczynek doby " + F1(rest) + " h (baza " + F1(baza) + ", sen w menu "
                          + (sleeping ? "tak" : "nie") + ", splata od reki w tej dobie " + (credited ? "tak" : "nie")
                          + (enlisted ? ", w sluzbie ROT" : "") + "), dlug przed " + before + ", po " + Debt
                          + " - wzor (dlug +1, gdy < baza i nie spi; maks. 3): " + (expect == Debt ? "zgodny" : "NIEZGODNY, oczekiwany " + expect)
-                         + "; dlug o swicie (musztra) " + DawnDebt + (DawnDebt == Debt ? "" : " - NIEZGODNY z dlugiem po") + ".");
+                         + "; dlug o swicie (musztra) " + DawnDebt + (DawnDebt == Debt ? "" : " - NIEZGODNY z dlugiem po")
+                         + "; marsz w godzinach obozu " + marchH + " h, oboz automatyczny " + (autoCamps > 0 ? "tak" : "nie") + ", tryb zmierzchu " + CampPromptMode
+                         + ", sen przerwany poza menu " + cuts + ", dlug odlozony do pobudki " + (_dawnOwed > 0f ? "tak (brak " + F1(_dawnOwed) + " h)" : "nie")
+                         + (_dawnDeferredUp > 0 ? ", dlug odlozony z poprzedniego switu +" + _dawnDeferredUp : "")
+                         + "; komunikat: " + (string.IsNullOrEmpty(_lastDawnMsg) ? "-" : "'" + _lastDawnMsg + "'") + ".");
             }
             catch { }
         }

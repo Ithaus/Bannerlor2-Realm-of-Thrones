@@ -4260,6 +4260,18 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightfallPromptEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Night Ledger Clock", HintText = "the sleep ledger keeps the true hour: the night camp, the dawn reckoning and your rest count by the hour each hourly tick was due, not the hour it happened to land in - at high speed no dawn is skipped and no camp night shrinks to five hours (yours and the AI's); off = the old way")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool NightLedgerClock { get; set; } = true;
+
+        [SettingPropertyBool("Player Sleep Guard", HintText = "sleep that is cut short ends properly: when an attack or another menu breaks your bedded-down sleep, the hours slept still count and you are no longer treated as asleep; a sleep that runs past dawn is judged when you wake - rise before the base hours are made up and the night counts as sleepless; off = as before")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool PlayerSleepGuard { get; set; } = true;
+
+        [SettingPropertyBool("Night March Notice", HintText = "night marches are told plainly: the first camp hour your column is on the move (not only the camp-start hour) brings the nightfall question or your standing order, marching on brings a warning, standing still pitches camp with a note, and each dawn says how long the men rested and why they do or do not owe sleep; off = as before")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool NightMarchNotice { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer")]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -7280,6 +7292,9 @@ namespace Armoury
             s.CampTentIcon = CampTentIcon;
             s.CoursePlotterEnabled = CoursePlotterEnabled;
             s.NightfallPromptEnabled = NightfallPromptEnabled;
+            s.NightLedgerClock = NightLedgerClock;
+            s.PlayerSleepGuard = PlayerSleepGuard;
+            s.NightMarchNotice = NightMarchNotice;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;

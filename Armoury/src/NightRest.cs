@@ -57,6 +57,19 @@ namespace Armoury
         private static float _menuRest;
         private static float _menuTarget = 5f;
         private static float _menuBase;   // stan _restTonight w chwili polozenia sie
+        // noc 15/16.10 (PlayerSleepGuard): sen w menu przez swit - _menuDawnCut = stan licznika snu w menu (_menuBase + _menuRest) o swicie (ta czesc
+        // nalezy do starej doby i nie idzie drugi raz do nowej), _dawnOwed = brak do bazy starej doby, oceniany przy pobudce (dospane po swicie
+        // >= brak - dlugu nie ma, te godziny ida na stara noc; mniej - noc nieprzespana). _dawnDeferredUp: dlug +1 z brakiem poprzedniego switu w tym samym
+        // snie (drugi swit we snie) - do wzoru linii gracza. Tylko pamiec (wczytanie w trakcie snu = sen od nowa, jak dotad).
+        private static float _menuDawnCut, _dawnOwed;
+        private static int _dawnDeferredUp;
+        // noc 15/16.10 (NightLedgerClock): stan poprzedniej godziny gracza - tick nadrabiany w tej samej klatce go powtarza (jak AI T10-R R7)
+        private static bool _lastRestPlayer, _lastMovedPlayer;
+        // noc 15/16.10 (NightMarchNotice): numer nocy obozu (NightClock.NightId) ostatniego pytania, ostrzezenia i komunikatu obozu automatycznego;
+        // liczniki doby gracza do linii switu (godziny marszu w godzinach obozu, obozy automatyczne, sny przerwane poza menu) i tresc komunikatow switu
+        private static long _promptNight = -1, _warnNight = -1, _campMsgNight = -1;
+        private static int _marchHoursDay, _autoCampDay, _sleepCutDay;
+        private static string _lastDawnMsg;
 
         // kary % za dlug 0..3 (Jeff 30.08: juz PIERWSZA zarwana noc boli -25%;
         // morale procentowo przez AddFactor - "spada o 95%", nie o 95 punktow)
@@ -90,11 +103,20 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 MasterSwitch(s);   // T10 poprawka recenzji: przelacznik glowny wylaczony w trakcie gry - jednorazowo wszystko na stare
+                // noc 15/16.10 (NightLedgerClock): godzina ksiegi z terminu ticku godzinowego gry - raz na tick, przed ksiega AI i gracza (NightClock.cs)
+                NightClock.Tick(s);
                 if (s == null || !s.NightRestEnabled) return;
+                // noc 15/16.10 (PlayerSleepGuard): sen w menu przerwany atakiem albo innym menu (gra przelacza menu na spotkanie, a _sleeping zdejmowal tylko
+                // LeaveSleep) - koniec snu bez wywolan menu; PRZED ksiega AI, bo doczepieni do gracza czytaja _sleeping (SleepsWithLeader)
+                if (_sleeping && s.PlayerSleepGuard)
+                {
+                    string menuId = MenuIdNow();
+                    if (menuId != "arm_sleep_wait" && menuId != "?") EndSleepQuiet(s, menuId ?? "brak");
+                }
                 // T10 (uwaga krytyki 9, A07 3.10): swiat AI nie zalezy od stanu gracza - ksiega snu AI, oboz splaty
                 // dlugu, oboz swiata i bandy biegna PRZED wyjsciami gracza (martwy gracz, gracz-Nieumarly);
                 // ponizsze wyjscia dotycza juz tylko ksiegi gracza
-                try { AiHourly(s, CampaignTime.Now.GetHourOfDay); } catch (Exception e) { Log.Error("NightRest.AiHourly", e); }
+                try { AiHourly(s, NightClock.Hour); } catch (Exception e) { Log.Error("NightRest.AiHourly", e); }
                 var mp = MobileParty.MainParty;
                 if (mp == null || Hero.MainHero == null || !Hero.MainHero.IsAlive) return;
                 // umarli nie spia: armia Innych nie zna dlugu snu
@@ -102,6 +124,7 @@ namespace Armoury
                 { Debt = 0; DawnDebt = 0; _restTonight = 0f; return; }
 
                 var pos = mp.GetPosition2D;
+                bool hadPos = _hadPos;   // noc 15/16.10: przed nadpisaniem - tick nadrabiany powtarza godzine tylko przy znanej poprzedniej pozycji
                 // grupa11: krok godziny i prog "ruszyl sie" wspolne z musztra i ksiega AI (Drill.RestStep, Drill.RestHour);
                 // bez poprzedniego odczytu krok 0 - godzina postoju jak dotad
                 float step = _hadPos ? pos.Distance(_lastPos) : 0f;
@@ -115,7 +138,8 @@ namespace Armoury
                     PlayerCamped = false;
                 }
 
-                int h = CampaignTime.Now.GetHourOfDay;
+                // noc 15/16.10 (NightLedgerClock): godzina ksiegi z terminu ticku (klucz wylaczony - zegar gry, jak dotad)
+                int h = NightClock.Hour;
                 // T1: tick o godzinie h liczy godzine, ktora wlasnie minela - tick
                 // konca obozu (6:00) liczy godzine 5-6 jako noc (inaczej oboz 0-6
                 // dawal 5.6 h i dlug); sufit 12, zeby zle ustawienie nie robilo nocy z calej doby
@@ -127,9 +151,19 @@ namespace Armoury
                 bool resting = Drill.RestHour(mp, step)
                                || (s.SleepAtSeaFree && mp.IsCurrentlyAtSea)
                                || RotEnlisted();
+                // noc 15/16.10 (NightLedgerClock, jak AI T10-R R7): tick nadrabiany w tej samej klatce - pozycja ta sama, wiec krok 0 dalby darmowy
+                // odpoczynek; ta godzina wyglada jak poprzednia (odpoczynek i ruch). Zwijanie namiotu wyzej liczy prawdziwy krok, jak dotad
+                bool movedH = moved;
+                if (s.NightLedgerClock && NightClock.CatchUp && hadPos) { resting = _lastRestPlayer; movedH = _lastMovedPlayer; }
+                _lastRestPlayer = resting; _lastMovedPlayer = movedH;
                 // spac mozna O KAZDEJ porze - noc liczy sie w calosci, dzien slabiej
                 // (gwar obozu, upal, swiatlo); rachunek zamyka sie o swicie
                 if (resting) _restTonight += night ? 1f : MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f);
+
+                // noc 15/16.10 (NightMarchNotice): numer nocy obozu - pytanie, ostrzezenie i komunikat obozu najwyzej raz na noc
+                long nightId = NightClock.NightId(CampStart);
+                bool captive = TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive;
+                bool enl = RotEnlisted();   // sluzba ROT raz na tick (odbicie) - dla nowych warunkow nocy gracza
 
                 // NAMIOT SAM SIE STAWIA (Jeff 31.08: "jak spie, to czasami sie
                 // nie uruchamia") - nocny postoj w polu to oboz, takze bez menu
@@ -139,6 +173,15 @@ namespace Armoury
                 {
                     Tent(mp, true);
                     PlayerCamped = true;
+                    // noc 15/16.10 (NightMarchNotice, Jeff 15.10 "nie rozbija obozu"): oboz automatyczny widac - komunikat raz na noc (bez menu i bez obozu BK:
+                    // postoj noca i tak liczy sie jako sen); linia logu zawsze (diagnostyka), komunikat tylko przy kluczu, poza niewola i sluzba ROT
+                    if (_campMsgNight != nightId)
+                    {
+                        _campMsgNight = nightId; _autoCampDay++;
+                        bool show = s.NightMarchNotice && !_sleeping && !captive && !enl;
+                        if (show) Msg("The column halts for the night - camp is pitched where it stands.", Colors.White);
+                        Log.Info("Nocleg: gracz - oboz automatyczny o " + h + ":00 (postoj noca poza osada), noc " + nightId + (show ? "" : " - bez komunikatu") + ".");
+                    }
                 }
 
                 // ROZLICZENIE OD REKI (Jeff: "sen ma byc aktualizowany zaraz po
@@ -153,33 +196,70 @@ namespace Armoury
                 // JENIEC NIE DOWODZI (Jeff 01.09: "jako jeniec decydowalem
                 // o noclegu bandytow - to nie moja sprawa") - w niewoli zero
                 // pytan o oboz i zero auto-obozu
-                if (h == CampStart && CampStart != CampEnd && moved && _promptDay != (int)CampaignTime.Now.ToDays
+                // noc 15/16.10 (NightMarchNotice, Jeff 15.10 "nie pokazuje obozu"): pytanie (albo staly rozkaz "always make camp") w PIERWSZEJ godzinie obozu
+                // z marszem, nie tylko w jednym ticku o CampStart (pominieta godzina, osada, walka albo postoj o 0:00 = tej nocy nic) - raz na noc i tylko,
+                // gdy zostaja >= 2 h obozu (oboz o 5:00 na godzine nie ma sensu, dalej tylko ostrzezenie). Klucz wylaczony - stary warunek (h == CampStart, dzien zegara)
+                bool promptHour = s.NightMarchNotice
+                    ? InCamp(h) && Mod24(CampEnd - h) >= 2 && _promptNight != nightId
+                    : h == CampStart && _promptDay != (int)CampaignTime.Now.ToDays;
+                bool promptNow = false;
+                if (promptHour && CampStart != CampEnd && movedH
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped
-                    && !TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive
+                    && !captive
                     && mp.CurrentSettlement == null && mp.MapEvent == null
                     && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
                     && PlayerEncounter.Current == null && !RotEnlisted())
                 {
                     _promptDay = (int)CampaignTime.Now.ToDays;
+                    _promptNight = nightId;
+                    promptNow = true;
+                    // noc 15/16.10: tryb zmierzchu w logu (zyl tylko w zapisie)
+                    Log.Info("Nocleg: gracz - zmierzch o " + h + ":00, kolumna w marszu: tryb zmierzchu " + CampPromptMode
+                             + (CampPromptMode == 1 ? " (always make camp - oboz z rozkazu)" : " (ask - pytanie Night Falls)") + ", noc " + nightId + ".");
                     if (CampPromptMode == 1)
                     {
                         Msg("Night falls - the column makes camp.", Colors.White);
                         MakeCampNow();
                     }
-                    else NightfallAsk();
+                    else { NightfallAsk(); _warnNight = nightId; }   // gracz zapytany - tej nocy bez osobnego ostrzezenia
+                }
+
+                // noc 15/16.10 (NightMarchNotice): marsz w godzinach obozu - licznik do linii switu (godzina, ktora wlasnie minela, jak pomiar ruchu AI:
+                // InCamp(h - 1), wiec tick switu liczy jeszcze godzine 5-6) i ostrzezenie raz na noc (kolumna w ruchu w godzinie obozu, tylko gdy doba nie ma
+                // jeszcze bazy - z baza dlugu o swicie nie bedzie); poza osada, morzem, armia cudzego wodza (doczepiony), niewola, spotkaniem i sluzba ROT
+                bool marchField = CampStart != CampEnd && movedH && !resting && !PlayerCamped && !_sleeping
+                    && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
+                    && PlayerEncounter.Current == null && !captive && !enl;
+                if (marchField && InCamp(h - 1)) _marchHoursDay++;
+                if (marchField && InCamp(h))
+                {
+                    float bazaW = Math.Max(1f, s.SleepHoursNeeded);
+                    if (s.NightMarchNotice && _warnNight != nightId && !promptNow && _restTonight < bazaW)
+                    {
+                        _warnNight = nightId;
+                        int nd = Math.Min(3, Debt + 1);
+                        Msg("Your column marches on through the night - the men get no sleep. They have rested " + F1(_restTonight) + "h of the "
+                            + F1(bazaW) + "h they need today; fall short at dawn and they wake weary (speed -" + SpdPenalty[nd] + "%, morale -" + MorPenalty[nd] + "%).",
+                            Colors.Yellow);
+                        Log.Info("NocnyMarsz: gracz idzie noca - ostrzezenie o " + h + ":00 (odpoczynek doby " + F1(_restTonight) + " h z " + F1(bazaW)
+                                 + " h, dlug " + Debt + "), noc " + nightId + ".");
+                    }
                 }
 
                 // Jeff 15.10 ("cos zle liczy nieprzespane noce"): swit gracza rozliczal sie 2 razy tej samej doby (log 108858: dlug 0 -> 1 -> 2 w jednej sekundzie,
                 // 108859: drugi raz godzine pozniej z 1.0 h odpoczynku) - tick godzinowy nadrabiany przy szybkim czasie ma te sama godzine doby. Jak u AI (T10-R R7):
-                // swit raz na 12 h gry.
-                double nowAbsH = CampaignTime.Now.ToHours;
+                // swit raz na 12 h gry. Noc 15/16.10: odstep liczony godzina ksiegi (NightClock.NomH; klucz wylaczony - zegar, jak dotad)
+                double nowAbsH = NightClock.NomH;
                 if (h == dawn && (_playerDawnH < 0 || nowAbsH - _playerDawnH > 12.0 || nowAbsH < _playerDawnH))
                 {
                     _playerDawnH = nowAbsH;
                     // T10 (uwaga krytyki 5, P10): linia ksiegi gracza o swicie - sam log, SettleNight bez zmian
                     int debtBefore = Debt; float restBefore = _restTonight; bool sleepingNow = _sleeping, creditedBefore = _credited;
+                    int marchH = _marchHoursDay, autoCamps = _autoCampDay, cuts = _sleepCutDay;
+                    _lastDawnMsg = null;
                     SettleNight(s);
-                    LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore);
+                    LogPlayerDawn(s, restBefore, debtBefore, sleepingNow, creditedBefore, marchH, autoCamps, cuts);
+                    _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0;
                 }
                 // T10: AiNightCamp i AiBanditRest przeniesione do AiHourly (przed wyjscia gracza)
             }
@@ -190,7 +270,9 @@ namespace Armoury
         /// (baza + odsetki wg NeededHours); wtedy dlug schodzi do zera.</summary>
         private static void CreditRest(Settings s)
         {
-            if (_credited || _restTonight < NeededHours()) return;
+            // noc 15/16.10 (PlayerSleepGuard): przy dlugu odlozonym do pobudki (sen przez swit) godziny po swicie najpierw dospiewaja stara noc - do splaty
+            // liczy sie tylko nadwyzka (bez odlozonego brak = 0, jak dotad)
+            if (_credited || _restTonight - Math.Max(0f, _dawnOwed) < NeededHours()) return;
             _credited = true;
             if (Debt > 0)
             {
@@ -271,6 +353,16 @@ namespace Armoury
                 // w tym samym uruchomieniu gry (nowa gra nie wola Import) - inaczej zabieralby predkosc, morale i pierwszy dzien musztry bez zadnej nocy.
                 // Wczytanie: Import (SyncData, po konstruktorze) ustawia te pola z zapisu jak dotad
                 Debt = 0; DawnDebt = 0; _restTonight = 0f; _credited = false;
+                // noc 15/16.10: zegar ksiegi i stan nocy gracza nowej paczki od zera (pamiec sesji, bez zapisu)
+                NightClock.Reset();
+                _lastRestPlayer = false; _lastMovedPlayer = false;
+                _menuDawnCut = 0f; _dawnOwed = 0f; _dawnDeferredUp = 0;
+                _promptNight = -1; _warnNight = -1; _campMsgNight = -1;
+                _marchHoursDay = 0; _autoCampDay = 0; _sleepCutDay = 0; _lastDawnMsg = null;
+                // PlayerSleepGuard: flaga snu z poprzedniej kampanii / sprzed wczytania nie przechodzi (dotad zawieszony sen przezywal wczytanie zapisu
+                // z mapy); wczytanie zapisu z menu snu ustawia ja od nowa w SleepInit (menu wstaje po konstruktorze)
+                var sg = Settings.Current;
+                if (sg == null || sg.PlayerSleepGuard) _sleeping = false;
                 ResetHourCounters();
                 ResetAi();   // T10: ksiega snu AI, snu dluznikow, alarmy, wstrzymani w osadach
                 ResetGate(); // E7/O1 (228): zegar przegladu osad
@@ -286,8 +378,9 @@ namespace Armoury
         /// Wizerunkow nie rusza (mapa nowej kampanii buduje je od nowa). Zwraca, ile z tych rzeczy zostalo w pamieci (do linii startu).</summary>
         internal static int ResetCamp()
         {
-            int had = (PlayerCamped ? 1 : 0) + (_tentStrikes > 0 ? 1 : 0) + (_tentChildren >= 0 ? 1 : 0) + (_promptDay >= 0 ? 1 : 0);
+            int had = (PlayerCamped ? 1 : 0) + (_tentStrikes > 0 ? 1 : 0) + (_tentChildren >= 0 ? 1 : 0) + (_promptDay >= 0 || _promptNight >= 0 ? 1 : 0);
             _tentStrikes = 0; _tentChildren = -1; _promptDay = -1; PlayerCamped = false;
+            _promptNight = -1; _warnNight = -1; _campMsgNight = -1;   // noc 15/16.10 (NightMarchNotice): numery nocy pytania, ostrzezenia i obozu - jak dzien pytania
             return had;
         }
 
@@ -1180,9 +1273,38 @@ namespace Armoury
             float sleptH = _restTonight;
             bool sleptBase = _sleeping || _restTonight >= baza;
             bool paidInFull = _credited;
+            // noc 15/16.10 (PlayerSleepGuard): sen w menu przez swit - licznik snu w menu od poprzedniego ciecia (pasek: "prawda o tym snie") przed
+            // zerowaniem doby; od tej chwili sen w menu liczy sie do nowej doby (LeaveSleep odejmuje _menuDawnCut - stara doba nie idzie drugi raz)
+            bool guard = _sleeping && s.PlayerSleepGuard;
+            float menuNow = _menuBase + _menuRest - _menuDawnCut;
+            bool notice = s.NightMarchNotice;
             _restTonight = 0f;
             _credited = false;
-            if (RotEnlisted()) { Debt = 0; return; }   // w sluzbie spisz, kiedy kaza
+            _dawnDeferredUp = 0;
+            if (guard) _menuDawnCut = _menuBase + _menuRest;
+            if (RotEnlisted()) { Debt = 0; _dawnOwed = 0f; return; }   // w sluzbie spisz, kiedy kaza
+
+            if (guard)
+            {
+                // kto spi, ten dlugu teraz nie dostaje (Jeff 31.08 "dospi po swicie") - ale brak do bazy czeka na pobudke (SettleDeferred): wstal przed
+                // dospaniem = noc nieprzespana. Polozenie sie o 5:50 po calonocnym marszu nie kasuje juz kary
+                float slept = Math.Max(sleptH, menuNow);
+                if (_dawnOwed > 0f)
+                {
+                    // drugi swit w tym samym snie (dlug 2-3: sen do 40 h zegara): brak sprzed poprzedniego switu rozliczony teraz
+                    float owed = _dawnOwed, had = slept;
+                    int before = Debt;
+                    _dawnOwed = 0f;
+                    if (slept >= owed) slept -= owed;
+                    else { Debt = Math.Min(3, Debt + 1); _dawnDeferredUp = Debt - before; }
+                    Log.Info("Nocleg: swit we snie - dlug odlozony: po swicie " + F1(had) + " h z brakujacych " + F1(owed)
+                             + " h -> dlug " + before + " -> " + Debt + " (brak z poprzedniego switu w tym samym snie).");
+                }
+                _dawnOwed = slept >= baza ? 0f : baza - slept;
+                if (_dawnOwed > 0f && notice)
+                    MsgLog("Dawn finds the men still abed - they need " + F1(_dawnOwed) + "h more sleep before they rise, or last night counts as sleepless.",
+                           Colors.White);
+            }
 
             if (sleptBase)
             {
@@ -1194,26 +1316,34 @@ namespace Armoury
                 if (!_sleeping && sleptH >= 1f)
                 {
                     float shown = Math.Min(sleptH, NeededHours());
-                    Msg("The night gave the men about " + shown.ToString("0.#") + "h of sleep.", Colors.White);
+                    // noc 15/16.10 (NightMarchNotice): marsz noca przy przespanej bazie - powiedziane wprost, dlaczego dlugu nie ma (zasada Jeffa 30.08:
+                    // sen o kazdej porze, dzien slabiej - odpoczynek w osadzie za dnia pokrywa noc w marszu)
+                    if (notice && _marchHoursDay > 0)
+                        MsgLog("The column marched " + _marchHoursDay + "h through the night, but the men rested " + shown.ToString("0.#")
+                               + "h today - no sleep debt.", Colors.White);
+                    else
+                        MsgLog("The night gave the men about " + shown.ToString("0.#") + "h of sleep.", Colors.White);
                 }
                 if (Debt > 0 && !paidInFull)
-                    Msg("The men slept, but old weariness lingers - a full rest takes "
+                    MsgLog("The men slept, but old weariness lingers - a full rest takes "
                         + (int)Math.Ceiling(NeededHours()) + " hours." + DrillNote(s), Colors.Yellow);
                 return;
             }
 
             Debt = Math.Min(3, Debt + 1);
+            // noc 15/16.10 (NightMarchNotice): ile bylo odpoczynku tej doby wobec bazy - kara z liczbami
+            string rested = notice ? " Rested " + F1(sleptH) + "h of the " + F1(baza) + "h needed." : "";
             if (Debt == 1)
-                Msg("The men marched through the night. One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
-                    + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest." + DrillNote(s), Colors.Yellow);
+                MsgLog("The men marched through the night. One sleepless night - speed -" + SpdPenalty[1] + "%, morale -"
+                    + MorPenalty[1] + "%; paying it back will take " + (int)Math.Ceiling(NeededHours()) + " hours of rest." + rested + DrillNote(s), Colors.Yellow);
             else if (Debt == 2)
-                Msg("Second night without sleep - the column staggers (speed -" + SpdPenalty[2] + "%, morale -"
-                    + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours." + DrillNote(s), Colors.Red);
+                MsgLog("Second night without sleep - the column staggers (speed -" + SpdPenalty[2] + "%, morale -"
+                    + MorPenalty[2] + "%). A full rest now takes " + (int)Math.Ceiling(NeededHours()) + " hours." + rested + DrillNote(s), Colors.Red);
             else
             {
-                Msg("Third sleepless night - the company collapses where it stands (speed -" + SpdPenalty[3]
+                MsgLog("Third sleepless night - the company collapses where it stands (speed -" + SpdPenalty[3]
                     + "%, morale -" + MorPenalty[3] + "%). They need " + (int)Math.Ceiling(NeededHours())
-                    + " hours of rest." + DrillNote(s), Colors.Red);
+                    + " hours of rest." + rested + DrillNote(s), Colors.Red);
                 // wojsko ZASYPIA: kolumna staje w miejscu (raz, przy zapasci -
                 // jesli gracz mimo to pogna dalej, powlecze sie na 10% predkosci)
                 try
@@ -1229,6 +1359,83 @@ namespace Armoury
         private static void Msg(string t, Color c)
         {
             try { InformationManager.DisplayMessage(new InformationMessage(t, c)); } catch { }
+        }
+
+        /// <summary>Noc 15/16.10: komunikat switu gracza takze w logu (Log.Player / sam komunikat nie trafia do pliku) - tresc idzie tez do linii
+        /// "gracz o swicie" (_lastDawnMsg). Linia logu zawsze (diagnostyka); nie rzuca wyjatku.</summary>
+        private static void MsgLog(string t, Color c)
+        {
+            Msg(t, c);
+            try
+            {
+                _lastDawnMsg = _lastDawnMsg == null ? t : _lastDawnMsg + " / " + t;
+                Log.Info("NocnyMarsz: gracz - komunikat switu: " + t);
+            }
+            catch { }
+        }
+
+        /// <summary>Noc 15/16.10 (PlayerSleepGuard): id biezacego menu gry (null = mapa bez menu, "?" = blad odczytu - wtedy straznik nic nie robi).</summary>
+        private static string MenuIdNow()
+        {
+            try
+            {
+                var c = Campaign.Current;
+                var mc = c != null ? c.CurrentMenuContext : null;
+                var gm = mc != null ? mc.GameMenu : null;
+                return gm != null ? gm.StringId : null;
+            }
+            catch { return "?"; }
+        }
+
+        /// <summary>
+        /// Noc 15/16.10 (PlayerSleepGuard): koniec snu w menu, ktory przerwalo spotkanie (atak - gra przelacza menu snu na "encounter") albo inne menu.
+        /// Dotad _sleeping zdejmowal tylko LeaveSleep (pasek albo "Rouse the men early"), wiec kazdy kolejny swit mowil "sen w menu tak" bez kary
+        /// (log 10-56-30, 11:47-12:01: 6 switow, odpoczynek 0.0-18.6 h), pytanie o nocleg bylo zablokowane, a doczepieni lordowie "spali z graczem".
+        /// Same pola: sen z menu do doby (jak LeaveSleep, bez starej doby po swicie), flaga zdjeta, odlozony dlug rozliczony. BEZ wywolan GameMenu
+        /// (pulapka CLAUDE.md - menu juz zmienila gra) i bez ruszania namiotu (zwinie go ruch - straznik w OnTick).
+        /// </summary>
+        private static void EndSleepQuiet(Settings s, string why)
+        {
+            try
+            {
+                float menuH = _menuBase + _menuRest - _menuDawnCut;
+                _restTonight = Math.Max(_restTonight, menuH);
+                _sleeping = false;
+                _sleepCutDay++;
+                string d = SettleDeferred(s, "sen przerwany");
+                float clockH = 0f;
+                try { clockH = (float)(CampaignTime.Now - _sleepStart).ToHours; } catch { }
+                Log.Info("Nocleg: sen w menu przerwany poza menu snu (menu '" + why + "') - koniec snu: w menu " + F1(_menuRest) + " h (zegara " + F1(clockH)
+                         + " h), odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + d + ".");
+            }
+            catch (Exception e) { _sleeping = false; Log.Error("NightRest.EndSleepQuiet", e); }
+        }
+
+        /// <summary>
+        /// Noc 15/16.10 (PlayerSleepGuard): rozliczenie dlugu odlozonego przez swit (sen w menu, ktory przeszedl przez swit z odpoczynkiem ponizej bazy).
+        /// Po swicie dospane (odpoczynek nowej doby po pobudce) >= brakujace godziny - dlugu nie ma, a te godziny ida na stara noc (z nowej doby schodza:
+        /// jedna godzina snu nie liczy sie do dwoch dob); mniej - noc liczy sie jako nieprzespana (dlug +1, maks. 3; dlug o swicie dla musztry tez).
+        /// Zawsze zeruje brak i ciecie switu. Zwraca kawalek linii logu ("" = nie bylo czego rozliczac).
+        /// </summary>
+        private static string SettleDeferred(Settings s, string how)
+        {
+            float owed = _dawnOwed;
+            _dawnOwed = 0f; _menuDawnCut = 0f;
+            if (owed <= 0f || s == null || !s.PlayerSleepGuard) return "";
+            float after = _restTonight;
+            int before = Debt;
+            bool enlisted = RotEnlisted();   // w sluzbie ROT dlugu nie liczymy (jak swit)
+            if (!enlisted && after >= owed) _restTonight = after - owed;
+            else if (!enlisted)
+            {
+                Debt = Math.Min(3, Debt + 1);
+                DawnDebt = Math.Max(DawnDebt, Debt);
+                Msg("You roused the men before they had slept their fill - last night counts as sleepless (speed -" + SpdPenalty[Debt] + "%, morale -"
+                    + MorPenalty[Debt] + "%).", Colors.Yellow);
+            }
+            string t = "dlug odlozony: po swicie " + F1(after) + " h z brakujacych " + F1(owed) + " h -> dlug " + before + " -> " + Debt + (enlisted ? " (w sluzbie ROT)" : "");
+            Log.Info("Nocleg: " + how + " po swicie - " + t + ".");
+            return "; " + t;
         }
 
         // ------------------------------------------------------------ kary
@@ -1649,8 +1856,11 @@ namespace Armoury
                 // 4/5 i dawal dlug (Jeff 27.08: "przespalem noc i rano mam, ze
                 // men nie spali"). Po pobudce dopisujemy przespane godziny
                 // i od razu splacamy dlug.
-                _restTonight = Math.Max(_restTonight, _menuBase + _menuRest);
+                // noc 15/16.10 (PlayerSleepGuard): bez snu sprzed switu - ta czesc zostala w starej dobie (_menuDawnCut, 0 bez switu we snie i przy
+                // wylaczonym kluczu); dotad caly sen z menu szedl drugi raz do nowej doby. Potem dlug odlozony przez swit (SettleDeferred), dopiero splata
+                _restTonight = Math.Max(_restTonight, _menuBase + _menuRest - _menuDawnCut);
                 var s = Settings.Current;
+                SettleDeferred(s, "pobudka");
                 if (s != null) CreditRest(s);
                 // ZEGAREK SNU (Jeff 31.08): po pobudce liczby - ile zegara
                 // uplynelo, ile snu sie NALICZYLO (dzien liczy sie slabiej)
@@ -1740,10 +1950,15 @@ namespace Armoury
                 // bezpiecznik: nikt nie spi wiecznie - ale przy dlugu snu suma
                 // godzin ZEGARA bywa wieksza niz godzin SNU (dzien liczy sie slabiej)
                 _sleepUntil = CampaignTime.HoursFromNow(Math.Max(14f, needed * 1.8f + 2f));
+                bool again = _sleeping;   // noc 15/16.10: ponowne wejscie w menu snu w trakcie tego samego snu (wczytanie zapisu z menu, powrot do menu)
                 _sleeping = true;
                 _sleepStart = CampaignTime.Now;
                 _menuRest = 0f;
                 _menuBase = _restTonight;
+                // noc 15/16.10 (PlayerSleepGuard): liczniki snu w menu od nowa - ciecie switu dotyczylo starych; dlug odlozony przez swit zostaje tylko
+                // w tym samym snie (_menuBase to juz odpoczynek nowej doby)
+                _menuDawnCut = 0f;
+                if (!again) _dawnOwed = 0f;
                 // cel snu: ile jeszcze brakuje DO wyspania - pasek liczy wlasne
                 // godziny i NIE cofa sie, gdy swit wyzeruje rachunek doby
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);

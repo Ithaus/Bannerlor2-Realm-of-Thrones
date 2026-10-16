@@ -655,6 +655,11 @@ Uzycie (Python 3, tylko odczyt):
                     K2-3b rok do roku +-10% (bieg >= 392 dob), K2-3c przebieg (INFO), K2-4 pobrany podatek > 0, K2-5 ksiega (pobrano = do panow + do kas,
                     nic ponizej poziomu normalnego, Obieg = linia doby, kontrola kies r = 0), K2-6 komu i ile (INFO), K2-7 miara W5-7 (INFO).
                     Log bez paczki: INFO, bez wyjatku.
+--grupa noboz     : (noc 15/16.10, Jeff 15.10 "nie pokazuje obozu, nie rozbija, raz kara jest, raz nie"; galaz w-toku/noc-oboz, NightClock.cs, NightRest.cs)
+                    python -I tools/sprawdz_logi.py --grupa noboz <Armoury-*.log> (strumieniowo; sesja = od linii "Nocleg (zegar ksiegi):"). NO-0 zegar ksiegi z terminu
+                    ticku gry TAK w kazdej sesji, NO-1 swity AI kolejne i "dob bez switu 0", NO-2 24 tiki na dobe, NO-3 "pomiar z pozycji, <dlugosc obozu> h", NO-4 nowy
+                    dlug 1 AI <= 40 na swit, NO-5 linie gracza = linie AI, odpoczynek <= 18.45 h, NIEZGODNY 0, NO-6 bledy 0, NO-7 dlug odlozony wedlug reguly, NO-8 po
+                    przerwanym snie swit "sen w menu nie", NO-9 noc gracza (INFO). Pierwszy swit sesji poza NO-1..NO-5. Log bez paczki: INFO, bez wyjatku.
 --grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
                     TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
                     (strumieniowo). OB2-0 linia startu (klucze tak), OB2-1 linie doby straznika / wsi / pozyczek, OB2-2 potkniecia i ERROR 0, OB2-3a lud / poziom
@@ -26644,6 +26649,188 @@ def oblezenia2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ noboz (noc 15/16.10, Jeff 15.10 "nie pokazuje obozu, nie rozbija, raz kara jest, raz nie"; NightClock.cs, NightRest.cs)
+NO_START = "Nocleg (zegar ksiegi): "
+NO_DAWN = re.compile(r"^NocnyMarsz: swit dnia (\d+)")
+NO_NEW = re.compile(r"nowy dlug 1/2/3: (\d+)/(\d+)/(\d+)")
+NO_MOVE = re.compile(r"ruch w oknie obozu \(pomiar z pozycji, (\d+) h\)")
+NO_TICKS = re.compile(r" ms \((\d+) tikow\)")
+NO_CLOCK = re.compile(r"zegar ksiegi \((\w+)\): tick switu termin ([\d:-]+), zegar ([\d:-]+); tikow z godzina zegara inna niz ksiegi (\d+) z (\d+)")
+NO_GAP = re.compile(r"dob bez switu od poprzedniego (\d+|-)")
+NO_PLAYER = re.compile(r"^NocnyMarsz: gracz o swicie - odpoczynek doby ([\d.]+) h \(baza [\d.]+, sen w menu (tak|nie)")
+NO_PMARCH = re.compile(r"marsz w godzinach obozu (\d+) h, oboz automatyczny (tak|nie), tryb zmierzchu (\d)")
+NO_DEFER = re.compile(r"dlug odlozony: po swicie ([\d.]+) h z brakujacych ([\d.]+) h -> dlug (\d) -> (\d)")
+NO_CAMPCFG = re.compile(r"^NightRest: oboz swiata (\d+):00-(\d+):00")
+NO_ERR = ("ERROR in NightRest", "ERROR in NocnyMarsz", "ERROR in Nocleg", "ERROR in NightClock", "ERROR in NightfallAsk", "ERROR in MakeCampNow")
+
+
+def noboz_main(logp):
+    """noboz (noc 15/16.10; galaz w-toku/noc-oboz; Armoury/src/NightClock.cs, NightRest.cs, NightMarch.cs): zegar ksiegi snu, straznik snu w menu,
+    nocny marsz powiedziany wprost. Wejscie: log Armoury (czytany strumieniowo); sesja = od linii startu "Nocleg (zegar ksiegi):" (kazde wczytanie).
+    NO-0 linia startu - godzina ksiegi z terminu ticku gry TAK w kazdej sesji (wylaczony klucz - INFO, NIE = zapas licznikowy - do zbadania);
+    NO-1 swity AI kolejne (0 dziur od pierwszego switu sesji) i "dob bez switu od poprzedniego 0"; NO-2 "(24 tikow)" w kazdej linii switu poza
+    pierwsza w sesji; NO-3 "pomiar z pozycji, <dlugosc obozu> h" tak samo; NO-4 nowy dlug 1 na swit <= 40 (przed poprawka 116-423, dobra faza <= 18),
+    poza pierwszym w sesji; NO-5 linii gracza o swicie tyle co linii AI, odpoczynek doby <= 18.45 h poza pierwszym w sesji, "NIEZGODNY" 0, nowe pola
+    w linii; NO-6 ERROR NightRest / NocnyMarsz / Nocleg / NightClock 0; NO-7 dlug odlozony wedlug reguly (B = A przy X >= Y, B = min(3, A+1) przy X < Y);
+    NO-8 po "sen w menu przerwany" najblizszy swit gracza ma "sen w menu nie"; NO-9 (INFO) zdarzenia nocy gracza i godziny pomieszane przez zegar gry.
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NO-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sessions = []          # kazda: dict(start, dawns=[...], players=[...])
+    errs = 0
+    cut_pending = 0        # sen przerwany czeka na nastepny swit gracza
+    cut_ok = cut_bad = 0
+    ev = {"warn": 0, "camp": 0, "prompt": 0, "cut": 0, "defer": 0, "defer_up": 0, "defer_bad": 0, "msg": 0, "dawnsleep": 0}
+    camp_len = 6
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(NO_ERR):
+                    errs += 1
+                continue
+            mc = NO_CAMPCFG.match(s)
+            if mc:
+                a, b = int(mc.group(1)), int(mc.group(2))
+                camp_len = (b - a) % 24 or 6
+                continue
+            if s.startswith(NO_START):
+                if s.startswith(NO_START + "godzina ksiegi"):
+                    sessions.append({"start": s, "dawns": [], "players": []})
+                continue
+            if not sessions:
+                continue
+            cur = sessions[-1]
+            md = NO_DAWN.match(s)
+            if md:
+                nn = NO_NEW.search(s); mv = NO_MOVE.search(s); tk = NO_TICKS.search(s); ck = NO_CLOCK.search(s); gp = NO_GAP.search(s)
+                cur["dawns"].append(dict(day=int(md.group(1)), new1=int(nn.group(1)) if nn else None, move=int(mv.group(1)) if mv else None,
+                                         ticks=int(tk.group(1)) if tk else None, src=ck.group(1) if ck else None,
+                                         diff=int(ck.group(4)) if ck else None, diffn=int(ck.group(5)) if ck else None,
+                                         gap=gp.group(1) if gp else None))
+                continue
+            mp = NO_PLAYER.match(s)
+            if mp:
+                pm = NO_PMARCH.search(s)
+                cur["players"].append(dict(rest=float(mp.group(1)), sleep=mp.group(2), bad="NIEZGODNY" in s, fields=pm is not None))
+                if cut_pending:
+                    if mp.group(2) == "nie":
+                        cut_ok += 1
+                    else:
+                        cut_bad += 1
+                    cut_pending = 0
+                continue
+            if s.startswith("NocnyMarsz: gracz idzie noca - ostrzezenie"):
+                ev["warn"] += 1
+            elif s.startswith("Nocleg: gracz - oboz automatyczny"):
+                ev["camp"] += 1
+            elif s.startswith("Nocleg: gracz - zmierzch"):
+                ev["prompt"] += 1
+            elif s.startswith("Nocleg: sen w menu przerwany"):
+                ev["cut"] += 1
+                cut_pending = 1
+            elif s.startswith("NocnyMarsz: gracz - komunikat switu"):
+                ev["msg"] += 1
+            elif s.startswith("Nocleg: swit we snie"):
+                ev["dawnsleep"] += 1
+            # rozliczenia dlugu odlozonego: pobudka, sen przerwany, drugi swit we snie (linia "sen w menu przerwany" powtarza kawalek - bez niej)
+            if s.startswith("Nocleg: ") and "dlug odlozony:" in s and not s.startswith("Nocleg: sen w menu przerwany"):
+                mm = NO_DEFER.search(s)
+                if mm:
+                    x, y, a, b = float(mm.group(1)), float(mm.group(2)), int(mm.group(3)), int(mm.group(4))
+                    ev["defer"] += 1
+                    if b > a:
+                        ev["defer_up"] += 1
+                    # w sluzbie ROT dlug bez zmian (B = A takze przy X < Y)
+                    want = a if (x >= y or "w sluzbie ROT" in s) else min(3, a + 1)
+                    if b != want:
+                        ev["defer_bad"] += 1
+    print(f"plik: {logp} | sesji z paczka {len(sessions)}, switow AI {sum(len(x['dawns']) for x in sessions)}, "
+          f"switow gracza {sum(len(x['players']) for x in sessions)}, dlugosc obozu {camp_len} h")
+    if not sessions:
+        rep.add("NO-0: linia startu zegara ksiegi", "brak linii", "INFO (wersja sprzed noc-oboz)", None)
+        rep.show()
+        return 0
+    # NO-0
+    tak = sum(1 for x in sessions if "gry TAK" in x["start"])
+    off = sum(1 for x in sessions if "gry wylaczona" in x["start"])
+    nie = len(sessions) - tak - off
+    rep.add("NO-0: zegar ksiegi z terminu ticku gry (kazda sesja)", f"sesji {len(sessions)}: TAK {tak}, NIE (zapas licznikowy) {nie}, klucz wylaczony {off}; "
+            f"ostatnia: {sessions[-1]['start'][len(NO_START):][:200]}", "TAK w kazdej sesji z kluczem", (nie == 0 and tak > 0) if tak + nie > 0 else None)
+    if tak + nie == 0:
+        rep.add("NO-1..NO-9", "klucz NightLedgerClock wylaczony we wszystkich sesjach", "INFO", None)
+        rep.show()
+        return 0
+    # NO-1..NO-4 (swity AI)
+    holes, gaps, n1, ticks_bad, move_bad, new1 = [], 0, 0, [], [], []
+    srcs = {}
+    diff_sum = diff_n = 0
+    for x in sessions:
+        ds = x["dawns"]
+        for i, d in enumerate(ds):
+            srcs[d["src"]] = srcs.get(d["src"], 0) + 1
+            if d["diff"] is not None:
+                diff_sum += d["diff"]; diff_n += d["diffn"]
+            if i == 0:
+                continue
+            n1 += 1
+            if d["day"] != ds[i - 1]["day"] + 1:
+                holes.append((ds[i - 1]["day"], d["day"]))
+            if d["gap"] not in ("0", "-"):
+                gaps += 1
+            if d["ticks"] != 24:
+                ticks_bad.append((d["day"], d["ticks"]))
+            if d["move"] != camp_len:
+                move_bad.append((d["day"], d["move"]))
+            if d["new1"] is not None:
+                new1.append((d["new1"], d["day"]))
+    rep.add("NO-1: swity AI kolejne, bez dob bez switu", f"switow poza pierwszym w sesji {n1}, dziur w numerach {len(holes)}" + (f" (np. {holes[:4]})" if holes else "")
+            + f", 'dob bez switu' > 0: {gaps}", "0 / 0", (len(holes) == 0 and gaps == 0) if n1 > 0 else None)
+    rep.add("NO-2: 24 tiki ksiegi na dobe", f"linii z innym licznikiem {len(ticks_bad)} z {n1}" + (f" (np. {ticks_bad[:5]})" if ticks_bad else ""),
+            "0 (poza pierwszym switem sesji)", (len(ticks_bad) == 0) if n1 > 0 else None)
+    rep.add("NO-3: godziny obozu w pomiarze ruchu", f"linii z innym niz {camp_len} h: {len(move_bad)} z {n1}" + (f" (np. {move_bad[:5]})" if move_bad else ""),
+            f"0 ('pomiar z pozycji, {camp_len} h')", (len(move_bad) == 0) if n1 > 0 else None)
+    if new1:
+        mx = max(new1)
+        avg = sum(v for v, _ in new1) / len(new1)
+        rep.add("NO-4: nowy dlug 1 na swit (AI)", f"maks. {mx[0]} (dzien {mx[1]}), sr. {avg:.1f} na {len(new1)} switow", "<= 40 (przed poprawka 116-423, dobra faza <= 18)",
+                mx[0] <= 40)
+    else:
+        rep.add("NO-4: nowy dlug 1 na swit (AI)", "brak switow poza pierwszym w sesji", "<= 40", None)
+    # NO-5 (gracz)
+    na = sum(len(x["dawns"]) for x in sessions)
+    npl = sum(len(x["players"]) for x in sessions)
+    over, bad, nof = [], 0, 0
+    for x in sessions:
+        for i, p in enumerate(x["players"]):
+            bad += 1 if p["bad"] else 0
+            nof += 0 if p["fields"] else 1
+            if i > 0 and p["rest"] > 18.45:
+                over.append(p["rest"])
+    rep.add("NO-5: ksiega gracza o swicie", f"linii gracza {npl}, linii AI {na}; odpoczynek > 18.45 h poza pierwszym w sesji: {len(over)}"
+            + (f" (maks. {max(over):.1f})" if over else "") + f"; NIEZGODNY {bad}; bez nowych pol {nof}",
+            "gracz = AI, 0, 0, 0", npl == na and not over and bad == 0 and nof == 0)
+    # NO-6
+    rep.add("NO-6: bledy NightRest / NocnyMarsz / Nocleg / NightClock", f"ERROR {errs}", "0", errs == 0)
+    # NO-7
+    rep.add("NO-7: dlug odlozony do pobudki wedlug reguly", f"rozliczen {ev['defer']} (z dlugiem +1: {ev['defer_up']}), niezgodnych {ev['defer_bad']}",
+            "0 niezgodnych", (ev["defer_bad"] == 0) if ev["defer"] > 0 else None)
+    # NO-8
+    rep.add("NO-8: sen przerwany poza menu -> nastepny swit 'sen w menu nie'", f"przerwan {ev['cut']}: swit potem 'nie' {cut_ok}, 'tak' {cut_bad}",
+            "0 'tak'", (cut_bad == 0) if cut_ok + cut_bad > 0 else None)
+    # NO-9 (INFO)
+    rep.add("NO-9: noc gracza (INFO)", f"ostrzezenia o marszu {ev['warn']}, oboz automatyczny {ev['camp']}, zmierzch (pytanie / rozkaz) {ev['prompt']}, "
+            f"sen przerwany {ev['cut']}, swit we snie z dlugiem odlozonym {ev['dawnsleep']}, komunikaty switu w logu {ev['msg']}; "
+            f"zrodlo godziny ksiegi w liniach switu {srcs}; tikow z godzina zegara inna niz ksiegi {diff_sum} z {diff_n}"
+            + (f" ({100.0 * diff_sum / diff_n:.0f}%)" if diff_n else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ kiesa2 (15.10, decyzja Jeffa "napraw to, najwyzej zwieksz podatki"; Armoury/src/TownFolk.Hoard.cs)
 K2_HEAD = "Podatek od nadwyzki ludu (kiesa2): "
 K2_DAY = re.compile(r"Podatek od nadwyzki ludu \(kiesa2\): dzien (\d+) \| stawka ([\d.]+)%/d .*?\| pobrano (\d+) z (\d+) osad \(miasta (\d+), zamki (\d+); rodow (\d+)\): "
@@ -27380,6 +27567,8 @@ def main(argv):
         return wyspywolni_main(logp, start_arg, until_arg, bdp, csp, cspb)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
+    if group == "noboz" and logp:
+        return noboz_main(logp)   # noc-oboz (noc 15/16.10): zegar ksiegi snu z terminu ticku, straznik snu w menu, nocny marsz powiedziany wprost
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
