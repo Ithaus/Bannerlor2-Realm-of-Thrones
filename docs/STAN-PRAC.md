@@ -2486,3 +2486,4 @@ tekstura proporczyka.
    razem z produkcja (ZC3) i koszykami stanow (ZC4) - inaczej popyt nie odpowiada modelowi. Test 120 dob: kazdy towar 0.95-1.05 w pierwszych 28 dobach, obieg zamkniety.
 4. Wgranie po udanych testach. 5. Jesli czas: przysiolki na pustkowiach, zajazdy, +15% drogi ROT (dane sondy roz/geo-dane).
 Rano: docs/RAPORT-NOCNY-2026-10-17.md.
+TERMIN: gra gotowa 17.10 10:00 CEST = 01:00 PDT (zegar komp.); ostatnie wgranie do ok. 00:15 PDT, co nie przeszlo testu - nie wgrywac.
