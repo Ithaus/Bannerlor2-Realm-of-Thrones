@@ -2443,3 +2443,6 @@ premia wazona ludzmi; pieniadze do kiesy mieszczan (TownFolk.Earn); okno lupu - 
 Premia predkosci podnosi takze LimitMax MarchPace (krytyczna uwaga recenzji). Dom gracza (RealisticCaptivity Homes) - pominiety. Klucze TownInns, TownInnPriceBonus.
 Test (Armoury-2026-10-16_12-51-32.log): 5 dob + 2 bitwy, 0 ERROR, nkarczmy 7 / nbitwa 17 / nturniej 7 progow - 0 NIE. Menu nie sprawdzone automatem.
 DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Audyt predkosci" powyzej limitu marszu, linia "Karczmy (KA)".
+- Jeff dopisal (wiazace): "w opisie wioski - jak w cos inwestuje ... ze mam tam inwestycje i ile procent produkcji i w co. Poboczne wioski moga produkowac - kazda pojedyncza
+  cos innego w danym obszarze, wiadomo w sniegu nie robimy oliwek, i sumuje sie wszystkie wioski poboczne regionu i pokazuje sie ten zasob, ktorego produkcja (ikona) jest glowna".
+  -> projekt inwestycji wznowiony z tym wymaganiem (+ rozpoznanie specjalizacji: towary ROT, klimat, teren, ikona wsi) - specjalizacja wiosek i inwestycje projektowane RAZEM.
