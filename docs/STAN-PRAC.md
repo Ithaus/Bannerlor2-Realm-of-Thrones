@@ -2215,3 +2215,32 @@ w-toku/noc-misje, noc-harmony, noc-sprzet (filtr sprzetu + zbrojownia gracza), n
   Scalone do w-toku/zbior-e8 (zb/int): noc-misje (a3211d9d), noc-oboz (3dd2e2e8; dispatch noboz recznie przeniesiony poza petle argumentow), noc-skarbiec (bbb91b9c), noc-drobne (6164fb75).
   W TOKU autotest fin50a (6164fb75, zapis F d240, 15 dob). Baza wydajnosci WGRANIA 61: 18.9 s/dobe, Armoury 7% klatki (scratchpad test/BAZA-61.txt).
   DECYZJA CLAUDE: straznik Harmony (noc-harmony) tylko raportuje, nie przestawia latek sam (recenzja: dubel latki i Unpatch na metodzie pochodnej) - drewno juz dziala, innych zepsutych latek 0 z ok. 470.
+
+### 42. WGRANIE 62 (16.10 noc, ok. 18:50 zegara komp.) - START TUTAJ
+W grze: `w-toku/zbior-e8` **2ffbdfc1** (= `noc/wgranie-62`; DLL zbudowane z 2035120c - pozniej tylko narzedzie) | Armoury cbd3651b, CrashScribe 5d4de3a6,
+CrashScribe.settings.xml a2b76ff9; RC/GT/FV bez zmian. Kopie: *.bak-2026-10-16-wgranie62-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie62-przed.
+Zapis Jeffa przed wgraniem: D:/Backup-Bannerlord/zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-15-1212-noc-przed.sav (md5 31199349, bez zmian od 12:12).
+Zawartosc (8 galezi nocy, kazda: rozpoznanie -> kod -> recenzja -> poprawki; szczegoly w CHANGELOG):
+- noc-misje (NM): Team.Invalid (widzowie pojedynku z hersztem, turnieje) pomijani w alarmie kryjowki, odwrocie rannych, ucieczce z pola, mistrzu bloku, liczeniu zabic;
+  ranni uciekaja tylko w bitwie na mapie (WoundedFleeBattlesOnly); wyjatek na czlowieka, nie na takt; linia "Druzyny w misji (NM)" po misji.
+- noc-oboz (noboz): zegar ksiegi snu z terminu ticku gry (17 z 44 switow Jeffa gubionych przy szybkim czasie; AI 203-423 partii z dlugiem naraz), straznik snu w menu
+  (atak w czasie snu), splata dlugu calym snem, oboz automatyczny poza osada noca z komunikatem, ostrzezenie i raport switu (NightLedgerClock, PlayerSleepGuard, NightMarchNotice).
+- noc-skarbiec (nskarbiec): banda z kryjowka odnosi codziennie 25% kiesy do kasy kryjowki; przeszukanie/bitwa gracza - komunikaty "The outlaws carried X" / "The hideout held Y";
+  kryjowka rozbita przez AI - zloto zwyciezcy. Test 40 dob: kryjowki 40 -> 140 tys. zl.
+- noc-drobne: AUD-P1-5 dorobione 2 tytuly wsi BK (Guntak, Volug przy Omber - CrashScribe BkTitlesVillageFix), OB6 oboz-widmo (SiegePhantomLift), AB-10 prog INFO, D10 instrukcja robocza.
+- noc-harmony (nharmony): linia "Latki czynnego modelu (HT)" - straznik PatchProcessor.Patch/Unpatch liczy latki, ktore nie weszly. DECYZJA CLAUDE: PatchTargetGuard = false
+  (tylko raport; przestawianie celu grozilo dublami). Przyczyna drewna: Harmony rzuca ArgumentException, finalizer BKROTPatch polyka (CLAUDE.md rozdz. 7).
+- noc-oblezenia (nobl): szturm AI do konca bitwy (SiegeAssaultRunsToEnd), okup po odparciu tylko przy przewadze < 4:1, trebusz AI w mur, armie BK bez pustych wezwan
+  (GentryBannersNeedVassalParty - armie rozwiazane w dniu zalozenia 14.1/d -> 0, armii AI 9 -> 17), linia KO (przyczyna konca oblezenia). OB2 i OB5 bez zmian.
+- noc-ceny (nceny): kusze 1.75 x luk tej samej sily (crossbow_f 27 -> 117 d), kuznia i zakupy AI wedlug sily; owoce i miod we wsiach wedlug wag BK (marchew i jablka ok. 250/d,
+  indeks jablek 9.95 -> 2.5-6.7), zamienniki brakujacego jedzenia (FoodSubstituteShare 0.5), syty lord nie przeplaca (x2.5); towarzysze: cena = pol sprzetu + 20 dni zoldu
+  (mediana 2041 zamiast ok. 14.8 tys.), umiejetnosci morskie liczone jak role.
+- noc-sprzet (nsprzet): GearFit - jeden filtr "czy zolnierz tego uzyje" (umiejetnosc, siodlo, kultura z krewnymi stylami ROT) przy zakupie notabla, przekazaniu kompletu,
+  dobytku t1, weteranach, zakupach zbrojowni, u lordow AI i zalog; nieuzywalne sprzedawane (nic nie znika); podloga broni w bitwie (nikt piesciami, gdy w zbrojowni jest bron);
+  RealmWard bez wzorca z niczego (CrashScribe). Zbrojownia gracza: widok tylko Twoje (ArmouryShowsOnlyYours), wymiana zwraca stary sprzet zolnierza (SwapReturnsTheirOldKit),
+  ludzie sprzedaja zbedne konie (PlayerMenSellSpareHorses).
+Testy: zapis F d240 15 dob (4 galezie), 8 dob z profilem, 40 dob (6 galezi), nowa kampania 15 dob (8 galezi), zapis F 25 dob (8 galezi): Armoury 0 ERROR, wszystkie nowe grupy TAK
+(poza kalibracja NC-15b/NC-16a/NC-16b), znane NIE bez zmian (OB-4, AB-11b, OB2-6a). Predkosc 17.8-20.5 s/dobe (baza 18.9). Misji (kryjowka, turniej, bitwa gracza) autotest nie gra -
+sprawdzic w logu Jeffa: "Druzyny w misji (NM)", NS-8 podloga broni, NS-15..18 zbrojownia.
+Narzedzie: naprawione kolizje nazw globalnych w sprawdz_logi.py (O2_START obieg2 -> OBG2_START - grupa oblezenia2 wywracala sie od 15.10; NS_CTL/NS_STUM nsprzet -> NSP_*).
+W TOKU: noc-ekonomia (recenzja), noc-wydajnosc (kod) -> scalenie, test, WGRANIE 63.
