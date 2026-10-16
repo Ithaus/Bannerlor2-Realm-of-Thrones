@@ -31681,6 +31681,8 @@ NBW_LINE = re.compile(
     r"\| krew przez pancerz (TAK|NIE) \(RBMCombat (TAK|NIE)\): bryzgi (\d+) \(przez pancerz (\d+), smiertelne (\d+)\), odrzucone limitem (\d+), "
     r"zla kosc (\d+) "
     r"\| okrzyki i jeki (TAK|NIE): szarze (\d+) \(okrzykow (\d+), roznych ludzi (\d+)\), jeki (\d+) \(rannych (\d+)\), odrzucone limitem (\d+) )?"
+    # 16.10 ForeignVoices: stan obcych modow glosow (BA / IB) - grupa opcjonalna
+    r"(?:\| obce glosy: [^|]+ )?"
     r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))? "
     r"\(sesja (\d+), linia misji (\d+)\)\.$")
 NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
