@@ -2478,3 +2478,11 @@ bieg-bitwa.ps1 przenosza arm_houses_canon.tsv. Test (Armoury-2026-10-16_14-49-31
 UWAGA: limit tekstur herbow 160 (1024x1024, ok. 4 MiB) do najblizszej misji - po dlugim zwiedzaniu bez misji czesc wiosek pokazuje herb pana (w tescie 125); do rozwazenia mniejsza
 tekstura proporczyka.
 - MODEL RECE I SPRZET (Jeff 16.10: "czy wszyscy pracuja, czy sa bezrobotni ... inwestycje: sieci, lodzie, narzedzia"): produkcja = min(ludzie zdolni do pracy, miejsca pracy) x wydajnosc (jedna dla swiata: zajecie x ziemia x klimat); wolne rece = niedozatrudnienie (przedza w domu, najem w zniwa, migracja do miast, nizszy Dostatek); inwestycja = nowe miejsca pracy albo wydajnosc; zysk zalezy od wolnych rak. START (Jeff: "produkcji ma byc tyle, ze jest mniej wiecej max -5% +5%"): kalibracja ustawia LICZBE MIEJSC PRACY w okregach (ziemia i ludzie) tak, by swiat mial 95-105% potrzeb kazdego towaru; wydajnosci nie rusza; braku nie latac. Dopisac do PROJEKT-KALIBRACJA-STARTU po workflow wf_ef9562a5-85b.
+
+### 61. NOC 16/17.10 - PLAN (Jeff: "pracowac w nocy, aby wszystko zrobic, skonczyc, sprawdzic i ustawic, aby bylo idealnie skalibrowane")
+1. ZC0 pomiar (wf_07d475bf-4e3) -> scalenie, test 120 dob (zapis F), wgranie.
+2. ZC1 naprawy dziwactw towarow (mieso wieloryba, aksamit x10, sol, deski, wegiel/sztabki, towary BK z niczego ~1460/d, nieznane +34/-17).
+3. Kalibracja startu (wf_ef9562a5-85b + model rece i sprzet): miejsca pracy w okregach tak, by swiat mial 95-105% potrzeb kazdego towaru; wydajnosc jedna dla swiata;
+   razem z produkcja (ZC3) i koszykami stanow (ZC4) - inaczej popyt nie odpowiada modelowi. Test 120 dob: kazdy towar 0.95-1.05 w pierwszych 28 dobach, obieg zamkniety.
+4. Wgranie po udanych testach. 5. Jesli czas: przysiolki na pustkowiach, zajazdy, +15% drogi ROT (dane sondy roz/geo-dane).
+Rano: docs/RAPORT-NOCNY-2026-10-17.md.
