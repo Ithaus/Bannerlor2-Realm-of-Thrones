@@ -6184,7 +6184,7 @@ namespace Armoury
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool BesiegedReliefKingsArmy { get; set; } = true;
 
-        [SettingPropertyBool("Siege Phantom Lift", HintText = "A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted) for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not the player's camp or army, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege")]
+        [SettingPropertyBool("Siege Phantom Lift", HintText = "A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted), or whose parties together have a strength below 1 in the game's own reckoning, for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not a camp with the player's own party, the player's army or a party of the player's clan, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege")]
         [SettingPropertyGroup("Siege camps without fighting men")]
         public bool SiegePhantomLift { get; set; } = true;
 

@@ -757,8 +757,9 @@ Uzycie (Python 3, tylko odczyt):
                     potkniecia 0; UN-1, UN-8, UN-10, UN-12 INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa ndrobne   : (noc-drobne 16.10; Armoury/src/SiegePhantomLift.cs, CrashScribe/src/BkTitles.cs) python -I tools/sprawdz_logi.py --grupa ndrobne
                     <Armoury-*.log> [--crashscribe <session-*.log>] (strumieniowo). OB6 oboz bez sily: ND-0 linia startu (klucz SiegePhantomLift tak,
-                    wpiete 4/4 typy oblezen fabuly ROT), ND-1 potkniecia 0 i ERROR in SiegePhantomLift 0, ND-2 obozy w liniach doby: dob <= SiegePhantomLiftDays
-                    i oblezen nadal trwajacych po zdjeciu 0 (brak linii doby - INFO), ND-3 zdjete / pominiete (INFO), ND-4 zwiniete oblezenie sledzone przez OB5 -
+                    wpiete 4/4 typy oblezen fabuly ROT, droga zapasowa RemoveSiegePartyInternal wpieta), ND-1 potkniecia 0 i ERROR in SiegePhantomLift 0, ND-2 obozy
+                    w liniach doby: dob <= SiegePhantomLiftDays i oblezen nadal trwajacych po zdjeciu 0 (brak linii doby - INFO), ND-3 zdjete (w tym droga
+                    zapasowa), powod (zdrowi / sila), pominiete (INFO), ND-4 zwiniete oblezenie sledzone przez OB5 -
                     'Odsiecz (OB5) koniec' z wynikiem 'utrzymane' (brak zwiniec - INFO); AUD-P1-5 (z --crashscribe): ND-5 linia dorobki tytulow wsi BK -
                     zostalo 0, nie dodane 0, potkniec 0 (klucz BkTitlesVillageFix false - INFO). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -26135,9 +26136,10 @@ def _audytb_p4(logp):
     rep.add("AB-10: (AM-13) predkosc na morzu - wpisy NavalDLC w probkach > 0, powtorzone 0 (proporcja teraz/bez naprawy INFO)",
             (f"dob z partiami na morzu {len(rs)} (partio-probek {nsea}): x{avg:.2f} (INFO: wzor War Sails, u Jeffa x0.97, test fin32 x0.93)"
              + (" UWAGA: teraz = bez naprawy - lancuch NavalDLC nie dziala?" if ab10_same else "")
-             + f"; probek {smp}, z wpisem NavalDLC {open_sea}, powtorzone wpisy niezerowe {dup} (wszystkie powtorzone nazwy {dup_all}, INFO)") if avg is not None else "brak dob z partiami na morzu",
-            "probki z wpisem NavalDLC > 0 (albo brak probek), powtorzone niezerowe 0 (klucz predkosc; inaczej INFO)",
-            (dup == 0 and (open_sea > 0 or smp == 0)) if (avg is not None and on("predkosc")) else None)
+             + f"; probek {smp}, z wpisem NavalDLC {open_sea}, powtorzone wpisy niezerowe {dup} (wszystkie powtorzone nazwy {dup_all}, INFO)"
+             + ("; brak probek - INFO" if smp == 0 else "")) if avg is not None else "brak dob z partiami na morzu",
+            "probki z wpisem NavalDLC > 0, powtorzone niezerowe 0 (klucz predkosc i probki > 0; inaczej INFO)",
+            (dup == 0 and open_sea > 0) if (avg is not None and on("predkosc") and smp > 0) else None)   # noc-drobne po recenzji: smp == 0 to brak dowodu, nie TAK
     lastp = next((x for x in reversed(days) if x[7].strip() not in ("", "-")), days[-1])
     rep.add("AB-10b: (AM-13) probki predkosci - ostatnia doba z probkami (INFO)", f"dzien {lastp[0]}: {lastp[7].strip()[:600]}; lad (gracz): {lastp[8]}",
             "INFO (lad: teraz = bez naprawy, poza zaciagiem ROT +20% i eskorta karawan BEE)", None)
@@ -27276,8 +27278,10 @@ def korona2_main(logp):
 
 # ------------------------------------------------------------ ndrobne (noc-drobne 16.10: OB6 oboz bez sily - Armoury SiegePhantomLift; AUD-P1-5 dorobka tytulow wsi BK - CrashScribe)
 ND_START = re.compile(r"Oboz bez sily \(OB6\): start sesji \| klucz SiegePhantomLift (tak|nie), dob (\d+), ponizej (\d+) zdolnych do walki \| pomijane: .*?\(wpiete (\d+)/(\d+)([^)]*)\)")
-ND_DAY = re.compile(r"Oboz bez sily \(OB6\): dzien (\d+) \| obozow ponizej (\d+) zdolnych do walki (\d+)(?: \[(.*)\])? \| zdjete dzis (\d+) \(od sesji (\d+)\), druzyn odeslanych (\d+),"
-                    r" oblezen nadal trwajacych po zdjeciu (\d+) \| pominiete: gracz (\d+), fabula ROT (\d+), Inni (\d+), w bitwie (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.")
+ND_DAY = re.compile(r"Oboz bez sily \(OB6\): dzien (\d+) \| obozow ponizej (\d+) zdolnych do walki(?: \(albo sila obozu < \d+\))? (\d+)(?: \[(.*)\])? \| zdjete dzis (\d+) \(od sesji (\d+)\),"
+                    r" druzyn odeslanych (\d+), oblezen nadal trwajacych po zdjeciu (\d+) \| pominiete: gracz (\d+), fabula ROT (\d+), Inni (\d+), w bitwie (\d+) \| potkniecia (\d+)"
+                    r" \(sesja (\d+)\)(?: \| droga zapasowa (\d+))?\.")
+ND_FB = re.compile(r"droga zapasowa RemoveSiegePartyInternal (wpieta|BRAK)")
 ND_ROW = re.compile(r"([^;\[]+?) \(([^()\s]+)\): druzyn (\d+), zdrowi (\d+), ranni (\d+), sila (-?\d+), dob (\d+)(.*?)(?=; [^;]+? \([^()\s]+\): druzyn |$)")
 ND_OB5_END = re.compile(r"Odsiecz \(OB5\) koniec: dzien (\d+) \| .*? \(([^,()\s]+), (?:stolica|miasto|zamek)\) .*\| wynik: (\S+) \(([^)]*)\)\.")
 
@@ -27295,7 +27299,7 @@ def ndrobne_main(logp, csp=None):
     armp = logp if logp and os.path.isfile(logp) and not os.path.basename(logp).lower().startswith("session-") else None
     if csp is None and logp and os.path.basename(logp).lower().startswith("session-"):
         csp = logp
-    starts, days, errs, ob5_end, ob5_seen = [], [], 0, [], set()
+    starts, days, errs, ob5_end, ob5_seen, fbw = [], [], 0, [], set(), []
     if armp:
         with open(armp, encoding="utf-8", errors="replace") as fh:
             for ln in fh:
@@ -27309,6 +27313,8 @@ def ndrobne_main(logp, csp=None):
                 mm = ND_START.search(s)
                 if mm:
                     starts.append(mm.groups())
+                    mf = ND_FB.search(s)
+                    fbw.append(mf.group(1) if mf else None)   # None = linia sprzed poprawek recenzji (bez drogi zapasowej)
                     continue
                 mm = ND_DAY.search(s)
                 if mm:
@@ -27334,9 +27340,11 @@ def ndrobne_main(logp, csp=None):
             elif not on:
                 rep.add("ND-0: (OB6) linia startu", f"klucz SiegePhantomLift nie (linii {len(starts)})", "INFO (klucz wylaczony = stan 39f8fe72)", None)
             else:
-                rep.add("ND-0: (OB6) linia startu - klucz tak, typy oblezen fabuly ROT wpiete 4/4",
-                        f"linii {len(starts)}; ostatnia: dob {st[1]}, ponizej {st[2]} zdolnych, wpiete {st[3]}/{st[4]}{st[5]}",
-                        "klucz tak, wpiete 4/4 (ROT 8.1.8)", st[3] == st[4] == "4")
+                fbl = fbw[-1] if fbw else None
+                rep.add("ND-0: (OB6) linia startu - klucz tak, typy oblezen fabuly ROT wpiete 4/4, droga zapasowa wpieta",
+                        f"linii {len(starts)}; ostatnia: dob {st[1]}, ponizej {st[2]} zdolnych, wpiete {st[3]}/{st[4]}{st[5]}"
+                        + f", droga zapasowa RemoveSiegePartyInternal {fbl if fbl else '- (linia bez pola)'}",
+                        "klucz tak, wpiete 4/4 (ROT 8.1.8), droga zapasowa wpieta (gra 1.4.8)", st[3] == st[4] == "4" and fbl != "BRAK")
             stl = sum(int(g[12]) for g in days)
             rep.add("ND-1: (OB6) potkniecia w liniach doby i ERROR in SiegePhantomLift", f"potkniecia (suma dob) {stl}, ERROR {errs}", "0, 0", stl == 0 and errs == 0)
             if not days:
@@ -27357,8 +27365,17 @@ def ndrobne_main(logp, csp=None):
             lifted = sum(int(g[4]) for g in days)
             sk = [sum(int(g[i]) for g in days) for i in (8, 9, 10, 11)]
             last = days[-1] if days else None
+            fbn = sum(int(g[14]) for g in days if g[14])
+            why = {}
+            for g in days:
+                for r in ND_ROW.finditer(g[3] or ""):
+                    mw = re.search(r", powod ([a-z ]+?)(?: \(|,|$)", r.group(8))
+                    if mw:
+                        why[mw.group(1)] = why.get(mw.group(1), 0) + 1
             rep.add("ND-3: (OB6) zdjete i pominiete (INFO)",
-                    f"zdjete razem {lifted}, druzyn odeslanych {sum(int(g[6]) for g in days)}; pominiete (doby-oboz): gracz {sk[0]}, fabula ROT {sk[1]}, Inni {sk[2]}, w bitwie {sk[3]}"
+                    f"zdjete razem {lifted}, druzyn odeslanych {sum(int(g[6]) for g in days)}, w tym droga zapasowa (RemoveSiegePartyInternal) {fbn}"
+                    + (f"; powod (wiersze obozow): {', '.join(f'{k} {v}' for k, v in sorted(why.items()))}" if why else "")
+                    + f"; pominiete (doby-oboz): gracz {sk[0]}, fabula ROT {sk[1]}, Inni {sk[2]}, w bitwie {sk[3]}"
                     + (f"; ostatnia linia d{last[0]}: {(last[3] or '-')[:300]}" if last else ""), "INFO", None)
             lifts = []
             for g in days:

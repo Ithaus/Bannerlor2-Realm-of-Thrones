@@ -24,12 +24,19 @@ namespace Armoury
     /// regula nie zalezy od tej przyczyny.
     ///
     /// REGULA (raz na dobe, po SiegeWalls2.Daily): oboz, w ktorym wszystkie druzyny razem maja mniej niz SiegePhantomMinMen (5) zdrowych ludzi
-    /// (MemberRoster.TotalHealthyCount - roster, nie EstimatedStrength: zywy oboz z sila 0 z modelu nie jest zwijany), przez SiegePhantomLiftDays (3) doby
+    /// (MemberRoster.TotalHealthyCount z rostera) albo sila obozu < 1 (drugi powod, nizej), przez SiegePhantomLiftDays (3) doby
     /// z rzedu, zwija sie droga gry przy pokoju (Helpers/FactionHelper.cs:337-338): kazda druzyna obozu BesiegerCamp = null (wodz armii zabiera
     /// przylaczonych), a kazda druzyna poza armia i kazdy wodz armii SetMoveModeHold - wybiera nowy cel. Ostatnia druzyna wychodzi, gra konczy
     /// oblezenie (FinalizeSiegeEvent -> OnSiegeEventEnded), wiec nasluchy konca oblezenia dzialaja jak zwykle (SiegeRansom, SiegeWalls OB4, BesiegedRelief
-    /// "utrzymane", EnemyCaravans). Doba w bitwie nie liczy sie i nie zeruje serii; doba z co najmniej MinMen zdrowymi zeruje serie.
-    /// POMIJANE (seria zerowana): oboz z druzyna gracza albo z jego armia i oblezenie, w ktorego murach stoi gracz (gra prowadzi go menu oblezenia);
+    /// "utrzymane", EnemyCaravans). Doba w bitwie nie liczy sie i nie zeruje serii; doba z co najmniej MinMen zdrowymi (i sila obozu >= 1) zeruje serie.
+    /// DRUGI POWOD "bez sily" (po recenzji): suma EstimatedStrength druzyn obozu < 1 (StrMin), tylko gdy sile dalo sie odczytac u kazdej druzyny. Dowod
+    /// znanego przypadku to "druzyn 1, sila 0" [L 6lat 20:19:35], liczby zdrowych w logu nie ma; przy modelu gry (DefaultMilitaryPowerModel :96-121, :244-247 -
+    /// najslabszy zolnierz 0.4, x0.7 przy niskim morale) 5 zdrowych to co najmniej 1.4, wiec warunek sily dziala tylko, gdyby inny model zanizal sile [P].
+    /// DROGA ZAPASOWA (po recenzji): druzyna, ktora po zejsciu dalej stoi na liscie obozu, a sama obozu u siebie nie ma (stan niespojny - wtedy setter
+    /// BesiegerCamp nic nie robi), jest zdejmowana wewnetrzna metoda gry BesiegerCamp.RemoveSiegePartyInternal (AccessTools.DeclaredMethod, raz na sesje):
+    /// usuwa ja z listy i przy zerze konczy oblezenie (BesiegerCamp.cs:224-245). Druzyny z obozem u siebie recznie nie ruszamy (setter juz probowal).
+    /// POMIJANE (seria zerowana): oboz z druzyna gracza, z jego armia albo z druzyna jego rodu (towarzysz jako dowodca - gracz nie dostalby komunikatu)
+    /// i oblezenie, w ktorego murach stoi gracz albo ktore gracz sam oblega (gra prowadzi go menu oblezenia);
     /// oblezenia fabuly ROT - czynne wydarzenie ROT.Events BlackwaterSiegeEvent / WallSiegeEvent / BastardsSiegeEvent / HarrenhalSiegeEvent (statyczne
     /// Instance, IsActive, SiegeLeaderParty w tym obozie; refleksja raz na sesje; CrashScribe, gdy rozstawia te oblezenia sam, wpisuje swojego dowodce
     /// w SiegeLeaderParty ROT); Inni (Undead.Party druzyny obozu, osada rodu Innych / kultury whitewalker - ROTOthersCampaignBehavior ma wlasne oblezenia).
@@ -37,8 +44,9 @@ namespace Armoury
     /// B6b/B6c - 'zamrozony na stale (flaga w sejwie)'), a zamrozony wodz nie zejdzie z oblezenia sam - wiersz linii pokazuje stan mysli wodza.
     /// Seria tylko w pamieci (bez zapisu): po wczytaniu liczy od zera. Zamknieta ekonomia: nikt nic nie placi i nic nie dostaje - druzyny odchodza z tym,
     /// co maja (zloto, ludzie, jency, jedzenie). Wyjatek na jednym obozie - potkniecie (licznik), reszta dalej; bez globalnego wylacznika.
-    /// Linie: "Oboz bez sily (OB6): start sesji" (OnSessionLaunched) i "Oboz bez sily (OB6): dzien N" (tylko, gdy jest oboz ponizej progu, zwiniecie
-    /// albo potkniecie). Klucz wylaczony = stan 39f8fe72 (oboz stoi, az cos innego skonczy oblezenie).
+    /// Linie: "Oboz bez sily (OB6): start sesji" (OnSessionLaunched; z "droga zapasowa RemoveSiegePartyInternal wpieta/BRAK") i "Oboz bez sily (OB6): dzien N"
+    /// (tylko, gdy jest oboz ponizej progu, zwiniecie albo potkniecie; wiersz obozu z "powod zdrowi / sila", koniec linii "droga zapasowa N").
+    /// Klucz wylaczony = stan 39f8fe72 (oboz stoi, az cos innego skonczy oblezenie).
     /// </summary>
     internal static class SiegePhantomLift
     {
@@ -60,6 +68,12 @@ namespace Armoury
         private sealed class StoryRef { public string Name; public FieldInfo Inst; public PropertyInfo Active; public FieldInfo Leader; }
         private static readonly List<StoryRef> _story = new List<StoryRef>();
         private static string _storyMissing = "";
+        // refleksja raz na sesje: SessionStart albo (gdyby OnSessionLaunched do niej nie doszedl) pierwsza doba - bez tego Daily zwijalby tez oblezenia fabuly ROT
+        private static bool _resolved;
+        // droga zapasowa: internal void BesiegerCamp.RemoveSiegePartyInternal(MobileParty) (gra 1.4.8, BesiegerCamp.cs:224)
+        private static MethodInfo _mRemove;
+        // drugi powod "bez sily": suma EstimatedStrength obozu ponizej tej wartosci
+        private const float StrMin = 1f;
 
         private static void Stumble(string where, Exception e)
         {
@@ -93,6 +107,33 @@ namespace Armoury
             _storyMissing = miss.Count > 0 ? "; brak: " + string.Join(", ", miss.ToArray()) : "";
         }
 
+        /// <summary>Refleksja sesji: typy fabuly ROT i droga zapasowa. Ustawia _resolved takze przy bledzie (bez powtarzania co dobe).</summary>
+        private static void Resolve()
+        {
+            _resolved = true;
+            ResolveStory();
+            _mRemove = null;
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(BesiegerCamp), "RemoveSiegePartyInternal", new[] { typeof(MobileParty) });
+                if (m != null && !m.IsStatic) _mRemove = m;
+            }
+            catch (Exception e) { Stumble("Resolve.Remove", e); }
+        }
+
+        /// <summary>Druzyny na liscie obozu (bez powtorzen). Wyjatek - potkniecie, zwraca to, co zebral.</summary>
+        private static List<MobileParty> Members(BesiegerCamp camp, string where)
+        {
+            var l = new List<MobileParty>(4);
+            try
+            {
+                foreach (var pb in camp.GetInvolvedPartiesForEventType())
+                    if (pb != null && pb.MobileParty != null && !l.Contains(pb.MobileParty)) l.Add(pb.MobileParty);
+            }
+            catch (Exception e) { Stumble(where, e); }
+            return l;
+        }
+
         /// <summary>Oblezenie fabuly ROT: czynne wydarzenie z wodzem (SiegeLeaderParty) w tym obozie. Null = nie.</summary>
         private static string Story(BesiegerCamp camp, List<MobileParty> parties)
         {
@@ -116,10 +157,12 @@ namespace Armoury
             var main = MobileParty.MainParty;
             if (main == null) return false;
             if (ReferenceEquals(main.CurrentSettlement, st) || ReferenceEquals(main.BesiegedSettlement, st)) return true;
+            var pc = Clan.PlayerClan;
             for (int i = 0; i < parties.Count; i++)
             {
                 var p = parties[i];
                 if (ReferenceEquals(p, main) || (p.Army != null && ReferenceEquals(p.Army.LeaderParty, main))) return true;
+                if (pc != null && ReferenceEquals(p.ActualClan, pc)) return true;   // druzyna rodu gracza (towarzysz jako dowodca)
             }
             return false;
         }
@@ -142,11 +185,13 @@ namespace Armoury
         {
             _days.Clear(); _err.Clear();
             _liftedSess = _stumbles = _dStumbles = 0;
+            _resolved = false;
             try
             {
-                ResolveStory();
+                Resolve();
                 Log.Info("Oboz bez sily (OB6): start sesji | klucz SiegePhantomLift " + (On ? "tak" : "nie") + ", dob " + LiftDays + ", ponizej " + MinMen + " zdolnych do walki"
-                         + " | pomijane: gracz (oboz, armia, w murach), oblezenia fabuly ROT (wpiete " + _story.Count + "/" + StoryTypes.Length + _storyMissing + "), Inni, bitwa w toku"
+                         + " | pomijane: gracz (oboz, armia, rod, w murach), oblezenia fabuly ROT (wpiete " + _story.Count + "/" + StoryTypes.Length + _storyMissing + "), Inni, bitwa w toku"
+                         + " | albo sila obozu < " + StrMin.ToString("0", Inv) + " | droga zapasowa RemoveSiegePartyInternal " + (_mRemove != null ? "wpieta" : "BRAK")
                          + " | seria dob tylko w pamieci (po wczytaniu od zera).");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -158,8 +203,9 @@ namespace Armoury
             if (!On) { _days.Clear(); _dStumbles = 0; return; }
             var mgr = Campaign.Current != null ? Campaign.Current.SiegeEventManager : null;
             if (mgr == null) return;
+            if (!_resolved) { try { Resolve(); } catch (Exception e) { _resolved = true; Stumble("Daily.Resolve", e); } }   // gdyby SessionStart nie ruszyl
             int min = MinMen, need = LiftDays;
-            int cand = 0, lifted = 0, sent = 0, still = 0, skPlayer = 0, skStory = 0, skOthers = 0, skBattle = 0, shown = 0;
+            int cand = 0, lifted = 0, sent = 0, still = 0, skPlayer = 0, skStory = 0, skOthers = 0, skBattle = 0, shown = 0, fbAll = 0;
             var rows = new StringBuilder(600);
             var live = new HashSet<SiegeEvent>();
             List<SiegeEvent> evs;
@@ -178,13 +224,15 @@ namespace Armoury
                         if (pb != null && pb.MobileParty != null && !parties.Contains(pb.MobileParty)) parties.Add(pb.MobileParty);
                     if (parties.Count == 0) continue;
                     live.Add(ev);
-                    int healthy = 0, wounded = 0; float str = 0f;
+                    int healthy = 0, wounded = 0; float str = 0f; bool strOk = true;
                     foreach (var p in parties)
                     {
                         if (p.MemberRoster != null) { healthy += p.MemberRoster.TotalHealthyCount; wounded += p.MemberRoster.TotalWounded; }
-                        try { if (p.Party != null) str += p.Party.EstimatedStrength; } catch { }
+                        try { if (p.Party != null) str += p.Party.EstimatedStrength; else strOk = false; } catch { strOk = false; }
                     }
-                    if (healthy >= min) { _days.Remove(ev); continue; }
+                    // bez sily: za malo zdrowych albo (sila odczytana u kazdej druzyny) suma sily < StrMin - nieudany odczyt sily nie robi z obozu kandydata
+                    bool fewMen = healthy < min, weak = strOk && str < StrMin;
+                    if (!fewMen && !weak) { _days.Remove(ev); continue; }
                     // kandydat - wykluczenia (seria zerowana; bitwa - doba bez liczenia, seria zostaje)
                     if (PlayerIn(st, parties)) { skPlayer++; _days.Remove(ev); continue; }
                     if (Story(camp, parties) != null) { skStory++; _days.Remove(ev); continue; }
@@ -196,7 +244,7 @@ namespace Armoury
                     d++;
                     _days[ev] = d;
                     bool lift = d >= need;
-                    int gone = 0; bool ended = false;
+                    int gone = 0, fb = 0; bool ended = false;
                     if (lift)
                     {
                         // droga gry przy pokoju (FactionHelper :337-338): druzyna obozu BesiegerCamp = null (wodz armii zabiera przylaczonych - MobileParty :716-719),
@@ -209,7 +257,24 @@ namespace Armoury
                             try { if (!p.IsMainParty && ReferenceEquals(p.BesiegerCamp, camp)) p.BesiegerCamp = null; }
                             catch (Exception e) { Stumble("Daily.Leave", e); }
                         }
-                        foreach (var p in parties) if (p.BesiegerCamp == null) gone++;
+                        // droga zapasowa: druzyna dalej na liscie obozu, a bez tego obozu u siebie (setter wyzej jej nie ruszyl) - RemoveSiegePartyInternal gry
+                        // (usuwa z listy, OnPartyLeftSiege, przy zerze SiegeEvent.FinalizeSiegeEvent). Druzyny z obozem u siebie nie ruszamy (stan druzyny bylby niespojny)
+                        if (_mRemove != null && ReferenceEquals(st.SiegeEvent, ev))
+                        {
+                            foreach (var p in Members(camp, "Daily.Left"))
+                            {
+                                try
+                                {
+                                    if (p.IsMainParty || ReferenceEquals(p.BesiegerCamp, camp)) continue;
+                                    _mRemove.Invoke(camp, new object[] { p });
+                                    fb++;
+                                }
+                                catch (Exception e) { Stumble("Daily.Fallback", e); }
+                            }
+                        }
+                        fbAll += fb;
+                        var rest = Members(camp, "Daily.Rest");
+                        foreach (var p in parties) if (!rest.Contains(p)) gone++;
                         foreach (var p in free)
                         {
                             try { if (p.IsActive && p.BesiegerCamp == null && p.MapEvent == null) p.SetMoveModeHold(); }
@@ -228,7 +293,9 @@ namespace Armoury
                         float food = 0f; bool starving = false;
                         try { food = lead.Food; starving = lead.Party != null && lead.Party.IsStarving; } catch { }
                         rows.Append(Nm(st)).Append(" (").Append(st.StringId).Append("): druzyn ").Append(parties.Count).Append(", zdrowi ").Append(healthy).Append(", ranni ").Append(wounded)
-                            .Append(", sila ").Append(str.ToString("0", Inv)).Append(", dob ").Append(d).Append(", wodz ").Append(lh != null ? Nm(lh) : "brak (druzyna bez bohatera)");
+                            .Append(", sila ").Append(str.ToString("0", Inv)).Append(", dob ").Append(d)
+                            .Append(", powod ").Append(fewMen && weak ? "zdrowi i sila" : fewMen ? "zdrowi" : "sila").Append(strOk ? "" : " (sila nieodczytana)")
+                            .Append(", wodz ").Append(lh != null ? Nm(lh) : "brak (druzyna bez bohatera)");
                         if (lh != null) rows.Append(" (ranny ").Append(lh.IsWounded ? "tak" : "nie").Append(", w niewoli ").Append(lh.IsPrisoner ? "tak" : "nie").Append(")");
                         bool frozen = false;
                         try { frozen = lead.Ai != null && lead.Ai.DoNotMakeNewDecisions; } catch { }
@@ -236,28 +303,26 @@ namespace Armoury
                         rows.Append(", frakcja ").Append(camp.MapFaction != null && camp.MapFaction.Name != null ? camp.MapFaction.Name.ToString() : "-")
                             .Append(", jedzenie ").Append(food.ToString("0.#", Inv)).Append(starving ? " (glod)" : "")
                             .Append(", oblezenie od ").Append(ev.SiegeStartTime.ElapsedDaysUntilNow.ToString("0.0", Inv)).Append(" dob");
-                        if (lift) rows.Append(ended ? ", ZDJETE (druzyn odeslanych " + gone + ")" : ", NIE ZDJETE (druzyn wyszlo " + gone + " z " + parties.Count + ")");
+                        string fbs = fb > 0 ? ", droga zapasowa " + fb : "";
+                        if (lift) rows.Append(ended ? ", ZDJETE (druzyn odeslanych " + gone + fbs + ")" : ", NIE ZDJETE (druzyn wyszlo " + gone + " z " + parties.Count + fbs + ")");
                         shown++;
                     }
                 }
                 catch (Exception e) { Stumble("Daily.camp", e); }
             }
-            // pamiec: oblezenia, ktorych juz nie ma
-            if (_days.Count > live.Count)
-            {
-                var gone = new List<SiegeEvent>();
-                foreach (var kv in _days) if (!live.Contains(kv.Key)) gone.Add(kv.Key);
-                foreach (var ev in gone) _days.Remove(ev);
-            }
+            // pamiec: oblezenia, ktorych juz nie ma (zawsze - kilka wpisow; wpis oblezenia zakonczonego inaczej trzymalby SiegeEvent z obozem do konca sesji)
+            var ended0 = new List<SiegeEvent>();
+            foreach (var kv in _days) if (!live.Contains(kv.Key)) ended0.Add(kv.Key);
+            foreach (var ev in ended0) _days.Remove(ev);
             int skipped = skPlayer + skStory + skOthers + skBattle;
             if (cand > 0 || skipped > 0 || _dStumbles > 0)
             {
                 try
                 {
-                    Log.Info("Oboz bez sily (OB6): dzien " + Today + " | obozow ponizej " + min + " zdolnych do walki " + cand + (shown > 0 ? " [" + rows + "]" : "")
+                    Log.Info("Oboz bez sily (OB6): dzien " + Today + " | obozow ponizej " + min + " zdolnych do walki (albo sila obozu < " + StrMin.ToString("0", Inv) + ") " + cand + (shown > 0 ? " [" + rows + "]" : "")
                              + " | zdjete dzis " + lifted + " (od sesji " + _liftedSess + "), druzyn odeslanych " + sent + ", oblezen nadal trwajacych po zdjeciu " + still
                              + " | pominiete: gracz " + skPlayer + ", fabula ROT " + skStory + ", Inni " + skOthers + ", w bitwie " + skBattle
-                             + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ").");
+                             + " | potkniecia " + _dStumbles + " (sesja " + _stumbles + ") | droga zapasowa " + fbAll + ".");
                 }
                 catch { }
             }
