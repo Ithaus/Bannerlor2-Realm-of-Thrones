@@ -2453,3 +2453,14 @@ DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Au
 - Jeff (zycie codzienne, duzy temat): kazdy towar - produkcja, kg/sztuke, cena za kg; produkcja pod potrzeby 52M ludzi (ok. 53M kg jedzenia/dzien, wedlug regionu i warstwy);
   codzienne wydatki ludzi, zamoznosc obszaru, awans spoleczny, wojny niszcza dobrobyt, wskaznik "zamoznosc na mieszkanca" (nie PKB), sklad warstw w regionie/miescie/wsi.
   -> audyt i projekt workflow wf_c4f075f1-def (dane: towary, ludnosc, historia -> 2 modele -> synteza do docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md). Najpierw pokazac Jeffowi.
+
+### 59. SONDA GEOGRAFII (16.10 ok. 14:05) i projekt inwestycji
+- Galaz `w-toku/noc-geo` 19e6f041 (od 1958e987; NIE scalona, NIE wgrana): MapGeoProbe.cs (klucz MapGeoProbeEnabled=false, wlacza tylko plik testu arm_geo_probe.cfg i tryb autotestu),
+  tools/geo (geo_drogi_rot.py - drogi ROT to farba terenu z terrain.bin: 311 lamanych 10016 jedn.; geo_czytaj.py). Bieg 14:01 (Armoury-2026-10-16_13-59-16.log): 1 s pracy, 0 bledow.
+  Dane: scratchpad roz/geo-dane i D:/Backup-Bannerlord/geo-dane-2026-10-16 (geo-siatka 560800, geo-trasy 1214, geo-trasy-punkty 80526, geo-drogi 10876).
+  Wyniki: lad przejezdny 30.9% mapy; PUSTKI 32.8% ladu (Polnoc 46%, Za Murem 69%, stepy 62%); drogi pod bramami: miasta 45/97, zamki 48/130, wsie 33/571;
+  trasy AI po drogach malowanych 4-8%; zajazdy co dzien marszu (45 jedn.) na parach sasiadow gry ok. 536 miejsc.
+  bieg-bitwa.ps1: nowy parametr -ExtraAdd "rel=zrodlo;rel2=zrodlo2" (srednik).
+- PROJEKT INWESTYCJI: docs/PROJEKT-INWESTYCJE-OKREGU-2026-10-16.md (prace okregu: sprzet konkretnej wioski, polowa dodatku dla inwestora, 26%/17% pierwsze monety,
+  pozar per osada, odbudowa pol ceny 91 dni; specjalizacja wiosek, ikona = zajecie o najwiekszej wartosci). Przedstawiony Jeffowi; czeka na jego slowo (2 pytania:
+  spadek wartosci okregow czysto rybackich/zbozowych do ~20%; AI bez inwestycji na start). Wdrozenie po audycie zycia codziennego (wf_c4f075f1-def).
