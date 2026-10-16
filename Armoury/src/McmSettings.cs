@@ -6428,9 +6428,9 @@ namespace Armoury
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool SutlersByPurse { get; set; } = true;
 
-        [SettingPropertyBool("Folk Guard No Memory", HintText = "the steward of the realm's coin (Folk Circulation Guard) sets the hoard tax each day from how much the common folk hold right now, without memory: the usual rate times 1 + 8 x (their savings against the normal level - 1.5), between a quarter and Folk Guard Max Times - at 1.5 times the normal level the usual rate, at 1.75 three times, at 2 five times. Before, the rate crept up 3% a day and stayed up long after the hoards had shrunk (off = the slow rate with memory, as before; the save keeps both)")]
+        [SettingPropertyBool("Folk Guard No Memory", HintText = "DECYZJA CLAUDE noc 15/16.10: test 60 dob - lud 8.0 -> 10.4% zlota swiata, korony szybciej w dol; najpierw ujscia (audyt P1-P6), potem N7              // the steward of the realm's coin (Folk Circulation Guard) sets the hoard tax each day from how much the common folk hold right now, without memory: the usual rate times 1 + 8 x (their savings against the normal level - 1.5), between a quarter and Folk Guard Max Times - at 1.5 times the normal level the usual rate, at 1.75 three times, at 2 five times. Before, the rate crept up 3% a day and stayed up long after the hoards had shrunk (off = the slow rate with memory, as before; the save keeps both)")]
         [SettingPropertyGroup("Coin flow (night 16.10)")]
-        public bool FolkGuardNoMemory { get; set; } = true;
+        public bool FolkGuardNoMemory { get; set; } = false;
 
         [SettingPropertyBool("Folk Loan Before Guard", HintText = "with Folk Loans: a house at war may borrow from what its own people held before the steward's hoard tax took its part that day, and the next day's hoard tax of every place that lent is lowered by what it lent - the people lend first, the lord's gift from the hoard comes second (off = the house borrows only from what is left after the tax, as before)")]
         [SettingPropertyGroup("Coin flow (night 16.10)")]
