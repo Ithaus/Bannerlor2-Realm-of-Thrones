@@ -255,6 +255,8 @@ namespace Armoury
                 SpoilsCompany.ApplyAll(_harmony);   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (bez szablonu, dosypki i ochotnikow z mapy; zaplata za ludzi do kiesy klanu)
                 try { BeeSeal.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BeeSeal.ApplyAll", e); }   // paczka 170: BetterEconomy bez zlota w nicosc i bez towaru, ludzi, XP z niczego (akcje gracza zamkniete z powodem, bierne zrodla zatrzymane)
                 BattleWind.ApplyAll(_harmony);
+                // NB2 czesc 2 (16.10): weterani wedlug tieru - postfiks SetAiRelatedProperties po RBM (Priority.Last, after com.rbmai); wlasny try
+                try { VeteranAi.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VeteranAi.ApplyAll", e); }
                 BkSupplyTemper.ApplyAll(_harmony);
                 try { BkSupplyMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSupplyMarket.ApplyAll", e); }   // 3.4: zakupy zaopatrzenia BK wedlug zapasu partii, zaplata do kasy osady (PRZED ksiega towarow)
                 try { BkSeal34.ApplyAll(_harmony); } catch (Exception e) { Log.Error("BkSeal34.ApplyAll", e); }               // 3.4: rynek wsi BK, sprzedaz niewolnikow, wyposazenie rycerza BKROT - bez zlota z niczego (PRZED oknami ksiegi obiegu)
@@ -386,10 +388,15 @@ namespace Armoury
                 if (Settings.Current.WoundedFleeEnabled && mission != null)
                     mission.AddMissionBehavior(new BrokenMen());
                 // NB2 (16.10): zlamani raz na bitwe (BrokenMen + FieldCraft przez RoutHold.Break) i linia "Bitwa (NB2)" z postura wedlug tieru
+                // czesc 2: linia NB2 takze dla taktyki wedlug dowodcy, weteranow wedlug tieru, krwi przez pancerz i glosow (BattleSense ponizej)
+                bool nb2b = Settings.Current.CommanderTactics || Settings.Current.VeteransByTier || Settings.Current.BloodThroughArmour
+                            || Settings.Current.BattleCriesAndMoans;
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
-                        || Settings.Current.SoldierPostureByTier))
+                        || Settings.Current.SoldierPostureByTier || nb2b))
                     mission.AddMissionBehavior(new RoutKeeper());
+                if (mission != null && nb2b)
+                    mission.AddMissionBehavior(new BattleSense());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && NightRest.PlayerCamped)
                     mission.AddMissionBehavior(new CampScene());

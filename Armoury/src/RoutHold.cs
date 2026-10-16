@@ -37,13 +37,17 @@ namespace Armoury
     ///  - Wyjatek na czlowieka liczony (Stumble, pierwsze 3 na miejsce w sesji do logu) - funkcji nie gasimy (CLAUDE.md 7). Bez Harmony, wszystko
     ///    na glownym watku (OnMissionTick, przed tickiem agentow - Mission.cs:3743 / 3774). Iterujemy tylko wlasna liste, nie Mission.Agents.
     /// Postura szeregowych wedlug tieru (BattleWind.PostureInitPostfix) pisze swoje liczniki tutaj - jedna linia "Bitwa (NB2)" po misji.
+    /// Czesc 2 (16.10): ta sama linia niesie liczniki taktyki wedlug dowodcy (WarCouncil), weteranow wedlug tieru (VeteranAi), krwi przez pancerz
+    /// (BattleGore) i glosow bitwy (BattleCries) - ich liczniki zeruje Ensure (zmiana misji), pisza je pod Gate przez EnsureLocked.
     /// Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings" (CrashScribe Net.cs:155).
     /// </summary>
     internal static class RoutHold
     {
         internal const int SitePanic = 0, SiteDir = 1, SitePosture = 2;
-        private const int Sites = 3;
-        private static readonly string[] SiteName = { "panika", "kierunek", "postura" };
+        // NB2 czesc 2: taktyka wedlug dowodcy (WarCouncil), weterani wedlug tieru (VeteranAi), krew przez pancerz (BattleGore), glosy (BattleCries)
+        internal const int SiteTactics = 3, SiteVeteran = 4, SiteGore = 5, SiteVoice = 6;
+        private const int Sites = 7;
+        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -52,7 +56,8 @@ namespace Armoury
         internal const int PathPerMan = 3;        // kandydatow z droga na czlowieka w jednej ocenie
         internal const float NoHandlerAfter = 1f; // po tylu sekundach bez odwrotu z handlera paniki wysylamy odwrot sami
 
-        private static readonly object Gate = new object();
+        // NB2 czesc 2: wspolna blokada licznikow linii misji - takze dla WarCouncil, VeteranAi, BattleGore, BattleCries (EnsureLocked)
+        internal static readonly object Gate = new object();
         private static WeakReference _mission;
         private static bool _any, _flushed;
         private static string _kind = "?";
@@ -171,6 +176,12 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>NB2 czesc 2: zgodnosc licznikow z misja dla innych klas linii - wolajacy trzyma Gate.</summary>
+        internal static void EnsureLocked(Mission m)
+        {
+            Ensure(m);
+        }
+
         private static void Ensure(Mission m)
         {
             if (m == null || (_mission != null && ReferenceEquals(m, _mission.Target))) return;
@@ -191,6 +202,10 @@ namespace Armoury
             _noWeapon = 0;
             _sample1 = _sample6 = null;
             for (int i = 0; i < Sites; i++) Stum[i] = 0;
+            WarCouncil.ResetCounters();
+            VeteranAi.ResetCounters();
+            BattleGore.ResetCounters();
+            BattleCries.ResetCounters();
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -223,12 +238,13 @@ namespace Armoury
             int soldiers = 0;
             for (int i = 1; i < Tiers.Length; i++) soldiers += Tiers[i].Count;
             int broken = Broken + Fled, stum = Sum(Stum);
+            int extra = WarCouncil.Activity + VeteranAi.Activity + BattleGore.Activity + BattleCries.Activity;   // czesc 2 - tylko w bitwach
             // spacer po miescie / wsi / zamku ("inna") bez zlamanych i potkniec - bez linii (straz miasta tez dostaje postury RBM)
-            if (_kind == "inna" && broken + stum == 0) return;
-            if (_kind == "?" && broken + stum + soldiers + Heroes.Count == 0) return;
+            if (_kind == "inna" && broken + stum + extra == 0) return;
+            if (_kind == "?" && broken + stum + soldiers + Heroes.Count + extra == 0) return;
             _lines++;
             var c = Settings.Current;
-            var sb = new StringBuilder(700);
+            var sb = new StringBuilder(1400);
             sb.Append("Bitwa (NB2): misja ").Append(_kind).Append(" (pole bitwy ").Append(Field == 1 ? "TAK" : (Field == 0 ? "NIE" : "?"))
               .Append(", Broken Men Never Rally ").Append(c != null && c.BrokenMenNeverRally ? "TAK" : "NIE").Append(')')
               .Append(" | zlamani ").Append(broken).Append(" (rozbici ").Append(Broken).Append(", ucieczka ").Append(Fled)
@@ -243,8 +259,13 @@ namespace Armoury
               .Append(" | postura wg tieru ").Append(c != null && c.SoldierPostureByTier ? "TAK" : "NIE").Append(": szeregowych ").Append(soldiers).Append(" (");
             for (int i = 1; i < Tiers.Length; i++) sb.Append(i > 1 ? ", " : "").Append('T').Append(i).Append(' ').Append(Tiers[i].Count);
             sb.Append("), bohaterow ").Append(Heroes.Count).Append(", bez broni pominiete ").Append(_noWeapon)
-              .Append("; probka T1 ").Append(_sample1 ?? "-").Append(", T6 ").Append(_sample6 ?? "-")
-              .Append(" | potkniecia: ");
+              .Append("; probka T1 ").Append(_sample1 ?? "-").Append(", T6 ").Append(_sample6 ?? "-");
+            // czesc 2 (16.10): taktyka wedlug dowodcy, weterani wedlug tieru, krew przez pancerz, okrzyki i jeki
+            WarCouncil.Append(sb, c);
+            VeteranAi.Append(sb, c);
+            BattleGore.Append(sb, c);
+            BattleCries.Append(sb, c);
+            sb.Append(" | potkniecia: ");
             for (int i = 0; i < Sites; i++) sb.Append(i > 0 ? ", " : "").Append(SiteName[i]).Append(' ').Append(Stum[i]);
             sb.Append(" (sesja ").Append(Sum(StumSession)).Append(", linia misji ").Append(_lines).Append(").");
             Log.Info(sb.ToString());
@@ -262,7 +283,7 @@ namespace Armoury
             }
             var c = Settings.Current;
             if (c == null) return;
-            var sb = new StringBuilder(500);
+            var sb = new StringBuilder(1200);
             sb.Append("Bitwa (NB2): start sesji | panika: Broken Men Never Rally ").Append(c.BrokenMenNeverRally ? "TAK" : "NIE")
               .Append(" (rozbici BrokenMen ").Append(c.WoundedFleeEnabled ? "TAK" : "NIE")
               .Append(", ucieczka FieldCraft ").Append(c.FieldCraftEnabled && c.AiFleeWhenNearDeath ? "TAK" : "NIE")
@@ -274,6 +295,20 @@ namespace Armoury
             for (int t = 1; t <= 7; t++) sb.Append(t > 1 ? ", " : "").Append('T').Append(t).Append(" x").Append(BattleWind.SoldierMul(t).ToString("0.00"));
             sb.Append(", regeneracja x pierwiastek | latka postury RBM wpieta ").Append(BattleWind.PosturePatched ? "TAK" : "NIE")
               .Append(", oddech bohaterow ").Append(BattleWind.Active ? "TAK" : "NIE")
+              // czesc 2 (16.10)
+              .Append(" | Commander Tactics ").Append(c.CommanderTactics ? "TAK" : "NIE").Append(" (tlum ponizej ").Append(WarCouncil.HordeBelow)
+              .Append(" Tactics, konnica i obrona od ").Append(WarCouncil.CavalryFrom).Append(", okrazenie RBM od ").Append(WarCouncil.EnvelopFrom)
+              .Append(" przy stronie od ").Append(WarCouncil.EnvelopMinMen).Append(" ludzi, druzyna gracza bez zmian)")
+              .Append(" | Veterans By Tier ").Append(c.VeteransByTier ? "TAK" : "NIE").Append(" (latka weteranow wpieta ").Append(VeteranAi.Patched ? "TAK" : "NIE")
+              .Append("; prog tieru 0.05 + 0.13 x (T-1), limity RBM wyzej od T5, agresja x0.80..x1.28)")
+              .Append(" | Blood Through Armour ").Append(c.BloodThroughArmour ? "TAK" : "NIE").Append(" (od ").Append(BattleGore.MinDamage)
+              .Append(" obrazen przez kolczuge / plyty albo cios smiertelny, 1 na czlowieka na ").Append(BattleGore.PerManEvery.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))
+              .Append(" s, ").Append(BattleGore.PerSecond).Append(" na s)")
+              .Append(" | Battle Cries And Moans ").Append(c.BattleCriesAndMoans ? "TAK" : "NIE").Append(" (szarza szyku AI raz na ")
+              .Append((int)BattleCries.FormationCooldown).Append(" s, czlowiek raz na ").Append((int)BattleCries.ManCooldown).Append(" s, jeki ponizej ")
+              .Append((int)Math.Round(BattleCries.MoanBelow * 100)).Append("% co ").Append((int)BattleCries.MoanMin).Append('-')
+              .Append((int)(BattleCries.MoanMin + BattleCries.MoanSpan)).Append(" s do ").Append((int)BattleCries.MoanRange).Append(" m, najwyzej ")
+              .Append(BattleCries.MaxPerSecond).Append(" glosow na s)")
               .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }
@@ -282,6 +317,8 @@ namespace Armoury
     /// <summary>
     /// NB2: zachowanie misji pilnujace zlamanych (patrz RoutHold). Rejestrowane w SubModuleMain.OnMissionBehaviorInitialize, gdy jest czym sie
     /// zajac (BrokenMenNeverRally przy WoundedFlee albo FieldCraft + AiFleeWhenNearDeath) albo gdy liczona jest postura wedlug tieru (linia NB2).
+    /// Czesc 2 (16.10): takze przy kluczach CommanderTactics, VeteransByTier, BloodThroughArmour, BattleCriesAndMoans - OnEndMission pisze linie NB2
+    /// z ich licznikami (dodawane przed BattleSense, wiec jego AfterStart widzi juz RoutHold.Begin).
     /// </summary>
     internal sealed class RoutKeeper : MissionBehavior
     {

@@ -872,6 +872,10 @@ Uzycie (Python 3, tylko odczyt):
                     - TAK), NBW-0b linia wpiecia latki postury przy starcie gry, NBW-1 ERROR in RoutHold / RoutKeeper / BattleWind.PostureInit 0. Reszta
                     INFO (autotest nie gra bitew): NBW-2 linie misji, NBW-3 raz Panic na czlowieka, NBW-4 morale i ponowienia, NBW-5 cel ucieczki, NBW-6
                     postura wedlug tieru (probki T1 / T6), NBW-7 potkniecia, NBW-8 linia NM w bitwach (wywolan = ludzi).
+                    Czesc 2 (16.10; WarCouncil.cs, VeteranAi.cs, BattleGore.cs, BattleCries.cs, BattleSense.cs): NBW-0 takze Commander Tactics, Veterans
+                    By Tier (latka weteranow wpieta), Blood Through Armour, Battle Cries And Moans - TAK; NBW-0c linia wpiecia latki weteranow przy starcie
+                    gry; NBW-1 takze ERROR in WarCouncil / VeteranAi / BattleGore / BattleCries / BattleSense 0. INFO: NBW-9 taktyka wedlug dowodcy,
+                    NBW-10 weterani wedlug tieru, NBW-11 krew przez pancerz, NBW-12 okrzyki i jeki.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -31667,13 +31671,72 @@ NBW_LINE = re.compile(
     r"\| kierunek: gry (\d+), sektor (\d+), bez drogi (\d+), limit zapytan (\d+), poza polem (\d+) \(zapytan o droge (\d+)\) "
     r"\| postura wg tieru (TAK|NIE): szeregowych (\d+) \(T1 (\d+), T2 (\d+), T3 (\d+), T4 (\d+), T5 (\d+), T6 (\d+), T7 (\d+)\), bohaterow (\d+), "
     r"bez broni pominiete (\d+); probka T1 (\S+), T6 (\S+) "
-    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+) \(sesja (\d+), linia misji (\d+)\)\.$")
+    # czesc 2 (16.10): taktyka wg dowodcy, weterani wg tieru, krew przez pancerz, okrzyki i jeki - grupa opcjonalna (linie czesci 1 dalej rozpoznane)
+    r"(?:\| taktyka wg dowodcy (TAK|NIE): druzyn (\d+) \(tlum (\d+), konnica i obrona (\d+), okrazenie (\d+), bez zmian (\d+), gracza pominieto (\d+), "
+    r"nie pole bitwy (\d+), bez danych dowodcy (\d+)\), taktyk dodanych (\d+) \(duble (\d+), brak typu RBM (\d+)\); probka atak (\S+), obrona (\S+) "
+    r"\| weterani wg tieru (TAK|NIE) \(latka (TAK|NIE), po RBM ([^)]*)\): ludzi (\d+) \(T1 (\d+), T2 (\d+), T3 (\d+), T4 (\d+), T5 (\d+), T6 (\d+), "
+    r"T7 (\d+)\), wywolan (\d+), ponad limit RBM (\d+), z tarcza (\d+), kapitan Tactics 150\+ (\d+); probka T6 parowanie (\S+) "
+    r"\| krew przez pancerz (TAK|NIE) \(RBMCombat (TAK|NIE)\): bryzgi (\d+) \(przez pancerz (\d+), smiertelne (\d+)\), odrzucone limitem (\d+), "
+    r"zla kosc (\d+) "
+    r"\| okrzyki i jeki (TAK|NIE): szarze (\d+) \(okrzykow (\d+), roznych ludzi (\d+)\), jeki (\d+) \(rannych (\d+)\), odrzucone limitem (\d+) )?"
+    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))? "
+    r"\(sesja (\d+), linia misji (\d+)\)\.$")
 NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
             "pin", "pin_ludzi", "zgaszone", "ponowienia", "ponowienia_ludzi", "zwroty", "bez_handlera", "gracz",
             "k_gry", "k_sektor", "k_bez_drogi", "k_limit", "k_poza", "zapytan", "postura", "szeregowych", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
-            "bohaterow", "bez_broni", "probka1", "probka6", "st_panika", "st_kierunek", "st_postura", "st_sesja", "linia")
-NBW_ERR = ("ERROR in RoutHold", "ERROR in RoutKeeper", "ERROR in BattleWind.PostureInit")
-NBW_NEED = ("Broken Men Never Rally TAK", "Flee Away From Enemies TAK", "postura szeregowych wg tieru TAK", "latka postury RBM wpieta TAK")
+            "bohaterow", "bez_broni", "probka1", "probka6",
+            # czesc 2 (16.10)
+            "takt", "t_druzyn", "t_tlum", "t_konnica", "t_okrazenie", "t_bez_zmian", "t_gracza", "t_nie_pole", "t_bez_danych", "t_dodane", "t_duble",
+            "t_brak_typu", "t_probka_a", "t_probka_d",
+            "wet", "w_latka", "w_po_rbm", "w_ludzi", "w1", "w2", "w3", "w4", "w5", "w6", "w7", "w_wywolan", "w_ponad", "w_tarcza", "w_kapitan", "w_probka",
+            "gore", "g_rbm", "g_bryzgi", "g_pancerz", "g_smiertelne", "g_limit", "g_kosc",
+            "glosy", "v_szarze", "v_okrzyki", "v_ludzi", "v_jeki", "v_rannych", "v_limit",
+            "st_panika", "st_kierunek", "st_postura", "st_taktyka", "st_weteran", "st_krew", "st_glosy", "st_sesja", "linia")
+NBW_ERR = ("ERROR in RoutHold", "ERROR in RoutKeeper", "ERROR in BattleWind.PostureInit",
+           # czesc 2 (16.10)
+           "ERROR in WarCouncil", "ERROR in VeteranAi", "ERROR in BattleGore", "ERROR in BattleCries", "ERROR in BattleSense")
+NBW_NEED = ("Broken Men Never Rally TAK", "Flee Away From Enemies TAK", "postura szeregowych wg tieru TAK", "latka postury RBM wpieta TAK",
+            # czesc 2 (16.10)
+            "Commander Tactics TAK", "Veterans By Tier TAK", "latka weteranow wpieta TAK", "Blood Through Armour TAK", "Battle Cries And Moans TAK")
+NBW_VET_HEAD = "VeteranAi (NB2): "
+NBW_VET_WIRE = "VeteranAi (NB2): weterani wedlug tieru - latka SetAiRelatedProperties wpieta"
+
+
+def nbw_first(rows, key):
+    """Pierwsza probka (napis inny niz '-') z linii misji NB2 - czesc 2."""
+    for r in rows:
+        v = r.get(key)
+        if isinstance(v, str) and v != "-":
+            return v
+    return "-"
+
+
+def nbw_part2(rep, rows, tot):
+    """nbitwa czesc 2 (16.10): NBW-9 taktyka wedlug dowodcy, NBW-10 weterani wedlug tieru, NBW-11 krew przez pancerz, NBW-12 okrzyki i jeki -
+    INFO (autotest nie gra bitew). Linie czesci 1 (bez tych pol) - INFO 'brak pol czesci 2'."""
+    p2 = [r for r in rows if r.get("takt") is not None]
+    if not p2:
+        rep.add("NBW-9..12: taktyka, weterani, krew, glosy", "brak pol czesci 2 w liniach misji", "INFO (wersja sprzed czesci 2)", None)
+        return
+    rep.add("NBW-9: taktyka wedlug dowodcy (Commander Tactics)", f"druzyn {tot('t_druzyn')} (tlum {tot('t_tlum')}, konnica i obrona {tot('t_konnica')},"
+            f" okrazenie {tot('t_okrazenie')}, bez zmian {tot('t_bez_zmian')}, gracza pominieto {tot('t_gracza')}, nie pole {tot('t_nie_pole')},"
+            f" bez danych {tot('t_bez_danych')}); dodanych {tot('t_dodane')} (duble {tot('t_duble')}, brak typu RBM {tot('t_brak_typu')});"
+            f" probka atak {nbw_first(p2, 't_probka_a')}, obrona {nbw_first(p2, 't_probka_d')}",
+            "INFO (bitwa polowa: druzyny AI z taktyka wedlug Tactics; bez danych i brak typu RBM 0)", None)
+    wt = [tot(f"w{i}") for i in range(1, 8)]
+    orders = sorted(set(str(r.get("w_po_rbm")) for r in p2))
+    rep.add("NBW-10: weterani wedlug tieru (Veterans By Tier)", f"ludzi {tot('w_ludzi')} (" + ", ".join(f"T{i + 1} {n}" for i, n in enumerate(wt))
+            + f"), wywolan {tot('w_wywolan')}, ponad limit RBM {tot('w_ponad')}, z tarcza {tot('w_tarcza')}, kapitan Tactics 150+ {tot('w_kapitan')};"
+            f" po RBM: {', '.join(orders)}; probka T6 parowanie {nbw_first(p2, 'w_probka')}",
+            "INFO (po RBM TAK; ponad limit tylko T5+ bez tarczy; probka T6 0.60->0.80 przy Realistic)", None)
+    rep.add("NBW-11: krew przez pancerz (Blood Through Armour)", f"bryzgi {tot('g_bryzgi')} (przez pancerz {tot('g_pancerz')}, smiertelne"
+            f" {tot('g_smiertelne')}), odrzucone limitem {tot('g_limit')}, zla kosc {tot('g_kosc')}; misji z RBMCombat"
+            f" {sum(1 for r in p2 if r.get('g_rbm') == 'TAK')} z {len(p2)}", "INFO (zla kosc 0; limit 1 na czlowieka na 0.5 s, 20 na s)", None)
+    vl = tot("v_ludzi")
+    rep.add("NBW-12: okrzyki przy szarzy i jeki rannych (Battle Cries And Moans)", f"szarze {tot('v_szarze')} (okrzykow {tot('v_okrzyki')}, roznych"
+            f" ludzi {vl}, na glowe {tot('v_okrzyki') / max(1, vl):.1f}), jeki {tot('v_jeki')} (rannych {tot('v_rannych')}, na rannego"
+            f" {tot('v_jeki') / max(1, tot('v_rannych')):.1f}), odrzucone limitem {tot('v_limit')}",
+            "INFO (okrzyk najwyzej raz na 20 s na czlowieka, szyk raz na 40 s; jek co 7-14 s; najwyzej 6 glosow na s)", None)
 
 
 def nbitwa_main(logp):
@@ -31689,7 +31752,7 @@ def nbitwa_main(logp):
         rep.add("NBW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    starts, wires, rows, bad, notes, nm = [], [], [], [], [], []
+    starts, wires, rows, bad, notes, nm, vets = [], [], [], [], [], [], []
     wind_off = wind_bad = wind_norbm = 0
     errs = {k: 0 for k in NBW_ERR}
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -31704,7 +31767,7 @@ def nbitwa_main(logp):
                     if mm:
                         r = {}
                         for k, v in zip(NBW_KEYS, mm.groups()):
-                            r[k] = int(v) if v.isdigit() else v
+                            r[k] = int(v) if v is not None and v.isdigit() else v
                         rows.append(r)
                     else:
                         bad.append(s)
@@ -31712,6 +31775,8 @@ def nbitwa_main(logp):
                     notes.append(s)
             elif s.startswith(NBW_WIRE):
                 wires.append(s)
+            elif s.startswith(NBW_VET_HEAD):
+                vets.append(s)
             elif s.startswith("BattleWind: RBM nieobecny"):
                 wind_norbm += 1
             elif s.startswith("BattleWind: pola RBMAI.Stance nie pasuja") or s.startswith("BattleWind: metody RBMAI.Stance nie pasuja"):
@@ -31747,9 +31812,20 @@ def nbitwa_main(logp):
         rep.add("NBW-0b: latka postury RBM (start gry)", "BattleWind: wylaczone (oba klucze wylaczone przy starcie)", "INFO", None)
     else:
         rep.add("NBW-0b: latka postury RBM (start gry)", "pola / metody RBM nie pasuja" if wind_bad else "brak linii", "linia wpiecia jest", False)
+    # NBW-0c latka weteranow przy starcie gry (czesc 2)
+    vw = [v for v in vets if v.startswith(NBW_VET_WIRE)]
+    if vw:
+        rep.add("NBW-0c: latka weteranow wedlug tieru (start gry)", vw[-1][:200], "linia wpiecia jest", True)
+    elif any("RBM nieobecny" in v for v in vets):
+        rep.add("NBW-0c: latka weteranow wedlug tieru (start gry)", "RBM nieobecny", "INFO (bez RBM nic do zmiany)", None)
+    elif any("wylaczeni przy starcie" in v for v in vets):
+        rep.add("NBW-0c: latka weteranow wedlug tieru (start gry)", "VeteransByTier wylaczony przy starcie", "INFO", None)
+    else:
+        rep.add("NBW-0c: latka weteranow wedlug tieru (start gry)", (vets[-1][:200] if vets else "brak linii"), "linia wpiecia jest", False)
     # NBW-1 bledy
     n_err = sum(errs.values())
-    rep.add("NBW-1: ERROR zlamanych i postury", ", ".join(f"{k[len('ERROR in '):]} {v}" for k, v in errs.items()), "0", n_err == 0)
+    rep.add("NBW-1: ERROR zlamanych, postury, taktyki, weteranow, krwi i glosow", ", ".join(f"{k[len('ERROR in '):]} {v}" for k, v in errs.items()),
+            "0", n_err == 0)
     # NBW-2 linie misji
     if not rows and not bad:
         rep.add("NBW-2: linie misji 'Bitwa (NB2)'", "brak linii", "INFO (autotest nie gra bitew - sprawdzenie w grze: bitwa polowa z rannymi)", None)
@@ -31799,8 +31875,10 @@ def nbitwa_main(logp):
             + f"), bohaterow {tot('bohaterow')}, bez broni pominiete {tot('bez_broni')}; probka T1 {ratio('probka1')}, T6 {ratio('probka6')}",
             "INFO (T1 x0.85, T6 x1.70 przy kluczach domyslnych; pula T1 ok. 115, T6 ok. 344)", None)
     # NBW-7 potkniecia
-    rep.add("NBW-7: potkniecia w liniach misji", f"panika {tot('st_panika')}, kierunek {tot('st_kierunek')}, postura {tot('st_postura')}"
+    rep.add("NBW-7: potkniecia w liniach misji", f"panika {tot('st_panika')}, kierunek {tot('st_kierunek')}, postura {tot('st_postura')},"
+            f" taktyka {tot('st_taktyka')}, weteran {tot('st_weteran')}, krew {tot('st_krew')}, glosy {tot('st_glosy')}"
             + (f"; linii '3. potkniecie' {len(notes)}" if notes else ""), "INFO (oczekiwane 0)", None)
+    nbw_part2(rep, rows, tot)
     # NBW-8 linia NM w bitwach
     bat = [r for r in nm if r["battle"]]
     if bat:
