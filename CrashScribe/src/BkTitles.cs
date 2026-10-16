@@ -44,6 +44,11 @@ namespace CrashScribe
         private static bool _checked;
         private static string _namesPath;
         private static HashSet<string> _names;
+        // AUD-P1-5 (klucz BkTitlesVillageFix): czesci BK do dorobki tytulu wsi w biegnacej kampanii - TitleGenerator.CreateLordship i TitleManager.ExecuteAddTitle
+        // (internal, tylko wywolania - bez latki Harmony), FeudalTitle: Contract, Vassals, deJure, Sovereign, SetSovereign; brak ktorejs = tylko nazwy wsi w linii
+        private static MethodInfo _mCreateLordship, _mAddTitle, _mSetSov;
+        private static PropertyInfo _pContract, _pVassals, _pDeJure, _pSov;
+        private static string _fixMissing = "czesci BK nieodczytane (Install)";
 
         /// <summary>Start procesu (OnBeforeInitialModuleScreenSetAsRoot, po zaladowaniu BK i BKROTPatch). Nie rzuca.</summary>
         internal static void Install(Harmony harmony)
@@ -80,6 +85,21 @@ namespace CrashScribe
                 var tFt = _mGetTitle != null ? _mGetTitle.ReturnType : null;
                 _pType = tFt != null ? AccessTools.Property(tFt, "TitleType") : null;
                 _pShort = tFt != null ? AccessTools.Property(tFt, "shortName") : null;
+                // AUD-P1-5: dorobka tytulu wsi tak, jak BK zaklada go przy starcie gry (TitleGenerator.CreateLandedTitle: CreateLordship + ExecuteAddTitle + wasal twierdzy;
+                // GenerateKingdom: SetSovereign); refleksja raz, tu - przed kontrola latek sciezki (linia sesji biegnie takze bez nich)
+                _pContract = tFt != null ? AccessTools.Property(tFt, "Contract") : null;
+                _pVassals = tFt != null ? AccessTools.Property(tFt, "Vassals") : null;
+                _pDeJure = tFt != null ? AccessTools.Property(tFt, "deJure") : null;
+                _pSov = tFt != null ? AccessTools.Property(tFt, "Sovereign") : null;
+                _mSetSov = tFt != null ? AccessTools.Method(tFt, "SetSovereign", new[] { tFt }) : null;
+                _mCreateLordship = _pContract != null ? AccessTools.Method(tGen, "CreateLordship", new[] { typeof(Settlement), typeof(Hero), _pContract.PropertyType }) : null;
+                _mAddTitle = tTm != null && tFt != null ? AccessTools.Method(tTm, "ExecuteAddTitle", new[] { tFt }) : null;
+                var fixMiss = new List<string>();
+                if (_mCreateLordship == null || _mCreateLordship.ReturnType != tFt) fixMiss.Add("TitleGenerator.CreateLordship");
+                if (_mAddTitle == null) fixMiss.Add("TitleManager.ExecuteAddTitle");
+                if (_pContract == null || _pVassals == null || _pDeJure == null || _pDeJure.PropertyType != typeof(Hero) || _pSov == null || _mSetSov == null)
+                    fixMiss.Add("FeudalTitle.Contract / Vassals / deJure / Sovereign / SetSovereign");
+                _fixMissing = fixMiss.Count > 0 ? string.Join(", ", fixMiss.ToArray()) : null;
                 var miss = new List<string>();
                 if (mInit == null) miss.Add("TitleGenerator.InitializeTitles");
                 if (mRetro == null || mRetro.ReturnType != typeof(int)) miss.Add("TitleGenerator.RetrofitOrphanedTitles");
@@ -284,6 +304,7 @@ namespace CrashScribe
                 int forts = 0, vil = 0, vilNo = 0, ks = 0, stumbles = 0;
                 var noT = new List<string>();
                 var noK = new List<string>();
+                var vilMiss = new List<Settlement>();   // AUD-P1-5: wsie bez tytulu przy twierdzach z tytulem (nazwy i dorobka po linii sesji)
                 var titled = new HashSet<Settlement>();
                 foreach (var s in Settlement.All)
                 {
@@ -300,7 +321,7 @@ namespace CrashScribe
                     vil++;
                     object t = null;
                     try { t = _mGetTitle.Invoke(tm, new object[] { s }); } catch { stumbles++; }
-                    if (t == null) vilNo++;
+                    if (t == null) { vilNo++; vilMiss.Add(s); }
                 }
                 foreach (var k in Kingdom.All)
                 {
@@ -339,8 +360,80 @@ namespace CrashScribe
                             + " | " + duchies
                             + " | retrofit przy wczytaniu: " + (_retroN < 0 ? "brak (nowa gra)" : _retroN + " (plik " + Kind(_retroPath) + ")")
                             + " | potkniec " + stumbles + ".");
+                FixVillages(tm, vilMiss);   // AUD-P1-5: liczby linii wyzej to stan PRZED dorobka (regex AU_SESS narzedzia bez zmian)
             }
             catch (Exception e) { try { Scribe.Report("CrashScribe", e, "BkTitles.SessionCheck", null); } catch { } }
+        }
+
+        private static string Nm(Settlement s) { try { return s == null ? "-" : s.Name + " (" + s.StringId + ")"; } catch { return "?"; } }
+        private static string Nm(Hero h) { try { return h == null || h.Name == null ? "-" : h.Name.ToString(); } catch { return "?"; } }
+
+        /// <summary>AUD-P1-5 (klucz BkTitlesVillageFix; pierwsza godzina sesji, po linii sesji): wies przy twierdzy z tytulem BK bez wlasnego tytulu dostaje go
+        /// tak, jak BK daje go kazdej wsi przy starcie gry (TitleGenerator.CreateLandedTitle :123-129, GenerateKingdom :311-314): lordship z CreateLordship
+        /// (de iure = zywy posiadacz de iure tytulu twierdzy, a gdy go nie ma - wlasciciel twierdzy, jak CreateLandedTitle :115-118; de facto = wlasciciel
+        /// twierdzy; kontrakt twierdzy), dodany przez ExecuteAddTitle (sam odswieza pamiec BK), dopisany do wasali twierdzy i z suwerenem twierdzy. BK nie
+        /// dorabia tytulow wsi w biegnacej kampanii (CreateLordship wolany tylko w CreateLandedTitle; RetrofitOrphanedTitles rusza ksiestwa, hrabstwa i baronie).
+        /// ExecuteAddTitle po cichu pomija tytul "rowny" istniejacemu (FeudalTitle.Equals) - dlatego kontrola GetTitle po dodaniu ("nie dodane", bez wasala).
+        /// Idempotentna: wies z tytulem pominieta. Klucz false (albo brak czesci BK) = tylko nazwy. Linia zawsze, takze gdy przed 0. Wyjatek na jednej wsi -
+        /// potkniecie, reszta dalej. Nowe tytuly trafiaja do zapisu BK na stale (wylaczenie klucza ich nie usuwa).</summary>
+        private static void FixVillages(object tm, List<Settlement> miss)
+        {
+            int made = 0, notAdded = 0, noFort = 0, stumbles = 0, left = 0;
+            var items = new List<string>();
+            bool key = Config.BkTitlesVillageFix;
+            bool can = key && _fixMissing == null && _mCreateLordship != null && _mAddTitle != null;
+            try
+            {
+                foreach (var s in miss)
+                {
+                    var bound = s != null && s.Village != null ? s.Village.Bound : null;
+                    string nm = Nm(s) + " przy " + Nm(bound);
+                    try
+                    {
+                        object bt = bound != null ? _mGetTitle.Invoke(tm, new object[] { bound }) : null;
+                        if (bt == null) { noFort++; items.Add(nm + ": bez tytulu twierdzy"); continue; }
+                        if (!can) { items.Add(nm + ": tylko nazwa"); continue; }
+                        if (_mGetTitle.Invoke(tm, new object[] { s }) != null) { items.Add(nm + ": ma juz tytul"); continue; }   // idempotentnie
+                        if (bound.Owner == null) { items.Add(nm + ": twierdza bez wlasciciela - pominieta"); continue; }
+                        var dj = _pDeJure.GetValue(bt, null) as Hero;
+                        if (dj == null || !dj.IsAlive) dj = bound.Owner;
+                        var lt = _mCreateLordship.Invoke(null, new object[] { s, dj, _pContract.GetValue(bt, null) });
+                        if (lt == null) { notAdded++; items.Add(nm + ": NIE dodane (CreateLordship zwrocil null)"); continue; }
+                        _mAddTitle.Invoke(tm, new object[] { lt });
+                        var got = _mGetTitle.Invoke(tm, new object[] { s });
+                        if (!ReferenceEquals(got, lt))
+                        {
+                            notAdded++;
+                            items.Add(nm + ": NIE dodane (BK " + (got == null ? "uznal tytul za rowny istniejacemu" : "ma inny tytul tej wsi") + ")");
+                            continue;
+                        }
+                        var vl = _pVassals.GetValue(bt, null) as System.Collections.IList;
+                        if (vl != null && !vl.Contains(lt)) vl.Add(lt);
+                        var sov = _pSov.GetValue(bt, null);
+                        if (sov != null) _mSetSov.Invoke(lt, new object[] { sov });
+                        made++;
+                        items.Add(nm + ": dorobione, de iure " + Nm(dj) + (vl == null ? ", twierdza bez listy wasali" : "") + (sov == null ? ", bez suwerena (jak twierdza)" : ""));
+                    }
+                    catch (Exception e)
+                    {
+                        stumbles++;
+                        var ie = e is TargetInvocationException && e.InnerException != null ? e.InnerException : e;
+                        items.Add(nm + ": potkniecie " + ie.GetType().Name);
+                    }
+                }
+                foreach (var s in miss)
+                {
+                    object t = null;
+                    try { t = _mGetTitle.Invoke(tm, new object[] { s }); } catch { stumbles++; }
+                    if (t == null) left++;
+                }
+            }
+            catch (Exception e) { stumbles++; try { Scribe.Report("CrashScribe", e, "BkTitles.FixVillages", null); } catch { } }
+            string note = !key ? "; dorobka wylaczona - tylko nazwy"
+                        : _fixMissing != null ? "; OSTRZEZENIE: brak " + _fixMissing + " (inna wersja BK) - dorobka pominieta, tylko nazwy" : "";
+            Scribe.Line("Mends: tytuly BK (AUD-P1-5) - wsie bez tytulu przy twierdzach z tytulem: przed " + miss.Count + ", dorobione " + made + ", nie dodane " + notAdded
+                        + ", bez tytulu twierdzy " + noFort + ", zostalo " + left + " (BkTitlesVillageFix=" + (key ? "true" : "false") + ")" + note + List(items)
+                        + " | potkniec " + stumbles + ".");
         }
     }
 

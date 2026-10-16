@@ -261,6 +261,9 @@ RANGES = {
     'SiegeSurrenderMen': (0, 200, "0"),
     'SiegeLadderMinDays': (0, 364, "0"),
     'SiegeLadderMinRatio': (2.0, 20.0, "0.0"),
+    # OB6 (noc-drobne 16.10, SiegePhantomLift): doby 1..30 i ludzie 1..50 - jak przycinanie w kodzie (SiegePhantomLift.LiftDays / MinMen)
+    'SiegePhantomLiftDays': (1, 30, "0"),
+    'SiegePhantomMinMen': (1, 50, "0"),
     # CR (zasada Jeffa 14.10): czas ciazy w dobach, 0 = gra (36); kod przycina do 0..364 (PregnancyYear.Days)
     'PregnancyDays': (0, 364, "0"),
     # wyspy-wolni (decyzja Jeffa 14.10): udzialy przycinane w kodzie do 0..1 (ReaverLaw.Q / Qw), doby zaplaty 1..28 (ReaverLaw.PayDays), dziesiecina 0..1,

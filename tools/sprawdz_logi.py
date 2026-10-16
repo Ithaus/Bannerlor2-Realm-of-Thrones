@@ -713,7 +713,8 @@ Uzycie (Python 3, tylko odczyt):
                     (INFO). Metoda wylaczona kluczem albo BRAK - jej wiersz INFO. Log bez paczki: INFO, bez wyjatku.
                     P4 (lancuchy modeli BKROT, Armoury/src/BkrotChains.cs): ta sama grupa z logiem Armoury - python -I tools/sprawdz_logi.py --grupa audytb
                     <Armoury-*.log>: AB-8 linia startu (wpiecia BRAK 0, lancuchy z NavalDLC / ROT), AB-9 doby i potkniecia 0, AB-10 (AM-13) predkosc na morzu
-                    teraz / bez naprawy > 1.05 i wpisy NavalDLC w probkach, AB-11 (AM-09) zold Innych 0, Nieskalani 0, cena werbunku bez zmian, ujemny zold 0,
+                    - wpisy NavalDLC w probkach, powtorzone 0 (proporcja teraz / bez naprawy INFO: wzor War Sails daje x0.93-0.97), AB-11 (AM-09) zold Innych 0,
+                    Nieskalani 0, cena werbunku bez zmian, ujemny zold 0,
                     AB-11b obnizka morska > 0, AB-12 (AM-19) INFO, AB-13 wzrok na morzu teraz > bez naprawy; wiersz klucza wylaczonego - INFO.
                     Trop gentry (Armoury/src/GentryNames.cs, klucz GentryNamesFallback): ta sama grupa, ten sam log Armoury - linie "Nazwy gentry BK":
                     AB-14 linia startu (wpiete 3/3, BRAK -), AB-15 doby i potkniecia 0, AB-16 gentry bez nazwy 0, AB-17 (nowa kampania - rody przed
@@ -724,7 +725,8 @@ Uzycie (Python 3, tylko odczyt):
                     <session-*.log CrashScribe> (strumieniowo). Tytuly BK na mapie ROT: AUD-P1-0 linia startu (latki sciezki wpiete TAK, plik ROT 8.1.8 zapisany),
                     AUD-P1-1 (AM-26) kazde ustawienie sciezki = plik ROT 8.1.8, AUD-P1-2 retrofit BK przy wczytaniu z plikiem ROT 8.1.8 i 0 przepietych
                     (test: nowa kampania -> zapis -> NOWY proces -> wczytanie), linia pierwszej godziny sesji: AUD-P1-3 twierdz bez tytulu 0, AUD-P1-4
-                    krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0, AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
+                    krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu 0 (z linia dorobki 'Mends: tytuly BK (AUD-P1-5)' - klucz BkTitlesVillageFix:
+                    zostalo 0, nie dodane 0, potkniec 0 w kazdej linii; klucz false - INFO z nazwami), AUD-P1-6 ksiestw spoza pliku 0 (zamiast savescan3), AUD-P1-7 potkniecia
                     i bledy 0; AUD-P1-8 (AM-04, INFO) 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log. Log bez paczki: INFO, bez wyjatku.
                     P3 (ten sam log sesji; wiersze Armoury: Armoury-*.log jako log + --crashscribe <session-*.log>): AUD-P3-20a..d (AM-20, droga B domyslna:
                     wpiete 3/3 i ogon doby 'kultura osady TAK', od 4. doby 0 prostowanych Artisan / Merchant, 0 petli >= 2 razy, zablokowane BK INFO;
@@ -753,6 +755,12 @@ Uzycie (Python 3, tylko odczyt):
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
                     wolnych w miastach tylko przez zgony / najecie / rody / niewole, UN-7 bez miejsca nie rosnie, UN-9 dzieci z imieniem wzoru 0, UN-11
                     potkniecia 0; UN-1, UN-8, UN-10, UN-12 INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa ndrobne   : (noc-drobne 16.10; Armoury/src/SiegePhantomLift.cs, CrashScribe/src/BkTitles.cs) python -I tools/sprawdz_logi.py --grupa ndrobne
+                    <Armoury-*.log> [--crashscribe <session-*.log>] (strumieniowo). OB6 oboz bez sily: ND-0 linia startu (klucz SiegePhantomLift tak,
+                    wpiete 4/4 typy oblezen fabuly ROT), ND-1 potkniecia 0 i ERROR in SiegePhantomLift 0, ND-2 obozy w liniach doby: dob <= SiegePhantomLiftDays
+                    i oblezen nadal trwajacych po zdjeciu 0 (brak linii doby - INFO), ND-3 zdjete / pominiete (INFO), ND-4 zwiniete oblezenie sledzone przez OB5 -
+                    'Odsiecz (OB5) koniec' z wynikiem 'utrzymane' (brak zwiniec - INFO); AUD-P1-5 (z --crashscribe): ND-5 linia dorobki tytulow wsi BK -
+                    zostalo 0, nie dodane 0, potkniec 0 (klucz BkTitlesVillageFix false - INFO). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -25483,6 +25491,9 @@ AU_RETRO = re.compile(r"Mends: tytuly BK \(AM-26\) - retrofit BK przy wczytaniu:
 AU_SESS = re.compile(r"Mends: tytuly BK \(AM-26/AM-27\) - pierwsza godzina sesji: plik (.*?) \| twierdz bez tytulu (\d+) z (\d+)(.*?) \| wsi bez tytulu przy twierdzach"
                      r" z tytulem (\d+) z (\d+) \| krolestw bez tytulu krolewskiego (\d+) z (\d+)(.*?) \| (?:ksiestw (\d+), spoza pliku (\d+)(.*?)|ksiestw \?[^|]*)"
                      r" \| retrofit przy wczytaniu: (.*?) \| potkniec (\d+)\.")
+# AUD-P1-5 (klucz BkTitlesVillageFix, BkTitles.FixVillages): linia dorobki tytulow wsi zaraz po linii sesji (liczby AU_SESS = stan PRZED dorobka)
+AU_VFIX = re.compile(r"Mends: tytuly BK \(AUD-P1-5\) - wsie bez tytulu przy twierdzach z tytulem: przed (\d+), dorobione (\d+), nie dodane (\d+),"
+                     r" bez tytulu twierdzy (\d+), zostalo (\d+) \(BkTitlesVillageFix=(true|false)\)(.*?) \| potkniec (\d+)\.")
 AU_ROT = "ROT 8.1.8 (CrashScribe)"
 AU_FC_MARK = re.compile(r"=== BK FirstChance logger installed at (\d{4}-\d\d-\d\d)T(\d\d:\d\d:\d\d)")
 AU_LOG_T0 = re.compile(r"session-(\d{4}-\d\d-\d\d)_(\d\d)-(\d\d)-(\d\d)\.log$", re.I)
@@ -25547,7 +25558,8 @@ def audyta_main(logp, csp=None):
     kazde ustawienie sciezki przed odczytem BK (InitializeTitles / RetrofitOrphanedTitles) = plik ROT 8.1.8; AUD-P1-2 (AM-26, wczytanie) retrofit BK
     z plikiem ROT 8.1.8 i 0 przepietych (kampania zaczeta z P1; stary zapis z ksiestwami Calradii daje wiecej - wtedy NIE z opisem); linia pierwszej
     godziny sesji: AUD-P1-3 (AM-27) twierdz bez tytulu 0, AUD-P1-4 krolestw bez tytulu krolewskiego 0, AUD-P1-5 wsi bez tytulu przy twierdzach
-    z tytulem 0, AUD-P1-6 (AM-26 w grze, zamiast savescan3) ksiestw spoza pliku 0, AUD-P1-7 potkniecia i bledy BkTitles 0; AUD-P1-8 (AM-04, INFO)
+    z tytulem 0 (gdy sa linie dorobki AUD-P1-5 z kluczem BkTitlesVillageFix=true: w kazdej zostalo 0, nie dodane 0, potkniec 0; tylko klucz false -
+    INFO z nazwami), AUD-P1-6 (AM-26 w grze, zamiast savescan3) ksiestw spoza pliku 0, AUD-P1-7 potkniecia i bledy BkTitles 0; AUD-P1-8 (AM-04, INFO)
     wpisy 'GetIdealCapital' w Configs/ModLogs/bk-firstchance.log obok katalogu logu (plik BK bez dat - porownac z biegiem sprzed P1).
     Test AM-26: nowa kampania -> zapis -> wyjscie -> NOWY proces gry -> wczytanie -> log tej drugiej sesji (AUD-P1-2 i AUD-P1-6).
     Log bez paczki: INFO, bez wyjatku.
@@ -25562,6 +25574,7 @@ def audyta_main(logp, csp=None):
         rep.show()
         return 0
     start, off, warn, apply, retro, sess, errs = [], 0, [], [], [], [], 0
+    vfix = []   # AUD-P1-5: linie dorobki tytulow wsi
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             if "tytuly BK" not in ln and "BkTitles." not in ln:
@@ -25576,6 +25589,10 @@ def audyta_main(logp, csp=None):
             m = AU_START.search(s)
             if m:
                 start.append(m.groups())
+                continue
+            m = AU_VFIX.search(s)
+            if m:
+                vfix.append(m.groups())
                 continue
             if "Mends: tytuly BK (AM-26) wylaczone" in s:
                 off += 1
@@ -25594,8 +25611,8 @@ def audyta_main(logp, csp=None):
             m = AU_SESS.search(s)
             if m:
                 sess.append(m.groups())
-    print(f"plik: {logp} | linie P1: start {len(start)}, sciezka {len(apply)}, retrofit {len(retro)}, sesja {len(sess)}, wylaczone {off}, ostrzezen {len(warn)}")
-    if not (start or apply or retro or sess or off or warn):
+    print(f"plik: {logp} | linie P1: start {len(start)}, sciezka {len(apply)}, retrofit {len(retro)}, sesja {len(sess)}, dorobka wsi {len(vfix)}, wylaczone {off}, ostrzezen {len(warn)}")
+    if not (start or apply or retro or sess or vfix or off or warn):
         rep.add("AUD-P1: linie tytulow BK (CrashScribe BkTitles)", "brak linii (log bez paczki P1)", "INFO", None)
         audyta_bkfc(rep, logp)
         audyta_p3(rep, logp, armp)
@@ -25641,7 +25658,19 @@ def audyta_main(logp, csp=None):
                 + (f"; plik inny niz ROT 8.1.8 w {len(notrot)} liniach" if notrot else ""), "0 (plik ROT 8.1.8)", not notrot and all(v == 0 for v in nt))
         rep.add("AUD-P1-4 (AM-27): krolestw bez tytulu krolewskiego", f"{nk} z {[int(x[7]) for x in sess]}" + (f"; {sess[0][8][:160]}" if nk[0] else ""),
                 "0 (w dlugiej kampanii nowe krolestwa z buntow moga byc bez tytulu - patrz nazwy)", all(v == 0 for v in nk))
-        rep.add("AUD-P1-5 (AM-27): wsi bez tytulu przy twierdzach z tytulem", f"{nv} z {[int(x[5]) for x in sess]}", "0", all(v == 0 for v in nv))
+        von = [v for v in vfix if v[5] == "true"]
+        if von:
+            lv = von[-1]
+            rep.add("AUD-P1-5 (AM-27): wsi bez tytulu przy twierdzach z tytulem - po dorobce (BkTitlesVillageFix)",
+                    f"linia sesji {nv} z {[int(x[5]) for x in sess]}; dorobka: linii {len(von)}, zostalo {[int(v[4]) for v in von]}, nie dodane {[int(v[2]) for v in von]},"
+                    f" potkniec {[int(v[7]) for v in von]}; ostatnia: przed {lv[0]}, dorobione {lv[1]}, bez tytulu twierdzy {lv[3]}{lv[6][:200]}",
+                    "zostalo 0, nie dodane 0, potkniec 0 w kazdej linii dorobki (linia sesji = stan przed dorobka)",
+                    all(int(v[4]) == 0 and int(v[2]) == 0 and int(v[7]) == 0 for v in von))
+        elif vfix:
+            rep.add("AUD-P1-5 (AM-27): wsi bez tytulu przy twierdzach z tytulem (dorobka wylaczona)", f"{nv} z {[int(x[5]) for x in sess]}; {vfix[-1][6][:200]}",
+                    "INFO (BkTitlesVillageFix=false - tylko nazwy)", None)
+        else:
+            rep.add("AUD-P1-5 (AM-27): wsi bez tytulu przy twierdzach z tytulem", f"{nv} z {[int(x[5]) for x in sess]}", "0", all(v == 0 for v in nv))
         if any(v is None for v in nd):
             rep.add("AUD-P1-6 (AM-26): ksiestwa spoza pliku tytulow", "brak liczby (BK bez AllTitles albo pliku)", "INFO", None)
         else:
@@ -26079,6 +26108,7 @@ def _audytb_p4(logp):
     dk = lambda g, k: dict(P4_KEYS.findall(g[1])).get(k) == "TAK"
     # AB-10 AM-13 predkosc na morzu
     rs, nsea, dup, open_sea, smp = [], 0, 0, 0, 0
+    dup_all = 0   # noc-drobne: powtorzona nazwa liczona jako podwojny wpis tylko, gdy oba wpisy sa niezerowe (Jeff 10-56-30: 'Snow 0' gry + 'Snow -0.20' NavalDLC)
     for g in days:
         if not dk(g, "predkosc"):
             continue
@@ -26088,14 +26118,26 @@ def _audytb_p4(logp):
             nsea += int(g[4])
         for sm in P4_SAMPLE.finditer(g[7]):
             smp += 1
-            dup += int(sm.group(5))
+            dup_all += int(sm.group(5))
+            nz = {}
+            for ent in sm.group(3).split(", "):
+                nm_, _, v_ = ent.strip().rpartition(" ")
+                fv = _abf(v_)
+                if nm_ and fv is not None and fv != 0.0:
+                    nz[nm_] = nz.get(nm_, 0) + 1
+            dup += sum(1 for c_ in nz.values() if c_ > 1)
             if "Open Sea" in sm.group(3) or "River" in sm.group(3) or "Wind" in sm.group(3):
                 open_sea += 1
     avg = sum(rs) / len(rs) if rs else None
-    rep.add("AB-10: (AM-13) predkosc na morzu - teraz / bez naprawy srednio > 1.05; w probkach wpisy NavalDLC (Open Sea / River / Wind), powtorzone 0",
-            f"dob z partiami na morzu {len(rs)} (partio-probek {nsea}): x{avg:.2f}; probek {smp}, z wpisem NavalDLC {open_sea}, powtorzone wpisy {dup}" if avg is not None else "brak dob z partiami na morzu",
-            "> 1.05, probki z wpisem NavalDLC > 0, powtorzone 0 (klucz predkosc; inaczej INFO)",
-            ((avg > 1.05) and dup == 0 and (open_sea > 0 or smp == 0)) if (avg is not None and on("predkosc")) else None)
+    # noc-drobne 16.10: proporcja teraz / bez naprawy tylko INFO - lancuch przez NavalDLC daje prawdziwy wzor War Sails (u Jeffa x0.97, test fin32 x0.93),
+    # probki raz szybsze, raz wolniejsze; o dzialaniu naprawy mowia wpisy NavalDLC w probkach i brak powtorzonych wpisow
+    ab10_same = avg is not None and 0.995 < avg < 1.005
+    rep.add("AB-10: (AM-13) predkosc na morzu - wpisy NavalDLC w probkach > 0, powtorzone 0 (proporcja teraz/bez naprawy INFO)",
+            (f"dob z partiami na morzu {len(rs)} (partio-probek {nsea}): x{avg:.2f} (INFO: wzor War Sails, u Jeffa x0.97, test fin32 x0.93)"
+             + (" UWAGA: teraz = bez naprawy - lancuch NavalDLC nie dziala?" if ab10_same else "")
+             + f"; probek {smp}, z wpisem NavalDLC {open_sea}, powtorzone wpisy niezerowe {dup} (wszystkie powtorzone nazwy {dup_all}, INFO)") if avg is not None else "brak dob z partiami na morzu",
+            "probki z wpisem NavalDLC > 0 (albo brak probek), powtorzone niezerowe 0 (klucz predkosc; inaczej INFO)",
+            (dup == 0 and (open_sea > 0 or smp == 0)) if (avg is not None and on("predkosc")) else None)
     lastp = next((x for x in reversed(days) if x[7].strip() not in ("", "-")), days[-1])
     rep.add("AB-10b: (AM-13) probki predkosci - ostatnia doba z probkami (INFO)", f"dzien {lastp[0]}: {lastp[7].strip()[:600]}; lad (gracz): {lastp[8]}",
             "INFO (lad: teraz = bez naprawy, poza zaciagiem ROT +20% i eskorta karawan BEE)", None)
@@ -27232,6 +27274,141 @@ def korona2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ ndrobne (noc-drobne 16.10: OB6 oboz bez sily - Armoury SiegePhantomLift; AUD-P1-5 dorobka tytulow wsi BK - CrashScribe)
+ND_START = re.compile(r"Oboz bez sily \(OB6\): start sesji \| klucz SiegePhantomLift (tak|nie), dob (\d+), ponizej (\d+) zdolnych do walki \| pomijane: .*?\(wpiete (\d+)/(\d+)([^)]*)\)")
+ND_DAY = re.compile(r"Oboz bez sily \(OB6\): dzien (\d+) \| obozow ponizej (\d+) zdolnych do walki (\d+)(?: \[(.*)\])? \| zdjete dzis (\d+) \(od sesji (\d+)\), druzyn odeslanych (\d+),"
+                    r" oblezen nadal trwajacych po zdjeciu (\d+) \| pominiete: gracz (\d+), fabula ROT (\d+), Inni (\d+), w bitwie (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.")
+ND_ROW = re.compile(r"([^;\[]+?) \(([^()\s]+)\): druzyn (\d+), zdrowi (\d+), ranni (\d+), sila (-?\d+), dob (\d+)(.*?)(?=; [^;]+? \([^()\s]+\): druzyn |$)")
+ND_OB5_END = re.compile(r"Odsiecz \(OB5\) koniec: dzien (\d+) \| .*? \(([^,()\s]+), (?:stolica|miasto|zamek)\) .*\| wynik: (\S+) \(([^)]*)\)\.")
+
+
+def ndrobne_main(logp, csp=None):
+    """ndrobne (noc-drobne 16.10; Armoury/src/SiegePhantomLift.cs, CrashScribe/src/BkTitles.cs). Log Armoury (strumieniowo) i opcjonalnie --crashscribe
+    <session-*.log>. OB6 - oboz bez sily (klucze SiegePhantomLift / SiegePhantomLiftDays / SiegePhantomMinMen): ND-0 linia startu sesji (klucz tak,
+    wpiete 4/4 typy oblezen fabuly ROT), ND-1 potkniecia 0 w liniach doby i 0 'ERROR in SiegePhantomLift', ND-2 kazdy oboz w liniach doby: 'dob' <=
+    SiegePhantomLiftDays i 'oblezen nadal trwajacych po zdjeciu' 0 w kazdej linii (brak linii doby - INFO: zwykly bieg nie ma obozu bez ludzi),
+    ND-3 zdjete i pominiete (gracz / fabula ROT / Inni / w bitwie) razem (INFO), ND-4 zwiniete oblezenie twierdzy krolestwa sledzonej przez OB5 -
+    linia 'Odsiecz (OB5) koniec' tej samej doby z wynikiem 'utrzymane' (brak zwiniec - INFO). AUD-P1-5 (z --crashscribe; klucz BkTitlesVillageFix):
+    ND-5 linia dorobki 'Mends: tytuly BK (AUD-P1-5)': zostalo 0, nie dodane 0, potkniec 0 w kazdej linii (klucz false - INFO z nazwami; brak linii -
+    INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    armp = logp if logp and os.path.isfile(logp) and not os.path.basename(logp).lower().startswith("session-") else None
+    if csp is None and logp and os.path.basename(logp).lower().startswith("session-"):
+        csp = logp
+    starts, days, errs, ob5_end, ob5_seen = [], [], 0, [], set()
+    if armp:
+        with open(armp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if "OB6" not in ln and "SiegePhantomLift" not in ln and "Odsiecz (OB5)" not in ln:
+                    continue
+                m = TS.match(ln.rstrip("\r\n"))
+                s = m.group(2) if m else ln.rstrip("\r\n")
+                if s.startswith("ERROR in SiegePhantomLift"):
+                    errs += 1
+                    continue
+                mm = ND_START.search(s)
+                if mm:
+                    starts.append(mm.groups())
+                    continue
+                mm = ND_DAY.search(s)
+                if mm:
+                    days.append(mm.groups())
+                    continue
+                if s.startswith("Odsiecz (OB5) poczatek: dzien "):
+                    mm = re.search(r"\| .*? \(([^,()\s]+), (?:stolica|miasto|zamek)\) krolestwa", s)
+                    if mm:
+                        ob5_seen.add(mm.group(1))
+                    continue
+                mm = ND_OB5_END.search(s)
+                if mm:
+                    ob5_end.append((int(mm.group(1)), mm.group(2), mm.group(3), mm.group(4)))
+        print(f"plik: {armp} | OB6: linii startu {len(starts)}, linii doby {len(days)}, ERROR {errs}; OB5 koniec {len(ob5_end)}")
+        if not starts and not days:
+            rep.add("ND-0: (OB6) linia startu 'Oboz bez sily (OB6): start sesji'", "brak linii", "INFO (log bez paczki noc-drobne)", None)
+        else:
+            st = starts[-1] if starts else None
+            on = st is not None and st[0] == "tak"
+            need = int(st[1]) if st else 3
+            if st is None:
+                rep.add("ND-0: (OB6) linia startu", "brak linii startu (sa linie doby)", "linia przy kazdym starcie sesji", False)
+            elif not on:
+                rep.add("ND-0: (OB6) linia startu", f"klucz SiegePhantomLift nie (linii {len(starts)})", "INFO (klucz wylaczony = stan 39f8fe72)", None)
+            else:
+                rep.add("ND-0: (OB6) linia startu - klucz tak, typy oblezen fabuly ROT wpiete 4/4",
+                        f"linii {len(starts)}; ostatnia: dob {st[1]}, ponizej {st[2]} zdolnych, wpiete {st[3]}/{st[4]}{st[5]}",
+                        "klucz tak, wpiete 4/4 (ROT 8.1.8)", st[3] == st[4] == "4")
+            stl = sum(int(g[12]) for g in days)
+            rep.add("ND-1: (OB6) potkniecia w liniach doby i ERROR in SiegePhantomLift", f"potkniecia (suma dob) {stl}, ERROR {errs}", "0, 0", stl == 0 and errs == 0)
+            if not days:
+                rep.add("ND-2: (OB6) obozy bez sily - doby <= SiegePhantomLiftDays, oblezen trwajacych po zdjeciu 0", "brak linii doby (zaden oboz ponizej progu)",
+                        "INFO (zwykly bieg nie ma obozu bez ludzi; test 6-letni - 1 przypadek)", None)
+            else:
+                rows, over = [], []
+                for g in days:
+                    for r in ND_ROW.finditer(g[3] or ""):
+                        rows.append((int(g[0]), r.group(2), int(r.group(7)), r.group(8)))
+                        if int(r.group(7)) > need:
+                            over.append(f"d{g[0]} {r.group(1).strip()} ({r.group(2)}) dob {r.group(7)}")
+                still = sum(int(g[7]) for g in days)
+                rep.add("ND-2: (OB6) obozy bez sily - doby <= SiegePhantomLiftDays, oblezen trwajacych po zdjeciu 0",
+                        f"linii doby {len(days)}, wierszy obozow {len(rows)}, ponad {need} dob {len(over)}" + (f" ({'; '.join(over[:4])})" if over else "")
+                        + f", oblezen nadal trwajacych po zdjeciu (suma) {still}",
+                        f"dob <= {need}, nadal trwajacych 0", not over and still == 0)
+            lifted = sum(int(g[4]) for g in days)
+            sk = [sum(int(g[i]) for g in days) for i in (8, 9, 10, 11)]
+            last = days[-1] if days else None
+            rep.add("ND-3: (OB6) zdjete i pominiete (INFO)",
+                    f"zdjete razem {lifted}, druzyn odeslanych {sum(int(g[6]) for g in days)}; pominiete (doby-oboz): gracz {sk[0]}, fabula ROT {sk[1]}, Inni {sk[2]}, w bitwie {sk[3]}"
+                    + (f"; ostatnia linia d{last[0]}: {(last[3] or '-')[:300]}" if last else ""), "INFO", None)
+            lifts = []
+            for g in days:
+                for r in ND_ROW.finditer(g[3] or ""):
+                    if ", ZDJETE" in r.group(8):
+                        lifts.append((int(g[0]), r.group(2)))
+            if not lifts:
+                rep.add("ND-4: (OB6) zwiniete oblezenie - OB5 koniec 'utrzymane'", "brak zwiniec", "INFO", None)
+            else:
+                chk, bad = 0, []
+                for d, sid in lifts:
+                    if sid not in ob5_seen:
+                        continue
+                    chk += 1
+                    e = [x for x in ob5_end if x[1] == sid and d - 1 <= x[0] <= d + 1]
+                    if not e or e[-1][2] != "utrzymane":
+                        bad.append(f"d{d} {sid}: " + (f"{e[-1][2]} ({e[-1][3]})" if e else "brak linii OB5 koniec"))
+                rep.add("ND-4: (OB6) zwiniete oblezenie twierdzy krolestwa - OB5 koniec 'utrzymane' tej doby",
+                        f"zwiniec {len(lifts)}, sledzonych przez OB5 {chk}, zle {len(bad)}" + (f" ({'; '.join(bad[:4])})" if bad else ""),
+                        "kazde sledzone: 'utrzymane' (twierdza poza krolestwem / Inni - OB5 nie sledzi)", (len(bad) == 0) if chk else None)
+    else:
+        rep.add("ND-0..4: (OB6) log Armoury", f"brak ({logp})", "INFO (podaj <Armoury-*.log>)", None)
+    # AUD-P1-5 z logu CrashScribe
+    if csp and os.path.isfile(csp):
+        vf = []
+        with open(csp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                if "AUD-P1-5" not in ln:
+                    continue
+                m = AU_VFIX.search(ln)
+                if m:
+                    vf.append(m.groups())
+        print(f"plik: {csp} | AUD-P1-5: linii dorobki {len(vf)}")
+        von = [v for v in vf if v[5] == "true"]
+        if von:
+            lv = von[-1]
+            rep.add("ND-5: (AUD-P1-5) dorobka tytulow wsi BK - zostalo 0, nie dodane 0, potkniec 0",
+                    f"linii {len(von)}; zostalo {[int(v[4]) for v in von]}, nie dodane {[int(v[2]) for v in von]}, potkniec {[int(v[7]) for v in von]}; ostatnia: przed {lv[0]},"
+                    f" dorobione {lv[1]}, bez tytulu twierdzy {lv[3]}{lv[6][:240]}", "0, 0, 0 w kazdej linii",
+                    all(int(v[4]) == 0 and int(v[2]) == 0 and int(v[7]) == 0 for v in von))
+        elif vf:
+            rep.add("ND-5: (AUD-P1-5) dorobka tytulow wsi BK", f"klucz BkTitlesVillageFix=false; {vf[-1][6][:240]}", "INFO (tylko nazwy)", None)
+        else:
+            rep.add("ND-5: (AUD-P1-5) dorobka tytulow wsi BK", "brak linii 'Mends: tytuly BK (AUD-P1-5)'", "INFO (log bez paczki albo czas gry nie ruszyl)", None)
+    else:
+        rep.add("ND-5: (AUD-P1-5) dorobka tytulow wsi BK", "bez logu CrashScribe", "INFO (--crashscribe <session-*.log>)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -27380,6 +27557,8 @@ def main(argv):
         return wyspywolni_main(logp, start_arg, until_arg, bdp, csp, cspb)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
+    if group == "ndrobne" and (logp or csp):
+        return ndrobne_main(logp, csp)   # noc-drobne 16.10: OB6 oboz bez sily (Armoury SiegePhantomLift), AUD-P1-5 dorobka tytulow wsi BK (CrashScribe, --crashscribe)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
