@@ -11,7 +11,7 @@ from collections import defaultdict, Counter
 
 B = os.path.dirname(os.path.abspath(__file__))
 L = os.path.dirname(B)
-VILLAGES_TSV = sys.argv[1] if len(sys.argv) > 1 else os.path.join(L, "..", "..", "Armoury", "ModuleData", "arm_map_villages.tsv")
+VILLAGES_TSV = sys.argv[1] if len(sys.argv) > 1 else os.path.join(L, "..", "..", "Armoury", "ModuleData", "arm_map_villages_v4.tsv")   # Jeff 16.10: lore z ukladu v4 (naglowek l0.py)
 GAME = sys.argv[2] if len(sys.argv) > 2 else r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules"
 
 def fnv1a(s):

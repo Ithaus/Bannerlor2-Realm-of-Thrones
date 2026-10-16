@@ -402,10 +402,11 @@ namespace Armoury
         /// <summary>Linia stanu (co 2 minuty przy zmianie, z podsumowaniem wiosek, i na koniec mapy; liczniki od wczytania mapy).</summary>
         private string LookLine()
         {
-            int burned = 0, dark = 0, smaller = 0, smoke = 0, wait = 0;
+            int burned = 0, dark = 0, smaller = 0, smoke = 0, wait = 0, known = 0;
             foreach (var s in _slots)
             {
                 if (!s.LookKnown) continue;
+                known++;
                 if (s.BookBurned) burned++;
                 if (s.PicBurned && s.Root != null) dark++;
                 if (s.PicLevel < Math.Max(1, Math.Min(3, s.R.Level))) smaller++;
@@ -417,10 +418,21 @@ namespace Armoury
                    + ", schowane do nastepnego pokazania " + _lookDropped + ", bez obrazka " + _lookNoPic + ", polaczone " + _lookMerged + ", czeka " + wait
                    + "; najwiecej przebudow jednej wioski " + _lookBuildsMax + ") | teraz: spalonych w ksiedze " + burned + " (ciemny obrazek stoi " + dark
                    + ", dym nad spalonymi " + smoke + "), mniejszych " + smaller + "; ciemnych obrazkow od wczytania " + _lookDarkBuilt + " (encji przyciemnionych "
-                   + _lookTinted + ") | napisy w kadrze teraz " + _lblCount + ", maks. " + _lblMax + ", warstwa " + (_lblLayer != null ? "stoi" : "brak")
+                   + _lookTinted + ")" + BookBurnedText(known) + " | napisy w kadrze teraz " + _lblCount + ", maks. " + _lblMax + ", warstwa " + (_lblLayer != null ? "stoi" : "brak")
                    + " (postawiona " + _lblLayers + " razy), przeliczenie pozycji sr. " + ms.ToString("0.0000", CultureInfo.InvariantCulture) + " ms/klatke (klatek z napisami "
                    + _lblFrames + ") | potkniecia: wyglad " + _stLook + ", napisy " + _stLbl + (_lblBroken ? " - NAPISY WYLACZONE do nastepnego wczytania mapy" : "")
                    + (_lookKeyOn ? "" : " | wyglad WYLACZONY w MCM") + (_lblKeyOn ? "" : " | napisy WYLACZONE w MCM") + ".";
+        }
+
+        /// <summary>Jeff 16.10 (D4): spalone w calej ksiedze obok "spalonych w ksiedze" widoku (te liczy tylko wioski z odczytanym wygladem - postawione przy kamerze
+        /// od wczytania mapy); bez tego linia wygladu pokazywala 0 przy 3 spalonych w ksiedze (log Jeffa 16.10 10:26). Nazwy bez "spalonych w ksiedze" i "mniejszych"
+        /// (wzorce tools/sprawdz_logi.py etap7_w4 biora pierwsze wystapienie).</summary>
+        private string BookBurnedText(int known)
+        {
+            int side, main;
+            if (!VillageBook.BurnedCounts(out side, out main)) return " | cala ksiega: nieczynna";
+            return " | cala ksiega: wioski poboczne spalone " + side + ", wsie gry spalone " + main + " (wsie gry bez obrazka Armoury); wyglad odczytany u " + known + " z "
+                   + _slots.Count + " wiosek (tylko postawione przy kamerze od wczytania mapy - dalsze spalone widok liczy, gdy kamera do nich dojdzie)";
         }
 
         // ---------- napisy nad spalonymi ----------

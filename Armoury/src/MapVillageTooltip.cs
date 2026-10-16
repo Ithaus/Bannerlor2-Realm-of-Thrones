@@ -215,6 +215,13 @@ namespace Armoury
             Settlement bound = district != null && district.Village != null ? district.Village.Bound : null;
             Clan lord = bound != null ? bound.OwnerClan : null;    // pan jak HeldLine (MapVillagesView)
             t.Banner = lord != null ? lord.Banner : null;
+            // Jeff 16.10 (D1, VillageBannerPerHolder): herb i linia GOSPODARZA wioski (VillageHolders - ten sam co proporczyk i okno okregu); null - jak dotad (pan)
+            VillageHolders.Holder holder = null;
+            if (Settings.Current.VillageBannerPerHolder)
+            {
+                holder = VillageHolders.Of(district, uid);
+                if (holder != null && holder.Banner != null) t.Banner = holder.Banner;
+            }
             t.Mode = ModeOf(district);
             t.Add(name, TooltipProperty.TooltipPropertyFlags.Title);
             t.Add(held, TooltipProperty.TooltipPropertyFlags.None, MapVillageTip.Always, 0, heldIsLord && lord != null ? lord.Color : 0u);
@@ -223,7 +230,7 @@ namespace Armoury
             try
             {
                 row = MapVillageLore.Of(uid);
-                knight = MapVillageLore.KnightLine(row, district, lord);
+                knight = holder != null ? VillageHolders.Line(holder) : MapVillageLore.KnightLine(row, district, lord);
             }
             catch (Exception e) { MapVillageLore.CountRowStumble(uid, e); }
             if (knight != null) t.Add(knight);

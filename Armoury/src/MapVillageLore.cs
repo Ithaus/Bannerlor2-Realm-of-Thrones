@@ -28,7 +28,9 @@ namespace Armoury
     /// </summary>
     internal static class MapVillageLore
     {
-        internal const string FileName = "arm_map_village_lore.tsv";
+        internal const string FileName = "arm_map_village_lore.tsv";            // lore ukladu v5 (bramka = crc ukladu v5)
+        internal const string FileNameV4 = "arm_map_village_lore_v4.tsv";       // Jeff 16.10: lore ukladu v4 (VillageLayoutV5 = false)
+        private static string LoreFileName { get { return MapVillageData.LayoutV5 ? FileName : FileNameV4; } }
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly string[] NoIds = new string[0];
 
@@ -55,8 +57,9 @@ namespace Armoury
             }
         }
 
-        // ---------- plik (raz na proces: plik i uklad w grze sie nie zmieniaja) ----------
+        // ---------- plik (raz na proces: plik i uklad w grze sie nie zmieniaja; Jeff 16.10: raz na uklad ksiegi - VillageLayoutV5 moze wybrac inny w nowej sesji) ----------
         private static bool _tried;
+        private static uint _loadedFor;                     // crc ukladu ksiegi, dla ktorego wczytano lore
         private static readonly Dictionary<string, Row> _rows = new Dictionary<string, Row>(StringComparer.Ordinal);
         private static List<string> _layoutUids;
         private static uint _layoutCrc, _fileCrc;
@@ -94,19 +97,39 @@ namespace Armoury
             return _gateOk && _rows.TryGetValue(uid, out r) ? r : null;
         }
 
+        /// <summary>Jeff 16.10 (D1, po recenzji): wiersz lore BEZ klucza VillageTipLore (ta sama bramka crc ukladu) - przydzial gospodarzy wiosek (VillageHolders: rycerz
+        /// z lore i jego herb na proporczyku) nie zalezy od klucza dymka. null - bramka, brak pliku albo wioska bez wiersza.</summary>
+        internal static Row RowOf(string uid)
+        {
+            if (uid == null) return null;
+            EnsureLoaded();
+            Row r;
+            return _gateOk && _rows.TryGetValue(uid, out r) ? r : null;
+        }
+
         private static void EnsureLoaded()
         {
-            if (_tried) return;
+            uint now;
+            if (_tried && VillageBook.LayoutCrcNow(out now) && now == _loadedFor) return;   // ten sam uklad co przy wczytaniu (O(1) przy kazdym dymku)
             uint crc;
             List<string> uids;
-            if (!VillageBook.Layout(out crc, out uids)) { _note = "brak ukladu ksiegi wiosek (plik wiosek nie wczytany albo z innej sceny)"; return; }   // bez _tried: ksiega moze wczytac uklad pozniej
+            if (!VillageBook.Layout(out crc, out uids))
+            {
+                // bez _tried: ksiega moze wczytac uklad pozniej; lore poprzedniego ukladu (inna sesja procesu) nie zostaje
+                if (_tried) { _tried = false; _rows.Clear(); _gateOk = false; _layoutUids = null; _layoutN = 0; }
+                _note = "brak ukladu ksiegi wiosek (plik wiosek nie wczytany albo z innej sceny)";
+                return;
+            }
             _tried = true;
+            _loadedFor = crc;
+            _rows.Clear(); _gateOk = false;
             var sw = Stopwatch.StartNew();
             try
             {
                 _layoutCrc = crc; _layoutUids = uids; _layoutN = uids.Count;
-                string path = MapVillageTooltip.ModulePath("ModuleData", FileName);
-                if (path == null || !System.IO.File.Exists(path)) { _note = "brak pliku " + FileName; return; }
+                string name = LoreFileName;
+                string path = MapVillageTooltip.ModulePath("ModuleData", name);
+                if (path == null || !System.IO.File.Exists(path)) { _note = "brak pliku " + name; return; }
                 Parse(System.IO.File.ReadAllText(path, Encoding.UTF8), uids);
             }
             catch (Exception e) { _rows.Clear(); _gateOk = false; _note = "blad wczytania (" + e.GetType().Name + ")"; Log.Error("MapVillageLore.Load", e); }
@@ -341,7 +364,7 @@ namespace Armoury
             EnsureLoaded();
             ResolveBk();
             string lore = _gateOk
-                ? "lore " + _rows.Count + "/" + _layoutN + " (bramka " + _fileCrc.ToString("X8") + " zgodna, odrzucone " + _rejected + ", bez lore " + _missing + ", wczytanie " + _loadMs.ToString("0", Inv) + " ms raz na proces)"
+                ? "lore " + _rows.Count + "/" + _layoutN + " (bramka " + _fileCrc.ToString("X8") + " zgodna, odrzucone " + _rejected + ", bez lore " + _missing + ", wczytanie " + _loadMs.ToString("0", Inv) + " ms raz na uklad, plik " + LoreFileName + ")"
                 : "lore WYLACZONE: " + _note + (_layoutN > 0 ? " (wiosek ukladu " + _layoutN + ", odrzucone " + _rejected + ")" : "") + " - dymek bez linii lore";
             Log.Info("Dymek wioski (E7/W2): start | " + lore + ", dymek " + MapVillageTooltip.Movie + " " + MapVillageTooltip.StatusText
                      + " | BK: wiara " + (BkFaithOk ? "tak" : "nie") + ", tytuly " + (BkTitleOk ? "tak" : "nie")

@@ -5,6 +5,7 @@
 // "campaign_flag") (SandBox.View 1.4.8: kopia siatki + material z tekstura herbu z MapScreen.CharacterBannerMaterialCache; klucz = (material,
 // OBIEKT Banner), Banner nie nadpisuje Equals - wiec jeden WLASNY obiekt Banner na kod herbu = jedna tekstura dla wszystkich wiosek jednego pana).
 // Pan = rod wlasciciela wsi gry (Village.Bound.OwnerClan, Clan.Banner - dla rodu panujacego herb krolestwa), ten sam co dymek W2 i HeldLine.
+// Jeff 16.10 (D1, VillageBannerPerHolder): herb GOSPODARZA wioski (VillageHolders: majatek BK, rycerz z lore, rycerz krolestwa, pan) - ten sam co dymek i okno okregu.
 // Bez fizyki i skryptow (nie lapie klikniec; dymek wioski szuka po obrysie, nie po encji). Tylko z bliska: kamera z <= 90, najblizsze 80 wiosek
 // z postawionym obrazkiem (od punktu, na ktory patrzy kamera), budowa najwyzej 12 na cwierc sekundy; dalej schowane, nie usuwane.
 // Raz na sekunde dla pokazanych porownanie KODU herbu (gra zmienia barwy herbu w miejscu, ta sama referencja; kazda zmiana zeruje
@@ -105,7 +106,7 @@ namespace Armoury
                     if (p.Shown && p.Why == PenWhyNone && !check) continue;
                     try
                     {
-                        string code = LordCode(s.D);
+                        string code = LordCode(s);
                         if (code.Length == 0)
                         {
                             // wies bez pana (rzadkie): bez proporczyka; wroci przy pierwszym ticku z panem
@@ -172,6 +173,14 @@ namespace Armoury
                 s.Pen.Stamp = _penStamp;
             }
             return n;
+        }
+
+        /// <summary>Jeff 16.10 (D1, VillageBannerPerHolder): kod herbu GOSPODARZA tej wioski (VillageHolders.Code - ten sam gospodarz co dymek i okno okregu; pamiec
+        /// okregu na dobe, wiec porownanie raz na sekunde to sam odczyt); klucz off - herb pana okregu jak dotad. "" = brak pana albo herbu.</summary>
+        private static string LordCode(Slot s)
+        {
+            if (Settings.Current.VillageBannerPerHolder && s.D != null && s.D.S != null) return VillageHolders.Code(s.D.S, s.R.Uid);
+            return LordCode(s.D);
         }
 
         /// <summary>Kod herbu pana okregu (Village.Bound.OwnerClan.Banner - jak HeldLine i dymek W2); "" = brak pana albo herbu.</summary>
