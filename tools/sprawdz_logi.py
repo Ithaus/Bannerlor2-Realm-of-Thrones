@@ -27707,7 +27707,7 @@ def kiesa2_main(logp):
 
 # ------------------------------------------------------------ obieg2 (15.10, decyzja Jeffa "kasa sie zbiera u ludu ... lordowie i krolestwa zostana bez kasy";
 # "pamietaj o pozyczkach"; Armoury/src/TownFolk.Guard.cs, TownFolk.Loans.cs, TownFolk.Luxury.cs)
-O2_START = "Obieg ludu (obieg2): start sesji"
+OBG2_START = "Obieg ludu (obieg2): start sesji"
 O2_GUARD = "Straznik obiegu (obieg2): dzien "
 O2_VILL = "Podatek od nadwyzki wsi (obieg2): dzien "
 O2_LOANS = "Pozyczki od ludu (obieg2): dzien "
@@ -27771,7 +27771,7 @@ def obieg2_main(logp, basep=None):
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
-            if s.startswith(O2_START):
+            if s.startswith(OBG2_START):
                 starts.append(s)
             elif s.startswith(O2_GUARD):
                 d = num(r"dzien (\d+)", s)
@@ -27823,7 +27823,7 @@ def obieg2_main(logp, basep=None):
     st = starts[-1] if starts else ""
     keys = {k: (f"({k}) tak" in st) for k in ("Folk Hoard Villages", "Folk Circulation Guard", "Folk Loans", "Folk Ladder Ceiling By Wealth", "Folk Hoard Tax")}
     allon = all(keys.values())
-    rep.add("OB2-0: linia startu (klucze obieg2)", (st[len(O2_START):][:260] if st else "brak linii startu (sa linie doby)"),
+    rep.add("OB2-0: linia startu (klucze obieg2)", (st[len(OBG2_START):][:260] if st else "brak linii startu (sa linie doby)"),
             "linia jest, klucze tak", bool(st) and allon)
     # OB2-1 linie doby
     if kl:
