@@ -7,6 +7,8 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -43,6 +45,14 @@ namespace Armoury
     ///    sztuki kroku >= 0.4 x wartosci (gabka BK przy wyjezdzie kupuje ponizej 0.33 - BKPartyBehavior :329); liczniki "odkupione";
     ///  - kasa miasta tylko ponad TownPurse.BuyFloor i najwyzej 1/20 tej nadwyzki na dobe (wycena limitu BuyFloorPeek - bez licznikow 169c);
     ///  - krokami po 5 sztuk (sztuka > 200 d - po 1), cena liczona od nowa po kazdym kroku, najwyzej polowa stosu na wizyte, jedzenie zostaje na 10 dob druzyny.
+    ///  - STROJENIE PO TESCIE 120 DOB (S1; test 16.10 02-08-15 na zapisie F: na stracie 28.8 tys. zl/d przy zysku 30.1 tys. - glownie stary zapas "dlugo
+    ///    w jukach" po wczytaniu - i zrzut na jeden targ: najwiekszy spadek indeksu kategorii w jednym miescie w dobie 92.7% (Ibben oil 6.13 -> 0.45), ponad 40%
+    ///    w 120 z 121 dob): gra placi sztuka po sztuce (SellItemsAction.ApplyInternal - cena kazdej sztuki od nowa), wiec krok z zyskiem sprawdza cene OSTATNIEJ
+    ///    sztuki kroku i nie przeskakuje progu zysku; krok, ktorego ostatnia sztuka nie ma zysku, jest przycinany do sztuk z zyskiem (reszta - regula straty).
+    ///    Sprzedaz NA STRACIE z kazdego powodu poza rozwiazaniem i brakiem na zold idzie PORCJAMI: po sprzedazy indeks kategorii w tym miescie nie nizej niz
+    ///    0.70 x indeks przed pierwsza sprzedaza T1 tej kategorii w tym miescie tej doby, a cena kazdej sztuki >= 0.60 x wartosci (Value); sztuka po sztuce -
+    ///    stop, gdy nastepna przekroczylaby ktoras granice; reszta czeka na nastepne miasto (licznik "wstrzymane (porcja)"). Rozwiazanie i brak na zold - jak dotad.
+    /// E3-T2 (S2, klucz CaravanProfitToOwner) - NADWYZKA KIESY KARAWANY DO WLASCICIELA raz na dobe (ProfitToOwners nizej; opis tam).
     /// Kto placi, kto dostaje: kasa miasta -> kiesa karawany (SellItemsAction - zwykly handel gry), od utargu myto E3-G3 (TownToll). Potem lud i wsie kupuja
     /// z polki: kiesy -> kasa -> zawor. Kontrola w linii (poprawki): kasy miast zmierzone przed i po sprzedazy = przyrost kies karawan + myto - myto wrocone do kas.
     /// Linia "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien N" (z zyskiem / na stracie z powodem, odrzucone, wedlug towaru, ksiega kosztu, blokady,
@@ -54,6 +64,7 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int MaxAgeDays = 30, FoodAgeDays = 7, FoodKeepDays = 10, CashDays = 3, StepN = 5, DearValue = 200, TownDayShare = 20, BlockDays = 7, BkLogDays = 7;
         private const float GabkaFloor = 0.40f;
+        private const float PortionDrop = 0.30f, LossFloor = 0.60f;   // S1: na stracie porcjami - indeks kategorii w miescie najwyzej -30% w dobie, cena sztuki >= 0.6 x wartosci
         private static readonly string[] WatchIds = { "tools", "fur", "silver", "wine", "Papyrus", "velvet", "jewelry", "Eggs", "honey", "salt" };
 
         // ------------------------------------------------------------ ksiega kosztu (sesja)
@@ -86,6 +97,8 @@ namespace Armoury
         private static readonly Dictionary<ItemObject, Row> _rows = new Dictionary<ItemObject, Row>();
         private static int _entries, _sellers, _rNoProfit, _bkBlocked, _bkBlockedOther, _rGabka, _rCash, _rLimit, _rFood, _rHalf, _skipOrders, _skipContract, _stumbles, _stumbleSess;
         private static int _lAge, _lFood, _lCash, _lFull, _lDisband, _fullCut;
+        private static int _rPortionIdx, _rPortionPrice, _portionCut, _profitCut;   // S1: wstrzymane (porcja) - indeks / cena; kroki przyciete porcja; kroki przyciete do sztuk z zyskiem
+        private static readonly float[] _dropKind = new float[3];                  // S1: najwiekszy spadek indeksu wedlug rodzaju sprzedazy: 0 z zyskiem, 1 na stracie porcjami, 2 bez wyjscia
         private static long _lAgeG, _lFoodG, _lCashG, _lFullG, _lDisbandG, _gross, _toll, _rebought, _reboughtOther, _rebuiltLate, _bookBuys, _bookBuyUnits;
         private static long _townSpare0;
         private static long _cTown, _cPurse, _cToll, _cTollTown;     // kontrola: kasy miast zmierzone (-), kiesy karawan (+), myto, myto wrocone do kas osad
@@ -98,6 +111,7 @@ namespace Armoury
             _snapDone = false; _snapCaravans = 0; _snapUnits = _snapBk = _snapAvg = 0; _avgIdx.Clear(); _avgDay = -1;
             _bkBeh = null; _fLogs = _fItem = _fPrice = _fTime = null; _bkTried = false; _bkLogState = "nie czytany";
             _startDone = false; _stumbleSess = 0; _err.Clear();
+            LastOwnerPaid = LastOwnerNot = LastOwnerLord = LastOwnerPlayer = 0; LastOwnerN = 0; _oStumbles = _oStumbleSess = 0;
             ZeroDay();
         }
 
@@ -106,6 +120,7 @@ namespace Armoury
             _rows.Clear();
             _entries = _sellers = _rNoProfit = _bkBlocked = _bkBlockedOther = _rGabka = _rCash = _rLimit = _rFood = _rHalf = _skipOrders = _skipContract = _stumbles = 0;
             _lAge = _lFood = _lCash = _lFull = _lDisband = _fullCut = 0;
+            _rPortionIdx = _rPortionPrice = _portionCut = _profitCut = 0; Array.Clear(_dropKind, 0, _dropKind.Length);
             _lAgeG = _lFoodG = _lCashG = _lFullG = _lDisbandG = _gross = _toll = _rebought = _reboughtOther = _rebuiltLate = _bookBuys = _bookBuyUnits = 0;
             _townSpare0 = 0;
             _cTown = _cPurse = _cToll = _cTollTown = 0;
@@ -437,6 +452,35 @@ namespace Armoury
 
         private static string Name(Settlement st) { return st == null ? "?" : (st.Name != null ? st.Name.ToString() : st.StringId); }
 
+        /// <summary>Cena k-tej sztuki kroku (1 = pierwsza) przy dzisiejszej polce `d`: gra placi sztuka po sztuce i po kazdej sztuce polka rosnie o jej wage
+        /// (SellItemsAction.ApplyInternal, TownMarketData.OnTownInventoryUpdated) - ta sama miara co dotad dla ostatniej sztuki kroku.</summary>
+        private static int PriceAt(TradeItemPriceFactorModel model, EquipmentElement el, MobileParty mp, ItemData d, int k, int wv)
+        {
+            return model.GetPrice(el, mp, null, true, d.InStoreValue + (Math.Max(1, k) - 1) * wv, d.Supply, d.Demand);
+        }
+
+        /// <summary>Indeks kategorii po sprzedazy k sztuk (ta sama miara co Town.GetItemCategoryPriceIndex - TownMarketData.GetPriceFactor).</summary>
+        private static float IndexAfter(TradeItemPriceFactorModel model, ItemCategory cat, ItemData d, int k, int wv)
+        {
+            return model.GetBasePriceFactor(cat, d.InStoreValue + k * wv, d.Supply, d.Demand, false, 0);
+        }
+
+        /// <summary>Indeks kategorii w miescie przed pierwsza sprzedaza T1 tej doby (gdy dzis jeszcze nic - obecny).</summary>
+        private static float RefIndex(Town town, ItemCategory cat)
+        {
+            Dictionary<ItemCategory, float> ix; float v;
+            return _idx0.TryGetValue(town, out ix) && ix.TryGetValue(cat, out v) ? v : town.GetItemCategoryPriceIndex(cat);
+        }
+
+        /// <summary>S1: czy porcja k sztuk na stracie miesci sie w granicach (0 tak; 1 indeks spadlby ponizej 0.70 x indeksu sprzed pierwszej sprzedazy doby;
+        /// 2 cena k-tej sztuki < 0.60 x wartosci).</summary>
+        private static int PortionStop(TradeItemPriceFactorModel model, EquipmentElement el, MobileParty mp, ItemCategory cat, ItemData d, int k, int wv, float ref0, int value)
+        {
+            if (ref0 > 0f && IndexAfter(model, cat, d, k, wv) < (1f - PortionDrop) * ref0) return 1;
+            if (PriceAt(model, el, mp, d, k, wv) < LossFloor * value) return 2;
+            return 0;
+        }
+
         private static void Sell(MobileParty mp, Settlement st, Town town, Settings s)
         {
             _entries++;
@@ -511,12 +555,19 @@ namespace Armoury
                     }
                     if (step <= 0) break;
                     var d = town.MarketData.GetCategoryData(cat);
-                    int pLast = model.GetPrice(el.EquipmentElement, mp, null, true, d.InStoreValue + (step - 1) * wv, d.Supply, d.Demand);   // cena ostatniej sztuki kroku
+                    int pLast = PriceAt(model, el.EquipmentElement, mp, d, step, wv);   // cena ostatniej sztuki kroku
                     var lot = Sync(mp, it, pack.GetItemNumber(it), false);
                     double age = lot != null ? Math.Max(0, now - lot.Day) : 0;
                     float wgt = it.Weight;
                     bool cash = mp.PartyTradeGold < CashDays * wage, full = wgt > 0f && mp.TotalWeightCarried > cap;   // poprawki (uwaga recenzji 2): ponad udzwig, jak BK
                     bool profit = pLast * keepK > c.Min;
+                    if (!profit && step > 1)
+                    {
+                        // S1: krok nie przeskakuje progu zysku - najwiecej sztuk, z ktorych OSTATNIA ma jeszcze zysk (gra placi sztuka po sztuce); reszta - regula straty
+                        int kp = step - 1;
+                        while (kp >= 1 && PriceAt(model, el.EquipmentElement, mp, d, kp, wv) * keepK <= c.Min) kp--;
+                        if (kp >= 1) { step = kp; pLast = PriceAt(model, el.EquipmentElement, mp, d, kp, wv); profit = true; _profitCut++; }
+                    }
                     int why = profit ? 0 : LossWhy(disband, cash, full, c.Food, age);
                     if (why == 3)
                     {
@@ -525,11 +576,25 @@ namespace Armoury
                         if (need < step)
                         {
                             step = need; _fullCut++;
-                            pLast = model.GetPrice(el.EquipmentElement, mp, null, true, d.InStoreValue + (step - 1) * wv, d.Supply, d.Demand);
+                            pLast = PriceAt(model, el.EquipmentElement, mp, d, step, wv);
                             if (pLast * keepK > c.Min) { profit = true; why = 0; }
                         }
                     }
                     if (!profit && why == 0) { _rNoProfit++; break; }
+                    if (why >= 3)
+                    {
+                        // S1: na stracie (juki ponad udzwig, jedzenie psuje sie, dlugo w jukach) porcjami - sztuka po sztuce, stop przed sztuka, ktora zbilaby indeks
+                        // kategorii w tym miescie ponizej 0.70 x indeksu sprzed pierwszej sprzedazy doby albo poszlaby ponizej 0.60 x wartosci; reszta czeka
+                        float ref0 = RefIndex(town, cat);
+                        int kl = step, stop = 0;
+                        for (; kl >= 1; kl--)
+                        {
+                            stop = PortionStop(model, el.EquipmentElement, mp, cat, d, kl, wv, ref0, it.Value);
+                            if (stop == 0) break;
+                        }
+                        if (kl <= 0) { if (stop == 1) _rPortionIdx++; else _rPortionPrice++; break; }
+                        if (kl < step) { step = kl; _portionCut++; pLast = PriceAt(model, el.EquipmentElement, mp, d, kl, wv); }
+                    }
                     if (pLast < GabkaFloor * it.Value) { _rGabka++; break; }
                     int price = Math.Max(1, town.GetItemPrice(el.EquipmentElement, mp, true));
                     int spare = town.Gold - TownPurse.BuyFloor(town, reserve);
@@ -590,6 +655,8 @@ namespace Armoury
                     {
                         float drop = 1f - i1 / i0;
                         if (drop > _dropMax) { _dropMax = drop; _dropWhere = Name(st) + " " + cat.StringId + " " + i0.ToString("0.00", Inv) + " -> " + i1.ToString("0.00", Inv); }
+                        int kind = why == 0 ? 0 : (why >= 3 ? 1 : 2);                // S1: z zyskiem / na stracie porcjami / bez wyjscia (rozwiazanie, brak na zold)
+                        if (drop > _dropKind[kind]) _dropKind[kind] = drop;
                     }
                     if (done == null) done = new List<(EquipmentElement, int)>();
                     done.Add((el.EquipmentElement, moved));
@@ -633,11 +700,15 @@ namespace Armoury
                              + "; koszt = wartosc x max(1, srednia indeksu 97 miast), z dziennika BK wyzsza z cen; dzien z dziennika BK, bez wpisu " + BkLogDays + " dob wstecz; dziennik BK " + _bkLogState + ")"
                              + " | regula: sprzedaz, gdy cena po mycie E3-G3 > koszt zakupu + zold za dni w drodze (najwyzej " + MaxAgeDays + " dob, najwyzej 100% kosztu); na stracie tylko: rozwiazanie, kiesa < "
                              + CashDays + " dni zoldu, juki ponad udzwig (tylko do zejscia pod udzwig), jedzenie > " + FoodAgeDays + " dob, towar > " + MaxAgeDays + " dob"
+                             + " | na stracie (poza rozwiazaniem i brakiem na zold) porcjami: indeks kategorii w miescie najwyzej -" + (100 * PortionDrop).ToString("0", Inv)
+                             + "% w dobie wobec indeksu przed pierwsza sprzedaza, cena sztuki >= " + LossFloor.ToString("0.00", Inv) + " x wartosci (reszta czeka na nastepne miasto); krok z zyskiem"
+                             + " nie przeskakuje progu zysku (cena ostatniej sztuki kroku, krok przyciety do sztuk z zyskiem)"
                              + " | bez progu sredniej (Jeff 16.10); zawsze: ta sama karawana nie odkupuje przy tej samej wizycie kategorii, ktora sprzedala (inne karawany moga - Jeff 16.10; blokada "
                              + (_bkHooked ? "wpieta" : "NIE") + "), cena >= " + GabkaFloor.ToString("0.00", Inv)
                              + " x wartosci (gabka), kasa miasta ponad BuyFloor i najwyzej 1/" + TownDayShare + " nadwyzki na dobe, krok " + StepN + " szt. (ponad " + DearValue + " d - 1), polowa stosu,"
                              + " jedzenie na " + FoodKeepDays + " dob.");
                 }
+                try { ProfitToOwners(s, day); } catch (Exception e) { OStumble("ProfitToOwners", e); }   // E3-T2 (S2): wlasna linia doby, wlasny licznik potkniec
                 // juki wybranych towarow (raz na dobe) i porzadki ksiegi i blokad
                 var cats = new Dictionary<ItemCategory, string>();
                 var om = MBObjectManager.Instance;
@@ -686,7 +757,7 @@ namespace Armoury
                 foreach (var kv in rows) { pN += kv.Value.ProfitN; pG += kv.Value.ProfitG; pC += kv.Value.ProfitCost; lN += kv.Value.LossN; lG += kv.Value.LossG; lC += kv.Value.LossCost; }
                 rows.Sort((a, b) => (b.Value.ProfitG + b.Value.LossG).CompareTo(a.Value.ProfitG + a.Value.LossG));
                 long ctl = _cTown - (_cPurse + _cToll - _cTollTown);
-                var sb = new StringBuilder(2800);
+                var sb = new StringBuilder(3400);
                 sb.Append("Karawany - towar tam, gdzie maja zysk (E3-T1): dzien ").Append(day).Append(" | ").Append(s.CaravanSellWhereDear ? "CZYNNE" : "WYLACZONE (MCM)")
                   .Append(" | wjazdow z towarem ").Append(_entries).Append(", sprzedaly ").Append(_sellers)
                   .Append(" | z zyskiem ").Append(pN).Append(" szt. za ").Append(pG).Append(" (koszt zakupu ").Append(pC).Append(", marza ").Append(pC > 0 ? ((pG / (double)pC - 1) * 100).ToString("+0.0;-0.0", Inv) + "%" : "-").Append(')')
@@ -696,7 +767,11 @@ namespace Armoury
                   .Append("; kroki przyciete do zejscia pod udzwig ").Append(_fullCut)
                   .Append(" | odrzucone kroki: bez zysku ").Append(_rNoProfit).Append(", gabka (cena < ").Append(GabkaFloor.ToString("0.00", Inv)).Append(" x wartosci) ").Append(_rGabka)
                   .Append(", kasa miasta (BuyFloor) ").Append(_rCash).Append(", limit 1/").Append(TownDayShare).Append(" nadwyzki ").Append(_rLimit).Append(", rezerwa jedzenia ").Append(_rFood)
-                  .Append(", polowa stosu ").Append(_rHalf).Append(" | pominiete: kontrakt 174 ").Append(_skipContract).Append(", rozkaz gracza (BK) ").Append(_skipOrders)
+                  .Append(", polowa stosu ").Append(_rHalf)
+                  .Append(", wstrzymane (porcja) ").Append(_rPortionIdx + _rPortionPrice).Append(" (indeks kategorii w miescie spadlby ponizej ").Append((1f - PortionDrop).ToString("0.00", Inv))
+                  .Append(" x indeksu sprzed pierwszej sprzedazy doby ").Append(_rPortionIdx).Append(", cena sztuki < ").Append(LossFloor.ToString("0.00", Inv)).Append(" x wartosci ").Append(_rPortionPrice)
+                  .Append("; kroki przyciete porcja ").Append(_portionCut).Append("); kroki przyciete do sztuk z zyskiem ").Append(_profitCut)
+                  .Append(" | pominiete: kontrakt 174 ").Append(_skipContract).Append(", rozkaz gracza (BK) ").Append(_skipOrders)
                   .Append(" | wedlug towaru (z zyskiem / na stracie, szt./zl): ");
                 int k = 0;
                 foreach (var kv in rows)
@@ -713,6 +788,9 @@ namespace Armoury
                   .Append(" (w tym innym karawanom ").Append(_bkBlockedOther).Append("), blokad czynnych ").Append(blocks).Append(" w ").Append(blockTowns).Append(" miastach (sprzedane w nich ").Append(blockSold).Append(" szt.)")
                   .Append("; odkupione mimo to: w tej samej wizycie (gabka, inne) ").Append(_rebought).Append(" szt., przez inne karawany ").Append(_reboughtOther).Append(" szt.")
                   .Append(" | najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis ").Append((100 * _dropMax).ToString("0.0", Inv)).Append('%').Append(_dropWhere != null ? " (" + _dropWhere + ")" : "")
+                  .Append(" | spadek indeksu wedlug rodzaju sprzedazy (najwiekszy w jednym miescie dzis): z zyskiem ").Append((100 * _dropKind[0]).ToString("0.0", Inv))
+                  .Append("%, na stracie porcjami ").Append((100 * _dropKind[1]).ToString("0.0", Inv)).Append("% (granica ").Append((100 * PortionDrop).ToString("0", Inv))
+                  .Append("%), bez wyjscia (rozwiazanie, brak na zold) ").Append((100 * _dropKind[2]).ToString("0.0", Inv)).Append('%')
                   .Append(" | ksiega kosztu: karawan ").Append(books).Append(", sztuk ").Append(bookUnits).Append(", zakupow dzis ").Append(_bookBuys).Append(" (").Append(_bookBuyUnits).Append(" szt.)")
                   .Append(", odtworzone przy wczytaniu ").Append(_snapUnits).Append(" szt. (z dziennika BK ").Append(_snapBk).Append(", ze sredniej indeksu ").Append(_snapAvg).Append("; dziennik BK ").Append(_bkLogState)
                   .Append("), dzis bez zakupu w ksiedze ").Append(_rebuiltLate).Append(" szt.")
@@ -733,6 +811,108 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ZeroDay(); }
+        }
+
+        // ------------------------------------------------------------ E3-T2 (S2, strojenie po tescie 120 dob; klucz CaravanProfitToOwner) - zysk karawany do wlasciciela
+        /// <summary>
+        /// Dowod [L] (test 16.10 02-08-15, 120 dob na zapisie F, baza WGRANIA 64 20-16-31): kiesy karawan 4.34 -> 5.73 mln (+32%), 2.62% zlota swiata wobec 1.98%
+        /// w bazie, nachylenie +19.8 tys./d - zysk T1 (z kas miast ok. 59 tys./d) zostaje w kiesach. Przyczyna [K]: przy BK Realistic Caravan Income
+        /// (u Jeffa wlaczone) gra nie oddaje zysku karawan wlascicielom - BK EconomyPatches.AddIncomeFromPartyPrefix wylacza AddIncomeFromParty karawan
+        /// (gra: 10% kiesy ponad 10 000 na dobe do rodu, DefaultClanFinanceModel :693-718), a BKClanFinanceModel.CalculateOwnerIncomeFromCaravan zwraca 0
+        /// (gra: (kiesa - kapital startowy) / RevenueSmoothenFraction na dobe do notabla, :864-889); zostaje BKPartyBehavior.AddRealisticIncome: wszystko
+        /// ponad 10 000 tylko przy wjezdzie do siedziby, wlasnej osady albo miasta udzialowca wlasciciela (BK :941-975; E3/9 Seal31B - takze miasta krolestwa
+        /// pana) - 2-9 wplat na dobe na ok. 350 karawan (328 to karawany notabli). ROT.Models.ROTClanFinanceModel deleguje do BK.
+        /// Regula (raz na dobe, CaravanGoods.Daily, przed ksiega pieniadza): karawana bez wodza oddaje wlascicielowi (CaravanPartyComponent.Owner - notabl,
+        /// lord albo gracz; ten sam odbiorca co BK) wszystko ponad kapital obrotowy = max(10 000, 30 dni zoldu): 10 000 to kapital startowy gry
+        /// (DefaultCaravanModel.GetInitialTradeGold) i prog wplaty BK, wystarcza na pelny zakup BK w miescie (BuyCategory: najwyzej 1 500 na kategorie, 5 kategorii;
+        /// BudgetFactor pelny od 5 000). Zadnego dubla: tylko przy BK Realistic Caravan Income; karawana z wodzem pominieta (gra placi z niej rodowi przez
+        /// AddIncomeFromParty - BK puszcza ja, gdy wodz nie ma tytulu); karawana, za ktora czynny model finansow sam placi (CalculateOwnerIncomeFromCaravan > 0),
+        /// pominieta; rozwiazywana (kiesa do wlasciciela przy rozwiazaniu - E3/7) i w bitwie - pominiete; BK wplaca dalej to, co przy wjezdzie ponad 10 000.
+        /// Platnik -> odbiorca: kiesa karawany -> zloto wlasciciela (GiveGoldAction.ApplyForPartyToCharacter - zdarzenie gry; ksiega pieniadza widzi przelew,
+        /// nie zloto z niczego; pozycja w linii "Obieg: notable i karawany"). Notabl ponad 10 500 - pasmo gry oddaje nadwyzke kasie miasta handlu (E5/A3).
+        /// Te same skutki co wplata zysku w grze: slawa rodu za perk Great Investor (AddIncomeFromParty, AddRealisticIncome). Gracz = AI; jeden komunikat dziennie.
+        /// Nic w zapisie. Wyjatek per karawana - licznik potkniec (reszta karawan dalej).
+        /// </summary>
+        private const int KeepGold = 10000, KeepWageDays = 30;
+        internal static long LastOwnerPaid, LastOwnerNot, LastOwnerLord, LastOwnerPlayer;   // linia "Obieg: notable i karawany" (MoneyLedger.Daily - ta sama doba)
+        internal static int LastOwnerN;
+        private static int _oStumbles, _oStumbleSess;
+
+        private static void OStumble(string where, Exception e)
+        {
+            _oStumbles++; _oStumbleSess++;
+            try { if (_err.Add(where)) Log.Error("CaravanGoods." + where, e); } catch { }
+        }
+
+        private static void ProfitToOwners(Settings s, int day)
+        {
+            LastOwnerPaid = LastOwnerNot = LastOwnerLord = LastOwnerPlayer = 0; LastOwnerN = 0;
+            var sb = new StringBuilder(1400);
+            sb.Append("Karawany - zysk do wlasciciela (E3-T2): dzien ").Append(day);
+            if (!s.CaravanProfitToOwner)
+            {
+                Log.Info(sb.Append(" | WYLACZONE (MCM) | potkniecia ").Append(_oStumbles).Append(" (sesja ").Append(_oStumbleSess).Append(").").ToString());
+                _oStumbles = 0;
+                return;
+            }
+            if (!Seal31B.RealisticCaravanIncome())
+            {
+                Log.Info(sb.Append(" | NIECZYNNE: BK Realistic Caravan Income wylaczone albo brak BK - gra i BK same oddaja zysk karawan wlascicielom (bez dubla) | potkniecia ")
+                           .Append(_oStumbles).Append(" (sesja ").Append(_oStumbleSess).Append(").").ToString());
+                _oStumbles = 0;
+                return;
+            }
+            int n = 0, below = 0, paidN = 0, notN = 0, lordN = 0, plN = 0, sDis = 0, sBat = 0, sLead = 0, sOwn = 0, sModel = 0;
+            long keepAll = 0, held = 0, paid = 0, pNot = 0, pLord = 0, pPl = 0, ctlFrom = 0, ctlTo = 0;
+            var cfm = Campaign.Current.Models.ClanFinanceModel;
+            var list = new List<MobileParty>(MobileParty.AllCaravanParties);
+            foreach (var mp in list)
+            {
+                try
+                {
+                    if (mp == null || !mp.IsActive || !mp.IsCaravan) continue;
+                    n++;
+                    int g = mp.PartyTradeGold;
+                    long keep = Math.Max(KeepGold, (long)KeepWageDays * Math.Max(0, mp.TotalWage));
+                    keepAll += keep; held += Math.Min(Math.Max(0, g), keep);
+                    if (g <= keep) { below++; continue; }
+                    if (mp.IsDisbanding) { sDis++; continue; }
+                    if (mp.MapEvent != null) { sBat++; continue; }
+                    if (mp.LeaderHero != null) { sLead++; continue; }
+                    var owner = mp.Owner;
+                    if (owner == null || !owner.IsAlive) { sOwn++; continue; }
+                    if (cfm != null && cfm.CalculateOwnerIncomeFromCaravan(mp) > 0) { sModel++; continue; }
+                    int amt = (int)Math.Min(int.MaxValue, g - keep);
+                    int g0 = mp.PartyTradeGold, h0 = owner.Gold;
+                    GiveGoldAction.ApplyForPartyToCharacter(mp.Party, owner, amt, true);
+                    int moved = g0 - mp.PartyTradeGold, got = owner.Gold - h0;
+                    ctlFrom += moved; ctlTo += got;
+                    if (moved <= 0) continue;
+                    paid += moved; paidN++;
+                    if (owner == Hero.MainHero) { pPl += moved; plN++; }
+                    else if (owner.IsNotable) { pNot += moved; notN++; }
+                    else { pLord += moved; lordN++; }
+                    var cl = owner.Clan;
+                    if (cl != null && cl.Leader != null && cl.Leader.GetPerkValue(DefaultPerks.Trade.GreatInvestor)) cl.AddRenown(DefaultPerks.Trade.GreatInvestor.PrimaryBonus, true);
+                }
+                catch (Exception e) { OStumble("ProfitToOwners(karawana)", e); }
+            }
+            LastOwnerPaid = paid; LastOwnerNot = pNot; LastOwnerLord = pLord; LastOwnerPlayer = pPl; LastOwnerN = paidN;
+            if (pPl > 0) Log.Player("Your caravans handed you " + pPl + " denars - all they held above what they keep for trade and a month of wages.");
+            sb.Append(" | CZYNNE | karawan ").Append(n).Append(", oddaly ").Append(paidN).Append(" za ").Append(paid).Append(" zl (notablom ").Append(notN).Append('/').Append(pNot)
+              .Append(", lordom i innym ").Append(lordN).Append('/').Append(pLord).Append(", graczowi ").Append(plN).Append('/').Append(pPl).Append(')')
+              .Append(" | kapital obrotowy (zostaje w kiesie): max(").Append(KeepGold).Append(", ").Append(KeepWageDays).Append(" dni zoldu) - razem ").Append(keepAll)
+              .Append(", w kiesach do kapitalu ").Append(held).Append(" (").Append(keepAll > 0 ? (100.0 * held / keepAll).ToString("0.0", Inv) : "-").Append("%), karawan z kiesa nie wieksza niz kapital ").Append(below)
+              .Append(" | pominiete z nadwyzka: rozwiazywane ").Append(sDis).Append(" (kiesa do wlasciciela przy rozwiazaniu - E3/7), w bitwie ").Append(sBat)
+              .Append(", z wodzem ").Append(sLead).Append(" (gra placi rodowi z kiesy partii z wodzem - AddIncomeFromParty), bez zywego wlasciciela ").Append(sOwn)
+              .Append(", model finansow placi sam ").Append(sModel)
+              .Append(" | kontrola: kiesy karawan -").Append(ctlFrom).Append(" = wlasciciele +").Append(ctlTo).Append(" (roznica ").Append(ctlFrom - ctlTo).Append(')')
+              .Append(" | wplyw na skrzynie: karawany -").Append(paid).Append(", notable +").Append(pNot).Append(" (ponad 10 500 pasmo gry oddaje nadwyzke kasie miasta handlu - E5/A3)")
+              .Append(", lordowie i inni +").Append(pLord).Append(", gracz +").Append(pPl)
+              .Append(" | BK Realistic Caravan Income tak - wplata BK ponad 10 000 przy wjezdzie do siedziby, osady lub miasta udzialowca (i E3/9 w miastach krolestwa pana) zostaje")
+              .Append(" | potkniecia ").Append(_oStumbles).Append(" (sesja ").Append(_oStumbleSess).Append(").");
+            Log.Info(sb.ToString());
+            _oStumbles = 0;
         }
     }
 }

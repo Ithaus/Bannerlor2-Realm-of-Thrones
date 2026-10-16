@@ -15,7 +15,7 @@ namespace Armoury
     /// Regula (rozdz. 165 pkt 1-6):
     ///  - WPLYWY DNIA krolestwa = to, co od wczorajszego zamkniecia korony wplynelo do skarbca: powinnosci, danina wojenna, clo, 1/3 zaworu zamkow
     ///    (114), podatek gry/BK od bogatych rodow, splaty dlugu wobec korony, trybut i wszystko inne (zmiana skarbca od wczorajszej migawki -
-    ///    gra, BK, Diplomacy) + raty reparacji przyjete (dochodza w trakcie) + 1/CrownReserveReleaseDays (360) zapasu ponad CrownReserveGold
+    ///    gra, BK, Diplomacy) + raty reparacji przyjete (dochodza w trakcie) + 1/CrownReserveReleaseDays (450 od strojenia po tescie 120 dob, dotad 360) zapasu ponad CrownReserveGold
     ///    (500 000). Zapas = skarbiec minus dzisiejsze wplywy; 1/360 zawiera sie we wplywach (nigdzie drugi raz).
     ///  - KOLEJNOSC WYDATKOW: rata kredytu korony w Banku (186, CrownBorrow) -> dary (182) -> raty reparacji -> kontrakty najemnikow (185) -> wezwania sojusznikow do wojny (168, CrownCallToWar) -> (nagroda za wielkiego jenca - 178, krok D) -> zwrot
     ///    zoldu (186: brak zwrotu korona w wojnie pozycza w Banku - CrownBorrow.Lend) -> renty 180 (krok C2, CrownRents: reszta do rodow wedlug lenn, udzialy
