@@ -1,0 +1,1001 @@
+# Banner icon id -> heraldic charge. Names from the extracted textures (Native core.tpac custom_banner_icons_* + GUI ui_bannericons_1,
+# ROT-Content pack0 RoT_icons, CCsBanners Pack01 cc_banners_*), checked by eye. source_house: canon pick = house whose ASOIAF charge this
+# icon draws or best substitutes (rody_kanon.tsv icons_active/icons_ccs list the best first);
+# ROT banner = ROT spclans/ROT_spkingdoms banner where this icon is a large charge layer (% of charge area). ROT clan banners are mostly
+# composites of hundreds of Shape primitives (503 roundel, 505 square, 426 crescent...), so few icons get a ROT association.
+# family = fallback family for unknown charges; heraldic=no -> do not use for Westeros arms. loaded_now: CCsBanners is IsSelected=false
+# in Documents/.../Configs/LauncherData.xml (16.10) - its icons render only when that module is on.
+icon_id	charge	family	source_house	keywords	module	icon_group	material	texture_index	loaded_now	heraldic	rot_clans_using	rot_layers_using
+100	double-headed eagle displayed	bird		eagle|double-headed eagle	Native	Animal	custom_banner_icons_01	10	yes	yes	0	0
+101	double-headed eagle displayed	bird		eagle|double-headed eagle	Native	Animal	custom_banner_icons_01	9	yes	yes	0	0
+102	eagle displayed (ornate)	bird	canon pick: Mallister	eagle	Native	Animal	custom_banner_icons_01	3	yes	yes	0	0
+103	eagle/falcon rising	bird	canon pick: Arryn, Fowler	falcon|hawk|eagle	Native	Animal	custom_banner_icons_01	11	yes	yes	2	4
+104	eagle displayed	bird	canon pick: Mallister; ROT banner: Celeris (38%, 667px)	eagle	Native	Animal	custom_banner_icons_02	4	yes	yes	1	1
+105	eagle rising, wings elevated	bird		eagle|phoenix	Native	Animal	custom_banner_icons_04	13	yes	yes	0	0
+106	eagle on a plinth (aquila)	bird		eagle	Native	Animal	custom_banner_icons_02	1	yes	yes	0	0
+107	eagle standard on a pole	bird		eagle	Native	Animal	custom_banner_icons_03	6	yes	yes	0	0
+108	eagle volant (soaring, wings level)	bird	canon pick: Fowler	eagle|gull|hawk	Native	Animal	custom_banner_icons_02	6	yes	yes	0	0
+109	eagle volant, wings spread	bird		eagle|hawk	Native	Animal	custom_banner_icons_03	12	yes	yes	0	0
+110	stylised eagle (thunderbird)	bird		eagle	Native	Animal	custom_banner_icons_02	8	yes	yes	1	18
+111	knotwork raven	bird		raven|crow	Native	Animal	custom_banner_icons_02	5	yes	yes	2	2
+112	knotwork beast (Norse)	knot		beast	Native	Animal	custom_banner_icons_04	5	yes	yes	0	0
+113	stylised cock/bird with comb	bird	canon pick: Swyft	rooster|cock	Native	Animal	custom_banner_icons_02	15	yes	yes	0	0
+114	long-tailed bird (peacock/pheasant)	bird	canon pick: Serrett	peacock|pheasant|bird	Native	Animal	custom_banner_icons_03	13	yes	yes	1	24
+115	bird volant (swallow/martlet)	bird	canon pick: Caron; ROT banner: Ostyrion (41%, 132px), Thorne (31%, 116px)	martlet|swallow|lark|nightingale|gull	Native	Animal	custom_banner_icons_02	2	yes	yes	5	115
+116	bird displayed (stylised raven)	bird	canon pick: Corbray, Blackmont	raven|crow|bat	Native	Animal	custom_banner_icons_04	7	yes	yes	0	0
+117	swallow/swift volant	bird	canon pick: Caron; ROT banner: Qhaedarene (36%, 678px)	swallow|martlet|lark|nightingale	Native	Animal	custom_banner_icons_04	0	yes	yes	3	10
+118	raven/crow standing	bird	canon pick: Blackwood, Corbray, Caron, Blackmont; ROT banner: Caron (100%, 138px)	raven|crow|rook|nightingale|vulture	Native	Animal	custom_banner_icons_02	0	yes	yes	1	44
+119	eagle's head	bird	ROT banner: Florent (36%, 71px), Lydden (30%, 112px)	eagle's head|hawk|falcon	Native	Animal	custom_banner_icons_04	6	yes	yes	15	238
+120	wyvern/dragon segreant	monster	canon pick: Targaryen, Toland	dragon|wyvern	Native	Animal	custom_banner_icons_04	11	yes	yes	0	0
+121	sea serpent / lindworm	monster	canon pick: Velaryon	sea serpent|serpent|dragon	Native	Animal	custom_banner_icons_04	3	yes	yes	0	0
+122	dragon rampant (sinuous, eastern)	monster	ROT banner: Sons of the Harpy (100%, 483px)	dragon|harpy	Native	Animal	custom_banner_icons_02	13	yes	yes	1	1
+123	dragon's head (spiked)	monster	canon pick: Reed; ROT banner: Reed (23%, 172px)	dragon's head|lizard-lion	Native	Animal	custom_banner_icons_04	8	yes	yes	7	18
+124	horse courant	beast	ROT banner: Chovaqqo (100%, 483px)	horse|stallion	Native	Animal	custom_banner_icons_01	8	yes	yes	1	1
+125	horse rampant (rearing)	beast	canon pick: Bracken; ROT banner: Pono (100%, 456px), Jhago (96%, 729px), Heggo (76%, 490px)	horse|stallion	Native	Animal	custom_banner_icons_01	1	yes	yes	3	6
+126	horse rearing on a base (statue)	beast		horse	Native	Animal	custom_banner_icons_03	10	yes	yes	0	0
+127	horse statant	beast	ROT banner: Qhaedarene (12%, 393px)	horse	Native	Animal	custom_banner_icons_02	11	yes	yes	1	1
+128	mounted archer	human	canon pick: Tarly; ROT banner: Moro (58%, 602px)	horse archer|rider|huntsman	Native	Animal	custom_banner_icons_01	12	yes	yes	1	1
+129	horseman riding	human	canon pick: Darry	rider|knight|horseman	Native	Animal	custom_banner_icons_03	3	yes	yes	0	0
+130	stylised rider	human		rider	Native	Animal	custom_banner_icons_03	4	yes	yes	0	0
+131	horse's head	beast	canon pick: Ryswell	horse's head	Native	Animal	custom_banner_icons_02	12	yes	yes	8	86
+132	ram's head caboshed	beast	ROT banner: Albersan (31%, 429px)	ram's head|ram|mountain goat	Native	Animal	custom_banner_icons_02	9	yes	yes	1	1
+133	stag's head caboshed	beast	canon pick: Hornwood	stag's head|hart|elk|stag's skull|moose	Native	Animal	custom_banner_icons_02	7	yes	yes	1	1
+134	stag's head (ornamented)	beast		stag's head	Native	Animal	custom_banner_icons_04	4	yes	yes	0	0
+135	stag courant (small)	beast		stag|hart|deer|fawn	Native	Animal	custom_banner_icons_03	11	yes	yes	0	0
+136	stag springing (antelope)	beast		stag|hart|antelope|fawn	Native	Animal	custom_banner_icons_04	2	yes	yes	0	0
+137	stag statant	beast	canon pick: Hornwood, Baratheon (Renly), Baratheon (Storm's End)	stag|hart|elk|moose	Native	Animal	custom_banner_icons_01	6	yes	yes	0	0
+138	bear rampant	beast	canon pick: Mormont	bear	Native	Animal	custom_banner_icons_01	0	yes	yes	0	0
+139	lion's head erased (maned)	beast	ROT banner: Broken Men (97%, 950px), Rogue Dothraki (99%, 461px), Corbray (22%, 40px), Tarth (21%, 51px), Rayder (37%, 133px), Waxley (32%, 76px) +2	lion's head	Native	Animal	custom_banner_icons_04	1	yes	yes	60	1943
+140	lion rampant	beast	canon pick: Lannister; ROT banner: Lannister (8%, 548px)	lion|lions	Native	Animal	custom_banner_icons_01	5	yes	yes	1	1
+141	lion passant guardant	beast	ROT banner: Vaith (43%, 236px)	lion|lions|leopard	Native	Animal	custom_banner_icons_01	4	yes	yes	1	3
+142	lion passant (small)	beast	ROT banner: Sumai (59%, 513px), Company of the Cat (100%, 483px)	lion|cat|sand cat|leopard	Native	Animal	custom_banner_icons_04	14	yes	yes	2	2
+143	lion/leopard passant	beast		lion|leopard|cat	Native	Animal	custom_banner_icons_02	14	yes	yes	0	0
+144	lion statant (maned)	beast		lion|sleeping lion	Native	Animal	custom_banner_icons_04	15	yes	yes	0	0
+145	mastiff/hound statant	beast	canon pick: Clegane	dog|hound|mastiff	Native	Animal	custom_banner_icons_03	2	yes	yes	0	0
+146	hound passant	beast	canon pick: Clegane	dog|hound|jackal	Native	Animal	custom_banner_icons_04	12	yes	yes	0	0
+147	wolf/dog statant on an ornament	beast		wolf|dog	Native	Animal	custom_banner_icons_03	7	yes	yes	0	0
+148	wolf/greyhound courant	beast	canon pick: Stark, Snow (Jon), Clegane	wolf|direwolf|greyhound|hound|jackal	Native	Animal	custom_banner_icons_03	8	yes	yes	0	0
+149	boar statant	beast	canon pick: Crakehall	boar	Native	Animal	custom_banner_icons_01	2	yes	yes	1	12
+150	stylised beast glyph	glyph			Native	Animal	custom_banner_icons_03	15	yes	yes	3	4
+151	boar on a base	beast	canon pick: Crakehall	boar	Native	Animal	custom_banner_icons_03	1	yes	yes	0	0
+152	dog/puppy statant	beast		dog|otter|badger	Native	Animal	custom_banner_icons_02	10	yes	yes	0	0
+153	stylised ram in knotwork	knot		ram	Native	Animal	custom_banner_icons_03	5	yes	yes	0	0
+154	serpent/wyrm (S-shaped)	reptile	canon pick: Reed, Toland, Wyl	serpent|viper|adder|snake	Native	Animal	custom_banner_icons_03	0	yes	yes	0	0
+155	serpent (cobra)	reptile	canon pick: Wyl; ROT banner: Desert Brigands (18%, 476px), Bright Banners (49%, 369px)	serpent|viper|adder|snake	Native	Animal	custom_banner_icons_01	14	yes	yes	2	2
+156	scorpion (ROT uses it as crab)	vermin	canon pick: Celtigar, Qorgyle; ROT banner: Celtigar (39%, 163px)	scorpion|scorpions|crab	Native	Animal	custom_banner_icons_02	3	yes	yes	1	36
+157	swan	bird	canon pick: Crane, Swann	swan|goose	Native	Animal	custom_banner_icons_01	7	yes	yes	1	22
+158	fish naiant (carp)	fish	canon pick: Tully, Tully (Blackfish), Mooton, Botley	fish|leaping fish|carp	Native	Animal	custom_banner_icons_01	13	yes	yes	3	45
+159	fish (salmon/pike) leaping	fish	canon pick: Tully, Tully (Blackfish), Mooton, Riverlands (kingdom, Tully), Bar Emmon, Botley; ROT banner: Tallhart (23%, 75px)	fish|salmon|trout|pike|leaping fish|dolphin	Native	Animal	custom_banner_icons_03	14	yes	yes	16	174
+160	lion rampant (small, Vlandia style)	beast		lion	Native	Animal	custom_banner_icons_15	7	yes	yes	0	0
+161	double-headed eagle (Empire)	bird		double-headed eagle|eagle	Native	Animal	custom_banner_icons_15	10	yes	yes	0	0
+162	double-headed eagle with fleur	bird		double-headed eagle	Native	Animal	custom_banner_icons_15	11	yes	yes	0	0
+163	double-headed eagle with wreath	bird		double-headed eagle	Native	Animal	custom_banner_icons_15	12	yes	yes	0	0
+164	double-headed eagle with sword	bird		double-headed eagle	Native	Animal	custom_banner_icons_15	13	yes	yes	0	0
+165	knotwork wolf rampant (Norse)	beast	canon pick: Stark	wolf	NavalDLC	Animal	custom_banner_icons_16	5	yes	yes	0	0
+166	longship with mast	ship		longship|ship|galley	NavalDLC	Animal	custom_banner_icons_16	6	yes	yes	0	0
+167	dragon's head prow (Norse)	monster		dragon's head|dragon	NavalDLC	Animal	custom_banner_icons_16	7	yes	yes	0	0
+168	knotwork twin beasts (Norse)	knot			NavalDLC	Animal	custom_banner_icons_16	9	yes	yes	0	0
+169	triskele of beasts (Norse)	knot		triskele	NavalDLC	Animal	custom_banner_icons_16	10	yes	yes	0	0
+170	raven on a branch (Norse)	bird		raven|crow	NavalDLC	Animal	custom_banner_icons_16	11	yes	yes	0	0
+171	raven displayed on a spear (Norse)	bird		raven	NavalDLC	Animal	custom_banner_icons_16	12	yes	yes	0	0
+172	raven's head (Norse)	bird		raven|crow	NavalDLC	Animal	custom_banner_icons_16	13	yes	yes	0	0
+173	raven displayed (Norse)	bird		raven|crow	NavalDLC	Animal	custom_banner_icons_16	14	yes	yes	0	0
+174	sea serpent (Norse)	monster		sea serpent|serpent	NavalDLC	Animal	custom_banner_icons_16	15	yes	yes	0	0
+175	knotwork bird-beast (Norse)	knot			NavalDLC	Animal	custom_banner_icons_16	8	yes	yes	0	0
+176	Norse knot lozenge	knot			NavalDLC	Animal	custom_banner_icons_16	2	yes	yes	0	0
+177	Norse tree knot	knot		tree	NavalDLC	Animal	custom_banner_icons_16	3	yes	yes	0	0
+178	sun wheel with rays (Norse)	celestial		sun	NavalDLC	Animal	custom_banner_icons_16	4	yes	yes	0	0
+200	laurel sprig	flora		laurel|olive branch|branch	Native	Flora	custom_banner_icons_13	0	yes	yes	4	54
+201	ear of wheat (garb)	flora	canon pick: Selmy	wheat|sheaf of wheat|garb	Native	Flora	custom_banner_icons_05	14	yes	yes	6	71
+202	olive branch	flora		olive branch|branch|sprig	Native	Flora	custom_banner_icons_05	13	yes	yes	31	555
+203	fir/pine tree	flora	canon pick: Tallhart, Marbrand; ROT banner: Ashford (99%, 1296px), Orkwood (83%, 96px)	pine tree|fir|sentinel|tree	Native	Flora	custom_banner_icons_05	6	yes	yes	20	651
+204	stylised branch (fern)	flora		branch|fern	Native	Flora	custom_banner_icons_05	9	yes	yes	6	49
+205	tulip bud	flora		flower|tulip	Native	Flora	custom_banner_icons_05	0	yes	yes	3	5
+206	rose slipped (on a stem)	flora	canon pick: Tyrell	rose|flower	Native	Flora	custom_banner_icons_05	1	yes	yes	2	40
+207	lily on a stem	flora		lily|flower	Native	Flora	custom_banner_icons_05	3	yes	yes	1	1
+208	flowering branch	flora	canon pick: Redwyne	flower|blossom|grapes	Native	Flora	custom_banner_icons_05	15	yes	yes	0	0
+209	leaf	flora	ROT banner: Qaraxos (51%, 47px), Joth (72%, 80px)	leaf	Native	Flora	custom_banner_icons_05	5	yes	yes	8	144
+210	trefoil (clover)	flora		trefoil|clover	Native	Flora	custom_banner_icons_13	3	yes	yes	0	0
+211	apple/pomegranate	flora	canon pick: Smallwood	apple|pear|lemon|pomegranate|fruit	Native	Flora	custom_banner_icons_13	8	yes	yes	4	21
+212	tree (stylised, branching)	flora	canon pick: Forrester, Blackwood, Marbrand, Rowan; ROT banner: Forrester (8%, 442px), Ryger (22%, 541px)	tree|willow|weirwood|oak	Native	Flora	custom_banner_icons_13	2	yes	yes	2	3
+213	maple/oak leaf	flora	canon pick: Oakheart; ROT banner: Norrey (40%, 59px)	oak leaf|leaf	Native	Flora	custom_banner_icons_13	1	yes	yes	10	96
+214	oak leaf (stylised)	flora	canon pick: Oakheart	oak leaf|leaf	Native	Flora	custom_banner_icons_13	6	yes	yes	2	14
+215	acanthus/thistle leaf	flora		leaf|thistle	Native	Flora	custom_banner_icons_13	7	yes	yes	0	0
+216	palm frond/fern	flora	ROT banner: Xho (21%, 227px), Ryger (25%, 204px), Summer Isles (21%, 227px)	palm tree|frond|fern	Native	Flora	custom_banner_icons_13	4	yes	yes	16	161
+217	leaf spray (fir branch)	flora	ROT banner: Errol (21%, 81px)	branch|frond	Native	Flora	custom_banner_icons_13	5	yes	yes	6	87
+218	tulip/lotus (three petals)	flora		lotus|tulip|flower	Native	Flora	custom_banner_icons_05	11	yes	yes	4	27
+219	three leaves	flora	ROT banner: Tendiras (65%, 235px), Wildling Renegades (8%, 629px)	leaves|flower	Native	Flora	custom_banner_icons_05	2	yes	yes	17	402
+220	cinquefoil (five-petal flower)	flora	canon pick: Cuy	cinquefoil|flower|rose|sunflower	Native	Flora	custom_banner_icons_05	4	yes	yes	1	6
+221	quatrefoil	flora	ROT banner: Xho (38%, 433px), Summer Isles (38%, 433px)	quatrefoil|flower	Native	Flora	custom_banner_icons_05	10	yes	yes	3	6
+222	ring of berries (annulet of pellets)	flora	canon pick: Redwyne	berries|grapes	Native	Flora	custom_banner_icons_05	7	yes	yes	0	0
+223	four leaves (pinwheel)	flora		leaves	Native	Flora	custom_banner_icons_05	8	yes	yes	0	0
+300	short sword (gladius)	weapon		sword|dagger|knife	Native	Handmade	custom_banner_icons_13	13	yes	yes	0	0
+301	sword (cruciform)	weapon	canon pick: Dayne	sword|longsword	Native	Handmade	custom_banner_icons_06	13	yes	yes	1	1
+302	sword (slender)	weapon		sword|rapier|dagger	Native	Handmade	custom_banner_icons_06	11	yes	yes	1	1
+303	mace (ball on shaft)	weapon	ROT banner: Forzho (23%, 359px), Staegone (37%, 142px)	mace|club	Native	Handmade	custom_banner_icons_06	2	yes	yes	4	25
+304	spear	weapon	canon pick: Martell; ROT banner: Stalwart Shields (25%, 327px), Forrester (10%, 339px), Bright Banners (20%, 136px)	spear|lance|spearhead|harpoon	Native	Handmade	custom_banner_icons_06	3	yes	yes	11	23
+305	flanged mace	weapon	ROT banner: Strickland (78%, 944px)	mace	Native	Handmade	custom_banner_icons_06	15	yes	yes	1	2
+306	halberd/poleaxe	weapon	canon pick: Cerwyn; ROT banner: Darry (47%, 430px)	halberd|poleaxe|axe	Native	Handmade	custom_banner_icons_06	0	yes	yes	2	5
+307	bearded axe	weapon	canon pick: Cerwyn, Dustin; ROT banner: Giantsbane (34%, 557px), bar Emmon (99%, 1276px), Darry (7%, 329px), Locke (31%, 414px), Ostyrion (11%, 355px)	axe|battle-axe|longaxe|broken axe	Native	Handmade	custom_banner_icons_06	9	yes	yes	6	54
+308	pitchfork	tool	canon pick: Manderly	pitchfork|fork|trident	Native	Handmade	custom_banner_icons_06	1	yes	yes	6	21
+309	scimitar/sabre	weapon	canon pick: Harlaw; ROT banner: Marbrand (61%, 227px), Brave Companions (23%, 50px)	scimitar|sabre|arakh|sword|scythe	Native	Handmade	custom_banner_icons_06	7	yes	yes	16	257
+310	double axe (labrys)	weapon	canon pick: Cerwyn	axe|battle-axe	Native	Handmade	custom_banner_icons_06	14	yes	yes	2	46
+311	bow and arrow	weapon	canon pick: Tarly	bow|longbow|arrow	Native	Handmade	custom_banner_icons_06	10	yes	yes	0	0
+312	bow drawn with arrow	weapon		bow|longbow	Native	Handmade	custom_banner_icons_06	5	yes	yes	2	4
+313	composite bow	weapon		bow	Native	Handmade	custom_banner_icons_06	12	yes	yes	2	10
+314	bow with sheaf of arrows	weapon	canon pick: Hunter	arrows|bow|crossed arrows	Native	Handmade	custom_banner_icons_06	4	yes	yes	0	0
+315	crossbow	weapon		crossbow	Native	Handmade	custom_banner_icons_06	6	yes	yes	0	0
+316	heater shield, embattled top	tool	ROT banner: Fregar (24%, 73px), Swann (38%, 171px)	shield|escutcheon	Native	Handmade	custom_banner_icons_07	0	yes	yes	23	192
+317	shield (round-topped)	tool	ROT banner: Clegane (23%, 49px), Giantsbane (20%, 304px), Stalwart Shields (28%, 350px), Dalba (24%, 166px)	shield|escutcheon	Native	Handmade	custom_banner_icons_07	1	yes	yes	45	718
+318	kite shield	tool	ROT banner: Hightower (35%, 297px), Swyft (42%, 199px), Glover (35%, 374px), Phassar (41%, 98px), Drumm (35%, 51px), Sunderly (24%, 57px) +1	shield|escutcheon	Native	Handmade	custom_banner_icons_07	2	yes	yes	50	676
+319	shield quartered by a cross	tool	ROT banner: Drahar (28%, 625px), Glover (16%, 498px), Redfort (56%, 675px), Mallarawan (37%, 625px), Myr (28%, 625px)	shield|escutcheon	Native	Handmade	custom_banner_icons_07	3	yes	yes	17	163
+320	throne/chair	tool		throne|chair	Native	Handmade	custom_banner_icons_07	4	yes	yes	0	0
+321	chalice/goblet (ROT uses it inverted as a bell)	tool	canon pick: Belmore; ROT banner: Belmore (50%, 458px), Wildling Renegades (6%, 911px)	chalice|goblet|cup|flagon|bell|winged chalice	Native	Handmade	custom_banner_icons_07	8	yes	yes	2	7
+322	column/pillar	building		column|pillar	Native	Handmade	custom_banner_icons_12	8	yes	yes	1	24
+323	doorway/gate frame	building		gate|door|doorway	Native	Handmade	custom_banner_icons_12	13	yes	yes	0	0
+324	brick wall	building		wall|fess embattled	Native	Handmade	custom_banner_icons_14	1	yes	yes	4	25
+325	castle wall, embattled	building	canon pick: Redfort	castle|wall|castles	Native	Handmade	custom_banner_icons_07	15	yes	yes	1	1
+326	gatehouse/tower with gate	building	canon pick: Frey, Redfort, Hightower	tower|castle|towers|gates	Native	Handmade	custom_banner_icons_07	13	yes	yes	0	0
+327	round tower	building	canon pick: Frey, Hightower	round tower|tower|towers	Native	Handmade	custom_banner_icons_07	12	yes	yes	6	110
+328	pavilion/lantern-topped tower	building	canon pick: Hightower	lantern|tower|pagoda	Native	Handmade	custom_banner_icons_07	14	yes	yes	0	0
+329	tent/pavilion	building		tent|pavilion	Native	Handmade	custom_banner_icons_14	0	yes	yes	0	0
+330	bridge/arch	building	canon pick: Frey	bridge|bridges|bridge of three arches|arch	Native	Handmade	custom_banner_icons_13	9	yes	yes	0	0
+331	double door	building		door|gates	Native	Handmade	custom_banner_icons_13	11	yes	yes	11	145
+332	longship with oars	ship	canon pick: Seaworth; ROT banner: Pirates (100%, 483px)	galley|longship|ship|galleys	Native	Handmade	custom_banner_icons_13	15	yes	yes	2	2
+333	cog with sail	ship	canon pick: Seaworth; ROT banner: Seaworth (28%, 431px)	ship|cog|ships|galley	Native	Handmade	custom_banner_icons_13	10	yes	yes	4	14
+334	trebuchet	tool		trebuchet|siege engine	Native	Handmade	custom_banner_icons_07	9	yes	yes	0	0
+335	horseshoe	tool		horseshoe	Native	Handmade	custom_banner_icons_11	2	yes	yes	0	0
+336	crossed keys	tool	canon pick: Locke	keys|key|crossed keys	Native	Handmade	custom_banner_icons_07	6	yes	yes	0	0
+337	scales (balance)	tool		scales|pair of scales	Native	Handmade	custom_banner_icons_07	7	yes	yes	0	0
+338	candelabrum	tool	canon pick: Waxley	candles|candelabrum|brazier	Native	Handmade	custom_banner_icons_13	12	yes	yes	0	0
+339	lute (stringed instrument)	tool		lute|harp	Native	Handmade	custom_banner_icons_13	14	yes	yes	1	1
+340	crown (coronet)	crown	canon pick: Dustin, Manwoody	crown|coronet	Native	Handmade	custom_banner_icons_07	5	yes	yes	1	8
+341	open hand	human	canon pick: Glover; ROT banner: Tollett (100%, 483px)	hand	Native	Handmade	custom_banner_icons_08	11	yes	yes	3	4
+342	raised hand (gauntlet)	human	canon pick: Glover	hand|fist|gauntlet	Native	Handmade	custom_banner_icons_10	13	yes	yes	0	0
+343	knobbed sceptre/staff	tool		sceptre|staff	Native	Handmade	custom_banner_icons_08	10	yes	yes	2	8
+344	human head in profile (laureate)	human		head|mask|face	Native	Handmade	custom_banner_icons_12	14	yes	yes	3	13
+345	open helmet (barbute)	tool		helm|helmet	Native	Handmade	custom_banner_icons_07	10	yes	yes	30	141
+346	great helm	tool	ROT banner: Royce (13%, 369px), Clegane (25%, 52px), Sixskins (27%, 48px), Oakheart (20%, 42px), Others (42%, 34px)	helm|greathelm|helmet	Native	Handmade	custom_banner_icons_07	11	yes	yes	83	2163
+347	spectacle helmet (Norse)	tool		helm|mask	Native	Handmade	custom_banner_icons_15	4	yes	yes	4	10
+400	rosette of hexagons	ordinary		rosette	Native	Sign	custom_banner_icons_11	11	yes	yes	2	12
+401	sun/star of twelve points	celestial	canon pick: Karstark, Ashford, Cuy, Tarth, Martell	sun|sunburst|star|suns	Native	Sign	custom_banner_icons_11	15	yes	yes	2	12
+402	brooch (fibula)	tool	canon pick: Buckler	brooch|buckle	Native	Sign	custom_banner_icons_09	11	yes	yes	0	0
+403	annulet (ring)	ordinary	canon pick: Buckler	ring|annulet|plate	Native	Sign	custom_banner_icons_09	10	yes	yes	2	30
+404	segmented ring	ordinary	canon pick: Umber	ring|chain	Native	Sign	custom_banner_icons_08	8	yes	yes	0	0
+405	wheel of six spokes	tool	canon pick: Waynwood	wheel|mill wheel|sun wheel	Native	Sign	custom_banner_icons_08	0	yes	yes	2	4
+406	Celtic ring knot	knot		knot	Native	Sign	custom_banner_icons_08	3	yes	yes	0	0
+407	Celtic roundel	knot		knot	Native	Sign	custom_banner_icons_08	5	yes	yes	2	4
+408	runic roundel	glyph		rune	Native	Sign	custom_banner_icons_08	7	yes	yes	0	0
+409	wheel (ornamented)	tool	canon pick: Waynwood	wheel|mill wheel	Native	Sign	custom_banner_icons_09	0	yes	yes	0	0
+410	wheel of eight spokes	tool		wheel|mill wheel	Native	Sign	custom_banner_icons_09	9	yes	yes	0	0
+411	sun with ray-pellets	celestial	canon pick: Karstark; ROT banner: Forzho (16%, 302px)	sun|sunburst	Native	Sign	custom_banner_icons_11	3	yes	yes	1	3
+412	triquetra knot	knot		knot|triquetra	Native	Sign	custom_banner_icons_10	8	yes	yes	0	0
+413	triskele (spiral)	knot		triskele	Native	Sign	custom_banner_icons_08	6	yes	yes	1	1
+414	triple spiral	knot		spiral	Native	Sign	custom_banner_icons_09	3	yes	yes	2	4
+415	endless knot	knot		knot	Native	Sign	custom_banner_icons_08	15	yes	yes	0	0
+416	solar cross glyph	glyph			Native	Sign	custom_banner_icons_09	4	yes	yes	0	0
+417	cross flory rounded (quatrefoil cross)	cross		cross	Native	Sign	custom_banner_icons_08	13	yes	yes	1	29
+418	cross bottony	cross		cross	Native	Sign	custom_banner_icons_08	12	yes	yes	3	36
+419	cross patonce	cross		cross	Native	Sign	custom_banner_icons_10	11	yes	yes	0	0
+420	knot lozenge	knot		knot	Native	Sign	custom_banner_icons_01	15	yes	yes	0	0
+421	ring of scrolls (sun wheel)	celestial		sun	Native	Sign	custom_banner_icons_11	4	yes	yes	1	4
+422	eight-pointed star of two squares	celestial		star	Native	Sign	custom_banner_icons_08	14	yes	yes	0	0
+423	laurel wreath	flora	ROT banner: Dalt (41%, 115px)	wreath|golden wreath|laurel	Native	Sign	custom_banner_icons_12	12	yes	yes	1	84
+424	fleur-de-lis	flora	ROT banner: Volentin (58%, 149px)	fleur-de-lis|lily	Native	Sign	custom_banner_icons_11	9	yes	yes	4	51
+425	two crescents addorsed	celestial		crescents|crescent moons	Native	Sign	custom_banner_icons_11	0	yes	yes	16	193
+426	crescent moon with face (ROT: curve primitive)	celestial		crescent moon|crescent|moon	Native	Sign	custom_banner_icons_10	0	yes	yes	169	14572
+427	crescent (horns up)	celestial	canon pick: Arryn, Tarth	crescent moon|crescent|moon	Native	Sign	custom_banner_icons_10	12	yes	yes	117	2760
+428	crescent (thick, horns up)	celestial		crescent moon|crescent	Native	Sign	custom_banner_icons_10	10	yes	yes	3	12
+429	stacked chevrons (stylised trees)	glyph	ROT banner: Moro (42%, 361px)		Native	Sign	custom_banner_icons_10	3	yes	yes	3	14
+430	hamsa hand	human		hand	Native	Sign	custom_banner_icons_10	4	yes	yes	0	0
+431	horned torc symbol	glyph			Native	Sign	custom_banner_icons_09	1	yes	yes	0	0
+432	knotwork dragon	knot		dragon|serpent	Native	Sign	custom_banner_icons_03	9	yes	yes	0	0
+433	knotwork dragon (Norse)	knot	ROT banner: Lo (100%, 483px)	dragon	Native	Sign	custom_banner_icons_04	10	yes	yes	3	3
+434	knotwork serpent	knot	ROT banner: Qorgyle (21%, 30px)	serpent	Native	Sign	custom_banner_icons_04	9	yes	yes	3	82
+435	bird descending on an arrow	bird		bird|dove	Native	Sign	custom_banner_icons_09	13	yes	yes	0	0
+436	staff with ring (Y glyph)	glyph			Native	Sign	custom_banner_icons_09	12	yes	yes	0	0
+437	valknut	knot	ROT banner: Harlaw (24%, 29px)	valknut	Native	Sign	custom_banner_icons_08	9	yes	yes	5	228
+438	ornamental band	ordinary			Native	Sign	custom_banner_icons_09	7	yes	yes	2	16
+439	Celtic interlace	knot		knot	Native	Sign	custom_banner_icons_11	14	yes	yes	1	3
+440	tree of life on a pole	glyph		tree	Native	Sign	custom_banner_icons_05	12	yes	yes	2	4
+441	knot arch	knot	ROT banner: Wildling Renegades (26%, 1351px)		Native	Sign	custom_banner_icons_08	2	yes	yes	1	2
+442	bind-rune column	glyph		rune|rune-stone	Native	Sign	custom_banner_icons_08	4	yes	yes	2	5
+443	statue on a pedestal	human		statue|idol	Native	Sign	custom_banner_icons_12	15	yes	yes	0	0
+444	fish-knot with bar	glyph			Native	Sign	custom_banner_icons_08	1	yes	yes	1	2
+445	ceremonial axe-hammer	weapon	ROT banner: Wildling Renegades (13%, 1351px)	hammer|axe	Native	Sign	custom_banner_icons_06	8	yes	yes	1	1
+446	two crescents and orb	celestial		crescents	Native	Sign	custom_banner_icons_09	15	yes	yes	0	0
+447	lozenge ornament	ordinary	ROT banner: Emeros (22%, 209px), Qarth (22%, 209px)	lozenge	Native	Sign	custom_banner_icons_10	2	yes	yes	2	32
+448	horseshoe knot	knot			Native	Sign	custom_banner_icons_09	2	yes	yes	1	6
+449	tau ornament	glyph			Native	Sign	custom_banner_icons_11	1	yes	yes	0	0
+450	sign of Tanit (triangle and ring)	glyph			Native	Sign	custom_banner_icons_10	5	yes	yes	0	0
+451	rune-figure with ring	glyph	ROT banner: Wild Hares (100%, 483px)	rune	Native	Sign	custom_banner_icons_09	5	yes	yes	1	1
+452	stepped tower glyph	glyph		stepped tower|pyramid	Native	Sign	custom_banner_icons_09	6	yes	yes	0	0
+453	glyph (hooked)	glyph	ROT banner: Wildling Renegades (13%, 1351px)		Native	Sign	custom_banner_icons_10	6	yes	yes	1	1
+454	yaz glyph	glyph			Native	Sign	custom_banner_icons_09	8	yes	yes	1	4
+455	glyph with star and crescent	glyph			Native	Sign	custom_banner_icons_10	7	yes	yes	0	0
+456	omega with staff	glyph			Native	Sign	custom_banner_icons_09	14	yes	yes	0	0
+457	three arrows rising (trident of arrows)	weapon	canon pick: Manderly, Hunter	arrows|trident	Native	Sign	custom_banner_icons_12	10	yes	yes	0	0
+458	fish-eye symbol	glyph			Native	Sign	custom_banner_icons_12	11	yes	yes	0	0
+459	double loop knot	knot			Native	Sign	custom_banner_icons_12	3	yes	yes	1	46
+460	golden triskele of spirals (coloured)	knot		triskele	Native	Sign	custom_banner_icons_15	9	yes	yes	0	0
+461	coloured emblem (red)	emblem			Native	Sign	custom_banner_icons_15	14	yes	no	0	0
+462	coloured emblem (blue)	emblem			Native	Sign	custom_banner_icons_15	15	yes	no	0	0
+463	coloured emblem (gold)	emblem			Native	Sign	custom_banner_icons_15	8	yes	no	0	0
+500	annulet (circle outline)	ordinary		ring|annulet	Native	Shape	custom_banner_icons_11	5	yes	yes	15	256
+501	triangle outline	ordinary		triangle	Native	Shape	custom_banner_icons_11	6	yes	yes	1	1
+502	square outline (mascle)	ordinary		mascle|square	Native	Shape	custom_banner_icons_11	7	yes	yes	1	10
+503	roundel (disc)	ordinary	canon pick: Smallwood, Royce	roundel|plate|coin|coins|bezant|stud|roundels	Native	Shape	custom_banner_icons_14	4	yes	yes	202	8778
+504	triangle (pile)	ordinary		pile|triangle|pyramid|dune|mountain	Native	Shape	custom_banner_icons_14	5	yes	yes	133	3000
+505	square (billet)	ordinary		billet|square	Native	Shape	custom_banner_icons_14	6	yes	yes	178	4992
+506	oval	ordinary	canon pick: Beesbury	oval|egg	Native	Shape	custom_banner_icons_14	7	yes	yes	64	2811
+507	pentagon	ordinary		pentagon	Native	Shape	custom_banner_icons_14	9	yes	yes	38	228
+508	hexagon	ordinary		hexagon	Native	Shape	custom_banner_icons_14	10	yes	yes	16	60
+509	octagon	ordinary		octagon	Native	Shape	custom_banner_icons_14	11	yes	yes	12	35
+510	bar (rectangle)	ordinary		bar|fess|pale|bend	Native	Shape	custom_banner_icons_14	12	yes	yes	29	849
+511	chevron	ordinary	canon pick: Ashford	chevron	Native	Shape	custom_banner_icons_14	13	yes	yes	37	477
+512	lozenge	ordinary		lozenge|mascles	Native	Shape	custom_banner_icons_11	8	yes	yes	41	533
+513	spade (pique)	ordinary		spade|leaf	Native	Shape	custom_banner_icons_10	9	yes	yes	86	1665
+514	heart	ordinary	canon pick: Corbray, Baratheon (Stannis)	heart|hearts	Native	Shape	custom_banner_icons_11	10	yes	yes	100	2241
+515	four-pointed star	celestial		star|mullet	Native	Shape	custom_banner_icons_14	2	yes	yes	6	100
+516	five-pointed star (mullet)	celestial	canon pick: Dondarrion, Dayne	star|mullet|falling star	Native	Shape	custom_banner_icons_10	14	yes	yes	0	0
+517	pentagram	celestial		pentagram|star	Native	Shape	custom_banner_icons_14	8	yes	yes	0	0
+518	six-pointed star (estoile)	celestial		star|estoile	Native	Shape	custom_banner_icons_11	13	yes	yes	0	0
+519	eight-pointed star	celestial		star	Native	Shape	custom_banner_icons_10	15	yes	yes	0	0
+520	twelve-pointed star	celestial		star|sun	Native	Shape	custom_banner_icons_11	12	yes	yes	0	0
+521	spiked sun (ten rays)	celestial	canon pick: Karstark, Tarth, Martell	sun|sunburst|starfish	Native	Shape	custom_banner_icons_14	3	yes	yes	3	17
+522	saltire (X)	ordinary		saltire	Native	Shape	custom_banner_icons_12	7	yes	yes	1	45
+523	six-armed asterisk	celestial		star|asterisk	Native	Shape	custom_banner_icons_12	0	yes	yes	2	12
+524	lightning bolt	celestial	canon pick: Dondarrion	lightning bolt|lightning	Native	Shape	custom_banner_icons_12	9	yes	yes	3	37
+525	double-barred cross	cross		cross	Native	Shape	custom_banner_icons_12	2	yes	yes	1	33
+526	rune kaun (K)	glyph	canon pick: Royce	rune|runes	Native	Shape	custom_banner_icons_12	1	yes	yes	0	0
+527	letter C	glyph		crescent	Native	Shape	custom_banner_icons_12	5	yes	yes	8	25
+528	V (chevron reversed)	ordinary		chevron	Native	Shape	custom_banner_icons_12	4	yes	yes	15	193
+529	rune wunjo (P)	glyph	canon pick: Royce	rune|runes	Native	Shape	custom_banner_icons_12	6	yes	yes	0	0
+530	rune sowilo	glyph		rune|runes	Native	Shape	custom_banner_icons_15	0	yes	yes	0	0
+531	rune dagaz	glyph	canon pick: Royce	rune|runes	Native	Shape	custom_banner_icons_15	3	yes	yes	0	0
+532	rune algiz	glyph		rune|runes	Native	Shape	custom_banner_icons_15	1	yes	yes	1	42
+533	rune othala	glyph		rune|runes	Native	Shape	custom_banner_icons_15	2	yes	yes	2	25
+534	rune ansuz	glyph	canon pick: Royce	rune|runes	Native	Shape	custom_banner_icons_14	14	yes	yes	1	2
+535	rune (hooked)	glyph		rune|runes	Native	Shape	custom_banner_icons_14	15	yes	yes	0	0
+536	three-headed dragon in a ring	monster	canon pick: Targaryen	dragon|three-headed dragon	ROT	ROT	rot_icons	0	yes	yes	0	0
+537	direwolf's head	beast	canon pick: Stark, Snow (Jon)	direwolf|wolf's head|wolf	ROT	ROT	rot_icons	1	yes	yes	0	0
+538	heraldic rose	flora	canon pick: Tyrell	rose	ROT	ROT	rot_icons	2	yes	yes	0	0
+539	stag rampant	beast	canon pick: Baratheon (Renly), Baratheon (Storm's End), Baratheon (Stannis), Baratheon (Joffrey)	stag|hart|elk	ROT	ROT	rot_icons	3	yes	yes	0	0
+540	lion rampant	beast	canon pick: Lannister, Baratheon (Joffrey)	lion	ROT	ROT	rot_icons	4	yes	yes	0	0
+541	lion rampant (variant)	beast	canon pick: Lannister	lion	ROT	ROT	rot_icons	5	yes	yes	0	0
+542	skeletal hand	human	canon pick: Drumm	bone hand|hand|skeleton	ROT	ROT	rot_icons	6	yes	yes	0	0
+543	stallion rampant	beast	canon pick: Bracken	horse|stallion	ROT	ROT	rot_icons	7	yes	yes	0	0
+544	serpent	reptile	canon pick: Wyl	serpent|viper|adder|snake|sea serpent	ROT	ROT	rot_icons	8	yes	yes	0	0
+545	crown	crown		crown	ROT	ROT	rot_icons	9	yes	yes	0	0
+546	bear rampant	beast	canon pick: Mormont	bear	ROT	ROT	rot_icons	10	yes	yes	0	0
+547	cat rampant (shadowcat/lioness)	beast		cat|sand cat|shadowcat|lioness	ROT	ROT	rot_icons	11	yes	yes	0	0
+548	mammoth	beast		mammoth|elephant	ROT	ROT	rot_icons	12	yes	yes	0	0
+549	eagle displayed	bird	canon pick: Mallister, Arryn	eagle|falcon	ROT	ROT	rot_icons	13	yes	yes	0	0
+74901	lion rampant	beast	canon pick: Lannister	lion	CCsBanners	Requests	cc_banners_requests_01	0	no (CCsBanners off in LauncherData)	yes	0	0
+74902	three lions passant guardant	beast		lions	CCsBanners	Requests	cc_banners_requests_01	1	no (CCsBanners off in LauncherData)	yes	0	0
+74903	lion rampant holding an axe	beast		lion	CCsBanners	Requests	cc_banners_requests_01	2	no (CCsBanners off in LauncherData)	yes	0	0
+74904	lobster/crayfish	fish		lobster|crayfish|crab	CCsBanners	Requests	cc_banners_requests_01	3	no (CCsBanners off in LauncherData)	yes	0	0
+74905	fleur-de-lis	flora		fleur-de-lis	CCsBanners	Requests	cc_banners_requests_01	4	no (CCsBanners off in LauncherData)	yes	0	0
+74906	eagle rising (imperial)	bird		eagle	CCsBanners	Requests	cc_banners_requests_01	5	no (CCsBanners off in LauncherData)	yes	0	0
+74907	raven holding a cross, star and crescent	bird		raven|crow	CCsBanners	Requests	cc_banners_requests_01	6	no (CCsBanners off in LauncherData)	yes	0	0
+74908	triskele of blades	knot		triskele	CCsBanners	Requests	cc_banners_requests_01	7	no (CCsBanners off in LauncherData)	yes	0	0
+75001	lion rampant holding an axe	beast		lion	CCsBanners	Various Banners 01	cc_banners_01	0	no (CCsBanners off in LauncherData)	yes	0	0
+75002	per pale demi-eagle and three crowns	achievement		eagle|crowns	CCsBanners	Various Banners 01	cc_banners_01	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75003	triskelion under a crown	knot		triskele	CCsBanners	Various Banners 01	cc_banners_01	2	no (CCsBanners off in LauncherData)	yes	0	0
+75004	eagle displayed on a shield	achievement		eagle	CCsBanners	Various Banners 01	cc_banners_01	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75005	eagle displayed crowned with sword and orb	bird		eagle	CCsBanners	Various Banners 01	cc_banners_01	4	no (CCsBanners off in LauncherData)	yes	0	0
+75006	wyvern's head in a wreath on a shield	achievement		dragon	CCsBanners	Various Banners 01	cc_banners_01	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75007	tower with spire	building		tower	CCsBanners	Various Banners 01	cc_banners_01	6	no (CCsBanners off in LauncherData)	yes	0	0
+75008	phoenix rising	monster		phoenix	CCsBanners	Various Banners 01	cc_banners_01	7	no (CCsBanners off in LauncherData)	yes	0	0
+75009	goat rampant with three crowns	beast		goat|mountain goat	CCsBanners	Various Banners 01	cc_banners_01	8	no (CCsBanners off in LauncherData)	yes	0	0
+75010	bear passant	beast		bear|badger	CCsBanners	Various Banners 01	cc_banners_01	9	no (CCsBanners off in LauncherData)	yes	0	0
+75011	wyvern sejant (Welsh dragon)	monster		dragon|wyvern	CCsBanners	Various Banners 01	cc_banners_01	10	no (CCsBanners off in LauncherData)	yes	0	0
+75012	eagle displayed	bird		eagle	CCsBanners	Various Banners 01	cc_banners_01	11	no (CCsBanners off in LauncherData)	yes	0	0
+75013	knot wheel with crosses	knot		knot	CCsBanners	Various Banners 01	cc_banners_01	12	no (CCsBanners off in LauncherData)	yes	0	0
+75014	lion rampant	beast		lion	CCsBanners	Various Banners 01	cc_banners_01	13	no (CCsBanners off in LauncherData)	yes	0	0
+75015	lion rampant	beast		lion	CCsBanners	Various Banners 01	cc_banners_01	14	no (CCsBanners off in LauncherData)	yes	0	0
+75016	griffin/wyvern rampant	monster		griffin|wyvern	CCsBanners	Various Banners 01	cc_banners_01	15	no (CCsBanners off in LauncherData)	yes	0	0
+75101	eagle displayed (heraldic, German)	bird		eagle	CCsBanners	Various Banners 02	cc_banners_02	0	no (CCsBanners off in LauncherData)	yes	0	0
+75102	crossed keys and sword	tool		keys|sword	CCsBanners	Various Banners 02	cc_banners_02	1	no (CCsBanners off in LauncherData)	yes	0	0
+75103	fleur-de-lis in a ring of stars	flora		fleur-de-lis|stars	CCsBanners	Various Banners 02	cc_banners_02	2	no (CCsBanners off in LauncherData)	yes	0	0
+75104	winged lion sejant	monster		winged lion|lion|sphinx|manticore	CCsBanners	Various Banners 02	cc_banners_02	3	no (CCsBanners off in LauncherData)	yes	0	0
+75105	trophy of axes and spears	weapon		axe|spear	CCsBanners	Various Banners 02	cc_banners_02	4	no (CCsBanners off in LauncherData)	yes	0	0
+75106	Latin cross flory	cross		cross	CCsBanners	Various Banners 02	cc_banners_02	5	no (CCsBanners off in LauncherData)	yes	0	0
+75107	cross pattee with crossed arrows	cross		cross|arrows	CCsBanners	Various Banners 02	cc_banners_02	6	no (CCsBanners off in LauncherData)	yes	0	0
+75108	five-pointed star (faceted)	celestial		star	CCsBanners	Various Banners 02	cc_banners_02	7	no (CCsBanners off in LauncherData)	yes	0	0
+75109	cross radiant	cross		cross	CCsBanners	Various Banners 02	cc_banners_02	8	no (CCsBanners off in LauncherData)	yes	0	0
+75110	crossed swords and arrows	weapon		swords|arrows|crossed arrows	CCsBanners	Various Banners 02	cc_banners_02	9	no (CCsBanners off in LauncherData)	yes	0	0
+75111	cross with crossed axes	cross		cross|axe	CCsBanners	Various Banners 02	cc_banners_02	10	no (CCsBanners off in LauncherData)	yes	0	0
+75112	trophy of axes and swords	weapon		axe|sword	CCsBanners	Various Banners 02	cc_banners_02	11	no (CCsBanners off in LauncherData)	yes	0	0
+75113	crossed keys	tool	canon pick: Locke	keys|crossed keys	CCsBanners	Various Banners 02	cc_banners_02	12	no (CCsBanners off in LauncherData)	yes	0	0
+75114	winged lion (griffin) sejant	monster		griffin|winged lion	CCsBanners	Various Banners 02	cc_banners_02	13	no (CCsBanners off in LauncherData)	yes	0	0
+75115	tower with spire and door	building		tower	CCsBanners	Various Banners 02	cc_banners_02	14	no (CCsBanners off in LauncherData)	yes	0	0
+75116	lion rampant crowned	beast		lion	CCsBanners	Various Banners 02	cc_banners_02	15	no (CCsBanners off in LauncherData)	yes	0	0
+75201	cross on a shield	achievement		cross	CCsBanners	Various Banners 03	cc_banners_03	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75202	trophy of key and axes	weapon		key|axe	CCsBanners	Various Banners 03	cc_banners_03	1	no (CCsBanners off in LauncherData)	yes	0	0
+75203	trophy of axes, swords and arrows	weapon		axe|sword|arrows	CCsBanners	Various Banners 03	cc_banners_03	2	no (CCsBanners off in LauncherData)	yes	0	0
+75204	ornate fleur-de-lis	flora		fleur-de-lis	CCsBanners	Various Banners 03	cc_banners_03	3	no (CCsBanners off in LauncherData)	yes	0	0
+75205	shield with arrows	achievement		arrows	CCsBanners	Various Banners 03	cc_banners_03	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75206	arrows with a banner	weapon		arrows	CCsBanners	Various Banners 03	cc_banners_03	5	no (CCsBanners off in LauncherData)	yes	0	0
+75207	cross bottony outlined	cross		cross	CCsBanners	Various Banners 03	cc_banners_03	6	no (CCsBanners off in LauncherData)	yes	0	0
+75208	horse rampant	beast		horse|stallion	CCsBanners	Various Banners 03	cc_banners_03	7	no (CCsBanners off in LauncherData)	yes	0	0
+75209	crossed swords	weapon		crossed swords|swords|sword	CCsBanners	Various Banners 03	cc_banners_03	8	no (CCsBanners off in LauncherData)	yes	0	0
+75210	crossed axes and spear	weapon		axe|spear|crossed spears	CCsBanners	Various Banners 03	cc_banners_03	9	no (CCsBanners off in LauncherData)	yes	0	0
+75211	trophy of axes and arrows	weapon		axe|arrows	CCsBanners	Various Banners 03	cc_banners_03	10	no (CCsBanners off in LauncherData)	yes	0	0
+75212	cross on a sunburst	cross		cross|sun	CCsBanners	Various Banners 03	cc_banners_03	11	no (CCsBanners off in LauncherData)	yes	0	0
+75213	Latin cross outlined	cross		cross	CCsBanners	Various Banners 03	cc_banners_03	12	no (CCsBanners off in LauncherData)	yes	0	0
+75214	trident (tryzub)	weapon	canon pick: Manderly	trident	CCsBanners	Various Banners 03	cc_banners_03	13	no (CCsBanners off in LauncherData)	yes	0	0
+75215	lion passant guardant	beast		lion|sleeping lion	CCsBanners	Various Banners 03	cc_banners_03	14	no (CCsBanners off in LauncherData)	yes	0	0
+75216	fleur ornament	flora		fleur-de-lis	CCsBanners	Various Banners 03	cc_banners_03	15	no (CCsBanners off in LauncherData)	yes	0	0
+75301	griffin on a shield	achievement		griffin	CCsBanners	Various Banners 04	cc_banners_04	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75302	lion rampant with sword on a shield	achievement		lion	CCsBanners	Various Banners 04	cc_banners_04	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75303	wolf rampant on a shield	achievement		wolf	CCsBanners	Various Banners 04	cc_banners_04	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75304	eagle on a shield	achievement		eagle	CCsBanners	Various Banners 04	cc_banners_04	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75305	wyvern on a shield	achievement		wyvern|dragon	CCsBanners	Various Banners 04	cc_banners_04	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75306	griffin rampant on a shield	achievement		griffin	CCsBanners	Various Banners 04	cc_banners_04	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75307	eagle rising on a shield	achievement		eagle	CCsBanners	Various Banners 04	cc_banners_04	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75308	lion rampant with sword on a shield	achievement		lion	CCsBanners	Various Banners 04	cc_banners_04	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75309	eagle on a shield	achievement		eagle	CCsBanners	Various Banners 04	cc_banners_04	8	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75310	double-headed eagle on a shield	achievement		double-headed eagle	CCsBanners	Various Banners 04	cc_banners_04	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75311	cross bottony on a shield	achievement		cross	CCsBanners	Various Banners 04	cc_banners_04	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75312	griffin's head crowned on a shield	achievement		griffin	CCsBanners	Various Banners 04	cc_banners_04	11	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75313	lion rampant with sword on a shield	achievement		lion	CCsBanners	Various Banners 04	cc_banners_04	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75314	scallop and crossed swords on a shield	achievement		seashell|swords	CCsBanners	Various Banners 04	cc_banners_04	13	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75315	crossed keys on a shield	achievement		keys	CCsBanners	Various Banners 04	cc_banners_04	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75316	tower with axes on a shield	achievement		tower	CCsBanners	Various Banners 04	cc_banners_04	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+75401	griffin rampant	monster	canon pick: Connington	griffin	CCsBanners	Various Banners 05	cc_banners_05	0	no (CCsBanners off in LauncherData)	yes	0	0
+75402	lion rampant with sword	beast		lion	CCsBanners	Various Banners 05	cc_banners_05	1	no (CCsBanners off in LauncherData)	yes	0	0
+75403	wolf rampant	beast	canon pick: Stark	wolf|direwolf	CCsBanners	Various Banners 05	cc_banners_05	2	no (CCsBanners off in LauncherData)	yes	0	0
+75404	eagle displayed	bird		eagle	CCsBanners	Various Banners 05	cc_banners_05	3	no (CCsBanners off in LauncherData)	yes	0	0
+75405	wyvern rampant	monster		wyvern|dragon	CCsBanners	Various Banners 05	cc_banners_05	4	no (CCsBanners off in LauncherData)	yes	0	0
+75406	griffin rampant	monster		griffin	CCsBanners	Various Banners 05	cc_banners_05	5	no (CCsBanners off in LauncherData)	yes	0	0
+75407	eagle rising	bird		eagle|hawk|falcon	CCsBanners	Various Banners 05	cc_banners_05	6	no (CCsBanners off in LauncherData)	yes	0	0
+75408	lion rampant with sword	beast		lion	CCsBanners	Various Banners 05	cc_banners_05	7	no (CCsBanners off in LauncherData)	yes	0	0
+75409	eagle displayed	bird		eagle	CCsBanners	Various Banners 05	cc_banners_05	8	no (CCsBanners off in LauncherData)	yes	0	0
+75410	double-headed eagle	bird		double-headed eagle	CCsBanners	Various Banners 05	cc_banners_05	9	no (CCsBanners off in LauncherData)	yes	0	0
+75411	cross bottony	cross		cross	CCsBanners	Various Banners 05	cc_banners_05	10	no (CCsBanners off in LauncherData)	yes	0	0
+75412	griffin's head crowned	monster		griffin|eagle's head	CCsBanners	Various Banners 05	cc_banners_05	11	no (CCsBanners off in LauncherData)	yes	0	0
+75413	lion rampant with sword	beast		lion	CCsBanners	Various Banners 05	cc_banners_05	12	no (CCsBanners off in LauncherData)	yes	0	0
+75414	scallop shell and crossed swords	fish	canon pick: Westerling	seashell|scallop	CCsBanners	Various Banners 05	cc_banners_05	13	no (CCsBanners off in LauncherData)	yes	0	0
+75415	crossed keys	tool		keys|crossed keys	CCsBanners	Various Banners 05	cc_banners_05	14	no (CCsBanners off in LauncherData)	yes	0	0
+75416	tower with axes	building		tower	CCsBanners	Various Banners 05	cc_banners_05	15	no (CCsBanners off in LauncherData)	yes	0	0
+75501	cross clechee (Occitan)	cross		cross	CCsBanners	Simple 1	cc_banners_06	0	no (CCsBanners off in LauncherData)	yes	0	0
+75502	fylfot (avoid)	glyph			CCsBanners	Simple 1	cc_banners_06	1	no (CCsBanners off in LauncherData)	yes	0	0
+75503	cross of chains	cross		chain|chains|cross	CCsBanners	Simple 1	cc_banners_06	2	no (CCsBanners off in LauncherData)	yes	0	0
+75504	cross over a square	cross		cross	CCsBanners	Simple 1	cc_banners_06	3	no (CCsBanners off in LauncherData)	yes	0	0
+75505	endless knot	knot		knot	CCsBanners	Simple 1	cc_banners_06	4	no (CCsBanners off in LauncherData)	yes	0	0
+75506	cross fleury	cross		cross	CCsBanners	Simple 1	cc_banners_06	5	no (CCsBanners off in LauncherData)	yes	0	0
+75507	cross pattee in a ring	cross		cross	CCsBanners	Simple 1	cc_banners_06	6	no (CCsBanners off in LauncherData)	yes	0	0
+75508	cross in a wheel	cross		cross|wheel	CCsBanners	Simple 1	cc_banners_06	7	no (CCsBanners off in LauncherData)	yes	0	0
+75509	star-cross with crosslets	cross		cross	CCsBanners	Simple 1	cc_banners_06	8	no (CCsBanners off in LauncherData)	yes	0	0
+75510	interlaced cross	cross		cross	CCsBanners	Simple 1	cc_banners_06	9	no (CCsBanners off in LauncherData)	yes	0	0
+75511	cross with ring and rays	cross		cross	CCsBanners	Simple 1	cc_banners_06	10	no (CCsBanners off in LauncherData)	yes	0	0
+75512	crossed keys with crosses	cross		keys	CCsBanners	Simple 1	cc_banners_06	11	no (CCsBanners off in LauncherData)	yes	0	0
+75513	cross formy (pattee)	cross		cross	CCsBanners	Simple 1	cc_banners_06	12	no (CCsBanners off in LauncherData)	yes	0	0
+75514	cross crosslet	cross		cross	CCsBanners	Simple 1	cc_banners_06	13	no (CCsBanners off in LauncherData)	yes	0	0
+75515	Jerusalem cross	cross		cross	CCsBanners	Simple 1	cc_banners_06	14	no (CCsBanners off in LauncherData)	yes	0	0
+75516	cross pattee (curved)	cross		cross	CCsBanners	Simple 1	cc_banners_06	15	no (CCsBanners off in LauncherData)	yes	0	0
+75601	six-armed curved asterisk	celestial		star	CCsBanners	Simple 2	cc_banners_07	0	no (CCsBanners off in LauncherData)	yes	0	0
+75602	orb (globus cruciger)	tool		orb	CCsBanners	Simple 2	cc_banners_07	1	no (CCsBanners off in LauncherData)	yes	0	0
+75603	IHS christogram	glyph			CCsBanners	Simple 2	cc_banners_07	2	no (CCsBanners off in LauncherData)	yes	0	0
+75604	cross recercelee	cross		cross	CCsBanners	Simple 2	cc_banners_07	3	no (CCsBanners off in LauncherData)	yes	0	0
+75605	cross bottony	cross		cross	CCsBanners	Simple 2	cc_banners_07	4	no (CCsBanners off in LauncherData)	yes	0	0
+75606	horned cross	cross		cross	CCsBanners	Simple 2	cc_banners_07	5	no (CCsBanners off in LauncherData)	yes	0	0
+75607	patriarchal cross	cross		cross	CCsBanners	Simple 2	cc_banners_07	6	no (CCsBanners off in LauncherData)	yes	0	0
+75608	Maltese cross	cross		cross	CCsBanners	Simple 2	cc_banners_07	7	no (CCsBanners off in LauncherData)	yes	0	0
+75609	cross with rounded ends	cross		cross	CCsBanners	Simple 2	cc_banners_07	8	no (CCsBanners off in LauncherData)	yes	0	0
+75610	cross potent	cross		cross	CCsBanners	Simple 2	cc_banners_07	9	no (CCsBanners off in LauncherData)	yes	0	0
+75611	cross pattee (Templar)	cross		cross	CCsBanners	Simple 2	cc_banners_07	10	no (CCsBanners off in LauncherData)	yes	0	0
+75612	cross of mascles	cross		cross|mascles	CCsBanners	Simple 2	cc_banners_07	11	no (CCsBanners off in LauncherData)	yes	0	0
+75613	cross raguly (rope)	cross		cross	CCsBanners	Simple 2	cc_banners_07	12	no (CCsBanners off in LauncherData)	yes	0	0
+75614	cross moline	cross		cross	CCsBanners	Simple 2	cc_banners_07	13	no (CCsBanners off in LauncherData)	yes	0	0
+75615	cross voided	cross		cross	CCsBanners	Simple 2	cc_banners_07	14	no (CCsBanners off in LauncherData)	yes	0	0
+75616	patriarchal cross (double)	cross		cross	CCsBanners	Simple 2	cc_banners_07	15	no (CCsBanners off in LauncherData)	yes	0	0
+75701	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	0	no (CCsBanners off in LauncherData)	no	0	0
+75702	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	1	no (CCsBanners off in LauncherData)	no	0	0
+75703	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	2	no (CCsBanners off in LauncherData)	no	0	0
+75704	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	3	no (CCsBanners off in LauncherData)	no	0	0
+75705	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	4	no (CCsBanners off in LauncherData)	no	0	0
+75706	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	5	no (CCsBanners off in LauncherData)	no	0	0
+75707	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	6	no (CCsBanners off in LauncherData)	no	0	0
+75708	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	7	no (CCsBanners off in LauncherData)	no	0	0
+75709	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	8	no (CCsBanners off in LauncherData)	no	0	0
+75710	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	9	no (CCsBanners off in LauncherData)	no	0	0
+75711	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	10	no (CCsBanners off in LauncherData)	no	0	0
+75712	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	11	no (CCsBanners off in LauncherData)	no	0	0
+75713	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	12	no (CCsBanners off in LauncherData)	no	0	0
+75714	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	13	no (CCsBanners off in LauncherData)	no	0	0
+75715	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	14	no (CCsBanners off in LauncherData)	no	0	0
+75716	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 1	cc_banners_08	15	no (CCsBanners off in LauncherData)	no	0	0
+75801	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	0	no (CCsBanners off in LauncherData)	no	0	0
+75802	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	1	no (CCsBanners off in LauncherData)	no	0	0
+75803	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	2	no (CCsBanners off in LauncherData)	no	0	0
+75804	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	3	no (CCsBanners off in LauncherData)	no	0	0
+75805	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	4	no (CCsBanners off in LauncherData)	no	0	0
+75806	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	5	no (CCsBanners off in LauncherData)	no	0	0
+75807	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	6	no (CCsBanners off in LauncherData)	no	0	0
+75808	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	7	no (CCsBanners off in LauncherData)	no	0	0
+75809	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	8	no (CCsBanners off in LauncherData)	no	0	0
+75810	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	9	no (CCsBanners off in LauncherData)	no	0	0
+75811	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	10	no (CCsBanners off in LauncherData)	no	0	0
+75812	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	11	no (CCsBanners off in LauncherData)	no	0	0
+75813	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	12	no (CCsBanners off in LauncherData)	no	0	0
+75814	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	13	no (CCsBanners off in LauncherData)	no	0	0
+75815	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	14	no (CCsBanners off in LauncherData)	no	0	0
+75816	Japanese mon (crest in a ring)	emblem			CCsBanners	Japanese Clans 2	cc_banners_09	15	no (CCsBanners off in LauncherData)	no	0	0
+75901	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	0	no (CCsBanners off in LauncherData)	yes	0	0
+75902	oriental dragon's head	monster		dragon's head	CCsBanners	Dragons	cc_banners_10	1	no (CCsBanners off in LauncherData)	yes	0	0
+75903	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	2	no (CCsBanners off in LauncherData)	yes	0	0
+75904	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	3	no (CCsBanners off in LauncherData)	yes	0	0
+75905	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	4	no (CCsBanners off in LauncherData)	yes	0	0
+75906	oriental dragon's head	monster		dragon's head	CCsBanners	Dragons	cc_banners_10	5	no (CCsBanners off in LauncherData)	yes	0	0
+75907	oriental dragon's head	monster		dragon's head	CCsBanners	Dragons	cc_banners_10	6	no (CCsBanners off in LauncherData)	yes	0	0
+75908	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	7	no (CCsBanners off in LauncherData)	yes	0	0
+75909	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	8	no (CCsBanners off in LauncherData)	yes	0	0
+75910	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	9	no (CCsBanners off in LauncherData)	yes	0	0
+75911	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	10	no (CCsBanners off in LauncherData)	yes	0	0
+75912	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	11	no (CCsBanners off in LauncherData)	yes	0	0
+75913	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	12	no (CCsBanners off in LauncherData)	yes	0	0
+75914	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	13	no (CCsBanners off in LauncherData)	yes	0	0
+75915	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	14	no (CCsBanners off in LauncherData)	yes	0	0
+75916	oriental dragon	monster		dragon	CCsBanners	Dragons	cc_banners_10	15	no (CCsBanners off in LauncherData)	yes	0	0
+76001	horse rampant (full achievement in a framed shield)	achievement		horse	CCsBanners	Heraldry	cc_banners_11	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76002	horse rampant with fleurs (full achievement in a framed shield)	achievement		horse	CCsBanners	Heraldry	cc_banners_11	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76003	horse rampant (full achievement in a framed shield)	achievement		horse	CCsBanners	Heraldry	cc_banners_11	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76004	lion rampant (full achievement in a framed shield)	achievement		lion	CCsBanners	Heraldry	cc_banners_11	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76005	three lions passant (full achievement in a framed shield)	achievement		lions	CCsBanners	Heraldry	cc_banners_11	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76006	lion passant over crossed swords (full achievement in a framed shield)	achievement		lion	CCsBanners	Heraldry	cc_banners_11	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76007	eagle displayed (full achievement in a framed shield)	achievement		eagle	CCsBanners	Heraldry	cc_banners_11	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76008	eagle displayed with helm (full achievement in a framed shield)	achievement		eagle	CCsBanners	Heraldry	cc_banners_11	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76009	eagle displayed (full achievement in a framed shield)	achievement		eagle	CCsBanners	Heraldry	cc_banners_11	8	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76010	griffin rampant with fleurs (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_11	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76011	wyvern with crossed swords (full achievement in a framed shield)	achievement		wyvern|dragon	CCsBanners	Heraldry	cc_banners_11	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76012	griffin rampant (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_11	11	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76013	wyvern crowned (full achievement in a framed shield)	achievement		wyvern|dragon	CCsBanners	Heraldry	cc_banners_11	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76014	griffin rampant (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_11	13	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76015	griffin over crossed anchors (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_11	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76016	griffin rampant (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_11	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76101	griffin rampant (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76102	griffin with sword (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76103	wyvern (full achievement in a framed shield)	achievement		wyvern|dragon	CCsBanners	Heraldry	cc_banners_12	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76104	griffin with fleurs (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76105	wyvern (full achievement in a framed shield)	achievement		wyvern|dragon	CCsBanners	Heraldry	cc_banners_12	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76106	griffin (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76107	griffin (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76108	griffin with stars (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76109	griffin (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	8	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76110	wyvern with crossed swords (full achievement in a framed shield)	achievement		wyvern|dragon	CCsBanners	Heraldry	cc_banners_12	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76111	griffin with crossed swords (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76112	horse rampant (full achievement in a framed shield)	achievement		horse	CCsBanners	Heraldry	cc_banners_12	11	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76113	eagle displayed (full achievement in a framed shield)	achievement		eagle	CCsBanners	Heraldry	cc_banners_12	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76114	lion passant with crossed swords (full achievement in a framed shield)	achievement		lion	CCsBanners	Heraldry	cc_banners_12	13	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76115	eagle crowned (full achievement in a framed shield)	achievement		eagle	CCsBanners	Heraldry	cc_banners_12	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76116	griffin (full achievement in a framed shield)	achievement		griffin	CCsBanners	Heraldry	cc_banners_12	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76201	lion rampant with fleurs (full achievement in a framed shield)	achievement		lion	CCsBanners	Simple Heraldry	cc_banners_13	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76202	eagle over a quartered shield (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76203	eagle crowned with keys (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76204	eagle with crossed swords (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76205	lion rampant crowned (full achievement in a framed shield)	achievement		lion	CCsBanners	Simple Heraldry	cc_banners_13	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76206	three keys on a shield	achievement		keys|key	CCsBanners	Simple Heraldry	cc_banners_13	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76207	eagle under a mural crown (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76208	eagle with an escutcheon (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76209	lion rampant with sword and shield (full achievement in a framed shield)	achievement		lion	CCsBanners	Simple Heraldry	cc_banners_13	8	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76210	eagle with stars (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76211	eagle with stars (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76212	eagle with crossed swords (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	11	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76213	eagle, chief with sword and stars (full achievement in a framed shield)	achievement		eagle,	CCsBanners	Simple Heraldry	cc_banners_13	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76214	eagle in a roundel with swords (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	13	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76215	castle and eagle in a lozenge (full achievement in a framed shield)	achievement		castle	CCsBanners	Simple Heraldry	cc_banners_13	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76216	eagle crowned (full achievement in a framed shield)	achievement		eagle	CCsBanners	Simple Heraldry	cc_banners_13	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76301	eagle displayed (heraldic)	bird	canon pick: Mallister	eagle	CCsBanners	Various Banners	cc_banners_14	0	no (CCsBanners off in LauncherData)	yes	0	0
+76302	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	1	no (CCsBanners off in LauncherData)	yes	0	0
+76303	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	2	no (CCsBanners off in LauncherData)	yes	0	0
+76304	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	3	no (CCsBanners off in LauncherData)	yes	0	0
+76305	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	4	no (CCsBanners off in LauncherData)	yes	0	0
+76306	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	5	no (CCsBanners off in LauncherData)	yes	0	0
+76307	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	6	no (CCsBanners off in LauncherData)	yes	0	0
+76308	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	7	no (CCsBanners off in LauncherData)	yes	0	0
+76309	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	8	no (CCsBanners off in LauncherData)	yes	0	0
+76310	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	9	no (CCsBanners off in LauncherData)	yes	0	0
+76311	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	10	no (CCsBanners off in LauncherData)	yes	0	0
+76312	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	11	no (CCsBanners off in LauncherData)	yes	0	0
+76313	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	12	no (CCsBanners off in LauncherData)	yes	0	0
+76314	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	13	no (CCsBanners off in LauncherData)	yes	0	0
+76315	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	14	no (CCsBanners off in LauncherData)	yes	0	0
+76316	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_14	15	no (CCsBanners off in LauncherData)	yes	0	0
+76401	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	0	no (CCsBanners off in LauncherData)	yes	0	0
+76402	double-headed eagle displayed	bird		double-headed eagle|eagle	CCsBanners	Various Banners	cc_banners_15	1	no (CCsBanners off in LauncherData)	yes	0	0
+76403	double-headed eagle displayed	bird		double-headed eagle|eagle	CCsBanners	Various Banners	cc_banners_15	2	no (CCsBanners off in LauncherData)	yes	0	0
+76404	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	3	no (CCsBanners off in LauncherData)	yes	0	0
+76405	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	4	no (CCsBanners off in LauncherData)	yes	0	0
+76406	double-headed eagle displayed	bird		double-headed eagle|eagle	CCsBanners	Various Banners	cc_banners_15	5	no (CCsBanners off in LauncherData)	yes	0	0
+76407	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	6	no (CCsBanners off in LauncherData)	yes	0	0
+76408	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	7	no (CCsBanners off in LauncherData)	yes	0	0
+76409	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	8	no (CCsBanners off in LauncherData)	yes	0	0
+76410	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	9	no (CCsBanners off in LauncherData)	yes	0	0
+76411	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	10	no (CCsBanners off in LauncherData)	yes	0	0
+76412	double-headed eagle displayed	bird		double-headed eagle|eagle	CCsBanners	Various Banners	cc_banners_15	11	no (CCsBanners off in LauncherData)	yes	0	0
+76413	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	12	no (CCsBanners off in LauncherData)	yes	0	0
+76414	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	13	no (CCsBanners off in LauncherData)	yes	0	0
+76415	double-headed eagle displayed	bird		double-headed eagle|eagle	CCsBanners	Various Banners	cc_banners_15	14	no (CCsBanners off in LauncherData)	yes	0	0
+76416	eagle displayed (heraldic)	bird		eagle	CCsBanners	Various Banners	cc_banners_15	15	no (CCsBanners off in LauncherData)	yes	0	0
+76501	eagle displayed	bird		eagle	CCsBanners	Various Banners	cc_banners_16	0	no (CCsBanners off in LauncherData)	yes	0	0
+76502	lion rampant	beast		lion	CCsBanners	Various Banners	cc_banners_16	1	no (CCsBanners off in LauncherData)	yes	0	0
+76503	griffin passant	monster		griffin	CCsBanners	Various Banners	cc_banners_16	2	no (CCsBanners off in LauncherData)	yes	0	0
+76504	eagle displayed	bird		eagle	CCsBanners	Various Banners	cc_banners_16	3	no (CCsBanners off in LauncherData)	yes	0	0
+76505	griffin segreant	monster		griffin	CCsBanners	Various Banners	cc_banners_16	4	no (CCsBanners off in LauncherData)	yes	0	0
+76506	double-headed eagle	bird		double-headed eagle	CCsBanners	Various Banners	cc_banners_16	5	no (CCsBanners off in LauncherData)	yes	0	0
+76507	eagle displayed	bird		eagle	CCsBanners	Various Banners	cc_banners_16	6	no (CCsBanners off in LauncherData)	yes	0	0
+76508	lion rampant	beast		lion	CCsBanners	Various Banners	cc_banners_16	7	no (CCsBanners off in LauncherData)	yes	0	0
+76509	sea-wyvern (fish-tailed dragon)	monster		sea serpent|sea dragon	CCsBanners	Various Banners	cc_banners_16	8	no (CCsBanners off in LauncherData)	yes	0	0
+76510	dragon passant (Welsh)	monster		dragon|wyvern	CCsBanners	Various Banners	cc_banners_16	9	no (CCsBanners off in LauncherData)	yes	0	0
+76511	lion rampant	beast		lion	CCsBanners	Various Banners	cc_banners_16	10	no (CCsBanners off in LauncherData)	yes	0	0
+76512	unicorn passant	monster	canon pick: Brax	unicorn	CCsBanners	Various Banners	cc_banners_16	11	no (CCsBanners off in LauncherData)	yes	0	0
+76513	dragon passant	monster		dragon	CCsBanners	Various Banners	cc_banners_16	12	no (CCsBanners off in LauncherData)	yes	0	0
+76514	heron/liver bird	bird	canon pick: Crane	heron|crane|stork	CCsBanners	Various Banners	cc_banners_16	13	no (CCsBanners off in LauncherData)	yes	0	0
+76515	eagle displayed	bird		eagle	CCsBanners	Various Banners	cc_banners_16	14	no (CCsBanners off in LauncherData)	yes	0	0
+76516	pegasus rampant	monster		pegasus|winged horse	CCsBanners	Various Banners	cc_banners_16	15	no (CCsBanners off in LauncherData)	yes	0	0
+76601	imperial crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	0	no (CCsBanners off in LauncherData)	yes	0	0
+76602	crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	1	no (CCsBanners off in LauncherData)	yes	0	0
+76603	coronet	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	2	no (CCsBanners off in LauncherData)	yes	0	0
+76604	coronet	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	3	no (CCsBanners off in LauncherData)	yes	0	0
+76605	royal arched crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	4	no (CCsBanners off in LauncherData)	yes	0	0
+76606	crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	5	no (CCsBanners off in LauncherData)	yes	0	0
+76607	crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	6	no (CCsBanners off in LauncherData)	yes	0	0
+76608	crown of fleurs (outline)	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	7	no (CCsBanners off in LauncherData)	yes	0	0
+76609	crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	8	no (CCsBanners off in LauncherData)	yes	0	0
+76610	crown of fleurs	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	9	no (CCsBanners off in LauncherData)	yes	0	0
+76611	coronet with crosses	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	10	no (CCsBanners off in LauncherData)	yes	0	0
+76612	thin coronet	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	11	no (CCsBanners off in LauncherData)	yes	0	0
+76613	crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	12	no (CCsBanners off in LauncherData)	yes	0	0
+76614	crown with crosses	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	13	no (CCsBanners off in LauncherData)	yes	0	0
+76615	spiked crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	14	no (CCsBanners off in LauncherData)	yes	0	0
+76616	crown	crown		crown|coronet	CCsBanners	Various Banners	cc_banners_17	15	no (CCsBanners off in LauncherData)	yes	0	0
+76701	quarterly: crown, bendy, cross (on a shield)	achievement		crown	CCsBanners	Various Banners	cc_banners_18	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76702	cross (on a shield)	achievement		cross	CCsBanners	Various Banners	cc_banners_18	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76703	bendy (on a shield)	achievement		bend	CCsBanners	Various Banners	cc_banners_18	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76704	patriarchal cross (on a shield)	achievement		cross	CCsBanners	Various Banners	cc_banners_18	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76705	cross with a roundel (on a shield)	achievement		cross	CCsBanners	Various Banners	cc_banners_18	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76706	castle over a rising sun (on a shield)	achievement		castle|sun	CCsBanners	Various Banners	cc_banners_18	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76707	quarterly (on a shield)	achievement			CCsBanners	Various Banners	cc_banners_18	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76708	crown and cross bottony (on a shield)	achievement		crown|cross	CCsBanners	Various Banners	cc_banners_18	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76709	barry with a bend (on a shield)	achievement		bend	CCsBanners	Various Banners	cc_banners_18	8	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76710	Jerusalem cross (on a shield)	achievement		cross	CCsBanners	Various Banners	cc_banners_18	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76711	chief and pallets (on a shield)	achievement		pale	CCsBanners	Various Banners	cc_banners_18	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76712	cross with a mullet (on a shield)	achievement		cross|star	CCsBanners	Various Banners	cc_banners_18	11	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76713	compass star (on a shield)	achievement		star	CCsBanners	Various Banners	cc_banners_18	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76714	castle with crossed arrows (on a shield)	achievement		castle|crossed arrows	CCsBanners	Various Banners	cc_banners_18	13	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76715	roundel over pallets (on a shield)	achievement		roundel	CCsBanners	Various Banners	cc_banners_18	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76716	tau over a pile (on a shield)	achievement			CCsBanners	Various Banners	cc_banners_18	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76801	eagle displayed	bird		eagle	CCsBanners	Simple Heraldry	cc_banners_19	0	no (CCsBanners off in LauncherData)	yes	0	0
+76802	double-headed eagle	bird		double-headed eagle|eagle	CCsBanners	Simple Heraldry	cc_banners_19	1	no (CCsBanners off in LauncherData)	yes	0	0
+76803	eagle displayed	bird		eagle	CCsBanners	Simple Heraldry	cc_banners_19	2	no (CCsBanners off in LauncherData)	yes	0	0
+76804	eagle displayed	bird		eagle	CCsBanners	Simple Heraldry	cc_banners_19	3	no (CCsBanners off in LauncherData)	yes	0	0
+76805	griffin segreant	monster	canon pick: Connington	griffin	CCsBanners	Simple Heraldry	cc_banners_19	4	no (CCsBanners off in LauncherData)	yes	0	0
+76806	griffin segreant	monster		griffin	CCsBanners	Simple Heraldry	cc_banners_19	5	no (CCsBanners off in LauncherData)	yes	0	0
+76807	griffin segreant	monster		griffin	CCsBanners	Simple Heraldry	cc_banners_19	6	no (CCsBanners off in LauncherData)	yes	0	0
+76808	griffin segreant	monster		griffin	CCsBanners	Simple Heraldry	cc_banners_19	7	no (CCsBanners off in LauncherData)	yes	0	0
+76809	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	8	no (CCsBanners off in LauncherData)	yes	0	0
+76810	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	9	no (CCsBanners off in LauncherData)	yes	0	0
+76811	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	10	no (CCsBanners off in LauncherData)	yes	0	0
+76812	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	11	no (CCsBanners off in LauncherData)	yes	0	0
+76813	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	12	no (CCsBanners off in LauncherData)	yes	0	0
+76814	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	13	no (CCsBanners off in LauncherData)	yes	0	0
+76815	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	14	no (CCsBanners off in LauncherData)	yes	0	0
+76816	lion rampant	beast		lion	CCsBanners	Simple Heraldry	cc_banners_19	15	no (CCsBanners off in LauncherData)	yes	0	0
+76901	two chevronels (Witcher arms on a shield)	achievement		chevron	CCsBanners	Witcher	cc_banners_20	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76902	flowers with crossed arrows (Witcher arms on a shield)	achievement		flower|arrows	CCsBanners	Witcher	cc_banners_20	1	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76903	sun in splendour (Witcher arms on a shield)	achievement		sun	CCsBanners	Witcher	cc_banners_20	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76904	per chevron: anchor and keys, fir trees (Witcher arms on a shield)	achievement		anchor|pine tree	CCsBanners	Witcher	cc_banners_20	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76905	tree under a chief of fleurs (Witcher arms on a shield)	achievement		tree|fleur-de-lis	CCsBanners	Witcher	cc_banners_20	4	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76906	label/tau (Witcher arms on a shield)	achievement			CCsBanners	Witcher	cc_banners_20	5	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76907	three mullets and a crescent (Witcher arms on a shield)	achievement		star|crescent	CCsBanners	Witcher	cc_banners_20	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76908	sun rising over waves (Witcher arms on a shield)	achievement		sun	CCsBanners	Witcher	cc_banners_20	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76909	per pale, demi sea-beasts (Witcher arms on a shield)	achievement		sea serpent	CCsBanners	Witcher	cc_banners_20	8	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76910	five fans/shells (Witcher arms on a shield)	achievement		seashell	CCsBanners	Witcher	cc_banners_20	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76911	griffin rampant (Witcher arms on a shield)	achievement		griffin	CCsBanners	Witcher	cc_banners_20	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76912	eagle displayed (Witcher arms on a shield)	achievement		eagle	CCsBanners	Witcher	cc_banners_20	11	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76913	eagle with an escutcheon (Witcher arms on a shield)	achievement		eagle	CCsBanners	Witcher	cc_banners_20	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76914	quarterly: lions and lozenges (Witcher arms on a shield)	achievement		lion|lozenge	CCsBanners	Witcher	cc_banners_20	13	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76915	lion rampant (Witcher arms on a shield)	achievement		lion	CCsBanners	Witcher	cc_banners_20	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+76916	bend with a sun (Witcher arms on a shield)	achievement		sun|bend	CCsBanners	Witcher	cc_banners_20	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+77001	cross pattee (iron cross)	cross		cross	CCsBanners	Various Banners	cc_banners_21	0	no (CCsBanners off in LauncherData)	yes	0	0
+77002	Chi-Rho	glyph			CCsBanners	Various Banners	cc_banners_21	1	no (CCsBanners off in LauncherData)	yes	0	0
+77003	cross IC XC NIKA	cross		cross	CCsBanners	Various Banners	cc_banners_21	2	no (CCsBanners off in LauncherData)	yes	0	0
+77004	SPQR eagle standard	bird		eagle	CCsBanners	Various Banners	cc_banners_21	3	no (CCsBanners off in LauncherData)	yes	0	0
+77005	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	4	no (CCsBanners off in LauncherData)	no	0	0
+77006	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	5	no (CCsBanners off in LauncherData)	no	0	0
+77007	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	6	no (CCsBanners off in LauncherData)	no	0	0
+77008	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	7	no (CCsBanners off in LauncherData)	no	0	0
+77009	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	8	no (CCsBanners off in LauncherData)	no	0	0
+77010	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	9	no (CCsBanners off in LauncherData)	no	0	0
+77011	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	10	no (CCsBanners off in LauncherData)	no	0	0
+77012	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	11	no (CCsBanners off in LauncherData)	no	0	0
+77013	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	12	no (CCsBanners off in LauncherData)	no	0	0
+77014	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	13	no (CCsBanners off in LauncherData)	no	0	0
+77015	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	14	no (CCsBanners off in LauncherData)	no	0	0
+77016	magic circle (occult)	emblem			CCsBanners	Various Banners	cc_banners_21	15	no (CCsBanners off in LauncherData)	no	0	0
+77101	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	0	no (CCsBanners off in LauncherData)	no	0	0
+77102	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	1	no (CCsBanners off in LauncherData)	no	0	0
+77103	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	2	no (CCsBanners off in LauncherData)	no	0	0
+77104	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	3	no (CCsBanners off in LauncherData)	no	0	0
+77105	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	4	no (CCsBanners off in LauncherData)	no	0	0
+77106	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	5	no (CCsBanners off in LauncherData)	no	0	0
+77107	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	6	no (CCsBanners off in LauncherData)	no	0	0
+77108	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	7	no (CCsBanners off in LauncherData)	no	0	0
+77109	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	8	no (CCsBanners off in LauncherData)	no	0	0
+77110	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	9	no (CCsBanners off in LauncherData)	no	0	0
+77111	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	10	no (CCsBanners off in LauncherData)	no	0	0
+77112	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	11	no (CCsBanners off in LauncherData)	no	0	0
+77113	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	12	no (CCsBanners off in LauncherData)	no	0	0
+77114	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	13	no (CCsBanners off in LauncherData)	no	0	0
+77115	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	14	no (CCsBanners off in LauncherData)	no	0	0
+77116	magic circle (occult)	emblem			CCsBanners	Magic Circles	cc_banners_22	15	no (CCsBanners off in LauncherData)	no	0	0
+77201	Aztec-style fish/insect	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	0	no (CCsBanners off in LauncherData)	no	0	0
+77202	Aztec-style mask	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	1	no (CCsBanners off in LauncherData)	no	0	0
+77203	Aztec-style monkey	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	2	no (CCsBanners off in LauncherData)	no	0	0
+77204	Aztec-style horse/llama	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	3	no (CCsBanners off in LauncherData)	no	0	0
+77205	Aztec-style feathered serpent	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	4	no (CCsBanners off in LauncherData)	no	0	0
+77206	Aztec-style turtle	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	5	no (CCsBanners off in LauncherData)	no	0	0
+77207	Aztec-style coyote	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	6	no (CCsBanners off in LauncherData)	no	0	0
+77208	Aztec-style heron	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	7	no (CCsBanners off in LauncherData)	no	0	0
+77209	Aztec-style sun face	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	8	no (CCsBanners off in LauncherData)	no	0	0
+77210	Aztec-style mask	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	9	no (CCsBanners off in LauncherData)	no	0	0
+77211	Aztec-style jaguar head	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	10	no (CCsBanners off in LauncherData)	no	0	0
+77212	Aztec-style warrior head	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	11	no (CCsBanners off in LauncherData)	no	0	0
+77213	Aztec-style turtle	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	12	no (CCsBanners off in LauncherData)	no	0	0
+77214	Aztec-style lizard	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	13	no (CCsBanners off in LauncherData)	no	0	0
+77215	Aztec-style eagle	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	14	no (CCsBanners off in LauncherData)	no	0	0
+77216	Aztec-style frog	emblem			CCsBanners	Aztec / Mayan	cc_banners_23	15	no (CCsBanners off in LauncherData)	no	0	0
+77301	triquetra	knot		knot|triquetra	CCsBanners	Celtic	cc_banners_24	0	no (CCsBanners off in LauncherData)	yes	0	0
+77302	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	1	no (CCsBanners off in LauncherData)	yes	0	0
+77303	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	2	no (CCsBanners off in LauncherData)	yes	0	0
+77304	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	3	no (CCsBanners off in LauncherData)	yes	0	0
+77305	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	4	no (CCsBanners off in LauncherData)	yes	0	0
+77306	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	5	no (CCsBanners off in LauncherData)	yes	0	0
+77307	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	6	no (CCsBanners off in LauncherData)	yes	0	0
+77308	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	7	no (CCsBanners off in LauncherData)	yes	0	0
+77309	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	8	no (CCsBanners off in LauncherData)	yes	0	0
+77310	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	9	no (CCsBanners off in LauncherData)	yes	0	0
+77311	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	10	no (CCsBanners off in LauncherData)	yes	0	0
+77312	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	11	no (CCsBanners off in LauncherData)	yes	0	0
+77313	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	12	no (CCsBanners off in LauncherData)	yes	0	0
+77314	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	13	no (CCsBanners off in LauncherData)	yes	0	0
+77315	triquetra	knot		knot|triquetra	CCsBanners	Celtic	cc_banners_24	14	no (CCsBanners off in LauncherData)	yes	0	0
+77316	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_24	15	no (CCsBanners off in LauncherData)	yes	0	0
+77401	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	0	no (CCsBanners off in LauncherData)	yes	0	0
+77402	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	1	no (CCsBanners off in LauncherData)	yes	0	0
+77403	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	2	no (CCsBanners off in LauncherData)	yes	0	0
+77404	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	3	no (CCsBanners off in LauncherData)	yes	0	0
+77405	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	4	no (CCsBanners off in LauncherData)	yes	0	0
+77406	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	5	no (CCsBanners off in LauncherData)	yes	0	0
+77407	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	6	no (CCsBanners off in LauncherData)	yes	0	0
+77408	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	7	no (CCsBanners off in LauncherData)	yes	0	0
+77409	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	8	no (CCsBanners off in LauncherData)	yes	0	0
+77410	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	9	no (CCsBanners off in LauncherData)	yes	0	0
+77411	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	10	no (CCsBanners off in LauncherData)	yes	0	0
+77412	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	11	no (CCsBanners off in LauncherData)	yes	0	0
+77413	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	12	no (CCsBanners off in LauncherData)	yes	0	0
+77414	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	13	no (CCsBanners off in LauncherData)	yes	0	0
+77415	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	14	no (CCsBanners off in LauncherData)	yes	0	0
+77416	Celtic knot	knot		knot	CCsBanners	Celtic	cc_banners_25	15	no (CCsBanners off in LauncherData)	yes	0	0
+77501	triquetra	knot		knot|triquetra	CCsBanners	Celtic	cc_banners_26	0	no (CCsBanners off in LauncherData)	yes	0	0
+77502	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	1	no (CCsBanners off in LauncherData)	yes	0	0
+77503	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	2	no (CCsBanners off in LauncherData)	yes	0	0
+77504	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	3	no (CCsBanners off in LauncherData)	yes	0	0
+77505	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	4	no (CCsBanners off in LauncherData)	yes	0	0
+77506	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	5	no (CCsBanners off in LauncherData)	yes	0	0
+77507	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	6	no (CCsBanners off in LauncherData)	yes	0	0
+77508	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	7	no (CCsBanners off in LauncherData)	yes	0	0
+77509	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	8	no (CCsBanners off in LauncherData)	yes	0	0
+77510	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	9	no (CCsBanners off in LauncherData)	yes	0	0
+77511	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	10	no (CCsBanners off in LauncherData)	yes	0	0
+77512	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	11	no (CCsBanners off in LauncherData)	yes	0	0
+77513	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	12	no (CCsBanners off in LauncherData)	yes	0	0
+77514	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	13	no (CCsBanners off in LauncherData)	yes	0	0
+77515	triquetra	knot		knot|triquetra	CCsBanners	Celtic	cc_banners_26	14	no (CCsBanners off in LauncherData)	yes	0	0
+77516	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_26	15	no (CCsBanners off in LauncherData)	yes	0	0
+77601	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	0	no (CCsBanners off in LauncherData)	yes	0	0
+77602	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	1	no (CCsBanners off in LauncherData)	yes	0	0
+77603	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	2	no (CCsBanners off in LauncherData)	yes	0	0
+77604	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	3	no (CCsBanners off in LauncherData)	yes	0	0
+77605	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	4	no (CCsBanners off in LauncherData)	yes	0	0
+77606	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	5	no (CCsBanners off in LauncherData)	yes	0	0
+77607	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	6	no (CCsBanners off in LauncherData)	yes	0	0
+77608	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	7	no (CCsBanners off in LauncherData)	yes	0	0
+77609	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	8	no (CCsBanners off in LauncherData)	yes	0	0
+77610	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	9	no (CCsBanners off in LauncherData)	yes	0	0
+77611	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	10	no (CCsBanners off in LauncherData)	yes	0	0
+77612	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	11	no (CCsBanners off in LauncherData)	yes	0	0
+77613	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	12	no (CCsBanners off in LauncherData)	yes	0	0
+77614	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	13	no (CCsBanners off in LauncherData)	yes	0	0
+77615	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	14	no (CCsBanners off in LauncherData)	yes	0	0
+77616	Celtic knot (outline)	knot		knot	CCsBanners	Celtic	cc_banners_27	15	no (CCsBanners off in LauncherData)	yes	0	0
+77701	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	0	no (CCsBanners off in LauncherData)	no	0	0
+77702	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	1	no (CCsBanners off in LauncherData)	no	0	0
+77703	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	2	no (CCsBanners off in LauncherData)	no	0	0
+77704	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	3	no (CCsBanners off in LauncherData)	no	0	0
+77705	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	4	no (CCsBanners off in LauncherData)	no	0	0
+77706	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	5	no (CCsBanners off in LauncherData)	no	0	0
+77707	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	6	no (CCsBanners off in LauncherData)	no	0	0
+77708	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	7	no (CCsBanners off in LauncherData)	no	0	0
+77709	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	8	no (CCsBanners off in LauncherData)	no	0	0
+77710	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	9	no (CCsBanners off in LauncherData)	no	0	0
+77711	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	10	no (CCsBanners off in LauncherData)	no	0	0
+77712	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	11	no (CCsBanners off in LauncherData)	no	0	0
+77713	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	12	no (CCsBanners off in LauncherData)	no	0	0
+77714	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	13	no (CCsBanners off in LauncherData)	no	0	0
+77715	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	14	no (CCsBanners off in LauncherData)	no	0	0
+77716	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 01	cc_banners_28	15	no (CCsBanners off in LauncherData)	no	0	0
+77801	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	0	no (CCsBanners off in LauncherData)	no	0	0
+77802	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	1	no (CCsBanners off in LauncherData)	no	0	0
+77803	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	2	no (CCsBanners off in LauncherData)	no	0	0
+77804	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	3	no (CCsBanners off in LauncherData)	no	0	0
+77805	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	4	no (CCsBanners off in LauncherData)	no	0	0
+77806	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	5	no (CCsBanners off in LauncherData)	no	0	0
+77807	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	6	no (CCsBanners off in LauncherData)	no	0	0
+77808	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	7	no (CCsBanners off in LauncherData)	no	0	0
+77809	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	8	no (CCsBanners off in LauncherData)	no	0	0
+77810	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	9	no (CCsBanners off in LauncherData)	no	0	0
+77811	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	10	no (CCsBanners off in LauncherData)	no	0	0
+77812	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	11	no (CCsBanners off in LauncherData)	no	0	0
+77813	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	12	no (CCsBanners off in LauncherData)	no	0	0
+77814	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	13	no (CCsBanners off in LauncherData)	no	0	0
+77815	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	14	no (CCsBanners off in LauncherData)	no	0	0
+77816	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 02	cc_banners_29	15	no (CCsBanners off in LauncherData)	no	0	0
+77901	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	0	no (CCsBanners off in LauncherData)	no	0	0
+77902	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	1	no (CCsBanners off in LauncherData)	no	0	0
+77903	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	2	no (CCsBanners off in LauncherData)	no	0	0
+77904	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	3	no (CCsBanners off in LauncherData)	no	0	0
+77905	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	4	no (CCsBanners off in LauncherData)	no	0	0
+77906	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	5	no (CCsBanners off in LauncherData)	no	0	0
+77907	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	6	no (CCsBanners off in LauncherData)	no	0	0
+77908	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	7	no (CCsBanners off in LauncherData)	no	0	0
+77909	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	8	no (CCsBanners off in LauncherData)	no	0	0
+77910	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	9	no (CCsBanners off in LauncherData)	no	0	0
+77911	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	10	no (CCsBanners off in LauncherData)	no	0	0
+77912	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	11	no (CCsBanners off in LauncherData)	no	0	0
+77913	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	12	no (CCsBanners off in LauncherData)	no	0	0
+77914	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	13	no (CCsBanners off in LauncherData)	no	0	0
+77915	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	14	no (CCsBanners off in LauncherData)	no	0	0
+77916	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 03	cc_banners_30	15	no (CCsBanners off in LauncherData)	no	0	0
+78001	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	0	no (CCsBanners off in LauncherData)	no	0	0
+78002	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	1	no (CCsBanners off in LauncherData)	no	0	0
+78003	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	2	no (CCsBanners off in LauncherData)	no	0	0
+78004	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	3	no (CCsBanners off in LauncherData)	no	0	0
+78005	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	4	no (CCsBanners off in LauncherData)	no	0	0
+78006	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	5	no (CCsBanners off in LauncherData)	no	0	0
+78007	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	6	no (CCsBanners off in LauncherData)	no	0	0
+78008	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	7	no (CCsBanners off in LauncherData)	no	0	0
+78009	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	8	no (CCsBanners off in LauncherData)	no	0	0
+78010	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	9	no (CCsBanners off in LauncherData)	no	0	0
+78011	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	10	no (CCsBanners off in LauncherData)	no	0	0
+78012	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	11	no (CCsBanners off in LauncherData)	no	0	0
+78013	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	12	no (CCsBanners off in LauncherData)	no	0	0
+78014	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	13	no (CCsBanners off in LauncherData)	no	0	0
+78015	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	14	no (CCsBanners off in LauncherData)	no	0	0
+78016	demon seal (Goetia, occult)	emblem			CCsBanners	Demon Signs 04	cc_banners_31	15	no (CCsBanners off in LauncherData)	no	0	0
+78101	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	0	no (CCsBanners off in LauncherData)	yes	0	0
+78102	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	1	no (CCsBanners off in LauncherData)	yes	0	0
+78103	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	2	no (CCsBanners off in LauncherData)	yes	0	0
+78104	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	3	no (CCsBanners off in LauncherData)	yes	0	0
+78105	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	4	no (CCsBanners off in LauncherData)	yes	0	0
+78106	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	5	no (CCsBanners off in LauncherData)	yes	0	0
+78107	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	6	no (CCsBanners off in LauncherData)	yes	0	0
+78108	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	7	no (CCsBanners off in LauncherData)	yes	0	0
+78109	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	8	no (CCsBanners off in LauncherData)	yes	0	0
+78110	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	9	no (CCsBanners off in LauncherData)	yes	0	0
+78111	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	10	no (CCsBanners off in LauncherData)	yes	0	0
+78112	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	11	no (CCsBanners off in LauncherData)	yes	0	0
+78113	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	12	no (CCsBanners off in LauncherData)	yes	0	0
+78114	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	13	no (CCsBanners off in LauncherData)	yes	0	0
+78115	alchemical/astrological sign	glyph			CCsBanners	Celestial Signs	cc_banners_32	14	no (CCsBanners off in LauncherData)	yes	0	0
+78116	circle quartered (earth sign)	glyph		cross|wheel	CCsBanners	Celestial Signs	cc_banners_32	15	no (CCsBanners off in LauncherData)	yes	0	0
+78201	three-headed dragon	monster	canon pick: Targaryen	dragon|three-headed dragon	CCsBanners	GoT 1	cc_banners_33	0	no (CCsBanners off in LauncherData)	yes	0	0
+78202	direwolf courant	beast	canon pick: Stark, Snow (Jon)	direwolf|wolf	CCsBanners	GoT 1	cc_banners_33	1	no (CCsBanners off in LauncherData)	yes	0	0
+78203	lion rampant	beast	canon pick: Lannister, Baratheon (Joffrey)	lion	CCsBanners	GoT 1	cc_banners_33	2	no (CCsBanners off in LauncherData)	yes	0	0
+78204	falcon displayed	bird	canon pick: Arryn, Fowler	falcon|hawk|eagle	CCsBanners	GoT 1	cc_banners_33	3	no (CCsBanners off in LauncherData)	yes	0	0
+78205	trout leaping	fish	canon pick: Tully, Tully (Blackfish), Mooton, Riverlands (kingdom, Tully)	trout|leaping fish|fish|salmon	CCsBanners	GoT 1	cc_banners_33	4	no (CCsBanners off in LauncherData)	yes	0	0
+78206	kraken	monster	canon pick: Greyjoy	kraken|squid	CCsBanners	GoT 1	cc_banners_33	5	no (CCsBanners off in LauncherData)	yes	0	0
+78207	stag rampant	beast	canon pick: Baratheon (Renly), Baratheon (Storm's End), Baratheon (Stannis), Baratheon (Joffrey)	stag|hart	CCsBanners	GoT 1	cc_banners_33	6	no (CCsBanners off in LauncherData)	yes	0	0
+78208	heraldic rose	flora	canon pick: Tyrell	rose	CCsBanners	GoT 1	cc_banners_33	7	no (CCsBanners off in LauncherData)	yes	0	0
+78209	sun pierced by a spear	celestial	canon pick: Martell	sun|spear	CCsBanners	GoT 1	cc_banners_33	8	no (CCsBanners off in LauncherData)	yes	0	0
+78210	laurel wreath	flora		wreath|golden wreath|laurel	CCsBanners	GoT 1	cc_banners_33	9	no (CCsBanners off in LauncherData)	yes	0	0
+78211	open hand	human		hand	CCsBanners	GoT 1	cc_banners_33	10	no (CCsBanners off in LauncherData)	yes	0	0
+78212	wheel of eight spokes, broken rim	tool	canon pick: Waynwood	wheel|broken wheel|mill wheel	CCsBanners	GoT 1	cc_banners_33	11	no (CCsBanners off in LauncherData)	yes	0	0
+78213	lizard-lion (crocodile) in a ring	reptile	canon pick: Reed	lizard-lion|crocodile|lizard	CCsBanners	GoT 1	cc_banners_33	12	no (CCsBanners off in LauncherData)	yes	0	0
+78214	castle with two towers and gate	building	canon pick: Frey, Redfort	castle|towers|twin towers	CCsBanners	GoT 1	cc_banners_33	13	no (CCsBanners off in LauncherData)	yes	0	0
+78215	helm with face visor	tool		helm|mask	CCsBanners	GoT 1	cc_banners_33	14	no (CCsBanners off in LauncherData)	yes	0	0
+78216	swordfish	fish	canon pick: Bar Emmon	swordfish|fish	CCsBanners	GoT 1	cc_banners_33	15	no (CCsBanners off in LauncherData)	yes	0	0
+78301	portcullis with chains	building		portcullis|gates|chains	CCsBanners	GoT 2	cc_banners_34	0	no (CCsBanners off in LauncherData)	yes	0	0
+78302	bird rising (heron/crane)	bird		heron|crane|gull	CCsBanners	GoT 2	cc_banners_34	1	no (CCsBanners off in LauncherData)	yes	0	0
+78303	dead tree with ravens (on a shield)	achievement	canon pick: Blackwood	tree|weirwood|raven	CCsBanners	GoT 2	cc_banners_34	2	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78304	flayed man with blood drops (on a shield)	achievement	canon pick: Bolton	flayed man	CCsBanners	GoT 2	cc_banners_34	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78305	crab	fish	canon pick: Celtigar	crab|crabs	CCsBanners	GoT 2	cc_banners_34	4	no (CCsBanners off in LauncherData)	yes	0	0
+78306	stallion rampant	beast	canon pick: Bracken	horse|stallion	CCsBanners	GoT 2	cc_banners_34	5	no (CCsBanners off in LauncherData)	yes	0	0
+78307	unicorn rampant	monster	canon pick: Brax	unicorn	CCsBanners	GoT 2	cc_banners_34	6	no (CCsBanners off in LauncherData)	yes	0	0
+78308	bridge of arches (on a shield)	achievement		bridge|bridge of three arches	CCsBanners	GoT 2	cc_banners_34	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78309	dragon coiled in a ring	monster	canon pick: Toland	dragon|ouroboros	CCsBanners	GoT 2	cc_banners_34	8	no (CCsBanners off in LauncherData)	yes	0	0
+78310	bear's paw (on a shield)	achievement		bear's paw|bear paw	CCsBanners	GoT 2	cc_banners_34	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78311	three annulets with bars (buckles)	tool	canon pick: Buckler	buckle|ring|annulet	CCsBanners	GoT 2	cc_banners_34	10	no (CCsBanners off in LauncherData)	yes	0	0
+78312	antlers (rack)	beast	canon pick: Hornwood	rack of antlers|antlers|stag's antler|moose	CCsBanners	GoT 2	cc_banners_34	11	no (CCsBanners off in LauncherData)	yes	0	0
+78313	bull's skull	beast	canon pick: Bulwer	bull's skull|skull|ox	CCsBanners	GoT 2	cc_banners_34	12	no (CCsBanners off in LauncherData)	yes	0	0
+78314	rooster (bantam)	bird	canon pick: Swyft	rooster|cock|bantam	CCsBanners	GoT 2	cc_banners_34	13	no (CCsBanners off in LauncherData)	yes	0	0
+78315	spider	vermin		spider	CCsBanners	GoT 2	cc_banners_34	14	no (CCsBanners off in LauncherData)	yes	0	0
+78316	dragon skeleton	monster		dragon|skeleton	CCsBanners	GoT 2	cc_banners_34	15	no (CCsBanners off in LauncherData)	yes	0	0
+78401	fishes over a net (on a shield)	achievement		fish|fret	CCsBanners	GoT 3	cc_banners_35	0	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78402	two goats rampant combatant	beast		goat|rams|mountain goat	CCsBanners	GoT 3	cc_banners_35	1	no (CCsBanners off in LauncherData)	yes	0	0
+78403	goose	bird		goose|swan|gull	CCsBanners	GoT 3	cc_banners_35	2	no (CCsBanners off in LauncherData)	yes	0	0
+78404	ten hounds' heads	beast		dog's head|wolf's head	CCsBanners	GoT 3	cc_banners_35	3	no (CCsBanners off in LauncherData)	yes	0	0
+78405	centaur archer	monster		centaur	CCsBanners	GoT 3	cc_banners_35	4	no (CCsBanners off in LauncherData)	yes	0	0
+78406	sword and morningstar	weapon		sword|mace|morningstar	CCsBanners	GoT 3	cc_banners_35	5	no (CCsBanners off in LauncherData)	yes	0	0
+78407	hand within a flaming border (on a shield)	achievement		hand	CCsBanners	GoT 3	cc_banners_35	6	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78408	three dogs courant (on a shield)	achievement	canon pick: Clegane	dogs|hound	CCsBanners	GoT 3	cc_banners_35	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78409	three plumes (feathers)	flora		feathers|plume|wheat	CCsBanners	GoT 3	cc_banners_35	8	no (CCsBanners off in LauncherData)	yes	0	0
+78410	crossed tridents with a griffin's head	weapon	canon pick: Manderly	tridents|trident	CCsBanners	GoT 3	cc_banners_35	9	no (CCsBanners off in LauncherData)	yes	0	0
+78411	per pale, griffin and lion combatant (on a shield)	achievement		griffin|lion	CCsBanners	GoT 3	cc_banners_35	10	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78412	boar	beast	canon pick: Crakehall	boar	CCsBanners	GoT 3	cc_banners_35	11	no (CCsBanners off in LauncherData)	yes	0	0
+78413	lozengy with a pale of escutcheons (on a shield)	achievement		lozenge	CCsBanners	GoT 3	cc_banners_35	12	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78414	sword and falling star crossed	weapon	canon pick: Dayne	sword|falling star|star	CCsBanners	GoT 3	cc_banners_35	13	no (CCsBanners off in LauncherData)	yes	0	0
+78415	per bend, griffin and horse (on a shield)	achievement		griffin|horse	CCsBanners	GoT 3	cc_banners_35	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78416	forked lightning and stars (on a shield)	achievement	canon pick: Dondarrion	lightning bolt|stars	CCsBanners	GoT 3	cc_banners_35	15	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78501	skeletal hand	human	canon pick: Drumm	bone hand|hand	CCsBanners	GoT 4	cc_banners_36	0	no (CCsBanners off in LauncherData)	yes	0	0
+78502	crossed axes under a crown	weapon	canon pick: Dustin	axe|crossed axes|longaxe|crown	CCsBanners	GoT 4	cc_banners_36	1	no (CCsBanners off in LauncherData)	yes	0	0
+78503	sea turtle	reptile	canon pick: Estermont	turtle|tortoise	CCsBanners	GoT 4	cc_banners_36	2	no (CCsBanners off in LauncherData)	yes	0	0
+78504	saltire between eagles (on a shield)	achievement		saltire|double-headed eagles	CCsBanners	GoT 4	cc_banners_36	3	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78505	jester juggling	human		fool|jester|motley	CCsBanners	GoT 4	cc_banners_36	4	no (CCsBanners off in LauncherData)	yes	0	0
+78506	sunburst	celestial	canon pick: Karstark	sunburst|sun	CCsBanners	GoT 4	cc_banners_36	5	no (CCsBanners off in LauncherData)	yes	0	0
+78507	arrows fanned (radiating)	weapon	canon pick: Hunter	arrows|crossed arrows	CCsBanners	GoT 4	cc_banners_36	6	no (CCsBanners off in LauncherData)	yes	0	0
+78508	gyronny with beasts (on a shield)	achievement			CCsBanners	GoT 4	cc_banners_36	7	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78509	catfish (barbel)	fish		catfish|fish	CCsBanners	GoT 4	cc_banners_36	8	no (CCsBanners off in LauncherData)	yes	0	0
+78510	fox's head in a ring of flowers	beast	canon pick: Florent	fox|fox's head	CCsBanners	GoT 4	cc_banners_36	9	no (CCsBanners off in LauncherData)	yes	0	0
+78511	twin towers joined by a bridge	building	canon pick: Frey	towers|twin towers|bridge	CCsBanners	GoT 4	cc_banners_36	10	no (CCsBanners off in LauncherData)	yes	0	0
+78512	cockatrice	monster		cockatrice|rooster	CCsBanners	GoT 4	cc_banners_36	11	no (CCsBanners off in LauncherData)	yes	0	0
+78513	mailed fist (gauntlet)	human	canon pick: Glover	fist|gauntlet|hand	CCsBanners	GoT 4	cc_banners_36	12	no (CCsBanners off in LauncherData)	yes	0	0
+78514	hunting horn	tool	canon pick: Goodbrother	hunting horn|horn|warhorn	CCsBanners	GoT 4	cc_banners_36	13	no (CCsBanners off in LauncherData)	yes	0	0
+78515	quarterly ermine and trefoils (on a shield)	achievement		trefoil	CCsBanners	GoT 4	cc_banners_36	14	no (CCsBanners off in LauncherData)	shield-framed	0	0
+78516	lion couchant	beast		sleeping lion|lion	CCsBanners	GoT 4	cc_banners_36	15	no (CCsBanners off in LauncherData)	yes	0	0
+78601	stag trippant	beast		stag|hart|elk|deer	CCsBanners	Wappenwiki 1	cc_banners_37	0	no (CCsBanners off in LauncherData)	yes	0	0
+78602	knight on horseback with sword	human		knight|rider	CCsBanners	Wappenwiki 1	cc_banners_37	1	no (CCsBanners off in LauncherData)	yes	0	0
+78603	eagle displayed crowned	bird	canon pick: Mallister	eagle	CCsBanners	Wappenwiki 1	cc_banners_37	2	no (CCsBanners off in LauncherData)	yes	0	0
+78604	unicorn salient	monster	canon pick: Brax	unicorn	CCsBanners	Wappenwiki 1	cc_banners_37	3	no (CCsBanners off in LauncherData)	yes	0	0
+78605	swan/goose	bird	canon pick: Swann	swan|goose	CCsBanners	Wappenwiki 1	cc_banners_37	4	no (CCsBanners off in LauncherData)	yes	0	0
+78606	sea-stag	monster	canon pick: Velaryon	sea-stag|seahorse	CCsBanners	Wappenwiki 1	cc_banners_37	5	no (CCsBanners off in LauncherData)	yes	0	0
+78607	triskelion of legs	human		triskele|legs	CCsBanners	Wappenwiki 1	cc_banners_37	6	no (CCsBanners off in LauncherData)	yes	0	0
+78608	griffin segreant	monster	canon pick: Connington	griffin	CCsBanners	Wappenwiki 1	cc_banners_37	7	no (CCsBanners off in LauncherData)	yes	0	0
+78609	raven	bird	canon pick: Corbray	raven|crow|rook	CCsBanners	Wappenwiki 1	cc_banners_37	8	no (CCsBanners off in LauncherData)	yes	0	0
+78610	castle triple-towered	building	canon pick: Redfort	castle|castles|towers	CCsBanners	Wappenwiki 1	cc_banners_37	9	no (CCsBanners off in LauncherData)	yes	0	0
+78611	crane/heron	bird	canon pick: Crane	crane|heron|cranes	CCsBanners	Wappenwiki 1	cc_banners_37	10	no (CCsBanners off in LauncherData)	yes	0	0
+78612	three pike palewise between crosslets	fish		fish|pike	CCsBanners	Wappenwiki 1	cc_banners_37	11	no (CCsBanners off in LauncherData)	yes	0	0
+78613	pike (lucy)	fish		pike|fish	CCsBanners	Wappenwiki 1	cc_banners_37	12	no (CCsBanners off in LauncherData)	yes	0	0
+78614	fleur-de-lis	flora		fleur-de-lis	CCsBanners	Wappenwiki 1	cc_banners_37	13	no (CCsBanners off in LauncherData)	yes	0	0
+78615	boar's head	beast		boar's head|boar	CCsBanners	Wappenwiki 1	cc_banners_37	14	no (CCsBanners off in LauncherData)	yes	0	0
+78616	dragon rampant	monster		dragon	CCsBanners	Wappenwiki 1	cc_banners_37	15	no (CCsBanners off in LauncherData)	yes	0	0
+78701	stag springing	beast		stag|hart|elk	CCsBanners	Wappenwiki 2	cc_banners_38	0	no (CCsBanners off in LauncherData)	yes	0	0
+78702	bear rampant	beast	canon pick: Mormont	bear	CCsBanners	Wappenwiki 2	cc_banners_38	1	no (CCsBanners off in LauncherData)	yes	0	0
+78703	lion rampant (leopard)	beast		lion|leopard|cat	CCsBanners	Wappenwiki 2	cc_banners_38	2	no (CCsBanners off in LauncherData)	yes	0	0
+78704	crowned king's head	human		head|king|crowned head	CCsBanners	Wappenwiki 2	cc_banners_38	3	no (CCsBanners off in LauncherData)	yes	0	0
+78705	pair of wings (vol)	bird		eagle's wing|wings|golden wings	CCsBanners	Wappenwiki 2	cc_banners_38	4	no (CCsBanners off in LauncherData)	yes	0	0
+78706	cross moline (curled ends)	cross		cross	CCsBanners	Wappenwiki 2	cc_banners_38	5	no (CCsBanners off in LauncherData)	yes	0	0
+78707	griffin passant	monster		griffin	CCsBanners	Wappenwiki 2	cc_banners_38	6	no (CCsBanners off in LauncherData)	yes	0	0
+78708	rose slipped	flora	canon pick: Tyrell	rose	CCsBanners	Wappenwiki 2	cc_banners_38	7	no (CCsBanners off in LauncherData)	yes	0	0
+78709	horse rampant	beast	canon pick: Bracken	horse|stallion	CCsBanners	Wappenwiki 2	cc_banners_38	8	no (CCsBanners off in LauncherData)	yes	0	0
+78710	owl	bird	canon pick: Mertyns	owl|owls	CCsBanners	Wappenwiki 2	cc_banners_38	9	no (CCsBanners off in LauncherData)	yes	0	0
+78711	eagle displayed, wings inverted	bird		eagle	CCsBanners	Wappenwiki 2	cc_banners_38	10	no (CCsBanners off in LauncherData)	yes	0	0
+78712	goat salient	beast		goat|mountain goat|ram	CCsBanners	Wappenwiki 2	cc_banners_38	11	no (CCsBanners off in LauncherData)	yes	0	0
+78713	camel	beast		camel	CCsBanners	Wappenwiki 2	cc_banners_38	12	no (CCsBanners off in LauncherData)	yes	0	0
+78714	wheel (Catherine wheel)	tool	canon pick: Waynwood	wheel|mill wheel	CCsBanners	Wappenwiki 2	cc_banners_38	13	no (CCsBanners off in LauncherData)	yes	0	0
+78715	two fish addorsed	fish	canon pick: Botley	fish|dolphins|leaping fish	CCsBanners	Wappenwiki 2	cc_banners_38	14	no (CCsBanners off in LauncherData)	yes	0	0
+78716	two rams combatant	beast		rams|ram	CCsBanners	Wappenwiki 2	cc_banners_38	15	no (CCsBanners off in LauncherData)	yes	0	0
+78801	mastiff statant	beast	canon pick: Clegane	dog|hound|mastiff	CCsBanners	Wappenwiki 3	cc_banners_39	0	no (CCsBanners off in LauncherData)	yes	0	0
+78802	hound statant collared	beast		dog|hound	CCsBanners	Wappenwiki 3	cc_banners_39	1	no (CCsBanners off in LauncherData)	yes	0	0
+78803	oak tree eradicated	flora	canon pick: Tallhart, Forrester, Marbrand, Rowan	tree|oak|willow|weirwood	CCsBanners	Wappenwiki 3	cc_banners_39	2	no (CCsBanners off in LauncherData)	yes	0	0
+78804	lion rampant (plain)	beast		lion	CCsBanners	Wappenwiki 3	cc_banners_39	3	no (CCsBanners off in LauncherData)	yes	0	0
+78805	sea monster (fish-tailed)	monster		sea serpent|sea monster|sea lion	CCsBanners	Wappenwiki 3	cc_banners_39	4	no (CCsBanners off in LauncherData)	yes	0	0
+78806	wyvern sejant	monster		wyvern|dragon	CCsBanners	Wappenwiki 3	cc_banners_39	5	no (CCsBanners off in LauncherData)	yes	0	0
+78807	lion rampant holding an axe	beast		lion	CCsBanners	Wappenwiki 3	cc_banners_39	6	no (CCsBanners off in LauncherData)	yes	0	0
+78808	fleur-de-lis florencee	flora		fleur-de-lis|lily	CCsBanners	Wappenwiki 3	cc_banners_39	7	no (CCsBanners off in LauncherData)	yes	0	0
+78809	cock	bird	canon pick: Swyft	rooster|cock	CCsBanners	Wappenwiki 3	cc_banners_39	8	no (CCsBanners off in LauncherData)	yes	0	0
+78810	serpent devouring a child (biscione)	reptile		serpent|viper	CCsBanners	Wappenwiki 3	cc_banners_39	9	no (CCsBanners off in LauncherData)	yes	0	0
+78811	branch with leaves (vine)	flora		branch|vine|hop|leaves	CCsBanners	Wappenwiki 3	cc_banners_39	10	no (CCsBanners off in LauncherData)	yes	0	0
+78812	bird displayed issuing from a crown	bird		phoenix|swan	CCsBanners	Wappenwiki 3	cc_banners_39	11	no (CCsBanners off in LauncherData)	yes	0	0
+78813	two hunting horns addorsed	tool	canon pick: Goodbrother	hunting horn|horn	CCsBanners	Wappenwiki 3	cc_banners_39	12	no (CCsBanners off in LauncherData)	yes	0	0
+78814	eagle displayed crowned	bird		eagle	CCsBanners	Wappenwiki 3	cc_banners_39	13	no (CCsBanners off in LauncherData)	yes	0	0
+78815	eagle rising from a coronet	bird		eagle	CCsBanners	Wappenwiki 3	cc_banners_39	14	no (CCsBanners off in LauncherData)	yes	0	0
+78816	dragon rampant (winged)	monster		dragon	CCsBanners	Wappenwiki 3	cc_banners_39	15	no (CCsBanners off in LauncherData)	yes	0	0
+78901	harp	tool		harp	CCsBanners	Wappenwiki 4	cc_banners_40	0	no (CCsBanners off in LauncherData)	yes	0	0
+78902	tower	building	canon pick: Hightower	tower|stepped tower|round tower	CCsBanners	Wappenwiki 4	cc_banners_40	1	no (CCsBanners off in LauncherData)	yes	0	0
+78903	ragged staff (thorn branch)	flora		branch|staff	CCsBanners	Wappenwiki 4	cc_banners_40	2	no (CCsBanners off in LauncherData)	yes	0	0
+78904	demi-horse (ass)	beast	canon pick: Ryswell	horse's head|donkey	CCsBanners	Wappenwiki 4	cc_banners_40	3	no (CCsBanners off in LauncherData)	yes	0	0
+78905	winged crowned figure	human		angel|king	CCsBanners	Wappenwiki 4	cc_banners_40	4	no (CCsBanners off in LauncherData)	yes	0	0
+78906	cross flory (Calatrava)	cross		cross	CCsBanners	Wappenwiki 4	cc_banners_40	5	no (CCsBanners off in LauncherData)	yes	0	0
+78907	crossed keys	tool	canon pick: Locke	keys|key|crossed keys	CCsBanners	Wappenwiki 4	cc_banners_40	6	no (CCsBanners off in LauncherData)	yes	0	0
+78908	bull	beast		bull|bulls|ox	CCsBanners	Wappenwiki 4	cc_banners_40	7	no (CCsBanners off in LauncherData)	yes	0	0
+78909	escarbuncle	ordinary		escarbuncle	CCsBanners	Wappenwiki 4	cc_banners_40	8	no (CCsBanners off in LauncherData)	yes	0	0
+78910	lion rampant crowned	beast		lion	CCsBanners	Wappenwiki 4	cc_banners_40	9	no (CCsBanners off in LauncherData)	yes	0	0
+78911	hound sejant	beast		dog|hound|jackal	CCsBanners	Wappenwiki 4	cc_banners_40	10	no (CCsBanners off in LauncherData)	yes	0	0
+78912	ring of serpents	monster	canon pick: Greyjoy	kraken|serpents	CCsBanners	Wappenwiki 4	cc_banners_40	11	no (CCsBanners off in LauncherData)	yes	0	0
+78913	squirrel sejant	beast		squirrel	CCsBanners	Wappenwiki 4	cc_banners_40	12	no (CCsBanners off in LauncherData)	yes	0	0
+78914	wing (single)	bird	canon pick: Jordayne	eagle's wing|wing|feather|quill	CCsBanners	Wappenwiki 4	cc_banners_40	13	no (CCsBanners off in LauncherData)	yes	0	0
+78915	escarbuncle fleury	ordinary		escarbuncle	CCsBanners	Wappenwiki 4	cc_banners_40	14	no (CCsBanners off in LauncherData)	yes	0	0
+78916	pegasus/winged unicorn rampant	monster		pegasus|unicorn	CCsBanners	Wappenwiki 4	cc_banners_40	15	no (CCsBanners off in LauncherData)	yes	0	0
+79001	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	0	no (CCsBanners off in LauncherData)	no	0	0
+79002	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	1	no (CCsBanners off in LauncherData)	no	0	0
+79003	wolf rampant (Space Wolves)	beast		wolf	CCsBanners	Warhammer 1	cc_banners_41	2	no (CCsBanners off in LauncherData)	yes	0	0
+79004	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	3	no (CCsBanners off in LauncherData)	no	0	0
+79005	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	4	no (CCsBanners off in LauncherData)	no	0	0
+79006	wolf's head (Space Wolves)	beast		wolf's head	CCsBanners	Warhammer 1	cc_banners_41	5	no (CCsBanners off in LauncherData)	yes	0	0
+79007	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	6	no (CCsBanners off in LauncherData)	no	0	0
+79008	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	7	no (CCsBanners off in LauncherData)	no	0	0
+79009	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	8	no (CCsBanners off in LauncherData)	no	0	0
+79010	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	9	no (CCsBanners off in LauncherData)	no	0	0
+79011	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	10	no (CCsBanners off in LauncherData)	no	0	0
+79012	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	11	no (CCsBanners off in LauncherData)	no	0	0
+79013	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	12	no (CCsBanners off in LauncherData)	no	0	0
+79014	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	13	no (CCsBanners off in LauncherData)	no	0	0
+79015	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	14	no (CCsBanners off in LauncherData)	no	0	0
+79016	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 1	cc_banners_41	15	no (CCsBanners off in LauncherData)	no	0	0
+79101	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	0	no (CCsBanners off in LauncherData)	no	0	0
+79102	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	1	no (CCsBanners off in LauncherData)	no	0	0
+79103	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	2	no (CCsBanners off in LauncherData)	no	0	0
+79104	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	3	no (CCsBanners off in LauncherData)	no	0	0
+79105	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	4	no (CCsBanners off in LauncherData)	no	0	0
+79106	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	5	no (CCsBanners off in LauncherData)	no	0	0
+79107	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	6	no (CCsBanners off in LauncherData)	no	0	0
+79108	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	7	no (CCsBanners off in LauncherData)	no	0	0
+79109	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	8	no (CCsBanners off in LauncherData)	no	0	0
+79110	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	9	no (CCsBanners off in LauncherData)	no	0	0
+79111	winged chalice	tool		winged chalice|chalice	CCsBanners	Warhammer 2	cc_banners_42	10	no (CCsBanners off in LauncherData)	yes	0	0
+79112	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	11	no (CCsBanners off in LauncherData)	no	0	0
+79113	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	12	no (CCsBanners off in LauncherData)	no	0	0
+79114	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	13	no (CCsBanners off in LauncherData)	no	0	0
+79115	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	14	no (CCsBanners off in LauncherData)	no	0	0
+79116	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_42	15	no (CCsBanners off in LauncherData)	no	0	0
+79201	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	0	no (CCsBanners off in LauncherData)	no	0	0
+79202	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	1	no (CCsBanners off in LauncherData)	no	0	0
+79203	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	2	no (CCsBanners off in LauncherData)	no	0	0
+79204	lightning bolt in a ring	celestial		lightning bolt	CCsBanners	Warhammer 2	cc_banners_43	3	no (CCsBanners off in LauncherData)	yes	0	0
+79205	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	4	no (CCsBanners off in LauncherData)	no	0	0
+79206	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	5	no (CCsBanners off in LauncherData)	no	0	0
+79207	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	6	no (CCsBanners off in LauncherData)	no	0	0
+79208	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	7	no (CCsBanners off in LauncherData)	no	0	0
+79209	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	8	no (CCsBanners off in LauncherData)	no	0	0
+79210	labrys on a shield	achievement		axe	CCsBanners	Warhammer 2	cc_banners_43	9	no (CCsBanners off in LauncherData)	shield-framed	0	0
+79211	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	10	no (CCsBanners off in LauncherData)	no	0	0
+79212	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	11	no (CCsBanners off in LauncherData)	no	0	0
+79213	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	12	no (CCsBanners off in LauncherData)	no	0	0
+79214	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	13	no (CCsBanners off in LauncherData)	no	0	0
+79215	cross pattee	cross		cross	CCsBanners	Warhammer 2	cc_banners_43	14	no (CCsBanners off in LauncherData)	yes	0	0
+79216	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 2	cc_banners_43	15	no (CCsBanners off in LauncherData)	no	0	0
+79301	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	0	no (CCsBanners off in LauncherData)	no	0	0
+79302	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	1	no (CCsBanners off in LauncherData)	no	0	0
+79303	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	2	no (CCsBanners off in LauncherData)	no	0	0
+79304	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	3	no (CCsBanners off in LauncherData)	no	0	0
+79305	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	4	no (CCsBanners off in LauncherData)	no	0	0
+79306	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	5	no (CCsBanners off in LauncherData)	no	0	0
+79307	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	6	no (CCsBanners off in LauncherData)	no	0	0
+79308	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	7	no (CCsBanners off in LauncherData)	no	0	0
+79309	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	8	no (CCsBanners off in LauncherData)	no	0	0
+79310	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	9	no (CCsBanners off in LauncherData)	no	0	0
+79311	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	10	no (CCsBanners off in LauncherData)	no	0	0
+79312	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	11	no (CCsBanners off in LauncherData)	no	0	0
+79313	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	12	no (CCsBanners off in LauncherData)	no	0	0
+79314	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	13	no (CCsBanners off in LauncherData)	no	0	0
+79315	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	14	no (CCsBanners off in LauncherData)	no	0	0
+79316	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 3	cc_banners_44	15	no (CCsBanners off in LauncherData)	no	0	0
+79401	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	0	no (CCsBanners off in LauncherData)	no	0	0
+79402	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	1	no (CCsBanners off in LauncherData)	no	0	0
+79403	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	2	no (CCsBanners off in LauncherData)	no	0	0
+79404	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	3	no (CCsBanners off in LauncherData)	no	0	0
+79405	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	4	no (CCsBanners off in LauncherData)	no	0	0
+79406	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	5	no (CCsBanners off in LauncherData)	no	0	0
+79407	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	6	no (CCsBanners off in LauncherData)	no	0	0
+79408	winged sword	weapon		sword	CCsBanners	Warhammer 4	cc_banners_45	7	no (CCsBanners off in LauncherData)	yes	0	0
+79409	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	8	no (CCsBanners off in LauncherData)	no	0	0
+79410	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	9	no (CCsBanners off in LauncherData)	no	0	0
+79411	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	10	no (CCsBanners off in LauncherData)	no	0	0
+79412	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	11	no (CCsBanners off in LauncherData)	no	0	0
+79413	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	12	no (CCsBanners off in LauncherData)	no	0	0
+79414	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	13	no (CCsBanners off in LauncherData)	no	0	0
+79415	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	14	no (CCsBanners off in LauncherData)	no	0	0
+79416	Warhammer 40k emblem (sci-fi)	emblem			CCsBanners	Warhammer 4	cc_banners_45	15	no (CCsBanners off in LauncherData)	no	0	0

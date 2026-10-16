@@ -6,6 +6,9 @@
 // OBIEKT Banner), Banner nie nadpisuje Equals - wiec jeden WLASNY obiekt Banner na kod herbu = jedna tekstura dla wszystkich wiosek jednego pana).
 // Pan = rod wlasciciela wsi gry (Village.Bound.OwnerClan, Clan.Banner - dla rodu panujacego herb krolestwa), ten sam co dymek W2 i HeldLine.
 // Jeff 16.10 (D1, VillageBannerPerHolder): herb GOSPODARZA wioski (VillageHolders: majatek BK, rycerz z lore, rycerz krolestwa, pan) - ten sam co dymek i okno okregu.
+// Jeff 16.10 (D2, VillageTwoPennants; "jedna flaga wasala-rycerza i seniora jako druga flaga"): gospodarz inny niz pan = DRUGI proporczyk - pana (Village.Bound.OwnerClan,
+// jak dymek W2) na drugim narozniku obrysu: najpierw drugi przedni (ten sam front, drugi koniec ulicy), potem tylne; zaden inny na ladzie - bez drugiego (licznik).
+// Ten sam wybor najblizszych 80 wiosek; budowa najwyzej 12 PROPORCZYKOW na cwierc sekundy (wioska z dwoma liczona za dwa); porownanie obu kodow raz na sekunde.
 // Bez fizyki i skryptow (nie lapie klikniec; dymek wioski szuka po obrysie, nie po encji). Tylko z bliska: kamera z <= 90, najblizsze 80 wiosek
 // z postawionym obrazkiem (od punktu, na ktory patrzy kamera), budowa najwyzej 12 na cwierc sekundy; dalej schowane, nie usuwane.
 // Raz na sekunde dla pokazanych porownanie KODU herbu (gra zmienia barwy herbu w miejscu, ta sama referencja; kazda zmiana zeruje
@@ -15,6 +18,12 @@
 // pokazaniu; samo ClearVisualMemory nie rusza encji (moze przyjsc, gdy mapa nie jest na ekranie).
 // Nic co klatke (praca w ticku widoku 4 razy na sekunde, encje tylko przy zmianie stanu - CLAUDE.md 7), nic do zapisu gry, wylacznik
 // VillagePennants. Potkniecia liczone per wioska (3 = ta jedna wioska bez proporczyka do nastepnego wczytania), nigdy wylacznik calosci.
+// Po recenzji D2 (16.10, koszt): (1) LIMIT ENCJI - plotno choragwi tyka co klatke, gdy pokazane; razem najwyzej PenEntityMax (100) proporczykow:
+// pierwszy dla kazdej z najblizszych 80 wiosek, drugi (pana) tylko najblizszym w reszcie limitu (wybrane posortowane od punktu kamery); drugi poza
+// limitem schowany (flagi, bez przebudowy), postawiony osobno od pierwszego (zmiana samego pana = tylko drugi od nowa). (2) LIMIT TEKSTUR - kazdy nowy
+// kod herbu to tekstura 1024x1024 (GetTableauTextureLarge, ok. 4 MiB) do najblizszej misji (ClearGPUMemory); powyzej PenCodesSoft (100) kodow w pamieci
+// nowy herb gospodarza dostaja tylko najblizsze PenCodesNear (30) wiosek, powyzej PenCodesHard (160) zadna - reszta herb pana (ten sam co partie,
+// jeden proporczyk). (3) liczniki: wiosek bez drugiego naroznika na ladzie (rozne uid) osobno od potkniec budowy drugiego.
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -31,6 +40,8 @@ namespace Armoury
     {
         private const float PenCameraZ = 90f;         // proporczyki tylko przy kamerze z <= 90 (WL-P 2)
         private const int PenMax = 80;                // najblizsze 80 wiosek z obrazkiem
+        private const int PenEntityMax = 100;         // po recenzji D2: najwyzej 100 pokazanych proporczykow (encji z plotnem) - drugie tylko najblizszym w limicie
+        private const int PenCodesSoft = 100, PenCodesHard = 160, PenCodesNear = 30;   // po recenzji D2: limit tekstur herbow (nowe kody w _penBanners)
         private const int PenBuildPerTick = 12;       // budowa / przebudowa najwyzej 12 na cwierc sekundy
         private const float PenCheckEvery = 1f;       // porownanie kodu herbu pokazanych raz na sekunde
         private const float PenScale = 0.32f;         // skala choragwi (namiot oblezenia gry 0.15-0.5)
@@ -44,6 +55,12 @@ namespace Armoury
         {
             public GameEntity E;              // encja w scenie mapy (null = nie zbudowany albo zdjety)
             public string Code = "";          // kod herbu, z ktorym zbudowano
+            public GameEntity E2;             // D2: drugi proporczyk - pana (null = jeden, jeszcze nie zbudowany albo brak drugiego naroznika na ladzie)
+            public string Code2 = "";         // D2: kod herbu pana, z ktorym zbudowano drugi ("" = brak drugiego)
+            public string Want2 = "";         // po recenzji D2: kod herbu pana na drugi proporczyk ("" = jeden proporczyk)
+            public int Corner = -1;           // po recenzji D2: naroznik pierwszego (drugi szuka innego); -1 = srodek obrazka, bez drugiego
+            public bool Shown2;               // po recenzji D2: drugi pokazany (limit encji)
+            public bool NoCorner2, Failed2;   // po recenzji D2: drugi bez naroznika na ladzie / blad budowy - bez ponownej proby do zmiany herbu albo przebudowy
             public bool Shown, Failed;
             public int Why;                   // PenWhy*: do przebudowy (po misji / inny herb)
             public int Strikes;
@@ -58,6 +75,10 @@ namespace Armoury
         private bool _penOff;
         private float _penCheckAcc;
         private int _penStamp, _penShownMax, _penBuilt, _penBuildTicks, _penAfterMission, _penMissions, _penLord, _penFailed, _stPen;
+        private int _penTwoBuilt, _penTwoMax, _stPen2, _penTwoHiddenMax;   // D2: zbudowane drugie proporczyki, najwiecej podwojnych w kadrze, potkniecia drugiego, najwiecej schowanych drugich (limit encji)
+        private readonly HashSet<string> _penNoCorner = new HashSet<string>(StringComparer.Ordinal);   // po recenzji D2: wioski (uid) bez drugiego naroznika na ladzie
+        private readonly HashSet<string> _penCapped = new HashSet<string>(StringComparer.Ordinal);     // po recenzji D2: wioski (uid) z herbem pana zamiast gospodarza (limit tekstur)
+        private int _penCodesMax;                                                                       // po recenzji D2: najwiecej kodow herbow w pamieci
         private long _penBuildTime;
         private string _penLastLine = "";
 
@@ -96,36 +117,47 @@ namespace Armoury
                     try { HidePennant(s); }
                     catch (Exception e) { Stumble(s, "Hide", e); }
                 }
-                // 2) wybrane: pokaz / zbuduj / przebuduj
+                // 2) wybrane (od najblizszej): pokaz / zbuduj / przebuduj; drugi proporczyk (pan) najblizszym w limicie encji
                 int built = 0;
-                long t0 = 0;
+                long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                int allow2 = Math.Max(0, PenEntityMax - n), two = 0, hidden2 = 0;
                 for (int i = 0; i < n; i++)
                 {
                     Slot s = _penCand[i];
                     PenState p = s.Pen;
-                    if (p.Shown && p.Why == PenWhyNone && !check) continue;
                     try
                     {
-                        string code = LordCode(s);
-                        if (code.Length == 0)
+                        if (!(p.Shown && p.Why == PenWhyNone && !check))
                         {
-                            // wies bez pana (rzadkie): bez proporczyka; wroci przy pierwszym ticku z panem
-                            if (p.Shown) { _penShown.Remove(s); HidePennant(s); }
-                            continue;
+                            string code = LordCode(s);
+                            if (code.Length == 0)
+                            {
+                                // wies bez pana (rzadkie): bez proporczyka; wroci przy pierwszym ticku z panem
+                                if (p.Shown) { _penShown.Remove(s); HidePennant(s); }
+                                continue;
+                            }
+                            code = CapCode(s, code, i);           // po recenzji D2: limit tekstur herbow
+                            string code2 = LiegeCode(s, code);   // D2: herb pana obok herbu gospodarza ("" = jeden proporczyk)
+                            if (p.E != null && p.Why == PenWhyNone && !string.Equals(code, p.Code, StringComparison.Ordinal)) p.Why = PenWhyLord;
+                            if (p.E != null && p.Why == PenWhyNone)
+                            {
+                                // ten sam gospodarz, inny pan (albo pan zamiast drugiego) - tylko drugi od nowa
+                                if (!string.Equals(code2, p.Want2, StringComparison.Ordinal)) { DropSecond(p); p.Want2 = code2; _penLord++; }
+                                if (!p.Shown) ShowPennant(s);
+                            }
+                            else
+                            {
+                                if (built >= PenBuildPerTick) continue;   // reszta w nastepnym ticku (Why zostaje)
+                                built += BuildPennant(s, code, code2);
+                            }
                         }
-                        if (p.E != null && p.Why == PenWhyNone && !string.Equals(code, p.Code, StringComparison.Ordinal)) p.Why = PenWhyLord;
-                        if (p.E != null && p.Why == PenWhyNone)
-                        {
-                            if (!p.Shown) ShowPennant(s);
-                            continue;
-                        }
-                        if (built >= PenBuildPerTick) continue;   // reszta w nastepnym ticku (Why zostaje)
-                        if (built == 0) t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-                        built++;
-                        BuildPennant(s, code);
+                        if (p.Want2.Length > 0 && two >= allow2 && p.E2 != null) hidden2++;
+                        built += SyncSecond(s, two < allow2, ref two, built);
                     }
                     catch (Exception e) { Stumble(s, "Build", e); }
                 }
+                if (hidden2 > _penTwoHiddenMax) _penTwoHiddenMax = hidden2;
+                if (_penBanners.Count > _penCodesMax) _penCodesMax = _penBanners.Count;
                 if (built > 0)
                 {
                     _penBuildTicks++;
@@ -133,6 +165,12 @@ namespace Armoury
                     _penBuildTime += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
                 }
                 if (_penShown.Count > _penShownMax) _penShownMax = _penShown.Count;
+                if (built > 0)
+                {
+                    int twoShown = 0;
+                    foreach (var q in _penShown) if (q.Pen != null && q.Pen.Shown2) twoShown++;
+                    if (twoShown > _penTwoMax) _penTwoMax = twoShown;
+                }
             }
             catch (Exception e)
             {
@@ -164,7 +202,7 @@ namespace Armoury
                 _penDist[m] = dx * dx + dy * dy;
                 m++;
             }
-            if (m > PenMax) Array.Sort(_penDist, _penCand, 0, m);
+            if (m > 1) Array.Sort(_penDist, _penCand, 0, m);   // po recenzji D2: zawsze od najblizszej (limit encji i tekstur liczony od kamery)
             int n = Math.Min(m, PenMax);
             for (int i = 0; i < n; i++)
             {
@@ -181,6 +219,29 @@ namespace Armoury
         {
             if (Settings.Current.VillageBannerPerHolder && s.D != null && s.D.S != null) return VillageHolders.Code(s.D.S, s.R.Uid);
             return LordCode(s.D);
+        }
+
+        /// <summary>Jeff 16.10 (D2, VillageTwoPennants): kod herbu PANA na drugi proporczyk - tylko przy herbach gospodarza (VillageBannerPerHolder) i gdy gospodarz ma inny
+        /// herb niz pan; "" = jeden proporczyk. Sam odczyt gry (Village.Bound.OwnerClan.Banner), bez BK.</summary>
+        private static string LiegeCode(Slot s, string holderCode)
+        {
+            var set = Settings.Current;
+            if (set == null || !set.VillageTwoPennants || !set.VillageBannerPerHolder) return "";
+            string lc = LordCode(s.D);
+            return lc.Length > 0 && !string.Equals(lc, holderCode, StringComparison.Ordinal) ? lc : "";
+        }
+
+        /// <summary>Po recenzji D2 (limit tekstur): kod herbu gospodarza, ktorego jeszcze nie ma w pamieci, powyzej PenCodesSoft kodow tylko dla najblizszych
+        /// PenCodesNear wiosek (rank = miejsce od kamery), powyzej PenCodesHard dla zadnej - inaczej herb pana (jeden proporczyk). Kod juz w pamieci - zawsze.</summary>
+        private string CapCode(Slot s, string code, int rank)
+        {
+            if (_penBanners.ContainsKey(code)) return code;
+            int have = _penBanners.Count;
+            if (have < PenCodesSoft || (have < PenCodesHard && rank < PenCodesNear)) return code;
+            string lord = LordCode(s.D);
+            if (lord.Length == 0 || string.Equals(lord, code, StringComparison.Ordinal)) return code;
+            _penCapped.Add(s.R.Uid);
+            return lord;
         }
 
         /// <summary>Kod herbu pana okregu (Village.Bound.OwnerClan.Banner - jak HeldLine i dymek W2); "" = brak pana albo herbu.</summary>
@@ -216,23 +277,129 @@ namespace Armoury
                         : _penMesh + (_penMesh == PenMeshes[0] ? " (z plotnem, jak przy partiach gry)" : " (ZAPAS - brak campaign_flag, bez plotna)"))
                      + " | kamera z <= " + PenCameraZ.ToString("0", CultureInfo.InvariantCulture) + ", najblizsze " + PenMax + ", budowa najwyzej "
                      + PenBuildPerTick + " na cwierc sekundy, kod herbu raz na sekunde, skala " + PenScale.ToString("0.00", CultureInfo.InvariantCulture)
-                     + " | nic do zapisu gry.");
+                     + " | D2: drugi proporczyk pana przy gospodarzu innym niz pan " + (Settings.Current.VillageTwoPennants ? "tak" : "NIE (VillageTwoPennants)")
+                     + " (kazdy proporczyk w limicie budowy; razem najwyzej " + PenEntityMax + " pokazanych, drugie najblizszym) | herby w pamieci: nowe powyzej "
+                     + PenCodesSoft + " tylko najblizszym " + PenCodesNear + ", powyzej " + PenCodesHard + " herb pana | nic do zapisu gry.");
         }
 
-        /// <summary>Stawia (albo stawia od nowa) proporczyk jednej wioski i go pokazuje. Stara encja zdejmowana przed nowa.</summary>
-        private void BuildPennant(Slot s, string code)
+        /// <summary>Stawia (albo stawia od nowa) PIERWSZY proporczyk jednej wioski (gospodarz) i go pokazuje; drugi (pan, code2) - SyncSecond w tym samym
+        /// albo nastepnym ticku (limit encji). Stare encje zdejmowane przed nowymi. Zwraca liczbe postawionych proporczykow (budzet ticku liczy kazdy).</summary>
+        private int BuildPennant(Slot s, string code, string code2)
         {
             PenState p = s.Pen;
             int why = p.Why;
+            if (p.Shown) { _penShown.Remove(s); p.Shown = false; }
             if (p.E != null)
             {
                 GameEntity old = p.E;
                 p.E = null;
-                if (p.Shown) { _penShown.Remove(s); p.Shown = false; }
                 old.Remove(111);
             }
+            DropSecond(p);
             Scene scene = MapScene;
             if (scene == null) throw new InvalidOperationException("brak sceny mapy");
+            int corner;
+            GameEntity e = MakePennant(scene, s, code, -1, "", out corner);
+            p.E = e;
+            p.Code = code;
+            p.Want2 = code2;
+            p.Corner = corner;
+            p.Why = PenWhyNone;
+            if (why == PenWhyMission) _penAfterMission++;
+            else if (why == PenWhyLord) _penLord++;
+            ShowPennant(s);
+            return 1;
+        }
+
+        /// <summary>Po recenzji D2: drugi proporczyk (pan) pokazanej wioski - w limicie encji (may: miejsce wsrod najblizszych) postawiony (budzet ticku) i
+        /// pokazany, poza limitem schowany. two - drugie zajmujace limit (zbudowane albo czekajace na budzet). Zwraca liczbe postawionych.</summary>
+        private int SyncSecond(Slot s, bool may, ref int two, int built)
+        {
+            PenState p = s.Pen;
+            if (p == null || p.E == null || !p.Shown) return 0;
+            if (!may || p.Want2.Length == 0)
+            {
+                if (p.Shown2) HideSecond(p);
+                return 0;
+            }
+            int made = 0;
+            if (p.E2 == null)
+            {
+                if (p.NoCorner2 || p.Failed2) return 0;
+                if (built >= PenBuildPerTick) { two++; return 0; }   // miejsce w limicie zajete, budowa w nastepnym ticku
+                made = BuildSecond(s);
+                if (made == 0) return 0;
+            }
+            two++;
+            if (!p.Shown2)
+            {
+                ShowEntity(p.E2);
+                p.Shown2 = true;
+            }
+            return made;
+        }
+
+        /// <summary>Drugi proporczyk na drugim narozniku obrysu. 1 - postawiony (schowany do SyncSecond), 0 - brak naroznika na ladzie (wioska w liczniku)
+        /// albo blad (licznik potkniec drugiego, bez ponownej proby do zmiany herbu); pierwszy zostaje.</summary>
+        private int BuildSecond(Slot s)
+        {
+            PenState p = s.Pen;
+            GameEntity e2 = null;
+            try
+            {
+                Scene scene = MapScene;
+                if (scene == null) throw new InvalidOperationException("brak sceny mapy");
+                int corner;
+                if (p.Corner >= 0) e2 = MakePennant(scene, s, p.Want2, p.Corner, "_lord", out corner);
+            }
+            catch (Exception ex)
+            {
+                _stPen2++;
+                p.Failed2 = true;
+                if (_stPen2 <= 3 || _stPen2 % 200 == 0) Log.Error("MapVillagesView.PennantBuild2 " + s.R.Uid + " (potkniecie " + _stPen2 + ")", ex);
+                return 0;
+            }
+            if (e2 == null)
+            {
+                p.NoCorner2 = true;
+                _penNoCorner.Add(s.R.Uid);
+                return 0;
+            }
+            p.E2 = e2;
+            p.Code2 = p.Want2;
+            p.Shown2 = false;
+            _penTwoBuilt++;
+            return 1;
+        }
+
+        /// <summary>Zdejmuje drugi proporczyk ze sceny (zmiana pana, przebudowa pierwszego); flagi drugiego od nowa.</summary>
+        private static void DropSecond(PenState p)
+        {
+            if (p.E2 != null)
+            {
+                GameEntity old2 = p.E2;
+                p.E2 = null;
+                old2.Remove(111);
+            }
+            p.Code2 = "";
+            p.Shown2 = p.NoCorner2 = p.Failed2 = false;
+        }
+
+        private static void HideSecond(PenState p)
+        {
+            p.Shown2 = false;
+            if (p.E2 == null) return;
+            p.E2.SetVisibilityExcludeParents(false);
+            p.E2.EntityFlags = p.E2.EntityFlags | EntityFlags.DoNotTick;
+        }
+
+        /// <summary>Jedna encja proporczyka: siatka choragwi z herbem kodu, naroznik obrysu (avoid = naroznik pierwszego proporczyka albo -1). null - drugi bez
+        /// naroznika na ladzie (pierwszy zawsze stoi: zaden naroznik na ladzie = srodek obrazka).</summary>
+        private GameEntity MakePennant(Scene scene, Slot s, string code, int avoid, string suffix, out int corner)
+        {
+            float x, y, z;
+            corner = PennantSpot(s, avoid, out x, out y, out z);
+            if (avoid >= 0 && corner < 0) return null;
             TaleWorlds.Core.Banner banner;
             if (!_penBanners.TryGetValue(code, out banner))
             {
@@ -241,13 +408,11 @@ namespace Armoury
             }
             MetaMesh mm = MobilePartyVisual.GetBannerOfCharacter(banner, _penMesh);
             if (mm == null || !mm.IsValid) throw new InvalidOperationException("brak siatki " + _penMesh);
-            float x, y, z;
-            PennantSpot(s, out x, out y, out z);
             GameEntity e = GameEntity.CreateEmpty(scene, false, false, false);   // bez fizyki, bez skryptow
             if (e == (GameEntity)null) throw new InvalidOperationException("CreateEmpty zwrocil null");
             try
             {
-                e.Name = "arm_mappennant_" + SafeName(s.R.Uid);   // nie id osady (gra szuka osad po nazwie encji)
+                e.Name = "arm_mappennant_" + SafeName(s.R.Uid) + suffix;   // nie id osady (gra szuka osad po nazwie encji)
                 e.AddMultiMesh(mm, true);
                 Mat3 rot = Mat3.Identity;
                 rot.RotateAboutUp(s.Deg * (float)Math.PI / 180f);
@@ -264,57 +429,70 @@ namespace Armoury
                 try { e.Remove(111); } catch { }
                 throw;
             }
-            p.E = e;
-            p.Code = code;
-            p.Why = PenWhyNone;
-            if (why == PenWhyMission) _penAfterMission++;
-            else if (why == PenWhyLord) _penLord++;
-            ShowPennant(s);
+            return e;
         }
 
         /// <summary>Miejsce drzewca: naroznik obrysu wioski z pliku (pol dlugosci x pol szerokosci) wokol srodka i obrotu POSTAWIONEGO obrazka
         /// (Cx / Cy / Deg - po przesunieciu na lad / ku wodzie / ze stoku); kolejnosc: przednie (droga / woda), potem tylne; pierwszy na ladzie.
-        /// Zaden na ladzie - srodek obrazka (nie pod poziomem morza).</summary>
-        private void PennantSpot(Slot s, out float x, out float y, out float z)
+        /// Zaden na ladzie - srodek obrazka (nie pod poziomem morza), zwraca -1. D2: avoid >= 0 (drugi proporczyk, pana) - najpierw drugi przedni naroznik
+        /// (avoid ^ 1: drugi koniec ulicy po tej samej stronie), potem pozostale; zaden inny na ladzie - zwraca -1 (bez drugiego).</summary>
+        private int PennantSpot(Slot s, int avoid, out float x, out float y, out float z)
         {
             var g = new Geo { Ms = Campaign.Current.MapSceneWrapper, Sea = _seaLevel, Faces = _faceTest != 0 };
             double a = s.Deg * Math.PI / 180.0;
             float ca = (float)Math.Cos(a), sa = (float)Math.Sin(a);
             float hl = s.R.HalfLen, hw = s.R.HalfWid;
-            for (int k = 0; k < 4; k++)
+            for (int t = 0; t < 4; t++)
             {
+                int k = t;
+                if (avoid >= 0)
+                {
+                    // kolejnosc: drugi przedni (avoid ^ 1), potem pozostale dwa (tylne albo przednie) - bez naroznika pierwszego proporczyka
+                    if (t == 3) break;
+                    k = t == 0 ? (avoid ^ 1) : ((avoid & 2) ^ 2) + (t - 1);
+                }
                 float kx = (k & 1) == 0 ? hl : -hl;      // lokalna X = ulica wzdluz drogi
                 float ky = k < 2 ? hw : -hw;             // lokalna +Y = front
                 float wx = s.Cx + ca * kx - sa * ky, wy = s.Cy + sa * kx + ca * ky;
                 if (!g.Land(wx, wy)) continue;
                 x = wx; y = wy; z = g.H(wx, wy);
-                return;
+                return k;
             }
             x = s.Cx; y = s.Cy;
             float h = g.H(x, y);
             z = g.Sea > MapVillageData.NoSea * 0.5f ? Math.Max(h, g.Sea) : h;
+            return -1;
         }
 
+        /// <summary>Pokazuje PIERWSZY proporczyk (drugi - SyncSecond, limit encji).</summary>
         private void ShowPennant(Slot s)
         {
             PenState p = s.Pen;
             if (p == null || p.E == null || p.Shown) return;
-            p.E.EntityFlags = p.E.EntityFlags & ~EntityFlags.DoNotTick;   // plotno choragwi tyka tylko na widoku
-            p.E.SetVisibilityExcludeParents(true);   // tylko przy zmianie stanu
-            p.E.CheckResources(true, false);         // scena mapy laduje tylko widoczne (jak obrazek wioski)
+            ShowEntity(p.E);
             p.Shown = true;
             _penShown.Add(s);
         }
 
-        /// <summary>Chowa encje (zostaje w scenie do ponownego pokazania). Liste _penShown porzadkuje wolajacy.</summary>
+        private static void ShowEntity(GameEntity e)
+        {
+            e.EntityFlags = e.EntityFlags & ~EntityFlags.DoNotTick;   // plotno choragwi tyka tylko na widoku
+            e.SetVisibilityExcludeParents(true);   // tylko przy zmianie stanu
+            e.CheckResources(true, false);         // scena mapy laduje tylko widoczne (jak obrazek wioski)
+        }
+
+        /// <summary>Chowa encje (zostaja w scenie do ponownego pokazania). Liste _penShown porzadkuje wolajacy.</summary>
         private static void HidePennant(Slot s)
         {
             PenState p = s.Pen;
             if (p == null) return;
             p.Shown = false;
-            if (p.E == null) return;
-            p.E.SetVisibilityExcludeParents(false);
-            p.E.EntityFlags = p.E.EntityFlags | EntityFlags.DoNotTick;
+            if (p.E != null)
+            {
+                p.E.SetVisibilityExcludeParents(false);
+                p.E.EntityFlags = p.E.EntityFlags | EntityFlags.DoNotTick;
+            }
+            HideSecond(p);
         }
 
         /// <summary>Potkniecie jednej wioski: schowana; po PenStrikesMax ta jedna wioska bez proporczyka (encja zdjeta), reszta dalej.</summary>
@@ -332,6 +510,8 @@ namespace Armoury
                     p.Failed = true;
                     _penFailed++;
                     if (p.E != null) { try { p.E.Remove(111); } catch { } p.E = null; }
+                    if (p.E2 != null) { try { p.E2.Remove(111); } catch { } p.E2 = null; }
+                    p.Shown2 = false;
                 }
             }
             if (_stPen <= 3 || _stPen % 200 == 0)
@@ -377,6 +557,15 @@ namespace Armoury
                         if (_stPen <= 3) Log.Error("MapVillagesView.RemovePennants " + s.R.Uid + " (potkniecie " + _stPen + ")", e);
                     }
                 }
+                if (p.E2 != null)
+                {
+                    try { p.E2.Remove(111); n++; }
+                    catch (Exception e)
+                    {
+                        _stPen++;
+                        if (_stPen <= 3) Log.Error("MapVillagesView.RemovePennants " + s.R.Uid + " pan (potkniecie " + _stPen + ")", e);
+                    }
+                }
                 s.Pen = null;
             }
             _penShown.Clear();
@@ -398,9 +587,15 @@ namespace Armoury
         private string PennantLine()
         {
             double ms = _penBuildTicks > 0 ? _penBuildTime * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _penBuildTicks : 0;
-            return "Proporczyki (E7/W5): w kadrze " + _penShown.Count + " (najwiecej " + _penShownMax + "), budowa sr. "
+            int two = 0;
+            foreach (var q in _penShown) if (q.Pen != null && q.Pen.Shown2) two++;
+            return "Proporczyki (E7/W5): w kadrze " + _penShown.Count + " wiosek (najwiecej " + _penShownMax + "), z dwoma proporczykami (gospodarz i pan, D2 "
+                   + (Settings.Current.VillageTwoPennants ? "tak" : "NIE") + ") " + two + " (najwiecej " + _penTwoMax + "; pokazanych proporczykow najwyzej " + PenEntityMax
+                   + ", drugich schowanych w limicie najwiecej " + _penTwoHiddenMax + "), drugich zbudowanych " + _penTwoBuilt
+                   + ", wiosek bez drugiego naroznika na ladzie " + _penNoCorner.Count + ", potkniecia drugiego " + _stPen2 + " | budowa sr. "
                    + ms.ToString("0.000", CultureInfo.InvariantCulture) + " ms/klatke (klatek z budowa " + _penBuildTicks + ", zbudowane " + _penBuilt
-                   + ", herbow w pamieci " + _penBanners.Count + "), przebudowy po misji " + _penAfterMission + " (misji " + _penMissions
+                   + ", herbow w pamieci " + _penBanners.Count + ", najwiecej " + _penCodesMax + ", limit " + PenCodesSoft + "/" + PenCodesHard
+                   + ", wiosek z herbem pana zamiast gospodarza " + _penCapped.Count + "), przebudowy po misji " + _penAfterMission + " (misji " + _penMissions
                    + "), zmiany herbu " + _penLord + ", potkniecia " + _stPen + " (wiosek bez proporczyka " + _penFailed + ")"
                    + (Settings.Current.VillagePennants ? "" : " | WYLACZONE w MCM") + ".";
         }

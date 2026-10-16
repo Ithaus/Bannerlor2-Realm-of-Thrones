@@ -100,6 +100,8 @@ namespace Armoury.Villages
         public const string DistPick = "{=arm_dist_pick}Pick a village to hear more about it.";
         public const string DistRowDamaged = "{=arm_dist_row_damaged}{VILLAGE}, some homes empty";
         public const string VilArms = "{=arm_vil_arms}Arms of {HOUSE}: {ARMS}.";
+        // Jeff 16.10 (D2, VillageCanonHouses): dewiza rodu kanonu w "Hear more" (dopisane recznie)
+        public const string VilWords = "{=arm_vil_words}Words of {HOUSE}: \"{WORDS}\"";
 
         /// <summary>TextObject z para (NAZWA, wartosc) - np. Make(VilBurning, "VILLAGE", "Brackenford").</summary>
         public static TextObject Make(string text, params object[] kv)

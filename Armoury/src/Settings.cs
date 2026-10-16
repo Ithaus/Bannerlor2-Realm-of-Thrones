@@ -2250,6 +2250,15 @@ namespace Armoury
         // inaczej pan. Proporczyk, dymek i "Look over the district" pokazuja tego samego gospodarza (imie, rod, "sworn to" pan). Po podboju gospodarz z wrogiego
         // krolestwa odpada (nastepna regula). Off = herb pana i rycerz z tytulu BK wsi gry dla wszystkich wiosek okregu, jak dotad
         public bool VillageBannerPerHolder = true;         // every map village flies the banner of the house that keeps it - a knight with a Banner Kings estate there, the knight who holds the village's Banner Kings title, the village's own knight, or another house of the lord's realm - and its tooltip and "Look over the district" name him and the lord he is sworn to. Off = every village of a district shows its lord's banner, as before
+        // Jeff 16.10 (D2, "dane wez ze swiata gry o tron jesli to mozliwe", "nie wygladalo tak jednolicie"): zamiast rycerza z lore (wymyslone rody, np. House Weirley)
+        // ROD KANONU tej samej krainy (ModuleData\arm_houses_canon.tsv z tools/herby/herby_kanon.py - 536 rodow awoiaf; VillageHolders.cs, CanonHouses.cs): siedziba w okregu,
+        // 2 najblizsze siedziby, rody zaprzysiezone rodowi pana, reszta krainy; rod z klanem ROT tylko z krolestwa pana (jego herb), inny rod - herb ROT z pliku albo
+        // zlozony z opisu kanonu z ikon gry (CCsBanners, gdy wczytany). Rycerz z lore tylko w krainie bez rodow. Wymaga VillageBannerPerHolder. Off = rycerze z lore jak dotad
+        public bool VillageCanonHouses = true;             // the villages are kept by the houses of A Song of Ice and Fire from their own land - a house seated nearby, a house sworn to the lord, or another house of that land - each under its own arms, and "Look over the district" tells their arms and words. Off = the village knights of the local lore, as before
+        // Jeff 16.10 (D2, "jedna flaga wasala-rycerza i seniora jako druga flaga"): przy wiosce z gospodarzem innym niz pan DWA proporczyki - gospodarza na przednim narozniku
+        // obrysu i pana (Village.Bound.OwnerClan) na drugim przednim (albo innym na ladzie); ten sam limit (najblizsze 80 wiosek, budowa 12 proporczykow na cwierc sekundy,
+        // kazdy proporczyk liczony). Gospodarz = pan - jeden. Off = jeden proporczyk gospodarza jak dotad
+        public bool VillageTwoPennants = true;             // a village kept for its lord by another house flies two pennants: the keeper's and, beside it, the lord's. Off = one pennant, the keeper's
         // Jeff 16.10 ("niektore sa za blisko i za gesto", "mniej wiosek o 20% ... 20% wiecej ludzi w danej wiosce, ale zeby nie bylo identycznie"): uklad wiosek v5 -
         // ModuleData\arm_map_villages.tsv (1957 wiosek: 20% mniej, najpierw te najblizej sasiadki; osady wedlug miejsca i uid 6..36) i arm_map_village_lore.tsv z nowa
         // bramka; off = pliki v4 (arm_map_villages_v4.tsv, arm_map_village_lore_v4.tsv - 2446 wiosek po 16 osad). Wybor przy starcie sesji, przed ksiega wiosek; zapis z innym
