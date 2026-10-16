@@ -83,16 +83,13 @@ namespace Armoury
                     try
                     {
                         if (a == null || !a.IsActive() || !a.IsHuman) continue;
-                        // NM: widz bez druzyny (Team.Invalid, pojedynek z hersztem) nie panikuje ani nie ucieka - Retreat na nim
-                        // wywraca Mission.GetClosestFleePositionForAgent, a Panic kod gry (MissionAgentPanicHandler) poza naszym catch
-                        if (MissionTeams.Skip(a, MissionTeams.Broken)) continue;
                         if (!a.IsAIControlled) continue;                 // gracza nikt nie zmusi do ucieczki
                         if (a == mission.MainAgent) continue;
                         if (a.IsHero && !c.WoundedFleeHeroes) continue;  // dowodcy trzymaja sie do konca
                         // trup nie zna strachu - wight bije sie do konca (Jeff 27.08)
                         if (Undead.Character(a.Character)) continue;
 
-                        // tylko swoi gracza albo wszyscy - wedle ustawienia
+                        // tylko swoi gracza albo wszyscy - wedle ustawienia (Enemies przy Team.Invalid = false, bez natywnego IsEnemy)
                         if (c.WoundedFleeEnemiesOnly && mission.MainAgent != null
                             && MissionTeams.Valid(mission.MainAgent.Team)
                             && !MissionTeams.Enemies(a.Team, mission.MainAgent.Team)) continue;
@@ -100,6 +97,10 @@ namespace Armoury
                         float max = a.HealthLimit;
                         if (max <= 0f) continue;
                         if (a.Health / max >= cut) continue;             // jeszcze stoi o wlasnych silach
+                        // NM: ranny bez druzyny (Team.Invalid: widz pojedynku z hersztem) nie panikuje ani nie ucieka - Retreat na nim
+                        // wywraca Mission.GetClosestFleePositionForAgent, a Panic kod gry (MissionAgentPanicHandler) poza naszym catch.
+                        // Po progu zdrowia (recenzja NM): cywile gry sa w Team.Invalid (MissionAgentHandler.cs:849-853) - liczymy tylko rannych
+                        if (MissionTeams.Skip(a, MissionTeams.Broken)) continue;
                         if (hold) { MissionTeams.Held(MissionTeams.Broken, a); continue; }
 
                         var ai = a.CommonAIComponent;
@@ -120,7 +121,7 @@ namespace Armoury
                         // NM: odstep proby PRZED wywolaniem - po wywrotce czlowiek nie jest probowany znowu za pol sekundy
                         _tries[a] = tries + 1;
                         _nextTry[a] = now + (tries >= 3 ? 20f : 3f + 3f * tries);
-                        MissionTeams.Pushed(MissionTeams.Broken);
+                        MissionTeams.Pushed(MissionTeams.Broken, a);
                         if (tries == 0) ai.Panic();                      // normalna droga: handler odeslie go na tyly
                         else ai.Retreat();                               // panika zjedzona przez model morale - wprost
                     }

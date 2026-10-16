@@ -792,7 +792,7 @@ namespace Armoury
                 try { edge = mission.GetClosestBoundaryPosition(far); }           // przyciecie do granicy mapy
                 catch { edge = far; }
                 var wp = new WorldPosition(mission.Scene, new Vec3(edge.x, edge.y, agent.Position.z));
-                MissionTeams.Pushed(MissionTeams.Flee);
+                MissionTeams.Pushed(MissionTeams.Flee, agent);
                 agent.Retreat(wp);
             }
             catch (Exception e) { MissionTeams.Stumble(MissionTeams.Flee, "FleeTheField", e); }

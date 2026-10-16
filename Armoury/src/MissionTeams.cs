@@ -15,6 +15,10 @@ namespace Armoury
     /// pod AI) do Team.Invalid (HideoutMissionController.cs:931/938); Retreat agenta z Team.Invalid wywraca Mission.GetClosestFleePositionForAgent
     /// (Team.Mission == null, Team.cs:228). Log 10-56-30: 9 x ERROR in HideoutAlarm.AlarmAround i 14 x ERROR in BrokenMen.OnMissionTick 12:10:00-12:10:19.
     /// Turnieje [L]: FleeTheField 8 (11:10-11:16), 167 (07-16-10), GuardMaster.Tick 35 (08-34-15) - zrodlo agenta bez druzyny w turnieju nieustalone [P].
+    /// Team.Invalid to tez ZWYKLY stan ludzi gry [K]: kazdy neutralny cywil (MissionAgentHandler.SpawnWanderingAgentWithInitialFrame,
+    /// MissionAgentHandler.cs:849-853 - misje miasta, zamku, wsi, wnetrz, areny, bojki w zaulku: SandBoxMissions.cs), ludzie po strefie skradania
+    /// (StealthZone.cs:159), sprawca w FamilyFeudIssueBehavior.cs:846. Turniej gry nie ma MissionAgentHandler (TournamentMissionStarter.cs:46-61),
+    /// Tournaments XPanded druzyn nie rusza (dec/txp: SetTeam / Team.Invalid 0) - stad "pierwszy" w linii turnieju.
     ///
     /// Zasady:
     ///  - Valid / Enemies: druzyna wazna (MBTeam.Index >= 0, bez wywolania natywnego) i obie wazne, zanim padnie natywne IsEnemy;
@@ -22,9 +26,13 @@ namespace Armoury
     ///  - Stumble: wyjatek per miejsce liczony (misja i sesja), do logu pelny slad tylko 3 pierwszych na miejsce w sesji (CLAUDE.md 7: licz, nie gas);
     ///  - IsBattle: bitwa na mapie (Campaign.Current == null albo MapEvent.PlayerMapEvent != null) - poza nia ranni nie uciekaja
     ///    (klucz WoundedFleeBattlesOnly; gra w turnieju sama zabrania rozbicia: TournamentFightMissionController.CanAgentRout = false);
-    ///  - Flush: jedna linia "Druzyny w misji (NM)" po misji (kryjowka, turniej, arena, bitwa albo niezerowe liczniki).
+    ///  - Flush: jedna linia "Druzyny w misji (NM)" po misji (kryjowka, turniej, arena, bitwa albo misja "inna" z wstrzymanymi, odwrotami
+    ///    albo potknieciami - sami pominieci jej nie daja, bo cywile miasta zawsze sa w Team.Invalid; spacer po miescie bez linii).
     /// Stan kluczowany referencja misji (nowa misja = liczniki od zera; niewypisana poprzednia wypisuje sie przy zmianie). Bez zapisu kampanii.
     /// Nazwa klasy nie moze byc "Log", "Settings" ani "McmSettings" (CrashScribe Net.cs:155 - te omija siec finalizatorow).
+    /// Na liste "optymalizacja na koniec" (recenzja NM): Valid / Enemies / Skip wolane na kazdego agenta (GuardMaster co 0.05 s przy bloku,
+    /// BrokenMen co 0.5 s) ida przez siec finalizatorow CrashScribe - do rozwazenia wyjatek t.Name == "MissionTeams" w Net.cs:155
+    /// (kazda metoda ma wlasny try/catch albo jest jednolinijkowa bez wyjatkow).
     /// </summary>
     internal static class MissionTeams
     {
@@ -43,7 +51,8 @@ namespace Armoury
         private static readonly HashSet<int> _skippedAll = new HashSet<int>();
         private static string _first;             // pierwszy pominiety: StringId i zdrowie
         private static readonly HashSet<int>[] _held = NewSets();      // rozni ranni wstrzymani poza bitwa (Broken, Flee)
-        private static readonly int[] _pushed = new int[Sites];        // odwroty wyslane w tej misji (Broken: Panic/Retreat, Flee: Retreat)
+        private static readonly HashSet<int>[] _pushed = NewSets();    // rozni ludzie, ktorym wyslano odwrot w tej misji (Broken: Panic/Retreat, Flee: Retreat)
+        private static readonly int[] _pushCalls = new int[Sites];     // wywolania odwrotu (FieldCraft ponawia co 0.2 s, gdy odwrot wygasl)
         private static readonly int[] _stum = new int[Sites];          // potkniecia tej misji
         private static readonly int[] _stumSession = new int[Sites];   // potkniecia sesji (limit sladow w logu)
         private static int _lines;                // linii misji w sesji
@@ -123,14 +132,16 @@ namespace Armoury
             catch { }
         }
 
-        /// <summary>Odwrot wyslany (BrokenMen: Panic albo Retreat; FieldCraft: Retreat) - do progu "poza bitwa przy kluczu 0".</summary>
-        internal static void Pushed(int site)
+        /// <summary>Odwrot wyslany (BrokenMen: Panic albo Retreat; FieldCraft: Retreat) - do progu "poza bitwa przy kluczu 0".
+        /// Rozni ludzie (jak Held) i osobno wywolania (ponowienia FieldCraft co 0.2 s - lekcja zapetlonego krzyku 27.08).</summary>
+        internal static void Pushed(int site, Agent a)
         {
             try
             {
-                if (site < 0 || site >= Sites) return;
-                Ensure(Mission.Current);
-                _pushed[site]++;
+                if (a == null || site < 0 || site >= Sites) return;
+                Ensure(a.Mission ?? Mission.Current);
+                _pushed[site].Add(a.Index);
+                _pushCalls[site]++;
             }
             catch { }
         }
@@ -165,7 +176,7 @@ namespace Armoury
             _mission = new WeakReference(m);
             _any = true;
             _flushed = false;
-            for (int i = 0; i < Sites; i++) { _skipped[i].Clear(); _held[i].Clear(); _pushed[i] = 0; _stum[i] = 0; }
+            for (int i = 0; i < Sites; i++) { _skipped[i].Clear(); _held[i].Clear(); _pushed[i].Clear(); _pushCalls[i] = 0; _stum[i] = 0; }
             _skippedAll.Clear();
             _first = null;
             bool battle = true;
@@ -216,9 +227,11 @@ namespace Armoury
 
         private static void Write()
         {
-            int skips = _skippedAll.Count, held = 0, stum = Sum(_stum);
-            for (int i = 0; i < Sites; i++) held += _held[i].Count;
-            if (skips + held + stum == 0 && _kind == "inna") return;   // spacer po miescie bez zdarzen - bez linii
+            int skips = _skippedAll.Count, held = 0, pushed = 0, stum = Sum(_stum);
+            for (int i = 0; i < Sites; i++) { held += _held[i].Count; pushed += _pushed[i].Count; }
+            // recenzja NM: cywile gry maja Team.Invalid (MissionAgentHandler.cs:849-853) - sami pominieci nie daja linii misji "inna"
+            // (spacer po miescie, wsi, zamku, karczmie); linia tylko, gdy cos sie stalo: wstrzymani, odwroty albo potkniecia
+            if (held + pushed + stum == 0 && _kind == "inna") return;
             _lines++;
             var c = Settings.Current;
             bool key = c != null && c.WoundedFleeBattlesOnly;
@@ -230,7 +243,8 @@ namespace Armoury
             if (_first != null) sb.Append(", pierwszy ").Append(_first);
             sb.Append(") | ucieczka tylko w bitwie (WoundedFleeBattlesOnly ").Append(key ? "TAK" : "NIE").Append("): wstrzymani rozbici ")
               .Append(_held[Broken].Count).Append(", ucieczka ").Append(_held[Flee].Count)
-              .Append(" | odwroty wyslane: rozbici ").Append(_pushed[Broken]).Append(", ucieczka ").Append(_pushed[Flee])
+              .Append(" | odwroty wyslane (roznych ludzi): rozbici ").Append(_pushed[Broken].Count).Append(", ucieczka ").Append(_pushed[Flee].Count)
+              .Append(" (wywolan: rozbici ").Append(_pushCalls[Broken]).Append(", ucieczka ").Append(_pushCalls[Flee]).Append(')')
               .Append(" | potkniecia: ");
             for (int i = 0; i < Sites; i++) sb.Append(i > 0 ? ", " : "").Append(SiteName[i]).Append(' ').Append(_stum[i]);
             sb.Append(" (sesja ").Append(Sum(_stumSession)).Append(", linia misji ").Append(_lines).Append(").");

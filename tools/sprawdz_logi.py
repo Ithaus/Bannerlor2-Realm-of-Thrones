@@ -27242,7 +27242,7 @@ NM_HEAD = "Druzyny w misji (NM): "
 NM_LINE = re.compile(r"Druzyny w misji \(NM\): misja (\w+) \(bitwa na mapie (TAK|NIE)\) \| agenci bez druzyny \(Team\.Invalid\) pominieci: "
                      r"alarm (\d+), rozbici (\d+), ucieczka (\d+), blok (\d+), zabicia (\d+) \(roznych ludzi (\d+)(?:, pierwszy (.*?))?\) "
                      r"\| ucieczka tylko w bitwie \(WoundedFleeBattlesOnly (TAK|NIE)\): wstrzymani rozbici (\d+), ucieczka (\d+) "
-                     r"\| odwroty wyslane: rozbici (\d+), ucieczka (\d+) "
+                     r"\| odwroty wyslane \(roznych ludzi\): rozbici (\d+), ucieczka (\d+) \(wywolan: rozbici (\d+), ucieczka (\d+)\) "
                      r"\| potkniecia: alarm (\d+), rozbici (\d+), ucieczka (\d+), blok (\d+), zabicia (\d+) \(sesja (\d+), linia misji (\d+)\)\.$")
 NM_ERR = ("ERROR in HideoutAlarm", "ERROR in BrokenMen", "ERROR in FleeTheField", "ERROR in GuardMaster.Tick", "ERROR in BattlefieldLaw.CountKill")
 
@@ -27274,7 +27274,7 @@ def nmisje_main(logp):
                         g = mm.groups()
                         rows.append(dict(kind=g[0], battle=g[1] == "TAK", skip=[int(x) for x in g[2:7]], people=int(g[7]), first=g[8] or "",
                                          key=g[9] == "TAK", held=(int(g[10]), int(g[11])), pushed=(int(g[12]), int(g[13])),
-                                         stum=[int(x) for x in g[14:19]], sess=int(g[19])))
+                                         calls=(int(g[14]), int(g[15])), stum=[int(x) for x in g[16:21]], sess=int(g[21])))
                     else:
                         bad.append(s)
                 else:
@@ -27335,7 +27335,9 @@ def nmisje_main(logp):
     if bat:
         held = sum(r["held"][0] + r["held"][1] for r in bat)
         push = (sum(r["pushed"][0] for r in bat), sum(r["pushed"][1] for r in bat))
-        rep.add("NM-6: bitwa na mapie - wstrzymani", f"misji {len(bat)}, wstrzymani {held}; odwroty rozbici {push[0]}, ucieczka {push[1]}",
+        calls = (sum(r["calls"][0] for r in bat), sum(r["calls"][1] for r in bat))
+        rep.add("NM-6: bitwa na mapie - wstrzymani", f"misji {len(bat)}, wstrzymani {held}; odwroty (roznych ludzi) rozbici {push[0]}, ucieczka {push[1]}"
+                f" (wywolan: rozbici {calls[0]}, ucieczka {calls[1]})",
                 "wstrzymani 0 (w bitwie ranni uciekaja jak dotad)", held == 0)
     else:
         rep.add("NM-6: bitwa na mapie - wstrzymani", "brak misji bitwy", "INFO", None)
