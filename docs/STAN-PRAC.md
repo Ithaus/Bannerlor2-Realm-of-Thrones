@@ -2375,3 +2375,8 @@ senior, opis herbu; herb z ROT, gdy rod jest w ROT; slownik ikon z 244 herbow ro
 w miejscach odludnych, tez jacys ludzie zyja - teraz masa natkanych wiosek i masa pustego miejsca" -> przesuniecie: mniej w skupiskach, male przysiolki (pasterze, drwale,
 rybacy, wegla) na pustkowiach, ludzie okregu bez zmian; miejsca na ladzie z sondy terenu w grze (bieg probny jak MapRoadsProbe).
 Kolejnosc: W1 noc-wioski (w toku) -> W2 herby kanon + dwie flagi + przysiolki na pustkowiach -> W3 zajazdy, noclegi, plotki. WGRANIE 68 = bitwa + turniej.
+KARCZMY W MIESCIE (Jeff 16.10: "w miescie moge spac tylko w karczmie, daj trzy jakosci ... ludzie sami placa za siebie i za swoje konie, dostaja zold, ja place za siebie
+i za konie, ktore nie sa na ludziach"; potem "to zaczynaj"). Projekt: Podla karczma (zolnierz 1 d, kon 1 d, izba gracza 3 d; +5% predkosci do zmroku, +2 morale), Porzadna gospoda
+(2 / 2 / 8; +10%, +5, szybsze odsypianie), Dobry dom (4 / 3 / 20; +12%, +8, szybsze leczenie, lepsze ceny nazajutrz). Zolnierze i towarzysze z wlasnej sakiewki (MenPurse /
+Hero.Gold) za siebie i swojego konia; gracz za siebie i luzaki/juczne; kogo nie stac - tansza karczma albo stajnia, premia oddzialu wazona ludzmi; pieniadze do kiesy mieszczan.
+Sen w miescie bez placenia = jak oboz (dlug snu spada, bez premii). Dom gracza w miescie (BK) = gracz i towarzysze za darmo z premia gospody. Zajazdy: te same poziomy, zwykle 1-2.
