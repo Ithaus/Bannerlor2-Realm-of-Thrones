@@ -19,6 +19,8 @@ namespace Armoury
     ///  - szarza: szyk AI (Formation.IsAIControlled - szarze gracza ma gra) przechodzi na rozkaz Charge / ChargeToTarget po rozstawieniu; ten sam szyk
     ///    najwyzej raz na 40 s i nie po krotkiej przerwie w szarzy (8 s - RBM przelacza rozkazy czesto); krzyczy kapitan (zawsze, pierwszy) i czesc
     ///    ludzi: (10% + 3% x tier) x morale/50 (0.25..1.5) + 5% za kazde 50 Leadership kapitana (najwyzej 15%), najwyzej 75%; opoznienie 0.2-2.5 s;
+    ///  - 16.10: ustepuja obcym modom glosow (ForeignVoices: Battle Atmosphere, Immersive Battlefields) - szyk AI pelny / tylko kapitan / nic,
+    ///    szyk gracza tylko wtedy, gdy IB wycial natywny okrzyk, a nie ma choru BA (np. kryjowka);
     ///  - jek: AI ponizej 30% zdrowia (zapisany przy trafieniu, nie w ucieczce), do 60 m od gracza: MakeVoice(Pain) najwyzej 3 razy na rannego na
     ///    bitwe - pierwszy 3-7 s po ciosie, drugi 7-14 s pozniej, trzeci 20-30 s pozniej (poprawka 16.10: dawniej co 7-14 s do konca bitwy);
     ///  - bez bitew morskich i wypadow morskich (IsNavalBattle, IsNavalRaidBattle - poprawka 16.10);
@@ -83,6 +85,7 @@ namespace Armoury
             sb.Append(" | okrzyki i jeki ").Append(c != null && c.BattleCriesAndMoans ? "TAK" : "NIE").Append(": szarze ").Append(_charges)
               .Append(" (okrzykow ").Append(_yells).Append(", roznych ludzi ").Append(_yellPeople.Count).Append("), jeki ").Append(_moans)
               .Append(" (rannych ").Append(_moanPeople.Count).Append("), odrzucone limitem ").Append(_limited);
+            ForeignVoices.Append(sb);   // 16.10: ustapienie Battle Atmosphere / Immersive Battlefields
         }
 
         /// <summary>AfterStart (BattleSense): stan od zera dla nowej misji.</summary>
@@ -90,6 +93,7 @@ namespace Armoury
         {
             Clear();
             _m = new WeakReference(m);
+            ForeignVoices.Detect(m);   // 16.10: nasze okrzyki szarzy ustepuja BA / IB (tryb szyku AI i gracza)
         }
 
         internal static void Clear()
@@ -210,10 +214,11 @@ namespace Armoury
                     if (charge && !st.Charge)
                     {
                         st.Charge = true;
-                        if (f.IsAIControlled && now - st.LastCry >= FormationCooldown && now - st.ChargeEnd >= ChargeGap)
+                        int mode = f.IsAIControlled ? ForeignVoices.AiMode : ForeignVoices.PlayerMode;   // 16.10: obce glosy (ForeignVoices)
+                        if (mode != ForeignVoices.ModeNone && now - st.LastCry >= FormationCooldown && now - st.ChargeEnd >= ChargeGap)
                         {
                             st.LastCry = now;
-                            Cry(f, now);
+                            Cry(f, now, mode == ForeignVoices.ModeCaptain);
                         }
                     }
                     else if (!charge && st.Charge)
@@ -225,7 +230,7 @@ namespace Armoury
             }
         }
 
-        private static void Cry(Formation f, float now)
+        private static void Cry(Formation f, float now, bool captainOnly)
         {
             _buf.Clear();
             f.ApplyActionOnEachUnit(_collect);                    // gra iteruje swoje listy - my tylko zbieramy
@@ -239,7 +244,7 @@ namespace Armoury
             catch { lb = 0f; }
             _tCharges++;
             if (cap != null && CanVoice(cap, now, ManCooldown)) Yell(cap, now, 0.1f + MBRandom.RandomFloat * 0.3f);
-            for (int k = 0; k < _buf.Count; k++)
+            for (int k = 0; !captainOnly && k < _buf.Count; k++)
             {
                 var a = _buf[k];
                 if (a == cap || !CanVoice(a, now, ManCooldown)) continue;
