@@ -252,7 +252,8 @@ namespace Armoury
                 // K1 (przeglad): bron po slotach wzorca - ta sama regula co nadwyzki i zakupy brakow zalogi (wklad, ktory tu "wypelnia brak",
                 // nie moze nazajutrz pojsc do kupca jako nadwyzka); pancerz jak dotad u kazdego - DTE ubiera z zbrojowni takze sloty spoza wzorca
                 QuartermasterLaw.MenOf(g.MemberRoster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
-                var sw = SwapMath.Swap(men, troops.Count, QuartermasterLaw.MeetsOf(troops), pieces, true);   // wyniki w egzemplarzach: OwnWorn, Back
+                // GearFit (poprawka po recenzji): kto co nosi w zalodze - MeetsFitOf (umiejetnosc, siodlo, kultura), jak nadwyzki i bitwa; wklad zza morza zostaje Twoj
+                var sw = SwapMath.Swap(men, troops.Count, QuartermasterLaw.MeetsFitOf(troops), pieces, true);   // wyniki w egzemplarzach: OwnWorn, Back
                 // noszone wklady -> zbrojownia zalogi (ze stanem: AiWear), najpierw, zeby zwroty braly z pelnej zbrojowni
                 bool failed = false;
                 foreach (var p in pieces)
@@ -302,7 +303,8 @@ namespace Armoury
             // K1 (Jeff 09.10 04:40): gorsza, rowna albo za trudna sztuka nie jest brana - wraca do sakw z powodem (nikt jej nie chcial albo
             // nie udzwignal); reszta zwrotow to noszone wklady, ktorych zbrojownia DTE nie przyjela (failedAdd)
             int refused = Math.Max(0, returned - keptWorse - keptHard);
-            string why = QuartermasterLaw.KeptWhy(keptWorse, keptHard, refused, "the stores would not take");
+            string why = QuartermasterLaw.KeptWhy(keptWorse, keptHard, refused, "the stores would not take",
+                                                  GearFit.On || GearFit.CultureOn ? "skill requirement, a rider's saddle or their people's style" : "skill requirement");   // GearFit: powod jak u druzyny
             if (worn > 0 || x > 0)
                 Log.Player("The garrison of " + st.Name + " took " + worn + " pcs (" + string.Join(", ", takenNames.ToArray()) + "): " + filled + " filled empty hands, "
                            + x + " replaced worse kit" + (x > 0 ? " - you got the worse ones back (" + string.Join(", ", backNames.ToArray()) + ")" : "") + "."
@@ -389,7 +391,7 @@ namespace Armoury
                     List<CharacterObject> troops; int[] men; SkillObject skill;
                     QuartermasterLaw.MenOf(g.MemberRoster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenTemplate, battle);
                     if (men.Length == 0) continue;
-                    int unfit = pieces.Count > 0 ? SwapMath.Fit(men, troops.Count, QuartermasterLaw.MeetsOf(troops), pieces) : men.Length;
+                    int unfit = pieces.Count > 0 ? SwapMath.Fit(men, troops.Count, QuartermasterLaw.MeetsFitOf(troops), pieces) : men.Length;   // GearFit (po recenzji): jak nadwyzki
                     need += men.Length; used += men.Length - unfit;
                     if (unfit > 0 && shorts != null && shorts.Count < 4) shorts.Add(unfit + " " + Plural(type));
                 }
@@ -708,7 +710,7 @@ namespace Armoury
                     if (side != null && mySide != null && side.Equals(mySide)) allyBare++; else enemyBare++;
                 }
                 Log.Info("Bitwa gracza (sklad7b-p, start): Twoich ludzi " + men + " - bez broni " + noWeapon + ", bez zbroi " + noBody + ", jezdzcy pieszo " + onFoot + ", jezdzcy z koniem bez uprzezy (E8/H) " + noSaddle
-                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem).");
+                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem)." + GearFit.FloorNote());   // GearFit: dopisek NA KONCU
                 var parts = new List<string>();
                 if (noWeapon > 0) parts.Add(noWeapon + " have no weapon");
                 if (noBody > 0) parts.Add(noBody + " no body armour");

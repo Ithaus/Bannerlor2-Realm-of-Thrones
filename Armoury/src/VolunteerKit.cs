@@ -26,6 +26,8 @@ namespace Armoury
     /// zlota; towar schodzi z polki. Brak towaru albo zlota = awans cofniety (zostaje X).
     /// Swiezy ochotnik tieru 1 przychodzi z wlasnym dobytkiem (odzienie, narzedzie) - bez zakupu.
     /// Komplet DTE przy werbunku to wtedy ten zakupiony sprzet (przybliznie - DTE losuje rownowazne sztuki).
+    /// GearFit (noc 15/16.10, klucz GearFitKits): kandydat musi przejsc GearFit.ForTroop dla Y (umiejetnosc, bron z siodla, kultura) - dotad sztuka o tier
+    /// wyzej (+35 wymogu po prawie tieru broni) trafiala do zbrojowni werbujacego, choc rekrut nie umial jej uzyc; wlasna kultura do 125% ceny najtanszej.
     /// </summary>
     internal static class VolunteerKit
     {
@@ -234,12 +236,16 @@ namespace Armoury
             // stosow); w petli dodatkow tez po kazdym zamowieniu (NoteUnmetOnce zmienia popyt, wiec i cene)
             int[] memo = new int[roster.Count], memoGen = new int[roster.Count];
             int gen = 1;
+            // GearFit (noc 15/16.10): notabl kupuje tylko sztuke, ktorej TEN ochotnik uzyje (umiejetnosc, bron z siodla, kultura); wsrod uzywalnych
+            // sztuka wlasnej kultury, gdy kosztuje najwyzej 125% najtanszej. Bez uzywalnej - jak dotad: zamowienie dla warsztatow i awans cofniety
+            bool fitOn = GearFit.On, natOn = fitOn && GearFit.CultureOn;
             try
             {
             foreach (var it in need)
             {
                 int best = -1, bestPrice = int.MaxValue;
-                bool resHit = false;
+                int bestNat = -1, priceNat = int.MaxValue;   // GearFit: najtansza uzywalna sztuka wlasnej kultury
+                bool resHit = false, fitHit = false;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
@@ -248,6 +254,8 @@ namespace Armoury
                     if (ArmsPricing.IsUnique(cand)) continue;   // wpis 87 (audyt pkt 6): unikat nie znika w puli ochotnikow
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     if (el.Amount <= 0) continue;
+                    int why;
+                    if (fitOn && !GearFit.ForTroop(y, cand, true, out why)) { GearFit.NoteBuyReject(why); fitHit = true; continue; }
                     // 174b.4: sztuka z rezerwy kramu nie jest kandydatem; scalenie sklad8: wybrane sztuki kompletu sa juz zdjete z polki (ceny hurtu),
                     // wiec Free liczy je samo - bez osobnego licznika pasma wybranych (174b takenBand liczylby je drugi raz)
                     if (ShopReserve.Free(market, cand) <= 0) { resHit = true; continue; }
@@ -259,12 +267,15 @@ namespace Armoury
                         if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
                     }
                     if (price < bestPrice) { bestPrice = price; best = i; }
+                    if (natOn && price < priceNat && GearFit.CultureRank(y, cand) == 0) { priceNat = price; bestNat = i; }
                 }
+                if (bestNat >= 0 && bestNat != best && priceNat <= bestPrice * 1.25) { best = bestNat; bestPrice = priceNat; GearFit.NoteNativePick(); }
                 if (best < 0)
                 {
                     PutBack(roster, picks);   // ceny hurtu: wczesniej wybrane sztuki kompletu wracaja na polke
                     SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f);   // nie ma czego kupic - zamowienie (wpis 67)
                     if (resHit) Measure174b.NoteHeld(Measure174b.BNotable, 1);
+                    if (fitHit && countWhy) GearFit.NoteRevertNoFit();   // GearFit: na polce byly tylko sztuki, ktorych ten ochotnik nie uzyje
                     // 174b.4 (krytyka 13): awans cofniety przez rezerwe kramu - osobny powod i licznik
                     if (countWhy) { Why((resHit ? "rezerwa kramu " : "") + it.ItemType + " t" + ((int)it.Tier + 1)); if (resHit) _revReserve++; if (IsAmmoType(it.ItemType)) TownFletchers.NoteNotableRevert(it.ItemType); }   // 172: awans cofniety z braku amunicji
                     return false;
@@ -295,13 +306,16 @@ namespace Armoury
             foreach (var it in extra)
             {
                 int best = -1, bestPrice = int.MaxValue;
-                bool resHit2 = false;
+                int bestNat = -1, priceNat = int.MaxValue;   // GearFit: jak wyzej
+                bool resHit2 = false, fitHit2 = false;
                 for (int i = 0; i < roster.Count; i++)
                 {
                     var el = roster.GetElementCopyAtIndex(i);
                     var cand = el.EquipmentElement.Item;
                     if (cand == null || el.Amount <= 0 || cand.ItemType != it.ItemType || cand.Tier < it.Tier) continue;
                     if (ArmsPricing.IsUnique(cand)) continue;
+                    int why;
+                    if (fitOn && !GearFit.ForTroop(y, cand, true, out why)) { GearFit.NoteBuyReject(why); fitHit2 = true; continue; }   // GearFit: jak wyzej
                     if (ShopReserve.Free(market, cand) <= 0) { resHit2 = true; continue; }   // 174b.4
                     if (cand.ItemType == ItemObject.ItemTypeEnum.Horse && cand.HorseComponent != null && cand.HorseComponent.IsPackAnimal) continue;
                     int price;
@@ -312,9 +326,12 @@ namespace Armoury
                         if (i < memo.Length) { memo[i] = price; memoGen[i] = gen; }
                     }
                     if (price < bestPrice) { bestPrice = price; best = i; }
+                    if (natOn && price < priceNat && GearFit.CultureRank(y, cand) == 0) { priceNat = price; bestNat = i; }
                 }
+                if (bestNat >= 0 && bestNat != best && priceNat <= bestPrice * 1.25) { best = bestNat; bestPrice = priceNat; GearFit.NoteNativePick(); }
                 if (best < 0 || notable.Gold < bestPrice)
                 {
+                    if (best < 0 && fitHit2) GearFit.NoteExtraNoFit();   // GearFit: dodatek bez zakupu - na polce tylko nieuzywalne
                     _extraMissing++;
                     if (best < 0 && resHit2) Measure174b.NoteHeld(Measure174b.BNotable, 1);
                     if (best < 0) { SupplyDemand.NoteUnmetOnce(notable, market, it.ItemType, (int)it.Tier + 1, 1f); gen++; }   // 174b.5 F3: zamowienie zmienia popyt - ceny od nowa

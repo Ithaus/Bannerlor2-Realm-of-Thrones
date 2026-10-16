@@ -184,6 +184,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Items", e); continue; }
                     men++;
                     if (kind == RecruitKit.PlRecord) rec++; else if (kind == RecruitKit.PlTemplate) tpl++; else own++;
+                    GearFit.CheckEntry(troop, items);   // GearFit (po recenzji): kontrola na wejsciu do Twojej zbrojowni (licznik, ma byc 0)
                     foreach (var e in items)
                     {
                         if (e.Item == null) continue;
@@ -199,6 +200,7 @@ namespace Armoury
                      + ", wzorzec - wylacznik " + tpl + "), do zbrojowni druzyny " + pcs + " szt. (w tym konie i rzedy najemnikow " + horsePcs + "; nieprzyjete przez DTE " + refused
                      + "), komplet DTE zablokowany dla " + w.DteBlocked + " ludzi; tier 1 z wlasnym dobytkiem " + t1 + " (komplet DTE dla " + w.DteTier1
                      + "); ochotnik spoza koszyka " + noCart + "; od startu sesji ludzi " + _tMen + ", szt. " + _tPcs + "; potkniecia " + _stumbles + ".");
+            GearFit.PlayerNotice();   // GearFit (noc 15/16.10): jedno zdanie w grze, gdy rekruci oddali na targ rzeczy, ktorych nie uzyja
         }
 
         /// <summary>Jedna sztuka do zbrojowni druzyny gracza droga DTE (rozpoznanie sztuki, czarna lista DTE, prawo unikatow - UniqueLaw.IntakePlayer);

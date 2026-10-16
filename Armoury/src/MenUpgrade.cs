@@ -190,10 +190,24 @@ namespace Armoury
                 if (!Gate(main)) return;
                 Touch();
                 int purse0 = MenPurse.Get(main);
-                int budget = purse0 - TroopSelfMend.OutstandingCost(st);   // naprawy maja pierwszenstwo (wpis 84)
-                if (budget <= 0) return;
+                int mend = TroopSelfMend.OutstandingCost(st);
+                int budget = purse0 - mend;   // naprawy maja pierwszenstwo (wpis 84)
+                // Jeff 15.10 (b): "gracz 0/0" w linii doby bez powodu - linia mowi, dlaczego ludzie nic nie kupili (najwyzej raz na dobe - Gate wyzej)
+                if (budget <= 0)
+                {
+                    Log.Info("Dozbrajanie: gracz w " + st.Name + " - bez zakupow: sakiewka " + purse0 + ", zalegle naprawy " + mend + " (budzet " + budget + ").");
+                    return;
+                }
+                int nb0 = _dNoBetter, nm0 = _dNoMoney, nl0 = _dNoLift, nh0 = _dHeld;   // liczniki doby przed wizyta - roznica = powody tej wizyty (tylko log)
                 var v = Run(main, new PlayerKit(armory), st, null, st, budget, true);
-                if (v.N <= 0) return;
+                if (v.N <= 0)
+                {
+                    Log.Info("Dozbrajanie: gracz w " + st.Name + " - bez zakupow: budzet " + budget + ", sloty z pelnych koszykow " + v.Cands
+                             + (v.Cands == 0 ? " (najpierw braki - zaden koszyk typ x tier nie jest pelny)" : "")
+                             + "; pominiete: brak lepszej na polce " + Math.Max(0, _dNoBetter - nb0) + ", za malo w sakiewce " + Math.Max(0, _dNoMoney - nm0)
+                             + ", nikt nie udzwignie " + Math.Max(0, _dNoLift - nl0) + ", lepsza tylko w rezerwie kramu " + Math.Max(0, _dHeld - nh0) + ".");
+                    return;
+                }
                 _dPlayerN += v.N; _dPlayerGold += v.Gold;
                 Log.Player("Your men bought " + v.N + " better pieces with their own coin for " + v.Gold + " denars (" + string.Join(", ", v.Names.ToArray())
                            + (v.N > v.Names.Count ? ", ..." : "") + "); the old ones fetched " + v.SoldGold + "." + (v.Kept > 0 ? " " + v.Kept + " old pieces stay in the stores - the merchants had no coin." : ""));
@@ -384,7 +398,7 @@ namespace Armoury
         // ------------------------------------------------------------ silnik
         private sealed class Cand { public ItemObject.ItemTypeEnum Type; public int Order; public SwapMath.Slot Slot; public CharacterObject Troop; public int Ceil; }
         private sealed class Ware { public Settlement Shop; public EquipmentElement El; public int Price, Left, Tier; public long Power; public bool HasCls; public WeaponClass Cls; public float Fac = -1f; }   // Fac: sklad8-s S4, mnoznik polki koszyka (-1 = do policzenia)
-        private sealed class Visit { public int N, Gold, Sold, SoldGold, Kept, Carted, CartGold; public List<string> Lines = new List<string>(); public List<string> Names = new List<string>(); }
+        private sealed class Visit { public int N, Gold, Sold, SoldGold, Kept, Carted, CartGold, Cands; public List<string> Lines = new List<string>(); public List<string> Names = new List<string>(); }
 
         /// <summary>sklad7: cartFrom/cart - zaloga zamku kupujaca w miescie handlowym: sztuka z polki tego miasta idzie do zamowienia wozem (GarrisonCarts,
         /// linia UpgradeBucket), nie do zbrojowni; stara zostaje do dostawy.</summary>
@@ -407,9 +421,12 @@ namespace Armoury
                 var pieces = kit.Pieces(type);
                 if (pieces.Count == 0) continue;
                 // najpierw braki (Jeff 14.09): tylko PELNE koszyki maja kandydata do wymiany
-                foreach (var sl in SwapMath.Assign(buckets, pieces, QuartermasterLaw.MeetsOf(troops)))
+                // Jeff 15.10 (PlayerArmoryView): kto co nosi - ten sam predykat GearFit co wymiana, nadwyzki i braki (MeetsFitOf); poprawka po recenzji (noc 15/16.10):
+                // takze lordowie AI i zalogi (dotad MeetsOf - sztuka zza morza "noszona" w koszyku, a w bitwie zdejmowana przez RealmWard)
+                foreach (var sl in SwapMath.Assign(buckets, pieces, QuartermasterLaw.MeetsFitOf(troops)))
                     if (sl.Bucket.Full) cands.Add(new Cand { Type = type, Order = ti, Slot = sl, Troop = troops[sl.Group], Ceil = SwapMath.CeilingTier(TroopTier(troops[sl.Group]), oneUp) });
             }
+            v.Cands = cands.Count;   // Jeff 15.10 (b): sloty z PELNYCH koszykow - tylko do linii "Dozbrajanie: gracz ... bez zakupow"
             if (cands.Count == 0) return v;
             // najpierw sloty z najwieksza roznica "sufit jednostki - tier sztuki", potem typy (korpus, bron, tarcza, helm, ...), najslabsze najpierw
             cands.Sort((a, b) =>
@@ -557,6 +574,7 @@ namespace Armoury
                     if (ammoRule && w.Tier <= oldP.Tier) { lowTier = true; continue; }
                     better = true;
                     if (!ItemReq.Meets(c.Troop, w.El.Item) || (c.Slot.Bucket.Mounted && !MountOk(w.El.Item))) continue;   // wymog i bron z siodla
+                    if (GearFit.CultureOn && !GearFit.CultureOk(c.Troop, w.El.Item)) continue;   // GearFit (noc 15/16.10): kultura jak przy zakupie notabla i w bitwie
                     lift = true;
                     // sklad8-p (uwaga 1): dozbrajanie kupuje dla oddzialu (lord, zaloga, ludzie gracza z sakiewki) - hurt jak zakupy brakow, wiec
                     // ostatnia sztuka pasma zbroi zostaje na straganie dla kupujacego osobiscie (ShopReserve; MAX = rezerwa nie dotyczy: zamek, nie zbroja)

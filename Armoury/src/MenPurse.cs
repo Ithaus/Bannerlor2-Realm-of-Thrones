@@ -23,7 +23,8 @@ namespace Armoury
     ///    Gracz: wszystko do sakiewki ludzi. Lord AI: trzecia (LordLootThirdPercent) do kiesy, reszta do sakiewki.
     ///  - Ludzie wydaja: naprawy (godzinowo u kowali miasta, TroopSelfMend) -> braki w kompletach -> reszta na zycie w miescie
     ///    przy wyjezdzie (kasa miasta). Zostaje tylko tyle, ile potrzeba na zalegle naprawy.
-    ///  - Gracz bierze cos z nadwyzek zbrojowni = KUPUJE od ludzi po cenie skupu (rozliczenie przy zamknieciu ekranu).
+    ///  - Gracz bierze cos z nadwyzek zbrojowni = KUPUJE od ludzi po cenie skupu (rozliczenie przy zamknieciu ekranu). Jeff 15.10 (a): przy
+    ///    ArmouryShowsOnlyYours zapasu ludzi nie ma na liscie okna (PlayerArmoryView) - zakup nieczynny (NoteBuy/SettleBuys zostaja dla klucza wylaczonego).
     /// K1 (Jeff 09.10, docs/paczki/K1-dozbrajanie.md): przy wyjezdzie czesc odkladaja na lepszy sprzet (A3, limit dni zoldu); w miescie
     /// nadwyzki -> naprawy -> braki -> lepsze (MenUpgrade); nadwyzki i braki liczone po DOPASOWANIU (skill), nie po liczbie sztuk;
     /// zalogi maja wlasna sakiewke (czesc zoldu - SoldierPay) w tym samym slowniku i tym samym zapisie "arm_menpurse".
@@ -411,12 +412,15 @@ namespace Armoury
         {
             var s = Settings.Current;
             var main = MobileParty.MainParty;
-            if (armory == null || s == null || main == null || main.MemberRoster == null || type == ItemObject.ItemTypeEnum.Horse) return null;   // konie - Stajnia
+            if (armory == null || s == null || main == null || main.MemberRoster == null) return null;
+            // Jeff 15.10 (b), PlayerArmoryView: zbedne konie ludzi (ponad 1 na jezdzca + SurplusKeepPercent i te, ktorych zaden ich jezdziec nie dosiadzie) do kupca
+            // jak reszta lupu; klucz wylaczony - konie zostaja w zbrojowni, jak dotad (Stajnia). Musztra (Drill.PlayerSurplus) koni nie pyta (StockTypes bez Horse).
+            if (type == ItemObject.ItemTypeEnum.Horse && !PlayerArmoryView.SellHorses) return null;
             var pieces = QuartermasterLaw.KitPieces(armory, type, true);
             if (pieces.Count == 0) return null;
             List<CharacterObject> troops; int[] men; SkillObject skill;
             QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
-            var meets = QuartermasterLaw.MeetsOf(troops);
+            var meets = QuartermasterLaw.MeetsFitOf(troops);   // Jeff 15.10: ten sam predykat co wymiana (FitFor) - umiejetnosc, siodlo, kultura (GearFit)
             // K1 (Jeff 09.10 04:40): kto co nosi - ta sama regula co wymiana (najlepsze najpierw; sztuka gracza tylko w puste rece albo
             // w miejsce gorszej), inaczej ludzie sprzedawaliby lepsza sztuke, ktora nosza, bo "noszona" byla gorsza sztuka gracza
             if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
@@ -431,10 +435,10 @@ namespace Armoury
             var armory = QuartermasterLaw.DteArmory();
             if (armory == null || QuartermasterEscrow.Active) return;
             var main = MobileParty.MainParty;
-            int sold = 0, gold = 0;
+            int sold = 0, gold = 0, horses = 0, horseGold = 0;
             foreach (var type in QuartermasterLaw.KitTypes)
             {
-                var pieces = PlayerSurplusPlan(armory, type);   // K1 A9 - jedna definicja nadwyzki (konie - Stajnia)
+                var pieces = PlayerSurplusPlan(armory, type);   // K1 A9 - jedna definicja nadwyzki (konie - przy PlayerMenSellSpareHorses, Jeff 15.10 (b))
                 if (pieces == null) continue;
                 foreach (var p in pieces)
                 {
@@ -460,15 +464,17 @@ namespace Armoury
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -paidN);   // paczka 169: linia kas (tylko licznik)
                     Add(main, paidN);
                     sold += n; gold += paidN;
+                    if (type == ItemObject.ItemTypeEnum.Horse) { horses += n; horseGold += paidN; }   // Jeff 15.10 (b): tylko do linii
                     MenUpgrade.NoteChurn(main, el.Item, false);                   // K1 (przeglad): kupione i sprzedane tej samej doby (autotest: 0)
+                    GearFit.GapIdle(p.Key, n);                                    // GearFit (kontrola po recenzji): kupione na brak i sprzedane jako nadwyzka (tylko licznik)
                 }
             }
             if (sold > 0)
             {
                 _daySold += sold; _dayGold += gold;
-                Log.Player("Your men sold " + sold + " spare pieces from the stores to the merchants of " + st.Name + " for " + gold
+                Log.Player("Your men sold " + sold + " spare pieces" + (horses > 0 ? " (" + horses + (horses == 1 ? " of them a horse)" : " of them horses)") : "") + " from the stores to the merchants of " + st.Name + " for " + gold
                            + " denars - their share of the spoils. Purse of the men: " + Get(main) + ".");
-                Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + ", sakiewka " + Get(main) + ".");
+                Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + " (w tym konie " + horses + " za " + horseGold + "), sakiewka " + Get(main) + ".");
             }
         }
 
@@ -490,6 +496,10 @@ namespace Armoury
                 var fit = QuartermasterLaw.FitFor(armory, type);
                 int gap = fit.UnfitMen;
                 int maxReq = fit.UnfitMinSkill;
+                // GearFit (kontrola po recenzji, tylko licznik): egzemplarz kupiony na brak w ostatnich dniach lezy wolny, a ludzie tego typu dalej bez sztuki
+                if (gap > 0 && fit.Pieces != null)
+                    foreach (var fp in fit.Pieces)
+                        if (!fp.Barred && fp.MenFree > 0) GearFit.GapIdle(fp.Key, fp.MenFree);
                 // K1c (przeglad K1b, Jeff 09.10 P1, "rekrut nie kupi plyty"): k-ty zakup typu najwyzej do k-tego sufitu ludzi bez sztuki
                 // (SwapMath.CeilingTier, od najwyzszego); dotad braki nie mialy zadnego limitu tieru
                 var ceils = MenUpgrade.CeilingsOf(fit.UnfitByTroop, Settings.Current.MenUpgradeOneTierUp);
@@ -505,6 +515,9 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type) || ArmsPricing.IsUnique(it)) continue;
                         if (it.Difficulty > 0 && ItemReq.SkillFor(it) != null && it.Difficulty > maxReq) continue;   // najslabszy bez sztuki ja udzwignie
+                        // GearFit (poprawka po recenzji, uwaga krytyczna): ktos bez sztuki jej UZYJE wedlug tego samego predykatu co dopasowanie FitFor (MeetsFitOf:
+                        // umiejetnosc, siodlo, kultura) - dotad tylko kultura: konnym kupowany byl dlugi luk / kusza / pika, dalej "bez sztuki", co dobe kolejne
+                        if ((GearFit.On || GearFit.CultureOn) && !GearFit.AnyFitFor(fit.UnfitByTroop.Keys, it, GearFit.On)) continue;
                         if (AiGear.TierOf(it) > maxTier) continue;   // K1c (P1): nie ponad sufit czlowieka, dla ktorego ten zakup
                         if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;   // K1 (przeglad): ksiega per id - zakup ludzi przesunalby Twoja czesc na gorszy egzemplarz
                         if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }   // 174b.4: ludzie gracza kupuja hurtem jak ludzie lorda - ostatnia sztuka pasma zostaje
@@ -523,6 +536,7 @@ namespace Armoury
                     MoneyLedger.Note169(MoneyLedger.N169Kit, st, bestPrice);   // paczka 169: linia kas (tylko licznik)
                     MenUpgrade.NoteChurn(main, pick.Item, true);
                     XbowPrice.NoteBuy(pick.Item, 1, false);   // kusze wedlug luku: linia "Kusze wedlug luku (zakupy)" (tylko licznik)
+                    GearFit.NoteGapBuy(QuartermasterLaw.KeyOf(pick));   // kontrola po recenzji: zakup braku bez skutku (tylko licznik)
                     spent += bestPrice; pieces++; gap--;
                 }
             }
@@ -584,7 +598,9 @@ namespace Armoury
             // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
             // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
             QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
-            meets = QuartermasterLaw.MeetsOf(troops);
+            // GearFit (poprawka po recenzji, uwaga powazna): kto co nosi - ten sam predykat co u ludzi gracza i w bitwie (MeetsFitOf: umiejetnosc, siodlo, kultura);
+            // dotad MeetsOf (sama umiejetnosc) - lepsza sztuka zza morza byla "noszona", gorsza wlasna szla do kupca, a w bitwie RealmWard zdejmowal obca (slot pusty)
+            meets = QuartermasterLaw.MeetsFitOf(troops);
             // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
             // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
             SwapMath.FitBest(men, troops.Count, meets, pieces);
@@ -639,6 +655,7 @@ namespace Armoury
                 foreach (var p in pieces)
                 {
                     var it = QuartermasterLaw.ElOf(p).Item;
+                    int sold0 = sold;   // GearFit (po recenzji): sprzedane sztuki tego egzemplarza - licznik obcej kultury nizej
                     for (int k = 0; k < p.Sell && !stop && planned < cap; k++)
                     {
                         int cnt;
@@ -663,6 +680,7 @@ namespace Armoury
                         SellByCondition.NoteSale(SellByCondition.Men, el, 1, unit);   // ksiega skupu sprzetu (tylko log)
                         MenUpgrade.NoteChurn(mp, it, false);                           // K1 (przeglad): kupione i sprzedane tej samej doby (autotest: 0)
                     }
+                    if (sold > sold0 && GearFit.ForeignToAll(roster, it)) GearFit.NoteAiForeignSold(sold - sold0, garrison);   // tylko licznik linii "GearFit: dzien"
                 }
                 if (grp) meleeLeft -= planned;
             }

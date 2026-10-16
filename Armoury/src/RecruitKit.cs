@@ -27,6 +27,9 @@ namespace Armoury
     ///    autowerbunek zalogi (OnGarrisonTook): komplet do zbrojowni zalogi zamiast sieroty.
     /// Gracz: bez zmian (DTE), zdejmujemy tylko zapisy. E8/T (263, PLAN 1.12): przy PlayerRecruitNoFreeKit gracz ta sama sciezka co AI - PlayerRecruit.cs
     /// (okno werbunku i najmu gracza) bierze rzeczy z PlayerVolunteer / PlayerMerc ponizej, komplet DTE dla tieru 2+ zablokowany.
+    /// GearFit (noc 15/16.10, klucz GearFitKits): kazde przekazanie rzeczy do zbrojowni (AI 5-8, gracz, zaloga) idzie przez FitHandover - sztuka, ktorej
+    /// czlowiek nie uzyje (umiejetnosc, siodlo, kultura), nie wchodzi do zbrojowni: kupiona - notabl ja sprzedaje, dobytek - czlowiek sprzedaje (sakiewka ludzi);
+    /// w zamian rzecz z domu tego samego rodzaju. Zapisy kompletow z dawnych zakupow i zamian HouseLevies przechodza filtr przy werbunku (naprawa wsteczna).
     /// </summary>
     internal static class RecruitKit
     {
@@ -124,6 +127,15 @@ namespace Armoury
             if (k.Template) l.AddRange(TemplateItems(k.Troop));
             l.AddRange(k.Own);
             l.AddRange(k.Items);
+            return l;
+        }
+
+        /// <summary>GearFit: rzeczy CZLOWIEKA z zapisu (wzorzec dorobku stuleci + dobytek) - bez kupionych przez notabla (te osobno, notabl je sprzedaje).</summary>
+        private static List<EquipmentElement> OwnRecord(Kit k)
+        {
+            var l = new List<EquipmentElement>(); if (k == null) return l;
+            if (k.Template) l.AddRange(TemplateItems(k.Troop));
+            l.AddRange(k.Own);
             return l;
         }
 
@@ -338,7 +350,14 @@ namespace Armoury
                 return;
             }
             List<EquipmentElement> items;
-            if (x.Tier <= 1) { items = TemplateItems(x); _dGarT1++; _dGarT1Pcs += items.Count; }   // dobytek tieru 1 (regula wpisu 92, jak przy werbunku do partii)
+            var market = MarketOfNotable(n);   // GearFit: targ notabla - tu idzie to, czego zolnierz zalogi nie uzyje
+            if (x.Tier <= 1)
+            {
+                // dobytek tieru 1 (regula wpisu 92, jak przy werbunku do partii); GearFit: ta sama regula co komplet DTE tieru 1 (sztuka wzorca w miejsce nieuzywalnej)
+                items = TemplateItems(x);
+                if (GearFit.On) { try { GearFit.FitHomeKit(x, items); } catch (Exception e) { Stumble("FitHomeKit", e); } }
+                _dGarT1++; _dGarT1Pcs += items.Count;
+            }
             else
             {
                 var k = Pop(n, x);
@@ -351,14 +370,17 @@ namespace Armoury
                     // Twoja kiesa tylko przy GarrisonBuysGearPlayer (dotad placil zawsze pan, takze Ty - bez wylacznika i bez komunikatu)
                     var lordHero = owner != null ? owner.Leader : null;
                     bool lordPays = !(lordHero != null && lordHero == Hero.MainHero && (s == null || !s.GarrisonBuysGearPlayer));
-                    var unpaid = PayForBought(n, k.Items, lordHero, garrison, lordPays);
+                    // GearFit: kupione, ktorych zolnierz nie uzyje, notabl sprzedaje od razu (zaloga za nie nie placi); dobytek nieuzywalny - do sakiewki zalogi
+                    var fitBought = new List<EquipmentElement>();
+                    items = FitHandover(n, x, k.Items, OwnRecord(k), garrison, market, GearFit.PathGarrison, fitBought, lordHero);   // dobytek i dorobek stuleci - rzeczy czlowieka
+                    var unpaid = PayForBought(n, fitBought, lordHero, garrison, lordPays);
                     k.Items = new List<EquipmentElement>();
-                    items = Materialize(k);   // dobytek i dorobek stuleci - rzeczy czlowieka
                     items.AddRange(_paidItems);
-                    if (unpaid.Count > 0) SellOff(n, new Kit { Troop = x, Items = unpaid }, MarketOfNotable(n));
+                    if (unpaid.Count > 0) SellOff(n, new Kit { Troop = x, Items = unpaid }, market);
                 }
-                else { items = OwnOf(x); _dGarOwn++; }
+                else { items = FitHandover(null, x, null, OwnOf(x), garrison, market, GearFit.PathGarrison, null, owner != null ? owner.Leader : null); _dGarOwn++; }
             }
+            GearFit.CheckEntry(x, items);   // GearFit (po recenzji): kontrola na wejsciu do zbrojowni zalogi (licznik, ma byc 0)
             foreach (var e in items)
                 if (e.Item != null && AiGear.AddToArmory(garrison, e.Item, 1))
                 {
@@ -457,22 +479,182 @@ namespace Armoury
         /// </summary>
         private static int SellOff(Hero n, Kit k, Settlement market)
         {
-            if (k == null || k.Items.Count == 0 || market == null || market.Town == null || market.ItemRoster == null) return 0;
+            if (k == null) return 0;
+            int gold, free;
+            int sold = SellOffCore(n, k.Items, market, out gold, out free);
+            _daySold += sold; _daySoldFree += free;
+            return sold;
+        }
+
+        /// <summary>Wydzielone z SellOff bez zmiany zachowania (GearFit, noc 15/16.10 - ta sama sprzedaz notabla dla sztuk, ktorych rekrut nie uzyje): kazda sztuka
+        /// na polke targu; notabl dostaje cene skupu, dopoki kasa miasta ma zloto (free - na polke bez zaplaty). Bez targu - nic (wolajacy sprawdza targ).</summary>
+        private static int SellOffCore(Hero n, List<EquipmentElement> items, Settlement market, out int gold, out int free)
+        {
+            gold = 0; free = 0;
+            if (items == null || items.Count == 0 || market == null || market.Town == null || market.ItemRoster == null) return 0;
             int sold = 0;
-            foreach (var e in k.Items)
+            foreach (var e in items)
             {
                 if (e.Item == null) continue;
                 int price = MenPurse.SellPrice(e, market, null);
                 market.ItemRoster.AddToCounts(e, 1);
-                if (n == null || market.Town.Gold < price) { _daySoldFree++; continue; }
+                if (n == null || market.Town.Gold < price) { free++; continue; }
                 market.Town.ChangeGold(-price);
                 MoneyLedger.Note169(MoneyLedger.N169Other, market, -price, TownFolk.BBack);   // paczka 169: linia kas (tylko licznik); E5/0: likwidacja z calej kasy (BBack)
                 n.ChangeHeroGold(price);
-                _daySold++;
-                sold++;
+                sold++; gold += price;
                 SellByCondition.NoteSale(SellByCondition.Notable, e, 1, price);   // ksiega skupu sprzetu (tylko log)
             }
             return sold;
+        }
+
+        // ------------------------------------------------------------ GearFit (noc 15/16.10): do zbrojowni tylko to, czego zolnierz uzyje
+        /// <summary>
+        /// GearFit (Jeff 15.10: "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac - oddaj bron"): rzeczy czlowieka przy przekazaniu do zbrojowni
+        /// (werbunek AI i gracza, najem z karczmy, autowerbunek zalog). Kazda sztuka przez GearFit.ForTroop(troop, sztuka, kit). Uzywalna - do wyniku (kupione
+        /// przy boughtOut != null do boughtOut: wolajacy za nie placi - zaloga, PayForBought). Nieuzywalna NIE znika: kupiona przez notabla - notabl sprzedaje ja
+        /// na swoim targu (SellOffCore: cena skupu, kasa pusta - na polke bez zaplaty, regula recenzji 171); dobytek czlowieka - czlowiek sprzedaje ja na tym
+        /// targu, zloto do sakiewki ludzi partii (SellOwn). W zamian rzecz z domu tego samego rodzaju (HomeFor, regula 92/A10). Bez targu - jak dotad (sztuka
+        /// idzie z czlowiekiem). Wylacznik GearFitKits - wszystko jak dotad.
+        /// Poprawki po recenzji (noc 15/16.10): x (odrzucone na targ) liczone w chwili decyzji - ksiega x = x1 + x2 + x3 sprawdza sprzedaz, a nie sama siebie;
+        /// kontrola "do zbrojowni nieuzywalnych" przeniesiona na wejscie do zbrojowni (GearFit.CheckEntry u wolajacych); garLord - pan osady zalogi: przy
+        /// zalodze bez sakiewki (GarrisonPurseEnabled off) zloto za jej dobytek dostaje on (regula 171), nie martwa sakiewka.
+        /// </summary>
+        private static List<EquipmentElement> FitHandover(Hero notable, CharacterObject troop, List<EquipmentElement> bought, List<EquipmentElement> own, MobileParty party, Settlement market, int path, List<EquipmentElement> boughtOut = null, Hero garLord = null)
+        {
+            var res = new List<EquipmentElement>();
+            var bOut = boughtOut ?? res;
+            if (!GearFit.On || troop == null)
+            {
+                if (own != null) res.AddRange(own);
+                if (bought != null) bOut.AddRange(bought);
+                return res;
+            }
+            bool mk = market != null && market.Town != null && market.ItemRoster != null;
+            int n = 0, u = 0, x = 0, x1 = 0, g1 = 0, x2 = 0, g2 = 0, x3 = 0, keep = 0, home = 0;
+            var rejected = new List<ItemObject>();
+            var badBought = new List<EquipmentElement>();
+            var kept = new List<EquipmentElement>();
+            // wyjatek przy jednej sztuce - sztuka idzie z czlowiekiem jak dotad (w strone "jak przed GearFit", nigdy w nicosc), potkniecie liczone
+            if (own != null)
+                foreach (var e in own)
+                {
+                    if (e.Item == null) continue;
+                    n++;
+                    bool fit = true;
+                    try { fit = GearFit.ForTroop(troop, e.Item, true); } catch (Exception ex) { Stumble("FitHandover", ex); }
+                    if (fit) { res.Add(e); u++; continue; }
+                    if (!mk) { kept.Add(e); keep++; continue; }
+                    x++;   // decyzja: na targ (ksiega x = x1 + x2 + x3)
+                    int g; bool paid;
+                    try { paid = SellOwn(market, e, party, out g, garLord); }
+                    catch (Exception ex) { Stumble("SellOwn", ex); x--; kept.Add(e); keep++; continue; }   // sztuka nie trafila na polke - zostaje z czlowiekiem
+                    rejected.Add(e.Item);
+                    if (paid) { x2++; g2 += g; } else x3++;
+                }
+            if (bought != null)
+                foreach (var e in bought)
+                {
+                    if (e.Item == null) continue;
+                    n++;
+                    bool fit = true;
+                    try { fit = GearFit.ForTroop(troop, e.Item, true); } catch (Exception ex) { Stumble("FitHandover", ex); }
+                    if (fit) { bOut.Add(e); u++; continue; }
+                    if (!mk) { kept.Add(e); keep++; continue; }
+                    badBought.Add(e);
+                    x++;   // decyzja: notabl sprzedaje na targu
+                }
+            if (badBought.Count > 0)
+            {
+                int gold = 0, free = 0, sold = 0;
+                // targ sprawdzony (mk) - kazda sztuka na polke, z zaplata albo bez; wyjatek - potkniecie (rozjazd x z x1 + x3 widac w linii doby), werbunek biegnie dalej
+                try { sold = SellOffCore(notable, badBought, market, out gold, out free); } catch (Exception ex) { Stumble("SellOffCore", ex); }
+                x1 += sold; g1 += gold; x3 += free;
+                foreach (var e in badBought) rejected.Add(e.Item);
+            }
+            try
+            {
+                foreach (var bad in rejected)
+                {
+                    var hf = HomeFor(troop, bad, res, bOut);
+                    if (hf != null) { res.Add(new EquipmentElement(hf)); home++; }
+                }
+            }
+            catch (Exception ex) { Stumble("FitHandover(dom)", ex); }
+            res.AddRange(kept);
+            GearFit.NoteHandover(path, n, u, x, x1, g1, x2, g2, x3, keep, home);   // keep = dozwolone nieuzywalne dla GearFit.CheckEntry na wejsciu
+            return res;
+        }
+
+        /// <summary>GearFit: dobytek, ktorego czlowiek nie uzyje, sprzedaje on sam na targu (jak nadwyzki ludzi gracza - SellPlayerSurplus): sztuka zawsze na polke;
+        /// kupiec placi cene skupu z nadwyzki kasy ponad zapas kupcow (TownPurse.BuyFloor), zloto do sakiewki ludzi partii. Bez sakiewki (MenPurseEnabled off,
+        /// brak partii) albo bez zlota w kasie - na polke bez zaplaty (false). Nic nie powstaje: kasa miasta -> sakiewka ludzi, sztuka -> polka.
+        /// Poprawka po recenzji: zaloga bez sakiewki (MenUpgrade.GarrisonPurseOn false - jej sakiewki nikt nie wydaje) - zloto dostaje pan osady (garLord;
+        /// regula 171, jak nadwyzki zalog w MenPurse.SellArmorySurplus: ChangeHeroGold + ClanIncomeBook KThird); bez zywego pana - na polke bez zaplaty.</summary>
+        private static bool SellOwn(Settlement market, EquipmentElement e, MobileParty party, out int gold, Hero garLord = null)
+        {
+            gold = 0;
+            market.ItemRoster.AddToCounts(e, 1);   // wyjatek tutaj - sztuka nie jest na polce, wolajacy zostawia ja czlowiekowi
+            try
+            {
+                if (party == null || !MenPurse.On) return false;
+                bool toLord = party.IsGarrison && !MenUpgrade.GarrisonPurseOn;
+                if (toLord && (garLord == null || !garLord.IsAlive)) return false;
+                int price = Math.Max(0, MenPurse.SellPrice(e, market, party));
+                if (price <= 0 || market.Town.Gold - TownPurse.BuyFloor(market.Town, 0) < price) return false;
+                market.Town.ChangeGold(-price);
+                if (toLord)
+                {
+                    garLord.ChangeHeroGold(price);
+                    if (garLord != Hero.MainHero) ClanIncomeBook.NoteInflow(garLord, price, ClanIncomeBook.KThird);   // paczka 169: D rodu (tylko licznik), jak nadwyzki zalog
+                    GearFit.NoteOwnToLord(price);
+                }
+                else MenPurse.Add(party, price);
+                gold = price;
+                MoneyLedger.Note169(MoneyLedger.N169Surplus, market, -price);   // paczka 169: linia kas (tylko licznik) - jak SellPlayerSurplus
+                SellByCondition.NoteSale(SellByCondition.Men, e, 1, price);    // ksiega skupu sprzetu (tylko log)
+                Measure174b.NoteSurplusSale(e.Item, 1, price);                   // 174b.0 M3 (tylko licznik)
+                Measure174b.NoteArrival(market, e.Item, 1, Measure174b.ArrPurse);
+                return true;
+            }
+            catch (Exception ex) { Stumble("SellOwn", ex); return gold > 0; }   // sztuka juz na polce: bez zaplaty (x3) albo zaplacona (x2)
+        }
+
+        /// <summary>GearFit: rzecz z domu w miejsce odrzuconej - przedmiot przodka tieru 1 linii (RootOf) tego samego rodzaju (KindOf), ktorego zolnierz uzyje
+        /// i ktorego jeszcze nie ma (regula 92/A10: dobytek z domu). Bez koni i rzedow (dobytek ich nie obejmuje). null - brak.</summary>
+        private static ItemObject HomeFor(CharacterObject troop, ItemObject bad, List<EquipmentElement> have, List<EquipmentElement> have2)
+        {
+            if (troop == null || bad == null || MenPurse.HorseKind(bad)) return null;
+            var root = RootOf(troop);
+            if (root == null) return null;
+            int k = KindOf(bad);
+            foreach (var e in TemplateItems(root))
+            {
+                var it = e.Item;
+                if (it == null || it == bad || MenPurse.HorseKind(it) || KindOf(it) != k) continue;
+                bool dup = false;
+                foreach (var h in have) if (h.Item == it) { dup = true; break; }
+                if (!dup && have2 != null && !ReferenceEquals(have2, have)) foreach (var h in have2) if (h.Item == it) { dup = true; break; }
+                if (dup || !GearFit.ForTroop(troop, it, true)) continue;
+                return it;
+            }
+            return null;
+        }
+
+        /// <summary>GearFit: targ, na ktorym rekrut sprzedaje to, czego nie uzyje - targ notabla (jak SellOff), inaczej targ osady werbunku; null - bez targu.</summary>
+        private static Settlement MarketFor(Hero notable, Settlement settlement)
+        {
+            Settlement m = null;
+            try { if (notable != null) m = MarketOfNotable(notable); } catch { }
+            try { if (m == null && settlement != null) m = VolunteerKit.MarketOf(settlement); } catch { }
+            return m;
+        }
+
+        private static int HorsePcs(List<EquipmentElement> l)
+        {
+            int n = 0;
+            if (l != null) foreach (var e in l) if (MenPurse.HorseKind(e.Item)) n++;
+            return n;
         }
 
         private static Settlement MarketOfNotable(Hero n)
@@ -564,25 +746,35 @@ namespace Armoury
             if (troop.Tier <= 1) { _dayTier1 += amount; return true; }   // 3: wlasny dobytek rekruta - komplet DTE jak dotad
             var mp = recruiterHero.PartyBelongedTo;
             if (mp == null) return true;                                 // 4: DTE i tak wychodzi
+            var market = MarketFor(recruitmentSource, settlement);       // GearFit: tu rekrut sprzedaje to, czego nie uzyje
             for (int i = 0; i < amount; i++)
             {
                 var k = Pop(recruitmentSource, troop);
                 List<EquipmentElement> items;
-                if (k != null) { items = Materialize(k); _dayKits++; _dRecPcs += items.Count; _tRec[TierIdx(troop)]++; }   // 5: z zapisu notabla
+                if (k != null)                                                                                                // 5: z zapisu notabla
+                {
+                    // GearFit: kupione przez notabla osobno od rzeczy czlowieka (dorobek stuleci i dobytek) - do zbrojowni tylko to, czego uzyje
+                    items = FitHandover(recruitmentSource, troop, k.Items, OwnRecord(k), mp, market, GearFit.PathAi);
+                    _dayKits++; _dRecPcs += items.Count; _tRec[TierIdx(troop)]++;
+                }
                 else if (!what) { items = TemplateItems(troop); _dayLegacy++; }                                               // wylacznik: wzorzec jak dotad
                 else
                 {
                     items = OwnOf(troop);
+                    int horse = 0;
                     if (recruitmentSource != null) { _dOwnNotable++; if (troop.IsMounted) _dMountedNoHorse++; }                // 6: ochotnik bez zapisu
                     else if (settlement != null)                                                                              // 7: najemnik z karczmy
                     {
                         _dOwnMerc++;
                         VetKit.Hire(settlement, troop, items);   // C3: komplet weterana z puli karczmy zastepuje dobytek z domu tych rodzajow
-                        _dMercHorsePcs += MercHorseKit(settlement, troop, items);   // E8/T (263): ta sama regula konia i rzedu dla AI i gracza (wydzielone bez zmian)
+                        horse = MercHorseKit(settlement, troop, items);   // E8/T (263): ta sama regula konia i rzedu dla AI i gracza (wydzielone bez zmian)
                     }
                     else { _dOwnNoSource++; if (troop.IsMounted) _dMountedNoHorse++; }                                        // 8: bez zrodla (ochotnik z mapy, inne mody)
+                    items = FitHandover(null, troop, null, items, mp, market, GearFit.PathAi);   // GearFit: dobytek, ktorego nie uzyje, sprzedaje sam
+                    _dMercHorsePcs += Math.Min(horse, HorsePcs(items));
                     _dOwnPcs += items.Count; _tOwn[TierIdx(troop)]++;
                 }
+                GearFit.CheckEntry(troop, items);   // GearFit (po recenzji): kontrola na wejsciu do zbrojowni partii (licznik, ma byc 0)
                 foreach (var e in items)
                 {
                     if (e.Item == null) continue;
@@ -638,10 +830,12 @@ namespace Armoury
         {
             var s = Settings.Current;
             var k = Pop(notable, troop);
-            if (k != null) { kind = PlRecord; return Materialize(k); }
+            // GearFit (noc 15/16.10): do Twojej zbrojowni tylko to, czego rekrut uzyje - reszte sprzedaje notabl (kupione) albo rekrut (dobytek, sakiewka ludzi)
+            Settlement here = null; try { here = Settlement.CurrentSettlement; } catch { }
+            if (k != null) { kind = PlRecord; return FitHandover(notable, troop, k.Items, OwnRecord(k), MobileParty.MainParty, MarketFor(notable, here), GearFit.PathPlayer); }
             if (s != null && !s.RecruitBringsWhatHeHas) { kind = PlTemplate; return TemplateItems(troop); }
             kind = PlOwn;
-            return OwnOf(troop);
+            return FitHandover(null, troop, null, OwnOf(troop), MobileParty.MainParty, MarketFor(notable, here), GearFit.PathPlayer);
         }
 
         /// <summary>E8/T: rzeczy najemnika z karczmy najetego przez gracza - przypadek 7 OnRecruited: dobytek oraz kon i rzad (MercHorseKit); wylacznik - wzorzec.</summary>
@@ -654,6 +848,8 @@ namespace Armoury
             var items = OwnOf(troop);
             VetKit.Hire(town, troop, items);   // C3: komplet weterana z puli karczmy - ta sama regula co u AI (przypadek 7)
             horsePcs = MercHorseKit(town, troop, items);
+            items = FitHandover(null, troop, null, items, MobileParty.MainParty, MarketFor(null, town), GearFit.PathPlayer);   // GearFit: jak u AI (przypadek 7)
+            horsePcs = Math.Min(horsePcs, HorsePcs(items));
             return items;
         }
 

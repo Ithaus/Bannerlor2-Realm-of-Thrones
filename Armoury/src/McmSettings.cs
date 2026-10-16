@@ -664,9 +664,21 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonPurseEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Quartermaster Swap One For One", HintText = "swap in the stores: the men take a piece of yours only if it fills empty hands or beats the one they wear (and they meet its skill requirement); for every piece that replaced one of theirs they hand you their worst piece of that kind; worse, equal or too heavy pieces stay yours in the stash; the men's spare is theirs - take it and you pay them the merchant's price")]
+        [SettingPropertyBool("Quartermaster Swap One For One", HintText = "swap in the stores: the men take a piece of yours only if it fills empty hands or beats the one they wear (and they meet its skill requirement); for every piece that replaced one of theirs they hand you a piece of that kind back (with Swap Returns Their Old Kit the very piece it replaced, else their worst spare one); worse, equal or too heavy pieces stay yours in the stash; the men's spare is theirs - take it and you pay them the merchant's price (with Armoury Shows Only Yours their spare is not listed at all)")]
         [SettingPropertyGroup("The finished piece")]
         public bool QuartermasterSwapOneForOne { get; set; } = true;
+
+        [SettingPropertyBool("Armoury Shows Only Yours", HintText = "the troop armoury (Dynamic Troop Equipment stash) lists only YOUR kit, free to take: what the men wear and their share of the spoils is theirs and is not listed - they sell their spare spoils in the next town and buy better kit if they can afford it (needs Men Purse Enabled and Armoury Protect Used; off = their spare is listed and you pay them for what you take)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool ArmouryShowsOnlyYours { get; set; } = true;
+
+        [SettingPropertyBool("Swap Returns Their Old Kit", HintText = "when the men take a better piece of yours in the stores, you get back the very piece it replaced (the soldier's old kit), not their worst spare piece; a piece that filled empty hands gives nothing back (off = their worst spare piece of that kind, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SwapReturnsTheirOldKit { get; set; } = true;
+
+        [SettingPropertyBool("Player Men Sell Spare Horses", HintText = "your men sell spare horses from the troop armoury (beyond one per rider plus Surplus Keep Percent, and horses no rider of theirs can ride) to the merchants of the next town, like the rest of their spare kit - the coin goes to the men's purse (off = their horses stay in the armoury, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PlayerMenSellSpareHorses { get; set; } = true;
 
         [SettingPropertyBool("Garrison Kit Menu", HintText = "'Hand kit to the garrison' in the menu of your towns and castles: drop kit on the garrison - they take what fills empty hands or beats their own and give you their worse pieces back; the rest comes back to you")]
         [SettingPropertyGroup("The finished piece")]
@@ -4948,6 +4960,30 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool ArmsCoverageLog { get; set; } = true;
 
+        [SettingPropertyBool("Gear Fit Kits", HintText = "a soldier is given only kit he can use: notables buy for a volunteer only pieces his skills carry (weapon and shield skill, Athletics for armour, Riding for horse and barding, a rider's weapon usable from the saddle); a piece a recruit, hireling or transferred man cannot use stays with its owner - the notable sells what he bought, the man sells his own and the coin goes to the men's purse - and he takes his home piece of that kind instead; a first-rank recruit's starting kit swaps such a piece for one of his own troop's (off = as before)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitKits { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Culture", HintText = "kit follows the soldier's people: from his side of the Narrow Sea, or of a style his own people's troops wear in Realm of Thrones; a piece of his own template always fits; used when notables, lords, garrisons and your men buy, when they count what is worn and what is spare to sell, and when battle takes kit from across the sea off a soldier (off = only the side of the Narrow Sea, in battle only)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitCulture { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Weapon Floor", HintText = "in battle no soldier fights bare-handed while his party's stores hold a weapon he can use: a man left without any weapon after the skill and culture checks takes the best melee weapon he can wield from the stores, of his people's kind first (from across the sea only with Gear Fit Floor Foreign) - nothing from thin air (off = as before)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitWeaponFloor { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Floor Foreign", HintText = "with Gear Fit Weapon Floor: a bare-handed man with no weapon of his people's kind in the stores takes one from across the Narrow Sea he can wield - even the very piece that was just taken off him or a comrade for its foreign style - better a foreign blade than bare hands (off = no foreign weapon in battle: he fights bare-handed when the stores hold nothing of his people's kind)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitFloorForeign { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Floor Over Skill", HintText = "with Gear Fit Weapon Floor: when the stores hold no weapon a bare-handed man can wield, he takes the lightest one there even above his skill - better over-armed than bare-handed (off = skills are sacred: no weapon he cannot use, as decided on 14.09)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitFloorOverSkill { get; set; } = false;
+
+        [SettingPropertyBool("Gear Fit Realm From Stores", HintText = "a piece from across the Narrow Sea taken off a soldier in battle is replaced from his party's stores - the best piece of the same kind he can use - not from his template out of thin air (which the nothing-from-nothing guard took away again at spawn, leaving him empty-handed) (off = as before)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitRealmFromStores { get; set; } = true;
+
         [SettingPropertyBool("Drill Law", HintText = "your men drill every day out of battle, and so do your clan's parties and lords in your army (the game gave them no daily drill), by the one rule every lord's party follows: each man learns 10 + 2 x his tier a day, x1.5 on a day of rest (moved in fewer than 4 of the last 24 hours - an hour in a settlement, in a siege camp or barely moving rests, as for sleep), x0.9 on the march, not at all when starving or after a night without sleep (they met the dawn with sleep debt - no drill until the next dawn; training perks included); the pace follows the commander's Leadership (170 = normal, from half to one and a half). Off = as before")]
         [SettingPropertyGroup("Drill")]
         public bool DrillLaw { get; set; } = true;
@@ -6494,6 +6530,9 @@ namespace Armoury
             s.MenUpgradeAmmoNeedsSurplus = MenUpgradeAmmoNeedsSurplus;
             s.GarrisonPurseEnabled = GarrisonPurseEnabled;
             s.QuartermasterSwapOneForOne = QuartermasterSwapOneForOne;
+            s.ArmouryShowsOnlyYours = ArmouryShowsOnlyYours;
+            s.SwapReturnsTheirOldKit = SwapReturnsTheirOldKit;
+            s.PlayerMenSellSpareHorses = PlayerMenSellSpareHorses;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;
@@ -7564,6 +7603,12 @@ namespace Armoury
             s.GarrisonDrillNeedsArms = GarrisonDrillNeedsArms;
             s.PartyDrillNeedsArms = PartyDrillNeedsArms;
             s.ArmsCoverageLog = ArmsCoverageLog;
+            s.GearFitKits = GearFitKits;
+            s.GearFitCulture = GearFitCulture;
+            s.GearFitWeaponFloor = GearFitWeaponFloor;
+            s.GearFitFloorForeign = GearFitFloorForeign;
+            s.GearFitFloorOverSkill = GearFitFloorOverSkill;
+            s.GearFitRealmFromStores = GearFitRealmFromStores;
             s.DrillLaw = DrillLaw;
             s.DrillNeedsArmsPlayer = DrillNeedsArmsPlayer;
             s.DrillStock = DrillStock;

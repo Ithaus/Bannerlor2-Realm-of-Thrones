@@ -12,7 +12,8 @@ namespace Armoury
     ///    ze sztuka (nadwyzki, braki, prog K1-C); wymiana z graczem (Swap) liczy tyle samo ludzi, ale "najlepsze najpierw" (Greedy).
     ///  - AllocateOwn: ksiega wkladow gracza jest per id; przy jednym id obejmuje NAJGORSZE egzemplarze (watpliwosc na korzysc ludzi).
     ///  - Swap (B2): noszony wklad gracza przechodzi na ludzi; za kazdy, ktory WYPARL sztuke ludzi, gracz dostaje jedna najgorsza
-    ///    wolna UZYTECZNA sztuke ludzi tego typu (Jeff 30.08); wklad, ktory wypelnil puste rece, przechodzi bez zwrotu (Jeff 14.09);
+    ///    wolna UZYTECZNA sztuke ludzi tego typu (Jeff 30.08; od 15.10 u gracza przy SwapReturnsTheirOldKit - sztuke WYPARTA, czyli stary sprzet
+    ///    zolnierza: backDisplaced); wklad, ktory wypelnil puste rece, przechodzi bez zwrotu (Jeff 14.09);
     ///    nienoszony wklad zostaje gracza; reszta wolnych sztuk ludzi nalezy do LUDZI.
     ///    K1 (Jeff 09.10 04:40, WYMIANA): "jesli dasz cos taniego, ale gorszego od tego, co maja - oni tego tez nie biora, zostaje po
     ///    prostu w okienku DTE". Wklad wypiera sztuke ludzi TYLKO, gdy jest od niej LEPSZY (Better: tier, sila, wrak, jakosc) i ktos
@@ -54,6 +55,8 @@ namespace Armoury
             // ma rowna albo lepsza, albo nikt ich nie potrzebuje), KeptHard: ten, komu bylyby lepsze, ich nie udzwignie (wymog)
             public int KeptWorse, KeptHard;
             public bool[] UnfitMan;       // kto (indeks czlowieka) zostal bez uzytecznej sztuki w dopasowaniu PO
+            // Jeff 15.10 (c): ile zwrotow X to sztuki WYPARTE (stary sprzet ludzi) - przy backDisplaced; reszta (X - XDisp) z innych wolnych
+            public int XDisp;
         }
 
         // ------------------------------------------------------------ porzadki
@@ -192,8 +195,11 @@ namespace Armoury
         /// gracza; w PO sztuki ludzi sa podzbiorem tych z PRZED). Dotychczasowy przypadek "wklad wyparl lepsza sztuke ludzi" (NotBetter)
         /// nie moze sie zdarzyc. Zwrot (Back) to X najgorszych wolnych - kazdy nie lepszy od swojej wypartej.
         /// oneForOne=false: regula sprzed K1 - dopasowanie FitCore i wszystko nienoszone dla gracza (Target = Total - Used).
+        /// backDisplaced (Jeff 15.10 (c), klucz SwapReturnsTheirOldKit - tylko druzyna gracza): zwrot X najpierw z sztuk WYPARTYCH (max(0, UsedBefore - MenWorn)
+        /// na egzemplarz - stary sprzet ludzi, ktory nosili przed wymiana, od najgorszego); suma wypartych >= X, wiec caly zwrot to ich stary sprzet, a ich wolny
+        /// zapas z lupu zostaje ich (sprzedaja go w miescie). false (zalogi, klucz wylaczony) - najgorsze wolne uzyteczne, jak dotad.
         /// </summary>
-        internal static SwapResult Swap(int[] group, int groups, Func<int, Piece, bool> meets, List<Piece> pieces, bool oneForOne)
+        internal static SwapResult Swap(int[] group, int groups, Func<int, Piece, bool> meets, List<Piece> pieces, bool oneForOne, bool backDisplaced = false)
         {
             var r = new SwapResult { Need = group.Length, UnfitMan = new bool[group.Length] };
             pieces.Sort(FitOrder);
@@ -217,16 +223,31 @@ namespace Armoury
             foreach (var p in pieces) { p.OwnWorn = Math.Max(0, p.Used - p.MenTotal); p.Back = 0; r.Worn += p.OwnWorn; }
             foreach (var p in pieces) r.Displaced += Math.Max(0, p.UsedBefore - p.MenWorn);
             int x = Math.Min(r.Worn, r.Displaced);
+            if (x > 0 && group.Length > 0 && backDisplaced)
+            {
+                // Jeff 15.10 (c): "na jego miejsce do zbrojowni gracza trafia stary, gorszy pancerz zolnierza (o ile jakis mial)" - sztuka wyparta byla
+                // noszona w PRZED, wiec ktos ja udzwignie (bez filtra group[0] - inna grupa mogla ja nosic)
+                var disp = new List<Piece>();
+                foreach (var p in pieces) if (!p.Barred && p.UsedBefore > p.MenWorn && p.MenFree > 0) disp.Add(p);
+                disp.Sort(WorseFirst);
+                foreach (var p in disp)
+                {
+                    if (x <= 0) break;
+                    int k = Math.Min(x, Math.Min(p.UsedBefore - p.MenWorn, p.MenFree - p.Back));
+                    if (k <= 0) continue;
+                    p.Back += k; x -= k; r.X += k; r.XDisp += k;
+                }
+            }
             if (x > 0 && group.Length > 0)
             {
                 var cand = new List<Piece>();
-                foreach (var p in pieces) if (!p.Barred && p.MenFree > 0 && ok.Ok(group[0], p)) cand.Add(p);
+                foreach (var p in pieces) if (!p.Barred && p.MenFree - p.Back > 0 && ok.Ok(group[0], p)) cand.Add(p);
                 cand.Sort(WorseFirst);
                 foreach (var p in cand)
                 {
                     if (x <= 0) break;
-                    int k = Math.Min(x, p.MenFree);
-                    p.Back = k; x -= k; r.X += k;
+                    int k = Math.Min(x, p.MenFree - p.Back);
+                    p.Back += k; x -= k; r.X += k;
                 }
             }
             r.Filled = r.Worn - Math.Min(r.Worn, r.Displaced);   // puste rece (bez zwrotu)

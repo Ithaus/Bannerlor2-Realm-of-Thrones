@@ -5997,6 +5997,67 @@ namespace CrashScribe
             return set.Contains(it);
         }
 
+        // ===== GearFit (noc 15/16.10, Jeff 15.10 "walcza piesciami") =====
+        // (1) kultura jak w Armoury: Armoury.GearFit.CultureOk (ta sama strona morza, styl, ktory ROT sam daje tej kulturze - "krewny", wlasny wzorzec);
+        //     bez Armoury z GearFit - ForeignShore + TemplateHas jak dotad. Dotad straz zdejmowala tez style, ktore ROT sam daje swoim wojskom
+        //     (Dorzecze w kolczudze "empire", Volantis w stroju "aserai" - rozpoznanie: 513 z 581 slotow wzorcow).
+        // (2) GearFitRealmFromStores (ustawienie Armoury, domyslnie tak): zamiennik z PULI rozdzielacza (ta sama grupa, uzywalny, dozwolonej kultury,
+        //     u jezdzca z siodla), nie ze wzorca - sztuka wzorca byla z niczego i straz "nic z niczego" Armoury zabierala ja przy spawnie (log 15.10
+        //     12:03:43: 3x pointed_falchion_sword_t4, slot pusty). Bez zamiennika slot pusty - bron biala dobierze podloga Armoury (GearFit, Priority.Last).
+        //     Ksiegowosc polki: najpierw zwrot obcej (AddEquipmentToAssign), potem pobranie zamiennika (ConsumeEquipmentToAssign).
+        // poprawka po recenzji (noc 15/16.10): WardForeignTpl liczony w galezi "ze wzorca" (dotad T = K - Z - B, wiec Z + B + T = K zawsze sie zgadzalo)
+        internal static int WardForeignSub, WardForeignBare, WardForeignTpl;
+        private static Func<CharacterObject, ItemObject, bool> _gfCultureOk;
+        private static bool _gfLooked;
+
+        private static Func<CharacterObject, ItemObject, bool> GearFitCultureOk()
+        {
+            if (_gfLooked) return _gfCultureOk;
+            _gfLooked = true;
+            try
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "Armoury") continue;
+                    var t = asm.GetType("Armoury.GearFit");
+                    var m = t != null ? t.GetMethod("CultureOk", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, new[] { typeof(CharacterObject), typeof(ItemObject) }, null) : null;
+                    if (m != null) _gfCultureOk = (Func<CharacterObject, ItemObject, bool>)Delegate.CreateDelegate(typeof(Func<CharacterObject, ItemObject, bool>), m);
+                    break;
+                }
+            }
+            catch { _gfCultureOk = null; }
+            try
+            {
+                Scribe.Line("Mends: Waskie Morze - kultura " + (_gfCultureOk != null ? "wedlug Armoury GearFit.CultureOk (PODPIETA: strona morza, style krewne ROT, wlasny wzorzec)"
+                                                                         : "BRAK Armoury GearFit.CultureOk - sama strona morza i wlasny wzorzec (jak dotad)") + ".");
+            }
+            catch { }
+            return _gfCultureOk;
+        }
+
+        /// <summary>GearFit: zamiennik obcej sztuki z puli rozdzielacza - ta sama grupa (typ + klasa broni), uzywalny (CanUse), dozwolonej kultury, u jezdzca
+        /// w slotach 0-3 z siodla (MountOk), bez unikatow, sprzetu umarlych i klingi lore; najwyzszy wymog, potem RangedKey (jak SkillLawWard).</summary>
+        private static bool StoreSub(System.Collections.IDictionary pool, CharacterObject co, ItemObject it, int slot, bool mounted, Func<CharacterObject, ItemObject, bool> cultureOk, out EquipmentElement best)
+        {
+            best = default(EquipmentElement);
+            ItemObject bi = null;
+            string grp = WardGroup(it);
+            foreach (System.Collections.DictionaryEntry kv in pool)
+            {
+                int cnt; try { cnt = Convert.ToInt32(kv.Value); } catch { continue; }
+                if (cnt <= 0 || !(kv.Key is EquipmentElement)) continue;
+                var cand = (EquipmentElement)kv.Key;
+                var ci = cand.Item;
+                if (ci == null || WardGroup(ci) != grp) continue;
+                if (IsUniqueGear(ci) || IsDeadGear(ci) || IsLoreBlade(ci)) continue;
+                bool ok = cultureOk != null ? cultureOk(co, ci) : !(ForeignShore(ci, co) && !TemplateHas(co, ci));
+                if (!ok || !CanUse(co, ci)) continue;
+                if (mounted && slot <= 3 && !MountOk(ci)) continue;
+                if (bi == null || ci.Difficulty > bi.Difficulty || (ci.Difficulty == bi.Difficulty && RangedKey(ci) > RangedKey(bi))) { bi = ci; best = cand; }
+            }
+            return bi != null;
+        }
+
         public static void RealmWard(object __instance)
         {
             try
@@ -6005,6 +6066,13 @@ namespace CrashScribe
                 var list = tr.Property("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) list = tr.Field("Assignments").GetValue() as System.Collections.IEnumerable;
                 if (list == null) return;
+                // GearFit: raz na wywolanie (nie na zolnierza) - goraca sciezka, podglad gotowosci zbrojowni na mapie tez wola DoAssignAsync
+                var cultureOk = GearFitCultureOk();
+                // poprawka po recenzji: brak klucza (stara Armoury bez GearFit, bez podlogi broni) = 0 - zamiennik ze wzorca jak przed zmiana; dotad domyslne 1
+                // dawalo pusty slot u WSZYSTKICH partii, bo stara Armoury pustego slotu broni nie uzupelnia
+                bool fromStores = ArmouryFloat("GearFitRealmFromStores", 0f) > 0.5f;
+                System.Collections.IDictionary pool = null;
+                if (fromStores) { try { pool = tr.Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary; } catch { pool = null; } }
                 foreach (var a in list)
                 {
                     var ta = Traverse.Create(a);
@@ -6015,22 +6083,39 @@ namespace CrashScribe
                     Equipment tpl = null;
                     try { tpl = ta.Property("ReferenceEquipment").GetValue() as Equipment; } catch { }
                     if (_mIsTemp == null) { try { _mIsTemp = AccessTools.Method(a.GetType(), "IsTemporarySlot"); } catch { } }
+                    bool mounted = false;
+                    if (pool != null) { try { var hs = eq[EquipmentIndex.Horse]; mounted = !hs.IsEmpty && hs.Item != null; } catch { } }
                     for (int s = 0; s <= 9; s++)
                     {
                         if (s == 4) continue;                                   // sztandar
                         EquipmentElement el; ItemObject it;
                         try { el = eq[(EquipmentIndex)s]; it = el.Item; } catch { continue; }
-                        if (it == null || !ForeignShore(it, co) || TemplateHas(co, it)) continue;
+                        if (it == null) continue;
+                        bool foreign = cultureOk != null ? !cultureOk(co, it) : (ForeignShore(it, co) && !TemplateHas(co, it));
+                        if (!foreign) continue;
                         bool temp = false;
                         try { temp = _mIsTemp != null && (bool)_mIsTemp.Invoke(a, new object[] { (EquipmentIndex)s, it }); } catch { }
                         if (temp) continue;                                     // awaryjny przydzial DTE - nie z polki
+                        if (pool != null)
+                        {
+                            // GearFit: najpierw obca wraca na polke, potem zamiennik z polki (albo pusty slot - podloga Armoury dobierze bron biala)
+                            try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }
+                            EquipmentElement got;
+                            bool found = false;
+                            try { found = StoreSub(pool, co, it, s, mounted, cultureOk, out got); } catch { got = default(EquipmentElement); found = false; }
+                            try { ta.Method("SetEquipment", (EquipmentIndex)s, found ? got : default(EquipmentElement)).GetValue(); } catch { }
+                            if (found) { try { tr.Method("ConsumeEquipmentToAssign", got).GetValue(); } catch { } WardForeignSub++; }
+                            else WardForeignBare++;
+                            WardForeign++;
+                            continue;
+                        }
                         ItemObject sub = null;
                         try { sub = tpl != null ? tpl[(EquipmentIndex)s].Item : null; } catch { }
                         if (sub != null && (IsUniqueGear(sub) || IsDeadGear(sub) || IsLoreBlade(sub))) sub = null;
                         if (sub != null && !CanUse(co, sub)) sub = null;
                         try { ta.Method("SetEquipment", (EquipmentIndex)s, sub != null ? new EquipmentElement(sub) : default(EquipmentElement)).GetValue(); } catch { }
                         try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }   // sztuka wraca na polke
-                        WardForeign++;
+                        WardForeign++; WardForeignTpl++;
                     }
                 }
             }
@@ -6043,11 +6128,13 @@ namespace CrashScribe
             try
             {
                 if (WardBlades == 0 && WardArmour == 0 && WardStumbles == 0 && WardForeign == 0) return;
+                // GearFit (noc 15/16.10): dopisek NA KONCU - zamiennik obcej z polki rozdzielacza / bez zamiennika (slot pusty; Z + B = sztuk z polki, reszta ze wzorca)
                 Scribe.Line("Straz unikatow: " + WardBlades + " klng/unikatow zdjetych z przydzialu DTE, "
                             + WardArmour + " sztuk pancerza cofnietych do wzorca oddzialu, "
                             + WardForeign + " sztuk zza Waskiego Morza wroconych na polke, "
-                            + WardStumbles + " potkniec.");
-                WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0;
+                            + WardStumbles + " potkniec | zamiennik z polki (GearFit) " + WardForeignSub + ", bez zamiennika (slot pusty, podloga Armoury) " + WardForeignBare
+                            + ", ze wzorca (Gear Fit Realm From Stores wylaczone albo brak puli) " + WardForeignTpl + ".");
+                WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0; WardForeignSub = 0; WardForeignBare = 0; WardForeignTpl = 0;
             }
             catch { }
         }
