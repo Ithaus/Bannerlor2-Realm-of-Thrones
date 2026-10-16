@@ -2339,3 +2339,12 @@ i Immersive Battlefields (Nexus 4633, plik V3.6.2 "v1.4.x"; V3.6.3 to gra 1.5). 
 Realistic Blood (mniej krwi), Larmantine (kultury vanilli), Realistic Combat Sounds (build 1.3), inne AI (gryza sie z RBM), aktualizacja RBM w trakcie kampanii.
 DO ZROBIENIA: gdy Jeff wgra Battle Atmosphere - nasze BattleVoices (noc-bitwa cz. 2) wylaczyc albo samo-wylaczenie przy module ROTBattleAtmosphere; kod nowych modow przeczytac przed wlaczeniem.
 noc-bitwa (wf_b217935f-e51, zb/n-bitwa od 591f64ff) w toku - bedzie WGRANIEM 68 (scalanie na int cdc98e78).
+
+### 51. CRASH 16.10 10:06:57 - MoreBloodPoolMod wylaczony; korekta Combat AI
+Sesja Jeffa 10:03 (Armoury-2026-10-16_10-03-14.log, CrashScribe session-..._10-03-13 + hang-..._10-07-07, rgl_log_17440 - kopie D:/Backup-Bannerlord/logi-jeffa/2026-10-16):
+arena Seagard, misja 10:06:39, przy pierwszym ciosie 10:06:57 0xC0000005 w TaleWorlds.Native (bez ramek zarzadzanych). Przyczyna: MoreBloodPoolMod (wlaczony w 50.)
+- BloodPoolBehavior.SpawnDecal: Decal.CreateDecal + Scene.AddDecalInstance("blood_set") bez SetMaterial (wybrany material nieuzyty); OnMeleeHit przy >= 20 obrazen. Jedyny nowy kod przy trafieniu.
+Jego decal_sets.xml i tak sie nie laduje (modul bez project.mbproj). LauncherData: MoreBloodPoolMod false (kopia D:/Backup-Bannerlord/ustawienia/2026-10-16-po-crashu-krew).
+Zapis Ironman z 09:20 nietkniety (kopia zapisy-jeffa/...-po-crashu-1006.sav).
+KOREKTA: kampania Jeffa ma WSZYSTKIE opcje trudnosci Realistic (linia 10:05:38 "juz Realistic"); "Game Difficulty +0.40" w 50. pochodzilo z autotestu (zapis F). CombatAiRealistic u Jeffa = bez zmian.
+Wniosek: kod misji (mody i nasz) wlaczac dopiero po probie w bitwie - autotest bitew nie odpala. BattleGore (noc-bitwa) uzywa CreateBloodBurstAtLimb (jak DismembermentPlus), bez decali.
