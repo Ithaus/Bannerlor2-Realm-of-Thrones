@@ -5,6 +5,9 @@
 # Wyjscie: Armoury/ModuleData/arm_map_villages.tsv (v5), arm_map_village_lore.tsv (v5: te same zdania lore dla wiosek, ktore zostaly,
 # nowy naglowek layout_crc) i tools/wioski-v5/raport-v5.txt. Przebieg deterministyczny (ten sam plik za kazdym razem).
 #
+# KOLEJNOSC POTOKU: najpierw lore v4 (python tools/wioski-lore/l0.py - domyslnie arm_map_villages_v4.tsv -> arm_map_village_lore_v4.tsv), potem ten skrypt.
+# Nie puszczac l0.py na arm_map_villages.tsv (v5): przydzial rycerzy zalezy od ukladu, teksty v5 rozjechalyby sie z v4.
+#
 # Uzycie (z katalogu repo):  python -I tools/wioski-v5/v5_uklad.py [--okregi <okregi.tsv generatora v4>] [--sprawdz]
 #   --okregi  - tabela okregow generatora v4 (kolumna osad = osady okregu przy generacji): tylko do oceny w raporcie, ile okregow
 #               ksiega pomniejszy (wioski + najwieksza > osady okregu); bez niej ta linia raportu jest pomijana
@@ -26,7 +29,10 @@
 #   brod 1.35, rzeka 1.15 (przystan / widly - klasa H - 1.35), jezioro 1.15, brzeg 1.1 (port - klasa H - 1.3), droga 1.0, pole 0.6.
 #   Czynnik z uid 0.70..1.45 (fnv1a). Ludzie okregu w grze sie nie zmieniaja (n okregu z ludzi, VillageBook.EnsureN) - plik dzieli
 #   tylko n miedzy wioski i wies gry, a skoro wiosek jest mniej, srednia wioska jest wieksza.
-import io, os, sys, zlib
+#   Po recenzji D3: suma osad wiosek okregu PO zaokragleniu, kolanie i suficie dociagana krok po kroku: okreg bez ubytku wiosek - dokladnie suma v4
+#   (rozklad tylko wedlug miejsca i uid), inny - w granicach 85..115% v4; L4 jako gorna granica. Poza granicami zostaja tylko okregi, w ktorych
+#   wszystkie wioski sa juz na suficie 36 (raport: linia "suma okregu po zaokragleniu").
+import io, math, os, sys, zlib
 from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -303,25 +309,53 @@ def main():
     fbar = 0.5 * (F_LO + F_HI)
     clamped = Counter()
     budget_hit = budget_short = 0
+    fit = Counter()                                 # dociaganie sumy okregu po zaokragleniu (po recenzji D3)
     for did, rs in kdist.items():
         base = s_old[did] / float(len(rs))
         raw = [base * (r["_w"] / wbar) * (r["_f"] / fbar) for r in rs]
-        # suma okregu blisko v4 (+-15%): wies gry zostaje przy swojej czesci n, a jedna wioska okregu nadal zalezy od miejsca i uid
+        # suma okregu blisko v4 (+-15%): wies gry zostaje przy swojej czesci n, a jedna wioska okregu nadal zalezy od miejsca i uid.
+        # Po recenzji D3: okreg BEZ ubytku wiosek - dokladnie suma v4 (rozklad tylko wedlug miejsca i uid; dotad 12 okregow z jedna wioska spadlo z 16 do 12-13,
+        # ludzie szli do wsi gry - odwrotnie niz "mniej wiosek = wieksze wioski")
+        no_loss = len(rs) == len(dist[did])
         c = s_old[did] / sum(raw)
-        c = min(DIST_HI, max(DIST_LO, c))
+        if not no_loss:
+            c = min(DIST_HI, max(DIST_LO, c))
         for r, q in zip(rs, raw):
             q *= c
             if q > KNEE:
                 q = KNEE + (q - KNEE) * KNEE_K          # miekki sufit: bez "sciany" wiosek na 36
+            r["_q"] = q
             v = int(round(q))
             if v < S_MIN:
                 v = S_MIN; clamped["min"] += 1
             if v > S_MAX:
                 v = S_MAX; clamped["max"] += 1
             r["_s5"] = v
+        n_gen = N_GEN.get(did)
+
+        def l4_ok(extra_sum, new_max):
+            return n_gen is None or sum(r["_s5"] for r in rs) + extra_sum + new_max <= n_gen
+
+        # po recenzji D3: granice obcinaly tylko wspolczynnik c, nie wynik po zaokragleniu, kolanie i suficie - suma okregu dociagana do przedzialu (bez ubytku:
+        # dokladnie v4; inaczej +-15% v4), krok po kroku na wioske najbardziej zaokraglona w druga strone; L4 jako gorna granica
+        lo = s_old[did] if no_loss else int(math.ceil(DIST_LO * s_old[did] - 1e-9))
+        hi = s_old[did] if no_loss else int(math.floor(DIST_HI * s_old[did] + 1e-9))
+        while sum(r["_s5"] for r in rs) < lo:
+            cand = [r for r in rs if r["_s5"] < S_MAX and l4_ok(1, max(max(x["_s5"] for x in rs), r["_s5"] + 1))]
+            if not cand:
+                break
+            up = max(cand, key=lambda r: (r["_q"] - r["_s5"], r["uid"]))
+            up["_s5"] += 1
+            fit["up"] += 1
+        while sum(r["_s5"] for r in rs) > hi:
+            cand = [r for r in rs if r["_s5"] > S_MIN]
+            if not cand:
+                break
+            dn = max(cand, key=lambda r: (r["_s5"] - r["_q"], r["uid"]))
+            dn["_s5"] -= 1
+            fit["down"] += 1
         # regula L4 generatora v4: wies gry nie mniejsza od najwiekszej wioski (wioski + najwieksza <= n okregu z generacji) -
         # inaczej ksiega pomniejsza wszystkie wioski okregu (VillageBook.Split); najpierw schodzi najwieksza
-        n_gen = N_GEN.get(did)
         if n_gen is not None:
             hit = False
             while sum(r["_s5"] for r in rs) + max(r["_s5"] for r in rs) > n_gen:
@@ -334,6 +368,17 @@ def main():
                 budget_hit += 1
             if sum(r["_s5"] for r in rs) + max(r["_s5"] for r in rs) > n_gen:
                 budget_short += 1
+        s5 = sum(r["_s5"] for r in rs)
+        if no_loss:
+            fit["no_loss"] += 1
+            if s5 != s_old[did]:
+                fit["no_loss_off"] += 1
+        if s5 < lo:
+            fit["out"] += 1
+            fit["out_sufit %d" % S_MAX if all(r["_s5"] >= S_MAX for r in rs) else ("out_L4" if n_gen is not None else "out_inne")] += 1
+        elif s5 > hi:
+            fit["out"] += 1
+            fit["out_dno %d" % S_MIN if all(r["_s5"] <= S_MIN for r in rs) else "out_inne"] += 1
         for r in rs:
             people = r["_s5"] * 250
             r["_lv"] = 3 if people >= 9000 else (2 if people >= 5000 else 1)
@@ -432,6 +477,9 @@ def main():
         ds.append(sum(r["_s5"] for r in rs) / float(s_old[did]))
     ds.sort()
     rep.append("suma osad wiosek okregu v5 / v4 (reszta n okregu zostaje we wsi gry): min %.2f, mediana %.2f, max %.2f" % (ds[0], ds[len(ds) // 2], ds[-1]))
+    outs = ", ".join("%s %d" % (k[4:], v) for k, v in sorted(fit.items()) if k.startswith("out_")) or "-"
+    rep.append("suma okregu po zaokragleniu: okregow bez ubytku wiosek %d (suma = v4, rozne %d), poza %d-%d%% v4 %d (%s); dociagniete +%d / -%d osad" % (
+        fit["no_loss"], fit["no_loss_off"], int(round(100 * DIST_LO)), int(round(100 * DIST_HI)), fit["out"], outs, fit["up"], fit["down"]))
     rep.append("regula L4 (wioski + najwieksza <= n okregu, %s): okregow przycietych %d, nadal ponad n (wszystkie wioski po %d) %d" % (
         os.path.basename(IN_NGEN) if N_GEN else "BRAK pliku - bez reguly", budget_hit, S_MIN, budget_short))
     nmap = dict(N_GEN)

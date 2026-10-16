@@ -4,8 +4,14 @@
 # Uzycie (z katalogu repo):
 #   python tools/wioski-lore/l0.py                      - caly przebieg: rody (A) -> rycerze (A) -> zdania (B) -> zlaczenie -> kontrole
 #   python tools/wioski-lore/l0.py --bez-generacji      - tylko zlaczenie i kontrole z wynikow posrednich
-# Opcje: --uklad <arm_map_villages.tsv> (domyslnie Armoury\ModuleData z repo), --gra <katalog Modules gry, tylko odczyt>,
-#        --oczekiwany <crc ukladu z logu gry, hex> (domyslnie 5A8C2735 - VillageBook w LOG120).
+# Opcje: --uklad <plik ukladu> (domyslnie Armoury\ModuleData\arm_map_villages_v4.tsv z repo), --gra <katalog Modules gry, tylko odczyt>,
+#        --oczekiwany <crc ukladu z logu gry, hex> (domyslnie 5A8C2735 - VillageBook w LOG120, uklad v4).
+#
+# KOLEJNOSC POTOKU OD UKLADU v5 (Jeff 16.10, VillageLayoutV5): lore powstaje TYLKO z ukladu v4, a uklad v5 i jego lore robi z niego v5_uklad.py:
+#   1) python tools/wioski-lore/l0.py   (domyslnie --uklad Armoury/ModuleData/arm_map_villages_v4.tsv -> Armoury/ModuleData/arm_map_village_lore_v4.tsv)
+#   2) python -I tools/wioski-v5/v5_uklad.py   (czyta oba pliki _v4, pisze arm_map_villages.tsv + arm_map_village_lore.tsv v5 z nowa bramka layout_crc)
+# Przydzial rycerzy zalezy od ukladu (generator.py), wiec l0.py na pliku v5 dalby inne teksty niz v4 i para v4/v5 by sie rozjechala - nie puszczac
+# l0.py na arm_map_villages.tsv i nie pisac nim arm_map_village_lore.tsv (to robi krok 2).
 # Kod wyjscia 0 = wszystkie kontrole L0 przeszly; 1 = ktoras nie (plik i tak zapisany - do obejrzenia).
 #
 # Kolejnosc krokow (kazdy skrypt mozna puscic osobno):
@@ -14,7 +20,8 @@
 #   b-skrypty/b_wiara_zajecia.py, b_historia.py -> wiara.csv, zajecia.csv, historia.csv (P8-P10 zdania, P9 bez Haerega)
 #   b-skrypty/b_dane.py     -> b-skrypty/wioski_b.tsv (wioska + osada ROT + rzeka)
 #   b-skrypty/b_dymki.py    -> wioski-lore-przypis.tsv (P7 historia bez powtorki tematu zajecia / wiary)
-#   l0.py                   -> Armoury/ModuleData/arm_map_village_lore.tsv (P11 war_lore, P13 jeden plik, tabela wiar BK) + probka-dymkow.txt
+#   l0.py                   -> Armoury/ModuleData/arm_map_village_lore_v4.tsv (P11 war_lore, P13 jeden plik, tabela wiar BK) + probka-dymkow.txt
+#   ../wioski-v5/v5_uklad.py -> uklad v5 i arm_map_village_lore.tsv (te same wiersze dla wiosek, ktore zostaly, nowa bramka)
 import argparse, csv, os, re, subprocess, sys, zlib
 from collections import Counter, defaultdict
 
@@ -23,7 +30,7 @@ REPO = os.path.normpath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, os.path.join(HERE, "skrypty"))
 from lore_osoby import FAMOUS, MAIN_GIVEN, lore_persons, read_rody   # noqa: E402
 
-OUT_FILE = os.path.join(REPO, "Armoury", "ModuleData", "arm_map_village_lore.tsv")
+OUT_FILE = os.path.join(REPO, "Armoury", "ModuleData", "arm_map_village_lore_v4.tsv")   # Jeff 16.10: lore ukladu v4 (v5 robi z niego tools/wioski-v5/v5_uklad.py)
 SAMPLE_FILE = os.path.join(HERE, "probka-dymkow.txt")
 COLUMNS = ["uid", "knight", "knight_form", "knight_house", "knight_arms", "knight_banner",
            "livelihood", "faith", "faith_key", "faith_bk", "history", "war_lore"]
@@ -135,7 +142,7 @@ def banner_ok(code, icon_ids, palette):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--uklad", default=os.path.join(REPO, "Armoury", "ModuleData", "arm_map_villages.tsv"))
+    ap.add_argument("--uklad", default=os.path.join(REPO, "Armoury", "ModuleData", "arm_map_villages_v4.tsv"))
     ap.add_argument("--gra", default=r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules")
     ap.add_argument("--oczekiwany", default="5A8C2735")
     ap.add_argument("--bez-generacji", action="store_true")

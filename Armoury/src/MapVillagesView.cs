@@ -314,7 +314,12 @@ namespace Armoury
         /// Jeff 16.10: plik ukladu tej sesji (LayoutFileName - v5 albo v4).</summary>
         internal static string DataPath()
         {
-            string name = LayoutFileName;
+            return DataPathFor(LayoutFileName);
+        }
+
+        /// <summary>Jeff 16.10 (D5, po recenzji): sciezka dowolnego pliku ukladu w ModuleData (VillageBook.OldLayout czyta drugi plik ukladu, gdy zapis ma jego crc).</summary>
+        internal static string DataPathFor(string name)
+        {
             try
             {
                 string dir = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);   // Modules\Armoury\bin\Win64_Shipping_Client

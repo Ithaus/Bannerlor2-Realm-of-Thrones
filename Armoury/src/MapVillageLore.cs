@@ -97,6 +97,16 @@ namespace Armoury
             return _gateOk && _rows.TryGetValue(uid, out r) ? r : null;
         }
 
+        /// <summary>Jeff 16.10 (D1, po recenzji): wiersz lore BEZ klucza VillageTipLore (ta sama bramka crc ukladu) - przydzial gospodarzy wiosek (VillageHolders: rycerz
+        /// z lore i jego herb na proporczyku) nie zalezy od klucza dymka. null - bramka, brak pliku albo wioska bez wiersza.</summary>
+        internal static Row RowOf(string uid)
+        {
+            if (uid == null) return null;
+            EnsureLoaded();
+            Row r;
+            return _gateOk && _rows.TryGetValue(uid, out r) ? r : null;
+        }
+
         private static void EnsureLoaded()
         {
             uint now;

@@ -18,9 +18,12 @@ namespace Armoury
     /// tylko do jednego Pana, ale sa jeszcze rycerze ... w kazdej wiosce gospodarzyl jakis lord, nawet jesli wioska nalezala do krola". Dotad proporczyk i dymek kazdej
     /// wioski okregu mialy herb wlasciciela wsi gry (Village.Bound.OwnerClan - dla rodu panujacego herb krolestwa), a okno okregu jednego rycerza z tytulu BK na caly okreg.
     /// Odtad wioska ma wlasnego gospodarza, wybranego na zywo (raz na dobe na okreg, przy zmianie pana albo jego krolestwa od razu; nic w zapisie):
-    ///  (a) MAJATEK BK tej wsi gry: wlasciciel zywy, z rodem z herbem, rod pana albo rod tego samego krolestwa; majatki w kolejnosci listy BK na wioski w kolejnosci
-    ///      (order, uid) - jeden majatek na wioske;
-    ///  (b) RYCERZ Z LORE wioski (arm_map_village_lore.tsv) z waznym knight_banner - jak R12 w menu: zywy gospodarz z BK (a) przed rycerzem z lore;
+    ///  (a) MAJATEK BK tej wsi gry: wlasciciel zywy, z rodem z herbem, rod pana albo rod tego samego krolestwa, nie glowa rodu pana (jak R12 - pan nie "trzyma wioski
+    ///      dla siebie"); majatki w kolejnosci listy BK na wioski w kolejnosci (order, uid) - jeden majatek na wioske;
+    ///  (a2) POSIADACZ TYTULU WSI Z BK (R12, po recenzji D1): gdy jego rodu nie ma jeszcze w (a) - pierwsza wioska bez majatku (najnizszy order); to dokladnie "lord, ktory
+    ///      gospodarzyl, choc wies nalezy do krola" - dotad dymek W2 pokazywal go na kazdej wiosce okregu, wiec nie znika z mapy;
+    ///  (b) RYCERZ Z LORE wioski (arm_map_village_lore.tsv) z waznym knight_banner - jak R12 w menu: zywy gospodarz z BK (a, a2) przed rycerzem z lore; wiersz lore
+    ///      czytany bez klucza VillageTipLore (MapVillageLore.RowOf - herby nie zaleza od klucza dymka);
     ///  (c) RYCERZ KROLESTWA PANA: rody z majatkiem BK w tym albo jednym z 6 najblizszych okregow (wlasciciel jak w (a), rod inny niz pan i niz uzyte w (a) tego okregu),
     ///      w kolejnosci: ten okreg, potem okregi od najblizszego; do tego 3 najblizsze siedziba rody krolestwa pana nie wyzsze od niego (bez rodu panujacego, najemnikow,
     ///      rodow bez glowy i herbu; dla rodu panujacego - kazdy rod krolestwa); wioski bez (a) i (b) po kolei z tej listy (w kolko);
@@ -29,12 +32,20 @@ namespace Armoury
     /// na zywo) i wioska bierze nastepna regule. Proporczyk (MapVillagePennants), dymek (MapVillageTooltip) i "Look over the district" (DistrictMenu) pytaja TEJ SAMEJ
     /// funkcji (Of), wiec pokazuja tego samego gospodarza: imie, rod, "sworn to" pan. Klucz off - herb pana i rycerz z tytulu BK jak dotad (wolajacy nie wola Of).
     /// BK przez odbicie (raz na proces), GetPopData tylko dla osady z danymi BK (IsSettlementPopulated - jak MapVillageLore). Bledy liczone per miejsce, nic nie gasnie.
+    /// Po recenzji D1 (koszt): odswiezenie DOBOWE pamieci okregu najwyzej DayRebuildsPerSlice okregow na 100 ms (reszta czyta pamiec poprzedniej doby do nastepnego
+    /// odczytu) - inaczej przy zmianie doby kazdy okreg przy kamerze przebudowywal sie w jednym ticku proporczykow (odbicie BK wsi i 6 sasiadow). Pierwsza budowa, zmiana
+    /// pana albo krolestwa i gospodarz niewazny (smierc, zmiana strony) - od razu, bez limitu.
     /// </summary>
     internal static class VillageHolders
     {
         internal const int RuleEstate = 0, RuleLore = 1, RuleRealmEstate = 2, RuleRealmHouse = 3, RuleLord = 4, RuleTitle = 5;
         private static readonly string[] RuleName = { "majatek BK", "rycerz z lore", "rycerz krolestwa z majatku obok", "rod krolestwa", "pan", "tytul BK" };
         private const int NearDistricts = 6, NearHouses = 3;
+        private const int DayRebuildsPerSlice = 4;                  // odswiezenia dobowe okregow na odcinek czasu (po recenzji D1 - koszt przy zmianie doby)
+        private static readonly long SliceTicks = System.Diagnostics.Stopwatch.Frequency / 10;   // 100 ms
+        private static long _sliceStart;
+        private static int _sliceRebuilds, _dayRebuildsDeferred;
+        private static bool _noBudget;                              // linia startowa (Daily) - caly przeglad bez limitu
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         /// <summary>Gospodarz jednej wioski (albo wsi gry): regula, bohater (null - rycerz z lore albo sam rod), rod, herb, pan (wlasciciel wsi gry), wiersz lore.</summary>
@@ -78,6 +89,7 @@ namespace Armoury
         {
             _cache.Clear(); _owners.Clear(); _ownersDay = int.MinValue; _villages = null; _near.Clear();
             _st = _stEstates = 0; _startDone = false;
+            _sliceStart = 0; _sliceRebuilds = _dayRebuildsDeferred = 0; _noBudget = false;
             lock (_errSites) _errSites.Clear();
         }
 
@@ -149,7 +161,7 @@ namespace Armoury
 
         private static MapVillageLore.Row LoreOf(string uid)
         {
-            try { return uid != null ? MapVillageLore.Of(uid) : null; }
+            try { return uid != null ? MapVillageLore.RowOf(uid) : null; }          // po recenzji D1: bez klucza VillageTipLore (herb rycerza z lore na proporczyku)
             catch (Exception e) { MapVillageLore.CountRowStumble(uid, e); return null; }
         }
 
@@ -161,10 +173,24 @@ namespace Armoury
             Kingdom realm = lord.Kingdom;
             int today = Today();
             DistCache c;
-            if (_cache.TryGetValue(st.StringId, out c) && c.Day == today && ReferenceEquals(c.Lord, lord) && ReferenceEquals(c.Realm, realm)) return c;
+            if (_cache.TryGetValue(st.StringId, out c) && ReferenceEquals(c.Lord, lord) && ReferenceEquals(c.Realm, realm))
+            {
+                if (c.Day == today) return c;
+                // ten sam pan i krolestwo, tylko nowa doba (majatki BK) - najwyzej kilka okregow na 100 ms, reszta z pamieci poprzedniej doby do nastepnego odczytu
+                if (!_noBudget && !TakeDayRebuild()) { _dayRebuildsDeferred++; return c; }
+            }
             c = Build(st, lord, realm, today);
             _cache[st.StringId] = c;
             return c;
+        }
+
+        private static bool TakeDayRebuild()
+        {
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (now - _sliceStart >= SliceTicks || now < _sliceStart) { _sliceStart = now; _sliceRebuilds = 0; }
+            if (_sliceRebuilds >= DayRebuildsPerSlice) return false;
+            _sliceRebuilds++;
+            return true;
         }
 
         // ------------------------------------------------------------ przydzial okregu
@@ -196,6 +222,14 @@ namespace Armoury
                     continue;
                 }
                 left.Add(i);
+            }
+            // (a2) posiadacz tytulu wsi z BK (R12 - jak menu: tytul przed rycerzem z lore) - pierwsza wioska bez majatku, gdy jego rodu nie ma jeszcze w (a)
+            if (c.Main.Rule == RuleTitle && c.Main.Clan != null && left.Count > 0 && !used.Contains(c.Main.Clan))
+            {
+                int i = left[0];
+                left.RemoveAt(0);
+                c.ByUid[uids[i]] = new Holder { Rule = RuleTitle, Hero = c.Main.Hero, Clan = c.Main.Clan, Banner = c.Main.Banner, Lord = lord, Lore = rows[i] };
+                used.Add(c.Main.Clan);
             }
             // (b) rycerz z lore z waznym herbem
             var rest = new List<int>(left.Count);
@@ -232,12 +266,14 @@ namespace Armoury
             return c;
         }
 
-        /// <summary>Wlasciciele majatkow BK wsi (kolejnosc listy BK), ktorzy moga gospodarzyc dla pana: zywi, z rodem z herbem, rod pana albo jego krolestwa.</summary>
+        /// <summary>Wlasciciele majatkow BK wsi (kolejnosc listy BK), ktorzy moga gospodarzyc dla pana: zywi, z rodem z herbem, rod pana albo jego krolestwa, nie glowa
+        /// rodu pana (po recenzji D1, jak R12 w MapVillageLore.BkHolder: inaczej "Kept for them by <sam pan>", u gracza "Kept for you by <gracz>").</summary>
         private static List<Hero> EligibleOwners(Settlement v, Clan lord, Kingdom realm)
         {
             var all = OwnersOf(v);
             var r = new List<Hero>(all.Count);
-            foreach (var h in all) if (h != null && h.IsAlive && ClanOk(h.Clan) && Ours(h.Clan, lord, realm)) r.Add(h);
+            Hero head = lord != null ? lord.Leader : null;
+            foreach (var h in all) if (h != null && h.IsAlive && !ReferenceEquals(h, head) && ClanOk(h.Clan) && Ours(h.Clan, lord, realm)) r.Add(h);
             return r;
         }
 
@@ -376,7 +412,7 @@ namespace Armoury
                 sameHouse = ReferenceEquals(h.Clan, lord);
                 if (!sameHouse && h.Clan != null) who = WithHouse(who, MapVillagesView.HouseName(h.Clan));
             }
-            bool tribute = h.Rule == RuleLore && row != null && row.Tribute;
+            bool tribute = (h.Rule == RuleLore || h.Rule == RuleTitle) && row != null && row.Tribute;   // posiadacz tytulu - forma z lore wioski, jak dotad R12 (KnightLine)
             if (own) return VillageTexts.Make(tribute ? VillageTexts.VilTipTributeOwn : VillageTexts.VilTipKeptOwn, "KNIGHT", who).ToString();
             if (sameHouse || lord == null) return VillageTexts.Make(VillageTexts.VilTipKept, "KNIGHT", who).ToString();
             return VillageTexts.Make(tribute ? VillageTexts.VilTipTributeSworn : VillageTexts.VilTipKeptSworn, "KNIGHT", who, "LORD", MapVillagesView.HouseName(lord)).ToString();
@@ -400,6 +436,7 @@ namespace Armoury
         {
             if (_startDone) return;
             _startDone = true;
+            _noBudget = true;                               // przeglad calej mapy raz na sesje - bez limitu odswiezen dobowych
             try
             {
                 var s = Settings.Current;
@@ -442,13 +479,16 @@ namespace Armoury
                   .Append(": ").Append(RuleName[RuleEstate]).Append(' ').Append(rules[RuleEstate]).Append(", ").Append(RuleName[RuleLore]).Append(' ').Append(rules[RuleLore])
                   .Append(", ").Append(RuleName[RuleRealmEstate]).Append(' ').Append(rules[RuleRealmEstate]).Append(", ").Append(RuleName[RuleRealmHouse]).Append(' ').Append(rules[RuleRealmHouse])
                   .Append(", ").Append(RuleName[RuleLord]).Append(' ').Append(rules[RuleLord])
+                  .Append(", ").Append(RuleName[RuleTitle]).Append(' ').Append(rules[RuleTitle]).Append(" (posiadacz tytulu wsi na pierwszej wiosce bez majatku)")
                   .Append(" | roznych herbow na wioskach ").Append(codes.Count).Append(" (dotad herb pana okregu: ").Append(lordCodes.Count).Append(')')
                   .Append(" | wsie gry: tytul BK ").Append(mainTitle).Append(", pan ").Append(mainLord)
-                  .Append(" | potkniecia ").Append(_st).Append(" (majatki BK ").Append(_stEstates).Append(") | czas ").Append(t0.Elapsed.TotalMilliseconds.ToString("0.0", Inv)).Append(" ms")
+                  .Append(" | potkniecia ").Append(_st).Append(" (majatki BK ").Append(_stEstates).Append(") | odswiezen dobowych odlozonych (limit ").Append(DayRebuildsPerSlice)
+                  .Append(" na 100 ms) ").Append(_dayRebuildsDeferred).Append(" | czas ").Append(t0.Elapsed.TotalMilliseconds.ToString("0.0", Inv)).Append(" ms")
                   .Append(" | przyklady: ").Append(samples.Count > 0 ? string.Join(" | ", samples.ToArray()) : "-").Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
+            finally { _noBudget = false; }
         }
     }
 }

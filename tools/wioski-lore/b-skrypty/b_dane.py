@@ -5,8 +5,9 @@ from collections import Counter, defaultdict
 
 GAME = r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord\Modules"
 OUT = os.path.dirname(os.path.abspath(__file__))   # E7/L: wyniki posrednie obok skryptu (bylo: Temp sesji 3cf3e0ac)
-# plik ukladu z argumentu (E7/L: l0.py podaje Armoury\ModuleData\arm_map_villages.tsv z repo - v4, 2 446 wiosek)
-TSV = sys.argv[1] if len(sys.argv) > 1 else os.path.join(OUT, "..", "..", "..", "Armoury", "ModuleData", "arm_map_villages.tsv")
+# plik ukladu z argumentu (E7/L: l0.py podaje Armoury\ModuleData\arm_map_villages_v4.tsv z repo - v4, 2 446 wiosek; Jeff 16.10:
+# arm_map_villages.tsv to juz uklad v5, a lore powstaje z v4 - kolejnosc potoku w naglowku l0.py)
+TSV = sys.argv[1] if len(sys.argv) > 1 else os.path.join(OUT, "..", "..", "..", "Armoury", "ModuleData", "arm_map_villages_v4.tsv")
 TAG = sys.argv[2] if len(sys.argv) > 2 else ""    # np. v4-proba: wyniki b_dymki.py w wioski-lore/<TAG>
 SUF = ("_" + TAG) if TAG else ""
 PLACES = {"road", "river", "coast", "crossroad", "bridge", "field", "lake", "ford", "mouth", "fork", "bay", "harbour"}

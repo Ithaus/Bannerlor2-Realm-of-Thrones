@@ -5992,7 +5992,7 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool BurnedVillageLabels { get; set; } = true;
 
-        [SettingPropertyBool("Village Banner Per Holder", HintText = "every map village flies the banner of the house that keeps it - a knight with a Banner Kings estate there, the village's own knight, or another house of the lord's realm - and its tooltip and 'Look over the district' name him and the lord he is sworn to. Off = every village of a district shows its lord's banner, as before")]
+        [SettingPropertyBool("Village Banner Per Holder", HintText = "every map village flies the banner of the house that keeps it - a knight with a Banner Kings estate there, the knight who holds the village's Banner Kings title, the village's own knight, or another house of the lord's realm - and its tooltip and 'Look over the district' name him and the lord he is sworn to. Off = every village of a district shows its lord's banner, as before")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageBannerPerHolder { get; set; } = true;
 

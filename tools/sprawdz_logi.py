@@ -3587,6 +3587,11 @@ def valve_decisions(lines, start, until):
     return out, lo, hi
 
 
+# Jeff 16.10 (VillageLayoutV5, po recenzji D2/D3): crc ukladu wiosek ("uid:osady;" jak VillageBook) plikow modulu - tools/wioski-v5/raport-v5.txt
+LAYOUT_V5_CRC, LAYOUT_V5_N = "68BB06AD", 1957
+LAYOUT_V4_CRC, LAYOUT_V4_N = "5A8C2735", 2446
+
+
 def etap4_e411(rep, lines, start, win, until, logp):
     """E4/11 (193): progi G1-G14 i G-ETAP z planu kodu E4/11 (rozdz. 9) - linia startowa "VillageBook (E4/11)", linie "Ksiega wiosek (E4/11)" (start sesji,
     pierwsza doba, doba), ognie widoku "Wioski: ogien nad ... (ksiega|lancuch gry)" z pliku tematycznego wioski.log, wiersze wioski-okregi.csv. G9 (bieg zimowy),
@@ -3629,6 +3634,17 @@ def etap4_e411(rep, lines, start, win, until, logp):
         ok = vals == ((1953, 423, 0, 4) if v5 else (2441, 423, 0, 5)) and mb == 2 and tot == 569 and saved + new == tot
         rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", f"wiosek/okregi/odrzucone/brak wsi {vals} (brak w {mb} okregach); okregi {tot}, n z zapisu {saved} + nowe {new}; pomniejszone {shr} (INFO)",
                 g2_rule, ok)
+    # po recenzji D2 (wgranie): DLL z VillageLayoutV5 podaje w linii startowej nazwe pliku ukladu - arm_map_villages.tsv musi miec crc ukladu v5, _v4.tsv crc v4
+    # (inaczej w grze stary plik v4 pod nazwa v5 - wgranie bez arm_map_villages.tsv: lore v5 wypada na bramce, ksiega "uklad zgodny", D2/D3/D5 nie biegna)
+    g2b = []
+    for x in [y for y in lines if y.startswith("Ksiega wiosek (E4/11): start sesji")]:
+        mf = re.search(r"\(crc ukladu ([0-9A-F]{8}), plik crc32 [0-9A-F]{8}, (arm_map_villages(?:_v4)?\.tsv)", x)
+        if mf:
+            want = LAYOUT_V4_CRC if mf.group(2).endswith("_v4.tsv") else LAYOUT_V5_CRC
+            g2b.append((mf.group(2), mf.group(1), want))
+    if g2b:
+        rep.add("E4/11 G2b: plik ukladu wiosek w grze (v5 / v4)", "; ".join(f"{n} crc {c}" for n, c, _ in g2b[-3:]),
+                f"arm_map_villages.tsv = v5 (crc ukladu {LAYOUT_V5_CRC}), arm_map_villages_v4.tsv = v4 ({LAYOUT_V4_CRC}) w kazdej sesji", all(c == w for _, c, w in g2b))
     # poprawka po recenzji (R1-3): bieg z ksiega wylaczona (G13) - wiersz CZYNNA jako INFO, G13 oceniany przed wyjsciem z bloku
     if off and not on:
         rep.add("E4/11: linia dzienna CZYNNA", f"czynna 0 dob, WYLACZONA {len(off)} dob z {len(win)} - bieg z ksiega wylaczona (patrz G13)", "czynna w kazdej dobie z ruchem (bieg zwykly)", None)
@@ -3726,8 +3742,35 @@ def etap4_e411(rep, lines, start, win, until, logp):
     ld = [x for x in rs if "z zapisu: n " in x]
     if ld:
         okz = all("uklad zgodny" in x for x in ld)
-        rep.add("E4/11 G11: wczytanie zapisu (arm_district)", "; ".join(re.search(r"z zapisu: (.*?);", x).group(1)[:120] for x in ld if re.search(r"z zapisu: (.*?);", x)),
-                "n 571 okregow, puste osady M, uklad zgodny; G3/G4 od pierwszej doby po wczytaniu", okz)
+        # po recenzji D5: pierwsze wczytanie zapisu z innym ukladem (Ironman Jeffa: v4 na v5) - zamiast "uklad zgodny" segment "inny uklad (D5)" linii pierwszej doby:
+        # rozlozone = oczekiwane (rabunek X z X, glod Y z Y), ponad pulap 0, zepsute wpisy 0; uklad zapisu rozpoznany ("stan wiosek po uid") - TAK, nieznany - INFO
+        d5 = None
+        if not okz and all("uklad zgodny" in x or "uklad inny" in x for x in ld):
+            seg = next((x.split("inny uklad (D5): ", 1)[1] for x in lines if x.startswith("Ksiega wiosek (E4/11): uklad") and "inny uklad (D5): " in x), None)
+            if seg is None:
+                d5 = ("brak segmentu 'inny uklad (D5)' w linii pierwszej doby", None)
+            else:
+                mr = re.search(r"rabunek " + F_ + r" z " + F_ + r", glod " + F_ + r" z " + F_ + r" osad, ponad pulap " + F_ + r", zepsute wpisy (\d+)", seg)
+                if not mr:
+                    d5 = (seg[:200], None)
+                else:
+                    pr, er, pf, ef, drop = (float(mr.group(i)) for i in range(1, 6))
+                    bad_n = int(mr.group(6))
+                    eq = abs(pr - er) <= 0.02 + 1e-3 * er and abs(pf - ef) <= 0.02 + 1e-3 * ef
+                    good = eq and drop <= 0.01 and bad_n == 0
+                    d5 = (("po uid" if "stan wiosek po uid" in seg else "uklad zapisu nieznany - sumy okregow") + f": rabunek {pr:g} z {er:g}, glod {pf:g} z {ef:g}, ponad pulap {drop:g}, zepsute {bad_n}",
+                          (True if "stan wiosek po uid" in seg else None) if good else False)
+            # zapis z ukladem v4 albo v5 modulu, a ksiega go nie rozpoznala = w grze brak drugiego pliku ukladu (wgranie bez arm_map_villages_v4.tsv) - NIE
+            unk = [x for x in ld if "uklad zapisu nieznany" in x and re.search(r"crc zapisu (" + LAYOUT_V4_CRC + "|" + LAYOUT_V5_CRC + r")\b", x)]
+            if unk:
+                d5 = ((d5[0] + " | " if d5 else "") + "zapis z ukladem modulu, a 'uklad zapisu nieznany' - w grze brak drugiego pliku ukladu (_v4 albo v5)", False)
+        txt = "; ".join(re.search(r"z zapisu: (.*?);", x).group(1)[:120] for x in ld if re.search(r"z zapisu: (.*?);", x))
+        if d5 is not None:
+            rep.add("E4/11 G11: wczytanie zapisu (arm_district) - inny uklad (D5)", txt[:160] + " | " + d5[0],
+                    "uklad zapisu rozpoznany (crc = plik _v4 albo v5): stan po uid, rabunek X z X, glod Y z Y, ponad pulap 0, zepsute wpisy 0 (uklad nieznany - INFO)", d5[1])
+        else:
+            rep.add("E4/11 G11: wczytanie zapisu (arm_district)", txt,
+                    "n 571 okregow, puste osady M, uklad zgodny; G3/G4 od pierwszej doby po wczytaniu", okz)
     else:
         rep.add("E4/11 G11: wczytanie zapisu (arm_district)", "brak wczytania z kluczem w tym logu", "autotest zapisu 9 dob", None)
     rep.add("E4/11 G12: menu okregu (People of this land, takze village_looted)", "reczna proba Jeffa", "liczby = linia/CSV tego okregu", None)
@@ -10378,8 +10421,13 @@ def etap7_w2(rep, lines, start, win, until=120, **kw):
             reg = "dymek ArmMapVillageTooltip zarejestrowany" in s
             herb = num(r"herby z lore niewazne (\d+)", s, int)
             ok = bool(m) and m.group(1) == m.group(2) and int(m.group(4)) == 0 and reg and herb == 0
+            # po recenzji D2 (wgranie): DLL z VillageLayoutV5 podaje plik lore - v5 musi miec bramke i liczbe wiosek ukladu v5, _v4 ukladu v4 (stary plik pod nowa nazwa = NIE)
+            fl = re.search(r"plik (arm_map_village_lore(?:_v4)?\.tsv)\)", s)
+            if fl and m:
+                want = (LAYOUT_V4_CRC, LAYOUT_V4_N) if fl.group(1).endswith("_v4.tsv") else (LAYOUT_V5_CRC, LAYOUT_V5_N)
+                ok = ok and m.group(3) == want[0] and int(m.group(2)) == want[1]
             rep.add("E7/W2 T1: lore i dymek (linia startowa, ostatnia sesja)", body[:260],
-                    "lore N/N, bramka zgodna (5A8C2735), odrzucone 0, dymek zarejestrowany, herby z lore niewazne 0", ok)
+                    f"lore N/N, bramka zgodna (v5 {LAYOUT_V5_CRC} {LAYOUT_V5_N}/{LAYOUT_V5_N}, v4 {LAYOUT_V4_CRC} {LAYOUT_V4_N}/{LAYOUT_V4_N}), odrzucone 0, dymek zarejestrowany, herby z lore niewazne 0", ok)
             bk = re.search(r"BK: wiara (tak|nie), tytuly (tak|nie)", s)
             rep.add("E7/W2 W2-1b: odczyty BK (odbicie)", bk.group(0) if bk else "brak", "wiara tak, tytuly tak (BannerKings w zestawie)",
                     (bk.group(1) == "tak" and bk.group(2) == "tak") if bk else None)

@@ -2190,15 +2190,17 @@ namespace Armoury
         public bool BurnedVillageLabels = true;            // "X has been burned" over burned villages, close up only
         // Jeff 16.10 ("herb do jakiego lorda nalezy, nie tylko do jakiego krolestwa ... w kazdej wiosce gospodarzyl jakis lord, nawet jesli wioska nalezala do krola"):
         // herb GOSPODARZA kazdej wioski pobocznej (VillageHolders.cs, wybor na zywo raz na dobe, bez zapisu): (a) majatek BK tej wsi gry (wlasciciel zywy, rod z herbem,
-        // rod pana albo jego krolestwa; majatki po kolei na wioski wedlug order, uid), (b) rycerz z lore z waznym knight_banner, (c) rycerz krolestwa pana (rod gentry /
+        // rod pana albo jego krolestwa, nie glowa rodu pana; majatki po kolei na wioski wedlug order, uid), (a2) posiadacz tytulu wsi z BK (R12) na pierwszej wiosce bez
+        // majatku, (b) rycerz z lore z waznym knight_banner (wiersz lore bez klucza VillageTipLore), (c) rycerz krolestwa pana (rod gentry /
         // pomniejszy z majatkiem BK w tym albo sasiednim okregu, inaczej najblizszy rod krolestwa nie wyzszy od pana), (d) rod pana (jak dotad). Wies gry: tytul BK (R12),
         // inaczej pan. Proporczyk, dymek i "Look over the district" pokazuja tego samego gospodarza (imie, rod, "sworn to" pan). Po podboju gospodarz z wrogiego
         // krolestwa odpada (nastepna regula). Off = herb pana i rycerz z tytulu BK wsi gry dla wszystkich wiosek okregu, jak dotad
-        public bool VillageBannerPerHolder = true;         // every map village flies the banner of the house that keeps it - a knight with a Banner Kings estate there, the village's own knight, or another house of the lord's realm - and its tooltip and "Look over the district" name him and the lord he is sworn to. Off = every village of a district shows its lord's banner, as before
+        public bool VillageBannerPerHolder = true;         // every map village flies the banner of the house that keeps it - a knight with a Banner Kings estate there, the knight who holds the village's Banner Kings title, the village's own knight, or another house of the lord's realm - and its tooltip and "Look over the district" name him and the lord he is sworn to. Off = every village of a district shows its lord's banner, as before
         // Jeff 16.10 ("niektore sa za blisko i za gesto", "mniej wiosek o 20% ... 20% wiecej ludzi w danej wiosce, ale zeby nie bylo identycznie"): uklad wiosek v5 -
         // ModuleData\arm_map_villages.tsv (1957 wiosek: 20% mniej, najpierw te najblizej sasiadki; osady wedlug miejsca i uid 6..36) i arm_map_village_lore.tsv z nowa
         // bramka; off = pliki v4 (arm_map_villages_v4.tsv, arm_map_village_lore_v4.tsv - 2446 wiosek po 16 osad). Wybor przy starcie sesji, przed ksiega wiosek; zapis z innym
-        // ukladem: n okregow i puste osady z zapisu przeniesione na nowe wioski (VillageBook, "inny uklad"), pamiec wojny wiosek pominieta
+        // ukladem: n okregow z zapisu; uklad zapisu rozpoznany po crc (drugi plik ukladu) - stan wiosek po uid (puste osady, flagi, pamiec wojny; wioski usuniete do
+        // najblizszych), rozlozony przy starcie sesji po MCM; uklad zapisu nieznany - sumy pustych osad okregu na nowe wioski, pamiec wojny pominieta (VillageBook, "inny uklad")
         public bool VillageLayoutV5 = true;                // a fifth fewer map villages, none crowded against its neighbour, and each of its own size - from about 1,500 souls in a farm by the fields to 9,000 at a crossroads; the people of a district stay the same. It takes effect when a campaign is loaded. Off = the earlier layout, 2,446 villages of about 4,000 souls each
         // --- Map roads (test) ---
         // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,

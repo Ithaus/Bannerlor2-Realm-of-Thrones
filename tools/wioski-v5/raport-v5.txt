@@ -7,15 +7,16 @@ gestosc (sasiedzi w promieniu 10 jedn.): wiosek z >= 6 sasiadami v4 3, v5 0; naj
 usuniete: najblizsza sasiadka od 4.49 do 6.13 jedn.; rodzaj miejsca: road 305, river 88, coast 87, field 4, crossroad 3, lake 1, bridge 1
 okregi z najwiekszym ubytkiem (wiosek mniej): castle_village_V1_1 -6 (18->12), village_ES1_3 -5 (14->9), village_EN4_3 -5 (10->5), castle_village_EW1_2 -5 (14->9), ROT_castle31_village2 -5 (15->10), ROT_castle23_village2 -5 (11->6), village_V5_3 -4 (11->7), village_V5_2 -4 (13->9)
 wiosek w okregu v5: 1: 58, 2: 60, 3: 58, 4: 62, 5: 52, 6: 29, 7: 36, 8: 21, 9: 20, 10: 13, 11: 7, 12: 4, 13: 2, 14: 3
-osady wioski v5: min 6, mediana 21, max 36, srednia 21.09 (ludzi przy 250: 1500 / 5250 / 9000); v4: min 8, mediana 16, max 27, srednia 17.21
+osady wioski v5: min 6, mediana 21, max 36, srednia 21.11 (ludzi przy 250: 1500 / 5250 / 9000); v4: min 8, mediana 16, max 27, srednia 17.21
 najczestsza wartosc v5: 20 osad u 157 wiosek = 8.0% (prog 15%; v4: 16 osad u 1981 = 81.0%)
 przyciete do granic: do 6 - 0 wiosek, do 36 - 16 wiosek
-histogram osad v5 (wartosc: wiosek): 6: 2, 7: 3, 8: 3, 9: 5, 10: 7, 11: 22, 12: 41, 13: 55, 14: 77, 15: 99, 16: 128, 17: 123, 18: 118, 19: 135, 20: 157, 21: 136, 22: 121, 23: 108, 24: 90, 25: 94, 26: 72, 27: 64, 28: 71, 29: 73, 30: 55, 31: 26, 32: 16, 33: 21, 34: 10, 35: 6, 36: 19
-pasma osad v5: 6-10 20 (1%), 11-15 294 (15%), 16-20 661 (34%), 21-25 549 (28%), 26-30 335 (17%), 31-36 98 (5%)
-poziom obrazka v5: 1: 818, 2: 1120, 3: 19; v4: 1: 2133, 2: 313
-srednie osady wedlug miejsca (klasa/rodzaj): R/road 19.8 (944), R/river 20.9 (381), R/coast 20.9 (281), H/crossroad 27.5 (163), H/bridge 25.4 (73), H/coast 25.5 (73), F/field 10.3 (31), R/lake 21.5 (6), H/river 26.4 (5)
-suma osad wiosek okregu v5 / v4 (reszta n okregu zostaje we wsi gry): min 0.61, mediana 1.00, max 1.19
-regula L4 (wioski + najwieksza <= n okregu, okregi_n_v4.tsv): okregow przycietych 9, nadal ponad n (wszystkie wioski po 6) 0
+histogram osad v5 (wartosc: wiosek): 6: 1, 7: 2, 8: 5, 9: 4, 10: 8, 11: 19, 12: 35, 13: 55, 14: 71, 15: 97, 16: 143, 17: 124, 18: 119, 19: 136, 20: 157, 21: 134, 22: 123, 23: 106, 24: 92, 25: 92, 26: 74, 27: 66, 28: 72, 29: 70, 30: 54, 31: 25, 32: 17, 33: 21, 34: 10, 35: 5, 36: 20
+pasma osad v5: 6-10 20 (1%), 11-15 277 (14%), 16-20 679 (35%), 21-25 547 (28%), 26-30 336 (17%), 31-36 98 (5%)
+poziom obrazka v5: 1: 819, 2: 1118, 3: 20; v4: 1: 2133, 2: 313
+srednie osady wedlug miejsca (klasa/rodzaj): R/road 19.8 (944), R/river 20.8 (381), R/coast 21.0 (281), H/crossroad 27.5 (163), H/bridge 25.3 (73), H/coast 25.4 (73), F/field 10.5 (31), R/lake 22.2 (6), H/river 26.4 (5)
+suma osad wiosek okregu v5 / v4 (reszta n okregu zostaje we wsi gry): min 0.61, mediana 1.00, max 1.15
+suma okregu po zaokragleniu: okregow bez ubytku wiosek 163 (suma = v4, rozne 0), poza 85-115% v4 4 (sufit 36 4); dociagniete +26 / -11 osad
+regula L4 (wioski + najwieksza <= n okregu, okregi_n_v4.tsv): okregow przycietych 4, nadal ponad n (wszystkie wioski po 6) 0
 okregi pomniejszone przez ksiege (wioski + najwieksza > osady okregu z generacji v4; w grze n z biezacych ludzi): v4 0, v5 0 z 425
-crc ukladu (uid:osady; jak VillageBook): v4 5A8C2735, v5 9F828BDA
-lore v5: wierszy 1957 (wiosek v5 1957, bez lore 0), bramka layout_crc 9F828BDA
+crc ukladu (uid:osady; jak VillageBook): v4 5A8C2735, v5 68BB06AD
+lore v5: wierszy 1957 (wiosek v5 1957, bez lore 0), bramka layout_crc 68BB06AD
