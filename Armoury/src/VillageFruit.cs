@@ -71,6 +71,7 @@ namespace Armoury
             {
                 if (item == null || v == null) return;
                 string id = item.StringId;
+                if (id == "Egg") { EggBase(v, item, ref r); return; }   // N2-E1 (noc-ekonomia2): jaja wsi rolniczych wedlug wag drobiu BK
                 if (id == null || !Fruit(id)) return;
                 var s = Settings.Current;
                 if (s == null || !s.VillageFruitFromBk) return;
@@ -142,6 +143,171 @@ namespace Armoury
             lock (Gate) { n = _calls; st = _stumbles; c = _carrot; a = _apple; o = _orange; h = _honey; _calls = 0; _carrot = _apple = _orange = _honey = 0; }
             Log.Info("Owoce wsi (VillageFruitFromBk): dzien " + (int)CampaignTime.Now.ToDays + " | baza dopisana w " + n + " pytaniach modelu (tick BK, okna wsi): marchew " + c.ToString("0", Inv)
                      + ", jablka " + a.ToString("0", Inv) + ", pomarancze " + o.ToString("0", Inv) + ", miod " + h.ToString("0", Inv) + " (sztuki z ticku - linia \"Towary\", wsie) | potkniecia sesji " + st + ".");
+        }
+
+        // ============================================================ N2-E1: JAJA ZE WSI ROLNICZYCH (noc 16.10, galaz noc-ekonomia2)
+        // Raport audytu ekonomii 15.10 rozdz. 3.2 P1 (czesc, ktorej noc-ceny nie zrobila) i tabela 1.8: jaja 26 331 d na dobe budzetu ludu bez towaru (najwieksza pozycja).
+        // Dowod (log Jeffa 2026-10-15_10-56-30, 12:10:56): "Egg (8 d): zapas 2090 | produkcja 76 [wsie 42 (cattle_farm 42); inne ticki dobowe 34]" i w "Ceny surowcow":
+        // "Eggs ... 3.20/10.00/10.00, na polkach 56 szt., pusto w 88 miastach, budzet mieszczan 28812 d (przy dzisiejszych polkach do 2481 d)" - cena na suficie x10.
+        // Przyczyna [K]: BK PopulationManager.GetProductions (dec-bk :304-336) dokleja wsi rolniczej (IsFarmingVillage: klasa Cropland albo FibreFarm - farmy zboza,
+        // gaje oliwne, winnice, daktyle, len, jedwab) kure i ges z waga kultury (aserai 0.15, sturgia/khuzait 0.45, empire/battania 0.75, reszta 1.0), ale jaj nie;
+        // model gry daje kurze i gesi 0 (spoza VillageType.Productions), a jaja BK robi tylko z drobiu w partiach (BKPartyBehavior.OnDailyTick: 5% na ptaka na dobe).
+        // Jaja jako plon wsi BK zna tylko na hodowli bydla (BKVillageTypes: CattleRange Egg 1.5 w VillageType.Productions - liczy gra, te 42 sztuki).
+        // Regula (klucz VillageEggsFromBk; DECYZJA CLAUDE noc 16.10: waga jaj = suma wag drobiu BK z listy tej wsi, kura + ges - w partiach BK oba ptaki niosa
+        // jaja tak samo): MineralOnce.Postfix dopisuje do listy BK wsi z drobiem pozycje Egg z ta waga (nowa lista - BK-owej nie ruszamy; jaja juz na liscie - nic),
+        // tick BK (EconomyPatches.TickGoodProduction) pyta model o jaja, a EggBase dopisuje baze = waga x (poziom ognisk + 1) x 0.5 - ten sam wzor co owoce wyzej
+        // i kazdy plon gry, przed mnoznikami (P1 ludzie wsi, rece, zima). Plon dodatkowy: zboze i reszta listy bez zmian; kura i ges dalej 0.
+        // GL1 (VillageByPeople): g(typ) = suma((poziom + 1) / 2) / suma(u_v) po wsiach typu - z poziomow ognisk i ludzi, nie z towarow, wiec nowa pozycja go nie
+        // rusza; linia GL1 "surowce wobec kalibracji" liczy z VillageType.Productions (jaj z listy BK tam nie ma - jak owocow). Regulator 221 jedzenia nie tnie
+        // (HarvestValve.Eligible: !IsFood). Magazyn wsi (GetWarehouseCapacity) liczy z VillageType.Productions - jaja go nie powiekszaja (jak owoce).
+        // Obieg: jaja powstaja z pracy wsi (magazyn wsi, ksiega towarow "wsie"), wozy wioza je na targ ta sama droga co reszte plonu - zloto tylko za sprzedaz.
+        // Nic w zapisie (lista skladana przez BK co tick). Wyjatek - potkniecie (licznik), lista tej wsi jak z BK.
+        private static readonly TextObject TxtEgg = new TextObject("{=!}Armoury: village poultry (Banner Kings)");
+        private static readonly Dictionary<Village, float> _eggW = new Dictionary<Village, float>();   // wies -> waga jaj z ostatniego zlozenia jej listy BK (kura + ges)
+        private static readonly HashSet<Village> _eggVill = new HashSet<Village>();                     // wsie z jajami na liscie od poprzedniej linii doby
+        private static int _eggLists, _eggCalls;
+        private static double _eggBase;
+        private static ItemObject _egg; private static Campaign _eggFor;
+
+        /// <summary>Klucz VillageEggsFromBk (sam odczyt ustawien - z kazdego watku).</summary>
+        internal static bool EggsOn { get { var s = Settings.Current; return s != null && s.VillageEggsFromBk; } }
+
+        /// <summary>Przedmiot BK "Egg" (BKItems: kosz jaj) tej kampanii; null - brak BK.</summary>
+        private static ItemObject EggItem()
+        {
+            var c = Campaign.Current;
+            if (!ReferenceEquals(_eggFor, c))
+            {
+                ItemObject e = null;
+                try { e = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("Egg"); } catch { e = null; }
+                _egg = e; _eggFor = c;
+            }
+            return _egg;
+        }
+
+        /// <summary>Waga kury (i gesi) BK wedlug kultury wsi - BK PopulationManager.GetProductions :306-332 (do linii startu; w ticku liczy sie waga z listy BK).</summary>
+        internal static float PoultryWeight(string culture)
+        {
+            switch (culture)
+            {
+                case "aserai": return 0.15f;
+                case "sturgia": case "khuzait": return 0.45f;
+                case "empire": case "battania": return 0.75f;
+                default: return 1f;
+            }
+        }
+
+        /// <summary>Typ wsi rolniczej BK (DefaultVillageClasses.GetClass: Cropland - farma zboza, gaj oliwny, winnica, daktyle; FibreFarm - len, jedwab). Do linii startu.</summary>
+        private static bool FarmType(VillageType t)
+        {
+            return t != null && (t == DefaultVillageTypes.WheatFarm || t == DefaultVillageTypes.OliveTrees || t == DefaultVillageTypes.VineYard || t == DefaultVillageTypes.DateFarm
+                                 || t == DefaultVillageTypes.FlaxPlant || t == DefaultVillageTypes.SilkPlant);
+        }
+
+        /// <summary>MineralOnce.Postfix (lista produkcji wsi BK, po filtrze klimatu i wielbladach): lista z jajami o wadze kury + gesi BK; bez drobiu albo z jajami juz
+        /// na liscie - ta sama lista. Nowa lista (BK-owej nie ruszamy). Rzuca - wolajacy liczy potkniecie i oddaje liste BK.</summary>
+        internal static List<(ItemObject, float)> EggStep(Village v, List<(ItemObject, float)> list)
+        {
+            if (v == null || list == null) return list;
+            var egg = EggItem();
+            if (egg == null) return list;
+            float w = 0f; bool has = false;
+            for (int i = 0; i < list.Count; i++)
+            {
+                var it = list[i].Item1;
+                if (it == null) continue;
+                if (ReferenceEquals(it, egg)) { has = true; break; }
+                string id = it.StringId;
+                if (id == "chicken" || id == "goose") w += list[i].Item2;
+            }
+            if (has || !(w > 0f)) { lock (Gate) _eggW.Remove(v); return list; }
+            var res = new List<(ItemObject, float)>(list.Count + 1);
+            res.AddRange(list);
+            res.Add((egg, w));
+            lock (Gate) { _eggW[v] = w; _eggLists++; _eggVill.Add(v); }
+            return res;
+        }
+
+        /// <summary>Lista tej wsi wrocila do postaci BK (potkniecie postfiksu) - model nie dopisuje jaj do nastepnego zlozenia listy.</summary>
+        internal static void ForgetEgg(Village v)
+        {
+            if (v == null) return;
+            lock (Gate) _eggW.Remove(v);
+        }
+
+        /// <summary>Base (MaterialLaw.ProdPostfix, przed mnoznikami): jaja wsi, ktorej lista BK dostala jaja (EggStep) - waga x (poziom ognisk + 1) x 0.5.</summary>
+        private static void EggBase(Village v, ItemObject item, ref ExplainedNumber r)
+        {
+            if (!EggsOn) return;
+            if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.VillageType == null) return;
+            if (InTypeList(v.VillageType, item)) return;                      // jaja w typie wsi (hodowla bydla BK) - liczy gra
+            float w;
+            lock (Gate) { if (!_eggW.TryGetValue(v, out w)) return; }
+            float x = w * (v.GetHearthLevel() + 1) * 0.5f;
+            if (!(x > 0f)) return;
+            r.Add(x, TxtEgg);
+            lock (Gate) { _eggCalls++; _eggBase += x; }
+        }
+
+        /// <summary>Z ArmouryBehavior.OnSessionLaunched (zaraz po SessionStart owocow): linia "Jaja wsi (N2-E1): start sesji" - liczba wsi rolniczych i oczekiwany plon.</summary>
+        internal static void EggSessionStart()
+        {
+            lock (Gate) { _eggW.Clear(); _eggVill.Clear(); _eggLists = 0; _eggCalls = 0; _eggBase = 0; }
+            var s = Settings.Current;
+            const string Head = "Jaja wsi (N2-E1): start sesji | ";
+            if (s == null || !s.VillageEggsFromBk)
+            {
+                Log.Info(Head + "klucz VillageEggsFromBk NIE | WYLACZONE (MCM) - jaja tylko z hodowli bydla BK i z drobiu w partiach BK, jak dotad | potkniecia " + _stumbles + ".");
+                return;
+            }
+            int farms = 0, inType = 0, noMarket = 0;
+            double basis = 0;
+            var byType = new SortedDictionary<string, int>(StringComparer.Ordinal);
+            var egg = EggItem();
+            try
+            {
+                foreach (var v in Village.All)
+                {
+                    try
+                    {
+                        if (v == null || v.VillageType == null || v.Settlement == null || !FarmType(v.VillageType)) continue;
+                        if (egg != null && InTypeList(v.VillageType, egg)) { inType++; continue; }
+                        farms++;
+                        string t = v.VillageType.StringId ?? "?";
+                        int k; byType.TryGetValue(t, out k); byType[t] = k + 1;
+                        if (v.TradeBound == null) { noMarket++; continue; }
+                        var c = v.Settlement.Culture;
+                        float w = 2f * PoultryWeight(c != null ? c.StringId : null);
+                        basis += w * (v.GetHearthLevel() + 1) * 0.5;
+                    }
+                    catch (Exception e) { Stumble(e); }
+                }
+            }
+            catch (Exception e) { Stumble(e); }
+            var parts = new List<string>();
+            foreach (var kv in byType) parts.Add(kv.Key + " " + kv.Value);
+            Log.Info(Head + "klucz VillageEggsFromBk TAK | CZYNNE | wsi rolniczych BK (klasa uprawy i wlokna typu wsi) " + farms + " [" + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "-") + "]"
+                     + " | waga jaj = kura + ges z listy BK (kultura: aserai 0.15 + 0.15, sturgia i khuzait 0.45 + 0.45, empire i battania 0.75 + 0.75, reszta 1 + 1)"
+                     + " | oczekiwany plon na dobe przed mnoznikami (waga x (poziom ognisk + 1) x 0.5): jaja " + basis.ToString("0", Inv) + " (dotad ze wsi tylko hodowla bydla BK)"
+                     + " | jaja juz w typie wsi (pominiete) " + inType + " | bez targu (bez plonu) " + noMarket
+                     + " | Egg w grze " + (egg != null ? "jest" : "BRAK - nic sie nie dzieje")
+                     + " | lista produkcji BK " + (MineralOnce.Wired ? "jest (postfiks GetProductions dopisze jaja)" : "BEZ latki GetProductions - jaj nie bedzie")
+                     + " | potkniecia " + _stumbles + ".");
+        }
+
+        /// <summary>Z ArmouryBehavior.OnDailyTick (po linii owocow): linia "Jaja wsi (N2-E1): dzien" (tylko log; sztuki - linia "Towary: ... Egg", wsie).</summary>
+        internal static void EggDaily()
+        {
+            if (!EggsOn) return;
+            int lists, calls, vill, st; double b;
+            lock (Gate)
+            {
+                lists = _eggLists; calls = _eggCalls; b = _eggBase; vill = _eggVill.Count; st = _stumbles;
+                _eggLists = 0; _eggCalls = 0; _eggBase = 0; _eggVill.Clear();
+            }
+            Log.Info("Jaja wsi (N2-E1): dzien " + (int)CampaignTime.Now.ToDays + " | listy BK z jajami " + lists + " (wsi " + vill + ")"
+                     + " | baza dopisana w " + calls + " pytaniach modelu (tick BK, okna wsi): jaja " + b.ToString("0", Inv)
+                     + " (sztuki z ticku - linia \"Towary\", Egg, wsie) | potkniecia sesji " + st + ".");
         }
     }
 }

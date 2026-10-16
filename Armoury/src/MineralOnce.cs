@@ -145,7 +145,8 @@ namespace Armoury
                 bool crop = s.CropClimateFilter, mineral = _patched && s.MineralsCountedOnce;   // T8: dwie osobne bramki
                 bool camel = CamelLaw.On;                                                     // E6/M2 (208): wielblady tylko w Qarthu - trzecia bramka (nowa kampania)
                 bool hamlet = HamletKinds.On;                                                 // E6/W2 (210): ryby wiosek rybackich za zbozem - czwarta bramka (ostatni krok listy)
-                if (!crop && !mineral && !camel && !hamlet) return;                           // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
+                bool eggs = VillageFruit.EggsOn;                                              // N2-E1 (noc-ekonomia2): jaja wsi z drobiem BK - piata bramka (pozycja dopisana na koncu listy)
+                if (!crop && !mineral && !camel && !hamlet && !eggs) return;                  // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
                 var list = __result;
                 if (list == null) return;
                 v = VillageOf(__0);
@@ -167,6 +168,13 @@ namespace Armoury
                     // E6/M2 (208): po filtrze klimatu, przed petla powtorzen; potkniecie - lista bez zmian wielbladow i bez mnoznika gospodarza
                     try { list = CamelLaw.ListFilter(v, list); }
                     catch (Exception mex) { CamelLaw.Forget(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.CamelLaw", mex); }
+                }
+                if (eggs)
+                {
+                    // N2-E1: jaja na koncu listy (po filtrze klimatu i wielbladach, przed petla powtorzen - jaj na liscie nie bylo, wiec powtorzeniem nie beda);
+                    // potkniecie - lista bez jaj (jak z BK), model nie dopisze jaj tej wsi
+                    try { list = VillageFruit.EggStep(v, list); }
+                    catch (Exception gex) { VillageFruit.ForgetEgg(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.Eggs", gex); }
                 }
                 if (!mineral) { __result = HamletKinds.ListStep(v, list); return; }         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia)
                 int n = list.Count;
@@ -210,6 +218,7 @@ namespace Armoury
                 int k;
                 lock (Gate) { k = ++_stumbles; if (v != null) _dup.Remove(v); }
                 CamelLaw.Forget(v);                        // E6/M2: lista z BK (z wielbladami) - bez mnoznika gospodarza
+                VillageFruit.ForgetEgg(v);                 // N2-E1: lista z BK bez jaj - model nie dopisze jaj tej wsi
                 HamletKinds.Forget(v);                     // E6/W2: lista z BK bez ryb za zbozem - zboze tej wsi bez zmian
                 if (k <= 3) Log.Error("MineralOnce.Postfix", ex);
             }

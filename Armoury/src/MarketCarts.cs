@@ -451,6 +451,21 @@ namespace Armoury
                     double sc = val * c.Rate;
                     if (best == null || sc > bestSc || (sc == bestSc && c.D < best.D)) { best = c; bestSc = sc; bestVal = val; }
                 }
+                // N2-E3 (noc-ekonomia2, klucz VillageFibreToMarket): woz z lnem, welna albo skorami surowymi, gdy zapas tego towaru wsi (juki + magazyn) przekracza
+                // FibreToMarket.FibreDays dob jej produkcji - do miasta targowego wsi (ownC), takze ponizej ceny bazowej; wycena ownC jak kazdego kandydata (Value).
+                // ownC juz najlepsze, poza kandydatami albo nic nie zaplaci - wybor jak dotad
+                bool fibreSent = false;
+                if (FibreToMarket.On && !ReferenceEquals(ownC, best))
+                {
+                    int fu; double fd;
+                    if (FibreToMarket.Wants(v, home, load, ownC != null, out fu, out fd))
+                    {
+                        long ov = Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk); _evals++;
+                        if (ov > 0) { FibreToMarket.NoteSent(cart, ownC.T.Settlement, castle, fu, ov, bestVal); best = ownC; bestVal = ov; fibreSent = true; }
+                        else FibreToMarket.NoteOwnZero();
+                    }
+                }
+                if (!fibreSent) FibreToMarket.Forget(cart);
                 if (best.Full && plan != null)
                 {
                     int moved = TopUp(cart, home.ItemRoster, plan);
@@ -580,6 +595,7 @@ namespace Armoury
             try
             {
                 Forget(__1);
+                FibreToMarket.SellBegin(__0, __1);                                      // N2-E3: woz skierowany do miasta targowego - migawka wlokna i sakwy (licznik)
                 var s = Settings.Current;
                 var town = __0 != null ? __0.Town : null;
                 if (s == null || !s.VillageCartFairPrice || town == null) return;
@@ -602,6 +618,12 @@ namespace Armoury
         /// <summary>Po sprzedazy (gry albo BK): odtworzenie tej samej sprzedazy z migawki, cena sztuka po sztuce, zwrot nadplaty
         /// z sakwy taboru do kasy osady. Tylko gdy odtworzenie zgadza sie co do denara z tym, co tabor dostal.</summary>
         public static void SellPostfix(Settlement __0, MobileParty __1, Snap __state)
+        {
+            SellPostfixCore(__0, __1, __state);
+            FibreToMarket.SellEnd(__0, __1);                                            // N2-E3: po zwrocie nadplaty - sprzedane wlokno i utarg wozu skierowanego (licznik)
+        }
+
+        private static void SellPostfixCore(Settlement __0, MobileParty __1, Snap __state)
         {
             if (__state == null || __1 == null) return;
             try

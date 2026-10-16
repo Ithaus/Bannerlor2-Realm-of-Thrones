@@ -1448,7 +1448,11 @@ namespace Armoury
             try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem, potem na stale) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
             try { VineOlive.Apply(); } catch (Exception e) { Log.Error("VineOlive.Apply", e); }   // B6: 8 wsi poludnia -> winnice (tylko kampania zaczeta z kluczem, potem na stale) - PO GoodsRates.Apply, PRZED kalibracja plonu P1
             try { VillageFruit.SessionStart(); } catch (Exception e) { Log.Error("VillageFruit.SessionStart", e); }   // noc 15/16.10 (B1): owoce i miod wsi - linia startu PO zmianach typow wsi (VillageClimate, GoodsRates, VineOlive)
+            try { VillageFruit.EggSessionStart(); } catch (Exception e) { Log.Error("VillageFruit.EggSessionStart", e); }   // noc 16.10 (noc-ekonomia2, N2-E1): jaja wsi rolniczych - linia startu (liczba wsi, oczekiwany plon) PO zmianach typow wsi
             try { FoodSubstitute.SessionStart(); FoodThrift.SessionStart(); } catch (Exception e) { Log.Error("FoodSubstitute/FoodThrift.SessionStart", e); }   // noc 15/16.10 (B2, B3): linie startu sesji (klucze z MCM)
+            try { NoMakerBudget.SessionStart(); } catch (Exception e) { Log.Error("NoMakerBudget.SessionStart", e); }   // noc 16.10 (N2-E2): budzet kategorii bez producenta na zbytki - linia startu (klucz z MCM)
+            try { FibreToMarket.SessionStart(); } catch (Exception e) { Log.Error("FibreToMarket.SessionStart", e); }   // noc 16.10 (N2-E3): len, welna i skory do miasta targowego - linia startu, pamiec wozow od zera
+            try { TownFolk.FirewoodSessionStart(); } catch (Exception e) { Log.Error("TownFolk.FirewoodSessionStart", e); }   // noc 16.10 (N2-E4): opal mieszczan - linia startu
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
@@ -1821,6 +1825,9 @@ namespace Armoury
             // E6/R1 (214): woz kopalni kupuje drewno dymarki z polki miasta handlowego za zloto wsi (na nastepna dobe) - zakup wsi w miescie jak E5/B1
             // (pozycja MFolk ksiegi pieniadza, wlasna ramka ksiegi towarow FBloom), PRZED ksiega zelaza i drewna (OreLedger.Daily)
             try { Bloomery.Daily(); } catch (Exception e) { Log.Error("Bloomery.Daily", e); } DayProfile.Lap("Bloomery.Daily");
+            // N2-E4 (noc 16.10, noc-ekonomia2): opal mieszczan z polki miasta za zloto kiesy ludu ponad jutrzejszy koszyk - PO koniach roboczych (ta sama regula zaplaty)
+            // i PO dymarkach (drewno dymarek pierwsze), w tej samej pozycji MFolk ksiegi pieniadza (kiesa -> kasa miasta); wlasna ramka ksiegi towarow FCons ("mieszczanie")
+            try { TownFolk.FirewoodDaily(); } catch (Exception e) { Log.Error("TownFolk.FirewoodDaily", e); } DayProfile.Lap("TownFolk.FirewoodDaily");
             try { MoneyLedger.Mark(MoneyLedger.MFolk); } catch { }
             // wpis 86 (audyt pkt 7): budowy PO rentach - 10% od dzisiejszego dochodu
             try { WarFront.Daily(); } catch (Exception e) { Log.Error("WarFront.Daily", e); } DayProfile.Lap("WarFront.Daily");   // N5-E: warownie przy froncie (skan doby) - PRZED rozliczeniem budow
@@ -1851,7 +1858,9 @@ namespace Armoury
             DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
             try { XbowPrice.Daily(); } catch (Exception e) { Log.Error("XbowPrice.Daily", e); } DayProfile.Lap("XbowPrice.Daily");   // kusze wedlug luku (noc 15/16.10): linia "Kusze wedlug luku (zakupy)" (tylko log)
             try { VillageFruit.Daily(); } catch (Exception e) { Log.Error("VillageFruit.Daily", e); } DayProfile.Lap("VillageFruit.Daily");       // placek i marchew (B1): linia "Owoce wsi" (tylko log)
+            try { VillageFruit.EggDaily(); } catch (Exception e) { Log.Error("VillageFruit.EggDaily", e); } DayProfile.Lap("VillageFruit.EggDaily");   // N2-E1: linia "Jaja wsi (N2-E1)" (tylko log)
             try { FoodSubstitute.Daily(); } catch (Exception e) { Log.Error("FoodSubstitute.Daily", e); } DayProfile.Lap("FoodSubstitute.Daily");   // placek i marchew (B2): linia "Zamienniki jedzenia (B2)" (tylko log)
+            try { NoMakerBudget.Daily(); } catch (Exception e) { Log.Error("NoMakerBudget.Daily", e); } DayProfile.Lap("NoMakerBudget.Daily");   // N2-E2: linia "Budzet bez producenta (N2-E2)" (tylko log)
             try { FoodThrift.Daily(); } catch (Exception e) { Log.Error("FoodThrift.Daily", e); } DayProfile.Lap("FoodThrift.Daily");           // placek i marchew (B3): linia "Lordowie a drogie jedzenie (B3)" (tylko log)
             try { CompanionPay.Daily(); } catch (Exception e) { Log.Error("CompanionPay.Daily", e); } DayProfile.Lap("CompanionPay.Daily");       // towarzysze (C): linia "Towarzysze (C): dzien" (tylko log; ok. 3 wyceny na wolnego wedrowca)
             try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); } DayProfile.Lap("MineralOnce.Daily");   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
@@ -1859,6 +1868,7 @@ namespace Armoury
             try { if (LogGate.Lines) MarketRoad.Daily(); else MarketRoad.Reset(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); } DayProfile.Lap("MarketRoad.Daily");   // wpis 100: dowoz wsi zamkowych na targi (log)
             try { VillageClogDiag.Daily(); } catch (Exception e) { Log.Error("VillageClogDiag.Daily", e); } DayProfile.Lap("VillageClogDiag.Daily");   // diagnoza zatkanych wsi - zaraz po "Dowoz (skutki)" (tylko log)
             try { MarketCarts.Daily(); } catch (Exception e) { Log.Error("MarketCarts.Daily", e); } DayProfile.Lap("MarketCarts.Daily");   // poprawka 119: wozy wsi do najlepiej placacego miasta, cena ladunku sztuka po sztuce (log + porzadki wiesci z drogi)
+            try { FibreToMarket.Daily(); } catch (Exception e) { Log.Error("FibreToMarket.Daily", e); } DayProfile.Lap("FibreToMarket.Daily");   // N2-E3: linia "Wlokno do miasta targowego (N2-E3)" i porzadki pamieci wozow
             try { CastleMarket.Daily(); } catch (Exception e) { Log.Error("CastleMarket.Daily", e); } DayProfile.Lap("CastleMarket.Daily");   // E5/B4 (199): targ przy zamku - porzadki rezerwacji i strazy, linia "Targ przy zamku (5.11)" (po wozach 119)
             try { CartTownExit.Daily(); } catch (Exception e) { Log.Error("CartTownExit.Daily", e); } DayProfile.Lap("CartTownExit.Daily");   // paczka 130: bezpiecznik (woz w miescie od N dob - do domu) i linia "Wozy w miastach:"
             try { CaravanBulk.Daily(); } catch (Exception e) { Log.Error("CaravanBulk.Daily", e); } DayProfile.Lap("CaravanBulk.Daily");   // wpis 103: surowce masowe w karawanach (przeliczenie swiata + log)

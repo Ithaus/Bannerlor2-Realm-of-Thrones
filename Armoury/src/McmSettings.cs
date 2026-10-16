@@ -6440,6 +6440,22 @@ namespace Armoury
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool FolkLoanBeforeGuard { get; set; } = true;
 
+        [SettingPropertyBool("Village Eggs From Bk", HintText = "farming villages (wheat farms, olive groves, vineyards, date farms, flax and silk fields) lay eggs: the Banner Kings list of village goods gives them chickens and geese with their culture's weight, but no eggs, and the game counted the birds as nothing - eggs came only from cattle ranches and from fowl carried in parties, so 88 of 97 towns had none and they cost ten times their worth. The eggs follow the weight of the village's chickens and geese together, grown the way the game grows any crop (the weight times the village's size step plus one, halved, each day); an extra crop - the village's own crops stay as they were (off = as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool VillageEggsFromBk { get; set; } = true;
+
+        [SettingPropertyBool("No Maker Budget To Luxury", HintText = "the townsfolk's money for goods that no village or workshop in the world makes - garum, dyes, gems, ink and gold ore where none is on the stall - goes to the nearest kind of better goods that does lie on the stall in plenty: garum to the better table (meat, cheese, butter, wine), dyes to cloth and clothing, gems and gold ore to jewellery and silver, ink to household goods. Each kind takes at most half of what its stall holds beyond its own buyers. What finds no room stays in the purse, as before; the townsfolk still pay for all of it themselves (off = as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool NoMakerBudgetToLuxury { get; set; } = true;
+
+        [SettingPropertyBool("Village Fibre To Market", HintText = "a village cart carrying flax, wool or hides goes to the village's own market town and sells there, even below the usual price, when the village holds more than six days of its own output of that good (cart and storehouse together) - instead of a long haul to the best-paying town while the storehouse fills and the village stops working. From the market town the merchants carry it on to the weavers and tanners of other towns (off = the cart always seeks the best price, as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool VillageFibreToMarket { get; set; } = true;
+
+        [SettingPropertyBool("Town Folk Firewood", HintText = "the townsfolk buy firewood: a tenth of a load of hardwood (100 kg) a day for each thousand townsfolk in spring and autumn, half that in summer (cooking only), in the winter of Westeros up to twice that (the North twice, the warm south less), taken from their own town's stall only above what the smiths and bloomeries need, and paid from the townsfolk's purse only out of money beyond tomorrow's basket (the excise to the commune, the rest to the town's merchants). In summer little wood is to spare, so they burn little; in winter, when wood piles up, they burn their fill (off = wood only in the Banner Kings basket, as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool TownFolkFirewood { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8049,6 +8065,10 @@ namespace Armoury
             s.SutlersByPurse = SutlersByPurse;
             s.FolkGuardNoMemory = FolkGuardNoMemory;
             s.FolkLoanBeforeGuard = FolkLoanBeforeGuard;
+            s.VillageEggsFromBk = VillageEggsFromBk;
+            s.NoMakerBudgetToLuxury = NoMakerBudgetToLuxury;
+            s.VillageFibreToMarket = VillageFibreToMarket;
+            s.TownFolkFirewood = TownFolkFirewood;
         }
 
         internal static void Apply()
