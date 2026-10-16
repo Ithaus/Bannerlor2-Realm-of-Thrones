@@ -1,5 +1,49 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-16 (karczmy - poprawki recenzji KA: sufit predkosci, przerwanie snu w oblezonym miescie, towarzysze z sakiewki ludzi, ceny dobrego domu) - KA POPRAWKI RECENZJI
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-karczmy` (na 881bf26e) | **Tor:** M (recenzja 16 uwag, bez autotestu - autotest nie bierze noclegow) | **Klucze:** bez nowych (`TownInns`, `TownInnPriceBonus` - opisy MCM poprawione) | **Pliki:** `TownInns.cs`, `NightRest.cs`, `MenPurse.cs` (`InnPay`), `CitySack.Window.cs` (`StayWindow`), `Settings.cs` + `McmSettings.cs` (gen_mcm), `tools/sprawdz_logi.py` (nkarczmy) | **Zapis:** `arm_inns` - opcjonalne pole 15 (zysk z premii cen), zapis z 14 polami czyta sie jak dotad, stary DLL czyta nowy zapis (pierwsze 14 pol) | **Cofanie:** `git revert` albo klucz `TownInns`
+
+**Dla Jeffa (prosto):**
+- Premia do predkosci po karczmie naprawde dziala: dotad u piechoty znikala pod "sufitem kolumny marszowej" (w rozpisce bylo "Slept in a bed +0.30" i zaraz "Maximum -0.30"). Teraz wypoczety piechur idzie o te kilka procent szybciej niz zwykle tempo piechura.
+- Jak wrog zacznie oblegac miasto, kiedy spisz w karczmie - budzisz sie i od razu widzisz menu oblezenia (jak w zwyklej grze), zamiast przespac oblezenie z premia.
+- Towarzysze placa najpierw ze swoich pieniedzy, a brakujace z sakiewki ludzi - bo tam idzie ich zold. Nie laduja juz w stajni, choc maja zold.
+- Konie w zbrojowni, na ktorych nikt nie jedzie, sa na Twoim rachunku (jak luzaki w taborze); konny bez konia w zbrojowni placi jak pieszy.
+- Opisy: porzadna karczma to lozka, ogien i piwo, dobry dom - pokoje, wino i laznia; jedzenia karczma nie sprzedaje, ludzie jedza swoj prowiant jak w drodze (dotad placili za posilek dwa razy).
+- W podpowiedzi kazdej opcji widac, o ktorej sie obudzisz i do ktorej jestes wypoczety. Od 18:00 spisz do switu, w dzien - az ludzie sie wyspia. Wypoczety do zmierzchu, ale najwyzej 12 godzin od pobudki.
+- Lepsze ceny w dobrym domu tylko po nocy (sen do switu), nie po drzemce w dzien; najwyzej 3%, ale nigdy wiecej niz polowa roznicy miedzy cena kupna i sprzedazy w tym miescie - kupno i odsprzedaz nigdy sie nie oplaca. Po zarobieniu na premii ok. 100 denarow premia cen sie konczy.
+- W oknie lupu rachunek w menu pokazuje to, co naprawde zaplacisz (ludzie nic).
+
+**Problem:** recenzja paczki KA (16 uwag: 1 krytyczna, 2 wazne, 13 drobnych). Krytyczna: log Jeffa `Armoury-2026-10-16_11-22-18.log` - 6 z 9 linii "Audyt predkosci" konczy sie "=> 3.00" = sufit kolumny 4.0 x 75%; premia karczmy (Add do bazy) podnosila tylko wartosc przed docieciem LimitMax.
+
+**Przyczyna [K]:**
+1. `MarchPace.SpeedPostfix` (Priority.Last, latka wczesniej niz NightRest) zawsze ustawia `LimitMax(cap)`; `TownInns.SpeedBonus` robil tylko `Add` - `ResultNumber = Clamp(..., LimitMaxValue)` zostawal na suficie.
+2. `NightRest.SleepTick` nie pytal `GetGenericStateMenu` (vanilla `town_wait_menus` robi to co tick - PlayerTownVisitCampaignBehavior:119-122); `LeaveSleep` w osadzie zawsze `SwitchToMenu("town")`.
+3. Towarzysze z `Hero.Gold`, a ich zold (TotalWage druzyny gracza) SoldierPay wplaca do sakiewki ludzi (`MenPurse.Add`, SoldierPay.cs:496).
+4. `InnPay` dawal `CrownIncome.NoteOwnSpend` cala kwote, choc przy czynnej kiesie ludu do kasy miasta (zaworu rodu) idzie 0.
+5. Reszta: staly krok 3% cen (przy waskiej rozpietosci gry ok. 1.059 < 1.062 petla dawala grosz), premia cen po dziennej drzemce i do zmierzchu nastepnego dnia, okno lupu w menu inne niz przy zaplacie, konie zbrojowni DTE poza rachunkiem, posilek placony dwa razy, teksty "zawsze do switu", zdjecie noclegu po wczytaniu w menu snu (flaga), czasy z zapisu bez sprawdzenia, KA-1 falszywy blad w logu z samym menu glownym, puste `catch { }`, flaga snu w `Allowed`, rozpiska gojenia "+25%" przy +50%.
+
+**Zmiana:**
+- `TownInns.SpeedBonus`: obok `Add` sufit `LimitMax` (gdy jest) w gore o ten sam procent (+0.001 zapasu na float). Wynik = min(naturalna, sufit) x (1 + premia), bez linii "Maximum". (Droga z MarchPace `cap *= 1+x` dawalaby linie "Maximum" przy naturalnej > sufit x (1+x), bo SpeedBonus dodaje jeszcze raz.)
+- `NightRest.SettlementInterrupt` (z `SleepTick`, przed pobudka): tylko przy zagrozeniu (oblezenie twierdzy, bitwa partii albo osady, cudza armia) menu z `GetGenericStateMenu` (zwykle menu osady / null -> `menu_siege_strategies` przy oblezeniu), koniec snu jak przerwany (`EndSleepQuiet` -> `TownInns.OnInterrupted`; bez SleepInit po wczytaniu - sam `OnInterrupted`), komunikat, `SwitchToMenu` z ticku (jak vanilla). `SettlementMenu`: oblezona twierdza -> `menu_siege_strategies` (wzor PlayerArmyWaitBehavior:356). Opcji `IsPlayerWaiting` NIE wlaczono - flaga jest w zapisie gry i po wczytaniu pchnelaby gre w `town_wait_menus`.
+- Towarzysze: `Plan` - najpierw `Hero.Gold`, brak do wybranej jakosci z wolnej sakiewki ludzi po szeregowych; zaplata jednym `MenPurse.InnPay` (szeregowi + doplata), w linii noclegu obie czesci ("kiesa a, sakiewka ludzi b"), w linii doby "towarzysze X (z sakiewki ludzi Y)".
+- `MenPurse.InnPay`: `NoteOwnSpend(coffer)` tylko gdy coffer > 0 (`ClanIncomeBook.NoteOwnPaid` dalej z calej kwoty - licznik).
+- Ceny: krok = min(3%, (B-S)/(2(B+S))) z cen gry w tej chwili (B, S bez premii), kupno >= S+1, sprzedaz <= kupno z premia - 1; premia cen tylko po nocy (`WakeMin > 0`); wypoczeci do min(zmierzch, pobudka + 12 h); limit zysku 5 x pokoj dobrego domu (100 d, szacunek z 3% przy kazdym zamknieciu ekranu handlu - potem `Price` zdjete, linia "premia cen ... zdjeta").
+- Zbrojownia DTE (`QuartermasterLaw.DteArmory`): wierzchowce ponad konnych szeregowych + juczne -> rachunek gracza po `PHorse[q]`; przy `TroopsFightWithOwnKitOnly` konni ponad konie zbrojowni jako piesi.
+- Teksty: bez posilku (QWhat, menu, sen w karczmie, MCM), "od 18:00 (swit - 12 h) do switu, w dzien do wyspania", przewidywana pobudka i koniec premii w podpowiedzi (`PredictWake` - te same zasady co SleepTick, `NightRest.SleepTargetNow` / `SleepCapHours`), MCM "Needs Night Rest".
+- Okno lupu: `CitySack.StayWindow` (bramka bez licznika `_dBlockStayN`), ten sam rachunek w `QCondition` i `Commit` (`Plan(..., sacked)`); w oknie darowana tez doplata towarzyszy z sakiewki.
+- `Hourly`: zdjecie noclegu po samym id menu (`SleepMenuOpen`); `Allowed`: `InSleepMenu()` zamiast flagi; `CheckTimes` na starcie sesji (wypoczeci > 24 h - zdjete, pobudka > 12 h - 0, nocleg z przyszlosci - zdjety; w linii startu sesji); `HealPostfix`: `Add(wynik x premia / f)`; `HealPostfix`, `MarketPostfix` - `Stumble`; `SpeedBonus`, `MoraleBonus` - licznik Interlocked w linii doby.
+- `sprawdz_logi.py` nkarczmy: nowe pola linii doby, KA-1 INFO dla logu z sama linia latek, KA-6 = min(18:00, pobudka + 12 h), KA-7 z potknieciami predkosci i morale oraz `ERROR in NightRest.SettlementInterrupt`. Sprawdzone na sztucznym logu (pelny i sama linia latek).
+
+**Ryzyko / co sprawdzic:**
+1. Predkosc (najwazniejsze): po pierwszym noclegu i pobudce bez dlugu w "Audyt predkosci" wynik "=>" ma byc POWYZEJ sufitu kolumny (np. 3.00 -> ok. 3.30 przy porzadnej karczmie dla calej druzyny) i bez ujemnej linii "Maximum"; sama obecnosc "Slept in a bed" nic nie dowodzi.
+2. Przerwanie w oblezeniu - wniosek z kodu vanilli, nie sprawdzone w grze; `SwitchToMenu` z ticku menu oczekiwania (jak vanilla `town_wait_menus` i dotychczasowa pobudka w osadzie). Bez zagrozenia kod nic nie robi.
+3. Limit zysku z cen sprawdzany przy zamknieciu ekranu handlu - jeden duzy ekran moze go przekroczyc o swoja czesc; szacunek z 3% (gorna granica - prawdziwy krok bywa mniejszy).
+4. Zbrojownia DTE: konie liczone z `ArmyArmory.Armory` (ItemType Horse, bez zywego inwentarza); kto ich wlascicielem (wklad gracza czy zapas ludzi) - bez znaczenia, placi gracz (Jeff: "konie, ktore nie sa na ludziach").
+5. Kontrola obiegu bez zmian (suma posiadaczy przed / po noclegu = 0); doplata towarzyszy idzie ta sama ksiega `InnPay`.
+
+**Status:** DO SPRAWDZENIA (build Release rc=0, nie wgrane, bez autotestu).
+
 ## 2026-10-16 (karczmy, Jeff "w miescie moge spac tylko w karczmie, daj do wyboru trzy jakosci karczmy ... ludzie sami placa za siebie i za swoje konie, dostaja zold, ja place za siebie i za konie, ktore nie sa na ludziach" -> "to zaczynaj") - NOCLEG W KARCZMIE: TRZY JAKOSCI, KAZDY PLACI ZA SIEBIE, SEN DO SWITU, WYPOCZETY DO ZMIERZCHU (KA)
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-karczmy` (na c3ea7e03 = WGRANIE 69) | **Tor:** M (projekt zatwierdzony, bez autotestu - autotest nie bierze noclegow) | **Klucze (NOWE - w `Armoury.json` Jeffa ich nie ma, dzialaja domyslne; sprawdzone grepem 16.10, tylko odczyt):** `TownInns` true ("Town Inns"), `TownInnPriceBonus` true ("Town Inn Price Bonus") - grupa MCM "A night's rest" | **Pliki:** nowy `Armoury/src/TownInns.cs`; zmienione `NightRest.cs` (haczyki snu), `MenPurse.cs` (`InnPay`), `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen_mcm), `tools/sprawdz_logi.py` (grupa nkarczmy) | **Zapis:** nowy klucz `arm_inns` (brak = brak stanu) | **Cofanie:** klucz `TownInns` w MCM (wylaczony = bez opcji w menu, bez premii) albo `git revert`

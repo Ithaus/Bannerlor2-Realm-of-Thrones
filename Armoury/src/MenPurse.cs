@@ -355,8 +355,10 @@ namespace Armoury
             int coffer = t - folk;
             if (coffer > 0) st.Town.ChangeGold(coffer);
             ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, t);   // 169c: wydatki ludzi rodu w jego miescie (tylko licznik)
-            if ((mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
-                CrownIncome.NoteOwnSpend(mp.ActualClan, t);     // 165 (K3): zold wydany we wlasnym miescie rodu - jedna regula z OnLeft
+            // 165 (K3): zold wydany we wlasnym miescie rodu wraca rodowi zaworem kasy miasta - bez zwrotu korony od niego. Recenzja 16.10: tylko czesc w kasie (coffer),
+            // jak MoneyLedger.Note / TownFolk.Note / SoldierPay.Hold nizej - przy czynnej kiesie ludu cala kwota idzie do karczmarzy i zawor kasy nic rodowi nie oddaje
+            if (coffer > 0 && (mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
+                CrownIncome.NoteOwnSpend(mp.ActualClan, coffer);
             if (coffer > 0)
             {
                 MoneyLedger.Note(MoneyLedger.NLife, st, coffer);   // ksiega przeplywow osad (tylko licznik) - czesc w kasie

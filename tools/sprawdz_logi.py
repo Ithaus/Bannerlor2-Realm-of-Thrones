@@ -875,7 +875,8 @@ Uzycie (Python 3, tylko odczyt):
 --grupa nkarczmy  : (16.10, Jeff "w miescie moge spac tylko w karczmie, daj do wyboru trzy jakosci karczmy"; galaz w-toku/noc-karczmy, Armoury/src/TownInns.cs)
                     python -I tools/sprawdz_logi.py --grupa nkarczmy <Armoury-*.log> (strumieniowo). KA-0 latki (cena 2/2, gojenie 2/2), KA-1 start sesji (klucze),
                     KA-2 linie doby i noclegu rozpoznane, KA-3 kontrola obiegu (roznica 0), KA-4 rachunek noclegu spojny, KA-5 premie w granicach projektu,
-                    KA-6 wypoczeci do 18:00, KA-7 potkniecia i ERROR paczki 0, KA-8 noclegi i zaplata (INFO). Bez noclegu w logu KA-3..6 - INFO.
+                    KA-6 wypoczeci do zmierzchu 18:00, najwyzej 12 h od pobudki, KA-7 potkniecia (takze w predkosci i morale) i ERROR paczki 0,
+                    KA-8 noclegi i zaplata (INFO). Bez noclegu w logu KA-3..6 - INFO; log tylko z linia latek (menu glowne) - KA-1 INFO.
 --grupa nbitwa    : (16.10, Jeff 'krzyk paniki zapetlony, ranni ida w moja strone, bija piescia' i 'wysoki tier traci zielony pasek'; galaz
                     w-toku/noc-bitwa, Armoury/src/RoutHold.cs, BattleWind.cs) python -I tools/sprawdz_logi.py --grupa nbitwa <Armoury-*.log> (strumieniowo).
                     Progi: NBW-0 linia 'Bitwa (NB2): start sesji' (Broken Men Never Rally, Flee Away From Enemies, postura wg tieru, latka postury RBM
@@ -32004,19 +32005,22 @@ def nturniej_main(logp):
 # ------------------------------------------------------------ nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie, daj do wyboru trzy jakosci"; Armoury/src/TownInns.cs)
 NKA_HEAD = "Karczmy (KA): "
 NKA_DAY = re.compile(r"Karczmy \(KA\): dzien (?P<day>-?\d+) \| klucze: Town Inns (?P<k1>tak|WYLACZONE), Town Inn Price Bonus (?P<k2>tak|WYLACZONE), Night Rest (?P<k3>tak|WYLACZONE) "
-                     r"\| noclegi (?P<n>\d+): osoby (?P<p>\d+) \(wspolna izba (?P<q0>\d+), porzadna karczma (?P<q1>\d+), dobry dom (?P<q2>\d+), stajnia (?P<st>\d+)\), konie bez jezdzca (?P<h>\d+) "
-                     r"\| zaplacone (?P<paid>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+), gracz (?P<pl>\d+)\) -> kiesa ludu (?P<folk>\d+), kasa miasta (?P<cof>-?\d+) "
+                     r"\| noclegi (?P<n>\d+): osoby (?P<p>\d+) \(wspolna izba (?P<q0>\d+), porzadna karczma (?P<q1>\d+), dobry dom (?P<q2>\d+), stajnia (?P<st>\d+)\), "
+                     r"konie bez jezdzca (?P<h>\d+) \(zbrojownia (?P<ha>\d+)\) "
+                     r"\| zaplacone (?P<paid>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+) \(z sakiewki ludzi (?P<cpurse>\d+)\), gracz (?P<pl>\d+)\) "
+                     r"-> kiesa ludu (?P<folk>\d+), kasa miasta (?P<cof>-?\d+) "
                      r"\| kontrola obiegu \(prog 0\): roznica (?P<diff>-?\d+) \| pobudki: wypoczeci (?P<woke>\d+), bez premii (?P<norest>\d+), noclegi bez snu (?P<drop>\d+) "
                      r"\| stan noclegu: (?P<state>.*?) \| gojenie dobrego domu: godzin (?P<heal>\d+) "
-                     r"\| cena dobrego domu: kupione (?P<bn>\d+) szt\. za (?P<b>\d+) \(taniej ok\. (?P<bs>-?\d+)\), sprzedane (?P<sn>\d+) szt\. za (?P<s>\d+) \(drozej ok\. (?P<ss>-?\d+)\) "
-                     r"\| potkniecia dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\)\.$")
+                     r"\| cena dobrego domu: kupione (?P<bn>\d+) szt\. za (?P<b>\d+) \(taniej ok\. (?P<bs>-?\d+)\), sprzedane (?P<sn>\d+) szt\. za (?P<s>\d+) \(drozej ok\. (?P<ss>-?\d+)\), "
+                     r"premia zdjeta po limicie (?P<pcut>\d+) "
+                     r"\| potkniecia dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\), w predkosci i morale dzis (?P<pstum>\d+) \(od wczytania (?P<pstumall>\d+)\)\.$")
 NKA_STAY = re.compile(r"Karczmy \(KA\): nocleg w .*? - wybor (?P<q>[012]) .*?"
                       r"\| razem (?P<tot>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+), gracz (?P<pl>\d+)\) -> kiesa ludu (?P<folk>\d+), kasa miasta (?P<cof>-?\d+) "
                       r"\| kontrola obiegu: roznica (?P<diff>-?\d+) \| osoby (?P<p>\d+): .*?"
                       r"\| premia po snie: predkosc \+(?P<sp>\d+\.\d)%, morale \+(?P<mo>\d+\.\d), sen x(?P<sl>\d+\.\d\d), gojenie \+(?P<he>\d+)%, cena (?P<pr>tak|nie)\.$")
-NKA_WAKE = re.compile(r"-> wypoczeci do (?P<d>-?\d+) (?P<hh>\d\d):(?P<mm>\d\d) ")
+NKA_WAKE = re.compile(r"(?P<wd>-?\d+) (?P<wh>\d\d):(?P<wm>\d\d) - w menu .*?-> wypoczeci do (?P<d>-?\d+) (?P<hh>\d\d):(?P<mm>\d\d) ")
 NKA_HOOKS = re.compile(r"Karczmy \(KA\): latki przy starcie gry - cena .*? (?P<price>\d)/2, gojenie .*? (?P<heal>\d)/2\.$")
-NKA_ERR = ("ERROR in TownInns.", "ERROR in SyncData.arm_inns")
+NKA_ERR = ("ERROR in TownInns.", "ERROR in SyncData.arm_inns", "ERROR in NightRest.SettlementInterrupt")
 NKA_CAP = {"sp": 12.0, "mo": 8.0, "sl": 1.25, "he": 50.0}   # projekt: dobry dom - najwyzsza premia kazdego rodzaju
 
 
@@ -32025,8 +32029,9 @@ def nkarczmy_main(logp):
     towarzysze z kiesy, gracz za siebie i konie bez jezdzca; sen do switu, premia do zmierzchu. Wejscie: log Armoury (strumieniowo).
     KA-0 latki przy starcie gry (cena 2/2, gojenie 2/2), KA-1 linia startu sesji (klucze), KA-2 linie doby i noclegu rozpoznane, KA-3 kontrola obiegu (kazdy nocleg
     i suma dob: roznica 0), KA-4 rachunek noclegu spojny (razem = ludzie + towarzysze + gracz = kiesa ludu + kasa miasta), KA-5 premie w granicach projektu
-    (predkosc <= 12%, morale <= 8, sen <= x1.25, gojenie <= 50%), KA-6 wypoczeci zawsze do zmierzchu 18:00, KA-7 potkniecia i ERROR paczki 0, KA-8 noclegi,
-    zaplata, ceny (INFO). Autotest nie bierze noclegow - bez linii noclegu KA-3..KA-6 to INFO. Log bez paczki: INFO, bez wyjatku."""
+    (predkosc <= 12%, morale <= 8, sen <= x1.25, gojenie <= 50%), KA-6 wypoczeci do zmierzchu 18:00, najwyzej 12 h od pobudki (recenzja 16.10), KA-7 potkniecia
+    (takze w predkosci i morale - Interlocked) i ERROR paczki 0, KA-8 noclegi, zaplata, ceny (INFO). Autotest nie bierze noclegow - bez linii noclegu KA-3..KA-6
+    to INFO. Log z sama linia latek (menu glowne, wywrotka przed wczytaniem kampanii) - KA-1 INFO. Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("KA-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -32034,11 +32039,14 @@ def nkarczmy_main(logp):
         return 0
     hooks, sess, days, bad, stays, bad_stays, wakes = [], [], [], [], [], [], []
     n_err = 0
+    n_camp = 0   # linie KA kampanii (wszystko poza linia latek przy starcie gry)
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
             if s.startswith(NKA_HEAD):
+                if not s.startswith(NKA_HEAD + "latki przy starcie gry"):
+                    n_camp += 1
                 if s.startswith(NKA_HEAD + "latki przy starcie gry"):
                     hooks.append(s)
                 elif s.startswith(NKA_HEAD + "start sesji"):
@@ -32077,6 +32085,8 @@ def nkarczmy_main(logp):
         s0 = sess[-1]
         off = [k for k in ("Town Inns", "Town Inn Price Bonus", "Night Rest") if k + " WYLACZONE" in s0]
         rep.add("KA-1: linia startu sesji - klucze", s0[len(NKA_HEAD):][:240], "klucze tak (WYLACZONE - INFO)", None if off else True)
+    elif n_camp == 0:
+        rep.add("KA-1: linia startu sesji", "brak - w logu tylko linia latek (menu glowne albo wywrotka przed wczytaniem kampanii)", "INFO (log bez kampanii)", None)
     else:
         rep.add("KA-1: linia startu sesji", "brak (sa inne linie KA)", "linia przy kazdym starcie sesji", False)
     rep.add("KA-2: linie doby i noclegu rozpoznane", f"doby {len(days)} (nierozpoznane {len(bad)}), noclegi {len(stays)} (nierozpoznane {len(bad_stays)})"
@@ -32096,20 +32106,32 @@ def nkarczmy_main(logp):
     else:
         rep.add("KA-3..5: noclegi", "brak noclegu w logu", "INFO (autotest nie bierze noclegow)", None)
     if wakes:
-        notdusk = [w for w in wakes if not (w["hh"] == "18" and w["mm"] == "00")]
-        rep.add("KA-6: wypoczeci do zmierzchu (18:00)", f"pobudek z premia {len(wakes)}, nie do 18:00: {len(notdusk)}", "0", not notdusk)
+        def nka_until(w):
+            wake = int(w["wd"]) * 1440 + int(w["wh"]) * 60 + int(w["wm"])
+            dusk = wake - wake % 1440 + 18 * 60
+            if dusk <= wake:
+                dusk += 1440
+            return min(dusk, wake + 12 * 60), int(w["d"]) * 1440 + int(w["hh"]) * 60 + int(w["mm"])
+        notdusk = [w for w in wakes if nka_until(w)[0] != nka_until(w)[1]]
+        rep.add("KA-6: wypoczeci do zmierzchu (18:00), najwyzej 12 h od pobudki", f"pobudek z premia {len(wakes)}, inny koniec premii: {len(notdusk)}"
+                + (f" (np. pobudka {notdusk[0]['wd']} {notdusk[0]['wh']}:{notdusk[0]['wm']} -> {notdusk[0]['d']} {notdusk[0]['hh']}:{notdusk[0]['mm']})" if notdusk else ""),
+                "0", not notdusk)
     else:
         rep.add("KA-6: pobudki z premia", "brak", "INFO", None)
     stum = sum(int(g["stum"]) for g in days)
-    rep.add("KA-7: potkniecia (suma dob) i ERROR paczki (TownInns.*, SyncData.arm_inns)", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+    pstum = sum(int(g["pstum"]) for g in days)
+    rep.add("KA-7: potkniecia (suma dob; predkosc i morale osobno) i ERROR paczki (TownInns.*, SyncData.arm_inns, NightRest.SettlementInterrupt)",
+            f"potkniecia {stum}, w predkosci i morale {pstum}, ERROR {n_err}", "0 / 0 / 0", stum == 0 and pstum == 0 and n_err == 0)
     if days:
         def tot(k):
             return sum(int(g[k]) for g in days)
         rep.add("KA-8: noclegi, zaplata, ceny dobrego domu (suma dob)",
                 f"noclegi {tot('n')}, osoby {tot('p')} (wspolna izba {tot('q0')}, porzadna karczma {tot('q1')}, dobry dom {tot('q2')}, stajnia {tot('st')}), "
-                f"konie bez jezdzca {tot('h')}; zaplacone {tot('paid')} (ludzie {tot('men')}, towarzysze {tot('comp')}, gracz {tot('pl')}) -> kiesa ludu {tot('folk')}, "
+                f"konie bez jezdzca {tot('h')} (zbrojownia {tot('ha')}); zaplacone {tot('paid')} (ludzie {tot('men')}, towarzysze {tot('comp')} - z sakiewki ludzi {tot('cpurse')}, "
+                f"gracz {tot('pl')}) -> kiesa ludu {tot('folk')}, "
                 f"kasa miasta {tot('cof')}; pobudki z premia {tot('woke')}, bez premii {tot('norest')}, bez snu {tot('drop')}; gojenie godzin {tot('heal')}; "
-                f"kupione {tot('bn')} szt. za {tot('b')} (taniej ok. {tot('bs')}), sprzedane {tot('sn')} szt. za {tot('s')} (drozej ok. {tot('ss')}); "
+                f"kupione {tot('bn')} szt. za {tot('b')} (taniej ok. {tot('bs')}), sprzedane {tot('sn')} szt. za {tot('s')} (drozej ok. {tot('ss')}), "
+                f"premia cen zdjeta po limicie {tot('pcut')}; "
                 f"stan na koniec: {days[-1]['state'][:120]}", "INFO", None)
     else:
         rep.add("KA-8: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba)", None)
