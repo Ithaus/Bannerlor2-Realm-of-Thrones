@@ -6212,6 +6212,10 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool FixPrincelyArbiterWage { get; set; } = true;
 
+        [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when one of the five mods (Armoury, CrashScribe, Realistic Captivity, Grand Tourney, ForgeView) hooks a game rule through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook is moved onto the class that really holds the rule. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log")]
+        [SettingPropertyGroup("Model chains under the BKROT patch")]
+        public bool PatchTargetGuard { get; set; } = true;
+
         [SettingPropertyBool("Gentry Names Fallback", HintText = "New gentry houses (locals who take up a vacant estate) rise in every realm again. Banner Kings names a new house with the first name on its culture's list that no house of the SAME culture bears, and the game then refuses a name any house bears. Realm of Thrones gives one list to many cultures, so the realm that founded the first house took that name for good and no gentry ever rose again in Braavos, Lys, Myr, Tyrosh, Norvos, Qohor, Volantis, the Reach, the Riverlands, the Stormlands, Dragonstone and others; the short lists of the North, the Vale, Dorne, the Free Folk and the Ghiscari ran out too. On = the first name on the list that no house in the world bears; when the list is used up, a name from the village (the village itself, or a name from the list of the village). A knight founding his house gets a free name the same way, but only where Banner Kings would have given him one. Lorath, Ibben, Qarth, the Night's Watch and the Summer Isles still have no gentry (Banner Kings has no gentry for their cultures). Off = as before")]
         [SettingPropertyGroup("Banner Kings gentry")]
         public bool GentryNamesFallback { get; set; } = true;
@@ -7768,6 +7772,7 @@ namespace Armoury
             s.FixBkrotWageChain = FixBkrotWageChain;
             s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
+            s.PatchTargetGuard = PatchTargetGuard;
             s.GentryNamesFallback = GentryNamesFallback;
         }
 

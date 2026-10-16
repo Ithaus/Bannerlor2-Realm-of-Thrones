@@ -699,7 +699,7 @@ namespace Armoury
             if (model != null)
             {
                 _modelType = model.GetType().FullName;
-                var m = AccessTools.Method(model.GetType(), "CalculateHeroFiefScore", args);
+                var m = PatchTarget.OfActive(model, "CalculateHeroFiefScore", args, "nadania lenn: ocena");   // HT: klasa deklarujaca
                 if (m != null) targets.Add(m);
                 else _missing.Add("ocena: " + _modelType + ".CalculateHeroFiefScore (brak metody)");
             }

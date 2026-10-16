@@ -281,9 +281,7 @@ namespace Armoury
                 MethodInfo m = null;
                 if (cm != null)
                 {
-                    var any = cm.GetType().GetMethod("GetInitialTradeGold", BindingFlags.Public | BindingFlags.Instance, null, CapArgs, null);
-                    var decl = any != null ? any.DeclaringType : null;
-                    m = decl != null ? decl.GetMethod("GetInitialTradeGold", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly, null, CapArgs, null) : null;
+                    m = PatchTarget.OfActive(cm, "GetInitialTradeGold", CapArgs, "kapital: model karawan");   // HT: metoda z klasy deklarujacej (jak dotad DeclaredOnly)
                     if (m != null && m.IsAbstract) m = null;
                 }
                 Seal31.Patch("kapital: model karawan (" + (cm != null ? cm.GetType().Name : "brak") + ".GetInitialTradeGold, Low - przed oknem O17)", m, typeof(CaravanCapital),

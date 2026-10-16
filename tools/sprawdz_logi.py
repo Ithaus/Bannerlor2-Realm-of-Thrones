@@ -753,6 +753,13 @@ Uzycie (Python 3, tylko odczyt):
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
                     wolnych w miastach tylko przez zgony / najecie / rody / niewole, UN-7 bez miejsca nie rosnie, UN-9 dzieci z imieniem wzoru 0, UN-11
                     potkniecia 0; UN-1, UN-8, UN-10, UN-12 INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa nharmony  : (15.10 noc, pulapka Harmony "czynnego modelu" - drewno w kuzni; galaz w-toku/noc-harmony, Armoury/src/PatchTarget.cs) python -I
+                    tools/sprawdz_logi.py --grupa nharmony <Armoury-*.log> (strumieniowo). NH-0a straznik na PatchProcessor.Patch wpiety, NH-0b linia
+                    "Latki czynnego modelu (HT): start sesji" w kazdej sesji (klucz TAK), NH-1 czynne modele wpiete N = R (R >= 8, bez proby 0, NIE 0), NH-2
+                    przez klase deklarujaca (INFO, oczekiwane 1 - drewno), NH-3 nasze proby = udane, NIE 0, NH-4a poprawione 0 (> 0 = DECYZJA), NH-4b bez
+                    poprawki 0 przy kluczu TAK, NH-5 cudze z typem pochodnym (INFO), NH-6 samosprawdzenie drewna 0 w kazdej sesji, NH-7 potkniecia i
+                    ERROR in PatchTarget 0, NH-8a linie "po starcie - NIE" 0, NH-8b "po starcie - poprawiona" 0 (DECYZJA), NH-9 lancuchy (INFO).
+                    Log bez linii HT: INFO, bez wyjatku. Recznie po autotescie: Modules/BKROTPatch/BKROTLog.txt bez "Caught ArgumentException when patching".
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -27232,6 +27239,154 @@ def korona2_main(logp):
     return 0
 
 
+
+# ------------------------------------------------------------ nharmony (15.10 noc, pulapka Harmony "czynnego modelu" - SmithWood; Armoury/src/PatchTarget.cs)
+NH_HEAD = "Latki czynnego modelu (HT): "
+NH_MODELS = re.compile(r"czynne modele: wpiete (\d+) z (\d+) \(na metodzie typu czynnego (\d+), przez klase deklarujaca (\d+)(?:: (.*?))?\), bez proby (\d+)")
+NH_MNO = re.compile(r", NIE (\d+)(?:: (.*))?$")
+NH_GUARD = re.compile(r"straznik Harmony (.+?): nasze proby (\d+), udane (\d+), NIE (\d+)")
+NH_FIXED = re.compile(r"; poprawione na klase deklarujaca (\d+)(?:: (.*?))?(?:; nasze z typem|; cudze z typem|$)")
+NH_UNFIX = re.compile(r"; nasze z typem pochodnym bez poprawki (\d+)(?:: (.*?))?(?:; cudze z typem|$)")
+NH_FOREIGN = re.compile(r"; cudze z typem pochodnym (\d+)(?:: (.*?))?(?:; nasze z celem null|$)")
+NH_STUM = re.compile(r"^potkniecia (\d+)\.?$")
+NH_WOOD = re.compile(r"koszt drewna przy zapasie 50 kg (-?\d+|\?) \(oczekiwane 0\)")
+
+
+def nharmony_main(logp):
+    """nharmony (15.10 noc, pulapka Harmony "czynnego modelu" - drewno w kuzni; Armoury/src/PatchTarget.cs, galaz w-toku/noc-harmony). Wejscie: log Armoury.
+    NH-0 straznik na PatchProcessor.Patch wpiety (linia przy starcie gry) i linia "Latki czynnego modelu (HT): start sesji" w kazdej sesji (klucz TAK);
+    NH-1 czynne modele: wpiete N z R, N = R i R >= 8 (zestaw Jeffa 9) w kazdej sesji; NH-2 przez klase deklarujaca M (INFO, oczekiwane 1 - drewno);
+    NH-3 straznik: nasze proby P = udane W, NIE 0, P > 0; NH-4 poprawione na klase deklarujaca K = 0 (K > 0 = DECYZJA: latka ozyla - linia szukania
+    celu do przerobienia na PatchTarget.OfActive, sprawdzic zasada 4), z kluczem TAK nasze bez poprawki 0; NH-5 cudze z typem pochodnym (INFO);
+    NH-6 samosprawdzenie drewna: koszt przy zapasie 50 kg = 0 w kazdej sesji, linia startu drewna bez BRAK / wyjatek; NH-7 potkniecia 0
+    i ERROR in PatchTarget 0; NH-8 linie "po starcie": NIE 0 (poprawiona = DECYZJA); NH-9 lancuchy modeli (INFO).
+    Log bez linii HT: INFO, bez wyjatku. Poza logiem (recznie): BKROTLog.txt bez "Caught ArgumentException when patching"."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NH-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, guards, late, woods, wstarts = [], [], [], [], []
+    errs = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NH_HEAD):
+                rest = s[len(NH_HEAD):]
+                if rest.startswith("start sesji"):
+                    starts.append(s)
+                elif rest.startswith("straznik Harmony "):
+                    guards.append(s)
+                elif rest.startswith("po starcie - "):
+                    late.append(s)
+            elif s.startswith("Drewno w kuzni (kg) - samosprawdzenie:"):
+                woods.append(s)
+            elif s.startswith("Drewno w kuzni (kg): start sesji"):
+                wstarts.append(s)
+            elif s.startswith("ERROR in PatchTarget"):
+                errs += 1
+    print(f"plik: {logp} | linii straznika {len(guards)}, linii startu sesji {len(starts)}, linii 'po starcie' {len(late)}, samosprawdzen drewna {len(woods)}")
+    if not starts and not guards:
+        rep.add("NH-0: linie HT (latki czynnego modelu)", "brak linii", "INFO (wersja sprzed HT)", None)
+        rep.show()
+        return 0
+    g = guards[-1] if guards else ""
+    rep.add("NH-0a: straznik na PatchProcessor.Patch (start gry)", g[len(NH_HEAD):][:200] if g else "brak linii straznika",
+            "linia jest, 'straznik Harmony wpiety'", bool(g) and g.startswith(NH_HEAD + "straznik Harmony wpiety"))
+    on_all = all("| klucz PatchTargetGuard TAK" in s for s in starts)
+    rep.add("NH-0b: linia startu sesji (HT) w kazdej sesji", f"linii {len(starts)}, klucz TAK we wszystkich: {'tak' if on_all else 'nie'}",
+            ">= 1, klucz TAK", (len(starts) >= 1 and on_all) if (on_all or not starts) else None)
+    if not starts:
+        rep.show()
+        return 0
+    rows = []
+    for s in starts:
+        seg = s.split(" | ")
+        mseg = next((x for x in seg if x.startswith("czynne modele: ")), "")
+        gseg = next((x for x in seg if x.startswith("straznik Harmony ")), "")
+        cseg = next((x for x in seg if x.startswith("lancuchy ")), "")
+        sseg = next((x for x in seg if x.startswith("potkniecia ")), "")
+        a = NH_MODELS.match(mseg)
+        b = NH_MNO.search(mseg)
+        gg = NH_GUARD.match(gseg)
+        fx = NH_FIXED.search(gseg)
+        uf = NH_UNFIX.search(gseg)
+        fo = NH_FOREIGN.search(gseg)
+        st_ = NH_STUM.match(sseg)
+        rows.append(dict(
+            ok=bool(a and b and gg),
+            n=int(a.group(1)) if a else None, r=int(a.group(2)) if a else None, direct=int(a.group(3)) if a else None,
+            via=int(a.group(4)) if a else None, vial=(a.group(5) or "") if a else "", none=int(a.group(6)) if a else None,
+            no=int(b.group(1)) if b else None, nol=(b.group(2) or "") if b else "",
+            gname=gg.group(1) if gg else "", p=int(gg.group(2)) if gg else None, w=int(gg.group(3)) if gg else None, gno=int(gg.group(4)) if gg else None,
+            k=int(fx.group(1)) if fx else None, kl=(fx.group(2) or "") if fx else "",
+            u=int(uf.group(1)) if uf else 0, ul=(uf.group(2) or "") if uf else "",
+            c=int(fo.group(1)) if fo else None, cl=(fo.group(2) or "") if fo else "",
+            chains=cseg, stum=int(st_.group(1)) if st_ else None, on="| klucz PatchTargetGuard TAK" in s))
+    bad = [i + 1 for i, x in enumerate(rows) if not x["ok"]]
+    if bad:
+        rep.add("NH-1..NH-7: format linii startu sesji", f"nie do odczytu w sesjach {bad}", "kazda linia czytelna", False)
+    rd = [x for x in rows if x["ok"]]
+    if not rd:
+        rep.show()
+        return 0
+    last = rd[-1]
+    # NH-1
+    ok1 = all(x["n"] == x["r"] and x["r"] >= 8 and x["no"] == 0 and x["none"] == 0 for x in rd)
+    rep.add("NH-1: czynne modele - wpiete N z R (kazda sesja)",
+            "; ".join(f"s{i + 1}: {x['n']} z {x['r']} (bez proby {x['none']}, NIE {x['no']})" for i, x in enumerate(rd))
+            + (f" | NIE: {last['nol'][:300]}" if last["no"] else ""),
+            "N = R, R >= 8 (zestaw Jeffa 9), bez proby 0, NIE 0", ok1)
+    # NH-2
+    rep.add("NH-2: przez klase deklarujaca (INFO)", f"{last['via']}" + (f": {last['vial'][:300]}" if last["vial"] else "") + f"; na metodzie typu czynnego {last['direct']}",
+            "INFO (oczekiwane 1: drewno w kuzni BKSmithingModel -> DefaultSmithingModel)", None)
+    # NH-3
+    ok3 = all(x["gno"] == 0 and x["p"] == x["w"] and x["p"] > 0 for x in rd) and last["gname"] == "wpiety"
+    rep.add("NH-3: straznik - nasze proby / udane / NIE", f"straznik {last['gname']}, proby {last['p']}, udane {last['w']}, NIE {last['gno']}"
+            + (f" | {nh_gseg(starts[-1])}" if last["gno"] else ""), "wpiety, P = W > 0, NIE 0", ok3)
+    # NH-4
+    kmax = max((x["k"] or 0) for x in rd)
+    rep.add("NH-4a: poprawione na klase deklarujaca", f"{kmax}" + (f": {last['kl'][:300]}" if last["kl"] else ""),
+            "0 (> 0 = DECYZJA: martwa latka ozyla - przerobic linie szukania celu na PatchTarget.OfActive, sprawdzic ile pracy robi)",
+            True if kmax == 0 else False, decide=kmax > 0)
+    umax = max(x["u"] for x in rd)
+    rep.add("NH-4b: nasze z typem pochodnym bez poprawki", f"{umax}" + (f": {last['ul'][:300]}" if last["ul"] else ""),
+            "0 przy kluczu TAK (klucz NIE = INFO)", (umax == 0) if all(x["on"] for x in rd) else None)
+    # NH-5
+    rep.add("NH-5: cudze latki z typem pochodnym (INFO, bez zmian)", f"{last['c']}" + (f": {last['cl'][:300]}" if last["cl"] else ""), "INFO", None)
+    # NH-6
+    vals = []
+    for s in woods:
+        mm = NH_WOOD.search(s)
+        vals.append(mm.group(1) if mm else "?")
+    wbad = [s for s in wstarts if "BRAK" in s.split("| latki: ")[-1] or "wyjatek" in s.split("| latki: ")[-1]]
+    if woods:
+        rep.add("NH-6: drewno w kuzni - koszt przy zapasie 50 kg (samosprawdzenie, kazda sesja)", f"{vals}; linie startu drewna z BRAK / wyjatek {len(wbad)}",
+                "0 w kazdej sesji (-1 = latka kosztu nie wolana), 0 linii z BRAK", all(v == "0" for v in vals) and not wbad)
+    else:
+        rep.add("NH-6: drewno w kuzni - samosprawdzenie", "brak linii", "INFO (klucz SmithWoodKg albo wersja sprzed)", None)
+    # NH-7
+    smax = max((x["stum"] or 0) for x in rd)
+    rep.add("NH-7: potkniecia PatchTarget / ERROR in PatchTarget", f"potkniecia {smax}, ERROR {errs}", "0 / 0",
+            smax == 0 and errs == 0 and all(x["stum"] is not None for x in rd))
+    # NH-8
+    lno = [s for s in late if s[len(NH_HEAD):].startswith("po starcie - NIE ")]
+    lfix = [s for s in late if s[len(NH_HEAD):].startswith("po starcie - poprawiona ")]
+    rep.add("NH-8a: linie 'po starcie' - NIE", f"{len(lno)}" + (f": {lno[0][len(NH_HEAD):][:240]}" if lno else ""), "0", len(lno) == 0)
+    rep.add("NH-8b: linie 'po starcie' - poprawiona", f"{len(lfix)}" + (f": {lfix[0][len(NH_HEAD):][:240]}" if lfix else ""),
+            "0 (> 0 = DECYZJA jak NH-4a)", True if not lfix else False, decide=bool(lfix))
+    # NH-9
+    rep.add("NH-9: lancuchy modeli (INFO)", last["chains"][:400], "INFO", None)
+    rep.show()
+    return 0
+
+
+def nh_gseg(s):
+    seg = next((x for x in s.split(" | ") if x.startswith("straznik Harmony ")), "")
+    return seg[:300]
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -27380,6 +27535,8 @@ def main(argv):
         return wyspywolni_main(logp, start_arg, until_arg, bdp, csp, cspb)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
+    if group == "nharmony" and logp:
+        return nharmony_main(logp)   # nharmony (15.10 noc, w-toku/noc-harmony): straznik celu latek Harmony i linia "Latki czynnego modelu (HT)" (PatchTarget.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

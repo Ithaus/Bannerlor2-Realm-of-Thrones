@@ -138,7 +138,7 @@ namespace Armoury
             try
             {
                 var model = Campaign.Current.Models != null ? Campaign.Current.Models.SettlementLoyaltyModel : null;
-                var m = model != null ? AccessTools.Method(model.GetType(), "CalculateLoyaltyChange", new[] { typeof(Town), typeof(bool) }) : null;
+                var m = model != null ? PatchTarget.OfActive(model, "CalculateLoyaltyChange", new[] { typeof(Town), typeof(bool) }, "lojalnosc za danine (P1b)") : null;   // HT: klasa deklarujaca (uchwyt ten sam)
                 if (model == null) why = "brak modelu lojalnosci";
                 else if (m == null) why = "brak metody CalculateLoyaltyChange(Town, bool) w " + model.GetType().FullName;
                 else

@@ -498,7 +498,7 @@ namespace Armoury
             Wire("rozwiazanie partii rycerza (BK FinishParty)", g != null ? AccessTools.Method(g, "FinishParty") : null, nameof(FinishPrefix), null);
             // rycerz nie zajmuje miejsca zolnierza: bez tego partia pelna + rycerz = przepelnienie i gra wypedza co dobe zolnierza (dezercja z wielkosci partii)
             var psm = Campaign.Current.Models != null ? Campaign.Current.Models.PartySizeLimitModel : null;
-            WirePost("miejsce rycerza w druzynie (GetPartyMemberSizeLimit)", psm != null ? AccessTools.Method(psm.GetType(), "GetPartyMemberSizeLimit", new[] { typeof(PartyBase), typeof(bool) }) : null, nameof(SizePostfix));
+            WirePost("miejsce rycerza w druzynie (GetPartyMemberSizeLimit)", psm != null ? PatchTarget.OfActive(psm, "GetPartyMemberSizeLimit", new[] { typeof(PartyBase), typeof(bool) }, "miejsce rycerza (179)") : null, nameof(SizePostfix));
             var sl = AccessTools.TypeByName("BannerKings.Behaviours.BKEstateAutoSlavePurchaseBehavior");
             Wire("majatek: niewolnicy (BK TryAutoBuyForEstate)", sl != null ? AccessTools.Method(sl, "TryAutoBuyForEstate") : null, nameof(SlavesPrefix), nameof(SlavesFinalizer));
             var sup = AccessTools.TypeByName("BannerKings.Behaviours.Estates.BKVillageSupplyAutoBehavior");
