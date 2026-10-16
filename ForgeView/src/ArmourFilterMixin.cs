@@ -98,7 +98,7 @@ namespace ForgeView
         [DataSourceMethod]
         public void ExecuteFvCHorse()  { Cat(7); }
 
-        private void Cat(int c) { _cat = c; Apply(_tier); }
+        private void Cat(int c) { _cat = c; Apply(_tier, "kategoria"); }
 
         /// <summary>Wybor kategorii w natywnym oknie - odpowiednik "CHOOSE WHAT TO CRAFT" przy broni.</summary>
         [DataSourceMethod]
@@ -176,7 +176,7 @@ namespace ForgeView
         private static System.Reflection.MethodInfo _knownOf;
         private static bool _knownLooked;
 
-        // internal: SortKnownFirst przegrupowuje lista po sortowaniu BK ta sama miarka
+        // internal: SortKnownFirst przegrupowuje liste po sortowaniu BK ta sama miarka
         internal static bool Known(ItemObject it)
         {
             try
@@ -314,7 +314,7 @@ namespace ForgeView
                 Snapshot();
                 InjectRanged();
                 InjectMasterworks();
-                Apply(_tier);
+                Apply(_tier, "odswiezenie BK (RefreshValues)");
             }
             catch (Exception e) { Log.Error("OnRefresh", e); }
         }
@@ -333,7 +333,7 @@ namespace ForgeView
             Log.Info("Zapamietano pelna liste zbroi: " + _all.Count);
         }
 
-        private void Apply(int tier)
+        private void Apply(int tier, string path = "poziom")
         {
             try
             {
@@ -343,21 +343,25 @@ namespace ForgeView
                 if (_all.Count == 0) Snapshot();
                 if (_all.Count == 0) return;
 
-                list.Clear();
-                // najpierw to, co UMIESZ wykuc, potem zamkniete wzory - zeby polka
-                // otwierala sie na robocie, a nie na kloktach
-                var open = new List<ArmorItemVM>();
-                var shut = new List<ArmorItemVM>();
+                // NA EKRANIE NAJPIERW TO, CO UMIESZ WYKUC (Jeff 26.08 i 16.10): lista BK rysuje
+                // sie OD DOLU (prefab: VerticalBottomToTop - pozycja 0 = najnizszy kafelek), wiec
+                // zamkniete wzory ida na poczatek listy, znane na KONIEC = na gore ekranu; w obu
+                // grupach porzadek przycisku sortowania BK (SortKnownFirst.Arrange)
+                var pick = new List<ArmorItemVM>();
                 foreach (var vm in _all)
                 {
                     if (vm == null || vm.Item == null) continue;
                     if (tier != 0 && (int)vm.Item.Tier + 1 != tier) continue;
                     if (_cat != 0 && CatOf(vm.Item) != _cat) continue;
-                    (Known(vm.Item) ? open : shut).Add(vm);
+                    pick.Add(vm);
                 }
-                foreach (var vm in open) list.Add(vm);
-                foreach (var vm in shut) list.Add(vm);
-                if (list.Count > 0) ViewModel.CurrentItem = list[0];
+                int open, shut;
+                string sort;
+                var ordered = SortKnownFirst.Arrange(ViewModel.SortController, pick, out open, out shut, out sort);
+                list.Clear();
+                foreach (var vm in ordered) list.Add(vm);
+                // zaznaczony najwyzszy kafelek (koniec listy) - pierwszy znany wzor od gory
+                if (list.Count > 0) ViewModel.CurrentItem = list[list.Count - 1];
 
                 OnPropertyChanged("FvTier");
                 OnPropertyChanged("FvAllOn"); OnPropertyChanged("FvT1On"); OnPropertyChanged("FvT2On");
@@ -368,6 +372,7 @@ namespace ForgeView
                 OnPropertyChanged("FvCShieldOn"); OnPropertyChanged("FvCHorseOn");
                 OnPropertyChanged("FvCategoryText");
                 Log.Info("Filtr: poziom " + tier + ", kategoria " + _cat + " -> pozycji: " + list.Count);
+                SortKnownFirst.Line(path + " - filtr: poziom " + tier + ", kategoria " + _cat, open, shut, sort, true);
             }
             catch (Exception e) { Log.Error("Apply", e); }
         }
