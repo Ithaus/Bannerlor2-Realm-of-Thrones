@@ -410,8 +410,10 @@ namespace Armoury
                     int n = (int)Math.Min(Math.Min(have, 10), spare / price);
                     if (n <= 0) break;                                           // miasto bez nadwyzki na te sztuke - zostaje regule dobytku
                     int purse = c.PartyTradeGold;
+                    TownToll.ExemptBegin();                                      // E3-G3: wyprzedaz przed rozwiazaniem bez myta targowego
                     try { SellItemsAction.Apply(c.Party, town.Owner, pack.GetElementCopyAtIndex(at), n, st); }
                     catch (Exception e) { Stumble("SellOut(sprzedaz)", e); break; }
+                    finally { TownToll.ExemptEnd(); }
                     int at2 = pack.FindIndexOfElement(ee);
                     int moved = have - (at2 >= 0 ? pack.GetElementNumber(at2) : 0);
                     long got = Math.Max(0, c.PartyTradeGold - purse);

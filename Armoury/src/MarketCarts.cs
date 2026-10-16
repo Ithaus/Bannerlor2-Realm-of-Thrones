@@ -597,6 +597,7 @@ namespace Armoury
             {
                 Forget(__1);
                 FibreToMarket.SellBegin(__0, __1);                                      // N2-E3: woz skierowany do miasta targowego - migawka wlokna i sakwy (licznik)
+                TownToll.CartBegin(__1);                                                // E3-G3: sakwa wozu przed sprzedaza (myto od utargu netto - w postfiksie)
                 var s = Settings.Current;
                 var town = __0 != null ? __0.Town : null;
                 if (s == null || !s.VillageCartFairPrice || town == null) return;
@@ -622,6 +623,8 @@ namespace Armoury
         {
             SellPostfixCore(__0, __1, __state);
             FibreToMarket.SellEnd(__0, __1);                                            // N2-E3: po zwrocie nadplaty - sprzedane wlokno i utarg wozu skierowanego (licznik)
+            TownToll.CartEnd(__0, __1);                                                 // E3-G3: myto targowe od utargu netto wozu (po zwrocie nadplaty 119)
+            TownFolk.CartBuys(__0, __1);                                                // E3-W1: wies kupuje przez swoj woz w miescie sprzedazy to, czego nie bylo w miescie targowym
         }
 
         private static void SellPostfixCore(Settlement __0, MobileParty __1, Snap __state)
@@ -720,6 +723,7 @@ namespace Armoury
                 h.Patch(_sell, prefix: new HarmonyMethod(typeof(MarketCarts), nameof(SellPrefix)) { priority = Priority.First },
                                postfix: new HarmonyMethod(typeof(MarketCarts), nameof(SellPostfix)));
                 _wired = true;
+                TownToll.NoteHooks(true, false);                                       // E3-G3: myto wozow siedzi w tej latce
                 var s = Settings.Current;
                 Log.Info("MarketCarts: poprawka 119 - wozy wsi do najlepiej placacego miasta w zasiegu " + (s != null ? s.MarketMaxDistance.ToString("0", CultureInfo.InvariantCulture) : "?")
                          + " (" + (s != null && s.VillageCartsBestMarket ? "CZYNNE" : "wylaczone") + "; pelny woz na daleka droge " + (s != null && s.VillageCartFullLoadFar ? "tak" : "nie")

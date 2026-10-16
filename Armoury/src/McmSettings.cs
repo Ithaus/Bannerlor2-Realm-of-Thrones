@@ -6456,6 +6456,50 @@ namespace Armoury
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool TownFolkFirewood { get; set; } = true;
 
+        [SettingPropertyFloatingInteger("Folk Guard Normal Share Max", 0.000f, 0.200f, "0.000", HintText = "with Folk Circulation Guard: when the steward of the realm's coin decides whether the hoard tax should rise or fall, the common folk's normal savings count as at most this part of all the gold in the world (0.064 = 6.4%). New goods to buy raise the folk's normal savings, and without this limit the steward grew lenient while their purses kept swelling. What each class pays is still counted above its own normal level (0 = no limit, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public float FolkGuardNormalShareMax { get; set; } = 0.064f;
+
+        [SettingPropertyFloatingInteger("Folk Guard Share Fuse", 0.000f, 0.300f, "0.000", HintText = "with Folk Circulation Guard: a safety fuse - while the common folk and the villagers together hold more than this part of all the gold in the world, the hoard tax rises a little each day (3%) even inside its usual band, up to five times the usual rate; the fuse never lowers the tax (0 = off)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public float FolkGuardShareFuse { get; set; } = 0.09f;
+
+        [SettingPropertyBool("Crown Keeps Valve Share", HintText = "emergency lever, off by default: while the realms' treasuries hold less than Folk Guard Crown Target of all the gold in the world, part of the crown's share of the town purses' surplus (five times the shortfall, at most half) is laid by in the treasury's reserve instead of being handed to the houses as rents the same day. It is taken only from what is left for the rents - never from the wage refund, the aid to houses or any other payment - and not on a day the crown borrows from the Iron Bank (off = as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CrownKeepsValveShare { get; set; } = false;
+
+        [SettingPropertyBool("Village Tribute From Sutlers", HintText = "the coin soldiers in the field spend with the sutlers of a nearby village is split the way all village takings are: the lord of the village takes his tax by his decree (the same rule as when the village cart comes home), the rest stays in the village purse; a village of the soldiers' own house keeps all of it (off = all of it to the village purse, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool VillageTributeFromSutlers { get; set; } = true;
+
+        [SettingPropertyBool("Town Market Toll", HintText = "a market toll: when a village cart or a caravan sells its goods to a town or a castle it pays a small part of the takings - half to the head of the house that holds the town, half to the reserve of the realm's treasury (no realm - all to the lord; no living lord - his half to the town's purse). One rule for every cart and caravan, the player's own included; caravans on a material contract are free (their dues are paid at the source), and so is a caravan selling out before it is broken up (off = no toll, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool TownMarketToll { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Market Toll Rate", 0.000f, 0.200f, "0.000", HintText = "with Town Market Toll: the toll on a village cart's takings (0.04 = 4%)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public float TownMarketTollRate { get; set; } = 0.04f;
+
+        [SettingPropertyFloatingInteger("Town Market Toll Caravan Rate", 0.000f, 0.200f, "0.000", HintText = "with Town Market Toll: the toll on a caravan's takings (0.02 = 2%; caravans already pay duty when they buy, so their margin is thin)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public float TownMarketTollCaravanRate { get; set; } = 0.02f;
+
+        [SettingPropertyBool("Town Ground Rent", HintText = "a third of the rent the working folk and the craftsmen pay for their houses goes to the head of the house that holds the town as ground rent; the other two thirds still go to the townsmen who own the houses (off = all of it to the townsmen, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool TownGroundRent { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Sell Where Dear", HintText = "a caravan sells its trade goods where it makes a profit: entering a town it sells, a few pieces at a time and at most half of each stack, every piece whose price there is above what the caravan paid for it plus its share of the caravan's wages for the days on the road. It sells at a loss only when it has no way out: the goods have lain in its packs for over 30 days, food is going off (over 7 days), it has no coin left for three days of wages, its packs are full, or it is being broken up. It never sells so low that the merchants would buy the goods back in the same town, the town pays only from its purse above the merchants' reserve and at most a twentieth of that in a day, and bulk raw goods, animals and horses keep their own rules (off = Banner Kings sells one or two pieces a visit, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CaravanSellWhereDear { get; set; } = true;
+
+        [SettingPropertyBool("Village Cart Brings Goods", HintText = "what a village could not buy in its own market town - salt, tools, flax and linen, pots, beer - it buys when its cart sells the village's produce in another town or castle: up to seven days of the village's need from that stall, paid from the village purse (off = only the market town, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool VillageCartBringsGoods { get; set; } = true;
+
+        [SettingPropertyBool("Village Cloth Half Reserve", HintText = "with Village Cloth Above Reserve: where linen is cheap in the market (its price below the usual), the villagers may buy linen above half of the stock the town keeps for the army's clothing instead of only above all of it (off = above all of it, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool VillageClothHalfReserve { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8069,6 +8113,17 @@ namespace Armoury
             s.NoMakerBudgetToLuxury = NoMakerBudgetToLuxury;
             s.VillageFibreToMarket = VillageFibreToMarket;
             s.TownFolkFirewood = TownFolkFirewood;
+            s.FolkGuardNormalShareMax = FolkGuardNormalShareMax;
+            s.FolkGuardShareFuse = FolkGuardShareFuse;
+            s.CrownKeepsValveShare = CrownKeepsValveShare;
+            s.VillageTributeFromSutlers = VillageTributeFromSutlers;
+            s.TownMarketToll = TownMarketToll;
+            s.TownMarketTollRate = TownMarketTollRate;
+            s.TownMarketTollCaravanRate = TownMarketTollCaravanRate;
+            s.TownGroundRent = TownGroundRent;
+            s.CaravanSellWhereDear = CaravanSellWhereDear;
+            s.VillageCartBringsGoods = VillageCartBringsGoods;
+            s.VillageClothHalfReserve = VillageClothHalfReserve;
         }
 
         internal static void Apply()

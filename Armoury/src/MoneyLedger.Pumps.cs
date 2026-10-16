@@ -55,6 +55,11 @@ namespace Armoury
             long m3 = V("chleb M3", () => TownFolk.LastBreadCrown + TownFolk.LastBreadLord), crownLoan = V("pozyczki koron od miast", () => TownFolk.LastCrownLoanLent);
             long reg = V("dosypka regulatora kas miast", () => _regIn[CTown]);
             long all = A + B + C + D + E;
+            // F (E3, noc-ekonomia3 16.10) naturalne z obrotu - POZA suma sztucznych: myto targowe (E3-G3), czynsz gruntowy (E3-G4), danina pana od markietanow (E3-G2);
+            // rozbicie wedlug platnika (uwaga recenzji 1): z ludu i wsi (kiesy W/R, czesc wsi markietanow, utarg wozow wsi przed podzialem 112) / z kies karawan
+            long fCart = V("myto wozow wsi", () => TownToll.LastCart), fCar = V("myto karawan", () => TownToll.LastCaravan);
+            long fRent = V("czynsz gruntowy", () => TownFolk.LastGroundRent), fSut = V("danina markietanow", () => Sutlers.LastVillTribute);
+            long fFolk = fCart + fRent + fSut, F = fFolk + fCar;
             var sb = new StringBuilder(1024);
             sb.Append("Pompy - sztuczne przelewy (nekon): dzien ").Append(day)
               .Append(" | razem ").Append(all).Append(" zl = ").Append(pay > 0 ? (100.0 * all / pay).ToString("0.0", Inv) : "-").Append("% zoldu (zold partii i zalog ").Append(pay).Append(')')
@@ -65,6 +70,9 @@ namespace Armoury
               .Append(" | D korona -> rody tej samej doby ").Append(D).Append(" (zwrot zoldu ").Append(dRef).Append(", renty 180 ").Append(dRent).Append(", W5 ").Append(dW5).Append(", W5b ").Append(dW5b)
               .Append(", W6 ").Append(dW6).Append(", M1 ").Append(dM1).Append(')')
               .Append(" | E rody -> dwor (sprzet niewydany) ").Append(E)
+              .Append(" | F naturalne z obrotu (E3, poza suma) ").Append(F).Append(" (z ludu i wsi ").Append(fFolk).Append(": czynsz gruntowy z kies W/R ").Append(fRent)
+              .Append(", danina markietanow zamiast do kies wsi ").Append(fSut).Append(", myto wozow wsi - utarg wsi przed 112 ").Append(fCart).Append("; z kies karawan - wlasciciele ").Append(fCar)
+              .Append("), udzial z ludu w zwrocie od ludu F-lud / (B + F-lud) ").Append(B + fFolk > 0 ? (100.0 * fFolk / (B + fFolk)).ToString("0.0", Inv) + "%" : "-")
               .Append(" | poza suma: chleb M3 ").Append(m3).Append(", pozyczki koron od miast ").Append(crownLoan).Append(", dosypka regulatora kas miast ").Append(reg)
               .Append(" | uspione (0 dzis): ").Append(sleep.Count > 0 ? string.Join(", ", sleep.ToArray()) : "-")
               .Append(" | potkniecia ").Append(st).Append('.');

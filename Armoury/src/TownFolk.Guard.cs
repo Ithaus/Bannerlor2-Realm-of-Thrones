@@ -63,6 +63,15 @@ namespace Armoury
         // dopiero ponizej 1.25 x po 3% na dobe (do 1 ok. 54 dob). Przy 1.577 nowa regula daje 1.62 (stawka 1.6%/d zamiast 5.0%/d). Stary mnoznik (_gdM) liczony dalej
         // ta sama regula i zapisywany w arm_obieg2 jak dotad (nieczytany przy kluczu) - zapis zgodny w obie strony, klucz wylaczony wraca do niego bez skoku pamieci.
         private const double GdNmSlope = 8.0, GdNmMid = 1.5;
+        // E3-G1 (noc-ekonomia3 16.10, klucze FolkGuardNormalShareMax i FolkGuardShareFuse). Dowod [L] (ekon2 21-25-46, d109093-109114): nowe towary (jaja, len, opal)
+        // podniosly poziom normalny ludu N 5.9-6.8% -> 6.3-7.7% swiata, pasmo poszlo w gore i mnoznik zszedl 5.49 -> 2.01 (33 kroki w dol, potem stoi - w pasmie nie
+        // rosnie), lud 8.1 -> 10.8% swiata. (a) do DECYZJI o mnozniku poziom normalny liczy sie najwyzej jako FolkGuardNormalShareMax (6.4% - srednia bazy) zlota
+        // swiata; podstawa podatku bez zmian (kazda klasa placi od nadwyzki ponad WLASNY poziom). (b) bezpiecznik: wczorajszy udzial ludu z wsiami (LastShares)
+        // > FolkGuardShareFuse - mnoznik x1.03 na dobe takze w pasmie, najwyzej GdFuseCeil (uwaga recenzji 1: bez wlasnego sufitu 40 dob dawalo x3.3); w dol nigdy.
+        // To w praktyce cel udzialu ludu 8.0-9.0% swiata (dolna krawedz pasma 1.25 x 6.4%) - zapisane wprost w CHANGELOG. Cien "mnoznik bez bezpiecznika" - sesja.
+        private const double GdFuseCeil = 5.0;
+        private static double _gdNBand, _gdMNoFuse = double.NaN;
+        private static bool _gdFuseToday; private static int _gdFuseDays;
         private static double _gdMNew = double.NaN, _gdRateOld;          // N7: mnoznik nowej reguly tej doby (NaN - klucz wylaczony), stawka starej reguly (porownanie)
         private static bool _gdNmToday, _gdNmBase;                        // N7: stawke doby dala regula bez pamieci; potrzeba nieznana - baza x1
         /// <summary>N7 / N8 (linia NE): podatek od nadwyzki tej doby (miasta, zamki, wsie) - zaplanowany, przy starej stawce, bez zaliczenia pozyczek; zaliczone pozyczki.</summary>
@@ -167,6 +176,7 @@ namespace Armoury
         private static void ResetGuard()
         {
             _gdM = 1.0; _gdInEma = double.NaN; _gdPEnd = long.MinValue; _gdReady = false; _gdStartDone = false; _gdRate = 0;
+            _gdMNoFuse = double.NaN; _gdFuseDays = 0;                  // E3-G1: cien mnoznika bez bezpiecznika i doby bezpiecznika - sesja
             GuardDayZero();
             _gdStumbleSess = 0;
             _lineGuard = _lineGuardStart = _lineVill = null;
@@ -175,6 +185,7 @@ namespace Armoury
         private static void GuardDayZero()
         {
             _gdN = _gdP = _gdE = _gdCapAbs = _gdNT = _gdNC = _gdNV = _gdPT = _gdPC = _gdPV = _gdWorldUsed = 0; _gdIn = double.NaN;
+            _gdNBand = 0; _gdFuseToday = false;                        // E3-G1
             _gdCovT = _gdAllT = 0; _gdMove = "-"; _gdWorld = _gdFolk = _gdLords = _gdCrowns = _gdTicks = 0; _gdShares = false;
             _gdCrownT = 0; _gdCrownTN = 0; _gdResT = 0; LastHoardCrownReserve = 0;
             _gdMNew = double.NaN; _gdRateOld = 0; _gdNmToday = false; _gdNmBase = false; N7Plan = N7PlanOld = N8PlanNoCredit = N8CreditUsed = 0; N8CreditN = 0;   // N7 / N8 (noc 16.10)
@@ -264,15 +275,29 @@ namespace Armoury
                 double world = _gdShares ? _gdWorld : MoneyLedger.WorldNow();
                 _gdWorldUsed = world;
                 double lo = GdLo(s), hi = GdHi(s), mx = GdMax(s);
+                // E3-G1 (a): poziom normalny do pasma najwyzej FolkGuardNormalShareMax zlota swiata (0 = bez kapu); (b) bezpiecznik udzialu ludu z wsiami
+                double capS = HdClamp(s.FolkGuardNormalShareMax, 0, 0.5), fuse = HdClamp(s.FolkGuardShareFuse, 0, 1);
+                double nBand = capS > 0 && world > 0 ? Math.Min(_gdN, capS * world) : _gdN;
+                _gdNBand = nBand;
+                _gdFuseToday = fuse > 0 && _gdShares && _gdWorld > 0 && (double)_gdFolk / _gdWorld > fuse;
+                if (_gdFuseToday) _gdFuseDays++;
+                if (double.IsNaN(_gdMNoFuse)) _gdMNoFuse = _gdM;              // cien bez bezpiecznika od stanu z zapisu (sesja)
                 if (_gdN > 0 && _gdAllT > 0 && _gdCovT >= GdCover * _gdAllT)
                 {
-                    if (_gdP > hi * _gdN) { _gdM = _gdM * (1 + GdStep); _gdMove = "w gore"; }
-                    else if (_gdP < lo * _gdN) { _gdM = _gdM * (1 - GdStep); _gdMove = "w dol"; }
+                    bool up = _gdP > hi * nBand, down = _gdP < lo * nBand;
+                    if (up) _gdMNoFuse *= 1 + GdStep; else if (down) _gdMNoFuse *= 1 - GdStep;
+                    double fc = Math.Min(mx, GdFuseCeil);
+                    if (up) { _gdM = _gdM * (1 + GdStep); _gdMove = "w gore"; }
+                    else if (_gdFuseToday && _gdM < fc) { _gdM = Math.Min(fc, _gdM * (1 + GdStep)); _gdMove = "w gore (bezpiecznik udzialu ludu)"; }
+                    else if (_gdFuseToday) _gdMove = "bez zmian (bezpiecznik udzialu ludu - na suficie " + fc.ToString("0.0", Inv) + ")";
+                    else if (down) { _gdM = _gdM * (1 - GdStep); _gdMove = "w dol"; }
                     else _gdMove = "bez zmian (w pasmie)";
                 }
                 else _gdMove = "wstrzymany (potrzeba ludu znana w " + _gdCovT + " z " + _gdAllT + " miast)";
                 if (double.IsNaN(_gdM) || double.IsInfinity(_gdM)) _gdM = 1.0;
                 _gdM = Math.Max(GdMin, Math.Min(mx, _gdM));
+                if (double.IsNaN(_gdMNoFuse) || double.IsInfinity(_gdMNoFuse)) _gdMNoFuse = _gdM;
+                _gdMNoFuse = Math.Max(GdMin, Math.Min(mx, _gdMNoFuse));
                 // N7 (klucz FolkGuardNoMemory): mnoznik doby z odchylenia tej doby - bez pamieci; potrzeba znana w < 80% miast - baza (x1, jak bez straznika).
                 // Stary mnoznik wyzej liczony dalej (zapis, porownanie). Klucz wylaczony - mUse = _gdM, co do monety jak dotad
                 double mUse = _gdM;
@@ -280,7 +305,7 @@ namespace Armoury
                 {
                     if (_gdN > 0 && _gdAllT > 0 && _gdCovT >= GdCover * _gdAllT)
                     {
-                        double q = _gdP / _gdN;
+                        double q = _gdP / (nBand > 0 ? nBand : _gdN);    // E3-G1: ten sam poziom do decyzji co pasmo
                         mUse = 1 + GdNmSlope * (q - GdNmMid);
                         if (double.IsNaN(mUse) || double.IsInfinity(mUse)) mUse = 1.0;
                         mUse = Math.Max(GdMin, Math.Min(mx, mUse));
@@ -427,6 +452,10 @@ namespace Armoury
                                   + " | N7 regula stawki: " + (s.FolkGuardNoMemory ? "bez pamieci (Folk Guard No Memory tak) - mnoznik = clamp(1 + " + GdNmSlope.ToString("0", Inv) + " x (lud / poziom normalny - "
                                      + GdNmMid.ToString("0.00", Inv) + "), " + GdMin.ToString("0.00", Inv) + ", " + F2(GdMax(s)) + ") co dobe, pasmo i mnoznik z pamiecia tylko do zapisu"
                                      : "z pamiecia (Folk Guard No Memory nie) - pasmo jak dotad")
+                                  + " | E3-G1: poziom normalny do pasma najwyzej " + (100 * HdClamp(s.FolkGuardNormalShareMax, 0, 0.5)).ToString("0.0", Inv) + "% swiata (Folk Guard Normal Share Max"
+                                     + (s.FolkGuardNormalShareMax > 0 ? "" : " - wylaczony") + "), dzis poziom normalny " + Pct(_gdN, _gdShares ? _gdWorld : 0) + " swiata - kap "
+                                     + (_gdNBand > 0 && _gdNBand < _gdN ? "WIAZE" : "nie wiaze") + "; bezpiecznik udzialu ludu z wsiami (Folk Guard Share Fuse) "
+                                     + (s.FolkGuardShareFuse > 0 ? (100 * HdClamp(s.FolkGuardShareFuse, 0, 1)).ToString("0.0", Inv) + "% swiata - mnoznik x" + (1 + GdStep).ToString("0.00", Inv) + "/d do " + GdFuseCeil.ToString("0.0", Inv) : "wylaczony")
                                   + " | stan z zapisu: mnoznik " + _gdM.ToString("0.000", Inv) + ", doplyw EMA " + N0(_gdInEma) + LoansStateNote()
                                   + " | klucze wylaczone = e2a422ec.";
             }
@@ -447,6 +476,12 @@ namespace Armoury
                       .Append(N0(_gdNC)).Append(" / wsie ").Append(N0(_gdNV)).Append("), kiesy z potrzeba ").Append(N0(_gdP)).Append(" (miasta ").Append(N0(_gdPT)).Append(" / podzamcza ")
                       .Append(N0(_gdPC)).Append(" / wsie ").Append(N0(_gdPV)).Append(") = ").Append(_gdN > 0 ? (_gdP / _gdN).ToString("0.000", Inv) : "-").Append(" x poziom normalny")
                       .Append("; pasmo ").Append(F2(GdLo(s))).Append("-").Append(F2(GdHi(s))).Append(" x (").Append(Pct(GdLo(s) * _gdN, w)).Append(" - ").Append(Pct(GdHi(s) * _gdN, w)).Append(" swiata)")
+                      .Append(" | E3-G1 do pasma ").Append(N0(_gdNBand)).Append(" (").Append(Pct(_gdNBand, w)).Append(" swiata; najwyzej ").Append((100 * HdClamp(s.FolkGuardNormalShareMax, 0, 0.5)).ToString("0.0", Inv))
+                      .Append("%, kap ").Append(_gdNBand > 0 && _gdNBand < _gdN ? "wiaze" : "nie wiaze").Append(") = ").Append(_gdNBand > 0 ? (_gdP / _gdNBand).ToString("0.000", Inv) : "-")
+                      .Append(" x; pasmo do decyzji ").Append(Pct(GdLo(s) * _gdNBand, w)).Append(" - ").Append(Pct(GdHi(s) * _gdNBand, w)).Append(" swiata")
+                      .Append(" | bezpiecznik udzialu ludu ").Append(s.FolkGuardShareFuse > 0 ? (100 * HdClamp(s.FolkGuardShareFuse, 0, 1)).ToString("0.0", Inv) + "%" : "wylaczony")
+                      .Append(": dzis ").Append(_gdFuseToday ? "tak" : "nie").Append(", dob w sesji ").Append(_gdFuseDays).Append(", mnoznik bez bezpiecznika ").Append(double.IsNaN(_gdMNoFuse) ? "-" : _gdMNoFuse.ToString("0.000", Inv))
+                      .Append(" (sufit bezpiecznika ").Append(GdFuseCeil.ToString("0.0", Inv)).Append(')')
                       .Append(" | czesc korony teraz ").Append((100 * GuardCrownShare(s)).ToString("0.0", Inv)).Append("% (cel udzialu koron ").Append((100 * HdClamp(s.FolkGuardCrownTarget, 0, 0.5)).ToString("0.0", Inv)).Append("%)").Append(" | mnoznik ").Append((_gdNmToday ? _gdMNew : _gdM).ToString("0.000", Inv)).Append(" (").Append(_gdMove).Append("; granice ").Append(GdMin.ToString("0.00", Inv)).Append("-").Append(F2(GdMax(s))).Append(')')
                       .Append(" | stawka doby ").Append((100 * _gdRate).ToString("0.000", Inv)).Append("%/d (baza ").Append((100 * HoardRate(s)).ToString("0.00", Inv)).Append("% x mnoznik")
                       .Append(", sufit doby ").Append(N0(_gdCapAbs)).Append(" = max(").Append((100 * GdCapWorld).ToString("0.00", Inv)).Append("% swiata ").Append(N0(_gdWorldUsed))

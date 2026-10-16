@@ -1,5 +1,129 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-16 (noc-ekonomia3, CZESC 1 - naprawa ekonomii) - OBIEG Z OBROTU I TOWAR TAM, GDZIE KARAWANA MA ZYSK: KAP STRAZNIKA (G1), MYTO TARGOWE (G3), DANINA OD MARKIETANOW (G2), CZYNSZ GRUNTOWY (G4), KARAWANY SPRZEDAJA Z ZYSKIEM (T1), WOZ WSI KUPUJE W MIESCIE SPRZEDAZY (W1); G5 JAKO DZWIGNIA AWARYJNA
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na a6abfc70 = WGRANIE 64 + noc-ekonomia2) | **Tor:** L (czesc 1 z 2; plan + 2 recenzje, uwagi krytyczne i powazne uwzglednione) | **Klucze (nowe, wszystkie w MCM, grupa "Trade pays its way (night 16.10, part 3)"):** `FolkGuardNormalShareMax` 0.064, `FolkGuardShareFuse` 0.09, `CrownKeepsValveShare` **false** (dzwignia awaryjna), `VillageTributeFromSutlers`, `TownMarketToll`, `TownMarketTollRate` 0.04, `TownMarketTollCaravanRate` 0.02, `TownGroundRent`, `CaravanSellWhereDear`, `VillageCartBringsGoods`, `VillageClothHalfReserve` (zadnego nie ma w Armoury.json Jeffa z 13.10 - sprawdzone grep) | **Zmiana ekonomii:** tak | **Zapis:** bez zmian (zadnego nowego klucza - Ironman Jeffa sie wczytuje; pamieci sesji odbudowuja sie po wczytaniu) | **Cofanie:** `git revert` tego commita albo klucze jak wyzej | **Pliki:** `Armoury/src/TownFolk.Guard.cs`, `CrownIncome.cs`, `CrownRents.cs`, `Sutlers.cs`, `VillageTakings.cs` (Split internal), `TownToll.cs` (nowy), `CaravanGoods.cs` (nowy), `MarketCarts.cs`, `TownFolk.Live.cs`, `CaravanBulk.cs`, `CaravanAmmo.cs`, `CaravanFlow.cs`, `MaterialOrders.cs`, `MoneyLedger.Pumps.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen_mcm), `tools/gen_mcm.py`, `tools/sprawdz_logi.py` (grupa nekon3)
+
+**Dla Jeffa (prosto):**
+- **Karawany sprzedaja tam, gdzie maja zysk** (Twoja poprawka 16.10, zamiast "powyzej sredniej"). Karawana pamieta, ile zaplacila za towar w jukach. W miescie sprzedaje sztuke, gdy dostanie za nia wiecej, niz kosztowala, plus czesc zoldu karawany za dni w drodze. Na stracie sprzedaje tylko wtedy, gdy nie ma wyjscia: towar lezy w jukach ponad 30 dni, jedzenie sie psuje (ponad 7 dni), brakuje pieniedzy na zold na 3 dni, juki sa pelne albo karawana jest rozwiazywana. Sprzedaje po kilka sztuk, najwyzej polowe stosu na wizyte, a miasto placi tylko z nadwyzki kasy (najwyzej 1/20 dziennie). Zeby karawana nie odkupila zaraz tego samego, w tej samej wizycie Banner Kings nie kupuje tu towaru, ktory ona wlasnie sprzedala. Dzis karawany sprzedaja 1-2 sztuki na wizyte i wioza w jukach 89% narzedzi swiata oraz rosnacy stos srebra.
+- **Myto targowe:** woz wsi oddaje 4% utargu, a karawana 2% (placi juz clo przy zakupie). Polowa trafia do pana miasta, polowa do zapasu korony. Tak pieniadz wraca do panow i krolestw z handlu, a nie z coraz wiekszego podatku od oszczednosci.
+- **Markietani:** z tego, co zolnierze wydaja we wsi, pan wsi bierze swoj podatek wedlug dekretu, jak z utargu wozu. Wies wlasnego rodu nie placi.
+- **Czynsz gruntowy:** 1/3 czynszu, ktory robotnicy i rzemieslnicy placa za domy, idzie do pana miasta.
+- **Straznik obiegu:** nowe towary podniosly "normalne oszczednosci" ludu i straznik zlagodnial (mnoznik 5.49 -> 2.01, lud 8.1 -> 10.8% zlota swiata). Teraz do decyzji liczy je najwyzej jako 6.4% zlota swiata (srednia bazy). Do tego bezpiecznik: gdy lud z wsiami ma ponad 9% zlota swiata, podatek rosnie powoli, ale najwyzej do x5. Mowiac wprost: to przywraca sile podatku z bazy, a bezpiecznik dziala jak cel udzialu ludu 8-9%.
+- **Woz wsi przywozi towar:** czego wies nie kupila w swoim miescie targowym (sol, narzedzia, len i plotno, garnki, piwo), kupuje, gdy jej woz sprzedaje plon w innym miescie albo zamku (najwyzej 7 dni potrzeby, z kiesy wsi). Tam, gdzie plotno lezy tanio, wies moze brac je juz od polowy zapasu wojska.
+- **Korona trzyma czesc zaworu miast w zapasie** - jest gotowe, ale domyslnie WYLACZONE. To dzwignia awaryjna, jesli korony w dobie 60 testu spadna ponizej 20.4%.
+- Nic nie zmienia zapisu. Wszystko wylaczysz w MCM osobno.
+
+**Problem [L] (test noc-ekonomia2 `D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-15_21-25-46.log` d109195-196, baza WGRANIA 64 `..._20-16-31.log`):**
+- **Udzialy w zlocie swiata (lud z wsiami / lordowie / korony):** ekon2 10.8 / 36.3 / 18.3%, baza 9.2 / 36.4 / 19.7% (kryterium: lud <= 9.1%, korony >= 19.9% - baza tez go nie spelnia).
+- **Straznik:** poziom normalny N 6.3-7.7% swiata (baza 5.9-6.8%), mnoznik 5.489 (z zapisu) -> 2.009, "bez zmian (w pasmie)", pasmo 9.1-12.7% swiata, podatek od nadwyzki 120 177/d (czesc korony 64 532); w bazie mnoznik koncowy 3.694.
+- **Pompy B (podatki od oszczednosci):** ekon2 375 886/d (straznik 120 177 + danina P1 236 507 + 184 13 333 + W7 5 869).
+- **Karawany** ("Karawany - zapas wedlug towaru (nekon)"): narzedzia 2 371 w jukach z 2 671 swiata (88.8%), miasta 194, kupily 18 / sprzedaly 19 na dobe; srebro 4 736 (kupily 303, sprzedaly 32); wino 819 (81.6%), sol 1 169.
+- **Markietani:** 57 360 zl/d do kies wsi w 169 wsiach (pan nic).
+- **Czynsz W/R -> P:** 28 997 zl/d.
+- **Wsie** ("Kiesa ludu" wsie 571): zakupy 7 164 z 71 543 (10.0%), wsi bez towaru 486; prog plotna trzyma w kiesach 38 959 zl/d (459 wierszy); indeks plotna mediana 0.56.
+- **Nie do wydania** ("Ceny surowcow", suma kategorii): koniec okna 102 915 d/d (srednia 10 dob; jedna doba 108 124), baza 116 443.
+- **Kredyt 186:** 3 054 zl/d (1 krolestwo).
+
+**Przyczyna [K]:**
+- (T1) BK `SellGoods` (BKCaravansBehavior.cs:1592-1611) sprzedaje na wizyte wynik kategorii / cene (1-2 szt.) i tylko przy indeksie >= (1.1 - do 0.4) x srednia; BK kupuje przy (srednia/indeks)^2 > 1.1 (:1506). Gra przy zakupie miasta od partii nie bierze podatku (SellItemsAction.ApplyInternal, galaz buyer IsSettlement), wiec myto nie dubluje cla.
+- (G1) `TownFolk.Guard.cs` GuardBegin: pasmo = 1.25-1.75 x N, a N rosnie z kazdym nowym towarem ludu (jaja, len, opal z ekon2). W pasmie mnoznik nie rosnie, wiec stoi na 2.01.
+- (G2) `Sutlers.One`: czesc wsi `vill.SettlementComponent.ChangeGold(villPart)` - 100% do kiesy, bez reguly 112.
+- (G4) `TownFolk.Live.cs` TownLive: czynsz W 8% / R 13% wydatku w calosci do P.
+- (W1) koszyk wsi tylko w miescie targowym (`Villages` -> `BuyGoods(mk)`); K2 trzyma plotno ponad caly prog wojska takze tam, gdzie lezy tanio.
+- (G5, recenzje) w `CrownIncome.Begin` cialoby caly dzien korony, takze zwrot zoldu (KingdomTreasury.cs:287 `rc.Have = LeftFor` -> kredyt 186), i dublowaloby regulator czesci korony straznika (`GuardCrownShare` = 0.35 + 5 x brak do 22%, do zapasu).
+
+**Zmiana:**
+- **E3-G1** (`TownFolk.Guard.cs` GuardBegin):
+  - do decyzji o mnozniku `nBand = min(N, FolkGuardNormalShareMax x swiat)`, takze w N7 (q = P / nBand); podstawa podatku bez zmian;
+  - bezpiecznik: wczorajszy udzial ludu z wsiami (MoneyLedger.LastShares) > FolkGuardShareFuse - mnoznik x1.03/d takze w pasmie, najwyzej 5.0 (wlasny sufit - uwaga recenzji), w dol nigdy;
+  - cien "mnoznik bez bezpiecznika" (sesja);
+  - linia straznika: "E3-G1 do pasma X (Y% swiata; najwyzej 6.4%, kap wiaze/nie wiaze)", "bezpiecznik udzialu ludu 9.0%: dzis tak/nie, dob w sesji N, mnoznik bez bezpiecznika M";
+  - linia startu "Obieg ludu (obieg2)": N jako % swiata i czy kap wiaze.
+- **E3-G5** (`CrownIncome.KeepValve`, wolane w `CrownRents.Daily` po M3, przed podzialem rent; klucz domyslnie WYLACZONY):
+  - przy udziale koron < FolkGuardCrownTarget: keep = min(r x TownPurse.CrownToday, pula rent), r = min(0.5, 5 x brak);
+  - `Spent` - zloto zostaje w skarbcu, jutro w zapasie; zwrot zoldu, W5, M1, raty i dary nietkniete; doba z kredytem 186 - 0;
+  - dopisek w "Korona: wplywy dnia (165)".
+- **E3-G2** (`Sutlers.One`): czesc wsi przez `VillageTakings.Split` (podatek z czynnego modelu na licznik podatku wsi, reszta do kiesy); wies rodu partii - 100% do kiesy (K3, uwaga recenzji). Dopisek w "Markietani (E5/A3)": do kies / na liczniki / wlasne wsie, kontrola "zaplacone wsiom = kiesa + licznik".
+- **E3-G3** (nowy `TownToll.cs`):
+  - woz: MarketCarts.SellPrefix -> CartBegin, SellPostfix (po zwrocie 119 i liczniku wlokna) -> CartEnd: 4% utargu netto;
+  - karawana: postfiks na SellItemsAction.ApplyInternal (CaravanGoods) -> TakeCaravan: 2% (uwaga recenzji - cienka marza); obejmuje BK SellGoods, CaravanBulk, CaravanAmmo i T1;
+  - odbiorcy: polowa glowie rodu pana osady (dochod ziemi D przez pending -> `TownToll.RentMerge` zaraz po `Seal31B.RentMerge`, bo PopulationLaw.Daily czysci RentToday - uwaga recenzji), polowa do zapasu korony (`KingdomBudgetWallet` + `CrownIncome.ShiftSnapshot`); bez krolestwa - calosc panu, bez zywego pana - jego polowa do kasy osady;
+  - jedna regula takze dla rodu gracza (licznik "w tym rod gracza"); zwolnione: kontrakt 174 (`MaterialOrders.HasContract`), wyprzedaz `CaravanFlow.SellOut` i dostawa `MaterialOrders.Deliver` (zakres `ExemptBegin/End`);
+  - liczniki CaravanBulk ("kasy miast zaplacily") i CaravanAmmo licza utarg PRZED mytem (`TownToll.LastTaken`);
+  - linie "Myto targowe (E3-G3): start sesji" i "...: dzien N" (wozy, karawany, gracz, do panow / koron / kas, zwolnione, kontrola, wplyw na skrzynie).
+- **E3-G4** (`TownFolk.Live.cs`): 1/3 czynszu W i R -> `PayLord` (oblezenie - czeka, bez zywego pana - gmina, RentToday), 2/3 do P; "czynsz gruntowy do panow miast E3-G4 X" w "Kiesa ludu".
+- **E3-T1** (nowy `CaravanGoods.cs`, sluchacz SettlementEntered dopisany miedzy CaravanAmmo a CaravanBulk - biegnie po surowcach masowych, przed amunicja i BK):
+  - ksiega kosztu partii w jukach (sesja; po wczytaniu brak wpisu = cena bazowa Value, doba wczytania);
+  - sprzedaz z zyskiem (cena ostatniej sztuki kroku > koszt + zold x dni w drodze (najwyzej 30) x udzial sztuki w koszcie ladunku, najwyzej 100% kosztu), na stracie tylko z powodem (rozwiazanie, kiesa < 3 dni zoldu, juki >= 95%, jedzenie > 7 dob, towar > 30 dob);
+  - BEZ progu sredniej; blokada odkupienia: prefiks/finalizer BK `BuyGoods` + postfiks BK `CalculateBuyValue` (wycena 0 dla kategorii sprzedanej przez T1 w tej wizycie); cena >= 0.4 x wartosci (gabka 0.33);
+  - kasa miasta ponad BuyFloor, najwyzej 1/20 nadwyzki na dobe (uwaga recenzji: zawor 7%/d);
+  - krok 5 szt. (> 200 d - 1), polowa stosu, jedzenie na 10 dob druzyny; bez surowcow CaravanBulk, zwierzat, koni; pomija kontrakt 174 i rozkazy gracza BK;
+  - linia "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien N" (z zyskiem / na stracie z powodem, odrzucone, wedlug towaru, zloto z kas / myto / przyrost kies, blokada BK i odkupione, ksiega, juki z dniami do wyczerpania, mediana indeksu narzedzi, futer, srebra, wina, papirusu, aksamitu, klejnotow, jaj, miodu, soli).
+- **E3-W1** (`TownFolk.Live.cs` + `MarketCarts.SellPostfix`, uwaga recenzji 1: zakup w chwili sprzedazy, gdy woz jest w miescie):
+  - potrzeba dnia niekupiona w miescie targowym liczona PRZED "wsi bez towaru" (zaleglosc, najwyzej 7 dni potrzeby, sesja);
+  - woz sprzedajacy w innym miescie albo zamku -> `CartBuys`: BuyGoods z polki tej osady (kiesa wsi -> kasa osady, ramka ksiegi towarow "zakupy wsi w miastach", VillWin);
+  - (b) plotno od polowy progu polki tylko tam, gdzie indeks plotna < 1 (uwaga recenzji: polowa progu tylko tam, gdzie plotno lezy);
+  - dopisek w czesci "wsie" linii "Kiesa ludu".
+- **Pompy F** (`MoneyLedger.Pumps.cs`): "F naturalne z obrotu (E3, poza suma)" z rozbiciem wedlug platnika (z ludu i wsi: czynsz gruntowy, danina markietanow, myto wozow / z kies karawan) i udzialem F-lud / (B + F-lud).
+- **Progi** `python -I tools/sprawdz_logi.py --grupa nekon3 [--baza-doby <log bazy>] <Armoury-*.log>`: NE3-0..NE3-16 czesci 1 (z 9b/9c, 11b, 12b, 14b, 14c), NE3-4 i NE3-17..24 - czesc 2 (INFO).
+
+**Decyzje (z recenzji, zapisane wprost):**
+- **G5 domyslnie wylaczony.** Recenzja 1: dwa regulatory jednej zmiennej daja wzmocnienie 10 zamiast 5, a G1 sam przywraca czesc korony straznika (baza 104 tys./d, ekon2 64.5 tys./d). Zasada "kazda mechanika domyslnie wlaczona" tu ustepuje, decyzja po dobie 60 testu (korony < 20.4%).
+- **Myto karawan 2%, wozow 4%** (recenzja 2: zold karawan 122.7 tys./d, marza cienka).
+- **Gracz placi myto jak wszyscy** (recenzja 1, regula 112-p 2.0b), zamiast zwolnienia gracza z recenzji 2.
+- **T1 bez progu sredniej i bez progu indeksu po kroku** (poprawka Jeffa). Petle sprzedaz-odkupienie zamyka blokada wyceny BK w tej wizycie, nie prog ceny.
+- **Bezpiecznik prog 9.0%, a nie 9.1%**, bo bezpiecznik rosnie 3% na dobe i musi zadzialac przed kryterium; sufit 5.0.
+- **NE3-11b:** udzial F-lud / (B + F-lud) jako INFO, nie prog 30%. Przy B ok. 380-415 tys./d i F-lud ok. 40 tys./d to ok. 9-10%, wiec 30% jest dzis nieosiagalne. Zwrot od ludu dalej idzie glownie z podatku, co mowie wprost.
+
+**Kontrola calosci (CLAUDE.md 8.0) [K]:**
+- **Myto:**
+  - Nie dubluje cla: przy zakupie miasta od partii gra nie bierze podatku.
+  - 112 liczy podatek pana od utargu po mycie, bez dubla.
+  - Okna ksiegi obiegu: WSell otwiera sie tylko, gdy sprzedaje osada; WTolls mierzy licznik cel, ktorego myto nie dotyka. Przelew odbywa sie w swiecie, wiec "Pieniadz swiata" sie nie zmienia.
+  - Liczniki istniejacych linii licza utarg przed mytem.
+- **T1:**
+  - Kolejnosc sluchaczy: MaterialOrders -> CaravanBulk -> T1 -> CaravanAmmo -> ... -> BK. Ostatnio dopisany biegnie pierwszy, BK laduje sie wczesniej.
+  - Zdarzenie OnCaravanTransactionCompleted jak w CaravanBulk (marza P1).
+  - Ksiega kosztu nie zmienia zachowania BK. Blokada dotyczy tylko kategorii sprzedanej w tej wizycie przez T1 i tylko w BuyGoods tej karawany.
+- **G2:** Split to ta sama funkcja co 112 przy rozwiazanym taborze. Licznik podatku wsi jest posiadaczem "Pieniadz swiata" (HVillageTax).
+- **G4:** PayLord, jak farma gminy, liczy sie w kontroli kiesy ludu (r = 0).
+- **W1:**
+  - Kiesa wsi nie jest w kontroli r, tak jak koszyk dnia.
+  - Ramka FFolkVill zagniezdzona w ramce sprzedazy wozu.
+- **G1:**
+  - Podstawa podatku sie nie zmienia, zmienia sie tylko decyzja o mnozniku.
+  - Bezpiecznik podnosi `_gdM` zapisany w arm_obieg2.
+
+**Ryzyko / co sprawdzic:**
+- **G1:**
+  - Po wylaczeniu FolkGuardShareFuse podniesiony mnoznik zostaje w zapisie i schodzi 3%/d tylko ponizej dolnej krawedzi pasma.
+  - Gdy N w kampanii Jeffa < 6.4% swiata, kap nie wiaze (linia startu mowi "kap nie wiaze").
+  - Sygnal slabych ujsc: bezpiecznik "tak" > 20 dob (NE3-10).
+- **Pompy B:** okolo 400-415 tys./d, granica NE3-11 (recenzja 1: G1 przywraca ok. +80 tys./d podatku).
+- **G3:**
+  - Wies ma ok. 2.2 pkt proc. utargu mniej, pan wsi ok. 1.5 pkt.
+  - Kiesy karawan: NE3-14c. Marza CaravanBulk mniejsza o 2% - sprawdzic "Karawany: dzien" (kupione / sprzedane surowce) wobec bazy.
+- **T1:**
+  - Kasy miast placa karawanom z nadwyzki, wiec zawor (Pompy C) moze chwilowo spasc (NE3-14b: >= 95% bazy). Korony w dobie 30 i 60 - NE3-8.
+  - Juki karawan to jednorazowy zapas (narzedzia ok. 11 dni zuzycia swiata), a produkcji T1 nie zmienia. "Nie do wydania" moze wrocic przed koncem okna, wiec NE3-15 pokazuje doby 30-60 i koniec.
+  - Sprzedaz ponizej sredniej obniza ceny w drogich miastach. Mediany i skoki: NE3-5.
+  - Ksiega kosztu po wczytaniu = cena bazowa: pierwszy miesiac sesji liczy zysk wobec Value.
+- **W1:** wsie biora narzedzia budowom (progi ShelfKeep 5 i ToolsKeep 5 zostaja). Plotno od polowy progu tylko przy indeksie < 1 - sprawdzic "Odziez wojska (150)".
+- **G2:** wies w rabunku - model BK daje mniej podatku (to w porzadku).
+- **Wszystko:** 7 mechanik w jednym biegu. Gdy padnie NE3-7/8/11, drugi bieg 120 dob z samymi G1-G4 (klucze CaravanSellWhereDear i VillageCartBringsGoods wylaczone) i porownanie.
+- **Bez testu w grze:** testy uruchamiac tylko, gdy gra Jeffa jest zamknieta (Jeff gra od 15.10).
+
+**Sprawdzone:**
+- Build Release: kod wyjscia 0, 0 Error(s); jedno stare ostrzezenie CS0169 BattlefieldLaw.
+- `python -I tools/gen_mcm.py`: 1622 ustawienia.
+- `sprawdz_logi --grupa nekon3`:
+  - na logu ekon2 i bazie: bez wyjatku, linie paczki INFO / NIE zgodnie z brakiem paczki;
+  - na logu syntetycznym z napisow kodu: 37 linii, NIE tylko NE3-14 (okno 3 doby < 60).
+- Gry nie uruchamialem.
+
+**Status:** DO SPRAWDZENIA (autotest 120 dob na zapisie F, progi NE3-0..16 wobec bazy 20-16-31 i ekon2 21-25-46; wgranie dopiero po udanym autotescie i tylko, gdy Jeff nie gra).
+
 ## 2026-10-16 (noc - noc-ekonomia2, POPRAWKI PO RECENZJI GALEZI) - LIMIT PRZESUNIECIA BUDZETU PRZY NOWYM POPYCIE TARGU (E2 I ZAMIENNIK JEDZENIA B2), PROG N2-4, MAGAZYN WSI Z JAJAMI I OWOCAMI, ZIMA OPALU JAK KAZDY SKUTEK ZIMY, LICZNIKI WLOKNA I OPALU
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia2` (na 3c599b50) | **Tor:** M (poprawki recenzji: 2 powazne, 5 drobnych - wszystkie uwagi sprawdzone w kodzie i trafne) | **Klucze:** bez nowych - limit E2 pod `NoMakerBudgetToLuxury`, limit B2 pod `FoodSubstituteWhenShort`, magazyn wsi pod `VillageFruitFromBk` (owoce i miod) i `VillageEggsFromBk` (jaja), opal pod `TownFolkFirewood`, wlokno pod `VillageFibreToMarket` | **Zmiana ekonomii:** tak, mala (B2 i E2 przesuwaja nieco mniej; W wsi rolniczych wiekszy o dodatki; opal w zimie wedlug polnocy) | **Zapis:** bez zmian | **Cofanie:** `git revert` tego commita (albo klucze jak wyzej) | **Pliki:** `Armoury/src/ShiftLimit.cs` (nowy), `NoMakerBudget.cs`, `FoodSubstitute.cs`, `VillageFruit.cs` (CapPostfix, ApplyAll, linie jaj), `SubModuleMain.cs` (wpiecie), `TownFolk.Firewood.cs`, `WinterBite.cs` (NorthOf), `FibreToMarket.cs`, `MarketCarts.cs`, `Settings.cs` + `McmSettings.cs` (opis TownFolkFirewood, gen_mcm), `tools/sprawdz_logi.py` (grupa nekon2)

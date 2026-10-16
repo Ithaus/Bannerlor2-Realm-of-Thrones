@@ -290,6 +290,11 @@ RANGES = {
     'CompanionHireDays': (0.0, 60.0, "0"),
     # N2 (noc 16.10): waga bryly wegla w kg, 0 = waga gry (5 kg); kod przycina do 50 (ArmouryBehavior.FixCharcoalWeight)
     'CharcoalWeightKg': (0.0, 10.0, "0.00"),
+    # noc-ekonomia3 (16.10): kap poziomu normalnego straznika i bezpiecznik udzialu ludu - kod przycina do 0..0.5 / 0..1 (TownFolk.Guard.cs); myto targowe - kod 0..0.2 (TownToll.cs)
+    'FolkGuardNormalShareMax': (0.0, 0.2, "0.000"),
+    'FolkGuardShareFuse': (0.0, 0.3, "0.000"),
+    'TownMarketTollRate': (0.0, 0.2, "0.000"),
+    'TownMarketTollCaravanRate': (0.0, 0.2, "0.000"),
 }
 
 def gen(module_dir, ns, display):

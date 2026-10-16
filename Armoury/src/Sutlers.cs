@@ -37,6 +37,7 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.SutlersEnabled && MenPurse.On; } }
+        private static bool TributeOn { get { var s = Settings.Current; return s != null && s.VillageTributeFromSutlers; } }
 
         private const float RampFrom = 0.01f;           // rozruch: stawka pierwszej doby (projekt: "od 1% do 10% w 28 dob")
         private const double RampTriggerDays = 15.0;    // rozruch, gdy sakiewki partii rodow > 15 dni ich zoldu (prog etapu 5: sakiewki <= 15 dni zoldu)
@@ -47,6 +48,10 @@ namespace Armoury
         // liczniki doby (linie "Markietani (E5/A3)" i "Obieg")
         private static long _dTaken, _dTown, _dVill, _dOwnK3, _dReserve, _dKept, _dPlayer, _dNoTownGold, _dNoVillGold;
         private static long _dLordPurse, _dLordWage, _dLordSaved;   // sakiewki partii rodow, ich zold dnia, w tym oszczednosci K1 (odczyt)
+        // E3-G2 (VillageTributeFromSutlers): czesc wsi - do kiesy, na licznik podatku wsi (pan wsi), wlasna wies rodu partii bez daniny (K3); doba
+        private static long _dVillPurse, _dVillTax, _dVillOwn; private static int _dVillTaxN, _dVillOwnN;
+        /// <summary>Pompy F (MoneyLedger.Daily, ta sama doba): danina pana od czesci wsi markietanow; -1 = klucz albo paczka wylaczone.</summary>
+        internal static long LastVillTribute = -1;
         private static int _dParties, _dPaidN, _dInSettl, _dInBattle, _dAtSea, _dInactive, _dEmpty, _dNoTown, _dNoVill, _dTownsN, _dVillsN;
         private static float _dRate, _dFull;
         private static int _dRampDay = -1, _dRampDays;
@@ -128,7 +133,7 @@ namespace Armoury
         {
             _rampStart = -2;
             _pRamp = -2; _gearDay.Clear(); _n6On = false; _n6Ramp = 1f;   // N6 (noc 16.10): stan z zapisu wczytuje Import po Reset
-            LastTown = LastVill = -1;
+            LastTown = LastVill = -1; LastVillTribute = -1;
             _stumbles = 0;
             _err.Clear();
             ClearDay();
@@ -138,6 +143,7 @@ namespace Armoury
         {
             _dTaken = _dTown = _dVill = _dOwnK3 = _dReserve = _dKept = _dPlayer = _dNoTownGold = _dNoVillGold = 0;
             _dLordPurse = _dLordWage = _dLordSaved = 0;
+            _dVillPurse = _dVillTax = _dVillOwn = 0; _dVillTaxN = _dVillOwnN = 0;   // E3-G2
             _dParties = _dPaidN = _dInSettl = _dInBattle = _dAtSea = _dInactive = _dEmpty = _dNoTown = _dNoVill = _dTownsN = _dVillsN = 0;
             _dRate = _dFull = 0f; _dRampDay = -1; _dRampDays = 0; _dMs = 0;
             _towns.Clear(); _vills.Clear();
@@ -197,7 +203,7 @@ namespace Armoury
         // ------------------------------------------------------------ raz na dobe (ArmouryBehavior: po IronBank i migawce MRest, przed ClanBudget.Daily)
         internal static void Daily()
         {
-            LastTown = LastVill = -1;
+            LastTown = LastVill = -1; LastVillTribute = -1;
             ClearDay();
             var s = Settings.Current;
             if (Campaign.Current == null || s == null) return;
@@ -253,6 +259,7 @@ namespace Armoury
                 foreach (var mp in parties) ReadSaved(s, mp);    // F6: stawka 0 (Sutler Daily Share 0 albo wyjatek RateToday) - One nie biegnie, pelna petla odczytu jak dotad
             _dTownsN = _towns.Count; _dVillsN = _vills.Count;
             LastTown = _dTown; LastVill = _dVill;
+            LastVillTribute = TributeOn ? _dVillTax : -1;                 // E3-G2: Pompy F
             sw.Stop();
             _dMs = sw.Elapsed.TotalMilliseconds;
             try { if (s.LogEnabled) Log.Info(Line(today)); }
@@ -369,7 +376,24 @@ namespace Armoury
             int townPart = x - villPart;
             int folk = townPart > 0 ? TownFolk.EarnService(town, townPart, TownFolk.KLife) : 0;   // E5/B1 (R9, 75/25): arytmetyka - nie rzuca (recenzja A3 2-2 zachowana)
             if (townPart > 0) town.Town.ChangeGold(townPart - folk);
-            if (villPart > 0) vill.SettlementComponent.ChangeGold(villPart);   // kiesa wsi (posiadacz "Pieniadz swiata")
+            if (villPart > 0)
+            {
+                // E3-G2 (VillageTributeFromSutlers): ta sama regula co utarg taboru 112 - podatek pana z czynnego modelu na licznik podatku wsi, reszta do kiesy
+                // (VillageTakings.Split: arytmetyka, model w try - nie rzuca). Wies rodu partii - bez daniny (K3: zold zwraca korona, nie wraca do wlasnej kiesy rodu)
+                var vv = vill.Village;
+                if (TributeOn && vv != null && !ReferenceEquals(vill.OwnerClan, mp.ActualClan))
+                {
+                    int vtax, vpurse;
+                    VillageTakings.Split(vv, villPart, villPart, out vtax, out vpurse);
+                    _dVillTax += vtax; _dVillPurse += vpurse; if (vtax > 0) _dVillTaxN++;
+                }
+                else
+                {
+                    vill.SettlementComponent.ChangeGold(villPart);    // kiesa wsi (posiadacz "Pieniadz swiata")
+                    _dVillPurse += villPart;
+                    if (TributeOn && vv != null) { _dVillOwn += villPart; _dVillOwnN++; }
+                }
+            }
             // ---- liczniki (zloto juz na miejscu)
             _dTaken += x; _dPaidN++;
             if (wantVill && vill == null) { int vp = (int)(x * (double)(1f - townShare)); if (vp > 0) { _dNoVill++; _dNoVillGold += vp; } }
@@ -444,6 +468,10 @@ namespace Armoury
               .Append(" | w polu ").Append(_dParties).Append(" partii, wydaly ").Append(_dPaidN).Append(": z sakiewek ").Append(_dTaken).Append(" (gracz ").Append(_dPlayer).Append(')')
               .Append(" -> kasy miast ").Append(_dTown).Append(" w ").Append(_dTownsN).Append(" miastach (").Append(ta.ToString("0.0", Inv)).Append("%), kiesy wsi ").Append(_dVill)
               .Append(" w ").Append(_dVillsN).Append(" wsiach")
+              .Append(" | E3-G2 danina pana od czesci wsi (Village Tribute From Sutlers ").Append(TributeOn ? "tak" : "nie").Append("): do kies wsi ").Append(_dVillPurse)
+              .Append(", na liczniki podatku wsi (pan wsi) ").Append(_dVillTax).Append(" (").Append(_dVillTaxN).Append(" wplat), wlasne wsie rodu partii bez daniny (K3) ").Append(_dVillOwn)
+              .Append(" (").Append(_dVillOwnN).Append("); kontrola: zaplacone wsiom ").Append(_dVill).Append(" = kiesa + licznik ").Append(_dVillPurse + _dVillTax)
+              .Append(" (roznica ").Append(_dVill - _dVillPurse - _dVillTax).Append(')')
               .Append(" | we wlasnych miastach rodow (K3) ").Append(_dOwnK3)
               .Append(" | bez niewrogiego miasta -> najblizsze miasto ").Append(_dNoTown).Append(" partii (").Append(_dNoTownGold).Append(')')
               .Append(" | bez niewrogiej wsi w stanie Normal -> miasto ").Append(_dNoVill).Append(" partii (").Append(_dNoVillGold).Append(')')

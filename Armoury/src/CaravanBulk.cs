@@ -173,6 +173,25 @@ namespace Armoury
 
         private static bool Ready() { return _goods != null || Resolve(); }
 
+        /// <summary>E3-T1 (CaravanGoods): surowiec z tabeli CaravanBulk przy czynnej regule - T1 go nie sprzedaje (jedna regula na jeden towar).</summary>
+        internal static bool Owns(ItemObject it)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (it == null || !_wired || s == null || !s.CaravanBulkEnabled || !Ready()) return false;
+                foreach (var g in _goods) if (ReferenceEquals(g.Item, it)) return true;
+                return false;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>E3-T1: ta sama bramka handlu karawany co sprzedaz surowcow (Trades).</summary>
+        internal static bool TradesForT1(MobileParty mp) { return mp != null && Trades(mp); }
+
+        /// <summary>E3-T1: karawana gracza z czynnym rozkazem BK (CaravanOrdersBehavior) - T1 jej nie rusza.</summary>
+        internal static bool HasOrders(MobileParty mp) { try { return OrderFilter(mp) != null; } catch { return false; } }
+
         /// <summary>Szuka przedmiotow z tabeli; zastepuje liste tylko wtedy, gdy cos znalazl.</summary>
         private static bool Resolve()
         {
@@ -618,10 +637,12 @@ namespace Armoury
                 if (n <= 0) { _poor++; continue; }
                 int purse = mp.PartyTradeGold, had = el.Amount;
                 bool broke = false;
+                TownToll.LastTaken = 0;
                 try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, town.Settlement); }
                 catch (Exception e) { broke = true; if (!_errSell) { _errSell = true; Log.Error("CaravanBulk.Sell", e); } }
                 int moved = had - pack.GetItemNumber(g.Item);                 // liczymy to, co faktycznie zeszlo z jukow
-                int got = Math.Max(0, mp.PartyTradeGold - purse);
+                int got = Math.Max(0, mp.PartyTradeGold - purse) + TownToll.LastTaken;   // E3-G3: utarg przed mytem targowym (licznik "kasy miast zaplacily")
+                TownToll.LastTaken = 0;
                 if (broke && moved > 0 && got == 0) { GiveBack(shelf, pack, el.EquipmentElement, moved); moved = 0; }   // towar poszedl, zloto nie - cofamy
                 if (moved > 0)
                 {
