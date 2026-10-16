@@ -4416,6 +4416,14 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool NightMarchNotice { get; set; } = true;
 
+        [SettingPropertyBool("Town Inns", HintText = "in a town you can take lodgings at an inn: a common room (straw - 1 a man, 1 a horse, 3 for your own room), a decent inn (beds, hot meal, ale - 2/2/8) or a good house (rooms, meat, wine, a bath - 4/3/20). Every soldier pays for himself and his horse from his own purse and companions from theirs (who cannot afford it takes a cheaper bed or the stable, free); you pay for yourself, your horse and the horses that carry nobody. You sleep until dawn and wake rested until the next dusk: +5/+10/+12% speed on the map and +2/+5/+8 morale, weighted by how many slept in each kind of bed (only with no sleep debt); a decent inn or a good house also pays off sleep debt a quarter faster, and a good house heals the wounded half again as fast that night. The coin goes to the townsfolk who keep the inns. Off = no inns, as before")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TownInns { get; set; } = true;
+
+        [SettingPropertyBool("Town Inn Price Bonus", HintText = "after a night in a good house you trade a little better in that same town until dusk: you buy 3% cheaper and sell 3% dearer in the trade screen (never dearer than the same piece would cost you to buy back). Off = the good house gives no price bonus")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool TownInnPriceBonus { get; set; } = true;
+
         [SettingPropertyBool("Anvil Shift Enabled", HintText = "waiting at the forge runs in day shifts: after AnvilShiftHours of work the smith beds down for his needed sleep (6h, more with sleep debt), then returns to the hammer")]
         [SettingPropertyGroup("A night's rest")]
         public bool AnvilShiftEnabled { get; set; } = true;
@@ -7695,6 +7703,8 @@ namespace Armoury
             s.NightLedgerClock = NightLedgerClock;
             s.PlayerSleepGuard = PlayerSleepGuard;
             s.NightMarchNotice = NightMarchNotice;
+            s.TownInns = TownInns;
+            s.TownInnPriceBonus = TownInnPriceBonus;
             s.AnvilShiftEnabled = AnvilShiftEnabled;
             s.AnvilShiftHours = AnvilShiftHours;
             s.WorkshopNightRest = WorkshopNightRest;

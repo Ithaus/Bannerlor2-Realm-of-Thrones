@@ -263,6 +263,8 @@ namespace Armoury
                 DragonUnmount.ApplyAll(_harmony);
                 SlowMuster.ApplyAll(_harmony);
                 SlowHealing.ApplyAll(_harmony);
+                // KA (16.10): karczmy - gojenie w dobrym domu PO SlowHealing (te same metody, priorytet nizszy) i ceny ekranu handlu w miescie noclegu; wlasny try
+                try { TownInns.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownInns.ApplyAll", e); }
                 HungerLaw.ApplyAll(_harmony);
                 try { FoodThrift.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodThrift.ApplyAll", e); }         // noc 15/16.10 (B3): syta partia AI nie przeplaca za jedzenie (te same modele co HungerLaw)
                 try { FoodSubstitute.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodSubstitute.ApplyAll", e); }   // noc 15/16.10 (B2): zamiennik jedzenia przy pustym straganie (UpdateDemandShift, PRZED nawiasem kiesy ludu TownFolk)

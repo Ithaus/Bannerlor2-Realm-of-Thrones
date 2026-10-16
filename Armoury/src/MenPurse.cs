@@ -337,6 +337,38 @@ namespace Armoury
         private static int Wage(MobileParty mp) { try { return mp.TotalWage; } catch { return 0; } }
 
         /// <summary>
+        /// KA (16.10, karczmy - TownInns.cs; Jeff "ludzie sami placa za siebie i za swoje konie, dostaja zold"): nocleg ludzi w karczmie z ich sakiewki.
+        /// Ta sama droga co "zycie" przy wyjezdzie (OnLeft), ale cala kwota do karczmarzy - kiesy ludu osady (TownFolk.Earn, uslugi KLife); kiesa ludu nieczynna
+        /// albo wyjatek - reszta do kasy miasta (jak dotad przy wylaczonej kiesie). Liczniki jak w OnLeft: "na zycie w miastach" linii "Sakiewka ludzi", ksiega
+        /// przeplywow osad (czesc w kasie), 169c i 165 (wlasne miasto rodu), tarcza zoldu (czesc w kasie), lup miast L0. Okno kiesy ludu (TownFolk.Note) tylko
+        /// dla czesci w kasie - podstawa robocizny kupcow (75% "zycia") nie liczy pieniedzy, ktore do kupcow nie trafily. Wolajacy sprawdza wolna sakiewke
+        /// (CampFree) i okno lupu (CitySack.NoSpendStay). Zwraca zdjete z sakiewki; folk - ile przyjela kiesa ludu.
+        /// </summary>
+        internal static int InnPay(MobileParty mp, Settlement st, int amount, out int folk)
+        {
+            folk = 0;
+            if (!On || mp == null || st == null || !st.IsTown || st.Town == null || amount <= 0) return 0;
+            Day();
+            int t = Take(mp, amount);
+            if (t <= 0) return 0;
+            folk = Math.Max(0, Math.Min(t, TownFolk.Earn(st, t, TownFolk.KLife)));   // arytmetyka - nie rzuca (0 przy kiesie nieczynnej)
+            int coffer = t - folk;
+            if (coffer > 0) st.Town.ChangeGold(coffer);
+            ClanIncomeBook.NoteOwnPaid(st, mp.ActualClan, t);   // 169c: wydatki ludzi rodu w jego miescie (tylko licznik)
+            if ((mp.IsLordParty || mp.IsMainParty) && mp.ActualClan != null && ReferenceEquals(st.OwnerClan, mp.ActualClan))
+                CrownIncome.NoteOwnSpend(mp.ActualClan, t);     // 165 (K3): zold wydany we wlasnym miescie rodu - jedna regula z OnLeft
+            if (coffer > 0)
+            {
+                MoneyLedger.Note(MoneyLedger.NLife, st, coffer);   // ksiega przeplywow osad (tylko licznik) - czesc w kasie
+                try { TownFolk.Note(st, coffer, TownFolk.KLife); } catch { }
+                SoldierPay.Hold(st, coffer);
+            }
+            _dayLife += t;
+            CitySack.NoteSpend(st, mp, t);   // lup miast (L0): zloto zostawione w osadzie (tylko licznik, wlasny try)
+            return t;
+        }
+
+        /// <summary>
         /// E5/A3 (paczka 163, R9) - markietani: doba partii w POLU. Ta sama kolejnosc rezerw co OnLeft - zalegle naprawy (robocizna, bez szacunku materialu:
         /// poza miastem nie ma polki - jak zaopatrzenie BK D11-4), odziez czekajaca na zakup (150) i oszczednosci K1 juz odlozone zostaja w sakiewce;
         /// z reszty ludzie wydaja `rate` (nowe oszczednosci odkladaja dalej tylko przy wyjezdzie z miasta). Tylko liczy kwote - zdejmuje CampTake, odbiorcow
