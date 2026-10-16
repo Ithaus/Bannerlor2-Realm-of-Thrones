@@ -140,8 +140,62 @@ namespace Armoury
     /// <summary>Czyste funkcje danych wiosek (bez gry): wczytanie, CRC, lancuch ognia, obrys, przerzedzenie, os domow.</summary>
     internal static class MapVillageData
     {
-        internal const string FileName = "arm_map_villages.tsv";
+        internal const string FileName = "arm_map_villages.tsv";              // uklad v5 (Jeff 16.10: 20% mniej wiosek, osady wedlug miejsca)
+        internal const string FileNameV4 = "arm_map_villages_v4.tsv";         // uklad v4 (2446 wiosek po ok. 16 osad) - klucz VillageLayoutV5 = false
         internal const int CheckNoCrc = 0, CheckMatch = 1, CheckMismatch = 2;
+
+        // Jeff 16.10 (VillageLayoutV5): wybor ukladu RAZ NA SESJE - pierwszy odczyt pliku w sesji (VillageBook.Resolve albo widok mapy, kto pierwszy) czyta klucz z MCM
+        // (McmSettings.Apply idzie dopiero po Resolve w OnSessionLaunched, wiec Settings.Current moze byc jeszcze z pliku ustawien); ksiega, widok i lore biora ten sam
+        // plik do konca sesji (zmiana klucza w trakcie - od nastepnego wczytania). ResetChoice - VillageBook.Reset (konstruktor ArmouryBehavior, kazda kampania).
+        private static bool _chosen, _v5 = true;
+        private static string _choiceNote = "";
+
+        internal static void ResetChoice() { _chosen = false; _choiceNote = ""; }
+
+        /// <summary>Opis wyboru do linii startowych ("" - plik wybrany kluczem jest w module).</summary>
+        internal static string ChoiceNote { get { EnsureChosen(); return _choiceNote; } }
+
+        /// <summary>Uklad v5 w tej sesji (wybor przy pierwszym odczycie).</summary>
+        internal static bool LayoutV5 { get { EnsureChosen(); return _v5; } }
+
+        /// <summary>Nazwa pliku ukladu tej sesji (v5 albo v4).</summary>
+        internal static string LayoutFileName { get { return LayoutV5 ? FileName : FileNameV4; } }
+
+        private static void EnsureChosen()
+        {
+            if (_chosen) return;
+            _chosen = true;
+            var s = Settings.Current;
+            bool v = s == null || s.VillageLayoutV5;
+            try { v = McmLayoutV5(v); } catch { }
+            // wgranie bez jednego z plikow (np. sam arm_map_villages.tsv bez _v4) - drugi uklad zamiast braku wiosek; lore idzie za ukladem (bramka crc i tak pilnuje)
+            if (!ModuleFileExists(v ? FileName : FileNameV4) && ModuleFileExists(v ? FileNameV4 : FileName))
+            {
+                _choiceNote = "BRAK pliku " + (v ? FileName : FileNameV4) + " - uklad " + (v ? "v4" : "v5") + " mimo klucza Village Layout V5 " + (v ? "TAK" : "NIE");
+                v = !v;
+            }
+            _v5 = v;
+        }
+
+        private static bool ModuleFileExists(string name)
+        {
+            try
+            {
+                string dir = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, "..", ".."));
+                if (System.IO.File.Exists(System.IO.Path.Combine(root, "ModuleData", name))) return true;
+            }
+            catch { }
+            try { return System.IO.File.Exists(System.IO.Path.Combine(BasePath.Name, "Modules", "Armoury", "ModuleData", name)); }
+            catch { return false; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool McmLayoutV5(bool dflt)
+        {
+            try { var i = McmSettings.Instance; return i != null ? i.VillageLayoutV5 : dflt; }
+            catch { return dflt; }
+        }
 
         private static readonly string[] Required = { "id", "village_id", "name", "x", "y", "settlements", "order", "level", "front_deg" };
         // kolumny pliku v2 / wedlug ludnosci (generator: naglowek "#id\tvillage_id\t...") - gdy naglowka brak, takie pozycje
@@ -256,18 +310,20 @@ namespace Armoury
             return null;
         }
 
-        /// <summary>Sciezka pliku w module (Modules\Armoury\ModuleData). E4/11: przeniesione z widoku - ten sam plik czyta ksiega wiosek po stronie kampanii.</summary>
+        /// <summary>Sciezka pliku w module (Modules\Armoury\ModuleData). E4/11: przeniesione z widoku - ten sam plik czyta ksiega wiosek po stronie kampanii.
+        /// Jeff 16.10: plik ukladu tej sesji (LayoutFileName - v5 albo v4).</summary>
         internal static string DataPath()
         {
+            string name = LayoutFileName;
             try
             {
                 string dir = System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);   // Modules\Armoury\bin\Win64_Shipping_Client
                 string root = System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, "..", ".."));
-                string p = System.IO.Path.Combine(root, "ModuleData", FileName);
+                string p = System.IO.Path.Combine(root, "ModuleData", name);
                 if (System.IO.File.Exists(p)) return p;
             }
             catch { }
-            try { return System.IO.Path.Combine(BasePath.Name, "Modules", "Armoury", "ModuleData", FileName); }
+            try { return System.IO.Path.Combine(BasePath.Name, "Modules", "Armoury", "ModuleData", name); }
             catch { return null; }
         }
 
@@ -1623,14 +1679,15 @@ namespace Armoury
             string path = MapVillageData.DataPath();
             if (path == null || !System.IO.File.Exists(path))
             {
-                Log.Info("Wioski: brak pliku " + (path ?? MapVillageData.FileName) + " - wioski na mapie nie beda pokazane (gra bez zmian).");
+                Log.Info("Wioski: brak pliku " + (path ?? MapVillageData.LayoutFileName) + " - wioski na mapie nie beda pokazane (gra bez zmian).");
                 return;
             }
             byte[] bytes = System.IO.File.ReadAllBytes(path);
             var file = MapVillageData.Parse(Encoding.UTF8.GetString(bytes));
             file.FileCrc32 = MapVillageData.Crc32(bytes);
             string head = "Wioski: plik '" + file.Title + "' (crc32 " + file.FileCrc32.ToString("X8") + ", " + bytes.Length + " B, wierszy danych "
-                          + file.DataLines + ")";
+                          + file.DataLines + "; " + MapVillageData.LayoutFileName + ", uklad " + (MapVillageData.LayoutV5 ? "v5" : "v4")
+                          + (MapVillageData.ChoiceNote.Length > 0 ? " - " + MapVillageData.ChoiceNote : "") + ")";
             if (file.MissingColumns.Length > 0)
             {
                 Log.Info(head + " - BRAK kolumn w naglowku: " + file.MissingColumns + "; wioski na mapie WYLACZONE.");

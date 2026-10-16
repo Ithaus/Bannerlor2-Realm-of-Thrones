@@ -90,6 +90,9 @@ namespace Armoury.Villages
         public const string VilTipTribute = "{=arm_vil_tip_tribute}{KNIGHT} takes its tribute";
         public const string VilTipTributeOwn = "{=arm_vil_tip_tribute_own}{KNIGHT} takes its tribute for you";
         public const string VilTipHolderOf = "{=arm_vil_tip_holder_of}{HERO} of {HOUSE}";
+        // Jeff 16.10 (D1, VillageBannerPerHolder): gospodarz wioski z innego rodu niz pan - imie, rod i komu przysiegal (dymek, okno okregu; dopisane recznie)
+        public const string VilTipKeptSworn = "{=arm_vil_tip_kept_sworn}Kept by {KNIGHT}, sworn to {LORD}";
+        public const string VilTipTributeSworn = "{=arm_vil_tip_tribute_sworn}{KNIGHT} takes its tribute, sworn to {LORD}";
         public const string VilTipFaith = "{=arm_vil_tip_faith}Faith: {FAITH} ({SHARE}%)";
         // E7/W3 (234, R13): okno okregu "Look over the district" - dopisane recznie (VillageTexts.xml / teksty_cs.py nie ma w repo)
         public const string DistHearMore = "{=arm_dist_hear_more}Hear more";

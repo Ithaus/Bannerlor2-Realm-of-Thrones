@@ -31,9 +31,10 @@ namespace Armoury
         private static bool _wired, _startLogged;
         private static int _st;                                                              // potkniecia (sesja)
         private static int _dOpen, _dMore, _dRowsMax, _dSt, _dBk, _dLore, _dLord, _dNone;    // doba
+        private static int _dEst, _dRealm;                                                   // Jeff 16.10 (D1): herby wierszy z majatku BK i od rycerzy krolestwa
 
-        /// <summary>Wiersz okna: wioska z ksiegi, wiersz lore (albo null) i gotowa linia rycerza (albo null).</summary>
-        private sealed class Item { public VillageBook.DistRow R; public MapVillageLore.Row Lore; public string Knight; }
+        /// <summary>Wiersz okna: wioska z ksiegi, wiersz lore (albo null), gotowa linia rycerza (albo null) i gospodarz (D1; null - klucz off, jak dotad).</summary>
+        private sealed class Item { public VillageBook.DistRow R; public MapVillageLore.Row Lore; public string Knight; public VillageHolders.Holder H; }
 
         /// <summary>Pozycja wpieta i klucz wlaczony - wtedy "People of this land" pokazuje okreg bez wierszy wiosek.</summary>
         internal static bool On { get { var s = Settings.Current; return _wired && s != null && s.DistrictMenuEnabled; } }
@@ -41,7 +42,7 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior (przed OnSessionLaunched): stan sesji.</summary>
         internal static void Reset() { _wired = _startLogged = false; _st = 0; DayReset(); }
 
-        private static void DayReset() { _dOpen = _dMore = _dRowsMax = _dSt = _dBk = _dLore = _dLord = _dNone = 0; }
+        private static void DayReset() { _dOpen = _dMore = _dRowsMax = _dSt = _dBk = _dLore = _dLord = _dNone = _dEst = _dRealm = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -90,7 +91,7 @@ namespace Armoury
                 string title = VillageTexts.Make(VillageTexts.DistTitle, "DISTRICT", name ?? "?").ToString();
                 string leave = VillageTexts.Make(VillageTexts.DistClose).ToString();
                 Clan lord = st.Village != null && st.Village.Bound != null ? st.Village.Bound.OwnerClan : null;   // pan jak dymek W2 (HeldLine)
-                Hero holder = MapVillageLore.BkHolder(st, lord);                                                  // jeden odczyt tytulu BK na okno (tytul jest na wies gry)
+                Hero holder = MapVillageLore.BkHolder(st, lord);                                                  // jeden odczyt tytulu BK na okno (tytul jest na wies gry; D1 off)
                 var list = new List<InquiryElement>(rows.Count);
                 foreach (var r in rows) list.Add(Element(st, r, lord, holder));
                 if (list.Count == 0)
@@ -117,10 +118,29 @@ namespace Armoury
             try
             {
                 it.Lore = r.Uid != null ? MapVillageLore.Of(r.Uid) : null;
-                it.Knight = MapVillageLore.KnightLine(it.Lore, lord, holder);
-                if (holder != null && holder.Clan != null) { b = holder.Clan.Banner; if (b != null) _dBk++; }
-                else if (it.Lore != null && it.Lore.KnightBanner != null) { b = it.Lore.KnightBanner; _dLore++; }
-                else if (lord != null) { b = lord.Banner; if (b != null) _dLord++; }
+                // Jeff 16.10 (D1, VillageBannerPerHolder): gospodarz TEJ wioski (VillageHolders - ten sam co proporczyk i dymek; wies gry - tytul BK albo pan)
+                it.H = Settings.Current.VillageBannerPerHolder ? VillageHolders.Of(st, r.Main ? null : r.Uid) : null;
+                if (it.H != null)
+                {
+                    it.Knight = VillageHolders.Line(it.H);
+                    b = it.H.Banner;
+                    if (b != null)
+                        switch (it.H.Rule)
+                        {
+                            case VillageHolders.RuleTitle: _dBk++; break;
+                            case VillageHolders.RuleEstate: _dEst++; break;
+                            case VillageHolders.RuleLore: _dLore++; break;
+                            case VillageHolders.RuleRealmEstate: case VillageHolders.RuleRealmHouse: _dRealm++; break;
+                            default: _dLord++; break;
+                        }
+                }
+                else
+                {
+                    it.Knight = MapVillageLore.KnightLine(it.Lore, lord, holder);
+                    if (holder != null && holder.Clan != null) { b = holder.Clan.Banner; if (b != null) _dBk++; }
+                    else if (it.Lore != null && it.Lore.KnightBanner != null) { b = it.Lore.KnightBanner; _dLore++; }
+                    else if (lord != null) { b = lord.Banner; if (b != null) _dLord++; }
+                }
                 if (it.Knight != null) hint.Add(it.Knight);
                 if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(VineOlive.Livelihood(st, GoodsRates.Livelihood(st, r.Uid, it.Lore.Livelihood)));   // GL-5 (P5): wies lniana - zdanie lnu
                 string mem = Memory(r, it.Lore);
@@ -160,7 +180,9 @@ namespace Armoury
                     if (row.Livelihood.Length > 0) more.Add(VineOlive.Livelihood(st, GoodsRates.Livelihood(st, it.R.Uid, row.Livelihood)));   // GL-5 (P5): wies lniana - zdanie lnu
                     if (faith != null && row.Faith.Length > 0 && row.FaithMatches(bkId)) more.Add(row.Faith);
                     if (row.History.Length > 0) more.Add(row.History);
-                    if (holder == null && row.Knight.Length > 0 && row.House.Length > 0 && row.Arms.Length > 0)
+                    // godlo rycerza z lore - gdy wioske trzyma on (D1: regula lore albo kasztelan pana z lore; klucz off - brak tytulu BK, jak dotad)
+                    bool loreKnight = it.H != null ? (it.H.Rule == VillageHolders.RuleLore || it.H.Rule == VillageHolders.RuleLord) : holder == null;
+                    if (loreKnight && row.Knight.Length > 0 && row.House.Length > 0 && row.Arms.Length > 0)
                         more.Add(VillageTexts.Make(VillageTexts.VilArms, "HOUSE", row.House, "ARMS", Lower(row.Arms)).ToString());
                 }
                 string mem = Memory(it.R, row);
@@ -188,6 +210,7 @@ namespace Armoury
             if (_dOpen > 0 || _dSt > 0)
                 Log.Info("Menu okregu (E7/W3): dzien " + ((int)CampaignTime.Now.ToDays).ToString(Inv) + " | okien " + _dOpen + " (wiosek w oknie najwiecej " + _dRowsMax + "), Hear more " + _dMore
                          + " | herby wierszy: rod posiadacza tytulu BK " + _dBk + ", rycerz z lore " + _dLore + ", pan " + _dLord + ", bez herbu " + _dNone
+                         + ", majatek BK " + _dEst + ", rycerz krolestwa " + _dRealm
                          + " | potkniecia dzis " + _dSt + " (sesja " + _st + ")");
             DayReset();
         }

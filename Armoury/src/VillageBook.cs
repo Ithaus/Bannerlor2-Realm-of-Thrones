@@ -76,7 +76,13 @@ namespace Armoury
             public bool Event;                              // zdarzenie dzis (wiersz CSV)
             public Mem[] M;                                 // E7/W1 (232): pamiec wojny na wioske (indeks jak Br; W = wies gry) - sekcja m: zapisu
             public bool LookDirty;                          // E7/W4 (237): okreg czeka na odczyt wygladu przez widok mapy (bez zapisu)
+            public Pend P;                                  // Jeff 16.10 (D5): puste osady z zapisu innego ukladu do rozlozenia na wioski tego ukladu (PlacePending)
         }
+
+        /// <summary>Jeff 16.10 (D5, uklad v5 na zapisie v4): puste osady okregu z zapisu innego ukladu - sumy niezalezne od indeksow wiosek: rabunek i glod osobno
+        /// w wioskach (S) i we wsi gry (M), doba ostatniego zdarzenia z flag zapisu (Ev; -1 brak). Rozkladane w PIERWSZEJ DOBIE (albo przy zapisie, jesli wczesniej)
+        /// z biezacym pulapem (MCM wchodzi po Resolve) - wies gry swoja czesc, wioski wedlug kolejnosci (glod - FamOrder), reszta do wsi gry.</summary>
+        private sealed class Pend { public double Rs, Rm, Fs, Fm; public int Ev = -1; public bool NoAcc; }   // NoAcc: zapis bez y: okregu - konto oczekiwane = biezace (bez drugiego przydzialu)
 
         // E7/W1: C - napastnik sesji (identyfikatory do pamieci i komunikatu), Burned - ta sesja przeszla jakas wioske na spalona (przy Looted bez "plundered")
         private sealed class Sess { public object Key; public int Cur = -1; public string Raider = "?"; public float Fx, Fy; public bool HasFrom; public int Day; public Cx C; public bool Burned; }
@@ -126,16 +132,20 @@ namespace Armoury
         private static double _resolveMs;
         private static int _rowsNoVillage, _distNoVillage, _savedN, _savedB, _savedBad;
         private static bool _layoutSame;
+        // Jeff 16.10 (D5): przeniesienie pustych osad z zapisu innego ukladu - liczniki do linii pierwszej doby (raz na sesje)
+        private static int _pendDists, _pendBad, _pendMemSkipped;
+        private static double _pendR0, _pendF0, _pendR, _pendF, _pendDrop;
         private static readonly List<double> _newN = new List<double>();
         private static readonly List<string> _newNames = new List<string>();
         private static string _csvPath;
 
-        // uklad z pliku (raz na proces - plik w grze sie nie zmienia)
+        // uklad z pliku (raz na proces - plik w grze sie nie zmienia; Jeff 16.10: raz na plik - VillageLayoutV5 wybiera v5 albo v4 przy starcie sesji, MapVillageData.LayoutFileName)
         private static MapVillageFile _file;
         private static string _fileNote = "";
         private static uint _layoutCrc;
         private static double _loadMs;
         private static bool _fileTried;
+        private static string _fileName;                    // nazwa wczytanego pliku ukladu (inny wybor w nowej sesji - wczytanie od nowa)
 
         // liczniki doby (bez zapisu; zeruje Daily)
         private static double _dRaidW, _dRaidMain, _dForW, _dForMain, _dFam, _dUp, _dZast, _dOver, _dOverPeople, _dSetS, _dHitSkip;
@@ -196,10 +206,12 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior: stan jednej kampanii nie przecieka do drugiej.</summary>
         internal static void Reset()
         {
+            MapVillageData.ResetChoice();                   // Jeff 16.10: uklad v5 / v4 wybierany od nowa przy pierwszym odczycie tej kampanii (VillageLayoutV5)
             lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); _news.Clear(); _nBurned = _nNewsLost = _nMemNew = _savedM = 0; }
             LookTouchAll();                                 // E7/W4: stare okregi puszczone, widok czyta wszystko od nowa
             _pending = null; _resolved = _resolveTried = false; _firstDay = true; _offSeen = _offLogged = false; _pSet = false; _p = 250;
             _resolveNote = ""; _resolveMs = 0.0; _rowsNoVillage = _distNoVillage = _savedN = _savedB = _savedBad = 0; _layoutSame = false; _distNoVillageIds.Clear();
+            _pendDists = _pendBad = _pendMemSkipped = 0; _pendR0 = _pendF0 = _pendR = _pendF = _pendDrop = 0.0;
             _newN.Clear(); _newNames.Clear(); _csvPath = null;
             _stumblesAll = 0;
             lock (_errSites) _errSites.Clear();
@@ -223,13 +235,16 @@ namespace Armoury
         // ------------------------------------------------------------ plik ukladu (ten sam parser co widok W2)
         private static void LoadFile()
         {
-            if (_fileTried) return;
+            string want = MapVillageData.LayoutFileName;
+            if (_fileTried && string.Equals(_fileName, want, StringComparison.Ordinal)) return;
             _fileTried = true;
+            _fileName = want;
+            _file = null; _fileNote = ""; _layoutCrc = 0;     // inny plik niz w poprzedniej sesji procesu - nic ze starego ukladu nie zostaje
             var sw = Stopwatch.StartNew();
             try
             {
                 string path = MapVillageData.DataPath();
-                if (path == null || !System.IO.File.Exists(path)) { _fileNote = "brak pliku " + (path ?? MapVillageData.FileName); return; }
+                if (path == null || !System.IO.File.Exists(path)) { _fileNote = "brak pliku " + (path ?? MapVillageData.LayoutFileName); return; }
                 byte[] bytes = System.IO.File.ReadAllBytes(path);
                 var f = MapVillageData.Parse(Encoding.UTF8.GetString(bytes));
                 f.FileCrc32 = MapVillageData.Crc32(bytes);
@@ -336,7 +351,8 @@ namespace Armoury
             {
                 int with = 0; lock (Gate) foreach (var d in _d.Values) if (d.W > 0) with++;
                 Log.Info("Ksiega wiosek (E4/11): start sesji (" + how + ") - " + (_resolved ? "okregi " + _d.Count + " (z wioskami " + with + ")" : "NIEROZWIAZANA - ksiega nieczynna do nastepnego wczytania")
-                         + "; plik ukladu: " + (_file != null ? "'" + _file.Title + "' (crc ukladu " + _layoutCrc.ToString("X8") + ", plik crc32 " + _file.FileCrc32.ToString("X8") + ")" : _fileNote)
+                         + "; plik ukladu: " + (_file != null ? "'" + _file.Title + "' (crc ukladu " + _layoutCrc.ToString("X8") + ", plik crc32 " + _file.FileCrc32.ToString("X8") + ", " + _fileName
+                                                     + (MapVillageData.ChoiceNote.Length > 0 ? " - " + MapVillageData.ChoiceNote : "") + ")" : _fileNote)
                          + "; " + _resolveNote + "; czas: plik " + F(_loadMs, "0.0") + " ms, okregi " + F(_resolveMs, "0.0") + " ms.");
             }
             catch (Exception e) { Stumble("VillageBook.Resolve(linia)", e); }
@@ -399,8 +415,17 @@ namespace Armoury
             if (!_layoutSame)
             {
                 foreach (var d in _d.Values) d.Z = ZLayout;
-                _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady - uklad inny (crc zapisu " + (hasCrc ? crc.ToString("X8") : "?") + ", pliku " + _layoutCrc.ToString("X8") + ") - przydzial zastepczy"
-                               + (string.IsNullOrEmpty(sm) ? "" : "; pamiec wojny (E7/W1) pominieta - indeksy wiosek z innego ukladu");
+                // Jeff 16.10 (D5): sumy pustych osad okregu (w:) i konto oczekiwane (y:) nie zaleza od indeksow wiosek - przeniesione na wioski tego ukladu (PlacePending w
+                // pierwszej dobie); okreg z zepsutym wpisem albo bez wpisu w: - jak dotad przydzial zastepczy z konta uchodzcow (Z = inny uklad). Zapis z ksiega
+                // wylaczona (o:1) - stan i tak wyzerowany: jak dotad.
+                if (!wasOff) PendingFromSave(sw, sx, sy);
+                if (!string.IsNullOrEmpty(sm)) _pendMemSkipped = CountMem(sm);
+                _resolveNote = "z zapisu: n " + _savedN + " okregow, puste osady - uklad inny (crc zapisu " + (hasCrc ? crc.ToString("X8") : "?") + ", pliku " + _layoutCrc.ToString("X8") + ") - "
+                               + (_pendDists > 0 || _pendBad > 0
+                                  ? "sumy z zapisu przeniesione na wioski tego ukladu w " + _pendDists + " okregach (rabunek " + F(_pendR0, "0.##") + ", glod " + F(_pendF0, "0.##")
+                                    + " osad; rozlozone w pierwszej dobie), zepsute wpisy " + _pendBad + " (przydzial zastepczy), okregi bez pustych osad w zapisie - przydzial zastepczy tylko przy koncie uchodzcow"
+                                  : "przydzial zastepczy" + (wasOff ? " (ksiega wylaczona przy zapisie)" : ""))
+                               + (string.IsNullOrEmpty(sm) ? "" : "; pamiec wojny (E7/W1) pominieta - indeksy wiosek z innego ukladu (" + _pendMemSkipped + " wpisow)");
                 return;
             }
             var bad = new HashSet<Dist>();
@@ -501,10 +526,141 @@ namespace Armoury
                            + ", pamiec wojny (E7/W1) " + _savedM + " wpisow" + (sm == null ? " (zapis bez sekcji m:)" : "");
         }
 
+        /// <summary>
+        /// Jeff 16.10 (D5): zapis z innym ukladem wiosek - z sekcji w: (puste osady na indeks wioski starego ukladu, ostatni = wies gry) sumy na okreg: rabunek i glod
+        /// osobno w wioskach i we wsi gry; z y: konto oczekiwane (ARexp / AFexp - na okreg, bez indeksow); z x: najpozniejsza doba zdarzenia flag okregu. Wpis zepsuty
+        /// (liczba, ujemna, NaN, suma ponad 95% n okregu) - okreg zostaje przy przydziale zastepczym (Z = inny uklad). Pod Gate (ApplyPending), kazdy wpis we wlasnym try.
+        /// </summary>
+        private static void PendingFromSave(string sw, string sx, string sy)
+        {
+            var ev = new Dictionary<string, int>(StringComparer.Ordinal);
+            if (!string.IsNullOrEmpty(sx))
+                foreach (var item in sx.Split(';'))
+                {
+                    try
+                    {
+                        int eq = item.LastIndexOf('=');
+                        if (eq <= 0) continue;
+                        int best = -1;
+                        foreach (var e1 in item.Substring(eq + 1).Split(','))
+                        {
+                            var q = e1.Split(':');
+                            int fl, day;
+                            if (q.Length != 4 || !int.TryParse(q[1], NumberStyles.Integer, Inv, out fl) || !int.TryParse(q[2], NumberStyles.Integer, Inv, out day)) continue;
+                            if ((fl & 3) != 0 && day > best) best = day;
+                        }
+                        if (best >= 0) ev[item.Substring(0, eq)] = best;
+                    }
+                    catch (Exception e) { Stumble("VillageBook.PendingFromSave(x)", e); }
+                }
+            var acc = new Dictionary<string, KeyValuePair<double, double>>(StringComparer.Ordinal);
+            if (!string.IsNullOrEmpty(sy))
+                foreach (var item in sy.Split(';'))
+                {
+                    try
+                    {
+                        int eq = item.LastIndexOf('=');
+                        if (eq <= 0) continue;
+                        var q = item.Substring(eq + 1).Split('/');
+                        double ar, af;
+                        if (q.Length == 2 && double.TryParse(q[0], NumberStyles.Float, Inv, out ar) && double.TryParse(q[1], NumberStyles.Float, Inv, out af))
+                            acc[item.Substring(0, eq)] = new KeyValuePair<double, double>(ar > 0.0 && !double.IsInfinity(ar) ? ar : 0.0, af > 0.0 && !double.IsInfinity(af) ? af : 0.0);
+                    }
+                    catch (Exception e) { Stumble("VillageBook.PendingFromSave(y)", e); }
+                }
+            if (string.IsNullOrEmpty(sw)) return;
+            foreach (var item in sw.Split(';'))
+            {
+                try
+                {
+                    int eq = item.LastIndexOf('=');
+                    if (eq <= 0) continue;
+                    Dist d;
+                    string id = item.Substring(0, eq);
+                    if (!_d.TryGetValue(id, out d)) continue;
+                    var a = item.Substring(eq + 1).Split(',');
+                    bool ok = d.NSet && a.Length >= 1;
+                    double rs = 0.0, rm = 0.0, fs = 0.0, fm = 0.0;
+                    for (int i = 0; ok && i < a.Length; i++)
+                    {
+                        var q = a[i].Split('/');
+                        double br, bf;
+                        if (q.Length != 2 || !double.TryParse(q[0], NumberStyles.Float, Inv, out br) || !double.TryParse(q[1], NumberStyles.Float, Inv, out bf)
+                            || double.IsNaN(br) || double.IsNaN(bf) || double.IsInfinity(br) || double.IsInfinity(bf) || br < 0.0 || bf < 0.0) { ok = false; break; }
+                        if (i == a.Length - 1) { rm = br; fm = bf; } else { rs += br; fs += bf; }   // ostatni indeks starego ukladu = wies gry (Build: indeks W)
+                    }
+                    if (ok && rs + rm + fs + fm > 0.95 * d.N + 1e-4) ok = false;   // najwyzszy pulap (jak przy zgodnym ukladzie) wobec n okregu
+                    if (!ok) { _pendBad++; continue; }
+                    if (rs + rm + fs + fm <= 0.0) continue;
+                    int e0;
+                    d.P = new Pend { Rs = rs, Rm = rm, Fs = fs, Fm = fm, Ev = ev.TryGetValue(id, out e0) ? e0 : -1 };
+                    d.Z = ZNone;                             // stan z zapisu (rozlozony w pierwszej dobie), nie przydzial zastepczy
+                    KeyValuePair<double, double> y;
+                    if (acc.TryGetValue(id, out y)) { d.ARexp = y.Key; d.AFexp = y.Value; }
+                    else d.P.NoAcc = true;
+                    _pendDists++; _pendR0 += rs + rm; _pendF0 += fs + fm;
+                }
+                catch (Exception e) { _pendBad++; Stumble("VillageBook.PendingFromSave(w)", e); }
+            }
+        }
+
+        private static int CountMem(string sm)
+        {
+            int n = 0;
+            try { foreach (var item in sm.Split(';')) { int eq = item.LastIndexOf('='); if (eq > 0) n += item.Substring(eq + 1).Split(',').Length; } }
+            catch { }
+            return n;
+        }
+
+        /// <summary>Jeff 16.10 (D5): rozklada puste osady z zapisu innego ukladu (Pend) na wioski tego ukladu z biezacym pulapem - wies gry najpierw swoja czesc,
+        /// wioski wedlug kolejnosci (rabunek: indeks = order; glod: FamOrder - ubocze, linia, wezel), nadmiar do wsi gry, reszta ponad pulap policzona. Flagi stanu
+        /// (spalona / opuszczona) od nowa w CheckUp bez wiadomosci (list false) z doba ostatniego zdarzenia okregu z zapisu (brak - ostatni najazd regionu, inaczej dzis).
+        /// Pod Gate (Daily albo Export), nie rzuca.</summary>
+        private static void PlacePending(Dist d, int today)
+        {
+            var p = d.P;
+            d.P = null;
+            if (p == null) return;
+            try
+            {
+                int ev = p.Ev;
+                if (ev < 0)
+                {
+                    ev = today;
+                    try { int last; if (PeopleBook.LastStrike(OutlawLaw.RegionFor(d.St), out last)) ev = last; } catch (Exception e) { Stumble("VillageBook.PlacePending(zegar)", e); }
+                }
+                // rabunek: wies gry swoja czesc, wioski wedlug kolejnosci, nadmiar do wsi gry
+                double put = Math.Min(Math.Max(0.0, Room(d, d.W)), p.Rm);
+                d.Br[d.W] += put; _pendR += put;
+                double left = p.Rs + (p.Rm - put);
+                for (int w = 0; w < d.W && left > Eps; w++) { double x = Math.Min(Math.Max(0.0, Room(d, w)), left); d.Br[w] += x; left -= x; _pendR += x; }
+                if (left > Eps) { double x = Math.Min(Math.Max(0.0, Room(d, d.W)), left); d.Br[d.W] += x; left -= x; _pendR += x; }
+                if (left > Eps) _pendDrop += left;
+                // glod: wies gry swoja czesc, wioski kolejnoscia opuszczania (FamOrder konczy sie wsia gry)
+                put = Math.Min(Math.Max(0.0, Room(d, d.W)), p.Fm);
+                d.Bf[d.W] += put; _pendF += put;
+                left = p.Fs + (p.Fm - put);
+                foreach (int w in d.FamOrder)
+                {
+                    if (left <= Eps) break;
+                    double x = Math.Min(Math.Max(0.0, Room(d, w)), left); d.Bf[w] += x; left -= x; _pendF += x;
+                }
+                if (left > Eps) _pendDrop += left;
+                for (int w = 0; w <= d.W; w++) if (d.Br[w] + d.Bf[w] > 0.0) CheckUp(d, w, ev, "inny uklad", false);
+                // zapis bez konta oczekiwanego okregu (y:) przy pustych osadach (rzadkie) - konto biezace, inaczej uzgodnienie dolozyloby osady drugi raz z konta
+                if (p.NoAcc) { var sn = SnapOf(d); d.ARexp = sn.Ar; d.AFexp = sn.Af; }
+                d.Event = true;
+            }
+            catch (Exception e) { Stumble("VillageBook.PlacePending", e); }
+        }
+
         /// <summary>SyncData (zapis). Ksiega nierozwiazana (zapis przed startem sesji) - napis z wczytania bez zmian.</summary>
         internal static string Export()
         {
             if (!_resolved) return _pending ?? "";
+            // Jeff 16.10 (D5): zapis przed pierwsza doba po wczytaniu zapisu z innym ukladem - puste osady z zapisu najpierw na wioski (inaczej zapis bez nich)
+            try { lock (Gate) { int t = Today(); foreach (var d in _d.Values) if (d.P != null) PlacePending(d, t); } }
+            catch (Exception e) { Stumble("VillageBook.Export(przeniesienie)", e); }
             var sb = new StringBuilder(32 * 1024);
             sb.Append("v1|L:").Append(_layoutCrc.ToString("X8")).Append("|P:").Append(_p.ToString(Inv));
             if (_offSeen) sb.Append("|o:1");                                // R1-5: stan wyzerowany przez OffDay, wlaczenie jeszcze nie przeszlo doby
@@ -1143,6 +1299,29 @@ namespace Armoury
             return (d.Flag[w] & FBurned) != 0 && d.Br[w] >= KeepShare * d.Nw[w];
         }
 
+        /// <summary>
+        /// Jeff 16.10 (D4 "czy dziala palenie wiosek"): spalone w CALEJ ksiedze (BurnedAt - ta sama definicja co wyglad) osobno wioski poboczne i wsie gry. Linia wygladu
+        /// "Wioski - wyglad (E7/W4)" liczyla dotad tylko wioski, ktorych wyglad widok juz odczytal (obrazek postawiony od wczytania mapy - przy kamerze), a linia ksiegi
+        /// liczy wszystkie wioski i wsie gry (wies gry spalona nie ma obrazka Armoury) - stad "ksiega 3 spalone, wyglad 0" w logu Jeffa 16.10 przy kamerze daleko od
+        /// spalonych. Sam odczyt pod Gate (co 2 minuty), nie rzuca.
+        /// </summary>
+        internal static bool BurnedCounts(out int side, out int main)
+        {
+            side = main = 0;
+            if (!Active) return false;
+            try
+            {
+                lock (Gate)
+                    foreach (var d in _d.Values)
+                    {
+                        if (!d.NSet) continue;
+                        for (int w = 0; w <= d.W; w++) if (BurnedAt(d, w)) { if (w == d.W) main++; else side++; }
+                    }
+                return true;
+            }
+            catch (Exception e) { Stumble("VillageBook.BurnedCounts", e); return false; }
+        }
+
         /// <summary>Okreg do odczytu wygladu przez widok mapy (raz do zabrania listy). Wolane pod Gate z miejsc, ktore zmieniaja puste osady albo flagi.</summary>
         private static void LookTouch(Dist d)
         {
@@ -1344,6 +1523,34 @@ namespace Armoury
 
         /// <summary>E7/W2 (233, R11): crc ukladu (ten sam co "L:" zapisu) i uid wierszy pliku ukladu - bramka danych lore (MapVillageLore). Plik ukladu
         /// wczytuje LoadFile raz na proces (Resolve w OnSessionLaunched); false - pliku nie ma albo z innej sceny. Tylko odczyt, bez Gate (_file sie nie zmienia).</summary>
+        /// <summary>Jeff 16.10 (D1): uid wiosek pobocznych okregu (klucz = StringId wsi gry, jak _d) w stalej kolejnosci: order, potem uid - przydzial gospodarzy
+        /// (VillageHolders). false - okreg nieznany (ksiega bez ukladu albo okreg bez wlasnego Village). Sam odczyt pod Gate, bez Active (herby nie zaleza od klucza ksiegi).</summary>
+        internal static bool DistrictUids(string districtId, List<string> into)
+        {
+            if (districtId == null || into == null) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_d.TryGetValue(districtId, out d)) return false;
+                    var idx = new List<int>(d.W);
+                    for (int w = 0; w < d.W; w++) idx.Add(w);
+                    idx.Sort((x, y) => { int c = d.Order[x].CompareTo(d.Order[y]); return c != 0 ? c : string.CompareOrdinal(d.Uid[x], d.Uid[y]); });
+                    foreach (int w in idx) into.Add(d.Uid[w]);
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.DistrictUids", e); return false; }
+        }
+
+        /// <summary>Jeff 16.10: sam crc ukladu (bez listy uid) - lore sprawdza nim przy kazdym dymku, czy uklad sie nie zmienil (VillageLayoutV5 w nowej sesji).</summary>
+        internal static bool LayoutCrcNow(out uint crc)
+        {
+            crc = _layoutCrc;
+            return _file != null;
+        }
+
         internal static bool Layout(out uint crc, out List<string> uids)
         {
             crc = _layoutCrc; uids = null;
@@ -1426,6 +1633,7 @@ namespace Armoury
                             if (d.S != null && !d.St.IsUnderRaid) { d.SmokeIdx = d.S.Cur; d.S = null; }
                             if (d.S == null && d.SmokeIdx >= 0 && !d.St.IsRaided) d.SmokeIdx = -1;
                             if (!EnsureN(d)) { noK++; continue; }
+                            if (d.P != null) PlacePending(d, today);   // Jeff 16.10 (D5): puste osady z zapisu innego ukladu - z biezacym pulapem, przed uzgodnieniem z kontem
                             double a0 = PeopleBook.RefugeesOf(d.V);
                             if (a0 > 0.0 || d.ARexp > 0.0 || d.AFexp > 0.0 || Sum(d.Br) > 0.0 || Sum(d.Bf) > 0.0) Reconcile(d, s, today);
                             // zdarzenia "odbudowana" (b < 1% osad)
@@ -1621,6 +1829,10 @@ namespace Armoury
             sb.Append(" | puste osady: z zapisu ").Append(_savedB).Append(" okregow, po pierwszej dobie ").Append(savedB).Append(" okregow, przydzial zastepczy ")
               .Append(_dZastWhy[ZOld] + _dZastWhy[ZLayout] + _dZastWhy[ZEnable]).Append(" (stary zapis ").Append(_dZastWhy[ZOld]).Append(" / inny uklad ").Append(_dZastWhy[ZLayout])
               .Append(" / wlaczenie ").Append(_dZastWhy[ZEnable]).Append(')');
+            if (_pendDists > 0 || _pendBad > 0 || _pendMemSkipped > 0)
+                sb.Append(" | inny uklad (D5): puste osady z zapisu przeniesione na wioski tego ukladu w ").Append(_pendDists).Append(" okregach - rabunek ").Append(F(_pendR, "0.##"))
+                  .Append(" z ").Append(F(_pendR0, "0.##")).Append(", glod ").Append(F(_pendF, "0.##")).Append(" z ").Append(F(_pendF0, "0.##")).Append(" osad, ponad pulap ").Append(F(_pendDrop, "0.##"))
+                  .Append(", zepsute wpisy ").Append(_pendBad).Append(" (przydzial zastepczy), pamiec wojny pominieta ").Append(_pendMemSkipped).Append(" wpisow (indeksy starego ukladu)");
             sb.Append(" | czas: plik ").Append(F(_loadMs, "0.0")).Append(" ms, okregi ").Append(F(_resolveMs, "0.0")).Append(" ms, pierwsza doba ")
               .Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms.");
             Log.Info(sb.ToString());
@@ -1640,7 +1852,7 @@ namespace Armoury
                     for (int w = 0; w <= d.W; w++) { if (d.Flag[w] != 0) { villages++; flags = true; } d.Flag[w] = 0; }
                     if (x > 0.0 || flags) { dists++; b += x; }
                     Array.Clear(d.Br, 0, d.Br.Length); Array.Clear(d.Bf, 0, d.Bf.Length);
-                    d.ARexp = d.AFexp = 0.0; d.S = null; d.SmokeIdx = -1; d.Event = false;
+                    d.ARexp = d.AFexp = 0.0; d.S = null; d.SmokeIdx = -1; d.Event = false; d.P = null;   // D5: przeniesienie z zapisu przepada razem z reszta stanu
                 }
             if (!s.LogEnabled || (_offLogged && dists == 0)) { NewDay(); return; }
             _offLogged = true;

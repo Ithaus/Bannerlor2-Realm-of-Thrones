@@ -3622,7 +3622,11 @@ def etap4_e411(rep, lines, start, win, until, logp):
         tot = int(ok_n.group(1)) if ok_n else 0
         shr = num(r"pomniejszonymi (\d+)", fd, int, 0)
         vals = tuple(int(g) for g in m.groups()) if m else None
-        ok = vals == (2441, 423, 0, 5) and mb == 2 and tot == 569 and saved + new == tot
+        # Jeff 16.10 (VillageLayoutV5): uklad v5 (tools/wioski-v5) - 1957 wiosek, z tego 4 w okregach ROT_town40_village2/3 bez wlasnego Village
+        v5 = "layout v5" in fd
+        if v5:
+            g2_rule = g2_rule.replace("wiosek 2441 w 423 okregach", "uklad v5: wiosek 1953 w 423 okregach").replace("brak 5 wiosek", "brak 4 wiosek")
+        ok = vals == ((1953, 423, 0, 4) if v5 else (2441, 423, 0, 5)) and mb == 2 and tot == 569 and saved + new == tot
         rep.add("E4/11 G2: pierwsza doba (uklad, okregi, n)", f"wiosek/okregi/odrzucone/brak wsi {vals} (brak w {mb} okregach); okregi {tot}, n z zapisu {saved} + nowe {new}; pomniejszone {shr} (INFO)",
                 g2_rule, ok)
     # poprawka po recenzji (R1-3): bieg z ksiega wylaczona (G13) - wiersz CZYNNA jako INFO, G13 oceniany przed wyjsciem z bloku
