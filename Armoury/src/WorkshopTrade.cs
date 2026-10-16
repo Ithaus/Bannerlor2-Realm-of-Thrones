@@ -99,6 +99,7 @@ namespace Armoury
         // recenzja 123: regula tylko przy wpietym CALYM pomiarze (wsad z targu, wsad z magazynu, wyrob do miasta, poczatek obu cykli) -
         // bez latki wsadu cykl liczylby koszt 0 i warsztat oddawalby miastu cene wsadu w kazdym cyklu. Raz na proces (Reset nie rusza)
         private static bool _fairWired;
+        internal static bool ConvertWired;                  // E3-D3: latka ChangeProductionTypeOfWorkshopAction.Apply wpieta (koszt sprzetu -> kasa miasta)
 
         /// <summary>Nowa gra / wczytanie: wolane z WorkshopLaw.Reset(), czyli z konstruktora ArmouryBehavior.</summary>
         internal static void Reset()
@@ -108,6 +109,8 @@ namespace Armoury
             _cyc = null; _cycIn = _cycWare = _cycCredit = 0; _cycOut = 0;
             ClearDay();
             ArtisanInputs.Reset();   // 147: rzemieslnicy BK - te same latki cyklu i wyrobu, stan czyszczony razem
+            WorkshopPace.Reset();    // E3-D2 (noc-ekonomia3 czesc 2): tempo linii - stan sesji
+            WorkshopRetool.Reset();  // E3-D3: zmiany typu za cena - pamiec sesji (limit miasta 30 dob)
         }
 
         private static void ClearDay()
@@ -230,6 +233,31 @@ namespace Armoury
             return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * WageIndex(w) / sum * BulkFactor(p);   // place czeladnikow x poziom plac miasta
         }
 
+        /// <summary>
+        /// E3-D3 (noc-ekonomia3 czesc 2): place jednego cyklu linii towarowej typu `t` w osadzie `st` dla warsztatu NOTABLA - ten sam wzor co CycleLabour
+        /// (zaloga x stawka x poziom plac miasta / suma szybkosci linii towarowych typu, bez zamknietej linii strzal przy czynnych strzelarzach), ale dla typu,
+        /// ktorego warsztat jeszcze nie ma (wycena przezbrojenia). Bez plac cyklu (WorkshopTradeBatchWages wylaczone) - 0, jak w Expected.
+        /// </summary>
+        internal static float CycleLabourAt(Settlement st, WorkshopType t, WorkshopType.Production p)
+        {
+            if (!Batch || t == null || t.IsHidden || !IsTradeLine(p)) return 0f;
+            float sum = TradeSpeed(t, TownFletchers.Active);
+            if (sum <= 0f) return 0f;
+            var s = Settings.Current;
+            float idx = s.WorkshopWageByTier && st != null ? TownWage.Index(st) : 1f;
+            return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * idx / sum * BulkFactor(p);
+        }
+
+        /// <summary>E3-D3: srednie wyniku warsztatu (miesiac, rok) i liczba dob w sredniej dla OBECNEGO typu; false - brak rachunku albo typ juz inny (sam odczyt).</summary>
+        internal static bool RecOf(Workshop w, out float avg, out float slow, out int days)
+        {
+            avg = 0f; slow = 0f; days = 0;
+            Rec r;
+            if (w == null || !_rec.TryGetValue(w, out r) || r == null || r.Type != TypeId(w)) return false;
+            avg = r.Avg; slow = r.Slow; days = r.Days;
+            return true;
+        }
+
         private static ItemObject _oreItem;
 
         /// <summary>
@@ -349,6 +377,7 @@ namespace Armoury
         public static void RunPrefix(Workshop __1, out int __state)
         {
             __state = __1 != null ? __1.Capital : 0;
+            WorkshopPace.Begin(__1);   // E3-D2 (noc-ekonomia3 czesc 2): mnozniki linii tego warsztatu na ten tick (wlasny try; sam klucz WorkshopPaceByMarket)
             try
             {
                 if (__1 == null || !On || !Live || __1.WorkshopType == null || __1.WorkshopType.IsHidden) return;
@@ -366,6 +395,7 @@ namespace Armoury
         /// <summary>... i po: wynik doby z produkcji (utarg - wsad - place zaplacone z kapitalu), takze warsztatow zbrojnych.</summary>
         public static void RunPostfix(Workshop __1, int __state)
         {
+            WorkshopPace.End(__1);     // E3-D2: kontrola licznika linii (wlasny try)
             try
             {
                 if (__1 == null || !On || !Live || __1.WorkshopType == null || __1.WorkshopType.IsHidden) return;
@@ -805,6 +835,9 @@ namespace Armoury
         /// zabiloby to klase na caly proces. W OnSessionLaunched Game.Current istnieje i klasa jest juz zainicjowana (wymuszamy to).
         /// Raz na proces; gdy sie nie uda, DailyExpense zostaje 0 (gracz nie placi dwa razy, ekran rodu pokaze 0).
         /// </summary>
+        /// <summary>E3-D2: latka tempa linii na metode szybkosci czynnego modelu warsztatow - w kampanii (model znany dopiero tu), tym samym Harmony.</summary>
+        internal static void ApplyPaceInCampaign() { WorkshopPace.ApplyInCampaign(_harmony); }
+
         internal static void ApplyInCampaign()
         {
             if (_finTried || _harmony == null) return;
@@ -1358,6 +1391,7 @@ namespace Armoury
             patch("kapital przy zmianie wlasciciela", AccessTools.Method(typeof(Workshop), "ChangeOwnerOfWorkshop"), nameof(OwnerPrefix), nameof(OwnerPostfix), null);
             patch("sprzedaz gracza", AccessTools.Method(typeof(ChangeOwnerOfWorkshopAction), "ApplyInternal"), nameof(SalePrefix), nameof(SalePostfix), null);
             patch("zmiana produkcji", AccessTools.Method(typeof(ChangeProductionTypeOfWorkshopAction), "Apply"), nameof(ConvertPrefix), nameof(ConvertPostfix), null);
+            ConvertWired = done.Contains("zmiana produkcji");   // E3-D3: przezbrojenie za cena tylko, gdy koszt sprzetu idzie do kasy miasta (bez latki - gra kasuje go w nicosc)
             var model = typeof(DefaultWorkshopModel);
 
             patch("prog kapitalu", AccessTools.PropertyGetter(model, "CapitalLowLimit"), null, nameof(LowLimitPostfix), null);
@@ -1389,12 +1423,16 @@ namespace Armoury
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, WorkshopTrade.OnGold);   // 123: pomiar kies notabli (tylko licznik)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("ArtisanInputs.Daily", ArtisanInputs.Daily));           // 147: linia dnia rzemieslnikow BK
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("SmallFixes8.Daily", SmallFixes8.Daily));               // E8/B (258): linia dnia "Kowadlo i drobne (E8/B)" (sam log)
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopPace.Daily", WorkshopPace.Daily));             // E3-D2 (noc-ekonomia3 czesc 2): linia "Tempo warsztatow (E3-D2)"
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopRetool.Daily", WorkshopRetool.Daily));         // E3-D3: krok "warsztat zmienia branze za cena" i jego linia
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             WorkshopTrade.ApplyInCampaign();
             WorkshopTrade.ApplyClanScreen();   // E8/B (258, LAWA 6): "Daily Wage" warsztatu w ekranie rodu z poziomem plac miasta (sam napis)
+            try { WorkshopTrade.ApplyPaceInCampaign(); WorkshopPace.SessionStart(); } catch (Exception e) { Log.Error("WorkshopPace.SessionStart", e); }   // E3-D2: latka szybkosci czynnego modelu (raz na proces) i linia startu
+            try { WorkshopRetool.SessionStart(); } catch (Exception e) { Log.Error("WorkshopRetool.SessionStart", e); }   // E3-D3: linia startu
             // 124: kapitalu startowego NIE tu - ten sluchacz idzie przed ArmouryBehavior (gra wola od ostatnio dopisanego), czyli przed
             // HistoricalPrices.Apply; SeedNewCampaign wola ArmouryBehavior.OnSessionLaunched zaraz po RawPrice.SeedNewCampaign
             try

@@ -5722,7 +5722,7 @@ namespace Armoury
 
         [SettingPropertyFloatingInteger("Folk Ladder Ceiling Max", 1.00f, 10.00f, "0.0", HintText = "with Folk Ladder Ceiling By Wealth: the highest price, as a multiple of the usual one, the richest townsfolk will pay for fine goods from their savings")]
         [SettingPropertyGroup("The townsfolk's purse")]
-        public float FolkLadderCeilingMax { get; set; } = 4f;
+        public float FolkLadderCeilingMax { get; set; } = 8f;
 
         [SettingPropertyBool("Folk Predict Bought", HintText = "with Folk Luxury List: the townsfolk reckon their reserve for hard times from what their spare coin actually bought the day before, not from what they offered (an offer that found no goods is not part of their living) - so towns whose people live well keep a full reserve; their share of the bill likewise counts only the part of the offer that found goods. Off = the reserve and the share count the whole offer, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
@@ -6499,6 +6499,38 @@ namespace Armoury
         [SettingPropertyBool("Village Cloth Half Reserve", HintText = "with Village Cloth Above Reserve: where linen is cheap in the market (its price below the usual), the villagers may buy linen above half of the stock the town keeps for the army's clothing instead of only above all of it (off = above all of it, as before)")]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool VillageClothHalfReserve { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Pace By Market", HintText = "a notable's trade workshop in a town works at the pace of its market: more hands where the town has more people than the usual town (at most four times, at least a third), and a little faster where what it makes is dear in that town, slower where it is cheap (the square root of the price, between 0.7 and 1.4); the whole at most four times the usual pace. More cycles take more raw goods from the stall and pay more wages, as if more men were hired. Weapon and armour lines, lines without raw goods, the town's hidden artisans, castles and your own workshops keep the usual pace (off = the usual pace everywhere, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool WorkshopPaceByMarket { get; set; } = true;
+
+        [SettingPropertyBool("Workshop Retool By Price", HintText = "a notable's trade workshop that has lost money for 60 days or more changes its trade to the one that earns most at its own town's prices after wages - only a trade whose raw goods grow in the town's villages, lie on its stall or come by a materials contract, only if it earns clearly more (by a third, and at least 10 a day), and the owner pays the new tools to the town's craftsmen from his own purse. At most three workshops a day in the world, one a town in 30 days; a smithy may be chosen (it is the only maker of tools). When a workshop goes bankrupt or is taken from you, the new trade is the best one at the town's prices when it earns a quarter more than the game's pick. Your own workshops, smithies and mines never change by this rule (off = trades change only by bankruptcy, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool WorkshopRetoolByPrice { get; set; } = true;
+
+        [SettingPropertyBool("Village Hands Follow Price", HintText = "the villagers move their hands to what is dear: where eggs, fruit or honey fetch far more in the village's market town than its other crops, the village yields up to twice as much of them (the square root of how many times dearer, between 1 and 2), and as much less of its other crops by worth at the usual price - the same hands, the same work, at most a sixth less of the other crops; timber and ore are never cut, a village with nothing else to give keeps its yield (off = the usual yields, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool VillageHandsFollowPrice { get; set; } = true;
+
+        [SettingPropertyBool("Court Buys Goods", HintText = "a lord's household living in a town lives off its market: up to 60% of what the head of the house spends on his court buys wine, beer, cheese, meat, fish, bread, fruit and oil (half), linen above the army's reserve, velvet and furs (a fifth) and jewels, silver, spice and pottery (the rest) from that town's stall at its price - only goods that are not dear there (price at most one and a half times the usual), never below the last few pieces, at most a quarter of a stack a day. The townsfolk get their fifth of what the court spends only from the part that pays for service, not for goods (off = the court pays the town in coin only, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool CourtBuysGoods { get; set; } = true;
+
+        [SettingPropertyBool("Crown Court Goods", HintText = "the king's household in the capital buys the same goods from the capital's stall, paid by the treasury from what is left for the rents that day (never from the wage refund or the reserve); what it does not spend goes to the rents as before (off = no royal household purchases, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool CrownCourtGoods { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Crown Court Share", 0.00f, 0.50f, "0.00", HintText = "with Crown Court Goods: the part of what is left for the rents that the king's household may spend on goods each day (0.05 = 5%)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public float CrownCourtShare { get; set; } = 0.05f;
+
+        [SettingPropertyBool("Men Upgrade Orders", HintText = "when soldiers who could carry better kit find no better piece on the stall although their rank allows one, they order it: one order a band a day for the next tier from that town's smiths, at most five pieces, the same order not again for a week (off = no orders, as before). The daily line also tells apart soldiers already at the ceiling of their rank and soldiers held back by an empty stall")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool MenUpgradeOrders { get; set; } = true;
+
+        [SettingPropertyBool("Build Wood Half Reserve", HintText = "with Build Wood Above Craft Stock: where timber is cheap in the town (its price below the usual), building works may buy timber down to half of the stock the smiths and bloomeries need (at least 20 loads) instead of only above all of it; where timber is dear the whole stock stays for the crafts (off = above all of it, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool BuildWoodHalfReserve { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -8124,6 +8156,14 @@ namespace Armoury
             s.CaravanSellWhereDear = CaravanSellWhereDear;
             s.VillageCartBringsGoods = VillageCartBringsGoods;
             s.VillageClothHalfReserve = VillageClothHalfReserve;
+            s.WorkshopPaceByMarket = WorkshopPaceByMarket;
+            s.WorkshopRetoolByPrice = WorkshopRetoolByPrice;
+            s.VillageHandsFollowPrice = VillageHandsFollowPrice;
+            s.CourtBuysGoods = CourtBuysGoods;
+            s.CrownCourtGoods = CrownCourtGoods;
+            s.CrownCourtShare = CrownCourtShare;
+            s.MenUpgradeOrders = MenUpgradeOrders;
+            s.BuildWoodHalfReserve = BuildWoodHalfReserve;
         }
 
         internal static void Apply()

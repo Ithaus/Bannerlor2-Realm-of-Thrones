@@ -167,6 +167,7 @@ namespace Armoury
         // do sufitu 60, a cena polki szla na x4. Teraz jeden kupiec zamawia dany rodzaj (miasto x typ x tier) raz na
         // SupplyDemandOrderRepeatDays dni - zamowienie to potrzeba, nie licznik prob.
         private static readonly Dictionary<string, int> _onceSeen = new Dictionary<string, int>();
+        internal static int OnceClears;   // E3-Z1 (noc-ekonomia3 czesc 2): ile razy slownik dedupu wpisu 81 przepelnil sie i zostal wyczyszczony (od startu procesu; linia liczy przyrost)
         // tb (AmmoOrders): zwraca, czy zamowienie weszlo (false - ten kupiec zamowil ten rodzaj w tym miescie w ostatnich SupplyDemandOrderRepeatDays dobach) - tylko licznik
         internal static bool NoteUnmetOnce(object who, Settlement market, ItemObject.ItemTypeEnum type, int tier, float n)
         {
@@ -175,7 +176,7 @@ namespace Armoury
             string k = who.GetHashCode() + "|" + Key(market, type, Math.Max(1, Math.Min(6, tier)));
             if (_onceSeen.TryGetValue(k, out last) && day - last < Math.Max(1, Settings.Current.SupplyDemandOrderRepeatDays)) return false;
             _onceSeen[k] = day;
-            if (_onceSeen.Count > 20000) _onceSeen.Clear();
+            if (_onceSeen.Count > 20000) { _onceSeen.Clear(); OnceClears++; }   // E3-Z1: licznik czyszczen (linia "Dozbrajanie", cel 0) - Z1 ma wlasny slownik
             NoteUnmet(market, type, tier, n);
             if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteUnmet(type);   // 172: "AI bez towaru" (tylko licznik)
             return true;

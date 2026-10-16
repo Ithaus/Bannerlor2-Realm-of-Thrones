@@ -79,7 +79,7 @@ namespace Armoury
                 if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.VillageType == null) return;
                 float w = WeightFor(v.VillageType.StringId, id);
                 if (!(w > 0f) || InTypeList(v.VillageType, item)) return;
-                float x = w * (v.GetHearthLevel() + 1) * 0.5f;
+                float x = w * (v.GetHearthLevel() + 1) * 0.5f * HandsF(v, id);   // E3-D1: rece wsi za cena (1 = bez przesuniecia)
                 if (!(x > 0f)) return;
                 r.Add(x, Txt);
                 lock (Gate)
@@ -245,7 +245,7 @@ namespace Armoury
             if (InTypeList(v.VillageType, item)) return;                      // jaja w typie wsi (hodowla bydla BK) - liczy gra
             float w;
             lock (Gate) { if (!_eggW.TryGetValue(v, out w)) return; }
-            float x = w * (v.GetHearthLevel() + 1) * 0.5f;
+            float x = w * (v.GetHearthLevel() + 1) * 0.5f * HandsF(v, "Egg");   // E3-D1: rece wsi za cena (1 = bez przesuniecia)
             if (!(x > 0f)) return;
             r.Add(x, TxtEgg);
             lock (Gate) { _eggCalls++; _eggBase += x; }
@@ -289,14 +289,14 @@ namespace Armoury
                     foreach (var id in FruitIds)
                     {
                         float w = WeightFor(ty, id);
-                        if (w > 0f && !InTypeListId(v.VillageType, id)) x += w * lvl;
+                        if (w > 0f && !InTypeListId(v.VillageType, id)) x += w * lvl * HandsF(v, id);   // E3-D1: magazyn z tym samym f co plon
                     }
                 }
                 if (s.VillageEggsFromBk)
                 {
                     float w;
                     lock (Gate) { if (!_eggW.TryGetValue(v, out w)) w = 0f; }
-                    if (w > 0f) { var egg = EggItem(); if (egg != null && !InTypeList(v.VillageType, egg)) x += w * lvl; }
+                    if (w > 0f) { var egg = EggItem(); if (egg != null && !InTypeList(v.VillageType, egg)) x += w * lvl * HandsF(v, "Egg"); }
                 }
                 if (!(x > 0f)) return;
                 float f, u, g;
@@ -389,6 +389,212 @@ namespace Armoury
                      + " (sztuki z ticku - linia \"Towary\", Egg, wsie)"
                      + " | magazyn wsi powiekszony o jaja i owoce: wsi " + capN + ", razem +" + capSum + " szt. (srednio +" + (capN > 0 ? ((double)capSum / capN).ToString("0.0", Inv) : "0") + "), potkniecia " + capSt
                      + " | potkniecia sesji " + st + ".");
+        }
+
+        // ============================================================ E3-D1: RECE WSI IDA ZA CENA (noc-ekonomia3 16.10, czesc 2; klucz VillageHandsFollowPrice)
+        // Dowod [L] (test noc-ekonomia2 21-25-46 d109195): "Ceny surowcow" - budzet mieszczan bez towaru: jaja 21 457 d/d, miod 12 851, jablka 8 431; "Towary": Egg produkcja
+        // 505/d przy indeksie mediana ok. 8, honey 56/d, apple 308/d. Wies daje te plony stala waga BK (Base, EggBase wyzej), choc w miescie targowym kosztuja kilka razy
+        // wiecej niz jej inne plony.
+        // Regula (te same rece, inny podzial - decyzja Jeffa 13.10 "produkuja ludzie"; ValveRaiseWhileShort zostaje wylaczone): raz na dobe (watek glowny, Daily/SessionStart)
+        // dla kazdej wsi Normal z targiem i z dodatkami listy BK (owoce, miod, jaja - Base/EggBase): f towaru = clamp(sqrt(indeks towaru / max(1, indeks innych plonow tej wsi
+        // w tym samym miescie, srednia wazona wartoscia)), 1, 2) - drogi WOBEC tego, co wies juz robi (DECYZJA CLAUDE: wzgledny indeks - z drozszego plonu na tanszy rak nie
+        // przesuwamy). Dodatkowa wartosc (f - 1) x baza x Value (cena BAZOWA przedmiotu - uwaga recenzji, nie cena targu) zdejmowana z innych plonow listy typu wsi, tez w
+        // wartosci bazowej. Progi: inne plony najwyzej -15%, ZBOZE najwyzej -5% (DECYZJA: glowne jedzenie swiata - decyzja noc 15/16.10 "nie tniemy plonu zboza" zlagodzona
+        // do 5%); gdy prog wiaze, f maleje tak, ze przyrost = ubytek (uwaga recenzji: bez towaru z niczego). Drewno, ruda i zwierzeta poza regula (waskie gardla K1, sufit
+        // dymarki, hodowla HarvestValve; uwaga recenzji), wies bez innych plonow - bez przesuniecia. Bez pamieci: po wczytaniu ta sama liczba z dzisiejszych cen.
+        // Kod: Base/EggBase mnoza baze przez f, CapPostfix liczy magazyn z f, MaterialLaw.ProdPostfix mnozy inne plony przez HostFactor = c (wzor CamelLaw.HostFactor).
+        // Odczyt z dowolnego watku (podmiana referencji slownika - bez zapisu do opublikowanego). Kto placi, kto dostaje: towar z pracy wsi; sprzedaz wozem: kasa miasta ->
+        // utarg wsi (112) minus myto E3-G3. Nic w zapisie. Wyjatek - potkniecie (licznik), wies bez przesuniecia.
+        private sealed class Hands { public string[] Ids; public float[] F; public ItemObject[] Others; public float[] C; }
+        private static Dictionary<Village, Hands> _hands = new Dictionary<Village, Hands>();
+        private const float OtherCut = 0.15f, GrainCut = 0.05f;
+        private static int _hStumbles, _hSess;
+        private static bool _hErr;
+
+        /// <summary>Klucz VillageHandsFollowPrice (sam odczyt ustawien - z kazdego watku).</summary>
+        internal static bool HandsOn { get { var s = Settings.Current; return s != null && s.VillageHandsFollowPrice; } }
+
+        /// <summary>f dodatku listy BK (owoc, miod, jaja) tej wsi z ostatniego przeliczenia; 1 - bez przesuniecia albo klucz wylaczony.</summary>
+        internal static float HandsF(Village v, string id)
+        {
+            if (v == null || id == null || !HandsOn) return 1f;
+            var d = _hands; Hands h;
+            if (d == null || !d.TryGetValue(v, out h)) return 1f;
+            for (int i = 0; i < h.Ids.Length; i++) if (h.Ids[i] == id) return h.F[i];
+            return 1f;
+        }
+
+        /// <summary>MaterialLaw.ProdPostfix: c innego plonu tej wsi (te same rece - ubytek za dodatek); 1 - plon poza regula albo klucz wylaczony.</summary>
+        internal static float HostFactor(Village v, ItemObject item)
+        {
+            if (v == null || item == null || !HandsOn) return 1f;
+            var d = _hands; Hands h;
+            if (d == null || !d.TryGetValue(v, out h)) return 1f;
+            for (int i = 0; i < h.Others.Length; i++) if (ReferenceEquals(h.Others[i], item)) return h.C[i];
+            return 1f;
+        }
+
+        private static bool OutOfHands(ItemObject it)
+        {
+            string id = it.StringId;
+            return id == "hardwood" || id == "iron" || it.Value <= 0 || it.IsMountable || it.IsAnimal;
+        }
+
+        private static float Index(Town t, ItemObject it)
+        {
+            float x = 1f;
+            try { x = t.GetItemCategoryPriceIndex(it.ItemCategory); } catch { x = 1f; }
+            return x > 0f && !float.IsInfinity(x) && !float.IsNaN(x) ? x : 1f;
+        }
+
+        private sealed class HStat { public int N; public double Sum, Min = double.NaN, Max = double.NaN, Add; }
+        private static readonly SortedDictionary<string, HStat> _hF = new SortedDictionary<string, HStat>(StringComparer.Ordinal);
+        private static readonly SortedDictionary<string, double[]> _hCut = new SortedDictionary<string, double[]>(StringComparer.Ordinal);   // plon -> [szt., wartosc]
+        private static int _hVill, _hWith, _hNoOther, _hBind;
+        private static double _hAdd, _hRem, _hCSum, _hCMin = double.NaN, _hGSum, _hGMin = double.NaN; private static int _hCN, _hGN;
+
+        /// <summary>Przeliczenie f i c wszystkich wsi (watek glowny): nowy slownik, potem podmiana referencji.</summary>
+        private static void HandsCompute()
+        {
+            _hF.Clear(); _hCut.Clear(); _hVill = _hWith = _hNoOther = _hBind = 0; _hAdd = _hRem = _hCSum = _hGSum = 0; _hCMin = _hGMin = double.NaN; _hCN = _hGN = 0;
+            var nd = new Dictionary<Village, Hands>();
+            var s = Settings.Current;
+            if (s == null || !s.VillageHandsFollowPrice) { _hands = nd; return; }
+            var ids = new List<string>(); var bases = new List<float>(); var items = new List<ItemObject>();
+            var oth = new List<ItemObject>(); var othW = new List<float>();
+            foreach (var v in Village.All)
+            {
+                try
+                {
+                    if (v == null || v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.TradeBound.Town == null || v.VillageType == null) continue;
+                    var town = v.TradeBound.Town;
+                    float lvl = (v.GetHearthLevel() + 1) * 0.5f;
+                    ids.Clear(); bases.Clear(); items.Clear();
+                    if (s.VillageFruitFromBk && MineralOnce.Wired)
+                    {
+                        string ty = v.VillageType.StringId;
+                        foreach (var id in FruitIds)
+                        {
+                            float w = WeightFor(ty, id);
+                            if (!(w > 0f) || InTypeListId(v.VillageType, id)) continue;
+                            var it = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>(id);
+                            if (it == null || it.Value <= 0) continue;
+                            ids.Add(id); bases.Add(w * lvl); items.Add(it);
+                        }
+                    }
+                    if (s.VillageEggsFromBk)
+                    {
+                        float w;
+                        lock (Gate) { if (!_eggW.TryGetValue(v, out w)) w = 0f; }
+                        var egg = EggItem();
+                        if (w > 0f && egg != null && egg.Value > 0 && !InTypeList(v.VillageType, egg)) { ids.Add("Egg"); bases.Add(w * lvl); items.Add(egg); }
+                    }
+                    if (ids.Count == 0) continue;
+                    _hVill++;
+                    oth.Clear(); othW.Clear();
+                    double vn = 0, vg = 0, ixw = 0;
+                    foreach (var pr in v.VillageType.Productions)
+                    {
+                        var it = pr.Item1;
+                        if (it == null || OutOfHands(it) || items.Contains(it) || !(pr.Item2 > 0f)) continue;
+                        double val = pr.Item2 * lvl * it.Value;
+                        if (it.ItemCategory == DefaultItemCategories.Grain) vg += val; else vn += val;
+                        ixw += val * Index(town, it);
+                        oth.Add(it); othW.Add(pr.Item2 * lvl);
+                    }
+                    double vo = vn + vg;
+                    if (vo <= 0) { _hNoOther++; continue; }
+                    double ixo = Math.Max(1.0, ixw / vo);
+                    var f0 = new float[ids.Count];
+                    double extra = 0;
+                    for (int i = 0; i < ids.Count; i++)
+                    {
+                        double rel = Index(town, items[i]) / ixo;
+                        f0[i] = (float)Math.Max(1.0, Math.Min(2.0, Math.Sqrt(rel)));
+                        extra += (f0[i] - 1.0) * bases[i] * items[i].Value;
+                    }
+                    if (extra <= 0) continue;
+                    double allowed = OtherCut * vn + GrainCut * vg;
+                    if (allowed <= 0) { _hNoOther++; continue; }
+                    double k = 1.0;
+                    if (extra > allowed) { k = allowed / extra; _hBind++; }
+                    double share = extra * k / allowed;                 // czesc progu, ktora zjada dodatek (0..1); ubytek = share x prog = dodatek
+                    float cn = (float)(1.0 - OtherCut * share), cg = (float)(1.0 - GrainCut * share);
+                    var h = new Hands { Ids = ids.ToArray(), F = new float[ids.Count], Others = oth.ToArray(), C = new float[oth.Count] };
+                    for (int i = 0; i < ids.Count; i++)
+                    {
+                        float f = (float)(1.0 + (f0[i] - 1.0) * k);
+                        h.F[i] = f;
+                        HStat st; if (!_hF.TryGetValue(ids[i], out st)) { st = new HStat(); _hF[ids[i]] = st; }
+                        st.N++; st.Sum += f; if (double.IsNaN(st.Min) || f < st.Min) st.Min = f; if (double.IsNaN(st.Max) || f > st.Max) st.Max = f;
+                        st.Add += (f - 1.0) * bases[i] * items[i].Value;
+                    }
+                    for (int i = 0; i < oth.Count; i++)
+                    {
+                        bool grain = oth[i].ItemCategory == DefaultItemCategories.Grain;
+                        float c = grain ? cg : cn;
+                        h.C[i] = c;
+                        double[] cut; string oid = oth[i].StringId ?? "?";
+                        if (!_hCut.TryGetValue(oid, out cut)) { cut = new double[2]; _hCut[oid] = cut; }
+                        cut[0] += (1.0 - c) * othW[i]; cut[1] += (1.0 - c) * othW[i] * oth[i].Value;
+                        if (grain) { _hGSum += c; _hGN++; if (double.IsNaN(_hGMin) || c < _hGMin) _hGMin = c; }
+                        else { _hCSum += c; _hCN++; if (double.IsNaN(_hCMin) || c < _hCMin) _hCMin = c; }
+                    }
+                    _hAdd += extra * k; _hRem += OtherCut * share * vn + GrainCut * share * vg;
+                    _hWith++;
+                    nd[v] = h;
+                }
+                catch (Exception e) { HStumble(e); }
+            }
+            _hands = nd;   // podmiana referencji - czytajacy widza stary albo nowy slownik, nigdy w polowie
+        }
+
+        private static void HStumble(Exception e)
+        {
+            lock (Gate) { _hStumbles++; _hSess++; }
+            if (!_hErr) { _hErr = true; Log.Error("VillageFruit.Hands", e); }
+        }
+
+        private static string D2(double v) { return double.IsNaN(v) ? "-" : v.ToString("0.00", Inv); }
+
+        private static string HandsText()
+        {
+            var parts = new List<string>();
+            foreach (var kv in _hF) parts.Add(kv.Key + " " + D2(kv.Value.N > 0 ? kv.Value.Sum / kv.Value.N : double.NaN) + "/" + D2(kv.Value.Min) + "/" + D2(kv.Value.Max) + " (" + kv.Value.N + " wsi, +" + kv.Value.Add.ToString("0", Inv) + " d)");
+            var cuts = new List<string>();
+            foreach (var kv in _hCut) if (kv.Value[0] >= 0.05) cuts.Add(kv.Key + " -" + kv.Value[0].ToString("0.0", Inv) + " szt. (" + kv.Value[1].ToString("0", Inv) + " d)");
+            double diff = _hAdd - _hRem;
+            return "wsi z dodatkami listy BK " + _hVill + ", z przesunieciem " + _hWith + ", bez innych plonow do przesuniecia " + _hNoOther + ", na progu (f przyciete) " + _hBind
+                   + " | f wedlug towaru srednio/min/max: " + (parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "-")
+                   + " | c inne plony srednio " + D2(_hCN > 0 ? _hCSum / _hCN : double.NaN) + ", min " + D2(_hCMin) + " (prog 0.85); zboze srednio " + D2(_hGN > 0 ? _hGSum / _hGN : double.NaN) + ", min " + D2(_hGMin) + " (prog 0.95)"
+                   + " | wartosc bazowa na dobe przed mnoznikami: przybylo " + _hAdd.ToString("0", Inv) + " d, ubylo " + _hRem.ToString("0", Inv) + " d (" + (cuts.Count > 0 ? string.Join(", ", cuts.ToArray()) : "-") + ")"
+                   + ", roznica " + diff.ToString("0.0", Inv) + " d (" + (_hAdd > 0 ? (100.0 * diff / _hAdd).ToString("0.00", Inv) : "0.00") + "%)"
+                   + " | drewno, ruda i zwierzeta poza regula";
+        }
+
+        /// <summary>Z ArmouryBehavior.OnSessionLaunched (po EggSessionStart): przeliczenie i linia startu "Rece wsi za cena (E3-D1): start sesji".</summary>
+        internal static void HandsSessionStart()
+        {
+            lock (Gate) { _hStumbles = 0; _hSess = 0; }
+            _hErr = false;
+            var s = Settings.Current;
+            const string Head = "Rece wsi za cena (E3-D1): start sesji | ";
+            if (s == null || !s.VillageHandsFollowPrice) { _hands = new Dictionary<Village, Hands>(); Log.Info(Head + "klucz Village Hands Follow Price NIE | WYLACZONE (MCM) - plony wsi jak dotad | potkniecia 0."); return; }
+            try { HandsCompute(); } catch (Exception e) { HStumble(e); }
+            Log.Info(Head + "klucz Village Hands Follow Price TAK | CZYNNE | f = clamp(sqrt(indeks towaru / max(1, indeks innych plonow wsi)), 1, 2), ubytek innych plonow w wartosci bazowej (inne najwyzej -15%, zboze -5%) | "
+                     + HandsText() + " | jaja w listach BK dojda przy pierwszym ticku produkcji (przeliczenie co dobe) | potkniecia " + _hStumbles + ".");
+        }
+
+        /// <summary>Z ArmouryBehavior.OnDailyTick (po linii jaj): przeliczenie f i c na nowa dobe i linia "Rece wsi za cena (E3-D1): dzien N".</summary>
+        internal static void HandsDaily()
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            if (!s.VillageHandsFollowPrice) { _hands = new Dictionary<Village, Hands>(); Log.Info("Rece wsi za cena (E3-D1): dzien " + (int)CampaignTime.Now.ToDays + " | WYLACZONE (MCM) | potkniecia 0 (sesja " + _hSess + ")."); return; }
+            int st0; lock (Gate) { st0 = _hStumbles; _hStumbles = 0; }
+            try { HandsCompute(); } catch (Exception e) { HStumble(e); }
+            int st1; lock (Gate) { st1 = _hStumbles; _hStumbles = 0; }
+            Log.Info("Rece wsi za cena (E3-D1): dzien " + (int)CampaignTime.Now.ToDays + " | CZYNNE | " + HandsText() + " | potkniecia " + (st0 + st1) + " (sesja " + _hSess + ").");
         }
     }
 }

@@ -295,6 +295,8 @@ RANGES = {
     'FolkGuardShareFuse': (0.0, 0.3, "0.000"),
     'TownMarketTollRate': (0.0, 0.2, "0.000"),
     'TownMarketTollCaravanRate': (0.0, 0.2, "0.000"),
+    # noc-ekonomia3 czesc 2 (16.10): czesc puli rent na dwor krolewski - kod przycina do 0..0.5 (CourtGoods.Crown)
+    'CrownCourtShare': (0.0, 0.5, "0.00"),
 }
 
 def gen(module_dir, ns, display):
