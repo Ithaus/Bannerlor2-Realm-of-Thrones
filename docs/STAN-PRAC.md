@@ -2469,3 +2469,11 @@ DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Au
 - Jeff 16.10: "2. ok na razie nie inwestuja" - lordowie AI bez inwestycji (decyzja).
 - ZASADA JEFFA 16.10 (start): "musimy zaczac rynkowo, ze generalnie jest mniej wiecej bilans wszystkiego, czegos moze byc mniej o 5%, czegos wiecej o 5%, zeby ekonomia i rynek startowaly zbilansowane, a dopiero potem ... dynamicznie". -> KALIBRACJA STARTU (jednorazowa przy wlaczeniu: podaz = popyt +-5% kazdego towaru w swiecie, zapasy, ceny przy normie, kiesy ludu wedlug stanow w ramach istniejacych pieniedzy). Projekt: workflow wf_ef9562a5-85b -> docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md. Kolejnosc: ZC0 pomiar -> kalibracja -> dynamika.
 - ZASADA JEFFA 16.10 (podaz z pracy): "nie sztucznie dodajesz ... obszar 100 000 ludzi produkuje 200 zboza, a 10 000 na Zelaznych Wyspach tez 200, bo postanowiles wyrownac - ma sie zgadzac z realnej produkcji i rak do pracy". -> produkcja = pracownicy x wydajnosc zajecia na danej ziemi (jedna tabela dla swiata, zero mnoznikow okregu); bilans tylko z doboru zajec, udzialu na targ, handlu i zapasow; czego sie nie da - pokazac jako prawdziwy brak.
+
+### 60. WGRANIE 73 (16.10 ok. 14:58 zegara komp.) - herby kanoniczne GoT + dwie flagi (gospodarz i senior) - START TUTAJ
+W grze: `w-toku/zbior-e8` **c4932168** (= `w-toku/noc-wgranie-73`) | Armoury 983df98f + nowy plik Armoury/ModuleData/arm_houses_canon.tsv (664403b9). Kopie *.bak-...wgranie73-przed.
+= 72 + noc-herby (105d98b8 + d47b01d7 po 2 recenzjach): 540 rodow kanonu (awoiaf; 150 herb ROT, 376 z opisu, 14 galezi), 993 ikony nazwane z tekstur gry (tools/herby, scratchpad
+roz/herby), CanonHouses.cs + VillageHolders (rod kanonu przy siedzibie <= 150 jedn., wyspy na wyspach), MapVillagePennants D2: drugi proporczyk pana. Skrypty: wgraj-v5.ps1 i
+bieg-bitwa.ps1 przenosza arm_houses_canon.tsv. Test (Armoury-2026-10-16_14-49-31.log + zdjecia CrashScribe/zdjecia/at-20261016-144916): 0 ERROR; rody kanonu 1188 wiosek z 319 rodow.
+UWAGA: limit tekstur herbow 160 (1024x1024, ok. 4 MiB) do najblizszej misji - po dlugim zwiedzaniu bez misji czesc wiosek pokazuje herb pana (w tescie 125); do rozwazenia mniejsza
+tekstura proporczyka.
