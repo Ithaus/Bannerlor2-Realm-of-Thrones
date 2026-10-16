@@ -2348,3 +2348,20 @@ Jego decal_sets.xml i tak sie nie laduje (modul bez project.mbproj). LauncherDat
 Zapis Ironman z 09:20 nietkniety (kopia zapisy-jeffa/...-po-crashu-1006.sav).
 KOREKTA: kampania Jeffa ma WSZYSTKIE opcje trudnosci Realistic (linia 10:05:38 "juz Realistic"); "Game Difficulty +0.40" w 50. pochodzilo z autotestu (zapis F). CombatAiRealistic u Jeffa = bez zmian.
 Wniosek: kod misji (mody i nasz) wlaczac dopiero po probie w bitwie - autotest bitew nie odpala. BattleGore (noc-bitwa) uzywa CreateBloodBurstAtLimb (jak DismembermentPlus), bez decali.
+
+### 52. KOLEJKA ZYCZEN JEFFA 16.10 (po WGRANIU 67) - wioski, zajazdy, plotki, drogi
+W toku (workflow): noc-bitwa (recenzje), bitwa w autotescie (CrashScribe at1-cs-bitwa), noc-turniej (lancuch platnikow nagrody/zakladu + dlug + zwrot 1300+220 Seagard),
+przeglad Battle Atmosphere / Immersive Battlefields, noc-wioski (herb gospodarza z majatkow BK / rycerza lore, -20% wiosek najciasniejszych, rozne wielkosci 6-36 osad,
+wyglad spalonych: ksiega 3 spalone / 5 plonie, widok 0 ciemnych; przelacznik VillageLayoutV5 na stary uklad).
+Potem, po kolei (slowa Jeffa):
+1. Zajazdy i noclegi: "tawerny gdzie mozna sie zatrzymac zaplacic za nocleg ... nocleg w miescie czy tawernie kosztuje, ale daje wyspanie w lozku +10% do predkosci + 5 do morale.
+   W tawernie, do ktorych mozna wjechac na mapie, mozna spac, posluchac gossip". Projekt: nocleg ok. 1 d/zolnierz + 5 d pokoj bohatera do kiesy mieszczan (karczmarz); stan
+   "wypoczeci" do nastepnego zmroku; zajazdy = czesc wiosek pobocznych przy rozdrozach/drogach, menu po dojechaniu (nie nowe osady gry). Gotowego moda brak (szukane 16.10).
+2. Plotki (Jeff): "gdzie sa bandyci lub jacys zboje i ich kryjowki, a moze skarby; slyszalem, ze banda Lysego Johna rabuje od miesiaca, oblowila sie tak mocno, ze ciezko ich
+   bedzie teraz wykurzyc". Projekt: plotki z prawdziwego stanu swiata - bandy w okolicy (sila, ile dni rabuja, prawdziwe zloto z lupow), kryjowki (miejsce, skarbiec kryjowki
+   z naszego skarbca band = skarb do zdobycia), przezwiska hersztow deterministyczne z listy imion kultury; im dalej i starsza wiesc, tym mniej dokladna (przesada, kierunek
+   zamiast miejsca); takze karczmarz w miescie. Do tego wojska lordow w okolicy, karawany, ceny w pobliskich miastach, wiesci z wojen.
+3. Specjalizacja wiosek: wies gry = stolica okregu (glowny towar regionu), wioski poboczne produkuja wedlug terenu i oplacalnosci (ryby, drewno, owce/ruda, mlyn/zboze,
+   len/wino), plon okregu = suma; wieksze potrzeby wsi i miast, zeby towary schodzily z rynku - test 120 dob wobec bazy.
+4. Drogi na calej mapie (tekstury z gry; Jeff moze pobrac paczke tekstur), +15% predkosci na drodze.
+Wszystko ma dzialac ze starym zapisem Ironman (sprawdzic sciezke "inny uklad" ksiegi wiosek).
