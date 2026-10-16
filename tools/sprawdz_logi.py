@@ -758,8 +758,11 @@ Uzycie (Python 3, tylko odczyt):
                     "Latki czynnego modelu (HT): start sesji" w kazdej sesji (klucz TAK), NH-1 czynne modele wpiete N = R (R >= 8, bez proby 0, NIE 0), NH-2
                     przez klase deklarujaca (INFO, oczekiwane 1 - drewno), NH-3 nasze proby = udane, NIE 0, NH-4a poprawione 0 (> 0 = DECYZJA), NH-4b bez
                     poprawki 0 przy kluczu TAK, NH-5 cudze z typem pochodnym (INFO), NH-6 samosprawdzenie drewna 0 w kazdej sesji, NH-7 potkniecia i
-                    ERROR in PatchTarget 0, NH-8a linie "po starcie - NIE" 0, NH-8b "po starcie - poprawiona" 0 (DECYZJA), NH-9 lancuchy (INFO).
-                    Log bez linii HT: INFO, bez wyjatku. Recznie po autotescie: Modules/BKROTPatch/BKROTLog.txt bez "Caught ArgumentException when patching".
+                    ERROR in PatchTarget 0, NH-8a linie "po starcie - NIE" i z dublem 0, NH-8b "po starcie - poprawiona / Unpatch poprawiony / cudzy
+                    Unpatch" 0 (DECYZJA), NH-9 lancuchy (INFO); po recenzji: NH-0c format (dubel, Unpatch), NH-4c nasz Unpatch z typem pochodnym
+                    poprawiony 0 (DECYZJA), NH-4d dubel 0 (NIE), NH-5b cudzy Unpatch z typem pochodnym 0 (DECYZJA). Log bez linii HT: INFO, bez wyjatku;
+                    autotest tej galezi: --grupa nharmony --wymagaj-ht <log> (brak linii HT albo stary format = NIE). Recznie po autotescie:
+                    Modules/BKROTPatch/BKROTLog.txt bez "Caught ArgumentException when patching".
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -27245,22 +27248,28 @@ NH_HEAD = "Latki czynnego modelu (HT): "
 NH_MODELS = re.compile(r"czynne modele: wpiete (\d+) z (\d+) \(na metodzie typu czynnego (\d+), przez klase deklarujaca (\d+)(?:: (.*?))?\), bez proby (\d+)")
 NH_MNO = re.compile(r", NIE (\d+)(?:: (.*))?$")
 NH_GUARD = re.compile(r"straznik Harmony (.+?): nasze proby (\d+), udane (\d+), NIE (\d+)")
-NH_FIXED = re.compile(r"; poprawione na klase deklarujaca (\d+)(?:: (.*?))?(?:; nasze z typem|; cudze z typem|$)")
-NH_UNFIX = re.compile(r"; nasze z typem pochodnym bez poprawki (\d+)(?:: (.*?))?(?:; cudze z typem|$)")
+NH_FIXED = re.compile(r"; poprawione na klase deklarujaca (\d+)(?:: (.*?))?(?:; nasze z typem|; dubel |; cudze z typem|$)")
+NH_UNFIX = re.compile(r"; nasze z typem pochodnym bez poprawki (\d+)(?:: (.*?))?(?:; dubel |; cudze z typem|$)")
+# poprawki po recenzji (uwagi 1 i 2): dubel latki i zdejmowanie latek (Unpatch) z typem pochodnym
+NH_DUP = re.compile(r"; dubel (\d+)(?:: (.*?))?(?:; cudze z typem|$)")
+NH_UNP = re.compile(r"^Unpatch z typem pochodnym: nasze poprawione (\d+)(?:: (.*?))?, nasze bez poprawki (\d+)(?:: (.*?))?, cudze (\d+)(?:: (.*))?$")
 NH_FOREIGN = re.compile(r"; cudze z typem pochodnym (\d+)(?:: (.*?))?(?:; nasze z celem null|$)")
 NH_STUM = re.compile(r"^potkniecia (\d+)\.?$")
 NH_WOOD = re.compile(r"koszt drewna przy zapasie 50 kg (-?\d+|\?) \(oczekiwane 0\)")
 
 
-def nharmony_main(logp):
+def nharmony_main(logp, need=False):
     """nharmony (15.10 noc, pulapka Harmony "czynnego modelu" - drewno w kuzni; Armoury/src/PatchTarget.cs, galaz w-toku/noc-harmony). Wejscie: log Armoury.
     NH-0 straznik na PatchProcessor.Patch wpiety (linia przy starcie gry) i linia "Latki czynnego modelu (HT): start sesji" w kazdej sesji (klucz TAK);
     NH-1 czynne modele: wpiete N z R, N = R i R >= 8 (zestaw Jeffa 9) w kazdej sesji; NH-2 przez klase deklarujaca M (INFO, oczekiwane 1 - drewno);
     NH-3 straznik: nasze proby P = udane W, NIE 0, P > 0; NH-4 poprawione na klase deklarujaca K = 0 (K > 0 = DECYZJA: latka ozyla - linia szukania
     celu do przerobienia na PatchTarget.OfActive, sprawdzic zasada 4), z kluczem TAK nasze bez poprawki 0; NH-5 cudze z typem pochodnym (INFO);
     NH-6 samosprawdzenie drewna: koszt przy zapasie 50 kg = 0 w kazdej sesji, linia startu drewna bez BRAK / wyjatek; NH-7 potkniecia 0
-    i ERROR in PatchTarget 0; NH-8 linie "po starcie": NIE 0 (poprawiona = DECYZJA); NH-9 lancuchy modeli (INFO).
-    Log bez linii HT: INFO, bez wyjatku. Poza logiem (recznie): BKROTLog.txt bez "Caught ArgumentException when patching"."""
+    i ERROR in PatchTarget 0; NH-8 linie "po starcie": NIE i dubel 0 (poprawiona, Unpatch poprawiony, cudzy Unpatch = DECYZJA); NH-9 lancuchy
+    modeli (INFO). Poprawki po recenzji: NH-0c format linii (dubel, Unpatch), NH-4c nasz Unpatch z typem pochodnym poprawiony 0 (> 0 = DECYZJA,
+    bez poprawki przy kluczu TAK = NIE), NH-4d dubel 0 (> 0 = NIE), NH-5b cudzy Unpatch z typem pochodnym 0 (> 0 = DECYZJA).
+    Log bez linii HT: INFO, bez wyjatku; need (--wymagaj-ht, autotest tej galezi): brak linii HT albo stary format = NIE.
+    Poza logiem (recznie): BKROTLog.txt bez "Caught ArgumentException when patching"."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NH-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -27288,7 +27297,11 @@ def nharmony_main(logp):
                 errs += 1
     print(f"plik: {logp} | linii straznika {len(guards)}, linii startu sesji {len(starts)}, linii 'po starcie' {len(late)}, samosprawdzen drewna {len(woods)}")
     if not starts and not guards:
-        rep.add("NH-0: linie HT (latki czynnego modelu)", "brak linii", "INFO (wersja sprzed HT)", None)
+        if need:
+            rep.add("NH-0a: straznik na PatchProcessor.Patch (start gry)", "brak linii straznika", "linia jest (--wymagaj-ht: autotest tej galezi)", False)
+            rep.add("NH-0b: linia startu sesji (HT) w kazdej sesji", "brak linii", ">= 1 (--wymagaj-ht)", False)
+        else:
+            rep.add("NH-0: linie HT (latki czynnego modelu)", "brak linii", "INFO (wersja sprzed HT; autotest tej galezi: --wymagaj-ht)", None)
         rep.show()
         return 0
     g = guards[-1] if guards else ""
@@ -27307,6 +27320,7 @@ def nharmony_main(logp):
         gseg = next((x for x in seg if x.startswith("straznik Harmony ")), "")
         cseg = next((x for x in seg if x.startswith("lancuchy ")), "")
         sseg = next((x for x in seg if x.startswith("potkniecia ")), "")
+        useg = next((x for x in seg if x.startswith("Unpatch z typem pochodnym: ")), "")
         a = NH_MODELS.match(mseg)
         b = NH_MNO.search(mseg)
         gg = NH_GUARD.match(gseg)
@@ -27314,6 +27328,8 @@ def nharmony_main(logp):
         uf = NH_UNFIX.search(gseg)
         fo = NH_FOREIGN.search(gseg)
         st_ = NH_STUM.match(sseg)
+        du = NH_DUP.search(gseg)
+        un = NH_UNP.match(useg)
         rows.append(dict(
             ok=bool(a and b and gg),
             n=int(a.group(1)) if a else None, r=int(a.group(2)) if a else None, direct=int(a.group(3)) if a else None,
@@ -27323,7 +27339,10 @@ def nharmony_main(logp):
             k=int(fx.group(1)) if fx else None, kl=(fx.group(2) or "") if fx else "",
             u=int(uf.group(1)) if uf else 0, ul=(uf.group(2) or "") if uf else "",
             c=int(fo.group(1)) if fo else None, cl=(fo.group(2) or "") if fo else "",
-            chains=cseg, stum=int(st_.group(1)) if st_ else None, on="| klucz PatchTargetGuard TAK" in s))
+            chains=cseg, stum=int(st_.group(1)) if st_ else None, on="| klucz PatchTargetGuard TAK" in s,
+            d=int(du.group(1)) if du else None, dl=(du.group(2) or "") if du else "",
+            uf=int(un.group(1)) if un else None, ufl=(un.group(2) or "") if un else "", uu=int(un.group(3)) if un else 0,
+            uul=(un.group(4) or "") if un else "", uc=int(un.group(5)) if un else 0, ucl=(un.group(6) or "") if un else ""))
     bad = [i + 1 for i, x in enumerate(rows) if not x["ok"]]
     if bad:
         rep.add("NH-1..NH-7: format linii startu sesji", f"nie do odczytu w sesjach {bad}", "kazda linia czytelna", False)
@@ -27355,6 +27374,37 @@ def nharmony_main(logp):
             "0 przy kluczu TAK (klucz NIE = INFO)", (umax == 0) if all(x["on"] for x in rd) else None)
     # NH-5
     rep.add("NH-5: cudze latki z typem pochodnym (INFO, bez zmian)", f"{last['c']}" + (f": {last['cl'][:300]}" if last["cl"] else ""), "INFO", None)
+    # poprawki po recenzji: format (dubel, Unpatch), Unpatch nasz / cudzy, dubel
+    new = [x for x in rd if x["d"] is not None and x["uf"] is not None]
+    if need or new:
+        rep.add("NH-0c: format linii HT (dubel, Unpatch - poprawki recenzji)", f"sesji z nowym formatem {len(new)} z {len(rd)}",
+                "wszystkie (bez --wymagaj-ht stary format = INFO)", len(new) == len(rd))
+    else:
+        rep.add("NH-0c: format linii HT (dubel, Unpatch)", "stary format (bez pol dubel / Unpatch)", "INFO (wersja sprzed poprawek recenzji)", None)
+    if new:
+        ln_ = new[-1]
+        ufmax = max(x["uf"] for x in new)
+        uumax = max(x["uu"] for x in new)
+        allon = all(x["on"] for x in new)
+        if uumax > 0 and allon:
+            ok4c, dec4c = False, False
+        elif ufmax > 0:
+            ok4c, dec4c = False, True
+        elif uumax > 0:
+            ok4c, dec4c = None, False
+        else:
+            ok4c, dec4c = True, False
+        rep.add("NH-4c: nasz Unpatch z typem pochodnym", f"poprawione {ufmax}" + (f": {ln_['ufl'][:300]}" if ln_["ufl"] else "")
+                + f"; bez poprawki {uumax}" + (f": {ln_['uul'][:200]}" if ln_["uul"] else ""),
+                "0 (poprawione > 0 = DECYZJA: zdejmowanie dziala, linia szukania celu do przerobienia; bez poprawki > 0 przy kluczu TAK = NIE)",
+                ok4c, decide=dec4c)
+        dmax = max(x["d"] for x in new)
+        rep.add("NH-4d: dubel - ta sama latka juz na celu (zerowana, biegnie 1x)", f"{dmax}" + (f": {ln_['dl'][:300]}" if ln_["dl"] else ""),
+                "0 (> 0 = NIE: dwie linie szukania celu tej samej latki - jedna do usuniecia)", dmax == 0)
+        ucmax = max(x["uc"] for x in new)
+        rep.add("NH-5b: cudzy Unpatch z typem pochodnym (bez zmian)", f"{ucmax}" + (f": {ln_['ucl'][:300]}" if ln_["ucl"] else ""),
+                "0 (> 0 = DECYZJA: taki Unpatch wylacza WSZYSTKIE latki tej metody, nasze tez, do nastepnej latki - czy poprawiac tez cudze)",
+                True if ucmax == 0 else False, decide=ucmax > 0)
     # NH-6
     vals = []
     for s in woods:
@@ -27371,11 +27421,11 @@ def nharmony_main(logp):
     rep.add("NH-7: potkniecia PatchTarget / ERROR in PatchTarget", f"potkniecia {smax}, ERROR {errs}", "0 / 0",
             smax == 0 and errs == 0 and all(x["stum"] is not None for x in rd))
     # NH-8
-    lno = [s for s in late if s[len(NH_HEAD):].startswith("po starcie - NIE ")]
-    lfix = [s for s in late if s[len(NH_HEAD):].startswith("po starcie - poprawiona ")]
-    rep.add("NH-8a: linie 'po starcie' - NIE", f"{len(lno)}" + (f": {lno[0][len(NH_HEAD):][:240]}" if lno else ""), "0", len(lno) == 0)
-    rep.add("NH-8b: linie 'po starcie' - poprawiona", f"{len(lfix)}" + (f": {lfix[0][len(NH_HEAD):][:240]}" if lfix else ""),
-            "0 (> 0 = DECYZJA jak NH-4a)", True if not lfix else False, decide=bool(lfix))
+    lno = [s for s in late if s[len(NH_HEAD):].startswith("po starcie - NIE ") or "(dubel: " in s]
+    lfix = [s for s in late if s[len(NH_HEAD):].startswith(("po starcie - poprawiona ", "po starcie - Unpatch poprawiony ", "po starcie - cudzy Unpatch "))]
+    rep.add("NH-8a: linie 'po starcie' - NIE / dubel", f"{len(lno)}" + (f": {lno[0][len(NH_HEAD):][:240]}" if lno else ""), "0", len(lno) == 0)
+    rep.add("NH-8b: linie 'po starcie' - poprawiona / Unpatch poprawiony / cudzy Unpatch", f"{len(lfix)}" + (f": {lfix[0][len(NH_HEAD):][:240]}" if lfix else ""),
+            "0 (> 0 = DECYZJA jak NH-4a / NH-4c / NH-5b)", True if not lfix else False, decide=bool(lfix))
     # NH-9
     rep.add("NH-9: lancuchy modeli (INFO)", last["chains"][:400], "INFO", None)
     rep.show()
@@ -27397,6 +27447,7 @@ def main(argv):
     final = False
     horses = False   # P1 (kiesa1): progi dla biegu z regula koni roboczych
     tabp = None      # PROJEKT-LENNA (grupa lenna): katalog tabel biegu (ludzie-regiony.csv)
+    need_ht = False  # nharmony (recenzja, uwaga 5): autotest galezi noc-harmony - brak linii HT albo stary format = NIE
     i = 0
     while i < len(args):
         a = args[i]
@@ -27424,6 +27475,8 @@ def main(argv):
             bdp = args[i + 1]; i += 2; continue
         if a == "--tabele":
             tabp = args[i + 1]; i += 2; continue
+        if a == "--wymagaj-ht":
+            need_ht = True; i += 1; continue
         logp = a; i += 1
     if group == "audytb" and logp:
         return audytb_main(logp)   # P2 audytu modow 14.10 (AM-10/11/12/15/18): samowywolania BKROT -> model BK (CrashScribe BkrotSelfCall), progi AB-0..AB-7
@@ -27536,7 +27589,7 @@ def main(argv):
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
     if group == "nharmony" and logp:
-        return nharmony_main(logp)   # nharmony (15.10 noc, w-toku/noc-harmony): straznik celu latek Harmony i linia "Latki czynnego modelu (HT)" (PatchTarget.cs)
+        return nharmony_main(logp, need_ht)   # nharmony (15.10 noc, w-toku/noc-harmony): straznik celu latek Harmony i linia "Latki czynnego modelu (HT)" (PatchTarget.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

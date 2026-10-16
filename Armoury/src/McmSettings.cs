@@ -6212,7 +6212,7 @@ namespace Armoury
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool FixPrincelyArbiterWage { get; set; } = true;
 
-        [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when one of the five mods (Armoury, CrashScribe, Realistic Captivity, Grand Tourney, ForgeView) hooks a game rule through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook is moved onto the class that really holds the rule. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log")]
+        [SettingPropertyBool("Patch Target Guard", HintText = "Fix hooks aimed at an inherited rule: when Armoury, CrashScribe, Realistic Captivity, Grand Tourney or ForgeView hooks a game rule by hand after Armoury has loaded, through a mod's model that only inherits that rule (like the Banner Kings smithing cost), the hook and its later removal are moved onto the class that really holds the rule, and a hook already in place there is not added a second time. Without it the game's patching tool refuses such a hook, the Banner Kings - Realm of Thrones patch hides the refusal, and the feature silently does nothing (this is how wood at the anvil failed). Hooks of other mods are only counted in the log, never changed. Off = only report such hooks in the log")]
         [SettingPropertyGroup("Model chains under the BKROT patch")]
         public bool PatchTargetGuard { get; set; } = true;
 
