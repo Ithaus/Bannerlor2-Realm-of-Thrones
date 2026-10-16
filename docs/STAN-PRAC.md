@@ -2244,3 +2244,21 @@ Testy: zapis F d240 15 dob (4 galezie), 8 dob z profilem, 40 dob (6 galezi), now
 sprawdzic w logu Jeffa: "Druzyny w misji (NM)", NS-8 podloga broni, NS-15..18 zbrojownia.
 Narzedzie: naprawione kolizje nazw globalnych w sprawdz_logi.py (O2_START obieg2 -> OBG2_START - grupa oblezenia2 wywracala sie od 15.10; NS_CTL/NS_STUM nsprzet -> NSP_*).
 W TOKU: noc-ekonomia (recenzja), noc-wydajnosc (kod) -> scalenie, test, WGRANIE 63.
+
+### 43. WGRANIE 63 (16.10 noc, ok. 19:45 zegara komp.) - START TUTAJ
+W grze: `w-toku/zbior-e8` **43f3a548** (= `noc/wgranie-63`) | Armoury 7e4d705b, CrashScribe da755a8a, CrashScribe.settings.xml 15aeaa3d; RC/GT/FV bez zmian.
+Kopie: *.bak-2026-10-16-wgranie63-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie63-przed. Zapis Jeffa nietkniety (md5 31199349).
+= WGRANIE 62 + noc-ekonomia (c6175bf5) + noc-wydajnosc (c95146c5; scalona od bazy 508b0346 - scal1.sh ma teraz parametr bazy) + N7 wylaczony (43f3a548).
+- noc-ekonomia (nekon): N2 wegiel z waga gry 5 kg (CharcoalWeightKg; stary klucz CharcoalWeight 0.5 z Armoury.json martwy) + SmithCoalKg (bron i przetop pala 0.5 kg z otwartej bryly),
+  N3 sol x3.5 (SaltRateRaised), futra x3 (FurRateRaised), N9 helmy jedna regula (HelmOneRule), N10 bez kopalni BK w miastach (NoTownMines), N11 jednostka ladunku na kampanie
+  (BulkUnitPerCampaign, zapis arm_bulk_unit), N12 kuznia (SmithWoodOnScreen - NE-5: ekran kucia NIE wpiety, do sprawdzenia; SelfMendWoodKg), N1 linie "Pompy" i "Karawany - zapas",
+  N4 doplata 35% od sprzedanego (FolkCraftWageOnSale, zapis arm_craft_sale; 46 tys./d zamiast 87), N6 markietani wedlug sakiewki (SutlersByPurse; przyrost sakiewek zolnierzy
+  -40%), N8 pozyczka przed darem (FolkLoanBeforeGuard).
+  DECYZJA CLAUDE: N7 FolkGuardNoMemory = false - test 60 dob: lud 8.0 -> 10.4% zlota swiata, korony 21.5 -> 19.3% (bez N7 lud 8.0% stale) - wrocic do N7 po ujsciach ludu (audyt P1-P6).
+- noc-wydajnosc (nwyd): swaty ROT leniwe (MarriageLazyDraw), audyt ekonomii CS raz na 7 dob (EconomyAuditWeekly), ciche logi pomiarowe w grze co 7 dob (QuietLog; autotest pelny),
+  spalona ziemia i siatka zagrozen szybciej, log CrashScribe otwartym plikiem. Pomiar (-Profile, 8 dob, zapis F): Armoury 7.1 -> 5.3 ms/klatke, ROT CheckNPCMarriages 5.4 -> 1.4,
+  klatka sr. 103.8 -> 85.2 ms (ok. +22% klatek/s), doba 18.9 -> 18.6 s.
+Testy: zapis F 60 dob (9 galezi), 30 dob (10 galezi, N7 tak), 8 dob z profilem (10 galezi, N7 nie): Armoury 0 ERROR; wszystkie nowe grupy TAK poza kalibracja NC-15b/16a/16b,
+NK-6 (prog P skarbcow), NE-5 (ekran kuzni), znane NIE (OB-4, AB-11b, OB2-6a).
+Rozpoznania bez kodu: bandyci (roz/wyniki/rozp_bandyci.json) - to limit gry ROT (zajete kryjowki x 12), plateau ok. 1100-1150 band w tescie 4-letnim, nie naprawiac bez Jeffa;
+trebusze (rozp_trebusze.json) - druga ekipa zaczyna trebusz po gotowym obozie i za wolno: 0 trebuszy gotowych, 0 z 12 miast zdobytych -> W TOKU galaz w-toku/noc-tb2 (WGRANIE 64).
