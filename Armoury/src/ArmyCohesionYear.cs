@@ -129,7 +129,7 @@ namespace Armoury
                 if (model == null) { _hook = "BRAK (model armii nieznany)"; }
                 else
                 {
-                    var m = AccessTools.Method(model.GetType(), "CalculateDailyCohesionChange", new[] { typeof(Army), typeof(bool) });
+                    var m = PatchTarget.OfActive(model, "CalculateDailyCohesionChange", new[] { typeof(Army), typeof(bool) }, "spojnosc armii (AC)");   // HT: metoda z klasy deklarujacej
                     if (m == null) _hook = "BRAK (" + model.GetType().FullName + ".CalculateDailyCohesionChange)";
                     else if (_patched.Contains(m)) _hook = "wpieta " + m.DeclaringType.FullName + "." + m.Name + " (juz wczesniej w tym procesie)";
                     else

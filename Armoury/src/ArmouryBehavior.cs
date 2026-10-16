@@ -822,6 +822,8 @@ namespace Armoury
             CampaignEvents.TickEvent.AddNonSerializedListener(this, delegate (float dt) { SiegeRansom.Tick(); });
             // O3: opcja "Demand a ransom" w menu oblezenia gry - po wszystkich OnSessionLaunched (menu gry juz jest; wstawiona przed "Leave")
             CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, SiegeRansom.AddMenus);
+            // HT (15.10 noc, PatchTarget.cs): linia "Latki czynnego modelu (HT): start sesji" - po OnSessionLaunched wszystkich modow (latki modeli w kampanii)
+            CampaignEvents.OnAfterSessionLaunchedEvent.AddNonSerializedListener(this, s => PatchTarget.Report());
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("SiegeRansom.OnMapEventEnded", SiegeRansom.OnMapEventEnded));
             // mury oblezen OB1-OB4 (SiegeWalls.cs): rejestr szturmow AI (prog odparcia OB2, bitwa z murow OB3), wynik szturmu, koniec oblezenia (przerwy, OB4),
             // pomiary do linii OB0 (armie rozwiazane przy oblezeniu, machiny AI, trafienia w mury, nowe oblezenia) - tylko pamiec i log poza OB2/OB3

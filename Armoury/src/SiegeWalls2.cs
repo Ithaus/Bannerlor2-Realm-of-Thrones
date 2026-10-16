@@ -877,7 +877,7 @@ namespace Armoury
             try
             {
                 var sm = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SiegeStrategyActionModel : null;
-                var mt = AccessTools.Method(sm != null ? sm.GetType() : typeof(DefaultSiegeStrategyActionModel), "GetLogicalActionForStrategy");
+                var mt = PatchTarget.OfActiveOr(sm, typeof(DefaultSiegeStrategyActionModel), "GetLogicalActionForStrategy", null, "oblezenia 2: plan machin");   // HT: klasa deklarujaca
                 if (mt == null) _hookAction = "BRAK (GetLogicalActionForStrategy)";
                 else
                 {
@@ -901,7 +901,7 @@ namespace Armoury
             try
             {
                 var fm = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SettlementFoodModel : null;
-                var mf = AccessTools.Method(fm != null ? fm.GetType() : typeof(DefaultSettlementFoodModel), "CalculateTownFoodStocksChange", new[] { typeof(Town), typeof(bool), typeof(bool) });
+                var mf = PatchTarget.OfActiveOr(fm, typeof(DefaultSettlementFoodModel), "CalculateTownFoodStocksChange", new[] { typeof(Town), typeof(bool), typeof(bool) }, "oblezenia 2: jedzenie");
                 if (mf == null) _hookFood = "BRAK (CalculateTownFoodStocksChange)";
                 else
                 {

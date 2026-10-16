@@ -146,11 +146,10 @@ namespace Armoury
             {
                 var parts = new List<string>();
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.SmithingModel : null;
-                var mc = model != null ? AccessTools.Method(model.GetType(), "GetSmithingCostsForWeaponDesign", new[] { typeof(WeaponDesign) }) : null;
-                // test 15.10: metoda z klasy bazowej znaleziona przez typ pochodny (BKSmithingModel -> DefaultSmithingModel) - latka wpieta, ale nie wolana
-                // (samosprawdzenie: koszt -1 przy zapasie 50 kg, zero linii postfiksu); wpinamy metode wziety z klasy, ktora ja deklaruje
-                if (mc != null && mc.DeclaringType != null && mc.DeclaringType != mc.ReflectedType)
-                    mc = AccessTools.DeclaredMethod(mc.DeclaringType, "GetSmithingCostsForWeaponDesign", new[] { typeof(WeaponDesign) }) ?? mc;
+                // test 15.10: metoda z klasy bazowej znaleziona przez typ pochodny (BKSmithingModel -> DefaultSmithingModel) - Harmony 2.4.2 rzuca
+                // "You can only patch implemented methods", finalizer BKROTPatch polyka (samosprawdzenie: koszt -1 przy zapasie 50 kg); PatchTarget.OfActive
+                // daje metode z klasy, ktora ja deklaruje (wpis do linii "Latki czynnego modelu (HT)")
+                var mc = model != null ? PatchTarget.OfActive(model, "GetSmithingCostsForWeaponDesign", new[] { typeof(WeaponDesign) }, "drewno w kuzni: koszt") : null;
                 if (mc != null && !_patched.Contains(mc)) { _h.Patch(mc, postfix: new HarmonyMethod(typeof(SmithWood), nameof(CostPostfix)) { priority = Priority.Last }); _patched.Add(mc); }
                 parts.Add(mc != null ? "koszt " + mc.DeclaringType.Name : "koszt BRAK");
                 var ms = AccessTools.Method(typeof(CraftingCampaignBehavior), "SpendMaterials", new[] { typeof(WeaponDesign) });

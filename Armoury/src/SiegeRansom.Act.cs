@@ -670,7 +670,7 @@ namespace Armoury
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.TargetScoreCalculatingModel : null;
                 if (model != null && model.GetType() != typeof(DefaultTargetScoreCalculatingModel))
                 {
-                    var mm = AccessTools.Method(model.GetType(), "GetTargetScoreForFaction");
+                    var mm = PatchTarget.OfActive(model, "GetTargetScoreForFaction", null, "okup oblezenia: rozejm");   // HT: klasa deklarujaca (dziedziczona = Default, wpieta wyzej)
                     if (mm != null && mm.DeclaringType == model.GetType())
                     {
                         Seal31.Patch("okup oblezenia: rozejm (" + model.GetType().FullName + ".GetTargetScoreForFaction)", mm, typeof(SiegeRansom), null, nameof(ScorePost), null,

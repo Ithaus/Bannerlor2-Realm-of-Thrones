@@ -25,6 +25,9 @@ namespace Armoury
                 Log.Init(moduleRoot);
                 Settings.Load(Path.Combine(moduleRoot, "ModuleData"));
                 Log.Info("Ustawienia wczytane. CraftingEnabled=" + Settings.Current.CraftingEnabled + " WearEnabled=" + Settings.Current.WearEnabled);
+                // HT (15.10 noc): straznik celu latek na PatchProcessor.Patch PRZED wszystkimi naszymi latkami (Armoury 31. - przed ForgeView, GT i BKROTPatch);
+                // wlasny try - jego wywrotka nie zabiera latek ponizej
+                try { PatchTarget.InstallGuard(); } catch (Exception e) { Log.Error("PatchTarget.InstallGuard", e); }
 
                 if (!_patched)
                 {
