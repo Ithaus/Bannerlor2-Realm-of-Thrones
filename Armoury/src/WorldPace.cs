@@ -135,8 +135,8 @@ namespace Armoury
                 float before = __result;
                 if (p < 100 && p >= 5) __result *= p / 100f;
                 // OB4 (Jeff 14.10: "realistyczne oblezenia takze dla mnie i czas budowy tez realistyczny"): strona OBLEGAJACA - AI i gracz - x SiegeBesiegerPrepPercent
-                // / klasa twierdzy (miasto 1.5, stolica 2.5); bez Innych i obozow skryptu fabuly; raz na lancuch (tu, po OutermostSiege)
-                float ob4 = SiegeWalls.PrepFactor(siegeEvent, side);
+                // / klasa twierdzy (miasto 1.5, stolica 2.5); bez Innych i obozow skryptu fabuly; raz na lancuch (tu, po OutermostSiege); TB2-b: trebusz bez klasy
+                float ob4 = SiegeWalls.PrepFactor(siegeEvent, side, type);
                 if (ob4 > 0f && ob4 < 1f) __result *= ob4;
                 // slad w logu: tylko oblezenie gracza, raz na typ machiny
                 try

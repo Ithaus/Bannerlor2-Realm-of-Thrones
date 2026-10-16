@@ -28,7 +28,8 @@ namespace Armoury
     ///   (b) budowa po kolei: GetLogicalActionToCompleteEngineList (:151-181) stawia nowa machine tylko po gotowym obozie i gdy ZADNA rozstawiona nie jest
     ///       w budowie, w kolejnosci listy (taran, wieza, dopiero potem trebusze); SiegeEvent.ConstructionTick buduje jedna machine naraz;
     ///   (c) tempo: trebusz 40 osobodni (RBM), taran 12, wieza 16, przygotowania 24; postep = sqrt(ludzi) / osobodni x BK LongerSieges 0.5 x RB bez narzedzi
-    ///       0.75 x SiegePacePercent 0.5 x OB4 0.5 / klasa (zamek 1, miasto 1.5, stolica 2.5) = 9.4% / 6.3% / 3.8% tempa gry. Oboz 3000 ludzi: pierwszy trebusz
+    ///       0.75 x SiegePacePercent 0.5 x OB4 0.5 / klasa (zamek 1, miasto 1.5, stolica 2.5) = 9.4% / 6.3% / 3.8% tempa gry [wzor; zmierzone w logach 15.10
+    ///       (rozpoznanie TB2): 7.5% / 5% / 3% - RB mnozy x0.4 (RealisticSiegeEventModel :24, wartosc bez ustawien MCM; w jego pliku 1.0), OB4 dzis 100%]. Oboz 3000 ludzi: pierwszy trebusz
     ///       w WearOutDefenders po ok. 18 (zamek) / 27 (miasto) / 45 (stolica) dobach, 1500 ludzi - 25 / 38 / 63; oblezenia trwaly mediana 9 dob, p90 25
     ///       (linie OB5 koniec, 234 oblezen), a oboz z taranem i wieza szturmuje (OB1) - trebusz nie zdazyl ani razu. Warunek dostepnosci trebusza dla AI
     ///       nie istnieje (lista strategii uzywa DefaultSiegeEngineTypes.Trebuchet wprost; GetAvailableAttackerRangedSiegeEngines tylko w menu gracza);
@@ -40,6 +41,19 @@ namespace Armoury
     ///   machina daleka, jak gra). Prefiks + postfiks SiegeEvent.ConstructionTick: gra buduje pierwsza niegotowa machine, my pierwsza niegotowa DRUGIEJ
     ///   kategorii (tylko po gotowym obozie). Zamek jak dzis, chyba ze oboz stoi SiegeTrebuchetCastleDays (10) dob po gotowym obozie bez taranu i wiezy
     ///   (oboz 1000 ludzi ma oba po ok. 9.4 dobie) - wtedy to samo. Bez gracza (jego oboz), skryptu fabuly ROT i Innych.
+    ///
+    /// TB2 - TREBUSZ OD 1. DOBY (klucz SiegeTrebuchetEarly, noc 16.10; rozpoznanie trebusze: w 110 dobach Jeffa 4 trebusze zaczete, 0 zbudowanych; 12 oblezen
+    ///   miast z logow, 0 zdobytych - zadna droga zdobycia nie konczyla sie przed odsiecza 10.7-18.7 doby). [K] gra stawia nowa machine dopiero po gotowym
+    ///   obozie (DefaultSiegeStrategyActionModel :151-180), ConstructionTick buduje najpierw przygotowania (SiegeEvent :1098-1104), a ActionPost i BuildPre
+    ///   tez czekaly; przygotowania pod miastem 7-11 dob, pod stolica ok. 18. Zmiana (tylko obozy TB miasta i stolicy - zamek bez zmian):
+    ///   (a) ActionPost przed gotowym obozem: plan WearOutDefenders, zadna machina daleka w budowie, trebuszy < 4 - nowy trebusz ekipy dalekiej (RangedSlot);
+    ///       BuildPre przy budowie przygotowan podaje je jako machine gry, wiec BuildPost doklada postep pierwszej niegotowej machinie dalekiej. Po gotowym
+    ///       obozie jak TB (gra widzi trebusz w budowie i mowi Hold, postfiks daje taran, potem wieze ekipie bliskiej);
+    ///   (b) SiegeWalls.PrepFactor: trebusz bez dzielenia przez klase twierdzy (samo SiegeBesiegerPrepPercent) - AI i gracz (OB4 wspolny); oboz, taran i wieza
+    ///       dalej x klasa;
+    ///   (c) Unblock: rozbity odcinek muru (WallHpMin 0) - szansa jak drabiny DR (0.1 x s gry) bez kary machin w budowie i bez czlonu 0.25 x (5 - gotowe);
+    ///       powod "wyrwa". OB1, przerwa po odparciu OB2 i okup F1 bez zmian.
+    ///   Wylaczony = c95146c5 (poza liniami logu "Trebusz wczesnie (TB2, start / doba)").
     ///
     /// GL - GLOD OBLEZENIA (klucz SiegeStarvation). Przyczyna castle_B8 [P csv spichlerze-regiony / ludzie-regiony 2026-10-14_15-55-37, K gra]:
     ///   oblegal jeden oddzial Wolnych Ludzi o sile 4 (potem 0 - linie OB5), zapas 8863 spadal -60..-69 na dobe do 0 (doba 109395, 141. doba oblezenia);
@@ -93,6 +107,8 @@ namespace Armoury
         // ------------------------------------------------------------ klucze
         internal static bool TrebOn { get { var s = Settings.Current; return s != null && s.SiegeAiTrebuchets; } }
         private static int CastleDays { get { var s = Settings.Current; return s == null ? 10 : (int)Clamp(s.SiegeTrebuchetCastleDays, 0, 60); } }
+        /// <summary>TB2: trebusz od 1. doby (a), trebusz bez klasy OB4 (b - SiegeWalls.PrepFactor), szturm przez wyrwe bez kary machin (c).</summary>
+        internal static bool EarlyOn { get { var s = Settings.Current; return s != null && s.SiegeTrebuchetEarly; } }
         internal static bool StarveOn { get { var s = Settings.Current; return s != null && s.SiegeStarvation; } }
         private static double LossPct { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeStarveLossPercent) ? 5.0 : Clamp(s.SiegeStarveLossPercent, 0.0, 20.0); } }
         private static double SurShare { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeSurrenderShare) ? 0.1 : Clamp(s.SiegeSurrenderShare, 0.0, 0.5); } }
@@ -130,10 +146,23 @@ namespace Armoury
         {
             public bool On; public float NextEval = -1f, PrepSeen = -1f, OnAt = -1f; public string Cls = "-", Why = "-";
             public int ParT, ParM, ParDone;
+            public bool EarlyFirst;                                                 // TB2-a: pierwszy trebusz tego oblezenia zaczety przed gotowym obozem (licznik doby)
         }
         private static readonly Dictionary<SiegeEvent, Treb> _treb = new Dictionary<SiegeEvent, Treb>();
         private static int _marked;                                                 // obozy z druga ekipa (szybkie wyjscie z ticka budowy)
         private static int _dNewTown, _dNewCap, _dNewCastle, _dSwitch, _dParT, _dParM, _dParDone, _dTrebBuilt, _dTrebLost, _dUnmark;
+        // TB2 (linia "Trebusz wczesnie (TB2, doba)"): trebusze zaczete przed gotowym obozem, pierwsze w oblezeniu (w 1. dobie / pozniej), obozy z trebuszem w tempie
+        // zamku (b - z SiegeWalls.PrepFactor), szturmy przez wyrwe (c)
+        private static int _dEarlyT, _dEarlyFirst1, _dEarlyFirstLate, _dUnGap;
+        private static double _dEarlyFirstMax;
+        private static readonly HashSet<SiegeEvent> _dTrebPace = new HashSet<SiegeEvent>(), _dTrebPacePlayer = new HashSet<SiegeEvent>();
+
+        /// <summary>TB2-b (z SiegeWalls.PrepFactor): trebusz tego obozu dostal tempo bez klasy twierdzy. Tylko licznik doby. Nie rzuca.</summary>
+        internal static void NoteTrebPace(SiegeEvent ev, bool player)
+        {
+            try { if (ev != null) lock (Gate) { if (player) _dTrebPacePlayer.Add(ev); else _dTrebPace.Add(ev); } }   // model budowy - zamek jak FoodPost
+            catch (Exception e) { Stumble("NoteTrebPace", e); }
+        }
 
         /// <summary>Postfiks GetLogicalActionForStrategy czynnego modelu planu (wolany co tick obu stron kazdego oblezenia): oboz AI pod miastem / stolica
         /// (zamek po CastleDays) - plan WearOutDefenders i druga ekipa. Szybkie wyjscie dla obroncow i przy wylaczonym kluczu.</summary>
@@ -159,9 +188,15 @@ namespace Armoury
                     __1 = SiegeStrategyActionModel.SiegeAction.Hold; __2 = null; __3 = -1; __4 = -1;   // akcja tej tury liczona po starym planie - nastepna po nowym
                     return;
                 }
-                if (__1 != SiegeStrategyActionModel.SiegeAction.Hold || !camp.IsPreparationComplete) return;
+                if (__1 != SiegeStrategyActionModel.SiegeAction.Hold) return;
                 var se = camp.SiegeEngines;
                 if (se == null) return;
+                if (!camp.IsPreparationComplete)
+                {
+                    // TB2-a: przed gotowym obozem gra nie stawia machin (DefaultSiegeStrategyActionModel :151-180) - ekipa daleka miasta i stolicy zaczyna trebusz od 1. doby
+                    if (EarlyOn && t.Cls != "zamek") EarlyTreb(ev, se, t, ref __1, ref __2, ref __3, ref __4);
+                    return;
+                }
                 bool meleeBusy = false, rangedBusy = false;
                 foreach (var e in se.DeployedSiegeEngines)
                 {
@@ -197,6 +232,26 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("ActionPost", e); }
+        }
+
+        /// <summary>TB2-a: trebusz ekipy dalekiej przed gotowym obozem (miasto, stolica): zadna machina daleka w budowie i trebuszy mniej niz 4 (lista gry
+        /// WearOutDefenders). Gra buduje w tym czasie przygotowania obozu - postep trebuszowi daje BuildPost (BuildPre podaje mu przygotowania jako machine gry).</summary>
+        private static void EarlyTreb(SiegeEvent ev, SiegeEvent.SiegeEnginesContainer se, Treb t, ref SiegeStrategyActionModel.SiegeAction act, ref SiegeEngineType type, ref int dep, ref int res)
+        {
+            foreach (var e in se.DeployedSiegeEngines)
+                if (e != null && e.SiegeEngine != null && e.SiegeEngine.IsRanged && e.Progress < 1f) return;   // ekipa daleka zajeta
+            int have;
+            se.DeployedSiegeEngineTypesCount.TryGetValue(DefaultSiegeEngineTypes.Trebuchet, out have);
+            if (have >= TrebNeed) return;
+            int slot = RangedSlot(se);
+            if (slot < 0) return;
+            act = SiegeStrategyActionModel.SiegeAction.ConstructNewSiegeEngine; type = DefaultSiegeEngineTypes.Trebuchet; dep = slot; res = -1;
+            t.ParT++; _dParT++; _dEarlyT++;
+            if (have > 0 || t.EarlyFirst) return;
+            t.EarlyFirst = true;                                                    // pierwszy trebusz oblezenia (w pamieci sesji)
+            double age = ev.SiegeStartTime.ElapsedDaysUntilNow;
+            if (age < 1.0) _dEarlyFirst1++; else _dEarlyFirstLate++;               // pozniej niz 1. doba: oblezenie sprzed wczytania albo sprzed wlaczenia klucza
+            if (age > _dEarlyFirstMax) _dEarlyFirstMax = age;
         }
 
         /// <summary>Miejsce dla trebusza: wolne miejsce machiny dalekiej, inaczej nadmiarowa gotowa machina daleka spoza listy (gra: num2 w GetLogicalActionToCompleteEngineList
@@ -274,7 +329,7 @@ namespace Armoury
         }
 
         /// <summary>Prefiks SiegeEvent.ConstructionTick: maszyna, ktora gra buduje w tej turze (pierwsza rozstawiona niegotowa, nie w przestawianiu; przed gotowym
-        /// obozem - zadna, gra buduje oboz). Tylko oboz ze znacznikiem TB.</summary>
+        /// obozem - przygotowania: z TB2 pod miastem i stolica druga ekipa buduje wtedy machine daleka, inaczej nic). Tylko oboz ze znacznikiem TB.</summary>
         public static void BuildPre(SiegeEvent __instance, ISiegeEventSide __0, out SiegeEvent.SiegeEngineConstructionProgress __state)
         {
             __state = null;
@@ -286,7 +341,12 @@ namespace Armoury
                 if (__instance == null || !_treb.TryGetValue(__instance, out t) || !t.On) return;
                 var se = __0.SiegeEngines;
                 if (se == null) return;
-                if (se.SiegePreparations != null && !se.SiegePreparations.IsActive) return;   // gra buduje oboz (ConstructionTick :1101-1104)
+                if (se.SiegePreparations != null && !se.SiegePreparations.IsActive)
+                {
+                    // gra buduje oboz (ConstructionTick :1101-1104); TB2-a: druga ekipa miasta i stolicy (BuildPost) bierze wtedy pierwsza niegotowa machine daleka
+                    if (EarlyOn && t.Cls != "zamek") __state = se.SiegePreparations;
+                    return;
+                }
                 foreach (var e in se.DeployedSiegeEngines)
                     if (e != null && !e.IsConstructed && !e.IsBeingRedeployed) { __state = e; return; }
             }
@@ -701,9 +761,11 @@ namespace Armoury
                     if (x.IsConstructed) { if (t == DefaultSiegeEngineTypes.Ram || t == DefaultSiegeEngineTypes.ImprovedRam) ram = true; else if (t == DefaultSiegeEngineTypes.SiegeTower) tower = true; }
                     else if (!t.IsRanged && x.Progress > prog) prog = x.Progress;      // taran / wieza w budowie - kara gry zostaje, trebusze nie
                 }
-                bool eng = (ram && tower) || SiegeWalls.WallHpMin(st) <= 0.0;
+                bool breach = SiegeWalls.WallHpMin(st) <= 0.0;
+                bool gap = breach && EarlyOn;                                            // TB2-c: wyrwa - szansa jak drabiny DR, bez kary za machiny w budowie
+                bool eng = (ram && tower) || (breach && !gap);
                 bool lad = LadderOn && ev.SiegeStartTime.ElapsedDaysUntilNow >= LadderDays;
-                if (!eng && !lad) return false;
+                if (!eng && !gap && !lad) return false;
                 if (SiegeWalls.InRepelPause(ev)) return false;                           // przerwa po odparciu (OB2) - Veto i tak wstrzyma
                 int hour = (int)CampaignTime.Now.ToHours, last;
                 if (_unHour.TryGetValue(ev, out last) && last == hour) return false;       // jedno losowanie na godzine i oboz
@@ -718,6 +780,12 @@ namespace Armoury
                     double pe = pen > 0 ? Clamp(0.1 * m.SGame * pen, 0.0, 1.0) : 0.0;
                     if (pe > pt) { pt = pe; why = "machiny"; }
                 }
+                if (gap)
+                {
+                    // TB2-c: rozbity odcinek muru - bez czlonu 0.25 x (5 - gotowe) i bez postepu taranu albo wiezy w budowie (gra przy 1-2 gotowych daje kare <= 0)
+                    double pw = Clamp(0.1 * m.SGame, 0.0, 1.0);
+                    if (pw > pt) { pt = pw; why = "wyrwa"; }
+                }
                 if (lad && LadderOk(camp, m))
                 {
                     double pl = Clamp(0.1 * m.SGame, 0.0, 1.0);
@@ -726,7 +794,7 @@ namespace Armoury
                 if (why == null || pGame >= 1.0 || pt <= pGame) return false;            // kara gry nie byla przeszkoda
                 _dUnRolls++;
                 if (MBRandom.RandomFloat >= (pt - pGame) / (1.0 - pGame)) return false;  // razem z losowaniem gry: szansa pt
-                if (why == "machiny") _dUnEng++; else _dUnLad++;
+                if (why == "machiny") _dUnEng++; else if (why == "wyrwa") _dUnGap++; else _dUnLad++;
                 if (LogOn && _unLogged.Add(ev))
                 {
                     double def = Math.Max(m.Def, m.Def0);
@@ -828,7 +896,7 @@ namespace Armoury
                 int nRot; lock (Gate) { nRot = _dRotSt.Count; }
                 sb.Append(", straty RB pominiete ").Append(_dRbSkip).Append(", ziemie wokol ROT odjete ").Append(nRot)
                   .Append(" | DR: przepuszczone ").Append(_dDrGate + _dDrWalls + _dDrRoll).Append(" (brama ").Append(_dDrGate).Append(", mury ").Append(_dDrWalls).Append(", losowanie ").Append(_dDrRoll).Append(')')
-                  .Append(" | MB: ").Append(UnblockOn ? "tak" : "nie").Append(", szturmy bez czekania: machiny ").Append(_dUnEng).Append(", drabiny ").Append(_dUnLad).Append(" (losowan ").Append(_dUnRolls).Append(')')
+                  .Append(" | MB: ").Append(UnblockOn ? "tak" : "nie").Append(", szturmy bez czekania: machiny ").Append(_dUnEng).Append(", wyrwa ").Append(_dUnGap).Append(", drabiny ").Append(_dUnLad).Append(" (losowan ").Append(_dUnRolls).Append(')')
                   .Append(" | zdobyte dzis: miasta ").Append(_dCaptTown).Append(", stolice ").Append(_dCaptCap).Append(", zamki ").Append(_dCaptCastle).Append(" (po kapitulacji ").Append(_dCaptAfterSurr).Append(')')
                   .Append(" | oblezenia trwajace ").Append(going).Append(", najdluzsze ").Append(F(longest, "0.0")).Append(" dob (").Append(longestSt).Append("), ponad 150 dob: ")
                   .Append(over.Count == 0 ? "-" : string.Join(", ", over.ToArray()))
@@ -837,18 +905,36 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { Daily3(); ZeroDay(); }                                         // oblezenia 3: linia "Oblezenia 3 (doba)" po linii oblezen 2
+            finally { Daily3(); DailyTb2(); ZeroDay(); }                             // oblezenia 3: linia "Oblezenia 3 (doba)" po linii oblezen 2; TB2 po niej
+        }
+
+        /// <summary>Linia "Trebusz wczesnie (TB2, doba)" (z Daily, finally, przed ZeroDay): liczniki a / b / c. Tylko log.</summary>
+        private static void DailyTb2()
+        {
+            try
+            {
+                if (!LogOn) return;
+                int nPace, nPaceP;
+                lock (Gate) { nPace = _dTrebPace.Count; nPaceP = _dTrebPacePlayer.Count; }
+                Log.Info("Trebusz wczesnie (TB2, doba): dzien " + Today + " | klucz " + (EarlyOn ? "tak" : "nie")
+                         + " | (a) trebusze zaczete przed gotowym obozem " + _dEarlyT + " (pierwsze w oblezeniu: w 1. dobie oblezenia " + _dEarlyFirst1 + ", pozniej " + _dEarlyFirstLate
+                         + ", najpozniej " + F(_dEarlyFirstMax, "0.0") + " dob od poczatku oblezenia)"
+                         + " | (b) obozy z trebuszem w tempie zamku " + (nPace + nPaceP) + " (w tym gracz " + nPaceP + ")"
+                         + " | (c) szturmy przez wyrwe bez czekania na machiny " + _dUnGap + ".");
+            }
+            catch (Exception e) { Stumble("DailyTb2", e); }
         }
 
         private static void ZeroDay()
         {
             _dNewTown = _dNewCap = _dNewCastle = _dSwitch = _dParT = _dParM = _dParDone = _dTrebBuilt = _dTrebLost = _dUnmark = 0;
+            _dEarlyT = _dEarlyFirst1 = _dEarlyFirstLate = _dUnGap = 0; _dEarlyFirstMax = 0;
             _dBesieged = _dStarving = _dDead = _dSurr = _dSurrMen = _dRbSkip = _dNoPrison = 0;
             _dLongestHunger = 0; _dLongestHungerSt = "-"; _dSurSkip.Clear();
             _dDrGate = _dDrWalls = _dDrRoll = 0; _drLogged.Clear();
             _dUnEng = _dUnLad = _dUnRolls = 0; _unLogged.Clear();
             _dCaptTown = _dCaptCap = _dCaptCastle = _dCaptAfterSurr = 0;
-            lock (Gate) { _dClampSt.Clear(); _dRotSt.Clear(); _dClampSum = 0; _dStumbles = 0; }
+            lock (Gate) { _dClampSt.Clear(); _dRotSt.Clear(); _dClampSum = 0; _dStumbles = 0; _dTrebPace.Clear(); _dTrebPacePlayer.Clear(); }
         }
 
         /// <summary>Z SiegeWalls.Reset (konstruktor ArmouryBehavior: nowa kampania i kazde wczytanie).</summary>
@@ -951,6 +1037,22 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("SessionStart", e); }
             SessionStart3();                                                      // oblezenia 3: linia "Oblezenia 3 (start)"
+            SessionStartTb2();                                                    // TB2: linia "Trebusz wczesnie (TB2, start)"
+        }
+
+        /// <summary>Linia "Trebusz wczesnie (TB2, start)": klucz i klucze, od ktorych zalezy (TB - znacznik obozu, MB - szturm przez wyrwe, OB4 - klasa).</summary>
+        private static void SessionStartTb2()
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null) return;
+                Log.Info("Trebusz wczesnie (TB2, start): klucz SiegeTrebuchetEarly " + (EarlyOn ? "tak" : "nie") + " | (a) trebusz drugiej ekipy od 1. doby oblezenia miasta i stolicy"
+                         + " (wymaga trebusze TB " + (TrebOn ? "tak" : "nie") + "; zamek bez zmian) | (b) trebusz bez klasy twierdzy OB4 (OB4 " + s.SiegeBesiegerPrepPercent + "%, miasto x"
+                         + F(s.SiegeTownPrepFactor, "0.00") + ", stolica x" + F(s.SiegeCapitalPrepFactor, "0.00") + " - dalej oboz, taran i wieza) | (c) szturm przez wyrwe bez kary machin"
+                         + " (wymaga MB " + (UnblockOn ? "tak" : "nie") + ") | log " + (LogOn ? "tak" : "nie") + ".");
+            }
+            catch (Exception e) { Stumble("SessionStartTb2", e); }
         }
     }
 }

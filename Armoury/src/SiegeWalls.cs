@@ -58,6 +58,7 @@ namespace Armoury
     /// OB4 - budowa obozu i machin strony OBLEGAJACEJ (WorldPace.SiegePostfix, raz na lancuch): x SiegeBesiegerPrepPercent (50) / klasa (zamek 1,
     ///   miasto 1.5, stolica 2.5). Jeff 14.10: "realistyczne oblezenia takze dla mnie i czas budowy tez realistyczny" - takze oboz gracza. Bez Innych
     ///   i bez obozow skryptu fabuly ROT (szturm fabuly czeka tylko na przygotowania - ApplyStartAssaultAgainstWalls po IsPreparationComplete).
+    ///   TB2-b (SiegeTrebuchetEarly, noc 16.10): trebusz bez klasy - samo SiegeBesiegerPrepPercent (AI i gracz); klasa dalej dla obozu, taranu i wiezy.
     /// BITWA SZTURMU SZ1-SZ4 (decyzje Jeffa 14.10 o samej bitwie; postfiks GetSimulationTicksForBattleRound - szturm AI i autobitwa gracza, ta sama regula;
     ///   bez Innych, skryptu fabuly i morza). Gra (DefaultCombatSimulationModel.cs:251-256) liczy tury rundy szturmu "z murow" tylko przy obroncach > 100
     ///   (miasto) / > 30 (zamek): obrona 2 x round(0.5 + max(1 + D^0.3 x 0.7 x przewaga, (D+1)/(A+1))), atak 2 x round(1.5 + D^0.3) - waski front, ciosy
@@ -1038,12 +1039,14 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ OB4: tempo budowy strony oblegajacej (z WorldPace.SiegePostfix)
-        private sealed class PrepRec { public int Day; public float F; }
+        // TB2-b: FT - mnoznik trebusza (samo SiegeBesiegerPrepPercent, bez klasy twierdzy), osobno od F, zeby pamiec dnia obozu, taranu i wiezy zostala ta sama
+        private sealed class PrepRec { public int Day; public float F, FT; public bool Player; }
         private static readonly Dictionary<SiegeEvent, PrepRec> _prep = new Dictionary<SiegeEvent, PrepRec>();
         private static readonly HashSet<SiegeEvent> _dPrepAi = new HashSet<SiegeEvent>(), _dPrepPlayer = new HashSet<SiegeEvent>(), _dPrepExcl = new HashSet<SiegeEvent>();
 
-        /// <summary>Mnoznik OB4 dla strony oblegajacej (1 = bez zmian). Pamiec dnia na oblezenie. Nie rzuca.</summary>
-        internal static float PrepFactor(SiegeEvent ev, ISiegeEventSide side)
+        /// <summary>Mnoznik OB4 dla strony oblegajacej (1 = bez zmian) i machiny type. Pamiec dnia na oblezenie. TB2-b (SiegeTrebuchetEarly): trebusz bez klasy
+        /// twierdzy - AI i gracz (ta sama regula OB4). Nie rzuca.</summary>
+        internal static float PrepFactor(SiegeEvent ev, ISiegeEventSide side, SiegeEngineType type)
         {
             try
             {
@@ -1052,10 +1055,10 @@ namespace Armoury
                 if (s == null) return 1f;
                 int today = Today;
                 PrepRec r;
-                if (_prep.TryGetValue(ev, out r) && r.Day == today) return r.F;
+                if (_prep.TryGetValue(ev, out r) && r.Day == today) return ForType(ev, r, type);
                 bool first = r == null;
                 if (r == null) { r = new PrepRec(); _prep[ev] = r; }
-                r.Day = today; r.F = 1f;
+                r.Day = today; r.F = 1f; r.FT = 1f; r.Player = false;
                 double pct = Clamp(s.SiegeBesiegerPrepPercent, 10, 100) / 100.0;
                 double tf = float.IsNaN(s.SiegeTownPrepFactor) ? 1.0 : Clamp(s.SiegeTownPrepFactor, 1.0, 4.0);
                 double cf = float.IsNaN(s.SiegeCapitalPrepFactor) ? 1.0 : Clamp(s.SiegeCapitalPrepFactor, 1.0, 4.0);
@@ -1068,15 +1071,24 @@ namespace Armoury
                 string excl = Und(lp, st) ? "Inni" : Scripted(lp) ? "skrypt fabuly" : null;
                 bool cap = IsCapital(st);
                 double cls = cap ? cf : st.IsTown ? tf : 1.0;
-                if (excl == null) r.F = (float)(pct / cls);
+                if (excl == null) { r.F = (float)(pct / cls); r.FT = (float)pct; }
+                r.Player = player;
                 if (first && LogOn)
                     Log.Info("Mury oblezen (OB4): dzien " + today + " | osada " + st.StringId + " (" + Nm(st) + ", " + (cap ? "stolica" : st.IsTown ? "miasto" : "zamek") + ") | wodz " + Hn(lp)
                              + " (frakcja " + (lp.MapFaction != null ? lp.MapFaction.StringId : "-") + ") | gracz " + (player ? "tak" : "nie")
                              + " | tempo budowy obozu i machin oblegajacych x" + F(r.F, "0.000") + (excl != null ? " (wykluczone: " + excl + ")" : " (" + F(pct * 100.0, "0") + "% / klasa " + F(cls, "0.00") + ")") + ".");
-                return r.F;
+                return ForType(ev, r, type);
             }
             catch (Exception e) { Stumble("PrepFactor", e); return 1f; }
             finally { Count(ev, side); }
+        }
+
+        /// <summary>TB2-b: trebusz (DefaultSiegeEngineTypes.Trebuchet) przy kluczu SiegeTrebuchetEarly - FT (tempo zamku); reszta i klucz wylaczony - F.</summary>
+        private static float ForType(SiegeEvent ev, PrepRec r, SiegeEngineType type)
+        {
+            if (type != DefaultSiegeEngineTypes.Trebuchet || r.FT == r.F || !SiegeWalls2.EarlyOn) return r.F;
+            SiegeWalls2.NoteTrebPace(ev, r.Player);
+            return r.FT;
         }
 
         private static void Count(SiegeEvent ev, ISiegeEventSide side)
