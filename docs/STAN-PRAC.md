@@ -2365,3 +2365,7 @@ Potem, po kolei (slowa Jeffa):
    len/wino), plon okregu = suma; wieksze potrzeby wsi i miast, zeby towary schodzily z rynku - test 120 dob wobec bazy.
 4. Drogi na calej mapie (tekstury z gry; Jeff moze pobrac paczke tekstur), +15% predkosci na drodze.
 Wszystko ma dzialac ze starym zapisem Ironman (sprawdzic sciezke "inny uklad" ksiegi wiosek).
+D6 (Jeff 16.10 "wygeneruj albo pobierz herby wiosek i flagi, zeby nie wygladalo jednolicie") - po workflow noc-wioski, na tej samej galezi: herby z opisu lore
+(arm_map_village_lore.tsv: 1847 rodow rycerzy z opisem knight_arms, np. "A green rook on gold", tylko 140 ma kod herbu) - kolory pola i godla wprost z opisu, podzial pola z tel
+Native (pas, w krzyz, krokiew...), godlo z grupy ikon wedlug slowa (Native: Animal / Flora / Handmade / Sign / Shape; CCsBanners 728 ikon: Heraldry, Dragons...), ten sam
+rod = ten sam herb, Banner.IsValidBannerCode; bez pobierania. Ograniczenie: ikony nie maja nazw - figura z wlasciwej rodziny, nie zawsze to samo zwierze.
