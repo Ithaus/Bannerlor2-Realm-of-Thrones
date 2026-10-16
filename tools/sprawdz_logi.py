@@ -28858,13 +28858,13 @@ NS_DAY = re.compile(r"^GearFit: dzien (\d+) \| ")
 NS_REJ = re.compile(r"kandydatow odrzuconych (\d+) \(umiejetnosc (\d+), siodlo (\d+), kultura (\d+)\)")
 NS_HAND = re.compile(r"szt\. (\d+), uzywalne (\d+), nieuzywalne (\d+) \(kupione -> notabl (\d+) za (\d+) zl, dobytek -> sakiewka ludzi (\d+) za (\d+) zl, "
                      r"na polke bez zaplaty (\d+)\), bez targu zostawione jak dotad (\d+)")
-NS_CTL = re.compile(r"do zbrojowni nieuzywalnych (\d+) \(ma byc 0\)")
+NSP_CTL = re.compile(r"do zbrojowni nieuzywalnych (\d+) \(ma byc 0\)")
 # poprawki po recenzji (noc 15/16.10): braki ludzi gracza bez skutku (petla kupno -> skup), nadwyzki obcej kultury AI/zalog, dobytek zalog panu osady
 NS_GAP = re.compile(r"\| braki ludzi gracza: kupione (\d+), kupione w \d+ dniach i nieuzyte \(wolne przy brakach albo sprzedane jako nadwyzka\) (\d+)")
 NS_AIFOR = re.compile(r"sprzedane sztuki kultury, ktorej nie nosi nikt w partii: lordowie AI (\d+), zalogi (\d+)")
 NS_LORD = re.compile(r"\(w tym x2 zalog bez sakiewki - panu osady (\d+) za (\d+) zl\)")
 NS_PRE = re.compile(r"komplety DTE przed startem sesji bez filtra (\d+)")
-NS_STUM = re.compile(r"potkniecia (\d+) \(sesja (\d+)\)\.?$")
+NSP_STUM = re.compile(r"potkniecia (\d+) \(sesja (\d+)\)\.?$")
 NS_FLOOR = re.compile(r"\| podloga broni \(GearFit[^)]*\): Twoi ludzie - bez broni po strazach (\d+), z polki (\d+) \(uzywalna (\d+), obca kultura (\d+), "
                       r"ponad umiejetnosc - ostatnia deska (\d+)\), nic w polce (\d+)")
 NS_BARE = re.compile(r"Bitwa gracza \(sklad7b-p, start\): Twoich ludzi (\d+) - bez broni (\d+),")
@@ -29039,8 +29039,8 @@ def nsprzet_main(logp, csp, bdp):
                 "kazda doba", have == len(need) and len(days) > 0)
     else:
         rep.add("NS-2: linia 'GearFit: dzien'", f"linii {len(days)}, brak linii 'Komplet rekruta'", "INFO", None)
-    ctl = sum(num(NS_CTL.pattern, s, int, 0) or 0 for s in days.values())
-    ctl_miss = sum(1 for s in days.values() if not NS_CTL.search(s))
+    ctl = sum(num(NSP_CTL.pattern, s, int, 0) or 0 for s in days.values())
+    ctl_miss = sum(1 for s in days.values() if not NSP_CTL.search(s))
     rep.add("NS-3: kontrola 'do zbrojowni nieuzywalnych'", f"suma {ctl} w {len(days)} dobach (linii bez pola {ctl_miss})", "0", ctl == 0 and ctl_miss == 0 and len(days) > 0)
     bad, tot = [], [0] * 9
     for d, s in sorted(days.items()):
@@ -29058,7 +29058,7 @@ def nsprzet_main(logp, csp, bdp):
             f"sakiewka {tot[5]} za {tot[6]} zl, polka bez zaplaty {tot[7]}), bez targu {tot[8]}", "0 niezgodnych", len(bad) == 0 and len(days) > 0)
     stum = 0
     for s in days.values():
-        mm = NS_STUM.search(s)
+        mm = NSP_STUM.search(s)
         if mm:
             stum += int(mm.group(1))
     rep.add("NS-5: potkniecia GearFit / ERROR in GearFit", f"potkniecia {stum}, ERROR {errs}", "0 / 0", stum == 0 and errs == 0)
