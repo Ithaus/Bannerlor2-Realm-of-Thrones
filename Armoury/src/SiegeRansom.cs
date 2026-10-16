@@ -121,6 +121,7 @@ namespace Armoury
             public bool Capital, Story, Undead, Rebel; public string Excl;  // wykluczenie (null - brak)
             public bool DefPays; public string DefWhy;
             public bool AccNeed, AccFailed, AccBloody, AiAccepts; public string AccWhy;
+            public bool AccFailedHeld; public double Edge;                 // F1 (oblezenia 3): szturm bez zdobycia, ale przewaga oblegajacy / obroncy w pelni dalej >= prog DR
             public string Player;                                          // "w osadzie", "pan osady", "w obozie", "-"
             public int Failed; public double Days;
         }
@@ -186,7 +187,14 @@ namespace Armoury
                 // AI-oblegajacy (P2): pusta warownia - nigdy (zdobycie bez walki); szturm bez zdobycia liczy sie tylko tej samej frakcji
                 string fid = j.Faction != null ? j.Faction.StringId : null;
                 j.AccNeed = j.Need.InNeed;
-                j.AccFailed = j.Failed > 0 && s != null && fid != null && string.Equals(s.FailFaction, fid, StringComparison.Ordinal);
+                bool same = j.Failed > 0 && s != null && fid != null && string.Equals(s.FailFaction, fid, StringComparison.Ordinal);
+                // F1 (oblezenia 3, klucz SiegeRansomRepelNeedsWeakEdge; Jeff: "poczekaja do nastepnego szturmu, chyba ze przybedzie odsiecz"): po odpartym szturmie
+                // okup tylko przy przewadze stopnialej ponizej progu "miazdzacej przewagi" DR (SiegeLadderMinRatio, ta sama miara: sila obozu / obroncy w pelni);
+                // wodz silniejszy czeka na nastepny szturm (OB2 daje przerwe). Kazde odparcie kosztuje ok. 22% ludzi i morale - regula sama sie ogranicza
+                double lr = SiegeWalls2.LadderRatio;
+                j.Edge = j.Def0 > 0 ? j.Att / j.Def0 : 999.0;
+                j.AccFailedHeld = same && SiegeWalls2.RepelEdgeOn && j.Edge >= lr;
+                j.AccFailed = same && !j.AccFailedHeld;
                 double br = BloodyRatio;
                 j.AccBloody = br > 0 && !j.Empty && j.RatioWalls < br;
                 j.AiAccepts = !j.Empty && (j.AccNeed || j.AccFailed || j.AccBloody);
@@ -196,7 +204,8 @@ namespace Armoury
                 if (j.AccBloody) why.Add("krwawy szturm " + F(j.RatioWalls, "0.00") + " < " + F(br, "0.00"));
                 if (j.Empty) j.AccWhy = "pusta warownia - zdobycie bez walki";
                 else j.AccWhy = why.Count > 0 ? string.Join(", ", why.ToArray())
-                              : "bez powodu (wojsko syte, " + (j.Failed > 0 ? "szturm bez zdobycia innej frakcji, " : "") + "stosunek murow " + F(j.RatioWalls, "0.00") + " >= " + F(br, "0.00") + ")";
+                              : "bez powodu (wojsko syte, " + (j.AccFailedHeld ? "po odparciu przewaga " + F(j.Edge, "0.00") + " >= " + F(lr, "0.0") + " - czeka na nastepny szturm, "
+                                                               : j.Failed > 0 ? "szturm bez zdobycia innej frakcji, " : "") + "stosunek murow " + F(j.RatioWalls, "0.00") + " >= " + F(br, "0.00") + ")";
                 return j;
             }
             catch (Exception e) { Stumble("Evaluate", e); return null; }
@@ -287,6 +296,7 @@ namespace Armoury
                 s.Last = j;
                 if (j == null) return;
                 if (j.Excl != null) { int c; _dExcl.TryGetValue(j.Excl, out c); _dExcl[j.Excl] = c + 1; }
+                if (j.AccFailedHeld && !j.AiAccepts && !j.Empty && j.Excl == null && j.DefPays) SiegeWalls2.NoteRepelWait();   // F1 (oblezenia 3): okup po odparciu odpadl (obronca by zaplacil) - linia "Oblezenia 3 (doba)"
                 if (j.DefPays) _dDefPays++;
                 if (j.AiAccepts) _dAiAcc++;
                 if (j.DefPays && j.AiAccepts) _dBoth++;

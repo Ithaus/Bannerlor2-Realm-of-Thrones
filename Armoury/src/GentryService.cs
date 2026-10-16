@@ -225,6 +225,7 @@ namespace Armoury
         {
             _bkTried = false; _beh = null; _isGentry = null; _t1 = _t2 = null; _estData = _estSettlement = _estOwner = null;
             _knights.Clear(); _knightsDay = int.MinValue; ZeroLast(); ClearDay(); _dWoke = 0; _stumbles = 0; _err.Clear(); _weekSum = 0; _weekStart = -1;
+            _dBanPass = _dBanSkip = _dBanCd = _dBanWeak = _dBanNoVassal = 0;   // AR1 (oblezenia 3): po wczytaniu innego zapisu bez liczb poprzedniej sesji
         }
 
         internal static void ZeroLast() { LastPaid = 0; }
@@ -496,6 +497,10 @@ namespace Armoury
             var g = AccessTools.TypeByName("BannerKings.Behaviours.BKGentryBehavior");
             Wire("wezwanie rycerza (BK SummonGentry)", g != null ? AccessTools.Method(g, "SummonGentry") : null, nameof(SummonPrefix), null);
             Wire("rozwiazanie partii rycerza (BK FinishParty)", g != null ? AccessTools.Method(g, "FinishParty") : null, nameof(FinishPrefix), null);
+            // AR1 (oblezenia 3, GentryBannersNeedVassalParty): wezwanie choragwi AI BK bez pustych armii (metoda zadeklarowana w CallBannersGoal - override Goal.ApplyGoal)
+            var cb = AccessTools.TypeByName("BannerKings.Managers.Goals.Decisions.CallBannersGoal");
+            Wire("wezwanie choragwi AI (BK CallBannersGoal.ApplyGoal)", cb != null ? AccessTools.DeclaredMethod(cb, "ApplyGoal", Type.EmptyTypes) : null, nameof(BannersPrefix), null);
+            string ar1 = "BK " + (cb != null && BanResolve(cb) ? "TAK" : "BRAK") + ", SCA " + ScaResolve();
             // rycerz nie zajmuje miejsca zolnierza: bez tego partia pelna + rycerz = przepelnienie i gra wypedza co dobe zolnierza (dezercja z wielkosci partii)
             var psm = Campaign.Current.Models != null ? Campaign.Current.Models.PartySizeLimitModel : null;
             WirePost("miejsce rycerza w druzynie (GetPartyMemberSizeLimit)", psm != null ? PatchTarget.OfActive(psm, "GetPartyMemberSizeLimit", new[] { typeof(PartyBase), typeof(bool) }, "miejsce rycerza (179)") : null, nameof(SizePostfix));
@@ -522,7 +527,8 @@ namespace Armoury
             }
             catch (Exception e) { _missing.Add("zold druzyny pana (blad: " + e.Message + ")"); }
             Log.Info("Rycerze (179): latki BK - " + (_wired.Count > 0 ? string.Join(", ", _wired.ToArray()) : "-") + "; BRAK: " + (_missing.Count > 0 ? string.Join(", ", _missing.ToArray()) : "-")
-                     + "; rozpoznanie rodow rycerzy: BK IsGentryClan " + (BkResolve() ? "TAK" : "BRAK (tylko id \"gentryClan_\" bez lenna)") + ".");
+                     + "; rozpoznanie rodow rycerzy: BK IsGentryClan " + (BkResolve() ? "TAK" : "BRAK (tylko id \"gentryClan_\" bez lenna)")
+                     + "; choragwie AI tylko z druzyna wasala (AR1): " + ar1 + ".");
         }
 
         private static void Wire(string label, MethodBase m, string pre, string fin)
@@ -656,6 +662,103 @@ namespace Armoury
             catch (Exception e) { Stumble("FinishPrefix", e); }
         }
 
+        // ---- AR1 (oblezenia 3, klucz GentryBannersNeedVassalParty): wezwanie choragwi AI BK bez pustych armii
+        // [K] BK BKArmyBehavior.EvaluateCreateArmy (co dobe, kazda druzyna lorda) -> CallBannersGoal.DoAiDecision -> ApplyGoal: new Army (bez zdarzenia ArmyCreated),
+        // wasale z druzyna (IsAvailableForArmies) dolaczaja, majatki - SummonGentry; przy < 2 druzynach DisbandArmyAction.ApplyByNotEnoughParty. Przy 179 rycerz
+        // z majatku jedzie w druzynie pana (SummonPrefix) - armia z samych majatkow ma 1 druzyne i BK kasuje ja w dniu zalozenia (Jeff 10-56-30: 621 w 44 dobach),
+        // a SCA (OnArmyDispersed) daje wodzowi 0.75 doby przerwy w zakladaniu prawdziwej armii. Prefiks: wezwanie AI tylko, gdy przyjdzie choc jedna druzyna
+        // (wasal z wlasna druzyna albo majatek rodu spoza 179 - BK wystawi mu druzyne) i wodz spelnia zasade SCA dla wodza armii (przerwa po armii, >= 22 zdrowych
+        // i sila >= 80 - StrategicArmyManagementModel.CanLordCreateArmy; BK uzywa wlasnego modelu i jej nie pyta). Pominiete = BK nie tworzy armii, nie wydaje
+        // wplywu, nie wzywa rycerzy (jutro BK sprobuje znowu). Gracz i jego rod - BK jak dotad. Bledy refleksji - potkniecie i BK jak dotad.
+        private static bool _banTried, _scaTried;
+        private static FieldInfo _banList;
+        private static MethodInfo _banFulfiller;
+        private static PropertyInfo _optParty, _optHero, _optEstate;
+        private static Func<MobileParty, bool> _bkAvail, _scaRecovered;
+        private static Func<Hero, bool> _scaCooldown;
+        private static string _scaState = "nie sprawdzane";
+        private static int _dBanPass, _dBanSkip, _dBanCd, _dBanWeak, _dBanNoVassal;
+
+        /// <summary>Typy BK wezwania (raz na proces): pole "banners", Goal.GetFulfiller, BannerOption (Party, Hero, Estate), MobilePartyExtensions.IsAvailableForArmies.</summary>
+        private static bool BanResolve(Type t)
+        {
+            if (_banList != null) return true;
+            if (_banTried || t == null) return false;
+            _banTried = true;
+            try
+            {
+                var list = AccessTools.Field(t, "banners");
+                var ful = AccessTools.Method(t, "GetFulfiller", Type.EmptyTypes);
+                var ot = AccessTools.Inner(t, "BannerOption");
+                _optParty = ot != null ? AccessTools.Property(ot, "Party") : null;
+                _optHero = ot != null ? AccessTools.Property(ot, "Hero") : null;
+                _optEstate = ot != null ? AccessTools.Property(ot, "Estate") : null;
+                var ext = AccessTools.TypeByName("BannerKings.Extensions.MobilePartyExtensions");
+                var av = ext != null ? AccessTools.Method(ext, "IsAvailableForArmies", new[] { typeof(MobileParty) }) : null;
+                if (av != null) _bkAvail = (Func<MobileParty, bool>)Delegate.CreateDelegate(typeof(Func<MobileParty, bool>), av);
+                if (list == null || ful == null || _optParty == null || _optHero == null || _optEstate == null) return false;
+                _banFulfiller = ful; _banList = list;
+                return true;
+            }
+            catch (Exception e) { _banList = null; Stumble("BanResolve", e); return false; }
+        }
+
+        /// <summary>Zasada SCA dla wodza armii (raz na proces): StrategicAiState.IsArmyCreationOnCooldown(Hero), StrategicAiHelpers.IsRecoveredEnoughToLeadArmy(MobileParty).</summary>
+        private static string ScaResolve()
+        {
+            if (_scaTried) return _scaState;
+            _scaTried = true;
+            try
+            {
+                var st = AccessTools.TypeByName("StrategicCampaignAI145.StrategicAiState");
+                var sh = AccessTools.TypeByName("StrategicCampaignAI145.StrategicAiHelpers");
+                if (st == null && sh == null) { _scaState = "bez SCA"; return _scaState; }
+                var m1 = st != null ? AccessTools.Method(st, "IsArmyCreationOnCooldown", new[] { typeof(Hero) }) : null;
+                var m2 = sh != null ? AccessTools.Method(sh, "IsRecoveredEnoughToLeadArmy", new[] { typeof(MobileParty) }) : null;
+                if (m1 != null) _scaCooldown = (Func<Hero, bool>)Delegate.CreateDelegate(typeof(Func<Hero, bool>), m1);
+                if (m2 != null) _scaRecovered = (Func<MobileParty, bool>)Delegate.CreateDelegate(typeof(Func<MobileParty, bool>), m2);
+                _scaState = m1 != null && m2 != null ? "TAK" : "BRAK (" + (m1 == null ? "IsArmyCreationOnCooldown " : "") + (m2 == null ? "IsRecoveredEnoughToLeadArmy" : "") + ")";
+            }
+            catch (Exception e) { _scaCooldown = null; _scaRecovered = null; _scaState = "BRAK (" + e.GetType().Name + ")"; Stumble("ScaResolve", e); }
+            return _scaState;
+        }
+
+        /// <summary>Prefiks BK CallBannersGoal.ApplyGoal: wezwanie AI bez druzyny, ktora przyjdzie, albo wodza, ktorego SCA nie dopuscilo - pominiete (false). Nie rzuca.</summary>
+        public static bool BannersPrefix(object __instance)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (!On || s == null || !s.GentryBannersNeedVassalParty || __instance == null) return true;
+                if (!BanResolve(__instance.GetType())) return true;                // typy BK nieznane - BK jak dotad
+                var f = _banFulfiller.Invoke(__instance, null) as Hero;
+                if (f == null || f == Hero.MainHero || f.Clan == null || f.Clan == Clan.PlayerClan) return true;
+                var lp = f.PartyBelongedTo;
+                if (lp == null) return true;
+                ScaResolve();
+                if (_scaCooldown != null && _scaCooldown(f)) { _dBanSkip++; _dBanCd++; return false; }
+                if (_scaRecovered != null && !_scaRecovered(lp)) { _dBanSkip++; _dBanWeak++; return false; }
+                var list = _banList.GetValue(__instance) as System.Collections.IList;
+                int parties = 0;
+                if (list != null)
+                    foreach (var o in list)
+                    {
+                        if (o == null) continue;
+                        var p = _optParty.GetValue(o, null) as MobileParty;
+                        // BK ApplyGoal: wasal w druzynie - dolacza, gdy druzyna wolna dla armii (IsAvailableForArmies); druzyna samego wodza nie jest druga druzyna
+                        if (p != null) { if (p != lp && p.IsActive && (_bkAvail == null || _bkAvail(p))) parties++; continue; }
+                        // majatek bez druzyny: rod rycerza 179 jedzie w druzynie pana (SummonPrefix) - druzyny nie bedzie; inny rod - BK wystawi druzyne z majatku
+                        if (_optEstate.GetValue(o, null) == null) continue;
+                        var h = _optHero.GetValue(o, null) as Hero;
+                        if (h != null && h.Clan != null && !IsKnightClan(h.Clan)) parties++;
+                    }
+                if (parties == 0) { _dBanSkip++; _dBanNoVassal++; return false; }
+                _dBanPass++;
+                return true;
+            }
+            catch (Exception e) { Stumble("BannersPrefix", e); return true; }   // blad - BK jak dotad
+        }
+
         // ---- GentryEstateSpendCap: zakupy majatkow BK z przydzialu sprzetu 166, nie ponizej podlogi rodziny
         private static bool EstateGate(Hero owner)
         {
@@ -722,6 +825,7 @@ namespace Armoury
             {
                 _dSpawnBlock = _dSummon = _dSummonLord = _dSummonLead = _dSummonSkip = _dWoke = 0; _dLeadWageSkip = 0; _dLeadWageSkipN = 0;
                 _dFinish = _dFinishMen = _dFinishLost = _dFinishPris = _dFinishShips = 0; _dEstateBlock = 0; _dEstateSpent = 0;
+                _dBanPass = _dBanSkip = _dBanCd = _dBanWeak = _dBanNoVassal = 0;   // AR1 (oblezenia 3): wezwania AI BK od poprzedniej linii
             }
         }
 
@@ -748,6 +852,8 @@ namespace Armoury
               .Append(", rozwiazane przez BK ").Append(_dFinish).Append(" (ludzie do wsi majatku ").Append(_dFinishMen).Append(", bez wsi z danymi BK ").Append(_dFinishLost)
               .Append(", jency w rozwiazanych ").Append(_dFinishPris).Append(", statki ").Append(_dFinishShips).Append(')')
               .Append(" | majatki BK (przydzial sprzetu 166").Append(s.GentryEstateSpendCap ? "" : " - WYLACZONE").Append("): zakupy wstrzymane ").Append(_dEstateBlock).Append(", wydane ").Append(_dEstateSpent)
+              .Append(" | wezwania AI BK: przepuszczone ").Append(_dBanPass).Append(", pominiete ").Append(_dBanSkip).Append(" (SCA przerwa ").Append(_dBanCd)
+              .Append(", SCA slaby wodz ").Append(_dBanWeak).Append(", bez druzyn wasali ").Append(_dBanNoVassal).Append(')').Append(s.GentryBannersNeedVassalParty ? "" : " - WYLACZONE")
               .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');
             return sb.ToString();
         }
