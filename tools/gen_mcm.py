@@ -297,6 +297,9 @@ RANGES = {
     'TownMarketTollCaravanRate': (0.0, 0.2, "0.000"),
     # noc-ekonomia3 czesc 2 (16.10): czesc puli rent na dwor krolewski - kod przycina do 0..0.5 (CourtGoods.Crown)
     'CrownCourtShare': (0.0, 0.5, "0.00"),
+    # NB2 (16.10): mnozniki postury szeregowych wedlug tieru - kod przycina do 0.5..1.5 (T1) i 1.0..3.0 (T6) (BattleWind.SoldierMul)
+    'SoldierPostureTier1Multiplier': (0.5, 1.5, "0.00"),
+    'SoldierPostureTier6Multiplier': (1.0, 3.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

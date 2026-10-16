@@ -166,6 +166,13 @@ namespace Armoury
             try { Ensure(m); } catch { }
         }
 
+        /// <summary>NB2 (16.10): rodzaj misji do linii "Bitwa (NB2)" - ten sam co w linii NM (kryjowka / turniej / arena / bitwa / inna).</summary>
+        internal static string Kind(Mission m)
+        {
+            try { Ensure(m); return _kind; }
+            catch { return "inna"; }
+        }
+
         private static void Ensure(Mission m)
         {
             if (m == null || (_mission != null && ReferenceEquals(m, _mission.Target))) return;

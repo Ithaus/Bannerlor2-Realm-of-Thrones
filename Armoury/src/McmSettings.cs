@@ -1132,6 +1132,26 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float BattleWindedFloor { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Soldier Posture By Tier", HintText = "rank-and-file posture (the green bar under an enemy's name in RBM) grows with troop tier: recruits lose their guard easily, veterans hold it - tier 1 x0.85 up to tier 6 x1.7, the tiers between scale smoothly and the bar refills faster with the square root of it. Heroes keep their Endurance rule. Off = plain RBM posture for soldiers, as before")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool SoldierPostureByTier { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Soldier Posture Tier1 Multiplier", 0.50f, 1.50f, "0.00", HintText = "posture pool of tier 1 soldiers as a share of plain RBM (0.85 = 15% less)")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float SoldierPostureTier1Multiplier { get; set; } = 0.85f;
+
+        [SettingPropertyFloatingInteger("Soldier Posture Tier6 Multiplier", 1.00f, 3.00f, "0.00", HintText = "posture pool of tier 6 soldiers as a share of plain RBM (1.7 = 70% more); the tiers between follow a smooth curve and tier 7 goes one step further")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float SoldierPostureTier6Multiplier { get; set; } = 1.7f;
+
+        [SettingPropertyBool("Blood Through Armour", HintText = "with RBM a blow that cuts or crushes into mail or plate only shows sweat, even when it went through - now such a blow (30 damage or more) and every killing blow RBM left dry bursts blood from the wound. At most one burst per man every half second and 20 a second on the whole field. Off = RBM's particles only, as before")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool BloodThroughArmour { get; set; } = true;
+
+        [SettingPropertyBool("Battle Cries And Moans", HintText = "AI formations roar a battle cry when they charge, not only when you order a charge: the captain always, his men by tier, morale and his Leadership; badly wounded men (below 30% health) near you moan now and then, at most three times each. Never the same man over and over: one voice per man every 4 seconds (a battle cry every 20), at most 6 voices a second on the field, none in sea battles or sea raids. Off = the game's own voices only, as before")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool BattleCriesAndMoans { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Stamina Regen Per Second", 0.00f, 100.00f, "0.00", HintText = "without RBM: points regained each second of easing off (with RBM its own regen rules)")]
         [SettingPropertyGroup("Flesh and wind")]
         public float StaminaRegenPerSecond { get; set; } = 25f;
@@ -1243,6 +1263,22 @@ namespace Armoury
         [SettingPropertyBool("Wounded Flee Battles Only", HintText = "the wounded break and run (Wounded Flee and AI Flee When Near Death) only in real battles on the map - tournament, arena and brawl fighters fight on to the knock-out, as the game itself intends")]
         [SettingPropertyGroup("The master's parry")]
         public bool WoundedFleeBattlesOnly { get; set; } = true;
+
+        [SettingPropertyBool("Broken Men Never Rally", HintText = "a wounded man who breaks (Wounded Flee or AI Flee When Near Death) panics once per battle and runs for good: one scream and one fright, no turning back to brawl with bare fists - RBM no longer talks him back into the fight, and if his flight stalls he is sent off again quietly, at most every 4 seconds. Off = as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool BrokenMenNeverRally { get; set; } = true;
+
+        [SettingPropertyBool("Flee Away From Enemies", HintText = "with Broken Men Never Rally on: in a field battle a broken man runs where the enemy is not - straight away from the foes around him, never across their front, horsemen and you counting double; if you are within 15 metres he always runs away from you; when the enemy is all around, he runs where there are fewest of them, to the edge of the field by a path he can really walk. The game's own way out stays when it is safe and leads away from them. Sieges, sorties, sea battles and hideouts keep the game's way. Off = the game's way, as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool FleeAwayFromEnemies { get; set; } = true;
+
+        [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 150 a side of 150 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool CommanderTactics { get; set; } = true;
+
+        [SettingPropertyBool("Veterans By Tier", HintText = "AI soldiers fight by their experience on top of RBM: every tier has a floor of combat sense no difficulty setting takes away, tier 5 and above (without a shield) parry, read blows and riposte beyond RBM's caps, recruits hesitate to attack and veterans press harder. RBM's stamina penalties stay. Needs RBM; takes effect from the next game start when switched on. Off = plain RBM, as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool VeteransByTier { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Auto Parry Full Diff", 0.00f, 100.00f, "0.00", HintText = "your lead IS your chance: each point of skill lead gives (100 / this) % odds per swing, certain at this many points (25 = 4% a point: 13 pts -> 52%, 1 pt -> 4%)")]
         [SettingPropertyGroup("The master's parry")]
@@ -6826,6 +6862,11 @@ namespace Armoury
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
             s.BattleRegenAtEnd10 = BattleRegenAtEnd10;
             s.BattleWindedFloor = BattleWindedFloor;
+            s.SoldierPostureByTier = SoldierPostureByTier;
+            s.SoldierPostureTier1Multiplier = SoldierPostureTier1Multiplier;
+            s.SoldierPostureTier6Multiplier = SoldierPostureTier6Multiplier;
+            s.BloodThroughArmour = BloodThroughArmour;
+            s.BattleCriesAndMoans = BattleCriesAndMoans;
             s.StaminaRegenPerSecond = StaminaRegenPerSecond;
             s.TiredSpeedFactor = TiredSpeedFactor;
             s.WoundedPenaltiesEnabled = WoundedPenaltiesEnabled;
@@ -6854,6 +6895,10 @@ namespace Armoury
             s.WoundedFleeEnemiesOnly = WoundedFleeEnemiesOnly;
             s.WoundedFleeWithoutPlayer = WoundedFleeWithoutPlayer;
             s.WoundedFleeBattlesOnly = WoundedFleeBattlesOnly;
+            s.BrokenMenNeverRally = BrokenMenNeverRally;
+            s.FleeAwayFromEnemies = FleeAwayFromEnemies;
+            s.CommanderTactics = CommanderTactics;
+            s.VeteransByTier = VeteransByTier;
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;

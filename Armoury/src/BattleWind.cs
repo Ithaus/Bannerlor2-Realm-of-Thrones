@@ -30,6 +30,9 @@ namespace Armoury
         /// liniowego bonusu Endurance (bo bylby podwojny).</summary>
         internal static bool Active;
 
+        /// <summary>NB2: latka na RBMAI.Stance.InitializePosture wpieta (oddech bohaterow albo postura szeregowych wedlug tieru).</summary>
+        internal static bool PosturePatched;
+
         // regen RBM biega co 0,5 s z tickCount=30 - stad przelicznik pkt/s -> add
         private const float RbmTickSeconds = 0.5f;
         private const int RbmTickCount = 30;
@@ -164,6 +167,10 @@ namespace Armoury
         /// RBM liczy max od zera, wiec mnozymy za kazdym razem od nowa).
         /// Regen postury skalujemy TYM SAMYM mnoznikiem co pule - pasek jest
         /// wiekszy, ale wraca w tym samym czasie co w RBM; balans wymian zostaje.
+        /// NB2 (16.10, Jeff "wysoki tier traci zielony pasek po kilku ciosach"): szeregowi (nie bohaterowie) dostaja pule x mnoznik tieru
+        /// (SoldierMul: T1 x0.85 ... T6 x1.7, geometrycznie), regeneracje x pierwiastek z mnoznika. Bez broni glownej RBM nic nie przelicza
+        /// (Stance.cs:84 - InitializePosture tylko przy primaryWieldedItemIndex != -1), wiec wtedy nie mnozymy - dotad kazda zmiana broni
+        /// "na pusto" mnozyla pule bohatera od nowa.
         /// </summary>
         public static void PostureInitPostfix(Agent agent, object stance)
         {
@@ -179,14 +186,57 @@ namespace Armoury
                     _fPostureRegen.SetValue(stance, 1000f);
                     return;
                 }
+                // NB2: dziura ponownego mnozenia - RBM nie przeliczyl, wiec pula juz nosi nasz mnoznik z ostatniego przeliczenia
+                if (agent.GetPrimaryWieldedItemIndex() == EquipmentIndex.None) { RoutHold.PostureNoWeapon(agent); return; }
                 var hero = HeroOf(agent);
-                if (hero == null) return;
-                float mul = EnduranceMul(hero);
-                _fMaxPosture.SetValue(stance, (float)_fMaxPosture.GetValue(stance) * mul);
-                _fPosture.SetValue(stance, (float)_fPosture.GetValue(stance) * mul);
-                _fPostureRegen.SetValue(stance, (float)_fPostureRegen.GetValue(stance) * mul);
+                if (hero != null)
+                {
+                    if (!Active) return;     // oddech bohaterow wylaczony przy starcie (BattleStaminaEnabled) - jak dotad bez mnoznika
+                    float mul = EnduranceMul(hero);
+                    _fMaxPosture.SetValue(stance, (float)_fMaxPosture.GetValue(stance) * mul);
+                    _fPosture.SetValue(stance, (float)_fPosture.GetValue(stance) * mul);
+                    _fPostureRegen.SetValue(stance, (float)_fPostureRegen.GetValue(stance) * mul);
+                    RoutHold.PostureHero(agent);
+                    return;
+                }
+                // NB2: szeregowy wedlug tieru (klucz czytany na zywo)
+                var c = Settings.Current;
+                if (c == null || !c.SoldierPostureByTier || !agent.IsHuman) return;
+                var ch = agent.Character;
+                if (ch == null || ch.IsHero) return;    // bohater bez Hero (bitwa wlasna) - jak dotad, czysty RBM
+                int tier = TierOf(ch);
+                float k = SoldierMul(tier);
+                float max0 = (float)_fMaxPosture.GetValue(stance);
+                _fMaxPosture.SetValue(stance, max0 * k);
+                _fPosture.SetValue(stance, (float)_fPosture.GetValue(stance) * k);         // stosunek posture / max zostaje (RBM tez go trzyma)
+                _fPostureRegen.SetValue(stance, (float)_fPostureRegen.GetValue(stance) * (float)Math.Sqrt(k));
+                RoutHold.PostureSoldier(agent, tier, max0, max0 * k);
             }
-            catch (Exception e) { Log.Error("BattleWind.PostureInit", e); }
+            catch (Exception e) { RoutHold.Stumble(RoutHold.SitePosture, "BattleWind.PostureInit", e); }
+        }
+
+        /// <summary>NB2: tier jednostki z poziomu jak w grze (DefaultCharacterStatsModel.GetTier: ceil((Level - 5) / 5)), 1..7. Bez
+        /// CharacterObject.Tier - ten wola Campaign.Current (null w bitwie wlasnej).</summary>
+        internal static int TierOf(BasicCharacterObject ch)
+        {
+            int lv = 1;
+            try { lv = ch != null ? ch.Level : 1; } catch { }
+            int t = (int)Math.Ceiling((lv - 5) / 5.0);
+            if (t < 1) t = 1;
+            if (t > 7) t = 7;
+            return t;
+        }
+
+        /// <summary>NB2: mnoznik puli postury szeregowego: T1 x m1 ... T6 x m6, miedzy nimi (i T7) geometrycznie: m1 * (m6/m1)^((T-1)/5).
+        /// Klucze przyciete jak suwaki MCM (T1 0.5-1.5, T6 1.0-3.0).</summary>
+        internal static float SoldierMul(int tier)
+        {
+            var c = Settings.Current;
+            float m1 = Clamp(c != null ? c.SoldierPostureTier1Multiplier : 0.85f, 0.5f, 1.5f);
+            float m6 = Clamp(c != null ? c.SoldierPostureTier6Multiplier : 1.7f, 1f, 3f);
+            if (tier < 1) tier = 1;
+            if (tier > 7) tier = 7;
+            return (float)(m1 * Math.Pow(m6 / m1, (tier - 1) / 5.0));
         }
 
         /// <summary>Zadyszka zamiast gumki RBM: pusty pasek oddycha wolno, pelny szybko.</summary>
@@ -228,7 +278,11 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || !c.BattleStaminaEnabled) { Log.Info("BattleWind: wylaczone."); return; }
+                // NB2: latka InitializePosture potrzebna takze samej posturze szeregowych wedlug tieru (SoldierPostureByTier); stamina i oba
+                // ticki dalej tylko przy BattleStaminaEnabled, Active tylko przy staminie bohaterow (czyta to FieldCraft - Endurance nie dwa razy)
+                bool wind = c != null && c.BattleStaminaEnabled;
+                bool tiers = c != null && c.SoldierPostureByTier;
+                if (!wind && !tiers) { Log.Info("BattleWind: wylaczone."); return; }
                 var tStance = QuartermasterLaw.FindType("RBMAI.Stance");
                 if (tStance == null) { Log.Info("BattleWind: RBM nieobecny - nic do roboty."); return; }
 
@@ -245,22 +299,30 @@ namespace Armoury
                     || _mAddStamina == null || _mAddPosture == null)
                 { Log.Info("BattleWind: pola RBMAI.Stance nie pasuja - odpuszczam."); return; }
 
-                var mIS = AccessTools.Method(tStance, "InitializeStamina");
-                var mIP = AccessTools.Method(tStance, "InitializePosture");
-                var mTS = AccessTools.Method(tStance, "tickStaminaRegen");
-                var mTP = AccessTools.Method(tStance, "tickPostureRegen");
-                if (mIS == null || mIP == null || mTS == null || mTP == null)
+                // NB2: cele deklarowane w RBMAI.Stance (AccessTools.DeclaredMethod; Stance dziedziczy tylko po object - te same metody co dotad)
+                var mIS = AccessTools.DeclaredMethod(tStance, "InitializeStamina");
+                var mIP = AccessTools.DeclaredMethod(tStance, "InitializePosture");
+                var mTS = AccessTools.DeclaredMethod(tStance, "tickStaminaRegen");
+                var mTP = AccessTools.DeclaredMethod(tStance, "tickPostureRegen");
+                if (mIP == null || (wind && (mIS == null || mTS == null || mTP == null)))
                 { Log.Info("BattleWind: metody RBMAI.Stance nie pasuja - odpuszczam."); return; }
 
-                h.Patch(mIS, postfix: new HarmonyMethod(typeof(BattleWind), "StaminaInitPostfix"));
                 h.Patch(mIP, postfix: new HarmonyMethod(typeof(BattleWind), "PostureInitPostfix"));
-                h.Patch(mTS, prefix: new HarmonyMethod(typeof(BattleWind), "TickStaminaPrefix"));
-                h.Patch(mTP, prefix: new HarmonyMethod(typeof(BattleWind), "TickPosturePrefix"));
-                Active = true;
-                Log.Info("BattleWind: oddech bitewny bohaterow wg Endurance (pula 2^((END-2.5)/"
-                         + Settings.Current.BattleEndDoubleEvery.ToString("0.#") + "), regen "
-                         + (int)Settings.Current.BattleRegenAtEnd1 + "-" + (int)Settings.Current.BattleRegenAtEnd10
-                         + " pkt/s, zadyszka " + Settings.Current.BattleWindedFloor.ToString("0.00") + ").");
+                PosturePatched = true;
+                if (wind)
+                {
+                    h.Patch(mIS, postfix: new HarmonyMethod(typeof(BattleWind), "StaminaInitPostfix"));
+                    h.Patch(mTS, prefix: new HarmonyMethod(typeof(BattleWind), "TickStaminaPrefix"));
+                    h.Patch(mTP, prefix: new HarmonyMethod(typeof(BattleWind), "TickPosturePrefix"));
+                    Active = true;
+                    Log.Info("BattleWind: oddech bitewny bohaterow wg Endurance (pula 2^((END-2.5)/"
+                             + Settings.Current.BattleEndDoubleEvery.ToString("0.#") + "), regen "
+                             + (int)Settings.Current.BattleRegenAtEnd1 + "-" + (int)Settings.Current.BattleRegenAtEnd10
+                             + " pkt/s, zadyszka " + Settings.Current.BattleWindedFloor.ToString("0.00") + ").");
+                }
+                else Log.Info("BattleWind: oddech bohaterow wylaczony (BattleStaminaEnabled) - wpieta tylko postura szeregowych wedlug tieru.");
+                Log.Info("BattleWind (NB2): postura szeregowych wedlug tieru - latka InitializePosture wpieta (klucz SoldierPostureByTier na zywo"
+                         + ", przy starcie " + (tiers ? "TAK" : "NIE") + "); bez broni glownej bez ponownego mnozenia.");
             }
             catch (Exception e) { Log.Error("BattleWind.ApplyAll", e); }
         }

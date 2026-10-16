@@ -722,12 +722,21 @@ namespace Armoury
                             }
                         }
                         // NM: FleeHere na koncu warunku - poza bitwa na mapie (turniej, arena, bojka) st.Panicked zostaje false
+                        // NB2 (16.10, klucz BrokenMenNeverRally): jedna regula z BrokenMen - RoutHold.Break (raz Panic na bitwe, morale
+                        // przypiete na 0, ponowienia bez okrzyku i cel ucieczki w RoutKeeper). Odmowa Break (koniec bitwy, bez druzyny, odwrot
+                        // z rozkazu szyku) zostawia st.Panicked false - sprobujemy przy nastepnym takcie. Ponowne FleeTheField (Panic co 0,2 s -
+                        // zapetlony krzyk z logu 16.10: 257 wywolan na 7 ludzi) tylko na starej drodze (klucz wylaczony).
+                        bool rout = RoutHold.On(Mission);
                         if (broken && c.AiFleeWhenNearDeath && !agent.IsMainAgent && agent.IsAIControlled && !st.Panicked && FleeHere(agent))
                         {
-                            st.Panicked = true;
-                            FleeTheField(agent);
+                            if (rout) st.Panicked = RoutHold.Break(agent, MissionTeams.Flee);
+                            else
+                            {
+                                st.Panicked = true;
+                                FleeTheField(agent);
+                            }
                         }
-                        else if (st.Panicked && !agent.IsMainAgent && agent.IsAIControlled && !agent.IsRetreating() && FleeHere(agent))
+                        else if (!rout && st.Panicked && !agent.IsMainAgent && agent.IsAIControlled && !agent.IsRetreating() && FleeHere(agent))
                         {
                             // odwrot mu wygasl (zderzyl sie z kims, silnik go zawrocil) -
                             // przypominamy trupowi ze mial uciekac, nie boksowac
