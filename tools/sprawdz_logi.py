@@ -659,7 +659,8 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa noboz <Armoury-*.log> (strumieniowo; sesja = od linii "Nocleg (zegar ksiegi):"). NO-0 zegar ksiegi z terminu
                     ticku gry TAK w kazdej sesji, NO-1 swity AI kolejne i "dob bez switu 0", NO-2 24 tiki na dobe, NO-3 "pomiar z pozycji, <dlugosc obozu> h", NO-4 nowy
                     dlug 1 AI <= 40 na swit, NO-5 linie gracza = linie AI, odpoczynek <= 18.45 h, NIEZGODNY 0, NO-6 bledy 0, NO-7 dlug odlozony wedlug reguly, NO-8 po
-                    przerwanym snie swit "sen w menu nie", NO-9 noc gracza (INFO). Pierwszy swit sesji poza NO-1..NO-5. Log bez paczki: INFO, bez wyjatku.
+                    przerwanym snie swit "sen w menu nie", NO-9 noc gracza (INFO), NO-10 pelny pasek snu w menu (bez wzrostu dlugu w snie) -> dlug 0, takze
+                    przez swit. Pierwszy swit sesji poza NO-1..NO-5. Log bez paczki: INFO, bez wyjatku.
 --grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
                     TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
                     (strumieniowo). OB2-0 linia startu (klucze tak), OB2-1 linie doby straznika / wsi / pozyczek, OB2-2 potkniecia i ERROR 0, OB2-3a lud / poziom
@@ -26659,7 +26660,10 @@ NO_CLOCK = re.compile(r"zegar ksiegi \((\w+)\): tick switu termin ([\d:-]+), zeg
 NO_GAP = re.compile(r"dob bez switu od poprzedniego (\d+|-)")
 NO_PLAYER = re.compile(r"^NocnyMarsz: gracz o swicie - odpoczynek doby ([\d.]+) h \(baza [\d.]+, sen w menu (tak|nie)")
 NO_PMARCH = re.compile(r"marsz w godzinach obozu (\d+) h, oboz automatyczny (tak|nie), tryb zmierzchu (\d)")
-NO_DEFER = re.compile(r"dlug odlozony: po swicie ([\d.]+) h z brakujacych ([\d.]+) h -> dlug (\d) -> (\d)")
+NO_DEFER = re.compile(r"dlug odlozony: po swicie ([\d.]+) h z brakujacych ([\d.]+) h(?: \(brak pokryty (tak|nie)\))? -> dlug (\d) -> (\d)")
+# poprawka recenzji 3: pobudka z menu snu - pelny pasek bez wzrostu dlugu w tym snie = dlug 0 (NO-10)
+NO_WAKE = re.compile(r"^Nocleg: pobudka - pasek ([\d.]+) h z celu ([\d.]+|-) h \(pelny pasek (tak|nie)\), zegara -?[\d.]+ h, przez swit (tak|nie)"
+                     r".*?dlug na starcie snu (\d), dlug (\d) -> (\d)")
 NO_CAMPCFG = re.compile(r"^NightRest: oboz swiata (\d+):00-(\d+):00")
 NO_ERR = ("ERROR in NightRest", "ERROR in NocnyMarsz", "ERROR in Nocleg", "ERROR in NightClock", "ERROR in NightfallAsk", "ERROR in MakeCampNow")
 
@@ -26672,7 +26676,9 @@ def noboz_main(logp):
     pierwsza w sesji; NO-3 "pomiar z pozycji, <dlugosc obozu> h" tak samo; NO-4 nowy dlug 1 na swit <= 40 (przed poprawka 116-423, dobra faza <= 18),
     poza pierwszym w sesji; NO-5 linii gracza o swicie tyle co linii AI, odpoczynek doby <= 18.45 h poza pierwszym w sesji, "NIEZGODNY" 0, nowe pola
     w linii; NO-6 ERROR NightRest / NocnyMarsz / Nocleg / NightClock 0; NO-7 dlug odlozony wedlug reguly (B = A przy X >= Y, B = min(3, A+1) przy X < Y);
-    NO-8 po "sen w menu przerwany" najblizszy swit gracza ma "sen w menu nie"; NO-9 (INFO) zdarzenia nocy gracza i godziny pomieszane przez zegar gry.
+    NO-8 po "sen w menu przerwany" najblizszy swit gracza ma "sen w menu nie"; NO-9 (INFO) zdarzenia nocy gracza i godziny pomieszane przez zegar gry;
+    NO-10 (poprawka recenzji 3) "Nocleg: pobudka - ... (pelny pasek tak) ... dlug na starcie snu S, dlug A -> B": przy A > 0 i A <= S B = 0 (splata calym
+    snem, takze przez swit), a decyzja "pelny pasek" zgodna z liczbami; NO-7 sprawdza regule na jawnej decyzji "brak pokryty tak/nie".
     Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -26683,7 +26689,8 @@ def noboz_main(logp):
     errs = 0
     cut_pending = 0        # sen przerwany czeka na nastepny swit gracza
     cut_ok = cut_bad = 0
-    ev = {"warn": 0, "camp": 0, "prompt": 0, "cut": 0, "defer": 0, "defer_up": 0, "defer_bad": 0, "msg": 0, "dawnsleep": 0}
+    ev = {"warn": 0, "camp": 0, "prompt": 0, "cut": 0, "defer": 0, "defer_up": 0, "defer_bad": 0, "msg": 0, "dawnsleep": 0,
+          "paywhole": 0, "payrest": 0, "wake": 0, "wake_full": 0, "wake_full_dawn": 0, "wake_bad": 0, "wake_bad_ex": []}
     camp_len = 6
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -26737,16 +26744,43 @@ def noboz_main(logp):
                 ev["msg"] += 1
             elif s.startswith("Nocleg: swit we snie"):
                 ev["dawnsleep"] += 1
+            elif s.startswith("Nocleg: splata dlugu calym snem"):
+                ev["paywhole"] += 1
+            elif s.startswith("Nocleg: splata dlugu od reki"):
+                ev["payrest"] += 1
+            # NO-10: pobudka z menu snu (poprawka recenzji 3)
+            mw = NO_WAKE.match(s)
+            if mw:
+                w, full, via, s0, a, b = float(mw.group(1)), mw.group(3) == "tak", mw.group(4) == "tak", int(mw.group(5)), int(mw.group(6)), int(mw.group(7))
+                ev["wake"] += 1
+                if mw.group(2) != "-":
+                    n = float(mw.group(2))
+                    # decyzja "pelny pasek" zgodna z liczbami (2 miejsca, zapas kodu 0.01 h)
+                    if (full and w < n - 0.025) or (not full and w >= n + 0.005):
+                        ev["wake_bad"] += 1
+                        ev["wake_bad_ex"].append(s[:160])
+                if full and a > 0 and a <= s0:
+                    ev["wake_full"] += 1
+                    if via:
+                        ev["wake_full_dawn"] += 1
+                    if b != 0:
+                        ev["wake_bad"] += 1
+                        ev["wake_bad_ex"].append(s[:160])
             # rozliczenia dlugu odlozonego: pobudka, sen przerwany, drugi swit we snie (linia "sen w menu przerwany" powtarza kawalek - bez niej)
             if s.startswith("Nocleg: ") and "dlug odlozony:" in s and not s.startswith("Nocleg: sen w menu przerwany"):
                 mm = NO_DEFER.search(s)
                 if mm:
-                    x, y, a, b = float(mm.group(1)), float(mm.group(2)), int(mm.group(3)), int(mm.group(4))
+                    x, y, dec, a, b = float(mm.group(1)), float(mm.group(2)), mm.group(3), int(mm.group(4)), int(mm.group(5))
                     ev["defer"] += 1
                     if b > a:
                         ev["defer_up"] += 1
+                    # poprawka recenzji 5: regula na jawnej decyzji kodu ("brak pokryty tak/nie"; liczby w logu sa zaokraglone), a decyzja zgodna z liczbami
+                    # w granicy zaokraglenia (2 miejsca, zapas kodu 0.01 h); stary format bez decyzji - X >= Y
+                    covered = (dec == "tak") if dec else (x >= y)
+                    if dec and ((covered and x < y - 0.025) or (not covered and x >= y + 0.005)):
+                        ev["defer_bad"] += 1
                     # w sluzbie ROT dlug bez zmian (B = A takze przy X < Y)
-                    want = a if (x >= y or "w sluzbie ROT" in s) else min(3, a + 1)
+                    want = a if (covered or "w sluzbie ROT" in s) else min(3, a + 1)
                     if b != want:
                         ev["defer_bad"] += 1
     print(f"plik: {logp} | sesji z paczka {len(sessions)}, switow AI {sum(len(x['dawns']) for x in sessions)}, "
@@ -26823,6 +26857,11 @@ def noboz_main(logp):
     rep.add("NO-8: sen przerwany poza menu -> nastepny swit 'sen w menu nie'", f"przerwan {ev['cut']}: swit potem 'nie' {cut_ok}, 'tak' {cut_bad}",
             "0 'tak'", (cut_bad == 0) if cut_ok + cut_bad > 0 else None)
     # NO-9 (INFO)
+    # NO-10 (poprawka recenzji 3): pelny pasek snu w menu bez wzrostu dlugu w tym snie splaca dlug (takze sen przez swit - ciecie switu nie zabiera splaty)
+    rep.add("NO-10: pelny pasek snu -> dlug 0", f"pobudek {ev['wake']}, z pelnym paskiem i dlugiem {ev['wake_full']} (przez swit {ev['wake_full_dawn']}), "
+            f"niezgodnych {ev['wake_bad']}" + (f" (np. {ev['wake_bad_ex'][:2]})" if ev["wake_bad_ex"] else "")
+            + f"; linii splaty: calym snem {ev['paywhole']}, od reki {ev['payrest']}",
+            "0 niezgodnych", (ev["wake_bad"] == 0) if (ev["wake_full"] > 0 or ev["wake_bad"] > 0) else None)
     rep.add("NO-9: noc gracza (INFO)", f"ostrzezenia o marszu {ev['warn']}, oboz automatyczny {ev['camp']}, zmierzch (pytanie / rozkaz) {ev['prompt']}, "
             f"sen przerwany {ev['cut']}, swit we snie z dlugiem odlozonym {ev['dawnsleep']}, komunikaty switu w logu {ev['msg']}; "
             f"zrodlo godziny ksiegi w liniach switu {srcs}; tikow z godzina zegara inna niz ksiegi {diff_sum} z {diff_n}"
