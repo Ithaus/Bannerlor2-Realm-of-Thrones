@@ -647,7 +647,7 @@ namespace Armoury
                             if (AiBuyRules.OverCap(el.EquipmentElement, price)) { zCap += el.Amount; continue; }   // E8/Z (251): cena ponad sufit - to nie "za malo budzetu" (bez _lastBudgetStop)
                             if (price > budget - spent) { _lastBudgetStop = true; zBudget = true; continue; }
                             float eff = it.Effectiveness > 0f ? it.Effectiveness : 1f;
-                            float score = eff / price;
+                            float score = XbowPrice.BuyScore(it, eff, price);   // kusze wedlug luku (XbowBuyByPower): kusza skutecznosc^2 / cena, reszta skutecznosc / cena
                             if (score > bestScore) { bestScore = score; bestI = i; bestPrice = price; }
                         }
                         if (bestI < 0)
@@ -675,6 +675,7 @@ namespace Armoury
                             continue;
                         }
                         ArmsScrap.NoteBuy(market, pel.Item, n);   // 174 pytanie 4: popyt koszyka w miescie (tylko licznik)
+                        XbowPrice.NoteBuy(pel.Item, n, true);      // kusze wedlug luku: linia "Kusze wedlug luku (zakupy)" (tylko licznik)
                         if (type == ItemObject.ItemTypeEnum.Arrows || type == ItemObject.ItemTypeEnum.Bolts) TownFletchers.NoteBought(type, n);   // 172: linia strzelarzy (tylko licznik)
                         spent += cost; pieces += n; deficit -= n;
                         if (bought.Count < 6) bought.Add(pel.Item.StringId + " " + ShelfBuy.Prices(n, first, last));

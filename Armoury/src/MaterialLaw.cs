@@ -177,6 +177,7 @@ namespace Armoury
             {
                 if (item == null) return;
                 CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
+                VillageFruit.Base(village, item, ref __result);     // noc 15/16.10 (placek i marchew): owoce i miod wsi wedlug wag BK - baza przed mnoznikami (P1, rece, regulator, zima)
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;

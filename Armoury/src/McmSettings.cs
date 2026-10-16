@@ -2532,6 +2532,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistHorsePrices { get; set; } = true;
 
+        [SettingPropertyBool("Xbow Like Bow", HintText = "a crossbow is priced at Xbow Price Vs Bow times the price of a bow of the same draw strength (Realistic Battle Mod draw weights). The extra price is the crossbow maker's longer work - more days at a master's day wage - so town workshops, repairs and your forge reckon the same work and nobody pockets a free margin. The game ranks crossbows as tier 1-2 goods, so the strongest crossbow (330 lb) cost 27 pence while the best longbow cost 48; the estimate after the change is about 117 (not yet checked in a game). Repeating crossbows keep their price (their draw is weak). Needs historical prices and Realistic Battle Mod; takes effect when a game is next loaded (off = as before)")]
+        [SettingPropertyGroup("Crossbows by draw strength")]
+        public bool XbowLikeBow { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Xbow Price Vs Bow", 1.00f, 3.00f, "0.00", HintText = "a crossbow's price as a multiple of the price of a bow of the same draw strength (a crossbow of a draw stronger than any bow is priced in proportion to its strength)")]
+        [SettingPropertyGroup("Crossbows by draw strength")]
+        public float XbowPriceVsBow { get; set; } = 1.75f;
+
+        [SettingPropertyBool("Xbow Forge Equiv Tier", HintText = "at your forge a strong crossbow asks the smithing skill and stamina of a bow of the same strength (the 330 lb crossbow those of a tier 6 bow), not those of its low game tier - otherwise it would be the cheapest way to make money in the game. Metal and materials stay as before")]
+        [SettingPropertyGroup("Crossbows by draw strength")]
+        public bool XbowForgeEquivTier { get; set; } = true;
+
+        [SettingPropertyBool("Xbow Buy By Power", HintText = "AI lords, garrisons and your men pick a crossbow on the stall by its power: effectiveness squared over price instead of effectiveness over price, so they buy the strong crossbow when they can pay for it and a lighter one when the purse is short, instead of light 80-100 lb crossbows (all crossbows but one sit in the same tier basket)")]
+        [SettingPropertyGroup("Crossbows by draw strength")]
+        public bool XbowBuyByPower { get; set; } = true;
+
         [SettingPropertyBool("Town Household Use", HintText = "townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownHouseholdUse { get; set; } = true;
@@ -2652,6 +2668,26 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool BkWorkshopInputsFix { get; set; } = false;
 
+        [SettingPropertyBool("Village Fruit From Bk", HintText = "wheat farms grow carrots and apples, olive groves oranges, woodsmen and trappers honey - the Banner Kings list of village goods with its weights (2, 2, 2 and 0.5), grown the way the game grows any crop (the weight times the village's size step plus one, halved, each day). It is an extra crop: the village's own crops stay as they were (Banner Kings' own village model would share the village's work among them, but that model is not the one counting in this game). The game counted these goods as nothing, so no town ever had carrots, apples, oranges or honey; the village carts take them to market")]
+        [SettingPropertyGroup("Fruit and food on the stalls")]
+        public bool VillageFruitFromBk { get; set; } = true;
+
+        [SettingPropertyBool("Food Substitute When Short", HintText = "when a kind of food is missing from a town stall, the townsfolk spend part of that money on the nearest substitute that lies there in plenty (pie - bread, then grain; fruit - dates, grapes, olives; honey - butter, cheese; eggs - meat, cheese; grain and fish last). All the missing foods of a town together take at most half of what a substitute stall holds above the day's buying (counted after the townsfolk's own better-table spending), so the substitute stall is never emptied by it; the missing food's demand and price fall accordingly. Off = as before")]
+        [SettingPropertyGroup("Fruit and food on the stalls")]
+        public bool FoodSubstituteWhenShort { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Food Substitute Share", 0.00f, 1.00f, "0.00", HintText = "the share of the townsfolk's unmet money for a missing food that goes to a substitute (the rest stays in their purse, as before)")]
+        [SettingPropertyGroup("Fruit and food on the stalls")]
+        public float FoodSubstituteShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Ai Food Skips Dear", HintText = "an AI party that is not starving does not buy food dearer than Ai Food Dear Index times its worth when cheaper food lies on the same stall - it picks among the cheaper ones (by value for money). A starving party still buys at any price")]
+        [SettingPropertyGroup("Fruit and food on the stalls")]
+        public bool AiFoodSkipsDear { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ai Food Dear Index", 1.00f, 10.00f, "0.0", HintText = "price over worth above which a fed AI party looks for cheaper food on the same stall")]
+        [SettingPropertyGroup("Fruit and food on the stalls")]
+        public float AiFoodDearIndex { get; set; } = 2.5f;
+
         [SettingPropertyBool("Historical Recruit Cost", HintText = "a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level")]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistoricalRecruitCost { get; set; } = true;
@@ -2659,6 +2695,18 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Recruit Cost Days", 0.00f, 40.00f, "0.00", HintText = "days of a troop's daily pay paid to take him on (historical prest/advance: a few to a dozen days of wages)")]
         [SettingPropertyGroup("Iron Bank")]
         public float RecruitCostDays { get; set; } = 10f;
+
+        [SettingPropertyBool("Companion Naval Skills Priced", HintText = "a wanderer's sailing skills count like body skills and party roles in his price and pay (Mariner like Riding, Boatswain and Shipmaster like Scouting or Engineering), not like command as Banner Kings counted them - about two fifths of a Realm of Thrones companion's skill premium came from the sea. The same rule sets the pay of heroes in every party and of your own mercenary contract")]
+        [SettingPropertyGroup("Hiring companions")]
+        public bool CompanionNavalSkillsPriced { get; set; } = true;
+
+        [SettingPropertyBool("Companion Hire By Wage", HintText = "a wanderer asks half the worth of his gear plus Companion Hire Days of his daily pay to join you, like the prest of a sell-sword, instead of the Banner Kings skill premium (estimate, not yet checked in a game: a Realm of Thrones companion who asked about 15 000 would ask about 2 600). His daily pay does not change")]
+        [SettingPropertyGroup("Hiring companions")]
+        public bool CompanionHireByWage { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Companion Hire Days", 0.00f, 60.00f, "0", HintText = "days of a wanderer's daily pay in his hiring price (a sell-sword's prest: Recruit Cost Days 10 x 2)")]
+        [SettingPropertyGroup("Hiring companions")]
+        public float CompanionHireDays { get; set; } = 20f;
 
         [SettingPropertyBool("Ammo Recovery Enabled", HintText = "arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot")]
         [SettingPropertyGroup("Iron Bank")]
@@ -6912,6 +6960,10 @@ namespace Armoury
             s.HistBowDaysNew = HistBowDaysNew;
             s.HistThrownOwnDays = HistThrownOwnDays;
             s.HistHorsePrices = HistHorsePrices;
+            s.XbowLikeBow = XbowLikeBow;
+            s.XbowPriceVsBow = XbowPriceVsBow;
+            s.XbowForgeEquivTier = XbowForgeEquivTier;
+            s.XbowBuyByPower = XbowBuyByPower;
             s.TownHouseholdUse = TownHouseholdUse;
             s.TownUseFlax = TownUseFlax;
             s.TownUseWool = TownUseWool;
@@ -6942,8 +6994,16 @@ namespace Armoury
             s.WorkshopNoFreeRaw = WorkshopNoFreeRaw;
             s.WorkshopNoFreeRawAllTypes = WorkshopNoFreeRawAllTypes;
             s.BkWorkshopInputsFix = BkWorkshopInputsFix;
+            s.VillageFruitFromBk = VillageFruitFromBk;
+            s.FoodSubstituteWhenShort = FoodSubstituteWhenShort;
+            s.FoodSubstituteShare = FoodSubstituteShare;
+            s.AiFoodSkipsDear = AiFoodSkipsDear;
+            s.AiFoodDearIndex = AiFoodDearIndex;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
+            s.CompanionNavalSkillsPriced = CompanionNavalSkillsPriced;
+            s.CompanionHireByWage = CompanionHireByWage;
+            s.CompanionHireDays = CompanionHireDays;
             s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;
             s.AmmoRecoverPercent = AmmoRecoverPercent;
             s.AmmoRepairPercent = AmmoRepairPercent;

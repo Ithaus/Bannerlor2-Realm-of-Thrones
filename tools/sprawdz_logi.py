@@ -655,6 +655,19 @@ Uzycie (Python 3, tylko odczyt):
                     K2-3b rok do roku +-10% (bieg >= 392 dob), K2-3c przebieg (INFO), K2-4 pobrany podatek > 0, K2-5 ksiega (pobrano = do panow + do kas,
                     nic ponizej poziomu normalnego, Obieg = linia doby, kontrola kies r = 0), K2-6 komu i ile (INFO), K2-7 miara W5-7 (INFO).
                     Log bez paczki: INFO, bez wyjatku.
+--grupa nceny     : (noc 15/16.10, decyzje Jeffa 15.10 TAK; galaz w-toku/noc-ceny) python -I tools/sprawdz_logi.py --grupa nceny <Armoury-*.log> (strumieniowo).
+                    (A) kusze wedlug luku (XbowPrice.cs): NC-0 linia startu (przeliczenie czynne), NC-1 lukow w tabeli 16-22, NC-2 kusz przeliczonych >= 8,
+                    NC-3 kazda kusza / luk tej sily 1.70-1.80, NC-4 crossbow_f 100-130 d i crossbow_a 18-28 d, NC-5 najmocniejsza kusza / najmocniejszy luk
+                    x2.0-3.0, NC-6 powtarzalne bez zmian, NC-7 potkniecia i ERROR 0, NC-8 kuznia i zakupy wedlug sily tak, NC-9 zakupy AI > 0 i srednio
+                    >= 160 funtow, NC-10 warsztaty robia kusze kazdej doby. (B) placek i marchew (VillageFruit.cs, FoodSubstitute.cs, FoodThrift.cs): NC-11 linia
+                    startu owocow (wsie wedlug typu), NC-12 plon wsi carrot/apple >= 150, orange >= 25, honey >= 15 na dobe, NC-13 marchew i jablka na targach
+                    miast po 7 dobach, NC-12b zboze farm zboza (INFO - owoce to plon dodatkowy), NC-14 potkniecia owocow 0, NC-15 zamienniki: budzet przesuniety
+                    kazdej doby i potkniecia 0, NC-15b kontrola limitu zamiennika (wszystkie zrodla osady razem <= 0.5 nadwyzki polki po ofercie ludu:
+                    przekroczen 0, najwiecej <= 50.5%), NC-16a indeks owocow <= 6.0
+                    po 10 dobach, NC-16b bread/meat/cheese <= 3.0, NC-16c placek i miod (INFO), NC-17 syty lord zamienia drogie jedzenie (T > 0), NC-18 placek
+                    kupiony przez lordow (INFO), NC-19 kiesa ludu (INFO). (C) towarzysze (CompanionPay.cs): NC-20 start sesji - latki czynnika i ceny wpiete,
+                    samosprawdzenie ZGODNE (osobno czynnik, zold, cena bez sprzetu), NC-21 linia doby: wedrowcy >= 10, nasza cena > 0, nasza/BK 0.1-0.6, potkniecia i ERROR 0, NC-22 zold, poziom
+                    i czas linii (INFO). NC-23 / NC-24 linie startu sesji B2 i B3 (klucz TAK, latki wpiete). Log bez paczki: INFO, bez wyjatku.
 --grupa noboz     : (noc 15/16.10, Jeff 15.10 "nie pokazuje obozu, nie rozbija, raz kara jest, raz nie"; galaz w-toku/noc-oboz, NightClock.cs, NightRest.cs)
                     python -I tools/sprawdz_logi.py --grupa noboz <Armoury-*.log> (strumieniowo; sesja = od linii "Nocleg (zegar ksiegi):"). NO-0 zegar ksiegi z terminu
                     ticku gry TAK w kazdej sesji, NO-1 swity AI kolejne i "dob bez switu 0", NO-2 24 tiki na dobe, NO-3 "pomiar z pozycji, <dlugosc obozu> h", NO-4 nowy
@@ -27206,6 +27219,330 @@ def nobl_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nceny (noc 15/16.10, decyzje Jeffa 15.10 TAK: kusze wedlug luku, placek i marchew, werbunek towarzyszy; galaz w-toku/noc-ceny)
+NC_XS = "Kusze wedlug luku (XbowLikeBow): start sesji | "
+NC_XD = "Kusze wedlug luku (zakupy): dzien "
+NC_X_ROW = re.compile(r"(\w+) (\d+)->(\d+) \((\d+) J, (\d+) lb, t(\d)->t(\d), dni ([\d.]+)->([\d.]+), luk tej sily ([\d.]+), x([\d.]+)")
+NC_X_BOWS = re.compile(r"lukow w tabeli (\d+) ")
+NC_X_DONE = re.compile(r"kusz przeliczonych (\d+) z (\d+) na handel")
+NC_X_SAME = re.compile(r"\| bez zmian (\d+)(?: \[(.*?)\])?")
+NC_X_TOP = re.compile(r"najmocniejsza kusza (\S+) (\d+) d / najmocniejszy luk (\d+) d = x([\d.]+|-)")
+NC_STUM = re.compile(r"potkniecia (\d+)\.?$")
+NC_XD_RE = re.compile(r"kusz kupionych przez AI (\d+) \(srednio (\d+|-) funtow\), ludzie gracza (\d+)")
+NC_WS = re.compile(r"Warsztaty: dzien (\d+) - wykonano \d+ szt\. \[([^\]]*)\]")
+# (B) placek i marchew: owoce wsi (VillageFruit), zamienniki jedzenia (FoodSubstitute), syty lord nie przeplaca (FoodThrift)
+NC_FS = "Owoce wsi (VillageFruitFromBk): start sesji | "
+NC_FD = "Owoce wsi (VillageFruitFromBk): dzien "
+NC_FS_RE = re.compile(r"wheat_farm (\d+) wsi .*?olive_trees (\d+) .*?lumberjack (\d+) \+ trapper (\d+)")
+NC_SD = "Zamienniki jedzenia (B2): dzien "
+NC_TD = "Lordowie a drogie jedzenie (B3): dzien "
+NC_STUM2 = re.compile(r"potkniecia (\d+) \(sesja (\d+)\)")
+NC_SD_MOVE = re.compile(r"przesunieto budzetu (\d+)")
+NC_SD_SHORT = re.compile(r"miast z brakiem jedzenia (\d+) \(zamkow (\d+)\)")
+NC_SD_IDX = re.compile(r"indeks cen jedzenia \(mediana miast\): (.*?) \|")
+NC_TD_RE = re.compile(r"drogich wyborow modelu \(syte partie AI\) (\d+) \(partie lordow (\d+)\), zamienionych na tansze (\d+) \(lordow (\d+)\), zostawionych \(brak tanszego na polce\) (\d+)")
+NC_TOW = re.compile(r"Towary: dzien (\d+) - (carrot|apple|orange|honey|pie|grain) \(\d+ d\): .*?\| produkcja (\d+) \[(.*?)\] \|")
+NC_SD_CHK = re.compile(r"kontrola limitu zamiennikow: z dopisem (\d+), przekroczen (\d+) \(najwiecej ([\d.]+)% nadwyzki\), oferta ludu zmniejszyla nadwyzke w (\d+), zjadla w (\d+)")
+NC_TOW_OWN = re.compile(r"posiadacze \[(.*?)\]")
+NC_TOW_LORD = re.compile(r"lordowie kupili (\d+)")
+NC_FOLK = re.compile(r"Kiesa ludu: dzien (\d+) \| CZYNNA \|.*?zaplacone przez lud miast (\d+)")
+# (C) towarzysze: umiejetnosci morskie w regule BK i cena werbunku wedlug zoldu (CompanionPay)
+NC_CS = "Towarzysze (C): start sesji | "
+NC_CD = "Towarzysze (C): dzien "
+NC_CD_RE = re.compile(r"wedrowcy w osadach (\d+) \| cena BK mediana (\d+|-)(?: \((\d+)-(\d+)\))? -> nasza (\d+|-)(?: \((\d+)-(\d+)\))? \| zold/d mediana ([\d.]+|-).*?\| nasza/BK mediana ([\d.]+|-)")
+NC_CD_LV = re.compile(r"poziom mediana (\d+|-)")
+NC_CD_MS = re.compile(r"czas ([\d.]+) ms")
+
+
+def _nc_items(s):
+    out = {}
+    for p in s.split(","):
+        p = p.strip()
+        m = re.match(r"(\w+) (\d+)$", p)
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def nceny_main(logp):
+    """nceny (noc 15/16.10, decyzje Jeffa 15.10 TAK; galaz w-toku/noc-ceny): (A) kusze wedlug luku tej samej sily - Armoury/src/XbowPrice.cs.
+    Wejscie: log Armoury (czytany strumieniowo). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    xs, xd, ws, errs = [], {}, {}, {}
+    fs, fd, sd, td, tow, own, lordpie, folk, gwf = [], {}, {}, {}, {}, {}, {}, {}, {}
+    cs, cd = [], {}
+    b2start, b3start = [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NC_XS):
+                xs.append(s)
+            elif s.startswith(NC_XD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    xd[d] = s
+            elif s.startswith("Warsztaty: dzien "):
+                mm = NC_WS.match(s)
+                if mm:
+                    ws[int(mm.group(1))] = _nc_items(mm.group(2))
+            elif s.startswith(NC_FS):
+                fs.append(s)
+            elif s.startswith(NC_FD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    fd[d] = s
+            elif s.startswith("Zamienniki jedzenia (B2): start sesji | "):
+                b2start.append(s)
+            elif s.startswith("Lordowie a drogie jedzenie (B3): start sesji | "):
+                b3start.append(s)
+            elif s.startswith(NC_SD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    sd[d] = s
+            elif s.startswith(NC_TD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    td[d] = s
+            elif s.startswith("Towary: dzien "):
+                mm = NC_TOW.match(s)
+                if mm:
+                    d, g = int(mm.group(1)), mm.group(2)
+                    w = num(r"(?:^|; )wsie (\d+)", mm.group(4), default=0)
+                    tow.setdefault(g, {})[d] = (int(mm.group(3)), w)
+                    if g == "grain":
+                        gwf[d] = num(r"(?:^|; )wsie \d+ \(wheat_farm (\d+)", mm.group(4))
+                    mo = NC_TOW_OWN.search(s)
+                    if mo:
+                        own.setdefault(g, {})[d] = num(r"miasta (\d+)", mo.group(1), default=0)
+                    if g == "pie":
+                        lp = NC_TOW_LORD.search(s)
+                        lordpie[d] = int(lp.group(1)) if lp else 0
+            elif s.startswith(NC_CS):
+                cs.append(s)
+            elif s.startswith(NC_CD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    cd[d] = s
+            elif s.startswith("Kiesa ludu: dzien "):
+                mm = NC_FOLK.match(s)
+                if mm:
+                    folk[int(mm.group(1))] = int(mm.group(2))
+            elif s.startswith("ERROR in "):
+                for k in ("XbowPrice", "VillageFruit", "FoodSubstitute", "FoodThrift", "CompanionPay"):
+                    if s.startswith("ERROR in " + k):
+                        errs[k] = errs.get(k, 0) + 1
+    print(f"plik: {logp} | A: linii startu {len(xs)}, linii doby {len(xd)}, linii Warsztaty {len(ws)} | B: start owocow {len(fs)}, doby owocow {len(fd)}, zamiennikow {len(sd)}, B3 {len(td)}")
+    # ---------------- A: kusze wedlug luku
+    if not xs and not xd:
+        rep.add("NC-0: kusze wedlug luku - linia startu", "brak linii", "INFO (wersja sprzed paczki nceny)", None)
+    else:
+        st = xs[-1] if xs else ""
+        on = bool(re.search(r"\| x[\d.]+ ceny luku tej samej sily", st)) and "klucz XbowLikeBow TAK" in st
+        rep.add("NC-0: kusze wedlug luku - linia startu, przeliczenie czynne", st[len(NC_XS):][:200] if st else "brak linii startu (sa linie doby)",
+                "linia jest, klucz XbowLikeBow TAK, przeliczenie czynne (x... ceny luku)", bool(st) and on)
+        if on:
+            nb = num(NC_X_BOWS.pattern, st)
+            rep.add("NC-1: lukow w tabeli", f"{nb}", "16-22 (19 +-3)", nb is not None and 16 <= nb <= 22)
+            md = NC_X_DONE.search(st)
+            done = int(md.group(1)) if md else 0
+            rep.add("NC-2: kusz przeliczonych", f"{done} z {md.group(2) if md else '?'} na handel", ">= 8", done >= 8)
+            rows = {r.group(1): r for r in NC_X_ROW.finditer(st)}
+            bad = [f"{k} x{r.group(11)}" for k, r in rows.items() if not (1.70 <= float(r.group(11)) <= 1.80)]
+            rep.add("NC-3: cena przeliczonej kuszy / cena luku tej sily", f"wierszy {len(rows)}, poza widelkami {len(bad)}" + (f" ({', '.join(bad[:5])})" if bad else ""),
+                    "kazda 1.70-1.80", len(rows) > 0 and not bad)
+            f = rows.get("crossbow_f"); a = rows.get("crossbow_a")
+            fv = int(f.group(3)) if f else None; av = int(a.group(3)) if a else None
+            rep.add("NC-4: crossbow_f / crossbow_a po zmianie", f"crossbow_f {f.group(2) + '->' + f.group(3) if f else 'brak'}, crossbow_a {a.group(2) + '->' + a.group(3) if a else 'brak'}",
+                    "crossbow_f 100-130 d, crossbow_a 18-28 d", fv is not None and av is not None and 100 <= fv <= 130 and 18 <= av <= 28)
+            mt = NC_X_TOP.search(st)
+            rr = float(mt.group(4)) if mt and mt.group(4) != "-" else None
+            rep.add("NC-5: najmocniejsza kusza / najmocniejszy luk", f"{mt.group(1)} {mt.group(2)} d / {mt.group(3)} d = x{mt.group(4)}" if mt else "brak",
+                    "x2.0-3.0", rr is not None and 2.0 <= rr <= 3.0)
+            rep_ids = [k for k in rows if "repeating" in k]
+            ms = NC_X_SAME.search(st)
+            rep.add("NC-6: kusze powtarzalne bez zmian", f"przeliczone powtarzalne {len(rep_ids)}; bez zmian {ms.group(1) if ms else '?'} [{(ms.group(2) or '')[:120] if ms else ''}]",
+                    "0 przeliczonych powtarzalnych", len(rep_ids) == 0)
+            stum = num(NC_STUM.pattern, st, default=0)
+            rep.add("NC-7: potkniecia (linia startu) / ERROR in XbowPrice", f"potkniecia {stum}, ERROR {errs.get('XbowPrice', 0)}", "0 / 0", stum == 0 and errs.get("XbowPrice", 0) == 0)
+            rep.add("NC-8: kuznia gracza i zakupy wedlug sily", "kuznia: " + ("tak" if "tieru rownowaznego tak" in st else "nie") + ", zakupy: " + ("tak" if "wedlug sily tak" in st else "nie"),
+                    "obie tak", "tieru rownowaznego tak" in st and "wedlug sily tak" in st)
+        # A dzien
+        ai = 0; lbs = 0.0; men = 0; dstum = 0
+        for d, s in xd.items():
+            mm = NC_XD_RE.search(s)
+            if mm:
+                n = int(mm.group(1)); ai += n; men += int(mm.group(3))
+                if n > 0 and mm.group(2) != "-":
+                    lbs += n * int(mm.group(2))
+            dstum += num(NC_STUM.pattern, s, default=0)
+        avg = lbs / ai if ai else 0
+        rep.add("NC-9: kusze kupione przez AI (suma dob) i srednie funty", f"dob {len(xd)}, AI {ai} szt. (srednio {avg:.0f} funtow), ludzie gracza {men}, potkniecia doby {dstum}",
+                "AI > 0, srednio >= 160 funtow (bez wyboru wedlug sily ok. 90), potkniecia 0", (ai > 0 and avg >= 160 and dstum == 0) if len(xd) >= 5 else None)
+        if ws:
+            zero = [d for d, v in sorted(ws.items()) if v.get("Crossbow", 0) <= 0]
+            xb = sum(v.get("Crossbow", 0) for v in ws.values()) / len(ws)
+            bw = sum(v.get("Bow", 0) for v in ws.values()) / len(ws)
+            rep.add("NC-10: warsztaty - kusze kazdej doby", f"dob {len(ws)}, bez kusz {len(zero)}" + (f" (np. {zero[:5]})" if zero else "") + f"; srednio kusz {xb:.0f}/d, lukow {bw:.0f}/d (przed: kusze 32-70, luki ok. 437)",
+                    "0 dob bez kusz (luki - INFO, nie mniej niz 80% sprzed zmiany)", len(zero) == 0)
+    # ---------------- B: placek i marchew
+    if not fs and not fd and not sd and not td:
+        rep.add("NC-11: owoce wsi / zamienniki / B3 - linie", "brak linii", "INFO (wersja sprzed czesci B)", None)
+    else:
+        st = fs[-1] if fs else ""
+        mf = NC_FS_RE.search(st)
+        on = "| CZYNNE |" in st
+        if mf:
+            wf, ol, lj, tr = (int(mf.group(i)) for i in range(1, 5))
+            rep.add("NC-11: owoce wsi - linia startu (wsie wedlug typu)", f"wheat_farm {wf}, olive_trees {ol}, lumberjack {lj} + trapper {tr}; " + st[len(NC_FS):][:120],
+                    "CZYNNE, wheat_farm >= 100, olive_trees >= 10, drwale + trzebiciele >= 40, potkniecia 0",
+                    on and wf >= 100 and ol >= 10 and lj + tr >= 40 and num(NC_STUM.pattern, st, default=1) == 0)
+        else:
+            rep.add("NC-11: owoce wsi - linia startu", st[len(NC_FS):][:160] if st else "brak linii startu", "CZYNNE z liczbami wsi", False if st and "WYLACZONE" not in st else None)
+        mins = {"carrot": 150, "apple": 150, "orange": 25, "honey": 15}
+        res, oks = [], []
+        for g, lim in mins.items():
+            dd = tow.get(g, {})
+            days = sorted(dd)[1:] if len(dd) > 1 else sorted(dd)
+            vals = sorted(dd[d][1] for d in days)
+            med = vals[len(vals) // 2] if vals else None
+            res.append(f"{g} {med if med is not None else '-'} (prog {lim})")
+            oks.append(med is not None and med >= lim)
+        rep.add("NC-12: plon wsi (Towary: produkcja ... wsie W, mediana dob bez pierwszej)", ", ".join(res), "carrot >= 150, apple >= 150, orange >= 25, honey >= 15",
+                all(oks) if any(tow.get(g) for g in mins) else None)
+        gv = [(d, v) for d, v in sorted(gwf.items()) if v is not None]
+        if gv:
+            rep.add("NC-12b: zboze farm zboza (Towary: grain ... wsie (wheat_farm N); INFO - owoce to plon dodatkowy, zboze bez zmian)",
+                    f"pierwsza doba {gv[0][0]}: {gv[0][1]}, ostatnia {gv[-1][0]}: {gv[-1][1]} (log Jeffa 108945 bez paczki: 6959)", "INFO (bez spadku z powodu owocow; zima tnie)", None)
+        oc = own.get("carrot", {}); oa = own.get("apple", {})
+        if oc and oa:
+            dl = max(oc); span = dl - min(oc)
+            rep.add("NC-13: marchew i jablka na targach miast (posiadacze, ostatnia doba)", f"doba {dl} (po {span} dobach): carrot w miastach {oc[dl]}, apple {oa.get(dl, 0)}",
+                    "> 0 obu po >= 7 dobach", (oc[dl] > 0 and oa.get(dl, 0) > 0) if span >= 7 else None)
+        b2s = [s for s in b2start]
+        rep.add("NC-23: zamienniki - linia startu sesji", b2s[-1][len("Zamienniki jedzenia (B2): start sesji | "):][:200] if b2s else "brak linii",
+                "klucz FoodSubstituteWhenShort TAK, latka wpiety, zrodel >= 10, potkniecia 0",
+                (("klucz FoodSubstituteWhenShort TAK" in b2s[-1] and "latka wpiety" in b2s[-1] and num(r"zrodel (\d+)", b2s[-1], default=0) >= 10 and num(NC_STUM.pattern, b2s[-1], default=1) == 0)) if b2s else None)
+        b3s = [s for s in b3start]
+        rep.add("NC-24: syty lord - linia startu sesji", b3s[-1][len("Lordowie a drogie jedzenie (B3): start sesji | "):][:200] if b3s else "brak linii",
+                "klucz AiFoodSkipsDear TAK, modeli zalatanych >= 1, potkniecia 0",
+                ("klucz AiFoodSkipsDear TAK" in b3s[-1] and num(r"zalatanych (\d+)", b3s[-1], default=0) >= 1 and num(NC_STUM.pattern, b3s[-1], default=1) == 0) if b3s else None)
+        fst = max([num(r"potkniecia sesji (\d+)", s, default=0) for s in fd.values()] or [0])
+        rep.add("NC-14: owoce wsi - potkniecia / ERROR in VillageFruit", f"potkniecia sesji (najwiecej) {fst}, ERROR {errs.get('VillageFruit', 0)}", "0 / 0",
+                fst == 0 and errs.get("VillageFruit", 0) == 0)
+        # B2
+        if sd:
+            ds = sorted(sd)
+            zero, stum, mv = [], 0, []
+            for d in ds[1:]:
+                mm = NC_SD_MOVE.search(sd[d]); p = int(mm.group(1)) if mm else 0
+                mv.append(p)
+                if p <= 0:
+                    zero.append(d)
+            for s in sd.values():
+                mm = NC_STUM2.search(s)
+                if mm:
+                    stum += int(mm.group(1))
+            on2 = "| CZYNNE (" in sd[ds[-1]]
+            sh = NC_SD_SHORT.search(sd[ds[-1]])
+            rep.add("NC-15: zamienniki - przesuniety budzet kazdej doby, potkniecia / ERROR", f"dob {len(ds)}, bez przesuniecia {len(zero)}" + (f" (np. {zero[:5]})" if zero else "")
+                    + f", srednio {sum(mv) / len(mv) if mv else 0:.0f}/d; miast z brakiem (ostatnia doba) {sh.group(1) if sh else '?'}; potkniecia {stum}, ERROR {errs.get('FoodSubstitute', 0)}",
+                    "CZYNNE, P > 0 kazdej doby (poza pierwsza), 0 / 0", on2 and not zero and stum == 0 and errs.get("FoodSubstitute", 0) == 0 and len(ds) > 1)
+            chk = [NC_SD_CHK.search(sd[d]) for d in ds]
+            chk = [c for c in chk if c]
+            if chk:
+                n_chk = sum(int(c.group(1)) for c in chk); n_over = sum(int(c.group(2)) for c in chk); top = max(float(c.group(3)) for c in chk)
+                o_cut = sum(int(c.group(4)) for c in chk); o_all = sum(int(c.group(5)) for c in chk)
+                rep.add("NC-15b: zamienniki - kontrola limitu (wszystkie zrodla osady razem <= 0.5 nadwyzki polki zamiennika, po ofercie ludu)",
+                        f"dob {len(chk)}: zamiennikow z dopisem {n_chk}, przekroczen {n_over}, najwiecej {top:.1f}% nadwyzki; oferta ludu zmniejszyla nadwyzke {o_cut}, zjadla {o_all}",
+                        "przekroczen 0, najwiecej <= 50.5%", n_over == 0 and top <= 50.5)
+            else:
+                rep.add("NC-15b: zamienniki - kontrola limitu", "brak liczb kontroli w liniach doby", "INFO (wersja sprzed poprawki 16.10)", None)
+            mi = NC_SD_IDX.search(sd[ds[-1]])
+            idx = {}
+            if mi:
+                for part in mi.group(1).split(", "):
+                    pp = part.rsplit(" ", 1)
+                    if len(pp) == 2:
+                        try:
+                            idx[pp[0]] = float(pp[1])
+                        except ValueError:
+                            pass
+            span = ds[-1] - ds[0]
+            a = idx.get("apple")
+            rep.add("NC-16a: indeks owocow (apple, mediana miast, ostatnia doba)", f"{a} po {span} dobach (przed: 9.95)", "<= 6.0 (bieg >= 10 dob)",
+                    (a is not None and a <= 6.0) if span >= 10 else None)
+            sub = {g: idx.get(g) for g in ("bread", "meat", "cheese")}
+            rep.add("NC-16b: indeks zamiennikow (bread, meat, cheese - mediana miast)", ", ".join(f"{g} {v}" for g, v in sub.items()), "kazdy <= 3.0",
+                    all(v is not None and v <= 3.0 for v in sub.values()) if span >= 10 else None)
+            rep.add("NC-16c: indeks placka i miodu (INFO)", f"pie {idx.get('pie')} (przed 2.15), honey {idx.get('honey')}, Eggs {idx.get('Eggs')}, grain {idx.get('grain')}, fish {idx.get('fish')}",
+                    "INFO (pie <= 2.2)", None)
+        else:
+            rep.add("NC-15: zamienniki - linie doby", "brak linii", "INFO (wersja sprzed B2)", None)
+        # B3
+        if td:
+            D = T = L = DL = TL = 0; stum = 0
+            for s in td.values():
+                mm = NC_TD_RE.search(s)
+                if mm:
+                    D += int(mm.group(1)); DL += int(mm.group(2)); T += int(mm.group(3)); TL += int(mm.group(4)); L += int(mm.group(5))
+                m2 = NC_STUM2.search(s)
+                if m2:
+                    stum += int(m2.group(1))
+            rep.add("NC-17: syty lord nie przeplaca - zamienione na tansze, potkniecia / ERROR", f"dob {len(td)}: drogich {D} (lordow {DL}), zamienionych {T} (lordow {TL}), zostawionych {L}; potkniecia {stum}, ERROR {errs.get('FoodThrift', 0)}",
+                    "T > 0, 0 / 0", T > 0 and stum == 0 and errs.get("FoodThrift", 0) == 0)
+        if lordpie:
+            vals = [lordpie[d] for d in sorted(lordpie)[1:]] or list(lordpie.values())
+            rep.add("NC-18: placek - lordowie kupili na dobe (INFO)", f"srednio {sum(vals) / len(vals):.0f} (przed 235)", "INFO (< 235)", None)
+        if folk:
+            vals = [folk[d] for d in sorted(folk)[1:]] or list(folk.values())
+            rep.add("NC-19: kiesa ludu - zaplacone przez lud miast na dobe (INFO)", f"srednio {sum(vals) / len(vals):.0f}", "INFO (+5..+20% wobec biegu bez B2)", None)
+    # ---------------- C: towarzysze
+    if not cs and not cd:
+        rep.add("NC-20: towarzysze - linia startu", "brak linii", "INFO (wersja sprzed czesci C)", None)
+    else:
+        st = cs[-1] if cs else ""
+        hooked = "czynnik wpiety" in st and "cena wpieta" in st
+        agree = "- ZGODNE" in st
+        stum = num(NC_STUM.pattern, st, default=1) if st else 1
+        sc = re.search(r"samosprawdzenie \((czynnik: \w+, zold: [\w-]+, cena: [\w-]+)\)", st)
+        rep.add("NC-20: towarzysze - start sesji (latki i samosprawdzenie)", ((sc.group(1) + " | ") if sc else "") + (st[len(NC_CS):][:260] if st else "brak linii startu (sa linie doby)"),
+                "czynnik i cena wpiete, samosprawdzenie ZGODNE, potkniecia 0", bool(st) and hooked and agree and stum == 0)
+        hs, ours, rs, ws, lv, mss, dst = [], [], [], [], [], [], 0
+        for d, s in sorted(cd.items()):
+            mm = NC_CD_RE.search(s)
+            if mm:
+                hs.append(int(mm.group(1)))
+                if mm.group(5) != "-":
+                    ours.append(int(mm.group(5)))
+                if mm.group(9) != "-":
+                    rs.append(float(mm.group(9)))
+                if mm.group(8) != "-":
+                    ws.append(float(mm.group(8)))
+            l2 = NC_CD_LV.search(s)
+            if l2 and l2.group(1) != "-":
+                lv.append(int(l2.group(1)))
+            m3 = NC_CD_MS.search(s)
+            if m3:
+                mss.append(float(m3.group(1)))
+            m4 = NC_STUM2.search(s)
+            if m4:
+                dst += int(m4.group(1))
+        med = lambda l: sorted(l)[len(l) // 2] if l else None
+        H, B, R = med(hs), med(ours), med(rs)
+        rep.add("NC-21: towarzysze - linia doby (wedrowcy, nasza cena, nasza/BK)", f"dob {len(cd)}: wedrowcy mediana {H}, nasza cena mediana {B}, nasza/BK mediana {R}; potkniecia {dst}, ERROR {errs.get('CompanionPay', 0)}",
+                "wedrowcy >= 10, nasza > 0, nasza/BK 0.1-0.6, 0 / 0",
+                (H is not None and H >= 10 and B is not None and B > 0 and R is not None and 0.1 <= R <= 0.6 and dst == 0 and errs.get("CompanionPay", 0) == 0) if cd else None)
+        rep.add("NC-22: towarzysze - zold i poziom (INFO), czas linii doby", f"zold/d mediana {med(ws)}, poziom mediana {med(lv)}, czas linii doby najwiecej {max(mss) if mss else '-'} ms",
+                "INFO (postac ROT ok. 90 d/d; czas < 100 ms)", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ kiesa2 (15.10, decyzja Jeffa "napraw to, najwyzej zwieksz podatki"; Armoury/src/TownFolk.Hoard.cs)
 K2_HEAD = "Podatek od nadwyzki ludu (kiesa2): "
 K2_DAY = re.compile(r"Podatek od nadwyzki ludu \(kiesa2\): dzien (\d+) \| stawka ([\d.]+)%/d .*?\| pobrano (\d+) z (\d+) osad \(miasta (\d+), zamki (\d+); rodow (\d+)\): "
@@ -28648,6 +28985,8 @@ def main(argv):
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group == "kiesa2" and logp:
         return kiesa2_main(logp)   # kiesa2 (15.10, Jeff "napraw to, najwyzej zwieksz podatki"): podatek pana od nadwyzki oszczednosci ludu (TownFolk.Hoard.cs)
+    if group == "nceny" and logp:
+        return nceny_main(logp)   # nceny (noc 15/16.10, decyzje Jeffa 15.10 TAK): kusze wedlug luku (XbowPrice), owoce wsi i zamienniki jedzenia, werbunek towarzyszy
     if group == "obieg2" and logp:
         return obieg2_main(logp, bdp)   # obieg2 (15.10, Jeff "kasa zbiera sie u ludu" + "pamietaj o pozyczkach"): wsie, straznik obiegu, pozyczki od ludu, zbytki wedlug zasobnosci
     if group == "korona2" and logp:

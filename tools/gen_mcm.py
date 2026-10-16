@@ -279,6 +279,13 @@ RANGES = {
     'FairFiefCapExtra': (0, 10, "0"),
     # nskarbiec (noc 15/16.10): udzial kiesy odnoszony codziennie do kryjowki - kod przycina do 0..1 (OutlawLaw.StashDay)
     'HideoutDailyStashShare': (0.0, 1.0, "0.00"),
+    # ceny (noc 15/16.10): kusza wedlug luku x1.0-3.0 (Jeff 1.5-2; kod: najmniej 1)
+    'XbowPriceVsBow': (1.0, 3.0, "0.00"),
+    # ceny (noc 15/16.10): udzial zamiennika 0..1 (kod przycina), prog drogiego jedzenia x1-10 (kod: najmniej 1)
+    'FoodSubstituteShare': (0.0, 1.0, "0.00"),
+    'AiFoodDearIndex': (1.0, 10.0, "0.0"),
+    # ceny (noc 15/16.10): dni zoldu w cenie werbunku towarzysza (kod: najmniej 0)
+    'CompanionHireDays': (0.0, 60.0, "0"),
 }
 
 def gen(module_dir, ns, display):
