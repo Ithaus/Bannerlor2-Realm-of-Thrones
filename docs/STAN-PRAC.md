@@ -2369,3 +2369,9 @@ D6 (Jeff 16.10 "wygeneruj albo pobierz herby wiosek i flagi, zeby nie wygladalo 
 (arm_map_village_lore.tsv: 1847 rodow rycerzy z opisem knight_arms, np. "A green rook on gold", tylko 140 ma kod herbu) - kolory pola i godla wprost z opisu, podzial pola z tel
 Native (pas, w krzyz, krokiew...), godlo z grupy ikon wedlug slowa (Native: Animal / Flora / Handmade / Sign / Shape; CCsBanners 728 ikon: Heraldry, Dragons...), ten sam
 rod = ten sam herb, Banner.IsValidBannerCode; bez pobierania. Ograniczenie: ikony nie maja nazw - figura z wlasciwej rodziny, nie zawsze to samo zwierze.
+Jeff 16.10 (dopiski): "jedna flaga wasala-rycerza i seniora jako druga flaga"; "dane wez ze swiata gry o tron" (kanon: pomniejsze rody regionu z wiki ASOIAF - siedziba,
+senior, opis herbu; herb z ROT, gdy rod jest w ROT; slownik ikon z 244 herbow rodow ROT o znanych godlach); "dobierz mody z godlami" (brak dobrej paczki pod 1.4 - CCsBanners
+728 ikon juz jest); ZAJAZDY: osobne budynki przy szlakach "ale nie za gesto, im mniej ludzi tym mniej zajazdow, zeby nie wygladalo jak armia zajazdow"; WIOSKI: "daj wioski
+w miejscach odludnych, tez jacys ludzie zyja - teraz masa natkanych wiosek i masa pustego miejsca" -> przesuniecie: mniej w skupiskach, male przysiolki (pasterze, drwale,
+rybacy, wegla) na pustkowiach, ludzie okregu bez zmian; miejsca na ladzie z sondy terenu w grze (bieg probny jak MapRoadsProbe).
+Kolejnosc: W1 noc-wioski (w toku) -> W2 herby kanon + dwie flagi + przysiolki na pustkowiach -> W3 zajazdy, noclegi, plotki. WGRANIE 68 = bitwa + turniej.
