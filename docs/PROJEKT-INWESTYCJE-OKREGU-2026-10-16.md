@@ -1,5 +1,12 @@
 # PROJEKT: Prace okregu (inwestycja gracza) + specjalizacja wiosek pobocznych - 16.10.2026
 
+> ZASADA JEFFA 16.10 (WIAZACA, nadrzedna wobec liczb ponizej): "ma byc to system dynamiczny, ktory sam sie reguluje podaza i popytem, tak jak prawdziwa ekonomia".
+> Zadnych sztywnych mnoznikow produkcji (x2.9 zboza itd. to tylko PRZEWIDYWANA rownowaga, nie ustawienie). Ustawiamy granice fizyczne (ziemia, ludzie, klimat, pora roku,
+> pojemnosc pracy) i reguly decyzji (zysk przy cenie rynkowej, koszt zmiany, czas przejscia, bezwladnosc); produkcja i konsumpcja wynikaja z cen. Start neutralny:
+> w dniu wlaczenia dzisiejsza mieszanka towarow kazdego okregu (bez skoku -20%), dalej zmiany tylko z cen i wolno (zasada zmiany zajecia Jeffa). AI lordowie inwestuja
+> z wolnych pieniedzy ponad rezerwe wojny, gdy sie oplaca - wlaczane po tescie stabilnosci.
+
+
 Zrodlo: workflow wf_b9d7d613-f77 (rozpoznanie BEE / liczby / historia / specjalizacja -> 3 projekty -> ocena). STATUS: PROJEKT, NIE WDROZONY.
 
 DOPISEK Jeffa (16.10, wiazacy, do wdrozenia razem): zmiana zajecia wioski NIE od razu - prog oplacalnosci (+25%) utrzymany ok. 60 dni, koszt przebudowy do rzemieslnikow,

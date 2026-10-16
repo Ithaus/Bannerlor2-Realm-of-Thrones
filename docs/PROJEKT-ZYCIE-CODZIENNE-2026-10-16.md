@@ -1,5 +1,12 @@
 # PROJEKT: ZYCIE CODZIENNE - stany, koszyk dnia w kg, "Dostatek" i awans spoleczny (2026-10-16)
 
+> ZASADA JEFFA 16.10 (WIAZACA, nadrzedna wobec liczb ponizej): "ma byc to system dynamiczny, ktory sam sie reguluje podaza i popytem, tak jak prawdziwa ekonomia".
+> Zadnych sztywnych mnoznikow produkcji (x2.9 zboza itd. to tylko PRZEWIDYWANA rownowaga, nie ustawienie). Ustawiamy granice fizyczne (ziemia, ludzie, klimat, pora roku,
+> pojemnosc pracy) i reguly decyzji (zysk przy cenie rynkowej, koszt zmiany, czas przejscia, bezwladnosc); produkcja i konsumpcja wynikaja z cen. Start neutralny:
+> w dniu wlaczenia dzisiejsza mieszanka towarow kazdego okregu (bez skoku -20%), dalej zmiany tylko z cen i wolno (zasada zmiany zajecia Jeffa). AI lordowie inwestuja
+> z wolnych pieniedzy ponad rezerwe wojny, gdy sie oplaca - wlaczane po tescie stabilnosci.
+
+
 Zrodlo: workflow wf_c4f075f1-def (3 rozpoznania: towary, ludnosc, historia -> 2 modele -> ocena i synteza). STATUS: PROJEKT, NIC NIE WDROZONE.
 Skrot w logach i paczkach: **ZC** (zycie codzienne). Tor pracy: **L** (pelny lancuch), paczki ZC0-ZC7 kazda jak tor M (1 workflow, recenzja, autotest 120 dob).
 
