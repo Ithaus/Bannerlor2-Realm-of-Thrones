@@ -121,6 +121,11 @@ namespace CrashScribe
     /// wzroscie puli. Pamiec sesji (bez zapisu). Linia doby Z.3: mnoznik dnia, oczekiwane przy 1.0 i przy mnozniku, srednia, mnoznik na jutro.
     /// Nie dziala tylko, gdy liczy oryginal ROT (MarriageFast = false, obca latka na lancuchu oceny pary albo prefiks na CheckNPCMarriages, bieg cienia).
     ///
+    /// LOSOWANIE LENIWE (NW O1, noc 16.10, klucz MarriageLazyDraw; rozpoznanie wydajnosci WGRANIA 61: swaty ok. 0.96 s na dobe, ok. 1.1 mln ocen pary,
+    /// z czego wiekszosc to pelne przejscia wolnych lordow przy regule wyzej). Wolny lord przy czynnej regule nie przechodzi calej listy przeciwnej
+    /// plci: losuje z niej bez zwracania i ocenia pare tylko dla wylosowanego (PickViableLazy) - ten sam rozklad wyniku i te same liczniki,
+    /// inny ciag losowy. Kontrola R9 co 64. losowanie (pelne przejscie obok, linia doby: probek starej drogi, rozjazdow).
+    ///
     /// Wylaczniki: MarriageFast (true; false = oryginal ROT bez latki - wtedy nie dziala tez regula wyzej), MarriageFastShadow (false),
     /// MarriageOnlyViableCandidates (true), MarriageTargetPerYear (48; 0 = staly MarriageChanceScale), MarriageChanceScale (0.17 - start regulatora albo
     /// staly hamulec; 1.0 = bez hamulca) w ModuleData/CrashScribe.settings.xml. Bez zapisu w grze.
@@ -203,6 +208,12 @@ namespace CrashScribe
         // bez szans, ilu nie mialo zadnego kandydata z szansa i ile razy pytalismy model o szanse (dwa ostatnie tylko przy nowej regule)
         private static int _dayFree, _dayOldDead, _dayNoViable, _dayChanceEvals;
         private static int _totPairs;
+        // NW O1 (losowanie leniwe, klucz MarriageLazyDraw): stan sesji, pula losowania, liczniki doby i kontrola R9 (co LazySampleEvery-te losowanie)
+        private static bool _lazyOn;
+        private static readonly List<Hero> _pool = new List<Hero>(1024);
+        private const int LazySampleEvery = 64;
+        private static long _lazySeq, _dayLazySampleEvals;
+        private static int _dayLazy, _dayLazySamples, _dayLazyDiff, _totLazyDiff, _lazyDiffLines;
 
         private struct Rng
         {
@@ -529,6 +540,7 @@ namespace CrashScribe
             {
                 _ready = false; _shadow = false; _spouseOk = false; _spouseModelOk = false; _standDown = false; _standWhy = null; _patchCheckDue = true;
                 _viableCfg = false; _viableOn = false; _scale = 1f; _scaleCfg = 1f; _regOn = false; _target = 0;
+                _lazyOn = false; LazyReset();   // NW O1
                 RegReset();
                 bool fast = Config.MarriageFast, shadow = Config.MarriageFastShadow;
                 if (!fast && !shadow) { Say(false, "MarriageFast = false"); return; }
@@ -557,6 +569,7 @@ namespace CrashScribe
                 _spouseOk = _spouseModelOk;
                 _viableCfg = Config.MarriageOnlyViableCandidates && !shadow;
                 _viableOn = _viableCfg && _spouseOk;
+                _lazyOn = Config.MarriageLazyDraw;   // NW O1: dziala tylko przy czynnej regule (viable w Decide)
                 _scaleCfg = ScaleFromConfig();   // hamulec: staly mnoznik (tylko przy _viableOn) albo start regulatora
                 int tg = Config.MarriageTargetPerYear;
                 _target = tg < 0 ? 0 : tg > TargetMax ? TargetMax : tg;
@@ -572,7 +585,8 @@ namespace CrashScribe
                                                 : "decyduje nasza droga: ta sama regula i te same szanse co w ROT, jedno przejscie po kandydatach przeciwnej plci (pary w grze inne, niz wylosowalby sam ROT - BK losuje w ocenie szansy)")
                           + "; skrot dla zonatych: " + (spouseWhy == null ? "tak" : "nie - " + spouseWhy)
                           + "; tylko kandydaci z szansa (MarriageOnlyViableCandidates): " + ViableState()
-                          + "; " + ScaleState());
+                          + "; " + ScaleState()
+                          + "; " + LazyState());
             }
             catch (Exception e)
             {
@@ -623,7 +637,7 @@ namespace CrashScribe
             {
                 _busy = false;
                 // bufory nie trzymaja bohaterow miedzy wywolaniami (po wyjsciu do menu przypinalyby stara kampanie do nastepnego wczytania)
-                _lords.Clear(); _males.Clear(); _females.Clear(); _nullHomes.Clear(); _cand.Clear();
+                _lords.Clear(); _males.Clear(); _females.Clear(); _nullHomes.Clear(); _cand.Clear(); _pool.Clear();
                 _court.Clear(); _courtBuilt = false;
             }
             long dt = Stopwatch.GetTimestamp() - t0;
@@ -750,6 +764,7 @@ namespace CrashScribe
                 List<Hero> other = female ? _males : _females;
                 Hero spouse = _spouseOk ? hero1.Spouse : null;
                 bool quick = spouse != null && spouse.IsAlive;   // lord z zyjacym malzonkiem: szansa slubu zawsze 0
+                bool lazy = viable && !quick && _lazyOn;         // NW O1: wolny lord przy regule - losowanie leniwe (PickViableLazy), bez pelnego przejscia
                 bool any = false;
                 if (quick)
                 {
@@ -760,7 +775,7 @@ namespace CrashScribe
                         if (model.IsCoupleSuitableForMarriage(hero1, other[i])) { any = true; break; }
                     }
                 }
-                else
+                else if (!lazy)
                 {
                     for (int i = 0; i < other.Count; i++)
                     {
@@ -772,12 +787,14 @@ namespace CrashScribe
                 // bohaterowie z pusta pamiecia domu, ktorych skroty by nie zapytaly: oryginal ocenia cala liste, a ocena wypelnia te
                 // pamiec - robimy to samo (ta sama plec zawsze; przeciwna tylko po skrocie zonatego - przy pelnym przejsciu juz byla).
                 // Ponowna ocena tej samej pary niczego nie zmienia (oryginal tez liczy ja do trzech razy).
+                // NW O1: przy losowaniu leniwym przeciwna plec z pusta pamiecia domu tez tutaj (jak po skrocie zonatego) - pelnego przejscia nie ma,
+                // a pamiec domu ma sie wypelnic tak samo jak w oryginale, zanim padnie pierwsze losowanie
                 for (int i = 0; i < _nullHomes.Count; i++)
                 {
                     Hero h = _nullHomes[i];
                     if (_home(h) != null) continue;
                     bool same = h.IsFemale == female;
-                    if (!same && !quick) continue;
+                    if (!same && !quick && !lazy) continue;
                     _dayEvals++;
                     if (!model.IsCoupleSuitableForMarriage(hero1, h)) continue;
                     if (same) throw new InvalidOperationException("model uznal pare tej samej plci za dobra - podzial wedlug plci nie jest rownowazny");
@@ -788,6 +805,7 @@ namespace CrashScribe
                     if (any) MBRandom.RandomInt(1);   // krok, ktory oryginal zuzywa na wybor kandydata (szansa 0 - RandomFloat nie pada; krokow, ktore w grze zuzywa sama ocena szansy BK, nie odtwarzamy)
                     return false;
                 }
+                if (lazy) return PickViableLazy(model, hero1, other, out x, out num);
             }
             if (_cand.Count == 0) return false;
             if (viable) return PickViable(model, hero1, out x, out num);
@@ -828,6 +846,82 @@ namespace CrashScribe
             }
             _dayNoViable++;
             return false;
+        }
+
+        /// <summary>
+        /// NW O1 (noc 16.10; klucz MarriageLazyDraw): regula "tylko kandydaci z szansa" bez pelnego przejscia po liscie. Pula = wszyscy bohaterowie
+        /// przeciwnej plci (ta sama lista, z ktorej pelne przejscie robilo _cand); losowanie bez zwracania, warunek pary tylko dla wylosowanego,
+        /// dla pasujacego - ta sama kontrola co PickViable (zyjacy malzonek, zaloty stanu >= 3, szansa modelu > 0). Pierwszy pasujacy z szansa wygrywa.
+        /// Rozklad wyniku ten sam: kazdy "pasuje i ma szanse" z rowna szansa (losowanie bez zwracania z puli, w ktorej tylko oni koncza losowanie),
+        /// tak jak bez zwracania z _cand. Liczniki znacza to samo: _dayFree - lord mial co najmniej jednego pasujacego (i nie jest sam w zalotach),
+        /// _dayOldDead - pierwszy wylosowany PASUJACY nie ma szansy (pierwszy pasujacy z puli ma ten sam rozklad co pierwsze losowanie z _cand -
+        /// losowanie starej reguly), _dayNoViable - pasujacy byli, zadnego z szansa, _dayChanceEvals - pytania o szanse. Inny jest tylko ciag
+        /// losowy (krok generatora na kazde losowanie z puli, takze niepasujacego) - zamierzone, jak przy samej regule. Warunek pary jest czysta
+        /// funkcja stanu (naglowek klasy), pamiec domu przeciwnej plci wypelnia petla _nullHomes w Scan przed pierwszym losowaniem.
+        /// R9 (kontrola): co LazySampleEvery-te losowanie leniwe liczy tez pelne przejscie (tylko warunek pary - bez generatora i bez pytan o szanse)
+        /// i porownuje: jest pasujacy tu i tam, wynik nalezy do pasujacych pelnego przejscia, przy wyczerpanej puli ta sama liczba pasujacych.
+        /// </summary>
+        private static bool PickViableLazy(MarriageModel model, Hero hero1, List<Hero> other, out Hero x, out float num)
+        {
+            x = null; num = 0f;
+            if (!_courtBuilt) BuildCourt();
+            if (_court.Contains(hero1)) return false;   // sam w zalotach stanu >= 3: jak PickViable (bez licznikow)
+            _dayLazy++;
+            _pool.Clear();
+            _pool.AddRange(other);
+            int suitable = 0;
+            while (_pool.Count > 0)
+            {
+                int i = MBRandom.RandomInt(_pool.Count);
+                Hero h = _pool[i];
+                int last = _pool.Count - 1;
+                _pool[i] = _pool[last];
+                _pool.RemoveAt(last);
+                _dayEvals++;
+                if (!model.IsCoupleSuitableForMarriage(hero1, h)) continue;
+                suitable++;
+                if (suitable == 1) _dayFree++;
+                Hero sp = h.Spouse;
+                float c = 0f;
+                if ((sp == null || !sp.IsAlive) && !_court.Contains(h))
+                {
+                    _dayChanceEvals++;
+                    c = model.NpcCoupleMarriageChance(hero1, h);
+                }
+                if (c > 0f) { x = h; num = c; break; }
+                if (suitable == 1) _dayOldDead++;
+            }
+            if (x == null && suitable > 0) _dayNoViable++;
+            _pool.Clear();
+            if (++_lazySeq % LazySampleEvery == 0)
+            {
+                try { LazyCheck(model, hero1, other, x, suitable); }
+                catch (Exception e) { Stumble("MarriageFast.LazyCheck", e); }
+            }
+            return x != null;
+        }
+
+        /// <summary>NW O1 R9: pelne przejscie (sam warunek pary, jak stara droga) wobec wyniku losowania leniwego - rozjazd = blad przeniesienia reguly.</summary>
+        private static void LazyCheck(MarriageModel model, Hero hero1, List<Hero> other, Hero x, int suitableSeen)
+        {
+            _dayLazySamples++;
+            int all = 0; bool inSet = x == null;
+            for (int i = 0; i < other.Count; i++)
+            {
+                Hero h = other[i];
+                _dayLazySampleEvals++;
+                if (!model.IsCoupleSuitableForMarriage(hero1, h)) continue;
+                all++;
+                if (h == x) inSet = true;
+            }
+            bool bad = (all > 0) != (suitableSeen > 0) || !inSet || (x == null && all != suitableSeen) || suitableSeen > all;
+            if (!bad) return;
+            _dayLazyDiff++; _totLazyDiff++;
+            if (_lazyDiffLines >= 3) return;
+            _lazyDiffLines++;
+            Scribe.Line(Tag + ": losowanie leniwe - ROZJAZD z pelnym przejsciem: lord " + Name(hero1) + ", pasujacych w pelnym przejsciu " + all
+                        + ", w losowaniu " + suitableSeen + ", wynik " + (x != null ? Name(x) + (inSet ? "" : " SPOZA pasujacych") : "brak")
+                        + " (linia " + _lazyDiffLines + " z 3 w sesji).");
         }
 
         /// <summary>Bohaterowie w zalotach stanu >= 3 (MatchMadeByFamily i wyzej, takze Marriage) - ten sam warunek co kontrola ROT po rzucie,
@@ -986,7 +1080,9 @@ namespace CrashScribe
                                                  + (_regOn ? ", jutro mnoznik " + N3(next) + (fed ? "" : _dayOrig > 0 ? " (doba bez wpisu do sredniej - rody liczone przez oryginal ROT " + _dayOrig + ")"
                                                                                                          : " (doba bez wpisu do sredniej - pierwsza po wczytaniu)") : "")
                                                : "")
-                                  + "; sluby dzis " + wed + ", od wczytania " + _totPairs;
+                                  + "; sluby dzis " + wed + ", od wczytania " + _totPairs
+                                  + "; " + LazyState() + ": losowan " + _dayLazy + ", probek starej drogi " + _dayLazySamples + " (ocen pary w probkach " + _dayLazySampleEvals
+                                  + "), rozjazdow " + _dayLazyDiff + " (od wczytania " + _totLazyDiff + ")";   // NW O1
                     if (_shadow)
                         Scribe.Line(Tag + ": klanow " + _dayClans + ", par stara droga " + _dayOldPairs + ", nowa " + _dayNewPairs + ", roznic " + _dayDiff
                                     + ", czas stara " + (_dayOldTicks * ms).ToString("0.0", ci) + " ms, nowa " + (_dayNewTicks * ms).ToString("0.0", ci) + " ms"
@@ -1004,7 +1100,19 @@ namespace CrashScribe
             _dayEvals = _dayNewTicks = _dayOldTicks = 0;
             _dayFree = _dayOldDead = _dayNoViable = _dayChanceEvals = 0;
             _dayExp = _dayExpS = 0; _dayRolls = _dayOrig = 0;
+            LazyReset();   // NW O1
             _stumblesDay = 0;
+        }
+
+        /// <summary>NW O1: liczniki doby losowania leniwego od zera.</summary>
+        private static void LazyReset() { _dayLazy = _dayLazySamples = _dayLazyDiff = 0; _dayLazySampleEvals = 0; }
+
+        /// <summary>NW O1: stan losowania leniwego slowami - do linii startu i linii doby.</summary>
+        private static string LazyState()
+        {
+            if (!Config.MarriageLazyDraw) return "losowanie leniwe (MarriageLazyDraw) [wyl] - pelna lista jak dotad";
+            if (!_viableOn) return "losowanie leniwe (MarriageLazyDraw) NIE DZIALA - regula 'tylko kandydaci z szansa' nieczynna";
+            return "losowanie leniwe (MarriageLazyDraw) [WL]";
         }
 
         /// <summary>Regulator: srednia i liczniki od zera (nowa sesja - pamiec sesji, bez zapisu).</summary>
@@ -1019,6 +1127,7 @@ namespace CrashScribe
         {
             _ready = false; _shadow = false; _spouseOk = false; _spouseModelOk = false; _standDown = false; _standWhy = null; _patchCheckDue = true;
             _viableCfg = false; _viableOn = false; _scale = 1f; _scaleCfg = 1f; _regOn = false; _target = 0;
+            _lazyOn = false; LazyReset(); _totLazyDiff = 0; _lazyDiffLines = 0; _lazySeq = 0;   // NW O1
             RegReset();
             _busy = false;
             ShadowClose();

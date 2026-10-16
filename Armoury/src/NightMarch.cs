@@ -1287,6 +1287,12 @@ namespace Armoury
               .Append(" ms, maks. ").Append(d.GuardMsMax.ToString("0.000", ci)).Append(" ms")
               .Append("; straznik snu dlugu - maks. odstep ").Append(_debtDhMax.ToString("0.000", ci)).Append(" h, alarmow ")
               .Append(_alarmDhMax.ToString("0.000", ci)).Append(" h gry; potkniecia T10 w sesji ").Append(_aiStumbles).Append('.');
+            // NW O5: na koncu linii - zagrozenia karawan (siatka) od poprzedniej linii switu: zapytania, kontrola R9, czas sekcji zagrozen (z budowa siatki)
+            var st = Settings.Current;
+            sb.Append(" | zagrozenia karawan (NW): siatka (AiCampFastScan) ").Append(st != null && st.AiCampFastScan ? "[WL]" : "[wyl]")
+              .Append(", zapytan ").Append(ThQueries).Append(", probek starej drogi ").Append(ThSamples).Append(", rozjazdow ").Append(ThDiff)
+              .Append(", czas zagrozen ").Append((ThTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", ci)).Append(" ms");
+            ThQueries = 0; ThSamples = 0; ThDiff = 0; ThTicks = 0;
             Log.Info(sb.ToString());
             _debtDhMax = 0; _alarmDhMax = 0;
         }

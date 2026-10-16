@@ -471,4 +471,16 @@
        realm in a Banner Kings revolt. Succession when the story ruler dies, and thrones handed over by Realm of Thrones events (the Night's Watch,
        the North), work as before. Your own house is never removed from a throne. Set to false for the old behaviour. -->
   <StoryThroneGuard>true</StoryThroneGuard>
+  <!-- Faster matchmaking for Realm of Thrones lords (needs MarriageFast and MarriageOnlyViableCandidates above). A free lord used to check
+       every possible partner in the world first and only then draw one; now he draws partners one by one at random and checks only the ones
+       drawn, until he finds one he can marry. The same rule and the same odds - every partner who could marry him is just as likely as
+       before - only about five to eight times less work a day. Set to false to check the whole list first (old behaviour). -->
+  <MarriageLazyDraw>true</MarriageLazyDraw>
+  <!-- The clan economy audit (the economy-*.csv file and the EKONOMIA line in the session log) runs once every 7 days and once after
+       loading, instead of every day - it takes about a fifth of a second at midnight. It only reads the game and changes nothing.
+       Automatic tests still run it every day. Set to false to run it every day (old behaviour). -->
+  <EconomyAuditWeekly>true</EconomyAuditWeekly>
+  <!-- Keep the session log open while the game runs instead of opening and closing the file for every line. Every line is still handed
+       to Windows at once, so nothing is lost if the game crashes, and the log can be read during play. Set to false for the old behaviour. -->
+  <ScribeKeepOpen>true</ScribeKeepOpen>
 </CrashScribe>

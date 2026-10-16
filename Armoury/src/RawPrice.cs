@@ -74,6 +74,18 @@ namespace Armoury
         /// <summary>Nowa gra albo wczytanie (z HistoricalPrices.Reset, czyli z konstruktora ArmouryBehavior): bledy nowej kampanii znow ida do logu.</summary>
         internal static void Reset() { _errFactor = false; _errUse = false; _errLog = false; _errBudget = false; _stFactor = 0; _stUse = 0; _stBudget = 0; }
 
+        /// <summary>NW O4 (ciche logi): doba bez linii "Ceny surowcow" - potkniecia doby odczytane i zerowane jak w Daily (linia "potkniecia dzis" mowi
+        /// o jednej dobie); niezerowe - krotka linia z innym poczatkiem (bledy zawsze w logu, narzedzie czyta "Ceny surowcow: dzien" tylko z pelnych dob).</summary>
+        internal static void QuietDay()
+        {
+            int stF = System.Threading.Interlocked.Exchange(ref _stFactor, 0), stU = System.Threading.Interlocked.Exchange(ref _stUse, 0);
+            int stB = _stBudget; _stBudget = 0;
+            int stS = HistoricalPrices.TakeShelfStumbles();
+            if (stF + stU + stB + stS > 0)
+                Log.Info("Ceny surowcow (ciche logi): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - potkniecia dzis (wyjatki, pierwszy w logu): wycena " + stF
+                         + ", popyt " + stU + ", budzet BK " + stB + ", wagi polki " + stS + ".");
+        }
+
         // ------------------------------------------------------------ (A) stala wzoru w nowej monecie
         // BetterEconomy (BEE_ItemPriceFactorModel) wola w srodku model gry - przelicza tylko najbardziej zewnetrzne wywolanie.
         // Metoda jest wolana przy kazdej wycenie (karawany licza nia kazde miasto i kazdy towar): prefiks ma byc tani - zadnych

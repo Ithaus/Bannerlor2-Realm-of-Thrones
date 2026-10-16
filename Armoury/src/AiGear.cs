@@ -288,7 +288,9 @@ namespace Armoury
             {
                 if (mp == null || mp.CurrentSettlement == null) return;
                 var st = mp.CurrentSettlement;
+                long p0 = DayProfile.GearBegin(mp);   // NW O6 (a): czesci doby partii w probce 1/16 (tylko pomiar)
                 if (mp.IsGarrison) MenPurse.GarrisonDay(mp, st);   // K1 (A11): zaloga bez ludzi - sakiewka do kasy osady (nadwyzki: GarrisonArmory.SellWeek)
+                long p1 = DayProfile.Now(p0);
                 // K1 (przeglad): zaloga zamku naprawia u kowali najblizszego miasta handlowego (jak zakupy) - od K1 jej sprzet obija sie
                 // w bitwach (AiWear), a bez kowali rezerwa sakiewki na naprawy wisialaby wiecznie i blokowala zakupy
                 // Poprawki sklad7: naprawy to usluga (obite sztuki jada do kowala miasta i wracaja), nie zakup towaru - swiadome odstepstwo od reguly
@@ -296,8 +298,11 @@ namespace Armoury
                 // handlowe, droga, odleglosc MarketMaxDistance, bez oblezenia i wojny); inaczej zamek bez napraw (nie ma kowali)
                 Settlement mendAt = st;
                 if (mp.IsGarrison && st.IsCastle && AiWear.BookOn) { float d; string why; mendAt = GarrisonCarts.MarketFor(st, out d, out why, false) ?? st; }
+                long p2 = DayProfile.Now(p0);
                 AiWear.MendInTown(mp, mendAt);
+                long p3 = DayProfile.Now(p0);
                 TryBuy(mp, st);
+                DayProfile.GearEnd(p0, p1, p2, p3);
             }
             catch { }
         }

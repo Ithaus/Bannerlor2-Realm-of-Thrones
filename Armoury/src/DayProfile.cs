@@ -136,6 +136,8 @@ namespace Armoury
             _tsCount = 0;
             Array.Clear(_inTicks, 0, 2); Array.Clear(_inCalls, 0, 2); Array.Clear(_inMax, 0, 2); Array.Clear(_inKindTicks, 0, 3); Array.Clear(_inKindCalls, 0, 3);
             Array.Clear(_cwCalls, 0, 2); Array.Clear(_cwTicks, 0, 2); Array.Clear(_cwSampled, 0, 2);
+            _gCalls = 0; Array.Clear(_gN, 0, 3); Array.Clear(_gS, 0, 3); Array.Clear(_gT, 0, _gT.Length);   // NW O6 (a)
+            _fCalls = 0; _fSampled = 0; _fShort = 0; Array.Clear(_fT, 0, 3);                                  // NW O6 (b)
         }
 
         // ------------------------------------------------------------ takt doby
@@ -425,6 +427,89 @@ namespace Armoury
             _nsTs = (t2 - t1) * 1e9 / Stopwatch.Frequency / N + (sink == 1 ? 1e-9 : 0.0);
         }
 
+        // ------------------------------------------------------------ NW O6 (noc 16.10): pomiary pod runde 2 - tylko log, probki 1/16
+        // (a) AiGear.OnDailyTickParty (w osadzie) wedlug rodzaju partii (0 zaloga, 1 lord, 2 inne) i czesci (0 MenPurse.GarrisonDay, 1 GarrisonCarts.MarketFor,
+        //     2 AiWear.MendInTown, 3 TryBuy z MenUpgrade.ForAi); (b) MenPurse.AiFitted wedlug czesci (0 MenUpgrade.AiPieces, 1 QuartermasterLaw.MenOf + MeetsOf,
+        //     2 SwapMath.FitBest) - wszyscy wolajacy (nadwyzki, naprawy AI, kontekst musztry).
+        private static long _gCalls; private static int _gKind;
+        private static readonly long[] _gN = new long[3], _gS = new long[3];
+        private static readonly long[] _gT = new long[12];   // rodzaj x 4 + czesc
+        private static long _fCalls, _fSampled, _fShort;
+        private static readonly long[] _fT = new long[3];
+        private static readonly string[] GearKinds = { "zalogi", "lordowie", "inne" };
+
+        /// <summary>NW O6 (a): poczatek AiGear.OnDailyTickParty partii w osadzie; 0 = bez probki, inaczej znacznik czasu.</summary>
+        internal static long GearBegin(MobileParty mp)
+        {
+            int k = mp.IsGarrison ? 0 : mp.IsLordParty ? 1 : 2;
+            _gN[k]++;
+            if ((++_gCalls & 15) != 1) return 0L;
+            _gKind = k;
+            return Stopwatch.GetTimestamp();
+        }
+
+        /// <summary>NW O6 (a): t0 przed GarrisonDay, t1 przed MarketFor, t2 przed MendInTown, t3 przed TryBuy; koniec teraz.</summary>
+        internal static void GearEnd(long t0, long t1, long t2, long t3)
+        {
+            if (t0 == 0 || t1 == 0 || t2 == 0 || t3 == 0) return;
+            long t4 = Stopwatch.GetTimestamp();
+            int b = _gKind * 4;
+            _gT[b] += t1 - t0; _gT[b + 1] += t2 - t1; _gT[b + 2] += t3 - t2; _gT[b + 3] += t4 - t3; _gS[_gKind]++; _tsCount += 5;
+        }
+
+        /// <summary>NW O6 (b): poczatek MenPurse.AiFitted; 0 = bez probki.</summary>
+        internal static long FitBegin() { return (++_fCalls & 15) == 1 ? Stopwatch.GetTimestamp() : 0L; }
+
+        /// <summary>NW O6 (b): AiFitted bez sztuk tego typu (powrot po AiPieces) - sama czesc 0.</summary>
+        internal static void FitShort(long t0)
+        {
+            if (t0 == 0) return;
+            _fT[0] += Stopwatch.GetTimestamp() - t0; _fSampled++; _fShort++; _tsCount += 2;
+        }
+
+        /// <summary>NW O6 (b): t1 przed MenOf, t2 przed FitBest; koniec teraz.</summary>
+        internal static void FitEnd(long t0, long t1, long t2)
+        {
+            if (t0 == 0 || t1 == 0 || t2 == 0) return;
+            long t3 = Stopwatch.GetTimestamp();
+            _fT[0] += t1 - t0; _fT[1] += t2 - t1; _fT[2] += t3 - t2; _fSampled++; _tsCount += 4;
+        }
+
+        // NW O4: odcinki tylko-log zestawu 1 cichych logow (takt doby) i godzina TerrainEase.Hourly - w dobie bez pomiaru blisko 0 ms
+        private static readonly string[] QuietLaps = { "RawPrice.Daily", "MarketRoad.Daily", "TerrainEase.Stage7Daily" };
+        private const string QuietHour = "TerrainEase.Hourly";
+
+        /// <summary>NW O4 + O6: pola na KONCU linii "Profil doby (E8/0)" (pola wyzej bez zmian).</summary>
+        private static void TailNw(StringBuilder sb)
+        {
+            double q = 0; int qn = 0;
+            var qs = new StringBuilder();
+            for (int i = 0; i < _lN; i++)
+                for (int k = 0; k < QuietLaps.Length; k++)
+                    if (_lName[i] == QuietLaps[k]) { double m = Ms(_lTicks[i]); q += m; qn++; qs.Append(qs.Length > 0 ? ", " : "").Append(QuietLaps[k]).Append(' ').Append(F1(m)); }
+            for (int i = 0; i < _hN; i++)
+                if (_hName[i] == QuietHour) { double m = Ms(_hTicks[i]); q += m; qn++; qs.Append(qs.Length > 0 ? ", " : "").Append("godzina ").Append(QuietHour).Append(' ').Append(F1(m)); }
+            sb.Append(" | ciche (tylko log, NW) ").Append(F1(q)).Append(" ms / ").Append(qn).Append(" odcinkow (").Append(qs).Append("); ciche logi ")
+              .Append(LogGate.On ? "[WL] co " + LogGate.Every + " dob" : "pelne");
+            // (a) AiGear wedlug czesci: srednia probki x wywolan rodzaju
+            sb.Append(" | AiGear doba partii wg czesci (NW, probka 1/16):");
+            double all = 0;
+            for (int k = 0; k < 3; k++)
+            {
+                double sc = _gS[k] > 0 ? (double)_gN[k] / _gS[k] : 0.0;
+                double a = Ms(_gT[k * 4]) * sc, b = Ms(_gT[k * 4 + 1]) * sc, c = Ms(_gT[k * 4 + 2]) * sc, d = Ms(_gT[k * 4 + 3]) * sc;
+                all += a + b + c + d;
+                sb.Append(k == 0 ? " " : "; ").Append(GearKinds[k]).Append(' ').Append(_gN[k]).Append(" (probek ").Append(_gS[k]).Append(") [zaloga ").Append(F1(a))
+                  .Append(", rynek ").Append(F1(b)).Append(", naprawy ").Append(F1(c)).Append(", zakupy ").Append(F1(d)).Append(']');
+            }
+            sb.Append("; razem ").Append(F1(all)).Append(" ms");
+            // (b) AiFitted wedlug czesci
+            double fs = _fSampled > 0 ? (double)_fCalls / _fSampled : 0.0;
+            sb.Append(" | AiFitted (NW, probka 1/16): wywolan ").Append(_fCalls).Append(" (probek ").Append(_fSampled).Append(", bez sztuk ").Append(_fShort)
+              .Append("), AiPieces ").Append(F1(Ms(_fT[0]) * fs)).Append(" ms, MenOf ").Append(F1(Ms(_fT[1]) * fs)).Append(" ms, FitBest ").Append(F1(Ms(_fT[2]) * fs))
+              .Append(" ms, razem ").Append(F1((Ms(_fT[0]) + Ms(_fT[1]) + Ms(_fT[2])) * fs)).Append(" ms");
+        }
+
         private static void Line()
         {
             if (_nsWrap < 0) Calibrate();
@@ -585,6 +670,7 @@ namespace Armoury
                   .Append(F1(Ms(_inKindTicks[PkLord]))).Append(" ms/").Append(_inKindCalls[PkLord]).Append(", zalogi ").Append(F1(Ms(_inKindTicks[PkGarrison]))).Append(" ms/")
                   .Append(_inKindCalls[PkGarrison]).Append(", pozostale ").Append(F1(Ms(_inKindTicks[PkOther]))).Append(" ms/").Append(_inKindCalls[PkOther]);
             }
+            try { TailNw(sb); } catch (Exception e) { sb.Append(" | NW: blad ").Append(e.GetType().Name); }   // NW O4 + O6: na koncu linii
             Log.Info(sb.ToString());
         }
 

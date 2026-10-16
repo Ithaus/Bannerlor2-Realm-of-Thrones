@@ -21,6 +21,8 @@ namespace CrashScribe
     ///  - w logu sesji podsumowanie wedle pozycji (krol / rod krolestwa / rod mniejszy
     ///    / gracz): ile rodow, mediana i max zlota, mediana bilansu i faktycznej zmiany,
     ///    plus piec najbogatszych rodow.
+    /// NW O2 (noc 16.10): w grze raz na 7 dob (doba podzielna przez 7) i raz po wczytaniu - ok. 190 ms w klatce polnocy; w autotescie bez
+    /// pomiaru klatki codziennie (TestMode); klucz EconomyAuditWeekly = false - codziennie jak dotad. Przebiegi i czas w linii "Profil CS (E8/0)".
     /// </summary>
     internal sealed class EconomyAudit : CampaignBehaviorBase
     {
@@ -29,9 +31,46 @@ namespace CrashScribe
         // zloto rodziny przy poprzednim audycie (tylko ta sesja) - do faktycznej zmiany
         private static readonly Dictionary<Clan, KeyValuePair<double, long>> _prev = new Dictionary<Clan, KeyValuePair<double, long>>();
 
+        // NW O2 (noc 16.10): przebiegi audytu od poprzedniej linii "Profil CS (E8/0)" (liczba, w tym "start" po wczytaniu, czas) - tylko pomiar.
+        // Sluchacze MbEvent biegna od ostatnio dopisanego: Blame.DayLine (dopisany nizej) idzie w takcie PRZED Run, wiec linia doby N-1
+        // pokazuje przebieg z taktu N-1 (i "start" z pierwszej godziny), a nie z taktu, w ktorym jest pisana.
+        private static int _perRuns, _perStart;
+        private static long _perTicks;
+
+        /// <summary>O2: audyt w tym takcie doby? Klucz wylaczony albo pelne logi (autotest bez pomiaru klatki, tryb nie rozpoznany) - codziennie;
+        /// inaczej raz na 7 dob (doba gry podzielna przez 7). _prev liczy faktyczna zmiane na dobe przez (today - p.Key), wiec 7 dob jest dzielone przez 7.</summary>
+        private static bool Due()
+        {
+            if (!Config.EconomyAuditWeekly || TestMode.FullLogs) return true;
+            try { return (int)CampaignTime.Now.ToDays % 7 == 0; } catch { return true; }
+        }
+
+        private static void Timed(string when)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try { Run(when); }
+            finally
+            {
+                _perTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; _perRuns++;
+                if (when == "start") _perStart++;
+            }
+        }
+
+        /// <summary>O2: dopisek do linii "Profil CS (E8/0)" - przebiegi od poprzedniej linii; liczniki od zera.</summary>
+        internal static string DayText()
+        {
+            string tryb = !Config.EconomyAuditWeekly ? "codziennie (EconomyAuditWeekly = false)"
+                          : TestMode.FullLogs ? "codziennie (tryb " + TestMode.Describe() + ")" : "raz na 7 dob (tryb " + TestMode.Describe() + ")";
+            string s = " | EconomyAudit: przebiegow " + _perRuns + " (po wczytaniu " + _perStart + "), "
+                       + (_perTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", CultureInfo.InvariantCulture) + " ms; " + tryb;
+            _perRuns = 0; _perStart = 0; _perTicks = 0;
+            return s;
+        }
+
         public override void RegisterEvents()
         {
-            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { Run("dzien"); });
+            _perRuns = 0; _perStart = 0; _perTicks = 0;   // NW O2: nowa kampania / wczytanie - liczniki od zera (jak Blame.DayReset)
+            CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { if (Due()) Timed("dzien"); });   // NW O2: raz na 7 dob w grze (Config.EconomyAuditWeekly)
             // E8/0 (242): linia "Profil CS (E8/0)" - bledy pierwszej szansy i czas Blame.Culprits za dobe (tylko pomiar; wylacznik Stage8ProfileLog w CrashScribe.settings.xml)
             Blame.DayReset();   // recenzja E8/0: stan linii od zera przy kazdej kampanii (pierwszy takt po wczytaniu bez linii)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, delegate { try { Blame.DayLine((int)CampaignTime.Now.ToDays); } catch { } });
@@ -40,7 +79,7 @@ namespace CrashScribe
             {
                 if (_firstDone) return;
                 _firstDone = true;
-                Run("start");
+                Timed("start");
             });
         }
 

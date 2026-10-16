@@ -577,16 +577,20 @@ namespace Armoury
         {
             men = null; meets = null;
             if (arm == null || roster == null || type == ItemObject.ItemTypeEnum.Horse || type == ItemObject.ItemTypeEnum.HorseHarness) return null;   // konie i rzedy - Stajnia
+            long q0 = DayProfile.FitBegin();   // NW O6 (b): czesci dopasowania w probce 1/16 (tylko pomiar)
             var pieces = MenUpgrade.AiPieces(arm, type);
-            if (pieces.Count == 0) return null;
+            if (pieces.Count == 0) { DayProfile.FitShort(q0); return null; }
+            long q1 = DayProfile.Now(q0);
             List<CharacterObject> troops; SkillObject skill;
             // K1 (przeglad): bron po SLOTACH WZORCA (jak braki AiGear.Deficit i MenUpgrade.Buckets) - dotad 1 bron na czlowieka, wiec
             // druga bron oddzialu szla do kupca, a zakupy brakow (dawniej K1 BuyGaps) odkupowaly ja tego samego dnia
             QuartermasterLaw.MenOf(roster, type, pieces, out troops, out men, out skill, QuartermasterLaw.MenPerSlot, false);
             meets = QuartermasterLaw.MeetsOf(troops);
+            long q2 = DayProfile.Now(q0);
             // K1 (Jeff 09.10 04:40, "to samo dla AI"): ludzie nosza najlepsze, co udzwigna (FitBest), a do kupca idzie najgorsze - dotad
             // ciezki gorszy grat byl "noszony", a lepsza lzejsza sztuka szla do kupca (czlowiek zostawal z gorsza w miejsce lepszej)
             SwapMath.FitBest(men, troops.Count, meets, pieces);
+            DayProfile.FitEnd(q0, q1, q2);
             return pieces;
         }
 

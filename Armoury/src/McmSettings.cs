@@ -872,6 +872,10 @@ namespace Armoury
         [SettingPropertyGroup("The law of the battlefield")]
         public int LegendaryLootValueFloor { get; set; } = 100000;
 
+        [SettingPropertyBool("Legendary Sweep Lazy", HintText = "the daily sweep of AI armouries checks who owns an armoury only when it holds giant gear or an exotic mount - the same items removed, faster; off = the owner of every armoury is checked first")]
+        [SettingPropertyGroup("The law of the battlefield")]
+        public bool LegendarySweepLazy { get; set; } = true;
+
         [SettingPropertyBool("Spoils Clan Real Soldiers", HintText = "your Spoils of War mercenary company gets no soldiers out of thin air: a founded, reformed, newly hired or re-formed warband starts with its captain alone (no ready-made 50-odd men from the party template, no 20 initial troops, no volunteers from the map, and Banner Kings no longer swaps the captain out of his own warband for a soldier from nowhere) and grows only by real recruitment - notables' volunteers and tavern hirelings, paid from the company's own purse; what you pay Spoils of War to found, reform or hire a warband goes whole into the company's purse instead of partly vanishing (off = Spoils of War as before; the day's log line shows how many men either way)")]
         [SettingPropertyGroup("The law of the battlefield")]
         public bool SpoilsClanRealSoldiers { get; set; } = true;
@@ -1599,6 +1603,10 @@ namespace Armoury
         [SettingPropertyBool("Scorched Earth Enabled", HintText = "war leaves scars: enemy armies forage villages on the march, and plundered villages heal slowly (with Devastation Enabled the march drives out a share of the countryside's people instead of taking hearths, and they come home in time)")]
         [SettingPropertyGroup("The marching column")]
         public bool ScorchedEarthEnabled { get; set; } = true;
+
+        [SettingPropertyBool("Scorched Earth Fast Scan", HintText = "foraging armies look at villages within reach before asking who is at war with whom - the same villages are foraged, found faster; off = the old order")]
+        [SettingPropertyGroup("The marching column")]
+        public bool ScorchedEarthFastScan { get; set; } = true;
 
         [SettingPropertyInteger("Forage Min Men", 0, 400, "0", HintText = "armies at least this large live off enemy land")]
         [SettingPropertyGroup("The marching column")]
@@ -4224,6 +4232,10 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool AiCampsAtNight { get; set; } = true;
 
+        [SettingPropertyBool("Ai Camp Fast Scan", HintText = "camping caravans look for enemies only in the map squares around them instead of checking every lord and band in the world - the same alarms, found faster; off = the old full check")]
+        [SettingPropertyGroup("A night's rest")]
+        public bool AiCampFastScan { get; set; } = true;
+
         [SettingPropertyInteger("Camp Start Hour", 0, 23, "0", HintText = "hour the world makes camp (lords, armies, caravans, day-hunting bands, your nightfall prompt); 0 and 6 = midnight to six; equal hours = no camp")]
         [SettingPropertyGroup("A night's rest")]
         public int CampStartHour { get; set; } = 0;
@@ -4695,6 +4707,14 @@ namespace Armoury
         [SettingPropertyBool("Log Keep Open", HintText = "keep the log files open while the game runs instead of opening and closing a file for every line - the same lines, each written out at once (nothing is lost if the game crashes), and the log can still be read during play; saves a little time every day. Off: a file is opened and closed for every line, as before")]
         [SettingPropertyGroup("Grateful villages")]
         public bool LogKeepOpen { get; set; } = true;
+
+        [SettingPropertyBool("Quiet Log", HintText = "quiet measurement logs: the diagnostic-only measurements (raw goods prices, terrain probes, castle-village market roads, who changes goods in daily ticks, the dry-run clan budget report) are taken on one day in every N instead of daily - errors, events and the daily profile are always written, automatic tests always write everything; off = every day")]
+        [SettingPropertyGroup("Grateful villages")]
+        public bool QuietLog { get; set; } = true;
+
+        [SettingPropertyInteger("Quiet Log Every Days", 1, 28, "0", HintText = "with quiet measurement logs: take the measurements on one day in this many (1 = every day, at most 28)")]
+        [SettingPropertyGroup("Grateful villages")]
+        public int QuietLogEveryDays { get; set; } = 7;
 
         [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
@@ -6497,6 +6517,7 @@ namespace Armoury
             s.WreckSalvageEnabled = WreckSalvageEnabled;
             s.LootMinConditionPercent = LootMinConditionPercent;
             s.LegendaryLootValueFloor = LegendaryLootValueFloor;
+            s.LegendarySweepLazy = LegendarySweepLazy;
             s.SpoilsClanRealSoldiers = SpoilsClanRealSoldiers;
             s.SpoilsNoAutoSale = SpoilsNoAutoSale;
             s.SpoilsNoFreeGold = SpoilsNoFreeGold;
@@ -6679,6 +6700,7 @@ namespace Armoury
             s.WinterHorsesEat = WinterHorsesEat;
             s.WinterHorseFeedShare = WinterHorseFeedShare;
             s.ScorchedEarthEnabled = ScorchedEarthEnabled;
+            s.ScorchedEarthFastScan = ScorchedEarthFastScan;
             s.ForageMinMen = ForageMinMen;
             s.ForageRadius = ForageRadius;
             s.ForageHearthPerDay = ForageHearthPerDay;
@@ -7335,6 +7357,7 @@ namespace Armoury
             s.QuickCampKey = QuickCampKey;
             s.SleepAtSeaFree = SleepAtSeaFree;
             s.AiCampsAtNight = AiCampsAtNight;
+            s.AiCampFastScan = AiCampFastScan;
             s.CampStartHour = CampStartHour;
             s.CampEndHour = CampEndHour;
             s.AiBanditsCampToo = AiBanditsCampToo;
@@ -7453,6 +7476,8 @@ namespace Armoury
             s.BanditCheerRelation = BanditCheerRelation;
             s.LogEnabled = LogEnabled;
             s.LogKeepOpen = LogKeepOpen;
+            s.QuietLog = QuietLog;
+            s.QuietLogEveryDays = QuietLogEveryDays;
             s.Army175Measure = Army175Measure;
             s.NorthHomeEdgePercent = NorthHomeEdgePercent;
             s.NorthHardyWeaponBonus = NorthHardyWeaponBonus;

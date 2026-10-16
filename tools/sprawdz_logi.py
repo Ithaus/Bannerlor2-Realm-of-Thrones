@@ -28503,6 +28503,320 @@ def nh_gseg(s):
     return seg[:300]
 
 
+# ============================================================ NW (noc 16.10, w-toku/noc-wydajnosc): wydajnosc - grupa nwyd
+# Armoury: LogGate.cs (ciche logi), ScorchedEarth.Next (O3), NightRest siatka zagrozen (O5), DayProfile pola NW (O4, O6), LegendaryLaw (O6c, O7);
+# CrashScribe (--crashscribe): MarriageFast.PickViableLazy (O1), EconomyAudit.Due (O2), Scribe pisarz (O9).
+NW_START = re.compile(r"^Ciche logi \(NW\): (\[WL\] co (\d+) dob|\[wyl\][^|]*).*? \| tryb: (.*?) \| dzialaja: (tak|nie)")
+NW_O6 = re.compile(r"^Log \(E8/O6\): dzien (\d+) .*?\| ciche logi \(NW\) (\[WL\]|\[wyl\]) tryb (\S+(?: rozpoznany)?), linie pomiarow tej doby (tak|nie)")
+NW_FAM = ("Ceny surowcow: dzien", "Dowoz: dzien", "Dowoz (skutki): dzien", "Kary terenu (E7/T): dzien", "Budzet rodow (na sucho): dzien",
+          "Towary (inne ticki dobowe): dzien")
+NW_PROF_Q = re.compile(r"\| ciche \(tylko log, NW\) ([0-9.]+) ms / (\d+) odcinkow")
+NW_PROF_G = re.compile(r"\| AiGear doba partii wg czesci \(NW, probka 1/16\):.*?; razem ([0-9.]+) ms")
+NW_PROF_GK = re.compile(r"(zalogi|lordowie|inne) (\d+) \(probek (\d+)\) \[zaloga ([0-9.]+), rynek ([0-9.]+), naprawy ([0-9.]+), zakupy ([0-9.]+)\]")
+NW_PROF_F = re.compile(r"\| AiFitted \(NW, probka 1/16\): wywolan (\d+) \(probek (\d+), bez sztuk (\d+)\), AiPieces ([0-9.]+) ms, MenOf ([0-9.]+) ms, FitBest ([0-9.]+) ms")
+NW_SE = re.compile(r"^Spalona ziemia \(NW\): dzien (\d+) \| szybki przeglad \(ScorchedEarthFastScan\) (\[WL\]|\[wyl\]) \| partii (\d+), probek starej drogi (\d+), "
+                   r"rozjazdow (\d+) \(od wczytania (\d+)\) \| czas ([0-9.]+) ms")
+NW_DAWN = re.compile(r"^NocnyMarsz: swit dnia (\d+)")
+NW_DAWN_C = re.compile(r"oboz swiata \(petla AiNightCamp\): sr\. ([0-9.]+) ms, maks\. ([0-9.]+) ms")
+NW_DAWN_T = re.compile(r"\| zagrozenia karawan \(NW\): siatka \(AiCampFastScan\) (\[WL\]|\[wyl\]), zapytan (\d+), probek starej drogi (\d+), rozjazdow (\d+), czas zagrozen ([0-9.]+) ms")
+NW_LL = re.compile(r"^LegendaryLaw \(doba, NW\): dzien (\d+) \| zbrojownie AI ([0-9.]+) ms \(wlascicieli sprawdzonych (\d+) z (\d+), szukanie leniwe \(LegendarySweepLazy\) "
+                   r"(\[WL\]|\[wyl\]), probek starej drogi (\d+), rozjazdow (\d+) \(od wczytania (\d+)\)\), targi ([0-9.]+) ms, stal valyrianska ([0-9.]+) ms")
+NW_ERR_WHERE = ("LogGate", "RawPrice.QuietDay", "MarketRoad.Daily", "ScorchedEarth", "AiNightCamp", "DayProfile.Line", "NocnyMarsz.LogDawn", "LegendaryLaw")
+NW_Z3 = re.compile(r"^Swaty ROT \(Z\.3\): dzien (\d+) - klanow (\d+), slubow (\d+), czas ([0-9.]+) ms; lordow szukajacych (\d+) .*?ocen pary (\d+)")
+NW_Z3V = re.compile(r"proby wolnych lordow (\d+), w tym stara regula trafilaby w kandydata bez szans (\d+)(?: \(\d+%\))?, bez zadnego kandydata z szansa (\d+), pytan o szanse (\d+)")
+NW_Z3L = re.compile(r"; losowanie leniwe \(MarriageLazyDraw\) (\[WL\]|\[wyl\][^:]*|NIE DZIALA[^:]*): losowan (\d+), probek starej drogi (\d+) \(ocen pary w probkach (\d+)\), "
+                    r"rozjazdow (\d+) \(od wczytania (\d+)\)")
+NW_CS = re.compile(r"^Profil CS \(E8/0\): dzien (\d+) .*?\| EconomyAudit: przebiegow (\d+) \(po wczytaniu (\d+)\), ([0-9.]+) ms; (.*?)(?: \| log sesji: (.*))?$")
+NW_CS_W = re.compile(r"(otwarty plik \(ScribeKeepOpen \[WL\]\)|plik na zapis \(ScribeKeepOpen \[wyl\]\)), otwarc (\d+), potkniec pisarza (\d+), zapisow stara droga (\d+)")
+
+
+def nwyd_main(logp, csp=None):
+    """nwyd (noc 16.10, w-toku/noc-wydajnosc; rozpoznanie wydajnosci WGRANIA 61, kroki O1-O7, O9). Log Armoury (strumieniowo) i --crashscribe <session-*.log>
+    (bez niego - log sesji z tego samego startu, jak inne grupy). NW-0 linia 'Ciche logi (NW)': w autotescie (bez -Profile) 'tryb: autotest - pelne' - inaczej
+    NIE (wykrycie autotestu zawiodlo: progi dzienne innych grup padna); bieg -Profile - INFO (ciche jak u gracza). NW-1 linia 'Log (E8/O6)': 'linie pomiarow
+    tej doby' tak w kazdej dobie (tryb pelny) albo tylko w dobach podzielnych przez N (tryb gry / profilu), a linie zestawu 1 (Ceny surowcow, Dowoz, Dowoz
+    (skutki), Kary terenu, Budzet rodow (na sucho), Towary (inne ticki dobowe)) dokladnie w dobach 'tak' (bez dwoch pierwszych dob sesji). NW-2 'ciche (tylko
+    log, NW)' w Profilu doby: doby 'nie' srednio <= 1 ms (INFO, gdy wszystkie 'tak'). NW-3 (CS) swaty Z.3 - losowanie leniwe [WL]: rozjazdow 0, probek >= 1,
+    srednio ocen pary <= 300000 i czas <= 300 ms (doby 2..), sluby w biegu >= 100 dob 8-26 na 120 dob; proporcje prob (pytan / proby, trafienia bez szans,
+    bez kandydata) INFO. NW-4 (CS) 'Profil CS': EconomyAudit codziennie (tryb pelny) albo dokladnie w dobach podzielnych przez 7 (gra / profil). NW-5
+    'Spalona ziemia (NW)': rozjazdow 0, probek >= 1, mediana czasu <= 15 ms; ScorchedEarth.OnDaily z Profilu doby INFO. NW-6 linia switu - zagrozenia karawan:
+    rozjazdow 0, probek >= 1 (gdy byly zapytania), 'oboz swiata (petla AiNightCamp)' srednio <= 3.0 ms. NW-7 AiGear wedlug czesci: suma = AiGear.OnDailyTickParty
+    z Profilu doby +-25% (suma okna); AiFitted INFO. NW-8 'LegendaryLaw (doba, NW)': rozjazdow 0, przy [WL] wlascicieli sprawdzonych <= 20% magazynow,
+    suma czesci = 'LegendaryLaw (czystki, ValyrianBlades)' z Profilu doby +-10% (suma okna). NW-9 bledy: Armoury 'ERROR in' w miejscach paczki 0, CrashScribe
+    raporty WHERE MarriageFast / EconomyAudit 0 i POTKNIECIA w Z.3 0. NW-10 (CS) pisarz logu sesji: otwarty plik, potkniec 0 (ostatnia linia Profil CS);
+    koniec sesji (SUMMARY / Session ended) INFO. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    starts, o6, fam, prof, se, dawn, ll, errs = [], {}, {f: set() for f in NW_FAM}, {}, [], [], [], []
+    if logp and os.path.isfile(logp):
+        with open(logp, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                m = TS.match(ln.rstrip("\r\n"))
+                s = m.group(2) if m else ln.rstrip("\r\n")
+                if s.startswith("Ciche logi (NW)"):
+                    mm = NW_START.search(s)
+                    starts.append(mm.groups() if mm else (s[:160], None, "?", "?"))
+                    continue
+                if s.startswith("Log (E8/O6): dzien"):
+                    mm = NW_O6.search(s)
+                    if mm:
+                        o6[int(mm.group(1))] = (mm.group(2), mm.group(3), mm.group(4))
+                    continue
+                if s.startswith("Profil doby (E8/0): dzien"):
+                    d = num(r"dzien (\d+)", s)
+                    if d is not None:
+                        prof[d] = s
+                    continue
+                if s.startswith("Spalona ziemia (NW)"):
+                    mm = NW_SE.search(s)
+                    if mm:
+                        se.append(mm.groups())
+                    continue
+                if s.startswith("NocnyMarsz: swit dnia"):
+                    mc, mt = NW_DAWN_C.search(s), NW_DAWN_T.search(s)
+                    dawn.append((int(NW_DAWN.match(s).group(1)), mc.groups() if mc else None, mt.groups() if mt else None))
+                    continue
+                if s.startswith("LegendaryLaw (doba, NW)"):
+                    mm = NW_LL.search(s)
+                    if mm:
+                        ll.append(mm.groups())
+                    continue
+                if s.startswith("ERROR in "):
+                    w = s[9:].split(":", 1)[0]
+                    if any(w.startswith(x) for x in NW_ERR_WHERE):
+                        errs.append(w)
+                    continue
+                for f in NW_FAM:
+                    if s.startswith(f):
+                        d = num(r"dzien (\d+)", s)
+                        if d is not None:
+                            fam[f].add(d)
+                        break
+        print(f"plik: {logp} | NW: linii startu {len(starts)}, Log (E8/O6) z polem NW {len(o6)}, Profil doby {len(prof)}, Spalona ziemia {len(se)}, switow {len(dawn)}, LegendaryLaw NW {len(ll)}")
+    else:
+        rep.add("NW-0..9: log Armoury", f"brak ({logp})", "INFO (podaj <Armoury-*.log>)", None)
+    full, every, mode = True, 7, "?"
+    # NW-0
+    if not starts:
+        rep.add("NW-0: linia startu 'Ciche logi (NW)'", "brak linii", "INFO (log bez paczki noc-wydajnosc)", None)
+    else:
+        st = starts[-1]
+        mode = st[2]
+        every = int(st[1]) if st[1] else 1
+        full = mode.startswith("autotest - pelne") or mode.startswith("nie rozpoznany") or not st[0].startswith("[WL]")
+        if mode.startswith("profil autotestu"):
+            rep.add("NW-0: tryb cichych logow", f"{st[0]}, tryb: {mode}, dzialaja: {st[3]} (linii {len(starts)})", "INFO (bieg -Profile mierzy gre jak u gracza)", None)
+        else:
+            rep.add("NW-0: tryb cichych logow w autotescie - 'autotest - pelne'", f"{st[0]}, tryb: {mode}, dzialaja: {st[3]} (linii {len(starts)})",
+                    "'tryb: autotest - pelne (codziennie)', dzialaja: nie (inny tryb = wykrycie autotestu zawiodlo)", mode.startswith("autotest - pelne") and st[3] == "nie")
+    # NW-1
+    if o6:
+        days = sorted(o6)
+        bad = [d for d in days if (o6[d][2] == "tak") != (True if full else (every <= 1 or d % every == 0))]
+        rep.add("NW-1a: 'linie pomiarow tej doby' w linii Log (E8/O6) zgodnie z trybem",
+                f"dob {len(days)} ({days[0]}-{days[-1]}), 'tak' {sum(1 for d in days if o6[d][2] == 'tak')}, niezgodnych {len(bad)}" + (f" (np. d{bad[0]})" if bad else ""),
+                ("tak w kazdej dobie (tryb pelny)" if full else f"tak tylko w dobach podzielnych przez {every}"), not bad)
+        inner = days[2:]
+        miss, extra, seen = [], [], []
+        for f in NW_FAM:
+            if not fam[f]:
+                continue
+            seen.append(f.split(":")[0])
+            for d in inner:
+                on = o6[d][2] == "tak"
+                if on and d not in fam[f]:
+                    miss.append(f"{f.split(':')[0]} d{d}")
+                elif not on and d in fam[f]:
+                    extra.append(f"{f.split(':')[0]} d{d}")
+        rep.add("NW-1b: linie zestawu 1 dokladnie w dobach 'tak' (bez 2 pierwszych dob sesji)",
+                f"rodzin linii {len(seen)} ({', '.join(seen)}), brak w dobie 'tak' {len(miss)}" + (f" ({'; '.join(miss[:4])})" if miss else "")
+                + f", w dobie 'nie' {len(extra)}" + (f" ({'; '.join(extra[:4])})" if extra else ""), "0 i 0", (not miss and not extra) if seen and inner else None)
+    else:
+        rep.add("NW-1: linia Log (E8/O6) z polem 'ciche logi (NW)'", "brak", "INFO (log bez paczki albo LogEnabled wylaczony)", None)
+    # NW-2
+    qy, qn = [], []
+    for d, s in prof.items():
+        m = NW_PROF_Q.search(s)
+        if not m:
+            continue
+        flag = o6.get(d, (None, None, None))[2]
+        (qn if flag == "nie" else qy).append(float(m.group(1)))
+    if qy or qn:
+        rep.add("NW-2: Profil doby - odcinki tylko-log (ciche) w dobach bez pomiaru",
+                f"doby z pomiarem srednio {sum(qy) / len(qy) if qy else 0:.1f} ms ({len(qy)}), bez pomiaru {sum(qn) / len(qn) if qn else 0:.2f} ms ({len(qn)})",
+                "<= 1 ms w dobach bez pomiaru (wszystkie z pomiarem - INFO)", (sum(qn) / len(qn) <= 1.0) if qn else None)
+    else:
+        rep.add("NW-2: Profil doby - pole 'ciche (tylko log, NW)'", "brak", "INFO (Stage8ProfileLog wylaczony albo log bez paczki)", None)
+    # NW-5
+    if se:
+        rd = sum(int(g[4]) for g in se); smp = sum(int(g[3]) for g in se); ms = sorted(float(g[6]) for g in se)
+        med = ms[len(ms) // 2]
+        on = se[-1][1] == "[WL]"
+        rep.add("NW-5: spalona ziemia - odleglosc przed wojna: rozjazdow 0, probek >= 1, mediana czasu <= 15 ms",
+                f"dob {len(se)}, klucz {se[-1][1]}, partii srednio {sum(int(g[2]) for g in se) / len(se):.0f}, probek {smp}, rozjazdow {rd}, czas mediana {med:.1f} ms (maks. {ms[-1]:.1f})",
+                "rozjazdow 0, probek >= 1, mediana <= 15 ms (bylo 41.6-42.2 ms w klatce polnocy)", (rd == 0 and smp >= 1 and med <= 15.0) if on else None)
+        sod = [fnum(r"ScorchedEarth\.OnDaily ([0-9.]+)", s) for s in prof.values()]
+        sod = [x for x in sod if x is not None]
+        rep.add("NW-5b: ScorchedEarth.OnDaily w Profilu doby (top 15 taktu)", f"srednio {sum(sod) / len(sod):.1f} ms ({len(sod)} dob w top 15)" if sod else "poza top 15 w kazdej dobie",
+                "INFO (bylo 41.6-42.2 ms)", None)
+    else:
+        rep.add("NW-5: linia 'Spalona ziemia (NW)'", "brak", "INFO (ScorchedEarthEnabled wylaczony albo log bez paczki)", None)
+    # NW-6
+    dt = [g for g in dawn if g[2]]
+    if dt:
+        rd = sum(int(g[2][3]) for g in dt); smp = sum(int(g[2][2]) for g in dt); q = sum(int(g[2][1]) for g in dt)
+        camp = [float(g[1][0]) for g in dt if g[1]]
+        avg = sum(camp) / len(camp) if camp else None
+        on = dt[-1][2][0] == "[WL]"
+        rep.add("NW-6: oboz nocy - siatka zagrozen karawan: rozjazdow 0, probek >= 1, petla AiNightCamp srednio <= 3.0 ms",
+                f"switow {len(dt)}, klucz {dt[-1][2][0]}, zapytan {q}, probek {smp}, rozjazdow {rd}, czas zagrozen srednio {sum(float(g[2][4]) for g in dt) / len(dt):.1f} ms/noc"
+                + (f", petla AiNightCamp sr. {avg:.2f} ms (maks. nocy {max(float(g[1][1]) for g in dt if g[1]):.1f} ms)" if camp else ""),
+                "rozjazdow 0, probek >= 1 przy zapytaniach, sr. <= 3.0 ms (bylo 6.24)", (rd == 0 and (smp >= 1 or q == 0) and (avg is None or avg <= 3.0)) if on else None)
+    else:
+        rep.add("NW-6: linia switu z polem 'zagrozenia karawan (NW)'", "brak", "INFO (AiCampsAtNight wylaczony albo log bez paczki)", None)
+    # NW-7
+    gs, ev, fit = 0.0, 0.0, []
+    nd = 0
+    for d, s in prof.items():
+        mg = NW_PROF_G.search(s); me = fnum(r"AiGear\.OnDailyTickParty ([0-9.]+)", s)
+        if mg and me is not None:
+            gs += float(mg.group(1)); ev += me; nd += 1
+        mf = NW_PROF_F.search(s)
+        if mf:
+            fit.append(mf.groups())
+    if nd:
+        rel = abs(gs - ev) / ev if ev > 0 else 0.0
+        rep.add("NW-7: AiGear doba partii wedlug czesci = AiGear.OnDailyTickParty z Profilu doby +-25% (suma okna)",
+                f"dob {nd}: czesci {gs:.0f} ms, zdarzenie {ev:.0f} ms (roznica {100 * rel:.0f}%)", "+-25%", rel <= 0.25 if ev > 0 else None)
+    else:
+        rep.add("NW-7: AiGear wedlug czesci", "brak pola albo AiGear.OnDailyTickParty poza top 4 zdarzen", "INFO", None)
+    if fit:
+        n = len(fit)
+        rep.add("NW-7b: AiFitted wedlug czesci (INFO pod runde 2)",
+                f"dob {n}: wywolan srednio {sum(int(g[0]) for g in fit) / n:.0f}, AiPieces {sum(float(g[3]) for g in fit) / n:.1f} ms, MenOf {sum(float(g[4]) for g in fit) / n:.1f} ms,"
+                f" FitBest {sum(float(g[5]) for g in fit) / n:.1f} ms na dobe", "INFO", None)
+    # NW-8
+    if ll:
+        rd = sum(int(g[6]) for g in ll); own = sum(int(g[2]) for g in ll); arm = sum(int(g[3]) for g in ll)
+        parts = sum(float(g[1]) + float(g[8]) + float(g[9]) for g in ll[1:-1])
+        dx = [fnum(r"LegendaryLaw \(czystki, ValyrianBlades\) ([0-9.]+)", prof[d]) for d in sorted(prof)[1:-1]]
+        dx = [x for x in dx if x is not None]
+        lazy = ll[-1][4] == "[WL]"
+        rep.add("NW-8: LegendaryLaw - wlasciciel zbrojowni leniwie: rozjazdow 0, wlascicieli <= 20% magazynow",
+                f"dob {len(ll)}, klucz {ll[-1][4]}, wlascicieli {own} z {arm} ({100.0 * own / arm if arm else 0:.0f}%), probek {sum(int(g[5]) for g in ll)}, rozjazdow {rd};"
+                f" srednio zbrojownie {sum(float(g[1]) for g in ll) / len(ll):.1f} ms, targi {sum(float(g[8]) for g in ll) / len(ll):.1f} ms, stal {sum(float(g[9]) for g in ll) / len(ll):.1f} ms",
+                "rozjazdow 0; przy [WL] <= 20%", (rd == 0 and (not lazy or arm == 0 or own <= 0.2 * arm)))
+        if dx and len(ll) > 2:
+            sx = sum(dx)
+            rel = abs(parts - sx) / sx if sx > 0 else 0.0
+            rep.add("NW-8b: LegendaryLaw czesci = 'LegendaryLaw (czystki, ValyrianBlades)' z Profilu doby +-10% (suma okna bez pierwszej i ostatniej)",
+                    f"czesci {parts:.0f} ms ({len(ll) - 2} dob), Profil doby {sx:.0f} ms ({len(dx)} dob), roznica {100 * rel:.0f}%", "+-10%", rel <= 0.10 if sx > 0 else None)
+    else:
+        rep.add("NW-8: linia 'LegendaryLaw (doba, NW)'", "brak", "INFO (Stage8ProfileLog wylaczony, brak DTE albo log bez paczki)", None)
+    # CrashScribe
+    cs_path, how = (None, "bez logu Armoury")
+    if csp or logp:
+        cs_path, how = crashscribe_session_of(logp, csp) if logp else ((csp, "--crashscribe") if csp and os.path.isfile(csp) else (None, "brak pliku"))
+    z3, csl, lazy_lines, cs_err, z3_stumble, ended, start_z3 = [], [], [], 0, 0, False, None
+    if cs_path:
+        with open(cs_path, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                s = ln.rstrip("\r\n")
+                m = TS.match(s)
+                s2 = m.group(2) if m else s
+                if s2.startswith("Swaty ROT (Z.3): dzien"):
+                    mz = NW_Z3.search(s2)
+                    if mz:
+                        mv, ml = NW_Z3V.search(s2), NW_Z3L.search(s2)
+                        z3.append((mz.groups(), mv.groups() if mv else None, ml.groups() if ml else None))
+                    if "POTKNIECIA" in s2:
+                        z3_stumble += 1
+                    continue
+                if s2.startswith("Swaty ROT (Z.3): losowanie leniwe - ROZJAZD"):
+                    lazy_lines.append(s2)
+                    continue
+                if s2.startswith("Mends: swaty ROT (Z.3)"):
+                    start_z3 = s2
+                    continue
+                if s2.startswith("Profil CS (E8/0): dzien"):
+                    mc = NW_CS.search(s2)
+                    if mc:
+                        csl.append(mc.groups())
+                    continue
+                if s2.startswith("WHERE   : ") and ("MarriageFast" in s2 or "EconomyAudit" in s2):
+                    cs_err += 1
+                    continue
+                if "SUMMARY" in s2 or s2.startswith("Session ended"):
+                    ended = True
+        print(f"plik: {cs_path} ({how}) | NW: linii Z.3 {len(z3)}, Profil CS z EconomyAudit {len(csl)}")
+    # NW-3
+    zl = [g for g in z3 if g[2]]
+    if zl:
+        body = zl[1:] if len(zl) > 1 else zl
+        rd = sum(int(g[2][4]) for g in zl); smp = sum(int(g[2][2]) for g in zl)
+        ev = sum(int(g[0][5]) for g in body) / len(body); tm = sum(float(g[0][3]) for g in body) / len(body)
+        on = zl[-1][2][0] == "[WL]"
+        rep.add("NW-3: swaty Z.3 - losowanie leniwe: rozjazdow 0, probek >= 1, srednio ocen pary <= 300000 i czas <= 300 ms (doby 2..)",
+                f"dob {len(zl)}, stan {zl[-1][2][0]}, losowan srednio {sum(int(g[2][1]) for g in zl) / len(zl):.0f}, probek {smp}, rozjazdow {rd} (linii ROZJAZD {len(lazy_lines)});"
+                f" ocen pary srednio {ev:.0f}, czas {tm:.1f} ms", "rozjazdow 0, probek >= 1, <= 300000, <= 300 ms (bylo 1.03-1.13 mln, 944-1013 ms)",
+                (rd == 0 and smp >= 1 and ev <= 300000 and tm <= 300.0) if on else None)
+        vv = [g[1] for g in body if g[1] and int(g[1][0]) > 0]
+        if vv:
+            fr = sum(int(v[0]) for v in vv); dead = sum(int(v[1]) for v in vv); nov = sum(int(v[2]) for v in vv); ce = sum(int(v[3]) for v in vv)
+            rep.add("NW-3b: swaty - proporcje prob (ten sam rozklad co pelna lista; porownac z biegiem MarriageLazyDraw=false na tym samym zapisie)",
+                    f"proby wolnych lordow {fr}: pytan o szanse na probe {ce / fr:.2f}, stara regula w kandydata bez szans {100.0 * dead / fr:.0f}%, bez kandydata z szansa {100.0 * nov / fr:.0f}%",
+                    "INFO (Jeff 15.10, pozna kampania: ok. 5.3, 66-69%, ok. 10%)", None)
+        wed = sum(int(g[0][2]) for g in zl)
+        if len(zl) >= 100:
+            per120 = wed * 120.0 / len(zl)
+            rep.add("NW-3c: swaty - sluby w biegu (regulator 48 na rok)", f"{wed} w {len(zl)} dobach ({per120:.1f} na 120 dob)", "8-26 na 120 dob", 8 <= per120 <= 26)
+        else:
+            rep.add("NW-3c: swaty - sluby w biegu", f"{wed} w {len(zl)} dobach", "INFO (prog 8-26 dla biegu >= 100 dob)", None)
+    elif z3:
+        rep.add("NW-3: swaty Z.3 - pole losowania leniwego", "brak pola w liniach Z.3", "INFO (CrashScribe bez paczki)", None)
+    else:
+        rep.add("NW-3: swaty Z.3 (CrashScribe)", f"brak linii ({how})", "INFO (--crashscribe <session-*.log>)", None)
+    if start_z3 is not None:
+        rep.add("NW-3d: linia startu swatow - stan losowania leniwego", start_z3[start_z3.find("losowanie leniwe"):][:120] if "losowanie leniwe" in start_z3 else start_z3[:160],
+                "INFO", None)
+    # NW-4
+    if csl:
+        body = csl[1:]
+        tryb = csl[-1][4]
+        cfull = "codziennie" in tryb
+        # kolejnosc sluchaczy doby (MbEvent: od ostatnio dopisanego) - linia "dzien D" niesie przebieg z taktu D; druga hipoteza (takt D+1) dla pewnosci
+        bads = []
+        for sh in (0, 1):
+            bad = []
+            for g in body:
+                d, runs, st0 = int(g[0]), int(g[1]), int(g[2])
+                want = 1 if (cfull or (d + sh) % 7 == 0) else 0
+                if (runs - st0 >= 1) != (want == 1):
+                    bad.append(f"d{d} {runs - st0}")
+            bads.append(bad)
+        bad = bads[0] if len(bads[0]) <= len(bads[1]) else bads[1]
+        ran = [float(g[3]) / max(1, int(g[1])) for g in csl if int(g[1]) > 0]
+        rep.add("NW-4: audyt ekonomii CS - przebiegi zgodnie z trybem",
+                f"linii {len(csl)}, tryb '{tryb}', niezgodnych {len(bad)}" + (f" ({', '.join(bad[:4])})" if bad else "")
+                + (f"; przebieg srednio {sum(ran) / len(ran):.0f} ms" if ran else ""),
+                "codziennie (autotest) albo tylko w dobach podzielnych przez 7 (gra, -Profile)", not bad if body else None)
+        mw = NW_CS_W.search(csl[-1][5] or "")
+        if mw:
+            rep.add("NW-10: pisarz logu sesji CrashScribe - otwarty plik, potkniec 0", f"{mw.group(1)}, otwarc {mw.group(2)}, potkniec {mw.group(3)}, zapisow stara droga {mw.group(4)}",
+                    "[WL], potkniec 0", "[WL]" in mw.group(1) and int(mw.group(3)) == 0)
+        else:
+            rep.add("NW-10: pisarz logu sesji CrashScribe", "brak pola 'log sesji' w linii Profil CS", "INFO", None)
+    else:
+        rep.add("NW-4: audyt ekonomii CS (linia Profil CS z polem EconomyAudit)", f"brak ({how})", "INFO (Stage8ProfileLog CrashScribe albo log bez paczki)", None)
+    if cs_path:
+        rep.add("NW-10b: koniec sesji CrashScribe (SUMMARY / Session ended - pisarz zamkniety przy wyjsciu)", "jest" if ended else "brak", "INFO (brak = gra nie wyszla zwyczajnie)", None)
+    # NW-9
+    rep.add("NW-9: bledy w miejscach paczki - Armoury 'ERROR in', CrashScribe WHERE MarriageFast / EconomyAudit, POTKNIECIA w Z.3",
+            f"Armoury {len(errs)}" + (f" ({', '.join(sorted(set(errs))[:4])})" if errs else "") + (f", CrashScribe raportow {cs_err}, potkniec Z.3 {z3_stumble}" if cs_path else ", bez logu CrashScribe"),
+            "0, 0, 0", len(errs) == 0 and cs_err == 0 and z3_stumble == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -28666,6 +28980,8 @@ def main(argv):
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
     if group == "nmisje" and logp:
         return nmisje_main(logp)   # NM (noc 15/16.10): druzyny w misji (Team.Invalid pominiety, potkniecia liczone), ucieczka rannych tylko w bitwie na mapie
+    if group == "nwyd" and (logp or csp):
+        return nwyd_main(logp, csp)   # nwyd (noc 16.10, w-toku/noc-wydajnosc): ciche logi, swaty leniwe, audyt CS co 7 dob, spalona ziemia, siatka zagrozen, LegendaryLaw, pisarz CS
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

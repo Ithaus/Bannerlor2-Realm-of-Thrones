@@ -139,6 +139,11 @@ namespace CrashScribe
         public static bool StoryThroneGuard = true;
         public static bool BkrotFixCaravanIncome = true;     // BKROTClanFinanceModel.CalculateOwnerIncomeFromCaravan -> BKClanFinanceModel (przy RealisticCaravanIncome = true BK i tak daje 0)
 
+        // --- NW (noc 16.10, rozpoznanie wydajnosci WGRANIA 61; tryb autotestu - TestMode.cs) ---
+        public static bool MarriageLazyDraw = true;     // O1 (MarriageFast.PickViableLazy): wolny lord przy regule MarriageOnlyViableCandidates losuje kandydatow po kolei i ocenia tylko wylosowanych (ta sama regula, te same szanse, inny ciag losowy); false = pelna lista jak dotad
+        public static bool EconomyAuditWeekly = true;   // O2 (EconomyAudit.Due): audyt ekonomii (economy-*.csv, linia EKONOMIA) raz na 7 dob i raz po wczytaniu; w autotescie bez pomiaru klatki codziennie; false = codziennie jak dotad
+        public static bool ScribeKeepOpen = true;       // O9 (Scribe.Raw): log sesji otwartym plikiem (kazdy zapis od razu u systemu, zamkniecie przy wyjsciu); false = plik otwierany na kazdy zapis jak dotad
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -237,6 +242,9 @@ namespace CrashScribe
                         case "RotStoryArmyGuard": RotStoryArmyGuard = B(v); break;
                         case "BkPietyBarOnce": BkPietyBarOnce = B(v); break;
                         case "StoryThroneGuard": StoryThroneGuard = B(v); break;
+                        case "MarriageLazyDraw": MarriageLazyDraw = B(v); break;
+                        case "EconomyAuditWeekly": EconomyAuditWeekly = B(v); break;
+                        case "ScribeKeepOpen": ScribeKeepOpen = B(v); break;
                     }
                 }
             }

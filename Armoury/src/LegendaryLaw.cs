@@ -63,10 +63,15 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("LegendaryLaw (czystki, ValyrianBlades)",   // E8/0: opakowanie pomiaru (tylko log)
                 delegate
                 {
-                    try { SweepAiArmories("dzien"); } catch { } try { SweepMarkets("dzien"); } catch { }
+                    long t0 = System.Diagnostics.Stopwatch.GetTimestamp();   // NW O6 (c): stopery czesci (tylko pomiar, linia przy Stage8ProfileLog)
+                    try { SweepAiArmories("dzien"); } catch { }
+                    long t1 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    try { SweepMarkets("dzien"); } catch { }
+                    long t2 = System.Diagnostics.Stopwatch.GetTimestamp();
                     // 177-2: spis stali valyrianskiej (straznik wedlug stanu startowego) - zaraz po czystce magazynow AI, jedno przejscie na dobe
                     try { ValyrianBlades.Daily(); } catch (Exception e) { Log.Error("ValyrianBlades.Daily", e); }
                     try { ValyrianBlades.DailyPatches(); } catch { }
+                    try { DayLineNw(t0, t1, t2); } catch { }
                 }));
         }
 
@@ -231,8 +236,54 @@ namespace Armoury
         /// Jeff: "usun z innych armii AI te unikatowe bronie - moze byc jedna
         /// na swiecie i ktos ja nosi, ale nie ze polowa armii ja ma".
         /// Bohaterow nie tykamy - noszone klingi zostaja przy wlascicielach.</summary>
+        // NW O6 (c) i O7 (noc 16.10): liczniki ostatniej czystki magazynow AI - wlascicieli sprawdzonych / magazynow, kontrola R9 (co 64. magazyn
+        // liczy tez stara droge: wlasciciel najpierw), rozjazdy; linia "LegendaryLaw (doba, NW)" w sluchaczu doby przy Stage8ProfileLog
+        private const int SweepSampleEvery = 64;
+        private static long _swSeq;
+        private static int _swOwners, _swArmories, _swSamples, _swDiff, _swDiffAll;
+
+        private static void DayLineNw(long t0, long t1, long t2)
+        {
+            var s = Settings.Current;
+            if (s == null || !s.Stage8ProfileLog) return;
+            long t3 = System.Diagnostics.Stopwatch.GetTimestamp();
+            double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            Log.Info("LegendaryLaw (doba, NW): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " | zbrojownie AI " + ((t1 - t0) * f).ToString("0.0", ci) + " ms (wlascicieli sprawdzonych "
+                     + _swOwners + " z " + _swArmories + ", szukanie leniwe (LegendarySweepLazy) " + (s.LegendarySweepLazy ? "[WL]" : "[wyl]") + ", probek starej drogi " + _swSamples
+                     + ", rozjazdow " + _swDiff + " (od wczytania " + _swDiffAll + ")), targi " + ((t2 - t1) * f).ToString("0.0", ci) + " ms, stal valyrianska "
+                     + ((t3 - t2) * f).ToString("0.0", ci) + " ms.");
+        }
+
+        /// <summary>NW O7 R9: stara droga dla jednego magazynu (wlasciciel i olbrzymy najpierw, potem te same warunki) - lista sztuk do usuniecia.</summary>
+        private static List<object> KillListOld(System.Collections.DictionaryEntry e, System.Collections.IDictionary inner)
+        {
+            bool giants = true;
+            MobileParty owner = null;
+            try
+            {
+                if (e.Key is MBGUID) owner = MBObjectManager.Instance.GetObject((MBGUID)e.Key) as MobileParty;
+                if (owner != null) giants = GiantGear.PartyHasGiants(owner);
+            }
+            catch { }
+            var kill = new List<object>();
+            foreach (System.Collections.DictionaryEntry kv in inner)
+            {
+                var it = kv.Key as ItemObject;
+                if (it == null) continue;
+                if (!giants && GiantGear.Is(it)) { kill.Add(kv.Key); continue; }
+                if (owner != null && MountLaw.IsExotic(it) && !MountLaw.AllowedForParty(owner, it)) { kill.Add(kv.Key); continue; }
+                if (!IsLegend(it)) continue;
+                if (ValyrianBlades.Is(it)) continue;
+                kill.Add(kv.Key);
+            }
+            return kill;
+        }
+
         private static void SweepAiArmories(string why)
         {
+            _swOwners = 0; _swArmories = 0; _swSamples = 0; _swDiff = 0;   // NW: liczniki tej czystki
+            bool lazy = Settings.Current != null && Settings.Current.LegendarySweepLazy;
             try
             {
                 var t = AccessTools.TypeByName("DynamicTroopEquipmentReupload.EveryoneCampaignBehavior");
@@ -247,34 +298,52 @@ namespace Armoury
                     // SPRZET OLBRZYMOW (Jeff 14.09): z magazynu partii BEZ olbrzymow
                     // precz - a partia z olbrzymami zostawia go swoim (DTE zbroi
                     // z magazynu, wiec czystka rozbroilaby olbrzymow)
-                    bool giants = true;
+                    // NW O7 (LegendarySweepLazy): wlasciciel (MBObjectManager.GetObject + przeglad rosteru) dopiero przy pierwszej sztuce, ktora go potrzebuje
+                    // (sprzet olbrzymow, egzotyczny wierzchowiec) - te same odczyty, ta sama kolejnosc dla kazdej sztuki, te same sztuki usuniete
+                    _swArmories++;
+                    bool giants = true, res = false;
                     MobileParty owner = null;
-                    try
+                    var key = e.Key;
+                    void resolve()   // funkcja lokalna (bez przydzialu delegata na magazyn)
                     {
-                        if (e.Key is MBGUID) owner = MBObjectManager.Instance.GetObject((MBGUID)e.Key) as MobileParty;
-                        if (owner != null) giants = GiantGear.PartyHasGiants(owner);
+                        if (res) return;
+                        res = true; _swOwners++;
+                        try
+                        {
+                            if (key is MBGUID) owner = MBObjectManager.Instance.GetObject((MBGUID)key) as MobileParty;
+                            if (owner != null) giants = GiantGear.PartyHasGiants(owner);
+                        }
+                        catch { }
                     }
-                    catch { }
+                    if (!lazy) resolve();
                     List<object> kill = null;
                     foreach (System.Collections.DictionaryEntry kv in inner)
                     {
                         var it = kv.Key as ItemObject;
                         if (it == null) continue;
-                        if (!giants && GiantGear.Is(it))
+                        if (GiantGear.Is(it))
                         {
-                            if (kill == null) kill = new List<object>();
-                            kill.Add(kv.Key);
-                            try { clubs += Convert.ToInt32(kv.Value); } catch { clubs++; }
-                            continue;
+                            resolve();
+                            if (!giants)
+                            {
+                                if (kill == null) kill = new List<object>();
+                                kill.Add(kv.Key);
+                                try { clubs += Convert.ToInt32(kv.Value); } catch { clubs++; }
+                                continue;
+                            }
                         }
                         // GEOGRAFIA WIERZCHOWCOW (Jeff 14.09): mamut/wielblad/rydwan/slon
                         // w magazynie partii, ktorej sie nie naleza - precz
-                        if (owner != null && MountLaw.IsExotic(it) && !MountLaw.AllowedForParty(owner, it))
+                        if (MountLaw.IsExotic(it))
                         {
-                            if (kill == null) kill = new List<object>();
-                            kill.Add(kv.Key);
-                            try { mounts += Convert.ToInt32(kv.Value); } catch { mounts++; }
-                            continue;
+                            resolve();
+                            if (owner != null && !MountLaw.AllowedForParty(owner, it))
+                            {
+                                if (kill == null) kill = new List<object>();
+                                kill.Add(kv.Key);
+                                try { mounts += Convert.ToInt32(kv.Value); } catch { mounts++; }
+                                continue;
+                            }
                         }
                         if (!IsLegend(it)) continue;
                         // 177-2: stal valyrianska nie przepada w nicosc - spis ValyrianBlades (zaraz po tej czystce): nadwyzka -> zwykla stal,
@@ -283,6 +352,15 @@ namespace Armoury
                         if (kill == null) kill = new List<object>();
                         kill.Add(kv.Key);
                         try { cut += Convert.ToInt32(kv.Value); } catch { cut++; }
+                    }
+                    if (lazy && ++_swSeq % SweepSampleEvery == 0)
+                    {
+                        // NW O7 R9: ta sama lista sztuk stara droga (przed usunieciem - magazyn jeszcze nietkniety)
+                        _swSamples++;
+                        var old = KillListOld(e, inner);
+                        bool same = old.Count == (kill != null ? kill.Count : 0);
+                        for (int i = 0; same && i < old.Count; i++) same = Equals(old[i], kill[i]);
+                        if (!same) { _swDiff++; _swDiffAll++; }
                     }
                     if (kill != null)
                     {

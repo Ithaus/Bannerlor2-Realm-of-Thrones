@@ -22,6 +22,8 @@ RANGES = {
     'ShelfIndexSelfCheckDays': (0, 30, "0"),
     'TownMaterialOrderSeaMaxRoute': (100.0, 3000.0, "0"),
     'ShopKeepPieces': (0, 3, "0"),
+    # NW O4 (noc 16.10): ciche logi - co ile dob pomiary tylko-log; kod przycina do 1..28 (LogGate.Every)
+    'QuietLogEveryDays': (1, 28, "0"),
     # T10 poprawka recenzji: prog dlugu snu w calych nocach (kod porownuje dlug calkowity) - suwak bez ulamkow w opisie
     'AiNightsAwakeInChase': (0.0, 4.0, "0"),
     # T10-R: noce forsownego marszu z rzedu (dlug konczy sie na 3, dalej liczy juz tylko seria) - 0 = bez limitu

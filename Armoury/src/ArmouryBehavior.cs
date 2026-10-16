@@ -1395,6 +1395,7 @@ namespace Armoury
             try { ArmsDrill.EnsureHooks(); } catch (Exception e) { Log.Error("ArmsDrill.EnsureHooks", e); }
             try { SkillLedger.EnsureHooks(); } catch (Exception e) { Log.Error("SkillLedger.EnsureHooks", e); }   // E8/P1 (243): ksiega umiejetnosci - latki-liczniki w kampanii (raz na proces, tylko przy SkillLedgerLog), linia startu sesji
             try { XpFair.EnsureHooks(); } catch (Exception e) { Log.Error("XpFair.EnsureHooks", e); }   // E8/X (248): doswiadczenie za skutek - latki w kampanii (raz na proces, tylko sprawy wlaczone), linia "FairXp (E8/X): start sesji"
+            try { LogGate.SessionLine(); } catch (Exception e) { Log.Error("LogGate.SessionLine", e); }   // NW O4: linia "Ciche logi (NW)" - stan klucza i tryb (gra / autotest / profil)
             try { DayProfile.EnsureHooks(); } catch (Exception e) { Log.Error("DayProfile.EnsureHooks", e); }   // Z.3 poz. 3: stopery wnetrza cudzych tikow (warsztaty gry, trening gry) - latki w kampanii (raz na proces, tylko przy Stage8ProfileLog), tylko log
             try { Drill.SessionStart(); } catch (Exception e) { Log.Error("Drill.SessionStart", e); }   // musztra: zapas z zapisu, opisy perkow kwatermistrza, linia startowa
             try { FixCharcoalWeight(); } catch (Exception e) { Log.Error("FixCharcoalWeight", e); }   // wpis 87 (audyt pkt 11d): waga wegla PRZED wycena
@@ -1809,9 +1810,13 @@ namespace Armoury
             try { VillageWoodlot.Daily(); } catch (Exception e) { Log.Error("VillageWoodlot.Daily", e); } DayProfile.Lap("VillageWoodlot.Daily");   // paczka 126: las wsi - drewno kazdej wsi bez drwali (tylko log)
             try { SpoilsSeal.Daily(); } catch (Exception e) { Log.Error("SpoilsSeal.Daily", e); } DayProfile.Lap("SpoilsSeal.Daily");   // paczka 128: Spoils of War bez sprzedazy automatycznej i bez zlota z niczego (tylko log)
             try { SpoilsCompany.Daily(); } catch (Exception e) { Log.Error("SpoilsCompany.Daily", e); } DayProfile.Lap("SpoilsCompany.Daily");   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (tylko log)
-            try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); } DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
+            // NW O4 (ciche logi, LogGate): linia "Ceny surowcow" tylko w dobie pomiaru; w innej dobie same potkniecia doby (RawPrice.QuietDay)
+            if (LogGate.Lines) { try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); } }
+            else { try { RawPrice.QuietDay(); } catch (Exception e) { Log.Error("RawPrice.QuietDay", e); } }
+            DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
             try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); } DayProfile.Lap("MineralOnce.Daily");   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
-            try { MarketRoad.Daily(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); } DayProfile.Lap("MarketRoad.Daily");   // wpis 100: dowoz wsi zamkowych na targi (log)
+            // NW O4: linie "Dowoz" tylko w dobie pomiaru; w innej dobie samo zerowanie licznikow (Daily konczy sie Reset - bez tego linia probna liczylaby N dob)
+            try { if (LogGate.Lines) MarketRoad.Daily(); else MarketRoad.Reset(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); } DayProfile.Lap("MarketRoad.Daily");   // wpis 100: dowoz wsi zamkowych na targi (log)
             try { VillageClogDiag.Daily(); } catch (Exception e) { Log.Error("VillageClogDiag.Daily", e); } DayProfile.Lap("VillageClogDiag.Daily");   // diagnoza zatkanych wsi - zaraz po "Dowoz (skutki)" (tylko log)
             try { MarketCarts.Daily(); } catch (Exception e) { Log.Error("MarketCarts.Daily", e); } DayProfile.Lap("MarketCarts.Daily");   // poprawka 119: wozy wsi do najlepiej placacego miasta, cena ladunku sztuka po sztuce (log + porzadki wiesci z drogi)
             try { CastleMarket.Daily(); } catch (Exception e) { Log.Error("CastleMarket.Daily", e); } DayProfile.Lap("CastleMarket.Daily");   // E5/B4 (199): targ przy zamku - porzadki rezerwacji i strazy, linia "Targ przy zamku (5.11)" (po wozach 119)
