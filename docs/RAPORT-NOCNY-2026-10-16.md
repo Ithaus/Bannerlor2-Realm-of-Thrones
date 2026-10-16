@@ -2,7 +2,7 @@
 
 ## Najkrocej
 
-- W grze jest **WGRANIE 63** (dokladnie co i jak - rozdz. 1 i 6). Gra sie uruchamia, autotesty przeszly, w logach Armoury **0 bledow**. Mozesz grac.
+- W grze jest **WGRANIE 64** (dokladnie co i jak - rozdz. 1 i 6). Gra sie uruchamia, autotesty przeszly, w logach Armoury **0 bledow**. Mozesz grac.
 - Twoj zapis Ironman jest nietkniety (md5 bez zmian od 12:12). Kopia przed wgraniem: `D:\Backup-Bannerlord\zapisy-jeffa\IronmanjCg6MOpv28iN-2026-10-15-1212-noc-przed.sav`.
 - Kazda nowa rzecz ma wlasny wylacznik w MCM (Armoury albo CrashScribe), domyslnie wlaczony. Gdyby cos Ci nie pasowalo, wylaczysz ja bez nowej wersji.
 - Autotest nie gra misji: kryjowki, turnieju, Twoich bitew ani ekranu zbrojowni. Te rzeczy sprawdzisz dopiero Ty w grze. Na co patrzec - rozdz. 4.
@@ -84,7 +84,11 @@ Zbrojownia (Twoja decyzja z 15.10):
   - wodz bral okup po jednym odpartym szturmie, choc mial przewage 7:1 - teraz czeka i szturmuje znowu;
   - armia potrafila odejsc w polowie szturmu przy 93% strat obroncow - teraz szturm trwa do konca bitwy;
   - armie BK z jedna druzyna byly kasowane w dniu zalozenia - juz nie.
-- **Trebusze**: w 110 dobach Twojej kampanii nie powstal ani jeden, bo druga ekipa zaczynala je za pozno i budowala za wolno. Poprawka TB2 (trebusz od 1. doby) - rozdz. 6.
+- **Trebusze**: w 110 dobach Twojej kampanii nie powstal ani jeden. Druga ekipa zaczynala je dopiero po gotowym obozie (7-18 dob) i budowala 2,5 x wolniej. Teraz:
+  - trebusz zaczyna sie w 1. dobie oblezenia miasta;
+  - buduje sie w tempie zamku;
+  - wyrwa w murze pozwala na szturm.
+  W tescie 40 dob powstalo 7 trebuszy (wczesniej 0) i padl 1 odcinek muru. Miasta dalej najczesciej ratuje odsiecz (Twoja zasada OB5).
 
 **11. Audyt ekonomii** - rozdz. 3.
 
@@ -108,6 +112,7 @@ Zbrojownia (Twoja decyzja z 15.10):
 | Sol x3,5, futra x3 | sol x8 przez 4 lata (46 sztuk w 97 miastach), futer 39 dziennie przy popycie ok. 150 | Salt Rate Raised, Fur Rate Raised |
 | N7 (slabszy podatek od nadwyzki ludu) WYLACZONY | w tescie 60 dob lud urosl z 8 do 10,4% zlota swiata - najpierw lud musi miec co kupic | Folk Guard No Memory (NIE) |
 | Ciche logi: pomiary diagnostyczne w grze co 7 dni | koszt pomiarow, nie zapisu | Quiet Log, Economy Audit Weekly |
+| Trebusz drugiej ekipy od 1. doby oblezenia miasta, w tempie zamku; wyrwa = szturm | bez tego zadne miasto nie padalo (0 z 12) | Siege Trebuchet Early |
 | Bandytow nie ruszam | to limit gry ROT, swiat dochodzi do ok. 1100 band i stoi | - |
 
 ## 3. Audyt ekonomii (Twoje pytania)
@@ -166,6 +171,7 @@ Pelny raport: `docs/AUDYT-EKONOMII-2026-10-16.md`.
 |---|---|---|
 | 62 | ok. 18:50 | 8 galezi: misje, oboz, skarbiec, drobne, harmony, oblezenia, ceny, sprzet |
 | 63 | ok. 19:45 | + ekonomia (pierwsze kroki audytu) + optymalizacja; N7 wylaczony |
+| 64 | ok. 20:15 | + trebusze AI od 1. doby oblezenia miasta (TB2, klucz Siege Trebuchet Early) |
 
 Testy w grze tej nocy:
 - baza wersji 61 z pomiarem;
