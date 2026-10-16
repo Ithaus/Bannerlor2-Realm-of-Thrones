@@ -2466,3 +2466,4 @@ DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Au
   spadek wartosci okregow czysto rybackich/zbozowych do ~20%; AI bez inwestycji na start). Wdrozenie po audycie zycia codziennego (wf_c4f075f1-def).
 - ZASADA JEFFA (16.10): ekonomia dynamiczna z podazy i popytu, bez sztywnych mnoznikow; start neutralny (bez -20%); AI inwestuje po tescie. Dopisane w obu projektach.
 - Start: ZC0 (sam pomiar: stany, Dostatek, kg jedzenia) - workflow.
+- Jeff 16.10: "2. ok na razie nie inwestuja" - lordowie AI bez inwestycji (decyzja).
