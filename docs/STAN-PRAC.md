@@ -2425,3 +2425,11 @@ W grze: `w-toku/zbior-e8` **76723911** (= `w-toku/noc-wgranie-71`) | Armoury 89a
 (NavalDLC ShipWaterEffects: CreateDecal -> SetMaterial -> GetMaterial waznosc -> AddDecalInstance "editor_set" deletable -> Frame), materialy blood_terrain_decal_0..11 sprawdzane
 na starcie misji; sprawdzenie ziemi i wody, zageszczenie na obszar, 600 na misje, 20/s; zdejmowane przy koncu misji. Klucz GroundBloodPools. MoreBloodPoolMod dalej WYL.
 Test (Armoury-2026-10-16_12-25-19.log): 3 bitwy, 88 decali z materialem (12/12, bez materialu 0), 0 ERROR, NBW-13b TAK, 17 progow nbitwa 0 NIE, kod 0 "misje sprawdzone".
+
+### 57. KOLEJKA 16.10 popoludnie - inwestycja w okreg, uchodzcy do miast
+- INWESTYCJA (Jeff: "inwestuje w dany obszar i dzieki temu otrzymuje przychody, ale jak spala wioske to trace inwestycje ... wartosc calej produkcji regionu, ile moge zainwestowac,
+  jaki procent, jak sie przeklada na zarobki, liczby spojne z ekonomia"): dzis BEE inwestycja we wies 5/15/30 tys. ZAMKNIETA (BeeSeal - zloto znikaloby). Projekt: workflow
+  wf_b9d7d613-f77 (rozpoznanie BEE / liczby / historia -> 3 projekty -> ocena). Najpierw przedstawic Jeffowi zasady z liczbami, potem kod + test 120 dob.
+- PALENIE (Jeff pytal, czy pamietam): dziala od 05.10 - osada po osadzie od strony wroga, wies gry na koncu; plon x udzial ludzi w domu (spladrowana nie 0); uchodzcy wracaja
+  po 30 dniach spokoju, wszyscy najpozniej rok po najezdzie. Propozycja (czeka na slowo Jeffa): uchodzcy ida do najblizszego miasta (ludnosc/biedota), potem wracaja.
+- W toku: noc-karczmy (poprawki), herby kanon + dwie flagi (dane z wiki), potem przysiolki na pustkowiach (sonda terenu w autotescie), zajazdy i plotki.
