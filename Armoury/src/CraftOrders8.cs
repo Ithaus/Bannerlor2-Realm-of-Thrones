@@ -40,7 +40,7 @@ namespace Armoury
     ///      - CompleteOrder: wyplata przez GiverPay.PayFromGiver - placi zleceniodawca ze swojej kiesy, przy pustej kiesie mniej i komunikat;
     ///        wykuta bron: lord - jak gra, a gdy nie wzial do reki - do taboru jego druzyny; zleceniodawca bez druzyny (notabl, lord w miescie, zadanie) -
     ///        na polke miasta zlecenia; zolnierz z niczego wyciety (licznik).
-    ///    Klucz CraftOrdersGiverCanPay (NZ, 16.10, CraftOrdersPurse.cs): zlecenie miejskie tylko od zleceniodawcy z nagroda (po przeliczeniu) w kiesie; zlecenia
+    ///    Klucz CraftOrdersGiverCanPay (NZ, 16.10, CraftOrdersPurse.cs): zlecenie miejskie tylko od zleceniodawcy z kiesa na sume swoich zlecen (po przeliczeniu, +20% na premie); zlecenia
     ///    bez pokrycia albo zmarlego zleceniodawcy zdejmowane przy starcie sesji i co dobe (zlecenia zadan bez zmian).
     ///    Klucz CraftOrdersOpenedOnly (true): szablon losowany tylko z klas, w ktorych KAZDY slot szablonu ma czesc otwarta u gracza (IsOpened), tier czesci
     ///    najwyzej najwyzszy otwarty tier szablonu + 1. Brak takiej klasy = los gry (licznik). W nowej kampanii zlecenia startowe powstaja PRZED brama

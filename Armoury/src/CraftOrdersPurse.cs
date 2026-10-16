@@ -32,14 +32,22 @@ namespace Armoury
     /// (GameStateManager.LastOrDefault), przeglad nie usuwa zlecen miasta gracza (licznik). Kampania i tak stoi przy otwartej kuzni (GameStateManager.OnTick
     /// tyka tylko stan czynny) - to zabezpieczenie.
     ///
+    /// Jeden bohater moze miec kilka zlecen naraz (DailyTickSettlement, ReplaceCraftingOrder i start kampanii losuja bohatera bez sprawdzania, czy ma juz
+    /// zlecenie; zlecenie zostaje w miescie, gdy bohater wyjedzie) - gracz moze oddac kilka w jednej wizycie w kuzni, a GiverPay placi kazde z tej samej kiesy.
+    /// Dlatego miara jest SUMA zlecen zleceniodawcy (miejskie we wszystkich miastach + zlecenia zadan - te placi tez GiverPay), z zapasem ReservePct na premie
+    /// gry za lepsza bron (CalculateOrderPriceDifference: BaseGoldReward x (1 + nadwyzka statystyk / wymog x 0.1)): pokrycie = Gold >= Need(suma).
+    ///
     /// Teraz (klucz true i Craft Orders Historical czynne - bez niego zloto idzie z niczego i nie ma czego sprawdzac):
     ///   (1) postfiks CreateTownOrder (metoda deklarowana): nowe zlecenie (inne niz w slocie przed wywolaniem - prefiks BK moze pominac metode), gdy
-    ///       zleceniodawca ma mniej niz BaseGoldReward (juz po przeliczeniu historycznym w postfiksie konstruktora E8/K) - zdjete droga gry
-    ///       (CraftingOrderSlots.RemoveTownOrder); slot wolny, gra sprobuje innego bohatera w kolejnych dobach. Nowa kampania przed przeliczeniem cen
-    ///       (HistoricalPrices czynne, a jeszcze nie Applied) - bez sprawdzenia, sprawdza start sesji;
+    ///       kiesa zleceniodawcy nie pokrywa jego nagrody (BaseGoldReward juz po przeliczeniu historycznym w postfiksie konstruktora E8/K) razem z nagrodami
+    ///       jego pozostalych zlecen (OtherDue) - zdjete droga gry (CraftingOrderSlots.RemoveTownOrder); slot wolny, gra sprobuje innego bohatera w kolejnych
+    ///       dobach. Nowa kampania przed przeliczeniem cen (HistoricalPrices czynne, a jeszcze nie Applied) - bez sprawdzenia, sprawdza start sesji;
     ///   (2) start sesji (po CraftOrders8.SessionStart - nagrody z zapisu juz przeliczone) i kazda doba (ArmouryBehavior.OnDailyTick, po CraftOrders8.Daily):
-    ///       zlecenia miejskie zmarlego (albo bez zleceniodawcy) i zleceniodawcy z kiesa ponizej nagrody - zdjete ta sama droga;
-    ///   (3) oddanie bez zmian (GiverPay: placi, ile ma - komunikat zostaje na wypadek, gdy kiesa spadla po ostatnim przegladzie albo premia za lepsza bron).
+    ///       zlecenia miejskie zmarlego (albo bez zleceniodawcy) zdjete; dla zywego - najpierw do sumy ida zlecenia zadan i zlecenia spod otwartej kuzni
+    ///       (tych nie zdejmujemy), potem zlecenia miejskie po kolei (miasta, sloty): zostaje, gdy kiesa pokrywa sume zostawionych z nim wlacznie, inaczej
+    ///       zdjete ta sama droga (pozniejsze, mniejsze zlecenie moze sie jeszcze zmiescic);
+    ///   (3) oddanie bez zmian (GiverPay: placi, ile ma - komunikat zostaje na wypadek, gdy kiesa spadla po ostatnim przegladzie, premia przekroczyla zapas
+    ///       albo zlecenie zadania szefa gangu bez pokrycia - tych nie zdejmujemy, licznik "zlecen zadan bez pokrycia").
     /// Klucz wylaczony: nic nie zdejmujemy, przeglad liczy "w cieniu", ile by zdjal.
     /// Stan tylko w pamieci (liczniki); zlecenia zapisuje gra (_craftingOrders). Reset z CraftOrders8.Reset (WorldMeasure.Reset - konstruktor ArmouryBehavior).
     /// Linie: "Zlecenia kowalskie (NZ): latki przy starcie gry", "... start sesji", "... dzien N". Wyjatek = licznik potkniec per zlecenie, bez wylacznika.
@@ -113,6 +121,45 @@ namespace Armoury
             return all != null && all.TryGetValue(town, out slots) ? slots : null;
         }
 
+        // ------------------------------------------------------------ miara: suma zlecen zleceniodawcy z zapasem na premie
+
+        /// <summary>Zapas na premie gry za lepsza bron (CalculateOrderPriceDifference: BaseGoldReward x (1 + nadwyzka statystyk / wymog x 0.1)).
+        /// +20% = statystyki wykutej broni 3x wymog zlecenia; wieksza premia - rzadko, wtedy GiverPay placi, ile ma, z komunikatem.</summary>
+        internal const int ReservePct = 20;
+
+        /// <summary>Kiesa potrzebna na sume nagrod: suma + ReservePct, w gore do pelnego denara.</summary>
+        private static long Need(long due) { return due <= 0 ? 0 : (due * (100 + ReservePct) + 99) / 100; }
+
+        private static long Reward(CraftingOrder o) { int r = o != null ? o.BaseGoldReward : 0; return r > 0 ? r : 0; }
+
+        /// <summary>Suma nagrod pozostalych zlecen zleceniodawcy (miejskie we wszystkich miastach i zadan; bez "except") - GiverPay placi kazde z tej samej kiesy.</summary>
+        private static long OtherDue(CraftingCampaignBehavior beh, Hero owner, CraftingOrder except)
+        {
+            long sum = 0;
+            var all = beh != null ? beh.CraftingOrders : null;
+            if (all == null || owner == null) return 0;
+            foreach (var kv in all)
+            {
+                var slots = kv.Value;
+                if (slots == null) continue;
+                var arr = slots.Slots;
+                if (arr != null)
+                    for (int i = 0; i < arr.Length; i++)
+                    {
+                        var x = arr[i];
+                        if (x != null && !ReferenceEquals(x, except) && ReferenceEquals(x.OrderOwner, owner)) sum += Reward(x);
+                    }
+                var cu = slots.CustomOrders;
+                if (cu != null)
+                    for (int i = 0; i < cu.Count; i++)
+                    {
+                        var x = cu[i];
+                        if (x != null && !ReferenceEquals(x, except) && ReferenceEquals(x.OrderOwner, owner)) sum += Reward(x);
+                    }
+            }
+            return sum;
+        }
+
         /// <summary>Ekran kuzni na stosie stanow gry (CraftingState) - wtedy nie zdejmujemy zlecen miasta gracza. Blad odczytu = traktuj jak otwarty.</summary>
         private static bool ForgeOpen(out Town here)
         {
@@ -131,7 +178,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ (1) nowe zlecenie miejskie
 
-        private static int _made, _rejected, _early, _madeOff, _madeOpen, _madeKept;
+        private static int _made, _rejected, _rejectedSum, _early, _madeOff, _madeOpen, _madeKept;   // _rejectedSum: kiesa na to jedno zlecenie, nie na sume z innymi
         private static long _rejectedDue;
 
         /// <summary>Prefiks CreateTownOrder(Hero orderOwner, int orderSlot): zlecenie, ktore stoi w slocie przed wywolaniem (zwykle null).</summary>
@@ -147,7 +194,8 @@ namespace Armoury
             catch (Exception e) { Stumble("CreatePrefix", e); }
         }
 
-        /// <summary>Postfiks CreateTownOrder: nowe zlecenie od zleceniodawcy bez nagrody w kiesie - zdjete zaraz po utworzeniu (slot zostaje wolny).</summary>
+        /// <summary>Postfiks CreateTownOrder: nowe zlecenie od zleceniodawcy, ktorego kiesa nie pokrywa sumy jego zlecen (to + pozostale, z zapasem) - zdjete
+        /// zaraz po utworzeniu (slot zostaje wolny). Pelne przejscie tablic (OtherDue) tylko, gdy kiesa pokrywa samo to zlecenie (~30 tworzen na dobe).</summary>
         public static void CreatePostfix(CraftingCampaignBehavior __instance, Hero __0, int __1, CraftingOrder __state)
         {
             long t0 = Stopwatch.GetTimestamp();
@@ -163,10 +211,14 @@ namespace Armoury
                 if (!On) { _madeOff++; return; }
                 if (HistoricalPrices.On && !HistoricalPrices.Applied) { _early++; return; }   // start nowej kampanii: nagroda jeszcze w starej monecie - sprawdzi start sesji
                 var owner = o.OrderOwner;
-                if (owner == null || owner.Gold >= o.BaseGoldReward) return;
+                if (owner == null) return;
+                long r = Reward(o);
+                int gold = owner.Gold;
+                bool alone = gold < Need(r);                                     // kiesa nie pokrywa nawet tego jednego zlecenia
+                if (!alone && gold >= Need(r + OtherDue(__instance, owner, o))) return;
                 Town here;
                 if (ForgeOpen(out here) && (here == null || ReferenceEquals(here, town))) { _madeOpen++; return; }
-                if (Remove(slots, o)) { _rejected++; _rejectedDue += o.BaseGoldReward; }
+                if (Remove(slots, o)) { _rejected++; _rejectedDue += r; if (!alone) _rejectedSum++; }
                 else _madeKept++;                                                // brak drogi gry albo niezgodny slot - zlecenie zostaje
             }
             catch (Exception e) { Stumble("CreatePostfix", e); }
@@ -177,9 +229,21 @@ namespace Armoury
 
         private sealed class Pass
         {
-            public int Seen, Poor, Dead, Hang, Uncovered, Open, Mismatch, Custom, ShPoor, ShDead;
+            public int Seen, Poor, Dead, Hang, Uncovered, Open, Mismatch, Custom, CustomUncovered, ShPoor, ShDead, PoorSum, Multi, MaxN;
             public long PoorDue;
             public readonly List<int> Gold = new List<int>(64);
+        }
+
+        /// <summary>Zostawione zlecenia jednego zleceniodawcy w przegladzie: suma nagrod i liczba (miejskie + zadan).</summary>
+        private sealed class Acc { public long Due; public int N; }
+
+        private struct Entry { public Town Town; public CraftingCampaignBehavior.CraftingOrderSlots Slots; public CraftingOrder Order; public bool Locked; }
+
+        private static Acc AccOf(Dictionary<Hero, Acc> due, Hero h)
+        {
+            Acc a;
+            if (!due.TryGetValue(h, out a)) { a = new Acc(); due[h] = a; }
+            return a;
         }
 
         private static void Sweep(Pass p, bool act)
@@ -190,42 +254,76 @@ namespace Armoury
             Town here = null;
             bool open = act && ForgeOpen(out here);
             int mm0 = _mismatchDay;
+            var due = new Dictionary<Hero, Acc>(256);
+            var list = new List<Entry>(640);
+            // krok 1: zlecenia zadan (nie zdejmujemy - ida pierwsze do sumy zleceniodawcy, placi je ta sama kiesa) i lista zlecen miejskich
             foreach (var kv in all)
             {
                 var slots = kv.Value;
                 if (slots == null) continue;
-                try { var cu = slots.CustomOrders; if (cu != null) p.Custom += cu.Count; } catch (Exception e) { Stumble("Sweep(zadania)", e); }
+                try
+                {
+                    var cu = slots.CustomOrders;
+                    if (cu != null)
+                        for (int i = 0; i < cu.Count; i++)
+                        {
+                            var c = cu[i];
+                            if (c == null) continue;
+                            p.Custom++;
+                            var h = c.OrderOwner;
+                            if (h == null || !h.IsAlive) { p.CustomUncovered++; continue; }
+                            var a = AccOf(due, h);
+                            a.Due += Reward(c); a.N++;
+                            if (h.Gold < Need(a.Due)) p.CustomUncovered++;           // szef gangu bez pokrycia - przy oddaniu "could pay only" (zadania nie psujemy)
+                        }
+                }
+                catch (Exception e) { Stumble("Sweep(zadania)", e); }
                 var arr = slots.Slots;
                 if (arr == null) continue;
+                bool locked = open && (here == null || ReferenceEquals(here, kv.Key));   // ekran kuzni otwarty - zlecenie moze byc wlasnie wykonywane
                 for (int i = 0; i < arr.Length; i++)
+                    if (arr[i] != null) list.Add(new Entry { Town = kv.Key, Slots = slots, Order = arr[i], Locked = locked });
+            }
+            // krok 2: najpierw zlecenia spod otwartej kuzni (zostaja i licza sie do sumy), potem reszta po kolei
+            for (int pass = 0; pass < 2; pass++)
+                for (int k = 0; k < list.Count; k++)
                 {
-                    var o = arr[i];
-                    if (o == null) continue;
-                    try
-                    {
-                        p.Seen++;
-                        var owner = o.OrderOwner;
-                        bool dead = owner == null || !owner.IsAlive;
-                        bool poor = !dead && owner.Gold < o.BaseGoldReward;
-                        bool bad = dead || poor;
-                        if (bad)
-                        {
-                            if (!act) { if (dead) p.ShDead++; else p.ShPoor++; }
-                            else if (open && (here == null || ReferenceEquals(here, kv.Key))) p.Open++;   // ekran kuzni otwarty - zlecenie moze byc wlasnie wykonywane
-                            else if (Remove(slots, o))
-                            {
-                                if (dead) p.Dead++; else { p.Poor++; p.PoorDue += o.BaseGoldReward; }
-                                continue;
-                            }
-                        }
-                        p.Hang++;
-                        if (bad) p.Uncovered++;                    // = ekran kuzni + niezgodny slot / brak drogi + cien (klucz wylaczony)
-                        if (owner != null) p.Gold.Add(owner.Gold);
-                    }
+                    var en = list[k];
+                    if (en.Locked != (pass == 0)) continue;
+                    try { Check(p, due, en, act); }
                     catch (Exception e) { Stumble("Sweep(zlecenie)", e); }
                 }
-            }
+            foreach (var a in due.Values)
+                if (a.N >= 2) { p.Multi++; if (a.N > p.MaxN) p.MaxN = a.N; }
             p.Mismatch = _mismatchDay - mm0;
+        }
+
+        /// <summary>Jedno zlecenie miejskie w przegladzie: zostaje, gdy kiesa zleceniodawcy pokrywa sume jego zostawionych zlecen z tym wlacznie.</summary>
+        private static void Check(Pass p, Dictionary<Hero, Acc> due, Entry en, bool act)
+        {
+            var o = en.Order;
+            p.Seen++;
+            var owner = o.OrderOwner;
+            bool dead = owner == null || !owner.IsAlive;
+            long r = Reward(o);
+            Acc a = dead ? null : AccOf(due, owner);
+            bool poor = !dead && owner.Gold < Need(a.Due + r);
+            bool bad = dead || poor;
+            if (bad)
+            {
+                bool sum = poor && owner.Gold >= Need(r);                    // kiesa na to jedno zlecenie, nie na sume z innymi
+                if (!act) { if (dead) p.ShDead++; else { p.ShPoor++; if (sum) p.PoorSum++; } }
+                else if (en.Locked) p.Open++;
+                else if (Remove(en.Slots, o))
+                {
+                    if (dead) p.Dead++; else { p.Poor++; p.PoorDue += r; if (sum) p.PoorSum++; }
+                    return;
+                }
+            }
+            if (a != null && (act || !bad)) { a.Due += r; a.N++; }          // zostaje w grze; cien (klucz wylaczony): zlecenie bez pokrycia liczone jak zdjete
+            p.Hang++;
+            if (bad) p.Uncovered++;                                           // = ekran kuzni + niezgodny slot / brak drogi + cien (klucz wylaczony)
+            if (owner != null) p.Gold.Add(owner.Gold);
         }
 
         private static string Purse(Pass p)
@@ -240,9 +338,11 @@ namespace Armoury
         private static string Rest(Pass p, bool on)
         {
             return ", wiszacych " + p.Hang + " (bez pokrycia " + p.Uncovered + "), kiesa zleceniodawcow min/mediana " + Purse(p)
+                   + " | suma zlecen jednego zleceniodawcy (zapas na premie +" + ReservePct + "%): kiesa na jedno, nie na sume " + p.PoorSum
+                   + ", zleceniodawcow z kilkoma zleceniami " + p.Multi + " (najwiecej " + p.MaxN + " u jednego)"
                    + " | zostawione mimo braku: ekran kuzni otwarty " + p.Open + ", niezgodny slot albo brak drogi gry " + p.Mismatch
                    + " | w cieniu (klucz wylaczony): bez kiesy " + p.ShPoor + ", bez zywego zleceniodawcy " + p.ShDead
-                   + " | zlecen zadan (pominiete) " + p.Custom
+                   + " | zlecen zadan (pominiete) " + p.Custom + ", bez pokrycia " + p.CustomUncovered
                    + " | klucz Craft Orders Giver Can Pay " + OnOff(KeyOn) + ", placi zleceniodawca (Craft Orders Historical) " + OnOff(CraftOrders8.PayOn)
                    + ", dziala " + (on ? "TAK" : "NIE");
         }
@@ -253,11 +353,11 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             bool on = On;
             var p = new Pass();
-            int early = _early, made = _made, rej = _rejected;
+            int early = _early, made = _made, rej = _rejected, rejSum = _rejectedSum;
             try { Sweep(p, on); } catch (Exception e) { Stumble("SessionStart", e); }
             Log.Info(Head + "start sesji | zlecen miejskich z zapisu " + p.Seen + ", usuniete z zapisu " + (p.Poor + p.Dead) + " (kiesa " + p.Poor + ", smierc " + p.Dead
                      + "; nagrod usunietych razem " + p.PoorDue + ")" + Rest(p, on)
-                     + " | przed startem sesji (start nowej kampanii): utworzone " + made + ", odrzucone przy tworzeniu " + rej + ", przed przeliczeniem cen (sprawdzone tutaj) " + early
+                     + " | przed startem sesji (start nowej kampanii): utworzone " + made + ", odrzucone przy tworzeniu " + rej + " (w tym przez sume zlecen " + rejSum + "), przed przeliczeniem cen (sprawdzone tutaj) " + early
                      + " | latka tworzenia (CreateTownOrder) " + (_wiredCreate ? "TAK" : "NIE") + ", droga gry RemoveTownOrder " + (_removeTown != null ? "TAK" : "NIE")
                      + " | koszt " + Ms(Stopwatch.GetTimestamp() - t0) + " ms | potkniecia " + _stumbles + ".");
             ClearDay();                                       // linia pierwszej doby liczy od startu sesji
@@ -281,6 +381,7 @@ namespace Armoury
                   .Append(Rest(p, on))
                   .Append(" | przy tworzeniu bez sprawdzenia: klucz albo platnik wylaczony ").Append(_madeOff).Append(", przed przeliczeniem cen ").Append(_early)
                   .Append(", ekran kuzni otwarty ").Append(_madeOpen).Append(", zostawione (niezgodny slot albo brak drogi gry) ").Append(_madeKept)
+                  .Append(" | odrzucone przy tworzeniu przez sume zlecen zleceniodawcy ").Append(_rejectedSum)
                   .Append(" | nagrody: odrzuconych razem ").Append(_rejectedDue).Append(", usunietych w dobie razem ").Append(p.PoorDue)
                   .Append(" | koszt ").Append(Ms(_ticks + Stopwatch.GetTimestamp() - t0)).Append(" ms/dobe")
                   .Append(" | potkniecia ").Append(_stumblesDay).Append(" (od wczytania ").Append(_stumbles).Append(").");
@@ -303,7 +404,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _stumblesDay = 0; _ticks = 0; _mismatchDay = 0;
-            _made = _rejected = _madeOff = _madeOpen = _madeKept = _early = 0; _rejectedDue = 0;
+            _made = _rejected = _rejectedSum = _madeOff = _madeOpen = _madeKept = _early = 0; _rejectedDue = 0;
         }
 
         // ------------------------------------------------------------ start gry (SubModuleMain - po CraftOrders8.ApplyAll)
@@ -352,7 +453,7 @@ namespace Armoury
             Log.Info(Head + "latki przy starcie gry - wpiete " + n + "/2: prefiks i postfiks CreateTownOrder (metoda deklarowana) " + _createWhy
                      + ", droga gry CraftingOrderSlots.RemoveTownOrder " + rm
                      + "; BRAK: " + (n == 2 ? "-" : (!_wiredCreate ? "CreateTownOrder" : "") + (!_wiredCreate && _removeTown == null ? ", " : "") + (_removeTown == null ? "RemoveTownOrder" : ""))
-                     + " | klucz Craft Orders Giver Can Pay " + OnOff(KeyOn) + " (zlecenie tylko od zleceniodawcy z nagroda w kiesie; zlecenia bez pokrycia zdejmowane co dobe i przy starcie sesji; zlecenia zadan bez zmian).");
+                     + " | klucz Craft Orders Giver Can Pay " + OnOff(KeyOn) + " (zlecenie tylko od zleceniodawcy z kiesa na sume swoich zlecen z zapasem +" + ReservePct + "% na premie; zlecenia bez pokrycia zdejmowane co dobe i przy starcie sesji; zlecenia zadan bez zmian).");
         }
     }
 }

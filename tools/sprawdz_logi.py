@@ -837,10 +837,11 @@ Uzycie (Python 3, tylko odczyt):
                     NM-2 linie misji rozpoznane (brak = INFO, autotest nie gra misji), NM-3 potkniecia 0, NM-4 kryjowka (INFO), NM-5 poza bitwa na mapie
                     przy kluczu TAK odwroty 0, NM-6 bitwa na mapie wstrzymani 0, NM-7 agenci bez druzyny wedlug misji (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa nzlec     : (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"; galaz w-toku/noc-zlecenia, Armoury/src/CraftOrdersPurse.cs)
-                    python -I tools/sprawdz_logi.py --grupa nzlec <Armoury-*.log> (strumieniowo). Zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie
-                    (klucz CraftOrdersGiverCanPay): NZE-0 linia startu gry (wpiete 2/2), NZE-1 linia startu sesji (klucz i platnik czynne), NZE-2 start sesji -
-                    zlecenia z zapisu bez pokrycia zdjete, NZE-3 linia doby w kazdej dobie z linia E8/K, NZE-4 spojnosc licznikow doby, NZE-5 po przegladzie
-                    doby bez pokrycia tylko spod otwartej kuzni, NZE-6/7 odrzucone, usuniete, wiszace i kiesy (INFO), NZE-8 niedoplata przy oddaniu <= 1 na 10
+                    python -I tools/sprawdz_logi.py --grupa nzlec <Armoury-*.log> (strumieniowo). Zlecenie kowalskie tylko od zleceniodawcy z kiesa na sume
+                    swoich zlecen (+20% na premie; klucz CraftOrdersGiverCanPay): NZE-0 linia startu gry (wpiete 2/2), NZE-1 linia startu sesji (klucz i platnik
+                    czynne), NZE-2 start sesji - zlecenia z zapisu bez pokrycia zdjete, NZE-3 linia doby w kazdej dobie z linia E8/K, NZE-4 spojnosc licznikow
+                    doby (takze sumy zlecen jednego zleceniodawcy), NZE-5 po przegladzie doby bez pokrycia tylko spod otwartej kuzni, NZE-6/7 odrzucone,
+                    usuniete (w tym przez sume), wiszace, kiesy, zleceniodawcy z kilkoma zleceniami, zlecenia zadan bez pokrycia (INFO), NZE-8 niedoplata <= 1 na 10
                     (oddanych < 5 - INFO), NZE-9 potkniecia i ERROR in CraftOrdersPurse.* 0, NZE-10 koszt (INFO). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -29976,29 +29977,31 @@ def nwyd_main(logp, csp=None):
 # ------------------------------------------------------------ nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"; Armoury/src/CraftOrdersPurse.cs)
 NZE_HEAD = "Zlecenia kowalskie (NZ): "
 NZE_REST = (r", wiszacych (\d+) \(bez pokrycia (\d+)\), kiesa zleceniodawcow min/mediana (-?\d+|-)/(-?\d+|-) "
+            r"\| suma zlecen jednego zleceniodawcy \(zapas na premie \+(\d+)%\): kiesa na jedno, nie na sume (\d+), "
+            r"zleceniodawcow z kilkoma zleceniami (\d+) \(najwiecej (\d+) u jednego\) "
             r"\| zostawione mimo braku: ekran kuzni otwarty (\d+), niezgodny slot albo brak drogi gry (\d+) "
             r"\| w cieniu \(klucz wylaczony\): bez kiesy (\d+), bez zywego zleceniodawcy (\d+) "
-            r"\| zlecen zadan \(pominiete\) (\d+) "
+            r"\| zlecen zadan \(pominiete\) (\d+), bez pokrycia (\d+) "
             r"\| klucz Craft Orders Giver Can Pay (CZYNNE|WYLACZONE), placi zleceniodawca \(Craft Orders Historical\) (CZYNNE|WYLACZONE), dziala (TAK|NIE)")
 NZE_DAY = re.compile(r"Zlecenia kowalskie \(NZ\): dzien (-?\d+) \| utworzone (\d+), odrzucone przy tworzeniu (\d+) \(brak kiesy\), "
                      r"usuniete w dobie (\d+) \(kiesa (\d+), smierc (\d+)\)" + NZE_REST
                      + r" \| przy tworzeniu bez sprawdzenia: klucz albo platnik wylaczony (\d+), przed przeliczeniem cen (\d+), ekran kuzni otwarty (\d+), "
-                     r"zostawione \(niezgodny slot albo brak drogi gry\) (\d+) \| nagrody: odrzuconych razem (\d+), usunietych w dobie razem (\d+) "
+                     r"zostawione \(niezgodny slot albo brak drogi gry\) (\d+) \| odrzucone przy tworzeniu przez sume zlecen zleceniodawcy (\d+) \| nagrody: odrzuconych razem (\d+), usunietych w dobie razem (\d+) "
                      r"\| koszt ([0-9.]+) ms/dobe \| potkniecia (\d+) \(od wczytania (\d+)\)\.$")
 NZE_SES = re.compile(r"Zlecenia kowalskie \(NZ\): start sesji \| zlecen miejskich z zapisu (\d+), usuniete z zapisu (\d+) \(kiesa (\d+), smierc (\d+); "
                      r"nagrod usunietych razem (\d+)\)" + NZE_REST
-                     + r" \| przed startem sesji \(start nowej kampanii\): utworzone (\d+), odrzucone przy tworzeniu (\d+), przed przeliczeniem cen \(sprawdzone tutaj\) (\d+) "
+                     + r" \| przed startem sesji \(start nowej kampanii\): utworzone (\d+), odrzucone przy tworzeniu (\d+) \(w tym przez sume zlecen (\d+)\), przed przeliczeniem cen \(sprawdzone tutaj\) (\d+) "
                      r"\| latka tworzenia \(CreateTownOrder\) (TAK|NIE), droga gry RemoveTownOrder (TAK|NIE) \| koszt ([0-9.]+) ms \| potkniecia (\d+)\.$")
 NZE_WIRE = NZE_HEAD + "latki przy starcie gry"
 NZE_E8K = re.compile(r"Kuznia \(E8/K\): dzien (-?\d+) \|.*?oddanych (\d+) \(w tym zlecen zadan (\d+)\), obiecane (\d+), zaplacone przez zleceniodawce (\d+), "
                      r"niedoplata przy pustej kiesie (-?\d+) w (\d+) zleceniach")
 NZE_ERR = "ERROR in CraftOrdersPurse."
-NZE_REST_KEYS = ("hang", "unc", "pmin", "pmed", "open", "mism", "shp", "shd", "quest", "key", "pay", "on")
+NZE_REST_KEYS = ("hang", "unc", "pmin", "pmed", "resv", "psum", "multi", "maxn", "open", "mism", "shp", "shd", "quest", "qunc", "key", "pay", "on")
 
 
 def nze_rest(g, i):
     """Wspolny srodek linii doby i startu sesji (Rest w CraftOrdersPurse.cs) od grupy i."""
-    v = g[i:i + 12]
+    v = g[i:i + len(NZE_REST_KEYS)]
     d = {}
     for k, x in zip(NZE_REST_KEYS, v):
         if k in ("key", "pay"):
@@ -30014,12 +30017,14 @@ def nze_rest(g, i):
 
 def nzlec_main(logp):
     """nzlec (16.10; Armoury/src/CraftOrdersPurse.cs, klucz CraftOrdersGiverCanPay): zlecenie kowalskie (miejskie: notable i lordowie) tylko od zleceniodawcy
-    z nagroda w kiesie - odrzucenie przy tworzeniu (postfiks CreateTownOrder), przeglad przy starcie sesji i co dobe (zmarly albo kiesa ponizej nagrody -
-    zdjete droga gry RemoveTownOrder; ekran kuzni otwarty - zostaje; zlecenia zadan pominiete). Wejscie: log Armoury (strumieniowo).
+    z kiesa na sume swoich zlecen (miejskie we wszystkich miastach + zadan, zapas +20% na premie) - odrzucenie przy tworzeniu (postfiks CreateTownOrder),
+    przeglad przy starcie sesji i co dobe (zmarly albo kiesa ponizej narastajacej sumy - zdjete droga gry RemoveTownOrder; ekran kuzni otwarty - zostaje;
+    zlecenia zadan pominiete, tylko licznik bez pokrycia). Wejscie: log Armoury (strumieniowo).
     NZE-0 linia startu gry (wpiete 2/2, BRAK: -), NZE-1 linia startu sesji (klucz i platnik czynne, dziala TAK; klucz wylaczony - INFO), NZE-2 start sesji:
     bez pokrycia = ekran kuzni + niezgodny slot + cien, przy dziala TAK bez pokrycia 0, NZE-3 linia doby w kazdej dobie z linia "Kuznia (E8/K): dzien"
     od pierwszej linii NZ i wszystkie rozpoznane, NZE-4 spojnosc linii doby (usuniete = kiesa + smierc, odrzucone <= utworzone, bez pokrycia = ekran kuzni +
-    niezgodny + cien; dziala TAK - cien 0; dziala NIE - odrzucone i usuniete 0), NZE-5 po przegladzie doby (dziala TAK) wiszace bez pokrycia tylko spod
+    niezgodny + cien; dziala TAK - cien 0; dziala NIE - odrzucone i usuniete 0; kiesa na jedno, nie na sume <= kiesa + cien bez kiesy, przy tworzeniu <=
+    odrzucone; kilka zlecen u jednego - najwiecej >= 2; zadan bez pokrycia <= zadan), NZE-5 po przegladzie doby (dziala TAK) wiszace bez pokrycia tylko spod
     otwartej kuzni, niezgodny slot / brak drogi gry 0 (przegladu i tworzenia), NZE-6 odrzucone i usuniete (INFO), NZE-7 wiszace i kiesy zleceniodawcow
     (INFO), NZE-8 niedoplata przy oddaniu (linie E8/K w dobach z NZ dziala TAK): najwyzej 1 na 10 oddanych (oddanych < 5 - INFO), NZE-9 potkniecia (doby
     i startu sesji) i ERROR in CraftOrdersPurse.* 0, NZE-10 koszt (INFO). Log bez paczki: INFO, bez wyjatku."""
@@ -30043,7 +30048,8 @@ def nzlec_main(logp):
                         g = mm.groups()
                         r = dict(seen=int(g[0]), rem=int(g[1]), poor=int(g[2]), dead=int(g[3]), due=int(g[4]))
                         r.update(nze_rest(g, 5))
-                        r.update(made=int(g[17]), rej=int(g[18]), early=int(g[19]), wired=g[20] == "TAK", way=g[21] == "TAK", ms=float(g[22]), stum=int(g[23]))
+                        r.update(made=int(g[22]), rej=int(g[23]), rejsum=int(g[24]), early=int(g[25]), wired=g[26] == "TAK", way=g[27] == "TAK", ms=float(g[28]),
+                                 stum=int(g[29]))
                         sess.append(r)
                     else:
                         bad.append(s)
@@ -30053,8 +30059,8 @@ def nzlec_main(logp):
                         g = mm.groups()
                         r = dict(day=int(g[0]), made=int(g[1]), rej=int(g[2]), rem=int(g[3]), poor=int(g[4]), dead=int(g[5]))
                         r.update(nze_rest(g, 6))
-                        r.update(c_off=int(g[18]), c_early=int(g[19]), c_open=int(g[20]), c_kept=int(g[21]), rej_due=int(g[22]), rem_due=int(g[23]),
-                                 ms=float(g[24]), stum=int(g[25]), stum_s=int(g[26]))
+                        r.update(c_off=int(g[23]), c_early=int(g[24]), c_open=int(g[25]), c_kept=int(g[26]), rejsum=int(g[27]), rej_due=int(g[28]),
+                                 rem_due=int(g[29]), ms=float(g[30]), stum=int(g[31]), stum_s=int(g[32]))
                         days[r["day"]] = r
                     else:
                         bad.append(s)
@@ -30101,14 +30107,19 @@ def nzlec_main(logp):
     if sess:
         bad_s = [i + 1 for i, r in enumerate(sess)
                  if r["unc"] != r["open"] + r["mism"] + r["shp"] + r["shd"] or (r["on"] and (r["unc"] != r["open"] or r["mism"] != 0))
-                 or r["rem"] != r["poor"] + r["dead"]]
+                 or r["rem"] != r["poor"] + r["dead"] or r["psum"] > r["poor"] + r["shp"] or r["rejsum"] > r["rej"]
+                 or (r["on"] and r["psum"] > r["poor"]) or (r["multi"] > 0) != (r["maxn"] >= 2) or r["qunc"] > r["quest"]]
         rem = sum(r["rem"] for r in sess)
         rep.add("NZE-2: start sesji - zlecenia z zapisu bez pokrycia zdjete",
                 f"usuniete z zapisu razem {rem} (kiesa {sum(r['poor'] for r in sess)}, smierc {sum(r['dead'] for r in sess)}, nagrod {sum(r['due'] for r in sess)}); "
                 f"bez pokrycia po przegladzie {sum(r['unc'] for r in sess)} (ekran kuzni {sum(r['open'] for r in sess)}, niezgodny slot {sum(r['mism'] for r in sess)}, "
-                f"cien {sum(r['shp'] + r['shd'] for r in sess)}); przed startem sesji utworzone {sum(r['made'] for r in sess)}, przed przeliczeniem cen {sum(r['early'] for r in sess)}"
+                f"cien {sum(r['shp'] + r['shd'] for r in sess)}); kiesa na jedno, nie na sume (z zapasem +{sess[-1]['resv']}%) {sum(r['psum'] for r in sess)}, "
+                f"zleceniodawcow z kilkoma zleceniami po przegladzie (ostatnia sesja) {sess[-1]['multi']} (najwiecej {sess[-1]['maxn']}); "
+                f"przed startem sesji utworzone {sum(r['made'] for r in sess)}, odrzucone {sum(r['rej'] for r in sess)} (przez sume {sum(r['rejsum'] for r in sess)}), "
+                f"przed przeliczeniem cen {sum(r['early'] for r in sess)}"
                 + (f"; NIESPOJNE sesje {bad_s[:5]}" if bad_s else ""),
-                "usuniete = kiesa + smierc; bez pokrycia = ekran kuzni + niezgodny + cien; dziala TAK - bez pokrycia tylko spod otwartej kuzni, niezgodny 0", not bad_s)
+                "usuniete = kiesa + smierc; bez pokrycia = ekran kuzni + niezgodny + cien; dziala TAK - bez pokrycia tylko spod otwartej kuzni, niezgodny 0; "
+                "kiesa na jedno, nie na sume <= kiesa (+ cien); kilka zlecen - najwiecej >= 2", not bad_s)
     # NZE-3 linie doby
     first = min(days) if days else None
     want = sorted(d for d in e8k if first is not None and d >= first)
@@ -30140,9 +30151,18 @@ def nzlec_main(logp):
             why.append("odrzucone/usuniete przy dziala NIE")
         if r["on"] != (r["key"] and r["pay"]):
             why.append("dziala != klucz i platnik")
+        if r["psum"] > r["poor"] + r["shp"] or (r["on"] and r["psum"] > r["poor"]):
+            why.append("kiesa na jedno, nie na sume > usuniete przez kiese (+ cien)")
+        if r["rejsum"] > r["rej"]:
+            why.append("odrzucone przez sume > odrzucone")
+        if (r["multi"] > 0) != (r["maxn"] >= 2):
+            why.append("kilka zlecen u jednego != najwiecej >= 2")
+        if r["qunc"] > r["quest"]:
+            why.append("zadan bez pokrycia > zadan")
         if why:
             inc.append((r["day"], why))
-    rep.add("NZE-4: spojnosc linii doby (usuniete = kiesa + smierc, odrzucone <= utworzone, bez pokrycia = ekran + niezgodny + cien, cien tylko przy kluczu wylaczonym)",
+    rep.add("NZE-4: spojnosc linii doby (usuniete = kiesa + smierc, odrzucone <= utworzone, bez pokrycia = ekran + niezgodny + cien, cien tylko przy kluczu wylaczonym, "
+            "suma zlecen jednego zleceniodawcy)",
             f"dob {len(rows)}, niespojnych {len(inc)}" + (f" (np. d{inc[0][0]}: {', '.join(inc[0][1])})" if inc else ""), "0", not inc)
     on_rows = [r for r in rows if r["on"]]
     off_rows = [r for r in rows if not r["on"]]
@@ -30163,14 +30183,17 @@ def nzlec_main(logp):
     remp, remd = sum(r["poor"] for r in rows), sum(r["dead"] for r in rows)
     rep.add("NZE-6: zlecenia utworzone, odrzucone przy tworzeniu (brak kiesy) i usuniete w dobie (suma dob)",
             f"utworzone {made} ({made / len(rows):.1f}/d), odrzucone {rej}" + (f" ({100.0 * rej / made:.0f}%)" if made else "")
-            + f", nagrod odrzuconych {sum(r['rej_due'] for r in rows)}; usuniete w dobie {remp + remd} (kiesa {remp}, smierc {remd}, nagrod {sum(r['rem_due'] for r in rows)}); "
+            + f" (przez sume zlecen {sum(r['rejsum'] for r in rows)}), nagrod odrzuconych {sum(r['rej_due'] for r in rows)}; usuniete w dobie {remp + remd} "
+            f"(kiesa {remp}, w tym przez sume {sum(r['psum'] for r in rows if r['on'])}, smierc {remd}, nagrod {sum(r['rem_due'] for r in rows)}); "
             f"bez sprawdzenia: klucz albo platnik wylaczony {sum(r['c_off'] for r in rows)}, przed przeliczeniem cen {sum(r['c_early'] for r in rows)}",
             "INFO (odrzucone 100% przez >= 28 dob - sprawdzic kiesy notabli)", None)
     # NZE-7 wiszace i kiesy
     step = max(1, len(rows) // 8)
     path = "; ".join(f"d{r['day']}: {r['hang']} (kiesa min/med {r['pmin'] if r['pmin'] is not None else '-'}/{r['pmed'] if r['pmed'] is not None else '-'})" for r in rows[::step])
-    rep.add("NZE-7: wiszace zlecenia miejskie i kiesy zleceniodawcow (przebieg), zlecen zadan (pominiete)",
-            path[:600] + f" | zadan ostatniej doby {rows[-1]['quest']}", "INFO", None)
+    rep.add("NZE-7: wiszace zlecenia miejskie i kiesy zleceniodawcow (przebieg), zleceniodawcy z kilkoma zleceniami, zlecenia zadan (pominiete) bez pokrycia",
+            path[:600] + f" | ostatnia doba: zleceniodawcow z kilkoma zleceniami {rows[-1]['multi']} (najwiecej {rows[-1]['maxn']}), zapas +{rows[-1]['resv']}%; "
+            f"zadan {rows[-1]['quest']}, bez pokrycia {rows[-1]['qunc']} (najwiecej w dobie {max(r['qunc'] for r in rows)})",
+            "INFO (zadanie szefa gangu bez pokrycia - przy oddaniu 'could pay only'; zadania nie zdejmujemy)", None)
     # NZE-8 niedoplata przy oddaniu
     ed = [e8k[r["day"]] for r in on_rows if e8k.get(r["day"])]
     done = sum(x["done"] for x in ed)

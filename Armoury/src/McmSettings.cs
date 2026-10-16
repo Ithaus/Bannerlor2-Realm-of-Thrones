@@ -4688,7 +4688,7 @@ namespace Armoury
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersHistorical { get; set; } = true;
 
-        [SettingPropertyBool("Craft Orders Giver Can Pay", HintText = "a smithing order is offered only by a lord or notable who has the promised reward in his purse: a client without the coin makes no order, and an order whose client has since spent his coin or died is withdrawn the next day or when the game is loaded (never while you are at the forge). Works together with Craft Orders Historical, where the client pays from his own purse. Quest orders are left alone. Off = orders as before (a client short of coin pays what he has and you are told)")]
+        [SettingPropertyBool("Craft Orders Giver Can Pay", HintText = "a smithing order is offered only by a lord or notable who can pay for it: his purse must cover the rewards of all the orders he has placed at once, with a fifth to spare for the bonus a better weapon earns. A client without the coin makes no order, and an order whose client has since spent his coin or died is withdrawn the next day or when the game is loaded (never while you are at the forge). Works together with Craft Orders Historical, where the client pays from his own purse. Quest orders are left alone (a gang leader short of coin still pays only what he has). Off = orders as before (a client short of coin pays what he has and you are told)")]
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersGiverCanPay { get; set; } = true;
 
