@@ -95,6 +95,9 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
+                // nskarbiec: bitwa w kryjowce bez gracza (gra daje wtedy endState Defeated - PlayerSide None) - wlasna droga, przed wylacznikiem przeszukania
+                var ev0 = component != null ? component.MapEvent : null;
+                if (c != null && ev0 != null && !ev0.IsPlayerMapEvent) { AiCleared(ev0); return; }
                 if (c == null || !c.HideoutPurgeEnabled) return;
                 if (endState != HideoutEventComponent.HideoutBattleEndState.Victory) return;
                 var mapEvent = component != null ? component.MapEvent : null;
@@ -125,12 +128,72 @@ namespace Armoury
                 _pendingStrikes = 0; _pendingRetryAt = DateTime.MinValue;   // E8/S (246): nowe przeszukanie - licznik potkniec od zera
                 _pending = true;
                 BuildLoot(sett);
-                Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + ", band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
+                Log.Info("HideoutPurge: zwyciestwo w " + _pendingName + " (" + (sett != null ? sett.StringId : "-") + "), band " + bands + ", lup " + _pendingGold + " zlota czeka na przeszukanie.");
                 // odwet rusza JUZ TERAZ - przy duzej partii przeszukanie trwa
                 // ledwie pare godzin gry i bandy musza wyjsc w droge od razu
                 Reprisal();
             }
             catch (Exception e) { Log.Error("HideoutPurge.OnHideoutBattle", e); }
+        }
+
+        /// <summary>
+        /// nskarbiec (noc 15/16.10): kryjowka oczyszczona BEZ gracza - jedna regula z przeszukaniem gracza: kase kryjowki bierze ten, kto ja oczyscil,
+        /// bez 1/9 korony. Odbiorca jak w 3.2 (BeatenPurse): zywy wodz zwyciezcow (do jego kiesy), inaczej ich partia z kiesa handlowa (takze zaloga - gra daje
+        /// jej kiese, GarrisonPartyComponent), inaczej kasa ich osady - milicja, patrol (BeatenPurse.SettlementOf: miasto, zamek, wies), inaczej najblizsze
+        /// otwarte miasto (nieumarli monety nie biora). Oczyszczona = zwyciezca to nie banda i w kryjowce nie zostala zadna banda z ludzmi (gra niszczy
+        /// pokonane bandy dopiero po tym zdarzeniu - pusta banda sie nie liczy). Odbiorca wybrany PRZED zdjeciem zlota: bez odbiorcy kasa zostaje w kryjowce.
+        /// Kasy czekajacej na przeszukanie przez gracza nie rusza. Wylacznik HideoutHoardToAiVictor (off = jak dotad: kasa zostaje i kapie do miasta).
+        /// </summary>
+        private static void AiCleared(MapEvent ev)
+        {
+            try
+            {
+                var sett = ev != null ? ev.MapEventSettlement : null;
+                if (sett == null || !sett.IsHideout) return;
+                PartyBase lead = null;
+                MobileParty lmp = null;
+                bool won = false;
+                if (ev.HasWinner)
+                {
+                    lead = ev.GetLeaderParty(ev.WinningSide);
+                    lmp = lead != null && lead.IsMobile ? lead.MobileParty : null;
+                    if (lmp != null && lmp.IsMainParty) return;          // straz: bitwa gracza (np. "wyslij wojsko") nigdy nie idzie droga AI - kase bierze przeszukanie
+                    won = lmp != null && !OutlawLaw.IsOutlawParty(lmp);
+                }
+                bool cleared = won;
+                if (cleared && sett.Parties != null)
+                    foreach (var p in sett.Parties)
+                        if (p != null && p.IsActive && OutlawLaw.IsOutlawParty(p) && p.MemberRoster != null && p.MemberRoster.TotalManCount > 0) { cleared = false; break; }
+                OutlawLaw.NoteAiHideBattle(cleared);
+                var c = Settings.Current;
+                if (!cleared || c == null || !c.HideoutHoardToAiVictor || Holds(sett)) return;
+                // odbiorca przed zdjeciem zlota
+                Hero hero = lmp.LeaderHero;
+                bool dead = Undead.Party(lmp);
+                int who;
+                Settlement town = null;
+                if (hero != null && hero.IsAlive && hero != Hero.MainHero && !dead) who = OutlawLaw.AiToLord;
+                else if (hero == null && lmp.IsPartyTradeActive && !dead) who = OutlawLaw.AiToParty;
+                else
+                {
+                    // recenzja: jak 3.2 (BeatenPurse.OnPartyDestroyed) - zwyciezca bez kiesy (milicja, patrol) daje kase swojej osadzie, inaczej najblizsze miasto
+                    town = BeatenPurse.SettlementOf(lead) ?? OutlawLaw.NearestTownOf(sett.GetPosition2D);
+                    if (town == null || town.SettlementComponent == null) return;      // nie ma dokad - kasa zostaje w kryjowce (nic nie ginie)
+                    who = OutlawLaw.AiToTown;
+                }
+                string name = sett.Name != null ? sett.Name.ToString() : "Hideout";
+                string by = lmp.Name != null ? lmp.Name.ToString() : "?";
+                int g = OutlawLaw.HoardTakeAll(sett, OutlawLaw.HoardOutAi);
+                string to;
+                if (g <= 0) to = "nic do wziecia";
+                else if (who == OutlawLaw.AiToLord) { hero.ChangeHeroGold(g); to = "wodz " + hero.Name; }
+                else if (who == OutlawLaw.AiToParty) { lmp.PartyTradeGold += g; to = "partia " + by; }
+                else { town.SettlementComponent.ChangeGold(g); MoneyLedger.Note169(MoneyLedger.N169Other, town, g); to = (town.IsTown ? "miasto " : "osada ") + town.Name; }   // kasa osady poza GiveGoldAction (tylko licznik)
+                OutlawLaw.NoteAiTo(who, g);
+                Log.Info("Skarbce kryjowek (nskarbiec): kryjowka " + name + " (" + sett.StringId + ") oczyszczona bez gracza przez " + by
+                         + " - skarbiec " + g + " zl -> " + to + ".");
+            }
+            catch (Exception e) { OutlawLaw.HoardStumble("HideoutPurge.AiCleared", e); }
         }
 
         /// <summary>
@@ -269,6 +332,7 @@ namespace Armoury
                     : "Jedna skala czasu (E7/C): odwet kryjowek co 3 s realne - stara regula (HideoutPursuitHours 0).");
             }
             catch (Exception e) { Log.Error("HideoutPurge.LogClock", e); }
+            try { Log.Info(OutlawLaw.HoardStartLine()); } catch (Exception e) { Log.Error("HideoutPurge.HoardStart", e); }   // nskarbiec: linia startu sesji
         }
 
         /// <summary>Tlo menu: grafika kultury gracza, zapasowo ogolna - zadnych czerwonych TEMP.</summary>
@@ -593,17 +657,32 @@ namespace Armoury
             {
                 var c = Settings.Current;
                 _pending = false;   // lup zebrany - koniec sprawy
+                string hid = _pendingHideout != null ? _pendingHideout.StringId : "-";
                 try
                 {
                     var hs = _pendingHideout;
-                    _pendingGold = hs != null && hs.SettlementComponent != null ? Math.Max(0, hs.SettlementComponent.Gold) : 0;
-                    if (_pendingGold > 0) hs.SettlementComponent.ChangeGold(-_pendingGold);
+                    // nskarbiec: cala kasa kryjowki przez ksiege kas kryjowek (OutlawLaw.HoardTakeAll - kategoria "przeszukanie gracza", kontrola k i r)
+                    _pendingGold = hs != null && hs.SettlementComponent != null ? OutlawLaw.HoardTakeAll(hs, OutlawLaw.HoardOutSearch) : 0;
                 }
                 catch { _pendingGold = 0; }
                 _pendingHideout = null;
-                if (_pendingGold > 0)
+                if (_pendingGold > 0) Hero.MainHero.ChangeHeroGold(_pendingGold);
+                if (c.HideoutGoldMessages)
                 {
-                    Hero.MainHero.ChangeHeroGold(_pendingGold);
+                    // nskarbiec: komunikat zawsze - takze przy pustej kryjowce (dotad gracz nie wiedzial, czy cos bylo); zloty kolor, kopia w pliku
+                    try
+                    {
+                        string t = _pendingGold > 0
+                            ? "The hideout held " + _pendingGold + " denars - the hoard its bands had put by, buried under the bedrolls."
+                            : "The hideout held no coin - its bands had spent or carried off everything they took.";
+                        Log.Player(t);
+                        Log.Info("Skarbce kryjowek (nskarbiec): przeszukanie " + _pendingName + " (" + hid + ") - skarbiec " + _pendingGold + " zl do gracza; komunikat: " + t);
+                        OutlawLaw.NoteSearchMsg();
+                    }
+                    catch (Exception e) { OutlawLaw.HoardStumble("HideoutPurge.DoSearch(komunikat)", e); }
+                }
+                else if (_pendingGold > 0)
+                {
                     Log.Player("Buried under the bedrolls you find the plunder of " + _pendingBands
                                + " raiding band" + (_pendingBands > 1 ? "s" : "") + ": " + _pendingGold + " gold.", true);
                 }

@@ -788,6 +788,22 @@ namespace Armoury
         [SettingPropertyGroup("The hideout purge")]
         public float HideoutPursuitHours { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Hideout Daily Stash", HintText = "every day a band with a home hideout carries part of its purse back to the den's hoard - outlaws keep their coin at home, so a band beaten in the field carries only its pocket money and a cleared, searched den pays (off = coin is put by only on the rare visits home, as before)")]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutDailyStash { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Hideout Daily Stash Share", 0.00f, 1.00f, "0.00", HintText = "with Hideout Daily Stash: share of its purse, after the day's living, a band carries home each day")]
+        [SettingPropertyGroup("The hideout purge")]
+        public float HideoutDailyStashShare { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Hideout Hoard To Ai Victor", HintText = "a hideout cleared without you: its hoard goes to the victor - the lord's purse, else the party's purse, else the nearest town (off = it stays in the empty den and leaks to the nearest town, as before)")]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutHoardToAiVictor { get; set; } = true;
+
+        [SettingPropertyBool("Hideout Gold Messages", HintText = "after a hideout fight you are told what coin the bands carried, after the search what the den held - also when there was nothing (off = only the old message when gold is found)")]
+        [SettingPropertyGroup("The hideout purge")]
+        public bool HideoutGoldMessages { get; set; } = true;
+
         [SettingPropertyBool("Loot Arrives Worn", HintText = "gear stripped from the fallen comes to you already used")]
         [SettingPropertyGroup("Loot from the field")]
         public bool LootArrivesWorn { get; set; } = true;
@@ -6428,6 +6444,10 @@ namespace Armoury
             s.HideoutReprisalFleeOdds = HideoutReprisalFleeOdds;
             s.HideoutReprisalHours = HideoutReprisalHours;
             s.HideoutPursuitHours = HideoutPursuitHours;
+            s.HideoutDailyStash = HideoutDailyStash;
+            s.HideoutDailyStashShare = HideoutDailyStashShare;
+            s.HideoutHoardToAiVictor = HideoutHoardToAiVictor;
+            s.HideoutGoldMessages = HideoutGoldMessages;
             s.LootArrivesWorn = LootArrivesWorn;
             s.LootWearBase = LootWearBase;
             s.LootWearSpread = LootWearSpread;

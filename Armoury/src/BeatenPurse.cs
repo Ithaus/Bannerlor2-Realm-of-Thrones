@@ -130,6 +130,7 @@ namespace Armoury
             _joined.Clear(); _joinGold = 0; _joinN = 0;
             _lpWin = _lpTown = 0; _lpWinN = _lpTownN = 0;
             _verdictParty = null; _verdictBeaten = false;
+            _carryEv = null;                                // nskarbiec: komunikat po bitwie w kryjowce - pamiec bitwy tylko do konca doby
         }
 
         // 3.1 (poprawka po recenzji 3.1+3.3, W13 - jedna regula kiesa/sakiewka): werdykt "pokonana w tej bitwie przez przywodce zwyciezcow" dla partii
@@ -238,7 +239,7 @@ namespace Armoury
                     total += d.GoldLost;
                     if (PurseLoser(d.Party) >= 0) purse += d.GoldLost;
                 }
-                if (purse <= 0 || total <= 0) return;           // bez kies objetych regula - wszystko jak w grze
+                if (purse <= 0 || total <= 0) { HideoutCarry(__instance, 0); return; }   // bez kies objetych regula - wszystko jak w grze (nskarbiec: komunikat "no coin")
                 _battles++;
                 double pf = (double)purse / total;              // czesc puli z kies (reszta - 5% zlota pokonanych wodzow, regula gry)
 
@@ -275,7 +276,7 @@ namespace Armoury
                 double fd = Math.Min(1.0, (double)ok / total);   // czesc puli wyplacona zwyciezcom
 
                 // pokonani z kiesa: placa tylko te czesc, ktora gra wyplaci (w gore - zwyciezcy dostaja nie wiecej, niz pokonani daja)
-                long paidAll = 0;
+                long paidAll = 0, paidBand = 0;
                 foreach (var d in __1)
                 {
                     if (d == null || d.GoldLost <= 0) continue;
@@ -287,13 +288,16 @@ namespace Armoury
                     _paid[t] += pay; if (pay > 0) _paidN[t]++;
                     _kept[t] += lost - pay;
                     paidAll += pay;
+                    if (t == TBand) paidBand += pay;            // nskarbiec: czesc z kies band (komunikat po bitwie gracza w kryjowce)
                 }
-                if (paidAll <= 0 || ok <= 0) return;
+                if (paidAll <= 0 || ok <= 0) { HideoutCarry(__instance, 0); return; }
 
                 // rozbicie zaplaconego wedlug zwyciezcow (pula wspolna z lupem z wodzow - wedlug udzialow) i 1/9 korony od wodzow-wasali
                 double q = (double)paidAll / ok;               // czesc kazdego udzialu, ktora pochodzi z kies (= pf przy fd < 1)
                 _toLords += (long)Math.Round(okLords * q); _toPlayer += (long)Math.Round(okPlayer * q); _toBands += (long)Math.Round(okBands * q);
                 _toParties += (long)Math.Round((ok - okLords - okBands) * q);
+                // nskarbiec: kiesy band, ktore gra wyplaci graczowi (udzial gracza x czesc z kies x czesc band w kiesach) - tylko komunikat, bez zmiany kwot
+                HideoutCarry(__instance, (long)Math.Round((double)okPlayer * q * paidBand / paidAll));
                 foreach (var w in __0)
                 {
                     if (w == null || w.PlunderedGold <= 0) continue;
@@ -314,6 +318,37 @@ namespace Armoury
             var mp = p.MobileParty;
             if (mp != null && Undead.Party(mp)) return false;
             return p.LeaderHero != null || (mp != null && mp.IsPartyTradeActive);
+        }
+
+        // ------------------------------------------------------------ nskarbiec: komunikat po bitwie gracza w kryjowce
+        private static MapEvent _carryEv;      // bitwa, o ktorej komunikat juz poszedl (podzial bywa liczony drugi raz przy zmianie wyniku) - czyszczone w ClearDay
+
+        /// <summary>
+        /// nskarbiec (noc 15/16.10): po WYGRANEJ bitwie gracza w kryjowce gracz slyszy, ile monety niosly przy sobie bandy (czesc z kies band, ktora
+        /// gra mu wyplaci w podziale lupu) - takze gdy nic ("purses were empty"). Kwota stad, bo tu jest znana (CalculatePlunderedAndLostGoldAmounts przy wygranej,
+        /// MapEvent.OnBattleWon) i nie zalezy od kolejnosci wobec OnHideoutBattleCompleted. Tylko komunikat i licznik - kwot nie zmienia. Wylacznik
+        /// HideoutGoldMessages; przy wylaczonym 3.2 (BeatenPurseToVictor) komunikatu nie ma (SplitPostfix wychodzi wczesniej).
+        /// </summary>
+        private static void HideoutCarry(MapEvent ev, long g)
+        {
+            try
+            {
+                if (ev == null || !ev.IsPlayerMapEvent || !ev.IsHideoutBattle || ReferenceEquals(ev, _carryEv)) return;
+                if (ev.WinningSide == BattleSideEnum.None || ev.WinningSide != ev.PlayerSide) return;
+                var s = Settings.Current;
+                if (s == null || !s.HideoutGoldMessages) return;
+                _carryEv = ev;
+                if (g < 0) g = 0;
+                // recenzja: gra i tak pokazuje "You plundered X" (MapEventParty.CommitGoldChanges) - z dzialka zlota herszta z bohaterem (5% zlota wodza);
+                // nasz napis mowi tylko o czesci z kies band, wiec tekst wprost "z tego" - bez pozoru sprzecznosci liczb
+                string t = g > 0 ? g + " denars of your plunder came from the outlaws' own purses." : "The outlaws' purses were empty.";
+                Log.Player(t);
+                var st = ev.MapEventSettlement;
+                Log.Info("Skarbce kryjowek (nskarbiec): bitwa gracza w kryjowce " + (st != null && st.Name != null ? st.Name.ToString() : "?") + " (" + (st != null ? st.StringId : "-")
+                         + ") - kiesy band do gracza " + g + " zl; komunikat: " + t);
+                OutlawLaw.NoteCarry(g);
+            }
+            catch (Exception e) { OutlawLaw.HoardStumble("BeatenPurse.HideoutCarry", e); }
         }
 
         // ------------------------------------------------------------ 6. D11-2: banda przylacza sie do gracza
@@ -408,8 +443,9 @@ namespace Armoury
             catch (Exception e) { Stumble("BeatenPurse.OnPartyDestroyed", e); }
         }
 
-        /// <summary>Osada zwyciezcy, ktory nie nosi kiesy: osada-niszczyciel albo osada milicji, zalogi lub patrolu (miasto, zamek, wies).</summary>
-        private static Settlement SettlementOf(PartyBase destroyer)
+        /// <summary>Osada zwyciezcy, ktory nie nosi kiesy: osada-niszczyciel albo osada milicji, zalogi lub patrolu (miasto, zamek, wies).
+        /// nskarbiec (recenzja): ta sama regula dla kasy kryjowki oczyszczonej bez gracza (HideoutPurge.AiCleared) - stad internal.</summary>
+        internal static Settlement SettlementOf(PartyBase destroyer)
         {
             Settlement st = null;
             if (destroyer == null) return null;
