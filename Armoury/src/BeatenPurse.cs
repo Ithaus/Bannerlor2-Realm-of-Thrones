@@ -325,7 +325,7 @@ namespace Armoury
 
         /// <summary>
         /// nskarbiec (noc 15/16.10): po WYGRANEJ bitwie gracza w kryjowce gracz slyszy, ile monety niosly przy sobie bandy (czesc z kies band, ktora
-        /// gra mu wyplaci w podziale lupu) - takze gdy nic ("no coin"). Kwota stad, bo tu jest znana (CalculatePlunderedAndLostGoldAmounts przy wygranej,
+        /// gra mu wyplaci w podziale lupu) - takze gdy nic ("purses were empty"). Kwota stad, bo tu jest znana (CalculatePlunderedAndLostGoldAmounts przy wygranej,
         /// MapEvent.OnBattleWon) i nie zalezy od kolejnosci wobec OnHideoutBattleCompleted. Tylko komunikat i licznik - kwot nie zmienia. Wylacznik
         /// HideoutGoldMessages; przy wylaczonym 3.2 (BeatenPurseToVictor) komunikatu nie ma (SplitPostfix wychodzi wczesniej).
         /// </summary>
@@ -339,7 +339,9 @@ namespace Armoury
                 if (s == null || !s.HideoutGoldMessages) return;
                 _carryEv = ev;
                 if (g < 0) g = 0;
-                string t = g > 0 ? "The outlaws carried " + g + " denars on them." : "The outlaws carried no coin on them.";
+                // recenzja: gra i tak pokazuje "You plundered X" (MapEventParty.CommitGoldChanges) - z dzialka zlota herszta z bohaterem (5% zlota wodza);
+                // nasz napis mowi tylko o czesci z kies band, wiec tekst wprost "z tego" - bez pozoru sprzecznosci liczb
+                string t = g > 0 ? g + " denars of your plunder came from the outlaws' own purses." : "The outlaws' purses were empty.";
                 Log.Player(t);
                 var st = ev.MapEventSettlement;
                 Log.Info("Skarbce kryjowek (nskarbiec): bitwa gracza w kryjowce " + (st != null && st.Name != null ? st.Name.ToString() : "?") + " (" + (st != null ? st.StringId : "-")
@@ -441,8 +443,9 @@ namespace Armoury
             catch (Exception e) { Stumble("BeatenPurse.OnPartyDestroyed", e); }
         }
 
-        /// <summary>Osada zwyciezcy, ktory nie nosi kiesy: osada-niszczyciel albo osada milicji, zalogi lub patrolu (miasto, zamek, wies).</summary>
-        private static Settlement SettlementOf(PartyBase destroyer)
+        /// <summary>Osada zwyciezcy, ktory nie nosi kiesy: osada-niszczyciel albo osada milicji, zalogi lub patrolu (miasto, zamek, wies).
+        /// nskarbiec (recenzja): ta sama regula dla kasy kryjowki oczyszczonej bez gracza (HideoutPurge.AiCleared) - stad internal.</summary>
+        internal static Settlement SettlementOf(PartyBase destroyer)
         {
             Settlement st = null;
             if (destroyer == null) return null;

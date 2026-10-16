@@ -138,7 +138,8 @@ namespace Armoury
 
         /// <summary>
         /// nskarbiec (noc 15/16.10): kryjowka oczyszczona BEZ gracza - jedna regula z przeszukaniem gracza: kase kryjowki bierze ten, kto ja oczyscil,
-        /// bez 1/9 korony. Odbiorca jak w 3.2 (BeatenPurse): zywy wodz zwyciezcow (do jego kiesy), inaczej ich partia z kiesa handlowa, inaczej najblizsze
+        /// bez 1/9 korony. Odbiorca jak w 3.2 (BeatenPurse): zywy wodz zwyciezcow (do jego kiesy), inaczej ich partia z kiesa handlowa (takze zaloga - gra daje
+        /// jej kiese, GarrisonPartyComponent), inaczej kasa ich osady - milicja, patrol (BeatenPurse.SettlementOf: miasto, zamek, wies), inaczej najblizsze
         /// otwarte miasto (nieumarli monety nie biora). Oczyszczona = zwyciezca to nie banda i w kryjowce nie zostala zadna banda z ludzmi (gra niszczy
         /// pokonane bandy dopiero po tym zdarzeniu - pusta banda sie nie liczy). Odbiorca wybrany PRZED zdjeciem zlota: bez odbiorcy kasa zostaje w kryjowce.
         /// Kasy czekajacej na przeszukanie przez gracza nie rusza. Wylacznik HideoutHoardToAiVictor (off = jak dotad: kasa zostaje i kapie do miasta).
@@ -175,8 +176,9 @@ namespace Armoury
                 else if (hero == null && lmp.IsPartyTradeActive && !dead) who = OutlawLaw.AiToParty;
                 else
                 {
-                    town = OutlawLaw.NearestTownOf(sett.GetPosition2D);
-                    if (town == null || town.Town == null) return;      // nie ma dokad - kasa zostaje w kryjowce (nic nie ginie)
+                    // recenzja: jak 3.2 (BeatenPurse.OnPartyDestroyed) - zwyciezca bez kiesy (milicja, patrol) daje kase swojej osadzie, inaczej najblizsze miasto
+                    town = BeatenPurse.SettlementOf(lead) ?? OutlawLaw.NearestTownOf(sett.GetPosition2D);
+                    if (town == null || town.SettlementComponent == null) return;      // nie ma dokad - kasa zostaje w kryjowce (nic nie ginie)
                     who = OutlawLaw.AiToTown;
                 }
                 string name = sett.Name != null ? sett.Name.ToString() : "Hideout";
@@ -186,7 +188,7 @@ namespace Armoury
                 if (g <= 0) to = "nic do wziecia";
                 else if (who == OutlawLaw.AiToLord) { hero.ChangeHeroGold(g); to = "wodz " + hero.Name; }
                 else if (who == OutlawLaw.AiToParty) { lmp.PartyTradeGold += g; to = "partia " + by; }
-                else { town.Town.ChangeGold(g); MoneyLedger.Note169(MoneyLedger.N169Other, town, g); to = "miasto " + town.Name; }   // kasa miasta poza GiveGoldAction (tylko licznik)
+                else { town.SettlementComponent.ChangeGold(g); MoneyLedger.Note169(MoneyLedger.N169Other, town, g); to = (town.IsTown ? "miasto " : "osada ") + town.Name; }   // kasa osady poza GiveGoldAction (tylko licznik)
                 OutlawLaw.NoteAiTo(who, g);
                 Log.Info("Skarbce kryjowek (nskarbiec): kryjowka " + name + " (" + sett.StringId + ") oczyszczona bez gracza przez " + by
                          + " - skarbiec " + g + " zl -> " + to + ".");
@@ -671,7 +673,7 @@ namespace Armoury
                     try
                     {
                         string t = _pendingGold > 0
-                            ? "The hideout held " + _pendingGold + " denars - the hoard of " + _pendingBands + " raiding band" + (_pendingBands > 1 ? "s" : "") + ", buried under the bedrolls."
+                            ? "The hideout held " + _pendingGold + " denars - the hoard its bands had put by, buried under the bedrolls."
                             : "The hideout held no coin - its bands had spent or carried off everything they took.";
                         Log.Player(t);
                         Log.Info("Skarbce kryjowek (nskarbiec): przeszukanie " + _pendingName + " (" + hid + ") - skarbiec " + _pendingGold + " zl do gracza; komunikat: " + t);

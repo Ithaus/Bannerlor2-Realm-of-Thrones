@@ -880,6 +880,7 @@ namespace Armoury
             CampaignEvents.AfterSettlementEntered.AddNonSerializedListener(this, MoneyLedger.OnAfterEntered);          // ... i PO
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, AlleyProbe.OnGold);                 // m6b (6): kasy zaulkow - przelewy gry z udzialem kasy miasta (tylko licznik)
             CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, MoneyLedger.OnGoldTraded);             // kazdy GiveGoldAction gry
+            CampaignEvents.HeroOrPartyTradedGold.AddNonSerializedListener(this, OutlawLaw.OnGoldTraded);               // nskarbiec: przelewy gry z kasa kryjowki (okup gracza, RC) - kategoria linii kas kryjowek (tylko licznik)
             CampaignEvents.OnCaravanTransactionCompletedEvent.AddNonSerializedListener(this, TownFolk.OnCaravanTrade);   // P1 (obieg kiesy ludu): dostawy karawan do miast - marza kupcow na towarze z karawan (tylko log)
             // paczka 169: nasluch kies partii, ktore znikaja z mapy (CirculationWindows.OnPartyDestroyed) - B-1: przeniesiony na poczatek RegisterEvents
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, CirculationWindows.OnKingdomDestroyed); // paczka 169: skarbce krolestw, ktore upadly (tylko log)
