@@ -29357,7 +29357,7 @@ def nekon_main(logp):
         # noc 16.10: linia NE pisana PRZED SmithWood.SessionStart (stan "nie wpiete" zawsze) - stan latki z linii "Drewno w kuzni (kg): start sesji"
         if not scr:
             try:
-                for _ln in io.open(logp, encoding="utf-8", errors="replace"):
+                for _ln in open(logp, encoding="utf-8", errors="replace"):
                     if "Drewno w kuzni (kg): start sesji" in _ln and "ekran kucia wpiete" in _ln: scr = True
             except Exception:
                 pass
