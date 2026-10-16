@@ -2405,3 +2405,16 @@ krolestwo w wojnie z graczem czeka do pokoju. D3: wyrownanie Seagard 1522 (1300 
 sprzed zmiany (bez klucza arm_tp_debts), bohater Ithauser, ROT_town33, doba >= 109020; flaga 4 stany. Klucze TourneyPayerChain / TourneyDebts / TourneySeagardCatchUp.
 Test (Armoury-2026-10-16_11-22-18.log): 8 dob + 2 bitwy (1007 ciosow), 0 ERROR, nturniej 7 progow 0 NIE, nbitwa 15 progow 0 NIE; D3 na zapisie F "nie dotyczy - Regenard".
 DO SPRAWDZENIA U JEFFA (pierwsze wczytanie): linia "Turniej-platnik (TP): ... wyrownanie Seagard 16.10: zrobione teraz", komunikat o 1522, splaty w kolejnych dobach.
+
+### 55. WGRANIE 70 (16.10 ok. 12:25 zegara komp.) - wioski: -20%, rozne wielkosci, herb gospodarza - START TUTAJ
+W grze: `w-toku/zbior-e8` **8ed95be5** (= `w-toku/noc-wgranie-70`) | Armoury d5596357 + dane: arm_map_villages.tsv (v5, crc ukladu 68BB06AD), arm_map_village_lore.tsv (v5),
+arm_map_villages_v4.tsv i arm_map_village_lore_v4.tsv (stare v4 = poprzednie pliki 1:1). Kopie *.bak-2026-10-16-wgranie70-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie70-przed.
+WGRYWANIE: od teraz skrypt test/wgraj-v5.ps1 (= tools/wgranie/wgraj.ps1 z d5c37b2f, przenosi pliki wiosek) i test/bieg-bitwa.ps1 (dopisane arm_map_villages + _v4).
+= 69 + noc-wioski (41ead72f + 32f79c25 po 2 recenzjach): 2446 -> 1957 wiosek (najblizszy sasiad min 4.49 -> 6.13, mediana 6.41 -> 8.36), osady 6-36 (1500-9000 ludzi,
+mediana 5250; najczestsza wartosc 8% zamiast 81%), herb gospodarza VillageHolders.cs (majatek BK -> rycerz lore -> rycerz krolestwa z majatku obok -> rod krolestwa -> pan; tytul BK
+dla wsi gry), stary zapis v4 -> v5 po uid (VillageBook.OldLayout, osady usunietych do najblizszych), linia wygladu liczy cala ksiege (D4: spalone byly daleko od kamery, nie blad).
+Klucze VillageBannerPerHolder, VillageLayoutV5 (false = v4). Test (Armoury-2026-10-16_12-07-06.log, zapis F v4): 0 ERROR, G2b TAK (68BB06AD), lore 1957/1957, herby 422 rozne
+(bylo 167), etap7 74 progi 0 NIE, etap4 5 NIE jak w bazie 11:22 (ciche logi). Zdjecia: CrashScribe/zdjecia/at-20261016-121556 (Stoney Sept, Rosby, Seagard).
+Narzedzie testu: autotest-bitwa.ps1 - 0 wygranych i arena zajeta turniejem = UWAGA, nie kod 4.
+UWAGA (do obserwacji): bitwy testowe "mocna" druzyna (2x wrog, czempioni) przegrywa z bandytami (panika 53-58) - porownac z kluczami bitwy wylaczonymi.
+DALEJ: W2 herby kanon GoT + dwie flagi (rycerz + senior) + przysiolki na pustkowiach; W3 zajazdy/plotki; w toku: kaluze krwi, karczmy w miescie.
