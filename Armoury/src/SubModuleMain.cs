@@ -385,6 +385,11 @@ namespace Armoury
                     mission.AddMissionBehavior(new GuardMaster());
                 if (Settings.Current.WoundedFleeEnabled && mission != null)
                     mission.AddMissionBehavior(new BrokenMen());
+                // NB2 (16.10): zlamani raz na bitwe (BrokenMen + FieldCraft przez RoutHold.Break) i linia "Bitwa (NB2)" z postura wedlug tieru
+                if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
+                        || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
+                        || Settings.Current.SoldierPostureByTier))
+                    mission.AddMissionBehavior(new RoutKeeper());
                 if (Settings.Current.CampBattlePropsEnabled && Campaign.Current != null && mission != null
                     && NightRest.PlayerCamped)
                     mission.AddMissionBehavior(new CampScene());

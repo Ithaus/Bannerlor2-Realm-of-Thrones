@@ -105,6 +105,11 @@ namespace Armoury
 
                         var ai = a.CommonAIComponent;
                         if (ai == null) continue;
+                        // NB2 (16.10, klucz BrokenMenNeverRally): jedna regula z FieldCraft - RoutHold.Break: raz Panic na czlowieka na bitwe,
+                        // morale zlamanego przypiete na 0 (RBM go nie zatrzyma), ponowienia odwrotu bez okrzyku w RoutKeeper. Takze ten, kto juz
+                        // ucieka panika gry - zeby RBM nie zawrocil go do walki; odwrot z rozkazu szyku odrzuca sam Break. Ponowne wywolania
+                        // dla zlamanego koncza sie na slowniku (raz na bitwe), wiec stare odstepy 3/6/9/20 s nie sa potrzebne.
+                        if (RoutHold.On(mission)) { RoutHold.Break(a, MissionTeams.Broken); continue; }
                         // JUZ UCIEKA - jakakolwiek droga (nasz odwrot, vanillowa
                         // panika morale, masowa ucieczka po zlamaniu armii). Stary
                         // warunek patrzyl tylko na IsRetreating, wiec przy ROZBICIU

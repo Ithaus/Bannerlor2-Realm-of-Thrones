@@ -1132,6 +1132,18 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float BattleWindedFloor { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Soldier Posture By Tier", HintText = "rank-and-file posture (the green bar under an enemy's name in RBM) grows with troop tier: recruits lose their guard easily, veterans hold it - tier 1 x0.85 up to tier 6 x1.7, the tiers between scale smoothly and the bar refills faster with the square root of it. Heroes keep their Endurance rule. Off = plain RBM posture for soldiers, as before")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool SoldierPostureByTier { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Soldier Posture Tier1 Multiplier", 0.50f, 1.50f, "0.00", HintText = "posture pool of tier 1 soldiers as a share of plain RBM (0.85 = 15% less)")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float SoldierPostureTier1Multiplier { get; set; } = 0.85f;
+
+        [SettingPropertyFloatingInteger("Soldier Posture Tier6 Multiplier", 1.00f, 3.00f, "0.00", HintText = "posture pool of tier 6 soldiers as a share of plain RBM (1.7 = 70% more); the tiers between follow a smooth curve and tier 7 goes one step further")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public float SoldierPostureTier6Multiplier { get; set; } = 1.7f;
+
         [SettingPropertyFloatingInteger("Stamina Regen Per Second", 0.00f, 100.00f, "0.00", HintText = "without RBM: points regained each second of easing off (with RBM its own regen rules)")]
         [SettingPropertyGroup("Flesh and wind")]
         public float StaminaRegenPerSecond { get; set; } = 25f;
@@ -1243,6 +1255,14 @@ namespace Armoury
         [SettingPropertyBool("Wounded Flee Battles Only", HintText = "the wounded break and run (Wounded Flee and AI Flee When Near Death) only in real battles on the map - tournament, arena and brawl fighters fight on to the knock-out, as the game itself intends")]
         [SettingPropertyGroup("The master's parry")]
         public bool WoundedFleeBattlesOnly { get; set; } = true;
+
+        [SettingPropertyBool("Broken Men Never Rally", HintText = "a wounded man who breaks (Wounded Flee or AI Flee When Near Death) panics once per battle and runs for good: one scream and one fright, no turning back to brawl with bare fists - RBM no longer talks him back into the fight, and if his flight stalls he is sent off again quietly, at most every 4 seconds. Off = as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool BrokenMenNeverRally { get; set; } = true;
+
+        [SettingPropertyBool("Flee Away From Enemies", HintText = "with Broken Men Never Rally on: in a field battle a broken man runs where the enemy is not - away from the foes around him, horsemen and you counting double; when the enemy is all around, he runs where there are fewest of them, to the edge of the field by a path he can really walk. The game's own way out stays when it is safe. Sieges, sorties, sea battles and hideouts keep the game's way. Off = the game's way, as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool FleeAwayFromEnemies { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Auto Parry Full Diff", 0.00f, 100.00f, "0.00", HintText = "your lead IS your chance: each point of skill lead gives (100 / this) % odds per swing, certain at this many points (25 = 4% a point: 13 pts -> 52%, 1 pt -> 4%)")]
         [SettingPropertyGroup("The master's parry")]
@@ -6822,6 +6842,9 @@ namespace Armoury
             s.BattleRegenAtEnd1 = BattleRegenAtEnd1;
             s.BattleRegenAtEnd10 = BattleRegenAtEnd10;
             s.BattleWindedFloor = BattleWindedFloor;
+            s.SoldierPostureByTier = SoldierPostureByTier;
+            s.SoldierPostureTier1Multiplier = SoldierPostureTier1Multiplier;
+            s.SoldierPostureTier6Multiplier = SoldierPostureTier6Multiplier;
             s.StaminaRegenPerSecond = StaminaRegenPerSecond;
             s.TiredSpeedFactor = TiredSpeedFactor;
             s.WoundedPenaltiesEnabled = WoundedPenaltiesEnabled;
@@ -6850,6 +6873,8 @@ namespace Armoury
             s.WoundedFleeEnemiesOnly = WoundedFleeEnemiesOnly;
             s.WoundedFleeWithoutPlayer = WoundedFleeWithoutPlayer;
             s.WoundedFleeBattlesOnly = WoundedFleeBattlesOnly;
+            s.BrokenMenNeverRally = BrokenMenNeverRally;
+            s.FleeAwayFromEnemies = FleeAwayFromEnemies;
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;

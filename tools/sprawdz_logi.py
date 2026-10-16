@@ -866,6 +866,12 @@ Uzycie (Python 3, tylko odczyt):
                     doby (takze sumy zlecen jednego zleceniodawcy), NZE-5 po przegladzie doby bez pokrycia tylko spod otwartej kuzni, NZE-6/7 odrzucone,
                     usuniete (w tym przez sume), wiszace, kiesy, zleceniodawcy z kilkoma zleceniami, zlecenia zadan bez pokrycia (INFO), NZE-8 niedoplata <= 1 na 10
                     (oddanych < 5 - INFO), NZE-9 potkniecia i ERROR in CraftOrdersPurse.* 0, NZE-10 koszt (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa nbitwa    : (16.10, Jeff 'krzyk paniki zapetlony, ranni ida w moja strone, bija piescia' i 'wysoki tier traci zielony pasek'; galaz
+                    w-toku/noc-bitwa, Armoury/src/RoutHold.cs, BattleWind.cs) python -I tools/sprawdz_logi.py --grupa nbitwa <Armoury-*.log> (strumieniowo).
+                    Progi: NBW-0 linia 'Bitwa (NB2): start sesji' (Broken Men Never Rally, Flee Away From Enemies, postura wg tieru, latka postury RBM
+                    - TAK), NBW-0b linia wpiecia latki postury przy starcie gry, NBW-1 ERROR in RoutHold / RoutKeeper / BattleWind.PostureInit 0. Reszta
+                    INFO (autotest nie gra bitew): NBW-2 linie misji, NBW-3 raz Panic na czlowieka, NBW-4 morale i ponowienia, NBW-5 cel ucieczki, NBW-6
+                    postura wedlug tieru (probki T1 / T6), NBW-7 potkniecia, NBW-8 linia NM w bitwach (wywolan = ludzi).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -31648,6 +31654,166 @@ def nekon3_main(logp, bdp=None):
     return 0
 
 
+# ------------------------------------------------------------ nbitwa (16.10, bitwa czesc 1; Armoury/src/RoutHold.cs, BattleWind.PostureInitPostfix)
+NBW_HEAD = "Bitwa (NB2): "
+NBW_START = "Bitwa (NB2): start sesji"
+NBW_WIRE = "BattleWind (NB2): postura szeregowych wedlug tieru - latka InitializePosture wpieta"
+NBW_LINE = re.compile(
+    r"Bitwa \(NB2\): misja (\S+) \(pole bitwy (TAK|NIE|\?), Broken Men Never Rally (TAK|NIE)\) "
+    r"\| zlamani (\d+) \(rozbici (\d+), ucieczka (\d+); Panic (\d+), juz w panice (\d+), ponowne paniki gry (\d+); odmowy: po koncu bitwy (\d+), "
+    r"bez druzyny (\d+), odwrot z rozkazu (\d+)\) "
+    r"\| morale przypiete (\d+) razy \(ludzi (\d+)\), zgaszone przez innych (\d+) "
+    r"\| odwrot: ponowienia bez okrzyku (\d+) \(ludzi (\d+)\), zmiany kierunku (\d+), bez handlera paniki (\d+), przejeci przez gracza (\d+) "
+    r"\| kierunek: gry (\d+), sektor (\d+), bez drogi (\d+), limit zapytan (\d+), poza polem (\d+) \(zapytan o droge (\d+)\) "
+    r"\| postura wg tieru (TAK|NIE): szeregowych (\d+) \(T1 (\d+), T2 (\d+), T3 (\d+), T4 (\d+), T5 (\d+), T6 (\d+), T7 (\d+)\), bohaterow (\d+), "
+    r"bez broni pominiete (\d+); probka T1 (\S+), T6 (\S+) "
+    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+) \(sesja (\d+), linia misji (\d+)\)\.$")
+NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
+            "pin", "pin_ludzi", "zgaszone", "ponowienia", "ponowienia_ludzi", "zwroty", "bez_handlera", "gracz",
+            "k_gry", "k_sektor", "k_bez_drogi", "k_limit", "k_poza", "zapytan", "postura", "szeregowych", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
+            "bohaterow", "bez_broni", "probka1", "probka6", "st_panika", "st_kierunek", "st_postura", "st_sesja", "linia")
+NBW_ERR = ("ERROR in RoutHold", "ERROR in RoutKeeper", "ERROR in BattleWind.PostureInit")
+NBW_NEED = ("Broken Men Never Rally TAK", "Flee Away From Enemies TAK", "postura szeregowych wg tieru TAK", "latka postury RBM wpieta TAK")
+
+
+def nbitwa_main(logp):
+    """nbitwa (16.10, bitwa czesc 1; Armoury/src/RoutHold.cs, BattleWind.PostureInitPostfix): (A) zlamany ranny (BrokenMen + FieldCraft) panikuje
+    raz na bitwe, morale przypiete na 0, ponowienia odwrotu bez okrzyku co 4 s, cel ucieczki z 16 sektorow (klucze BrokenMenNeverRally,
+    FleeAwayFromEnemies); (B) postura szeregowych RBM wedlug tieru (SoldierPostureByTier, T1 x0.85 ... T6 x1.7). Wejscie: log Armoury
+    (strumieniowo). Progi twarde: NBW-0 linia startu sesji (4 x TAK), NBW-0b linia wpiecia latki postury przy starcie gry, NBW-1 ERROR in
+    RoutHold / RoutKeeper / BattleWind.PostureInit = 0. Reszta INFO (autotest nie gra bitew): NBW-2 linie misji, NBW-3 raz Panic na czlowieka
+    (ponowne paniki gry 0), NBW-4 morale i ponowienia, NBW-5 kierunek, NBW-6 postura wedlug tieru (probki: mnoznik T1 / T6), NBW-7 potkniecia,
+    NBW-8 linia NM w bitwach (wywolan = roznych ludzi). Log bez paczki: NBW-0 NIE, reszta INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NBW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, wires, rows, bad, notes, nm = [], [], [], [], [], []
+    wind_off = wind_bad = wind_norbm = 0
+    errs = {k: 0 for k in NBW_ERR}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NBW_HEAD):
+                if s.startswith(NBW_START):
+                    starts.append(s)
+                elif s.startswith(NBW_HEAD + "misja "):
+                    mm = NBW_LINE.match(s)
+                    if mm:
+                        r = {}
+                        for k, v in zip(NBW_KEYS, mm.groups()):
+                            r[k] = int(v) if v.isdigit() else v
+                        rows.append(r)
+                    else:
+                        bad.append(s)
+                else:
+                    notes.append(s)
+            elif s.startswith(NBW_WIRE):
+                wires.append(s)
+            elif s.startswith("BattleWind: RBM nieobecny"):
+                wind_norbm += 1
+            elif s.startswith("BattleWind: pola RBMAI.Stance nie pasuja") or s.startswith("BattleWind: metody RBMAI.Stance nie pasuja"):
+                wind_bad += 1
+            elif s.startswith("BattleWind: wylaczone."):
+                wind_off += 1
+            elif s.startswith("Druzyny w misji (NM): misja "):
+                mm = NM_LINE.match(s)
+                if mm:
+                    g = mm.groups()
+                    nm.append(dict(battle=g[1] == "TAK", pushed=(int(g[12]), int(g[13])), calls=(int(g[14]), int(g[15]))))
+            elif s.startswith("ERROR in "):
+                for k in NBW_ERR:
+                    if s.startswith(k):
+                        errs[k] += 1
+                        break
+    print(f"plik: {logp} | linii startu {len(starts)}, wpiecia postury {len(wires)}, linii misji {len(rows) + len(bad)} (rozpoznanych {len(rows)}),"
+          f" innych linii NB2 {len(notes)}, linii NM {len(nm)}")
+    # NBW-0 start sesji
+    st = starts[-1] if starts else ""
+    if st:
+        miss = [k for k in NBW_NEED if k not in st]
+        rep.add("NBW-0: linia startu sesji (Bitwa NB2)", st[len(NBW_HEAD):][:260] + (" | brak: " + "; ".join(miss) if miss else ""),
+                "linia jest, " + ", ".join(NBW_NEED), not miss)
+    else:
+        rep.add("NBW-0: linia startu sesji (Bitwa NB2)", "brak linii", "linia jest (brak = wersja sprzed NB2 albo log bez kampanii)", False)
+    # NBW-0b latka postury przy starcie gry
+    if wires:
+        rep.add("NBW-0b: latka postury RBM (start gry)", wires[-1][:200], "linia wpiecia jest", True)
+    elif wind_norbm:
+        rep.add("NBW-0b: latka postury RBM (start gry)", "RBM nieobecny", "INFO (bez RBM nie ma postury)", None)
+    elif wind_off:
+        rep.add("NBW-0b: latka postury RBM (start gry)", "BattleWind: wylaczone (oba klucze wylaczone przy starcie)", "INFO", None)
+    else:
+        rep.add("NBW-0b: latka postury RBM (start gry)", "pola / metody RBM nie pasuja" if wind_bad else "brak linii", "linia wpiecia jest", False)
+    # NBW-1 bledy
+    n_err = sum(errs.values())
+    rep.add("NBW-1: ERROR zlamanych i postury", ", ".join(f"{k[len('ERROR in '):]} {v}" for k, v in errs.items()), "0", n_err == 0)
+    # NBW-2 linie misji
+    if not rows and not bad:
+        rep.add("NBW-2: linie misji 'Bitwa (NB2)'", "brak linii", "INFO (autotest nie gra bitew - sprawdzenie w grze: bitwa polowa z rannymi)", None)
+        rep.show()
+        return 0
+    kinds = {}
+    for r in rows:
+        kinds[r["bitwa"]] = kinds.get(r["bitwa"], 0) + 1
+    rep.add("NBW-2: linie misji rozpoznane", f"{len(rows)} z {len(rows) + len(bad)} (" + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) + ")"
+            + (f"; nierozpoznana np.: {bad[0][:160]}" if bad else ""), "INFO (wszystkie rozpoznane)", None)
+
+    def tot(k):
+        return sum(r[k] for r in rows if isinstance(r.get(k), int))
+
+    br = tot("zlamani")
+    # NBW-3 raz Panic
+    rep.add("NBW-3: raz Panic na czlowieka na bitwe", f"zlamani {br} (rozbici {tot('rozbici')}, ucieczka {tot('ucieczka')}); Panic {tot('panic')}, juz w panice"
+            f" {tot('juz')}, ponowne paniki gry {tot('repanic')}; odmowy: po koncu {tot('po_koncu')}, bez druzyny {tot('bez_druzyny')},"
+            f" z rozkazu {tot('rozkaz')}", "INFO (Panic + juz w panice = zlamani; ponowne paniki gry 0; log 16.10 03:50: 257 wywolan na 7 ludzi)", None)
+    # NBW-4 morale i ponowienia
+    rp = tot("ponowienia_ludzi")
+    rep.add("NBW-4: morale przypiete i ponowienia bez okrzyku", f"przypiete {tot('pin')} razy (ludzi {tot('pin_ludzi')}), zgaszone przez innych {tot('zgaszone')};"
+            f" ponowienia {tot('ponowienia')} (ludzi {rp}, na glowe {tot('ponowienia') / max(1, rp):.1f}), zmiany kierunku {tot('zwroty')},"
+            f" bez handlera {tot('bez_handlera')}, przejeci przez gracza {tot('gracz')}",
+            "INFO (ponowien najwyzej czas ucieczki / 4 s na glowe; zgaszone = RBM zdazyl przed przypieciem)", None)
+    # NBW-5 kierunek
+    rep.add("NBW-5: cel ucieczki", f"gry {tot('k_gry')}, sektor {tot('k_sektor')}, bez drogi {tot('k_bez_drogi')}, limit zapytan {tot('k_limit')},"
+            f" poza polem {tot('k_poza')}; zapytan o droge {tot('zapytan')}; misji z polem bitwy {sum(1 for r in rows if r['pole'] == 'TAK')}",
+            "INFO (gry + sektor + bez drogi + poza polem = zlamani z odwrotem; limit rzadko)", None)
+    # NBW-6 postura
+    tiers = [tot(f"t{i}") for i in range(1, 8)]
+
+    def ratio(key):
+        for r in rows:
+            v = r.get(key, "-")
+            if isinstance(v, str) and "->" in v:
+                a, b = v.split("->", 1)
+                try:
+                    a, b = float(a), float(b)
+                    if a > 0:
+                        return f"{v} (x{b / a:.2f})"
+                except ValueError:
+                    pass
+        return "-"
+
+    rep.add("NBW-6: postura szeregowych wedlug tieru", f"szeregowych {sum(tiers)} (" + ", ".join(f"T{i + 1} {n}" for i, n in enumerate(tiers))
+            + f"), bohaterow {tot('bohaterow')}, bez broni pominiete {tot('bez_broni')}; probka T1 {ratio('probka1')}, T6 {ratio('probka6')}",
+            "INFO (T1 x0.85, T6 x1.70 przy kluczach domyslnych; pula T1 ok. 115, T6 ok. 344)", None)
+    # NBW-7 potkniecia
+    rep.add("NBW-7: potkniecia w liniach misji", f"panika {tot('st_panika')}, kierunek {tot('st_kierunek')}, postura {tot('st_postura')}"
+            + (f"; linii '3. potkniecie' {len(notes)}" if notes else ""), "INFO (oczekiwane 0)", None)
+    # NBW-8 linia NM w bitwach
+    bat = [r for r in nm if r["battle"]]
+    if bat:
+        push = (sum(r["pushed"][0] for r in bat), sum(r["pushed"][1] for r in bat))
+        calls = (sum(r["calls"][0] for r in bat), sum(r["calls"][1] for r in bat))
+        rep.add("NBW-8: linia NM w bitwach - wywolan na czlowieka", f"rozbici {calls[0]} wywolan / {push[0]} ludzi, ucieczka {calls[1]} / {push[1]}",
+                "INFO (przy Broken Men Never Rally wywolan = roznych ludzi; dotad 342 na 23)", None)
+    else:
+        rep.add("NBW-8: linia NM w bitwach", "brak linii bitwy", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -31825,6 +31991,8 @@ def main(argv):
         return nekon3_main(logp, bdp)   # noc-ekonomia3 (16.10, czesc 1): straznik z kapem, myto, czynsz gruntowy, danina markietanow, karawany tam, gdzie zysk, woz wsi z towarem
     if group == "nzlec" and logp:
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
+    if group == "nbitwa" and logp:
+        return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

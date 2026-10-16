@@ -377,6 +377,12 @@ namespace Armoury
         public float BattleRegenAtEnd1 = 5f;               // stamina regained per second at Endurance 1 (Athletics adds its share on top)
         public float BattleRegenAtEnd10 = 100f;            // stamina regained per second at Endurance 10 - the curve between is exponential, not a straight line
         public float BattleWindedFloor = 0.25f;            // share of regen left with an empty bar - the emptier the lungs the slower they fill
+        // NB2 (16.10, Jeff 'wysoki tier traci zielony pasek po kilku ciosach'): postura szeregowych RBM wedlug tieru w BattleWind.PostureInitPostfix -
+        // pula x mnoznik (T1 x0.85 ... T6 x1.7 geometrycznie, T7 krok dalej), regeneracja x pierwiastek; bohaterowie dalej wedlug Endurance; bez broni
+        // glownej bez ponownego mnozenia. Klucz czytany na zywo; latka InitializePosture wpinana takze bez BattleStaminaEnabled. Linia 'Bitwa (NB2)'
+        public bool SoldierPostureByTier = true;           // rank-and-file posture (the green bar under an enemy's name in RBM) grows with troop tier: recruits lose their guard easily, veterans hold it - tier 1 x0.85 up to tier 6 x1.7, the tiers between scale smoothly and the bar refills faster with the square root of it. Heroes keep their Endurance rule. Off = plain RBM posture for soldiers, as before
+        public float SoldierPostureTier1Multiplier = 0.85f; // posture pool of tier 1 soldiers as a share of plain RBM (0.85 = 15% less)
+        public float SoldierPostureTier6Multiplier = 1.7f;  // posture pool of tier 6 soldiers as a share of plain RBM (1.7 = 70% more); the tiers between follow a smooth curve and tier 7 goes one step further
         public float StaminaRegenPerSecond = 25f;          // without RBM: points regained each second of easing off (with RBM its own regen rules)
         public float TiredSpeedFactor = 0.78f;             // top speed of a man whose pool has run dry
         public bool WoundedPenaltiesEnabled = true;        // hurt men move and swing slower, the worse the wound the worse the arm
@@ -407,6 +413,11 @@ namespace Armoury
         public bool WoundedFleeEnemiesOnly = false;        // only the enemy breaks (off: every man on the field, both sides)
         public bool WoundedFleeWithoutPlayer = true;       // also in battles the player is not personally fighting
         public bool WoundedFleeBattlesOnly = true;         // the wounded break and run (Wounded Flee and AI Flee When Near Death) only in real battles on the map - tournament, arena and brawl fighters fight on to the knock-out, as the game itself intends
+        // NB2 (16.10, Jeff 'krzyk paniki zapetlony, ranni ida w moja strone, rzucaja bron i bija piescia'): RoutHold.cs - jedna regula zlamanego dla
+        // BrokenMen i FieldCraft: raz Panic na czlowieka na bitwe, morale przypiete na 0 (RBM StopRetreating go nie zatrzyma), ponowienie odwrotu
+        // bez okrzyku co 4 s; cel ucieczki z 16 sektorow wedlug wrogow w 50 m (FleeAwayFromEnemies). Wylaczone = stare drogi. Linia 'Bitwa (NB2)'
+        public bool BrokenMenNeverRally = true;            // a wounded man who breaks (Wounded Flee or AI Flee When Near Death) panics once per battle and runs for good: one scream and one fright, no turning back to brawl with bare fists - RBM no longer talks him back into the fight, and if his flight stalls he is sent off again quietly, at most every 4 seconds. Off = as before
+        public bool FleeAwayFromEnemies = true;            // with Broken Men Never Rally on: in a field battle a broken man runs where the enemy is not - away from the foes around him, horsemen and you counting double; when the enemy is all around, he runs where there are fewest of them, to the edge of the field by a path he can really walk. The game's own way out stays when it is safe. Sieges, sorties, sea battles and hideouts keep the game's way. Off = the game's way, as before
         public float AutoParryFullDiff = 25f;              // your lead IS your chance: each point of skill lead gives (100 / this) % odds per swing, certain at this many points (25 = 4% a point: 13 pts -> 52%, 1 pt -> 4%)
         public bool AutoParryTwoHandedOnly = true;         // the master's parry works only with two-handed blades (off = any melee weapon)
         public bool AutoParryMirrorSides = true;           // side swings block mirror-wise (his left = your right) - flip if blocks feel wrong-sided
