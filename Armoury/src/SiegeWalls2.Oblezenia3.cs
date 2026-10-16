@@ -488,7 +488,8 @@ namespace Armoury
             try
             {
                 var m = AccessTools.DeclaredMethod(typeof(BesiegerCamp), "GetAttackTarget",
-                                                   new[] { typeof(ISiegeEventSide), typeof(SiegeEngineType), typeof(int), typeof(SiegeBombardTargets).MakeByRefType(), typeof(int).MakeByRefType() });
+                                                   new[] { typeof(ISiegeEventSide), typeof(SiegeEngineType), typeof(int), typeof(SiegeBombardTargets).MakeByRefType(), typeof(int).MakeByRefType() })
+                        ?? AccessTools.DeclaredMethod(typeof(BesiegerCamp), "GetAttackTarget");   // jedna metoda o tej nazwie (gra 1.4.8) - gdyby sygnatura z out sie nie dopasowala
                 if (m == null) _hookAim = "BRAK (BesiegerCamp.GetAttackTarget)";
                 else
                 {
