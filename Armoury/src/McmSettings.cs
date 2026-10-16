@@ -3604,9 +3604,9 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int CrownReserveGold { get; set; } = 500000;
 
-        [SettingPropertyFloatingInteger("Crown Reserve Release Days", 30.00f, 1440.00f, "0", HintText = "the hoard above the reserve is released over this many days: each day one part in this many of it is added to the day's income (360 = it lasts about two years)")]
+        [SettingPropertyFloatingInteger("Crown Reserve Release Days", 30.00f, 1440.00f, "0", HintText = "the hoard above the reserve is released over this many days: each day one part in this many of it is added to the day's income (450 = about a fifth of the hoard in a hundred days)")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
-        public float CrownReserveReleaseDays { get; set; } = 360f;
+        public float CrownReserveReleaseDays { get; set; } = 450f;
 
         [SettingPropertyFloatingInteger("Crown Refund Own Towns Cut", 0.00f, 1.00f, "0.00", HintText = "with Crown Current Income: the share of what a party's men spent in the towns of their own house that is taken off the wages the crown repays (1 = all of it - the coin came back to the house through its town's dues; 0 = nothing taken off); with the town purse valve on, the cut follows the lord's share of the valve")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
@@ -6492,9 +6492,13 @@ namespace Armoury
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool TownGroundRent { get; set; } = true;
 
-        [SettingPropertyBool("Caravan Sell Where Dear", HintText = "a caravan sells its trade goods where it makes a profit: entering a town it sells, a few pieces at a time and at most half of each stack, every piece whose price there is above what the caravan paid for it plus its share of the caravan's wages for the days on the road. The price counts after the market toll. Goods it carried before the game was loaded are valued at the most the merchants could have paid for them (their worth times the average price level of the realm's towns, or the price in the merchants' own trade log if higher). It sells at a loss only when it has no way out: the goods have lain in its packs for over 30 days, food is going off (over 7 days), it has no coin left for three days of wages, its packs are over their load - and then only as much as brings them under it - or it is being broken up. No caravan buys those goods back in that town for 7 days or until the stall is back where it was before the sale, the town pays only from its purse above the merchants' reserve and at most a twentieth of that in a day, and bulk raw goods, animals and horses keep their own rules (off = Banner Kings sells one or two pieces a visit, as before)")]
+        [SettingPropertyBool("Caravan Sell Where Dear", HintText = "a caravan sells its trade goods where it makes a profit: entering a town it sells, a few pieces at a time and at most half of each stack, every piece whose price there is above what the caravan paid for it plus its share of the caravan's wages for the days on the road. The price counts after the market toll. Goods it carried before the game was loaded are valued at the most the merchants could have paid for them (their worth times the average price level of the realm's towns, or the price in the merchants' own trade log if higher). It sells at a loss only when it has no way out: the goods have lain in its packs for over 30 days, food is going off (over 7 days), it has no coin left for three days of wages, its packs are over their load - and then only as much as brings them under it - or it is being broken up. Unless it is being broken up or has no coin for wages, it sells at a loss only a little at a time: in one town on one day the price level of those goods may fall by at most 30% from where it stood before the first such sale, and no piece goes for less than 0.6 of its worth - the rest waits for the next town. It does not buy back at the same visit what it has just sold, the town pays only from its purse above the merchants' reserve and at most a twentieth of that in a day, and bulk raw goods, animals and horses keep their own rules (off = Banner Kings sells one or two pieces a visit, as before)")]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public bool CaravanSellWhereDear { get; set; } = true;
+
+        [SettingPropertyBool("Caravan Profit To Owner", HintText = "once a day a caravan without a hero at its head hands its owner - the notable, the lord or you - all the coin it holds above what it keeps for trade: 10,000, or a month of its wages if that is more. It works only with the Banner Kings realistic caravan income, which otherwise pays the owner only when the caravan calls at his home; a caravan being broken up or in a battle keeps its purse, and a notable's gold above his usual band still goes to his market town for influence, as before (off = the profit reaches the owner only when the caravan calls at his home, as before)")]
+        [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
+        public bool CaravanProfitToOwner { get; set; } = true;
 
         [SettingPropertyBool("Village Cart Brings Goods", HintText = "what a village could not buy in its own market town - salt, tools, flax and linen, pots, beer - it buys when its cart sells the village's produce in another town or castle: up to seven days of the village's need from that stall, paid from the village purse (off = only the market town, as before)")]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
@@ -8159,6 +8163,7 @@ namespace Armoury
             s.TownMarketTollCaravanRate = TownMarketTollCaravanRate;
             s.TownGroundRent = TownGroundRent;
             s.CaravanSellWhereDear = CaravanSellWhereDear;
+            s.CaravanProfitToOwner = CaravanProfitToOwner;
             s.VillageCartBringsGoods = VillageCartBringsGoods;
             s.VillageClothHalfReserve = VillageClothHalfReserve;
             s.WorkshopPaceByMarket = WorkshopPaceByMarket;

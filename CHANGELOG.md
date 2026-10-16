@@ -33,6 +33,138 @@
 8. Poprawka po recenzji (drugi commit na galezi): pierwsza wersja (5bcf708e) sprawdzala kiese osobno dla kazdego zlecenia (`Gold >= BaseGoldReward`) - notabl z 20 zlota i zleceniami 11 i 15 przechodzil oba, a przy drugim oddaniu Jeff widzialby "could pay only 9 of the agreed 15"; teraz suma na bohatera z zapasem 20% (punkty 2, 2a, 2b).
 
 **Status:** DO SPRAWDZENIA (build Release rc=0, "0 Error(s)" po poprawce po recenzji; nie wgrane; autotest: `python -I tools/sprawdz_logi.py --grupa nzlec <Armoury-*.log>` - zapis z wiszacymi zleceniami (start sesji: usuniete z zapisu > 0 przy biednych notablach) i nowa kampania; dotychczasowe grupy (etap8 K-0..K-K) bez zmian)
+## 2026-10-16 (noc-ekonomia3, POPRAWKI po recenzji strojenia - narzedzie) - NE3-5b LICZY TYLKO SPRZEDAZ NA STRACIE PORCJAMI (Z ZYSKIEM, BEZ WYJSCIA I STARA MIARA - INFO)
+
+**Mod:** narzedzie (kod DLL bez zmian) | **Galaz:** `w-toku/noc-ekonomia3` (na 4b56708c) | **Tor:** S (jedna uwaga powazna recenzji strojenia; drobne - zapisane nizej, nie zrobione) | **Klucze:** bez zmian | **Zmiana ekonomii:** nie | **Zapis:** bez zmian | **Cofanie:** `git revert` tego commita | **Pliki:** `tools/sprawdz_logi.py` (grupa nekon3: NE3-5b i opis grupy), `CHANGELOG.md`
+
+**Dla Jeffa (prosto):**
+- W grze nic sie nie zmienia. Poprawione jest tylko narzedzie, ktore ocenia test. Prog "karawany nie zbijaja ceny towaru w jednym miescie o ponad 40% w ciagu dnia" liczy teraz tylko sprzedaz na stracie. Sprzedaz z zyskiem moze zbic cene mocniej (np. oliwa w Elyrii z 10.00 na 1.33, a karawana dalej miala zysk) - i wedlug Twojej zasady to jest w porzadku.
+
+**Problem [L] (recenzja strojenia, sprawdzone na logu testu 02-08-15):**
+- NE3-5b liczyl najwiekszy dobowy spadek indeksu z kazdej sprzedazy T1, takze z zyskiem.
+- W 72 ze 120 dob (z polem miejsca) najwiekszy spadek konczy sie na indeksie >= 1.0, np. Stoney Sept date_fruit 7.94 -> 1.03, Elyria oil 10.00 -> 1.33, Vaes Dothrak olives 7.37 -> 1.01. Tak konczy sie sprzedaz zatrzymana przez prog zysku albo limit polowy stosu lub kasy miasta, a nie przez gabke 0.4 (indeks ok. 0.43).
+- W miastach z indeksem 6-10 sama sprzedaz z zyskiem zbija ponad 40%. Po S1 prog prawie na pewno dalby NIE, a kolejne strojenie zaczeloby ograniczac sprzedaz z zyskiem wbrew zasadzie Jeffa.
+
+**Przyczyna [K]:** `nekon3_main` bral NE3-5b z pola "najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis" (`_dropMax` w `CaravanGoods.Sell` - wszystkie rodzaje sprzedazy). S1 ogranicza tylko rodzaj 1 (na stracie porcjami, powody 3-5).
+
+**Zmiana:**
+- NE3-5b: bramka z pola "spadek indeksu wedlug rodzaju sprzedazy" - tylko "na stracie porcjami" <= 40% w >= 95% dob.
+- W tej samej linii INFO: z zyskiem (max i liczba dob ponad 40%), bez wyjscia (rozwiazanie, brak na zold; max i liczba dob ponad 40%), stara miara (wszystkie rodzaje, z miejscem).
+- Log bez pola rodzaju (sprzed S1): stara miara tylko jako INFO (dotad byla bramka).
+- NE3-5c bez zmian (porcje <= 30.5% kazdej doby - ostrzejsza bramka tego samego rodzaju).
+- Opis grupy nekon3 w naglowku narzedzia.
+- Zastepuje punkt NE3-5b w "Ryzyko" poprzedniego wpisu ("gdy NE3-5b padnie mimo NE3-5c = TAK, winna jest sprzedaz z zyskiem albo bez wyjscia") - teraz te rodzaje sa tylko INFO.
+
+**Kontrola calosci:**
+- Przypisanie rodzaju w kodzie (`CaravanGoods.Sell`): spadek mierzony od indeksu przed pierwsza sprzedaza T1 tej kategorii w tym miescie tej doby (`_idx0`) i przypisany rodzajowi sprzedazy, ktora go zakonczyla. Porcja na stracie sprawdza granice wzgledem tego samego `_idx0`. Gdy sprzedaz z zyskiem juz zbila indeks o 30%, tego dnia nikt tam nie sprzeda na stracie, wiec spadek z zyskiem nie trafia do rodzaju 1.
+- Nazwy: bez nowych nazw globalnych (lokalne `n5`, `ov5`, `xl5`, `ok5`, `old5b` - bez kolizji w `nekon3_main`); ast ok; plik dalej CRLF.
+- DLL: kod bez zmian, build kontrolny.
+
+**Ryzyko / co sprawdzic:**
+- NE3-5b dla porcji praktycznie wynika z NE3-5c (30.5% kazdej doby). Zostaje jako prog zadania S1 (40% w 95% dob) z luzem na blad przewidywania indeksu (`IndexAfter`).
+- "Bez wyjscia" - INFO. W tescie 02-08-15 "brak na zold" sprzedawal w 114 ze 121 dob (3 315 szt.), rozwiazanie 0 szt. Sprzedaje do gabki 0.4 bez porcji (zadanie S1) i bez ograniczenia do brakujacego zoldu. Jesli INFO czesto pokaze > 40%, to decyzja projektowa na pozniej (np. sprzedaz tylko do 3 dni zoldu), a nie bramka.
+- "Z zyskiem" - INFO. Zgodnie z zasada Jeffa jedyna granica sprzedazy z zyskiem jest prog zysku (cena > koszt zakupu + droga) i budzet platnika (BuyFloor, 1/20 nadwyzki kasy miasta). "Polowa stosu na wizyte" to stara regula wizyty (sprzed S1), nie czesc zasady zysku - nie traktowac jej jako ochrony indeksu i nie zaostrzac pod NE3-5b.
+
+**Uwagi drobne recenzji - NIE zrobione w tym commicie (zadanie: tylko krytyczne i powazne; zapis dla nastepnego autora):**
+- S2 oddaje cala nadwyzke od razu. Na starym zapisie pierwsza doba to jednorazowo ok. 2 mln, glownie dla notabli. Gra (`DefaultClanFinanceModel.CalculateOwnerIncomeFromCaravan`) oddaje dziennie 1/`RevenueSmoothenFraction` (ROT i BK: 5) nadwyzki. Skutek pierwszej doby: `BalanceGoldAndPowerOfNotable` daje notablowi +1 wplywu za kazde 500 zl ponad 10 000 (20 tys. = +40 wplywu), kasy miast skacza przez pasmo E5/A3, a limit T1 (1/20 nadwyzki kas) rosnie skokowo na kilka dni. Propozycja: `amt = (g - keep) / Math.Max(1f, cfm.RevenueSmoothenFraction())`.
+- S2 sprawdza tylko `owner.IsAlive`. `CaravanCapital.RoutePurse` ma tez `!CW.OutOfWorld(head)`. Przelew do wlasciciela w stanie Disabled ksiega pokazalaby jako "w nicosc". Propozycja: dodac `CW.OutOfWorld(owner)` do pominiec.
+- `CaravanGoods.LastOwner*` zeruje dopiero `ProfitToOwners`. Przy wyjatku wczesniej w `CaravanGoods.Daily` (EnsureSnap) pozycja w "Obieg: notable i karawany" pokaze kwoty z poprzedniej doby. Propozycja: zerowac na poczatku `Daily` (nie w ZeroDay - MoneyLedger.Daily czyta je pozniej).
+- S2 nie pomija karawan z kontraktem 174 (`MaterialOrders.HasContract`) ani karawan gracza z rozkazem BK (`CaravanBulk.HasOrders`), a T1 je pomija. Codzienne sciecie do kapitalu obrotowego zmniejsza ladunek kontraktu (kupuje z kiesy) i budzet zakupu wybrany przez gracza.
+- Powod 3 (juki ponad udzwig) dostaje porcje -30% i podloge 0.6 x wartosci, choc Jeff wymienia go razem z sytuacjami "bez wyjscia". Przeladowana karawana w tanim miescie moze nie zejsc pod udzwig i jedzie wolniej (nie zatnie sie na stale - BK dalej sprzedaje 1-2 szt.). Propozycja: dla why == 3 tylko `need` z sama gabka 0.4, albo licznik "wstrzymane przy przeladowaniu" i prog INFO.
+- NE3-9b dla kas miast lub notabli i NE3-9 (lordowie 37.57% przy granicy 37.5%) moga dac NIE jako zamierzony skutek S2 (nadwyzka kies karawan idzie do notabli, przez pasmo do kas miast, zaworem do lordow i koron). Czytac razem: NIE na kasach miast przy TAK na sumie "karawany + notable + kasy miast" wobec bazy znaczy, ze zawor kas nie nadaza, a nie ze powstala nowa skrzynia. Pola INFO z ta suma w NE3-9b jeszcze nie ma.
+- Slawa Great Investor: S2 daje ja co dobe za kazda karawane, BK AddRealisticIncome i E3/9 przy kazdej wplacie. Przy wjezdzie do siedziby tego samego dnia rod dostaje ja dwa razy (gra: raz na dobe na karawane). Mala roznica.
+- S3: linia daniny wojennej (`KingdomTreasury.WarAid`) i komentarze (ok. 13 plikow: `CrownIncome`, `KingdomTreasury*`, `CrownBorrow`, `CrownGifts`, `CrownRents`, `TownFolk.*` i inne) dalej pisza "1/360 zapasu", choc wydawane jest 1/450 (linia "Korona: wplywy dnia (165)" pisze poprawnie "1/450"). Propozycja: w napisie `"1/" + (int)CrownReserveReleaseDays + " zapasu"`, a w sprawdz_logi regex `\+ 1/\d+ zapasu (\d+)`.
+
+**Sprawdzone tu:**
+- `sprawdz_logi --grupa nekon3` na tescie 02-08-15 + baza 20-16-31: rc=0, bez wyjatku. NE3-5b - INFO ze stara miara (max 92.7% d109162 Ibben oil 6.13 -> 0.45, ponad 40% w 120 z 121 dob), NE3-5c - INFO.
+- Log syntetyczny (linie T1 testu + pole rodzaju: z zyskiem 65%, bez wyjscia 55% kazdej doby): porcje 45% w 3 dobach -> NE3-5b TAK (97.5% dob), NE3-5c NIE; porcje 45% w 10 dobach -> NE3-5b NIE (91.7%). Z zyskiem i bez wyjscia ponad 40% we wszystkich dobach nie zmieniaja wyniku NE3-5b.
+- Build Release (kontrolny): rc=0, 0 bledow, 1 stare ostrzezenie CS0169 (log `scratchpad/zb/build-ekon3s.log`).
+- Gra NIE uruchomiona, nic nie wgrane.
+
+**Status:** DO SPRAWDZENIA (razem z poprzednim wpisem - autotest 120 dob na zapisie F).
+
+## 2026-10-16 (noc-ekonomia3, STROJENIE PO TESCIE 120 DOB - naprawa ekonomii) - KARAWANY SPRZEDAJA NA STRACIE PORCJAMI (INDEKS NAJWYZEJ -30% W DOBIE, CENA >= 0.6 x WARTOSCI), NADWYZKA KIESY KARAWANY DO WLASCICIELA (E3-T2), ZAPAS KORONY ODDAWANY WOLNIEJ (450 DOB)
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na a19efca6) | **Tor:** M (strojenie po tescie; jeden autor, bez autotestu) | **Klucze:** nowy `CaravanProfitToOwner` (tak); domyslna `CrownReserveReleaseDays` 360 -> 450 (klucza nie ma w `Armoury.json` Jeffa - sprawdzone grep, dziala domyslna); opis MCM `CaravanSellWhereDear` (gen_mcm, 1631 ustawien) | **Zmiana ekonomii:** tak (T1, nowy przelew E3-T2, korona) | **Zapis:** bez zmian (nic nowego w zapisie) | **Cofanie:** `git revert` tego commita; E3-T2 w MCM `Caravan Profit To Owner`; korona - `Crown Reserve Release Days` 360 | **Pliki:** `Armoury/src/CaravanGoods.cs`, `Seal31B.cs` (odczyt przelacznika BK - internal), `MoneyLedger.Obieg.cs` (pozycja E3-T2), `CrownIncome.cs` (opis), `Settings.cs` + `McmSettings.cs`, `tools/sprawdz_logi.py` (grupa nekon3)
+
+**Dla Jeffa (prosto):**
+- **Karawana, ktora musi sprzedac na stracie (towar za dlugo w jukach, jedzenie sie psuje, juki ponad udzwig), sprzedaje po troche.** W jednym miescie w ciagu dnia cena tego towaru moze przez nia spasc najwyzej o 30%, a zadnej sztuki nie odda taniej niz za 0.6 jej wartosci. Reszta jedzie do nastepnego miasta. Dotad potrafila zrzucic caly stos na jeden targ (oliwa w Ibben z 6.13 na 0.45 w jeden dzien).
+- **Sprzedaz z zyskiem bez zmian** - sprzedaje tak dlugo, jak kazda sztuka daje zysk. Teraz liczy sztuka po sztuce: jesli z kroku 5 sztuk zysk daja 3, sprzedaje te 3, a nie wcale.
+- **Rozwiazanie karawany i brak pieniedzy na zold** - jak dotad (wtedy naprawde nie ma wyjscia).
+- **Zysk karawany wraca do wlasciciela codziennie.** Karawana zostawia sobie na handel 10 000 (albo zold na miesiac, jesli wiekszy), a reszte raz dziennie oddaje wlascicielowi - kupcowi, panu albo Tobie. Dotad (Banner Kings) oddawala zysk tylko wtedy, gdy wjechala do domu wlasciciela, wiec pieniadze lezaly w kiesach karawan (5.7 mln zamiast 4.3 mln). Kupiec, ktory ma za duzo zlota, jak dotad zamienia je na wplywy, a zloto idzie do kasy jego miasta.
+- **Korona oddaje swoj zapas wolniej**: codziennie 1/450 zapasu zamiast 1/360. Skarbce krolestw powinny trzymac wiecej. Zwrot zoldu bez zmian.
+- Nic nie zmienia zapisu. Nowa opcja: `Caravan Profit To Owner` (wlaczona).
+
+**Problem [L] (test 120 dob na zapisie F `D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-16_02-08-15.log`, baza WGRANIA 64 `..._20-16-31.log`, `sprawdz_logi --grupa nekon3 --baza-doby`):**
+- (1) T1 na stracie srednio 28 804 zl/d przy zysku 30 118 zl/d. Glownie stary zapas "dlugo w jukach" po wczytaniu (np. d109134: 167 szt. / 21 029 zl) i "jedzenie psuje sie". Zrzut na jeden targ: NE3-5b max 92.7% w dobie (d109162 Ibben oil 6.13 -> 0.45), ponad 40% w 120 z 121 dob. Narzedzia w jukach dalej 80.3% swiata na koniec (od doby 60 max 86.3%).
+- (2) Kiesy karawan 4 337 885 (baza) -> 5 733 042 (+32.2%). NE3-9b: karawany 2.62% swiata wobec 1.98% w bazie; NE3-14b: nachylenie +19 788 zl/d. Wplaty BK do wlascicieli 2-9 na dobe (linia "Szczelnosc (164a/31b)", "BK sam"). 328 z ok. 352 karawan to karawany notabli.
+- (3) Korony 21.88% -> 19.37% na koniec (baza 19.7%), doba 30 20.61%, doba 60 19.79%, czyli < 20.4%. Plan testu przewidywal wtedy `CrownReserveReleaseDays` 360 -> 450 (albo G5 - nigdy oba).
+
+**Przyczyna [K]:**
+- (1) `CaravanGoods.Sell` przy powodzie straty sprzedawal krokami az do progu gabki (cena >= 0.4 x wartosci), bez limitu na jeden targ. Wiele karawan w jednym miescie w ciagu doby zbijalo indeks do dna. Gra placi sztuka po sztuce (`SellItemsAction.ApplyInternal`: cena kazdej sztuki od nowa, polka rosnie o jej wartosc - `TownMarketData.OnTownInventoryUpdated`). Warunek zysku na cenie OSTATNIEJ sztuki kroku nie przeskakuje progu, ale krok 5 sztuk, ktorego ostatnia nie miala zysku, szedl w calosci jako strata (gdy byl powod) albo wcale.
+- (2) Przy BK Realistic Caravan Income (u Jeffa wlaczone) gra nie oddaje zysku karawan:
+  - BK `EconomyPatches.AddIncomeFromPartyPrefix` wylacza `DefaultClanFinanceModel.AddIncomeFromParty` karawan (gra: 10% kiesy ponad 10 000 na dobe do rodu);
+  - `BKClanFinanceModel.CalculateOwnerIncomeFromCaravan` = 0 (gra: (kiesa - kapital startowy) / RevenueSmoothenFraction na dobe do notabla w `CalculateHeroIncomeFromAssets`);
+  - `ROT.Models.ROTClanFinanceModel` deleguje do BK;
+  - zostaje `BKPartyBehavior.AddRealisticIncome`: wszystko ponad 10 000 tylko przy wjezdzie do siedziby, wlasnej osady albo miasta udzialowca wlasciciela (E3/9 - takze miasta krolestwa pana). Nie dubluje E3/7 (`CaravanFlow`, kiesa przy rozwiazaniu) ani wyplat w oknach `CirculationWindows` (O02 zold karawan notabli, dochod notabla - tylko pomiar).
+- (3) `CrownIncome.Begin`: Release = zapas ponad 500 000 / `CrownReserveReleaseDays` co dobe, wydawany tego samego dnia (renty 180).
+
+**Zmiana:**
+- **S1 - T1 na stracie porcjami** (`CaravanGoods.Sell`, stale `PortionDrop` 0.30, `LossFloor` 0.60):
+  - krok bez zysku na ostatniej sztuce jest przycinany do najwiekszej liczby sztuk, z ktorych ostatnia ma zysk (`PriceAt`, licznik "kroki przyciete do sztuk z zyskiem");
+  - powody 3-5 (juki ponad udzwig, jedzenie psuje sie, dlugo w jukach): sztuka po sztuce od calego kroku w dol - sprzedaje najwiecej k sztuk, przy ktorych indeks kategorii po sprzedazy (`TradeItemPriceFactorModel.GetBasePriceFactor` z polka + k x waga - ta sama miara co `Town.GetItemCategoryPriceIndex`) >= 0.70 x indeks sprzed pierwszej sprzedazy T1 tej kategorii w tym miescie tej doby (`_idx0`; dzis nic - obecny) i cena k-tej sztuki >= 0.60 x `Value`. Gdy nawet 1 sztuka nie miesci sie - stop, reszta czeka na nastepne miasto (licznik "wstrzymane (porcja)": indeks / cena; "kroki przyciete porcja");
+  - powody 1-2 (rozwiazanie, brak na zold) - bez zmian (gabka 0.4).
+  Linia T1: nowe pola po "polowa stosu" i po "najwiekszy spadek indeksu": "spadek indeksu wedlug rodzaju sprzedazy: z zyskiem / na stracie porcjami (granica 30%) / bez wyjscia". Linia startu opisuje regule.
+- **S2 - E3-T2 nadwyzka kiesy do wlasciciela** (`CaravanGoods.ProfitToOwners`, klucz `CaravanProfitToOwner`):
+  - raz na dobe w `CaravanGoods.Daily`, przed ksiega pieniadza, kazda aktywna karawana: kapital obrotowy = max(10 000, 30 dni zoldu). 10 000 to kapital startowy gry (`DefaultCaravanModel.GetInitialTradeGold`) i prog wplaty BK; wystarcza na pelny zakup BK w miescie (BuyCategory najwyzej 1 500 na kategorie, 5 kategorii; BudgetFactor pelny od 5 000). Zold karawan ok. 330 zl/d (3 dni zoldu wszystkich = 348 396), wiec 30 dni to zwykle ok. 10 000;
+  - nadwyzka -> `CaravanPartyComponent.Owner` (notabl, lord albo gracz - ten sam odbiorca co BK) przez `GiveGoldAction.ApplyForPartyToCharacter` (zdarzenie gry - ksiega widzi przelew partia -> bohater, nie zloto z niczego);
+  - bez dubla: tylko przy BK Realistic Caravan Income (`Seal31B.RealisticCaravanIncome`, teraz internal); pominiete: z wodzem (gra placi rodowi przez AddIncomeFromParty, gdy wodz nie ma tytulu BK), rozwiazywane (E3/7), w bitwie, bez zywego wlasciciela, takie, za ktore czynny model finansow sam placi (`CalculateOwnerIncomeFromCaravan > 0`); wplata BK przy wjezdzie (ponad 10 000) zostaje;
+  - te same skutki co wplata gry: slawa rodu za Great Investor; graczowi jeden komunikat dziennie (EN);
+  - linia "Karawany - zysk do wlasciciela (E3-T2): dzien N" (kwota, liczba karawan, notable / lordowie i inni / gracz, kapital obrotowy razem i w kiesach, pominiete, kontrola "kiesy karawan = wlasciciele", wplyw na skrzynie, potkniecia) i pozycja w linii "Obieg: notable i karawany";
+  - wyjatek per karawana - licznik potkniec, reszta karawan dalej.
+- **S3** - `CrownReserveReleaseDays` 360 -> 450 (Settings + MCM + opis w CrownIncome). Zwrot zoldu, renty i kredyt 186 - kod bez zmian. Napis "1/360 zapasu" w linii daniny wojennej (KingdomTreasury.WarAid) to nazwa pola dla narzedzia - liczba idzie z Release.
+- **sprawdz_logi --grupa nekon3** (8 nowych nazw `N3E_`, razem 111, 0 dubli - ast):
+  - NE3-5b: <= 40% w >= 95% dob (dotad kazdej doby);
+  - NE3-5c (nowy): na stracie porcjami <= 30.5% kazdej doby; z zyskiem, bez wyjscia i "wstrzymane (porcja)" - INFO;
+  - NE3-14c: przy czynnym E3-T2 - doplaty notabli do 5000 ("Obieg: notable i karawany", gra dopelnia biedne karawany z kiesy notabla) srednio 30 dob <= 1.1 x baza (bez bazy 80 000). Kiesy karawan wobec bazy - INFO, bo E3-T2 z zamiaru obniza kiesy do kapitalu obrotowego. Bez E3-T2 - stary prog (-5%);
+  - NE3-25 (nowy): linia E3-T2 w >= 95% dob, kontrola 0 kazdej doby, oddane > 0 (srednio 30 dob);
+  - NE3-0: potkniecia T2. NE3-8 (korony >= 19.9%), NE3-9b (karawany <= baza + 0.3 pkt) i NE3-14b (nachylenie kies karawan <= 10 tys./d) - bez zmian; to progi S2 i S3.
+
+**Decyzje (sprawdzone w kodzie, bez pytania Jeffa - ekonomie projektuje Claude):**
+- Kapital obrotowy max(10 000, 30 dni zoldu), a nie "pelny ladunek po cenie bazowej". BK nie wydaje na wizyte wiecej niz 7 500 (5 x 1 500), a wartosc pelnego ladunku (tysiace kg) bylaby wieksza niz dzisiejsze kiesy, wiec przelew prawie by nie dzialal.
+- Cala nadwyzka od razu (nie 1/5 dziennie jak w grze dla notabli). Pierwsza doba odda jednorazowo zgromadzony zapas (szacunek: do ok. 2 mln). Glownie notablom, a ich zloto ponad 10 500 pasmo gry (E5/A3) przenosi do kasy miasta handlu; zawor kas miast (7% nadwyzki na dobe) oddaje to panom i koronom w kilka tygodni.
+- Limit porcji liczony wzgledem indeksu sprzed PIERWSZEJ sprzedazy T1 tej doby w tym miescie (dowolnej: z zyskiem tez). Gdy sprzedaz z zyskiem juz zbila indeks o 30%, tego dnia nikt tam nie sprzeda na stracie.
+- Sprzedaz z zyskiem bez limitu porcji (zadanie): ogranicza ja tylko prog zysku, polowa stosu na wizyte i 1/20 nadwyzki kasy miasta.
+
+**Kontrola calosci:**
+- **Pieniadz**: S1 nie ma nowego przelewu. Kontrola T1 (kasy miast = kiesy + myto) bez zmian. S2: kiesa karawany -> zloto wlasciciela, zdarzenie gry (MoneyLedger.OnGoldTraded - przelew, ani "z niczego", ani "w nicosc"); suma swiata bez zmian; ClanIncomeBook pomija zdarzenia w bloku dnia (jak kazdy przelew z naszego ticku); kontrola w linii T2. S3 przesuwa tylko tempo wydawania zapasu.
+- **Kolizje**:
+  - BK AddRealisticIncome i E3/9 (Seal31B.ProfitPost) dzialaja jak dotad - po S2 maja mniej do wplacenia;
+  - NotablesCampaignBehavior dopelnia kase karawany do 5000 z kiesy notabla - S2 nigdy nie schodzi ponizej 10 000, wiec bez ping-ponga;
+  - powod T1 "brak na zold" (< 3 dni zoldu) - S2 zostawia >= 30 dni;
+  - kontrakty 174, CaravanBulk, PackMarket i RecruitGoldToSeller placa z kiesy - 10 000 wystarcza;
+  - rozwiazanie E3/7 pominiete (IsDisbanding);
+  - pasmo notabli A3 (ponad 10 500 -> kasa miasta handlu) - istniejaca regula, przyjmuje nadwyzke dalej;
+  - postfiks blokady BK (CalculateBuyValue) i ksiega kosztu T1 - nietkniete.
+- **Kolejnosc**: S2 w `CaravanGoods.Daily` (po CaravanAmmo, przed TownToll, korona i MoneyLedger.Daily); pozycja w "Obieg" czyta `CaravanGoods.LastOwner*` tej samej doby.
+- **Wydajnosc**: S1 - do 4 dodatkowych wycen na krok bez zysku i do 10 na krok straty. S2 - jeden przeglad ok. 350 karawan raz na dobe. Bez petli godzinowych.
+
+**Ryzyko / co sprawdzic (autotest 120 dob na zapisie F, potem `sprawdz_logi --grupa nekon3 --baza-doby <20-16-31>`):**
+- NE3-5b (<= 40% w >= 95% dob) i NE3-5c (porcje <= 30.5%). Gdy NE3-5b padnie mimo NE3-5c = TAK, winna jest sprzedaz z zyskiem albo bez wyjscia - pole "spadek indeksu wedlug rodzaju sprzedazy" powie ktora.
+- Na stracie (NE3-14) ma spasc. Narzedzia w jukach (< 50% od doby 60) moga spadac WOLNIEJ - porcje wydluzaja wyprzedaz starego zapasu. "Wstrzymane (porcja)" pokaze skale.
+- NE3-9b karawany <= 2.28% i NE3-14b nachylenie <= 10 tys./d. NE3-25: pierwsza doba duza kwota, potem dzienny zysk.
+- Kasy miast (NE3-9b <= baza + 0.3), lordowie (NE3-9 <= 37.5% - juz na granicy 37.57%), notable (pasmo trzyma) - po jednorazowym splywie do kas przez notabli.
+- NE3-14c (doplaty notabli). NE3-8 korony >= 19.9% (S3 i zawor). NE3-9c kredyt 186 (juz 18.6 tys. > 15 tys.): mniejszy Release moze zwiekszyc pozyczki koron w wojnie. NE3-12b zwrot zoldu 100%.
+
+**Sprawdzone tu:**
+- Build Release: rc=0, 0 Error(s), 1 stare ostrzezenie CS0169 (log `scratchpad/zb/build-ekon3s.log`).
+- `python -I tools/gen_mcm.py`: Armoury 1631 ustawien (RealisticCaptivity i GrandTourney bez zmian).
+- `sprawdz_logi --grupa nekon3` na tescie 02-08-15 + baza: rc=0, 47 progow, bez wyjatku. NE3-5c i NE3-25 - INFO (stary log), NE3-14c - stary prog.
+- Log syntetyczny (linie testu + nowe pola T1 i linie T2 w formacie kodu): NE3-5c, NE3-14c (nowa galaz) i NE3-25 trafiaja. Podstawione bledy (porcja 31.0%, kontrola z roznica 6) daja NIE.
+- Gra NIE uruchomiona (zasada zadania) - zachowanie w grze niesprawdzone.
+
+**Status:** DO SPRAWDZENIA (autotest 120 dob na zapisie F nie uruchomiony; nic nie wgrane).
+
 ## 2026-10-16 (noc-ekonomia3, POPRAWKI po recenzjach - naprawa ekonomii) - KARAWANY: CENA ZAKUPU PO WCZYTANIU, ZADNA KARAWANA NIE ODKUPUJE TOWARU Z POLKI, "PELNE JUKI" = PONAD UDZWIG, ZYSK PO MYCIE; KSIEGA KAS OSAD (MYTO WOZOW, ZAKUPY WSI WOZEM); BEZPIECZNIK STRAZNIKA DO 3.7
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na 10622d0e = czesc 2) | **Tor:** L (poprawki po 2 recenzjach galezi: 5 uwag powaznych + drobne) | **Klucze:** bez nowych; zmienione opisy MCM `CaravanSellWhereDear`, `FolkGuardShareFuse`, `WorkshopPaceByMarket`, `WorkshopRetoolByPrice`, `VillageHandsFollowPrice` (gen_mcm, 1630 ustawien) | **Zmiana ekonomii:** tak (T1, G1, P1, D3) | **Zapis:** bez zmian (zadnego nowego klucza; migawka ksiegi kosztu i blokady odkupienia - pamiec sesji) | **Cofanie:** `git revert` tego commita; T1 w MCM `Caravan Sell Where Dear` | **Pliki:** `Armoury/src/CaravanGoods.cs`, `TownToll.cs`, `MoneyLedger.cs`, `MoneyLedger.Obieg.cs`, `TownFolk.Live.cs`, `AlleyProbe.cs`, `TownFolk.Guard.cs`, `ClanBudget.cs`, `VillageFruit.cs`, `NoTownMines.cs`, `WorkshopRetool.cs`, `WorkshopPace.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `CrownIncome.cs`, `WorkshopTrade.cs` (komentarze), `Settings.cs` + `McmSettings.cs`, `tools/sprawdz_logi.py` (grupa nekon3)

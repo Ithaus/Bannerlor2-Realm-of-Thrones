@@ -1111,7 +1111,7 @@ namespace Armoury
             catch (Exception e) { Stumble("ProfitPost", e); }
         }
 
-        private static bool RealisticCaravanIncome()
+        internal static bool RealisticCaravanIncome()                 // E3-T2 (CaravanGoods.ProfitToOwners) czyta ten sam przelacznik BK
         {
             try
             {

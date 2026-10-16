@@ -697,6 +697,10 @@ Uzycie (Python 3, tylko odczyt):
                     Poprawki po recenzjach: NE3-2c ksiega kas osad (TM1 srednia 28 dob < 10 000, |TZ1| i |TW1| nie gorzej niz baza), NE3-3 kontrola kas T1 (roznica 0),
                     NE3-5 prog 0.8 tylko dla towarow od >= 0.8, NE3-5b dobowy spadek indeksu w jednym miescie <= 40%, NE3-10 bezpiecznik 0 dob = TAK, 1-20 = DECYZJA,
                     NE3-11 B <= 0.97 x baza, NE3-11c F z ludu rosnie, NE3-14d na stracie z pelnych jukow <= 10%, NE3-16 i NE3-16c2 na liczbie 'wsi bez towaru po W1'.
+                    Strojenie po tescie 120 dob (S1-S3): NE3-5b spadek indeksu w jednym miescie od sprzedazy NA STRACIE porcjami <= 40% w >= 95% dob (z zyskiem,
+                    bez wyjscia i stara miara - INFO; log bez pola rodzaju - INFO), NE3-5c na stracie porcjami <= 30% (+0.5 pkt) kazdej
+                    doby, NE3-14c przy E3-T2 doplaty notabli do 5000 <= 1.1 x baza (kiesy karawan wobec bazy - INFO), NE3-25 linia E3-T2 (zysk karawan do wlascicieli:
+                    w >= 95% dob, kontrola 0, oddane > 0); NE3-8 i NE3-9b bez zmian (korony, karawany <= baza + 0.3 pkt), NE3-14b nachylenie kies karawan <= 10 tys./d.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -30646,16 +30650,26 @@ N3E_1_SNAP = re.compile(r"odtworzone przy wczytaniu (\d+) szt\. \(z dziennika BK
 N3E_G_NOFUSE = re.compile(r"mnoznik bez bezpiecznika ([\d.]+)")
 N3E_F_NOG2 = re.compile(r"wsi bez towaru po W1 (\d+)")
 N3E_D3_DUP = re.compile(r"miast z 3\+ warsztatami jednego typu (\d+)")
+# strojenie po tescie 120 dob (S1 porcje T1, S2 zysk karawan do wlascicieli E3-T2, S3 zapas korony 450 dob)
+N3E_T2 = "Karawany - zysk do wlasciciela (E3-T2): dzien "
+N3E_OBNC = "Obieg: notable i karawany: dzien "
+N3E_2_PAID = re.compile(r"\| CZYNNE \| karawan (\d+), oddaly (\d+) za (\d+) zl \(notablom (\d+)/(\d+), lordom i innym (\d+)/(\d+), graczowi (\d+)/(\d+)\)")
+N3E_2_KEEP = re.compile(r"razem (\d+), w kiesach do kapitalu (\d+)")
+N3E_2_CTL = re.compile(r"kontrola: kiesy karawan -(-?\d+) = wlasciciele \+(-?\d+) \(roznica (-?\d+)\)")
+N3E_OB_TOPUP = re.compile(r"doplaty notabli do 5000 ([+-]?\d+)")
+N3E_1_PORT = re.compile(r"wstrzymane \(porcja\) (\d+) \(")
+N3E_1_KIND = re.compile(r"spadek indeksu wedlug rodzaju sprzedazy \(najwiekszy w jednym miescie dzis\): z zyskiem (-?[\d.]+)%, na stracie porcjami (-?[\d.]+)% "
+                        r"\(granica [\d.]+%\), bez wyjscia \(rozwiazanie, brak na zold\) (-?[\d.]+)%")
 
 
 def _n3e_read(logp, full=True):
     """Strumieniowo: linie dob nekon3 (full=False - tylko 'Pieniadz swiata', 'Pompy', 'Kredyt korony', 'Korona 165' i 'Ceny surowcow' - log bazy)."""
-    d = {k: {} for k in ("world", "guard", "folk", "pumps", "crown", "loan", "sutl", "toll", "t1", "stock", "price", "flow")}
+    d = {k: {} for k in ("world", "guard", "folk", "pumps", "crown", "loan", "sutl", "toll", "t1", "stock", "price", "flow", "t2", "obnc")}
     st = {"guard": None, "toll": None, "t1": None, "hook": None}
     errs, newerr = [], []
-    heads = [(N3E_WORLD, "world"), (N3E_PUMPS, "pumps"), (N3E_LOAN, "loan"), (N3E_PRICE, "price"), (N3E_CROWN, "crown"), (N3E_FLOW, "flow")]
+    heads = [(N3E_WORLD, "world"), (N3E_PUMPS, "pumps"), (N3E_LOAN, "loan"), (N3E_PRICE, "price"), (N3E_CROWN, "crown"), (N3E_FLOW, "flow"), (N3E_OBNC, "obnc")]
     if full:
-        heads += [(N3E_GUARD, "guard"), (N3E_FOLK, "folk"), (N3E_SUTL, "sutl"), (N3E_TOLL, "toll"), (N3E_T1, "t1"), (N3E_STOCK, "stock")]
+        heads += [(N3E_GUARD, "guard"), (N3E_FOLK, "folk"), (N3E_SUTL, "sutl"), (N3E_TOLL, "toll"), (N3E_T1, "t1"), (N3E_STOCK, "stock"), (N3E_T2, "t2")]
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -31157,10 +31171,11 @@ def nekon3_main(logp, bdp=None):
     st_t1 = sum(num(r"\| potkniecia (\d+) \(sesja", s, int, 0) for s in D["t1"].values())
     st_g = sum(num(r"\| potkniecia (\d+) \(sesja", s, int, 0) for s in D["guard"].values())
     st_w1 = sum(num(r"potkniecia (\d+)\), zaleglosc koszyka wsi", s, int, 0) for s in D["folk"].values())
-    rep.add("NE3-0: ERROR w logu = 0; potkniecia nowych linii (myto, T1, straznik, W1) = 0",
+    st_t2 = sum(num(r"\| potkniecia (\d+) \(sesja", s, int, 0) for s in D["t2"].values())
+    rep.add("NE3-0: ERROR w logu = 0; potkniecia nowych linii (myto, T1, T2, straznik, W1) = 0",
             f"ERROR {len(errs)} (w modulach serii {len(newerr)}{': ' + newerr[0] if newerr else ''}{'; pierwszy: ' + errs[0] if errs and not newerr else ''}), "
-            f"potkniecia myto {st_toll}, T1 {st_t1}, straznik {st_g}, W1 {st_w1}",
-            "0 / 0", len(errs) == 0 and st_toll == 0 and st_t1 == 0 and st_g == 0 and st_w1 == 0)
+            f"potkniecia myto {st_toll}, T1 {st_t1}, T2 {st_t2}, straznik {st_g}, W1 {st_w1}",
+            "0 / 0", len(errs) == 0 and st_toll == 0 and st_t1 == 0 and st_t2 == 0 and st_g == 0 and st_w1 == 0)
     # ---- NE3-1 linie w kazdej dobie, linie startu
     if nd:
         cov = {}
@@ -31289,13 +31304,48 @@ def nekon3_main(logp, bdp=None):
         a = N3E_1_DROP.search(s)
         if a:
             drops[x] = float(a.group(1)); dwhere[x] = a.group(2) or ""
+    kinds, port = {}, 0
+    for x, s in D["t1"].items():
+        a = N3E_1_KIND.search(s)
+        if a:
+            kinds[x] = (float(a.group(1)), float(a.group(2)), float(a.group(3)))
+        b = N3E_1_PORT.search(s)
+        if b:
+            port += int(b.group(1))
+    # poprawki po recenzji strojenia (uwaga powazna): bramka NE3-5b liczy tylko sprzedaz NA STRACIE porcjami (S1, powody 3-5). Sprzedaz z zyskiem ogranicza
+    # wedlug zasady Jeffa tylko prog zysku - w miescie z indeksem 6-10 sama zbija ponad 40% (test 02-08-15: w 72 ze 120 dob najwiekszy spadek konczyl sie
+    # na indeksie >= 1.0, np. Stoney Sept date_fruit 7.94 -> 1.03), a bez wyjscia (rozwiazanie, brak na zold) z zalozenia S1 nie ma porcji - oba INFO.
+    # Stara miara (wszystkie rodzaje sprzedazy) - INFO; log bez pola rodzaju - tylko stara miara jako INFO
+    old5b = ""
     if drops:
         xmax = max(drops, key=lambda k: drops[k])
         over5 = [x for x, v in drops.items() if v > 40.0]
-        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu sprzedanej kategorii w jednym miescie <= 40% (T1 nie zbija jednego targu - mediana 97 miast tego nie widzi)",
-                f"max {drops[xmax]:.1f}% (d{xmax}: {dwhere[xmax]}), dob ponad 40% {len(over5)} z {len(drops)}", "<= 40% kazdej doby", not over5)
+        okd = (len(drops) - len(over5)) / len(drops) * 100
+        old5b = f"wszystkie rodzaje (stara miara) max {drops[xmax]:.1f}% (d{xmax}: {dwhere[xmax]}), dob ponad 40% {len(over5)} z {len(drops)} (dob do 40%: {okd:.1f}%)"
+    if kinds:
+        n5 = len(kinds)
+        ov5 = [[x for x, v in kinds.items() if v[k] > 40.0] for k in range(3)]
+        xl5 = max(kinds, key=lambda k: kinds[k][1])
+        ok5 = (n5 - len(ov5[1])) / n5 * 100
+        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu kategorii w jednym miescie od sprzedazy NA STRACIE porcjami (S1: juki ponad udzwig, jedzenie psuje sie, "
+                "dlugo w jukach) <= 40% w >= 95% dob; z zyskiem (zasada Jeffa: tylko prog zysku), bez wyjscia (rozwiazanie, brak na zold - bez porcji) i stara miara - INFO",
+                f"na stracie porcjami max {kinds[xl5][1]:.1f}% (d{xl5}), dob ponad 40% {len(ov5[1])} z {n5} (dob do 40%: {ok5:.1f}%) | INFO: z zyskiem max "
+                f"{max(v[0] for v in kinds.values()):.1f}% (dob ponad 40% {len(ov5[0])}), bez wyjscia max {max(v[2] for v in kinds.values()):.1f}% "
+                f"(dob ponad 40% {len(ov5[2])})" + (f"; {old5b}" if old5b else ""), ">= 95% dob <= 40% (na stracie porcjami)", ok5 >= 95.0)
+    elif drops:
+        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu sprzedanej kategorii w jednym miescie (stara miara - wszystkie rodzaje sprzedazy, takze z zyskiem)", old5b,
+                "INFO (log sprzed strojenia S1 - brak pola 'spadek indeksu wedlug rodzaju sprzedazy'; bramka liczy tylko sprzedaz na stracie porcjami)", None)
     else:
         rep.add("NE3-5b: spadek indeksu w jednym miescie", "brak pola w linii E3-T1", "INFO (log sprzed poprawek)", None)
+    if kinds:
+        kl = max(kinds, key=lambda k: kinds[k][1])
+        badk = [x for x, v in kinds.items() if v[1] > 30.5]
+        rep.add("NE3-5c: S1 - sprzedaz na stracie porcjami (poza rozwiazaniem i brakiem na zold) zbija indeks kategorii w jednym miescie najwyzej o 30% w dobie (+0.5 pkt) kazdej doby; "
+                "z zyskiem i bez wyjscia - INFO",
+                f"na stracie porcjami max {kinds[kl][1]:.1f}% (d{kl}), dob ponad 30.5% {len(badk)}; z zyskiem max {max(v[0] for v in kinds.values()):.1f}%, "
+                f"bez wyjscia max {max(v[2] for v in kinds.values()):.1f}%; wstrzymane (porcja) razem {port}", "0 dob ponad 30.5%", not badk)
+    else:
+        rep.add("NE3-5c: porcje T1", "brak pola 'spadek indeksu wedlug rodzaju sprzedazy' w linii E3-T1", "INFO (log sprzed strojenia S1)", None)
     # ---- NE3-6 wczytanie zapisu
     mload = num(r"\| stan z zapisu: mnoznik ([\d.]+)", g, float, None) if g else None
     rep.add("NE3-6: wczytanie zapisu - stan straznika z zapisu (arm_obieg2) i 0 ERROR (NE3-0)", f"mnoznik z zapisu {mload if mload is not None else '-'}",
@@ -31495,8 +31545,27 @@ def nekon3_main(logp, bdp=None):
         rep.add("NE3-14b: kiesy karawan ('Pieniadz swiata') nie rosna szybciej niz +10 tys./d (30 dob); zawor miast (Pompy C) >= 95% bazy (bez bazy 346 tys.)",
                 f"karawany nachylenie {cs if cs is None else round(cs)} zl/d; zawor miast {cm30 if cm30 is None else round(cm30)} (prog {floor_c:.0f}); z kas do karawan T1 srednio {(_n3e_mean(gross) or 0):.0f}, myto T1 {(_n3e_mean(toll) or 0):.0f}",
                 "<= 10000 / >= prog", (cs is not None and cs <= 10000) and (cm30 is not None and cm30 >= floor_c))
-        # NE3-14c (uwaga recenzji 2: myto karawan i cienka marza) - kiesy karawan na koniec nie nizsze niz w bazie o wiecej niz 5%
-        if BWd and nd:
+        # NE3-14c (uwaga recenzji 2: myto karawan i cienka marza) - kiesy karawan na koniec nie nizsze niz w bazie o wiecej niz 5%;
+        # strojenie po tescie 120 dob (S2): przy czynnym E3-T2 kiesy karawan schodza do kapitalu obrotowego z zamiaru (nadwyzka do wlascicieli) - miara "T1 i myto
+        # nie topia kapitalu" to doplaty notabli do 5000 (gra dopelnia kase karawany ponizej 5000 z kiesy notabla; E3-T2 nigdy nie schodzi ponizej 10 000)
+        t2on = [x for x, s in D["t2"].items() if " | CZYNNE | " in s]
+        top = {x: num(N3E_OB_TOPUP.pattern, s, int, None) for x, s in D["obnc"].items()}
+        top = {x: v for x, v in top.items() if v is not None}
+        btop = {}
+        if B and B["obnc"]:
+            btop = {x: num(N3E_OB_TOPUP.pattern, s, int, None) for x, s in B["obnc"].items()}
+            btop = {x: v for x, v in btop.items() if v is not None}
+        if t2on and top:
+            tt30 = _n3e_mean([top[x] for x in tail(top, 30)])
+            tb30 = _n3e_mean([btop[x] for x in sorted(btop)[-30:]]) if btop else None
+            tlim = 1.1 * tb30 if tb30 else 80000
+            tinfo = ""
+            if BWd and nd:
+                be3 = BWd[sorted(BWd)[-1]]
+                tinfo = f"; kiesy karawan na koniec {W[days[-1]]['karawany']} wobec bazy {be3['karawany']} (INFO - E3-T2 oddaje nadwyzke wlascicielom)"
+            rep.add("NE3-14c: przy E3-T2 - doplaty notabli do 5000 (gra dopelnia biedne karawany) srednio 30 dob <= 1.1 x baza (bez bazy 80 000; T1 i myto nie topia kapitalu karawan)",
+                    f"{tt30:.0f} zl/d" + (f" (baza {tb30:.0f})" if tb30 else "") + tinfo, f"<= {tlim:.0f}", tt30 <= tlim)
+        elif BWd and nd:
             be2 = BWd[sorted(BWd)[-1]]
             ce, cb = W[days[-1]]["karawany"], be2["karawany"]
             rep.add("NE3-14c: kiesy karawan na koniec nie nizsze niz w bazie o wiecej niz 5% (myto 2% i T1 nie topia kapitalu karawan)",
@@ -31552,6 +31621,28 @@ def nekon3_main(logp, bdp=None):
         rep.add("NE3-16: koszyk wsi (koszyk dnia + W1) / potrzeba na koniec >= 15% (ekon2 10.0%), wsi bez towaru po W1 <= 420 (ekon2 486 w miescie targowym), zakupy W1 > 0",
                 f"realizacja {real:.1f}%, wsi bez towaru po W1 {nog_w1 if nog_w1 is None else round(nog_w1)} (w miescie targowym {nog_mk if nog_mk is None else round(nog_mk)}), W1 razem {w1} zl",
                 ">= 15% / <= 420 / > 0", real >= 15 and nog is not None and nog <= 420 and w1 > 0)
+    # ---- NE3-25 (strojenie po tescie 120 dob, S2): E3-T2 zysk karawan do wlascicieli - linia w kazdej dobie, kontrola 0, cos oddane
+    if D["t2"]:
+        on2 = sorted(x for x, s in D["t2"].items() if " | CZYNNE | " in s)
+        cov2 = len([x for x in D["t2"] if days and days[0] <= x <= days[-1] + 1]) / nd if nd else 0
+        bad2, paid2, n2, keep2, held2 = [], [], [], [], []
+        for x in on2:
+            s = D["t2"][x]
+            a, c, k = N3E_2_PAID.search(s), N3E_2_CTL.search(s), N3E_2_KEEP.search(s)
+            if c and int(c.group(3)) != 0:
+                bad2.append(x)
+            if a:
+                paid2.append(int(a.group(3))); n2.append(int(a.group(2)))
+            if k:
+                keep2.append(int(k.group(1))); held2.append(int(k.group(2)))
+        p30 = _n3e_mean(paid2[-30:]) if paid2 else 0
+        rep.add("NE3-25: E3-T2 zysk karawan do wlascicieli - linia w >= 95% dob, kontrola 'kiesy karawan = wlasciciele' 0 kazdej doby, oddane > 0 (srednio 30 dob); kwoty - INFO",
+                f"linia {cov2 * 100:.0f}% dob (czynna {len(on2)}), z roznica {len(bad2)}" + (f" (np. d{bad2[0]})" if bad2 else "")
+                + f"; oddane srednio 30 dob {p30:.0f} zl/d u {(_n3e_mean(n2[-30:]) or 0):.0f} karawan, pierwsza doba {paid2[0] if paid2 else '-'}"
+                + (f"; kapital obrotowy na koniec {keep2[-1]}, w kiesach do kapitalu {held2[-1]}" if keep2 else ""),
+                ">= 95% / 0 / > 0", bool(on2) and cov2 >= 0.95 and not bad2 and p30 > 0)
+    else:
+        rep.add("NE3-25: E3-T2 zysk karawan do wlascicieli", "brak linii", "INFO (log sprzed strojenia S2)", None)
     _n3e_part2(rep, logp, bdp, D, W, days)   # czesc 2: NE3-0b, NE3-1c, NE3-4, NE3-15c2, NE3-16c2, NE3-17..24
     rep.show()
     return 0
