@@ -19,10 +19,13 @@ namespace Armoury
     ///   przed czyszczeniem przerw OB2). Przyczyna w kolejnosci: (1) zdobycie - znacznik z MapEventEnded (szturm albo bitwa pod murami wygrana przez
     ///   oblegajacych; gra zwija oboz w KingdomManager.SiegeCompleted PRZED zmiana pana - dlatego OB5 pisal "utrzymane" przy Cape Wrath); (2) oblegajacy
     ///   pokonani - pole gry SiegeEvent._isBesiegerDefeated (OnBeforeSiegeEventEnd); (3) wolajacy z rzutu stosu (pierwsza pasujaca ramka od srodka): okup
-    ///   (SiegeRansom), SCA odwrot (StrategicCampaignAI145), mysl wodza (ROT AIThinkPatch / AiPartyThinkBehavior), armia rozwiazana (DisbandArmyAction / Army),
-    ///   pokoj (MakePeaceAction), frakcja zniknela (FactionDiscontinuation); inaczej "inne" z dwiema pierwszymi ramkami spoza zdarzen gry. Ramka metody latanej
-    ///   przez Harmony (DMD) nie ma typu - liczy sie nazwa metody, ktora zawiera typ oryginalu. "Szturm przerwany": szturm AI skonczony w tej chwili bez zwyciezcy
-    ///   (SiegeWalls.OnMapEventEnded, galaz "bez rozstrzygniecia") albo bitwa szturmu jeszcze trwa (SCA zwijal oboz przed bitwa - SiegeEvent :889 przed :900).
+    ///   (SiegeRansom), SCA odwrot (StrategicCampaignAI145), pokoj (MakePeaceAction / AiPartyThinkBehavior.OnMakePeace), mysl wodza (PartyHourlyAiTick: ROT
+    ///   AIThinkPatch / AiPartyThinkBehavior), odejscie z obozu (SiegeEvent.Tick -> BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave: wodz zmienil cel poza bitwa -
+    ///   w linii cel z jego ostatniej mysli), armia rozwiazana (DisbandArmyAction / Army), frakcja zniknela (FactionDiscontinuation); inaczej "inne" z dwiema
+    ///   pierwszymi ramkami spoza zdarzen gry. Ramka metody latanej przez Harmony (DMD) nie ma typu - liczy sie nazwa metody, ktora zawiera typ oryginalu.
+    ///   "Szturm przerwany": szturm AI skonczony w tej chwili bez zwyciezcy (SiegeWalls.OnMapEventEnded, galaz "bez rozstrzygniecia") albo bitwa szturmu jeszcze
+    ///   trwa (SCA zwijal oboz przed bitwa - SiegeEvent :889 przed :900); "regula SK" - czy ta bitwa byla pod regula F2 (bez Innych, skryptu, gracza, morza, 96 h).
+    ///   Jedna linia na oblezenie: FinalizeSiegeEvent wolane wprost przy niepustym obozie wysyla zdarzenie drugi raz (_koDone).
     ///   Gra zwija oboz przed zdarzeniem (RemoveAllSiegeParties) - ludzie i jedzenie obozu wtedy z ostatniej mysli wodza obozu (zapis co jego mysl, LogOn).
     ///
     /// F2 - SZTURM AI DO KONCA (klucz SiegeAssaultRunsToEnd). [K] ROT AIThinkPatch.PartyHourlyAiTick (prefiks zastepujacy AiPartyThinkBehavior, ta sama logika
@@ -73,9 +76,14 @@ namespace Armoury
             public double Hour = -1; public string Leader = "-", Fac = "-", Beh = "-", Tgt = "-"; public float Score = -1f, Siege = -1f; public bool Held; public int Men = -1, Food = -1;
         }
         private static readonly Dictionary<SiegeEvent, Snap> _snap = new Dictionary<SiegeEvent, Snap>();        // ostatnia mysl wodza obozu (LogOn)
-        private static readonly string[] EndName = { "zdobycie", "oblegajacy pokonani", "okup", "SCA odwrot", "mysl wodza", "armia rozwiazana", "pokoj", "frakcja zniknela", "inne" };
-        private const int ECapture = 0, EBeaten = 1, EThink = 4, ESca = 3, EOther = 8;
-        private static readonly int[] _dEnd = new int[9];
+        // poprawka po recenzji: regula F2 dla przerwanego szturmu AI ("tak" albo "nie (powod)") - z MapEventEnded, gdy bitwa jeszcze jest
+        private static readonly Dictionary<Settlement, string> _abortRule = new Dictionary<Settlement, string>();
+        // poprawka po recenzji: SiegeEvent.FinalizeSiegeEvent wolane wprost przy niepustym obozie (ROT AIThinkPatch :405, FactionDiscontinuation :102/:114) wysyla
+        // OnSiegeEventEnded drugi raz (BesiegerCamp.FinalizeSiegeEvent -> RemoveAllSiegeParties -> RemoveSiegePartyInternal :242-245) - jedna linia KO na oblezenie
+        private static readonly HashSet<SiegeEvent> _koDone = new HashSet<SiegeEvent>();
+        private static readonly string[] EndName = { "zdobycie", "oblegajacy pokonani", "okup", "SCA odwrot", "mysl wodza", "armia rozwiazana", "pokoj", "frakcja zniknela", "odejscie z obozu", "inne" };
+        private const int ECapture = 0, EBeaten = 1, ERansom = 2, ESca = 3, EThink = 4, EArmy = 5, EPeace = 6, EGone = 7, ELeave = 8, EOther = 9;
+        private static readonly int[] _dEnd = new int[10];
         private static int _dEnds, _dEndAbort, _dEndAbortOurs;
         private static AccessTools.FieldRef<SiegeEvent, bool> _beatRef;
         private static bool _beatFail;
@@ -83,8 +91,28 @@ namespace Armoury
         /// <summary>Z OnMapEventEnded (szturm albo bitwa pod murami wygrana przez oblegajacych): zdobycie tej twierdzy w tej chwili.</summary>
         internal static void NoteCaptured(Settlement st) { try { if (st != null) _capAt[st] = NowD; } catch (Exception e) { Stumble3("NoteCaptured", e); } }
 
-        /// <summary>Z SiegeWalls.OnMapEventEnded (szturm AI bez zwyciezcy i bez odparcia OB2): szturm przerwany w tej chwili.</summary>
-        internal static void NoteAborted(Settlement st) { try { if (st != null) _abortAt[st] = NowD; } catch (Exception e) { Stumble3("NoteAborted", e); } }
+        /// <summary>Z SiegeWalls.OnMapEventEnded (szturm AI bez zwyciezcy i bez odparcia OB2): szturm przerwany w tej chwili i czy byl pod regula F2.</summary>
+        internal static void NoteAborted(Settlement st, MapEvent me)
+        {
+            try { if (st != null) { _abortAt[st] = NowD; _abortRule[st] = RuleSk(me, st); } }
+            catch (Exception e) { Stumble3("NoteAborted", e); }
+        }
+
+        /// <summary>Czy bitwa szturmu byla pod regula F2 (jak ThinkPost / ScaRetreatPre): "tak" albo "nie (powod)". Liczone w chwili bitwy (MapEventEnded albo bitwa trwa).</summary>
+        private static string RuleSk(MapEvent me, Settlement st)
+        {
+            if (me == null) return "nie (bez bitwy)";
+            if (!RunsToEndOn) return "nie (klucz wylaczony)";
+            var lpb = me.AttackerSide != null ? me.AttackerSide.LeaderParty : null;
+            var lp = lpb != null && lpb.IsMobile ? lpb.MobileParty : null;
+            if (lp == null) return "nie (bez wodza)";
+            if (lp.IsMainParty || me.IsPlayerMapEvent) return "nie (gracz w bitwie)";
+            if (me.IsNavalMapEvent) return "nie (morze)";
+            if (Scripted(lp)) return "nie (skrypt)";
+            if (Und(lp, st)) return "nie (Inni)";
+            if (me.BattleStartTime.ElapsedHoursUntilNow > HoldMaxHours) return "nie (ponad " + F(HoldMaxHours, "0") + " h)";
+            return "tak";
+        }
 
         /// <summary>Twierdza zdobyta w ciagu ostatnich 0.02 doby (KO, OB5 Finish - koniec oblezenia przychodzi przed zmiana pana).</summary>
         internal static bool CapturedNow(Settlement st)
@@ -112,18 +140,25 @@ namespace Armoury
                 || t.StartsWith("MonoMod.", StringComparison.Ordinal) || t.StartsWith("TaleWorlds.CampaignSystem.MbEvent", StringComparison.Ordinal)
                 || t.StartsWith("TaleWorlds.CampaignSystem.CampaignEvents.", StringComparison.Ordinal) || t.StartsWith("TaleWorlds.CampaignSystem.CampaignEventDispatcher.", StringComparison.Ordinal)
                 || t.StartsWith("TaleWorlds.CampaignSystem.Siege.SiegeEvent.FinalizeSiegeEvent", StringComparison.Ordinal) || t.StartsWith("TaleWorlds.CampaignSystem.Siege.BesiegerCamp.", StringComparison.Ordinal)
-                || t.StartsWith("TaleWorlds.CampaignSystem.Party.MobileParty.set_BesiegerCamp", StringComparison.Ordinal) || t.StartsWith("Armoury.SiegeWalls.OnSiegeEnded", StringComparison.Ordinal);
+                || t.StartsWith("TaleWorlds.CampaignSystem.Party.MobileParty.set_BesiegerCamp", StringComparison.Ordinal) || t.StartsWith("Armoury.SiegeWalls.OnSiegeEnded", StringComparison.Ordinal)
+                || t.StartsWith("TaleWorlds.CampaignSystem.Party.MobileParty.OnPartyLeftSiegeInternal", StringComparison.Ordinal)
+                || t.StartsWith("TaleWorlds.CampaignSystem.Siege.SiegeEvent.Tick", StringComparison.Ordinal)
+                || t.StartsWith("Helpers.FactionHelper.FinishAllRelatedHostileActions", StringComparison.Ordinal);   // wolana z pokoju, ChangeKingdomAction i MarriageAction - liczy sie wolajacy
         }
 
-        /// <summary>Rodzaj konca z nazwy ramki albo -1.</summary>
+        /// <summary>Rodzaj konca z nazwy ramki albo -1. Ramki sprawdzane od srodka (nasluch) na zewnatrz - pierwsza pasujaca wygrywa.
+        /// Poprawka po recenzji [K]: pokoj idzie MakePeaceAction -> AiPartyThinkBehavior.OnMakePeace (AiPartyThinkBehavior.cs:216) -> FactionHelper (BesiegerCamp = null,
+        /// FactionHelper.cs:337), wiec mysl wodza tylko z PartyHourlyAiTick (ROT AIThinkPatch :405, gra AiPartyThinkBehavior :123); odejscie po zmianie celu poza bitwa idzie
+        /// SiegeEvent.Tick -> BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave (SiegeEvent.cs:848, BesiegerCamp.cs:200-210) - bez ramki mysli w stosie.</summary>
         private static int Kind(string t)
         {
-            if (t.Contains("SiegeRansom")) return 2;
+            if (t.Contains("SiegeRansom")) return ERansom;
             if (t.Contains("StrategicCampaignAI145")) return ESca;
-            if (t.Contains("AIThinkPatch") || t.Contains("AiPartyThinkBehavior")) return EThink;
-            if (t.Contains("DisbandArmyAction") || t.StartsWith("TaleWorlds.CampaignSystem.Army.", StringComparison.Ordinal)) return 5;
-            if (t.Contains("MakePeaceAction")) return 6;
-            if (t.Contains("FactionDiscontinuation")) return 7;
+            if (t.Contains("MakePeaceAction") || t.Contains("AiPartyThinkBehavior.OnMakePeace")) return EPeace;
+            if (t.Contains("AIThinkPatch.PartyHourlyAiTick") || t.Contains("AiPartyThinkBehavior.PartyHourlyAiTick")) return EThink;
+            if (t.Contains("BesiegerCamp.CheckBesiegerPartiesAndMakeThemLeave")) return ELeave;
+            if (t.Contains("DisbandArmyAction") || t.StartsWith("TaleWorlds.CampaignSystem.Army.", StringComparison.Ordinal)) return EArmy;
+            if (t.Contains("FactionDiscontinuation")) return EGone;
             if (t.Contains("KingdomManager.SiegeCompleted")) return ECapture;
             return -1;
         }
@@ -165,17 +200,21 @@ namespace Armoury
                 if (!LogOn) return;
                 var st = ev.BesiegedSettlement;
                 if (st == null || st.Town == null || !st.IsFortification) return;
+                if (!_koDone.Add(ev)) return;                                         // drugie OnSiegeEventEnded tego samego oblezenia (opis _koDone)
                 string other = null;
                 int k = CapturedNow(st) ? ECapture : BeatenNow(ev) ? EBeaten : ByStack(out other);
                 double t0;
                 bool abort = _abortAt.TryGetValue(st, out t0) && Math.Abs(NowD - t0) < 0.02;
+                string rule = "-";
+                if (abort) { if (!_abortRule.TryGetValue(st, out rule)) rule = "?"; }
                 var sme = st.Party != null ? st.Party.MapEvent : null;
-                if (!abort && sme != null && sme.IsSiegeAssault && !sme.IsFinalized) abort = true;
+                if (!abort && sme != null && sme.IsSiegeAssault && !sme.IsFinalized) { abort = true; rule = RuleSk(sme, st); }
                 _dEnds++; _dEnd[k]++;
-                if (abort) { _dEndAbort++; if (k == EThink || k == ESca) _dEndAbortOurs++; }
+                if (abort) { _dEndAbort++; if ((k == EThink || k == ESca) && rule == "tak") _dEndAbortOurs++; }   // przerwanie, ktore regula F2 miala zatrzymac
                 var camp = ev.BesiegerCamp;
                 var lp = camp != null ? camp.LeaderParty : null;
                 Snap sn; _snap.TryGetValue(ev, out sn);
+                if (k == ELeave) other = sn != null ? "zmiana celu - ostatnia mysl: " + sn.Beh + " " + sn.Tgt : "zmiana celu - bez mysli wodza w pamieci";
                 int men = 0, food = int.MaxValue; bool live = false;
                 if (camp != null)
                     foreach (var pb in camp.GetInvolvedPartiesForEventType(MapEvent.BattleTypes.Siege))
@@ -202,8 +241,8 @@ namespace Armoury
                 sb.Append("Koniec oblezenia (KO): dzien ").Append(Today).Append(" | osada ").Append(st.StringId).Append(" (").Append(Nm(st)).Append(", ").Append(Cls(st)).Append(')')
                   .Append(" | oblegajacy ").Append(fac).Append(", wodz ").Append(lead).Append(", ").Append(campTxt)
                   .Append(" | obroncow ").Append(def).Append(" | oblezenie ").Append(F(ev.SiegeStartTime.ElapsedDaysUntilNow, "0.0")).Append(" dob")
-                  .Append(" | przyczyna: ").Append(EndName[k]).Append(k == EOther ? " (" + (other ?? "?") + ")" : "")
-                  .Append(" | szturm przerwany ").Append(abort ? "tak" : "nie").Append(" | odparc ").Append(repels)
+                  .Append(" | przyczyna: ").Append(EndName[k]).Append(k == EOther || k == ELeave ? " (" + (other ?? "?") + ")" : "")
+                  .Append(" | szturm przerwany ").Append(abort ? "tak" : "nie").Append(" | regula SK: ").Append(rule).Append(" | odparc ").Append(repels)
                   .Append(" | mury HP ").Append(F(SiegeWalls.WallHp(st) * 100.0, "0")).Append("%, najslabszy ").Append(F(SiegeWalls.WallHpMin(st) * 100.0, "0")).Append('%')
                   .Append(", taran ").Append(ram ? "tak" : "nie").Append(", wieza ").Append(tower ? "tak" : "nie").Append(", trebusze ").Append(tr)
                   .Append(" | odsiecz w drodze ").Append(BesiegedRelief.ReliefOnWay(ev))
@@ -330,7 +369,11 @@ namespace Armoury
         }
 
         // ============================================================ W: trebusz AI bije w mur
-        private static int _dAimed, _dAimIdx, _dTrebWall, _dTrebBroken, _dTrebEngUp, _dTrebEngDown, _dRepelWait;
+        private static int _dAimed, _dAimIdx, _dTrebWall, _dTrebBroken, _dTrebEngUp, _dTrebEngDown, _dTrebEngPre, _dRepelWait;
+        /// <summary>Poprawka po recenzji: pociski z zapisu (BesiegerCamp._siegeEngineMissiles [SaveableField(1)]) leca najwyzej czas przeladowania trebusza
+        /// (1440 / 10 strzalow na dobe = 2.4 h w grze, 4.8 h przy RBM 5 na dobe) - trafienia w machiny w pierwszych 12 h po wczytaniu liczone osobno.</summary>
+        private const double PreLoadHours = 12.0;
+        private static double _loadH = -1.0;                                     // godzina kampanii przy linii startowej sesji (SessionStart3)
 
         /// <summary>Oboz AI w zakresie W (jak TB): twierdza, wodz nie gracz, gracz nie w tym obozie, bez skryptu fabuly i Innych.</summary>
         private static bool AiCampOf(BesiegerCamp camp, MobileParty lp, Settlement st)
@@ -387,7 +430,9 @@ namespace Armoury
                 bool up = false;
                 var l = st.SettlementWallSectionHitPointsRatioList;
                 if (l != null) for (int i = 0; i < l.Count; i++) if (l[i] > 0f) { up = true; break; }
-                if (up) _dTrebEngUp++; else _dTrebEngDown++;
+                if (!up) _dTrebEngDown++;
+                else if (_loadH >= 0.0 && CampaignTime.Now.ToHours - _loadH < PreLoadHours) _dTrebEngPre++;   // pocisk mogl wyleciec przed wczytaniem (bez latki)
+                else _dTrebEngUp++;
             }
             catch (Exception e) { Stumble3("OnBombardHit", e); }
         }
@@ -411,9 +456,16 @@ namespace Armoury
             {
                 double now = NowD;
                 PruneAt(_capAt, now); PruneAt(_abortAt, now);
+                if (_abortRule.Count > 0)
+                {
+                    List<Settlement> gone = null;
+                    foreach (var kv in _abortRule) if (kv.Key == null || !_abortAt.ContainsKey(kv.Key)) { if (gone == null) gone = new List<Settlement>(); gone.Add(kv.Key); }
+                    if (gone != null) foreach (var s in gone) _abortRule.Remove(s);
+                }
                 List<SiegeEvent> dead = null;
                 foreach (var kv in _snap) if (kv.Key == null || kv.Key.BesiegedSettlement == null || kv.Key.BesiegedSettlement.SiegeEvent != kv.Key) { if (dead == null) dead = new List<SiegeEvent>(); dead.Add(kv.Key); }
                 if (dead != null) foreach (var ev in dead) _snap.Remove(ev);
+                _koDone.RemoveWhere(e => e == null || e.BesiegedSettlement == null || e.BesiegedSettlement.SiegeEvent != e);   // oblezenia skonczone - drugie zdarzenie przychodzi od razu
                 _skLogged.RemoveWhere(m => m == null || m.IsFinalized);
                 if (!LogOn) return;
                 var sb = new StringBuilder(900);
@@ -422,14 +474,15 @@ namespace Armoury
                   .Append(", okup po odparciu tylko przy przewadze < ").Append(F(LadderRatio, "0.0")).Append(" : 1 ").Append(RepelEdgeOn ? "tak" : "nie")
                   .Append(" | konce oblezen dzis ").Append(_dEnds).Append(" (zdobycie ").Append(_dEnd[0]).Append(", pokonani ").Append(_dEnd[1]).Append(", okup ").Append(_dEnd[2])
                   .Append(", SCA odwrot ").Append(_dEnd[3]).Append(", mysl wodza ").Append(_dEnd[4]).Append(", armia ").Append(_dEnd[5]).Append(", pokoj ").Append(_dEnd[6])
-                  .Append(", frakcja zniknela ").Append(_dEnd[7]).Append(", inne ").Append(_dEnd[8]).Append("; szturmy przerwane ").Append(_dEndAbort)
-                  .Append(", w tym mysl wodza / SCA ").Append(_dEndAbortOurs).Append(')')
+                  .Append(", frakcja zniknela ").Append(_dEnd[7]).Append(", odejscie z obozu ").Append(_dEnd[8]).Append(", inne ").Append(_dEnd[9])
+                  .Append("; szturmy przerwane ").Append(_dEndAbort).Append(", w tym mysl wodza / SCA pod regula SK ").Append(_dEndAbortOurs).Append(')')
                   .Append(" | szturm do konca: godzin szturmu pod regula ").Append(_dHoldH).Append(", obca mysl wybrala inny cel ").Append(_dHoldSaved)
                   .Append(", niska ocena szturmu podniesiona ").Append(_dHoldLow).Append(", odwrot SCA wstrzymany ").Append(_dScaHeld)
                   .Append(", bitwa ponad ").Append(F(HoldMaxHours, "0")).Append(" h - mysl gry ").Append(_dHoldOld)
                   .Append(" | trebusze AI: przestawione na mury ").Append(_dAimed).Append(", na najslabszy odcinek ").Append(_dAimIdx)
                   .Append(", trafienia w mury ").Append(_dTrebWall).Append(" (odcinki rozbite ").Append(_dTrebBroken).Append(")")
-                  .Append(", w machiny przy stojacym murze ").Append(_dTrebEngUp).Append(" (po rozbiciu murow ").Append(_dTrebEngDown).Append(')')
+                  .Append(", w machiny przy stojacym murze ").Append(_dTrebEngUp).Append(" (pociski sprzed wczytania ").Append(_dTrebEngPre)
+                  .Append(", po rozbiciu murow ").Append(_dTrebEngDown).Append(')')
                   .Append(" | okup po odparciu odmowiony (przewaga >= ").Append(F(LadderRatio, "0.0")).Append(":1) ").Append(_dRepelWait)
                   .Append(" | w pamieci: mysli wodzow ").Append(_snap.Count).Append(", szturmy z SK ").Append(_skLogged.Count)
                   .Append(" | potkniecia ").Append(_dStumbles3).Append(" (od wczytania ").Append(_stumbles3).Append(").");
@@ -444,14 +497,15 @@ namespace Armoury
             for (int i = 0; i < _dEnd.Length; i++) _dEnd[i] = 0;
             _dEnds = _dEndAbort = _dEndAbortOurs = 0;
             _dHoldH = _dHoldSaved = _dHoldLow = _dScaHeld = _dHoldOld = 0;
-            _dAimed = _dAimIdx = _dTrebWall = _dTrebBroken = _dTrebEngUp = _dTrebEngDown = _dRepelWait = 0;
+            _dAimed = _dAimIdx = _dTrebWall = _dTrebBroken = _dTrebEngUp = _dTrebEngDown = _dTrebEngPre = _dRepelWait = 0;
             _dStumbles3 = 0;
         }
 
         /// <summary>Z SiegeWalls2.Reset (nowa kampania i kazde wczytanie).</summary>
         private static void Reset3()
         {
-            _capAt.Clear(); _abortAt.Clear(); _snap.Clear(); _skLogged.Clear();
+            _capAt.Clear(); _abortAt.Clear(); _abortRule.Clear(); _koDone.Clear(); _snap.Clear(); _skLogged.Clear();
+            _loadH = -1.0;
             ZeroDay3();
             _stumbles3 = 0; _err3.Clear();
         }
@@ -503,6 +557,7 @@ namespace Armoury
         /// <summary>Linia "Oblezenia 3 (start)" (z SiegeWalls2.SessionStart): latki i klucze.</summary>
         private static void SessionStart3()
         {
+            try { _loadH = CampaignTime.Now.ToHours; } catch (Exception e) { Stumble3("SessionStart3.Clock", e); }   // W: okno pociskow sprzed wczytania
             try
             {
                 var s = Settings.Current;

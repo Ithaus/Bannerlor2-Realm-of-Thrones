@@ -225,6 +225,7 @@ namespace Armoury
         {
             _bkTried = false; _beh = null; _isGentry = null; _t1 = _t2 = null; _estData = _estSettlement = _estOwner = null;
             _knights.Clear(); _knightsDay = int.MinValue; ZeroLast(); ClearDay(); _dWoke = 0; _stumbles = 0; _err.Clear(); _weekSum = 0; _weekStart = -1;
+            _dBanPass = _dBanSkip = _dBanCd = _dBanWeak = _dBanNoVassal = 0;   // AR1 (oblezenia 3): po wczytaniu innego zapisu bez liczb poprzedniej sesji
         }
 
         internal static void ZeroLast() { LastPaid = 0; }

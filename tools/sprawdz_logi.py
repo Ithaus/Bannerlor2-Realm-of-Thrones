@@ -675,8 +675,9 @@ Uzycie (Python 3, tylko odczyt):
                     oblezenie <= 150 dob; O2-5 potkniecia i ERROR 0. Log bez paczki: INFO, bez wyjatku.
 --grupa nobl      : (noc 15/16.10; galaz w-toku/noc-oblezenia, SiegeWalls2.Oblezenia3.cs) python -I tools/sprawdz_logi.py --grupa nobl <Armoury-*.log>
                     (log strumieniowo). NB-0 linia startowa i doby; KO: NB-1a KO >= OB5 koniec - 1, NB-1b "inne" <= 10%, NB-1c szturm przerwany przez mysl
-                    wodza / SCA = 0, NB-1d zdobycie spojne z OB5 i "Oblezenia 2 (zdobycie)", NB-1e przyczyny (INFO); F2: NB-2a SK (INFO), NB-2b SZ AI
-                    "bez rozstrzygniecia" <= 5%, NB-3a przerwane <= max(1, 5% KO); W: NB-3b trafienia w machiny przy stojacym murze 0, NB-3c/3d trafienia
+                    wodza / SCA pod regula SK = 0, NB-1d zdobycie spojne z OB5 i "Oblezenia 2 (zdobycie)", NB-1e przyczyny (INFO); F2: NB-2a SK (INFO), NB-2b SZ AI
+                    "bez rozstrzygniecia" <= 5%, NB-3a przerwane <= max(1, 5% KO); W: NB-3b trafienia w machiny przy stojacym murze <= 2 (bez pociskow sprzed
+                    wczytania), NB-3c/3d trafienia
                     i odcinki rozbite; F1: NB-4a okup "szturm bez zdobycia" przy przewadze >= progu 0, NB-4b (INFO); AR: NB-5a NotEnoughParty w dniu
                     zalozenia <= 2/dobe, NB-5b (INFO), NB-6a wezwania AI BK pominiete > 0, NB-6b (INFO); NB-7 potkniecia i ERROR 0; NB-8 CEL (INFO).
 --grupa oblezenia : (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia) python -I tools/sprawdz_logi.py --grupa oblezenia <Armoury-*.log>
@@ -26655,13 +26656,15 @@ NB_START = re.compile(r"^Oblezenia 3 \(start\): latki - szturm do konca: mysl wo
                       r" cel trebusza \(BesiegerCamp\.GetAttackTarget\) (.+?) \| klucze: szturm do konca (tak|nie), okup po odparciu tylko przy przewadze < ([\d.]+) : 1 (tak|nie),"
                       r" trebusze AI w mury (tak|nie), choragwie BK tylko z druzyna wasala (tak|nie) \(rycerze 179 (tak|nie)\), log (tak|nie)\.$")
 NB_DAY = re.compile(r"^Oblezenia 3 \(doba\): dzien (\d+) \| klucze: .*? \| konce oblezen dzis (\d+) \(zdobycie (\d+), pokonani (\d+), okup (\d+), SCA odwrot (\d+), mysl wodza (\d+), armia (\d+),"
-                    r" pokoj (\d+), frakcja zniknela (\d+), inne (\d+); szturmy przerwane (\d+), w tym mysl wodza / SCA (\d+)\) \| szturm do konca: godzin szturmu pod regula (\d+),"
+                    r" pokoj (\d+), frakcja zniknela (\d+), odejscie z obozu (\d+), inne (\d+); szturmy przerwane (\d+), w tym mysl wodza / SCA pod regula SK (\d+)\)"
+                    r" \| szturm do konca: godzin szturmu pod regula (\d+),"
                     r" obca mysl wybrala inny cel (\d+), niska ocena szturmu podniesiona (\d+), odwrot SCA wstrzymany (\d+)(?:, bitwa ponad \d+ h - mysl gry \d+)? \| trebusze AI: przestawione na mury (\d+),"
-                    r" na najslabszy odcinek (\d+), trafienia w mury (\d+) \(odcinki rozbite (\d+)\), w machiny przy stojacym murze (\d+) \(po rozbiciu murow (\d+)\)"
+                    r" na najslabszy odcinek (\d+), trafienia w mury (\d+) \(odcinki rozbite (\d+)\), w machiny przy stojacym murze (\d+) \(pociski sprzed wczytania (\d+),"
+                    r" po rozbiciu murow (\d+)\)"
                     r" \| okup po odparciu odmowiony \(przewaga >= [\d.]+:1\) (\d+) \| w pamieci: .*? \| potkniecia (\d+) \(od wczytania (\d+)\)\.$")
 NB_KO = re.compile(r"^Koniec oblezenia \(KO\): dzien (\d+) \| osada (\S+) \((.*?), (miasto|stolica|zamek)\) \| oblegajacy (\S+), wodz (.*?), ludzi (-?\d+|-).*? \| obroncow (\d+)"
-                   r" \| oblezenie ([\d.]+) dob \| przyczyna: (zdobycie|oblegajacy pokonani|okup|SCA odwrot|mysl wodza|armia rozwiazana|pokoj|frakcja zniknela|inne)(?: \((.*?)\))?"
-                   r" \| szturm przerwany (tak|nie) \| odparc (\d+) \| .*? \| gracz (tak|nie)\.$")
+                   r" \| oblezenie ([\d.]+) dob \| przyczyna: (zdobycie|oblegajacy pokonani|okup|SCA odwrot|mysl wodza|armia rozwiazana|pokoj|frakcja zniknela|odejscie z obozu|inne)"
+                   r"(?: \((.*?)\))? \| szturm przerwany (tak|nie) \| regula SK: (tak|nie \([^)]*\)|-|\?) \| odparc (\d+) \| .*? \| gracz (tak|nie)\.$")
 NB_DAY_OLD = re.compile(r", bitwa ponad (\d+) h - mysl gry (\d+) \| trebusze AI")
 NB_SK = re.compile(r"^Szturm do konca \(SK\): dzien (\d+) \| osada (\S+) \(")
 NB_SZ = re.compile(r"^Bitwa szturmu \(SZ\): dzien (\d+) \| osada (\S+) \(.*?\) \| gracz (tak|nie) \| tryb (.*?) \|.*\| wynik (zdobyte|odparty \(OB2\)|obronca wygral|bez rozstrzygniecia)\.$")
@@ -26681,10 +26684,11 @@ NB_ERR = ("ERROR in SiegeWalls2.O3.", "ERROR in GentryService.BannersPrefix", "E
 def nobl_main(logp):
     """nobl (noc 15/16.10, galaz w-toku/noc-oblezenia; SiegeWalls2.Oblezenia3.cs, SiegeRansom.Evaluate, GentryService.BannersPrefix, ArmyCohesionYear AR0).
     Log Armoury strumieniowo. NB-0 linia startowa (latki wpiete przy kluczach; SCA 'wpieta' albo 'bez SCA'), NB-0b linia doby w >= 90% dob linii 'Oblezenia 2 (doba)'.
-    KO: NB-1a liczba KO >= liczba 'Odsiecz (OB5) koniec' - 1, NB-1b przyczyna 'inne' <= 10% KO (>= 10 KO), NB-1c szturm przerwany przy 'mysl wodza' / 'SCA odwrot' = 0
-    (klucz szturmu do konca), NB-1d zdobycie spojne z OB5 ('ZDOBYTE' tego dnia) i z 'Oblezenia 2 (zdobycie)', NB-1e rozklad przyczyn (INFO).
+    KO: NB-1a liczba KO >= liczba 'Odsiecz (OB5) koniec' - 1, NB-1b przyczyna 'inne' <= 10% KO (>= 10 KO), NB-1c szturm przerwany przy 'mysl wodza' / 'SCA odwrot'
+    z 'regula SK: tak' = 0 (klucz szturmu do konca; Inni, skrypt, gracz w bitwie i bitwa ponad 96 h poza regula), NB-1d zdobycie spojne z OB5 ('ZDOBYTE' tego dnia) i z 'Oblezenia 2 (zdobycie)', NB-1e rozklad przyczyn (INFO).
     F2: NB-2a szturmy z SK konczace sie 'bez rozstrzygniecia' (INFO), NB-2b bitwy szturmu AI 'bez rozstrzygniecia' <= 5% (>= 10 bitew; baza 7 z 39 = 18%),
-    NB-3a szturmy przerwane (doba) <= max(1, 5% KO). W: NB-3b trafienia trebuszy AI w machiny przy stojacym murze = 0, NB-3c trafienia w mury > 0 przy >= 10
+    NB-3a szturmy przerwane (doba) <= max(1, 5% KO). W: NB-3b trafienia trebuszy AI w machiny przy stojacym murze <= 2 (pociski sprzed wczytania - pierwsze 12 h
+    sesji - osobno; 2 na zmiane zakresu obozu w locie pocisku), NB-3c trafienia w mury > 0 przy >= 10
     strzalach przestawionych, NB-3d odcinki rozbite > 0 przy >= 60 trafieniach (inaczej INFO). F1: NB-4a O0 'AI przyjalby tak (szturm bez zdobycia ...)' przy
     przewadze oblegajacy / obroncy w pelni >= prog + 0.05 = 0, NB-4b czekanie na nastepny szturm (INFO). AR: NB-5a NotEnoughParty w dniu zalozenia srednio <= 2 na dobe
     (>= 10 dob z dopiskiem; baza 14.1/dobe), NB-5b armie AI srednio (INFO, baza 9.4), NB-6a wezwania AI BK pominiete > 0 (>= 10 dob), NB-6b wezwania BK i powroty
@@ -26727,7 +26731,7 @@ def nobl_main(logp):
             m = NB_KO.match(s)
             if m:
                 kos.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(4), why=m.group(10), other=m.group(11) or "", abort=m.group(12) == "tak",
-                                rep=int(m.group(13)), player=m.group(14) == "tak"))
+                                rule=m.group(13), rep=int(m.group(14)), player=m.group(15) == "tak"))
                 continue
             m = NB_SK.match(s)
             if m:
@@ -26811,9 +26815,11 @@ def nobl_main(logp):
         ex[k["other"]] = ex.get(k["other"], 0) + 1
     rep.add("NB-1b: przyczyna 'inne' w KO", f"{len(oth)} z {n_ko}" + (f"; {dict(sorted(ex.items(), key=lambda kv: -kv[1])[:4])}" if ex else ""), "<= 10% (przy >= 10 KO)",
             (len(oth) <= 0.1 * n_ko) if n_ko >= 10 else None)
-    ours = [k for k in kos if k["abort"] and k["why"] in ("mysl wodza", "SCA odwrot") and not k["player"]]
-    rep.add("NB-1c: szturm przerwany przez mysl wodza albo odwrot SCA (KO)", f"{len(ours)}" + (f" (np. {ours[0]['st']} dzien {ours[0]['d']} - {ours[0]['why']})" if ours else "")
-            + f"; szturmow przerwanych razem {sum(1 for k in kos if k['abort'])}", "0 (klucz szturmu do konca; baza: test 6-letni 7 z 39 szturmow AI, Jeff 1 z 7)",
+    ours = [k for k in kos if k["abort"] and k["why"] in ("mysl wodza", "SCA odwrot") and k["rule"] == "tak" and not k["player"]]
+    outr = sum(1 for k in kos if k["abort"] and k["why"] in ("mysl wodza", "SCA odwrot") and k["rule"] != "tak")
+    rep.add("NB-1c: szturm przerwany przez mysl wodza albo odwrot SCA pod regula SK (KO)", f"{len(ours)}" + (f" (np. {ours[0]['st']} dzien {ours[0]['d']} - {ours[0]['why']})" if ours else "")
+            + f"; poza regula (Inni, skrypt, gracz w bitwie, ponad 96 h) {outr}; szturmow przerwanych razem {sum(1 for k in kos if k['abort'])}",
+            "0 (klucz szturmu do konca; baza: test 6-letni 7 z 39 szturmow AI, Jeff 1 z 7)",
             (not ours) if (f2_on and kos) else None)
     mis, cmiss = [], []
     for k in kos:
@@ -26847,14 +26853,15 @@ def nobl_main(logp):
     none = sum(1 for z in ai if z["res"] == "bez rozstrzygniecia")
     rep.add("NB-2b: bitwy szturmu AI 'bez rozstrzygniecia' (SZ)", f"{none} z {len(ai)}" + (f" ({none / len(ai):.0%})" if ai else ""), "<= 5% przy >= 10 bitwach (baza 18%)",
             (none <= 0.05 * len(ai)) if (f2_on and len(ai) >= 10) else None)
-    ab = tot(12) if dl else 0
-    rep.add("NB-3a: szturmy przerwane (linia doby, kazda przyczyna)", f"{ab} (w tym mysl wodza / SCA {tot(13) if dl else 0}); KO {n_ko}; godzin szturmu pod regula {tot(14) if dl else 0},"
-            f" obca mysl wybrala inny cel {tot(15) if dl else 0}, niska ocena podniesiona {tot(16) if dl else 0}, odwrot SCA wstrzymany {tot(17) if dl else 0}, bitwa ponad 96 h - mysl gry {old[0]}",
+    ab = tot(13) if dl else 0
+    rep.add("NB-3a: szturmy przerwane (linia doby, kazda przyczyna)", f"{ab} (w tym mysl wodza / SCA pod regula SK {tot(14) if dl else 0}); KO {n_ko}; godzin szturmu pod regula {tot(15) if dl else 0},"
+            f" obca mysl wybrala inny cel {tot(16) if dl else 0}, niska ocena podniesiona {tot(17) if dl else 0}, odwrot SCA wstrzymany {tot(18) if dl else 0}, bitwa ponad 96 h - mysl gry {old[0]}",
             "<= max(1, 5% KO) (pokoj i inne przyczyny w trakcie bitwy zostaja)", (ab <= max(1, 0.05 * n_ko)) if (f2_on and dl) else None)
     # ---- W
-    aimed, aimidx, hits, broken, engup, engdn = (tot(18), tot(19), tot(20), tot(21), tot(22), tot(23)) if dl else (0, 0, 0, 0, 0, 0)
-    rep.add("NB-3b: trafienia trebuszy AI w machiny obroncow przy stojacym murze", f"{engup} (po rozbiciu murow {engdn}); przestawione na mury {aimed}, na najslabszy odcinek {aimidx}",
-            "0 (klucz trebuszy w mury)", (engup == 0) if (w_on and (aimed + aimidx + hits + engup) > 0) else None)
+    aimed, aimidx, hits, broken, engup, engpre, engdn = (tot(19), tot(20), tot(21), tot(22), tot(23), tot(24), tot(25)) if dl else (0, 0, 0, 0, 0, 0, 0)
+    rep.add("NB-3b: trafienia trebuszy AI w machiny obroncow przy stojacym murze", f"{engup} (pociski sprzed wczytania {engpre}, po rozbiciu murow {engdn}); przestawione na mury {aimed},"
+            f" na najslabszy odcinek {aimidx}", "<= 2 (klucz trebuszy w mury; pociski z zapisu - pierwsze 12 h sesji - osobno, 2 na zmiane zakresu obozu w locie pocisku)",
+            (engup <= 2) if (w_on and (aimed + aimidx + hits + engup) > 0) else None)
     rep.add("NB-3c: trafienia trebuszy AI w mury po przestawieniu", f"trafienia w mury {hits}, strzaly przestawione {aimed}", "> 0 przy >= 10 przestawionych",
             (hits > 0) if (w_on and aimed >= 10) else None)
     rep.add("NB-3d: odcinki murow rozbite przez trebusze AI", f"{broken} przy {hits} trafieniach", "> 0 przy >= 60 trafieniach (inaczej INFO)", (broken > 0) if (w_on and hits >= 60) else None)
@@ -26869,7 +26876,7 @@ def nobl_main(logp):
         if any(z["st"] == o["st"] and o["d"] <= z["d"] <= o["d"] + 30 for z in szs):
             after += 1
     rep.add("NB-4b: wodz czeka na nastepny szturm po odparciu (INFO)", f"O0 z 'po odparciu przewaga' {len(held)} (osad {len({o['st'] for o in held})}), potem szturm w 30 dob {after};"
-            f" linia doby: okup odmowiony {tot(24) if dl else 0}", "INFO (Mardosh 15.10: okup przy 7.1:1)", None)
+            f" linia doby: okup odmowiony {tot(26) if dl else 0}", "INFO (Mardosh 15.10: okup przy 7.1:1)", None)
     # ---- AR
     acw = [a for a in acs if a["who"] is not None]
     if acw:
@@ -26893,7 +26900,7 @@ def nobl_main(logp):
     rep.add("NB-6b: wezwania BK i powroty rycerzy na dobe (INFO)", f"wezwania BK srednio {sum(r['summ'] for r in rs) / len(rs):.1f}, wrocili do majatku {sum(r['home'] for r in rs) / len(rs):.1f} w {len(rs)} dobach"
             if rs else "brak linii 179", "INFO (baza ok. 34.8 / 36.5 na dobe - powinny spasc)", None)
     # ---- NB-7
-    stum = tot(25) if dl else 0
+    stum = tot(27) if dl else 0
     ne = sum(errs.values())
     rep.add("NB-7: potkniecia (linia doby) i ERROR nowych miejsc", f"potkniecia {stum}, ERROR {ne}" + (f" ({ {k: v for k, v in errs.items() if v} })" if ne else ""), "0 / 0", stum == 0 and ne == 0)
     # ---- NB-8 CEL (INFO)

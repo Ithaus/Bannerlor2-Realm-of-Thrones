@@ -1021,7 +1021,7 @@ namespace Armoury
                 if (a.Repelled) { }
                 else if (w == BattleSideEnum.Attacker) _dWon++;
                 else if (w == BattleSideEnum.Defender) _dDefWon++;
-                else { _dNone++; SiegeWalls2.NoteAborted(a.St); }                    // oblezenia 3 (KO): szturm AI przerwany bez zwyciezcy
+                else { _dNone++; SiegeWalls2.NoteAborted(a.St, me); }                // oblezenia 3 (KO): szturm AI przerwany bez zwyciezcy (i czy pod regula F2)
                 bool held = a.Repelled || w == BattleSideEnum.Defender;
                 if (a.FromWalls && held) _dFromWallsHeld++;
                 if (a.Outside && LogOn)
