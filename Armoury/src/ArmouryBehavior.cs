@@ -1407,6 +1407,7 @@ namespace Armoury
         private void OnSessionLaunched(CampaignGameStarter starter)
         {
             SaveText.ReportAfterLoad();   // 161: ile dlugich napisow uratowal ratunek przy wczytaniu
+            try { CombatAiLevel.Apply(); } catch (Exception e) { Log.Error("CombatAiLevel.Apply", e); }   // Jeff 16.10: SI walki kampanii na Realistic (CombatAiRealistic) + linia opcji trudnosci
             try { RecruitKit.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("RecruitKit.ResolvePending", e); }   // 161: komplety rekrutow dopiero teraz (w SyncData bohaterow nie ma)
             try { PeopleBook.ResolveOrigin("wczytanie"); } catch (Exception e) { Log.Error("PeopleBook.ResolveOrigin", e); }     // E4/7: slowniki pochodzenia partii z zapisu (w SyncData partii nie ma)
             try { VillageBook.Resolve("wczytanie albo nowa kampania"); } catch (Exception e) { Log.Error("VillageBook.Resolve", e); }   // E4/11: plik ukladu wiosek, okregi, stan z zapisu (arm_district)
