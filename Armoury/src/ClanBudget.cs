@@ -369,6 +369,31 @@ namespace Armoury
             catch (Exception e) { Stumble("ChestOf", e); return false; }
         }
 
+        /// <summary>TP (16.10, recenzja - TourneyPay.ClanSpare): budzet wlaczony, ale w tej sesji jeszcze nie policzony (Pending - do pierwszego ClanBudget.Daily
+        /// po wczytaniu albo starcie kampanii): G, R i wojna rodu tym samym wzorem co budzet (Ceiling: max(War Reserve Floor; War Reserve Days x D) + War Reserve
+        /// Per Adult x dorosli), D z zapisu budzetu (D wczorajszej doby) albo G/60 (start 166). Te same wykluczenia co ChestOf: rod bez budzetu (Eligible),
+        /// kompania najemna, Straz bez zoldu (Zero), dluznik i rod w zajeciu (168). Poza Pending - false (wolajacy bierze ChestOf). Tylko odczyt.</summary>
+        internal static bool PendingChestOf(Clan c, out double G, out double R, out bool war)
+        {
+            G = 0; R = 0; war = false;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !Pending || !Eligible(c) || c.IsUnderMercenaryService) return false;
+                if (s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c)) return false;
+                if (DebtLadder.On && (DebtLadder.IsDebtor(c) || DebtLadder.IsSeized(c))) return false;
+                long g = ClanIncomeBook.FamilyGoldOf(c);
+                double[] sv;
+                double D = _saved.TryGetValue(c.StringId, out sv) && sv != null && sv.Length > 0 && sv[0] >= 0 ? sv[0] : Math.Max(0, g / 60.0);
+                war = AtWar(c);
+                double f, chest;
+                Ceiling(D, g, war, AdultsOf(c), out R, out f, out chest);
+                G = g;
+                return true;
+            }
+            catch (Exception e) { Stumble("PendingChestOf", e); return false; }
+        }
+
         /// <summary>W6 (KingdomTreasury.Scutage.cs - krok korony biegnie przed ClanBudget.Daily, wiec budzet z wczoraj): pulap WLASNY druzyn rodu do podstawy
         /// tarczowego = pulap partii z ostatniego budzetu bez przydzialu korony (W5), bez udzialu dworu dopisanego do pulapu w wojnie (rod z luzem placi dwor
         /// w calosci - to nie jest zaoszczedzony zold) i bez miejsca kredytu wojennego; reserve = rezerwa wojenna R z tego samego budzetu. false: rod bez

@@ -4728,15 +4728,15 @@ namespace Armoury
         [SettingPropertyGroup("Player fees and bets")]
         public bool PlayerSmallSourcesClosed { get; set; } = true;
 
-        [SettingPropertyBool("Tourney Payer Chain", HintText = "a tournament prize, your bet winnings, the arena purse and winnings at the tavern board are paid in full when the host town's treasury runs short: what the town cannot spare is paid by the lord who holds the town, then by the ruler of its realm - each only from what his house can spare above its reserve, never his men's wages - and you are told who paid how much. Off = the town alone pays what it can spare, as before")]
+        [SettingPropertyBool("Tourney Payer Chain", HintText = "a tournament prize, your bet winnings, the arena purse and winnings at the tavern board are paid in full when the host town's treasury runs short: what the town cannot spare is paid by the lord who holds the town, then by the ruler of its realm - each only from what his house can spare above its reserve, never his men's wages - and you are told who paid how much. In a town of your own you are the host: only its treasury pays and the rest is yours to bear. Off = the town alone pays what it can spare, as before")]
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneyPayerChain { get; set; } = true;
 
-        [SettingPropertyBool("Tourney Debts", HintText = "what neither the town nor its lords can pay at once becomes that town's debt to you: every day the town, its lord and the ruler of its realm pay it off from what they can spare, and you are told each time they pay - a realm at war with yours pays nothing until peace. Off = the unpaid rest is lost, as before")]
+        [SettingPropertyBool("Tourney Debts", HintText = "what neither the town nor its lords can pay at once becomes that town's debt to you: every day the town, its lord and the ruler of its realm pay it off from what they can spare - a lord no faster than his war chest allows - and you are told each time they pay at least 50 (or the rest); a realm at war with yours pays nothing until peace. Off = the unpaid rest is lost, as before")]
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneyDebts { get; set; } = true;
 
-        [SettingPropertyBool("Tourney Seagard Catch Up", HintText = "one-time amends for the Seagard tournament of 16 October in Ithauser's campaign: Seagard owes you the 1,300 of prize money and the 222 of your bet it could not pay, and pays them off like any other town debt. Happens once per campaign and only for the hero Ithauser (needs Tourney Debts). Off = no amends")]
+        [SettingPropertyBool("Tourney Seagard Catch Up", HintText = "one-time amends for the Seagard tournament of 16 October in Ithauser's campaign: Seagard owes you the 1,300 of prize money and the 222 of your bet it could not pay, and Seagard, its lord and the ruler pay it in the first hour as a prize would be paid; whatever is left is paid off like any other town debt. Only for a save made before this change, with the hero Ithauser, after that tournament - decided once, at the first load (needs Tourney Debts). Off = no amends")]
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneySeagardCatchUp { get; set; } = true;
 

@@ -1600,16 +1600,24 @@ namespace Armoury
         // i "only 1205 of the 1425 denars you won on your bet") - ogloszona nagroda i wygrany zaklad musza byc zaplacone: TourneyPay.cs (PayChain, dlugi, wyrownanie).
         // D1+D4 lancuch: kasa osady z nadwyzki (jak dotad, zaklad: stawka gracza zawsze) -> gospodarz (rod osady) -> rod panujacy krolestwa osady; rod daje tylko
         // z kiesy rodziny ponad rezerwe rodu R budzetu 166 i z kiesy glowy ponad zold dnia (nie mniej niz Family Purse Floor) - rod bez budzetu, dluznik, rod
-        // w zajeciu, najemnik i gracz nie placa. Komunikat: kto ile zaplacil. Dotyczy zlota TXP (nagroda, premie meczu), ceny nagrody zamiast przedmiotu, wygranej
-        // zakladu, planszy i areny; zapasy wsi bez zmian. Wylaczone (z Tourney Debts) = kasa osady sama, "could pay only", jak dotad
-        public bool TourneyPayerChain = true;              // a tournament prize, your bet winnings, the arena purse and winnings at the tavern board are paid in full when the host town's treasury runs short: what the town cannot spare is paid by the lord who holds the town, then by the ruler of its realm - each only from what his house can spare above its reserve, never his men's wages - and you are told who paid how much. Off = the town alone pays what it can spare, as before
-        // D2 dlugi: reszta, ktorej nie pokryl lancuch, to dlug osady wobec gracza (zapis "arm_tp_debts"); splata co dobe i w pierwszej godzinie sesji tym samym
-        // lancuchem (kto teraz trzyma osade i krolestwo), kazdy platnik najwyzej to, co moze dac tej doby; krolestwo osady w wojnie z krolestwem gracza - czeka
-        // do pokoju. Linia "Turniej-platnik (TP): dzien N" z lista dlugow. Wylaczone = reszta przepada (licznik), dlugi z zapisu czekaja nieruszone
-        public bool TourneyDebts = true;                   // what neither the town nor its lords can pay at once becomes that town's debt to you: every day the town, its lord and the ruler of its realm pay it off from what they can spare, and you are told each time they pay - a realm at war with yours pays nothing until peace. Off = the unpaid rest is lost, as before
-        // D3 wyrownanie (jednorazowe): turniej w Seagard 16.10 juz zaplacony za malo (log: TXP 1300 niezaplacone, zaklad 222 = 1425 - 1203) - przy pierwszym starcie
-        // sesji po zmianie (albo pierwszej dobie po 109020) dlug Seagard (ROT_town33) +1522; tylko bohater Ithauser (kampania Jeffa), flaga w zapisie, wymaga Tourney Debts
-        public bool TourneySeagardCatchUp = true;          // one-time amends for the Seagard tournament of 16 October in Ithauser's campaign: Seagard owes you the 1,300 of prize money and the 222 of your bet it could not pay, and pays them off like any other town debt. Happens once per campaign and only for the hero Ithauser (needs Tourney Debts). Off = no amends
+        // w zajeciu, najemnik i gracz nie placa. Pierwsza doba po wczytaniu (budzet 166 jeszcze nie liczony): R tym samym wzorem z D z zapisu budzetu albo G/60.
+        // Osada rodu gracza: gospodarzem jest gracz - tylko kasa osady, bez rodu panujacego; reszta przepada (bez dlugu wobec samego siebie).
+        // Komunikat: kto ile zaplacil. Dotyczy zlota TXP (nagroda, premie meczu), ceny nagrody zamiast przedmiotu, wygranej zakladu, planszy i areny; zapasy wsi
+        // bez zmian. Wyjatek w lancuchu, zanim cokolwiek przeszlo - stara sciezka. Wylaczone (z Tourney Debts) = kasa osady sama, "could pay only", jak dotad
+        public bool TourneyPayerChain = true;              // a tournament prize, your bet winnings, the arena purse and winnings at the tavern board are paid in full when the host town's treasury runs short: what the town cannot spare is paid by the lord who holds the town, then by the ruler of its realm - each only from what his house can spare above its reserve, never his men's wages - and you are told who paid how much. In a town of your own you are the host: only its treasury pays and the rest is yours to bear. Off = the town alone pays what it can spare, as before
+        // D2 dlugi: reszta, ktorej nie pokryl lancuch, to dlug osady wobec gracza (zapis "arm_tp_debts"); splata co dobe (PO budzecie 166 tej doby) i w pierwszej
+        // godzinie sesji tym samym lancuchem (kto TERAZ trzyma osade i krolestwo; osada teraz gracza - tylko jej kasa). Kasa osady - z nadwyzki; rod - jak w lancuchu,
+        // ale najwyzej TEMPO jak chleb biedoty: (kiesa rodziny - R) / War Chest Days na dobe x czesc, ktorej nie bierze zold (wojna 1 - War Chest To Wages = 0.2,
+        // pokoj 1 - Peace Chest Share x War Chest To Wages = 0.68), minus chleb i splaty tego rodu dzis. Splata dopiero od min(reszta, 50) - drobne kwoty czekaja,
+        // bez codziennych komunikatow. Krolestwo osady w wojnie z krolestwem gracza - czeka do pokoju. Linia "Turniej-platnik (TP): dzien N" z lista dlugow.
+        // Wylaczone = reszta przepada (licznik), dlugi z zapisu czekaja nieruszone
+        public bool TourneyDebts = true;                   // what neither the town nor its lords can pay at once becomes that town's debt to you: every day the town, its lord and the ruler of its realm pay it off from what they can spare - a lord no faster than his war chest allows - and you are told each time they pay at least 50 (or the rest); a realm at war with yours pays nothing until peace. Off = the unpaid rest is lost, as before
+        // D3 wyrownanie (jednorazowe): turniej w Seagard 16.10 juz zaplacony za malo (log: TXP 1300 niezaplacone, zaklad 222 = 1425 - 1203; zrzut mowil 1205).
+        // Decyzja RAZ przy pierwszym starcie sesji (flaga w zapisie 0/1/2/3): tylko zapis wczytany BEZ klucza "arm_tp_debts" (sprzed tej zmiany), bohater Ithauser,
+        // ROT_town33 (Seagard) jest miastem, czas przy starcie >= 109020 (zapis sprzed konca doby turnieju - nie: turniej rozegrany jeszcze raz zaplaci lancuch);
+        // inaczej "nie dotyczy" na zawsze (nowa kampania z tym imieniem, zapis po zmianie). Czeka tylko na wlaczenie tego klucza i Tourney Debts. Wtedy dlug
+        // Seagard +1522, komunikat i splata w pierwszej godzinie regula wyplaty (pelna podloga, bez tempa - zalegla wyplata z turnieju), reszta jak kazdy dlug
+        public bool TourneySeagardCatchUp = true;          // one-time amends for the Seagard tournament of 16 October in Ithauser's campaign: Seagard owes you the 1,300 of prize money and the 222 of your bet it could not pay, and Seagard, its lord and the ruler pay it in the first hour as a prize would be paid; whatever is left is paid off like any other town debt. Only for a save made before this change, with the hero Ithauser, after that tournament - decided once, at the first load (needs Tourney Debts). Off = no amends
 
         // --- Hideout spotted ---
         public bool HideoutFlagEnabled = true;             // a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there
