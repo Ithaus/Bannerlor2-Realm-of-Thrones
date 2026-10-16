@@ -2446,3 +2446,10 @@ DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Au
 - Jeff dopisal (wiazace): "w opisie wioski - jak w cos inwestuje ... ze mam tam inwestycje i ile procent produkcji i w co. Poboczne wioski moga produkowac - kazda pojedyncza
   cos innego w danym obszarze, wiadomo w sniegu nie robimy oliwek, i sumuje sie wszystkie wioski poboczne regionu i pokazuje sie ten zasob, ktorego produkcja (ikona) jest glowna".
   -> projekt inwestycji wznowiony z tym wymaganiem (+ rozpoznanie specjalizacji: towary ROT, klimat, teren, ikona wsi) - specjalizacja wiosek i inwestycje projektowane RAZEM.
+- Jeff (zmiana produkcji): "zmiana produkcji nie powinna odbywac sie od tak - mlyn na tartak to nie trwa od tak, najpierw inwestycja, strata, potem jakis czas i zmienia sie
+  produkcja ... ale nie chce, aby zabilo to ekonomie". Projekt (do dopisania po workflow inwestycji): prog oplacalnosci +25% przez ~60 dni, koszt przebudowy do rzemieslnikow,
+  okres przejsciowy (stary towar gasnie, nowy rosnie; sezon / ~2 mies. / dluzej dla sadow i winnic, skrocone), najwyzej 1 wioska na okreg naraz i maly udzial regionu na sezon;
+  AI te same zasady; ikona wsi glownej = towar o najwiekszej WARTOSCI produkcji okregu.
+- Jeff (zycie codzienne, duzy temat): kazdy towar - produkcja, kg/sztuke, cena za kg; produkcja pod potrzeby 52M ludzi (ok. 53M kg jedzenia/dzien, wedlug regionu i warstwy);
+  codzienne wydatki ludzi, zamoznosc obszaru, awans spoleczny, wojny niszcza dobrobyt, wskaznik "zamoznosc na mieszkanca" (nie PKB), sklad warstw w regionie/miescie/wsi.
+  -> audyt i projekt workflow wf_c4f075f1-def (dane: towary, ludnosc, historia -> 2 modele -> synteza do docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md). Najpierw pokazac Jeffowi.
