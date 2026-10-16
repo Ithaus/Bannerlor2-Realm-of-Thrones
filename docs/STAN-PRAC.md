@@ -2208,3 +2208,10 @@ Kopia zapisu Jeffa: D:/Backup-Bannerlord/zapisy-jeffa/IronmanjCg6MOpv28iN-2026-1
 W TOKU: workflow wf_698dd431-d80 (rozpoznanie 10 tematow -> kod -> recenzja -> poprawki); galezie od 39f8fe72 w drzewach zb/n-<klucz>:
 w-toku/noc-misje, noc-harmony, noc-sprzet (filtr sprzetu + zbrojownia gracza), noc-oboz, noc-ceny (kusze, placek/marchew, towarzysze), noc-skarbiec, noc-oblezenia (+ armie), noc-drobne
 (AUD-P1-5, Joffrey, obserwacje, AB-10, D1-D10); wydajnosc - tylko rozpoznanie, kod po scaleniu. Potem: scalenie do zbior-e8 (tools/scalanie/scal.sh), autotest, WGRANIE 62.
+- (17:50 zegara komp.) Rozpoznanie 10 tematow GOTOWE (wyniki: scratchpad sesji 6ba92574 roz/wyniki/*.json). Audyt ekonomii GOTOWY: roz/audyt-ekonomii/RAPORT-AUDYT-EKONOMII.md
+  (wnioski: zloto sie nie gubi; lud ma budzet 105 tys. d/dobe na towary, ktorych nie ma - owoce, miod, jaja, futra, sol; warsztaty 3+1 na miasto niezaleznie od ludnosci, 42% stoi;
+  drewno ZOSTAJE 100 kg (kuznia w kg dziala), blad jednostki jest w weglu 0.5 kg; nowa skrzynia: sakiewki zolnierzy +140 tys./d). W TOKU galaz w-toku/noc-ekonomia (wf_8a5f4542-fee):
+  N2 wegiel 5 kg, N3 sol x3.5, futra x3, helmy, N10 bez kopalni BK w miastach, N11 blokada jednostki ladunku, N12 kuznia, N1 pomiary, N4 doplata od sprzedanego, N6 markietani, N7 straznik bez pamieci, N8 pozyczka przed darem.
+  Scalone do w-toku/zbior-e8 (zb/int): noc-misje (a3211d9d), noc-oboz (3dd2e2e8; dispatch noboz recznie przeniesiony poza petle argumentow), noc-skarbiec (bbb91b9c), noc-drobne (6164fb75).
+  W TOKU autotest fin50a (6164fb75, zapis F d240, 15 dob). Baza wydajnosci WGRANIA 61: 18.9 s/dobe, Armoury 7% klatki (scratchpad test/BAZA-61.txt).
+  DECYZJA CLAUDE: straznik Harmony (noc-harmony) tylko raportuje, nie przestawia latek sam (recenzja: dubel latki i Unpatch na metodzie pochodnej) - drewno juz dziala, innych zepsutych latek 0 z ok. 470.
