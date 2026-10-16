@@ -57,7 +57,7 @@ namespace Armoury
         private static bool _installed, _wired, _reported;
         private static string _guard = "nie zakladany";
 
-        private static bool GuardOn { get { var s = Settings.Current; return s == null || s.PatchTargetGuard; } }
+        private static bool GuardOn { get { var s = Settings.Current; return s != null && s.PatchTargetGuard; } }   // noc 15/16.10: bez ustawien = tylko raport
 
         private static void Stumble(string where, Exception e)
         {
