@@ -426,6 +426,41 @@ namespace Armoury
         }
 
         /// <summary>
+        /// Zamienniki jedzenia (B2, FoodSubstitute - postfiks UpdateDemandShift PRZED DemandPostfix): gorna granica popytu, ktory AddOffer dopisze dzis do kategorii c
+        /// tej osady (jednostki slownika budzetu dnia, jak `add` w AddOffer: zloto / (indeks^0.15 x czesc domowa)). Lista dostatku: oferta x waga calej grupy kategorii
+        /// (udzial kategorii w grupie zalezy od slownika, wiec bierzemy cala grupe); stara regula: cala oferta, gdy c jest wsrod BetterIds. Te same warunki co AnchorDict;
+        /// 0 = kategoria bez oferty. Tylko odczyt (osada spoza slownika ludu - 0, Folk nie jest zakladany). Wyjatek - nieskonczonosc (zamiennik pominiety) i potkniecie.
+        /// </summary>
+        internal static double OfferCapFor(Town town, ItemCategory c)
+        {
+            try
+            {
+                if (town == null || c == null || town.Settlement == null || !Live) return 0;
+                Folk f;
+                if (!_f.TryGetValue(town.Settlement, out f) || f == null || f.Kind > 1 || !f.Cal || (f.Kind == 1 && !CastleLive)) return 0;
+                long off = f.Offer[0] + f.Offer[1] + f.Offer[2];
+                if (off <= 0) return 0;
+                double x = 0;
+                if (LadderOn)
+                {
+                    EnsureLx();
+                    int i;
+                    if (_lxIdx != null && _lxIdx.TryGetValue(c, out i) && i >= 0 && i < _lxGroup.Length) x = off * LxWeight[_lxGroup[i]];
+                }
+                else
+                {
+                    if (_better == null) _better = CatsOf(BetterIds, out _betterText);
+                    if (_better.Contains(c)) x = off;
+                }
+                if (!(x > 0)) return 0;
+                double idx = Math.Max(0.01, town.GetItemCategoryPriceIndex(c));
+                double hs = Math.Max(0.05, HistoricalPrices.HouseShare(c));
+                return x / (Math.Pow(idx, OfferIdxPow) * hs);
+            }
+            catch (Exception e) { Stumble("OfferCapFor", e); return double.PositiveInfinity; }
+        }
+
+        /// <summary>
         /// Postfiks Priority.Low na BK EconomyPatches.CalculateBudget (po HistoricalPrices.BudgetPostfix, przed pomiarem E5/0): w nawiasie konsumpcji tej osady
         /// czlon dobrobytu wiersza (liczony od nowa przy kazdej pozycji polki) x czynnik grupy - jak slownik (K1: nie caly wynik, bez m^k). Wywolania spoza
         /// nawiasu (RawPrice.HouseBudget) - bez zmian. Wyjatek - wynik bez zmian.

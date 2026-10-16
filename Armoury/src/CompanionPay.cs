@@ -20,8 +20,10 @@ namespace Armoury
     /// (C1) CompanionNavalSkillsPriced: postfiks na BKCompanionPrices.GetCostFactor (metoda zadeklarowana w BK - pulapka Harmony z 15.10): zeglarz 3 (jak jazda i atletyka),
     /// bosman i kapitan 10 (role w druzynie jak zwiad i inzynieria). Ta jedna regula BK dziala w cenie werbunku, w zoldzie bohatera (GetHeroWage - BKPartyWageModel.cs:336,
     /// takze bohaterowie w partiach AI) i w kontrakcie BK gracza-najemnika (Contract.cs:42, 54). SAMOSPRAWDZENIE po wpieciu: czynniki i zold jednego wedrowca z
-    /// umiejetnosciami morskimi wobec wlasnego rachunku; gdy czynnik nie wraca zmieniony (latka nie wolana) - zapas: postfiksy na GetHeroWage i GetHiringPrice
-    /// odejmuja roznice czesci morskiej.
+    /// umiejetnosciami morskimi wobec wlasnego rachunku; zapas OSOBNO dla kazdej metody (poprawka po recenzji 16.10): zold (GetHeroWage) i cena bez sprzetu
+    /// (GetHiringPrice) porownane z wynikiem z nowymi czynnikami i z wynikiem BK (15) - zapas danej metody (postfiks odejmuje czesc morska) wlacza sie tylko wtedy,
+    /// gdy ta metoda daje wynik BK (latka czynnika w niej niewidoczna); wynik ani nowy, ani BK - rozjazd bez zapasu (nie odejmujemy drugi raz). Nasz wlasny rachunek
+    /// (SkillSum) bierze czynniki morskie wprost (NavalFactor), nie przez metode BK - jest niezalezny od tego, czy latka dziala.
     /// (C2) CompanionHireByWage: postfiks na GetCompanionHiringPrice zadeklarowanej w typie czynnego modelu (DeclaringType -> DeclaredMethod): cena = czesc sprzetu
     /// BK (cena z BK - cena BK bez sprzetu = sprzet / 2 x perki) + CompanionHireDays x zold dzienny x perki; zold = (int)max((2 + 2 x poziom) x BaseWage BK, 1) + suma
     /// umiejetnosci x czynnik x 0.005 (oczekiwana wartosc BK GetHeroWage); perki gracza (PaidInPromise, GreatInvestor) = cena BK bez sprzetu / (10 x poziom + suma).
@@ -32,7 +34,9 @@ namespace Armoury
     internal static class CompanionPay
     {
         private static Harmony _h;
-        private static bool _factorHooked, _priceHooked, _fallback;
+        private static bool _factorHooked, _priceHooked;
+        private static bool _fbWage, _fbHire;               // zapas C1 czynny w tej sesji: zold (GetHeroWage) / cena bez sprzetu (GetHiringPrice) - kazdy osobno z samosprawdzenia
+        private static bool _fbWageHooked, _fbHireHooked;   // postfiksy zapasu wpiete (raz na proces; dzialaja tylko przy fladze sesji)
         private static Type _bkType;
         private static MethodInfo _mFactor, _mHiring, _mWage;
         private static PropertyInfo _pSet, _pBaseWage;
@@ -70,7 +74,7 @@ namespace Armoury
             if (f > 0) __result = f;
         }
 
-        /// <summary>Zapas C1 (czynnik nie wraca zmieniony): roznica czesci morskiej bohatera (umiejetnosc > 30 x (15 - nowy czynnik)).</summary>
+        /// <summary>Zapas C1 (metoda BK nie widzi latki czynnika): roznica czesci morskiej bohatera (umiejetnosc > 30 x (15 - nowy czynnik)).</summary>
         private static float NavalCut(Hero h)
         {
             float cut = 0f;
@@ -86,13 +90,13 @@ namespace Armoury
 
         public static void WageFallbackPostfix(Hero __0, ref int __result)
         {
-            try { if (_bypass || !_fallback || __0 == null || !NavalOn) return; __result = Math.Max(0, __result - (int)Math.Round(NavalCut(__0) * 0.005f)); }
+            try { if (_bypass || !_fbWage || __0 == null || !NavalOn) return; __result = Math.Max(0, __result - (int)Math.Round(NavalCut(__0) * 0.005f)); }
             catch (Exception e) { Stumble("WageFallbackPostfix", e); }
         }
 
         public static void HiringFallbackPostfix(Hero __0, ref int __result)
         {
-            try { if (_bypass || !_fallback || __0 == null || !NavalOn) return; __result = Math.Max(1, __result - (int)Math.Round(NavalCut(__0))); }   // perki gracza pominiete (ok. 1)
+            try { if (_bypass || !_fbHire || __0 == null || !NavalOn) return; __result = Math.Max(1, __result - (int)Math.Round(NavalCut(__0))); }   // perki gracza pominiete (ok. 1)
             catch (Exception e) { Stumble("HiringFallbackPostfix", e); }
         }
 
@@ -106,17 +110,22 @@ namespace Armoury
             return f;
         }
 
+        /// <summary>Suma umiejetnosci (> 30) x czynnik: przy wlaczonym C1 (i bez _bypass) czynniki morskie wprost z NavalFactor, reszta przez metode BK (delegat) -
+        /// wynik nie zalezy od tego, czy latka czynnika jest widoczna w metodzie (poprawka po recenzji 16.10: dotad zapas odejmowal czesc morska drugi raz).
+        /// Przy _bypass albo wylaczonym C1 - czynniki BK (15).</summary>
         private static float SkillSum(object model, Hero h)
         {
             var f = FactorOf(model);
+            bool naval = NavalOn && !_bypass;
             float sum = 0f;
             foreach (var sk in MBObjectManager.Instance.GetObjectTypeList<SkillObject>())
             {
                 if (sk == null) continue;
                 int v = h.GetSkillValue(sk);
-                if (v > 30) sum += (float)v * f(sk);
+                if (!(v > 30)) continue;
+                int nf = naval ? NavalFactor(sk.StringId) : 0;
+                sum += (float)v * (nf > 0 ? nf : f(sk));
             }
-            if (_fallback && NavalOn && !_bypass) sum -= NavalCut(h);   // zapas C1: czynnik BK wraca 15 - czesc morska odjeta jak w GetHeroWage / GetHiringPrice
             return sum;
         }
 
@@ -163,6 +172,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 lock (Gate) _factorOf.Clear();   // nowa kampania = nowe modele BK
+                _fbWage = _fbHire = false;        // zapas od nowa - samosprawdzenie tej sesji mierzy metody BK bez niego
                 if (_h == null) _h = new Harmony("com.jeff.armoury.companionpay");
                 if (_bkType == null) _bkType = AccessTools.TypeByName("BannerKings.Models.Vanilla.BKCompanionPrices");
                 if (_bkType == null) { Log.Info(Head + "bez Banner Kings (BKCompanionPrices) - cena i zold towarzyszy jak w grze | potkniecia 0."); return; }
@@ -231,48 +241,88 @@ namespace Armoury
                 if (got != want) factorOk = false;
                 parts.Add(id + " " + got + " (oczekiwane " + want + ")");
             }
-            // zold wedrowca z umiejetnosciami morskimi: GetHeroWage BK wobec wlasnego rachunku (BK zaokragla losowo - roznica < 1)
-            string wageTxt = "brak wedrowca z umiejetnosciami morskimi";
+            // wedrowiec z najwieksza czescia morska (wyrazna roznica wyniku z nowymi czynnikami i wyniku BK)
+            string wageTxt = "zold: brak wedrowca z umiejetnosciami morskimi", hireTxt = "cena bez sprzetu: -", priceTxt = "";
+            bool wageOk = true, hireOk = true, wageBk = false, hireBk = false;
             Hero probe = null;
             try
             {
-                var mar = MBObjectManager.Instance.GetObject<SkillObject>("Mariner");
+                float best = 0f;
                 foreach (var h in Hero.AllAliveHeroes)
-                    if (h != null && h.IsWanderer && mar != null && h.GetSkillValue(mar) > 30) { probe = h; break; }
-                if (probe != null && _mWage != null)
                 {
-                    float want = SkillSum(bk, probe) * 0.005f;
-                    int got = (int)_mWage.Invoke(bk, new object[] { probe });
-                    bool ok = Math.Abs(got - want) < 1.0001f;
-                    if (!ok) factorOk = false;
-                    wageTxt = "zold BK " + probe.Name + " " + got + " (oczekiwane " + want.ToString("0.0", Inv) + ")";
-                    if (_priceHooked && HireOn && model != null)
+                    if (h == null || !h.IsWanderer) continue;
+                    float c = NavalCut(h);
+                    if (c > best) { best = c; probe = h; }
+                }
+                if (probe != null)
+                {
+                    float sOurs = SkillSum(bk, probe), s15;
+                    _bypass = true;
+                    try { s15 = SkillSum(bk, probe); }
+                    finally { _bypass = false; }
+                    // zold: GetHeroWage BK wobec rachunku z nowymi czynnikami i z czynnikami BK (BK zaokragla losowo - roznica < 1)
+                    if (_mWage != null)
                     {
-                        int bkPrice, ours;
+                        float want = sOurs * 0.005f, want15 = s15 * 0.005f;
+                        int got = (int)_mWage.Invoke(bk, new object[] { probe });
+                        wageOk = Math.Abs(got - want) < 1.0001f;
+                        wageBk = !wageOk && Math.Abs(got - want15) < 1.0001f;
+                        wageTxt = "zold BK " + probe.Name + " " + got + " (oczekiwane " + want.ToString("0.0", Inv) + ", BK bez latki " + want15.ToString("0.0", Inv) + ") - "
+                                  + (wageOk ? "zgodny" : wageBk ? "rozjazd: latka czynnika niewidoczna" : "rozjazd nieznany");
+                    }
+                    // cena bez sprzetu: GetHiringPrice BK (perki gracza w obu wynikach) wobec wyniku BK bez latki x (10 x poziom + suma nowa) / (10 x poziom + suma BK)
+                    if (_mHiring != null)
+                    {
+                        int p15, p;
                         _bypass = true;
-                        try { bkPrice = Campaign.Current.Models.CompanionHiringPriceCalculationModel.GetCompanionHiringPrice(probe); }
+                        try { p15 = (int)_mHiring.Invoke(bk, new object[] { probe, false }); }
                         finally { _bypass = false; }
-                        _stat = true;
-                        try { ours = Campaign.Current.Models.CompanionHiringPriceCalculationModel.GetCompanionHiringPrice(probe); }
-                        finally { _stat = false; }
-                        wageTxt += "; cena " + bkPrice + " -> " + ours + " d (poziom " + probe.Level + ")";
+                        p = (int)_mHiring.Invoke(bk, new object[] { probe, false });
+                        int lv = probe.CharacterObject != null ? probe.CharacterObject.Level : probe.Level;
+                        float r15 = 10f * lv + s15;
+                        float exp = r15 > 0.5f ? p15 * (10f * lv + sOurs) / r15 : p15;
+                        float tol = 2f + 0.002f * Math.Abs(exp);
+                        hireOk = Math.Abs(p - exp) <= tol;
+                        hireBk = !hireOk && Math.Abs(p - p15) <= tol;
+                        hireTxt = "cena bez sprzetu " + p + " (oczekiwane " + exp.ToString("0", Inv) + ", BK bez latki " + p15 + ") - "
+                                  + (hireOk ? "zgodna" : hireBk ? "rozjazd: latka czynnika niewidoczna" : "rozjazd nieznany");
                     }
                 }
             }
-            catch (Exception e) { Stumble("SelfCheck(zold)", e); wageTxt = "wyjatek (ERROR w logu)"; factorOk = false; }
-            // zapas C1: czynnik nie wraca zmieniony mimo wlaczonego klucza - roznica czesci morskiej odejmowana w GetHeroWage i GetHiringPrice
-            if (!factorOk && NavalOn && !_fallback)
+            catch (Exception e) { Stumble("SelfCheck(zold, cena)", e); wageTxt = "zold i cena: wyjatek (ERROR w logu)"; hireTxt = "-"; wageOk = hireOk = false; }
+            // zapas C1 OSOBNO dla kazdej metody: tylko gdy ta metoda daje wynik BK (latka niewidoczna); bez wedrowca do pomiaru - wedlug czynnika przez metode BK.
+            // Wynik ani nowy, ani BK - bez zapasu (nie odejmujemy czesci morskiej drugi raz)
+            bool needW = NavalOn && (probe != null ? wageBk : !factorOk);
+            bool needH = NavalOn && (probe != null ? hireBk : !factorOk);
+            try
+            {
+                if (needW && !_fbWageHooked && _mWage != null) { _h.Patch(_mWage, postfix: new HarmonyMethod(typeof(CompanionPay), nameof(WageFallbackPostfix)) { priority = Priority.Last }); _fbWageHooked = true; }
+                if (needH && !_fbHireHooked && _mHiring != null) { _h.Patch(_mHiring, postfix: new HarmonyMethod(typeof(CompanionPay), nameof(HiringFallbackPostfix)) { priority = Priority.Last }); _fbHireHooked = true; }
+            }
+            catch (Exception e) { Stumble("SelfCheck(zapas)", e); }
+            _fbWage = needW && _fbWageHooked; _fbHire = needH && _fbHireHooked;
+            // cena calego werbunku po decyzji o zapasie (ta, ktora zobaczy gracz)
+            if (probe != null && _priceHooked && HireOn && model != null)
             {
                 try
                 {
-                    if (_mWage != null) _h.Patch(_mWage, postfix: new HarmonyMethod(typeof(CompanionPay), nameof(WageFallbackPostfix)) { priority = Priority.Last });
-                    if (_mHiring != null) _h.Patch(_mHiring, postfix: new HarmonyMethod(typeof(CompanionPay), nameof(HiringFallbackPostfix)) { priority = Priority.Last });
-                    _fallback = true;
+                    int bkPrice, ours;
+                    _bypass = true;
+                    try { bkPrice = Campaign.Current.Models.CompanionHiringPriceCalculationModel.GetCompanionHiringPrice(probe); }
+                    finally { _bypass = false; }
+                    _stat = true;
+                    try { ours = Campaign.Current.Models.CompanionHiringPriceCalculationModel.GetCompanionHiringPrice(probe); }
+                    finally { _stat = false; }
+                    priceTxt = "; cena " + bkPrice + " -> " + ours + " d (poziom " + probe.Level + ")";
                 }
-                catch (Exception e) { Stumble("SelfCheck(zapas)", e); }
+                catch (Exception e) { Stumble("SelfCheck(cena)", e); priceTxt = "; cena: wyjatek (ERROR w logu)"; hireOk = false; }
             }
-            _check = string.Join(", ", parts.ToArray()) + "; " + wageTxt;
-            Log.Info(head + _hook + " | samosprawdzenie - czynnik " + _check + (factorOk ? " - ZGODNE" : " - ROZJAZD" + (_fallback ? " (zapas: postfiksy GetHeroWage i GetHiringPrice odejmuja czesc morska)" : ""))
+            bool allOk = factorOk && wageOk && hireOk;
+            string fb = _fbWage || _fbHire ? " (zapas: " + (_fbWage ? "GetHeroWage" : "") + (_fbWage && _fbHire ? " i " : "") + (_fbHire ? "GetHiringPrice" : "") + " odejmuje czesc morska)"
+                      : (allOk ? "" : " (zapas nie wlaczony)");
+            _check = string.Join(", ", parts.ToArray()) + "; " + wageTxt + "; " + hireTxt + priceTxt;
+            Log.Info(head + _hook + " | samosprawdzenie (czynnik: " + (factorOk ? "zgodny" : "rozjazd") + ", zold: " + (probe == null || _mWage == null ? "-" : wageOk ? "zgodny" : "rozjazd")
+                     + ", cena: " + (probe == null || _mHiring == null ? "-" : hireOk ? "zgodna" : "rozjazd") + ") - czynnik " + _check + (allOk ? " - ZGODNE" : " - ROZJAZD" + fb)
                      + " | umiejetnosci morskie wedlug rol " + (NavalOn ? "tak" : "nie (WYLACZONE)") + " | cena wedlug zoldu " + (HireOn ? "tak (" + Math.Max(0f, s.CompanionHireDays).ToString("0", Inv) + " dni, BaseWage " + _baseWage.ToString("0.00", Inv) + ")" : "nie (WYLACZONE)")
                      + " | potkniecia " + _stumbles + ".");
         }
@@ -325,7 +375,7 @@ namespace Armoury
             int sd, pr;
             lock (Gate) { sd = _stDay; pr = _priced; _stDay = 0; _priced = 0; }
             Log.Info("Towarzysze (C): dzien " + (int)CampaignTime.Now.ToDays + " | umiejetnosci morskie wedlug rol " + (NavalOn ? "tak" : "nie") + ", cena wedlug zoldu " + (HireOn ? "tak (" + Math.Max(0f, s.CompanionHireDays).ToString("0", Inv) + " dni)" : "nie")
-                     + (_fallback ? ", ZAPAS C1 czynny" : "") + " | wedrowcy w osadach " + n + " | cena BK mediana " + Med(bkL, "0") + " -> nasza " + Med(ourL, "0")
+                     + (_fbWage || _fbHire ? ", ZAPAS C1 czynny (" + (_fbWage ? "zold" : "") + (_fbWage && _fbHire ? " i " : "") + (_fbHire ? "cena" : "") + ")" : "") + " | wedrowcy w osadach " + n + " | cena BK mediana " + Med(bkL, "0") + " -> nasza " + Med(ourL, "0")
                      + " | zold/d mediana " + Med(wL, "0.0") + " (poziom mediana " + Med(lvL, "0") + ") | nasza/BK mediana " + Med(rL, "0.00")
                      + " | wycen w grze od wczoraj " + pr + " | gracz: zloto " + (Hero.MainHero != null ? Hero.MainHero.Gold : 0) + " | czas " + ms.ToString("0.0", Inv) + " ms | potkniecia " + sd + " (sesja " + _stumbles + ").");
         }

@@ -2504,7 +2504,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistHorsePrices { get; set; } = true;
 
-        [SettingPropertyBool("Xbow Like Bow", HintText = "a crossbow costs about as much more than a bow of the same draw strength as its maker's work is longer: Xbow Price Vs Bow times the price of a bow that shoots as hard (Realistic Battle Mod draw weights). Today the game ranks crossbows as tier 1-2 goods, so the strongest crossbow (330 lb) cost 27 pence while the best longbow cost 48; now it costs about 117. The price grows through the crossbow maker's days and his master's day wage, so town workshops, repairs and your forge reckon the same work and nobody pockets a free margin. Repeating crossbows keep their price (their draw is weak). Needs historical prices and Realistic Battle Mod; takes effect when a game is next loaded (off = as before)")]
+        [SettingPropertyBool("Xbow Like Bow", HintText = "a crossbow is priced at Xbow Price Vs Bow times the price of a bow of the same draw strength (Realistic Battle Mod draw weights). The extra price is the crossbow maker's longer work - more days at a master's day wage - so town workshops, repairs and your forge reckon the same work and nobody pockets a free margin. The game ranks crossbows as tier 1-2 goods, so the strongest crossbow (330 lb) cost 27 pence while the best longbow cost 48; the estimate after the change is about 117 (not yet checked in a game). Repeating crossbows keep their price (their draw is weak). Needs historical prices and Realistic Battle Mod; takes effect when a game is next loaded (off = as before)")]
         [SettingPropertyGroup("Crossbows by draw strength")]
         public bool XbowLikeBow { get; set; } = true;
 
@@ -2640,11 +2640,11 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool BkWorkshopInputsFix { get; set; } = false;
 
-        [SettingPropertyBool("Village Fruit From Bk", HintText = "wheat farms grow carrots and apples, olive groves oranges, woodsmen and trappers honey, as Banner Kings meant (2, 2, 2 and 0.5 a day for each step of the village size, like any crop) - the game counted them as nothing, so no town ever had carrots, apples, oranges or honey; the village carts take them to market")]
+        [SettingPropertyBool("Village Fruit From Bk", HintText = "wheat farms grow carrots and apples, olive groves oranges, woodsmen and trappers honey - the Banner Kings list of village goods with its weights (2, 2, 2 and 0.5), grown the way the game grows any crop (the weight times the village's size step plus one, halved, each day). It is an extra crop: the village's own crops stay as they were (Banner Kings' own village model would share the village's work among them, but that model is not the one counting in this game). The game counted these goods as nothing, so no town ever had carrots, apples, oranges or honey; the village carts take them to market")]
         [SettingPropertyGroup("Fruit and food on the stalls")]
         public bool VillageFruitFromBk { get; set; } = true;
 
-        [SettingPropertyBool("Food Substitute When Short", HintText = "when a kind of food is missing from a town stall, the townsfolk spend part of that money on the nearest substitute that lies there in plenty (pie - bread, then grain; fruit - dates, grapes, olives; honey - butter, cheese; eggs - meat, cheese; grain and fish last), taking at most half of what the substitute stall holds above the day's buying; the missing food's demand and price fall accordingly. Off = as before")]
+        [SettingPropertyBool("Food Substitute When Short", HintText = "when a kind of food is missing from a town stall, the townsfolk spend part of that money on the nearest substitute that lies there in plenty (pie - bread, then grain; fruit - dates, grapes, olives; honey - butter, cheese; eggs - meat, cheese; grain and fish last). All the missing foods of a town together take at most half of what a substitute stall holds above the day's buying (counted after the townsfolk's own better-table spending), so the substitute stall is never emptied by it; the missing food's demand and price fall accordingly. Off = as before")]
         [SettingPropertyGroup("Fruit and food on the stalls")]
         public bool FoodSubstituteWhenShort { get; set; } = true;
 
@@ -2672,7 +2672,7 @@ namespace Armoury
         [SettingPropertyGroup("Hiring companions")]
         public bool CompanionNavalSkillsPriced { get; set; } = true;
 
-        [SettingPropertyBool("Companion Hire By Wage", HintText = "a wanderer asks half the worth of his gear plus Companion Hire Days of his daily pay to join you, like the prest of a sell-sword, instead of the Banner Kings skill premium (a Realm of Thrones companion asked about 15 000, five times your purse; now about 2 600). His daily pay does not change")]
+        [SettingPropertyBool("Companion Hire By Wage", HintText = "a wanderer asks half the worth of his gear plus Companion Hire Days of his daily pay to join you, like the prest of a sell-sword, instead of the Banner Kings skill premium (estimate, not yet checked in a game: a Realm of Thrones companion who asked about 15 000 would ask about 2 600). His daily pay does not change")]
         [SettingPropertyGroup("Hiring companions")]
         public bool CompanionHireByWage { get; set; } = true;
 

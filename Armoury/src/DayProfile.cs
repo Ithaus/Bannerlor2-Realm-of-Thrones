@@ -58,7 +58,7 @@ namespace Armoury
         private static double Ms(long ticks) { return ticks * 1000.0 / Stopwatch.Frequency; }
 
         // ---- takt doby
-        private const int LMax = 200, XMax = 8;
+        private const int LMax = 256, XMax = 8;   // ceny 16.10: 202 odcinki taktu doby + "reszta taktu" - przy 200 trzy ostatnie wypadaly z nazw (zapas na nastepne)
         private static readonly string[] _lName = new string[LMax];
         private static readonly long[] _lTicks = new long[LMax];
         private static int _lN, _lapCount;

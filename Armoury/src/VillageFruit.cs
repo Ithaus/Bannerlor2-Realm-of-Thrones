@@ -9,7 +9,13 @@ using TaleWorlds.Localization;
 namespace Armoury
 {
     /// <summary>
-    /// OWOCE I MIOD WE WSIACH, TAK JAK ZAPROJEKTOWAL BANNER KINGS (decyzja Jeffa 15.10 TAK - "placek i marchew"; DECYZJA CLAUDE noc 15/16.10: liczby BK, bez ula).
+    /// OWOCE I MIOD WE WSIACH: WAGI Z LISTY BANNER KINGS, WZOR PLONU GRY (decyzja Jeffa 15.10 TAK - "placek i marchew"; DECYZJA CLAUDE noc 15/16.10: liczby BK, bez ula).
+    /// Doprecyzowanie po recenzji 16.10 [K]: wlasny model BK (BKVillageProductionModel.cs:86, num3 = waga / suma wag listy) dzieli sile robocza wsi na wszystkie
+    /// pozycje listy - tam owoce bralyby udzial od zboza. U Jeffa ten model NIE liczy (czynny jest model gry przez NavalDLC - log 11:02:32), a w modelu gry
+    /// (DefaultVillageProductionCalculatorModel.cs:22-36) kazda pozycja typu wsi daje plon niezaleznie: waga x (poziom ognisk + 1) x 0.5. Owoce sa wiec PLONEM
+    /// DODATKOWYM (jakby staly na liscie typu wsi), nie dzielonym z glownym: farma zboza dostaje +4 sztuki owocow na swoje 50 zboza (ok. +8% sztuk), drwale i
+    /// trzebiciele miod ponad swoje dotychczasowe plony - te plony bez zmian (DECYZJA: nie tniemy plonu zboza - glowne jedzenie swiata; kontrola - wiersz INFO
+    /// NC-12b w grupie nceny: zboze farm z linii "Towary: ... grain ... wsie (wheat_farm N)").
     /// Dowod (log 2026-10-15_10-56-30, 12:10:56): "Towary: dzien 108945 - carrot (2 d): ... produkcja 208 [inne ticki dobowe 208 (osady 208)] | zuzycie 318
     /// [przepadlo z rozbitymi partiami 318]" - zadne miasto nie ma marchwi, jablek, pomaranczy ani miodu ("apple ... na polkach 0 szt., pusto w 97 miastach").
     /// Przyczyna [K]: BK PopulationManager.GetProductions (dec-bk PopulationManager.cs:337-355) dokleja do listy wsi: farma zboza - jablka 2 i marchew 2, gaj

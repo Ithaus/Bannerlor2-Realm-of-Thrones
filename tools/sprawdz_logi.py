@@ -661,10 +661,12 @@ Uzycie (Python 3, tylko odczyt):
                     x2.0-3.0, NC-6 powtarzalne bez zmian, NC-7 potkniecia i ERROR 0, NC-8 kuznia i zakupy wedlug sily tak, NC-9 zakupy AI > 0 i srednio
                     >= 160 funtow, NC-10 warsztaty robia kusze kazdej doby. (B) placek i marchew (VillageFruit.cs, FoodSubstitute.cs, FoodThrift.cs): NC-11 linia
                     startu owocow (wsie wedlug typu), NC-12 plon wsi carrot/apple >= 150, orange >= 25, honey >= 15 na dobe, NC-13 marchew i jablka na targach
-                    miast po 7 dobach, NC-14 potkniecia owocow 0, NC-15 zamienniki: budzet przesuniety kazdej doby i potkniecia 0, NC-16a indeks owocow <= 6.0
+                    miast po 7 dobach, NC-12b zboze farm zboza (INFO - owoce to plon dodatkowy), NC-14 potkniecia owocow 0, NC-15 zamienniki: budzet przesuniety
+                    kazdej doby i potkniecia 0, NC-15b kontrola limitu zamiennika (wszystkie zrodla osady razem <= 0.5 nadwyzki polki po ofercie ludu:
+                    przekroczen 0, najwiecej <= 50.5%), NC-16a indeks owocow <= 6.0
                     po 10 dobach, NC-16b bread/meat/cheese <= 3.0, NC-16c placek i miod (INFO), NC-17 syty lord zamienia drogie jedzenie (T > 0), NC-18 placek
                     kupiony przez lordow (INFO), NC-19 kiesa ludu (INFO). (C) towarzysze (CompanionPay.cs): NC-20 start sesji - latki czynnika i ceny wpiete,
-                    samosprawdzenie ZGODNE, NC-21 linia doby: wedrowcy >= 10, nasza cena > 0, nasza/BK 0.1-0.6, potkniecia i ERROR 0, NC-22 zold, poziom
+                    samosprawdzenie ZGODNE (osobno czynnik, zold, cena bez sprzetu), NC-21 linia doby: wedrowcy >= 10, nasza cena > 0, nasza/BK 0.1-0.6, potkniecia i ERROR 0, NC-22 zold, poziom
                     i czas linii (INFO). NC-23 / NC-24 linie startu sesji B2 i B3 (klucz TAK, latki wpiete). Log bez paczki: INFO, bez wyjatku.
 --grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
                     TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
@@ -26677,7 +26679,8 @@ NC_SD_MOVE = re.compile(r"przesunieto budzetu (\d+)")
 NC_SD_SHORT = re.compile(r"miast z brakiem jedzenia (\d+) \(zamkow (\d+)\)")
 NC_SD_IDX = re.compile(r"indeks cen jedzenia \(mediana miast\): (.*?) \|")
 NC_TD_RE = re.compile(r"drogich wyborow modelu \(syte partie AI\) (\d+) \(partie lordow (\d+)\), zamienionych na tansze (\d+) \(lordow (\d+)\), zostawionych \(brak tanszego na polce\) (\d+)")
-NC_TOW = re.compile(r"Towary: dzien (\d+) - (carrot|apple|orange|honey|pie) \(\d+ d\): .*?\| produkcja (\d+) \[(.*?)\] \|")
+NC_TOW = re.compile(r"Towary: dzien (\d+) - (carrot|apple|orange|honey|pie|grain) \(\d+ d\): .*?\| produkcja (\d+) \[(.*?)\] \|")
+NC_SD_CHK = re.compile(r"kontrola limitu zamiennikow: z dopisem (\d+), przekroczen (\d+) \(najwiecej ([\d.]+)% nadwyzki\), oferta ludu zmniejszyla nadwyzke w (\d+), zjadla w (\d+)")
 NC_TOW_OWN = re.compile(r"posiadacze \[(.*?)\]")
 NC_TOW_LORD = re.compile(r"lordowie kupili (\d+)")
 NC_FOLK = re.compile(r"Kiesa ludu: dzien (\d+) \| CZYNNA \|.*?zaplacone przez lud miast (\d+)")
@@ -26708,7 +26711,7 @@ def nceny_main(logp):
         rep.show()
         return 0
     xs, xd, ws, errs = [], {}, {}, {}
-    fs, fd, sd, td, tow, own, lordpie, folk = [], {}, {}, {}, {}, {}, {}, {}
+    fs, fd, sd, td, tow, own, lordpie, folk, gwf = [], {}, {}, {}, {}, {}, {}, {}, {}
     cs, cd = [], {}
     b2start, b3start = [], []
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -26749,6 +26752,8 @@ def nceny_main(logp):
                     d, g = int(mm.group(1)), mm.group(2)
                     w = num(r"(?:^|; )wsie (\d+)", mm.group(4), default=0)
                     tow.setdefault(g, {})[d] = (int(mm.group(3)), w)
+                    if g == "grain":
+                        gwf[d] = num(r"(?:^|; )wsie \d+ \(wheat_farm (\d+)", mm.group(4))
                     mo = NC_TOW_OWN.search(s)
                     if mo:
                         own.setdefault(g, {})[d] = num(r"miasta (\d+)", mo.group(1), default=0)
@@ -26847,6 +26852,10 @@ def nceny_main(logp):
             oks.append(med is not None and med >= lim)
         rep.add("NC-12: plon wsi (Towary: produkcja ... wsie W, mediana dob bez pierwszej)", ", ".join(res), "carrot >= 150, apple >= 150, orange >= 25, honey >= 15",
                 all(oks) if any(tow.get(g) for g in mins) else None)
+        gv = [(d, v) for d, v in sorted(gwf.items()) if v is not None]
+        if gv:
+            rep.add("NC-12b: zboze farm zboza (Towary: grain ... wsie (wheat_farm N); INFO - owoce to plon dodatkowy, zboze bez zmian)",
+                    f"pierwsza doba {gv[0][0]}: {gv[0][1]}, ostatnia {gv[-1][0]}: {gv[-1][1]} (log Jeffa 108945 bez paczki: 6959)", "INFO (bez spadku z powodu owocow; zima tnie)", None)
         oc = own.get("carrot", {}); oa = own.get("apple", {})
         if oc and oa:
             dl = max(oc); span = dl - min(oc)
@@ -26881,6 +26890,16 @@ def nceny_main(logp):
             rep.add("NC-15: zamienniki - przesuniety budzet kazdej doby, potkniecia / ERROR", f"dob {len(ds)}, bez przesuniecia {len(zero)}" + (f" (np. {zero[:5]})" if zero else "")
                     + f", srednio {sum(mv) / len(mv) if mv else 0:.0f}/d; miast z brakiem (ostatnia doba) {sh.group(1) if sh else '?'}; potkniecia {stum}, ERROR {errs.get('FoodSubstitute', 0)}",
                     "CZYNNE, P > 0 kazdej doby (poza pierwsza), 0 / 0", on2 and not zero and stum == 0 and errs.get("FoodSubstitute", 0) == 0 and len(ds) > 1)
+            chk = [NC_SD_CHK.search(sd[d]) for d in ds]
+            chk = [c for c in chk if c]
+            if chk:
+                n_chk = sum(int(c.group(1)) for c in chk); n_over = sum(int(c.group(2)) for c in chk); top = max(float(c.group(3)) for c in chk)
+                o_cut = sum(int(c.group(4)) for c in chk); o_all = sum(int(c.group(5)) for c in chk)
+                rep.add("NC-15b: zamienniki - kontrola limitu (wszystkie zrodla osady razem <= 0.5 nadwyzki polki zamiennika, po ofercie ludu)",
+                        f"dob {len(chk)}: zamiennikow z dopisem {n_chk}, przekroczen {n_over}, najwiecej {top:.1f}% nadwyzki; oferta ludu zmniejszyla nadwyzke {o_cut}, zjadla {o_all}",
+                        "przekroczen 0, najwiecej <= 50.5%", n_over == 0 and top <= 50.5)
+            else:
+                rep.add("NC-15b: zamienniki - kontrola limitu", "brak liczb kontroli w liniach doby", "INFO (wersja sprzed poprawki 16.10)", None)
             mi = NC_SD_IDX.search(sd[ds[-1]])
             idx = {}
             if mi:
@@ -26928,7 +26947,8 @@ def nceny_main(logp):
         hooked = "czynnik wpiety" in st and "cena wpieta" in st
         agree = "- ZGODNE" in st
         stum = num(NC_STUM.pattern, st, default=1) if st else 1
-        rep.add("NC-20: towarzysze - start sesji (latki i samosprawdzenie)", st[len(NC_CS):][:260] if st else "brak linii startu (sa linie doby)",
+        sc = re.search(r"samosprawdzenie \((czynnik: \w+, zold: [\w-]+, cena: [\w-]+)\)", st)
+        rep.add("NC-20: towarzysze - start sesji (latki i samosprawdzenie)", ((sc.group(1) + " | ") if sc else "") + (st[len(NC_CS):][:260] if st else "brak linii startu (sa linie doby)"),
                 "czynnik i cena wpiete, samosprawdzenie ZGODNE, potkniecia 0", bool(st) and hooked and agree and stum == 0)
         hs, ours, rs, ws, lv, mss, dst = [], [], [], [], [], [], 0
         for d, s in sorted(cd.items()):
