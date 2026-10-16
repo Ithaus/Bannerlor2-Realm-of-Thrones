@@ -2640,6 +2640,26 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool BkWorkshopInputsFix { get; set; } = false;
 
+        [SettingPropertyBool("Village Fruit From Bk", HintText = "wheat farms grow carrots and apples, olive groves oranges, woodsmen and trappers honey, as Banner Kings meant (2, 2, 2 and 0.5 a day for each step of the village size, like any crop) - the game counted them as nothing, so no town ever had carrots, apples, oranges or honey; the village carts take them to market")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool VillageFruitFromBk { get; set; } = true;
+
+        [SettingPropertyBool("Food Substitute When Short", HintText = "when a kind of food is missing from a town stall, the townsfolk spend part of that money on the nearest substitute that lies there in plenty (pie - bread, then grain; fruit - dates, grapes, olives; honey - butter, cheese; eggs - meat, cheese; grain and fish last), taking at most half of what the substitute stall holds above the day's buying; the missing food's demand and price fall accordingly. Off = as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool FoodSubstituteWhenShort { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Food Substitute Share", 0.00f, 1.00f, "0.00", HintText = "the share of the townsfolk's unmet money for a missing food that goes to a substitute (the rest stays in their purse, as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float FoodSubstituteShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Ai Food Skips Dear", HintText = "an AI party that is not starving does not buy food dearer than Ai Food Dear Index times its worth when cheaper food lies on the same stall - it picks among the cheaper ones (by value for money). A starving party still buys at any price")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool AiFoodSkipsDear { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ai Food Dear Index", 1.00f, 10.00f, "0.0", HintText = "price over worth above which a fed AI party looks for cheaper food on the same stall")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float AiFoodDearIndex { get; set; } = 2.5f;
+
         [SettingPropertyBool("Historical Recruit Cost", HintText = "a recruit costs his prest money - some days of his pay (mercenaries twice that) - instead of the game's flat table by level")]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistoricalRecruitCost { get; set; } = true;
@@ -6891,6 +6911,11 @@ namespace Armoury
             s.WorkshopNoFreeRaw = WorkshopNoFreeRaw;
             s.WorkshopNoFreeRawAllTypes = WorkshopNoFreeRawAllTypes;
             s.BkWorkshopInputsFix = BkWorkshopInputsFix;
+            s.VillageFruitFromBk = VillageFruitFromBk;
+            s.FoodSubstituteWhenShort = FoodSubstituteWhenShort;
+            s.FoodSubstituteShare = FoodSubstituteShare;
+            s.AiFoodSkipsDear = AiFoodSkipsDear;
+            s.AiFoodDearIndex = AiFoodDearIndex;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
             s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;

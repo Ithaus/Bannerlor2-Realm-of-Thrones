@@ -256,6 +256,8 @@ namespace Armoury
                 SlowMuster.ApplyAll(_harmony);
                 SlowHealing.ApplyAll(_harmony);
                 HungerLaw.ApplyAll(_harmony);
+                try { FoodThrift.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodThrift.ApplyAll", e); }         // noc 15/16.10 (B3): syta partia AI nie przeplaca za jedzenie (te same modele co HungerLaw)
+                try { FoodSubstitute.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodSubstitute.ApplyAll", e); }   // noc 15/16.10 (B2): zamiennik jedzenia przy pustym straganie (UpdateDemandShift, PRZED nawiasem kiesy ludu TownFolk)
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
                 CraftPopup.ApplyAll(_harmony);

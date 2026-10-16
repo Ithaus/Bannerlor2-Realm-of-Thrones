@@ -1406,7 +1406,8 @@ namespace Armoury
             try { DayHeld.SessionStart(); } catch (Exception e) { Log.Error("DayHeld.SessionStart", e); }   // A14 / G20 (drobne2): doba po wczytaniu ze srodka doby - PO McmSettings.Apply (klucz z MCM), przed pierwszym tickiem osad
             try { VillageClimate.Apply(); } catch (Exception e) { Log.Error("VillageClimate.Apply", e); }   // T8: typ wsi wedlug klimatu (PO McmSettings.Apply; bez zapisu)
             try { GoodsRates.Apply(); } catch (Exception e) { Log.Error("GoodsRates.Apply", e); }   // GL-5 (P5): 16 wsi lnianych (tylko kampania zaczeta z kluczem, potem na stale) - PO VillageClimate.Apply, PRZED kalibracja plonu P1 (1. doba nowej kampanii)
-            try { VineOlive.Apply(); } catch (Exception e) { Log.Error("VineOlive.Apply", e); }   // B6: 8 wsi poludnia -> winnice (tylko kampania zaczeta z kluczem, potem na stale) - PO GoodsRates.Apply, PRZED kalibracja plonu P1
+            try { VineOlive.Apply(); } catch (Exception e) { Log.Error("VineOlive.Apply", e); }
+            try { VillageFruit.SessionStart(); } catch (Exception e) { Log.Error("VillageFruit.SessionStart", e); }   // noc 15/16.10 (B1): owoce i miod wsi - linia startu PO zmianach typow wsi (VillageClimate, GoodsRates, VineOlive)   // B6: 8 wsi poludnia -> winnice (tylko kampania zaczeta z kluczem, potem na stale) - PO GoodsRates.Apply, PRZED kalibracja plonu P1
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
@@ -1803,6 +1804,9 @@ namespace Armoury
             try { SpoilsCompany.Daily(); } catch (Exception e) { Log.Error("SpoilsCompany.Daily", e); } DayProfile.Lap("SpoilsCompany.Daily");   // klan najemnikow Spoils tylko z prawdziwych zolnierzy (tylko log)
             try { RawPrice.Daily(); } catch (Exception e) { Log.Error("RawPrice.Daily", e); } DayProfile.Lap("RawPrice.Daily");     // cena surowcow od niedoboru: linia "Ceny surowcow:" (tylko log)
             try { XbowPrice.Daily(); } catch (Exception e) { Log.Error("XbowPrice.Daily", e); }   // kusze wedlug luku (noc 15/16.10): linia "Kusze wedlug luku (zakupy)" (tylko log)
+            try { VillageFruit.Daily(); } catch (Exception e) { Log.Error("VillageFruit.Daily", e); }       // placek i marchew (B1): linia "Owoce wsi" (tylko log)
+            try { FoodSubstitute.Daily(); } catch (Exception e) { Log.Error("FoodSubstitute.Daily", e); }   // placek i marchew (B2): linia "Zamienniki jedzenia (B2)" (tylko log)
+            try { FoodThrift.Daily(); } catch (Exception e) { Log.Error("FoodThrift.Daily", e); }           // placek i marchew (B3): linia "Lordowie a drogie jedzenie (B3)" (tylko log)
             try { MineralOnce.Daily(); } catch (Exception e) { Log.Error("MineralOnce.Daily", e); } DayProfile.Lap("MineralOnce.Daily");   // powtorzenia mineralu zdjete z list produkcji BK (tylko log)
             try { MarketRoad.Daily(); } catch (Exception e) { Log.Error("MarketRoad.Daily", e); } DayProfile.Lap("MarketRoad.Daily");   // wpis 100: dowoz wsi zamkowych na targi (log)
             try { VillageClogDiag.Daily(); } catch (Exception e) { Log.Error("VillageClogDiag.Daily", e); } DayProfile.Lap("VillageClogDiag.Daily");   // diagnoza zatkanych wsi - zaraz po "Dowoz (skutki)" (tylko log)
