@@ -6392,6 +6392,10 @@ namespace Armoury
         [SettingPropertyGroup("Banner Kings gentry")]
         public bool GentryNamesFallback { get; set; } = true;
 
+        [SettingPropertyBool("Combat Ai Realistic", HintText = "every time the campaign is loaded the battle AI of the campaign options (Combat AI) is set to Realistic, the highest level of the game, when it stands lower - the AI then blocks, parries and picks its blows as well as its skill allows. Your other campaign options (map speed, damage to your men, recruitment and the rest) stay as they are (off = Combat AI stays as set in the campaign options)")]
+        [SettingPropertyGroup("Combat AI level (16.10)")]
+        public bool CombatAiRealistic { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Charcoal Weight Kg", 0.00f, 10.00f, "0.00", HintText = "a lump of charcoal weighs this many kilograms (0 = the game's own 5 kg brick). With the game's weight a load of hardwood (100 kg) burns down to 4 lumps (a fifth of its weight), each refining step takes one 5 kg lump, armour from your forge needs the same kilograms of charcoal per kilogram of iron as before (in whole lumps), and with Smith Coal Kg a weapon forged or smelted on the smithing screen still burns half a kilogram, taken from the lump burning in the forge (without it one whole 5 kg lump per weapon - a load of hardwood would make charcoal for 4 weapons instead of 40); 0.5 = the old half-kilo lump (a load of wood worth 4 pence gave 40 lumps worth 40 pence). Takes effect when a game is next loaded")]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public float CharcoalWeightKg { get; set; } = 0f;
@@ -8137,6 +8141,7 @@ namespace Armoury
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
             s.PatchTargetGuard = PatchTargetGuard;
             s.GentryNamesFallback = GentryNamesFallback;
+            s.CombatAiRealistic = CombatAiRealistic;
             s.CharcoalWeightKg = CharcoalWeightKg;
             s.SmithCoalKg = SmithCoalKg;
             s.SaltRateRaised = SaltRateRaised;
