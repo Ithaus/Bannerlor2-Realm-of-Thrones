@@ -376,7 +376,7 @@ namespace Armoury
                     _bkHooked = true;
                 }
                 Log.Info("CaravanGoods (E3-T1, E3-G3): SellItemsAction.ApplyInternal - latka " + (_hooked ? "wpieta" : "NIE wpieta (inna sygnatura)") + " (ksiega kosztu karawan, myto karawan)"
-                         + "; blokada odkupienia przez BK (BuyGoods + CalculateBuyValue) - " + (_bkHooked ? "wpieta" : "NIE (brak metod BK)") + " (miasto: kazda karawana, do " + BlockDays + " dob albo do zejscia sprzedanych sztuk z polki).");
+                         + "; blokada odkupienia przez BK (BuyGoods + CalculateBuyValue) - " + (_bkHooked ? "wpieta" : "NIE (brak metod BK)") + " (tylko ta sama karawana przy tej samej wizycie - Jeff 16.10: inne karawany moga odkupic).");
             }
             catch (Exception e) { Log.Error("CaravanGoods.ApplyAll", e); }
         }
@@ -393,7 +393,10 @@ namespace Armoury
             {
                 var st = __1.Settlement;
                 var b = BlockOf(st, __0);
-                if (b == null || !Alive(b, __1.MarketData.GetItemCountOfCategory(__0), (int)Now)) return;
+                // Jeff 16.10: "jedni kupuja, drudzy sprzedaja" - inne karawany moga odkupic (sprzedadza z zyskiem tam, gdzie drozej); blokada tylko
+                // dla TEJ SAMEJ karawany przy TEJ SAMEJ wizycie (pusty ruch: sprzedaz i odkup tej samej kategorii w jednym miescie)
+                Visit v0;
+                if (b == null || _bkBuyer == null || !(_visit.TryGetValue(_bkBuyer, out v0) && ReferenceEquals(v0.St, st) && v0.Cats.Contains(__0))) return;
                 __result = 0f;
                 _bkBlocked++;
                 Visit v;
@@ -630,7 +633,7 @@ namespace Armoury
                              + "; koszt = wartosc x max(1, srednia indeksu 97 miast), z dziennika BK wyzsza z cen; dzien z dziennika BK, bez wpisu " + BkLogDays + " dob wstecz; dziennik BK " + _bkLogState + ")"
                              + " | regula: sprzedaz, gdy cena po mycie E3-G3 > koszt zakupu + zold za dni w drodze (najwyzej " + MaxAgeDays + " dob, najwyzej 100% kosztu); na stracie tylko: rozwiazanie, kiesa < "
                              + CashDays + " dni zoldu, juki ponad udzwig (tylko do zejscia pod udzwig), jedzenie > " + FoodAgeDays + " dob, towar > " + MaxAgeDays + " dob"
-                             + " | bez progu sredniej (Jeff 16.10); zawsze: kategorii sprzedanej przez T1 w miescie zadna karawana BK tam nie odkupuje (do " + BlockDays + " dob albo do zejscia sprzedanych sztuk z polki; blokada "
+                             + " | bez progu sredniej (Jeff 16.10); zawsze: ta sama karawana nie odkupuje przy tej samej wizycie kategorii, ktora sprzedala (inne karawany moga - Jeff 16.10; blokada "
                              + (_bkHooked ? "wpieta" : "NIE") + "), cena >= " + GabkaFloor.ToString("0.00", Inv)
                              + " x wartosci (gabka), kasa miasta ponad BuyFloor i najwyzej 1/" + TownDayShare + " nadwyzki na dobe, krok " + StepN + " szt. (ponad " + DearValue + " d - 1), polowa stosu,"
                              + " jedzenie na " + FoodKeepDays + " dob.");
