@@ -2324,3 +2324,18 @@ lordowie 37%; kiesy karawan 0.93% swiata (baza 1.98%); 'nie do wydania' 90 tys. 
 Zostaje (do obserwacji): warsztaty stojace 42%, narzedzia w jukach 90% (nie sprzedaja ze strata - zasada Jeffa), notable +0.31 pkt (zysk karawan).
 FORGEVIEW: znane wzory na gorze listy CRAFT - lista BK rysuje sie od dolu (VerticalBottomToTop), a stara latka wisiala na nieuzywanej SortByCurrentState; teraz postfiksy na
 ExecuteSortByName/Yield/Type + Arrange w filtrze (log ForgeView 'postfiksy wpiete 4/4'). Do sprawdzenia przez Jeffa w grze.
+
+### 50. WGRANIE 67 (16.10 ok. 09:45 zegara komp.) - Combat AI Realistic + ustawienia krwi i trupow - START TUTAJ
+W grze: `w-toku/zbior-e8` **cdc98e78** (= `w-toku/noc-wgranie-67`) | Armoury fe788569; ForgeView 19aa052a, CrashScribe da755a8a, RC/GT bez zmian. Kopie *.bak-2026-10-16-wgranie67-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie67-przed.
+Sesja Jeffa 08:50-09:20 (0 ERROR): logi w D:/Backup-Bannerlord/logi-jeffa/2026-10-16 (Armoury-..._08-50-07 + Logs/ + CrashScribe session-..._08-50-04), zapis D:/Backup-Bannerlord/zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-16-po-0850.sav.
+= 66 + `w-toku/noc-aitrud` 5a2a6266: CombatAiLevel.cs, klucz CombatAiRealistic (tak) - przy starcie sesji CampaignOptions.CombatAIDifficulty -> Realistic (najwyzszy stopien gry; "Hard" nie istnieje),
+linia "Trudnosc SI walki (CombatAiRealistic)" z pozostalymi opcjami trudnosci (bez zmian). Powod: Jeff "Daj Realistic albo Hard"; jego kampania ma predkosc mapy Very Easy (log "Game Difficulty +0.40"),
+RBM mnozy poziom SI 0.7/0.85/1.0. Opcja jest w ESC -> opcje kampanii (DefaultCampaignOptionsProvider), nie w zwyklych Opcjach. Autotest 5 dob (zapis F, Armoury-2026-10-16_09-36-42.log): 0 ERROR,
+linia: Very Easy -> Realistic (zapis F ma wszystko Very Easy). U Jeffa sprawdzic linie przy pierwszym wczytaniu.
+USTAWIENIA (na prosbe Jeffa, kopie D:/Backup-Bannerlord/ustawienia/2026-10-16-przed-krew-trupy): LauncherData.xml MoreBloodPoolMod IsSelected true (kod przeczytany: tylko MissionBehavior,
+kaluze przy smierci, plama przy trafieniu >= 20 obrazen, limit 500 decali, MCMv5 jak Armoury); BannerlordConfig.txt NumberOfCorpses 4 (250) -> 5 (Unlimited). Ragdolle i dzwiek juz na maks.
+MODY Z SIECI (Jeff pobiera sam - Nexus wymaga logowania; DLL cudzych autorow). Polecone: Battle Atmosphere - ROT (Nexus 13192, V1.5.0 18.09.2026, 572 MB, sam MissionBehavior, MCM)
+i Immersive Battlefields (Nexus 4633, plik V3.6.2 "v1.4.x"; V3.6.3 to gra 1.5). Odradzone: Blood Bath / Blood Fury (ten sam plik decali co MoreBloodPoolMod, krew na kazdym trafieniu),
+Realistic Blood (mniej krwi), Larmantine (kultury vanilli), Realistic Combat Sounds (build 1.3), inne AI (gryza sie z RBM), aktualizacja RBM w trakcie kampanii.
+DO ZROBIENIA: gdy Jeff wgra Battle Atmosphere - nasze BattleVoices (noc-bitwa cz. 2) wylaczyc albo samo-wylaczenie przy module ROTBattleAtmosphere; kod nowych modow przeczytac przed wlaczeniem.
+noc-bitwa (wf_b217935f-e51, zb/n-bitwa od 591f64ff) w toku - bedzie WGRANIEM 68 (scalanie na int cdc98e78).
