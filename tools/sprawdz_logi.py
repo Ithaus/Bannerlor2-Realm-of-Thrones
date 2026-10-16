@@ -876,6 +876,8 @@ Uzycie (Python 3, tylko odczyt):
                     By Tier (latka weteranow wpieta), Blood Through Armour, Battle Cries And Moans - TAK; NBW-0c linia wpiecia latki weteranow przy starcie
                     gry; NBW-1 takze ERROR in WarCouncil / VeteranAi / BattleGore / BattleCries / BattleSense 0. INFO: NBW-9 taktyka wedlug dowodcy,
                     NBW-10 weterani wedlug tieru, NBW-11 krew przez pancerz, NBW-12 okrzyki i jeki.
+                    Czesc 3 (16.10; BloodPools.cs - kaluze krwi na ziemi): NBW-0 takze Ground Blood Pools TAK; NBW-1 takze ERROR in BloodPools 0;
+                    NBW-7 takze potkniecia 'kaluze'; INFO: NBW-13 kaluze krwi (decale z materialem, limity 600 na misje / 20 na s, materialy 12/12).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -31683,7 +31685,11 @@ NBW_LINE = re.compile(
     r"\| okrzyki i jeki (TAK|NIE): szarze (\d+) \(okrzykow (\d+), roznych ludzi (\d+)\), jeki (\d+) \(rannych (\d+)\), odrzucone limitem (\d+) )?"
     # 16.10 ForeignVoices: stan obcych modow glosow (BA / IB) - grupa opcjonalna
     r"(?:\| obce glosy: [^|]+ )?"
-    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))? "
+    # czesc 3 (16.10, BloodPools.cs): kaluze krwi na ziemi - grupa opcjonalna (starsze linie dalej rozpoznane)
+    r"(?:\| kaluze krwi (TAK|NIE): decali (\d+) z (\d+) \(kaluze (\d+), plamy (\d+), bez materialu (\d+)\), zgonow (\d+) \(ludzi (\d+), "
+    r"nieprzytomnych (\d+), koni (\d+), nieumarli pominieci (\d+)\), pominiete decale: limit misji (\d+), kolejka (\d+), koniec bitwy (\d+); "
+    r"materialy (\d+)/(\d+), renderer decali (TAK|NIE), MoreBlood (TAK|NIE) )?"
+    r"\| potkniecia: panika (\d+), kierunek (\d+), postura (\d+)(?:, taktyka (\d+), weteran (\d+), krew (\d+), glosy (\d+))?(?:, kaluze (\d+))? "
     r"\(sesja (\d+), linia misji (\d+)\)\.$")
 NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
             "pin", "pin_ludzi", "zgaszone", "ponowienia", "ponowienia_ludzi", "zwroty", "bez_handlera", "gracz",
@@ -31695,15 +31701,22 @@ NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic",
             "wet", "w_latka", "w_po_rbm", "w_ludzi", "w1", "w2", "w3", "w4", "w5", "w6", "w7", "w_wywolan", "w_ponad", "w_tarcza", "w_kapitan", "w_probka",
             "gore", "g_rbm", "g_bryzgi", "g_pancerz", "g_smiertelne", "g_limit", "g_kosc",
             "glosy", "v_szarze", "v_okrzyki", "v_ludzi", "v_jeki", "v_rannych", "v_limit",
-            "st_panika", "st_kierunek", "st_postura", "st_taktyka", "st_weteran", "st_krew", "st_glosy", "st_sesja", "linia")
+            # czesc 3 (16.10): kaluze krwi
+            "kal", "p_decali", "p_max", "p_kaluze", "p_plamy", "p_bez_mat", "p_zgonow", "p_ludzi", "p_nieprz", "p_koni", "p_nieumarli",
+            "p_limit", "p_kolejka", "p_koniec", "p_mat", "p_mat_all", "p_renderer", "p_moreblood",
+            "st_panika", "st_kierunek", "st_postura", "st_taktyka", "st_weteran", "st_krew", "st_glosy", "st_kaluze", "st_sesja", "linia")
 NBW_ERR = ("ERROR in RoutHold", "ERROR in RoutKeeper", "ERROR in BattleWind.PostureInit",
            # poprawka 16.10 (recenzja): wyjatek przy wpinaniu latki postury (bez tego NBW-0b pokazywal tylko 'brak linii')
            "ERROR in BattleWind.ApplyAll",
            # czesc 2 (16.10)
-           "ERROR in WarCouncil", "ERROR in VeteranAi", "ERROR in BattleGore", "ERROR in BattleCries", "ERROR in BattleSense")
+           "ERROR in WarCouncil", "ERROR in VeteranAi", "ERROR in BattleGore", "ERROR in BattleCries", "ERROR in BattleSense",
+           # czesc 3 (16.10)
+           "ERROR in BloodPools")
 NBW_NEED = ("Broken Men Never Rally TAK", "Flee Away From Enemies TAK", "postura szeregowych wg tieru TAK", "latka postury RBM wpieta TAK",
             # czesc 2 (16.10)
-            "Commander Tactics TAK", "Veterans By Tier TAK", "latka weteranow wpieta TAK", "Blood Through Armour TAK", "Battle Cries And Moans TAK")
+            "Commander Tactics TAK", "Veterans By Tier TAK", "latka weteranow wpieta TAK", "Blood Through Armour TAK", "Battle Cries And Moans TAK",
+            # czesc 3 (16.10)
+            "Ground Blood Pools TAK")
 NBW_VET_HEAD = "VeteranAi (NB2): "
 NBW_VET_WIRE = "VeteranAi (NB2): weterani wedlug tieru - latka SetAiRelatedProperties wpieta"
 
@@ -31743,6 +31756,25 @@ def nbw_part2(rep, rows, tot):
             f" ludzi {vl}, na glowe {tot('v_okrzyki') / max(1, vl):.1f}), jeki {tot('v_jeki')} (rannych {tot('v_rannych')}, na rannego"
             f" {tot('v_jeki') / max(1, tot('v_rannych')):.1f}), odrzucone limitem {tot('v_limit')}",
             "INFO (okrzyk najwyzej raz na 20 s na czlowieka, szyk raz na 40 s; jekow na rannego <= 3; najwyzej 6 glosow na s)", None)
+
+
+def nbw_part3(rep, rows, tot):
+    """nbitwa czesc 3 (16.10, BloodPools.cs): NBW-13 kaluze krwi na ziemi - INFO (autotest gra bitwy z bandytami: decale z materialem,
+    materialy 12/12, renderer TAK, bez materialu 0, najwyzej 600 na misje). Linie bez segmentu kaluz - INFO 'brak pol czesci 3'."""
+    p3 = [r for r in rows if r.get("kal") is not None]
+    if not p3:
+        rep.add("NBW-13: kaluze krwi (Ground Blood Pools)", "brak pol czesci 3 w liniach misji", "INFO (wersja sprzed kaluz)", None)
+        return
+    on = [r for r in p3 if r.get("kal") == "TAK"]
+    mats = sorted(set(f"{r.get('p_mat')}/{r.get('p_mat_all')}" for r in on)) or ["-"]
+    over = sum(1 for r in p3 if isinstance(r.get("p_decali"), int) and isinstance(r.get("p_max"), int) and r["p_decali"] > r["p_max"])
+    rep.add("NBW-13: kaluze krwi (Ground Blood Pools)", f"decali {tot('p_decali')} (kaluze {tot('p_kaluze')}, plamy {tot('p_plamy')}, bez materialu"
+            f" {tot('p_bez_mat')}); zgonow z kaluza {tot('p_zgonow')} (ludzi {tot('p_ludzi')}, nieprzytomnych {tot('p_nieprz')}, koni {tot('p_koni')},"
+            f" nieumarli pominieci {tot('p_nieumarli')}); pominiete decale: limit misji {tot('p_limit')}, kolejka {tot('p_kolejka')}, koniec bitwy"
+            f" {tot('p_koniec')}; misji z kluczem {len(on)} z {len(p3)}, materialy {', '.join(mats)}, renderer TAK w"
+            f" {sum(1 for r in on if r.get('p_renderer') == 'TAK')}, MoreBlood w {sum(1 for r in p3 if r.get('p_moreblood') == 'TAK')};"
+            f" ponad pulap {over}; potkniecia 'kaluze' {tot('st_kaluze')}",
+            "INFO (materialy 12/12, renderer TAK, bez materialu 0, decali <= 600 na misje, potkniecia 0; kolejka i limit rzadko)", None)
 
 
 def nbitwa_main(logp):
@@ -31834,7 +31866,7 @@ def nbitwa_main(logp):
         rep.add("NBW-0c: latka weteranow wedlug tieru (start gry)", (vets[-1][:200] if vets else "brak linii"), "linia wpiecia jest", False)
     # NBW-1 bledy
     n_err = sum(errs.values())
-    rep.add("NBW-1: ERROR zlamanych, postury, taktyki, weteranow, krwi i glosow", ", ".join(f"{k[len('ERROR in '):]} {v}" for k, v in errs.items()),
+    rep.add("NBW-1: ERROR zlamanych, postury, taktyki, weteranow, krwi, glosow i kaluz", ", ".join(f"{k[len('ERROR in '):]} {v}" for k, v in errs.items()),
             "0", n_err == 0)
     # NBW-2 linie misji
     if not rows and not bad:
@@ -31887,9 +31919,10 @@ def nbitwa_main(logp):
             "INFO (T1 x0.85, T6 x1.70 przy kluczach domyslnych; pula T1 ok. 115, T6 ok. 344)", None)
     # NBW-7 potkniecia
     rep.add("NBW-7: potkniecia w liniach misji", f"panika {tot('st_panika')}, kierunek {tot('st_kierunek')}, postura {tot('st_postura')},"
-            f" taktyka {tot('st_taktyka')}, weteran {tot('st_weteran')}, krew {tot('st_krew')}, glosy {tot('st_glosy')}"
+            f" taktyka {tot('st_taktyka')}, weteran {tot('st_weteran')}, krew {tot('st_krew')}, glosy {tot('st_glosy')}, kaluze {tot('st_kaluze')}"
             + (f"; linii '3. potkniecie' {len(notes)}" if notes else ""), "INFO (oczekiwane 0)", None)
     nbw_part2(rep, rows, tot)
+    nbw_part3(rep, rows, tot)   # czesc 3 (16.10): kaluze krwi
     # NBW-8 linia NM w bitwach
     bat = [r for r in nm if r["battle"]]
     if bat:
