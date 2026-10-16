@@ -125,8 +125,28 @@ namespace Armoury
         private static readonly HashSet<Village> _w1NgCur = new HashSet<Village>(), _w1Served = new HashSet<Village>();
         private static int _w1NgLastN = -1, _w1ServedLastN; private static bool _w1NgRan;
 
+        // ZC1 (CartPriceByDestination, MarketCarts): chciany koszyk dnia wsi wedlug miasta targowego z POPRZEDNIEJ doby ludu - [0] koszyk (sol, narzedzia, len, garnki,
+        // piwo - po rowno), [1] nadwyzka na sol i narzedzia (P5); woz wsi liczy cene czesci ladunku, ktora wsie tego targu kupuja w dobe. Tylko odczyt dla wozow.
+        private static Dictionary<Settlement, double[]> _vwCur = new Dictionary<Settlement, double[]>(), _vwPrev = new Dictionary<Settlement, double[]>();
+
+        /// <summary>ZC1: ile zl na dobe wsie targu mk chca wydac na kategorie cat koszyka dnia (0 - poza koszykiem, brak danych, pierwsza doba sesji).</summary>
+        internal static double VillageWant(Settlement mk, ItemCategory cat)
+        {
+            try
+            {
+                var p = _vwPrev; var cats = _villCats;
+                double[] w;
+                if (mk == null || cat == null || p == null || cats == null || !cats.Contains(cat) || !p.TryGetValue(mk, out w) || w == null) return 0;
+                double x = w[0] / Math.Max(1, cats.Count);
+                if (VillWorkCat(cat)) x += w[1] / 2.0;
+                return x > 0 && !double.IsNaN(x) ? x : 0;
+            }
+            catch { return 0; }
+        }
+
         private static void ResetLive()
         {
+            _vwCur = new Dictionary<Settlement, double[]>(); _vwPrev = new Dictionary<Settlement, double[]>();   // ZC1: koszyk wsi wedlug targu - sesja
             _w1Owed.Clear(); W1Zero(); _w1NgCur.Clear(); _w1Served.Clear(); _w1NgLastN = -1; _w1ServedLastN = 0; _w1NgRan = false;                                 // E3-W1: zaleglosci koszyka wsi i liczniki - sesja
             _seedT = _seedC = 0; _pending = null; _orphan = 0; _stateKey = null;
             _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear();
@@ -1081,6 +1101,7 @@ namespace Armoury
             // NE3-16 (poprawki): wczorajsze "bez towaru" i ile z nich kupilo potem wozem - do linii; dzis zbior od nowa
             if (_w1NgRan) { _w1NgLastN = _w1NgCur.Count; _w1ServedLastN = _w1Served.Count; }
             _w1NgRan = true; _w1NgCur.Clear(); _w1Served.Clear();
+            _vwPrev = _vwCur; _vwCur = new Dictionary<Settlement, double[]>();   // ZC1: koszyk wsi wedlug targu - wczorajszy do wycen wozow, dzisiejszy od zera
             double pph = Math.Max(0f, Math.Min(1f, s.VillagePurchasePerHead));
             if (_villCats == null) _villCats = CatsOf(VillIds, out _villText);
             var shelf = new Dictionary<Settlement, List<EquipmentElement>>();
@@ -1107,6 +1128,7 @@ namespace Armoury
                     if (want < 1) continue;
                     var mk = vil.TradeBound ?? vil.Bound;
                     if (mk == null || mk.Town == null) { d.NoTrade++; continue; }
+                    { double[] vw; if (!_vwCur.TryGetValue(mk, out vw)) { vw = new double[2]; _vwCur[mk] = vw; } vw[0] += Math.Max(0, want - wx); vw[1] += Math.Max(0, wx); }   // ZC1
                     List<EquipmentElement> list;
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
                     long spent = BuyGoods(vil, mk, list, want - wx, d, wx);

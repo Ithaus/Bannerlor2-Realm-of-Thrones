@@ -877,6 +877,11 @@ Uzycie (Python 3, tylko odczyt):
                     KA-2 linie doby i noclegu rozpoznane, KA-3 kontrola obiegu (roznica 0), KA-4 rachunek noclegu spojny, KA-5 premie w granicach projektu,
                     KA-6 wypoczeci do zmierzchu 18:00, najwyzej 12 h od pobudki, KA-7 potkniecia (takze w predkosci i morale) i ERROR paczki 0,
                     KA-8 noclegi i zaplata (INFO). Bez noclegu w logu KA-3..6 - INFO; log tylko z linia latek (menu glowne) - KA-1 INFO.
+--grupa nzc1      : (16.10, projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md paczka ZC1 "drogi towarow"; galaz w-toku/noc-zc1, Armoury/src/GoodsPaths.cs)
+                    python -I tools/sprawdz_logi.py --grupa nzc1 <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie doby, ZC1-2 potkniecia i ERROR 0,
+                    ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast, ZC1-5 sol: cena wozu / cena miasta 0.6-1.2, ZC1-6 zrodla
+                    "bez nazwy" w jedzeniu <= 2 szt./d na towar, ZC1-7 RemoveParty w jedzeniu <= 2/d, ZC1-8 kontrola z ksiega rudy i drewna ZGODNA, ZC1-9 przejscie
+                    BK (marmur i miod), ZC1-10 konwoje DTE i karawany BK bez jedzenia z niczego, ZC1-11 czas <= 5 ms, ZC1-12..14 INFO. Log bez paczki: INFO.
 --grupa nbitwa    : (16.10, Jeff 'krzyk paniki zapetlony, ranni ida w moja strone, bija piescia' i 'wysoki tier traci zielony pasek'; galaz
                     w-toku/noc-bitwa, Armoury/src/RoutHold.cs, BattleWind.cs) python -I tools/sprawdz_logi.py --grupa nbitwa <Armoury-*.log> (strumieniowo).
                     Progi: NBW-0 linia 'Bitwa (NB2): start sesji' (Broken Men Never Rally, Flee Away From Enemies, postura wg tieru, latka postury RBM
@@ -32263,6 +32268,210 @@ def nkarczmy_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nzc1 (16.10, projekt ZYCIE CODZIENNE paczka ZC1 "drogi towarow"; Armoury/src/GoodsPaths.cs i pliki z naglowkiem ZC1)
+NZ1_HEAD = "Towary (ZC1): "
+NZ1_FOOD = ("Egg", "WhaleMeat", "apple", "beer", "bread", "butter", "carrot", "cheese", "date_fruit", "fish", "grain", "grape", "honey", "meat", "olives", "orange", "pie")
+NZ1_GOODS = re.compile(r"^Towary: dzien (?P<day>-?\d+) - (?P<id>\S+) \(\d+ d\): zapas (?P<stock>\d+) .*?\| produkcja (?P<p>\d+) \[(?P<src>.*?)\] \| zuzycie (?P<c>\d+) \[(?P<sink>.*?)\] \| bez wyjasnienia")
+NZ1_TICK = re.compile(r"inne ticki dobowe (\d+)")
+NZ1_REMOVED = re.compile(r"przepadlo z partiami usunietymi bez zniszczenia \(RemoveParty\) (\d+)")
+NZ1_EXTRA = re.compile(r"\| mnoznik BK rzemieslnikow \+(\d+)")
+NZ1_VELVET = re.compile(r"aksamit: miast (?P<n>\d+), z indeksem < 10 (?P<low>\d+) ")
+NZ1_SALT = re.compile(r"woz za cena celu \(Cart Price By Destination (?P<key>tak|nie)\): sol (?P<n>\d+) szt\. - woz dostal (?P<got>[-\d.]+) d/szt\., cena miasta przy wjezdzie (?P<first>[-\d.]+) "
+                      r"\(stosunek [-\d.]+; stara regula [-\d.]+\); zelazo (?P<in>\d+) szt\. - (?P<igot>[-\d.]+) / (?P<ifirst>[-\d.]+) ")
+NZ1_SIDE = re.compile(r"marmur zdjety kopalniom srebra (?P<mcut>[\d.]+), glinanki dostaly (?P<mgive>\d+) .*?miod pitny zdjety drwalom (?P<mead>[\d.]+), miod lesny (?P<honey>\d+)")
+NZ1_DTE = re.compile(r"konwoje DTE \(Dte Convoy No Free Food (?:tak|nie)\) (?P<conv>\d+), zdjete (?P<food>\d+) szt\., konwoj je \(zostawione\) (?P<eats>\d+); karawany BK \(Bk Caravan No Free Food (?:tak|nie)\) bez daru (?P<bk>\d+), partia je \(dar zostal\) (?P<bkeats>\d+)")
+NZ1_WHALE = re.compile(r"wyrob warsztatow WhaleMeat -> meat (?P<swap>\d+) szt\., wielorybnicy: ryby z ticku (?P<fish>\d+), z tego mieso wieloryba (?P<made>\d+)")
+NZ1_COAL = re.compile(r"drwale wypalili (?P<wood>\d+) ladunkow drewna na (?P<coal>\d+) bryl")
+NZ1_INGOT = re.compile(r"sztaby z polek \(Iron Ingots Off Shelf (?:tak|nie)\): osad (?P<towns>\d+), sztab (?P<pcs>\d+) warte (?P<val>\d+) zl -> zelaza (?P<iron>\d+)")
+NZ1_BEER = re.compile(r"drugie piwo z cyklu (?P<extra>\d+), niesprzedane \(kasa bez nadwyzki\) (?P<unsold>\d+)")
+NZ1_STUM = re.compile(r"\| potkniecia (?P<st>\d+) \(sesja \d+\), czas ticku wsi (?P<tick>[\d.]+) ms, linia (?P<line>[\d.]+) ms\.$")
+NZ1_CTL = re.compile(r"kontrola z ksiega rudy i drewna: ruda (?P<ore>ZGODNA|NIEZGODNA).*?drewno (?P<wood>ZGODNA|NIEZGODNA)")
+NZ1_ERR = ("ERROR in GoodsPaths.", "ERROR in GoodsRates.SideStep", "ERROR in SyncData.arm_zc1", "ERROR in MarketCarts.Absorb")
+
+
+def nzc1_main(logp):
+    """nzc1 (16.10; projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 13-14, paczka ZC1; Armoury/src/GoodsPaths.cs): drogi towarow. Wejscie: log Armoury
+    (strumieniowo). ZC1-0 latki przy starcie gry, ZC1-1 linie doby rozpoznane, ZC1-2 potkniecia i ERROR paczki 0, ZC1-3 mieso wieloryba <= 10% miesa (produkcja
+    ksiegi towarow), ZC1-4 indeks aksamitu < 10 w >= 50% miast (mediana ostatnich 28 dob), ZC1-5 sol: cena wozu / cena miasta przy wjezdzie 0.6-1.2, ZC1-6 zrodla
+    "bez nazwy" w jedzeniu (inne ticki dobowe) <= 2 szt./d na towar, ZC1-7 ujscie RemoveParty w jedzeniu <= 2 szt./d na towar, ZC1-8 kontrola ksiegi towarow z ksiega
+    rudy i drewna ZGODNA (wegiel drwali i sztaby z polek), ZC1-9 przejscie BK: marmur oddany glinankom / zdjety 0.7-1.3, miod lesny / (0.5 x miod pitny zdjety)
+    0.7-1.3, ZC1-10 konwoje DTE i karawany BK bez jedzenia z niczego (konwoj je 0), ZC1-11 czas bloku ZC1 (tick wsi + linia) <= 5 ms na dobe (mediana), ZC1-12..14 INFO
+    (piwo x2, wegiel, sztaby, mnoznik BK rzemieslnikow, autorzy K4 "(nieznany)" w jedzeniu, linia koni). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ZC1-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    hooks, days, bad = [], [], []
+    goods = {}          # dzien -> {towar: (produkcja, zrodla, ujscia)}
+    ctl = []
+    unknown_food = 0
+    horses = 0
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NZ1_HEAD):
+                if s.startswith(NZ1_HEAD + "latki przy starcie gry"):
+                    hooks.append(s)
+                elif s.startswith(NZ1_HEAD + "dzien "):
+                    if NZ1_STUM.search(s) and NZ1_SALT.search(s) and NZ1_VELVET.search(s):
+                        days.append(s)
+                    else:
+                        bad.append(s)
+            elif s.startswith("Towary: dzien "):
+                mm = NZ1_GOODS.match(s)
+                if mm:
+                    goods.setdefault(int(mm.group("day")), {})[mm.group("id")] = (int(mm.group("p")), mm.group("src"), mm.group("sink"), s)
+            elif s.startswith("Towary (bilans): dzien "):
+                mm = NZ1_CTL.search(s)
+                if mm:
+                    ctl.append((mm.group("ore"), mm.group("wood")))
+            elif s.startswith("Towary (inne ticki dobowe): dzien "):
+                for f in NZ1_FOOD:
+                    mm = re.search(r"(?:^|; |: )" + re.escape(f) + r" \[([^\]]*)\]", s)
+                    if mm and "(nieznany)" in mm.group(1):
+                        unknown_food += 1
+            elif s.startswith("Towary (konie jako kapital, ZC1): dzien "):
+                horses += 1
+            elif s.startswith(NZ1_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii latek {len(hooks)}, doby ZC1 {len(days)} (nierozpoznanych {len(bad)}), dob ksiegi towarow {len(goods)}, linii bilansu z kontrola {len(ctl)}")
+    if not hooks and not days and not bad:
+        rep.add("ZC1-0: linie 'Towary (ZC1)'", "brak w logu", "INFO (log sprzed paczki ZC1)", None)
+        rep.show()
+        return 0
+    if hooks:
+        h = hooks[-1]
+        need = ("tick produkcji wsi", "konwoje DTE", "karawany BK (2/2)", "wsad z targu", "koszt wsadu")
+        miss = [k for k in need if k not in h]
+        rep.add("ZC1-0: latki przy starcie gry", h[len(NZ1_HEAD):][:220], "tick wsi, konwoje DTE, karawany BK 2/2, wsad i koszt wsadu - wszystkie", not miss)
+    else:
+        rep.add("ZC1-0: latki przy starcie gry", "brak linii (log bez startu gry?)", "INFO", None)
+    rep.add("ZC1-1: linie doby rozpoznane", f"doby {len(days)}, nierozpoznane {len(bad)}" + (f" (np. {bad[0][:160]})" if bad else ""), "nierozpoznane 0", not bad)
+    stum = sum(int(NZ1_STUM.search(s).group("st")) for s in days)
+    rep.add("ZC1-2: potkniecia (suma dob) i ERROR paczki (GoodsPaths.*, GoodsRates.SideStep, SyncData.arm_zc1, MarketCarts.Absorb)", f"potkniecia {stum}, ERROR {n_err}", "0 / 0",
+            stum == 0 and n_err == 0)
+    # ZC1-3 mieso wieloryba wobec calego miesa (produkcja ksiegi, bez pierwszej doby sesji)
+    gd = sorted(goods)
+    if len(gd) > 1:
+        use = gd[1:]
+        wp = sum(goods[d].get("WhaleMeat", (0,))[0] for d in use)
+        mp = sum(goods[d].get("meat", (0,))[0] for d in use)
+        share = wp / (wp + mp) if wp + mp > 0 else 0.0
+        rep.add("ZC1-3: mieso wieloryba w produkcji miesa (ksiega towarow, doby 2..)", f"WhaleMeat {wp}, meat {mp} -> {share:.1%}", "<= 10%", share <= 0.10)
+    else:
+        rep.add("ZC1-3: mieso wieloryba", "za malo dob ksiegi towarow", "INFO", None)
+    # ZC1-4 aksamit
+    vel = []
+    for s in days:
+        mm = NZ1_VELVET.search(s)
+        if mm and int(mm.group("n")) > 0:
+            vel.append(int(mm.group("low")) / int(mm.group("n")))
+    if vel:
+        tail = vel[-28:]
+        med = st.median(tail)
+        rep.add("ZC1-4: indeks aksamitu < 10 (czesc miast, mediana ostatnich do 28 dob)", f"{med:.0%} (pierwsza doba {vel[0]:.0%}, ostatnia {vel[-1]:.0%})", ">= 50% miast", med >= 0.5)
+    # ZC1-5 sol: cena wozu / cena miasta przy wjezdzie
+    sn = sf = sg = 0.0
+    inn = ifr = ig = 0.0
+    for s in days:
+        mm = NZ1_SALT.search(s)
+        n = int(mm.group("n"))
+        if n > 0 and mm.group("got") != "-":
+            sn += n; sg += n * float(mm.group("got")); sf += n * float(mm.group("first"))
+        ni = int(mm.group("in"))
+        if ni > 0 and mm.group("igot") != "-":
+            inn += ni; ig += ni * float(mm.group("igot")); ifr += ni * float(mm.group("ifirst"))
+    if sn > 0 and sf > 0:
+        r = sg / sf
+        rep.add("ZC1-5: sol - cena wozu / cena miasta przy wjezdzie (suma dob)", f"{r:.2f} ({sn:.0f} szt., woz {sg / sn:.2f} d/szt., miasto {sf / sn:.2f})", "0.6-1.2", 0.6 <= r <= 1.2)
+    else:
+        rep.add("ZC1-5: sol - sprzedaze wozow", "brak sprzedazy soli w liniach ZC1", "INFO", None)
+    if inn > 0 and ifr > 0:
+        rep.add("ZC1-5b: zelazo - cena wozu / cena miasta przy wjezdzie (suma dob)", f"{ig / ifr:.2f} ({inn:.0f} szt.)", "INFO", None)
+    # ZC1-6 / ZC1-7 zrodla i ujscia bez nazwy w jedzeniu
+    if len(gd) > 1:
+        use = gd[1:]
+        over_src, over_rm = [], []
+        for f in NZ1_FOOD:
+            src = rm = 0
+            for d in use:
+                g = goods[d].get(f)
+                if not g:
+                    continue
+                mm = NZ1_TICK.search(g[1])
+                if mm:
+                    src += int(mm.group(1))
+                mm = NZ1_REMOVED.search(g[2])
+                if mm:
+                    rm += int(mm.group(1))
+            if src / len(use) > 2.0:
+                over_src.append(f"{f} {src / len(use):.1f}")
+            if rm / len(use) > 2.0:
+                over_rm.append(f"{f} {rm / len(use):.1f}")
+        rep.add("ZC1-6: zrodla 'bez nazwy' w jedzeniu (inne ticki dobowe, srednio na dobe)", f"towarow ponad 2/d: {len(over_src)}" + (f" ({', '.join(over_src)})" if over_src else ""),
+                "0 (kazde jedzenie <= 2 szt./d)", not over_src)
+        rep.add("ZC1-7: ujscie RemoveParty w jedzeniu (srednio na dobe)", f"towarow ponad 2/d: {len(over_rm)}" + (f" ({', '.join(over_rm)})" if over_rm else ""),
+                "0 (kazde jedzenie <= 2 szt./d)", not over_rm)
+        extra = sum(int(NZ1_EXTRA.search(g[3]).group(1)) for d in use for g in goods[d].values() if NZ1_EXTRA.search(g[3]))
+        rep.add("ZC1-12: mnoznik BK rzemieslnikow ponad recepture x cykle (suma dob, wszystkie towary)", f"{extra} szt. ({extra / len(use):.0f}/d)", "INFO (dotad ok. 1 460/d - liczone na jeden cykl)", None)
+    if ctl:
+        badc = [c for c in ctl[1:] if c[0] != "ZGODNA" or c[1] != "ZGODNA"]
+        rep.add("ZC1-8: kontrola ksiegi towarow z ksiega rudy i drewna (bez pierwszej linii)", f"NIEZGODNA {len(badc)} z {max(0, len(ctl) - 1)}", "0", not badc)
+    # ZC1-9 przejscie BK
+    mcut = mgive = mead = honey = 0.0
+    for s in days:
+        mm = NZ1_SIDE.search(s)
+        if mm:
+            mcut += float(mm.group("mcut")); mgive += float(mm.group("mgive")); mead += float(mm.group("mead")); honey += float(mm.group("honey"))
+    if mcut > 20:
+        rm_ = mgive / mcut
+        rep.add("ZC1-9a: marmur oddany glinankom / zdjety kopalniom srebra (suma dob; rozdanie dzien pozniej)", f"{rm_:.2f} ({mgive:.0f} / {mcut:.1f})", "0.7-1.3", 0.7 <= rm_ <= 1.3)
+    else:
+        rep.add("ZC1-9a: marmur - przejscie", f"zdjete {mcut:.1f} (za malo do oceny)", "INFO", None)
+    if mead > 20:
+        rh = honey / (0.5 * mead)
+        rep.add("ZC1-9b: miod lesny / (0.5 x miod pitny zdjety drwalom)", f"{rh:.2f} ({honey:.0f} / {0.5 * mead:.1f})", "0.7-1.3", 0.7 <= rh <= 1.3)
+    else:
+        rep.add("ZC1-9b: miod pitny - przejscie", f"zdjete {mead:.1f} (za malo do oceny)", "INFO", None)
+    # ZC1-10 konwoje DTE i karawany BK
+    conv = food = eats = bk = bkeats = 0
+    for s in days:
+        mm = NZ1_DTE.search(s)
+        if mm:
+            conv += int(mm.group("conv")); food += int(mm.group("food")); eats += int(mm.group("eats")); bk += int(mm.group("bk")); bkeats += int(mm.group("bkeats"))
+    rep.add("ZC1-10: konwoje DTE i karawany BK bez jedzenia z niczego", f"konwojow {conv}, zdjete jedzenie {food} szt., konwoj je {eats}; karawany BK bez daru {bk}, partia je {bkeats}",
+            "konwoj je 0, partia je 0", eats == 0 and bkeats == 0)
+    # ZC1-11 czas
+    if days:
+        tm = [float(NZ1_STUM.search(s).group("tick")) + float(NZ1_STUM.search(s).group("line")) for s in days]
+        rep.add("ZC1-11: czas bloku ZC1 (tick wsi + linia doby, mediana)", f"{st.median(tm):.2f} ms (najwiecej {max(tm):.1f})", "<= 5 ms", st.median(tm) <= 5.0)
+    # INFO
+    sw = fishw = made = beer = unsold = wood = coal = itowns = ipcs = iiron = 0
+    for s in days:
+        mm = NZ1_WHALE.search(s)
+        if mm:
+            sw += int(mm.group("swap")); fishw += int(mm.group("fish")); made += int(mm.group("made"))
+        mm = NZ1_BEER.search(s)
+        if mm:
+            beer += int(mm.group("extra")); unsold += int(mm.group("unsold"))
+        mm = NZ1_COAL.search(s)
+        if mm:
+            wood += int(mm.group("wood")); coal += int(mm.group("coal"))
+        mm = NZ1_INGOT.search(s)
+        if mm:
+            itowns += int(mm.group("towns")); ipcs += int(mm.group("pcs")); iiron += int(mm.group("iron"))
+    nd = max(1, len(days))
+    rep.add("ZC1-13: wieloryb, piwo x2, wegiel, sztaby (suma dob)", f"WhaleMeat -> meat {sw} ({sw / nd:.0f}/d), wielorybnicy ryby {fishw} -> mieso wieloryba {made}; drugie piwo {beer}, "
+            f"niesprzedane {unsold}; wegiel {coal} bryl z {wood} ladunkow; sztaby {ipcs} szt. w {itowns} osadodobach -> zelaza {iiron}", "INFO", None)
+    rep.add("ZC1-14: autorzy K4 '(nieznany)' w jedzeniu (wpisy towaru z nieznanym autorem), linie koni", f"{unknown_food} wpisow, linii 'Towary (konie jako kapital, ZC1)' {horses}",
+            "INFO (K4 rozpoznaje metody latane - nieznany ma byc rzadki)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -32446,6 +32655,8 @@ def main(argv):
         return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group == "nkarczmy" and logp:
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
+    if group == "nzc1" and logp:
+        return nzc1_main(logp)   # nzc1 (16.10, projekt ZYCIE CODZIENNE paczka ZC1): drogi towarow - wieloryb, jedwab, deski, wegiel, sztaby, BK, woz za cena celu, jedzenie z niczego
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

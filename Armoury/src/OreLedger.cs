@@ -41,6 +41,8 @@ namespace Armoury
             public int Scrap;                                      // 174, pytanie 4: ruda ze zlomu starego nadmiaru (ArmsScrap) - zrodlo
             public int DrillScrap;                                 // musztra: ruda ze zlomu zapasu cwiczebnego odkupiona przez kowali miasta (Drill) - zrodlo
             public int BloomWood;                                  // E6/R1 (214): drewno zdjete z polek miast przez dymarki przy kopalniach (Bloomery) - ujscie
+            public int Coal;                                       // ZC1 (CharcoalBurners): drewno z magazynow wsi drwali wypalone na wegiel - ujscie
+            public int Ingot;                                      // ZC1 (IronIngotsOffShelf): zelazo z przekutych sztab z polek osad - zrodlo
             public float Model;
             public readonly HashSet<Settlement> Makers = new HashSet<Settlement>();
             public readonly HashSet<Settlement> WoodlotMakers = new HashSet<Settlement>();
@@ -49,7 +51,7 @@ namespace Armoury
             public int[] Shown; public int ShownDay = -1;           // paczka 146: liczby ostatniej wydrukowanej linii - kontrola ksiegi towarow (GoodsLedger)
 
             public Book(string id, string name, string townSource, string lineName) { Id = id; Name = name; TownSource = townSource; LineName = lineName; }
-            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
+            public void NewDay() { Villages = 0; Towns = 0; Lines = 0; Shops = 0; Builds = 0; Woodlot = 0; Fletch = 0; Scrap = 0; DrillScrap = 0; BloomWood = 0; Coal = 0; Ingot = 0; Model = 0f; Makers.Clear(); WoodlotMakers.Clear(); Modelled.Clear(); }
             public void Reset() { NewDay(); LastAll = -1; LastTowns = -1; Shown = null; ShownDay = -1; }
         }
 
@@ -184,6 +186,20 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>ZC1 (GoodsPaths.Coal): ladunki drewna wypalone na wegiel we wsi drwali - ujscie drewna. Tylko licznik.</summary>
+        internal static void NoteCoalWood(ItemObject item, int loads)
+        {
+            try { var b = Of(item); if (b != null && loads > 0) b.Coal += loads; }
+            catch { }
+        }
+
+        /// <summary>ZC1 (GoodsPaths.Ingots): zelazo (lupy / ruda) z przekutych sztab z polek osad - zrodlo. Tylko licznik.</summary>
+        internal static void NoteIngotIron(ItemObject item, int n)
+        {
+            try { var b = Of(item); if (b != null && n > 0) b.Ingot += n; }
+            catch { }
+        }
+
         /// <summary>Material zdjety z targu przez nasze budowy (BuildFunding.BuyMaterials / BuyOneCheapest). Tylko licznik.</summary>
         internal static void NoteBuild(ItemObject item, int loads)
         {
@@ -240,9 +256,11 @@ namespace Armoury
             if (b == _wood) sb.Append(", las wsi (126) +").Append(b.Woodlot).Append(" (").Append(b.WoodlotMakers.Count).Append(" wsi)");
             if (b.Scrap > 0) sb.Append(", zlom z nadmiaru (174) +").Append(b.Scrap);
             if (b.DrillScrap > 0) sb.Append(", zlom z cwiczen (musztra) +").Append(b.DrillScrap);
+            if (b.Ingot > 0) sb.Append(", sztaby z polek (ZC1) +").Append(b.Ingot);
             sb.Append("; zuzycie: warsztaty zbrojne ").Append(b.Shops).Append(", linie towarowe (").Append(b.LineName).Append(") ").Append(b.Lines)
               .Append(", budowy ").Append(b.Builds)
               .Append(", strzelarze (172) ").Append(b.Fletch);
+            if (b.Coal > 0) sb.Append(", wegiel drwali (ZC1) ").Append(b.Coal);
             if (b == _wood && (b.BloomWood > 0 || Bloomery.On)) sb.Append(Bloomery.WoodSegment(b.BloomWood));   // E6/R1 (214): dymarki przy kopalniach (targ - ujscie zapasu; las okregu - poza zapasem)
             if (bloom) sb.Append(Bloomery.SmeltSegment(b.Scrap, b.DrillScrap));
             sb.Append("; zapas: miasta ").Append(towns);
@@ -255,7 +273,7 @@ namespace Armoury
             if (b.LastAll >= 0)
             {
                 int delta = all - b.LastAll;
-                int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap - b.Shops - b.Lines - b.Builds - b.Fletch - b.BloomWood;
+                int known = b.Villages + b.Woodlot + b.Towns + b.Scrap + b.DrillScrap + b.Ingot - b.Shops - b.Lines - b.Builds - b.Fletch - b.BloomWood - b.Coal;
                 sb.Append(" (").Append(Signed(delta)).Append(", bez wyjasnienia ").Append(Signed(delta - known)).Append(")");
             }
             sb.Append("; miast bez towaru ").Append(empty).Append(" z ").Append(townCount)

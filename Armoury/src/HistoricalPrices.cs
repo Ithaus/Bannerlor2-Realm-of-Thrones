@@ -483,8 +483,10 @@ namespace Armoury
                 // N11 (noc 16.10): czynnik ladunku kampanii z zapisu (BulkUnit, klucz BulkUnitPerCampaign) - suwak MCM tylko dla nowej kampanii
                 float bulk = BulkUnit.Factor(s);
                 bool bloom = bulk > 1.01f && Bloomery.CanApply();
+                // ZC1 (BulkClayLimeCharcoal): glina i wapien w ladunkach tylko w kampanii zaczetej z kluczem (GoodsPaths - flaga w zapisie arm_zc1); wegiel zostaje w brylach
+                bool clayBulk = GoodsPaths.BulkClayActive();
                 if (bulk > 1.01f)
-                    foreach (var id in new[] { "iron", "hardwood" })
+                    foreach (var id in clayBulk ? new[] { "iron", "hardwood", "clay", "limestone" } : new[] { "iron", "hardwood" })
                     {
                         var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                         if (it == null) continue;
@@ -1079,6 +1081,9 @@ namespace Armoury
                 // K1-3a krok 2: przy regule koni roboczych (TownsfolkBuyOnlyWorkHorses i czynna kiesa ludu) koszyk BK nie kupuje koni zadnej z czterech kategorii
                 // targu - wymiane padlych koni roboczych robi TownFolk.WorkHorsesDaily (jeden zakup, jedna zaplata); takze bez cen historycznych
                 if (TownFolk.NoHorseBasket(town, category, true)) { __result = 0f; return; }
+                // ZC1 (SilkToWeavers / SilverOreToSmiths / PlanksToBuilding): jedwab surowy dla tkalni aksamitu, ruda srebra dla zlotnikow i dworow, deski dla budow -
+                // mieszczanie tych kategorii nie kupuja (budzet wiersza 0, jak bron i zbroja); takze bez cen historycznych
+                if (GoodsPaths.NoTownBudget(category)) { __result = 0f; return; }
                 if (!_applied) return;
                 var s = Settings.Current;
                 float idx = Math.Max(0.01f, town.GetItemCategoryPriceIndex(category));

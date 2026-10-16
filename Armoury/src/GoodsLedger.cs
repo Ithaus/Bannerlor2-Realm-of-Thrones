@@ -56,10 +56,10 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, FFish = 29, FSack = 30, FDragon = 31, FCourt = 32, Kinds = 33;   // FCourt: E3-P1 (noc-ekonomia3 czesc 2) - dwor pana i krola kupuje towar z polki siedziby (CourtGoods) - ujscie;   // FDragon: 24c (14.10) - smoki jedza zwierzeta z taborow i stad wsi (DragonFeed) - ujscie;   // FSack: L7 lupu miast (CitySack.Goods.cs) - polka zdobytej osady -> tabory zwyciezcow znosi sie do zera, reszta (-) = spalone przy spustoszeniu miasta;   // FFish: m6b (5) - polow lodzi rybackich NavalDLC (FishingPartyCampaignBehavior.CatchFish, tick godzinowy - dotad poza ramkami, "bez wyjasnienia");   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, FFish = 29, FSack = 30, FDragon = 31, FCourt = 32, FZc1 = 33, Kinds = 34;   // FZc1: ZC1 (16.10, GoodsPaths) - drogi towarow: mieso wieloryba z polowu, miod lesny, marmur glinanek, wegiel drwali, sztaby z polek -> zelazo;   // FCourt: E3-P1 (noc-ekonomia3 czesc 2) - dwor pana i krola kupuje towar z polki siedziby (CourtGoods) - ujscie;   // FDragon: 24c (14.10) - smoki jedza zwierzeta z taborow i stad wsi (DragonFeed) - ujscie;   // FSack: L7 lupu miast (CitySack.Goods.cs) - polka zdobytej osady -> tabory zwyciezcow znosi sie do zera, reszta (-) = spalone przy spustoszeniu miasta;   // FFish: m6b (5) - polow lodzi rybackich NavalDLC (FishingPartyCampaignBehavior.CatchFish, tick godzinowy - dotad poza ramkami, "bez wyjasnienia");   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)", "polow lodzi rybackich (NavalDLC)", "lup miast (L7)", "smoki (24c)", "dwory (E3-P1)" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)", "polow lodzi rybackich (NavalDLC)", "lup miast (L7)", "smoki (24c)", "dwory (E3-P1)", "drogi towarow (ZC1)" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         // P3/Z1 (TRIAZ-3 O2-1 P1): HCart - surowiec w wozach kupcow w drodze (MaterialCarts; poza rosterami - bez tego posiadacza zakup wozem bylby "bez wyjasnienia")
@@ -77,9 +77,10 @@ namespace Armoury
                              GBee = "BetterEconomy", GForage = "furaz armii (Armoury)", GLost = "przepadlo z rozbitymi partiami", GNoBuyer = "sprzedane bez kupca",
                              GDiscard = "porzucone przez lordow (gra)",
                              GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)", GSack = "lup miast (L7)", GDragon = "zjedzone przez smoka (24c)", GCourt = "dwory (E3-P1)",
-                             GFish = "lodzie rybackie (NavalDLC, polow)", GSpawn = "nowe druzyny lordow (zboze gry)", GRemoved = "przepadlo z partiami usunietymi bez zniszczenia (RemoveParty)";   // m6b (5)
-        private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
+                             GFish = "lodzie rybackie (NavalDLC, polow)", GSpawn = "nowe druzyny lordow (zboze gry)", GRemoved = "przepadlo z partiami usunietymi bez zniszczenia (RemoveParty)",   // m6b (5)
+                             GZc1 = "drogi towarow (ZC1)";   // ZC1 (16.10): przemiana towaru we wsi i w osadzie (opis w podpozycji)
+        private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GZc1, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -136,6 +137,7 @@ namespace Armoury
             public string Key;                   // "zboze>chleb" w id kategorii gry, np. "grain>bread", "sheep>meat+hides+wool"
             public bool TanWeave;
             public readonly Dictionary<ItemCategory, int> Out = new Dictionary<ItemCategory, int>();
+            public readonly Dictionary<ItemCategory, int> In = new Dictionary<ItemCategory, int>();   // ZC1: wsad jednego cyklu (liczba cykli ramki = wsad zjedzony / wsad cyklu)
         }
 
         /// <summary>Dzienne liczniki jednego towaru.</summary>
@@ -158,6 +160,8 @@ namespace Armoury
 
         // ------------------------------------------------------------ stan
         private static ItemObject[] _items;
+        private static int[] _horseCat;          // ZC1: rodzaj konia (HorseBook.Cat) dla koni w ksiedze, -1 = towar (linia "Towary:")
+        private static readonly string[] HorseCatName = { "zwykle", "bojowe", "szlachetne", "juczne", "egzotyczne" };
         private static Dictionary<ItemObject, int> _idx;
         private static Acc[] _acc;
         private const int MaxDepth = 24;
@@ -190,7 +194,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _items = null; _idx = null; _acc = null; _top = null; _depth = 0; _lines.Clear();
+            _items = null; _idx = null; _acc = null; _top = null; _depth = 0; _lines.Clear(); _horseCat = null;
             _tickAuth.Clear(); _authNames.Clear(); _authIx.Clear(); _authCache.Clear(); _authTraces = 0; _authCapped = 0; _authTicks = 0;   // K4 (Towary 2): autorzy zmian w tickach
             for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
             _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _stumbles = _offThread = 0;
@@ -214,12 +218,15 @@ namespace Armoury
             {
                 var mgr = MBObjectManager.Instance;
                 if (mgr == null) return false;
+                var s0 = Settings.Current;
+                bool horses = s0 != null && s0.GoodsLedgerHorses;   // ZC1: raz na sesje (lista towarow ksiegi)
                 var list = new List<ItemObject>();
                 foreach (var it in mgr.GetObjectTypeList<ItemObject>())
                 {
                     if (it == null || it.IsCraftedByPlayer) continue;
                     bool live = it.IsAnimal && it.HorseComponent != null && it.HorseComponent.IsLiveStock;
-                    if (it.IsTradeGood || live) list.Add(it);
+                    bool horse = horses && it.ItemType == ItemObject.ItemTypeEnum.Horse && !it.NotMerchandise && HorseBook.Cat(it) >= 0;   // ZC1: konie jako kapital
+                    if (it.IsTradeGood || live || horse) list.Add(it);
                 }
                 if (list.Count == 0) return false;
                 list.Sort((a, b) => string.CompareOrdinal(a.StringId, b.StringId));
@@ -228,6 +235,9 @@ namespace Armoury
                 var acc = new Acc[list.Count];
                 for (int i = 0; i < acc.Length; i++) acc[i] = new Acc();
                 for (int d = 0; d < MaxDepth; d++) { if (_pool[d] == null) _pool[d] = new Frame(); _pool[d].Size(list.Count); _pool[d].Clean(); }
+                var hc = new int[list.Count];
+                for (int i = 0; i < list.Count; i++) hc[i] = list[i].ItemType == ItemObject.ItemTypeEnum.Horse ? HorseBook.Cat(list[i]) : -1;
+                _horseCat = hc;
                 _idx = idx; _acc = acc; _items = list.ToArray();
                 return true;
             }
@@ -410,16 +420,47 @@ namespace Armoury
             for (int k = 0; k < n && k < 48; k++)
             {
                 var fr = st.GetFrame(k);
-                var m = fr != null ? fr.GetMethod() : null;
-                if (m == null) continue;
+                if (fr == null) continue;
+                var m = fr.GetMethod();
                 string c;
-                if (!_authCache.TryGetValue(m, out c)) { c = Classify(m); _authCache[m] = c; }
+                if (m == null) c = Patched(fr, null);   // ZC1: ramka metody latanej bez obiektu metody - oryginal z Harmony (bez pamieci - rzadkie)
+                else if (!_authCache.TryGetValue(m, out c)) { c = Classify(m); if (c == null) c = Patched(fr, m); _authCache[m] = c; }
                 if (c == null) continue;
                 if (c == "#") break;                        // dyspozytor zdarzen gry - dalej juz tylko petla kampanii
                 if (c[0] == '!') return c.Substring(1);
                 if (first == null) first = c;
             }
             return first ?? "(nieznany)";
+        }
+
+        /// <summary>ZC1 (K4 autorzy tickow): ramka metody zalatanej przez Harmony (DMD / metoda dynamiczna) - oryginal (Harmony.GetOriginalMethodFromStackframe)
+        /// klasyfikowany jak kazda metoda; dotad takie ramki pomijano, a gdy wolajacy byl tylko w nich (np. latany sluchacz zdarzenia DTE OnDailyTickTown / BK),
+        /// autor wychodzil "(nieznany)". null - ramka bez oryginalu (pomin, jak dotad).</summary>
+        private static string Patched(StackFrame fr, MethodBase m)
+        {
+            MethodBase o = null;
+            try { o = Harmony.GetOriginalMethodFromStackframe(fr); } catch { o = null; }
+            if (o != null && !ReferenceEquals(o, m)) return Classify(o);   // oryginal znany - ta sama klasyfikacja (ksiega, ItemRoster, System - pomin)
+            // nazwa metody MonoMod "DMD<Przestrzen.Typ::Metoda>" (tak widac ja w raportach wywrotek) - typ oryginalu z nazwy, gdy Harmony nie odda obiektu metody
+            try
+            {
+                string n = m != null ? m.Name : null;
+                if (n == null || !n.StartsWith("DMD<", StringComparison.Ordinal)) return null;
+                int end = n.IndexOf('>'), sep = n.IndexOf("::", StringComparison.Ordinal);
+                if (end < 0 || sep < 4 || sep > end) return null;
+                string tn = n.Substring(4, sep - 4), mn = n.Substring(sep + 2, end - sep - 2);
+                var t = AccessTools.TypeByName(tn);
+                if (t == null || t == typeof(GoodsLedger) || t == typeof(ItemRoster)) return null;
+                string ns = t.Namespace ?? "";
+                if (ns.StartsWith("System", StringComparison.Ordinal) || ns.StartsWith("HarmonyLib", StringComparison.Ordinal) || ns.StartsWith("MonoMod", StringComparison.Ordinal)) return null;
+                var top = t;
+                while (top.DeclaringType != null) top = top.DeclaringType;
+                string asm = top.Assembly != null ? top.Assembly.GetName().Name : "?";
+                if (typeof(CampaignBehaviorBase).IsAssignableFrom(top)) return "!" + asm + ":" + top.Name;
+                if (t == typeof(CampaignEventDispatcher) || t == typeof(CampaignEvents)) return "#";
+                return asm + ":" + top.Name + "." + mn;
+            }
+            catch { return null; }
         }
 
         private static string Classify(MethodBase m)
@@ -585,6 +626,7 @@ namespace Armoury
                         // len -> plotno 1:1); gdy nic nie zeszlo, a wyrob przybyl - linia BK z niczego (WorkshopNoFreeRaw wylaczony)
                         bool tanWeave = false;
                         if (line != null && line.TanWeave && hidden) foreach (var i in f.Touched) if (f.Net[i] < 0) { tanWeave = true; break; }
+                        int cycles = hidden ? CyclesOf(f, line) : 0;   // ZC1: ile cykli ramka zrobila z wlasnego wsadu (0 - linia bez wsadu albo wsadu nie widac)
                         foreach (var i in f.Touched)
                         {
                             long n = f.Net[i];
@@ -601,7 +643,13 @@ namespace Armoury
                                 {
                                     int exp;
                                     var cat = _items[i].ItemCategory;
-                                    if (cat != null && line.Out.TryGetValue(cat, out exp) && exp > 0 && n > exp) _acc[i].Extra += n - exp;
+                                    if (cat != null && line.Out.TryGetValue(cat, out exp) && exp > 0)
+                                    {
+                                        // ZC1: receptura x liczba cykli z wsadu (ArtisanOwnInputs - dodatkowe cykle biora wlasny wsad), piwo x2 przy BkRecipeYieldByWorkshop;
+                                        // dotad porownanie z JEDNYM cyklem liczylo wyrob cykli z wlasnym wsadem jako "z niczego"
+                                        long due = (long)exp * Math.Max(1, cycles) * (cycles > 0 ? ArtisanInputs.YieldOf(line.In, cat) : 1);
+                                        if (n > due) _acc[i].Extra += n - due;
+                                    }
                                 }
                                 continue;
                             }
@@ -670,6 +718,9 @@ namespace Armoury
                     return;
                 case FDragon:      // 24c (14.10): smok zjadl zwierzeta z taboru albo ze stad wsi (DragonFeed.Take) - ujscie, etykieta zrodla w Info
                     foreach (var i in f.Touched) Book(i, GDragon, f.Info as string, f.Net[i]);
+                    return;
+                case FZc1:         // ZC1 (16.10, GoodsPaths): przemiana towaru (wsad -, wyrob +) - etykieta w Info
+                    foreach (var i in f.Touched) Book(i, GZc1, f.Info as string, f.Net[i]);
                     return;
                 case FFish:        // m6b (5): ryby zlowione przez lodzie rybackie NavalDLC (produkcja ludzi wsi rybackiej na morzu) - zrodlo
                     foreach (var i in f.Touched) Book(i, GFish, null, f.Net[i]);
@@ -774,6 +825,7 @@ namespace Armoury
                     if (anyIn) sb.Append('+');
                     if (x.Item2 > 1) sb.Append(x.Item2);
                     sb.Append(x.Item1.StringId); anyIn = true;
+                    if (x.Item2 > 0) { int ci; l.In.TryGetValue(x.Item1, out ci); l.In[x.Item1] = ci + x.Item2; }
                 }
             sb.Append('>');
             bool first = true; string only = null; int outN = 0;
@@ -789,6 +841,22 @@ namespace Armoury
             l.TanWeave = !anyIn && outN == 1 && (only == "leather" || only == "linen");   // WorkshopLaw.TanOrWeave: linia rzemieslnikow bez wsadu
             _lines[outs] = l;
             return l;
+        }
+
+        /// <summary>ZC1: liczba cykli ramki cyklu warsztatu z wsadu zjedzonego w niej (najmniejszy iloraz wsad kategorii / wsad cyklu). 0 - linia bez wsadu
+        /// albo wsad poza towarami ksiegi.</summary>
+        private static int CyclesOf(Frame f, Line line)
+        {
+            if (line == null || line.In.Count == 0 || _items == null) return 0;
+            int best = int.MaxValue;
+            foreach (var kv in line.In)
+            {
+                long used = 0;
+                foreach (var i in f.Touched) if (f.Net[i] < 0 && _items[i].ItemCategory == kv.Key) used += -f.Net[i];
+                int c = (int)(used / Math.Max(1, kv.Value));
+                if (c < best) best = c;
+            }
+            return best == int.MaxValue ? 0 : best;
         }
 
         /// <summary>N5-B (SlaughterHides): receptura linii zmieniona w sesji - opisy linii (klucz "wsad>wyroby") od nowa przy nastepnym cyklu.</summary>
@@ -1144,6 +1212,7 @@ namespace Armoury
                 var unexplained = new List<KeyValuePair<string, long>>();
                 long wagonUnits = 0, wagonGold = 0;
                 var wagonLines = new List<KeyValuePair<long, string>>();
+                var hz = new HorseAgg[HorseCatName.Length];   // ZC1: konie jako kapital - jedna linia wedlug rodzaju
                 for (int i = 0; i < _items.Length; i++)
                 {
                     var a = _acc[i];
@@ -1154,6 +1223,8 @@ namespace Armoury
                     bool trade = false;
                     foreach (var t in a.Tr) if (t != 0) { trade = true; break; }
                     if (now == 0 && p == 0 && c == 0 && !trade && a.Last <= 0) { a.Last = now; a.NewDay(); continue; }
+                    int hcat = _horseCat != null && i < _horseCat.Length ? _horseCat[i] : -1;
+                    if (hcat >= 0 && hcat < hz.Length) { (hz[hcat] ?? (hz[hcat] = new HorseAgg())).Add(a, it, now); continue; }
                     moving++;
                     var sb = new StringBuilder();
                     sb.Append("Towary: dzien ").Append(day).Append(" - ").Append(it.StringId).Append(" (").Append(it.Value).Append(" d): zapas ").Append(now);
@@ -1205,6 +1276,7 @@ namespace Armoury
                                                                                     + " d/szt. = " + (it.Value > 0 ? (avg / it.Value).ToString("0.00", inv) : "-") + " wartosci)"));
                     }
                 }
+                string horseLine = HorseLine(day, hz);   // ZC1: linia koni (null - klucz wylaczony albo koni nie ma w ksiedze)
                 // ---- utarg wozow wedlug towaru
                 wagonLines.Sort((x, y) => y.Key.CompareTo(x.Key));
                 var wl = new StringBuilder();
@@ -1256,6 +1328,7 @@ namespace Armoury
                 string auth = null;
                 try { auth = AuthorsLine(day); } catch (Exception e) { Stumble("AuthorsLine", e); }
                 if (auth != null) all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(auth);
+                if (horseLine != null) all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(horseLine);
                 Log.Info(all.ToString());
 
                 try { WatchCapture(day); } catch (Exception e) { Stumble("WatchCapture", e); }   // N1(b) (noc 16.10): zapas karawan wedlug towaru - migawka przed nowa doba (tylko log)
@@ -1273,6 +1346,64 @@ namespace Armoury
                 _lastDay = day; _wasOn = true;
             }
             catch (Exception e) { Stumble("Daily", e); }
+        }
+
+        // ------------------------------------------------------------ ZC1: konie jako kapital (klucz GoodsLedgerHorses)
+        private sealed class HorseAgg
+        {
+            public long Now, Last, P, C, U, Value, Kinds; public bool Known = true;
+            public readonly long[] Hold = new long[Holders];
+            public readonly Dictionary<string, Dictionary<string, long>> Src = new Dictionary<string, Dictionary<string, long>>(), Sink = new Dictionary<string, Dictionary<string, long>>();
+            public void Add(Acc a, ItemObject it, long now)
+            {
+                Kinds++; Now += now; Value += now * Math.Max(0, it.Value);
+                long p = Sum(a.Src), c = Sum(a.Sink); P += p; C += c;
+                if (a.Last >= 0) { Last += a.Last; U += (now - a.Last) - (p - c); } else Known = false;
+                for (int h = 0; h < Holders; h++) Hold[h] += a.Hold[h];
+                Merge(Src, a.Src); Merge(Sink, a.Sink);
+            }
+            private static void Merge(Dictionary<string, Dictionary<string, long>> to, Dictionary<string, Dictionary<string, long>> from)
+            {
+                foreach (var g in from)
+                {
+                    Dictionary<string, long> d;
+                    if (!to.TryGetValue(g.Key, out d)) { d = new Dictionary<string, long>(); to[g.Key] = d; }
+                    foreach (var kv in g.Value) { long v; d.TryGetValue(kv.Key, out v); d[kv.Key] = v + kv.Value; }
+                }
+            }
+        }
+
+        private static string HorseLine(int day, HorseAgg[] hz)
+        {
+            var s0 = Settings.Current;
+            if (s0 == null || !s0.GoodsLedgerHorses || _horseCat == null) return null;
+            var sb = new StringBuilder(1200);
+            sb.Append("Towary (konie jako kapital, ZC1): dzien ").Append(day).Append(" - konie, wielblady i juczne (sztuki; wartosc = zapas x cena sztuki)");
+            long tv = 0, tn = 0;
+            for (int k = 0; k < hz.Length; k++)
+            {
+                var a = hz[k];
+                sb.Append(" | ").Append(HorseCatName[k]).Append(": ");
+                if (a == null) { sb.Append('-'); continue; }
+                tv += a.Value; tn += a.Now;
+                sb.Append("rodzajow ").Append(a.Kinds).Append(", zapas ").Append(a.Now).Append(" (").Append(a.Known ? Signed(a.Now - a.Last) : "pierwszy pomiar").Append("), wartosc ").Append(a.Value)
+                  .Append(" zl, produkcja ").Append(a.P).Append(" [");
+                Groups(sb, a.Src, SrcOrder);
+                sb.Append("], zuzycie ").Append(a.C).Append(" [");
+                Groups(sb, a.Sink, SinkOrder);
+                sb.Append("], bez wyjasnienia ").Append(a.Known ? Signed(a.U) : "-").Append(", posiadacze [");
+                bool fh = true;
+                for (int h = 0; h < Holders; h++)
+                {
+                    if (a.Hold[h] == 0) continue;
+                    if (!fh) sb.Append(", ");
+                    sb.Append(HolderName[h]).Append(' ').Append(a.Hold[h]); fh = false;
+                }
+                if (fh) sb.Append('-');
+                sb.Append(']');
+            }
+            sb.Append(" | razem ").Append(tn).Append(" szt. warte ").Append(tv).Append(" zl (poza sumami linii Towary (bilans)).");
+            return sb.ToString();
         }
 
         // ------------------------------------------------------------ N1(b) (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1, tabela problemow 19): karawany trzymaja wiecej

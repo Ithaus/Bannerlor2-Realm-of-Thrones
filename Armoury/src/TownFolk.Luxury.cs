@@ -191,6 +191,7 @@ namespace Armoury
                     w[i] = 0; f.LxWide[i] = false;
                     float v;
                     if (!dict.TryGetValue(_lxCats[i], out v) || !(v > 0)) continue;
+                    if (GoodsPaths.NoFolkLuxury(_lxCats[i])) continue;   // ZC1 (SilkToWeavers / SilverOreToSmiths): jedwab i ruda srebra poza lista - ich czesc grupy na reszte grupy
                     int g = _lxGroup[i];
                     bool c = cl && _lxCloth[i];
                     _lxGa[g] += v;                                       // (b) suma grupy razem z kategoriami, ktore wypadna ponad cena graniczna

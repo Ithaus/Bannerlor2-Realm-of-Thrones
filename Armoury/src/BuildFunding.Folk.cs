@@ -212,8 +212,9 @@ namespace Armoury
             if (market == null || market.Town == null || market.ItemRoster == null || budget < 1) return 0;
             int spent = 0;
             var roster = market.ItemRoster;
+            var order = MatOrder;   // ZC1 (PlanksToBuilding): deski pierwsze
             for (int pass = 0; pass < 3 && spent < budget; pass++)
-                for (int k = 0; k < MatIds.Length; k++)
+                foreach (int k in order)
                 {
                     var it = MBObjectManager.Instance.GetObject<ItemObject>(MatIds[k]);
                     if (it == null) continue;

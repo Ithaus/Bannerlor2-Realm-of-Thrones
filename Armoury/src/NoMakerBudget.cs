@@ -195,6 +195,7 @@ namespace Armoury
                 float roomSum = 0f;
                 foreach (var t in targets)
                 {
+                    if (GoodsPaths.NoFolkLuxury(t)) continue;   // ZC1 (SilkToWeavers / SilverOreToSmiths): jedwab i ruda srebra nie sa celem - mieszczanie ich nie kupuja
                     var rm = RoomOf(town, dict, t);
                     if (rm != null && rm.Left > 0.01f) roomSum += rm.Left;
                 }
@@ -204,6 +205,7 @@ namespace Armoury
                 foreach (var t in targets)
                 {
                     Room rm;
+                    if (GoodsPaths.NoFolkLuxury(t)) continue;   // ZC1: jak wyzej
                     if (!_room.TryGetValue(t, out rm) || rm == null || !(rm.Left > 0.01f)) continue;
                     float add = Math.Min(rm.Left, take * rm.Left / roomSum);
                     if (!(add > 0.01f)) continue;

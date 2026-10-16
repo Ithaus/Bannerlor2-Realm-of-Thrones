@@ -6620,6 +6620,58 @@ namespace Armoury
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool BuildWoodHalfReserve { get; set; } = true;
 
+        [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool WhaleMeatFromWhalersOnly { get; set; } = true;
+
+        [SettingPropertyBool("Bk Recipe Yield By Workshop", HintText = "the hidden craftsmen of a town brew two jugs of beer from a sack of grain, as a brewery does, instead of one (bread stays one loaf from a sack). The second jug is bought by the town merchants at the town's price only from the coin they have to spare, otherwise it is not brewed (off = one jug from a sack, as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool BkRecipeYieldByWorkshop { get; set; } = true;
+
+        [SettingPropertyBool("Silk To Weavers", HintText = "townsfolk no longer buy raw silk for their homes - it stays on the stall for the velvet weavers (until now the townsfolk took about 43 of the 47 bales the world brings in each day and the weavers 3); the part of their purse meant for silk goes to the other cloths and furs (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool SilkToWeavers { get; set; } = true;
+
+        [SettingPropertyBool("Silver Ore To Smiths", HintText = "townsfolk no longer buy silver ore for their homes - it stays for the silversmiths and the lords' households; the part of their purse meant for it goes to jewels, spice and walrus ivory (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool SilverOreToSmiths { get; set; } = true;
+
+        [SettingPropertyBool("Planks To Building", HintText = "sawn planks go to building works: the townsfolk no longer use them up at home, and the works buy planks before their other materials (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool PlanksToBuilding { get; set; } = true;
+
+        [SettingPropertyBool("Charcoal Burners", HintText = "the woodcutters' villages burn charcoal from the wood in their own store (6.5 kg of wood for 1 kg of charcoal) when their market town has almost none left (fewer than 8 lumps) and the charcoal fetches more there than the wood it is burnt from; at most one load of wood a village a day and one village a town a day (off = nobody makes charcoal, as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool CharcoalBurners { get; set; } = true;
+
+        [SettingPropertyBool("Iron Ingots Off Shelf", HintText = "iron bars of every grade lying on the stall of a town or castle (sold there by you - nobody else makes or uses them) are taken by the town's smiths and worked back into iron for the forges, at the same worth; the bars in your own bags stay yours (off = they lie on the stall, as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool IronIngotsOffShelf { get; set; } = true;
+
+        [SettingPropertyBool("Bk Side Goods Origin", HintText = "the side goods Banner Kings gives some villages come from where they belong, step by step over 60 days: the marble of the silver mines moves to the clay and limestone pits (the world keeps as much marble), and the woodcutters bring in wild forest honey instead of mead (half as much by weight - mead is honey and water, and the meaderies make it from honey). Papyrus already grows only in the hot south and the gold of the West stays exhausted (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool BkSideGoodsOrigin { get; set; } = true;
+
+        [SettingPropertyBool("Cart Price By Destination", HintText = "a village cart gets the town's going price for as much of its salt, tools, linen, pots and beer as the villages trading in that town buy there in a day; only what is beyond that sells cheaper and cheaper as the stall fills up (until now every sack was priced as if nobody would ever buy it, and a salt cart got a fraction of the town's price) (off = every piece cheaper as the stall fills, as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool CartPriceByDestination { get; set; } = true;
+
+        [SettingPropertyBool("Bulk Clay Lime Charcoal", HintText = "NEW campaign only: clay and limestone come in loads of 100 kg, like ore and timber - a load is worth ten old sacks, so their price is no longer rounded up to a whole penny (two and five times their worth); potters still take the same kilograms of clay for a pot. Charcoal keeps its lump, because smithing burns it by the lump. A campaign started without it never changes (off = sacks of 10 kg, as before). Takes effect only when a new campaign is started")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool BulkClayLimeCharcoal { get; set; } = true;
+
+        [SettingPropertyBool("Dte Convoy No Free Food", HintText = "a lord's supply convoy (Dynamic Troop Equipment) no longer sets out with 17 sacks of every kind of food made out of thin air - convoys do not eat on the road, and the food vanished with the convoy when it reached the army (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool DteConvoyNoFreeFood { get; set; } = true;
+
+        [SettingPropertyBool("Bk Caravan No Free Food", HintText = "Banner Kings slave and food caravans no longer set out with food from nothing - they do not eat on the road, and the food was lost when they arrived (off = as before)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool BkCaravanNoFreeFood { get; set; } = true;
+
+        [SettingPropertyBool("Goods Ledger Horses", HintText = "the goods ledger in the log also counts horses, camels and pack animals as capital: one line a day by kind of horse - how many there are, who holds them, where they come from and where they go (log only, changes nothing in the game; off = not counted)")]
+        [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
+        public bool GoodsLedgerHorses { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8274,6 +8326,19 @@ namespace Armoury
             s.CrownCourtShare = CrownCourtShare;
             s.MenUpgradeOrders = MenUpgradeOrders;
             s.BuildWoodHalfReserve = BuildWoodHalfReserve;
+            s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
+            s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
+            s.SilkToWeavers = SilkToWeavers;
+            s.SilverOreToSmiths = SilverOreToSmiths;
+            s.PlanksToBuilding = PlanksToBuilding;
+            s.CharcoalBurners = CharcoalBurners;
+            s.IronIngotsOffShelf = IronIngotsOffShelf;
+            s.BkSideGoodsOrigin = BkSideGoodsOrigin;
+            s.CartPriceByDestination = CartPriceByDestination;
+            s.BulkClayLimeCharcoal = BulkClayLimeCharcoal;
+            s.DteConvoyNoFreeFood = DteConvoyNoFreeFood;
+            s.BkCaravanNoFreeFood = BkCaravanNoFreeFood;
+            s.GoodsLedgerHorses = GoodsLedgerHorses;
         }
 
         internal static void Apply()

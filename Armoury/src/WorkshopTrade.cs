@@ -480,8 +480,9 @@ namespace Armoury
         /// Pierwszenstwo First - jak InPrefix. Paczka 147: ten sam prefiks zapamietuje polke wyrobu i kapital rzemieslnikow BK przed
         /// prefiksem BK (ArtisanInputs.OutPre), postfiks liczy, ile BK dopisal, i bierze wsad dodatkowych cykli albo zdejmuje sztuki bez wsadu.</summary>
         [HarmonyPriority(Priority.First)]
-        public static void OutPrefix(EquipmentElement __0, Workshop __1, out int __state)
+        public static void OutPrefix(ref EquipmentElement __0, Workshop __1, out int __state)
         {
+            GoodsPaths.WhaleOutput(ref __0);               // ZC1 (WhaleMeatFromWhalersOnly): uboj w warsztacie daje meat, nie WhaleMeat - PRZED rachunkiem rzemieslnikow i prefiksem BK (wlasny try)
             CirculationWindows.WorkshopOutPre(__1);        // paczka 169: okno O35 (tylko log, wlasny try) - przed ArtisanInputs.OutPre
             ArtisanInputs.OutPre(__0, __1);
             __state = _cyc != null && __1 == _cyc ? __1.Capital : int.MinValue;
