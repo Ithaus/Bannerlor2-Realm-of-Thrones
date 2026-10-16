@@ -672,7 +672,10 @@ Uzycie (Python 3, tylko odczyt):
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
                     NS-2 linia doby GearFit, NS-3 do zbrojowni nieuzywalnych 0, NS-4 ksiega przekazania, NS-5 potkniecia / ERROR 0, NS-6 awanse ochotnikow
                     >= 50% bazy (DECYZJA), NS-7 odrzucenia (INFO), NS-8 bitwy gracza: bez broni <= nic w polce i 0 linii strazy slotow 0-3 (bez bitew INFO),
-                    NS-9 CrashScribe: zamiennik z polki + bez + ze wzorca = zza morza. Log bez paczki: INFO, bez wyjatku.
+                    NS-9 CrashScribe: zamiennik z polki + bez + ze wzorca = zza morza. Czesc 2 (zbrojownia gracza, Jeff 15.10 a/b/c, PlayerArmoryView.cs):
+                    NS-10 linia startu "Zbrojownia gracza (15.10)" (3 klucze tak, widok czynny), NS-11 samosprawdzenie widoku, NS-12 samosprawdzenie wymiany,
+                    NS-13 ERROR zbrojowni gracza 0, NS-14 "Wymiana: NIEZMIENNIK" 0, NS-15 przy widoku tylko Twoje 0 zakupow od ludzi z okna (bez okna INFO),
+                    NS-16 zwrot wymiany: inne 0 (wszystko z wypartych; bez wymiany INFO), NS-17 konie w nadwyzkach i "bez zakupow" (INFO). Log bez paczki: INFO.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -27257,6 +27260,96 @@ NS_WARD = re.compile(r"Straz unikatow: .*?(\d+) sztuk zza Waskiego Morza wrocony
 # GF-6: srednia "Ochotnicy: awanse z kupionym sprzetem" sprzed zmiany - bieg 6 lat (D:/Backup-Bannerlord/logs/2026-10-15-6lat/Armoury-2026-10-15_00-10-53.log,
 # 212 dob: 134.5/d) i kampania Jeffa 15.10 (127 i 132/d) - 130; --baza-doby <log Armoury sprzed zmiany> liczy baze z tego logu
 NS_VOL_BASE = 130.0
+# czesc 2 (Jeff 15.10 a/b/c, Armoury/src/PlayerArmoryView.cs): zbrojownia gracza - czyje co jest
+NS_ZB_START = "Zbrojownia gracza (15.10): start sesji"
+NS_ZB_VIEW = re.compile(r"-> widoczne (\d+) \(oczekiwane (\d+); regula sprzed 15\.10: (\d+)\)")
+NS_ZB_SWAP = re.compile(r"samosprawdzenie wymiany: zwrot (\S+) \(oczekiwane (\S+); regula sprzed 15\.10: (\S+)\), z wypartych (\d+) z (\d+), "
+                        r"noszony wklad (\d+) \(oczekiwane 1\), czesci gracza w granicach (tak|NIE)")
+NS_ZB_BUY = re.compile(r"^Sakiewka ludzi: gracz kupil od ludzi (\d+) szt\.")
+NS_ZB_BACK = re.compile(r"; zwrot - wyparte \(stary sprzet ludzi\) (\d+), inne (\d+)\.?$")
+NS_ZB_HORSE = re.compile(r"^Sakiewka ludzi: gracz w .* - nadwyzki (\d+) szt\. za (\d+) \(w tym konie (\d+) za (\d+)\)")
+NS_ZB_ERR = ("ERROR in PlayerArmoryView", "ERROR in Escrow.Hold", "ERROR in QuartermasterLaw.PurgeUnusable", "ERROR in QuartermasterLaw.FitFor",
+             "ERROR in Escrow.ProcessSwaps", "ERROR in Escrow.Release", "ERROR in MenPurse.OnEntered", "ERROR in MenPurse.OnDailyTickParty",
+             "ERROR in MenPurse.SettlePlayerBook", "ERROR in MenUpgrade.ForPlayer")
+
+
+class NsZbroj:
+    """nsprzet czesc 2: linie zbrojowni gracza zbierane w tym samym przebiegu co czesc 1 (log 18 MB - jeden odczyt)."""
+    def __init__(self):
+        self.starts, self.errs, self.inv = [], 0, 0
+        self.screens, self.hidden, self.buys, self.buys_after = 0, 0, 0, 0
+        self.back_d, self.back_i, self.back_lines = 0, 0, 0
+        self.sales, self.horses, self.horse_gold, self.nobuy = 0, 0, 0, 0
+
+    def feed(self, s):
+        if s.startswith(NS_ZB_START):
+            self.starts.append(s)
+        elif s.startswith("ERROR in "):
+            if any(s.startswith(e) for e in NS_ZB_ERR):
+                self.errs += 1
+        elif s.startswith("Wymiana: NIEZMIENNIK"):
+            if self.starts:
+                self.inv += 1
+        elif s.startswith("Wymiana: ekran zbrojowni - "):
+            self.screens += 1
+            if "(ukryty - widok tylko Twoje)" in s:
+                self.hidden += 1
+        elif s.startswith("Wymiana: ") and "; zwrot - wyparte" in s:
+            mm = NS_ZB_BACK.search(s)
+            if mm:
+                self.back_lines += 1; self.back_d += int(mm.group(1)); self.back_i += int(mm.group(2))
+        elif s.startswith("Sakiewka ludzi: gracz kupil od ludzi"):
+            mm = NS_ZB_BUY.match(s)
+            if mm and int(mm.group(1)) > 0:
+                self.buys += 1
+                if self.starts and "widok tylko Twoje tak (czynny tak)" in self.starts[-1]:
+                    self.buys_after += 1
+        elif s.startswith("Sakiewka ludzi: gracz w "):
+            mm = NS_ZB_HORSE.match(s)
+            if mm:
+                self.sales += 1; self.horses += int(mm.group(3)); self.horse_gold += int(mm.group(4))
+        elif s.startswith("Dozbrajanie: gracz w ") and " - bez zakupow:" in s:
+            self.nobuy += 1
+
+    def report(self, rep):
+        st = self.starts[-1] if self.starts else ""
+        if not st:
+            rep.add("NS-10: linia 'Zbrojownia gracza (15.10): start sesji'", f"brak linii (otwarc zbrojowni {self.screens})", "INFO (wersja sprzed czesci 2)", None)
+            return
+        keys = ("widok tylko Twoje tak (czynny tak)", "zwrot starego sprzetu tak", "ludzie sprzedaja zbedne konie tak")
+        off = [k for k in keys if k not in st]
+        rep.add("NS-10: linia startu zbrojowni gracza (3 klucze, widok czynny)", f"linii {len(self.starts)}" + ("; klucze tak" if not off else "; NIE: " + ", ".join(off)),
+                "3 klucze tak, widok czynny", not off)
+        v = NS_ZB_VIEW.search(st)
+        if v:
+            rep.add("NS-11: samosprawdzenie widoku (5 szt.: noszone 2, Twoje 1)", f"widoczne {v.group(1)}, oczekiwane {v.group(2)} (regula sprzed 15.10: {v.group(3)})",
+                    "widoczne == oczekiwane", v.group(1) == v.group(2))
+        else:
+            rep.add("NS-11: samosprawdzenie widoku", "brak pola w linii startu", "widoczne == oczekiwane", False)
+        w = NS_ZB_SWAP.search(st)
+        if w:
+            ok = w.group(1) == w.group(2) and w.group(6) == "1" and w.group(7) == "tak" and (w.group(4) == w.group(5) or w.group(2) != "test_t2")
+            rep.add("NS-12: samosprawdzenie wymiany (t2 noszone, t1 w zapasie, Twoj t4)",
+                    f"zwrot {w.group(1)} (oczekiwane {w.group(2)}; sprzed 15.10 {w.group(3)}), z wypartych {w.group(4)} z {w.group(5)}, noszony wklad {w.group(6)}, w granicach {w.group(7)}",
+                    "zwrot == oczekiwane, noszony 1, w granicach tak", ok)
+        else:
+            rep.add("NS-12: samosprawdzenie wymiany", "brak pola w linii startu", "zwrot == oczekiwane", False)
+        rep.add("NS-13: ERROR zbrojowni gracza (PlayerArmoryView, Escrow, PurgeUnusable, FitFor, MenPurse wjazd/doba, MenUpgrade.ForPlayer)", f"{self.errs}", "0", self.errs == 0)
+        rep.add("NS-14: 'Wymiana: NIEZMIENNIK' (czesc gracza, widok tylko Twoje)", f"{self.inv} po starcie", "0", self.inv == 0)
+        if self.screens:
+            rep.add("NS-15: okno zbrojowni - zapas ludzi ukryty, zakupy od ludzi przy widoku tylko Twoje",
+                    f"otwarc {self.screens} (ukryty {self.hidden}), zakupow od ludzi > 0: {self.buys} (przy widoku czynnym {self.buys_after})",
+                    "0 zakupow przy widoku czynnym", self.buys_after == 0)
+        else:
+            rep.add("NS-15: okno zbrojowni (widok tylko Twoje)", "okno nie otwarte w tym logu", "INFO (autotest nie otwiera zbrojowni)", None)
+        if self.back_lines:
+            need0 = "zwrot starego sprzetu tak" in st
+            rep.add("NS-16: zwrot wymiany - wyparte (stary sprzet ludzi) / inne", f"linii {self.back_lines}: wyparte {self.back_d}, inne {self.back_i}",
+                    "inne 0 (przy SwapReturnsTheirOldKit)" if need0 else "INFO (klucz wylaczony)", (self.back_i == 0) if need0 else None)
+        else:
+            rep.add("NS-16: zwrot wymiany", "brak wymiany z wkladem gracza w tym logu", "INFO (autotest nie wklada sprzetu)", None)
+        rep.add("NS-17: konie w nadwyzkach ludzi gracza i dozbrajanie 'bez zakupow' (INFO)",
+                f"wizyt z nadwyzkami {self.sales}: konie {self.horses} za {self.horse_gold}; linii 'bez zakupow' {self.nobuy}", "INFO", None)
 
 
 def nsprzet_main(logp, csp, bdp):
@@ -27277,10 +27370,12 @@ def nsprzet_main(logp, csp, bdp):
     starts, days, kom, vols, battles, errs = [], {}, set(), [], [], 0
     guard_after = 0
     seen_start = False
+    zb = NsZbroj()   # czesc 2 (zbrojownia gracza) - ten sam przebieg
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            zb.feed(s)
             if s.startswith(NS_START):
                 starts.append(s); seen_start = True
             elif s.startswith("GearFit: dzien "):
@@ -27305,6 +27400,7 @@ def nsprzet_main(logp, csp, bdp):
     print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)}, dob 'Komplet rekruta' {len(kom)}, linii Ochotnicy {len(vols)}, startow bitew {len(battles)}")
     if not starts and not days:
         rep.add("NS-0: linia startu GearFit", "brak linii", "INFO (wersja sprzed GearFit)", None)
+        zb.report(rep)
         rep.show()
         return 0
     st = starts[-1] if starts else ""
@@ -27414,6 +27510,7 @@ def nsprzet_main(logp, csp, bdp):
                 (wbad == 0) if wl > 0 else None)
     else:
         rep.add("NS-9: CrashScribe 'Straz unikatow'", "brak --crashscribe", "INFO", None)
+    zb.report(rep)   # czesc 2: NS-10..NS-17
     rep.show()
     return 0
 

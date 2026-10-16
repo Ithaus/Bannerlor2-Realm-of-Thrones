@@ -664,9 +664,21 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonPurseEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Quartermaster Swap One For One", HintText = "swap in the stores: the men take a piece of yours only if it fills empty hands or beats the one they wear (and they meet its skill requirement); for every piece that replaced one of theirs they hand you their worst piece of that kind; worse, equal or too heavy pieces stay yours in the stash; the men's spare is theirs - take it and you pay them the merchant's price")]
+        [SettingPropertyBool("Quartermaster Swap One For One", HintText = "swap in the stores: the men take a piece of yours only if it fills empty hands or beats the one they wear (and they meet its skill requirement); for every piece that replaced one of theirs they hand you a piece of that kind back (with Swap Returns Their Old Kit the very piece it replaced, else their worst spare one); worse, equal or too heavy pieces stay yours in the stash; the men's spare is theirs - take it and you pay them the merchant's price (with Armoury Shows Only Yours their spare is not listed at all)")]
         [SettingPropertyGroup("The finished piece")]
         public bool QuartermasterSwapOneForOne { get; set; } = true;
+
+        [SettingPropertyBool("Armoury Shows Only Yours", HintText = "the troop armoury (Dynamic Troop Equipment stash) lists only YOUR kit, free to take: what the men wear and their share of the spoils is theirs and is not listed - they sell their spare spoils in the next town and buy better kit if they can afford it (needs Men Purse Enabled and Armoury Protect Used; off = their spare is listed and you pay them for what you take)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool ArmouryShowsOnlyYours { get; set; } = true;
+
+        [SettingPropertyBool("Swap Returns Their Old Kit", HintText = "when the men take a better piece of yours in the stores, you get back the very piece it replaced (the soldier's old kit), not their worst spare piece; a piece that filled empty hands gives nothing back (off = their worst spare piece of that kind, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SwapReturnsTheirOldKit { get; set; } = true;
+
+        [SettingPropertyBool("Player Men Sell Spare Horses", HintText = "your men sell spare horses from the troop armoury (beyond one per rider plus Surplus Keep Percent, and horses no rider of theirs can ride) to the merchants of the next town, like the rest of their spare kit - the coin goes to the men's purse (off = their horses stay in the armoury, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool PlayerMenSellSpareHorses { get; set; } = true;
 
         [SettingPropertyBool("Garrison Kit Menu", HintText = "'Hand kit to the garrison' in the menu of your towns and castles: drop kit on the garrison - they take what fills empty hands or beats their own and give you their worse pieces back; the rest comes back to you")]
         [SettingPropertyGroup("The finished piece")]
@@ -6402,6 +6414,9 @@ namespace Armoury
             s.MenUpgradeAmmoNeedsSurplus = MenUpgradeAmmoNeedsSurplus;
             s.GarrisonPurseEnabled = GarrisonPurseEnabled;
             s.QuartermasterSwapOneForOne = QuartermasterSwapOneForOne;
+            s.ArmouryShowsOnlyYours = ArmouryShowsOnlyYours;
+            s.SwapReturnsTheirOldKit = SwapReturnsTheirOldKit;
+            s.PlayerMenSellSpareHorses = PlayerMenSellSpareHorses;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;

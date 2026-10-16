@@ -23,7 +23,8 @@ namespace Armoury
     ///    Gracz: wszystko do sakiewki ludzi. Lord AI: trzecia (LordLootThirdPercent) do kiesy, reszta do sakiewki.
     ///  - Ludzie wydaja: naprawy (godzinowo u kowali miasta, TroopSelfMend) -> braki w kompletach -> reszta na zycie w miescie
     ///    przy wyjezdzie (kasa miasta). Zostaje tylko tyle, ile potrzeba na zalegle naprawy.
-    ///  - Gracz bierze cos z nadwyzek zbrojowni = KUPUJE od ludzi po cenie skupu (rozliczenie przy zamknieciu ekranu).
+    ///  - Gracz bierze cos z nadwyzek zbrojowni = KUPUJE od ludzi po cenie skupu (rozliczenie przy zamknieciu ekranu). Jeff 15.10 (a): przy
+    ///    ArmouryShowsOnlyYours zapasu ludzi nie ma na liscie okna (PlayerArmoryView) - zakup nieczynny (NoteBuy/SettleBuys zostaja dla klucza wylaczonego).
     /// K1 (Jeff 09.10, docs/paczki/K1-dozbrajanie.md): przy wyjezdzie czesc odkladaja na lepszy sprzet (A3, limit dni zoldu); w miescie
     /// nadwyzki -> naprawy -> braki -> lepsze (MenUpgrade); nadwyzki i braki liczone po DOPASOWANIU (skill), nie po liczbie sztuk;
     /// zalogi maja wlasna sakiewke (czesc zoldu - SoldierPay) w tym samym slowniku i tym samym zapisie "arm_menpurse".
@@ -411,12 +412,15 @@ namespace Armoury
         {
             var s = Settings.Current;
             var main = MobileParty.MainParty;
-            if (armory == null || s == null || main == null || main.MemberRoster == null || type == ItemObject.ItemTypeEnum.Horse) return null;   // konie - Stajnia
+            if (armory == null || s == null || main == null || main.MemberRoster == null) return null;
+            // Jeff 15.10 (b), PlayerArmoryView: zbedne konie ludzi (ponad 1 na jezdzca + SurplusKeepPercent i te, ktorych zaden ich jezdziec nie dosiadzie) do kupca
+            // jak reszta lupu; klucz wylaczony - konie zostaja w zbrojowni, jak dotad (Stajnia). Musztra (Drill.PlayerSurplus) koni nie pyta (StockTypes bez Horse).
+            if (type == ItemObject.ItemTypeEnum.Horse && !PlayerArmoryView.SellHorses) return null;
             var pieces = QuartermasterLaw.KitPieces(armory, type, true);
             if (pieces.Count == 0) return null;
             List<CharacterObject> troops; int[] men; SkillObject skill;
             QuartermasterLaw.MenOf(main.MemberRoster, type, pieces, out troops, out men, out skill);
-            var meets = QuartermasterLaw.MeetsOf(troops);
+            var meets = QuartermasterLaw.MeetsFitOf(troops);   // Jeff 15.10: ten sam predykat co wymiana (FitFor) - umiejetnosc, siodlo, kultura (GearFit)
             // K1 (Jeff 09.10 04:40): kto co nosi - ta sama regula co wymiana (najlepsze najpierw; sztuka gracza tylko w puste rece albo
             // w miejsce gorszej), inaczej ludzie sprzedawaliby lepsza sztuke, ktora nosza, bo "noszona" byla gorsza sztuka gracza
             if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
@@ -431,10 +435,10 @@ namespace Armoury
             var armory = QuartermasterLaw.DteArmory();
             if (armory == null || QuartermasterEscrow.Active) return;
             var main = MobileParty.MainParty;
-            int sold = 0, gold = 0;
+            int sold = 0, gold = 0, horses = 0, horseGold = 0;
             foreach (var type in QuartermasterLaw.KitTypes)
             {
-                var pieces = PlayerSurplusPlan(armory, type);   // K1 A9 - jedna definicja nadwyzki (konie - Stajnia)
+                var pieces = PlayerSurplusPlan(armory, type);   // K1 A9 - jedna definicja nadwyzki (konie - przy PlayerMenSellSpareHorses, Jeff 15.10 (b))
                 if (pieces == null) continue;
                 foreach (var p in pieces)
                 {
@@ -460,15 +464,16 @@ namespace Armoury
                     MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -paidN);   // paczka 169: linia kas (tylko licznik)
                     Add(main, paidN);
                     sold += n; gold += paidN;
+                    if (type == ItemObject.ItemTypeEnum.Horse) { horses += n; horseGold += paidN; }   // Jeff 15.10 (b): tylko do linii
                     MenUpgrade.NoteChurn(main, el.Item, false);                   // K1 (przeglad): kupione i sprzedane tej samej doby (autotest: 0)
                 }
             }
             if (sold > 0)
             {
                 _daySold += sold; _dayGold += gold;
-                Log.Player("Your men sold " + sold + " spare pieces from the stores to the merchants of " + st.Name + " for " + gold
+                Log.Player("Your men sold " + sold + " spare pieces" + (horses > 0 ? " (" + horses + (horses == 1 ? " of them a horse)" : " of them horses)") : "") + " from the stores to the merchants of " + st.Name + " for " + gold
                            + " denars - their share of the spoils. Purse of the men: " + Get(main) + ".");
-                Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + ", sakiewka " + Get(main) + ".");
+                Log.Info("Sakiewka ludzi: gracz w " + st.Name + " - nadwyzki " + sold + " szt. za " + gold + " (w tym konie " + horses + " za " + horseGold + "), sakiewka " + Get(main) + ".");
             }
         }
 

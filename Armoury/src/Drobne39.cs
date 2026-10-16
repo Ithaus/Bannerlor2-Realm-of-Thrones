@@ -24,8 +24,9 @@ namespace Armoury
     ///  (3) ZLOMOWANIE ZBROJOWNI WOJSKA GRACZA PRZEZ DTE (DteScrapKeep; AUDYT-PELNY-LOGISTYKA N7). DTE ArmyArmoryBehavior.OnDailyTick co 3 doby
     ///      kasuje najtansze sztuki ponad ScrapCapPerCategory - 1 (600 - 1) na kategorie - w nicosc. Biegnie tylko przy CommandersGreed WYLACZONYM
     ///      (u Jeffa wlaczone - dzis martwe). Prefiks ScrapArmyArmoryByCategory: sztuki zostaja w zbrojowni (wlasnosc wojska), a nadwyzke ponad
-    ///      komplet ludzie i tak sprzedaja kupcom przy wjezdzie do miasta (MenPurse.SellPlayerSurplus: kasa miasta -> sakiewka ludzi); konie zostaja w
-    ///      zbrojowni - kupcom ich nikt nie sprzedaje (PlayerSurplusPlan pomija konie, Stables tylko doklada konie z awansow; recenzja 3.9).
+    ///      komplet ludzie i tak sprzedaja kupcom przy wjezdzie do miasta (MenPurse.SellPlayerSurplus: kasa miasta -> sakiewka ludzi); konie zostawaly w
+    ///      zbrojowni - kupcom ich nikt nie sprzedawal (PlayerSurplusPlan pomijal konie, Stables tylko doklada konie z awansow; recenzja 3.9). Od 15.10
+    ///      (Jeff (b), PlayerMenSellSpareHorses) ludzie sprzedaja tez zbedne konie (ponad 1 na jezdzca + SurplusKeepPercent) ta sama droga.
     /// Liczniki tylko do logu: (1) w linii "Sakiewka ludzi", (2) w linii "Spoils of War (128)", (3) linia przy zablokowanym zlomowaniu. Bez zapisu.
     /// </summary>
     internal static class Drobne39

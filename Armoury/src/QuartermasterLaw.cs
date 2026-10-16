@@ -360,8 +360,9 @@ namespace Armoury
                 bool oneForOne = swap && s != null && s.QuartermasterSwapOneForOne;
                 // PORZADEK CALKOWITY (Jeff 19.09): wymog malejaco, RangedRank (pod RBM naciag), jakosc modyfikatora, id, mod -
                 // SwapMath.FitOrder; bitwa tego nie wyda (Barred) - papier tez nie. K1 (Jeff 09.10 04:40): przy wymianie 1:1 dopasowanie
-                // "najlepsze najpierw" (SwapMath.Greedy) - wklad gracza tylko w puste rece albo w miejsce GORSZEJ sztuki ludzi
-                var sw = SwapMath.Swap(men, troops.Count, MeetsOf(troops), pieces, oneForOne);
+                // "najlepsze najpierw" (SwapMath.Greedy) - wklad gracza tylko w puste rece albo w miejsce GORSZEJ sztuki ludzi.
+                // Jeff 15.10 (PlayerArmoryView): kto co nosi - predykat GearFit (umiejetnosc, siodlo, kultura; MeetsFitOf); (c) zwrot = wyparty stary sprzet ludzi
+                var sw = SwapMath.Swap(men, troops.Count, MeetsFitOf(troops), pieces, oneForOne, oneForOne && PlayerArmoryView.ReturnOld);
                 f.Pieces = pieces; f.Swap = sw; f.OneForOne = oneForOne;
                 f.Usable = men.Length - sw.Unfit;
                 for (int m = 0; m < men.Length; m++)
@@ -542,6 +543,17 @@ namespace Armoury
             return (g, p) => g >= 0 && g < troops.Count && ItemReq.Meets(troops[g], ElOf(p).Item);
         }
 
+        /// <summary>Zbrojownia gracza (Jeff 15.10, PlayerArmoryView): kto co nosi u ludzi GRACZA - predykat GearFit.ForTroop (umiejetnosc; przy GearFitKits bron
+        /// z siodla u jezdzca; przy GearFitCulture kultura) - ten sam, ktorym notable i ludzie kupuja, a rekruci oddaja nieuzywalne. Sztuka, ktorej oddzial nie
+        /// uzyje (obca kultura, z siodla), nie jest "noszona": wklad gracza zostaje gracza, zapas ludzi idzie do kupca jako pierwszy, czlowiek z nia to brak.
+        /// Obie bramki GearFit wylaczone - MeetsOf. Tylko druzyna gracza (FitFor, PlayerSurplusPlan, MenUpgrade.Run gracza); zalogi i lordowie AI - MeetsOf.</summary>
+        internal static Func<int, SwapMath.Piece, bool> MeetsFitOf(List<CharacterObject> troops)
+        {
+            if (!GearFit.On && !GearFit.CultureOn) return MeetsOf(troops);
+            bool kit = GearFit.On;
+            return (g, p) => g >= 0 && g < troops.Count && GearFit.ForTroop(troops[g], ElOf(p).Item, kit);
+        }
+
         /// <summary>Ile sztuk tego typu wojsko REALNIE obsadzi (dopasowanie po skillu, cala polka).</summary>
         internal static int WarUsableOf(ItemRoster armory, ItemObject.ItemTypeEnum type)
         {
@@ -574,7 +586,7 @@ namespace Armoury
                 var perType = new List<string>();
                 // K1: wymiana 1:1 - liczniki calego przebiegu, nazwy obu stron i podzial egzemplarzy dla ekranu (HoldReserve, BookPostfix)
                 bool swapRule = false;
-                int sWorn = 0, sX = 0, sFilled = 0, sKept = 0, sSpare = 0, sPlayerVis = 0, sKeptWorse = 0, sKeptHard = 0;
+                int sWorn = 0, sX = 0, sFilled = 0, sKept = 0, sSpare = 0, sPlayerVis = 0, sKeptWorse = 0, sKeptHard = 0, sXDisp = 0;
                 var wornNames = new List<string>(); var backNames = new List<string>();
                 int wornKinds = 0, backKinds = 0;
                 var dep = new SwapMath.DepositTally();   // K1c: wklady tej sesji - co ludzie wzieli, co zostalo i dlaczego, co przeszlo za ich gorszy egzemplarz
@@ -605,7 +617,7 @@ namespace Armoury
                     if (f.Swap != null && f.OneForOne)
                     {
                         var sw = f.Swap;
-                        sWorn += sw.Worn; sX += sw.X; sFilled += sw.Filled; sKept += sw.KeptOwn; sSpare += sw.MenSpare; sKeptWorse += sw.KeptWorse; sKeptHard += sw.KeptHard;
+                        sWorn += sw.Worn; sX += sw.X; sFilled += sw.Filled; sKept += sw.KeptOwn; sSpare += sw.MenSpare; sKeptWorse += sw.KeptWorse; sKeptHard += sw.KeptHard; sXDisp += sw.XDisp;
                         foreach (var p in f.Pieces) sPlayerVis += p.Target;
                         SwapMath.TallyDeposits(f.Pieces, deposits, dep);
                         if (sw.Worn > 0 || sw.X > 0)
@@ -625,7 +637,8 @@ namespace Armoury
                             }
                             Log.Info("Wymiana: " + type + ": wklady noszone " + sw.Worn + " (braki " + sw.Filled + ", wymiana " + sw.X + "), graczowi: "
                                      + (back.Count > 0 ? string.Join(", ", back.ToArray()) : "nic") + "; wklady nienoszone " + sw.KeptOwn
-                                     + " zostaja gracza (nie lepsze od ich " + sw.KeptWorse + ", za trudne " + sw.KeptHard + "); zapas ludzi " + sw.MenSpare + ".");
+                                     + " zostaja gracza (nie lepsze od ich " + sw.KeptWorse + ", za trudne " + sw.KeptHard + "); zapas ludzi " + sw.MenSpare
+                                     + "; zwrot - wyparte (stary sprzet ludzi) " + sw.XDisp + ", inne " + (sw.X - sw.XDisp) + ".");   // Jeff 15.10 (c): przy SwapReturnsTheirOldKit inne = 0
                         }
                     }
                     // KSIEGA JEST PER ID, dopasowanie per sztuka (modyfikator!) - sumujemy
@@ -700,7 +713,8 @@ namespace Armoury
                     {
                         var kn = new List<string>();
                         foreach (var kv in dep.Kept) { if (kn.Count >= 4) { kn.Add("..."); break; } kn.Add(kv.Value + "x " + PieceName(kv.Key)); }
-                        kept = dep.Kept0 + " pcs you put in stay yours in the stash" + KeptWhy(dep.KeptWorse, dep.KeptHard, dep.KeptBarred, "are never issued (heirlooms, lore blades, the dead's kit)")
+                        kept = dep.Kept0 + " pcs you put in stay yours in the stash" + KeptWhy(dep.KeptWorse, dep.KeptHard, dep.KeptBarred, "are never issued (heirlooms, lore blades, the dead's kit)",
+                                                                                                         GearFit.On || GearFit.CultureOn ? "skill requirement, a rider's saddle or their people's style" : "skill requirement")
                                + " (" + string.Join(", ", kn.ToArray()) + ")";
                     }
                     if (deposits != null && dep.Moved > 0)
@@ -722,7 +736,8 @@ namespace Armoury
                         string took = "QM: the men took " + sWorn + " pcs of yours (" + string.Join(", ", wornNames.ToArray())
                                       + (wornKinds > wornNames.Count ? ", ..." : "") + "): " + sFilled + " filled empty hands, " + sX + " replaced worse kit";
                         string back = sX > 0
-                            ? " - those " + sX + " worse pcs are yours in the stash (" + string.Join(", ", backNames.ToArray()) + (backKinds > backNames.Count ? ", ..." : "") + ")"
+                            ? (sXDisp == sX ? " - the old kit they took off for it (" + sX + " pcs) is yours in the stash (" : " - those " + sX + " worse pcs are yours in the stash (")   // Jeff 15.10 (c)
+                              + string.Join(", ", backNames.ToArray()) + (backKinds > backNames.Count ? ", ..." : "") + ")"
                             : "";
                         Log.Player(took + back + (moved.Length > 0 ? "; " + moved : "") + (kept.Length > 0 ? "; " + kept : "") + ".");
                     }
@@ -774,11 +789,14 @@ namespace Armoury
         /// <summary>K1 (Jeff 09.10 04:40: "zostaje po prostu w okienku DTE, co oznacza, ze maja wszyscy lepszy sprzet albo wymagania byly za duze"):
         /// powod, dla ktorego sztuki gracza zostaly - worse: nikt ich nie chcial (kazdy, kto je udzwignie, ma rowna albo lepsza), hard: ten, komu
         /// bylyby lepsze, ich nie udzwignie (wymog), other: inny powod (otherWhy). Pusty, gdy wszystko zero.</summary>
-        internal static string KeptWhy(int worse, int hard, int other, string otherWhy)
+        internal static string KeptWhy(int worse, int hard, int other, string otherWhy) { return KeptWhy(worse, hard, other, otherWhy, "skill requirement"); }
+
+        /// <summary>Jeff 15.10 (PlayerArmoryView): to samo z wlasnym powodem "hard" - u ludzi gracza predykat GearFit (umiejetnosc, siodlo, kultura).</summary>
+        internal static string KeptWhy(int worse, int hard, int other, string otherWhy, string hardWhy)
         {
             var parts = new List<string>();
             if (worse > 0) parts.Add(worse + " nobody wanted (the men have as good or better, or no use for them)");
-            if (hard > 0) parts.Add(hard + " nobody who would gain from them can use them (skill requirement)");
+            if (hard > 0) parts.Add(hard + " nobody who would gain from them can use them (" + hardWhy + ")");
             if (other > 0) parts.Add(other + " " + otherWhy);
             return parts.Count > 0 ? ": " + string.Join(", ", parts.ToArray()) : "";
         }
@@ -1352,14 +1370,18 @@ namespace Armoury
                 // K1 (B3): chowamy to, co ludzie NOSZA (per egzemplarz: id + stan, z podzialu porzadku); widac sztuki gracza (za darmo)
                 // i wolny zapas LUDZI - wziety zapas oplacasz im przy zamknieciu po cenie kupca (wpis 84, MenPurse.SettleBuys).
                 // Sztuki spoza kitu i ekran bez podzialu (porzadek wylaczony) - jak dotad: widac tylko ksiege gracza (per id).
+                // Jeff 15.10 (a), PlayerArmoryView (ArmouryShowsOnlyYours): chowamy WSZYSTKO ponad czesc gracza - noszone i zapas ludzi z lupu (ich wlasnosc,
+                // sprzedaja go w miescie); na liscie tylko Twoje sztuki, do wziecia za darmo (zakup od ludzi z okna nieczynny - nic ich nie widac)
                 var split = QuartermasterLaw.LastSplit;
                 _free.Clear(); _kitKeys.Clear(); _freeAtOpen = null; _freeOn = split != null;
+                bool onlyYours = split != null && PlayerArmoryView.OnlyYours;
                 var usedLeft = new Dictionary<string, int>();
-                int visOwn = 0, visSpare = 0;
+                var ownLeft = new Dictionary<string, int>();
+                int visOwn = 0, visSpare = 0, listedKit = 0;
                 if (split != null)
                     foreach (var kv in split)
                     {
-                        usedLeft[kv.Key] = kv.Value[0]; _free[kv.Key] = kv.Value[1]; _kitKeys.Add(kv.Key);
+                        usedLeft[kv.Key] = kv.Value[0]; ownLeft[kv.Key] = kv.Value[1]; _free[kv.Key] = kv.Value[1]; _kitKeys.Add(kv.Key);
                         visOwn += kv.Value[1]; visSpare += Math.Max(0, kv.Value[2] - kv.Value[0] - kv.Value[1]);
                     }
                 var allowance = new Dictionary<string, int>();
@@ -1368,12 +1390,11 @@ namespace Armoury
                     var el = armory[i];
                     var it = el.EquipmentElement.Item;
                     if (it == null || el.Amount <= 0) continue;
-                    int hide, ul;
+                    int hide;
                     string key = QuartermasterLaw.KeyOf(el.EquipmentElement);
-                    if (split != null && usedLeft.TryGetValue(key, out ul))
+                    if (split != null && usedLeft.ContainsKey(key))
                     {
-                        hide = Math.Min(el.Amount, Math.Max(0, ul));
-                        usedLeft[key] = ul - hide;
+                        hide = PlayerArmoryView.HideOf(onlyYours, el.Amount, key, usedLeft, ownLeft);   // wylaczone - tylko noszone, jak dotad
                     }
                     else
                     {
@@ -1384,6 +1405,7 @@ namespace Armoury
                         allowance[id] = allowLeft - visible;
                         hide = el.Amount - visible;
                     }
+                    if (onlyYours && QuartermasterLaw.IsKitItem(it)) listedKit += el.Amount - Math.Max(0, hide);
                     if (hide <= 0) continue;
                     armory.AddToCounts(el.EquipmentElement, -hide);
                     _held.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, hide));
@@ -1391,13 +1413,19 @@ namespace Armoury
                 if (_freeOn) _freeAtOpen = new Dictionary<string, int>(_free);
                 bool swapMsg = split != null && s.QuartermasterSwapOneForOne;
                 int xBack = Math.Min(visOwn, QuartermasterLaw.TakeUnseenX());   // K1 (przeglad): zwroty od ostatniego otwarcia, nie z porzadku otwarcia
+                // Jeff 15.10 (a): niezmiennik widoku - na liscie dokladnie Twoje sztuki kitu (inaczej podzial nie objal jakiegos egzemplarza)
+                if (onlyYours && listedKit != visOwn)
+                    Log.Info("Wymiana: NIEZMIENNIK - widok tylko Twoje: na liscie " + listedKit + " szt. kitu przy Twoich " + visOwn + ".");
                 if (swapMsg)
                 {
-                    Log.Info("Wymiana: ekran zbrojowni - widoczne sztuki gracza " + visOwn + " (w tym zwroty z wymiany od ostatniego otwarcia " + xBack + "), zapas ludzi " + visSpare + " (do kupienia).");
+                    Log.Info("Wymiana: ekran zbrojowni - widoczne sztuki gracza " + visOwn + " (w tym zwroty z wymiany od ostatniego otwarcia " + xBack + "), zapas ludzi " + visSpare
+                             + (onlyYours ? " (ukryty - widok tylko Twoje)." : " (do kupienia)."));
                     if (visOwn + visSpare > 0)
-                        InformationManager.DisplayMessage(new InformationMessage(
-                            "QM: free to take - " + visOwn + " pcs that are yours" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "") + "; the men's spare ("
-                            + visSpare + " pcs) is theirs - take it and you pay them the merchant's price on closing.", Colors.Yellow));
+                        InformationManager.DisplayMessage(new InformationMessage(onlyYours
+                            ? "QM: listed - " + visOwn + " pcs, all yours and free to take" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "")
+                              + ". The men's own kit is not listed - what they wear and " + visSpare + " spare pcs from their share of the spoils; they sell the spare in the next town."
+                            : "QM: free to take - " + visOwn + " pcs that are yours" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "") + "; the men's spare ("
+                              + visSpare + " pcs) is theirs - take it and you pay them the merchant's price on closing.", Colors.Yellow));
                 }
                 Active = _held.Count > 0;
                 if (Active)
