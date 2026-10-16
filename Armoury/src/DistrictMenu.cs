@@ -87,6 +87,9 @@ namespace Armoury
                 var rows = new List<VillageBook.DistRow>();
                 string name, head;
                 if (!VillageBook.DistrictView(st, out name, out head, rows)) return;     // ksiega nieczynna (pozycja i tak ukryta) albo blad (licznik ksiegi)
+                // ZC2: w naglowku sklad stanow i Dostatek okregu (tylko odczyt; klucz DailyLifeEstates off - null)
+                try { string zc = DailyLife.DistrictLine(st); if (!string.IsNullOrEmpty(zc)) head = (head ?? "") + "\n" + zc; }
+                catch (Exception e) { Stumble("Estates " + st.StringId, e); }
                 _dOpen++;
                 if (rows.Count > _dRowsMax) _dRowsMax = rows.Count;
                 string title = VillageTexts.Make(VillageTexts.DistTitle, "DISTRICT", name ?? "?").ToString();
@@ -144,6 +147,8 @@ namespace Armoury
                     else if (lord != null) { b = lord.Banner; if (b != null) _dLord++; }
                 }
                 if (it.Knight != null) hint.Add(it.Knight);
+                string est = DailyLife.DistrictRowCounts(st, r.Uid, r.Main);   // ZC2: ludzie wioski wedlug stanow okregu (null - wies gry, klucz off)
+                if (est != null) hint.Add(est);
                 if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(VineOlive.Livelihood(st, GoodsRates.Livelihood(st, r.Uid, it.Lore.Livelihood)));   // GL-5 (P5): wies lniana - zdanie lnu
                 string mem = Memory(r, it.Lore);
                 if (mem != null) hint.Add(mem);

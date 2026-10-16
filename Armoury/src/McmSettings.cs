@@ -6628,6 +6628,10 @@ namespace Armoury
         [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
         public int DailyLifeMarketScale { get; set; } = 37;
 
+        [SettingPropertyBool("Daily Life Estates", HintText = "with Daily Life Measure: the estates of every town and village - slaves, peasants, labourers, craftsmen, merchants, gentry - are kept in the land's book and in the save (an old save gets them at the first dawn from the land's customs and its Banner Kings classes), and you can see them: the map tooltips of towns, castles (their region), villages and the villages of a district show the estates and their Livelihood, 'People of this land' and 'Look over the district' show how many people of each estate live there, and 'Realm ledger' in town and castle menus shows the realm, its regions and the whole world. Only labels and views - nothing in the economy changes (off = the estates are reckoned afresh each day for the log only, as before; the book kept in the save stays untouched)")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public bool DailyLifeEstates { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8284,6 +8288,7 @@ namespace Armoury
             s.BuildWoodHalfReserve = BuildWoodHalfReserve;
             s.DailyLifeMeasure = DailyLifeMeasure;
             s.DailyLifeMarketScale = DailyLifeMarketScale;
+            s.DailyLifeEstates = DailyLifeEstates;
         }
 
         internal static void Apply()

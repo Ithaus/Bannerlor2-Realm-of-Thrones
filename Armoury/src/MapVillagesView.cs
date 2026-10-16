@@ -4746,6 +4746,8 @@ namespace Armoury
                     list.Add(new TooltipProperty("", _s.R.Name, 0, false, TooltipProperty.TooltipPropertyFlags.Title));
                     list.Add(new TooltipProperty("", heldText, 0));
                     list.Add(new TooltipProperty("", peopleText, 0));
+                    string est = DailyLife.SideTipLine(_s.D.S);   // ZC2: sklad stanow okregu i Dostatek (null - klucz off)
+                    if (est != null) list.Add(new TooltipProperty("", est, 0));
                     if (state != null) list.Add(new TooltipProperty("", state, 0));
                     if (fire != null) list.Add(new TooltipProperty("", fire, 0));
                     InformationManager.ShowTooltip(typeof(List<TooltipProperty>), new object[] { list });

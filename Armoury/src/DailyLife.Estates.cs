@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -17,6 +19,16 @@ namespace Armoury
     /// Region = warownia + jej wsie: wies do regionu przez Village.Bound (poprawka New Ibbish z rozdz. 13 - TYLKO w pomiarze: dwie wsie, ktorych lista
     /// BoundVillages warowni nie zna, licza sie do regionu przez Bound; liczba i ludzie takich wsi w linii). Wies bez Bound - region OutlawLaw.RegionFor.
     /// Tylko odczyt gry - nic w grze nie zmienia.
+    /// ZC2 (projekt rozdz. 14 "ZC2 stany w ksiedze + widok", klucz DailyLifeEstates): STANY W KSIEDZE I W ZAPISIE. Udzialy 6 stanow ksiegi kazdego miasta i wsi
+    /// (w milionowych, suma dokladnie 1 000 000) siedza w ksiedze stanow (_eb) i w zapisie (arm_estates, SaveText.Sync - kawalki ponizej limitu napisu):
+    ///  - zasiew: osada bez wpisu (stary zapis - wszystkie 798 w pierwszej dobie pomiaru z kluczem; nowa kampania - pierwsza doba po kalibracji ksiegi ludzi;
+    ///    osada nowa w spisie) dostaje udzialy ZC0 (pasma x pochylenie klasami BK tej doby) zaokraglone do milionowych - w pamieci od razu te same liczby
+    ///    co w zapisie, wiec zapis + wczytanie daje te same stany co do czlowieka (suma kontrolna w liniach zapisu, wczytania i doby);
+    ///  - dalej udzialy STOJA (ZC2 nikogo nie przesuwa; awans i spadek - ZC6, blizna wojny - ZC7): ludzie stanu = ludzie ksiegi osady x udzial; konto
+    ///    NIEWOLNI i wielkie rody jak w ZC0 (z ksiegi i z bohaterow kazdej doby);
+    ///  - pamiec Dostatku: co 7 dob D osady bez wielkich rodow (D0, setne) w 5 tygodniach (strzalka "w 28 dob" w widoku; zamek - D regionu) - tez w zapisie.
+    /// Klucz wylaczony (albo DailyLifeMeasure wylaczony): stany jak ZC0 z pasm co dobe, ksiega stanow nietknieta i zapisywana dalej (wlaczenie wraca do niej).
+    /// Zapis bez klucza arm_estates (zapis sprzed ZC2) albo w nieznanym formacie - zasiew przy pierwszej dobie pomiaru (linia "Stany (ZC2): ... zasiano").
     /// </summary>
     internal static partial class DailyLife
     {
@@ -174,11 +186,22 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("ZcBkHeads", e); }
             }
-            // 2. pasma x pochylenie BK; ludzie stanow
+            // 2. udzialy stanow: ZC2 (klucz DailyLifeEstates) - z ksiegi stanow (arm_estates); osada bez wpisu - pasma x pochylenie BK jak ZC0 i ZASIEW do ksiegi
+            //    (stary zapis: wszystkie osady w pierwszej dobie). Bez klucza - jak ZC0: pasma x pochylenie BK co dobe, ksiega stanow nietknieta.
+            bool book = EstatesOn;
+            int seedTowns = 0, seedVils = 0, seedTilt = 0, seedNoBk = 0;
             foreach (var r in _recs)
             {
                 if (r.Kind == KCastle) continue;
                 bool town = r.Kind == KTown;
+                EBook eb = null;
+                if (book && SafeId(r.Id) && _eb.TryGetValue(r.Id, out eb) && eb.P != null)
+                {
+                    for (int e = 0; e < 6; e++) r.Share[e] = eb.P[e] / (double)PpmAll;
+                    r.Tilted = eb.Tilted; if (r.Tilted) _tiltN++;
+                    for (int e = 0; e < 6; e++) r.N[e] = r.L * r.Share[e];
+                    continue;
+                }
                 Bands(r.Cul, town, r.Share);
                 r.Tilted = false;
                 if (!double.IsNaN(r.Upper) && _upW[r.Kind] > 0)
@@ -196,8 +219,20 @@ namespace Armoury
                         }
                     }
                 }
+                if (book && SafeId(r.Id))
+                {
+                    // ZC2: zasiew - udzialy w milionowych (suma dokladnie 1 000 000), w pamieci od razu te same liczby co w zapisie (zapis + wczytanie = te same stany)
+                    if (eb == null) { eb = new EBook(); _eb[r.Id] = eb; }
+                    eb.P = Quantize(r.Share, town ? ELabour : EPeasant);
+                    eb.SeedDay = _eDay; eb.Tilted = r.Tilted;
+                    for (int e = 0; e < 6; e++) r.Share[e] = eb.P[e] / (double)PpmAll;
+                    if (town) seedTowns++; else seedVils++;
+                    if (r.Tilted) seedTilt++;
+                    if (double.IsNaN(r.Upper)) seedNoBk++;
+                }
                 for (int e = 0; e < 6; e++) r.N[e] = r.L * r.Share[e];
             }
+            if (seedTowns + seedVils > 0) SeedNote(seedTowns, seedVils, seedTilt, seedNoBk);
             // 3. konto NIEWOLNI ksiegi - region trzymania
             _thrBook = 0; _thrNoRegion = 0;
             try { PeopleBook.ThrallsByHold(_thrHold); } catch (Exception e) { _thrHold.Clear(); Stumble("ThrallsByHold", e); }
@@ -254,6 +289,321 @@ namespace Armoury
                 else if (!_kName.TryGetValue(k, out nm)) { nm = k.Name != null ? Clean(k.Name.ToString()) : r.KingdomId; _kName[k] = nm; }   // TextObject.ToString raz na krolestwo (spis od nowa co 28 dob)
                 r.KingdomName = nm;
             }
+        }
+
+        // ============================================================ ZC2: ksiega stanow (udzialy w zapisie arm_estates) i pamiec Dostatku
+        private const string PE = "Stany (ZC2): ";
+        private const string EVersion = "v1";      // v1|bazowa doba zasiewu|5 dob pamieci D|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4;...
+        private const int PpmAll = 1000000;        // udzialy w milionowych
+        private const int RingN = 5;               // pamiec Dostatku: 5 tygodni (strzalka "w 28 dob" ma zawsze wpis sprzed >= 28 dob)
+
+        /// <summary>Wpis ksiegi stanow osady: udzialy 6 stanow ksiegi (null - jeszcze nie zasiane; zamek - zawsze null, sama pamiec D), doba zasiewu,
+        /// pochylenie BK przy zasiewie, D0 osady w dobach _ringDays (setne; NaN - brak).</summary>
+        private sealed class EBook
+        {
+            public int[] P;
+            public int SeedDay = -1;
+            public bool Tilted;
+            public readonly float[] Ring = { float.NaN, float.NaN, float.NaN, float.NaN, float.NaN };
+        }
+
+        private static readonly Dictionary<string, EBook> _eb = new Dictionary<string, EBook>(StringComparer.Ordinal);
+        private static readonly int[] _ringDays = { -1, -1, -1, -1, -1 };
+        private static int _eDay = -1;                              // doba pomiaru (zasiew)
+        private static int _eSeedDay, _eSeedSess, _eSeedTiltSess, _eSeedNoBkSess;   // zasiane w tej dobie / od wczytania
+        private static int _eLoadN, _eLoadP, _eLoadBad, _eLoadBadP;
+        private static bool _eLoaded;
+        private static uint _eLoadHash;
+        private static string _eLoadNote;
+        private static int _eSaves;
+
+        internal static bool EstatesOn { get { var s = Settings.Current; return s != null && s.DailyLifeMeasure && s.DailyLifeEstates; } }
+
+        /// <summary>Z Reset (konstruktor ArmouryBehavior): ksiega stanow i licznik widoku od nowa - zapis wczytuje ImportEstates po konstruktorze.</summary>
+        private static void ResetEstates()
+        {
+            _eb.Clear();
+            for (int i = 0; i < RingN; i++) _ringDays[i] = -1;
+            _eDay = -1; _eSeedDay = _eSeedSess = _eSeedTiltSess = _eSeedNoBkSess = 0;
+            _eLoadN = _eLoadP = _eLoadBad = _eLoadBadP = 0; _eLoaded = false; _eLoadHash = 0; _eLoadNote = null; _eSaves = 0;
+            ResetView();
+        }
+
+        /// <summary>Udzialy (suma 1) -> milionowe z suma dokladnie 1 000 000 (reszta zaokraglen do stanu rest; gdyby rest mial za malo - do najwiekszego).</summary>
+        private static int[] Quantize(double[] sh, int rest)
+        {
+            var p = new int[6];
+            long s = 0;
+            for (int e = 0; e < 6; e++)
+            {
+                double v = sh[e];
+                long q = Fin(v) && v > 0 ? (long)Math.Round(v * PpmAll) : 0;
+                if (q > PpmAll) q = PpmAll;
+                p[e] = (int)q; s += q;
+            }
+            long d = PpmAll - s;
+            if (d != 0)
+            {
+                int at = rest;
+                if (p[at] + d < 0) { at = 0; for (int e = 1; e < 6; e++) if (p[e] > p[at]) at = e; }
+                p[at] = (int)Math.Max(0, p[at] + d);
+            }
+            s = 0; for (int e = 0; e < 6; e++) s += p[e];
+            if (s != PpmAll) { Array.Clear(p, 0, 6); p[rest] = PpmAll; }   // udzialy zdegenerowane - wszyscy w stanie "ostatnim"
+            return p;
+        }
+
+        /// <summary>Linia zdarzenia zasiewu (zawsze, nie tylko w dobie linii - zdarzenie rzadkie: stary zapis, nowa kampania, nowa osada).</summary>
+        private static void SeedNote(int towns, int vils, int tilt, int noBk)
+        {
+            _eSeedDay += towns + vils; _eSeedSess += towns + vils; _eSeedTiltSess += tilt; _eSeedNoBkSess += noBk;
+            try
+            {
+                Log.Info(PE + "dzien " + _eDay + " | zasiano " + (towns + vils) + " osad (miasta " + towns + ", wsie " + vils + ") z pasm x klasy BK (pochylonych " + tilt + ", bez klas BK " + noBk
+                         + ") - od teraz stany w ksiedze i w zapisie (arm_estates), udzialy stoja (bez awansu - ZC6) | " + (_eLoaded ? "zapis mial ksiege stanow " + _eLoadP + " osad" : "zapis bez ksiegi stanow (sprzed ZC2) albo nowa kampania")
+                         + " | ksiega stanow teraz " + CountP() + " osad, zapis ok. " + F1(EstimateKb()) + " KB | gra bez zmian.");
+            }
+            catch (Exception e) { Stumble("SeedNote", e); }
+        }
+
+        private static int CountP() { int n = 0; foreach (var kv in _eb) if (kv.Value.P != null) n++; return n; }
+
+        private static double EstimateKb() { return _eb.Count * 60.0 / 1024.0; }
+
+        // ------------------------------------------------------------ suma kontrolna udzialow (niezalezna od kolejnosci: suma FNV-1a wpisow)
+        private static uint EntryHash(string id, int[] p)
+        {
+            uint h = 2166136261u;
+            for (int i = 0; i < id.Length; i++) { h ^= id[i]; h *= 16777619u; }
+            for (int e = 0; e < 6; e++)
+            {
+                uint v = (uint)p[e];
+                for (int b = 0; b < 4; b++) { h ^= (v >> (8 * b)) & 0xFF; h *= 16777619u; }
+            }
+            return h;
+        }
+
+        private static uint EstatesHash()
+        {
+            uint s = 0;
+            foreach (var kv in _eb) if (kv.Value.P != null) s += EntryHash(kv.Key, kv.Value.P);
+            return s;
+        }
+
+        private static string Hex(uint h) { return h.ToString("X8", Inv); }
+
+        // ------------------------------------------------------------ pamiec Dostatku (co 7 dob)
+        /// <summary>Doba z widokiem (po LivelihoodDay): co 7 dob (doba podzielna przez 7) D0 kazdej osady do pamieci (setne - te same liczby co w zapisie).</summary>
+        private static void RingDay(int day)
+        {
+            if (day % 7 != 0 || _ringDays[0] == day) return;
+            for (int i = RingN - 1; i > 0; i--) _ringDays[i] = _ringDays[i - 1];
+            _ringDays[0] = day;
+            foreach (var kv in _eb)
+            {
+                var g = kv.Value.Ring;
+                for (int i = RingN - 1; i > 0; i--) g[i] = g[i - 1];
+                g[0] = float.NaN;
+            }
+            foreach (var r in _recs)
+            {
+                if (!SafeId(r.Id)) continue;
+                EBook eb;
+                if (!_eb.TryGetValue(r.Id, out eb)) { eb = new EBook(); _eb[r.Id] = eb; }
+                eb.Ring[0] = Fin(r.D0) && Math.Abs(r.D0) < 1e6 ? (float)(Math.Round(r.D0 * 100.0) / 100.0) : float.NaN;
+            }
+        }
+
+        /// <summary>D0 osady sprzed ok. 28 dob z pamieci: najmlodszy wpis sprzed >= 28 dob, a bez niego najstarszy sprzed >= 14 dob. false - brak.</summary>
+        private static bool PastD0(Rec r, out double d, out int days)
+        {
+            d = double.NaN; days = -1;
+            EBook eb;
+            if (r == null || r.Id == null || !_eb.TryGetValue(r.Id, out eb)) return false;
+            int pick = -1;
+            for (int i = 0; i < RingN; i++) if (_ringDays[i] >= 0 && _viewDay - _ringDays[i] >= 28) { pick = i; break; }
+            if (pick < 0) for (int i = RingN - 1; i >= 0; i--) if (_ringDays[i] >= 0 && _viewDay - _ringDays[i] >= 14) { pick = i; break; }
+            if (pick < 0) return false;
+            float v = eb.Ring[pick];
+            if (float.IsNaN(v) || float.IsInfinity(v)) return false;
+            d = v; days = _viewDay - _ringDays[pick];
+            return true;
+        }
+
+        // ------------------------------------------------------------ zapis arm_estates
+        internal static string ExportEstates()
+        {
+            if (_eb.Count == 0) return "";
+            var sb = new StringBuilder(_eb.Count * 64 + 64);
+            int n = 0, np = 0, nr = 0;
+            try
+            {
+                // bazowa doba zasiewu = najczestsza (wpis z ta doba nie powtarza jej)
+                var cnt = new Dictionary<int, int>();
+                foreach (var kv in _eb) if (kv.Value.P != null) { int c; cnt.TryGetValue(kv.Value.SeedDay, out c); cnt[kv.Value.SeedDay] = c + 1; }
+                int seedBase = -1, best = 0;
+                foreach (var kv in cnt) if (kv.Value > best) { best = kv.Value; seedBase = kv.Key; }
+                sb.Append(EVersion).Append('|').Append(seedBase.ToString(Inv)).Append('|');
+                for (int i = 0; i < RingN; i++) { if (i > 0) sb.Append(','); sb.Append(_ringDays[i].ToString(Inv)); }
+                sb.Append('|');
+                foreach (var kv in _eb)
+                {
+                    var b = kv.Value;
+                    if (!SafeId(kv.Key)) continue;
+                    bool ring = false;
+                    for (int i = 0; i < RingN; i++) if (!float.IsNaN(b.Ring[i])) { ring = true; break; }
+                    if (b.P == null && !ring) continue;
+                    if (n > 0) sb.Append(';');
+                    sb.Append(kv.Key).Append(':');
+                    if (b.P != null)
+                    {
+                        for (int e = 0; e < 6; e++) { if (e > 0) sb.Append(','); sb.Append(b.P[e].ToString(Inv)); }
+                        np++;
+                    }
+                    sb.Append(':');
+                    if (b.P != null && b.SeedDay != seedBase) sb.Append(b.SeedDay.ToString(Inv));
+                    sb.Append(':');
+                    if (b.P != null) sb.Append(b.Tilted ? '1' : '0');
+                    sb.Append(':');
+                    for (int i = 0; i < RingN; i++)
+                    {
+                        if (i > 0) sb.Append(',');
+                        float v = b.Ring[i];
+                        if (!float.IsNaN(v) && !float.IsInfinity(v)) sb.Append(((long)Math.Round(v * 100.0)).ToString(Inv));
+                    }
+                    if (ring) nr++;
+                    n++;
+                }
+            }
+            catch (Exception e) { Stumble("ExportEstates", e); }
+            string s = sb.ToString();
+            _eSaves++;
+            try
+            {
+                int parts = s.Length <= 8000 ? 1 : (s.Length + 7999) / 8000;
+                Log.Info(PE + "zapis | dzien " + ((int)CampaignTime.Now.ToDays).ToString(Inv) + " | osad " + n + " (z udzialami " + np + ", z pamiecia Dostatku " + nr + ") | "
+                         + F1(s.Length / 1024.0) + " KB (" + s.Length + " znakow, kawalkow " + parts + ") | suma kontrolna " + Hex(EstatesHash()) + " | zapis nr " + _eSaves + " w tej sesji.");
+            }
+            catch { }
+            return s;
+        }
+
+        internal static void ImportEstates(string data)
+        {
+            _eb.Clear();
+            for (int i = 0; i < RingN; i++) _ringDays[i] = -1;
+            _eLoaded = false; _eLoadN = _eLoadP = _eLoadBad = _eLoadBadP = 0; _eLoadHash = 0; _eLoadNote = null;
+            if (string.IsNullOrEmpty(data))
+            {
+                _eLoadNote = "brak klucza arm_estates (zapis sprzed ZC2 albo kampania bez klucza) - stany zasiane w pierwszej dobie pomiaru z kluczem";
+                try { Log.Info(PE + "wczytanie | " + _eLoadNote + "."); } catch { }
+                return;
+            }
+            try
+            {
+                var a = data.Split(new[] { '|' }, 4);
+                int seedBase;
+                if (a.Length != 4 || a[0] != EVersion || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
+                {
+                    _eLoadNote = "arm_estates w nieznanym formacie - pominiety, stany zasiane od nowa";
+                    Log.Info(PE + "wczytanie | " + _eLoadNote + ".");
+                    return;
+                }
+                var rd = a[2].Split(',');
+                if (rd.Length == RingN)
+                    for (int i = 0; i < RingN; i++) { int x; _ringDays[i] = int.TryParse(rd[i], NumberStyles.Integer, Inv, out x) ? x : -1; }
+                if (a[3].Length > 0)
+                    foreach (var ent in a[3].Split(';'))
+                    {
+                        if (ent.Length == 0) continue;
+                        var p = ent.Split(':');
+                        if (p.Length != 5 || !SafeId(p[0])) { _eLoadBad++; continue; }
+                        var b = new EBook();
+                        if (p[1].Length > 0)
+                        {
+                            var q = p[1].Split(',');
+                            var pp = new int[6];
+                            long sum = 0; bool ok = q.Length == 6;
+                            for (int e = 0; ok && e < 6; e++)
+                            {
+                                int x;
+                                if (!int.TryParse(q[e], NumberStyles.Integer, Inv, out x) || x < 0 || x > PpmAll) ok = false;
+                                else { pp[e] = x; sum += x; }
+                            }
+                            if (ok && sum == PpmAll)
+                            {
+                                b.P = pp;
+                                int sd;
+                                b.SeedDay = p[2].Length == 0 ? seedBase : int.TryParse(p[2], NumberStyles.Integer, Inv, out sd) ? sd : seedBase;
+                                b.Tilted = p[3] == "1";
+                            }
+                            else _eLoadBadP++;                       // zle udzialy - osada zasiana od nowa
+                        }
+                        var g = p[4].Split(',');
+                        if (g.Length == RingN)
+                            for (int i = 0; i < RingN; i++)
+                            {
+                                long x;
+                                b.Ring[i] = g[i].Length > 0 && long.TryParse(g[i], NumberStyles.Integer, Inv, out x) ? (float)(x / 100.0) : float.NaN;
+                            }
+                        _eb[p[0]] = b;
+                        _eLoadN++; if (b.P != null) _eLoadP++;
+                    }
+                _eLoaded = true; _eLoadHash = EstatesHash();
+                Log.Info(PE + "wczytanie | format " + EVersion + " | osad " + _eLoadN + " (z udzialami " + _eLoadP + ", pominiete wpisy " + _eLoadBad + ", zle udzialy - zasiew od nowa " + _eLoadBadP
+                         + ") | pamiec Dostatku z dob " + string.Join(",", Array.ConvertAll(_ringDays, x => x.ToString(Inv))) + " | suma kontrolna " + Hex(_eLoadHash) + ".");
+            }
+            catch (Exception e)
+            {
+                _eb.Clear(); for (int i = 0; i < RingN; i++) _ringDays[i] = -1; _eLoaded = false;
+                _eLoadNote = "blad odczytu arm_estates - stany zasiane od nowa";
+                Stumble("ImportEstates", e);
+            }
+        }
+
+        /// <summary>OnSessionLaunched (po SessionStart ZC0): linia startu ZC2 - klucz, ksiega stanow z zapisu, widok.</summary>
+        internal static void EstatesSessionStart()
+        {
+            try
+            {
+                var s = Settings.Current;
+                Log.Info(PE + "start sesji | klucz Daily Life Estates " + (s != null && s.DailyLifeEstates ? "tak" : "WYLACZONE") + " (Daily Life Measure " + (KeyOn ? "tak" : "WYLACZONE") + ")"
+                         + (EstatesOn ? "" : " - stany jak ZC0 z pasm co dobe, ksiega stanow nietknieta, bez widoku")
+                         + " | ksiega stanow z zapisu: " + (_eLoaded ? _eLoadP + " osad z udzialami, " + _eLoadN + " wpisow, suma kontrolna " + Hex(_eLoadHash) : (_eLoadNote ?? "brak"))
+                         + " | widok: dymki osad gry (miasta, zamki, wsie: " + TipWhere + ") i wiosek pobocznych, People of this land, Look over the district, Realm ledger (menu miasta i zamku)"
+                         + " - okna ShowInquiry, bez GameMenu.SwitchToMenu | gra bez zmian (etykiety ludzi i widok - zloto, towar, ceny, dobrobyt, AI nietkniete).");
+            }
+            catch (Exception e) { Stumble("EstatesSessionStart", e); }
+        }
+
+        /// <summary>Linia doby ZC2 (doba linii): pokrycie ksiegi stanow, zasiew, swiat wedlug stanow, suma kontrolna, pamiec Dostatku, widok.</summary>
+        private static string EstatesLine(int day)
+        {
+            int towns = 0, vils = 0, castles = 0, tP = 0, vP = 0, miss = 0;
+            foreach (var r in _recs)
+            {
+                if (r.Kind == KCastle) { castles++; continue; }
+                EBook eb;
+                bool has = SafeId(r.Id) && _eb.TryGetValue(r.Id, out eb) && eb.P != null;
+                if (r.Kind == KTown) { towns++; if (has) tP++; } else { vils++; if (has) vP++; }
+                if (!has) miss++;
+            }
+            int all = towns + vils + castles, cov = tP + vP + castles;
+            int weeks = 0; for (int i = 0; i < RingN; i++) if (_ringDays[i] >= 0) weeks++;
+            double burgh = _nE[ELabour] + _nE[ECraft] + _nE[EMerchant];
+            var sb = new StringBuilder(900);
+            sb.Append(PE).Append("dzien ").Append(day).Append(" | stany w ksiedze ").Append(cov).Append('/').Append(all).Append(" osad (miasta ").Append(tP).Append('/').Append(towns)
+              .Append(", wsie ").Append(vP).Append('/').Append(vils).Append(" z udzialami; zamki ").Append(castles).Append(" - ludzie w ich wsiach; bez udzialow ").Append(miss).Append(')')
+              .Append(" | zasiano dzis ").Append(_eSeedDay).Append(", od wczytania ").Append(_eSeedSess).Append(" (pochylonych BK ").Append(_eSeedTiltSess).Append(", bez klas BK ").Append(_eSeedNoBkSess)
+              .Append("), z zapisu ").Append(_eLoadP).Append(" (zle udzialy ").Append(_eLoadBadP).Append(')')
+              .Append(" | swiat (ksiega): chlopi ").Append(N0(_nE[EPeasant])).Append(", mieszczanie ").Append(N0(burgh)).Append(" (biedota ").Append(N0(_nE[ELabour])).Append(", rzemieslnicy ")
+              .Append(N0(_nE[ECraft])).Append(", kupcy ").Append(N0(_nE[EMerchant])).Append("), szlachta ").Append(N0(_nE[EGentry])).Append(", wielkie rody ").Append(N0(_nE[EHouse]))
+              .Append(", niewolni ").Append(N0(_nE[ESlave]))
+              .Append(" | suma kontrolna ").Append(Hex(EstatesHash()))
+              .Append(" | pamiec Dostatku: tygodni ").Append(weeks).Append(" (ostatni dzien ").Append(_ringDays[0]).Append(')')
+              .Append(" | widok od ostatniej linii: ").Append(ViewText());
+            sb.Append('.');
+            return sb.ToString();
         }
     }
 }

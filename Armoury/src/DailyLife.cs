@@ -28,6 +28,9 @@ namespace Armoury
     /// linii; log wylaczony (LogEnabled) - nic (srednia stoi). Srednia: zwykla przez pierwsze 28 dob osady, potem wykladnicza z waga 1/28.
     /// Koszt: ok. 800 osad x 7 stanow x 13 grup w tablicach, ceny miast raz na dobe; czas bloku w linii bez zapisu linii (cel projektu: mediana <= 5 ms na dobe).
     /// Wyjatki liczone per miejsce (pierwszy do pliku) - bez globalnych wylacznikow (CLAUDE.md 7). Klucz wylaczony - nic (linia raz).
+    /// ZC2 (klucz DailyLifeEstates, DailyLife.Estates.cs i DailyLife.View.cs): udzialy stanow z ksiegi stanow w zapisie (arm_estates; zasiew z pasm x BK),
+    /// Dostatek liczony KAZDEJ doby (takze bez linii i przy wylaczonym logu - czyta go widok w grze: dymki osad, People of this land, Look over the district,
+    /// Realm ledger), pamiec Dostatku co 7 dob, linia "Stany (ZC2): dzien N" w dobie linii. Bez klucza - jak ZC0.
     /// </summary>
     internal static partial class DailyLife
     {
@@ -79,6 +82,7 @@ namespace Armoury
             _recs = null; _byS.Clear(); _byHold.Clear(); _kName.Clear(); _cacheSig = -1; _cacheDay = int.MinValue;
             _items = null; _pxBase = null; _usual = null; _pxWorld = null; _basket.Clear(); _kgOf.Clear(); _civil.Clear();
             _reg.Clear(); _idxMemo.Clear(); _king.Clear(); _kingName.Clear(); _thrHold.Clear(); _wv.Clear();
+            ResetEstates();                                // ZC2: ksiega stanow, pamiec Dostatku, liczniki widoku (zapis wczytuje ImportEstates po konstruktorze)
         }
 
         /// <summary>Potkniecie w miejscu where: liczone zawsze, pierwsze w danym miejscu do pliku (wyjatek albo opis detail). Bez wylacznika.</summary>
@@ -296,7 +300,8 @@ namespace Armoury
                 _offLogged = false;
                 if (Campaign.Current == null) return;
                 var s = Settings.Current;
-                if (s == null || !s.LogEnabled) { TakeWindows(); return; }   // log wylaczony: nikt nie przeczyta - bez liczenia (srednia stoi)
+                // log wylaczony: nikt nie przeczyta - bez liczenia (srednia stoi); ZC2 (DailyLifeEstates): widok w grze czyta liczby - liczenie bez linii
+                if (s == null || (!s.LogEnabled && !EstatesOn)) { TakeWindows(); return; }
                 if (!PopulationLaw.Calibrated)
                 {
                     TakeWindows();
@@ -328,6 +333,7 @@ namespace Armoury
             EnsureItems();
             EnsureRecs(day);
             _winTaken = TakeWindows();
+            _eDay = day; _eSeedDay = 0;                    // ZC2: doba zasiewu ksiegi stanow
             long t1 = Stopwatch.GetTimestamp();
             PeopleDay();
             long t2 = Stopwatch.GetTimestamp();
@@ -337,8 +343,17 @@ namespace Armoury
             _winTaken = null;
             _days++;
             double f = 1000.0 / Stopwatch.Frequency;
-            if (!LogGate.Lines) { AddMs((Stopwatch.GetTimestamp() - t0) * f); return; }   // doba bez linii (ciche logi): bez Dostatku i Spizarni
+            var st = Settings.Current;
+            bool estates = EstatesOn;
+            if (!LogGate.Lines || st == null || !st.LogEnabled)
+            {
+                // doba bez linii (ciche logi, log wylaczony): bez Spizarni i linii; ZC2 - Dostatek do widoku co dobe (i pamiec Dostatku co 7 dob)
+                if (estates) { try { LivelihoodDay(); ViewDay(day); } catch (Exception e) { Stumble("LivelihoodDay(widok)", e); } }
+                AddMs((Stopwatch.GetTimestamp() - t0) * f);
+                return;
+            }
             LivelihoodDay();
+            if (estates) { try { ViewDay(day); } catch (Exception e) { Stumble("ViewDay", e); } }
             long t4 = Stopwatch.GetTimestamp();
             PantryDay();
             long t5 = Stopwatch.GetTimestamp();
@@ -362,6 +377,7 @@ namespace Armoury
             try { Log.Info(LifeLine(day, ms, (t1 - t0) * f, (t3 - t2) * f, (t2 - t1) * f, (t4 - t3) * f, (t5 - t4) * f, (t6 - t5) * f, week ? csvNote : null)); }
             catch (Exception e) { Stumble("LifeLine", e); }
             if (pantry != null) Log.Info(pantry);
+            if (estates) { try { Log.Info(EstatesLine(day)); } catch (Exception e) { Stumble("EstatesLine", e); } }   // ZC2: linia "Stany (ZC2): dzien N"
         }
 
         // ------------------------------------------------------------ linie

@@ -772,6 +772,11 @@ namespace Armoury
             // albo kampania z wylaczonym kluczem) = sigma z MCM przy pierwszej dobie z kluczem; Reset przed SyncData (konstruktor)
             try { string zc = dataStore.IsSaving ? DailyLife.Export() : null; SaveText.Sync(dataStore, "arm_dailylife", ref zc); if (dataStore.IsLoading) DailyLife.Import(zc); }
             catch (Exception e) { Log.Error("SyncData.arm_dailylife", e); }
+            // ZC2 (16.10, stany w ksiedze): udzialy stanow miast i wsi w milionowych i pamiec Dostatku co 7 dob ("v1|baza zasiewu|doby pamieci|id:p0..p5:zasiew:pochylenie:d0..d4;..."
+            // - SaveText w kawalkach) - wlasny try; brak klucza (zapis sprzed paczki) albo nieznany format = zasiew z pasm x BK w pierwszej dobie pomiaru z kluczem
+            // DailyLifeEstates; Reset przed SyncData (konstruktor, DailyLife.Reset)
+            try { string ze = dataStore.IsSaving ? DailyLife.ExportEstates() : null; SaveText.Sync(dataStore, "arm_estates", ref ze); if (dataStore.IsLoading) DailyLife.ImportEstates(ze); }
+            catch (Exception e) { Log.Error("SyncData.arm_estates", e); }
         }
 
         public override void RegisterEvents()
@@ -1455,6 +1460,7 @@ namespace Armoury
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
             try { TourneyPay.SessionStart(); } catch (Exception e) { Log.Error("TourneyPay.SessionStart", e); }   // TP (16.10): linia "Turniej-platnik (TP): start sesji", decyzja wyrownania Seagard (D3, raz: zapis sprzed zmiany, Ithauser, czas >= 109020) - bez przelewow (komunikat i splata w pierwszej godzinie)
             try { DailyLife.SessionStart(); } catch (Exception e) { Log.Error("DailyLife.SessionStart", e); }   // ZC0 (16.10): linia "Zycie (ZC0): start sesji" - klucze i skala targu sigma (z zapisu albo z MCM)
+            try { DailyLife.EstatesSessionStart(); } catch (Exception e) { Log.Error("DailyLife.EstatesSessionStart", e); }   // ZC2 (16.10): linia "Stany (ZC2): start sesji" - klucz, ksiega stanow z zapisu, widok
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
@@ -1545,6 +1551,7 @@ namespace Armoury
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
+            try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
             try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }

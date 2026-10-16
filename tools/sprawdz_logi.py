@@ -900,6 +900,13 @@ Uzycie (Python 3, tylko odczyt):
                     NZC0-10 ksiega towarow +-2% bazy (z --baza-doby), NZC0-11..13 INFO (Dostatek stanow, rody 1:1 brutto, New Ibbish, Spizarnia), NZC0-14..16
                     potrzeba wobec audytu rozdz. 7.1 (45 904 t/d +-3%, 0.885 kg/os +-0.02, z pola 76.6% +-2 pkt; DECYZJA), NZC0-17 zapis wczytany ponownie
                     (ta sama doba dwa razy w logu: Dostatek swiata +-3%).
+--grupa nzc2      : (16.10, Jeff "pokazywac ile w danym regionie, miescie, wiosce, calym obszarze jest chlopstwa, szlachty, mieszczan, arystokracji"; galaz
+                    w-toku/noc-zc267, Armoury/src/DailyLife.Estates.cs, DailyLife.View.cs; projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 12 i 14 ZC2)
+                    python -I tools/sprawdz_logi.py --grupa nzc2 <Armoury-*.log> [--baza-doby <log bazy>] [--do-doby 120] (strumieniowo). NZC2-0 start sesji (klucz
+                    Daily Life Estates), NZC2-0b dymek osady wpiety, NZC2-0c Realm ledger wpiety, NZC2-1 linia "Stany (ZC2)" w kazdej dobie z linia "Zycie (ZC0)",
+                    NZC2-2 stany w ksiedze N/N osad (798/798), NZC2-3 stary zapis zasiany w pierwszej dobie, NZC2-4 zapis + wczytanie: ta sama suma kontrolna udzialow,
+                    NZC2-5 zapis <= 60 KB, NZC2-6 udzialy stoja (suma kontrolna stala), NZC2-7 potkniecia i ERROR 0, NZC2-8 menu bez SwitchToMenu (kod widoku),
+                    NZC2-9 ksiega towarow +-2% bazy (z --baza-doby), NZC2-10..11 INFO (swiat wedlug stanow, uzycie widoku). Razem z --grupa nzc0 (czas, Dostatek).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -32587,6 +32594,231 @@ def nzc0_main(logp, bdp=None, until=120):
     rep.show()
     return 0
 
+# ------------------------------------------------------------ nzc2 (16.10, zycie codzienne ZC2 - stany w ksiedze i w zapisie + widok; projekt ZC rozdz. 12, 14)
+NZC2_HEAD = "Stany (ZC2): "
+NZC2_START = re.compile(r"Stany \(ZC2\): start sesji \| klucz Daily Life Estates (?P<k>tak|WYLACZONE) \(Daily Life Measure (?P<m>tak|WYLACZONE)\)")
+NZC2_DAY = re.compile(r"Stany \(ZC2\): dzien (?P<day>-?\d+) \| stany w ksiedze (?P<cov>\d+)/(?P<all>\d+) osad \(miasta (?P<tp>\d+)/(?P<t>\d+), wsie (?P<vp>\d+)/(?P<v>\d+) z udzialami; "
+                      r"zamki (?P<c>\d+) - ludzie w ich wsiach; bez udzialow (?P<miss>\d+)\) "
+                      r"\| zasiano dzis (?P<sd>\d+), od wczytania (?P<ss>\d+) \(pochylonych BK (?P<tilt>\d+), bez klas BK (?P<nobk>\d+)\), z zapisu (?P<fromsave>\d+) \(zle udzialy (?P<badp>\d+)\) "
+                      r"\| swiat \(ksiega\): chlopi (?P<peas>\d+|-), mieszczanie (?P<burgh>\d+|-) \(biedota (?P<lab>\d+|-), rzemieslnicy (?P<craft>\d+|-), kupcy (?P<merch>\d+|-)\), "
+                      r"szlachta (?P<gent>\d+|-), wielkie rody (?P<house>\d+|-), niewolni (?P<slave>\d+|-) "
+                      r"\| suma kontrolna (?P<hash>[0-9A-F]{8}) "
+                      r"\| pamiec Dostatku: tygodni (?P<weeks>\d+) \(ostatni dzien (?P<wday>-?\d+)\) "
+                      r"\| widok od ostatniej linii: dymki osad (?P<tip>\d+) \(w tym zamki - region (?P<tipc>\d+)\), dymki wiosek pobocznych (?P<side>\d+), People of this land (?P<ppl>\d+), "
+                      r"Look over the district (?P<dist>\d+), Realm ledger (?P<realm>\d+) \| potkniecia widoku (?P<vst>\d+) \(od wczytania (?P<vsta>\d+)\)\.$")
+NZC2_SEED = re.compile(r"Stany \(ZC2\): dzien (?P<day>-?\d+) \| zasiano (?P<n>\d+) osad \(miasta (?P<t>\d+), wsie (?P<v>\d+)\) z pasm x klasy BK \(pochylonych (?P<tilt>\d+), bez klas BK (?P<nobk>\d+)\)")
+NZC2_SAVE = re.compile(r"Stany \(ZC2\): zapis \| dzien (?P<day>-?\d+) \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), z pamiecia Dostatku (?P<nr>\d+)\) \| (?P<kb>[\d.]+) KB "
+                       r"\((?P<chars>\d+) znakow, kawalkow (?P<parts>\d+)\) \| suma kontrolna (?P<hash>[0-9A-F]{8})")
+NZC2_LOAD = re.compile(r"Stany \(ZC2\): wczytanie \| format v1 \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), pominiete wpisy (?P<bad>\d+), zle udzialy - zasiew od nowa (?P<badp>\d+)\) "
+                       r"\| pamiec Dostatku z dob (?P<rd>[-\d,]+) \| suma kontrolna (?P<hash>[0-9A-F]{8})\.")
+NZC2_TIP = "Stany (ZC2): dymek osady - linie stanow i Dostatku wpiete w: "
+NZC2_MENU = "Stany (ZC2): pozycja \"Realm ledger\""
+NZC2_ERR = ("ERROR in DailyLife.", "ERROR in SyncData.arm_estates", "ERROR in PeopleMenu.Estates", "ERROR in DistrictMenu.Estates")
+NZC2_ZC0ST = re.compile(r"Zycie \(ZC0\): dzien (?P<day>-?\d+) \|.* \| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<sta>\d+)\)\.$")
+NZC2_KB = 60.0              # projekt rozdz. 14 ZC2: zapis + <= 60 KB
+NZC2_VIEW = ("DailyLife.View.cs", "PeopleMenu.cs", "DistrictMenu.cs")
+
+
+def nzc2_src_scan():
+    """Menu bez GameMenu.SwitchToMenu (CLAUDE.md 7): pliki widoku ZC2 w Armoury/src obok tools/ (repo, z ktorego biegnie skrypt)."""
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Armoury", "src")
+    found, hits = [], []
+    for f in NZC2_VIEW:
+        p = os.path.join(base, f)
+        if not os.path.isfile(p):
+            continue
+        found.append(f)
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            for i, ln in enumerate(fh, 1):
+                code = ln.split("//", 1)[0]
+                if "SwitchToMenu(" in code:
+                    hits.append(f"{f}:{i}")
+    return found, hits
+
+
+def nzc2_main(logp, bdp=None, until=120):
+    """nzc2 (16.10; Armoury/src/DailyLife.Estates.cs, DailyLife.View.cs, klucz DailyLifeEstates): ZC2 - stany w ksiedze i w zapisie (arm_estates) i widok
+    (dymki osad i wiosek pobocznych, People of this land, Look over the district, Realm ledger); bez skutku w ekonomii. Progi projektu rozdz. 14 (ZC2) i wspolne:
+    NZC2-0 linia startu sesji (klucz tak), NZC2-0b dymek osady wpiety (TooltipRefresherCollection; z NavalDLC - oba), NZC2-0c pozycja Realm ledger wpieta,
+    NZC2-1 linia 'Stany (ZC2): dzien N' w kazdej dobie z linia 'Zycie (ZC0)' (bez luk, nierozpoznane 0), NZC2-2 stany w ksiedze N/N osad kazdej doby
+    (projekt: 798/798), NZC2-3 stary zapis zasiany w pierwszej dobie (wczytanie bez klucza -> pierwsza linia doby N/N, zasiano = miasta + wsie),
+    NZC2-4 zapis + wczytanie: suma kontrolna udzialow przy wczytaniu = przy ostatnim zapisie przed nim (bez wczytania po zapisie - INFO), NZC2-5 zapis
+    <= 60 KB (najwiekszy), NZC2-6 udzialy stoja (suma kontrolna stala poza dobami zasiewu - ZC2 nikogo nie przesuwa), NZC2-7 potkniecia (ZC0 + widok)
+    i ERROR paczki 0, NZC2-8 menu bez SwitchToMenu (kod widoku w repo), NZC2-9 ksiega towarow +-2% bazy (z --baza-doby; bez - INFO), NZC2-10..11 INFO
+    (swiat wedlug stanow, uzycie widoku - autotest nie najezdza dymkow).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NZC2-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess, days, bad, seeds, saves, loads, loads_other, tips, menus = [], {}, [], [], [], [], [], [], []
+    events = []      # (kolejnosc, rodzaj, dane) - zapis / wczytanie po kolei w logu
+    zc0 = {}
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NZC2_HEAD):
+                if s.startswith(NZC2_HEAD + "start sesji"):
+                    sess.append(s)
+                elif s.startswith(NZC2_TIP):
+                    tips.append(s)
+                elif s.startswith(NZC2_MENU):
+                    menus.append(s)
+                elif s.startswith(NZC2_HEAD + "zapis"):
+                    mm = NZC2_SAVE.match(s)
+                    if mm:
+                        saves.append(mm.groupdict()); events.append(("zapis", mm.groupdict()))
+                    else:
+                        bad.append(s)
+                elif s.startswith(NZC2_HEAD + "wczytanie"):
+                    mm = NZC2_LOAD.match(s)
+                    if mm:
+                        loads.append(mm.groupdict()); events.append(("wczytanie", mm.groupdict()))
+                    else:
+                        loads_other.append(s); events.append(("wczytanie-bez", {"text": s}))
+                elif s.startswith(NZC2_HEAD + "dzien "):
+                    if "| zasiano " in s and "| stany w ksiedze" not in s:
+                        mm = NZC2_SEED.match(s)
+                        if mm:
+                            seeds.append(mm.groupdict())
+                        else:
+                            bad.append(s)
+                    else:
+                        mm = NZC2_DAY.match(s)
+                        if mm:
+                            days[int(mm.group("day"))] = mm.groupdict()
+                        else:
+                            bad.append(s)
+                else:
+                    bad.append(s)
+            elif s.startswith("Zycie (ZC0): dzien "):
+                mm = NZC2_ZC0ST.match(s)
+                if mm:
+                    zc0[int(mm.group("day"))] = (int(mm.group("st")), int(mm.group("sta")))
+            elif s.startswith(NZC2_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Stany {len(days)} (nierozpoznanych {len(bad)}), zasiewow {len(seeds)}, zapisow {len(saves)}, "
+          f"wczytan {len(loads)} (bez ksiegi stanow {len(loads_other)}), doby Zycie (ZC0) {len(zc0)}")
+    if not sess and not days and not bad and not saves and not loads and not loads_other:
+        rep.add("NZC2-0: linie 'Stany (ZC2)'", "brak w logu", "INFO (log sprzed paczki ZC2)", None)
+        rep.show()
+        return 0
+    # NZC2-0
+    if sess:
+        mm = NZC2_START.match(sess[-1])
+        ok = bool(mm) and mm.group("k") == "tak" and mm.group("m") == "tak"
+        rep.add("NZC2-0: linia startu sesji (klucz Daily Life Estates)", sess[-1][len(NZC2_HEAD):][:320], "Daily Life Estates tak (z Daily Life Measure tak)",
+                True if ok else (None if mm and (mm.group("k") == "WYLACZONE" or mm.group("m") == "WYLACZONE") else False))
+    else:
+        rep.add("NZC2-0: linia startu sesji", "brak", "linia przy kazdym starcie sesji", False)
+    if tips:
+        t = tips[-1][len(NZC2_TIP):]
+        okt = "TooltipRefresherCollection" in t and "NIGDZIE" not in t
+        rep.add("NZC2-0b: dymek osady wpiety (postfiks dymka gry i NavalDLC)", t[:200], "TooltipRefresherCollection (z NavalDLC - takze NavalTooltipRefresherCollection)", okt)
+    else:
+        rep.add("NZC2-0b: dymek osady wpiety", "brak linii wpiecia (log otwarty po menu glownym?)", "INFO (linia przy starcie gry)", None)
+    rep.add("NZC2-0c: pozycja 'Realm ledger' w menu miasta i zamku", (menus[-1][len(NZC2_HEAD):][:200] if menus else "brak linii"), "linia wpiecia przy starcie sesji", bool(menus))
+    # NZC2-1
+    dd = sorted(days)
+    if not dd:
+        rep.add("NZC2-1: linie 'Stany (ZC2): dzien N'", f"brak rozpoznanych linii doby (nierozpoznane {len(bad)})" + (f": {bad[0][:220]}" if bad else ""), "linia kazdej doby", False)
+        rep.show()
+        return 0
+    zd = sorted(d for d in zc0 if dd[0] <= d <= dd[-1])
+    miss = [d for d in zd if d not in days]
+    span = dd[-1] - dd[0] + 1
+    rep.add("NZC2-1: linia 'Stany (ZC2)' w kazdej dobie z linia 'Zycie (ZC0)'", f"doby Stany {len(dd)} (dzien {dd[0]}-{dd[-1]}), doby Zycie bez Stany {len(miss)}"
+            + (f" (np. {miss[:5]})" if miss else "") + f", nierozpoznane {len(bad)}" + (f" (np. {bad[0][:200]})" if bad else "")
+            + (f"; dob w logu mniej niz {until} (bieg krotszy)" if span < until else ""), "0 dob bez linii, nierozpoznane 0", not miss and not bad)
+    last, first = days[dd[-1]], days[dd[0]]
+    # NZC2-2
+    badc = [d for d in dd if int(days[d]["cov"]) != int(days[d]["all"]) or int(days[d]["all"]) == 0]
+    rep.add("NZC2-2: stany w ksiedze dla wszystkich osad (kazda doba)", f"ostatnia doba {last['cov']}/{last['all']} (miasta {last['tp']}/{last['t']}, wsie {last['vp']}/{last['v']}, zamki {last['c']}, "
+            f"bez udzialow {last['miss']}); doby z brakiem {len(badc)} z {len(dd)}" + (f" (np. dzien {badc[0]}: {days[badc[0]]['cov']}/{days[badc[0]]['all']})" if badc else ""),
+            "N/N kazdej doby (projekt: 798/798)", not badc)
+    # NZC2-3: stary zapis zasiany w pierwszej dobie
+    old_save = any("brak klucza arm_estates" in x["text"] for k, x in events if k == "wczytanie-bez")
+    seeded = sum(int(x["n"]) for x in seeds)
+    tv = int(first["t"]) + int(first["v"])
+    if old_save or (not loads and seeds):
+        ok3 = int(first["cov"]) == int(first["all"]) and seeded >= tv and int(first["ss"]) >= tv
+        rep.add("NZC2-3: stary zapis (bez arm_estates) zasiany w pierwszej dobie", f"zasiano {seeded} osad w {len(seeds)} liniach (pierwsza: dzien {seeds[0]['day'] if seeds else '-'}, "
+                f"pochylonych BK {seeds[0]['tilt'] if seeds else '-'}, bez klas BK {seeds[0]['nobk'] if seeds else '-'}); pierwsza doba linii {dd[0]}: {first['cov']}/{first['all']}, "
+                f"od wczytania {first['ss']} (miasta + wsie {tv})", "pierwsza doba N/N, zasiano = miasta + wsie (projekt: 798/798)", ok3)
+    elif loads:
+        rep.add("NZC2-3: zapis z ksiega stanow", f"wczytano {loads[-1]['np']} osad z udzialami (zle udzialy {loads[-1]['badp']}); zasiano w biegu {seeded} (nowe osady)",
+                "INFO (zasiew tylko starego zapisu - tu ksiega z zapisu)", None)
+    else:
+        rep.add("NZC2-3: zasiew", f"brak linii wczytania; zasiano {seeded}", "INFO", None)
+    # NZC2-4: zapis + wczytanie - suma kontrolna przy wczytaniu = przy ostatnim zapisie przed nim
+    pairs, last_save = [], None
+    for k, x in events:
+        if k == "zapis":
+            last_save = x
+        elif k == "wczytanie" and last_save is not None:
+            pairs.append((last_save, x))
+    if pairs:
+        badh = [(a, b) for a, b in pairs if a["hash"] != b["hash"] or a["np"] != b["np"]]
+        rep.add("NZC2-4: zapis + wczytanie - te same stany (suma kontrolna udzialow)", f"par zapis -> wczytanie {len(pairs)}, rozne {len(badh)}"
+                + (f" (np. zapis dzien {badh[0][0]['day']}: {badh[0][0]['hash']} / {badh[0][0]['np']} osad, wczytanie {badh[0][1]['hash']} / {badh[0][1]['np']})" if badh
+                   else f"; ostatnia para {pairs[-1][0]['hash']} = {pairs[-1][1]['hash']} ({pairs[-1][1]['np']} osad)"),
+                "rowne kazdej pary", not badh)
+    else:
+        rep.add("NZC2-4: zapis + wczytanie", f"zapisow {len(saves)}, wczytan z ksiega stanow po zapisie 0 (bieg bez ponownego wczytania)", "INFO (rowne sumy kontrolne)", None)
+    # NZC2-5
+    if saves:
+        kb = max(float(x["kb"]) for x in saves)
+        w = max(saves, key=lambda x: float(x["kb"]))
+        rep.add("NZC2-5: rozmiar ksiegi stanow w zapisie", f"najwiekszy {kb:.1f} KB (dzien {w['day']}, {w['n']} osad, {w['chars']} znakow w {w['parts']} kawalkach), zapisow {len(saves)}",
+                f"<= {NZC2_KB:.0f} KB", kb <= NZC2_KB)
+    else:
+        rep.add("NZC2-5: rozmiar ksiegi stanow w zapisie", "brak linii zapisu (bieg bez zapisu gry)", f"INFO (<= {NZC2_KB:.0f} KB)", None)
+    # NZC2-6: udzialy stoja - suma kontrolna stala poza dobami zasiewu
+    changes, prev = [], None
+    for d in dd:
+        h = days[d]["hash"]
+        if prev is not None and h != prev[1] and int(days[d]["sd"]) == 0:
+            changes.append((d, prev[1], h))
+        prev = (d, h)
+    rep.add("NZC2-6: udzialy stanow stoja (ZC2 bez awansu i spadku)", f"zmiany sumy kontrolnej poza dobami zasiewu {len(changes)}" + (f" (np. dzien {changes[0][0]}: {changes[0][1]} -> {changes[0][2]})" if changes else "")
+            + f"; ostatnia {last['hash']}", "0", not changes)
+    # NZC2-7
+    stz = sum(zc0[d][0] for d in zd)
+    vst = sum(int(days[d]["vst"]) for d in dd)
+    rep.add("NZC2-7: potkniecia (doby ZC0 z ksiega stanow + widok) i ERROR paczki", f"potkniecia ZC0 {stz} (od wczytania na koniec {zc0[zd[-1]][1] if zd else '-'}), widoku {vst} (od wczytania {last['vsta']}), "
+            f"ERROR {n_err}", "0 / 0 / 0", stz == 0 and vst == 0 and n_err == 0)
+    # NZC2-8
+    found, hits = nzc2_src_scan()
+    if found:
+        rep.add("NZC2-8: menu widoku bez GameMenu.SwitchToMenu (kod)", f"pliki {', '.join(found)}: wywolan SwitchToMenu {len(hits)}" + (f" ({', '.join(hits[:5])})" if hits else ""), "0 (CLAUDE.md 7 - ShowInquiry)", not hits)
+    else:
+        rep.add("NZC2-8: menu bez SwitchToMenu", "brak plikow widoku obok tools/ (skrypt poza repo)", "INFO", None)
+    # NZC2-9
+    if bdp:
+        g1, g0 = nzc0_goods(logp), nzc0_goods(bdp)
+        common = sorted(set(g1) & set(g0))
+        if common:
+            a, b = st.mean(g1[d] for d in common), st.mean(g0[d] for d in common)
+            r = a / b - 1 if b else None
+            rep.add("NZC2-9: ksiega towarow (produkcja na dobe) wobec biegu bazowego - bez skutku w ekonomii", f"bieg {a:.0f} szt./d, baza {b:.0f} szt./d ({len(common)} wspolnych dob), roznica "
+                    + (f"{100 * r:+.2f}%" if r is not None else "-"), "+-2%", (abs(r) <= 0.02) if r is not None else None)
+        else:
+            rep.add("NZC2-9: ksiega towarow wobec bazy", "brak wspolnych dob linii 'Towary (bilans)'", "+-2%", None)
+    else:
+        rep.add("NZC2-9: ksiega towarow wobec bazy", "bez --baza-doby", "INFO (+-2% z logiem bazy)", None)
+    # INFO
+    rep.add("NZC2-10: swiat wedlug stanow (ostatnia doba, ksiega)", f"chlopi {last['peas']}, mieszczanie {last['burgh']} (biedota {last['lab']}, rzemieslnicy {last['craft']}, kupcy {last['merch']}), "
+            f"szlachta {last['gent']}, wielkie rody {last['house']}, niewolni {last['slave']}; pamiec Dostatku tygodni {last['weeks']} (ostatni dzien {last['wday']}); "
+            f"pochylonych BK przy zasiewie {last['tilt']}, bez klas BK {last['nobk']}", "INFO (udzialy swiata: grupa nzc0 NZC0-3)", None)
+    tot = {k: sum(int(days[d][k]) for d in dd) for k in ("tip", "tipc", "side", "ppl", "dist", "realm")}
+    rep.add("NZC2-11: uzycie widoku w biegu", f"dymki osad {tot['tip']} (zamki - region {tot['tipc']}), dymki wiosek pobocznych {tot['side']}, People of this land {tot['ppl']}, "
+            f"Look over the district {tot['dist']}, Realm ledger {tot['realm']}", "INFO (autotest nie najezdza dymkow i nie otwiera menu - sprawdzenie w grze)", None)
+    rep.show()
+    return 0
+
 
 def main(argv):
     args = argv[1:]
@@ -32773,6 +33005,8 @@ def main(argv):
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
     if group == "nzc0" and logp:
         return nzc0_main(logp, bdp, until_arg)   # nzc0 (16.10, zycie codzienne ZC0 - pomiar na sucho): stany, koszyki w kg, Spizarnia, Dostatek (DailyLife*.cs)
+    if group == "nzc2" and logp:
+        return nzc2_main(logp, bdp, until_arg)   # nzc2 (16.10, zycie codzienne ZC2): stany w ksiedze i w zapisie (arm_estates) + widok (DailyLife.Estates.cs, DailyLife.View.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
