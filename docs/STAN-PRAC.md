@@ -2467,3 +2467,4 @@ DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Au
 - ZASADA JEFFA (16.10): ekonomia dynamiczna z podazy i popytu, bez sztywnych mnoznikow; start neutralny (bez -20%); AI inwestuje po tescie. Dopisane w obu projektach.
 - Start: ZC0 (sam pomiar: stany, Dostatek, kg jedzenia) - workflow.
 - Jeff 16.10: "2. ok na razie nie inwestuja" - lordowie AI bez inwestycji (decyzja).
+- ZASADA JEFFA 16.10 (start): "musimy zaczac rynkowo, ze generalnie jest mniej wiecej bilans wszystkiego, czegos moze byc mniej o 5%, czegos wiecej o 5%, zeby ekonomia i rynek startowaly zbilansowane, a dopiero potem ... dynamicznie". -> KALIBRACJA STARTU (jednorazowa przy wlaczeniu: podaz = popyt +-5% kazdego towaru w swiecie, zapasy, ceny przy normie, kiesy ludu wedlug stanow w ramach istniejacych pieniedzy). Projekt: workflow wf_ef9562a5-85b -> docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md. Kolejnosc: ZC0 pomiar -> kalibracja -> dynamika.
