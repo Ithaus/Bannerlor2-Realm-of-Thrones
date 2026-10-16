@@ -461,11 +461,12 @@ namespace Armoury
                     if (FibreToMarket.Wants(v, home, load, ownC != null, out fu, out fd))
                     {
                         long ov = Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk); _evals++;
-                        if (ov > 0) { FibreToMarket.NoteSent(cart, ownC.T.Settlement, castle, fu, ov, bestVal); best = ownC; bestVal = ov; fibreSent = true; }
+                        // licznik sztuk z ladunku miasta targowego (z doladowaniem TopUp, gdy pelny woz) - nie z samych juk (fu)
+                        if (ov > 0) { FibreToMarket.NoteSent(cart, ownC.T.Settlement, castle, FibreToMarket.Units(ownC.Load), ov, bestVal); best = ownC; bestVal = ov; fibreSent = true; }
                         else FibreToMarket.NoteOwnZero();
                     }
                 }
-                if (!fibreSent) FibreToMarket.Forget(cart);
+                if (!fibreSent) FibreToMarket.Forget(cart, best.T.Settlement);
                 if (best.Full && plan != null)
                 {
                     int moved = TopUp(cart, home.ItemRoster, plan);

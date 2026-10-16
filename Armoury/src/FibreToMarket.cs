@@ -43,7 +43,7 @@ namespace Armoury
         private static MobileParty _preCart; private static int _preGold;
 
         // liczniki od poprzedniej linii doby
-        private static int _checked, _over, _sent, _sentCastle, _noOwn, _ownZero, _soldCarts, _stumbles, _stDay;
+        private static int _checked, _over, _sent, _sentCastle, _noOwn, _ownZero, _soldCarts, _stumbles, _stDay, _again;
         private static long _sentUnits, _valOwn, _valBest, _soldUnits, _soldGold;
         private static double _maxDays;
         private static readonly Dictionary<string, long> _soldBy = new Dictionary<string, long>(StringComparer.Ordinal);
@@ -72,7 +72,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _checked = _over = _sent = _sentCastle = _noOwn = _ownZero = _soldCarts = _stDay = 0;
+            _checked = _over = _sent = _sentCastle = _noOwn = _ownZero = _soldCarts = _stDay = _again = 0;
             _sentUnits = _valOwn = _valBest = _soldUnits = _soldGold = 0;
             _maxDays = 0;
             _soldBy.Clear();
@@ -120,14 +120,27 @@ namespace Armoury
             catch (Exception e) { Stumble(e); return false; }
         }
 
+        /// <summary>Sztuki wlokna w ladunku (poprawka po recenzji 16.10: licznik z ladunku wybranego kandydata - z doladowaniem TopUp z magazynu, gdy pelny woz).</summary>
+        internal static int Units(List<MarketCarts.Line> load)
+        {
+            int u = 0;
+            if (load == null) return 0;
+            foreach (var l in load) if (Fibre(l.El.Item) && l.N > 0) u += l.N;
+            return u;
+        }
+
         /// <summary>MarketCarts.Choose: wycena w miescie targowym 0 - zostaje najlepsze miasto (licznik).</summary>
         internal static void NoteOwnZero() { _ownZero++; }
 
-        /// <summary>MarketCarts.Choose: woz skierowany do miasta targowego - zapamietany do sprzedazy (licznik sztuk i zlota przy wjezdzie).</summary>
+        /// <summary>MarketCarts.Choose: woz skierowany do miasta targowego - zapamietany do sprzedazy (licznik sztuk i zlota przy wjezdzie). Poprawka po recenzji 16.10:
+        /// drugi wybor tego samego kursu (woz wsi zamkowej po przystanku w zamku, CastleMarket.FirstStop -> SellPrefix -> PickTown) z tym samym celem nie liczy sie
+        /// drugi raz - tylko odswieza pamiec wozu.</summary>
         internal static void NoteSent(MobileParty cart, Settlement to, bool castle, int units, long valOwn, long valBest)
         {
             try
             {
+                Trip old;
+                if (cart != null && to != null && _trips.TryGetValue(cart, out old) && old != null && old.To == to) { old.Units = units; _again++; return; }
                 _sent++; if (castle) _sentCastle++;
                 _sentUnits += units; _valOwn += valOwn; _valBest += valBest;
                 if (cart != null && to != null) _trips[cart] = new Trip { To = to, Units = units, Day = CampaignTime.Now.ToDays };
@@ -135,8 +148,15 @@ namespace Armoury
             catch (Exception e) { Stumble(e); }
         }
 
-        /// <summary>MarketCarts.Choose dla wozu bez skierowania: poprzednie skierowanie tego wozu wygasa (nowy wybor).</summary>
-        internal static void Forget(MobileParty cart) { if (cart != null && _trips.Count > 0) _trips.Remove(cart); }
+        /// <summary>MarketCarts.Choose dla wozu bez skierowania: poprzednie skierowanie tego wozu wygasa (nowy wybor) - chyba ze nowy wybor to ten sam cel (drugi
+        /// odcinek kursu wozu wsi zamkowej, gdy miasto targowe wygralo samo: sprzedaz w nim dalej liczy sie do skierowania).</summary>
+        internal static void Forget(MobileParty cart, Settlement chosen)
+        {
+            if (cart == null || _trips.Count == 0) return;
+            Trip t;
+            if (_trips.TryGetValue(cart, out t) && t != null && chosen != null && t.To == chosen) return;
+            _trips.Remove(cart);
+        }
 
         /// <summary>MarketCarts.SellPrefix: woz skierowany wjezdza do miasta celu - migawka wlokna w jukach i sakwy (przed sprzedaza gry / BK).</summary>
         internal static void SellBegin(Settlement at, MobileParty cart)
@@ -210,7 +230,7 @@ namespace Armoury
             Log.Info("Wlokno do miasta targowego (N2-E3): dzien " + ((int)now - 1) + " | wozow z wloknem (najlepsze miasto inne niz targowe) sprawdzonych " + _checked + ", zapas ponad " + FibreDays.ToString("0", Inv) + " dob " + _over
                      + " (najwiekszy " + _maxDays.ToString("0.0", Inv) + " dob) | skierowane do miasta targowego " + _sent + " (wsi zamkowych " + _sentCastle + "), wlokna w jukach " + _sentUnits + " szt."
                      + ", wycena ladunku w miescie targowym " + _valOwn + " d wobec najlepszego miasta " + _valBest + " d (wies traci " + Math.Max(0, _valBest - _valOwn) + " d)"
-                     + " | bez miasta targowego w zasiegu " + _noOwn + ", miasto targowe nic nie zaplaci " + _ownZero
+                     + " | bez miasta targowego w zasiegu " + _noOwn + ", miasto targowe nic nie zaplaci " + _ownZero + ", ten sam kurs wybrany drugi raz (po zamku, bez licznika) " + _again
                      + " | sprzedaz w miescie celu: wozow " + _soldCarts + ", wlokna sprzedanego " + _soldUnits + " szt." + (parts.Count > 0 ? " (" + string.Join(", ", parts.ToArray()) + ")" : "")
                      + ", utarg tych wozow (kasa miasta -> sakwa wozu, po zwrocie nadplaty 119) " + _soldGold + " d"
                      + " | w drodze " + _trips.Count + ", wygasle przy porzadkach " + (stale != null ? stale.Count : 0)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -159,7 +160,8 @@ namespace Armoury
         // i kazdy plon gry, przed mnoznikami (P1 ludzie wsi, rece, zima). Plon dodatkowy: zboze i reszta listy bez zmian; kura i ges dalej 0.
         // GL1 (VillageByPeople): g(typ) = suma((poziom + 1) / 2) / suma(u_v) po wsiach typu - z poziomow ognisk i ludzi, nie z towarow, wiec nowa pozycja go nie
         // rusza; linia GL1 "surowce wobec kalibracji" liczy z VillageType.Productions (jaj z listy BK tam nie ma - jak owocow). Regulator 221 jedzenia nie tnie
-        // (HarvestValve.Eligible: !IsFood). Magazyn wsi (GetWarehouseCapacity) liczy z VillageType.Productions - jaja go nie powiekszaja (jak owoce).
+        // (HarvestValve.Eligible: !IsFood). Magazyn wsi: gra liczy go z VillageType.Productions (Village.GetWarehouseCapacity = 5 dob produkcji typu), a bramka
+        // produkcji (TickProductions: suma WSZYSTKICH sztuk magazynu >= 1.5 W - cala wies stoi) liczy tez jaja i owoce - POPRAWKA PO RECENZJI 16.10: CapPostfix nizej.
         // Obieg: jaja powstaja z pracy wsi (magazyn wsi, ksiega towarow "wsie"), wozy wioza je na targ ta sama droga co reszte plonu - zloto tylko za sprzedaz.
         // Nic w zapisie (lista skladana przez BK co tick). Wyjatek - potkniecie (licznik), lista tej wsi jak z BK.
         private static readonly TextObject TxtEgg = new TextObject("{=!}Armoury: village poultry (Banner Kings)");
@@ -249,10 +251,83 @@ namespace Armoury
             lock (Gate) { _eggCalls++; _eggBase += x; }
         }
 
+        // ------------------------------------------------------------ magazyn wsi (poprawka po recenzji noc-ekonomia2 16.10)
+        // Dowod [K]: Village.GetWarehouseCapacity (twall Village.cs:248) = ceil(5 x (jedzenie + suma modelu po VillageType.Productions)); bramka produkcji gry
+        // (VillageGoodProductionCampaignBehavior.TickProductions :143-151) liczy sume WSZYSTKICH sztuk magazynu, wiec plon spoza typu (owoce i miod, jaja) zjadal
+        // magazyn bez jego powiekszenia: farma zboza ok. +8% sztuk owocow i ok. +4% jaj - wies stawala o tyle wczesniej, a woz wyjezdzal przy W liczonym bez nich
+        // (MarketCarts.Choose liczy kurs tym samym W). Regula (wzorem lasu wsi - VillageWoodlot.CapPostfix: magazyn = 5 dob produkcji, wiec i 5 dob dodatku):
+        // W + ceil(5 x dobowy plon dodatkow) - owoce i miod z wag BK (klucz VillageFruitFromBk, lista BK wpieta), jaja z wagi drobiu listy tej wsi (klucz
+        // VillageEggsFromBk, wies z jajami na liscie - _eggW); plon = baza (waga x (poziom ognisk + 1) x 0.5, ten sam wzor co Base / EggBase) x czynnik ludzi wsi
+        // P1 (VillageByPeople.TryFactor - jak las wsi); zima, rece i spustoszenie pominiete (W w zimie o ulamek doby wiekszy). Tylko wies Normal z targiem i
+        // czynnym modelem produkcji z naszym postfiksem (MaterialLaw.ProdModels) - tam, gdzie te plony naprawde powstaja. Bez pytan modelu (bez skutkow ubocznych
+        // ksiegi rudy i W2). Klucze obu dodatkow wylaczone - W jak w grze. Wyjatek - W bez zmian (licznik potkniec).
+        private static readonly string[] FruitIds = { "carrot", "apple", "orange", "honey" };
+        private static readonly Dictionary<Village, int> _capLast = new Dictionary<Village, int>();   // wies -> ostatni dopisek do W (od poprzedniej linii doby)
+        private static bool _capWired;
+        private static int _capStumbles;
+
+        private static bool InTypeListId(VillageType vt, string id)
+        {
+            foreach (var p in vt.Productions) if (p.Item1 != null && p.Item1.StringId == id) return true;
+            return false;
+        }
+
+        /// <summary>Postfiks Village.GetWarehouseCapacity(): + 5 dob plonu owocow, miodu i jaj z listy BK (opis wyzej).</summary>
+        public static void CapPostfix(Village __instance, ref int __result)
+        {
+            try
+            {
+                var v = __instance;
+                if (v == null || v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.VillageType == null) return;
+                var s = Settings.Current;
+                if (s == null || MaterialLaw.ProdModels <= 0) return;
+                float lvl = (v.GetHearthLevel() + 1) * 0.5f;
+                float x = 0f;
+                if (s.VillageFruitFromBk && MineralOnce.Wired)
+                {
+                    string ty = v.VillageType.StringId;
+                    foreach (var id in FruitIds)
+                    {
+                        float w = WeightFor(ty, id);
+                        if (w > 0f && !InTypeListId(v.VillageType, id)) x += w * lvl;
+                    }
+                }
+                if (s.VillageEggsFromBk)
+                {
+                    float w;
+                    lock (Gate) { if (!_eggW.TryGetValue(v, out w)) w = 0f; }
+                    if (w > 0f) { var egg = EggItem(); if (egg != null && !InTypeList(v.VillageType, egg)) x += w * lvl; }
+                }
+                if (!(x > 0f)) return;
+                float f, u, g;
+                if (VillageByPeople.TryFactor(v, out f, out u, out g)) x *= f;
+                if (!(x > 0f) || float.IsNaN(x) || float.IsInfinity(x)) return;
+                int add = (int)Math.Ceiling(5f * x - 1e-4f);
+                if (add <= 0) return;
+                __result += add;
+                lock (Gate) _capLast[v] = add;
+            }
+            catch (Exception e) { lock (Gate) _capStumbles++; if (!_errLogged) { _errLogged = true; Log.Error("VillageFruit.CapPostfix", e); } }
+        }
+
+        /// <summary>Z SubModuleMain (latki przy starcie gry): postfiks Village.GetWarehouseCapacity (magazyn wsi z dodatkami listy BK).</summary>
+        internal static void ApplyAll(Harmony h)
+        {
+            try
+            {
+                var cap = AccessTools.Method(typeof(Village), "GetWarehouseCapacity", Type.EmptyTypes);
+                if (cap == null || cap.ReturnType != typeof(int)) { Log.Info("Magazyn wsi (owoce i jaja BK): BRAK Village.GetWarehouseCapacity() - magazyn jak w grze."); return; }
+                h.Patch(cap, postfix: new HarmonyMethod(typeof(VillageFruit), nameof(CapPostfix)));
+                _capWired = true;
+                Log.Info("Magazyn wsi (owoce i jaja BK): postfiks GetWarehouseCapacity wpiety - W + 5 dob plonu owocow, miodu i jaj z listy BK (klucze VillageFruitFromBk, VillageEggsFromBk).");
+            }
+            catch (Exception e) { Log.Error("VillageFruit.ApplyAll", e); }
+        }
+
         /// <summary>Z ArmouryBehavior.OnSessionLaunched (zaraz po SessionStart owocow): linia "Jaja wsi (N2-E1): start sesji" - liczba wsi rolniczych i oczekiwany plon.</summary>
         internal static void EggSessionStart()
         {
-            lock (Gate) { _eggW.Clear(); _eggVill.Clear(); _eggLists = 0; _eggCalls = 0; _eggBase = 0; }
+            lock (Gate) { _eggW.Clear(); _eggVill.Clear(); _eggLists = 0; _eggCalls = 0; _eggBase = 0; _capLast.Clear(); _capStumbles = 0; }
             var s = Settings.Current;
             const string Head = "Jaja wsi (N2-E1): start sesji | ";
             if (s == null || !s.VillageEggsFromBk)
@@ -292,6 +367,7 @@ namespace Armoury
                      + " | jaja juz w typie wsi (pominiete) " + inType + " | bez targu (bez plonu) " + noMarket
                      + " | Egg w grze " + (egg != null ? "jest" : "BRAK - nic sie nie dzieje")
                      + " | lista produkcji BK " + (MineralOnce.Wired ? "jest (postfiks GetProductions dopisze jaja)" : "BEZ latki GetProductions - jaj nie bedzie")
+                     + " | magazyn wsi + 5 dob jaj i owocow (GetWarehouseCapacity) " + (_capWired ? "wpiety" : "NIE wpiety")
                      + " | potkniecia " + _stumbles + ".");
         }
 
@@ -299,15 +375,20 @@ namespace Armoury
         internal static void EggDaily()
         {
             if (!EggsOn) return;
-            int lists, calls, vill, st; double b;
+            int lists, calls, vill, st, capN, capSt; double b; long capSum = 0;
             lock (Gate)
             {
                 lists = _eggLists; calls = _eggCalls; b = _eggBase; vill = _eggVill.Count; st = _stumbles;
                 _eggLists = 0; _eggCalls = 0; _eggBase = 0; _eggVill.Clear();
+                capN = _capLast.Count; capSt = _capStumbles;
+                foreach (var kv in _capLast) capSum += kv.Value;
+                _capLast.Clear();
             }
             Log.Info("Jaja wsi (N2-E1): dzien " + (int)CampaignTime.Now.ToDays + " | listy BK z jajami " + lists + " (wsi " + vill + ")"
                      + " | baza dopisana w " + calls + " pytaniach modelu (tick BK, okna wsi): jaja " + b.ToString("0", Inv)
-                     + " (sztuki z ticku - linia \"Towary\", Egg, wsie) | potkniecia sesji " + st + ".");
+                     + " (sztuki z ticku - linia \"Towary\", Egg, wsie)"
+                     + " | magazyn wsi powiekszony o jaja i owoce: wsi " + capN + ", razem +" + capSum + " szt. (srednio +" + (capN > 0 ? ((double)capSum / capN).ToString("0.0", Inv) : "0") + "), potkniecia " + capSt
+                     + " | potkniecia sesji " + st + ".");
         }
     }
 }

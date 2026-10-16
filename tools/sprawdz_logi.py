@@ -681,10 +681,11 @@ Uzycie (Python 3, tylko odczyt):
 --grupa nekon2    : (noc 16.10, galaz w-toku/noc-ekonomia2; raport audytu ekonomii 15.10 rozdz. 1.8 "nie do wydania", 3.2 P1 jaja, P2 wariant prosty, P7, P8 (b))
                     python -I tools/sprawdz_logi.py --grupa nekon2 <Armoury-*.log> (strumieniowo). N2-0 linie startu E1-E4 (klucze TAK), N2-1 jaja - start (wsi
                     rolniczych, oczekiwany plon, Egg, lista BK), N2-2 linia doby jaj (listy z jajami > 0, potkniecia 0), N2-3 jaja ze wsi poza typem > 0 (N2-3b wobec
-                    oczekiwanego - INFO), N2-4 budzet bez producenta - start (latka, 5 zrodel), N2-5 linia doby (potkniecia 0, przekroczen 0, niezaspokojone =
-                    przeniesiono + zostalo), N2-5b przeniesiono > 0, N2-5c zrodla (INFO), N2-6 wlokno do miasta targowego - start i doba (potkniecia 0), N2-6b
-                    skierowania i sprzedaz (INFO), N2-6c sprzedaz <= skierowania, N2-7 opal - doba (kupione <= potrzeba, potkniecia 0), N2-7b zloto opalu
-                    (akcyza + do kas = zaplacone), N2-7c/N2-7d opal i drewno mieszczan (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO).
+                    oczekiwanego - INFO), N2-1c magazyn wsi z jajami i owocami, zatkane wsie rolnicze (INFO), N2-4 budzet bez producenta - start (latka wpieta,
+                    5 zrodel), N2-5 linia doby (potkniecia 0, przekroczen 0, najwiecej <= 50.5% nadwyzki, niezaspokojone = przeniesiono + zostalo), N2-5b
+                    przeniesiono > 0, N2-5c zrodla (INFO), N2-6 wlokno do miasta targowego - start i doba (potkniecia 0), N2-6b skierowania i sprzedaz (INFO),
+                    N2-6c sprzedaz <= skierowania, N2-7 opal - doba (kupione <= potrzeba, potkniecia 0), N2-7b zloto opalu (z kies ludu = zaplacone, gminy + kasy
+                    = zaplacone), N2-7c/N2-7d opal i drewno mieszczan (INFO), N2-7e opal a drewno budow (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO).
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -29676,17 +29677,25 @@ N2E_E1D = re.compile(r"^Jaja wsi \(N2-E1\): dzien (\d+) \| listy BK z jajami (\d
 N2E_E2D = re.compile(r"^Budzet bez producenta \(N2-E2\): dzien (\d+) \| (CZYNNE|WYLACZONE \(MCM\)) \| osad przeliczonych (\d+) \(zamkow (\d+)\) \| "
                      r"wierszy zrodel z niezaspokojonym budzetem (\d+) \| niezaspokojone \(budzet dnia\) (\d+), przeniesiono (\d+) \(zrodla: ([^)]*)\), "
                      r"zostalo w kategorii zrodla (\d+) \(bez miejsca na polce celu (\d+) wierszy\) .*?budzet BK celow \+(-?\d+) zl \| "
-                     r"kontrola limitu celow: z dopisem (\d+), przekroczen (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.$")
+                     r"kontrola limitu celow: z dopisem (\d+), przekroczen (\d+)(?: \(najwiecej [\d.]+% nadwyzki\), przyciete \(indeks ceny rosnie z popytem\) \d+)? \| "
+                     r"potkniecia (\d+) \(sesja (\d+)\)\.$")
+N2E_E2MAX = re.compile(r"kontrola limitu celow: z dopisem \d+, przekroczen \d+ \(najwiecej ([\d.]+)% nadwyzki\), przyciete \(indeks ceny rosnie z popytem\) (\d+) \|")
 N2E_E3D = re.compile(r"^Wlokno do miasta targowego \(N2-E3\): dzien (\d+) \| wozow z wloknem \(najlepsze miasto inne niz targowe\) sprawdzonych (\d+), "
                      r"zapas ponad \d+ dob (\d+) \(najwiekszy ([\d.]+) dob\) \| skierowane do miasta targowego (\d+) \(wsi zamkowych (\d+)\), wlokna w jukach (\d+) szt\., "
                      r"wycena ladunku w miescie targowym (\d+) d wobec najlepszego miasta (\d+) d \(wies traci (\d+) d\) \| bez miasta targowego w zasiegu (\d+), "
-                     r"miasto targowe nic nie zaplaci (\d+) \| sprzedaz w miescie celu: wozow (\d+), wlokna sprzedanego (\d+) szt\.(?: \([^)]*\))?, utarg tych wozow "
+                     r"miasto targowe nic nie zaplaci (\d+)(?:, ten sam kurs wybrany drugi raz \(po zamku, bez licznika\) \d+)? \| sprzedaz w miescie celu: wozow (\d+), wlokna sprzedanego (\d+) szt\.(?: \([^)]*\))?, utarg tych wozow "
                      r"\(kasa miasta -> sakwa wozu, po zwrocie nadplaty 119\) (-?\d+) d \| w drodze (\d+), wygasle przy porzadkach (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.$")
-N2E_E4D = re.compile(r"^Opal mieszczan \(N2-E4\): dzien (\d+) \| CZYNNE \| miasta (\d+): glowy kiesy ludu (\S+) \| pora: (ZIMA|lato|wiosna albo jesien)[^|]*\| "
-                     r"potrzeba (\S+) ladunkow \(po zaokragleniu (\d+)\) \| kupione i spalone (\d+) ladunkow za (\d+) zl \(akcyza do gmin (\d+), do kas miast (-?\d+)\) \| "
+N2E_E4D = re.compile(r"^Opal mieszczan \(N2-E4\): dzien (\d+) \| CZYNNE \| miasta (\d+): glowy kiesy ludu (\S+) \| pora: (ZIMA|lato|wiosna albo jesien|zima bez skutkow)[^|]*\| "
+                     r"potrzeba (\S+) ladunkow \(po zaokragleniu (\d+)\) \| kupione i spalone (\d+) ladunkow za (\d+) zl \((?:z kies ludu \d+, )?akcyza do gmin (\d+), do kas miast (-?\d+)\) \| "
                      r"bez opalu dzis (\d+) ladunkow: polka nie wyzej niz zapas rzemiosla (\d+) miast, czesciowo (\d+), za mala kiesa ponad jutrzejszy koszyk (\d+) miast \| "
                      r"drewno zostawione rzemioslu na polkach (\d+) \| poza regula: miasta nieskalibrowane (\d+) \| czas \S+ ms \| potkniecia (\d+)\.$")
 N2E_EGG = re.compile(r"^Towary: dzien (\d+) - Egg \(")
+N2E_PURSE = r"zl \(z kies ludu (\d+), akcyza do gmin"
+N2E_CAPW = re.compile(r"\| magazyn wsi powiekszony o jaja i owoce: wsi (\d+), razem \+(\d+) szt\.")
+N2E_CLOG = re.compile(r"^Zatkane wsie \(diagnoza\): dzien (\d+) - .*?rodziny \(zatkane/wszystkie\):.*?rolnicze (\d+)/(\d+)")
+N2E_FOLK = "Roboty ludu (P2): dzien "
+N2E_FOLK_MAT = re.compile(r"\| material \d+ zl za ([\d/]+) szt\. \(([a-z/]+)\)")
+N2E_FOLK_HELD = re.compile(r"budowy zostawily drewno rzemioslu - pan na \d+ targach \((\d+) szt\.\), lud na \d+ targach \((\d+) szt\.\)")
 N2E_WOOD = re.compile(r"^Towary: dzien (\d+) - hardwood \(")
 N2E_PRICE = "Ceny surowcow: dzien "
 N2E_NOMAKER = ("garum", "Ink", "Dyes", "gems", "gold")
@@ -29706,10 +29715,10 @@ def nekon2_main(logp):
     welna i skory do miasta targowego przy zapasie wsi ponad 6 dob, E4 opal mieszczan). Wejscie: log Armoury (strumieniowo). N2-0 linie startu czterech
     punktow (klucze TAK), N2-1 jaja - start (wsi rolniczych > 0, oczekiwany plon > 0, Egg jest, lista BK wpieta), N2-2 jaja - linia doby w kazdej dobie,
     listy z jajami > 0 od drugiej doby, potkniecia 0, N2-3 jaja ze wsi poza typem (ksiega towarow "BK poza typem wsi") srednio > 0, N2-3b wobec oczekiwanego
-    (INFO), N2-4 budzet bez producenta - start (latka wpieta, 5 zrodel w mapie), N2-5 linia doby w kazdej dobie, potkniecia 0, przekroczen limitu 0,
-    niezaspokojone = przeniesiono + zostalo, N2-5b przeniesiono > 0 (suma dob), N2-5c grupy celu (INFO), N2-6 wlokno - start i linia doby, potkniecia 0,
-    N2-6b skierowania i sprzedaz (INFO), N2-7 opal - linia doby w kazdej dobie, potkniecia 0, kupione <= potrzeba po zaokragleniu, N2-7b akcyza + do kas = zloto,
-    N2-7c opal razem (INFO), N2-7d drewno mieszczan w ksiedze towarow (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO).
+    (INFO), N2-1c magazyn wsi z jajami i owocami i zatkane wsie rolnicze (INFO), N2-4 budzet bez producenta - start (latka wpieta - kod pisze "wpiety",
+    5 zrodel w mapie), N2-5 linia doby w kazdej dobie, potkniecia 0, przekroczen limitu 0, najwiecej <= 50.5% nadwyzki, niezaspokojone = przeniesiono + zostalo, N2-5b przeniesiono > 0 (suma dob), N2-5c grupy celu (INFO), N2-6 wlokno - start i linia doby, potkniecia 0,
+    N2-6b skierowania i sprzedaz (INFO), N2-7 opal - linia doby w kazdej dobie, potkniecia 0, kupione <= potrzeba po zaokragleniu, N2-7b z kies ludu = zaplacone
+    i gminy + kasy = zaplacone, N2-7c opal razem (INFO), N2-7d drewno mieszczan w ksiedze towarow (INFO), N2-7e opal a drewno budow (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO).
     Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -29720,6 +29729,7 @@ def nekon2_main(logp):
     e1, e2, e3, e4, bad = {}, {}, {}, {}, []
     e4off = []
     egg, wood, prices, errs = {}, {}, {}, []
+    e2x, e4p, capw, clog, folk = {}, {}, {}, {}, {}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -29740,6 +29750,9 @@ def nekon2_main(logp):
                 a = N2E_E1D.match(s)
                 if a:
                     e1[int(a.group(1))] = tuple(int(x) for x in a.groups())
+                    c = N2E_CAPW.search(s)
+                    if c:
+                        capw[int(a.group(1))] = (int(c.group(1)), int(c.group(2)))
                 else:
                     bad.append(s[:140])
                 continue
@@ -29747,6 +29760,9 @@ def nekon2_main(logp):
                 a = N2E_E2D.match(s)
                 if a:
                     e2[int(a.group(1))] = a.groups()
+                    x = N2E_E2MAX.search(s)
+                    if x:
+                        e2x[int(a.group(1))] = (float(x.group(1)), int(x.group(2)))
                 else:
                     bad.append(s[:140])
                 continue
@@ -29761,6 +29777,7 @@ def nekon2_main(logp):
                 a = N2E_E4D.match(s)
                 if a:
                     e4[int(a.group(1))] = a.groups()
+                    e4p[int(a.group(1))] = num(N2E_PURSE, s, int, None)
                 elif " | CZYNNE | " in s:
                     bad.append(s[:140])
                 else:
@@ -29780,6 +29797,24 @@ def nekon2_main(logp):
                 d = num(r"dzien (\d+)", s)
                 if d is not None:
                     prices[d] = s
+                continue
+            if s.startswith("Zatkane wsie (diagnoza): dzien "):
+                a = N2E_CLOG.match(s)
+                if a:
+                    clog[int(a.group(1))] = (int(a.group(2)), int(a.group(3)))
+                continue
+            if s.startswith(N2E_FOLK):
+                d = num(r"dzien (\d+)", s)
+                if d is None:
+                    continue
+                hw = None
+                a = N2E_FOLK_MAT.search(s)
+                if a:
+                    names, vals = a.group(2).split("/"), a.group(1).split("/")
+                    if "hardwood" in names and len(vals) == len(names):
+                        hw = int(vals[names.index("hardwood")])
+                h = N2E_FOLK_HELD.search(s)
+                folk[d] = (num(r", bez materialu (\d+),", s, int, None), hw, (int(h.group(1)) + int(h.group(2))) if h else None)
     print(f"plik: {logp} | linii startu {sum(1 for v in start.values() if v)}/4, linii doby: jaja {len(e1)}, budzet {len(e2)}, wlokno {len(e3)}, opal {len(e4)}"
           f" (opal nieczynny {len(e4off)}, nierozpoznanych {len(bad)}), Towary Egg {len(egg)}, hardwood {len(wood)}, Ceny surowcow {len(prices)}")
     if not any(start.values()) and not (e1 or e2 or e3 or e4):
@@ -29831,10 +29866,18 @@ def nekon2_main(logp):
                     "INFO (mnozniki P1, rece, zima - zwykle 0.5-1.5)", None)
     else:
         rep.add("N2-3: jaja ze wsi (ksiega towarow)", "brak linii 'Towary: ... Egg'", "INFO (ksiega towarow wylaczona albo bez BK)", None)
+    if capw or clog:
+        cd = sorted(capw)
+        kd = sorted(clog)
+        cap_t = (f"wsi z wiekszym magazynem srednio {sum(capw[d][0] for d in cd) / len(cd):.0f}, +{sum(capw[d][1] for d in cd) / max(1, sum(capw[d][0] for d in cd)):.1f} szt. na wies"
+                 if cd else "brak liczb magazynu w linii jaj")
+        clog_t = (f"zatkane wsie rolnicze d{kd[0]} {clog[kd[0]][0]}/{clog[kd[0]][1]} -> d{kd[-1]} {clog[kd[-1]][0]}/{clog[kd[-1]][1]}" if kd else "brak linii 'Zatkane wsie (diagnoza)'")
+        rep.add("N2-1c: magazyn wsi + 5 dob jaj i owocow (GetWarehouseCapacity) i zatkane wsie rolnicze (INFO)", cap_t + "; " + clog_t,
+                "INFO (magazyn rosnie o dodatki listy BK - wsie rolnicze nie powinny zatykac sie czesciej niz przed paczka)", None)
     # ---- E2 budzet bez producenta
     if s2:
         srcs = [x for x in ("garum ->", "Dyes ->", "gems ->", "gold ->", "Ink ->") if x in s2]
-        wired = "latka wpieta" in s2
+        wired = re.search(r"latka wpiet[ay]", s2) is not None      # kod: "latka wpiety (UpdateDemandShift, ...)" - jak NC-23 dla B2
         rep.add("N2-4: budzet bez producenta - linia startu (latka wpieta, 5 zrodel w mapie)", f"latka {'wpieta' if wired else 'NIE'}, zrodel {len(srcs)}/5",
                 "wpieta, 5/5" if k2 else "INFO (klucz NIE)", (wired and len(srcs) == 5) if k2 else None)
     else:
@@ -29846,10 +29889,15 @@ def nekon2_main(logp):
         st = sum(int(e2[d][13]) for d in ds)
         over = sum(int(e2[d][12]) for d in ds)
         sumbad = [d for d in on if abs(int(e2[d][5]) - int(e2[d][6]) - int(e2[d][8])) > 3 + 0.01 * int(e2[d][5])]
-        rep.add("N2-5: budzet - linia doby w kazdej dobie, potkniecia 0, przekroczen limitu celu 0, niezaspokojone = przeniesiono + zostalo",
-                f"dob {len(ds)} (czynnych {len(on)}, brak {gaps}), potkniecia {st}, przekroczen {over}, dob z niezgodna suma {len(sumbad)}"
+        mx = max((e2x[d][0] for d in ds if d in e2x), default=None)
+        trim = sum(e2x[d][1] for d in ds if d in e2x)
+        rep.add("N2-5: budzet - linia doby w kazdej dobie, potkniecia 0, przekroczen limitu celu 0 (najwiecej <= 50.5% nadwyzki), niezaspokojone = przeniesiono + zostalo",
+                f"dob {len(ds)} (czynnych {len(on)}, brak {gaps}), potkniecia {st}, przekroczen {over}"
+                + (f" (najwiecej {mx:.1f}% nadwyzki, przycietych przy nowym popycie targu {trim})" if mx is not None else " (linia bez najwiekszego udzialu - wersja sprzed poprawki)")
+                + f", dob z niezgodna suma {len(sumbad)}"
                 + (f" (np. d{sumbad[0]}: {e2[sumbad[0]][5]} vs {e2[sumbad[0]][6]} + {e2[sumbad[0]][8]})" if sumbad else ""),
-                "brak 0, potkniecia 0, przekroczen 0, niezgodnych 0", gaps == 0 and st == 0 and over == 0 and not sumbad)
+                "brak 0, potkniecia 0, przekroczen 0, najwiecej <= 50.5%, niezgodnych 0",
+                gaps == 0 and st == 0 and over == 0 and not sumbad and (mx is None or mx <= 50.5))
         mv = sum(int(e2[d][6]) for d in on)
         nd = sum(int(e2[d][5]) for d in on)
         gold = sum(int(e2[d][10]) for d in on)
@@ -29892,9 +29940,15 @@ def nekon2_main(logp):
         rep.add("N2-7: opal - linia doby w kazdej dobie, potkniecia 0, kupione <= potrzeba po zaokragleniu",
                 f"dob {len(ds)} (d{ds[0]}-d{ds[-1]}, brak {gaps}), potkniecia {st}, dob z kupionymi ponad potrzebe {len(over)}",
                 "brak 0, potkniecia 0, ponad potrzebe 0", gaps == 0 and st == 0 and not over)
-        badg = [d for d in ds if int(e4[d][8]) + int(e4[d][9]) != int(e4[d][7]) or (int(e4[d][6]) > 0 and int(e4[d][7]) <= 0)]
-        rep.add("N2-7b: opal - zloto: akcyza + do kas = zaplacone, kupione > 0 => zaplacone > 0", f"dob niezgodnych {len(badg)}" + (f" (np. d{badg[0]})" if badg else ""),
-                "0", not badg)
+        withp = [d for d in ds if e4p.get(d) is not None]
+        if withp:
+            # obieg liczony osobno w kodzie: z kies klas (W/R/P) = zaplacone, wplaty do kas miast + akcyza gmin = zaplacone; kupione > 0 => zaplacone > 0
+            badg = [d for d in withp if e4p[d] != int(e4[d][7]) or int(e4[d][8]) + int(e4[d][9]) != int(e4[d][7]) or (int(e4[d][6]) > 0 and int(e4[d][7]) <= 0)]
+            rep.add("N2-7b: opal - zloto: z kies ludu = zaplacone, gminy + kasy miast = zaplacone, kupione > 0 => zaplacone > 0",
+                    f"dob {len(withp)}, niezgodnych {len(badg)}" + (f" (np. d{badg[0]}: z kies {e4p[badg[0]]}, zaplacone {e4[badg[0]][7]}, gminy {e4[badg[0]][8]}, kasy {e4[badg[0]][9]})" if badg else ""),
+                    "0", not badg)
+        else:
+            rep.add("N2-7b: opal - zloto (z kies ludu = zaplacone)", "linie bez 'z kies ludu' (wersja sprzed poprawki 16.10)", "INFO", None)
         need = sum(float(e4[d][4]) for d in ds if e4[d][4] != "-")
         bought = sum(int(e4[d][6]) for d in ds); gold = sum(int(e4[d][7]) for d in ds); win = sum(1 for d in ds if e4[d][3] == "ZIMA")
         short = sum(int(e4[d][10]) for d in ds)
@@ -29909,6 +29963,22 @@ def nekon2_main(logp):
         wd = sorted(wood)
         rep.add("N2-7d: drewno mieszczan w ksiedze towarow ('mieszczanie' w zuzyciu hardwood, INFO)",
                 f"d{wd[0]} {wood[wd[0]]} -> d{wd[-1]} {wood[wd[-1]]}, srednio {sum(wood.values()) / len(wd):.0f}/d ({len(wd)} dob)", "INFO (koszyk BK + opal E4)", None)
+    if e4 and folk:
+        # opal biegnie w dobie PRZED budowami (ArmouryBehavior: FirewoodDaily przed BuildFunding.Daily) i bierze z tej samej puli ponad zapas rzemiosla;
+        # linia opalu ma dzien = doba - 1, linia "Roboty ludu (P2)" - doba (ta sama doba gry: opal d, roboty d + 1)
+        pairs = [(d, folk[d + 1]) for d in sorted(e4) if (d + 1) in folk]
+        if pairs:
+            ob = sum(int(e4[d][6]) for d, _ in pairs)
+            hw = sum(f[1] for _, f in pairs if f[1] is not None)
+            held = [f[2] for _, f in pairs if f[2] is not None]
+            nm = [f[0] for _, f in pairs if f[0] is not None]
+            on_d = [f[0] for d, f in pairs if f[0] is not None and int(e4[d][6]) > 0]
+            off_d = [f[0] for d, f in pairs if f[0] is not None and int(e4[d][6]) <= 0]
+            rep.add("N2-7e: opal a drewno budow w tych samych dobach (INFO - czy opal przed budowami nie zabiera im drewna)",
+                    f"dob {len(pairs)}: opal kupiony {ob} ladunkow, drewno robot ludu {hw} szt., budowy zostawily rzemioslu (pan + lud) srednio {sum(held) / max(1, len(held)):.0f} szt./d"
+                    f"; roboty ludu bez materialu srednio {sum(nm) / max(1, len(nm)):.0f} osad/d (doby z opalem {sum(on_d) / max(1, len(on_d)):.0f}"
+                    f" [{len(on_d)}], bez opalu {sum(off_d) / max(1, len(off_d)):.0f} [{len(off_d)}])",
+                    "INFO (gdy w dobach z opalem roboty wyraznie czesciej bez materialu - przeniesc E4 za BuildFunding)", None)
     # ---- bledy i ceny
     rep.add("N2-8: ERROR noc-ekonomia2 (VillageFruit, MineralOnce.Eggs, NoMakerBudget, FibreToMarket, TownFolk.Firewood, MarketCarts sprzedaz/wybor)",
             f"{len(errs)}" + (f" np. {errs[0]}" if errs else ""), "0", not errs)

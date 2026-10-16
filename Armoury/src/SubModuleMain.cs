@@ -265,6 +265,7 @@ namespace Armoury
                 try { FoodThrift.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodThrift.ApplyAll", e); }         // noc 15/16.10 (B3): syta partia AI nie przeplaca za jedzenie (te same modele co HungerLaw)
                 try { FoodSubstitute.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FoodSubstitute.ApplyAll", e); }   // noc 15/16.10 (B2): zamiennik jedzenia przy pustym straganie (UpdateDemandShift, PRZED nawiasem kiesy ludu TownFolk)
                 try { NoMakerBudget.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NoMakerBudget.ApplyAll", e); }   // noc 16.10 (N2-E2): budzet kategorii bez producenta na zbytki (UpdateDemandShift, priorytet 450 - PO B2, PRZED nawiasem kiesy ludu)
+                try { VillageFruit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageFruit.ApplyAll", e); }   // poprawka po recenzji noc-ekonomia2 16.10: magazyn wsi + 5 dob owocow, miodu i jaj z listy BK (GetWarehouseCapacity)
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
                 CraftPopup.ApplyAll(_harmony);

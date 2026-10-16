@@ -33,6 +33,9 @@ namespace Armoury
     /// Cel bierze najwyzej SpareUse (0.5) swojej nadwyzki polki po ofercie ludu (S_t - B_t - oferta nadwyzki TownFolk.OfferCapFor, jak limit zamiennika B2),
     /// wspolnie dla wszystkich zrodel osady (limit liczony raz na osade i zmniejszany kazdym dopisem); podzial w grupie wedlug tego limitu. Czego cele nie
     /// przyjma - zostaje w kategorii zrodla (jak dotad). Popyt targu (ItemData.Demand, cena): ta sama zamiana z waga wygladzania gry, co w B2 (podloga 0.1 x popyt).
+    /// POPRAWKA PO RECENZJI 16.10 (ShiftLimit): dopis podnosi popyt targu celu, a z nim indeks ceny i budzet BK celu ponad nachylenie liczone przy starym indeksie
+    /// (w B2 to samo dawalo co dobe 51-91 przekroczen, najwiecej 53.6% nadwyzki) - najpierw plan calej osady, potem dopis kazdego celu x f (przyrost budzetu BK celu
+    /// przy NOWYM popycie targu <= limit w zlocie), dopiero potem zmiany slownika i popytu; czesc odcieta zostaje w kategorii zrodla.
     /// Zloto: tylko przesuniecie budzetu w tej samej osadzie - placi dalej lud (TownFolk.PayForGoods: kiesa -> kasa miasta), kotwica ogranicza wydatek jak dotad.
     /// Tworzenie nowej gry (przed GameStarted) - pomijane w calosci (jak B2). Wyjatek przy osadzie - potkniecie (licznik), slownik tej osady bez zmian.
     /// Nic w zapisie. Linie: "Budzet bez producenta (N2-E2): start sesji" i "...: dzien N" (ile przeniesiono na co).
@@ -52,7 +55,8 @@ namespace Armoury
         private const float SpareUse = 0.5f;   // DECYZJA (jak B2): wszystkie zrodla osady razem biora najwyzej polowe nadwyzki polki celu (po ofercie ludu)
         private const int Prio = 450;           // miedzy FoodSubstitute (500) a TownFolk.DemandPostfix (400)
 
-        private sealed class Room { public float Left, Gold, B0, Got; }
+        private sealed class Room { public float Left, Gold, B0, Bt0, Got, F = 1f, Used; }
+        private sealed class Plan { public int Src; public ItemCategory To; public float Add; }
         private static ItemCategory[] _src;
         private static ItemCategory[][] _grp;
         private static HashSet<ItemCategory> _cats;
@@ -63,11 +67,12 @@ namespace Armoury
         private static float _alpha = -1f;
         private static readonly Dictionary<ItemCategory, float> _shelf = new Dictionary<ItemCategory, float>();
         private static readonly Dictionary<ItemCategory, Room> _room = new Dictionary<ItemCategory, Room>();
-        private static readonly List<KeyValuePair<ItemCategory, float>> _adds = new List<KeyValuePair<ItemCategory, float>>();
+        private static readonly List<Plan> _plan = new List<Plan>();
+        private static readonly float[] _srcB = new float[SrcIds.Length], _srcMove = new float[SrcIds.Length], _srcMoved = new float[SrcIds.Length];
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         // liczniki od poprzedniej linii doby
-        private static int _towns, _castles, _srcRows, _noRoom, _stumbles, _stDay, _over, _chk;
-        private static double _need, _moved, _gold, _left;
+        private static int _towns, _castles, _srcRows, _noRoom, _stumbles, _stDay, _over, _chk, _trim;
+        private static double _need, _moved, _gold, _left, _maxUse;
         private static readonly double[] _byGroup = new double[4], _goldByGroup = new double[4];
         private static readonly Dictionary<string, double> _bySrc = new Dictionary<string, double>(StringComparer.Ordinal);
         private static readonly Dictionary<string, double> _byDst = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -156,8 +161,7 @@ namespace Armoury
             var shelf = town.Owner != null ? town.Owner.ItemRoster : null;
             var md = town.MarketData;
             if (shelf == null || md == null) return;
-            if (town.IsTown) _towns++; else _castles++;
-            _shelf.Clear(); _room.Clear();
+            _shelf.Clear(); _room.Clear(); _plan.Clear();
             for (int i = 0; i < shelf.Count; i++)
             {
                 var el = shelf.GetElementCopyAtIndex(i);
@@ -169,8 +173,13 @@ namespace Armoury
                 if (p <= 0) continue;
                 float v; _shelf.TryGetValue(c, out v); _shelf[c] = v + (float)el.Amount * p;
             }
+            // 1. PLAN (bez zmian slownika i popytu targu): ile kazde zrodlo chce oddac i ile kazdy cel przyjmie w swoim limicie (limit wspolny dla zrodel osady)
+            int rows = 0, noRoom = 0;
+            double need = 0, left = 0;
+            ItemCategory anySrc = null;
             for (int i = 0; i < _src.Length; i++)
             {
+                _srcB[i] = 0f; _srcMove[i] = 0f; _srcMoved[i] = 0f;
                 var sc = _src[i];
                 if (sc == null) continue;
                 float b;
@@ -179,64 +188,86 @@ namespace Armoury
                 if (!(B > 0.01f)) continue;
                 float S; _shelf.TryGetValue(sc, out S);
                 if (S >= B) continue;
-                _srcRows++;
+                rows++;
                 float move = (1f - S / B) * b;
-                _need += move;
-                // najpierw rachunek (pytania o budzet BK moga rzucic), potem zmiany - slownik albo przesuniety, albo nietkniety (suma bez zmian)
-                int g = SrcGroup[i];
-                var targets = _grp[g];
+                need += move;
+                var targets = _grp[SrcGroup[i]];
                 float roomSum = 0f;
-                _adds.Clear();
                 foreach (var t in targets)
                 {
                     var rm = RoomOf(town, dict, t);
                     if (rm != null && rm.Left > 0.01f) roomSum += rm.Left;
                 }
-                if (!(roomSum > 0.01f)) { _noRoom++; _left += move; continue; }
+                if (!(roomSum > 0.01f)) { noRoom++; left += move; continue; }
                 float take = Math.Min(move, roomSum);
+                int n0 = _plan.Count;
                 foreach (var t in targets)
                 {
                     Room rm;
                     if (!_room.TryGetValue(t, out rm) || rm == null || !(rm.Left > 0.01f)) continue;
                     float add = Math.Min(rm.Left, take * rm.Left / roomSum);
                     if (!(add > 0.01f)) continue;
-                    _adds.Add(new KeyValuePair<ItemCategory, float>(t, add));
+                    _plan.Add(new Plan { Src = i, To = t, Add = add });
                 }
-                float moved = 0f;
-                foreach (var kv in _adds) moved += kv.Value;
-                if (_adds.Count == 0 || !(moved > 0.01f)) { _noRoom++; _left += move; continue; }
-                float alpha = Alpha(town, sc);
-                foreach (var kv in _adds)
-                {
-                    var rt = _room[kv.Key];
-                    rt.Left -= kv.Value; rt.Got += kv.Value;   // limit celu wspolny dla wszystkich zrodel tej osady
-                    float before; dict.TryGetValue(kv.Key, out before);
-                    dict[kv.Key] = before + kv.Value;
-                    var dt = md.GetCategoryData(kv.Key);
-                    md.SetDemand(kv.Key, dt.Demand + alpha * kv.Value);
-                    string id = kv.Key.StringId ?? "?";
-                    double pv; _byDst.TryGetValue(id, out pv); _byDst[id] = pv + kv.Value;
-                }
-                dict[sc] = b - moved;
-                var dc = md.GetCategoryData(sc);
-                md.SetDemand(sc, Math.Max(0.1f * dc.Demand, dc.Demand - alpha * moved));
-                _moved += moved; _left += move - moved;
-                _byGroup[g] += moved;
-                string sid = sc.StringId ?? "?";
-                double sv; _bySrc.TryGetValue(sid, out sv); _bySrc[sid] = sv + moved;
+                if (_plan.Count == n0) { noRoom++; left += move; continue; }
+                for (int k = n0; k < _plan.Count; k++) { var rt = _room[_plan[k].To]; rt.Left -= _plan[k].Add; rt.Got += _plan[k].Add; }
+                _srcB[i] = b; _srcMove[i] = move;
+                if (anySrc == null) anySrc = sc;
             }
-            // kontrola limitu i zloto budzetu BK dopisane celom (tylko liczniki): przyrost budzetu BK celu <= 0.5 nadwyzki polki po ofercie ludu
+            // 2. LIMIT PRZY NOWYM POPYCIE TARGU (poprawka po recenzji 16.10, ShiftLimit): dopis celu x f - przyrost budzetu BK celu z indeksem ceny po dopisie
+            // nie wiekszy niz 0.5 nadwyzki polki; popyt targu kazdego celu wraca do stanu sprzed rachunku (zmiany - dopiero w kroku 3)
+            float alpha = anySrc != null ? Alpha(town, anySrc) : 0.15f;
+            int chk = 0, trim = 0, over = 0;
+            double maxUse = 0, gold = 0;
             foreach (var kv in _room)
             {
                 var rm = kv.Value;
                 if (rm == null || !(rm.Got > 0f)) continue;
-                float bt; dict.TryGetValue(kv.Key, out bt);
-                float used = Budget(town, bt, kv.Key) - rm.B0;
-                _chk++;
-                if (used > rm.Gold * 1.001f + 0.5f) _over++;
-                _gold += used;
-                for (int g = 0; g < _grp.Length; g++) if (Array.IndexOf(_grp[g], kv.Key) >= 0) { _goldByGroup[g] += used; break; }
+                float used; bool cut;
+                rm.F = ShiftLimit.Fit(town, md, kv.Key, rm.Bt0, rm.B0, rm.Got, rm.Gold, alpha, Budget, out used, out cut);
+                rm.Used = used;
+                chk++;
+                if (cut) trim++;
+                if (used > rm.Gold * 1.001f + 0.5f) over++;
+                if (rm.Gold > 0f) { double u = SpareUse * used / rm.Gold; if (u > maxUse) maxUse = u; }
             }
+            // 3. ZMIANY (po calym rachunku osady - slownik albo przesuniety, albo nietkniety; suma slownika bez zmian)
+            foreach (var pl in _plan) _srcMoved[pl.Src] += pl.Add * _room[pl.To].F;
+            foreach (var kv in _room)
+            {
+                var rm = kv.Value;
+                if (rm == null || !(rm.Got > 0f)) continue;
+                float add = rm.Got * rm.F;
+                gold += rm.Used;
+                for (int g = 0; g < _grp.Length; g++) if (Array.IndexOf(_grp[g], kv.Key) >= 0) { _goldByGroup[g] += rm.Used; break; }
+                if (!(add > 0f)) continue;
+                float before; dict.TryGetValue(kv.Key, out before);
+                dict[kv.Key] = before + add;
+                var dt = md.GetCategoryData(kv.Key);
+                md.SetDemand(kv.Key, dt.Demand + alpha * add);
+                string id = kv.Key.StringId ?? "?";
+                double pv; _byDst.TryGetValue(id, out pv); _byDst[id] = pv + add;
+            }
+            double moved = 0;
+            for (int i = 0; i < _src.Length; i++)
+            {
+                if (!(_srcMove[i] > 0f)) continue;
+                var sc = _src[i];
+                float mv = Math.Min(_srcMoved[i], _srcMove[i]);
+                left += _srcMove[i] - mv;
+                if (!(mv > 0f)) continue;
+                dict[sc] = _srcB[i] - mv;
+                var dc = md.GetCategoryData(sc);
+                md.SetDemand(sc, Math.Max(0.1f * dc.Demand, dc.Demand - alpha * mv));
+                moved += mv;
+                _byGroup[SrcGroup[i]] += mv;
+                string sid = sc.StringId ?? "?";
+                double sv; _bySrc.TryGetValue(sid, out sv); _bySrc[sid] = sv + mv;
+            }
+            if (town.IsTown) _towns++; else _castles++;
+            _srcRows += rows; _noRoom += noRoom; _need += need; _left += left; _moved += moved; _gold += gold;
+            _chk += chk; _trim += trim; _over += over;
+            if (maxUse > _maxUse) _maxUse = maxUse;
         }
 
         /// <summary>Limit celu t w tej osadzie - liczony raz (pierwsze uzycie), ze slownika po zamienniku jedzenia B2: 0.5 x (polka - budzet BK - oferta ludu) w zlocie
@@ -261,7 +292,7 @@ namespace Armoury
                         double offU = TownFolk.OfferCapFor(town, t);
                         float offG = double.IsNaN(offU) || double.IsInfinity(offU) ? float.MaxValue : (float)(Math.Max(0.0, offU) * slope);
                         float spare = St - Bt - offG;
-                        if (spare > 0f) rm = new Room { Left = SpareUse * spare / slope, Gold = SpareUse * spare, B0 = Bt };
+                        if (spare > 0f) rm = new Room { Left = SpareUse * spare / slope, Gold = SpareUse * spare, B0 = Bt, Bt0 = bt0 };
                     }
                 }
             }
@@ -296,8 +327,8 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _towns = _castles = _srcRows = _noRoom = _stDay = _over = _chk = 0;
-            _need = _moved = _gold = _left = 0;
+            _towns = _castles = _srcRows = _noRoom = _stDay = _over = _chk = _trim = 0;
+            _need = _moved = _gold = _left = _maxUse = 0;
             Array.Clear(_byGroup, 0, _byGroup.Length); Array.Clear(_goldByGroup, 0, _goldByGroup.Length);
             _bySrc.Clear(); _byDst.Clear();
         }
@@ -326,7 +357,8 @@ namespace Armoury
                      + " | na grupy (budzet dnia, w nawiasie przyrost budzetu BK celu w zlocie): " + string.Join(", ", gp.ToArray())
                      + " | najwiecej do: " + Top(_byDst, 8)
                      + " | suma slownika bez zmian (przesuniecie), budzet BK celow +" + _gold.ToString("0", Inv) + " zl"
-                     + " | kontrola limitu celow: z dopisem " + _chk + ", przekroczen " + _over
+                     + " | kontrola limitu celow: z dopisem " + _chk + ", przekroczen " + _over + " (najwiecej " + (_maxUse * 100.0).ToString("0.0", Inv) + "% nadwyzki)"
+                     + ", przyciete (indeks ceny rosnie z popytem) " + _trim
                      + " | potkniecia " + _stDay + " (sesja " + _stumbles + ").");
             ClearDay();
         }

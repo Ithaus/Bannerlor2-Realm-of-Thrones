@@ -16,8 +16,12 @@ namespace Armoury
     /// Regula (DECYZJA CLAUDE noc 16.10; wzor zakupu - konie robocze K1-3a, TownFolk.Horses.cs): raz na dobe, po koniach roboczych i dymarkach (kotwica na jutro
     /// policzona, drewno dymarek kupione), kazde miasto z kiesa ludu (Live, osada skalibrowana) potrzebuje FwPer1000 (0.1) ladunku drewna (100 kg) na 1000 glow
     /// kiesy ludu (te same glowy, ktore placa za konia: glowy BK x skala ludzi rynku); latem (pora ekonomii WesterosClimate.Now) x FwSummer (0.5 - gotowanie, bez
-    /// grzania), w zimie (WinterBite.WinterNow - zima ROT) x (1 + czynnik krainy WinterRealm.OfTown: Polnoc 1 = x2, cieple krainy 0.4 = x1.4, Wyspy Letnie 0 = x1).
-    /// Swiat (ok. 1.52 mln glow): ok. 75 ladunkow na dobe latem, ok. 150 wiosna i jesienia, do ok. 300 w zimie. Ulamek - zaokraglenie losowe
+    /// grzania), w zimie (WinterBite.WinterNow - zima ROT) x (1 + czynnik krainy WinterRealm.OfTown x gradient polnocy WinterBite.NorthOf) - POPRAWKA PO RECENZJI
+    /// 16.10: ta sama sila zimy, ktora mnozy kazdy inny skutek zimy (ciecie plonu wsi WinterBite.CutOf: procent x Northness x kraina), nie druga regula na jedno
+    /// zjawisko; czynnik krainy to 1 dla calego Westeros poza cieplymi krainami (WinterWarmRealmFactor 0.4) i Wyspami Letnimi (0), gradient 0.75 (Dorne) - 1.25
+    /// (daleka Polnoc) przy NorthGradientPercent 25: wiekszosc Westeros ok. x1.75-2.25, cieple x1.3-1.5, Wyspy Letnie x1. Pora zima przy wylaczonym
+    /// WinterBiteEnabled - x1 (skutki zimy wylaczone), linia doby mowi to wprost ("zima bez skutkow").
+    /// Swiat (ok. 1.52 mln glow): ok. 75 ladunkow na dobe latem, ok. 150 wiosna i jesienia, ok. 300 w zimie. Ulamek - zaokraglenie losowe
     /// (MBRandom.RoundRandomized), bez pamieci i bez zapisu. Kupuje z polki TEGO miasta tylko drewno ponad zapas rzemiosla (CaravanBulk.TargetFor - ten sam prog,
     /// ponizej ktorego budowy nie biora drewna, K1 BuildWoodAboveCraftStock) i ponad ShelfKeep (5): kuznie, dymarki, warsztaty i deski maja pierwszenstwo; ponad
     /// zapasem opal kupuje przed budowami w kolejnosci doby (latem ok. 75 ladunkow wobec ok. 1 080 budow). Latem, gdy drewna jest tyle, ile rzemioslo potrzebuje,
@@ -42,7 +46,7 @@ namespace Armoury
             var s = Settings.Current;
             bool on = s != null && s.TownFolkFirewood;
             Log.Info("Opal mieszczan (N2-E4): start sesji | klucz TownFolkFirewood " + (on ? "TAK" : "NIE | WYLACZONE (MCM) - drewno tylko w koszyku BK mieszczan, jak dotad")
-                     + " | potrzeba " + FwPer1000.ToString("0.00", Inv) + " ladunku (100 kg) na 1000 glow kiesy ludu na dobe, latem x" + FwSummer.ToString("0.0", Inv) + ", w zimie ROT x (1 + czynnik krainy: Polnoc x2, cieple x1.4, Wyspy Letnie x1)"
+                     + " | potrzeba " + FwPer1000.ToString("0.00", Inv) + " ladunku (100 kg) na 1000 glow kiesy ludu na dobe, latem x" + FwSummer.ToString("0.0", Inv) + ", w zimie ROT x (1 + czynnik krainy x gradient polnocy - jak kazdy skutek zimy: wiekszosc Westeros ok. x1.75-2.25, cieple x1.3-1.5, Wyspy Letnie x1)"
                      + " | tylko drewno ponad zapas rzemiosla miasta (CaravanBulk.TargetFor) i ponad " + ShelfKeep + " szt.; placi kiesa ludu ponad jutrzejszy koszyk, akcyza do gminy, reszta do kasy miasta"
                      + " | kiesa ludu " + (LiveKey ? "czynna" : "NIECZYNNA - brak platnika") + " | potkniecia 0.");
         }
@@ -79,12 +83,18 @@ namespace Armoury
                 }
                 double exc = Math.Max(0f, Math.Min(0.2f, s.TownFolkExcise));
                 bool winter = WinterBite.WinterNow();
-                bool summer = false;
-                if (!winter) { try { summer = WesterosClimate.Now() == CampaignTime.Seasons.Summer; } catch { summer = false; } }
+                // pora ekonomii niezaleznie od WinterBiteEnabled (etykieta linii): zima przy wylaczonych skutkach zimy - x1 i "zima bez skutkow"
+                bool summer = false, winterOff = false;
+                if (!winter)
+                {
+                    try { var se = WesterosClimate.Now(); summer = se == CampaignTime.Seasons.Summer; winterOff = se == CampaignTime.Seasons.Winter; }
+                    catch { summer = false; winterOff = false; }
+                }
                 var el = new EquipmentElement(wood, null, null, false);
                 int towns = 0, noCal = 0, waitShelf = 0, waitPurse = 0, part = 0, winterTowns = 0;
                 double heads = 0, need = 0, realmSum = 0;
                 long want = 0, bought = 0, gold = 0, excise = 0, short0 = 0, kept = 0;
+                long fromPurse = 0, toTowns = 0, toComm = 0;   // obieg zlota liczony osobno: zeszlo z kies klas W/R/P, wplacono do kas miast, do gmin
                 foreach (var f in _fk)
                 {
                     if (f.Kind != 0) continue;
@@ -101,7 +111,7 @@ namespace Armoury
                         double k = summer ? FwSummer : 1.0;
                         if (winter)
                         {
-                            double rf = Math.Max(0.0, Math.Min(1.0, WinterRealm.OfTown(town)));
+                            double rf = Math.Max(0.0, Math.Min(1.0, WinterRealm.OfTown(town))) * Math.Max(0.0, WinterBite.NorthOf(f.St));
                             k = 1.0 + rf; realmSum += rf; winterTowns++;
                         }
                         double x = people / 1000.0 * FwPer1000 * k;
@@ -141,7 +151,8 @@ namespace Armoury
                         if (got < take) short0 += take - got;
                         long ex = (long)Math.Round(cost * exc), kp = cost - ex;
                         f.KW -= _whP[0]; f.KR -= _whP[1]; f.KP -= _whP[2]; f.KG += ex;
-                        if (kp > 0) town.ChangeGold((int)kp);
+                        fromPurse += _whP[0] + _whP[1] + _whP[2]; toComm += ex;
+                        if (kp > 0) { town.ChangeGold((int)kp); toTowns += kp; }
                         _ctlOut += kp; f.PaidKeep += kp; f.LDayOut += cost;
                         bought += got; gold += cost; excise += ex;
                     }
@@ -149,9 +160,10 @@ namespace Armoury
                 }
                 var sb = new StringBuilder(700);
                 sb.Append("Opal mieszczan (N2-E4): dzien ").Append(day).Append(" | CZYNNE | miasta ").Append(towns).Append(": glowy kiesy ludu ").Append(N0(heads))
-                  .Append(" | pora: ").Append(winter ? "ZIMA (x (1 + kraina), srednio x" + F2(winterTowns > 0 ? 1.0 + realmSum / winterTowns : 1.0) + ")" : (summer ? "lato (x" + FwSummer.ToString("0.0", Inv) + ")" : "wiosna albo jesien (x1)"))
+                  .Append(" | pora: ").Append(winter ? "ZIMA (x (1 + kraina x gradient polnocy), srednio x" + F2(winterTowns > 0 ? 1.0 + realmSum / winterTowns : 1.0) + ")"
+                          : (summer ? "lato (x" + FwSummer.ToString("0.0", Inv) + ")" : (winterOff ? "zima bez skutkow (Winter Bite = off, x1)" : "wiosna albo jesien (x1)")))
                   .Append(" | potrzeba ").Append(F2(need)).Append(" ladunkow (po zaokragleniu ").Append(want).Append(")")
-                  .Append(" | kupione i spalone ").Append(bought).Append(" ladunkow za ").Append(gold).Append(" zl (akcyza do gmin ").Append(excise).Append(", do kas miast ").Append(gold - excise).Append(")")
+                  .Append(" | kupione i spalone ").Append(bought).Append(" ladunkow za ").Append(gold).Append(" zl (z kies ludu ").Append(fromPurse).Append(", akcyza do gmin ").Append(toComm).Append(", do kas miast ").Append(toTowns).Append(")")
                   .Append(" | bez opalu dzis ").Append(short0).Append(" ladunkow: polka nie wyzej niz zapas rzemiosla ").Append(waitShelf).Append(" miast, czesciowo ").Append(part)
                   .Append(", za mala kiesa ponad jutrzejszy koszyk ").Append(waitPurse).Append(" miast | drewno zostawione rzemioslu na polkach ").Append(kept)
                   .Append(" | poza regula: miasta nieskalibrowane ").Append(noCal)
