@@ -2488,3 +2488,9 @@ tekstura proporczyka.
 Rano: docs/RAPORT-NOCNY-2026-10-17.md.
 TERMIN: gra gotowa 17.10 10:00 CEST = 01:00 PDT (zegar komp.); ostatnie wgranie do ok. 00:15 PDT, co nie przeszlo testu - nie wgrywac.
 ZMIANA (Jeff ~15:45 PDT): "wszystkie 8 rob, najwyzej bedziesz jeszcze w trakcie jak wstane ... nie przerywal pracy" - zakres ZC0-ZC7 + kalibracja, termin miekki; gdy Jeff gra - bez testow i wgran.
+
+### 62. NOC 16/17 - STAN (ok. 16:05 PDT)
+- ZC0 gotowy: `w-toku/noc-zc0` 1a3278c6 + 6d0eaf48 (2 recenzje bez krytycznych) -> scalony do int **66bda99b** (NIE wgrany; test w paczce 1 razem z ZC1/ZC2).
+- W toku: ZC1 (wf_04b93638-21d, `w-toku/noc-zc1` od c4932168), projekt kalibracji (wf_ef9562a5-85b; po nim dopisac model rece i sprzet), ZC2->ZC6->ZC7 (workflow - nastepny).
+- Paczki testow: (1) ZC0+ZC1+ZC2 120 dob; (2) kalibracja+ZC3+ZC4+ZC5; (3) ZC6+ZC7; (4) koncowy. Skrypty: test/bieg-bitwa.ps1 (-ExtraAdd, -SwitchWaitSec 720), test/wgraj-v5.ps1.
+- Galaz `w-toku/noc-geo` (sonda geografii) NIE scalona - tylko test; dane w roz/geo-dane.
