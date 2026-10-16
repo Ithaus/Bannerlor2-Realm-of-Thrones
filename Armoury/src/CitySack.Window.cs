@@ -87,15 +87,22 @@ namespace Armoury
         /// Nie rzuca (wyjatek = false, zakupy jak dotad).</summary>
         internal static bool NoSpendStay(Settlement st, MobileParty mp)
         {
+            if (!StayWindow(st, mp)) return false;
+            _dBlockStayN++;
+            return true;
+        }
+
+        /// <summary>KA (karczmy, recenzja 16.10): ta sama bramka co NoSpendStay, bez licznika doby postoju - menu karczmy odswiezane co klatke i nocleg to nie doba
+        /// postoju (TownInns: rachunek w menu i zaplata). Nie rzuca (wyjatek = false).</summary>
+        internal static bool StayWindow(Settlement st, MobileParty mp)
+        {
             try
             {
                 if (!NoSpendOn || st == null || mp == null) return false;
                 Ensure();
                 if (_track.Count == 0) return false;
                 Track t;
-                if (!_track.TryGetValue(st, out t) || t == null || t.Kind == KMercy || Now - t.Day0 >= WindowDays || !Sacker(t, mp)) return false;
-                _dBlockStayN++;
-                return true;
+                return _track.TryGetValue(st, out t) && t != null && t.Kind != KMercy && Now - t.Day0 < WindowDays && Sacker(t, mp);
             }
             catch (Exception e) { Stumble("NoSpendStay", e); return false; }
         }

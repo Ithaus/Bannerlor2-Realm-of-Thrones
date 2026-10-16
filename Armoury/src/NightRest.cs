@@ -74,6 +74,34 @@ namespace Armoury
         // (SleepInit; -1 = nie bylo SleepInit w tej sesji - wtedy bez splaty paskiem) oraz liczba switow w tym snie (do linii pobudki). Tylko pamiec.
         private static float _menuNeeded = -1f;
         private static int _menuDebt0, _menuDawns;
+        // KA (16.10, karczmy - TownInns.cs): "Rouse the men early" w osadzie tylko podnosi flage - pobudke robi SleepTick (SwitchToMenu z opcji menu
+        // oczekiwania = CTD, CLAUDE.md 7; ExitToLast w miescie laduje w town_outside - SmithMenu). Tylko pamiec
+        private static bool _rouseAsked;
+
+        /// <summary>KA: gracz spi w menu snu (arm_sleep_wait) - odczyt dla karczm (gojenie w dobrym domu tylko tej nocy).</summary>
+        internal static bool SleepingNow { get { return _sleeping; } }
+        /// <summary>KA: sluzba ROT gracza (o snie decyduje lord) - karczma niedostepna.</summary>
+        internal static bool EnlistedNow { get { return RotEnlisted(); } }
+
+        /// <summary>KA: nocleg oplacony w karczmie (TownInns.Commit, opcja zwyklego menu - SwitchToMenu wolno) - ten sam sen w menu co w obozie.</summary>
+        internal static void BeginInnSleep()
+        {
+            _sleepReturn = "town";
+            GameMenu.SwitchToMenu("arm_sleep_wait");
+        }
+
+        /// <summary>KA: menu osady do powrotu po snie w osadzie (karczma). Recenzja 16.10: oblezona twierdza - menu oblezenia (wzor PlayerArmyWaitBehavior:356).</summary>
+        private static string SettlementMenu(TaleWorlds.CampaignSystem.Settlements.Settlement st)
+        {
+            if (st.IsFortification && st.SiegeEvent != null) return "menu_siege_strategies";
+            return st.IsTown ? "town" : st.IsCastle ? "castle" : "village";
+        }
+
+        /// <summary>KA: cel snu w menu, gdyby gracz polozyl sie teraz (ten sam wzor co SleepInit - _menuTarget). Do przewidywanej pobudki w menu karczmy.</summary>
+        internal static float SleepTargetNow() { return Math.Max(0.5f, NeededHours() - _restTonight); }
+
+        /// <summary>Bezpiecznik snu w menu w godzinach zegara (SleepInit: _sleepUntil) - nikt nie spi wiecznie, ale przy dlugu zegar biegnie dluzej niz sen.</summary>
+        internal static float SleepCapHours() { return Math.Max(14f, NeededHours() * 1.8f + 2f); }
 
         // kary % za dlug 0..3 (Jeff 30.08: juz PIERWSZA zarwana noc boli -25%;
         // morale procentowo przez AddFactor - "spada o 95%", nie o 95 punktow)
@@ -1540,6 +1568,7 @@ namespace Armoury
                 try { clockH = (float)(CampaignTime.Now - _sleepStart).ToHours; } catch { }
                 Log.Info("Nocleg: sen w menu przerwany poza menu snu (menu '" + why + "') - koniec snu: w menu " + F1(_menuRest) + " h (zegara " + F1(clockH)
                          + " h), odpoczynek doby " + F1(_restTonight) + " h, dlug " + Debt + d + ".");
+                TownInns.OnInterrupted(_menuRest, why);   // KA: sen w karczmie przerwany - premia tylko po przespanej bazie (wlasny try)
                 _menuNeeded = -1f; _menuDawns = 0;
             }
             catch (Exception e) { _sleeping = false; Log.Error("NightRest.EndSleepQuiet", e); }
@@ -1662,7 +1691,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
                 int d = DebtFor(mobileParty);
-                if (d < 1) return;
+                if (d < 1)
+                {
+                    // KA (karczmy): wyspany w lozku gracz bez dlugu snu - premia do zmierzchu (TownInns.SpeedBonus; raz na lancuch modeli, jak kara)
+                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostFinal) TownInns.SpeedBonus(ref __result);
+                    return;
+                }
                 if (!SpeedDepth.OutermostFinal) return;          // lancuch modeli (ROT->RB->vanilla): kara tylko raz
                 // kara od WYNIKU (po suficie kolumny MarchPace - nasz postfix
                 // biegnie ostatni), nie od bazy: -25% ma byc widoczne takze
@@ -1687,7 +1721,12 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.NightRestEnabled || mobileParty == null) return;
                 int d = DebtFor(mobileParty);
-                if (d < 1) return;
+                if (d < 1)
+                {
+                    // KA (karczmy): premia morale wyspanego w lozku gracza bez dlugu snu (TownInns.MoraleBonus; raz na lancuch modeli)
+                    if (mobileParty == MobileParty.MainParty && SpeedDepth.OutermostMorale) TownInns.MoraleBonus(ref __result);
+                    return;
+                }
                 if (!SpeedDepth.OutermostMorale) return;         // lancuch modeli morale: kara tylko raz
                 // procentowo ("morale spada o 95%"), nie punktowo - przy zapasci
                 // z bazowego ~50 zostaje ~2-3, ponizej progu dezercji: spiacego
@@ -1986,7 +2025,15 @@ namespace Armoury
                 starter.AddGameMenuOption("arm_sleep_wait", "arm_sleep_stop",
                     "{=!}Rouse the men early",
                     delegate (MenuCallbackArgs a) { a.optionLeaveType = GameMenuOption.LeaveType.Leave; return true; },
-                    delegate (MenuCallbackArgs a) { LeaveSleep(); }, true, 9);
+                    delegate (MenuCallbackArgs a)
+                    {
+                        // KA (karczmy): w osadzie pobudka z ticku snu (flaga) - z opcji menu oczekiwania nie wolno SwitchToMenu, a ExitToLast laduje w town_outside;
+                        // zegar ruszamy sami (ratunek po wczytaniu w srodku menu oczekiwania - wzor SmithMenu "Step away"). Poza osada - jak dotad
+                        var here = MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null;
+                        if (here == null) { LeaveSleep(); return; }
+                        _rouseAsked = true;
+                        try { Campaign.Current.TimeControlMode = CampaignTimeControlMode.StoppablePlay; a.MenuContext.GameMenu.StartWait(); } catch { }
+                    }, true, 9);
 
                 // oboz BannerKings pilnuje wlasnego menu co tick - tam wystarczy STAC
                 starter.AddGameMenuOption("bk_camping_wait_menu", "arm_sleep_bk",
@@ -2042,6 +2089,7 @@ namespace Armoury
                              + (d.Length > 0 ? ", dlug odlozony rozliczony (linia wyzej)" : "") + ".");
                 }
                 catch { }
+                bool innFull = _menuNeeded > 0f && whole + 0.01f >= _menuNeeded;   // KA: pelny pasek - do premii karczmy (TownInns.OnWake nizej)
                 _menuNeeded = -1f; _menuDawns = 0;
                 // ZEGAREK SNU (Jeff 31.08): po pobudce liczby - ile zegara
                 // uplynelo, ile snu sie NALICZYLO (dzien liczy sie slabiej)
@@ -2072,6 +2120,11 @@ namespace Armoury
                     }
                 }
                 catch { }
+                TownInns.OnWake(_menuRest, innFull);   // KA: sen w karczmie - stan "wypoczety" do zmierzchu albo bez premii (wlasny try; poza karczma nic)
+                // KA: sen w osadzie (karczma) - bez namiotu, powrot do menu osady z ticku snu (LeaveSleep w osadzie wola tylko SleepTick - opcja
+                // "Rouse the men early" podnosi tam flage); ExitToLast w miescie niszczy MenuContext i laduje w town_outside (SmithMenu)
+                var here = MobileParty.MainParty != null ? MobileParty.MainParty.CurrentSettlement : null;
+                if (here != null) { GameMenu.SwitchToMenu(SettlementMenu(here)); return; }   // recenzja 16.10: oblezona osada - menu oblezenia (SettlementMenu)
                 // pobudka zwija namiot - chyba ze WLASNY oboz dalej stoi
                 // (wtedy namiot nalezy do obozu, zwinie go "Break camp")
                 if (_sleepReturn != "arm_camp_wait")
@@ -2130,7 +2183,7 @@ namespace Armoury
                 float needed = NeededHours();                  // baza + odsetki dlugu (do 21 h)
                 // bezpiecznik: nikt nie spi wiecznie - ale przy dlugu snu suma
                 // godzin ZEGARA bywa wieksza niz godzin SNU (dzien liczy sie slabiej)
-                _sleepUntil = CampaignTime.HoursFromNow(Math.Max(14f, needed * 1.8f + 2f));
+                _sleepUntil = CampaignTime.HoursFromNow(SleepCapHours());   // max(14, needed x 1.8 + 2) - wzor w SleepCapHours (KA: przewidywana pobudka)
                 bool again = _sleeping;   // noc 15/16.10: ponowne wejscie w menu snu w trakcie tego samego snu (wczytanie zapisu z menu, powrot do menu)
                 _sleeping = true;
                 _sleepStart = CampaignTime.Now;
@@ -2147,13 +2200,52 @@ namespace Armoury
                 _menuTarget = Math.Max(0.5f, needed - _restTonight);
                 int h = CampaignTime.Now.GetHourOfDay;
                 bool night = h >= 21 || h <= 5;
-                MBTextManager.SetTextVariable("ARM_SLEEP_TEXT",
-                    _restTonight >= needed
+                _rouseAsked = false;
+                // KA (karczmy): sen w osadzie po oplaconym noclegu - pobudka nie przed switem (gdy swit w 12 h), tlo miasta, wlasny tekst (null = jak dotad)
+                string inn = TownInns.OnSleepInit(args);
+                MBTextManager.SetTextVariable("ARM_SLEEP_TEXT", inn ??
+                    (_restTonight >= needed
                         ? "The men have already slept their fill today - but a little more never hurt."
-                        : ("The men bed down and sleep" + (night ? "." : " - by daylight the rest comes slower.")));
+                        : ("The men bed down and sleep" + (night ? "." : " - by daylight the rest comes slower."))));
                 args.MenuContext.GameMenu.StartWait();
             }
             catch (Exception e) { Log.Error("NightRest.SleepInit", e); }
+        }
+
+        private static bool _interruptErr;   // pierwszy wyjatek do Log.Error (tick menu - bez zalewu logu)
+
+        /// <summary>
+        /// KA (recenzja 16.10, wniosek z kodu vanilli - nie sprawdzone w grze): sen w menu w osadzie przerwany przez stan gry. Vanilla w czekaniu w miescie co tick
+        /// pyta EncounterGameMenuModel.GetGenericStateMenu (PlayerTownVisitCampaignBehavior:119-122, DefaultEncounterGameMenuModel:254-283) - tylko tak pokazuje
+        /// oblezenie / bitwe pod murami; nasz arm_sleep_wait tego nie robil, wiec gracz spal przez oblezenie (HoldAbed do 12 h) z premia, a pobudka konczyla w zwyklym
+        /// menu "town". Tu: tylko przy zagrozeniu (oblezenie osady, bitwa partii albo osady, cudza armia) - menu ze stanu gry (zwykle menu osady i null - menu
+        /// oblezenia, gdy osada oblezona), koniec snu jak przerwany (EndSleepQuiet: godziny do doby, TownInns.OnInterrupted - premia tylko po przespanej bazie),
+        /// komunikat i SwitchToMenu z ticku (jak vanilla). Bez zagrozenia - nic (zwykly nocleg nie zalezy od cudzych modeli menu).
+        /// </summary>
+        private static bool SettlementInterrupt(Settings s)
+        {
+            try
+            {
+                var mp = MobileParty.MainParty;
+                var here = mp != null ? mp.CurrentSettlement : null;
+                if (here == null) return false;
+                bool siege = here.IsFortification && here.SiegeEvent != null;
+                bool threat = siege || mp.MapEvent != null || (here.Party != null && here.Party.MapEvent != null) || (mp.Army != null && mp.Army.LeaderParty != mp);
+                if (!threat) return false;
+                string g = null;
+                try { g = Campaign.Current.Models.EncounterGameMenuModel.GetGenericStateMenu(); } catch { g = null; }
+                if (string.IsNullOrEmpty(g) || g == "arm_sleep_wait" || g == "town_outside" || g == "castle_outside" || g == "town_wait_menus" || g == "town" || g == "castle")
+                    g = siege ? "menu_siege_strategies" : null;
+                if (g == null) return false;
+                string why = siege ? "oblezenie" : mp.MapEvent != null ? "bitwa druzyny" : here.Party != null && here.Party.MapEvent != null ? "bitwa osady" : "armia";
+                if (_sleeping) EndSleepQuiet(s, "przerwanie w osadzie (" + why + ") -> " + g);
+                else TownInns.OnInterrupted(_menuRest, "przerwanie w osadzie (" + why + ") -> " + g);   // menu snu bez SleepInit (wczytanie) - sam rachunek karczmy
+                Msg(siege ? "While you slept, a host arrived outside the walls - the men are roused." : "Your rest is broken - the men are roused.", Colors.Yellow);
+                Log.Info("Nocleg: sen w osadzie " + here.Name + " przerwany przez stan gry (" + why + ") - menu '" + g + "'.");
+                GameMenu.SwitchToMenu(g);
+                return true;
+            }
+            catch (Exception e) { if (!_interruptErr) { _interruptErr = true; Log.Error("NightRest.SettlementInterrupt", e); } return false; }
         }
 
         private static void SleepTick(MenuCallbackArgs args, CampaignTime dt)
@@ -2161,18 +2253,25 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                // KA (recenzja 16.10): sen w osadzie - przerwania gry jak w czekaniu vanilli (town_wait_menus wola co tick SwitchToMenuIfThereIsAnInterrupt):
+                // oblezenie, bitwa pod murami, armia. Samo rozpoczecie oblezenia menu nie przelacza, a straznik snu reaguje dopiero na zmiane menu
+                if (SettlementInterrupt(s)) { _rouseAsked = false; return; }
+                // KA (karczmy): "Rouse the men early" w osadzie - pobudka tutaj (SwitchToMenu z ticku, wzor vanilla i SmithMenu)
+                if (_rouseAsked) { _rouseAsked = false; LeaveSleep(); return; }
                 // wlasne godziny snu: noc pelna stawka, dzien slabiej - te same
                 // zasady co rachunek doby w OnHourly, ale bez jego zerowania
                 int h = CampaignTime.Now.GetHourOfDay;
                 bool night = h >= 21 || h <= 5;
                 float day = s != null ? MBMath.ClampFloat(s.DayRestFactor, 0.1f, 1f) : 0.5f;
-                _menuRest += (float)dt.ToHours * (night ? 1f : day);
-                if (_menuRest >= _menuTarget || (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f)
+                // KA: w lozku karczmy sen idzie szybciej (wazone liczba ludzi w porzadnej karczmie i dobrym domu, x1.25); poza karczma 1 - jak dotad
+                _menuRest += (float)dt.ToHours * (night ? 1f : day) * TownInns.SleepFactor();
+                // KA: oplacony nocleg - pobudka nie przed switem (TownInns.HoldAbed; bezpiecznik _sleepUntil bez zmian)
+                if ((_menuRest >= _menuTarget && !TownInns.HoldAbed()) || (float)(_sleepUntil - CampaignTime.Now).ToHours <= 0.02f)
                 {
                     LeaveSleep();
                     return;
                 }
-                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(Math.Min(1f, _menuRest / _menuTarget));
+                args.MenuContext.GameMenu.SetProgressOfWaitingInMenu(TownInns.Progress(Math.Min(1f, _menuRest / _menuTarget)));
             }
             catch (Exception e) { Log.Error("NightRest.SleepTick", e); }
         }
