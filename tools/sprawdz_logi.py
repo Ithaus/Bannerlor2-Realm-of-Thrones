@@ -697,7 +697,8 @@ Uzycie (Python 3, tylko odczyt):
                     Poprawki po recenzjach: NE3-2c ksiega kas osad (TM1 srednia 28 dob < 10 000, |TZ1| i |TW1| nie gorzej niz baza), NE3-3 kontrola kas T1 (roznica 0),
                     NE3-5 prog 0.8 tylko dla towarow od >= 0.8, NE3-5b dobowy spadek indeksu w jednym miescie <= 40%, NE3-10 bezpiecznik 0 dob = TAK, 1-20 = DECYZJA,
                     NE3-11 B <= 0.97 x baza, NE3-11c F z ludu rosnie, NE3-14d na stracie z pelnych jukow <= 10%, NE3-16 i NE3-16c2 na liczbie 'wsi bez towaru po W1'.
-                    Strojenie po tescie 120 dob (S1-S3): NE3-5b spadek indeksu w jednym miescie <= 40% w >= 95% dob, NE3-5c na stracie porcjami <= 30% (+0.5 pkt) kazdej
+                    Strojenie po tescie 120 dob (S1-S3): NE3-5b spadek indeksu w jednym miescie od sprzedazy NA STRACIE porcjami <= 40% w >= 95% dob (z zyskiem,
+                    bez wyjscia i stara miara - INFO; log bez pola rodzaju - INFO), NE3-5c na stracie porcjami <= 30% (+0.5 pkt) kazdej
                     doby, NE3-14c przy E3-T2 doplaty notabli do 5000 <= 1.1 x baza (kiesy karawan wobec bazy - INFO), NE3-25 linia E3-T2 (zysk karawan do wlascicieli:
                     w >= 95% dob, kontrola 0, oddane > 0); NE3-8 i NE3-9b bez zmian (korony, karawany <= baza + 0.3 pkt), NE3-14b nachylenie kies karawan <= 10 tys./d.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
@@ -31053,15 +31054,6 @@ def nekon3_main(logp, bdp=None):
         a = N3E_1_DROP.search(s)
         if a:
             drops[x] = float(a.group(1)); dwhere[x] = a.group(2) or ""
-    if drops:
-        xmax = max(drops, key=lambda k: drops[k])
-        over5 = [x for x, v in drops.items() if v > 40.0]
-        okd = (len(drops) - len(over5)) / len(drops) * 100
-        # strojenie po tescie 120 dob (S1): <= 40% w >= 95% dob (dotad kazdej doby; test 02-08-15: ponad 40% w 120 z 121, max 92.7%)
-        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu sprzedanej kategorii w jednym miescie <= 40% w >= 95% dob (T1 nie zbija jednego targu - mediana 97 miast tego nie widzi)",
-                f"max {drops[xmax]:.1f}% (d{xmax}: {dwhere[xmax]}), dob ponad 40% {len(over5)} z {len(drops)} (dob do 40%: {okd:.1f}%)", ">= 95% dob <= 40%", okd >= 95.0)
-    else:
-        rep.add("NE3-5b: spadek indeksu w jednym miescie", "brak pola w linii E3-T1", "INFO (log sprzed poprawek)", None)
     kinds, port = {}, 0
     for x, s in D["t1"].items():
         a = N3E_1_KIND.search(s)
@@ -31070,6 +31062,31 @@ def nekon3_main(logp, bdp=None):
         b = N3E_1_PORT.search(s)
         if b:
             port += int(b.group(1))
+    # poprawki po recenzji strojenia (uwaga powazna): bramka NE3-5b liczy tylko sprzedaz NA STRACIE porcjami (S1, powody 3-5). Sprzedaz z zyskiem ogranicza
+    # wedlug zasady Jeffa tylko prog zysku - w miescie z indeksem 6-10 sama zbija ponad 40% (test 02-08-15: w 72 ze 120 dob najwiekszy spadek konczyl sie
+    # na indeksie >= 1.0, np. Stoney Sept date_fruit 7.94 -> 1.03), a bez wyjscia (rozwiazanie, brak na zold) z zalozenia S1 nie ma porcji - oba INFO.
+    # Stara miara (wszystkie rodzaje sprzedazy) - INFO; log bez pola rodzaju - tylko stara miara jako INFO
+    old5b = ""
+    if drops:
+        xmax = max(drops, key=lambda k: drops[k])
+        over5 = [x for x, v in drops.items() if v > 40.0]
+        okd = (len(drops) - len(over5)) / len(drops) * 100
+        old5b = f"wszystkie rodzaje (stara miara) max {drops[xmax]:.1f}% (d{xmax}: {dwhere[xmax]}), dob ponad 40% {len(over5)} z {len(drops)} (dob do 40%: {okd:.1f}%)"
+    if kinds:
+        n5 = len(kinds)
+        ov5 = [[x for x, v in kinds.items() if v[k] > 40.0] for k in range(3)]
+        xl5 = max(kinds, key=lambda k: kinds[k][1])
+        ok5 = (n5 - len(ov5[1])) / n5 * 100
+        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu kategorii w jednym miescie od sprzedazy NA STRACIE porcjami (S1: juki ponad udzwig, jedzenie psuje sie, "
+                "dlugo w jukach) <= 40% w >= 95% dob; z zyskiem (zasada Jeffa: tylko prog zysku), bez wyjscia (rozwiazanie, brak na zold - bez porcji) i stara miara - INFO",
+                f"na stracie porcjami max {kinds[xl5][1]:.1f}% (d{xl5}), dob ponad 40% {len(ov5[1])} z {n5} (dob do 40%: {ok5:.1f}%) | INFO: z zyskiem max "
+                f"{max(v[0] for v in kinds.values()):.1f}% (dob ponad 40% {len(ov5[0])}), bez wyjscia max {max(v[2] for v in kinds.values()):.1f}% "
+                f"(dob ponad 40% {len(ov5[2])})" + (f"; {old5b}" if old5b else ""), ">= 95% dob <= 40% (na stracie porcjami)", ok5 >= 95.0)
+    elif drops:
+        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu sprzedanej kategorii w jednym miescie (stara miara - wszystkie rodzaje sprzedazy, takze z zyskiem)", old5b,
+                "INFO (log sprzed strojenia S1 - brak pola 'spadek indeksu wedlug rodzaju sprzedazy'; bramka liczy tylko sprzedaz na stracie porcjami)", None)
+    else:
+        rep.add("NE3-5b: spadek indeksu w jednym miescie", "brak pola w linii E3-T1", "INFO (log sprzed poprawek)", None)
     if kinds:
         kl = max(kinds, key=lambda k: kinds[k][1])
         badk = [x for x, v in kinds.items() if v[1] > 30.5]
