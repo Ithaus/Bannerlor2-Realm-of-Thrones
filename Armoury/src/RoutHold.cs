@@ -51,8 +51,10 @@ namespace Armoury
         internal const int SitePanic = 0, SiteDir = 1, SitePosture = 2;
         // NB2 czesc 2: taktyka wedlug dowodcy (WarCouncil), weterani wedlug tieru (VeteranAi), krew przez pancerz (BattleGore), glosy (BattleCries)
         internal const int SiteTactics = 3, SiteVeteran = 4, SiteGore = 5, SiteVoice = 6;
-        private const int Sites = 7;
-        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy" };
+        // NB2 czesc 3 (16.10): kaluze krwi na ziemi (BloodPools)
+        internal const int SitePools = 7;
+        private const int Sites = 8;
+        private static readonly string[] SiteName = { "panika", "kierunek", "postura", "taktyka", "weteran", "krew", "glosy", "kaluze" };
         private const int ErrorsPerSite = 3;      // pelny slad do logu: pierwsze 3 na miejsce w sesji
 
         internal const float RefreshEvery = 4f;   // najkrotszy odstep ponowienia odwrotu - dluzej niz najdluzszy okrzyk Debacle / Fear (3,0 s)
@@ -218,6 +220,7 @@ namespace Armoury
             VeteranAi.ResetCounters();
             BattleGore.ResetCounters();
             BattleCries.ResetCounters();
+            BloodPools.ResetCounters();
         }
 
         /// <summary>Licznik misji dla RoutKeeper (glowny watek): misja zgodna z licznikami.</summary>
@@ -250,7 +253,8 @@ namespace Armoury
             int soldiers = 0;
             for (int i = 1; i < Tiers.Length; i++) soldiers += Tiers[i].Count;
             int broken = Broken + Fled, stum = Sum(Stum);
-            int extra = WarCouncil.Activity + VeteranAi.Activity + BattleGore.Activity + BattleCries.Activity;   // czesc 2 - tylko w bitwach
+            int extra = WarCouncil.Activity + VeteranAi.Activity + BattleGore.Activity + BattleCries.Activity   // czesc 2 - tylko w bitwach
+                        + BloodPools.Activity;                                                                // czesc 3 - kaluze krwi
             // spacer po miescie / wsi / zamku ("inna") bez zlamanych i potkniec - bez linii (straz miasta tez dostaje postury RBM)
             if (_kind == "inna" && broken + stum + extra == 0) return;
             if (_kind == "?" && broken + stum + soldiers + Heroes.Count + extra == 0) return;
@@ -278,6 +282,7 @@ namespace Armoury
             VeteranAi.Append(sb, c);
             BattleGore.Append(sb, c);
             BattleCries.Append(sb, c);
+            BloodPools.Append(sb, c);   // czesc 3 (16.10): kaluze krwi na ziemi - po 'obce glosy'
             sb.Append(" | potkniecia: ");
             for (int i = 0; i < Sites; i++) sb.Append(i > 0 ? ", " : "").Append(SiteName[i]).Append(' ').Append(Stum[i]);
             sb.Append(" (sesja ").Append(Sum(StumSession)).Append(", linia misji ").Append(_lines).Append(").");
@@ -324,6 +329,12 @@ namespace Armoury
               .Append((int)(BattleCries.MoanMin + BattleCries.MoanSpan)).Append(" s do ").Append((int)BattleCries.MoanRange).Append(" m, najwyzej ")
               .Append(BattleCries.MoansPerMan).Append(" na rannego, najwyzej ")
               .Append(BattleCries.MaxPerSecond).Append(" glosow na s)")
+              // czesc 3 (16.10): kaluze krwi na ziemi
+              .Append(" | Ground Blood Pools ").Append(c.GroundBloodPools ? "TAK" : "NIE").Append(" (decale ").Append(BloodPools.DecalSet).Append(" z materialem ")
+              .Append(BloodPools.MaterialPrefix).Append("0..").Append(BloodPools.Materials - 1).Append(", zgon 1-3 kaluze po upadku ciala, nokaut obuchem plama, kon 1-2, plama od ")
+              .Append(BloodPools.SplatMinDamage).Append(" obrazen ciecia / klucia / strzaly ").Append(BloodPools.SplatsPerSecond).Append(" na s; ziemia, woda i pudlo sceny sprawdzane; najwyzej ")
+              .Append(BloodPools.MaxPerMission).Append(" na misje, ").Append(BloodPools.PerSecond).Append(" na s, ").Append(BloodPools.PoolsPerCell)
+              .Append(" kaluze na komorke ").Append(BloodPools.CellSize.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)).Append(" m)")
               .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
         }

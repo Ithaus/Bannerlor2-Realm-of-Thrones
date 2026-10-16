@@ -45,6 +45,9 @@ namespace Armoury
 
         internal static int Activity { get { return _bursts + _limited + _badBone; } }
 
+        /// <summary>RBMCombat czynny w biezacej misji (Begin) - czyta tez BloodPools (czesc 3: bez plamy, gdy RBM daje pot, a Blood Through Armour wylaczone).</summary>
+        internal static bool RbmCombat { get { return _rbmCombat; } }
+
         internal static void Append(StringBuilder sb, Settings c)
         {
             sb.Append(" | krew przez pancerz ").Append(c != null && c.BloodThroughArmour ? "TAK" : "NIE").Append(" (RBMCombat ").Append(_rbmCombat ? "TAK" : "NIE")
@@ -84,7 +87,7 @@ namespace Armoury
         }
 
         /// <summary>Material pancerza czesci ciala - to samo przypisanie co RBM (RealisticWeaponCollision.GetMateirialTypeofHitBodyPart) i gra.</summary>
-        private static ArmorComponent.ArmorMaterialTypes MaterialOf(Agent victim, BoneBodyPartType part)
+        internal static ArmorComponent.ArmorMaterialTypes MaterialOf(Agent victim, BoneBodyPartType part)
         {
             EquipmentIndex idx;
             switch (part)

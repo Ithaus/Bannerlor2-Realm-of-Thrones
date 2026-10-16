@@ -1148,6 +1148,10 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool BloodThroughArmour { get; set; } = true;
 
+        [SettingPropertyBool("Ground Blood Pools", HintText = "blood pools spread on the ground a moment after a man falls in battle, killed or knocked out by a blade or an arrow (a crushing blow leaves less blood than a cut, an arrow less than a blade, a head wound more; a man stunned by a mace or club only a small spot), and under dead horses; a small splat lands where a cut, stab or arrow wound of 30 damage or more gets through armour. They stay until you leave the battlefield. Field battles, sieges and hideouts only - not tournaments, the arena, training or sea battles; none in water, on ladders or on siege towers. At most 600 per battle, 20 a second and 3 pools on the same spot. Off = only the blood of the game and other mods, as before")]
+        [SettingPropertyGroup("Flesh and wind")]
+        public bool GroundBloodPools { get; set; } = true;
+
         [SettingPropertyBool("Battle Cries And Moans", HintText = "AI formations roar a battle cry when they charge, not only when you order a charge: the captain always, his men by tier, morale and his Leadership; badly wounded men (below 30% health) near you moan now and then, at most three times each. Never the same man over and over: one voice per man every 4 seconds (a battle cry every 20), at most 6 voices a second on the field, none in sea battles or sea raids. Off = the game's own voices only, as before")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleCriesAndMoans { get; set; } = true;
@@ -6886,6 +6890,7 @@ namespace Armoury
             s.SoldierPostureTier1Multiplier = SoldierPostureTier1Multiplier;
             s.SoldierPostureTier6Multiplier = SoldierPostureTier6Multiplier;
             s.BloodThroughArmour = BloodThroughArmour;
+            s.GroundBloodPools = GroundBloodPools;
             s.BattleCriesAndMoans = BattleCriesAndMoans;
             s.StaminaRegenPerSecond = StaminaRegenPerSecond;
             s.TiredSpeedFactor = TiredSpeedFactor;

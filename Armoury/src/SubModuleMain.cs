@@ -390,7 +390,7 @@ namespace Armoury
                 // NB2 (16.10): zlamani raz na bitwe (BrokenMen + FieldCraft przez RoutHold.Break) i linia "Bitwa (NB2)" z postura wedlug tieru
                 // czesc 2: linia NB2 takze dla taktyki wedlug dowodcy, weteranow wedlug tieru, krwi przez pancerz i glosow (BattleSense ponizej)
                 bool nb2b = Settings.Current.CommanderTactics || Settings.Current.VeteransByTier || Settings.Current.BloodThroughArmour
-                            || Settings.Current.BattleCriesAndMoans;
+                            || Settings.Current.BattleCriesAndMoans || Settings.Current.GroundBloodPools;   // czesc 3 (16.10): kaluze krwi
                 if (mission != null && ((Settings.Current.BrokenMenNeverRally && (Settings.Current.WoundedFleeEnabled
                         || (Settings.Current.FieldCraftEnabled && Settings.Current.AiFleeWhenNearDeath && Campaign.Current != null)))
                         || Settings.Current.SoldierPostureByTier || nb2b))
