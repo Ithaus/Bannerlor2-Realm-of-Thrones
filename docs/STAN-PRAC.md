@@ -2418,3 +2418,10 @@ Klucze VillageBannerPerHolder, VillageLayoutV5 (false = v4). Test (Armoury-2026-
 Narzedzie testu: autotest-bitwa.ps1 - 0 wygranych i arena zajeta turniejem = UWAGA, nie kod 4.
 UWAGA (do obserwacji): bitwy testowe "mocna" druzyna (2x wrog, czempioni) przegrywa z bandytami (panika 53-58) - porownac z kluczami bitwy wylaczonymi.
 DALEJ: W2 herby kanon GoT + dwie flagi (rycerz + senior) + przysiolki na pustkowiach; W3 zajazdy/plotki; w toku: kaluze krwi, karczmy w miescie.
+
+### 56. WGRANIE 71 (16.10 ok. 12:35 zegara komp.) - kaluze krwi na ziemi (wlasne, z materialem) - START TUTAJ
+W grze: `w-toku/zbior-e8` **76723911** (= `w-toku/noc-wgranie-71`) | Armoury 89a39b28. Kopie *.bak-2026-10-16-wgranie71-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie71-przed.
+= 70 + noc-kaluze (f7c7d40b + aa6edf34 po 2 recenzjach): BloodPools.cs - kaluze przy zgonie / ogluszeniu (1-3, 0.6-1.3 m), plamy przy ranie 30+ przez pancerz; wzor gry
+(NavalDLC ShipWaterEffects: CreateDecal -> SetMaterial -> GetMaterial waznosc -> AddDecalInstance "editor_set" deletable -> Frame), materialy blood_terrain_decal_0..11 sprawdzane
+na starcie misji; sprawdzenie ziemi i wody, zageszczenie na obszar, 600 na misje, 20/s; zdejmowane przy koncu misji. Klucz GroundBloodPools. MoreBloodPoolMod dalej WYL.
+Test (Armoury-2026-10-16_12-25-19.log): 3 bitwy, 88 decali z materialem (12/12, bez materialu 0), 0 ERROR, NBW-13b TAK, 17 progow nbitwa 0 NIE, kod 0 "misje sprawdzone".
