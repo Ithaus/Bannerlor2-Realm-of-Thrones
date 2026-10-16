@@ -2628,6 +2628,13 @@ namespace Armoury
         public bool MenUpgradeOrders = true;               // when soldiers who could carry better kit find no better piece on the stall although their rank allows one, they order it: one order a band a day for the next tier from that town's smiths, at most five pieces, the same order not again for a week (off = no orders, as before). The daily line also tells apart soldiers already at the ceiling of their rank and soldiers held back by an empty stall
         public bool BuildWoodHalfReserve = true;           // with Build Wood Above Craft Stock: where timber is cheap in the town (its price below the usual), building works may buy timber down to half of the stock the smiths and bloomeries need (at least 20 loads) instead of only above all of it; where timber is dear the whole stock stays for the crafts (off = above all of it, as before)
 
+        // --- Daily life, estates and livelihood (measure only) ---
+        // ZC0 (projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 14): POMIAR NA SUCHO - stany z pasm (z ksiegi ludzi), koszyki w kg, Spizarnia, Dostatek (Livelihood)
+        // i dochod na glowe na stan, osade, region, krolestwo i swiat - tylko linie logu "Zycie (ZC0)", "Spizarnia (ZC)" i plik stany-dostatek.csv (DailyLife*.cs);
+        // gra bez zmian. Skala targu sigma - w zapisie (arm_dailylife) przy pierwszym wczytaniu z kluczem, potem nie ruszana. Progi: sprawdz_logi --grupa nzc0.
+        public bool DailyLifeMeasure = true;               // Daily life (a measure only): every day the people of each village and town are reckoned by estate - slaves, peasants, labourers, craftsmen, merchants, gentry and the great houses - with their daily table in kilograms (own fields and the market) and their Livelihood: how many times over they can afford the bare survival basket of bread, pottage, salt and fuel at local prices, for each estate, village, town, district, realm and the whole world, with the income per head. Written to the log and to stany-dostatek.csv only - nothing in the game changes (no coin, goods, prices, prosperity or AI). Off = no measure, as before
+        public int DailyLifeMarketScale = 37;              // with Daily Life Measure: how many real sacks one sack on a market stall stands for in the people's trade (28-73). Taken into the save once, at the first load with Daily Life Measure, and kept for the whole campaign - changing it later does not change a campaign already begun
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

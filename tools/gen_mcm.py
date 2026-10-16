@@ -300,6 +300,8 @@ RANGES = {
     # NB2 (16.10): mnozniki postury szeregowych wedlug tieru - kod przycina do 0.5..1.5 (T1) i 1.0..3.0 (T6) (BattleWind.SoldierMul)
     'SoldierPostureTier1Multiplier': (0.5, 1.5, "0.00"),
     'SoldierPostureTier6Multiplier': (1.0, 3.0, "0.00"),
+    # ZC0 (16.10): skala targu sigma - kod przycina do 28..73 (DailyLife.SigmaFromMcm; widelki projektu rozdz. 4)
+    'DailyLifeMarketScale': (28, 73, "0"),
 }
 
 def gen(module_dir, ns, display):

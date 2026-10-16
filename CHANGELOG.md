@@ -66,6 +66,47 @@
 5. Kolizje [K]: `Settlement.Culture` nie czytana (kraina z pliku); BK tylko jak dotad (majatki / tytul w (a)/(a2)); klany ROT tylko odczyt.
 
 **Status:** DO SPRAWDZENIA (build Release rc=0, "0 Error(s)", 1 stare ostrzezenie CS0169; gen_mcm; nie wgrane; gry nie uruchamiano)
+## 2026-10-16 (zycie codzienne, ZC0, POPRAWKI po recenzji) - DOSTATEK WAZONY LUDZMI, SREDNIA DOCHODU W ZAPISIE, WIES BEZ PRZYCIECIA DOBOWEGO, RACJA NIEWOLNYCH Z KIES R/P; GRA DALEJ BEZ ZMIAN
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-zc0` | **Tor:** M (poprawki po recenzji, bez gry - autotest 120 dob osobno) | **Klucze:** bez nowych (`DailyLifeMeasure`, `DailyLifeMarketScale` jak byly)
+
+**Dla Jeffa (prosto):**
+- Dalej nic w grze sie nie zmienia - to tylko liczenie i log.
+- Dostatek regionu, krolestwa i swiata liczy teraz kazdego czlowieka tak samo (wczesniej mieszczanie wazyli prawie 2 razy wiecej niz chlopi, bo ich koszyk jest drozszy).
+- Srednia dochodu ludzi zapisuje sie w zapisie gry - po wczytaniu Dostatek jest taki sam jak przed zapisem, a nie liczony od jednego dnia. Na swiezym starcie linie przez pierwsze dni pisza "ROZGRZEWKA".
+- We wsi renta, dziesiecina i danina wojenna sa odejmowane kazdego dnia, takze w dni bez powrotu taboru; niewolnych w miescie karmia rzemieslnicy i kupcy (40/60), wiec ich racja nie liczy sie dwa razy.
+
+**Zmiana:**
+- `DailyLife.Livelihood.cs`: region, krolestwo, swiat, Westeros / Essos i stany swiata - srednia D osad wazona LUDZMI (suma Y/K przez sume ludzi; wczesniej suma Y / suma L x K); dochod na glowe = suma Y / ludzie. Wies: gotowka = (do kiesy z utargu - renta - dziesiecina, ktora wyszla z kiesy - danina wojenna) x sigma bez przyciecia dobowego, przyciete do 0 dopiero Y stanu doby (gotowka + plon). Miasto: racja niewolnych (ludzie x K) z Y rzemieslnikow 40% i kupcow + szlachty 60%, najwyzej do zera (reszta "niepokryte" w linii). Miasto bez liczb kiesy tej doby: W/R/P bez wpisu do sredniej (doba brakujaca, nie zero), D z regionu, poza sumami D i dochodu. Straznik NaN / nieskonczonosci w Y, sredniej i Famine.HungerOf (0 / najedzeni 1 i potkniecie). Mediana regionow bez wielkich rodow (dochod rodow 1:1 brutto - nie do progow).
+- `DailyLife.cs`: zapis `arm_dailylife` v2 = sigma + srednia dochodu kazdej osady (`id:dni:7 liczb`, ok. 60 KB, SaveText.Sync w kawalkach; v1 czytany - srednia od nowa); rozgrzewka (polowa osad < 7 dob): linia "ROZGRZEWKA", bez `stany-dostatek.csv` i linii krolestw; plik i krolestwa przy liniach co dobe w dobie podzielnej przez 7 (ten sam rytm po wczytaniu); log wylaczony - bez liczenia; doba bez linii (ciche logi) - tylko srednia dochodu (bez Dostatku i Spizarni); czas bloku bez zapisu linii, pierscien 364 dob; potkniecia: kazdy `catch` przez Stumble (pierwszy do pliku), sluchacze (NoteVillageReturn, nowy NoteVillageLevy) atomowo do licznikow na poczatku doby; Reset czysci slowniki regionow, krolestw, indeksow, konta niewolnych; CSV: kolumna `D_bez_rodow`, uwagi (miasto bez liczb kiesy, rozgrzewka), cudzyslow w nazwach -> apostrof.
+- `DailyLife.Estates.cs`: spis od nowa tylko przy innej liczbie miast, zamkow i wsi (nie wszystkich osad gry); srednia z zapisu do pierwszego spisu; potkniecia RegionFor / StableIncome / Kingdom.
+- `TownFolk`: `ZcVillageTithe` (dziesiecina, ktora wyszla z kiesy wsi tej doby - licznik `ZcTiV` w VillageTithe), metody ZC nad naglowkiem E5/C4 (BreadLine odzyskuje opis). `KingdomTreasury.Levies`: danina wojenna z kiesy wsi -> `DailyLife.NoteVillageLevy` (licznik).
+
+**Progi:** `sprawdz_logi --grupa nzc0`: NZC0-2 ksiega (wsie + miasta) = linia "Ludnosc" tego samego taktu +-0.5% (stara kontrola sumy stanow -> NZC0-2b INFO), NZC0-4 opisany jako kontrola glodu, NZC0-5 takze miasta bez wlasnego D = 0, NZC0-9 doby zgloszone w linii w pliku z N roznymi osadami (para doba, osada), 0 dob "NIE ZAPISANY", odczyt bez cudzyslowow, NZC0-11 uwaga o rodach 1:1 brutto, NZC0-14..16 potrzeba wobec audytu (45 904 t/d +-3%, 0.885 kg/os +-0.02, z pola 76.6% +-2 pkt; DECYZJA), NZC0-17 zapis wczytany ponownie (ta sama doba dwa razy: Dostatek swiata +-3%). Sprawdzone na logach syntetycznych (dobry bieg, brak wiersza, NIE ZAPISANY, miasto bez kiesy, ksiega wobec Ludnosc, wczytanie).
+
+**Ryzyka / uwagi:** zapis +ok. 60 KB (arm_dailylife); podatek wojenny korony od zarobku ludu miast dalej nie odjety (tylko pan, cech, dziesiecina); w miastach z duza niewola (Volantis) racja niewolnych moze zjesc caly dochod R/P (liczba "niepokryte" w linii - do kalibracji ZC6).
+
+## 2026-10-16 (zycie codzienne, ZC0) - POMIAR NA SUCHO: STANY, KOSZYK DNIA W KG, SPIZARNIA, DOSTATEK (LIVELIHOOD); GRA BEZ ZMIAN
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-zc0` (na 1958e987 = WGRANIE 72) | **Tor:** M (paczka ZC0 toru L projektu) | **Klucze:** `DailyLifeMeasure` (tak), `DailyLifeMarketScale` (37, suwak 28-73; w zapisie raz) - `python -I tools/gen_mcm.py`
+
+**Dla Jeffa (prosto):**
+- Nic w grze sie nie zmienia - ani pieniadze, ani towar, ceny, dobrobyt czy decyzje AI. To tylko liczenie i log.
+- Co dobe liczymy, ilu w kazdej wsi i miescie jest niewolnych, chlopow, biedoty, rzemieslnikow, kupcow i szlachty (z naszej ksiegi ludzi, wedlug krainy), plus wielkie rody z bohaterow gry.
+- Ile ludzie jedza w kg (z wlasnego pola i z targu) i ile z tego bylo dzis na polkach - linia "Spizarnia".
+- "Dostatek" (Livelihood): ile razy ludzi stac na koszyk przetrwania (chleb, polewka, sol, opal) po cenach ich targu - na stan, wies, miasto, region, krolestwo i swiat; obok dochod na glowe w zl na rok.
+- Skala targu (1 worek na straganie = 37 prawdziwych) zapisuje sie raz w zapisie gry i juz sie nie zmienia.
+
+**Zmiana:**
+- `Armoury/src/DailyLife.cs` (doba, linie, CSV, zapis sigma `arm_dailylife` przez SaveText.Sync, linia startu sesji), `DailyLife.Estates.cs` (stany: pasma rozdz. 5.2 wedlug kultury z kalibracji i rodzaju osady, pochylenie R i P klasami BK z kalibracji kiesy ludu x clamp 0.7-1.3 - reszta do biedoty / chlopow, suma udzialow 1; konto NIEWOLNI ksiegi do warowni regionu trzymania; wielkie rody = zywi bohaterowie rodow z lennem x 3 po rowno na lenna; region przez `Village.Bound` - poprawka New Ibbish TYLKO w pomiarze: wsie spoza `BoundVillages` warowni liczone do regionu, liczba i ludzie w linii), `DailyLife.Basket.cs` (koszyki 7 stanow x 12 profili krain jak `synteza/bilans_zc.py` - tabele sprawdzone skryptem; udzial z targu; ceny za kg 23 towarow w miastach: wartosc x indeks kategorii; koszyk przetrwania Allena: miasto z opalem, wies u bramy 0.6 x), `DailyLife.Livelihood.cs` (Y stanow: lud miast - zarobek okna klas W/R/P kiesy czynnej netto od pana, cechu i dziesieciny x sigma; podzamcze - rzemieslnicy wsi zamku; wies - utarg taborow do kiesy wsi minus renta wsi x sigma, majatki BK x sigma, plon zjedzony z pola x czesc najedzona (Famine) x cena u bramy; niewolni D = 1; rody - D rodu 1:1; srednia biezaca do 28 dob, pamiec sesji; D osady / regionu / krolestwa / swiata, mediana chlopow wsi; Spizarnia: potrzeba, z pola (x najedzeni), z targu, towar ludu doby z ksiegi towarow x sigma, dwory 1:1, brak).
+- Odczyty bez zmiany gry: `TownFolk` (`ZcEarnNet`, `ZcBkHeads`, migawka zarobku okna klas `ZcE` w TownLive / CastleLiveDay), `GoodsLedger.CivilEaten` (kopia zuzycia doby: mieszczanie, wsie, dwory), `PeopleBook.ThrallsByHold`, `MoneyLedger.OnAfterEntered` -> `DailyLife.NoteVillageReturn` (licznik gotowki wsi i majatkow BK).
+- `ArmouryBehavior`: Reset, SyncData `arm_dailylife`, linia startu sesji, doba po VineOlive.Daily (po TownFolk, GoodsLedger, Famine, PopulationLaw, ClanIncomeBook, ThrallLaw).
+
+**Linie logu:** "Zycie (ZC0): start sesji", "Zycie (ZC0): dzien N" (ksiega i stany z kontrola roznicy, wielkie rody, udzialy swiata / Westeros / Essos, Dostatek swiata i stanow, dochod na glowe, koszyk przetrwania, D policzone N/N osad, regiony min / mediana / max, wejscia doby, pochylenie BK, New Ibbish, czas ms z mediana sesji, potkniecia), "Spizarnia (ZC): dzien N" (potrzeba stale i napoje, z pola i domu / z targu = potrzeba %, targ dzis, brak, 13 grup), co 7 dob "Zycie (ZC0) - krolestwa" i `stany-dostatek.csv` (wiersz na osade). Ciche logi NW: w grze co N dob, w autotescie codziennie; liczenie codziennie.
+
+**Progi:** `python -I tools/sprawdz_logi.py --grupa nzc0 <Armoury-*.log> [--baza-doby <log bazy>]` - NZC0-0..13 (linie kazdej doby, suma stanow = ksiega +-0, udzialy swiata +-1 pkt od rozdz. 5.3, z pola + z targu = potrzeba +-5%, D dla wszystkich osad, mediana czasu <= 5 ms, potkniecia i ERROR 0, sigma stala, CSV wiersz na osade z D, ksiega towarow +-2% bazy, INFO). Symulacja udzialow z ludnosc.tsv: niewolni 10.90, chlopi 71.09, biedota 8.18, rzemieslnicy 6.92, kupcy 1.44, szlachta 1.47 (projekt 10.9 / 71.1 / 8.2 / 6.9 / 1.4 / 1.5).
+
+**Ryzyka / uwagi:** Dostatek to pierwszy pomiar (kalibracja progow po ZC0 - projekt ryzyko 7); zold 1:1 w kiesie 1:37 zawyza D miast garnizonowych (ryzyko 6); podatek wojenny, korona i czynsz gruntowy nie odjete od zarobku ludu miast (tylko pan, cech, dziesiecina); kiesa ludu nieczynna - miasta bez gotowki (licznik "bez liczb kiesy").
 
 ## 2026-10-16 (bitwa, czesc 3, POPRAWKI po recenzji kaluz) - KALUZE TYLKO NA ZIEMI (NIE NA DRABINIE, MURZE, WIEZY, W WODZIE), PO UPADKU CIALA, WEDLUG CIOSU; KOMORKI 1.75 M; BRAMA WSPOLRZEDNYCH PRZED SILNIKIEM; RENDERER W KAZDYM TICKU; NBW-13b TAK / NIE
 

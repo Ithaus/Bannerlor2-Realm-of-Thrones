@@ -6620,6 +6620,14 @@ namespace Armoury
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool BuildWoodHalfReserve { get; set; } = true;
 
+        [SettingPropertyBool("Daily Life Measure", HintText = "Daily life (a measure only): every day the people of each village and town are reckoned by estate - slaves, peasants, labourers, craftsmen, merchants, gentry and the great houses - with their daily table in kilograms (own fields and the market) and their Livelihood: how many times over they can afford the bare survival basket of bread, pottage, salt and fuel at local prices, for each estate, village, town, district, realm and the whole world, with the income per head. Written to the log and to stany-dostatek.csv only - nothing in the game changes (no coin, goods, prices, prosperity or AI). Off = no measure, as before")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public bool DailyLifeMeasure { get; set; } = true;
+
+        [SettingPropertyInteger("Daily Life Market Scale", 28, 73, "0", HintText = "with Daily Life Measure: how many real sacks one sack on a market stall stands for in the people's trade (28-73). Taken into the save once, at the first load with Daily Life Measure, and kept for the whole campaign - changing it later does not change a campaign already begun")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public int DailyLifeMarketScale { get; set; } = 37;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8274,6 +8282,8 @@ namespace Armoury
             s.CrownCourtShare = CrownCourtShare;
             s.MenUpgradeOrders = MenUpgradeOrders;
             s.BuildWoodHalfReserve = BuildWoodHalfReserve;
+            s.DailyLifeMeasure = DailyLifeMeasure;
+            s.DailyLifeMarketScale = DailyLifeMarketScale;
         }
 
         internal static void Apply()

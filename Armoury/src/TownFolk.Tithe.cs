@@ -163,6 +163,7 @@ namespace Armoury
                     int had = vil.Gold;
                     vil.ChangeGold(-(int)build);
                     long got = Math.Max(0, had - vil.Gold);
+                    f.ZcTiV = got; f.ZcTiDay = _liveDay;                          // ZC0 (DailyLife): dziesiecina, ktora wyszla z kiesy wsi tej doby - tylko licznik
                     if (got < build) d.TiNoMarket += build - got;                  // czego kiesa nie oddala - zostalo w niej (linia: suma = przez kaplanow)
                     if (got <= 0) continue;
                     long wage = (long)Math.Round(got * TitheWage), mat = got - wage;
