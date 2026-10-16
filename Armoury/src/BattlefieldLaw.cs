@@ -605,14 +605,15 @@ namespace Armoury
                 if (!ReferenceEquals(m, _killMission)) { _killMission = m; _killsHero = 0; _killsTroop = 0; }
                 if (agentState != AgentState.Killed && agentState != AgentState.Unconscious) return;
                 if (affectedAgent == null || !affectedAgent.IsHuman || affectorAgent == null) return;
-                if (m.PlayerTeam == null || affectedAgent.Team == null || !affectedAgent.Team.IsEnemyOf(m.PlayerTeam)) return;
+                // NM: powalony bez waznej druzyny (Team.Invalid) - pominiety i liczony; obie druzyny wazne przed natywnym IsEnemy
+                if (MissionTeams.Skip(affectedAgent, MissionTeams.Kill) || !MissionTeams.Enemies(affectedAgent.Team, m.PlayerTeam)) return;
                 var a = affectorAgent;
                 if (a.IsMount && a.RiderAgent != null) a = a.RiderAgent;   // stratowany przez konia - liczy sie jezdziec
                 if (a == Agent.Main) { _killsHero++; return; }
                 if (!IsMainPartyAgent(a)) return;                             // sojusznicy - ich lup
                 if (a.IsHero) _killsHero++; else _killsTroop++;
             }
-            catch { }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Kill, "BattlefieldLaw.CountKill", e); }   // NM: dotad cichy catch gubil zliczenie
         }
 
         private static int PlayerSharePercent()

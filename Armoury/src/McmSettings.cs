@@ -1208,6 +1208,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool WoundedFleeWithoutPlayer { get; set; } = true;
 
+        [SettingPropertyBool("Wounded Flee Battles Only", HintText = "the wounded break and run (Wounded Flee and AI Flee When Near Death) only in real battles on the map - tournament, arena and brawl fighters fight on to the knock-out, as the game itself intends")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool WoundedFleeBattlesOnly { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Auto Parry Full Diff", 0.00f, 100.00f, "0.00", HintText = "your lead IS your chance: each point of skill lead gives (100 / this) % odds per swing, certain at this many points (25 = 4% a point: 13 pts -> 52%, 1 pt -> 4%)")]
         [SettingPropertyGroup("The master's parry")]
         public float AutoParryFullDiff { get; set; } = 25f;
@@ -6517,6 +6521,7 @@ namespace Armoury
             s.WoundedFleeHeroes = WoundedFleeHeroes;
             s.WoundedFleeEnemiesOnly = WoundedFleeEnemiesOnly;
             s.WoundedFleeWithoutPlayer = WoundedFleeWithoutPlayer;
+            s.WoundedFleeBattlesOnly = WoundedFleeBattlesOnly;
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;

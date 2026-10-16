@@ -50,15 +50,28 @@ namespace Armoury
                 if (s == null || !s.HideoutAlarmEnabled) return;
                 if (affectedAgent == null || affectorAgent == null || affectedAgent == affectorAgent) return;
                 if (!affectedAgent.IsHuman) return;
-                if (affectedAgent.Team == null || affectorAgent.Team == null) return;
-                if (!affectedAgent.Team.IsEnemyOf(affectorAgent.Team)) return;
+                // NM: obie druzyny wazne (widz pojedynku z hersztem ma Team.Invalid - natywne IsEnemy na nim sie wywraca)
+                if (!MissionTeams.Enemies(affectedAgent.Team, affectorAgent.Team)) return;
                 if (blow.InflictedDamage <= 0) return;
                 // pada od TEGO ciosu - o alarmie zdecyduja swiadkowie (OnAgentRemoved)
                 if (affectedAgent.Health <= 0f) return;
 
                 AlarmAround(affectedAgent, s.HideoutAlarmScreamRadius, s.HideoutAlarmScreamRadius);
             }
-            catch (Exception e) { Log.Error("HideoutAlarm.OnAgentHit", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Alarm, "HideoutAlarm.OnAgentHit", e); }
+        }
+
+        // NM: liczniki misji od poczatku misji; jedna linia "Druzyny w misji (NM)" po misji
+        public override void AfterStart()
+        {
+            try { MissionTeams.Begin(Mission); } catch { }
+            base.AfterStart();
+        }
+
+        protected override void OnEndMission()
+        {
+            try { MissionTeams.Flush(Mission); } catch { }
+            base.OnEndMission();
         }
 
         public override void OnAgentRemoved(Agent affectedAgent, Agent affectorAgent, AgentState agentState, KillingBlow blow)
@@ -69,14 +82,13 @@ namespace Armoury
                 if (s == null || !s.HideoutAlarmEnabled) return;
                 if (affectedAgent == null || affectorAgent == null || !affectedAgent.IsHuman) return;
                 if (agentState != AgentState.Killed && agentState != AgentState.Unconscious) return;
-                if (affectedAgent.Team == null || affectorAgent.Team == null) return;
-                if (!affectedAgent.Team.IsEnemyOf(affectorAgent.Team)) return;
+                if (!MissionTeams.Enemies(affectedAgent.Team, affectorAgent.Team)) return;   // NM: obie druzyny wazne
 
                 // czysta likwidacja: tylko swiadkowie przy ciele; nikogo = cisza,
                 // ale SWIADEK krzyczy juz pelnym glosem i uruchamia sztafete
                 AlarmAround(affectedAgent, s.HideoutAlarmWitnessRadius, s.HideoutAlarmScreamRadius);
             }
-            catch (Exception e) { Log.Error("HideoutAlarm.OnAgentRemoved", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Alarm, "HideoutAlarm.OnAgentRemoved", e); }
         }
 
         // ------------------------------------------------- halas krokow
@@ -113,7 +125,7 @@ namespace Armoury
                     CautionAround(a, radius + kg * MathF.Max(0f, s.HideoutNoisePerArmorKg));
                 }
             }
-            catch (Exception e) { Log.Error("HideoutAlarm.Noise", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Alarm, "HideoutAlarm.Noise", e); }
         }
 
         /// <summary>
@@ -128,18 +140,19 @@ namespace Armoury
             try
             {
                 var m = Mission;
-                if (m == null || m.PlayerTeam == null || radius <= 0f) return;
+                if (m == null || !MissionTeams.Valid(m.PlayerTeam) || radius <= 0f) return;
                 var point = noisy.Position;
                 foreach (var a in m.Agents)
                 {
                     if (a == null || !a.IsHuman || !a.IsActive()) continue;
-                    if (a.Team == null || !a.Team.IsEnemyOf(m.PlayerTeam)) continue;
+                    // NM: widz bez druzyny (Team.Invalid) pominiety i liczony
+                    if (MissionTeams.Skip(a, MissionTeams.Alarm) || !MissionTeams.Enemies(a.Team, m.PlayerTeam)) continue;
                     if (a.CurrentWatchState != Agent.WatchState.Patrolling) continue;   // czujnego nie cofamy
                     if (a.Position.Distance(point) > radius) continue;
                     a.SetAlarmState(Agent.AIStateFlag.Cautious);
                 }
             }
-            catch (Exception e) { Log.Error("HideoutAlarm.CautionAround", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Alarm, "HideoutAlarm.CautionAround", e); }
         }
 
         /// <summary>
@@ -154,7 +167,7 @@ namespace Armoury
             try
             {
                 var m = Mission;
-                if (m == null || m.PlayerTeam == null || firstRadius <= 0f) return;
+                if (m == null || !MissionTeams.Valid(m.PlayerTeam) || firstRadius <= 0f) return;
                 var s = Settings.Current;
                 bool relay = s != null && s.HideoutAlarmRelay && relayRadius > 0f;
 
@@ -169,7 +182,8 @@ namespace Armoury
                     foreach (var a in m.Agents)
                     {
                         if (a == null || a == victim || !a.IsHuman || !a.IsActive()) continue;
-                        if (a.Team == null || !a.Team.IsEnemyOf(m.PlayerTeam)) continue;
+                        // NM: widz pojedynku z hersztem (Team.Invalid) nie slyszy alarmu - gra trzyma go na stalej pozycji
+                        if (MissionTeams.Skip(a, MissionTeams.Alarm) || !MissionTeams.Enemies(a.Team, m.PlayerTeam)) continue;
                         if (a.CurrentWatchState == Agent.WatchState.Alarmed) continue;   // juz krzyczal
                         bool inRange = false;
                         foreach (var p in wave)
@@ -198,7 +212,7 @@ namespace Armoury
                     Log.Info("HideoutAlarm: alarm obudzil " + woken + " zbojcow w " + rings + " kregach (start "
                              + (int)firstRadius + " m, sztafeta " + (int)relayRadius + " m).");
             }
-            catch (Exception e) { Log.Error("HideoutAlarm.AlarmAround", e); }
+            catch (Exception e) { MissionTeams.Stumble(MissionTeams.Alarm, "HideoutAlarm.AlarmAround", e); }
         }
     }
 }

@@ -391,6 +391,7 @@ namespace Armoury
         public bool WoundedFleeHeroes = false;             // heroes and companions break too (off: captains hold their ground)
         public bool WoundedFleeEnemiesOnly = false;        // only the enemy breaks (off: every man on the field, both sides)
         public bool WoundedFleeWithoutPlayer = true;       // also in battles the player is not personally fighting
+        public bool WoundedFleeBattlesOnly = true;         // the wounded break and run (Wounded Flee and AI Flee When Near Death) only in real battles on the map - tournament, arena and brawl fighters fight on to the knock-out, as the game itself intends
         public float AutoParryFullDiff = 25f;              // your lead IS your chance: each point of skill lead gives (100 / this) % odds per swing, certain at this many points (25 = 4% a point: 13 pts -> 52%, 1 pt -> 4%)
         public bool AutoParryTwoHandedOnly = true;         // the master's parry works only with two-handed blades (off = any melee weapon)
         public bool AutoParryMirrorSides = true;           // side swings block mirror-wise (his left = your right) - flip if blocks feel wrong-sided
