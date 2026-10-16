@@ -2494,3 +2494,4 @@ ZMIANA (Jeff ~15:45 PDT): "wszystkie 8 rob, najwyzej bedziesz jeszcze w trakcie 
 - W toku: ZC1 (wf_04b93638-21d, `w-toku/noc-zc1` od c4932168), projekt kalibracji (wf_ef9562a5-85b; po nim dopisac model rece i sprzet), ZC2->ZC6->ZC7 (workflow - nastepny).
 - Paczki testow: (1) ZC0+ZC1+ZC2 120 dob; (2) kalibracja+ZC3+ZC4+ZC5; (3) ZC6+ZC7; (4) koncowy. Skrypty: test/bieg-bitwa.ps1 (-ExtraAdd, -SwitchWaitSec 720), test/wgraj-v5.ps1.
 - Galaz `w-toku/noc-geo` (sonda geografii) NIE scalona - tylko test; dane w roz/geo-dane.
+- 16:10 PDT: workflow ZC2->ZC6->ZC7 wf_347c8b21-ebe (galaz w-toku/noc-zc267, worktree zb/n-zc267 od 66bda99b). Nastepny: po kalibracji (wf_ef9562a5-85b) workflow KS+ZC3+ZC4+ZC5 od int (po ZC1).
