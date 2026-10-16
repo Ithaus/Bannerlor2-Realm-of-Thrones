@@ -728,6 +728,10 @@ Uzycie (Python 3, tylko odczyt):
                     wczytania), NB-3c/3d trafienia
                     i odcinki rozbite; F1: NB-4a okup "szturm bez zdobycia" przy przewadze >= progu 0, NB-4b (INFO); AR: NB-5a NotEnoughParty w dniu
                     zalozenia <= 2/dobe, NB-5b (INFO), NB-6a wezwania AI BK pominiete > 0, NB-6b (INFO); NB-7 potkniecia i ERROR 0; NB-8 CEL (INFO).
+                    TB2 (noc 16.10, galaz w-toku/noc-tb2, klucz SiegeTrebuchetEarly): NB-9a linia startowa, NB-9b linia doby TB2 >= 90% dob, NB-9c pierwszy
+                    trebusz w 1. dobie >= 80% nowych znacznikow TB miast, NB-9d pozniejsze tylko w oblezeniach sprzed wczytania, NB-9e trebusz w tempie zamku
+                    > 0, NB-9f szturm MB "wyrwa" tylko przy wyrwie, NB-9g trebusze AI zbudowane > 0 (>= 25 dob), NB-9h CEL miasto zdobyte >= 1 (>= 5 KO miast),
+                    NB-9i ERROR miejsc TB2 0 i liczniki przy kluczu "nie" 0.
 --grupa oblezenia : (14.10, PROJEKT-WYBRANY OB1-OB4 z decyzjami Jeffa 14.10; galaz w-toku/oblezenia) python -I tools/sprawdz_logi.py --grupa oblezenia <Armoury-*.log>
                     (log czytany strumieniowo). OB-0 linia startowa i OB0 kazdej doby, OB-1a decyzja AI przy s OB1 <= 1 = 0, OB-1d decyzja AI bez taranu
                     i wiezy i bez wyrwy = 0 (brama), OB-1b weta (INFO), OB-1c AI bije
@@ -27006,6 +27010,17 @@ NB_179_SUM = re.compile(r"wezwania BK \(od wczoraj\) (\d+) \(do pana (\d+), do w
 NB_179_BAN = re.compile(r"\| wezwania AI BK: przepuszczone (\d+), pominiete (\d+) \(SCA przerwa (\d+), SCA slaby wodz (\d+), bez druzyn wasali (\d+)\)( - WYLACZONE)?")
 NB_ERR = ("ERROR in SiegeWalls2.O3.", "ERROR in GentryService.BannersPrefix", "ERROR in GentryService.BanResolve", "ERROR in GentryService.ScaResolve",
           "ERROR in BesiegedRelief.ReliefOnWay", "ArmyCohesionYear.OnDispersed.Who")
+# TB2 (noc 16.10, galaz w-toku/noc-tb2, klucz SiegeTrebuchetEarly): trebusz od 1. doby, trebusz bez klasy OB4, szturm przez wyrwe (NB-9..)
+NB_TB2_START = re.compile(r"^Trebusz wczesnie \(TB2, start\): klucz SiegeTrebuchetEarly (tak|nie) \| .*?\(wymaga trebusze TB (tak|nie); zamek bez zmian\)"
+                          r" \| \(b\) trebusz bez klasy twierdzy OB4 \(OB4 (\d+)%, miasto x([\d.]+), stolica x([\d.]+) - .*?\(wymaga MB (tak|nie)\) \| log (tak|nie)\.$")
+NB_TB2_DAY = re.compile(r"^Trebusz wczesnie \(TB2, doba\): dzien (\d+) \| klucz (tak|nie) \| \(a\) trebusze zaczete przed gotowym obozem (\d+) \(pierwsze w oblezeniu:"
+                        r" w 1\. dobie oblezenia (\d+), pozniej (\d+), najpozniej ([\d.]+) dob od poczatku oblezenia\) \| \(b\) obozy z trebuszem w tempie zamku (\d+)"
+                        r" \(w tym gracz (\d+)\) \| \(c\) szturmy przez wyrwe bez czekania na machiny (\d+)\.$")
+NB_TB2_MARK = re.compile(r"\| oboz gotowy (tak|nie), oblezenie ([\d.]+) dob \|")
+NB_TB2_MB = re.compile(r"^Szturm bez czekania na machiny \(MB\): dzien (\d+) \| osada (\S+) .*?\| powod: (\S+) \| taran (tak|nie), wieza (tak|nie), wyrwa (tak|nie),")
+NB_TB2_KO = re.compile(r"najslabszy (\d+)%, taran (tak|nie), wieza (tak|nie), trebusze (\d+)")
+NB_TB2_ERR = ("ERROR in SiegeWalls2.ActionPost", "ERROR in SiegeWalls2.BuildPre", "ERROR in SiegeWalls2.BuildPost", "ERROR in SiegeWalls2.Unblock",
+              "ERROR in SiegeWalls2.NoteTrebPace", "ERROR in SiegeWalls2.DailyTb2", "ERROR in SiegeWalls2.SessionStartTb2", "ERROR in SiegeWalls.PrepFactor")
 
 
 def nobl_main(logp):
@@ -27020,6 +27035,11 @@ def nobl_main(logp):
     przewadze oblegajacy / obroncy w pelni >= prog + 0.05 = 0, NB-4b czekanie na nastepny szturm (INFO). AR: NB-5a NotEnoughParty w dniu zalozenia srednio <= 2 na dobe
     (>= 10 dob z dopiskiem; baza 14.1/dobe), NB-5b armie AI srednio (INFO, baza 9.4), NB-6a wezwania AI BK pominiete > 0 (>= 10 dob), NB-6b wezwania BK i powroty
     rycerzy (INFO, baza ok. 35 / 36 na dobe). NB-7 potkniecia (doba) 0 i ERROR nowych miejsc 0. NB-8 CEL (INFO): zdobycia wedlug klasy, szturmy przez wyrwe.
+    TB2 (noc 16.10, klucz SiegeTrebuchetEarly; linie 'Trebusz wczesnie (TB2, start / doba)'): NB-9a linia startowa, NB-9b linia doby w >= 90% dob 'Oblezenia 2 (doba)',
+    NB-9c (a) pierwsze trebusze w 1. dobie >= 80% nowych znacznikow 'Trebusze AI (TB)' miast i stolic z 'oboz gotowy nie' i oblezeniem < 1 doby (>= 3), NB-9d (a) pierwsze
+    pozniej niz w 1. dobie <= znaczniki TB miast w wieku >= 1 doby (oblezenia sprzed wczytania), NB-9e (b) obozy z trebuszem w tempie zamku > 0 przy pierwszych
+    trebuszach i klasie > 1, NB-9f (c) linie MB 'powod: wyrwa' tylko z 'wyrwa tak', licznik doby >= linii, przy kluczu wylaczonym 0, NB-9g trebusze AI zbudowane > 0
+    (>= 3 pierwsze trebusze, >= 25 dob), NB-9h CEL miasta / stolice zdobyte >= 1 przy >= 5 KO miast, NB-9i ERROR miejsc TB2 0 i liczniki TB2 przy kluczu 'nie' 0.
     Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -27030,13 +27050,45 @@ def nobl_main(logp):
     o2days = set()
     old = [0]   # bezpiecznik F2: godziny mysli wodza / SCA w bitwie ponad 96 h (linia doby)
     errs = {k: 0 for k in NB_ERR}
+    # TB2: start, doba, znaczniki TB, linie MB, (zaczete, zbudowane) z 'Oblezenia 2 (doba)'
+    tb2s, tb2d, tbm, mbl, o2built = [], {}, [], [], {}
+    errs2 = {k: 0 for k in NB_TB2_ERR}
     keys = ("Oblezenia 3 (", "Koniec oblezenia (KO)", "Szturm do konca (SK)", "Bitwa szturmu (SZ): dzien", "Odsiecz (OB5) koniec", "Okup oblezenia (O0)",
-            "Spojnosc armii (AC): dzien", "Rycerze (179): dzien", "Oblezenia 2 (doba)", "Oblezenia 2 (zdobycie)") + NB_ERR
+            "Spojnosc armii (AC): dzien", "Rycerze (179): dzien", "Oblezenia 2 (doba)", "Oblezenia 2 (zdobycie)") + NB_ERR \
+        + ("Trebusz wczesnie (TB2", "Trebusze AI (TB)", "Szturm bez czekania na machiny (MB)") + NB_TB2_ERR
     with open(logp, encoding="utf-8", errors="replace") as f:
         for ln in f:
             if not any(k in ln for k in keys):
                 continue
             s = O2_TS.sub("", ln.rstrip("\r\n"))
+            hit2 = False
+            for k in NB_TB2_ERR:
+                if k in s:
+                    errs2[k] += 1
+                    hit2 = True
+            if hit2:
+                continue
+            if s.startswith("Trebusz wczesnie (TB2"):
+                m = NB_TB2_START.match(s)
+                if m:
+                    tb2s.append(m.groups())
+                    continue
+                m = NB_TB2_DAY.match(s)
+                if m:
+                    g = m.groups()
+                    tb2d[int(g[0])] = dict(on=g[1] == "tak", early=int(g[2]), f1=int(g[3]), flate=int(g[4]), fmax=float(g[5]), pace=int(g[6]), pacep=int(g[7]), gap=int(g[8]))
+                continue
+            if s.startswith("Trebusze AI (TB)"):
+                m = O2_TB.match(s)
+                mk = NB_TB2_MARK.search(s)
+                if m and mk:
+                    tbm.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(3), ready=mk.group(1) == "tak", age=float(mk.group(2))))
+                continue
+            if s.startswith("Szturm bez czekania na machiny (MB)"):
+                m = NB_TB2_MB.match(s)
+                if m:
+                    mbl.append(dict(d=int(m.group(1)), st=m.group(2), why=m.group(3), gap=m.group(6) == "tak"))
+                continue
             hit = False
             for k in NB_ERR:
                 if k in s:
@@ -27057,8 +27109,10 @@ def nobl_main(logp):
                 continue
             m = NB_KO.match(s)
             if m:
+                mw = NB_TB2_KO.search(s)   # TB2 (NB-9h): najslabszy odcinek i trebusze przy koncu
                 kos.append(dict(d=int(m.group(1)), st=m.group(2), cls=m.group(4), why=m.group(10), other=m.group(11) or "", abort=m.group(12) == "tak",
-                                rule=m.group(13), rep=int(m.group(14)), player=m.group(15) == "tak"))
+                                rule=m.group(13), rep=int(m.group(14)), player=m.group(15) == "tak",
+                                weak=int(mw.group(1)) if mw else None, treb=int(mw.group(4)) if mw else None))
                 continue
             m = NB_SK.match(s)
             if m:
@@ -27098,6 +27152,9 @@ def nobl_main(logp):
                 m = O2_DAY.match(s)
                 if m:
                     o2days.add(int(m.group(1)))
+                    mt = O2_D["tb"].search(s)   # TB2 (NB-9g): druga ekipa zaczete trebusze, trebusze AI zbudowane
+                    if mt:
+                        o2built[int(m.group(1))] = (int(mt.group(10)), int(mt.group(13)))
                 continue
             m = O2_CAPT.match(s)
             if m:
@@ -27237,6 +27294,66 @@ def nobl_main(logp):
     span = (dl[-1] - dl[0] + 1) if dl else 0
     rep.add("NB-8: CEL - zdobycia i szturmy przez wyrwe (INFO)", f"zdobyte szturmem: zamki {cz}, miasta ze stolicami {ct} na {span} dob (linii 'Oblezenia 2 (zdobycie)' {len(capl)}, w tym pod murami {sum(1 for c in capl if not c['assault'])}); bitwy szturmu AI w trybie 'wyrwa' {br}",
             "INFO (bieg 60 dob: zamki >= baza Jeffa 3 w 110 dob, co najmniej jedno miasto albo jeden szturm przez wyrwe)", None)
+    # ---- NB-9.. TB2 (noc 16.10, galaz w-toku/noc-tb2, klucz SiegeTrebuchetEarly): (a) trebusz od 1. doby, (b) trebusz bez klasy OB4, (c) szturm przez wyrwe
+    t0 = tb2s[-1] if tb2s else None
+    tb2_on = t0 is not None and t0[0] == "tak"
+    tb_on = t0 is not None and t0[1] == "tak"
+    rep.add("NB-9a: linia startowa TB2 (klucz SiegeTrebuchetEarly)",
+            f"linii {len(tb2s)}; klucz {t0[0]}, trebusze TB {t0[1]}, OB4 {t0[2]}% (miasto x{t0[3]}, stolica x{t0[4]}), MB {t0[5]}, log {t0[6]}" if t0 else "brak (log bez paczki TB2 albo od srodka sesji)",
+            "jest (a dziala przy TB tak, c przy MB tak)", True if t0 else None)
+    tdl = sorted(tb2d)
+    cov2 = len(o2days & set(tdl))
+    rep.add("NB-9b: linia 'Trebusz wczesnie (TB2, doba)' w dobach linii 'Oblezenia 2 (doba)'", f"{cov2} z {len(o2days)} (linii TB2 doby {len(tdl)})", ">= 90%",
+            (cov2 >= 0.9 * len(o2days)) if (t0 and len(o2days) >= 5) else None)
+
+    def t2(k):
+        return sum(tb2d[d][k] for d in tdl)
+    town_new = [x for x in tbm if x["cls"] in ("miasto", "stolica") and not x["ready"] and x["age"] < 1.0]
+    town_old = [x for x in tbm if x["cls"] in ("miasto", "stolica") and x["age"] >= 1.0]
+    early, f1, flate = (t2("early"), t2("f1"), t2("flate")) if tdl else (0, 0, 0)
+    rep.add("NB-9c: (a) pierwszy trebusz w 1. dobie oblezenia miasta / stolicy (wobec nowych znacznikow TB z 'oboz gotowy nie')",
+            f"pierwsze trebusze w 1. dobie {f1}, nowe znaczniki TB miast i stolic {len(town_new)}; zaczete przed gotowym obozem razem {early}",
+            ">= 80% nowych znacznikow (przy >= 3; klucze TB2 i TB wlaczone - baza: trebusz dopiero po gotowym obozie, 6.4-17.5 doby)",
+            (f1 >= 0.8 * len(town_new)) if (tb2_on and tb_on and len(town_new) >= 3) else None)
+    fmax = max((tb2d[d]["fmax"] for d in tdl), default=0.0)
+    rep.add("NB-9d: (a) pierwszy trebusz pozniej niz w 1. dobie tylko w oblezeniach sprzed wczytania (znacznik TB miasta / stolicy w wieku >= 1 doby)",
+            f"pozniej {flate} (najpozniej {fmax:.1f} doby od poczatku oblezenia), znaczniki TB miast i stolic w wieku >= 1 doby {len(town_old)}",
+            "pozniej <= takie znaczniki (konstrukcyjne)", (flate <= len(town_old)) if (tb2_on and tdl) else None)
+    pace = t2("pace") if tdl else 0
+    cls_up = t0 is not None and (float(t0[3]) > 1.0 or float(t0[4]) > 1.0)
+    rep.add("NB-9e: (b) trebusz w tempie zamku pod miastem i stolica (obozy na dobe, suma)", f"{pace} (w tym gracz {t2('pacep') if tdl else 0}); pierwsze trebusze {f1 + flate}",
+            "> 0 przy pierwszych trebuszach > 0 i klasie miasta / stolicy > 1 (konstrukcyjne: trebusz w budowie pyta o tempo co tick)",
+            (pace > 0) if (tb2_on and cls_up and (f1 + flate) > 0) else None)
+    last2 = tdl[-1] if tdl else None
+    gl = [x for x in mbl if x["why"] == "wyrwa" and last2 is not None and x["d"] < last2]   # linia MB raz na oboz i dobe; licznik w linii doby TB2 nastepnej doby
+    bad_gap = [x for x in gl if not x["gap"]]
+    gap_tot = t2("gap") if tdl else 0
+    rep.add("NB-9f: (c) szturm przez wyrwe (MB 'powod: wyrwa') tylko przy rozbitym odcinku i w liczniku doby",
+            f"linii MB 'wyrwa' {len(gl)} (bez wyrwy {len(bad_gap)}" + (f", np. {bad_gap[0]['st']} dzien {bad_gap[0]['d']}" if bad_gap else "") + f"), licznik doby {gap_tot};"
+            f" MB razem {len(mbl)} (machiny {sum(1 for x in mbl if x['why'] == 'machiny')}, drabiny {sum(1 for x in mbl if x['why'] == 'drabiny')})",
+            "bez wyrwy 0 i licznik doby >= linii; klucz wylaczony - linii 'wyrwa' 0 (konstrukcyjne)",
+            ((not bad_gap and gap_tot >= len(gl)) if tb2_on else (not gl)) if (t0 and tdl) else None)
+    built = sum(v[1] for v in o2built.values())
+    span2 = (tdl[-1] - tdl[0] + 1) if tdl else 0
+    rep.add("NB-9g: trebusze AI zbudowane (linia 'Oblezenia 2 (doba)') po trebuszach od 1. doby",
+            f"zbudowane {built}, druga ekipa zaczela {sum(v[0] for v in o2built.values())}; pierwsze trebusze w 1. dobie {f1} w {span2} dobach linii TB2",
+            "> 0 przy >= 3 pierwszych trebuszach i >= 25 dobach (trebusz miasta przy 2000 ludzi ok. 12 dob; baza 0 z 4 Jeffa, 0 z ok. 8 testu)",
+            (built > 0) if (tb2_on and f1 >= 3 and span2 >= 25) else None)
+    kt = [k for k in kos if k["cls"] in ("miasto", "stolica") and not k["player"]]
+    kcap = sum(1 for k in kt if k["why"] == "zdobycie")
+    kw = {}
+    for k in kt:
+        kw[k["why"]] = kw.get(k["why"], 0) + 1
+    rep.add("NB-9h: CEL - miasta i stolice zdobyte (KO 'zdobycie' miast i stolic AI)",
+            f"{kcap} z {len(kt)}; z trebuszem {sum(1 for k in kt if (k['treb'] or 0) >= 1)}, z rozbitym odcinkiem (najslabszy 0%) {sum(1 for k in kt if k['weak'] == 0)};"
+            f" przyczyny {dict(sorted(kw.items(), key=lambda kv: -kv[1]))}",
+            ">= 1 przy >= 5 KO miast i stolic (baza 0 z 12: test 18-08-31 i Jeff 15.10); DECYZJA - odsiecz OB5 i odejscia to zwykle drogi gry (decyzja Jeffa)",
+            (kcap >= 1) if (tb2_on and len(kt) >= 5) else None, decide=True)
+    ne2 = sum(errs2.values())
+    off_bad = sum(tb2d[d]["early"] + tb2d[d]["pace"] + tb2d[d]["gap"] for d in tdl if not tb2d[d]["on"])
+    rep.add("NB-9i: ERROR miejsc TB2 (ActionPost, BuildPre / BuildPost, Unblock, PrepFactor, linie TB2) i liczniki TB2 w dobach z kluczem 'nie'",
+            f"ERROR {ne2}" + (f" ({ {k: v for k, v in errs2.items() if v} })" if ne2 else "") + f"; liczniki przy kluczu 'nie' {off_bad}",
+            "0 / 0 (klucz przelaczony w MCM w trakcie doby moze dac jedna dobe z licznikami)", (ne2 == 0 and off_bad == 0) if (t0 or tdl) else None)
     rep.show()
     return 0
 

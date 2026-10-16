@@ -1564,6 +1564,10 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeAiTrebuchetsHitWalls { get; set; } = true;
 
+        [SettingPropertyBool("Siege Trebuchet Early", HintText = "AI lords besieging a town or a realm's capital start their first trebuchet on the first day of the siege, while the siege camp is still being prepared, instead of waiting for the camp to stand ready (castle sieges as before). A trebuchet takes as long to build before a town or a capital as before a castle - the longer preparations of a large fortress (Siege Town / Capital Prep Factor) still slow the camp, the battering ram and the siege tower - for AI lords and for you alike. Once a stretch of wall is battered down, an AI camp may storm through the breach without waiting for engines still being built, as readily as an assault with ladders. Off = as before")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeTrebuchetEarly { get; set; } = true;
+
         [SettingPropertyBool("Siege Walls Log", HintText = "writes log lines about these siege rules: a daily summary, each assault held back by the walls, each repelled assault with the pause before the next, each assault joined by a relief force, each siege camp slowed (log only - nothing in the game changes)")]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsLog { get; set; } = true;
@@ -6826,6 +6830,7 @@ namespace Armoury
             s.SiegeEnginesInProgressDontHold = SiegeEnginesInProgressDontHold;
             s.SiegeAssaultRunsToEnd = SiegeAssaultRunsToEnd;
             s.SiegeAiTrebuchetsHitWalls = SiegeAiTrebuchetsHitWalls;
+            s.SiegeTrebuchetEarly = SiegeTrebuchetEarly;
             s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;
