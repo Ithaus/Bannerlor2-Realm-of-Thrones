@@ -206,7 +206,7 @@ namespace Armoury
             for (int i = 0; i < Items; i++)
             {
                 ItemObject it = null;
-                try { it = om != null ? om.GetObject<ItemObject>(ItemIds[i]) : null; } catch { it = null; }
+                try { it = om != null ? om.GetObject<ItemObject>(ItemIds[i]) : null; } catch (Exception e) { it = null; Stumble("GetObject", e); }
                 if (it == null || it.ItemCategory == null) { miss++; it = null; }
                 items[i] = it;
                 bas[i] = it != null ? KgPrice(it, 1.0, FallbackKg[i]) : FallbackKg[i];
@@ -215,7 +215,7 @@ namespace Armoury
             for (int j = 0; j < NfIds.Length; j++)
             {
                 ItemObject it = null;
-                try { it = om != null ? om.GetObject<ItemObject>(NfIds[j]) : null; } catch { it = null; }
+                try { it = om != null ? om.GetObject<ItemObject>(NfIds[j]) : null; } catch (Exception e) { it = null; Stumble("GetObject", e); }
                 nf[j] = it != null ? KgPrice(it, 1.0, NfFallbackKg[j]) : NfFallbackKg[j];
             }
             nf[8] /= 1000.0;   // klejnoty w gramach
@@ -255,7 +255,7 @@ namespace Armoury
                 double ix;
                 if (!idxMemo.TryGetValue(it.ItemCategory, out ix))
                 {
-                    try { ix = town.GetItemCategoryPriceIndex(it.ItemCategory); } catch { ix = 1.0; _priceStumbles++; }
+                    try { ix = town.GetItemCategoryPriceIndex(it.ItemCategory); } catch (Exception e) { ix = 1.0; Stumble("PriceIndex", e); }
                     if (!(ix > 0.0) || double.IsInfinity(ix) || double.IsNaN(ix)) ix = 1.0;
                     idxMemo[it.ItemCategory] = ix;
                 }

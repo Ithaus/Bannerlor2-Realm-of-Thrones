@@ -42,7 +42,10 @@ namespace Armoury
             public double CastleIn;                          // zamek: dochod podzamcza doby (prawdziwe zl) - do rzemieslnikow wsi regionu
             public double[] Px;                              // miasto: ceny za kg towarow dzis
             public double D = double.NaN; public int DSrc = -1;     // 0 wlasne, 1 regionu, 2 krolestwa, 3 swiata
+            public double D0 = double.NaN;                   // D bez wielkich rodow (dochod rodow 1:1 brutto - nie do progow)
             public readonly double[] DE = new double[Estates];
+            public bool NoEarn;                              // miasto bez liczb kiesy ludu tej doby: W/R/P bez wpisu do sredniej, D z regionu
+            public double Nv, YSum, YK, NvH, YKH;            // doba linii: ludzie z liczbami dochodu, suma Y, suma Y/K (H - bez rodow)
             public string KingdomId, KingdomName;
             public double Clans;                             // wielkie rody: ile rodow ma tu lenno (ulamek przy kilku lennach)
         }
@@ -51,17 +54,31 @@ namespace Armoury
         private static readonly Dictionary<Settlement, Rec> _byS = new Dictionary<Settlement, Rec>();
         private static readonly Dictionary<string, Rec> _byHold = new Dictionary<string, Rec>(StringComparer.Ordinal);   // id warowni -> osada (konto NIEWOLNI)
         private static readonly Dictionary<Kingdom, string> _kName = new Dictionary<Kingdom, string>();                   // nazwy krolestw (pamiec do spisu osad)
-        private static int _cacheN = -1, _cacheDay = int.MinValue;
+        private static long _cacheSig = -1; private static int _cacheDay = int.MinValue;
         private static int _outsideN; private static double _outsideL; private static string _outsideNames = "-";
         private static int _unknownCul, _noRegion, _noMarket;
 
-        /// <summary>Spis osad (miasta, zamki, wsie) - raz na sesje, od nowa co 28 dob albo przy innej liczbie osad. Region, miasto targowe, kultura z kalibracji.</summary>
+        /// <summary>Sygnal spisu: liczba miast, zamkow i wsi gry (kryjowki i inne osady modow nie licza sie - nie przebudowuja spisu).</summary>
+        private static long SettlementSignal()
+        {
+            try
+            {
+                long t = Town.AllTowns != null ? Town.AllTowns.Count : 0, c = Town.AllCastles != null ? Town.AllCastles.Count : 0, v = Village.All != null ? Village.All.Count : 0;
+                return (t << 40) | (c << 20) | v;
+            }
+            catch (Exception e) { Stumble("SettlementSignal", e); return -2; }
+        }
+
+        /// <summary>Spis osad (miasta, zamki, wsie) - raz na sesje, od nowa co 28 dob albo przy innej liczbie miast, zamkow i wsi. Region, miasto targowe,
+        /// kultura z kalibracji. Srednia dochodu: z poprzedniego spisu, a w pierwszym spisie po wczytaniu - z zapisu (arm_dailylife v2).</summary>
         private static void EnsureRecs(int day)
         {
-            int n = Settlement.All != null ? Settlement.All.Count : 0;
-            if (_recs != null && n == _cacheN && day - _cacheDay < 28) return;
+            long n = SettlementSignal();
+            if (_recs != null && n == _cacheSig && day - _cacheDay < 28) return;
             var recs = new List<Rec>(900);
             var old = _byS.Count > 0 ? new Dictionary<Settlement, Rec>(_byS) : null;   // srednia biezaca dochodu przechodzi do nowego spisu (bez skoku co 28 dob)
+            var saved = old == null ? _saved : null;
+            int restored = 0;
             _byS.Clear(); _byHold.Clear(); _kName.Clear();
             foreach (var st in Settlement.All)
             {
@@ -76,7 +93,10 @@ namespace Armoury
                     r.Prof = ProfOf(r.Cul, out known); r.KnownCul = known;
                     r.West = r.Cul != null && PopulationLaw.WesterosCultures.Contains(r.Cul);
                     Rec o;
+                    double[] sv;
                     if (old != null && old.TryGetValue(st, out o) && o != null && o.Kind == kind) { Array.Copy(o.YAvg, r.YAvg, Estates); r.YDays = o.YDays; }
+                    else if (saved != null && saved.TryGetValue(r.Id, out sv) && sv != null && sv.Length > Estates)
+                    { Array.Copy(sv, r.YAvg, Estates); r.YDays = Math.Max(0, Math.Min(AvgDays, (int)sv[Estates])); restored++; }
                     recs.Add(r); _byS[st] = r;
                     if (kind != KVillage && st.StringId != null) _byHold[st.StringId] = r;
                 }
@@ -91,7 +111,7 @@ namespace Armoury
                     if (!r.KnownCul) unk++;
                     var v = r.St.Village;
                     Settlement reg = v.Bound;
-                    if (reg == null || !(reg.IsTown || reg.IsCastle)) { try { reg = OutlawLaw.RegionFor(r.St); } catch { reg = null; } }
+                    if (reg == null || !(reg.IsTown || reg.IsCastle)) { try { reg = OutlawLaw.RegionFor(r.St); } catch (Exception e) { reg = null; Stumble("RegionFor", e); } }
                     Rec rr;
                     r.Region = reg != null && _byS.TryGetValue(reg, out rr) ? rr : null;
                     if (r.Region == null) noReg++;
@@ -111,12 +131,13 @@ namespace Armoury
                 catch (Exception e) { Stumble("EnsureRecs(region)", e); }
             }
             foreach (var r in recs) if (r.Kind == KTown && !r.KnownCul) unk++;
-            _recs = recs; _cacheN = n; _cacheDay = day;
+            _recs = recs; _cacheSig = n; _cacheDay = day;
+            if (saved != null) { _restoredN = restored; _saved = null; }   // srednia z zapisu przeszla do spisu (reszta wpisow - osady, ktorych juz nie ma)
             _unknownCul = unk; _noRegion = noReg; _noMarket = noMk; _outsideN = outN;
             _outsideNames = outNames.Count > 0 ? string.Join(", ", outNames.Count > 6 ? outNames.GetRange(0, 6).ToArray() : outNames.ToArray()) + (outNames.Count > 6 ? ", ..." : "") : "-";
         }
 
-        private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "?" : s.Replace(';', ',').Replace('|', '/').Replace('\r', ' ').Replace('\n', ' '); }
+        private static string Clean(string s) { return string.IsNullOrEmpty(s) ? "?" : s.Replace(';', ',').Replace('|', '/').Replace('"', '\'').Replace('\r', ' ').Replace('\n', ' '); }
 
         // ------------------------------------------------------------ ludzie stanow doby
         private static double _book, _bookVil, _bookTown, _thrBook, _thrNoRegion, _estSum, _houses;
@@ -125,7 +146,8 @@ namespace Armoury
         private static readonly double[] _bkH = new double[4];
         private static readonly double[] _upSum = new double[3], _upW = new double[3];
 
-        /// <summary>Ludzie ksiegi i stanow kazdej osady na dzis: PeopleOf, pasma, pochylenie BK, konto niewolnych, wielkie rody. Nie rzuca.</summary>
+        /// <summary>Ludzie ksiegi i stanow kazdej osady na dzis: PeopleOf, pasma, pochylenie BK, konto niewolnych, wielkie rody. Nie rzuca.
+        /// Suma stanow ksiegi = ksiega z budowy (udzialy sumuja sie do 1) - to kontrola arytmetyki; ksiege wobec linii "Ludnosc" sprawdza sprawdz_logi NZC0-2.</summary>
         private static void PeopleDay()
         {
             _book = _bookVil = _bookTown = _estSum = _houses = 0; _houseClans = _houseHeroes = 0; _tiltN = _bkN = 0; _outsideL = 0;
@@ -203,7 +225,9 @@ namespace Armoury
                     if (hs != null) for (int i = 0; i < hs.Count; i++) { var h = hs[i]; if (h != null && h.IsAlive) alive++; }
                     if (alive <= 0) continue;
                     double heads = 3.0 * alive, inc = 0;
-                    try { inc = Math.Max(0.0, ClanIncomeBook.StableIncome(c)); } catch { inc = 0; }
+                    try { inc = ClanIncomeBook.StableIncome(c); } catch (Exception e) { inc = 0; Stumble("StableIncome", e); }
+                    if (!Fin(inc)) { Stumble("StableIncome-NaN", null, c.StringId); inc = 0; }
+                    inc = Math.Max(0.0, inc);
                     int places = 0;
                     for (int i = 0; i < fiefs.Count; i++) { var t = fiefs[i]; if (t != null && t.Settlement != null && _byS.ContainsKey(t.Settlement)) places++; }
                     if (places == 0) continue;
@@ -223,7 +247,7 @@ namespace Armoury
             {
                 var reg = r.Region != null ? r.Region.St : r.St;
                 Kingdom k = null;
-                try { k = reg != null && reg.OwnerClan != null ? reg.OwnerClan.Kingdom : null; } catch { k = null; }
+                try { k = reg != null && reg.OwnerClan != null ? reg.OwnerClan.Kingdom : null; } catch (Exception e) { k = null; Stumble("Kingdom", e); }
                 r.KingdomId = k != null ? k.StringId ?? "?" : "-";
                 string nm;
                 if (k == null) nm = "bez krolestwa";

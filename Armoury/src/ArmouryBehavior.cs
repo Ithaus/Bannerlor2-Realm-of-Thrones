@@ -768,7 +768,7 @@ namespace Armoury
             // Reset przed SyncData (konstruktor)
             try { string inn = dataStore.IsSaving ? TownInns.Export() : null; SaveText.Sync(dataStore, "arm_inns", ref inn); if (dataStore.IsLoading) TownInns.Import(inn); }
             catch (Exception e) { Log.Error("SyncData.arm_inns", e); }
-            // ZC0 (16.10, zycie codzienne - pomiar na sucho): skala targu sigma ustalona RAZ ("v1|sigma|dzien") - wlasny try; brak klucza (zapis sprzed paczki
+            // ZC0 (16.10, zycie codzienne - pomiar na sucho): skala targu sigma ustalona RAZ i srednia dochodu stanow osad ("v2|sigma|dzien|id:dni:y0,...,y6;..." - SaveText w kawalkach; v1 czytany) - wlasny try; brak klucza (zapis sprzed paczki
             // albo kampania z wylaczonym kluczem) = sigma z MCM przy pierwszej dobie z kluczem; Reset przed SyncData (konstruktor)
             try { string zc = dataStore.IsSaving ? DailyLife.Export() : null; SaveText.Sync(dataStore, "arm_dailylife", ref zc); if (dataStore.IsLoading) DailyLife.Import(zc); }
             catch (Exception e) { Log.Error("SyncData.arm_dailylife", e); }

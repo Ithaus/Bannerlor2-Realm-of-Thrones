@@ -893,10 +893,13 @@ Uzycie (Python 3, tylko odczyt):
                     w wodzie, poza polem, zle wspolrzedne, bez renderera); NBW-13b TAK / NIE - materialy 12/12, bez materialu 0 i decali > 0 przy zgonach.
 --grupa nzc0      : (16.10, Jeff "codzienne zycie ludzi, Dostatek na mieszkanca, ilu chlopow, szlachty, mieszczan"; galaz w-toku/noc-zc0, Armoury/src/DailyLife*.cs;
                     projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 14 ZC0) python -I tools/sprawdz_logi.py --grupa nzc0 <Armoury-*.log> [--baza-doby <log bazy>]
-                    [--do-doby 120] (strumieniowo). NZC0-0 linia startu sesji, NZC0-1 linie "Zycie (ZC0)" i "Spizarnia (ZC)" kazdej doby (bez luk), NZC0-2 suma
-                    stanow = ksiega +-0, NZC0-3 udzialy swiata +-1 pkt od rozdz. 5.3, NZC0-4 z pola + z targu = potrzeba +-5%, NZC0-5 D dla wszystkich osad,
-                    NZC0-6 mediana czasu <= 5 ms/dobe, NZC0-7 potkniecia i ERROR 0, NZC0-8 sigma stala, NZC0-9 stany-dostatek.csv (wiersz na osade, D w kazdym),
-                    NZC0-10 ksiega towarow +-2% bazy (z --baza-doby), NZC0-11..13 INFO (Dostatek stanow, rody, New Ibbish, Spizarnia).
+                    [--do-doby 120] (strumieniowo). NZC0-0 linia startu sesji, NZC0-1 linie "Zycie (ZC0)" i "Spizarnia (ZC)" kazdej doby (bez luk), NZC0-2 ksiega
+                    (wsie + miasta) = linia "Ludnosc" tego samego taktu +-0.5% (NZC0-2b suma stanow = ksiega - INFO, z budowy), NZC0-3 udzialy swiata +-1 pkt od
+                    rozdz. 5.3, NZC0-4 kontrola glodu (z pola + z targu = potrzeba +-5%), NZC0-5 D dla wszystkich osad i miasta z wlasnym D, NZC0-6 mediana czasu
+                    <= 5 ms/dobe, NZC0-7 potkniecia i ERROR 0, NZC0-8 sigma stala, NZC0-9 stany-dostatek.csv (doby z linii w pliku, osada raz, D w kazdym),
+                    NZC0-10 ksiega towarow +-2% bazy (z --baza-doby), NZC0-11..13 INFO (Dostatek stanow, rody 1:1 brutto, New Ibbish, Spizarnia), NZC0-14..16
+                    potrzeba wobec audytu rozdz. 7.1 (45 904 t/d +-3%, 0.885 kg/os +-0.02, z pola 76.6% +-2 pkt; DECYZJA), NZC0-17 zapis wczytany ponownie
+                    (ta sama doba dwa razy w logu: Dostatek swiata +-3%).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -32283,17 +32286,19 @@ NZC0_DAY = re.compile(r"Zycie \(ZC0\): dzien (?P<day>-?\d+) \| sigma (?P<sig>\d+
                       r"\| Dostatek swiat (?P<dw>-?[\d.]+|-) \(mediana chlopow wsi (?P<dpeas>-?[\d.]+|-), Westeros (?P<dwest>-?[\d.]+|-), Essos (?P<dess>-?[\d.]+|-)\), stany: (?P<dest>[^|]*) "
                       r"\| dochod na glowe (?P<inc>-?\d+|-) zl/rok \(Westeros (?P<incw>-?\d+|-), Essos (?P<ince>-?\d+|-)\), stany: (?P<incest>[^|]*) "
                       r"\| koszyk przetrwania zl/d: miasta (?P<kt>[\d.]+|-) \(mediana\), wsie (?P<kv>[\d.]+|-) \(mediana, u bramy\) "
-                      r"\| D policzone (?P<dn>\d+)/(?P<dall>\d+) osad \(wlasne (?P<down>\d+), regionu (?P<dreg>\d+), krolestwa (?P<dking>\d+), swiata (?P<dworld>\d+), bez D (?P<dnone>\d+)\)"
-                      r"; regiony (?P<nreg>\d+): D min (?P<rmin>-?[\d.]+|-) / mediana (?P<rmed>-?[\d.]+|-) / max (?P<rmax>-?[\d.]+|-) "
+                      r"\| D policzone (?P<dn>\d+)/(?P<dall>\d+) osad \(wlasne (?P<down>\d+), regionu (?P<dreg>\d+), krolestwa (?P<dking>\d+), swiata (?P<dworld>\d+), bez D (?P<dnone>\d+)"
+                      r"; miasta bez liczb kiesy - bez wlasnego D (?P<dnoearn>\d+)\)"
+                      r"; regiony (?P<nreg>\d+): D min (?P<rmin>-?[\d.]+|-) / mediana (?P<rmed>-?[\d.]+|-) / max (?P<rmax>-?[\d.]+|-) \(bez wielkich rodow: mediana (?P<rmed0>-?[\d.]+|-)\) "
                       r"\| wejscia doby \(zl gry\): (?P<inflow>[^|]*) "
-                      r"\| srednia (?P<avg>\d+) dob \(najwyzej 28\) "
+                      r"\| srednia biezaca dochodu: wykladnicza 1/28 \(pierwsze 28 dob - zwykla\), mediana osad (?P<avg>\d+) dob \(najwyzej 28\), z zapisu (?P<rest>\d+) osad"
+                      r"(?P<warm> - ROZGRZEWKA[^|]*?)? "
                       r"\| pochylenie BK R i P: (?P<tilt>\d+) osad \(klasy BK z kalibracji kiesy ludu: (?P<bk>\d+)\) "
                       r"\| New Ibbish: wsie poza BoundVillages swojej warowni (?P<nib>\d+) \((?P<nibp>\d+|-) ludzi: (?P<nibn>[^)]*)\) - liczone do regionu przez Bound; "
                       r"wsie bez regionu (?P<noreg>\d+), bez miasta targowego (?P<nomk>\d+) "
                       r"\| kultury spoza tabeli (?P<unk>\d+) osad \(profil zachod\)"
                       r"(?: \| towarow cen brak w grze (?P<miss>\d+) \(cena z tabeli\))?"
                       r"(?: \| (?P<csv>stany-dostatek\.csv [^|]*))?"
-                      r" \| czas (?P<ms>[\d.]+) ms \(mediana sesji (?P<med>[\d.]+|-) ms z (?P<nms>\d+) dob; [^)]*\) "
+                      r" \| czas (?P<ms>[\d.]+) ms \(bez zapisu linii; mediana (?P<med>[\d.]+|-) ms z (?P<nms>\d+) ostatnich dob; [^)]*\) "
                       r"\| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<sta>\d+)\)\.$")
 NZC0_PDAY = re.compile(r"Spizarnia \(ZC\): dzien (?P<day>-?\d+) \| sigma (?P<sig>\d+) "
                        r"\| potrzeba stale (?P<need>\d+|-) t/d \((?P<kgpp>[\d.]+|-) kg/os\), napoje (?P<drink>\d+|-) tys\. l \((?P<lpp>[\d.]+|-) l/os\), kcal (?P<kcal>\d+|-) "
@@ -32307,8 +32312,15 @@ NZC0_PDAY = re.compile(r"Spizarnia \(ZC\): dzien (?P<day>-?\d+) \| sigma (?P<sig
 NZC0_START = re.compile(r"Zycie \(ZC0\): start sesji \| klucze: Daily Life Measure (?P<k1>tak|WYLACZONE), Daily Life Market Scale (?P<k2>\d+) \| sigma (?P<sig>.*?) \|")
 NZC0_KING = "Zycie (ZC0) - krolestwa: dzien "
 NZC0_ERR = ("ERROR in DailyLife.", "ERROR in SyncData.arm_dailylife")
+# PopulationLaw.Daily (ten sam takt doby co DailyLife.Daily): "Ludnosc: dzien N | X.X mln" - N = doba DailyLife + 1 (DailyLife pisze dobe wczorajsza)
+NZC0_LUD = re.compile(r"Ludnosc: dzien (?P<day>\d+) \| (?P<mln>[\d.]+) mln \|")
+NZC0_CSVW = re.compile(r"stany-dostatek\.csv (\d+) wierszy")
 # projekt rozdz. 5.3: udzialy swiata (%) - prog +-1 pkt
 NZC0_DOC = (("niewolni", 10.9), ("chlopi", 71.1), ("biedota", 8.2), ("rzemieslnicy", 6.9), ("kupcy", 1.4), ("szlachta", 1.5))
+# projekt rozdz. 7.1 (audyt, doba 109027): potrzeba stale 45 904 t/d +-3%, 0.885 kg/os +-0.02, z pola i domu 76.6% +-2 pkt
+NZC0_NEED = (45904.0, 0.03)
+NZC0_KGPP = (0.885, 0.02)
+NZC0_FIELD = (76.6, 2.0)
 
 
 def nzc0_f(x):
@@ -32347,10 +32359,16 @@ def nzc0_main(logp, bdp=None, until=120):
     """nzc0 (16.10; Armoury/src/DailyLife*.cs, klucze DailyLifeMeasure / DailyLifeMarketScale): ZC0 - stany, koszyki w kg, Spizarnia, Dostatek NA SUCHO
     (gra bez zmian). Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log Armoury biegu bazowego> (ksiega towarow +-2%).
     Progi projektu rozdz. 14 (ZC0): NZC0-0 linia startu sesji (klucz tak, sigma), NZC0-1 linie 'Zycie (ZC0)' i 'Spizarnia (ZC)' kazdej doby (bez luk, nierozpoznane 0),
-    NZC0-2 suma stanow ksiegi = ksiega +-0 (kazda doba), NZC0-3 udzialy swiata +-1 pkt od rozdz. 5.3 (ostatnia doba), NZC0-4 Spizarnia z pola + z targu = potrzeba +-5%
-    (kazda doba), NZC0-5 D policzone dla wszystkich osad (kazda doba), NZC0-6 czas bloku: mediana <= 5 ms na dobe, NZC0-7 potkniecia i ERROR paczki 0,
-    NZC0-8 sigma stala w calym logu, NZC0-9 stany-dostatek.csv: wiersz na osade w kazdej dobie pliku i D w kazdym wierszu, NZC0-10 ksiega towarow +-2% bazy
-    (z --baza-doby; bez - INFO), NZC0-11..13 INFO (Dostatek i dochod na glowe stanow, wielkie rody i New Ibbish, Spizarnia i brak z targu).
+    NZC0-2 ksiega bez konta niewolnych (wsie + miasta) = linia 'Ludnosc' tej samej doby (PopulationLaw, ten sam takt) +-0.5% (kazda doba; bez linii - INFO),
+    NZC0-2b suma stanow ksiegi = ksiega (INFO - z budowy, udzialy sumuja sie do 1), NZC0-3 udzialy swiata +-1 pkt od rozdz. 5.3 (ostatnia doba),
+    NZC0-4 kontrola glodu: Spizarnia z pola + z targu = potrzeba +-5% (kazda doba; rowne z arytmetyki poza glodem ze spichlerzy), NZC0-5 D policzone dla
+    wszystkich osad i kazde miasto z wlasnym D (miasto bez liczb kiesy ludu = bez wlasnego D; kazda doba), NZC0-6 czas bloku: mediana <= 5 ms na dobe,
+    NZC0-7 potkniecia i ERROR paczki 0, NZC0-8 sigma stala w calym logu, NZC0-9 stany-dostatek.csv: kazda doba, ktora linia zglosila jako zapisana
+    ('stany-dostatek.csv N wierszy'), jest w pliku z N roznymi osadami (pary doba, osada_id - wczytanie w tym samym procesie nie dubluje), D w kazdym
+    wierszu, 0 dob 'NIE ZAPISANY', NZC0-10 ksiega towarow +-2% bazy (z --baza-doby; bez - INFO), NZC0-11..13 INFO (Dostatek i dochod na glowe stanow -
+    wielkie rody 1:1 brutto, wielkie rody i New Ibbish, Spizarnia), NZC0-14..16 potrzeba wobec audytu rozdz. 7.1 (ostatnia doba; DECYZJA, gdy poza
+    progiem): 45 904 t/d +-3%, 0.885 kg/os +-0.02, z pola i domu 76.6% +-2 pkt, NZC0-17 zapis wczytany ponownie (ta sama doba policzona dwa razy w logu):
+    Dostatek swiata +-3% przy sredniej >= 14 dob (bez powtorzonej doby - INFO).
     Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -32358,6 +32376,7 @@ def nzc0_main(logp, bdp=None, until=120):
         rep.show()
         return 0
     sess, days, bad, pdays, pbad, kings = [], {}, [], {}, [], 0
+    lud, dups = {}, []
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -32369,7 +32388,10 @@ def nzc0_main(logp, bdp=None, until=120):
                 elif s.startswith(NZC0_HEAD + "dzien "):
                     mm = NZC0_DAY.match(s)
                     if mm:
-                        days[int(mm.group("day"))] = mm.groupdict()
+                        d = int(mm.group("day"))
+                        if d in days:
+                            dups.append((d, days[d], mm.groupdict()))
+                        days[d] = mm.groupdict()
                     elif "| czeka na kalibracje" in s or "| WYLACZONY" in s:
                         pass
                     else:
@@ -32382,9 +32404,14 @@ def nzc0_main(logp, bdp=None, until=120):
                     pbad.append(s)
             elif s.startswith(NZC0_KING):
                 kings += 1
+            elif s.startswith("Ludnosc: dzien "):
+                mm = NZC0_LUD.match(s)
+                if mm:
+                    lud[int(mm.group("day"))] = float(mm.group("mln"))
             elif s.startswith(NZC0_ERR):
                 n_err += 1
-    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Zycie {len(days)} (nierozpoznanych {len(bad)}), Spizarnia {len(pdays)} (nierozpoznanych {len(pbad)}), krolestw {kings}")
+    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Zycie {len(days)} (nierozpoznanych {len(bad)}), Spizarnia {len(pdays)} (nierozpoznanych {len(pbad)}), krolestw {kings}"
+          f", doby Ludnosc {len(lud)}, doby powtorzone {len(dups)}")
     if not sess and not days and not bad and not pdays and not pbad:
         rep.add("NZC0-0: linie 'Zycie (ZC0)'", "brak w logu", "INFO (log sprzed paczki ZC0)", None)
         rep.show()
@@ -32393,7 +32420,7 @@ def nzc0_main(logp, bdp=None, until=120):
     if sess:
         mm = NZC0_START.match(sess[-1])
         ok = bool(mm) and mm.group("k1") == "tak"
-        rep.add("NZC0-0: linia startu sesji (klucz, sigma)", sess[-1][len(NZC0_HEAD):][:260], "Daily Life Measure tak, sigma ustalona", True if ok else (None if mm and mm.group("k1") == "WYLACZONE" else False))
+        rep.add("NZC0-0: linia startu sesji (klucz, sigma)", sess[-1][len(NZC0_HEAD):][:300], "Daily Life Measure tak, sigma ustalona", True if ok else (None if mm and mm.group("k1") == "WYLACZONE" else False))
     else:
         rep.add("NZC0-0: linia startu sesji", "brak", "linia przy kazdym starcie sesji", False)
     # NZC0-1
@@ -32411,11 +32438,22 @@ def nzc0_main(logp, bdp=None, until=120):
         rep.show()
         return 0
     last = days[dd[-1]]
-    # NZC0-2
+    # NZC0-2: ksiega bez konta niewolnych wobec linii "Ludnosc" tego samego taktu (doba Ludnosc = doba Zycie + 1)
+    pairs = [(d, (int(days[d]["vil"]) + int(days[d]["town"])) / 1e6, lud.get(d + 1)) for d in dd]
+    have = [(d, b, l) for d, b, l in pairs if l is not None and l > 0]
+    if have:
+        badl = [(d, b, l) for d, b, l in have if abs(b - l) > 0.005 * l + 0.05]   # +-0.5% i zaokraglenie linii Ludnosc do 0.1 mln
+        worst = max(have, key=lambda x: abs(x[1] - x[2]) / x[2])
+        rep.add("NZC0-2: ksiega (wsie + miasta, bez konta niewolnych) = linia 'Ludnosc' tego samego taktu", f"doby porownane {len(have)} z {len(dd)}, poza progiem {len(badl)}"
+                + (f" (np. dzien {badl[0][0]}: ksiega {badl[0][1]:.2f} mln, Ludnosc {badl[0][2]:.1f} mln)" if badl else "")
+                + f"; najwieksza roznica dzien {worst[0]}: {worst[1]:.2f} / {worst[2]:.1f} mln ({100 * (worst[1] / worst[2] - 1):+.2f}%)",
+                "+-0.5% (+ 0.05 mln zaokraglenia) kazdej doby", not badl)
+    else:
+        rep.add("NZC0-2: ksiega wobec linii 'Ludnosc'", f"brak linii 'Ludnosc: dzien N+1' do {len(dd)} dob Zycie (renty krain wylaczone?)", "INFO (+-0.5% z linia Ludnosc)", None)
     diffs = [(d, nzc0_f(days[d]["diff"])) for d in dd]
     badd = [(d, x) for d, x in diffs if x is None or abs(x) > 0.5]
-    rep.add("NZC0-2: suma stanow ksiegi = ksiega (wsie + miasta + konto niewolnych)", f"doby z roznica > 0.5 czlowieka {len(badd)} z {len(dd)}"
-            + (f" (np. dzien {badd[0][0]}: {badd[0][1]})" if badd else f"; ostatnia doba ksiega {last['book']}, stany {last['est']}"), "+-0 (|roznica| <= 0.5) kazdej doby", not badd)
+    rep.add("NZC0-2b: suma stanow ksiegi = ksiega (arytmetyka - udzialy sumuja sie do 1)", f"doby z roznica > 0.5 czlowieka {len(badd)} z {len(dd)}"
+            + (f" (np. dzien {badd[0][0]}: {badd[0][1]})" if badd else f"; ostatnia doba ksiega {last['book']}, stany {last['est']}"), "INFO (z budowy +-0)", None)
     # NZC0-3
     sh = [nzc0_f(last["s%d" % i]) for i in range(6)]
     devs = [(NZC0_DOC[i][0], sh[i], NZC0_DOC[i][1]) for i in range(6)]
@@ -32428,19 +32466,22 @@ def nzc0_main(logp, bdp=None, until=120):
         pv = [(d, nzc0_f(pdays[d]["dpct"])) for d in pd]
         badp = [(d, x) for d, x in pv if x is None or abs(x) > 5.0]
         worst = max((abs(x) for d, x in pv if x is not None), default=None)
-        rep.add("NZC0-4: Spizarnia - z pola i domu + z targu = potrzeba", f"doby poza +-5%: {len(badp)} z {len(pd)}" + (f" (np. dzien {badp[0][0]}: {badp[0][1]}%)" if badp else "")
-                + (f"; najwieksza roznica {worst:.2f}%" if worst is not None else ""), "+-5% kazdej doby", not badp)
+        rep.add("NZC0-4: kontrola glodu - Spizarnia z pola i domu + z targu = potrzeba", f"doby poza +-5%: {len(badp)} z {len(pd)}" + (f" (np. dzien {badp[0][0]}: {badp[0][1]}%)" if badp else "")
+                + (f"; najwieksza roznica {worst:.2f}%" if worst is not None else "") + " (rowne z arytmetyki - odchylenie to glod ze spichlerzy)", "+-5% kazdej doby", not badp)
     else:
         rep.add("NZC0-4: Spizarnia", "brak linii 'Spizarnia (ZC)'", "linia kazdej doby", False)
     # NZC0-5
-    badD = [d for d in dd if int(days[d]["dn"]) != int(days[d]["dall"]) or int(days[d]["dall"]) == 0]
-    rep.add("NZC0-5: D policzone dla wszystkich osad", f"ostatnia doba {last['dn']}/{last['dall']} (wlasne {last['down']}, regionu {last['dreg']}, krolestwa {last['dking']}, swiata {last['dworld']}, "
-            f"bez D {last['dnone']}); doby z brakiem {len(badD)} z {len(dd)}", "N/N kazdej doby (projekt: 798/798)", not badD)
+    badD = [d for d in dd if int(days[d]["dn"]) != int(days[d]["dall"]) or int(days[d]["dall"]) == 0 or int(days[d]["dnoearn"]) > 0]
+    noearn = [d for d in dd if int(days[d]["dnoearn"]) > 0]
+    rep.add("NZC0-5: D policzone dla wszystkich osad, miasta z wlasnym D", f"ostatnia doba {last['dn']}/{last['dall']} (wlasne {last['down']}, regionu {last['dreg']}, krolestwa {last['dking']}, "
+            f"swiata {last['dworld']}, bez D {last['dnone']}; miasta bez liczb kiesy - bez wlasnego D {last['dnoearn']}); doby z brakiem {len(badD)} z {len(dd)}"
+            + (f" (w tym z miastami bez wlasnego D {len(noearn)}, np. dzien {noearn[0]}: {days[noearn[0]]['dnoearn']})" if noearn else ""),
+            "N/N kazdej doby (projekt: 798/798), miasta bez wlasnego D 0", not badD)
     # NZC0-6
     ms = [nzc0_f(days[d]["ms"]) for d in dd]
     ms = [x for x in ms if x is not None]
     med = st.median(ms) if ms else None
-    rep.add("NZC0-6: czas bloku ZC na dobe", (f"mediana {med:.3f} ms, max {max(ms):.3f} ms z {len(ms)} dob" if ms else "brak"), "mediana <= 5 ms", (med is not None and med <= 5.0) if ms else None)
+    rep.add("NZC0-6: czas bloku ZC na dobe (bez zapisu linii)", (f"mediana {med:.3f} ms, max {max(ms):.3f} ms z {len(ms)} dob" if ms else "brak"), "mediana <= 5 ms", (med is not None and med <= 5.0) if ms else None)
     # NZC0-7
     stum = sum(int(days[d]["st"]) for d in dd)
     rep.add("NZC0-7: potkniecia (suma dob) i ERROR paczki (DailyLife.*, SyncData.arm_dailylife)", f"potkniecia {stum} (od wczytania na koniec {last['sta']}), ERROR {n_err}",
@@ -32448,31 +32489,47 @@ def nzc0_main(logp, bdp=None, until=120):
     # NZC0-8
     sigs = sorted(set(days[d]["sig"] for d in dd))
     rep.add("NZC0-8: skala targu sigma stala w calym logu", f"sigma {', '.join(sigs)} ({last['sigsrc']})", "jedna wartosc (projekt: 37)", len(sigs) == 1)
-    # NZC0-9
+    # NZC0-9: doby zgloszone w linii jako zapisane - w pliku z tyloma roznymi osadami
+    written, notw = {}, []
+    for d in dd:
+        c = days[d].get("csv") or ""
+        mw = NZC0_CSVW.search(c)
+        if mw:
+            written[d] = int(mw.group(1))
+        elif "NIE ZAPISANY" in c:
+            notw.append(d)
     cp = nzc0_csv_path(logp)
     if cp:
-        rows = {}
-        nod = {}
+        ids, nod, rd_err = {}, set(), None
         try:
-            with open(cp, encoding="utf-8", errors="replace") as fh:
-                rd = csv.DictReader(fh, delimiter=";")
+            with open(cp, encoding="utf-8", errors="replace", newline="") as fh:
+                rd = csv.DictReader(fh, delimiter=";", quoting=csv.QUOTE_NONE)
                 for r in rd:
                     try:
                         d = int(r.get("dzien", ""))
-                    except ValueError:
+                    except (TypeError, ValueError):
                         continue
-                    rows[d] = rows.get(d, 0) + 1
+                    oid = r.get("osada_id") or ""
+                    ids.setdefault(d, set()).add(oid)
                     if (r.get("D") or "-") in ("-", ""):
-                        nod[d] = nod.get(d, 0) + 1
+                        nod.add((d, oid))
         except Exception as e:
-            rows = {}
-            rep.add("NZC0-9: stany-dostatek.csv", f"blad odczytu {e}", "czytelny", False)
-        if rows:
-            mism = [d for d in rows if d in days and rows[d] != int(days[d]["dall"])]
-            rep.add("NZC0-9: stany-dostatek.csv - wiersz na osade i D w kazdym wierszu", f"dob w pliku {len(rows)} (wierszy ostatniej {rows[max(rows)]}), doby z inna liczba wierszy niz osad {len(mism)}, "
-                    f"wiersze bez D {sum(nod.values())}", "wiersze = osady, bez D 0", not mism and not nod)
+            rd_err = e
+        if rd_err is not None:
+            rep.add("NZC0-9: stany-dostatek.csv", f"blad odczytu {rd_err}", "czytelny", False)
+        elif written or notw:
+            mism = [(d, n, len(ids.get(d, ()))) for d, n in sorted(written.items()) if len(ids.get(d, ())) != n]
+            rep.add("NZC0-9: stany-dostatek.csv - doby z linii w pliku, osada raz, D w kazdym wierszu",
+                    f"doby zapisane wedlug linii {len(written)} (wierszy ostatniej {written[max(written)] if written else '-'}), w pliku {len(ids)} dob; "
+                    f"doby z inna liczba osad niz w linii {len(mism)}" + (f" (np. dzien {mism[0][0]}: linia {mism[0][1]}, plik {mism[0][2]})" if mism else "")
+                    + f", wiersze bez D {len(nod)}, doby 'NIE ZAPISANY' {len(notw)}" + (f" (np. {notw[:3]})" if notw else ""),
+                    "kazda doba z linii w pliku z N osadami, bez D 0, NIE ZAPISANY 0", not mism and not nod and not notw)
+        else:
+            rep.add("NZC0-9: stany-dostatek.csv", f"plik jest ({len(ids)} dob), ale zadna linia doby nie zglosila zapisu (bieg krotszy niz 7 dob albo rozgrzewka)", "INFO", None)
+    elif notw:
+        rep.add("NZC0-9: stany-dostatek.csv", f"brak pliku, linie: 'NIE ZAPISANY' w {len(notw)} dobach (np. {notw[:3]})", "plik w katalogu sesji", False)
     else:
-        rep.add("NZC0-9: stany-dostatek.csv", "brak pliku obok logu (katalog sesji)", "INFO (log bez katalogu sesji)", None)
+        rep.add("NZC0-9: stany-dostatek.csv", f"brak pliku obok logu (katalog sesji); linie zglosily {len(written)} dob", "INFO (log bez katalogu sesji)", None)
     # NZC0-10
     if bdp:
         g1, g0 = nzc0_goods(logp), nzc0_goods(bdp)
@@ -32489,15 +32546,44 @@ def nzc0_main(logp, bdp=None, until=120):
     # INFO
     rep.add("NZC0-11: Dostatek i dochod na glowe (ostatnia doba)", f"swiat D {last['dw']} (mediana chlopow wsi {last['dpeas']}, Westeros {last['dwest']}, Essos {last['dess']}); stany D: {last['dest']}; "
             f"dochod na glowe {last['inc']} zl/rok (Westeros {last['incw']}, Essos {last['ince']}), stany: {last['incest']}; koszyk przetrwania miasta {last['kt']}, wsie {last['kv']} zl/d; "
-            f"regiony {last['nreg']}: D {last['rmin']} / {last['rmed']} / {last['rmax']}", "INFO (projekt rozdz. 9: chlopi 1.7-2.2, rzemieslnicy 2.5-4, kupcy 4-9, szlachta 6-12)", None)
+            f"regiony {last['nreg']}: D {last['rmin']} / {last['rmed']} / {last['rmax']} (bez wielkich rodow: mediana {last['rmed0']}); srednia: mediana osad {last['avg']} dob"
+            + (" - ROZGRZEWKA" if last.get("warm") else "")
+            + "; wielkie rody: D z dochodu rodu 1:1 BRUTTO / 3 x zywi bohaterowie - nieporownywalne z 'x20' projektu 6.1, nie do progow ZC6",
+            "INFO (projekt rozdz. 9: chlopi 1.7-2.2, rzemieslnicy 2.5-4, kupcy 4-9, szlachta 6-12)", None)
     rep.add("NZC0-12: wielkie rody, pochylenie BK, New Ibbish (ostatnia doba)", f"wielkie rody {last['gh']} ({last['heroes']} bohaterow x 3 w {last['clans']} rodach; projekt ok. 10 tys.); "
             f"pochylenie BK {last['tilt']} osad (klasy BK {last['bk']}); wsie poza BoundVillages {last['nib']} ({last['nibp']} ludzi: {last['nibn']}), bez regionu {last['noreg']}, "
-            f"bez miasta targowego {last['nomk']}; kultury spoza tabeli {last['unk']}; wejscia doby: {last['inflow'][:300]}", "INFO", None)
+            f"bez miasta targowego {last['nomk']}; kultury spoza tabeli {last['unk']}; wejscia doby: {last['inflow'][:400]}", "INFO", None)
     if pd:
         lp = pdays[pd[-1]]
         rep.add("NZC0-13: Spizarnia (ostatnia doba)", f"potrzeba {lp['need']} t/d ({lp['kgpp']} kg/os), napoje {lp['drink']} tys. l, kcal {lp['kcal']}; z pola {lp['field']} t ({lp['fp']}%), "
                 f"z targu {lp['mkt']} t ({lp['mp']}%); targ dzis {lp['act']} t, brak {lp['brak']} t ({lp['bp']}%); krolestw linii {kings}",
                 "INFO (projekt rozdz. 7.1: 45.9 tys. t, 0.885 kg/os, z targu 23%, 2 315 kcal)", None)
+        need, kgpp, fp = nzc0_f(lp["need"]), nzc0_f(lp["kgpp"]), nzc0_f(lp["fp"])
+        rep.add("NZC0-14: potrzeba stale wobec audytu rozdz. 7.1 (ostatnia doba)", f"{lp['need']} t/d (audyt {NZC0_NEED[0]:.0f}" + (f", {100 * (need / NZC0_NEED[0] - 1):+.2f}%)" if need is not None else ")"),
+                f"{NZC0_NEED[0]:.0f} t/d +-{100 * NZC0_NEED[1]:.0f}% (DECYZJA - ludnosc rozna od doby audytu)", (need is not None and abs(need / NZC0_NEED[0] - 1) <= NZC0_NEED[1]), decide=True)
+        rep.add("NZC0-15: kg na osobe wobec audytu rozdz. 7.1 (ostatnia doba)", f"{lp['kgpp']} kg/os (audyt {NZC0_KGPP[0]})",
+                f"{NZC0_KGPP[0]} +-{NZC0_KGPP[1]} (DECYZJA - mieszanka stanow i krain inna niz w audycie)", (kgpp is not None and abs(kgpp - NZC0_KGPP[0]) <= NZC0_KGPP[1]), decide=True)
+        rep.add("NZC0-16: udzial z pola i domu wobec audytu rozdz. 7.1 (ostatnia doba)", f"{lp['fp']}% (audyt {NZC0_FIELD[0]}%; z targu {lp['mp']}%)",
+                f"{NZC0_FIELD[0]}% +-{NZC0_FIELD[1]:.0f} pkt (DECYZJA - glod ze spichlerzy albo inna mieszanka)", (fp is not None and abs(fp - NZC0_FIELD[0]) <= NZC0_FIELD[1]), decide=True)
+    # NZC0-17: ta sama doba policzona dwa razy (zapis wczytany ponownie w tym samym logu) - Dostatek swiata z sredniej z zapisu
+    if dups:
+        cmp_, skip = [], 0
+        for d, a, b in dups:
+            da, db_, na, nb = nzc0_f(a["dw"]), nzc0_f(b["dw"]), nzc0_f(a["avg"]), nzc0_f(b["avg"])
+            if None in (da, db_, na, nb) or na < 14 or nb < 14 or da <= 0:
+                skip += 1
+                continue
+            cmp_.append((d, da, db_, abs(db_ / da - 1), b["rest"]))
+        if cmp_:
+            badr = [x for x in cmp_ if x[3] > 0.03]
+            w = max(cmp_, key=lambda x: x[3])
+            rep.add("NZC0-17: zapis wczytany ponownie - ta sama doba, ten sam Dostatek swiata", f"doby powtorzone {len(dups)} (porownane {len(cmp_)}, pominiete przy sredniej < 14 dob {skip}); "
+                    f"poza progiem {len(badr)}; najwieksza roznica dzien {w[0]}: D {w[1]:.2f} / {w[2]:.2f} ({100 * w[3]:.2f}%, po wczytaniu z zapisu {w[4]} osad)",
+                    "+-3% (srednia z zapisu; dzien po wczytaniu rozni sie tylko o 1/28 doby)", not badr)
+        else:
+            rep.add("NZC0-17: zapis wczytany ponownie", f"doby powtorzone {len(dups)}, wszystkie przy sredniej < 14 dob", "INFO (+-3% przy sredniej >= 14 dob)", None)
+    else:
+        rep.add("NZC0-17: zapis wczytany ponownie", "brak doby policzonej dwa razy w logu (bez wczytania w tym samym procesie)", "INFO (+-3% Dostatku swiata)", None)
     rep.show()
     return 0
 

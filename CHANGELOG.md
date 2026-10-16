@@ -1,5 +1,25 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-16 (zycie codzienne, ZC0, POPRAWKI po recenzji) - DOSTATEK WAZONY LUDZMI, SREDNIA DOCHODU W ZAPISIE, WIES BEZ PRZYCIECIA DOBOWEGO, RACJA NIEWOLNYCH Z KIES R/P; GRA DALEJ BEZ ZMIAN
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-zc0` | **Tor:** M (poprawki po recenzji, bez gry - autotest 120 dob osobno) | **Klucze:** bez nowych (`DailyLifeMeasure`, `DailyLifeMarketScale` jak byly)
+
+**Dla Jeffa (prosto):**
+- Dalej nic w grze sie nie zmienia - to tylko liczenie i log.
+- Dostatek regionu, krolestwa i swiata liczy teraz kazdego czlowieka tak samo (wczesniej mieszczanie wazyli prawie 2 razy wiecej niz chlopi, bo ich koszyk jest drozszy).
+- Srednia dochodu ludzi zapisuje sie w zapisie gry - po wczytaniu Dostatek jest taki sam jak przed zapisem, a nie liczony od jednego dnia. Na swiezym starcie linie przez pierwsze dni pisza "ROZGRZEWKA".
+- We wsi renta, dziesiecina i danina wojenna sa odejmowane kazdego dnia, takze w dni bez powrotu taboru; niewolnych w miescie karmia rzemieslnicy i kupcy (40/60), wiec ich racja nie liczy sie dwa razy.
+
+**Zmiana:**
+- `DailyLife.Livelihood.cs`: region, krolestwo, swiat, Westeros / Essos i stany swiata - srednia D osad wazona LUDZMI (suma Y/K przez sume ludzi; wczesniej suma Y / suma L x K); dochod na glowe = suma Y / ludzie. Wies: gotowka = (do kiesy z utargu - renta - dziesiecina, ktora wyszla z kiesy - danina wojenna) x sigma bez przyciecia dobowego, przyciete do 0 dopiero Y stanu doby (gotowka + plon). Miasto: racja niewolnych (ludzie x K) z Y rzemieslnikow 40% i kupcow + szlachty 60%, najwyzej do zera (reszta "niepokryte" w linii). Miasto bez liczb kiesy tej doby: W/R/P bez wpisu do sredniej (doba brakujaca, nie zero), D z regionu, poza sumami D i dochodu. Straznik NaN / nieskonczonosci w Y, sredniej i Famine.HungerOf (0 / najedzeni 1 i potkniecie). Mediana regionow bez wielkich rodow (dochod rodow 1:1 brutto - nie do progow).
+- `DailyLife.cs`: zapis `arm_dailylife` v2 = sigma + srednia dochodu kazdej osady (`id:dni:7 liczb`, ok. 60 KB, SaveText.Sync w kawalkach; v1 czytany - srednia od nowa); rozgrzewka (polowa osad < 7 dob): linia "ROZGRZEWKA", bez `stany-dostatek.csv` i linii krolestw; plik i krolestwa przy liniach co dobe w dobie podzielnej przez 7 (ten sam rytm po wczytaniu); log wylaczony - bez liczenia; doba bez linii (ciche logi) - tylko srednia dochodu (bez Dostatku i Spizarni); czas bloku bez zapisu linii, pierscien 364 dob; potkniecia: kazdy `catch` przez Stumble (pierwszy do pliku), sluchacze (NoteVillageReturn, nowy NoteVillageLevy) atomowo do licznikow na poczatku doby; Reset czysci slowniki regionow, krolestw, indeksow, konta niewolnych; CSV: kolumna `D_bez_rodow`, uwagi (miasto bez liczb kiesy, rozgrzewka), cudzyslow w nazwach -> apostrof.
+- `DailyLife.Estates.cs`: spis od nowa tylko przy innej liczbie miast, zamkow i wsi (nie wszystkich osad gry); srednia z zapisu do pierwszego spisu; potkniecia RegionFor / StableIncome / Kingdom.
+- `TownFolk`: `ZcVillageTithe` (dziesiecina, ktora wyszla z kiesy wsi tej doby - licznik `ZcTiV` w VillageTithe), metody ZC nad naglowkiem E5/C4 (BreadLine odzyskuje opis). `KingdomTreasury.Levies`: danina wojenna z kiesy wsi -> `DailyLife.NoteVillageLevy` (licznik).
+
+**Progi:** `sprawdz_logi --grupa nzc0`: NZC0-2 ksiega (wsie + miasta) = linia "Ludnosc" tego samego taktu +-0.5% (stara kontrola sumy stanow -> NZC0-2b INFO), NZC0-4 opisany jako kontrola glodu, NZC0-5 takze miasta bez wlasnego D = 0, NZC0-9 doby zgloszone w linii w pliku z N roznymi osadami (para doba, osada), 0 dob "NIE ZAPISANY", odczyt bez cudzyslowow, NZC0-11 uwaga o rodach 1:1 brutto, NZC0-14..16 potrzeba wobec audytu (45 904 t/d +-3%, 0.885 kg/os +-0.02, z pola 76.6% +-2 pkt; DECYZJA), NZC0-17 zapis wczytany ponownie (ta sama doba dwa razy: Dostatek swiata +-3%). Sprawdzone na logach syntetycznych (dobry bieg, brak wiersza, NIE ZAPISANY, miasto bez kiesy, ksiega wobec Ludnosc, wczytanie).
+
+**Ryzyka / uwagi:** zapis +ok. 60 KB (arm_dailylife); podatek wojenny korony od zarobku ludu miast dalej nie odjety (tylko pan, cech, dziesiecina); w miastach z duza niewola (Volantis) racja niewolnych moze zjesc caly dochod R/P (liczba "niepokryte" w linii - do kalibracji ZC6).
+
 ## 2026-10-16 (zycie codzienne, ZC0) - POMIAR NA SUCHO: STANY, KOSZYK DNIA W KG, SPIZARNIA, DOSTATEK (LIVELIHOOD); GRA BEZ ZMIAN
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-zc0` (na 1958e987 = WGRANIE 72) | **Tor:** M (paczka ZC0 toru L projektu) | **Klucze:** `DailyLifeMeasure` (tak), `DailyLifeMarketScale` (37, suwak 28-73; w zapisie raz) - `python -I tools/gen_mcm.py`

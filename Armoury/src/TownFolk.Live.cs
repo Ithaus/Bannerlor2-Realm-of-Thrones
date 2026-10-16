@@ -1740,12 +1740,7 @@ namespace Armoury
             return n;
         }
 
-        // ============================================================ E5/C4 (205, PLAN 5.13): zdanie "czy ludzi stac na chleb" w oknie People of this land
-        /// <summary>E5/C4: zdanie do okna "People of this land" (PeopleMenu) dla osady, w ktorej stoi gracz - liczby kiesy czynnej z ostatniej doby tej osady:
-        /// miasto i zamek DAffF / DAff (te same co kolumny stac_jedzenie / stac_pelny kiesa-ludu.csv i skladniki sum "stac jedzenie" / "pelny" / "stac" linii "Kiesa ludu:"),
-        /// wies - zakupy tej doby / potrzeba (skladniki "wsie: zakupy X z Y"). Tylko odczyt: bez Get (nie tworzy wpisu), bez zlota i bez stanu.
-        /// null - bez zdania (kiesa nieczynna, zawor zamkow wylaczony, osada spoza ksiegi, wies bez miasta targowego). log - linia do logu z fragmentem linii
-        /// "Kiesa ludu:" tej samej doby (sprawdz_logi E5/C4-1 porownuje go z linia doby).</summary>
+        // ============================================================ ZC0 (DailyLife): odczyty kiesy ludu do pomiaru Dostatku - bez Get, bez zlota
         /// <summary>ZC0 (DailyLife, pomiar Dostatku - tylko odczyt, bez Get): zarobek okna klas ostatniej doby kiesy czynnej NETTO od podatku pana, cechu R i dziesieciny
         /// (stawki tej klasy: W 1% + 1%, R 2% + 1% + 2%, P 3% + 3%; podzamcze 3%) w zl gry: net[0..2] = W, R, P (zamek - [0] podzamcze). kind: 0 miasto, 1 zamek.
         /// false - kiesa nieczynna, osada spoza kiesy, wies, zamek przy wylaczonym zaworze zamkow albo liczby nie z tej doby. Nie rzuca.</summary>
@@ -1784,6 +1779,21 @@ namespace Armoury
             catch { h[0] = h[1] = h[2] = h[3] = 0; return false; }
         }
 
+        /// <summary>ZC0 (DailyLife, Dostatek wsi - tylko odczyt, bez Get): dziesiecina, ktora wyszla z kiesy wsi w tej dobie kiesy (czesc budowy septow; jalmuzna
+        /// i dziesiecina bez kaplana zostaja w kiesie wsi) w zl gry. 0 - wies bez dziesieciny tej doby, kiesa nieczynna albo osada spoza kiesy.</summary>
+        internal static double ZcVillageTithe(Settlement st)
+        {
+            Folk f;
+            if (st == null || !Live || _liveDay < 0 || !_f.TryGetValue(st, out f) || f == null || f.Kind != 2 || f.ZcTiDay != _liveDay) return 0;
+            return Math.Max(0, f.ZcTiV);
+        }
+
+        // ============================================================ E5/C4 (205, PLAN 5.13): zdanie "czy ludzi stac na chleb" w oknie People of this land
+        /// <summary>E5/C4: zdanie do okna "People of this land" (PeopleMenu) dla osady, w ktorej stoi gracz - liczby kiesy czynnej z ostatniej doby tej osady:
+        /// miasto i zamek DAffF / DAff (te same co kolumny stac_jedzenie / stac_pelny kiesa-ludu.csv i skladniki sum "stac jedzenie" / "pelny" / "stac" linii "Kiesa ludu:"),
+        /// wies - zakupy tej doby / potrzeba (skladniki "wsie: zakupy X z Y"). Tylko odczyt: bez Get (nie tworzy wpisu), bez zlota i bez stanu.
+        /// null - bez zdania (kiesa nieczynna, zawor zamkow wylaczony, osada spoza ksiegi, wies bez miasta targowego). log - linia do logu z fragmentem linii
+        /// "Kiesa ludu:" tej samej doby (sprawdz_logi E5/C4-1 porownuje go z linia doby).</summary>
         internal static string BreadLine(Settlement st, out string log)
         {
             log = null;
