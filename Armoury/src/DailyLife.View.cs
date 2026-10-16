@@ -232,6 +232,7 @@ namespace Armoury
         {
             if (_tipWired) return;
             _tipWired = true;
+            _h = h;                                          // ZC6: postfiks dobrobytu wpinany przy starcie sesji (DailyLife.Prosperity.cs) tym samym Harmony
             var where = new List<string>();
             foreach (var tn in new[] { "TaleWorlds.CampaignSystem.ViewModelCollection.TooltipRefresherCollection", "NavalDLC.View.NavalTooltipRefresherCollection" })
             {
@@ -394,6 +395,8 @@ namespace Armoury
                     var g = RegionAgg(r);
                     RegionLine(sb, r, g);
                     EstateRows(sb, g, null);
+                    string pv = ProsperityViewText(r);           // ZC6: dobrobyt za Dostatkiem regionu
+                    if (pv != null) sb.Append(pv).Append('\n');
                 }
                 else
                 {
@@ -407,6 +410,10 @@ namespace Armoury
                     EstateRows(sb, a, r);
                     var reg0 = r.Region ?? r;
                     if (r.Kind == KTown || !ReferenceEquals(reg0, r)) RegionLine(sb, reg0, RegionAgg(r));
+                    string mt = MobilityText(r);                 // ZC6: kto awansowal i spadl w ostatnich 28 dobach
+                    if (mt != null) sb.Append(mt).Append('\n');
+                    string pv = ProsperityViewText(r);           // ZC6: dobrobyt za Dostatkiem regionu
+                    if (pv != null) sb.Append(pv).Append('\n');
                     TableLine(sb, r);
                 }
                 sb.Append(Legend).Append('\n');

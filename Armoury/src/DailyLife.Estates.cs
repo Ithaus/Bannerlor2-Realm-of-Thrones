@@ -293,7 +293,7 @@ namespace Armoury
 
         // ============================================================ ZC2: ksiega stanow (udzialy w zapisie arm_estates) i pamiec Dostatku
         private const string PE = "Stany (ZC2): ";
-        private const string EVersion = "v1";      // v1|bazowa doba zasiewu|5 dob pamieci D|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4;...
+        private const string EVersion = "v2";      // v2|bazowa doba zasiewu|5 dob pamieci D|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4:bbb;... (v1 - bez pola bbb - czytany)
         private const int PpmAll = 1000000;        // udzialy w milionowych
         private const int RingN = 5;               // pamiec Dostatku: 5 tygodni (strzalka "w 28 dob" ma zawsze wpis sprzed >= 28 dob)
 
@@ -305,6 +305,10 @@ namespace Armoury
             public int SeedDay = -1;
             public bool Tilted;
             public readonly float[] Ring = { float.NaN, float.NaN, float.NaN, float.NaN, float.NaN };
+            // ZC6 (DailyLife.Mobility.cs): przeglady tygodniowe z rzedu z Dostatkiem ponizej progu spadku - rzemieslnicy, kupcy, szlachta (0-9; zapis v2, pole "bbb")
+            public readonly byte[] Below = new byte[3];
+            // ZC6, pamiec sesji (widok "w ostatnich 28 dobach"): ludzie przesunieci w 4 ostatnich przegladach (przeglad x przejscie), doby przegladow, przybysze od przegladu
+            public float[] Mv; public int[] MvDay; public float MigAcc;
         }
 
         private static readonly Dictionary<string, EBook> _eb = new Dictionary<string, EBook>(StringComparer.Ordinal);
@@ -327,6 +331,7 @@ namespace Armoury
             _eDay = -1; _eSeedDay = _eSeedSess = _eSeedTiltSess = _eSeedNoBkSess = 0;
             _eLoadN = _eLoadP = _eLoadBad = _eLoadBadP = 0; _eLoaded = false; _eLoadHash = 0; _eLoadNote = null; _eSaves = 0;
             ResetView();
+            ResetMobility();                                // ZC6: liczniki awansu i dobrobytu sesji (stan kampanii - pole "bbb" w arm_estates)
         }
 
         /// <summary>Udzialy (suma 1) -> milionowe z suma dokladnie 1 000 000 (reszta zaokraglen do stanu rest; gdyby rest mial za malo - do najwiekszego).</summary>
@@ -471,6 +476,9 @@ namespace Armoury
                         float v = b.Ring[i];
                         if (!float.IsNaN(v) && !float.IsInfinity(v)) sb.Append(((long)Math.Round(v * 100.0)).ToString(Inv));
                     }
+                    sb.Append(':');
+                    if (b.P != null && (b.Below[0] | b.Below[1] | b.Below[2]) != 0)
+                        for (int i = 0; i < 3; i++) sb.Append((char)('0' + Math.Min((byte)9, b.Below[i])));   // ZC6: tygodnie ponizej progu spadku
                     if (ring) nr++;
                     n++;
                 }
@@ -503,7 +511,8 @@ namespace Armoury
             {
                 var a = data.Split(new[] { '|' }, 4);
                 int seedBase;
-                if (a.Length != 4 || a[0] != EVersion || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
+                bool v1 = a.Length == 4 && a[0] == "v1";
+                if (a.Length != 4 || (a[0] != EVersion && !v1) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
                 {
                     _eLoadNote = "arm_estates w nieznanym formacie - pominiety, stany zasiane od nowa";
                     Log.Info(PE + "wczytanie | " + _eLoadNote + ".");
@@ -517,7 +526,7 @@ namespace Armoury
                     {
                         if (ent.Length == 0) continue;
                         var p = ent.Split(':');
-                        if (p.Length != 5 || !SafeId(p[0])) { _eLoadBad++; continue; }
+                        if (p.Length != (v1 ? 5 : 6) || !SafeId(p[0])) { _eLoadBad++; continue; }
                         var b = new EBook();
                         if (p[1].Length > 0)
                         {
@@ -546,11 +555,13 @@ namespace Armoury
                                 long x;
                                 b.Ring[i] = g[i].Length > 0 && long.TryParse(g[i], NumberStyles.Integer, Inv, out x) ? (float)(x / 100.0) : float.NaN;
                             }
+                        if (!v1 && b.P != null && p[5].Length == 3)
+                            for (int i = 0; i < 3; i++) { int x = p[5][i] - '0'; b.Below[i] = (byte)(x >= 0 && x <= 9 ? x : 0); }   // ZC6: tygodnie ponizej progu spadku
                         _eb[p[0]] = b;
                         _eLoadN++; if (b.P != null) _eLoadP++;
                     }
                 _eLoaded = true; _eLoadHash = EstatesHash();
-                Log.Info(PE + "wczytanie | format " + EVersion + " | osad " + _eLoadN + " (z udzialami " + _eLoadP + ", pominiete wpisy " + _eLoadBad + ", zle udzialy - zasiew od nowa " + _eLoadBadP
+                Log.Info(PE + "wczytanie | format " + (v1 ? "v1" : EVersion) + " | osad " + _eLoadN + " (z udzialami " + _eLoadP + ", pominiete wpisy " + _eLoadBad + ", zle udzialy - zasiew od nowa " + _eLoadBadP
                          + ") | pamiec Dostatku z dob " + string.Join(",", Array.ConvertAll(_ringDays, x => x.ToString(Inv))) + " | suma kontrolna " + Hex(_eLoadHash) + ".");
             }
             catch (Exception e)

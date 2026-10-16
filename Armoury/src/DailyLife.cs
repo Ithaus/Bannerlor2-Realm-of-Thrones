@@ -31,6 +31,8 @@ namespace Armoury
     /// ZC2 (klucz DailyLifeEstates, DailyLife.Estates.cs i DailyLife.View.cs): udzialy stanow z ksiegi stanow w zapisie (arm_estates; zasiew z pasm x BK),
     /// Dostatek liczony KAZDEJ doby (takze bez linii i przy wylaczonym logu - czyta go widok w grze: dymki osad, People of this land, Look over the district,
     /// Realm ledger), pamiec Dostatku co 7 dob, linia "Stany (ZC2): dzien N" w dobie linii. Bez klucza - jak ZC0.
+    /// ZC6 (klucze DailyLifeMobility, DailyLifeFreedom, DailyLifeProsperityLink; DailyLife.Mobility.cs, DailyLife.Prosperity.cs): po Dostatku doby (kazdej doby) awans
+    /// i spadek osad koszyka tygodnia, etykieta migracji miast, wyzwolenie, czlon dobrobytu na jutro; linia "Awans (ZC6): dzien N" w dobie linii.
     /// </summary>
     internal static partial class DailyLife
     {
@@ -348,12 +350,17 @@ namespace Armoury
             if (!LogGate.Lines || st == null || !st.LogEnabled)
             {
                 // doba bez linii (ciche logi, log wylaczony): bez Spizarni i linii; ZC2 - Dostatek do widoku co dobe (i pamiec Dostatku co 7 dob)
-                if (estates) { try { LivelihoodDay(); ViewDay(day); } catch (Exception e) { Stumble("LivelihoodDay(widok)", e); } }
+                if (estates)
+                {
+                    try { LivelihoodDay(); ViewDay(day); } catch (Exception e) { Stumble("LivelihoodDay(widok)", e); }
+                    try { ActiveDay(day); } catch (Exception e) { Stumble("ActiveDay", e); }   // ZC6: awans i spadek, wyzwolenie, dobrobyt na jutro (co dobe, takze bez linii)
+                }
                 AddMs((Stopwatch.GetTimestamp() - t0) * f);
                 return;
             }
             LivelihoodDay();
             if (estates) { try { ViewDay(day); } catch (Exception e) { Stumble("ViewDay", e); } }
+            if (estates) { try { ActiveDay(day); } catch (Exception e) { Stumble("ActiveDay", e); } }   // ZC6: awans i spadek, wyzwolenie, dobrobyt na jutro (po Dostatku doby)
             long t4 = Stopwatch.GetTimestamp();
             PantryDay();
             long t5 = Stopwatch.GetTimestamp();
@@ -378,6 +385,7 @@ namespace Armoury
             catch (Exception e) { Stumble("LifeLine", e); }
             if (pantry != null) Log.Info(pantry);
             if (estates) { try { Log.Info(EstatesLine(day)); } catch (Exception e) { Stumble("EstatesLine", e); } }   // ZC2: linia "Stany (ZC2): dzien N"
+            if (estates) { try { Log.Info(MobilityLine(day)); } catch (Exception e) { Stumble("MobilityLine", e); } }   // ZC6: linia "Awans (ZC6): dzien N" (liczniki od ostatniej linii)
         }
 
         // ------------------------------------------------------------ linie

@@ -1461,6 +1461,7 @@ namespace Armoury
             try { TourneyPay.SessionStart(); } catch (Exception e) { Log.Error("TourneyPay.SessionStart", e); }   // TP (16.10): linia "Turniej-platnik (TP): start sesji", decyzja wyrownania Seagard (D3, raz: zapis sprzed zmiany, Ithauser, czas >= 109020) - bez przelewow (komunikat i splata w pierwszej godzinie)
             try { DailyLife.SessionStart(); } catch (Exception e) { Log.Error("DailyLife.SessionStart", e); }   // ZC0 (16.10): linia "Zycie (ZC0): start sesji" - klucze i skala targu sigma (z zapisu albo z MCM)
             try { DailyLife.EstatesSessionStart(); } catch (Exception e) { Log.Error("DailyLife.EstatesSessionStart", e); }   // ZC2 (16.10): linia "Stany (ZC2): start sesji" - klucz, ksiega stanow z zapisu, widok
+            try { DailyLife.MobilitySessionStart(); } catch (Exception e) { Log.Error("DailyLife.MobilitySessionStart", e); }   // ZC6 (16.10): postfiks dobrobytu na czynnym modelu (raz na metode) i linia "Awans (ZC6): start sesji"
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
@@ -1991,7 +1992,11 @@ namespace Armoury
             try { VineOlive.Daily(); } catch (Exception e) { Log.Error("VineOlive.Daily", e); } DayProfile.Lap("VineOlive.Daily");   // B6: linia "Winnice i gaje (B6)" (tylko log)
             // ZC0 (16.10, zycie codzienne - pomiar na sucho): linie "Zycie (ZC0)" i "Spizarnia (ZC)", co 7 dob krolestwa i stany-dostatek.csv - PO TownFolk.Daily (zarobek klas),
             // GoodsLedger.Daily (towar ludu doby), Famine.Daily (najedzeni), PopulationLaw.Daily (renta wsi), ClanIncomeBook.Daily (D rodow) i ThrallLaw.Daily (konto niewolnych)
+            // ZC6 (16.10, Dostatek czynny): awans i spadek stanow w tym samym bloku - kupno ziemi z kies wsi do panow (GiveGoldAction) osobna pozycja "Przeplywy osad"
+            // (MZc6); migawka MRest przed blokiem = te same liczby "pozostale moduly ticku" co dotad (dotad zlapalaby je migawka MRest przed wywozem kupcow)
+            try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }
             try { DailyLife.Daily(); } catch (Exception e) { Log.Error("DailyLife.Daily", e); } DayProfile.Lap("DailyLife.Daily");
+            try { MoneyLedger.Mark(MoneyLedger.MZc6); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)
             // M6a: linie "Okupy powtorne (M6a-2)", "Najemnicy - sluzba (M6a-1)" (z przegladem pola gry ShouldStayInKingdomUntil) i "Pokoj a jency (M6a-3)"

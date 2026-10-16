@@ -6632,6 +6632,18 @@ namespace Armoury
         [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
         public bool DailyLifeEstates { get; set; } = true;
 
+        [SettingPropertyBool("Daily Life Mobility", HintText = "with Daily Life Estates: people rise and fall between the estates once a week in every town and village, by the Livelihood of their estate and the savings in their purse - a peasant takes up a craft, a labourer joins a guild (paying its fee to the craftsmen), a craftsman turns merchant, a merchant buys land from the lord of the land and joins the gentry; when an estate cannot keep itself for weeks it falls a step down. The money goes with the people, nothing is made or lost; owners free a few slaves each year and the newcomers from the villages swell the town's labourers. Slow: about 3% of the way up a year, at most 0.2% of a place's people a week (off = the estates stand still, as before)")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public bool DailyLifeMobility { get; set; } = true;
+
+        [SettingPropertyBool("Daily Life Freedom", HintText = "with Daily Life Estates: where a stronghold of a slaving land is ruled by a realm whose ruler is not of a slaving culture, a tenth of its region's slaves are set free every 28 days - to the labourers in the town and to the peasants in the villages (off = the slaves stay slaves under any ruler)")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public bool DailyLifeFreedom { get; set; } = true;
+
+        [SettingPropertyBool("Daily Life Prosperity Link", HintText = "with Daily Life Estates: the prosperity of towns and castles drifts slowly toward the Livelihood of their region - a region richer than the land's middle grows toward more prosperity than the land's middle town, a poorer one toward less; at most 1% of the gap and 2 points a day, shown as 'Livelihood of the region' in the prosperity tooltip. The middle of each land stays where it is (off = prosperity as before)")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public bool DailyLifeProsperityLink { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8289,6 +8301,9 @@ namespace Armoury
             s.DailyLifeMeasure = DailyLifeMeasure;
             s.DailyLifeMarketScale = DailyLifeMarketScale;
             s.DailyLifeEstates = DailyLifeEstates;
+            s.DailyLifeMobility = DailyLifeMobility;
+            s.DailyLifeFreedom = DailyLifeFreedom;
+            s.DailyLifeProsperityLink = DailyLifeProsperityLink;
         }
 
         internal static void Apply()
