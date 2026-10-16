@@ -2487,3 +2487,4 @@ tekstura proporczyka.
 4. Wgranie po udanych testach. 5. Jesli czas: przysiolki na pustkowiach, zajazdy, +15% drogi ROT (dane sondy roz/geo-dane).
 Rano: docs/RAPORT-NOCNY-2026-10-17.md.
 TERMIN: gra gotowa 17.10 10:00 CEST = 01:00 PDT (zegar komp.); ostatnie wgranie do ok. 00:15 PDT, co nie przeszlo testu - nie wgrywac.
+ZMIANA (Jeff ~15:45 PDT): "wszystkie 8 rob, najwyzej bedziesz jeszcze w trakcie jak wstane ... nie przerywal pracy" - zakres ZC0-ZC7 + kalibracja, termin miekki; gdy Jeff gra - bez testow i wgran.
