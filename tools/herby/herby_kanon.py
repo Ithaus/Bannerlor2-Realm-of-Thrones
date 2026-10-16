@@ -22,6 +22,16 @@ istnieja w banner_icons.xml, herb zlozony bez barw 194-251 (CCsBanners nadpisuje
 
 Kadr gry: BannerTextureCreator.CreateDefaultBannerCamera widzi srodkowa jedna trzecia plotna 1528 (509..1019) - tam idzie cale godlo.
 Obrot warstwy w kodzie = stopnie przeciwnie do zegara (ROT Sarsfield: pionowy pas obrocony o 45 = skos w prawo w dol).
+
+Po recenzji D2 (16.10): figury 'counterchanged' w barwie odwrotnej do pola pod srodkiem kazdej (Painter._counter, field_side; na linii - jak
+dotad z obrysem) i po jednej w kazdej czesci pola (region_points); polozenia 'in chief / in dexter / in sinister chief ...' w nazwanej czesci
+(pos_box, box_points); uklad rzedami '4-3-2' (token 'arr' - tynktura po nim nalezy do figury); kilka figur na jednym nosicielu (on_points, slot);
+godla bez pasujacej ikony (NO_FIT: cma, zaba, czaszka, szkielet) - jedyna figura glowna = neutralne, reszta pominieta; nietoperz -> kruk jako
+zastepca (NOT_EXACT); obramowanie z figur bez linii obramowania; galezie bez herbu w kanonie - herb rodu glownego z roznica (CADET_OF, ten
+sam rdzen nazwy i kraina; difference: bordiura / lambel / kantonik / obramowanie); poprawki danych (DROP_HOUSES, LIEGE_AT_START, NO_ROT_CLAN,
+EXTRA_HOUSES, rod wymarly w 298 AC albo pozniej zyje na starcie); podkrainy (SUBREGION: osada odniesienia do odleglosci, wyspa) i okregi wysp;
+kontrola barw (tynktura opisu slowami, ktorej nie ma w kodzie - lista na wyjsciu); druga kontrola po zapisie takze wariantu CCs; kolumna
+imion "list". Linia per fess zostaje na 764: kwadrat 505 wypelnia 88% pola ikony (alfa tekstury 30..482 z 512), wiec 868 x 0.88 / 2 = 382.
 """
 import sys, os, re, io, csv, zlib, collections
 import xml.etree.ElementTree as ET
@@ -138,9 +148,9 @@ def load_spclans(modules):
 
 
 def load_villages(modules):
-    """id wsi gry -> (kultura, nazwa) z ROT-Map settlements.xml."""
+    """id wsi gry -> (kultura, nazwa) z ROT-Map settlements.xml; wszystkie osady -> rodzaj; wies gry -> jej zamek / miasto (bound)."""
     root = read_xml(os.path.join(modules, 'ROT-Map', 'ModuleData', 'settlements.xml'))
-    out, alls = {}, {}
+    out, alls, bounds = {}, {}, {}
     for s in root.iter('Settlement'):
         sid = s.get('id')
         comp = s.find('Components')
@@ -150,7 +160,19 @@ def load_villages(modules):
         alls[sid] = kind
         if kind == 'Village':
             out[sid] = (cul, name)
-    return out, alls
+            b = comp[0].get('bound') or ''
+            bounds[sid] = b.replace('Settlement.', '')
+    return out, alls, bounds
+
+
+def load_spclan_info(modules):
+    """klan ROT -> (krolestwo, kultura) ze spclans.xml (rody dopisane w EXTRA_HOUSES)."""
+    out = {}
+    root = read_xml(os.path.join(modules, 'ROT-Content', 'ModuleData', 'spclans.xml'))
+    for f in root.iter('Faction'):
+        if f.get('id'):
+            out[f.get('id')] = ((f.get('super_faction') or '').strip(), (f.get('culture') or '').strip())
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ krainy
@@ -331,7 +353,7 @@ LEX = {
     'pair of balances': ([337], [], 'tool', 'or'), 'pair of scales': ([337], [], 'tool', 'or'), 'harp': ([339], [], 'tool', 'or'),
     'lute': ([339], [], 'tool', 'or'), 'trumpet': ([339], [78514], 'tool', 'or'), 'horn': ([339], [78514, 78813], 'tool', 'or'),
     'hunting horn': ([339], [78514, 78813], 'tool', 'or'), 'wheel': ([405, 410, 409], [78212], 'tool', 'brun'), 'broken wheel': ([405], [78212], 'tool', 'sable'),
-    'horseshoe': ([335], [], 'tool', 'sable'), 'anchor': ([304], [], 'tool', 'sable'), 'oar': ([304], [], 'tool', 'brun'),
+    'horseshoe': ([335], [], 'tool', 'sable'), 'flail': ([303], [78406], 'weapon', 'argent'), 'anchor': ([304], [], 'tool', 'sable'), 'oar': ([304], [], 'tool', 'brun'),
     'buckle': ([402], [], 'tool', 'or'), 'brooch': ([402], [], 'tool', 'or'), 'chain': ([404], [75503, 78301], 'tool', 'argent'),
     'ring': ([500, 403], [], 'shape', 'or'), 'annulet': ([500], [], 'shape', 'or'), 'noose': ([500], [], 'shape', 'sable'),
     'nail': ([304], [], 'tool', 'copper'), 'brazier': ([338], [], 'tool', 'sable'), 'candle': ([338], [], 'tool', 'or'),
@@ -352,6 +374,7 @@ LEX = {
     'heart': ([514], [], 'shape', 'gules'), 'winged heart': ([514], [], 'shape', 'sable'), 'drop': ([506], [], 'shape', 'sanguine'),
     'hand': ([341, 342], [], 'human', 'carnation'), 'fist': ([342], [], 'human', 'carnation'), 'gauntlet': ([342], [], 'human', 'cendree'),
     'skull': ([344], [78313], 'human', 'argent'), "death's head": ([344], [78313], 'human', 'argent'), 'head': ([344], [], 'human', 'carnation'),
+    'skeleton': ([], [78316], 'monster', 'argent'),
     "woman's head": ([344], [], 'human', 'carnation'), "sea king's head": ([344], [78704], 'human', 'argent'), 'stone head': ([344], [], 'human', 'cendree'),
     "mother's head": ([344], [], 'human', 'carnation'), 'face': ([344], [], 'human', 'carnation'), 'mask': ([344, 347], [], 'human', 'argent'),
     'lips': ([514], [], 'human', 'carnation'), 'footprint': ([506], [], 'shape', 'argent'), 'man': ([443], [], 'human', 'carnation'),
@@ -425,7 +448,7 @@ DIVS = [('per pale', 'pale'), ('per fess', 'fess'), ('per bend sinister', 'bends
         ('parted into six', 'paly'), ('parted into nine', 'chequy')]
 MODS = ['embattled', 'engrailed', 'indented', 'wavy', 'rayonne', 'rayonny', 'nebuly', 'cotised', 'enhanced', 'inverted', 'reversed', 'undy',
         'saltirewise', 'saltirwise', 'in saltire', 'crossed', 'counter-salient', 'counter salient', 'combatant', 'addorsed', 'palewise', 'fesswise',
-        'bendwise sinister', 'bendwise', 'bendways sinister', 'bendways', 'erect', 'upright', 'in fess', 'in pale', 'in bend',
+        'bendwise sinister', 'bendwise', 'bendways sinister', 'bendways', 'erect', 'upright', 'in fess', 'in pale', 'in bend sinister', 'in bend',
         'rampant', 'passant', 'statant', 'salient', 'sejant', 'couchant', 'dormant', 'displayed', 'volant', 'rising', 'rousant', 'close',
         'naiant', 'hauriant', 'erased', 'couped', 'caboshed', 'cabossed', 'regardant', 'guardant', 'segreant', 'embowed', 'courant',
         'springing', 'trippant', 'queue-fourchee', 'queue-forchee', 'blasted', 'veined', 'increscent', 'decrescent',
@@ -537,7 +560,8 @@ def tokenize(text, phrase):
             continue
         m = re.match(r'(\d+(?:-\d+)+)\b', text[i:])
         if m:
-            out.append(Tok('cnt', sum(int(x) for x in m.group(1).split('-')), i))
+            # uklad rzedami ('4-3-2', '4-3-2-1') - osobny token: po figurze to jej uklad, nie liczba nastepnej (recenzja D2: Peckledon, Whent)
+            out.append(Tok('arr', tuple(int(x) for x in m.group(1).split('-')), i))
             i += len(m.group(1))
             continue
         m = re.match(r'(\d+)\b', text[i:])
@@ -574,6 +598,7 @@ class Item(object):
     def __init__(self, kind, name, count=1, tin=None):
         self.kind, self.name, self.count, self.tin = kind, name, count, tin
         self.mods, self.role, self.host, self.pos, self.tins = [], 'main', None, None, []
+        self.arr = None                  # uklad rzedami z blazonu ('4-3-2' -> (4, 3, 2))
 
     def __repr__(self):
         return '%s(%s x%s %s %s%s)' % (self.kind, self.name, self.count, self.tin, self.role, ' on ' + self.host.name if self.host else '')
@@ -634,7 +659,7 @@ def parse_field_tokens(toks):
             fret = True
         elif t.kind == 'kw' and t.v == 'gouttee':
             gout = True
-        elif t.kind in ('ord', 'chg', 'cnt'):
+        elif t.kind in ('ord', 'chg', 'cnt', 'arr'):
             break
         k += 1
     return div, tins, fret, gout, k
@@ -670,6 +695,14 @@ def parse_items(toks, mentioned, field, tech=False):
             if t.v == 'crowned' and tech:
                 skip = True
             prev_kind = 'mod' if not skip else 'det'
+            continue
+        if t.kind == 'arr':
+            if last is not None and last.kind == 'chg' and prev_kind in ('chg', 'mod'):
+                # 'ten mullets 4-3-2-1 purpure' - uklad tej figury; prev_kind zostaje, wiec tynktura po ukladzie nalezy do niej
+                last.arr = t.v
+                continue
+            pcount = sum(t.v)
+            prev_kind = 'cnt'
             continue
         if t.kind == 'cnt':
             pcount = t.v
@@ -755,6 +788,9 @@ def parse_items(toks, mentioned, field, tech=False):
                 ptins.append(t.v)
             prev_kind = 'tin'
             continue
+        if t.kind == 'ord' and t.v in ('lozenge', 'escutcheon', 'cartouche') and isinstance(pcount, int) and pcount > 1:
+            # 'four lozenges', 'seven escutcheons' - kilka sztuk to figury, nie jedna figura zwyczajna (kontrola barw: Yarwyck, Darklyn)
+            t = Tok('chg', t.v, t.pos)
         if t.kind in ('ord', 'chg'):
             if t.kind == 'chg' and prev_kind == 'of' and last is not None:
                 if last.kind == 'ord' and last.name in ('orle', 'bordure', 'tressure'):
@@ -835,7 +871,7 @@ def parse_english_field(toks):
         if t.kind == 'kw' and t.v in ('on', 'upon', 'over', 'against'):
             j = k + 1
             div, tins = None, []
-            while j < len(toks) and toks[j].kind in ('cnt', 'div', 'tin', 'kw', 'mod', 'word') and not (toks[j].kind == 'kw' and toks[j].v in ('on', 'upon', 'between', 'within', 'beneath')):
+            while j < len(toks) and toks[j].kind in ('cnt', 'arr', 'div', 'tin', 'kw', 'mod', 'word') and not (toks[j].kind == 'kw' and toks[j].v in ('on', 'upon', 'between', 'within', 'beneath')):
                 tj = toks[j]
                 if tj.kind == 'div':
                     div = div or tj.v
@@ -1039,9 +1075,16 @@ ORD_ICON = {'saltire': 522, 'cross': 418, 'lozenge': 512, 'chevron': 511, 'chevr
 INTRINSIC = {'pellet': 'sable', 'plate': 'argent', 'bezant': 'or', 'hurt': 'azure', 'torteau': 'gules', 'golpe': 'purpure', 'pomme': 'vert',
              'fountain': 'azure', 'coin': 'or'}
 ICON_KW = {}   # ikona -> slowa (keywords + nazwa godla) - czy dobrana ikona to DOKLADNIE to godlo, czy zastepca z rodziny
+# recenzja D2: zastepca, nie godlo - kruk rozpostarty (116, slowa ikony maja 'bat') za nietoperza Whentow i Lothstonow
+NOT_EXACT = {('bat', 116), ('skeleton', 542)}   # 542 = koscista dlon ROT, nie szkielet
+# recenzja D2: godla bez pasujacej ikony w grze (Native / NavalDLC / ROT) - zastepca z innej rodziny myli (cma -> orzel 105, zaba -> waz 154,
+# czaszka / szkielet -> glowa w wiencu 344); wariant CCs bierze ikone CCs, gdy jest; inaczej figura glowna = neutralne godlo, reszta pominieta
+NO_FIT = {'moth', "death's head moth", 'butterfly', 'frog', 'toad', 'skull', "death's head", 'skeleton', 'dragonbone skeleton'}
 
 
 def is_exact(noun, iid):
+    if (noun, iid) in NOT_EXACT:
+        return False
     kw = ICON_KW.get(iid)
     if not kw:
         return False
@@ -1055,10 +1098,23 @@ class Painter(object):
     def __init__(self, lex, act_icons, ccs_icons, ccs):
         self.lex, self.act, self.ccsset, self.ccs = lex, act_icons, ccs_icons, ccs
         self.layers, self.notes, self.used_ccs = [], [], False
+        self.counter = None              # (podzial, (tynktura 1, tynktura 2)) - figury 'counterchanged' w barwie odwrotnej do pola pod srodkiem
 
     def icon(self, noun):
-        """(ikona, jak dobrana): dokladne godlo -> (CCs, gdy wariant CCs) -> ta sama rodzina -> neutralne."""
+        """(ikona, jak dobrana): dokladne godlo -> (CCs, gdy wariant CCs) -> ta sama rodzina -> neutralne.
+        Godlo z NO_FIT bez dokladnej ikony -> (None, 'none') - wolajacy daje neutralne godlo (jedyna figura glowna) albo je pomija."""
         e = self.lex.get(noun)
+        if e and noun in NO_FIT:
+            act, ccs, fam, _ = e
+            for i in act:
+                if i in self.act and is_exact(noun, i):
+                    return i, 'exact'
+            if self.ccs:
+                for i in ccs:
+                    if i in self.ccsset:
+                        self.used_ccs = True
+                        return i, 'ccs'
+            return None, 'none'
         if e:
             act, ccs, fam, _ = e
             # wariant CCs: ikona CCs tylko tam, gdzie gra nie ma dokladnego godla (sowa, zolw, byk, wiewiorka...)
@@ -1078,12 +1134,123 @@ class Painter(object):
         return NEUTRAL, 'neutral'
 
     def add(self, *lay):
+        if self.counter is not None and self.layers:
+            lay = self._counter(list(lay))
         self.layers.append(L(*lay))
+
+    def _counter(self, lay):
+        """Recenzja D2 (counterchanged): figura po jednej stronie linii podzialu - barwa drugiej polowy pola (bez obrysu); figura NA linii
+        (np. jedna w srodku 'per pale') - jak dotad: jasna tynktura z ciemnym obrysem (barwy podane przez wolajacego)."""
+        div, (t0, t1) = self.counter
+        lay = lay + [0] * (10 - len(lay))
+        side, dist = field_side(div, lay[5], lay[6])
+        half = max(lay[3], lay[4]) * 0.5 * SQ
+        if side is None or dist < half * 0.6:
+            return lay
+        c = TINCT_COLOR.get(t1 if side == 0 else t0, TINCT_COLOR['argent'])
+        lay[1], lay[2], lay[7] = c, c, 0
+        return lay
 
 
 def col(t, field_t, h):
     t = t if t else contrast(field_t, h)
     return TINCT_COLOR.get(t, TINCT_COLOR['argent'])
+
+
+COUNTER_DIVS = ('pale', 'fess', 'bend', 'bendsin', 'chevron', 'quarterly', 'saltire')
+CHEV_APEX, CHEV_SLOPE = MID + 51, 1.2     # tlo 13 przesuniete o +300 (draw): wierzcholek ok. y 815, ramiona 1.2 w dol na jednostke w bok (podglad tekstur)
+
+
+def field_side(div, x, y):
+    """(0 - pole pierwszej tynktury, 1 - drugiej, odleglosc od linii podzialu) w punkcie plotna (y w dol); None - podzial bez reguly (gyronny, wzory).
+    Geometria jak tla w draw(): pale - lewa polowa 1.; fess - gorna 1.; bend (tlo 12 odbite) - gorna prawa 1.; bend sinister - gorna lewa 1.;
+    chevron - nad krokwia 1.; quarterly (tlo 3) - 1. i 4. cwiartka 1.; saltire (tlo 14) - glowica i podstawa 1., boki 2."""
+    dx, dy = x - MID, y - MID
+    if div == 'pale':
+        return (0 if dx < 0 else 1), abs(dx)
+    if div == 'fess':
+        return (0 if dy < 0 else 1), abs(dy)
+    if div == 'bend':
+        return (0 if dy < dx else 1), abs(dy - dx) / 1.4142
+    if div == 'bendsin':
+        return (0 if dx + dy < 0 else 1), abs(dx + dy) / 1.4142
+    if div == 'chevron':
+        line = CHEV_APEX + CHEV_SLOPE * abs(dx)
+        return (0 if y < line else 1), abs(y - line) / (1.0 + CHEV_SLOPE * CHEV_SLOPE) ** 0.5
+    if div == 'quarterly':
+        return (0 if (dx < 0) == (dy < 0) else 1), min(abs(dx), abs(dy))
+    if div == 'saltire':
+        return (0 if abs(dy) > abs(dx) else 1), abs(abs(dy) - abs(dx)) / 1.4142
+    return None, 0.0
+
+
+def region_points(div, n):
+    """Recenzja D2: n figur 'counterchanged' na polu podzielonym - po jednej w kazdej czesci (srodki czesci, rozmiar); None - zwykly uklad."""
+    if n == 2 and div == 'pale':
+        return [(MID - 128, MID), (MID + 128, MID)], 210
+    if n == 2 and div == 'fess':
+        return [(MID, MID - 128), (MID, MID + 128)], 210
+    if n == 2 and div in ('bend', 'bendsin'):
+        r = 149                                       # okrag wpisany w polowe kadru (trojkat prostokatny o przyprostokatnych 510)
+        if div == 'bend':
+            return [(V1 - r, V0 + r), (V0 + r, V1 - r)], 2 * r * 0.95
+        return [(V0 + r, V0 + r), (V1 - r, V1 - r)], 2 * r * 0.95
+    if n == 4 and div == 'saltire':
+        return [(MID, V0 + 95), (V1 - 95, MID), (MID, V1 - 95), (V0 + 95, MID)], 150
+    if n == 4 and div == 'quarterly':
+        return [(MID - 128, MID - 128), (MID + 128, MID - 128), (MID - 128, MID + 128), (MID + 128, MID + 128)], 190
+    return None
+
+
+def pos_box(pos, area, div):
+    """Recenzja D2: polozenie z blazonu ('in chief', 'in dexter', 'in sinister chief', 'in dexter base') -> czesc pola (cx, cy, w, h, trojkat).
+    Pole 'per bend' / 'per bend sinister' z polozeniem w rogu - polowa trojkatna (srodek okregu wpisanego); inaczej polowa / cwiartka prostokata."""
+    x0, y0, x1, y1 = area
+    mx, my = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+    if div == 'fess':
+        my = MID
+    if div == 'pale':
+        mx = MID
+    chief, base = 'chief' in pos, 'base' in pos
+    dexter, sinister = 'dexter' in pos, 'sinister' in pos
+    if div in ('bend', 'bendsin'):
+        r = 149
+        if div == 'bend':
+            upper = chief or (sinister and not base)
+            return ((V1 - r, V0 + r) if upper else (V0 + r, V1 - r)) + (2 * r, 2 * r, True)
+        upper = chief or (dexter and not base)
+        return ((V0 + r, V0 + r) if upper else (V1 - r, V1 - r)) + (2 * r, 2 * r, True)
+    bx0, bx1, by0, by1 = x0, x1, y0, y1
+    if chief:
+        by1 = my
+    if base:
+        by0 = my
+    if dexter:
+        bx1 = mx
+    if sinister:
+        bx0 = mx
+    return (bx0 + bx1) / 2.0, (by0 + by1) / 2.0, bx1 - bx0, by1 - by0, False
+
+
+def box_points(n, w, h, mods=(), rows=None):
+    """n figur w prostokacie w x h (przesuniecia od srodka, rozmiar): szeroki - rzad, wysoki - kolumna, inaczej uklad pola; 'seme' - siatka."""
+    if n == 'seme':
+        cols = max(2, int(round(w / 95.0)))
+        rws = max(2, int(round(h / 95.0)))
+        pts = []
+        for r in range(rws):
+            off = 0.5 if r % 2 else 0.0
+            for c in range(cols - (1 if r % 2 else 0)):
+                pts.append(((c + 0.5 + off) * w / cols - w / 2.0, (r + 0.5) * h / rws - h / 2.0))
+        return pts, min(w / cols, h / rws) * 0.62
+    k = max(1, min(int(n), 12))
+    if rows is None and w >= 1.6 * h:
+        step = w / float(k)
+        return [((j - (k - 1) / 2.0) * step, 0) for j in range(k)], min(h * 0.8, step * 0.85)
+    if rows is None and h >= 1.6 * w:
+        step = h / float(k)
+        return [(0, (j - (k - 1) / 2.0) * step) for j in range(k)], min(w * 0.8, step * 0.85)
+    return arrangement(n, min(w, h) / 2.0, mods, rows)
 
 
 def proper_of(noun, lex):
@@ -1092,7 +1259,7 @@ def proper_of(noun, lex):
 
 
 # rozmieszczenie n figur (przesuniecia od srodka, rozmiar) w polu o polowie boku hb
-def arrangement(n, hb, mods=()):
+def arrangement(n, hb, mods=(), rows=None):
     if n == 'seme':
         pts, s = [], hb * 0.36
         rows = [(-0.66, (-0.66, 0.0, 0.66)), (-0.22, (-0.33, 0.33)), (0.22, (-0.66, 0.0, 0.66)), (0.66, (-0.33, 0.33))]
@@ -1101,6 +1268,22 @@ def arrangement(n, hb, mods=()):
                 pts.append((x * hb, y * hb))
         return pts, s
     n = max(1, min(int(n), 12))
+    if rows and sum(rows) == n and len(rows) > 1 and max(rows) <= 6:
+        # recenzja D2: uklad z blazonu rzedami ('nine bats 4-3-2', 'ten mullets 4-3-2-1') - rzedy rowno od gory do dolu
+        R, mx = len(rows), max(rows)
+        ys = [(-0.62 + 1.24 * k / (R - 1)) for k in range(R)]
+        dx = min(0.62, 1.3 / max(mx - 1, 1))
+        pts = []
+        for r, y in zip(rows, ys):
+            for k in range(r):
+                pts.append(((k - (r - 1) / 2.0) * dx * hb, y * hb))
+        return pts, hb * min(dx * 0.95, 1.24 / (R - 1) * 0.85, 0.7)
+    if n > 1 and ('in bend' in mods or 'in bend sinister' in mods):
+        # recenzja D2 (Lightfoot): figury w linii po skosie - 'in bend' z lewej gory w prawy dol, 'in bend sinister' z lewego dolu w prawa gore
+        sgn = -1 if 'in bend sinister' in mods else 1
+        step = 1.5 / (n - 1)
+        pts = [((-0.75 + k * step) * hb, sgn * (-0.75 + k * step) * hb) for k in range(n)]
+        return pts, hb * min(0.5, step * 1.1)
     if n == 1:
         return [(0, 0)], hb * 1.55
     if n == 2:
@@ -1216,22 +1399,38 @@ def draw(arms, lex, act_icons, ccs_icons, house, ccs=False):
                 continue
             it = chg[0]
             ic, how = (ORD_ICON[it.name], 'ordinary') if it.kind == 'ord' else P.icon(it.name)
+            if ic is None:
+                # recenzja D2: godlo bez pasujacej ikony (Lonmouth: czaszki) - cwiartka bez godla
+                P.notes.append('q%d:%s->left out (no icon)' % (qi + 1, it.name))
+                continue
             tin = it.tin
             if tin == 'proper':
                 tin = proper_of(it.name, lex)
             cc = col(tin if tin and tin != 'counter' else None, qt or field, h + qi)
+            # recenzja D2 (Lonmouth 'three lips'): do trzech figur w cwiartce
+            n = it.count if isinstance(it.count, int) and it.kind == 'chg' else 1
+            pts = [(0, 0)] if n <= 1 else ([(-50, 0), (50, 0)] if n == 2 else [(-50, -42), (50, -42), (0, 46)])
+            s = 190 if n <= 1 else (105 if n == 2 else 92)
             for ox, oy in offs[qi]:
-                P.add(ic, cc, cc, 190, 190, MID + ox * HALF, MID + oy * HALF, 0, 0, 0)
+                for px, py in pts:
+                    P.add(ic, cc, cc, s, s, MID + ox * HALF + px, MID + oy * HALF + py, 0, 0, 0)
             P.notes.append('q%d:%s->%d(%s)' % (qi + 1, it.name, ic, how))
         return P.layers, P.notes, P.used_ccs
     # --- zwyczajne (ord) w roli main, potem bordiura i glowica, potem figury
     ords = [it for it in arms.items if it.kind == 'ord' and it.role in ('main', 'over')]
     chief = next((o for o in ords if o.name == 'chief'), None)
     bord = next((o for o in ords if o.name in ('bordure',)), None)
+    # recenzja D2 (Kettleblack 'an orle of pellets'): obramowanie Z FIGUR - same figury, bez linii / pasa obramowania
+    orle_hosts = set(id(it.host) for it in arms.items if it.kind == 'chg' and it.role == 'orle' and it.host is not None)
+    if bord is not None and id(bord) in orle_hosts:
+        bord = None
     area = [V0, V0, V1, V1]       # wolne pole na figury glowne
     hosts, placed = {}, {}
     for o in ords:
         if o.name in ('chief', 'bordure'):
+            continue
+        if id(o) in orle_hosts:
+            hosts[id(o)] = ('escutcheon', MID, MID, 260)
             continue
         oc = col(o.tin if o.tin not in ('proper', 'counter') else None, field, h + 7)
         hosts[id(o)] = draw_ord(P, o, oc, field)
@@ -1253,6 +1452,14 @@ def draw(arms, lex, act_icons, ccs_icons, house, ccs=False):
     mains = [it for it in chg if it.role == 'main']
     order = [it for it in chg if it.role == 'around' and it.host is not None and it.host in chg] + mains
     order += [it for it in chg if it not in order]
+    # recenzja D2 (Harclay 'a crescent, a roundel and a crescent' na pasie): kilka figur na jednym nosicielu - kolejne miejsca jednego ukladu
+    on_slots, on_total = {}, collections.Counter()
+    for it in chg:
+        if it.role == 'on' and it.host is not None:
+            k = it.count if isinstance(it.count, int) else 3
+            on_slots[id(it)] = (on_total[id(it.host)], k)
+            on_total[id(it.host)] += k
+    two_fields = len(arms.field) >= 2 and arms.field[0] and arms.field[1] and div in COUNTER_DIVS
     for it in order:
         tin = it.tin
         if tin is None and it.name in INTRINSIC:
@@ -1274,62 +1481,84 @@ def draw(arms, lex, act_icons, ccs_icons, house, ccs=False):
         if cc == TINCT_COLOR.get(host_field) and it.role != 'on' and not counter and it.name not in INTRINSIC:
             cc = col(contrast(host_field, h + 19), host_field, h)
         ic, how = P.icon(it.name)
-        P.notes.append('%s %s->%d(%s)' % (it.role, it.name, ic, how))
-        if it.role == 'on' and it.host is not None and id(it.host) in placed:
-            for (hx, hy, hs) in placed[id(it.host)]:
-                P.add(ic, cc, c2x or cc, hs * 0.62, hs * 0.62, hx, hy, stroke, 0, 0)
-        elif it.role == 'on' and it.host is not None:
-            place_on(P, it, ic, cc, hosts.get(id(it.host)), it.host, stroke, c2x)
-        elif it.role == 'around' and it.host is not None and id(it.host) in hosts:
-            place_around(P, it, ic, cc, hosts[id(it.host)], stroke, c2x)
-        elif it.role == 'around' and it.host is not None:
-            crossed = any(m in it.mods for m in ('saltirewise', 'in saltire', 'crossed'))
-            if crossed and it.count == 2:
-                P.add(ic, cc, c2x or cc, 200, 470, MID - 2, MID, stroke, 0, 45)
-                P.add(ic, cc, c2x or cc, 200, 470, MID + 2, MID, stroke, 1, 315)
+        if ic is None:
+            # recenzja D2: godlo bez pasujacej ikony - jedyna figura glowna = neutralne godlo, inaczej pominiete (Willum, Qoherys: czaszki)
+            if it.role == 'main' and len(mains) == 1:
+                ic, how = NEUTRAL, 'neutral'
             else:
-                place_around(P, it, ic, cc, ('fieldhost', MID, MID, 300), stroke, c2x)
-        elif it.role == 'orle':
-            import math
-            r = 205 if bord is None else 150
-            for k in range(8):
-                a = k * math.pi / 4 + math.pi / 8
-                P.add(ic, cc, c2x or cc, 70, 70, MID + r * math.cos(a), MID + r * math.sin(a), stroke, 0, 0)
-        elif it.role == 'over':
-            s = (area[2] - area[0]) * 0.8
-            rot = 315 if lex.get(it.name, ([], [], ''))[2] == 'weapon' else 0
-            P.add(ic, cc, c2x or cc, s, s, MID, MID, stroke, 0, rot)
-        else:
-            cx, cy = (area[0] + area[2]) / 2.0, (area[1] + area[3]) / 2.0
-            hb = min(area[2] - area[0], area[3] - area[1]) / 2.0
-            if it.pos:
-                if 'chief' in it.pos:
-                    cy -= hb * 0.45
-                if 'base' in it.pos:
-                    cy += hb * 0.45
-                if 'dexter' in it.pos:
-                    cx -= hb * 0.45
-                if 'sinister' in it.pos:
-                    cx += hb * 0.45
-                hb *= 0.55
-            if len(mains) > 1 and it in mains and it.pos is None and it.count != 'seme':
-                # dwie grupy glowne bez polozenia: obok siebie
-                k = mains.index(it)
-                cx += (-0.42 if k == 0 else 0.42) * hb
-                hb *= 0.55
-            crossed = it.count == 2 and any(m in it.mods for m in ('saltirewise', 'in saltire', 'crossed'))
-            if crossed:
-                s = hb * 1.7
-                P.add(ic, cc, c2x or cc, s * 0.55, s, cx - 2, cy, stroke, 0, 45)
-                P.add(ic, cc, c2x or cc, s * 0.55, s, cx + 2, cy, stroke, 1, 315)
+                P.notes.append('%s %s->left out (no icon)' % (it.role, it.name))
                 continue
-            pts, s = arrangement(it.count, hb, it.mods)
-            mirror_alt = any(m in it.mods for m in ('counter-salient', 'combatant', 'addorsed'))
-            placed[id(it)] = []
-            for k, (ox, oy) in enumerate(pts):
-                mir = 1 if (mirror_alt and k % 2 == 1) else 0
-                P.add(ic, cc, c2x or cc, s, s, cx + ox, cy + oy, stroke, mir, 0)
-                placed[id(it)].append((cx + ox, cy + oy, s))
+        P.notes.append('%s %s->%d(%s)' % (it.role, it.name, ic, how))
+        rot1 = 90 if 'increscent' in it.mods else (270 if 'decrescent' in it.mods else 0)
+        # recenzja D2 (counterchanged): kazda figura w barwie odwrotnej do pola pod jej srodkiem (Painter._counter)
+        P.counter = (div, (arms.field[0], arms.field[1])) if counter and two_fields else None
+        try:
+            if it.role == 'on' and it.host is not None and id(it.host) in placed:
+                for (hx, hy, hs) in placed[id(it.host)]:
+                    P.add(ic, cc, c2x or cc, hs * 0.62, hs * 0.62, hx, hy, stroke, 0, rot1)
+            elif it.role == 'on' and it.host is not None:
+                sl = on_slots.get(id(it))
+                place_on(P, it, ic, cc, hosts.get(id(it.host)), it.host, stroke, c2x,
+                         (sl[0], on_total[id(it.host)]) if sl and on_total[id(it.host)] > sl[1] else None, rot1)
+            elif it.role == 'around' and it.host is not None and id(it.host) in hosts:
+                place_around(P, it, ic, cc, hosts[id(it.host)], stroke, c2x)
+            elif it.role == 'around' and it.host is not None:
+                crossed = any(m in it.mods for m in ('saltirewise', 'in saltire', 'crossed'))
+                if crossed and it.count == 2:
+                    P.add(ic, cc, c2x or cc, 200, 470, MID - 2, MID, stroke, 0, 45)
+                    P.add(ic, cc, c2x or cc, 200, 470, MID + 2, MID, stroke, 1, 315)
+                else:
+                    place_around(P, it, ic, cc, ('fieldhost', MID, MID, 300), stroke, c2x)
+            elif it.role == 'orle':
+                import math
+                r = 205 if bord is None else 150
+                for k in range(8):
+                    a = k * math.pi / 4 + math.pi / 8
+                    P.add(ic, cc, c2x or cc, 70, 70, MID + r * math.cos(a), MID + r * math.sin(a), stroke, 0, 0)
+            elif it.role == 'over':
+                s = (area[2] - area[0]) * 0.8
+                rot = 315 if lex.get(it.name, ([], [], ''))[2] == 'weapon' else 0
+                P.add(ic, cc, c2x or cc, s, s, MID, MID, stroke, 0, rot)
+            else:
+                cx, cy = (area[0] + area[2]) / 2.0, (area[1] + area[3]) / 2.0
+                hb = min(area[2] - area[0], area[3] - area[1]) / 2.0
+                mirror_alt = any(m in it.mods for m in ('counter-salient', 'combatant', 'addorsed'))
+                rp = region_points(div, it.count) if counter and two_fields and isinstance(it.count, int) and len(mains) == 1 and it.pos is None else None
+                if rp is not None:
+                    # recenzja D2: figury 'counterchanged' po jednej w kazdej czesci pola (Harlaw of Harlaw Hall, Terrick)
+                    placed[id(it)] = []
+                    for k, (x, y) in enumerate(rp[0]):
+                        P.add(ic, cc, c2x or cc, rp[1], rp[1], x, y, stroke, 1 if (mirror_alt and k % 2 == 1) else 0, rot1)
+                        placed[id(it)].append((x, y, rp[1]))
+                    continue
+                box = None
+                if it.pos:
+                    # recenzja D2: 'in chief' / 'in dexter' / 'in sinister chief' ... - figury w nazwanej czesci pola (Orme, Doggett, Liddle, Sloane, Langward)
+                    box = pos_box(it.pos, area, div)
+                    cx, cy = box[0], box[1]
+                    hb = min(box[2], box[3]) / 2.0 * (0.95 if box[4] else 1.0)
+                elif len(mains) > 1 and it in mains and it.count != 'seme':
+                    # dwie grupy glowne bez polozenia: obok siebie
+                    k = mains.index(it)
+                    cx += (-0.42 if k == 0 else 0.42) * hb
+                    hb *= 0.55
+                crossed = it.count == 2 and any(m in it.mods for m in ('saltirewise', 'in saltire', 'crossed'))
+                if crossed:
+                    s = hb * 1.7
+                    P.add(ic, cc, c2x or cc, s * 0.55, s, cx - 2, cy, stroke, 0, 45)
+                    P.add(ic, cc, c2x or cc, s * 0.55, s, cx + 2, cy, stroke, 1, 315)
+                    continue
+                if box is not None and not box[4]:
+                    pts, s = box_points(it.count, box[2], box[3], it.mods, it.arr)
+                else:
+                    pts, s = arrangement(it.count, hb, it.mods, it.arr)
+                placed[id(it)] = []
+                for k, (ox, oy) in enumerate(pts):
+                    mir = 1 if (mirror_alt and k % 2 == 1) else 0
+                    P.add(ic, cc, c2x or cc, s, s, cx + ox, cy + oy, stroke, mir, rot1)
+                    placed[id(it)].append((cx + ox, cy + oy, s))
+        finally:
+            P.counter = None
     if len(P.layers) == 1:
         # samo pole (np. 'Barry vert and argent', 'Colours: Black') - bez godla nie ma czego pokazac na proporczyku z daleka:
         # zostaje pole, a gdy jednobarwne - neutralne godlo w metalu (zasada tynktur)
@@ -1454,65 +1683,60 @@ def draw_ord(P, o, oc, field):
     return ('fieldhost', MID, MID, 300)
 
 
-def place_on(P, it, ic, cc, host, ho, stroke, c2x):
-    if host is None:
-        # nosiciel = figura (np. 'upon a plate a falcon', 'on an escutcheon or a hand') - w srodku, mniejsza
-        host = ('escutcheon', MID, MID, 230)
-    kind, cx, cy, size = host
-    n = it.count if isinstance(it.count, int) else 3
+def on_points(kind, cx, cy, size, n, mods=(), rows=None):
+    """Miejsca n figur na nosicielu (x, y, rozmiar) - ta sama geometria co dotad w place_on."""
     if kind == 'chief':
         n = max(1, min(n, 7))
         s = min(150, 480.0 / max(n, 1) * 0.85)
-        for k in range(n):
-            x = MID + (k - (n - 1) / 2.0) * (480.0 / max(n, 1))
-            P.add(ic, cc, c2x or cc, s, s, x, cy, stroke, 0, 0)
-        return
+        return [(MID + (k - (n - 1) / 2.0) * (480.0 / max(n, 1)), cy, s) for k in range(n)]
     if kind in ('fess',):
         n = max(1, min(n, 7))
         s = min(size * 0.9, 460.0 / n * 0.85)
-        for k in range(n):
-            P.add(ic, cc, c2x or cc, s, s, MID + (k - (n - 1) / 2.0) * (460.0 / n), cy, stroke, 0, 0)
-        return
+        return [(MID + (k - (n - 1) / 2.0) * (460.0 / n), cy, s) for k in range(n)]
     if kind == 'pale':
         n = max(1, min(n, 7))
         s = min(size * 0.9, 460.0 / n * 0.85)
-        for k in range(n):
-            P.add(ic, cc, c2x or cc, s, s, cx, MID + (k - (n - 1) / 2.0) * (460.0 / n), stroke, 0, 0)
-        return
+        return [(cx, MID + (k - (n - 1) / 2.0) * (460.0 / n), s) for k in range(n)]
     if kind in ('bend', 'bend sinister'):
         n = max(1, min(n, 7))
         step = 560.0 / (n + 1)
         s = min(size * 0.9, step * 0.85)
+        out = []
         for k in range(n):
             d = (k - (n - 1) / 2.0) * step
-            dx = 0.707 * d
-            dy = 0.707 * d if kind == 'bend' else -0.707 * d
-            P.add(ic, cc, c2x or cc, s, s, cx + dx, cy + dy, stroke, 0, 0)
-        return
+            out.append((cx + 0.707 * d, cy + (0.707 * d if kind == 'bend' else -0.707 * d), s))
+        return out
     if kind in ('chevron', 'chevron inverted'):
         pts = [(0, -95), (-150, 40), (150, 40)] if kind == 'chevron' else [(0, 80), (-150, -60), (150, -60)]
-        pts = pts[:max(1, min(n, 3))]
-        for (ox, oy) in pts:
-            P.add(ic, cc, c2x or cc, 95, 95, MID + ox, cy + oy, stroke, 0, 0)
-        return
+        return [(MID + ox, cy + oy, 95) for (ox, oy) in pts[:max(1, min(n, 3))]]
     if kind in ('cross', 'saltire'):
         if kind == 'cross':
             pts = [(0, 0), (0, -170), (0, 170), (-170, 0), (170, 0), (0, -85), (0, 85), (-85, 0), (85, 0)]
         else:
             pts = [(0, 0), (-130, -130), (130, -130), (-130, 130), (130, 130), (-65, -65), (65, -65), (-65, 65), (65, 65)]
-        for (ox, oy) in pts[:max(1, min(n, 9))]:
-            P.add(ic, cc, c2x or cc, 90, 90, MID + ox, MID + oy, stroke, 0, 0)
-        return
+        return [(MID + ox, MID + oy, 90) for (ox, oy) in pts[:max(1, min(n, 9))]]
     if kind == 'canton':
-        P.add(ic, cc, c2x or cc, 150, 150, cx, cy, stroke, 0, 0)
-        return
+        return [(cx, cy, 150)]
     if kind == 'pile':
-        P.add(ic, cc, c2x or cc, 190, 190, MID, cy - 40, stroke, 0, 0)
-        return
+        return [(MID, cy - 40, 190)]
     # tarcza / krazek / figura: w srodku nosiciela
-    pts, s = arrangement(n, size / 2.0 * 0.85, it.mods)
-    for ox, oy in pts:
-        P.add(ic, cc, c2x or cc, s, s, cx + ox, cy + oy, stroke, 0, 0)
+    pts, s = arrangement(n, size / 2.0 * 0.85, mods, rows)
+    return [(cx + ox, cy + oy, s) for ox, oy in pts]
+
+
+def place_on(P, it, ic, cc, host, ho, stroke, c2x, slot=None, rot=0):
+    """slot = (pierwsze miejsce, wszystkich miejsc na nosicielu) - kilka roznych figur na jednym nosicielu (recenzja D2, Harclay)."""
+    if host is None:
+        # nosiciel = figura (np. 'upon a plate a falcon', 'on an escutcheon or a hand') - w srodku, mniejsza
+        host = ('escutcheon', MID, MID, 230)
+    kind, cx, cy, size = host
+    n = it.count if isinstance(it.count, int) else 3
+    first, total = 0, n
+    if slot is not None:
+        first, total = slot
+    pts = on_points(kind, cx, cy, size, total, it.mods, it.arr)
+    for (x, y, s) in pts[first:first + n]:
+        P.add(ic, cc, c2x or cc, s, s, x, y, stroke, 0, rot)
 
 
 def place_around(P, it, ic, cc, host, stroke, c2x):
@@ -1538,9 +1762,14 @@ def place_around(P, it, ic, cc, host, stroke, c2x):
         pts = [(0, -190), (-170, 105), (170, 105)]
     elif kind == 'pall reversed':
         pts = [(-170, -105), (170, -105), (0, 190)]
+    elif kind == 'fieldhost' and n >= 5:
+        # recenzja D2 (Falwell 'juggling five suns'): piec i wiecej figur wokol glownej - luk nad nia (od lewego boku do prawego)
+        import math
+        m = min(n, 7)
+        pts = [(int(200 * math.cos(math.pi * (1.0 + (k + 0.5) / m))), int(200 * math.sin(math.pi * (1.0 + (k + 0.5) / m)) + 30)) for k in range(m)]
     else:
         pts = [(-175, 0), (175, 0), (0, -175), (0, 175)]
-    s = 130 if kind != 'fieldhost' else 150
+    s = 130 if kind != 'fieldhost' else (150 if n < 5 else 100)
     if kind in ('pall', 'pall reversed'):
         s = 115
     for k, (ox, oy) in enumerate(pts[:max(1, min(n, len(pts)))]):
@@ -1557,37 +1786,37 @@ OVERRIDES = {
     'House Byrch': 'Vert, an axe argent',
     'House Casterly of Casterly Rock': 'Gules, a lion or',
     'House Codd': 'Azure, a codfish argent',
-    'House Costayne of the Three Towers': 'Sable, a chalice argent',
+    'House Costayne of the Three Towers': 'Quarterly clockwise, 1st and 3rd sable, a chalice argent, 2nd and 4th or, a rose sable',   # kontrola barw (recenzja D2): czarna roza na zlocie
     'House Crowl of Deepdown': 'Sable, a pile tenne',
     'House Edgerton': 'Indigo, a wheel tenne',
     'House Keath': 'Cendree, a fish argent',
     'House Lake': 'Brunatre, seven pommes vert',
     'House Lannister of Darry': 'Gules, a lion or',
-    'House Lonmouth': 'Or, three lips gules',
+    'House Lonmouth': 'Quarterly clockwise, 1st and 3rd or, three lips gules, 2nd and 4th sable, three skulls or',   # recenzja D2: 'parted into six' - usta na zlotym, czaszki na czarnym (czaszki tylko z CCs)
     'House Spicer of Castamere': 'Vert, on a bend or three pepperpots brunatre',
     'House Suggs': 'Azure, a pig rose',
-    'House Willum': 'Sable, three swords argent, on a chief argent a skull cendree',
+    'House Willum': 'Sable, three swords argent, on a chief argent a skeleton cendree',   # recenzja D2: szkielet smoka tylko z CCs (78316), inaczej sama glowica
     'House Wydman': 'Or, five lances azure, on a chief argent a castle gules',
-    'House Yarwyck': 'Argent, two halberds saltirewise bronze',
+    'House Yarwyck': 'Argent, two halberds saltirewise bronze between four lozenges gules',   # kontrola barw (recenzja D2): cztery czerwone romby kanonu
     'House Harlaw of Grey Garden': 'Sable, a scythe argent',
     'House Fenn': 'Lilac, three water lilies sable',
-    'House Harclay': 'Azure, on a bend argent three crescents azure',
+    'House Harclay': 'Azure, on a bend argent a crescent increscent azure, a roundel azure and a crescent decrescent azure',   # recenzja D2: ksiezyc rosnacy, pelny, malejacy
     'House Myre of Harlaw': 'Argent, ten nooses sable within a bordure sanguine',
     'House Drox': 'Or, three crossbows sable within a bordure sable',
     'House Hoare of Orkmont': 'Per saltire sable and or, a longship or',
     'House Polander': 'Per bend sinister argent and purpure, a broken sword argent',
     'House Shawney': 'Per fess azure and sable, a catfish argent',
     'House Wendwater': 'Argent, a pall reversed vert between three trees vert',
-    'House Langward': 'Per fess murrey and sable, five mullets argent',
-    'House Sloane': 'Per pale purpure and or, a sun tenne',
-    'House Orme': 'Per fess sable and or, three harps or',
+    'House Langward': 'Per fess murrey and sable, in chief five mullets argent',   # recenzja D2: korona gwiazd w glowicy, nie na obu polowach
+    'House Sloane': 'Per pale purpure and or, in dexter seme of mullets argent, in sinister a sun tenne',   # recenzja D2: kazda polowa swoje godlo
+    'House Orme': 'Per fess sable and or, in chief three harps or',   # recenzja D2: harfy w czarnej glowicy (podstawa bendy sinister - tu or)
     'House Lyberr': "Per bend sinister sable and argent, a cat's head cendree",
-    'House Doggett': 'Per bend vert and argent, a unicorn argent',
+    'House Doggett': 'Per bend vert and argent, in sinister chief a unicorn argent, in dexter base a raven sable',   # recenzja D2: jednorozec i kruk z kanonu
     'House Vikary': 'Quarterly clockwise, 1st and 3rd white, a boar gules, 2nd and 4th gules, a lion argent',
     'House Parren': "Per saltire gules and or, a lion's head sable",
     'House Hutcheson': 'Or, two bendlets gules, a sun gules',
     'House Kenning of Harlaw': 'Sable, a hand cendree between two lightning bolts or',
-    'House Falwell': 'Sable, a fool gules between two suns or',
+    'House Falwell': 'Sable, a fool gules between five suns or',   # recenzja D2: piec slonc kanonu
     'House Merryweather of Longtable': 'Argent, a cornucopia or within a bordure or',
     'House Royce of the Gates of the Moon': 'Purpure, a portcullis sable within a bordure bronze',
     'House Risley of Risley Glade': 'Argent, a knight sable',
@@ -1623,7 +1852,7 @@ OVERRIDES = {
     'House Donniger': 'Per fess wavy or and vert-cendree, a sun gules',
     'House Upcliff of the Witch Isle': 'Sable, a wave aquamarine',
     'House Wynch of Iron Holt': 'Purpure, a crescent sanguine',
-    'House Lightfoot': 'Brunatre, five footprints argent',
+    'House Lightfoot': 'Brunatre, five footprints in bend sinister argent',   # recenzja D2: slad w skos lewy
     'House Lipps': 'Azure, lips carnation',
     'House Thenn': 'Argent, a disk bronze',
     'House Meadows of Grassy Vale': 'Vert, eight flowers or',
@@ -1637,7 +1866,7 @@ OVERRIDES = {
     'House Grimm of Greyshield': 'Vert-cendree, an escutcheon cendree',
     'House Staedmon of Broad Arch': 'Argent, a heart gules within a bordure gules',
     'House Toyne': 'Or, a winged heart sable within a bordure sable',
-    'House Peasebury of Poddingfield': 'Argent, a pea pod within a bordure vert',
+    'House Peasebury of Poddingfield': 'Argent, a pea pod vert within a bordure vert',   # recenzja D2: straczek zielony jak w kanonie
     'House Gaunt': 'Rose, three lances sable between two flaunches sable',
     'House Teague': 'Sable, between two flaunches a trident or',
     'House Yew': 'Argent, between two flaunches gules a longbow or',
@@ -1668,7 +1897,7 @@ OVERRIDES = {
     'House Towers of Harrenhal': 'Argent, five towers sable within a double tressure gules and sable',
     'House Qoherys of Harrenhal': 'Sable, a saltire gules between four skulls argent',
     'House Condon': "Argent, between two tridents saltirewise gules an eagle's head gules",
-    'House Liddle': 'Per pale argent and vert, three pinecones brunatre',
+    'House Liddle': 'Per pale argent and vert, in dexter three pinecones brunatre',   # recenzja D2: szyszki na bialej polowie
     'House Mollen': 'Argent, on a pile vert a pine tree argent',
     'House Burley': 'Argent, on a pile azure a knife argent',
     'House Saltcliffe of Saltcliffe': 'Argent, a serpent sable',
@@ -1677,8 +1906,8 @@ OVERRIDES = {
     'House Volmark of Volmark': 'Cendree, a leviathan sable',
     'House Tawney of Orkmont': 'Argent, a scourge sable',
     'House Tudbury': 'Vert, on a lozenge or a tortoise brunatre',
-    'House Vypren': 'Vert, a toad sable',
-    'House Wells': 'Per fess cendree and vert, five pellets in fess',
+    'House Vypren': 'Vert, on a lilypad argent a toad sable',   # kontrola barw (recenzja D2): bialy lisc; ropucha bez ikony w grze - pominieta
+    'House Wells': 'Per fess cendree and vert, in chief five pellets',   # recenzja D2: krazki w szarej glowicy
     'House Horpe': "Per chevron cendree and argent, three death's head moths counterchanged",
     'House Blackfyre': 'Gules, a three-headed dragon sable',
     'House Hollard': 'Barry gules and rose, on a chief azure three crowns or',
@@ -1696,13 +1925,157 @@ OVERRIDES = {
     'House Lothston of Harrenhal': 'Per bend argent and or, a bat sable',
     'House Gower': 'Ermine, on a cross sable nine trefoils or',
     'House Estren of Wyndhall': 'Argent, a saltire vert between four double-headed eagles gules',
-    'House Ironsmith': 'Or, between four horseshoes a sword sable, all within a bordure vert-cendree',
+    'House Ironsmith': 'Or, between four horseshoes sable a sword sable, all within a bordure vert-cendree',   # recenzja D2: podkowy czarne
     'House Ruthermont': 'Pean, on a pale or five starfish sable',
     'House Shett of Gull Tower': 'Chequy argent and sable, three wings or',
     'House Shett of Gulltown': 'Brunatre, nine seagulls argent',
     'House Cassel': "Cendree, ten wolf's heads argent within a bordure sable",
     'House Marsh': 'Or, ten frogs vert',
 }
+
+
+# ------------------------------------------------------------------------------------------------ poprawki danych kanonu (recenzja D2, 16.10)
+# kanon_rody.tsv = import awoiaf bez zmian (build_kanon.py agenta danych); poprawki tutaj, jawnie, zeby nowy import ich nie zgubil.
+DROP_HOUSES = {'House Otharys'}      # awoiaf List of Houses: "possibly a misspelling of Otherys" - jedna rodzina Braavos pod dwoma nazwami
+LIEGE_AT_START = {                   # pan z AGOT / ACOK (start ROT ok. 298 AC), nie z ADWD (wtedy Stannis) - grupa "zaprzysiezone panu"
+    'House Meadows of Grassy Vale': 'House Tyrell',
+    "House Morrigen of Crow's Nest": 'House Baratheon',
+}
+# klany ROT tych rodow to Nocna Straz (ROTclan_125 The Wall, clan_nord_3 Shadow Tower) - CanonClanOk zawsze je odrzuca (inne krolestwo),
+# wiec rod nigdy nie trafial na wioske; bez klanu = zwykly rod kanonu krainy. True - herb dalej z banner_key klanu ROT (Thorne: cep na czerwieni
+# z czarna bordiura jak w kanonie), False - herb z opisu (Tollett: klan ROT ma inny herb niz kanon 'Pily cendree and sable')
+NO_ROT_CLAN = {'House Thorne': True, 'House Tollett of the Grey Glen': False}
+# klany ROT krain Essos bez rodu w awoiaf (recenzja D2: Volantis 5 rodow na 96 wiosek, Tagaros 37 wiosek - "jednolicie"; Braavos po zdjeciu
+# Otharysa): rod = klan ROT z jego herbem (banner_key); gospodarzy tylko w krolestwie pana i nie wyzej od pana (CanonClanOk)
+EXTRA_HOUSES = [('House Melane', 'Volantis', 'ROTclan_105'), ('House Celeris', 'Braavos', 'clan_empire_south_9'),
+                ('House Volentin', 'Braavos', 'ROTclan_94'), ('House Vaelaro', 'Lys', 'ROTclan_23'), ('House Lohar', 'Lys', 'ROTclan_115')]
+START_YEAR = 298                     # start kampanii ROT (ok. 298 AC): rod wymarly w 298 AC albo pozniej zyje na starcie (Clegane, Darry, Hollard)
+# podkraina kanonu -> (osada odniesienia, wyspa). Osada odniesienia = punkt TYLKO do odleglosci (filtr dalekich rodow w VillageHolders.CanonPool)
+# dla rodu bez siedziby w pliku mapy - nie siedziba (rod nie wchodzi przez nia do grupy "siedziba w okregu"). Wyspa: rod wyspy gospodarzy tylko
+# wioskami tej wyspy, a okreg wyspy bierze najpierw rody wyspy (recenzja D2: Skagosi na wschodnim wybrzezu, Sunderland na ladzie Doliny).
+SUBREGION = {
+    'North (Crannogmen)': ('castle_B2', ''),                     # Greywater Watch
+    'North (Wolfswood Clans)': ('ROT_town2', ''),                # Deepwood Motte
+    'North (Mountain Clans)': ('castle_B6', ''),                 # Norrey Keep (gory polnocne)
+    'North (Skagosi Clans)': ('town_N1', 'Skagos'),              # Driftwood Hall
+    'Vale of Arryn (Sistermen)': ('town_S1', 'Three Sisters'),   # Sisterton
+    'Reach (Shield Islands)': ('ROT_town27', 'Shield Islands'),  # Lord Hewett's Town (Oakenshield)
+    'Crownlands (Crackclaw Point)': ('castle_S7', ''),           # Dyre Den
+    'Crownlands (Dragonstone)': ('town_EW1', ''),                # Dragonstone
+}
+ISLAND_BOUND = {'town_N1': 'Skagos', 'town_S1': 'Three Sisters', 'ROT_town27': 'Shield Islands'}   # wsie gry tych osad = okregi wyspy
+ISLAND_DISTRICT = {'ROT_castle23_village1': 'Shield Islands'}   # Shieldview (wioski nad Tarczami, recenzja D2)
+# galezie rodow bez herbu w kanonie -> rod glowny (nazwisko inne niz rdzen); reszta galezi z tego samego rdzenia nazwy i krainy (house_base)
+CADET_OF = {'House Lanny': 'House Lannister of Casterly Rock', 'House Lantell': 'House Lannister of Casterly Rock',
+            'House Lannett': 'House Lannister of Casterly Rock'}
+DIFFS = ['bordure', 'label', 'canton', 'orle']
+
+
+def alive_at_start(status):
+    """'extinct (300 AC (possibly))' -> True; 'extinct (261 AC)', 'extinct (209-298 AC)', 'extinct' (bez roku), '... BC' -> False."""
+    if 'BC' in status:
+        return False
+    years = re.findall(r'\d+', status)
+    return bool(years) and int(years[0]) >= START_YEAR
+
+
+def load_color_hex():
+    out = {}
+    for r in load_tsv(os.path.join(DANE, 'kolory.tsv')):
+        try:
+            out[int(r['color_id'])] = r['hex']
+        except (KeyError, ValueError):
+            pass
+    return out
+
+
+def color_light(cid, hexes):
+    h = hexes.get(cid)
+    if not h or len(h) < 6:
+        return False
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return 0.299 * r + 0.587 * g + 0.114 * b > 140
+
+
+def split_layers(code):
+    a = [int(x) for x in code.split('.')]
+    return [a[i:i + 10] for i in range(0, len(a) - len(a) % 10, 10)]
+
+
+def difference(code, k, hexes):
+    """Recenzja D2 (galezie): herb rodu glownego + roznica (jak w kanonie: Harlaw - ta sama kosa z bordiura / na innym polu).
+    k = numer galezi tego rodu (kolejnosc kluczy): bordiura, lambel, kantonik, obramowanie; tynktura - metal na ciemnym polu, barwa na jasnym,
+    inna niz pole i niz pierwsza figura. (kod, opis) albo (None, powod) - za duzo warstw."""
+    lays = split_layers(code)
+    if len(lays) < 2:
+        return None, 'no layers'
+    field_c, main_c = lays[0][1], lays[1][1]
+    picks = ['sable', 'azure', 'gules', 'vert'] if color_light(field_c, hexes) else ['argent', 'or']
+    cands = [t for t in picks if TINCT_COLOR[t] not in (field_c, main_c)] or picks
+    tin = cands[(k // len(DIFFS)) % len(cands)]
+    c = TINCT_COLOR[tin]
+    kind = DIFFS[k % len(DIFFS)]
+    add = []
+    if kind == 'bordure':
+        t = 60
+        for (sx, sy, px, py) in ((FULL, 2 * t, MID, V0), (FULL, 2 * t, MID, V1), (2 * t, FULL, V0, MID), (2 * t, FULL, V1, MID)):
+            add.append(L(505, c, c, sx / SQ, sy / SQ, px, py))
+    elif kind == 'label':
+        add.append(L(505, c, c, 330 / SQ, 30 / SQ, MID, V0 + 58))
+        for x in (MID - 115, MID, MID + 115):
+            add.append(L(505, c, c, 34 / SQ, 78 / SQ, x, V0 + 92))
+    elif kind == 'canton':
+        add.append(L(505, c, c, 170 / SQ, 170 / SQ, V0 + 85, V0 + 85))
+    else:
+        a, b = V0 + 72, V1 - 72
+        ln = (b - a) + 18
+        for (sx, sy, px, py) in ((ln, 18, MID, a), (ln, 18, MID, b), (18, ln, a, MID), (18, ln, b, MID)):
+            add.append(L(505, c, c, sx / SQ, sy / SQ, px, py))
+    if len(lays) <= 33 < len(lays) + len(add):
+        # herb zlozony (najwyzej 33 warstwy jak Banner.AddIconData) - roznica jedna warstwa; kod ROT ma juz wiecej warstw (Banner.Deserialize
+        # nie ma limitu, gra rysuje go tak samo), wiec roznica dopisana w calosci
+        if len(lays) + 1 > 33:
+            return None, 'too many layers'
+        kind, add = 'canton', [L(505, c, c, 170 / SQ, 170 / SQ, V0 + 85, V0 + 85)]
+    return code_of(lays + add), '%s %s' % (kind, tin)
+
+
+# tynktury slowami (do kontroli barw): rodzina wizualna klucza TINCT_COLOR
+TINCT_FAMILY = {
+    'or': 'Y', 'yellow': 'Y', 'erminois': 'Y', 'argent': 'W', 'white': 'W', 'silver': 'W', 'ivory': 'W', 'ermine': 'W',
+    'gules': 'R', 'scarlet': 'R', 'sanguine': 'R', 'murrey': 'P', 'azure': 'B', 'indigo': 'B', 'celeste': 'B', 'vert': 'G', 'olive': 'G',
+    'lightgreen': 'G', 'greygreen': 'G', 'seagreen': 'G', 'sable': 'K', 'ermines': 'K', 'pean': 'K', 'purpure': 'P', 'lilac': 'P',
+    'tenne': 'O', 'copper': 'N', 'bronze': 'N', 'russet': 'N', 'brun': 'N', 'cendree': 'S', 'lightgrey': 'S', 'iron': 'S', 'rose': 'Q', 'carnation': 'Q',
+}
+
+
+CHECK_SKIP = {'rose', 'stone', 'oak', 'oaken', 'wooden', 'flame', 'iron', 'bone', 'blood', 'bloody'}   # zwykle przedmiot, nie tynktura ('a red rose')
+
+
+def blazon_families(text):
+    """Rodziny tynktur wymienionych w tekscie (najdluzsza fraza najpierw, jak colorcheck.py recenzji)."""
+    t = ' ' + norm_text(text) + ' '
+    found = set()
+    for p, k in sorted(TINCT_PHRASES, key=lambda x: -len(x[0])):
+        if p in CHECK_SKIP:
+            continue
+        if re.search(r'(?<![a-z])' + re.escape(p) + r'(?![a-z])', t):
+            found.add(TINCT_FAMILY[k])
+            t = re.sub(r'(?<![a-z])' + re.escape(p) + r'(?![a-z])', ' ', t)
+    return found
+
+
+def code_families(code):
+    fam = {}
+    for k, c in TINCT_COLOR.items():
+        fam.setdefault(c, set()).add(TINCT_FAMILY[k])
+    out = set()
+    for lay in split_layers(code):
+        if lay[3] <= 4 and lay[4] <= 4:
+            continue                       # niewidoczny punkt (samo pole podzielone)
+        for c in (lay[1], lay[2]):
+            out |= fam.get(c, set())
+    return out
 
 
 # ------------------------------------------------------------------------------------------------ glowna
@@ -1771,20 +2144,40 @@ def main(argv):
     for t, c in TINCT_COLOR.items():
         assert c in col_act and c not in FORBID_COLORS, (t, c)
     spclans = load_spclans(modules)
-    villages, alls = load_villages(modules)
+    claninfo = load_spclan_info(modules)
+    villages, alls, bounds = load_villages(modules)
+    hexes = load_color_hex()
     icon_rows = load_tsv(os.path.join(DANE, 'ikony_godla.tsv'))
     for ir in icon_rows:
         ICON_KW[int(ir['icon_id'])] = set(k.strip().lower() for k in ir['keywords'].split('|') if k.strip()) | set(re.findall(r"[a-z'-]+", ir['charge'].lower()))
     phrase, lex = build_lexicon(icon_rows)
-    houses = load_tsv(os.path.join(DANE, 'kanon_rody.tsv'))
+    houses = []
+    for r in load_tsv(os.path.join(DANE, 'kanon_rody.tsv')):
+        name = r['house'].strip()
+        if name in DROP_HOUSES:
+            continue
+        if name in LIEGE_AT_START:
+            r['liege'] = LIEGE_AT_START[name]
+        if name in NO_ROT_CLAN:
+            r['banner_clans'] = r['rot_clan_id'] if NO_ROT_CLAN[name] else ''
+            r['rot_clan_id'] = ''
+        houses.append(r)
+    for name, region, cid in EXTRA_HOUSES:
+        kg, cu = claninfo.get(cid, ('', ''))
+        assert cid in spclans, cid
+        houses.append({'house': name, 'region': region, 'rot_kingdom_culture': kg + ';' + cu, 'seat': '', 'seat_settlement_id': '', 'liege': '',
+                       'blazon': '', 'words': '', 'rot_clan_id': cid, 'source_url': '', 'status': 'essos (ROT clan, no awoiaf house)'})
     names = lore_names(REPO, villages)
 
     rows, stats = [], collections.Counter()
     bad = []
     seen_keys = set()
+    whys = {}
+    nocanon = {}        # klucz -> True: herb z nazwiska / neutralny (kanon herbu nie podaje) - kandydat na herb rodu glownego z roznica
     for r in houses:
         name = r['house'].strip()
-        area = area_of_region(r['region'])
+        region = (r['region'] or '').strip()
+        area = area_of_region(region)
         key = name if name not in seen_keys else name + '|' + area
         seen_keys.add(key)
         culture = ''
@@ -1797,23 +2190,29 @@ def main(argv):
         liege = (r['liege'] or '').strip()
         clans = [c for c in (r['rot_clan_id'] or '').split(';') if c.strip()]
         rot_code = ''
-        for c in clans:
+        code_clans = [c for c in (r.get('banner_clans') or '').split(';') if c.strip()] or clans
+        for c in code_clans:
             if c in spclans:
                 rot_code = spclans[c]
                 break
         blazon = (r['blazon'] or '').strip()
+        sub = SUBREGION.get(region)
+        anchor = sub[0] if sub and not seats and sub[0] in alls else ''
+        island = sub[1] if sub else ''
         holder = 'yes'
         why = ''
         if area not in HOLDER_AREAS:
             holder, why = 'no', 'area'
         elif not name.startswith('House '):
             holder, why = 'no', 'person'     # 'Andrik of Southshield', 'Nute of Oakenshield' - lordowie z AFFC, nie rody
-        elif status.startswith('extinct'):
+        elif status.startswith('extinct') and not alive_at_start(status):
             holder, why = 'no', 'extinct'
         elif status.startswith('adwd'):
             holder, why = 'no', 'adwd'
         elif status.startswith('great') or liege.startswith('none'):
             holder, why = 'no', 'great'
+        if holder == 'yes' and status.startswith('extinct'):
+            stats['alive at start (extinct %d AC or later)' % START_YEAR] += 1
         code = ccode = parse = ''
         if rot_code:
             source = 'rot'
@@ -1822,7 +2221,7 @@ def main(argv):
             if pr:
                 bad.append((name, 'rot', pr))
                 holder, why = 'no', 'rot-code'
-            parse = 'ROT clan %s banner_key (%d layers)' % (clans[0], len(code.split('.')) // 10)
+            parse = 'ROT clan %s banner_key (%d layers)%s' % (code_clans[0], len(code.split('.')) // 10, '' if clans else ' - house without the ROT clan')
         else:
             source = 'generated'
             spec = OVERRIDES.get(name)
@@ -1838,6 +2237,7 @@ def main(argv):
                 arms = parse_arms(blazon, phrase, name)
             else:
                 arms = canting_arms(key, area)
+                nocanon[key] = True
             layers, notes, _ = draw(arms, lex, ic_act, ic_ccs, key, ccs=False)
             code = code_of(layers)
             pr = problems(code, bg_act, ic_act, col_act, True)
@@ -1860,21 +2260,85 @@ def main(argv):
                     stats['charge family'] += 1
                 elif '(neutral)' in nn:
                     stats['charge neutral'] += 1
+                elif 'left out' in nn:
+                    stats['charge left out (no fitting icon)'] += 1
             if used:
                 stats['ccs variant'] += 1
-        stats['source ' + source] += 1
-        stats['holder ' + holder + (' (' + why + ')' if why else '')] += 1
-        if holder == 'yes':
-            stats['holder area ' + area] += 1
-        rows.append([name, key, (r['region'] or '').strip(), area, culture, ';'.join(seats), liege, house_base(liege) if liege and not liege.startswith('none') else '',
-                     house_base(name), status, blazon, (r['words'] or '').strip(), ';'.join(clans), code, ccode, source, holder, parse])
+        whys[key] = why
+        rows.append([name, key, region, area, culture, ';'.join(seats), liege, house_base(liege) if liege and not liege.startswith('none') else '',
+                     house_base(name), status, blazon, (r['words'] or '').strip(), ';'.join(clans), code, ccode, source, holder, parse, anchor, island])
+
+    # recenzja D2: galezie bez herbu w kanonie - herb rodu glownego z roznica (nie herb z nazwiska): CADET_OF albo ten sam rdzen nazwy i kraina,
+    # rod glowny z wlasnym herbem (klan ROT albo opis kanonu) - pierwszy w pliku, klan ROT przed opisem
+    own = [rw for rw in rows if rw[13] and not nocanon.get(rw[1])]
+    by_name = dict((rw[0], rw) for rw in own)
+    kids = collections.defaultdict(list)
+    for rw in rows:
+        if not nocanon.get(rw[1]):
+            continue
+        par = by_name.get(CADET_OF.get(rw[0], ''))
+        if par is None:
+            cands = [p for p in own if p is not rw and p[8] == rw[8] and p[3] == rw[3]]
+            cands.sort(key=lambda p: 0 if p[15] == 'rot' else 1)
+            par = cands[0] if cands else None
+        if par is not None:
+            kids[par[1]].append(rw)
+    by_key = dict((rw[1], rw) for rw in rows)
+    for pk in sorted(kids):
+        par = by_key[pk]
+        for k, rw in enumerate(sorted(kids[pk], key=lambda x: x[1])):
+            dcode, what = difference(par[13], k, hexes)
+            if dcode is None:
+                stats['cadet skipped (%s)' % what] += 1
+                continue
+            pr = problems(dcode, bg_act, ic_act, col_act, par[15] != 'rot')
+            if not pr and par[15] != 'rot' and len(split_layers(dcode)) > 33:
+                pr = ['warstw > 33']
+            if pr:
+                bad.append((rw[0], 'cadet', pr))
+                stats['cadet skipped (code)'] += 1
+                continue
+            dccs = ''
+            if par[14]:
+                dccs, _ = difference(par[14], k, hexes)
+                if dccs is None or problems(dccs, bg_act, ic_act | ic_ccs, col_all, True):
+                    dccs = ''
+            rw[13], rw[14], rw[15] = dcode, dccs, 'cadet'
+            rw[17] = 'cadet of %s: its arms with a difference (%s)' % (par[0], what)
+            stats['cadet arms (parent + difference)'] += 1
+    for rw in rows:
+        stats['source ' + rw[15]] += 1
+        stats['holder ' + rw[16] + (' (' + whys[rw[1]] + ')' if whys.get(rw[1]) else '')] += 1
+        if rw[16] == 'yes':
+            stats['holder area ' + rw[3]] += 1
+        if rw[18]:
+            stats['anchor (sub-region, no seat)'] += 1
+        if rw[19] and rw[16] == 'yes':
+            stats['island house ' + rw[19]] += 1
 
     dist_rows = []
     for vid in sorted(villages):
         cul, nm = villages[vid]
-        dist_rows.append([vid, CULTURE_AREA.get(cul, ''), cul, nm])
+        isle = ISLAND_DISTRICT.get(vid) or ISLAND_BOUND.get(bounds.get(vid, ''), '')
+        dist_rows.append([vid, CULTURE_AREA.get(cul, ''), cul, nm, isle])
     stats['districts'] = len(dist_rows)
     stats['districts with area'] = sum(1 for d in dist_rows if d[1])
+    stats['districts on islands'] = sum(1 for d in dist_rows if d[4])
+
+    # recenzja D2 (kontrola barw): kazda tynktura opisu slowami jest w kodzie herbu zlozonego (brak = zgubiona barwa kanonu) i odwrotnie
+    missing, extra = [], []
+    for rw in rows:
+        if rw[15] != 'generated' or not rw[10] or rw[10].lower().startswith(('colours', 'colors', 'unknown')):
+            continue
+        eng = split_blazon(rw[10])[0]
+        want = blazon_families(eng)
+        have = code_families(rw[13])
+        if want - have:
+            missing.append((rw[0], ''.join(sorted(want - have)), eng[:110]))
+        if 'proper' not in rw[10].lower() and have - want - blazon_families(rw[10]):
+            extra.append((rw[0], ''.join(sorted(have - want)), eng[:110]))
+    stats['colour check: blazon tincture missing in code'] = len(missing)
+    stats['colour check: code colour not in blazon'] = len(extra)
 
     def clean(s):
         return s.replace('\t', ' ').replace('\r', ' ').replace('\n', ' ')
@@ -1884,42 +2348,61 @@ def main(argv):
     buf.write('# Generated by tools/herby/herby_kanon.py from tools/herby/dane/*.tsv and the game data - do not edit.\n')
     buf.write('# banner_code: source rot = the ROT clan banner_key (spclans.xml, first rot_clan_id); generated = drawn from the blazon (field and division,\n')
     buf.write('#   ordinaries, charges -> Native/NavalDLC/ROT icons; exact charge, else the same family, else a mullet), or canting arms from the name\n')
-    buf.write('#   when the canon gives none. banner_code_ccs: the same arms with Bannerlord.CCsBanners icons, used only when that module is loaded.\n')
-    buf.write('# holder = yes: may keep villages of its area (not extinct, not only in ADWD, not a great or sovereign house, area with villages).\n')
+    buf.write('#   when the canon gives none; cadet = a cadet branch without canon arms: the arms of its main house with a difference.\n')
+    buf.write('#   banner_code_ccs: the same arms with Bannerlord.CCsBanners icons, used only when that module is loaded.\n')
+    buf.write('# holder = yes: may keep villages of its area (not extinct at the start of ROT, not only in ADWD, not a great or sovereign house).\n')
+    buf.write('# anchor_settlement_id: a settlement of its sub-region for a house without a seat - used only to measure distance, not as a seat.\n')
+    buf.write('# subregion: an island (Skagos, Three Sisters, Shield Islands) - the house keeps villages of that island only.\n')
     buf.write('# Every code passes Banner.TryGetBannerDataFromCode (1.4.8) and has its background, icons and colours in banner_icons.xml.\n')
-    buf.write('#house\tkey\tregion\tarea\tculture\tseat_settlement_id\tliege\tliege_base\tbase\tstatus\tblazon\twords\trot_clan_id\tbanner_code\tbanner_code_ccs\tsource\tholder\tparse\n')
+    buf.write('#house\tkey\tregion\tarea\tculture\tseat_settlement_id\tliege\tliege_base\tbase\tstatus\tblazon\twords\trot_clan_id\tbanner_code\tbanner_code_ccs'
+              '\tsource\tholder\tparse\tanchor_settlement_id\tsubregion\n')
     for row in rows:
         buf.write('\t'.join(clean(str(x)) for x in row) + '\n')
-    buf.write('# districts: game village -> area of its culture in ROT-Map settlements.xml (fixed - Banner Kings changes Settlement.Culture in play)\n')
-    buf.write('#district\tarea\tculture\tname\n')
+    buf.write('# districts: game village -> area of its culture in ROT-Map settlements.xml (fixed - Banner Kings changes Settlement.Culture in play);\n')
+    buf.write('#   subregion = the island of the district (its houses go first there)\n')
+    buf.write('#district\tarea\tculture\tname\tsubregion\n')
     for d in dist_rows:
         buf.write('\t'.join(clean(x) for x in d) + '\n')
     buf.write("# names: first names of the lore knights of each area (spare name for a village without lore); 'X zo' = Ghiscari form 'X zo <House>'\n")
-    buf.write('#names\tarea\tnames\n')
+    buf.write('#names\tarea\tlist\n')
     for a in sorted(names):
         buf.write('names\t%s\t%s\n' % (a, '|'.join(names[a])))
     data = buf.getvalue()
     with io.open(out, 'w', encoding='utf-8', newline='\n') as f:
         f.write(data)
-    # kontrola: plik czytany od nowa, kazdy kod jeszcze raz
+    # kontrola: plik czytany od nowa, kazdy kod jeszcze raz (zwykly i wariant CCs)
+    NC = 20
     back = [l.rstrip('\n').split('\t') for l in io.open(out, encoding='utf-8') if l and not l.startswith('#')]
-    nh = sum(1 for b in back if len(b) == 18)
+    nh = sum(1 for b in back if len(b) == NC)
     assert nh == len(rows), (nh, len(rows))
-    recheck = 0
+    recheck = recheck_ccs = 0
     for b in back:
-        if len(b) == 18:
+        if len(b) == NC:
             assert not problems(b[13], bg_act, ic_act, col_act, b[15] == 'generated') or b[16] == 'no', b[0]
+            assert len(split_layers(b[13])) <= 33 or b[15] in ('rot', 'cadet'), b[0]
             recheck += 1
-    print('arm_houses_canon.tsv: %d rodow (%d sprawdzonych ponownie), %d okregow, imiona %d krain, %d bajtow -> %s' % (len(rows), recheck, len(dist_rows), len(names), len(data.encode('utf-8')), out))
+            if b[14]:
+                assert not problems(b[14], bg_act, ic_act | ic_ccs, col_all, b[15] == 'generated'), b[0]
+                recheck_ccs += 1
+    print('arm_houses_canon.tsv: %d rodow (%d kodow i %d wariantow CCs sprawdzonych ponownie), %d okregow, imiona %d krain, %d bajtow -> %s'
+          % (len(rows), recheck, recheck_ccs, len(dist_rows), len(names), len(data.encode('utf-8')), out))
     for k in sorted(stats):
-        print('  %-40s %d' % (k, stats[k]))
+        print('  %-48s %d' % (k, stats[k]))
     if bad:
         print('NIEWAZNE KODY:')
         for b in bad:
             print('  ', b)
+    if missing:
+        print('KONTROLA BARW - tynktura z opisu nie w kodzie (%d):' % len(missing))
+        for x in missing:
+            print('   %s | brak %s | %s' % x)
     if report:
+        if extra:
+            print('KONTROLA BARW - barwa kodu spoza opisu (%d):' % len(extra))
+            for x in extra:
+                print('   %s | %s | %s' % x)
         for row in rows:
-            if row[15] == 'generated':
+            if row[15] in ('generated', 'cadet'):
                 print('%s | %s | %s' % (row[0], row[10][:90], row[17]))
     return 0 if not [b for b in bad if b[1] != 'ccs'] else 1
 

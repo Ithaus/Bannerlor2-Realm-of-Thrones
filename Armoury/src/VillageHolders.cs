@@ -44,6 +44,14 @@ namespace Armoury
     /// juz majatku BK w tym okregu - wtedy herb tego klanu (Clan.Banner); inaczej herb z pliku (klan ROT - jego banner_key, rod bez klanu - herb zlozony z opisu).
     /// Imie: poczatek imienia rycerza z lore TEJ wioski ("Ser Howard", "Lady Barbrey", "Harwood", "Gorzhak zo") - "Kept by Ser Howard of House Florent, sworn to ...";
     /// wioska bez lore - imie rycerza z lore krainy (skrot uid). Rycerz z lore (stare (b)) tylko w krainie bez zadnego rodu kanonu. Klucz off - jak dotad.
+    /// Po recenzji D2 (16.10): (0) rody z siedziba w tym okregu z KAZDEJ krainy (Penrose of Parchments, Seaworth - okregi kultury dragonstone); rod z
+    /// punktem (siedziba z pliku, siedziba klanu ROT w grze, osada podkrainy - CanonHouses.RefPos) dalej niz FarRadius (150 = 2.5 x SeatRadius) od wsi gry
+    /// nie wchodzi do (3) i (4) - tylko gdy lista bylaby pusta (symulacja startu: 144 z 599 przydzialow z siedziba dalej niz 150, np. Magnar ze Skagos
+    /// 626 na Flint Cliffs); rod wyspy (Skagos, Three Sisters, Shield Islands) tylko na swojej wyspie, a okreg wyspy bierze najpierw (i, gdy sa, wylacznie)
+    /// rody wyspy; Valid sprawdza klan rodu ta sama regula co CanonClanOk (rod panujacy, wyzszy od pana, najemnik, gracz w ciagu doby - okreg od nowa);
+    /// galaz rodu pana (ten sam rdzen) - pelna nazwa ("Ser X of House Harlaw of Grey Garden, sworn to House Harlaw"); jeden rod najwyzej 2 wioski okregu,
+    /// rod bez punktu ("z calej krainy") 1 - reszta do rodow krolestwa (c) (symulacja startu: Tagaros 34 -> 15 wiosek Volantis, sasiednie wioski z tym
+    /// samym rodem 15 -> 0 par).
     /// </summary>
     internal static class VillageHolders
     {
@@ -53,6 +61,9 @@ namespace Armoury
         private const int NearSeats = 2;                            // D2: rody 2 najblizszych siedzib przed rodami zaprzysiezonymi panu
         private const float SeatRadius = 60f;                       // D2: ...ale tylko siedzib do 60 jednostek mapy od wsi gry (p90 najblizszej siedziby; symulacja startu: bez
                                                                     // promienia jeden rod Polnocy (Stout z Goldgrass) bral 22 wioski, z promieniem najwiecej 14 w Westeros)
+        private const float FarRadius = 150f;                       // po recenzji D2: rod dalej niz 150 (2.5 x SeatRadius) - tylko gdy okreg nie ma innego rodu kanonu
+        private const int MaxPerDistrict = 2, MaxPerDistrictAnywhere = 1;   // po recenzji D2: wiosek jednego rodu kanonu w okregu (rod bez punktu - 1)
+        private static readonly HashSet<Clan> NoClans = new HashSet<Clan>();
         private const int DayRebuildsPerSlice = 4;                  // odswiezenia dobowe okregow na odcinek czasu (po recenzji D1 - koszt przy zmianie doby)
         private static readonly long SliceTicks = System.Diagnostics.Stopwatch.Frequency / 10;   // 100 ms
         private static long _sliceStart;
@@ -164,8 +175,14 @@ namespace Armoury
         private static bool Valid(Holder h, DistCache c)
         {
             if (h.Rule == RuleLord || h.Rule == RuleLore) return true;
-            // D2: rod kanonu bez klanu w grze - zawsze; z klanem - klan zyje, nie jest panem i jest z krolestwa pana (zmiana strony / podboj = okreg od nowa)
-            if (h.Rule == RuleCanon) return h.Clan == null || (!h.Clan.IsEliminated && !ReferenceEquals(h.Clan, c.Lord) && Ours(h.Clan, c.Lord, c.Realm));
+            // D2: rod kanonu bez klanu w grze - zawsze; z klanem - ta sama regula co przy budowie (CanonClanOk: zyje, nie pan, krolestwo pana, nie rod
+            // panujacy, nie wyzszy od pana, nie najemnik, nie rod gracza) - po recenzji D2 takze rod, ktory w ciagu doby zostal rodem panujacym albo najemnikiem
+            if (h.Rule == RuleCanon)
+            {
+                if (h.Clan == null) return true;
+                bool ruler = c.Realm != null && ReferenceEquals(c.Realm.RulingClan, c.Lord);
+                return c.Lord != null && CanonClanOk(h.Clan, c.Lord, c.Realm, ruler, NoClans);
+            }
             if (h.Hero != null && !h.Hero.IsAlive) return false;
             return h.Clan != null && !h.Clan.IsEliminated && (ReferenceEquals(h.Clan, c.Lord) || (c.Realm != null && ReferenceEquals(h.Clan.Kingdom, c.Realm)));
         }
@@ -252,32 +269,46 @@ namespace Armoury
                 used.Add(c.Main.Clan);
             }
             // (b) D2: rod kanonu krainy (VillageCanonHouses) - wioski bez (a) i (a2) po kolei z listy rodow okregu (w kolko); rycerz z lore tylko, gdy w krainie
-            // nie zostal zaden rod (kraina bez kanonu albo wszystkie odpadly)
+            // nie zostal zaden rod (kraina bez kanonu albo wszystkie odpadly). Po recenzji D2 (Tagaros 37 wiosek Volantis): jeden rod najwyzej MaxPerDistrict (2)
+            // wioski okregu, rod "z calej krainy" (bez siedziby, klanu i podkrainy) najwyzej 1 - reszta wiosek do (c) rodow krolestwa (bez wymyslonych rycerzy z lore)
+            bool canonDone = false;
             if (c.Canon && left.Count > 0)
             {
                 List<CanonHouses.House> pool = null;
                 try { pool = CanonPool(st, lord, realm, used); } catch (Exception e) { Stumble("Build(rody kanonu)", e); }
                 if (pool != null && pool.Count > 0)
                 {
+                    var lordHouse = CanonHouses.OfClan(lord);
+                    string lordBase = lordHouse != null ? lordHouse.Base : null;
+                    var per = new Dictionary<CanonHouses.House, int>();
+                    var over = new List<int>();
                     for (int j = 0; j < left.Count; j++)
                     {
                         int i = left[j];
                         var ch = pool[j % pool.Count];
+                        Vec2 q;
+                        int lim = CanonHouses.RefPos(ch, out q) ? MaxPerDistrict : MaxPerDistrictAnywhere;
+                        int had;
+                        per.TryGetValue(ch, out had);
+                        if (had >= lim) { over.Add(i); continue; }
+                        per[ch] = had + 1;
                         Clan live = CanonHouses.LiveClan(ch);
                         c.ByUid[uids[i]] = new Holder
                         {
-                            Rule = RuleCanon, Canon = ch, Clan = live, Banner = CanonHouses.BannerOf(ch, live), Lord = lord, Lore = rows[i], Who = WhoOf(uids[i], rows[i], ch)
+                            Rule = RuleCanon, Canon = ch, Clan = live, Banner = CanonHouses.BannerOf(ch, live), Lord = lord, Lore = rows[i], Who = WhoOf(uids[i], rows[i], ch, lordBase)
                         };
                     }
-                    return c;
+                    if (over.Count == 0) return c;
+                    left = over;
+                    canonDone = true;
                 }
             }
-            // (b) rycerz z lore z waznym herbem
+            // (b) rycerz z lore z waznym herbem (po rodach kanonu - nie: reszta ponad limit idzie do rodow krolestwa)
             var rest = new List<int>(left.Count);
             foreach (int i in left)
             {
                 var r = rows[i];
-                if (r != null && r.Knight.Length > 0 && r.KnightBanner != null)
+                if (!canonDone && r != null && r.Knight.Length > 0 && r.KnightBanner != null)
                     c.ByUid[uids[i]] = new Holder { Rule = RuleLore, Banner = r.KnightBanner, Lord = lord, Lore = r };
                 else rest.Add(i);
             }
@@ -428,52 +459,92 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ D2: rody kanonu
-        /// <summary>Rody kanonu dla wiosek okregu, w kolejnosci przydzialu: siedziba w tym okregu (zamek / miasto okregu albo sama wies gry), 2 najblizsze siedziby (do 60),
-        /// rody zaprzysiezone rodowi pana (skrot okreg+rod), reszta krainy (skrot). Bez rodu pana, rodow z klanem ROT spoza krolestwa pana / wyeliminowanym /
-        /// panujacym / wyzszym od pana / juz z majatkiem BK w okregu i bez waznego herbu. Pusta lista - kraina bez rodow (rycerz z lore jak dotad).</summary>
+        /// <summary>Rody kanonu dla wiosek okregu, w kolejnosci przydzialu: (0) siedziba w tym okregu (zamek / miasto okregu albo sama wies gry) z kazdej
+        /// krainy, (1) okreg wyspy - rody tej wyspy (skrot), (2) 2 najblizsze siedziby (do 60), (3) rody zaprzysiezone rodowi pana (skrot okreg+rod), (4) reszta
+        /// krainy (skrot); w (3) i (4) tylko rody bez punktu albo z punktem do FarRadius (150) - dalsze i rody innej wyspy tylko, gdy lista bylaby pusta
+        /// (najblizsze najpierw). Okreg wyspy z rodami wyspy - tylko one (i siedziba w okregu). Bez rodu pana, rodow z klanem ROT spoza krolestwa pana /
+        /// wyeliminowanym / panujacym / wyzszym od pana / juz z majatkiem BK w okregu i bez waznego herbu. Pusta lista - rycerz z lore jak dotad.</summary>
         private static List<CanonHouses.House> CanonPool(Settlement st, Clan lord, Kingdom realm, HashSet<Clan> used)
         {
             var pool = new List<CanonHouses.House>();
             var list = CanonHouses.InArea(CanonHouses.AreaOf(st.StringId));
-            if (list == null || list.Count == 0) return pool;
+            Settlement bound = st.Village != null ? st.Village.Bound : null;
+            string boundId = bound != null ? bound.StringId : null;
+            var atHere = CanonHouses.SeatedAt(st.StringId);
+            var atBound = CanonHouses.SeatedAt(boundId);
+            if ((list == null || list.Count == 0) && atHere.Count == 0 && atBound.Count == 0) return pool;
             var lordHouse = CanonHouses.OfClan(lord);
             string lordBase = lordHouse != null ? lordHouse.Base : null;
             bool ruler = realm != null && ReferenceEquals(realm.RulingClan, lord);
-            Settlement bound = st.Village != null ? st.Village.Bound : null;
-            string boundId = bound != null ? bound.StringId : null;
+            string isle = CanonHouses.SubOf(st.StringId);
             var p = st.GetPosition2D;
             var here = new List<CanonHouses.House>();
+            var island = new List<KeyValuePair<uint, CanonHouses.House>>();
             var seated = new List<KeyValuePair<float, CanonHouses.House>>();
             var sworn = new List<KeyValuePair<uint, CanonHouses.House>>();
             var rest = new List<KeyValuePair<uint, CanonHouses.House>>();
-            foreach (var h in list)
+            var far = new List<KeyValuePair<float, CanonHouses.House>>();
+            var taken = new HashSet<CanonHouses.House>();
+            // (0) siedziba w okregu - z kazdej krainy (rod Stormlands z siedziba w okregu kultury dragonstone)
+            foreach (var h in atHere) if (!taken.Contains(h) && CanonUsable(h, lordHouse, lord, realm, ruler, used)) { here.Add(h); taken.Add(h); }
+            foreach (var h in atBound) if (!taken.Contains(h) && CanonUsable(h, lordHouse, lord, realm, ruler, used)) { here.Add(h); taken.Add(h); }
+            if (list != null)
             {
-                if (ReferenceEquals(h, lordHouse)) continue;
-                Clan live = CanonHouses.LiveClan(h);
-                if (live != null && !CanonClanOk(live, lord, realm, ruler, used)) continue;
-                if (CanonHouses.BannerOf(h, live) == null) continue;
-                if (CanonHouses.SeatIs(h, st.StringId) || CanonHouses.SeatIs(h, boundId)) { here.Add(h); continue; }
-                Vec2 q;
-                if (CanonHouses.SeatPos(h, out q))
+                foreach (var h in list)
                 {
-                    float d2 = (q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y);
-                    if (d2 <= SeatRadius * SeatRadius) seated.Add(new KeyValuePair<float, CanonHouses.House>(d2, h));
+                    if (taken.Contains(h) || !CanonUsable(h, lordHouse, lord, realm, ruler, used)) continue;
+                    Vec2 q;
+                    bool hasRef = CanonHouses.RefPos(h, out q);
+                    float d2 = hasRef ? (q.x - p.x) * (q.x - p.x) + (q.y - p.y) * (q.y - p.y) : float.MaxValue;
+                    if (h.Sub.Length > 0)
+                    {
+                        // rod wyspy: na swojej wyspie najpierw, poza nia tylko jako ostatni zapas
+                        if (string.Equals(h.Sub, isle, StringComparison.Ordinal)) island.Add(new KeyValuePair<uint, CanonHouses.House>(Fnv(st.StringId, h.Key), h));
+                        else far.Add(new KeyValuePair<float, CanonHouses.House>(d2, h));
+                        continue;
+                    }
+                    if (hasRef && d2 > FarRadius * FarRadius) { far.Add(new KeyValuePair<float, CanonHouses.House>(d2, h)); continue; }
+                    Vec2 s;
+                    if (CanonHouses.SeatPos(h, out s))
+                    {
+                        float s2 = (s.x - p.x) * (s.x - p.x) + (s.y - p.y) * (s.y - p.y);
+                        if (s2 <= SeatRadius * SeatRadius) seated.Add(new KeyValuePair<float, CanonHouses.House>(s2, h));
+                    }
+                    var kv = new KeyValuePair<uint, CanonHouses.House>(Fnv(st.StringId, h.Key), h);
+                    if (lordBase != null && string.Equals(h.LiegeBase, lordBase, StringComparison.Ordinal)) sworn.Add(kv);
+                    else rest.Add(kv);
                 }
-                var kv = new KeyValuePair<uint, CanonHouses.House>(Fnv(st.StringId, h.Key), h);
-                if (lordBase != null && string.Equals(h.LiegeBase, lordBase, StringComparison.Ordinal)) sworn.Add(kv);
-                else rest.Add(kv);
             }
             here.Sort((x, y) => string.CompareOrdinal(x.Key, y.Key));
             pool.AddRange(here);
-            var taken = new HashSet<CanonHouses.House>(here);
-            seated.Sort((x, y) => { int r = x.Key.CompareTo(y.Key); return r != 0 ? r : string.CompareOrdinal(x.Value.Key, y.Value.Key); });
-            for (int i = 0, n = 0; i < seated.Count && n < NearSeats; i++) if (taken.Add(seated[i].Value)) { pool.Add(seated[i].Value); n++; }
             Comparison<KeyValuePair<uint, CanonHouses.House>> byHash = (x, y) => { int r = x.Key.CompareTo(y.Key); return r != 0 ? r : string.CompareOrdinal(x.Value.Key, y.Value.Key); };
-            sworn.Sort(byHash);
-            rest.Sort(byHash);
-            foreach (var kv in sworn) if (taken.Add(kv.Value)) pool.Add(kv.Value);
-            foreach (var kv in rest) if (taken.Add(kv.Value)) pool.Add(kv.Value);
+            Comparison<KeyValuePair<float, CanonHouses.House>> byDist = (x, y) => { int r = x.Key.CompareTo(y.Key); return r != 0 ? r : string.CompareOrdinal(x.Value.Key, y.Value.Key); };
+            island.Sort(byHash);
+            foreach (var kv in island) if (taken.Add(kv.Value)) pool.Add(kv.Value);
+            if (isle.Length == 0 || island.Count == 0)
+            {
+                seated.Sort(byDist);
+                for (int i = 0, n = 0; i < seated.Count && n < NearSeats; i++) if (taken.Add(seated[i].Value)) { pool.Add(seated[i].Value); n++; }
+                sworn.Sort(byHash);
+                rest.Sort(byHash);
+                foreach (var kv in sworn) if (taken.Add(kv.Value)) pool.Add(kv.Value);
+                foreach (var kv in rest) if (taken.Add(kv.Value)) pool.Add(kv.Value);
+            }
+            if (pool.Count == 0)
+            {
+                far.Sort(byDist);
+                foreach (var kv in far) if (taken.Add(kv.Value)) pool.Add(kv.Value);
+            }
             return pool;
+        }
+
+        /// <summary>Rod kanonu moze gospodarzyc wioska tego pana: nie rod pana, klan ROT (jesli jest w grze) przechodzi CanonClanOk, wazny herb.</summary>
+        private static bool CanonUsable(CanonHouses.House h, CanonHouses.House lordHouse, Clan lord, Kingdom realm, bool ruler, HashSet<Clan> used)
+        {
+            if (h == null || ReferenceEquals(h, lordHouse)) return false;
+            Clan live = CanonHouses.LiveClan(h);
+            if (live != null && !CanonClanOk(live, lord, realm, ruler, used)) return false;
+            return CanonHouses.BannerOf(h, live) != null;
         }
 
         /// <summary>Klan ROT rodu kanonu moze gospodarzyc wioska pana: zyje, nie jest panem ani rodem panujacym, jest z krolestwa pana (pan bez krolestwa - nikt), nie wyzszy
@@ -490,8 +561,9 @@ namespace Armoury
         }
 
         /// <summary>"Ser Howard of House Florent": poczatek imienia rycerza z lore tej wioski, inaczej imie rycerza z lore krainy (skrot uid+rod); Ghiscari "Gorzhak zo Loraq".
-        /// Bez imienia - sama nazwa rodu.</summary>
-        private static string WhoOf(string uid, MapVillageLore.Row row, CanonHouses.House h)
+        /// Bez imienia - sama nazwa rodu. Po recenzji D2: galaz rodu pana (rdzen = rdzen rodu pana, np. Harlaw of Grey Garden u Harlawow z Ten Towers) - pelna
+        /// nazwa galezi ("of House Harlaw of Grey Garden, sworn to House Harlaw"), nie sam rdzen.</summary>
+        private static string WhoOf(string uid, MapVillageLore.Row row, CanonHouses.House h, string lordBase)
         {
             string start = row != null ? NameStart(row.Knight) : null;
             if (string.IsNullOrEmpty(start))
@@ -499,7 +571,7 @@ namespace Armoury
                 var names = CanonHouses.NamesOf(h.Area);
                 if (names.Length > 0) start = names[(int)(Fnv(uid ?? "", h.Key) % (uint)names.Length)];
             }
-            string house = h.Base.Length > 0 ? h.Base : h.Name;
+            string house = h.Base.Length > 0 && !string.Equals(h.Base, lordBase, StringComparison.Ordinal) ? h.Base : h.Name;
             if (string.IsNullOrEmpty(start)) return house;
             if (start.EndsWith(" zo", StringComparison.Ordinal))
             {
@@ -555,7 +627,7 @@ namespace Armoury
             }
             else if (h.Rule == RuleCanon)
             {
-                // D2: "Ser Howard of House Florent" (WhoOf) - zawsze inny rod niz pan (rod pana nie trafia do listy)
+                // D2: "Ser Howard of House Florent" (WhoOf) - rod pana nie trafia do listy; galaz rodu pana z pelna nazwa (WhoOf), wiec tez "sworn to"
                 if (string.IsNullOrEmpty(h.Who)) return null;
                 who = h.Who;
                 sameHouse = false;
@@ -649,7 +721,7 @@ namespace Armoury
                             cnAreas[h.Canon.Area] = na + 1;
                             if (h.Clan != null) cnLive++;
                             else if (h.Canon.Rot) cnRotFile++;
-                            else if (h.Canon.CheckedCcs && h.Canon.CodeCcs.Length > 0) cnGenCcs++;
+                            else if (h.Canon.UsedCcs) cnGenCcs++;   // po recenzji D2: wariant CCs naprawde w uzyciu (zly wariant CCs = zwykly kod)
                             else cnGen++;
                         }
                         bool canonSample = h.Rule == RuleCanon && h.Canon != null && cnSamples < 6 && cnSampleAreas.Add(h.Canon.Area);
@@ -672,7 +744,7 @@ namespace Armoury
                   .Append(" | rody kanonu (D2, VillageCanonHouses ").Append(s.VillageCanonHouses ? "tak" : "NIE - rycerze z lore jak dotad").Append("): wiosek ").Append(rules[RuleCanon])
                   .Append(" z ").Append(cnHouses.Count).Append(" roznych rodow (herb zywego klanu ROT ").Append(cnLive).Append(", herb ROT z pliku ").Append(cnRotFile)
                   .Append(", herb zlozony z opisu ").Append(cnGen).Append(", w tym z ikonami CCsBanners ").Append(cnGenCcs).Append("), rycerz z lore w krainach bez rodow ").Append(loreNoCanon)
-                  .Append(", krainy: ").Append(AreaText(cnAreas)).Append(" | ").Append(CanonHouses.StatusText())
+                  .Append(", krainy: ").Append(AreaText(cnAreas)).Append(" | ").Append(CanonHouses.StatusText(s.VillageCanonHouses))
                   .Append(" | dwa proporczyki (VillageTwoPennants ").Append(s.VillageTwoPennants ? "tak" : "NIE").Append("): wiosek z gospodarzem innym niz pan ").Append(twoPen)
                   .Append(" z ").Append(villages)
                   .Append(" | roznych herbow na wioskach ").Append(codes.Count).Append(" (dotad herb pana okregu: ").Append(lordCodes.Count).Append(')')

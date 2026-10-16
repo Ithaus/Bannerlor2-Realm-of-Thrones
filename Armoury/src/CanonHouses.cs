@@ -22,6 +22,11 @@ namespace Armoury
     /// Kazdy kod sprawdzany w grze przed pierwszym uzyciem (raz na proces): Banner.TryGetBannerDataFromCode, tlo w grupie wzorow (GetBackgroundMeshName),
     /// kazda ikona ma material (GetIconDataFromIconId), kazda barwa w palecie (ReadOnlyColorPalette); zly kod = rod bez herbu z pliku (licznik), nie wywrotka.
     /// Nic w zapisie gry. Bledy liczone (pierwsze w logu), nic nie gasnie.
+    /// Po recenzji D2 (16.10): kolumny anchor_settlement_id (osada podkrainy - punkt TYLKO do odleglosci dla rodu bez siedziby: Crannogmen, Wolfswood,
+    /// gory, Skagos, Siostry, Tarcze, Crackclaw, Dragonstone) i subregion (wyspa rodu / okregu: Skagos, Three Sisters, Shield Islands); polozenie rodu:
+    /// siedziba z pliku -> siedziba klanu ROT w grze (HomeSettlement) -> osada podkrainy; rody z siedziba w danej osadzie z kazdej krainy (SeatedAt - Penrose,
+    /// Seaworth w okregach kultury dragonstone); kolumna imion "list" (dotad "names" = tez znacznik czesci); plik wczytany przy starcie sesji (SessionStart,
+    /// tylko przy wlaczonym kluczu), po bledzie wczytania ponowna proba w nastepnej sesji (nie raz na proces); UsedCcs - herb z wariantu CCs naprawde w uzyciu.
     /// </summary>
     internal static class CanonHouses
     {
@@ -31,6 +36,7 @@ namespace Armoury
         internal sealed class House
         {
             public string Name = "", Key = "", Region = "", Area = "", Culture = "", Liege = "", LiegeBase = "", Base = "", Status = "", Blazon = "", Words = "";
+            public string Anchor = "", Sub = "";       // po recenzji D2: osada podkrainy (tylko odleglosc) i wyspa ("" - lad)
             public string Code = "", CodeCcs = "", Source = "", Parse = "";
             public string[] Seats = NoIds, Clans = NoIds;
             public bool Holder, Rot;
@@ -38,22 +44,28 @@ namespace Armoury
             // proces
             internal int Checked;                      // 0 - nie sprawdzony, 1 - wazny, -1 - zly
             internal bool CheckedCcs;                  // ktory kod sprawdzono (CCs albo zwykly)
+            internal bool UsedCcs;                     // po recenzji D2: herb z pliku to wariant CCs (wariant CCs zly - zwykly kod, false)
             internal Banner Banner;                    // wlasny obiekt (kod z pliku) - jeden na rod
             // sesja
             internal int Stamp = -1;
             internal Clan Live;                        // klan ROT tego rodu w tej kampanii (moze byc wyeliminowany)
-            internal bool HasSeat;
+            internal bool HasSeat;                     // siedziba z pliku albo siedziba klanu ROT w grze
             internal Vec2 SeatPos;
+            internal bool HasAnchor;                   // po recenzji D2: osada podkrainy (rod bez siedziby)
+            internal Vec2 AnchorPos;
         }
 
         private static readonly string[] NoIds = new string[0];
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private static bool _tried;
+        private static bool _tried, _failed;         // _failed - blad wczytania: ponowna proba w nastepnej sesji (ResetSession)
         private static string _note = "nie wczytane";
         private static readonly List<House> _all = new List<House>(560);
         private static readonly Dictionary<string, List<House>> _byArea = new Dictionary<string, List<House>>(StringComparer.Ordinal);   // tylko holder = yes
         private static readonly Dictionary<string, House> _byClan = new Dictionary<string, House>(StringComparer.Ordinal);               // klan ROT -> rod (wszystkie)
         private static readonly Dictionary<string, string> _district = new Dictionary<string, string>(StringComparer.Ordinal);           // wies gry -> kraina
+        private static readonly Dictionary<string, string> _districtSub = new Dictionary<string, string>(StringComparer.Ordinal);        // wies gry -> wyspa
+        private static readonly Dictionary<string, List<House>> _bySeat = new Dictionary<string, List<House>>(StringComparer.Ordinal);   // osada -> rody z siedziba (holder = yes)
+        private static readonly List<House> NoHouses = new List<House>(0);
         private static readonly Dictionary<string, string[]> _names = new Dictionary<string, string[]>(StringComparer.Ordinal);
         private static int _holders, _rotN, _genN, _ccsN, _rejected;
         private static double _loadMs;
@@ -71,6 +83,7 @@ namespace Armoury
         /// <summary>VillageHolders.Reset (konstruktor ArmouryBehavior, kazda kampania): stan sesji (klany, siedziby, CCs) od nowa; plik zostaje.</summary>
         internal static void ResetSession()
         {
+            if (_failed) { _tried = false; _failed = false; }   // po recenzji D2: blad wczytania (IO) nie gasi rodow kanonu do konca procesu
             _session++;
             _clans = null;
             _ccs = -1;
@@ -87,6 +100,15 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ plik (raz na proces)
+        /// <summary>Po recenzji D2: OnSessionLaunched (po McmSettings.Apply) - plik 1.4 MB wczytany przy ladowaniu sesji, nie w pierwszym ticku proporczykow
+        /// na mapie; tylko przy wlaczonych herbach gospodarzy i rodach kanonu.</summary>
+        internal static void SessionStart()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.VillageBannerPerHolder || !s.VillageCanonHouses) return;
+            EnsureLoaded();
+        }
+
         private static void EnsureLoaded()
         {
             if (_tried) return;
@@ -95,11 +117,18 @@ namespace Armoury
             try
             {
                 string path = MapVillageTooltip.ModulePath("ModuleData", FileName);
-                if (path == null || !System.IO.File.Exists(path)) { _note = "brak pliku " + FileName; return; }
+                if (path == null || !System.IO.File.Exists(path)) { _note = "brak pliku " + FileName; _failed = true; return; }
                 Parse(System.IO.File.ReadAllText(path, Encoding.UTF8));
                 _note = "";
             }
-            catch (Exception e) { _all.Clear(); _byArea.Clear(); _byClan.Clear(); _district.Clear(); _names.Clear(); _note = "blad wczytania (" + e.GetType().Name + ")"; Log.Error("CanonHouses.Load", e); }
+            catch (Exception e)
+            {
+                _all.Clear(); _byArea.Clear(); _byClan.Clear(); _district.Clear(); _districtSub.Clear(); _bySeat.Clear(); _names.Clear();
+                _holders = _rotN = _genN = _ccsN = _rejected = 0;
+                _failed = true;
+                _note = "blad wczytania (" + e.GetType().Name + ") - ponowna proba w nastepnej sesji";
+                Log.Error("CanonHouses.Load", e);
+            }
             finally { _loadMs = sw.Elapsed.TotalMilliseconds; }
         }
 
@@ -121,6 +150,8 @@ namespace Armoury
                         section = head;
                         col.Clear();
                         string[] names = body.Split('\t');
+                        // indeks 0 = znacznik czesci i zarazem pierwsza kolumna ("house" = nazwa rodu, "district" = id wsi gry); w "#names" pierwsze pole wiersza
+                        // to sam znacznik - imiona w kolumnie "list" (po recenzji D2: dotad kolumna "names" = znacznik, dzialalo tylko przez nadpisanie indeksu)
                         for (int i = 0; i < names.Length; i++) col[names[i].Trim()] = i;
                     }
                     continue;
@@ -139,6 +170,8 @@ namespace Armoury
                     if (h.Key.Length == 0) h.Key = h.Name;
                     h.Seats = Ids(Get(f, col, "seat_settlement_id"));
                     h.Clans = Ids(Get(f, col, "rot_clan_id"));
+                    h.Anchor = Get(f, col, "anchor_settlement_id");
+                    h.Sub = Get(f, col, "subregion");
                     h.Rot = string.Equals(h.Source, "rot", StringComparison.Ordinal);
                     h.Holder = string.Equals(Get(f, col, "holder"), "yes", StringComparison.Ordinal);
                     h.ArmsText = Arms(h.Blazon);
@@ -152,16 +185,24 @@ namespace Armoury
                         if (!_byArea.TryGetValue(h.Area, out list)) _byArea[h.Area] = list = new List<House>();
                         list.Add(h);
                         _holders++;
+                        foreach (string sid in h.Seats)
+                        {
+                            List<House> at;
+                            if (!_bySeat.TryGetValue(sid, out at)) _bySeat[sid] = at = new List<House>(2);
+                            at.Add(h);
+                        }
                     }
                 }
                 else if (section == "district")
                 {
-                    string id = Get(f, col, "district"), area = Get(f, col, "area");
+                    string id = Get(f, col, "district"), area = Get(f, col, "area"), sub = Get(f, col, "subregion");
                     if (id.Length > 0 && area.Length > 0) _district[id] = area;
+                    if (id.Length > 0 && sub.Length > 0) _districtSub[id] = sub;
                 }
                 else if (section == "names")
                 {
-                    string area = Get(f, col, "area"), ns = Get(f, col, "names");
+                    string area = Get(f, col, "area"), ns = Get(f, col, "list");
+                    if (!col.ContainsKey("list")) ns = Get(f, col, "names");   // plik sprzed recenzji D2 (kolumna "names" nadpisana indeksem 2)
                     if (area.Length > 0 && ns.Length > 0) _names[area] = ns.Split('|');
                 }
             }
@@ -211,6 +252,23 @@ namespace Armoury
             return districtId != null && _district.TryGetValue(districtId, out a) ? a : null;
         }
 
+        /// <summary>Po recenzji D2: wyspa okregu (Skagos, Three Sisters, Shield Islands) albo "" (lad).</summary>
+        internal static string SubOf(string districtId)
+        {
+            EnsureLoaded();
+            string s;
+            return districtId != null && _districtSub.TryGetValue(districtId, out s) ? s : "";
+        }
+
+        /// <summary>Po recenzji D2: rody (holder = yes) z siedziba w tej osadzie - z kazdej krainy (Penrose of Parchments: Stormlands w okregu kultury
+        /// dragonstone = Crownlands); pusta lista - brak.</summary>
+        internal static List<House> SeatedAt(string settlementId)
+        {
+            EnsureLoaded();
+            List<House> l;
+            return settlementId != null && _bySeat.TryGetValue(settlementId, out l) ? l : NoHouses;
+        }
+
         /// <summary>Rody krainy, ktore moga gospodarzyc wioskami (kolejnosc pliku); null - brak.</summary>
         internal static List<House> InArea(string area)
         {
@@ -242,12 +300,21 @@ namespace Armoury
             return h.Live;
         }
 
-        /// <summary>Polozenie pierwszej istniejacej siedziby rodu (sesja).</summary>
+        /// <summary>Polozenie siedziby rodu (sesja): pierwsza istniejaca siedziba z pliku, inaczej siedziba klanu ROT w grze (Clan.HomeSettlement).</summary>
         internal static bool SeatPos(House h, out Vec2 pos)
         {
             Touch(h);
             pos = h.SeatPos;
             return h.HasSeat;
+        }
+
+        /// <summary>Po recenzji D2: punkt rodu do odleglosci - siedziba (SeatPos), inaczej osada podkrainy (anchor_settlement_id). false - rod "z calej krainy".</summary>
+        internal static bool RefPos(House h, out Vec2 pos)
+        {
+            Touch(h);
+            if (h.HasSeat) { pos = h.SeatPos; return true; }
+            pos = h.AnchorPos;
+            return h.HasAnchor;
         }
 
         internal static bool SeatIs(House h, string settlementId)
@@ -262,7 +329,7 @@ namespace Armoury
             if (h.Stamp == _session) return;
             h.Stamp = _session;
             h.Live = null;
-            h.HasSeat = false;
+            h.HasSeat = h.HasAnchor = false;
             try
             {
                 if (h.Clans.Length > 0)
@@ -277,6 +344,17 @@ namespace Armoury
                     h.SeatPos = s.GetPosition2D;
                     h.HasSeat = true;
                     break;
+                }
+                if (!h.HasSeat && h.Live != null && h.Live.HomeSettlement != null)
+                {
+                    // po recenzji D2: rod z klanem ROT bez siedziby w pliku (Celtigar, Velaryon, Hewett, klany Essos) - siedziba klanu w tej kampanii
+                    h.SeatPos = h.Live.HomeSettlement.GetPosition2D;
+                    h.HasSeat = true;
+                }
+                if (h.Anchor.Length > 0)
+                {
+                    var a = Settlement.Find(h.Anchor);
+                    if (a != null) { h.AnchorPos = a.GetPosition2D; h.HasAnchor = true; }
                 }
             }
             catch (Exception e) { Stumble("Touch", e); }
@@ -327,6 +405,7 @@ namespace Armoury
             if (h.Checked != 0 && h.CheckedCcs == ccs) return h.Checked > 0;
             h.CheckedCcs = ccs;
             string code = ccs ? h.CodeCcs : h.Code;
+            bool useCcs = ccs;
             bool ok = false;
             try { ok = CodeOk(code); }
             catch (Exception e) { Stumble("Usable " + h.Key, e); ok = false; }
@@ -334,9 +413,11 @@ namespace Armoury
             {
                 // wariant CCs zly - zwykly kod
                 code = h.Code;
+                useCcs = false;
                 try { ok = CodeOk(code); } catch (Exception e) { Stumble("Usable " + h.Key, e); ok = false; }
             }
             h.Checked = ok ? 1 : -1;
+            h.UsedCcs = ok && useCcs;
             h.Banner = ok ? new Banner(code) : null;
             if (!ok) { _badCodes++; if (_badCodes <= 3) Log.Info("Rody kanonu (D2): zly kod herbu rodu " + h.Key + " (" + h.Source + ") - rod bez herbu z pliku."); }
             return ok;
@@ -362,14 +443,16 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ log
-        /// <summary>Do linii "Herby wiosek (D1)": stan pliku i rodow.</summary>
-        internal static string StatusText()
+        /// <summary>Do linii "Herby wiosek (D1)": stan pliku i rodow. Po recenzji D2: przy wylaczonym kluczu bez wczytywania pliku i bez proby CCs.</summary>
+        internal static string StatusText(bool on)
         {
+            if (!on && !_tried) return "plik " + FileName + " nie wczytany (klucz wylaczony)";
             EnsureLoaded();
             if (_all.Count == 0) return "plik " + FileName + ": " + (_note.Length > 0 ? _note : "pusty") + " - rycerze z lore jak dotad";
             int areas = _byArea.Count;
             return "plik: rodow " + _all.Count + " (herb klanu ROT " + _rotN + ", zlozony z opisu " + _genN + ", z wariantem CCs " + _ccsN + "), gospodarzy " + _holders
-                   + " w " + areas + " krainach, okregow z kraina " + _district.Count + ", odrzucone wiersze " + _rejected + ", wczytanie " + _loadMs.ToString("0", Inv) + " ms"
+                   + " w " + areas + " krainach, okregow z kraina " + _district.Count + " (na wyspach " + _districtSub.Count + "), odrzucone wiersze " + _rejected
+                   + ", wczytanie " + _loadMs.ToString("0", Inv) + " ms"
                    + " | CCsBanners " + (CcsLoaded ? "wczytany (wariant CCs)" : "nie wczytany (ikony gry i ROT)") + " | zle kody " + _badCodes + " | potkniecia " + _st;
         }
     }
