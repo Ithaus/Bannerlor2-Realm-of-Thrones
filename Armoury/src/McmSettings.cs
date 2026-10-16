@@ -4872,13 +4872,17 @@ namespace Armoury
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitKits { get; set; } = true;
 
-        [SettingPropertyBool("Gear Fit Culture", HintText = "kit follows the soldier's people: from his side of the Narrow Sea, or of a style his own people's troops wear in Realm of Thrones; a piece of his own template always fits; used when notables, lords, garrisons and your men buy and when battle takes kit from across the sea off a soldier (off = only the side of the Narrow Sea, in battle only)")]
+        [SettingPropertyBool("Gear Fit Culture", HintText = "kit follows the soldier's people: from his side of the Narrow Sea, or of a style his own people's troops wear in Realm of Thrones; a piece of his own template always fits; used when notables, lords, garrisons and your men buy, when they count what is worn and what is spare to sell, and when battle takes kit from across the sea off a soldier (off = only the side of the Narrow Sea, in battle only)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitCulture { get; set; } = true;
 
-        [SettingPropertyBool("Gear Fit Weapon Floor", HintText = "in battle no soldier fights bare-handed while his party's stores hold a weapon he can use: a man left without any weapon after the skill and culture checks takes the best melee weapon he can wield from the stores, of his people's kind first, else one from across the sea - nothing from thin air (off = as before)")]
+        [SettingPropertyBool("Gear Fit Weapon Floor", HintText = "in battle no soldier fights bare-handed while his party's stores hold a weapon he can use: a man left without any weapon after the skill and culture checks takes the best melee weapon he can wield from the stores, of his people's kind first (from across the sea only with Gear Fit Floor Foreign) - nothing from thin air (off = as before)")]
         [SettingPropertyGroup("Arming the garrisons")]
         public bool GearFitWeaponFloor { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Floor Foreign", HintText = "with Gear Fit Weapon Floor: a bare-handed man with no weapon of his people's kind in the stores takes one from across the Narrow Sea he can wield - even the very piece that was just taken off him or a comrade for its foreign style - better a foreign blade than bare hands (off = no foreign weapon in battle: he fights bare-handed when the stores hold nothing of his people's kind)")]
+        [SettingPropertyGroup("Arming the garrisons")]
+        public bool GearFitFloorForeign { get; set; } = true;
 
         [SettingPropertyBool("Gear Fit Floor Over Skill", HintText = "with Gear Fit Weapon Floor: when the stores hold no weapon a bare-handed man can wield, he takes the lightest one there even above his skill - better over-armed than bare-handed (off = skills are sacred: no weapon he cannot use, as decided on 14.09)")]
         [SettingPropertyGroup("Arming the garrisons")]
@@ -7467,6 +7471,7 @@ namespace Armoury
             s.GearFitKits = GearFitKits;
             s.GearFitCulture = GearFitCulture;
             s.GearFitWeaponFloor = GearFitWeaponFloor;
+            s.GearFitFloorForeign = GearFitFloorForeign;
             s.GearFitFloorOverSkill = GearFitFloorOverSkill;
             s.GearFitRealmFromStores = GearFitRealmFromStores;
             s.DrillLaw = DrillLaw;

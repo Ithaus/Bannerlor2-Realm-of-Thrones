@@ -6005,7 +6005,8 @@ namespace CrashScribe
         //     u jezdzca z siodla), nie ze wzorca - sztuka wzorca byla z niczego i straz "nic z niczego" Armoury zabierala ja przy spawnie (log 15.10
         //     12:03:43: 3x pointed_falchion_sword_t4, slot pusty). Bez zamiennika slot pusty - bron biala dobierze podloga Armoury (GearFit, Priority.Last).
         //     Ksiegowosc polki: najpierw zwrot obcej (AddEquipmentToAssign), potem pobranie zamiennika (ConsumeEquipmentToAssign).
-        internal static int WardForeignSub, WardForeignBare;
+        // poprawka po recenzji (noc 15/16.10): WardForeignTpl liczony w galezi "ze wzorca" (dotad T = K - Z - B, wiec Z + B + T = K zawsze sie zgadzalo)
+        internal static int WardForeignSub, WardForeignBare, WardForeignTpl;
         private static Func<CharacterObject, ItemObject, bool> _gfCultureOk;
         private static bool _gfLooked;
 
@@ -6067,7 +6068,9 @@ namespace CrashScribe
                 if (list == null) return;
                 // GearFit: raz na wywolanie (nie na zolnierza) - goraca sciezka, podglad gotowosci zbrojowni na mapie tez wola DoAssignAsync
                 var cultureOk = GearFitCultureOk();
-                bool fromStores = ArmouryFloat("GearFitRealmFromStores", 1f) > 0.5f;
+                // poprawka po recenzji: brak klucza (stara Armoury bez GearFit, bez podlogi broni) = 0 - zamiennik ze wzorca jak przed zmiana; dotad domyslne 1
+                // dawalo pusty slot u WSZYSTKICH partii, bo stara Armoury pustego slotu broni nie uzupelnia
+                bool fromStores = ArmouryFloat("GearFitRealmFromStores", 0f) > 0.5f;
                 System.Collections.IDictionary pool = null;
                 if (fromStores) { try { pool = tr.Field("_equipmentToAssign").GetValue() as System.Collections.IDictionary; } catch { pool = null; } }
                 foreach (var a in list)
@@ -6112,7 +6115,7 @@ namespace CrashScribe
                         if (sub != null && !CanUse(co, sub)) sub = null;
                         try { ta.Method("SetEquipment", (EquipmentIndex)s, sub != null ? new EquipmentElement(sub) : default(EquipmentElement)).GetValue(); } catch { }
                         try { tr.Method("AddEquipmentToAssign", el, 1).GetValue(); } catch { }   // sztuka wraca na polke
-                        WardForeign++;
+                        WardForeign++; WardForeignTpl++;
                     }
                 }
             }
@@ -6130,8 +6133,8 @@ namespace CrashScribe
                             + WardArmour + " sztuk pancerza cofnietych do wzorca oddzialu, "
                             + WardForeign + " sztuk zza Waskiego Morza wroconych na polke, "
                             + WardStumbles + " potkniec | zamiennik z polki (GearFit) " + WardForeignSub + ", bez zamiennika (slot pusty, podloga Armoury) " + WardForeignBare
-                            + ", ze wzorca (Gear Fit Realm From Stores wylaczone albo brak puli) " + Math.Max(0, WardForeign - WardForeignSub - WardForeignBare) + ".");
-                WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0; WardForeignSub = 0; WardForeignBare = 0;
+                            + ", ze wzorca (Gear Fit Realm From Stores wylaczone albo brak puli) " + WardForeignTpl + ".");
+                WardBlades = 0; WardArmour = 0; WardStumbles = 0; WardForeign = 0; WardForeignSub = 0; WardForeignBare = 0; WardForeignTpl = 0;
             }
             catch { }
         }

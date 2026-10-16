@@ -546,7 +546,9 @@ namespace Armoury
         /// <summary>Zbrojownia gracza (Jeff 15.10, PlayerArmoryView): kto co nosi u ludzi GRACZA - predykat GearFit.ForTroop (umiejetnosc; przy GearFitKits bron
         /// z siodla u jezdzca; przy GearFitCulture kultura) - ten sam, ktorym notable i ludzie kupuja, a rekruci oddaja nieuzywalne. Sztuka, ktorej oddzial nie
         /// uzyje (obca kultura, z siodla), nie jest "noszona": wklad gracza zostaje gracza, zapas ludzi idzie do kupca jako pierwszy, czlowiek z nia to brak.
-        /// Obie bramki GearFit wylaczone - MeetsOf. Tylko druzyna gracza (FitFor, PlayerSurplusPlan, MenUpgrade.Run gracza); zalogi i lordowie AI - MeetsOf.</summary>
+        /// Obie bramki GearFit wylaczone - MeetsOf. Druzyna gracza (FitFor, PlayerSurplusPlan, MenUpgrade.Run), a od poprawki po recenzji (noc 15/16.10) takze
+        /// lordowie AI i zalogi (MenPurse.AiFitted - nadwyzki, musztra, naprawy AI; MenUpgrade.Run; GarrisonKit - wklady gracza i procent gotowosci zalogi).
+        /// Zakupy licza ten sam predykat (AiGear.Lift, MenPurse.BuyPlayerGaps - GearFit.AnyFitFor) - inaczej kupiona sztuka bylaby nazajutrz nadwyzka.</summary>
         internal static Func<int, SwapMath.Piece, bool> MeetsFitOf(List<CharacterObject> troops)
         {
             if (!GearFit.On && !GearFit.CultureOn) return MeetsOf(troops);

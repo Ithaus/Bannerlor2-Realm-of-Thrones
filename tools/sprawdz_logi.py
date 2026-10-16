@@ -675,7 +675,9 @@ Uzycie (Python 3, tylko odczyt):
                     NS-9 CrashScribe: zamiennik z polki + bez + ze wzorca = zza morza. Czesc 2 (zbrojownia gracza, Jeff 15.10 a/b/c, PlayerArmoryView.cs):
                     NS-10 linia startu "Zbrojownia gracza (15.10)" (3 klucze tak, widok czynny), NS-11 samosprawdzenie widoku, NS-12 samosprawdzenie wymiany,
                     NS-13 ERROR zbrojowni gracza 0, NS-14 "Wymiana: NIEZMIENNIK" 0, NS-15 przy widoku tylko Twoje 0 zakupow od ludzi z okna (bez okna INFO),
-                    NS-16 zwrot wymiany: inne 0 (wszystko z wypartych; bez wymiany INFO), NS-17 konie w nadwyzkach i "bez zakupow" (INFO). Log bez paczki: INFO.
+                    NS-16 zwrot wymiany: inne 0 (wszystko z wypartych; bez wymiany INFO), NS-17 konie w nadwyzkach i "bez zakupow" (INFO). Poprawki po recenzji:
+                    NS-18 braki ludzi gracza - kupione na brak i nieuzyte 0 (DECYZJA; bez zakupow INFO), NS-19 nadwyzki obcej kultury AI/zalog, dobytek zalog
+                    panu osady, komplety DTE przed startem sesji (INFO). Log bez paczki: INFO.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -27249,6 +27251,11 @@ NS_REJ = re.compile(r"kandydatow odrzuconych (\d+) \(umiejetnosc (\d+), siodlo (
 NS_HAND = re.compile(r"szt\. (\d+), uzywalne (\d+), nieuzywalne (\d+) \(kupione -> notabl (\d+) za (\d+) zl, dobytek -> sakiewka ludzi (\d+) za (\d+) zl, "
                      r"na polke bez zaplaty (\d+)\), bez targu zostawione jak dotad (\d+)")
 NS_CTL = re.compile(r"do zbrojowni nieuzywalnych (\d+) \(ma byc 0\)")
+# poprawki po recenzji (noc 15/16.10): braki ludzi gracza bez skutku (petla kupno -> skup), nadwyzki obcej kultury AI/zalog, dobytek zalog panu osady
+NS_GAP = re.compile(r"\| braki ludzi gracza: kupione (\d+), kupione w \d+ dniach i nieuzyte \(wolne przy brakach albo sprzedane jako nadwyzka\) (\d+)")
+NS_AIFOR = re.compile(r"sprzedane sztuki kultury, ktorej nie nosi nikt w partii: lordowie AI (\d+), zalogi (\d+)")
+NS_LORD = re.compile(r"\(w tym x2 zalog bez sakiewki - panu osady (\d+) za (\d+) zl\)")
+NS_PRE = re.compile(r"komplety DTE przed startem sesji bez filtra (\d+)")
 NS_STUM = re.compile(r"potkniecia (\d+) \(sesja (\d+)\)\.?$")
 NS_FLOOR = re.compile(r"\| podloga broni \(GearFit[^)]*\): Twoi ludzie - bez broni po strazach (\d+), z polki (\d+) \(uzywalna (\d+), obca kultura (\d+), "
                       r"ponad umiejetnosc - ostatnia deska (\d+)\), nic w polce (\d+)")
@@ -27404,12 +27411,13 @@ def nsprzet_main(logp, csp, bdp):
         rep.show()
         return 0
     st = starts[-1] if starts else ""
-    keys = ("Gear Fit Kits", "Gear Fit Culture", "Gear Fit Weapon Floor", "Gear Fit Realm From Stores")
+    keys = ("Gear Fit Kits", "Gear Fit Culture", "Gear Fit Weapon Floor", "Gear Fit Floor Foreign", "Gear Fit Realm From Stores")
     off = [k for k in keys if (k + " tak") not in st]
-    wires = ("DTE GetRecruitEquipments tak", "podloga broni DoAssignAsync tak", "RealmWard z polki (CrashScribe) tak")
+    # "start sesji tak" (poprawka po recenzji): filtr kompletu t1 DTE czynny od OnSessionLaunched (GearFit.SessionStart); linia sprzed poprawki - bez pola
+    wires = ("DTE GetRecruitEquipments tak", "podloga broni DoAssignAsync tak", "RealmWard z polki (CrashScribe) tak", "start sesji tak")
     miss = [w for w in wires if w not in st]
     rep.add("NS-0: linia startu (klucze i wpiecia)", ("klucze tak" if not off else "WYLACZONE: " + ", ".join(off)) + ("; wpiecia tak" if not miss else "; BRAK: " + ", ".join(miss)),
-            "4 klucze tak, 3 wpiecia tak", bool(st) and not off and not miss)
+            "5 kluczy tak, 3 wpiecia i start sesji tak", bool(st) and not off and not miss)
     over = num(r"ponad umiejetnosc (\d+) \(ma byc 0\)", st) if st else None
     kin = num(r"\): (\d+) par", st) if st else None
     rep.add("NS-1: wzorce wojsk po prawach CS - sloty ponad umiejetnosc", f"{over} (par krewnych kultur {kin})", "0 (inaczej DECYZJA: SkillSinew / dane ROT)",
@@ -27510,6 +27518,32 @@ def nsprzet_main(logp, csp, bdp):
                 (wbad == 0) if wl > 0 else None)
     else:
         rep.add("NS-9: CrashScribe 'Straz unikatow'", "brak --crashscribe", "INFO", None)
+    # NS-18 (poprawka po recenzji, uwaga krytyczna): zakup braku ludzi gracza, ktorego nikt bez sztuki nie uzyje, wracal co dobe i szedl do kupca
+    gb, gi, gmiss = 0, 0, 0
+    for s in days.values():
+        mm = NS_GAP.search(s)
+        if not mm:
+            gmiss += 1; continue
+        gb += int(mm.group(1)); gi += int(mm.group(2))
+    if gb > 0:
+        rep.add("NS-18: braki ludzi gracza - kupione na brak i nieuzyte w 14 dniach (wolne przy brakach albo sprzedane jako nadwyzka)",
+                f"kupione {gb}, nieuzyte {gi} (linii doby bez pola {gmiss})", "0 (wiecej - DECYZJA: petla kupno -> skup albo straty w bitwie; ids w linii doby)",
+                gi == 0, decide=True)
+    else:
+        rep.add("NS-18: braki ludzi gracza (BuyPlayerGaps)", f"zakupow brakow 0 (linii doby bez pola {gmiss})", "INFO (autotest nie wjezdza druzyna do miasta)", None)
+    af, gf, ln, lg, pre = 0, 0, 0, 0, None
+    for s in days.values():
+        mm = NS_AIFOR.search(s)
+        if mm:
+            af += int(mm.group(1)); gf += int(mm.group(2))
+        mm = NS_LORD.search(s)
+        if mm:
+            ln += int(mm.group(1)); lg += int(mm.group(2))
+    mm = NS_PRE.search(st) if st else None
+    if mm:
+        pre = int(mm.group(1))
+    rep.add("NS-19: nadwyzki obcej kultury (AI / zalogi), dobytek zalog bez sakiewki panu osady, komplety DTE przed startem sesji (INFO)",
+            f"sprzedane obcej kultury: lordowie AI {af}, zalogi {gf}; panu osady {ln} szt. za {lg} zl; przed startem sesji bez filtra {pre}", "INFO", None)
     zb.report(rep)   # czesc 2: NS-10..NS-17
     rep.show()
     return 0

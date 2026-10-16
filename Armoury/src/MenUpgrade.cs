@@ -421,8 +421,9 @@ namespace Armoury
                 var pieces = kit.Pieces(type);
                 if (pieces.Count == 0) continue;
                 // najpierw braki (Jeff 14.09): tylko PELNE koszyki maja kandydata do wymiany
-                // Jeff 15.10 (PlayerArmoryView): u ludzi gracza kto co nosi - ten sam predykat GearFit co wymiana, nadwyzki i braki (MeetsFitOf); AI i zalogi jak dotad
-                foreach (var sl in SwapMath.Assign(buckets, pieces, player ? QuartermasterLaw.MeetsFitOf(troops) : QuartermasterLaw.MeetsOf(troops)))
+                // Jeff 15.10 (PlayerArmoryView): kto co nosi - ten sam predykat GearFit co wymiana, nadwyzki i braki (MeetsFitOf); poprawka po recenzji (noc 15/16.10):
+                // takze lordowie AI i zalogi (dotad MeetsOf - sztuka zza morza "noszona" w koszyku, a w bitwie zdejmowana przez RealmWard)
+                foreach (var sl in SwapMath.Assign(buckets, pieces, QuartermasterLaw.MeetsFitOf(troops)))
                     if (sl.Bucket.Full) cands.Add(new Cand { Type = type, Order = ti, Slot = sl, Troop = troops[sl.Group], Ceil = SwapMath.CeilingTier(TroopTier(troops[sl.Group]), oneUp) });
             }
             v.Cands = cands.Count;   // Jeff 15.10 (b): sloty z PELNYCH koszykow - tylko do linii "Dozbrajanie: gracz ... bez zakupow"

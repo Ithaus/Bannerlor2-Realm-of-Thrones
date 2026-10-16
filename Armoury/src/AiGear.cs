@@ -765,11 +765,13 @@ namespace Armoury
         /// <summary>K1 (przeglad): czy ktos z oddzialow koszyka udzwignie sztuke (brak listy - bez warunku, jak dotad).
         /// GearFit (noc 15/16.10, klucz GearFitCulture): i moze ja nosic wedlug kultury (GearFit.CultureOk) - dotad AI kupowala sztuki zza Waskiego Morza,
         /// ktore straz RealmWard zdejmowala w bitwie (zloto wydane na nic).</summary>
+        // Poprawka po recenzji (noc 15/16.10): pelny predykat GearFit.ForTroop (umiejetnosc, przy GearFitKits bron z siodla u jezdzca, kultura) - ten sam,
+        // ktorym nadwyzki AI licza kto co nosi (MenPurse.AiFitted -> MeetsFitOf); inaczej dlugi luk kupiony konnym bylby nazajutrz nadwyzka (petla kupno -> skup).
         private static bool Lift(List<CharacterObject> who, ItemObject it)
         {
             if (who == null || who.Count == 0) return true;
-            bool cul = GearFit.CultureOn;
-            foreach (var c in who) if (ItemReq.Meets(c, it) && (!cul || GearFit.CultureOk(c, it))) return true;
+            bool gf = GearFit.On || GearFit.CultureOn, kit = GearFit.On;
+            foreach (var c in who) if (gf ? GearFit.ForTroop(c, it, kit) : ItemReq.Meets(c, it)) return true;
             return false;
         }
 

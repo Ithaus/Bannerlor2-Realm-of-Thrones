@@ -37,6 +37,11 @@ namespace Armoury
     /// "jak nic nie pasuje, to nic nie zaklada"; ZASADA NADRZEDNA 29.08 "umiejetnosci sa swiete"). Nic z niczego: sztuka podlogi pochodzi z puli
     /// rozdzielacza DTE (ConsumeEquipmentToAssign), kazde zloto ma platnika (kasa miasta) i odbiorce (notabl, sakiewka ludzi).
     ///
+    /// Poprawki po recenzji (noc 15/16.10): kto co nosi (QuartermasterLaw.MeetsFitOf = ForTroop) liczy ten sam predykat u ludzi gracza, lordow AI i zalog
+    /// (nadwyzki, naprawy AI, koszyki dozbrajania, wklady do zalogi, procent gotowosci zalogi), a zakupy (AiGear.Lift, MenPurse.BuyPlayerGaps - AnyFitFor) ten sam,
+    /// takze z siodlem - inaczej sztuka kupiona na brak jest nazajutrz "nieuzywalna" nadwyzka (petla kupno -> skup). Kontrola na wejsciu do zbrojowni
+    /// (CheckEntry), x odrzuconych liczone w chwili decyzji, filtr kompletu t1 dopiero od startu sesji (SessionStart), obca bron w podlodze za kluczem
+    /// GearFitFloorForeign.
     /// Bez zapisu w SyncData (stan sesji); Reset z konstruktora ArmouryBehavior; linie "GearFit (start sesji)" i "GearFit: dzien N" (Daily).
     /// PUNKTY STYKU dla czesci 2 (zbrojownia gracza, przekazanie pkt 15): ForTroop / CultureOk / AnyCultureOk - ten sam predykat dla wymiany sprzetu
     /// gracza z ludzmi i sprzedazy ich rzeczy; RecruitKit.FitHandover - miejsce, w ktorym rzeczy zolnierza wchodza do zbrojowni gracza (PlayerVolunteer /
@@ -50,6 +55,9 @@ namespace Armoury
         internal static bool FloorOn { get { var s = Settings.Current; return s != null && s.GearFitWeaponFloor; } }
         internal static bool FloorOverSkillOn { get { var s = Settings.Current; return s != null && s.GearFitFloorOverSkill; } }
         internal static bool RealmFromStoresOn { get { var s = Settings.Current; return s != null && s.GearFitRealmFromStores; } }
+        // poprawki po recenzji (noc 15/16.10): drugie przejscie podlogi (bron obcej kultury) osobnym kluczem - to zasada Jeffa (16.09: obca bron zdejmowana),
+        // nie decyzja techniczna; bez niego czlowiek bez innej broni moze dostac z polki te sama bron zza morza, ktora RealmWard chwile wczesniej zdjal
+        internal static bool FloorForeignOn { get { var s = Settings.Current; return s != null && s.GearFitFloorForeign; } }
 
         internal const int WhySkill = 1, WhySaddle = 2, WhyCulture = 3;
         internal const int KinMinSlots = 3;
@@ -62,6 +70,17 @@ namespace Armoury
         private static readonly List<KeyValuePair<string, int>> _kinTop = new List<KeyValuePair<string, int>>();
         private static readonly Dictionary<CharacterObject, HashSet<ItemObject>> _tpl = new Dictionary<CharacterObject, HashSet<ItemObject>>();
         private static bool _census;
+        // poprawki po recenzji: DTE OnGameLoaded -> OnMobilePartyCreated -> GetRecruitEquipments biegnie PRZED OnSessionLaunched, czyli przed prawami
+        // CrashScribe (WeightLaw, ArmorTierLaw, WeaponTierLaw, SkillSinew) - wtedy filtr kompletu t1 nie dziala (_live), liczone w _preSkip (linia startu)
+        private static bool _live;
+        private static int _preSkip;
+        // kontrola w miejscu wejscia do zbrojowni (CheckEntry): sztuki "bez targu" ostatniego FitHandover - dozwolone nieuzywalne (jak dotad z czlowiekiem)
+        private static int _pendKeep;
+        // braki ludzi gracza (MenPurse.BuyPlayerGaps): egzemplarz (id|mod) -> doba zakupu; ten sam egzemplarz wolny przy brakach albo sprzedany jako
+        // nadwyzka w ciagu GapIdleDays = zakup "bez skutku" (petla kupno -> skup, recenzja noc 15/16.10)
+        private static readonly Dictionary<string, int> _gapBuy = new Dictionary<string, int>();
+        private static readonly List<string> _gapIdleIds = new List<string>();
+        internal const int GapIdleDays = 14;
 
         // latki DTE
         private static FieldInfo _fPool, _fAssigns, _fParty, _fMission, _fEq;
@@ -71,8 +90,10 @@ namespace Armoury
 
         // liczniki doby
         private static int _dRej, _dRejSkill, _dRejSaddle, _dRejCulture, _dNative, _dRevNoFit, _dExtraNoFit;
-        private static int _dMenAi, _dMenPl, _dMenGar, _dN, _dU, _dX1, _dX2, _dX3, _dKeep, _dHome, _dCtl;
+        private static int _dMenAi, _dMenPl, _dMenGar, _dN, _dU, _dX, _dX1, _dX2, _dX3, _dKeep, _dHome, _dCtl;
         private static long _dG1, _dG2;
+        private static int _dLordN, _dEntry, _dEntryPcs, _dEntryKeep, _dGapBuy, _dGapIdle, _dAiForeign, _dGarForeign;
+        private static long _dLordG;
         private static int _dPlan, _dTpl, _dDrop;
         private static int _dMis, _dBare, _dB1, _dB2, _dB3, _dNone, _dNoSlot, _dKept;
         private static int _stum, _stumAll;
@@ -96,14 +117,25 @@ namespace Armoury
         {
             lock (_lock) { _kin = null; _kinTop.Clear(); _tpl.Clear(); _floorKept.Clear(); }
             _census = false; _stumAll = 0; _errSites.Clear(); _mMission = null;
+            _live = false; _preSkip = 0; _pendKeep = 0; _gapBuy.Clear();
             ClearDay(); ClearMission();
             _plPcs = _plMen = _plMenGold = _plNotGold = _plShelf = 0;
+        }
+
+        /// <summary>Start sesji (ArmouryBehavior.OnSessionLaunched, po McmSettings.Apply): od teraz filtr kompletu t1 (FitHomeKit) czynny; pamiec wzorcow
+        /// i par krewnych od nowa (zbudowane przy OnGameLoaded DTE mogly widziec swiat przed startem sesji). Kolejnosc OnSessionLaunched Armoury i CrashScribe
+        /// nieznana - miedzy nimi nikt nie werbuje (werbunek i nowe partie tylko w tikach), a ItemReq.Meets czyta wymogi i umiejetnosci w chwili wolania.</summary>
+        internal static void SessionStart()
+        {
+            lock (_lock) { _tpl.Clear(); _kin = null; _kinTop.Clear(); }
+            _live = true;
         }
 
         private static void ClearDay()
         {
             _dRej = _dRejSkill = _dRejSaddle = _dRejCulture = _dNative = _dRevNoFit = _dExtraNoFit = 0;
-            _dMenAi = _dMenPl = _dMenGar = _dN = _dU = _dX1 = _dX2 = _dX3 = _dKeep = _dHome = _dCtl = 0; _dG1 = _dG2 = 0;
+            _dMenAi = _dMenPl = _dMenGar = _dN = _dU = _dX = _dX1 = _dX2 = _dX3 = _dKeep = _dHome = _dCtl = 0; _dG1 = _dG2 = 0;
+            _dLordN = _dEntry = _dEntryPcs = _dEntryKeep = _dGapBuy = _dGapIdle = _dAiForeign = _dGarForeign = 0; _dLordG = 0; _gapIdleIds.Clear();
             _dPlan = _dTpl = _dDrop = 0;
             _dMis = _dBare = _dB1 = _dB2 = _dB3 = _dNone = _dNoSlot = _dKept = 0;
             _stum = 0;
@@ -174,6 +206,43 @@ namespace Armoury
                 if (CultureOk(c, it)) return true;
             }
             return !any;
+        }
+
+        /// <summary>Czy ktos z tych oddzialow uzyje sztuki wedlug pelnego predykatu ForTroop (umiejetnosc, siodlo przy kit, kultura) - ten sam, ktorym
+        /// QuartermasterLaw.MeetsFitOf liczy, kto co nosi; pusta lista - true. Poprawka po recenzji (noc 15/16.10, uwaga krytyczna): zakupy brakow ludzi gracza
+        /// (MenPurse.BuyPlayerGaps) sprawdzaly tylko kulture, a dopasowanie takze siodlo - dlugi luk dla konnego lucznika byl kupowany co dobe i sprzedawany
+        /// przy wjezdzie jako nieuzywalny.</summary>
+        internal static bool AnyFitFor(IEnumerable<CharacterObject> troops, ItemObject it, bool kit)
+        {
+            if (troops == null) return true;
+            bool any = false;
+            foreach (var c in troops)
+            {
+                if (c == null) continue;
+                any = true;
+                if (ForTroop(c, it, kit)) return true;
+            }
+            return !any;
+        }
+
+        /// <summary>Nadwyzki AI i zalog (MenPurse.SellArmorySurplus): sztuka, ktorej kultury nie nosi zaden oddzial partii (CultureOk) - tylko do licznika doby.</summary>
+        internal static bool ForeignToAll(TaleWorlds.CampaignSystem.Roster.TroopRoster roster, ItemObject it)
+        {
+            if (!CultureOn || roster == null || it == null) return false;
+            try
+            {
+                bool any = false;
+                for (int i = 0; i < roster.Count; i++)
+                {
+                    var el = roster.GetElementCopyAtIndex(i);
+                    var c = el.Character;
+                    if (c == null || c.IsHero || el.Number <= 0) continue;
+                    any = true;
+                    if (CultureOk(c, it)) return false;
+                }
+                return any;
+            }
+            catch (Exception e) { Stumble("ForeignToAll", e); return false; }
         }
 
         /// <summary>0 - kultura zolnierza albo sztuka bez kultury, 1 - inna (dozwolona) kultura. Do preferencji wlasnej kultury przy zakupie notabla.</summary>
@@ -293,14 +362,75 @@ namespace Armoury
         internal static void NoteExtraNoFit() { _dExtraNoFit++; }
         internal static void NotePlanSkip() { _dPlan++; }
 
-        /// <summary>RecruitKit.FitHandover: jeden czlowiek - sztuk n, uzywalnych u, kupione nieuzywalne x1 sprzedane notablowi za g1, dobytek x2 za g2 do
-        /// sakiewki ludzi, x3 na polke bez zaplaty, keep bez targu (jak dotad), home zamiennikow z domu, ctl - kontrola (uzywalnosc wyniku, ma byc 0).</summary>
-        internal static void NoteHandover(int path, int n, int u, int x1, int g1, int x2, int g2, int x3, int keep, int home, int ctl)
+        /// <summary>RecruitKit.FitHandover: jeden czlowiek - sztuk n, uzywalnych u, x odrzuconych na targ (liczone w chwili decyzji, NIEZALEZNIE od wyniku
+        /// sprzedazy - ksiega x = x1 + x2 + x3), kupione nieuzywalne x1 sprzedane notablowi za g1, dobytek x2 za g2 do sakiewki ludzi (zaloga bez sakiewki
+        /// - panu osady, NoteOwnToLord), x3 na polke bez zaplaty, keep bez targu (jak dotad), home zamiennikow z domu. keep - dozwolone nieuzywalne dla
+        /// kontroli na wejsciu do zbrojowni (CheckEntry) zaraz po tym przekazaniu.</summary>
+        internal static void NoteHandover(int path, int n, int u, int x, int x1, int g1, int x2, int g2, int x3, int keep, int home)
         {
             if (path == PathPlayer) _dMenPl++; else if (path == PathGarrison) _dMenGar++; else _dMenAi++;
-            _dN += n; _dU += u; _dX1 += x1; _dG1 += g1; _dX2 += x2; _dG2 += g2; _dX3 += x3; _dKeep += keep; _dHome += home; _dCtl += ctl;
+            _dN += n; _dU += u; _dX += x; _dX1 += x1; _dG1 += g1; _dX2 += x2; _dG2 += g2; _dX3 += x3; _dKeep += keep; _dHome += home;
+            _pendKeep = keep;
             if (path == PathPlayer && x1 + x2 + x3 > 0) { _plPcs += x1 + x2 + x3; _plMen++; _plMenGold += g2; _plNotGold += g1; _plShelf += x3; }
         }
+
+        /// <summary>RecruitKit.SellOwn: zaloga bez sakiewki (GarrisonPurseEnabled off) - zloto za nieuzywalny dobytek dostaje pan osady (regula 171, jak
+        /// nadwyzki zalog w MenPurse.SellArmorySurplus); sztuka liczona dalej w x2 (zaplacona).</summary>
+        internal static void NoteOwnToLord(int gold) { _dLordN++; _dLordG += Math.Max(0, gold); }
+
+        /// <summary>
+        /// Kontrola w miejscu WEJSCIA do zbrojowni (poprawka po recenzji: dotad liczona w FitHandover na sztukach, ktore przed chwila przeszly ten sam
+        /// ForTroop - zawsze 0). Wolane tuz przed petla dodawania (RecruitKit.OnRecruited, RecruitKit.OnGarrisonTook, PlayerRecruit.Settle) na liscie, ktora
+        /// NAPRAWDE idzie do zbrojowni: ile sztuk ten zolnierz nie uzyje, ponad sztuki "bez targu" ostatniego przekazania (_pendKeep - jak dotad idzie
+        /// z czlowiekiem). Ma byc 0; lapie kazda droge obok filtra (wzorzec przy RecruitBringsWhatHeHas off, sztuki dolozone po FitHandover, dobytek t1 zalog).
+        /// </summary>
+        internal static void CheckEntry(CharacterObject troop, List<EquipmentElement> items)
+        {
+            int allow = _pendKeep;
+            _pendKeep = 0;
+            if (!On || troop == null || items == null) return;
+            try
+            {
+                if (troop.IsHero) return;
+                int bad = 0, pcs = 0;
+                foreach (var e in items)
+                {
+                    if (e.Item == null) continue;
+                    pcs++;
+                    if (!ForTroop(troop, e.Item, true)) bad++;
+                }
+                _dEntry++; _dEntryPcs += pcs;
+                int ok = Math.Min(bad, allow);
+                _dEntryKeep += ok;
+                _dCtl += bad - ok;
+            }
+            catch (Exception e) { Stumble("CheckEntry", e); }
+        }
+
+        private static int Today() { try { return (int)CampaignTime.Now.ToDays; } catch { return 0; } }
+
+        /// <summary>MenPurse.BuyPlayerGaps: egzemplarz kupiony przez ludzi gracza na brak (klucz id|mod - QuartermasterLaw.KeyOf).</summary>
+        internal static void NoteGapBuy(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            _gapBuy[key] = Today(); _dGapBuy++;
+        }
+
+        /// <summary>Egzemplarz kupiony na brak w ciagu GapIdleDays lezy wolny przy brakach tego typu (BuyPlayerGaps) albo idzie do kupca jako nadwyzka
+        /// (SellPlayerSurplus) - zakup bez skutku (ma byc 0; po bitwie ze stratami mozliwy uczciwy przypadek - prog DECYZJA). Raz na egzemplarz.</summary>
+        internal static void GapIdle(string key, int n)
+        {
+            int d;
+            if (n <= 0 || string.IsNullOrEmpty(key) || _gapBuy.Count == 0 || !_gapBuy.TryGetValue(key, out d)) return;
+            _gapBuy.Remove(key);
+            if (Today() - d > GapIdleDays) return;
+            _dGapIdle += n;
+            if (_gapIdleIds.Count < 4 && !_gapIdleIds.Contains(key)) _gapIdleIds.Add(key);
+        }
+
+        /// <summary>MenPurse.SellArmorySurplus: sprzedane jako nadwyzka sztuki kultury, ktorej nie nosi zaden oddzial partii (od poprawki AI i zalogi licza
+        /// kto co nosi przez MeetsFitOf - takie sztuki ida do kupca pierwsze).</summary>
+        internal static void NoteAiForeignSold(int n, bool garrison) { if (n <= 0) return; if (garrison) _dGarForeign += n; else _dAiForeign += n; }
 
         /// <summary>Koniec okna werbunku / najmu gracza (PlayerRecruit.Settle): jedno zdanie w grze, gdy rekruci oddali rzeczy, ktorych nie uzyja.</summary>
         internal static void PlayerNotice()
@@ -382,6 +512,8 @@ namespace Armoury
         internal static void FitHomeKit(CharacterObject c, List<EquipmentElement> l)
         {
             if (c == null || l == null || c.IsHero) return;
+            // przed startem sesji (OnGameLoaded DTE zaklada zbrojownie partii bez wpisu) - wymogi sprzed praw CrashScribe: bez filtra, jak przed GearFit
+            if (!_live) { _preSkip++; return; }
             for (int i = l.Count - 1; i >= 0; i--)
             {
                 var it = l[i].Item;
@@ -449,8 +581,9 @@ namespace Armoury
 
         /// <summary>Postfiks DTE PartyEquipmentDistributor.DoAssignAsync (Priority.Last - po SkillLawWard i RealmWard CrashScribe; takze podglad gotowosci
         /// zbrojowni na mapie i autorozstrzygniecie - ta sama regula, liczniki tylko w misji). Kazdy nie-bohater bez broni (Armed) dostaje w pierwszy pusty slot 0-3
-        /// bron biala z puli rozdzielacza: (1) uzywalna (umiejetnosc i siodlo) dozwolonej kultury, (2) uzywalna obcej kultury, (3) przy GearFitFloorOverSkill
-        /// najlzejsza ponad umiejetnosc. W kazdym przejsciu: najpierw klasa jego najwyzszej umiejetnosci, potem najwyzszy wymog. Bez unikatow, lore, sprzetu
+        /// bron biala z puli rozdzielacza: (1) uzywalna (umiejetnosc i siodlo) dozwolonej kultury, (2) przy GearFitFloorForeign uzywalna obcej kultury - takze ta
+        /// sama sztuka zza morza, ktora RealmWard chwile wczesniej zwrocil na polke (lepsza obca bron niz piesci; zasada Jeffa do decyzji), (3) przy
+        /// GearFitFloorOverSkill najlzejsza ponad umiejetnosc (bez GearFitFloorForeign - tylko dozwolonej kultury). W kazdym przejsciu: najpierw klasa jego najwyzszej umiejetnosci, potem najwyzszy wymog. Bez unikatow, lore, sprzetu
         /// umarlych (QuartermasterLaw.BarredInBattle), legend i sprzetu olbrzymow nie dla niego. Pobranie przez ConsumeEquipmentToAssign (DTE nie da sztuki
         /// drugi raz, straz "nic z niczego" widzi pokrycie). Partie umarlych - bez zmian.</summary>
         public static void FloorPostfix(object __instance)
@@ -527,6 +660,7 @@ namespace Armoury
             pass = 0;
             for (int p = 1; p <= 3; p++)
             {
+                if (p == 2 && !FloorForeignOn) continue;   // obca kultura tylko za kluczem GearFitFloorForeign (zasada Jeffa, nie techniczna)
                 if (p == 3 && !FloorOverSkillOn) break;
                 Piece best = null; long bk = long.MinValue;
                 foreach (var pc in stock)
@@ -544,7 +678,11 @@ namespace Armoury
                         int have = sk != null ? co.GetSkillValue(sk) : 0;
                         key = (long)have * 1000000L + (long)Math.Max(0, it.Difficulty) * 1000L + (long)Math.Max(0f, Math.Min(999f, it.Effectiveness));
                     }
-                    else key = -(long)Math.Max(0, it.Difficulty);   // ostatnia deska: najlzejsza
+                    else
+                    {
+                        if (!FloorForeignOn && !CultureOk(co, it)) continue;   // bez GearFitFloorForeign obca nie wraca takze z ostatniej deski
+                        key = -(long)Math.Max(0, it.Difficulty);   // ostatnia deska: najlzejsza
+                    }
                     if (best == null || key > bk) { best = pc; bk = key; }
                 }
                 if (best != null) { pass = p; return best; }
@@ -665,8 +803,9 @@ namespace Armoury
                 for (int i = 0; i < _kinTop.Count && i < 5; i++) ex.Add(_kinTop[i].Key + " " + _kinTop[i].Value);
             }
             Log.Info("GearFit (start sesji): klucze - Gear Fit Kits " + Yes(On) + ", Gear Fit Culture " + Yes(CultureOn) + ", Gear Fit Weapon Floor " + Yes(FloorOn)
-                     + ", Gear Fit Floor Over Skill " + Yes(FloorOverSkillOn) + ", Gear Fit Realm From Stores " + Yes(RealmFromStoresOn)
-                     + " | wpiete: " + _wiring + ", RealmWard z polki (CrashScribe) " + cs
+                     + ", Gear Fit Floor Foreign " + Yes(FloorForeignOn) + ", Gear Fit Floor Over Skill " + Yes(FloorOverSkillOn) + ", Gear Fit Realm From Stores " + Yes(RealmFromStoresOn)
+                     + " | wpiete: " + _wiring + ", RealmWard z polki (CrashScribe) " + cs + ", start sesji " + Yes(_live)
+                     + " (komplety DTE przed startem sesji bez filtra " + _preSkip + ")"
                      + " | wzorce wojsk po prawach CS: jednostek " + units + ", slotow " + slots + ", ponad umiejetnosc " + over + " (ma byc 0), dopuszczone tylko wyjatkiem wlasnego wzorca "
                      + ownOnly + " | kultury krewne (przez Waskie Morze, prog " + KinMinSlots + " sloty i " + (int)(KinMinShare * 100f) + "%): " + pairs + " par"
                      + (ex.Count > 0 ? ", np. " + string.Join(", ", ex.ToArray()) : "")
@@ -676,17 +815,29 @@ namespace Armoury
         private static void Flush()
         {
             if (!On && !CultureOn && !FloorOn) { ClearDay(); return; }
-            int day = 0; try { day = (int)CampaignTime.Now.ToDays; } catch { }
-            int x = _dX1 + _dX2 + _dX3;
+            int day = Today();
+            // poprawka po recenzji: x liczone w chwili odrzucenia (FitHandover), nie jako suma x1 + x2 + x3 - ksiega x = x1 + x2 + x3 jest prawdziwym sprawdzeniem
+            int x = _dX;
             bool book = _dN == _dU + x + _dKeep;
+            // pamiec zakupow brakow starsza niz GapIdleDays - bez znaczenia dla kontroli
+            if (_gapBuy.Count > 0)
+            {
+                var old = new List<string>();
+                foreach (var kv in _gapBuy) if (day - kv.Value > GapIdleDays) old.Add(kv.Key);
+                foreach (var k in old) _gapBuy.Remove(k);
+            }
             Log.Info("GearFit: dzien " + day + " | zakupy notabli: kandydatow odrzuconych " + _dRej + " (umiejetnosc " + _dRejSkill + ", siodlo " + _dRejSaddle + ", kultura " + _dRejCulture
                      + "), kultura wlasna zamiast tanszej " + _dNative + ", awanse cofniete przez brak uzywalnej sztuki " + _dRevNoFit + ", dodatki bez uzywalnej sztuki " + _dExtraNoFit
                      + " | przekazanie kompletow (AI " + _dMenAi + ", gracz " + _dMenPl + ", zalogi " + _dMenGar + " ludzi): szt. " + _dN + ", uzywalne " + _dU + ", nieuzywalne " + x
                      + " (kupione -> notabl " + _dX1 + " za " + _dG1 + " zl, dobytek -> sakiewka ludzi " + _dX2 + " za " + _dG2 + " zl, na polke bez zaplaty " + _dX3 + "), bez targu zostawione jak dotad " + _dKeep
-                     + ", zamiennik z domu " + _dHome + " | PlanKits pominiete " + _dPlan + " | dobytek tieru 1 (DTE GetRecruitEquipments, zalogi t1): podmienione na wzorzec " + _dTpl + ", usuniete " + _dDrop
+                     + ", zamiennik z domu " + _dHome + " (w tym x2 zalog bez sakiewki - panu osady " + _dLordN + " za " + _dLordG + " zl)" + " | PlanKits pominiete " + _dPlan + " | dobytek tieru 1 (DTE GetRecruitEquipments, zalogi t1): podmienione na wzorzec " + _dTpl + ", usuniete " + _dDrop
                      + " | bitwy (podloga broni, misji " + _dMis + "): bez broni po strazach " + _dBare + ", z polki " + (_dB1 + _dB2 + _dB3) + " (uzywalna " + _dB1 + ", obca kultura " + _dB2
                      + ", ponad umiejetnosc " + _dB3 + "), nic w polce " + _dNone + ", bez wolnego slotu " + _dNoSlot + ", DragonUnmount pozostawione " + _dKept
-                     + " | kontrola: do zbrojowni nieuzywalnych " + _dCtl + " (ma byc 0), x = x1 + x2 + x3 " + x + " = " + _dX1 + " + " + _dX2 + " + " + _dX3
+                     + " | nadwyzki wedlug MeetsFitOf - sprzedane sztuki kultury, ktorej nie nosi nikt w partii: lordowie AI " + _dAiForeign + ", zalogi " + _dGarForeign
+                     + " | braki ludzi gracza: kupione " + _dGapBuy + ", kupione w " + GapIdleDays + " dniach i nieuzyte (wolne przy brakach albo sprzedane jako nadwyzka) " + _dGapIdle
+                     + (_gapIdleIds.Count > 0 ? " (" + string.Join(", ", _gapIdleIds.ToArray()) + ")" : "")
+                     + " | kontrola: do zbrojowni nieuzywalnych " + _dCtl + " (ma byc 0) - na wejsciu, list " + _dEntry + ", sztuk " + _dEntryPcs + ", dozwolone bez targu " + _dEntryKeep
+                     + ", x = x1 + x2 + x3 " + x + " = " + _dX1 + " + " + _dX2 + " + " + _dX3
                      + ", szt. = uzywalne + nieuzywalne + bez targu " + (book ? "zgodne" : "NIEZGODNE") + "; potkniecia " + _stum + " (sesja " + _stumAll + ").");
             ClearDay();
         }

@@ -184,6 +184,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("Items", e); continue; }
                     men++;
                     if (kind == RecruitKit.PlRecord) rec++; else if (kind == RecruitKit.PlTemplate) tpl++; else own++;
+                    GearFit.CheckEntry(troop, items);   // GearFit (po recenzji): kontrola na wejsciu do Twojej zbrojowni (licznik, ma byc 0)
                     foreach (var e in items)
                     {
                         if (e.Item == null) continue;
