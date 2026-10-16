@@ -156,8 +156,9 @@ namespace Armoury
         }
 
         /// <summary>Recenzja M3: czesc tempa skrzyni (G - R) / WarChestDays, ktorej nie bierze zold - z niej (i tylko z niej) pan placi chleb. W wojnie 1 - WarChestToWages
-        /// (reszta to skrzynia sprzetu 0.2 - ClanBudget zdejmuje z niej zaplacony chleb), w pokoju 1 - PeaceChestShare x WarChestToWages.</summary>
-        private static double BreadLordShare(Settings s, bool war)
+        /// (reszta to skrzynia sprzetu 0.2 - ClanBudget zdejmuje z niej zaplacony chleb), w pokoju 1 - PeaceChestShare x WarChestToWages.
+        /// TP (16.10): to samo tempo ogranicza splate dlugu osady wobec gracza z kiesy rodu (TourneyPay.ClanSpare, minus chleb tego rodu dzis).</summary>
+        internal static double BreadLordShare(Settings s, bool war)
         {
             double w = Math.Max(0f, Math.Min(1f, s.WarChestToWages));
             double used = war ? w : Math.Max(0f, Math.Min(1f, s.PeaceChestShare)) * w;
