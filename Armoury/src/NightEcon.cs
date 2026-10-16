@@ -42,7 +42,7 @@ namespace Armoury
             Log.Info("Noc-ekonomia (NE): start sesji | klucze: Charcoal Weight Kg " + F(s.CharcoalWeightKg) + (s.CharcoalWeightKg > 0f ? "" : " (waga gry)")
                      + ", Salt Rate Raised " + TN(s.SaltRateRaised) + ", Fur Rate Raised " + TN(s.FurRateRaised) + ", Helm One Rule " + TN(s.HelmOneRule)
                      + ", No Town Mines " + TN(s.NoTownMines) + ", Bulk Unit Per Campaign " + TN(s.BulkUnitPerCampaign) + ", Smith Wood On Screen " + TN(s.SmithWoodOnScreen)
-                     + ", Self Mend Wood Kg " + TN(s.SelfMendWoodKg)
+                     + ", Self Mend Wood Kg " + TN(s.SelfMendWoodKg) + ", Smith Coal Kg " + TN(s.SmithCoalKg)
                      + ", Folk Craft Wage On Sale " + TN(s.FolkCraftWageOnSale) + ", Sutlers By Purse " + TN(s.SutlersByPurse) + ", Folk Guard No Memory " + TN(s.FolkGuardNoMemory)
                      + ", Folk Loan Before Guard " + TN(s.FolkLoanBeforeGuard)
                      + " | obok: Goods Rates By Pattern " + TN(s.GoodsRatesByPattern) + ", Smith Wood Kg " + TN(s.SmithWoodKg)
@@ -79,12 +79,17 @@ namespace Armoury
                         }
                 }
                 catch (Exception e) { Stumble("CoalLine(przetop)", e); }
-                int expect = cw > 0.01f ? Math.Max(1, (int)Math.Round(ww * 0.2f / cw)) : -1;
+                // recenzja (drobna): MaterialLaw.RefinePostfix daje x1.5 z perkiem CharcoalMaker (Jeff kuje - perk prawdopodobny) - oczekiwane tym samym wzorem
+                bool perk = false;
+                try { perk = Hero.MainHero != null && TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.CharcoalMaker != null && Hero.MainHero.GetPerkValue(TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks.Crafting.CharcoalMaker); } catch { }
+                int expect = cw > 0.01f ? Math.Max(1, (int)Math.Round(ww * 0.2f / cw * (perk ? 1.5f : 1f))) : -1;
                 Log.Info("Noc-ekonomia (NE): wegiel (N2) | bryla " + F(cw) + " kg (waga gry " + F(ArmouryBehavior.CoalGameKg) + " kg), cena bryly " + (coal != null ? coal.Value.ToString(Inv) : "-")
                          + " d (" + (cw > 0.01f && coal != null ? F(coal.Value / cw) : "-") + " d/kg)"
-                         + " | ladunek drewna " + F(ww) + " kg -> wegli " + fromWood + " (przetop gracza z czynnego modelu kuzni; z wag oczekiwane " + expect + ")"
+                         + " | ladunek drewna " + F(ww) + " kg -> wegli " + fromWood + " (przetop gracza z czynnego modelu kuzni; perk CharcoalMaker " + TN(perk) + "; z wag oczekiwane " + expect + ")"
                          + " | bryly wegla w kwicie kuzni x" + F(Recipes.CoalLumpScale()) + " (kg wegla na kg zelaza jak przy bryle 0.5 kg)"
                          + " | stopnie z weglem: " + (steps.Count > 0 ? string.Join("; ", steps.ToArray()) : "-")
+                         + " | bron i przetop na ekranie kuzni: Smith Coal Kg " + TN(s.SmithCoalKg) + ", " + F(SmithCoal.PieceKg) + " kg wegla na sztuke z otwartej bryly (zapas "
+                         + F(SmithCoal.OpenKg) + " kg), latki " + SmithCoal.Hook + ", samosprawdzenie wegla broni: " + SmithCoal.CheckText + " (przy kluczu: 0 i -1)"
                          + " | potkniecia " + (_stumbles - st0) + ".");
             }
             catch (Exception e) { Stumble("CoalLine", e); }
@@ -214,11 +219,14 @@ namespace Armoury
                 int hints = SmithWood.ScreenHints, sst = SmithWood.ScreenStumbles;
                 int mu = SmithWood.MendUses, ml = SmithWood.MendLoads; double mk = SmithWood.MendKg;
                 SmithWood.ScreenHints = SmithWood.ScreenStumbles = 0; SmithWood.MendUses = SmithWood.MendLoads = 0; SmithWood.MendKg = 0;
-                int st = _stumbles + mst + sst; _stumbles = 0;
+                int cu = SmithCoal.DayUses, cl = SmithCoal.DayLumps, ch = SmithCoal.ScreenHints, cst = SmithCoal.DayStumbles; double ck = SmithCoal.DayKg;   // N2 po recenzji
+                SmithCoal.DayUses = SmithCoal.DayLumps = SmithCoal.ScreenHints = SmithCoal.DayStumbles = 0; SmithCoal.DayKg = 0;
+                int st = _stumbles + mst + sst + cst; _stumbles = 0;
                 Log.Info("Noc-ekonomia (NE): dzien " + (int)CampaignTime.Now.ToDays + " | wegiel " + (coal != null ? F(coal.Weight) : "-") + " kg"
                          + " | futra: Fur Rate Raised " + TN(s.FurRateRaised) + ", wsi traperskich " + trappers + ", wywolan modelu z czynnikiem x" + F(GoodsRates.FurRate) + " " + fur
                          + " | kopalnie: No Town Mines " + TN(s.NoTownMines) + ", " + mines
                          + " | kuznia: podpowiedzi drewna na ekranie " + hints + ", czesci przepisu z drewnem w kg (naprawy wlasnymi rekami, pekniecia) " + mu + " (kg " + mk.ToString("0.##", Inv) + ", ladunkow " + ml + ")"
+                         + ", wegiel z otwartej bryly (bron i przetop na ekranie kuzni) " + cu + " (kg " + ck.ToString("0.##", Inv) + ", bryl " + cl + ", podpowiedzi " + ch + ")"
                          + " | potkniecia " + st + ".");
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -248,7 +256,12 @@ namespace Armoury
                   .Append(", zeszlych z polki z puli ").Append(Math.Round(TownFolk.N4SoldV).ToString("0", Inv)).Append(" (").Append(TownFolk.N4SoldN).Append(" szt. w ").Append(TownFolk.N4Towns)
                   .Append(" miastach; na zlom bez doplaty ").Append(TownFolk.N4GoneN).Append(" szt.)")
                   .Append(", pula niesprzedanych ").Append(Math.Round(TownFolk.N4PoolV).ToString("0", Inv)).Append(" (").Append(TownFolk.N4PoolN).Append(" szt.)")
-                  .Append(", doplata z kas miast zaplacona ").Append(TownFolk.N4TopUp).Append(" (stara regula ").Append(TownFolk.N4TopUpOld).Append(", roznica ").Append(Sg(TownFolk.N4TopUp - TownFolk.N4TopUpOld)).Append(')');
+                  .Append(", doplata z kas miast zaplacona ").Append(TownFolk.N4TopUp).Append(" (stara regula ").Append(TownFolk.N4TopUpOld).Append(", roznica ").Append(Sg(TownFolk.N4TopUp - TownFolk.N4TopUpOld)).Append(')')
+                  // poprawka po recenzji: sztuki-widma - dubli zdarzen gry pominietych, sztuki gry bez BK, zdjete przez rzemieslnikow BK, kontrola polki (prog NE-17b)
+                  .Append(", dubli zdarzen gry pominietych ").Append(TownFolk.N4DupN).Append(" szt., sztuk gry bez BK ").Append(TownFolk.N4GameN)
+                  .Append(", zdjetych przez rzemieslnikow BK ").Append(TownFolk.N4DropN).Append(" szt., kontrola polki (latki ").Append(TownFolk.N4Wired ? "TAK" : "NIE")
+                  .Append("): do puli w wyrobie do miasta ").Append(TownFolk.N4ChkIn).Append(" szt. wobec przyrostu polek ").Append(TownFolk.N4ChkShelf)
+                  .Append(" szt. (ponad przyrost ").Append(TownFolk.N4ChkOver).Append(", oczekiwan bez zdarzenia ").Append(TownFolk.N4StaleN).Append(')');
                 // N6
                 long sut = Sutlers.LastTown >= 0 ? Sutlers.LastTown + Math.Max(0, Sutlers.LastVill) : -1;
                 sb.Append(" | N6 markietani: Sutlers By Purse ").Append(TN(s.SutlersByPurse)).Append(Sutlers.N6On ? "" : " (nie biegnie dzis)")

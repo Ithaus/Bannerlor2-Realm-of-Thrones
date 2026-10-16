@@ -6216,9 +6216,13 @@ namespace Armoury
         [SettingPropertyGroup("Banner Kings gentry")]
         public bool GentryNamesFallback { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Charcoal Weight Kg", 0.00f, 10.00f, "0.00", HintText = "a lump of charcoal weighs this many kilograms (0 = the game's own 5 kg brick). With the game's weight a load of hardwood (100 kg) burns down to 4 lumps (a fifth of its weight), each refining step takes one 5 kg lump, and the charcoal of a piece forged at your anvil is counted by the kilogram as before; 0.5 = the old half-kilo lump (a load of wood worth 4 pence gave 40 lumps worth 40 pence)")]
+        [SettingPropertyFloatingInteger("Charcoal Weight Kg", 0.00f, 10.00f, "0.00", HintText = "a lump of charcoal weighs this many kilograms (0 = the game's own 5 kg brick). With the game's weight a load of hardwood (100 kg) burns down to 4 lumps (a fifth of its weight), each refining step takes one 5 kg lump, armour from your forge needs the same kilograms of charcoal per kilogram of iron as before (in whole lumps), and with Smith Coal Kg a weapon forged or smelted on the smithing screen still burns half a kilogram, taken from the lump burning in the forge (without it one whole 5 kg lump per weapon - a load of hardwood would make charcoal for 4 weapons instead of 40); 0.5 = the old half-kilo lump (a load of wood worth 4 pence gave 40 lumps worth 40 pence). Takes effect when a game is next loaded")]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public float CharcoalWeightKg { get; set; } = 0f;
+
+        [SettingPropertyBool("Smith Coal Kg", HintText = "a weapon forged or smelted on the smithing screen burns half a kilogram of charcoal, as when a lump weighed half a kilo: it is taken from the lump already burning in your forge, and a new lump (5 kg) is taken from your bags only when the fire runs short - a load of hardwood still makes charcoal for 40 weapons, not 4. Hover the charcoal counter on the smithing screen to see what is left in the fire (off = one whole lump for every weapon, as the game does)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool SmithCoalKg { get; set; } = true;
 
         [SettingPropertyBool("Salt Rate Raised", HintText = "with Goods Rates By Pattern, salt pans yield three and a half times their old rate instead of twice: salt has cost eight times its worth for years and the 97 towns together hold a few dozen sacks (off = twice, as before)")]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
@@ -6228,7 +6232,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool FurRateRaised { get; set; } = true;
 
-        [SettingPropertyBool("Helm One Rule", HintText = "plate helmets of every tier are priced by one rule: days of work = weight x Helm Days Per Kg plus half a day for each tier above the third, and the weight that counts is never more than the usual weight of a plate helmet with that much head armour (the median of all plate helmets) - a tier 3 helmet no longer costs more than a tier 4 one. The same weight counts at the workshop, at your forge and in repairs (off = tiers 1 to 3 priced like a breastplate, by the game's weight)")]
+        [SettingPropertyBool("Helm One Rule", HintText = "plate helmets of every tier are priced by one rule: days of work = weight x Helm Days Per Kg plus half a day for each tier above the third, and the weight that counts is never more than the usual weight of a plate helmet with that much head armour (the median of all plate helmets) - a tier 3 helmet no longer costs more than a tier 4 one. The same weight counts at the workshop, at your forge and in repairs (off = tiers 1 to 3 priced like a breastplate, by the game's weight). Takes effect when a game is next loaded")]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool HelmOneRule { get; set; } = true;
 
@@ -6236,7 +6240,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool NoTownMines { get; set; } = true;
 
-        [SettingPropertyBool("Bulk Unit Per Campaign", HintText = "the load of ore and timber (Hist Bulk Unit Factor) is fixed for the whole campaign and kept in the save: moving the slider later changes nothing in a running campaign, where it would have counted every stack of wood and ore in the world anew (a save from before keeps 10, the load it has; off = the slider counts at every load, as before)")]
+        [SettingPropertyBool("Bulk Unit Per Campaign", HintText = "the load of ore and timber (Hist Bulk Unit Factor) is fixed for the whole campaign and kept in the save: moving the slider later changes nothing in a running campaign, where it would have counted every stack of wood and ore in the world anew (a save from before keeps 10, the load it has; off = the slider counts at every load, as before). Takes effect when a game is next loaded")]
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool BulkUnitPerCampaign { get; set; } = true;
 
@@ -6248,7 +6252,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool SelfMendWoodKg { get; set; } = true;
 
-        [SettingPropertyBool("Folk Craft Wage On Sale", HintText = "the merchants top up the craftsmen's wages (Town Folk Craft Wage Share of the worth of every workshop good) only for goods that leave the town's stalls - bought by caravans, lords, soldiers, builders or the townsfolk themselves, the oldest stock first. A sword that lies unsold on a glutted stall earns the craftsmen nothing more until somebody buys it; the coin stays in the town's purse (off = the top-up is paid for every piece made, sold or not, as before)")]
+        [SettingPropertyBool("Folk Craft Wage On Sale", HintText = "the merchants top up the craftsmen's wages (Town Folk Craft Wage Share of the worth of every workshop good) only for goods that leave the town's stalls - bought by caravans, lords, soldiers, builders or the townsfolk themselves; approximately - the workshop's own goods count as the newest on the stall, so goods others sold to the town go first. A sword that lies unsold on a glutted stall earns the craftsmen nothing more until somebody buys it; the coin stays in the town's purse (off = the top-up is paid for every piece made, sold or not, as before)")]
         [SettingPropertyGroup("Coin flow (night 16.10)")]
         public bool FolkCraftWageOnSale { get; set; } = true;
 
@@ -7818,6 +7822,7 @@ namespace Armoury
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
             s.GentryNamesFallback = GentryNamesFallback;
             s.CharcoalWeightKg = CharcoalWeightKg;
+            s.SmithCoalKg = SmithCoalKg;
             s.SaltRateRaised = SaltRateRaised;
             s.FurRateRaised = FurRateRaised;
             s.HelmOneRule = HelmOneRule;

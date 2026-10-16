@@ -217,6 +217,7 @@ namespace Armoury
                 }
                 if (remove <= 0) return;
                 o[1] += remove;
+                TownFolk.CsDrop(w.Settlement, _item, remove);   // N4 (poprawka po recenzji 16.10): sztuki BK zdjete z polki schodza z puli doplaty 35% bez doplaty (wlasny try)
                 if (credit <= 0) return;
                 long due = (long)Math.Round((double)credit * remove / added, MidpointRounding.AwayFromZero);
                 int back = (int)Math.Min(due, (long)Math.Max(0, w.Capital));

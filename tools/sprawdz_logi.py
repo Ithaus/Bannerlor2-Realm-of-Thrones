@@ -672,7 +672,8 @@ Uzycie (Python 3, tylko odczyt):
                     (bryla = waga gry, wegli z ladunku drewna z modelu kuzni = z wag, 4 przy 5 kg / 100 kg), NE-2 helmy plytowe (mediana t3 <= t4, k > 0), NE-3
                     jednostka ladunku (MCM inny od kampanii - NE-3b INFO), NE-4 kopalnie (latka, kolejnosc BK -> NoTownMines -> WorkshopInputs), NE-5 kuznia (ekran
                     wpiety, samosprawdzenie naprawy 0 ladunkow), NE-6 linia doby w kazdej dobie, NE-7 futra (wywolania > 0), NE-8 sol x3.5 w GL5, NE-9 wegiel w dobach,
-                    NE-10 kopalnie zamienione (INFO), NE-11 kuznia w dobach (INFO), NE-12 ERROR 0. Log bez paczki: INFO, bez wyjatku.
+                    NE-10 kopalnie zamienione (INFO), NE-11 kuznia w dobach (INFO), NE-12 ERROR 0. Log bez paczki: INFO, bez wyjatku. Po recenzji: NE-1b wegiel
+                    broni i przetopu z ekranu kuzni z otwartej bryly (Smith Coal Kg), NE-17b N4 kontrola polki (do puli <= przyrost polki).
                     Cz. 2 (obieg zlota N1 N4 N6 N7 N8): NE-13 klucze cz. 2 TAK, NE-14 linia "Pompy - sztuczne przelewy" w kazdej dobie (potkniecia 0; razem i %
                     zoldu - INFO), NE-15 linia "Karawany - zapas wedlug towaru" (dni w jukach - INFO), NE-16 linia obieg zlota w kazdej dobie i potkniecia 0, NE-17 N4
                     doplata <= stara regula + 5% (suma dob), NE-18 N6 bez skoku przy rozruchu (pierwsza doba: nowa kwota <= stara x 1.2 + 1000), NE-19 N7 mnoznik =
@@ -27264,12 +27265,13 @@ NE_FORGE = "Noc-ekonomia (NE): kuznia (N12)"
 NE_HEAD = "Noc-ekonomia (NE): dzien "
 NE_DAY = re.compile(r"Noc-ekonomia \(NE\): dzien (?P<d>\d+) \| wegiel (?P<coal>[\d.]+|-) kg \| futra: Fur Rate Raised (?P<furOn>TAK|NIE), wsi traperskich (?P<trap>\d+), "
                     r"wywolan modelu z czynnikiem x[\d.]+ (?P<fur>\d+) \| kopalnie: No Town Mines (?P<minesOn>TAK|NIE), wyborow typu w miastach (?P<picks>\d+), "
-                    r"kopalnia -> inny typ (?P<swaps>\d+)(?: \[(?P<ex>[^\]]*)\])?, bez lepszego typu \(kopalnia zostala\) (?P<kept>\d+) \| kuznia: podpowiedzi drewna "
+                    r"kopalnia -> inny typ (?P<swaps>\d+)(?: \[(?P<ex>[^\]]*)\])?, bez lepszego typu \(kopalnia zostala\) (?P<kept>\d+)(?: \(typ bez wsadu w okregu odlozony (?P<gated>\d+)\))? \| kuznia: podpowiedzi drewna "
                     r"na ekranie (?P<hints>\d+), czesci przepisu z drewnem w kg \(naprawy wlasnymi rekami, pekniecia\) (?P<mend>\d+) \(kg (?P<mendKg>[\d.]+), "
-                    r"ladunkow (?P<mendL>\d+)\) \| potkniecia (?P<st>\d+)\.")
+                    r"ladunkow (?P<mendL>\d+)\)(?:, wegiel z otwartej bryly \(bron i przetop na ekranie kuzni\) (?P<coalN>\d+) \(kg (?P<coalKg>[\d.]+), bryl (?P<coalL>\d+), "
+                    r"podpowiedzi (?P<coalH>\d+)\))? \| potkniecia (?P<st>\d+)\.")
 NE_ERR = ("ERROR in NightEcon.", "ERROR in NoTownMines.", "ERROR in BulkUnit.", "ERROR in SyncData.arm_bulk_unit", "ERROR in SmithWood.ScreenPostfix",
-          "ERROR in SmithWood.SessionStart(ekran)", "ERROR in MendMaterial.SelfMendDone (drewno)", "ERROR in GoodsRates.ProdStep", "ERROR in FixCharcoalWeight")
-NE_KEYS = ("Salt Rate Raised", "Fur Rate Raised", "Helm One Rule", "No Town Mines", "Bulk Unit Per Campaign", "Smith Wood On Screen", "Self Mend Wood Kg")
+          "ERROR in SmithWood.SessionStart(ekran)", "ERROR in MendMaterial.SelfMendDone (drewno)", "ERROR in GoodsRates.ProdStep", "ERROR in FixCharcoalWeight", "ERROR in SmithCoal.")
+NE_KEYS = ("Salt Rate Raised", "Fur Rate Raised", "Helm One Rule", "No Town Mines", "Bulk Unit Per Campaign", "Smith Wood On Screen", "Self Mend Wood Kg", "Smith Coal Kg")
 # cz. 2 (obieg zlota: N1 pomiary, N4 doplata od sprzedanego, N6 markietani wedlug sakiewki, N7 straznik bez pamieci, N8 pozyczka przed darem)
 NE_KEYS2 = ("Folk Craft Wage On Sale", "Sutlers By Purse", "Folk Guard No Memory", "Folk Loan Before Guard")
 NE_COIN = "Noc-ekonomia (NE): obieg zlota (N4 N6 N7 N8): dzien "
@@ -27285,13 +27287,16 @@ NE_C7 = re.compile(r"\| N7 straznik: Folk Guard No Memory (TAK|NIE)( \(regula be
                    r" roznica ([+-]?\d+)\)")
 NE_C8 = re.compile(r"\| N8 pozyczka przed darem: Folk Loan Before Guard (TAK|NIE), migawka kies (\d+), kandydaci z nadwyzka tylko dzieki migawce (\d+), miejsce w pulapie (\d+)"
                    r" \(stara regula (\d+)\), pozyczone dzis (\d+) \(ponad stara regule (\d+) u (\d+) rodow\), zaliczone na podatek dzis (\d+) w (\d+) kiesach - podatek mniejszy o (\d+)")
+NE_C4B = re.compile(r", dubli zdarzen gry pominietych (\d+) szt\., sztuk gry bez BK (\d+), zdjetych przez rzemieslnikow BK (\d+) szt\., kontrola polki \(latki (TAK|NIE)\):"
+                    r" do puli w wyrobie do miasta (-?\d+) szt\. wobec przyrostu polek (-?\d+) szt\. \(ponad przyrost (\d+), oczekiwan bez zdarzenia (\d+)\)")
 NE_CST = re.compile(r"\| potkniecia (\d+)\.$")
 NE_P = re.compile(r"\| razem (\d+) zl = ([\d.]+|-)% zoldu \(zold partii i zalog (\d+)\)")
 NE_CARI = re.compile(r"(sol|narzedzia|wino|maslo|srebro) \(\w+\): karawany (\d+) = ([\d.]+|-) dni, miasta (\d+) = ([\d.]+|-) dni, swiat (\d+)")
 NE_ERR2 = ("ERROR in TownFolk.CsAdd", "ERROR in TownFolk.ShelfGone", "ERROR in TownFolk.CraftSaleDay", "ERROR in TownFolk.TownLive(N4)", "ERROR in TownFolk.ExportCraftSale",
            "ERROR in TownFolk.ImportCraftSale", "ERROR in SyncData.arm_craft_sale", "ERROR in MoneyLedger.PumpsLine", "ERROR in Sutlers.ByPurseRamp", "ERROR in Sutlers.Export(N6)",
            "ERROR in TownFolk.Guard.HoardNote", "ERROR in TownFolk.Loans.LnSnapBegin", "ERROR in TownFolk.Loans.FolkLoanLend(N8)", "ERROR in GoodsLedger.WatchCapture",
-           "ERROR in NightEcon.CoinLine", "ERROR in NightEcon.CaravanLine")
+           "ERROR in NightEcon.CoinLine", "ERROR in NightEcon.CaravanLine", "ERROR in TownFolk.CsDrop", "ERROR in TownFolk.CsOutPre", "ERROR in TownFolk.CsOutPost",
+           "ERROR in TownFolk.CsOutFin", "ERROR in TownFolk.ApplyCraftSale")
 
 
 def nekon_main(logp):
@@ -27301,7 +27306,8 @@ def nekon_main(logp):
     potkniecia 0; MCM inny od kampanii - INFO), NE-4 kopalnie (latka wpieta, kolejnosc BK -> NoTownMines -> WorkshopInputs), NE-5 kuznia (ekran wpiety,
     samosprawdzenie naprawy 0 ladunkow), NE-6 linia doby w kazdej dobie i potkniecia 0, NE-7 futra (wywolania > 0 przy kluczu), NE-8 sol x3.5 w linii GL5
     (Salt Rate Raised i Goods Rates By Pattern), NE-9 wegiel w dobach = waga startu, NE-10 kopalnie zamienione (INFO), NE-11 kuznia w dobach (INFO),
-    NE-12 ERROR 0. Log bez paczki: INFO, bez wyjatku."""
+    NE-12 ERROR 0. Log bez paczki: INFO, bez wyjatku. Poprawki po recenzji: NE-1 z perkiem CharcoalMaker 6 wegli, NE-1b wegiel broni i przetopu z ekranu kuzni
+    z otwartej bryly (Smith Coal Kg: zapas 1 kg -> 0 bryl, 0 kg -> 1), NE-10 typ bez wsadu w okregu odlozony (INFO), NE-11 wegiel z otwartej bryly (INFO)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NE-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -27318,7 +27324,8 @@ def nekon_main(logp):
                 dd = num(r"dzien (\d+)", s)
                 a4, a6, a7, a8, ast = NE_C4.search(s), NE_C6.search(s), NE_C7.search(s), NE_C8.search(s), NE_CST.search(s)
                 if dd is not None and a4 and a6 and a7 and a8 and ast:
-                    coin[dd] = (a4.groups(), a6.groups(), a7.groups(), a8.groups(), int(ast.group(1)))
+                    a4b = NE_C4B.search(s)
+                    coin[dd] = (a4.groups(), a6.groups(), a7.groups(), a8.groups(), int(ast.group(1)), a4b.groups() if a4b else None)
                 else:
                     coinBad.append(s[:160])
                 continue
@@ -27373,10 +27380,20 @@ def nekon_main(logp):
         got = num(r"-> wegli (-?\d+)", c)
         exp = num(r"oczekiwane (-?\d+)\)", c)
         cst = num(r"potkniecia (\d+)\.", c)
-        four = not (bw == 5.0 and lw == 100.0) or got == 4
+        perk = "perk CharcoalMaker TAK" in c
+        four = not (bw == 5.0 and lw == 100.0) or got == (6 if perk else 4)
         rep.add("NE-1: wegiel (bryla = waga gry, wegli z ladunku drewna z modelu kuzni = z wag)", c[len(NE_COAL):].lstrip(" |")[:320],
-                "bryla = waga gry (przy kluczu 0), wegli = oczekiwane > 0 (5 kg i ladunek 100 kg: 4), potkniecia 0",
+                "bryla = waga gry (przy kluczu 0), wegli = oczekiwane > 0 (5 kg i ladunek 100 kg: 4, z perkiem CharcoalMaker 6), potkniecia 0",
                 (bw is not None and gw is not None and (abs(bw - gw) < 0.01 or not coal0)) and got is not None and got > 0 and got == exp and four and cst == 0)
+        # NE-1b (poprawka N2 po recenzji): bron i przetop z ekranu kuzni - 0.5 kg z otwartej bryly (samosprawdzenie: zapas 1 kg -> 0, zapas 0 kg -> -1)
+        sc = re.search(r"wykucie przy zapasie 1 kg (-?\d+), przy 0 kg (-?\d+); przetop przy 1 kg (-?\d+), przy 0 kg (-?\d+)", c)
+        hk = re.search(r"latki (koszt [^,]+, pobranie [^,]+, przetop [^,]+, pobranie [^,]+, ekran kucia [^,]+), samosprawdzenie", c)
+        if "Smith Coal Kg TAK" in c:
+            ok1 = bool(sc) and [int(x) for x in sc.groups()] == [0, -1, 0, -1] and bool(hk) and "BRAK" not in hk.group(1) and "wyjatek" not in hk.group(1)
+            rep.add("NE-1b: wegiel broni i przetopu z ekranu kuzni w kg (Smith Coal Kg)", (sc.group(0) if sc else "brak samosprawdzenia") + "; latki " + (hk.group(1) if hk else "?"),
+                    "wykucie i przetop: zapas 1 kg -> 0 bryl, 0 kg -> 1 bryla; latki bez BRAK", ok1)
+        else:
+            rep.add("NE-1b: wegiel broni z ekranu kuzni (Smith Coal Kg)", "klucz NIE albo linia sprzed poprawki", "INFO", None)
     else:
         rep.add("NE-1: wegiel", "brak linii", "linia jest", False)
     h = last[NE_HELM]
@@ -27438,13 +27455,18 @@ def nekon_main(logp):
         pk = sum(int(days[d]["picks"]) for d in ds)
         kp = sum(int(days[d]["kept"]) for d in ds)
         ex = [days[d]["ex"] for d in ds if days[d]["ex"]]
-        rep.add("NE-10: kopalnie w miastach - zamienione na inny typ (INFO)", f"wyborow typu w miastach {pk}, kopalnia -> inny typ {sw}, kopalnia zostala {kp}"
+        gt = sum(int(days[d]["gated"] or 0) for d in ds)
+        rep.add("NE-10: kopalnie w miastach - zamienione na inny typ (INFO)", f"wyborow typu w miastach {pk}, kopalnia -> inny typ {sw}, kopalnia zostala {kp}, typ bez wsadu w okregu odlozony {gt}"
                 + (f"; np. {ex[0][:160]}" if ex else ""), "INFO (zamiany tylko przy bankructwie / zmianie wlasciciela)", None)
         hn = sum(int(days[d]["hints"]) for d in ds)
         mu = sum(int(days[d]["mend"]) for d in ds)
         mk = sum(float(days[d]["mendKg"]) for d in ds)
         ml = sum(int(days[d]["mendL"]) for d in ds)
-        rep.add("NE-11: kuznia w dobach - podpowiedzi drewna, czesci z drewnem w kg (INFO)", f"podpowiedzi {hn}, czesci {mu} (kg {mk:.1f}, ladunkow {ml})", "INFO", None)
+        cn = sum(int(days[d]["coalN"] or 0) for d in ds)
+        ckg = sum(float(days[d]["coalKg"] or 0) for d in ds)
+        cl = sum(int(days[d]["coalL"] or 0) for d in ds)
+        rep.add("NE-11: kuznia w dobach - podpowiedzi drewna, czesci z drewnem w kg, wegiel z otwartej bryly (INFO)", f"podpowiedzi {hn}, czesci {mu} (kg {mk:.1f}, ladunkow {ml});"
+                f" wegiel broni i przetopu {cn} (kg {ckg:.1f}, bryl {cl})", "INFO", None)
     else:
         rep.add("NE-6: linia doby", f"brak linii doby (nierozpoznanych {len(bad)})" + (f" np. {bad[0]}" if bad else ""), "linie doby sa", False)
     sd = sorted(salt)
@@ -27466,7 +27488,8 @@ def nekon2_rows(rep, st0, coin, coinBad, pumps, cars, errs2):
     """nekon cz. 2 (noc 16.10, obieg zlota; Armoury/src/MoneyLedger.Pumps.cs, NightEcon.cs, TownFolk.CraftSale.cs, Sutlers.cs, TownFolk.Guard.cs, TownFolk.Loans.cs):
     NE-13 klucze cz. 2 TAK w linii startu, NE-14 "Pompy - sztuczne przelewy" w kazdej dobie i potkniecia 0 (razem, % zoldu, pierwsza / ostatnia doba - INFO),
     NE-15 "Karawany - zapas wedlug towaru" (dni w jukach i na polkach, ostatnia doba - INFO), NE-16 linia obieg zlota w kazdej dobie, rozpoznana, potkniecia 0,
-    NE-17 N4 doplata zaplacona <= stara regula + 5% (suma dob, klucz TAK), NE-18 N6 bez skoku przy rozruchu (pierwsza doba z kluczem: nowa <= stara x 1.2 + 1000),
+    NE-17 N4 doplata zaplacona <= stara regula + 5% (suma dob, klucz TAK), NE-17b N4 kontrola polki (do puli w wyrobie do miasta <= przyrost polki, poprawka po
+    recenzji: dubli zdarzen gry nie liczymy), NE-18 N6 bez skoku przy rozruchu (pierwsza doba z kluczem: nowa <= stara x 1.2 + 1000),
     NE-19 N7 mnoznik bez pamieci = clamp(1 + 8 x (lud/poziom - 1.5), 0.25, 10) +- 0.01 w kazdej dobie, gdy liczyl, NE-20 N8 (INFO), NE-21 ERROR cz. 2 = 0."""
     if not coin and not pumps and not cars and not (st0 and "Folk Craft Wage On Sale" in st0):
         rep.add("NE-13: noc-ekonomia cz. 2 (obieg zlota)", "brak linii cz. 2", "INFO (wersja sprzed cz. 2)", None)
@@ -27522,6 +27545,18 @@ def nekon2_rows(rep, st0, coin, coinBad, pumps, cars, errs2):
                     f" wyroby wykonane {made}, zeszle z polki {sold}, pula ostatniej doby {pool}", "zaplacono <= stara x 1.05 + 100", paid <= old * 1.05 + 100)
         else:
             rep.add("NE-17: N4 doplata do 35% od sprzedanego", "klucz NIE w liniach doby", "INFO", None)
+        # NE-17b (poprawka po recenzji): do puli tylko sztuki, ktore trafily na polke - w kazdym wywolaniu ProduceAnOutputToTown dopisane do puli <= przyrost polki
+        on4b = [x for x in od if coin[x][0][0] == "TAK" and coin[x][5] is not None]
+        if on4b:
+            g = [coin[x][5] for x in on4b]
+            wired = all(v[3] == "TAK" for v in g)
+            dup, game, drop = sum(int(v[0]) for v in g), sum(int(v[1]) for v in g), sum(int(v[2]) for v in g)
+            cin, csh, over, stale = sum(int(v[4]) for v in g), sum(int(v[5]) for v in g), sum(int(v[6]) for v in g), sum(int(v[7]) for v in g)
+            rep.add("NE-17b: N4 do puli tylko sztuki na polce (kontrola polki: ponad przyrost 0, latki TAK)", f"dob {len(on4b)}, latki {'TAK' if wired else 'NIE'}; dubli gry pominietych {dup},"
+                    f" sztuk gry bez BK {game}, zdjetych przez rzemieslnikow BK {drop}; do puli w wyrobie do miasta {cin} wobec przyrostu polek {csh}, ponad przyrost {over},"
+                    f" oczekiwan bez zdarzenia {stale}", "latki TAK, ponad przyrost 0, oczekiwan bez zdarzenia 0", wired and over == 0 and stale == 0)
+        else:
+            rep.add("NE-17b: N4 kontrola polki", "klucz NIE albo linia sprzed poprawki", "INFO", None)
         # NE-18 N6
         on6 = [x for x in od if coin[x][1][0] == "TAK" and not coin[x][1][1]]
         if on6:

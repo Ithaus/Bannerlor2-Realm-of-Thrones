@@ -21,20 +21,22 @@ namespace Armoury
     /// w tym miescie sztuki o srodkowej wartosci kategorii (Town.MarketData.GetPrice - z naszymi prawami ceny). Brak typu z wynikiem - kopalnia zostaje
     /// (licznik). Istniejacych warsztatow nie przestawia (tylko przyszle wybory typu: bankructwo, odebranie, start nowej gry); warsztatow gracza nie dotyka
     /// (gra nie wola tej metody dla warsztatu gracza w toku). Obieg: zloto i towar bez zmian - inny typ warsztatu tej samej akcji gry.
+    /// Recenzja (noc 16.10): typy, ktorym brak wsadu w okregu (bramka E6/M2 WorkshopInputs: linia towarowa bez surowca w slowniku gry i bez kontraktu), ida
+    /// na koniec - wybrane tylko, gdy zaden typ z wsadem nie ma wyniku (inaczej np. tlocznia bez winnic stoi albo bankrutuje); licznik "typ bez wsadu odlozony".
     /// </summary>
     internal static class NoTownMines
     {
         private const string MinesId = "mines";
         private static System.Reflection.MethodBase _target;
         internal static string Hook = "nie wpiete";
-        private static int _picks, _swaps, _kept, _stumbles;
+        private static int _picks, _swaps, _kept, _stumbles, _gated;
         private static readonly List<string> _samples = new List<string>();
         private static readonly Dictionary<ItemCategory, ItemObject> _sample = new Dictionary<ItemCategory, ItemObject>();
         private static bool _sampleBuilt;
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.NoTownMines; } }
 
-        internal static void Reset() { _picks = _swaps = _kept = _stumbles = 0; _samples.Clear(); _sample.Clear(); _sampleBuilt = false; }
+        internal static void Reset() { _picks = _swaps = _kept = _stumbles = _gated = 0; _samples.Clear(); _sample.Clear(); _sampleBuilt = false; }
 
         /// <summary>Start sesji (PO HistoricalPrices.Apply): sztuki kategorii od nowa - wybory typu przy starcie nowej gry biegna przed cenami historycznymi.</summary>
         internal static void SessionStart() { _sample.Clear(); _sampleBuilt = false; }
@@ -138,25 +140,34 @@ namespace Armoury
             BuildSamples();
             var have = new HashSet<WorkshopType>();
             foreach (var w in town.Workshops) if (w != null && w.WorkshopType != null) have.Add(w.WorkshopType);
-            WorkshopType bestNew = null, bestAny = null;
-            float sNew = 0f, sAny = 0f;
+            // [0] typy z wsadem w okregu (albo bez potrzeby wsadu), [1] typy bez wsadu w okregu (bramka E6/M2) - na koniec
+            var bestNew = new WorkshopType[2]; var bestAny = new WorkshopType[2];
+            var sNew = new float[2]; var sAny = new float[2];
             foreach (var t in WorkshopType.All)
             {
                 if (t == null || t.IsHidden || t == mines || t == exclude || t.StringId == MinesId) continue;
                 float sc = Score(town, t);
                 if (!(sc > 0f)) continue;
-                if (!have.Contains(t) && (bestNew == null || sc > sNew)) { bestNew = t; sNew = sc; }
-                if (bestAny == null || sc > sAny) { bestAny = t; sAny = sc; }
+                int g = WorkshopInputs.InputMissing(t) ? 1 : 0;
+                if (!have.Contains(t) && (bestNew[g] == null || sc > sNew[g])) { bestNew[g] = t; sNew[g] = sc; }
+                if (bestAny[g] == null || sc > sAny[g]) { bestAny[g] = t; sAny[g] = sc; }
             }
-            return bestNew ?? bestAny;
+            var pick = bestNew[0] ?? bestAny[0];
+            // licznik: bez bramki wygralby typ bez wsadu w okregu (ta sama kolejnosc: najpierw typy nowe w miescie)
+            var oldNew = bestNew[0] != null && (bestNew[1] == null || sNew[0] >= sNew[1]) ? bestNew[0] : bestNew[1];
+            var oldAny = bestAny[0] != null && (bestAny[1] == null || sAny[0] >= sAny[1]) ? bestAny[0] : bestAny[1];
+            var old = oldNew ?? oldAny;
+            if (old != null && pick != null && old != pick) _gated++;
+            return pick ?? bestNew[1] ?? bestAny[1];
         }
 
         /// <summary>NightEcon.Daily: "wyborow typu w miastach N, kopalnia BK -> inny typ Z [przyklady], bez lepszego typu K" (zeruje liczniki doby).</summary>
         internal static string DayText(out int swaps, out int stumbles)
         {
             swaps = _swaps; stumbles = _stumbles;
-            string t = "wyborow typu w miastach " + _picks + ", kopalnia -> inny typ " + _swaps + (_samples.Count > 0 ? " [" + string.Join("; ", _samples.ToArray()) + "]" : "") + ", bez lepszego typu (kopalnia zostala) " + _kept;
-            _picks = _swaps = _kept = _stumbles = 0; _samples.Clear();
+            string t = "wyborow typu w miastach " + _picks + ", kopalnia -> inny typ " + _swaps + (_samples.Count > 0 ? " [" + string.Join("; ", _samples.ToArray()) + "]" : "") + ", bez lepszego typu (kopalnia zostala) " + _kept
+                       + " (typ bez wsadu w okregu odlozony " + _gated + ")";
+            _picks = _swaps = _kept = _stumbles = _gated = 0; _samples.Clear();
             return t;
         }
     }

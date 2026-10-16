@@ -222,7 +222,7 @@ namespace Armoury
     /// <summary>Zapas otwartego ladunku drewna kowala gracza w zapisie.</summary>
     internal sealed class SmithWoodBehavior : CampaignBehaviorBase
     {
-        public SmithWoodBehavior() { SmithWood.OpenKg = 0f; }
+        public SmithWoodBehavior() { SmithWood.OpenKg = 0f; SmithCoal.OpenKg = 0f; }
 
         public override void RegisterEvents() { }
 
@@ -231,6 +231,10 @@ namespace Armoury
             float kg = SmithWood.OpenKg;
             dataStore.SyncData("arm_smith_wood_kg", ref kg);
             SmithWood.OpenKg = float.IsNaN(kg) || kg < 0f ? 0f : kg;
+            // poprawka N2 po recenzji (noc 16.10): zapas otwartej bryly wegla w palenisku (SmithCoal); stary zapis bez klucza - 0 kg (z konstruktora)
+            float ck = SmithCoal.OpenKg;
+            dataStore.SyncData("arm_smith_coal_kg", ref ck);
+            SmithCoal.OpenKg = float.IsNaN(ck) || ck < 0f ? 0f : Math.Min(ck, 50f);
         }
     }
 }

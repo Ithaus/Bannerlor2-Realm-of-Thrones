@@ -90,6 +90,14 @@ namespace Armoury
 
         public static void DecidePrefix() { _anyWithInput = false; _lastDict = null; }
 
+        /// <summary>N10 (NoTownMines, recenzja noc 16.10): typ potrzebuje wsadu, a okreg miasta go nie ma (slownik tego wyboru typu, bramka E6/M2 czynna).
+        /// Wolane z postfiksu Low DecideBestWorkshopType - _lastDict zyje do naszego postfiksu Last (zeruje go DecidePostfix). Bramka wylaczona / brak slownika - false.</summary>
+        internal static bool InputMissing(WorkshopType t)
+        {
+            try { return On && _lastDict != null && t != null && NeedsInput(t) && !HasInput(t, _lastDict); }
+            catch { return false; }
+        }
+
         public static void ScorePostfix(WorkshopType workshopType, IDictionary<ItemCategory, float> productionDict, ref float __result)
         {
             if (workshopType == null || !On) return;

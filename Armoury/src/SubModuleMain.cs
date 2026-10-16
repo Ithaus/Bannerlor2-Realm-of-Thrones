@@ -143,6 +143,7 @@ namespace Armoury
                 try { FixedSums38.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FixedSums38.ApplyAll", e); }   // 3.8: okna wartosci w starej monecie (nagroda turnieju gry i TXP)
                 RawPrice.ApplyAll(_harmony);     // cena surowcow od niedoboru: stala wzoru ceny w nowej monecie, popyt z prawdziwego zuzycia miasta
                 try { TownFolk.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplyAll", e); }   // E5/0 (195): okna pomiaru kiesy ludu - tylko odczyt (budzet dnia, wiersze polki BK, konsumpcja, bitwy, notable)
+                try { TownFolk.ApplyCraftSale(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplyCraftSale", e); }   // N4 (poprawka po recenzji 16.10): do puli doplaty 35% tylko sztuki, ktore trafily na polke (po WorkshopTrade - wyrob do miasta wpiety wczesniej)
                 try { TownFolk.ApplySkup(_harmony); } catch (Exception e) { Log.Error("TownFolk.ApplySkup", e); }   // GL-B / 11c: robocizna od skupu plonu wsi (zaplata kasy taborom wsi; klucz FolkEarnFromVillageBuys czytany na zywo)
                 AmmoRecovery.ApplyAll(_harmony);
                 RecruitCost.ApplyAll(_harmony);
