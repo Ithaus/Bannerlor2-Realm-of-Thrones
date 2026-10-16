@@ -29354,6 +29354,13 @@ def nekon_main(logp):
     fo = last[NE_FORGE]
     if fo:
         scr = "ekran kucia wpiete" in fo
+        # noc 16.10: linia NE pisana PRZED SmithWood.SessionStart (stan "nie wpiete" zawsze) - stan latki z linii "Drewno w kuzni (kg): start sesji"
+        if not scr:
+            try:
+                for _ln in io.open(logp, encoding="utf-8", errors="replace"):
+                    if "Drewno w kuzni (kg): start sesji" in _ln and "ekran kucia wpiete" in _ln: scr = True
+            except Exception:
+                pass
         pr = num(r"ladunkow (\d+) \(regula kg", fo)
         rep.add("NE-5: kuznia - ekran kucia wpiety, samosprawdzenie naprawy (otwarty 1 kg) 0 ladunkow", fo[len(NE_FORGE):].lstrip(" |")[:320],
                 "wpiete; ladunkow 0 przy Self Mend Wood Kg (brak sztuki do proby - INFO)",
