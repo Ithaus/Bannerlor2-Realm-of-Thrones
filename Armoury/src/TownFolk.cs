@@ -102,6 +102,7 @@ namespace Armoury
             public long KW, KR, KP, KG;                               // miasto: kiesy W/R/P i gmina; zamek: KW = kiesa podzamcza (zapis arm_townfolk)
             public long CourtCr;                                      // zamek: kredyt dworu (kuchnia pana) - liczba, bez zlota (zapis)
             public readonly long[] EarnWin = new long[3];             // zarobek okna klas - podstawa podatkow panu (zamek: [0])
+            public readonly long[] ZcE = new long[3]; public int ZcDay = -1;   // ZC0 (DailyLife, tylko odczyt): zarobek okna klas z ostatniej doby kiesy czynnej (zamek: [0]) i jej dzien; bez zapisu
             public readonly long[] PaidG = new long[3];               // zaplacone za towar w oknie (czynsz, leczenie, sluzba - w dobie)
             public readonly long[] Offer = new long[3];               // nadwyzka oferowana na towar jutro (nie przelew - budzet "lepszych" kategorii)
             public long PaidKeep, VillWin, GmMatWin;                  // okno: zaplata ludu do kasy, zakupy wsi w tym miescie, material robot gminy (podstawa robocizny)

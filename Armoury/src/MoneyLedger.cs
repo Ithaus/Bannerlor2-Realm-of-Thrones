@@ -323,6 +323,7 @@ namespace Armoury
                     if (home != null) { _vKept += home.Gold - _winHomeGold; _vTax += home.TradeTaxAccumulated - _winHomeTax; }
                     _vEstates += _winEstates;
                     TownFolk.NoteVillageReturn(mp.HomeSettlement, handed, home != null ? home.Gold - _winHomeGold : 0, home != null ? home.TradeTaxAccumulated - _winHomeTax : 0, _winEstates);   // E5/0 (195): ta sama definicja utargu wsi (wlasny try)
+                    DailyLife.NoteVillageReturn(mp.HomeSettlement, home != null ? home.Gold - _winHomeGold : 0, home != null ? home.TradeTaxAccumulated - _winHomeTax : 0, _winEstates);   // ZC0: gotowka wsi i majatki BK do Dostatku (tylko licznik, wlasny try)
                 }
             }
             catch { _stumbles++; }

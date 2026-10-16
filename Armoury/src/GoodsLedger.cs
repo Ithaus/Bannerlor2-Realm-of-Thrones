@@ -1046,6 +1046,27 @@ namespace Armoury
             return s;
         }
 
+        // ZC0 (DailyLife, Spizarnia - tylko odczyt): towar zjedzony i zuzyty dzis przez lud z polek - mieszczanie (konsumpcja miast), wsie (koszyk wsi z polki
+        // miasta targowego, E5/B1), dwory (CourtGoods E3-P1); id towaru -> [mieszczanie, wsie, dwory] w sztukach. Doba ostatniej linii ksiegi; -1 = brak (ksiega wylaczona).
+        private static readonly Dictionary<string, long[]> _zcCivil = new Dictionary<string, long[]>(StringComparer.Ordinal);
+        private static int _zcDay = -1;
+
+        private static void ZcNote(ItemObject it, Dictionary<string, Dictionary<string, long>> sink)
+        {
+            if (it == null || it.StringId == null) return;
+            long t = Group(sink, GTown), v = Group(sink, GFolkVill), k = Group(sink, GCourt);
+            if (t + v + k > 0) _zcCivil[it.StringId] = new[] { t, v, k };
+        }
+
+        /// <summary>ZC0: kopia zuzycia ludu doby ostatniej linii ksiegi towarow do dst; zwraca dzien (-1 - brak liczb). Nie rzuca.</summary>
+        internal static int CivilEaten(Dictionary<string, long[]> dst)
+        {
+            if (dst == null) return -1;
+            dst.Clear();
+            try { foreach (var kv in _zcCivil) dst[kv.Key] = kv.Value; return _zcDay; }
+            catch { dst.Clear(); return -1; }
+        }
+
         private static long Group(Dictionary<string, Dictionary<string, long>> d, string g)
         {
             Dictionary<string, long> subs;
@@ -1102,6 +1123,7 @@ namespace Armoury
                 if (_wasOn) Log.Info("Towary (bilans): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - KSIEGA WYLACZONA (Goods Ledger Enabled = off) - brak linii towarow.");
                 _wasOn = false; _lastDay = -1;
                 if (_acc != null) foreach (var a in _acc) { a.NewDay(); a.Last = -1; }
+                _zcCivil.Clear(); _zcDay = -1;   // ZC0: bez ksiegi - targ dzis nieznany
                 return;
             }
             long t0 = Stopwatch.GetTimestamp();
@@ -1138,6 +1160,7 @@ namespace Armoury
                 long tStock = Stopwatch.GetTimestamp() - t0;
 
                 // ---- linie towarow
+                _zcCivil.Clear(); _zcDay = day;   // ZC0 (DailyLife "Spizarnia (ZC)"): zuzycie doby ludu wedlug towaru - tylko kopia liczb ksiegi
                 string ts = DateTime.Now.ToString("HH:mm:ss");
                 var all = new StringBuilder();
                 long sumP = 0, sumC = 0, sumD = 0, sumU = 0; int moving = 0, closed = 0;
@@ -1151,6 +1174,7 @@ namespace Armoury
                     long now = 0;
                     foreach (var h in a.Hold) now += h;
                     long p = Sum(a.Src), c = Sum(a.Sink);
+                    if (c > 0) ZcNote(it, a.Sink);
                     bool trade = false;
                     foreach (var t in a.Tr) if (t != 0) { trade = true; break; }
                     if (now == 0 && p == 0 && c == 0 && !trade && a.Last <= 0) { a.Last = now; a.NewDay(); continue; }

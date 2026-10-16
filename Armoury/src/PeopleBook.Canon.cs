@@ -286,6 +286,22 @@ namespace Armoury
             return t;
         }
 
+        /// <summary>ZC0 (DailyLife, stany - tylko odczyt): konto NIEWOLNI wedlug regionu trzymania (id warowni; "" = bez regionu) - kopia do dst.</summary>
+        internal static void ThrallsByHold(Dictionary<string, double> dst)
+        {
+            if (dst == null) return;
+            dst.Clear();
+            try
+            {
+                foreach (var h in _thr)
+                {
+                    double t = 0.0; foreach (var v in h.Value.Values) t += v;
+                    if (t > 0.0) dst[h.Key ?? ""] = t;
+                }
+            }
+            catch (Exception e) { OStumble("ThrallsByHold", e); }
+        }
+
         /// <summary>Niewolni trzymani w regionie (id warowni).</summary>
         private static double ThrallsHeldIn(string regionId)
         {

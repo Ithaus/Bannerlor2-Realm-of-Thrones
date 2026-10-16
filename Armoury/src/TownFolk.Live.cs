@@ -848,6 +848,7 @@ namespace Armoury
             d.Towns++;
             // ---- 1. podatki od zarobku okna: pan 1/2/3% (W/R/P), cech 1% R -> gmina (raz na dobe); E5/B2 korona 184 na wierzch (scalenie B)
             long eW = f.EarnWin[0], eR = f.EarnWin[1], eP = f.EarnWin[2];
+            f.ZcE[0] = eW; f.ZcE[1] = eR; f.ZcE[2] = eP; f.ZcDay = _liveDay;   // ZC0 (DailyLife): zarobek okna klas tej doby - tylko odczyt pomiaru Dostatku
             long tW = (long)Math.Round(eW * TaxW), tR = (long)Math.Round(eR * TaxR), tP = (long)Math.Round(eP * TaxP);
             long guild = (long)Math.Round(eR * GuildR);
             Array.Clear(f.EarnWin, 0, 3);
@@ -1022,6 +1023,7 @@ namespace Armoury
             }
             // ---- 1. pan 3% od zarobku okna; E5/B2 korona 184 na wierzch (scalenie B)
             long eC = f.EarnWin[0];
+            f.ZcE[0] = eC; f.ZcE[1] = f.ZcE[2] = 0; f.ZcDay = _liveDay;      // ZC0 (DailyLife): zarobek okna podzamcza tej doby - tylko odczyt
             long tax = (long)Math.Round(eC * TaxC);
             d.CInc += eC;
             Array.Clear(f.EarnWin, 0, 3);
@@ -1744,6 +1746,44 @@ namespace Armoury
         /// wies - zakupy tej doby / potrzeba (skladniki "wsie: zakupy X z Y"). Tylko odczyt: bez Get (nie tworzy wpisu), bez zlota i bez stanu.
         /// null - bez zdania (kiesa nieczynna, zawor zamkow wylaczony, osada spoza ksiegi, wies bez miasta targowego). log - linia do logu z fragmentem linii
         /// "Kiesa ludu:" tej samej doby (sprawdz_logi E5/C4-1 porownuje go z linia doby).</summary>
+        /// <summary>ZC0 (DailyLife, pomiar Dostatku - tylko odczyt, bez Get): zarobek okna klas ostatniej doby kiesy czynnej NETTO od podatku pana, cechu R i dziesieciny
+        /// (stawki tej klasy: W 1% + 1%, R 2% + 1% + 2%, P 3% + 3%; podzamcze 3%) w zl gry: net[0..2] = W, R, P (zamek - [0] podzamcze). kind: 0 miasto, 1 zamek.
+        /// false - kiesa nieczynna, osada spoza kiesy, wies, zamek przy wylaczonym zaworze zamkow albo liczby nie z tej doby. Nie rzuca.</summary>
+        internal static bool ZcEarnNet(Settlement st, double[] net, out int kind)
+        {
+            kind = -1;
+            if (net == null || net.Length < 3) return false;
+            net[0] = net[1] = net[2] = 0;
+            try
+            {
+                if (st == null || !Live) return false;
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind < 0 || f.Kind > 1 || f.ZcDay < 0 || f.ZcDay != _liveDay) return false;
+                if (f.Kind == 1 && !CastleLive) return false;
+                kind = f.Kind;
+                if (f.Kind == 1) { net[0] = Math.Max(0, f.ZcE[0]) * (1 - TaxC); return true; }
+                net[0] = Math.Max(0, f.ZcE[0]) * (1 - TaxW - TitheW); net[1] = Math.Max(0, f.ZcE[1]) * (1 - TaxR - GuildR - TitheR); net[2] = Math.Max(0, f.ZcE[2]) * (1 - TaxP - TitheP);
+                return true;
+            }
+            catch { net[0] = net[1] = net[2] = 0; kind = -1; return false; }
+        }
+
+        /// <summary>ZC0 (DailyLife, pochylenie pasm stanow klasami BK - tylko odczyt, bez Get): glowy BK osady z kalibracji kiesy ludu h[0..3] = W (chlopi i dzierzawcy),
+        /// R (rzemieslnicy), P (szlachta BK = patrycjat), S (niewolni). false - osada bez kalibracji albo spoza kiesy. Nie rzuca.</summary>
+        internal static bool ZcBkHeads(Settlement st, double[] h)
+        {
+            if (h == null || h.Length < 4) return false;
+            h[0] = h[1] = h[2] = h[3] = 0;
+            try
+            {
+                Folk f;
+                if (st == null || !_f.TryGetValue(st, out f) || f == null || !f.Cal || f.NoBk) return false;
+                h[0] = Math.Max(0, f.HW); h[1] = Math.Max(0, f.HR); h[2] = Math.Max(0, f.HP); h[3] = Math.Max(0, f.HS);
+                return h[0] + h[1] + h[2] + h[3] > 0;
+            }
+            catch { h[0] = h[1] = h[2] = h[3] = 0; return false; }
+        }
+
         internal static string BreadLine(Settlement st, out string log)
         {
             log = null;
