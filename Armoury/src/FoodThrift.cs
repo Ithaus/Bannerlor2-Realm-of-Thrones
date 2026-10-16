@@ -106,6 +106,14 @@ namespace Armoury
             catch (Exception e) { Log.Error("FoodThrift.ApplyAll", e); }
         }
 
+        /// <summary>Z ArmouryBehavior.OnSessionLaunched: linia startu sesji (klucz, prog, liczba zalatanych modeli).</summary>
+        internal static void SessionStart()
+        {
+            var s = Settings.Current;
+            Log.Info("Lordowie a drogie jedzenie (B3): start sesji | klucz AiFoodSkipsDear " + (s != null && s.AiFoodSkipsDear ? "TAK" : "NIE") + " (prog x"
+                     + (s != null ? Math.Max(1f, s.AiFoodDearIndex).ToString("0.0#", Inv) : "-") + " wartosci) | modeli zakupu jedzenia zalatanych " + _hooks + " | potkniecia " + _stumbles + ".");
+        }
+
         /// <summary>Z ArmouryBehavior.OnDailyTick: linia "Lordowie a drogie jedzenie (B3)" (tylko log).</summary>
         internal static void Daily()
         {

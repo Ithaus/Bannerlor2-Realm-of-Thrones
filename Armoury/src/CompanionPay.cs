@@ -220,6 +220,7 @@ namespace Armoury
                 }
                 catch { bk = null; }
             }
+            head += "klucz CompanionNavalSkillsPriced " + (NavalOn ? "TAK" : "NIE") + ", CompanionHireByWage " + (HireOn ? "TAK" : "NIE") + " (" + Math.Max(0f, s != null ? s.CompanionHireDays : 0f).ToString("0", Inv) + " dni) | ";
             if (bk == null || _mFactor == null) { Log.Info(head + _hook + " | samosprawdzenie: BRAK modelu BK | potkniecia " + _stumbles + "."); return; }
             var f = FactorOf(bk);
             foreach (var id in new[] { "Mariner", "Boatswain", "Shipmaster" })

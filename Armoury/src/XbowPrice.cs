@@ -124,10 +124,12 @@ namespace Armoury
         internal static void Build()
         {
             lock (Gate) { _days.Clear(); _tier.Clear(); _active = false; _stumbles = 0; _errLogged = false; }
-            const string Head = "Kusze wedlug luku (XbowLikeBow): start sesji | ";
+            string Head = "Kusze wedlug luku (XbowLikeBow): start sesji | ";
             try
             {
                 var s = Settings.Current;
+                string keys = s == null ? "klucze -" : "klucz XbowLikeBow " + (s.XbowLikeBow ? "TAK" : "NIE") + ", XbowForgeEquivTier " + (s.XbowForgeEquivTier ? "TAK" : "NIE") + ", XbowBuyByPower " + (s.XbowBuyByPower ? "TAK" : "NIE");
+                Head += keys + " | ";
                 if (s == null || !s.XbowLikeBow) { _start = Head + "WYLACZONE (MCM) - kusze wyceniane jak dotad (dni kusznika i dniowka tieru gry) | potkniecia 0."; return; }
                 if (!HistoricalPrices.On) { _start = Head + "NIECZYNNE - ceny historyczne wylaczone, kusze jak dotad | potkniecia 0."; return; }
                 bool rbm = false;

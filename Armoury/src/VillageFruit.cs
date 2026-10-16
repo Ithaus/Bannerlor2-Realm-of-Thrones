@@ -89,7 +89,7 @@ namespace Armoury
             lock (Gate) { _stumbles = 0; _calls = 0; _carrot = _apple = _orange = _honey = 0; _errLogged = false; }
             var s = Settings.Current;
             const string Head = "Owoce wsi (VillageFruitFromBk): start sesji | ";
-            if (s == null || !s.VillageFruitFromBk) { Log.Info(Head + "WYLACZONE (MCM) - marchew, jablka, pomarancze i miod tylko z niczego BK, jak dotad | potkniecia 0."); return; }
+            if (s == null || !s.VillageFruitFromBk) { Log.Info(Head + "klucz VillageFruitFromBk NIE | WYLACZONE (MCM) - marchew, jablka, pomarancze i miod tylko z niczego BK, jak dotad | potkniecia 0."); return; }
             int wheat = 0, olive = 0, lumber = 0, trap = 0, skipped = 0, noMarket = 0;
             double bc = 0, ba = 0, bo = 0, bh = 0;
             try
@@ -121,7 +121,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble(e); }
-            Log.Info(Head + "CZYNNE | wheat_farm " + wheat + " wsi (marchew 2, jablka 2), olive_trees " + olive + " (pomarancze 2), lumberjack " + lumber + " + trapper " + trap + " (miod 0.5)"
+            Log.Info(Head + "klucz VillageFruitFromBk TAK | CZYNNE | wheat_farm " + wheat + " wsi (marchew 2, jablka 2), olive_trees " + olive + " (pomarancze 2), lumberjack " + lumber + " + trapper " + trap + " (miod 0.5)"
                      + " | baza na dobe przed mnoznikami (waga x (poziom ognisk + 1) x 0.5): marchew " + bc.ToString("0", Inv) + ", jablka " + ba.ToString("0", Inv) + ", pomarancze " + bo.ToString("0", Inv) + ", miod " + bh.ToString("0", Inv)
                      + " | juz na liscie typu (pominiete) " + skipped + " | bez targu (bez plonu) " + noMarket
                      + " | lista produkcji BK " + (MineralOnce.Wired ? "jest (tick BK pyta model o owoce)" : "BEZ latki GetProductions - zalezy od BK") + " | potkniecia " + _stumbles + ".");

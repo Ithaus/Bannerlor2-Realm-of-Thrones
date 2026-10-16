@@ -220,6 +220,19 @@ namespace Armoury
             catch (Exception e) { _hook = "wyjatek " + e.GetType().Name; Log.Error("FoodSubstitute.ApplyAll", e); }
         }
 
+        /// <summary>Z ArmouryBehavior.OnSessionLaunched: linia startu sesji (klucz, latka, tabela kategorii tej kampanii).</summary>
+        internal static void SessionStart()
+        {
+            var s = Settings.Current;
+            int src = 0, dst = 0;
+            try { if (Campaign.Current != null) { EnsureMap(); src = _map.Count; dst = _cats.Count - _map.Count; } }
+            catch (Exception e) { _stumbles++; if (!_errLogged) { _errLogged = true; Log.Error("FoodSubstitute.SessionStart", e); } }
+            Log.Info("Zamienniki jedzenia (B2): start sesji | klucz FoodSubstituteWhenShort " + (s != null && s.FoodSubstituteWhenShort ? "TAK" : "NIE")
+                     + " (udzial " + (s != null ? s.FoodSubstituteShare.ToString("0.00", Inv) : "-") + ", zamiennik oddaje najwyzej " + SpareUse.ToString("0.0", Inv) + " nadwyzki polki) | latka " + _hook
+                     + " | budzet BK " + (Campaign.Current != null ? "pytany przy pierwszej osadzie" : "-") + " | kategorii jedzenia z tabeli: zrodel " + src + ", innych kategorii w tabeli " + Math.Max(0, dst)
+                     + " | potkniecia " + _stumbles + ".");
+        }
+
         private static string Median(ItemCategory c)
         {
             var l = new List<float>();

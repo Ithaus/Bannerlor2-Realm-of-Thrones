@@ -665,7 +665,7 @@ Uzycie (Python 3, tylko odczyt):
                     po 10 dobach, NC-16b bread/meat/cheese <= 3.0, NC-16c placek i miod (INFO), NC-17 syty lord zamienia drogie jedzenie (T > 0), NC-18 placek
                     kupiony przez lordow (INFO), NC-19 kiesa ludu (INFO). (C) towarzysze (CompanionPay.cs): NC-20 start sesji - latki czynnika i ceny wpiete,
                     samosprawdzenie ZGODNE, NC-21 linia doby: wedrowcy >= 10, nasza cena > 0, nasza/BK 0.1-0.6, potkniecia i ERROR 0, NC-22 zold, poziom
-                    i czas linii (INFO). Log bez paczki: INFO, bez wyjatku.
+                    i czas linii (INFO). NC-23 / NC-24 linie startu sesji B2 i B3 (klucz TAK, latki wpiete). Log bez paczki: INFO, bez wyjatku.
 --grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
                     TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
                     (strumieniowo). OB2-0 linia startu (klucze tak), OB2-1 linie doby straznika / wsi / pozyczek, OB2-2 potkniecia i ERROR 0, OB2-3a lud / poziom
@@ -26710,6 +26710,7 @@ def nceny_main(logp):
     xs, xd, ws, errs = [], {}, {}, {}
     fs, fd, sd, td, tow, own, lordpie, folk = [], {}, {}, {}, {}, {}, {}, {}
     cs, cd = [], {}
+    b2start, b3start = [], []
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -26730,6 +26731,10 @@ def nceny_main(logp):
                 d = num(r"dzien (\d+)", s)
                 if d is not None:
                     fd[d] = s
+            elif s.startswith("Zamienniki jedzenia (B2): start sesji | "):
+                b2start.append(s)
+            elif s.startswith("Lordowie a drogie jedzenie (B3): start sesji | "):
+                b3start.append(s)
             elif s.startswith(NC_SD):
                 d = num(r"dzien (\d+)", s)
                 if d is not None:
@@ -26770,9 +26775,9 @@ def nceny_main(logp):
         rep.add("NC-0: kusze wedlug luku - linia startu", "brak linii", "INFO (wersja sprzed paczki nceny)", None)
     else:
         st = xs[-1] if xs else ""
-        on = st.startswith(NC_XS + "x")
+        on = bool(re.search(r"\| x[\d.]+ ceny luku tej samej sily", st)) and "klucz XbowLikeBow TAK" in st
         rep.add("NC-0: kusze wedlug luku - linia startu, przeliczenie czynne", st[len(NC_XS):][:200] if st else "brak linii startu (sa linie doby)",
-                "linia jest, przeliczenie czynne (x... ceny luku)", bool(st) and on)
+                "linia jest, klucz XbowLikeBow TAK, przeliczenie czynne (x... ceny luku)", bool(st) and on)
         if on:
             nb = num(NC_X_BOWS.pattern, st)
             rep.add("NC-1: lukow w tabeli", f"{nb}", "16-22 (19 +-3)", nb is not None and 16 <= nb <= 22)
@@ -26847,6 +26852,14 @@ def nceny_main(logp):
             dl = max(oc); span = dl - min(oc)
             rep.add("NC-13: marchew i jablka na targach miast (posiadacze, ostatnia doba)", f"doba {dl} (po {span} dobach): carrot w miastach {oc[dl]}, apple {oa.get(dl, 0)}",
                     "> 0 obu po >= 7 dobach", (oc[dl] > 0 and oa.get(dl, 0) > 0) if span >= 7 else None)
+        b2s = [s for s in b2start]
+        rep.add("NC-23: zamienniki - linia startu sesji", b2s[-1][len("Zamienniki jedzenia (B2): start sesji | "):][:200] if b2s else "brak linii",
+                "klucz FoodSubstituteWhenShort TAK, latka wpiety, zrodel >= 10, potkniecia 0",
+                (("klucz FoodSubstituteWhenShort TAK" in b2s[-1] and "latka wpiety" in b2s[-1] and num(r"zrodel (\d+)", b2s[-1], default=0) >= 10 and num(NC_STUM.pattern, b2s[-1], default=1) == 0)) if b2s else None)
+        b3s = [s for s in b3start]
+        rep.add("NC-24: syty lord - linia startu sesji", b3s[-1][len("Lordowie a drogie jedzenie (B3): start sesji | "):][:200] if b3s else "brak linii",
+                "klucz AiFoodSkipsDear TAK, modeli zalatanych >= 1, potkniecia 0",
+                ("klucz AiFoodSkipsDear TAK" in b3s[-1] and num(r"zalatanych (\d+)", b3s[-1], default=0) >= 1 and num(NC_STUM.pattern, b3s[-1], default=1) == 0) if b3s else None)
         fst = max([num(r"potkniecia sesji (\d+)", s, default=0) for s in fd.values()] or [0])
         rep.add("NC-14: owoce wsi - potkniecia / ERROR in VillageFruit", f"potkniecia sesji (najwiecej) {fst}, ERROR {errs.get('VillageFruit', 0)}", "0 / 0",
                 fst == 0 and errs.get("VillageFruit", 0) == 0)
