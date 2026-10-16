@@ -2298,3 +2298,15 @@ zlecenie miejskie powstaje tylko, gdy kiesa zleceniodawcy pokrywa sume jego zlec
 nie zlecenia zadan). Test zapis F 15 dob: 0 ERROR, grupa nzlec 0 NIE, wiszacych 529 (bez pokrycia 0), odrzucone przy tworzeniu ok. 20/dobe.
 Jeff o lupach ("kogo zabije, jego sprzet w 100% moj"): log sesji 23:26/23:33/23:39 - regula dziala (OwnKillsLootWhole: Twoje ciala w calosci, zolnierskie x 33%); czekam na wskazanie bitwy, jesli cos nie pasowalo.
 W TOKU: naprawa ekonomii wf_1f856eec-9a6 (galaz w-toku/noc-ekonomia3) - z poprawka Jeffa: karawany sprzedaja z zyskiem (cena > koszt zakupu + droga), na stracie tylko bez wyjscia.
+
+### 48. Naprawa ekonomii (noc-ekonomia3) - test 1 i strojenie (16.10 ok. 02:50 zegara komp.)
+Jeff: "Napraw aby ekonomia byla dynamiczna i kazdy mial co kupic"; "zostaw 100 kg, rob ekonomie"; karawany "sprzedaja tam, gdzie maja zysk ... nie na stracie, chyba ze nie maja wyjscia";
+"jedni kupuja, drudzy sprzedaja, czemu to problem" (blokada odkupienia tylko ta sama karawana i wizyta - a19efca6).
+Galaz w-toku/noc-ekonomia3 (zb/n-ekon3, od noc-ekonomia2): czesc 1 (myto targowe 4%/2%, danina markietanow, czynsz gruntowy, T1 karawany z zyskiem, W1 wozy wsi przywoza koszyk,
+kap poziomu normalnego straznika 6.4% + bezpiecznik 9%) i czesc 2 (tempo i typ warsztatow za cena D2/P3, D1 plon jaj/miodu/owocow za cena, dwory P1, budowy B1, Z1 zamowienia zolnierzy).
+UWAGA: zbior-e8 w zb/int = 4820a959 (scalona ekonomia3, NIEWGRANA); w grze WGRANIE 65 = a2310165 (noc/wgranie-65). Jesli ekonomia3 nie przejdzie - git reset zb/int do a2310165.
+Test 1, 120 dob (zapis F; D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-16_02-08-15.log) wobec bazy 64: 0 ERROR; lud 8.9% (baza 9.2%), bezpiecznik 0 dob;
+'nie do wydania' 95 tys. (baza 115 tys.); koszyk wsi 25.4% (10%); zbytki 48%; 45 zmian typu warsztatu; F z obrotu 47 tys./d. NIE: korony 19.37% (baza 19.7%), kiesy karawan +32%
+(2.62% swiata wobec 1.98%), zrzuty na jeden targ (indeks oliwy w Ibben 6.13 -> 0.45 w dobe), T1 na stracie 28.8 tys./d (stary zapas), narzedzia w jukach 80%.
+W TOKU strojenie (wf_1d02b9eb-495): S1 sprzedaz na stracie porcjami (spadek indeksu <= 30%/dobe w miescie, cena >= 0.6 x wartosc), S2 nadwyzka kiesy karawany do wlasciciela
+(CaravanProfitToOwner), S3 CrownReserveReleaseDays 360 -> 450. Potem test 2 (120 dob) i decyzja o WGRANIU 66.
