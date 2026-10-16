@@ -50,6 +50,27 @@ namespace Armoury
         private static AccessTools.FieldRef<Army, CampaignTime> _ctRef;
         private static bool _ctFail;
         private static double _dAgeSum;
+        // AR0 (oblezenia 3, tylko log): NotEnoughParty w dniu zalozenia wedlug wolajacego (rzut stosu): 0 BK wezwanie (CallBannersGoal), 1 SCA (OnArmyCreated),
+        // 2 gra (Army.OnRemovePartyInternal - odeszla ostatnia druzyna), 3 inne
+        private static readonly int[] _dWho = new int[4];
+
+        /// <summary>AR0: wolajacy DisbandArmyAction.ApplyByNotEnoughParty z rzutu stosu (pierwsza pasujaca ramka od srodka; ramka DMD Harmony - nazwa metody).</summary>
+        private static int Who()
+        {
+            var tr = new System.Diagnostics.StackTrace(2, false);
+            for (int i = 0; i < tr.FrameCount; i++)
+            {
+                var f = tr.GetFrame(i);
+                var m = f != null ? f.GetMethod() : null;
+                if (m == null) continue;
+                string s = m.DeclaringType != null ? m.DeclaringType.FullName + "." + m.Name : m.Name;
+                if (string.IsNullOrEmpty(s)) continue;
+                if (s.Contains("CallBannersGoal")) return 0;
+                if (s.Contains("StrategicCampaignAI145")) return 1;
+                if (s.EndsWith(".Army.OnRemovePartyInternal", StringComparison.Ordinal) || s.Contains("Army::OnRemovePartyInternal")) return 2;
+            }
+            return 3;
+        }
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.ArmyCohesionYearScale; } }
 
@@ -92,6 +113,7 @@ namespace Armoury
                 _dReasons.TryGetValue(r, out int n);
                 _dReasons[r] = n + 1;
                 _dDisp++; _tDisp++;
+                double age = -1.0;
                 if (a != null && !_ctFail)
                 {
                     try
@@ -100,13 +122,17 @@ namespace Armoury
                         var ct = _ctRef(a);
                         if (ct != default(CampaignTime))
                         {
-                            double age = CampaignTime.Now.ToDays - ct.ToDays;
+                            age = CampaignTime.Now.ToDays - ct.ToDays;
                             double[] v;
                             if (!_sAge.TryGetValue(r, out v)) _sAge[r] = v = new double[3];
                             v[0]++; if (age < 1.0) v[1]++; v[2] += age;
                         }
                     }
                     catch (Exception e) { _ctFail = true; Stumble("OnDispersed.CreationTime", e); }
+                }
+                if (reason == Army.ArmyDispersionReason.NotEnoughParty && age >= 0.0 && age < 1.0)
+                {
+                    try { _dWho[Who()]++; } catch (Exception e) { Stumble("OnDispersed.Who", e); }
                 }
                 if (a != null && _born.TryGetValue(a, out double d0))
                 {
@@ -122,7 +148,7 @@ namespace Armoury
         {
             if (_h == null) _h = new Harmony("com.jeff.armoury.armycohesionyear");
             var harmony = _h;
-            _born.Clear(); _dReasons.Clear(); _dDisp = _dAgedN = _tDisp = 0; _dAgeSum = 0; _sAge.Clear();
+            _born.Clear(); _dReasons.Clear(); _dDisp = _dAgedN = _tDisp = 0; _dAgeSum = 0; _sAge.Clear(); for (int i = 0; i < _dWho.Length; i++) _dWho[i] = 0;
             try
             {
                 var model = Campaign.Current != null && Campaign.Current.Models != null ? Campaign.Current.Models.ArmyManagementCalculationModel : null;
@@ -180,7 +206,8 @@ namespace Armoury
                          + " | zmiana na dobe srednio teraz " + (n > 0 ? (now / n).ToString("0.00", Inv) : "-") + ", bez skali " + (n > 0 ? (raw / n).ToString("0.00", Inv) : "-")
                          + " | rozwiazane dzis " + _dDisp + (sb.Length > 0 ? " (" + sb + ")" : "")
                          + " | wiek przy rozwiazaniu srednio " + (_dAgedN > 0 ? (_dAgeSum / _dAgedN).ToString("0.0", Inv) + " dob (" + _dAgedN + " armii z tej sesji)" : "-")
-                         + " | od startu sesji rozwiazanych " + _tDisp + " | potkniecia " + _errors + ".");
+                         + " | od startu sesji rozwiazanych " + _tDisp + " | potkniecia " + _errors
+                         + " | NotEnoughParty w dniu zalozenia wedlug wolajacego: BK wezwanie " + _dWho[0] + ", SCA " + _dWho[1] + ", gra " + _dWho[2] + ", inne " + _dWho[3] + ".");
                 if (_sAge.Count > 0)
                 {
                     var sw = new System.Text.StringBuilder();
@@ -195,7 +222,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Daily", e); }
-            _dReasons.Clear(); _dDisp = 0; _dAgedN = 0; _dAgeSum = 0;
+            _dReasons.Clear(); _dDisp = 0; _dAgedN = 0; _dAgeSum = 0; for (int i = 0; i < _dWho.Length; i++) _dWho[i] = 0;
         }
     }
 }

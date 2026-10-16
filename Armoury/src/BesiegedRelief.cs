@@ -93,6 +93,9 @@ namespace Armoury
         private static readonly Dictionary<SiegeEvent, Track> _tracks = new Dictionary<SiegeEvent, Track>();
         // armie wladcy zalozone z opcji OB5 -> osada odsieczy (przy zbiorce Army.AiBehaviorObject to MIEJSCE ZBIORKI - Army.FindBestGatheringSettlementAndMoveTheLeader)
         private static readonly Dictionary<Army, Settlement> _armyFor = new Dictionary<Army, Settlement>();
+        // oblezenia 3 (KO): odsiecz w chwili konca oblezenia - Finish zdejmuje Track PRZED nasluchem SiegeWalls (ReliefBehavior dodany po ArmouryBehavior, a MbEvent
+        // wola ostatnio dopisanego sluchacza pierwszy), wiec ostatni stan (zebrana, wymagana) zostaje tu do konca doby
+        private static readonly Dictionary<SiegeEvent, float[]> _endedRelief = new Dictionary<SiegeEvent, float[]>();
         private static readonly List<int> _tmpIdx = new List<int>();
         private static readonly List<Siege> _tmpSg = new List<Siege>();
         private static readonly HashSet<MobileParty> _dParties = new HashSet<MobileParty>();
@@ -106,7 +109,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0;
+            _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
             _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = 0;
         }
 
@@ -485,7 +488,9 @@ namespace Armoury
             _tracks.Remove(ev);
             try
             {
-                bool cap = t.Captured || (t.St != null && !ReferenceEquals(t.St.MapFaction, t.K));
+                // oblezenia 3: gra zwija oboz (KingdomManager.SiegeCompleted) PRZED zmiana pana - zdobycie ze znacznika MapEventEnded (Cape Wrath 15.10 "utrzymane" przy zdobyciu)
+                bool cap = t.Captured || (t.St != null && !ReferenceEquals(t.St.MapFaction, t.K)) || SiegeWalls2.CapturedNow(t.St);
+                if (ev != null) _endedRelief[ev] = new[] { t.LastC, Math.Max(t.Need0, t.LastNeed) };
                 _dEnded++; if (cap) _dCaptured++;
                 float pct = t.LastNeed > 0f ? 100f * t.CMax / Math.Max(t.Need0, t.LastNeed) : 0f;
                 var sb = new StringBuilder(600);
@@ -501,6 +506,20 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Finish", e); }
+        }
+
+        /// <summary>KO / SK (oblezenia 3): zebrana odsiecz i wymagana dla tego oblezenia (ostatnie przeliczenie godziny OB5) albo "- (poza OB5)". Nie rzuca.</summary>
+        internal static string ReliefOnWay(SiegeEvent ev)
+        {
+            try
+            {
+                if (ev == null) return "-";
+                Track t; float[] v;
+                if (_tracks.TryGetValue(ev, out t)) return F0(t.LastC) + " / wymagana " + F0(Math.Max(t.Need0, t.LastNeed));
+                if (_endedRelief.TryGetValue(ev, out v)) return F0(v[0]) + " / wymagana " + F0(v[1]);
+                return "- (poza OB5)";
+            }
+            catch (Exception e) { Stumble("ReliefOnWay", e); return "?"; }
         }
 
         // ------------------------------------------------------------ linie
@@ -578,7 +597,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = 0;
-            _dParties.Clear();
+            _dParties.Clear(); _endedRelief.Clear();
         }
     }
 

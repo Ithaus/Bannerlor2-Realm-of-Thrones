@@ -1520,6 +1520,14 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public bool SiegeEnginesInProgressDontHold { get; set; } = true;
 
+        [SettingPropertyBool("Siege Assault Runs To End", HintText = "an AI lord who has stormed a fortress fights the assault to its end: he no longer drops the siege halfway through the battle for another goal, and Strategic Campaign AI does not lift it while the battle runs - a relief force still joins the battle. Off = as before")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAssaultRunsToEnd { get; set; } = true;
+
+        [SettingPropertyBool("Siege Ai Trebuchets Hit Walls", HintText = "AI trebuchets aim at the walls while any stretch of wall still stands - the game rolled between the walls and the defenders' engines, and walls were almost never hit; other engines still choose as in the game. Your own camp is unchanged. Off = as in the game")]
+        [SettingPropertyGroup("The marching column")]
+        public bool SiegeAiTrebuchetsHitWalls { get; set; } = true;
+
         [SettingPropertyBool("Siege Walls Log", HintText = "writes log lines about these siege rules: a daily summary, each assault held back by the walls, each repelled assault with the pause before the next, each assault joined by a relief force, each siege camp slowed (log only - nothing in the game changes)")]
         [SettingPropertyGroup("The marching column")]
         public bool SiegeWallsLog { get; set; } = true;
@@ -4028,6 +4036,10 @@ namespace Armoury
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
         public bool GentryNoParties { get; set; } = true;
 
+        [SettingPropertyBool("Gentry Banners Need Vassal Party", HintText = "with Gentry No Parties: an AI lord calls his banners only when at least one vassal with a war party of his own can come - his estate knights ride in his own party and alone do not make an army - and only when Strategic Campaign AI would let him lead one (not too weak, not just after an army broke up). Off = Banner Kings formed such an army and broke it up the same day")]
+        [SettingPropertyGroup("Knights without fiefs (stage 2)")]
+        public bool GentryBannersNeedVassalParty { get; set; } = true;
+
         [SettingPropertyInteger("Gentry Knight Wage", 0, 96, "0", HintText = "a knight's wage a day (two shillings, a knight's pay in the contracts of 1282-1300), paid by the head of the house whose party he rides in - counted in that house's wage ceiling and in the crown's wage refund at war, like any party wage; the brothers of the Night's Watch take none")]
         [SettingPropertyGroup("Knights without fiefs (stage 2)")]
         public int GentryKnightWage { get; set; } = 24;
@@ -6024,6 +6036,10 @@ namespace Armoury
         [SettingPropertyGroup("The sack of towns and castles")]
         public float SiegeRansomBloodyRatio { get; set; } = 1.5f;
 
+        [SettingPropertyBool("Siege Ransom Repel Needs Weak Edge", HintText = "after an assault on the walls has failed, a besieging lord takes a ransom only when his edge has melted below Siege Ladder Min Ratio (four to one); a host still that much stronger waits and storms again. Off = one failed assault is reason enough")]
+        [SettingPropertyGroup("The sack of towns and castles")]
+        public bool SiegeRansomRepelNeedsWeakEdge { get; set; } = true;
+
         [SettingPropertyBool("Siege Ransom Ai", HintText = "a town or castle about to be stormed may buy the besiegers off: when the walls will not hold and a quarter of all its coin (Siege Ransom Share) is worth at least a day's pay of the besieging army, the town offers it, and a lord takes it when his army is short of pay, when an assault on these walls has already failed, or when the assault would be bloody (Siege Ransom Bloody Ratio). The ransom is shared like plunder - two thirds to the soldiers' purses, a third to the captains, of which the crown claims its third - and the besiegers leave and do not besiege that place again for Siege Ransom Truce Days. Never at a realm's capital, at the places of the great sieges of the story, by or against the Others. Off = every assault goes ahead as before")]
         [SettingPropertyGroup("The sack of towns and castles")]
         public bool SiegeRansomAi { get; set; } = true;
@@ -6595,6 +6611,8 @@ namespace Armoury
             s.SiegeLadderMinDays = SiegeLadderMinDays;
             s.SiegeLadderMinRatio = SiegeLadderMinRatio;
             s.SiegeEnginesInProgressDontHold = SiegeEnginesInProgressDontHold;
+            s.SiegeAssaultRunsToEnd = SiegeAssaultRunsToEnd;
+            s.SiegeAiTrebuchetsHitWalls = SiegeAiTrebuchetsHitWalls;
             s.SiegeWallsLog = SiegeWallsLog;
             s.SingleWinterSource = SingleWinterSource;
             s.WinterBiteEnabled = WinterBiteEnabled;
@@ -7222,6 +7240,7 @@ namespace Armoury
             s.RansomRepeatFloor = RansomRepeatFloor;
             s.PeaceReleaseAfterDay = PeaceReleaseAfterDay;
             s.GentryNoParties = GentryNoParties;
+            s.GentryBannersNeedVassalParty = GentryBannersNeedVassalParty;
             s.GentryKnightWage = GentryKnightWage;
             s.GentryEstateSpendCap = GentryEstateSpendCap;
             s.ArmyClothingEnabled = ArmyClothingEnabled;
@@ -7721,6 +7740,7 @@ namespace Armoury
             s.SiegeRansomMeasureLog = SiegeRansomMeasureLog;
             s.SiegeRansomShare = SiegeRansomShare;
             s.SiegeRansomBloodyRatio = SiegeRansomBloodyRatio;
+            s.SiegeRansomRepelNeedsWeakEdge = SiegeRansomRepelNeedsWeakEdge;
             s.SiegeRansomAi = SiegeRansomAi;
             s.SiegeRansomTruceDays = SiegeRansomTruceDays;
             s.SiegeRansomPlayerDefender = SiegeRansomPlayerDefender;

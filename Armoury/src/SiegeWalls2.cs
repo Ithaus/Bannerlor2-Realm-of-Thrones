@@ -80,7 +80,7 @@ namespace Armoury
     ///   Losowanie raz na godzine i oboz, warunkowo tak, by razem z losowaniem gry szansa byla ta wyliczona; potem OB1 (brama, mury, DR) i okup jak zwykle.
     /// Wyjatek per obiekt = licznik potkniec (CLAUDE.md 7). Stan tylko w pamieci (po wczytaniu: licznik dob zamku i ludzie z poczatku oblezenia od wczytania).
     /// </summary>
-    internal static class SiegeWalls2
+    internal static partial class SiegeWalls2
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static float Now { get { return (float)CampaignTime.Now.ToDays; } }
@@ -99,7 +99,7 @@ namespace Armoury
         private static int SurMen { get { var s = Settings.Current; return s == null ? 20 : (int)Clamp(s.SiegeSurrenderMen, 0, 200); } }
         internal static bool LadderOn { get { var s = Settings.Current; return s != null && s.SiegeLadderOverwhelm; } }
         private static int LadderDays { get { var s = Settings.Current; return s == null ? 30 : (int)Clamp(s.SiegeLadderMinDays, 0, 364); } }
-        private static double LadderRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderMinRatio) ? 6.0 : Clamp(s.SiegeLadderMinRatio, 2.0, 20.0); } }
+        internal static double LadderRatio { get { var s = Settings.Current; return s == null || float.IsNaN(s.SiegeLadderMinRatio) ? 6.0 : Clamp(s.SiegeLadderMinRatio, 2.0, 20.0); } }
         private static bool LogOn { get { var s = Settings.Current; return s != null && s.SiegeWallsLog && s.LogEnabled; } }
         /// <summary>Lista gry WearOutDefenders: trebuszy (DefaultSiegeStrategyActionModel :273-278).</summary>
         private const int TrebNeed = 4;
@@ -750,6 +750,10 @@ namespace Armoury
         {
             try
             {
+                // oblezenia 3 (KO, OB5): zdobycie w tej chwili - KingdomManager.SiegeCompleted bierze twierdze po wygranym szturmie i po pobitym wypadzie obroncow
+                // (SallyOut / BlockadeSallyOut, zwyciezca strona obrony bitwy = oblegajacy); wygrana pod murami (SiegeOutside) twierdzy nie daje (gra: tylko Siege / SallyOut)
+                if (me != null && me.MapEventSettlement != null && ((me.IsSiegeAssault && me.WinningSide == BattleSideEnum.Attacker)
+                    || ((me.IsSallyOut || me.IsBlockadeSallyOut) && me.WinningSide == BattleSideEnum.Defender))) NoteCaptured(me.MapEventSettlement);
                 if (me == null || !(me.IsSiegeAssault || me.IsSiegeOutside) || me.WinningSide != BattleSideEnum.Attacker) return;
                 var st = me.MapEventSettlement;
                 if (st == null || !st.IsFortification || st.Town == null) return;
@@ -833,7 +837,7 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { ZeroDay(); }
+            finally { Daily3(); ZeroDay(); }                                         // oblezenia 3: linia "Oblezenia 3 (doba)" po linii oblezen 2
         }
 
         private static void ZeroDay()
@@ -851,6 +855,7 @@ namespace Armoury
         internal static void Reset()
         {
             _treb.Clear(); _gl.Clear(); _surrendered.Clear(); _marked = 0; _unHour.Clear();
+            Reset3();                                                             // oblezenia 3: KO, szturm do konca, trebusze w mury
             ZeroDay();
             lock (Gate) { _stumbles = 0; _err.Clear(); }
         }
@@ -924,6 +929,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { _hookRb = "BRAK (blad: " + e.Message + ")"; Stumble("EnsureHooks.Rb", e); }
+            EnsureHooks3();                                                       // oblezenia 3: mysl wodza w szturmie, odwrot SCA, cel trebusza
         }
 
         private static string TypeOf(object o) { return o == null ? "-" : o.GetType().FullName; }
@@ -944,6 +950,7 @@ namespace Armoury
                          + F(LadderRatio, "0.0") + " : 1), log " + (LogOn ? "tak" : "nie") + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
+            SessionStart3();                                                      // oblezenia 3: linia "Oblezenia 3 (start)"
         }
     }
 }

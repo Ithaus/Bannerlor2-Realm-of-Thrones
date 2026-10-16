@@ -1021,7 +1021,7 @@ namespace Armoury
                 if (a.Repelled) { }
                 else if (w == BattleSideEnum.Attacker) _dWon++;
                 else if (w == BattleSideEnum.Defender) _dDefWon++;
-                else _dNone++;
+                else { _dNone++; SiegeWalls2.NoteAborted(a.St); }                    // oblezenia 3 (KO): szturm AI przerwany bez zwyciezcy
                 bool held = a.Repelled || w == BattleSideEnum.Defender;
                 if (a.FromWalls && held) _dFromWallsHeld++;
                 if (a.Outside && LogOn)
@@ -1131,6 +1131,7 @@ namespace Armoury
         {
             _dWallHits++;
             if (broken) _dWallBroken++;
+            SiegeWalls2.NoteWallHit(besieger, st, side, t, broken);              // oblezenia 3 (W): trafienia trebuszy obozow AI w mury
         }
 
         internal static void OnSiegeStarted(SiegeEvent ev) { _dSiegesNew++; SiegeWalls2.OnSiegeStarted(ev); }   // oblezenia 2: ludzie twierdzy na starcie (prog kapitulacji)
@@ -1140,6 +1141,8 @@ namespace Armoury
             try
             {
                 if (ev == null) return;
+                var pz = PauseOf(ev, false);
+                SiegeWalls2.EndLine(ev, pz != null ? pz.Repels : 0);                  // oblezenia 3 (KO): przyczyna konca oblezenia - PRZED czyszczeniem przerw OB2
                 _pauses.Remove(ev);
                 _prep.Remove(ev);
                 _vetoLogged.Remove(ev);

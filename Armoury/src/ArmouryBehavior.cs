@@ -832,6 +832,8 @@ namespace Armoury
             CampaignEvents.ArmyDispersed.AddNonSerializedListener(this, SiegeWalls.OnArmyDispersed);
             CampaignEvents.SiegeEngineBuiltEvent.AddNonSerializedListener(this, SiegeWalls.OnEngineBuilt);
             CampaignEvents.OnSiegeBombardmentWallHitEvent.AddNonSerializedListener(this, SiegeWalls.OnWallHit);
+            // oblezenia 3 (W, SiegeWalls2.Oblezenia3.cs): trafienia trebuszy obozow AI w machiny obroncow - przy stojacym murze i po rozbiciu murow (licznik linii "Oblezenia 3 (doba)")
+            CampaignEvents.OnSiegeBombardmentHitEvent.AddNonSerializedListener(this, SiegeWalls2.OnBombardHit);
             // oblezenia 2 (SiegeWalls2.cs): trebusze AI zniszczone przez obroncow (licznik linii "Oblezenia 2 (doba)")
             CampaignEvents.OnSiegeEngineDestroyedEvent.AddNonSerializedListener(this, SiegeWalls2.OnEngineDestroyed);
             // przeglad 175 (tylko log): przecieki wolnych koni zbrojowni - jezdzcy zostawieni w zalodze i dezerterzy; stare zbrojownie (T2) w 1. godzinie
