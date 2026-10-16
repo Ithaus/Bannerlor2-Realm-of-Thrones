@@ -252,6 +252,12 @@ namespace Armoury
         public float HideoutReprisalHours = 48f;           // the horde hunts you this long - then gives up and drifts back to its old ways
         // E7/C (227, PLAN 7.1, R4): jedna skala czasu - rozkaz pogoni odwetu odnawiany na zegarze gry (HideoutPurge.PursuitDue), nie co 3 s realne
         public float HideoutPursuitHours = 0.5f;           // a reprisal band renews its chase every this many game hours, whatever the game speed (0 = the old every three real seconds)
+        // nskarbiec (Jeff 15.10 16:05 "zloto bandytow / skarbiec kryjowki - TAK"; DECYZJA CLAUDE noc 15/16.10): skarbiec kryjowki = kasa kryjowki gry
+        // (SettlementComponent.Gold) - dola dzienna band (OutlawLaw.StashDay), wyplata zwyciezcy AI (HideoutPurge.AiCleared), komunikaty o zlocie (BeatenPurse/HideoutPurge)
+        public bool HideoutDailyStash = true;              // every day a band with a home hideout carries part of its purse back to the den's hoard - outlaws keep their coin at home, so a band beaten in the field carries only its pocket money and a cleared, searched den pays (off = coin is put by only on the rare visits home, as before)
+        public float HideoutDailyStashShare = 0.25f;       // with Hideout Daily Stash: share of its purse, after the day's living, a band carries home each day
+        public bool HideoutHoardToAiVictor = true;         // a hideout cleared without you: its hoard goes to the victor - the lord's purse, else the party's purse, else the nearest town (off = it stays in the empty den and leaks to the nearest town, as before)
+        public bool HideoutGoldMessages = true;            // after a hideout fight you are told what coin the bands carried, after the search what the den held - also when there was nothing (off = only the old message when gold is found)
 
         // --- Loot from the field ---
         public bool LootArrivesWorn = true;                // gear stripped from the fallen comes to you already used

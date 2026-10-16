@@ -61,6 +61,8 @@ namespace Armoury
     /// startowa (zamiast z niczego), bandy kryjowki siegaja po to, gdy brakuje im na sprzet, a reszta idzie co dobe na
     /// zycie w miescie. Skarbiec (HideoutGoldBase + HideoutGoldPerBand x bandy kryjowki) zostaje - HideoutPurge wyplaca
     /// kase temu, kto kryjowke przetrzebi i przeszuka. Bandy tez zyja: co dobe wydaja czesc kiesy w najblizszym otwartym miescie.
+    /// nskarbiec (noc 15/16.10): wplata przy wejsciu byla rzadka (gra rzadko odsyla bande do domu) - teraz kazda banda z kryjowka odnosi co dobe
+    /// HideoutDailyStashShare kiesy do jej kasy (StashDay); kryjowke oczyszczona bez gracza oproznia zwyciezca (HideoutPurge.AiCleared).
     /// </summary>
     internal static class OutlawLaw
     {
@@ -125,6 +127,16 @@ namespace Armoury
         private static int _lifeStumbles, _upStumbles;
         // kryjowka -> skarbiec, ktory w niej zostaje (HideoutGoldBase + HideoutGoldPerBand x bandy tej kryjowki); liczony raz na dobe
         private static readonly Dictionary<Settlement, int> _hoardKeep = new Dictionary<Settlement, int>();
+        // nskarbiec (noc 15/16.10): skarbiec kryjowki - licznik dnia linii "Skarbce kryjowek (nskarbiec)". Dola dzienna band (StashDay): bandy aktywne
+        // i z kryjowka, ktore dola objela, pominiete wedlug przyczyny; kiesy przed dola i sama dola. Wyplaty kas kryjowek: herszt BK (TakeHoardSurplus),
+        // przeszukanie gracza i zwyciezca AI (HoardTakeAll). _hoardNet = suma NASZYCH zmian kas kryjowek (HoardChange + wplata przy wejsciu) - kontrola k
+        private static int _stashBands, _stashAll, _stashHome, _stashSkipBattle, _stashSkipQuest, _stashSkipUndead, _stashSkipHeld, _stashSkipEmpty, _stashSkipSmall, _stashInTick;
+        private static int _paySearchN, _payAiN, _aiHideBattles, _aiHideCleared, _carryN, _searchMsgN, _hoardStumbles;
+        private static long _stashPurse, _stashDaily, _hoardBk, _paySearch, _payAi, _payAiLord, _payAiParty, _payAiTown, _hoardNet, _carryGold;
+        // pola sesji: stan kas kryjowek przy poprzedniej linii (-1 = pierwsza doba po wczytaniu - bez kontroli r), potkniecia od startu sesji, miejsca ERROR (raz na miejsce)
+        private static long _hoardLastSum = -1;
+        private static int _hoardSessStumbles;
+        private static readonly HashSet<string> _hoardErrSites = new HashSet<string>();
         // zywnosc z niczego (licznik dnia): ilu nowym bandom gra chciala ja dac; ile sztuk dosypanych bandom w bitwie zdjelismy
         private static int _foodBands, _foodTaken;
         private static bool _errSell, _errHide, _errFenceLog, _errLife, _errStart, _errFood, _errUpgrade;
@@ -143,6 +155,7 @@ namespace Armoury
             PoolNewDay(); _pLast = -1;
             _warHome.Clear();
             _watchKey.Clear();                                         // E4/9: pamiec kluczy puli Strazy
+            _hoardLastSum = -1; _hoardSessStumbles = 0; _hoardErrSites.Clear();   // nskarbiec: stan kas kryjowek i potkniecia tylko z tej kampanii (liczniki dnia - FenceNewDay wyzej)
         }
 
         private static void PoolNewDay()
@@ -164,6 +177,10 @@ namespace Armoury
             _hideEntries = _hideStumbles = 0; _hideBand = _hideHoard = _hideStash = 0;
             _hoardStart = _hoardStartWant = _startNothing = _hoardGear = _lifeBands = _lifeHoards = _goneFought = _goneDisbanded = 0; _lifeStumbles = _upStumbles = 0;
             _foodBands = _foodTaken = 0;
+            // nskarbiec: licznik dnia linii "Skarbce kryjowek (nskarbiec)" (linia biegnie tuz przed FenceLog, ktory zeruje w finally)
+            _stashBands = _stashAll = _stashHome = _stashSkipBattle = _stashSkipQuest = _stashSkipUndead = _stashSkipHeld = _stashSkipEmpty = _stashSkipSmall = _stashInTick = 0;
+            _paySearchN = _payAiN = _aiHideBattles = _aiHideCleared = _carryN = _searchMsgN = _hoardStumbles = 0;
+            _stashPurse = _stashDaily = _hoardBk = _paySearch = _payAi = _payAiLord = _payAiParty = _payAiTown = _hoardNet = _carryGold = 0;
         }
 
         // ------------------------------------------------------------ geografia
@@ -1205,6 +1222,7 @@ namespace Armoury
                 // Bez kiesy banda nie ma dokad wziac zaplaty; partii zajetej przez zadanie nie ruszamy; trup nie handluje.
                 MoneyLedger.Mark(MoneyLedger.MRest);          // ksiega przeplywow osad (tylko log): to, co zmienilo kasy dotad, to nie bandy
                 LifeDay(s);
+                StashDay(s);                                  // nskarbiec: dola dzienna band do kryjowek - po zyciu (dzisiejsza wplata nie idzie dzis na zycie); kryjowki nie sa w migawkach Mark
                 MoneyLedger.Mark(MoneyLedger.MLife);          // ... zmiana kas od poprzedniej migawki to wydatki band i kryjowek na zycie
                 float fenceShare = MBMath.ClampFloat(s.OutlawFenceLootShare, 0f, 1f);
                 if (s.OutlawFenceBuysLoot && fenceShare > 0f)
@@ -1255,6 +1273,7 @@ namespace Armoury
                          + " | hearth za tych ludzi (E4/3, PeopleBook.Move): rabunki (przy spustoszeniu E4/5 hearth w ksiedze: spustoszenie) -" + _hRaid.ToString("0.###", CultureInfo.InvariantCulture)
                          + ", bieda/wojna -" + _hMisery.ToString("0.###", CultureInfo.InvariantCulture) + ", powrot do wsi +" + _hReturn.ToString("0.###", CultureInfo.InvariantCulture) + ".");
                 try { Log.Info(PoolLine(s, tot)); } catch (Exception e) { Log.Error("OutlawLaw.PoolLine", e); }   // E4/3: naplyw i odplyw puli wedlug przyczyny
+                HoardLog(s);                                  // nskarbiec: linia "Skarbce kryjowek (nskarbiec)" - przed FenceLog, ktory zeruje liczniki dnia kryjowek
                 FenceLog(s, _upFence, _fenceGold);
                 H3NewDay();
                 _desUndead = 0; OverflowHome.NewDay();
@@ -1743,7 +1762,7 @@ namespace Armoury
         {
             if (hideout == null || want <= 0) return 0;
             int got = Math.Min(want, HoardSurplus(hideout));
-            if (got > 0) HoardChange(hideout, -got);
+            if (got > 0) { HoardChange(hideout, -got); _hoardBk += got; }   // nskarbiec: wyplata z kasy kryjowki do herszta BK - kategoria linii (kontrola k)
             return Math.Max(0, got);
         }
 
@@ -1788,6 +1807,187 @@ namespace Armoury
             hideout.SettlementComponent.ChangeGold(delta);
             long seen; _hoardSeen.TryGetValue(hideout, out seen);
             _hoardSeen[hideout] = seen + delta;
+            _hoardNet += delta;      // nskarbiec: suma naszych zmian kas kryjowek dnia - kontrola k linii "Skarbce kryjowek (nskarbiec)"
+        }
+
+        // ------------------------------------------------------------ nskarbiec: skarbiec kryjowki (noc 15/16.10)
+        // Jeff 15.10: "bandyci sprzedaja rzeczy - gdzie trzymaja zloto? to podstawowa logika"; 16:05 "zloto bandytow / skarbiec kryjowki - TAK".
+        // Skarbiec = kasa kryjowki gry (SettlementComponent.Gold - gra ja zapisuje, ksiega pieniadza liczy "kryjowki i inne"); bez nowego klucza zapisu.
+        // Doplyw: dola dzienna band (StashDay) i wplata przy wejsciu (HideoutGoldPostfix). Odplyw: kiesy startowe, sprzet, herszt BK, zycie w miastach
+        // (nadwyzka ponad skarbiec) oraz cala kasa temu, kto kryjowke oczysci - gracz po przeszukaniu (HideoutPurge.DoSearch), zwyciezca AI (HideoutPurge.AiCleared).
+        internal const int HoardOutSearch = 0, HoardOutAi = 1;
+        internal const int AiToLord = 0, AiToParty = 1, AiToTown = 2;
+
+        /// <summary>nskarbiec: cala kasa kryjowki dla tego, kto ja oczyscil (przelew przez HoardChange). Bierze dokladnie Gold - nigdy wiecej (ChangeGold
+        /// przycina do 0, wiec zdjecie ponad stan daloby odbiorcy zloto z niczego). Zwraca zdjeta kwote; odbiorca dopisuje ja sam.</summary>
+        internal static int HoardTakeAll(Settlement hideout, int kind)
+        {
+            var comp = hideout != null ? hideout.SettlementComponent : null;
+            if (comp == null) return 0;
+            int g = Math.Max(0, comp.Gold);
+            if (g > 0) HoardChange(hideout, -g);
+            if (kind == HoardOutAi) { _payAi += g; _payAiN++; }
+            else { _paySearch += g; _paySearchN++; }
+            return g;
+        }
+
+        /// <summary>nskarbiec: bitwa w kryjowce bez gracza (HideoutPurge.AiCleared) - licznik linii doby.</summary>
+        internal static void NoteAiHideBattle(bool cleared) { _aiHideBattles++; if (cleared) _aiHideCleared++; }
+
+        /// <summary>nskarbiec: komu zwyciezca AI oddal skarbiec (AiToLord / AiToParty / AiToTown) - licznik linii doby.</summary>
+        internal static void NoteAiTo(int who, int g)
+        {
+            if (g <= 0) return;
+            if (who == AiToLord) _payAiLord += g; else if (who == AiToParty) _payAiParty += g; else _payAiTown += g;
+        }
+
+        /// <summary>nskarbiec: komunikat po bitwie gracza w kryjowce (BeatenPurse.HideoutCarry) - ile kies band dostal gracz.</summary>
+        internal static void NoteCarry(long g) { _carryN++; _carryGold += Math.Max(0, g); }
+
+        /// <summary>nskarbiec: komunikat po przeszukaniu kryjowki (HideoutPurge.DoSearch).</summary>
+        internal static void NoteSearchMsg() { _searchMsgN++; }
+
+        /// <summary>nskarbiec: potkniecie (wyjatek zlapany na jednym obiekcie albo zdarzeniu) - liczone zawsze, ERROR do pliku raz na miejsce; mechanizmu nie gasimy.</summary>
+        internal static void HoardStumble(string where, Exception e)
+        {
+            _hoardStumbles++; _hoardSessStumbles++;
+            try { if (where != null && e != null && _hoardErrSites.Add(where)) Log.Error(where, e); } catch { }
+        }
+
+        /// <summary>nskarbiec: najblizsze nieoblezone miasto (odbiorca skarbca, gdy zwyciezca AI nie moze wziac monety).</summary>
+        internal static Settlement NearestTownOf(Vec2 pos) { return NearestOpenTown(pos); }
+
+        /// <summary>
+        /// nskarbiec: DOLA DZIENNA - raz na dobe, po zyciu band i kryjowek (LifeDay), przed skupem: kazda banda, ktora ma kryjowke, odnosi do jej kasy
+        /// HideoutDailyStashShare kiesy (w dol do zlotowki). Przelew kiesa bandy -> kasa jej kryjowki (HoardChange), bez promienia - 100% band z kryjowka.
+        /// Poza dola (jak w LifeDay i u pasera): banda w bitwie, zajeta przez zadanie, nieumarli; kryjowka, ktorej kasa czeka na przeszukanie przez gracza
+        /// (kasy czekajacej nikt nie rusza). Dola nie biegnie w srodku dziennego ticku gry (migawka kies GoldPrefix/GoldPostfix cofnelaby przelew z kiesy).
+        /// </summary>
+        private static void StashDay(Settings s)
+        {
+            if (s == null) return;
+            if (_goldTick) { _stashInTick++; return; }      // straz migawki kies gry: przy dobrej kolejnosci zawsze 0
+            double share = s.HideoutDailyStash ? MBMath.ClampFloat(s.HideoutDailyStashShare, 0f, 1f) : 0.0;
+            List<MobileParty> list;
+            try { list = MobileParty.AllBanditParties.ToList(); }
+            catch (Exception e) { HoardStumble("OutlawLaw.StashDay(lista)", e); return; }   // wyjatek nie moze zatrzymac reszty doby (skup, linie)
+            foreach (var p in list)
+            {
+                try
+                {
+                    if (p == null || !p.IsActive) continue;
+                    _stashAll++;
+                    if (!p.IsPartyTradeActive) continue;
+                    var home = HomeHideout(p);
+                    if (home == null || home.SettlementComponent == null) continue;
+                    _stashHome++;
+                    if (share <= 0.0) continue;                      // klucz wylaczony albo udzial 0 - tylko licznik band z kryjowka (jak dotad)
+                    if (p.MapEvent != null) { _stashSkipBattle++; continue; }
+                    if (p.IsCurrentlyUsedByAQuest) { _stashSkipQuest++; continue; }
+                    if (Undead.Party(p)) { _stashSkipUndead++; continue; }
+                    if (HideoutPurge.Holds(home)) { _stashSkipHeld++; continue; }
+                    int purse = p.PartyTradeGold;
+                    if (purse <= 0) { _stashSkipEmpty++; continue; }
+                    _stashPurse += purse;
+                    int put = (int)(purse * share);
+                    if (put <= 0) { _stashSkipSmall++; continue; }   // kiesa ponizej zlotowki doli - zostaje w kiesie
+                    p.PartyTradeGold = purse - put;
+                    HoardChange(home, put);
+                    _stashDaily += put; _stashBands++;
+                }
+                catch (Exception e) { HoardStumble("OutlawLaw.StashDay", e); }
+            }
+        }
+
+        /// <summary>
+        /// nskarbiec: linia "Skarbce kryjowek (nskarbiec): dzien" - raz na dobe, tuz przed linia "Paser:" (FenceLog zeruje liczniki dnia w finally).
+        /// Wplaty (dola, wejscia), wyplaty wedlug odbiorcy, stan kas kryjowek wczoraj i dzis, kontrola k = (wplaty - wyplaty) - suma naszych zmian kas
+        /// (kazda zmiana ma kategorie; oczekiwane 0) i r = zmiana stanu - (wplaty - wyplaty) - dosypka gry przy otwartym kurku (zmiany kas spoza naszych
+        /// kategorii: okup gracza do kryjowki, gra, inny mod; dzis 0). Niczego nie zmienia.
+        /// </summary>
+        private static void HoardLog(Settings s)
+        {
+            try
+            {
+                var inv = CultureInfo.InvariantCulture;
+                long sum = 0, withBandsGold = 0, abandonedGold = 0, keepSum = 0, max = -1;
+                int all = 0, withGold = 0, withBands = 0, full = 0, abandoned = 0;
+                string maxName = "-";
+                foreach (var h in Hideout.All)
+                {
+                    try
+                    {
+                        if (h == null || h.Settlement == null) continue;
+                        all++;
+                        int g = h.Gold;
+                        sum += g;
+                        if (g > 0) withGold++;
+                        if (g > max) { max = g; maxName = (h.Settlement.Name != null ? h.Settlement.Name.ToString() : "?") + " " + h.Settlement.StringId; }
+                        int keep;
+                        if (_hoardKeep.TryGetValue(h.Settlement, out keep) && keep > 0) { withBands++; withBandsGold += g; if (g >= keep) full++; }
+                        else if (g > 0) { abandoned++; abandonedGold += g; }
+                    }
+                    catch (Exception e) { HoardStumble("OutlawLaw.HoardLog(kryjowka)", e); }
+                }
+                foreach (var kv in _hoardKeep) keepSum += kv.Value;
+                long inn = _stashDaily + _hideStash;
+                long outw = _hoardStart + _hoardGear + _hoardBk + _lifeHoards + _paySearch + _payAi;
+                long k = (inn - outw) - _hoardNet;
+                long gameAdd = s.OutlawNoHideoutGold ? 0 : _hideHoard;
+                string r = _hoardLastSum < 0 ? "-" : ((sum - _hoardLastSum) - (inn - outw) - gameAdd).ToString(inv);
+                bool on = s.HideoutDailyStash;
+                double share = MBMath.ClampFloat(s.HideoutDailyStashShare, 0f, 1f);
+                var sb = new StringBuilder("Skarbce kryjowek (nskarbiec): dzien ").Append((int)CampaignTime.Now.ToDays);
+                if (on) sb.Append(" | dola tak (udzial ").Append(share.ToString("0.00", inv)).Append(" kiesy po dniu zycia)");
+                else sb.Append(" | dola NIE (wylaczona - jak dotad)");
+                sb.Append(" | band z kryjowka ").Append(_stashHome).Append(" z ").Append(_stashAll).Append(", dola dalo ").Append(_stashBands)
+                  .Append(" (pominiete: bitwa ").Append(_stashSkipBattle).Append(", zadanie ").Append(_stashSkipQuest).Append(", nieumarli ").Append(_stashSkipUndead)
+                  .Append(", czeka na przeszukanie ").Append(_stashSkipHeld).Append(", pusta kiesa ").Append(_stashSkipEmpty).Append(", kiesa ponizej zlotowki doli ").Append(_stashSkipSmall)
+                  .Append(", w ticku gry ").Append(_stashInTick).Append(")")
+                  .Append(" | kiesy band z kryjowka przed dola ").Append(_stashPurse).Append(" zl, dola ").Append(_stashDaily).Append(" zl")
+                  .Append(" | wplaty ").Append(inn).Append(" zl (dola ").Append(_stashDaily).Append(", wejscia do kryjowek ").Append(_hideStash).Append(")")
+                  .Append(" | wyplaty ").Append(outw).Append(" zl (kiesy startowe ").Append(_hoardStart).Append(", sprzet ").Append(_hoardGear).Append(", herszt BK ").Append(_hoardBk)
+                  .Append(", zycie w miastach ").Append(_lifeHoards).Append(", przeszukanie gracza ").Append(_paySearch).Append(" w ").Append(_paySearchN)
+                  .Append(", zwyciezca AI ").Append(_payAi).Append(" w ").Append(_payAiN).Append(": wodzom ").Append(_payAiLord).Append(", partiom ").Append(_payAiParty)
+                  .Append(", miastom ").Append(_payAiTown).Append(")")
+                  .Append(" | stan wczoraj ").Append(_hoardLastSum < 0 ? "-" : _hoardLastSum.ToString(inv)).Append(" zl, dzis ").Append(sum).Append(" zl w ").Append(withGold)
+                  .Append(" kryjowkach z kasa z ").Append(all).Append(" (z bandami ").Append(withBands).Append(": kasa ").Append(withBandsGold).Append(" zl, z kasa co najmniej skarbiec ").Append(full)
+                  .Append("; opuszczone z kasa ").Append(abandoned).Append(": ").Append(abandonedGold).Append(" zl), skarbce razem do ").Append(keepSum)
+                  .Append(" zl, najwieksza ").Append(Math.Max(0, max)).Append(" zl (").Append(maxName).Append(")")
+                  .Append(" | kontrola: k ").Append(k).Append(", r ").Append(r)
+                  .Append(s.OutlawNoHideoutGold ? "" : " (kurek kryjowek otwarty - dosypka gry " + gameAdd + " zl poza r)")
+                  .Append(" | bitwy w kryjowkach bez gracza ").Append(_aiHideBattles).Append(" (oczyszczone ").Append(_aiHideCleared).Append(")")
+                  .Append(" | komunikaty: po bitwie ").Append(_carryN).Append(" (kiesy ").Append(_carryGold).Append(" zl), po przeszukaniu ").Append(_searchMsgN)
+                  .Append(" | potkniecia ").Append(_hoardStumbles).Append(" (sesja ").Append(_hoardSessStumbles).Append(").");
+                Log.Info(sb.ToString());
+                _hoardLastSum = sum;
+            }
+            catch (Exception e) { _hoardLastSum = -1; HoardStumble("OutlawLaw.HoardLog", e); }
+        }
+
+        /// <summary>nskarbiec: linia startu sesji (HideoutPurge.LogClock, OnSessionLaunched) - klucze, kryjowki z kasa, bandy z kryjowka.</summary>
+        internal static string HoardStartLine()
+        {
+            var s = Settings.Current;
+            var inv = CultureInfo.InvariantCulture;
+            int all = 0, withGold = 0, bands = 0, home = 0;
+            long gold = 0;
+            foreach (var h in Hideout.All)
+            {
+                if (h == null || h.Settlement == null) continue;
+                all++;
+                if (h.Gold > 0) { withGold++; gold += h.Gold; }
+            }
+            foreach (var p in MobileParty.AllBanditParties)
+            {
+                if (p == null || !p.IsActive) continue;
+                bands++;
+                if (HomeHideout(p) != null) home++;
+            }
+            return "Skarbce kryjowek (nskarbiec): start sesji | klucze: Hideout Daily Stash " + (s.HideoutDailyStash ? "tak" : "NIE")
+                   + " (udzial " + MBMath.ClampFloat(s.HideoutDailyStashShare, 0f, 1f).ToString("0.00", inv) + "), Hideout Hoard To Ai Victor " + (s.HideoutHoardToAiVictor ? "tak" : "NIE")
+                   + ", Hideout Gold Messages " + (s.HideoutGoldMessages ? "tak" : "NIE") + " | prawo wyrzutkow " + (s.OutlawLawEnabled ? "tak" : "NIE - dola nie biegnie (OutlawLaw.Daily)")
+                   + " | kryjowek " + all + ", z kasa " + withGold + " (" + gold + " zl) | band z kryjowka " + home + " z " + bands + ".";
         }
 
         private static ItemObject Find(ItemRoster r, Func<ItemObject, bool> ok)
@@ -2304,9 +2504,12 @@ namespace Armoury
                     sb.Append(", zloto z niczego zablokowane - bandom ").Append(_hideBand).Append(" zl, kryjowkom ").Append(_hideHoard).Append(" zl");
                 else
                     sb.Append(", KUREK OTWARTY w ustawieniach - gra dopisala z niczego bandom ").Append(_hideBand).Append(" zl, kryjowkom ").Append(_hideHoard).Append(" zl");
-                sb.Append("; kasy kryjowek: doplyw ").Append(_hideStash).Append(" zl (bandy odlozyly z wlasnych kies), odplyw ").Append(_hoardStart + _hoardGear + _lifeHoards)
+                // nskarbiec: doplyw z dola dzienna (StashDay), odplyw z hersztem BK (TakeHoardSurplus), przeszukaniem gracza i zwyciezca AI (HoardTakeAll) - stan(d) - stan(d-1) = doplyw - odplyw
+                sb.Append("; kasy kryjowek: doplyw ").Append(_hideStash + _stashDaily).Append(" zl (bandy odlozyly z wlasnych kies - przy wejsciu ").Append(_hideStash)
+                  .Append(", dola dzienna ").Append(_stashDaily).Append("), odplyw ").Append(_hoardStart + _hoardGear + _lifeHoards + _hoardBk + _paySearch + _payAi)
                   .Append(" zl (kiesy startowe nowych band ").Append(_hoardStart).Append(" z ").Append(_hoardStartWant).Append(" zl, na ktore liczyly; sprzet ").Append(_hoardGear)
-                  .Append("; zycie w miastach ").Append(_lifeHoards).Append("); stan ").Append(hoards).Append(" zl w ").Append(hoardN).Append(" kryjowkach, najwieksza ").Append(hoardMax)
+                  .Append("; zycie w miastach ").Append(_lifeHoards).Append("; herszt BK ").Append(_hoardBk).Append("; przeszukanie gracza ").Append(_paySearch)
+                  .Append("; zwyciezca AI ").Append(_payAi).Append("); stan ").Append(hoards).Append(" zl w ").Append(hoardN).Append(" kryjowkach, najwieksza ").Append(hoardMax)
                   .Append(" zl, skarbce (to, co zostaje dla zdobywcy) razem do ").Append(keepSum).Append(" zl");
                 if (!s.OutlawHoardCirculates) sb.Append("; OBIEG KAS WYLACZONY - kiesy startowe z niczego: ").Append(_startNothing).Append(" zl");
                 sb.Append(" | zywnosc z niczego: ");
@@ -2387,6 +2590,7 @@ namespace Armoury
                 comp.ChangeGold(put);
                 _hoardSeen[__1] = seen + put;
                 _hideStash += put;
+                _hoardNet += put;    // nskarbiec: nasza zmiana kasy kryjowki poza HoardChange - kontrola k
                 // wejscie w srodku dziennego ticku gry (w praktyce: banda urodzona w tym ticku, dopisana do migawki przez StartGoldPostfix):
                 // GoldPostfix przywraca kiesy z migawki - wplata nie moze wrocic do bandy
                 if (_gold.TryGetValue(__0, out snap)) _gold[__0] = Math.Max(0, snap - put);

@@ -274,6 +274,8 @@ RANGES = {
     # PROJEKT-LENNA (14.10): punkty zdobywcy i zapas pulapu ponad przydzial - kod przycina do 0..200 i 0..10 (FiefGrants.ConquerorBonus / CapExtra)
     'FairFiefConquerorBonus': (0, 200, "0"),
     'FairFiefCapExtra': (0, 10, "0"),
+    # nskarbiec (noc 15/16.10): udzial kiesy odnoszony codziennie do kryjowki - kod przycina do 0..1 (OutlawLaw.StashDay)
+    'HideoutDailyStashShare': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

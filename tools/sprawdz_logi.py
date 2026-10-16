@@ -667,6 +667,13 @@ Uzycie (Python 3, tylko odczyt):
                     KR2-2 potkniecia i ERROR 0, KR2-3 ksiega (kontrola dlugu |r| <= 1, skarbiec po pozyczce nie ponad zapas wojny, Obieg = linia), KR2-4 dlug / limit
                     <= 1.05 i dlug <= 5% zlota swiata, KR2-5 udzial koron >= 18% (28 dob, bieg >= 182), KR2-6 pozyczki i splaty (INFO), KR2-7 czesc korony do
                     zapasu (INFO), KR2-8 przebieg (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa nskarbiec : (noc 15/16.10, Jeff 15.10 "zloto bandytow / skarbiec kryjowki - TAK"; galaz w-toku/noc-skarbiec, OutlawLaw.StashDay/HoardLog,
+                    HideoutPurge.AiCleared/DoSearch, BeatenPurse.HideoutCarry) python -I tools/sprawdz_logi.py --grupa nskarbiec [--baza-doby <log Armoury bazy>]
+                    <Armoury-*.log> (strumieniowo). Skarbiec kryjowki = kasa kryjowki gry: NK-0 linia startu (klucze tak), NK-1 linia doby w kazdej dobie z linia
+                    Paser, NK-2 potkniecia i ERROR 0, NK-3 dola dzienna (kazda doba z kiesami daje dole, dola / kiesy w [udzial - 0.02, udzial], w ticku gry 0),
+                    NK-4 kontrola k = 0 (twardy), NK-5 kontrola r = 0 (twardy), NK-6 od doby 28 kryjowki z bandami z kasa >= skarbiec srednio >= 0.5 (P),
+                    NK-7 stan kas (INFO), NK-8 kiesy startowe z kas kryjowek (INFO, wobec bazy), NK-9 zdarzenia: przeszukanie, bitwa gracza, zwyciezca AI (INFO),
+                    NK-10 Pieniadz swiata - bandy i kryjowki (INFO), NK-11 linia Paser: stan = doplyw - odplyw (twardy). Log bez paczki: INFO, bez wyjatku.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -27232,6 +27239,252 @@ def korona2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nskarbiec (noc 15/16.10, Jeff 15.10 16:05 "zloto bandytow / skarbiec kryjowki - TAK"; Armoury/src/OutlawLaw.cs StashDay/HoardLog, HideoutPurge.cs AiCleared/DoSearch, BeatenPurse.cs HideoutCarry)
+NS_HEAD = "Skarbce kryjowek (nskarbiec): "
+NS_SHARE = re.compile(r"\| dola tak \(udzial ([\d.]+) kiesy")
+NS_BANDS = re.compile(r"\| band z kryjowka (\d+) z (\d+), dola dalo (\d+) \(pominiete: bitwa (\d+), zadanie (\d+), nieumarli (\d+), czeka na przeszukanie (\d+), "
+                      r"pusta kiesa (\d+), kiesa ponizej zlotowki doli (\d+), w ticku gry (\d+)\)")
+NS_PURSE = re.compile(r"\| kiesy band z kryjowka przed dola (\d+) zl, dola (\d+) zl")
+NS_IN = re.compile(r"\| wplaty (\d+) zl \(dola (\d+), wejscia do kryjowek (\d+)\)")
+NS_OUT = re.compile(r"\| wyplaty (\d+) zl \(kiesy startowe (\d+), sprzet (\d+), herszt BK (\d+), zycie w miastach (\d+), przeszukanie gracza (\d+) w (\d+), "
+                    r"zwyciezca AI (\d+) w (\d+): wodzom (\d+), partiom (\d+), miastom (\d+)\)")
+NS_STATE = re.compile(r"\| stan wczoraj (-|\d+) zl, dzis (\d+) zl w (\d+) kryjowkach z kasa z (\d+) \(z bandami (\d+): kasa (\d+) zl, z kasa co najmniej skarbiec (\d+); "
+                      r"opuszczone z kasa (\d+): (\d+) zl\), skarbce razem do (\d+) zl, najwieksza (\d+) zl")
+NS_CTL = re.compile(r"\| kontrola: k (-?\d+), r (-?\d+|-)")
+NS_AI = re.compile(r"\| bitwy w kryjowkach bez gracza (\d+) \(oczyszczone (\d+)\)")
+NS_MSG = re.compile(r"\| komunikaty: po bitwie (\d+) \(kiesy (\d+) zl\), po przeszukaniu (\d+)")
+NS_STUM = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.?$")
+NS_ERR = ("ERROR in OutlawLaw.StashDay", "ERROR in OutlawLaw.HoardLog", "ERROR in HideoutPurge.AiCleared", "ERROR in HideoutPurge.DoSearch(komunikat)",
+          "ERROR in HideoutPurge.HoardStart", "ERROR in BeatenPurse.HideoutCarry")
+# linia "Paser:" - kasy kryjowek (stary i nowy tekst): doplyw, odplyw, kiesy startowe nowych band X z Y, stan
+NS_PASER = re.compile(r"kasy kryjowek: doplyw (\d+) zl .*?odplyw (\d+) zl \(kiesy startowe nowych band (\d+) z (\d+) zl.*?; stan (\d+) zl w (\d+) kryjowkach")
+NS_PSW = (re.compile(r"\| razem (\d+) "), re.compile(r"kryjowki i inne (\d+) "), re.compile(r", bandy (\d+) \("))
+NS_EV_SEARCH = re.compile(r"przeszukanie .*? - skarbiec (\d+) zl do gracza")
+NS_EV_CARRY = re.compile(r"kiesy band do gracza (\d+) zl")
+NS_EV_AI = re.compile(r"- skarbiec (\d+) zl -> (wodz|partia|miasto|nic)")
+NS_HP_SEARCH = re.compile(r"^HideoutPurge: przeszukano .* - zloto (\d+),")
+
+
+def nskarbiec_paser(path):
+    """Linie "Paser:" logu -> {doba: ((doplyw, odplyw, kiesy startowe dane, chciane, stan, kryjowek z kasa) albo None, kurek otwarty)} (strumieniowo)."""
+    out = {}
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if not s.startswith("Paser: dzien "):
+                continue
+            d = num(r"Paser: dzien (\d+)", s)
+            if d is None:
+                continue
+            mm = NS_PASER.search(s)
+            out[d] = (tuple(int(x) for x in mm.groups()) if mm else None, "KUREK OTWARTY" in s)
+    return out
+
+
+def nskarbiec_main(logp, bdp=None):
+    """nskarbiec (noc 15/16.10, Jeff 15.10 "zloto bandytow / skarbiec kryjowki - TAK"): skarbiec kryjowki = kasa kryjowki gry. Wejscie: log Armoury (strumieniowo),
+    opcjonalnie --baza-doby <log Armoury bazy> (NK-8). NK-0 linia startu (klucze tak), NK-1 linia doby w kazdej dobie z linia "Paser:", NK-2 potkniecia
+    i ERROR 0, NK-3 dola dzienna (kazda doba z kiesami band z kryjowka daje dole, dola / kiesy w [udzial - 0.02, udzial], w ticku gry 0), NK-4 kontrola k = 0
+    (twardy - kazda nasza zmiana kas kryjowek ma kategorie), NK-5 kontrola r = 0 w kazdej dobie ze "stan wczoraj" (twardy - zmiany kas spoza naszych
+    kategorii), NK-6 od doby 28 biegu kryjowki z bandami z kasa >= skarbiec srednio >= 0.5 (P - pierwszy prog), NK-7 stan kas kryjowek (INFO), NK-8 kiesy
+    startowe nowych band z kas kryjowek, ostatnie 28 dob (INFO, wobec bazy), NK-9 zdarzenia gry gracza i AI (INFO), NK-10 "Pieniadz swiata" - bandy maleja,
+    kryjowki rosna, suma bez skoku (INFO), NK-11 linia "Paser:" - stan(d) - stan(d-1) = doplyw - odplyw (twardy; kurek kryjowek otwarty - INFO).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NK-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, psw, errs = [], {}, {}, 0
+    ev_search, ev_carry, ev_ai, hp_search = [], [], [], []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NS_HEAD):
+                rest = s[len(NS_HEAD):]
+                if rest.startswith("start sesji"):
+                    starts.append(s)
+                elif rest.startswith("dzien "):
+                    d = num(r"dzien (\d+)", rest)
+                    if d is not None:
+                        days[d] = s
+                elif rest.startswith("przeszukanie "):
+                    ev_search.append(s)
+                elif rest.startswith("bitwa gracza w kryjowce "):
+                    ev_carry.append(s)
+                elif rest.startswith("kryjowka "):
+                    ev_ai.append(s)
+            elif s.startswith("Pieniadz swiata: dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    psw[d] = tuple((int(p.search(s).group(1)) if p.search(s) else None) for p in NS_PSW)
+            elif s.startswith("HideoutPurge: przeszukano "):
+                mm = NS_HP_SEARCH.match(s)
+                if mm:
+                    hp_search.append(int(mm.group(1)))
+            elif s.startswith(NS_ERR):
+                errs += 1
+    paser = nskarbiec_paser(logp)
+    print(f"plik: {logp} | linii startu {len(starts)}, linii doby {len(days)}, linii Paser {len(paser)}, zdarzen: przeszukania {len(ev_search)}, "
+          f"po bitwie {len(ev_carry)}, zwyciezca AI {len(ev_ai)}")
+    if not starts and not days:
+        rep.add("NK-0: linia startu (skarbiec kryjowki)", "brak linii", "INFO (wersja sprzed nskarbiec)", None)
+        rep.show()
+        return 0
+    # NK-0 start
+    st = starts[-1] if starts else ""
+    keys = ("Hideout Daily Stash tak", "Hideout Hoard To Ai Victor tak", "Hideout Gold Messages tak")
+    rep.add("NK-0: linia startu (klucze skarbca kryjowki)", st[len(NS_HEAD):][:300] if st else "brak linii startu (sa linie doby)",
+            "linia jest, klucze tak", all(k in st for k in keys) if st else None)
+    # NK-1 linia doby w kazdej dobie z linia Paser
+    pd = sorted(paser)
+    miss = [d for d in pd if d not in days and d != pd[0]]
+    rep.add("NK-1: linia doby w kazdej dobie z linia Paser", f"dob z linia {len(days)}, dob Paser {len(pd)}, brak w {len(miss)}" + (f" (np. {miss[:5]})" if miss else ""),
+            "0 brakow (poza pierwsza doba logu)", len(miss) == 0 and len(days) > 0)
+    # NK-2 potkniecia
+    stum = 0
+    for s in days.values():
+        mm = NS_STUM.search(s)
+        if mm:
+            stum += int(mm.group(1))
+    rep.add("NK-2: potkniecia skarbca / ERROR (StashDay, HoardLog, AiCleared, DoSearch, HoardStart, HideoutCarry)", f"potkniecia {stum}, ERROR {errs}", "0 / 0",
+            stum == 0 and errs == 0)
+    # liczby doby
+    rows = {}
+    for d, s in sorted(days.items()):
+        a, p, i_, o, t, c = NS_BANDS.search(s), NS_PURSE.search(s), NS_IN.search(s), NS_OUT.search(s), NS_STATE.search(s), NS_CTL.search(s)
+        if not (a and p and i_ and o and t and c):
+            continue
+        ai, mg, sh = NS_AI.search(s), NS_MSG.search(s), NS_SHARE.search(s)
+        rows[d] = dict(on="| dola tak" in s, share=float(sh.group(1)) if sh else None,
+                       home=int(a.group(1)), all=int(a.group(2)), gave=int(a.group(3)), held=int(a.group(7)), tick=int(a.group(10)),
+                       purse=int(p.group(1)), dola=int(p.group(2)), inn=int(i_.group(1)), ent=int(i_.group(3)),
+                       out=int(o.group(1)), start=int(o.group(2)), gear=int(o.group(3)), bk=int(o.group(4)), life=int(o.group(5)),
+                       srch=int(o.group(6)), srchN=int(o.group(7)), ai=int(o.group(8)), aiN=int(o.group(9)),
+                       aiL=int(o.group(10)), aiP=int(o.group(11)), aiT=int(o.group(12)),
+                       y0=None if t.group(1) == "-" else int(t.group(1)), y1=int(t.group(2)), hg=int(t.group(3)), hall=int(t.group(4)),
+                       h2=int(t.group(5)), z=int(t.group(6)), h3=int(t.group(7)), h4=int(t.group(8)), u=int(t.group(9)), ks=int(t.group(10)), mx=int(t.group(11)),
+                       k=int(c.group(1)), r=None if c.group(2) == "-" else int(c.group(2)),
+                       aib=int(ai.group(1)) if ai else 0, aic=int(ai.group(2)) if ai else 0,
+                       m1=int(mg.group(1)) if mg else 0, cg=int(mg.group(2)) if mg else 0, m2=int(mg.group(3)) if mg else 0)
+    if not rows:
+        rep.add("NK-3..NK-11: liczby linii doby", f"linii doby {len(days)}, rozpoznanych 0", "format linii doby", False)
+        rep.show()
+        return 0
+    ds = sorted(rows)
+    d0 = ds[0]
+    span = ds[-1] - d0 + 1
+    on_ds = [d for d in ds if rows[d]["on"]]
+    # NK-3 dola dzienna
+    if on_ds:
+        share = rows[on_ds[-1]]["share"] if rows[on_ds[-1]]["share"] is not None else 0.25
+        nogive = [d for d in on_ds if rows[d]["home"] > 0 and rows[d]["purse"] > 0 and rows[d]["dola"] <= 0]
+        sp = sum(rows[d]["purse"] for d in on_ds)
+        sd = sum(rows[d]["dola"] for d in on_ds)
+        q = (sd / sp) if sp > 0 else None
+        tick = sum(rows[d]["tick"] for d in on_ds)
+        n = len(on_ds)
+        val = (f"dob {n}, bez doli przy kiesach {len(nogive)}" + (f" {nogive[:5]}" if nogive else "")
+               + (f"; dola {sd} / kiesy przed dola {sp} = {q:.4f}" if q is not None else "; kiesy przed dola 0")
+               + f"; w ticku gry {tick}; band z kryjowka srednio {sum(rows[d]['home'] for d in on_ds) / n:.0f} z {sum(rows[d]['all'] for d in on_ds) / n:.0f},"
+               + f" dola dalo srednio {sum(rows[d]['gave'] for d in on_ds) / n:.0f}, czeka na przeszukanie {sum(rows[d]['held'] for d in on_ds)}")
+        rep.add("NK-3: dola dzienna (kazda doba z kiesami daje dole, dola / kiesy, w ticku gry)", val,
+                f"0 dob bez doli; dola / kiesy w [{share - 0.02:.2f}, {share:.2f}]; w ticku gry 0",
+                len(nogive) == 0 and q is not None and (share - 0.02) <= q <= share + 1e-9 and tick == 0)
+    else:
+        rep.add("NK-3: dola dzienna", "dola wylaczona we wszystkich dobach (Hideout Daily Stash NIE)", "INFO", None)
+    # NK-4 kontrola k
+    badk = [(d, rows[d]["k"]) for d in ds if rows[d]["k"] != 0]
+    rep.add("NK-4: kontrola k (kazda nasza zmiana kas kryjowek ma kategorie)", f"dob {len(ds)}, k != 0 w {len(badk)}" + (f" {badk[:5]}" if badk else ""),
+            "0 dob (twardy)", len(badk) == 0)
+    # NK-5 kontrola r
+    rr = [d for d in ds if rows[d]["r"] is not None]
+    badr = [(d, rows[d]["r"]) for d in rr if rows[d]["r"] != 0]
+    rep.add("NK-5: kontrola r (zmiany kas kryjowek spoza naszych kategorii)",
+            f"dob ze 'stan wczoraj' {len(rr)}, r != 0 w {len(badr)}" + (f": {badr[:8]} (suma {sum(x for _, x in badr)})" if badr else ""),
+            "0 dob (twardy; r != 0 = zrodlo do rozpoznania: okup gracza do kryjowki, gra, inny mod)", (len(badr) == 0) if rr else None)
+    # NK-6 skarbce sie napelniaja
+    late = [d for d in on_ds if d - d0 + 1 >= 28 and rows[d]["h2"] > 0]
+    if late:
+        rat = [rows[d]["h3"] / rows[d]["h2"] for d in late]
+        avg = sum(rat) / len(rat)
+        L6 = rows[late[-1]]
+        rep.add("NK-6: skarbce sie napelniaja - kryjowki z bandami z kasa >= skarbiec (od doby 28 biegu)",
+                f"srednio {avg:.2f}, ostatnia doba {rat[-1]:.2f} ({L6['h3']} z {L6['h2']}), min {min(rat):.2f}; dob {len(late)}",
+                ">= 0.50 srednio (P - pierwszy prog, do korekty z pomiaru)", avg >= 0.5)
+    else:
+        rep.add("NK-6: skarbce sie napelniaja (od doby 28 biegu)", f"bieg {span} dob" + ("" if on_ds else ", dola wylaczona"), "INFO (bieg >= 28 dob z dola)", None)
+    # NK-7 stan kas kryjowek
+    def y_at(k):
+        d = d0 + k - 1
+        return rows[d]["y1"] if d in rows else None
+    path = ", ".join(f"d{k}: {y_at(k)}" for k in (1, 7, 28, 56) if y_at(k) is not None)
+    L = rows[ds[-1]]
+    rep.add("NK-7: stan kas kryjowek (INFO)",
+            f"{path}; ostatnia d{span}: {L['y1']} zl w {L['hg']} z {L['hall']} kryjowek, skarbce razem do {L['ks']}, z bandami {L['h2']} (kasa {L['z']}, z kasa >= skarbiec {L['h3']}),"
+            f" opuszczone z kasa {L['h4']} ({L['u']} zl), najwieksza {L['mx']}", "INFO", None)
+    # NK-8 kiesy startowe nowych band z kas kryjowek
+    def start28(pp):
+        kk = sorted(d for d in pp if pp[d][0])
+        if not kk:
+            return None
+        w = [d for d in kk if d > kk[-1] - 28]
+        return sum(pp[d][0][2] for d in w), sum(pp[d][0][3] for d in w), len(w)
+    s8 = start28(paser)
+    b8 = start28(nskarbiec_paser(bdp)) if bdp and os.path.isfile(bdp) else None
+    if s8:
+        val = f"{s8[0]} z {s8[1]} zl" + (f" ({100.0 * s8[0] / s8[1]:.1f}%)" if s8[1] else "") + f" w {s8[2]} dobach"
+        base = (f"baza {b8[0]} z {b8[1]} zl" + (f" ({100.0 * b8[0] / b8[1]:.1f}%)" if b8[1] else "")) if b8 else \
+            "bez bazy - przed paczka ok. 1% (sesja Jeffa 10-56-30: 0 z 292 zl; bieg 6 lat 20-17-37: 1636 z 178028 zl)"
+        rep.add("NK-8: kiesy startowe nowych band z kas kryjowek (ostatnie 28 dob, INFO)", val, "INFO - oczekiwany wzrost; " + base, None)
+    else:
+        rep.add("NK-8: kiesy startowe nowych band z kas kryjowek", "brak linii Paser", "INFO", None)
+    # NK-9 zdarzenia gry gracza i AI
+    def amounts(lst, pat):
+        v = []
+        for s in lst:
+            mm = pat.search(s)
+            if mm:
+                v.append(int(mm.group(1)))
+        return v
+    vs, vc, va = amounts(ev_search, NS_EV_SEARCH), amounts(ev_carry, NS_EV_CARRY), amounts(ev_ai, NS_EV_AI)
+    day_srch = sum(rows[d]["srch"] for d in ds)
+    day_ai = sum(rows[d]["ai"] for d in ds)
+    rep.add("NK-9: zdarzenia - przeszukanie gracza, bitwa gracza w kryjowce, zwyciezca AI (INFO)",
+            f"przeszukania {len(vs)} (skarbiec {sum(vs)} zl; linie HideoutPurge 'przeszukano' {len(hp_search)}: {sum(hp_search)} zl; w liniach doby {day_srch} zl"
+            f" w {sum(rows[d]['srchN'] for d in ds)}); po bitwie {len(vc)} (kiesy band {sum(vc)} zl); zwyciezca AI {len(va)} (skarbiec {sum(va)} zl; w liniach doby"
+            f" {day_ai} zl: wodzom {sum(rows[d]['aiL'] for d in ds)}, partiom {sum(rows[d]['aiP'] for d in ds)}, miastom {sum(rows[d]['aiT'] for d in ds)});"
+            f" bitwy w kryjowkach bez gracza {sum(rows[d]['aib'] for d in ds)} (oczyszczone {sum(rows[d]['aic'] for d in ds)}); komunikaty w liniach doby:"
+            f" po bitwie {sum(rows[d]['m1'] for d in ds)}, po przeszukaniu {sum(rows[d]['m2'] for d in ds)}",
+            "INFO (autotest: 0; gra Jeffa: przeszukanie = linia HideoutPurge)", None)
+    # NK-10 Pieniadz swiata
+    pk = sorted(d for d in psw if psw[d][0] is not None and psw[d][1] is not None and psw[d][2] is not None)
+    if pk:
+        a0, a1 = psw[pk[0]], psw[pk[-1]]
+        rep.add("NK-10: Pieniadz swiata - bandy maleja, kryjowki i inne rosna, suma bez skoku (INFO)",
+                f"dzien {pk[0]} -> {pk[-1]}: bandy {a0[2]} -> {a1[2]}, kryjowki i inne {a0[1]} -> {a1[1]}, razem {a0[0]} -> {a1[0]}"
+                f" (bandy + kryjowki {a0[1] + a0[2]} -> {a1[1] + a1[2]})", "INFO", None)
+    else:
+        rep.add("NK-10: Pieniadz swiata", "brak linii", "INFO", None)
+    # NK-11 linia Paser - bilans kas kryjowek
+    pk2 = sorted(d for d in paser if paser[d][0])
+    rs = []
+    for a, b in zip(pk2, pk2[1:]):
+        if b != a + 1:
+            continue
+        A, B = paser[a][0], paser[b][0]
+        rs.append((b, (B[4] - A[4]) - (B[0] - B[1])))
+    badp = [x for x in rs if x[1] != 0]
+    tap = any(paser[d][1] for d in pk2)
+    rep.add("NK-11: linia Paser - stan kas kryjowek = doplyw - odplyw (jak roz/nskarbiec/resid.py)",
+            f"par dob {len(rs)}, r != 0 w {len(badp)}" + (f": {badp[:8]}" if badp else "") + ("; kurek kryjowek otwarty" if tap else ""),
+            "0 dob (twardy; kurek kryjowek otwarty - INFO)", (len(badp) == 0) if (rs and not tap) else None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -27374,6 +27627,8 @@ def main(argv):
         return obieg2_main(logp, bdp)   # obieg2 (15.10, Jeff "kasa zbiera sie u ludu" + "pamietaj o pozyczkach"): wsie, straznik obiegu, pozyczki od ludu, zbytki wedlug zasobnosci
     if group == "korona2" and logp:
         return korona2_main(logp)   # korona2 (15.10, Jeff "korony pozyczaja od miast"): pozyczki koron od miast i mieszczan, czesc korony podatku do zapasu korony
+    if group == "nskarbiec" and logp:
+        return nskarbiec_main(logp, bdp)   # nskarbiec (noc 15/16.10, Jeff "skarbiec kryjowki - TAK"): dola dzienna band do kryjowek, wyplata zwyciezcy AI, komunikaty o zlocie
     if group == "rok2" and logp:
         return rok2_main(logp, start_arg, until_arg, bdp)   # pieniadze roku 2: M1, M2a/b/c, M3, B4, L1/L2 (T1 rok 2 z zapisu - okno > 240 dob, T2 nowa kampania)
     if group == "wyspywolni" and logp:
