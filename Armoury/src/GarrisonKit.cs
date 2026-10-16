@@ -708,7 +708,7 @@ namespace Armoury
                     if (side != null && mySide != null && side.Equals(mySide)) allyBare++; else enemyBare++;
                 }
                 Log.Info("Bitwa gracza (sklad7b-p, start): Twoich ludzi " + men + " - bez broni " + noWeapon + ", bez zbroi " + noBody + ", jezdzcy pieszo " + onFoot + ", jezdzcy z koniem bez uprzezy (E8/H) " + noSaddle
-                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem).");
+                         + "; bez broni u sojusznikow " + allyBare + ", u wroga " + enemyBare + " (przydzialy DTE przed spawnem)." + GearFit.FloorNote());   // GearFit: dopisek NA KONCU
                 var parts = new List<string>();
                 if (noWeapon > 0) parts.Add(noWeapon + " have no weapon");
                 if (noBody > 0) parts.Add(noBody + " no body armour");

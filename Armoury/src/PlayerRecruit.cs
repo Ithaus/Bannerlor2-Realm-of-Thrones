@@ -199,6 +199,7 @@ namespace Armoury
                      + ", wzorzec - wylacznik " + tpl + "), do zbrojowni druzyny " + pcs + " szt. (w tym konie i rzedy najemnikow " + horsePcs + "; nieprzyjete przez DTE " + refused
                      + "), komplet DTE zablokowany dla " + w.DteBlocked + " ludzi; tier 1 z wlasnym dobytkiem " + t1 + " (komplet DTE dla " + w.DteTier1
                      + "); ochotnik spoza koszyka " + noCart + "; od startu sesji ludzi " + _tMen + ", szt. " + _tPcs + "; potkniecia " + _stumbles + ".");
+            GearFit.PlayerNotice();   // GearFit (noc 15/16.10): jedno zdanie w grze, gdy rekruci oddali na targ rzeczy, ktorych nie uzyja
         }
 
         /// <summary>Jedna sztuka do zbrojowni druzyny gracza droga DTE (rozpoznanie sztuki, czarna lista DTE, prawo unikatow - UniqueLaw.IntakePlayer);

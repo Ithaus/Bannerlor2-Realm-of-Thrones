@@ -505,6 +505,7 @@ namespace Armoury
                         var it = el.EquipmentElement.Item;
                         if (el.Amount <= 0 || !QuartermasterLaw.CountsAsKit(it, type) || ArmsPricing.IsUnique(it)) continue;
                         if (it.Difficulty > 0 && ItemReq.SkillFor(it) != null && it.Difficulty > maxReq) continue;   // najslabszy bez sztuki ja udzwignie
+                        if (GearFit.CultureOn && !GearFit.AnyCultureOk(fit.UnfitByTroop.Keys, it)) continue;   // GearFit (noc 15/16.10): ktos bez sztuki moze ja nosic wedlug kultury
                         if (AiGear.TierOf(it) > maxTier) continue;   // K1c (P1): nie ponad sufit czlowieka, dla ktorego ten zakup
                         if (ArmouryBehavior.StockOf(it.StringId) > 0) continue;   // K1 (przeglad): ksiega per id - zakup ludzi przesunalby Twoja czesc na gorszy egzemplarz
                         if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }   // 174b.4: ludzie gracza kupuja hurtem jak ludzie lorda - ostatnia sztuka pasma zostaje

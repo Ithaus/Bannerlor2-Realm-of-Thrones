@@ -106,6 +106,9 @@ namespace Armoury
                                          + (repl != null ? repl.StringId : "goly slot") + ".");
                                 continue;
                             }
+                            // GearFit (noc 15/16.10): bron ponad umiejetnosc dala swiadomie podloga broni (ostatnia deska, GearFitFloorOverSkill) ze zbrojowni
+                            // partii - bez podmiany na wzorzec z niczego (straz "nic z niczego" przy spawnie zdjelaby go i czlowiek szedlby z pustymi rekami)
+                            if (w != null && GearFit.FloorKept(eq, slot)) continue;
                             // ZASADA NADRZEDNA na scenie: bron ponad skill schodzi,
                             // ale zolnierz dostaje najlepsza W RAMACH swojego skilla
                             // (nie wchodzi golym slotem) - i log mowi wprost CZEMU

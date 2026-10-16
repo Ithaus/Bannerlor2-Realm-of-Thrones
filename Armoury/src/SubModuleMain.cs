@@ -131,6 +131,7 @@ namespace Armoury
                 Levy.ApplyAll(_harmony);
                 try { PeopleLevy.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleLevy.ApplyAll", e); }   // GL-4 (P4): tylko Harmony - latki modelu milicji gry i BK zaklada PeopleLevy.EnsureHooks W KAMPANII (CLAUDE.md 7: pole statyczne GameTexts w modelu gry)
                 VolunteerKit.ApplyAll(_harmony);
+                try { GearFit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GearFit.ApplyAll", e); }   // GearFit (noc 15/16.10): komplet DTE tieru 1 (GetRecruitEquipments) i podloga broni w bitwie (DoAssignAsync, Priority.Last)
                 LevyGold.ApplyAll(_harmony);
                 try { GarrisonRecruitFee.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonRecruitFee.ApplyAll", e); }   // E5 decyzja 9: oplata za werbunek zalog do sprzedajacego
                 WinterSource.ApplyAll(_harmony);

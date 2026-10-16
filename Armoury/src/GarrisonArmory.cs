@@ -224,8 +224,8 @@ namespace Armoury
                 List<ItemObject> l; if (!byType.TryGetValue(t, out l)) byType[t] = l = new List<ItemObject>(); l.Add(kv.Key);
                 avail[kv.Key] = kv.Value;
             }
-            // co ludzie nosza: typ -> (przedmiot wzorca, ilu ludzi), od najwyzszego tieru
-            var wanted = new Dictionary<int, List<KeyValuePair<ItemObject, int>>>();
+            // co ludzie nosza: typ -> (przedmiot wzorca, ilu ludzi, oddzial - GearFit), od najwyzszego tieru
+            var wanted = new Dictionary<int, List<Want>>();
             foreach (var kv in moved)
             {
                 if (kv.Key == null || kv.Value <= 0) continue;
@@ -241,8 +241,8 @@ namespace Armoury
                         var it = eq[(EquipmentIndex)sl].Item;
                         if (it == null || !SupplyDemand.Equipmentish(it)) continue;
                         int t = (int)it.ItemType;
-                        List<KeyValuePair<ItemObject, int>> l; if (!wanted.TryGetValue(t, out l)) wanted[t] = l = new List<KeyValuePair<ItemObject, int>>();
-                        l.Add(new KeyValuePair<ItemObject, int>(it, num));
+                        List<Want> l; if (!wanted.TryGetValue(t, out l)) wanted[t] = l = new List<Want>();
+                        l.Add(new Want { Item = it, Num = num, Troop = kv.Key });
                     }
                 }
             }
@@ -254,15 +254,15 @@ namespace Armoury
                 int share = h >= nm + nl ? nm : (int)Math.Round(h * (double)nm / Math.Max(1, nm + nl));
                 share = Math.Max(0, Math.Min(share, Math.Min(nm, h)));
                 if (share <= 0) continue;
-                List<KeyValuePair<ItemObject, int>> w; List<ItemObject> cands;
+                List<Want> w; List<ItemObject> cands;
                 if (!wanted.TryGetValue(type, out w) || !byType.TryGetValue(type, out cands)) continue;
-                w.Sort((a, b) => TierOf(b.Key).CompareTo(TierOf(a.Key)));
+                w.Sort((a, b) => TierOf(b.Item).CompareTo(TierOf(a.Item)));
                 foreach (var e in w)
                 {
-                    int want = e.Value;
+                    int want = e.Num;
                     while (want > 0 && share > 0)
                     {
-                        var pick = Pick(avail, cands, e.Key);
+                        var pick = Pick(avail, cands, e.Item, e.Troop);
                         if (pick == null) break;
                         int c = Math.Min(Math.Min(want, share), avail[pick]);
                         avail[pick] -= c; want -= c; share -= c;
@@ -300,26 +300,41 @@ namespace Armoury
             return need;
         }
 
-        /// <summary>Sztuka dla przedmiotu wzorca: dokladnie ten, potem ten sam tier, wyzsze rosnaco, nizsze malejaco.</summary>
-        private static ItemObject Pick(Dictionary<ItemObject, int> avail, List<ItemObject> cands, ItemObject want)
+        /// <summary>Wpis potrzeby przenoszonych ludzi: przedmiot wzorca, ilu ludzi, oddzial (GearFit - kto ma te sztuke nosic).</summary>
+        private sealed class Want { internal ItemObject Item; internal int Num; internal CharacterObject Troop; }
+
+        /// <summary>Sztuka dla przedmiotu wzorca: dokladnie ten, potem ten sam tier, wyzsze rosnaco, nizsze malejaco.
+        /// GearFit (noc 15/16.10, klucz GearFitKits): tylko sztuka, ktorej ten oddzial uzyje (GearFit.ForTroop - umiejetnosc, bron z siodla, kultura); dotad
+        /// "wyzszy tier" szedl bez sprawdzenia (weteran z karczmy, ludzie przenoszeni miedzy partia a zaloga). Nieuzywalna zostaje u dawcy - sprzeda ja
+        /// jego nadwyzka (nic nie znika).</summary>
+        private static ItemObject Pick(Dictionary<ItemObject, int> avail, List<ItemObject> cands, ItemObject want, CharacterObject troop)
         {
             int v;
-            if (want != null && avail.TryGetValue(want, out v) && v > 0) return want;
+            bool fit = troop != null && GearFit.On;
+            bool skipped = false;
+            if (want != null && avail.TryGetValue(want, out v) && v > 0)
+            {
+                if (!fit || GearFit.ForTroop(troop, want, true)) return want;
+                skipped = true;
+            }
             int t = TierOf(want);
-            for (int pass = 0; pass < 3; pass++)
+            ItemObject r = null;
+            for (int pass = 0; pass < 3 && r == null; pass++)
             {
                 ItemObject best = null; int bt = pass == 2 ? 0 : 99;
                 foreach (var it in cands)
                 {
                     if (!avail.TryGetValue(it, out v) || v <= 0) continue;
+                    if (fit && !GearFit.ForTroop(troop, it, true)) { skipped = true; continue; }
                     int ti = TierOf(it);
-                    if (pass == 0) { if (ti == t) return it; }
+                    if (pass == 0) { if (ti == t) { best = it; break; } }
                     else if (pass == 1) { if (ti > t && ti < bt) { bt = ti; best = it; } }
                     else { if (ti < t && ti > bt) { bt = ti; best = it; } }
                 }
-                if (best != null) return best;
+                r = best;
             }
-            return null;
+            if (skipped) GearFit.NotePlanSkip();   // GearFit: wybor pominal co najmniej jedna sztuke, ktorej ten oddzial nie uzyje (tylko licznik)
+            return r;
         }
 
         /// <summary>A7: cala zbrojownia from -> to (rozwiazana partia: jej tabor zostaje w twierdzy, nadwyzke zaloga sprzeda w C10).</summary>

@@ -557,6 +557,7 @@ namespace Armoury
                     if (ammoRule && w.Tier <= oldP.Tier) { lowTier = true; continue; }
                     better = true;
                     if (!ItemReq.Meets(c.Troop, w.El.Item) || (c.Slot.Bucket.Mounted && !MountOk(w.El.Item))) continue;   // wymog i bron z siodla
+                    if (GearFit.CultureOn && !GearFit.CultureOk(c.Troop, w.El.Item)) continue;   // GearFit (noc 15/16.10): kultura jak przy zakupie notabla i w bitwie
                     lift = true;
                     // sklad8-p (uwaga 1): dozbrajanie kupuje dla oddzialu (lord, zaloga, ludzie gracza z sakiewki) - hurt jak zakupy brakow, wiec
                     // ostatnia sztuka pasma zbroi zostaje na straganie dla kupujacego osobiscie (ShopReserve; MAX = rezerwa nie dotyczy: zamek, nie zbroja)

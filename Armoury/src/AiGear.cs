@@ -762,11 +762,14 @@ namespace Armoury
             return spent;
         }
 
-        /// <summary>K1 (przeglad): czy ktos z oddzialow koszyka udzwignie sztuke (brak listy - bez warunku, jak dotad).</summary>
+        /// <summary>K1 (przeglad): czy ktos z oddzialow koszyka udzwignie sztuke (brak listy - bez warunku, jak dotad).
+        /// GearFit (noc 15/16.10, klucz GearFitCulture): i moze ja nosic wedlug kultury (GearFit.CultureOk) - dotad AI kupowala sztuki zza Waskiego Morza,
+        /// ktore straz RealmWard zdejmowala w bitwie (zloto wydane na nic).</summary>
         private static bool Lift(List<CharacterObject> who, ItemObject it)
         {
             if (who == null || who.Count == 0) return true;
-            foreach (var c in who) if (ItemReq.Meets(c, it)) return true;
+            bool cul = GearFit.CultureOn;
+            foreach (var c in who) if (ItemReq.Meets(c, it) && (!cul || GearFit.CultureOk(c, it))) return true;
             return false;
         }
 
