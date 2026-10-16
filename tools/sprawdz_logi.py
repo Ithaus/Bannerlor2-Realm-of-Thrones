@@ -667,6 +667,12 @@ Uzycie (Python 3, tylko odczyt):
                     KR2-2 potkniecia i ERROR 0, KR2-3 ksiega (kontrola dlugu |r| <= 1, skarbiec po pozyczce nie ponad zapas wojny, Obieg = linia), KR2-4 dlug / limit
                     <= 1.05 i dlug <= 5% zlota swiata, KR2-5 udzial koron >= 18% (28 dob, bieg >= 182), KR2-6 pozyczki i splaty (INFO), KR2-7 czesc korony do
                     zapasu (INFO), KR2-8 przebieg (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa nekon     : (noc 16.10, galaz w-toku/noc-ekonomia; raport audytu ekonomii 15.10 rozdz. 3.1 N2, N3, N9 helmy, N10, N11, N12 i 3.2 P8a; NightEcon.cs)
+                    python -I tools/sprawdz_logi.py --grupa nekon <Armoury-*.log> (strumieniowo). NE-0 linia startu (klucze TAK, wegiel waga gry), NE-1 wegiel
+                    (bryla = waga gry, wegli z ladunku drewna z modelu kuzni = z wag, 4 przy 5 kg / 100 kg), NE-2 helmy plytowe (mediana t3 <= t4, k > 0), NE-3
+                    jednostka ladunku (MCM inny od kampanii - NE-3b INFO), NE-4 kopalnie (latka, kolejnosc BK -> NoTownMines -> WorkshopInputs), NE-5 kuznia (ekran
+                    wpiety, samosprawdzenie naprawy 0 ladunkow), NE-6 linia doby w kazdej dobie, NE-7 futra (wywolania > 0), NE-8 sol x3.5 w GL5, NE-9 wegiel w dobach,
+                    NE-10 kopalnie zamienione (INFO), NE-11 kuznia w dobach (INFO), NE-12 ERROR 0. Log bez paczki: INFO, bez wyjatku.
 --grupa oblezenia2: (15.10, Jeff "napraw oblezenia"; galaz w-toku/oblezenia-2, SiegeWalls2.cs) python -I tools/sprawdz_logi.py --grupa oblezenia2 <Armoury-*.log>
                     (log czytany strumieniowo). O2-0 linia startowa (latki wpiete) i doby; TB trebusze AI: O2-1a obozy AI pod miastem / stolica z TB >= 90%,
                     O2-1b zamek po progu dob, O2-1c druga ekipa zaczyna trebusze, O2-1d trebusze zbudowane i trafienia w mury > 0, O2-1e zniszczone (INFO);
@@ -27232,6 +27238,171 @@ def korona2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nekon (noc 16.10, galaz noc-ekonomia; raport audytu ekonomii 15.10 rozdz. 3.1 N2, N3, N9 helmy,
+# N10, N11, N12 i rozdz. 3.2 P8a; Armoury/src/NightEcon.cs, GoodsRates.cs, ArmsPricing.cs, NoTownMines.cs, BulkUnit.cs, SmithWood.cs, Recipes.cs, MendMaterial.cs)
+NE_START = "Noc-ekonomia (NE): start sesji"
+NE_COAL = "Noc-ekonomia (NE): wegiel (N2)"
+NE_HELM = "Noc-ekonomia (NE): helmy plytowe (N9)"
+NE_BULK = "Noc-ekonomia (NE): jednostka ladunku (N11)"
+NE_MINES = "Noc-ekonomia (NE): kopalnie w miastach (N10)"
+NE_FORGE = "Noc-ekonomia (NE): kuznia (N12)"
+NE_HEAD = "Noc-ekonomia (NE): dzien "
+NE_DAY = re.compile(r"Noc-ekonomia \(NE\): dzien (?P<d>\d+) \| wegiel (?P<coal>[\d.]+|-) kg \| futra: Fur Rate Raised (?P<furOn>TAK|NIE), wsi traperskich (?P<trap>\d+), "
+                    r"wywolan modelu z czynnikiem x[\d.]+ (?P<fur>\d+) \| kopalnie: No Town Mines (?P<minesOn>TAK|NIE), wyborow typu w miastach (?P<picks>\d+), "
+                    r"kopalnia -> inny typ (?P<swaps>\d+)(?: \[(?P<ex>[^\]]*)\])?, bez lepszego typu \(kopalnia zostala\) (?P<kept>\d+) \| kuznia: podpowiedzi drewna "
+                    r"na ekranie (?P<hints>\d+), czesci przepisu z drewnem w kg \(naprawy wlasnymi rekami, pekniecia\) (?P<mend>\d+) \(kg (?P<mendKg>[\d.]+), "
+                    r"ladunkow (?P<mendL>\d+)\) \| potkniecia (?P<st>\d+)\.")
+NE_ERR = ("ERROR in NightEcon.", "ERROR in NoTownMines.", "ERROR in BulkUnit.", "ERROR in SyncData.arm_bulk_unit", "ERROR in SmithWood.ScreenPostfix",
+          "ERROR in SmithWood.SessionStart(ekran)", "ERROR in MendMaterial.SelfMendDone (drewno)", "ERROR in GoodsRates.ProdStep", "ERROR in FixCharcoalWeight")
+NE_KEYS = ("Salt Rate Raised", "Fur Rate Raised", "Helm One Rule", "No Town Mines", "Bulk Unit Per Campaign", "Smith Wood On Screen", "Self Mend Wood Kg")
+
+
+def nekon_main(logp):
+    """nekon (noc 16.10, galaz noc-ekonomia: wegiel z waga gry, sol x3.5, futra x3, helmy plytowe jedna regula, bez kopalni BK w miastach, jednostka ladunku
+    z zapisu, drewno kuzni w kg na ekranie i w naprawie). Wejscie: log Armoury (strumieniowo). NE-0 linia startu (klucze TAK, wegiel waga gry), NE-1 wegiel
+    (bryla = waga gry, wegli z ladunku drewna = z wag, 4 przy 5 kg i 100 kg), NE-2 helmy plytowe (po: mediana t3 <= t4, k > 0), NE-3 jednostka ladunku (linia,
+    potkniecia 0; MCM inny od kampanii - INFO), NE-4 kopalnie (latka wpieta, kolejnosc BK -> NoTownMines -> WorkshopInputs), NE-5 kuznia (ekran wpiety,
+    samosprawdzenie naprawy 0 ladunkow), NE-6 linia doby w kazdej dobie i potkniecia 0, NE-7 futra (wywolania > 0 przy kluczu), NE-8 sol x3.5 w linii GL5
+    (Salt Rate Raised i Goods Rates By Pattern), NE-9 wegiel w dobach = waga startu, NE-10 kopalnie zamienione (INFO), NE-11 kuznia w dobach (INFO),
+    NE-12 ERROR 0. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NE-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    last = {k: None for k in (NE_START, NE_COAL, NE_HELM, NE_BULK, NE_MINES, NE_FORGE)}
+    days, bad, salt, errs = {}, [], {}, []
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("Noc-ekonomia (NE): "):
+                hit = False
+                for k in last:
+                    if s.startswith(k):
+                        last[k] = s
+                        hit = True
+                        break
+                if hit:
+                    continue
+                if s.startswith(NE_HEAD):
+                    a = NE_DAY.search(s)
+                    if a:
+                        days[int(a.group("d"))] = a.groupdict()
+                    else:
+                        bad.append(s[:140])
+            elif s.startswith("Stawki towarow (GL5): dzien "):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    salt[d] = s
+            elif s.startswith(NE_ERR):
+                errs.append(s[:160])
+    st0 = last[NE_START]
+    print(f"plik: {logp} | linii startu {'tak' if st0 else 'nie'}, linii doby {len(days)} (nierozpoznanych {len(bad)}), linii GL5 doby {len(salt)}")
+    if not st0 and not days:
+        rep.add("NE-0: linia startu noc-ekonomia", "brak linii", "INFO (wersja sprzed noc-ekonomia)", None)
+        rep.show()
+        return 0
+    keys = {k: (st0 is not None and f"{k} TAK" in st0) for k in NE_KEYS}
+    coal0 = st0 is not None and "Charcoal Weight Kg 0 (waga gry)" in st0
+    rep.add("NE-0: linia startu (klucze TAK, Charcoal Weight Kg 0 = waga gry)", (st0[len(NE_START):].lstrip(" |")[:300] if st0 else "brak linii startu (sa linie doby)"),
+            "linia jest, klucze TAK, wegiel z waga gry", bool(st0) and all(keys.values()) and coal0)
+    c = last[NE_COAL]
+    if c:
+        bw = num(r"bryla ([\d.]+) kg", c, float)
+        gw = num(r"waga gry ([\d.]+) kg\)", c, float)
+        lw = num(r"ladunek drewna ([\d.]+) kg", c, float)
+        got = num(r"-> wegli (-?\d+)", c)
+        exp = num(r"oczekiwane (-?\d+)\)", c)
+        cst = num(r"potkniecia (\d+)\.", c)
+        four = not (bw == 5.0 and lw == 100.0) or got == 4
+        rep.add("NE-1: wegiel (bryla = waga gry, wegli z ladunku drewna z modelu kuzni = z wag)", c[len(NE_COAL):].lstrip(" |")[:320],
+                "bryla = waga gry (przy kluczu 0), wegli = oczekiwane > 0 (5 kg i ladunek 100 kg: 4), potkniecia 0",
+                (bw is not None and gw is not None and (abs(bw - gw) < 0.01 or not coal0)) and got is not None and got > 0 and got == exp and four and cst == 0)
+    else:
+        rep.add("NE-1: wegiel", "brak linii", "linia jest", False)
+    h = last[NE_HELM]
+    if h:
+        k = num(r"k ([\d.]+) kg na punkt", h, float)
+        ok34 = "po: t3 <= t4 TAK" in h
+        hst = num(r"potkniecia (\d+)\.", h)
+        rep.add("NE-2: helmy plytowe (po: mediana t3 <= t4; k > 0)", h[len(NE_HELM):].lstrip(" |")[:420], "t3 <= t4 TAK, k > 0, potkniecia 0 (klucz wylaczony - INFO)",
+                (ok34 and (k or 0) > 0 and hst == 0) if keys.get("Helm One Rule") else None)
+    else:
+        rep.add("NE-2: helmy plytowe", "brak linii", "linia jest", False)
+    b = last[NE_BULK]
+    if b:
+        bst = num(r"potkniecia (\d+)\.", b)
+        ign = "ignored, campaign uses" in b
+        rep.add("NE-3: jednostka ladunku (czynnik kampanii, potkniecia 0)", b[len(NE_BULK):].lstrip(" |")[:260],
+                "linia jest, potkniecia 0 (MCM inny niz kampania: linia 'ignored' - INFO w wartosci)", bst == 0)
+        rep.add("NE-3b: suwak MCM inny niz czynnik kampanii (INFO)", "tak - " + b[b.find("MCM"):][:120] if ign else "nie", "INFO", None)
+    else:
+        rep.add("NE-3: jednostka ladunku", "brak linii", "linia jest", False)
+    mi = last[NE_MINES]
+    if mi:
+        wired = "latka wpiete" in mi
+        o = mi[mi.find("DecideBestWorkshopType: ") + 24:] if "DecideBestWorkshopType: " in mi else ""
+        ib = o.find("WorkshopsCampaignBehaviorPatches.DecideBestWorkshopTypePostfix")   # BK EconomyPatches (klasa zagniezdzona) - postfiks z kopalnia
+        iu, iw = o.find("NoTownMines.Postfix"), o.find("WorkshopInputs.DecidePostfix")
+        order = iu >= 0 and (ib < 0 or ib < iu) and (iw < 0 or iu < iw)
+        rep.add("NE-4: kopalnie - latka wpieta, kolejnosc postfiksow BK -> NoTownMines -> WorkshopInputs", mi[len(NE_MINES):].lstrip(" |")[:420]
+                + ("" if ib >= 0 else " [postfiksu BK nie ma na liscie]"),
+                "wpiete, NoTownMines po BK (EconomyPatches.WorkshopsCampaignBehaviorPatches) i przed WorkshopInputs", (wired and order) if keys.get("No Town Mines") else None)
+    else:
+        rep.add("NE-4: kopalnie", "brak linii", "linia jest", False)
+    fo = last[NE_FORGE]
+    if fo:
+        scr = "ekran kucia wpiete" in fo
+        pr = num(r"ladunkow (\d+) \(regula kg", fo)
+        rep.add("NE-5: kuznia - ekran kucia wpiety, samosprawdzenie naprawy (otwarty 1 kg) 0 ladunkow", fo[len(NE_FORGE):].lstrip(" |")[:320],
+                "wpiete; ladunkow 0 przy Self Mend Wood Kg (brak sztuki do proby - INFO)",
+                (scr and (pr == 0 if pr is not None else True)) if keys.get("Smith Wood On Screen") and keys.get("Self Mend Wood Kg") else None)
+    else:
+        rep.add("NE-5: kuznia", "brak linii", "linia jest", False)
+    ds = sorted(days)
+    if ds:
+        miss = [d for d in range(ds[0], ds[-1] + 1) if d not in days]
+        stum = sum(int(days[d]["st"]) for d in ds)
+        rep.add("NE-6: linia doby w kazdej dobie, potkniecia 0", f"dob {len(ds)} (d{ds[0]}-d{ds[-1]}), brak {len(miss)}" + (f" np. {miss[:4]}" if miss else "")
+                + f", nierozpoznanych {len(bad)}" + (f" np. {bad[0]}" if bad else "") + f", potkniecia {stum}", "brak 0, nierozpoznanych 0, potkniecia 0",
+                not miss and not bad and stum == 0)
+        fur = sum(int(days[d]["fur"]) for d in ds)
+        trap = max(int(days[d]["trap"]) for d in ds)
+        furOn = all(days[d]["furOn"] == "TAK" for d in ds)
+        rep.add("NE-7: futra - wywolania czynnika x3 we wsiach traperskich", f"wsi traperskich {trap}, wywolan {fur} w {len(ds)} dobach ({fur / len(ds):.0f}/d)",
+                "> 0 przy Fur Rate Raised TAK", (fur > 0 and trap > 0) if furOn else None)
+        coal = {days[d]["coal"] for d in ds}
+        bw = num(r"bryla ([\d.]+) kg", c, float) if c else None
+        rep.add("NE-9: wegiel w dobach = waga startu", f"wagi w dobach {sorted(coal)}; start {bw}", "jedna waga = start",
+                len(coal) == 1 and bw is not None and abs(float(next(iter(coal))) - bw) < 0.01 if "-" not in coal else False)
+        sw = sum(int(days[d]["swaps"]) for d in ds)
+        pk = sum(int(days[d]["picks"]) for d in ds)
+        kp = sum(int(days[d]["kept"]) for d in ds)
+        ex = [days[d]["ex"] for d in ds if days[d]["ex"]]
+        rep.add("NE-10: kopalnie w miastach - zamienione na inny typ (INFO)", f"wyborow typu w miastach {pk}, kopalnia -> inny typ {sw}, kopalnia zostala {kp}"
+                + (f"; np. {ex[0][:160]}" if ex else ""), "INFO (zamiany tylko przy bankructwie / zmianie wlasciciela)", None)
+        hn = sum(int(days[d]["hints"]) for d in ds)
+        mu = sum(int(days[d]["mend"]) for d in ds)
+        mk = sum(float(days[d]["mendKg"]) for d in ds)
+        ml = sum(int(days[d]["mendL"]) for d in ds)
+        rep.add("NE-11: kuznia w dobach - podpowiedzi drewna, czesci z drewnem w kg (INFO)", f"podpowiedzi {hn}, czesci {mu} (kg {mk:.1f}, ladunkow {ml})", "INFO", None)
+    else:
+        rep.add("NE-6: linia doby", f"brak linii doby (nierozpoznanych {len(bad)})" + (f" np. {bad[0]}" if bad else ""), "linie doby sa", False)
+    sd = sorted(salt)
+    if sd and keys.get("Salt Rate Raised"):
+        on = [d for d in sd if "Goods Rates By Pattern tak" in salt[d]]
+        x35 = [d for d in on if "sol x3.5" in salt[d]]
+        rep.add("NE-8: sol x3.5 w linii GL5 (Salt Rate Raised, Goods Rates By Pattern)", f"dob GL5 z kluczem {len(on)}, z x3.5 {len(x35)}", "wszystkie doby z kluczem: x3.5",
+                (len(on) == len(x35)) if on else None)
+    else:
+        rep.add("NE-8: sol x3.5", f"linii GL5 {len(sd)}; Salt Rate Raised {'TAK' if keys.get('Salt Rate Raised') else 'NIE'}", "INFO", None)
+    rep.add("NE-12: ERROR noc-ekonomia (NightEcon, NoTownMines, BulkUnit, arm_bulk_unit, ekran kucia, drewno naprawy, GoodsRates.ProdStep, FixCharcoalWeight)",
+            f"{len(errs)}" + (f" np. {errs[0]}" if errs else ""), "0", not errs)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -27380,6 +27551,8 @@ def main(argv):
         return wyspywolni_main(logp, start_arg, until_arg, bdp, csp, cspb)   # wyspy-wolni: WW0-WW4 (Zelazne Wyspy z rabunku), WL1-WL3 (Wolni Ludzie bez zoldu) - T1 rok 2 z zapisu, T2 nowa kampania
     if group == "z1" and logp:
         return z1_main(logp, start_arg, until_arg if "--do-doby" in args else 728, bdp)   # Z.1: wojsko krolestw w pokoju (pulap pokoju 0.28 D + 0.4 x skrzynia wojenna)
+    if group == "nekon" and logp:
+        return nekon_main(logp)   # noc-ekonomia (16.10): wegiel z waga gry, sol x3.5, futra x3, helmy plytowe, bez kopalni BK w miastach, jednostka ladunku, drewno kuzni w kg
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

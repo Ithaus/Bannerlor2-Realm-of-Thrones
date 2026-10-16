@@ -44,9 +44,22 @@ namespace Armoury
     internal static class GoodsRates
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        internal const float SaltRate = 2f;
+        // N3 (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1): sol x3.5 zamiast x2 (klucz SaltRateRaised; wylaczony - x2 jak dotad). Sol x8 wartosci przez 4 lata,
+        // w 97 miastach razem 46 sztuk, wsie kupuja 3.9% tego, co chca - wykupia kazda dodatkowa sztuke; regulator wsi (221) przytnie, gdy zapas > 60 dni
+        internal const float SaltRateOld = 2f, SaltRateNew = 3.5f;
+        internal static float SaltRate { get { var s = Settings.Current; return s != null && s.SaltRateRaised ? SaltRateNew : SaltRateOld; } }
         private const string Flax = "flax_plant", SaltType = "salt_mine", SaltItem = "salt";
         private static readonly TextObject SaltText = new TextObject("{=!}Armoury: salt rate of the realm (x2)");
+        private static readonly TextObject SaltTextNew = new TextObject("{=!}Armoury: salt rate of the realm (x3.5)");
+        // P8a (noc 16.10, audyt rozdz. 3.2): futra wsi traperskich x3 wzorem soli (klucz FurRateRaised, niezalezny od GoodsRatesByPattern) - swiat robil ok. 39 paczek
+        // na dobe przy popycie ok. 150 (regulator na suficie x1.3, cena x2-5); ten sam wzor "czynnik x suma" zaraz po soli, przed rekami i regulatorem (ten tnie nadmiar)
+        internal const float FurRate = 3f;
+        private const string FurType = "trapper", FurItem = "fur";
+        private static readonly TextObject FurText = new TextObject("{=!}Armoury: trappers' fur rate (x3)");
+        internal static bool FurOn { get { var s = Settings.Current; return s != null && s.FurRateRaised; } }
+        private static long _furCalls;
+        /// <summary>NightEcon.Daily: wywolania modelu z czynnikiem futer od ostatniego odczytu (zeruje).</summary>
+        internal static long TakeFurCalls() { return Interlocked.Exchange(ref _furCalls, 0); }
         // zdanie zajecia przysiolka wsi lnianej (dymek lore, po Alt) - jak zajecia.csv (flax_plant); przysiolek z obrazkiem rybackim - len na sieci i zagle
         private const string FlaxLore = "Flax growers and linen weavers.";
         private const string FlaxLoreFishing = "Flax growers and net-makers: linen thread for nets and sails.";
@@ -117,17 +130,31 @@ namespace Armoury
 
         // ============================================================ (a) sol - MaterialLaw.ProdPostfix (dowolny watek)
 
-        /// <summary>MaterialLaw.ProdPostfix, zaraz po kroku P1: wies solna, towar sol - czynnik x2.0 wzorem "czynnik x suma". Klucz wylaczony - nic. Nie rzuca.</summary>
+        /// <summary>MaterialLaw.ProdPostfix, zaraz po kroku P1: wies solna, towar sol - czynnik x2.0 (N3: x3.5 przy SaltRateRaised) wzorem "czynnik x suma".
+        /// Klucz wylaczony - nic. P8a: wies traperska, towar futra - czynnik x3 tym samym wzorem (wlasny klucz FurRateRaised). Nie rzuca.</summary>
         internal static void ProdStep(Village village, ItemObject item, ref ExplainedNumber r)
         {
-            if (!KeyOn) return;                                     // klucz wylaczony: nic (stan 97dd474)
             try
             {
-                if (village == null || item == null || item.StringId != SaltItem) return;
+                if (village == null || item == null) return;
+                string id = item.StringId;
+                if (id == FurItem)
+                {
+                    if (!FurOn) return;                             // P8a wylaczone: futra jak dotad
+                    var ft = village.VillageType;
+                    if (ft == null || ft.StringId != FurType) return;
+                    float fs = 1f + r.SumOfFactors;
+                    if (fs > 0f) r.AddFactor((FurRate - 1f) * fs, FurText);
+                    Interlocked.Increment(ref _furCalls);
+                    return;
+                }
+                if (!KeyOn) return;                                 // klucz wylaczony: nic (stan 97dd474)
+                if (id != SaltItem) return;
                 var t = village.VillageType;
                 if (t == null || t.StringId != SaltType) return;
                 float sum = 1f + r.SumOfFactors;
-                if (sum > 0f) r.AddFactor((SaltRate - 1f) * sum, SaltText);
+                float rate = SaltRate;
+                if (sum > 0f) r.AddFactor((rate - 1f) * sum, rate > SaltRateOld + 0.01f ? SaltTextNew : SaltText);
                 Interlocked.Increment(ref _saltCalls);
             }
             catch (Exception e) { if (Interlocked.Increment(ref _readStumbles) == 1) { try { Log.Error("GoodsRates.ProdStep", e); } catch { } } }

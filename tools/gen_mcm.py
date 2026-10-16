@@ -274,6 +274,8 @@ RANGES = {
     # PROJEKT-LENNA (14.10): punkty zdobywcy i zapas pulapu ponad przydzial - kod przycina do 0..200 i 0..10 (FiefGrants.ConquerorBonus / CapExtra)
     'FairFiefConquerorBonus': (0, 200, "0"),
     'FairFiefCapExtra': (0, 10, "0"),
+    # N2 (noc 16.10): waga bryly wegla w kg, 0 = waga gry (5 kg); kod przycina do 50 (ArmouryBehavior.FixCharcoalWeight)
+    'CharcoalWeightKg': (0.0, 10.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

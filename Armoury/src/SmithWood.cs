@@ -47,13 +47,15 @@ namespace Armoury
         }
 
         /// <summary>Kucie zuzylo kg drewna, a kuznia zdjela loads ladunkow z sakw.</summary>
-        internal static void Use(float kg, int loads, string what)
+        internal static void Use(float kg, int loads, string what, bool quiet = false)
         {
             try
             {
                 if (kg <= 0f && loads <= 0) return;
                 OpenKg = Math.Max(0f, OpenKg + loads * LoadKg - Math.Max(0f, kg));
                 _sUses++; _sLoads += Math.Max(0, loads); _sKg += Math.Max(0f, kg);
+                // N12 (noc 16.10): naprawa wlasnymi rekami (quiet) - wiadomosc gracza tylko przy otwarciu nowego ladunku (naprawa calego rynsztunku = wiele sztuk naraz)
+                if (!quiet || loads > 0)
                 Log.Player("Wood at the anvil: " + kg.ToString("0.#", Inv) + " kg" + (string.IsNullOrEmpty(what) ? "" : " for " + what)
                            + (loads > 0 ? " - a new load of hardwood opened" : "") + "; " + OpenKg.ToString("0.#", Inv) + " kg left of the open load.");
                 Log.Info("Drewno w kuzni (kg): " + (what ?? "-") + " " + kg.ToString("0.##", Inv) + " kg, otwartych ladunkow " + loads + ", zapas " + OpenKg.ToString("0.##", Inv)
@@ -116,6 +118,41 @@ namespace Armoury
             Use(__state[0], (int)__state[1], string.IsNullOrEmpty(name) ? "the handle" : name);
         }
 
+        // ------------------------------------------------------------ N12 (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1): kg otwartego ladunku na ekranie kuznie
+        // Podpowiedz licznika drewna na dole ekranu kucia (CraftingVM.PlayerCurrentMaterials[Wood].ResourceHint - gra daje tam sama nazwe "Hardwood"): nazwa +
+        // "Open load of hardwood: N kg left". Postfiks na prywatna metode gry CraftingVM.UpdateCurrentMaterialsAvailable (DeclaredMethod) - biegnie przy otwarciu
+        // ekranu i po kazdej akcji (UpdateAll), nie co klatke; nowa podpowiedz tylko, gdy tekst sie zmienil. Klucz SmithWoodOnScreen (i SmithWoodKg).
+        internal static int ScreenHints, ScreenStumbles;
+        private static string _screenHook = "nie wpiete";
+        private static bool ScreenOn { get { var s = Settings.Current; return s != null && s.SmithWoodKg && s.SmithWoodOnScreen; } }
+
+        internal static string OpenLoadText() { return "Open load of hardwood: " + Math.Max(0f, OpenKg).ToString("0.#", Inv) + " kg left"; }
+
+        public static void ScreenPostfix(TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.CraftingVM __instance)
+        {
+            try
+            {
+                if (!ScreenOn || __instance == null) return;
+                var list = __instance.PlayerCurrentMaterials;
+                if (list == null) return;
+                foreach (var vm in list)
+                {
+                    if (vm == null || vm.ResourceMaterial != CraftingMaterials.Wood) continue;
+                    string text = (vm.ResourceName ?? "Hardwood") + "\n" + OpenLoadText() + " (a new load is opened only when it runs short)";
+                    var cur = vm.ResourceHint != null && vm.ResourceHint.HintText != null ? vm.ResourceHint.HintText.ToString() : null;
+                    if (cur == text) return;
+                    vm.ResourceHint = new TaleWorlds.Core.ViewModelCollection.Information.HintViewModel(new TaleWorlds.Localization.TextObject("{=!}" + text));
+                    ScreenHints++;
+                    return;
+                }
+            }
+            catch (Exception e) { ScreenStumbles++; if (ScreenStumbles <= 1) Stumble("ScreenPostfix", e); }
+        }
+
+        // N12: naprawa wlasnymi rekami - drewno wedlug kg naprawy (Recipes.MissingParts / TakePartial, MendMaterial.SelfParts); licznik do linii doby NightEcon
+        internal static int MendUses, MendLoads; internal static double MendKg;
+        internal static bool MendKgOn { get { var s = Settings.Current; return s != null && s.SmithWoodKg && s.SelfMendWoodKg; } }
+
         /// <summary>Samosprawdzenie przy starcie: koszt drewna pierwszej wykutej broni z gry przy zapasie 50 kg (zapas potem jak byl).</summary>
         private static void SelfCheck()
         {
@@ -138,10 +175,13 @@ namespace Armoury
         }
 
         /// <summary>Start sesji (po McmSettings.Apply): wpiecie na metode czynnego modelu kosztow i SpendMaterials (raz na proces).</summary>
+        internal static string ScreenHook { get { return _screenHook; } }
+
         internal static void SessionStart()
         {
             if (_h == null) _h = new Harmony("com.jeff.armoury.smithwood");
             _sUses = _sLoads = 0; _sKg = 0;
+            ScreenHints = ScreenStumbles = 0; MendUses = MendLoads = 0; MendKg = 0;
             try
             {
                 var parts = new List<string>();
@@ -160,6 +200,15 @@ namespace Armoury
                     _patched.Add(ms);
                 }
                 parts.Add(ms != null ? "pobranie SpendMaterials" : "pobranie BRAK");
+                // N12: podpowiedz kg otwartego ladunku na ekranie kucia (metoda klasy deklarujacej)
+                try
+                {
+                    var mu = AccessTools.DeclaredMethod(typeof(TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.CraftingVM), "UpdateCurrentMaterialsAvailable");
+                    if (mu != null && !_patched.Contains(mu)) { _h.Patch(mu, postfix: new HarmonyMethod(typeof(SmithWood), nameof(ScreenPostfix))); _patched.Add(mu); }
+                    _screenHook = mu != null ? "wpiete" : "BRAK UpdateCurrentMaterialsAvailable";
+                }
+                catch (Exception e2) { _screenHook = "wyjatek " + e2.GetType().Name; Stumble("SessionStart(ekran)", e2); }
+                parts.Add("ekran kucia " + _screenHook);
                 _hook = string.Join(", ", parts.ToArray());
             }
             catch (Exception e) { _hook = "wyjatek " + e.GetType().Name; Stumble("SessionStart", e); }

@@ -296,7 +296,7 @@ namespace Armoury
         [SettingPropertyGroup("Forge fee")]
         public bool QuartermasterPurgeUnusable { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Charcoal Weight", 0.00f, 2.00f, "0.00", HintText = "a lump of charcoal weighs this much (vanilla hauls 5 kg bricks; 0 = leave alone)                   // the day's hire costs this many hours at the smith's rate (~200 gold in an average town)")]
+        [SettingPropertyFloatingInteger("Charcoal Weight", 0.00f, 2.00f, "0.00", HintText = "no longer read: the weight of a lump of charcoal is set by Charcoal Weight Kg (this old value may stay in your saved settings and is ignored)")]
         [SettingPropertyGroup("Forge fee")]
         public float CharcoalWeight { get; set; } = 0.5f;
 
@@ -2460,7 +2460,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistUniquePrestige { get; set; } = 4f;
 
-        [SettingPropertyFloatingInteger("Hist Bulk Unit Factor", 0.00f, 40.00f, "0.00", HintText = "ore and timber are sold by the load: one unit weighs this many times the game's 10 kg, so a unit costs whole pence (ore 100 kg = about 8 d, timber 100 kg = about 4 d) instead of a fraction of a penny rounded up to 1-2; village output, town use and every recipe are counted by weight, so nothing else changes")]
+        [SettingPropertyFloatingInteger("Hist Bulk Unit Factor", 0.00f, 40.00f, "0.00", HintText = "ore and timber are sold by the load: one unit weighs this many times the game's 10 kg, so a unit costs whole pence (ore 100 kg = about 8 d, timber 100 kg = about 4 d) instead of a fraction of a penny rounded up to 1-2; village output, town use and every recipe are counted by weight, so nothing else changes. New campaigns only: with Bulk Unit Per Campaign a campaign keeps the load it was begun with (saved with it), and moving this slider later changes nothing in it")]
         [SettingPropertyGroup("Iron Bank")]
         public float HistBulkUnitFactor { get; set; } = 10f;
 
@@ -2488,7 +2488,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HarnessKgPerArmor { get; set; } = 0.4f;
 
-        [SettingPropertyFloatingInteger("Helm Days Per Kg", 0.00f, 3.00f, "0.00", HintText = "a plate helmet of tier 4 to 6 takes this many days of an armourer's work for each kilogram, plus half a day for each tier above the third - before, it was priced like a breastplate and cost three to five times a real bascinet (0 = as before)")]
+        [SettingPropertyFloatingInteger("Helm Days Per Kg", 0.00f, 3.00f, "0.00", HintText = "a plate helmet of tier 4 to 6 (of every tier with Helm One Rule) takes this many days of an armourer's work for each kilogram, plus half a day for each tier above the third - before, it was priced like a breastplate and cost three to five times a real bascinet (0 = as before)")]
         [SettingPropertyGroup("Iron Bank")]
         public float HelmDaysPerKg { get; set; } = 1.0f;
 
@@ -6076,7 +6076,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool MilitiaByPeople { get; set; } = true;
 
-        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield twice what they did, and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign). Turned off during a campaign, only the salt pans go back to their old yield; the flax villages stay.")]
+        [SettingPropertyBool("Goods Rates By Pattern", HintText = "Salt pans yield more than they did (three and a half times with Salt Rate Raised, twice without it), and sixteen villages of the crowded lands - cotton growers, silver miners and fishers of the Reach, Volantis, Qarth, King's Landing, Braavos and the Stormlands, where cotton and silver lie unsold and every market keeps another village that feeds it - grow flax instead (36 flax villages instead of 20), so the world has the linen its people and soldiers wear. The flax villages come with a new campaign begun with this option and stay for that whole campaign, since each village's yield is measured with them; a campaign already under way keeps its villages. Off = salt as before (and no flax villages in a new campaign). Turned off during a campaign, only the salt pans go back to their old yield; the flax villages stay.")]
         [SettingPropertyGroup("Goods follow the people (GL)")]
         public bool GoodsRatesByPattern { get; set; } = true;
 
@@ -6215,6 +6215,38 @@ namespace Armoury
         [SettingPropertyBool("Gentry Names Fallback", HintText = "New gentry houses (locals who take up a vacant estate) rise in every realm again. Banner Kings names a new house with the first name on its culture's list that no house of the SAME culture bears, and the game then refuses a name any house bears. Realm of Thrones gives one list to many cultures, so the realm that founded the first house took that name for good and no gentry ever rose again in Braavos, Lys, Myr, Tyrosh, Norvos, Qohor, Volantis, the Reach, the Riverlands, the Stormlands, Dragonstone and others; the short lists of the North, the Vale, Dorne, the Free Folk and the Ghiscari ran out too. On = the first name on the list that no house in the world bears; when the list is used up, a name from the village (the village itself, or a name from the list of the village). A knight founding his house gets a free name the same way, but only where Banner Kings would have given him one. Lorath, Ibben, Qarth, the Night's Watch and the Summer Isles still have no gentry (Banner Kings has no gentry for their cultures). Off = as before")]
         [SettingPropertyGroup("Banner Kings gentry")]
         public bool GentryNamesFallback { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Charcoal Weight Kg", 0.00f, 10.00f, "0.00", HintText = "a lump of charcoal weighs this many kilograms (0 = the game's own 5 kg brick). With the game's weight a load of hardwood (100 kg) burns down to 4 lumps (a fifth of its weight), each refining step takes one 5 kg lump, and the charcoal of a piece forged at your anvil is counted by the kilogram as before; 0.5 = the old half-kilo lump (a load of wood worth 4 pence gave 40 lumps worth 40 pence)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public float CharcoalWeightKg { get; set; } = 0f;
+
+        [SettingPropertyBool("Salt Rate Raised", HintText = "with Goods Rates By Pattern, salt pans yield three and a half times their old rate instead of twice: salt has cost eight times its worth for years and the 97 towns together hold a few dozen sacks (off = twice, as before)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool SaltRateRaised { get; set; } = true;
+
+        [SettingPropertyBool("Fur Rate Raised", HintText = "trappers' villages bring in three times the furs they did: the whole world made about 40 packs a day while townsfolk sought about 150, and furs cost two to five times their worth (off = as before)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool FurRateRaised { get; set; } = true;
+
+        [SettingPropertyBool("Helm One Rule", HintText = "plate helmets of every tier are priced by one rule: days of work = weight x Helm Days Per Kg plus half a day for each tier above the third, and the weight that counts is never more than the usual weight of a plate helmet with that much head armour (the median of all plate helmets) - a tier 3 helmet no longer costs more than a tier 4 one. The same weight counts at the workshop, at your forge and in repairs (off = tiers 1 to 3 priced like a breastplate, by the game's weight)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool HelmOneRule { get; set; } = true;
+
+        [SettingPropertyBool("No Town Mines", HintText = "Banner Kings no longer turns a town workshop into a mine (one time in three when the town would get a second workshop of a kind) - town mines never worked a single cycle. The town gets instead the kind of workshop that earns most at its own market prices (outputs less inputs) and that it does not have yet; mines already standing stay until the workshop changes hands (off = as before)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool NoTownMines { get; set; } = true;
+
+        [SettingPropertyBool("Bulk Unit Per Campaign", HintText = "the load of ore and timber (Hist Bulk Unit Factor) is fixed for the whole campaign and kept in the save: moving the slider later changes nothing in a running campaign, where it would have counted every stack of wood and ore in the world anew (a save from before keeps 10, the load it has; off = the slider counts at every load, as before)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool BulkUnitPerCampaign { get; set; } = true;
+
+        [SettingPropertyBool("Smith Wood On Screen", HintText = "with Smith Wood Kg: hover the hardwood counter on the smithing screen to see how many kilograms are left of the open load of hardwood")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool SmithWoodOnScreen { get; set; } = true;
+
+        [SettingPropertyBool("Self Mend Wood Kg", HintText = "with Smith Wood Kg: mending at your own anvil takes wood by the kilogram of the repair from the open load - a new load of hardwood is asked for only when the open one runs short (off = a share of whole loads, as before)")]
+        [SettingPropertyGroup("Goods and prices (night 16.10)")]
+        public bool SelfMendWoodKg { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -7769,6 +7801,14 @@ namespace Armoury
             s.FixBkrotWageSeaCut = FixBkrotWageSeaCut;
             s.FixPrincelyArbiterWage = FixPrincelyArbiterWage;
             s.GentryNamesFallback = GentryNamesFallback;
+            s.CharcoalWeightKg = CharcoalWeightKg;
+            s.SaltRateRaised = SaltRateRaised;
+            s.FurRateRaised = FurRateRaised;
+            s.HelmOneRule = HelmOneRule;
+            s.NoTownMines = NoTownMines;
+            s.BulkUnitPerCampaign = BulkUnitPerCampaign;
+            s.SmithWoodOnScreen = SmithWoodOnScreen;
+            s.SelfMendWoodKg = SelfMendWoodKg;
         }
 
         internal static void Apply()

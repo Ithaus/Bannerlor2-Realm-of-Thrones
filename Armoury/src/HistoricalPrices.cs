@@ -19,7 +19,7 @@ namespace Armoury
     /// i zbroje (wzor gry 100-120 x 2.75^tier - t1 -> t6 x157) i surowce kuzni (ruda, drewno, wegiel, sztabki).
     ///
     /// Etap 1+2 (ten plik): przy starcie sesji ustawiamy Value (setter, jak MaterialLaw):
-    ///  - surowce kuzni wedle cen historycznych za kg (wegiel liczony ze swoja prawdziwa waga z gry - 5 kg);
+    ///  - surowce kuzni wedle cen historycznych za kg (wegiel liczony ze swoja prawdziwa waga z gry - 5 kg; N2 16.10: CharcoalWeightKg 0, wczesniej 0.5 kg);
     ///  - kazda bron, zbroja, tarcza, amunicja, uprzaz: KOSZT HISTORYCZNY z ilosci fizycznych naszego modelu
     ///    (ArmsPricing.Cost: kg metalu ze strata, skory, lnu, drewna, dni pracy x jakosc sztuki): material x cena
     ///    historyczna + dni x dniowka mistrza wedle tieru, zysk; unikaty x prestiz.
@@ -261,7 +261,12 @@ namespace Armoury
         /// <summary>Koszt historyczny sztuki w pensach (0 = nie umiemy policzyc).</summary>
         internal static float HistCost(ItemObject it)
         {
-            var c = ArmsPricing.CostOf(it);
+            return HistCostOf(it, ArmsPricing.CostOf(it));
+        }
+
+        /// <summary>Koszt historyczny z podanego rachunku kosztu (N9, noc 16.10: tabela helmow przed / po w linii startu - rachunek starej reguly bez pamieci kosztu).</summary>
+        internal static float HistCostOf(ItemObject it, ArmsPricing.Cost c)
+        {
             if (c == null) return 0f;
             var s = Settings.Current;
             float mat = c.MetalKg * MetalPerKg(c.Grade)
@@ -464,22 +469,24 @@ namespace Armoury
                 // 0. ruda i drewno w ladunkach (wpis 50)
                 // E6/R1 (214): przy wytopie przy kopalni (Bloomery.CanApply - klucz, nowa kampania, latki ticku i modelu wsi) sztuka "iron" to lupa:
                 // metal z ladunku rudy (100 kg x WorkshopCrudeKgPerOre / 10 = 15 kg surowki), liczona dalej jak ten ladunek (CountScale / CountKg)
-                bool bloom = s.HistBulkUnitFactor > 1.01f && Bloomery.CanApply();
-                if (s.HistBulkUnitFactor > 1.01f)
+                // N11 (noc 16.10): czynnik ladunku kampanii z zapisu (BulkUnit, klucz BulkUnitPerCampaign) - suwak MCM tylko dla nowej kampanii
+                float bulk = BulkUnit.Factor(s);
+                bool bloom = bulk > 1.01f && Bloomery.CanApply();
+                if (bulk > 1.01f)
                     foreach (var id in new[] { "iron", "hardwood" })
                     {
                         var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                         if (it == null) continue;
                         if (!_origWeight.ContainsKey(it)) _origWeight[it] = it.Weight;
-                        float w = _origWeight[it] * s.HistBulkUnitFactor;
+                        float w = _origWeight[it] * bulk;
                         if (bloom && id == "iron")
                         {
                             w *= Math.Max(0.01f, s.WorkshopCrudeKgPerOre) / 10f;
-                            Bloomery.MarkApplied(it, s.HistBulkUnitFactor);
+                            Bloomery.MarkApplied(it, bulk);
                         }
                         SetWeight(it, w);
                     }
-                Bloomery.StartLine(s.HistBulkUnitFactor > 1.01f);
+                Bloomery.StartLine(bulk > 1.01f);
 
                 // 1. surowce kuzni - cena za kg x WAGA (ruda i drewno 100 kg w ladunku, wegiel, sztabki 0.5 kg)
                 var raw = new List<string>();

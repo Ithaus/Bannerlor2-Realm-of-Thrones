@@ -12,7 +12,8 @@ namespace Armoury
 {
     /// <summary>
     /// PRAWO SUROWCOW (Jeff 04.10, "zbuduj pelny system" - docs/MODEL-MATERIALOW.md, krok 1).
-    /// Jednostki gry: ruda 10 kg (50), drewno 10 kg (25), sztabka i wegiel po 0.5 kg.
+    /// Jednostki gry: ruda 10 kg (50), drewno 10 kg (25), sztabka 0.5 kg, wegiel 5 kg (N2, noc 16.10: waga gry - CharcoalWeightKg 0; do 16.10 klucz
+    /// CharcoalWeight robil z bryly pol kilo, a przetop z wagi dawal 40 wegli z ladunku drewna).
     /// Vanilla: 2 drewna (20 kg) -> 1 wegiel (0.5 kg), 1 ruda + 1 wegiel -> 2 surowki,
     /// wegiel po 50 (100 za kg, 40x drozszy od drewna). Historycznie koszt zelaza robi
     /// WEGIEL: 1-2 kg wegla na kg rudy, z 4-7 kg drewna na kg wegla.
@@ -105,7 +106,7 @@ namespace Armoury
             int bloomCoal = Math.Max(1, s.BloomeryCharcoalPerOre);
             if (HistoricalPrices.On)
             {
-                // ceny historyczne: wegiel liczony ze swoja PRAWDZIWA waga z gry (5 kg) - z drewna wychodzi ok. 20% wagi
+                // ceny historyczne: wegiel liczony ze swoja PRAWDZIWA waga z gry (5 kg; N2 16.10 - wczesniej klucz CharcoalWeight dawal 0.5 kg) - z drewna wychodzi ok. 20% wagi
                 // w weglu (5 drewna = 50 kg -> 2 wegle = 10 kg); dymarka: 1 ruda (10 kg) + 2 wegle -> 4 surowki (2 kg zelaza);
                 // dalsze stopnie: 5 sztabek + 1 wegiel -> 4 (strata 20%, Jeff)
                 // wpis 50: ilosci z WAG (ladunek drewna/rudy 100 kg, wegiel i sztabki z gry): drewno -> 20% masy w weglu,
