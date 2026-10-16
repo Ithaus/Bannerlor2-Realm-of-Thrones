@@ -2289,3 +2289,12 @@ egzemplarzach tego samego id z innym modyfikatorem gracz przy nastepnym porzadku
 ArmouryShowsOnlyYours + !PlayerMenSellSpareHorses (MenPurse.cs:441), SurplusPlan pyta tylko grupe group[0] (MenPurse.cs:499), StoreSub RealmWard bez filtra legend/olbrzymow
 (Mends.cs:6052), jezdziec w kryjowce/oblezeniu wedlug konia DTE (Mends.cs:6087), NightRest.cs:207 (pytanie o nocleg po snie w menu).
 Nastepne kroki: monitoring logu Jeffa (rozdz. 41 PRZEKAZANIE - lista linii); ksiega per modyfikator; noc-ekonomia2 + P6 z Jeffem; bandyci z Jeffem.
+
+### 47. WGRANIE 65 (16.10 ok. 00:05 zegara komp.) - START TUTAJ
+W grze: `w-toku/zbior-e8` **a2310165** (= `noc/wgranie-65`) | Armoury 9e65bb72; reszta jak 64. Kopie *.bak-2026-10-16-wgranie65-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie65-przed.
+Zapis Jeffa po sesji 22:48-23:4x (WGRANIE 64, 0 ERROR): D:/Backup-Bannerlord/zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-16-po-sesji.sav (md5 d720baa6); logi sesji w D:/Backup-Bannerlord/logi-jeffa/2026-10-16.
+= 64 + noc-zlecenia (CraftOrdersGiverCanPay, CraftOrdersPurse.cs): Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy" (Prudence 0 z 11, Corwyn 0 z 5 - log 23:13:57) -
+zlecenie miejskie powstaje tylko, gdy kiesa zleceniodawcy pokrywa sume jego zlecen (+20% na premie), przeglad dobowy i przy starcie usuwa zlecenia bez pokrycia/zmarlych (nie przy otwartej kuzni,
+nie zlecenia zadan). Test zapis F 15 dob: 0 ERROR, grupa nzlec 0 NIE, wiszacych 529 (bez pokrycia 0), odrzucone przy tworzeniu ok. 20/dobe.
+Jeff o lupach ("kogo zabije, jego sprzet w 100% moj"): log sesji 23:26/23:33/23:39 - regula dziala (OwnKillsLootWhole: Twoje ciala w calosci, zolnierskie x 33%); czekam na wskazanie bitwy, jesli cos nie pasowalo.
+W TOKU: naprawa ekonomii wf_1f856eec-9a6 (galaz w-toku/noc-ekonomia3) - z poprawka Jeffa: karawany sprzedaja z zyskiem (cena > koszt zakupu + droga), na stracie tylko bez wyjscia.
