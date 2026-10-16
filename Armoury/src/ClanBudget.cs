@@ -150,6 +150,7 @@ namespace Armoury
         private static string _watchDetail = "";
         // test 120 dob (wojsko w wojnie): dwor ustepuje zoldowi (udzial dostepny, zold go zajal, u ilu rodow); limity partii z wolnego miejsca rodu
         private static long _dCourtRoom, _dCourtYield; private static int _dCourtRoomN, _dCourtYieldN, _dPartyOverCap;
+        private static long _dCourtGoods;   // E3-P1 (a): czesc dworu za towar z polki siedziby (licznik linii 166)
         // 168: kredyt wojenny w pulapie (miejsce i wyplata), dluznicy, zajete wsie
         private static long _dKwRoom, _dKwLent, _dSeizedLand; private static int _dKwRoomN, _dKwLentN, _dDebtorN, _dSeizedN;
         internal static long LastKwLent, LastKwRoom; internal static int LastKwLentN, LastKwRoomN;
@@ -187,6 +188,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _dCourt = _dCourtTown = _dFood = _dFamily = _dRelPurse = _dBuild = _dGear = _dCapSum = _dWageSum = _dD = 0;
+            _dCourtGoods = 0;
             _dRelMen = _dRelPar = _dRelGar = _dNoVillage = _dFamilyN = _dOver = _dStreak = _dPeace = _dWar = _dClans = _dPoor = _dVanished = 0;
             _dRelTavern = 0; _dRelPurseVet = 0;
             _dPzCap = _dPzChest = _dPzWage = 0; _dPzN = _dPzChestN = _dPzMenPar = _dPzMenGar = 0;   // Z.1
@@ -1007,16 +1009,22 @@ namespace Armoury
             _dFood += (long)food;
             if (x <= 0) return;
             int ix = (int)Math.Min(int.MaxValue, x);
+            // E3-P1 (a) (CourtBuysGoods, noc-ekonomia3 czesc 2): siedziba-miasto - do 60% WLASNEJ czesci dworu (bez sprzetu E5/A2; dwor placony pierwszy) kupuje towar z polki
+            // siedziby; towar schodzi z polki tu, zloto idzie nizej w tej samej wplacie (ta sama kwota co dotad - czesc za towar); zamki bez zmian
+            long goods = seat.IsTown ? CourtGoods.Lord(seat, Math.Min((long)ix, (long)Math.Max(0, court))) : 0;
             head.ChangeHeroGold(-ix);
             CirculationWindows.NoteHeroGold(head, -ix);            // paczka 169b: glowa poza swiatem - zloto weszlo do swiata (tylko licznik)
-            int folk = TownFolk.Earn(seat, (int)(ix * (double)CourtFull.FolkShare), TownFolk.KCourt);   // E5/B1 (R8, KL 1.3): 20% dworu do ludu siedziby (zamek - podzamcze); arytmetyka
+            int folk = TownFolk.Earn(seat, (int)((ix - goods) * (double)CourtFull.FolkShare), TownFolk.KCourt);   // E5/B1 (R8, KL 1.3): 20% dworu do ludu siedziby (zamek - podzamcze); arytmetyka; E3-P1: tylko od czesci "sluzba" (bez towaru)
             seat.Town.ChangeGold(ix - folk);                       // dwor zyje z kasy siedziby: kuchnia, sluzba, stajnie - pieniadze zostaja w osadzie
             if (seat.IsCastle) TownFolk.CourtCredit(seat, ix - folk);   // E5/B1 (kuchnia pana): czesc kupcow dworu w kasie zamku - kredyt na jedzenie podzamcza (bez zlota); CourtCredit sam sprawdza kiese czynna zamkow
             long lpK = folk > 0 && ix > 0 ? lp - (long)(lp * (double)folk / ix) : lp;   // E5/B1: sprzet w kasie (CourtFull.Paid/Own od czesci w kasie)
             ClanIncomeBook.NoteOwnPaid(seat, c, Math.Max(0, ix - folk - CourtFull.Own(seat, c, lpK)));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
             try { TownFolk.Note(seat, ix, TownFolk.KCourt); } catch { }   // E5/0 (195): dwor w kasie siedziby (tylko licznik)
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty
-            _dCourt += ix;
+            // E3-P1 poprawki (uwagi recenzji 1 i 2, jedna regula): towar z polki siedziby kupiony przez dwor pana to sprzedaz kupcow z polki - robocizna handlu jak przy
+            // dworze krola (CourtGoods.Crown) i kazdej naszej sprzedazy z polki (AiGear, MenUpgrade, BuildFunding, MaterialOrders); tylko licznik podstawy plac jutra
+            if (goods > 0) { try { TownFolk.Sale(seat, (int)Math.Min(int.MaxValue, goods), TownFolk.MixGoods); } catch { } }
+            _dCourt += ix; _dCourtGoods += goods;
         }
 
         // ------------------------------------------------------------ zwolnienia (15% nadwyzki dziennie po 3 dobach ponad 1.10 x pulap)
@@ -2012,7 +2020,7 @@ namespace Armoury
               .Append(" | dezercja gry z limitu zoldu wylaczona (rody z budzetem): ").Append(_dDesertOff).Append(" wywolan")
               .Append(" | limity: partie zmienione ").Append(_dPartyLimited).Append(", zalogi przyciete do celu pokojowego ").Append(_dGarLimited)
               .Append(", nowe partie wstrzymane ").Append(_dSpawnBlock)
-              .Append(" | dwor (162m): wplacone do kas siedzib ").Append(_dCourt).Append(" (w tym miasta pod tarcza dworu ").Append(_dCourtTown).Append("), jedzenie partii (szacunek, odjete) ").Append(_dFood)
+              .Append(" | dwor (162m): wplacone do kas siedzib ").Append(_dCourt).Append(" (w tym miasta pod tarcza dworu ").Append(_dCourtTown).Append("; w tym za towar z polki siedziby E3-P1 ").Append(_dCourtGoods).Append("), jedzenie partii (szacunek, odjete) ").Append(_dFood)
               .Append(", ").Append(SoldierPay.CourtNote())
               .Append(" | kiesa rodziny do glow: ").Append(_dFamily).Append(" zl w ").Append(_dFamilyN).Append(" przelewach; glowy < 5000 (rody z budzetem): ").Append(_dPoor)
               .Append(" | sprzet: przydzial dnia ").Append(_dGear).Append(", wydane przez panow od wczoraj ").Append(_dGearSpent)

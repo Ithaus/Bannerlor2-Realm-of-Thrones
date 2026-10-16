@@ -55,6 +55,8 @@ namespace Armoury
             public long KingOut;          // L1 (pieniadze roku 2): czesc RepOut - raty okupow krolow (178, dlug Kind 'k'); reszta RepOut to reparacje
             public long NeedAidRent;      // M1 (pieniadze roku 2): doplata W5 z reszty wplywow dnia przed rentami (KingdomTreasury.RentAid.cs) - obok NeedAid (szczebel daniny), nie w nim
             public long ScutIn, ScutOut;  // W6: tarczowe tej doby - pobrane (glowy platnikow -> skarbiec) i wyplacone przez W5 ponad danine (skarbiec -> glowy rodow); POZA wplywami dnia (Spend / Left)
+            public long ValveKept; public double ValveR;   // E3-G5: czesc korony z zaworu miast zatrzymana w zapasie (z puli rent, po M3) i jej udzial r tej doby
+            public long Court;            // E3-P1 (b): dwor krolewski - towar z polki stolicy z reszty wplywow dnia (po M3 i G5, przed rentami; skarbiec -> kasa stolicy)
             public bool Snap;
         }
 
@@ -136,6 +138,44 @@ namespace Armoury
 
         /// <summary>Ile z wplywow dnia krolestwo moze jeszcze wydac (0 poza 165).</summary>
         internal static long LeftFor(Kingdom k) { var d = DayOf(k); return d != null ? Math.Max(0, Math.Min(d.Left, (long)k.KingdomBudgetWallet)) : 0; }
+
+        /// <summary>
+        /// E3-G5 (klucz CrownKeepsValveShare, DOMYSLNIE WYLACZONY - dzwignia awaryjna; uwagi recenzji 1 i 2: w Begin cielo by caly dzien korony, takze zwrot zoldu,
+        /// i dublowalo regulator czesci korony straznika 5 x brak do 22%): CrownRents.Daily po M3, tuz przed podzialem rent - gdy wczorajszy udzial koron
+        /// w zlocie swiata (MoneyLedger.LastShares) < FolkGuardCrownTarget, czesc r = min(0.5, 5 x brak) udzialu korony z zaworu miast tej doby (TownPurse.CrownToday)
+        /// zostaje w skarbcu jako zapas (Spent - nie idzie w renty 180; jutro w Stock, wychodzi po 1/CrownReserveReleaseDays). Tylko z puli rent (`pool`), nigdy
+        /// z rat, darow, kontraktow, zwrotu zoldu, W5 i M1 (te biegna wczesniej). Doba z kredytem Banku 186 (LoanIn > 0) - 0. Zwraca zatrzymane. Nie rzuca.
+        /// </summary>
+        internal static long KeepValve(Kingdom k, long pool)
+        {
+            try
+            {
+                var s = Settings.Current;
+                var d = DayOf(k);
+                if (s == null || !s.CrownKeepsValveShare || d == null || pool <= 0) return 0;
+                if (d.LoanIn > 0) { _dValveLoanN++; return 0; }
+                long world, folk, lords, crowns;
+                if (!MoneyLedger.LastShares(out world, out folk, out lords, out crowns) || world <= 0) return 0;
+                double tgt = Math.Max(0, Math.Min(0.5, s.FolkGuardCrownTarget)), share = (double)crowns / world;
+                double r = Math.Min(0.5, 5.0 * (tgt - share));
+                if (!(r > 0)) return 0;
+                long tow; TownPurse.CrownToday.TryGetValue(k, out tow);
+                long keep = Math.Min((long)(r * Math.Max(0, tow)), pool);
+                if (keep <= 0) return 0;
+                Spent(k, keep);
+                d.ValveKept += keep; d.ValveR = r; _dValveShare = share;
+                return keep;
+            }
+            catch (Exception e) { Stumble("KeepValve", e); return 0; }
+        }
+        private static int _dValveLoanN; private static double _dValveShare = double.NaN;
+
+        /// <summary>E3-P1 (b): dwor krolewski zaplacil dzis kasie stolicy (licznik linii 165; zloto zeszlo juz ze skarbca i jest w Spent).</summary>
+        internal static void NoteCourt(Kingdom k, long amount)
+        {
+            KDay d;
+            if (k != null && amount > 0 && _day.TryGetValue(k, out d)) d.Court += amount;
+        }
 
         /// <summary>Wydatek z wplywow dnia (dar, kontrakt, zwrot) - skarbiec placi wolajacy; tu tylko licznik reszty.</summary>
         internal static void Spent(Kingdom k, long amount)
@@ -336,6 +376,8 @@ namespace Armoury
                 long naid = 0;   // W5: doplata do zoldu wedlug potrzeby
                 long scIn = 0, scOut = 0;   // W6: tarczowe (pobrane i wyplacone tej samej doby)
                 long cAid = 0;   // W5b regula 2: doplata W5 ze skarbcow ponad zapas wojny (poza wplywami dnia)
+                long vKept = 0; int vKeptN = 0; double vR = 0;   // E3-G5
+                long court = 0; int courtN = 0;   // E3-P1 (b)
                 var parts = new List<KeyValuePair<long, string>>();
                 foreach (var kv in _day)
                 {
@@ -343,6 +385,8 @@ namespace Armoury
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
                     loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
+                    if (d.ValveKept > 0) { vKept += d.ValveKept; vKeptN++; vR = Math.Max(vR, d.ValveR); }
+                    if (d.Court > 0) { court += d.Court; courtN++; }
                     if (!d.Snap) noSnap++;
                     if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0 && d.ScutIn <= 0 && d.CrownAid <= 0) continue;
                     parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "") + (d.WarAid > 0 ? " (danina P1 " + d.WarAid + ")" : "")
@@ -383,6 +427,10 @@ namespace Armoury
                       .Append(", renty (180) ").Append(rent).Append(" (wstrzymane w skarbcach - rody bez warunku i zaokraglenia ").Append(rentH).Append(CrownRents.On ? ")" : "; renty wylaczone)")
                       .Append(", doplata do zoldu wedlug potrzeby (W5, przed rentami) ").Append(naid).Append(", doplata z reszty wplywow dnia przed rentami (M1) ").Append(naRent)
                       .Append(", chleb dla glodnych osad (M3, z reszty wplywow przed rentami) ").Append(bread)
+                      .Append(", E3-G5 z zaworu miast do zapasu (Crown Keeps Valve Share ").Append(s.CrownKeepsValveShare ? "tak" : "nie - dzwignia awaryjna").Append(", z puli rent po M3) ").Append(vKept)
+                      .Append(" (krolestw ").Append(vKeptN).Append(", r najwyzej ").Append(vR.ToString("0.000", Inv)).Append(", udzial koron wczoraj ").Append(double.IsNaN(_dValveShare) ? "-" : (100 * _dValveShare).ToString("0.0", Inv) + "%")
+                      .Append(", pominiete przy kredycie 186 ").Append(_dValveLoanN).Append(')')
+                      .Append(", E3-P1 dwor krolewski - towar z polki stolicy z puli rent (Crown Court Goods ").Append(s.CrownCourtGoods ? "tak" : "nie").Append(") ").Append(court).Append(" (krolestw ").Append(courtN).Append(')')
                       .Append(", tarczowe (W6, poza wplywami dnia): pobrane od rodow do skarbcow ").Append(scIn).Append(", wyplacone tej samej doby rodom z doplata W5 ").Append(scOut)
                       .Append(", doplata ze skarbcow ponad zapas wojny (W5b, poza wplywami dnia - z zapasu) ").Append(cAid)
                       .Append(", skarbce zdobytych stolic (L5b-1, poza wplywami dnia - migawka przesunieta): ze skarbcow przegranych ").Append(CapitalTreasury.LastTaken)
@@ -402,6 +450,7 @@ namespace Armoury
                     Log.Info(sb.ToString());
                 }
                 _dDropped = 0; _dDroppedN = 0; _dDebtUnpaid = 0; _dNewKing = 0; _dNewKingN = 0;
+                _dValveLoanN = 0; _dValveShare = double.NaN;   // E3-G5
             }
             catch (Exception e) { Stumble("End", e); }
             finally { _open = false; }

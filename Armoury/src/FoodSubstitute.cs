@@ -27,6 +27,9 @@ namespace Armoury
     /// popycie: popyt x indeks^a + dobrobyt / indeks). Limit liczony RAZ przy pierwszym uzyciu t w osadzie i zmniejszany kazdym dopisem (nie od nowa ze zmienionego
     /// slownika - inaczej N zrodel bralo 1 - 0.5^N nadwyzki); zrodlo z brakiem nie ma nadwyzki, wiec nie bywa zamiennikiem (bez przelewania tam i z powrotem).
     /// Kontrola po osadzie: budzet BK dopisany do kazdego zamiennika <= 0.5 N_t (licznik przekroczen w linii doby). Brak zamiennika z nadwyzka - nic (jak dotad).
+    /// POPRAWKA PO RECENZJI noc-ekonomia2 16.10 (ShiftLimit; autotesty 15.10: co dobe 51-91 przekroczen, najwiecej 53.6% nadwyzki): dopis podnosi popyt targu
+    /// zamiennika, a z nim indeks ceny i budzet BK ponad nachylenie liczone przy starym indeksie - teraz najpierw plan calej osady (ze slownika sprzed zmian),
+    /// potem dopis kazdego zamiennika x f (przyrost budzetu BK przy NOWYM popycie targu <= 0.5 N_t), dopiero potem zmiany; czesc odcieta zostaje w zrodle.
     /// Popyt targu (ItemData.Demand, cena): ta sama zamiana z waga wygladzania gry (GetSupplyDemandForCategory: nowy = 0.85 stary + 0.15 dzisiejszy - waga mierzona
     /// raz na sesje), wiec w stanie ustalonym popyt pustego towaru spada o przesuniety budzet, a zamiennika rosnie o tyle samo - nie 6.7 razy tyle (POPRAWKA PLANU:
     /// odjecie calej kwoty co dobe kumulowaloby sie przez wygladzanie). Podloga 0.1 x popyt.
@@ -56,7 +59,8 @@ namespace Armoury
 
         private sealed class Src { public ItemCategory Cat; public ItemCategory[] To; }
         /// <summary>Zamiennik w tej osadzie: reszta limitu (jednostki budzetu dnia), limit w zlocie (0.5 nadwyzki), budzet BK sprzed dopisow, suma dopisow.</summary>
-        private sealed class Room { public float Left, Gold, B0, Got; }
+        private sealed class Room { public float Left, Gold, B0, Got, F = 1f; }
+        private sealed class Plan { public int Src; public ItemCategory To; public float Add; }
         private static List<Src> _map;
         private static HashSet<ItemCategory> _cats;
         private static Campaign _builtFor;
@@ -66,11 +70,12 @@ namespace Armoury
         private static readonly Dictionary<ItemCategory, float> _shelf = new Dictionary<ItemCategory, float>();
         private static readonly Dictionary<ItemCategory, float> _orig = new Dictionary<ItemCategory, float>();   // slownik osady sprzed naszych zmian (kategorie z tabeli)
         private static readonly Dictionary<ItemCategory, Room> _room = new Dictionary<ItemCategory, Room>();     // limit zamiennikow tej osady (null = bez nadwyzki)
-        private static readonly List<KeyValuePair<ItemCategory, float>> _adds = new List<KeyValuePair<ItemCategory, float>>();
+        private static readonly List<Plan> _plan = new List<Plan>();
+        private static float[] _srcB, _srcMoved;   // budzet dnia zrodla z planem i suma jego dopisow po limicie (indeks w _map)
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         // liczniki od poprzedniej linii doby
         private static int _towns, _castles, _shortT, _shortC, _noSub, _stumbles, _stDay;
-        private static int _chk, _over, _offCut, _offAll;   // kontrola limitu: zamiennikow z dopisem, przekroczen; oferta ludu zmniejszyla / zjadla nadwyzke
+        private static int _chk, _over, _offCut, _offAll, _trim;   // kontrola limitu: zamiennikow z dopisem, przekroczen; oferta ludu zmniejszyla / zjadla nadwyzke; przyciete (ShiftLimit)
         private static double _maxUse;                       // najwiekszy udzial nadwyzki zamiennika wziety w jednej osadzie (kontrola, cel <= 0.5)
         private static double _moved;
         private static readonly Dictionary<string, double> _pairs = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -168,62 +173,90 @@ namespace Armoury
             }
             float share = Math.Max(0f, Math.Min(1f, s.FoodSubstituteShare));
             if (!(share > 0f)) return;
-            // slownik sprzed naszych zmian - z niego limit kazdego zamiennika (raz na osade, nie od nowa po dopisach)
-            _orig.Clear(); _room.Clear();
+            // slownik sprzed naszych zmian - z niego limit kazdego zamiennika (raz na osade, nie od nowa po dopisach) i budzet kazdego zrodla
+            _orig.Clear(); _room.Clear(); _plan.Clear();
             foreach (var c in _cats) { float v; if (dict.TryGetValue(c, out v)) _orig[c] = v; }
+            if (_srcB == null || _srcB.Length < _map.Count) { _srcB = new float[_map.Count]; _srcMoved = new float[_map.Count]; }
             bool shortHere = false;
-            foreach (var src in _map)
+            int noSub = 0;
+            ItemCategory anySrc = null;
+            // 1. PLAN (bez zmian slownika i popytu targu): zamienniki po kolei, limit zamiennika wspolny dla wszystkich zrodel osady
+            for (int si = 0; si < _map.Count; si++)
             {
+                _srcB[si] = 0f; _srcMoved[si] = 0f;
+                var src = _map[si];
                 float b;
-                if (!dict.TryGetValue(src.Cat, out b) || !(b > 0.01f)) continue;
+                if (!_orig.TryGetValue(src.Cat, out b) || !(b > 0.01f)) continue;
                 float B = Budget(town, b, src.Cat);
                 if (!(B > 0.01f)) continue;
                 float S; _shelf.TryGetValue(src.Cat, out S);
                 if (S >= B) continue;
                 shortHere = true;
                 float move = (1f - S / B) * b * share, left = move;
-                // najpierw rachunek (pytania o budzet BK moga rzucic), potem zmiany - slownik albo caly przesuniety, albo nietkniety (suma bez zmian)
-                _adds.Clear();
+                int n0 = _plan.Count;
                 foreach (var t in src.To)
                 {
                     var rm = RoomOf(town, t);
                     if (rm == null || !(rm.Left > 0.01f)) continue;
                     float add = Math.Min(left, rm.Left);
                     if (!(add > 0.01f)) continue;
-                    _adds.Add(new KeyValuePair<ItemCategory, float>(t, add));
+                    _plan.Add(new Plan { Src = si, To = t, Add = add });
+                    rm.Left -= add; rm.Got += add;
                     left -= add;
                     if (left <= 0.01f) break;
                 }
-                float moved = move - left;
-                if (_adds.Count == 0 || !(moved > 0.01f)) { _noSub++; continue; }
-                float alpha = Alpha(town, src.Cat);
-                foreach (var kv in _adds)
-                {
-                    var rt = _room[kv.Key];
-                    rt.Left -= kv.Value; rt.Got += kv.Value;   // limit zamiennika wspolny dla wszystkich zrodel tej osady
-                    dict[kv.Key] = dict[kv.Key] + kv.Value;
-                    var dt = md.GetCategoryData(kv.Key);
-                    md.SetDemand(kv.Key, dt.Demand + alpha * kv.Value);
-                    string key = src.Cat.StringId + " -> " + kv.Key.StringId;
-                    double pv; _pairs.TryGetValue(key, out pv); _pairs[key] = pv + kv.Value;
-                }
-                dict[src.Cat] = b - moved;
-                var dc = md.GetCategoryData(src.Cat);
-                md.SetDemand(src.Cat, Math.Max(0.1f * dc.Demand, dc.Demand - alpha * moved));
-                _moved += moved;
+                if (_plan.Count == n0) { noSub++; continue; }
+                _srcB[si] = b;
+                if (anySrc == null) anySrc = src.Cat;
             }
-            if (shortHere) { if (town.IsTown) _shortT++; else _shortC++; }
-            // kontrola limitu (tylko licznik): budzet BK dopisany do zamiennika przez wszystkie zrodla tej osady <= 0.5 nadwyzki polki (po ofercie ludu)
+            // 2. LIMIT PRZY NOWYM POPYCIE TARGU (poprawka po recenzji noc-ekonomia2 16.10, ShiftLimit - dowod: 51-91 przekroczen na dobe, najwiecej 53.6% nadwyzki):
+            // dopis zamiennika x f - przyrost budzetu BK zamiennika z indeksem ceny po dopisie <= 0.5 nadwyzki polki; popyt targu wraca do stanu sprzed rachunku
+            float alpha = anySrc != null ? Alpha(town, anySrc) : 0.15f;
             foreach (var kv in _room)
             {
                 var rm = kv.Value;
                 if (rm == null || !(rm.Got > 0f)) continue;
                 float bt0; _orig.TryGetValue(kv.Key, out bt0);
-                float used = Budget(town, bt0 + rm.Got, kv.Key) - rm.B0;
+                float used; bool cut;
+                rm.F = ShiftLimit.Fit(town, md, kv.Key, bt0, rm.B0, rm.Got, rm.Gold, alpha, Budget, out used, out cut);
                 _chk++;
+                if (cut) _trim++;
                 if (rm.Gold > 0f) { double u = SpareUse * used / rm.Gold; if (u > _maxUse) _maxUse = u; }
                 if (used > rm.Gold * 1.001f + 0.5f) _over++;
             }
+            // 3. ZMIANY (po calym rachunku osady - slownik albo caly przesuniety, albo nietkniety; suma bez zmian)
+            foreach (var pl in _plan)
+            {
+                float fin = pl.Add * _room[pl.To].F;
+                _srcMoved[pl.Src] += fin;
+                if (!(fin > 0f)) continue;
+                string key = _map[pl.Src].Cat.StringId + " -> " + pl.To.StringId;
+                double pv; _pairs.TryGetValue(key, out pv); _pairs[key] = pv + fin;
+            }
+            foreach (var kv in _room)
+            {
+                var rm = kv.Value;
+                if (rm == null || !(rm.Got > 0f)) continue;
+                float add = rm.Got * rm.F;
+                if (!(add > 0f)) continue;
+                float before; dict.TryGetValue(kv.Key, out before);
+                dict[kv.Key] = before + add;
+                var dt = md.GetCategoryData(kv.Key);
+                md.SetDemand(kv.Key, dt.Demand + alpha * add);
+            }
+            for (int si = 0; si < _map.Count; si++)
+            {
+                if (!(_srcB[si] > 0f)) continue;
+                float moved = _srcMoved[si];
+                if (!(moved > 0.01f)) { noSub++; continue; }
+                var sc = _map[si].Cat;
+                dict[sc] = _srcB[si] - moved;
+                var dc = md.GetCategoryData(sc);
+                md.SetDemand(sc, Math.Max(0.1f * dc.Demand, dc.Demand - alpha * moved));
+                _moved += moved;
+            }
+            _noSub += noSub;
+            if (shortHere) { if (town.IsTown) _shortT++; else _shortC++; }
         }
 
         /// <summary>Limit zamiennika t w tej osadzie - liczony raz (pierwsze uzycie), ze slownika sprzed naszych zmian: 0.5 x (polka - budzet BK - oferta ludu)
@@ -301,11 +334,11 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null) return;
             int towns = _towns, castles = _castles, st = _shortT, sc = _shortC, ns = _noSub, sd = _stDay;
-            int chk = _chk, over = _over, offCut = _offCut, offAll = _offAll;
+            int chk = _chk, over = _over, offCut = _offCut, offAll = _offAll, trim = _trim;
             double moved = _moved, maxUse = _maxUse;
             var pairs = new List<KeyValuePair<string, double>>(_pairs);
             _towns = _castles = _shortT = _shortC = _noSub = _stDay = 0; _moved = 0; _pairs.Clear();
-            _chk = _over = _offCut = _offAll = 0; _maxUse = 0;
+            _chk = _over = _offCut = _offAll = _trim = 0; _maxUse = 0;
             pairs.Sort((a, b) => b.Value.CompareTo(a.Value));
             var pp = new List<string>();
             for (int i = 0; i < pairs.Count && i < 14; i++) pp.Add(pairs[i].Key + " " + pairs[i].Value.ToString("0", Inv));
@@ -326,7 +359,7 @@ namespace Armoury
                      + " | osad przeliczonych " + towns + " (zamkow " + castles + ") | miast z brakiem jedzenia " + st + " (zamkow " + sc + ")"
                      + " | przesunieto budzetu " + moved.ToString("0", Inv) + (pp.Count > 0 ? " (" + string.Join(", ", pp.ToArray()) + ")" : "")
                      + " | bez zamiennika na polce " + ns
-                     + " | kontrola limitu zamiennikow: z dopisem " + chk + ", przekroczen " + over + " (najwiecej " + (maxUse * 100.0).ToString("0.0", Inv) + "% nadwyzki), oferta ludu zmniejszyla nadwyzke w " + offCut + ", zjadla w " + offAll
+                     + " | kontrola limitu zamiennikow: z dopisem " + chk + ", przekroczen " + over + " (najwiecej " + (maxUse * 100.0).ToString("0.0", Inv) + "% nadwyzki), oferta ludu zmniejszyla nadwyzke w " + offCut + ", zjadla w " + offAll + ", przyciete (indeks ceny rosnie z popytem) " + trim
                      + " | indeks cen jedzenia (mediana miast): " + (ix.Count > 0 ? string.Join(", ", ix.ToArray()) : "-")
                      + " | potkniecia " + sd + " (sesja " + _stumbles + ").");
         }

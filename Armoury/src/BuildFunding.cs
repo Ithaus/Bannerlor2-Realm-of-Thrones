@@ -41,7 +41,12 @@ namespace Armoury
         private static ItemObject _woodIt;
         private static bool _woodErr; private static int _woodErrN;
         internal static bool WoodHoldOn { get { var s = Settings.Current; return s != null && s.BuildWoodAboveCraftStock; } }
-        private static void WoodReset() { _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodIt = null; _woodErr = false; _woodErrN = 0; }
+        private static void WoodReset() { _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodIt = null; _woodErr = false; _woodErrN = 0; _woodHalf.Clear(); }
+        // E3-B1b (klucz BuildWoodHalfReserve, noc-ekonomia3 czesc 2; Jeff 16.10: "drewno moze kosztowac drozej co za problem?"): tam, gdzie drewno jest TANIE (indeks drewna w miescie < 1 -
+        // lezy), budowa bierze je do polowy zapasu rzemiosla (najmniej 20 ladunkow); tam, gdzie drogie (indeks >= 1), caly zapas K1 zostaje kuzniom i dymarkom (uwaga recenzji:
+        // nie cofac K1 tam, gdzie drewna brak). Licznik: targi z polowa progu tej doby.
+        private static readonly HashSet<Settlement> _woodHalf = new HashSet<Settlement>();
+        internal static bool WoodHalfOn { get { var s = Settings.Current; return s != null && s.BuildWoodHalfReserve; } }
 
         /// <summary>K1: ile sztuk materialu budowa zostawia na polce targu dla rzemiosla miasta - dla drewna zapas rzemiosla (CaravanBulk.TargetFor), dla reszty 0;
         /// klucz wylaczony albo blad - 0 (jak dotad). folk - licznik robot ludu (P2), inaczej pana. Licznik: raz na targ i dobe, sztuki zostawione = min(polka, zapas).</summary>
@@ -52,6 +57,7 @@ namespace Armoury
                 if (!WoodHoldOn || market == null || market.Town == null || it == null || it.StringId != "hardwood") return 0;
                 int keep = CaravanBulk.TargetFor(market.Town, it);
                 if (keep <= 0) return 0;
+                if (WoodHalfOn && market.Town.GetItemCategoryPriceIndex(it.ItemCategory) < 1f) { keep = Math.Max(Math.Min(keep, 20), keep / 2); _woodHalf.Add(market); }   // E3-B1b: drewno tanie - polowa zapasu
                 int shelf = market.ItemRoster != null ? market.ItemRoster.GetItemNumber(it) : 0;
                 if (shelf > 0)
                 {
@@ -85,10 +91,12 @@ namespace Armoury
                 sb.Append(" | drewno budow ponad zapas rzemiosla (BuildWoodAboveCraftStock) ").Append(WoodHoldOn ? "tak" : "nie").Append(": budowy zostawily drewno rzemioslu - pan na ")
                   .Append(_woodHeldLord.Count).Append(" targach (").Append(_woodHeldLordPcs).Append(" szt.), lud na ").Append(_woodHeldFolk.Count).Append(" targach (").Append(_woodHeldFolkPcs)
                   .Append(" szt.); zapas rzemiosla miast razem ").Append(target).Append(" szt. (srednio ").Append(towns > 0 ? ((double)target / towns).ToString("0.0", inv) : "-")
-                  .Append("), drewno na polkach miast ").Append(shelf).Append(" szt., miast ponizej zapasu rzemiosla ").Append(below).Append(", bez drewna ").Append(none).Append(" z ").Append(towns).Append(_woodErrN > 0 ? ", potkniecia " + _woodErrN : "");
+                  .Append("), drewno na polkach miast ").Append(shelf).Append(" szt., miast ponizej zapasu rzemiosla ").Append(below).Append(", bez drewna ").Append(none).Append(" z ").Append(towns).Append(_woodErrN > 0 ? ", potkniecia " + _woodErrN : "")
+                  .Append(" | E3-B1b drewno budow od polowy zapasu tam, gdzie tanie (Build Wood Half Reserve ").Append(WoodHalfOn ? "tak" : "nie").Append("): targow z polowa progu ").Append(_woodHalf.Count)
+                  .Append(" (zapas rzemiosla wyzej - pelny; przy polowie progu budowa zostawia polowe)");
             }
             catch (Exception e) { Log.Error("BuildFunding.WoodTail", e); }
-            _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodErrN = 0;
+            _woodHeldLord.Clear(); _woodHeldFolk.Clear(); _woodHeldLordPcs = _woodHeldFolkPcs = 0; _woodErrN = 0; _woodHalf.Clear();
             return sb.ToString();
         }
 

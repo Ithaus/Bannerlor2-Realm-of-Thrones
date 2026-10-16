@@ -33,6 +33,411 @@
 8. Poprawka po recenzji (drugi commit na galezi): pierwsza wersja (5bcf708e) sprawdzala kiese osobno dla kazdego zlecenia (`Gold >= BaseGoldReward`) - notabl z 20 zlota i zleceniami 11 i 15 przechodzil oba, a przy drugim oddaniu Jeff widzialby "could pay only 9 of the agreed 15"; teraz suma na bohatera z zapasem 20% (punkty 2, 2a, 2b).
 
 **Status:** DO SPRAWDZENIA (build Release rc=0, "0 Error(s)" po poprawce po recenzji; nie wgrane; autotest: `python -I tools/sprawdz_logi.py --grupa nzlec <Armoury-*.log>` - zapis z wiszacymi zleceniami (start sesji: usuniete z zapisu > 0 przy biednych notablach) i nowa kampania; dotychczasowe grupy (etap8 K-0..K-K) bez zmian)
+## 2026-10-16 (noc-ekonomia3, POPRAWKI po recenzjach - naprawa ekonomii) - KARAWANY: CENA ZAKUPU PO WCZYTANIU, ZADNA KARAWANA NIE ODKUPUJE TOWARU Z POLKI, "PELNE JUKI" = PONAD UDZWIG, ZYSK PO MYCIE; KSIEGA KAS OSAD (MYTO WOZOW, ZAKUPY WSI WOZEM); BEZPIECZNIK STRAZNIKA DO 3.7
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na 10622d0e = czesc 2) | **Tor:** L (poprawki po 2 recenzjach galezi: 5 uwag powaznych + drobne) | **Klucze:** bez nowych; zmienione opisy MCM `CaravanSellWhereDear`, `FolkGuardShareFuse`, `WorkshopPaceByMarket`, `WorkshopRetoolByPrice`, `VillageHandsFollowPrice` (gen_mcm, 1630 ustawien) | **Zmiana ekonomii:** tak (T1, G1, P1, D3) | **Zapis:** bez zmian (zadnego nowego klucza; migawka ksiegi kosztu i blokady odkupienia - pamiec sesji) | **Cofanie:** `git revert` tego commita; T1 w MCM `Caravan Sell Where Dear` | **Pliki:** `Armoury/src/CaravanGoods.cs`, `TownToll.cs`, `MoneyLedger.cs`, `MoneyLedger.Obieg.cs`, `TownFolk.Live.cs`, `AlleyProbe.cs`, `TownFolk.Guard.cs`, `ClanBudget.cs`, `VillageFruit.cs`, `NoTownMines.cs`, `WorkshopRetool.cs`, `WorkshopPace.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `CrownIncome.cs`, `WorkshopTrade.cs` (komentarze), `Settings.cs` + `McmSettings.cs`, `tools/sprawdz_logi.py` (grupa nekon3)
+
+**Dla Jeffa (prosto):**
+- **Karawany nie sprzedaja na stracie po wczytaniu gry.** Gra nie zapisuje, za ile karawana kupila towar. Dotad po kazdym wczytaniu karawana liczyla, ze zaplacila zwykla cene - i stos narzedzi szedl za tanio, ponizej tego, co naprawde zaplacila. Teraz przyjmuje najwyzsza cene, jaka kupcy mogli dac (srednia cena w miastach albo cena z dziennika kupcow BK, jesli wyzsza). Sprzedaje wiec tylko tam, gdzie na pewno ma zysk. Towar, ktory lezy w jukach ponad 30 dni, i tak zejdzie - to jest "brak wyjscia".
+- **Zysk liczy sie po mycie** (2% utargu). Marza 1% nie jest juz "zyskiem".
+- **Co karawana sprzeda w miescie, tego zadna inna karawana tam nie odkupi** - przez 7 dni albo do chwili, gdy ludzie to wykupia. Towar trafia do ludzi, a nie krazy miedzy karawanami.
+- **"Pelne juki" to przeciazenie, jak w BK** (ponad udzwig, a nie 95%). Wtedy karawana sprzedaje ze strata tylko tyle, ile trzeba, zeby zejsc pod udzwig.
+- **Bezpiecznik straznika** (podatek od oszczednosci ludu, gdy lud ma ponad 9% zlota swiata) podnosi stawke najwyzej do 3.7 x, czyli do poziomu przed zmiana, a nie do 5 x. To podatek awaryjny. Test powie, ile dni dzialal. Jesli dzialal choc 1 dzien, wynik to DECYZJA, a nie TAK, bo pieniadze od ludu mialy wracac do panow z handlu (myto, czynsz, danina), a nie z podatku.
+- **Ksiegi kas miast i wsi sa poprawione** (myto wozow i zakupy wsi wozem). Pieniadze sie zgadzaly, ale raport mieszal przyczyny i moglby schowac prawdziwy blad.
+- **Drobne:** dwor pana daje kupcom te sama robocizne handlu co dwor krola. Warsztat zmieniajacy branze nie wybiera typu, ktory miasto juz ma (kara 20% za kazdy taki warsztat). Opisy w MCM mowia teraz to samo co kod.
+- Nic nie zmienia zapisu i nie ma nowych opcji.
+
+**Problem [L]/[K] (recenzje galezi ae6aab2f + 10622d0e; logi `D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-15_21-25-46.log` (ekon2) i `..._20-16-31.log` (baza WGRANIA 64)):**
+- (uwaga 1, powazna) T1 po wczytaniu: `CaravanGoods.Sync` dopisywal brakujacym sztukom koszt = `Value` i doba = teraz. Chodzi o ladunek 2 371 narzedzi (88.8% swiata) i 4 736 srebra. BK kupuje go tylko przy indeksie < srednia x (1 - do 0.4) (BKCaravansBehavior.cs:1884-1915), a dla rzadkich towarow srednia jest > 1. Prog zysku puszczal sprzedaz do indeksu ok. 1.0-1.1, czyli na realnej stracie.
+- (uwaga 1, powazna) blokada odkupienia dzialala tylko dla tej samej karawany w tej samej wizycie (`BkValuePostfix` z `_bkBuyer`). Inne karawany odkupowaly towar z polki, a BK kaze kazdej kupowac ponizej sredniej. Dzis karawany kupuja 18 narzedzi na dobe przy 194 sztukach w miastach.
+- (uwaga 1, powazna) ksiega kas osad:
+  - myto wozow (4% z 216-269 tys./d = ok. 8.6-10.8 tys./d) schodzilo z sakwy wozu w srodku okna `MoneyLedger.OnBeforeEntered/OnAfterEntered`, a okno liczy "zaplata taborom wsi" jako przyrost sakwy - wiec netto;
+  - W1 (kiesa wsi -> kasa) i polowa myta do kasy bez zywego pana szly bez `Note169`;
+  - na ekon2: TM1 od -509 do +14 575, srednia 28 dob na koniec +1 619 (max |.| 3 458, prog 10 000); TZ1 niezerowe w 2 dobach (max 26); |TW1| srednio 320 (baza 280).
+- (uwaga 2, powazna) "pelne juki" od 95% udzwigu. Tymczasem BK `CalculateCapacityFactor` = 1.1 - zapelnienie (:1736-1739), wiec przy 95% BK dalej kupuje ze wspolczynnikiem 0.15, a sam sprzedaje dopiero ponad 100% (`toLoseWeight`, :1231). Karawana czesto wjezdza z jukami >= 95%.
+- (uwaga 2, powazna) bezpiecznik G1: x1.03/d do 5.0, a 1.03^20 = 1.81. NE3-10 dawal TAK przy 20 dobach bezpiecznika (od 3.7 mnoznik dochodzi do 5.0 i NE3-10 by padl). NE3-11b (udzial F-lud ok. 10%) byl tylko INFO.
+- drobne:
+  - zysk T1 bez myta 2%;
+  - kontrola T1 liczyla sama siebie (przyrost kies = gross - toll z definicji);
+  - limit 1/20 przez `BuyFloor` podbijal liczniki 169c;
+  - NE3-16 liczyl "wsi bez towaru" przed W1;
+  - dwor pana bez `TownFolk.Sale`, a dwor krola z nim;
+  - D1 podawal dobe `Now`, a inne linie `Now - 1`;
+  - D2 bral tez warsztaty lordow BK (opis: "notabla");
+  - opisy MCM "by a third" (kod 1.3) i "a sixth" (kod 15% i 5% zboza);
+  - D1 bez srebra, soli i gliny w wykluczeniach;
+  - D3 bez kary za dubel typu;
+  - NE3-5 prog 0.8 takze dla towaru tanszego od pierwszej doby;
+  - dubel `N3E_CROWN` w `_n3e_read`;
+  - komentarze rozjechane w ArmouryBehavior, SubModuleMain, CrownIncome i WorkshopTrade.
+
+**Przyczyna [K]:** wyzej, przy kazdej uwadze. Wspolne zrodlo: ksiega kosztu tylko na sesje (gra nie zapisuje ceny zakupu karawany), blokada przywiazana do karawany zamiast do miasta, a nowe przelewy poza tickiem bez nazwy w ksiedze kas.
+
+**Zmiana:**
+- **T1 koszt po wczytaniu** (`CaravanGoods.EnsureSnap/Restore`): raz na sesje, przed pierwszym uzyciem ksiegi (`TradePrefix`, wjazd, doba), robi migawke wszystkich karawan i ich towarow handlowych:
+  - koszt sztuki = `Value` x max(1, srednia indeksu kategorii 97 miast) - ta sama miara co BK `AverageBuySellPriceIndex`;
+  - gdy dziennik BK `_tradeActionLogs` (w zapisie, 7 dob; refleksja, `BuyPrice` = cena sztuki) ma zakup tej sztuki, brana jest wyzsza z dwoch cen, a dzien zakupu z dziennika;
+  - bez wpisu - 7 dob wstecz (dziennik trzyma 7 dob); dziennik nieczytelny - doba wczytania;
+  - pozniejsze sztuki bez zakupu w ksiedze: gorne oszacowanie i doba teraz.
+  Linia: "odtworzone przy wczytaniu N szt. (z dziennika BK a, ze sredniej indeksu b; dziennik BK stan)".
+- **T1 blokada w miescie**: (miasto, kategoria) -> doba ostatniej sprzedazy T1 i stan polki kategorii przed pierwsza sprzedaza. `BkValuePostfix` zwraca 0 dla KAZDEJ karawany, dopoki od sprzedazy minelo <= 7 dob i na polce jest wiecej niz przed nia. Porzadki raz na dobe. Liczniki: wycen zablokowanych (w tym innym karawanom), blokad czynnych, "odkupione przez inne karawany".
+- **T1 pelne juki**: `TotalWeightCarried > InventoryCapacity` (jak BK); na stracie krok przyciety do `ceil((waga - udzwig) / waga sztuki)`, a po przycieciu cena liczona od nowa. Licznik "kroki przyciete do zejscia pod udzwig".
+- **T1 zysk po mycie**: `pLast x (1 - TownToll.CaravanRateFor(mp)) > koszt + zold`, takze w kolejnosci kandydatow.
+- **T1 kontrola zmierzona**: kasa miasta przed i po `SellItemsAction.Apply`. Linia: "kontrola: kasy -A = kiesy +B + myto C - myto do kas osad D (roznica R)" (`TownToll.LastToTown`).
+- **T1 limit**: limit 1/20 przez `BuyFloorPeek`. Nowe pole linii: "najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis X% (miasto towar a -> b)".
+- **Ksiega kas osad**:
+  - `TownToll.CartEnd` -> `MoneyLedger.CartTollInWindow` (migawka okna o myto - zaplata taborom brutto);
+  - `TownToll.Take`: polowa bez zywego pana -> `Note169` (nowy rodzaj "myto do kas osad (E3-G3)");
+  - `TownFolk.CartBuys`: `Note169` po obu stronach (nowy rodzaj "zakupy wsi wozem (E3-W1)"; kasa +, kiesa wsi -) i `AlleyProbe.NoteVillageBuy` (z kanalu "tabory wsi" do "wsie" w "Kasy zaulkow (m6b)");
+  - N169 6 -> 8.
+- **NE3-16**: zbior wsi "bez towaru" z koszyka dnia i te z nich, ktore potem kupily wozem. Dopisek linii "Kiesa ludu": "wsi bez towaru po W1 X (poprzedni koszyk dnia: bez towaru N, z nich kupily potem wozem M)".
+- **G1**: `GdFuseCeil` 5.0 -> 3.7 (mnoznik bazy na koniec 120 dob 3.694). Opis MCM: podatek awaryjny, przy Folk Guard No Memory nie dziala.
+- **P1**: `ClanBudget.Court` po zakupie z polki wola `TownFolk.Sale(seat, goods, MixGoods)` - jedna regula z dworem krola i kazda nasza sprzedaza z polki.
+- **D1**: linia doby `Now - 1`; `OutOfHands` + silver, salt, clay.
+- **D2**: opis i linia startu "notable i lordowie, bez gracza", licznik "w tym warsztatow lordow".
+- **D3**: `BestByPrice` - wynik typu juz obecnego w miescie x 0.8 za kazdy taki warsztat. W linii "miast z 3+ warsztatami jednego typu N".
+- **Komentarze**: przywrocone do swoich linii (CaravanAmmo, Seal31B.RentMerge, CaravanAmmo.Daily, NoMakerBudget, summary `Spent`, summary `ApplyInCampaign`).
+- **sprawdz_logi --grupa nekon3** (11 nowych nazw `N3E_`, razem 103, 0 dubli - ast):
+  - NE3-2c - ksiega kas osad: srednia 28 dob TM1 |.| < 10 000, |TZ1| <= baza + 50, |TW1| <= 1.25 x baza + 100;
+  - NE3-3 + kontrola kas T1 (roznica 0);
+  - NE3-5 - prog 0.8 tylko dla towaru od >= 0.8, inaczej >= pierwsza doba - 0.1;
+  - NE3-5b - dobowy spadek indeksu w jednym miescie <= 40%;
+  - NE3-10 - mnoznik bez bezpiecznika <= 3.7, bezpiecznik 0 dob = TAK, 1-20 = DECYZJA z dopiskiem "kryterium 3 spelnione podatkiem, nie obrotem";
+  - NE3-11 - B <= 0.97 x baza z tego samego okna;
+  - NE3-11c - F z ludu na koniec >= doba 30;
+  - NE3-14d - na stracie z pelnych jukow <= 10% sztuk T1;
+  - NE3-16 i NE3-16c2 - na liczbie "po W1";
+  - NE3-1c bez tolerancji -1 dla D1;
+  - NE3-21 + miasta z 3+ warsztatami jednego typu (INFO);
+  - bez dubla `N3E_CROWN`.
+
+**Decyzje (odstepstwa i uwagi sprawdzone):**
+- Koszt sprzed sesji to gorne oszacowanie, a nie zapis ksiegi w save. Powod: limit napisu 32 KB, a karawan jest kilkaset po ok. 10 towarow. Skutek: przez pierwsze dni po wczytaniu T1 sprzedaje stary stos tylko tam, gdzie indeks jest wyraznie ponad srednia + zold. Reszta schodzi po 30 dobach (7 dob wstecz + 23 doby sesji) z powodu "dlugo w jukach" - to jest istniejaca regula "brak wyjscia".
+- Blokada trwa 7 dob ALBO do zejscia sprzedanych sztuk z polki - co pierwsze. To nie jest prog "powyzej sredniej": gdzie sprzedac, dalej decyduje zysk.
+- Bezpiecznik ma sufit 3.7 jako stala w kodzie (bez nowego klucza).
+- D2: zamiast zawezac regule do notabli, poprawiony opis. Tempo idzie za rynkiem i rekami miasta, nie za wlascicielem; lordowie byli w regule od poczatku.
+- P1: dodane `Sale` u pana zamiast usuwania go u krola - jedna regula dla zakupu z polki.
+- **G5 zostaje wylaczony** (dzwignia awaryjna, swiadome odstepstwo od kryterium "klucz domyslnie wlaczony"). Regula awaryjna planu testu: gdy w dobie 60 korony < 20.4% - wlaczyc `CrownKeepsValveShare` ALBO `CrownReserveReleaseDays` 450. Jedno z dwoch, nigdy oba.
+- **Roboty krolewskie** (kryterium 1: korony - wlasne wydatki) - nie w tej serii. Seria ma tylko dwor krolewski (P1b, 5% puli rent). Nastepny krok, jesli NE3-8 (korony >= 19.9%) wyjdzie z zapasem.
+- **Uwaga recenzji 1 o ksiedze czesciowo nie zgadza sie z logiem**:
+  - "TZ1 dzis dokladnie 0, TW1 dzis 0" i propozycja "TZ1 = 0 i TW1 = 0 kazdej doby" nie pasuja do logu. Na ekon2 TZ1 jest niezerowe w 2 dobach (max 26), a TW1 w 41 dobach na 120 (max 9 422, srednio |.| 320; baza 51 dob, srednio 280). Dlatego NE3-2c porownuje z baza, zamiast wymagac 0;
+  - "TM1 = +336..+942" to tylko kilka dob - w oknie od -509 do +14 575. Srednia 28 dob (+1 619) sie zgadza.
+- Pozostale uwagi sprawdzone w kodzie i dekompilacji, wszystkie trafne: BK CalculateBuyValue i CalculateCapacityFactor, `_tradeActionLogs` (pola i SyncData), `BuyFloor` z licznikami 169c, mnoznik bez pamieci (N7) liczony bez bezpiecznika, D2 bez `IsNotable`.
+- Pominiete drobne: wiek partii w nowym kluczu zapisu (zastapiony migawka z dziennikiem BK i 7 dobami); osobny kanal W1 poza oknem sprzedazy (zamiast tego nazwanie przelewu w ksiedze i w zaulkach).
+- **Build**: w drzewie `libs/` jest pusty. Budowac pelna komenda z `-p:GameLibs=<libs>` (tu `.../3cf3e0ac-.../scratchpad/lancuch/libs`). Przed autotestem i wgraniem zbudowac Release tymi samymi bibliotekami, ktorymi sie wgrywa, i porownac hash.
+
+**Kontrola calosci:**
+- **Pieniadz**: nowych przelewow nie ma. `TownFolk.Sale` to licznik podstawy plac jutra (robocizna handlu z kasy siedziby do kies ludu - istniejacy przelew). Note169 i AlleyProbe to tylko liczniki. Myto, T1 i W1 bez zmian co do zlota.
+- **Kolizje**:
+  - `CalculateBuyValue` maja tez CaravanAmmo i CaravanBulk - wszystkie ustawiaja tylko 0;
+  - `SellItemsAction.ApplyInternal`: GoodsLedger (rama), SellByCondition (tylko log), VillageTakings (wsie) - kontrola T1 pokaze kazdy obcy przelew kasy miasta;
+  - nowe rodzaje Note169 sa tylko w linii "Przeplywy osad (przyczyny)" (stara linia kas bez zmian ksztaltu; "zaplata taborom wsi" teraz brutto - poprawka znaczenia).
+- **Kolejnosc**: migawka T1 przed pierwsza zmiana jukow w sesji. Rotacja zbioru "bez towaru" na poczatku `Villages` (raz na dobe, w ticku).
+- **Wydajnosc**:
+  - migawka - jeden przeglad karawan na sesje;
+  - postfiks BK - 2 odczyty slownika przy blokadach;
+  - D3 - 97 miast raz na dobe;
+  - petli godzinowych brak.
+
+**Ryzyko / co sprawdzic (autotest 120 dob na zapisie F, potem `sprawdz_logi --grupa nekon3 --baza-doby <20-16-31>`):**
+- T1 po wczytaniu sprzedaje mniej (wyzszy koszt): NE3-14 (narzedzia w jukach < 50% od doby 60) i NE3-15. Linia T1 pokazuje migawke (cena z dziennika BK / ze sredniej) i "dlugo w jukach" od ok. doby 23.
+- Blokada w miescie: BK kupuje mniej kategorii sprzedanych przez T1, wiec kiesy karawan moga rosnac (NE3-14b, NE3-14c). "Odkupione przez inne karawany" ma byc bliskie 0.
+- NE3-2c (TM1 srednia 28 dob, TZ1, TW1 wobec bazy) i NE3-3 (kontrola kas T1 = 0).
+- Bezpiecznik do 3.7: lud moze miec wiecej (NE3-7 <= 9.1%). Doby bezpiecznika w NE3-10 - 0 = TAK, 1-20 = DECYZJA.
+- Robocizna handlu z dworu pana: lud w siedzibach (NE3-7, NE3-17 "lud z dworu" < 30.9 tys.).
+- Kara za dubel typu D3: mniej zmian (NE3-21 dolny prog 20).
+- NE3-5b (spadek indeksu w jednym miescie <= 40%), NE3-14d (pelne juki <= 10%), NE3-16 i NE3-16c2 (po W1).
+
+**Sprawdzone tu:**
+- Build Release: rc=0, 0 Error(s), 1 stare ostrzezenie CS0169.
+- `python -I tools/gen_mcm.py`: 1630 ustawien.
+- `sprawdz_logi --grupa nekon3`, log ekon2 + baza: rc=0, 37 progow, bez wyjatku; NE3-2c TAK (srednia 28 dob max 3 458, |TW1| 320 wobec bazy 280); nowe pola T1 jeszcze nie wystepuja.
+- Log syntetyczny z napisow kodu (562 linie, 70 dob): wszystkie nowe regexy trafiaja; NE3-10 przy 3 dobach bezpiecznika = DECYZJA.
+
+**Status:** DO SPRAWDZENIA (autotest 120 dob na zapisie F nie uruchomiony - Jeff gra od 15.10; nic nie wgrane).
+
+## 2026-10-16 (noc-ekonomia3, CZESC 2 - naprawa ekonomii) - PRODUKCJA IDZIE ZA CENA I LUDZMI, PANOWIE, KORONY I ZOLNIERZE KUPUJA: TEMPO WARSZTATU (D2), WARSZTAT ZMIENIA BRANZE (D3), RECE WSI ZA CENA (D1), DWOR KUPUJE Z POLKI (P1), ZAMOWIENIA ZOLNIERZY (Z1), BOGACI PLACA DROZEJ I DREWNO BUDOW (B1)
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na ae6aab2f = czesc 1) | **Tor:** L (czesc 2 z 2; plan + 2 recenzje, uwagi do czesci 2 uwzglednione) | **Klucze (nowe, wszystkie w MCM, grupa "Production follows price and people (night 16.10, part 3, second half)", domyslnie wlaczone):** `WorkshopPaceByMarket`, `WorkshopRetoolByPrice`, `VillageHandsFollowPrice`, `CourtBuysGoods`, `CrownCourtGoods`, `CrownCourtShare` 0.05, `MenUpgradeOrders`, `BuildWoodHalfReserve`; **zmiana domyslnej:** `FolkLadderCeilingMax` 4 -> 8 (B1a). Zadnego z tych kluczy nie ma w Armoury.json Jeffa (13.10 02:10, grep - 0 trafien), wiec dzialaja domyslne | **Zmiana ekonomii:** tak | **Zapis:** bez zmian (zadnego nowego klucza; pamieci sesji - limit miasta i warsztatu D3, dedup Z1, limit wiersza P1, f i c D1 - odbudowuja sie po wczytaniu; 60 dob sredniej D3 jest w istniejacym arm_wstrade) | **Cofanie:** `git revert` tego commita albo klucze jak wyzej (zmiany typu warsztatu D3 sa akcja gry i zostaja - wylaczenie klucza zatrzymuje tylko dalsze) | **Pliki:** `Armoury/src/WorkshopPace.cs` (nowy), `WorkshopRetool.cs` (nowy), `CourtGoods.cs` (nowy), `MenUpgradeOrders.cs` (nowy), `WorkshopTrade.cs`, `NoTownMines.cs`, `WorkshopInputs.cs`, `VillageFruit.cs`, `MaterialLaw.cs`, `ClanBudget.cs`, `CrownRents.cs`, `CrownIncome.cs`, `GoodsLedger.cs`, `MenUpgrade.cs`, `SupplyDemand.cs`, `BuildFunding.cs`, `MoneyLedger.Obieg.cs`, `ArmouryBehavior.cs`, `Settings.cs` + `McmSettings.cs` (gen_mcm, 1630 ustawien), `tools/gen_mcm.py`, `tools/sprawdz_logi.py` (grupa nekon3: progi czesci 2)
+
+**Dla Jeffa (prosto):**
+- **Warsztat pracuje w tempie swojego miasta.** W duzym miescie jest wiecej rak, wiec warsztat robi wiecej cykli (do 4 x), w malym mniej (najmniej 0.3 x). Gdy jego wyrob jest w tym miescie drogi, robi troche szybciej, gdy tani - wolniej. Wiecej cykli to wiecej surowca kupionego z polki i wiecej plac. Twoje warsztaty, zamki, kuznie broni i kopalnie bez zmian.
+- **Warsztat, ktory traci od 60 dni, zmienia branze** na te, ktora w jego miescie zarabia najwiecej po placach - tylko gdy surowiec jest w okolicy (wsie, polka albo kontrakt) i zarobi wyraznie wiecej. Nowy sprzet wlasciciel placi rzemieslnikom miasta. Najwyzej 3 warsztaty dziennie na swiat, jedno miasto co 30 dni. Moze powstac nowa kuznia - jedyny wytworca narzedzi. Przy bankructwie tez wybiera sie branza z cen, jesli zarabia o 1/4 wiecej niz wybor gry.
+- **Wies przesuwa rece na to, co drogie.** Gdy jaja, owoce albo miod sa w miescie targowym wiele razy drozsze niz jej inne plony, wies robi ich do 2 x wiecej, a innych plonow tyle mniej, ile wart jest dodatek (ta sama praca). Innych plonow najwyzej 15% mniej, zboza najwyzej 5% mniej. Drewna i rudy nie rusza.
+- **Dwor pana kupuje z polki.** Do 60% tego, co pan wydaje na dwor w swoim miescie, idzie na wino, piwo, ser, mieso, ryby, chleb, owoce, oliwe (polowa), plotno, aksamit i futra (1/5) oraz klejnoty, srebro, korzenie i garnki (reszta). Bierze tylko to, co w tym miescie nie jest drogie, nigdy ostatnich sztuk i najwyzej 1/4 stosu dziennie - zeby nie zabrac ludziom jedzenia. **Dwor krola** w stolicy robi to samo za 5% tego, co korona ma na renty.
+- **Zolnierze zamawiaja lepszy sprzet.** Gdy ich ranga pozwala na lepsza sztuke, a na polce jej nie ma, skladaja zamowienie u kowali miasta (raz dziennie na druzyne). Linia "Dozbrajanie" pokazuje teraz osobno: ilu juz ma najlepsze, co im wolno, a ilu brakuje towaru.
+- **Bogaci mieszczanie placa za zbytki drozej** (do 8 x zwyklej ceny zamiast 4 x). **Budowy biora drewno drozej**: tam, gdzie drewno jest tanie, moga kupic je az do polowy zapasu kuzni; tam, gdzie drogie, caly zapas zostaje kuzniom.
+- Nic nie zmienia zapisu. Kazda rzecz wylaczysz w MCM osobno.
+
+**Problem [L] (test noc-ekonomia2 `D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-15_21-25-46.log` d109195-196, baza WGRANIA 64 `..._20-16-31.log`; liczby z linii i z `sprawdz_logi --grupa nekon3` na tych logach):**
+- **Warsztaty** ("Warsztaty towarowe"): 291, pracowalo 170 - stojace 43.6% (srednia 10 dob); piekarnie 73 (324 cykle), kuznie 29 (+128 d na warsztat, 44 cykle towarowe), tkalnie welny +114.5 d; garbarnie 13 (1 pracuje), tkalnie lnu 16 (3), olejarnie 8, kopalnie 8, garncarnie 6 (2). Tempo linii takie samo w kazdym miescie.
+- **Towary**: narzedzia produkcja 184/d przy zuzyciu 210/d; chleb 888/d (warsztaty 360) przy 921/d; jaja 505/d (lista BK 435), miod 56/d, jablka 308/d; futra 78/d przy 67/d (Fur Rate Raised x3 juz czynne); papirus 10/d, zapas 455, z tego 345 w karawanach.
+- **Nie do wydania** ("Ceny surowcow"): koniec 102 915 d/d (baza 116 443); jaja 21 457, futra 19 040, miod 12 851, papirus 12 796, chleb 10 411, jablka 8 431.
+- **Dwor** ("Budzet rodow (166)"): ok. 244 tys./d do kas siedzib (sprzet przeterminowany 137-141 tys., wlasny dwor ok. 106 tys.) - ani jednej sztuki z polki; lud z dworu ("Kiesa ludu") 30 884/d.
+- **Dozbrajanie**: "brak lepszej na polce" 26 604 koszykow/d (lordowie 217 zakupow, zalogi 330); tylko 3 z 97 miast bez zbroi korpusu t3+.
+- **Budowy** ("Budowy oplacone"): wydano 14 882/d (30 dob), brak materialow srednio 42.3 osad (ostatnia doba 51); drewno indeks mediana 0.54; bez drewna 3.8 miast (baza 1.4), ponizej zapasu rzemiosla 39.7.
+- **Zbytki ludu** ("Zbytki ludu (P3-P5)"): oferta 198 986 zl, kupione z oferty 75 422 (37.9%; 10 dob 38.2%, baza 38.6%), par miasto-kategoria ponad cena graniczna (lud nie kupuje) 934.
+
+**Przyczyna [K]:**
+- (D2) gra wola `GetEffectiveConversionSpeedOfProduction(warsztat, szybkosc, false)` raz na linie w `RunTownWorkshop` (twall WorkshopsCampaignBehavior.cs:1390-1398) i nie zna ani ludzi miasta, ani ceny wyrobu; tylko rece broni (WorkshopLaw.Hands :821) ida za m_t.
+- (D3) typ zmienia sie tylko przy bankructwie - losowo z wag wsadu (`DecideBestWorkshopType` :1278); warsztat bez zysku, ktory ma kapital na utrzymanie, stoi latami.
+- (D1) owoce, miod i jaja z listy BK maja stala wage (VillageFruit.Base/EggBase) niezaleznie od ceny; model gry liczy kazdy plon osobno (DefaultVillageProductionCalculatorModel :22-36).
+- (P1) `ClanBudget.Court`: glowa -> kasa siedziby samym zlotem; towar z polki nie schodzi.
+- (Z1) `MenUpgrade.Run` why 0 liczy razem "sufit tieru" i "pusta polke"; brak zamowienia (gdy wybor nic nie dal - tylko licznik).
+- (B1) `FolkLadderCeilingMax` 4 (TownFolk.Luxury.cs:111) i K1 `BuildFunding.WoodHold` - caly zapas rzemiosla takze tam, gdzie drewno lezy tanio.
+
+**Zmiana:**
+- **E3-D2** (nowy `WorkshopPace.cs`; wpiecie `WorkshopTrade.RunPrefix/RunPostfix` i `WorkshopTradeBehavior`):
+  - linia towarowa Z WSADEM warsztatu notabla w MIESCIE x F = clamp(m_t / srednia m_t warsztatow towarowych miast, 0.3, 4) x clamp(sqrt(indeks wyrobu w miescie), 0.7, 1.4), razem przycinane do 0.3-4;
+  - mnoznik NA LINIE (licznik linii w RunTownWorkshop), nie na typ: kuznia - tylko narzedzia; bez zmian linie broni i war_horse, linie bez wsadu (kopalnie), zamknieta linia strzal, ukryci rzemieslnicy, zamki (BK TickCastle) i warsztaty gracza;
+  - postfiks na metode szybkosci KLASY DEKLARUJACEJ w lancuchu czynnego modelu (`AccessTools.DeclaredMethod`; NavalDLCWorkshopModel wola BaseModel raz), zakladany w kampanii (OnSessionLaunched, raz na proces), wzor `AddFactor((F - 1) x (1 + SumOfFactors))`;
+  - kontrola: po RunTownWorkshop licznik wywolan = liczba linii typu, inaczej warsztat wypada z reguly na sesje ("niezgodne");
+  - linie "Tempo warsztatow (E3-D2): start sesji" i "...: dzien N" (rozklad F, czesc ludzi i ceny, szybkosc swiata przed/po, wedlug typu, zamki i gracz pominiete, niezgodne, latka).
+- **E3-D3** (nowy `WorkshopRetool.cs`; `NoTownMines.MarketScore/BestByPrice`, `WorkshopInputs.InputsNear`, `WorkshopTrade.CycleLabourAt/RecOf/ConvertWired`):
+  - (b) raz na dobe: warsztat notabla w miescie (nie gracza, nie ukryty, bez linii broni, nie kopalnia) z >= 60 dobami obecnego typu w sredniej i Avg < 0 oraz Slow < 0 -> typ o najlepszym wyniku NETTO z cen targu (tylko linie towarowe, po placach cyklu - ta sama miara dla typu obecnego i nowego, uwaga recenzji), gdy wsad jest w okregu (wsie TradeBound jak w grze, polka >= 5 szt., kontrakt 174), wynik > 0 i >= max(obecny + 10 d, obecny x 1.3), a wlascicielowi po sprzecie zostaje >= 4 500;
+  - limity: 3 na dobe na swiat (najgorszy Slow najpierw), miasto co 30 dob, warsztat co 120 dob (sesja);
+  - zmiana przez `ChangeProductionTypeOfWorkshopAction.Apply(w, t, false)` - koszt sprzetu wlasciciel -> kasa miasta (istniejaca latka ConvertPrefix/Postfix); bez tej latki albo bez paczki warsztatow - NIECZYNNE;
+  - (a) `NoTownMines.Postfix` (po podmianie kopalni): bankructwo i warsztat odebrany graczowi - typ z `BestByPrice`, gdy zarabia > 1.25 x wybor gry/BK; N10 (kopalnie) liczy jak dotad (`MarketScore` net = false);
+  - linie "Warsztaty za cena (E3-D3): start sesji" i "...: dzien N" (kandydaci, zmiany z -> na z wynikiem, odlozone wedlug powodu, bankructwa, sprzet do kas).
+- **E3-D1** (`VillageFruit.cs`: `HandsCompute`, `HandsF`, `HostFactor`; `MaterialLaw.ProdPostfix`):
+  - raz na dobe (i przy starcie sesji) dla wsi Normal z targiem i z dodatkami listy BK: f = clamp(sqrt(indeks towaru / max(1, indeks innych plonow wsi w tym samym miescie)), 1, 2);
+  - dodatek (f - 1) x baza x Value (cena BAZOWA) zdejmowany z innych plonow listy typu wsi w wartosci bazowej: inne najwyzej -15%, zboze najwyzej -5%; gdy prog wiaze, f maleje tak, ze przyrost = ubytek (uwaga recenzji - bez towaru z niczego);
+  - poza regula drewno, ruda i zwierzeta (uwaga recenzji); wies bez innych plonow - bez przesuniecia;
+  - Base/EggBase mnoza baze przez f, CapPostfix (magazyn wsi) tez, ProdPostfix mnozy inne plony przez c (`m *= VillageFruit.HostFactor`, obok CamelLaw.HostFactor);
+  - odczyt z dowolnego watku (podmiana referencji slownika); linie "Rece wsi za cena (E3-D1): start sesji" i "...: dzien N" (f wedlug towaru, c, wartosc przybylo / ubylo / roznica %).
+- **E3-P1** (nowy `CourtGoods.cs`; `ClanBudget.Court`, `CrownRents.Daily`, `CrownIncome.NoteCourt`, `GoodsLedger` rama FCourt):
+  - (a) siedziba-miasto: do 60% wlasnej czesci dworu (bez sprzetu E5/A2) kupuje z polki: jedzenie i napoje 50%, sukno 20% (plotno ponad zapas wojska), zbytki 30%; niewydane przechodzi do nastepnej grupy;
+  - tylko wiersze z indeksem <= 1.5 (uwaga recenzji: dwor nie zabiera ludowi rzadkiego jedzenia - "drogie tu" liczone), ponad 5 szt., najwyzej 1/4 wiersza na dobe (wszystkie dwory siedziby), sztuka po swojej cenie do 4 x wartosc (`ShelfBuy.Take`);
+  - zloto: ta sama wplata glowa -> kasa siedziby co dotad; 20% dla ludu (CourtFolkShare) tylko od czesci "sluzba": `Earn(seat, (ix - towar) x share)`;
+  - (b) korona po M3 i po G5, przed podzialem rent: `CrownCourtShare` puli rent w stolicy (siedziba rodu panujacego, tylko miasto); skarbiec -> kasa stolicy, `CrownIncome.Spent`, `TownFolk.Sale` (MixGoods); zwrot zoldu, W5, M1, M3 i zapas nietkniete;
+  - ksiega towarow: nowa rama "dwory (E3-P1)" (ujscie); dopiski w "Budzet rodow (166)" (w tym za towar), "Korona: wplywy dnia (165)" (dwor krolewski) i "Obieg"; linia "Dwor - towar z polki (E3-P1)" (pan / korona, wedlug grup: chciane / kupione / sztuk, pominiete: drogie, zapas polki, limit wiersza; wedlug towaru).
+- **E3-Z1** (nowy `MenUpgradeOrders.cs`; `MenUpgrade.Run`, `SupplyDemand.OnceClears`):
+  - podzial "brak lepszej na polce" na "na suficie tieru" (sufit jednostki <= tier sztuki) i "pod sufitem bez towaru";
+  - pod sufitem (bez strzal i beltow): zamowienie tier+1 w MIESCIE wizyty, najwyzej 5 szt., 1 na partie na dobe, ten sam rodzaj raz na SupplyDemandOrderRepeatDays - WLASNY slownik dedupu (uwaga recenzji: _onceSeen wpisu 81 ma sufit 20 000 i Clear), czyszczony z przeterminowanych raz na dobe;
+  - licznik czyszczen _onceSeen w linii (cel 0).
+- **E3-B1**: (a) `FolkLadderCeilingMax` 4 -> 8 (filc, plotno i skora zostaja przy cenie bazowej); (b) `BuildFunding.WoodHold`: indeks drewna w miescie < 1 - budowa bierze je ponad polowe zapasu rzemiosla (najmniej 20 ladunkow), indeks >= 1 - caly zapas K1 (uwaga recenzji); dopisek w "Roboty ludu (P2)": targow z polowa progu.
+- **Progi** (`tools/sprawdz_logi.py --grupa nekon3`, funkcja `_n3e_part2` wolana z `nekon3_main`, nazwy N3E_ bez dubli, ast OK): NE3-0b (ERROR modulow czesci 2, potkniecia D2/D3/D1/P1/Z1), NE3-1c (linie >= 95% dob, linie startu, D2 niezgodne 0), NE3-4 (ksiega towarow dworow wobec bazy, zelazo), NE3-15c2 (<= 85 tys.), NE3-16c2 (>= 18%, <= 400), NE3-17 (pan >= 15 tys./d, korona >= 3 tys./d, lud z dworu < 30.9 tys.), NE3-18 (brak materialow <= 35, wydano >= 20 tys.), NE3-18b (miasta bez drewna <= max(29, baza + 5)), NE3-19/19b (podzial Z1, czyszczenia 0, spadek "pod sufitem"), NE3-20 (zbytki >= 45%), NE3-21 (20-120 zmian, <= 3/d, miasto nie 2 razy w 30 dobach), NE3-22 (stojace <= 38%), NE3-23 (F 0.3-4, po/przed 0.95-1.4, narzedzia >= 230/d, chleb >= 850/d), NE3-24/24b/24c (f 1-2, c >= 0.85, zboze >= 0.95, jaja >= 1.4 x baza, przepadlo <= 2 x baza, bilans wartosci <= 1%, korelacja f z indeksem jaj - INFO).
+  - Sprawdzone na logach ekon2 + baza (bez wyjatku; nowe linie nie wystepuja, wiec ich progi INFO; istniejace miary: NE3-18 42.3 / 14 882, NE3-20 38.2%, NE3-22 43.6% - NIE, jak oczekiwano przed zmiana) i na logu syntetycznym z napisow kodu (regexy wszystkich nowych linii trafiaja).
+
+**Decyzje (Claude, "ekonomie projektuje Claude"; odstepstwa od planu):**
+- D1: indeks WZGLEDNY (towar / inne plony wsi), nie goly indeks - rece nie ida z drozszego plonu na tanszy; zboze najwyzej -5% (plan: 15% dla wszystkich) - glowne jedzenie swiata, decyzja noc 15/16.10 "nie tniemy plonu zboza" zlagodzona; poza regula takze zwierzeta; osobna linia "Rece wsi za cena (E3-D1)" zamiast dopiskow w "Owoce wsi" i "Jaja wsi".
+- D1 bez futer (uwaga recenzji 4): trapper ma w typie futra 1.4 i zboze 3 (twall DefaultVillageTypes :162/:270), a futro to jego najdrozszy plon (200 d wobec 3 d zboza) - "te same rece" daja najwyzej ok. 0.2% wiecej futer (zboze -5% = 0.45 d na poziom ognisk); Fur Rate Raised x3 jest juz czynne, a futra rodza 78/d przy zuzyciu 67/d - brak w miastach to towar w jukach (T1). Papirus (10/d z farm zboza ROT, 345 z 455 w karawanach) - bez zmiany produkcji w tej serii; NE3-15c2 pokazuje doby 30-60 i koniec osobno.
+- D2: F przycinane razem do 0.3-4 (progi NE3-23); linie bez wsadu (kopalnie) poza regula; warsztaty gracza i zamki poza regula (uwagi recenzji).
+- D3: wynik netto po placach dla obu typow (uwaga recenzji), warsztat najwyzej raz na 120 dob (prog NE3-21 "wahadlo"); zrodlem nie jest kuznia ani kopalnia (bez linii broni), celem moze byc kuznia.
+- P1: filtr indeks <= 1.5 i przeniesienie budzetu grup (uwaga recenzji - rzadkie jedzenie zastepuje to, co lezy); dwor krola liczony jak sprzedaz z polki (`TownFolk.Sale`), dwor pana jak dotad (`Note KCourt` od calej wplaty).
+- Z1: zamowienie tylko w miescie wizyty (zamek nie ma warsztatow).
+- B1b: pol progu tylko tam, gdzie drewno tanie (uwaga recenzji), nie wszedzie.
+- Jeden commit czesci 2 (plan: 6) - jeden autotest i tak obejmie calosc; rozdzielenie przyczyn kluczami (wylaczenie jednego klucza = jak bez tej mechaniki).
+
+**Kontrola calosci (CLAUDE.md 8.0):**
+- Zloto: D2 bez nowego przeplywu (wsad kapital -> kasa miasta przez latke BK, place cyklu kapital -> kasa / kiesa ludu - bez zmian na cykl); D3 sprzet wlasciciel -> kasa miasta (ConvertPostfix; bez latki regula nieczynna - gra kasowalaby koszt w nicosc); P1(a) ta sama kwota glowa -> kasa siedziby, zmienia sie tylko udzial ludu (20% od sluzby); P1(b) skarbiec -> kasa stolicy z reszty wplywow dnia (Spent; End korony po rentach, wiec jutrzejsze "inne" bez zmian); Z1 bez zlota; B1 bez nowego przeplywu (te same zakupy, inna cena / prog).
+- Towar: D1 w wartosci bazowej przyrost = ubytek (kontrola w linii i NE3-24b); P1 towar schodzi z polki w ramie "dwory (E3-P1)" (ujscie, NE3-4); D2/D3 wiecej cykli = wiecej wsadu z polki (ramy cykli warsztatow jak dotad).
+- Kolejnosc doby: TownFolk.Daily (konsumpcja ludu) -> CrownRents (P1 b po M3 i G5) -> ClanBudget (P1 a) -> CourtGoods.Daily (linia) -> MoneyLedger.Daily ("Obieg" czyta CourtGoods.Last*). Ksiega towarow (GoodsLedger.Daily) biegnie wczesniej - zakupy dworow z doby N ida do linii N+1 (rama + migawka zapasu - bilans sie zamyka).
+- Latki: D2 - jedna nowa latka (postfiks Last na metode klasy deklarujacej, w kampanii); D3 i P1 - bez nowych latek (RunTownWorkshop, ChangeProductionTypeOfWorkshopAction.Apply, DecideBestWorkshopType juz wpiete); `NoTownMines.Postfix` przebudowany bez zmiany N10 (ta sama kolejnosc liczb i licznikow); `WorkshopInputs` - tylko widocznosc + InputsNear.
+- Watki: D1 czytany z modelu produkcji wsi z dowolnego watku - slownik publikowany przez podmiane referencji (bez zapisu do opublikowanego).
+- Wyjatki: per warsztat / wies / zakup - liczniki potkniec w liniach, bez gaszenia funkcji (CLAUDE.md 7).
+- Wydajnosc: bez petli godzinowych; D1 raz na dobe po 571 wsiach, D3 raz na dobe po ok. 290 warsztatach, D2 przy kazdym RunTownWorkshop (raz na warsztat na dobe), P1 przy wplacie dworu (raz na rod na dobe).
+
+**Ryzyko / co sprawdzic (autotest 120 dob na zapisie F; `python -I tools/sprawdz_logi.py --grupa nekon3 --baza-doby <log bazy 20-16-31> <log>`):**
+- D2: zboze i ruda (wiecej cykli piekarni i kuzni) - "Famine", "Spichlerze", "Uzbrojenie wedlug zrodla"; place cykli x F - "Warsztaty towarowe" (place), "Kiesa ludu" (place warsztatow); NE3-1c niezgodne = 0.
+- D3: wahadlo (NE3-21), wiecej kuzni = wiecej rak broni w tych warsztatach ("Rynek broni"); sprzet do kas miast w linii D3.
+- D1: zboze farm najwyzej -5%, inne -15% - "Famine", "Zatkane wsie", "Towary" przepadlo (owoce, jaja); GL1 "Plon wsi od ludzi" pokaze plon typu wsi nizej (to pomiar wobec kalibracji - g liczone z ognisk, nie przelicza sie); regulator HarvestValve (decyzja co 28 dob) widzi nieco mniej lnu, winogron, oliwek.
+- P1: ceny zbytkow i wina w siedzibach w gore (sygnal dla D3); lud siedzib -6..9 tys./d (NE3-17); "Towary" bez wyjasnienia dla towarow dworow (NE3-4); tarcza dworu SoldierPay.HoldCourt bez zmian.
+- Z1: zamowienia drozej zbroi tier 3+ (petla drozenia wpisu 81 zamknieta wlasnym dedupem i sufitem SupplyDemand) - licznik czyszczen _onceSeen = 0.
+- B1: zbytki drozsze dla gracza w najbogatszych miastach; kuznie i dymarki - "Roboty ludu (P2)" miasta bez drewna i ponizej zapasu (NE3-18b), "Drewno".
+- Kryteria pieniadza (NE3-7..11) pilnuje czesc 1; czesc 2 zmienia je posrednio (P1: lud siedzib mniej, korony -8..17 tys./d na dwor krolewski) - porownac z logiem czesci 1, gdy bedzie.
+- Gra nie byla uruchamiana; build Release rc=0, 0 Error(s) (1 stare ostrzezenie CS0169).
+
+**Status:** DO SPRAWDZENIA (autotest 120 dob na zapisie F razem z czescia 1; nie wgrane - Jeff gra od 15.10).
+
+## 2026-10-16 (noc-ekonomia3, CZESC 1 - naprawa ekonomii) - OBIEG Z OBROTU I TOWAR TAM, GDZIE KARAWANA MA ZYSK: KAP STRAZNIKA (G1), MYTO TARGOWE (G3), DANINA OD MARKIETANOW (G2), CZYNSZ GRUNTOWY (G4), KARAWANY SPRZEDAJA Z ZYSKIEM (T1), WOZ WSI KUPUJE W MIESCIE SPRZEDAZY (W1); G5 JAKO DZWIGNIA AWARYJNA
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na a6abfc70 = WGRANIE 64 + noc-ekonomia2) | **Tor:** L (czesc 1 z 2; plan + 2 recenzje, uwagi krytyczne i powazne uwzglednione) | **Klucze (nowe, wszystkie w MCM, grupa "Trade pays its way (night 16.10, part 3)"):** `FolkGuardNormalShareMax` 0.064, `FolkGuardShareFuse` 0.09, `CrownKeepsValveShare` **false** (dzwignia awaryjna), `VillageTributeFromSutlers`, `TownMarketToll`, `TownMarketTollRate` 0.04, `TownMarketTollCaravanRate` 0.02, `TownGroundRent`, `CaravanSellWhereDear`, `VillageCartBringsGoods`, `VillageClothHalfReserve` (zadnego nie ma w Armoury.json Jeffa z 13.10 - sprawdzone grep) | **Zmiana ekonomii:** tak | **Zapis:** bez zmian (zadnego nowego klucza - Ironman Jeffa sie wczytuje; pamieci sesji odbudowuja sie po wczytaniu) | **Cofanie:** `git revert` tego commita albo klucze jak wyzej | **Pliki:** `Armoury/src/TownFolk.Guard.cs`, `CrownIncome.cs`, `CrownRents.cs`, `Sutlers.cs`, `VillageTakings.cs` (Split internal), `TownToll.cs` (nowy), `CaravanGoods.cs` (nowy), `MarketCarts.cs`, `TownFolk.Live.cs`, `CaravanBulk.cs`, `CaravanAmmo.cs`, `CaravanFlow.cs`, `MaterialOrders.cs`, `MoneyLedger.Pumps.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs` + `McmSettings.cs` (gen_mcm), `tools/gen_mcm.py`, `tools/sprawdz_logi.py` (grupa nekon3)
+
+**Dla Jeffa (prosto):**
+- **Karawany sprzedaja tam, gdzie maja zysk** (Twoja poprawka 16.10, zamiast "powyzej sredniej"). Karawana pamieta, ile zaplacila za towar w jukach. W miescie sprzedaje sztuke, gdy dostanie za nia wiecej, niz kosztowala, plus czesc zoldu karawany za dni w drodze. Na stracie sprzedaje tylko wtedy, gdy nie ma wyjscia: towar lezy w jukach ponad 30 dni, jedzenie sie psuje (ponad 7 dni), brakuje pieniedzy na zold na 3 dni, juki sa pelne albo karawana jest rozwiazywana. Sprzedaje po kilka sztuk, najwyzej polowe stosu na wizyte, a miasto placi tylko z nadwyzki kasy (najwyzej 1/20 dziennie). Zeby karawana nie odkupila zaraz tego samego, w tej samej wizycie Banner Kings nie kupuje tu towaru, ktory ona wlasnie sprzedala. Dzis karawany sprzedaja 1-2 sztuki na wizyte i wioza w jukach 89% narzedzi swiata oraz rosnacy stos srebra.
+- **Myto targowe:** woz wsi oddaje 4% utargu, a karawana 2% (placi juz clo przy zakupie). Polowa trafia do pana miasta, polowa do zapasu korony. Tak pieniadz wraca do panow i krolestw z handlu, a nie z coraz wiekszego podatku od oszczednosci.
+- **Markietani:** z tego, co zolnierze wydaja we wsi, pan wsi bierze swoj podatek wedlug dekretu, jak z utargu wozu. Wies wlasnego rodu nie placi.
+- **Czynsz gruntowy:** 1/3 czynszu, ktory robotnicy i rzemieslnicy placa za domy, idzie do pana miasta.
+- **Straznik obiegu:** nowe towary podniosly "normalne oszczednosci" ludu i straznik zlagodnial (mnoznik 5.49 -> 2.01, lud 8.1 -> 10.8% zlota swiata). Teraz do decyzji liczy je najwyzej jako 6.4% zlota swiata (srednia bazy). Do tego bezpiecznik: gdy lud z wsiami ma ponad 9% zlota swiata, podatek rosnie powoli, ale najwyzej do x5. Mowiac wprost: to przywraca sile podatku z bazy, a bezpiecznik dziala jak cel udzialu ludu 8-9%.
+- **Woz wsi przywozi towar:** czego wies nie kupila w swoim miescie targowym (sol, narzedzia, len i plotno, garnki, piwo), kupuje, gdy jej woz sprzedaje plon w innym miescie albo zamku (najwyzej 7 dni potrzeby, z kiesy wsi). Tam, gdzie plotno lezy tanio, wies moze brac je juz od polowy zapasu wojska.
+- **Korona trzyma czesc zaworu miast w zapasie** - jest gotowe, ale domyslnie WYLACZONE. To dzwignia awaryjna, jesli korony w dobie 60 testu spadna ponizej 20.4%.
+- Nic nie zmienia zapisu. Wszystko wylaczysz w MCM osobno.
+
+**Problem [L] (test noc-ekonomia2 `D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-15_21-25-46.log` d109195-196, baza WGRANIA 64 `..._20-16-31.log`):**
+- **Udzialy w zlocie swiata (lud z wsiami / lordowie / korony):** ekon2 10.8 / 36.3 / 18.3%, baza 9.2 / 36.4 / 19.7% (kryterium: lud <= 9.1%, korony >= 19.9% - baza tez go nie spelnia).
+- **Straznik:** poziom normalny N 6.3-7.7% swiata (baza 5.9-6.8%), mnoznik 5.489 (z zapisu) -> 2.009, "bez zmian (w pasmie)", pasmo 9.1-12.7% swiata, podatek od nadwyzki 120 177/d (czesc korony 64 532); w bazie mnoznik koncowy 3.694.
+- **Pompy B (podatki od oszczednosci):** ekon2 375 886/d (straznik 120 177 + danina P1 236 507 + 184 13 333 + W7 5 869).
+- **Karawany** ("Karawany - zapas wedlug towaru (nekon)"): narzedzia 2 371 w jukach z 2 671 swiata (88.8%), miasta 194, kupily 18 / sprzedaly 19 na dobe; srebro 4 736 (kupily 303, sprzedaly 32); wino 819 (81.6%), sol 1 169.
+- **Markietani:** 57 360 zl/d do kies wsi w 169 wsiach (pan nic).
+- **Czynsz W/R -> P:** 28 997 zl/d.
+- **Wsie** ("Kiesa ludu" wsie 571): zakupy 7 164 z 71 543 (10.0%), wsi bez towaru 486; prog plotna trzyma w kiesach 38 959 zl/d (459 wierszy); indeks plotna mediana 0.56.
+- **Nie do wydania** ("Ceny surowcow", suma kategorii): koniec okna 102 915 d/d (srednia 10 dob; jedna doba 108 124), baza 116 443.
+- **Kredyt 186:** 3 054 zl/d (1 krolestwo).
+
+**Przyczyna [K]:**
+- (T1) BK `SellGoods` (BKCaravansBehavior.cs:1592-1611) sprzedaje na wizyte wynik kategorii / cene (1-2 szt.) i tylko przy indeksie >= (1.1 - do 0.4) x srednia; BK kupuje przy (srednia/indeks)^2 > 1.1 (:1506). Gra przy zakupie miasta od partii nie bierze podatku (SellItemsAction.ApplyInternal, galaz buyer IsSettlement), wiec myto nie dubluje cla.
+- (G1) `TownFolk.Guard.cs` GuardBegin: pasmo = 1.25-1.75 x N, a N rosnie z kazdym nowym towarem ludu (jaja, len, opal z ekon2). W pasmie mnoznik nie rosnie, wiec stoi na 2.01.
+- (G2) `Sutlers.One`: czesc wsi `vill.SettlementComponent.ChangeGold(villPart)` - 100% do kiesy, bez reguly 112.
+- (G4) `TownFolk.Live.cs` TownLive: czynsz W 8% / R 13% wydatku w calosci do P.
+- (W1) koszyk wsi tylko w miescie targowym (`Villages` -> `BuyGoods(mk)`); K2 trzyma plotno ponad caly prog wojska takze tam, gdzie lezy tanio.
+- (G5, recenzje) w `CrownIncome.Begin` cialoby caly dzien korony, takze zwrot zoldu (KingdomTreasury.cs:287 `rc.Have = LeftFor` -> kredyt 186), i dublowaloby regulator czesci korony straznika (`GuardCrownShare` = 0.35 + 5 x brak do 22%, do zapasu).
+
+**Zmiana:**
+- **E3-G1** (`TownFolk.Guard.cs` GuardBegin):
+  - do decyzji o mnozniku `nBand = min(N, FolkGuardNormalShareMax x swiat)`, takze w N7 (q = P / nBand); podstawa podatku bez zmian;
+  - bezpiecznik: wczorajszy udzial ludu z wsiami (MoneyLedger.LastShares) > FolkGuardShareFuse - mnoznik x1.03/d takze w pasmie, najwyzej 5.0 (wlasny sufit - uwaga recenzji), w dol nigdy;
+  - cien "mnoznik bez bezpiecznika" (sesja);
+  - linia straznika: "E3-G1 do pasma X (Y% swiata; najwyzej 6.4%, kap wiaze/nie wiaze)", "bezpiecznik udzialu ludu 9.0%: dzis tak/nie, dob w sesji N, mnoznik bez bezpiecznika M";
+  - linia startu "Obieg ludu (obieg2)": N jako % swiata i czy kap wiaze.
+- **E3-G5** (`CrownIncome.KeepValve`, wolane w `CrownRents.Daily` po M3, przed podzialem rent; klucz domyslnie WYLACZONY):
+  - przy udziale koron < FolkGuardCrownTarget: keep = min(r x TownPurse.CrownToday, pula rent), r = min(0.5, 5 x brak);
+  - `Spent` - zloto zostaje w skarbcu, jutro w zapasie; zwrot zoldu, W5, M1, raty i dary nietkniete; doba z kredytem 186 - 0;
+  - dopisek w "Korona: wplywy dnia (165)".
+- **E3-G2** (`Sutlers.One`): czesc wsi przez `VillageTakings.Split` (podatek z czynnego modelu na licznik podatku wsi, reszta do kiesy); wies rodu partii - 100% do kiesy (K3, uwaga recenzji). Dopisek w "Markietani (E5/A3)": do kies / na liczniki / wlasne wsie, kontrola "zaplacone wsiom = kiesa + licznik".
+- **E3-G3** (nowy `TownToll.cs`):
+  - woz: MarketCarts.SellPrefix -> CartBegin, SellPostfix (po zwrocie 119 i liczniku wlokna) -> CartEnd: 4% utargu netto;
+  - karawana: postfiks na SellItemsAction.ApplyInternal (CaravanGoods) -> TakeCaravan: 2% (uwaga recenzji - cienka marza); obejmuje BK SellGoods, CaravanBulk, CaravanAmmo i T1;
+  - odbiorcy: polowa glowie rodu pana osady (dochod ziemi D przez pending -> `TownToll.RentMerge` zaraz po `Seal31B.RentMerge`, bo PopulationLaw.Daily czysci RentToday - uwaga recenzji), polowa do zapasu korony (`KingdomBudgetWallet` + `CrownIncome.ShiftSnapshot`); bez krolestwa - calosc panu, bez zywego pana - jego polowa do kasy osady;
+  - jedna regula takze dla rodu gracza (licznik "w tym rod gracza"); zwolnione: kontrakt 174 (`MaterialOrders.HasContract`), wyprzedaz `CaravanFlow.SellOut` i dostawa `MaterialOrders.Deliver` (zakres `ExemptBegin/End`);
+  - liczniki CaravanBulk ("kasy miast zaplacily") i CaravanAmmo licza utarg PRZED mytem (`TownToll.LastTaken`);
+  - linie "Myto targowe (E3-G3): start sesji" i "...: dzien N" (wozy, karawany, gracz, do panow / koron / kas, zwolnione, kontrola, wplyw na skrzynie).
+- **E3-G4** (`TownFolk.Live.cs`): 1/3 czynszu W i R -> `PayLord` (oblezenie - czeka, bez zywego pana - gmina, RentToday), 2/3 do P; "czynsz gruntowy do panow miast E3-G4 X" w "Kiesa ludu".
+- **E3-T1** (nowy `CaravanGoods.cs`, sluchacz SettlementEntered dopisany miedzy CaravanAmmo a CaravanBulk - biegnie po surowcach masowych, przed amunicja i BK):
+  - ksiega kosztu partii w jukach (sesja; po wczytaniu brak wpisu = cena bazowa Value, doba wczytania);
+  - sprzedaz z zyskiem (cena ostatniej sztuki kroku > koszt + zold x dni w drodze (najwyzej 30) x udzial sztuki w koszcie ladunku, najwyzej 100% kosztu), na stracie tylko z powodem (rozwiazanie, kiesa < 3 dni zoldu, juki >= 95%, jedzenie > 7 dob, towar > 30 dob);
+  - BEZ progu sredniej; blokada odkupienia: prefiks/finalizer BK `BuyGoods` + postfiks BK `CalculateBuyValue` (wycena 0 dla kategorii sprzedanej przez T1 w tej wizycie); cena >= 0.4 x wartosci (gabka 0.33);
+  - kasa miasta ponad BuyFloor, najwyzej 1/20 nadwyzki na dobe (uwaga recenzji: zawor 7%/d);
+  - krok 5 szt. (> 200 d - 1), polowa stosu, jedzenie na 10 dob druzyny; bez surowcow CaravanBulk, zwierzat, koni; pomija kontrakt 174 i rozkazy gracza BK;
+  - linia "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien N" (z zyskiem / na stracie z powodem, odrzucone, wedlug towaru, zloto z kas / myto / przyrost kies, blokada BK i odkupione, ksiega, juki z dniami do wyczerpania, mediana indeksu narzedzi, futer, srebra, wina, papirusu, aksamitu, klejnotow, jaj, miodu, soli).
+- **E3-W1** (`TownFolk.Live.cs` + `MarketCarts.SellPostfix`, uwaga recenzji 1: zakup w chwili sprzedazy, gdy woz jest w miescie):
+  - potrzeba dnia niekupiona w miescie targowym liczona PRZED "wsi bez towaru" (zaleglosc, najwyzej 7 dni potrzeby, sesja);
+  - woz sprzedajacy w innym miescie albo zamku -> `CartBuys`: BuyGoods z polki tej osady (kiesa wsi -> kasa osady, ramka ksiegi towarow "zakupy wsi w miastach", VillWin);
+  - (b) plotno od polowy progu polki tylko tam, gdzie indeks plotna < 1 (uwaga recenzji: polowa progu tylko tam, gdzie plotno lezy);
+  - dopisek w czesci "wsie" linii "Kiesa ludu".
+- **Pompy F** (`MoneyLedger.Pumps.cs`): "F naturalne z obrotu (E3, poza suma)" z rozbiciem wedlug platnika (z ludu i wsi: czynsz gruntowy, danina markietanow, myto wozow / z kies karawan) i udzialem F-lud / (B + F-lud).
+- **Progi** `python -I tools/sprawdz_logi.py --grupa nekon3 [--baza-doby <log bazy>] <Armoury-*.log>`: NE3-0..NE3-16 czesci 1 (z 9b/9c, 11b, 12b, 14b, 14c), NE3-4 i NE3-17..24 - czesc 2 (INFO).
+
+**Decyzje (z recenzji, zapisane wprost):**
+- **G5 domyslnie wylaczony.** Recenzja 1: dwa regulatory jednej zmiennej daja wzmocnienie 10 zamiast 5, a G1 sam przywraca czesc korony straznika (baza 104 tys./d, ekon2 64.5 tys./d). Zasada "kazda mechanika domyslnie wlaczona" tu ustepuje, decyzja po dobie 60 testu (korony < 20.4%).
+- **Myto karawan 2%, wozow 4%** (recenzja 2: zold karawan 122.7 tys./d, marza cienka).
+- **Gracz placi myto jak wszyscy** (recenzja 1, regula 112-p 2.0b), zamiast zwolnienia gracza z recenzji 2.
+- **T1 bez progu sredniej i bez progu indeksu po kroku** (poprawka Jeffa). Petle sprzedaz-odkupienie zamyka blokada wyceny BK w tej wizycie, nie prog ceny.
+- **Bezpiecznik prog 9.0%, a nie 9.1%**, bo bezpiecznik rosnie 3% na dobe i musi zadzialac przed kryterium; sufit 5.0.
+- **NE3-11b:** udzial F-lud / (B + F-lud) jako INFO, nie prog 30%. Przy B ok. 380-415 tys./d i F-lud ok. 40 tys./d to ok. 9-10%, wiec 30% jest dzis nieosiagalne. Zwrot od ludu dalej idzie glownie z podatku, co mowie wprost.
+
+**Kontrola calosci (CLAUDE.md 8.0) [K]:**
+- **Myto:**
+  - Nie dubluje cla: przy zakupie miasta od partii gra nie bierze podatku.
+  - 112 liczy podatek pana od utargu po mycie, bez dubla.
+  - Okna ksiegi obiegu: WSell otwiera sie tylko, gdy sprzedaje osada; WTolls mierzy licznik cel, ktorego myto nie dotyka. Przelew odbywa sie w swiecie, wiec "Pieniadz swiata" sie nie zmienia.
+  - Liczniki istniejacych linii licza utarg przed mytem.
+- **T1:**
+  - Kolejnosc sluchaczy: MaterialOrders -> CaravanBulk -> T1 -> CaravanAmmo -> ... -> BK. Ostatnio dopisany biegnie pierwszy, BK laduje sie wczesniej.
+  - Zdarzenie OnCaravanTransactionCompleted jak w CaravanBulk (marza P1).
+  - Ksiega kosztu nie zmienia zachowania BK. Blokada dotyczy tylko kategorii sprzedanej w tej wizycie przez T1 i tylko w BuyGoods tej karawany.
+- **G2:** Split to ta sama funkcja co 112 przy rozwiazanym taborze. Licznik podatku wsi jest posiadaczem "Pieniadz swiata" (HVillageTax).
+- **G4:** PayLord, jak farma gminy, liczy sie w kontroli kiesy ludu (r = 0).
+- **W1:**
+  - Kiesa wsi nie jest w kontroli r, tak jak koszyk dnia.
+  - Ramka FFolkVill zagniezdzona w ramce sprzedazy wozu.
+- **G1:**
+  - Podstawa podatku sie nie zmienia, zmienia sie tylko decyzja o mnozniku.
+  - Bezpiecznik podnosi `_gdM` zapisany w arm_obieg2.
+
+**Ryzyko / co sprawdzic:**
+- **G1:**
+  - Po wylaczeniu FolkGuardShareFuse podniesiony mnoznik zostaje w zapisie i schodzi 3%/d tylko ponizej dolnej krawedzi pasma.
+  - Gdy N w kampanii Jeffa < 6.4% swiata, kap nie wiaze (linia startu mowi "kap nie wiaze").
+  - Sygnal slabych ujsc: bezpiecznik "tak" > 20 dob (NE3-10).
+- **Pompy B:** okolo 400-415 tys./d, granica NE3-11 (recenzja 1: G1 przywraca ok. +80 tys./d podatku).
+- **G3:**
+  - Wies ma ok. 2.2 pkt proc. utargu mniej, pan wsi ok. 1.5 pkt.
+  - Kiesy karawan: NE3-14c. Marza CaravanBulk mniejsza o 2% - sprawdzic "Karawany: dzien" (kupione / sprzedane surowce) wobec bazy.
+- **T1:**
+  - Kasy miast placa karawanom z nadwyzki, wiec zawor (Pompy C) moze chwilowo spasc (NE3-14b: >= 95% bazy). Korony w dobie 30 i 60 - NE3-8.
+  - Juki karawan to jednorazowy zapas (narzedzia ok. 11 dni zuzycia swiata), a produkcji T1 nie zmienia. "Nie do wydania" moze wrocic przed koncem okna, wiec NE3-15 pokazuje doby 30-60 i koniec.
+  - Sprzedaz ponizej sredniej obniza ceny w drogich miastach. Mediany i skoki: NE3-5.
+  - Ksiega kosztu po wczytaniu = cena bazowa: pierwszy miesiac sesji liczy zysk wobec Value.
+- **W1:** wsie biora narzedzia budowom (progi ShelfKeep 5 i ToolsKeep 5 zostaja). Plotno od polowy progu tylko przy indeksie < 1 - sprawdzic "Odziez wojska (150)".
+- **G2:** wies w rabunku - model BK daje mniej podatku (to w porzadku).
+- **Wszystko:** 7 mechanik w jednym biegu. Gdy padnie NE3-7/8/11, drugi bieg 120 dob z samymi G1-G4 (klucze CaravanSellWhereDear i VillageCartBringsGoods wylaczone) i porownanie.
+- **Bez testu w grze:** testy uruchamiac tylko, gdy gra Jeffa jest zamknieta (Jeff gra od 15.10).
+
+**Sprawdzone:**
+- Build Release: kod wyjscia 0, 0 Error(s); jedno stare ostrzezenie CS0169 BattlefieldLaw.
+- `python -I tools/gen_mcm.py`: 1622 ustawienia.
+- `sprawdz_logi --grupa nekon3`:
+  - na logu ekon2 i bazie: bez wyjatku, linie paczki INFO / NIE zgodnie z brakiem paczki;
+  - na logu syntetycznym z napisow kodu: 37 linii, NIE tylko NE3-14 (okno 3 doby < 60).
+- Gry nie uruchamialem.
+
+**Status:** DO SPRAWDZENIA (autotest 120 dob na zapisie F, progi NE3-0..16 wobec bazy 20-16-31 i ekon2 21-25-46; wgranie dopiero po udanym autotescie i tylko, gdy Jeff nie gra).
+
+## 2026-10-16 (noc - noc-ekonomia2, POPRAWKI PO RECENZJI GALEZI) - LIMIT PRZESUNIECIA BUDZETU PRZY NOWYM POPYCIE TARGU (E2 I ZAMIENNIK JEDZENIA B2), PROG N2-4, MAGAZYN WSI Z JAJAMI I OWOCAMI, ZIMA OPALU JAK KAZDY SKUTEK ZIMY, LICZNIKI WLOKNA I OPALU
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia2` (na 3c599b50) | **Tor:** M (poprawki recenzji: 2 powazne, 5 drobnych - wszystkie uwagi sprawdzone w kodzie i trafne) | **Klucze:** bez nowych - limit E2 pod `NoMakerBudgetToLuxury`, limit B2 pod `FoodSubstituteWhenShort`, magazyn wsi pod `VillageFruitFromBk` (owoce i miod) i `VillageEggsFromBk` (jaja), opal pod `TownFolkFirewood`, wlokno pod `VillageFibreToMarket` | **Zmiana ekonomii:** tak, mala (B2 i E2 przesuwaja nieco mniej; W wsi rolniczych wiekszy o dodatki; opal w zimie wedlug polnocy) | **Zapis:** bez zmian | **Cofanie:** `git revert` tego commita (albo klucze jak wyzej) | **Pliki:** `Armoury/src/ShiftLimit.cs` (nowy), `NoMakerBudget.cs`, `FoodSubstitute.cs`, `VillageFruit.cs` (CapPostfix, ApplyAll, linie jaj), `SubModuleMain.cs` (wpiecie), `TownFolk.Firewood.cs`, `WinterBite.cs` (NorthOf), `FibreToMarket.cs`, `MarketCarts.cs`, `Settings.cs` + `McmSettings.cs` (opis TownFolkFirewood, gen_mcm), `tools/sprawdz_logi.py` (grupa nekon2)
+
+**Dla Jeffa (prosto):** recenzja znalazla dwie powazne rzeczy i kilka drobnych - wszystkie poprawione. (1) Przesuwanie pieniedzy ludu na inne rzeczy (zamiennik jedzenia z poprzedniej nocy i nowe "towary bez producenta") mialo brac najwyzej polowe tego, co lezy na straganie ponad zwyklych kupcow, a bralo do 53.6%: wiekszy popyt podnosi tez cene, a z cena rosnie budzet. Teraz najpierw liczymy cale miasto, potem kazdy dopis przycinamy tak, zeby po NOWEJ cenie zmiescil sie w polowie, i dopiero wtedy cokolwiek zmieniamy; reszta zostaje tam, gdzie byla. (2) Narzedzie do sprawdzania logu szukalo innego slowa, niz pisze gra, i przy budzecie zawsze pokazaloby blad - poprawione. Drobne: magazyn wsi rosnie teraz o jaja i owoce (wczesniej je zajmowaly i wies stawala troche wczesniej); opal w zimie liczy sie tak jak kazdy inny skutek zimy - na dalekiej Polnocy wiecej, ku Dorne mniej - a gdy zima jest wylaczona w ustawieniach, linia mowi to wprost; licznik wozow z lnem nie liczy drugi raz tego samego kursu przez zamek; zloto opalu liczy sie osobno (z sakiewek, do kas, do gmin), zeby kontrola naprawde cos sprawdzala; nowy wiersz pokaze, czy opal nie zabiera drewna budowom.
+
+**Problem [L/K, recenzja galezi noc-ekonomia2 16.10]:**
+- (P1, powazna) N2-4 sprawdzal `"latka wpieta" in s2`, a kod pisze "latka wpiety (UpdateDemandShift, po zamienniku jedzenia B2, przed nawiasem kiesy ludu)" (`NoMakerBudget._hook`, linia startu) - przy wlaczonym kluczu N2-4 NIE w kazdym autotescie (recenzent: log z napisow kodu `rtest/syn.log` - "latka NIE, zrodel 5/5"). Zdanie z poprzedniego wpisu "log syntetyczny w formacie z kodu - 18 wierszy, 0 NIE" bylo nieprawdziwe (sprostowane tam).
+- (P2, powazna) autotesty 15.10 19-59-53 i 20-16-31, linia "Zamienniki jedzenia (B2)": "kontrola limitu zamiennikow: z dopisem 693, przekroczen 86 (najwiecej 53.6% nadwyzki)", dalej 611/59 (52.9%), 611/61 (52.1%), 592/54 (51.7%); drugi log 696/91 (53.6%) ... 584/52 (53.4%) - co dobe 51-91 przekroczen przy limicie 50% (NC-15b NIE). E2 (`NoMakerBudget`) mial ten sam rachunek, a N2-5 wymaga przekroczen 0; linia E2 nie podawala najwiekszego udzialu.
+- (D1) owoce i miod (noc-ceny) i jaja (E1) leza w magazynie wsi, a W ich nie liczy - farma zboza ok. +8% sztuk owocow i ok. +4% jaj; wies stawala o tyle wczesniej, a woz wyjezdzal i liczyl kurs (MarketCarts.Choose) przy W bez nich.
+- (D2) opal w zimie x (1 + `WinterRealm.OfTown`): czynnik 1 ma kazda kraina poza cieplymi i Wyspami Letnimi (Reach, Westerlands, Riverlands, Crownlands tez x2, przy wylaczonym WinterByRealm x2 wszedzie), bez gradientu polnocy, ktorym mnoza sie wszystkie inne skutki zimy (druga regula na jedno zjawisko); pora zima przy wylaczonym WinterBiteEnabled - linia pisala "wiosna albo jesien (x1)"; opisy (MCM, CHANGELOG) sugerowaly x2 tylko na Polnocy.
+- (D3) opal bierze z tej samej puli "ponad zapas rzemiosla" co budowy (K1) i biegnie przed BuildFunding - zaden prog tego nie mierzyl.
+- (D4) N2-7b ("akcyza + do kas = zaplacone") byl tautologia: linia wypisywala "do kas miast" jako zaplacone - akcyza.
+- (D5) E3: woz wsi zamkowej po przystanku w zamku (CastleMarket.FirstStop -> SellPrefix -> PickTown -> Choose) liczyl ten sam kurs drugi raz w "skierowane", a drugi wybor bez skierowania (miasto targowe wygralo samo) kasowal pamiec wozu - sprzedaz nie liczyla sie do skierowania; "wlokna w jukach" bez doladowania TopUp z magazynu (zanizone).
+
+**Przyczyna [K]:** (P1) napis w kodzie "wpiety" (rodzaj meski - postfiks), w narzedziu "wpieta". (P2) limit dopisu w jednostkach budzetu dnia liczony nachyleniem BK przy STARYM indeksie ceny (BK `EconomyPatches.CalculateBudget` = popyt x indeks^a + dobrobyt / indeks), a ten sam dopis podnosi popyt targu celu (`SetDemand(Demand + waga x dopis)`), z ktorego gra liczy indeks (`TownMarketData.GetPriceFactor` czyta `ItemData.Demand`, `Town.GetItemCategoryPriceIndex` = GetPriceFactor) - budzet BK celu przy konsumpcji wychodzi wiekszy, niz zakladalo nachylenie; kontrola liczyla to juz po fakcie. (D1) `Village.GetWarehouseCapacity` (twall Village.cs:248) = ceil(5 x (jedzenie + model po `VillageType.Productions`)), a bramka `VillageGoodProductionCampaignBehavior.TickProductions` (:143-151) liczy sume WSZYSTKICH sztuk magazynu; odjazd wozu (`VillagerCampaignBehavior` :147) - ten sam W. (D2) `WinterRealm.FactorOf` zwraca 1 dla grupy "reszta"; `WinterBite.Northness` byl prywatny i opal go nie uzyl. (D4) `gold - excise` w linii. (D5) `NoteSent` bez sprawdzenia pamieci wozu, `Forget` bez celu, jednostki z `Wants` (juki).
+
+**Zmiana:**
+- (P1) `nekon2`: N2-4 - `re.search(r"latka wpiet[ay]", s2)` (jak NC-23 dla B2). Syntetyczny log generowany z napisow kodu (skrypt `mklog2.py` w scratchpadzie sesji: wszystkie linie przepisane z konkatenacji C#, takze nowe czesci), wariant "zly" do sprawdzenia, ze progi lapia blad.
+- (P2) nowy `ShiftLimit.Fit` (wspolny dla B2 i E2): planowany dopis got do celu t x f - przyrost budzetu BK celu przy popycie targu PO dopisie (d0 + waga x got x f) i slowniku po dopisie (bt0 + got x f) <= limit w zlocie (0.5 nadwyzki polki po ofercie ludu, x1.001 + 0.5 zl jak kontrola); krok siecznej przez zero f = f x limit / przyrost, najwyzej 4 kroki (zwykle 1-2); popyt targu celu wraca do d0 przed wyjsciem (takze przy wyjatku). `NoMakerBudget.Shift` i `FoodSubstitute.Shift` przebudowane na trzy kroki: (1) plan calej osady bez zmian slownika i popytu (limit celu wspolny dla zrodel osady, jak dotad; B2 czyta zrodla ze slownika sprzed zmian), (2) Fit kazdego celu z dopisem, (3) zmiany: cel + got x f, zrodlo - suma swoich dopisow po f, popyt targu tak jak dotad (waga wygladzania, podloga 0.1). Czesc odcieta zostaje w kategorii zrodla - suma slownika bez zmian. Linia E2: "kontrola limitu celow: z dopisem C, przekroczen O (najwiecej X% nadwyzki), przyciete (indeks ceny rosnie z popytem) T"; linia B2: dopisek ", przyciete (indeks ceny rosnie z popytem) T" na koncu czesci kontroli (NC_SD_CHK czyta dalej bez zmian). N2-5: przekroczen 0 i najwiecej <= 50.5% (stara linia bez udzialu - jak dotad); NC-15b bez zmian (przekroczen 0, najwiecej <= 50.5% - po poprawce powinien przejsc).
+- (D1) `VillageFruit.CapPostfix` (postfiks `Village.GetWarehouseCapacity`, wzorem `VillageWoodlot.CapPostfix`): W + ceil(5 x dobowy plon dodatkow listy BK) - owoce i miod z wag BK (`WeightFor`, klucz VillageFruitFromBk, lista BK wpieta), jaja z wagi drobiu listy tej wsi (`_eggW`, klucz VillageEggsFromBk); plon = baza (waga x (poziom ognisk + 1) x 0.5 - ten sam wzor co `Base`/`EggBase`) x czynnik ludzi wsi P1 (`VillageByPeople.TryFactor`, jak las wsi); bez pytan modelu (bez skutkow ubocznych ksiegi rudy i W2); tylko wies Normal z targiem i czynnym `MaterialLaw.ProdPostfix`. Linia startu jaj: "magazyn wsi + 5 dob jaj i owocow (GetWarehouseCapacity) wpiety"; linia doby jaj: "magazyn wsi powiekszony o jaja i owoce: wsi N, razem +S szt. (srednio +X), potkniecia P". Nowy wiersz N2-1c (INFO): wsie z wiekszym magazynem i "Zatkane wsie (diagnoza)" - rolnicze zatkane/wszystkie, pierwsza i ostatnia doba.
+- (D2) opal: zima x (1 + `WinterRealm.OfTown` x `WinterBite.NorthOf` (nowe internal - ten sam gradient polnocy, ktorym zima mnozy kazdy skutek, np. ciecie plonu wsi `CutOf`)) - przy NorthGradientPercent 25 wiekszosc Westeros ok. x1.75-2.25 (daleka Polnoc najwiecej), cieple x1.3-1.5, Wyspy Letnie x1. Pora ekonomii (`WesterosClimate.Now`) czytana niezaleznie od WinterBiteEnabled: zima przy wylaczonych skutkach zimy - x1 i "pora: zima bez skutkow (Winter Bite = off, x1)". Opis klucza w Settings/MCM poprawiony ("about twice across most of the realm (more in the far north, less towards Dorne), about a third more in the warm south, nothing extra in the Summer Isles, and no extra at all when Winter Bite is off"); `python -I tools/gen_mcm.py`. Regex N2E_E4D zna nowa pore.
+- (D3) nowy wiersz N2-7e (INFO): w tych samych dobach (opal d, "Roboty ludu (P2)" d + 1 - ta sama doba gry) opal kupiony, drewno robot ludu (material hardwood), drewno zostawione rzemioslu przez budowy (pan + lud) i "bez materialu" robot ludu w dobach z opalem i bez opalu. Kolejnosci doby nie zmienialem (bez dowodu z logu - decyzja po autotescie).
+- (D4) linia opalu liczy obieg osobno: "za G zl (z kies ludu P, akcyza do gmin E, do kas miast K)" - P = suma `_whP` (zeszlo z kies W/R/P), E = suma akcyzy dopisanej gminom (`KG += ex`), K = suma wplat `town.ChangeGold(kp)`. N2-7b: P = G i E + K = G (i kupione > 0 => G > 0); linia bez "z kies ludu" - INFO.
+- (D5) `FibreToMarket.NoteSent`: woz, ktory w pamieci ma juz ten sam cel, nie liczy sie drugi raz (licznik "ten sam kurs wybrany drugi raz (po zamku, bez licznika)" w linii doby); `Forget(cart, wybrane miasto)` - pamiec zostaje, gdy nowy wybor to ten sam cel; jednostki wlokna z ladunku miasta targowego (`FibreToMarket.Units(ownC.Load)` - z doladowaniem TopUp, gdy pelny woz). Regex N2E_E3D zna nowa czesc (bez nowej grupy).
+- Narzedzie `nekon2`: pomoc i docstring uzupelnione (N2-1c, N2-5 najwiecej <= 50.5%, N2-7b nowy rachunek, N2-7e); nowe regexy z przedrostkiem N2E_ (E2MAX, PURSE, CAPW, CLOG, FOLK, FOLK_MAT, FOLK_HELD) - bez dubli (ast: brak powtorzonych nazw globalnych), dispatch bez zmian (po petli argumentow, za nwyd), skladnia ast ok.
+
+**Ryzyko / co sprawdzic:**
+1. Kontrola calosci (zamknieta ekonomia): B2 i E2 dalej tylko przesuwaja budzet w slowniku tej samej osady (suma bez zmian, placi lud, odbiera kasa miasta); czesc odcieta limitem zostaje w zrodle (jak "bez miejsca"). Magazyn W - liczba, bez zlota i sztuk. Opal - te same przelewy co dotad (kiesa -> gmina i kasa), zmienione tylko liczniki i mnoznik zimy. Wlokno - tylko liczniki.
+2. B2 zachowanie: przesuwa nieco mniej (limit 50% dotrzymany zamiast 51.7-53.6%); kolejnosc zamiennikow ta sama; zrodla czytane ze slownika sprzed zmian (wczesniej zamiennik z dopisem mogl potem jako zrodlo liczyc brak od powiekszonego budzetu - teraz jednolicie od slownika sprzed zmian). Koszt: Fit = 1-5 pytan budzetu BK na cel z dopisem (B2 ok. 600 celow na dobe + E2) - kilka tysiecy wywolan CalculateBudget na dobe (male). `SetDemand` bez skutkow ubocznych (`TownMarketData.SetItemData` - sam slownik), `RawPrice.FactorPrefix` i `HistoricalPrices.BudgetPostfix` bez licznikow wywolan; pytania przed nawiasem kiesy ludu (priorytety 500/450 > 400) - nie wchodza do jego wierszy.
+3. Magazyn W wsi rolniczych i drwali/trzebicieli wiekszy o 5 dob dodatkow: woz wyjezdza przy W liczonym ze wszystkich plonow (zamierzone 5 dob), miernik kursu MarketCarts i bramka 1.5 W - ta sama liczba; VillageClogDiag, MarketRoad, Devastation, VillageWoodlot (swoj dopisek osobno, sumuja sie) - jeden W. Baza bez zimy i rak - w zimie W o ulamek doby wiekszy. Sprawdzic N2-1c: zatkane wsie rolnicze nie wiecej niz przed paczka (autotest 20-16-31: 13/223).
+4. Opal w zimie: daleka Polnoc do x2.25, Dorne x1.3-1.5 - swiat w zimie nadal ok. 300 ladunkow na dobe. Przy wylaczonym WinterBiteEnabled zima x1 (jak inne skutki zimy).
+5. N2-7e INFO: gdy w dobach z opalem roboty ludu wyraznie czesciej "bez materialu" - przeniesc E4 za BuildFunding (z pozycja ksiegi pieniadza) albo latem podniesc prog.
+6. Sprawdzone: build Release rc=0, "0 Error(s)" (1 stare ostrzezenie BattlefieldLaw); log syntetyczny z napisow kodu (`mklog2.py`, 6 dob, wszystkie pory opalu, linie "Zatkane wsie" i "Roboty ludu (P2)" w formacie z logu 20-16-31) - 19 progow, 0 NIE; wariant "zly" (najwiecej 53.6%, przekroczen 3/dobe; z kies ludu = zaplacone + 7) - N2-5 NIE i N2-7b NIE; stary syntetyk recenzenta (`rtest/syn.log`) - N2-4 TAK, N2-5 TAK (bez udzialu - wersja sprzed poprawki), N2-7b INFO; log 20-16-31 (bez paczki) - N2-0 INFO. Gry nie uruchamialem - Fit, CapPostfix i nowe liczniki bez pomiaru w grze.
+
+**Status:** DO SPRAWDZENIA (build Release rc=0, "0 Error(s)"; nie wgrane; autotest na zapisie Jeffa: `--grupa nekon2` (N2-0..N2-9, w tym N2-1c, N2-5 z najwiekszym udzialem, N2-7b, N2-7e) i `--grupa nceny` (NC-15b: przekroczen 0, najwiecej <= 50.5%), dalej `nekon`, `gl1`, `kiesa2`, `obieg2`)
+
+## 2026-10-16 (noc - noc-ekonomia2, raport audytu ekonomii 15.10 rozdz. 1.8 i 3.2 P1, P2, P7, P8) - JAJA ZE WSI ROLNICZYCH, BUDZET TOWAROW BEZ PRODUCENTA NA ZBYTKI Z POLKI, LEN I WELNA DO MIASTA TARGOWEGO, OPAL DLA MIESZCZAN
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia2` (od 3f8baef1 = stan po nocy: noc-ceny z owocami wsi VillageFruit, FoodSubstitute, FoodThrift; noc-ekonomia z sola x3.5, futrami x3, N4, N6, N7 wylaczonym) | **Tor:** M (cztery punkty E1-E4, kazdy z wlasnym kluczem; jeden autor, grupa progow `nekon2` N2-0..N2-9) | **Klucze (NOWE - w `Armoury.json` Jeffa ich nie ma, sprawdzone grep, dzialaja domyslne):** `VillageEggsFromBk`, `NoMakerBudgetToLuxury`, `VillageFibreToMarket`, `TownFolkFirewood` - wszystkie true (grupa MCM "Goods for the townsfolk (night 16.10, part 2)"); wylaczony = 3f8baef1 poza liniami logu | **Zmiana ekonomii:** tak (towar i obieg zlota ludu) | **Zapis:** bez nowych kluczy (pamiec tylko w sesji) | **Cofanie:** klucz w MCM / `Armoury.json` albo `git revert` tego commita | **Pliki:** `Armoury/src/VillageFruit.cs` (E1: EggStep, EggBase, linie), `MineralOnce.cs` (E1: jaja w postfiksie listy BK), `NoMakerBudget.cs` (E2, nowy), `FibreToMarket.cs` (E3, nowy), `MarketCarts.cs` (E3: Choose, SellPrefix, SellPostfix), `TownFolk.Firewood.cs` (E4, nowy), `ArmouryBehavior.cs`, `SubModuleMain.cs`, `Settings.cs`, `McmSettings.cs` (`python -I tools/gen_mcm.py`), `tools/sprawdz_logi.py` (grupa `nekon2`)
+
+**Dla Jeffa (prosto):** mieszczanie maja pieniadze na rzeczy, ktorych nie ma na straganach, wiec zloto lezy w ich sakiewkach. Cztery zmiany, zeby bylo na co wydawac i zeby towar szedl tam, gdzie go brakuje: (1) **jaja** - wsie rolnicze maja w Banner Kings kury i gesi, ale gra liczyla je jako nic, a jaja dawaly tylko farmy bydla; teraz farmy zboza, gaje oliwne, winnice, daktyle, len i jedwab znosza jaja wedlug liczby kur i gesi z Banner Kings (to plon dodatkowy - zboze i reszta bez zmian); (2) **garum, atrament, barwniki, kamienie szlachetne i ruda zlota** - tego nikt na swiecie nie robi, wiec pieniadze ludu na te rzeczy przepadaly; teraz ida na najblizszy rodzaj lepszych rzeczy, ktore leza na straganie (garum na lepszy stol, barwniki na sukno i odziez, kamienie i zloto na klejnoty i srebro, atrament na rzeczy do domu) - najwyzej polowe tego, co lezy ponad zwyklych kupcow; czego nie ma gdzie wydac, zostaje w sakiewce jak dotad; (3) **len i welna** - woz wsi wozil len daleko, do miasta, ktore najlepiej placi, a w tym czasie magazyn wsi sie zapychal (82% lnu swiata lezalo we wsiach i na wozach); teraz, gdy wies ma lnu albo welny na ponad 6 dni swojej produkcji, woz sprzedaje je w swoim miescie targowym takze taniej niz zwykle, a dalej rozwoza je kupcy; (4) **opal** - mieszczanie kupuja drewno do pieca: wiosna i jesienia 1/10 ladunku na 1000 ludzi dziennie, latem polowe (tylko gotowanie), w zimie do dwoch razy tyle (Polnoc dwa razy, cieple poludnie mniej), tylko drewno ponad to, czego potrzebuja kowale i dymarki, i tylko z pieniedzy ponad jutrzejszy koszyk. Latem drewna do spalenia jest malo, w zimie, gdy drewno sie pietrzy, pala do syta. Wszystko placi lud ze swojej sakiewki, nic nie powstaje z niczego.
+
+**Problem [L, raport audytu ekonomii 15.10 i log Jeffa 2026-10-15_10-56-30 (doba 108945); autotest 2026-10-15_19-59-53]:** lud miast ma budzet 136 275 d na dobe w 15 kategoriach jedzenia i surowcow, a polki pozwalaja wydac 30 823 d - 105 452 d na dobe nie ma na co wydac (tabela 1.8: jaja 26 331, futra 20 020, miod 10 407, jablka 9 840, chleb 9 371, papirus 8 318, garum 5 029, ruda zlota 4 845, barwniki 4 106, atrament 3 422, placek 3 275). (E1) "Egg (8 d): produkcja 76 [wsie 42 (cattle_farm 42); inne ticki dobowe 34]", "Eggs ... indeks 3.20/10.00/10.00, na polkach 56 szt., pusto w 88 miastach, budzet mieszczan 28812 d (przy dzisiejszych polkach do 2481 d)"; w autotescie po owocach noc-ceny dalej: jaja pusto w 95 miastach, indeks 10.00, budzet 31 720 d (do 1 126). (E2) garum 5 029 d, Ink 3 422 d, Dyes 4 106 d, gems 170 d: "na polkach 0 szt., pusto w 97 miastach, ... do 0 d"; ruda zlota 5 244 d (do 399 d, 14 sztuk w 5 miastach) - ok. 17 600 d na dobe bez towaru; w tescie 4-letnim te kategorie puste przez 4 lata. (E3) len: produkcja 687/d (flax_plant), posiadacze: wsie 2 632, wozy 5 121 (7.5 doby produkcji w jukach; zboze 1.8, ryby 2.2, welna 1.7), miasta 1 555; len bez towaru w 69 miastach, z nadwyzka w 1; welna bez towaru w 50 miastach; kontrakty 174 "brak zrodla z nadwyzka w zasiegu": len 83, skory 80, welna 68 miast. Skory surowe robia dzis tylko rzeznicy i rzemieslnicy miast (wsie ich nie maja). (E4) test 4-letni, 4. rok w zimie: zapas drewna swiata 41 555 -> 96 326, indeks 0.46-0.56, budowy 1 391 -> 780 ladunkow/d; mieszczanie pala 55-100 ladunkow/d (koszyk BK) wobec ok. 11 500 we wzorcu; autotest (lato): drewno na polkach miast 4 234, zapas rzemiosla miast razem 4 115, 40 miast ponizej zapasu.
+
+**Przyczyna [K]:** (E1) BK `PopulationManager.GetProductions` (dec-bk :304-336) dokleja wsi rolniczej (IsFarmingVillage: klasa Cropland albo FibreFarm) kure i ges z waga kultury (aserai 0.15, sturgia/khuzait 0.45, empire/battania 0.75, reszta 1.0), ale jaj nie; model gry (przez NavalDLC) daje kurze i gesi 0, bo nie stoja w `VillageType.Productions`; jaja BK robi tylko z drobiu w partiach (`BKPartyBehavior.OnDailyTick`: 5% na ptaka na dobe) i jako plon hodowli bydla (`BKVillageTypes`: CattleRange Egg 1.5). (E2) BK `EconomyPatches.ItemConsumptionPatch` liczy budzet (`CalculateBudget`) tylko przy wierszu polki - kategoria bez towaru nigdy nie dochodzi do zakupu, a jej wpis w slowniku budzetu dnia (`ItemConsumptionBehavior.UpdateDemandShift`) przepada; gra przesuwa popyt tylko w parach CanSubstitute (te kategorie ich nie maja). (E3) `MarketCarts.Choose` (poprawka 119) wybiera miasto najlepiej placace za caly ladunek na dobe kursu w zasiegu 250; len w miescie targowym wsi lnianej stoi ponizej ceny bazowej (indeks min 0.15), wiec woz wiezie go daleko, kurs trwa dluzej niz 5 dob, na ktore starcza magazynu (`Village.GetWarehouseCapacity` = 5 dob produkcji), a od 1.5 magazynu gra wstrzymuje produkcje wsi; kontrakty 174 (`MaterialOrders`) biora zrodlo tylko z miast z nadwyzka. Sprzedaz w miescie sama nie odrzuca towaru ponizej ceny (BK `SellGoodsPatch` sprzedaje wszystko do kasy miasta) - decyzja jest w wyborze miasta. (E4) lud miast kupuje drewno tylko koszykiem BK (budzet kategorii hardwood x `TownUseHardwood`); nikt nie grzeje domow, zima nic nie zmienia.
+
+**Zmiana:**
+- (E1, `VillageEggsFromBk`) `MineralOnce.Postfix` (lista produkcji wsi BK; nowa piata bramka) po filtrze klimatu i wielbladach, przed petla powtorzen: `VillageFruit.EggStep` dopisuje na koniec listy wsi z kura lub gesia pozycje `Egg` o wadze kura + ges z tej listy (DECYZJA CLAUDE: w partiach BK oba ptaki niosa jaja tak samo); nowa lista, BK-owej nie ruszamy; jaja juz na liscie - nic. Tick BK pyta model o jaja, a `VillageFruit.Base` -> `EggBase` (MaterialLaw.ProdPostfix, przed mnoznikami) dopisuje baze = waga x (poziom ognisk + 1) x 0.5 - ten sam wzor co owoce noc-ceny i kazdy plon gry; potem mnozniki jak kazdy towar (P1 ludzie wsi, rece, zima). Jaja w typie wsi (hodowla bydla) - liczy gra. Potkniecie listy - lista BK, `ForgetEgg`. Linie "Jaja wsi (N2-E1): start sesji" (wsi rolniczych wedlug typow, oczekiwany plon na dobe przed mnoznikami) i "...: dzien N" (listy BK z jajami, baza dopisana).
+- (E2, `NoMakerBudgetToLuxury`) nowy `NoMakerBudget` - postfiks `ItemConsumptionBehavior.UpdateDemandShift` z priorytetem 450 (PO zamienniku jedzenia B2, PRZED `TownFolk.DemandPostfix`, ktory otwiera nawias kiesy ludu - kotwica skaluje juz slownik po przesunieciu): dla zrodel garum, Dyes, gems, gold, Ink przy polce ponizej budzetu BK caly niezaspokojony udzial (1 - S/B) x budzet dnia idzie na grupe zbytku z listy dostatku ludu (TownFolk.Luxury): garum -> lepszy stol (mieso, ser, maslo, piwo, wino, miod pitny, oliwa, miod), barwniki -> sukno i odzienie (bawelna, aksamit, futra, odziez; bez lnu, skory i filcu - wsad zbrojowni i odziezy wojska), kamienie i ruda zlota -> klejnoty, srebro, korzenie, kiel morsa, atrament -> dom (garnki, tran, papirus). Cel bierze najwyzej 0.5 swojej nadwyzki polki po ofercie ludu (`TownFolk.OfferCapFor`), limit wspolny dla zrodel osady, podzial wedlug limitu; reszta zostaje w kategorii zrodla. Popyt targu przesuniety ta sama waga wygladzania co w B2. Suma slownika bez zmian. ODSTEPSTWO OD PLANU AUDYTU: przesuniecie w slowniku budzetu dnia zamiast w `HistoricalPrices.BudgetPostfix` - BudgetPostfix biegnie tylko dla wiersza polki, wiec kategorii bez towaru nie widzi, a dopisek do wiersza celu ominalby kotwice kiesy ludu (ta skaluje slownik). Linie "Budzet bez producenta (N2-E2): start sesji" i "...: dzien N" (niezaspokojone, przeniesiono wedlug zrodel i grup, przyrost budzetu BK celow w zlocie, zostalo, kontrola limitu).
+- (E3, `VillageFibreToMarket`) nowy `FibreToMarket` + `MarketCarts.Choose`: po wyborze najlepszego miasta, gdy woz wiezie len, welne albo skory surowe, a zapas tego towaru wsi (juki + magazyn) przekracza 6 dob jej produkcji (model produkcji wsi; DECYZJA CLAUDE: miedzy 5 dobami magazynu a 7.5 doby, przy ktorych wies staje), woz jedzie do miasta targowego wsi (wies miejska - jej miasto, zamkowa - TradeBound; ten sam kandydat "wlasne miasto" z linii "Dowoz") i sprzedaje tam caly ladunek takze ponizej ceny bazowej, gdy to miasto jest kandydatem (nieoblezone, niewrogie, w zasiegu) i cokolwiek zaplaci. Nastepny wyjazd z mniejszym zapasem znowu wybiera najlepsza cene. Platnik i odbiorca bez zmian: kasa miasta -> sakwa wozu (sprzedaz gry / BK, cena sztuka po sztuce 119) -> kiesa wsi i pan (utarg wsi 112); ksiega towarow - zwykla sprzedaz wozu (nic drugi raz). `SellPrefix` / `SellPostfix` (nowa otoczka `SellPostfixCore`): przy wjezdzie wozu skierowanego do miasta celu - sprzedane sztuki wlokna i utarg wozu po zwrocie nadplaty. Linie "Wlokno do miasta targowego (N2-E3): start sesji" i "...: dzien N" (sprawdzone, ponad prog, skierowane, wycena w miescie targowym wobec najlepszego - ile traci wies, sprzedane sztuki i utarg, w drodze).
+- (E4, `TownFolkFirewood`) nowy `TownFolk.Firewood.cs` (wzor konie robocze K1-3a): raz na dobe po `WorkHorsesDaily` i `Bloomery.Daily` (drewno dymarek pierwsze) kazde miasto z kiesa ludu potrzebuje 0.1 ladunku drewna na 1000 glow kiesy ludu (te same glowy co konie robocze), latem (pora ekonomii `WesterosClimate.Now`) x0.5 (DECYZJA CLAUDE: tylko gotowanie - "latem malo" z planu P7), w zimie ROT (`WinterBite.WinterNow`) x (1 + czynnik krainy `WinterRealm.OfTown`: Polnoc x2, cieple x1.4, Wyspy Letnie x1 - POPRAWIONE po recenzji 16.10, wpis wyzej: x (1 + kraina x gradient polnocy), x2 mialy tez Reach, Westerlands, Riverlands, Crownlands); ulamek - zaokraglenie losowe, bez pamieci. Kupuje z polki tego miasta tylko drewno ponad zapas rzemiosla (`CaravanBulk.TargetFor` - prog K1, ponizej ktorego budowy nie biora drewna) i ponad 5 sztuk, cena polki sztuka po sztuce (`ShelfBuy.Take`); placi kiesa ludu (W/R/P wedlug wolnych pieniedzy) tylko ponad jutrzejszy koszyk (`WhAvail`/`WhSplit`), akcyza `TownFolkExcise` do gminy, reszta do kasy miasta - jak PayForGoods; `_ctlOut`, `PaidKeep`, `LDayOut` jak przy koniu. Ksiega towarow: ramka konsumpcji osady (pozycja "mieszczanie"); ksiega pieniadza: pozycja MFolk (jak konie). Linie "Opal mieszczan (N2-E4): start sesji" i "...: dzien N" (glowy, pora, potrzeba, kupione i zloto, bez opalu: polka ponizej zapasu rzemiosla / za mala kiesa).
+- Narzedzie: `python -I tools/sprawdz_logi.py --grupa nekon2 <Armoury-*.log>` - N2-0 linie startu E1-E4 (klucze TAK), N2-1 jaja - start (wsi > 0, plon > 0, Egg, lista BK), N2-2 linia doby jaj (listy z jajami > 0 od drugiej doby, potkniecia 0), N2-3 jaja ze wsi "BK poza typem wsi" > 0 (N2-3b wobec oczekiwanego - INFO), N2-4 budzet - start (latka, 5 zrodel), N2-5 linia doby (potkniecia 0, przekroczen limitu 0, niezaspokojone = przeniesiono + zostalo), N2-5b przeniesiono > 0, N2-5c (INFO), N2-6 wlokno - start i doba (potkniecia 0), N2-6b (INFO), N2-6c sprzedaz <= skierowania, N2-7 opal - doba (kupione <= potrzeba, potkniecia 0), N2-7b akcyza + do kas = zaplacone, N2-7c/7d (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO). Funkcja `nekon2_main`, dispatch po petli argumentow (za `nwyd`), regexy z przedrostkiem `N2E_`, skladnia ast. Sprawdzone: log syntetyczny - 18 wierszy, 0 NIE (SPROSTOWANIE PO RECENZJI 16.10: syntetyk NIE byl w formacie z kodu - mial w linii startu E2 "latka wpieta", a kod pisze "latka wpiety (UpdateDemandShift, ...)"; na logu z napisow kodu N2-4 wychodzil NIE - poprawka we wpisie wyzej); log 18-27-07 (bez paczki) - N2-0 INFO; regex kategorii "Ceny surowcow" na prawdziwej linii autotestu 19-59-53 (Eggs, garum, Ink, Dyes, gems, gold).
+
+**Ryzyko / co sprawdzic:**
+1. Kontrola calosci (zamknieta ekonomia): E1 - jaja z pracy wsi (magazyn wsi, ksiega "wsie: BK poza typem wsi"), zloto tylko ze sprzedazy wozem; E2 - przesuniecie budzetu w tym samym miescie, suma slownika ta sama, placi lud (`PayForGoods`), odbiera kasa miasta; E3 - zwykla sprzedaz wozu (kasa miasta -> sakwa -> kiesa wsi i pan, 112), towar przewozem raz; E4 - drewno z polki miasta znika jako spalone (ramka konsumpcji osady), zloto kiesa ludu -> gmina (akcyza) i kasa miasta. Nic z niczego.
+2. GL1 (`VillageByPeople`): g(typ) = suma((poziom + 1) / 2) / suma(u_v) - z poziomow ognisk i ludzi, nie z towarow; linia "surowce wobec kalibracji" liczy z `VillageType.Productions` (jaj z listy BK tam nie ma) - kalibracja nietknieta (sprawdzone w kodzie: `Calibrate`, `TryFactor`). Regulator 221 nie tnie jedzenia (`HarvestValve.Eligible`: !IsFood). Magazyn wsi (`GetWarehouseCapacity`) nie liczy jaj - jak owocow; woz wiezie je razem z reszta (POPRAWIONE po recenzji 16.10, wpis wyzej: bramka gry liczy WSZYSTKIE sztuki magazynu, wiec W + 5 dob jaj i owocow). Mnoznik powtorzen MineralOnce: jaja dopisane tylko, gdy ich nie bylo - nie sa powtorzeniem.
+3. E1 skala (P): linia startu poda liczbe wsi rolniczych i plon przed mnoznikami; szacunek ok. 190 wsi (wheat_farm 124, olive_trees 19 z linii owocow + winnice, daktyle, len, jedwab) i ok. 300 jaj na dobe wobec 76 dzis - ok. 4 x podazy; przy budzecie ok. 1 100-3 600 jaj na dobe (zalezy od ceny) indeks jaj spadnie z 10, ale raczej nie do 1. Zamiennik jedzenia B2 "Eggs -> meat, cheese" przesunie mniej (mniej braku). BK `BKVillageProductionModel` (nieczynny u Jeffa - model gry przez NavalDLC) dzielilby sile robocza takze na jaja; BK targ wsi (Marketplace) nie kupi jaj w miescie dla wsi, ktora je ma.
+4. E2: ceny zbytkow z towarem moga podskoczyc (popyt targu celu rosnie o przesuniety budzet x waga wygladzania); limit 0.5 nadwyzki polki celu liczony od slownika PO B2 - razem z B2 zrodla jednej osady moga wziac do ok. 75% nadwyzki "lepszego stolu" (B2 polowe, E2 polowe reszty). Oferta nadwyzki ludu (lista dostatku P3) dzieli sie wedlug slownika - wiecej trafi na kategorie, ktore dostaly budzet. Kasy miast dostana wiecej zaplaty ludu, a z nich zawor do panow - straznik obiegu sam obnizy podatek od skrzyni.
+5. E3: wies traci czesc utargu (linia podaje "wies traci X d"), miasto targowe dostaje wiecej lnu i welny (cena tam spada); dalej rozwoza je kontrakty 174 i wozy kupcow P3/Z1. Sprawdzic w "Towary: ... flax / wool" posiadaczy (wozy i wsie w dol, miasta w gore) i "Ceny surowcow" (miasta bez lnu i welny w dol). Woz z zamku (drugi odcinek po targu przy zamku B4) - ta sama regula. Wywolanie modelu produkcji wsi tylko dla wozow z wloknem, przy wyborze miasta (rzadko).
+6. E4: swiat ok. 1.52 mln glow kiesy ludu - ok. 75 ladunkow na dobe latem, ok. 150 wiosna i jesienia, do ok. 300 w zimie; latem drewna ponad zapas rzemiosla jest malo (autotest: 4 234 na polkach, zapas 4 115) - opal bedzie jeszcze mniejszy. Ponad zapasem rzemiosla opal kupuje przed budowami w kolejnosci doby (latem ok. 75 wobec ok. 1 080 ladunkow budow) - gdy "Roboty ludu (P2)" / "Budowy" pokaza brak drewna, przeniesc opal za budowy (pozycja ksiegi pieniadza MBuild) albo podniesc prog. Zloto male (drewno 2-4 d za ladunek). W linii "Drewno:" OreLedger opal wchodzi do "bez wyjasnienia" (jak koszyk BK mieszczan - bez nowej pozycji, format linii bez zmian); w ksiedze towarow - "mieszczanie". Opal nie odbiera chleba (tylko pieniadze ponad jutrzejszy koszyk).
+7. Kazdy punkt: wyjatek per obiekt = licznik potkniec (linia doby), bez globalnych wylacznikow. Odcinki DayProfile +4 (209 z limitu 256).
+
+**Status:** DO SPRAWDZENIA (build Release rc=0, "0 Error(s)"; nie wgrane; autotest 30-40 dob na zapisie Jeffa: `--grupa nekon2` (N2-0..N2-9) i dotychczasowe `nceny`, `nekon`, `gl1`, `kiesa2`, `obieg2`; linie testu: "Jaja wsi (N2-E1): dzien" listy z jajami ok. liczby wsi rolniczych i "Towary: ... Egg" z "BK poza typem wsi" > 0; "Budzet bez producenta (N2-E2)" przeniesiono > 0 i przekroczen 0; "Wlokno do miasta targowego (N2-E3)" skierowane > 0 i sprzedaz w miescie celu; "Opal mieszczan (N2-E4)" kupione <= potrzeba; potkniecia 0)
 
 ## 2026-10-16 (noc - TB2, rozpoznanie "trebusze AI i miasta, ktore nie padaja") - TREBUSZ DRUGIEJ EKIPY OD 1. DOBY OBLEZENIA MIASTA I STOLICY, TREBUSZ W TEMPIE ZAMKU (AI I GRACZ), SZTURM PRZEZ WYRWE BEZ CZEKANIA NA MACHINY
 

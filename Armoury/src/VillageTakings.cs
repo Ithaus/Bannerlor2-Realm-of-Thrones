@@ -151,9 +151,9 @@ namespace Armoury
 
         /// <summary>
         /// Oddaje wsi `amount`: podatek od `income` (nie wiecej niz `amount`) na licznik podatku wsi, reszta do kiesy.
-        /// Razem dokladnie `amount` - ani denara wiecej.
+        /// Razem dokladnie `amount` - ani denara wiecej. E3-G2: takze czesc wsi markietanow (Sutlers.One) - jedna regula utargu wsi.
         /// </summary>
-        private static void Split(Village v, int income, int amount, out int tax, out int purse)
+        internal static void Split(Village v, int income, int amount, out int tax, out int purse)
         {
             tax = 0; purse = 0;
             if (v == null || amount <= 0) return;

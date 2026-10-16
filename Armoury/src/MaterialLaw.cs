@@ -193,6 +193,7 @@ namespace Armoury
                 // tyle razy, ile ich bylo (wydobycie bez zmian; niezalezne od wlacznika MaterialLaw i od suwakow)
                 m *= MineralOnce.Times(village, item);
                 m *= CamelLaw.HostFactor(village, item);    // E6/M2 (208): kon-gospodarz przejmuje wage wielbladow poza Qarthem / oddaje ja wielbladom Qarthu (ta sama suma sztuk)
+                m *= VillageFruit.HostFactor(village, item); // E3-D1 (noc-ekonomia3 czesc 2): inne plony wsi x c - rece przesuniete na drogie jaja, owoce i miod (ta sama wartosc bazowa)
                 if (Math.Abs(m - 1f) >= 0.001f)
                 {
                     // wpis 98: mnoznik ma MNOZYC. ExplainedNumber SUMUJE czynniki (wynik = baza x (1 + suma)), wiec AddFactor(m - 1)

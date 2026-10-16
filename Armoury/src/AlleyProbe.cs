@@ -98,6 +98,18 @@ namespace Armoury
             return __exception;
         }
 
+        /// <summary>E3-W1 (poprawki noc-ekonomia3, uwaga recenzji 2): wies kupila wozem z polki tej osady w srodku sprzedazy wozu (MarketCarts.SellPostfix -> TownFolk.CartBuys) -
+        /// wplata kiesy wsi do kasy nie jest utargiem taboru: z kanalu "tabory wsi" do kanalu "wsie". Tylko licznik - nie rzuca.</summary>
+        internal static void NoteVillageBuy(Town t, int amount)
+        {
+            try
+            {
+                if (!On || t == null || amount == 0 || _cartDepth <= 0) return;
+                lock (_lock) { if (_inTick) return; var a = Get(t); a.Carts -= amount; if (amount > 0) a.In[KVillage] += amount; else a.Out[KVillage] -= amount; }
+            }
+            catch (Exception e) { Stumble("NoteVillageBuy", e); }
+        }
+
         // ------------------------------------------------------------ przelewy gry
         private static int ClassOf(Hero h, PartyBase p)
         {

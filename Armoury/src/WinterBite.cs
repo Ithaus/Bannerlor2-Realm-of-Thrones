@@ -48,6 +48,13 @@ namespace Armoury
             catch { return false; }
         }
 
+        /// <summary>N2-E4 (opal mieszczan, poprawka po recenzji 16.10): gradient polnocy w polozeniu osady - ten sam mnoznik, ktorym zima mnozy kazdy swoj skutek. 1 bez osady.</summary>
+        internal static float NorthOf(Settlement st)
+        {
+            if (st == null) return 1f;
+            return Northness(st.GetPosition2D.Y);
+        }
+
         /// <summary>Mnoznik geografii: polnoc (wysokie Y) ~1.25, Dorne ~0.75.</summary>
         private static float Northness(float y)
         {

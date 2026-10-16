@@ -63,7 +63,7 @@ namespace Armoury
         }
 
         /// <summary>Typ potrzebuje wsadu: ma linie z wyrobem towarowym i niepustym wsadem (te same linie, ktore liczy waga gry).</summary>
-        private static bool NeedsInput(WorkshopType t)
+        internal static bool NeedsInput(WorkshopType t)
         {
             if (t == null || t.Productions == null) return false;
             foreach (var p in t.Productions) if (TradeLine(p)) return true;
@@ -71,7 +71,7 @@ namespace Armoury
         }
 
         /// <summary>Choc jedna linia towarowa ma caly wsad z okregu (slownik gry) albo z kontraktu surowca.</summary>
-        private static bool HasInput(WorkshopType t, IDictionary<ItemCategory, float> dict)
+        internal static bool HasInput(WorkshopType t, IDictionary<ItemCategory, float> dict)
         {
             foreach (var p in t.Productions)
             {
@@ -86,6 +86,46 @@ namespace Armoury
                 if (all) return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// E3-D3 (noc-ekonomia3 czesc 2): wsad "w okregu" miasta poza wyborem typu gry - ten sam slownik, ktory gra sklada w DecideBestWorkshopType (twall
+        /// WorkshopsCampaignBehavior.cs:1278-1305: wsie TradeBound == miasto, krowy -> skory, owce -> welna, zboze tylko u wsi, ktorej glownym plonem jest zboze),
+        /// plus towar, ktory lezy na polce miasta (co najmniej 5 sztuk kategorii); kontrakt surowca 174 sprawdza HasInput (Contracted). Sam odczyt.
+        /// </summary>
+        internal static Dictionary<ItemCategory, float> InputsNear(Town town)
+        {
+            var d = new Dictionary<ItemCategory, float>();
+            var st = town != null ? town.Settlement : null;
+            if (st == null) return d;
+            foreach (var v in Village.All)
+            {
+                if (v == null || v.VillageType == null || v.TradeBound != st) continue;
+                foreach (var pr in v.VillageType.Productions)
+                {
+                    var it = pr.Item1;
+                    if (it == null || it.ItemCategory == null) continue;
+                    var c = it.ItemCategory;
+                    if (c == DefaultItemCategories.Grain && v.VillageType.PrimaryProduction != DefaultItems.Grain) continue;
+                    if (c == DefaultItemCategories.Cow) c = DefaultItemCategories.Hides;
+                    if (c == DefaultItemCategories.Sheep) c = DefaultItemCategories.Wool;
+                    float x; d.TryGetValue(c, out x); d[c] = x + pr.Item2;
+                }
+            }
+            var r = town.Owner != null ? town.Owner.ItemRoster : null;
+            if (r != null)
+            {
+                var onShelf = new Dictionary<ItemCategory, int>();
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    var it = el.EquipmentElement.Item;
+                    if (it == null || it.ItemCategory == null || !it.IsTradeGood || el.Amount <= 0) continue;
+                    int n; onShelf.TryGetValue(it.ItemCategory, out n); onShelf[it.ItemCategory] = n + el.Amount;
+                }
+                foreach (var kv in onShelf) if (kv.Value >= 5 && !d.ContainsKey(kv.Key)) d[kv.Key] = 0.01f;   // lezy na polce - wsad jest (waga symboliczna)
+            }
+            return d;
         }
 
         public static void DecidePrefix() { _anyWithInput = false; _lastDict = null; }

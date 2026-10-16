@@ -1302,8 +1302,10 @@ namespace Armoury
                     int n = Math.Min(Math.Min(10, carried - sold), Math.Min(el.Amount, spare / price));
                     if (n <= 0) break;                                                    // miasto bez kasy ponad rezerwe - reszta zostaje karawanie
                     int had = el.Amount, purse = mp.PartyTradeGold, packAll = Total(pack, item), shelfAll = Total(town.Owner.ItemRoster, item);
+                    TownToll.ExemptBegin();                                      // E3-G3: dostawa kontraktu 174 bez myta targowego (marza liczona bez myta, Cost174)
                     try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, st); }
                     catch (Exception e) { Stumble("Deliver(sprzedaz)", e); break; }
+                    finally { TownToll.ExemptEnd(); }
                     int moved = packAll - Total(pack, item);   // 174b.2: wszystkie stosy (oprozniony stos zmienia kolejnosc w rosterze)
                     if (moved != Total(town.Owner.ItemRoster, item) - shelfAll) { _dAudit++; _auditAll++; }   // 174b.2 audyt: ubytek jukow == przyrost polki celu (wszystkie stosy)
                     if (moved <= 0) break;

@@ -305,10 +305,12 @@ namespace Armoury
                 if (n <= 0) { poor = true; continue; }
                 int purse = mp.PartyTradeGold, had = el.Amount;
                 bool broke = false;
+                TownToll.LastTaken = 0;
                 try { SellItemsAction.Apply(mp.Party, town.Owner, el, n, town.Settlement); }
                 catch (Exception e) { broke = true; Stumble("Unload(SellItemsAction)", e); }
                 int moved = had - CountOf(pack, what);                    // liczymy to, co faktycznie zeszlo z taborow
-                int got = Math.Max(0, mp.PartyTradeGold - purse);
+                int got = Math.Max(0, mp.PartyTradeGold - purse) + TownToll.LastTaken;   // E3-G3: utarg przed mytem targowym
+                TownToll.LastTaken = 0;
                 if (broke && moved > 0 && got == 0)                       // towar poszedl, zloto nie - cofamy
                 {
                     try { shelf.AddToCounts(what, -moved); pack.AddToCounts(what, moved); moved = 0; }

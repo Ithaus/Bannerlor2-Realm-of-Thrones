@@ -678,6 +678,25 @@ Uzycie (Python 3, tylko odczyt):
                     zoldu - INFO), NE-15 linia "Karawany - zapas wedlug towaru" (dni w jukach - INFO), NE-16 linia obieg zlota w kazdej dobie i potkniecia 0, NE-17 N4
                     doplata <= stara regula + 5% (suma dob), NE-18 N6 bez skoku przy rozruchu (pierwsza doba: nowa kwota <= stara x 1.2 + 1000), NE-19 N7 mnoznik =
                     clamp(1 + 8 x (lud/poziom - 1.5)), NE-20 N8 pozyczki przed darem (INFO), NE-21 ERROR cz. 2 = 0.
+--grupa nekon2    : (noc 16.10, galaz w-toku/noc-ekonomia2; raport audytu ekonomii 15.10 rozdz. 1.8 "nie do wydania", 3.2 P1 jaja, P2 wariant prosty, P7, P8 (b))
+                    python -I tools/sprawdz_logi.py --grupa nekon2 <Armoury-*.log> (strumieniowo). N2-0 linie startu E1-E4 (klucze TAK), N2-1 jaja - start (wsi
+                    rolniczych, oczekiwany plon, Egg, lista BK), N2-2 linia doby jaj (listy z jajami > 0, potkniecia 0), N2-3 jaja ze wsi poza typem > 0 (N2-3b wobec
+                    oczekiwanego - INFO), N2-1c magazyn wsi z jajami i owocami, zatkane wsie rolnicze (INFO), N2-4 budzet bez producenta - start (latka wpieta,
+                    5 zrodel), N2-5 linia doby (potkniecia 0, przekroczen 0, najwiecej <= 50.5% nadwyzki, niezaspokojone = przeniesiono + zostalo), N2-5b
+                    przeniesiono > 0, N2-5c zrodla (INFO), N2-6 wlokno do miasta targowego - start i doba (potkniecia 0), N2-6b skierowania i sprzedaz (INFO),
+                    N2-6c sprzedaz <= skierowania, N2-7 opal - doba (kupione <= potrzeba, potkniecia 0), N2-7b zloto opalu (z kies ludu = zaplacone, gminy + kasy
+                    = zaplacone), N2-7c/N2-7d opal i drewno mieszczan (INFO), N2-7e opal a drewno budow (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO).
+--grupa nekon3    : (noc-ekonomia3 16.10, czesc 1; plan "obieg z obrotu, towar tam, gdzie drogo" + poprawka Jeffa 16.10 "karawany sprzedaja tam, gdzie maja zysk")
+                    python -I tools/sprawdz_logi.py --grupa nekon3 [--baza-doby <log bazy WGRANIA 64>] <Armoury-*.log> (strumieniowo). NE3-0 ERROR i potkniecia 0, NE3-1 linie
+                    w >= 95% dob i linie startu (klucze tak, latki wpiete), NE3-2 zamknietosc (zmiana swiata <= 0.01%, Kiesa ludu r = 0), NE3-3 kontrole przelewow (myto,
+                    markietani), NE3-5 mediany indeksow bez skokow, NE3-6 wczytanie zapisu, NE3-7..9 udzialy lud <= 9.1% / korony >= 19.9% / lordowie 35-37.5%, NE3-9b/9c
+                    inne skrzynie i kredyt 186, NE3-10 straznik (do pasma <= 6.4%, mnoznik <= 3.7, bezpiecznik <= 20 dob), NE3-11/11b Pompy B i F, NE3-12/12b korona (G5
+                    INFO, zwrot 100%), NE3-13 myto, NE3-14/14b T1 (sprzedaz, juki, kiesy karawan, zawor miast), NE3-15 nie do wydania, NE3-16 koszyk wsi (z W1).
+                    Czesc 2 (produkcja za cena i ludzmi, dwory, zolnierze, drewno budow): NE3-0b/1c linie D2/D3/D1/P1/Z1, NE3-4 ksiega towarow dworow, NE3-15c2/16c2 progi c2,
+                    NE3-17 dwory, NE3-18/18b budowy i drewno miast, NE3-19/19b Z1, NE3-20 zbytki, NE3-21/22 warsztaty, NE3-23 tempo D2, NE3-24/24b/24c rece wsi D1.
+                    Poprawki po recenzjach: NE3-2c ksiega kas osad (TM1 srednia 28 dob < 10 000, |TZ1| i |TW1| nie gorzej niz baza), NE3-3 kontrola kas T1 (roznica 0),
+                    NE3-5 prog 0.8 tylko dla towarow od >= 0.8, NE3-5b dobowy spadek indeksu w jednym miescie <= 40%, NE3-10 bezpiecznik 0 dob = TAK, 1-20 = DECYZJA,
+                    NE3-11 B <= 0.97 x baza, NE3-11c F z ludu rosnie, NE3-14d na stracie z pelnych jukow <= 10%, NE3-16 i NE3-16c2 na liczbie 'wsi bez towaru po W1'.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -29660,6 +29679,346 @@ def nekon2_rows(rep, st0, coin, coinBad, pumps, cars, errs2):
             f"{len(errs2)}" + (f" np. {errs2[0]}" if errs2 else ""), "0", not errs2)
 
 
+# ============================================================ nekon2 (noc 16.10, galaz w-toku/noc-ekonomia2; raport audytu ekonomii 15.10 rozdz. 1.8 tabela
+# "nie do wydania", 3.2 P1 jaja, P2 wariant prosty, P7 opal, P8 (b) budzet bez producenta; Armoury/src/VillageFruit.cs (jaja), MineralOnce.cs (lista BK),
+# NoMakerBudget.cs, FibreToMarket.cs + MarketCarts.cs (Choose, SellPrefix/SellPostfix), TownFolk.Firewood.cs)
+N2E_E1S = "Jaja wsi (N2-E1): start sesji"
+N2E_E2S = "Budzet bez producenta (N2-E2): start sesji"
+N2E_E3S = "Wlokno do miasta targowego (N2-E3): start sesji"
+N2E_E4S = "Opal mieszczan (N2-E4): start sesji"
+N2E_E1H = "Jaja wsi (N2-E1): dzien "
+N2E_E2H = "Budzet bez producenta (N2-E2): dzien "
+N2E_E3H = "Wlokno do miasta targowego (N2-E3): dzien "
+N2E_E4H = "Opal mieszczan (N2-E4): dzien "
+N2E_E1D = re.compile(r"^Jaja wsi \(N2-E1\): dzien (\d+) \| listy BK z jajami (\d+) \(wsi (\d+)\) \| baza dopisana w (\d+) pytaniach modelu \(tick BK, okna wsi\): "
+                     r"jaja (\d+) .*\| potkniecia sesji (\d+)\.$")
+N2E_E2D = re.compile(r"^Budzet bez producenta \(N2-E2\): dzien (\d+) \| (CZYNNE|WYLACZONE \(MCM\)) \| osad przeliczonych (\d+) \(zamkow (\d+)\) \| "
+                     r"wierszy zrodel z niezaspokojonym budzetem (\d+) \| niezaspokojone \(budzet dnia\) (\d+), przeniesiono (\d+) \(zrodla: ([^)]*)\), "
+                     r"zostalo w kategorii zrodla (\d+) \(bez miejsca na polce celu (\d+) wierszy\) .*?budzet BK celow \+(-?\d+) zl \| "
+                     r"kontrola limitu celow: z dopisem (\d+), przekroczen (\d+)(?: \(najwiecej [\d.]+% nadwyzki\), przyciete \(indeks ceny rosnie z popytem\) \d+)? \| "
+                     r"potkniecia (\d+) \(sesja (\d+)\)\.$")
+N2E_E2MAX = re.compile(r"kontrola limitu celow: z dopisem \d+, przekroczen \d+ \(najwiecej ([\d.]+)% nadwyzki\), przyciete \(indeks ceny rosnie z popytem\) (\d+) \|")
+N2E_E3D = re.compile(r"^Wlokno do miasta targowego \(N2-E3\): dzien (\d+) \| wozow z wloknem \(najlepsze miasto inne niz targowe\) sprawdzonych (\d+), "
+                     r"zapas ponad \d+ dob (\d+) \(najwiekszy ([\d.]+) dob\) \| skierowane do miasta targowego (\d+) \(wsi zamkowych (\d+)\), wlokna w jukach (\d+) szt\., "
+                     r"wycena ladunku w miescie targowym (\d+) d wobec najlepszego miasta (\d+) d \(wies traci (\d+) d\) \| bez miasta targowego w zasiegu (\d+), "
+                     r"miasto targowe nic nie zaplaci (\d+)(?:, ten sam kurs wybrany drugi raz \(po zamku, bez licznika\) \d+)? \| sprzedaz w miescie celu: wozow (\d+), wlokna sprzedanego (\d+) szt\.(?: \([^)]*\))?, utarg tych wozow "
+                     r"\(kasa miasta -> sakwa wozu, po zwrocie nadplaty 119\) (-?\d+) d \| w drodze (\d+), wygasle przy porzadkach (\d+) \| potkniecia (\d+) \(sesja (\d+)\)\.$")
+N2E_E4D = re.compile(r"^Opal mieszczan \(N2-E4\): dzien (\d+) \| CZYNNE \| miasta (\d+): glowy kiesy ludu (\S+) \| pora: (ZIMA|lato|wiosna albo jesien|zima bez skutkow)[^|]*\| "
+                     r"potrzeba (\S+) ladunkow \(po zaokragleniu (\d+)\) \| kupione i spalone (\d+) ladunkow za (\d+) zl \((?:z kies ludu \d+, )?akcyza do gmin (\d+), do kas miast (-?\d+)\) \| "
+                     r"bez opalu dzis (\d+) ladunkow: polka nie wyzej niz zapas rzemiosla (\d+) miast, czesciowo (\d+), za mala kiesa ponad jutrzejszy koszyk (\d+) miast \| "
+                     r"drewno zostawione rzemioslu na polkach (\d+) \| poza regula: miasta nieskalibrowane (\d+) \| czas \S+ ms \| potkniecia (\d+)\.$")
+N2E_EGG = re.compile(r"^Towary: dzien (\d+) - Egg \(")
+N2E_PURSE = r"zl \(z kies ludu (\d+), akcyza do gmin"
+N2E_CAPW = re.compile(r"\| magazyn wsi powiekszony o jaja i owoce: wsi (\d+), razem \+(\d+) szt\.")
+N2E_CLOG = re.compile(r"^Zatkane wsie \(diagnoza\): dzien (\d+) - .*?rodziny \(zatkane/wszystkie\):.*?rolnicze (\d+)/(\d+)")
+N2E_FOLK = "Roboty ludu (P2): dzien "
+N2E_FOLK_MAT = re.compile(r"\| material \d+ zl za ([\d/]+) szt\. \(([a-z/]+)\)")
+N2E_FOLK_HELD = re.compile(r"budowy zostawily drewno rzemioslu - pan na \d+ targach \((\d+) szt\.\), lud na \d+ targach \((\d+) szt\.\)")
+N2E_WOOD = re.compile(r"^Towary: dzien (\d+) - hardwood \(")
+N2E_PRICE = "Ceny surowcow: dzien "
+N2E_NOMAKER = ("garum", "Ink", "Dyes", "gems", "gold")
+N2E_ERR = ("ERROR in VillageFruit", "ERROR in MineralOnce.Eggs", "ERROR in NoMakerBudget", "ERROR in FibreToMarket", "ERROR in TownFolk.Firewood",
+           "ERROR in MarketCarts.SellPostfix", "ERROR in MarketCarts.SellPrefix", "ERROR in MarketCarts.Choose")
+
+
+def _n2e_gaps(days):
+    """Liczba brakujacych dob miedzy pierwsza a ostatnia doba linii."""
+    if not days:
+        return 0
+    return (max(days) - min(days) + 1) - len(set(days))
+
+
+def nekon2_main(logp):
+    """nekon2 (noc 16.10, galaz noc-ekonomia2: E1 jaja wsi rolniczych wedlug wag drobiu BK, E2 budzet kategorii bez producenta na zbytki z towarem, E3 len,
+    welna i skory do miasta targowego przy zapasie wsi ponad 6 dob, E4 opal mieszczan). Wejscie: log Armoury (strumieniowo). N2-0 linie startu czterech
+    punktow (klucze TAK), N2-1 jaja - start (wsi rolniczych > 0, oczekiwany plon > 0, Egg jest, lista BK wpieta), N2-2 jaja - linia doby w kazdej dobie,
+    listy z jajami > 0 od drugiej doby, potkniecia 0, N2-3 jaja ze wsi poza typem (ksiega towarow "BK poza typem wsi") srednio > 0, N2-3b wobec oczekiwanego
+    (INFO), N2-1c magazyn wsi z jajami i owocami i zatkane wsie rolnicze (INFO), N2-4 budzet bez producenta - start (latka wpieta - kod pisze "wpiety",
+    5 zrodel w mapie), N2-5 linia doby w kazdej dobie, potkniecia 0, przekroczen limitu 0, najwiecej <= 50.5% nadwyzki, niezaspokojone = przeniesiono + zostalo, N2-5b przeniesiono > 0 (suma dob), N2-5c grupy celu (INFO), N2-6 wlokno - start i linia doby, potkniecia 0,
+    N2-6b skierowania i sprzedaz (INFO), N2-7 opal - linia doby w kazdej dobie, potkniecia 0, kupione <= potrzeba po zaokragleniu, N2-7b z kies ludu = zaplacone
+    i gminy + kasy = zaplacone, N2-7c opal razem (INFO), N2-7d drewno mieszczan w ksiedze towarow (INFO), N2-7e opal a drewno budow (INFO), N2-8 ERROR 0, N2-9 indeks jaj i budzet bez towaru (INFO).
+    Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("N2-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    start = {N2E_E1S: None, N2E_E2S: None, N2E_E3S: None, N2E_E4S: None}
+    e1, e2, e3, e4, bad = {}, {}, {}, {}, []
+    e4off = []
+    egg, wood, prices, errs = {}, {}, {}, []
+    e2x, e4p, capw, clog, folk = {}, {}, {}, {}, {}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(N2E_ERR):
+                    errs.append(s[:160])
+                continue
+            hit = False
+            for k in start:
+                if s.startswith(k):
+                    start[k] = s
+                    hit = True
+                    break
+            if hit:
+                continue
+            if s.startswith(N2E_E1H):
+                a = N2E_E1D.match(s)
+                if a:
+                    e1[int(a.group(1))] = tuple(int(x) for x in a.groups())
+                    c = N2E_CAPW.search(s)
+                    if c:
+                        capw[int(a.group(1))] = (int(c.group(1)), int(c.group(2)))
+                else:
+                    bad.append(s[:140])
+                continue
+            if s.startswith(N2E_E2H):
+                a = N2E_E2D.match(s)
+                if a:
+                    e2[int(a.group(1))] = a.groups()
+                    x = N2E_E2MAX.search(s)
+                    if x:
+                        e2x[int(a.group(1))] = (float(x.group(1)), int(x.group(2)))
+                else:
+                    bad.append(s[:140])
+                continue
+            if s.startswith(N2E_E3H):
+                a = N2E_E3D.match(s)
+                if a:
+                    e3[int(a.group(1))] = a.groups()
+                else:
+                    bad.append(s[:140])
+                continue
+            if s.startswith(N2E_E4H):
+                a = N2E_E4D.match(s)
+                if a:
+                    e4[int(a.group(1))] = a.groups()
+                    e4p[int(a.group(1))] = num(N2E_PURSE, s, int, None)
+                elif " | CZYNNE | " in s:
+                    bad.append(s[:140])
+                else:
+                    e4off.append(s[:160])
+                continue
+            if s.startswith("Towary: dzien "):
+                a = N2E_EGG.match(s)
+                if a:
+                    egg[int(a.group(1))] = (num(r"\| produkcja (-?\d+)", s, int, 0), num(r"BK poza typem wsi (\d+)", s, int, 0),
+                                            num(r"\| produkcja -?\d+ \[(?:[^\]]*?; )?wsie (\d+)", s, int, 0))
+                    continue
+                a = N2E_WOOD.match(s)
+                if a:
+                    wood[int(a.group(1))] = num(r"\| zuzycie -?\d+ \[(?:[^\]]*?; )?mieszczanie (\d+)", s, int, 0)
+                continue
+            if s.startswith(N2E_PRICE):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    prices[d] = s
+                continue
+            if s.startswith("Zatkane wsie (diagnoza): dzien "):
+                a = N2E_CLOG.match(s)
+                if a:
+                    clog[int(a.group(1))] = (int(a.group(2)), int(a.group(3)))
+                continue
+            if s.startswith(N2E_FOLK):
+                d = num(r"dzien (\d+)", s)
+                if d is None:
+                    continue
+                hw = None
+                a = N2E_FOLK_MAT.search(s)
+                if a:
+                    names, vals = a.group(2).split("/"), a.group(1).split("/")
+                    if "hardwood" in names and len(vals) == len(names):
+                        hw = int(vals[names.index("hardwood")])
+                h = N2E_FOLK_HELD.search(s)
+                folk[d] = (num(r", bez materialu (\d+),", s, int, None), hw, (int(h.group(1)) + int(h.group(2))) if h else None)
+    print(f"plik: {logp} | linii startu {sum(1 for v in start.values() if v)}/4, linii doby: jaja {len(e1)}, budzet {len(e2)}, wlokno {len(e3)}, opal {len(e4)}"
+          f" (opal nieczynny {len(e4off)}, nierozpoznanych {len(bad)}), Towary Egg {len(egg)}, hardwood {len(wood)}, Ceny surowcow {len(prices)}")
+    if not any(start.values()) and not (e1 or e2 or e3 or e4):
+        rep.add("N2-0: linie startu noc-ekonomia2", "brak linii", "INFO (wersja sprzed noc-ekonomia2)", None)
+        rep.show()
+        return 0
+    s1, s2, s3, s4 = start[N2E_E1S], start[N2E_E2S], start[N2E_E3S], start[N2E_E4S]
+    k1 = bool(s1) and "klucz VillageEggsFromBk TAK" in s1
+    k2 = bool(s2) and "klucz NoMakerBudgetToLuxury TAK" in s2
+    k3 = bool(s3) and "klucz VillageFibreToMarket TAK | CZYNNE" in s3
+    k4 = bool(s4) and "klucz TownFolkFirewood TAK" in s4 and "kiesa ludu czynna" in s4
+    rep.add("N2-0: linie startu E1-E4 (klucze TAK; E3 czynne; E4 przy czynnej kiesie ludu)",
+            f"jaja {'TAK' if k1 else ('jest' if s1 else 'brak')}, budzet {'TAK' if k2 else ('jest' if s2 else 'brak')}, wlokno {'TAK' if k3 else ('jest' if s3 else 'brak')},"
+            f" opal {'TAK' if k4 else ('jest' if s4 else 'brak')}", "4 x TAK", k1 and k2 and k3 and k4)
+    if bad:
+        rep.add("N2-0b: linie doby nierozpoznane", f"{len(bad)} np. {bad[0]}", "0", False)
+    # ---- E1 jaja
+    if s1 and k1:
+        farms = num(r"wsi rolniczych BK \(klasa uprawy i wlokna typu wsi\) (\d+)", s1)
+        exp = num(r"waga x \(poziom ognisk \+ 1\) x 0\.5\): jaja (\d+)", s1)
+        ok1 = bool(farms) and bool(exp) and "Egg w grze jest" in s1 and "lista produkcji BK jest" in s1
+        rep.add("N2-1: jaja - linia startu (wsi rolniczych, oczekiwany plon, Egg, lista BK)", f"wsi {farms}, oczekiwany plon {exp} jaj/d przed mnoznikami; " + s1[len(N2E_E1S):].split(" | ")[-2][:80],
+                "wsi > 0, plon > 0, Egg jest, lista BK wpieta", ok1)
+    else:
+        farms, exp = None, None
+        rep.add("N2-1: jaja - linia startu", (s1[len(N2E_E1S):][:120] if s1 else "brak"), "INFO (klucz NIE albo log bez paczki)", None)
+    if e1:
+        ds = sorted(e1)
+        gaps = _n2e_gaps(ds)
+        st = max(v[5] for v in e1.values())
+        later = ds[1:] if len(ds) > 1 else ds
+        zero = [d for d in later if e1[d][1] <= 0]
+        rep.add("N2-2: jaja - linia doby w kazdej dobie, listy z jajami > 0 (od drugiej doby), potkniecia 0",
+                f"dob {len(ds)} (d{ds[0]}-d{ds[-1]}, brak {gaps}), dob bez list z jajami {len(zero)}, srednio list {sum(e1[d][1] for d in later) / max(1, len(later)):.0f}"
+                f" (wsi {sum(e1[d][2] for d in later) / max(1, len(later)):.0f}), baza {sum(e1[d][4] for d in later) / max(1, len(later)):.0f} jaj/d, potkniecia {st}",
+                "brak 0, bez list 0, potkniecia 0", gaps == 0 and not zero and st == 0)
+    else:
+        rep.add("N2-2: jaja - linia doby", "brak linii doby", "linie sa (klucz TAK)" if k1 else "INFO", False if k1 else None)
+    if egg:
+        dd = sorted(egg)
+        later = dd[1:] if len(dd) > 1 else dd
+        out = [egg[d][1] for d in later]
+        avg = sum(out) / max(1, len(out))
+        rep.add("N2-3: jaja ze wsi poza typem wsi (ksiega towarow 'BK poza typem wsi', srednio od drugiej doby)", f"{avg:.0f} szt./d ({len(out)} dob)",
+                "> 0" if k1 else "INFO (klucz NIE)", (avg > 0) if k1 else None)
+        if exp:
+            rep.add("N2-3b: jaja ze wsi poza typem wobec oczekiwanego plonu przed mnoznikami (INFO)",
+                    f"{avg:.0f} / {exp} = {avg / max(1, exp):.2f}; produkcja Egg calosc d{dd[0]} {egg[dd[0]][0]} -> d{dd[-1]} {egg[dd[-1]][0]}, wsie {egg[dd[0]][2]} -> {egg[dd[-1]][2]}",
+                    "INFO (mnozniki P1, rece, zima - zwykle 0.5-1.5)", None)
+    else:
+        rep.add("N2-3: jaja ze wsi (ksiega towarow)", "brak linii 'Towary: ... Egg'", "INFO (ksiega towarow wylaczona albo bez BK)", None)
+    if capw or clog:
+        cd = sorted(capw)
+        kd = sorted(clog)
+        cap_t = (f"wsi z wiekszym magazynem srednio {sum(capw[d][0] for d in cd) / len(cd):.0f}, +{sum(capw[d][1] for d in cd) / max(1, sum(capw[d][0] for d in cd)):.1f} szt. na wies"
+                 if cd else "brak liczb magazynu w linii jaj")
+        clog_t = (f"zatkane wsie rolnicze d{kd[0]} {clog[kd[0]][0]}/{clog[kd[0]][1]} -> d{kd[-1]} {clog[kd[-1]][0]}/{clog[kd[-1]][1]}" if kd else "brak linii 'Zatkane wsie (diagnoza)'")
+        rep.add("N2-1c: magazyn wsi + 5 dob jaj i owocow (GetWarehouseCapacity) i zatkane wsie rolnicze (INFO)", cap_t + "; " + clog_t,
+                "INFO (magazyn rosnie o dodatki listy BK - wsie rolnicze nie powinny zatykac sie czesciej niz przed paczka)", None)
+    # ---- E2 budzet bez producenta
+    if s2:
+        srcs = [x for x in ("garum ->", "Dyes ->", "gems ->", "gold ->", "Ink ->") if x in s2]
+        wired = re.search(r"latka wpiet[ay]", s2) is not None      # kod: "latka wpiety (UpdateDemandShift, ...)" - jak NC-23 dla B2
+        rep.add("N2-4: budzet bez producenta - linia startu (latka wpieta, 5 zrodel w mapie)", f"latka {'wpieta' if wired else 'NIE'}, zrodel {len(srcs)}/5",
+                "wpieta, 5/5" if k2 else "INFO (klucz NIE)", (wired and len(srcs) == 5) if k2 else None)
+    else:
+        rep.add("N2-4: budzet bez producenta - linia startu", "brak", "INFO (log bez paczki)", None)
+    if e2:
+        ds = sorted(e2)
+        on = [d for d in ds if e2[d][1] == "CZYNNE"]
+        gaps = _n2e_gaps(ds)
+        st = sum(int(e2[d][13]) for d in ds)
+        over = sum(int(e2[d][12]) for d in ds)
+        sumbad = [d for d in on if abs(int(e2[d][5]) - int(e2[d][6]) - int(e2[d][8])) > 3 + 0.01 * int(e2[d][5])]
+        mx = max((e2x[d][0] for d in ds if d in e2x), default=None)
+        trim = sum(e2x[d][1] for d in ds if d in e2x)
+        rep.add("N2-5: budzet - linia doby w kazdej dobie, potkniecia 0, przekroczen limitu celu 0 (najwiecej <= 50.5% nadwyzki), niezaspokojone = przeniesiono + zostalo",
+                f"dob {len(ds)} (czynnych {len(on)}, brak {gaps}), potkniecia {st}, przekroczen {over}"
+                + (f" (najwiecej {mx:.1f}% nadwyzki, przycietych przy nowym popycie targu {trim})" if mx is not None else " (linia bez najwiekszego udzialu - wersja sprzed poprawki)")
+                + f", dob z niezgodna suma {len(sumbad)}"
+                + (f" (np. d{sumbad[0]}: {e2[sumbad[0]][5]} vs {e2[sumbad[0]][6]} + {e2[sumbad[0]][8]})" if sumbad else ""),
+                "brak 0, potkniecia 0, przekroczen 0, najwiecej <= 50.5%, niezgodnych 0",
+                gaps == 0 and st == 0 and over == 0 and not sumbad and (mx is None or mx <= 50.5))
+        mv = sum(int(e2[d][6]) for d in on)
+        nd = sum(int(e2[d][5]) for d in on)
+        gold = sum(int(e2[d][10]) for d in on)
+        rep.add("N2-5b: budzet - przeniesiono na zbytki z towarem (suma dob czynnych)",
+                f"niezaspokojone {nd}, przeniesiono {mv} ({100.0 * mv / max(1, nd):.0f}%), budzet BK celow +{gold} zl, srednio {gold / max(1, len(on)):.0f} zl/d",
+                "> 0" if on else "INFO (klucz NIE)", (mv > 0) if on else None)
+        if on:
+            last = e2[on[-1]]
+            rep.add("N2-5c: budzet - zrodla i cele (ostatnia doba, INFO)", f"d{on[-1]}: zrodla {last[7]}; osad {last[2]} (zamkow {last[3]}), bez miejsca {last[9]} wierszy",
+                    "INFO", None)
+    else:
+        rep.add("N2-5: budzet - linia doby", "brak linii doby", "linie sa (klucz TAK)" if k2 else "INFO", False if k2 else None)
+    # ---- E3 wlokno
+    if e3:
+        ds = sorted(e3)
+        gaps = _n2e_gaps(ds)
+        st = sum(int(e3[d][17]) for d in ds)
+        rep.add("N2-6: wlokno - linia startu i doby w kazdej dobie, potkniecia 0", f"start {'TAK' if k3 else ('jest' if s3 else 'brak')}, dob {len(ds)} (brak {gaps}), potkniecia {st}",
+                "start TAK, brak 0, potkniecia 0", k3 and gaps == 0 and st == 0)
+        chk = sum(int(e3[d][1]) for d in ds); ovr = sum(int(e3[d][2]) for d in ds); mx = max(float(e3[d][3]) for d in ds)
+        sent = sum(int(e3[d][4]) for d in ds); units = sum(int(e3[d][6]) for d in ds)
+        vo = sum(int(e3[d][7]) for d in ds); vb = sum(int(e3[d][8]) for d in ds)
+        sold = sum(int(e3[d][12]) for d in ds); sunits = sum(int(e3[d][13]) for d in ds); sg = sum(int(e3[d][14]) for d in ds)
+        noown = sum(int(e3[d][10]) for d in ds)
+        rep.add("N2-6b: wlokno - skierowania i sprzedaz w miescie targowym (INFO)",
+                f"sprawdzonych {chk}, zapas ponad prog {ovr} (najwiekszy {mx:.1f} dob), skierowanych {sent} (wlokna {units} szt.), wycena {vo} d wobec {vb} d"
+                f" (wies traci {max(0, vb - vo)} d), bez miasta targowego {noown}; sprzedaz: wozow {sold}, wlokna {sunits} szt., utarg {sg} d",
+                "INFO (skierowania tylko przy zapasie ponad 6 dob; sprzedane <= skierowane + w drodze)", None)
+        if sold > 0 or sent > 0:
+            rep.add("N2-6c: wlokno - sprzedaz nie wieksza niz skierowania (wozy)", f"sprzedaz {sold}, skierowania {sent} (w drodze na koncu {e3[ds[-1]][15]})",
+                    "sprzedaz <= skierowania", sold <= sent)
+    else:
+        rep.add("N2-6: wlokno - linia doby", "brak linii doby", "linie sa (klucz TAK)" if k3 else "INFO", False if k3 else None)
+    # ---- E4 opal
+    if e4:
+        ds = sorted(e4)
+        gaps = _n2e_gaps(ds)
+        st = max(int(e4[d][16]) for d in ds)
+        over = [d for d in ds if int(e4[d][6]) > int(e4[d][5])]
+        rep.add("N2-7: opal - linia doby w kazdej dobie, potkniecia 0, kupione <= potrzeba po zaokragleniu",
+                f"dob {len(ds)} (d{ds[0]}-d{ds[-1]}, brak {gaps}), potkniecia {st}, dob z kupionymi ponad potrzebe {len(over)}",
+                "brak 0, potkniecia 0, ponad potrzebe 0", gaps == 0 and st == 0 and not over)
+        withp = [d for d in ds if e4p.get(d) is not None]
+        if withp:
+            # obieg liczony osobno w kodzie: z kies klas (W/R/P) = zaplacone, wplaty do kas miast + akcyza gmin = zaplacone; kupione > 0 => zaplacone > 0
+            badg = [d for d in withp if e4p[d] != int(e4[d][7]) or int(e4[d][8]) + int(e4[d][9]) != int(e4[d][7]) or (int(e4[d][6]) > 0 and int(e4[d][7]) <= 0)]
+            rep.add("N2-7b: opal - zloto: z kies ludu = zaplacone, gminy + kasy miast = zaplacone, kupione > 0 => zaplacone > 0",
+                    f"dob {len(withp)}, niezgodnych {len(badg)}" + (f" (np. d{badg[0]}: z kies {e4p[badg[0]]}, zaplacone {e4[badg[0]][7]}, gminy {e4[badg[0]][8]}, kasy {e4[badg[0]][9]})" if badg else ""),
+                    "0", not badg)
+        else:
+            rep.add("N2-7b: opal - zloto (z kies ludu = zaplacone)", "linie bez 'z kies ludu' (wersja sprzed poprawki 16.10)", "INFO", None)
+        need = sum(float(e4[d][4]) for d in ds if e4[d][4] != "-")
+        bought = sum(int(e4[d][6]) for d in ds); gold = sum(int(e4[d][7]) for d in ds); win = sum(1 for d in ds if e4[d][3] == "ZIMA")
+        short = sum(int(e4[d][10]) for d in ds)
+        rep.add("N2-7c: opal razem (INFO)", f"potrzeba {need:.0f} ladunkow, kupione {bought} ({100.0 * bought / max(1.0, need):.0f}%) za {gold} zl"
+                f" ({gold / max(1, bought):.1f} zl/ladunek), bez opalu {short}; dob zimy {win} z {len(ds)}; glowy (ostatnia) {e4[ds[-1]][2]}",
+                "INFO (latem x0.5 i tylko drewno ponad zapas rzemiosla - malo; wiosna i jesien ok. 150/d, zima do ok. 300/d)", None)
+    elif e4off:
+        rep.add("N2-7: opal - linia doby", e4off[-1][:140], "INFO (klucz NIE albo kiesa ludu nieczynna)" if not k4 else "linie CZYNNE", None if not k4 else False)
+    else:
+        rep.add("N2-7: opal - linia doby", "brak linii doby", "linie sa (klucz TAK)" if k4 else "INFO", False if k4 else None)
+    if wood:
+        wd = sorted(wood)
+        rep.add("N2-7d: drewno mieszczan w ksiedze towarow ('mieszczanie' w zuzyciu hardwood, INFO)",
+                f"d{wd[0]} {wood[wd[0]]} -> d{wd[-1]} {wood[wd[-1]]}, srednio {sum(wood.values()) / len(wd):.0f}/d ({len(wd)} dob)", "INFO (koszyk BK + opal E4)", None)
+    if e4 and folk:
+        # opal biegnie w dobie PRZED budowami (ArmouryBehavior: FirewoodDaily przed BuildFunding.Daily) i bierze z tej samej puli ponad zapas rzemiosla;
+        # linia opalu ma dzien = doba - 1, linia "Roboty ludu (P2)" - doba (ta sama doba gry: opal d, roboty d + 1)
+        pairs = [(d, folk[d + 1]) for d in sorted(e4) if (d + 1) in folk]
+        if pairs:
+            ob = sum(int(e4[d][6]) for d, _ in pairs)
+            hw = sum(f[1] for _, f in pairs if f[1] is not None)
+            held = [f[2] for _, f in pairs if f[2] is not None]
+            nm = [f[0] for _, f in pairs if f[0] is not None]
+            on_d = [f[0] for d, f in pairs if f[0] is not None and int(e4[d][6]) > 0]
+            off_d = [f[0] for d, f in pairs if f[0] is not None and int(e4[d][6]) <= 0]
+            rep.add("N2-7e: opal a drewno budow w tych samych dobach (INFO - czy opal przed budowami nie zabiera im drewna)",
+                    f"dob {len(pairs)}: opal kupiony {ob} ladunkow, drewno robot ludu {hw} szt., budowy zostawily rzemioslu (pan + lud) srednio {sum(held) / max(1, len(held)):.0f} szt./d"
+                    f"; roboty ludu bez materialu srednio {sum(nm) / max(1, len(nm)):.0f} osad/d (doby z opalem {sum(on_d) / max(1, len(on_d)):.0f}"
+                    f" [{len(on_d)}], bez opalu {sum(off_d) / max(1, len(off_d)):.0f} [{len(off_d)}])",
+                    "INFO (gdy w dobach z opalem roboty wyraznie czesciej bez materialu - przeniesc E4 za BuildFunding)", None)
+    # ---- bledy i ceny
+    rep.add("N2-8: ERROR noc-ekonomia2 (VillageFruit, MineralOnce.Eggs, NoMakerBudget, FibreToMarket, TownFolk.Firewood, MarketCarts sprzedaz/wybor)",
+            f"{len(errs)}" + (f" np. {errs[0]}" if errs else ""), "0", not errs)
+    if prices:
+        pd = sorted(prices)
+
+        def idx_of(s, cat):
+            m = re.search(r"(?:^|[;:] )" + re.escape(cat) + r"(?: \([^)]*\))? /[\d.]+ [\d.]+/([\d.]+)/[\d.]+, na polkach (\d+) szt\., pusto w (\d+) miastach, budzet mieszczan (\d+) d"
+                          r" \(przy dzisiejszych polkach do (\d+) d\)", s)
+            return m.groups() if m else None
+
+        a, b = prices[pd[0]], prices[pd[-1]]
+        e_a, e_b = idx_of(a, "Eggs"), idx_of(b, "Eggs")
+        nm_a = sum(int(x[3]) - int(x[4]) for x in (idx_of(a, c) for c in N2E_NOMAKER) if x)
+        nm_b = sum(int(x[3]) - int(x[4]) for x in (idx_of(b, c) for c in N2E_NOMAKER) if x)
+        rep.add("N2-9: jaja - indeks (mediana miast) i budzet bez towaru garum/Ink/Dyes/gems/gold (pierwsza i ostatnia linia 'Ceny surowcow', INFO)",
+                f"Eggs d{pd[0]} {e_a[0] + ' (pusto ' + e_a[2] + ')' if e_a else '-'} -> d{pd[-1]} {e_b[0] + ' (pusto ' + e_b[2] + ')' if e_b else '-'}; "
+                f"niewydany budzet 5 kategorii {nm_a} -> {nm_b} d/dobe", "INFO (budzet w 'Ceny surowcow' to prognoza BK bez przesuniecia E2)", None)
+    rep.show()
+    return 0
+
+
 # ============================================================ NW (noc 16.10, w-toku/noc-wydajnosc): wydajnosc - grupa nwyd
 # Armoury: LogGate.cs (ciche logi), ScorchedEarth.Next (O3), NightRest siatka zagrozen (O5), DayProfile pola NW (O4, O6), LegendaryLaw (O6c, O7);
 # CrashScribe (--crashscribe): MarriageFast.PickViableLazy (O1), EconomyAudit.Due (O2), Scribe pisarz (O9).
@@ -30217,6 +30576,987 @@ def nzlec_main(logp):
     return 0
 
 
+
+# ============================================================ nekon3 (noc-ekonomia3 16.10, czesc 1: obieg z obrotu i towar tam, gdzie karawana ma zysk;
+# Armoury/src/TownFolk.Guard.cs (E3-G1), CrownIncome.cs + CrownRents.cs (E3-G5), Sutlers.cs (E3-G2), TownToll.cs (E3-G3), TownFolk.Live.cs (E3-G4, E3-W1),
+# CaravanGoods.cs (E3-T1), MoneyLedger.Pumps.cs (F). Porownanie z baza WGRANIA 64 (20-16-31) przez --baza-doby <log>.
+N3E_WORLD = "Pieniadz swiata: dzien "
+N3E_GUARD = "Straznik obiegu (obieg2): dzien "
+N3E_FOLK = "Kiesa ludu: dzien "
+N3E_PUMPS = "Pompy - sztuczne przelewy (nekon): dzien "
+N3E_CROWN = "Korona: wplywy dnia (165): dzien "
+N3E_LOAN = "Kredyt korony (186): dzien "
+N3E_SUTL = "Markietani (E5/A3): dzien "
+N3E_TOLL = "Myto targowe (E3-G3): dzien "
+N3E_T1 = "Karawany - towar tam, gdzie maja zysk (E3-T1): dzien "
+N3E_STOCK = "Karawany - zapas wedlug towaru (nekon): dzien "
+N3E_PRICE = "Ceny surowcow: dzien "
+N3E_S_GUARD = "Obieg ludu (obieg2): start sesji"
+N3E_S_TOLL = "Myto targowe (E3-G3): start sesji"
+N3E_S_T1 = "Karawany - towar tam, gdzie maja zysk (E3-T1): start sesji"
+N3E_S_HOOK = "CaravanGoods (E3-T1, E3-G3): SellItemsAction.ApplyInternal"
+N3E_DAY = re.compile(r"dzien (\d+)")
+N3E_W_TOT = re.compile(r"\| razem (\d+) \(([-+]?\d+)\)")
+N3E_W_HOLD = {"kasy_miast": r"kasy miast (\d+)", "kiesy_wsi": r"kiesy wsi (\d+)", "glowy": r"glowy rodow (\d+)", "lordowie": r"pozostali lordowie (\d+)",
+              "gracz": r"gracz (\d+)", "notable": r"notable (\d+)", "korony": r"skarbce krolestw (\d+)", "sakiewki": r"sakiewki ludzi (\d+)",
+              "bank": r"Bank Zelazny (\d+)", "karawany": r"partie bez wodza: tabory wsi \d+ \([-+]?\d+\), karawany (\d+)",
+              "lud_miasta": r"kiesy ludu \(E5/B1\): miasta (\d+)", "lud_podzamcza": r"podzamcza (\d+) \([-+]?\d+\), gminy", "lud_gminy": r"gminy (\d+)"}
+N3E_G_BAND = re.compile(r"E3-G1 do pasma (\d+) \(([\d.]+)% swiata; najwyzej ([\d.]+)%")
+N3E_G_MULT = re.compile(r"\| mnoznik ([\d.]+) \(")
+N3E_G_FUSE = re.compile(r"\| bezpiecznik udzialu ludu [^:]*: dzis (tak|nie)")
+N3E_F_R = re.compile(r"kontrola: zmiana kies -?\d+ = wplywy -?\d+ - wydatki -?\d+, r = (-?\d+)")
+N3E_F_VIL = re.compile(r"\| wsie (\d+): zakupy (\d+) z (\d+) \(")
+N3E_F_NOG = re.compile(r"wsi bez towaru (\d+), bez miasta targowego")
+N3E_F_W1 = re.compile(r"woz kupuje w miescie sprzedazy \(E3-W1\) (tak|nie): zakupow (\d+) za (\d+) zl")
+N3E_F_G4 = re.compile(r"czynsz gruntowy do panow miast E3-G4 (\d+|wylaczony)")
+N3E_P_B = re.compile(r"\| B lud -> podatki od oszczednosci (\d+)")
+N3E_P_C = re.compile(r"\(zawor miast (\d+)")
+N3E_P_F = re.compile(r"\| F naturalne z obrotu \(E3, poza suma\) (\d+) \(z ludu i wsi (\d+)")
+N3E_C_REF = re.compile(r"zwrot zoldu (\d+) \(nalezny (\d+)")
+N3E_C_G5 = re.compile(r"E3-G5 z zaworu miast do zapasu \(Crown Keeps Valve Share (tak|nie)[^)]*\) (\d+) \(krolestw (\d+), r najwyzej ([\d.]+), udzial koron wczoraj ([\d.]+)?")
+N3E_L_LENT = re.compile(r"^Kredyt korony \(186\): dzien (\d+) \| pozyczono dzis (\d+) zl")
+N3E_S_CTL = re.compile(r"kontrola: zaplacone wsiom (\d+) = kiesa \+ licznik (\d+) \(roznica (-?\d+)\)")
+N3E_S_TAX = re.compile(r"na liczniki podatku wsi \(pan wsi\) (\d+)")
+N3E_T_ON = re.compile(r"\| (CZYNNE|WYLACZONE \(MCM\)) \|")
+N3E_T_CART = re.compile(r"wozy wsi: sprzedazy (\d+), utarg netto (\d+), myto (\d+)")
+N3E_T_CAR = re.compile(r"\| karawany: sprzedazy (\d+), utarg (\d+), myto (\d+)")
+N3E_T_PL = re.compile(r"w tym rod gracza: sprzedazy (\d+), myto (\d+)")
+N3E_T_CTL = re.compile(r"kontrola: pobrano (\d+) = pan \+ korona \+ kasa (\d+) \(roznica (-?\d+)\)")
+N3E_STUMB = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
+N3E_1_PRO = re.compile(r"\| z zyskiem (\d+) szt\. za (\d+)")
+N3E_1_LOSS = re.compile(r"\| na stracie (\d+) szt\. za (\d+)")
+N3E_1_GOLD = re.compile(r"\| zloto: z kas miast (\d+) .*?myto E3-G3 (\d+), przyrost kies karawan (-?\d+)")
+N3E_1_MED = re.compile(r"\| indeks mediana: ([^|]+)\|")
+N3E_1_HELD = re.compile(r"\| w jukach \d+ karawan [^:]*: ([^|]+)\|")
+N3E_STK_TOOLS = re.compile(r"narzedzia \(tools\): karawany (\d+) = [\d.]+ dni, miasta (\d+) = [\d.]+ dni, swiat (\d+) \(karawany ([\d.]+)%\)")
+N3E_STK_SILVER = re.compile(r"srebro \(silver\): karawany (\d+)")
+N3E_PRICE_ND = re.compile(r"budzet mieszczan (\d+) d \(przy dzisiejszych polkach do (\d+) d\)")
+N3E_MED_IDS = ("tools", "fur", "silver", "wine", "Eggs", "honey", "Papyrus")
+N3E_NEWERR = ("ERROR in CaravanGoods", "ERROR in TownToll", "ERROR in TownFolk", "ERROR in CrownIncome", "ERROR in CrownRents", "ERROR in Sutlers",
+              "ERROR in MarketCarts", "ERROR in CaravanBulk", "ERROR in CaravanAmmo", "ERROR in VillageTakings", "ERROR in AlleyProbe", "ERROR in MoneyLedger")
+# poprawki po recenzjach noc-ekonomia3 (NE3-2c, NE3-3 T1, NE3-5b, NE3-10, NE3-14d, NE3-16)
+N3E_FLOW = "Przeplywy osad (przyczyny): dzien "
+N3E_FLOW_KEY = re.compile(r"kontrola: TM0=-?\d+ TM1=(-?\d+) TZ0=-?\d+ TZ1=(-?\d+) TW0=-?\d+ TW1=(-?\d+)")
+N3E_FLOW_AVG = re.compile(r"srednia 28 dob ([+-]?\d+)")
+N3E_1_CTL = re.compile(r"kontrola: kasy -(-?\d+) = kiesy \+(-?\d+) \+ myto (\d+) - myto do kas osad (\d+) \(roznica (-?\d+)\)")
+N3E_1_DROP = re.compile(r"najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis (-?[\d.]+)%(?: \(([^)]*)\))?")
+N3E_1_FULL = re.compile(r"pelne juki \(ponad udzwig\) (\d+)/(\d+)")
+N3E_1_REB = re.compile(r"przez inne karawany (\d+) szt\.")
+N3E_1_SNAP = re.compile(r"odtworzone przy wczytaniu (\d+) szt\. \(z dziennika BK (\d+), ze sredniej indeksu (\d+); dziennik BK ([^)]*)\)")
+N3E_G_NOFUSE = re.compile(r"mnoznik bez bezpiecznika ([\d.]+)")
+N3E_F_NOG2 = re.compile(r"wsi bez towaru po W1 (\d+)")
+N3E_D3_DUP = re.compile(r"miast z 3\+ warsztatami jednego typu (\d+)")
+
+
+def _n3e_read(logp, full=True):
+    """Strumieniowo: linie dob nekon3 (full=False - tylko 'Pieniadz swiata', 'Pompy', 'Kredyt korony', 'Korona 165' i 'Ceny surowcow' - log bazy)."""
+    d = {k: {} for k in ("world", "guard", "folk", "pumps", "crown", "loan", "sutl", "toll", "t1", "stock", "price", "flow")}
+    st = {"guard": None, "toll": None, "t1": None, "hook": None}
+    errs, newerr = [], []
+    heads = [(N3E_WORLD, "world"), (N3E_PUMPS, "pumps"), (N3E_LOAN, "loan"), (N3E_PRICE, "price"), (N3E_CROWN, "crown"), (N3E_FLOW, "flow")]
+    if full:
+        heads += [(N3E_GUARD, "guard"), (N3E_FOLK, "folk"), (N3E_SUTL, "sutl"), (N3E_TOLL, "toll"), (N3E_T1, "t1"), (N3E_STOCK, "stock")]
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                errs.append(s[:160])
+                if s.startswith(N3E_NEWERR):
+                    newerr.append(s[:160])
+                continue
+            if full:
+                if s.startswith(N3E_S_GUARD):
+                    st["guard"] = s; continue
+                if s.startswith(N3E_S_TOLL):
+                    st["toll"] = s; continue
+                if s.startswith(N3E_S_T1):
+                    st["t1"] = s; continue
+                if s.startswith(N3E_S_HOOK):
+                    st["hook"] = s; continue
+            for h, k in heads:
+                if s.startswith(h):
+                    a = N3E_DAY.search(s)
+                    if a:
+                        d[k][int(a.group(1))] = s
+                    break
+    return d, st, errs, newerr
+
+
+def _n3e_world(s):
+    """'Pieniadz swiata': razem, zmiana, posiadacze, udzialy lud / lordowie / korony."""
+    a = N3E_W_TOT.search(s)
+    if not a:
+        return None
+    w = {"razem": int(a.group(1)), "zmiana": int(a.group(2))}
+    for k, p in N3E_W_HOLD.items():
+        w[k] = num(p, s, int, 0)
+    tot = max(1, w["razem"])
+    w["lud"] = (w["kiesy_wsi"] + w["lud_miasta"] + w["lud_podzamcza"] + w["lud_gminy"]) / tot * 100
+    w["lordowie_pct"] = (w["glowy"] + w["lordowie"] + w["gracz"]) / tot * 100
+    w["korony_pct"] = w["korony"] / tot * 100
+    for k in ("sakiewki", "karawany", "kasy_miast", "notable", "bank"):
+        w[k + "_pct"] = w[k] / tot * 100
+    return w
+
+
+def _n3e_mean(vals):
+    return sum(vals) / len(vals) if vals else None
+
+
+def _n3e_slope(pts):
+    """Nachylenie (na dobe) prostej najmniejszych kwadratow przez (doba, wartosc)."""
+    if len(pts) < 2:
+        return None
+    n = len(pts)
+    mx = sum(p[0] for p in pts) / n
+    my = sum(p[1] for p in pts) / n
+    sxx = sum((p[0] - mx) ** 2 for p in pts)
+    if sxx <= 0:
+        return None
+    return sum((p[0] - mx) * (p[1] - my) for p in pts) / sxx
+
+
+def _n3e_nd(s):
+    """'Ceny surowcow': suma 'nie do wydania' = budzet mieszczan - przy dzisiejszych polkach (wzor plan3/nd2.py)."""
+    return sum(int(m.group(1)) - int(m.group(2)) for m in N3E_PRICE_ND.finditer(s))
+
+
+# ============================================================ nekon3 czesc 2 (noc-ekonomia3 16.10: produkcja idzie za cena i ludzmi, panowie, korony i zolnierze kupuja)
+# Progi NE3-4, NE3-17..24 (+ NE3-0b, NE3-1c, NE3-15c2, NE3-16c2, NE3-18b, NE3-24b). Wolane z nekon3_main (ta sama grupa, ten sam raport).
+N3E_D2 = "Tempo warsztatow (E3-D2): dzien "
+N3E_S_D2 = "Tempo warsztatow (E3-D2): start sesji"
+N3E_D3 = "Warsztaty za cena (E3-D3): dzien "
+N3E_S_D3 = "Warsztaty za cena (E3-D3): start sesji"
+N3E_D1 = "Rece wsi za cena (E3-D1): dzien "
+N3E_S_D1 = "Rece wsi za cena (E3-D1): start sesji"
+N3E_P1 = "Dwor - towar z polki (E3-P1): dzien "
+N3E_S_P1 = "Dwor - towar z polki (E3-P1): start sesji"
+N3E_ARM = "Dozbrajanie: dzien "
+N3E_BUILD = "Budowy oplacone: dzien "
+N3E_LUX = "Zbytki ludu (P3-P5): dzien "
+N3E_WS = "Warsztaty towarowe: dzien "
+N3E_GOODS = "Towary: dzien "
+N3E_ROB = "Roboty ludu (P2): dzien "
+N3E_D2_F = re.compile(r"\| F srednio ([\d.]+), min ([\d.]+), max ([\d.]+)")
+N3E_D2_SUM = re.compile(r"swiata przed ([\d.]+) / po ([\d.]+)")
+N3E_D2_MIS = re.compile(r"niezgodne \(licznik linii\) (\d+)")
+N3E_ST2 = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
+N3E_D3_CH = re.compile(r"\| zmiany (\d+)(?: \[([^\]]*)\])?")
+N3E_D3_ONE = re.compile(r"^(.*) (\S+) -> (\S+) \(wynik")
+N3E_D3_BK = re.compile(r"typ z cen zamiast wyboru gry (\d+)")
+N3E_D1_F = re.compile(r"f wedlug towaru srednio/min/max: ([^|]+)\|")
+N3E_D1_FI = re.compile(r"(\w+) ([\d.]+)/([\d.]+)/([\d.]+) \((\d+) wsi")
+N3E_D1_C = re.compile(r"c inne plony srednio ([\d.]+|-), min ([\d.]+|-) \(prog 0\.85\); zboze srednio ([\d.]+|-), min ([\d.]+|-)")
+N3E_D1_BAL = re.compile(r"przybylo (\d+) d, ubylo (\d+) d .*?, roznica (-?[\d.]+) d \((-?[\d.]+)%\)")
+N3E_P1_LORD = re.compile(r"\| pan \(Court Buys Goods (tak|nie)\): kupujacych (\d+) w (\d+) siedzibach, chciane (\d+) zl, kupione (\d+) zl")
+N3E_P1_CROWN = re.compile(r"\| korona \(Crown Court Goods (tak|nie)\): kupujacych (\d+) w (\d+) siedzibach, chciane (\d+) zl, kupione (\d+) zl")
+N3E_P1_DEAR = re.compile(r"drogie tu \(indeks > 1\.5 - lud ma brak\) (\d+)")
+N3E_Z1 = re.compile(r"brak lepszej na polce (\d+) \(E3-Z1: na suficie tieru (\d+), pod sufitem bez towaru (\d+); zamowienia tier\+1 \(Men Upgrade Orders (tak|nie)\) (\d+) za (\d+) szt\."
+                    r".*?czyszczenia slownika zamowien wpisu 81 dzis (\d+) \(cel 0\); potkniecia (\d+)")
+N3E_BLD = re.compile(r"wydano (\d+) .*?wstrzymane: brak materialow (\d+)")
+N3E_LUXR = re.compile(r"miasta: oferta (\d+) zl .*?kupione z oferty (\d+) zl \(([\d.]+)%")
+N3E_WSR = re.compile(r"\| warsztatow (\d+) \(bez ukrytych rzemieslnikow\), rozliczonych dzis \d+, pracowalo (\d+)")
+N3E_GD = re.compile(r"^Towary: dzien (\d+) - (\S+) \(\d+ d\): ")
+N3E_GD_PROD = re.compile(r"\| produkcja (\d+)")
+N3E_GD_UNEX = re.compile(r"\| bez wyjasnienia ([-+]?\d+)")
+N3E_GD_LOST = re.compile(r"przepadlo [^\d\]|;]*?(\d+) \(")
+N3E_ROB_WOOD = re.compile(r"miast ponizej zapasu rzemiosla (\d+), bez drewna (\d+) z (\d+)")
+N3E_ROB_HALF = re.compile(r"targow z polowa progu (\d+)")
+N3E_FOLK_COURT = re.compile(r"z zewnatrz i z kas \d+: wojsko \d+ \([^)]*\), dwor (\d+)")
+N3E_COURT_IDS = ("wine", "beer", "mead", "cheese", "butter", "meat", "fish", "bread", "pie", "honey", "apple", "orange", "oil", "Egg", "date_fruit",
+                 "linen", "velvet", "fur", "jewelry", "silver", "spice", "pottery")
+N3E_LOST_IDS = ("Egg", "apple", "carrot", "orange", "honey")
+N3E_NEWERR2 = ("ERROR in WorkshopPace", "ERROR in WorkshopRetool", "ERROR in VillageFruit", "ERROR in CourtGoods", "ERROR in MenUpgradeOrders", "ERROR in ClanBudget",
+               "ERROR in MaterialLaw", "ERROR in NoTownMines", "ERROR in BuildFunding", "ERROR in MenUpgrade")
+
+
+def _n3e_read2(logp, full=True):
+    """Strumieniowo: linie dob czesci 2 (full=False - tylko linie istniejace przed seria: Dozbrajanie, Budowy, Zbytki, Warsztaty towarowe, Towary, Roboty ludu - log bazy)."""
+    d = {k: {} for k in ("d2", "d3", "d1", "p1", "arm", "build", "lux", "ws", "rob")}
+    goods = {}
+    st = {"d2": None, "d3": None, "d1": None, "p1": None}
+    newerr = []
+    heads = [(N3E_ARM, "arm"), (N3E_BUILD, "build"), (N3E_LUX, "lux"), (N3E_WS, "ws"), (N3E_ROB, "rob")]
+    if full:
+        heads += [(N3E_D2, "d2"), (N3E_D3, "d3"), (N3E_D1, "d1"), (N3E_P1, "p1")]
+    starts = [(N3E_S_D2, "d2"), (N3E_S_D3, "d3"), (N3E_S_D1, "d1"), (N3E_S_P1, "p1")]
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(N3E_NEWERR2):
+                    newerr.append(s[:160])
+                continue
+            if s.startswith(N3E_GOODS):
+                g = N3E_GD.match(s)
+                if g:
+                    goods.setdefault(int(g.group(1)), {})[g.group(2)] = s
+                continue
+            if full:
+                hit = False
+                for h, k in starts:
+                    if s.startswith(h):
+                        st[k] = s
+                        hit = True
+                        break
+                if hit:
+                    continue
+            for h, k in heads:
+                if s.startswith(h):
+                    a = N3E_DAY.search(s)
+                    if a:
+                        d[k][int(a.group(1))] = s
+                    break
+    return d, goods, st, newerr
+
+
+def _n3e_goods(goods, item, pat):
+    """{dzien: liczba} z linii 'Towary' jednego towaru (pierwsza grupa wzorca)."""
+    out = {}
+    for x, row in goods.items():
+        s = row.get(item)
+        if s:
+            a = pat.search(s)
+            if a:
+                out[x] = int(a.group(1))
+    return out
+
+
+def _n3e_lost(goods, item):
+    out = {}
+    for x, row in goods.items():
+        s = row.get(item)
+        if s:
+            out[x] = sum(int(v) for v in N3E_GD_LOST.findall(s))
+    return out
+
+
+def _n3e_tailmean(dct, n=10):
+    ks = sorted(dct)[-n:]
+    return _n3e_mean([dct[x] for x in ks]) if ks else None
+
+
+def _n3e_part2(rep, logp, bdp, D, W, days):
+    """Progi czesci 2 (D2, D3, D1, P1, Z1, B1). D, W, days - z czesci 1 (linie 'Ceny surowcow', 'Kiesa ludu', T1, 'Pieniadz swiata')."""
+    P, G, S2, newerr2 = _n3e_read2(logp, True)
+    PB, GB = None, None
+    if bdp and os.path.isfile(bdp):
+        PB, GB = _n3e_read2(bdp, False)[:2]
+    # ---- NE3-0b bledy i potkniecia czesci 2
+    st_n = {}
+    for k, name in (("d2", "D2"), ("d3", "D3"), ("d1", "D1"), ("p1", "P1")):
+        st_n[name] = sum(int(N3E_ST2.search(s).group(1)) for s in P[k].values() if N3E_ST2.search(s))
+    z1 = {x: N3E_Z1.search(s) for x, s in P["arm"].items()}
+    z1 = {x: a for x, a in z1.items() if a}
+    st_n["Z1"] = sum(int(a.group(8)) for a in z1.values())
+    rep.add("NE3-0b: ERROR modulow czesci 2 = 0; potkniecia linii D2, D3, D1, P1, Z1 = 0",
+            f"ERROR {len(newerr2)}" + (f" ({newerr2[0]})" if newerr2 else "") + "; potkniecia " + ", ".join(f"{k} {v}" for k, v in st_n.items()),
+            "0 / 0", (not newerr2 and all(v == 0 for v in st_n.values())) if (P["d2"] or P["d1"] or P["p1"]) else None)
+    # ---- NE3-1c linie w kazdej dobie, linie startu, latki
+    nd = len(days)
+    if nd and (P["d2"] or P["d3"] or P["d1"] or P["p1"]):
+        cov = {}
+        for k, name in (("d2", "Tempo D2"), ("d3", "Warsztaty za cena D3"), ("d1", "Rece wsi D1"), ("p1", "Dwor P1")):
+            cov[name] = len([x for x in P[k] if days[0] <= x <= days[-1] + 1]) / nd   # poprawki: D1 podaje wczoraj jak inne linie - bez tolerancji -1
+        sd2, sd3, sd1, sp1 = S2["d2"] or "", S2["d3"] or "", S2["d1"] or "", S2["p1"] or ""
+        ok_s = ("klucz Workshop Pace By Market tak" in sd2 and "latka wpieta" in sd2, "klucz Workshop Retool By Price tak" in sd3 and "latka zmiany produkcji (sprzet do kasy miasta) wpieta" in sd3,
+                "klucz Village Hands Follow Price TAK" in sd1, "klucz Court Buys Goods tak" in sp1)
+        mis = sum(int(N3E_D2_MIS.search(s).group(1)) for s in P["d2"].values() if N3E_D2_MIS.search(s))
+        rep.add("NE3-1c: linie czesci 2 w >= 95% dob; linie startu (klucze tak, latka D2 i latka zmiany produkcji wpiete); D2 'niezgodne' (licznik linii) = 0",
+                ", ".join(f"{n} {c * 100:.0f}%" for n, c in cov.items()) + f"; start D2/D3/D1/P1 {'/'.join('tak' if o else 'NIE' for o in ok_s)}; niezgodne {mis}",
+                ">= 95% / tak x4 / 0", all(c >= 0.95 for c in cov.values()) and all(ok_s) and mis == 0)
+    else:
+        rep.add("NE3-1c: linie czesci 2", "brak linii", "INFO (log bez czesci 2)", None)
+    # ---- NE3-4 ksiega towarow: towar dworow bez nowego 'bez wyjasnienia' (wobec bazy - ryby NavalDLC maja reszte od zawsze); zelazo nie gorzej niz w bazie
+    def _unex_days(goods):
+        out = {}
+        ks = sorted(goods)[1:]                      # pierwsza doba sesji bez "wczoraj"
+        for x in ks:
+            row = goods[x]
+            for gid in N3E_COURT_IDS:
+                s = row.get(gid)
+                a = N3E_GD_UNEX.search(s) if s else None
+                if a and int(a.group(1)) != 0:
+                    out[gid] = out.get(gid, 0) + 1
+        return out
+    unex = _unex_days(G)
+    unex_b = _unex_days(GB) if GB else None
+    worse = [g for g, n in unex.items() if n > (unex_b.get(g, 0) + 1 if unex_b is not None else 0)]
+    iron = _n3e_goods(G, "iron", N3E_GD_UNEX)
+    ik = sorted(iron)[-30:]
+    iron_m = _n3e_mean([abs(iron[x]) for x in ik]) if ik else None
+    iron_b = None
+    if GB:
+        ib = _n3e_goods(GB, "iron", N3E_GD_UNEX)
+        ibk = sorted(ib)[-30:]
+        iron_b = _n3e_mean([abs(ib[x]) for x in ibk]) if ibk else None
+    lim = (iron_b + 5) if iron_b is not None else 12
+    if G:
+        rep.add("NE3-4: 'Towary' bez wyjasnienia dla towarow dworow (rama 'dwory (E3-P1)'): dob z reszta != 0 nie wiecej niz w bazie (+1; bez bazy 0); zelazo |bez wyjasnienia| srednio 30 dob nie gorzej niz baza (+5; bez bazy <= 12)",
+                "dob z reszta: " + (", ".join(f"{g} {n}" + (f" (baza {unex_b.get(g, 0)})" if unex_b is not None else "") for g, n in sorted(unex.items())) or "0")
+                + (f"; gorzej niz baza: {', '.join(worse)}" if worse else "")
+                + f"; zelazo {iron_m if iron_m is None else round(iron_m, 1)}" + (f" (baza {iron_b:.1f})" if iron_b is not None else ""),
+                f"<= baza + 1 / <= {lim:.1f}" + ("" if unex_b is not None else " (bez bazy - INFO: ryby NavalDLC maja reszte od zawsze)"),
+                (not worse and (iron_m is None or iron_m <= lim)) if unex_b is not None else None)
+    # ---- NE3-15 i NE3-16 progi c2
+    ndd = {x: _n3e_nd(s) for x, s in D["price"].items()}
+    ndd = {x: v for x, v in ndd.items() if v > 0}
+    if ndd:
+        ks = sorted(ndd)
+        end = _n3e_mean([ndd[x] for x in ks[-10:]])
+        mid = [ndd[x] for x in ks if ks[0] + 29 <= x <= ks[0] + 59]
+        rep.add("NE3-15c2: 'nie do wydania' mieszczan koniec <= 85 tys. d/d (c2); doby 30-60 i 110-120 osobno (uwaga recenzji: T1 to jednorazowe oproznienie jukow)",
+                f"koniec (ostatnie 10 dob) {end:.0f}" + (f", doby 30-60 {_n3e_mean(mid):.0f}" if mid else ""), "<= 85000", end <= 85000)
+    vb = {}
+    for x, s in D["folk"].items():
+        a, n, w1, n2 = N3E_F_VIL.search(s), N3E_F_NOG.search(s), N3E_F_W1.search(s), N3E_F_NOG2.search(s)
+        if a:
+            vb[x] = (int(a.group(2)), int(a.group(3)), int(n.group(1)) if n else None, int(w1.group(3)) if w1 else 0, int(n2.group(1)) if n2 else None)
+    if vb:
+        ks = sorted(vb)[-10:]
+        buy = sum(vb[x][0] + vb[x][3] for x in ks)
+        need = sum(vb[x][1] for x in ks)
+        nog_mk = _n3e_mean([vb[x][2] for x in ks if vb[x][2] is not None])
+        nog_w1 = _n3e_mean([vb[x][4] for x in ks if vb[x][4] is not None])
+        nog = nog_w1 if nog_w1 is not None else nog_mk
+        real = buy / need * 100 if need > 0 else 0
+        rep.add("NE3-16c2: koszyk wsi (z W1) / potrzeba na koniec >= 18% (c2), wsi bez towaru po W1 <= 400",
+                f"realizacja {real:.1f}%, wsi bez towaru po W1 {nog_w1 if nog_w1 is None else round(nog_w1)} (w miescie targowym {nog_mk if nog_mk is None else round(nog_mk)})",
+                ">= 18% / <= 400", real >= 18 and nog is not None and nog <= 400)
+    # ---- NE3-17 dwory
+    if P["p1"]:
+        lord, crown, dear = {}, {}, {}
+        for x, s in P["p1"].items():
+            a, b, c = N3E_P1_LORD.search(s), N3E_P1_CROWN.search(s), N3E_P1_DEAR.search(s)
+            if a:
+                lord[x] = int(a.group(5))
+            if b:
+                crown[x] = int(b.group(5))
+            if c:
+                dear[x] = int(c.group(1))
+        l30 = _n3e_tailmean(lord, 30) or 0
+        c30 = _n3e_tailmean(crown, 30) or 0
+        fc = {x: num(N3E_FOLK_COURT.pattern, s, int, None) for x, s in D["folk"].items()}
+        fc = {x: v for x, v in fc.items() if v is not None}
+        f30 = _n3e_tailmean(fc, 30)
+        rep.add("NE3-17: dwory rodow kupily towar >= 15 tys./d i korona >= 3 tys./d (srednia 30 dob); lud z dworu ('Kiesa ludu' dwor) < 30.9 tys./d",
+                f"pan {l30:.0f}, korona {c30:.0f}, lud z dworu {f30 if f30 is None else round(f30)}; wierszy pominietych jako drogie (lud ma brak) srednio {(_n3e_tailmean(dear, 30) or 0):.0f}",
+                ">= 15000 / >= 3000 / < 30884", l30 >= 15000 and c30 >= 3000 and (f30 is not None and f30 < 30884))
+    else:
+        rep.add("NE3-17: dwory", "brak linii E3-P1", "INFO (log bez czesci 2)", None)
+    # ---- NE3-18 budowy, NE3-18b drewno miast
+    bl = {x: N3E_BLD.search(s) for x, s in P["build"].items()}
+    bl = {x: a for x, a in bl.items() if a}
+    if bl:
+        ks = sorted(bl)[-30:]
+        held = _n3e_mean([int(bl[x].group(2)) for x in ks])
+        spent = _n3e_mean([int(bl[x].group(1)) for x in ks])
+        rep.add("NE3-18: budowy 'brak materialow' srednio 30 dob <= 35 osad (ekon2 51), wydano >= 20 tys./d (ekon2 15 tys.)", f"brak materialow {held:.1f}, wydano {spent:.0f}",
+                "<= 35 / >= 20000", held <= 35 and spent >= 20000)
+    rw = {x: N3E_ROB_WOOD.search(s) for x, s in P["rob"].items()}
+    rw = {x: a for x, a in rw.items() if a}
+    if rw:
+        ks = sorted(rw)[-30:]
+        none_m = _n3e_mean([int(rw[x].group(2)) for x in ks])
+        below_m = _n3e_mean([int(rw[x].group(1)) for x in ks])
+        half = {x: num(N3E_ROB_HALF.pattern, s, int, None) for x, s in P["rob"].items()}
+        half = {x: v for x, v in half.items() if v is not None}
+        bn, bb = None, None
+        if PB and PB["rob"]:
+            rb = {x: N3E_ROB_WOOD.search(s) for x, s in PB["rob"].items()}
+            rb = {x: a for x, a in rb.items() if a}
+            kb = sorted(rb)[-30:]
+            if kb:
+                bn = _n3e_mean([int(rb[x].group(2)) for x in kb]); bb = _n3e_mean([int(rb[x].group(1)) for x in kb])
+        lim_n = max(29, (bn or 0) + 5) if bn is not None else 29
+        rep.add("NE3-18b: E3-B1b - miasta bez drewna srednio 30 dob <= max(29, baza + 5) (uwaga recenzji: K1 nie cofniety tam, gdzie drewna brak); miasta ponizej zapasu rzemiosla - INFO",
+                f"bez drewna {none_m:.1f}" + (f" (baza {bn:.1f})" if bn is not None else "") + f", ponizej zapasu {below_m:.1f}" + (f" (baza {bb:.1f})" if bb is not None else "")
+                + f"; targow z polowa progu srednio {(_n3e_tailmean(half, 30) or 0):.1f}", f"<= {lim_n:.1f}", none_m <= lim_n)
+    # ---- NE3-19 zolnierze
+    if z1:
+        ks = sorted(z1)
+        bad = [x for x in ks if int(z1[x].group(2)) + int(z1[x].group(3)) != int(z1[x].group(1))]
+        clears = sum(int(z1[x].group(7)) for x in ks)
+        tot = sum(int(z1[x].group(1)) for x in ks)
+        under = sum(int(z1[x].group(3)) for x in ks)
+        orders = sum(int(z1[x].group(5)) for x in ks)
+        share = under / tot * 100 if tot > 0 else 0
+        rep.add("NE3-19: Z1 - licznik rozdzielony ('na suficie' + 'pod sufitem' = 'brak lepszej' kazdej doby); czyszczenia slownika wpisu 81 = 0",
+                f"dob {len(ks)}, z niezgodnym podzialem {len(bad)}; czyszczen {clears}; pod sufitem {share:.1f}% koszykow, zamowien razem {orders}", "0 / 0", not bad and clears == 0)
+        if share >= 10:
+            def _win(lo, hi):
+                v = [int(z1[x].group(3)) for x in ks if ks[0] + lo <= x <= ks[0] + hi]
+                return _n3e_mean(v)
+            u30, u120 = _win(25, 35), _n3e_mean([int(z1[x].group(3)) for x in ks[-10:]])
+            rep.add("NE3-19b: 'pod sufitem bez towaru' >= 10% koszykow - spada >= 20% miedzy doba 30 a koncem i zamowienia > 0",
+                    f"doba 30 {u30 if u30 is None else round(u30)}, koniec {u120 if u120 is None else round(u120)}, zamowien {orders}", "spadek >= 20% / > 0",
+                    u30 is not None and u120 is not None and u120 <= 0.8 * u30 and orders > 0)
+        else:
+            rep.add("NE3-19b: 'pod sufitem bez towaru'", f"{share:.1f}% koszykow (< 10%)", "INFO (zolnierze maja juz to, co im wolno)", None)
+    else:
+        rep.add("NE3-19: Z1", "brak dopisku E3-Z1 w 'Dozbrajanie'", "INFO (log bez czesci 2)", None)
+    # ---- NE3-20 zbytki ludu
+    lx = {x: N3E_LUXR.search(s) for x, s in P["lux"].items()}
+    lx = {x: a for x, a in lx.items() if a}
+    if lx:
+        ks = sorted(lx)[-10:]
+        offer = sum(int(lx[x].group(1)) for x in ks)
+        bought = sum(int(lx[x].group(2)) for x in ks)
+        pct = bought / offer * 100 if offer > 0 else 0
+        base_p = None
+        if PB and PB["lux"]:
+            lb = {x: N3E_LUXR.search(s) for x, s in PB["lux"].items()}
+            lb = {x: a for x, a in lb.items() if a}
+            kb = sorted(lb)[-10:]
+            ob = sum(int(lb[x].group(1)) for x in kb)
+            base_p = sum(int(lb[x].group(2)) for x in kb) / ob * 100 if ob > 0 else None
+        rep.add("NE3-20: zbytki ludu - kupione z oferty / oferta miast (ostatnie 10 dob) >= 45% (ekon2 37.9%; B1a cena graniczna bogatych do 8 x)",
+                f"{pct:.1f}%" + (f" (baza {base_p:.1f}%)" if base_p is not None else ""), ">= 45%", pct >= 45)
+    # ---- NE3-21 zmiany typu warsztatu
+    if P["d3"]:
+        ch, perday, towns = 0, 0, {}
+        bk = 0
+        for x in sorted(P["d3"]):
+            s = P["d3"][x]
+            a = N3E_D3_CH.search(s)
+            if a:
+                n = int(a.group(1)); ch += n; perday = max(perday, n)
+                if a.group(2):
+                    for one in a.group(2).split("; "):
+                        o = N3E_D3_ONE.match(one)
+                        if o:
+                            towns.setdefault(o.group(1), []).append(x)
+            b = N3E_D3_BK.search(s)
+            if b:
+                bk += int(b.group(1))
+        twice = [t for t, ds in towns.items() if any(ds[i + 1] - ds[i] < 30 for i in range(len(ds) - 1))]
+        dup3 = {x: num(N3E_D3_DUP.pattern, s, int, None) for x, s in P["d3"].items()}
+        dup3 = [dup3[x] for x in sorted(dup3) if dup3[x] is not None]
+        rep.add("NE3-21: zmiany typu warsztatu za cena 20-120 w oknie, najwyzej 3 na dobe, zadne miasto 2 razy w 30 dobach (wahadlo); bankructwa z typem z cen i miasta z 3+ warsztatami jednego typu - INFO",
+                f"zmian {ch}, najwiecej na dobe {perday}, miast 2 razy w 30 dobach {len(twice)}" + (f" ({twice[0]})" if twice else "") + f"; bankructwa z typem z cen {bk}"
+                + (f"; miast z 3+ warsztatami jednego typu d1 {dup3[0]} -> koniec {dup3[-1]}" if dup3 else ""),
+                "20-120 / <= 3 / 0", 20 <= ch <= 120 and perday <= 3 and not twice)
+    else:
+        rep.add("NE3-21: zmiany typu warsztatu", "brak linii E3-D3", "INFO (log bez czesci 2)", None)
+    # ---- NE3-22 stojace warsztaty
+    wsd = {x: N3E_WSR.search(s) for x, s in P["ws"].items()}
+    wsd = {x: a for x, a in wsd.items() if a}
+    if wsd:
+        ks = sorted(wsd)[-10:]
+        idle = _n3e_mean([(int(wsd[x].group(1)) - int(wsd[x].group(2))) / max(1, int(wsd[x].group(1))) * 100 for x in ks])
+        rep.add("NE3-22: stojace warsztaty na koniec (warsztatow - pracowalo, ostatnie 10 dob) <= 38% (ekon2 42%)", f"{idle:.1f}%", "<= 38%", idle <= 38)
+    # ---- NE3-23 tempo D2
+    if P["d2"]:
+        fmin, fmax, ratio = [], [], {}
+        for x, s in P["d2"].items():
+            a = N3E_D2_F.search(s)
+            if a:
+                fmin.append(float(a.group(2))); fmax.append(float(a.group(3)))
+            b = N3E_D2_SUM.search(s)
+            if b and float(b.group(1)) > 0:
+                ratio[x] = float(b.group(2)) / float(b.group(1))
+        r10 = _n3e_tailmean(ratio, 10)
+        tools = _n3e_tailmean(_n3e_goods(G, "tools", N3E_GD_PROD), 10)
+        bread = _n3e_tailmean(_n3e_goods(G, "bread", N3E_GD_PROD), 10)
+        okf = bool(fmin) and min(fmin) >= 0.3 - 1e-6 and max(fmax) <= 4 + 1e-6
+        rep.add("NE3-23: D2 - F w 0.3-4 kazdej doby, szybkosc linii swiata po / przed 0.95-1.4 (10 dob); narzedzia >= 230/d (ekon2 184), chleb >= 850/d (ostatnie 10 dob)",
+                f"F min {min(fmin) if fmin else '-'} max {max(fmax) if fmax else '-'}; po/przed {r10 if r10 is None else round(r10, 3)}; narzedzia {tools if tools is None else round(tools)}, chleb {bread if bread is None else round(bread)}",
+                "0.3-4 / 0.95-1.4 / >= 230 / >= 850",
+                okf and r10 is not None and 0.95 <= r10 <= 1.4 and tools is not None and tools >= 230 and bread is not None and bread >= 850)
+    else:
+        rep.add("NE3-23: tempo D2", "brak linii E3-D2", "INFO (log bez czesci 2)", None)
+    # ---- NE3-24 rece wsi D1, NE3-24b bilans wartosci
+    if P["d1"]:
+        fbad, cbad, gbad, balbad = [], [], [], []
+        fegg = {}
+        for x, s in P["d1"].items():
+            a = N3E_D1_F.search(s)
+            if a:
+                for it in N3E_D1_FI.finditer(a.group(1)):
+                    if float(it.group(3)) < 1 - 1e-6 or float(it.group(4)) > 2 + 1e-6:
+                        fbad.append(x)
+                    if it.group(1) == "Egg":
+                        fegg[x] = float(it.group(2))
+            c = N3E_D1_C.search(s)
+            if c:
+                if c.group(2) != "-" and float(c.group(2)) < 0.85 - 1e-6:
+                    cbad.append(x)
+                if c.group(4) != "-" and float(c.group(4)) < 0.95 - 1e-6:
+                    gbad.append(x)
+            b = N3E_D1_BAL.search(s)
+            if b and int(b.group(1)) > 0 and abs(float(b.group(4))) > 1.0:
+                balbad.append(x)
+        eggs = _n3e_goods(G, "Egg", N3E_GD_PROD)
+        e10 = _n3e_tailmean(eggs, 10)
+        eb = None
+        if GB:
+            eb = _n3e_tailmean(_n3e_goods(GB, "Egg", N3E_GD_PROD), 10)
+        eref = eb if eb else 383
+        lost = sum(sum(_n3e_lost(G, i).values()) for i in N3E_LOST_IDS)
+        lost_b = sum(sum(_n3e_lost(GB, i).values()) for i in N3E_LOST_IDS) if GB else None
+        rep.add("NE3-24: D1 - f w 1-2, c inne >= 0.85, zboze >= 0.95 kazdej doby; jaja >= 1.4 x baza (ostatnie 10 dob; bez bazy 383/d); przepadlo (jaja, owoce, miod) <= 2 x baza",
+                f"dob z f poza 1-2 {len(fbad)}, c < 0.85 {len(cbad)}, zboze < 0.95 {len(gbad)}; jaja {e10 if e10 is None else round(e10)} wobec {eref:.0f} (x{(e10 / eref) if e10 else 0:.2f})"
+                + f"; przepadlo {lost}" + (f" (baza {lost_b})" if lost_b is not None else ""),
+                ">= 1.4 x / <= 2 x baza", not fbad and not cbad and not gbad and e10 is not None and e10 >= 1.4 * eref and (lost_b is None or lost <= 2 * max(1, lost_b)))
+        rep.add("NE3-24b: D1 - wartosc bazowa plonu wsi z D1 rowna wartosci bez D1: |przybylo - ubylo| <= 1% kazdej doby (te same rece)", f"dob z roznica > 1%: {len(balbad)}", "0", not balbad)
+        # INFO: f jaj wobec indeksu jaj (mediana z linii T1) - przy spadku indeksu f maleje
+        med = {}
+        for x, s in D["t1"].items():
+            a = N3E_1_MED.search(s)
+            if a:
+                m2 = re.search(r"Eggs ([\d.]+)", a.group(1))
+                if m2:
+                    med[x] = float(m2.group(1))
+        pts = [(med[x], fegg[x]) for x in fegg if x in med]
+        corr = None
+        if len(pts) > 5:
+            mx = sum(p[0] for p in pts) / len(pts); my = sum(p[1] for p in pts) / len(pts)
+            sxy = sum((p[0] - mx) * (p[1] - my) for p in pts); sxx = sum((p[0] - mx) ** 2 for p in pts); syy = sum((p[1] - my) ** 2 for p in pts)
+            corr = sxy / (sxx * syy) ** 0.5 if sxx > 0 and syy > 0 else None
+        rep.add("NE3-24c: f jaj idzie za indeksem jaj (korelacja f z mediana indeksu Eggs >= 0 - przy spadku indeksu f maleje)", f"korelacja {corr if corr is None else round(corr, 2)} ({len(pts)} dob)", "INFO", None)
+    else:
+        rep.add("NE3-24: rece wsi D1", "brak linii E3-D1", "INFO (log bez czesci 2)", None)
+
+
+def nekon3_main(logp, bdp=None):
+    """nekon3 (noc-ekonomia3 16.10, czesc 1; plan 'obieg z obrotu, towar tam, gdzie drogo' + poprawka Jeffa 16.10 'karawany sprzedaja tam, gdzie maja zysk').
+    Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log bazy WGRANIA 64>. Progi czesci 1: NE3-0 ERROR 0 i potkniecia 0, NE3-1 linie w >= 95% dob
+    i linie startu (klucze tak, latki wpiete), NE3-2 zmiana dobowa swiata <= 0.01% i 'Kiesa ludu' r = 0, NE3-3 kontrole przelewow (myto, markietani), NE3-5 mediany
+    indeksow bez skokow > 25% i nie ponizej 0.8, NE3-6 wczytanie zapisu (stan z zapisu), NE3-7 lud <= 9.1% (INFO cel 8.0-8.8%, nachylenie), NE3-8 korony >= 19.9%,
+    NE3-9 lordowie 35.0-37.5%, NE3-9b inne skrzynie wobec bazy +0.3 pkt (kredyt 186 <= 15 tys./d), NE3-10 do pasma <= 6.4% / mnoznik <= 3.7 / bezpiecznik <= 20 dob,
+    NE3-11 Pompy B <= 400 tys./d i F >= 40 tys./d, NE3-11b F z ludu >= 35 tys./d (udzial w zwrocie od ludu - INFO), NE3-12 G5 (dzwignia domyslnie wylaczona - INFO)
+    i NE3-12b zwrot zoldu 100%, NE3-13 myto > 0 kazdej doby i wozy 6-14 tys./d, NE3-14 T1 sprzedaz > 0, narzedzia w jukach < 50% swiata od doby 60, srebro
+    w jukach nie rosnie, NE3-14b kiesy karawan <= +10 tys./d i zawor miast >= 95% bazy, NE3-15 'nie do wydania' <= 98 tys. (c1), NE3-16 koszyk wsi >= 15%,
+    wsi bez towaru <= 420, zakupy W1 > 0. Czesc 2 (_n3e_part2): NE3-0b/1c linie i potkniecia D2, D3, D1, P1, Z1, NE3-4 ksiega towarow dworow i zelazo, NE3-15c2 <= 85 tys.,
+    NE3-16c2 >= 18% / <= 400, NE3-17 dwory, NE3-18/18b budowy i drewno miast, NE3-19 Z1, NE3-20 zbytki, NE3-21/22 warsztaty, NE3-23 tempo D2, NE3-24/24b/24c rece wsi D1.
+    Koniec = srednia ostatnich 10 dob. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NE3-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D, ST, errs, newerr = _n3e_read(logp, True)
+    B = None
+    if bdp and os.path.isfile(bdp):
+        B = _n3e_read(bdp, False)[0]
+    W = {k: _n3e_world(v) for k, v in D["world"].items()}
+    W = {k: v for k, v in W.items() if v}
+    days = sorted(W)
+    nd = len(days)
+    last10 = days[-10:]
+    last30 = days[-30:]
+
+    def tail(dct, n=10):
+        ks = sorted(dct)
+        return ks[-n:]
+
+    # ---- NE3-0 bledy i potkniecia
+    st_toll = sum(num(r"\| potkniecia (\d+) \(sesja", s, int, 0) for s in D["toll"].values())
+    st_t1 = sum(num(r"\| potkniecia (\d+) \(sesja", s, int, 0) for s in D["t1"].values())
+    st_g = sum(num(r"\| potkniecia (\d+) \(sesja", s, int, 0) for s in D["guard"].values())
+    st_w1 = sum(num(r"potkniecia (\d+)\), zaleglosc koszyka wsi", s, int, 0) for s in D["folk"].values())
+    rep.add("NE3-0: ERROR w logu = 0; potkniecia nowych linii (myto, T1, straznik, W1) = 0",
+            f"ERROR {len(errs)} (w modulach serii {len(newerr)}{': ' + newerr[0] if newerr else ''}{'; pierwszy: ' + errs[0] if errs and not newerr else ''}), "
+            f"potkniecia myto {st_toll}, T1 {st_t1}, straznik {st_g}, W1 {st_w1}",
+            "0 / 0", len(errs) == 0 and st_toll == 0 and st_t1 == 0 and st_g == 0 and st_w1 == 0)
+    # ---- NE3-1 linie w kazdej dobie, linie startu
+    if nd:
+        cov = {}
+        for k, name in (("guard", "Straznik"), ("folk", "Kiesa ludu"), ("pumps", "Pompy"), ("crown", "Korona 165"), ("sutl", "Markietani"), ("toll", "Myto E3-G3"), ("t1", "T1")):
+            cov[name] = len([x for x in D[k] if days[0] <= x <= days[-1] + 1]) / nd
+        low = [f"{n} {c * 100:.0f}%" for n, c in cov.items() if c < 0.95]
+        rep.add("NE3-1: kazda linia serii w >= 95% dob okna", ", ".join(f"{n} {c * 100:.0f}%" for n, c in cov.items()), ">= 95% kazda", not low)
+    else:
+        rep.add("NE3-1: linie doby", "brak 'Pieniadz swiata'", "INFO (log bez ksiegi pieniadza)", None)
+    g = ST["guard"] or ""
+    t = ST["toll"] or ""
+    t1 = ST["t1"] or ""
+    hk = ST["hook"] or ""
+    ok_g = "E3-G1: poziom normalny do pasma najwyzej" in g and "wylaczony" not in g.split("E3-G1:")[-1].split("|")[0] if g else False
+    ok_t = "klucz Town Market Toll tak" in t and "sprzedaz wozow wpieta" in t and "sprzedaz karawan wpieta" in t
+    ok_1 = "klucz Caravan Sell Where Dear tak" in t1 and "latka SellItemsAction.ApplyInternal wpieta" in t1
+    ok_h = "latka wpieta" in hk and "blokada odkupienia przez BK (BuyGoods + CalculateBuyValue) - wpieta" in hk
+    rep.add("NE3-1b: linie startu (E3-G1 kap i bezpiecznik, myto - klucz tak i obie latki wpiete, T1 - klucz tak, latka i blokada BK wpiete)",
+            f"straznik {'tak' if ok_g else 'NIE'}, myto {'tak' if ok_t else 'NIE'}, T1 {'tak' if ok_1 else 'NIE'}, latki T1 {'tak' if ok_h else 'NIE'}",
+            "tak / tak / tak / tak", ok_g and ok_t and ok_1 and ok_h)
+    # ---- NE3-2 zamknietosc
+    def _jumps(ww):
+        ks = sorted(ww)
+        return [(x, ww[x]["zmiana"], ww[x]["razem"]) for x in ks[1:] if abs(ww[x]["zmiana"]) > 0.0001 * ww[x]["razem"]]
+
+    BWd = {}
+    if B and B["world"]:
+        BWd = {k: _n3e_world(v) for k, v in B["world"].items()}
+        BWd = {k: v for k, v in BWd.items() if v}
+    if nd:
+        jumps = _jumps(W)
+        bj = len(_jumps(BWd)) if BWd else None
+        rep.add("NE3-2: 'Pieniadz swiata' |zmiana dobowa| <= 0.01% swiata (od drugiej doby; z baza - nie wiecej dob niz w bazie: wojny, upadki krolestw)",
+                f"dob ponad progiem {len(jumps)} z {max(0, nd - 1)}" + (f" (np. d{jumps[0][0]}: {jumps[0][1]} na {jumps[0][2]})" if jumps else "")
+                + (f"; baza {bj}" if bj is not None else ""), "0 (z baza: <= baza)", (len(jumps) <= bj) if bj is not None else not jumps)
+    rr = {x: num(N3E_F_R.pattern, s, int, None) for x, s in D["folk"].items()}
+    bad_r = [x for x, v in rr.items() if v is not None and v != 0]
+    rep.add("NE3-2b: 'Kiesa ludu' kontrola r = 0 kazdej doby", f"dob z r {len([v for v in rr.values() if v is not None])}, z r != 0 {len(bad_r)}" + (f" (np. d{bad_r[0]} r = {rr[bad_r[0]]})" if bad_r else ""),
+            "0", (not bad_r) if rr else None)
+    # ---- NE3-2c ksiega kas osad (poprawki, uwaga recenzji 1: myto wozow w oknie taboru, W1 i myto do kas bez nazwy rozjezdzaly TM1/TZ1/TW1; NE3-2 tego nie widzi)
+    def _n3e_flow(fl):
+        tm, tz, tw, av = {}, {}, {}, {}
+        for x, s in fl.items():
+            a = N3E_FLOW_KEY.search(s)
+            if a:
+                tm[x], tz[x], tw[x] = int(a.group(1)), int(a.group(2)), int(a.group(3))
+            b = N3E_FLOW_AVG.search(s)
+            if b:
+                av[x] = int(b.group(1))
+        return tm, tz, tw, av
+
+    if D["flow"]:
+        ftm, ftz, ftw, fav = _n3e_flow(D["flow"])
+        avmax = max((abs(v) for v in fav.values()), default=None)
+        mtz = _n3e_mean([abs(v) for v in ftz.values()])
+        mtw = _n3e_mean([abs(v) for v in ftw.values()])
+        bfl = _n3e_flow(B["flow"]) if B and B["flow"] else None
+        if bfl and bfl[1]:
+            btz = _n3e_mean([abs(v) for v in bfl[1].values()])
+            btw = _n3e_mean([abs(v) for v in bfl[2].values()])
+            bav = max((abs(v) for v in bfl[3].values()), default=None)
+            ok2c = avmax is not None and avmax < 10000 and mtz is not None and mtz <= btz + 50 and mtw is not None and mtw <= 1.25 * btw + 100
+            btxt = f"; baza: srednia 28 dob max |.| {bav}, |TZ1| srednio {btz:.0f}, |TW1| srednio {btw:.0f}"
+            rule2c = "< 10000 / |TZ1| <= baza + 50 / |TW1| <= 1.25 x baza + 100"
+        else:
+            ok2c = avmax is not None and avmax < 10000 and mtz is not None and mtz <= 50 and mtw is not None and mtw <= 500
+            btxt = ""
+            rule2c = "< 10000 / |TZ1| <= 50 / |TW1| <= 500 (bez bazy)"
+        rep.add("NE3-2c: 'Przeplywy osad (przyczyny)' - reszta kas miast TM1 srednia 28 dob |.| < 10 000 kazdej doby; reszty zamkow |TZ1| i kies wsi |TW1| srednio nie gorzej niz baza",
+                f"srednia 28 dob max |.| {avmax}, TM1 srednio {(_n3e_mean(list(ftm.values())) or 0):.0f}; |TZ1| srednio {mtz if mtz is None else round(mtz)}, |TW1| srednio {mtw if mtw is None else round(mtw)}" + btxt,
+                rule2c, ok2c)
+    else:
+        rep.add("NE3-2c: ksiega kas osad", "brak linii 'Przeplywy osad (przyczyny)'", "INFO (ksiega obiegu wylaczona)", None)
+    # ---- NE3-3 kontrole przelewow
+    tbad = [x for x, s in D["toll"].items() if (lambda m: m and int(m.group(3)) != 0)(N3E_T_CTL.search(s))]
+    sbad = [x for x, s in D["sutl"].items() if (lambda m: m and int(m.group(3)) != 0)(N3E_S_CTL.search(s))]
+    sN = len([s for s in D["sutl"].values() if N3E_S_CTL.search(s)])
+    t1bad, t1N = [], 0
+    for x, s in D["t1"].items():
+        a = N3E_1_CTL.search(s)
+        if a:
+            t1N += 1
+            if int(a.group(5)) != 0:
+                t1bad.append(x)
+    rep.add("NE3-3: kontrole przelewow kazdej doby - myto pobrano = pan + korona + kasa, markietani zaplacone wsiom = kiesa + licznik, T1 kasy miast (zmierzone) = kiesy karawan + myto - myto do kas osad",
+            f"myto dob {len(D['toll'])}, z roznica {len(tbad)}; markietani dob z kontrola {sN}, z roznica {len(sbad)}; T1 dob z kontrola {t1N}, z roznica {len(t1bad)}"
+            + (f" (np. d{t1bad[0]})" if t1bad else ""), "0 / 0 / 0",
+            (not tbad and not sbad and not t1bad) if (D["toll"] or sN or t1N) else None)
+    # ---- NE3-5 mediany indeksow
+    meds = {}
+    for x, s in D["t1"].items():
+        a = N3E_1_MED.search(s)
+        if not a:
+            continue
+        for part in a.group(1).split(","):
+            p = part.strip().split(" ")
+            if len(p) == 2:
+                try:
+                    meds.setdefault(p[0], {})[x] = float(p[1])
+                except ValueError:
+                    pass
+    if meds:
+        rows, worst_jump, below = [], 0.0, []
+        for gid in N3E_MED_IDS:
+            ser = meds.get(gid)
+            if not ser:
+                continue
+            ks = sorted(ser)
+            jmax = 0.0
+            for i in range(1, len(ks)):
+                a0, a1 = ser[ks[i - 1]], ser[ks[i]]
+                if a0 > 0:
+                    jmax = max(jmax, abs(a1 - a0) / a0)
+            worst_jump = max(worst_jump, jmax)
+            mn = min(ser.values())
+            first = ser[ks[0]]
+            if (first >= 0.8 and mn < 0.8) or (first < 0.8 and mn < first - 0.1):
+                below.append(f"{gid} {mn:.2f} (pierwsza doba {first:.2f})")
+            rows.append(f"{gid} d{ks[0]} {ser[ks[0]]:.2f} -> d{ks[-1]} {ser[ks[-1]]:.2f} (skok max {jmax * 100:.0f}%, min {mn:.2f})")
+        rep.add("NE3-5: mediany indeksu (narzedzia, futra, srebro, wino, jaja, miod, papirus) - skok doby <= 25%, nie ponizej 0.8 (towar od < 0.8 w pierwszej dobie - nie nizej niz pierwsza doba - 0.1)",
+                "; ".join(rows) + (f"; ponizej progu: {', '.join(below)}" if below else ""), "skok <= 25%, min >= 0.8 (albo >= pierwsza - 0.1)", worst_jump <= 0.25 and not below)
+    else:
+        rep.add("NE3-5: mediany indeksow", "brak linii E3-T1 z mediana", "INFO (log bez paczki)", None)
+    drops, dwhere = {}, {}
+    for x, s in D["t1"].items():
+        a = N3E_1_DROP.search(s)
+        if a:
+            drops[x] = float(a.group(1)); dwhere[x] = a.group(2) or ""
+    if drops:
+        xmax = max(drops, key=lambda k: drops[k])
+        over5 = [x for x, v in drops.items() if v > 40.0]
+        rep.add("NE3-5b: najwiekszy dobowy spadek indeksu sprzedanej kategorii w jednym miescie <= 40% (T1 nie zbija jednego targu - mediana 97 miast tego nie widzi)",
+                f"max {drops[xmax]:.1f}% (d{xmax}: {dwhere[xmax]}), dob ponad 40% {len(over5)} z {len(drops)}", "<= 40% kazdej doby", not over5)
+    else:
+        rep.add("NE3-5b: spadek indeksu w jednym miescie", "brak pola w linii E3-T1", "INFO (log sprzed poprawek)", None)
+    # ---- NE3-6 wczytanie zapisu
+    mload = num(r"\| stan z zapisu: mnoznik ([\d.]+)", g, float, None) if g else None
+    rep.add("NE3-6: wczytanie zapisu - stan straznika z zapisu (arm_obieg2) i 0 ERROR (NE3-0)", f"mnoznik z zapisu {mload if mload is not None else '-'}",
+            "liczba z zapisu (nowa kampania 1.000 - INFO)", (mload is not None and len(errs) == 0) if mload not in (None, 1.0) else None)
+    # ---- NE3-7..9 udzialy
+    if nd:
+        lud = [W[x]["lud"] for x in last10]
+        kor = [W[x]["korony_pct"] for x in last10]
+        lor_all = [W[x]["lordowie_pct"] for x in days]
+        slope = _n3e_slope([(x, W[x]["lud"]) for x in last30])
+        lud_end, kor_end = _n3e_mean(lud), _n3e_mean(kor)
+        rep.add("NE3-7: lud z wsiami w zlocie swiata na koniec (srednia 10 dob) <= 9.1% (cel 8.0-8.8% INFO; nachylenie 30 dob <= +0.01 pkt/d)",
+                f"d{days[0]} {W[days[0]]['lud']:.2f}% -> koniec {lud_end:.2f}%, nachylenie {slope if slope is None else round(slope, 4)} pkt/d",
+                "<= 9.1%, nachylenie <= 0.01", lud_end <= 9.1 and (slope is None or slope <= 0.01))
+        rep.add("NE3-8: korony na koniec >= 19.9% (baza 19.7%, ekon2 18.3%)", f"d{days[0]} {W[days[0]]['korony_pct']:.2f}% -> koniec {kor_end:.2f}%"
+                + (f"; doba 30 {W[days[min(29, nd - 1)]]['korony_pct']:.2f}%, doba 60 {W[days[min(59, nd - 1)]]['korony_pct']:.2f}%" if nd > 30 else ""), ">= 19.9%", kor_end >= 19.9)
+        rep.add("NE3-9: lordowie (glowy rodow, pozostali, gracz) 35.0-37.5% przez cale okno", f"min {min(lor_all):.2f}%, max {max(lor_all):.2f}%, koniec {_n3e_mean([W[x]['lordowie_pct'] for x in last10]):.2f}%",
+                "35.0-37.5%", min(lor_all) >= 35.0 and max(lor_all) <= 37.5)
+        endw = W[days[-1]]
+        if BWd:
+            bd = sorted(BWd)
+            be = BWd[bd[-1]] if bd else None
+            over = []
+            parts = []
+            for k, nm in (("sakiewki", "sakiewki ludzi"), ("karawany", "karawany"), ("kasy_miast", "kasy miast"), ("notable", "notable"), ("bank", "Bank")):
+                v, b0 = endw[k + "_pct"], be[k + "_pct"] if be else None
+                parts.append(f"{nm} {v:.2f}% (baza {b0:.2f}%)" if b0 is not None else f"{nm} {v:.2f}%")
+                if b0 is not None and v > b0 + 0.3:
+                    over.append(nm)
+            rep.add("NE3-9b: inne skrzynie na koniec nie wyzej niz baza + 0.3 pkt (sakiewki ludzi, karawany, kasy miast, notable, Bank)", "; ".join(parts), "kazda <= baza + 0.3", not over)
+        else:
+            rep.add("NE3-9b: inne skrzynie na koniec (INFO bez --baza-doby)", "; ".join(f"{nm} {endw[k + '_pct']:.2f}%" for k, nm in (("sakiewki", "sakiewki ludzi"), ("karawany", "karawany"),
+                    ("kasy_miast", "kasy miast"), ("notable", "notable"), ("bank", "Bank"))), "INFO (podaj --baza-doby <log bazy>)", None)
+    lent = {}
+    for x, s in D["loan"].items():
+        a = N3E_L_LENT.search(s)
+        if a:
+            lent[x] = int(a.group(2))
+    if lent:
+        lm = _n3e_mean([lent[x] for x in tail(lent, 30)])
+        rep.add("NE3-9c: kredyt korony 186 'pozyczono dzis' srednio 30 dob <= 15 tys./d (baza 14.8 tys., ekon2 ok. 3.1 tys.)", f"{lm:.0f} zl/d", "<= 15000", lm <= 15000)
+    # ---- NE3-10 straznik
+    if D["guard"]:
+        bands, mults, fuses, nofuse = {}, {}, 0, {}
+        for x, s in D["guard"].items():
+            a = N3E_G_BAND.search(s)
+            if a:
+                bands[x] = (float(a.group(2)), float(a.group(3)))
+            m = N3E_G_MULT.search(s)
+            if m:
+                mults[x] = float(m.group(1))
+            f = N3E_G_FUSE.search(s)
+            if f and f.group(1) == "tak":
+                fuses += 1
+            q = N3E_G_NOFUSE.search(s)
+            if q:
+                nofuse[x] = float(q.group(1))
+        over = [x for x, v in bands.items() if v[0] > v[1] + 0.05]
+        mk = sorted(mults)
+        m_end = mults[mk[-1]] if mk else None
+        nk = sorted(nofuse)
+        n_end = nofuse[nk[-1]] if nk else m_end
+        core = bool(bands) and not over and n_end is not None and n_end <= 3.7
+        # poprawki (uwaga recenzji 2): bezpiecznik to podatek awaryjny - TAK tylko bez niego; 1-20 dob = DECYZJA (kryterium 3 spelnione podatkiem, nie obrotem)
+        rep.add("NE3-10: do pasma <= 6.4% swiata kazdej doby, mnoznik bez bezpiecznika na koniec <= 3.7 (baza 3.694), bezpiecznik 'tak' 0 dob (1-20 = DECYZJA: zwrot od ludu podatkiem, nie obrotem)",
+                f"dob z liczba pasma {len(bands)}, ponad kap {len(over)}; mnoznik d{mk[0] if mk else '-'} {mults[mk[0]] if mk else '-'} -> d{mk[-1] if mk else '-'} {m_end}, bez bezpiecznika {n_end}; bezpiecznik tak {fuses} dob"
+                + (" - kryterium 3 spelnione podatkiem, nie obrotem" if fuses > 0 else ""),
+                "0 / <= 3.7 / 0 (1-20 DECYZJA)", core and fuses == 0, decide=core and 0 < fuses <= 20)
+    else:
+        rep.add("NE3-10: straznik", "brak linii", "INFO", None)
+    # ---- NE3-11 pompy
+    pB, pF, pFl, pC = {}, {}, {}, {}
+    for x, s in D["pumps"].items():
+        a = N3E_P_B.search(s)
+        if a:
+            pB[x] = int(a.group(1))
+        c = N3E_P_C.search(s)
+        if c:
+            pC[x] = int(c.group(1))
+        f = N3E_P_F.search(s)
+        if f:
+            pF[x] = int(f.group(1)); pFl[x] = int(f.group(2))
+    if pB:
+        b30 = _n3e_mean([pB[x] for x in tail(pB, 30)])
+        base_b = None
+        if B and B["pumps"]:
+            bb = {x: num(N3E_P_B.pattern, s, int, None) for x, s in B["pumps"].items()}
+            bb = {x: v for x, v in bb.items() if v is not None}
+            base_b = _n3e_mean([bb[x] for x in sorted(bb)[-30:]]) if bb else None
+        f30 = _n3e_mean([pF[x] for x in tail(pF, 30)]) if pF else None
+        lim_b = 0.97 * base_b if base_b else 400000
+        rep.add("NE3-11: Pompy B (podatki od oszczednosci) srednio 30 dob <= 0.97 x baza z tego samego okna (bez bazy 400 tys./d; baza 410-415 tys., ekon2 376 tys.); F naturalne z obrotu >= 40 tys./d",
+                (f"B {b30:.0f}" + (f" (baza {base_b:.0f})" if base_b else "") + f"; F {f30:.0f}") if f30 is not None else f"B {b30:.0f}; F brak",
+                f"B <= {lim_b:.0f}, F >= 40000", b30 <= lim_b and f30 is not None and f30 >= 40000)
+        if pFl:
+            fl30 = _n3e_mean([pFl[x] for x in tail(pFl, 30)])
+            share = fl30 / (fl30 + b30) * 100 if (fl30 + b30) > 0 else 0
+            rep.add("NE3-11b: F z ludu i wsi (czynsz gruntowy, danina markietanow, myto wozow) srednio 30 dob >= 35 tys./d; udzial w zwrocie od ludu F-lud / (B + F-lud) - INFO",
+                    f"F-lud {fl30:.0f} zl/d, udzial {share:.1f}% (zwrot od ludu dalej glownie z podatku - zapisane w CHANGELOG)", ">= 35000 (udzial INFO)", fl30 >= 35000)
+            # poprawki (uwaga recenzji 2): zwrot od ludu ma isc coraz bardziej z obrotu - F z ludu na koniec nie mniej niz w dobie 30
+            fk = sorted(pFl)
+            f_d30 = [pFl[x] for x in fk if fk[0] + 25 <= x <= fk[0] + 35]
+            if f_d30 and len(fk) >= 45:
+                a30, a_end = _n3e_mean(f_d30), _n3e_mean([pFl[x] for x in fk[-10:]])
+                rep.add("NE3-11c: F z ludu i wsi rosnie miedzy doba 30 a koncem (srednia dob 25-35 wobec ostatnich 10)", f"doba 30 {a30:.0f}, koniec {a_end:.0f} zl/d", "koniec >= doba 30", a_end >= a30)
+            else:
+                rep.add("NE3-11c: F z ludu i wsi rosnie miedzy doba 30 a koncem", f"dob {len(fk)}", "INFO (okno < 45 dob)", None)
+    # ---- NE3-12 korona: G5 i zwrot zoldu
+    g5on, g5kept = False, 0
+    for x, s in D["crown"].items():
+        a = N3E_C_G5.search(s)
+        if a:
+            g5on = g5on or a.group(1) == "tak"
+            g5kept += int(a.group(2))
+
+    def _refbad(cr):
+        bad, n = [], 0
+        for x, s in cr.items():
+            r = N3E_C_REF.search(s)
+            if r and int(r.group(2)) > 0:
+                n += 1
+                if int(r.group(1)) < int(r.group(2)):
+                    bad.append(x)
+        return bad, n
+
+    refbad, refN = _refbad(D["crown"])
+    brb = len(_refbad(B["crown"])[0]) if B and B["crown"] else None
+    rep.add("NE3-12: E3-G5 korona trzyma czesc zaworu w zapasie (dzwignia awaryjna, domyslnie wylaczona)", f"klucz {'tak' if g5on else 'nie'}, zatrzymane razem {g5kept}",
+            "INFO (wlaczyc tylko, gdy korony w dobie 60 < 20.4%)", None)
+    rep.add("NE3-12b: zwrot zoldu wyplacony w 100% kazdej doby z naleznym > 0 (z baza: nie wiecej dob ponizej 100% niz w bazie)", f"dob {refN}, ponizej 100% {len(refbad)}"
+            + (f" (np. d{refbad[0]})" if refbad else "") + (f"; baza {brb}" if brb is not None else ""), "0 (z baza: <= baza)",
+            ((len(refbad) <= brb) if brb is not None else not refbad) if refN else None)
+    # ---- NE3-13 myto
+    if D["toll"]:
+        on = [x for x, s in D["toll"].items() if " | CZYNNE | " in s]
+        zero = []
+        carts, cars, pl = [], [], 0
+        for x in on:
+            s = D["toll"][x]
+            a, b = N3E_T_CART.search(s), N3E_T_CAR.search(s)
+            ct = int(a.group(3)) if a else 0
+            kt = int(b.group(3)) if b else 0
+            carts.append(ct); cars.append(kt)
+            if ct + kt <= 0:
+                zero.append(x)
+            p = N3E_T_PL.search(s)
+            if p:
+                pl += int(p.group(2))
+        cm = _n3e_mean(carts[-30:]) if carts else 0
+        km = _n3e_mean(cars[-30:]) if cars else 0
+        rep.add("NE3-13: myto > 0 kazdej doby, wozy wsi 6-14 tys./d (srednia 30 dob); rod gracza placi jak wszyscy (INFO)",
+                f"dob czynnych {len(on)}, z myto 0 {len(zero)}; wozy {cm:.0f} zl/d, karawany {km:.0f} zl/d; rod gracza razem {pl}",
+                "0 dob bez myta, wozy 6000-14000", bool(on) and not zero and 6000 <= cm <= 14000)
+    else:
+        rep.add("NE3-13: myto targowe", "brak linii", "INFO (log bez paczki)", None)
+    # ---- NE3-14 T1
+    if D["t1"]:
+        on = [x for x, s in D["t1"].items() if " | CZYNNE | " in s]
+        sold0 = []
+        pro, loss, gross, toll, inc = [], [], [], [], []
+        for x in sorted(on):
+            s = D["t1"][x]
+            a, b, c = N3E_1_PRO.search(s), N3E_1_LOSS.search(s), N3E_1_GOLD.search(s)
+            pn = int(a.group(1)) if a else 0
+            ln_ = int(b.group(1)) if b else 0
+            pro.append(int(a.group(2)) if a else 0); loss.append(int(b.group(2)) if b else 0)
+            if c:
+                gross.append(int(c.group(1))); toll.append(int(c.group(2))); inc.append(int(c.group(3)))
+            if pn + ln_ <= 0:
+                sold0.append(x)
+        tools = {}
+        for x, s in D["stock"].items():
+            a = N3E_STK_TOOLS.search(s)
+            if a:
+                tools[x] = float(a.group(4))
+        silver = {}
+        for x, s in D["stock"].items():
+            a = N3E_STK_SILVER.search(s)
+            if a:
+                silver[x] = int(a.group(1))
+        t60 = [tools[x] for x in sorted(tools)[59:]] if len(tools) > 60 else []
+        sk = sorted(silver)
+        sl = _n3e_slope([(x, silver[x]) for x in sk[-30:]]) if sk else None
+        rep.add("NE3-14: T1 sprzedaz > 0 kazdej doby; narzedzia w jukach < 50% swiata od doby 60 (ekon2 88.8%); srebro w jukach nie rosnie (nachylenie 30 dob <= 0)",
+                f"dob czynnych {len(on)}, bez sprzedazy {len(sold0)}; z zyskiem srednio {(_n3e_mean(pro) or 0):.0f} zl/d, na stracie {(_n3e_mean(loss) or 0):.0f} zl/d; "
+                f"narzedzia w jukach od d60 max {max(t60) if t60 else '-'}% (koniec {tools[sorted(tools)[-1]] if tools else '-'}%); srebro nachylenie {sl if sl is None else round(sl, 1)} szt./d",
+                "0 / < 50% / <= 0", bool(on) and not sold0 and (bool(t60) and max(t60) < 50) and (sl is not None and sl <= 0))
+        car = {x: W[x]["karawany"] for x in days}
+        cs = _n3e_slope([(x, car[x]) for x in days[-30:]]) if nd > 1 else None
+        cm30 = _n3e_mean([pC[x] for x in tail(pC, 30)]) if pC else None
+        base_c = None
+        if B and B["pumps"]:
+            bc = {x: num(N3E_P_C.pattern, s, int, None) for x, s in B["pumps"].items()}
+            bc = {x: v for x, v in bc.items() if v is not None}
+            base_c = _n3e_mean([bc[x] for x in sorted(bc)[-30:]]) if bc else None
+        floor_c = 0.95 * base_c if base_c else 346000
+        rep.add("NE3-14b: kiesy karawan ('Pieniadz swiata') nie rosna szybciej niz +10 tys./d (30 dob); zawor miast (Pompy C) >= 95% bazy (bez bazy 346 tys.)",
+                f"karawany nachylenie {cs if cs is None else round(cs)} zl/d; zawor miast {cm30 if cm30 is None else round(cm30)} (prog {floor_c:.0f}); z kas do karawan T1 srednio {(_n3e_mean(gross) or 0):.0f}, myto T1 {(_n3e_mean(toll) or 0):.0f}",
+                "<= 10000 / >= prog", (cs is not None and cs <= 10000) and (cm30 is not None and cm30 >= floor_c))
+        # NE3-14c (uwaga recenzji 2: myto karawan i cienka marza) - kiesy karawan na koniec nie nizsze niz w bazie o wiecej niz 5%
+        if BWd and nd:
+            be2 = BWd[sorted(BWd)[-1]]
+            ce, cb = W[days[-1]]["karawany"], be2["karawany"]
+            rep.add("NE3-14c: kiesy karawan na koniec nie nizsze niz w bazie o wiecej niz 5% (myto 2% i T1 nie topia kapitalu karawan)",
+                    f"{ce} wobec bazy {cb} ({(ce / cb - 1) * 100 if cb else 0:+.1f}%)", ">= -5%", cb <= 0 or ce >= 0.95 * cb)
+        else:
+            rep.add("NE3-14c: kiesy karawan wobec bazy", f"koniec {W[days[-1]]['karawany'] if nd else '-'}", "INFO (podaj --baza-doby <log bazy>)", None)
+        # NE3-14d (poprawki, uwaga recenzji 2): "pelne juki" to brak wyjscia tylko ponad udzwig - rzadki powod sprzedazy na stracie
+        full_n, all_n, reb_n, snap1 = 0, 0, 0, None
+        for x in sorted(D["t1"]):
+            s = D["t1"][x]
+            a, b, c, e = N3E_1_FULL.search(s), N3E_1_PRO.search(s), N3E_1_LOSS.search(s), N3E_1_REB.search(s)
+            full_n += int(a.group(1)) if a else 0
+            all_n += (int(b.group(1)) if b else 0) + (int(c.group(1)) if c else 0)
+            reb_n += int(e.group(1)) if e else 0
+            if snap1 is None:
+                snap1 = N3E_1_SNAP.search(s)
+        sh = full_n / all_n * 100 if all_n > 0 else 0
+        rep.add("NE3-14d: T1 na stracie z powodu 'pelne juki' (ponad udzwig) <= 10% sztuk sprzedanych przez T1; odkupione przez inne karawany i migawka ksiegi przy wczytaniu - INFO",
+                f"pelne juki {full_n} z {all_n} szt. ({sh:.1f}%); odkupione przez inne karawany {reb_n} szt.; migawka "
+                + (f"{snap1.group(1)} szt. (cena z dziennika BK {snap1.group(2)}, ze sredniej {snap1.group(3)}; dziennik {snap1.group(4)})" if snap1 else "-"),
+                "<= 10%", (sh <= 10) if all_n > 0 else None)
+    else:
+        rep.add("NE3-14: T1", "brak linii", "INFO (log bez paczki)", None)
+    # ---- NE3-15 nie do wydania
+    ndd = {x: _n3e_nd(s) for x, s in D["price"].items()}
+    ndd = {x: v for x, v in ndd.items() if v > 0}
+    if ndd:
+        ks = sorted(ndd)
+        end = _n3e_mean([ndd[x] for x in ks[-10:]])
+        mid = [ndd[x] for x in ks if ks[0] + 29 <= x <= ks[0] + 59]
+        base_nd = None
+        if B and B["price"]:
+            bnd = {x: _n3e_nd(s) for x, s in B["price"].items()}
+            bk = sorted(x for x in bnd if bnd[x] > 0)
+            base_nd = _n3e_mean([bnd[x] for x in bk[-10:]]) if bk else None
+        rep.add("NE3-15: 'nie do wydania' mieszczan (suma kategorii 'Ceny surowcow') koniec <= 98 tys. d/d (c1; ekon2 108 124, baza 115 131); doby 30-60 - INFO",
+                f"koniec {end:.0f}" + (f", doby 30-60 srednio {_n3e_mean(mid):.0f}" if mid else "") + (f", baza {base_nd:.0f}" if base_nd else ""), "<= 98000", end <= 98000)
+    # ---- NE3-16 koszyk wsi
+    vb = {}
+    for x, s in D["folk"].items():
+        a, n, w1, n2 = N3E_F_VIL.search(s), N3E_F_NOG.search(s), N3E_F_W1.search(s), N3E_F_NOG2.search(s)
+        if a:
+            vb[x] = (int(a.group(2)), int(a.group(3)), int(n.group(1)) if n else None, int(w1.group(3)) if w1 else 0, int(n2.group(1)) if n2 else None)
+    if vb:
+        ks = sorted(vb)[-10:]
+        buy = sum(vb[x][0] + vb[x][3] for x in ks)
+        need = sum(vb[x][1] for x in ks)
+        nog_mk = _n3e_mean([vb[x][2] for x in ks if vb[x][2] is not None])
+        nog_w1 = _n3e_mean([vb[x][4] for x in ks if vb[x][4] is not None])
+        nog = nog_w1 if nog_w1 is not None else nog_mk          # poprawki (uwaga recenzji 1): wies obsluzona wozem W1 nie jest "bez towaru"
+        w1 = sum(vb[x][3] for x in vb)
+        real = buy / need * 100 if need > 0 else 0
+        rep.add("NE3-16: koszyk wsi (koszyk dnia + W1) / potrzeba na koniec >= 15% (ekon2 10.0%), wsi bez towaru po W1 <= 420 (ekon2 486 w miescie targowym), zakupy W1 > 0",
+                f"realizacja {real:.1f}%, wsi bez towaru po W1 {nog_w1 if nog_w1 is None else round(nog_w1)} (w miescie targowym {nog_mk if nog_mk is None else round(nog_mk)}), W1 razem {w1} zl",
+                ">= 15% / <= 420 / > 0", real >= 15 and nog is not None and nog <= 420 and w1 > 0)
+    _n3e_part2(rep, logp, bdp, D, W, days)   # czesc 2: NE3-0b, NE3-1c, NE3-4, NE3-15c2, NE3-16c2, NE3-17..24
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -30388,6 +31728,10 @@ def main(argv):
         return nmisje_main(logp)   # NM (noc 15/16.10): druzyny w misji (Team.Invalid pominiety, potkniecia liczone), ucieczka rannych tylko w bitwie na mapie
     if group == "nwyd" and (logp or csp):
         return nwyd_main(logp, csp)   # nwyd (noc 16.10, w-toku/noc-wydajnosc): ciche logi, swaty leniwe, audyt CS co 7 dob, spalona ziemia, siatka zagrozen, LegendaryLaw, pisarz CS
+    if group == "nekon2" and logp:
+        return nekon2_main(logp)   # noc-ekonomia2 (16.10): jaja wsi rolniczych (BK), budzet kategorii bez producenta na zbytki, wlokno do miasta targowego, opal mieszczan
+    if group == "nekon3" and logp:
+        return nekon3_main(logp, bdp)   # noc-ekonomia3 (16.10, czesc 1): straznik z kapem, myto, czynsz gruntowy, danina markietanow, karawany tam, gdzie zysk, woz wsi z towarem
     if group == "nzlec" and logp:
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
     if group != "etap2" or not logp:

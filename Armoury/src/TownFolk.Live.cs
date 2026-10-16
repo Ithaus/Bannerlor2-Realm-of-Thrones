@@ -94,6 +94,8 @@ namespace Armoury
             // Towary 2 / K2 (VillageClothAboveReserve): plotno w koszyku dnia wsi - wiersze zatrzymane progiem polki, budzet plotna niewydany przez prog (zostaje w kiesach wsi),
             // kupione sztuki plotna, suma progu i liczba wierszy plotna (srednia progu)
             public long VClHeld, VClKept, VClPcs, VClCap, VClRows;
+            // E3-W1b (VillageClothHalfReserve): wiersze plotna z progiem polki obnizonym do polowy (plotno tanie w tym miescie); E3-G4: czynsz gruntowy do panow miast
+            public long VClHalf, GroundRent;
             public long Seed, Orphan;
             // dziesiecina (E5/C3, TownFolk.Tithe.cs): wsie (nalezne / zaplacone), lud miast W/R/P, jalmuzna miast / wsi, place i material septow, bez kaplana, bez miasta targowego
             public long TiVDue, TiV, TiW, TiR, TiP, TiAlmsT, TiAlmsV, TiWage, TiMat, TiNoPriestT, TiNoPriestV, TiNoMarket; public int TiPriestN, TiNoPriestN, TiVN;
@@ -108,8 +110,24 @@ namespace Armoury
         // zapasy startowe (linia jednorazowa)
         private static long _sW, _sR, _sP, _sC, _sV, _sGift; private static int _sTowns, _sCastles, _sVills, _sShort, _sNoBk;
 
+        // ---- E3-W1 (VillageCartBringsGoods): zaleglosc koszyka wsi (potrzeba dnia niekupiona w miescie targowym, najwyzej W1Days dni potrzeby) - pamiec sesji;
+        // zakup przez woz tej wsi w chwili sprzedazy plonu w innym miescie albo zamku (MarketCarts.SellPostfix -> CartBuys); liczniki od ostatniej linii doby
+        private const double W1Days = 7.0;
+        private static readonly Dictionary<Village, double> _w1Owed = new Dictionary<Village, double>();
+        private static readonly LDay _w1d = new LDay();
+        private static readonly HashSet<Village> _w1Vills = new HashSet<Village>();
+        private static int _w1N, _w1Tries, _w1NoGoods, _w1NoGold, _w1NoOwed, _w1Stumbles;
+        private static long _w1Gold, _w1Pcs;
+        private static bool W1On { get { var s = Settings.Current; return s != null && s.VillageCartBringsGoods; } }
+        private static void W1Zero() { _w1N = _w1Tries = _w1NoGoods = _w1NoGold = _w1NoOwed = _w1Stumbles = 0; _w1Gold = _w1Pcs = 0; _w1Vills.Clear(); }
+        // poprawki noc-ekonomia3 (uwaga recenzji 1, NE3-16): wsie "bez towaru" w miescie targowym przy ostatnim koszyku dnia i te z nich, ktore potem kupily wozem (W1);
+        // obrot zbiorow na poczatku Villages (raz na dobe) - linia doby podaje "wsi bez towaru po W1" z poprzedniego koszyka i wozow od niego
+        private static readonly HashSet<Village> _w1NgCur = new HashSet<Village>(), _w1Served = new HashSet<Village>();
+        private static int _w1NgLastN = -1, _w1ServedLastN; private static bool _w1NgRan;
+
         private static void ResetLive()
         {
+            _w1Owed.Clear(); W1Zero(); _w1NgCur.Clear(); _w1Served.Clear(); _w1NgLastN = -1; _w1ServedLastN = 0; _w1NgRan = false;                                 // E3-W1: zaleglosci koszyka wsi i liczniki - sesja
             _seedT = _seedC = 0; _pending = null; _orphan = 0; _stateKey = null;
             _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear();
             _better = null; _villCats = null; _betterText = _villText = "-"; _villBy = null;
@@ -886,7 +904,16 @@ namespace Armoury
             catch (Exception e) { N4Stumbles++; Stumble("TownLive(N4)", e); }
             // ---- 3. wewnatrz ludu z wczorajszych zakupow: czynsz W 8% / R 13% wydatku (x 1/keep) -> P (plan pkt 0.14), leczenie -> R, sluzba P -> W
             double spW = f.PaidG[0] / KeepW, spR = f.PaidG[1] / KeepR, spP = f.PaidG[2] / KeepP;
-            d.Rent += Move(f, 0, 2, (long)Math.Round(RentW * spW)) + Move(f, 1, 2, (long)Math.Round(RentR * spR));
+            long rentW = (long)Math.Round(RentW * spW), rentR = (long)Math.Round(RentR * spR);
+            // E3-G4 (TownGroundRent): 1/3 czynszu W i R do pana miasta (PayLord: oblezenie - zostaje w kiesie, bez zywego pana - do gminy, RentToday - dochod ziemi D),
+            // 2/3 do P jak dotad. Klucz wylaczony - caly czynsz do P, co do monety jak dotad
+            if (GroundRentOn)
+            {
+                long gw = rentW / 3, gr = rentR / 3;
+                d.GroundRent += PayLord(f, 0, gw, d) + PayLord(f, 1, gr, d);
+                rentW -= gw; rentR -= gr;
+            }
+            d.Rent += Move(f, 0, 2, rentW) + Move(f, 1, 2, rentR);
             d.Heal += Move(f, 0, 1, (long)Math.Round(HlW * spW)) + Move(f, 2, 1, (long)Math.Round(HlP * spP));
             d.Serv += Move(f, 2, 0, (long)Math.Round(ServP * spP));
             Array.Clear(f.PaidG, 0, 3);
@@ -1043,9 +1070,17 @@ namespace Armoury
             return Math.Max(0, f.HW + f.HR) * (scaled ? Scale(f) : 1.0);
         }
 
+        private static bool GroundRentOn { get { var s = Settings.Current; return s != null && s.TownGroundRent; } }
+
+        /// <summary>E3-G4: czynsz gruntowy tej doby do panow miast (Pompy F; -1 - doba nieliczona albo klucz wylaczony).</summary>
+        internal static long LastGroundRent { get { var d = _ld; return d != null && GroundRentOn && _liveDay == (int)CampaignTime.Now.ToDays - 1 ? d.GroundRent : -1; } }
+
         private static void Villages(LDay d)
         {
             var s = Settings.Current;
+            // NE3-16 (poprawki): wczorajsze "bez towaru" i ile z nich kupilo potem wozem - do linii; dzis zbior od nowa
+            if (_w1NgRan) { _w1NgLastN = _w1NgCur.Count; _w1ServedLastN = _w1Served.Count; }
+            _w1NgRan = true; _w1NgCur.Clear(); _w1Served.Clear();
             double pph = Math.Max(0f, Math.Min(1f, s.VillagePurchasePerHead));
             if (_villCats == null) _villCats = CatsOf(VillIds, out _villText);
             var shelf = new Dictionary<Settlement, List<EquipmentElement>>();
@@ -1076,8 +1111,16 @@ namespace Armoury
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
                     long spent = BuyGoods(vil, mk, list, want - wx, d, wx);
                     f.DVBuy = Math.Max(0, spent);                      // E5/C4
+                    // E3-W1: potrzeba dnia niekupiona w miescie targowym czeka na woz tej wsi w innym miescie (najwyzej W1Days dni potrzeby; PRZED "wsi bez towaru")
+                    if (W1On)
+                    {
+                        double un = Math.Max(0, buy1 - Math.Max(0, spent)), ow;
+                        _w1Owed.TryGetValue(vil, out ow);
+                        ow = Math.Min(W1Days * nv, ow + un);
+                        if (ow >= 1) _w1Owed[vil] = ow; else _w1Owed.Remove(vil);
+                    }
                     VillageLadder(f, vil, mk, gold, buy1, nv);         // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian)
-                    if (spent <= 0) { d.VNoGoods++; continue; }
+                    if (spent <= 0) { d.VNoGoods++; _w1NgCur.Add(vil); continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
                 catch (Exception e) { f.ADay = -1; Stumble("Villages(wies)", e); }   // E5/C4: liczby wsi z tej doby niepewne - okno bez liczby
@@ -1104,6 +1147,67 @@ namespace Armoury
         /// <summary>Towary 2 / K2 (docs/towary-2/ROZPOZNANIE-TOWARY-2.md A2-1, klucz VillageClothAboveReserve): koszyk dnia wsi bierze plotno tylko ponad prog polki miasta
         /// targowego (MaterialOrders.ShelfReserve - ten sam prog co FolkClothAboveReserve dla zbytkow ludu, podzamczy i wsi P5). Wylaczony - 5 sztuk jak dotad.</summary>
         private static bool VillClothOn { get { var s = Settings.Current; return s != null && s.VillageClothAboveReserve; } }
+        private static bool ClothHalfOn { get { var s = Settings.Current; return s != null && s.VillageClothAboveReserve && s.VillageClothHalfReserve; } }
+
+        /// <summary>
+        /// E3-W1 (VillageCartBringsGoods; uwaga recenzji 1: zakup w chwili, gdy woz jest w miescie, bez okna "21 dob po wizycie"): woz wsi sprzedal plon w miescie
+        /// albo zamku innym niz miasto targowe wsi - wies kupuje tam z polki koszyk wsi (sol, narzedzia, len i plotno, garnki, piwo - ta sama lista, progi ShelfKeep
+        /// i K2) za zaleglosc koszyka (potrzeba dni niekupiona w miescie targowym, najwyzej 7 dni potrzeby), najwyzej do stanu kiesy. Kiesa wsi -> kasa tej osady
+        /// (BuyGoods), towar zuzyty we wsi (ramka ksiegi towarow "zakupy wsi w miastach"); podstawa robocizny targu tej osady (VillWin) jak przy koszyku dnia.
+        /// Wyjatek - licznik potkniec (sprzedaz wozu zostaje).
+        /// </summary>
+        internal static void CartBuys(Settlement st, TaleWorlds.CampaignSystem.Party.MobileParty cart)
+        {
+            if (st == null || cart == null || !cart.IsVillager) return;
+            try
+            {
+                if (!W1On || !Live || _villCats == null || st.Town == null || st.ItemRoster == null) return;
+                var hs = cart.HomeSettlement;
+                var vil = hs != null ? hs.Village : null;
+                if (vil == null) return;
+                var mk = vil.TradeBound ?? vil.Bound;
+                if (ReferenceEquals(mk, st)) return;                  // miasto targowe - koszyk dnia kupil tu juz dzis
+                double owed;
+                if (!_w1Owed.TryGetValue(vil, out owed) || owed < 1) { _w1NoOwed++; return; }
+                double budget = Math.Min(owed, Math.Max(0, vil.Gold));
+                _w1Tries++;
+                if (budget < 1) { _w1NoGold++; return; }
+                var list = ShelfOf(st);
+                if (list.Count == 0) { _w1NoGoods++; return; }
+                long p0 = _w1d.VPieces;
+                var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill);
+                long spent;
+                try { spent = BuyGoods(vil, st, list, budget, _w1d); }
+                finally { GoodsLedger.End(gf); }
+                if (spent <= 0) { _w1NoGoods++; return; }
+                // poprawki (uwaga recenzji 1 i 2): kiesa wsi -> kasa osady poza tickiem, w srodku okna sprzedazy wozu - nazwane w "Przeplywy osad (przyczyny)" po obu
+                // stronach (bez tego reszta kas miast TM1 rosla, a kies wsi TW1 spadala o W1) i przeniesione z kanalu "tabory wsi" do "wsie" w "Kasy zaulkow (m6b)"
+                int sp = (int)Math.Min(int.MaxValue, spent);
+                MoneyLedger.Note169(MoneyLedger.N169CartBuy, st, sp);
+                MoneyLedger.Note169(MoneyLedger.N169CartBuy, vil.Settlement, -sp);
+                AlleyProbe.NoteVillageBuy(st.Town, sp);
+                owed -= spent;
+                if (owed >= 1) _w1Owed[vil] = owed; else _w1Owed.Remove(vil);
+                _w1N++; _w1Gold += spent; _w1Pcs += _w1d.VPieces - p0; _w1Vills.Add(vil);
+                if (_w1NgCur.Contains(vil)) _w1Served.Add(vil);           // NE3-16: wies bez towaru w miescie targowym kupila wozem
+                Folk mf; if (_f.TryGetValue(st, out mf)) mf.VillWin += spent;
+            }
+            catch (Exception e) { _w1Stumbles++; Stumble("CartBuys", e); }
+        }
+
+        /// <summary>Dopisek czesci "wsie" linii "Kiesa ludu": E3-W1 od ostatniej linii (liczniki zerowane) i E3-W1b.</summary>
+        private static string W1Note(LDay d)
+        {
+            double owedSum = 0; foreach (var v in _w1Owed.Values) owedSum += v;
+            string t = ", woz kupuje w miescie sprzedazy (E3-W1) " + (W1On ? "tak" : "nie") + ": zakupow " + _w1N + " za " + _w1Gold + " zl, sztuk " + _w1Pcs + ", wsi " + _w1Vills.Count
+                       + " (proby " + _w1Tries + ", bez towaru " + _w1NoGoods + ", bez kiesy " + _w1NoGold + ", bez zaleglosci " + _w1NoOwed + ", potkniecia " + _w1Stumbles + "), zaleglosc koszyka wsi "
+                       + N0(owedSum) + " zl u " + _w1Owed.Count + " wsi (najwyzej " + W1Days.ToString("0", Inv) + " dni potrzeby)"
+                       + ", plotno od polowy progu tam, gdzie tanie (E3-W1b) " + (ClothHalfOn ? "tak" : "nie") + ": wierszy " + d.VClHalf
+                       + ", wsi bez towaru po W1 " + (_w1NgLastN >= 0 ? (Math.Max(0, _w1NgLastN - _w1ServedLastN)).ToString(Inv) : "-")
+                       + " (poprzedni koszyk dnia: bez towaru " + (_w1NgLastN >= 0 ? _w1NgLastN.ToString(Inv) : "-") + ", z nich kupily potem wozem " + _w1ServedLastN + ")";
+            W1Zero();
+            return t;
+        }
 
         /// <summary>Zakup wsi w miescie targowym: budzet po rowno na kategorie obecne, cena targu, najwyzej sztuki ponad 5; najpierw zloto (wies -> kasa), potem towar z polki.
         /// K2 (VillageClothAboveReserve): plotno najwyzej ponad prog polki miasta (MaterialOrders.ShelfReserve); podzial budzetu na kategorie bez zmian (plotno na polce ponad 5
@@ -1130,7 +1234,14 @@ namespace Armoury
                     int ix = roster.FindIndexOfElement(e);
                     if (ix < 0) continue;
                     int keepRow = ShelfKeep;
-                    if (cloth) { int r = MaterialOrders.ShelfReserve(town, e.Item); if (r > ShelfKeep) keepRow = r; d.VClCap += keepRow; d.VClRows++; }
+                    if (cloth)
+                    {
+                        int r = MaterialOrders.ShelfReserve(town, e.Item);
+                        // E3-W1b (VillageClothHalfReserve): plotno tanie w tym miescie (indeks < 1 - lezy) - prog od polowy zapasu wojska (odziez 150 i zbrojownie maja polowe)
+                        if (ClothHalfOn && r > ShelfKeep && town.GetItemCategoryPriceIndex(c) < 1f) { r = Math.Max(ShelfKeep, r / 2); d.VClHalf++; }
+                        if (r > ShelfKeep) keepRow = r;
+                        d.VClCap += keepRow; d.VClRows++;
+                    }
                     int have = roster.GetElementNumber(ix) - keepRow;
                     if (have <= 0) { if (keepRow > ShelfKeep && roster.GetElementNumber(ix) > ShelfKeep) { d.VClHeld++; held = true; } continue; }
                     int price = town.MarketData.GetPrice(e);
@@ -1562,7 +1673,7 @@ namespace Armoury
               .Append(", budowy ").Append(w.Earn[KBuildLabour]).Append(", kopalnie ").Append(w.Earn[KMine]).Append(", place warsztatow ").Append(w.Earn[KCraftPaid]).Append(" (z kiesy gracza ").Append(w.FromTown).Append(")")
               .Append(", 5% zaworu ").Append(w.ValveT).Append(", w tym praca niewolnych do wlascicieli ").Append(w.SlaveW)
               .Append("; dzis z kas: robocizna ").Append(d.LabT).Append(SkupText(d.LabS, d.Skup)).Append(", obrot P ").Append(d.TurnT).Append(", doplata do 35% ").Append(d.TopT).Append(" (miast przycietych do stanu kasy ").Append(d.Cut).Append(")")
-              .Append(" | wewnatrz ludu: czynsz ").Append(d.Rent).Append(", leczenie ").Append(d.Heal).Append(", sluzba ").Append(d.Serv).Append(", place z nadwyzki R/P ").Append(d.SurpWage)
+              .Append(" | wewnatrz ludu: czynsz ").Append(d.Rent).Append(" (czynsz gruntowy do panow miast E3-G4 ").Append(GroundRentOn ? d.GroundRent.ToString(Inv) : "wylaczony").Append(')').Append(", leczenie ").Append(d.Heal).Append(", sluzba ").Append(d.Serv).Append(", place z nadwyzki R/P ").Append(d.SurpWage)
               .Append(", roboty gminy (place) ").Append(d.GmWage).Append(WorksRoute ? " (P2: place robot gminy w linii Roboty ludu)" : "")
               .Append(" | podatki panu: W ").Append(d.TaxW).Append(" / R ").Append(d.TaxR).Append(" / P ").Append(d.TaxP).Append(", cech ").Append(d.Guild).Append(", farma gmin ").Append(d.Farm)
               .Append(", wstrzymane w oblezeniu ").Append(d.Held).Append(", bez zywego pana (do gminy) ").Append(d.NoLord)
@@ -1585,6 +1696,7 @@ namespace Armoury
               .Append(", plotno wsi ponad zapas polki (VillageClothAboveReserve) ").Append(VillClothOn ? "tak" : "nie").Append(": wierszy zatrzymanych progiem ").Append(d.VClHeld)
               .Append(", zostalo w kiesach wsi ").Append(d.VClKept).Append(" zl, kupione plotno ").Append(d.VClPcs).Append(" szt. (prog polki srednio ")
               .Append(d.VClRows > 0 ? ((double)d.VClCap / d.VClRows).ToString("0.0", Inv) : "-").Append(" szt.)")
+              .Append(W1Note(d))
               .Append(" | zapasy z nadwyzki dzis ").Append(d.Seed).Append(d.Orphan > 0 ? ", kiesy osad nieznanych do kasy " + d.Orphan : "")
               // P1: nowy rodzaj wydatku kies (w kontroli nizej siedzi w "wydatki") - danina z oszczednosci do skarbcow krolestw; kiesa ponad zapas dni przed / po daninie
               .Append(" | danina z oszczednosci do korony (P1) ").Append(d.Aid[0] + d.Aid[1] + d.Aid[2] + d.Aid[3]).Append(" (W ").Append(d.Aid[0]).Append(" / R ").Append(d.Aid[1])

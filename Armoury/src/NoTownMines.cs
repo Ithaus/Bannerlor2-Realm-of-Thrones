@@ -74,19 +74,29 @@ namespace Armoury
 
         public static void Postfix(Settlement currentSettlement, bool atGameStart, WorkshopType workshopToExclude, ref WorkshopType __result)
         {
-            if (!On) return;
-            try
+            if (currentSettlement == null || !currentSettlement.IsTown || currentSettlement.Town == null) return;
+            if (On)
             {
-                if (currentSettlement == null || !currentSettlement.IsTown || currentSettlement.Town == null) return;
-                _picks++;
-                if (__result == null || __result.StringId != MinesId) return;
-                var best = Best(currentSettlement.Town, workshopToExclude, __result);
-                if (best == null) { _kept++; return; }
-                if (_samples.Count < 6) _samples.Add((currentSettlement.Name != null ? currentSettlement.Name.ToString() : currentSettlement.StringId) + " -> " + best.StringId + (atGameStart ? " (start gry)" : ""));
-                __result = best;
-                _swaps++;
+                try
+                {
+                    _picks++;
+                    if (__result != null && __result.StringId == MinesId)
+                    {
+                        var best = Best(currentSettlement.Town, workshopToExclude, __result);
+                        if (best == null) _kept++;
+                        else
+                        {
+                            if (_samples.Count < 6) _samples.Add((currentSettlement.Name != null ? currentSettlement.Name.ToString() : currentSettlement.StringId) + " -> " + best.StringId + (atGameStart ? " (start gry)" : ""));
+                            __result = best;
+                            _swaps++;
+                        }
+                    }
+                }
+                catch (Exception e) { if (++_stumbles <= 1) Log.Error("NoTownMines.Postfix", e); }
             }
-            catch (Exception e) { if (++_stumbles <= 1) Log.Error("NoTownMines.Postfix", e); }
+            // E3-D3 (a) (noc-ekonomia3 czesc 2, klucz WorkshopRetoolByPrice): bankructwo i warsztat odebrany graczowi (atGameStart = false) - typ z cen targu po placach,
+            // gdy zarabia > 1.25 x wybor gry/BK (po podmianie kopalni wyzej); ta sama regula wyboru co dobowe przezbrojenie (BestByPrice, wlasny try i licznik)
+            if (!atGameStart) WorkshopRetool.BankruptStep(currentSettlement.Town, workshopToExclude, ref __result);
         }
 
         /// <summary>Sztuka o srodkowej wartosci kazdej kategorii (raz na sesje; wartosci po cenach historycznych).</summary>
@@ -109,30 +119,67 @@ namespace Armoury
             }
         }
 
-        private static float Price(Town town, ItemCategory c)
+        internal static float Price(Town town, ItemCategory c)
         {
+            BuildSamples();
             ItemObject it;
             if (c == null || !_sample.TryGetValue(c, out it) || it == null) return -1f;
             return town.MarketData.GetPrice(it, null, false, null);
         }
 
         /// <summary>Wynik typu w tym miescie: najlepsza linia z wsadem (wyroby - wsad po cenach targu) x szybkosc; -1e9 - typ bez linii do policzenia.</summary>
-        private static float Score(Town town, WorkshopType t)
+        private static float Score(Town town, WorkshopType t) { return MarketScore(town, t, false); }
+
+        /// <summary>
+        /// Jedna regula wyboru typu z cen targu (N10 kopalnie; E3-D3 przezbrojenie i bankructwo): najlepsza linia z wsadem (wyroby - wsad po cenach targu) x szybkosc.
+        /// net (E3-D3, uwaga recenzji): tylko linie TOWAROWE (kuznia - narzedzia, bez broni i war_horse) i wynik po placach cyklu (WorkshopTrade.CycleLabourAt) -
+        /// ta sama miara dla typu obecnego i nowego. -1e9 - typ bez linii do policzenia.
+        /// </summary>
+        internal static float MarketScore(Town town, WorkshopType t, bool net)
         {
             float best = -1e9f;
-            if (t.Productions == null) return best;
+            if (town == null || t == null || t.Productions == null) return best;
+            BuildSamples();
             foreach (var p in t.Productions)
             {
                 if (p.Inputs == null || p.Inputs.Count == 0 || p.Outputs == null || p.Outputs.Count == 0) continue;   // linia bez wsadu: "z niczego" (WorkshopLaw ja zamyka) - nie liczymy
+                if (net && !WorkshopTrade.IsTradeLine(p)) continue;
                 float v = 0f; bool ok = true;
                 foreach (var o in p.Outputs) { float pr = Price(town, o.Item1); if (pr < 0f) { ok = false; break; } v += pr * o.Item2; }
                 if (!ok) continue;
                 foreach (var i in p.Inputs) { float pr = Price(town, i.Item1); if (pr < 0f) { ok = false; break; } v -= pr * i.Item2; }
                 if (!ok) continue;
+                if (net) v -= WorkshopTrade.CycleLabourAt(town.Settlement, t, p);
                 v *= Math.Max(0.01f, p.ConversionSpeed);
                 if (v > best) best = v;
             }
             return best;
+        }
+
+        /// <summary>
+        /// E3-D3: typ o najlepszym wyniku netto (MarketScore net) w tym miescie sposrod typow, ktorych wsad jest w okregu (dict - WorkshopInputs.InputsNear: wsie,
+        /// polka, kontrakt 174); bez ukrytych, kopalni i typu `exclude`. Kuznia moze byc celem (jedyny wytworca narzedzi). null - zaden typ z wynikiem > 0.
+        /// Poprawki (uwaga recenzji 2): wynik typu juz obecnego w miescie x 0.8 za kazdy taki warsztat (jak dywersyfikacja BK w DecideBestWorkshopType) - miasto nie
+        /// dostaje co 30 dob kolejnego warsztatu tego samego najlepszego typu.
+        /// </summary>
+        private const float DupKeep = 0.8f;
+        internal static WorkshopType BestByPrice(Town town, WorkshopType exclude, IDictionary<ItemCategory, float> dict, out float score)
+        {
+            score = -1e9f;
+            WorkshopType pick = null;
+            if (town == null) return null;
+            foreach (var t in WorkshopType.All)
+            {
+                if (t == null || t.IsHidden || t == exclude || t.StringId == MinesId) continue;
+                if (!WorkshopInputs.NeedsInput(t) || !WorkshopInputs.HasInput(t, dict)) continue;
+                float sc = MarketScore(town, t, true);
+                if (!(sc > 0f)) continue;
+                int dup = 0;
+                if (town.Workshops != null) foreach (var w in town.Workshops) if (w != null && w.WorkshopType == t) dup++;
+                if (dup > 0) sc *= (float)Math.Pow(DupKeep, dup);
+                if (pick == null || sc > score) { pick = t; score = sc; }
+            }
+            return pick;
         }
 
         private static WorkshopType Best(Town town, WorkshopType exclude, WorkshopType mines)

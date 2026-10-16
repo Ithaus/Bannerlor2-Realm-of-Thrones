@@ -583,6 +583,13 @@ namespace Armoury
                         // M3 (BreadForThePoor): chleb dla glodnych osad krolestwa z reszty wplywow dnia - po W5 / M1, PRZED podzialem rent (klucz wylaczony = 0)
                         try { if (TownFolk.BreadCrown(k) > 0) pool = CrownIncome.LeftFor(k); }
                         catch (Exception e) { Stumble("Daily(M3)", e); }
+                        // E3-G5 (CrownKeepsValveShare, domyslnie wylaczony): czesc korony z zaworu miast do zapasu - tylko z puli rent, po W5 / M1 / M3, przed podzialem rent
+                        try { if (CrownIncome.KeepValve(k, pool) > 0) pool = CrownIncome.LeftFor(k); }
+                        catch (Exception e) { Stumble("Daily(G5)", e); }
+                        // E3-P1 (b) (CrownCourtGoods, noc-ekonomia3 czesc 2): dwor krolewski - towar z polki stolicy za CrownCourtShare puli rent, po M3 i G5, przed podzialem rent
+                        // (zwrot zoldu, W5, M1 i zapas nietkniete - biegna wczesniej albo poza pula); czego nie wyda, zostaje w puli
+                        try { if (CourtGoods.Crown(k, pool) > 0) pool = CrownIncome.LeftFor(k); }
+                        catch (Exception e) { Stumble("Daily(P1)", e); }
                         bool pay = pool > 0;
                         if (pay) LastKingdoms++; else LastNoPool += list.Count;
                         bool toServing = pay && s.CrownRentHeldToServing && sumOk > 0 && sumOk < sum - 1e-9;

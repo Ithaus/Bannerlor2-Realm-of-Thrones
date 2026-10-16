@@ -147,7 +147,7 @@ namespace Armoury
                     catch { }
                     Log.Info("Dozbrajanie: dzien " + _dStamp + " - gracz " + _dPlayerN + "/" + _dPlayerGold + ", lordowie " + _dLordN + "/" + _dLordGold
                              + ", zalogi " + _dGarN + "/" + _dGarGold + " (szt./zloto; zamki czekaja na woz z dozbrajaniem " + _dWaitCart + "); stare sprzedane " + _dSold + " za " + _dSoldGold + " (do zbrojowni " + _dKept + ")"
-                             + "; pominiete koszyki: brak lepszej na polce " + _dNoBetter + ", za malo w sakiewce " + _dNoMoney + ", nikt nie udzwignie " + _dNoLift + ", lepsza tylko w rezerwie kramu (174b.4) " + _dHeld
+                             + "; pominiete koszyki: brak lepszej na polce " + _dNoBetter + MenUpgradeOrders.DayText() + ", za malo w sakiewce " + _dNoMoney + ", nikt nie udzwignie " + _dNoLift + ", lepsza tylko w rezerwie kramu (174b.4) " + _dHeld
                              + "; odlozone przy wyjazdach " + _dSaved + ", ponad limit na zycie " + _dOverCap
                              + "; zold zalog do sakiewek " + _dGarWage + " (" + _dGarWageN + " zalog), w sakiewkach zalog " + garPurses + " (" + garN + " zalog)"
                              + "; braki zalog z ich sakiewek " + _dGarGapGold + " (" + _dGarGapN + " zakupow), sakiewki pustych zalog do kas osad " + _dGarEmptyGold + " (" + _dGarEmptyN + ")"
@@ -453,7 +453,7 @@ namespace Armoury
                     var w = Pick(c, oldP, oldEl, oldSell, gain, budget, wares, mp, shop1, shop2, player, out why, out heldAt);
                     if (w == null)
                     {
-                        if (k == 0) { if (why == 1) _dNoLift++; else if (why == 2) _dNoMoney++; else if (why == 3) _dHeld++; else if (why == 4) _dAmmoShort++; else { _dNoBetter++; if (why == 5) _dAmmoLowTier++; } }   // sklad8-s S4: 4 i 5
+                        if (k == 0) { if (why == 1) _dNoLift++; else if (why == 2) _dNoMoney++; else if (why == 3) _dHeld++; else if (why == 4) _dAmmoShort++; else { _dNoBetter++; if (why == 5) _dAmmoLowTier++; MenUpgradeOrders.Note(mp, shop1, shop2, c.Type, oldP.Tier, c.Ceil, c.Slot.N); } }   // sklad8-s S4: 4 i 5; E3-Z1: podzial "na suficie / pod sufitem" i zamowienie tier+1 (wlasny try)
                         // sklad8-p (uwaga 1): rezerwa kramu 174b.4 - lepsza sztuka zostala na straganie (licznik "zatrzymane" linii M2, jak AiGear i notable:
                         // gdy wybor nic nie dal, a choc jeden kandydat odpadl na rezerwie)
                         if (heldAt != null) Measure174b.NoteHeld(BuyerOf(mp, player, heldAt, cart != null && heldAt == cartFrom), 1);
