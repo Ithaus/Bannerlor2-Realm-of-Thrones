@@ -159,7 +159,10 @@ namespace Armoury
         /// <summary>
         /// E3-D3: typ o najlepszym wyniku netto (MarketScore net) w tym miescie sposrod typow, ktorych wsad jest w okregu (dict - WorkshopInputs.InputsNear: wsie,
         /// polka, kontrakt 174); bez ukrytych, kopalni i typu `exclude`. Kuznia moze byc celem (jedyny wytworca narzedzi). null - zaden typ z wynikiem > 0.
+        /// Poprawki (uwaga recenzji 2): wynik typu juz obecnego w miescie x 0.8 za kazdy taki warsztat (jak dywersyfikacja BK w DecideBestWorkshopType) - miasto nie
+        /// dostaje co 30 dob kolejnego warsztatu tego samego najlepszego typu.
         /// </summary>
+        private const float DupKeep = 0.8f;
         internal static WorkshopType BestByPrice(Town town, WorkshopType exclude, IDictionary<ItemCategory, float> dict, out float score)
         {
             score = -1e9f;
@@ -171,6 +174,9 @@ namespace Armoury
                 if (!WorkshopInputs.NeedsInput(t) || !WorkshopInputs.HasInput(t, dict)) continue;
                 float sc = MarketScore(town, t, true);
                 if (!(sc > 0f)) continue;
+                int dup = 0;
+                if (town.Workshops != null) foreach (var w in town.Workshops) if (w != null && w.WorkshopType == t) dup++;
+                if (dup > 0) sc *= (float)Math.Pow(DupKeep, dup);
                 if (pick == null || sc > score) { pick = t; score = sc; }
             }
             return pick;

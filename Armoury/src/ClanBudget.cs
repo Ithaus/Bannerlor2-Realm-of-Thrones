@@ -1021,6 +1021,9 @@ namespace Armoury
             ClanIncomeBook.NoteOwnPaid(seat, c, Math.Max(0, ix - folk - CourtFull.Own(seat, c, lpK)));   // 169c: "wlasne" D stalego - dwor wraca zaworem wlasnej osady (tylko licznik); E5/A2 (recenzja): sprzet do wlasnej siedziby - zapas "wlasnego" az do zwrotu
             try { TownFolk.Note(seat, ix, TownFolk.KCourt); } catch { }   // E5/0 (195): dwor w kasie siedziby (tylko licznik)
             if (seat.IsTown) { SoldierPay.HoldCourt(seat, ix); _dCourtTown += ix; }   // tarcza dworu: regulator gry nie kasuje tej wplaty
+            // E3-P1 poprawki (uwagi recenzji 1 i 2, jedna regula): towar z polki siedziby kupiony przez dwor pana to sprzedaz kupcow z polki - robocizna handlu jak przy
+            // dworze krola (CourtGoods.Crown) i kazdej naszej sprzedazy z polki (AiGear, MenUpgrade, BuildFunding, MaterialOrders); tylko licznik podstawy plac jutra
+            if (goods > 0) { try { TownFolk.Sale(seat, (int)Math.Min(int.MaxValue, goods), TownFolk.MixGoods); } catch { } }
             _dCourt += ix; _dCourtGoods += goods;
         }
 

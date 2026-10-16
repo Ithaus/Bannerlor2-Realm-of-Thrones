@@ -29,6 +29,9 @@ namespace Armoury
     /// Liczniki istniejacych linii (CaravanBulk, CaravanAmmo, T1) licza utarg PRZED mytem: LastTaken - myto ostatniej sprzedazy karawany w ApplyInternal.
     /// Linie: "Myto targowe (E3-G3): start sesji" i "Myto targowe (E3-G3): dzien N"; Pompy F (MoneyLedger.Pumps.cs). Nic w zapisie (pending RentToday - sesja,
     /// zloto juz u pana). Wyjatek per sprzedaz - licznik potkniec, bez wylacznika.
+    /// POPRAWKI po recenzjach (uwaga 1, powazna - ksiega kas osad): myto wozu schodzi z sakwy W SRODKU okna MoneyLedger "tabor wsi wchodzi do osady" - CartEnd
+    /// przesuwa migawke okna o myto (MoneyLedger.CartTollInWindow), wiec "zaplata taborom wsi" jest brutto, a reszta kas miast TM1 i zamkow TZ1 nie spada o myto;
+    /// polowa pana bez zywego pana wplacona do kasy osady jest nazwana (Note169 "myto do kas osad (E3-G3)"). CaravanRateFor - stawka dla progu zysku T1.
     /// </summary>
     internal static class TownToll
     {
@@ -40,6 +43,8 @@ namespace Armoury
 
         /// <summary>Myto zdjete przy ostatniej sprzedazy karawany w SellItemsAction.ApplyInternal (CaravanGoods.TradePostfix) - wolajacy licza utarg przed mytem.</summary>
         internal static int LastTaken;
+        /// <summary>Czesc myta ostatniej sprzedazy, ktora wrocila do kasy tej osady (pan nie zyje) - kontrola kas linii T1 (CaravanGoods.Sell). Zeruje wolajacy.</summary>
+        internal static int LastToTown;
         private static int _exempt;                                   // zakres zwolnienia (CaravanFlow.SellOut, MaterialOrders.Deliver)
         internal static void ExemptBegin() { _exempt++; }
         internal static void ExemptEnd() { if (_exempt > 0) _exempt--; }
@@ -61,7 +66,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _cart = null; _cart0 = 0; LastTaken = 0; _exempt = 0;
+            _cart = null; _cart0 = 0; LastTaken = 0; LastToTown = 0; _exempt = 0;
             _rentPend.Clear(); _startDone = false; _stumbleSess = 0; _err.Clear(); _merged = 0;
             LastCart = LastCaravan = -1;
             ZeroDay();
@@ -100,6 +105,8 @@ namespace Armoury
                 int net = cart.PartyTradeGold - _cart0;
                 if (net <= 0) return;
                 int t = Take(st, cart, net, RateCart);
+                MoneyLedger.CartTollInWindow(cart, t);                    // poprawki (uwaga recenzji 1): okno ksiegi kas osad liczy zaplate taborom brutto
+                LastToTown = 0;                                            // licznik kontroli T1 dotyczy tylko karawan
                 _cN++; _cGross += net; _cToll += t;
                 if (Players(cart)) { _plN++; _plToll += t; }
             }
@@ -124,6 +131,18 @@ namespace Armoury
         }
 
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
+
+        /// <summary>Stawka myta, ktora zejdzie z utargu tej karawany przy sprzedazy miastu teraz (0 - klucz wylaczony, zakres zwolnienia, kontrakt 174) - prog zysku T1
+        /// (CaravanGoods.Sell; uwaga recenzji 1: marza 0-2% bez myta byla strata netto). Nie rzuca.</summary>
+        internal static double CaravanRateFor(MobileParty mp)
+        {
+            try
+            {
+                if (!On || mp == null || _exempt > 0 || MaterialOrders.HasContract(mp)) return 0;
+                return RateCaravan;
+            }
+            catch { return 0; }
+        }
 
         private static bool Players(MobileParty mp)
         {
@@ -161,6 +180,11 @@ namespace Armoury
             {
                 try { st.Town.ChangeGold((int)tp); }
                 catch (Exception e) { payer.PartyTradeGold += (int)tp; toll -= (int)tp; tp = 0; Stumble("Take(kasa)", e); }
+                if (tp > 0)
+                {
+                    LastToTown += (int)tp;
+                    MoneyLedger.Note169(MoneyLedger.N169Toll, st, (int)tp);   // poprawki (uwaga recenzji 1): wplata do kasy osady poza tickiem - nazwana w "Przeplywy osad (przyczyny)"
+                }
             }
             if (cp > 0)
             {

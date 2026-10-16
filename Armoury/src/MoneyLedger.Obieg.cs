@@ -25,8 +25,11 @@ namespace Armoury
         // ------------------------------------------------------------ nasze przeplywy kas bez licznika (Note169, D13)
         internal const int N169Repair = 0, N169Surplus = 1, N169Kit = 2, N169PurseGone = 3, N169Other = 4;
         internal const int N169CartPurse = 5;                // 112: sakwa rozwiazanego taboru (albo bez zwyciezcy) wraca do kiesy wsi
-        private const int N169 = 6;
-        private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne", "sakwy taborow wsi (112)" };
+        internal const int N169Toll = 6;                     // E3-G3 (poprawki noc-ekonomia3): polowa myta pana bez zywego pana do kasy osady (TownToll.Take)
+        internal const int N169CartBuy = 7;                  // E3-W1 (poprawki noc-ekonomia3): kiesa wsi -> kasa osady przy zakupie wozem w miescie sprzedazy (TownFolk.CartBuys)
+        private const int N169 = 8;
+        private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne", "sakwy taborow wsi (112)",
+                                                      "myto do kas osad (E3-G3)", "zakupy wsi wozem (E3-W1)" };
         private static readonly long[,] _n169In = new long[Classes, N169], _n169Out = new long[Classes, N169];
         private static long _purseGoneWin, _purseGoneTown;  // sakiewki rozbitych partii: do zwyciezcow (i ich lordow) / do kas miast
         private static readonly long[] _classRest = new long[Classes];   // reszta starej linii kas (ClassLine) - do linii przyczyn

@@ -162,7 +162,20 @@ namespace Armoury
                         catch (Exception e) { Stumble("Daily(zmiana)", e); }
                     }
                 }
-                var sb2 = new StringBuilder(700);
+                // poprawki (uwaga recenzji 2): miasta z 3 i wiecej warsztatami jednego typu (dubel typow - INFO NE3-21)
+                int dupTowns = 0;
+                foreach (var t in Town.AllTowns)
+                {
+                    if (t == null || t.Workshops == null) continue;
+                    var cnt = new Dictionary<WorkshopType, int>();
+                    foreach (var w in t.Workshops)
+                    {
+                        if (w == null || w.WorkshopType == null || w.WorkshopType.IsHidden) continue;
+                        int n0; cnt.TryGetValue(w.WorkshopType, out n0); cnt[w.WorkshopType] = n0 + 1;
+                    }
+                    foreach (var n1 in cnt.Values) if (n1 >= 3) { dupTowns++; break; }
+                }
+                var sb2 = new StringBuilder(760);
                 sb2.Append("Warsztaty za cena (E3-D3): dzien ").Append(today - 1).Append(" | ")
                    .Append(!On ? "WYLACZONE (MCM)" : !WorkshopTrade.On ? "NIECZYNNE (paczka warsztatow towarowych wylaczona)" : !WorkshopTrade.ConvertWired ? "NIECZYNNE (brak latki zmiany produkcji)" : "CZYNNE")
                    .Append(" | warsztatow notabli pod regula ").Append(_dShops).Append(", kandydaci (tracace od ").Append(MinDays).Append(" dob w obu pamieciach) ").Append(_dCands)
@@ -173,6 +186,7 @@ namespace Armoury
                    .Append(" | bankructwa i warsztaty odebrane graczowi: wyborow ").Append(_dBankPicks).Append(", typ z cen zamiast wyboru gry ").Append(_dBankSwaps)
                    .Append(_dBankSamples.Count > 0 ? " [" + string.Join("; ", _dBankSamples.ToArray()) + "]" : "")
                    .Append(" | zmian w sesji ").Append(_sessChanged)
+                   .Append(" | kara za typ juz obecny w miescie x0.8 na warsztat; miast z 3+ warsztatami jednego typu ").Append(dupTowns)
                    .Append(" | wplyw na skrzynie: notable -> kasy miast (sprzet)")
                    .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_sessStumbles).Append(").");
                 Log.Info(sb2.ToString());

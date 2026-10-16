@@ -120,10 +120,14 @@ namespace Armoury
         private static long _w1Gold, _w1Pcs;
         private static bool W1On { get { var s = Settings.Current; return s != null && s.VillageCartBringsGoods; } }
         private static void W1Zero() { _w1N = _w1Tries = _w1NoGoods = _w1NoGold = _w1NoOwed = _w1Stumbles = 0; _w1Gold = _w1Pcs = 0; _w1Vills.Clear(); }
+        // poprawki noc-ekonomia3 (uwaga recenzji 1, NE3-16): wsie "bez towaru" w miescie targowym przy ostatnim koszyku dnia i te z nich, ktore potem kupily wozem (W1);
+        // obrot zbiorow na poczatku Villages (raz na dobe) - linia doby podaje "wsi bez towaru po W1" z poprzedniego koszyka i wozow od niego
+        private static readonly HashSet<Village> _w1NgCur = new HashSet<Village>(), _w1Served = new HashSet<Village>();
+        private static int _w1NgLastN = -1, _w1ServedLastN; private static bool _w1NgRan;
 
         private static void ResetLive()
         {
-            _w1Owed.Clear(); W1Zero();                                 // E3-W1: zaleglosci koszyka wsi i liczniki - sesja
+            _w1Owed.Clear(); W1Zero(); _w1NgCur.Clear(); _w1Served.Clear(); _w1NgLastN = -1; _w1ServedLastN = 0; _w1NgRan = false;                                 // E3-W1: zaleglosci koszyka wsi i liczniki - sesja
             _seedT = _seedC = 0; _pending = null; _orphan = 0; _stateKey = null;
             _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear();
             _better = null; _villCats = null; _betterText = _villText = "-"; _villBy = null;
@@ -1074,6 +1078,9 @@ namespace Armoury
         private static void Villages(LDay d)
         {
             var s = Settings.Current;
+            // NE3-16 (poprawki): wczorajsze "bez towaru" i ile z nich kupilo potem wozem - do linii; dzis zbior od nowa
+            if (_w1NgRan) { _w1NgLastN = _w1NgCur.Count; _w1ServedLastN = _w1Served.Count; }
+            _w1NgRan = true; _w1NgCur.Clear(); _w1Served.Clear();
             double pph = Math.Max(0f, Math.Min(1f, s.VillagePurchasePerHead));
             if (_villCats == null) _villCats = CatsOf(VillIds, out _villText);
             var shelf = new Dictionary<Settlement, List<EquipmentElement>>();
@@ -1113,7 +1120,7 @@ namespace Armoury
                         if (ow >= 1) _w1Owed[vil] = ow; else _w1Owed.Remove(vil);
                     }
                     VillageLadder(f, vil, mk, gold, buy1, nv);         // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian)
-                    if (spent <= 0) { d.VNoGoods++; continue; }
+                    if (spent <= 0) { d.VNoGoods++; _w1NgCur.Add(vil); continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
                 catch (Exception e) { f.ADay = -1; Stumble("Villages(wies)", e); }   // E5/C4: liczby wsi z tej doby niepewne - okno bez liczby
@@ -1173,9 +1180,16 @@ namespace Armoury
                 try { spent = BuyGoods(vil, st, list, budget, _w1d); }
                 finally { GoodsLedger.End(gf); }
                 if (spent <= 0) { _w1NoGoods++; return; }
+                // poprawki (uwaga recenzji 1 i 2): kiesa wsi -> kasa osady poza tickiem, w srodku okna sprzedazy wozu - nazwane w "Przeplywy osad (przyczyny)" po obu
+                // stronach (bez tego reszta kas miast TM1 rosla, a kies wsi TW1 spadala o W1) i przeniesione z kanalu "tabory wsi" do "wsie" w "Kasy zaulkow (m6b)"
+                int sp = (int)Math.Min(int.MaxValue, spent);
+                MoneyLedger.Note169(MoneyLedger.N169CartBuy, st, sp);
+                MoneyLedger.Note169(MoneyLedger.N169CartBuy, vil.Settlement, -sp);
+                AlleyProbe.NoteVillageBuy(st.Town, sp);
                 owed -= spent;
                 if (owed >= 1) _w1Owed[vil] = owed; else _w1Owed.Remove(vil);
                 _w1N++; _w1Gold += spent; _w1Pcs += _w1d.VPieces - p0; _w1Vills.Add(vil);
+                if (_w1NgCur.Contains(vil)) _w1Served.Add(vil);           // NE3-16: wies bez towaru w miescie targowym kupila wozem
                 Folk mf; if (_f.TryGetValue(st, out mf)) mf.VillWin += spent;
             }
             catch (Exception e) { _w1Stumbles++; Stumble("CartBuys", e); }
@@ -1188,7 +1202,9 @@ namespace Armoury
             string t = ", woz kupuje w miescie sprzedazy (E3-W1) " + (W1On ? "tak" : "nie") + ": zakupow " + _w1N + " za " + _w1Gold + " zl, sztuk " + _w1Pcs + ", wsi " + _w1Vills.Count
                        + " (proby " + _w1Tries + ", bez towaru " + _w1NoGoods + ", bez kiesy " + _w1NoGold + ", bez zaleglosci " + _w1NoOwed + ", potkniecia " + _w1Stumbles + "), zaleglosc koszyka wsi "
                        + N0(owedSum) + " zl u " + _w1Owed.Count + " wsi (najwyzej " + W1Days.ToString("0", Inv) + " dni potrzeby)"
-                       + ", plotno od polowy progu tam, gdzie tanie (E3-W1b) " + (ClothHalfOn ? "tak" : "nie") + ": wierszy " + d.VClHalf;
+                       + ", plotno od polowy progu tam, gdzie tanie (E3-W1b) " + (ClothHalfOn ? "tak" : "nie") + ": wierszy " + d.VClHalf
+                       + ", wsi bez towaru po W1 " + (_w1NgLastN >= 0 ? (Math.Max(0, _w1NgLastN - _w1ServedLastN)).ToString(Inv) : "-")
+                       + " (poprzedni koszyk dnia: bez towaru " + (_w1NgLastN >= 0 ? _w1NgLastN.ToString(Inv) : "-") + ", z nich kupily potem wozem " + _w1ServedLastN + ")";
             W1Zero();
             return t;
         }

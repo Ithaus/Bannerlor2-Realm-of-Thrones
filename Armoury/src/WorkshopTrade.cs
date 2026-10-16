@@ -829,15 +829,15 @@ namespace Armoury
         /// <summary>DefaultClanFinanceModel.AddPlayerExpenseForWorkshops - drugi pobor wydatku z kiesy gracza (w nicosc); utrzymanie placi juz ExpensePrefix.</summary>
         public static bool PlayerExpensePrefix() { return !On; }
 
+        /// <summary>E3-D2: latka tempa linii na metode szybkosci czynnego modelu warsztatow - w kampanii (model znany dopiero tu), tym samym Harmony.</summary>
+        internal static void ApplyPaceInCampaign() { WorkshopPace.ApplyInCampaign(_harmony); }
+
         /// <summary>
         /// Jedyna latka paczki na DefaultClanFinanceModel - zakladana DOPIERO w kampanii (docs/ERRORS.md, pulapka z 14.09): konstruktor
         /// statyczny tej klasy czyta Game.Current, a Harmony kompiluje zalatana metode przy zakladaniu latki - przy starcie gry
         /// zabiloby to klase na caly proces. W OnSessionLaunched Game.Current istnieje i klasa jest juz zainicjowana (wymuszamy to).
         /// Raz na proces; gdy sie nie uda, DailyExpense zostaje 0 (gracz nie placi dwa razy, ekran rodu pokaze 0).
         /// </summary>
-        /// <summary>E3-D2: latka tempa linii na metode szybkosci czynnego modelu warsztatow - w kampanii (model znany dopiero tu), tym samym Harmony.</summary>
-        internal static void ApplyPaceInCampaign() { WorkshopPace.ApplyInCampaign(_harmony); }
-
         internal static void ApplyInCampaign()
         {
             if (_finTried || _harmony == null) return;

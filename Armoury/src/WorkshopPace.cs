@@ -17,7 +17,8 @@ namespace Armoury
     /// Dowod [L] (test noc-ekonomia2 21-25-46 d109195): "Warsztaty towarowe" - 291 warsztatow, pracowalo 170, piekarnie 73 (324 cykle), kuznie 29 (44 cykle
     /// towarowe); "Towary": narzedzia produkcja 184/d (smithy 176) przy zuzyciu 210/d, chleb 888/d przy zuzyciu 921/d. Tempo linii jest takie samo w miescie
     /// na 5 tys. i na 60 tys. ludzi i przy kazdej cenie wyrobu - tylko rece broni ida za ludzmi (WorkshopLaw.Hands :821, m_t z PeopleMarket.WorkersScale).
-    /// Regula: kazda linia TOWAROWA (WorkshopTrade.IsTradeLine) z wsadem warsztatu notabla w MIESCIE biegnie w tempie gry x F,
+    /// Regula: kazda linia TOWAROWA (WorkshopTrade.IsTradeLine) z wsadem warsztatu w MIESCIE (kazdego wlasciciela poza graczem: notable i lordowie BK - tempo idzie
+    /// za rynkiem i rekami miasta, nie za wlascicielem; poprawki: opis byl "notabla", kod od poczatku bral tez lordow - licznik w linii) biegnie w tempie gry x F,
     ///   F = clamp(m_t / srednia m_t warsztatow towarowych miast, 0.3, 4) x clamp(sqrt(indeks glownego wyrobu linii w tym miescie), 0.7, 1.4), najwyzej 4.
     /// Mnoznik NA LINIE, nie na typ: kuznia (smithy, SandBox spworkshops.xml :782) ma w jednym typie bron, zbroje, narzedzia i war_horse - linie broni
     /// (nie towarowe) i ukryci rzemieslnicy bez zmian. Bez zmian tez: linia bez wsadu (kopalnie - WorkshopLaw.BulkLineSkip, NoTownMines), linia strzal zamknieta
@@ -53,7 +54,7 @@ namespace Armoury
         private sealed class TStat { public int Shops, Lines; public double Before, After; }
         private static readonly Dictionary<string, TStat> _dType = new Dictionary<string, TStat>();
         private static readonly int[] _bins = new int[6];                                  // F: <0.7, 0.7-0.95, 0.95-1.05, 1.05-1.5, 1.5-2.5, >2.5
-        private static int _dShops, _dLines, _dSame, _dCastle, _dPlayer, _dMismatch, _dStumbles, _sessMismatch, _sessStumbles;
+        private static int _dShops, _dLines, _dSame, _dCastle, _dPlayer, _dMismatch, _dStumbles, _sessMismatch, _sessStumbles, _dLordShops;
         private static double _dFSum, _dFMin = double.NaN, _dFMax = double.NaN, _dBefore, _dAfter, _dMSum, _dPSum;
         private static bool _startDone;
 
@@ -70,7 +71,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dType.Clear(); for (int i = 0; i < _bins.Length; i++) _bins[i] = 0;
-            _dShops = _dLines = _dSame = _dCastle = _dPlayer = _dMismatch = _dStumbles = 0;
+            _dShops = _dLines = _dSame = _dCastle = _dPlayer = _dMismatch = _dStumbles = _dLordShops = 0;
             _dFSum = 0; _dFMin = _dFMax = double.NaN; _dBefore = _dAfter = _dMSum = _dPSum = 0;
         }
 
@@ -157,6 +158,7 @@ namespace Armoury
                 if (!any) return;
                 _shop = w; _type = w.WorkshopType.StringId ?? "?";
                 _dShops++;
+                if (!w.Owner.IsNotable) _dLordShops++;                     // poprawki: warsztaty lordow BK (ta sama regula - licznik)
                 TStat ts;
                 if (!_dType.TryGetValue(_type, out ts)) { ts = new TStat(); _dType[_type] = ts; }
                 ts.Shops++;
@@ -249,7 +251,7 @@ namespace Armoury
             {
                 if (s == null || !s.WorkshopPaceByMarket) { Log.Info(head + " | WYLACZONE (MCM) - tempo gry | latka " + _targetName + " | potkniecia 0."); return; }
                 _avgDay = int.MinValue; EnsureAvg();
-                Log.Info(head + " | latka " + _targetName + " | linie towarowe z wsadem warsztatow notabli w miastach x F = clamp(m_t / srednia, 0.3, 4) x clamp(sqrt(indeks wyrobu), 0.7, 1.4), najwyzej 4"
+                Log.Info(head + " | latka " + _targetName + " | linie towarowe z wsadem warsztatow w miastach (notable i lordowie, bez gracza) x F = clamp(m_t / srednia, 0.3, 4) x clamp(sqrt(indeks wyrobu), 0.7, 1.4), najwyzej 4"
                          + " | srednia m_t " + _avgM.ToString("0.000", Inv) + " z " + _avgN + " warsztatow towarowych miast | bez zmian: linie broni, bez wsadu, zamkniete strzaly, ukryci rzemieslnicy, zamki, gracz | potkniecia 0.");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -268,7 +270,7 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var sb = new StringBuilder(900);
                 sb.Append("Tempo warsztatow (E3-D2): dzien ").Append(day).Append(" | ").Append(s.WorkshopPaceByMarket ? (_target != null ? "CZYNNE" : "NIECZYNNE (brak latki)") : "WYLACZONE (MCM)")
-                  .Append(" | warsztatow z tempem ").Append(_dShops).Append(" (linii ").Append(_dLines).Append("), linie bez zmian w tych warsztatach (bron, bez wsadu, zamkniete) ").Append(_dSame)
+                  .Append(" | warsztatow z tempem ").Append(_dShops).Append(" (linii ").Append(_dLines).Append("; w tym warsztatow lordow ").Append(_dLordShops).Append("), linie bez zmian w tych warsztatach (bron, bez wsadu, zamkniete) ").Append(_dSame)
                   .Append(", zamki pominiete ").Append(_dCastle).Append(", gracz pominiety ").Append(_dPlayer)
                   .Append(" | F srednio ").Append(F2(_dLines > 0 ? _dFSum / _dLines : double.NaN)).Append(", min ").Append(F2(_dFMin)).Append(", max ").Append(F2(_dFMax))
                   .Append(", rozklad <0.7 ").Append(_bins[0]).Append(", 0.7-0.95 ").Append(_bins[1]).Append(", 0.95-1.05 ").Append(_bins[2]).Append(", 1.05-1.5 ").Append(_bins[3])

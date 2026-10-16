@@ -1,5 +1,128 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-16 (noc-ekonomia3, POPRAWKI po recenzjach - naprawa ekonomii) - KARAWANY: CENA ZAKUPU PO WCZYTANIU, ZADNA KARAWANA NIE ODKUPUJE TOWARU Z POLKI, "PELNE JUKI" = PONAD UDZWIG, ZYSK PO MYCIE; KSIEGA KAS OSAD (MYTO WOZOW, ZAKUPY WSI WOZEM); BEZPIECZNIK STRAZNIKA DO 3.7
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na 10622d0e = czesc 2) | **Tor:** L (poprawki po 2 recenzjach galezi: 5 uwag powaznych + drobne) | **Klucze:** bez nowych; zmienione opisy MCM `CaravanSellWhereDear`, `FolkGuardShareFuse`, `WorkshopPaceByMarket`, `WorkshopRetoolByPrice`, `VillageHandsFollowPrice` (gen_mcm, 1630 ustawien) | **Zmiana ekonomii:** tak (T1, G1, P1, D3) | **Zapis:** bez zmian (zadnego nowego klucza; migawka ksiegi kosztu i blokady odkupienia - pamiec sesji) | **Cofanie:** `git revert` tego commita; T1 w MCM `Caravan Sell Where Dear` | **Pliki:** `Armoury/src/CaravanGoods.cs`, `TownToll.cs`, `MoneyLedger.cs`, `MoneyLedger.Obieg.cs`, `TownFolk.Live.cs`, `AlleyProbe.cs`, `TownFolk.Guard.cs`, `ClanBudget.cs`, `VillageFruit.cs`, `NoTownMines.cs`, `WorkshopRetool.cs`, `WorkshopPace.cs`, `ArmouryBehavior.cs`, `SubModuleMain.cs`, `CrownIncome.cs`, `WorkshopTrade.cs` (komentarze), `Settings.cs` + `McmSettings.cs`, `tools/sprawdz_logi.py` (grupa nekon3)
+
+**Dla Jeffa (prosto):**
+- **Karawany nie sprzedaja na stracie po wczytaniu gry.** Gra nie zapisuje, za ile karawana kupila towar. Dotad po kazdym wczytaniu karawana liczyla, ze zaplacila zwykla cene - i stos narzedzi szedl za tanio, ponizej tego, co naprawde zaplacila. Teraz przyjmuje najwyzsza cene, jaka kupcy mogli dac (srednia cena w miastach albo cena z dziennika kupcow BK, jesli wyzsza). Sprzedaje wiec tylko tam, gdzie na pewno ma zysk. Towar, ktory lezy w jukach ponad 30 dni, i tak zejdzie - to jest "brak wyjscia".
+- **Zysk liczy sie po mycie** (2% utargu). Marza 1% nie jest juz "zyskiem".
+- **Co karawana sprzeda w miescie, tego zadna inna karawana tam nie odkupi** - przez 7 dni albo do chwili, gdy ludzie to wykupia. Towar trafia do ludzi, a nie krazy miedzy karawanami.
+- **"Pelne juki" to przeciazenie, jak w BK** (ponad udzwig, a nie 95%). Wtedy karawana sprzedaje ze strata tylko tyle, ile trzeba, zeby zejsc pod udzwig.
+- **Bezpiecznik straznika** (podatek od oszczednosci ludu, gdy lud ma ponad 9% zlota swiata) podnosi stawke najwyzej do 3.7 x, czyli do poziomu przed zmiana, a nie do 5 x. To podatek awaryjny. Test powie, ile dni dzialal. Jesli dzialal choc 1 dzien, wynik to DECYZJA, a nie TAK, bo pieniadze od ludu mialy wracac do panow z handlu (myto, czynsz, danina), a nie z podatku.
+- **Ksiegi kas miast i wsi sa poprawione** (myto wozow i zakupy wsi wozem). Pieniadze sie zgadzaly, ale raport mieszal przyczyny i moglby schowac prawdziwy blad.
+- **Drobne:** dwor pana daje kupcom te sama robocizne handlu co dwor krola. Warsztat zmieniajacy branze nie wybiera typu, ktory miasto juz ma (kara 20% za kazdy taki warsztat). Opisy w MCM mowia teraz to samo co kod.
+- Nic nie zmienia zapisu i nie ma nowych opcji.
+
+**Problem [L]/[K] (recenzje galezi ae6aab2f + 10622d0e; logi `D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-2026-10-15_21-25-46.log` (ekon2) i `..._20-16-31.log` (baza WGRANIA 64)):**
+- (uwaga 1, powazna) T1 po wczytaniu: `CaravanGoods.Sync` dopisywal brakujacym sztukom koszt = `Value` i doba = teraz. Chodzi o ladunek 2 371 narzedzi (88.8% swiata) i 4 736 srebra. BK kupuje go tylko przy indeksie < srednia x (1 - do 0.4) (BKCaravansBehavior.cs:1884-1915), a dla rzadkich towarow srednia jest > 1. Prog zysku puszczal sprzedaz do indeksu ok. 1.0-1.1, czyli na realnej stracie.
+- (uwaga 1, powazna) blokada odkupienia dzialala tylko dla tej samej karawany w tej samej wizycie (`BkValuePostfix` z `_bkBuyer`). Inne karawany odkupowaly towar z polki, a BK kaze kazdej kupowac ponizej sredniej. Dzis karawany kupuja 18 narzedzi na dobe przy 194 sztukach w miastach.
+- (uwaga 1, powazna) ksiega kas osad:
+  - myto wozow (4% z 216-269 tys./d = ok. 8.6-10.8 tys./d) schodzilo z sakwy wozu w srodku okna `MoneyLedger.OnBeforeEntered/OnAfterEntered`, a okno liczy "zaplata taborom wsi" jako przyrost sakwy - wiec netto;
+  - W1 (kiesa wsi -> kasa) i polowa myta do kasy bez zywego pana szly bez `Note169`;
+  - na ekon2: TM1 od -509 do +14 575, srednia 28 dob na koniec +1 619 (max |.| 3 458, prog 10 000); TZ1 niezerowe w 2 dobach (max 26); |TW1| srednio 320 (baza 280).
+- (uwaga 2, powazna) "pelne juki" od 95% udzwigu. Tymczasem BK `CalculateCapacityFactor` = 1.1 - zapelnienie (:1736-1739), wiec przy 95% BK dalej kupuje ze wspolczynnikiem 0.15, a sam sprzedaje dopiero ponad 100% (`toLoseWeight`, :1231). Karawana czesto wjezdza z jukami >= 95%.
+- (uwaga 2, powazna) bezpiecznik G1: x1.03/d do 5.0, a 1.03^20 = 1.81. NE3-10 dawal TAK przy 20 dobach bezpiecznika (od 3.7 mnoznik dochodzi do 5.0 i NE3-10 by padl). NE3-11b (udzial F-lud ok. 10%) byl tylko INFO.
+- drobne:
+  - zysk T1 bez myta 2%;
+  - kontrola T1 liczyla sama siebie (przyrost kies = gross - toll z definicji);
+  - limit 1/20 przez `BuyFloor` podbijal liczniki 169c;
+  - NE3-16 liczyl "wsi bez towaru" przed W1;
+  - dwor pana bez `TownFolk.Sale`, a dwor krola z nim;
+  - D1 podawal dobe `Now`, a inne linie `Now - 1`;
+  - D2 bral tez warsztaty lordow BK (opis: "notabla");
+  - opisy MCM "by a third" (kod 1.3) i "a sixth" (kod 15% i 5% zboza);
+  - D1 bez srebra, soli i gliny w wykluczeniach;
+  - D3 bez kary za dubel typu;
+  - NE3-5 prog 0.8 takze dla towaru tanszego od pierwszej doby;
+  - dubel `N3E_CROWN` w `_n3e_read`;
+  - komentarze rozjechane w ArmouryBehavior, SubModuleMain, CrownIncome i WorkshopTrade.
+
+**Przyczyna [K]:** wyzej, przy kazdej uwadze. Wspolne zrodlo: ksiega kosztu tylko na sesje (gra nie zapisuje ceny zakupu karawany), blokada przywiazana do karawany zamiast do miasta, a nowe przelewy poza tickiem bez nazwy w ksiedze kas.
+
+**Zmiana:**
+- **T1 koszt po wczytaniu** (`CaravanGoods.EnsureSnap/Restore`): raz na sesje, przed pierwszym uzyciem ksiegi (`TradePrefix`, wjazd, doba), robi migawke wszystkich karawan i ich towarow handlowych:
+  - koszt sztuki = `Value` x max(1, srednia indeksu kategorii 97 miast) - ta sama miara co BK `AverageBuySellPriceIndex`;
+  - gdy dziennik BK `_tradeActionLogs` (w zapisie, 7 dob; refleksja, `BuyPrice` = cena sztuki) ma zakup tej sztuki, brana jest wyzsza z dwoch cen, a dzien zakupu z dziennika;
+  - bez wpisu - 7 dob wstecz (dziennik trzyma 7 dob); dziennik nieczytelny - doba wczytania;
+  - pozniejsze sztuki bez zakupu w ksiedze: gorne oszacowanie i doba teraz.
+  Linia: "odtworzone przy wczytaniu N szt. (z dziennika BK a, ze sredniej indeksu b; dziennik BK stan)".
+- **T1 blokada w miescie**: (miasto, kategoria) -> doba ostatniej sprzedazy T1 i stan polki kategorii przed pierwsza sprzedaza. `BkValuePostfix` zwraca 0 dla KAZDEJ karawany, dopoki od sprzedazy minelo <= 7 dob i na polce jest wiecej niz przed nia. Porzadki raz na dobe. Liczniki: wycen zablokowanych (w tym innym karawanom), blokad czynnych, "odkupione przez inne karawany".
+- **T1 pelne juki**: `TotalWeightCarried > InventoryCapacity` (jak BK); na stracie krok przyciety do `ceil((waga - udzwig) / waga sztuki)`, a po przycieciu cena liczona od nowa. Licznik "kroki przyciete do zejscia pod udzwig".
+- **T1 zysk po mycie**: `pLast x (1 - TownToll.CaravanRateFor(mp)) > koszt + zold`, takze w kolejnosci kandydatow.
+- **T1 kontrola zmierzona**: kasa miasta przed i po `SellItemsAction.Apply`. Linia: "kontrola: kasy -A = kiesy +B + myto C - myto do kas osad D (roznica R)" (`TownToll.LastToTown`).
+- **T1 limit**: limit 1/20 przez `BuyFloorPeek`. Nowe pole linii: "najwiekszy spadek indeksu sprzedanej kategorii w jednym miescie dzis X% (miasto towar a -> b)".
+- **Ksiega kas osad**:
+  - `TownToll.CartEnd` -> `MoneyLedger.CartTollInWindow` (migawka okna o myto - zaplata taborom brutto);
+  - `TownToll.Take`: polowa bez zywego pana -> `Note169` (nowy rodzaj "myto do kas osad (E3-G3)");
+  - `TownFolk.CartBuys`: `Note169` po obu stronach (nowy rodzaj "zakupy wsi wozem (E3-W1)"; kasa +, kiesa wsi -) i `AlleyProbe.NoteVillageBuy` (z kanalu "tabory wsi" do "wsie" w "Kasy zaulkow (m6b)");
+  - N169 6 -> 8.
+- **NE3-16**: zbior wsi "bez towaru" z koszyka dnia i te z nich, ktore potem kupily wozem. Dopisek linii "Kiesa ludu": "wsi bez towaru po W1 X (poprzedni koszyk dnia: bez towaru N, z nich kupily potem wozem M)".
+- **G1**: `GdFuseCeil` 5.0 -> 3.7 (mnoznik bazy na koniec 120 dob 3.694). Opis MCM: podatek awaryjny, przy Folk Guard No Memory nie dziala.
+- **P1**: `ClanBudget.Court` po zakupie z polki wola `TownFolk.Sale(seat, goods, MixGoods)` - jedna regula z dworem krola i kazda nasza sprzedaza z polki.
+- **D1**: linia doby `Now - 1`; `OutOfHands` + silver, salt, clay.
+- **D2**: opis i linia startu "notable i lordowie, bez gracza", licznik "w tym warsztatow lordow".
+- **D3**: `BestByPrice` - wynik typu juz obecnego w miescie x 0.8 za kazdy taki warsztat. W linii "miast z 3+ warsztatami jednego typu N".
+- **Komentarze**: przywrocone do swoich linii (CaravanAmmo, Seal31B.RentMerge, CaravanAmmo.Daily, NoMakerBudget, summary `Spent`, summary `ApplyInCampaign`).
+- **sprawdz_logi --grupa nekon3** (11 nowych nazw `N3E_`, razem 103, 0 dubli - ast):
+  - NE3-2c - ksiega kas osad: srednia 28 dob TM1 |.| < 10 000, |TZ1| <= baza + 50, |TW1| <= 1.25 x baza + 100;
+  - NE3-3 + kontrola kas T1 (roznica 0);
+  - NE3-5 - prog 0.8 tylko dla towaru od >= 0.8, inaczej >= pierwsza doba - 0.1;
+  - NE3-5b - dobowy spadek indeksu w jednym miescie <= 40%;
+  - NE3-10 - mnoznik bez bezpiecznika <= 3.7, bezpiecznik 0 dob = TAK, 1-20 = DECYZJA z dopiskiem "kryterium 3 spelnione podatkiem, nie obrotem";
+  - NE3-11 - B <= 0.97 x baza z tego samego okna;
+  - NE3-11c - F z ludu na koniec >= doba 30;
+  - NE3-14d - na stracie z pelnych jukow <= 10% sztuk T1;
+  - NE3-16 i NE3-16c2 - na liczbie "po W1";
+  - NE3-1c bez tolerancji -1 dla D1;
+  - NE3-21 + miasta z 3+ warsztatami jednego typu (INFO);
+  - bez dubla `N3E_CROWN`.
+
+**Decyzje (odstepstwa i uwagi sprawdzone):**
+- Koszt sprzed sesji to gorne oszacowanie, a nie zapis ksiegi w save. Powod: limit napisu 32 KB, a karawan jest kilkaset po ok. 10 towarow. Skutek: przez pierwsze dni po wczytaniu T1 sprzedaje stary stos tylko tam, gdzie indeks jest wyraznie ponad srednia + zold. Reszta schodzi po 30 dobach (7 dob wstecz + 23 doby sesji) z powodu "dlugo w jukach" - to jest istniejaca regula "brak wyjscia".
+- Blokada trwa 7 dob ALBO do zejscia sprzedanych sztuk z polki - co pierwsze. To nie jest prog "powyzej sredniej": gdzie sprzedac, dalej decyduje zysk.
+- Bezpiecznik ma sufit 3.7 jako stala w kodzie (bez nowego klucza).
+- D2: zamiast zawezac regule do notabli, poprawiony opis. Tempo idzie za rynkiem i rekami miasta, nie za wlascicielem; lordowie byli w regule od poczatku.
+- P1: dodane `Sale` u pana zamiast usuwania go u krola - jedna regula dla zakupu z polki.
+- **G5 zostaje wylaczony** (dzwignia awaryjna, swiadome odstepstwo od kryterium "klucz domyslnie wlaczony"). Regula awaryjna planu testu: gdy w dobie 60 korony < 20.4% - wlaczyc `CrownKeepsValveShare` ALBO `CrownReserveReleaseDays` 450. Jedno z dwoch, nigdy oba.
+- **Roboty krolewskie** (kryterium 1: korony - wlasne wydatki) - nie w tej serii. Seria ma tylko dwor krolewski (P1b, 5% puli rent). Nastepny krok, jesli NE3-8 (korony >= 19.9%) wyjdzie z zapasem.
+- **Uwaga recenzji 1 o ksiedze czesciowo nie zgadza sie z logiem**:
+  - "TZ1 dzis dokladnie 0, TW1 dzis 0" i propozycja "TZ1 = 0 i TW1 = 0 kazdej doby" nie pasuja do logu. Na ekon2 TZ1 jest niezerowe w 2 dobach (max 26), a TW1 w 41 dobach na 120 (max 9 422, srednio |.| 320; baza 51 dob, srednio 280). Dlatego NE3-2c porownuje z baza, zamiast wymagac 0;
+  - "TM1 = +336..+942" to tylko kilka dob - w oknie od -509 do +14 575. Srednia 28 dob (+1 619) sie zgadza.
+- Pozostale uwagi sprawdzone w kodzie i dekompilacji, wszystkie trafne: BK CalculateBuyValue i CalculateCapacityFactor, `_tradeActionLogs` (pola i SyncData), `BuyFloor` z licznikami 169c, mnoznik bez pamieci (N7) liczony bez bezpiecznika, D2 bez `IsNotable`.
+- Pominiete drobne: wiek partii w nowym kluczu zapisu (zastapiony migawka z dziennikiem BK i 7 dobami); osobny kanal W1 poza oknem sprzedazy (zamiast tego nazwanie przelewu w ksiedze i w zaulkach).
+- **Build**: w drzewie `libs/` jest pusty. Budowac pelna komenda z `-p:GameLibs=<libs>` (tu `.../3cf3e0ac-.../scratchpad/lancuch/libs`). Przed autotestem i wgraniem zbudowac Release tymi samymi bibliotekami, ktorymi sie wgrywa, i porownac hash.
+
+**Kontrola calosci:**
+- **Pieniadz**: nowych przelewow nie ma. `TownFolk.Sale` to licznik podstawy plac jutra (robocizna handlu z kasy siedziby do kies ludu - istniejacy przelew). Note169 i AlleyProbe to tylko liczniki. Myto, T1 i W1 bez zmian co do zlota.
+- **Kolizje**:
+  - `CalculateBuyValue` maja tez CaravanAmmo i CaravanBulk - wszystkie ustawiaja tylko 0;
+  - `SellItemsAction.ApplyInternal`: GoodsLedger (rama), SellByCondition (tylko log), VillageTakings (wsie) - kontrola T1 pokaze kazdy obcy przelew kasy miasta;
+  - nowe rodzaje Note169 sa tylko w linii "Przeplywy osad (przyczyny)" (stara linia kas bez zmian ksztaltu; "zaplata taborom wsi" teraz brutto - poprawka znaczenia).
+- **Kolejnosc**: migawka T1 przed pierwsza zmiana jukow w sesji. Rotacja zbioru "bez towaru" na poczatku `Villages` (raz na dobe, w ticku).
+- **Wydajnosc**:
+  - migawka - jeden przeglad karawan na sesje;
+  - postfiks BK - 2 odczyty slownika przy blokadach;
+  - D3 - 97 miast raz na dobe;
+  - petli godzinowych brak.
+
+**Ryzyko / co sprawdzic (autotest 120 dob na zapisie F, potem `sprawdz_logi --grupa nekon3 --baza-doby <20-16-31>`):**
+- T1 po wczytaniu sprzedaje mniej (wyzszy koszt): NE3-14 (narzedzia w jukach < 50% od doby 60) i NE3-15. Linia T1 pokazuje migawke (cena z dziennika BK / ze sredniej) i "dlugo w jukach" od ok. doby 23.
+- Blokada w miescie: BK kupuje mniej kategorii sprzedanych przez T1, wiec kiesy karawan moga rosnac (NE3-14b, NE3-14c). "Odkupione przez inne karawany" ma byc bliskie 0.
+- NE3-2c (TM1 srednia 28 dob, TZ1, TW1 wobec bazy) i NE3-3 (kontrola kas T1 = 0).
+- Bezpiecznik do 3.7: lud moze miec wiecej (NE3-7 <= 9.1%). Doby bezpiecznika w NE3-10 - 0 = TAK, 1-20 = DECYZJA.
+- Robocizna handlu z dworu pana: lud w siedzibach (NE3-7, NE3-17 "lud z dworu" < 30.9 tys.).
+- Kara za dubel typu D3: mniej zmian (NE3-21 dolny prog 20).
+- NE3-5b (spadek indeksu w jednym miescie <= 40%), NE3-14d (pelne juki <= 10%), NE3-16 i NE3-16c2 (po W1).
+
+**Sprawdzone tu:**
+- Build Release: rc=0, 0 Error(s), 1 stare ostrzezenie CS0169.
+- `python -I tools/gen_mcm.py`: 1630 ustawien.
+- `sprawdz_logi --grupa nekon3`, log ekon2 + baza: rc=0, 37 progow, bez wyjatku; NE3-2c TAK (srednia 28 dob max 3 458, |TW1| 320 wobec bazy 280); nowe pola T1 jeszcze nie wystepuja.
+- Log syntetyczny z napisow kodu (562 linie, 70 dob): wszystkie nowe regexy trafiaja; NE3-10 przy 3 dobach bezpiecznika = DECYZJA.
+
+**Status:** DO SPRAWDZENIA (autotest 120 dob na zapisie F nie uruchomiony - Jeff gra od 15.10; nic nie wgrane).
+
 ## 2026-10-16 (noc-ekonomia3, CZESC 2 - naprawa ekonomii) - PRODUKCJA IDZIE ZA CENA I LUDZMI, PANOWIE, KORONY I ZOLNIERZE KUPUJA: TEMPO WARSZTATU (D2), WARSZTAT ZMIENIA BRANZE (D3), RECE WSI ZA CENA (D1), DWOR KUPUJE Z POLKI (P1), ZAMOWIENIA ZOLNIERZY (Z1), BOGACI PLACA DROZEJ I DREWNO BUDOW (B1)
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-ekonomia3` (na ae6aab2f = czesc 1) | **Tor:** L (czesc 2 z 2; plan + 2 recenzje, uwagi do czesci 2 uwzglednione) | **Klucze (nowe, wszystkie w MCM, grupa "Production follows price and people (night 16.10, part 3, second half)", domyslnie wlaczone):** `WorkshopPaceByMarket`, `WorkshopRetoolByPrice`, `VillageHandsFollowPrice`, `CourtBuysGoods`, `CrownCourtGoods`, `CrownCourtShare` 0.05, `MenUpgradeOrders`, `BuildWoodHalfReserve`; **zmiana domyslnej:** `FolkLadderCeilingMax` 4 -> 8 (B1a). Zadnego z tych kluczy nie ma w Armoury.json Jeffa (13.10 02:10, grep - 0 trafien), wiec dzialaja domyslne | **Zmiana ekonomii:** tak | **Zapis:** bez zmian (zadnego nowego klucza; pamieci sesji - limit miasta i warsztatu D3, dedup Z1, limit wiersza P1, f i c D1 - odbudowuja sie po wczytaniu; 60 dob sredniej D3 jest w istniejacym arm_wstrade) | **Cofanie:** `git revert` tego commita albo klucze jak wyzej (zmiany typu warsztatu D3 sa akcja gry i zostaja - wylaczenie klucza zatrzymuje tylko dalsze) | **Pliki:** `Armoury/src/WorkshopPace.cs` (nowy), `WorkshopRetool.cs` (nowy), `CourtGoods.cs` (nowy), `MenUpgradeOrders.cs` (nowy), `WorkshopTrade.cs`, `NoTownMines.cs`, `WorkshopInputs.cs`, `VillageFruit.cs`, `MaterialLaw.cs`, `ClanBudget.cs`, `CrownRents.cs`, `CrownIncome.cs`, `GoodsLedger.cs`, `MenUpgrade.cs`, `SupplyDemand.cs`, `BuildFunding.cs`, `MoneyLedger.Obieg.cs`, `ArmouryBehavior.cs`, `Settings.cs` + `McmSettings.cs` (gen_mcm, 1630 ustawien), `tools/gen_mcm.py`, `tools/sprawdz_logi.py` (grupa nekon3: progi czesci 2)

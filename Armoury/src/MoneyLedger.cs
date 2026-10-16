@@ -328,6 +328,18 @@ namespace Armoury
             catch { _stumbles++; }
         }
 
+        /// <summary>
+        /// E3-G3 (poprawki noc-ekonomia3, uwaga recenzji 1): TownToll.CartEnd zdjal myto z sakwy wozu W SRODKU okna "tabor wsi wchodzi do osady" (sprzedaz
+        /// SellGoodsForTradeAction biegnie miedzy BeforeSettlementEntered a AfterSettlementEntered). Okno liczy zaplate kasy jako przyrost sakwy - bez tej
+        /// poprawki wyszlaby netto po mycie, choc kasa zaplacila brutto (reszta kas miast TM1 i zamkow TZ1 spadlaby o myto). Migawka sakwy przesunieta o myto:
+        /// "zaplata taborom wsi" i TownFolk.NoteCartPaid sa brutto. Tylko licznik - nie rzuca.
+        /// </summary>
+        internal static void CartTollInWindow(MobileParty cart, int toll)
+        {
+            try { if (toll > 0 && cart != null && WinOpen && ReferenceEquals(_winParty, cart)) _winGold -= toll; }
+            catch { _stumbles++; }
+        }
+
         /// <summary>Sztuki towaru, ktore zostaly w taborze po sprzedazy (bez zwierzat jucznych, ktore tabor zatrzymuje).</summary>
         private static int Unsold(MobileParty mp)
         {

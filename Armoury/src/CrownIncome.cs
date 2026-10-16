@@ -170,7 +170,6 @@ namespace Armoury
         }
         private static int _dValveLoanN; private static double _dValveShare = double.NaN;
 
-        /// <summary>Wydatek z wplywow dnia (dar, kontrakt, zwrot) - skarbiec placi wolajacy; tu tylko licznik reszty.</summary>
         /// <summary>E3-P1 (b): dwor krolewski zaplacil dzis kasie stolicy (licznik linii 165; zloto zeszlo juz ze skarbca i jest w Spent).</summary>
         internal static void NoteCourt(Kingdom k, long amount)
         {
@@ -178,6 +177,7 @@ namespace Armoury
             if (k != null && amount > 0 && _day.TryGetValue(k, out d)) d.Court += amount;
         }
 
+        /// <summary>Wydatek z wplywow dnia (dar, kontrakt, zwrot) - skarbiec placi wolajacy; tu tylko licznik reszty.</summary>
         internal static void Spent(Kingdom k, long amount)
         {
             var d = DayOf(k);

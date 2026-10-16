@@ -437,7 +437,7 @@ namespace Armoury
         private static bool OutOfHands(ItemObject it)
         {
             string id = it.StringId;
-            return id == "hardwood" || id == "iron" || it.Value <= 0 || it.IsMountable || it.IsAnimal;
+            return id == "hardwood" || id == "iron" || id == "silver" || id == "salt" || id == "clay" || it.Value <= 0 || it.IsMountable || it.IsAnimal;   // poprawki: drewno i cala ruda (zelazo, srebro, sol, glina)
         }
 
         private static float Index(Town t, ItemObject it)
@@ -590,11 +590,11 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null) return;
-            if (!s.VillageHandsFollowPrice) { _hands = new Dictionary<Village, Hands>(); Log.Info("Rece wsi za cena (E3-D1): dzien " + (int)CampaignTime.Now.ToDays + " | WYLACZONE (MCM) | potkniecia 0 (sesja " + _hSess + ")."); return; }
+            if (!s.VillageHandsFollowPrice) { _hands = new Dictionary<Village, Hands>(); Log.Info("Rece wsi za cena (E3-D1): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " | WYLACZONE (MCM) | potkniecia 0 (sesja " + _hSess + ")."); return; }
             int st0; lock (Gate) { st0 = _hStumbles; _hStumbles = 0; }
             try { HandsCompute(); } catch (Exception e) { HStumble(e); }
             int st1; lock (Gate) { st1 = _hStumbles; _hStumbles = 0; }
-            Log.Info("Rece wsi za cena (E3-D1): dzien " + (int)CampaignTime.Now.ToDays + " | CZYNNE | " + HandsText() + " | potkniecia " + (st0 + st1) + " (sesja " + _hSess + ").");
+            Log.Info("Rece wsi za cena (E3-D1): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " | CZYNNE | " + HandsText() + " | potkniecia " + (st0 + st1) + " (sesja " + _hSess + ").");   // poprawki: dzien jak inne linie serii (wczoraj)
         }
     }
 }

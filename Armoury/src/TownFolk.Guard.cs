@@ -69,7 +69,10 @@ namespace Armoury
         // swiata; podstawa podatku bez zmian (kazda klasa placi od nadwyzki ponad WLASNY poziom). (b) bezpiecznik: wczorajszy udzial ludu z wsiami (LastShares)
         // > FolkGuardShareFuse - mnoznik x1.03 na dobe takze w pasmie, najwyzej GdFuseCeil (uwaga recenzji 1: bez wlasnego sufitu 40 dob dawalo x3.3); w dol nigdy.
         // To w praktyce cel udzialu ludu 8.0-9.0% swiata (dolna krawedz pasma 1.25 x 6.4%) - zapisane wprost w CHANGELOG. Cien "mnoznik bez bezpiecznika" - sesja.
-        private const double GdFuseCeil = 5.0;
+        // Poprawki po recenzjach (uwaga 2 powazna i 1 drobna): sufit bezpiecznika 5.0 -> 3.7 = mnoznik bazy WGRANIA 64 na koniec 120 dob (3.694) - bezpiecznik to
+        // podatek AWARYJNY i nie przebija sily bazy; zwrot ponad baze ma isc z obrotu (myto, czynsz gruntowy, danina markietanow), nie z podatku od oszczednosci.
+        // Przy kluczu FolkGuardNoMemory mnoznik doby liczy regula bez pamieci - bezpiecznik wtedy nie dziala (opis MCM).
+        private const double GdFuseCeil = 3.7;
         private static double _gdNBand, _gdMNoFuse = double.NaN;
         private static bool _gdFuseToday; private static int _gdFuseDays;
         private static double _gdMNew = double.NaN, _gdRateOld;          // N7: mnoznik nowej reguly tej doby (NaN - klucz wylaczony), stawka starej reguly (porownanie)
