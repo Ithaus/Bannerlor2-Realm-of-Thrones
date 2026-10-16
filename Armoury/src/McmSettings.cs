@@ -6056,6 +6056,14 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageBannerPerHolder { get; set; } = true;
 
+        [SettingPropertyBool("Village Canon Houses", HintText = "the villages are kept by the houses of A Song of Ice and Fire from their own land - a house seated nearby, a house sworn to the lord, or another house of that land - each under its own arms, and 'Look over the district' tells their arms and words. Off = the village knights of the local lore, as before")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageCanonHouses { get; set; } = true;
+
+        [SettingPropertyBool("Village Two Pennants", HintText = "a village kept for its lord by another house flies two pennants: the keeper's and, beside it, the lord's. Off = one pennant, the keeper's")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillageTwoPennants { get; set; } = true;
+
         [SettingPropertyBool("Village Layout V5", HintText = "a fifth fewer map villages, none crowded against its neighbour, and each of its own size - from about 1,500 souls in a farm by the fields to 9,000 at a crossroads; the people of a district stay the same. It takes effect when a campaign is loaded. Off = the earlier layout, 2,446 villages of about 4,000 souls each")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV5 { get; set; } = true;
@@ -8125,6 +8133,8 @@ namespace Armoury
             s.BurnedVillageLook = BurnedVillageLook;
             s.BurnedVillageLabels = BurnedVillageLabels;
             s.VillageBannerPerHolder = VillageBannerPerHolder;
+            s.VillageCanonHouses = VillageCanonHouses;
+            s.VillageTwoPennants = VillageTwoPennants;
             s.VillageLayoutV5 = VillageLayoutV5;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.StateHygieneEnabled = StateHygieneEnabled;

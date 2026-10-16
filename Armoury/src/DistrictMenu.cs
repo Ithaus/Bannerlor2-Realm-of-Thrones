@@ -32,6 +32,7 @@ namespace Armoury
         private static int _st;                                                              // potkniecia (sesja)
         private static int _dOpen, _dMore, _dRowsMax, _dSt, _dBk, _dLore, _dLord, _dNone;    // doba
         private static int _dEst, _dRealm;                                                   // Jeff 16.10 (D1): herby wierszy z majatku BK i od rycerzy krolestwa
+        private static int _dCanon, _dWords;                                                 // Jeff 16.10 (D2): herby wierszy rodow kanonu, "Hear more" z dewiza
 
         /// <summary>Wiersz okna: wioska z ksiegi, wiersz lore (albo null), gotowa linia rycerza (albo null) i gospodarz (D1; null - klucz off, jak dotad).</summary>
         private sealed class Item { public VillageBook.DistRow R; public MapVillageLore.Row Lore; public string Knight; public VillageHolders.Holder H; }
@@ -42,7 +43,7 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior (przed OnSessionLaunched): stan sesji.</summary>
         internal static void Reset() { _wired = _startLogged = false; _st = 0; DayReset(); }
 
-        private static void DayReset() { _dOpen = _dMore = _dRowsMax = _dSt = _dBk = _dLore = _dLord = _dNone = _dEst = _dRealm = 0; }
+        private static void DayReset() { _dOpen = _dMore = _dRowsMax = _dSt = _dBk = _dLore = _dLord = _dNone = _dEst = _dRealm = _dCanon = _dWords = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -131,6 +132,7 @@ namespace Armoury
                             case VillageHolders.RuleEstate: _dEst++; break;
                             case VillageHolders.RuleLore: _dLore++; break;
                             case VillageHolders.RuleRealmEstate: case VillageHolders.RuleRealmHouse: _dRealm++; break;
+                            case VillageHolders.RuleCanon: _dCanon++; break;
                             default: _dLord++; break;
                         }
                 }
@@ -185,6 +187,13 @@ namespace Armoury
                     if (loreKnight && row.Knight.Length > 0 && row.House.Length > 0 && row.Arms.Length > 0)
                         more.Add(VillageTexts.Make(VillageTexts.VilArms, "HOUSE", row.House, "ARMS", Lower(row.Arms)).ToString());
                 }
+                // Jeff 16.10 (D2): rod kanonu - herb slowami z kanonu i dewiza (gdy znane); nazwa rodu z siedziba ("House Florent of Brightwater Keep")
+                var ch = it.H != null && it.H.Rule == VillageHolders.RuleCanon ? it.H.Canon : null;
+                if (ch != null)
+                {
+                    if (ch.ArmsText.Length > 0) more.Add(VillageTexts.Make(VillageTexts.VilArms, "HOUSE", ch.Name, "ARMS", Lower(ch.ArmsText)).ToString());
+                    if (ch.Words.Length > 0) { more.Add(VillageTexts.Make(VillageTexts.VilWords, "HOUSE", ch.Name, "WORDS", ch.Words).ToString()); _dWords++; }
+                }
                 string mem = Memory(it.R, row);
                 if (mem != null) more.Add(mem);
                 if (more.Count > 0) sb.Append("\n\n").Append(string.Join("\n", more.ToArray()));
@@ -210,7 +219,7 @@ namespace Armoury
             if (_dOpen > 0 || _dSt > 0)
                 Log.Info("Menu okregu (E7/W3): dzien " + ((int)CampaignTime.Now.ToDays).ToString(Inv) + " | okien " + _dOpen + " (wiosek w oknie najwiecej " + _dRowsMax + "), Hear more " + _dMore
                          + " | herby wierszy: rod posiadacza tytulu BK " + _dBk + ", rycerz z lore " + _dLore + ", pan " + _dLord + ", bez herbu " + _dNone
-                         + ", majatek BK " + _dEst + ", rycerz krolestwa " + _dRealm
+                         + ", majatek BK " + _dEst + ", rycerz krolestwa " + _dRealm + ", rod kanonu " + _dCanon + " (Hear more z dewiza " + _dWords + ")"
                          + " | potkniecia dzis " + _dSt + " (sesja " + _st + ")");
             DayReset();
         }

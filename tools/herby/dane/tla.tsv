@@ -1,0 +1,41 @@
+# Banner background (first layer) mesh id -> field pattern. From the GUI thumbnails (Native ui_bannericons_1, sprites 1-36) and the
+# atlas texture banner_background_test_a (core.tpac). In the thumbnails white = colour 1 (layer c1, the field) and black = colour 2 (c2).
+# Banner code layer = mesh.c1.c2.sizeX.sizeY.posX.posY.stroke.mirror.rotation (TaleWorlds.Core.Banner.TryGetBannerDataFromCode);
+# layer 0 = background (mesh = pattern id, usually 1528x1528 at 764,764). ROT draws most fields as plain 11 + big Shape squares.
+bg_id	pattern	keywords	mesh_name	is_base	rot_banners_using	rot_examples
+1	per pale (field c1 dexter half, c2 sinister half)	per pale	banner_background_test_1		14	Mormont, Second Sons, Rayder, Baratheon, Joffrey, Fell, Connington
+2	per pale, sinister two-thirds c2 (c1 narrow dexter third)	per pale	banner_background_test_2		6	Stormcrows, Forzho, Albersan, Faith Militant, The Windblown, Bright Banners
+3	quarterly (c2 in 1st and 4th quarters)	quarterly	banner_background_test_3		4	Tarth, Kenning, Vance, Frozen Shore
+4	chequy (8x8)	chequy|checkered|checks	banner_background_test_4		1	Whitehead
+5	chequy, fine (10x10)	chequy|checkered	banner_background_test_5		3	Staunton, Jordayne, Orthys
+6	triangles in rows, large (lozengy-triangular)	lozengy	banner_background_test_6		0	
+7	triangles in rows, small	lozengy	banner_background_test_7		2	Xho, Summer Isles
+8	lozengy (large)	lozengy	banner_background_test_8		0	
+9	lozengy, fine	lozengy	banner_background_test_9		1	Lorosene
+10	tartan / fretty of thin lines	fretty|tartan	banner_background_test_10		0	
+11	plain field (base background; c1 only)	plain	banner_background_test_11	yes	224	Broken Men, Pirates, Highland Brigands, Woodland Brigands, Desert Brigands, Rogue Dothraki
+12	per bend sinister (c2 in the lower half)	per bend sinister	banner_background_test_12		1	Celeris
+13	per chevron (c1 chevron-shaped base rising to the centre, c2 above)	per chevron	banner_background_test_13		1	Vaith
+14	per saltire, flanks c2 (c1 chief and base)	per saltire	banner_background_test_14		1	Allyrion
+15	per saltire, chief and base c2 (c1 flanks)	per saltire|gyronny	banner_background_test_15		0	
+16	gyronny-like cross pattee of four c2 wedges	gyronny|cross pattee	banner_background_test_16		0	
+17	gyronny of sixteen (sunburst rays)	gyronny|sunburst	banner_background_test_17		1	Farman
+18	pinwheel of four, curved (large)	gyronny	banner_background_test_18		1	Kasgos
+19	pinwheel of four, curved (variant)	gyronny	banner_background_test_19		0	
+20	pinwheel of four, small swirl	gyronny	banner_background_test_20		0	
+21	swirl of many curved rays	gyronny	banner_background_test_21		0	
+22	spiral swirl	gyronny	banner_background_test_22		0	
+23	c2 field with a narrow c1 bend sinister	bend sinister	banner_background_test_23		0	
+24	c2 field with a c1 pale (right of centre)	pale|pallet	banner_background_test_24		1	Saldorys
+25	c2 field with a c1 pale (left of centre)	pale|pallet	banner_background_test_25		0	
+26	c2 field with two c1 bars (barry of three)	bars|barry|fess	banner_background_test_26		0	
+27	c2 field with a c1 cross (quarterly by a cross)	cross	banner_background_test_27		0	
+28	c2 field with a c1 saltire	saltire	banner_background_test_28		0	
+29	barry, many thin c1 lines	barry|bars gemmel	banner_background_test_29		1	Flint
+30	bendy sinister, many thin c1 lines	bendy sinister|bendlets	banner_background_test_30		0	
+31	c2 field, small c1 square outline in the centre	inescutcheon voided	banner_background_test_31		0	
+32	c2 field, small c1 square in the centre	inescutcheon|square	banner_background_test_32		0	
+33	c2 field, small c1 lozenge in the centre	lozenge	banner_background_test_33		0	
+34	c2 field, small c1 roundel in the centre	roundel|plate	banner_background_test_34		0	
+35	per fess indented / dancetty (c2 chief, c1 base)	per fess indented|dancetty|chief indented	banner_background_test_35		0	
+36	per fess engrailed / nebuly (c2 chief, c1 base)	per fess nebuly|wavy|engrailed	banner_background_test_36		1	Moro

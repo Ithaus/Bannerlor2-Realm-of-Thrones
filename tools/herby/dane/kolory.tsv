@@ -1,0 +1,258 @@
+# Bannerlord banner colour id -> heraldic tincture by hex (HSV rules in h6_build.py tincture()).
+# hex = effective value in the current load order (Native -> NavalDLC -> ROT-Content; MBObjectManager.MergeElements merges <Color> by id and
+# the LATER module overwrites hex). ROT-Content redefines 37,40,117,124,125,128,129,132,133,136,137,140,141,144,145 (same hues) and 194-251.
+# hex_if_ccs: CCsBanners (now disabled) would load after ROT and overwrite 194-241 with its own palette - ROT clan banners use none of 194-251.
+# evidence: canon tinctures of ROT clans whose banner uses this colour as field / main charge colour. recommended: top ROT-used ids per tincture.
+color_id	hex	tincture	heraldic_name	shade	hsv	defined_by	overrides	hex_if_ccs	player_pick	rot_uses	evidence	recommended
+0	B57A1E	bronze	bronze/ochre	mid	37/0.83/0.71	Native		B57A1E		654		yes
+1	4E1A13	red	sanguine (dark red)	dark	7/0.76/0.31	Native		4E1A13		432		
+2	284E19	green	vert	dark	103/0.68/0.31	Native		284E19		341	Estermont charge=green; Mormont field=green; Tarly field=green; Waynwood field=green	yes
+3	B4F0F1	sky blue	bleu celeste	light	181/0.25/0.95	Native		B4F0F1		0		
+4	793191	purple	purpure	mid	285/0.66/0.57	Native		793191		92		
+5	FCDE90	gold	or	light	43/0.43/0.99	Native		FCDE90		112		
+6	382188	blue	azure	mid	253/0.76/0.53	Native		382188		429	Buckler field=blue; Redwyne field=blue; Swyft charge=blue	yes
+7	DEA940	gold	or	mid	40/0.71/0.87	Native		DEA940		394		
+8	591645	purple	purpure	dark	318/0.75/0.35	Native		591645		84		
+9	FFAD54	orange	tenne	light	31/0.67/1.00	Native		FFAD54		78		
+10	429081	sea green	vert de mer / teal	mid	168/0.54/0.56	Native		429081		22	Manderly field=sea green	
+11	EFC990	gold	or	light	36/0.40/0.94	Native		EFC990		11		
+12	224277	blue	azure	mid	217/0.71/0.47	Native		224277		666	Frey charge=blue; Piper field=blue	yes
+13	CEDAE7	silver	argent	light	211/0.11/0.91	Native		CEDAE7		83		
+14	8D291A	red	gules	mid	8/0.82/0.55	Native		8D291A		193	Qorgyle field=red	
+15	F7BF46	gold	or	mid	41/0.72/0.97	Native		F7BF46		531	Beesbury charge=gold	
+16	6BD5DC	sea green	vert de mer / teal	mid	184/0.51/0.86	Native		6BD5DC		0		
+17	EED690	gold	or	light	45/0.39/0.93	Native		EED690		31		
+18	AEC382	green	vert	mid	79/0.33/0.76	Native		AEC382		9	Estermont field=green	
+19	C3C3C3	grey	cendree	mid	0/0.00/0.76	Native		C3C3C3		348	Rowan field=silver	
+20	D5D7D4	silver	argent	light	100/0.01/0.84	Native		D5D7D4		317	Karstark charge=white	
+21	E7ECD6	white	argent	light	74/0.09/0.93	Native		E7ECD6		54		
+22	EAEEEF	white	argent	light	192/0.02/0.94	Native		EAEEEF		229		
+23	7F6B60	grey	cendree	mid	21/0.24/0.50	Native		7F6B60		588	Marbrand field=grey	yes
+24	967E7E	grey	cendree	mid	0/0.16/0.59	Native		967E7E		218		
+25	B6ABA7	grey	cendree	mid	16/0.08/0.71	Native		B6ABA7		983	Frey field=grey; Snow (Jon) charge=grey	yes
+26	E7D3BA	silver	argent	light	33/0.19/0.91	Native		E7D3BA		150		
+27	EAE1DA	silver	argent	light	26/0.07/0.92	Native		EAE1DA		114		
+28	D9DBCE	silver	argent	light	69/0.06/0.86	Native		D9DBCE		333	Botley charge=silver; Celtigar field=white	yes
+29	DFD6CD	silver	argent	light	30/0.08/0.87	Native		DFD6CD		197		
+30	CAC1BA	silver	argent	light	26/0.08/0.79	Native		CAC1BA		227	Riverlands (kingdom, Tully) charge=silver; Tully charge=silver	
+31	ECE8DD	white	argent	light	44/0.06/0.93	Native		ECE8DD		877	Glover charge=silver; Hightower charge=white	
+32	E0DCD9	silver	argent	light	26/0.03/0.88	Native		E0DCD9		365		yes
+33	EFECE5	white	argent	light	42/0.04/0.94	Native		EFECE5		1119	Ashford charge=white; Corbray field=white; Mooton field=white; Velaryon charge=silver	yes
+34	EAE9E5	silver	argent	light	48/0.02/0.92	Native		EAE9E5		159		
+35	F5F5F5	white	argent	light	0/0.00/0.96	Native		F5F5F5		1474	Arryn charge=white	yes
+36	F5B365	orange	tenne	light	32/0.59/0.96	Native		F5B365		0		
+37	F5B365	orange	tenne	light	32/0.59/0.96	ROT-Content		F5B365		49		
+38	E68C36	orange	tenne	light	29/0.77/0.90	Native		E68C36		1103	Hornwood field=orange; Martell field=orange	yes
+39	DCAC46	gold	or	mid	41/0.68/0.86	Native		DCAC46		996	Baratheon (Renly) charge=gold; Tyrell charge=gold	yes
+40	FFFFFF	white	argent	light	0/0.00/1.00	ROT-Content		FFFFFF		1114	Mertyns charge=white	yes
+41	EEE7D4	white	argent	light	44/0.11/0.93	Native		EEE7D4		160	Stark field=white	
+42	E9E2C5	silver	argent	light	48/0.15/0.91	Native		E9E2C5		0		
+43	EBDCBB	gold	or	light	41/0.20/0.92	Native		EBDCBB		158	Baratheon (Stannis) field=yellow	
+44	F0E0A5	gold	or	light	47/0.31/0.94	Native		F0E0A5		51		
+45	E0C78E	gold	or	light	42/0.37/0.88	Native		E0C78E		525	Lannister charge=gold	
+46	CDA87C	orange	tenne	mid	33/0.40/0.80	Native		CDA87C		126		yes
+47	F9D575	gold	or	mid	44/0.53/0.98	Native		F9D575		718	Oakheart field=gold	yes
+48	E44434	red	gules	light	5/0.77/0.89	Native		E44434		8		
+49	E69077	orange	tenne	light	14/0.48/0.90	Native		E69077		0		
+50	E79C7D	orange	tenne	light	18/0.46/0.91	Native		E79C7D		0		
+51	C94B4E	red	gules	mid	359/0.63/0.79	Native		C94B4E		760	Bolton charge=red; Tarly charge=red	yes
+52	E6B0A6	pink	carnation/rose	light	9/0.28/0.90	Native		E6B0A6		0		
+53	E4C8C7	pink	carnation/rose	light	2/0.13/0.89	Native		E4C8C7		59		yes
+54	F2B0A2	pink	carnation/rose	light	11/0.33/0.95	Native		F2B0A2		0		
+55	DA6C6D	red	gules	light	359/0.50/0.85	Native		DA6C6D		2		
+56	E2BCAF	pink	carnation	light	15/0.23/0.89	Native		E2BCAF		37		
+57	BD7E75	red	gules	mid	8/0.38/0.74	Native		BD7E75		0		
+58	D1C7C5	silver	argent	light	10/0.06/0.82	Native		D1C7C5		199		
+59	975B43	bronze	bronze/copper	mid	17/0.56/0.59	Native		975B43		79	Tallhart field=brown	
+60	E6A57F	gold	or (pale)	light	22/0.45/0.90	Native		E6A57F		0		
+61	7B5E4E	brown	brunatre	dark	21/0.37/0.48	Native		7B5E4E		126		
+62	AC9188	grey	cendree	mid	15/0.21/0.67	Native		AC9188		17		
+63	D7967A	orange	tenne	mid	18/0.43/0.84	Native		D7967A		0		
+64	E6C9BB	silver	argent	light	20/0.19/0.90	Native		E6C9BB		0		
+65	934165	purple	murrey	mid	334/0.56/0.58	Native		934165		207	Brax charge=purple	yes
+66	D39EB0	pink	rose	light	340/0.25/0.83	Native		D39EB0		0		
+67	644974	purple	purpure	mid	278/0.37/0.45	Native		644974		27		
+68	7F658A	grey	cendree	mid	282/0.27/0.54	Native		7F658A		1		
+69	A793AE	grey	cendree	mid	284/0.16/0.68	Native		A793AE		1		
+70	C5057C	purple	purpure	mid	323/0.97/0.77	Native		C5057C		0		
+71	710083	purple	purpure	mid	292/1.00/0.51	Native		710083		407	Belmore field=purple; Dondarrion charge=purple	yes
+72	00667F	sea green	vert de mer / teal	mid	192/1.00/0.50	Native		00667F		105		yes
+73	00A0BA	sea green	vert de mer / teal	mid	188/1.00/0.73	Native		00A0BA		0		
+74	53B7C6	sea green	vert de mer / teal	mid	188/0.58/0.78	Native		53B7C6		23	Velaryon field=sea green	yes
+75	A1B1EF	sky blue	bleu celeste	light	228/0.33/0.94	Native		A1B1EF		1		
+76	7F8CC0	blue	azure	mid	228/0.34/0.75	Native		7F8CC0		0		
+77	5960A8	blue	azure	mid	235/0.47/0.66	Native		5960A8		46		
+78	C1589A	purple	purpure	mid	322/0.54/0.76	Native		C1589A		18		
+79	A34FAF	purple	purpure	mid	292/0.55/0.69	Native		A34FAF		55	Locke field=purple	
+80	D08E54	orange	tenne	mid	28/0.60/0.82	Native		D08E54		189	Ashford field=orange	yes
+81	939BD9	sky blue	bleu celeste	light	233/0.32/0.85	Native		939BD9		0		
+82	EA4F00	orange	tenne	light	20/1.00/0.92	Native		EA4F00		86		
+83	D22D33	red	gules	light	358/0.79/0.82	Native		D22D33		571		
+84	FDE217	yellow	or (bright yellow)	light	53/0.91/0.99	Native		FDE217		614	Blackmont field=yellow; Clegane field=yellow; Cuy charge=gold; Dustin field=yellow; Swyft field=yellow	yes
+85	FFA4DD	pink	rose	light	322/0.36/1.00	Native		FFA4DD		50		yes
+86	CB83D5	lilac	purpure (pale)	light	293/0.38/0.84	Native		CB83D5		1		yes
+87	895D5E	red	gules	mid	359/0.32/0.54	Native		895D5E		0		
+88	02FF19	green	vert	light	125/0.99/1.00	Native		02FF19		65		
+89	019678	sea green	vert de mer / teal	mid	168/0.99/0.59	Native		019678		601		yes
+90	9EC400	green	vert	mid	72/1.00/0.77	Native		9EC400		24		
+91	A34402	bronze	bronze/copper	mid	25/0.99/0.64	Native		A34402		35	Royce field=bronze	
+92	714214	brown	brunatre	dark	30/0.82/0.44	Native		714214		250	Bracken field=brown; Crakehall field=brown; Hunter field=brown; Selmy field=brown; Smallwood charge=brown	yes
+93	FFC3C3	pink	carnation/rose	light	0/0.24/1.00	Native		FFC3C3		52		yes
+94	855FA8	purple	purpure	mid	271/0.43/0.66	Native		855FA8		153		yes
+95	7E6E4A	brown	brunatre	dark	42/0.41/0.49	Native		7E6E4A		13		
+96	3A3321	brown	brunatre	dark	43/0.43/0.23	Native		3A3321		44		
+97	3D2F22	brown	brunatre	dark	29/0.44/0.24	Native		3D2F22		6		
+98	422C2E	red	sanguine (dark red)	dark	355/0.33/0.26	Native		422C2E		99		
+99	453E38	grey	cendree	dark	28/0.19/0.27	Native		453E38		3623	Hunter charge=silver; Waxley field=grey	yes
+100	332C4D	blue	azure	dark	253/0.43/0.30	Native		332C4D		585		yes
+101	515267	grey	cendree	dark	237/0.21/0.40	Native		515267		409	Hightower field=grey	
+102	6C72A2	blue	azure	mid	233/0.33/0.64	Native		6C72A2		0		
+103	8B93BA	grey	cendree	mid	230/0.25/0.73	Native		8B93BA		0		
+104	A6D5DB	sky blue	bleu celeste	light	187/0.24/0.86	Native		A6D5DB		0		
+105	A4B1C2	grey	cendree	mid	214/0.15/0.76	Native		A4B1C2		6		
+106	C5BCD1	silver	argent	light	266/0.10/0.82	Native		C5BCD1		0		
+107	D8AEC5	pink	rose	light	327/0.19/0.85	Native		D8AEC5		0		
+108	CEDADA	silver	argent	light	180/0.06/0.85	Native		CEDADA		12		
+109	D2D6D5	silver	argent	light	165/0.02/0.84	Native		D2D6D5		5		
+110	CACCCB	silver	argent	light	150/0.01/0.80	Native		CACCCB		380	Belmore charge=silver	yes
+111	DFDEDC	silver	argent	light	40/0.01/0.87	Native		DFDEDC		22		
+112	5D5B44	grey	cendree	dark	55/0.27/0.36	Native		5D5B44		68	Cerwyn field=silver; Stark charge=grey	
+113	726B3D	brown	olive-brown	dark	52/0.46/0.45	Native		726B3D		7		
+114	CDCC7C	gold	or	mid	59/0.40/0.80	Native		CDCC7C		7		
+115	8FD1DD	sky blue	bleu celeste	light	189/0.35/0.87	Native		8FD1DD		82		yes
+116	0B0C11	black	sable	dark	230/0.35/0.07	Native		0B0C11		16859	Beesbury field=black; Blackmont charge=black; Caron charge=black; Dondarrion field=black; Greyjoy field=black; Karstark field=black; Manwoody field=black; Mormont charge=black; Night's Watch field=black; Seaworth charge=black; Snow (Jon) field=black; Targaryen field=black; Waynwood charge=black	yes
+117	F5B365	orange	tenne	light	32/0.59/0.96	ROT-Content		F5B365		0		
+118	E36664	red	gules	light	1/0.56/0.89	Native		E36664		0		
+119	456DFF	blue	azure	mid	227/0.73/1.00	Native		456DFF		155		
+120	5FBD72	green	vert	mid	132/0.50/0.74	Native		5FBD72		725		yes
+121	F4D32E	yellow	or (bright yellow)	light	50/0.81/0.96	Native		F4D32E		395		yes
+122	A97435	bronze	bronze/copper	mid	33/0.69/0.66	Native		A97435		639		yes
+123	41281B	brown	brunatre	dark	21/0.58/0.25	Native		41281B		700		yes
+124	41281B	brown	brunatre	dark	21/0.58/0.25	ROT-Content		41281B		325		yes
+125	A97435	bronze	bronze/copper	mid	33/0.69/0.66	ROT-Content		A97435		276		yes
+126	34671E	green	vert	dark	102/0.71/0.40	Native		34671E		1273	Baratheon (Renly) field=green; Oakheart charge=green; Tallhart charge=green; Toland charge=green; Tyrell field=green	yes
+127	F3F3F3	white	argent	light	0/0.00/0.95	Native		F3F3F3		977	Forrester charge=white; Mallister charge=silver	
+128	F3F3F3	white	argent	light	0/0.00/0.95	ROT-Content		F3F3F3		397	Brax field=silver	
+129	34671E	green	vert	dark	102/0.71/0.40	ROT-Content		34671E		128		
+130	7739A7	purple	purpure	mid	274/0.66/0.65	Native		7739A7		100	Dayne field=lilac	
+131	F1C232	gold	or	mid	45/0.79/0.95	Native		F1C232		488	Greyjoy charge=gold; Smallwood field=yellow; Wyl field=gold	
+132	F1C232	gold	or	mid	45/0.79/0.95	ROT-Content		F1C232		136	Caron field=gold	
+133	7739A7	purple	purpure	mid	274/0.66/0.65	ROT-Content		7739A7		52	Mallister field=purple	
+134	5AA4AD	sea green	vert de mer / teal	mid	187/0.48/0.68	Native		5AA4AD		12		
+135	FFE9D4	white	argent	light	29/0.17/1.00	Native		FFE9D4		0		
+136	FFE9D4	white	argent	light	29/0.17/1.00	ROT-Content		FFE9D4		0		
+137	5AA4AD	sea green	vert de mer / teal	mid	187/0.48/0.68	ROT-Content		5AA4AD		6		
+138	3A6298	blue	azure	mid	214/0.62/0.60	Native		3A6298		52	Arryn field=sky blue	
+139	D9D9D9	silver	argent	light	0/0.00/0.85	Native		D9D9D9		29		
+140	D9D9D9	silver	argent	light	0/0.00/0.85	ROT-Content		D9D9D9		190		
+141	3A6298	blue	azure	mid	214/0.62/0.60	ROT-Content		3A6298		7	Cuy field=blue	
+142	830808	red	gules	mid	0/0.94/0.51	Native		830808		1341	Blackwood field=red; Celtigar charge=red; Drumm field=red; Glover field=red; Lannister field=red; Mooton charge=red; Targaryen charge=red	yes
+143	F4CA14	yellow	or (bright yellow)	light	49/0.92/0.96	Native		F4CA14		383	Toland field=yellow	yes
+144	F4CA14	yellow	or (bright yellow)	light	49/0.92/0.96	ROT-Content		F4CA14		66	Rowan charge=gold	
+145	830808	red	gules	mid	0/0.94/0.51	ROT-Content		830808		3874	Umber field=red	yes
+146	2C4D86	blue	azure	mid	218/0.67/0.53	Native		2C4D86		95		
+147	955066	purple	murrey	mid	341/0.46/0.58	Native		955066		10		
+148	6C1512	red	sanguine (dark red)	dark	2/0.83/0.42	Native		6C1512		391	Targaryen charge=red	
+149	211F1F	black	sable	dark	0/0.06/0.13	Native		211F1F		9759	Crakehall charge=black; Harlaw field=black; Royce charge=black; Targaryen field=black	yes
+150	CCC4BF	silver	argent	light	23/0.06/0.80	Native		CCC4BF		183	Seaworth field=grey	
+151	EF9B9B	pink	carnation/rose	light	0/0.35/0.94	Native		EF9B9B		0		
+152	B5D0FD	sky blue	bleu celeste	light	218/0.28/0.99	Native		B5D0FD		83		yes
+153	A8CEAB	green	vert	light	125/0.18/0.81	Native		A8CEAB		49		
+154	8D5C44	orange	tenne	mid	20/0.52/0.55	Native		8D5C44		36		
+155	E9A74D	gold	or	mid	35/0.67/0.91	Native		E9A74D		877		yes
+156	B3A491	grey	cendree	mid	34/0.19/0.70	Native		B3A491		245		
+157	5F4F44	brown	brunatre	dark	24/0.28/0.37	Native		5F4F44		35		
+158	234116	green	vert	dark	102/0.66/0.25	Native		234116	+bg	0		
+159	26406D	blue	azure	dark	218/0.65/0.43	Native		26406D	+bg	1		
+160	7A4253	purple	murrey	mid	342/0.46/0.48	Native		7A4253	+bg	0		
+161	5A1310	red	sanguine (dark red)	dark	2/0.82/0.35	Native		5A1310	+bg	1		
+162	2F2A2B	black	sable	dark	348/0.11/0.18	Native		2F2A2B	+bg	0		
+163	744C38	brown	brunatre	dark	20/0.52/0.45	Native		744C38	+bg	0		
+164	594012	brown	brunatre	dark	39/0.80/0.35	Native		594012	+bg	2		
+165	BF5A25	orange	tenne	mid	21/0.81/0.75	Native		BF5A25	+bg	1		
+166	FFCF83	gold	or	light	37/0.49/1.00	Native		FFCF83	sigil	0		
+167	85827F	grey	cendree	mid	30/0.05/0.52	Native		85827F	sigil	1		
+168	CE9697	pink	carnation/rose	light	359/0.27/0.81	Native		CE9697	sigil	0		
+169	95A9CC	sky blue	bleu celeste	light	218/0.27/0.80	Native		95A9CC	sigil	1		yes
+170	89A78B	grey	cendree	mid	124/0.18/0.65	Native		89A78B	sigil	2		
+171	FFB53E	gold	or	mid	37/0.76/1.00	Native		FFB53E	sigil	6		
+172	FFFFFF	white	argent	light	0/0.00/1.00	Native		FFFFFF	sigil	1		
+173	C7BEB7	silver	argent	light	26/0.08/0.78	Native		C7BEB7	sigil	0		
+174	B38841	bronze	bronze/ochre	mid	37/0.64/0.70	Native		B38841		0		
+175	848B65	grey	cendree	mid	71/0.27/0.55	Native		848B65		0		
+176	5A7A4F	green	vert	mid	105/0.35/0.48	Native		5A7A4F		0		
+177	7CAFC7	blue	azure	mid	199/0.38/0.78	Native		7CAFC7		0		
+178	7C2B1A	red	gules	mid	10/0.79/0.49	Native		7C2B1A		0		
+179	AC5F2E	bronze	bronze/copper	mid	23/0.73/0.67	Native		AC5F2E		0		
+180	72583B	brown	brunatre	dark	32/0.48/0.45	Native		72583B		0		
+181	61725E	grey	cendree	dark	111/0.18/0.45	Native		61725E		0		
+182	A6825C	orange	tenne	mid	31/0.45/0.65	Native		A6825C		0		
+183	CCC3AB	gold	or	light	44/0.16/0.80	Native		CCC3AB		0		
+184	8B7C73	grey	cendree	mid	23/0.17/0.55	Native		8B7C73		0		
+185	D0884E	orange	tenne	mid	27/0.62/0.82	Native		D0884E		0		
+186	7B5869	grey	cendree	mid	331/0.28/0.48	Native		7B5869		0		
+187	66CCFF	blue	azure	mid	200/0.60/1.00	Native		66CCFF		0		
+188	AA415D	purple	murrey	mid	344/0.62/0.67	Native		AA415D		0		
+189	687F5E	grey	cendree	mid	102/0.26/0.50	Native		687F5E		0		
+190	4E75BC	blue	azure	mid	219/0.59/0.74	Native		4E75BC		0		
+191	F1C178	gold	or	mid	36/0.50/0.95	Native		F1C178		0		
+192	D1C4A4	gold	or	light	43/0.22/0.82	Native		D1C4A4		0		
+193	5E5737	brown	olive-brown	dark	49/0.41/0.37	Native		5E5737		0		
+194	2E2E2E	black	sable	dark	0/0.00/0.18	ROT-Content	ROT-Content:2E2E2E, CCsBanners:F8F9BE	F8F9BE (gold)		0		
+195	0E3C4A	sea green	vert de mer / teal	mid	194/0.81/0.29	ROT-Content	CCsBanners:F9EBBE	F9EBBE (gold)		0		
+196	362D02	brown	olive-brown	dark	50/0.96/0.21	ROT-Content	ROT-Content:362D02, CCsBanners:F9DFBE	F9DFBE (gold)		0		
+197	311339	purple	purpure	dark	287/0.67/0.22	ROT-Content	ROT-Content:311339, CCsBanners:F9D0BE	F9D0BE (pink)		0		
+198	170B80	blue	azure	mid	246/0.91/0.50	ROT-Content	ROT-Content:170B80, CCsBanners:F9C7BE	F9C7BE (pink)		0		
+199	99915D	gold	or	mid	52/0.39/0.60	ROT-Content	CCsBanners:F4A8F4	F4A8F4 (pink)		0		
+200	2C320E	green	vert	dark	70/0.72/0.20	ROT-Content	ROT-Content:2C320E, CCsBanners:591313	591313 (red)		0		
+201	454642	black	sable	dark	75/0.06/0.27	ROT-Content	ROT-Content:454642, CCsBanners:712116	712116 (red)		0		
+202	44317D	purple	purpure	mid	255/0.61/0.49	ROT-Content	ROT-Content:44317D, CCsBanners:963901	963901 (bronze)		0		
+203	700F0F	red	sanguine (dark red)	dark	0/0.87/0.44	ROT-Content	CCsBanners:703A1D	703A1D (brown)		0		
+204	A0D57F	green	vert	light	97/0.40/0.84	ROT-Content	ROT-Content:A0D57F, CCsBanners:BB832F	BB832F (bronze)		0		
+205	610201	red	sanguine (dark red)	dark	1/0.99/0.38	ROT-Content	ROT-Content:610201, CCsBanners:FA9A50	FA9A50 (orange)		0		
+206	101126	black	sable	dark	237/0.58/0.15	ROT-Content	CCsBanners:EE9A00	EE9A00 (gold)	sigil	0		
+207	003100	green	vert	dark	120/1.00/0.19	ROT-Content	CCsBanners:FFE303	FFE303 (yellow)	sigil	0		
+208	398C77	sea green	vert de mer / teal	mid	165/0.59/0.55	ROT-Content	ROT-Content:398C77, CCsBanners:FBEC5D	FBEC5D (gold)		1		
+209	505666	grey	cendree	dark	224/0.22/0.40	ROT-Content	ROT-Content:505666, CCsBanners:FAAA32	FAAA32 (gold)		0		
+210	CC8836	orange	tenne	mid	33/0.74/0.80	ROT-Content	ROT-Content:CC8836, CCsBanners:7A4C32	7A4C32 (brown)		1		
+211	25522C	green	vert	dark	129/0.55/0.32	ROT-Content	CCsBanners:DC1A0E	DC1A0E (red)		0		
+212	C21E0C	red	gules	mid	6/0.94/0.76	ROT-Content	ROT-Content:C21E0C, CCsBanners:BD030A	BD030A (red)		0		
+213	A69B76	brown	brunatre	mid	46/0.29/0.65	ROT-Content	ROT-Content:A69B76, CCsBanners:283F15	283F15 (green)		0		
+214	96362C	red	gules	mid	6/0.71/0.59	ROT-Content	ROT-Content:96362C, CCsBanners:8FA685	8FA685 (grey)		0		
+215	593A1D	brown	brunatre	dark	29/0.67/0.35	ROT-Content	CCsBanners:1E4B23	1E4B23 (green)		0		
+216	E0D8D1	silver	argent	light	28/0.07/0.88	ROT-Content	ROT-Content:E0D8D1, CCsBanners:326437	326437 (green)		0		
+217	3C75A7	blue	azure	mid	208/0.64/0.65	ROT-Content	ROT-Content:3C75A7, CCsBanners:7BCC81	7BCC81 (green)		0		
+218	E7ECF0	white	argent	light	207/0.04/0.94	ROT-Content	ROT-Content:E7ECF0, CCsBanners:74E581	74E581 (green)		0		
+219	007717	green	vert	mid	132/1.00/0.47	ROT-Content	ROT-Content:007717, CCsBanners:8BF67A	8BF67A (green)		0		
+220	D6D31D	gold	or	mid	59/0.86/0.84	ROT-Content	ROT-Content:D6D31D, CCsBanners:9EE59F	9EE59F (green)		0		
+221	942022	red	gules	mid	359/0.78/0.58	ROT-Content	ROT-Content:942022, CCsBanners:A3FFA4	A3FFA4 (green)		0		
+222	131111	black	sable	dark	0/0.11/0.07	ROT-Content	ROT-Content:131111, CCsBanners:263F5C	263F5C (blue)		0		
+223	181717	black	sable	dark	0/0.04/0.09	ROT-Content	ROT-Content:181717, CCsBanners:DDAAF4	DDAAF4 (lilac)		0		
+224	C1A31B	gold	or	mid	49/0.86/0.76	ROT-Content	ROT-Content:C1A31B, CCsBanners:143D64	143D64 (blue)		0		
+225	C89427	gold	or	mid	41/0.80/0.78	ROT-Content	ROT-Content:C89427, CCsBanners:93ABC7	93ABC7 (blue)		0		
+226	C61C24	red	gules	mid	357/0.86/0.78	ROT-Content	ROT-Content:C61C24, CCsBanners:2A5B89	2A5B89 (blue)		0		
+227	DE1D26	red	gules	light	357/0.87/0.87	ROT-Content	ROT-Content:DE1D26, CCsBanners:1F2862	1F2862 (blue)		0		
+228	DCC027	yellow	or (bright yellow)	light	51/0.82/0.86	ROT-Content	ROT-Content:DCC027, CCsBanners:9098B0	9098B0 (grey)		0		
+229	80807F	grey	cendree	mid	60/0.01/0.50	ROT-Content	ROT-Content:80807F, CCsBanners:8594B4	8594B4 (grey)		0		
+230	E9E9E7	silver	argent	light	60/0.01/0.91	ROT-Content	ROT-Content:E9E9E7, CCsBanners:A9B5D0	A9B5D0 (sky blue)		0		
+231	906302	bronze	bronze/ochre	mid	41/0.99/0.56	ROT-Content	ROT-Content:906302, CCsBanners:ABBDE3	ABBDE3 (sky blue)		0		
+232	644110	brown	brunatre	dark	35/0.84/0.39	ROT-Content	ROT-Content:644110, CCsBanners:B8C9F9	B8C9F9 (sky blue)		0		
+233	6E4E22	brown	brunatre	dark	35/0.69/0.43	ROT-Content	ROT-Content:6E4E22, CCsBanners:7D7D7D	7D7D7D (grey)		0		
+234	846630	bronze	bronze/ochre	mid	39/0.64/0.52	ROT-Content	ROT-Content:846630, CCsBanners:C8C5C3	C8C5C3 (silver)		0		
+235	141413	black	sable	dark	60/0.05/0.08	ROT-Content	ROT-Content:141413, CCsBanners:7E4352	7E4352 (purple)		0		
+236	494847	black	sable	dark	30/0.03/0.29	ROT-Content	ROT-Content:494847, CCsBanners:675B65	675B65 (grey)		0		
+237	928D6F	grey	cendree	mid	51/0.24/0.57	ROT-Content	ROT-Content:928D6F, CCsBanners:7E5060	7E5060 (purple)		0		
+238	22211F	black	sable	dark	40/0.09/0.13	ROT-Content	ROT-Content:22211F, CCsBanners:C08082	C08082 (pink)		0		
+239	1F527E	blue	azure	mid	208/0.75/0.49	ROT-Content	ROT-Content:1F527E, CCsBanners:F569B6	F569B6 (purple)		0		
+240	C22628	red	gules	mid	359/0.80/0.76	ROT-Content	ROT-Content:C22628, CCsBanners:55295E	55295E (purple)		0		
+241	BA8A16	bronze	bronze/ochre	mid	42/0.88/0.73	ROT-Content	ROT-Content:BA8A16, CCsBanners:CF95E3	CF95E3 (lilac)		0		
+242	3A3426	brown	brunatre	dark	42/0.34/0.23	ROT-Content	ROT-Content:3A3426	3A3426		0		
+243	66237E	purple	purpure	mid	284/0.72/0.49	ROT-Content	ROT-Content:66237E	66237E		0		
+244	1E3C7C	blue	azure	mid	221/0.76/0.49	ROT-Content	ROT-Content:1E3C7C	1E3C7C		0		
+245	961C1A	red	gules	mid	1/0.83/0.59	ROT-Content	ROT-Content:961C1A	961C1A		0		
+246	2B2012	black	sable	dark	34/0.58/0.17	ROT-Content	ROT-Content:2B2012	2B2012		0		
+247	451010	red	sanguine (dark red)	dark	0/0.77/0.27	ROT-Content	ROT-Content:451010	451010		0		
+248	3F47B5	blue	azure	mid	236/0.65/0.71	ROT-Content	ROT-Content:3F47B5	3F47B5		0		
+249	3F47B5	blue	azure	mid	236/0.65/0.71	ROT-Content	ROT-Content:3F47B5	3F47B5		0		
+250	3E782C	green	vert	mid	106/0.63/0.47	ROT-Content	ROT-Content:3E782C	3E782C		0		
+251	3D3228	brown	brunatre	dark	29/0.34/0.24	ROT-Content		3D3228	sigil	0		
