@@ -2395,3 +2395,13 @@ patch test/at1-cs-bitwa.diff. Bieg 1 (bez modow): 2 bitwy, 181 ciosow, 30 panik,
 (bylo 342/23); 15 progow nbitwa, 0 NIE. Bieg 2 (z BA i IB, Armoury-2026-10-16_11-10-08.log): 3/3 bitwy, 569 ciosow, 0 ERROR, CrashScribe bez BLAME BA/IB.
 DO SPRAWDZENIA U JEFFA: krzyk paniki raz, ranni uciekaja od niego, pasek T6, dzwieki (za duzo krzykow? rogi?), wiwaty w srodku bitwy (powinny byc wylaczone).
 W toku: noc-turniej (poprawki po recenzjach), noc-wioski (kod), recenzja testu bitwy.
+
+### 54. WGRANIE 69 (16.10 ok. 11:35 zegara komp.) - turniej: lancuch platnikow + dlugi + wyrownanie Seagard - START TUTAJ
+W grze: `w-toku/zbior-e8` **c3ea7e03** (= `w-toku/noc-wgranie-69`) | Armoury 6c642b30; reszta bez zmian. Kopie *.bak-2026-10-16-wgranie69-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie69-przed.
+= 68 + noc-turniej (80714c62 + 30a27756 po 2 recenzjach, 14 uwag): TourneyPay.cs - zloto TXP (nagroda, premie meczu), wygrana zakladu, plansza, arena, cena nagrody: kasa
+osady (nadwyzka; stawka zakladu wraca zawsze) -> rod gospodarza (glowa) -> rod panujacy; rod daje do rezerwy wojny (max(20000, 20 x dochod) + 5000/doroslego, glowa zostaje
+z zoldem dnia); osada gracza - bez krola; reszta = dlug osady wobec gracza (zapis arm_tp_debts), splata po ClanBudget.Daily tym samym lancuchem, tempem skrzyni, od 50 d;
+krolestwo w wojnie z graczem czeka do pokoju. D3: wyrownanie Seagard 1522 (1300 nagrody + 222 zakladu - log 109019 "zaplacone 1203", nie 1205 ze zrzutu) raz, tylko zapis
+sprzed zmiany (bez klucza arm_tp_debts), bohater Ithauser, ROT_town33, doba >= 109020; flaga 4 stany. Klucze TourneyPayerChain / TourneyDebts / TourneySeagardCatchUp.
+Test (Armoury-2026-10-16_11-22-18.log): 8 dob + 2 bitwy (1007 ciosow), 0 ERROR, nturniej 7 progow 0 NIE, nbitwa 15 progow 0 NIE; D3 na zapisie F "nie dotyczy - Regenard".
+DO SPRAWDZENIA U JEFFA (pierwsze wczytanie): linia "Turniej-platnik (TP): ... wyrownanie Seagard 16.10: zrobione teraz", komunikat o 1522, splaty w kolejnych dobach.
