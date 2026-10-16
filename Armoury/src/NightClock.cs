@@ -148,12 +148,12 @@ namespace Armoury
             else
                 what = "NIE - zapas: licznik tikow (" + (_fEvent == null || _fNext == null ? "brak pola gry" : "termin poza zakresem " + _badTerm + " x")
                        + "; godzina ksiegi " + HM(NomH) + ", zegar " + HM(nowH) + ")";
-            Log.Info("Nocleg (zegar ksiegi): godzina ksiegi z terminu ticku godzinowego gry " + what
-                     + " | NightLedgerClock " + YesNo(s != null && s.NightLedgerClock) + ", PlayerSleepGuard " + YesNo(s != null && s.PlayerSleepGuard)
+            Log.Info("Nocleg (zegar ksiegi): start sesji | godzina ksiegi z terminu ticku godzinowego gry " + what
+                     + " | klucze: NightLedgerClock " + YesNo(s != null && s.NightLedgerClock) + ", PlayerSleepGuard " + YesNo(s != null && s.PlayerSleepGuard)
                      + ", NightMarchNotice " + YesNo(s != null && s.NightMarchNotice) + ".");
         }
 
-        private static string YesNo(bool b) { return b ? "tak" : "nie"; }
+        private static string YesNo(bool b) { return b ? "TAK" : "NIE"; }
 
         /// <summary>Kawalek linii switu ksiegi AI: zrodlo i stan zegara od poprzedniego switu; liczniki od zera po wypisaniu.</summary>
         internal static string DawnText()
@@ -164,7 +164,7 @@ namespace Armoury
                        + "; tikow z godzina zegara inna niz ksiegi " + _diff + " z " + _ticks
                        + (_fallTicks > 0 ? " (z licznika zapasowego " + _fallTicks + ")" : "")
                        + "; dob bez switu od poprzedniego " + gap
-                       + (_stumbles > 0 || _badTerm > 0 ? "; potkniecia zegara w sesji " + _stumbles + ", terminy poza zakresem " + _badTerm : "");
+                       + "; potkniecia zegara w sesji " + _stumbles + ", terminy poza zakresem " + _badTerm;
             _lastDawnDay = day;
             _ticks = 0; _diff = 0; _fallTicks = 0;
             return t;

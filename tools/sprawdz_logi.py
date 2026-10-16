@@ -26699,7 +26699,7 @@ def noboz_main(logp):
                 camp_len = (b - a) % 24 or 6
                 continue
             if s.startswith(NO_START):
-                if s.startswith(NO_START + "godzina ksiegi"):
+                if s.startswith(NO_START + "start sesji"):
                     sessions.append({"start": s, "dawns": [], "players": []})
                 continue
             if not sessions:
