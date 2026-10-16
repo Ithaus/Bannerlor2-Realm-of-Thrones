@@ -1435,6 +1435,7 @@ namespace Armoury
             try { CampScene.StartLine(); } catch (Exception e) { Log.Error("CampScene.StartLine", e); }   // E7/O2 (229): linia startowa "CampScene (E7/O2)" - prefaby obozu sprawdzone raz na proces (PrefabExists), tylko przy CampBattlePropsEnabled
             try { StateHygiene.SessionStart(); } catch (Exception e) { Log.Error("StateHygiene.SessionStart", e); }   // E8/S (246): linia startowa "Porzadek stanu (E8/S)" - ile klas wyzerowal konstruktor tej kampanii i co zostalo w pamieci po poprzedniej (tylko log)
             try { Seal31.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31.EnsureHooks", e); }   // 3.1 (31): latki w kampanii (portfele wezwan, modele karawan, DTE) - PO CrownCallToWar i oknach ksiegi
+            try { SiegePhantomLift.SessionStart(); } catch (Exception e) { Log.Error("SiegePhantomLift.SessionStart", e); }   // OB6 (noc-drobne): linia "Oboz bez sily (OB6): start sesji", pamiec serii od zera
             try { SiegeWalls.SessionStart(); } catch (Exception e) { Log.Error("SiegeWalls.SessionStart", e); }   // mury oblezen: linia startowa (modele, latki, wlasciciele latek Harmony) - PO Seal31.EnsureHooks
             try { DebtLadder.EnsureHooks(); } catch (Exception e) { Log.Error("DebtLadder.EnsureHooks", e); }   // 168: portfele gry bez zaliczki (OBIEG-1), B5 (karawany i warsztaty BK) - latki w kampanii
             try { MercTenure.EnsureHooks(); } catch (Exception e) { Log.Error("MercTenure.EnsureHooks", e); }   // M6a-1: najem gry i zwolnienie / przejscie BK (latki w kampanii)
@@ -1747,6 +1748,7 @@ namespace Armoury
             try { SiegeRansom.Daily(); } catch (Exception e) { Log.Error("SiegeRansom.Daily", e); } DayProfile.Lap("SiegeRansom.Daily");   // okup zamiast szturmu: linia doby, porzadek pamieci, rozejmy
             try { SiegeWalls.Daily(); } catch (Exception e) { Log.Error("SiegeWalls.Daily", e); } DayProfile.Lap("SiegeWalls.Daily");   // mury oblezen OB0: linia doby, porzadek pamieci
             try { SiegeWalls2.Daily(); } catch (Exception e) { Log.Error("SiegeWalls2.Daily", e); } DayProfile.Lap("SiegeWalls2.Daily");   // oblezenia 2: glod oblezenia (smierc, kapitulacja), linia "Oblezenia 2 (doba)"
+            try { SiegePhantomLift.Daily(); } catch (Exception e) { Log.Error("SiegePhantomLift.Daily", e); } DayProfile.Lap("SiegePhantomLift.Daily");   // OB6 (noc-drobne): oboz bez sily zwija oblezenie, linia "Oboz bez sily (OB6): dzien"
             // N7 (decyzja Jeffa 13.10): rozbici pod choragiew - gotowosc, odbior przez druzyny rodu (limit i zold z budzetu wczoraj, jak W5), rozejscie po czasie czekania;
             // PRZED H3 i wyrzutkami: ci, ktorzy sie rozeszli, wchodza do linii "Przegrani (H3)" (domy) i "Pula wyrzutkow (E4/3)" (naplyw) tej samej doby
             try { StragglersRally.Daily(); } catch (Exception e) { Log.Error("StragglersRally.Daily", e); } DayProfile.Lap("StragglersRally.Daily");

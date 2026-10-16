@@ -108,6 +108,7 @@ namespace CrashScribe
 
         // --- P1 audytu modow 14.10: tytuly BannerKings na mapie ROT (patrz BkTitles.cs) ---
         public static bool BkTitlesUseRotFile = true;   // AM-26: sciezka pliku tytulow ROT ustawiana przed KAZDYM odczytem BK (InitializeTitles nowej gry i RetrofitOrphanedTitles kazdego wczytania) - dotad BKROTPatch ustawial ja tylko dla nowej gry, a wczytanie w nowym procesie bralo kalradyjski titles.xml BK (30 ksiestw Calradii w kampanii); false = jak dotad (b47fecc3)
+        public static bool BkTitlesVillageFix = true;   // AUD-P1-5 (tylko z BkTitlesUseRotFile; BkTitles.FixVillages): wies przy twierdzy z tytulem BK bez wlasnego tytulu dostaje go w pierwszej godzinie sesji (biegnaca kampania) - lordship jak BK przy starcie gry (CreateLordship: de iure posiadacza twierdzy, kontrakt i suweren twierdzy, wasal twierdzy); BK sam nie dorabia; linia 'Mends: tytuly BK (AUD-P1-5)' z nazwami wsi; false = tylko nazwy (dorobione tytuly zostaja w zapisie)
         public static bool BkTitlesRot818 = true;       // AM-27 (tylko z BkTitlesUseRotFile): nasz plik tytulow dla mapy ROT 8.1.8 (zasob DLL, zapisywany do Documents\...\CrashScribe\bk_titles_rot818.xml) zamiast titles_6_3.xml BKROT z ROT 6.x - kazde z 97 miast i 130 zamkow z tytulem (dotad 25 bez), Lorath / Ibben / Qarth z tytulem krolewskim; false = titles_6_3 BKROT
 
         // --- P3 audytu modow 14.10 (RAPORT-AUDYT-MODOW.md rozdz. 3 i 5; kazdy klucz false = zachowanie b47fecc3) ---
@@ -219,6 +220,7 @@ namespace CrashScribe
                         case "UniqueCompanionsLog": UniqueCompanionsLog = B(v); break;
                         case "BkTitlesUseRotFile": BkTitlesUseRotFile = B(v); break;
                         case "BkTitlesRot818": BkTitlesRot818 = B(v); break;
+                        case "BkTitlesVillageFix": BkTitlesVillageFix = B(v); break;
                         case "NotablesKeepSettlementCulture": NotablesKeepSettlementCulture = B(v); break;
                         case "LocalLeviesPreachersOnly": LocalLeviesPreachersOnly = B(v); break;
                         case "CultureTemplateRepair": CultureTemplateRepair = B(v); break;

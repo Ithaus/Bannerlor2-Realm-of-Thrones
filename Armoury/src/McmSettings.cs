@@ -6216,6 +6216,18 @@ namespace Armoury
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool BesiegedReliefKingsArmy { get; set; } = true;
 
+        [SettingPropertyBool("Siege Phantom Lift", HintText = "A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted), or whose parties together have a strength below 1 in the game's own reckoning, for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not a camp with the player's own party, the player's army or a party of the player's clan, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege")]
+        [SettingPropertyGroup("Siege camps without fighting men")]
+        public bool SiegePhantomLift { get; set; } = true;
+
+        [SettingPropertyInteger("Siege Phantom Lift Days", 1, 30, "0", HintText = "with Siege Phantom Lift: how many days in a row a siege camp must be without enough fighting men before it breaks up (1-30)")]
+        [SettingPropertyGroup("Siege camps without fighting men")]
+        public int SiegePhantomLiftDays { get; set; } = 3;
+
+        [SettingPropertyInteger("Siege Phantom Min Men", 1, 50, "0", HintText = "with Siege Phantom Lift: a siege camp whose parties together have fewer healthy men than this counts as without fighting men (1-50)")]
+        [SettingPropertyGroup("Siege camps without fighting men")]
+        public int SiegePhantomMinMen { get; set; } = 5;
+
         [SettingPropertyBool("Clan Leave Log", HintText = "Writes a log line each time a clan holding a town or castle leaves or joins a realm: the clan, the old and the new realm, the reason the game gives, its leader's relation with both rulers, its coin and its fiefs. Log only - nothing in the game changes")]
         [SettingPropertyGroup("Clans changing realms")]
         public bool ClanLeaveLog { get; set; } = true;
@@ -7801,6 +7813,9 @@ namespace Armoury
             s.BesiegedReliefTownForce = BesiegedReliefTownForce;
             s.BesiegedReliefCastleForce = BesiegedReliefCastleForce;
             s.BesiegedReliefKingsArmy = BesiegedReliefKingsArmy;
+            s.SiegePhantomLift = SiegePhantomLift;
+            s.SiegePhantomLiftDays = SiegePhantomLiftDays;
+            s.SiegePhantomMinMen = SiegePhantomMinMen;
             s.ClanLeaveLog = ClanLeaveLog;
             s.FixBkrotModelChains = FixBkrotModelChains;
             s.FixBkrotMapModelChains = FixBkrotMapModelChains;

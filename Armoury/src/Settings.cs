@@ -2382,6 +2382,15 @@ namespace Armoury
         // gra zaklada armie Defender, zwykly koszt wplywu), chyba ze armia krolestwa juz zbiera sie albo idzie na odsiecz tej osady. Off = tylko armie gry i BK
         public bool BesiegedReliefKingsArmy = true;        // with Besieged Relief First: the ruler of a realm whose town or castle is besieged, when he is free, within reach and has lords he can call, raises an army to relieve it - the same call to arms as for a siege, at the same cost of influence - unless an army of the realm is already gathering for it or marching to it. Off = only the armies the game and Banner Kings raise on their own
 
+        // --- Siege camps without fighting men ---
+        // OB6 (noc-drobne 16.10; SiegePhantomLift.cs): oboz, w ktorym wszystkie druzyny razem maja mniej niz SiegePhantomMinMen zdrowych ludzi przez
+        // SiegePhantomLiftDays dob z rzedu (albo suma sily obozu < 1 - po recenzji), zwija sie droga gry przy pokoju (BesiegerCamp = null, SetMoveModeHold;
+        // zapasowo BesiegerCamp.RemoveSiegePartyInternal dla druzyny z listy obozu bez obozu u siebie); bez gracza (oboz, armia, rod, w murach),
+        // czynnych oblezen fabuly ROT (4 wydarzenia ROT.Events), Innych i bitwy w toku; seria tylko w pamieci. Test 6-letni: oboz o sile 0 trzymal Eastwatch (castle_B8) ok. 796 dob. Off = 39f8fe72
+        public bool SiegePhantomLift = true;               // A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted), or whose parties together have a strength below 1 in the game's own reckoning, for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not a camp with the player's own party, the player's army or a party of the player's clan, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege
+        public int SiegePhantomLiftDays = 3;               // with Siege Phantom Lift: how many days in a row a siege camp must be without enough fighting men before it breaks up (1-30)
+        public int SiegePhantomMinMen = 5;                 // with Siege Phantom Lift: a siege camp whose parties together have fewer healthy men than this counts as without fighting men (1-50)
+
         // --- Clans changing realms ---
         // S11 (projekt oblezen 14.10, rozdz. 2; KingdomBalance.OnClanChangedKingdom): linia przy kazdej zmianie krolestwa rodu z miastem albo zamkiem - pomiar, bez reguly
         public bool ClanLeaveLog = true;                   // Writes a log line each time a clan holding a town or castle leaves or joins a realm: the clan, the old and the new realm, the reason the game gives, its leader's relation with both rulers, its coin and its fiefs. Log only - nothing in the game changes

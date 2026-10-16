@@ -363,6 +363,13 @@
        start-up to Documents\Mount and Blade II Bannerlord\CrashScribe\bk_titles_rot818.xml. Takes effect for a new
        campaign; set to false to use the BKROTPatch file. -->
   <BkTitlesRot818>true</BkTitlesRot818>
+  <!-- Villages without a Banner Kings title (mod audit 14.10, AUD-P1-5; works only with BkTitlesUseRotFile). Banner Kings gives
+       every village of a titled town or castle its own lordship once, when a new campaign starts, and never again later; in a
+       running campaign two villages were left without one. With this on, at the first hour of each session such a village gets
+       the same lordship Banner Kings gives every other village: held by the rightful holder of its town or castle (or by its
+       owner, if there is none), with the laws and the realm of that town or castle, and listed among its vassal titles. The log
+       names every such village. Set to false to only name them; titles already given stay in the save. -->
+  <BkTitlesVillageFix>true</BkTitlesVillageFix>
   <!-- Notables keep the culture of their settlement (mod audit 14.10, AM-20). BannerKings lets a lord win the artisans and
        merchants of his towns over to his own culture: he pays influence for it and the notable likes him a little less.
        CrashScribe turns every notable back to the culture of the settlement the next morning (volunteers come from the
