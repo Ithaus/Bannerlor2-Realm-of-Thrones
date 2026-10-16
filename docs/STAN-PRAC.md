@@ -2262,3 +2262,12 @@ Testy: zapis F 60 dob (9 galezi), 30 dob (10 galezi, N7 tak), 8 dob z profilem (
 NK-6 (prog P skarbcow), NE-5 (ekran kuzni), znane NIE (OB-4, AB-11b, OB2-6a).
 Rozpoznania bez kodu: bandyci (roz/wyniki/rozp_bandyci.json) - to limit gry ROT (zajete kryjowki x 12), plateau ok. 1100-1150 band w tescie 4-letnim, nie naprawiac bez Jeffa;
 trebusze (rozp_trebusze.json) - druga ekipa zaczyna trebusz po gotowym obozie i za wolno: 0 trebuszy gotowych, 0 z 12 miast zdobytych -> W TOKU galaz w-toku/noc-tb2 (WGRANIE 64).
+
+### 44. WGRANIE 64 (16.10 noc, ok. 20:15 zegara komp.) - START TUTAJ
+W grze: `w-toku/zbior-e8` **3f8baef1** (= `noc/wgranie-64`) | Armoury a7e5fe6a; CrashScribe da755a8a i reszta bez zmian od 63. Kopie *.bak-2026-10-16-wgranie64-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie64-przed.
+= WGRANIE 63 + noc-tb2 (SiegeTrebuchetEarly): (a) trebusz drugiej ekipy od 1. doby oblezenia miasta i stolicy (rownolegle z przygotowaniami obozu), (b) trebusz w tempie zamku
+(klasa OB4 dalej dla obozu, taranu i wiezy), (c) wyrwa daje szturm bez kary za machiny w budowie (szansa jak DR). Test zapis F 40 dob: 0 ERROR, trebusze AI zaczete w 1. dobie 8,
+zbudowane 7 (przed: 0), rozbity odcinek 1; miasta zdobyte 0 z 7 (odsiecz pokonala 3 - decyzja Jeffa OB5). Narzedzie: NE-5 (stan ekranu kuzni z linii SmithWood), NE-13 bez N7, NW-8b INFO.
+Odkrycie (rozp_trebusze): zmierzone tempo budowy AI 2.5 x nizsze od opisow MCM (RB bierze 0.4 zamiast 1.0 z pliku) - nie ruszane.
+W TOKU: w-toku/noc-ekonomia2 (zb/n-ekon2 od 3f8baef1; wf_e2f60a6c-e13): E1 jaja ze wsi, E2 budzet kategorii bez producenta na istniejace zbytki, E3 len/welna/skory wozem do miast,
+E4 opal dla mieszczan - wgranie tylko po tescie 120 dob (trend udzialu ludu w zlocie).
