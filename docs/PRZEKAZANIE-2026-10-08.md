@@ -1342,3 +1342,19 @@ AccessTools.Method(BKSmithingModel, ...) zwraca metode bazowa z ReflectedType = 
 przy starcie: koszt -1 przy zapasie 50 kg, zero linii postfiksu). Ekran kuzni pokazywal 1 drewno mimo zapasu 99 kg. Samosprawdzenie i 12 linii diagnostyki kosztu zostaja w logu.
 UWAGA na przyszlosc: ten sam wzorzec (model.GetType() + metoda z klasy bazowej) moze byc gdzie indziej - sprawdzic latki "czynnego modelu" (SiegeWalls2 ActionPost/FoodPost,
 ArmyCohesionYear) czy metoda jest DECLARED w typie modelu.
+
+### 41. NOC 15/16.10 - DRUGIE KONTO (sesja 6ba92574) - START TUTAJ
+Najpierw: `docs/RAPORT-NOCNY-2026-10-16.md` (raport dla Jeffa: co zrobione, decyzje Claude z wylacznikami MCM), potem `docs/STAN-PRAC.md` rozdz. 41-44 (WGRANIA 62-64).
+Audyt ekonomii: `docs/AUDYT-EKONOMII-2026-10-16.md` (plan N1-N13 / P1-P14 / D1-D6; zrobione tej nocy: N1-N4, N6, N8-N12, P1 owoce+jaja, P2 len/welna, P7 opal, P8 futra + budzet kategorii bez producenta).
+W grze: WGRANIE 64 (`noc/wgranie-64`, zbior-e8 3f8baef1) - albo 65, jesli STAN-PRAC ma rozdz. 45 (noc-ekonomia2 po tescie 120 dob).
+Galezie nocy (wszystkie scalone do zbior-e8 i wypchniete): w-toku/noc-misje, noc-oboz, noc-skarbiec, noc-drobne, noc-harmony, noc-oblezenia, noc-ceny, noc-sprzet,
+noc-ekonomia, noc-wydajnosc (baza 508b0346!), noc-tb2 (baza c95146c5), noc-ekonomia2 (baza 3f8baef1). Drzewa: zb/n-<klucz>.
+Narzedzia sesji (scratchpad 6ba92574): `scal1.sh <klucz> [baza]` (scalenie + kontrola narzedzia + zdublowane nazwy globalne + gen_mcm + build ruszonych modow + commit),
+`cs_at.sh <commit> <nazwa>` (CrashScribe z trybem autotestu, konflikty = suma), `stan_wf.py <wf...>` (stan workflow z journal), zestawy test/fin50a..fin54.
+Wyniki rozpoznan (JSON): scratchpad 6ba92574 `roz/wyniki/rozp_*.json` (misje, harmony, sprzet_a/b, oboz, ceny, skarbiec, oblezenia, drobne, wydajnosc, bandyci, trebusze).
+Pulapki nocy: (1) sprawdz_logi.py - galezie daja te same nazwy globalne (O2_START, NS_CTL) i wstawiaja dispatch miedzy 'if group' a 'return'; (2) scal.sh liczy diff od podanej
+bazy - galaz z innej bazy = zly patch; (3) rotacja logow Armoury (12 plikow) usunela logi sesji Jeffa po serii autotestow - kopiowac na D: przed testami;
+(4) PRZEKAZANIE-DRUGIE-KONTO rozdz. 6 pkt 2 - przyczyna drewna byla inna: Harmony rzuca ArgumentException, a finalizer BKROTPatch go polyka (CLAUDE.md rozdz. 7).
+Otwarte (czeka na Jeffa): bandyci (limit ROT, plateau ok. 1100 band), N7 straznik bez pamieci (wylaczony), audyt P3-P6/P9-P14 i D1-D6, zold towarzyszy, kalibracja chleba
+(NC-16b) i zamiennikow (NC-15b), napelnianie skarbcow kryjowek (NK-6 prog P). Sprawdzic w logu Jeffa: "Druzyny w misji (NM)", NS-8 podloga broni, NS-15..18 zbrojownia,
+"Trebusz wczesnie (TB2, doba)", "Wlokno do miasta targowego", "Opal mieszczan".
