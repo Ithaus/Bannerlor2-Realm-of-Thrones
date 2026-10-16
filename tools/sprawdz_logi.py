@@ -866,6 +866,11 @@ Uzycie (Python 3, tylko odczyt):
                     doby (takze sumy zlecen jednego zleceniodawcy), NZE-5 po przegladzie doby bez pokrycia tylko spod otwartej kuzni, NZE-6/7 odrzucone,
                     usuniete (w tym przez sume), wiszace, kiesy, zleceniodawcy z kilkoma zleceniami, zlecenia zadan bez pokrycia (INFO), NZE-8 niedoplata <= 1 na 10
                     (oddanych < 5 - INFO), NZE-9 potkniecia i ERROR in CraftOrdersPurse.* 0, NZE-10 koszt (INFO). Log bez paczki: INFO, bez wyjatku.
+--grupa nturniej  : (16.10, Jeff "kolejny blad miasto nie moglo zaplacic mi 1300 za stake w turnieju"; galaz w-toku/noc-turniej, Armoury/src/TourneyPay.cs)
+                    python -I tools/sprawdz_logi.py --grupa nturniej <Armoury-*.log> (strumieniowo). Nagroda turnieju, zaklad, arena i plansza lancuchem
+                    platnikow (kasa osady -> gospodarz -> panujacy), reszta dlugiem osady splacanym co dobe: TP-0 linia startu sesji (klucze), TP-1 linie doby
+                    rozpoznane, TP-2 rachunek dlugow w dobie (roznica 0), TP-3 rod ponizej rezerwy po wyplacie 0, TP-4 potkniecia i ERROR in TourneyPay.* 0,
+                    TP-5 wyplaty i splaty (INFO), TP-6 dlugi na koniec i wyrownanie Seagard (INFO). Log bez paczki: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -31648,6 +31653,84 @@ def nekon3_main(logp, bdp=None):
     return 0
 
 
+# ------------------------------------------------------------ nturniej (16.10, Jeff "miasto nie moglo zaplacic mi 1300 za stake w turnieju"; Armoury/src/TourneyPay.cs)
+NTU_HEAD = "Turniej-platnik (TP): "
+NTU_DAY = re.compile(r"Turniej-platnik \(TP\): dzien (-?\d+) \| klucze: Tourney Payer Chain (tak|WYLACZONE), Tourney Debts (tak|WYLACZONE), Tourney Seagard Catch Up (tak|WYLACZONE) "
+                     r"\| wyplaty lancuchem (\d+) \(niepelne (\d+)\): kasa osady (\d+), gospodarz (\d+), panujacy (\d+), w dlug (\d+), przepadlo (\d+) "
+                     r"\| splaty dlugow (\d+): (\d+) \(kasa osady (\d+), gospodarz (\d+), panujacy (\d+)\), czeka na pokoj (\d+), osada nieznana (\d+) "
+                     r"\| nowe dlugi (\d+): (\d+) \| dlugi osad wobec gracza (\d+) na sume (\d+)(.*?) \| wyrownanie Seagard 16\.10: (.*?) "
+                     r"\| kontrola \(prog 0\): rod ponizej rezerwy po wyplacie (\d+), roznica rachunku dlugow (-?\d+) .*?"
+                     r"\| potkniecia dzis (\d+) \(od wczytania (\d+)\)\.$")
+NTU_ERR = "ERROR in TourneyPay."
+
+
+def nturniej_main(logp):
+    """nturniej (16.10; Armoury/src/TourneyPay.cs, klucze TourneyPayerChain / TourneyDebts / TourneySeagardCatchUp): nagroda turnieju, wygrana zakladu, areny
+    i planszy lancuchem platnikow (kasa osady -> gospodarz -> panujacy), reszta jako dlug osady wobec gracza splacany co dobe; wyrownanie Seagard 16.10.
+    Wejscie: log Armoury (strumieniowo). TP-0 linia startu sesji (klucze), TP-1 linia doby rozpoznana (wszystkie linie "dzien"), TP-2 rachunek dlugow
+    w kazdej dobie: poczatek + nowe - splaty = koniec (roznica 0), TP-3 rod po wyplacie ponizej rezerwy 0, TP-4 potkniecia i ERROR in TourneyPay.* 0,
+    TP-5 wyplaty lancuchem i splaty (INFO), TP-6 dlugi na koniec logu i wyrownanie Seagard (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("TP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess, days, bad, pays, reps = [], [], [], 0, 0
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NTU_HEAD):
+                if s.startswith(NTU_HEAD + "start sesji"):
+                    sess.append(s)
+                elif s.startswith(NTU_HEAD + "dzien "):
+                    mm = NTU_DAY.match(s)
+                    if mm:
+                        days.append(mm.groups())
+                    else:
+                        bad.append(s)
+                elif s.startswith(NTU_HEAD + "wyplata"):
+                    pays += 1
+                elif s.startswith(NTU_HEAD + "splata"):
+                    reps += 1
+            elif s.startswith(NTU_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby {len(days)}, nierozpoznanych linii doby {len(bad)}, wyplat lancuchem {pays}, splat {reps}")
+    if not sess and not days and not bad:
+        rep.add("TP-0: linie 'Turniej-platnik (TP)'", "brak w logu", "INFO (log sprzed paczki TP)", None)
+        rep.show()
+        return 0
+    if sess:
+        s0 = sess[-1]
+        off = [k for k in ("Tourney Payer Chain", "Tourney Debts", "Tourney Seagard Catch Up") if k + " WYLACZONE" in s0]
+        rep.add("TP-0: linia startu sesji - klucze", s0[len(NTU_HEAD):][:240], "trzy klucze tak (WYLACZONE - INFO)", None if off else True)
+    else:
+        rep.add("TP-0: linia startu sesji", "brak (sa inne linie TP)", "linia przy kazdym starcie sesji", False)
+    rep.add("TP-1: linie doby rozpoznane", f"rozpoznane {len(days)}, nierozpoznane {len(bad)}" + (f" (np. {bad[0][:160]})" if bad else ""), "nierozpoznane 0", not bad)
+    if days:
+        diff = [g for g in days if int(g[25]) != 0]
+        rep.add("TP-2: rachunek dlugow w dobie (poczatek + nowe - splaty = koniec)", f"dob {len(days)}, z roznica {len(diff)}" + (f" (np. dzien {diff[0][0]}: {diff[0][25]})" if diff else ""),
+                "0", not diff)
+        below = sum(int(g[24]) for g in days)
+        rep.add("TP-3: rod po wyplacie ponizej rezerwy R (suma dob)", str(below), "0", below == 0)
+        stum = sum(int(g[26]) for g in days)
+        rep.add("TP-4: potkniecia (suma dob) i ERROR in TourneyPay.*", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+
+        def tot(i):
+            return sum(int(g[i]) for g in days)
+        rep.add("TP-5: wyplaty lancuchem i splaty dlugow (suma dob)",
+                f"wyplat {tot(4)} (niepelne {tot(5)}): kasa osady {tot(6)}, gospodarz {tot(7)}, panujacy {tot(8)}, w dlug {tot(9)}, przepadlo {tot(10)}; "
+                f"splat {tot(11)}: {tot(12)} (kasa {tot(13)}, gospodarz {tot(14)}, panujacy {tot(15)}), czeka na pokoj {tot(16)}, osada nieznana {tot(17)}; nowe dlugi {tot(18)}: {tot(19)}",
+                "INFO", None)
+        last = days[-1]
+        rep.add("TP-6: dlugi osad wobec gracza na koniec logu i wyrownanie Seagard", f"dzien {last[0]}: {last[20]} na sume {last[21]}{last[22][:200]}; wyrownanie: {last[23]}", "INFO", None)
+    else:
+        rep.add("TP-2: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -31825,6 +31908,8 @@ def main(argv):
         return nekon3_main(logp, bdp)   # noc-ekonomia3 (16.10, czesc 1): straznik z kapem, myto, czynsz gruntowy, danina markietanow, karawany tam, gdzie zysk, woz wsi z towarem
     if group == "nzlec" and logp:
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
+    if group == "nturniej" and logp:
+        return nturniej_main(logp)   # nturniej (16.10, Jeff "miasto nie moglo zaplacic mi 1300"): lancuch platnikow nagrody turnieju i dlugi osad wobec gracza (TourneyPay)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

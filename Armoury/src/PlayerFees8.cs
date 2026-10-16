@@ -43,7 +43,9 @@ namespace Armoury
     ///     wysokosci; NavalDLC "Coastal Guard Edict" - drugie rozliczenie zalogi portowej (zold drugi raz w nicosc, dopelnienie kiesy z niczego,
     ///     +15% dopelnienia rodowi z niczego) pominiete. Zwrot ceny warsztatu gracza zamyka juz WorkshopTrade (kupiec placi z wlasnej kiesy).
     /// Bez doplat: platnik bez pieniedzy = mniej i komunikat. Wyjatek w naszym kodzie = wywolanie gry + licznik potkniec, nic nie gasimy.
-    /// Stan: liczniki doby i stawka zakladu w toku (pamiec; Reset z WorldMeasure.Reset). Nic w zapisie. Latki raz na proces, w kampanii.
+    /// TP (16.10, TourneyPay.cs): przy kluczach TourneyPayerChain / TourneyDebts nagroda turnieju (zloto TXP, cena nagrody), wygrana zakladu, planszy i areny
+    /// ida lancuchem platnikow (kasa osady wedlug CapOf -> gospodarz -> panujacy -> dlug osady wobec gracza) zamiast "mniej i komunikat"; zapasy wsi bez zmian.
+    /// Stan: liczniki doby i stawka zakladu w toku (pamiec; Reset z WorldMeasure.Reset). Nic w zapisie (dlugi TP - w zapisie TourneyPay). Latki raz na proces, w kampanii.
     /// </summary>
     internal static class PlayerFees8
     {
@@ -104,6 +106,8 @@ namespace Armoury
         private const int STxp = 0, SBetWon = 1, SBoardWon = 2, SArena = 3, SForce = 4, SPrize = 5, Sources = 6;
         private static readonly int[] _sN = new int[Sources], _sShortN = new int[Sources];
         private static readonly long[] _sDue = new long[Sources], _sPaid = new long[Sources], _sNothing = new long[Sources];
+        // TP (TourneyPay): czesci lancucha platnikow wedlug zrodla (zaplacone = kasa + gospodarz + panujacy; niedoplata = w dlug + przepadlo)
+        private static readonly long[] _sTown = new long[Sources], _sHost = new long[Sources], _sRuler = new long[Sources], _sDebt = new long[Sources];
 
         private static int _bStakeN, _bLostN, _bBoardLostN;
         private static long _bStake, _bStakeVoid, _bLost, _bLostKept, _bLostNothing, _bBoardLost, _bBoardVoid, _bStale;
@@ -122,6 +126,7 @@ namespace Armoury
             Array.Clear(_fN, 0, Fees); Array.Clear(_fSum, 0, Fees); Array.Clear(_fGame, 0, Fees);
             _toGuards = _toChest = _toTown = _toFolk = _feeVoid = 0;
             Array.Clear(_sN, 0, Sources); Array.Clear(_sShortN, 0, Sources); Array.Clear(_sDue, 0, Sources); Array.Clear(_sPaid, 0, Sources); Array.Clear(_sNothing, 0, Sources);
+            Array.Clear(_sTown, 0, Sources); Array.Clear(_sHost, 0, Sources); Array.Clear(_sRuler, 0, Sources); Array.Clear(_sDebt, 0, Sources);
             _bStakeN = _bLostN = _bBoardLostN = 0;
             _bStake = _bStakeVoid = _bLost = _bLostKept = _bLostNothing = _bBoardLost = _bBoardVoid = _bStale = 0;
             _pzN = _pzShelf = _pzShelfAlt = _pzNothingN = _pzNoItem = 0; _pzNothingVal = 0;
@@ -135,6 +140,7 @@ namespace Armoury
             _stakeTown = null; _stakeHeld = 0; _pzSnap = null;
             _lastBribeGame = _lastBribeNow = _lastBreakGame = _lastBreakNow = _lastTunGame = _lastTunNow = 0;
             ClearDay();
+            try { TourneyPay.Reset(); } catch (Exception e) { Stumble("TourneyPay.Reset", e); }   // TP: dlugi i flaga D3 czyszczone PRZED SyncData (wracaja z zapisu)
         }
 
         // ------------------------------------------------------------ wspolni pomocnicy
@@ -188,22 +194,44 @@ namespace Armoury
             catch (Exception e) { Stumble("TellShort", e); }
         }
 
-        /// <summary>nikt -> gracz: placi osada (miasto / zamek z nadwyzki, wies z kiesy); brak = mniej, komunikat. Poza kierunkiem albo przy wylaczonym kluczu - gra.</summary>
-        private static void TownPays(int kind, Hero giver, Hero recipient, int amount, bool dn, bool on, Settlement st, long floor)
+        /// <summary>Rodzaj dlugu TP wedlug zrodla: turniej (zloto TXP, zaklad, cena nagrody) albo inne (arena, plansza).</summary>
+        private static int MaskOf(int kind) { return kind == SArena || kind == SBoardWon ? TourneyPay.MOther : TourneyPay.MTourney; }
+
+        /// <summary>nikt -> gracz: placi osada (miasto / zamek z nadwyzki, wies z kiesy); brak = mniej, komunikat. Poza kierunkiem albo przy wylaczonym kluczu - gra.
+        /// TP: przy kluczu lancucha albo dlugow (TourneyPay.AnyOn) i osadzie z kasa miasta / zamku (nie zapasy wsi) - lancuch platnikow TourneyPay.PayChain
+        /// (kasa osady najwyzej CapOf - ta sama regula; reszta: gospodarz, panujacy, dlug osady). what - tekst komunikatu (TourneyPay.T*).</summary>
+        private static void TownPays(int kind, Hero giver, Hero recipient, int amount, bool dn, bool on, Settlement st, long floor, int what = -1)
         {
-            bool mine = false; int pay = -1; long before = 0;
+            bool mine = false, chain = false; int pay = -1; long before = 0;
             try
             {
                 mine = InDir(giver, recipient, amount);
                 if (mine)
                 {
                     _sN[kind]++; _sDue[kind] += amount;
-                    if (on && st != null && st.SettlementComponent != null) { pay = CapOf(st, amount, floor); before = st.SettlementComponent.Gold; }
+                    if (on && st != null && st.SettlementComponent != null)
+                    {
+                        pay = CapOf(st, amount, floor); before = st.SettlementComponent.Gold;
+                        chain = what >= 0 && kind != SForce && st.Town != null && TourneyPay.AnyOn;
+                    }
                 }
             }
-            catch (Exception e) { Stumble("TownPays(" + kind + ")", e); pay = -1; }
+            catch (Exception e) { Stumble("TownPays(" + kind + ")", e); pay = -1; chain = false; }
             if (!mine) { GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn); return; }
             if (pay < 0) { GiveGoldAction.ApplyBetweenCharacters(giver, recipient, amount, dn); _sNothing[kind] += amount; return; }   // jak gra (z niczego), licznik
+            if (chain)
+            {
+                var parts = TourneyPay.PayChain(st, amount, pay, dn, MaskOf(kind));
+                _sPaid[kind] += parts.Paid; _sTown[kind] += parts.Town; _sHost[kind] += parts.Host; _sRuler[kind] += parts.Ruler; _sDebt[kind] += parts.Debt;
+                try
+                {
+                    if (parts.Town > 0 && floor <= 0 && st.IsTown && st.Town != null) { long r = Seal31.TownReserve(st.Town); if (before >= r && before - parts.Town < r) _below++; }
+                    if (parts.Paid < amount) _sShortN[kind]++;
+                    if (parts.Town < amount) TourneyPay.Tell(what, st, amount, parts);   // kasa sama nie pokryla - kto zaplacil, co zostalo (D4)
+                }
+                catch (Exception e) { Stumble("TownPays(TP)", e); }
+                return;
+            }
             if (pay > 0) GiveGoldAction.ApplyForSettlementToCharacter(st, Hero.MainHero, pay, dn);
             _sPaid[kind] += pay;
             try
@@ -434,7 +462,7 @@ namespace Armoury
             try { on = BetsOn; st = _stakeTown ?? Here(); held = ReferenceEquals(_stakeTown, st) ? _stakeHeld : 0; }
             catch (Exception e) { Stumble("BetWon(stan)", e); st = null; }
             _stakeHeld = 0; _stakeTown = null;
-            TownPays(SBetWon, giver, recipient, amount, dn, on, st, held);
+            TownPays(SBetWon, giver, recipient, amount, dn, on, st, held, TourneyPay.TBet);
         }
 
         /// <summary>BoardGameCampaignBehavior.OnPlayerBoardGameOver (tylko gra z gospodarzem - nie-bohaterem): przegrana do kasy osady, wygrana z kasy osady.</summary>
@@ -443,7 +471,7 @@ namespace Armoury
             bool lost = false, on = false; Settlement st = null;
             try { lost = OutDir(giver, recipient, amount); on = BetsOn; st = Here(); }
             catch (Exception e) { Stumble("BoardBet(stan)", e); lost = false; st = null; on = false; }
-            if (!lost) { TownPays(SBoardWon, giver, recipient, amount, dn, on, st, 0); return; }
+            if (!lost) { TownPays(SBoardWon, giver, recipient, amount, dn, on, st, 0, TourneyPay.TBoard); return; }
             var me = Hero.MainHero;
             int had = me.Gold;
             if (!on || st == null)
@@ -460,8 +488,9 @@ namespace Armoury
         // ------------------------------------------------------------ nagroda turnieju gracza i zloto TXP (PlayerTourneyPrizeFromTown)
 
         /// <summary>Zloto Tournaments XPanded (TXPManager.EndTournament - nagroda; TXPTournamentMissionController.ApplyMatchAchievements - premie meczu):
-        /// z kasy miasta turnieju z nadwyzki.</summary>
-        public static void TxpGold(Hero giver, Hero recipient, int amount, bool dn) { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpGold"), 0); }
+        /// z kasy miasta turnieju z nadwyzki (TP: dalej gospodarz, panujacy, dlug miasta). Dwa wrappery tylko dla tekstu komunikatu - liczniki wspolne (STxp).</summary>
+        public static void TxpGold(Hero giver, Hero recipient, int amount, bool dn) { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpGold"), 0, TourneyPay.TPrize); }
+        public static void TxpBonus(Hero giver, Hero recipient, int amount, bool dn) { TownPays(STxp, giver, recipient, amount, dn, PrizeOn, SafeHere("TxpBonus"), 0, TourneyPay.TBonus); }
 
         /// <summary>RealPayer.TourneyPre (prefiks High na TournamentManager.GivePrizeToWinner - przed RBMTournament): migawka sakw gracza, gdy zwyciezca
         /// jest w jego druzynie. Bez migawki postfiks nic nie robi.</summary>
@@ -578,6 +607,23 @@ namespace Armoury
             int pay = CapOf(st, worth, 0);
             long before = st.SettlementComponent.Gold;
             _sN[SPrize]++; _sDue[SPrize] += worth;
+            if (worth > 0 && st.Town != null && TourneyPay.AnyOn)
+            {
+                // TP: cena nagrody tym samym lancuchem co zloto nagrody (kasa miasta z nadwyzki -> gospodarz -> panujacy -> dlug miasta)
+                var parts = TourneyPay.PayChain(st, worth, pay, true, TourneyPay.MTourney);
+                _sPaid[SPrize] += parts.Paid; _sTown[SPrize] += parts.Town; _sHost[SPrize] += parts.Host; _sRuler[SPrize] += parts.Ruler; _sDebt[SPrize] += parts.Debt;
+                if (parts.Town > 0) { long rsv = Seal31.TownReserve(st.Town); if (before >= rsv && before - parts.Town < rsv) _below++; }
+                if (parts.Paid < worth) _sShortN[SPrize]++;
+                Log.Info("Wydatki gracza (E8/D2): nagroda turnieju - " + el.Item.StringId + " nie ma na polce " + NameOf(st) + ": cena " + worth + ", zaplacone " + parts.Paid
+                         + " (lancuch TP: kasa " + parts.Town + ", gospodarz " + parts.Host + ", panujacy " + parts.Ruler + ", w dlug " + parts.Debt + ", przepadlo " + parts.Lost + ").");
+                if (parts.Town < worth)
+                {
+                    Log.Player(NameOf(st) + " had no " + item + " in its stores - you get its price instead.");
+                    TourneyPay.Tell(TourneyPay.TItem, st, worth, parts);
+                }
+                else Log.Player(NameOf(st) + " had no " + item + " in its stores - the town paid you " + worth + " denars for the prize.");
+                return;
+            }
             if (pay > 0) GiveGoldAction.ApplyForSettlementToCharacter(st, Hero.MainHero, pay, true);
             _sPaid[SPrize] += pay;
             if (pay > 0 && st.Town != null) { long rsv = Seal31.TownReserve(st.Town); if (before >= rsv && before - pay < rsv) _below++; }
@@ -590,7 +636,7 @@ namespace Armoury
         // ------------------------------------------------------------ drobne zrodla gracza (PlayerSmallSourcesClosed)
 
         /// <summary>ArenaMasterCampaignBehavior.conversation_arena_master_post_fight_on_condition: nagroda areny treningowej (5 - 250) z kasy miasta z nadwyzki.</summary>
-        public static void ArenaPrize(Hero giver, Hero recipient, int amount, bool dn) { TownPays(SArena, giver, recipient, amount, dn, SmallOn, SafeHere("ArenaPrize"), 0); }
+        public static void ArenaPrize(Hero giver, Hero recipient, int amount, bool dn) { TownPays(SArena, giver, recipient, amount, dn, SmallOn, SafeHere("ArenaPrize"), 0, TourneyPay.TArena); }
 
         /// <summary>VillageHostileActionCampaignBehavior.village_force_supplies_ended_successfully_on_consequence: hearth x 4 z kiesy wsi do jej wysokosci
         /// (ta sama regula co rabunek wsi - SmallGold RaidLootFromVillage).</summary>
@@ -721,7 +767,7 @@ namespace Armoury
                 // nagroda turnieju gracza i zloto Tournaments XPanded
                 Add("nagroda turnieju gracza (TournamentManager.GivePrizeToWinner)", typeof(TournamentManager).FullName, "GivePrizeToWinner").Post = nameof(PrizeAfter);
                 Call("zloto TXP - nagroda (TXPManager.EndTournament)", "TournamentsXPanded.TXPManager", "EndTournament", abc, nameof(TxpGold), 1, true);
-                Call("zloto TXP - premie meczu (ApplyMatchAchievements)", "TournamentsXPanded.Behaviors.TXPTournamentMissionController", "ApplyMatchAchievements", abc, nameof(TxpGold), 1, true);
+                Call("zloto TXP - premie meczu (ApplyMatchAchievements)", "TournamentsXPanded.Behaviors.TXPTournamentMissionController", "ApplyMatchAchievements", abc, nameof(TxpBonus), 1, true);
                 // zaklady
                 Call("zaklad - postawienie (PlaceABet)", TB, "PlaceABet", abc, nameof(BetStake), 1);
                 Call("zaklad - przegrana (OnPlayerEliminated)", TB, "OnPlayerEliminated", afcs, nameof(BetLost), 1);
@@ -838,6 +884,8 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays - 1;
             if (_stakeHeld != 0) { _bStale += _stakeHeld; _stakeHeld = 0; }
             _stakeTown = null;
+            // TP: splata dlugow osad wobec gracza (ten sam lancuch platnikow, przed blokiem ksiegi doby - jak wyplata w turnieju) i linia "Turniej-platnik (TP): dzien N"
+            try { TourneyPay.Daily(day); } catch (Exception e) { Stumble("TourneyPay.Daily", e); }
             try { Log.Info(DayLine(day, (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency)); }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ClearDay(); }
@@ -847,6 +895,9 @@ namespace Armoury
         {
             sb.Append(_sN[k]).Append(", nalezne ").Append(_sDue[k]).Append(", zaplacone ").Append(_sPaid[k]).Append(", niedoplata ")
               .Append(Math.Max(0, _sDue[k] - _sPaid[k] - _sNothing[k])).Append(" w ").Append(_sShortN[k]).Append(", z niczego ").Append(_sNothing[k]);
+            // TP: rozbicie zaplaconego (kasa + gospodarz + panujacy) i niedoplaty (w dlug osady); tylko gdy lancuch cos zrobil - format sprzed zmiany bez dopisku
+            if (_sTown[k] + _sHost[k] + _sRuler[k] + _sDebt[k] > 0)
+                sb.Append(" (lancuch TP: kasa ").Append(_sTown[k]).Append(", gospodarz ").Append(_sHost[k]).Append(", panujacy ").Append(_sRuler[k]).Append(", w dlug ").Append(_sDebt[k]).Append(')');
         }
 
         /// <summary>Linia doby z licznikow (osobno - probe poza gra wola ja wprost, zeby narzedzie sprawdzalo prawdziwy format).</summary>

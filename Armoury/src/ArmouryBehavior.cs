@@ -760,6 +760,10 @@ namespace Armoury
             // A14 / G20 (drobne2): doba po wczytaniu ze srodka doby - punkty budow tej doby i gotowka W5/W7 wczorajszego kroku (DayHeld.cs); wersja "1"; brak klucza = jak dotad
             try { string dh = dataStore.IsSaving ? DayHeld.Export() : null; SaveText.Sync(dataStore, "arm_dayheld", ref dh); if (dataStore.IsLoading) DayHeld.Import(dh); }
             catch (Exception e) { Log.Error("SyncData.arm_dayheld", e); }
+            // TP (16.10, Jeff "miasto nie moglo zaplacic mi 1300"): dlugi osad wobec gracza (nagroda turnieju, zaklad, arena, plansza) i flaga wyrownania Seagard - wlasny try;
+            // wersja "v1"; brak klucza (zapis sprzed zmiany) = bez dlugow, wyrownanie jeszcze nie zrobione; Reset przed SyncData (PlayerFees8.Reset)
+            try { string tp = dataStore.IsSaving ? TourneyPay.Export() : null; SaveText.Sync(dataStore, "arm_tp_debts", ref tp); if (dataStore.IsLoading) TourneyPay.Import(tp); }
+            catch (Exception e) { Log.Error("SyncData.arm_tp_debts", e); }
         }
 
         public override void RegisterEvents()
@@ -800,6 +804,7 @@ namespace Armoury
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("MaterialOrders.OnEntered", MaterialOrders.OnEntered));   // 174.2: dostawa kontraktu surowca - dopisana PO CaravanBulk, wiec idzie PRZED nim (najpierw zamowiony ladunek)
             CampaignEvents.OnSettlementLeftEvent.AddNonSerializedListener(this, MenPurse.OnLeft);
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TroopSelfMend.Hourly", delegate { try { TroopSelfMend.Hourly(); } catch { } }));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("TourneyPay.Hourly", delegate { try { TourneyPay.Hourly(); } catch (Exception e) { Log.Error("TourneyPay.Hourly", e); } }));   // TP: splata dlugow osad w pierwszej godzinie po starcie sesji (potem nic)
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("AiGear.OnDailyTickParty", AiGear.OnDailyTickParty));
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("MenPurse.OnDailyTickParty", MenPurse.OnDailyTickParty));   // K1 (A4): doba postoju druzyny gracza w miescie - braki i lepsze za swoje
             CampaignEvents.DailyTickPartyEvent.AddNonSerializedListener(this, DayProfile.PartyDay("UniqueSpoils.OnDailyTickParty", UniqueSpoils.OnDailyTickParty));
@@ -1436,6 +1441,7 @@ namespace Armoury
             try { CraftOrdersPurse.SessionStart(); } catch (Exception e) { Log.Error("CraftOrdersPurse.SessionStart", e); }   // NZ (16.10): zlecenia kowalskie z zapisu bez pokrycia w kiesie zleceniodawcy (suma jego zlecen) albo zmarlego zdjete; PO CraftOrders8.SessionStart (nagrody juz przeliczone)
             try { QuestPay8.SessionStart(this); } catch (Exception e) { Log.Error("QuestPay8.SessionStart", e); }   // E8/D1 (256): nagrody i wyplaty w zadaniach - nasluchy przyjecia zadan; skan metod zadan i latki raz na proces, W KAMPANII (CLAUDE.md 7)
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
+            try { TourneyPay.SessionStart(); } catch (Exception e) { Log.Error("TourneyPay.SessionStart", e); }   // TP (16.10): linia "Turniej-platnik (TP): start sesji", wyrownanie Seagard (D3) - bez przelewow (splata w pierwszej godzinie)
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
             try { PregnancyYear.SessionStart(); } catch (Exception e) { Log.Error("PregnancyYear.SessionStart", e); }   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): start sesji" - klucze z MCM (PO McmSettings.Apply), rok i mnoznik, czynny model, ciaze w toku
