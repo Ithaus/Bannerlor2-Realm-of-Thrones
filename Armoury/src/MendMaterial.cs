@@ -223,17 +223,34 @@ namespace Armoury
                         int n = (int)Math.Floor(FracOf(kv.Key) + kv.Value + FracEps);
                         if (n > 0) list.Add(new Recipes.Part(kv.Key, n));
                     }
-                    return list;
                 }
-                foreach (var kv in exact)
+                else
                 {
-                    int need = (int)Math.Round(kv.Value);
-                    if (need > 0) list.Add(new Recipes.Part(kv.Key, need));
+                    foreach (var kv in exact)
+                    {
+                        int need = (int)Math.Round(kv.Value);
+                        if (need > 0) list.Add(new Recipes.Part(kv.Key, need));
+                    }
                 }
+                // N12 (noc 16.10, SelfMendWoodKg): drewno wedlug kg naprawy (kg przepisu x share) z otwartego ladunku - nowy ladunek tylko, gdy otwarty nie starcza;
+                // poza licznikiem ulamkow (otwarty ladunek w kg JEST pamiecia reszt drewna). SelfExact drewna przy tej regule nie liczy
+                float wkg = WoodKgNeed(it, share);
+                int loads = wkg > 0f ? SmithWood.LoadsFor(wkg) : 0;
+                if (loads > 0 && Recipes.WoodItem != null) list.Add(new Recipes.Part(Recipes.WoodItem, loads));
             }
             catch (Exception e) { Log.Error("MendMaterial.SelfParts", e); }
             return list;
         }
+
+        /// <summary>N12: kg drewna naprawy wlasnymi rekami (kg przepisu sztuki x share - share jak drewno w SelfExact); 0 - regula wylaczona albo sztuka bez drewna.</summary>
+        private static float WoodKgNeed(ItemObject it, float share)
+        {
+            if (it == null || !SmithWood.MendKgOn) return 0f;
+            try { return Recipes.WoodKgOf(Recipes.For(it)) * Math.Max(0f, share); }
+            catch { return 0f; }
+        }
+
+        private static bool WoodPart(ItemObject x) { return x != null && SmithWood.MendKgOn && ReferenceEquals(x, Recipes.WoodItem); }
 
         /// <summary>Dokladne (ulamkowe) sztuki kazdej czesci receptury przed zaokragleniem - po kolei jak w recepturze (wzor SelfParts z E6/N1).</summary>
         private static List<KeyValuePair<ItemObject, float>> SelfExact(ItemObject it, float share, float loss)
@@ -248,6 +265,7 @@ namespace Armoury
             foreach (var p in r.Parts)
             {
                 if (p.Item == null) continue;
+                if (WoodPart(p.Item) && r.WoodKg > 0f) continue;   // N12: drewno liczy SelfParts w kg (ladunki do otwarcia), nie ulamek ladunku
                 list.Add(new KeyValuePair<ItemObject, float>(p.Item, p.Count * (ForgeMetalPart(p.Item) ? ms : share)));
             }
             return list;
@@ -325,6 +343,20 @@ namespace Armoury
         /// i nic nie powstaje). Wpisy ponizej 0.001 sztuki pomijane.</summary>
         private static void SelfMendDone(ItemObject it, float share, float loss, List<Recipes.Part> taken)
         {
+            // N12 (noc 16.10): kg drewna tej naprawy z otwartego ladunku (zdjete ladunki z listy SelfParts doszly do zapasu w kg) - takze bez pamieci ulamkow
+            float wkg = 0f;
+            try
+            {
+                wkg = WoodKgNeed(it, share);
+                if (wkg > 0f)
+                {
+                    int loads = 0;
+                    if (taken != null) foreach (var p in taken) if (WoodPart(p.Item) && p.Count > 0) loads += p.Count;
+                    SmithWood.Use(wkg, loads, "mending", true);
+                    SmithWood.MendUses++; SmithWood.MendLoads += loads; SmithWood.MendKg += wkg;
+                }
+            }
+            catch (Exception e) { Log.Error("MendMaterial.SelfMendDone (drewno)", e); }
             if (it == null || !FracOn) return;
             try
             {
@@ -332,8 +364,8 @@ namespace Armoury
                 var sum = Summed(SelfExact(it, share, loss));
                 if (taken != null)
                     foreach (var p in taken)
-                        if (p.Item != null && p.Count > 0 && sum.FindIndex(x => ReferenceEquals(x.Key, p.Item)) < 0)
-                            sum.Add(new KeyValuePair<ItemObject, float>(p.Item, 0f));   // zdjete spoza receptury (nie powinno sie zdarzyc) - tez z licznika
+                        if (p.Item != null && p.Count > 0 && !(wkg > 0f && WoodPart(p.Item)) && sum.FindIndex(x => ReferenceEquals(x.Key, p.Item)) < 0)
+                            sum.Add(new KeyValuePair<ItemObject, float>(p.Item, 0f));   // zdjete spoza receptury (nie powinno sie zdarzyc) - tez z licznika; N12: drewno w kg poza licznikiem
                 foreach (var kv in sum)
                 {
                     int n = 0;

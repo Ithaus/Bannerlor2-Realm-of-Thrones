@@ -59,10 +59,75 @@ namespace Armoury
         /// <summary>Linia "Obieg" (MoneyLedger.Daily, ta sama doba): markietani do kas miast i kies wsi; -1 = paczka wylaczona dzis.</summary>
         internal static long LastTown = -1, LastVill = -1;
 
+        // ------------------------------------------------------------ N6 (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1; klucz SutlersByPurse) - MARKIETANI WEDLUG SAKIEWKI
+        // Dowod (log Jeffa d108945-946): sakiewki ludzi 9.66 -> 15.55 mln w 42 doby (+140 tys./d, 7% zlota swiata), sakiewki partii rodow 10.05 mln = 17.9 dni zoldu,
+        // w tym oszczednosci K1 5.88 mln = 10.5 dni; "Dozbrajanie": brak lepszej na polce 27 112 koszykow/d - ludzie odkladaja na sprzet, ktorego nie ma.
+        // Regula (One): stawka dnia x min(ByPurseCap 3, dni wolnej sakiewki / ByPurseDays 10) - wolna sakiewka = po naprawach, odziezy i oszczednosciach K1, w dniach
+        // zoldu partii (10 dni - stawka jak dotad; 30+ - x3; 5 - x0.5). Partia bez zakupu sprzetu od IdleDays (14) dob (MenUpgrade.NoteChurn - zakupy brakow i lepszych)
+        // chroni w polu najwyzej IdleKeep (0.5) limitu K1 (MenPurse.CampReserve capShare) - reszta oszczednosci jest wolna dla markietanow; limit przy wyjezdzie
+        // z miasta (OnLeft) bez zmian. Odbiorcy jak dotad (kasa najblizszego miasta SutlerTownShare / kiesa wsi). Rozruch (pole "p" zapisu arm_sutlers - bez nowego
+        // klucza): gdy sakiewki partii rodow > 15 dni zoldu, kwota przechodzi od starej do nowej reguly w SutlerRampDays (28) dob (bez skoku pierwszego dnia - 15.5 mln
+        // w sakiewkach); klucz wylaczony - rozruch od nowa przy ponownym wlaczeniu. Doba ostatniego zakupu sprzetu - pole "g" zapisu (stary zapis: licznik 14 dob od wczytania).
+        private const double ByPurseCap = 3.0, ByPurseDays = 10.0;
+        private const int IdleDays = 14;
+        private const float IdleKeep = 0.5f;
+        private static int _pRamp = -2;                                   // N6: -2 nie rozstrzygniety, -1 bez rozruchu albo skonczony, >= 0 doba startu
+        private static readonly Dictionary<string, int> _gearDay = new Dictionary<string, int>();
+        private static bool _n6On; private static float _n6Ramp = 1f; private static int _n6Today, _n6RampDay, _n6RampDays;
+        /// <summary>N6 (linia NE, doba): kwoty markietanow wedlug starej i nowej reguly (po rozruchu), partie, x > 1 / x < 1, srednia mnoznika, partie z nizszym limitem K1
+        /// i uwolnione z nich oszczednosci.</summary>
+        internal static long N6PlanOld, N6Plan, N6Released; internal static int N6Parties, N6Up, N6Down, N6Idle; internal static double N6FacSum;
+        internal static bool N6On { get { return _n6On; } }
+        internal static float N6Ramp { get { return _n6Ramp; } }
+        internal static string N6RampText { get { return _n6RampDay > 0 ? "rozruch doba " + _n6RampDay + " z " + _n6RampDays : "bez rozruchu"; } }
+        internal static int N6Tracked { get { return _gearDay.Count; } }
+
+        /// <summary>MenUpgrade.NoteChurn (zakup sztuki przez ludzi partii): doba ostatniego zakupu sprzetu - partie rodow i gracza. Nie rzuca.</summary>
+        internal static void NoteGearBuy(MobileParty mp)
+        {
+            try
+            {
+                if (mp == null || mp.StringId == null || !(mp.IsLordParty || mp.IsMainParty)) return;
+                _gearDay[mp.StringId] = (int)CampaignTime.Now.ToDays;
+            }
+            catch { }
+        }
+
+        /// <summary>N6: czesc limitu K1 chroniona dzis w polu - IdleKeep, gdy partia od IdleDays dob nie kupila sprzetu; partia pierwszy raz widziana - licznik od dzis.</summary>
+        private static float IdleShare(MobileParty mp, int today)
+        {
+            if (mp == null || mp.StringId == null) return 1f;
+            int d;
+            if (!_gearDay.TryGetValue(mp.StringId, out d)) { _gearDay[mp.StringId] = today; return 1f; }
+            return today - d >= IdleDays ? IdleKeep : 1f;
+        }
+
+        /// <summary>N6: udzial nowej reguly dzis (rozruch od starej do nowej w SutlerRampDays dob; pierwsza doba z kluczem rozstrzyga rozruch).</summary>
+        private static float ByPurseRamp(Settings s, int today)
+        {
+            int rd = Math.Max(0, s.SutlerRampDays);
+            _n6RampDay = -1; _n6RampDays = 0;
+            if (_pRamp == -2)
+            {
+                double d = Days();
+                bool ramp = rd > 0 && (_dLordWage > 0 ? d > RampTriggerDays : _dLordPurse > 0);
+                _pRamp = ramp ? today : -1;
+                Log.Info("Markietani wedlug sakiewki (N6): rozruch - sakiewki partii rodow " + _dLordPurse + " = " + d.ToString("0.0", Inv) + " dni zoldu (zold dnia " + _dLordWage + ")"
+                         + (ramp ? " > " + RampTriggerDays.ToString("0", Inv) + " dni: kwota przechodzi od starej do nowej reguly w " + rd + " dob od doby " + today + " (pole p zapisu arm_sutlers)"
+                                 : " - bez rozruchu, od razu nowa regula") + ".");
+            }
+            if (_pRamp < 0) return 1f;
+            int k = Math.Max(0, today - _pRamp);
+            if (rd <= 0 || k >= rd) { _pRamp = -1; return 1f; }
+            _n6RampDay = k + 1; _n6RampDays = rd;
+            return (k + 1) / (float)rd;
+        }
+
         /// <summary>Konstruktor ArmouryBehavior (nowa kampania i kazde wczytanie) - stan rozruchu przed SyncData, liczniki, potkniecia, bledy.</summary>
         internal static void Reset()
         {
             _rampStart = -2;
+            _pRamp = -2; _gearDay.Clear(); _n6On = false; _n6Ramp = 1f;   // N6 (noc 16.10): stan z zapisu wczytuje Import po Reset
             LastTown = LastVill = -1;
             _stumbles = 0;
             _err.Clear();
@@ -76,6 +141,7 @@ namespace Armoury
             _dParties = _dPaidN = _dInSettl = _dInBattle = _dAtSea = _dInactive = _dEmpty = _dNoTown = _dNoVill = _dTownsN = _dVillsN = 0;
             _dRate = _dFull = 0f; _dRampDay = -1; _dRampDays = 0; _dMs = 0;
             _towns.Clear(); _vills.Clear();
+            N6PlanOld = N6Plan = N6Released = 0; N6Parties = N6Up = N6Down = N6Idle = 0; N6FacSum = 0;   // N6
         }
 
         private static void Stumble(string where, Exception e)
@@ -85,7 +151,30 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ zapis (arm_sutlers): tylko stan rozruchu
-        internal static string Export() { return "r=" + _rampStart.ToString(Inv); }
+        internal static string Export()
+        {
+            // N6 (noc 16.10): pola "p" (rozruch markietanow wedlug sakiewki) i "g" (doba ostatniego zakupu sprzetu partii) - stary kod czyta tylko "r" (zgodne w obie strony)
+            var sb = new StringBuilder(64);
+            sb.Append("r=").Append(_rampStart.ToString(Inv)).Append(";p=").Append(_pRamp.ToString(Inv));
+            try
+            {
+                if (_gearDay.Count > 0)
+                {
+                    var live = new HashSet<string>();
+                    foreach (var mp in MobileParty.All) if (mp != null && mp.StringId != null) live.Add(mp.StringId);
+                    bool first = true;
+                    var bad = new[] { ';', '=', ',', ':' };
+                    foreach (var kv in _gearDay)
+                    {
+                        if (!live.Contains(kv.Key) || kv.Key.IndexOfAny(bad) >= 0) continue;
+                        sb.Append(first ? ";g=" : ",").Append(kv.Key).Append(':').Append(kv.Value.ToString(Inv));
+                        first = false;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("Export(N6)", e); }
+            return sb.ToString();
+        }
 
         internal static void Import(string s)
         {
@@ -95,6 +184,13 @@ namespace Armoury
             {
                 var a = p.Split('='); int v;
                 if (a.Length == 2 && a[0] == "r" && int.TryParse(a[1], NumberStyles.Integer, Inv, out v) && v >= -2) _rampStart = v;
+                else if (a.Length == 2 && a[0] == "p" && int.TryParse(a[1], NumberStyles.Integer, Inv, out v) && v >= -2) _pRamp = v;   // N6
+                else if (a.Length == 2 && a[0] == "g")                                                                                    // N6
+                    foreach (var e in a[1].Split(','))
+                    {
+                        int c = e.LastIndexOf(':');
+                        if (c > 0 && int.TryParse(e.Substring(c + 1), NumberStyles.Integer, Inv, out v)) _gearDay[e.Substring(0, c)] = v;
+                    }
             }
         }
 
@@ -136,6 +232,14 @@ namespace Armoury
             try { rate = RateToday(s, today); }
             catch (Exception e) { Stumble("RateToday", e); rate = 0f; }
             _dRate = rate;
+            // N6 (SutlersByPurse): udzial nowej reguly dzis (rozruch); klucz wylaczony - rozruch od nowa przy ponownym wlaczeniu, kwota jak dotad
+            _n6Today = today; _n6On = false; _n6Ramp = 1f;
+            if (s.SutlersByPurse)
+            {
+                try { _n6Ramp = ByPurseRamp(s, today); _n6On = true; }
+                catch (Exception e) { Stumble("ByPurseRamp", e); _n6On = false; }
+            }
+            else _pRamp = -2;
             float townShare = MBMath.ClampFloat(s.SutlerTownShare, 0f, 1f);
             if (rate > 0f)
                 foreach (var mp in parties)
@@ -225,7 +329,26 @@ namespace Armoury
                 if (cloth > 0) MenPurse.NoteCampCloth(cloth);
             }
             int reserve, kept;
-            int want = MenPurse.CampPlan(mp, rate, mend, out reserve, out kept);
+            int want;
+            if (_n6On)
+            {
+                // N6: kwota z wolnej sakiewki wedlug jej zasobnosci (dni zoldu) i z nizszym limitem K1 partii bez zakupu sprzetu od 14 dob; rozruch miesza stara
+                // i nowa kwote. Naprawy liczone raz (jak T3-K1)
+                if (mend < 0) mend = MenPurse.CampMend(mp);
+                int keptOld, res2;
+                int freeOld = MenPurse.CampFree(mp, mend, 1f, out reserve, out keptOld);
+                float cs = IdleShare(mp, _n6Today);
+                int freeNew = freeOld; kept = keptOld;
+                if (cs < 1f) { freeNew = MenPurse.CampFree(mp, mend, cs, out res2, out kept); N6Idle++; N6Released += Math.Max(0, keptOld - kept); }
+                int wantOld = Math.Max(0, (int)(freeOld * (double)Math.Min(1f, rate)));
+                double fac = Math.Min(ByPurseCap, freeNew / (double)Math.Max(1, MenPurse.WageOf(mp)) / ByPurseDays);
+                int wantNew = Math.Max(0, (int)(freeNew * Math.Min(1.0, rate * fac)));
+                want = (int)Math.Round(wantOld + (wantNew - (double)wantOld) * _n6Ramp);
+                want = Math.Max(0, Math.Min(want, freeNew));
+                N6Parties++; N6FacSum += fac; if (fac > 1.0) N6Up++; else if (fac < 1.0) N6Down++;
+                N6PlanOld += wantOld; N6Plan += want;
+            }
+            else want = MenPurse.CampPlan(mp, rate, mend, out reserve, out kept);
             // F6: kept z CampPlan to ta sama liczba, ktora dawal odczyt MenPurse.KeptFor (ta sama CampReserve na tej samej sakiewce; 0 <= kept <= sakiewka) -
             // rezerwa napraw (AiWear.OutstandingCost) liczona raz na partie w polu, nie dwa
             _planned = true; _dLordSaved += kept;

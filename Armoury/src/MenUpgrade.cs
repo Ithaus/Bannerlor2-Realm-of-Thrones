@@ -78,6 +78,7 @@ namespace Armoury
             {
                 if (mp == null || it == null) return;
                 Touch();
+                if (buy) Sutlers.NoteGearBuy(mp);                     // N6 (noc 16.10, SutlersByPurse): doba ostatniego zakupu sprzetu partii (limit K1 w polu)
                 string k = (mp.StringId ?? "") + "|" + (it.StringId ?? "");
                 if ((buy ? _soldToday : _boughtToday).Contains(k)) { _dChurn++; if (_churnIds.Count < 4 && !_churnIds.Contains(k)) _churnIds.Add(k); }
                 (buy ? _boughtToday : _soldToday).Add(k);

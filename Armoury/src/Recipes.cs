@@ -172,6 +172,17 @@ namespace Armoury
             catch { return 0.5f; }
         }
 
+        /// <summary>N2 (noc 16.10): przelicznik liczby bryl wegla w kwicie kuzni - 0.5 kg / waga bryly (1 przy dawnych 0.5 kg, 0.1 przy wadze gry 5 kg).</summary>
+        internal static float CoalLumpScale()
+        {
+            try
+            {
+                var it = MaterialItem(CraftingMaterials.Charcoal);
+                return it != null && it.Weight > 0.05f ? Math.Min(1f, 0.5f / it.Weight) : 1f;
+            }
+            catch { return 1f; }
+        }
+
         /// <summary>sklad8-s S1: waga sztuki metalu danego gatunku (fallback 0.5, jak IngotKg).</summary>
         private static float MatKg(CraftingMaterials g)
         {
@@ -432,8 +443,10 @@ namespace Armoury
                     Add(r, MaterialItem(IronForTier(1)), MathF.Max(1, MathF.Ceiling(baseIron)));
                 }
 
+                // N2 (noc 16.10): CharcoalPerIron to bryly POL KILO na sztuke metalu (tak byl liczony, gdy wegiel wazyl 0.5 kg) - przy wadze gry 5 kg liczba
+                // bryl x 0.5 / waga, zeby kg wegla na kg zelaza zostaly (inaczej 10x wiecej wegla = 10x wiecej ladunkow drewna na ta sama zbroje); 0.5 kg - jak dotad
                 Add(r, MaterialItem(CraftingMaterials.Charcoal),
-                    MathF.Max(1, MathF.Ceiling(baseIron * s.CharcoalPerIron)));
+                    MathF.Max(1, MathF.Ceiling(baseIron * s.CharcoalPerIron * CoalLumpScale())));
 
                 // --- surowce miekkie: podszycie, pasy, wyscielka ---
                 // wyscielka pod metal - najwyzej tyle, ile pozwala limit na tier
@@ -639,6 +652,13 @@ namespace Armoury
             catch (Exception e) { Log.Error("TakeMaterials", e); return false; }
         }
 
+        /// <summary>N12 (noc 16.10, klucz SelfMendWoodKg): czesc drewna przepisu liczona w kg tej czesci przepisu - ladunki do otwarcia na r.WoodKg x share
+        /// (0, gdy otwarty ladunek pokrywa potrzebe). Dotad kazda czesc brala co najmniej 1 sztuke, wiec naprawa za 0.5 kg zadala calego ladunku 100 kg.</summary>
+        internal static bool WoodByKg(Recipe r, Part p)
+        {
+            return p.Item != null && p.Item == _wood && r.WoodKg > 0f && SmithWood.MendKgOn;
+        }
+
         /// <summary>Czego brakuje do wziecia share receptury - lista "2x Crude Iron".</summary>
         internal static List<string> MissingParts(Recipe r, float share)
         {
@@ -649,7 +669,8 @@ namespace Armoury
                 foreach (var p in r.Parts)
                 {
                     if (p.Item == null) continue;
-                    int need = MathF.Max(1, (int)(p.Count * share));
+                    int need = WoodByKg(r, p) ? SmithWood.LoadsFor(r.WoodKg * share) : MathF.Max(1, (int)(p.Count * share));   // N12: drewno wedlug kg
+                    if (need <= 0) continue;
                     int have = CountInInventory(p.Item);
                     if (have < need) missing.Add((need - have) + "x " + p.Item.Name);
                 }
@@ -663,11 +684,26 @@ namespace Armoury
             try
             {
                 var roster = MobileParty.MainParty.ItemRoster;
-                foreach (var p in r.Parts) Take(roster, p.Item, MathF.Max(1, (int)(p.Count * share)));
-                if (r.WoodKg > 0f) { int wl = WoodLoads(r); SmithWood.Use(r.WoodKg * share, wl > 0 ? MathF.Max(1, (int)(wl * share)) : 0, null); }
+                int woodKgLoads = -1;
+                foreach (var p in r.Parts)
+                {
+                    if (WoodByKg(r, p)) { woodKgLoads = SmithWood.LoadsFor(r.WoodKg * share); Take(roster, p.Item, woodKgLoads); continue; }   // N12: ladunki na kg tej czesci
+                    Take(roster, p.Item, MathF.Max(1, (int)(p.Count * share)));
+                }
+                if (woodKgLoads >= 0)
+                {
+                    SmithWood.Use(r.WoodKg * share, woodKgLoads, null);
+                    SmithWood.MendUses++; SmithWood.MendLoads += woodKgLoads; SmithWood.MendKg += r.WoodKg * share;
+                }
+                else if (r.WoodKg > 0f) { int wl = WoodLoads(r); SmithWood.Use(r.WoodKg * share, wl > 0 ? MathF.Max(1, (int)(wl * share)) : 0, null); }
             }
             catch (Exception e) { Log.Error("TakePartial", e); }
         }
+
+        /// <summary>N12: kg drewna przepisu sztuki (0 bez drewna albo przy SmithWoodKg wylaczonym) - MendMaterial.SelfParts liczy z tego czesc naprawy.</summary>
+        internal static float WoodKgOf(Recipe r) { return SmithWood.On ? Math.Max(0f, r.WoodKg) : 0f; }
+
+        internal static ItemObject WoodItem { get { ResolveGoods(); return _wood; } }
 
         // internal: FletchForge zdejmuje tedy skore/len takze dla kucia pancerzy
         // BK-owa droga (SpendMaterials liczyl tylko sztywne ID i schodzil na minus)

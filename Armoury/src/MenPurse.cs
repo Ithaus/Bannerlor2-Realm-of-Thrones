@@ -386,7 +386,11 @@ namespace Armoury
         /// </summary>
         private static void CampReserve(MobileParty mp, int purse, out long res, out int kept) { CampReserve(mp, purse, -1L, out res, out kept); }
 
-        private static void CampReserve(MobileParty mp, int purse, long mendIn, out long res, out int kept)
+        private static void CampReserve(MobileParty mp, int purse, long mendIn, out long res, out int kept) { CampReserve(mp, purse, mendIn, 1f, out res, out kept); }
+
+        /// <summary>N6 (noc 16.10, SutlersByPurse): `capShare` - czesc limitu MenGearSaveDays chroniona w polu (Sutlers: 0.5 dla partii bez zakupu sprzetu od 14 dob,
+        /// inaczej 1 = jak dotad). Limit przy wyjezdzie z miasta (OnLeft) bez zmian.</summary>
+        private static void CampReserve(MobileParty mp, int purse, long mendIn, float capShare, out long res, out int kept)
         {
             long mend = mendIn >= 0 ? mendIn : CampMend(mp);
             res = mend + Math.Max(0, ArmyClothing.PendingCost(mp));
@@ -395,9 +399,28 @@ namespace Armoury
             if (!MenUpgrade.On || s == null) return;
             int avail = (int)Math.Max(0L, purse - res);
             long cap = (long)Math.Max(0, s.MenGearSaveDays) * Math.Max(0, Wage(mp));
+            if (capShare < 1f) cap = (long)(cap * (double)Math.Max(0f, capShare));
             int room = (int)Math.Max(0L, Math.Min(int.MaxValue, cap - mend));
             kept = Math.Min(Math.Min(SavedOf(mp), avail), room);
         }
+
+        /// <summary>N6 (Sutlers.One): wolna sakiewka partii w polu (po rezerwach napraw i odziezy i po oszczednosciach K1 chronionych do `capShare` limitu) - ta sama
+        /// regula co CampPlan (CampPlan = wolna x stawka). `mend` policzone przez wolajacego. Bez wlasnego catch - wyjatek liczy Sutlers.</summary>
+        internal static int CampFree(MobileParty mp, long mend, float capShare, out int reserve, out int kept)
+        {
+            reserve = 0; kept = 0;
+            if (!On || mp == null) return 0;
+            int purse = Get(mp);
+            if (purse <= 0) return 0;
+            long res;
+            CampReserve(mp, purse, mend, capShare, out res, out kept);
+            reserve = (int)Math.Min(int.MaxValue, res);
+            int avail = (int)Math.Max(0L, purse - res);
+            return Math.Max(0, avail - kept);
+        }
+
+        /// <summary>N6: dzienny zold partii (dni wolnej sakiewki).</summary>
+        internal static int WageOf(MobileParty mp) { return Wage(mp); }
 
         // ------------------------------------------------------------ gracz: nadwyzki na targ
         // K1 (A9): po DOPASOWANIU, nie po liczbie sztuk - najpierw sztuki LUDZI, ktorych nikt nie udzwignie, potem najgorsze uzyteczne

@@ -286,6 +286,8 @@ RANGES = {
     'AiFoodDearIndex': (1.0, 10.0, "0.0"),
     # ceny (noc 15/16.10): dni zoldu w cenie werbunku towarzysza (kod: najmniej 0)
     'CompanionHireDays': (0.0, 60.0, "0"),
+    # N2 (noc 16.10): waga bryly wegla w kg, 0 = waga gry (5 kg); kod przycina do 50 (ArmouryBehavior.FixCharcoalWeight)
+    'CharcoalWeightKg': (0.0, 10.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

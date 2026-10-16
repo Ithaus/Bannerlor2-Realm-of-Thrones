@@ -131,6 +131,7 @@ namespace Armoury
                             if (n <= 0) break;
                             int take = Math.Min(n, el.Amount);
                             roster.AddToCounts(el.EquipmentElement, -take);
+                            TownFolk.ShelfGone(t.Settlement, el.EquipmentElement.Item, take);   // N4 (noc 16.10): zejscie z polki bez sprzedazy - bez doplaty do 35% (wlasny try)
                             ArmsBook.Sink(ArmsBook.KScrap, el.EquipmentElement.Item, take);   // E6/0 (206): ksiega uzbrojenia - ujscie "zlom" (tylko licznik)
                             n -= take; pieces += take; made += take; worth += (long)el.EquipmentElement.Item.Value * take;
                             long bt; byType.TryGetValue(kv.Key, out bt); byType[kv.Key] = bt + take;

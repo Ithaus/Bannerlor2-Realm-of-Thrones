@@ -42,7 +42,7 @@ namespace Armoury
         /// <summary>E8/K (255): projekt zlecenia kowalskiego wyceniony raz (HistoricalPrices.PriceDesign) nie zostaje w pamieci kosztu i unikatow - zlecen przybywa kilkanascie na dobe.</summary>
         internal static void Forget(ItemObject it) { if (it == null) return; _cost.Remove(it); _unique.Remove(it); }
 
-        internal static void Reset() { _cost.Clear(); _effMedian.Clear(); _idx.Clear(); _nearestTown.Clear(); _war.Clear(); _unique.Clear(); _built = false; _ore = _wood = _leather = _linen = null; }
+        internal static void Reset() { _cost.Clear(); _effMedian.Clear(); _idx.Clear(); _nearestTown.Clear(); _war.Clear(); _unique.Clear(); _built = false; _ore = _wood = _leather = _linen = null; _helmK = -1f; _helmKn = 0; }
         internal sealed class Cost
         {
             public float Metal, Charcoal, Leather, Linen, Wood, Special, Labor, Total;
@@ -144,11 +144,73 @@ namespace Armoury
             try
             {
                 var s = Settings.Current;
+                if (s != null && it.ItemType == ItemObject.ItemTypeEnum.HeadArmor) return HelmCostWeight(it, w, s);   // N9 (noc 16.10): helm plytowy z pancerza glowy
                 if (s == null || s.HarnessKgPerArmor <= 0f || it.ItemType != ItemObject.ItemTypeEnum.HorseHarness || it.ArmorComponent == null) return w;
                 float real = Math.Max(3f, s.HarnessKgPerArmor * Math.Max(0, it.ArmorComponent.BodyArmor));
                 return Math.Min(w, real);
             }
             catch { return w; }
+        }
+
+        // ------------------------------------------------------------ N9 (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1 "helmy"): jedna regula helmu plytowego
+        // Dotad helm plytowy t1-3 szedl wzorem napiersnika (dni = 1.5 x waga + tier), a t4-6 regula E8/C (waga x HelmDaysPerKg + 0.5 x (t - 3)) - helm t3 (mediana
+        // 58 d) wychodzil drozszy od t4 (40 d; linia "Cennik (E8/C)" 15.10). Teraz (klucz HelmOneRule): (1) ta sama regula dni dla kazdego tieru, czlon tieru
+        // 0.5 x max(0, t - 3); (2) waga do kosztu = min(waga gry, max(0.5 kg, k x pancerz glowy)), k = mediana (waga / pancerz glowy) wszystkich helmow
+        // plytowych swiata (liczona raz na sesje; RBM i ROT maja rozne skale pancerza, wiec stala w kg na punkt bylaby zla dla jednej z nich) - helm ciezki jak na
+        // swoja ochrone liczy sie jak typowy, lzejszy zostaje przy swojej wadze (jak uprzaz E8/C). Ta sama waga w wartosci, warsztacie, kwicie kuzni gracza,
+        // przetopie i naprawie (R7 "jedna wycena"). Wylaczony klucz albo HelmDaysPerKg 0 - jak dotad. _oldHelm: rachunek "przed" do linii startu (NightEcon).
+        private static float _helmK = -1f;
+        private static int _helmKn;
+        [ThreadStatic] private static bool _oldHelm;
+
+        private static bool HelmRuleOn(Settings s) { return s != null && s.HelmOneRule && s.HelmDaysPerKg > 0f && !_oldHelm; }
+
+        private static bool PlateHelm(ItemObject it)
+        {
+            return it != null && it.ItemType == ItemObject.ItemTypeEnum.HeadArmor && it.ArmorComponent != null && it.ArmorComponent.MaterialType == ArmorComponent.ArmorMaterialTypes.Plate;
+        }
+
+        /// <summary>k helmu: mediana (waga / pancerz glowy) helmow plytowych swiata (waga > 0.05 kg, pancerz > 0); raz na sesje (Build, Reset), 0 - brak danych.</summary>
+        internal static float HelmKgPerArmor()
+        {
+            if (_helmK >= 0f) return _helmK;
+            var l = new List<float>();
+            try
+            {
+                foreach (var it in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
+                {
+                    try
+                    {
+                        if (!PlateHelm(it) || it.Weight <= 0.05f || it.ArmorComponent.HeadArmor <= 0) continue;
+                        l.Add(it.Weight / it.ArmorComponent.HeadArmor);
+                    }
+                    catch { }
+                }
+            }
+            catch { }
+            l.Sort();
+            _helmKn = l.Count;
+            _helmK = l.Count > 0 ? l[l.Count / 2] : 0f;
+            return _helmK;
+        }
+
+        internal static int HelmKCount { get { return _helmKn; } }
+
+        private static float HelmCostWeight(ItemObject it, float w, Settings s)
+        {
+            if (!HelmRuleOn(s) || !PlateHelm(it)) return w;
+            int h = it.ArmorComponent.HeadArmor;
+            float k = HelmKgPerArmor();
+            if (h <= 0 || !(k > 0f)) return w;
+            return Math.Min(w, Math.Max(0.5f, k * h));
+        }
+
+        /// <summary>N9: koszt sztuki wedlug starej reguly helmu (przed N9) - bez pamieci kosztu; tylko do linii startu (tabela przed / po).</summary>
+        internal static Cost ComputeOldHelm(ItemObject it)
+        {
+            _oldHelm = true;
+            try { return Compute(it); }
+            finally { _oldHelm = false; }
         }
 
         private static int Stack(ItemObject it)
@@ -162,6 +224,7 @@ namespace Armoury
             try
             {
                 _cost.Clear(); _effMedian.Clear(); _unique.Clear();
+                _helmK = -1f; _helmKn = 0;   // N9: k helmu od nowa (definicje przedmiotow tej sesji)
                 _ore = MBObjectManager.Instance.GetObject<ItemObject>("iron");
                 _wood = MBObjectManager.Instance.GetObject<ItemObject>("hardwood");
                 _leather = MBObjectManager.Instance.GetObject<ItemObject>("leather");
@@ -272,8 +335,9 @@ namespace Armoury
                 }
                 // E8/C (253, PLAN 8.5e-f): helm plytowy t4-6 - dni z wagi i pol dnia za kazdy tier ponad trzeci (dotad wzor napiersnika: helm t5 2.4 kg = 13.4 dnia
                 // mistrza = 176 d przy bascinecie za 48 d); luki - tabela DaysBowWar. Metal, len i drewno bez zmian
-                if (it.ItemType == ItemObject.ItemTypeEnum.HeadArmor && mat == ArmorComponent.ArmorMaterialTypes.Plate && t >= 4 && s.HelmDaysPerKg > 0f)
-                    days = w * s.HelmDaysPerKg + 0.5f * (t - 3);
+                // N9 (noc 16.10, HelmOneRule): ta sama regula dla helmow plytowych WSZYSTKICH tierow (czlon tieru od zera do t3), w - waga do kosztu (CostWeight)
+                if (it.ItemType == ItemObject.ItemTypeEnum.HeadArmor && mat == ArmorComponent.ArmorMaterialTypes.Plate && s.HelmDaysPerKg > 0f && (t >= 4 || HelmRuleOn(s)))
+                    days = w * s.HelmDaysPerKg + 0.5f * Math.Max(0, t - 3);
                 else if (it.ItemType == ItemObject.ItemTypeEnum.Bow && s.HistBowDaysNew)
                     days = DaysBowWar[t - 1];
                 // jakosc konkretnej sztuki wzgledem jej typu i tieru (Jeff: pancerz, jaki daje)
@@ -282,7 +346,9 @@ namespace Armoury
                 if (it.Effectiveness > 0f && _effMedian.TryGetValue((int)it.ItemType * 10 + t, out med) && med > 0f)
                     q = MBMath.ClampFloat(it.Effectiveness / med, 0.6f, ammo ? AmmoQualityMax : 1.8f);   // sklad8-s S2: strzaly i belty do 1.15
                 c.Metal = metalKg * KgPrice(metalItem);
-                c.Charcoal = metalKg * (charItem != null ? charItem.Value * 2f * 0.5f : 9f);   // ~1 szt. (0.5 kg) wegla na kg metalu
+                // ~0.5 kg wegla na kg metalu po cenie kg wegla; N2 (noc 16.10): z prawdziwej wagi bryly - dotad "Value x 2 x 0.5" zakladalo bryle 0.5 kg
+                // (przy 0.5 kg wynik ten sam; przy 5 kg cena za kg = Value / 5). Przy cenach historycznych koszt sztuki liczy HistCost (FuelPerMetalKg), nie to pole
+                c.Charcoal = metalKg * (charItem != null ? 0.5f * KgPrice(charItem) : 9f);
                 c.Leather = leatherKg * KgPrice(_leather);
                 c.Linen = linenKg * KgPrice(_linen);
                 c.Wood = woodKg * KgPrice(_wood);

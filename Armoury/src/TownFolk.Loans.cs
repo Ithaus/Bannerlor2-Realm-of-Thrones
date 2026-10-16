@@ -51,6 +51,67 @@ namespace Armoury
         internal static long LastLoanRepaid;
 
         private static bool LoansOn { get { var s = Settings.Current; return s != null && s.FolkLoans && Live; } }
+
+        // ============================================================ N8 (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1; klucz FolkLoanBeforeGuard) - POZYCZKA PRZED DAREM
+        // Dowod (log Jeffa d108945 "Pozyczki od ludu (obieg2)"): 126 ze 131 kandydatow "lud lenn bez nadwyzki" - podatek od nadwyzki (kiesa2 / straznik) bierze ja w dobie
+        // ludu (TownFolk.Daily, ArmouryBehavior.cs:1793), a pozyczka liczy ja pozniej w tej samej dobie (ClanBudget.Daily :1888). Kolejnosc doby BEZ ZMIAN:
+        //  (a) GuardBegin robi migawke kies zrodel (W miasta, podzamcze, kiesa wsi) PRZED podatkiem tej doby; LnAvail bierze kiese = min(migawka, kiesa teraz + podatek
+        //      tej doby z tej kiesy) - nadwyzka sprzed podatku, ale bez tego, co lud tej doby wydal (zakupy, danina P1 - nie wraca);
+        //  (b) pozyczka zdjeta z kiesy w oknie pozyczek wlicza sie w podatek tej kiesy nastepnej doby ludu jak danina (TownFolk.Hoard.cs PayHoard, PayHoardVillage):
+        //      podatek = stawka x (nadwyzka + pozyczka) - pozyczka. Kiesa moze zejsc ponizej poziomu normalnego najwyzej o podatek tej doby - jutro go nie placi.
+        // Zloto: kiesa -> glowa rodu jak dotad (nic z niczego). Pamiec: migawka i zaliczenie tylko na dobe (bez zapisu - po wczytaniu jedna doba bez zaliczenia).
+        private static bool LoanBeforeOn { get { var s = Settings.Current; return s != null && s.FolkLoans && s.FolkLoanBeforeGuard && Live; } }
+        private static readonly Dictionary<Settlement, long> _lnSnap = new Dictionary<Settlement, long>(), _lnTaxed = new Dictionary<Settlement, long>();
+        private static Dictionary<Settlement, long> _lnCredit = new Dictionary<Settlement, long>(), _lnCreditToday = new Dictionary<Settlement, long>();
+        private static readonly Dictionary<string, double> _lnRoomOld = new Dictionary<string, double>();
+        private static int _lnSnapDay = int.MinValue;
+        /// <summary>N8 (linia NE, okno pozyczek jak "Pozyczki od ludu"): kandydaci bez nadwyzki przy starej regule z nadwyzka dzieki migawce, miejsce w pulapie stare / nowe,
+        /// pozyczki ponad stara regule (zl, rodow).</summary>
+        internal static int N8Unlocked, N8ExtraN; internal static double N8RoomOld, N8RoomNew; internal static long N8Extra, N8SnapN;
+
+        /// <summary>GuardBegin (poczatek doby ludu, przed podatkami): migawka kies zrodel, podatek doby od zera, zaliczenie pozyczek z minionego okna na te dobe. Nie rzuca.</summary>
+        private static void LnSnapBegin()
+        {
+            try
+            {
+                _lnSnap.Clear(); _lnTaxed.Clear();
+                var t = _lnCreditToday; _lnCreditToday = _lnCredit; _lnCredit = t; _lnCredit.Clear();
+                _lnSnapDay = int.MinValue; N8SnapN = 0;
+                if (!LoanBeforeOn) { _lnCreditToday.Clear(); return; }
+                foreach (var f in _f.Values)
+                {
+                    if (f == null || f.St == null) continue;
+                    if (f.Kind == 0 || (f.Kind == 1 && CastleLive)) _lnSnap[f.St] = Math.Max(0, f.KW);
+                    else if (f.Kind == 2 && f.St.Village != null) _lnSnap[f.St] = Math.Max(0, f.St.Village.Gold);
+                }
+                N8SnapN = _lnSnap.Count;
+                _lnSnapDay = (int)CampaignTime.Now.ToDays;
+            }
+            catch (Exception e) { LnStumble("LnSnapBegin", e); _lnSnap.Clear(); _lnSnapDay = int.MinValue; }
+        }
+
+        /// <summary>PayHoard / PayHoardVillage: podatek od nadwyzki tej doby zdjety z kiesy zrodla pozyczek (W miasta, podzamcze, kiesa wsi).</summary>
+        private static void LnNoteTaxed(Settlement st, long x)
+        {
+            if (st == null || x <= 0 || _lnSnapDay == int.MinValue) return;
+            long v; _lnTaxed.TryGetValue(st, out v); _lnTaxed[st] = v + x;
+        }
+
+        /// <summary>PayHoard (klasa W / podzamcze) i PayHoardVillage: pozyczka z tej kiesy w minionym oknie pozyczek - wlicza sie w podatek tej doby (0 - klucz wylaczony).</summary>
+        private static long LnCreditFor(Settlement st)
+        {
+            long v;
+            return st != null && _lnCreditToday.Count > 0 && LoanBeforeOn && _lnCreditToday.TryGetValue(st, out v) ? Math.Max(0, v) : 0;
+        }
+
+        /// <summary>N8: kiesa zrodla do pozyczki - przy kluczu min(migawka sprzed podatku, kiesa teraz + podatek tej doby z niej); inaczej kiesa teraz.</summary>
+        private static double LnPurse(Settlement st, double now)
+        {
+            long snap;
+            if (_lnSnapDay != (int)CampaignTime.Now.ToDays || st == null || !LoanBeforeOn || !_lnSnap.TryGetValue(st, out snap)) return now;
+            long tx; _lnTaxed.TryGetValue(st, out tx);
+            return Math.Max(now, Math.Min(snap, now + tx));
+        }
         private static double LnRate(Settings s) { return HdClamp(s.FolkLoanRateYear, 0, 0.5); }
         private static double LnShare(Settings s) { return HdClamp(s.FolkLoanMaxShareOfIncome, 0, 1); }
         private static double LnDays(Settings s) { return HdClamp(s.FolkLoanLimitDays, 0, 120); }
@@ -60,6 +121,7 @@ namespace Armoury
         private static void ResetLoans()
         {
             _ln.Clear(); _lnBan.Clear(); _lineLoans = null;
+            _lnSnap.Clear(); _lnTaxed.Clear(); _lnCredit.Clear(); _lnCreditToday.Clear(); _lnSnapDay = int.MinValue; N8SnapN = 0;   // N8 (noc 16.10): pamiec doby
             LoansWinZero(); LoansDayZero();
             _lnDebtPrev = double.NaN; _lnStumbleSess = 0;
         }
@@ -68,6 +130,7 @@ namespace Armoury
         {
             _lnLentAcc = _lnLentT = _lnLentC = _lnLentV = 0; _lnLentN = _lnCand = _lnRoomN = _lnBlkBan = _lnBlkLadder = _lnBlkLimit = _lnBlkNoSurplus = 0; _lnRoom = 0;
             _lnLentClans.Clear();
+            N8Unlocked = N8ExtraN = 0; N8RoomOld = N8RoomNew = 0; N8Extra = 0; _lnRoomOld.Clear();   // N8 (noc 16.10): okno pozyczek
         }
 
         private static void LoansDayZero()
@@ -107,7 +170,15 @@ namespace Armoury
         /// <summary>Nadwyzka ludu wlasnych lenn rodu ponad poziom normalny (miasta - klasa W, zamki - podzamcze, wsie lenn). `into` - zrodla (null - tylko suma).</summary>
         private static double LnAvail(Clan c, List<LnSrc> into, out int towns, out int castles)
         {
+            double old;
+            return LnAvail(c, into, out towns, out castles, out old);
+        }
+
+        /// <summary>N8: to samo; `old` - nadwyzka wedlug starej reguly (kiesa teraz, po podatku tej doby). Przy wylaczonym FolkLoanBeforeGuard obie liczby rowne.</summary>
+        private static double LnAvail(Clan c, List<LnSrc> into, out int towns, out int castles, out double old)
+        {
             towns = castles = 0;
+            old = 0;
             double sum = 0;
             var s = Settings.Current;
             double times = HoardTimes(s), rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays));
@@ -124,7 +195,9 @@ namespace Armoury
                 Folk f;
                 if (_f.TryGetValue(st, out f) && f != null && f.Need[0] > 0 && (f.Kind == 0 || (f.Kind == 1 && CastleLive)))
                 {
-                    double ex = f.KW - times * (f.Kind == 0 ? rdW : RdC) * f.Need[0];
+                    double norm = times * (f.Kind == 0 ? rdW : RdC) * f.Need[0];
+                    double ex0 = f.KW - norm, ex = LnPurse(st, f.KW) - norm;   // N8: kiesa sprzed podatku tej doby (klucz wylaczony - ex = ex0)
+                    if (ex0 >= 1) old += ex0;
                     if (ex >= 1) { sum += ex; if (into != null) into.Add(new LnSrc { St = st, F = f, Kind = f.Kind, Ex = ex }); }
                 }
                 var bv = st.BoundVillages;
@@ -136,7 +209,9 @@ namespace Armoury
                     if (!_f.TryGetValue(v.Settlement, out vf) || vf == null || !vf.Cal) continue;
                     double nv = pph * VillHeads(vf, true);
                     if (!(nv > 0)) continue;
-                    double ex = v.Gold - times * RdV * nv;
+                    double normV = times * RdV * nv;
+                    double ex0 = v.Gold - normV, ex = LnPurse(v.Settlement, v.Gold) - normV;   // N8: kiesa wsi sprzed podatku tej doby
+                    if (ex0 >= 1) old += ex0;
                     if (ex >= 1) { sum += ex; if (into != null) into.Add(new LnSrc { St = v.Settlement, V = v, Kind = 2, Ex = ex }); }
                 }
             }
@@ -159,14 +234,19 @@ namespace Armoury
                 if (DebtLadder.FolkLoanBlocked(c)) { _lnBlkLadder++; return 0; }
                 var s = Settings.Current;
                 int towns, castles;
-                double avail = LnAvail(c, null, out towns, out castles);
+                double availOld;
+                double avail = LnAvail(c, null, out towns, out castles, out availOld);
                 double limit = LnDays(s) * D + LnPerTown * towns + LnPerCastle * castles;
                 double room = Math.Min(LnShare(s) * D, limit - LnDebt(LnOf(c, false)));
                 if (room < 1) { _lnBlkLimit++; return 0; }
                 if (avail < 1) { _lnBlkNoSurplus++; return 0; }
+                double roomOld = availOld >= 1 ? Math.Floor(Math.Min(room, availOld)) : 0;   // N8: miejsce wedlug starej reguly (kiesa po podatku tej doby)
                 room = Math.Floor(Math.Min(room, avail));
                 if (room < 1) return 0;
                 _lnRoomN++; _lnRoom += room;
+                if (c.StringId != null) _lnRoomOld[c.StringId] = Math.Max(0, roomOld);
+                N8RoomNew += room; N8RoomOld += Math.Max(0, roomOld);
+                if (roomOld < 1) N8Unlocked++;                         // bez migawki rod bylby "lud lenn bez nadwyzki"
                 return room;
             }
             catch (Exception e) { LnStumble("FolkLoanRoom", e); return 0; }
@@ -202,9 +282,18 @@ namespace Armoury
                     part.Left += t; lc.Lent += t;
                     if (x.Kind == 0) _lnLentT += t; else if (x.Kind == 1) _lnLentC += t; else _lnLentV += t;
                     got += t; left -= t;
+                    if (LoanBeforeOn) { long cr; _lnCredit.TryGetValue(x.St, out cr); _lnCredit[x.St] = cr + t; }   // N8: zaliczenie na podatek tej kiesy nastepnej doby ludu
                 }
                 if (got > 0)
                 {
+                    try
+                    {
+                        // N8: ponad stara regule = wyplata ponad miejsce, ktore dalaby kiesa po podatku (FolkLoanRoom tej doby)
+                        double ro; if (c.StringId == null || !_lnRoomOld.TryGetValue(c.StringId, out ro)) ro = got;
+                        long extra = got - (long)Math.Min(got, Math.Floor(Math.Max(0, ro)));
+                        if (extra > 0) { N8Extra += extra; N8ExtraN++; }
+                    }
+                    catch (Exception e) { LnStumble("FolkLoanLend(N8)", e); }
                     _lnLentAcc += got; _lnLentN++;
                     if (c.StringId != null) _lnLentClans.Add(c.StringId);
                     if (lc.Day0 < 0) lc.Day0 = (int)CampaignTime.Now.ToDays;

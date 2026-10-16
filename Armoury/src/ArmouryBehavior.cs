@@ -392,7 +392,7 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
-        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); WorkshopInputsFix.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); GentryNames.Reset(); FiefGrants.Reset(); ReaverLaw.Reset(); DoomedPartyMen.Reset(); UniqueShelf.Reset(); OthersDuel.Reset(); A17Diag.Reset(); SiegeRansom.Reset(); VineOlive.Reset(); DayHeld.Reset(); FallenCrown.Reset(); RockGold.Reset(); DragonFeed.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); GearFit.Reset(); }
+        public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); WorkshopInputsFix.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); BulkUnit.Reset(); NightEcon.Reset(); GentryNames.Reset(); FiefGrants.Reset(); ReaverLaw.Reset(); DoomedPartyMen.Reset(); UniqueShelf.Reset(); OthersDuel.Reset(); A17Diag.Reset(); SiegeRansom.Reset(); VineOlive.Reset(); DayHeld.Reset(); FallenCrown.Reset(); RockGold.Reset(); DragonFeed.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); GearFit.Reset(); }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -406,6 +406,14 @@ namespace Armoury
                 if (dataStore.IsLoading) StartStock.Import(startStock);
             }
             catch (Exception e) { Log.Error("SyncData.StartStock", e); }
+            // N11 (noc 16.10): jednostka ladunku rudy i drewna tej kampanii "1|czynnik" - brak klucza = stary zapis (10); osobny try jak arm_startstock
+            try
+            {
+                string bulkUnit = dataStore.IsSaving ? BulkUnit.Export() : null;
+                SaveText.Sync(dataStore, "arm_bulk_unit", ref bulkUnit);
+                if (dataStore.IsLoading) BulkUnit.Import(bulkUnit);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_bulk_unit", e); }
             // 110 (zawor kasy zamku): dar startowy w kasach zamkow rozliczony raz na kampanie; brak klucza = stary zapis (o przycieciu
             // decyduje wiek kampanii). Osobny try PRZED reszta, jak przy zapasie startowym: wyjatek innego klucza nie moze zgubic tej flagi -
             // zgubiona flaga to drugie przyciecie, ktore zdjeloby z kas zamkow prawdziwy doplyw
@@ -443,6 +451,14 @@ namespace Armoury
                 if (dataStore.IsLoading) TownFolk.ImportObieg2(obieg2);
             }
             catch (Exception e) { Log.Error("SyncData.Obieg2", e); }
+            // N4 (noc 16.10): pula wyrobow miast wykonanych, a jeszcze niesprzedanych (doplata do 35% przy zejsciu z polki) - wlasny try; brak klucza = pula od zera
+            try
+            {
+                string craftSale = dataStore.IsSaving ? TownFolk.ExportCraftSale() : null;
+                SaveText.Sync(dataStore, "arm_craft_sale", ref craftSale);
+                if (dataStore.IsLoading) TownFolk.ImportCraftSale(craftSale);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_craft_sale", e); }
             // korona2 (TownFolk.CrownLoans.cs): dlugi koron u miast i mieszczan (krolestwo + osada + rodzaj), zakazy po niesplacie, srednie wplywy - wlasny try
             // (starszy DLL ignoruje klucz - cofniecie DLL w trakcie gry = dlugi przepadaja, zloto zostaje w skarbcach, CHANGELOG)
             try
@@ -1081,22 +1097,34 @@ namespace Armoury
             catch (Exception e) { Log.Error("OnGameMenuOpened", e); }
         }
 
-        /// <summary>Wegiel drzewny wazy u nas 5 kg od sztuki - absurd; sadzowa bryla to pol kilo.</summary>
+        /// <summary>Waga wegla drzewnego. Do N2 (noc 16.10) klucz CharcoalWeight (0.5 w Armoury.json Jeffa) robil z 5 kg bryly gry pol kilo - przy cenach
+        /// historycznych 0.5 kg kosztowalo 1 d (x28.6 historii), a przetop z wagi (MaterialLaw.RefinePostfix) robil z ladunku drewna za 4 d 40 wegli za 40 d.
+        /// N2: waga z klucza CharcoalWeightKg (0 = waga gry); stary klucz nieczytany. Waga gry zapamietana przy pierwszym odczycie w procesie - przy
+        /// CharcoalWeightKg 0 wraca, gdyby wczesniejsza sesja tego procesu ja zmienila. PRZED wycena (HistoricalPrices: cena = waga x cena za kg).</summary>
+        private static float _coalGameKg = -1f;
+        internal static float CoalGameKg { get { return _coalGameKg; } }
         private static void FixCharcoalWeight()
         {
             var c = Settings.Current;
-            if (c.CharcoalWeight <= 0f) return;
             var coal = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("charcoal");
-            if (coal == null || Math.Abs(coal.Weight - c.CharcoalWeight) < 0.01f) return;
-            var f = typeof(ItemObject).GetProperty("Weight");
-            if (f != null && f.CanWrite) { f.SetValue(coal, c.CharcoalWeight, null); }
-            else
+            if (coal == null) { Log.Info("Wegiel drzewny: brak przedmiotu charcoal - waga bez zmian."); return; }
+            if (_coalGameKg < 0f) _coalGameKg = coal.Weight;
+            float want = c.CharcoalWeightKg > 0f ? Math.Min(50f, c.CharcoalWeightKg) : _coalGameKg;
+            if (Math.Abs(coal.Weight - want) >= 0.001f && want > 0f)
             {
-                var bf = typeof(ItemObject).GetField("<Weight>k__BackingField",
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                if (bf != null) bf.SetValue(coal, c.CharcoalWeight);
+                var f = typeof(ItemObject).GetProperty("Weight");
+                if (f != null && f.CanWrite) { f.SetValue(coal, want, null); }
+                else
+                {
+                    var bf = typeof(ItemObject).GetField("<Weight>k__BackingField",
+                        System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                    if (bf != null) bf.SetValue(coal, want);
+                }
             }
-            Log.Info("Wegiel drzewny: waga " + coal.Weight + " kg/szt.");
+            Log.Info("Wegiel drzewny: waga " + coal.Weight.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " kg/szt. (waga gry "
+                     + _coalGameKg.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " kg; Charcoal Weight Kg "
+                     + c.CharcoalWeightKg.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + (c.CharcoalWeightKg > 0f ? "" : " = waga gry")
+                     + "; stary klucz Charcoal Weight " + c.CharcoalWeight.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + " nieczytany - N2).");
         }
 
         /// <summary>
@@ -1407,6 +1435,8 @@ namespace Armoury
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
             try { PregnancyYear.SessionStart(); } catch (Exception e) { Log.Error("PregnancyYear.SessionStart", e); }   // CR (zasada Jeffa 14.10): linia "Ciaza i plodnosc (CR): start sesji" - klucze z MCM (PO McmSettings.Apply), rok i mnoznik, czynny model, ciaze w toku
+            try { SmithCoal.SessionStart(); } catch (Exception e) { Log.Error("SmithCoal.SessionStart", e); }   // N2 po recenzji (noc 16.10): wegiel broni i przetopu z ekranu kuzni w kg z otwartej bryly (po SmithWood - te same cele, wlasna instancja Harmony)
+            try { NightEcon.SessionStart(); } catch (Exception e) { Log.Error("NightEcon.SessionStart", e); }   // noc 16.10 (N2, N3, P8a, N9, N10, N11, N12): linie "Noc-ekonomia (NE): start sesji" - PO HistoricalPrices.Apply i SmithWood.SessionStart
             try { SmithWood.SessionStart(); } catch (Exception e) { Log.Error("SmithWood.SessionStart", e); }   // Jeff 15.10: drewno w kuzni w kg - latki na czynny model kosztow i SpendMaterials
             try { PlayerArmoryView.SessionStart(); } catch (Exception e) { Log.Error("PlayerArmoryView.SessionStart", e); }   // Jeff 15.10 (a/b/c): zbrojownia gracza - czyje co jest; linia "Zbrojownia gracza (15.10): start sesji" (PO McmSettings.Apply)
             try { GearFit.SessionStart(); } catch (Exception e) { Log.Error("GearFit.SessionStart", e); }   // GearFit (po recenzji): filtr kompletu t1 DTE dopiero od startu sesji (OnGameLoaded DTE biegnie przed prawami CrashScribe), pamiec wzorcow od nowa
@@ -1899,6 +1929,7 @@ namespace Armoury
             try { PeopleMarket.Daily(); } catch (Exception e) { Log.Error("PeopleMarket.Daily", e); } DayProfile.Lap("PeopleMarket.Daily");   // GL-2/GL-3: linia "Rynek od ludzi (GL2)" (okno nawiasow konsumpcji od wczoraj), co 7 dob tabela krolestw - PO PeopleScale.Daily i TownFolk.Daily (tylko log)
             try { PeopleLevy.Daily(); } catch (Exception e) { Log.Error("PeopleLevy.Daily", e); } DayProfile.Lap("PeopleLevy.Daily");   // GL-4 (P4): czynniki poboru i milicji od ludzi na jutro (pamiec skal tej doby), linia "Pobor i milicja od ludzi (GL4)", co 7 dob tabela krolestw - PO PeopleScale.Daily
             try { GoodsRates.Daily(); } catch (Exception e) { Log.Error("GoodsRates.Daily", e); } DayProfile.Lap("GoodsRates.Daily");   // GL-5 (P5): linia "Stawki towarow (GL5)" (tylko log)
+            try { NightEcon.Daily(); } catch (Exception e) { Log.Error("NightEcon.Daily", e); } DayProfile.Lap("NightEcon.Daily");   // noc 16.10: linia "Noc-ekonomia (NE): dzien" (futra, kopalnie w miastach, drewno kuzni - tylko log)
             try { VineOlive.Daily(); } catch (Exception e) { Log.Error("VineOlive.Daily", e); } DayProfile.Lap("VineOlive.Daily");   // B6: linia "Winnice i gaje (B6)" (tylko log)
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)

@@ -175,6 +175,7 @@ namespace Armoury
                 ResetProbe();
                 _hDay = int.MinValue;   // GL-2/GL-3: srednie glow swiata od nowa (TownFolk.Market.cs)
                 ResetLive();   // E5/B1: kiesy czynne, flagi zapasow startowych, liczniki (zapis wczytuje Import po konstruktorze)
+                ResetCraftSale();   // N4 (noc 16.10): pula wyrobow niesprzedanych (zapis arm_craft_sale wczytuje Import po konstruktorze)
             }
             catch { }
         }
@@ -248,7 +249,11 @@ namespace Armoury
                 if (item == null || st == null || count <= 0 || !(st.IsTown || st.IsCastle) || st.Town == null || !Run || OffMain()) return;
                 long t = Stopwatch.GetTimestamp();
                 var f = Get(st);
-                if (f != null) f.ProdV += (double)count * Math.Max(0, st.Town.MarketData.GetPrice(item));
+                if (f != null)
+                {
+                    double v = (double)count * Math.Max(0, st.Town.MarketData.GetPrice(item));
+                    if (!CsAdd(st, item, count, v)) f.ProdV += v;      // N4 (FolkCraftWageOnSale): wyrob miasta do puli - wartosc do doplaty 35% dopiero przy zejsciu z polki
+                }
                 _patchTicks += Stopwatch.GetTimestamp() - t;
             }
             catch (Exception e) { Stumble("OnItemProduced", e); }
@@ -408,6 +413,7 @@ namespace Armoury
             try
             {
                 if (Campaign.Current == null) return;
+                try { CraftSaleDay(); } catch (Exception e) { N4Stumbles++; Stumble("CraftSaleDay", e); }   // N4 (noc 16.10): wyroby zeszle z polki -> f.ProdV (przed doba ludu i modelem na sucho)
                 // E5/B1: kiesa czynna - model z prawdziwymi przelewami (TownFolk.Live.cs); wylaczenie w trakcie - zwrot kies do kas (plan rozdz. 6.3)
                 if (Live) { DailyLive(); return; }
                 if (AnyPurse()) ReturnAll();
