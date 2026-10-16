@@ -27,11 +27,16 @@ namespace Armoury
     ///  - RoutKeeper co klatke tylko po zbiorze zlamanych: dopoki panika trwa (IsPanicked), morale przypiete na 0 - warunek RBM "morale > 0" nigdy
     ///    nie zachodzi. Gdy panike zgasi ktos inny (IsPanicked false), morale trzymane na 0,02: pod 0,01 gra sama wolalaby Panic (drugi okrzyk).
     ///  - Odwrot ponawiany samym Agent.Retreat (natywne, bez Panic i bez OnAgentFleeing), nie czesciej niz co RefreshEvery (4 s).
-    ///  - Cel ucieczki (klucz FleeAwayFromEnemies, tylko bitwa polowa bez kryjowki): 16 sektorow, wrogowie w promieniu 50 m, waga 1/max(d,4),
-    ///    konny x2, gracz x2, sasiednim sektorom pol wagi. Cel gry zostaje, gdy jego sektor ma zagrozenie <= 1,25 x minimum + 0,02; inaczej sektor
-    ///    najmniejszego zagrozenia (gdy wrog wszedzie - tam, gdzie go najmniej): punkt 2 m przed granica sceny w tym kierunku, droga sprawdzona
-    ///    (Scene.GetPathDistanceBetweenPositions, jak Mission.cs:2641), najwyzej 3 kandydaci na czlowieka i 20 zapytan na klatke; bez drogi albo
-    ///    ponad limit - cel gry. Oblezenie, wypad, morska, kryjowka - cel gry.
+    ///  - Cel ucieczki (klucz FleeAwayFromEnemies, tylko bitwa polowa bez kryjowki): 16 kierunkow, wrogowie w promieniu 50 m, waga 1/max(d,4),
+    ///    konny x2, gracz x2. Poprawka po recenzji (16.10): jadro cosinusowe - wrog dodaje zagrozenie w = waga x max(0, cos(kat kierunku - kat
+    ///    wroga)) KAZDEMU kierunkowi w swojej polowie (dawniej tylko swoj sektor i dwaj sasiedzi, +-34 stopnie, a remisy wygrywal sektor o
+    ///    najnizszym numerze - czlowiek mogl biec 45-67 stopni w strone Jeffa); wektor odpychania R = suma wag x kierunek OD wroga. Wynik kierunku
+    ///    = zagrozenie - 0,02 x suma wag x cos(kierunek, R), wiec remis rozstrzyga kierunek najdalej od wrogow. Gracz blizej niz 15 m: kierunki
+    ///    mniej niz 60 stopni od "od gracza" przegrywaja z kazdym kierunkiem od gracza. Cel gry zostaje, gdy zagrozenie jego kierunku
+    ///    <= 1,25 x minimum + 0,05 x suma wag ORAZ lezy do 60 stopni od R (gdy R wyrazne, |R| >= 0,2 x suma wag) ORAZ (gracz blizej niz 15 m)
+    ///    do 60 stopni od "od gracza"; inaczej kierunek najlepszego wyniku (gdy wrog wszedzie - tam, gdzie go najmniej): punkt 2 m przed granica
+    ///    sceny w tym kierunku, droga sprawdzona (Scene.GetPathDistanceBetweenPositions, jak Mission.cs:2641), najwyzej 3 kandydaci na czlowieka
+    ///    i 20 zapytan na klatke; bez drogi albo ponad limit - cel gry. Oblezenie, wypad, morska, kryjowka - cel gry.
     ///  - Koniec misji (MissionEnded) - nic nie robimy (gra sama zatrzymuje odwrot zwyciezcom, CommonAIComponent.cs:109-116); gracz przejmuje
     ///    czlowieka - wypada ze zbioru.
     ///  - Wyjatek na czlowieka liczony (Stumble, pierwsze 3 na miejsce w sesji do logu) - funkcji nie gasimy (CLAUDE.md 7). Bez Harmony, wszystko
@@ -55,6 +60,10 @@ namespace Armoury
         internal const int PathPerFrame = 20;     // zapytan o droge na klatke (cala misja)
         internal const int PathPerMan = 3;        // kandydatow z droga na czlowieka w jednej ocenie
         internal const float NoHandlerAfter = 1f; // po tylu sekundach bez odwrotu z handlera paniki wysylamy odwrot sami
+        internal const float DebacleMax = 3f;     // najdluzszy okrzyk Debacle po Panic (1,47-3,0 s): po zgaszeniu paniki przez innych ponowienie juz od Since + 3 s
+        internal const float LostCheckEvery = 0.5f; // miedzy ocenami: sprawdzenie "odwrot zgasl" najwyzej co 0,5 s na czlowieka (natywne IsRetreating / IsFadingOut)
+        internal const float NearPlayer = 15f;    // gracz blizej - ucieczka tylko do 60 stopni od kierunku "od gracza" (Jeff 16.10)
+        internal const float AwayCos = 0.5f;      // 60 stopni
 
         // NB2 czesc 2: wspolna blokada licznikow linii misji - takze dla WarCouncil, VeteranAi, BattleGore, BattleCries (EnsureLocked)
         internal static readonly object Gate = new object();
@@ -72,6 +81,8 @@ namespace Armoury
         internal static readonly HashSet<int> ResendPeople = new HashSet<int>();
         // ---- kierunek
         internal static int DirGame, DirSector, DirNoRoad, DirLimit, DirOff, PathQueries;
+        internal static readonly HashSet<int> GameRejected = new HashSet<int>();  // poprawka 16.10: cel gry odrzucony (w strone wrogow) - rozni ludzie
+        internal static readonly HashSet<int> NearMain = new HashSet<int>();      // z tego: gracz blizej niz 15 m, a cel gry nie od niego
         internal static int Field = -1;           // -1 nie wiadomo, 0 nie pole bitwy (cel gry), 1 bitwa polowa (sektory)
         // ---- postura
         private static readonly HashSet<int>[] Tiers = NewTiers();
@@ -196,6 +207,7 @@ namespace Armoury
             Broken = Fled = Panics = Already = RePanic = Pins = Extinct = Resends = Turns = NoHandler = Player = 0;
             AfterEnd.Clear(); NoTeam.Clear(); Ordered.Clear(); PinPeople.Clear(); ResendPeople.Clear();
             DirGame = DirSector = DirNoRoad = DirLimit = DirOff = PathQueries = 0;
+            GameRejected.Clear(); NearMain.Clear();
             Field = -1;
             for (int i = 0; i < Tiers.Length; i++) Tiers[i].Clear();
             Heroes.Clear();
@@ -256,6 +268,7 @@ namespace Armoury
               .Append(Turns).Append(", bez handlera paniki ").Append(NoHandler).Append(", przejeci przez gracza ").Append(Player)
               .Append(" | kierunek: gry ").Append(DirGame).Append(", sektor ").Append(DirSector).Append(", bez drogi ").Append(DirNoRoad)
               .Append(", limit zapytan ").Append(DirLimit).Append(", poza polem ").Append(DirOff).Append(" (zapytan o droge ").Append(PathQueries).Append(')')
+              .Append(", cel gry odrzucony ").Append(GameRejected.Count).Append(" (blisko gracza ").Append(NearMain.Count).Append(')')
               .Append(" | postura wg tieru ").Append(c != null && c.SoldierPostureByTier ? "TAK" : "NIE").Append(": szeregowych ").Append(soldiers).Append(" (");
             for (int i = 1; i < Tiers.Length; i++) sb.Append(i > 1 ? ", " : "").Append('T').Append(i).Append(' ').Append(Tiers[i].Count);
             sb.Append("), bohaterow ").Append(Heroes.Count).Append(", bez broni pominiete ").Append(_noWeapon)
@@ -289,7 +302,8 @@ namespace Armoury
               .Append(", ucieczka FieldCraft ").Append(c.FieldCraftEnabled && c.AiFleeWhenNearDeath ? "TAK" : "NIE")
               .Append("; raz Panic na czlowieka, morale przypiete na 0, ponowienie odwrotu bez okrzyku co ").Append(RefreshEvery.ToString("0"))
               .Append(" s), Flee Away From Enemies ").Append(c.FleeAwayFromEnemies ? "TAK" : "NIE")
-              .Append(" (16 sektorow, ").Append(Radius.ToString("0")).Append(" m, konny i gracz x2, droga sprawdzana, najwyzej ")
+              .Append(" (16 kierunkow, jadro cosinusowe, ").Append(Radius.ToString("0")).Append(" m, konny i gracz x2, gracz blizej niz ")
+              .Append(NearPlayer.ToString("0")).Append(" m - tylko od niego, droga sprawdzana, najwyzej ")
               .Append(PathPerMan).Append(" kandydatow na czlowieka i ").Append(PathPerFrame).Append(" zapytan na klatke)")
               .Append(" | postura szeregowych wg tieru ").Append(c.SoldierPostureByTier ? "TAK" : "NIE").Append(": ");
             for (int t = 1; t <= 7; t++) sb.Append(t > 1 ? ", " : "").Append('T').Append(t).Append(" x").Append(BattleWind.SoldierMul(t).ToString("0.00"));
@@ -308,6 +322,7 @@ namespace Armoury
               .Append((int)BattleCries.FormationCooldown).Append(" s, czlowiek raz na ").Append((int)BattleCries.ManCooldown).Append(" s, jeki ponizej ")
               .Append((int)Math.Round(BattleCries.MoanBelow * 100)).Append("% co ").Append((int)BattleCries.MoanMin).Append('-')
               .Append((int)(BattleCries.MoanMin + BattleCries.MoanSpan)).Append(" s do ").Append((int)BattleCries.MoanRange).Append(" m, najwyzej ")
+              .Append(BattleCries.MoansPerMan).Append(" na rannego, najwyzej ")
               .Append(BattleCries.MaxPerSecond).Append(" glosow na s)")
               .Append(" | bledy do logu: pierwsze ").Append(ErrorsPerSite).Append(" na miejsce w sesji, reszta w liczniku linii misji.");
             Log.Info(sb.ToString());
@@ -333,11 +348,13 @@ namespace Armoury
             public bool PanicSeen;            // OnAgentPanicked juz byl (drugi = ponowna panika gry)
             public bool Extinct;              // panike zgasil ktos inny
             public bool Resent;
+            public bool EarlyDone;            // poprawka 16.10: wczesne ponowienie po zgaszeniu paniki przez innych juz bylo
             public bool Dead;
             public int Fails;                 // potkniecia na tym czlowieku
             public float Since;
             public float NextEval;
             public float LastSend = -100f;
+            public float NextLostCheck;       // poprawka 16.10: miedzy ocenami sprawdzenie "odwrot zgasl" najwyzej co LostCheckEvery
             public WorldPosition Game = WorldPosition.Invalid;     // cel gry (handler albo GetClosestFleePositionForAgent)
             public WorldPosition Target = WorldPosition.Invalid;   // cel, ktory czlowiek ma teraz
         }
@@ -349,7 +366,20 @@ namespace Armoury
         private readonly List<Entry> _list = new List<Entry>();
         private readonly MBList<Agent> _near = new MBList<Agent>();
         private readonly float[] _threat = new float[16];
+        private readonly float[] _score = new float[16];
         private readonly int[] _order = new int[16];
+        private static readonly Vec2[] Dirs = MakeDirs();          // srodki 16 sektorow (te same katy co Sector)
+
+        private static Vec2[] MakeDirs()
+        {
+            var d = new Vec2[16];
+            for (int s = 0; s < 16; s++)
+            {
+                double ang = -Math.PI + (s + 0.5) * (2.0 * Math.PI / 16.0);
+                d[s] = new Vec2((float)Math.Cos(ang), (float)Math.Sin(ang));
+            }
+            return d;
+        }
         private int _pathLeft;
         private int _field = -1;
 
@@ -561,20 +591,27 @@ namespace Armoury
                 }
                 return;
             }
+            bool early = false;
             if (now < e.NextEval)
             {
-                // miedzy ocenami kierunku: gdy natywny odwrot zgasl, ponawiamy od razu po RefreshEvery od ostatniego wyslania (bez Panic)
-                if (now - e.LastSend < RoutHold.RefreshEvery) return;
+                // miedzy ocenami kierunku: gdy natywny odwrot zgasl, ponawiamy od razu po RefreshEvery od ostatniego wyslania (bez Panic).
+                // Poprawka 16.10 (recenzja): panike zgasil ktos inny (RBM po premii morale z callbacku) zaraz po pierwszym celu - jedno ponowienie
+                // juz od Since + DebacleMax (okrzyk Debacle skonczony), zeby czlowiek bez broni nie wracal do 4 s na piesci.
+                early = e.Extinct && !e.EarlyDone && now - e.Since >= RoutHold.DebacleMax;
+                if (!early && now - e.LastSend < RoutHold.RefreshEvery) return;
+                // sprawdzenie natywne najwyzej co 0,5 s na czlowieka (dawniej co klatke dla kazdego po 4 s od wyslania)
+                if (now < e.NextLostCheck) return;
                 bool lost = false;
                 try { lost = !a.IsRetreating() && !a.IsFadingOut(); } catch { }
-                if (!lost) return;
+                if (!lost) { e.NextLostCheck = now + RoutHold.LostCheckEvery; return; }
+                if (early) e.EarlyDone = true;                            // raz na czlowieka - potem zwykly odstep RefreshEvery
             }
-            Decide(e, m, now, c, false);
+            Decide(e, m, now, c, false, early);
         }
 
         /// <summary>Ocena celu: pierwsza (po handlerze) albo co RefreshEvery. Wysyla Agent.Retreat (natywne, bez Panic) tylko gdy trzeba:
         /// pierwszy cel inny niz gry, odwrot zgasl albo kierunek zmienil sie o ponad 45 stopni.</summary>
-        private void Decide(Entry e, Mission m, float now, Settings c, bool mustSend)
+        private void Decide(Entry e, Mission m, float now, Settings c, bool mustSend, bool early = false)
         {
             var a = e.A;
             e.NextEval = now + RoutHold.RefreshEvery;
@@ -601,7 +638,13 @@ namespace Armoury
                 else if (kind == NoRoadKind) RoutHold.DirNoRoad++;
                 else if (kind == OffKind) RoutHold.DirOff++;
             }
-            if (!pick.IsValid) return;                                    // nie ma czego wyslac - gra prowadzi sama
+            if (!pick.IsValid)
+            {
+                // nie ma czego wyslac - gra prowadzi sama; nastepna proba po RefreshEvery, nie w kolejnej klatce (recenzja 16.10: bez tego
+                // czlowiek z lost=true wchodzil tu co klatke z pelnym Choose i zjadal budzet zapytan o droge)
+                e.LastSend = now;
+                return;
+            }
 
             bool lost = false;
             try { lost = !a.IsRetreating() && !a.IsFadingOut(); } catch { }   // natywny odwrot zgasl (Agent.IsRetreating, nie komponent)
@@ -611,8 +654,9 @@ namespace Armoury
             else if (lost) send = true;
             else send = Turned(a, e.Target, pick);
             if (!send) return;
-            // ponowienie nie czesciej niz co RefreshEvery (pierwszy cel - zaraz po handlerze, w tej samej klatce co odwrot gry)
-            if (!first && !mustSend && now - e.LastSend < RoutHold.RefreshEvery) return;
+            // ponowienie nie czesciej niz co RefreshEvery (pierwszy cel - zaraz po handlerze, w tej samej klatce co odwrot gry; wczesne ponowienie
+            // po zgaszeniu paniki przez innych - raz, od Since + DebacleMax)
+            if (!first && !mustSend && !(early && lost) && now - e.LastSend < RoutHold.RefreshEvery) return;
             a.Retreat(pick);                                              // natywne SetRetreatMode - bez Panic, bez OnAgentFleeing, bez okrzyku gry
             if (!first && !mustSend)
             {
@@ -660,7 +704,8 @@ namespace Armoury
             return _field == 1;
         }
 
-        /// <summary>Cel ucieczki: cel gry, gdy bezpieczny; inaczej sektor najmniejszego zagrozenia z droga do granicy sceny.</summary>
+        /// <summary>Cel ucieczki: cel gry, gdy bezpieczny i od wrogow (od gracza, gdy blisko); inaczej kierunek najlepszego wyniku (jadro
+        /// cosinusowe + odpychanie) z droga do granicy sceny.</summary>
         private WorldPosition Choose(Entry e, Mission m, Settings c, out int kind)
         {
             var a = e.A;
@@ -670,8 +715,11 @@ namespace Armoury
             if (!FieldHere(m) || !MissionTeams.Valid(a.Team) || m.Scene == null) { kind = OffKind; return game; }
 
             Vec2 my = a.Position.AsVec2;
+            if (!my.IsValid) return game;                                 // utwardzenie: pozycja bez liczb - cel gry
             for (int i = 0; i < 16; i++) _threat[i] = 0f;
-            float total = 0f;
+            float total = 0f, rx = 0f, ry = 0f;
+            bool nearMain = false;
+            Vec2 fromMain = Vec2.Zero;
             try
             {
                 m.GetNearbyEnemyAgents(my, RoutHold.Radius, a.Team, _near);   // zapytanie natywne do naszej listy - bez iteracji Mission.Agents
@@ -680,33 +728,62 @@ namespace Armoury
                     var f = _near[i];
                     if (f == null || !f.IsActive() || !f.IsHuman || f.IsRunningAway) continue;
                     Vec2 v = f.Position.AsVec2 - my;
-                    float w = 1f / Math.Max(v.Length, 4f);
+                    float d = v.Length;
+                    if (!(d >= 0f) || float.IsInfinity(d)) continue;      // NaN / nieskonczonosc - pomijamy
+                    float w = 1f / Math.Max(d, 4f);
                     if (f.MountAgent != null) w *= 2f;                    // jezdziec dogoni
                     if (f.IsMainAgent) w *= 2f;                           // gracz (Jeff) - od niego przede wszystkim
-                    int s = Sector(v);
-                    _threat[s] += w;
-                    _threat[(s + 1) & 15] += 0.5f * w;
-                    _threat[(s + 15) & 15] += 0.5f * w;
                     total += w;
+                    if (d < 0.05f) { for (int s = 0; s < 16; s++) _threat[s] += 0.5f * w; continue; }   // tuz na nas - zagrozenie wszedzie po rowno
+                    Vec2 u = v * (1f / d);                                // kierunek NA wroga
+                    if (f.IsMainAgent && d < RoutHold.NearPlayer) { nearMain = true; fromMain = -u; }
+                    rx -= w * u.x;                                        // odpychanie: kierunek OD wroga
+                    ry -= w * u.y;
+                    // jadro cosinusowe: kazdy kierunek w polowie wroga dostaje zagrozenie (dawniej tylko sektor i dwaj sasiedzi, +-34 stopnie)
+                    for (int s = 0; s < 16; s++)
+                    {
+                        float cs = Dirs[s].x * u.x + Dirs[s].y * u.y;
+                        if (cs > 0f) _threat[s] += w * cs;
+                    }
                 }
             }
             finally { _near.Clear(); }                                    // bez referencji do agentow miedzy ocenami
             if (total <= 0f) return game;                                 // nikogo w promieniu - cel gry
 
+            float rl = (float)Math.Sqrt(rx * rx + ry * ry);
+            Vec2 rh = rl > 1e-5f ? new Vec2(rx / rl, ry / rl) : Vec2.Zero;
+            bool skew = rl >= 0.2f * total;                               // wyrazny kierunek "od wrogow" (nie otoczony po rowno)
             float min = float.MaxValue;
             for (int i = 0; i < 16; i++) if (_threat[i] < min) min = _threat[i];
             if (game.IsValid)
             {
                 Vec2 gv = game.AsVec2 - my;
-                if (gv.LengthSquared > 1f && _threat[Sector(gv)] <= 1.25f * min + 0.02f) return game;
+                float gl = gv.Length;
+                if (gl > 1f && gv.IsValid)
+                {
+                    Vec2 gu = gv * (1f / gl);
+                    bool safe = _threat[Sector(gv)] <= 1.25f * min + 0.05f * total;
+                    bool away = !skew || gu.DotProduct(rh) >= RoutHold.AwayCos;
+                    bool fromP = !nearMain || gu.DotProduct(fromMain) >= RoutHold.AwayCos;
+                    if (safe && away && fromP) return game;
+                    RoutHold.GameRejected.Add(a.Index);
+                    if (!fromP) RoutHold.NearMain.Add(a.Index);
+                }
             }
 
-            // sektory od najmniejszego zagrozenia (16 elementow - wybor prosty)
+            // wynik kierunku: zagrozenie, remis -> najdalej od wrogow (R); gracz blizej niz 15 m - kierunki nie od niego przegrywaja z kazdym od niego
+            for (int s = 0; s < 16; s++)
+            {
+                float sc = _threat[s] - 0.02f * total * Dirs[s].DotProduct(rh);
+                if (nearMain && Dirs[s].DotProduct(fromMain) < RoutHold.AwayCos) sc += 2f * total;
+                _score[s] = sc;
+            }
+            // kierunki od najlepszego wyniku (16 elementow - wybor prosty)
             for (int i = 0; i < 16; i++) _order[i] = i;
             for (int i = 0; i < 15; i++)
             {
                 int b = i;
-                for (int j = i + 1; j < 16; j++) if (_threat[_order[j]] < _threat[_order[b]]) b = j;
+                for (int j = i + 1; j < 16; j++) if (_score[_order[j]] < _score[_order[b]]) b = j;
                 if (b != i) { int t = _order[i]; _order[i] = _order[b]; _order[b] = t; }
             }
             int tried = 0;
@@ -714,15 +791,16 @@ namespace Armoury
             for (int k = 0; k < 16 && tried < RoutHold.PathPerMan; k++)
             {
                 int s = _order[k];
-                double ang = -Math.PI + (s + 0.5) * (2.0 * Math.PI / 16.0);
-                Vec2 dir = new Vec2((float)Math.Cos(ang), (float)Math.Sin(ang));
+                Vec2 dir = Dirs[s];
                 Vec2 edge = m.GetClosestBoundaryPosition(my + dir * 400f);
+                if (!edge.IsValid) continue;                              // utwardzenie: NaN z natywnego nie idzie dalej
                 Vec2 to = edge - my;
                 float len = to.Length;
                 if (len < 5f) continue;                                   // granica tuz obok - zaraz zniknie i tak
                 Vec2 tn = to * (1f / len);
                 if (tn.DotProduct(dir) < 0.6f) continue;                  // granica w tym kierunku nie lezy - nastepny sektor
                 Vec2 p = edge - tn * 2f;                                  // 2 m przed granica (zanika przy celu albo przy granicy)
+                if (!p.IsValid) continue;
                 if (!m.IsPositionInsideBoundaries(p)) p = edge;
                 if (_pathLeft <= 0) { kind = LimitKind; return game; }
                 _pathLeft--;

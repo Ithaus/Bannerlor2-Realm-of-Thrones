@@ -1148,7 +1148,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public bool BloodThroughArmour { get; set; } = true;
 
-        [SettingPropertyBool("Battle Cries And Moans", HintText = "AI formations roar a battle cry when they charge, not only when you order a charge: the captain always, his men by tier, morale and his Leadership; badly wounded men (below 30% health) near you moan every few seconds. Never the same man over and over: one voice per man every 4 seconds (a battle cry every 20), at most 6 voices a second on the field, none in sea battles. Off = the game's own voices only, as before")]
+        [SettingPropertyBool("Battle Cries And Moans", HintText = "AI formations roar a battle cry when they charge, not only when you order a charge: the captain always, his men by tier, morale and his Leadership; badly wounded men (below 30% health) near you moan now and then, at most three times each. Never the same man over and over: one voice per man every 4 seconds (a battle cry every 20), at most 6 voices a second on the field, none in sea battles or sea raids. Off = the game's own voices only, as before")]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleCriesAndMoans { get; set; } = true;
 
@@ -1268,11 +1268,11 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool BrokenMenNeverRally { get; set; } = true;
 
-        [SettingPropertyBool("Flee Away From Enemies", HintText = "with Broken Men Never Rally on: in a field battle a broken man runs where the enemy is not - away from the foes around him, horsemen and you counting double; when the enemy is all around, he runs where there are fewest of them, to the edge of the field by a path he can really walk. The game's own way out stays when it is safe. Sieges, sorties, sea battles and hideouts keep the game's way. Off = the game's way, as before")]
+        [SettingPropertyBool("Flee Away From Enemies", HintText = "with Broken Men Never Rally on: in a field battle a broken man runs where the enemy is not - straight away from the foes around him, never across their front, horsemen and you counting double; if you are within 15 metres he always runs away from you; when the enemy is all around, he runs where there are fewest of them, to the edge of the field by a path he can really walk. The game's own way out stays when it is safe and leads away from them. Sieges, sorties, sea battles and hideouts keep the game's way. Off = the game's way, as before")]
         [SettingPropertyGroup("The master's parry")]
         public bool FleeAwayFromEnemies { get; set; } = true;
 
-        [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 120 a side of 60 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before")]
+        [SettingPropertyBool("Commander Tactics", HintText = "in field battles an AI army fights by its commander's Tactics skill, not only by its culture as RBM sets it: below 30 a mob that just charges, from 60 cavalry charges at the front and defenders may form a ring or hold a choke point, from 150 a side of 150 men or more also tries to outflank with its infantry. Your own team's AI is left as it is. Off = RBM's culture tactics only, as before")]
         [SettingPropertyGroup("The master's parry")]
         public bool CommanderTactics { get; set; } = true;
 

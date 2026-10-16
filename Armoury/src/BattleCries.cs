@@ -19,7 +19,9 @@ namespace Armoury
     ///  - szarza: szyk AI (Formation.IsAIControlled - szarze gracza ma gra) przechodzi na rozkaz Charge / ChargeToTarget po rozstawieniu; ten sam szyk
     ///    najwyzej raz na 40 s i nie po krotkiej przerwie w szarzy (8 s - RBM przelacza rozkazy czesto); krzyczy kapitan (zawsze, pierwszy) i czesc
     ///    ludzi: (10% + 3% x tier) x morale/50 (0.25..1.5) + 5% za kazde 50 Leadership kapitana (najwyzej 15%), najwyzej 75%; opoznienie 0.2-2.5 s;
-    ///  - jek: AI ponizej 30% zdrowia (zapisany przy trafieniu, nie w ucieczce), do 60 m od gracza: MakeVoice(Pain) co 7-14 s, pierwszy 3-7 s po ciosie;
+    ///  - jek: AI ponizej 30% zdrowia (zapisany przy trafieniu, nie w ucieczce), do 60 m od gracza: MakeVoice(Pain) najwyzej 3 razy na rannego na
+    ///    bitwe - pierwszy 3-7 s po ciosie, drugi 7-14 s pozniej, trzeci 20-30 s pozniej (poprawka 16.10: dawniej co 7-14 s do konca bitwy);
+    ///  - bez bitew morskich i wypadow morskich (IsNavalBattle, IsNavalRaidBattle - poprawka 16.10);
     ///  - jeden glos na czlowieka na 4 s (okrzyk: 20 s), najwyzej 6 glosow na sekunde w misji (okrzyk odlozony najwyzej 2 x o 1 s, potem odrzucony
     ///    i liczony) - zadnych powtorek w kolko;
     ///  - ludzi szyku zbieramy do wlasnej listy (ApplyActionOnEachUnit tylko dodaje do listy), natywne glosy dopiero po zakonczeniu iteracji gry;
@@ -33,6 +35,10 @@ namespace Armoury
         internal const float BaseShare = 0.10f, PerTier = 0.03f, LeaderPer50 = 0.05f, LeaderMax = 0.15f, ShareMax = 0.75f;
         internal const float DelayMin = 0.2f, DelaySpan = 2.3f;
         internal const float MoanBelow = 0.30f, MoanRange = 60f, MoanMin = 7f, MoanSpan = 7f, MoanFirstMin = 3f, MoanFirstSpan = 4f;
+        // poprawka po recenzji (16.10, Jeff zglaszal "krzyk zapetlony"): najwyzej 3 jeki na rannego na bitwe, odstep rosnie: 3-7 s po ciosie,
+        // potem 7-14 s, potem 20-30 s; nowy cios ponizej progu nie zeruje licznika
+        internal const int MoansPerMan = 3;
+        internal const float MoanLateMin = 20f, MoanLateSpan = 10f;
         internal const int MaxPerSecond = 6, PendingMax = 500;
 
         private sealed class Form { public bool Charge; public float ChargeEnd = -1000f; public float LastCry = -1000f; }
@@ -41,6 +47,7 @@ namespace Armoury
         // stan misji (glowny watek; _pending pod _pend - OnAgentHit moze przyjsc z ticku asynchronicznego)
         private static readonly Dictionary<Formation, Form> _forms = new Dictionary<Formation, Form>();
         private static readonly Dictionary<Agent, float> _lastVoice = new Dictionary<Agent, float>();
+        private static readonly Dictionary<Agent, int> _moanCount = new Dictionary<Agent, int>();   // jeki na rannego w misji (glowny watek)
         private static readonly List<Hurt> _hurt = new List<Hurt>();
         private static readonly HashSet<Agent> _hurtSet = new HashSet<Agent>();
         private static readonly object _pend = new object();
@@ -89,6 +96,7 @@ namespace Armoury
         {
             _forms.Clear();
             _lastVoice.Clear();
+            _moanCount.Clear();
             _hurt.Clear();
             _hurtSet.Clear();
             _buf.Clear();
@@ -140,7 +148,7 @@ namespace Armoury
             if (_acc < TickEvery) return;
             _acc = 0f;
             if (_m == null || !ReferenceEquals(_m.Target, m)) { Clear(); _m = new WeakReference(m); }
-            if (m.MissionEnded || m.IsNavalBattle || !BattleSense.InBattle(m)) return;
+            if (m.MissionEnded || m.IsNavalBattle || m.IsNavalRaidBattle || !BattleSense.InBattle(m)) return;   // takze wypad morski (recenzja 16.10)
             float now = m.CurrentTime;
 
             // ranni z kolejki trafien
@@ -150,6 +158,8 @@ namespace Armoury
                 {
                     var a = _pending[i];
                     if (a == null || _hurtSet.Contains(a)) continue;
+                    int done;
+                    if (_moanCount.TryGetValue(a, out done) && done >= MoansPerMan) continue;   // swoje juz wyjeczal w tej bitwie
                     _hurtSet.Add(a);
                     _hurt.Add(new Hurt { A = a, Next = now + MoanFirstMin + MBRandom.RandomFloat * MoanFirstSpan });
                 }
@@ -286,7 +296,12 @@ namespace Armoury
                     _lastVoice[a] = now;
                     _tMoans++;
                     _tMoanIds.Add(a.Index);
-                    h.Next = now + MoanMin + MBRandom.RandomFloat * MoanSpan;
+                    int n;
+                    _moanCount.TryGetValue(a, out n);
+                    n++;
+                    _moanCount[a] = n;
+                    if (n >= MoansPerMan) { h.Dead = true; dead = true; continue; }   // trzeci jek - koniec dla tego rannego w tej bitwie
+                    h.Next = now + (n == 1 ? MoanMin + MBRandom.RandomFloat * MoanSpan : MoanLateMin + MBRandom.RandomFloat * MoanLateSpan);
                 }
                 catch (Exception e)
                 {

@@ -31668,7 +31668,9 @@ NBW_LINE = re.compile(
     r"bez druzyny (\d+), odwrot z rozkazu (\d+)\) "
     r"\| morale przypiete (\d+) razy \(ludzi (\d+)\), zgaszone przez innych (\d+) "
     r"\| odwrot: ponowienia bez okrzyku (\d+) \(ludzi (\d+)\), zmiany kierunku (\d+), bez handlera paniki (\d+), przejeci przez gracza (\d+) "
-    r"\| kierunek: gry (\d+), sektor (\d+), bez drogi (\d+), limit zapytan (\d+), poza polem (\d+) \(zapytan o droge (\d+)\) "
+    r"\| kierunek: gry (\d+), sektor (\d+), bez drogi (\d+), limit zapytan (\d+), poza polem (\d+) \(zapytan o droge (\d+)\)"
+    # poprawka 16.10 (recenzja kierunku): cel gry odrzucony (w strone wrogow / gracza) - grupa opcjonalna, starsze linie dalej rozpoznane
+    r"(?:, cel gry odrzucony (\d+) \(blisko gracza (\d+)\))? "
     r"\| postura wg tieru (TAK|NIE): szeregowych (\d+) \(T1 (\d+), T2 (\d+), T3 (\d+), T4 (\d+), T5 (\d+), T6 (\d+), T7 (\d+)\), bohaterow (\d+), "
     r"bez broni pominiete (\d+); probka T1 (\S+), T6 (\S+) "
     # czesc 2 (16.10): taktyka wg dowodcy, weterani wg tieru, krew przez pancerz, okrzyki i jeki - grupa opcjonalna (linie czesci 1 dalej rozpoznane)
@@ -31683,7 +31685,7 @@ NBW_LINE = re.compile(
     r"\(sesja (\d+), linia misji (\d+)\)\.$")
 NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic", "juz", "repanic", "po_koncu", "bez_druzyny", "rozkaz",
             "pin", "pin_ludzi", "zgaszone", "ponowienia", "ponowienia_ludzi", "zwroty", "bez_handlera", "gracz",
-            "k_gry", "k_sektor", "k_bez_drogi", "k_limit", "k_poza", "zapytan", "postura", "szeregowych", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
+            "k_gry", "k_sektor", "k_bez_drogi", "k_limit", "k_poza", "zapytan", "k_odrzucony", "k_gracz", "postura", "szeregowych", "t1", "t2", "t3", "t4", "t5", "t6", "t7",
             "bohaterow", "bez_broni", "probka1", "probka6",
             # czesc 2 (16.10)
             "takt", "t_druzyn", "t_tlum", "t_konnica", "t_okrazenie", "t_bez_zmian", "t_gracza", "t_nie_pole", "t_bez_danych", "t_dodane", "t_duble",
@@ -31693,6 +31695,8 @@ NBW_KEYS = ("bitwa", "pole", "klucz", "zlamani", "rozbici", "ucieczka", "panic",
             "glosy", "v_szarze", "v_okrzyki", "v_ludzi", "v_jeki", "v_rannych", "v_limit",
             "st_panika", "st_kierunek", "st_postura", "st_taktyka", "st_weteran", "st_krew", "st_glosy", "st_sesja", "linia")
 NBW_ERR = ("ERROR in RoutHold", "ERROR in RoutKeeper", "ERROR in BattleWind.PostureInit",
+           # poprawka 16.10 (recenzja): wyjatek przy wpinaniu latki postury (bez tego NBW-0b pokazywal tylko 'brak linii')
+           "ERROR in BattleWind.ApplyAll",
            # czesc 2 (16.10)
            "ERROR in WarCouncil", "ERROR in VeteranAi", "ERROR in BattleGore", "ERROR in BattleCries", "ERROR in BattleSense")
 NBW_NEED = ("Broken Men Never Rally TAK", "Flee Away From Enemies TAK", "postura szeregowych wg tieru TAK", "latka postury RBM wpieta TAK",
@@ -31736,7 +31740,7 @@ def nbw_part2(rep, rows, tot):
     rep.add("NBW-12: okrzyki przy szarzy i jeki rannych (Battle Cries And Moans)", f"szarze {tot('v_szarze')} (okrzykow {tot('v_okrzyki')}, roznych"
             f" ludzi {vl}, na glowe {tot('v_okrzyki') / max(1, vl):.1f}), jeki {tot('v_jeki')} (rannych {tot('v_rannych')}, na rannego"
             f" {tot('v_jeki') / max(1, tot('v_rannych')):.1f}), odrzucone limitem {tot('v_limit')}",
-            "INFO (okrzyk najwyzej raz na 20 s na czlowieka, szyk raz na 40 s; jek co 7-14 s; najwyzej 6 glosow na s)", None)
+            "INFO (okrzyk najwyzej raz na 20 s na czlowieka, szyk raz na 40 s; jekow na rannego <= 3; najwyzej 6 glosow na s)", None)
 
 
 def nbitwa_main(logp):
@@ -31744,7 +31748,7 @@ def nbitwa_main(logp):
     raz na bitwe, morale przypiete na 0, ponowienia odwrotu bez okrzyku co 4 s, cel ucieczki z 16 sektorow (klucze BrokenMenNeverRally,
     FleeAwayFromEnemies); (B) postura szeregowych RBM wedlug tieru (SoldierPostureByTier, T1 x0.85 ... T6 x1.7). Wejscie: log Armoury
     (strumieniowo). Progi twarde: NBW-0 linia startu sesji (4 x TAK), NBW-0b linia wpiecia latki postury przy starcie gry, NBW-1 ERROR in
-    RoutHold / RoutKeeper / BattleWind.PostureInit = 0. Reszta INFO (autotest nie gra bitew): NBW-2 linie misji, NBW-3 raz Panic na czlowieka
+    RoutHold / RoutKeeper / BattleWind.PostureInit / BattleWind.ApplyAll = 0 (poprawka 16.10: ApplyAll; NBW-5 z 'cel gry odrzucony'). Reszta INFO (autotest nie gra bitew): NBW-2 linie misji, NBW-3 raz Panic na czlowieka
     (ponowne paniki gry 0), NBW-4 morale i ponowienia, NBW-5 kierunek, NBW-6 postura wedlug tieru (probki: mnoznik T1 / T6), NBW-7 potkniecia,
     NBW-8 linia NM w bitwach (wywolan = roznych ludzi). Log bez paczki: NBW-0 NIE, reszta INFO, bez wyjatku."""
     rep = Report()
@@ -31754,6 +31758,7 @@ def nbitwa_main(logp):
         return 0
     starts, wires, rows, bad, notes, nm, vets = [], [], [], [], [], [], []
     wind_off = wind_bad = wind_norbm = 0
+    wind_err = None     # pierwsza linia 'ERROR in BattleWind.ApplyAll' (do NBW-0b)
     errs = {k: 0 for k in NBW_ERR}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -31792,6 +31797,8 @@ def nbitwa_main(logp):
                 for k in NBW_ERR:
                     if s.startswith(k):
                         errs[k] += 1
+                        if k == "ERROR in BattleWind.ApplyAll" and wind_err is None:
+                            wind_err = s[:200]
                         break
     print(f"plik: {logp} | linii startu {len(starts)}, wpiecia postury {len(wires)}, linii misji {len(rows) + len(bad)} (rozpoznanych {len(rows)}),"
           f" innych linii NB2 {len(notes)}, linii NM {len(nm)}")
@@ -31811,7 +31818,8 @@ def nbitwa_main(logp):
     elif wind_off:
         rep.add("NBW-0b: latka postury RBM (start gry)", "BattleWind: wylaczone (oba klucze wylaczone przy starcie)", "INFO", None)
     else:
-        rep.add("NBW-0b: latka postury RBM (start gry)", "pola / metody RBM nie pasuja" if wind_bad else "brak linii", "linia wpiecia jest", False)
+        rep.add("NBW-0b: latka postury RBM (start gry)", "pola / metody RBM nie pasuja" if wind_bad else (wind_err or "brak linii"),
+                "linia wpiecia jest", False)
     # NBW-0c latka weteranow przy starcie gry (czesc 2)
     vw = [v for v in vets if v.startswith(NBW_VET_WIRE)]
     if vw:
@@ -31853,8 +31861,9 @@ def nbitwa_main(logp):
             "INFO (ponowien najwyzej czas ucieczki / 4 s na glowe; zgaszone = RBM zdazyl przed przypieciem)", None)
     # NBW-5 kierunek
     rep.add("NBW-5: cel ucieczki", f"gry {tot('k_gry')}, sektor {tot('k_sektor')}, bez drogi {tot('k_bez_drogi')}, limit zapytan {tot('k_limit')},"
-            f" poza polem {tot('k_poza')}; zapytan o droge {tot('zapytan')}; misji z polem bitwy {sum(1 for r in rows if r['pole'] == 'TAK')}",
-            "INFO (gry + sektor + bez drogi + poza polem = zlamani z odwrotem; limit rzadko)", None)
+            f" poza polem {tot('k_poza')}; zapytan o droge {tot('zapytan')}; cel gry odrzucony {tot('k_odrzucony')} (blisko gracza"
+            f" {tot('k_gracz')}); misji z polem bitwy {sum(1 for r in rows if r['pole'] == 'TAK')}",
+            "INFO (gry + sektor + bez drogi + poza polem = zlamani z odwrotem; limit rzadko; odrzucony = cel gry w strone wrogow / gracza)", None)
     # NBW-6 postura
     tiers = [tot(f"t{i}") for i in range(1, 8)]
 

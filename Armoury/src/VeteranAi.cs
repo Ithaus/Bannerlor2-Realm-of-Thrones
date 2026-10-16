@@ -22,8 +22,9 @@ namespace Armoury
     ///    postureEnabled, bez vanillaCombatAi) - inaczej limity sa inne i nic nie ruszamy;
     ///  - poziom = max(poziom RBM, prog tieru 0.05 + 0.13 x (tier - 1)): T1 0.05 ... T5 0.57, T6 0.70, T7 0.83 (na Realistic t6 i tak ok. 0.96);
     ///    kapitan szyku z Tactics >= 150 dodaje 0.05;
-    ///  - pola zostawione z gry (RBM ich nie pisze): wzory gry z tym poziomem (losowy kierunek obrony, timery po trafieniu i parowaniu, ocena
-    ///    ogluszenia, parowanie w ataku, chamber, zmiana decyzji parowania);
+    ///  - pola zostawione z gry (RBM ich nie pisze): od tieru 3 wzory gry z tym poziomem (losowy kierunek obrony, timery po trafieniu i parowaniu,
+    ///    ocena ogluszenia, parowanie w ataku, chamber, zmiana decyzji parowania); tier 1-2 - pola gry bez zmian (poprawka 16.10);
+    ///  - brama misji z BattleSense.InBattle (bez MissionTeams.Kind - postfiks bywa wolany z ticku asynchronicznego; poprawka 16.10);
     ///  - tier 5+ bez tarczy: limity RBM wyzej (parowanie 0.7 / 0.8 / 0.85, zla strona 0.55 / 0.6 / 0.65, wyczucie bloku 0.38 / 0.42 / 0.46, atak po
     ///    parowaniu 0.42 / 0.46 / 0.5 dla T5 / T6 / T7); pola, ktore RBM mnozy przez zmeczenie (stamina), skalujemy stosunkiem - zmeczenie RBM zostaje;
     ///  - agresja wedlug tieru: obie szanse ataku x (0.8 + 0.08 x (tier - 1)) - T1 x0.80, T4 x1.04, T6 x1.20, T7 x1.28.
@@ -175,8 +176,13 @@ namespace Armoury
             catch { return 1f; }
         }
 
+        /// <summary>Brama misji. Poprawka po recenzji (16.10): rodzaj misji z BattleSense.InBattle (liczone w AfterStart na glownym watku, potem
+        /// tylko czytane) zamiast MissionTeams.Kind - Kind moze wolac MissionTeams.Ensure (czysci HashSety bez blokady), a ten postfiks bywa
+        /// wolany z ticku asynchronicznego druzyn. InBattle sprawdzane przy kazdym wywolaniu (dwa odczyty pol), w pamieci misji tylko galaz RBM.</summary>
         private static bool GateFor(Mission m, out float dm)
         {
+            dm = 1f;
+            if (!BattleSense.InBattle(m)) return false;
             var gm = _gm;
             if (gm != null && ReferenceEquals(gm.Target, m)) { dm = _gDm; return _gOn; }
             bool on = false;
@@ -184,10 +190,7 @@ namespace Armoury
             try
             {
                 Config();
-                string kind = MissionTeams.Kind(m);
-                bool battle = kind == "bitwa" || kind == "kryjowka";
-                bool branch = _fAi != null && Flag(_fAi, false) && Flag(_fPosture, false) && !Flag(_fVanilla, true);
-                on = battle && branch;
+                on = _fAi != null && Flag(_fAi, false) && Flag(_fPosture, false) && !Flag(_fVanilla, true);
                 d = DiffMul();
             }
             catch { on = false; }
@@ -257,18 +260,23 @@ namespace Armoury
                 lvl = Clamp(lvl, 0f, 1f);
                 var p = agentDrivenProperties;
 
-                // (1) pola zostawione z gry - wzory gry (AgentStatCalculateModel.SetAiRelatedProperties) z naszym poziomem
-                float l2 = lvl * lvl;
-                p.AiRandomizedDefendDirectionChance = 1f - l2 * lvl;
-                p.AISetNoAttackTimerAfterBeingHitAbility = Lerp(0.33f, 1f, lvl);
-                p.AISetNoAttackTimerAfterBeingParriedAbility = Lerp(0.2f, 1f, l2);
-                p.AISetNoDefendTimerAfterHittingAbility = Lerp(0.1f, 0.99f, l2);
-                p.AISetNoDefendTimerAfterParryingAbility = Lerp(0.15f, 1f, l2);
-                p.AIEstimateStunDurationPrecision = 1f - Lerp(0.2f, 1f, lvl);
-                p.AIParryOnAttackAbility = lvl;
-                p.AIParryOnAttackingContinueAbility = Lerp(0.5f, 0.95f, lvl);
-                p.AiTryChamberAttackOnDecide = (lvl - 0.15f) * 0.1f;
-                p.AiParryDecisionChangeValue = 0.05f + 0.7f * lvl;
+                // (1) pola zostawione z gry - wzory gry (AgentStatCalculateModel.SetAiRelatedProperties) z naszym poziomem. Poprawka po recenzji
+                // (16.10): tier 1-2 bez zmian - poziom RBM (umiejetnosc / 250 x trudnosc) jest wyzszy niz poziom gry (umiejetnosc / 300 x 0.1 / 0.32 /
+                // 0.96 x _AILevelMultiplier), wiec przeliczenie podnosiloby rekruta; "tier 1 slabiutki" = pola gry + agresja x0.80-0.88 + postura x0.85
+                if (tier >= 3)
+                {
+                    float l2 = lvl * lvl;
+                    p.AiRandomizedDefendDirectionChance = 1f - l2 * lvl;
+                    p.AISetNoAttackTimerAfterBeingHitAbility = Lerp(0.33f, 1f, lvl);
+                    p.AISetNoAttackTimerAfterBeingParriedAbility = Lerp(0.2f, 1f, l2);
+                    p.AISetNoDefendTimerAfterHittingAbility = Lerp(0.1f, 0.99f, l2);
+                    p.AISetNoDefendTimerAfterParryingAbility = Lerp(0.15f, 1f, l2);
+                    p.AIEstimateStunDurationPrecision = 1f - Lerp(0.2f, 1f, lvl);
+                    p.AIParryOnAttackAbility = lvl;
+                    p.AIParryOnAttackingContinueAbility = Lerp(0.5f, 0.95f, lvl);
+                    p.AiTryChamberAttackOnDecide = (lvl - 0.15f) * 0.1f;
+                    p.AiParryDecisionChangeValue = 0.05f + 0.7f * lvl;
+                }
 
                 // (2) tier 5+ bez tarczy: limity RBM wyzej (galaz RBM "postura, bez tarczy" - AgentAi.cs:95-121)
                 bool shield = HasShield(agent);

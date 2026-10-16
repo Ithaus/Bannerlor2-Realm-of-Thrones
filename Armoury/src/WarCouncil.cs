@@ -26,7 +26,7 @@ namespace Armoury
     ///  - tac &lt; 30: tlum bez manewru - lista od nowa: Charge + FullScaleAttack (bandyci, partie bez bohatera);
     ///  - 30..59: zestaw RBM bez zmian;
     ///  - od 60: + FrontalCavalryCharge (RBM ja obsluguje, waga x0.75), obronca + DefensiveRing i HoldChokePoint;
-    ///  - od 120 i strona od 60 ludzi (MapEvent gracza; bitwa wlasna - bez limitu): okrazenie piechota RBM (RBMTacticAttackSplitInfantry /
+    ///  - od 150 i strona od 150 ludzi (poprawka 16.10, dawniej 120 / 60; MapEvent gracza; bitwa wlasna - bez limitu): okrazenie piechota RBM (RBMTacticAttackSplitInfantry /
     ///    RBMTacticDefendSplitInfantry, typy z RBMAI.dll szukane po nazwie, brak typu = pominiete);
     ///  - bez dubli typow; kazde dodanie we wlasnym try (potkniecie liczone, funkcja dalej dziala).
     /// Lista taktyk (TeamAIComponent._availableTactics) czytana tylko na glownym watku w AfterStart - gra iteruje ja w MakeDecision z ticku druzyn,
@@ -34,7 +34,9 @@ namespace Armoury
     /// </summary>
     internal static class WarCouncil
     {
-        internal const int HordeBelow = 30, CavalryFrom = 60, EnvelopFrom = 120, EnvelopMinMen = 60;
+        // okrazenie: poprawka po recenzji (16.10) - prog 150 Tactics i strona od 150 ludzi (dawniej 120 / 60): RBM daje te taktyke tylko
+        // kulturom sturgia / nord, a przy 120 / 60 dzielilaby piechote w wiekszosci wiekszych bitew ROT z lordem
+        internal const int HordeBelow = 30, CavalryFrom = 60, EnvelopFrom = 150, EnvelopMinMen = 150;
 
         // ---- liczniki misji (pod RoutHold.Gate; zerowane w RoutHold.Ensure)
         private static int _teams, _horde, _cavalry, _envelop, _same, _player, _notField, _noData, _added, _dupes, _noType;
