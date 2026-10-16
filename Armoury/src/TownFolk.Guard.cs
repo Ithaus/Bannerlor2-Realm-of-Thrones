@@ -58,6 +58,50 @@ namespace Armoury
             return b;
         }
         private const double GdStep = 0.03, GdMin = 0.25, GdCapWorld = 0.005,   /* 15.10 test C: 0.0015 nie przegonilo doplywu do ludu (lud 9.9 -> 13% swiata, korony 24.9 -> 18.9% w 160 dob przy mnozniku 5) */ GdCapInflow = 2.0, GdCover = 0.8, GdEmaDays = 28;
+        // N7 (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1; klucz FolkGuardNoMemory): mnoznik BEZ PAMIECI = clamp(1 + GdNmSlope x (P/N - GdNmMid), GdMin, GdMax) liczony
+        // co dobe z odchylenia. Dowod (log Jeffa d108945 "Straznik obiegu (obieg2)"): mnoznik z pamiecia 5.028 stal, choc kiesy spadly 2.14 -> 1.577 x poziomu - schodzi
+        // dopiero ponizej 1.25 x po 3% na dobe (do 1 ok. 54 dob). Przy 1.577 nowa regula daje 1.62 (stawka 1.6%/d zamiast 5.0%/d). Stary mnoznik (_gdM) liczony dalej
+        // ta sama regula i zapisywany w arm_obieg2 jak dotad (nieczytany przy kluczu) - zapis zgodny w obie strony, klucz wylaczony wraca do niego bez skoku pamieci.
+        private const double GdNmSlope = 8.0, GdNmMid = 1.5;
+        private static double _gdMNew = double.NaN, _gdRateOld;          // N7: mnoznik nowej reguly tej doby (NaN - klucz wylaczony), stawka starej reguly (porownanie)
+        private static bool _gdNmToday, _gdNmBase;                        // N7: stawke doby dala regula bez pamieci; potrzeba nieznana - baza x1
+        /// <summary>N7 / N8 (linia NE): podatek od nadwyzki tej doby (miasta, zamki, wsie) - zaplanowany, przy starej stawce, bez zaliczenia pozyczek; zaliczone pozyczki.</summary>
+        internal static long N7Plan, N7PlanOld, N8PlanNoCredit, N8CreditUsed; internal static int N8CreditN;
+        internal static double N7Mult { get { return _gdMNew; } }
+        internal static double N7MultOld { get { return _gdM; } }
+        internal static double N7Rate { get { return _gdRate; } }
+        internal static double N7RateOld { get { return _gdRateOld; } }
+        internal static double N7Ratio { get { return _gdN > 0 ? _gdP / _gdN : double.NaN; } }
+        internal static bool N7Today { get { return _gdNmToday && !_gdNmBase; } }
+        internal static double N7Min { get { return GdMin; } }
+        internal static double N7Max { get { var s = Settings.Current; return s != null ? GdMax(s) : 10.0; } }
+        /// <summary>Stawka doby starej reguly (mnoznik z pamiecia; z tym samym sufitem doby) - tylko porownanie N7.</summary>
+        private static double HoardRateOld(Settings s) { return GuardOn && _gdReady ? _gdRateOld : HoardRate(s); }
+
+        /// <summary>N7 / N8: podatek doby jednej klaso-osady przy innej stawce / bez zaliczenia (te same granice co pobor: nadwyzka ponad poziom normalny, kiesa). Nie rzuca.</summary>
+        private static long HoardAlt(double rate, double room, double pre, long purse)
+        {
+            double due = rate * (room + pre) - pre;
+            if (!(due >= 1)) return 0;
+            long x = (long)Math.Floor(Math.Min(due, room));
+            return Math.Max(0, Math.Min(x, Math.Max(0, purse)));
+        }
+
+        /// <summary>N7 / N8 (tylko liczniki linii NE): zaplanowany podatek klaso-osady `x` (stawka doby, z zaliczeniem `credit`), ten sam przy starej stawce (mnoznik
+        /// z pamiecia) i bez zaliczenia pozyczki. `aid` - danina P1 / M4 tej doby (wliczona jak dotad). Nie rzuca.</summary>
+        private static void HoardNote(Settings s, double room, long aid, long credit, long purse, long x)
+        {
+            try
+            {
+                x = Math.Max(0, x);
+                N7Plan += x;
+                double pre = Math.Max(0, aid) + Math.Max(0, credit);
+                N7PlanOld += _gdNmToday ? HoardAlt(HoardRateOld(s), room, pre, purse) : x;
+                if (credit > 0) { N8PlanNoCredit += HoardAlt(HoardRateNow(s), room, Math.Max(0, aid), purse); N8CreditUsed += credit; N8CreditN++; }
+                else N8PlanNoCredit += x;
+            }
+            catch (Exception e) { GuardStumble("HoardNote", e); }
+        }
 
         /// <summary>
         /// korona2 (A, klucz FolkGuardCrownToReserve; test D: czesc korony wplywala w dobie ludu przed CrownIncome.Begin, 165 liczyl ja jako "inne wplywy dnia" i tego
@@ -133,6 +177,7 @@ namespace Armoury
             _gdN = _gdP = _gdE = _gdCapAbs = _gdNT = _gdNC = _gdNV = _gdPT = _gdPC = _gdPV = _gdWorldUsed = 0; _gdIn = double.NaN;
             _gdCovT = _gdAllT = 0; _gdMove = "-"; _gdWorld = _gdFolk = _gdLords = _gdCrowns = _gdTicks = 0; _gdShares = false;
             _gdCrownT = 0; _gdCrownTN = 0; _gdResT = 0; LastHoardCrownReserve = 0;
+            _gdMNew = double.NaN; _gdRateOld = 0; _gdNmToday = false; _gdNmBase = false; N7Plan = N7PlanOld = N8PlanNoCredit = N8CreditUsed = 0; N8CreditN = 0;   // N7 / N8 (noc 16.10)
             _vhTake = _vhLord = _vhTown = _vhCastle = _vhCrown = _vhPlayer = _vhHeld = _vhNoLord = _vhTicks = 0;
             _vhN = _vhUnder = _vhRaided = _vhHeldN = _vhNoBound = _vhBelow = _vhVill = _gdStumbles = 0;
             _vhGold0 = _vhGold1 = _vhNorm = _vhE0 = _vhE1 = 0;
@@ -164,9 +209,11 @@ namespace Armoury
         {
             GuardDayZero();
             _gdReady = false;
+            LnSnapBegin();                                             // N8 (noc 16.10): migawka kies zrodel pozyczek PRZED podatkiem tej doby, zaliczenie wczorajszych pozyczek (TownFolk.Loans.cs)
             var s = Settings.Current;
             if (s == null) return;
             _gdRate = HoardRate(s);
+            _gdRateOld = _gdRate;
             if (!s.FolkHoardTax || (!s.FolkCirculationGuard && !s.FolkHoardVillages)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
@@ -226,10 +273,32 @@ namespace Armoury
                 else _gdMove = "wstrzymany (potrzeba ludu znana w " + _gdCovT + " z " + _gdAllT + " miast)";
                 if (double.IsNaN(_gdM) || double.IsInfinity(_gdM)) _gdM = 1.0;
                 _gdM = Math.Max(GdMin, Math.Min(mx, _gdM));
-                double r = HoardRate(s) * _gdM;
+                // N7 (klucz FolkGuardNoMemory): mnoznik doby z odchylenia tej doby - bez pamieci; potrzeba znana w < 80% miast - baza (x1, jak bez straznika).
+                // Stary mnoznik wyzej liczony dalej (zapis, porownanie). Klucz wylaczony - mUse = _gdM, co do monety jak dotad
+                double mUse = _gdM;
+                if (s.FolkGuardNoMemory)
+                {
+                    if (_gdN > 0 && _gdAllT > 0 && _gdCovT >= GdCover * _gdAllT)
+                    {
+                        double q = _gdP / _gdN;
+                        mUse = 1 + GdNmSlope * (q - GdNmMid);
+                        if (double.IsNaN(mUse) || double.IsInfinity(mUse)) mUse = 1.0;
+                        mUse = Math.Max(GdMin, Math.Min(mx, mUse));
+                        _gdMove = "bez pamieci: 1 + " + GdNmSlope.ToString("0", Inv) + " x (" + q.ToString("0.000", Inv) + " - " + GdNmMid.ToString("0.00", Inv) + "), stara regula z pamiecia "
+                                  + _gdM.ToString("0.000", Inv) + " " + _gdMove + " - w zapisie, nieczytana";
+                    }
+                    else
+                    {
+                        mUse = 1.0; _gdNmBase = true;
+                        _gdMove = "bez pamieci: baza x1 - potrzeba ludu znana w " + _gdCovT + " z " + _gdAllT + " miast, stara regula z pamiecia " + _gdM.ToString("0.000", Inv) + " - w zapisie, nieczytana";
+                    }
+                    _gdMNew = mUse; _gdNmToday = true;
+                }
+                double r = HoardRate(s) * mUse, rOld = HoardRate(s) * _gdM;
                 _gdCapAbs = Math.Max(GdCapWorld * Math.Max(0, world), GdCapInflow * (double.IsNaN(_gdInEma) ? 0 : Math.Max(0, _gdInEma)));
-                if (_gdE >= 1 && _gdCapAbs > 0) r = Math.Min(r, _gdCapAbs / _gdE);
+                if (_gdE >= 1 && _gdCapAbs > 0) { r = Math.Min(r, _gdCapAbs / _gdE); rOld = Math.Min(rOld, _gdCapAbs / _gdE); }
                 _gdRate = HdClamp(r, 0, 0.1);
+                _gdRateOld = HdClamp(rOld, 0, 0.1);
                 _gdReady = true;
             }
             catch (Exception e) { GuardStumble("GuardBegin", e); _gdRate = HoardRate(s); _gdReady = false; }
@@ -258,9 +327,12 @@ namespace Armoury
                 if (vil.VillageState != Village.VillageStates.Normal) { _vhRaided++; _vhE1 += room; _vhGold1 += gold; return; }
                 var st = f.St; var bound = vil.Bound;
                 if (st == null || bound == null || bound.Town == null) { _vhNoBound++; _vhE1 += room; _vhGold1 += gold; return; }
-                double due = HoardRateNow(s) * room;
-                long x = (long)Math.Floor(Math.Min(due, room));
+                // N8 (FolkLoanBeforeGuard): pozyczka z tej kiesy w poprzednim oknie pozyczek zalicza sie na podatek (jak danina w kiesa2) - klucz wylaczony: credit 0, jak dotad
+                long credit = LnCreditFor(f.St);
+                double due = HoardRateNow(s) * (room + credit) - credit;
+                long x = due >= 1 ? (long)Math.Floor(Math.Min(due, room)) : 0;
                 x = Math.Min(x, (long)gold);
+                HoardNote(s, room, 0, credit, gold, x);                // N7 / N8: liczniki porownania (stara stawka, bez zaliczenia)
                 if (x <= 0) { _vhE1 += room; _vhGold1 += gold; return; }
                 if (BesiegedPay.Holds(bound, BesiegedPay.KFolkHoard, x, true)) { _vhHeld += x; _vhHeldN++; _vhE1 += room; _vhGold1 += gold; return; }
                 var clan = st.OwnerClan;
@@ -298,7 +370,7 @@ namespace Armoury
                     if (cp > 0) GuardCrownReserve(kd, cp);   // korona2 (A): zapas korony, nie wplyw dnia (nie renty 180 tego dnia)
                 }
                 _vhTake += x; _vhE1 += room - x; _vhGold1 += vil.Gold;
-                if (x > 0) _vhN++;
+                if (x > 0) { _vhN++; LnNoteTaxed(f.St, x); }          // N8: podatek tej doby z kiesy wsi (pozyczka liczy nadwyzke sprzed niego)
                 try
                 {
                     if (lp > 0)
@@ -325,7 +397,7 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null || !(s.FolkCirculationGuard || s.FolkHoardVillages)) return "";
             return " | obieg2: straznik obiegu " + (GuardOn ? "tak" : "nie") + ", do skarbcow koron z miast i zamkow " + _gdCrownT + " (" + _gdCrownTN
-                   + " klaso-osad; poza 'pobrano' wyzej), stawka bazowa " + (100 * HoardRate(s)).ToString("0.00", Inv) + "%/d x mnoznik " + _gdM.ToString("0.000", Inv)
+                   + " klaso-osad; poza 'pobrano' wyzej), stawka bazowa " + (100 * HoardRate(s)).ToString("0.00", Inv) + "%/d x mnoznik " + (_gdNmToday ? _gdMNew : _gdM).ToString("0.000", Inv)
                    + " (sufit doby " + N0(_gdCapAbs) + ")";
         }
 
@@ -352,6 +424,9 @@ namespace Armoury
                                   + (1 - GdStep).ToString("0.00", Inv) + " na dobe w granicach " + GdMin.ToString("0.00", Inv) + "-" + F2(GdMax(s)) + ", sufit doby max("
                                   + (100 * GdCapWorld).ToString("0.00", Inv) + "% swiata; " + GdCapInflow.ToString("0", Inv) + " x doplyw ludu EMA " + GdEmaDays.ToString("0", Inv)
                                   + " dob), czesc korony " + (100 * HdClamp(s.FolkGuardCrownShare, 0, 0.5)).ToString("0", Inv) + "%"
+                                  + " | N7 regula stawki: " + (s.FolkGuardNoMemory ? "bez pamieci (Folk Guard No Memory tak) - mnoznik = clamp(1 + " + GdNmSlope.ToString("0", Inv) + " x (lud / poziom normalny - "
+                                     + GdNmMid.ToString("0.00", Inv) + "), " + GdMin.ToString("0.00", Inv) + ", " + F2(GdMax(s)) + ") co dobe, pasmo i mnoznik z pamiecia tylko do zapisu"
+                                     : "z pamiecia (Folk Guard No Memory nie) - pasmo jak dotad")
                                   + " | stan z zapisu: mnoznik " + _gdM.ToString("0.000", Inv) + ", doplyw EMA " + N0(_gdInEma) + LoansStateNote()
                                   + " | klucze wylaczone = e2a422ec.";
             }
@@ -372,7 +447,7 @@ namespace Armoury
                       .Append(N0(_gdNC)).Append(" / wsie ").Append(N0(_gdNV)).Append("), kiesy z potrzeba ").Append(N0(_gdP)).Append(" (miasta ").Append(N0(_gdPT)).Append(" / podzamcza ")
                       .Append(N0(_gdPC)).Append(" / wsie ").Append(N0(_gdPV)).Append(") = ").Append(_gdN > 0 ? (_gdP / _gdN).ToString("0.000", Inv) : "-").Append(" x poziom normalny")
                       .Append("; pasmo ").Append(F2(GdLo(s))).Append("-").Append(F2(GdHi(s))).Append(" x (").Append(Pct(GdLo(s) * _gdN, w)).Append(" - ").Append(Pct(GdHi(s) * _gdN, w)).Append(" swiata)")
-                      .Append(" | czesc korony teraz ").Append((100 * GuardCrownShare(s)).ToString("0.0", Inv)).Append("% (cel udzialu koron ").Append((100 * HdClamp(s.FolkGuardCrownTarget, 0, 0.5)).ToString("0.0", Inv)).Append("%)").Append(" | mnoznik ").Append(_gdM.ToString("0.000", Inv)).Append(" (").Append(_gdMove).Append("; granice ").Append(GdMin.ToString("0.00", Inv)).Append("-").Append(F2(GdMax(s))).Append(')')
+                      .Append(" | czesc korony teraz ").Append((100 * GuardCrownShare(s)).ToString("0.0", Inv)).Append("% (cel udzialu koron ").Append((100 * HdClamp(s.FolkGuardCrownTarget, 0, 0.5)).ToString("0.0", Inv)).Append("%)").Append(" | mnoznik ").Append((_gdNmToday ? _gdMNew : _gdM).ToString("0.000", Inv)).Append(" (").Append(_gdMove).Append("; granice ").Append(GdMin.ToString("0.00", Inv)).Append("-").Append(F2(GdMax(s))).Append(')')
                       .Append(" | stawka doby ").Append((100 * _gdRate).ToString("0.000", Inv)).Append("%/d (baza ").Append((100 * HoardRate(s)).ToString("0.00", Inv)).Append("% x mnoznik")
                       .Append(", sufit doby ").Append(N0(_gdCapAbs)).Append(" = max(").Append((100 * GdCapWorld).ToString("0.00", Inv)).Append("% swiata ").Append(N0(_gdWorldUsed))
                       .Append("; 2 x doplyw EMA), nadwyzka ponad poziom normalny ").Append(N0(_gdE)).Append(')')

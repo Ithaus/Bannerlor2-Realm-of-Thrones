@@ -1232,6 +1232,7 @@ namespace Armoury
                         t169 += System.Diagnostics.Stopwatch.GetTimestamp() - ts;
                         try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }   // dolicza wlasny czas
                     }
+                    try { Log.Info(PumpsLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.PumpsLine", e); }   // N1(a) (noc 16.10): "Pompy - sztuczne przelewy (nekon)" - te same liczniki co "Obieg" (tylko log)
                 }
                 _lastSnap = end; _lastHold = hold; _first = false;
             }

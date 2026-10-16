@@ -6248,6 +6248,22 @@ namespace Armoury
         [SettingPropertyGroup("Goods and prices (night 16.10)")]
         public bool SelfMendWoodKg { get; set; } = true;
 
+        [SettingPropertyBool("Folk Craft Wage On Sale", HintText = "the merchants top up the craftsmen's wages (Town Folk Craft Wage Share of the worth of every workshop good) only for goods that leave the town's stalls - bought by caravans, lords, soldiers, builders or the townsfolk themselves, the oldest stock first. A sword that lies unsold on a glutted stall earns the craftsmen nothing more until somebody buys it; the coin stays in the town's purse (off = the top-up is paid for every piece made, sold or not, as before)")]
+        [SettingPropertyGroup("Coin flow (night 16.10)")]
+        public bool FolkCraftWageOnSale { get; set; } = true;
+
+        [SettingPropertyBool("Sutlers By Purse", HintText = "the men in the field spend with the sutlers by how full their purse is: the daily share (Sutler Daily Share) times their free coin in days of pay divided by ten, at most three times the share - men with a month of pay to spare spend three times as fast, men with five days half as fast. A company that has bought no kit for two weeks (nothing better on the stalls) keeps at most half of its usual savings for better kit (Men Gear Save Days) - the rest goes to the sutlers in the field or on food and drink in town. Starts gently over Sutler Ramp Days in a running campaign. The coin goes where it went before: the nearest friendly town and village (off = the same share of the free purse every day, as before)")]
+        [SettingPropertyGroup("Coin flow (night 16.10)")]
+        public bool SutlersByPurse { get; set; } = true;
+
+        [SettingPropertyBool("Folk Guard No Memory", HintText = "the steward of the realm's coin (Folk Circulation Guard) sets the hoard tax each day from how much the common folk hold right now, without memory: the usual rate times 1 + 8 x (their savings against the normal level - 1.5), between a quarter and Folk Guard Max Times - at 1.5 times the normal level the usual rate, at 1.75 three times, at 2 five times. Before, the rate crept up 3% a day and stayed up long after the hoards had shrunk (off = the slow rate with memory, as before; the save keeps both)")]
+        [SettingPropertyGroup("Coin flow (night 16.10)")]
+        public bool FolkGuardNoMemory { get; set; } = true;
+
+        [SettingPropertyBool("Folk Loan Before Guard", HintText = "with Folk Loans: a house at war may borrow from what its own people held before the steward's hoard tax took its part that day, and the next day's hoard tax of every place that lent is lowered by what it lent - the people lend first, the lord's gift from the hoard comes second (off = the house borrows only from what is left after the tax, as before)")]
+        [SettingPropertyGroup("Coin flow (night 16.10)")]
+        public bool FolkLoanBeforeGuard { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -7809,6 +7825,10 @@ namespace Armoury
             s.BulkUnitPerCampaign = BulkUnitPerCampaign;
             s.SmithWoodOnScreen = SmithWoodOnScreen;
             s.SelfMendWoodKg = SelfMendWoodKg;
+            s.FolkCraftWageOnSale = FolkCraftWageOnSale;
+            s.SutlersByPurse = SutlersByPurse;
+            s.FolkGuardNoMemory = FolkGuardNoMemory;
+            s.FolkLoanBeforeGuard = FolkLoanBeforeGuard;
         }
 
         internal static void Apply()

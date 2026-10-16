@@ -835,7 +835,20 @@ namespace Armoury
             d.LabT += FromCoffer(f, (long)(lab * k), ELabour);
             if (skupLab > 0) d.LabS += (long)(skupLab * k);              // 11c: czesc robocizny od skupu (po przycieciu do kasy) - do linii
             d.TurnT += FromCoffer(f, (long)(turn * k), ETurn);
-            d.TopT += FromCoffer(f, (long)(top * k), ETopUp);
+            long topPaid = FromCoffer(f, (long)(top * k), ETopUp);
+            d.TopT += topPaid;
+            // N4 (FolkCraftWageOnSale, tylko licznik linii NE): doplata zaplacona i wedlug starej reguly (wartosc wykonana w oknie, to samo przyciecie do kasy)
+            try
+            {
+                N4TopUp += topPaid;
+                if (CraftSaleOn)
+                {
+                    double topOld = Math.Max(0, Unit(s.TownFolkCraftWageShare) * CsMadeOf(st) - f.Win[KCraftPaid]), allOld = lab + turn + topOld;
+                    N4TopUpOld += (long)(topOld * (allOld > gold && allOld > 0 ? gold / allOld : 1));
+                }
+                else N4TopUpOld += topPaid;
+            }
+            catch (Exception e) { N4Stumbles++; Stumble("TownLive(N4)", e); }
             // ---- 3. wewnatrz ludu z wczorajszych zakupow: czynsz W 8% / R 13% wydatku (x 1/keep) -> P (plan pkt 0.14), leczenie -> R, sluzba P -> W
             double spW = f.PaidG[0] / KeepW, spR = f.PaidG[1] / KeepR, spP = f.PaidG[2] / KeepP;
             d.Rent += Move(f, 0, 2, (long)Math.Round(RentW * spW)) + Move(f, 1, 2, (long)Math.Round(RentR * spR));

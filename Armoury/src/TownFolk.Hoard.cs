@@ -99,10 +99,16 @@ namespace Armoury
                 double room = ov - (HoardTimes(s) - 1) * rd * need;    // kiesa ponad poziom normalny TERAZ (po daninie tej doby)
                 if (!(room >= 1)) { _hdUnder++; return 0; }
                 _hdOver++;
-                double due = HoardRateNow(s) * (room + Math.Max(0, aid)) - Math.Max(0, aid);   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza (obieg2: stawka straznika)
+                // N8 (noc 16.10, FolkLoanBeforeGuard): pozyczka rodu z tej kiesy (W miasta, podzamcze) w poprzednim oknie pozyczek wlicza sie jak danina - pozyczka
+                // przed darem; klucz wylaczony / bez pozyczki - credit 0 i wzor co do monety jak dotad
+                long credit = c == 0 ? LnCreditFor(f.St) : 0;
+                double pre = Math.Max(0, aid) + credit;
+                double due = HoardRateNow(s) * (room + pre) - pre;   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza (obieg2: stawka straznika)
+                long purse0 = Math.Max(0, PurseOf(f, c));
+                HoardNote(s, room, Math.Max(0, aid), credit, purse0, due >= 1 ? Math.Min((long)Math.Floor(Math.Min(due, room)), purse0) : 0);   // N7 / N8: liczniki porownania
                 if (!(due >= 1)) { if (aid > 0) _hdCovered++; _hdE0 += room; _hdE1 += room; return 0; }
                 long x = (long)Math.Floor(Math.Min(due, room));
-                x = Math.Min(x, Math.Max(0, PurseOf(f, c)));
+                x = Math.Min(x, purse0);
                 if (x > int.MaxValue) x = int.MaxValue;
                 if (x <= 0) { _hdE0 += room; _hdE1 += room; return 0; }
                 var st = f.St;
@@ -142,6 +148,7 @@ namespace Armoury
                 }
                 if (x <= 0) { _hdE0 += room; _hdE1 += room; return 0; }
                 _ctlOut += x; f.LDayOut += x;                          // ksiega kies: wydatek (kontrola zamknieta, wiersz kiesa-ludu.csv)
+                if (c == 0) LnNoteTaxed(f.St, x);                      // N8: podatek tej doby z kiesy W / podzamcza (pozyczka liczy nadwyzke sprzed niego)
                 f.DOver -= x; if (c >= 0 && c < 3) f.DOvC[c] = Math.Max(0, f.DOvC[c] - x);   // oferta, place z nadwyzki i W7 od reszty
                 _hdTake[slot] += x - cp; _hdE0 += room; _hdE1 += room - x;   // obieg2: "pobrano" linii kiesa2 = do panow + do kas (czesc korony osobno - _gdCrownT)
                 if (cp > 0) { _gdCrownT += cp; _gdCrownTN++; }

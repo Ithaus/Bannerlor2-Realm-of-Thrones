@@ -451,6 +451,14 @@ namespace Armoury
                 if (dataStore.IsLoading) TownFolk.ImportObieg2(obieg2);
             }
             catch (Exception e) { Log.Error("SyncData.Obieg2", e); }
+            // N4 (noc 16.10): pula wyrobow miast wykonanych, a jeszcze niesprzedanych (doplata do 35% przy zejsciu z polki) - wlasny try; brak klucza = pula od zera
+            try
+            {
+                string craftSale = dataStore.IsSaving ? TownFolk.ExportCraftSale() : null;
+                SaveText.Sync(dataStore, "arm_craft_sale", ref craftSale);
+                if (dataStore.IsLoading) TownFolk.ImportCraftSale(craftSale);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_craft_sale", e); }
             // korona2 (TownFolk.CrownLoans.cs): dlugi koron u miast i mieszczan (krolestwo + osada + rodzaj), zakazy po niesplacie, srednie wplywy - wlasny try
             // (starszy DLL ignoruje klucz - cofniecie DLL w trakcie gry = dlugi przepadaja, zloto zostaje w skarbcach, CHANGELOG)
             try

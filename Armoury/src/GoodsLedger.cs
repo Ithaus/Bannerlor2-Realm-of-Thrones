@@ -196,6 +196,7 @@ namespace Armoury
             _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _stumbles = _offThread = 0;
             _woodLeft = 0; _armsLeft = 0; _wagonGold = 0; _wagonSales = 0;
             _lastDay = -1; _wasOn = false;
+            WatchDay = -1;   // N1(b) (noc 16.10)
         }
 
         private static void Stumble(string where, Exception e)
@@ -1252,6 +1253,7 @@ namespace Armoury
                 if (auth != null) all.Append(Environment.NewLine).Append('[').Append(ts).Append("] ").Append(auth);
                 Log.Info(all.ToString());
 
+                try { WatchCapture(day); } catch (Exception e) { Stumble("WatchCapture", e); }   // N1(b) (noc 16.10): zapas karawan wedlug towaru - migawka przed nowa doba (tylko log)
                 // ---- nowa doba
                 for (int i = 0; i < _items.Length; i++)
                 {
@@ -1266,6 +1268,30 @@ namespace Armoury
                 _lastDay = day; _wasOn = true;
             }
             catch (Exception e) { Stumble("Daily", e); }
+        }
+
+        // ------------------------------------------------------------ N1(b) (noc 16.10, audyt ekonomii 15.10 rozdz. 3.1, tabela problemow 19): karawany trzymaja wiecej
+        // skapych towarow niz targi (sol 1 172 / 46, narzedzia 941 / 76, wino 821 / 188, maslo 7 044 / 623). Migawka doby ksiegi dla linii
+        // "Karawany - zapas wedlug towaru (nekon)" (NightEcon.CaravanLine): zapas w karawanach, w miastach, razem, zuzycie i produkcja doby, handel karawan.
+        internal static readonly string[] WatchIds = { "salt", "tools", "wine", "butter", "silver" };
+        internal static readonly long[] WCar = new long[5], WTown = new long[5], WAll = new long[5], WCons = new long[5], WProd = new long[5], WCarBuy = new long[5], WCarSell = new long[5];
+        internal static readonly bool[] WSeen = new bool[5];
+        internal static int WatchDay = -1;
+
+        private static void WatchCapture(int day)
+        {
+            for (int w = 0; w < WatchIds.Length; w++)
+            {
+                WSeen[w] = false; WCar[w] = WTown[w] = WAll[w] = WCons[w] = WProd[w] = WCarBuy[w] = WCarSell[w] = 0;
+                int i = -1;
+                for (int k = 0; k < _items.Length; k++) if (_items[k] != null && _items[k].StringId == WatchIds[w]) { i = k; break; }
+                if (i < 0) continue;
+                var a = _acc[i];
+                long now = 0; foreach (var h in a.Hold) now += h;
+                WSeen[w] = true; WCar[w] = a.Hold[HCaravan]; WTown[w] = a.Hold[HTown]; WAll[w] = now;
+                WCons[w] = Sum(a.Sink); WProd[w] = Sum(a.Src); WCarBuy[w] = a.Tr[TCarBuy]; WCarSell[w] = a.Tr[TCarSell];
+            }
+            WatchDay = day;
         }
 
         private static void Count(ItemRoster r, int holder)
