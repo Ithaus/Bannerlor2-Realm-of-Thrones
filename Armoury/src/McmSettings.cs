@@ -4688,6 +4688,10 @@ namespace Armoury
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersHistorical { get; set; } = true;
 
+        [SettingPropertyBool("Craft Orders Giver Can Pay", HintText = "a smithing order is offered only by a lord or notable who can pay for it: his purse must cover the rewards of all the orders he has placed at once, with a fifth to spare for the bonus a better weapon earns. A client without the coin makes no order, and an order whose client has since spent his coin or died is withdrawn the next day or when the game is loaded (never while you are at the forge). Works together with Craft Orders Historical, where the client pays from his own purse. Quest orders are left alone (a gang leader short of coin still pays only what he has). Off = orders as before (a client short of coin pays what he has and you are told)")]
+        [SettingPropertyGroup("The forge gate")]
+        public bool CraftOrdersGiverCanPay { get; set; } = true;
+
         [SettingPropertyBool("Craft Orders Opened Only", HintText = "new smithing orders ask only for weapon classes you can actually forge - every slot of the class must have a part you have unlocked - and for parts at most one tier above your best unlocked part of that class, so no order is impossible because of the forge gate. In a new campaign the starting orders are redrawn once on the first day by the same rule. Off = any class and tier, as before")]
         [SettingPropertyGroup("The forge gate")]
         public bool CraftOrdersOpenedOnly { get; set; } = true;
@@ -7611,6 +7615,7 @@ namespace Armoury
             s.ForgePartsFreeBelowTier = ForgePartsFreeBelowTier;
             s.BookPriceFix = BookPriceFix;
             s.CraftOrdersHistorical = CraftOrdersHistorical;
+            s.CraftOrdersGiverCanPay = CraftOrdersGiverCanPay;
             s.CraftOrdersOpenedOnly = CraftOrdersOpenedOnly;
             s.QuestRewardFromGiver = QuestRewardFromGiver;
             s.QuestRewardInWageDays = QuestRewardInWageDays;
