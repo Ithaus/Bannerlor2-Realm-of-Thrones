@@ -156,6 +156,11 @@ Pelny raport: `docs/AUDYT-EKONOMII-2026-10-16.md`.
 - **Noc w marszu:** dostajesz ostrzezenie i raport o switcie, a gdy stoisz poza osada, rozbija sie oboz.
 - **Kuznia:** w podpowiedzi licznika drewna jest "Open load of hardwood: N kg left", a wegiel schodzi po 0,5 kg.
 
+**Dodatkowy przeglad (ok. 22:30)** kodu bitwy, spawnu, kryjowki z pojedynkiem, turnieju, nocy i ekranu zbrojowni: nie znalazl niczego, co mogloby wywrocic gre albo zepsuc zapis. Znane ograniczenia:
+- Wymiana (c): gdy w zbrojowni leza dwie sztuki TEGO SAMEGO przedmiotu w roznym stanie (np. dobry i zardzewialy miecz), przy kolejnym otwarciu okna Twoja jest gorsza sztuka. Ksiega liczy przedmioty po nazwie, nie po stanie.
+- Gdy wlaczysz "tylko Twoje" i jednoczesnie wylaczysz "Player Men Sell Spare Horses", wolne konie ludzi zostana schowane na stale.
+- W kryjowce i oblezeniu (walka piesza) jezdziec moze dostac zamiennik broni dobrany jak dla konnego.
+
 ## 5. Co dalej
 
 - **Do Twojej decyzji (z audytu):**

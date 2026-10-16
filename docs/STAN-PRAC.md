@@ -2281,3 +2281,11 @@ lud 8.1 -> 10.8% zlota swiata (baza 8.0 -> 9.1%), korony 21.4 -> 18.3% (baza 21.
 DECYZJA CLAUDE: nie wgrywac - nowe towary dzialaja, ale zloto za nie zostaje u ludu (wsie licza sie do ludu), czyli wbrew celowi Jeffa (lordowie i korony nie moga biedniec).
 Nastepny krok (z Jeffem): sparowac E1-E4 z P6 (dwor pana jako prawdziwe zakupy) i/lub danina pana od nowego utargu wsi, potem ponowny test 120 dob.
 TB2 w biegu bazowym 120 dob: trebusze AI zbudowane 22, trafienia w mury 141, rozbity odcinek 1, MIASTA ZDOBYTE 3 z 19 (przed TB2: 0 z 12).
+
+### 46. KONIEC NOCY 15/16.10 (ok. 22:35 zegara komp.) - START TUTAJ
+W grze WGRANIE 64 (noc/wgranie-64 = zbior-e8 3f8baef1). Raport dla Jeffa: docs/RAPORT-NOCNY-2026-10-16.md. Przeglad sciezek misji i UI (wf_d9056776-3fb, 3 soczewki + weryfikacja):
+0 krytycznych; 1 powazna potwierdzona - wymiana (c) SwapReturnsTheirOldKit: ksiega gracza per id (QuartermasterLaw.cs:648-686, AllocateOwn na najgorszy egzemplarz) - przy dwoch
+egzemplarzach tego samego id z innym modyfikatorem gracz przy nastepnym porzadku dostaje gorszy (do zrobienia: ksiega per id+modyfikator); drobne: konie schowane na stale przy
+ArmouryShowsOnlyYours + !PlayerMenSellSpareHorses (MenPurse.cs:441), SurplusPlan pyta tylko grupe group[0] (MenPurse.cs:499), StoreSub RealmWard bez filtra legend/olbrzymow
+(Mends.cs:6052), jezdziec w kryjowce/oblezeniu wedlug konia DTE (Mends.cs:6087), NightRest.cs:207 (pytanie o nocleg po snie w menu).
+Nastepne kroki: monitoring logu Jeffa (rozdz. 41 PRZEKAZANIE - lista linii); ksiega per modyfikator; noc-ekonomia2 + P6 z Jeffem; bandyci z Jeffem.
