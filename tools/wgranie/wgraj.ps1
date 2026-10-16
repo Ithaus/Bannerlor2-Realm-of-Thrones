@@ -19,8 +19,17 @@ foreach ($m in 'Armoury', 'CrashScribe', 'RealisticCaptivity', 'GrandTourney', '
     $items += [pscustomobject]@{ name = $m + '.dll'; src = (Join-Path $DllDir ($m + '.dll')); dst = (Join-Path $GameDir ('Modules\' + $m + '\bin\Win64_Shipping_Client\' + $m + '.dll')); dll = $true }
 }
 foreach ($r in 'Armoury\GUI\Prefabs\ArmBurnedVillageLabels.xml', 'Armoury\GUI\Prefabs\ArmMapVillageTooltip.xml', 'Armoury\ModuleData\arm_map_roads_probe.tsv',
-               'Armoury\ModuleData\arm_map_village_lore.tsv', 'Armoury\Prefabs\arm_map_roads.xml', 'CrashScribe\ModuleData\CrashScribe.settings.xml') {
+               'Armoury\ModuleData\arm_map_villages.tsv', 'Armoury\ModuleData\arm_map_village_lore.tsv', 'Armoury\Prefabs\arm_map_roads.xml', 'CrashScribe\ModuleData\CrashScribe.settings.xml') {
     $items += [pscustomobject]@{ name = $r; src = (Join-Path $Tree $r); dst = (Join-Path $GameDir ('Modules\' + $r)); dll = $false }
+}
+# Jeff 16.10 (uklad wiosek v5, galaz w-toku/noc-wioski): uklad wiosek i lore ida PARAMI (bramka layout_crc). arm_map_villages.tsv zawsze (wyzej); pliki _v4
+# obowiazkowe, gdy uklad w drzewie to v5 (klucz VillageLayoutV5 = false i zapis v4 wczytany na v5 - VillageBook.OldLayout); starsze drzewo bez v5 - pomijane
+$lay = Join-Path $Tree 'Armoury\ModuleData\arm_map_villages.tsv'
+$v5tree = (Test-Path -LiteralPath $lay -PathType Leaf) -and ((Get-Content -LiteralPath $lay -TotalCount 1) -like '*layout v5*')
+foreach ($r in 'Armoury\ModuleData\arm_map_villages_v4.tsv', 'Armoury\ModuleData\arm_map_village_lore_v4.tsv') {
+    $src = Join-Path $Tree $r
+    if (-not $v5tree -and -not (Test-Path -LiteralPath $src -PathType Leaf)) { continue }
+    $items += [pscustomobject]@{ name = $r; src = $src; dst = (Join-Path $GameDir ('Modules\' + $r)); dll = $false }
 }
 foreach ($i in $items) {
     if (-not (Test-Path -LiteralPath $i.src -PathType Leaf)) { Write-Host ("STOP: brak zrodla " + $i.src); exit 2 }
