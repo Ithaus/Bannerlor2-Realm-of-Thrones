@@ -2380,3 +2380,18 @@ i za konie, ktore nie sa na ludziach"; potem "to zaczynaj"). Projekt: Podla karc
 (2 / 2 / 8; +10%, +5, szybsze odsypianie), Dobry dom (4 / 3 / 20; +12%, +8, szybsze leczenie, lepsze ceny nazajutrz). Zolnierze i towarzysze z wlasnej sakiewki (MenPurse /
 Hero.Gold) za siebie i swojego konia; gracz za siebie i luzaki/juczne; kogo nie stac - tansza karczma albo stajnia, premia oddzialu wazona ludzmi; pieniadze do kiesy mieszczan.
 Sen w miescie bez placenia = jak oboz (dlug snu spada, bez premii). Dom gracza w miescie (BK) = gracz i towarzysze za darmo z premia gospody. Zajazdy: te same poziomy, zwykle 1-2.
+
+### 53. WGRANIE 68 (16.10 ok. 11:25 zegara komp.) - bitwa + mody dzwiekowe + test bitwy w autotescie - START TUTAJ
+W grze: `w-toku/zbior-e8` **1a5cec1f** (= `w-toku/noc-wgranie-68`; Armoury z 0039d457) | Armoury f9f641b0; CrashScribe da755a8a, ForgeView 19aa052a, RC/GT bez zmian.
+Kopie *.bak-2026-10-16-wgranie68-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie68-przed. Zapis Jeffa: kopia ...-po-1014.sav (10:23), od tego czasu nie gral.
+= 67 + noc-bitwa (277592b2 cz.1, ee3c78ea cz.2, 4ca4cdd6 poprawki po 2 recenzjach: kierunek ucieczki jadro cosinusowe, gracz <15 m) + ForeignVoices (0039d457:
+nasze okrzyki ustepuja BA/IB - szyk AI kapitan przy salwie BA, nic przy okrzyku IB; gracza tylko gdy IB wycial natywny, a nie ma choru BA) + sprawdz_logi nbitwa (pole obce glosy).
+MODY (Jeff pobral, przeglad wf_2219635c-21e: bezpieczne): Modules/ROTBattleAtmosphere (v1.5.0) i Modules/ImmersiveBattlefields (v3.6.2), LauncherData na koncu listy IsSelected
+true (kopia D:/Backup-Bannerlord/ustawienia/2026-10-16-przed-ba-ib); MCM: ModSettings/Global/ROTBattleAtmosphere/ROTBattleAtmosphere_v1.json (cichsze, rzadsze, wiwaty po bitwie
+WYL. - falszywe zwyciestwo BA miedzy falami; echo rozkazow 0) i ModSettings/Global/ImmersiveBattlefields/ImmersiveBattlefields_MCM.json (ChargeShout false, zsiadanie false,
+okienka false, rogi progi 80/250 i 60/200). Pierwszy start z BA: bank 600 MB ladowal sie 4 min (11:04), drugi 0.3 s - jednorazowo (prawdopodobnie skan pliku).
+TEST BITWY W AUTOTESCIE (wf_defd1a1e-887, recenzja w toku): test/CrashScribe-at-bitwa.dll + test/bieg-bitwa.ps1 (-Battles N -BattleSec S -SwitchWaitSec) + test/autotest-bitwa.ps1;
+patch test/at1-cs-bitwa.diff. Bieg 1 (bez modow): 2 bitwy, 181 ciosow, 30 panik, 0 bledow; NB2: Panic raz na czlowieka, ponowne paniki gry 0, NM 32 wywolan / 32 ludzi
+(bylo 342/23); 15 progow nbitwa, 0 NIE. Bieg 2 (z BA i IB, Armoury-2026-10-16_11-10-08.log): 3/3 bitwy, 569 ciosow, 0 ERROR, CrashScribe bez BLAME BA/IB.
+DO SPRAWDZENIA U JEFFA: krzyk paniki raz, ranni uciekaja od niego, pasek T6, dzwieki (za duzo krzykow? rogi?), wiwaty w srodku bitwy (powinny byc wylaczone).
+W toku: noc-turniej (poprawki po recenzjach), noc-wioski (kod), recenzja testu bitwy.
