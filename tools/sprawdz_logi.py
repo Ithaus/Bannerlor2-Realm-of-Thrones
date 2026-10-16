@@ -663,7 +663,9 @@ Uzycie (Python 3, tylko odczyt):
                     startu owocow (wsie wedlug typu), NC-12 plon wsi carrot/apple >= 150, orange >= 25, honey >= 15 na dobe, NC-13 marchew i jablka na targach
                     miast po 7 dobach, NC-14 potkniecia owocow 0, NC-15 zamienniki: budzet przesuniety kazdej doby i potkniecia 0, NC-16a indeks owocow <= 6.0
                     po 10 dobach, NC-16b bread/meat/cheese <= 3.0, NC-16c placek i miod (INFO), NC-17 syty lord zamienia drogie jedzenie (T > 0), NC-18 placek
-                    kupiony przez lordow (INFO), NC-19 kiesa ludu (INFO). Log bez paczki: INFO, bez wyjatku.
+                    kupiony przez lordow (INFO), NC-19 kiesa ludu (INFO). (C) towarzysze (CompanionPay.cs): NC-20 start sesji - latki czynnika i ceny wpiete,
+                    samosprawdzenie ZGODNE, NC-21 linia doby: wedrowcy >= 10, nasza cena > 0, nasza/BK 0.1-0.6, potkniecia i ERROR 0, NC-22 zold, poziom
+                    i czas linii (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
                     TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
                     (strumieniowo). OB2-0 linia startu (klucze tak), OB2-1 linie doby straznika / wsi / pozyczek, OB2-2 potkniecia i ERROR 0, OB2-3a lud / poziom
@@ -26679,6 +26681,12 @@ NC_TOW = re.compile(r"Towary: dzien (\d+) - (carrot|apple|orange|honey|pie) \(\d
 NC_TOW_OWN = re.compile(r"posiadacze \[(.*?)\]")
 NC_TOW_LORD = re.compile(r"lordowie kupili (\d+)")
 NC_FOLK = re.compile(r"Kiesa ludu: dzien (\d+) \| CZYNNA \|.*?zaplacone przez lud miast (\d+)")
+# (C) towarzysze: umiejetnosci morskie w regule BK i cena werbunku wedlug zoldu (CompanionPay)
+NC_CS = "Towarzysze (C): start sesji | "
+NC_CD = "Towarzysze (C): dzien "
+NC_CD_RE = re.compile(r"wedrowcy w osadach (\d+) \| cena BK mediana (\d+|-)(?: \((\d+)-(\d+)\))? -> nasza (\d+|-)(?: \((\d+)-(\d+)\))? \| zold/d mediana ([\d.]+|-).*?\| nasza/BK mediana ([\d.]+|-)")
+NC_CD_LV = re.compile(r"poziom mediana (\d+|-)")
+NC_CD_MS = re.compile(r"czas ([\d.]+) ms")
 
 
 def _nc_items(s):
@@ -26701,6 +26709,7 @@ def nceny_main(logp):
         return 0
     xs, xd, ws, errs = [], {}, {}, {}
     fs, fd, sd, td, tow, own, lordpie, folk = [], {}, {}, {}, {}, {}, {}, {}
+    cs, cd = [], {}
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -26741,12 +26750,18 @@ def nceny_main(logp):
                     if g == "pie":
                         lp = NC_TOW_LORD.search(s)
                         lordpie[d] = int(lp.group(1)) if lp else 0
+            elif s.startswith(NC_CS):
+                cs.append(s)
+            elif s.startswith(NC_CD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    cd[d] = s
             elif s.startswith("Kiesa ludu: dzien "):
                 mm = NC_FOLK.match(s)
                 if mm:
                     folk[int(mm.group(1))] = int(mm.group(2))
             elif s.startswith("ERROR in "):
-                for k in ("XbowPrice", "VillageFruit", "FoodSubstitute", "FoodThrift"):
+                for k in ("XbowPrice", "VillageFruit", "FoodSubstitute", "FoodThrift", "CompanionPay"):
                     if s.startswith("ERROR in " + k):
                         errs[k] = errs.get(k, 0) + 1
     print(f"plik: {logp} | A: linii startu {len(xs)}, linii doby {len(xd)}, linii Warsztaty {len(ws)} | B: start owocow {len(fs)}, doby owocow {len(fd)}, zamiennikow {len(sd)}, B3 {len(td)}")
@@ -26892,6 +26907,43 @@ def nceny_main(logp):
         if folk:
             vals = [folk[d] for d in sorted(folk)[1:]] or list(folk.values())
             rep.add("NC-19: kiesa ludu - zaplacone przez lud miast na dobe (INFO)", f"srednio {sum(vals) / len(vals):.0f}", "INFO (+5..+20% wobec biegu bez B2)", None)
+    # ---------------- C: towarzysze
+    if not cs and not cd:
+        rep.add("NC-20: towarzysze - linia startu", "brak linii", "INFO (wersja sprzed czesci C)", None)
+    else:
+        st = cs[-1] if cs else ""
+        hooked = "czynnik wpiety" in st and "cena wpieta" in st
+        agree = "- ZGODNE" in st
+        stum = num(NC_STUM.pattern, st, default=1) if st else 1
+        rep.add("NC-20: towarzysze - start sesji (latki i samosprawdzenie)", st[len(NC_CS):][:260] if st else "brak linii startu (sa linie doby)",
+                "czynnik i cena wpiete, samosprawdzenie ZGODNE, potkniecia 0", bool(st) and hooked and agree and stum == 0)
+        hs, ours, rs, ws, lv, mss, dst = [], [], [], [], [], [], 0
+        for d, s in sorted(cd.items()):
+            mm = NC_CD_RE.search(s)
+            if mm:
+                hs.append(int(mm.group(1)))
+                if mm.group(5) != "-":
+                    ours.append(int(mm.group(5)))
+                if mm.group(9) != "-":
+                    rs.append(float(mm.group(9)))
+                if mm.group(8) != "-":
+                    ws.append(float(mm.group(8)))
+            l2 = NC_CD_LV.search(s)
+            if l2 and l2.group(1) != "-":
+                lv.append(int(l2.group(1)))
+            m3 = NC_CD_MS.search(s)
+            if m3:
+                mss.append(float(m3.group(1)))
+            m4 = NC_STUM2.search(s)
+            if m4:
+                dst += int(m4.group(1))
+        med = lambda l: sorted(l)[len(l) // 2] if l else None
+        H, B, R = med(hs), med(ours), med(rs)
+        rep.add("NC-21: towarzysze - linia doby (wedrowcy, nasza cena, nasza/BK)", f"dob {len(cd)}: wedrowcy mediana {H}, nasza cena mediana {B}, nasza/BK mediana {R}; potkniecia {dst}, ERROR {errs.get('CompanionPay', 0)}",
+                "wedrowcy >= 10, nasza > 0, nasza/BK 0.1-0.6, 0 / 0",
+                (H is not None and H >= 10 and B is not None and B > 0 and R is not None and 0.1 <= R <= 0.6 and dst == 0 and errs.get("CompanionPay", 0) == 0) if cd else None)
+        rep.add("NC-22: towarzysze - zold i poziom (INFO), czas linii doby", f"zold/d mediana {med(ws)}, poziom mediana {med(lv)}, czas linii doby najwiecej {max(mss) if mss else '-'} ms",
+                "INFO (postac ROT ok. 90 d/d; czas < 100 ms)", None)
     rep.show()
     return 0
 

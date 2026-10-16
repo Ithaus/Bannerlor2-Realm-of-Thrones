@@ -2668,6 +2668,18 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float RecruitCostDays { get; set; } = 10f;
 
+        [SettingPropertyBool("Companion Naval Skills Priced", HintText = "a wanderer's sailing skills count like body skills and party roles in his price and pay (Mariner like Riding, Boatswain and Shipmaster like Scouting or Engineering), not like command as Banner Kings counted them - about two fifths of a Realm of Thrones companion's skill premium came from the sea. The same rule sets the pay of heroes in every party and of your own mercenary contract")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool CompanionNavalSkillsPriced { get; set; } = true;
+
+        [SettingPropertyBool("Companion Hire By Wage", HintText = "a wanderer asks half the worth of his gear plus Companion Hire Days of his daily pay to join you, like the prest of a sell-sword, instead of the Banner Kings skill premium (a Realm of Thrones companion asked about 15 000, five times your purse; now about 2 600). His daily pay does not change")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool CompanionHireByWage { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Companion Hire Days", 0.00f, 60.00f, "0", HintText = "days of a wanderer's daily pay in his hiring price (a sell-sword's prest: Recruit Cost Days 10 x 2)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float CompanionHireDays { get; set; } = 20f;
+
         [SettingPropertyBool("Ammo Recovery Enabled", HintText = "arrows and bolts are spent: of those shot, the side holding the field gathers some back, some are mended, the rest are lost; the beaten side loses all it shot")]
         [SettingPropertyGroup("Iron Bank")]
         public bool AmmoRecoveryEnabled { get; set; } = true;
@@ -6918,6 +6930,9 @@ namespace Armoury
             s.AiFoodDearIndex = AiFoodDearIndex;
             s.HistoricalRecruitCost = HistoricalRecruitCost;
             s.RecruitCostDays = RecruitCostDays;
+            s.CompanionNavalSkillsPriced = CompanionNavalSkillsPriced;
+            s.CompanionHireByWage = CompanionHireByWage;
+            s.CompanionHireDays = CompanionHireDays;
             s.AmmoRecoveryEnabled = AmmoRecoveryEnabled;
             s.AmmoRecoverPercent = AmmoRecoverPercent;
             s.AmmoRepairPercent = AmmoRepairPercent;
