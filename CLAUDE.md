@@ -127,6 +127,13 @@ Armoury\Armoury.json` i nadpisuje nimi domyslne z kodu. Po zmianie domyslnej spr
 (`grep '"Klucz"'`); jesli klucz tam jest - popraw go w pliku (gra zamknieta, kopia `.bak`).
 Tak wpis 82 (dzialka 30 -> 33%) przez caly dzien nie dzialal u Jeffa.
 
+**Latka na metode dziedziczona przez typ pochodny jest po cichu polykana (15.10).** `AccessTools.Method(model.GetType(), nazwa)`
+dla metody zadeklarowanej w klasie BAZOWEJ (np. BKSmithingModel -> DefaultSmithingModel.GetSmithingCostsForWeaponDesign): Harmony 2.4.2
+rzuca ArgumentException ("You can only patch implemented methods"), a finalizer BKROTPatch ten wyjatek polyka - nasz kod pisze "wpiete",
+a latka nie dziala (drewno w kuzni do WGRANIA 61). Slad jest tylko w `Modules/BKROTPatch/BKROTLog.txt` (nadpisywany przy kazdym starcie).
+Cel szukaj przez `AccessTools.DeclaredMethod` na klasie deklarujacej (albo `PatchTarget` z noc-harmony); linia startu "Latki czynnego
+modelu (HT)" liczy latki, ktore nie weszly. Patch i Unpatch zawsze tym samym MethodInfo.
+
 ## 8. Zasady pracy (wyciagniete z bolesnych doswiadczen)
 
 0. **ZASADA GLOWNA (Jeff, 05.10): kazda zmiana = kontrola calosci.** Zanim zmiana pojdzie
