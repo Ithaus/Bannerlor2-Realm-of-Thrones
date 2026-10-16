@@ -2433,3 +2433,13 @@ Test (Armoury-2026-10-16_12-25-19.log): 3 bitwy, 88 decali z materialem (12/12, 
 - PALENIE (Jeff pytal, czy pamietam): dziala od 05.10 - osada po osadzie od strony wroga, wies gry na koncu; plon x udzial ludzi w domu (spladrowana nie 0); uchodzcy wracaja
   po 30 dniach spokoju, wszyscy najpozniej rok po najezdzie. Propozycja (czeka na slowo Jeffa): uchodzcy ida do najblizszego miasta (ludnosc/biedota), potem wracaja.
 - W toku: noc-karczmy (poprawki), herby kanon + dwie flagi (dane z wiki), potem przysiolki na pustkowiach (sonda terenu w autotescie), zajazdy i plotki.
+
+### 58. WGRANIE 72 (16.10 ok. 13:00 zegara komp.) - karczmy w miescie (3 jakosci) - START TUTAJ
+W grze: `w-toku/zbior-e8` **1958e987** (= `w-toku/noc-wgranie-72`) | Armoury b98705e9. Kopie *.bak-2026-10-16-wgranie72-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie72-przed.
+= 71 + noc-karczmy (881bf26e + 4669b8d6 po 2 recenzjach): TownInns.cs - menu miasta "Take lodgings at an inn": wspolna izba 1/1/3 (+5% predkosci, +2 morale), porzadna
+karczma 2/2/8 (+10%, +5, sen x1.25), dobry dom 4/3/20 (+12%, +8, sen x1.25, gojenie x1.5 tej nocy, handel w tym miescie -3% / +3% do zmierzchu); zolnierze z sakiewki ludzi
+(po rezerwie napraw i odziezy), towarzysze z Hero.Gold, brak - z sakiewki ludzi (tam ich zold), gracz za siebie, swojego konia i luzaki/juczne; kogo nie stac - tansza albo stajnia,
+premia wazona ludzmi; pieniadze do kiesy mieszczan (TownFolk.Earn); okno lupu - ludzie za darmo. Sen do switu (wieczor) albo do wyspania; premia do zmierzchu; zapis arm_inns.
+Premia predkosci podnosi takze LimitMax MarchPace (krytyczna uwaga recenzji). Dom gracza (RealisticCaptivity Homes) - pominiety. Klucze TownInns, TownInnPriceBonus.
+Test (Armoury-2026-10-16_12-51-32.log): 5 dob + 2 bitwy, 0 ERROR, nkarczmy 7 / nbitwa 17 / nturniej 7 progow - 0 NIE. Menu nie sprawdzone automatem.
+DO SPRAWDZENIA U JEFFA: pierwszy nocleg - rachunek w menu, pobudka o swicie, "Audyt predkosci" powyzej limitu marszu, linia "Karczmy (KA)".
