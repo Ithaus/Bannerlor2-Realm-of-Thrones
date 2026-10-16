@@ -2310,3 +2310,17 @@ Test 1, 120 dob (zapis F; D:/Backup-Bannerlord/logi-testow/2026-10-15/Armoury-20
 (2.62% swiata wobec 1.98%), zrzuty na jeden targ (indeks oliwy w Ibben 6.13 -> 0.45 w dobe), T1 na stracie 28.8 tys./d (stary zapas), narzedzia w jukach 80%.
 W TOKU strojenie (wf_1d02b9eb-495): S1 sprzedaz na stracie porcjami (spadek indeksu <= 30%/dobe w miescie, cena >= 0.6 x wartosc), S2 nadwyzka kiesy karawany do wlasciciela
 (CaravanProfitToOwner), S3 CrownReserveReleaseDays 360 -> 450. Potem test 2 (120 dob) i decyzja o WGRANIU 66.
+
+### 49. WGRANIE 66 (16.10 ok. 04:50 zegara komp.) - START TUTAJ
+W grze: `w-toku/zbior-e8` **591f64ff** (= `noc/wgranie-66`) | Armoury 23b4bb25, ForgeView 19aa052a; CrashScribe da755a8a, RC/GT bez zmian. Kopie *.bak-2026-10-16-wgranie66-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie66-przed.
+Zapis Jeffa przed wgraniem: D:/Backup-Bannerlord/zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-16-0415.sav (md5 14c0c832); logi sesji 03:08-04:13 w D:/Backup-Bannerlord/logi-jeffa/2026-10-16 (0 ERROR; grupy nmisje/nsprzet/noboz/nzlec/nskarbiec/nobl - 0 NIE).
+= 65 + noc-ekonomia2 + noc-ekonomia3 (+ strojenie 4b56708c/b2e5c554) + noc-forge.
+EKONOMIA (klucze MCM domyslnie tak): myto targowe (TownMarketToll 4%/2%), danina markietanow (VillageTributeFromSutlers), czynsz gruntowy (TownGroundRent), T1 karawany z zyskiem
+(CaravanSellWhereDear; na stracie porcjami - spadek indeksu <= 30%/dobe, cena >= 0.6 x wartosc), T2 zysk karawan do wlascicieli (CaravanProfitToOwner), W1 wozy wsi przywoza koszyk
+(VillageCartBringsGoods), kap poziomu normalnego straznika 6.4% + bezpiecznik 9% (FolkGuardNormalShareMax, FolkGuardShareFuse), CrownReserveReleaseDays 450, D2/P3 tempo i typ
+warsztatow za cena, D1 plon jaj/miodu/owocow za cena, dwory P1, budowy B1, Z1 zamowienia zolnierzy; z ekon2: jaja, budzet bez producenta, len/welna do miast, opal.
+Test 60 dob po strojeniu (Armoury-2026-10-16_04-15-40.log, D:/Backup-Bannerlord/logi-testow/2026-10-15) wobec bazy 64: 0 ERROR; lud 8.78% (baza 8.6%), korony 20.96% (baza 20.0%),
+lordowie 37%; kiesy karawan 0.93% swiata (baza 1.98%); 'nie do wydania' 90 tys. (baza 116 tys.); koszyk wsi 21.7% (10%); zbytki 43.3% (38.6%); zrzuty na stracie <= 30%.
+Zostaje (do obserwacji): warsztaty stojace 42%, narzedzia w jukach 90% (nie sprzedaja ze strata - zasada Jeffa), notable +0.31 pkt (zysk karawan).
+FORGEVIEW: znane wzory na gorze listy CRAFT - lista BK rysuje sie od dolu (VerticalBottomToTop), a stara latka wisiala na nieuzywanej SortByCurrentState; teraz postfiksy na
+ExecuteSortByName/Yield/Type + Arrange w filtrze (log ForgeView 'postfiksy wpiete 4/4'). Do sprawdzenia przez Jeffa w grze.
