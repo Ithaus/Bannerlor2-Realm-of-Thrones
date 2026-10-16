@@ -655,6 +655,11 @@ Uzycie (Python 3, tylko odczyt):
                     K2-3b rok do roku +-10% (bieg >= 392 dob), K2-3c przebieg (INFO), K2-4 pobrany podatek > 0, K2-5 ksiega (pobrano = do panow + do kas,
                     nic ponizej poziomu normalnego, Obieg = linia doby, kontrola kies r = 0), K2-6 komu i ile (INFO), K2-7 miara W5-7 (INFO).
                     Log bez paczki: INFO, bez wyjatku.
+--grupa nceny     : (noc 15/16.10, decyzje Jeffa 15.10 TAK; galaz w-toku/noc-ceny) python -I tools/sprawdz_logi.py --grupa nceny <Armoury-*.log> (strumieniowo).
+                    (A) kusze wedlug luku (XbowPrice.cs): NC-0 linia startu (przeliczenie czynne), NC-1 lukow w tabeli 16-22, NC-2 kusz przeliczonych >= 8,
+                    NC-3 kazda kusza / luk tej sily 1.70-1.80, NC-4 crossbow_f 100-130 d i crossbow_a 18-28 d, NC-5 najmocniejsza kusza / najmocniejszy luk
+                    x2.0-3.0, NC-6 powtarzalne bez zmian, NC-7 potkniecia i ERROR 0, NC-8 kuznia i zakupy wedlug sily tak, NC-9 zakupy AI > 0 i srednio
+                    >= 160 funtow, NC-10 warsztaty robia kusze kazdej doby. Log bez paczki: INFO, bez wyjatku.
 --grupa obieg2    : (15.10, Jeff "kasa zbiera sie u ludu ... lordowie i krolestwa zostana bez kasy" + "pamietaj o pozyczkach"; galaz w-toku/obieg-swiata,
                     TownFolk.Guard.cs / Loans.cs / Luxury.cs) python -I tools/sprawdz_logi.py --grupa obieg2 <Armoury-*.log> [--baza-doby <log Armoury bazy>]
                     (strumieniowo). OB2-0 linia startu (klucze tak), OB2-1 linie doby straznika / wsi / pozyczek, OB2-2 potkniecia i ERROR 0, OB2-3a lud / poziom
@@ -26644,6 +26649,113 @@ def oblezenia2_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nceny (noc 15/16.10, decyzje Jeffa 15.10 TAK: kusze wedlug luku, placek i marchew, werbunek towarzyszy; galaz w-toku/noc-ceny)
+NC_XS = "Kusze wedlug luku (XbowLikeBow): start sesji | "
+NC_XD = "Kusze wedlug luku (zakupy): dzien "
+NC_X_ROW = re.compile(r"(\w+) (\d+)->(\d+) \((\d+) J, (\d+) lb, t(\d)->t(\d), dni ([\d.]+)->([\d.]+), luk tej sily ([\d.]+), x([\d.]+)")
+NC_X_BOWS = re.compile(r"lukow w tabeli (\d+) ")
+NC_X_DONE = re.compile(r"kusz przeliczonych (\d+) z (\d+) na handel")
+NC_X_SAME = re.compile(r"\| bez zmian (\d+)(?: \[(.*?)\])?")
+NC_X_TOP = re.compile(r"najmocniejsza kusza (\S+) (\d+) d / najmocniejszy luk (\d+) d = x([\d.]+|-)")
+NC_STUM = re.compile(r"potkniecia (\d+)\.?$")
+NC_XD_RE = re.compile(r"kusz kupionych przez AI (\d+) \(srednio (\d+|-) funtow\), ludzie gracza (\d+)")
+NC_WS = re.compile(r"Warsztaty: dzien (\d+) - wykonano \d+ szt\. \[([^\]]*)\]")
+
+
+def _nc_items(s):
+    out = {}
+    for p in s.split(","):
+        p = p.strip()
+        m = re.match(r"(\w+) (\d+)$", p)
+        if m:
+            out[m.group(1)] = int(m.group(2))
+    return out
+
+
+def nceny_main(logp):
+    """nceny (noc 15/16.10, decyzje Jeffa 15.10 TAK; galaz w-toku/noc-ceny): (A) kusze wedlug luku tej samej sily - Armoury/src/XbowPrice.cs.
+    Wejscie: log Armoury (czytany strumieniowo). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NC-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    xs, xd, ws, errs = [], {}, {}, {}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NC_XS):
+                xs.append(s)
+            elif s.startswith(NC_XD):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    xd[d] = s
+            elif s.startswith("Warsztaty: dzien "):
+                mm = NC_WS.match(s)
+                if mm:
+                    ws[int(mm.group(1))] = _nc_items(mm.group(2))
+            elif s.startswith("ERROR in "):
+                for k in ("XbowPrice",):
+                    if s.startswith("ERROR in " + k):
+                        errs[k] = errs.get(k, 0) + 1
+    print(f"plik: {logp} | A: linii startu {len(xs)}, linii doby {len(xd)}, linii Warsztaty {len(ws)}")
+    # ---------------- A: kusze wedlug luku
+    if not xs and not xd:
+        rep.add("NC-0: kusze wedlug luku - linia startu", "brak linii", "INFO (wersja sprzed paczki nceny)", None)
+    else:
+        st = xs[-1] if xs else ""
+        on = st.startswith(NC_XS + "x")
+        rep.add("NC-0: kusze wedlug luku - linia startu, przeliczenie czynne", st[len(NC_XS):][:200] if st else "brak linii startu (sa linie doby)",
+                "linia jest, przeliczenie czynne (x... ceny luku)", bool(st) and on)
+        if on:
+            nb = num(NC_X_BOWS.pattern, st)
+            rep.add("NC-1: lukow w tabeli", f"{nb}", "16-22 (19 +-3)", nb is not None and 16 <= nb <= 22)
+            md = NC_X_DONE.search(st)
+            done = int(md.group(1)) if md else 0
+            rep.add("NC-2: kusz przeliczonych", f"{done} z {md.group(2) if md else '?'} na handel", ">= 8", done >= 8)
+            rows = {r.group(1): r for r in NC_X_ROW.finditer(st)}
+            bad = [f"{k} x{r.group(11)}" for k, r in rows.items() if not (1.70 <= float(r.group(11)) <= 1.80)]
+            rep.add("NC-3: cena przeliczonej kuszy / cena luku tej sily", f"wierszy {len(rows)}, poza widelkami {len(bad)}" + (f" ({', '.join(bad[:5])})" if bad else ""),
+                    "kazda 1.70-1.80", len(rows) > 0 and not bad)
+            f = rows.get("crossbow_f"); a = rows.get("crossbow_a")
+            fv = int(f.group(3)) if f else None; av = int(a.group(3)) if a else None
+            rep.add("NC-4: crossbow_f / crossbow_a po zmianie", f"crossbow_f {f.group(2) + '->' + f.group(3) if f else 'brak'}, crossbow_a {a.group(2) + '->' + a.group(3) if a else 'brak'}",
+                    "crossbow_f 100-130 d, crossbow_a 18-28 d", fv is not None and av is not None and 100 <= fv <= 130 and 18 <= av <= 28)
+            mt = NC_X_TOP.search(st)
+            rr = float(mt.group(4)) if mt and mt.group(4) != "-" else None
+            rep.add("NC-5: najmocniejsza kusza / najmocniejszy luk", f"{mt.group(1)} {mt.group(2)} d / {mt.group(3)} d = x{mt.group(4)}" if mt else "brak",
+                    "x2.0-3.0", rr is not None and 2.0 <= rr <= 3.0)
+            rep_ids = [k for k in rows if "repeating" in k]
+            ms = NC_X_SAME.search(st)
+            rep.add("NC-6: kusze powtarzalne bez zmian", f"przeliczone powtarzalne {len(rep_ids)}; bez zmian {ms.group(1) if ms else '?'} [{(ms.group(2) or '')[:120] if ms else ''}]",
+                    "0 przeliczonych powtarzalnych", len(rep_ids) == 0)
+            stum = num(NC_STUM.pattern, st, default=0)
+            rep.add("NC-7: potkniecia (linia startu) / ERROR in XbowPrice", f"potkniecia {stum}, ERROR {errs.get('XbowPrice', 0)}", "0 / 0", stum == 0 and errs.get("XbowPrice", 0) == 0)
+            rep.add("NC-8: kuznia gracza i zakupy wedlug sily", "kuznia: " + ("tak" if "tieru rownowaznego tak" in st else "nie") + ", zakupy: " + ("tak" if "wedlug sily tak" in st else "nie"),
+                    "obie tak", "tieru rownowaznego tak" in st and "wedlug sily tak" in st)
+        # A dzien
+        ai = 0; lbs = 0.0; men = 0; dstum = 0
+        for d, s in xd.items():
+            mm = NC_XD_RE.search(s)
+            if mm:
+                n = int(mm.group(1)); ai += n; men += int(mm.group(3))
+                if n > 0 and mm.group(2) != "-":
+                    lbs += n * int(mm.group(2))
+            dstum += num(NC_STUM.pattern, s, default=0)
+        avg = lbs / ai if ai else 0
+        rep.add("NC-9: kusze kupione przez AI (suma dob) i srednie funty", f"dob {len(xd)}, AI {ai} szt. (srednio {avg:.0f} funtow), ludzie gracza {men}, potkniecia doby {dstum}",
+                "AI > 0, srednio >= 160 funtow (bez wyboru wedlug sily ok. 90), potkniecia 0", (ai > 0 and avg >= 160 and dstum == 0) if len(xd) >= 5 else None)
+        if ws:
+            zero = [d for d, v in sorted(ws.items()) if v.get("Crossbow", 0) <= 0]
+            xb = sum(v.get("Crossbow", 0) for v in ws.values()) / len(ws)
+            bw = sum(v.get("Bow", 0) for v in ws.values()) / len(ws)
+            rep.add("NC-10: warsztaty - kusze kazdej doby", f"dob {len(ws)}, bez kusz {len(zero)}" + (f" (np. {zero[:5]})" if zero else "") + f"; srednio kusz {xb:.0f}/d, lukow {bw:.0f}/d (przed: kusze 32-70, luki ok. 437)",
+                    "0 dob bez kusz (luki - INFO, nie mniej niz 80% sprzed zmiany)", len(zero) == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ kiesa2 (15.10, decyzja Jeffa "napraw to, najwyzej zwieksz podatki"; Armoury/src/TownFolk.Hoard.cs)
 K2_HEAD = "Podatek od nadwyzki ludu (kiesa2): "
 K2_DAY = re.compile(r"Podatek od nadwyzki ludu \(kiesa2\): dzien (\d+) \| stawka ([\d.]+)%/d .*?\| pobrano (\d+) z (\d+) osad \(miasta (\d+), zamki (\d+); rodow (\d+)\): "
@@ -27370,6 +27482,8 @@ def main(argv):
         return kiesa1_main(logp, start_arg, until_arg, csvp, horses)   # P1 (obieg kiesy ludu): danina z oszczednosci + pomiary - progi rozdz. 9 projektu
     if group == "kiesa2" and logp:
         return kiesa2_main(logp)   # kiesa2 (15.10, Jeff "napraw to, najwyzej zwieksz podatki"): podatek pana od nadwyzki oszczednosci ludu (TownFolk.Hoard.cs)
+    if group == "nceny" and logp:
+        return nceny_main(logp)   # nceny (noc 15/16.10, decyzje Jeffa 15.10 TAK): kusze wedlug luku (XbowPrice), owoce wsi i zamienniki jedzenia, werbunek towarzyszy
     if group == "obieg2" and logp:
         return obieg2_main(logp, bdp)   # obieg2 (15.10, Jeff "kasa zbiera sie u ludu" + "pamietaj o pozyczkach"): wsie, straznik obiegu, pozyczki od ludu, zbytki wedlug zasobnosci
     if group == "korona2" and logp:

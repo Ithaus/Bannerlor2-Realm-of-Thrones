@@ -510,7 +510,7 @@ namespace Armoury
                         if (ShopReserve.Free(st, it) <= 0) { resHit = true; continue; }   // 174b.4: ludzie gracza kupuja hurtem jak ludzie lorda - ostatnia sztuka pasma zostaje
                         int price = st.Town.MarketData.GetPrice(el.EquipmentElement, main, false, st.Party);
                         if (price <= 0 || price > budget - spent) continue;
-                        float score = (it.Effectiveness > 0f ? it.Effectiveness : 1f) / price;
+                        float score = XbowPrice.BuyScore(it, it.Effectiveness > 0f ? it.Effectiveness : 1f, price);   // kusze wedlug luku (XbowBuyByPower): kusza skutecznosc^2 / cena
                         if (score > bestScore) { bestScore = score; best = i; bestPrice = price; }
                     }
                     if (best < 0) { if (resHit) Measure174b.NoteHeld(Measure174b.BPlayerMen, 1); break; }
@@ -522,6 +522,7 @@ namespace Armoury
                     st.Town.ChangeGold(bestPrice);
                     MoneyLedger.Note169(MoneyLedger.N169Kit, st, bestPrice);   // paczka 169: linia kas (tylko licznik)
                     MenUpgrade.NoteChurn(main, pick.Item, true);
+                    XbowPrice.NoteBuy(pick.Item, 1, false);   // kusze wedlug luku: linia "Kusze wedlug luku (zakupy)" (tylko licznik)
                     spent += bestPrice; pieces++; gap--;
                 }
             }

@@ -404,11 +404,14 @@ namespace Armoury
                     // wiazka strzal to nie kirys: 10x mniej staminy niz stara stawka (Jeff);
                     // luki i kusze: stary mnoznik 0.8 pozwalal wykuc 2 luki na sesje -
                     // luczarnia ma byc lekka jak kuznia broni (Jeff), stad wlasny mnoznik
+                    // kusze wedlug luku (XbowForgeEquivTier, noc 15/16.10): mocna kusza wymaga umiejetnosci i staminy jak luk tej samej sily (tier rownowazny
+                    // XbowPrice) - inaczej kusza za 117 d szla przy wymogu broni t2; metal (IronForTier), r.Tier i mnoznik t5-6 zostaja przy tierze gry
+                    int ft = tt == ItemObject.ItemTypeEnum.Crossbow ? Math.Max(tier, XbowPrice.ForgeTier(item)) : tier;
                     r.Ranged = true;
                     r.Stamina = ammo
                         ? MathF.Max(2, (int)(tier * s.StaminaPerTier * 0.05f))
-                        : MathF.Max(4, (int)(tier * s.StaminaPerTier * MathF.Max(0.05f, s.RangedStaminaFactor)));
-                    Need(ref r, tier, 10);
+                        : MathF.Max(4, (int)(ft * s.StaminaPerTier * MathF.Max(0.05f, s.RangedStaminaFactor)));
+                    Need(ref r, ft, 10);
                     return r;
                 }
 

@@ -176,7 +176,7 @@ namespace Armoury
         // a diagnostyka blokady (40 wpisow) wyczerpywala sie na cale uruchomienie gry
         // Konstruktor ArmouryBehavior (OnGameStart) biegnie PRZED definicjami przedmiotow tej kampanii (Campaign: OnGameStart ->
         // InitializeDefaultCampaignObjects -> DefaultItems -> BKItems.Initialize), wiec czyszczenie definicji niczego nie gubi.
-        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0; _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); _ratioSkip.Clear(); _e8cHorses.Clear(); _e8cHorseSt = 0; }   // RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
+        internal static void Reset() { _target.Clear(); _orig.Clear(); _origWeight.Clear(); _blockedLogged.Clear(); _defValue.Clear(); _defLeft.Clear(); _defUsed.Clear(); _errDefine = false; _stDefine = 0; _shelfWorth.Clear(); _shelfByValue.Clear(); _mixed.Clear(); _vsShelf = 0; _errShelf = false; _stShelf = 0; _applied = false; RawPrice.Reset(); _ratioSkip.Clear(); _e8cHorses.Clear(); _e8cHorseSt = 0; XbowPrice.Reset(); }   // XbowPrice (kusze wedlug luku, noc 15/16.10): dni i tier rownowazny kusz po ItemObject - nowa kampania od zera; RawPrice: cena surowcow liczy na tym przeliczeniu - czysci sie razem z nim; wagi polki (paczka 121) - nowe przedmioty kampanii
 
         // ------------------------------------------------------------ wartosc z definicji przedmiotu (paczka "towary w nowej monecie")
         // Test 06.10 14:08 (log, linia "surowce kuzni"): chleb 0 -> 6, jajka 0 -> 8, miod 0 -> 14, owoce 0 -> 2..10, garum 0 -> 20,
@@ -264,14 +264,21 @@ namespace Armoury
             var c = ArmsPricing.CostOf(it);
             if (c == null) return 0f;
             var s = Settings.Current;
-            float mat = c.MetalKg * MetalPerKg(c.Grade)
-                        + c.MetalKg * FuelPerMetalKg()               // wpis 48: drewno na wegiel tyle, ile spala warsztat (WorkshopLaw.Needs)
-                        + c.LeatherKg * s.HistLeatherPerKg
-                        + c.LinenKg * s.HistLinenPerKg
-                        + c.WoodKg * s.HistWoodPerKg
-                        + c.Special * s.HistSpecialFactor;           // rog, sciegno, klej lukow (w modelu w skali gry)
+            float mat = HistMaterial(it, c);
             float labor = MakingLabor(it, c);
             return (mat + labor) * (1f + Math.Max(0f, s.HistProfitPercent) / 100f);
+        }
+
+        /// <summary>Material sztuki w pensach (bez roboty i zysku) - czesc HistCost; XbowPrice (kusze wedlug luku) liczy z niej dni kusznika do celu ceny.</summary>
+        internal static float HistMaterial(ItemObject it, ArmsPricing.Cost c)
+        {
+            var s = Settings.Current;
+            return c.MetalKg * MetalPerKg(c.Grade)
+                   + c.MetalKg * FuelPerMetalKg()               // wpis 48: drewno na wegiel tyle, ile spala warsztat (WorkshopLaw.Needs)
+                   + c.LeatherKg * s.HistLeatherPerKg
+                   + c.LinenKg * s.HistLinenPerKg
+                   + c.WoodKg * s.HistWoodPerKg
+                   + c.Special * s.HistSpecialFactor;           // rog, sciegno, klej lukow (w modelu w skali gry)
         }
 
         /// <summary>Robota wykonania sztuki w pensach: dni pracy (HistDays) x dniowka mistrza wedle tieru - ta sama w wartosci sztuki
@@ -286,6 +293,8 @@ namespace Armoury
         internal static float DayWageOf(ItemObject it)
         {
             int t = Math.Max(1, Math.Min(6, (int)it.Tier + 1));
+            int xt = XbowPrice.EquivTier(it);                  // kusze wedlug luku (noc 15/16.10): mocna kusza - dniowka mistrza tieru luku tej samej sily; reszta 0
+            if (xt > t) t = xt;
             return IsAmmo(it) ? WageFor(1) : WageFor(t);      // test 04.10: dniowka mistrza t6 dawala snop strzal za 130 d - fletcher to zwykly rzemieslnik
         }
 
@@ -299,6 +308,8 @@ namespace Armoury
         internal static float HistDays(ItemObject it, ArmsPricing.Cost c)
         {
             var s = Settings.Current;
+            // kusze wedlug luku (XbowPrice, noc 15/16.10): dni kusznika do ceny 1.75 x luk tej samej sily (z jakoscia sztuki) - te same w wartosci, warsztacie, naprawie i zegarze kuzni
+            if (it.ItemType == ItemObject.ItemTypeEnum.Crossbow) { float xd; if (XbowPrice.TryDays(it, out xd)) return xd; }
             float days = c.Days;
             // E8/C (253, PLAN 8.4c, R3): mnoznik snopa tylko dla strzal i beltow - oszczep, topor i noz miotany maja wlasne dni (ArmsPricing.DaysThrown 0.5-3);
             // dotad x8 jak snop 24 strzal (stos oszczepow t5 70 d). Klucz HistThrownOwnDays; dniowka (DayWageOf) bez zmian
@@ -556,6 +567,9 @@ namespace Armoury
                     raw.Add(it.StringId + " " + _orig[it] + "->" + it.Value);
                 }
 
+                // kusze wedlug luku (XbowPrice, noc 15/16.10): dni kusznika i tier rownowazny PRZED wycena broni - wartosc kusz (krok 2), przelicznik popytu
+                // kategorii (krok 3) i wagi polki licza sie juz z nowych cen; luki w tabeli maja tu HistCost, ktory dostana w kroku 2 (HistExoticBows dopiero nizej)
+                XbowPrice.Build();
                 // 2. bron i zbroje z kosztu historycznego
                 int n = 0; long before = 0, after = 0;
                 var samples = new List<string>();
@@ -634,6 +648,7 @@ namespace Armoury
                 if (_origWeight.Count > 0) Log.Info("HistoricalPrices: ruda i drewno w ladunkach - " + string.Join(", ", _origWeight.Select(kv => kv.Key.StringId + " " + kv.Value + " -> " + kv.Key.Weight + " kg = " + kv.Key.Value + " d").ToArray()) + ".");
                 Log.Info("HistoricalPrices: surowce kuzni ["+ string.Join(", ", raw.ToArray()) + "]; uzbrojenie " + n + " szt. przeliczone z kosztu historycznego (suma wartosci "
                          + before + " -> " + after + "). Przyklady: " + string.Join("; ", samples.ToArray()) + ".");
+                Log.Info(XbowPrice.StartLine());   // kusze wedlug luku (noc 15/16.10): linia startu sesji
                 Log.Info("HistoricalPrices: zywy inwentarz " + (s.HistLivestockPrices ? "[" + string.Join(", ", beasts.ToArray()) + "] d za sztuke (" + (s.HistHorsePrices ? "konie - linia startu cennika E8/C" : "konie bez zmian") + ")"
                                                                                         + "; poza przelicznikiem popytu kategorii (w kategorii sa przedmioty na handel z cena nieprzeliczona - jej popyt jak przed 144): "
                                                                                         + (beastOutLog.Count > 0 ? string.Join(", ", beastOutLog.ToArray()) : "zadne")

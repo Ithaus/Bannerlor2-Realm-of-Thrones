@@ -2504,6 +2504,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistHorsePrices { get; set; } = true;
 
+        [SettingPropertyBool("Xbow Like Bow", HintText = "a crossbow costs about as much more than a bow of the same draw strength as its maker's work is longer: Xbow Price Vs Bow times the price of a bow that shoots as hard (Realistic Battle Mod draw weights). Today the game ranks crossbows as tier 1-2 goods, so the strongest crossbow (330 lb) cost 27 pence while the best longbow cost 48; now it costs about 117. The price grows through the crossbow maker's days and his master's day wage, so town workshops, repairs and your forge reckon the same work and nobody pockets a free margin. Repeating crossbows keep their price (their draw is weak). Needs historical prices and Realistic Battle Mod; takes effect when a game is next loaded (off = as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool XbowLikeBow { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Xbow Price Vs Bow", 1.00f, 3.00f, "0.00", HintText = "a crossbow's price as a multiple of the price of a bow of the same draw strength (a crossbow of a draw stronger than any bow is priced in proportion to its strength)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float XbowPriceVsBow { get; set; } = 1.75f;
+
+        [SettingPropertyBool("Xbow Forge Equiv Tier", HintText = "at your forge a strong crossbow asks the smithing skill and stamina of a bow of the same strength (the 330 lb crossbow those of a tier 6 bow), not those of its low game tier - otherwise it would be the cheapest way to make money in the game. Metal and materials stay as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool XbowForgeEquivTier { get; set; } = true;
+
+        [SettingPropertyBool("Xbow Buy By Power", HintText = "AI lords, garrisons and your men pick a crossbow on the stall by its power: effectiveness squared over price instead of effectiveness over price, so they buy the strong crossbow when they can pay for it and a lighter one when the purse is short, instead of light 80-100 lb crossbows (all crossbows but one sit in the same tier basket)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool XbowBuyByPower { get; set; } = true;
+
         [SettingPropertyBool("Town Household Use", HintText = "townsfolk buy only their household share of raw goods - flax, wool, hides and ore went to weavers, tanners and smiths, not into homes (England c.1300)")]
         [SettingPropertyGroup("Iron Bank")]
         public bool TownHouseholdUse { get; set; } = true;
@@ -6841,6 +6857,10 @@ namespace Armoury
             s.HistBowDaysNew = HistBowDaysNew;
             s.HistThrownOwnDays = HistThrownOwnDays;
             s.HistHorsePrices = HistHorsePrices;
+            s.XbowLikeBow = XbowLikeBow;
+            s.XbowPriceVsBow = XbowPriceVsBow;
+            s.XbowForgeEquivTier = XbowForgeEquivTier;
+            s.XbowBuyByPower = XbowBuyByPower;
             s.TownHouseholdUse = TownHouseholdUse;
             s.TownUseFlax = TownUseFlax;
             s.TownUseWool = TownUseWool;
