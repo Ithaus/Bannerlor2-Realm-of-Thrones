@@ -129,7 +129,7 @@ namespace CrashScribe
             if (!Config.Stage8ProfileLog || prev != nowDay - 1) return;
             Scribe.Line("Profil CS (E8/0): dzien " + prev + " | FirstChance " + seen + " (zgloszone " + rep + ", powtorki pominiete " + rpt + ", odfiltrowane bez moda " + filt
                         + ") | Blame.Culprits " + (ticks * 1000.0 / System.Diagnostics.Stopwatch.Frequency).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
-                        + " ms / " + calls + " wywolan.");
+                        + " ms / " + calls + " wywolan." + EconomyAudit.DayText() + Scribe.WriterText());   // NW O2: przebiegi audytu ekonomii od poprzedniej linii; NW O9: pisarz logu
         }
 
         /// <summary>Slad stosu z dopisana nazwa moda przy kazdej ramce.</summary>

@@ -37,8 +37,43 @@ namespace Armoury
         private static List<Village> _villages;
         private static int _playerForageShown = -1;
 
+        // NW O3 (noc 16.10, klucz ScorchedEarthFastScan): kontrola R9 - co SampleEvery-ta partia liczy tez stara kolejnosc warunkow; liczniki sesji
+        private const int SampleEvery = 64;
+        private static long _seSeq;
+        private static int _seDiffAll;
+
         /// <summary>E4/5: stan jednej kampanii (lista wsi to obiekty tej kampanii - po wczytaniu innej gry bez restartu bylyby martwe; 113 recenzja).</summary>
-        internal static void Reset() { _villages = null; _playerForageShown = -1; }
+        internal static void Reset() { _villages = null; _playerForageShown = -1; _seSeq = 0; _seDiffAll = 0; }
+
+        /// <summary>
+        /// NW O3: indeks pierwszej wsi od `from`, ktora przechodzi czyste warunki wstepne furazu (wies jest, hearth ponad podloga przy starej regule,
+        /// frakcja wsi w wojnie z frakcja partii, wies w promieniu). Wszystkie warunki to odczyty bez skutkow, wiec kolejnosc nie zmienia wyniku:
+        /// fast = najpierw odleglosc (tania), potem pytanie o wojne; inaczej kolejnosc sprzed zmiany. Granica ta sama: Distance > radius (bez kwadratu
+        /// odleglosci - zaokraglenia float na granicy). -1 = brak.
+        /// </summary>
+        private static int Next(Vec2 pos, IFaction f, int from, bool fast, bool dev, int floor, float radius)
+        {
+            for (int i = from; i < _villages.Count; i++)
+            {
+                var v = _villages[i];
+                if (v == null || v.Settlement == null) continue;
+                if (!dev && v.Hearth <= floor) continue;
+                if (fast)
+                {
+                    if (pos.Distance(v.Settlement.GetPosition2D) > radius) continue;
+                    var vf = v.Settlement.MapFaction;
+                    if (vf == null || vf == f || !FactionManager.IsAtWarAgainstFaction(vf, f)) continue;
+                }
+                else
+                {
+                    var vf = v.Settlement.MapFaction;
+                    if (vf == null || vf == f || !FactionManager.IsAtWarAgainstFaction(vf, f)) continue;
+                    if (pos.Distance(v.Settlement.GetPosition2D) > radius) continue;
+                }
+                return i;
+            }
+            return -1;
+        }
 
         internal static void OnDaily()
         {
@@ -61,6 +96,9 @@ namespace Armoury
                 // przed rentami i siewem puli wyrzutkow, czyli przed kalibracja ludnosci - bez niej wies nie mialaby przelicznika i dostalaby stara regule
                 bool dev = Devastation.On;
                 if (dev) PopulationLaw.EnsureCalibrated();
+                bool fast = s.ScorchedEarthFastScan;   // NW O3: odleglosc przed wojna (Next)
+                long tSe = System.Diagnostics.Stopwatch.GetTimestamp();
+                int seParties = 0, seChecks = 0, seDiff = 0;
 
                 foreach (var mp in MobileParty.All)
                 {
@@ -72,13 +110,17 @@ namespace Armoury
                     if (f == null) continue;
 
                     var pos = mp.GetPosition2D;
-                    foreach (var v in _villages)
+                    seParties++;
+                    bool sample = fast && ++_seSeq % SampleEvery == 0;   // NW O3 R9: ta partia liczy tez stara kolejnosc warunkow
+                    int from = 0;
+                    while (true)
                     {
-                        if (v == null || v.Settlement == null) continue;
-                        if (!dev && v.Hearth <= floor) continue;
-                        var vf = v.Settlement.MapFaction;
-                        if (vf == null || vf == f || !FactionManager.IsAtWarAgainstFaction(vf, f)) continue;
-                        if (pos.Distance(v.Settlement.GetPosition2D) > radius) continue;
+                        // NW O3: pierwsza wies od `from` po czystych warunkach wstepnych (dotad: foreach z tymi samymi warunkami w kolejnosci wojna -> odleglosc)
+                        int vi = Next(pos, f, from, fast, dev, floor, radius);
+                        if (sample) { seChecks++; if (Next(pos, f, from, false, dev, floor, radius) != vi) { seDiff++; _seDiffAll++; } }
+                        if (vi < 0) break;
+                        from = vi + 1;
+                        var v = _villages[vi];
 
                         // E4/5: wies bez przelicznika ludzi (w ROT nie ma takiej) zostaje przy starej regule z podloga hearth
                         float per;
@@ -112,6 +154,10 @@ namespace Armoury
                         break;   // jedna wioska dziennie na partie - marsz, nie odkurzacz
                     }
                 }
+                double seMs = (System.Diagnostics.Stopwatch.GetTimestamp() - tSe) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                Log.Info("Spalona ziemia (NW): dzien " + (day - 1) + " | szybki przeglad (ScorchedEarthFastScan) " + (fast ? "[WL]" : "[wyl]") + " | partii " + seParties
+                         + ", probek starej drogi " + seChecks + ", rozjazdow " + seDiff + " (od wczytania " + _seDiffAll + ") | czas "
+                         + seMs.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " ms.");
             }
             catch (Exception e) { Log.Error("ScorchedEarth.OnDaily", e); }
         }

@@ -308,7 +308,7 @@ namespace Armoury
         internal static void Hourly()
         {
             var s = Settings.Current;
-            if (s == null || !s.Stage7MeasureLog || Campaign.Current == null) return;
+            if (s == null || !s.Stage7MeasureLog || Campaign.Current == null || !LogGate.Today) return;   // NW O4: sondy tylko w dobie pomiaru (klucz Stage7MeasureLog nietkniety - pilnuje tez WorldClock7)
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -426,7 +426,7 @@ namespace Armoury
         internal static void Stage7Daily()
         {
             var s = Settings.Current;
-            if (s == null || !s.Stage7MeasureLog) { ZeroSample(); return; }
+            if (s == null || !s.Stage7MeasureLog || !LogGate.Lines) { ZeroSample(); return; }   // NW O4: linia za dobe pomiaru, w innej dobie samo zerowanie
             int day = (int)CampaignTime.Now.ToDays - 1;
             try
             {

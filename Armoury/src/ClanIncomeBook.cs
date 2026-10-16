@@ -391,6 +391,7 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !s.LogEnabled) return;     // D11: przy wylaczonym logu tylko pierscien D
                 if (_importN >= 0) { Log.Info("Budzet rodow: wczytano " + _importN + " rodow (bledne " + _importBad + ")."); _importN = -1; }
+                if (!LogGate.Lines) return;   // NW O4 (ciche logi): raport na sucho i budzet-rodow.csv tylko w dobie pomiaru - pierscien D wyzej codziennie
                 long tr = Stopwatch.GetTimestamp(); _ticksCsv = 0;
                 Report(s);
                 LastTicksCsv = _ticksCsv; LastTicksReport = Stopwatch.GetTimestamp() - tr - _ticksCsv;

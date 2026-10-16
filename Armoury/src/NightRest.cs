@@ -862,6 +862,106 @@ namespace Armoury
         /// bandyci (nocni lowcy) i umarli - Inni nie znaja snu. O swicie
         /// namioty znikaja i AI budzi sie samo.
         /// </summary>
+        // ---------------------------------------------------- NW O5 (noc 16.10, klucz AiCampFastScan): zagrozenia karawan w obozie nocy
+        // Dotad kazda partia starej sciezki (karawany, lordowie przy wylaczonym AiNightMarchByReason) przegladala wszystkich lordow i bandy swiata (ok. 1700).
+        // Teraz siatka mapy z tej samej migawki zagrozen (komorka nieco wieksza niz promien alarmu - kazdy wrog w promieniu lezy w jednej z 3 x 3 komorek wokol
+        // partii, takze przy zaokragleniach float), w komorkach ten sam warunek co dotad. Wynik to "czy jest ktokolwiek", wiec kolejnosc nie ma znaczenia;
+        // pozycje w tym ticku sie nie zmieniaja (petla daje tylko rozkazy). Siatka budowana co tick (promien z MCM moze sie zmienic), promien <= 0 - stara petla.
+        // R9: co ThreatSampleEvery-te zapytanie liczy tez stara petla liniowa; rozny wynik = rozjazd (linia switu). Liczniki doby do linii switu (NightMarch).
+        private const int ThreatSampleEvery = 64;
+        private static readonly System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<MobileParty>> _threatGrid =
+            new System.Collections.Generic.Dictionary<long, System.Collections.Generic.List<MobileParty>>();
+        private static readonly System.Collections.Generic.List<System.Collections.Generic.List<MobileParty>> _threatCells =
+            new System.Collections.Generic.List<System.Collections.Generic.List<MobileParty>>();   // komorki do ponownego uzycia (bez przydzialow co godzine)
+        private static int _threatCellsUsed;
+        private static float _threatCell;
+        private static long _thSeq;
+        internal static long ThQueries, ThSamples, ThDiff, ThTicks;   // od poprzedniej linii switu (NightMarch.LogDawn zeruje)
+
+        private static long CellKey(int cx, int cy) { return ((long)cx << 32) ^ (uint)cy; }
+
+        private static void BuildThreatGrid(System.Collections.Generic.List<MobileParty> threats, float radius)
+        {
+            _threatGrid.Clear();
+            for (int i = 0; i < _threatCellsUsed; i++) _threatCells[i].Clear();
+            _threatCellsUsed = 0;
+            _threatCell = radius * 1.01f + 0.01f;
+            for (int i = 0; i < threats.Count; i++)
+            {
+                var t = threats[i];
+                var p = t.GetPosition2D;
+                long k = CellKey((int)Math.Floor(p.x / _threatCell), (int)Math.Floor(p.y / _threatCell));
+                System.Collections.Generic.List<MobileParty> cell;
+                if (!_threatGrid.TryGetValue(k, out cell))
+                {
+                    if (_threatCellsUsed < _threatCells.Count) cell = _threatCells[_threatCellsUsed];
+                    else { cell = new System.Collections.Generic.List<MobileParty>(8); _threatCells.Add(cell); }
+                    _threatCellsUsed++;
+                    _threatGrid[k] = cell;
+                }
+                cell.Add(t);
+            }
+        }
+
+        /// <summary>Ten sam warunek co dotad dla jednego zagrozenia: nie ta sama partia, inna frakcja, banda albo wojna, w promieniu.</summary>
+        private static bool ThreatHits(MobileParty mp, IFaction mf, MobileParty t, float radius)
+        {
+            if (t == mp || t.MapFaction == mf) return false;
+            bool hostile = t.IsBandit || (mf != null && t.MapFaction != null && mf.IsAtWarWith(t.MapFaction));
+            if (!hostile) return false;
+            return mp.GetPosition2D.Distance(t.GetPosition2D) <= radius;
+        }
+
+        private static bool DangerLinear(MobileParty mp, IFaction mf, System.Collections.Generic.List<MobileParty> threats, float radius)
+        {
+            foreach (var t in threats) if (ThreatHits(mp, mf, t, radius)) return true;
+            return false;
+        }
+
+        private static bool DangerGrid(MobileParty mp, IFaction mf, float radius)
+        {
+            var p = mp.GetPosition2D;
+            int cx = (int)Math.Floor(p.x / _threatCell), cy = (int)Math.Floor(p.y / _threatCell);
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                {
+                    System.Collections.Generic.List<MobileParty> cell;
+                    if (!_threatGrid.TryGetValue(CellKey(cx + dx, cy + dy), out cell)) continue;
+                    for (int i = 0; i < cell.Count; i++) if (ThreatHits(mp, mf, cell[i], radius)) return true;
+                }
+            return false;
+        }
+
+        // NW O5 (d): ShortTermBehavior bez ToString na kazda partie - tablice z tych samych slow (StartsWith "Flee" / "Engage") zbudowane raz na proces
+        // z wartosci typu; wartosc spoza tablicy - stara droga (ToString)
+        private static bool[] _stbFlee, _stbEngage;
+
+        private static void StbTables()
+        {
+            if (_stbFlee != null) return;
+            int max = 0;
+            foreach (var o in Enum.GetValues(typeof(TaleWorlds.CampaignSystem.Party.AiBehavior))) max = Math.Max(max, (int)o);
+            var fl = new bool[max + 1]; var en = new bool[max + 1];
+            foreach (var o in Enum.GetValues(typeof(TaleWorlds.CampaignSystem.Party.AiBehavior)))
+            {
+                int i = (int)o; if (i < 0) continue;
+                string n = o.ToString();
+                fl[i] = n.StartsWith("Flee"); en[i] = n.StartsWith("Engage");
+            }
+            _stbEngage = en; _stbFlee = fl;
+        }
+
+        /// <summary>0 = nic, 1 = ucieczka ("Flee..."), 2 = poscig ("Engage...") - to samo, co StartsWith na ToString.</summary>
+        internal static int StbKind(MobileParty mp)
+        {
+            var b = mp.ShortTermBehavior;
+            int i = (int)b;
+            StbTables();
+            if (i >= 0 && i < _stbFlee.Length) return _stbFlee[i] ? 1 : _stbEngage[i] ? 2 : 0;
+            string stb = b.ToString();
+            return stb.StartsWith("Flee") ? 1 : stb.StartsWith("Engage") ? 2 : 0;
+        }
+
         private static void AiNightCamp(Settings s, int h)
         {
             try
@@ -909,6 +1009,10 @@ namespace Armoury
                     if (mp == null || !mp.IsActive) continue;
                     if (mp.IsLordParty || mp.IsBandit) threats.Add(mp);
                 }
+                // NW O5: siatka zagrozen z tej samej migawki (stoper sekcji zagrozen do linii switu)
+                float dangerR = s.AiCampDangerRadius;
+                bool grid = s.AiCampFastScan && dangerR > 0f;
+                if (grid) { long tg = System.Diagnostics.Stopwatch.GetTimestamp(); BuildThreatGrid(threats, dangerR); ThTicks += System.Diagnostics.Stopwatch.GetTimestamp() - tg; }
 
                 // T10: kto spal w chwili ticku (migawka - _camping zmienia sie w petli), tryb i liczniki godziny
                 var campSet = new System.Collections.Generic.HashSet<MobileParty>(_camping);
@@ -970,21 +1074,25 @@ namespace Armoury
                     else if (Undead.Party(mp)) cause = "umarli";                                // Inni maszeruja noca
                     else
                     {
-                        string stb = mp.ShortTermBehavior.ToString();
-                        if (stb.StartsWith("Flee")) cause = "ucieczka";                          // ucieczka i pogon
-                        else if (stb.StartsWith("Engage")) cause = "poscig";
+                        int sk = s.AiCampFastScan ? StbKind(mp) : -1;   // NW O5 (d): bez ToString - te same slowa
+                        if (sk < 0) { string stb = mp.ShortTermBehavior.ToString(); sk = stb.StartsWith("Flee") ? 1 : stb.StartsWith("Engage") ? 2 : 0; }
+                        if (sk == 1) cause = "ucieczka";                          // ucieczka i pogon
+                        else if (sk == 2) cause = "poscig";
                     }
                     if (cause == null)
                     {
-                        bool danger = false;
+                        bool danger;
                         var mf = mp.MapFaction;
-                        foreach (var t in threats)
+                        long tq = System.Diagnostics.Stopwatch.GetTimestamp();
+                        if (grid)
                         {
-                            if (t == mp || t.MapFaction == mf) continue;
-                            bool hostile = t.IsBandit || (mf != null && t.MapFaction != null && mf.IsAtWarWith(t.MapFaction));
-                            if (!hostile) continue;
-                            if (mp.GetPosition2D.Distance(t.GetPosition2D) <= s.AiCampDangerRadius) { danger = true; break; }
+                            // NW O5: siatka; R9 - co ThreatSampleEvery-te zapytanie takze stara petla liniowa
+                            danger = DangerGrid(mp, mf, dangerR);
+                            ThQueries++;
+                            if (++_thSeq % ThreatSampleEvery == 0) { ThSamples++; if (DangerLinear(mp, mf, threats, dangerR) != danger) ThDiff++; }
                         }
+                        else danger = DangerLinear(mp, mf, threats, dangerR);   // ten sam warunek co dotad (ThreatHits), pierwsze trafienie konczy
+                        ThTicks += System.Diagnostics.Stopwatch.GetTimestamp() - tq;
                         if (danger)
                         {
                             if (_tented.Contains(mp)) { Tent(mp, false); _tented.Remove(mp); }
@@ -1059,8 +1167,8 @@ namespace Armoury
                     if (mp == null || !mp.IsActive || !mp.IsBandit) continue;
                     if (mp.CurrentSettlement != null || mp.MapEvent != null) continue;
                     if (Undead.Party(mp)) continue;
-                    string stb = mp.ShortTermBehavior.ToString();
-                    if (stb.StartsWith("Flee") || stb.StartsWith("Engage")) continue;   // pogon nie zna pory
+                    if (s.AiCampFastScan) { if (StbKind(mp) != 0) continue; }   // NW O5 (d): pogon nie zna pory - te same slowa bez ToString
+                    else { string stb = mp.ShortTermBehavior.ToString(); if (stb.StartsWith("Flee") || stb.StartsWith("Engage")) continue; }   // pogon nie zna pory
                     bool dayHunter = mp.Id.InternalValue % 4u == 0u;   // stala natura bandy
                     if (dayWindow && dayHunter) continue;              // dzienny wlasnie poluje
                     if (nightWindow && !dayHunter) continue;           // nocny wlasnie poluje

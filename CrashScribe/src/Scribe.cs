@@ -58,11 +58,75 @@ namespace CrashScribe
             Raw(sb.ToString());
         }
 
+        // NW O9 (noc 16.10, klucz ScribeKeepOpen; wzor Armoury E8/O6 Log.WriteKept): jeden otwarty pisarz logu sesji zamiast File.AppendAllText
+        // na kazdy zapis (otwarcie i zamkniecie pliku na linie). AutoFlush - kazdy zapis od razu u systemu (przy CTD, takze wywrotce silnika bez
+        // kodu zarzadzanego, nic nie ginie - jak dotad), FileShare.ReadWrite (log czytelny w trakcie gry), Encoding.UTF8 jak dotad (BOM tylko w nowym
+        // pliku - jak AppendAllText). Zawsze pod Gate. Blad pisarza = pisarz zamkniety, ten zapis stara droga, nastepny otworzy plik od nowa (bez
+        // wylacznika na sesje). Bledy (Report) ida ta sama droga - flush od razu; zamkniecie przy wyjsciu (Summary: ProcessExit, OnSubModuleUnloaded,
+        // blad konczacy gre) - zapis po zamknieciu otwiera plik od nowa. Klucz wylaczony = te same wywolania File.AppendAllText co przed zmiana.
+        private static StreamWriter _w;
+        private static string _wPath;
+        private static int _wOpens, _wFails, _wOld;   // NW O9: otwarcia pisarza, potkniecia (zapis poszedl stara droga), zapisy stara droga - od startu procesu
+
+        /// <summary>NW O9: dopisek linii "Profil CS (E8/0)" - stan pisarza logu sesji od startu gry.</summary>
+        internal static string WriterText()
+        {
+            lock (Gate)
+            {
+                return " | log sesji: " + (Config.ScribeKeepOpen ? "otwarty plik (ScribeKeepOpen [WL])" : "plik na zapis (ScribeKeepOpen [wyl])")
+                       + ", otwarc " + _wOpens + ", potkniec pisarza " + _wFails + ", zapisow stara droga " + _wOld;
+            }
+        }
+
+        /// <summary>NW O9: zapis tekstu do logu sesji - wolane pod Gate. Wyjatek starej drogi wychodzi do wolajacego (jego catch, jak dotad).</summary>
+        private static void Write(string text)
+        {
+            if (Config.ScribeKeepOpen && SessionFile != null)
+            {
+                try
+                {
+                    if (_w == null || _wPath != SessionFile)
+                    {
+                        CloseLocked();
+                        FileStream fs = null;
+                        try
+                        {
+                            fs = new FileStream(SessionFile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                            _w = new StreamWriter(fs, Encoding.UTF8, 4096);
+                            _w.AutoFlush = true;
+                            _wPath = SessionFile;
+                            _wOpens++;
+                        }
+                        catch { if (_w == null && fs != null) { try { fs.Dispose(); } catch { } } throw; }
+                    }
+                    _w.Write(text);
+                    return;
+                }
+                catch { CloseLocked(); _wFails++; }
+            }
+            else if (_w != null) CloseLocked();   // klucz wylaczony: stara droga potrzebuje wolnego pliku
+            _wOld++;
+            File.AppendAllText(SessionFile, text, Encoding.UTF8);
+        }
+
+        private static void CloseLocked()
+        {
+            var w = _w;
+            _w = null; _wPath = null;
+            if (w != null) { try { w.Dispose(); } catch { } }
+        }
+
+        /// <summary>NW O9: pisarz zamkniety (wyjscie z gry) - kazda linia jest juz u systemu (AutoFlush); zapis pozniej otworzy plik od nowa.</summary>
+        internal static void Close()
+        {
+            try { lock (Gate) { CloseLocked(); } } catch { }
+        }
+
         internal static void Raw(string text)
         {
             lock (Gate)
             {
-                try { File.AppendAllText(SessionFile, text, Encoding.UTF8); }
+                try { Write(text); }
                 catch { }
             }
         }
@@ -77,7 +141,7 @@ namespace CrashScribe
             if (!System.Threading.Monitor.TryEnter(Gate, timeoutMs)) return false;
             try
             {
-                try { File.AppendAllText(SessionFile, text, Encoding.UTF8); } catch { }
+                try { Write(text); } catch { }
                 return true;
             }
             finally { System.Threading.Monitor.Exit(Gate); }
@@ -401,6 +465,7 @@ namespace CrashScribe
                 }
             }
             catch { }
+            finally { Close(); }   // NW O9: podsumowanie pisze sie przy wyjsciu - pisarz zamkniety (plik zwolniony)
         }
 
         /// <summary>Stare raporty kasujemy, zeby folder nie puchl.</summary>

@@ -383,7 +383,8 @@ namespace Armoury
         private static readonly Dictionary<string, int> _authIx = new Dictionary<string, int>();
         private static readonly Dictionary<MethodBase, string> _authCache = new Dictionary<MethodBase, string>();   // null = pomin ramke, "!" + nazwa = zachowanie (koniec), reszta = kandydat
         private static int _authTraces, _authCapped; private static long _authTicks;
-        private static bool AuthorsOn { get { var s = Settings.Current; return s != null && s.GoodsLedgerTickAuthors; } }
+        // NW O4 (ciche logi): slady stosu tylko w dobie pomiaru (LogGate.Today), linia w takcie nastepnej doby (LogGate.Lines); zerowanie w Daily codziennie
+        private static bool AuthorsOn { get { var s = Settings.Current; return s != null && s.GoodsLedgerTickAuthors && LogGate.Today; } }
 
         private static void NoteAuthor(int kind, int i, int n)
         {
@@ -441,7 +442,8 @@ namespace Armoury
         /// <summary>K4: linia "Towary (inne ticki dobowe)" - towary ze zmiana w tickach osad / miast, najwiekszych autorow (zmiana netto doby) - null, gdy klucz wylaczony.</summary>
         private static string AuthorsLine(int day)
         {
-            if (!AuthorsOn) return null;
+            var s0 = Settings.Current;
+            if (s0 == null || !s0.GoodsLedgerTickAuthors || !LogGate.Lines) return null;   // NW O4: linia za dobe pomiaru (takt S+1 za dobe S)
             var inv = CultureInfo.InvariantCulture;
             var per = new SortedDictionary<int, List<KeyValuePair<long, long>>>();   // towar -> [(klucz, zmiana)]
             foreach (var kv in _tickAuth)

@@ -296,6 +296,7 @@ namespace Armoury
                   .Append(" | od startu sesji: zapisow ").Append(_nKept + _nOld + _nLost).Append(", straconych ").Append(_nLost)
                   .Append(", potkniecia pisarza ").Append(_kOpenFails + _kWriteFails).Append(" (otwarcie ").Append(_kOpenFails).Append(", zapis ").Append(_kWriteFails).Append(')');
                 if (_kFirst != null) sb.Append(" [pierwsze: ").Append(_kFirst).Append(']');
+                try { sb.Append(LogGate.O6Text(day)); } catch { }   // NW O4: ciche logi - tryb i czy ta doba ma linie pomiarow (przed proba - narzedzie czyta koniec linii proby)
                 _dKept = 0; _dOld = 0;
                 if (_sampling)
                 {
