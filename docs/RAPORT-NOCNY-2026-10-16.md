@@ -88,7 +88,7 @@ Zbrojownia (Twoja decyzja z 15.10):
   - trebusz zaczyna sie w 1. dobie oblezenia miasta;
   - buduje sie w tempie zamku;
   - wyrwa w murze pozwala na szturm.
-  W tescie 40 dob powstalo 7 trebuszy (wczesniej 0) i padl 1 odcinek muru. Miasta dalej najczesciej ratuje odsiecz (Twoja zasada OB5).
+  W tescie 120 dob powstalo 22 trebusze, trafily w mury 141 razy i padly 3 z 19 oblezonych miast (wczesniej 0 z 12). Reszte miast ratuje odsiecz (Twoja zasada OB5).
 
 **11. Audyt ekonomii** - rozdz. 3.
 
@@ -132,6 +132,10 @@ Pelny raport: `docs/AUDYT-EKONOMII-2026-10-16.md`.
   - doplata do wyrobow tylko od sprzedanych;
   - markietani biora wiecej od pelnych sakiewek - sakiewki zolnierzy rosly 140 tys. dziennie, teraz o 40% wolniej;
   - pozyczki lordow u mieszczan dzialaja.
+- **Sprawdzilem tez nastepny krok, ale go NIE wgralem** (galaz `w-toku/noc-ekonomia2`): jaja ze wsi, budzet towarow bez producenta przeniesiony na zbytki, len i welna wozem do miast, opal dla mieszczan.
+  - W tescie 120 dob towary zadzialaly, ale zloto za nie zostalo u ludu (wsie tez sa "ludem").
+  - Lud 8,1 -> 10,8% zlota swiata (bez tej zmiany 8,0 -> 9,1%), a korony spadly szybciej (18,3% wobec 19,9%). To odwrotnie, niz chcesz.
+  - Zeby to mialo sens, trzeba to polaczyc z wydatkami panow (dwor jako prawdziwe zakupy, danina od nowego utargu wsi). To do decyzji z Toba.
 - **Na Twoje slowo czeka nastepny krok, wiekszy:**
   - jaja z wsi;
   - len, welna i skory ze wsi do tkaczy i garbarzy;

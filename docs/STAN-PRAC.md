@@ -2271,3 +2271,13 @@ zbudowane 7 (przed: 0), rozbity odcinek 1; miasta zdobyte 0 z 7 (odsiecz pokonal
 Odkrycie (rozp_trebusze): zmierzone tempo budowy AI 2.5 x nizsze od opisow MCM (RB bierze 0.4 zamiast 1.0 z pliku) - nie ruszane.
 W TOKU: w-toku/noc-ekonomia2 (zb/n-ekon2 od 3f8baef1; wf_e2f60a6c-e13): E1 jaja ze wsi, E2 budzet kategorii bez producenta na istniejace zbytki, E3 len/welna/skory wozem do miast,
 E4 opal dla mieszczan - wgranie tylko po tescie 120 dob (trend udzialu ludu w zlocie).
+
+### 45. noc-ekonomia2 - PRZETESTOWANA, NIE WGRANA (16.10 ok. 22:05 zegara komp.)
+Galaz `w-toku/noc-ekonomia2` a6abfc70 (od 3f8baef1, wypchnieta; zbior-e8 cofniety do 3f8baef1 = WGRANIE 64): E1 jaja ze wsi z kurami (VillageEggsFromBk),
+E2 budzet kategorii bez producenta na zbytki z towarem (NoMakerBudgetToLuxury), E3 len i welna wozem do miasta targowego takze ponizej ceny (VillageFibreToMarket),
+E4 opal mieszczan, w zimie wiecej (TownFolkFirewood). Recenzja + poprawki, build 0.
+Test 120 dob (zapis F, Armoury-2026-10-15_21-25-46.log) wobec biegu bazowego WGRANIA 64 (20-16-31, 120 dob): 0 ERROR w obu;
+lud 8.1 -> 10.8% zlota swiata (baza 8.0 -> 9.1%), korony 21.4 -> 18.3% (baza 21.4 -> 19.9%), lordowie ok. 36% w obu, sakiewki zolnierzy 17.9 -> 19.5 mln (baza -> 21.0 mln).
+DECYZJA CLAUDE: nie wgrywac - nowe towary dzialaja, ale zloto za nie zostaje u ludu (wsie licza sie do ludu), czyli wbrew celowi Jeffa (lordowie i korony nie moga biedniec).
+Nastepny krok (z Jeffem): sparowac E1-E4 z P6 (dwor pana jako prawdziwe zakupy) i/lub danina pana od nowego utargu wsi, potem ponowny test 120 dob.
+TB2 w biegu bazowym 120 dob: trebusze AI zbudowane 22, trafienia w mury 141, rozbity odcinek 1, MIASTA ZDOBYTE 3 z 19 (przed TB2: 0 z 12).
