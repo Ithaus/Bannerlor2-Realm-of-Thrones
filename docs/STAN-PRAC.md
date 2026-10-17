@@ -2601,3 +2601,8 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   Eastwatch), Nocna Straz dostaje danine w naturze od lordow Polnocy (zboze do Muru), Wolnych Ludzi glod pcha do najazdow na poludnie; czego nie da sie dowiezc - prawdziwy glod
   (ludzi powoli ubywa). (2) biedni rzemieslnicy Essos = "Tanszy koszyk": biedni jedza tansze (chleb, kasza, ryby zamiast miesa i wina), koszyk dopasowuje sie do kieszeni,
   place rosna same tam, gdzie brakuje rak. -> do rundy 4.
+- Jeff 17.10 ok. 10:45 PDT: "czemu nie moga miec wiecej wiosek z miesem, hodowla, zeby nie bylo glodu?" - SPRAWDZONE w ks-plan.csv (doba 109179): Wolni Ludzie 294k ludzi, tylko
+  hunter/trapper/konie, mieso 10.2 t/d = 0.047 kg jedzenia na glowe (potrzeba ~1 kg); Nocna Straz tak samo 0.047; Polnoc 2.75M: wheat_farm 1.42M, trapper 638k (futra placa lepiej),
+  jedza 0.533 kg/glowe. P0 hunter = 1.2 kg x ziemia snieg ~0 -> 54 g na mysliwego. -> RUNDA 4 dopisane: (1) "najpierw wyzywic siebie" - okreg najpierw stawia rece przy jedzeniu
+  o najwiekszych kcal na reke na swojej ziemi (bydlo, owce, kozy, ryby, owies/jeczmien, polowanie), nadwyzka rak na targ; (2) prawdziwe plony hodowli/polowan/ryb w zimnym klimacie
+  (jedna tabela swiata, poprawione wartosci dla zimnej ziemi, bez mnoznikow okregu; pustki za Murem 69% ladu); (3) reszta - dowoz z poludnia + danina zbozowa dla Muru; (4) reszta - glod.
