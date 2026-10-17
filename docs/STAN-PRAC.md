@@ -2547,3 +2547,16 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - RUNDA 3: workflow wf_0342c556-72c (ks-rozklad-miast): rozpoznanie (rozklad, glod wsi, ceny/koszt) -> 3 projekty (Plan na miasto / kupcy zbozowi / hybryda) + symulator
   97 miast offline (scratchpad ksim) -> ocena -> kod na w-toku/noc-ks -> symulacja do 3 rund -> 2 recenzje -> poprawki. Test w grze dopiero po przejsciu symulatora.
 - W grze dalej WGRANIE 74 (bez KS). Jeff moze grac.
+
+### 68. TEST KS runda 3 w grze (17.10 06:08-06:45 PDT, Armoury 909aba37 z drzewa zb/t-r3, Armoury-2026-10-17_06-07-51.log + CSV, kopia logi-testow) - NIE PRZESZEDL
+- Jeff gral 02:43-06:05 (0 ERROR, wyjscie czyste; kopia logow D:/Backup-Bannerlord/logi-jeffa/2026-10-17, zapis zapisy-jeffa/...-2026-10-17-po-0605.sav). Potem "gra wylaczona, mozesz wgrywac".
+- Flagi usuniete. 0 ERROR, bitwa OK, nzc0/nzc2/nbitwa 0 NIE. nks 14 NIE + 6 ETAP z 49 (runda 2: 15 NIE z 41).
+- Lepiej niz runda 2: S/C na rynek poza pasmem 30 z 46 (bylo 40), wsie kcal bez pokrycia W 18% / E 12% (bylo 34/40; ALE licznik chcianego liczony 2-3x - blad znaleziony w symulacji r2, c1f61987),
+  miasta zboza < 0.5 dnia 24% (bylo 39%). Kupcy KS-H: 946k szt. kupione, zwroty 0.1%, reszta towaru i zlota 0 - dziala; kasa celu za mala 42% zamowien.
+- NOWE Z GRY (symulator tego nie mial): ALFA WSI ZAPADA SIE W PETLI - mediana 0.47 (pomiar przed Apply) -> 0.22 -> 0.03 -> 0.00 (Plan co 7 dob); budzet wsi W 72k -> 8.5k zl/d;
+  zaplacony koszyk 32% -> 5%; praca domowa 21% -> 35% rak; sprzedaz wsi na targ -15% -> -33%. Przyczyna: kiesy wsi maja odplyw staly (korona danina/clo/mennica -43.5k/d, renty -9.6k,
+  tick -132.7k/d wobec +104k/d z taborow) - alfa netto ujemna -> Plan tnie zakupy -> mniej sprzedazy -> mniejszy wplyw -> nizsza alfa. Naprawa (runda 4): alfa endogeniczna -
+  zamrozic pomiar sprzed Apply (albo tlumic i ograniczyc), stale oplaty wsi jako koszt staly, nie udzial.
+- Inne: podloga spichlerza w 61% wsi (prog 20%), sterowanie rynku Essos x0.85 na granicy, korytarze 60 z 80 ponizej 0.8 Planu, koszt 4.36 / 12.45 ms.
+- Workflow wf_0342c556-72c dalej: symulacja runda 3 -> 2 recenzje -> poprawki (galaz w-toku/noc-ks3, n-ks HEAD c1f61987). Po nim runda 4 z danymi z tego testu, potem test w grze.
+- W grze WGRANIE 74 (bez KS).
