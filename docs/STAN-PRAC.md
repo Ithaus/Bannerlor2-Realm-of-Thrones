@@ -2683,3 +2683,9 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
 - Test fin78 120 dob (Armoury cfd3fb51, KS flaga armoury-ks-wlacz.flag UTWORZONA - USUNAC!), at-fin78-ks4.out.txt; ocena nks + nds.
 - DALEJ (runda 4): KS-H na kapitale kupcow (zaplata przy dostawie, rachunek, 30 dni zwloki = brak dostaw), najpierw wyzywic siebie + hodowla/ryby w zimnym klimacie,
   dowoz na Polnoc + danina zbozowa dla Muru, tanszy koszyk biednych Essos, rynek BK wsi wedlug potrzeb, bez darmowej podlogi spichlerza, koszt.
+- 15:50-16:05 PDT: Jeff "sprawdz czy inne jedzenie daje odpowiednie ilosci" + "przejrzyj wszystkie surowce": przeglad 136 linii warsztatow (BK workshops.xml, SandBox spworkshops.xml;
+  wagi z CrashScribe/items-dump.csv: towary 10 kg, pien 100 kg, lupka zelaza 15 kg, krowa 200 / swinia 120 / owca 40 / kura i ges 5 kg). Gra: oliwa 1 -> 1/2 (5-10x za duzo),
+  wino 1 -> 1/2, piekarnia 1 -> 2, pierogi 2 -> 4-6, skora 1 -> 2 (4.8x), plotno/sukno/filc/aksamit 1 -> 2 (2.4-2.9x), narzedzia 1 lupka -> 2/4, srebro 1 rudy -> 2 wyrobow (50x),
+  deski 1 pien -> 2 (20% wagi - za malo), mieso krowa 6 / swinia 2 / owca 1, drob u rzeznika 100%. Linie BK bez wsadu juz zablokowane (WorkshopNoFreeRaw, wgrane).
+  -> KsRecipes (n-ks4 b0d3914e + bc557e9d, klucz KsRealRecipes): przy KS wszystkie typy warsztatow wedlug wagi = stale KsTab Planu (tabela w kodzie). Bron/zbroja bez zmian.
+  Testy 120 dob odtad BEZ bitwy (Jeff: "czy jeszcze potrzebne testowanie bitwy?") - bitwa tylko w tescie 5 dob dokladnej DLL przed wgraniem.
