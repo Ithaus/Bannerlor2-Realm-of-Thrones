@@ -2495,3 +2495,4 @@ ZMIANA (Jeff ~15:45 PDT): "wszystkie 8 rob, najwyzej bedziesz jeszcze w trakcie 
 - Paczki testow: (1) ZC0+ZC1+ZC2 120 dob; (2) kalibracja+ZC3+ZC4+ZC5; (3) ZC6+ZC7; (4) koncowy. Skrypty: test/bieg-bitwa.ps1 (-ExtraAdd, -SwitchWaitSec 720), test/wgraj-v5.ps1.
 - Galaz `w-toku/noc-geo` (sonda geografii) NIE scalona - tylko test; dane w roz/geo-dane.
 - 16:10 PDT: workflow ZC2->ZC6->ZC7 wf_347c8b21-ebe (galaz w-toku/noc-zc267, worktree zb/n-zc267 od 66bda99b). Nastepny: po kalibracji (wf_ef9562a5-85b) workflow KS+ZC3+ZC4+ZC5 od int (po ZC1).
+- 17:55 PDT: ZC1 gotowy (3c258689 + d6767bd0, 18 uwag recenzji), scalony int **420cb539** (ZC0+ZC1; konflikt Settings.cs - oba bloki). Test 120 dob ZC0+ZC1 w toku (test/fin66, at-fin66-120.out.txt). ZC1 slad: +17 jedzenia DTE konwoje (DteConvoyNoFreeFood), BK GiveFood (BkCaravanNoFreeFood), BK 1460/d = blad pomiaru; ryby 70-130/d autor nieznany.
