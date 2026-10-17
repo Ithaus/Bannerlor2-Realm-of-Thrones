@@ -32,8 +32,6 @@ namespace Armoury
         private static Dictionary<Town, int> _townMk;
         private static readonly Dictionary<Settlement, int> _setMk = new Dictionary<Settlement, int>();   // zamki i inne osady: rynek z kultury (GoodsLedger - podzial na rynki)
         private static string _shelfNote;
-        private static readonly HashSet<string> Perish = new HashSet<string>(StringComparer.Ordinal) { "fish", "meat", "WhaleMeat", "Egg", "butter", "apple", "carrot", "orange", "grape", "date_fruit" };
-        private static readonly HashSet<string> PriceOne = new HashSet<string>(StringComparer.Ordinal) { "Egg", "honey", "carrot", "apple", "hides", "cow", "hog", "sheep", "spice", "whale_oil", "walrus_tusk" };
 
         private static void RampReset()
         {
@@ -110,16 +108,8 @@ namespace Armoury
         /// <summary>Cena startu towaru KS i na rynku m (rozdz. 6): cena cienia Planu w 0.7-1.5; psujace sie >= 1.0; domowe, uboczne, zwierzeta, regale - 1.0.</summary>
         private static double StartPrice(int m, int i)
         {
-            string id = ItemIds[i];
-            if (PriceOne.Contains(id)) return 1.0;
-            int g;
-            if (!KsTab.GoodIndex.TryGetValue(id == "WhaleMeat" ? "meat" : id, out g) || KsTab.RegGoodMask[g]) return 1.0;
             var r = _plan;
-            double p = r != null && r.P != null && r.P.Length == 2 * KsTab.NG ? r.P[(m == 0 ? 0 : 1) * KsTab.NG + g] : 1.0;
-            if (!(p > 0) || double.IsNaN(p)) p = 1.0;
-            p = Math.Max(0.7, Math.Min(1.5, p));
-            if (Perish.Contains(id)) p = Math.Max(1.0, p);
-            return p;
+            return KsCore.StartIndex(ItemIds[i], r != null ? r.P : null, m);   // ta sama regula co krok 8 Planu (KsCore.StartIndex)
         }
 
         /// <summary>Dni polki startu: 7 x cena^(-1/0.6) (wzor ceny gry z wykladnikiem 0.6).</summary>
@@ -182,7 +172,7 @@ namespace Armoury
             var cats = new Dictionary<ItemCategory, int>();                      // kategoria -> towar KS (cena startu) albo -1 (1.0)
             for (int i = 0; i < ItemCount; i++) { var it = _items[i]; if (it != null && it.ItemCategory != null && !cats.ContainsKey(it.ItemCategory)) cats[it.ItemCategory] = i; }
             foreach (var c in _zCats.Keys) if (!cats.ContainsKey(c)) cats[c] = -1;
-            int towns = 0, cells = 0, stum = 0, lift = 0; double sumIdx0 = 0, sumIdx1 = 0; int nIdx = 0;
+            int towns = 0, cells = 0, stum = 0, lift = 0, noShelf = 0; double sumIdx0 = 0, sumIdx1 = 0; int nIdx = 0;
             foreach (var town in Town.AllTowns)
             {
                 try
@@ -198,6 +188,9 @@ namespace Armoury
                         double p = kv.Value >= 0 ? StartPrice(m, kv.Value) : 1.0;
                         // wzor ceny: 0.1 x podaz + 0.04 x wartosc polki; cel 0.14 x dni x popyt - podaz dopelnia to, czego brakuje realnej polce (najwyzej x1.4 dni x popyt)
                         double days = ShelfDays(p), sv = Math.Max(0.0, d.InStoreValue);
+                        // F2 (poprawka po autotescie 16.10): bez sztucznych polek - wygladzona podaz tylko tam, gdzie prawdziwa polka ma co najmniej polowe celu
+                        // (dotad 3295 z 3977 pozycji mialo polke ponizej celu, indeks 3.87 -> 0.98 w D i wracal do 2-5); reszta - cena wzoru gry z prawdziwej polki
+                        if (sv < 0.5 * days * dem) { noShelf++; continue; }
                         double want = (0.14 * days * dem - 0.04 * sv) / 0.1;
                         float sup = (float)Math.Max(0.1, Math.Min(1.4 * days * dem, Math.Max(days * dem * 0.5, want)));
                         if (sup > days * dem * 1.001) lift++;
@@ -212,7 +205,8 @@ namespace Armoury
                 catch (Exception e) { if (stum++ < 1) Stumble("StartShelves(miasto)", e); }
             }
             _shelfNote = "doba " + today + ": miast " + towns + ", kategorii " + cats.Count + " (" + cells + " pozycji), srednia indeksu " + (nIdx > 0 ? (sumIdx0 / nIdx).ToString("0.00", Inv) : "-")
-                         + " -> " + (nIdx > 0 ? (sumIdx1 / nIdx).ToString("0.00", Inv) : "-") + ", pozycji z podaza ponad dni x popyt (polka realna ponizej celu) " + lift + ", potkniecia " + stum;
+                         + " -> " + (nIdx > 0 ? (sumIdx1 / nIdx).ToString("0.00", Inv) : "-") + ", pozycji z podaza ponad dni x popyt (polka realna ponizej celu) " + lift
+                         + ", bez ustawienia (prawdziwa polka ponizej polowy celu - cena z polki) " + noShelf + ", potkniecia " + stum;
             var ps = new StringBuilder(1200);
             for (int m = 0; m < 2; m++)
             {

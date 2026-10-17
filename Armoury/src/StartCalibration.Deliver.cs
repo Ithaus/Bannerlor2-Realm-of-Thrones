@@ -11,14 +11,16 @@ namespace Armoury
         public KsBlock K;                                  // ziemia, udzial w okregu, zajecie startowe (pamiec sesji)
         public double Hands, HomeFrac;                     // rece bloku i czesc rak domu (ostatni rachunek)
         // recenzja 16.10 (ziemia): ziemia zajeta bloku w ha (dom, zboze wlasne, rece zajec x ha na pracujacego - jak LandP Planu) i liczby do ziemi innego zajecia
-        public double LandUse; internal double WH, SubNW, Lg = double.NaN;
+        public double LandUse; internal double WH, SubNW, Lg = double.NaN, HW;
 
-        /// <summary>Ziemia (ha), ktora blok zajmowalby przy calych rekach w zajeciu c (ostatni rachunek rak): dom + zboze wlasne + reszta rak x ha na pracujacego.</summary>
+        /// <summary>Ziemia (ha), ktora blok zajmowalby przy calych rekach w zajeciu c (ostatni rachunek rak): dom + zboze wlasne + reszta rak x ha na pracujacego
+        /// (krok 8: rece pracy domowej na ziemi domu).</summary>
         internal double LandOf(int c, string type)
         {
             double rem = Math.Max(0.0, Hands - WH);
             double sub = c != KsTab.CWheat && Lg > 0 ? Math.Min(rem, SubNW) : 0.0;
-            return WH * KsTab.HaHome + sub * KsTab.HaOwnGrain + (rem - sub) * KsTab.HaPerWorker[c];
+            double hw = HW > 0 ? Math.Min(0.95, HW) : 0.0;
+            return WH * KsTab.HaHome + sub * KsTab.HaOwnGrain + (rem - sub) * ((1.0 - hw) * KsTab.HaPerWorker[c] + hw * KsTab.HaHome);
         }
         // pamiec przydatnosci ziemi bloku (ziemia sie nie zmienia): L zajecia c (NaN - jeszcze nie liczone), L zboza; klucz - blok ziemi K (nowy K = od nowa)
         internal double[] LC; internal double LG = double.NaN; internal object LKey;
@@ -88,6 +90,7 @@ namespace Armoury
         {
             Array.Clear(prod, 0, prod.Length);
             string type = d.Type;
+            double hw = KsCore.HomeOf(d);                     // krok 8: czesc rak zajec w pracy domowej (koszyk, na ktory wsi nie stac - nigdy na targ)
             for (int i = 0; i < parts.Length; i++)
             {
                 var lb = parts[i];
@@ -98,7 +101,7 @@ namespace Armoury
                 W = d.Wf * kb.Share; lg = lb.LGrain(type); lh = 0.5 + 0.5 * Math.Min(1.0, lg);
                 wH = Math.Min(W, d.Need0[KsTab.NH] * kb.Share / (KsTab.PH * lh)); if (!(wH >= 0)) wH = 0;
                 lb.Hands = W; lb.HomeFrac = W > 0 ? wH / W : 0;
-                lb.WH = wH; lb.Lg = lg; lb.SubNW = lg > 0 ? KsTab.OwnGrainShare(lg) * KsCore.GrainOwnNeed(d.Need0) * kb.Share / (KsTab.PGrainSub * lg) : 0.0;
+                lb.WH = wH; lb.Lg = lg; lb.SubNW = lg > 0 ? KsTab.OwnGrainShare(lg) * KsCore.GrainOwnNeed(d.Need0) * kb.Share / (KsTab.PGrainSub * lg) : 0.0; lb.HW = hw;
                 double land = 0; for (int j = 0; j < lb.C.Length; j++) if (lb.X[j] > 0) land += lb.X[j] * lb.LandOf(lb.C[j], type);
                 lb.LandUse = land;
                 double rsum = 0; if (lb.RF != null) for (int j = 0; j < lb.RF.Length; j++) rsum += lb.RF[j];
@@ -115,7 +118,7 @@ namespace Armoury
                         sub = Math.Min(rem, KsTab.OwnGrainShare(lg) * KsCore.GrainOwnNeed(d.Need0) * kb.Share / (KsTab.PGrainSub * lg));
                         prod[IGrain] += x * sub * KsTab.PGrainSub * lg;
                     }
-                    double cl = rem - sub;
+                    double cl = (rem - sub) * (1.0 - hw);
                     double L = lb.L(c, type);
                     foreach (var kv in KsTab.P0[c])
                     {
@@ -210,6 +213,32 @@ namespace Armoury
                            Pottery = 26, WhaleOil = 27, Wood = 28, Fur = 29, Flax = 30, Wool = 31, Hides = 32, Iron = 33, Clay = 34, Lime = 35, Marble = 36;
 
         private static void Put(double[] q, int z, double kg) { if (kg > 1e-9) q[z] += kg; }
+
+        // szczeble drabiny koszyka (ta sama kolejnosc co drabina zakupow ZC4 w grze): przetrwanie i sol, napoj, bialko, reszta jedzenia, przedza domowa, rzeczy
+        internal static readonly int[][] Rungs =
+        {
+            new[] { Grain, Bread, Pie, Salt }, new[] { Beer, Wine, Mead }, new[] { Meat, Whale, Fish, Cheese, Butter, Egg },
+            new[] { Apple, Carrot, Orange, Grape, Olives, Date, Oil, Honey, Spice }, new[] { Flax, Wool },
+            new[] { Linen, Felt, Leather, Tools, Pottery, WhaleOil, Fur, Wood, Hides, Iron, Clay, Lime, Marble }
+        };
+
+        /// <summary>KS krok 8 (Plan): drabina koszyka na budzet - szczebel po szczeblu w calosci, szczebel, na ktory budzet nie starcza, po rowno (paid = czesc zaplacona
+        /// 0..1 wedlug Ids), dalsze szczeble 0. price[po + z] - zl za kg (l). Zwraca wydane zl.</summary>
+        internal static double Ladder(double[] q, double[] price, int po, double budget, double[] paid)
+        {
+            double left = Math.Max(0.0, budget), spent = 0;
+            for (int z = 0; z < N; z++) paid[z] = 1.0;
+            foreach (var rung in Rungs)
+            {
+                double cost = 0;
+                foreach (int z in rung) if (q[z] > 0) cost += q[z] * price[po + z];
+                if (cost <= left) { left -= cost; spent += cost; continue; }
+                double f = cost > 0 ? left / cost : 1.0;
+                foreach (int z in rung) paid[z] = f;
+                spent += left; left = 0;
+            }
+            return spent;
+        }
 
         /// <summary>Koszyk miasta w kg/d (dodaje do q); opal w kg/d osobno.</summary>
         internal static void TownKg(double[] n, double whaleShare, double[] q, out double fireKg)

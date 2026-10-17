@@ -57,6 +57,8 @@ namespace Armoury
             public double Rations = -1; public double Wf;
             public float[] Saved;                              // stawki z zapisu ks2 (czytane, nieuzywane - recenzja 16.10: pierwsza doba po wczytaniu jak Undo)
             public DistResult Res; public float[] Basket; public int Slot = -1;   // rachunek okregu z ostatniego przeliczenia (co LiveEvery dob, na zmiane) i koszyk wsi
+            // krok 8 (pieniadze, z Planu co 7 dob; w zapisie): czesc rak zajec w pracy domowej, czesc zaplacona koszyka wsi (KsBasket.Ids; null - cala), kcal robione w domu
+            public float HomeWork; public float[] PaidZ; public double HomeKcal;
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed; }
@@ -269,6 +271,7 @@ namespace Armoury
                 double[] need; R.DistNeed.TryGetValue(d.Id, out need);
                 var ld = new LiveDist { Id = d.Id, TF = d.TownFields, Market = d.Market, L = land, K = d };
                 if (need != null) for (int k = 0; k < KsTab.NN; k++) ld.NeedMult[k] = d.Need0[k] > 1e-9 ? (float)Math.Max(0.25, Math.Min(4.0, need[k] / d.Need0[k])) : 1f;
+                MoneyFromPlan(R, ld);
                 if (!d.TownFields && d.PplHome != null && d.Bask != null)
                 {
                     double home = 0; foreach (var v in d.PplHome) home += v;
@@ -382,7 +385,7 @@ namespace Armoury
                     if (ld.TF) ld.T = st.Town; else ld.V = st.Village;
                     if ((ld.TF && ld.T == null) || (!ld.TF && ld.V == null)) { bad++; ld.St = null; continue; }
                     string type = ld.TF ? "town_fields" : (ld.V.VillageType != null ? ld.V.VillageType.StringId : "wheat_farm");
-                    var kd = new KsDistrict { Id = ld.Id, Type = type, Market = ld.Market, TownFields = ld.TF, Area = land.Area };
+                    var kd = new KsDistrict { Id = ld.Id, Type = type, Market = ld.Market, TownFields = ld.TF, Area = land.Area, HomeWork = ld.TF ? 0.0 : ld.HomeWork };
                     for (int i = 0; i < ld.B.Length; i++)
                     {
                         var row = i < 20 ? land.Main[i] : (i - 20 < land.Side.Count ? land.Side[i - 20] : null);
@@ -514,6 +517,7 @@ namespace Armoury
                         foreach (var b in kd.Blocks) b.Area = kd.Area * b.Share;       // ziemia bloku (regula A7 - recenzja 16.10)
                     }
                     ld.Wf = kd.Wf;
+                    kd.HomeWork = ld.TF ? 0.0 : ld.HomeWork;              // krok 8: praca domowa z Planu (KsDeliver.Produce)
                     var res = ComputeDistrict(ld, true, null);
                     if (res == null) continue;
                     ld.Res = res;
@@ -526,9 +530,10 @@ namespace Armoury
                     var a = new float[ItemCount];
                     for (int i = 0; i < ItemCount; i++) { a[i] = (float)res.Market[i]; mk[i] += res.Market[i]; }
                     rates[ld.V] = new VRate { A = a, M = m };
-                    ld.Rations = res.KcalNeed > 0 ? ld.PeopleHome * Math.Min(1.5, res.OwnKcal / res.KcalNeed) : -1;
-                    ownKcal += res.OwnKcal; kcalNeed += res.KcalNeed;
                     try { ld.Basket = VillageBasket(ld, res); zv[ld.V] = ld.Basket; } catch (Exception e) { Stumble("VillageBasket", e); }
+                    // racje spichlerza: kcal czesci domowej z wlasnego pola i domu + jedzenie robione w domu (krok 8 - koszyk, na ktory wsi nie stac)
+                    ld.Rations = res.KcalNeed > 0 ? ld.PeopleHome * Math.Min(1.5, (res.OwnKcal + ld.HomeKcal) / res.KcalNeed) : -1;
+                    ownKcal += res.OwnKcal + ld.HomeKcal; kcalNeed += res.KcalNeed;
                 }
                 catch (Exception e) { Stumble("LiveDaily(okreg)", e); }
             }
@@ -551,6 +556,7 @@ namespace Armoury
             try { RuleDaily(today); } catch (Exception e) { Stumble("RuleDaily", e); }
             // ZC4: koszyk dnia miast i wsi na jutro (popyt targu, kotwica, zakupy wsi) - po stawkach i rampie; stany nieswieze - ostatnia mapa miast (lambda biezaca)
             try { Zc4Build(today, recs, zv, mkByM, fresh); } catch (Exception e) { Stumble("Zc4Build", e); }
+            if (today >= DDay) { try { TownsCsv(day); } catch (Exception e) { Stumble("TownsCsv", e); } }   // F0 (poprawka po autotescie): ks-miasta.csv co 7 dob od D
             // polki startu w dobie D (rozdz. 6) - raz; potem srednie cen od zera (A7 i regale od D na cenach po rampie)
             if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; RulePxReset(); }
             string coffers = CoffersDaily(day);
@@ -614,13 +620,14 @@ namespace Armoury
                 LiveDist ld; double[] need;
                 if (!_live.TryGetValue(d.Id, out ld) || !R.DistNeed.TryGetValue(d.Id, out need) || need == null) continue;
                 for (int k = 0; k < KsTab.NN; k++) ld.NeedMult[k] = d.Need0[k] > 1e-9 ? (float)Math.Max(0.25, Math.Min(4.0, need[k] / d.Need0[k])) : 1f;
+                MoneyFromPlan(R, ld);                                   // krok 8: praca domowa i czesc zaplacona koszyka z nowego Planu
                 n++;
             }
             if (n > 0) _liveFull = true;
             Log.Info(PK + "lepszy stol (NeedMult) z Planu doby " + _wDay + " - okregow " + n + " (co 7 dob z Planem; nastepna doba przelicza wszystkie okregi).");
         }
         private static Dictionary<Village, VRate> _ratesKeep = new Dictionary<Village, VRate>();
-        private const int LiveEvery = 3;                   // okreg przeliczany co 3 doby (na zmiane) - koszt doby KS
+        private const int LiveEvery = 7;                   // okreg przeliczany co 7 dob (na zmiane) - koszt doby KS (poprawka po autotescie 16.10: 3 -> 7, okregi zmieniaja sie powoli)
         private static bool _liveFull = true;              // nastepna doba - wszystkie okregi (sesja, wlaczenie, ponowne wlaczenie)
         private static int _liveRedone;
 
@@ -641,7 +648,7 @@ namespace Armoury
             if (_ratesKeep.TryGetValue(ld.V, out old) && old != null) rates[ld.V] = old;
             else { var a = new float[ItemCount]; for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i]; rates[ld.V] = new VRate { A = a, M = m }; }
             for (int i = 0; i < ItemCount; i++) mk[i] += res.Market[i];
-            ownKcal += res.OwnKcal; kcalNeed += res.KcalNeed;
+            ownKcal += res.OwnKcal + ld.HomeKcal; kcalNeed += res.KcalNeed;
             if (ld.Basket != null) zv[ld.V] = ld.Basket;
         }
         private static Dictionary<string, double> _regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -711,8 +718,40 @@ namespace Armoury
             KsBasket.VillageKg(ld.FullNeed, ld.OwnNeed, res.Own, kg);
             double sigma = Math.Max(1, DailyLife.KsSigma);
             var q = new float[ZN];
-            for (int z = 0; z < ZN; z++) if (kg[z] > 0) q[z] = (float)(kg[z] / (sigma * ZKg(z)));
+            // krok 8 (pieniadze): na targ tylko czesc zaplacona z Planu (budzet wsi z utargu wozow); reszte wies robi w domu (praca domowa - te same rece i ziemia),
+            // jedzenie robione w domu liczy sie do racji spichlerza
+            var pz = ld.PaidZ; double hk = 0;
+            for (int z = 0; z < ZN; z++)
+            {
+                if (!(kg[z] > 0)) continue;
+                double f = pz != null && z < pz.Length ? Math.Max(0.0, Math.Min(1.0, pz[z])) : 1.0;
+                q[z] = (float)(kg[z] * f / (sigma * ZKg(z)));
+                if (f < 1.0) hk += kg[z] * (1.0 - f) * HomeKcalZ[z];
+            }
+            ld.HomeKcal = hk;
             return q;
+        }
+
+        // kcal na kg (l) pozycji koszyka (jedzenie robione w domu - racje spichlerza)
+        private static readonly double[] HomeKcalZ = BuildHomeKcal();
+        private static double[] BuildHomeKcal()
+        {
+            var k = new double[KsBasket.N];
+            k[KsBasket.Grain] = 3300; k[KsBasket.Bread] = 3300; k[KsBasket.Pie] = 3300; k[KsBasket.Meat] = 2200; k[KsBasket.Whale] = 2200; k[KsBasket.Fish] = 1100;
+            k[KsBasket.Cheese] = 3600; k[KsBasket.Butter] = 7200; k[KsBasket.Egg] = 1450; k[KsBasket.Apple] = 500; k[KsBasket.Carrot] = 400; k[KsBasket.Orange] = 450;
+            k[KsBasket.Grape] = 700; k[KsBasket.Olives] = 1150; k[KsBasket.Date] = 2800; k[KsBasket.Oil] = 8800; k[KsBasket.Honey] = 3000; k[KsBasket.Beer] = 400;
+            k[KsBasket.Wine] = 750; k[KsBasket.Mead] = 1000;
+            return k;
+        }
+
+        /// <summary>Krok 8 z Planu do okregu: praca domowa (wies) i czesc zaplacona koszyka wsi; okreg spoza wyniku - jak dotad (0 i cala).</summary>
+        private static void MoneyFromPlan(KsResult R, LiveDist ld)
+        {
+            if (R == null || ld == null || ld.TF) return;
+            double hw; float[] pz;
+            ld.HomeWork = R.DistHome != null && R.DistHome.TryGetValue(ld.Id, out hw) && hw > 0 ? (float)Math.Min(0.95, hw) : 0f;
+            ld.PaidZ = R.DistPaid != null && R.DistPaid.TryGetValue(ld.Id, out pz) && pz != null ? (float[])pz.Clone() : null;
+            if (ld.K != null) ld.K.HomeWork = ld.HomeWork;
         }
 
         // ============================================================ zapis stanu zastosowanego (kompaktowo: bloki w stalej kolejnosci, "=" - jak poprzedni)
@@ -772,7 +811,50 @@ namespace Armoury
                     prev = t;
                 }
                 sb.Append('~');
+                // krok 8 (pole 7; starsza DLL go nie czyta): praca domowa i czesc zaplacona koszyka wsi
+                if (!ld.TF && (ld.HomeWork > 0 || ld.PaidZ != null)) { sb.Append('~'); MoneyText(sb, ld.HomeWork, ld.PaidZ); }
             }
+            // krok 8: czesc zaplacona koszyka miast - wpisy "@miasto" (starsza DLL czyta je jako okreg bez osady i pomija)
+            foreach (var kv in _townPaid)
+            {
+                if (kv.Value == null) continue;
+                if (!firstD) sb.Append(';');
+                firstD = false;
+                sb.Append('@').Append(Clean(kv.Key)).Append("~P~0~~~~");
+                MoneyText(sb, 0f, kv.Value);
+            }
+        }
+
+        /// <summary>Krok 8 w zapisie: "praca domowa_pozycja:czesc,..." (tylko pozycje zaplacone w mniej niz 99.95%).</summary>
+        private static void MoneyText(StringBuilder sb, float hw, float[] pz)
+        {
+            sb.Append(hw.ToString("0.####", Inv)).Append('_');
+            bool f = true;
+            if (pz != null)
+                for (int z = 0; z < pz.Length; z++)
+                {
+                    if (pz[z] >= 0.9995f) continue;
+                    if (!f) sb.Append(',');
+                    f = false;
+                    sb.Append(z.ToString(Inv)).Append(':').Append(Math.Max(0f, pz[z]).ToString("0.###", Inv));
+                }
+        }
+
+        private static bool ParseMoney(string t, out float hw, out float[] pz)
+        {
+            hw = 0; pz = null;
+            if (string.IsNullOrEmpty(t)) return false;
+            int u = t.IndexOf('_');
+            string a = u >= 0 ? t.Substring(0, u) : t, b = u >= 0 ? t.Substring(u + 1) : "";
+            if (!float.TryParse(a, NumberStyles.Float, Inv, out hw) || hw < 0 || hw > 0.95f) hw = 0;
+            pz = new float[KsBasket.N]; for (int z = 0; z < pz.Length; z++) pz[z] = 1f;
+            if (b.Length > 0)
+                foreach (var kv in b.Split(','))
+                {
+                    var q = kv.Split(':'); int z; float v;
+                    if (q.Length == 2 && int.TryParse(q[0], NumberStyles.Integer, Inv, out z) && z >= 0 && z < pz.Length && float.TryParse(q[1], NumberStyles.Float, Inv, out v) && v >= 0 && v <= 1) pz[z] = v;
+                }
+            return true;
         }
 
         private static LiveBlock ParseBlock(string t)
@@ -818,6 +900,13 @@ namespace Armoury
                 try
                 {
                     var f = ent.Split('~');
+                    if (ent[0] == '@')
+                    {
+                        // krok 8: czesc zaplacona koszyka miasta
+                        float hw0; float[] tp;
+                        if (f.Length >= 7 && ParseMoney(f[6], out hw0, out tp)) _townPaid[f[0].Substring(1)] = tp;
+                        continue;
+                    }
                     if (f.Length < 5) { bad++; continue; }
                     var ld = new LiveDist { Id = f[0], TF = f[1] == "T" };
                     int mk; int.TryParse(f[2], NumberStyles.Integer, Inv, out mk); ld.Market = mk == 0 ? 0 : 1;
@@ -856,6 +945,7 @@ namespace Armoury
                         }
                         ld.Saved = sv;
                     }
+                    if (f.Length >= 7 && f[6].Length > 0 && !ld.TF) { float hw; float[] pz; if (ParseMoney(f[6], out hw, out pz)) { ld.HomeWork = hw; ld.PaidZ = pz; } }
                     map[ld.Id] = ld; nd++;
                 }
                 catch { bad++; }

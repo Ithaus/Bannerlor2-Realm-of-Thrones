@@ -77,6 +77,8 @@ namespace Armoury
             public readonly double[] One = new double[ZN];       // 1:1 (wojsko, zamki, dwory) - srednia swiata x udzial ludzi rynku miasta (sztuki/d)
             public readonly double[] DerLive = new double[3];    // zywiec (krowy, swinie, owce) na mieso z uboju (sztuki/d, pelna lambda)
             public readonly int[] Px = new int[ZN];              // cena sztuki na polce miasta (raz na dobe, Zc4Build)
+            public readonly int[] Ix = new int[ZN];              // koszt zakupow wsi (poprawka po autotescie 16.10): indeks wiersza towaru na polce (raz na dobe; -1 - brak)
+            public float[] Paid;                                 // krok 8: czesc zaplacona koszyka miasta (Plan) - Q juz pomnozone; null - cala
         }
 
         private static ItemObject[] _zItems;
@@ -111,7 +113,7 @@ namespace Armoury
         private static void Zc4Zero()
         {
             _zDictN = _zLadderN = _zBrewN = _zBreadN = 0; _zBrewPcs = _zBreadPcs = _zDictOld = _zDictNew = 0;
-            _zvGold = _zvPcs = _zvBrew = 0; _zvN = _zvNoGold = _zvNoGoods = 0; _zvWant = _zvGot = 0;
+            _zvGold = _zvPcs = _zvBrew = 0; _zvN = _zvNoGold = _zvNoGoods = 0; _zvWant = _zvGot = 0; _zvElse = 0;
             Array.Clear(_zvRung, 0, 3); Array.Clear(_zvRungWant, 0, 3);
             System.Threading.Interlocked.Exchange(ref _zTkDemand, 0); _zTkDict = _zTkVill = _zTkLadder = 0; _zDemandN = 0; _zFoodBud = _zLadCut = 0; _zvUnGold = 0;
         }
@@ -227,6 +229,9 @@ namespace Armoury
                     // cale miasto
                     KsCore.NeedsOf(r.N, bask, oil, north, true, true, r.L, n);
                     TownItems(n, zt.Q, whale[zt.Market], sigma, fireOn, out zt.Fire);
+                    // krok 8 (pieniadze Planu): koszyk miasta tylko w czesci, za ktora klasy W/R/P zaplaca z zarobku - popyt ceny, slownik budzetu, przetwory i koszt klas
+                    var tp = TownPaidOf(r.St); zt.Paid = tp;
+                    if (tp != null) for (int z = 0; z < ZN && z < tp.Length; z++) zt.Q[z] *= Math.Max(0f, Math.Min(1f, tp[z]));
                     zt.Hands = Math.Max(0, r.N[KsTab.ECraft]) * 0.55 / sigma * 0.5;      // ZC5: polowa rak rzemieslnikow miasta (praca stanu w miescie 0.55)
                     zt.Garum = r.Cul != null && KsTab.GarumLands.Contains(r.Cul);
                     double surv = 0; for (int e = 0; e < 6; e++) surv += Math.Max(0, r.N[e]);
@@ -234,7 +239,25 @@ namespace Armoury
                     // ceny miasta raz na dobe (koszt klas, slownik budzetu, drabina, zakupy wsi)
                     var md = t.MarketData;
                     var q1 = new double[ZN];
-                    for (int z = 0; z < ZN; z++) { var it = _zItems[z]; int p = 1; if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } } px[z] = Math.Max(1, p); zt.Px[z] = (int)px[z]; }
+                    // indeksy wierszy polki (zakupy wsi bez szukania liniowego - recenzja kosztu) i ilosc towaru
+                    var ro = r.St.ItemRoster; var cnt = new int[ZN];
+                    for (int z = 0; z < ZN; z++) zt.Ix[z] = -1;
+                    if (ro != null)
+                        for (int k = 0; k < ro.Count; k++)
+                        {
+                            var el = ro.GetElementCopyAtIndex(k); var ei = el.EquipmentElement.Item; int zi;
+                            if (ei == null || el.EquipmentElement.ItemModifier != null || !_zIx.TryGetValue(ei, out zi) || zt.Ix[zi] >= 0) continue;
+                            zt.Ix[zi] = k; cnt[zi] = el.Amount;
+                        }
+                    for (int z = 0; z < ZN; z++)
+                    {
+                        var it = _zItems[z]; int p = 1;
+                        if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } }
+                        // F3 (poprawka po autotescie): towaru brak na polce (najwyzej 5 sztuk) - cena wzoru gry idzie na sufit (10 x wartosc) i cielaby budzet koszyka
+                        // towarow, ktore SA na polce; w koszcie klas, drabinie i zakupach wsi najwyzej 1.5 x cena startu
+                        if (it != null && cnt[z] <= 5) { int cap = (int)Math.Ceiling(1.5 * KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, zt.Market) * Math.Max(1, it.Value)); if (p > cap) p = cap; }
+                        px[z] = Math.Max(1, p); zt.Px[z] = (int)px[z];
+                    }
                     for (int e = 0; e < 6; e++)
                     {
                         if (!(r.N[e] > 0)) continue;
@@ -243,7 +266,7 @@ namespace Armoury
                         double f0; Array.Clear(q1, 0, ZN);
                         TownItems(n, q1, whale[zt.Market], sigma, true, out f0);
                         double cost = 0;
-                        for (int z = 0; z < ZN; z++) if (q1[z] > 0 && _zItems[z] != null) cost += q1[z] * px[z];
+                        for (int z = 0; z < ZN; z++) if (q1[z] > 0 && _zItems[z] != null) cost += q1[z] * px[z] * (tp != null && z < tp.Length ? Math.Max(0f, Math.Min(1f, tp[z])) : 1f);
                         if (e == KsTab.ELabour || e == KsTab.EPeasant) zt.Cls[0] += cost;
                         else if (e == KsTab.ECraft) zt.Cls[1] += cost;
                         else if (e == KsTab.EMerchant || e == KsTab.EGentry) zt.Cls[2] += cost;
@@ -366,6 +389,13 @@ namespace Armoury
             return z >= 0 && z < ZN && ZTownOf(t, out zt) ? zt.Px[z] : 0;
         }
 
+        /// <summary>TownFolk.Zc4BuyVillage (koszt): indeks wiersza towaru koszyka z na polce miasta z doby (Zc4Build) albo -1 (wolajacy sprawdza wiersz i szuka sam).</summary>
+        internal static int ZRow(Town t, int z)
+        {
+            ZTown zt;
+            return z >= 0 && z < ZN && ZTownOf(t, out zt) ? zt.Ix[z] : -1;
+        }
+
         /// <summary>TownFolk.Villages: czas zakupow wsi (Stopwatch) do linii ZC4.</summary>
         internal static void Zc4NoteTime(long ticks) { _zTkVill += ticks; }
 
@@ -443,7 +473,8 @@ namespace Armoury
                         bz += q[z] * Math.Max(1, zt.Px[z]);                          // cena miasta z doby (Zc4Build) - recenzja 16.10, koszt
                     }
                     float old; __1.TryGetValue(c, out old);
-                    double bOld = old > 0.01f ? ChainBudget(__0, old, c) : 0.0;
+                    // koszt (poprawka po autotescie 16.10): przy lambda 1 budzet BK kategorii zastepowanej mnozy sie przez 0 - BK CalculateBudget pominiety
+                    double bOld = old > 0.01f && (add || lam < 0.9999) ? ChainBudget(__0, old, c) : 0.0;
                     double nv = add ? bOld + lam * bz : (1 - lam) * bOld + lam * bz;
                     if (!(nv >= 0) || double.IsInfinity(nv)) continue;
                     __1[c] = (float)nv;
@@ -624,6 +655,11 @@ namespace Armoury
         /// <summary>TownFolk.Zc4BuyVillage: liczniki zakupow wsi (zl, sztuki, chciane / kupione sztuki wedlug szczebla: 0 zboze i sol, 1 reszta jedzenia, 2 rzeczy).</summary>
         internal static void Zc4NoteVillage(long gold, long pcs, double want, double got, int noGold, int noGoods, double[] rw, double[] rg, long brew, long unGold)
         {
+            Zc4NoteVillageInner(gold, pcs, want, got, noGold, noGoods, rw, rg, brew, unGold);
+        }
+        private static double _zvElse;
+        private static void Zc4NoteVillageInner(long gold, long pcs, double want, double got, int noGold, int noGoods, double[] rw, double[] rg, long brew, long unGold)
+        {
             _zvGold += gold; _zvPcs += pcs; _zvWant += want; _zvGot += got; _zvN++; _zvNoGold += noGold; _zvNoGoods += noGoods; _zvBrew += brew; _zvUnGold += unGold;
             for (int i = 0; i < 3; i++) { _zvRungWant[i] += rw[i]; _zvRung[i] += rg[i]; }
         }
@@ -667,6 +703,12 @@ namespace Armoury
               .Append(" | stac na cale jedzenie: miasta ").Append(_zDictN > 0 ? (100.0 * (_zDictN - _zLadderN) / _zDictN).ToString("0.0", Inv) : "-").Append("% (").Append(_zDictN - _zLadderN).Append('/').Append(_zDictN)
               .Append("), jedzenie niekupione z braku pieniedzy: miasta ").Append(_zFoodBud > 0 ? (100.0 * _zLadCut / _zFoodBud).ToString("0.0", Inv) : "-").Append("% budzetu jedzenia (").Append(F0(_zLadCut)).Append(" zl)")
               .Append(", wsie ").Append(_zvWant > 0 ? (100.0 * _zvUnGold / _zvWant).ToString("0.0", Inv) : "-").Append("% chcianych sztuk (").Append(_zvUnGold).Append(" szt.)");
+            // krok 8 (pieniadze Planu): chciane = koszyk zaplacony (czesc z Planu); kiesy wsi zastosowanych razem (dryf w oknie odbioru - NKS-13), czesc zaplacona koszyka miast
+            double tpf = 0; int tpn = 0;
+            foreach (var zt in map.Values) { if (zt.Paid == null) continue; double s0 = 0; foreach (var x in zt.Paid) s0 += x; tpf += s0 / zt.Paid.Length; tpn++; }
+            sb.Append(" | krok 8: wsie kupuja koszyk zaplacony z Planu (chciane = zaplacone), kiesy wsi zastosowanych razem ").Append(AppliedVillagePurses()).Append(" zl")
+              .Append(", czesc zaplacona koszyka miast ").Append(tpn > 0 ? (tpf / tpn).ToString("0.000", Inv) : "1 (bez Planu)").Append(" (").Append(tpn).Append(" miast)")
+              .Append(", zakupy wsi w miescie obok (brak na polce targu) ").Append(F0(_zvElse)).Append(" szt.");
             // wsad przetworow i 1:1 w popycie ceny (sztuki/d przy lambdzie, wszystkie miasta)
             var der = new double[ZN]; var one = new double[ZN]; var dl = new double[3];
             foreach (var zt in map.Values) { for (int z = 0; z < ZN; z++) { der[z] += zt.Der[z] * zt.Lam; one[z] += zt.One[z] * zt.Lam; } for (int k = 0; k < 3; k++) dl[k] += zt.DerLive[k] * zt.Lam; }

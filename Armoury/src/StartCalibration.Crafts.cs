@@ -138,6 +138,8 @@ namespace Armoury
         {
             ZTown zt;
             if (!ZTownOf(town, out zt)) return;
+            // koszt (poprawka po autotescie 16.10: 1.96 ms/d): miasto co 2 doby na zmiane, wsad i rece dwoch dob naraz (zbyt i tak do tygodnia zakupow)
+            if (((Fnv(town.Settlement != null ? town.Settlement.StringId : null) + (uint)Today()) & 1u) != 0) return;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
@@ -152,8 +154,8 @@ namespace Armoury
                 float wage = Math.Max(0.5f, s != null ? s.WorkshopWagePerDay : 3f);
                 double pay = wage * TownCrafts.WageIndex(town);
                 double margin = 1.0 + Math.Max(0f, s != null ? s.SmithProfitPercent : 20f) / 100.0;
-                double hands = zt.Hands, lam = zt.Lam;
-                _kDayTowns++; _kHands += hands;
+                double hands = 2.0 * zt.Hands, lam = zt.Lam;
+                _kDayTowns += 2; _kHands += hands;                       // miasto-doby: jedna przerobka za dwie doby
                 var made = new int[n]; var taken = new int[n * 2]; var side = new int[n];
                 // kolejnosc par: zysk na roboczodzien przy cenach miasta (najlepsza pierwsza)
                 var order = new int[n]; var score = new double[n];
@@ -226,7 +228,7 @@ namespace Armoury
                     }
                     catch (Exception e) { _kStum++; Stumble("TownCraftsDay(zdarzenia)", e); }
                 }
-                _kUsed += zt.Hands - hands;
+                _kUsed += 2.0 * zt.Hands - hands;
             }
             catch (Exception e) { _kStum++; Stumble("TownCraftsDay", e); }
             finally { _kTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; }

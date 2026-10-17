@@ -56,8 +56,9 @@ namespace Armoury
         /// <summary>Doba D (po polkach startu): srednie cen miast od zera - A7 i regale licza od D na cenach po rampie (recenzja 16.10).</summary>
         private static void RulePxReset() { _px.Clear(); _pxNow.Clear(); _pxN.Clear(); _pxLoad = null; _pxDays = 0; _pxDay = -1; }
 
-        /// <summary>Indeksy cen miast dla towarow KS (zwykla srednia przez 14 odczytow, potem wykladnicza 1/14). Stan zastosowany: co dobe, miasto co 2 doby na zmiane
-        /// (ok. 28 dob). Plan i Uzbrojony (recenzja 16.10 - koszt): tylko w doby linii cen (co 7 dob), srednia z 4 odczytow - sama linia "KS: ceny miast".</summary>
+        /// <summary>Indeksy cen miast dla towarow KS (zwykla srednia przez 4 odczyty, potem wykladnicza 1/4). Stan zastosowany: co dobe, miasto co 7 dob na zmiane
+        /// (ok. 28 dob; poprawka po autotescie 16.10 - koszt doby KS, dotad co 2 doby i 14 odczytow). Plan i Uzbrojony (recenzja 16.10 - koszt): tylko w doby linii cen
+        /// (co 7 dob), srednia z 4 odczytow - sama linia "KS: ceny miast".</summary>
         private static void PricesDaily(int today)
         {
             if (_pxDay == today) return;
@@ -76,13 +77,13 @@ namespace Armoury
                     if (t == null || t.Settlement == null) continue;
                     double[] a;
                     bool fresh = !_px.TryGetValue(t, out a);
-                    // koszt doby KS: miasto co 2 doby na zmiane (srednia z 14 odczytow = ok. 28 dob), nowe miasto od razu
-                    if (applied && !fresh && ((k++ + today) & 1) != 0) continue;
+                    // koszt doby KS (poprawka po autotescie 16.10: co 2 -> co 7 dob): miasto co 7 dob na zmiane (srednia z 4 odczytow = ok. 28 dob), nowe miasto od razu
+                    if (applied && !fresh && ((k++ + today) % 7) != 0) continue;
                     if (fresh) { a = new double[ItemCount]; _px[t] = a; }
                     double[] now;
                     if (!_pxNow.TryGetValue(t, out now)) { now = new double[ItemCount]; _pxNow[t] = now; }
                     int nu; _pxN.TryGetValue(t, out nu); nu++; _pxN[t] = nu;
-                    double w = 1.0 / Math.Min(applied ? 14 : 4, nu);
+                    double w = 1.0 / Math.Min(4, nu);
                     for (int i = 0; i < ItemCount; i++)
                     {
                         var it = _items[i];

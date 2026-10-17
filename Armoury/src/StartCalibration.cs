@@ -87,6 +87,7 @@ namespace Armoury
             RampReset();
             Zc4Reset();
             CraftsReset();
+            MoneyReset();
         }
 
         private static void Stumble(string where, Exception e)
@@ -298,7 +299,8 @@ namespace Armoury
                 if (!LandReady) { KeysIdle(day); return; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 try { LedgerEma(); } catch (Exception e) { Stumble("LedgerEma", e); }   // srednia ksiegi towarow - co dobe (popyt 1:1 Planu)
-                PricesDaily(today);                                   // indeksy cen miast (stan zastosowany - co 2 doby na zmiane; Plan - tylko w doby linii cen)
+                try { MoneyEma(today); } catch (Exception e) { Stumble("MoneyEma", e); }   // krok 8: udzial kiesy wsi w utargu, zarobek klas miast (srednie 28 dob)
+                PricesDaily(today);                                   // indeksy cen miast (stan zastosowany - co 7 dob na zmiane; Plan - tylko w doby linii cen)
                 PlanCollect(day);                                     // wynik Planu z watku roboczego (linie i ks-plan.csv)
                 if (_keepRaw != null)
                 {

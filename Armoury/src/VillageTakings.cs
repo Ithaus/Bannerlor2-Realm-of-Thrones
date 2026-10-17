@@ -97,6 +97,9 @@ namespace Armoury
         private static int _stumbles;
 
         // odczyt dla ksiegi pieniadza (MoneyLedger.Daily biegnie tuz przed naszym Daily - te same granice doby)
+        /// <summary>KS krok 8 (pieniadze Planu): utarg oddany przez powracajace tabory od ostatniego Daily i czesc, ktora zostala we wsi (kiesa od BK + dopisane + zwrot za drewno).
+        /// Wolane przed VillageTakings.Daily tej samej doby (StartCalibration.Daily) - okno pelnej doby.</summary>
+        internal static void SplitToday(out long handed, out long village) { handed = _tHanded; village = _tKept + _tAddPurse + _tCoalBack; }
         internal static long TakingsToPurse { get { return _tAddPurse; } }
         internal static long TakingsToTax { get { return _tAddTax; } }
         internal static long FoodToPurse { get { return _fAddPurse; } }

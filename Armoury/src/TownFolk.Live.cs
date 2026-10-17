@@ -1181,7 +1181,10 @@ namespace Armoury
                     if (mk == null || mk.Town == null) { d.NoTrade++; continue; }
                     List<EquipmentElement> list;
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
-                    long spent = BuyGoods(vil, mk, list, want - wx, d, wx);
+                    long spent;
+                    var gfv = GoodsLedger.Begin(GoodsLedger.FFolkVill, mk);   // KS F0: ksiega towarow na rynek miasta targowego (dotad ramka bez osady - "bez rynku")
+                    try { spent = BuyGoods(vil, mk, list, want - wx, d, wx); }
+                    finally { GoodsLedger.End(gfv); }
                     f.DVBuy = Math.Max(0, spent) + Math.Max(0, zSpent);    // E5/C4
                     // E3-W1: potrzeba dnia niekupiona w miescie targowym czeka na woz tej wsi w innym miescie (najwyzej W1Days dni potrzeby; PRZED "wsi bez towaru")
                     if (W1On)
@@ -1247,7 +1250,7 @@ namespace Armoury
                 var list = ShelfOf(st);
                 if (list.Count == 0) { _w1NoGoods++; return; }
                 long p0 = _w1d.VPieces;
-                var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill);
+                var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill, st);   // KS F0: na rynek miasta sprzedazy wozu
                 long spent;
                 try { spent = BuyGoods(vil, st, list, budget, _w1d); }
                 finally { GoodsLedger.End(gf); }

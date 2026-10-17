@@ -77,7 +77,7 @@ namespace Armoury
         { "battania", "freefolk", "nightswatch", "skagosi", "sturgia", "river", "vale", "vlandia", "crownlands", "stormlands", "dragonstone", "reach", "aserai" };
 
         // ============================================================ zrzut (watek glowny)
-        private sealed class SnapInfo { public int Vil, NoLand, NoRec, Towns, TF, SideIn, SideOut, Dup; public double Woodlot, Boats; public bool Layout; public int Zc; }
+        private sealed class SnapInfo { public int Vil, NoLand, NoRec, Towns, TF, SideIn, SideOut, Dup, Budgets; public double Woodlot, Boats; public bool Layout; public int Zc; }
 
         private static KsInput BuildInput(int day, out string note, out SnapInfo info)
         {
@@ -91,6 +91,10 @@ namespace Armoury
             // recenzja 16.10 (3): bez poprawek ZC1 (SilkToWeavers wylaczony; srebro - bez klucza) mieszczanie jedza jedwab i rude srebra wprost - popyt Planu z tego zuzycia
             inp.SilkTownDirect = s == null || !s.SilkToWeavers;
             inp.SilverTownDirect = true;
+            // krok 8 (pieniadze, poprawka po autotescie 16.10): budzet wsi z utargu wozow (udzial kiesy wsi x cena wozu / cena polki x (1 - zapas na oplaty)),
+            // koszyk z wlasnego pola (udzialy stanow ZC), budzety klas miast z zarobku netto (28 dob)
+            inp.Money = true; inp.Keep = _keep;
+            double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va;
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
             foreach (var id in ids)
@@ -125,6 +129,8 @@ namespace Armoury
                         bool hasLand = _landTown.TryGetValue(r.St.StringId ?? "", out tl);
                         t.Market = hasLand ? tl.Market : (WestLands.Contains(land) ? 0 : 1);
                         KsCore.NeedsOf(r.N, bask, oil, north, true, true, r.L, t.Need0);
+                        var bud = TownBudget(r.St);
+                        if (bud != null) { t.ClassNeed = ClassNeeds(r.N, bask, oil, north); t.Budget = bud; info.Budgets++; }
                         inp.Towns.Add(t);
                         info.Towns++;
                         if (fields && hasLand)
@@ -185,6 +191,7 @@ namespace Armoury
                 inp.WarmRent = new Dictionary<string, double>(StringComparer.Ordinal);
                 for (int b = 0; b < _plan.NB; b++) if (_plan.Blocks[b].Uid != null) inp.WarmRent[_plan.Blocks[b].Uid] = _plan.Rent[b];
                 inp.RoundsFirst = _plan.Open.Count > 0 ? 6000 : 3000;     // recenzja 16.10 (drobne): poprzedni Plan niezbiezny - wiecej rund rownowagi
+                if (_plan.DistHome != null && _plan.DistHome.Count > 0) inp.WarmHome = new Dictionary<string, double>(_plan.DistHome, StringComparer.Ordinal);   // krok 8: cieply start pracy domowej
             }
             if (inp.Districts.Count == 0) { note = "zaden okreg z ziemia z pliku (plik ziemi nie pasuje do wsi gry)"; return null; }
             return inp;
@@ -281,7 +288,8 @@ namespace Armoury
             _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
-                        + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + ")";
+                        + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + "; krok 8: alfa wsi " + inp.VilAlpha[0].ToString("0.000", Inv) + " (" + MoneyNote() + "), budzety klas miast " + info.Budgets + "/" + info.Towns
+                        + (inp.WarmHome != null ? ", praca domowa z poprzedniego Planu" : "") + ")";
             try
             {
                 var t = new Thread(() =>
@@ -310,7 +318,7 @@ namespace Armoury
             _wOut = null;
             var inp = _wIn; _wIn = null;
             if (inp == null) return;
-            if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; _planEma = _wEma; if (_firstPlanDay < 0) _firstPlanDay = _wDay; }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
+            if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; _planEma = _wEma; if (_firstPlanDay < 0) _firstPlanDay = _wDay; TownPaidFromPlan(r); }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
             // recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu co 7 dob, nie zamrozony z dnia wlaczenia
             if (r.Error == null && _state == StateApplied) { try { RefreshNeedMult(r, inp); } catch (Exception e) { Stumble("RefreshNeedMult", e); } }
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
@@ -361,6 +369,7 @@ namespace Armoury
             sb.Append(" | na granicy ceny 0.05/5: ").Append(r.Bounds.Count > 0 ? string.Join(", ", r.Bounds.ToArray()) : "brak");
             sb.Append(" | ").Append(_snapNote).Append(" | gra bez zmian (Plan).");
             Log.Info(sb.ToString());
+            try { MoneyLines(r); } catch (Exception e) { Stumble("MoneyLines", e); }
             for (int m = 0; m < 2; m++)
             {
                 var b = new StringBuilder(1500);
