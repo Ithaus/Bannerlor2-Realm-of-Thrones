@@ -291,5 +291,60 @@ namespace Armoury
             for (int k = 0; k < nb.Length; k++) nb[k] = 1f;
             _beta = nb; _lam[0] = _lam[1] = 1.0; _rampDay = _applyDay - RampDemand;
         }
+
+        // ============================================================ kontrola wczesna D+7 (recenzja 17.10, wazne)
+        // ceny na rynek jak NKS-7 (mediana indeksu miast od D wobec ceny startu +-0.3) i sufit wzoru ceny (> 20% miast) dla towarow rak; wiecej niz polowa par rynek x towar
+        // poza pasmem - wynik biegu 120 dob znany z gory: w autotescie plik-przelacznik armoury-ks-przerwij.flag (lancuch przerywa bieg), w grze - tylko linia
+        internal const int EarlyDays = 7;
+        internal const string AbortFlagName = "armoury-ks-przerwij.flag";
+        private static bool _earlyDone;
+        private static readonly int[] EarlyItems = { IGrain, KsDeliver.IFish, IMeat, KsDeliver.ICheese, KsDeliver.IButter, KsDeliver.IGrape, KsDeliver.IOlives, KsDeliver.IOrange, KsDeliver.IDate,
+                                                     KsDeliver.ISalt, KsDeliver.IWool, KsDeliver.IFlax };
+
+        private static void EarlyCheck(int day)
+        {
+            if (_earlyDone) return;
+            _earlyDone = true;
+            var vals = new List<double>(64);
+            int n = 0, far = 0, ceilBad = 0;
+            var bad = new List<string>(); var cb = new List<string>();
+            for (int m = 0; m < 2; m++)
+                foreach (int i in EarlyItems)
+                {
+                    vals.Clear(); int ceil = 0, cnt = 0;
+                    foreach (var kv in _px)
+                    {
+                        if (kv.Key == null || kv.Value == null || i >= kv.Value.Length || TownMarket(kv.Key) != m) continue;
+                        vals.Add(kv.Value[i]);
+                        double[] now;
+                        if (_pxNow.TryGetValue(kv.Key, out now) && now != null && i < now.Length) { cnt++; if (now[i] >= CeilIx) ceil++; }
+                    }
+                    if (vals.Count < 3) continue;
+                    double med = Med(vals), sp = StartPrice(m, i);
+                    n++;
+                    string nm = (m == 0 ? "Westeros " : "Essos ") + ItemIds[i];
+                    if (med < sp - 0.3 || med > sp + 0.3) { far++; bad.Add(nm + " " + med.ToString("0.00", Inv) + " (start " + sp.ToString("0.00", Inv) + ")"); }
+                    if (cnt > 0 && 100.0 * ceil / cnt > 20.0) { ceilBad++; cb.Add(nm + " " + (100 * ceil / cnt).ToString(Inv) + "%"); }
+                }
+            bool stop = n > 0 && 2 * far > n;
+            bool flag = false;
+            if (stop && AutotestMode())
+            {
+                try
+                {
+                    var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    string dir = System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe");
+                    if (System.IO.Directory.Exists(dir))
+                    {
+                        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, AbortFlagName), "KS kontrola wczesna D+7 (dzien " + day + "): ceny poza pasmem " + far + " z " + n + "\r\n");
+                        flag = true;
+                    }
+                }
+                catch (Exception e) { Stumble("EarlyCheck(plik)", e); }
+            }
+            Log.Info(PK + "kontrola wczesna D+" + EarlyDays + " dzien " + day + " (D " + DDay + ") | ceny na rynek (mediana indeksu miast od D wobec ceny startu +-0.3, towary rak): w pasmie " + (n - far) + " z " + n
+                     + (bad.Count > 0 ? " (poza: " + string.Join(", ", bad.ToArray()) + ")" : "") + " | sufit wzoru ceny w > 20% miast: " + ceilBad + (cb.Count > 0 ? " (" + string.Join(", ", cb.ToArray()) + ")" : "")
+                     + " | WYNIK: " + (stop ? "PRZERWAC - ponad polowa poza pasmem, bieg 120 dob nie przejdzie NKS-7" + (flag ? " (autotest: plik " + AbortFlagName + " zapisany)" : (AutotestMode() ? " (pliku nie zapisano)" : " (gra - tylko linia)")) : "dalej") + ".");
+        }
     }
 }

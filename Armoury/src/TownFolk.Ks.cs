@@ -59,6 +59,7 @@ namespace Armoury
             public readonly double[] Rw = new double[3], Rg = new double[3];
             public readonly int[] Miss = new int[StartCalibration.ZN];   // F2 (poprawka po autotescie 16.10): sztuki bez towaru na polce miasta targowego - szukane w miastach obok
             public long NoGoodsPcs, Elsewhere;
+            public double KcalW, KcalG, ZlW, ZlG;                        // recenzja 17.10: kcal i wartosc (ceny polki) chciane / kupione - jedzenie robione w domu, linia ZC4
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -85,7 +86,13 @@ namespace Armoury
         private static int ZcTake(ZcBuy b, int z, int n, int rung, bool count = true)
         {
             if (n <= 0) return 0;
-            if (count) { b.Want += n; b.Rw[rung] += n; }
+            if (count)
+            {
+                b.Want += n; b.Rw[rung] += n;
+                b.KcalW += n * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
+                int pw = StartCalibration.ZPrice(b.T, z); if (pw <= 0) { var iw = StartCalibration.ZItem(z); pw = iw != null ? Math.Max(1, iw.Value) : 0; }
+                b.ZlW += (double)n * pw;
+            }
             if (b.Broke) { if (count) b.UnGold += n; return 0; }
             EquipmentElement e; int have;
             int price = ZcPrice(b, z, out e, out have);
@@ -100,6 +107,7 @@ namespace Armoury
             b.T.ChangeGold(paid);
             b.R.AddToCounts(e, -k);
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
+            b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
             return k;
@@ -139,11 +147,27 @@ namespace Armoury
             dr.Sort((x, y) => unit[x].CompareTo(unit[y]));
             var un = new int[StartCalibration.ZN];
             foreach (int z in dr) { un[z] = n[z] - ZcTake(b, z, n[z], 1); done[z] = true; }
-            if (un[StartCalibration.ZWine] > 0) un[StartCalibration.ZBeer] += un[StartCalibration.ZWine] - ZcTake(b, StartCalibration.ZBeer, un[StartCalibration.ZWine], 1, false);
+            // recenzja 17.10 (wazne): napoj zastepczy zmniejsza brak do szukania w miastach obok (dotad F2 kupowalo tam jeszcze raz to samo piwo i wino - wies placila
+            // dwa razy za jedna potrzebe napoju)
+            if (un[StartCalibration.ZWine] > 0)
+            {
+                int bw = ZcTake(b, StartCalibration.ZBeer, un[StartCalibration.ZWine], 1, false);
+                un[StartCalibration.ZBeer] += un[StartCalibration.ZWine] - bw;
+                MissCovered(b, StartCalibration.ZWine, bw);
+                un[StartCalibration.ZWine] = 0;
+            }
             if (un[StartCalibration.ZBeer] > 0)
             {
-                int g = (int)Math.Floor(un[StartCalibration.ZBeer] * StartCalibration.ZKg(StartCalibration.ZBeer) * KsTab.BeerGrain / StartCalibration.ZKg(StartCalibration.ZGrain));
-                if (g > 0) { int gb = ZcTake(b, StartCalibration.ZGrain, g, 1, false); _zcBrewV += gb; }
+                double gk = StartCalibration.ZKg(StartCalibration.ZGrain), bk = StartCalibration.ZKg(StartCalibration.ZBeer);
+                int g = (int)Math.Floor(un[StartCalibration.ZBeer] * bk * KsTab.BeerGrain / gk);
+                if (g > 0)
+                {
+                    int gb = ZcTake(b, StartCalibration.ZGrain, g, 1, false); _zcBrewV += gb;
+                    // litry piwa domowego z kupionego ziarna - najpierw brak piwa, potem reszta braku wina
+                    int brew = (int)Math.Floor(gb * gk / (KsTab.BeerGrain * bk) + 1e-9);
+                    brew -= MissCovered(b, StartCalibration.ZBeer, brew);
+                    if (brew > 0) MissCovered(b, StartCalibration.ZWine, brew);
+                }
             }
             // (3) bialko - najtansze za 1000 kcal najpierw
             var pr = new List<int>(ZcProtein);
@@ -195,25 +219,50 @@ namespace Armoury
             }
             StartCalibration.Zc4NoteVillage(b.Spent, b.Pcs, b.Want, b.Got, b.NoGold, b.NoGoods, b.Rw, b.Rg, _zcBrewV, b.UnGold);
             StartCalibration.Zc4NoteTown(mk, b.Want, b.Got, b.UnGold, Math.Max(0, b.NoGoodsPcs - b.Elsewhere), b.Elsewhere);
+            StartCalibration.Zc4NoteBought(vil, mk, lam, b.KcalW, b.KcalG, b.ZlW, b.ZlG);
             _zcBrewV = 0;
             return b.Spent;
         }
 
-        private static readonly Dictionary<Village, Settlement[]> _nearTowns = new Dictionary<Village, Settlement[]>();
+        /// <summary>Brak towaru z na polce pokryty zakupem zastepczym (n sztuk): mniej do szukania w miastach obok i mniej "bez towaru" w liczbach. Zwraca pokryte.</summary>
+        private static int MissCovered(ZcBuy b, int z, int n)
+        {
+            if (n <= 0 || b.Miss[z] <= 0) return 0;
+            int c = Math.Min(n, b.Miss[z]);
+            b.Miss[z] -= c; b.NoGoodsPcs = Math.Max(0, b.NoGoodsPcs - c);
+            return c;
+        }
 
-        /// <summary>F2: najwyzej 2 miasta poza targowym w zasiegu 250 jedn. mapy od wsi (linia prosta; pamiec sesji), nie wrogie miastu targowemu dzis.</summary>
+        private static readonly Dictionary<Village, Settlement[]> _nearTowns = new Dictionary<Village, Settlement[]>();
+        private static int _nearDay = -1;
+
+        /// <summary>F2: najwyzej 2 miasta poza targowym w zasiegu 250 jedn. mapy od wsi, nie wrogie miastu targowemu dzis. Recenzja 17.10 (drobne): droga ladowa gry
+        /// (MapDistanceModel osada -> osada, NavigationType.Default - nie przez morze i rzeki bez brodu; do 375 jedn. drogi przy 250 w linii prostej), pamiec zerowana
+        /// przy nowej sesji (TownFolk.Reset) i co 7 dob (zmiany granic i miast targowych).</summary>
         private static IEnumerable<Settlement> NearTowns(Village vil, Settlement mk)
         {
+            int today = (int)TaleWorlds.CampaignSystem.CampaignTime.Now.ToDays;
+            if (_nearDay < 0 || today - _nearDay >= 7 || today < _nearDay) { _nearTowns.Clear(); _nearDay = today; }
             Settlement[] l;
             if (!_nearTowns.TryGetValue(vil, out l))
             {
                 var all = new List<KeyValuePair<float, Settlement>>();
                 var pos = vil.Settlement.GetPosition2D;
+                TaleWorlds.CampaignSystem.ComponentInterfaces.MapDistanceModel dm = null;
+                try { dm = TaleWorlds.CampaignSystem.Campaign.Current.Models.MapDistanceModel; } catch { dm = null; }
                 foreach (var t in Town.AllTowns)
                 {
                     if (t == null || !t.IsTown || t.Settlement == null || ReferenceEquals(t.Settlement, mk)) continue;
                     float dd = pos.Distance(t.Settlement.GetPosition2D);
-                    if (dd <= 250f) all.Add(new KeyValuePair<float, Settlement>(dd, t.Settlement));
+                    if (dd > 250f) continue;
+                    if (dm != null)
+                    {
+                        float rd = -1f;
+                        try { rd = dm.GetDistance(vil.Settlement, t.Settlement, false, false, TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default); } catch { rd = -1f; }
+                        if (!(rd >= 0f) || rd > 375f) continue;          // bez drogi ladowej (morze, rzeka bez brodu) albo za daleko droga
+                        dd = rd;
+                    }
+                    all.Add(new KeyValuePair<float, Settlement>(dd, t.Settlement));
                 }
                 all.Sort((a, c) => a.Key.CompareTo(c.Key));
                 l = new Settlement[Math.Min(2, all.Count)];
@@ -222,11 +271,15 @@ namespace Armoury
             }
             foreach (var s in l)
             {
+                if (s == null || ReferenceEquals(s, mk)) continue;            // miasto targowe wsi zmienilo sie od zbudowania pamieci
                 bool war = false;
                 try { war = mk != null && mk.MapFaction != null && s.MapFaction != null && mk.MapFaction.IsAtWarWith(s.MapFaction); } catch { war = false; }
                 if (!war && !s.IsUnderSiege) yield return s;
             }
         }
+
+        /// <summary>Nowa sesja (TownFolk.Reset): pamiec miast obok i ulamki koszyka wsi od nowa.</summary>
+        private static void KsReset() { _nearTowns.Clear(); _nearDay = -1; _zcCarry.Clear(); }
         private static long _zcBrewV;
     }
 }

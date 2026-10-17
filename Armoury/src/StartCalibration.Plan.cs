@@ -23,6 +23,10 @@ namespace Armoury
         // towary planu potrzebne do popytu (1:1, wsady, zbytki) poza towarami KS
         private static readonly string[] PlanItemIds = { "bread", "pie", "beer", "wine", "oil", "mead", "linen", "felt", "leather", "tools", "pottery", "planks", "velvet", "jewelry", "meat", "hides" };
 
+        // recenzja 17.10 (wazne): Plan do wlaczenia i Plany w oknie D..D+28 licza podaz targu 1.03 x popyt targu (polki startu odbudowane z prawdziwej nadwyzki rak -
+        // praca domowa oddaje czesc rak na targ; po D+28 Plan bez marginesu, praca domowa wraca w nastepnym Planie). Test portu: 1.04 dawal zboze Westeros 1.06 na targu
+        // (poza 105%), 1.03 - 1.04-1.05; Essos bez pracy domowej do oddania - bez marginesu (linia: "brak rak do oddania")
+        private const double ShelfMargin = 1.03; private const int ShelfMarginDays = 28;
         private static KsResult _plan;                 // ostatni Plan (wynik) i jego wejscie
         private static KsInput _planIn;
         private static int _planDay = -1;
@@ -165,6 +169,7 @@ namespace Armoury
                     double hands = 1.0;
                     try { hands = Devastation.YieldFactor(v) * FreeHands.YieldFactor(v); } catch { hands = 1.0; }
                     kd.Wf = KsCore.VillageHands(ppl) * hands;
+                    kd.Alpha = VilAlphaFor(v);                            // recenzja 17.10: alfa tej wsi z pomiaru (dekret pana); -1 - alfa rynku
                     BuildBlocks(kd, ld, v, type, info.Layout, side, info);
                     inp.Districts.Add(kd);
                     info.Vil++;
@@ -194,6 +199,10 @@ namespace Armoury
                 if (_plan.DistHome != null && _plan.DistHome.Count > 0) inp.WarmHome = new Dictionary<string, double>(_plan.DistHome, StringComparer.Ordinal);   // krok 8: cieply start pracy domowej
             }
             if (inp.Districts.Count == 0) { note = "zaden okreg z ziemia z pliku (plik ziemi nie pasuje do wsi gry)"; return null; }
+            // recenzja 17.10: krok 8 z pomiaru (alfa wsi i budzety miast) - Plan bez pomiaru nie zastepuje pracy domowej i czesci zaplaconej zapisanych w okregach;
+            // margines popytu targu (zapas na polki): Plan do wlaczenia i Plany do D+28 - praca domowa oddaje rece na targ, az podaz targu = 1.03 x popyt targu
+            inp.MoneyMeasured = MoneyMeasuredNow(info.Towns, info.Budgets);
+            inp.MarketMargin = _state != StateApplied || (DDay >= 0 && day < DDay + ShelfMarginDays) ? ShelfMargin : 1.0;
             return inp;
         }
 
@@ -288,7 +297,8 @@ namespace Armoury
             _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
-                        + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + "; krok 8: alfa wsi " + inp.VilAlpha[0].ToString("0.000", Inv) + " (" + MoneyNote() + "), budzety klas miast " + info.Budgets + "/" + info.Towns
+                        + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + "; krok 8: alfa wsi rynku " + inp.VilAlpha[0].ToString("0.000", Inv) + " (" + MoneyNote() + "), budzety klas miast " + info.Budgets + "/" + info.Towns
+                        + ", z pomiaru " + (inp.MoneyMeasured ? "TAK" : "NIE") + ", margines popytu targu x" + inp.MarketMargin.ToString("0.00", Inv)
                         + (inp.WarmHome != null ? ", praca domowa z poprzedniego Planu" : "") + ")";
             try
             {
@@ -324,6 +334,8 @@ namespace Armoury
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
             // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku)
             if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { PlanCsv(_wDay, r, inp); } catch (Exception e) { Stumble("PlanCsv", e); } }
+            // recenzja 17.10 (wazne): zmierzone budzety klas miast i alfa wsi tego Planu - wejscie testu portu (harness kmoney) zamiast budzetow z umowy
+            if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { BudgetsCsv(_wDay, inp); } catch (Exception e) { Stumble("BudgetsCsv", e); } }
         }
 
         private static string F2(double x) { return double.IsNaN(x) || double.IsInfinity(x) ? "-" : x.ToString("0.00", Inv); }
@@ -355,10 +367,11 @@ namespace Armoury
                     double D = r.D[m * KsTab.NG + g], S = r.S[m * KsTab.NG + g];
                     dk += D;
                     if (D < 1000) continue;
-                    double q = S / D;
+                    double q = MarketQ(r, m, g);
                     if (q < 0.95 || q > 1.05) out_.Add(KsTab.Goods[g] + " " + F2(q) + (BandExceptions.Contains(KsTab.Goods[g]) ? "*" : ""));
                 }
-                sb.Append(" | ").Append(r.Markets[m]).Append(": popyt ").Append(F0(dk / 1000)).Append(" t/d, poza pasmem 0.95-1.05: ").Append(out_.Count > 0 ? string.Join(", ", out_.ToArray()) : "brak");
+                sb.Append(" | ").Append(r.Markets[m]).Append(": popyt ").Append(F0(dk / 1000)).Append(" t/d, poza pasmem 0.95-1.05 ").Append(r.Eaten != null ? "NA TARG ((podaz - zjedzone w okregach) / (popyt - zjedzone))" : "(podaz / popyt)")
+                  .Append(": ").Append(out_.Count > 0 ? string.Join(", ", out_.ToArray()) : "brak");
             }
             sb.Append(" (* uboczne/domowe - wyjatki projektu)");
             sb.Append(" | lepszy stol R8b: Westeros x").Append(r.Table[0].ToString("0.000", Inv)).Append(", Essos x").Append(r.Table[1].ToString("0.000", Inv));
@@ -381,6 +394,20 @@ namespace Armoury
                     if (D < 100) continue;
                     b.Append(first ? " " : ", ").Append(KsTab.Goods[g]).Append(' ').Append(F2(r.S[m * KsTab.NG + g] / D)).Append(" (").Append(F0(D / 1000)).Append(')');
                     first = false;
+                }
+                if (r.Eaten != null)
+                {
+                    // recenzja 17.10 (wazne): bilans NA TARG - zjedzone w okregach z wlasnego pola jest po obu stronach stosunku podaz/popyt i chowa brak na targu
+                    b.Append(" | na targ (podaz - zjedzone w okregach) / (popyt - zjedzone):");
+                    first = true;
+                    for (int g = 0; g < KsTab.NG; g++)
+                    {
+                        double D = r.D[m * KsTab.NG + g];
+                        if (D < 100) continue;
+                        b.Append(first ? " " : ", ").Append(KsTab.Goods[g]).Append(' ').Append(F2(MarketQ(r, m, g)));
+                        first = false;
+                    }
+                    first = true;
                 }
                 b.Append(" | dzis z mapy (zajecia startowe x tabela):");
                 first = true;
@@ -437,6 +464,15 @@ namespace Armoury
             }
             qb.Append(" | okregi zjadaja same: kcal z wlasnego pola i domu ").Append(need > 0 ? (100 * kcal / need).ToString("0", Inv) : "-").Append("% potrzeby (okregow ").Append(nd).Append(").");
             Log.Info(qb.ToString());
+        }
+
+        /// <summary>Stosunek NA TARG towaru g rynku m: (podaz - zjedzone w okregach) / (popyt - zjedzone); bez kroku 8 - podaz / popyt.</summary>
+        private static double MarketQ(KsResult r, int m, int g)
+        {
+            int i = m * KsTab.NG + g;
+            double D = r.D[i], S = r.S[i], E = r.Eaten != null && i < r.Eaten.Length ? Math.Max(0.0, r.Eaten[i]) : 0.0;
+            if (E >= D) E = 0.0;
+            return D - E > 1e-9 ? (S - E) / (D - E) : (D > 0 ? S / D : 0.0);
         }
 
         private static void PlanCsv(int day, KsResult r, KsInput inp)

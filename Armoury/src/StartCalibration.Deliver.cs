@@ -136,6 +136,44 @@ namespace Armoury
             }
         }
 
+        /// <summary>Recenzja 17.10 (krytyczne): konie okregu (sztuki gry x sigma na dobe, jednostki Planu) z tych samych czesci co Produce - lancuch gry (poza KS), wiec
+        /// rece zajec BEZ (1 - praca domowa), jak w grze i w KsCore.BlockOutput. Krok 8: utarg koni do sprzedazy wsi (budzet koszyka) - stadniny sprzedaja konie za zloto.</summary>
+        internal static double HorseOut(KsDistrict d, KsPart[] parts)
+        {
+            double h = 0;
+            if (d == null || parts == null) return 0;
+            string type = d.Type;
+            for (int i = 0; i < parts.Length; i++)
+            {
+                var lb = parts[i];
+                if (lb == null || lb.K == null || lb.C == null) continue;
+                var kb = lb.K;
+                double W = d.Wf * kb.Share, lg = lb.LGrain(type), lh = 0.5 + 0.5 * Math.Min(1.0, lg);
+                double wH = Math.Min(W, d.Need0[KsTab.NH] * kb.Share / (KsTab.PH * lh)); if (!(wH >= 0)) wH = 0;
+                double rsum = 0; if (lb.RF != null) for (int j = 0; j < lb.RF.Length; j++) rsum += lb.RF[j];
+                double scale = Math.Max(0.0, 1.0 - rsum), rem = W - wH;
+                for (int j = 0; j < lb.C.Length; j++)
+                {
+                    int c = lb.C[j]; double x = lb.X[j] * scale;
+                    if (!(x > 0) || c < KsTab.CHorse0 || c > KsTab.CHorse5) continue;
+                    double sub = lg > 0 ? Math.Min(rem, KsTab.OwnGrainShare(lg) * KsCore.GrainOwnNeed(d.Need0) * kb.Share / (KsTab.PGrainSub * lg)) : 0.0;
+                    double L = lb.L(c, type);
+                    foreach (var kv in KsTab.P0[c]) if (kv.Key == KsTab.GHorse) h += x * (rem - sub) * kv.Value * L;
+                }
+            }
+            return h;
+        }
+
+        /// <summary>Towar Planu (KsTab) towaru dostawy i: zywiec, mieso i mieso wieloryba - mieso; reszta - ten sam towar (-1 - brak).</summary>
+        internal static readonly int[] ItemGood = BuildItemGood();
+        private static int[] BuildItemGood()
+        {
+            var a = new int[ItemCount];
+            for (int i = 0; i < ItemCount; i++) { int g; a[i] = KsTab.GoodIndex.TryGetValue(ItemIds[i], out g) ? g : -1; }
+            a[ICow] = a[IHog] = a[ISheep] = a[IWhaleMeat] = a[IMeat] = KsTab.GMeat;
+            return a;
+        }
+
         /// <summary>To, co okreg zje sam (kg/d na towar), z potrzeb domowych (NeedsOfKeep x lepszy stol): zboze z piwem domowym, ryby, nabial, owoce, winogrona na wino,
         /// oliwki na oliwe, miod na miod pitny, len i welna przedzione w domu; mieso - dziczyzna i wieloryb, potem uboj zywca (mieso = polowa zywca; skory tego uboju
         /// dopisane do produkcji - na targ). Zwraca kcal zjedzone z wlasnego pola i domu (z warstwa dom).</summary>
@@ -213,6 +251,30 @@ namespace Armoury
                            Pottery = 26, WhaleOil = 27, Wood = 28, Fur = 29, Flax = 30, Wool = 31, Hides = 32, Iron = 33, Clay = 34, Lime = 35, Marble = 36;
 
         private static void Put(double[] q, int z, double kg) { if (kg > 1e-9) q[z] += kg; }
+
+        /// <summary>Recenzja 17.10: surowiec Planu (KsTab) pozycji koszyka do pracy domowej (KsCore.HomeMask): wyrob domowy - jego surowiec (chleb, placek, piwo - ziarno;
+        /// wino - winogrona; oliwa - oliwki; miod pitny - miod; plotno - len; sukno - welna); skora, narzedzia, garnki - -1 (rzemieslnik, nie dom).</summary>
+        internal static readonly int[] RawGood = BuildRawGood();
+        private static int[] BuildRawGood()
+        {
+            var a = new int[N];
+            for (int z = 0; z < N; z++) { int g; a[z] = KsTab.GoodIndex.TryGetValue(Ids[z], out g) ? g : -1; }
+            a[Grain] = a[Bread] = a[Pie] = a[Beer] = KsTab.GGrain; a[Meat] = a[Whale] = KsTab.GMeat; a[Wine] = KsTab.GGrape; a[Oil] = KsTab.GOlives; a[Mead] = KsTab.GHoney;
+            a[Linen] = KsTab.GFlax; a[Felt] = KsTab.GWool; a[Leather] = -1; a[Tools] = -1; a[Pottery] = -1;
+            return a;
+        }
+
+        /// <summary>kcal na kg (l) pozycji koszyka (jedzenie i napoje; reszta 0) - jedzenie robione w domu (racje spichlerza), kupione / chciane kcal zakupow wsi.</summary>
+        internal static readonly double[] Kcal = BuildKcalZ();
+        private static double[] BuildKcalZ()
+        {
+            var k = new double[N];
+            k[Grain] = 3300; k[Bread] = 3300; k[Pie] = 3300; k[Meat] = 2200; k[Whale] = 2200; k[Fish] = 1100;
+            k[Cheese] = 3600; k[Butter] = 7200; k[Egg] = 1450; k[Apple] = 500; k[Carrot] = 400; k[Orange] = 450;
+            k[Grape] = 700; k[Olives] = 1150; k[Date] = 2800; k[Oil] = 8800; k[Honey] = 3000; k[Beer] = 400;
+            k[Wine] = 750; k[Mead] = 1000;
+            return k;
+        }
 
         // szczeble drabiny koszyka (ta sama kolejnosc co drabina zakupow ZC4 w grze): przetrwanie i sol, napoj, bialko, reszta jedzenia, przedza domowa, rzeczy
         internal static readonly int[][] Rungs =
