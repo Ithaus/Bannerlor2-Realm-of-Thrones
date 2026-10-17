@@ -80,9 +80,10 @@ namespace Armoury
                              GFish = "lodzie rybackie (NavalDLC, polow)", GSpawn = "nowe druzyny lordow (zboze gry)", GRemoved = "przepadlo z partiami usunietymi bez zniszczenia (RemoveParty)",   // m6b (5)
                              GZc1 = "drogi towarow (ZC1)",   // ZC1 (16.10): przemiana towaru we wsi i w osadzie (opis w podpozycji)
                              GKs = "pola mieszczan (KS)",    // KS (kalibracja startu): plon pol mieszczan na polke miasta (StartCalibration.TownFields) - zrodlo
-                             GKsOwn = "wies je wlasny towar (KS)";   // KS-R3 G3: wies zjadla towar z magazynu (czekajacy na woz), gdy kupila mniej kcal niz zaplacone z Planu - ujscie
+                             GKsOwn = "wies je wlasny towar (KS)",   // KS-R3 G3: wies zjadla towar z magazynu (czekajacy na woz), gdy kupila mniej kcal niz zaplacone z Planu - ujscie
+                             GKsLost = "kupcy zywnosci (KS-H): stracone w drodze";   // recenzja runda 3: psucie w drodze, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty - ujscie
         private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GZc1, GKs, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GKsOwn, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GKsOwn, GKsLost, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -352,6 +353,20 @@ namespace Armoury
                 Book(i, GDiscard, null, -n);
             }
             catch (Exception e) { Stumble("NoteDiscard", e); }
+        }
+
+        /// <summary>Recenzja runda 3 (KS-H): towar wozu kupcow zywnosci stracony w drodze (psucie, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty) - posiadacz "kupcy zywnosci
+        /// w drodze" maleje bez zmiany rostera; ujscie (rynek 2 - poza targiem).</summary>
+        internal static void NoteKsLoss(ItemObject item, int n, string sub)
+        {
+            try
+            {
+                if (n <= 0 || item == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(item, out i)) return;
+                Book(i, GKsLost, sub, -n);
+            }
+            catch (Exception e) { Stumble("NoteKsLoss", e); }
         }
 
         /// <summary>A17 (A17Diag): nazwa rodzaju ramki do linii diagnozy.</summary>
@@ -632,7 +647,8 @@ namespace Armoury
         {
             if (n == 0 || _acc == null) return;
             var a = _acc[i];
-            if (_mkOn) { int m = _settleMk >= 0 ? _settleMk : 2; if (n > 0) a.MkP[m] += n; else a.MkC[m] -= n; }
+            // recenzja runda 3 (drobne): wies je swoje z magazynu (G3) - poza targiem (rynek 2): nie jest zuzyciem rynku (sterowanie P4, NKS-5), towar nie doszedl do straganu
+            if (_mkOn) { int m = _settleMk >= 0 && !ReferenceEquals(group, GKsOwn) ? _settleMk : 2; if (n > 0) a.MkP[m] += n; else a.MkC[m] -= n; }
             var d = n > 0 ? a.Src : a.Sink;
             Dictionary<string, long> subs;
             if (!d.TryGetValue(group, out subs)) { subs = new Dictionary<string, long>(); d[group] = subs; }

@@ -631,19 +631,30 @@ namespace Armoury
         private static void RefreshNeedMult(KsResult R, KsInput inp)
         {
             if (_wEma < MinLedgerDays || R == null || inp == null) return;
-            int n = 0;
+            int n = 0, lim = 0;
+            // recenzja runda 3 (wazne): po oknie startu (D+49) praca domowa okregu zmienia sie najwyzej o 0.02 rak na Plan (7 dob) - zmiana produkcji powoli (decyzja Jeffa 16.10);
+            // w oknie startu - jak Plan (kalibracja startu); klucz Ks Market Control
+            bool slow = SwMarketControl && DDay >= 0 && _wDay > DDay + CtlEnd;
             foreach (var d in inp.Districts)
             {
                 LiveDist ld; double[] need;
                 if (!_live.TryGetValue(d.Id, out ld) || !R.DistNeed.TryGetValue(d.Id, out need) || need == null) continue;
                 for (int k = 0; k < KsTab.NN; k++) ld.NeedMult[k] = d.Need0[k] > 1e-9 ? (float)Math.Max(0.25, Math.Min(4.0, need[k] / d.Need0[k])) : 1f;
+                float hw0 = ld.HomeWork;
                 MoneyFromPlan(R, ld);                                   // krok 8: praca domowa i czesc zaplacona koszyka z nowego Planu
+                if (slow && !ld.TF)
+                {
+                    float dh = ld.HomeWork - hw0;
+                    if (Math.Abs(dh) > HwStepPlan) { ld.HomeWork = hw0 + Math.Sign(dh) * HwStepPlan; if (ld.K != null) ld.K.HomeWork = ld.HomeWork; lim++; }
+                }
                 n++;
             }
+            if (slow) Log.Info(PK + "praca domowa po D+" + CtlEnd + ": zmiana najwyzej " + HwStepPlan.ToString("0.00", Inv) + " rak na Plan - ograniczona w " + lim + " okregach z " + n + ".");
             // KS-R3 C2 (koszt): bez przeliczenia wszystkich okregow nastepnej doby - nowy lepszy stol i krok 8 wchodza z przeliczeniem okregu (co 7 dob na zmiane)
             Log.Info(PK + "lepszy stol (NeedMult) z Planu doby " + _wDay + " - okregow " + n + " (co 7 dob z Planem; okregi przyjmuja go przy swoim przeliczeniu, co 7 dob na zmiane).");
         }
         private static Dictionary<Village, VRate> _ratesKeep = new Dictionary<Village, VRate>();
+        private const float HwStepPlan = 0.02f;            // recenzja runda 3: praca domowa po D+49 - najwyzej tyle zmiany na Plan
         private const int LiveEvery = 7;                   // okreg przeliczany co 7 dob (na zmiane) - koszt doby KS (poprawka po autotescie 16.10: 3 -> 7, okregi zmieniaja sie powoli)
         private static bool _liveFull = true;              // nastepna doba - wszystkie okregi (sesja, wlaczenie, ponowne wlaczenie)
         private static int _liveRedone;

@@ -46,6 +46,7 @@ namespace Armoury
 
         /// <summary>Raz na dobe (StartCalibration.Daily, przed VillageTakings.Daily): srednie 28 dob udzialu kiesy wsi w utargu (swiat i kazda wies), utargu swiata wobec
         /// wartosci bazowej produkcji wsi (ksiega towarow) i zarobku netto klas miast.</summary>
+        private static readonly double[] _regDay = new double[6], _regEma = new double[6];   // recenzja runda 3: utarg / panowie wedlug krain importu, eksportu, reszty
         private static void MoneyEma(int today)
         {
             if (_moneyDay == today) return;
@@ -72,7 +73,19 @@ namespace Armoury
                 seen.Add(v);
                 int m = MarketOfSettlement(v.Settlement);
                 if (m >= 0 && m < 2) _inflowDay[m] += k;
+                // recenzja runda 3 (drobne, INFO): utarg wozow i czesc panow (oddane - do kiesy) wedlug krain importu / eksportu zboza (gradient krainy z Planu)
+                try
+                {
+                    Settlement mk = TradeTownOf(v); double gz = LandGradZ(mk, ZGrain);
+                    int c = gz > 1.02 ? 0 : (gz < 0.98 ? 1 : 2);
+                    _regDay[c * 2] += h; _regDay[c * 2 + 1] += Math.Max(0, h - k);
+                }
+                catch { }
             });
+            for (int i = 0; i < 6; i++) { _regEma[i] = _vtDays <= 1 ? _regDay[i] : _regEma[i] + (_regDay[i] - _regEma[i]) / 7.0; _regDay[i] = 0; }
+            if (today % 7 == 0 && LogGate.Lines && KeyOn)
+                Log.Info(PK + "utarg wsi wedlug krain dzien " + (today - 1) + " (srednia 7 dob; kraina importu zboza: gradient zboza Planu > 1.02, eksportu < 0.98) | import: utarg " + F0(_regEma[0]) + " zl/d, panowie " + F0(_regEma[1])
+                         + " | eksport: utarg " + F0(_regEma[2]) + ", panowie " + F0(_regEma[3]) + " | reszta: utarg " + F0(_regEma[4]) + ", panowie " + F0(_regEma[5]) + " (INFO - Jeff przed odbiorem: KS-H przenosi zawor kas miast)" + ".");
             foreach (var kv in _vilTake) if (!seen.Contains(kv.Key)) { kv.Value[0] *= 1.0 - wv; kv.Value[1] *= 1.0 - wv; }
             VilOutDaily(wv);                                    // KS-R3 P2: wydatki wsi spoza koszyka i fracht KS-H (ta sama waga co utarg)
             // utarg swiata wobec wartosci bazowej produkcji wsi (ksiega towarow - doba wczorajsza, raz na nowa dobe ksiegi)
@@ -299,11 +312,26 @@ namespace Armoury
                   .Append("% (cel ").Append(m == 0 ? "3.0" : "3.5").Append("%), czynnik popytu targu ").Append(M.MfMin[m].ToString("0.000", Inv)).Append('-').Append(M.MfMax[m].ToString("0.000", Inv))
                   .Append(", wsie z wycietymi psujacymi sie ").Append(M.ReachCut[m])
                   // KS-R3 (port symulatora 17.10, runda 3) krok 8d: ubocze (jaja, miod, marchew, jablka, dziczyzna) ponad popyt zaplacony targu zostaje na stole okregu
-                  .Append(", stol 8d ").Append(F0(M.TableKg[m])).Append(" kg Planu/d (kcal w domu ").Append(P1(100 * M.TableKcal[m] / fk)).Append("%)");
+                  .Append(", stol 8d ").Append(F0(M.TableKg[m])).Append(" kg Planu/d w ").Append(M.TableN[m]).Append(" okregach (lepszy stol: potrzeba i wlasny stol w gore, bez zaliczenia do pracy domowej; krok 8 liczony ponownie)")
+                  // recenzja runda 3: towar zastepczy 8b/8c z plonu rak (okregi, gdzie parytet wartosci dawal wiecej niz plon; kcal zastepcze bez wolnej ziemi)
+                  .Append(", 8b z plonu: parytet wartosci > plon w ").Append(M.SubPhysOver[m]).Append(" okregach, kcal bez ziemi ").Append(P1(100 * M.SubLandShort[m] / fk)).Append('%');
             }
             double vo, vf; int vn; VilOutTotals(out vo, out vf, out vn);
             sb.Append(" | alfa ").Append(SwAlphaNet ? "NETTO (wplyw + fracht KS-H - wydatki spoza koszyka)" : "z utargu (klucz Ks Alpha Net wylaczony)").Append(": wydatki wsi spoza koszyka ").Append(F0(vo))
               .Append(" zl/d, fracht KS-H do wsi ").Append(F0(vf)).Append(" zl/d (wsi z liczbami ").Append(vn).Append(')');
+            // recenzja runda 3 (wazne): Plan bez pokrycia wedlug krainy (kraina miasta targowego okregu; najwiecej kcal bez pokrycia)
+            if (M.LandKcal != null && M.LandKcal.Count > 0)
+            {
+                var ll = new List<KeyValuePair<string, double[]>>(M.LandKcal);
+                ll.Sort((a, b) => b.Value[1].CompareTo(a.Value[1]));
+                sb.Append(" | Plan bez pokrycia wedlug krainy (kcal bez pokrycia / kcal koszyka):");
+                for (int i = 0; i < ll.Count && i < 10; i++)
+                {
+                    var kv = ll[i]; if (!(kv.Value[1] > 0)) break;
+                    sb.Append(i == 0 ? " " : ", ").Append(kv.Value[2] == 0 ? "W " : "E ").Append(kv.Key).Append(' ').Append(P1(100 * kv.Value[1] / Math.Max(1.0, kv.Value[0]))).Append("% (")
+                      .Append((kv.Value[1] / 1e6).ToString("0", Inv)).Append(" mln kcal)");
+                }
+            }
             sb.Append(" | praca domowa razem ").Append((r.HomeWorkLabour / 1e6).ToString("0.00", Inv)).Append(" mln rak (te same rece i ziemia, nigdy na targ)")
               .Append(" | utarg wozow i podatek panow od niego ida za sprzedaza wsi na targ (wyzej: mniej o ... wobec tych samych zajec bez pracy domowej).");
             Log.Info(sb.ToString());

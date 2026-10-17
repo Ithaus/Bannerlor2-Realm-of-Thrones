@@ -6676,19 +6676,19 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationConfirm { get; set; } = false;
 
-        [SettingPropertyBool("Ks Food Carts", HintText = "with the calibration applied: a town short of food buys grain, fish, meat, cheese, salt and the other foods in a town of the same market that has more than it needs, and the cart goes for as many days as the road (to the islands by sea through the ports). The buying town pays the selling town for every piece and the carters of the seller's villages (by sea - its dock hands) for the haul. Fish, meat, fruit and the other perishables go at most 7 days; off = no new food carts (carts on the road still arrive)")]
+        [SettingPropertyBool("Ks Food Carts", HintText = "with the calibration applied: a town short of food buys grain, fish, meat, cheese, salt and the other foods in a town of the same market that has more than it needs, and the cart goes for as many days as the road (by sea a ship is four times faster and much cheaper than a cart). The buying town pays the selling town for every piece and the carters of the seller's villages (by sea - its dock hands) for the haul, only when the merchants gain on it, and never below half of the town merchants' reserve. Fish, meat, fruit and the other perishables go at most 7 days and lose a little on the way; off = no new food carts (carts on the road still arrive)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsFoodCarts { get; set; } = true;
 
-        [SettingPropertyBool("Ks Land Gradient", HintText = "with Start Calibration: the weekly plan sees the road - where food must come from far away it is dearer by the cost of the haul, so the peasants there grow more of it, and where it cannot be sold it is cheaper. The work of a hand stays the same, only how many hands work at each thing changes; off = the plan prices every market as one place")]
+        [SettingPropertyBool("Ks Land Gradient", HintText = "with Start Calibration: the weekly plan sees the road - where food must come from far away it is dearer by the cost of the haul, so the peasants there grow more of it and their basket costs more, and where it cannot be sold it is cheaper. It counts what people there really pay for, and one purse per land for all its imports. The work of a hand stays the same, only how many hands work at each thing changes; off = the plan prices every market as one place")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsLandGradient { get; set; } = true;
 
-        [SettingPropertyBool("Ks Alpha Net", HintText = "with Start Calibration: the plan gives each village only the money it really has for its basket - its takings plus haulage pay, less the war levy, dues, market buying and taxes on its savings - and what it cannot buy and cannot grow itself it makes at home from its cheapest own food (grain, fish, game or dates) of the same worth in food; off = takings only, as before")]
+        [SettingPropertyBool("Ks Alpha Net", HintText = "with Start Calibration: the plan gives each village only the money it really has for its basket - its takings plus haulage pay, less the war levy, dues and taxes on its savings - and what it cannot buy and cannot grow itself it makes at home from its own staple that feeds best (grain, fish, game or dates), as much as its hands and free land really yield; eggs, honey, carrots, apples and farm animals nobody buys stay on the village's own table; off = takings only and the plan's market correction as before")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsAlphaNet { get; set; } = true;
 
-        [SettingPropertyBool("Ks Village Paid First", HintText = "with the calibration applied: a village first buys the part of its basket the plan says it can pay for (bread and salt first, then drink, meat and the rest), and the rest only from money beyond a week of its basket and only from stock beyond what the town needs on its stall; its old daily shopping list beyond the basket stops; off = the whole basket along the ladder and the old list, as before")]
+        [SettingPropertyBool("Ks Village Paid First", HintText = "with the calibration applied: a village first buys the part of its basket the plan says it can pay for (bread and salt first, then drink, meat and the rest), and the rest only from money beyond a week of its basket and only while the stall price is low (at most 4/5 of the starting price); its old daily shopping list beyond the basket stops and the Banner Kings village market buys no food and spends only money beyond a week of the basket; off = the whole basket along the ladder and the old list, as before")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsVillagePaidFirst { get; set; } = true;
 
@@ -6704,7 +6704,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsRealOfftake { get; set; } = true;
 
-        [SettingPropertyBool("Ks Market Control", HintText = "with the calibration applied: from two weeks after the start the weekly plan sends to market what people really bought and wanted, not what it reckoned they would, so that the stalls hold their starting stock; a land whose stalls fill up and keep filling (no way out - war or no buyer) moves a tenth of that work to home work each week; off = the plan keeps its own reckoning")]
+        [SettingPropertyBool("Ks Market Control", HintText = "with the calibration applied: from two to seven weeks after the start the weekly plan sends to market what people really bought and wanted (not what they bought from their savings), so that the stalls hold their starting stock; a land whose stalls fill up and keep filling (no way out - war or no buyer) moves a tenth of that work to home work each week. After seven weeks this steering fades out over two weeks and a village changes its home work by at most 2% of its hands a week - prices and profit move the hands; off = the plan keeps its own reckoning")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsMarketControl { get; set; } = true;
 

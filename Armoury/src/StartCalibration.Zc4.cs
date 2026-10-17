@@ -83,6 +83,9 @@ namespace Armoury
             // potrzeby co 7 dob na zmiane - C1)
             public readonly int[] Cnt = new int[ZN];
             public readonly double[] QC = new double[3 * ZN];
+            // recenzja runda 3 (wazne, H2): liczba wierszy polki, przy ktorej brak towaru (-1) byl sprawdzony - nowy wiersz polki (towar przyjechal wozem wsi, karawana, od pana,
+            // z pol mieszczan, z ZC5) = brak sprawdzany od nowa; dotad -1 z mapy doby ufany do jutra, a przy zakupach co 2. doba - do 2 dob
+            public readonly int[] IxCnt = new int[ZN];
         }
 
         private static ItemObject[] _zItems;
@@ -108,7 +111,15 @@ namespace Armoury
         private static long _zTkNeeds, _zTkPrices; private static int _zRedo;   // KS-R3 C1: czas mapy koszyka - potrzeby (co 7 dob na zmiane) i ceny z polka (codziennie)
 
         /// <summary>TownFolk.Zc4BuyVillage (G2): drabina 1 (koszyk zaplacony z Planu) - chciane, bez towaru po miastach obok, bez kiesy (szt.).</summary>
-        internal static void Zc4NotePass1(double want, double noGoods, double noGold) { _p1[0] += want; _p1[1] += noGoods; _p1[2] += noGold; }
+        internal static void Zc4NotePass1(double want, double noGoods, double noGold, int m = -1)
+        {
+            _p1[0] += want; _p1[1] += noGoods; _p1[2] += noGold;
+            if (m == 0 || m == 1) { _p1M[m * 3] += want; _p1M[m * 3 + 1] += noGoods; _p1M[m * 3 + 2] += noGold; }
+        }
+        private static readonly double[] _p1M = new double[6];              // recenzja runda 3: drabina 1 wedlug rynku [m * 3 + chciane/bez towaru/bez kiesy] (NKS-13b)
+        private static readonly double[] _p1Zl = new double[2];
+        /// <summary>Recenzja runda 3: zl wydane przez wies w drabinie 1 (koszyk zaplacony z Planu) - linia ZC4, NKS-13.</summary>
+        internal static void Zc4NotePass1Zl(Settlement mk, double zl) { if (zl <= 0) return; int m = MarketOfSettlement(mk); if (m == 0 || m == 1) _p1Zl[m] += zl; }
         private static Town _zcDictTown;                                     // miasto, ktorego slownik budzetu dnia jest juz w zlocie (BK CalculateBudget - bez zmian)
         [ThreadStatic] private static bool _zcBypass;
         private static Func<Town, float, ItemCategory, float> _zBk; private static bool _zBkLooked;
@@ -289,6 +300,7 @@ namespace Armoury
                             if (ei == null || el.EquipmentElement.ItemModifier != null || !_zIx.TryGetValue(ei, out zi) || zt.Ix[zi] >= 0) continue;
                             zt.Ix[zi] = k; cnt[zi] = el.Amount;
                         }
+                    { int rc = ro != null ? ro.Count : 0; for (int z = 0; z < ZN; z++) zt.IxCnt[z] = rc; }
                     Array.Copy(cnt, zt.Cnt, ZN);
                     for (int z = 0; z < ZN; z++)
                     {
@@ -327,12 +339,18 @@ namespace Armoury
                     _zTkNeeds += System.Diagnostics.Stopwatch.GetTimestamp() - tc0;
                     // P3 (KS-R3, klucz Ks Real Offtake): 1:1 w popycie ceny miasta = prawdziwy odbior panow (kupione - porzucone na polce) i dworow w tym miescie (srednia 28 dob);
                     // 1:1 zamkow wychodzi z popytu miasta (zostaje w popycie Planu - kupuja go zamki na swoich postojach); bez klucza - 1:1 swiata x udzial ludzi rynku miasta
-                    if (SwRealOfftake) for (int z = 0; z < ZN; z++) zt.One[z] = ZAdd(z) ? 0.0 : ZOne28(r.St, z);
-                    else
                     {
                         double pp; mkPeople.TryGetValue(r.St, out pp);
                         double sh = world > 0 ? pp / world : 0.0;
-                        for (int z = 0; z < ZN; z++) zt.One[z] = one[z] * sh;
+                        // recenzja runda 3 (drobne): prawdziwy odbior tylko dla jedzenia (material budow i narzedzia - 1:1 swiata z budowami, jak dotad); przy pustym straganie
+                        // (<= 5 szt.) odbior panow 0 nie obniza popytu ceny - najwyzej 1:1 swiata x udzial ludzi (popyt nie ocenzurowany brakiem)
+                        for (int z = 0; z < ZN; z++)
+                        {
+                            if (ZAdd(z)) { zt.One[z] = 0.0; continue; }
+                            double w1 = one[z] * sh;
+                            if (SwRealOfftake && ZFood(z)) { double o = ZOne28(r.St, z); zt.One[z] = cnt[z] <= 5 ? Math.Max(o, w1) : o; }
+                            else zt.One[z] = w1;
+                        }
                     }
                     map[r.St] = zt;
                 }
@@ -477,11 +495,51 @@ namespace Armoury
             return z >= 0 && z < ZN && ZTownOf(t, out zt) ? zt.Px[z] : 0;
         }
 
-        /// <summary>TownFolk.Zc4BuyVillage (koszt): indeks wiersza towaru koszyka z na polce miasta z doby (Zc4Build) albo -1 (wolajacy sprawdza wiersz i szuka sam).</summary>
-        internal static int ZRow(Town t, int z)
+        /// <summary>TownFolk.Zc4BuyVillage (koszt): indeks wiersza towaru koszyka z na polce miasta z doby (Zc4Build) albo -1 (wolajacy sprawdza wiersz i szuka sam).
+        /// Recenzja runda 3 (H2): -1 tylko, gdy polka ma tyle samo wierszy, co przy ostatnim sprawdzeniu braku (count) - nowy wiersz (towar przyjechal) = -2 (szukaj).</summary>
+        internal static int ZRow(Town t, int z, int count = -1)
         {
             ZTown zt;
-            return z >= 0 && z < ZN && ZTownOf(t, out zt) ? zt.Ix[z] : -2;   // KS-R3 H2: -1 - towaru nie bylo na polce przy budowie mapy (wolajacy ufa), -2 - miasto poza mapa (szuka sam)
+            if (!(z >= 0 && z < ZN && ZTownOf(t, out zt))) return -2;   // -2 - miasto poza mapa (szuka sam)
+            int ix = zt.Ix[z];
+            if (ix == -1 && count >= 0 && count != zt.IxCnt[z]) return -2;
+            return ix;
+        }
+
+        /// <summary>Recenzja runda 3 (H2): wynik szukania wiersza towaru z na polce miasta (ix albo -1) przy count wierszy polki - nastepne wsie tej doby bez szukania.</summary>
+        internal static void ZRowSet(Town t, int z, int ix, int count)
+        {
+            ZTown zt;
+            if (!(z >= 0 && z < ZN && ZTownOf(t, out zt))) return;
+            zt.Ix[z] = ix; zt.IxCnt[z] = count;
+        }
+
+        /// <summary>Recenzja runda 3: towar koszyka ZC4 jest jedzeniem (szczebel drabiny jedzenia) - rynek wsi BK.</summary>
+        internal static bool ZFoodItem(ItemObject it)
+        {
+            if (it == null) return false;
+            Zc4EnsureMap();
+            int z; return _zIx != null && _zIx.TryGetValue(it, out z) && ZFood(z);
+        }
+
+        // recenzja runda 3 (wazne): rynek wsi BK (BkSeal34) u wsi z koszykiem ZC4 - zl i wsie doby wedlug rynku (linia ZC4, NKS-29)
+        private static readonly double[] _bkVm = new double[2]; private static readonly HashSet<Village> _bkVv = new HashSet<Village>();
+        private static readonly int[] _bkVn = new int[2];
+        internal static void NoteBkVillageMarket(Village v, long zl)
+        {
+            if (v == null || zl <= 0) return;
+            int m = MarketOfSettlement(v.Settlement); if (m < 0 || m > 1) return;
+            _bkVm[m] += zl; if (_bkVv.Add(v)) _bkVn[m]++;
+        }
+
+        /// <summary>Recenzja runda 3 (wazne): wies z koszykiem ZC4 w stanie zastosowanym - budzet koszyka Planu na dobe (zl, ceny startu x cena krainy; rynek wsi BK
+        /// tylko z kiesy ponad 7 dob tego budzetu, bez jedzenia).</summary>
+        internal static bool Zc4BasketBudget(Village v, out double budgetDay)
+        {
+            budgetDay = 0;
+            double lam; if (Zc4VillageNeed(v, out lam) == null) return false;
+            Zc4VillagePaid(v, out budgetDay);
+            return true;
         }
 
         /// <summary>TownFolk.Villages: czas zakupow wsi (Stopwatch) do linii ZC4.</summary>
@@ -757,10 +815,12 @@ namespace Armoury
             if (map.Count == 0 || !map.TryGetValue(v, out q) || q == null) return null;
             int m = MarketOfSettlement(v.Settlement); if (m < 0) m = 0;
             Zc4EnsureMap();
+            // recenzja runda 3 (wazne): budzet przy cenie krainy (cena startu x gradient krainy miasta targowego - jak koszyk kroku 8 Planu)
+            Settlement mk = null; try { mk = TradeTownOf(v); } catch { mk = null; }
             for (int z = 0; z < ZN && z < q.Length; z++)
             {
                 var it = _zItems[z]; if (it == null || !(q[z] > 0)) continue;
-                budgetDay += q[z] * Math.Max(1, it.Value) * KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m);
+                budgetDay += q[z] * Math.Max(1, it.Value) * KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m) * LandGradZ(mk, z);
             }
             return q;
         }
@@ -865,7 +925,13 @@ namespace Armoury
               .Append("%), bez kiesy ").Append(F0(_p1[2])).Append(" (").Append(_p1[0] > 0 ? (100 * _p1[2] / _p1[0]).ToString("0.0", Inv) : "-").Append("%)")
               .Append("; drabina 2 (INFO, ponad plan): kupione ").Append(F0(_p2[0])).Append(" szt., nie wystawione (polka ponizej celu) ").Append(F0(_p2[1])).Append(", bez kiesy ponad zapas ").Append(F0(_p2[2]))
               .Append("; zakupy co 2. doba ").Append(SwBuyEvery2 ? "TAK" : "NIE");
-            Array.Clear(_p1, 0, _p1.Length); Array.Clear(_p2, 0, _p2.Length); _zvKcalR[0] = _zvKcalR[1] = 0;
+            // recenzja runda 3 (wazne): wartosc kupiona drabiny 1 (koszyk zaplacony z Planu, przy cenach polki) - NKS-13 z drabiny 1, bez drabiny 2
+            sb.Append(" | drabina 1 kupiona wartosc: Westeros ").Append(F0(_p1Zl[0])).Append(" zl, Essos ").Append(F0(_p1Zl[1])).Append(" zl");
+            sb.Append(" | drabina 1 wedlug rynku (chciane/bez towaru/bez kiesy szt.): Westeros ").Append(F0(_p1M[0])).Append('/').Append(F0(_p1M[1])).Append('/').Append(F0(_p1M[2]))
+              .Append(", Essos ").Append(F0(_p1M[3])).Append('/').Append(F0(_p1M[4])).Append('/').Append(F0(_p1M[5]));
+            Array.Clear(_p1M, 0, _p1M.Length);
+            sb.Append(" | rynek wsi BK (wsie z koszykiem ZC4: bez jedzenia, z kiesy ponad 7 dob budzetu Planu): Westeros ").Append(F0(_bkVm[0])).Append(" zl w ").Append(_bkVn[0]).Append(" wsiach, Essos ").Append(F0(_bkVm[1])).Append(" zl w ").Append(_bkVn[1]).Append(" wsiach");
+            Array.Clear(_p1, 0, _p1.Length); Array.Clear(_p2, 0, _p2.Length); _zvKcalR[0] = _zvKcalR[1] = 0; _p1Zl[0] = _p1Zl[1] = 0; _bkVm[0] = _bkVm[1] = 0; _bkVn[0] = _bkVn[1] = 0; _bkVv.Clear();
             sb.Append(" | kiesy wsi zastosowanych razem ").Append(AppliedVillagePurses()).Append(" zl")
               .Append(", czesc zaplacona koszyka miast ").Append(tpn > 0 ? (tpf / tpn).ToString("0.000", Inv) : "1 (bez Planu)").Append(" (").Append(tpn).Append(" miast)")
               .Append(", zakupy wsi w miescie obok (brak na polce targu) ").Append(F0(_zvElse)).Append(" szt.");

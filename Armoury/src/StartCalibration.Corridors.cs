@@ -11,14 +11,15 @@ namespace Armoury
     /// SWIAT (Westeros i Essos jako jeden targ kazdy), ale towar nie dochodzi do miast, ktore go potrzebuja: zboze lezy tam, gdzie roslo, a miasta daleko od pol stoja
     /// puste i drogie. Krok 5 wprowadza miejsce jednym czynnikiem:
     ///  - KRAINA osady = kultura miasta targowego (miasto - jego kultura; okreg wsi - kraina jego miasta targowego; pola mieszczan - ich miasto);
-    ///  - podaz krainy S_L = produkcja okregow krainy (z polami mieszczan i podaza spoza tabeli), popyt krainy D_L = potrzeby osad krainy + 1:1 wedlug ludzi -
-    ///    zjedzone w domu jest po obu stronach, wiec nadwyzka i brak krainy sa te same co na targu;
+    ///  - podaz krainy S_L = produkcja okregow krainy (z polami mieszczan i podaza spoza tabeli), popyt krainy D_L = popyt ZAPLACONY osad krainy (potrzeby po kroku 8 -
+    ///    krok 5 liczy sie po kroku 8; recenzja runda 3) + odbior panow i dworow w miastach krainy + reszta 1:1 wedlug ludzi - zjedzone w domu jest po obu stronach;
     ///  - PROBLEM PRZEWOZU na rynek i towar jedzenia: krainy z nadwyzka -> krainy z brakiem, koszt luku = doby wozem bramy (najblizsza para miast obu krain,
-    ///    nie w wojnie), luk tylko do 30 dob (trwale) albo 7 dob (psujace sie, KsCore.Perish), przepustowosc przed D z kasy miast importera (polowa kasy
-    ///    28 dob na towar w drodze), po D - 1.2 x dowiezione wozami KS-H (najmniej 20 szt./d); najtanszy przeplyw (kolejne najkrotsze sciezki);
-    ///  - GRADIENT krainy (cena krainy wobec ceny rynku w dochodzie bloku): importer 1.03 + tau x srednie doby dowozu (tau 0.010/d ladem, 0.005/d morzem), najwyzej 1.5;
+    ///    nie w wojnie; morzem - statkiem), luk tylko do 30 dob (trwale) albo 7 dob (psujace sie, KsCore.Perish), przepustowosc przed D z JEDNEGO budzetu kasy krainy
+    ///    importera (15% kasy 28 dob na dobe, polowa kasy na towar w drodze; dzielony na towary wedlug wartosci braku), po D - 1.2 x dowiezione wozami KS-H (najmniej
+    ///    20 szt./d; do NKS-24 takze przewoz bez tego sufitu); najtanszy przeplyw (kolejne najkrotsze sciezki);
+    ///  - GRADIENT krainy (cena krainy wobec ceny rynku w dochodzie bloku): importer 1.03 + tau x srednie doby dowozu (tau 0.025/d ladem, 0.0025/d morzem), najwyzej 1.5;
     ///    eksporter z nadwyzka, ktorej nie da sie wywiezc (> 5% podazy) - najwyzej 1 - nadwyzka/podaz, najmniej 0.6; brak bez zrodla w zasiegu (> 5% popytu) - 1.5
-    ///    (tryb "kraina": kraina liczy sie sama); reszta 1; tlumienie: Grad = 0.5 x poprzedni + 0.5 x nowy (cieply z Planu do Planu, w zapisie arm_ks);
+    ///    (tryb "kraina": kraina liczy sie sama); reszta 1; tlumienie: Grad = 0.75 x poprzedni + 0.25 x nowy (recenzja rundy 3; cieply z Planu do Planu, w zapisie arm_ks_r3);
     ///  - rownowaga: dochod bloku przy cenie rynku x gradient krainy (Rl), czyszczenie rynku, numerator, renta, najlepszy stan i koniec "stoi" - bez zmian; gradient 1 -
     ///    wynik bit w bit jak dotad;
     ///  - REGULA ZASIEGU psujacych sie: miasto, ktorego okregi daja mniej niz 5% jego popytu na towar psujacy sie i bez miasta z nadwyzka tego rynku w 7 dobach wozem
@@ -45,7 +46,13 @@ namespace Armoury
         // je tylko harness do prob (port symulatora 17.10, runda 3: eksporter zabieral Arbor utarg ryb - Plan bez pokrycia Westeros 3.8% -> 6.0%; premia i regula
         // zasiegu po przewozie - mediany cen bez zmiany ponad szum 3 ziaren, bez pokrycia Westeros +0.3..+0.9 pkt). Wylaczone - Plan bit w bit jak bez kroku miast.
         internal static bool TownGrad = false, TownExport = true, TownImport = true, TownReach = false; internal static double TownExportMin = 0.6;
-        internal const double CorrTauLand = 0.010, CorrTauSea = 0.005, CorrMargin = 0.03, CorrMaxG = 1.5, CorrMinG = 0.6, CorrDurableDays = 30.0, CorrPerishDays = 7.0;
+        // recenzja runda 3: tlumienie gradientu 0.75 poprzedni + 0.25 nowy (0.5/0.5 drgal: Essos winogrona i pomarancze 0.6-1.7 miedzy Planami w harnessie; 0.75 - zmiana < 5%)
+        internal static double GradDamp = 0.75; internal static bool GradSecondRound = true;   // harness (recenzja runda 3): tlumienie gradientu z Planu do Planu, druga runda Planu wlaczenia
+        // recenzja runda 3 (wazne): przewoz ladem drogi, morzem tani - woz 2.5% wartosci na dobe, statek 0.25% na dobe (dotad 1.0% / 0.5%: morze tylko 2 x taniej niz woz;
+        // w sredniowieczu woda 10-20 x taniej). Te same stale co KS-H (KsFoodCarts). Kasa importera: 15% kasy 28 dob na dobe (jak KS-H)
+        // recenzja runda 3 (wazne): statek szybszy niz woz - doby morzem = droga ladem i morzem / (4 x tempo wozu) + 1 doba portu (zaladunek i wyladunek); KS-H i krok 5
+        internal const double ShipSpeedK = 4.0; internal const int PortDays = 1;
+        internal const double CorrTauLand = 0.025, CorrTauSea = 0.0025, CorrMargin = 0.03, CorrMaxG = 1.5, CorrMinG = 0.6, CorrDurableDays = 30.0, CorrPerishDays = 7.0, CorrCofferDay = 0.15;
 
         private sealed partial class Ctx
         {
@@ -273,7 +280,30 @@ namespace Armoury
             return Math.Max(1.0, x.In.Sigma) * it.Kg;
         }
 
-        /// <summary>KROK 5 na rownowadze (xs, ceny p): podaz i popyt krain, problem przewozu na rynek i towar jedzenia, gradient (tlumiony), regula zasiegu.</summary>
+        /// <summary>Recenzja runda 3 (wazne): 1:1 jedzenia (kg/d Planu) poza odbiorem panow i dworow w miastach (TownOne) - zamki, wojsko w polu, dwory poza miastami;
+        /// rozkladane wedlug ludzi (gdzie nie wiadomo, kto je je).</summary>
+        private static double[] OneRest(Ctx x)
+        {
+            var w = new double[KsTab.NG];
+            OneGoods(x, 1.0, w);
+            if (x.In.TownOne != null)
+                foreach (var kv in x.In.TownOne) if (kv.Value != null) foreach (int g in Food) if (g < kv.Value.Length) w[g] -= Math.Max(0.0, kv.Value[g]);
+            for (int g = 0; g < w.Length; g++) if (w[g] < 0) w[g] = 0;
+            return w;
+        }
+
+        /// <summary>Odbior panow i dworow w miescie (TownOne, kg/d Planu) do popytu jedzenia D.</summary>
+        private static void TownOneAdd(Ctx x, string id, double[] D)
+        {
+            double[] one; if (x.In.TownOne == null || id == null || !x.In.TownOne.TryGetValue(id, out one) || one == null) return;
+            foreach (int g in Food) if (g < one.Length && one[g] > 0) D[g] += one[g];
+        }
+
+        /// <summary>KROK 5 na rownowadze PO KROKU 8 (xs, ceny p): podaz krain i popyt ZAPLACONY krain, problem przewozu na rynek i towar jedzenia, gradient (tlumiony).
+        /// Recenzja runda 3 (wazne): (1) popyt = potrzeby osad po kroku 8 (czesc niezaplacona zdjeta - dotad pelna potrzeba, blad rundy 1 na poziomie krainy) + odbior panow
+        /// i dworow w miastach (TownOne), reszta 1:1 swiata wedlug ludzi; zjedzone w okregu po obu stronach; (2) przed D jeden budzet kasy krainy importera na wszystkie towary
+        /// i luki (najwyzej 15% kasy 28 dob na dobe - jak KS-H - i polowa kasy na towar w drodze), dzielony wedlug wartosci braku towaru (dotad cala kasa dla kazdego towaru
+        /// i luku); (3) po D przepustowosc z dowozu KS-H (gradient), a do NKS-24 przewoz BEZ sufitu dowozu (z budzetem kasy jak przed D) - R.LandFlowFree.</summary>
         private static void CorridorStep(Ctx x, double[] p, double[] xs, double[] S)
         {
             var sw = Stopwatch.StartNew();
@@ -285,7 +315,7 @@ namespace Armoury
             var SL = new double[nl * NG]; var DL = new double[nl * NG];
             var tmp = new double[NG];
             double wpop = Math.Max(1.0, x.WPop);
-            // podaz i popyt krain (kraina miasta targowego okregu)
+            var rest = OneRest(x);
             foreach (var d in x.D)
             {
                 int l = LandOfD(x, d); if (l < 0) continue;
@@ -293,8 +323,7 @@ namespace Armoury
                 if (prod.TryGetValue(d.Id, out a)) foreach (int g in Food) SL[l * NG + g] += a[g];
                 Array.Clear(tmp, 0, NG);
                 CivilGoods(d.Need, tmp);
-                OneGoods(x, d.People / wpop, tmp);
-                foreach (int g in Food) DL[l * NG + g] += tmp[g];
+                foreach (int g in Food) DL[l * NG + g] += tmp[g] + rest[g] * d.People / wpop;
             }
             for (int t = 0; t < nt; t++)
             {
@@ -302,8 +331,8 @@ namespace Armoury
                 var ts = inp.Towns[t];
                 Array.Clear(tmp, 0, NG);
                 CivilGoods(ts.Need, tmp);
-                OneGoods(x, ts.People / wpop, tmp);
-                foreach (int g in Food) DL[l * NG + g] += tmp[g];
+                TownOneAdd(x, ts.Id, tmp);
+                foreach (int g in Food) DL[l * NG + g] += tmp[g] + rest[g] * ts.People / wpop;
             }
             foreach (var kv in inp.ExoLand)
             {
@@ -315,11 +344,21 @@ namespace Armoury
                 int l; if (!x.LandIx.TryGetValue(gl, out l)) continue;
                 DL[l * NG + KsTab.GFish] += KsTab.Garum * 2.0 / KsTab.GarumLands.Count; DL[l * NG + KsTab.GSalt] += KsTab.Garum * 0.4 / KsTab.GarumLands.Count;
             }
-            // kasa 28 dob miast krainy (przepustowosc przed D)
+            // kasa 28 dob miast krainy i budzet krainy importera: udzial towaru = wartosc braku towaru / wartosc braku wszystkich towarow jedzenia krainy
             var gold = new double[nl];
             for (int t = 0; t < nt; t++) { int l = x.TownLand[t]; if (l >= 0 && inp.TownGold28 != null && t < inp.TownGold28.Length) gold[l] += Math.Max(0.0, inp.TownGold28[t]); }
+            var zlG = new double[NM * NG];
+            foreach (int g in Food) for (int m = 0; m < NM; m++) zlG[m * NG + g] = ZlPerKg(inp, KsTab.Goods[g], StartIndex(KsTab.Goods[g], p, m));
+            var defSh = new double[nl * NG];
+            for (int l = 0; l < nl; l++)
+            {
+                int mk; if (!x.LandMk.TryGetValue(x.Lands[l], out mk)) mk = 0;
+                double tot = 0;
+                foreach (int g in Food) { double e = DL[l * NG + g] - SL[l * NG + g]; if (e > 0) { defSh[l * NG + g] = e * zlG[mk * NG + g]; tot += defSh[l * NG + g]; } }
+                foreach (int g in Food) defSh[l * NG + g] = tot > 0 ? defSh[l * NG + g] / tot : 0.0;
+            }
             // problem przewozu
-            R.LandFlow.Clear(); R.Kraina.Clear();
+            R.LandFlow.Clear(); R.LandFlowFree.Clear(); R.Kraina.Clear(); R.NoOutlet.Clear();
             Array.Clear(x.FlowPcs, 0, x.FlowPcs.Length); Array.Clear(x.FlowDays, 0, x.FlowDays.Length); Array.Clear(x.FlowSea, 0, x.FlowSea.Length);
             var graw = new double[nl * NG]; for (int i = 0; i < graw.Length; i++) graw[i] = 1.0;
             var nodes = new List<int>(nl);
@@ -338,32 +377,50 @@ namespace Armoury
                     for (int l = 0; l < nl; l++) { int mk; if (x.LandMk.TryGetValue(x.Lands[l], out mk) && mk == m && (SL[l * NG + g] > 1.0 || DL[l * NG + g] > 1.0)) nodes.Add(l); }
                     int n = nodes.Count;
                     if (n < 1) continue;
-                    var ex = new double[n];
-                    double ts = 0, td = 0;
-                    for (int i = 0; i < n; i++) { int l = nodes[i]; ex[i] = SL[l * NG + g] - DL[l * NG + g]; if (ex[i] > 0) ts += ex[i]; else td -= ex[i]; }
-                    // luki (zrodlo -> cel): doby bramy, przepustowosc
-                    var cost = new double[n * n]; var cap = new double[n * n];
-                    double idx = StartIndex(KsTab.Goods[g], p, m), zl = ZlPerKg(inp, KsTab.Goods[g], idx);
+                    var ex = new double[n]; var exM = new double[n];
+                    for (int i = 0; i < n; i++) { int l = nodes[i]; ex[i] = SL[l * NG + g] - DL[l * NG + g]; }
+                    double zl = zlG[m * NG + g];
+                    // budzet kasy importera (przed D i przewoz bez sufitu po D): najwyzej udzial towaru x 15% kasy krainy na dobe (towar wezla celu)
+                    for (int i = 0; i < n; i++)
+                    {
+                        int l = nodes[i];
+                        double capN = zl > 0 ? defSh[l * NG + g] * CorrCofferDay * gold[l] / zl : 0.0;
+                        exM[i] = ex[i] < 0 ? -Math.Min(-ex[i], Math.Max(0.0, capN)) : ex[i];
+                    }
+                    // luki (zrodlo -> cel): doby bramy, przepustowosc (przed D - polowa udzialu kasy importera na towar w drodze; po D - dowoz KS-H)
+                    var cost = new double[n * n]; var cap = new double[n * n]; var capM = new double[n * n];
                     for (int i = 0; i < n; i++)
                         for (int j = 0; j < n; j++)
                         {
-                            cost[i * n + j] = -1; cap[i * n + j] = 0;
+                            cost[i * n + j] = -1; cap[i * n + j] = 0; capM[i * n + j] = 0;
                             if (i == j || ex[i] <= 0 || ex[j] >= 0) continue;
                             int li = nodes[i], lj = nodes[j], k = li * nl + lj;
                             float dd = x.GwDays[k];
                             if (!(dd >= 0f) || dd > lim) continue;
-                            double c;
+                            double cm = zl > 0 ? defSh[lj * NG + g] * 0.5 * gold[lj] / (zl * Math.Max(1.0, dd)) : 0.0, c = cm;
                             if (inp.AfterD)
                             {
                                 double del = 0;
                                 if (inp.CorrDelivered != null) inp.CorrDelivered.TryGetValue(x.Lands[li] + "|" + x.Lands[lj] + "|" + g.ToString(CultureInfo.InvariantCulture), out del);
                                 c = Math.Max(1.2 * del, 20.0) * kgp;
                             }
-                            else c = zl > 0 ? 0.5 * gold[lj] / (zl * Math.Max(1.0, dd)) : 0.0;
-                            if (!(c > 0)) continue;
-                            cost[i * n + j] = Math.Max(1.0, dd); cap[i * n + j] = c;
+                            cost[i * n + j] = Math.Max(1.0, dd);
+                            if (c > 0) cap[i * n + j] = c;
+                            if (cm > 0) capM[i * n + j] = cm;
                         }
-                    var flow = KsCorridors.Transport(n, ex, cost, cap);
+                    var flow = KsCorridors.Transport(n, inp.AfterD ? ex : exM, cost, cap);
+                    if (inp.AfterD)
+                    {
+                        // NKS-24 (recenzja runda 3): przewoz bez sufitu dowozu KS-H (budzet kasy jak przed D) - wzorzec dowozu do porownania z tym, co KS-H naprawde dowiozl
+                        var free = KsCorridors.Transport(n, exM, cost, capM);
+                        for (int i = 0; i < n; i++)
+                            for (int j = 0; j < n; j++)
+                            {
+                                double f = free[i * n + j]; if (!(f > 1e-9)) continue;
+                                int li = nodes[i], lj = nodes[j];
+                                R.LandFlowFree.Add(new KsFlow { From = x.Lands[li], To = x.Lands[lj], G = g, M = m, Pcs = f / kgp, Days = cost[i * n + j], Sea = x.GwSea[li * nl + lj] });
+                            }
+                    }
                     bool noGrad = side || p[m * NG + g] <= 2.0 * PLo;
                     // gradient surowy
                     var inF = new double[n]; var inT = new double[n]; var outF = new double[n];
@@ -387,19 +444,20 @@ namespace Armoury
                         if (ex[i] < 0)
                         {
                             double r = -ex[i] - inF[i];
-                            // tryb "kraina" (brak bez zrodla w zasiegu > 5% popytu - kraina liczy sie sama, cena 1.5) tylko dla towarow trwalych; psujacego sie bez zrodla
-                            // w 7 dobach nikt nie dowiezie i nie ma po co go drozyc - regula zasiegu zdejmuje jego popyt zaplacony (drabina zastepuje)
-                            // (test portu 17.10: tryb "kraina" dla sera, masla, oliwek i miodu pchal stada i sady w krainach bez ziemi pod nie - mieso z uboczu stad na podloge
-                            // ceny, Westeros na targ 1.4-1.5; zostaje dla zboza - glod krainy, rozdz. 5 projektu)
+                            // tryb "kraina" (brak bez zrodla w zasiegu albo bez kasy na dowoz > 5% popytu - kraina liczy sie sama, cena 1.5) tylko dla zboza (rozdz. 5 projektu);
+                            // psujacego sie bez zrodla w 7 dobach nikt nie dowiezie - regula zasiegu zdejmuje jego popyt zaplacony (drabina zastepuje)
                             if (!per && g == KsTab.GGrain && dl > 50.0 && r > 0.05 * dl) { gr = CorrMaxG; kraina.Add((m == 0 ? "W " : "E ") + x.Lands[l] + " " + KsTab.Goods[g] + " " + (100.0 * r / dl).ToString("0", CultureInfo.InvariantCulture) + "%"); }
                             else if (inF[i] > 1e-9) gr = Math.Min(CorrMaxG, 1.0 + CorrMargin + inT[i] / inF[i]);
                         }
                         else if (ex[i] > 0 && sl > 50.0 && !per)
                         {
-                            // (test portu 17.10: tansze ryby w krainach bez odbiorcy w 7 dobach przenosily rybakow do owiec i mysliwych - mieso z uboczu na podloge ceny; psujacy sie
-                            // nadmiar zjada sama kraina - lepszy stol R8)
                             double u = ex[i] - outF[i];
-                            if (u > 0.05 * sl) gr = Math.Max(CorrMinG, 1.0 - u / sl);
+                            if (u > 0.05 * sl)
+                            {
+                                gr = Math.Max(CorrMinG, 1.0 - u / sl);
+                                // recenzja runda 3 (NKS-23): kraina z nadwyzka bez odbiorcy (wojna albo poza zasiegiem) - lista w linii korytarzy
+                                R.NoOutlet.Add((m == 0 ? "W " : "E ") + x.Lands[l] + " " + KsTab.Goods[g] + " " + (100.0 * u / sl).ToString("0", CultureInfo.InvariantCulture) + "%");
+                            }
                         }
                         graw[l * NG + g] = noGrad ? 1.0 : gr;
                     }
@@ -417,7 +475,7 @@ namespace Armoury
                     foreach (int g in Food)
                     {
                         int i = l * NG + g;
-                        double nv = 0.5 * x.GradBase[i] + 0.5 * graw[i];
+                        double nv = GradDamp * x.GradBase[i] + (1.0 - GradDamp) * graw[i];
                         nv = Math.Max(CorrMinG, Math.Min(CorrMaxG, nv));
                         double dd = Math.Abs(nv - x.GradBase[i]) / Math.Max(1e-9, x.GradBase[i]);
                         if (dd > dmax) dmax = dd;
@@ -461,8 +519,7 @@ namespace Armoury
                 R.Grad = gd;
             }
             R.GradDMax = dmax; R.GradMax = gmax; R.GradDBig = dbig;
-            // regula zasiegu psujacych sie
-            if (inp.Reach) ReachRule(x, prod);
+            // regula zasiegu psujacych sie - przed krokiem 8 (Solve, recenzja runda 3)
             R.CorrMs += sw.Elapsed.TotalMilliseconds;
         }
 
@@ -487,6 +544,8 @@ namespace Armoury
             if (nt <= 0 || x.TGradBase == null || inp.TownDays == null || inp.TownDays.Length != nt * nt) return null;
             var sup = new double[nt * NG]; var dem = new double[nt * NG]; var tmp = new double[NG];
             double wpop = Math.Max(1.0, x.WPop);
+            // recenzja runda 3: popyt zaplacony (potrzeby po kroku 8) + odbior panow i dworow w miescie + reszta 1:1 wedlug ludzi (jak krainy)
+            var rest = OneRest(x);
             foreach (var d in x.D)
             {
                 int t = d.CorrTown; if (t < 0 || t >= nt) continue;
@@ -494,16 +553,23 @@ namespace Armoury
                 if (prod.TryGetValue(d.Id, out a)) foreach (int g in Food) if (PerishG[g]) sup[t * NG + g] += a[g];
                 Array.Clear(tmp, 0, NG);
                 CivilGoods(d.Need, tmp);
-                OneGoods(x, d.People / wpop, tmp);
-                foreach (int g in Food) if (PerishG[g]) dem[t * NG + g] += tmp[g];
+                foreach (int g in Food) if (PerishG[g]) dem[t * NG + g] += tmp[g] + rest[g] * d.People / wpop;
             }
             for (int t = 0; t < nt; t++)
             {
                 var ts = inp.Towns[t];
                 Array.Clear(tmp, 0, NG);
                 CivilGoods(ts.Need, tmp);
-                OneGoods(x, ts.People / wpop, tmp);
-                foreach (int g in Food) if (PerishG[g]) dem[t * NG + g] += tmp[g];
+                TownOneAdd(x, ts.Id, tmp);
+                foreach (int g in Food) if (PerishG[g]) dem[t * NG + g] += tmp[g] + rest[g] * ts.People / wpop;
+            }
+            // recenzja runda 3 (wazne): jeden budzet kasy miasta celu na wszystkie psujace sie (udzial wedlug wartosci braku towaru), jak krainy
+            var tsh = new double[nt * NG];
+            for (int t = 0; t < nt; t++)
+            {
+                int mt = inp.Towns[t].Market == 0 ? 0 : 1; double tot = 0;
+                foreach (int g in Food) { if (!PerishG[g]) continue; double e = dem[t * NG + g] - sup[t * NG + g]; if (e > 0) { tsh[t * NG + g] = e * ZlPerKg(inp, KsTab.Goods[g], StartIndex(KsTab.Goods[g], p, mt)); tot += tsh[t * NG + g]; } }
+                foreach (int g in Food) if (PerishG[g]) tsh[t * NG + g] = tot > 0 ? tsh[t * NG + g] / tot : 0.0;
             }
             var graw = new double[nt * NG]; for (int i = 0; i < graw.Length; i++) graw[i] = 1.0;
             Array.Clear(x.TUnmet, 0, x.TUnmet.Length);
@@ -518,9 +584,15 @@ namespace Armoury
                     for (int t = 0; t < nt; t++) if (inp.Towns[t].Market == m && (sup[t * NG + g] > 1.0 || dem[t * NG + g] > 1.0)) nodes.Add(t);
                     int n = nodes.Count;
                     if (n < 1) continue;
-                    var ex = new double[n];
+                    var ex = new double[n]; var exM = new double[n];
                     for (int i = 0; i < n; i++) ex[i] = sup[nodes[i] * NG + g] - dem[nodes[i] * NG + g];
                     double idx = StartIndex(KsTab.Goods[g], p, m), zl = ZlPerKg(inp, KsTab.Goods[g], idx);
+                    for (int i = 0; i < n; i++)
+                    {
+                        int tj = nodes[i];
+                        double capN = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? tsh[tj * NG + g] * CorrCofferDay * Math.Max(0.0, inp.TownGold28[tj]) / zl : double.PositiveInfinity;
+                        exM[i] = ex[i] < 0 ? -Math.Min(-ex[i], capN) : ex[i];
+                    }
                     var cost = new double[n * n]; var cap = new double[n * n];
                     for (int i = 0; i < n; i++)
                         for (int j = 0; j < n; j++)
@@ -532,11 +604,11 @@ namespace Armoury
                             float dd = inp.TownDays[ti * nt + tj];
                             if (!(dd >= 0f) || dd > CorrPerishDays) continue;
                             if (inp.TownWar != null && inp.TownWar[ti * nt + tj]) continue;
-                            double c = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? 0.5 * Math.Max(0.0, inp.TownGold28[tj]) / (zl * Math.Max(1.0, dd)) : 1e12;
+                            double c = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? tsh[tj * NG + g] * 0.5 * Math.Max(0.0, inp.TownGold28[tj]) / (zl * Math.Max(1.0, dd)) : 1e12;
                             if (!(c > 0)) continue;
                             cost[k] = Math.Max(1.0, dd); cap[k] = c;
                         }
-                    var flow = KsCorridors.Transport(n, ex, cost, cap);
+                    var flow = KsCorridors.Transport(n, exM, cost, cap);
                     var inF = new double[n]; var inT = new double[n]; var outF = new double[n];
                     for (int i = 0; i < n; i++)
                         for (int j = 0; j < n; j++)
@@ -645,6 +717,18 @@ namespace Armoury
                     dem[t * NG + g] += PerishNeed(ts.Need, g) + (one != null && g < one.Length ? Math.Max(0.0, one[g]) : 0.0);
                 }
             }
+            // recenzja runda 3 (drobne): podaz spoza tabeli (lodzie rybackie NavalDLC - ExoLand krainy) w podazy miasta wedlug ludzi okregow miasta (jak Plan rozklada lodzie);
+            // pola mieszczan sa okregami miasta (byTown) - juz w podazy
+            if (x.TownLand != null && inp.ExoLand.Count > 0)
+                for (int t = 0; t < nt; t++)
+                {
+                    int l = x.TownLand[t]; if (l < 0) continue;
+                    double[] exo; double lp;
+                    if (!inp.ExoLand.TryGetValue(x.Lands[l], out exo) || exo == null || !x.LPop.TryGetValue(x.Lands[l], out lp) || !(lp > 0)) continue;
+                    double pp = inp.Towns[t].People; if (byTown[t] != null) foreach (var d in byTown[t]) pp += d.People;
+                    double sh = Math.Min(1.0, pp / lp);
+                    for (int g = 0; g < NG; g++) if (PerishG[g] && exo[g] > 0) sup[t * NG + g] += exo[g] * sh;
+                }
             x.ReachT = new Dictionary<string, bool[]>(StringComparer.Ordinal); x.ReachD = new Dictionary<string, bool[]>(StringComparer.Ordinal);
             R.Unreached.Clear();
             for (int t = 0; t < nt; t++)
@@ -689,7 +773,8 @@ namespace Armoury
             var R = x.R; var inv = CultureInfo.InvariantCulture;
             var sb = new StringBuilder(6000);
             sb.Append("KS: korytarze planu doba {DOBA} | gradient krainy ").Append(x.In.Corridors ? "TAK" : "NIE (klucz Ks Land Gradient)").Append(", regula zasiegu ").Append(x.In.Reach ? "TAK" : "NIE")
-              .Append(", przepustowosc ").Append(x.In.AfterD ? "po D (1.2 x dowoz KS-H, najmniej 20 szt./d)" : "przed D (polowa kasy 28 dob importera na towar w drodze)").Append(", rund kroku 5 ").Append(R.CorrRounds)
+              .Append(", przepustowosc ").Append(x.In.AfterD ? "po D (1.2 x dowoz KS-H, najmniej 20 szt./d)" : "przed D (budzet kasy importera: 15% kasy 28 dob na dobe, polowa kasy na towar w drodze, dzielony wedlug wartosci braku)")
+              .Append(", popyt krain zaplacony (po kroku 8), tau lad ").Append(CorrTauLand.ToString("0.000", inv)).Append(" morze ").Append(CorrTauSea.ToString("0.0000", inv)).Append("/d").Append(", rund kroku 5 ").Append(R.CorrRounds)
               .Append(", czas ").Append(R.CorrMs.ToString("0", inv)).Append(" ms");
             for (int m = 0; m < NM; m++)
             {
@@ -716,6 +801,19 @@ namespace Armoury
                 sb.Append(i == 0 ? " " : ", ").Append(k.From).Append('>').Append(k.To).Append(' ').Append(KsTab.Goods[k.G]).Append(' ').Append(k.Pcs.ToString("0", inv)).Append(" (").Append(k.Days.ToString("0", inv)).Append(k.Sea ? " d morzem)" : " d)");
             }
             if (big.Count > 80) sb.Append(", inne ").Append(big.Count - 80);
+            // recenzja runda 3 (NKS-24): po D przewoz bez sufitu dowozu KS-H (budzet kasy importera) - wzorzec do porownania z dowozem
+            if (x.In.AfterD)
+            {
+                sb.Append(" | korytarze bez sufitu dowozu >= 20 szt./d:");
+                var fb = R.LandFlowFree.FindAll(k => k.Pcs >= 20.0);
+                fb.Sort((a, b) => b.Pcs.CompareTo(a.Pcs));
+                if (fb.Count == 0) sb.Append(" -");
+                for (int i = 0; i < fb.Count && i < 80; i++)
+                {
+                    var k = fb[i];
+                    sb.Append(i == 0 ? " " : ", ").Append(k.From).Append('>').Append(k.To).Append(' ').Append(KsTab.Goods[k.G]).Append(' ').Append(k.Pcs.ToString("0", inv)).Append(" (").Append(k.Days.ToString("0", inv)).Append(k.Sea ? " d morzem)" : " d)");
+                }
+            }
             // KS-R3 runda 3 symulatora: psujace sie na poziomie miast - stojace (nadwyzka miasta bez odbiorcy w 7 dobach) i bez dowozu (% podazy / popytu rynku), gradient miast
             if (x.TownPerishDone)
             {
@@ -738,6 +836,7 @@ namespace Armoury
             }
             sb.Append(" | kraina-tryb: ").Append(R.Kraina.Count > 0 ? string.Join(", ", R.Kraina.ToArray()) : "brak");
             sb.Append(" | bez zrodla: ").Append(R.Unreached.Count > 0 ? string.Join(", ", R.Unreached.ToArray()) : "brak");
+            sb.Append(" | bez ujscia (nadwyzka bez odbiorcy - wojna albo poza zasiegiem): ").Append(R.NoOutlet.Count > 0 ? string.Join(", ", R.NoOutlet.ToArray()) : "brak");
             sb.Append(" | gradient max ").Append(R.GradMax.ToString("0.000", inv)).Append(" (zmiana ostatniej rundy ").Append((100 * R.GradDMax).ToString("0.0", inv)).Append("%, komorek kraina x towar ze zmiana > 5%: ").Append(R.GradDBig).Append(')');
             if (x.In.LandCut != null && x.In.LandCut.Count > 0)
             {
