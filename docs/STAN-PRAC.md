@@ -2727,3 +2727,8 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   (rynek wsi BK wedlug potrzeb, B1-B4, G1), r4-ceny (P3-P10, C1-C3, ser/maslo/sol/Essos), sw-drogi (+15% na drogach ROT, plik arm_map_roads_geo.tsv), sw-zajazdy (zajazdy +
   noclegi + plotki, takze w miescie), sw-przysiolki (uklad wiosek v6), sw-herby (limit 160 tekstur); kazda: kod -> recenzja -> poprawki; potem scalenie do w-toku/noc-ks4
   (zb/n-ks4), 2 recenzje calosci + weryfikacja + poprawki; rownolegle inwentarz listy 14.10 (co zostalo). Wpisy CHANGELOG paczek: docs/noc-1718/<paczka>-CHANGELOG.md -> scalenie.
+- DECYZJE JEFFA 17.10 ok. 16:40 PDT (wiazace): (3) kuznia jak u kowali AI - NIE ("to zepsuje zabawe w grze"; ForgeLikeTownSmith zostaje WYL.); (4) uchodzcy z najazdu do najblizszego
+  miasta - TAK (do fali 2); place rosna przy braku rak - TAK; Essos: "nie robmy sztucznego prawa - jak gloduja, jedza tansze jedzenie, jak nie ma jedzenia - bunt; w interesie
+  pana miasta dowiezc jedzenie, kupcy przywoza, bo duzo zarobia, chyba ze glod globalny - ustawia to ekonomia podazy i popytu" (-> fala 2: glod miasta -> niepokoj/bunt + pan
+  miasta finansuje dowoz, bez regul jednej krainy); NA KONIEC: pelny przeglad logiki calej ekonomii - akumulatory pieniadza (kto zarabia, a nie wydaje i wchlonie kase),
+  realizm z malymi poprawkami dla grywalnosci.
