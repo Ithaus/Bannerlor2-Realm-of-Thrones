@@ -85,6 +85,8 @@ namespace Armoury
             public double KcalW, KcalG, ZlW, ZlG;                        // recenzja 17.10: kcal i wartosc (ceny polki) chciane / kupione - jedzenie robione w domu, linia ZC4
             // KS-R3 G2: drabina 2 - kupuje tylko z kiesy ponad Lim i tylko ponad cel polki miasta (Pass2); liczniki drabiny 2 (INFO)
             public long Lim; public bool Pass2; public double P2Got, P2Shelf, P2Gold;
+            // KS-R3 (port symulatora 17.10, runda 2): drabina 2 w miastach obok (F2) - kcal i wartosc chciane juz policzone w miescie targowym (bez drugiego liczenia)
+            public bool Alt;
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -150,8 +152,14 @@ namespace Armoury
         {
             EquipmentElement e; int have;
             int price = ZcPrice(b, z, out e, out have);
-            b.KcalW += n * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
-            b.ZlW += (double)n * (price > 0 ? price : 0);
+            // KS-R3 (port symulatora 17.10, runda 2): chciane kcal i wartosc tylko w miescie targowym - reszta szukana w miastach obok (F2) to ta sama potrzeba (dotad
+            // kazde miasto obok dopisywalo ja jeszcze raz: kcal chciane wsi do 2-3 razy koszyka, "kupione" w linii ZC4 i NKS-8c o polowe za nisko, czesc kupiona wsi
+            // _zvBought za niska - racje z pracy domowej za wysokie; symulator: bez pokrycia Westeros 14.4% -> 7.6%, Essos 11.3% -> 3.4% przy tych samych zakupach)
+            if (!b.Alt)
+            {
+                b.KcalW += n * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
+                b.ZlW += (double)n * (price > 0 ? price : 0);
+            }
             if (price <= 0 || have <= 0) { b.P2Shelf += n; return 0; }
             int above = (int)Math.Floor(have + ShelfKeep - StartCalibration.ZStallTarget(b.T, z));   // have = polka - 5; nad celem polki miasta
             int k = Math.Min(n, Math.Min(have, above));
@@ -268,7 +276,7 @@ namespace Armoury
                         {
                             if (alt.Town == null || alt.ItemRoster == null) continue;
                             var keepT = b.T; var keepR = b.R; var keepM = b.Mk;
-                            b.T = alt.Town; b.R = alt.ItemRoster; b.Mk = alt;
+                            b.T = alt.Town; b.R = alt.ItemRoster; b.Mk = alt; b.Alt = true;
                             var gf2 = GoodsLedger.Begin(GoodsLedger.FFolkVill, alt);
                             long s0 = b.Spent; bool rest = false;
                             try
@@ -283,7 +291,7 @@ namespace Armoury
                             }
                             finally
                             {
-                                GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM;
+                                GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Alt = false;
                                 long sp = b.Spent - s0;
                                 if (sp > 0) { Folk ma, mm; if (_f.TryGetValue(alt, out ma)) ma.VillWin += sp; if (_f.TryGetValue(mk, out mm)) mm.VillWin -= sp; }
                             }

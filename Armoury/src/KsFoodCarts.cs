@@ -46,6 +46,9 @@ namespace Armoury
                                                 KsTab.GGrape, KsTab.GOlives, KsTab.GDate, KsTab.GHoney, KsTab.GSalt, -1 };
         private const double TauLand = 0.010, TauSea = 0.005, Margin = 0.03, SrcKeep = 1.25, OfferShare = 0.5, KxUp = 1.10, KxDown = 0.98, KxMax = 2.5, CofferShare = 0.15;
         private const int MaxSrc = 3, NCand = 12, Keep = 5, ReturnDays = 30, CallsPerDay = 200;
+        // KS-R3 (port symulatora 17.10, runda 2): gdy zadne z 12 najblizszych miast nie moze wyslac (bez nadwyzki, poza zasiegiem, wojna, cena) - najwyzej 4 dalsze miasta
+        // rynku z nadwyzka w zasiegu (wedlug dob; Qarth, Meereen, Polnoc: nadwyzka zboza Volantis i Reach lezala poza 12 najblizszymi - 191 z 240 prob "bez nadwyzki")
+        private const int NCandFar = 4;
         private const double MaxDur = 30.0, MaxPer = 7.0;
 
         internal static bool SwitchOn { get { var s = Settings.Current; return s == null || s.KsFoodCarts; } }
@@ -59,6 +62,7 @@ namespace Armoury
         private static int[] _pairs;                  // pary tego samego rynku (a * nt + b, a < b) w stalej kolejnosci
         private static int _cursor, _pairsDone;
         private static int[][] _cand;                 // 12 najblizszych miast rynku wedlug dob
+        private static int[][] _candFar;              // KS-R3 runda 2: reszta miast rynku wedlug dob (szukane tylko, gdy 12 najblizszych nic nie da)
         private static bool _candDirty = true;
         private static string _pendingDays;
         private static float[] _kx;                   // [nt * NZ] sterowanie brakiem
@@ -81,6 +85,7 @@ namespace Armoury
         // liczniki doby (linia)
         private static int _dLots, _dLand, _dSea, _dArrCarts, _dBack, _dWaitSiege, _dStum, _dSample;
         private static long _dBought, _dGold, _dFreight, _dFrV, _dFrP, _dArr, _dBackPcs, _dRefund, _dDrop, _dPoor, _dOrdered, _dLost;
+        private static int _dFar, _dRes; private static long _dResGold;   // KS-R3 runda 2: loty z dalszych miast, loty z zapasu kupcow (pusta polka) i ich zloto
         private static long _gDst, _gSrc, _gCarters, _gCrews, _gRefSrc, _gRefDst;
         private static readonly long[] _dByZ = new long[NZ];
         private static double _dSampleErr, _dSampleMax; private static long _dTicks;
@@ -89,7 +94,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _t = null; _st = null; _nt = 0; _tHash = 0; _ix = null; _mk = null; _days = null; _sea = null; _pairs = null; _cursor = _pairsDone = 0; _cand = null; _candDirty = true;
+            _t = null; _st = null; _nt = 0; _tHash = 0; _ix = null; _mk = null; _days = null; _sea = null; _pairs = null; _cursor = _pairsDone = 0; _cand = null; _candFar = null; _candDirty = true;
             _pendingDays = null; _kx = null; _pendingKx = null; _vilOf = null; _vilDay = -1;
             _carts.Clear(); _inc = null; _pending = null; _prevTransit = -1;
             _delEma.Clear(); _delDay.Clear(); _delN = 0; Array.Clear(_shipEma, 0, _shipEma.Length); Array.Clear(_daysEma, 0, _daysEma.Length); _shipN = 0;
@@ -99,7 +104,7 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dLots = _dLand = _dSea = _dArrCarts = _dBack = _dWaitSiege = _dStum = _dSample = 0;
+            _dLots = _dLand = _dSea = _dArrCarts = _dBack = _dWaitSiege = _dStum = _dSample = 0; _dFar = _dRes = 0; _dResGold = 0;
             _dBought = _dGold = _dFreight = _dFrV = _dFrP = _dArr = _dBackPcs = _dRefund = _dDrop = _dPoor = _dOrdered = _dLost = 0;
             _gDst = _gSrc = _gCarters = _gCrews = _gRefSrc = _gRefDst = 0;
             Array.Clear(_dByZ, 0, NZ); _dSampleErr = _dSampleMax = 0; _dTicks = 0;
@@ -276,7 +281,7 @@ namespace Armoury
         {
             if (!_candDirty && _cand != null) return;
             _candDirty = false;
-            _cand = new int[_nt][];
+            _cand = new int[_nt][]; _candFar = new int[_nt][];
             var l = new List<KeyValuePair<float, int>>(_nt);
             for (int t = 0; t < _nt; t++)
             {
@@ -286,6 +291,9 @@ namespace Armoury
                 var c = new int[Math.Min(NCand, l.Count)];
                 for (int i = 0; i < c.Length; i++) c[i] = l[i].Value;
                 _cand[t] = c;
+                var cf = new int[Math.Max(0, l.Count - c.Length)];
+                for (int i = 0; i < cf.Length; i++) cf[i] = l[c.Length + i].Value;
+                _candFar[t] = cf;
             }
         }
 
@@ -422,6 +430,10 @@ namespace Armoury
                 for (int k = 0; k < NZ; k++) { items[k] = StartCalibration.ZItem(Z[k]); cats[k] = items[k] != null ? items[k].ItemCategory : null; if (items[k] != null && !ixOf.ContainsKey(items[k])) ixOf[items[k]] = k; }
                 var sh = new int[nt * NZ]; var ix = new float[nt * NZ]; var dz = new double[nt * NZ]; var dp = new double[nt * NZ];
                 var budget = new double[nt]; var siege = new bool[nt];
+                // KS-R3 (port symulatora 17.10, runda 2): przy polce celu ponizej T* x popyt (miastu brakuje jedzenia) kupcy placa takze z zapasu kupcow - najwyzej 15% calej
+                // kasy na dobe (zapas kupcow to ich kapital na towar; jedzenie wraca do kasy przy sprzedazy mieszczanom i wsiom); dotad tylko ponad zapasem: kasy miast stoja
+                // przy zapasie (zawor do pana), Sunspear, Planky Town, Meereen, Lorath nie mogly kupic zboza przy pustej polce
+                var budgetAll = new double[nt]; var spent = new double[nt];
                 for (int i = 0; i < nt; i++)
                 {
                     var t = _t[i]; var st = _st[i];
@@ -449,6 +461,7 @@ namespace Armoury
                     }
                     long res = 0; try { res = Seal31.TownReserve(t); } catch { res = 0; }
                     budget[i] = CofferShare * Math.Max(0, t.Gold - res);
+                    budgetAll[i] = CofferShare * Math.Max(0, t.Gold);
                 }
                 var offer = new double[nt * NZ];
                 var tstar = new double[2 * NZ];
@@ -495,8 +508,31 @@ namespace Armoury
                             if (ix[t * NZ + k] < c * (1.0 + Margin)) continue;
                             cand.Add(new KeyValuePair<double, int>(c, s));
                         }
+                        bool far = false;
+                        if (cand.Count == 0 && _candFar != null && _candFar[t] != null)
+                        {
+                            // KS-R3 runda 2: 12 najblizszych nic nie da - dalsze miasta rynku (wedlug dob, te same warunki), najwyzej NCandFar
+                            var cf = _candFar[t];
+                            for (int ci = 0; ci < cf.Length && cand.Count < NCandFar; ci++)
+                            {
+                                int s = cf[ci];
+                                float L = Days(s, t); if (!(L >= 0f)) continue;
+                                if (L > lim) break;
+                                if (offer[s * NZ + k] < 1 || siege[s]) continue;
+                                bool war = false;
+                                try { war = _st[s].MapFaction != null && _st[t].MapFaction != null && FactionManager.IsAtWarAgainstFaction(_st[s].MapFaction, _st[t].MapFaction); } catch { war = false; }
+                                if (war) continue;
+                                double tau = _sea[s * nt + t] ? TauSea : TauLand;
+                                double c = ix[s * NZ + k] * (1.0 + tau * L);
+                                if (ix[t * NZ + k] < c * (1.0 + Margin)) continue;
+                                cand.Add(new KeyValuePair<double, int>(c, s));
+                            }
+                            far = cand.Count > 0;
+                        }
                         if (cand.Count == 0) continue;
                         cand.Sort((a, b) => a.Key != b.Key ? a.Key.CompareTo(b.Key) : a.Value.CompareTo(b.Value));
+                        // budzet celu tego towaru: ponad zapasem kupcow, a przy polce ponizej T* x popyt - z calej kasy (najwyzej 15% na dobe razem z tym, co juz wydane)
+                        bool shortStall = Hc < T * d;
                         int used = 0;
                         // KS-R3 (port symulatora 17.10, runda 1): licznik NKS-22 raz na cel x towar x dobe - zamowione = pierwsza ilosc z kandydata, kasa celu za mala = czego
                         // z niej nie kupiono, gdy kasa zatrzymala choc jeden lot (dotad kazdy kandydat dopisywal ten sam brak jeszcze raz: 58-66% zamowionych w symulatorze)
@@ -514,14 +550,16 @@ namespace Armoury
                             double tau = sea ? TauSea : TauLand;
                             long cost = LotPrice(_t[s], items[k], n, false);
                             long fr = (long)Math.Round(cost * tau * L);
-                            if (cost + fr > budget[t])
+                            // budzet lotu: ponad zapasem kupcow (budget) albo przy polce ponizej T* x popyt - z calej kasy (budgetAll); spent - wydane dzis na wszystkie towary celu
+                            double avail = (shortStall ? Math.Max(budget[t], budgetAll[t]) : budget[t]) - spent[t];
+                            if (cost + fr > avail)
                             {
-                                int nf = cost + fr > 0 ? (int)Math.Floor(n * budget[t] / (double)(cost + fr)) : 0;
+                                int nf = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
                                 poorHit = true;
                                 if (nf < Math.Max(5.0, 0.5 * d)) continue;
                                 n = nf;
                                 cost = LotPrice(_t[s], items[k], n, false); fr = (long)Math.Round(cost * tau * L);
-                                if (cost + fr > budget[t] + 1) continue;
+                                if (cost + fr > avail + 1) continue;
                             }
                             if (n <= 0 || cost <= 0) continue;
                             if ((Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u) Sample(_t[s], items[k], n, cost);
@@ -529,7 +567,10 @@ namespace Armoury
                             if (got <= 0) continue;
                             got0 += got;
                             used++;
-                            offer[s * NZ + k] -= got; sh[s * NZ + k] -= got; Hc += got; budget[t] -= cost + fr;
+                            if (far) _dFar++;
+                            double over = spent[t] + cost + fr - Math.Max(budget[t], spent[t]);      // czesc lotu ponad budzetem ponad zapasem - z zapasu kupcow
+                            if (over > 0) { _dRes++; _dResGold += (long)Math.Round(over); }
+                            offer[s * NZ + k] -= got; sh[s * NZ + k] -= got; Hc += got; spent[t] += cost + fr;
                         }
                         if (ord0 > 0) { _dOrdered += ord0; if (poorHit) _dPoor += Math.Max(0, ord0 - got0); }
                     }
@@ -730,6 +771,8 @@ namespace Armoury
                       .Append(" (cel -").Append(_gDst).Append(", zrodla +").Append(_gSrc).Append(", furmani +").Append(_gCarters).Append(", zalogi +").Append(_gCrews).Append(", zwroty ").Append(_gRefDst).Append('/').Append(_gRefSrc).Append(')');
                 }
                 else sb.Append(" | kontrola od nastepnej doby");
+                // KS-R3 runda 2 symulatora: loty z dalszych miast i z zapasu kupcow (przed "probka" - regex NKS-22 bez zmian)
+                sb.Append(" | z dalszych miast (12 najblizszych bez nadwyzki) ").Append(_dFar).Append(" wozow, z zapasu kupcow (polka ponizej T* x popyt) ").Append(_dRes).Append(" wozow, ").Append(_dResGold).Append(" zl");
                 sb.Append(" | probka wyceny 1/64 ").Append(_dSample > 0 ? (100.0 * _dSampleErr / _dSample).ToString("0.00", inv) + "% (max " + (100.0 * _dSampleMax).ToString("0.00", inv) + "%, lotow " + _dSample + ")" : "-")
                   .Append(" | tabela dob ").Append(_pairsDone).Append('/').Append(_pairs != null ? _pairs.Length : 0)
                   .Append(" | czas ").Append((_dTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv)).Append(" ms | potkniecia ").Append(_dStum).Append('.');

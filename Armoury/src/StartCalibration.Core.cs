@@ -1098,6 +1098,7 @@ namespace Armoury
             var view = new KsResult();
             var prod = new double[NI]; var prod2 = new double[NI]; var own = new double[NI]; var own2 = new double[NI];
             var q = new double[NZ]; var paid = new double[NZ]; var u = new double[NZ];
+            var cvZ = new int[NZ]; var cvP = new double[NZ];                 // KS-R3 krok 8c: pozycje do zamiany na towar zastepczy (wedlug surowca za kcal)
             var keep = new double[KsTab.NN]; var full = new double[KsTab.NN];
             var pz = new double[NM * NZ]; var pi = new double[NM * NI]; var bi = new double[NM * NI];
             var sz = new double[NM * NZ]; var si = new double[NM * NI];   // ceny cienia (praca) - rachunek pracy domowej
@@ -1242,7 +1243,7 @@ namespace Armoury
                         // KS-R3 P4 (regula nadmiaru krainy): towar, ktorego polki krainy okregu maja ponad 2 x cel i rosna - potrojna waga w poprawce G '+'
                         if (gk >= 0 && sur[m * KsTab.NG + gk]) svs += (prod[i] * si[m * NI + i] - vi) * (v.Glut != null && gk < v.Glut.Length && v.Glut[gk] ? 3.0 : 1.0);
                     }
-                    double v0 = hw2 > hwc ? Math.Max(0.0, made - made2) / (hw2 - hwc) : made, raw = 0, rawNo = 0, subK = 0;
+                    double v0 = hw2 > hwc ? Math.Max(0.0, made - made2) / (hw2 - hwc) : made, raw = 0, rawNo = 0, subK = 0, stK = 0, rawF = 0;
                     // udzial w nadmiarze (poprawka G w gore): wartosc towarow w nadmiarze w czesci rak zajec, ktora praca domowa zdejmuje (nie dom, nie zboze wlasne)
                     v.Sur = hw2 > hwc ? Math.Max(0.0, svs) / (hw2 - hwc) : 0.0;
                     for (int z = 0; z < NZ; z++)
@@ -1250,15 +1251,40 @@ namespace Armoury
                         u[z] = (1.0 - paid[z]) * q[z];
                         if (!(u[z] > 0)) continue;
                         double r = u[z] * RawZ(sz, m * NZ, z);
-                        if (v.Ok[z]) raw += r;
+                        if (v.Ok[z]) { raw += r; if (KsBasket.Kcal[z] > 0) rawF += r; }
                         else if (v.Sub >= 0 && KsBasket.Kcal[z] > 0 && KsBasket.Kcal[v.Sub] > 0)
                         {
                             // KS-R3 krok 8b: kcal pozycji, ktorej okreg sam nie zrobi, robi praca domowa jako najtanszy wlasny towar okregu (kcal za kcal)
                             double kz = u[z] * KsBasket.Kcal[z];
-                            raw += kz / KsBasket.Kcal[v.Sub] * RawZ(sz, m * NZ, v.Sub);
+                            double rs = kz / KsBasket.Kcal[v.Sub] * RawZ(sz, m * NZ, v.Sub);
+                            raw += rs; rawF += rs;
                             subK += kz;
                         }
                         else rawNo += r;
+                    }
+                    // KS-R3 krok 8c (port symulatora 17.10, runda 2; klucz Ks Alpha Net jak 8b): gdy rak na wlasny niezaplacony koszyk nie starcza (surowiec > HomeMax x V0),
+                    // praca domowa robi kcal najpierw najtanszym wlasnym towarem zastepczym (zboze, ryby, dziczyzna, daktyle) zamiast pozycji drozszych za kcal (mieso, ser,
+                    // wino...) - kcal za kcal, od najdrozszej, tylko tyle, ile trzeba, zeby rece starczyly. Biedna wies je chleb zamiast miesa, a nie glodzi sie przy pelnym
+                    // koszyku (harness: 54 okregi z bez pokrycia > 20%, Westeros Plan bez pokrycia 7.5% - oliwnik w Reach z koszykiem 4 x sprzedaz, raw / V0 1.31)
+                    if (v.Sub >= 0 && v0 > 0 && rawF > inp.HomeMax * v0 && KsBasket.Kcal[v.Sub] > 0)
+                    {
+                        double subPer = RawZ(sz, m * NZ, v.Sub) / KsBasket.Kcal[v.Sub];
+                        int nc = 0;
+                        for (int z = 0; z < NZ; z++)
+                        {
+                            if (!v.Ok[z] || z == v.Sub || !(u[z] > 0) || !(KsBasket.Kcal[z] > 0)) continue;
+                            double per = RawZ(sz, m * NZ, z) / KsBasket.Kcal[z];
+                            if (per > subPer * 1.0001) { cvZ[nc] = z; cvP[nc] = per; nc++; }
+                        }
+                        Array.Sort(cvP, cvZ, 0, nc);
+                        for (int j = nc - 1; j >= 0 && rawF > inp.HomeMax * v0; j--)
+                        {
+                            int z = cvZ[j];
+                            double kz = u[z] * KsBasket.Kcal[z], save = kz * (cvP[j] - subPer);
+                            if (!(save > 0)) continue;
+                            double fr = Math.Min(1.0, (rawF - inp.HomeMax * v0) / save);
+                            raw -= fr * save; rawF -= fr * save; stK += fr * kz;
+                        }
                     }
                     v.V0 = v0;
                     double target = v0 > 0 ? Math.Max(0.0, Math.Min(inp.HomeMax, raw / v0)) : 0.0;
@@ -1273,7 +1299,10 @@ namespace Armoury
                         var fp = new float[NZ]; for (int z = 0; z < NZ; z++) fp[z] = (float)paid[z];
                         R.DistPaid[d.Id] = fp; R.DistHome[d.Id] = hwc;
                         // czesc pokryta praca domowa (recenzja 17.10, wazne): hw x V0 / surowiec pozycji HomeMask, najwyzej 1 - kcal robione w domu najwyzej tyle (gra: racje)
-                        double cov = raw > 0 ? Math.Min(1.0, hwc * v0 / raw) : 0.0, hkc = 0, fk = 0, uk = 0;
+                        // KS-R3 krok 8c (klucz Ks Alpha Net jak 8b): rece pracy domowej najpierw na jedzenie (kcal), potem na rzeczy (plotno, sukno, skora...) - czesc pokryta
+                        // kcal z surowca jedzenia; bez klucza - jak dotad (surowiec calego niezaplaconego koszyka)
+                        double covBase = inp.HomeSub ? rawF : raw;
+                        double cov = covBase > 0 ? Math.Min(1.0, hwc * v0 / covBase) : 0.0, hkc = 0, fk = 0, uk = 0;
                         for (int z = 0; z < NZ; z++)
                         {
                             double kc = KsBasket.Kcal[z]; if (!(kc > 0)) continue;
@@ -1282,7 +1311,7 @@ namespace Armoury
                         }
                         hkc = cov * (hkc + subK);                                 // KS-R3 krok 8b: kcal zastepcze tez robione w domu (ta sama czesc pokryta)
                         R.DistHomeKcal[d.Id] = fk > 0 ? (float)Math.Max(0.0, Math.Min(1.0, hkc / fk)) : 0f;
-                        M.VFullKcal[m] += fk; M.VUnpaidKcal[m] += uk; M.VHomeKcal[m] += hkc; M.VSubKcal[m] += cov * subK;
+                        M.VFullKcal[m] += fk; M.VUnpaidKcal[m] += uk; M.VHomeKcal[m] += hkc; M.VSubKcal[m] += cov * (subK + stK);   // 8b + 8c (kcal robione towarem zastepczym)
                         // sprzedaz bez pracy domowej (te same zajecia) - ile krok 8 zdejmuje z targu (linia; podatek panow od utargu wozow idzie za sprzedaza)
                         d.HomeWork = 0.0;
                         KsDeliver.Produce(d, v.Parts, prod2);
