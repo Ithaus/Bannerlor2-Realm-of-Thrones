@@ -2620,3 +2620,11 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   BEZ darowania - splata z wplywow w pokoju; zwloka = miasta-wierzyciele nie pozyczaja, lojalnosc spada, dlug zostaje. Do wprowadzenia razem z F3.
 - Test F1 120 dob: test/fin72 (Armoury B646874C z n-ds 14f1a2f7), flaga armoury-ds-wlacz.flag UTWORZONA (USUNAC po tescie!), at-fin72-ds.out.txt; ocena: sprawdz_logi --grupa nds
   --baza-doby D:/Backup-Bannerlord/logi-testow/Armoury-2026-10-16_18-23-34.log (bieg WGRANIA 74 bez DS) + nzc0/nzc2/nbitwa.
+
+### 74. TEST DS F1 (wsie) w grze - PRZESZEDL 38/38 (17.10 11:48-12:25 PDT, n-ds 14f1a2f7, Armoury-2026-10-17_11-47-55.log + CSV, kopia logi-testow)
+- Flaga armoury-ds-wlacz.flag USUNIETA. 0 ERROR, bitwa OK (kod 0), nzc0 19/0, nzc2 14/0, nbitwa 17/0, nds 38/38 (po poprawce bramki: pierwsza doba z rampa 1 - ticki BK/W7 z rampa
+  poprzedniej doby, 2 zl + 1423 zl; commit narzedzia na n-ds).
+- Liczby wobec biegu WGRANIA 74 bez DS (18-23-34): korona w rampie 1.005, po rampie 0.965; zwrot zoldu 100% kazdej doby (baza: 5 dob z niedoplata 36.6k); krolestwo-doby z kredytem
+  Banku 4.2% (baza 16.1%); dlug koron w Banku +871/d (baza +6402/d); D staly rodow 1.022; kiesy wsi 3.97 -> 4.04 mln (+0.03%/d), mediana +18%, wsi < 1000 zl 5.1%; czynsz zaplacony
+  99.2%, zaleglosci 10 wsi / 0.9 dnia; dziesiecina przy wozie dokladnie 5%; roboty gminy 115k/d (place 86k + material 29k); takt doby 517.6 ms (baza 493.0).
+- WGRANIE 75 (propozycja) = WGRANIE 74 + DS F1 (DuesMedieval domyslnie TAK, DsTowns NIE, bez KS) - CZEKA NA SLOWO JEFFA (duza zmiana ekonomii).
