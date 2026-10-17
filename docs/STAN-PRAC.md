@@ -2650,3 +2650,8 @@ B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na P
   zwloki w pokoju NIE jest umarzany: -10 lojalnosci miast-wierzycieli, zakaz pozyczek od miast, dlug zostaje i idzie z wplywow (kara co 90 dob dalszej zwloki); plik-przelacznik
   autotestu armoury-dst-wlacz.flag dla DsTowns (tylko autotest). Build rc 0, gen_mcm 1711.
 - Test 120 dob F1 (domyslnie) + F3 (flaga): test/fin74 (Armoury 64541221), flaga armoury-dst-wlacz.flag UTWORZONA (USUNAC po tescie!), at-fin74-f3.out.txt; ocena nds (z baza 18-23-34).
+- 13:35 PDT: test F3 fin74 (Armoury-2026-10-17_12-57-44.log): 0 ERROR, bitwa OK, nds 38/41. NIE: NDS-7b po rampie korona 0.873 (prog 0.95), NDS-9 D staly rodow 0.944 (0.95),
+  NDS-14d (bramka F1 0.15; przy F3 g do 2 -> pulap 0.20 - poprawione w narzedziu). Zwrot zoldu 100%, kaskada: skarbiec 1.82M, zaliczki 0.40M, Bank 0.89M (29%), Bank +3673/d (baza +6402).
+  PRZYCZYNA korony 0.873: sesja przelaczenia liczy zwykle wplywy z okna pomiaru ze STARYMI poborami (P1, zawor) - King's Landing prognoza 85k, po rampie ok. 25k -> g 0.5 przy luce
+  45k/d; nastepna sesja dopiero w dzien kwartalu (109200 - po tescie). POPRAWKA ac170b34 (noc-ds-f3): swobodna sesja "po rampie" 7 dob po koncu rampy z 7 ostatnich probek.
+  Test fin75 160 dob (Armoury eaebcd63), flaga armoury-dst-wlacz.flag UTWORZONA (USUNAC!), at-fin75-f3b.out.txt.
