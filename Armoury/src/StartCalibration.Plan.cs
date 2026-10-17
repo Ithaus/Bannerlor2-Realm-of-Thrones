@@ -272,7 +272,8 @@ namespace Armoury
             _plan = r; _planIn = inp; _planDay = _wDay;
             if (r.Error == null) { _plans++; if (_firstPlanDay < 0) _firstPlanDay = _wDay; }
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
-            if (r.Error == null) { try { PlanCsv(_wDay, r, inp); } catch (Exception e) { Stumble("PlanCsv", e); } }
+            // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku)
+            if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { PlanCsv(_wDay, r, inp); } catch (Exception e) { Stumble("PlanCsv", e); } }
         }
 
         private static string F2(double x) { return double.IsNaN(x) || double.IsInfinity(x) ? "-" : x.ToString("0.00", Inv); }

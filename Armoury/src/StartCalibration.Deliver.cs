@@ -22,18 +22,19 @@ namespace Armoury
         internal static readonly string[] ItemIds =
         {
             "grain", "fish", "cheese", "butter", "Egg", "apple", "carrot", "orange", "grape", "olives", "date_fruit", "salt", "honey", "spice", "wool", "flax", "cotton",
-            "hardwood", "clay", "limestone", "marble", "iron", "silver", "gold_ore", "fur", "whale_oil", "walrus_tusk", "cow", "hog", "sheep", "WhaleMeat", "meat"
+            "hardwood", "clay", "limestone", "marble", "iron", "silver", "gold_ore", "fur", "whale_oil", "walrus_tusk", "cow", "hog", "sheep", "WhaleMeat", "meat", "hides"
         };
-        internal const int ItemCount = 32;
+        internal const int ItemCount = 33;
         internal const int IGrain = 0, IFish = 1, ICheese = 2, IButter = 3, IEgg = 4, IApple = 5, ICarrot = 6, IOrange = 7, IGrape = 8, IOlives = 9, IDate = 10, ISalt = 11,
                            IHoney = 12, ISpice = 13, IWool = 14, IFlax = 15, ICotton = 16, IWood = 17, IClay = 18, ILime = 19, IMarble = 20, IIron = 21, ISilver = 22, IGold = 23,
-                           IFur = 24, IWhaleOil = 25, ITusk = 26, ICow = 27, IHog = 28, ISheep = 29, IWhaleMeat = 30, IMeat = 31;
+                           IFur = 24, IWhaleOil = 25, ITusk = 26, ICow = 27, IHog = 28, ISheep = 29, IWhaleMeat = 30, IMeat = 31, IHides = 32;
         internal static readonly int[] GoodToItem = BuildG2I();
         private static int[] BuildG2I()
         {
             var a = new int[KsTab.NG];
             for (int g = 0; g < KsTab.NG; g++) a[g] = Array.IndexOf(ItemIds, KsTab.Goods[g]);
-            a[KsTab.GMeat] = -1; a[KsTab.GHides] = -1; a[KsTab.GHorse] = -1;    // mieso i skory z uboju robia miasta (rzemieslnicy BK); konie - lancuch gry
+            a[KsTab.GMeat] = -1; a[KsTab.GHides] = -1; a[KsTab.GHorse] = -1;    // mieso i skory z uboju zywca na targu robia miasta (rzemieslnicy BK); konie - lancuch gry
+            // (skory z uboju zywca zjedzonego w okregu - Own: na targ)
             return a;
         }
         internal static readonly double[] ItemKcal = BuildKcal();
@@ -92,8 +93,8 @@ namespace Armoury
         }
 
         /// <summary>To, co okreg zje sam (kg/d na towar), z potrzeb domowych (NeedsOfKeep x lepszy stol): zboze z piwem domowym, ryby, nabial, owoce, winogrona na wino,
-        /// oliwki na oliwe, miod na miod pitny, len i welna przedzione w domu; mieso - dziczyzna i wieloryb, potem uboj zywca (mieso = polowa zywca). Zwraca kcal zjedzone
-        /// z wlasnego pola i domu (z warstwa dom).</summary>
+        /// oliwki na oliwe, miod na miod pitny, len i welna przedzione w domu; mieso - dziczyzna i wieloryb, potem uboj zywca (mieso = polowa zywca; skory tego uboju
+        /// dopisane do produkcji - na targ). Zwraca kcal zjedzone z wlasnego pola i domu (z warstwa dom).</summary>
         internal static double Own(double[] prod, double[] n, double[] own)
         {
             Array.Clear(own, 0, own.Length);
@@ -113,6 +114,8 @@ namespace Armoury
             {
                 double need = Math.Min(live, meat / KsTab.MeatOfLive), k = need / live;
                 own[ICow] = prod[ICow] * k; own[IHog] = prod[IHog] * k; own[ISheep] = prod[ISheep] * k;
+                // skory zywca ubitego na wlasny stol ida na targ (do garbarzy miasta) - jak skory z uboju w modelu
+                prod[IHides] += own[ICow] * KsTab.HideOfLive(KsTab.GCow) + own[IHog] * KsTab.HideOfLive(KsTab.GHog) + own[ISheep] * KsTab.HideOfLive(KsTab.GSheep);
             }
             double kc = n[KsTab.NH] * 1200.0;
             for (int i = 0; i < ItemCount; i++) kc += own[i] * ItemKcal[i];

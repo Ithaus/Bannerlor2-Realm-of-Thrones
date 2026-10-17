@@ -57,10 +57,10 @@ namespace Armoury
                     if (t == null || t.Settlement == null) continue;
                     double[] a;
                     bool fresh = !_px.TryGetValue(t, out a);
-                    if (fresh) { a = new double[ItemCount + 1]; _px[t] = a; }
-                    for (int i = 0; i <= ItemCount; i++)
+                    if (fresh) { a = new double[ItemCount]; _px[t] = a; }
+                    for (int i = 0; i < ItemCount; i++)
                     {
-                        var it = i < ItemCount ? _items[i] : _hides;
+                        var it = _items[i];
                         double ix = 1.0;
                         if (it != null && it.ItemCategory != null) { try { ix = t.GetItemCategoryPriceIndex(it.ItemCategory); } catch { ix = 1.0; } }
                         if (!(ix > 0) || double.IsInfinity(ix) || double.IsNaN(ix)) ix = 1.0;
@@ -75,7 +75,7 @@ namespace Armoury
         private static double Px(double[] px, int g)
         {
             if (g == KsTab.GMeat) return px[IMeat];
-            if (g == KsTab.GHides) return px[ItemCount];
+            if (g == KsTab.GHides) return px[KsDeliver.IHides];
             int it = GoodToItem[g];
             return it >= 0 ? px[it] : 1.0;
         }
@@ -244,14 +244,14 @@ namespace Armoury
             sb.Append(PK).Append("ceny miast dzien ").Append(day).Append(" (mediana indeksu 28 dob, miast ").Append(_px.Count).Append(", dob sredniej ").Append(Math.Min(28, _pxDays)).Append("):");
             var vals = new List<double>(_px.Count);
             bool first = true;
-            for (int i = 0; i <= ItemCount; i++)
+            for (int i = 0; i < ItemCount; i++)
             {
                 vals.Clear();
                 foreach (var a in _px.Values) if (a != null && i < a.Length) vals.Add(a[i]);
                 if (vals.Count == 0) continue;
                 vals.Sort();
                 double med = vals.Count % 2 == 1 ? vals[vals.Count / 2] : 0.5 * (vals[vals.Count / 2 - 1] + vals[vals.Count / 2]);
-                sb.Append(first ? " " : ", ").Append(i < ItemCount ? ItemIds[i] : "hides").Append(' ').Append(med.ToString("0.00", Inv));
+                sb.Append(first ? " " : ", ").Append(ItemIds[i]).Append(' ').Append(med.ToString("0.00", Inv));
                 first = false;
             }
             sb.Append('.');
