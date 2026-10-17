@@ -2581,3 +2581,11 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - KS runda 3 (wf_0342c556-72c): symulacja 3 nie przeszla (16/26 towarow w pasmie, kiesy wsi -0.2..-0.4%/d), recenzje 1 krytyczna + 22 wazne, poprawki w toku. KS runda 4 po DS.
 - 09:15 PDT: KS runda 3 SKONCZONA (wf_0342c556-72c): 5c895704 na w-toku/noc-ks3 (41 uwag recenzji), scalone int **ed949c36** (build rc 0). Symulacja 3: S-G1/5/6/8/9 TAK,
   S-G2/3/4/7 NIE. Test w grze 120 dob: test/fin71 (Armoury z int ed949c36), flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC po tescie!), at-fin71-r3f.out.txt.
+
+### 71. TEST KS runda 3 final w grze (17.10 09:07-09:42 PDT, int ed949c36, Armoury-2026-10-17_09-07-09.log + CSV, kopia logi-testow) - NIE PRZESZEDL (24 z 53)
+- Flagi usuniete. 0 ERROR, bitwa OK, nzc0/nzc2/nbitwa 0 NIE. nks: 18 NIE + 6 ETAP z 53.
+- POPRAWA: zboze dni polki mediana 3.6 (r2 1.5), q90 8 (r2 60-300 - koniec przepelnionych), < 0.5 dnia 14-16% (r2 39%), indeks zboza mediana 1.29, wsie kupuja 77-79%,
+  kcal bez pokrycia W 12.6% / E 5.5%, kiesy wsi 3.72M (r3 2.61M), kupcy KS-H 1.04M szt., zwroty 0.2%, kasa celu za mala 24% (r3 42%).
+- DALEJ NIE: ceny miesa/nabialu/owocow/oliwek 2-3x startu (NKS-7, 23b), korytarze 71/80 ponizej 0.8 Planu (NKS-24), podloga spichlerza 51% wsi (NKS-26), sterowanie Essos x0.85 (NKS-27),
+  rynek BK wsi 17-24% wplywu (NKS-29), alfa wsi dalej 0 (NKS-3c - naprawi DS), koszt 4.9 / 14.5 ms (NKS-9/9b), KS-H 1.76 ms (NKS-28).
+- Rozpoznanie rundy 4 (tylko odczyt) rownolegle z kodem DS; runda 4 = DS (budzet wsi z praw) + kredyt kupcow KS-H + poprawki z tego testu.
