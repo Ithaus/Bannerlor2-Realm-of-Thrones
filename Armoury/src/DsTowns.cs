@@ -102,7 +102,7 @@ namespace Armoury
         internal static void Reset()
         {
             _dayOn = -1; _fixDay = -1; _mDays = 0; _worldShare = double.NaN; _farm.Clear();
-            SwitchDue = false; _stumblesSess = 0; _err.Clear(); _events.Clear(); _aidPend.Clear(); _waitLogged = false;
+            SwitchDue = false; _stumblesSess = 0; _err.Clear(); _events.Clear(); _aidPend.Clear(); _waitLogged = false; _atFlag = -1;
             ClearCounters();
         }
 
@@ -113,7 +113,33 @@ namespace Armoury
         }
 
         // ============================================================ przelaczniki
-        internal static bool Key { get { var s = Settings.Current; return s != null && s.DsTowns; } }
+        internal static bool Key { get { var s = Settings.Current; return s != null && (s.DsTowns || AutotestFlag); } }
+
+        internal const string AutotestFlagName = "armoury-dst-wlacz.flag";
+        private static int _atFlag = -1;   // -1 nie sprawdzony w tej sesji, 0 nie, 1 tak (Reset zeruje)
+
+        /// <summary>Plik-przelacznik autotestu F3 (jak DsVillage armoury-ds-wlacz.flag): Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-dst-wlacz.flag
+        /// wlacza DsTowns tylko w trybie autotestu CrashScribe (LogGate 1 / 2) - nigdy w grze Jeffa; sprawdzany raz na sesje.</summary>
+        internal static bool AutotestFlag
+        {
+            get
+            {
+                if (_atFlag >= 0) return _atFlag == 1;
+                bool f = false;
+                try
+                {
+                    int m = LogGate.Mode;
+                    if (m == 1 || m == 2)
+                    {
+                        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        f = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), AutotestFlagName));
+                    }
+                }
+                catch { f = false; }
+                if (Campaign.Current != null) _atFlag = f ? 1 : 0;
+                return f;
+            }
+        }
 
         /// <summary>F3 czynne: klucz, kiesa ludu (TownFolk.Live), korona z biezacych wplywow (165) i zawor kas miast (A1 - kasy to prawdziwy pieniadz).</summary>
         internal static bool On { get { return Key && TownFolk.Live && CrownIncome.On && TownPurse.ValveLive; } }

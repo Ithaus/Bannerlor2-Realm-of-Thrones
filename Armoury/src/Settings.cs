@@ -2016,6 +2016,7 @@ namespace Armoury
         public float CrownTownLoanRateYear = 0.10f;        // with Crown Town Loans: the interest a year the towns and townsfolk earn on what their crown borrowed (0.10 = ten parts in a hundred a year - less than a house pays its people, far less than the Iron Bank asks of a king)
         public float CrownTownLoanLimitDays = 90f;         // with Crown Town Loans: the most a crown may owe its towns, in days of its own daily income (dues, war levies, tolls, its share of the purses), plus 50000 for each town of the realm
         public int CrownTownLoanDefaultDays = 90;          // with Crown Town Loans: days in a row in peace without the full instalment after which a crown defaults on its debt to its towns
+        public bool CrownTownLoanNoWriteOff = true;        // with Crown Town Loans: a crown that does not pay its towns for Crown Town Loan Default Days in peace is in DEFAULT - its towns lose loyalty and lend it nothing for a while, but the debt is NOT written off: it stays and is paid from the crown's income (Jeff 17.10: debts must be paid); off = the old write-off
         // W5 (decyzja Jeffa 13.10 po biegu rocznym: wojska lordow 79 tys. przy progu 85 tys.; kierunek 1 "korona placi wedlug potrzeby"): danina P1 tej doby
         // najpierw doplaca do zoldu druzyn rodom, ktorych wlasny pulap zoldu nie starcza na druzyny do celu wypelnienia; reszta idzie w renty 180 jak dotad
         // (KingdomTreasury.NeedAid.cs; wpiecia: CrownRents.Daily, ClanBudget.Daily, WageRefund). Klucze NOWE - w Armoury.json Jeffa ich nie ma

@@ -5688,6 +5688,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int CrownTownLoanDefaultDays { get; set; } = 90;
 
+        [SettingPropertyBool("Crown Town Loan No Write Off", HintText = "with Crown Town Loans: a crown that does not pay its towns for Crown Town Loan Default Days in peace is in DEFAULT - its towns lose loyalty and lend it nothing for a while, but the debt is NOT written off: it stays and is paid from the crown's income (Jeff 17.10: debts must be paid); off = the old write-off")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownTownLoanNoWriteOff { get; set; } = true;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -8273,6 +8277,7 @@ namespace Armoury
             s.CrownTownLoanRateYear = CrownTownLoanRateYear;
             s.CrownTownLoanLimitDays = CrownTownLoanLimitDays;
             s.CrownTownLoanDefaultDays = CrownTownLoanDefaultDays;
+            s.CrownTownLoanNoWriteOff = CrownTownLoanNoWriteOff;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

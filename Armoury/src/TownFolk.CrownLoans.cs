@@ -53,6 +53,7 @@ namespace Armoury
         private const int KlPerTown = 50000, KlBanDays = 182, KlRepayDays = 182, KlIncDays = 84, KlIncWarmup = 7, KlSurplusDays = 30;
         private const double KlSrcShare = 0.5, KlIncomeShare = 0.30;
         private const float KlDefaultLoyalty = 10f;
+        private static int _klNoWoN; private static double _klNoWoAmt;   // Jeff 17.10: zwloki bez umorzenia (doba)
         private static bool _klStartDone;
         private static double _klDebtPrev = double.NaN;
         // ---- okno linii (od linii do linii: splaty po CrownIncome.Begin, pozyczki po CrownIncome.End)
@@ -81,7 +82,7 @@ namespace Armoury
             _klLent = _klLentKasa = _klLentW = _klLentR = _klLentP = _klPaidInc = _klPaidStock = _klPaidKasa = _klPaidPurse = _klWritten = _klLost = 0;
             _klInt = _klWrittenD = _klLostD = _klDust = _klGap = 0;
             _klLentN = _klWar = _klCand = _klBlkBan = _klBlkWarm = _klBlkLimit = _klBlkNoSrc = _klMissedN = _klDefaultN = _klLoyN = _klLostN = _klAbove = _klStumbles = 0;
-            _klFromAnt = 0;   // DS F3 (L1): dlug przeniesiony z zaliczek po kwartale
+            _klFromAnt = 0;   // DS F3 (L1): dlug przeniesiony z zaliczek po kwartale _klNoWoN = 0; _klNoWoAmt = 0;
             foreach (var kv in _kl) { kv.Value.DLent = 0; kv.Value.DPaid = 0; }
         }
 
@@ -337,7 +338,25 @@ namespace Armoury
                             }
                         }
                         x.DPaid += paid;
-                        if (!war && x.Missed >= dflt)
+                        if (!war && x.Missed >= dflt && s.CrownTownLoanNoWriteOff)
+                        {
+                            // Jeff 17.10 ("dlugi trzeba splacac"): ZWLOKA bez umorzenia - dlug zostaje i dalej idzie z wplywow; miasta-wierzyciele -10 lojalnosci
+                            // i bez nowych pozyczek od miast przez KlBanDays; licznik zwloki od nowa (kara co dflt dob dalszej niesplaty w pokoju). Zloto nie znika.
+                            double rest = KlDebt(x);
+                            _klDefaultN++; _klNoWoN++; _klNoWoAmt += rest;
+                            var hit2 = new HashSet<Town>();
+                            foreach (var p in x.Parts)
+                            {
+                                var st = Settlement.Find(p.St);
+                                if (st == null || st.Town == null || !hit2.Add(st.Town)) continue;
+                                try { st.Town.Loyalty = Math.Max(0f, st.Town.Loyalty - KlDefaultLoyalty); _klLoyN++; } catch (Exception e) { KlStumble("Pay(lojalnosc zwloki)", e); }
+                            }
+                            _klBan[kv.Key] = today + KlBanDays;
+                            x.Missed = 0;
+                            Log.Info("Pozyczki koron (korona2): " + (k.Name != null ? k.Name.ToString() : kv.Key) + " nie splacalo dlugu u miast " + dflt + " dob w pokoju - ZWLOKA, dlug "
+                                     + N0(rest) + " zl ZOSTAJE (bez umorzenia), miasta-wierzyciele -" + KlDefaultLoyalty.ToString("0", KlInv) + " lojalnosci, bez pozyczek od miast do doby " + (today + KlBanDays) + ".");
+                        }
+                        else if (!war && x.Missed >= dflt)
                         {
                             double rest = KlDebt(x);
                             _klWritten += (long)Math.Round(rest); _klWrittenD += rest; _klDefaultN++;
@@ -516,7 +535,7 @@ namespace Armoury
                       .Append("; odsetki narosle ").Append(N0(_klInt)).Append(" (").Append((100 * KlRate(s)).ToString("0.#", KlInv)).Append("% rocznie), krolestw z niepelna rata w pokoju ")
                       .Append(_klMissedN)
                       .Append(" | niesplacone (umorzone po ").Append(KlDefault(s)).Append(" dobach w pokoju) ").Append(_klWritten).Append(" zl u ").Append(_klDefaultN)
-                      .Append(" krolestw (lojalnosc -").Append(KlDefaultLoyalty.ToString("0", KlInv)).Append(" w ").Append(_klLoyN).Append(" miastach), przepadlo z krolestwami zniszczonymi ")
+                      .Append(" krolestw; zwloki bez umorzenia ").Append(_klNoWoN).Append(" (dlug ").Append(N0(_klNoWoAmt)).Append(" zl zostaje)").Append(" (lojalnosc -").Append(KlDefaultLoyalty.ToString("0", KlInv)).Append(" w ").Append(_klLoyN).Append(" miastach), przepadlo z krolestwami zniszczonymi ")
                       .Append(_klLost).Append(" (").Append(_klLostN).Append(')')
                       .Append(" | dlug koron u miast ").Append(N0(debt)).Append(" (krolestw ").Append(_kl.Count).Append(", miast ").Append(places.Count).Append(", czesci ").Append(parts)
                       .Append("; kasy ").Append(N0(debtKasa)).Append(" / kiesy ").Append(N0(debt - debtKasa)).Append("), limit krolestw z dlugiem ").Append(N0(limAll))
