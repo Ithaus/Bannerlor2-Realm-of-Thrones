@@ -2658,3 +2658,8 @@ B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na P
 - 14:30 PDT: test F3 fin75 160 dob (Armoury-2026-10-17_13-37-03.log): 0 ERROR, bitwa OK, nds 38/40; NIE: NDS-7b po rampie 0.869, NDS-9 0.935. Dobre: zwrot 100%, Bank 13% pokrycia,
   dlug koron w Banku +370/d (baza +6340/d), krolestwo-doby z Bankiem 2.8% (baza 16.1%). PRZYCZYNA: sesja "po rampie" liczyla srednia z 'inne' - King's Landing doba 109161
   jednorazowo 793k -> prognoza 149k/d -> g zostalo 0.5. POPRAWKA 0564a5a5: 'inne' mediana z dob wojny. Test fin76 160 dob (Armoury 2a1ce0d5), flaga armoury-dst-wlacz.flag (USUNAC!).
+- 15:10 PDT: test F3 fin76 160 dob (Armoury-2026-10-17_14-24-13.log): 0 ERROR, bitwa OK, nds 39/40 (NIE tylko NDS-7b okno od 109132: 0.927 - zawiera rampe F3 i 7 dob przed sesja
+  "po rampie"; po sesji 109167-109195 korona 0.971, 109167-109240 0.965 bazy); D staly rodow 0.991; zwrot 100%; Bank 18% pokrycia; dlug koron w Banku +1061/d (baza +6340/d);
+  g: 22 krolestwa ponad 1, King's Landing 0.5 -> 1.5, Dorne 1 -> 2. nzc0/nzc2/nbitwa 0 NIE.
+- WGRANIE 76 PRZYGOTOWANE: `w-toku/noc-wgranie-76` 725150ad (= noc-ds-f3 0564a5a5 + DsTowns domyslnie TAK), Armoury d84f7b66; test dokladnej DLL 5 dob + bitwa 0 ERROR.
+  CZEKA NA SLOWO JEFFA (duza zmiana: daniny miast, korony, podatki wojenne, kredyt; dlugi korony u miast bez umorzenia).
