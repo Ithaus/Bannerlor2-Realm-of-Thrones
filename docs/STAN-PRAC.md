@@ -2704,3 +2704,9 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   Testy 120 dob bez bitwy; flaga armoury-ks-wlacz.flag; ocena nks + nds (baza 18-23-34).
 - 16:35 PDT: n-ks4 efbbf0dc (KS r4 cz. 5): drabina 2 wsi DS tylko ponad skrzynie (DsVillage.Chest); spichlerz bez podlogi przy KS (klucz KsGranaryNoFloor). Test fin79 120 dob
   BEZ bitwy (Armoury aff494d1 = KsRecipes + skrzynia + bez podlogi), flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC!), at-fin79-ks4b.out.txt. Dalej: KS-H kredyt kupcow (krok 3).
+
+### 81. PRZEKAZANIE NA PRACE NOCNA (17.10 ok. 16:25 PDT) - START TUTAJ: docs/PRZEKAZANIE-NOC-2026-10-17.md
+- Jeff: "przerwij test, zrob dokument przekazania i puscimy reszte prac na innym koncie praca nocna". Test fin79 przerwany, gra przywrocona (-RestoreOnly: Armoury d84f7b66,
+  CrashScribe da755a8a, arm_ks_land.tsv usuniety; engine_config.txt z kopii sprzed testu; flagi usuniete). W GRZE WGRANIE 76.
+- Galaz w-toku/noc-ks4 efbbf0dc na GitHub (KS runda 4 cz. 1-5). Pierwszy krok nastepnego konta: test 120 dob efbbf0dc (bez bitwy), potem KS-H kredyt kupcow i reszta listy.
+- Katalog DLL testu (fin68: CrashScribe da755a8a, RC, GT, ForgeView) skopiowany do D:/Backup-Bannerlord/scratch-2026-10-17/test-fin68; skrypty i przeglad receptur w tools/autotest-2026-10-17/.

@@ -1,0 +1,136 @@
+##### BannerKings.Redux\ModuleData\workshops.xml
+  artisans         speed 1     |   ->  1xhardwood
+  artisans         speed 0.6   |   ->  1xhides
+  artisans         speed 1.25  |   ->  1xiron
+  artisans         speed 0.8   | 1xgrain  ->  1xbeer
+  artisans         speed 0.2   |   ->  1xleather
+  artisans         speed 0.4   | 1xclay  ->  1xpottery
+  artisans         speed 0.5   |   ->  1xlinen
+  artisans         speed 1.0   | 1xgrain  ->  1xbread
+  artisans         speed 0.1   | 1xgrape  ->  1xwine
+  artisans         speed 0.05  | 1xiron  ->  2xtools
+  artisans         speed 0.1   | 1xolives  ->  1xoil
+  artisans         speed 0.8   |   ->  2xgarment
+  artisans         speed 1.0   |   ->  1xlight_armor
+  artisans         speed 1.0   | 1xhides  ->  2xmedium_armor
+  artisans         speed 0.4   | 1xiron  ->  2xheavy_armor
+  artisans         speed 0.2   | 2xiron  ->  1xultra_armor
+  artisans         speed 1.5   |   ->  1xmelee_weapons
+  artisans         speed 1.0   |   ->  2xmelee_weapons_2
+  artisans         speed 0.8   | 1xiron  ->  3xmelee_weapons_3
+  artisans         speed 0.4   | 1xiron  ->  2xmelee_weapons_4
+  artisans         speed 0.2   | 2xiron  ->  1xmelee_weapons_5
+  artisans         speed 0.8   |   ->  4xarrows
+  artisans         speed 1.2   |   ->  1xranged_weapons
+  artisans         speed 0.6   | 1xhardwood  ->  1xranged_weapons_2
+  artisans         speed 1.0   | 1xhardwood  ->  1xranged_weapons_3
+  artisans         speed 0.8   | 1xhardwood  ->  1xranged_weapons_4
+  artisans         speed 0.5   | 1xhardwood + 1xiron  ->  1xranged_weapons_5
+  artisans         speed 1.0   |   ->  1xshield
+  artisans         speed 1.0   | 1xhardwood  ->  1xshield_2
+  artisans         speed 0.9   | 1xhardwood  ->  1xshield_3
+  artisans         speed 0.6   | 1xhardwood + 1xiron  ->  1xshield_4
+  artisans         speed 0.3   | 1xhardwood + 1xiron  ->  1xshield_5
+  artisans         speed 1.0   | 1xhardwood  ->  1xhorse_equipment
+  artisans         speed 0.4   | 1xhardwood  ->  1xhorse_equipment_2
+  artisans         speed 1.0   | 1xleather  ->  1xhorse_equipment_3
+  artisans         speed 1.0   | 3xiron + 1xleather  ->  1xhorse_equipment_4
+  artisans         speed 0.5   | 4xiron + 1xleather  ->  1xhorse_equipment_5
+  weaponsmithy     speed 1     | 1xiron  ->  6xmelee_weapons
+  weaponsmithy     speed 1.2   | 1xhardwood  ->  3xmelee_weapons
+  weaponsmithy     speed 1.0   | 1xiron  ->  4xmelee_weapons_2
+  weaponsmithy     speed 1.2   | 1xhardwood  ->  2xmelee_weapons_2
+  weaponsmithy     speed 0.8   | 1xiron  ->  3xmelee_weapons_3
+  weaponsmithy     speed 0.5   | 1xiron  ->  2xmelee_weapons_4
+  weaponsmithy     speed 0.3   | 1xiron  ->  1xmelee_weapons_5
+  armorsmithy      speed 1.5   |   ->  1xlight_armor
+  armorsmithy      speed 1     | 1xhides  ->  4xlight_armor
+  armorsmithy      speed 1.5   | 1xhides  ->  3xmedium_armor
+  armorsmithy      speed 1.0   | 1xiron  ->  1xheavy_armor
+  armorsmithy      speed 0.5   | 2xiron + 1xhides  ->  1xultra_armor
+  barding-smithy   speed 1.0   | 1xhides  ->  1xhorse_equipment
+  barding-smithy   speed 1.0   | 1xhides  ->  1xhorse_equipment_2
+  barding-smithy   speed 1.0   | 1xflax  ->  1xhorse_equipment_2
+  barding-smithy   speed 1.0   | 2xhides  ->  1xhorse_equipment_3
+  barding-smithy   speed 1.0   | 1xhides + 1xflax  ->  1xhorse_equipment_3
+  barding-smithy   speed 0.8   | 3xiron + 2xhides  ->  1xhorse_equipment_4
+  barding-smithy   speed 0.5   | 4xiron + 3xhides  ->  1xhorse_equipment_5
+  fletcher         speed 1.5   |   ->  1xarrows
+  fletcher         speed 1     | 1xhardwood  ->  4xranged_weapons
+  fletcher         speed 1     | 1xhardwood  ->  4xranged_weapons_2
+  fletcher         speed 0.8   | 1xhardwood  ->  3xranged_weapons_3
+  fletcher         speed 0.5   | 1xhardwood  ->  3xranged_weapons_4
+  fletcher         speed 0.3   | 1xhardwood  ->  2xranged_weapons_5
+  bakery           speed 3     | 1xgrain  ->  2xbread
+  bakery           speed 0.5   | 1xgrain + 1xbutter  ->  4xpie
+  bakery           speed 0.5   | 1xgrain + 1xcarrot  ->  4xpie
+  bakery           speed 0.5   | 1xgrain + 1xorange  ->  4xpie
+  bakery           speed 0.5   | 1xgrain + 1xapple  ->  4xpie
+  bakery           speed 0.5   | 1xgrain + 1xmeat  ->  6xpie
+  butcher          speed 1     | 2xchicken  ->  1xmeat
+  butcher          speed 1     | 2xgoose  ->  1xmeat
+  butcher          speed 1     | 1xcow  ->  10xmeat + 5xhides
+  butcher          speed 2     | 1xsheep  ->  2xmeat + 2xhides
+  butcher          speed 2     | 1xhog  ->  4xmeat + 2xhides
+  mines            speed 1     |   ->  1xiron
+  meadery          speed 3.5   | 1xhoney  ->  2xmead
+##### SandBox\ModuleData\spworkshops.xml
+  artisans         speed 0.1   | 1xgrape  ->  1xwine
+  artisans         speed 0.05  | 1xiron  ->  2xtools
+  artisans         speed 0.1   | 1xolives  ->  1xoil
+  artisans         speed 0.8   |   ->  2xgarment
+  artisans         speed 0.8   |   ->  1xlight_armor
+  artisans         speed 0.3   | 1xleather  ->  1xmedium_armor
+  artisans         speed 0.15  | 1xiron  ->  1xheavy_armor
+  artisans         speed 0.075 | 1xiron  ->  1xultra_armor
+  artisans         speed 1.5   |   ->  1xmelee_weapons
+  artisans         speed 0.6   | 1xiron  ->  1xmelee_weapons_2
+  artisans         speed 0.3   | 1xiron  ->  1xmelee_weapons_3
+  artisans         speed 0.15  | 1xiron + 1xhardwood  ->  1xmelee_weapons_4
+  artisans         speed 0.075 | 1xiron + 1xhardwood + 1xleather  ->  1xmelee_weapons_5
+  artisans         speed 1.5   |   ->  1xarrows
+  artisans         speed 1.2   |   ->  1xranged_weapons
+  artisans         speed 0.6   | 1xhardwood  ->  1xranged_weapons_2
+  artisans         speed 0.3   | 1xhardwood  ->  1xranged_weapons_3
+  artisans         speed 0.1   | 1xhardwood + 1xleather  ->  1xranged_weapons_4
+  artisans         speed 0.05  | 1xhardwood + 1xleather + 1xiron  ->  1xranged_weapons_5
+  artisans         speed 1.2   |   ->  1xshield
+  artisans         speed 0.6   | 1xhardwood  ->  1xshield_2
+  artisans         speed 0.3   | 1xhardwood  ->  1xshield_3
+  artisans         speed 0.1   | 1xhardwood + 1xiron  ->  1xshield_4
+  artisans         speed 0.05  | 1xhardwood + 1xleather + 1xiron  ->  1xshield_5
+  artisans         speed 1.0   | 1xhardwood  ->  1xhorse_equipment
+  artisans         speed 0.4   | 1xhardwood  ->  1xhorse_equipment_2
+  artisans         speed 0.1   | 1xhardwood + 1xleather  ->  1xhorse_equipment_3
+  artisans         speed 0.05  | 1xhardwood + 1xiron + 1xleather  ->  1xhorse_equipment_4
+  artisans         speed 0.025 | 1xhardwood + 1xiron + 1xleather  ->  1xhorse_equipment_5
+  brewery          speed 3.5   | 1xgrain  ->  2xbeer
+  velvet_weavery   speed 0.75  | 1xcotton  ->  2xvelvet
+  linen_weavery    speed 2     | 1xflax  ->  2xlinen
+  wine_press       speed 2.5   | 1xgrape  ->  2xwine
+  pottery_shop     speed 2     | 1xclay  ->  2xpottery
+  olive_press      speed 2     | 1xolives  ->  2xoil
+  wool_weavery     speed 1     | 1xwool  ->  2xgarment
+  wool_weavery     speed 2     | 1xwool  ->  2xfelt
+  tannery          speed 2     | 1xhides  ->  2xleather
+  wood_WorkshopType speed 2     | 1xhardwood  ->  2xplanks
+  wood_WorkshopType speed 0.33  | 1xhardwood  ->  3xranged_weapons
+  wood_WorkshopType speed 0.5   | 1xhardwood  ->  1xranged_weapons_2
+  wood_WorkshopType speed 0.4   | 1xhardwood  ->  1xranged_weapons_3
+  wood_WorkshopType speed 0.3   | 1xhardwood  ->  1xranged_weapons_4
+  wood_WorkshopType speed 0.2   | 1xhardwood  ->  1xranged_weapons_5
+  wood_WorkshopType speed 1     | 1xhardwood  ->  1xshield
+  wood_WorkshopType speed 0.33  | 1xhardwood  ->  1xshield_2
+  wood_WorkshopType speed 0.2   | 1xhardwood  ->  1xshield_3
+  wood_WorkshopType speed 0.1   | 1xhardwood  ->  1xshield_4
+  wood_WorkshopType speed 0.1   | 1xhardwood  ->  1xshield_5
+  smithy           speed 1     | 1xiron  ->  2xmelee_weapons
+  smithy           speed 1     | 1xiron  ->  1xmelee_weapons_2
+  smithy           speed 0.5   | 1xiron  ->  1xmelee_weapons_3
+  smithy           speed 0.2   | 1xiron  ->  1xmelee_weapons_4
+  smithy           speed 0.1   | 1xiron  ->  1xmelee_weapons_5
+  smithy           speed 1     | 1xiron  ->  1xmedium_armor
+  smithy           speed 0.25  | 1xiron  ->  1xheavy_armor
+  smithy           speed 0.1   | 1xiron  ->  1xultra_armor
+  smithy           speed 1.5   | 1xiron  ->  4xtools
+  silversmithy     speed 0.75  | 1xsilver  ->  2xjewelry
