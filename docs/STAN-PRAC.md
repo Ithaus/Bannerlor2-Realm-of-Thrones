@@ -2710,3 +2710,12 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   CrashScribe da755a8a, arm_ks_land.tsv usuniety; engine_config.txt z kopii sprzed testu; flagi usuniete). W GRZE WGRANIE 76.
 - Galaz w-toku/noc-ks4 efbbf0dc na GitHub (KS runda 4 cz. 1-5). Pierwszy krok nastepnego konta: test 120 dob efbbf0dc (bez bitwy), potem KS-H kredyt kupcow i reszta listy.
 - Katalog DLL testu (fin68: CrashScribe da755a8a, RC, GT, ForgeView) skopiowany do D:/Backup-Bannerlord/scratch-2026-10-17/test-fin68; skrypty i przeglad receptur w tools/autotest-2026-10-17/.
+
+### 82. NOC 17/18.10 - DRUGIE KONTO (sesja 7752dcdc; start 16:25 PDT = 01:25 CEST) - W TOKU
+- Jeff (doslownie, ok. 16:30 PDT): "pracuj przez noc, az wszystko zrobisz, ma byc gra rano jak wstane gotowa do gry ze wszystkimi poprawkami i z poprawnie dzialajaca
+  ekonomia, moda CK2 na UI nie wgrywamy olejemy go"; "Masz czas do 11.00" (= 02:00 PDT 18.10); "a zajazdy, szybsze poruszanie po drogach?" -> zakres nocy: KS runda 4 (cala lista
+  PRZEKAZANIE-NOC rozdz. 5A) + swiat: drogi +15%, zajazdy przy szlakach + noclegi + plotki (takze karczmarz w miescie), przysiolki na pustkowiach, limit 160 tekstur proporczykow,
+  na koncu specjalizacja wiosek + inwestycje w okreg (AI nie inwestuje); ZC6/ZC7. Mapa CK3 / mod CK2 UI - SKRESLONE. Uchodzcy do miast - tylko po "tak" Jeffa.
+- ZGODA: wgrac KS i reszte po udanych testach (120 dob + 5 dob z bitwa dokladnej DLL) bez pytania w nocy; co nie przejdzie - wylaczone kluczem.
+- 16:36 PDT: test fin80 = powtorka przerwanego fin79 (Armoury aff494d1 = n-ks4 efbbf0dc, KsRecipes + skrzynia + bez podlogi), 120 dob BEZ bitwy, flaga armoury-ks-wlacz.flag
+  UTWORZONA (USUNAC po tescie!), wyjscie test/at-fin80-ks4c.out.txt.
