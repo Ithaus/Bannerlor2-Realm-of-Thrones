@@ -1157,9 +1157,12 @@ namespace Armoury
                         }
                         M.Excess[m] = e; M.ExcessRel[m] = dm > 0 ? e / dm : 0.0;
                     }
-                    // poprawka okregu G (bez nawijania): + wedlug udzialu w towarach w nadmiarze, - wedlug wartosci pracy domowej; G w [-HwV, HomeMax - HwV]
+                    // poprawka okregu G (bez nawijania): + wedlug udzialu w towarach w nadmiarze, - wedlug pracy domowej DODANEJ przez '+'; G w [0, HomeMax - HwV]
+                    // KS-R3 (port symulatora 17.10, runda 1): brak rynku (G '-') oddaje rynkowi tylko prace domowa ponad wlasny niezaplacony koszyk okregu (G > 0);
+                    // praca domowa na wlasny koszyk (HwV) zostaje - wies najpierw zyje z wlasnej ziemi i rak, brak targu pokazuja ceny (dotad G do -HwV: rynek Essos
+                    // zabieral rece pracy domowej wsiom, ktorych nie stac na koszyk - Plan bez pokrycia Essos 15.8% kcal, z ta zasada 3.3%)
                     Array.Clear(sumSur, 0, NM); Array.Clear(sumHv, 0, NM);
-                    foreach (var v in vs) { int m = v.D.Market == 0 ? 0 : 1; sumSur[m] += v.Sur; sumHv[m] += HomeOf(v.D) * v.V0; }
+                    foreach (var v in vs) { int m = v.D.Market == 0 ? 0 : 1; sumSur[m] += v.Sur; sumHv[m] += Math.Max(0.0, v.G) * v.V0; }
                     for (int m = 0; m < NM; m++) M.HwLeft[m] = sumHv[m];
                     var gw = new double[NM]; var ww = new double[NM];
                     foreach (var v in vs)
@@ -1167,9 +1170,9 @@ namespace Armoury
                         int m = v.D.Market == 0 ? 0 : 1;
                         double e = M.Excess[m], dG = 0;
                         if (e > 0 && sumSur[m] > 0 && v.V0 > 0) dG = 0.5 * e * (v.Sur / sumSur[m]) / v.V0;
-                        else if (e < 0 && sumHv[m] > 0) dG = 0.5 * e * HomeOf(v.D) / sumHv[m];
+                        else if (e < 0 && sumHv[m] > 0) dG = 0.5 * e * Math.Max(0.0, v.G) / sumHv[m];
                         double g0 = v.G;
-                        v.G = Math.Max(-v.HwV, Math.Min(inp.HomeMax - v.HwV, v.G + dG));
+                        v.G = Math.Max(0.0, Math.Min(inp.HomeMax - v.HwV, v.G + dG));
                         if (Math.Abs(v.G - g0) > maxDG) maxDG = Math.Abs(v.G - g0);
                         gw[m] += v.G * v.D.Wf; ww[m] += v.D.Wf;
                     }
@@ -1390,7 +1393,7 @@ namespace Armoury
             for (int m = 0; m < NM; m++)
             {
                 double rel = M.ExcessRel[m];
-                bool stuck = rel < 0 && M.HwLeft[m] < 0.05 * Math.Abs(M.Excess[m]);      // praca domowa rynku (wartosc) mniejsza niz 5% braku - nie ma czego oddac
+                bool stuck = rel < 0 && M.HwLeft[m] < 0.05 * Math.Abs(M.Excess[m]);      // praca domowa do oddania (G > 0, wartosc) mniejsza niz 5% braku - nie ma czego oddac
                 M.Conv[m] = M.DTot[m] >= 0 && M.DTot[m] < 0.01 && (Math.Abs(rel) < 0.01 || stuck);
                 M.NoHands[m] = stuck;
             }

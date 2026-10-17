@@ -498,6 +498,9 @@ namespace Armoury
                         if (cand.Count == 0) continue;
                         cand.Sort((a, b) => a.Key != b.Key ? a.Key.CompareTo(b.Key) : a.Value.CompareTo(b.Value));
                         int used = 0;
+                        // KS-R3 (port symulatora 17.10, runda 1): licznik NKS-22 raz na cel x towar x dobe - zamowione = pierwsza ilosc z kandydata, kasa celu za mala = czego
+                        // z niej nie kupiono, gdy kasa zatrzymala choc jeden lot (dotad kazdy kandydat dopisywal ten sam brak jeszcze raz: 58-66% zamowionych w symulatorze)
+                        long ord0 = -1, got0 = 0; bool poorHit = false;
                         foreach (var kv in cand)
                         {
                             if (used >= MaxSrc) break;
@@ -506,7 +509,7 @@ namespace Armoury
                             double q = Math.Min(offer[s * NZ + k], want);
                             if (q < Math.Max(5.0, 0.5 * d)) continue;
                             int n = (int)Math.Floor(q);
-                            _dOrdered += n;
+                            if (ord0 < 0) ord0 = n;
                             bool sea = _sea[s * nt + t];
                             double tau = sea ? TauSea : TauLand;
                             long cost = LotPrice(_t[s], items[k], n, false);
@@ -514,18 +517,21 @@ namespace Armoury
                             if (cost + fr > budget[t])
                             {
                                 int nf = cost + fr > 0 ? (int)Math.Floor(n * budget[t] / (double)(cost + fr)) : 0;
-                                if (nf < Math.Max(5.0, 0.5 * d)) { _dPoor += n; continue; }
-                                _dPoor += n - nf; n = nf;
+                                poorHit = true;
+                                if (nf < Math.Max(5.0, 0.5 * d)) continue;
+                                n = nf;
                                 cost = LotPrice(_t[s], items[k], n, false); fr = (long)Math.Round(cost * tau * L);
-                                if (cost + fr > budget[t] + 1) { _dPoor += n; continue; }
+                                if (cost + fr > budget[t] + 1) continue;
                             }
                             if (n <= 0 || cost <= 0) continue;
                             if ((Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u) Sample(_t[s], items[k], n, cost);
                             int got = Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
                             if (got <= 0) continue;
+                            got0 += got;
                             used++;
                             offer[s * NZ + k] -= got; sh[s * NZ + k] -= got; Hc += got; budget[t] -= cost + fr;
                         }
+                        if (ord0 > 0) { _dOrdered += ord0; if (poorHit) _dPoor += Math.Max(0, ord0 - got0); }
                     }
                 }
             }
@@ -577,7 +583,7 @@ namespace Armoury
         {
             var src = _st[s]; var dstS = _st[t]; var srcT = _t[s]; var dstT = _t[t];
             var ro = src.ItemRoster;
-            if (ro == null || dstT.Gold < cost + fr) { _dPoor += n; return 0; }
+            if (ro == null || dstT.Gold < cost + fr) return 0;
             int before = ro.GetItemNumber(it);
             int take = Math.Min(n, Math.Max(0, before - Keep));
             if (take <= 0) return 0;

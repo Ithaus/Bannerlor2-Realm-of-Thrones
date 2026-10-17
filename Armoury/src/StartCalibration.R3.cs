@@ -44,7 +44,7 @@ namespace Armoury
         private static void R3Reset()
         {
             _tk = null; _tkN = 0; _tkDay = -1; _gold28 = null; _goldN = 0;
-            Array.Clear(_c28, 0, _c28.Length); Array.Clear(_u28, 0, _u28.Length); _cN = 0; _cDay = -1; Array.Clear(_uDay, 0, _uDay.Length); _mf = null;
+            Array.Clear(_c28, 0, _c28.Length); Array.Clear(_u28, 0, _u28.Length); _cN = 0; _cDay = -1; Array.Clear(_uDay, 0, _uDay.Length); _mf = null; _cRestart = -1;
             _landShelfPrev.Clear(); _landCut.Clear(); _landGlut.Clear(); _grad = null; _ctlLine = null;
             _floor.Clear(); _ownKr.Clear(); _bKcal.Clear(); _floorBack = 0; _ownLong = 0; _ownStreak.Clear();
             _vilOut.Clear(); _vilOutDay.Clear(); _vilFrDay.Clear(); _townLand.Clear(); _castleTown.Clear();
@@ -153,6 +153,12 @@ namespace Armoury
         private static readonly double[] _c28 = new double[2 * KsTab.NG], _u28 = new double[2 * KsTab.NG];
         private static readonly double[] _uDay = new double[2 * KsBasket.N];      // brak zaplaconego popytu doby (szt.): wsie drabina 1, mieszczanie, wsad ZC5
         private static int _cN, _cDay = -1;
+        // KS-R3 (port symulatora 17.10, runda 1): srednie zuzycia i braku od nowa w dobie konca rampy popytu (A + 28 = D + 14) - dotad srednia 28 dob z doby D+14 miala
+        // w sobie 14 dob starej gospodarki przed D i 14 dob rampy (runda 3: zuzycie zboza przed D 6.4k/d Westeros i 3k/d Essos wobec 11k i 10k po rampie) - pierwsze
+        // Plany sterowania ciely podaz o 7% na Plan; doba restartu w zapisie (R=)
+        private static int _cRestart = -1;
+        private const int CtlMinDays = 5;                 // najmniej tyle dob pelnej lambdy w srednich przed pierwsza zmiana czynnika
+        private const double CtlStep = 0.07, CtlGap = 0.05; // krok czynnika na Plan i luka polek (bez zmian; runda 1 symulatora: 10% / 10% - zboze Westeros 0.947 przy polkach celu w D)
         private static double[] _mf;                                                  // czynnik popytu targu [2 * NG] (zapis)
         private static string _ctlLine;
         private static readonly Dictionary<string, long[]> _ctlTmp = new Dictionary<string, long[]>(StringComparer.Ordinal);
@@ -183,6 +189,8 @@ namespace Armoury
             int d = GoodsLedger.KsMarketTake(_ctlTmp);
             if (d < 0) { Array.Clear(_uDay, 0, _uDay.Length); return; }
             _cDay = today;
+            int rampEnd = _state == StateApplied && DDay >= 0 ? DDay + (RampDemand - RampSupply) : -1;
+            if (rampEnd >= 0 && today >= rampEnd && _cRestart != rampEnd) { _cN = 0; _cRestart = rampEnd; }   // tylko doby z pelnym popytem koszyka (lambda 1)
             _cN++;
             double w = 1.0 / Math.Min(28, _cN);
             var c = new double[2 * KsTab.NG]; var u = new double[2 * KsTab.NG];
@@ -203,10 +211,10 @@ namespace Armoury
         private static double[] MarketControl(int day, KsInput inp)
         {
             if (!SwMarketControl) { _ctlLine = null; _landGlut.Clear(); return null; }      // bez klucza - margines popytu targu jak runda 3 (MarketMargin)
-            bool ctl = _state == StateApplied && DDay >= 0 && day >= DDay + 14 && _plan != null && _plan.Error == null && _plan.D != null;
+            bool ctl = _state == StateApplied && DDay >= 0 && day >= DDay + 14 && _cRestart >= 0 && _cN >= CtlMinDays && _plan != null && _plan.Error == null && _plan.D != null;
             var mf = new double[2 * KsTab.NG];
             var sb = new StringBuilder(1500);
-            sb.Append(PK).Append("sterowanie rynku doba ").Append(day).Append(ctl ? " | czynnik popytu targu z zuzycia i braku (28 dob)" : " | do D+14 albo bez klucza Ks Market Control: czynnik 1.03 (polki startu)");
+            sb.Append(PK).Append("sterowanie rynku doba ").Append(day).Append(ctl ? " | czynnik popytu targu z zuzycia i braku (" + Math.Min(28, _cN) + " dob od konca rampy " + _cRestart + ")" : " | do D+14 + " + CtlMinDays + " dob pelnej lambdy albo bez klucza Ks Market Control: czynnik 1.03 (polki startu)");
             for (int i = 0; i < mf.Length; i++) mf[i] = ShelfMargin;
             if (!ctl) { _ctlLine = sb.Append('.').ToString(); LandGlutWeekly(day, false); return mf; }
             if (_mf == null) { _mf = new double[2 * KsTab.NG]; for (int i = 0; i < _mf.Length; i++) _mf[i] = ShelfMargin; }
@@ -232,13 +240,16 @@ namespace Armoury
                     int i = m * KsTab.NG + g;
                     KsItem it; double kg = inp.Items.TryGetValue(KsTab.Goods[g], out it) && it != null && it.Kg > 0 ? it.Kg : 10.0;
                     double dm = Math.Max(0.0, _plan.D[i] - (_plan.Eaten != null && i < _plan.Eaten.Length ? _plan.Eaten[i] : 0.0)) / (sig * kg);
-                    double cu = _c28[i] + _u28[i];
+                    // KS-R3 (port symulatora 17.10, runda 1): brak zaplaconego popytu liczy sie tylko, dopoki polki rynku sa ponizej celu (h < hs) - przy polkach ponad celem
+                    // brak na pustych straganach to rozwoz (KS-H), nie rece: dotad brak z miast bez zboza trzymal podaz zboza Essos przy nadmiarze polek (S/C 1.14 w oknie)
+                    double uf = hs[i] > 0 ? Math.Max(0.0, Math.Min(1.0, 1.0 - h[i] / hs[i])) : 1.0;
+                    double cu = _c28[i] + _u28[i] * uf;
                     double k = _mf[i];
                     if (dm > 1.0 && cu > 1.0)
                     {
-                        double gap = Math.Max(-0.05, Math.Min(0.05, (hs[i] - h[i]) / (28.0 * cu)));
+                        double gap = Math.Max(-CtlGap, Math.Min(CtlGap, (hs[i] - h[i]) / (28.0 * cu)));
                         double tgt = cu * (1.0 + gap) / dm;
-                        k = Math.Max(_mf[i] * 0.93, Math.Min(_mf[i] * 1.07, tgt));
+                        k = Math.Max(_mf[i] * (1.0 - CtlStep), Math.Min(_mf[i] * (1.0 + CtlStep), tgt));
                         k = Math.Max(0.85, Math.Min(1.10, k));
                     }
                     _mf[i] = k; mf[i] = k;
@@ -648,6 +659,7 @@ namespace Armoury
                 foreach (var kv in _landShelfPrev) foreach (int g in KsCore.Food) if (kv.Value[g] > 0) { if (!f) sb.Append(','); f = false; sb.Append(Clean(kv.Key)).Append(':').Append(g).Append(':').Append(F0(kv.Value[g])); }
                 sb.Append('\n');
             }
+            if (_cRestart >= 0) sb.Append("R=").Append(_cRestart).Append('\n');
             sb.Append("C=").Append(_cN);
             for (int i = 0; i < _c28.Length; i++) if (_c28[i] > 0 || _u28[i] > 0) sb.Append(',').Append(i).Append(':').Append(_c28[i].ToString("0.#", Inv)).Append(':').Append(_u28[i].ToString("0.#", Inv));
             sb.Append('\n');
@@ -738,6 +750,7 @@ namespace Armoury
                                 }
                                 break;
                             }
+                        case 'R': { int rd; if (int.TryParse(v, out rd)) _cRestart = rd; break; }
                         case 'K': KsFoodCarts.ImportKx(v); break;
                         case 'D': KsFoodCarts.ImportDays(v); break;
                         case 'F':
