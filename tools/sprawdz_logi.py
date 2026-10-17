@@ -33940,6 +33940,9 @@ def nds_main(logp, bdp=None, until=120):
             "luk 0, nierozpoznane 0, start >= 1 (WYLACZONE w biegu testu - NIE)", bool(win) and not gaps and not D["dsbad"] and bool(D["start"]) and not D["off"])
     R = lambda d, k, i=0: D["ds"][d][k][i] if k in D["ds"][d] else 0.0
     full = [d for d in win if R(d, "ramp") >= 0.999]
+    # 17.10 (bieg fin72): pierwsza doba z rampa 1 w linii DS - ticki BK wsi i W7 biegna w tej dobie przed blokiem DS z rampa poprzedniej doby (0.964),
+    # wiec ich stary udzial (1/28) jest jeszcze prawidlowy; bramki "po rampie" od drugiej doby z rampa 1.
+    if full: full = full[1:]
     # NDS-1 stare pobory po rampie: liczniki DS i linie niezalezne
     if full:
         own = [(d, R(d, "old", 0), R(d, "old", 2), R(d, "old", 4), R(d, "old", 6), R(d, "old", 7)) for d in full]
