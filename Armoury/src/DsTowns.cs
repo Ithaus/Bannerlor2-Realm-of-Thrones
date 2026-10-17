@@ -149,6 +149,8 @@ namespace Armoury
 
         /// <summary>Firmy ustalone: nowe zasady miast, zamkow i korony.</summary>
         internal static bool FarmsLive { get { return _fixDay >= 0 && On; } }
+        /// <summary>Doba ustalenia firm (poczatek rampy F3); -1 - jeszcze nie (DsSeason: sesja nadan 'po rampie').</summary>
+        internal static int FixDay { get { return _fixDay; } }
 
         private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
         private static double Unit(double v) { return double.IsNaN(v) ? 0 : (v < 0 ? 0 : (v > 1 ? 1 : v)); }

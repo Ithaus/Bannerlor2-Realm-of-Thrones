@@ -32,7 +32,7 @@ namespace Armoury
     internal static class DsSeason
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-        private const int Ring = 28, MinDays = 7;
+        private const int Ring = 28, MinDays = 7, PostRampSample = 7;   // fin74: sesja 'po rampie' 7 dob po koncu rampy F3, srednia z 7 ostatnich probek
         private static readonly double[] Wt = { 0.5, 1.0, 1.5, 1.0 };   // wagi klas 184: W, R, P, podzamcze
 
         private sealed class GK
@@ -299,6 +299,15 @@ namespace Armoury
         private static string N0(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "0" : Math.Round(v).ToString("0", Inv); }
         private static string G2(double v) { return v.ToString("0.0#", Inv); }
 
+        /// <summary>Bieg fin74 (17.10): srednia z OSTATNICH 'last' probek wojny (pierscien od glowy H) - sesja 'po rampie' liczy zwykle wplywy juz bez starych poborow
+        /// (P1, zawor, podatek od skarbca ludu), ktore w oknie pomiaru firm zawyzaly prognoze (np. King's Landing: 85k prognozy wobec ok. 25k po rampie, g zostalo 0.5).</summary>
+        private static double AvgLast(double[] a, GK g, int last, out int used)
+        {
+            double t = 0; used = 0;
+            for (int j = 1; j <= Math.Min(last, g.F); j++) { int i = (g.H - j + Ring * 2) % Ring; if (!g.RW[i]) continue; t += a[i]; used++; }
+            return used > 0 ? t / used : 0;
+        }
+
         private static double Avg(double[] a, bool[] w, int n, bool warOnly, out int used)
         {
             double t = 0; used = 0;
@@ -341,7 +350,7 @@ namespace Armoury
             g.H = (g.H + 1) % Ring; if (g.F < Ring) g.F++;
         }
 
-        private static string Session(Kingdom k, GK g, bool war, bool free, string why, Settings s)
+        private static string Session(Kingdom k, GK g, bool war, bool free, string why, Settings s, int last = 0)
         {
             double g0 = g.G, g1;
             int n = 0;
@@ -350,10 +359,11 @@ namespace Armoury
             else
             {
                 double step = StepOf(s), max = MaxOf(s);
-                need = Avg(g.RNeed, g.RW, g.F, true, out n);
-                inc = Avg(g.RInc, g.RW, g.F, true, out n);
+                need = last > 0 ? AvgLast(g.RNeed, g, last, out n) : Avg(g.RNeed, g.RW, g.F, true, out n);
+                inc = last > 0 ? AvgLast(g.RInc, g, last, out n) : Avg(g.RInc, g.RW, g.F, true, out n);
                 int n2;
-                double S = Avg(g.RS, g.RW, g.F, true, out n2), E = Avg(g.RE, g.RW, g.F, true, out n2), M = Avg(g.RM, g.RW, g.F, true, out n2), V = Avg(g.RV, g.RW, g.F, true, out n2);
+                double S = last > 0 ? AvgLast(g.RS, g, last, out n2) : Avg(g.RS, g.RW, g.F, true, out n2), E = last > 0 ? AvgLast(g.RE, g, last, out n2) : Avg(g.RE, g.RW, g.F, true, out n2),
+                       M = last > 0 ? AvgLast(g.RM, g, last, out n2) : Avg(g.RM, g.RW, g.F, true, out n2), V = last > 0 ? AvgLast(g.RV, g, last, out n2) : Avg(g.RV, g.RW, g.F, true, out n2);
                 y1 = Yield(k, s, 1.0, S, E, M, V);
                 if (n < MinDays && !free) g1 = Math.Max(step, g0);                 // za malo dob pomiaru (po wczytaniu) - nadanie bez zmian
                 else
@@ -410,8 +420,10 @@ namespace Armoury
                             if (quarter) { try { TownFolk.AntToNormal(k); } catch (Exception e) { Stumble("Daily(zaliczki)", e); } }
                             bool peaceEnd = g.G > 0 && !war && g.Peace >= sd;
                             bool warStart = !(g.G > 0) && war && g.War >= sd && DsTowns.Quarter - today % DsTowns.Quarter > sd;   // dzien kwartalu blisko - nadanie w nim (bez dwoch wymiarow dziesiatej naraz)
-                            string why = sw ? "przelaczenie" : quarter ? "kwartal" : peaceEnd ? "pokoj " + g.Peace + " dob" : warStart ? "nowa wojna " + g.War + " dob" : null;
-                            if (why != null) { string line = Session(k, g, war, sw || !(g.G > 0), why, s); if (line != null) sess.Add(line); }
+                            int rampD = Math.Max(0, Math.Min(364, s.DsRampDays));
+                            bool postRamp = DsTowns.FixDay >= 0 && today == DsTowns.FixDay + rampD + PostRampSample;   // fin74: sesja swobodna po rampie, z probek po rampie
+                            string why = sw ? "przelaczenie" : quarter ? "kwartal" : postRamp ? "po rampie" : peaceEnd ? "pokoj " + g.Peace + " dob" : warStart ? "nowa wojna " + g.War + " dob" : null;
+                            if (why != null) { string line = Session(k, g, war, sw || postRamp || !(g.G > 0), why, s, postRamp ? PostRampSample : 0); if (line != null) sess.Add(line); }
                         }
                         if (g.G <= 0) gK0++; else if (g.G < 1.25) gK1++; else gK2++;
                         if (d != null && (war || g.G > 0 || d.DsTreas > 0 || d.DsAnt > 0))

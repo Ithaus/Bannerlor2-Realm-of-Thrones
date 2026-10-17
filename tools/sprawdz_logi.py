@@ -33905,6 +33905,16 @@ def _nds_ref(B, D, key, days):
     return None, "brak odniesienia"
 
 
+def _ds_f3_seen(logp):
+    try:
+        with open(logp, encoding='utf-8', errors='replace') as fh:
+            for ln in fh:
+                if 'Firmy miast i zamkow (DS)' in ln: return True
+    except Exception:
+        return False
+    return False
+
+
 def nds_main(logp, bdp=None, until=120):
     """nds (17.10; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md rozdz. 3, 9, 14; galaz w-toku/noc-ds: Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs, BkSeal34.cs).
     Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log biegu bez DS z tego samego zapisu> (odniesienie korony, D stalego, Banku, kosztu, reszty bilansu).
@@ -34151,18 +34161,21 @@ def nds_main(logp, bdp=None, until=120):
     rep.add("NDS-14c: stara dziesiecina wsi z kiesy po oknie ('Dziesiecina (E5/C3)' wsie) przy DS - tylko od utargu bez dziesieciny przy wozie",
             f"dob ponad 5% reszty + 100: {len(to)}" + (f" (dzien {to[0][0]}: {to[0][1]} przy reszcie {to[0][2]})" if to else "") + f"; reszta utargu razem {rest:.0f}",
             "0 (pierwsza doba DS - INFO)", not to)
+    # fin74 (17.10): przy F3 (linie 'Firmy miast i zamkow (DS)') g z nadania do DsGrantMax 2.0 -> pulap 0.20; przy samym F1 g najwyzej 1.5 -> 0.15
+    f3on = bool(D.get("f3")) if isinstance(D, dict) and "f3" in D else _ds_f3_seen(logp)
+    cap14d = 0.20 if f3on else 0.15
     wb = []
     for d in win:
         rr = R(d, "ramp")
         base = R(d, "carts", 3) - R(d, "tithe", 0)
         if rr > 0 and base > 0 and R(d, "crown") > 0:
             sh_ = R(d, "crown") / (rr * base)
-            if sh_ > 0.151:
+            if sh_ > cap14d + 0.001:
                 wb.append((d, sh_))
     cr = sum(R(d, "crown") for d in win); sc = sum(R(d, "sut", 1) for d in win); fl = sum(R(d, "w4", 0) for d in win)
     pend0 = R(win[0], "w4", 1) if win else 0; pend1 = R(win[-1], "w4", 1) if win else 0
     clos = (cr + sc) - (fl + pend1 - pend0)
-    rep.add("NDS-14d: udzial korony przy wozie / (rampa x (czesc wsi - dziesiecina)) <= 0.15 (g najwyzej 1.5 x 0.10)", f"dob ponad {len(wb)}" + (f" (dzien {wb[0][0]}: {wb[0][1]:.3f})" if wb else ""), "0", not wb)
+    rep.add("NDS-14d: udzial korony przy wozie / (rampa x (czesc wsi - dziesiecina)) <= pulap (F1: g <= 1.5 -> 0.15; F3: g <= 2.0 -> 0.20)", f"dob ponad {len(wb)}, pulap {cap14d:.2f}" + (f" (dzien {wb[0][0]}: {wb[0][1]:.3f})" if wb else ""), "0", not wb)
     rep.add("NDS-14e: W4 (wozy + markietani) dochodzi do wplywu dnia: suma W4 - (do LeviesToday + przyrost czekajacego)", f"W4 {cr + sc:.0f} - ({fl:.0f} + {pend1 - pend0:+.0f}) = {clos:+.0f}",
             "|roznica| <= 1% W4 + 100", abs(clos) <= 0.01 * (cr + sc) + 100)
     # NDS-15 czynsz = oplaty stale wsi (PopulationLaw placi to, co policzyl RentPay)
