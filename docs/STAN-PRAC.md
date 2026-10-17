@@ -2606,3 +2606,5 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   jedza 0.533 kg/glowe. P0 hunter = 1.2 kg x ziemia snieg ~0 -> 54 g na mysliwego. -> RUNDA 4 dopisane: (1) "najpierw wyzywic siebie" - okreg najpierw stawia rece przy jedzeniu
   o najwiekszych kcal na reke na swojej ziemi (bydlo, owce, kozy, ryby, owies/jeczmien, polowanie), nadwyzka rak na targ; (2) prawdziwe plony hodowli/polowan/ryb w zimnym klimacie
   (jedna tabela swiata, poprawione wartosci dla zimnej ziemi, bez mnoznikow okregu; pustki za Murem 69% ladu); (3) reszta - dowoz z poludnia + danina zbozowa dla Muru; (4) reszta - glod.
+- Jeff 17.10 "ok" (rynek wsi BK): runda 4 / DS - rynek wsi BK tylko z nadwyzki ponad skrzynie 21 dni i WEDLUG POTRZEB (sol, zelazo na narzedzia, sukno/len, garnki;
+  zbytki - wino, przyprawy - tylko wies bogata), zamiast "po sztuce kazdego towaru z nadmiarem miasta" (NKS-29: 17% W / 24% E wplywu kies wsi).
