@@ -132,7 +132,17 @@ namespace Armoury
                     if (want - got > 1e-3) { _hShort++; _shortMen += want - got; }
                 }
             }
-            if (st.StringId != null) _lastOf[st.StringId] = new[] { natApplied, got };
+            if (st.StringId != null) _lastOf[st.StringId] = new[] { natApplied, got, (double)(int)CampaignTime.Now.ToDays };   // ZC6: doba liczenia (MigratedToday)
+        }
+
+        /// <summary>ZC6 (DailyLife.Mobility - etykieta migracji: przybysze ze wsi do biedoty miasta): ludzie, ktorzy przyszli dzis ze wsi regionu do miasta (E4/8 R2,
+        /// ta sama doba gry). 0 - R2 nie liczylo dzis tego miasta, brak stanu albo bez migracji. Tylko odczyt.</summary>
+        internal static double MigratedToday(Settlement town)
+        {
+            if (town == null || town.StringId == null || !Active) return 0;
+            double[] a;
+            if (!_lastOf.TryGetValue(town.StringId, out a) || a == null || a.Length < 3 || (int)a[2] != (int)CampaignTime.Now.ToDays) return 0;
+            return a[1] > 0 && !double.IsNaN(a[1]) && !double.IsInfinity(a[1]) ? a[1] : 0;
         }
 
         /// <summary>Menu "People of this land" (9.6): mieszczanie i rok w dzisiejszym tempie (narodziny minus zgony, przybysze ze wsi). false - brak stanu albo R2 nie liczylo.</summary>

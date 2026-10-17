@@ -29,6 +29,9 @@ namespace Armoury
     /// zamek - srednia wsi regionu wazona ludzmi. Osada bez ludzi ksiegi (zamek, miasto krainy bez udzialu miast) - D regionu (dalej krolestwa, swiata).
     /// Liczba nieskonczona albo NaN w dochodzie - 0 i potkniecie (srednia nie zostaje NaN na sesje). Tylko liczby w pamieci, w zapisie i w logu - pieniadze,
     /// towar, ceny, dobrobyt i AI bez zmian.
+    /// ZC7 (klucz DailyLifeWarScar, DailyLife.War.cs): wies - uchodzcy okregu poza domem (PeopleBook "u:") licza sie w mianowniku D stanow wolnych (chlopi, rzemieslnicy,
+    /// kupcy, szlachta - wedlug ludzi w domu) BEZ dochodu (Rec.AwayE): okreg z polowa ludzi w ucieczce ma polowe Dostatku, a nie wiecej (dochod ludzi w domu
+    /// na mniej glow). Ludzie stanow (N), suma stanow = ksiega i liczby ludzi w liniach - bez zmian (sami ludzie w domu).
     /// </summary>
     internal static partial class DailyLife
     {
@@ -232,8 +235,9 @@ namespace Armoury
                     n += ne;
                     if (!(ne > 0) || !HasY(r, e)) continue;
                     double ye = r.YAvg[e];
-                    nv += ne; y += ye; yk += ye / k;
-                    if (e != EHouse) { nvH += ne; ykH += ye / k; }
+                    double nd = ne + r.AwayE[e];                  // ZC7: uchodzcy okregu w mianowniku Dostatku bez dochodu (0 bez klucza DailyLifeWarScar)
+                    nv += nd; y += ye; yk += ye / k;
+                    if (e != EHouse) { nvH += nd; ykH += ye / k; }
                 }
                 r.Nv = nv; r.YSum = y; r.YK = yk; r.YKH = ykH; r.NvH = nvH;
                 if (r.Region != null)
@@ -252,7 +256,7 @@ namespace Armoury
                 for (int e = 0; e < Estates; e++)
                 {
                     _nE[e] += r.N[e]; _nWE[w, e] += r.N[e];
-                    if (r.N[e] > 0 && HasY(r, e)) { _yE[e] += r.YAvg[e]; _ykE[e] += r.YAvg[e] / k; _dnE[e] += r.N[e]; }
+                    if (r.N[e] > 0 && HasY(r, e)) { _yE[e] += r.YAvg[e]; _ykE[e] += r.YAvg[e] / k; _dnE[e] += r.N[e] + r.AwayE[e]; }
                 }
                 double[] kg;
                 if (!_king.TryGetValue(r.KingdomId, out kg)) { kg = new double[KLen]; _king[r.KingdomId] = kg; _kingName[r.KingdomId] = r.KingdomName; }
@@ -286,7 +290,7 @@ namespace Armoury
             foreach (var r in _recs)
             {
                 double k = r.K > 0 ? r.K : _medTownK;
-                for (int e = 0; e < Estates; e++) r.DE[e] = r.N[e] > 0 && k > 0 && HasY(r, e) ? r.YAvg[e] / (r.N[e] * k) : double.NaN;
+                for (int e = 0; e < Estates; e++) r.DE[e] = r.N[e] > 0 && k > 0 && HasY(r, e) ? r.YAvg[e] / ((r.N[e] + r.AwayE[e]) * k) : double.NaN;   // ZC7: z uchodzcami okregu
                 r.D = double.NaN; r.D0 = double.NaN; r.DSrc = -1;
                 double own = Div(r.YK, r.Nv);
                 if (r.Kind != KCastle && !r.NoEarn && r.L > 0 && Fin(own)) { r.D = own; r.D0 = Div(r.YKH, r.NvH); r.DSrc = 0; _dOwn++; }

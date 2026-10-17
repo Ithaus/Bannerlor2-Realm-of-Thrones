@@ -28,6 +28,13 @@ namespace Armoury
     /// linii; log wylaczony (LogEnabled) - nic (srednia stoi). Srednia: zwykla przez pierwsze 28 dob osady, potem wykladnicza z waga 1/28.
     /// Koszt: ok. 800 osad x 7 stanow x 13 grup w tablicach, ceny miast raz na dobe; czas bloku w linii bez zapisu linii (cel projektu: mediana <= 5 ms na dobe).
     /// Wyjatki liczone per miejsce (pierwszy do pliku) - bez globalnych wylacznikow (CLAUDE.md 7). Klucz wylaczony - nic (linia raz).
+    /// ZC2 (klucz DailyLifeEstates, DailyLife.Estates.cs i DailyLife.View.cs): udzialy stanow z ksiegi stanow w zapisie (arm_estates; zasiew z pasm x BK),
+    /// Dostatek liczony KAZDEJ doby (takze bez linii i przy wylaczonym logu - czyta go widok w grze: dymki osad, People of this land, Look over the district,
+    /// Realm ledger), pamiec Dostatku co 7 dob, linia "Stany (ZC2): dzien N" w dobie linii. Bez klucza - jak ZC0.
+    /// ZC6 (klucze DailyLifeMobility, DailyLifeFreedom, DailyLifeProsperityLink; DailyLife.Mobility.cs, DailyLife.Prosperity.cs): po Dostatku doby (kazdej doby) awans
+    /// i spadek osad koszyka tygodnia, etykieta migracji miast, wyzwolenie, czlon dobrobytu na jutro; linia "Awans (ZC6): dzien N" w dobie linii.
+    /// ZC7 (klucz DailyLifeWarScar; DailyLife.War.cs): po ludziach doby (przed dochodem doby) blizna uderzen najazdow od wczoraj (Devastation -> NoteStrike) i uchodzcy
+    /// okregow w mianowniku Dostatku; ruina przy zlupieniu miasta w chwili wyboru (CitySack.People.cs); linia "Blizna wojny (ZC7): dzien N" w dobie linii.
     /// </summary>
     internal static partial class DailyLife
     {
@@ -79,6 +86,7 @@ namespace Armoury
             _recs = null; _byS.Clear(); _byHold.Clear(); _kName.Clear(); _cacheSig = -1; _cacheDay = int.MinValue;
             _items = null; _pxBase = null; _usual = null; _pxWorld = null; _basket.Clear(); _kgOf.Clear(); _civil.Clear();
             _reg.Clear(); _idxMemo.Clear(); _king.Clear(); _kingName.Clear(); _thrHold.Clear(); _wv.Clear();
+            ResetEstates();                                // ZC2: ksiega stanow, pamiec Dostatku, liczniki widoku (zapis wczytuje ImportEstates po konstruktorze)
         }
 
         /// <summary>Potkniecie w miejscu where: liczone zawsze, pierwsze w danym miejscu do pliku (wyjatek albo opis detail). Bez wylacznika.</summary>
@@ -153,6 +161,7 @@ namespace Armoury
 
         internal static string Export()
         {
+            WarFlushSave();                                 // ZC7: uderzenia od switu do ksiegi i sredniej dochodu przed zapisem (arm_dailylife idzie przed arm_estates)
             if (_sigma <= 0) return "";
             var sb = new StringBuilder(64 * 1024);
             sb.Append(Version).Append('|').Append(_sigma.ToString(Inv)).Append('|').Append(_sigmaDay.ToString(Inv)).Append('|');
@@ -285,6 +294,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays - 1;
             _stumblesDay = 0;
             FoldNoteStumbles();
+            try { ClearProsperityTerms(); } catch { }      // ZC6: czlon dobrobytu tylko z tej doby (doba przerwana wyjatkiem albo bez pomiaru - bez czlonu, nie wczorajszy)
             try
             {
                 if (!KeyOn)
@@ -296,7 +306,8 @@ namespace Armoury
                 _offLogged = false;
                 if (Campaign.Current == null) return;
                 var s = Settings.Current;
-                if (s == null || !s.LogEnabled) { TakeWindows(); return; }   // log wylaczony: nikt nie przeczyta - bez liczenia (srednia stoi)
+                // log wylaczony: nikt nie przeczyta - bez liczenia (srednia stoi); ZC2 (DailyLifeEstates): widok w grze czyta liczby - liczenie bez linii
+                if (s == null || (!s.LogEnabled && !EstatesOn)) { TakeWindows(); return; }
                 if (!PopulationLaw.Calibrated)
                 {
                     TakeWindows();
@@ -328,8 +339,11 @@ namespace Armoury
             EnsureItems();
             EnsureRecs(day);
             _winTaken = TakeWindows();
+            _eDay = day; _eSeedDay = 0;                    // ZC2: doba zasiewu ksiegi stanow
             long t1 = Stopwatch.GetTimestamp();
             PeopleDay();
+            WarSeed(day);                                  // ZC7: doba wlaczenia w kampanii (klucz off - od nowa przy nastepnym wlaczeniu); nie rzuca
+            if (EstatesOn) { try { WarFlush(day); WarPeople(); } catch (Exception e) { _wStum++; Stumble("WarFlush", e); } }   // ZC7: blizna najazdow doby (przed dochodem doby), uchodzcy w mianowniku
             long t2 = Stopwatch.GetTimestamp();
             PricesDay();                                   // po ludziach doby: koszyk zamku wazony ludzmi wsi regionu
             long t3 = Stopwatch.GetTimestamp();
@@ -337,8 +351,23 @@ namespace Armoury
             _winTaken = null;
             _days++;
             double f = 1000.0 / Stopwatch.Frequency;
-            if (!LogGate.Lines) { AddMs((Stopwatch.GetTimestamp() - t0) * f); return; }   // doba bez linii (ciche logi): bez Dostatku i Spizarni
+            var st = Settings.Current;
+            bool estates = EstatesOn;
+            if (!LogGate.Lines || st == null || !st.LogEnabled)
+            {
+                // doba bez linii (ciche logi, log wylaczony): bez Spizarni i linii; ZC2 - Dostatek do widoku co dobe (i pamiec Dostatku co 7 dob)
+                if (estates)
+                {
+                    bool live = false;
+                    try { LivelihoodDay(); live = true; ViewDay(day); } catch (Exception e) { Stumble("LivelihoodDay(widok)", e); }
+                    if (live) { try { ActiveDay(day); } catch (Exception e) { Stumble("ActiveDay", e); } }   // ZC6: awans i spadek, wyzwolenie, dobrobyt na jutro (co dobe, takze bez linii); bez Dostatku doby - nic
+                }
+                AddMs((Stopwatch.GetTimestamp() - t0) * f);
+                return;
+            }
             LivelihoodDay();
+            if (estates) { try { ViewDay(day); } catch (Exception e) { Stumble("ViewDay", e); } }
+            if (estates) { try { ActiveDay(day); } catch (Exception e) { Stumble("ActiveDay", e); } }   // ZC6: awans i spadek, wyzwolenie, dobrobyt na jutro (po Dostatku doby)
             long t4 = Stopwatch.GetTimestamp();
             PantryDay();
             long t5 = Stopwatch.GetTimestamp();
@@ -362,6 +391,9 @@ namespace Armoury
             try { Log.Info(LifeLine(day, ms, (t1 - t0) * f, (t3 - t2) * f, (t2 - t1) * f, (t4 - t3) * f, (t5 - t4) * f, (t6 - t5) * f, week ? csvNote : null)); }
             catch (Exception e) { Stumble("LifeLine", e); }
             if (pantry != null) Log.Info(pantry);
+            if (estates) { try { Log.Info(EstatesLine(day)); } catch (Exception e) { Stumble("EstatesLine", e); } }   // ZC2: linia "Stany (ZC2): dzien N"
+            if (estates) { try { Log.Info(MobilityLine(day)); } catch (Exception e) { Stumble("MobilityLine", e); } }   // ZC6: linia "Awans (ZC6): dzien N" (liczniki od ostatniej linii)
+            if (estates) { try { Log.Info(WarLine(day)); } catch (Exception e) { Stumble("WarLine", e); } }   // ZC7: linia "Blizna wojny (ZC7): dzien N" (liczniki od ostatniej linii)
         }
 
         // ------------------------------------------------------------ linie
@@ -485,6 +517,7 @@ namespace Armoury
                 else if (r.L <= 0) notes.Add("bez ludzi ksiegi - D " + (r.DSrc == 1 ? "regionu" : r.DSrc == 2 ? "krolestwa" : "swiata"));
                 if (r.NoEarn) notes.Add("miasto bez liczb kiesy ludu dzis - D regionu, W/R/P bez sredniej");
                 if (r.YDays < WarmDays) notes.Add("srednia z " + r.YDays + " dob (rozgrzewka)");
+                if (r.Away >= 0.5) notes.Add("uchodzcy poza domem " + N0(r.Away) + " w mianowniku D (ZC7)");
                 sb.Append(day).Append(';').Append(r.Id).Append(';').Append(r.Name).Append(';').Append(r.Kind == KTown ? "miasto" : r.Kind == KCastle ? "zamek" : "wies").Append(';')
                   .Append(r.KingdomName).Append(';').Append(r.Cul).Append(';').Append(Profs[r.Prof].Id).Append(';').Append(r.Region != null ? r.Region.Id : "-").Append(';')
                   .Append(N0(r.L));

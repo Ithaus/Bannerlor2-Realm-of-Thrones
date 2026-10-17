@@ -1819,6 +1819,100 @@ namespace Armoury
             return Math.Max(0, f.ZcTiV);
         }
 
+        // ============================================================ ZC6 (DailyLife.Mobility.cs): awans i spadek stanow - kiesy W/R/P miasta (pieniadze ida z ludzmi, kupno ziemi)
+        /// <summary>ZC6: stan kies ludu miasta (kiesa czynna) k[0..2] = W, R, P w zl gry - tylko odczyt, bez Get (nie tworzy wpisu). false - kiesa nieczynna, nie miasto,
+        /// osada spoza kiesy. Nie rzuca.</summary>
+        internal static bool ZcPurses(Settlement st, long[] k)
+        {
+            if (k == null || k.Length < 3) return false;
+            k[0] = k[1] = k[2] = 0;
+            try
+            {
+                if (st == null || !Live) return false;
+                if (_pending != null) EnsureImported();
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind != 0) return false;
+                k[0] = Math.Max(0, f.KW); k[1] = Math.Max(0, f.KR); k[2] = Math.Max(0, f.KP);
+                return true;
+            }
+            catch { k[0] = k[1] = k[2] = 0; return false; }
+        }
+
+        /// <summary>ZC6: ludzie przechodza miedzy stanami miasta z oszczednosciami - przelew kiesa `from` -> kiesa `to` (0 W, 1 R, 2 P) najwyzej do stanu kiesy platnika,
+        /// BEZ zarobku okna (to nie zarobek - podatki panu go nie widza). Wewnatrz ludu osady: suma kies i kontrola zamknieta (wplywy - wydatki) bez zmian. Zwraca przeniesione.</summary>
+        internal static long ZcCarry(Settlement st, int from, int to, long x)
+        {
+            try
+            {
+                if (x <= 0 || st == null || !Live || OffMain() || from < 0 || from > 2 || to < 0 || to > 2 || from == to) return 0;
+                if (_pending != null) EnsureImported();
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind != 0) return 0;
+                long y = Math.Min(x, PurseOf(f, from));
+                if (y <= 0) return 0;
+                AddPurse(f, from, -y); AddPurse(f, to, y);
+                return y;
+            }
+            catch (Exception e) { Stumble("ZcCarry", e); return 0; }
+        }
+
+        /// <summary>ZC6: kupno ziemi - kiesa P miasta -> glowa rodu pana miasta (ChangeHeroGold w try: wyjatek - nic nie schodzi), najwyzej do stanu kiesy P; bez zywego pana
+        /// i w oblezeniu - nic (kupna nie ma). Kiesa -> pan jak PayLord (_ctlOut, LDayOut, okna obiegu), ale BEZ RentToday: to jednorazowa sprzedaz ziemi, nie renta
+        /// (D "ziemia", budowy i powinnosci jej nie licza). Zwraca zaplacone; lord - kto dostal.</summary>
+        internal static long ZcPayLand(Settlement st, long x, out Hero lord)
+        {
+            lord = null;
+            try
+            {
+                if (x <= 0 || st == null || !Live || OffMain() || st.IsUnderSiege) return 0;
+                if (_pending != null) EnsureImported();
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind != 0) return 0;
+                long y = Math.Min(x, PurseOf(f, 2));
+                if (y <= 0) return 0;
+                var clan = st.OwnerClan;
+                var h = clan != null ? clan.Leader : null;
+                if (h == null || !h.IsAlive) return 0;
+                int ix = (int)Math.Min(int.MaxValue, y);
+                try { h.ChangeHeroGold(ix); } catch (Exception e) { Stumble("ZcPayLand", e); return 0; }
+                AddPurse(f, 2, -ix);
+                _ctlOut += ix; f.LDayOut += ix;
+                CirculationWindows.NoteHeroGold(h, ix);
+                lord = h;
+                return ix;
+            }
+            catch (Exception e) { Stumble("ZcPayLand", e); return 0; }
+        }
+
+        /// <summary>ZC6 (recenzja 16.10): odkup ziemi przy spadku szlachty miasta ("sprzedane majatki") - glowa rodu pana miasta -> kiesa P, najwyzej `lordShare` kiesy pana
+        /// (ChangeHeroGold w try: wyjatek - nic nie wchodzi); bez zywego pana i w oblezeniu - nic. Pan -> kiesa jak splata do kiesy (_ctlIn, LDayIn, okna obiegu). Zwraca
+        /// zaplacone; lord - kto zaplacil.</summary>
+        internal static long ZcLandBack(Settlement st, long x, double lordShare, out Hero lord)
+        {
+            lord = null;
+            try
+            {
+                if (x <= 0 || st == null || !Live || OffMain() || st.IsUnderSiege || !(lordShare > 0)) return 0;
+                if (_pending != null) EnsureImported();
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind != 0) return 0;
+                var clan = st.OwnerClan;
+                var h = clan != null ? clan.Leader : null;
+                if (h == null || !h.IsAlive) return 0;
+                long cap = (long)Math.Floor(Math.Max(0, h.Gold) * Math.Min(1.0, lordShare));
+                long y = Math.Min(x, cap);
+                if (y <= 0) return 0;
+                int ix = (int)Math.Min(int.MaxValue, y);
+                try { h.ChangeHeroGold(-ix); } catch (Exception e) { Stumble("ZcLandBack", e); return 0; }
+                AddPurse(f, 2, ix);
+                _ctlIn += ix; f.LDayIn += ix;
+                CirculationWindows.NoteHeroGold(h, -ix);
+                lord = h;
+                return ix;
+            }
+            catch (Exception e) { Stumble("ZcLandBack", e); return 0; }
+        }
+
         // ============================================================ E5/C4 (205, PLAN 5.13): zdanie "czy ludzi stac na chleb" w oknie People of this land
         /// <summary>E5/C4: zdanie do okna "People of this land" (PeopleMenu) dla osady, w ktorej stoi gracz - liczby kiesy czynnej z ostatniej doby tej osady:
         /// miasto i zamek DAffF / DAff (te same co kolumny stac_jedzenie / stac_pelny kiesa-ludu.csv i skladniki sum "stac jedzenie" / "pelny" / "stac" linii "Kiesa ludu:"),

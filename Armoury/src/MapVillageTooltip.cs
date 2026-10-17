@@ -235,6 +235,8 @@ namespace Armoury
             catch (Exception e) { MapVillageLore.CountRowStumble(uid, e); }
             if (knight != null) t.Add(knight);
             t.Add(people);
+            string est = DailyLife.SideTipLine(district);          // ZC2: sklad stanow okregu i Dostatek (null - klucz DailyLifeEstates off, przed pomiarem)
+            if (est != null) t.Add(est);
             if (state != null) t.Add(state);
             if (fire != null) t.Add(fire);
             string bkId;

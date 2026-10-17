@@ -776,6 +776,11 @@ namespace Armoury
             // albo kampania z wylaczonym kluczem) = sigma z MCM przy pierwszej dobie z kluczem; Reset przed SyncData (konstruktor)
             try { string zc = dataStore.IsSaving ? DailyLife.Export() : null; SaveText.Sync(dataStore, "arm_dailylife", ref zc); if (dataStore.IsLoading) DailyLife.Import(zc); }
             catch (Exception e) { Log.Error("SyncData.arm_dailylife", e); }
+            // ZC2 (16.10, stany w ksiedze): udzialy stanow miast i wsi w milionowych i pamiec Dostatku co 7 dob ("v1|baza zasiewu|doby pamieci|id:p0..p5:zasiew:pochylenie:d0..d4;..."
+            // - SaveText w kawalkach) - wlasny try; brak klucza (zapis sprzed paczki) albo nieznany format = zasiew z pasm x BK w pierwszej dobie pomiaru z kluczem
+            // DailyLifeEstates; Reset przed SyncData (konstruktor, DailyLife.Reset)
+            try { string ze = dataStore.IsSaving ? DailyLife.ExportEstates() : null; SaveText.Sync(dataStore, "arm_estates", ref ze); if (dataStore.IsLoading) DailyLife.ImportEstates(ze); }
+            catch (Exception e) { Log.Error("SyncData.arm_estates", e); }
         }
 
         public override void RegisterEvents()
@@ -1461,6 +1466,9 @@ namespace Armoury
             try { PlayerFees8.SessionStart(); } catch (Exception e) { Log.Error("PlayerFees8.SessionStart", e); }   // E8/D2 (257): nagroda turnieju gracza, zaklady, oplaty i drobne zrodla gracza - latki raz na proces, W KAMPANII (CLAUDE.md 7); PO QuestPay8
             try { TourneyPay.SessionStart(); } catch (Exception e) { Log.Error("TourneyPay.SessionStart", e); }   // TP (16.10): linia "Turniej-platnik (TP): start sesji", decyzja wyrownania Seagard (D3, raz: zapis sprzed zmiany, Ithauser, czas >= 109020) - bez przelewow (komunikat i splata w pierwszej godzinie)
             try { DailyLife.SessionStart(); } catch (Exception e) { Log.Error("DailyLife.SessionStart", e); }   // ZC0 (16.10): linia "Zycie (ZC0): start sesji" - klucze i skala targu sigma (z zapisu albo z MCM)
+            try { DailyLife.EstatesSessionStart(); } catch (Exception e) { Log.Error("DailyLife.EstatesSessionStart", e); }   // ZC2 (16.10): linia "Stany (ZC2): start sesji" - klucz, ksiega stanow z zapisu, widok
+            try { DailyLife.MobilitySessionStart(); } catch (Exception e) { Log.Error("DailyLife.MobilitySessionStart", e); }   // ZC6 (16.10): postfiks dobrobytu na czynnym modelu (raz na metode) i linia "Awans (ZC6): start sesji"
+            try { DailyLife.WarSessionStart(); } catch (Exception e) { Log.Error("DailyLife.WarSessionStart", e); }   // ZC7 (16.10): linia "Blizna wojny (ZC7): start sesji" - klucz, dlug blizny z zapisu
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { CompanionPay.SessionStart(); } catch (Exception e) { Log.Error("CompanionPay.SessionStart", e); }   // noc 15/16.10 (C): towarzysze - czynnik umiejetnosci morskich BK i cena werbunku wedlug zoldu; latki raz na proces, W KAMPANII, samosprawdzenie
             try { LevelPoints.SessionStart(); } catch (Exception e) { Log.Error("LevelPoints.SessionStart", e); }   // RP (decyzja Jeffa 14.10): linia "Rozwoj postaci (RP): start sesji" - klucze z MCM (PO McmSettings.Apply), czynny model, przyklad punktow
@@ -1551,6 +1559,7 @@ namespace Armoury
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
+            try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
             try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
             catch (Exception e) { Log.Error("OnSessionLaunched", e); }
@@ -1991,7 +2000,11 @@ namespace Armoury
             try { VineOlive.Daily(); } catch (Exception e) { Log.Error("VineOlive.Daily", e); } DayProfile.Lap("VineOlive.Daily");   // B6: linia "Winnice i gaje (B6)" (tylko log)
             // ZC0 (16.10, zycie codzienne - pomiar na sucho): linie "Zycie (ZC0)" i "Spizarnia (ZC)", co 7 dob krolestwa i stany-dostatek.csv - PO TownFolk.Daily (zarobek klas),
             // GoodsLedger.Daily (towar ludu doby), Famine.Daily (najedzeni), PopulationLaw.Daily (renta wsi), ClanIncomeBook.Daily (D rodow) i ThrallLaw.Daily (konto niewolnych)
+            // ZC6 (16.10, Dostatek czynny): awans i spadek stanow w tym samym bloku - kupno ziemi z kies wsi do panow (GiveGoldAction) osobna pozycja "Przeplywy osad"
+            // (MZc6); migawka MRest przed blokiem = te same liczby "pozostale moduly ticku" co dotad (dotad zlapalaby je migawka MRest przed wywozem kupcow)
+            try { MoneyLedger.Mark(MoneyLedger.MRest); } catch { }
             try { DailyLife.Daily(); } catch (Exception e) { Log.Error("DailyLife.Daily", e); } DayProfile.Lap("DailyLife.Daily");
+            try { MoneyLedger.Mark(MoneyLedger.MZc6); } catch { }
             try { RansomFlows.Daily(); } catch (Exception e) { Log.Error("RansomFlows.Daily", e); } DayProfile.Lap("RansomFlows.Daily");         // 2.14: linia "Okupy (2.14)" i harness niewoli w autotescie (doby sesji 5 i 8)
             try { Ransom178.Report(); } catch (Exception e) { Log.Error("Ransom178.Report", e); } DayProfile.Lap("Ransom178.Report");           // 178: linia "Okupy (178)" (zloto nie rusza)
             // M6a: linie "Okupy powtorne (M6a-2)", "Najemnicy - sluzba (M6a-1)" (z przegladem pola gry ShouldStayInKingdomUntil) i "Pokoj a jency (M6a-3)"

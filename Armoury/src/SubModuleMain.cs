@@ -83,6 +83,9 @@ namespace Armoury
                 // GL-1 (P1): linia "People of this land" w dymku osady (wies) - postfiks dymka gry i NavalDLC (ten rejestruje dymek osady od nowa); wlasny try,
                 // linia dziala tylko przy kluczu VillageOutputByPeople
                 try { VillageByPeople.ApplyTip(_harmony); } catch (Exception e) { Log.Error("VillageByPeople.ApplyTip", e); }
+                // ZC2 (16.10): linie "Estates (book)" i "Livelihood" w dymku osady (miasto, zamek - region, wies) - postfiks Low dymka gry i NavalDLC, PO GL1 (wstawia
+                // pod jego linie); wlasny try, linie tylko przy kluczu DailyLifeEstates
+                try { DailyLife.ApplyTip(_harmony); } catch (Exception e) { Log.Error("DailyLife.ApplyTip", e); }
                 MarketRoad.ApplyAll(_harmony);   // wpis 100: wsie zamkowe woza plon na targ miasta, nie do zamku
                 MarketCarts.ApplyAll(_harmony);  // poprawka 119: cena ladunku taboru sztuka po sztuce (wybor miasta wola MarketRoad.RoutePrefix)
                 try { CastleMarket.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CastleMarket.ApplyAll", e); }   // E5/B4 (199): targ przy zamku - sprzedaz w zamku (prefiks High po 119) i straz przed BK VillagersCastleTick

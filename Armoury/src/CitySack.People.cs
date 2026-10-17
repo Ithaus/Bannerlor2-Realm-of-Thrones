@@ -6,6 +6,7 @@ using System.Text;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -139,6 +140,32 @@ namespace Armoury
         private static void L6Clear() { _d6Calls = _d6Towns = _d6Castles = _d6NoBook = _d6NoBk = 0; _d6BkKilled = 0; _d6BookKilled = 0; _d6MaxGap = 0; }
 
         private static bool L6Any { get { return _d6Calls > 0; } }
+
+        // ------------------------------------------------------------ ZC7 (DailyLife.War.cs, klucz DailyLifeWarScar): RUINA PRZY ZLUPIENIU
+        // Postfiks OnSiegeAftermathApplied - po lupie z monety (L2, prefiks AftermathPre) i po karze gry: zlupione (grabiez, spustoszenie) i ZDOBYTE miasto spycha
+        // kupcow do rzemieslnikow i rzemieslnikow do biedoty (DailyLife.SackScar - udzialy stanow, oszczednosci z ludzmi, dlug blizny, okno ruiny 30 dob).
+        // Zdobycie: z prefiksu tego samego wywolania (_zcSt/_zcCap - wzor L0), bez niego - strona osady = strona zdobywcy. Laska, zamek, bez zdobycia - nic.
+        private static Settlement _zcSt;
+        private static bool _zcCap;
+
+        public static void ZcScarPost(MobileParty __0, Settlement __1, SiegeAftermathAction.SiegeAftermath __2, Clan __3, Dictionary<MobileParty, float> __4)
+        {
+            var st0 = _zcSt; bool cap0 = _zcCap;
+            _zcSt = null;
+            try
+            {
+                if (!Live || __1 == null || __1.Town == null) return;
+                bool captured = ReferenceEquals(st0, __1) ? cap0 : (__0 != null && __1.MapFaction == __0.MapFaction);
+                DailyLife.SackScar(__1, KindOf(__2), captured, __0, __4, __3, (int)CampaignTime.Now.ToDays);
+            }
+            catch (Exception e) { Stumble("ZcScarPost", e); }
+        }
+
+        private static void ZcPatch()
+        {
+            Seal31.Patch("zycie codzienne ZC7: ruina przy zlupieniu (OnSiegeAftermathApplied, postfiks)", AccessTools.Method(typeof(SiegeAftermathCampaignBehavior), "OnSiegeAftermathApplied"),
+                         typeof(CitySack), null, nameof(ZcScarPost), null, Priority.Normal, Priority.Low);
+        }
 
         private static void L6Patch()
         {
