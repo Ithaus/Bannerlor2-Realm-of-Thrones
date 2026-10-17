@@ -226,8 +226,8 @@ namespace Armoury
                     mf.Sale[MixBuild] += mat;
                     MoneyLedger.Note169(MoneyLedger.N169Dues, mk, (int)mat);   // kasa miasta targowego poza tickiem - nazwane w "Przeplywy osad (przyczyny)"
                 }
-                var vf = Get(st);
-                if (vf != null) vf.DsTiCart += got;                                 // ZC0: dziesiecina, ktora wyszla z kiesy wsi (do ZcTiV w DailyLive)
+                Folk vf;                                                            // TryGetValue, nie Get - bez dopisywania do _f poza doba ludu
+                if (_f.TryGetValue(st, out vf) && vf != null) vf.DsTiCart += got;  // ZC0: dziesiecina, ktora wyszla z kiesy wsi (do ZcTiV w DailyLive)
                 return x;
             }
             catch (Exception e) { Stumble("TitheVillageAtCart", e); return 0; }
