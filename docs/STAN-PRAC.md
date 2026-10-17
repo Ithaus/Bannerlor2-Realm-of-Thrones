@@ -2689,3 +2689,16 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   deski 1 pien -> 2 (20% wagi - za malo), mieso krowa 6 / swinia 2 / owca 1, drob u rzeznika 100%. Linie BK bez wsadu juz zablokowane (WorkshopNoFreeRaw, wgrane).
   -> KsRecipes (n-ks4 b0d3914e + bc557e9d, klucz KsRealRecipes): przy KS wszystkie typy warsztatow wedlug wagi = stale KsTab Planu (tabela w kodzie). Bron/zbroja bez zmian.
   Testy 120 dob odtad BEZ bitwy (Jeff: "czy jeszcze potrzebne testowanie bitwy?") - bitwa tylko w tescie 5 dob dokladnej DLL przed wgraniem.
+
+### 80. TEST KS runda 4 cz. 1-2 (17.10 15:37-16:20 PDT, n-ks4 a6c56999 = Armoury cfd3fb51, Armoury-2026-10-17_15-37-31.log + CSV, kopia logi-testow) - NIE PRZESZEDL
+- Flagi usuniete. 0 ERROR, bez bitwy. nzc0/nzc2 0 NIE. nks 18 NIE + 6 ETAP z 53 (jak r3 final, ale inny sklad); nds 35/41.
+- POPRAWA: alfa wsi z praw DS mediana 0.29-0.31 STABILNA (r3: 0.00), koszyk zaplacony 19-22% (r3 5%), praca domowa 22-25% (35%), Plan bez pokrycia ok. 3%; MIESO 1.12-1.37
+  (r3 3.1-3.7); zboze indeks 1.02, polki mediana 4.3 dnia; wsie kupuja 78-81%; rynek BK wsi 5-6% wplywu (r3 17-24%); KS-H 1.26M szt., zwroty 0.06%.
+- DALEJ NIE: KIESY WSI SPADAJA przy KS (NDS-3a -0.37%/d, mediana -30%, wsi < 1000 zl 20.5%) - wies kupuje koszyk ponad budzet DS (drabina 2) -> limit wydatku wsi
+  budzetem DS i skrzynia; PODLOGA SPICHLERZA w 99% wsi (NKS-26, kcal 5.5%) - usunac darmowa podloge przy KS; kasa celu za mala KS-H nadal duzo (NKS-22) - kredyt kupcow;
+  ser/maslo 2-2.2x (NKS-7), sol na suficie 32-39% miast, korytarze 69/80 < 0.8, Essos sterowanie x0.85, koszt 4.57 / 14.31 / 1.90 ms; korona 0.945, panowie 0.948 (prog 0.95).
+- W KODZIE PO TESCIE (jeszcze nie testowane): b0d3914e + bc557e9d KsRecipes (wszystkie receptury jedzenia i surowcow wedlug wagi).
+- NASTEPNE KROKI RUNDY 4 (kolejnosc): (1) wydatek wsi na koszyk <= budzet DS dnia i ponad skrzynie; (2) bez darmowej podlogi spichlerza przy KS; (3) KS-H na kredycie
+  kupcow (Ship bez zaplaty z kasy celu, fracht z kasy zrodla, zaplata przy dostawie, rachunek, 30 dni zwloki = brak dostaw; KsFoodCore budzet = limit kredytu); (4) najpierw
+  wyzywic siebie + hodowla/ryby/owies w zimnym klimacie (P0/ziemia snieg); (5) dowoz na Polnoc + danina zbozowa dla Muru; (6) tanszy koszyk biednych Essos; (7) koszt.
+  Testy 120 dob bez bitwy; flaga armoury-ks-wlacz.flag; ocena nks + nds (baza 18-23-34).
