@@ -399,15 +399,16 @@ namespace Armoury
         }
 
         /// <summary>Villages (po koszyku dnia): wies wydaje 1/T kiesy ponad 15 dni zakupow (liczonej przed koszykiem, jak dotad nadwyzka) z listy dostatku na polce
-        /// miasta targowego. `gold` - kiesa wsi przed koszykiem.</summary>
-        private static void VillageLadder(Folk f, Village vil, Settlement mk, int gold, double buy1, double nv)
+        /// miasta targowego. `gold` - kiesa wsi przed koszykiem. `scale` - DS (F1): wies DS x (1 - rampa) (stara drabina gasnie, krok 5 DsSurplus ja zastepuje); inne wsie 1.</summary>
+        private static void VillageLadder(Folk f, Village vil, Settlement mk, int gold, double buy1, double nv, double scale = 1.0)
         {
             if (!WardsShopOn) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
                 double avail = Math.Min(gold - buy1, vil.Gold);           // recenzja WAZNE 2: po koszyku dnia (sol i narzedzia z nadwyzki) - kiesa TERAZ
-                double want = Math.Max(0, avail - RdV * nv) / LxDays(Settings.Current);
+                double want = Math.Max(0, avail - RdV * nv) / LxDays(Settings.Current) * Math.Max(0.0, Math.Min(1.0, scale));
+                if (scale < 1.0) DsVillage.NoteOldExtras(0, want);       // DS: stara drabina w rampie (licznik linii "Daniny wsi (DS)")
                 f.DLxOff = want; f.DLxBuy = 0; f.LxSeen = _liveDay;
                 if (want < 1) return;
                 _lxVN++; _lxVWant += want;

@@ -1269,10 +1269,12 @@ namespace Armoury
                         // hak kiesy ludu (112, KL etap 5): E5/B1 - przy kiesie czynnej renta 20% kiesy wsi ustepuje stalej oplacie (VillageDuesPerHeadYear na wolna glowe, D1)
                         // ta sama sciezka (dekret, rabunek, zywy pan, przelew, RentToday, DayVillageRent) - jeden wlasciciel tych pol
                         bool fee = st.IsVillage && VillageTakings.VillageRentYieldsToFees;
+                        // DS (F1, rozdz. 3.1 W3): wies DS - czynsz staly z ksiega zaleglosci (rata + zaleglosc, najwyzej kiesa; rabunek, oblezenie targu, glod - rata darowana)
+                        bool ds = fee && DsVillage.On(st);
                         // E5/A1 (R4): przy czynnym zaworze kas miast miasto placi przez ValveTowns nizej (7% nadwyzki ponad zapas kupcow, pan 2/3 : korona 1/3,
                         // bez pulapu naleznej) - "nalezne" wyzej policzone jak dotad
                         if (st.IsTown && TownPurse.ValveLive) continue;
-                        if (st.IsVillage && (st.Village.VillageState == Village.VillageStates.Looted || st.Village.VillageState == Village.VillageStates.BeingRaided)) continue;
+                        if (st.IsVillage && (st.Village.VillageState == Village.VillageStates.Looted || st.Village.VillageState == Village.VillageStates.BeingRaided)) { if (ds) DsVillage.RentRemit(st); continue; }
                         var lord = st.OwnerClan != null ? st.OwnerClan.Leader : null;
                         if (lord == null || !lord.IsAlive) continue;
                         int gold = st.SettlementComponent != null ? st.SettlementComponent.Gold : 0;
@@ -1289,7 +1291,8 @@ namespace Armoury
                         // wpis 54: dekret podatkowy lenna BK (Low/Standard/High/Exemption) steruje renta
                         float decree = TaxDecree(st);
                         float rentNow = fee ? TownFolk.VillageFeeToday(st) : rent;
-                        int pay = (int)Math.Min(rentNow * decree, gold * takeShare * decree);
+                        int pay = ds ? DsVillage.RentPay(st, rentNow * decree, gold)   // DS: rata dnia + zaleglosc, najwyzej kiesa; reszta do ksiegi zaleglosci
+                                     : (int)Math.Min(rentNow * decree, gold * takeShare * decree);
                         if (fee && pay > gold) pay = gold;   // recenzja B1 (1-2): oplata stala (udzial 1) przy dekrecie High nie wieksza niz kiesa wsi - gra wyplaca panu cale pay, a kiese obcina do 0 (zloto z niczego)
                         if (pay <= 0) continue;
                         if (st.IsTown && BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) continue;   // E5/A4 (R22): oblezone miasto nie placi renty - zostaje w kasie, gdy kasa miasta jest prawdziwym pieniadzem (A1; inaczej placi i liczy; wies: rabunek wyzej)

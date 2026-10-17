@@ -259,6 +259,7 @@ namespace Armoury
                             int floor = TownFolk.VillageFloor(vs);
                             if (floor <= 0) continue;                         // wies bez miary zapasu (nieskalibrowana) - bez poboru
                             double ex = Math.Floor((double)v.Gold - floor);
+                            if (ex >= 1) ex = DsVillage.OldW7Room(vs, ex);    // DS (F1): wies DS jako zrodlo W7 x (1 - rampa), po rampie nie jest zrodlem
                             if (ex >= 1) { src.Add(new LvSrc { St = vs, V = v, Cls = -1, Room = ex, F = fief }); fief.Room += ex; }
                         }
                     if (fief.Room > 0) { fiefs.Add(fief); E += fief.Room; }
@@ -305,6 +306,7 @@ namespace Armoury
                         x.Took = Math.Max(0, had - x.V.Gold);
                         if (x.Took > 0 && x.V.Gold + 0.5 < TownFolk.VillageFloor(x.St)) _lvBelowRes++;   // kontrola: wies ponizej zapasu po poborze (oczekiwane 0)
                         vill += x.Took;
+                        DsVillage.NoteOldW7(x.St, x.Took);                   // DS (F1): stary pobor wsi DS w rampie (licznik)
                     }
                     else
                     {

@@ -6700,6 +6700,46 @@ namespace Armoury
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool GoodsLedgerHorses { get; set; } = true;
 
+        [SettingPropertyBool("Dues Medieval", HintText = "the villages pay their lords and their king as they did in the Middle Ages: the lord's share, the tithe and - in war - the crown's share are taken from what the carts bring home, the moment they bring it, and a small fixed rent is paid first; nothing is taken any more as 'a share a day of whatever the village has saved' (the crown's war levy on village savings, the hoard tax, the lords' war levy from villages, the 5 percent Banner Kings village market). A village keeps three weeks of its needs and rent in its chest and spends on finer goods only what lies beyond it. The old takings fade out over Ds Ramp Days from the first day with this on (needs Town Folk Live; off = the old rules from the next day)")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DuesMedieval { get; set; } = true;
+
+        [SettingPropertyBool("Ds Village Cart Dues", HintText = "with Dues Medieval: the tithe (Tithe Village Share of the takings, half of it back as alms for the village poor, half to build septs) and, in war, the crown's share are taken at the cart, from the village's part of the takings, the moment the cart comes home; the crown's share is also taken from what soldiers pay a village for lodging and services. Off = the tithe is taken from the village purse once a day as before and the crown takes no share from villages")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DsVillageCartDues { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ds War Share Village", 0.00f, 0.50f, "0.00", HintText = "with Dues Medieval: the crown's share of the village's part of the takings (after the tithe) for each step of war grant - one step in war (one and a half with the War Tax policy), none in peace; 0.10 = a tenth in war, as the 'ninth' of sheaves, fleeces and lambs was granted to Edward III. Nothing is taken from a village that is raided or looted, whose town or castle is besieged, or whose people go hungry")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public float DsWarShareVillage { get; set; } = 0.10f;
+
+        [SettingPropertyBool("Ds Rent Arrears", HintText = "with Dues Medieval: the village's fixed rent (Village Dues Per Head Year) is paid first each day; what the purse cannot pay is written in the lord's book of arrears and paid first on the days after, instead of being lost. Off = unpaid rent is lost as before")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DsRentArrears { get; set; } = true;
+
+        [SettingPropertyInteger("Ds Rent Forgive Days", 0, 728, "0", HintText = "with Ds Rent Arrears: arrears older than this many days of rent are forgiven by the lord - the oldest debt goes first (0 = never forgiven)")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public int DsRentForgiveDays { get; set; } = 364;
+
+        [SettingPropertyBool("Ds Rent Remit Raided", HintText = "with Dues Medieval: on a day when the village's town or market town is besieged, or its people go hungry, the lord lets the day's rent go (a raided or looted village pays no rent anyway); the arrears wait. Off = the rent is due on those days too")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DsRentRemitRaided { get; set; } = true;
+
+        [SettingPropertyInteger("Ds Village Chest Days", 0, 90, "0", HintText = "with Dues Medieval: the village keeps this many days of its daily purchases and its rent in its chest for a black day - nothing beyond its daily needs and rent is spent below it, and the village lends to lords only from what lies above it")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public int DsVillageChestDays { get; set; } = 21;
+
+        [SettingPropertyInteger("Ds Surplus Spend Days", 0, 120, "0", HintText = "with Dues Medieval: a village spends each day one part in this many of what its purse holds beyond its chest on finer goods - half on the townsfolk's list of finer goods in its market town, half at its Banner Kings village market (0 = it spends nothing beyond its daily needs)")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public int DsSurplusSpendDays { get; set; } = 15;
+
+        [SettingPropertyFloatingInteger("Ds Surplus Bk Share", 0.00f, 1.00f, "0.00", HintText = "with Dues Medieval: the share of a village's spending beyond its chest that goes to its Banner Kings village market; the rest goes to the finer goods in its market town (without the Banner Kings village market - all of it)")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public float DsSurplusBkShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Ds Ramp Days", 0, 112, "0", HintText = "with Dues Medieval: over how many days the old takings from village savings fade out and the crown's share at the cart and the spending beyond the chest come in, from the first day with Dues Medieval on - a running campaign (an old save) changes over step by step (0 = at once)")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public int DsRampDays { get; set; } = 28;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8374,6 +8414,16 @@ namespace Armoury
             s.DteConvoyNoFreeFood = DteConvoyNoFreeFood;
             s.BkCaravanNoFreeFood = BkCaravanNoFreeFood;
             s.GoodsLedgerHorses = GoodsLedgerHorses;
+            s.DuesMedieval = DuesMedieval;
+            s.DsVillageCartDues = DsVillageCartDues;
+            s.DsWarShareVillage = DsWarShareVillage;
+            s.DsRentArrears = DsRentArrears;
+            s.DsRentForgiveDays = DsRentForgiveDays;
+            s.DsRentRemitRaided = DsRentRemitRaided;
+            s.DsVillageChestDays = DsVillageChestDays;
+            s.DsSurplusSpendDays = DsSurplusSpendDays;
+            s.DsSurplusBkShare = DsSurplusBkShare;
+            s.DsRampDays = DsRampDays;
         }
 
         internal static void Apply()

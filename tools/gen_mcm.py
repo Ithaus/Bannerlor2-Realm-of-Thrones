@@ -302,6 +302,13 @@ RANGES = {
     'SoldierPostureTier6Multiplier': (1.0, 3.0, "0.00"),
     # ZC0 (16.10): skala targu sigma - kod przycina do 28..73 (DailyLife.SigmaFromMcm; widelki projektu rozdz. 4)
     'DailyLifeMarketScale': (28, 73, "0"),
+    # DS F1 (17.10): daniny wsi - zgodnie z przycieciem w kodzie (DsVillage: udzial korony 0..0.5, doby 0..3640 / 0..364, udzial BK 0..1)
+    'DsWarShareVillage': (0.0, 0.5, "0.00"),
+    'DsRentForgiveDays': (0, 728, "0"),
+    'DsVillageChestDays': (0, 90, "0"),
+    'DsSurplusSpendDays': (0, 120, "0"),
+    'DsSurplusBkShare': (0.0, 1.0, "0.00"),
+    'DsRampDays': (0, 112, "0"),
 }
 
 def gen(module_dir, ns, display):

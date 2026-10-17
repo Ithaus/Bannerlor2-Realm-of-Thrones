@@ -386,12 +386,14 @@ namespace Armoury
                     int vtax, vpurse;
                     VillageTakings.Split(vv, villPart, villPart, out vtax, out vpurse);
                     _dVillTax += vtax; _dVillPurse += vpurse; if (vtax > 0) _dVillTaxN++;
+                    if (vpurse > 0) DsVillage.WarShareSutlers(vv, vpurse);   // DS (F1): udzial korony g/10 od czesci wsi w kiesie (wlasny try; wies spoza DS - nic)
                 }
                 else
                 {
                     vill.SettlementComponent.ChangeGold(villPart);    // kiesa wsi (posiadacz "Pieniadz swiata")
                     _dVillPurse += villPart;
                     if (TributeOn && vv != null) { _dVillOwn += villPart; _dVillOwnN++; }
+                    if (vv != null) DsVillage.WarShareSutlers(vv, villPart);   // DS (F1): udzial korony g/10 od czesci wsi w kiesie (wlasny try)
                 }
             }
             // ---- liczniki (zloto juz na miejscu)

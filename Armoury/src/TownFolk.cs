@@ -104,6 +104,7 @@ namespace Armoury
             public readonly long[] EarnWin = new long[3];             // zarobek okna klas - podstawa podatkow panu (zamek: [0])
             public readonly long[] ZcE = new long[3]; public int ZcDay = -1;   // ZC0 (DailyLife, tylko odczyt): zarobek okna klas z ostatniej doby kiesy czynnej (zamek: [0]) i jej dzien; bez zapisu
             public long ZcTiV; public int ZcTiDay = -1;                        // ZC0 (DailyLife, tylko odczyt): dziesiecina, ktora wyszla z kiesy wsi tej doby (budowa septow) i jej dzien; bez zapisu
+            public long DsTiCart;                                             // DS (F1): dziesiecina wsi zdjeta przy wozie od ostatniej doby ludu (budowa septow) - do ZcTiV w DailyLive; bez zapisu
             public readonly long[] PaidG = new long[3];               // zaplacone za towar w oknie (czynsz, leczenie, sluzba - w dobie)
             public readonly long[] Offer = new long[3];               // nadwyzka oferowana na towar jutro (nie przelew - budzet "lepszych" kategorii)
             public long PaidKeep, VillWin, GmMatWin;                  // okno: zaplata ludu do kasy, zakupy wsi w tym miescie, material robot gminy (podstawa robocizny)

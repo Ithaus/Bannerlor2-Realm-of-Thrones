@@ -27,9 +27,10 @@ namespace Armoury
         internal const int N169CartPurse = 5;                // 112: sakwa rozwiazanego taboru (albo bez zwyciezcy) wraca do kiesy wsi
         internal const int N169Toll = 6;                     // E3-G3 (poprawki noc-ekonomia3): polowa myta pana bez zywego pana do kasy osady (TownToll.Take)
         internal const int N169CartBuy = 7;                  // E3-W1 (poprawki noc-ekonomia3): kiesa wsi -> kasa osady przy zakupie wozem w miescie sprzedazy (TownFolk.CartBuys)
-        private const int N169 = 8;
+        internal const int N169Dues = 8;                     // DS (F1): daniny wsi przy wozie - kiesa wsi -> skarbiec korony (W4), kiesa ludu i kasa miasta targowego (septy)
+        private const int N169 = 9;
         private static readonly string[] N169Name = { "naprawy", "skup nadwyzek zbrojowni", "komplety gracza", "sakiewki rozbitych partii", "inne", "sakwy taborow wsi (112)",
-                                                      "myto do kas osad (E3-G3)", "zakupy wsi wozem (E3-W1)" };
+                                                      "myto do kas osad (E3-G3)", "zakupy wsi wozem (E3-W1)", "daniny wsi przy wozie (DS)" };
         private static readonly long[,] _n169In = new long[Classes, N169], _n169Out = new long[Classes, N169];
         private static long _purseGoneWin, _purseGoneTown;  // sakiewki rozbitych partii: do zwyciezcow (i ich lordow) / do kas miast
         private static readonly long[] _classRest = new long[Classes];   // reszta starej linii kas (ClassLine) - do linii przyczyn

@@ -61,6 +61,9 @@ namespace Armoury
         /// pobiera wtedy oplate stala (VillageDuesPerHeadYear na wolna glowe) zamiast 20% kiesy; kiesa wylaczona - renta jak dotad w tej samej dobie.</summary>
         internal static bool VillageRentYieldsToFees { get { return TownFolk.Live; } }
 
+        /// <summary>DS (F1): okno powrotu wozu do wsi czynne (latka wpieta i VillageTakingsWhole) - daniny przy wozie (DsVillage.DuesAtCart) mozliwe.</summary>
+        internal static bool CartHookLive { get { var s = Settings.Current; return _enterHooked && s != null && s.VillageTakingsWhole; } }
+
         /// <summary>Stan przed latka BK: sakwa taboru, kiesa i licznik podatku wsi macierzystej (i wsi wejscia, gdy inna).</summary>
         internal sealed class Entry
         {
@@ -198,13 +201,32 @@ namespace Armoury
         }
 
         /// <summary>Po latce BK i po cudzych postfiksach (Priority.Last): dopisuje wsi to, co z oddanej gotowki nie trafilo nigdzie (Whole112),
-        /// a na samym koncu - F4b - rachunek za drewno kopalni przed dzialka pana (CoalFirst).</summary>
+        /// potem - F4b - rachunek za drewno kopalni przed dzialka pana (CoalFirst), a na samym koncu - DS (F1) - daniny wsi przy wozie (DsDues).</summary>
         public static void EnterPostfix(Entry __state)
         {
             if (__state == null) return;
             long estates;
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
+            DsDues(__state);
+        }
+
+        /// <summary>
+        /// DS (F1, rozdz. 3.1 W2/W4, 10.1): daniny przy wozie - po 112 i F4b, gdy czesc wsi utargu jest juz w kiesie wsi MACIERZYSTEJ (przyrost kiesy w oknie: BK + 112 +
+        /// zwrot F4b). Udzial pana i majatki (W1) bez zmian. Woz oddajacy utarg w obcej wsi - bez danin (kiesa macierzystej nie urosla). DsVillage.DuesAtCart: dziesiecina
+        /// i udzial korony (wlasny try - nie rzuca).
+        /// </summary>
+        private static void DsDues(Entry st)
+        {
+            try
+            {
+                if (st == null || st.Here != null || st.Home == null || st.Party == null) return;
+                int handed = st.Gold - st.Party.PartyTradeGold;
+                if (handed <= 0) return;
+                long part = (long)st.Home.Gold - st.HomeGold;
+                DsVillage.DuesAtCart(st.Party, st.Home, part, handed);
+            }
+            catch (Exception e) { Stumble("VillageTakings.DsDues", e); }
         }
 
         /// <summary>112 pkt 1 (bez zmian): reszta utargu do kiesy wsi. Zwraca true, gdy okno bylo nasze i krok przeszedl bez wyjatku; estates = wyplaty

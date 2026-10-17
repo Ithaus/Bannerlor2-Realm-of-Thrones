@@ -758,6 +758,7 @@ namespace Armoury
             var lw = CloseWin();
             // dziesiecina (E5/C3): kaplani BK raz na dobe, potem wsie (utarg okna) - przed miastami: place i material septow wsi licza sie w miastach targowych tej doby
             try { TitheBegin(); } catch (Exception e) { Stumble("TitheBegin", e); }
+            try { DsCartTitheZc(); } catch (Exception e) { Stumble("DsCartTitheZc", e); }   // DS (F1): dziesiecina wsi DS z wozow od ostatniej doby - do ZC0 (tylko licznik)
             try { VillageTithe(d); } catch (Exception e) { Stumble("VillageTithe", e); }
             AidBegin();                                                // P1: liczniki doby daniny z oszczednosci (czas poboru, nadwyzka po daninie wedlug krolestw)
             HoardBegin();                                              // kiesa2: liczniki doby podatku od nadwyzki (zeruje tez Last* dla linii Obieg)
@@ -1120,6 +1121,7 @@ namespace Armoury
             {
                 if (f.Kind != 2) continue;
                 Village vilTax = null; double nvTax = 0;               // obieg2: podatek od nadwyzki wsi po koszyku dnia i P5 (finally - takze przy "continue" bez zakupow)
+                Village vilDs = null;                                  // DS (F1): krok 5 - zbytki z nadwyzki ponad skrzynie (finally - takze przy "continue" bez koszyka)
                 try
                 {
                     f.DVNeed = 0; f.DVBuy = 0;                         // E5/C4: zakupy tej doby (okno People of this land)
@@ -1129,9 +1131,14 @@ namespace Armoury
                     d.Villages++;
                     double nv = pph * VillHeads(f, true);
                     vilTax = vil; nvTax = nv;
+                    // DS (F1): wies DS - stare wydatki z nadwyzki (15%/d na stara liste, stara drabina P5) x (1 - rampa), po rampie 0; krok 5 w finally
+                    bool ds = DsVillage.On(f.St);
+                    double oldK = ds ? DsVillage.OldShare(f.St) : 1.0;
+                    if (ds) vilDs = vil;
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nv, Math.Max(0, gold));
-                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv) * oldK;   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    if (ds) DsVillage.NoteOldExtras(extra, 0);
                     double wx = VillWorkOnly() ? extra : 0;            // P5 (zbytki, recenzja WAZNE 2): nadwyzka na koszyk tylko dla soli i narzedzi (len, garnki, piwo - lista)
                     double want = buy1 + extra;
                     d.VNeed += nv; d.VWant += want;
@@ -1151,13 +1158,56 @@ namespace Armoury
                         ow = Math.Min(W1Days * nv, ow + un);
                         if (ow >= 1) _w1Owed[vil] = ow; else _w1Owed.Remove(vil);
                     }
-                    VillageLadder(f, vil, mk, gold, buy1, nv);         // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian)
+                    VillageLadder(f, vil, mk, gold, buy1, nv, oldK);   // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian); DS x (1 - rampa)
                     if (spent <= 0) { d.VNoGoods++; _w1NgCur.Add(vil); continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
                 catch (Exception e) { f.ADay = -1; Stumble("Villages(wies)", e); }   // E5/C4: liczby wsi z tej doby niepewne - okno bez liczby
-                finally { if (vilTax != null && nvTax > 0) PayHoardVillage(f, vilTax, nvTax); }   // obieg2: klucz FolkHoardVillages wylaczony - nic (nie rzuca)
+                finally
+                {
+                    if (vilDs != null) DsSurplus(f, vilDs, nvTax, d, shelf);   // DS (F1) krok 5: zbytki tylko z nadwyzki ponad skrzynie (wlasny try)
+                    if (vilTax != null && nvTax > 0) PayHoardVillage(f, vilTax, nvTax);   // obieg2: klucz FolkHoardVillages wylaczony - nic (nie rzuca)
+                }
             }
+        }
+
+        /// <summary>
+        /// DS (F1) krok 5 (Villages, wies DS, po koszyku dnia i zaleglosci koszyka): skrzynia = DsVillageChestDays x (koszyk dnia + czynsz dnia); zbytki dnia =
+        /// rampa x (kiesa - skrzynia) / DsSurplusSpendDays (DsVillage.SurplusDay) - czesc P5 teraz: lista dostatku na polce miasta targowego (BuyLadder, jak P5), bez
+        /// podzialu miasta albo bez towaru na liscie - lista wsi (BuyGoods); czesc rynku BK odlozona do ticku BK wsi. Ponizej skrzyni nic. Nie rzuca.
+        /// </summary>
+        private static void DsSurplus(Folk f, Village vil, double nv, LDay d, Dictionary<Settlement, List<EquipmentElement>> shelf)
+        {
+            try
+            {
+                var s = Settings.Current;
+                double rent = Math.Max(0f, Math.Min(50f, s.VillageDuesPerHeadYear)) / YearDays * VillHeads(f, true);
+                double chest = DsVillage.ChestOf(f.St, nv, rent);
+                double p5 = DsVillage.SurplusDay(f.St, vil.Gold, chest);
+                if (p5 < 1) return;
+                var mk = vil.TradeBound ?? vil.Bound;
+                if (mk == null || mk.Town == null) return;
+                long got = 0;
+                if (WardsShopOn && mk.IsTown && _lxCats != null)
+                {
+                    long pcs = 0;
+                    _lxVN++; _lxVWant += p5;                               // linia "Zbytki ludu (P3-P5)": P5 wsi (stara drabina i krok 5 DS razem)
+                    if (f.LxSeen != _liveDay) { f.DLxOff = 0; f.DLxBuy = 0; f.LxSeen = _liveDay; }
+                    f.DLxOff += p5;
+                    long g1 = BuyLadder(vil, null, mk, p5, ref pcs);
+                    if (g1 > 0) { got = g1; _lxVBuy += g1; _lxVPcs += pcs; f.DLxBuy += g1; }
+                }
+                if (got <= 0)
+                {
+                    List<EquipmentElement> list;
+                    if (shelf == null || !shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); if (shelf != null) shelf[mk] = list; }
+                    long g2 = BuyGoods(vil, mk, list, p5, d);
+                    if (g2 > 0) { got = g2; Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += g2; }
+                }
+                if (got > 0) f.DVBuy += got;                                      // E5/C4: zakupy tej doby
+                DsVillage.NoteP5(got);
+            }
+            catch (Exception e) { Stumble("DsSurplus", e); }
         }
 
         /// <summary>Towar dla wsi na polce miasta targowego (kategorie sol, narzedzia, len, garnki, piwo) - raz na dobe na targ.</summary>
@@ -1329,6 +1379,25 @@ namespace Armoury
                 return x >= int.MaxValue ? int.MaxValue : (int)x;
             }
             catch (Exception e) { Stumble("VillageFloor", e); return 0; }
+        }
+
+        /// <summary>DS (F1, DsVillage - skrzynia, czynsz): koszyk dnia wsi (VillagePurchasePerHead x wolne glowy - ta sama liczba co Villages) i czynsz staly dnia przed
+        /// dekretem (VillageDuesPerHeadYear / 364 x wolne glowy - jak VillageFeeToday, bez ruszania ulamka). false - kiesa nieczynna, wies nieskalibrowana. Nie rzuca.</summary>
+        internal static bool DsVillageDay(Settlement st, out double nv, out double rent)
+        {
+            nv = rent = 0;
+            try
+            {
+                if (st == null || !st.IsVillage || !Live) return false;
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind != 2 || !f.Cal) return false;
+                var s = Settings.Current;
+                double h = VillHeads(f, true);
+                nv = Math.Max(0f, Math.Min(1f, s.VillagePurchasePerHead)) * h;
+                rent = Math.Max(0f, Math.Min(50f, s.VillageDuesPerHeadYear)) / YearDays * h;
+                return !(double.IsNaN(nv) || double.IsNaN(rent));
+            }
+            catch (Exception e) { Stumble("DsVillageDay", e); nv = rent = 0; return false; }
         }
 
         // ============================================================ R5: zapasy startowe

@@ -342,6 +342,17 @@ namespace Armoury
             catch { _stumbles++; }
         }
 
+        /// <summary>
+        /// DS (F1, DsVillage.DuesAtCart): daniny wsi przy wozie (dziesiecina na septy, udzial korony) zdjete z kiesy wsi macierzystej W SRODKU okna powrotu wozu. Okno liczy
+        /// "kiesa wsi z utargu" jako przyrost kiesy - bez tej poprawki wyszloby netto po daninach, a roznica poszlaby do "zniklo" bilansu swiata (zloto jest w skarbcu,
+        /// kiesie ludu i kasie miasta). Migawka kiesy przesunieta o daniny: utarg brutto; przelew poza tickiem nazwany pozycja Note169 N169Dues. Tylko licznik - nie rzuca.
+        /// </summary>
+        internal static void CartDuesInWindow(MobileParty cart, int dues)
+        {
+            try { if (dues > 0 && cart != null && WinOpen && _winVillage && ReferenceEquals(_winParty, cart)) _winHomeGold -= dues; }
+            catch { _stumbles++; }
+        }
+
         /// <summary>Sztuki towaru, ktore zostaly w taborze po sprzedazy (bez zwierzat jucznych, ktore tabor zatrzymuje).</summary>
         private static int Unsold(MobileParty mp)
         {

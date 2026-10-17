@@ -141,6 +141,7 @@ namespace Armoury
             foreach (var f in _f.Values)
             {
                 if (f.Kind != 2 || !(f.VHanded > 0)) continue;
+                if (DsVillage.CartDuesOn(f.St)) continue;                     // DS (F1): dziesiecina wsi DS zdjeta juz przy wozie (TitheVillageAtCart)
                 try
                 {
                     var vil = f.St.Village;
@@ -175,6 +176,70 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { Stumble("VillageTithe(wies)", e); }
+            }
+        }
+
+        /// <summary>
+        /// DS (F1, DsVillage.DuesAtCart): dziesiecina wsi PRZY WOZIE - TitheVillageShare oddanego utargu `handed`, najwyzej czesc wsi `part` (przyrost kiesy w oknie
+        /// powrotu). Ta sama regula co VillageTithe (kaplani z ostatniej doby ludu - _priests): polowa jalmuzna zostaje w kiesie wsi, budowa septow - kiesa wsi -> place
+        /// ludu miasta targowego (75%, KBuildLabour) i material do jego kasy (25%, sprzedaz MixBuild); bez kaplana albo bez miasta targowego - zostaje w kiesie.
+        /// Zwraca dziesiecine nalezna (zdjeta albo zostawiona); state: 0 klucz/brak, 1 bez kaplana, 2 bez miasta targowego, 3 zaplacona, 4 lista kaplanow doby nieznana
+        /// (pominieta); fromPurse - zeszlo z kiesy wsi, received - przybylo odbiorcom (zmierzone; kontrola DS). Poza blokiem doby - przelewy liczone w oknie ludu
+        /// (jak Earn: _ctlIn), material w "Przeplywy osad (przyczyny)" (N169Dues). Nie rzuca.
+        /// </summary>
+        internal static long TitheVillageAtCart(Village vil, int handed, long part, out long alms, out long wage, out long mat, out long fromPurse, out long received, out int state)
+        {
+            alms = wage = mat = fromPurse = received = 0; state = 0;
+            try
+            {
+                if (vil == null || vil.Settlement == null || handed <= 0 || part <= 0 || !Live || OffMain() || !TitheKey) return 0;
+                if (_priests == null) { state = 4; return 0; }
+                double share = TitheVillage(Settings.Current);
+                if (!(share > 0)) return 0;
+                long x = Math.Min((long)Math.Round(handed * share), part);
+                if (x <= 0) return 0;
+                var st = vil.Settlement;
+                if (!_priests.Contains(st)) { state = 1; return x; }
+                alms = (long)Math.Round(x * TitheAlms);
+                long build = x - alms;
+                var mk = vil.TradeBound ?? vil.Bound;
+                Folk mf = null;
+                if (mk != null && mk.Town != null) _f.TryGetValue(mk, out mf);
+                if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive) || build <= 0) { state = 2; return x; }
+                int had = vil.Gold;
+                vil.ChangeGold(-(int)Math.Min(int.MaxValue, build));
+                long got = Math.Max(0, (long)had - vil.Gold);
+                if (got <= 0) { state = 2; return x; }
+                state = 3; fromPurse = got;
+                wage = (long)Math.Round(got * TitheWage); mat = got - wage;
+                if (wage > 0)
+                {
+                    long k0 = mf.KW + mf.KR + mf.KP;
+                    Credit(mf, wage, KBuildLabour); _ctlIn += wage;                 // kiesa wsi -> kiesa ludu miasta targowego
+                    received += mf.KW + mf.KR + mf.KP - k0;                        // kontrola DS: odbiorca zmierzony
+                }
+                if (mat > 0)
+                {
+                    int t0 = mk.Town.Gold;
+                    mk.Town.ChangeGold((int)mat);
+                    received += (long)mk.Town.Gold - t0;
+                    mf.Sale[MixBuild] += mat;
+                    MoneyLedger.Note169(MoneyLedger.N169Dues, mk, (int)mat);   // kasa miasta targowego poza tickiem - nazwane w "Przeplywy osad (przyczyny)"
+                }
+                var vf = Get(st);
+                if (vf != null) vf.DsTiCart += got;                                 // ZC0: dziesiecina, ktora wyszla z kiesy wsi (do ZcTiV w DailyLive)
+                return x;
+            }
+            catch (Exception e) { Stumble("TitheVillageAtCart", e); return 0; }
+        }
+
+        /// <summary>DailyLive (przed VillageTithe): ZC0 - dziesiecina wsi DS zdjeta przy wozach od ostatniej doby ludu jako "dziesiecina tej doby" (ZcVillageTithe).</summary>
+        private static void DsCartTitheZc()
+        {
+            foreach (var f in _f.Values)
+            {
+                if (f.Kind != 2 || f.DsTiCart <= 0) continue;
+                f.ZcTiV = f.DsTiCart; f.ZcTiDay = _liveDay; f.DsTiCart = 0;
             }
         }
 

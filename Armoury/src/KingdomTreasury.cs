@@ -370,6 +370,7 @@ namespace Armoury
         internal static void Levies()
         {
             LeviesToday.Clear(); TownLevyToday.Clear();
+            DsVillage.FlushCrown(LeviesToday);   // DS (F1): udzial korony przy wozie i od markietanow (W4) wplacony do skarbcow od ostatniego Levies - wplyw dnia (165)
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             try
@@ -405,6 +406,7 @@ namespace Armoury
                         {
                             float share = (town ? s.LaySubsidyTownShare : s.LaySubsidyVillageShare) * (warTax ? Math.Max(1f, s.LaySubsidyWarTaxMultiplier) : 1f);
                             int x = (int)Math.Min(spare, spare * Math.Max(0f, share));
+                            if (!town && x > 0) x = DsVillage.OldLevy(st, x);   // DS (F1): wies DS - danina od kiesy x (1 - rampa), po rampie 0 (korona bierze W4 przy wozie)
                             if (x > 0)
                             {
                                 st.SettlementComponent.ChangeGold(-x); k.KingdomBudgetWallet += x; sub += x; spare -= x;

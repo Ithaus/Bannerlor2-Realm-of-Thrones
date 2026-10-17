@@ -341,6 +341,9 @@ namespace Armoury
         private static void PayHoardVillage(Folk f, Village vil, double nv)
         {
             if (!HoardVillOn || f == null || vil == null) return;
+            // DS (F1): wies DS - podatek od nadwyzki x (1 - rampa), po rampie nic (wies DS placi tylko daniny przy wozie i czynsz)
+            double dsOld = DsVillage.OldShare(f.St);
+            if (!(dsOld > 0)) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -360,6 +363,7 @@ namespace Armoury
                 double due = HoardRateNow(s) * (room + credit) - credit;
                 long x = due >= 1 ? (long)Math.Floor(Math.Min(due, room)) : 0;
                 x = Math.Min(x, (long)gold);
+                if (dsOld < 1.0) x = DsVillage.OldHoard(f.St, x);       // DS (F1): rampa
                 HoardNote(s, room, 0, credit, gold, x);                // N7 / N8: liczniki porownania (stara stawka, bez zaliczenia)
                 if (x <= 0) { _vhE1 += room; _vhGold1 += gold; return; }
                 if (BesiegedPay.Holds(bound, BesiegedPay.KFolkHoard, x, true)) { _vhHeld += x; _vhHeldN++; _vhE1 += room; _vhGold1 += gold; return; }
@@ -399,6 +403,7 @@ namespace Armoury
                 }
                 _vhTake += x; _vhE1 += room - x; _vhGold1 += vil.Gold;
                 if (x > 0) { _vhN++; LnNoteTaxed(f.St, x); }          // N8: podatek tej doby z kiesy wsi (pozyczka liczy nadwyzke sprzed niego)
+                if (dsOld < 1.0) DsVillage.NoteOldHoard(x);            // DS (F1): stary pobor wsi DS w rampie (licznik)
                 try
                 {
                     if (lp > 0)

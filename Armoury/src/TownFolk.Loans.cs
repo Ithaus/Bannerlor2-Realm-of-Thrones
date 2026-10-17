@@ -210,6 +210,9 @@ namespace Armoury
                     double nv = pph * VillHeads(vf, true);
                     if (!(nv > 0)) continue;
                     double normV = times * RdV * nv;
+                    // DS (F1, rozdz. 3.2 pkt 5): wies DS pozycza panom tylko z nadwyzki ponad skrzynie na czarna godzine (koszyk + czynsz x DsVillageChestDays)
+                    if (DsVillage.On(v.Settlement))
+                        normV = DsVillage.ChestOf(v.Settlement, nv, Math.Max(0f, Math.Min(50f, s.VillageDuesPerHeadYear)) / YearDays * VillHeads(vf, true));
                     double ex0 = v.Gold - normV, ex = LnPurse(v.Settlement, v.Gold) - normV;   // N8: kiesa wsi sprzed podatku tej doby
                     if (ex0 >= 1) old += ex0;
                     if (ex >= 1) { sum += ex; if (into != null) into.Add(new LnSrc { St = v.Settlement, V = v, Kind = 2, Ex = ex }); }

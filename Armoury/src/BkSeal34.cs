@@ -110,9 +110,13 @@ namespace Armoury
             if (town == null) return;
             var md = town.MarketData;
             var made = Produced(_getProductions.Invoke(pm, new[] { data }));
-            int budget = (int)(village.Gold * 0.05f);                                               // BK: 5% kiesy - nie maleje w petli (jak w BK)
+            // DS (F1, rozdz. 3.2 pkt 5): wies DS - rynek BK nie jest osobnym poborem 5% kiesy, tylko "sklepem" kroku 5: budzet = (1 - rampa) x 5% kiesy (stary, w rampie)
+            // + odlozona czesc zbytkow z nadwyzki ponad skrzynie (DsVillage.SurplusDay); budzet maleje z kazdym zakupem (prawdziwy budzet). Inne wsie - BK jak dotad
+            bool ds = DsVillage.On(st);
+            int budget = ds ? DsVillage.BkBudget(st, village.Gold) : (int)(village.Gold * 0.05f);   // BK: 5% kiesy - nie maleje w petli (jak w BK)
             var roster = town.Owner.ItemRoster;
             bool any = false;
+            long dsSpent = 0;
             for (int i = roster.Count - 1; i >= 0; i--)
             {
                 if (budget <= 10) break;
@@ -130,8 +134,10 @@ namespace Armoury
                 roster.AddToCounts(el, -1);
                 _vBuys++; _vPaid += price; any = true;
                 if (town.IsCastle) _vCastle += price;
+                if (ds) { budget -= price; dsSpent += price; }
             }
             if (any) _vVillages++;
+            if (ds) DsVillage.NoteBkSpent(dsSpent);
         }
 
         private static object Marketplace()
