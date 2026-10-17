@@ -88,7 +88,7 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior: nowa sesja (zapis wczytuje Import po konstruktorze).</summary>
         internal static void Reset()
         {
-            _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _bkTick.Clear(); _bkLeft.Clear(); _startLogged = false;
+            _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _bkTick.Clear(); _bkLeft.Clear(); _startLogged = false; _atFlag = -1;
             _stumblesSess = 0; _errOnce.Clear();
             ClearCounters();
         }
@@ -100,7 +100,33 @@ namespace Armoury
         }
 
         // ============================================================ przelaczniki
-        internal static bool Key { get { var s = Settings.Current; return s != null && s.DuesMedieval; } }
+        internal static bool Key { get { var s = Settings.Current; return s != null && (s.DuesMedieval || AutotestFlag); } }
+
+        internal const string AutotestFlagName = "armoury-ds-wlacz.flag";
+        private static int _atFlag = -1;   // -1 nie sprawdzony w tej sesji, 0 nie, 1 tak
+
+        /// <summary>Plik-przelacznik autotestu (jak KS armoury-ks-wlacz.flag): Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-ds-wlacz.flag
+        /// wlacza DS tylko w trybie autotestu CrashScribe (LogGate 1 pelne / 2 profil) - nigdy w grze Jeffa; sprawdzany raz na sesje (Reset zeruje).</summary>
+        internal static bool AutotestFlag
+        {
+            get
+            {
+                if (_atFlag >= 0) return _atFlag == 1;
+                bool f = false;
+                try
+                {
+                    int m = LogGate.Mode;
+                    if (m == 1 || m == 2)
+                    {
+                        var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                        f = System.IO.File.Exists(System.IO.Path.Combine(System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), AutotestFlagName));
+                    }
+                }
+                catch { f = false; }
+                if (Campaign.Current != null) _atFlag = f ? 1 : 0;
+                return f;
+            }
+        }
 
         /// <summary>F1 czynne (klucz DuesMedieval i kiesa ludu) - bez wzgledu na osade. Korona (K5 krok 1 przy samym F1: KingdomTreasury.WageRefund, DsSeason.TreasuryForRefund).</summary>
         internal static bool Live { get { return Key && TownFolk.Live; } }
@@ -128,7 +154,7 @@ namespace Armoury
             get
             {
                 var s = Settings.Current;
-                if (s == null || !s.DuesMedieval || !TownFolk.Live) return 0;
+                if (s == null || !Key || !TownFolk.Live) return 0;
                 int today = Today;
                 if (_dayOn < 0) _dayOn = today;
                 int days = Math.Max(0, Math.Min(364, s.DsRampDays));
@@ -603,7 +629,7 @@ namespace Armoury
                 if (Campaign.Current == null) return;
                 var s = Settings.Current;
                 int day = (int)CampaignTime.Now.ToDays - 1;
-                bool on = s != null && s.DuesMedieval && TownFolk.Live;
+                bool on = s != null && Key && TownFolk.Live;
                 if (!on)
                 {
                     if (_dayOn >= 0 || _startLogged)
