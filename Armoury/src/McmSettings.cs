@@ -6664,9 +6664,21 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationSwitchRule { get; set; } = true;
 
-        [SettingPropertyBool("Start Calibration Autotest Apply", HintText = "FOR THE AUTOTEST ONLY: right after the first finished plan the calibration is applied to the running game (village output from hands and land, town fields, the switching rule, the granary floor). Works only while the CrashScribe autotest is running; in a normal game it does nothing")]
+        [SettingPropertyBool("Start Calibration Autotest Apply", HintText = "FOR THE AUTOTEST ONLY: right after the first finished plan the calibration is applied to the running game (village output from hands and land, town fields, the switching rule, the granary floor, the people's daily basket at the market and the town food crafts). Works only while the CrashScribe autotest is running; in a normal game it does nothing")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationAutotestApply { get; set; } = false;
+
+        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan) and this switch turns itself off again, so another save is never touched. Nothing in the game changes yet")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationArmThisSave { get; set; } = false;
+
+        [SettingPropertyBool("Start Calibration Confirm", HintText = "Step 2 of 2: on a save marked with Arm This Save and after at least 7 days of weekly plans on it, the calibration starts the next day: for 14 days the villages move from today's output to what their hands make on their land, the people's daily basket comes to the market over 28 days, and the stalls get their starting prices. Cannot undo goods already made and sold, nor gold that changed hands in trade. This switch turns itself off again; to undo later switch Start Calibration off (from the next day output and demand are as before)")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationConfirm { get; set; } = false;
+
+        [SettingPropertyBool("Start Calibration Town Crafts", HintText = "with the calibration applied: the town's craftsmen bake bread and pies and brew beer from the grain on the stall, press wine from grapes and oil from olives, make mead from honey, pots from clay and (in Lys, Volantis, Myr, Tyrosh and Pentos) garum from fish and salt - only while the product pays for its goods and work and the stall wants it (at most a week of what the town buys); off = only the workshops do it, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationTownCrafts { get; set; } = true;
 
         [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: step by step over 60 days, up to about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
@@ -8386,6 +8398,9 @@ namespace Armoury
             s.StartCalibrationTownFields = StartCalibrationTownFields;
             s.StartCalibrationSwitchRule = StartCalibrationSwitchRule;
             s.StartCalibrationAutotestApply = StartCalibrationAutotestApply;
+            s.StartCalibrationArmThisSave = StartCalibrationArmThisSave;
+            s.StartCalibrationConfirm = StartCalibrationConfirm;
+            s.StartCalibrationTownCrafts = StartCalibrationTownCrafts;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;

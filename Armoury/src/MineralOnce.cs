@@ -174,7 +174,8 @@ namespace Armoury
                 if (ks)
                 {
                     // KS: wies zastosowana - towary KS ze stawka > 0 na liscie (brakujace z waga 0), jaja BK i krok W2 pominiete (KS liczy jaja i ryby sam); potkniecie - lista jak dotad
-                    try { var kl = StartCalibration.ListStep(v, list); if (kl != null) { list = kl; ksv = true; HamletKinds.Forget(v); VillageFruit.ForgetEgg(v); } }
+                    // KS etap 2 (rampa podazy): w rampie jaja BK i W2 zostaja (czesc gry stawki, BlendStep miesza) - pomijane dopiero przy pelnej stawce KS (FullFor)
+                    try { var kl = StartCalibration.ListStep(v, list); if (kl != null) { list = kl; if (StartCalibration.FullFor(v)) { ksv = true; HamletKinds.Forget(v); VillageFruit.ForgetEgg(v); } } }
                     catch (Exception kex) { int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.KS", kex); }
                 }
                 if (eggs && !ksv)

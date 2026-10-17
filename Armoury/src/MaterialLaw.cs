@@ -242,6 +242,9 @@ namespace Armoury
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);
+                // KS etap 2 (rampa podazy, rozdz. 6): wies zastosowana w rampie - wynik = (1 - beta) x lancuch gry (wyzej) + beta x stawka KS, PRZED sufitem dymarki i RockGold
+                // (sufity tna wynik mieszany); poza rampa tej wsi i towaru - nic
+                StartCalibration.BlendStep(village, item, ref __result);
                 // E6/R1 (214): dymarka kopalni bez drewna - w ticku produkcji tej wsi lupy najwyzej tyle, na ile starczy drewna w dymarce (sufit, nie czynnik;
                 // tylko "iron" i tylko w ticku TickGoodProduction tej wsi - podpowiedzi i magazyn wsi widza wynik bez sufitu)
                 Bloomery.Cap(village, item, ref __result);

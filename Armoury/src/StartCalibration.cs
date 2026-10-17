@@ -9,7 +9,8 @@ using TaleWorlds.Core;
 namespace Armoury
 {
     /// <summary>
-    /// KALIBRACJA STARTU (KS, projekt docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md; etap 1 - rdzen): produkcja okregu = rece x wydajnosc swiata x ziemia z mapy.
+    /// KALIBRACJA STARTU (KS, projekt docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md; etap 1 - rdzen, etap 2 - uzbrojenie, rampa, popyt koszyka ZC4 i przetwory ZC5):
+    /// produkcja okregu = rece x wydajnosc swiata x ziemia z mapy.
     ///  - BLOKI: wies gry w 20 blokach (punkt wsi + mieszanka ziemi okregu z rastra, arm_ks_land.tsv), kazda wioska poboczna osobno (udzial z osad ksiegi wiosek),
     ///    pola mieszczan (20 blokow rdzenia twierdzy; chlopi miasta, polowa pracy niewolnych, piata czesc wyrobnikow);
     ///  - RECE: ludzie okregu (dom + jego uchodzcy) x udzial stanu z ksiegi stanow ZC (chlopi 0.5, niewolni 0.65); ubytek rak robia dalej E4/5 i E4/7 (raz);
@@ -18,22 +19,27 @@ namespace Armoury
     ///  - WYBOR ZAJECIA: rownowaga reguly dochodu rodziny (logit beta 10, premia mapy 1.25, renta ziemi) - Plan na watku roboczym (StartCalibration.Core.cs);
     ///    po wlaczeniu ta sama regula przy 28-dobowym indeksie cen miasta wsi z hamulcem Jeffa (+25% przez 60 dob, koszt przebudowy do kasy miasta, okres przejsciowy,
     ///    najwyzej 1 czesc okregu naraz, najwyzej 5% rak regionu na sezon) - StartCalibration.Rule.cs;
-    ///  - PRODUKCJA W GRZE (tylko po wlaczeniu): stawki wsi z KS w MaterialLaw.ProdPostfix (zastepuja lancuch typu, ludzi, stawek, owocow, wielbladow, regulatora i W2),
-    ///    towary spoza typu na liscie BK z waga 0 (MineralOnce), magazyn wsi, zywnosc wsi gry (towar z niczego) wylaczona, plon pol mieszczan na polke miasta za zaplata
-    ///    kasy miasta ludowi; na targ idzie to, czego okreg nie zje sam (udzial z targu ZC) - w sztukach gry (kg / (sigma x kg sztuki));
-    ///  - SPICHLERZ: racje = max(racje KS z czesci domowej, dzisiejszy wzor) - podloga, dopoki nie ma zakupow ZC4 (KS nikogo nie zaglodzi);
+    ///  - PRODUKCJA W GRZE (tylko po wlaczeniu): stawki wsi z KS w MaterialLaw.ProdPostfix, towary spoza typu na liscie BK z waga 0 (MineralOnce), magazyn wsi, zywnosc
+    ///    wsi gry (towar z niczego) wylaczona, plon pol mieszczan na polke miasta za zaplata kasy miasta ludowi; na targ idzie to, czego okreg nie zje sam;
+    ///  - SPICHLERZ: racje = max(racje KS z czesci domowej, dzisiejszy wzor) - podloga (KS nikogo nie zaglodzi);
     ///  - PLAN co 7 dob (tylko liczy: linie "Kalibracja startu (KS)" i "KS: ...", plik ks-plan.csv wedlug okregu i towaru).
-    /// Wlaczenie (Apply) w tym etapie TYLKO w autotescie (klucz Start Calibration Autotest Apply i CrashScribe.Autotest.Active) - po pierwszym Planie; w grze Jeffa
-    /// uzbrojenie w zapisie przyjdzie w etapie 2 (projekt rozdz. 12). Stan po wlaczeniu w zapisie (arm_ks); klucz Start Calibration wylaczony = nastepna doba
-    /// produkcja wsi jak dzis (Undo bez terminu). Wyjatki per osada liczone (potkniecia) - bez globalnych wylacznikow.
+    /// ETAP 2 (rozdz. 6, 11.2, 12): UZBROJENIE W ZAPISIE - klucz MCM "Arm This Save" zapisuje w arm_ks id kampanii, dobe i skrot planu i sam wraca na Off; "Confirm"
+    /// (ten sam zapis, ten sam id, >= 7 dob Planu) wlacza nastepnej doby. Autotest - osobny klucz albo plik-przelacznik, tylko w autotescie CrashScribe, od razu po
+    /// pierwszym Planie. RAMPA: doba wlaczenia A = D-14; podaz KS na towar i rynek od A do D (14 dob, liniowo; towar, ktorego polki rynku maja juz zapas celu,
+    /// czeka na popyt - zapas tylko z prawdziwej nadwyzki), popyt koszyka ZC4 (StartCalibration.Zc4.cs) lambda 0 -> 1 przez 28 dob od A (do D+14); w dobie D wygladzona
+    /// podaz rynkow dostaje wartosc polki startu (cena startu z Planu w pasmie 0.7-1.5) - jedyne "ustawienie" ceny, bez towaru i zlota. PRZETWORY ZC5 w miastach
+    /// (StartCalibration.Crafts.cs). Undo bez terminu: klucz Start Calibration wylaczony = nastepna doba produkcja i popyt jak dzis (stan zostaje w zapisie).
+    /// Wyjatki per osada liczone (potkniecia) - bez globalnych wylacznikow.
     /// </summary>
     internal static partial class StartCalibration
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const string P = "Kalibracja startu (KS): ";
         private const string PK = "KS: ";
-        private const string SaveVersion = "ks1";
-        internal const int StatePlan = 0, StateApplied = 1;
+        private const string SaveVersion = "ks2", SaveVersion1 = "ks1";
+        internal const int StatePlan = 0, StateApplied = 1, StateArmed = 2;
+        internal const int RampSupply = 14, RampDemand = 28;     // rampa: podaz A..A+14 (= D), popyt koszyka A..A+28 (= D+14)
+        private const int MinPlanDays = 7;                        // potwierdzenie najwczesniej po 7 dobach Planu tego zapisu
 
         // ------------------------------------------------------------ stan kampanii (zapis arm_ks)
         private static int _state = StatePlan;
@@ -41,6 +47,10 @@ namespace Armoury
         private static string _campaign = "";
         private static uint _saveLandCrc, _saveLayoutCrc;
         private static int _saveSigma;
+        private static int _armDay = -1; private static uint _armHash;   // uzbrojenie: doba i skrot planu
+        private static uint _applyHash;                                   // skrot planu wlaczonego
+        private static bool _autotest;                                    // wlaczone kluczem autotestu (nie Jeffa)
+        private static bool _shelvesDone;                                 // polki startu w dobie D ustawione
         private static string _pending;               // zapis do rozwiazania przy starcie sesji
         private static string _loadNote = "";
 
@@ -49,17 +59,24 @@ namespace Armoury
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static bool _offLogged;
         private static int _lastPlanDay = int.MinValue;
+        private static int _keyLineDay = int.MinValue;
 
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.StartCalibration; } }
         internal static bool Applied { get { return _state == StateApplied && KeyOn; } }
+        /// <summary>Doba D (koniec rampy podazy) albo -1.</summary>
+        internal static int DDay { get { return _rampDay >= 0 ? _rampDay + RampSupply : -1; } }
 
         internal static void Reset()
         {
             _state = StatePlan; _applyDay = -1; _plans = 0; _firstPlanDay = -1; _campaign = ""; _saveLandCrc = _saveLayoutCrc = 0; _saveSigma = 0;
+            _armDay = -1; _armHash = 0; _applyHash = 0; _autotest = false; _shelvesDone = false;
             _pending = null; _loadNote = "";
-            _stumbles = _stumblesDay = 0; _err.Clear(); _offLogged = false; _lastPlanDay = int.MinValue;
+            _stumbles = _stumblesDay = 0; _err.Clear(); _offLogged = false; _lastPlanDay = int.MinValue; _keyLineDay = int.MinValue;
             PlanReset();
             LiveReset();
+            RampReset();
+            Zc4Reset();
+            CraftsReset();
         }
 
         private static void Stumble(string where, Exception e)
@@ -71,14 +88,18 @@ namespace Armoury
         private static int Today() { return (int)CampaignTime.Now.ToDays; }
 
         // ============================================================ zapis
+        // ks2|stan|kampania|doba A|plany|pierwszy plan|crc ziemi|crc ukladu|sigma|doba uzbrojenia|skrot uzbrojenia|skrot wlaczenia|flagi|beta|lambda|okregi...
         internal static string Export()
         {
             try
             {
-                if (_state != StateApplied && _plans == 0) return "";
+                if (_state == StatePlan && _plans == 0) return "";
                 var sb = new StringBuilder(96 * 1024);
                 sb.Append(SaveVersion).Append('|').Append(_state).Append('|').Append(Clean(_campaign)).Append('|').Append(_applyDay).Append('|').Append(_plans).Append('|')
-                  .Append(_firstPlanDay).Append('|').Append(_saveLandCrc.ToString("X8")).Append('|').Append(_saveLayoutCrc.ToString("X8")).Append('|').Append(_saveSigma).Append('|');
+                  .Append(_firstPlanDay).Append('|').Append(_saveLandCrc.ToString("X8")).Append('|').Append(_saveLayoutCrc.ToString("X8")).Append('|').Append(_saveSigma).Append('|')
+                  .Append(_armDay).Append('|').Append(_armHash.ToString("X8")).Append('|').Append(_applyHash.ToString("X8")).Append('|')
+                  .Append((_autotest ? 1 : 0) | (_shelvesDone ? 2 : 0)).Append('|');
+                RampExport(sb); sb.Append('|');
                 if (_state == StateApplied) ExportLive(sb);
                 return sb.ToString();
             }
@@ -92,32 +113,54 @@ namespace Armoury
             _pending = string.IsNullOrEmpty(data) ? null : data;
         }
 
-        /// <summary>Rozwiazanie zapisu (OnSessionLaunched): naglowek, a przy stanie "zastosowane" - zajecia blokow (wymaga pliku ziemi o tym samym crc i ukladu wiosek).</summary>
+        /// <summary>Rozwiazanie zapisu (OnSessionLaunched): naglowek, a przy stanie "zastosowane" - zajecia blokow (wymaga pliku ziemi o tym samym crc i ukladu wiosek).
+        /// Format ks1 (etap 1) czytany: bez uzbrojenia i rampy (zapis zastosowany ks1 = rampa juz za nami).</summary>
         private static void ResolvePending()
         {
             if (_pending == null) return;
             string data = _pending; _pending = null;
             try
             {
-                var h = data.Split(new[] { '|' }, 10);
+                bool v2 = data.StartsWith(SaveVersion + "|", StringComparison.Ordinal);
+                var h = data.Split(new[] { '|' }, v2 ? 16 : 10);
                 int st, ad, pl, fp, sg; uint lc, yc;
-                if (h.Length < 10 || h[0] != SaveVersion || !int.TryParse(h[1], NumberStyles.Integer, Inv, out st) || !int.TryParse(h[3], NumberStyles.Integer, Inv, out ad)
+                if ((v2 ? h.Length < 16 : (h.Length < 10 || h[0] != SaveVersion1)) || !int.TryParse(h[1], NumberStyles.Integer, Inv, out st) || !int.TryParse(h[3], NumberStyles.Integer, Inv, out ad)
                     || !int.TryParse(h[4], NumberStyles.Integer, Inv, out pl) || !int.TryParse(h[5], NumberStyles.Integer, Inv, out fp)
                     || !uint.TryParse(h[6], NumberStyles.HexNumber, Inv, out lc) || !uint.TryParse(h[7], NumberStyles.HexNumber, Inv, out yc) || !int.TryParse(h[8], NumberStyles.Integer, Inv, out sg))
                 { _loadNote = "zapis arm_ks w nieznanym formacie - pominiety (Plan od nowa, produkcja jak dzis)"; return; }
+                int armDay = -1, flags = 0; uint armHash = 0, applyHash = 0;
+                string body = h[9];
+                if (v2)
+                {
+                    int.TryParse(h[9], NumberStyles.Integer, Inv, out armDay);
+                    uint.TryParse(h[10], NumberStyles.HexNumber, Inv, out armHash); uint.TryParse(h[11], NumberStyles.HexNumber, Inv, out applyHash);
+                    int.TryParse(h[12], NumberStyles.Integer, Inv, out flags);
+                    body = h[15];
+                }
                 _plans = Math.Max(0, pl); _firstPlanDay = fp; _campaign = h[2] == "-" ? "" : h[2];
-                if (st != StateApplied) { _loadNote = "zapis: Plan (" + _plans + " planow od doby " + _firstPlanDay + ")"; return; }
                 string gid = "";
                 try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId ?? "" : ""; } catch { gid = ""; }
+                if (st == StateArmed)
+                {
+                    if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { _loadNote = "zapis UZBROJONY innej kampanii (id " + _campaign + ", gra " + gid + ") - uzbrojenie pominiete, Plan"; _campaign = ""; return; }
+                    _state = StateArmed; _armDay = armDay; _armHash = armHash;
+                    _loadNote = "zapis UZBROJONY od doby " + armDay + " (skrot planu " + armHash.ToString("X8") + "; " + _plans + " planow od doby " + _firstPlanDay + ") - czeka na Confirm";
+                    return;
+                }
+                if (st != StateApplied) { _loadNote = "zapis: Plan (" + _plans + " planow od doby " + _firstPlanDay + ")"; return; }
                 EnsureLand();
                 uint lay;
                 if (!LandReady || lc != _landCrc) { _loadNote = "zapis ZASTOSOWANY z innym plikiem ziemi (crc " + lc.ToString("X8") + ", plik " + _landCrc.ToString("X8") + ") - stan pominiety, produkcja jak dzis, Plan od nowa"; _plans = 0; return; }
                 if (!LayoutMatches(out lay) || yc != lay) { _loadNote = "zapis ZASTOSOWANY z innym ukladem wiosek (crc " + yc.ToString("X8") + ", gra " + lay.ToString("X8") + ") - stan pominiety, produkcja jak dzis, Plan od nowa"; _plans = 0; return; }
                 if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { _loadNote = "zapis ZASTOSOWANY innej kampanii (id " + _campaign + ", gra " + gid + ") - stan pominiety, produkcja jak dzis"; _plans = 0; return; }
                 int nd, nb, badD;
-                if (!ImportLive(h[9], out nd, out nb, out badD)) { _loadNote = "zapis ZASTOSOWANY - blad odczytu zajec blokow - stan pominiety, produkcja jak dzis"; LiveReset(); return; }
+                if (!ImportLive(body, out nd, out nb, out badD)) { _loadNote = "zapis ZASTOSOWANY - blad odczytu zajec blokow - stan pominiety, produkcja jak dzis"; LiveReset(); return; }
                 _state = StateApplied; _applyDay = ad; _saveLandCrc = lc; _saveLayoutCrc = yc; _saveSigma = sg;
-                _loadNote = "zapis ZASTOSOWANY od doby " + ad + ": okregow " + nd + ", blokow " + nb + (badD > 0 ? " (okregow pominietych " + badD + ")" : "") + ", sigma " + sg;
+                _armDay = armDay; _armHash = armHash; _applyHash = applyHash; _autotest = (flags & 1) != 0;
+                if (v2) { _shelvesDone = (flags & 2) != 0; RampImport(h[13], h[14]); }
+                else { _shelvesDone = true; RampImportFull(); }      // ks1: zapis etapu 1 (wlaczony bez rampy) - rampa i polki za nami
+                _loadNote = "zapis ZASTOSOWANY od doby " + ad + " (D " + DDay + (v2 ? "" : ", format ks1 - bez rampy") + "): okregow " + nd + ", blokow " + nb + (badD > 0 ? " (okregow pominietych " + badD + ")" : "") + ", sigma " + sg
+                            + ", " + (_autotest ? "autotest" : "uzbrojenie doba " + armDay);
             }
             catch (Exception e) { _loadNote = "blad odczytu arm_ks - stan pominiety"; LiveReset(); _state = StatePlan; Stumble("ResolvePending", e); }
         }
@@ -135,19 +178,28 @@ namespace Armoury
                 var s = Settings.Current;
                 Log.Info(P + "start sesji | klucz Start Calibration " + (KeyOn ? "TAK (Plan co 7 dob - tylko liczy)" : "NIE (nic nie liczy; zastosowany stan - produkcja jak dzis)")
                          + " | autotest: wlaczenie po pierwszym Planie " + (s != null && (s.StartCalibrationAutotestApply || ApplyFlag()) ? (AutotestMode() ? "TAK (autotest czynny; " + (s.StartCalibrationAutotestApply ? "klucz" : "plik " + ApplyFlagName) + ")" : "klucz/plik TAK, ale to nie autotest - nic") : "NIE")
-                         + " | stan: " + (_state == StateApplied ? "ZASTOSOWANY od doby " + _applyDay : "Plan") + (_loadNote.Length > 0 ? " (" + _loadNote + ")" : "")
+                         + " | uzbrojenie w zapisie: klucz Arm This Save " + (s != null && s.StartCalibrationArmThisSave ? "TAK (nastepna doba)" : "nie") + ", Confirm " + (s != null && s.StartCalibrationConfirm ? "TAK (nastepna doba)" : "nie")
+                         + " | stan: " + StateText() + (_loadNote.Length > 0 ? " (" + _loadNote + ")" : "")
                          + " | " + _landNote + " | uklad wiosek tej sesji " + (lm ? "zgodny z plikiem" : "NIEZGODNY albo ksiega wiosek nieczynna - wioski poboczne poza KS, Apply zablokowane")
                          + " | premia mapy " + (s != null ? s.StartCalibrationMapInertia : 1.25f).ToString("0.00", Inv) + ", pola mieszczan " + (s == null || s.StartCalibrationTownFields ? "TAK" : "NIE")
-                         + ", regula zmiany zajec po wlaczeniu " + (s == null || s.StartCalibrationSwitchRule ? "TAK" : "NIE") + " | potkniecia " + _stumbles + ".");
+                         + ", regula zmiany zajec po wlaczeniu " + (s == null || s.StartCalibrationSwitchRule ? "TAK" : "NIE") + ", przetwory miast (ZC5) " + (s == null || s.StartCalibrationTownCrafts ? "TAK" : "NIE")
+                         + " | rampa: podaz " + RampSupply + " dob (A..D), popyt koszyka ZC4 lambda " + RampDemand + " dob (A..D+14), polki startu w D | potkniecia " + _stumbles + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
+        }
+
+        private static string StateText()
+        {
+            if (_state == StateApplied) return "ZASTOSOWANY od doby " + _applyDay + " (D " + DDay + ", " + (_autotest ? "autotest" : "uzbrojony doba " + _armDay) + ")";
+            if (_state == StateArmed) return "UZBROJONY doba " + _armDay + " (skrot planu " + _armHash.ToString("X8") + ") - czeka na Confirm";
+            return "Plan";
         }
 
         /// <summary>Tryb autotestu CrashScribe (LogGate: 1 pelne, 2 profil) - jedyne miejsce, gdzie klucz Start Calibration Autotest Apply cos robi.</summary>
         private static bool AutotestMode() { int m = LogGate.Mode; return m == 1 || m == 2; }
 
-        /// <summary>ArmouryBehavior.OnDailyTick, po DailyLife.Daily (stany doby): wynik Planu z watku roboczego, nowy Plan co 7 dob, wlaczenie w autotescie,
-        /// a w stanie zastosowanym - stawki wsi na jutro, regula zmiany zajec, regale, pola mieszczan, linie. Wewnatrz bloku MoneyLedger (pozycja MKs).</summary>
+        /// <summary>ArmouryBehavior.OnDailyTick, po DailyLife.Daily (stany doby): wynik Planu z watku roboczego, nowy Plan co 7 dob, klucze uzbrojenia i wlaczenie,
+        /// a w stanie zastosowanym - rampa, stawki wsi na jutro, popyt koszyka ZC4, regula zmiany zajec, regale, pola mieszczan, linie. Wewnatrz bloku MoneyLedger (MKs).</summary>
         internal static void Daily()
         {
             int today = Today(), day = today - 1;
@@ -156,25 +208,30 @@ namespace Armoury
             {
                 if (!KeyOn)
                 {
+                    if (_state == StateApplied) _wasOff = true;     // Undo: przy ponownym wlaczeniu rampa od nowa
                     PlanCancel();
                     LivePublishOff();
-                    if (!_offLogged) { _offLogged = true; Log.Info(P + "dzien " + day + " | WYLACZONY (Start Calibration = off) - bez Planu" + (_state == StateApplied ? "; stan zastosowany zachowany w zapisie, produkcja wsi jak dzis (Undo)" : "") + "."); }
+                    if (!_offLogged) { _offLogged = true; Log.Info(P + "dzien " + day + " | WYLACZONY (Start Calibration = off) - bez Planu" + (_state == StateApplied ? "; stan zastosowany zachowany w zapisie, produkcja i popyt jak dzis (Undo)" : (_state == StateArmed ? "; uzbrojenie zachowane w zapisie" : "")) + "."); }
+                    KeysIdle(day);
                     return;
                 }
                 _offLogged = false;
                 if (Campaign.Current == null) return;
                 EnsureLand();
-                if (!LandReady) return;
+                if (!LandReady) { KeysIdle(day); return; }
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 PricesDaily(today);                                   // 28-dobowe indeksy cen miast (regula zmiany zajec, regale)
                 PlanCollect(day);                                     // wynik Planu z watku roboczego (linie i ks-plan.csv)
-                if (_state == StatePlan)
+                if (_state != StateApplied)
                 {
-                    if (ApplyWanted() && _plan != null && _plan.Error == null && _planIn != null) Apply(today);
-                    else if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);
+                    bool planOk = _plan != null && _plan.Error == null && _planIn != null;
+                    if (ApplyWanted() && planOk) Apply(today, true);
+                    else KeysDaily(today, planOk);
+                    if (_state != StateApplied && (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue)) PlanStart(day);
                 }
                 else
                 {
+                    if (_wasOff) RampRestart(today);                   // klucz znow wlaczony po przerwie (Undo -> Redo) - rampa od nowa, bez skoku
                     LiveDaily(today);
                     if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);   // Plan dalej co 7 dob - pomiar nacisku (gra bez zmian)
                 }
@@ -182,9 +239,10 @@ namespace Armoury
                 AddMs(ms);
                 if (LogGate.Lines)
                 {
-                    Log.Info(P + "dzien " + day + " | stan " + (_state == StateApplied ? "ZASTOSOWANY od doby " + _applyDay : "Plan") + " | Plan: " + (_wBusy ? "w toku (od doby " + _wDay + ")" : "czeka")
+                    Log.Info(P + "dzien " + day + " | stan " + (_state == StateApplied ? "ZASTOSOWANY od doby " + _applyDay : (_state == StateArmed ? "Plan (UZBROJONY doba " + _armDay + ")" : "Plan"))
+                             + " | Plan: " + (_wBusy ? "w toku (od doby " + _wDay + ")" : "czeka")
                              + ", ostatni gotowy doba " + _planDay + " (planow tego zapisu " + _plans + ", od doby " + _firstPlanDay + ")"
-                             + (_state == StateApplied ? " | " + MoneyText() : "")
+                             + (_state == StateApplied ? " | " + RampText(today) + " | " + MoneyText() : "")
                              + " | czas doby KS " + ms.ToString("0.00", Inv) + " ms (mediana " + MedianMs().ToString("0.00", Inv) + " ms z " + _msN + " dob; bez watku roboczego)"
                              + " | potkniecia dzis " + _stumblesDay + " (sesja " + _stumbles + ").");
                     if (day % 7 == 0) { try { Log.Info(PriceLine(day)); } catch (Exception e) { Stumble("PriceLine", e); } }
@@ -218,14 +276,106 @@ namespace Armoury
             catch { return false; }
         }
 
-        /// <summary>Wlaczenie w tym etapie: tylko autotest (klucz Start Calibration Autotest Apply albo plik-przelacznik + CrashScribe.Autotest.Active), stan Plan,
-        /// uklad wiosek zgodny z plikiem ziemi.</summary>
+        /// <summary>Wlaczenie autotestu: klucz Start Calibration Autotest Apply albo plik-przelacznik + CrashScribe.Autotest.Active, uklad wiosek zgodny z plikiem ziemi.
+        /// Nigdy w grze Jeffa (tam - uzbrojenie w zapisie i Confirm).</summary>
         private static bool ApplyWanted()
         {
             var s = Settings.Current;
             if (s == null || !AutotestMode() || !(s.StartCalibrationAutotestApply || ApplyFlag())) return false;
             uint lay;
             return LayoutMatches(out lay);
+        }
+
+        // ============================================================ uzbrojenie w zapisie (rozdz. 12)
+        /// <summary>Skrot planu: zajecia i regale wszystkich blokow (udzialy w promilach) - ten sam plan = ten sam skrot.</summary>
+        private static uint PlanHash(KsResult r)
+        {
+            if (r == null || r.X == null) return 0;
+            uint h = 2166136261;
+            unchecked
+            {
+                for (int k = 0; k < r.X.Length; k++) { h = (h ^ (uint)(int)Math.Round(r.X[k] * 1000)) * 16777619; h = (h ^ (uint)r.PairCraft[k]) * 16777619; }
+                if (r.RegHands != null) for (int i = 0; i < r.RegHands.Length; i++) if (r.RegHands[i] > 0) h = (h ^ (uint)i ^ (uint)(int)Math.Round(r.RegHands[i])) * 16777619;
+            }
+            return h == 0 ? 1u : h;
+        }
+
+        /// <summary>Klucz uzbrojenia albo potwierdzenia wylaczony w MCM i w pamieci (nastepna doba po zobaczeniu) - inny zapis nigdy go nie zobaczy. Plik ustawien MCM zapisany.</summary>
+        private static void KeyOff(bool arm)
+        {
+            var s = Settings.Current;
+            if (s != null) { if (arm) s.StartCalibrationArmThisSave = false; else s.StartCalibrationConfirm = false; }
+            try
+            {
+                var i = McmSettings.Instance;
+                if (i == null) return;
+                if (arm) i.StartCalibrationArmThisSave = false; else i.StartCalibrationConfirm = false;
+                try { var pv = MCM.Abstractions.BaseSettingsProvider.Instance; if (pv != null) pv.SaveSettings(i); } catch (Exception e) { Stumble("KeyOff(zapis MCM)", e); }
+            }
+            catch (Exception e) { Stumble("KeyOff", e); }
+        }
+
+        private static void Tell(string en)
+        {
+            try { TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage(new TaleWorlds.Localization.TextObject("{=!}" + en).ToString())); } catch { }
+        }
+
+        /// <summary>Klucz Start Calibration wylaczony albo bez pliku ziemi: klucze uzbrojenia wracaja na Off z linia (nic nie robia).</summary>
+        private static void KeysIdle(int day)
+        {
+            var s = Settings.Current;
+            if (s == null || (!s.StartCalibrationArmThisSave && !s.StartCalibrationConfirm)) return;
+            bool a = s.StartCalibrationArmThisSave;
+            KeyOff(true); KeyOff(false);
+            Log.Info(PK + "dzien " + day + " | klucz " + (a ? "Arm This Save" : "Confirm") + " przy " + (KeyOn ? "braku pliku ziemi" : "wylaczonym Start Calibration") + " - nic nie robie, klucz wraca na Off.");
+            Tell("Start calibration: " + (KeyOn ? "the land file is missing" : "Start Calibration is off") + " - nothing done, the switch is off again.");
+        }
+
+        /// <summary>Doba w stanie Plan albo Uzbrojony: klucz Arm This Save (uzbraja ten zapis), Confirm (wlacza od nastepnej doby). Kazdy klucz po jednej dobie wraca na Off.</summary>
+        private static void KeysDaily(int today, bool planOk)
+        {
+            var s = Settings.Current;
+            if (s == null) return;
+            int day = today - 1;
+            string gid = "";
+            try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId ?? "" : ""; } catch { gid = ""; }
+            uint lay; bool layOk = LayoutMatches(out lay);
+            if (s.StartCalibrationArmThisSave)
+            {
+                KeyOff(true);
+                if (_state == StateArmed) { Log.Info(PK + "dzien " + day + " | Arm This Save: ten zapis juz uzbrojony (doba " + _armDay + ") - klucz wraca na Off."); Tell("Start calibration: this save is already armed. Use Confirm after a week of plans."); }
+                else if (!planOk) { Log.Info(PK + "dzien " + day + " | Arm This Save: brak gotowego Planu na tym zapisie (planow " + _plans + ") - nic, klucz wraca na Off; sprobuj po pierwszym Planie."); Tell("Start calibration: no finished plan on this save yet - try again in a few days."); }
+                else if (!layOk) { Log.Info(PK + "dzien " + day + " | Arm This Save: uklad wiosek niezgodny z plikiem ziemi - nic, klucz wraca na Off."); Tell("Start calibration: the village layout does not match the land file - nothing done."); }
+                else
+                {
+                    _state = StateArmed; _armDay = today; _armHash = PlanHash(_plan); _campaign = gid;
+                    int ready = Math.Max(today, _firstPlanDay + MinPlanDays);
+                    Log.Info(PK + "uzbrojony zapis doba " + today + " | kampania " + (gid.Length > 0 ? gid : "-") + ", skrot planu " + _armHash.ToString("X8") + " (plan nr " + _plans + " doby " + _planDay + ")"
+                             + ", Plan na tym zapisie od doby " + _firstPlanDay + " | Confirm najwczesniej doba " + ready + " | nic w grze sie nie zmienia | klucz wraca na Off.");
+                    Tell("Start calibration: this save is armed. Nothing changes yet. Switch on Confirm from day " + ready + " to start it.");
+                }
+            }
+            if (s.StartCalibrationConfirm)
+            {
+                KeyOff(false);
+                if (_state != StateArmed) { Log.Info(PK + "klucz bez uzbrojenia tego zapisu - nic nie robie (dzien " + day + ", Confirm bez Arm This Save; klucz wraca na Off)."); Tell("Start calibration: this save is not armed - nothing done. Use Arm This Save first."); }
+                else if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { Log.Info(PK + "klucz bez uzbrojenia tego zapisu - nic nie robie (dzien " + day + ", inny id kampanii " + gid + " / uzbrojony " + _campaign + ")."); Tell("Start calibration: this save is not the one that was armed - nothing done."); }
+                else if (_firstPlanDay < 0 || today - _firstPlanDay < MinPlanDays) { Log.Info(PK + "dzien " + day + " | Confirm: za wczesnie - Plan na tym zapisie od doby " + _firstPlanDay + ", potrzeba " + MinPlanDays + " dob (najwczesniej doba " + (_firstPlanDay + MinPlanDays) + ") - nic, klucz wraca na Off."); Tell("Start calibration: too early - wait until day " + (_firstPlanDay + MinPlanDays) + " and confirm again."); }
+                else if (!planOk) { Log.Info(PK + "dzien " + day + " | Confirm: brak gotowego Planu - nic, klucz wraca na Off."); Tell("Start calibration: no finished plan - nothing done."); }
+                else if (!layOk) { Log.Info(PK + "dzien " + day + " | Confirm: uklad wiosek niezgodny z plikiem ziemi - nic, klucz wraca na Off."); Tell("Start calibration: the village layout does not match the land file - nothing done."); }
+                else
+                {
+                    Log.Info(PK + "potwierdzone doba " + today + " | zapis uzbrojony doba " + _armDay + " (skrot " + _armHash.ToString("X8") + "), kampania " + (gid.Length > 0 ? gid : "-") + " | plan do wlaczenia nr " + _plans + " doby " + _planDay
+                             + " (skrot " + PlanHash(_plan).ToString("X8") + ")");
+                    Apply(today, false);
+                    Tell("Start calibration has begun: over the next 14 days the villages move to what their hands make on their land; the people's daily basket comes to the market over 28 days.");
+                }
+            }
+            if (_state == StateArmed && LogGate.Lines && today != _keyLineDay && (today - _armDay) % 7 == 0)
+            {
+                _keyLineDay = today;
+                Log.Info(PK + "dzien " + day + " | zapis uzbrojony doba " + _armDay + " - czeka na Confirm (najwczesniej doba " + Math.Max(_armDay, _firstPlanDay + MinPlanDays) + "); gra bez zmian.");
+            }
         }
     }
 }

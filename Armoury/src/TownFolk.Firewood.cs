@@ -115,6 +115,7 @@ namespace Armoury
                             k = 1.0 + rf; realmSum += rf; winterTowns++;
                         }
                         double x = people / 1000.0 * FwPer1000 * k;
+                        x = StartCalibration.Zc4Firewood(town, x);   // ZC4 (KS etap 2): (1 - lambda) x dzis + lambda x 1.5 kg na osobe (tabela KS); poza ZC4 - bez zmian
                         need += x;
                         int n = MBRandom.RoundRandomized((float)x);
                         if (n <= 0) continue;

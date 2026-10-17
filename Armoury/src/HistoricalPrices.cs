@@ -1047,7 +1047,7 @@ namespace Armoury
 
         public static void DemandPrefix() { _demandDepth++; }
         public static Exception DemandFinalizer(Exception __exception) { if (_demandDepth > 0) _demandDepth--; return __exception; }
-        public static void DemandPostfix(Town __0, ItemCategory __1, ref float __result)
+        public static void DemandPostfix(Town __0, ItemCategory __1, int __2, ref float __result)
         {
             if (_demandDepth > 1 || __1 == null) return;
             if (_applied)
@@ -1063,6 +1063,9 @@ namespace Armoury
             // (GetEstimatedDemandForCategory) i czesc domowa RawPrice.UseDemand; zewnetrzne wywolanie (zagniezdzone - wyzej) raz; 1 = klucz MarketByPeople wylaczony
             float k = PeopleMarket.DemandScale(__0);
             if (k != 1f) __result *= k;
+            // ZC4 (KS etap 2): szacunek popytu do wzoru ceny (wywolanie z dodatkiem dobrobytu) w kategoriach koszyka stanow = (1 - lambda) x dzis + lambda x potrzeba miasta
+            // i wsi kupujacych w nim x wartosc sztuki; budzet dnia (bez dodatku) - StartCalibration.Zc4DictPostfix; poza zastosowana kalibracja startu - nic
+            if (__2 > 0) StartCalibration.Zc4Demand(__0, __1, __2, ref __result);
         }
 
         // ------------------------------------------------------------ zakupy mieszczan (wpis 53, docs/BILANS-ZUZYCIA.md)
