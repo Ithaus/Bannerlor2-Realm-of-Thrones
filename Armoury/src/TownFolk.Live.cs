@@ -125,8 +125,35 @@ namespace Armoury
         private static readonly HashSet<Village> _w1NgCur = new HashSet<Village>(), _w1Served = new HashSet<Village>();
         private static int _w1NgLastN = -1, _w1ServedLastN; private static bool _w1NgRan;
 
+        // ZC1 (CartPriceByDestination, MarketCarts): zloto, ktore wsie NAPRAWDE wydaly w miescie na kategorie koszyka dnia (sol, narzedzia, len, garnki, piwo) - koszyk
+        // dnia w miescie targowym i zakupy wozem w miescie sprzedazy (E3-W1), wszystko przez BuyGoods; [Prev] - ostatnia pelna doba ludu. Tylko odczyt dla wozow.
+        private static Dictionary<Settlement, Dictionary<ItemCategory, double>> _vwCur = new Dictionary<Settlement, Dictionary<ItemCategory, double>>(),
+                                                                                 _vwPrev = new Dictionary<Settlement, Dictionary<ItemCategory, double>>();
+
+        /// <summary>ZC1: ile zl wsie wydaly wczoraj w miescie mk na kategorie cat koszyka dnia (0 - poza koszykiem, brak zakupow, pierwsza doba sesji).</summary>
+        internal static double VillageBought(Settlement mk, ItemCategory cat)
+        {
+            try
+            {
+                var p = _vwPrev; var cats = _villCats;
+                Dictionary<ItemCategory, double> m; double x;
+                if (mk == null || cat == null || p == null || cats == null || !cats.Contains(cat) || !p.TryGetValue(mk, out m) || m == null || !m.TryGetValue(cat, out x)) return 0;
+                return x > 0 && !double.IsNaN(x) && !double.IsInfinity(x) ? x : 0;
+            }
+            catch { return 0; }
+        }
+
+        private static void NoteVillBought(Settlement mk, ItemCategory c, int got)
+        {
+            if (mk == null || c == null || got <= 0) return;
+            Dictionary<ItemCategory, double> m;
+            if (!_vwCur.TryGetValue(mk, out m)) { m = new Dictionary<ItemCategory, double>(); _vwCur[mk] = m; }
+            double v; m.TryGetValue(c, out v); m[c] = v + got;
+        }
+
         private static void ResetLive()
         {
+            _vwCur = new Dictionary<Settlement, Dictionary<ItemCategory, double>>(); _vwPrev = new Dictionary<Settlement, Dictionary<ItemCategory, double>>();   // ZC1: zakupy wsi wedlug targu - sesja
             _w1Owed.Clear(); W1Zero(); _w1NgCur.Clear(); _w1Served.Clear(); _w1NgLastN = -1; _w1ServedLastN = 0; _w1NgRan = false;                                 // E3-W1: zaleglosci koszyka wsi i liczniki - sesja
             _seedT = _seedC = 0; _pending = null; _orphan = 0; _stateKey = null;
             _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear();
@@ -501,6 +528,8 @@ namespace Armoury
                 if (!(part > 0)) return;
                 float v = __result + (float)((k - 1.0) * part);
                 __result = v > 0f ? v : 0f;
+                // ZC1 (SilkToWeavers / SilverOreToSmiths): galaz "w gore" nie podnosi budzetu ponad polke nad zapasem warsztatow miasta (ta sama granica co BudgetPostfix)
+                if (k > 1.0) __result = GoodsPaths.FolkCap(__0, __2, __result);
             }
             catch (Exception e) { Stumble("AnchorBudgetPostfix", e); }
             finally { if (sc != 1f) PeopleMarket.NoteAnchorWork(Stopwatch.GetTimestamp() - t0); }
@@ -1083,6 +1112,7 @@ namespace Armoury
             // NE3-16 (poprawki): wczorajsze "bez towaru" i ile z nich kupilo potem wozem - do linii; dzis zbior od nowa
             if (_w1NgRan) { _w1NgLastN = _w1NgCur.Count; _w1ServedLastN = _w1Served.Count; }
             _w1NgRan = true; _w1NgCur.Clear(); _w1Served.Clear();
+            _vwPrev = _vwCur; _vwCur = new Dictionary<Settlement, Dictionary<ItemCategory, double>>();   // ZC1: zakupy wsi wedlug targu - wczorajsze do wycen wozow, dzisiejsze od zera
             double pph = Math.Max(0f, Math.Min(1f, s.VillagePurchasePerHead));
             if (_villCats == null) _villCats = CatsOf(VillIds, out _villText);
             var shelf = new Dictionary<Settlement, List<EquipmentElement>>();
@@ -1259,6 +1289,7 @@ namespace Armoury
                     town.ChangeGold(got);
                     roster.AddToCounts(e, -n);
                     spent += got; left -= got; d.VBuy += got; d.VPieces += n;
+                    NoteVillBought(mk, c, got);   // ZC1 (CartPriceByDestination): co wsie naprawde kupily w tym miescie - koszyk wycen wozow nastepnej doby
                     if (cloth) d.VClPcs += n;
                 }
                 if (held && left >= 1) d.VClKept += (long)left;   // K2: czesc plotna niewydana przez prog polki - zostaje w kiesie wsi (licznik)

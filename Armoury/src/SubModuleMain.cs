@@ -111,6 +111,7 @@ namespace Armoury
                 try { CraftRealm.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CraftRealm.ApplyAll", e); }   // E6/M1 (207): okno kontekstu GetItemsToProduce dla lancucha krainy na drodze gry (klucz czytany na zywo)
                 try { WorkshopInputs.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopInputs.ApplyAll", e); }   // E6/M2 (208): bramka wsadu przy wyborze typu warsztatu (klucz czytany na zywo)
                 try { NoTownMines.ApplyAll(_harmony); } catch (Exception e) { Log.Error("NoTownMines.ApplyAll", e); }   // N10 (noc 16.10): kopalnia BK w miescie -> najlepszy typ z cen targu (postfiks Low: po BK, przed licznikiem WorkshopInputs)
+                try { GoodsPaths.ApplyEarly(_harmony); } catch (Exception e) { Log.Error("GoodsPaths.ApplyEarly", e); }   // ZC1: wsad gliny i wapna w ladunkach (ConsumeInputFromTownMarket, koszt w progu cyklu) - PRZED latkami cyklu warsztatu
                 try { WorkshopTrade.ApplyAll(_harmony); } catch (Exception e) { Log.Error("WorkshopTrade.ApplyAll", e); }   // warsztaty towarowe w nowej monecie: utrzymanie i place do kas miast, cena z zarobku
                 try { TownFletchers.ApplyAll(_harmony); } catch (Exception e) { Log.Error("TownFletchers.ApplyAll", e); }   // paczka 172: strzelarze miasta po warsztatach (postfiks doby miasta) i sonda linii arrows
                 Stables.ApplyAll(_harmony);
@@ -226,6 +227,8 @@ namespace Armoury
                 // m6b (4): juczne nowego taboru wsi ze stada albo z targu (postfiks InitializeVillagerPartyProperties), juczne konwoju DTE bez kopii do zbrojowni,
                 // nazwane pozycje ksiegi koni (zapas drogi DTE i BK, konie przy RemoveParty) i towar partii usunietych bez zniszczenia (ksiega towarow, klucz FoodSourcesInLedger)
                 try { PackSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackSources.ApplyAll", e); }
+                // ZC1 (16.10, drogi towarow): tick produkcji wsi (wielorybnicy, miod lesny, marmur glinanek, wegiel drwali), konwoje DTE i karawany BK bez jedzenia z niczego
+                try { GoodsPaths.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GoodsPaths.ApplyAll", e); }
                 // m6b (6): kasy zaulkow - rozbicie zmiany kasy miast ponizej 1/4 zapasu kupcow na kanaly (tylko log)
                 try { AlleyProbe.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AlleyProbe.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);

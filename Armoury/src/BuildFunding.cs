@@ -27,6 +27,9 @@ namespace Armoury
         private static readonly Dictionary<Town, float> _funded = new Dictionary<Town, float>();
         private static readonly TextObject _txt = new TextObject("{=!}Paid works (wages and materials from the owner's purse)");
         private static readonly string[] MatIds = { "limestone", "hardwood", "clay", "tools", "marble", "planks" };
+        // ZC1 (PlanksToBuilding): kolejnosc zakupu materialow - deski pierwsze (mieszczanie ich juz nie zjadaja; budowy to ich ujscie); indeksy w MatIds (licznik sztuk P2 bez zmian)
+        private static readonly int[] OrderNatural = { 0, 1, 2, 3, 4, 5 }, OrderPlanksFirst = { 5, 0, 1, 2, 3, 4 };
+        private static int[] MatOrder { get { return GoodsPaths.PlanksOn ? OrderPlanksFirst : OrderNatural; } }
         internal static bool On { get { var s = Settings.Current; return s != null && s.PaidConstruction; } }
 
         internal static void Reset() { _funded.Clear(); _near.Clear(); FolkReset(); WoodReset(); }   // P2 recenzja: takze stan robot ludu sesji (BuildFunding.Folk.cs); K1: liczniki drewna
@@ -343,9 +346,11 @@ namespace Armoury
             if (market == null || market.Town == null || market.ItemRoster == null || budget < 1f) return 0;
             int spent = 0;
             var roster = market.ItemRoster;
+            var order = MatOrder;
             for (int pass = 0; pass < 3 && spent < budget; pass++)
-                foreach (var id in MatIds)
+                foreach (int mi in order)
                 {
+                    var id = MatIds[mi];
                     var it = MBObjectManager.Instance.GetObject<ItemObject>(id);
                     if (it == null) continue;
                     int have = roster.GetItemNumber(it) - WoodHold(market, it, false);   // K1: drewno tylko ponad zapas rzemiosla miasta (klucz wylaczony - 0)

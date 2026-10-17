@@ -37,8 +37,8 @@ namespace Armoury
     internal static class StartStock
     {
         private const double MaxAgeDays = 1.0;
-        private static readonly string[] Ids = { "iron", "hardwood" };
-        private static readonly string[] Names = { "ruda", "drewno" };
+        private static readonly string[] IdsBase = { "iron", "hardwood" };
+        private static readonly string[] NamesBase = { "ruda", "drewno" };
         private static readonly string[] KindNames = { "miasta", "zamki", "wsie", "inne osady", "wiesniacy", "karawany", "lordowie", "bandy", "inne partie" };
 
         private static bool _done;
@@ -92,6 +92,12 @@ namespace Armoury
                 }
 
                 // 2. przelicznik: to, co HistoricalPrices faktycznie zrobil z waga w tej sesji
+                // ZC1 (BulkClayLimeCharcoal): w kampanii zaczetej z kluczem takze glina i wapien (ladunki 100 kg) - ta sama regula przeliczenia
+                var extra = GoodsPaths.BulkIds();
+                var Ids = new string[IdsBase.Length + extra.Length];
+                var Names = new string[Ids.Length];
+                for (int k = 0; k < IdsBase.Length; k++) { Ids[k] = IdsBase[k]; Names[k] = NamesBase[k]; }
+                for (int k = 0; k < extra.Length; k++) { Ids[IdsBase.Length + k] = extra[k]; Names[IdsBase.Length + k] = extra[k] == "clay" ? "glina" : "wapien"; }
                 var items = new ItemObject[Ids.Length];
                 var factors = new float[Ids.Length];
                 bool any = false;

@@ -160,6 +160,40 @@ namespace Armoury
             catch (Exception e) { if (Interlocked.Increment(ref _readStumbles) == 1) { try { Log.Error("GoodsRates.ProdStep", e); } catch { } } }
         }
 
+        // ============================================================ ZC1 (BkSideGoodsOrigin): towary uboczne BK tam, gdzie ich miejsce - ostatni krok modelu wsi
+        private static readonly TextObject SideText = new TextObject("{=!}Armoury: side goods moving to where they belong");
+        private static int _sideStumbles;
+
+        /// <summary>MaterialLaw.ProdPostfix, OSTATNI krok przed ksiega rudy (po sufitach dymarki i Skaly): marmur kopaln srebra x (1 - t), t = przejscie GoodsPaths.SideT
+        /// (0 -> 1 przez 60 dob); miod pitny drwali x (1 - GoodsPaths.MeadT) - ciety tylko o tyle, ile miodu pitnego zrobily wczoraj miasta (najwyzej przejscie; miasta go
+        /// nie robia - 0). Wzor "czynnik x suma" (jak sol). W ticku produkcji tej wsi zdjeta czesc idzie do GoodsPaths.NoteCut (marmur -> glinanki nastepnego dnia, miod
+        /// pitny -> miod lesny tej wsi), a miod pitny drwali przed cieciem do GoodsPaths.NoteMeadBase. Dowolny watek; nie rzuca.</summary>
+        internal static void SideStep(Village village, ItemObject item, ref ExplainedNumber r)
+        {
+            try
+            {
+                if (village == null || item == null) return;
+                string id = item.StringId;
+                if (id != "marble" && id != "mead") return;
+                if (!GoodsPaths.SideOn) return;
+                var vt = village.VillageType;
+                if (vt == null) return;
+                bool marble = id == "marble" && vt.StringId == "silver_mine";
+                bool mead = id == "mead" && vt.StringId == "lumberjack";
+                if (!marble && !mead) return;
+                float before = r.ResultNumber;
+                if (!(before > 0f)) return;
+                if (mead) GoodsPaths.NoteMeadBase(village, before);   // podstawa udzialu miast - takze przy t = 0 (liczone tylko w ticku tej wsi)
+                float t = marble ? GoodsPaths.SideT : GoodsPaths.MeadT;
+                if (!(t > 0f)) return;
+                float sum = 1f + r.SumOfFactors;
+                if (sum > 0f) r.AddFactor(-t * sum, SideText);
+                float cut = before - r.ResultNumber;
+                if (cut > 0f) GoodsPaths.NoteCut(village, marble, cut);
+            }
+            catch (Exception e) { if (Interlocked.Increment(ref _sideStumbles) == 1) { try { Log.Error("GoodsRates.SideStep", e); } catch { } } }
+        }
+
         // ============================================================ (b) len - start sesji (watek glowny, PO VillageClimate.Apply)
 
         private static VillageType Type(string id) { return MBObjectManager.Instance != null ? MBObjectManager.Instance.GetObject<VillageType>(id) : null; }
