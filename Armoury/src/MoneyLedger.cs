@@ -106,6 +106,7 @@ namespace Armoury
         internal const int MFolkValve = 19;                                                                     // E5/B1: zawor dla ludu - 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu
         internal const int MFolkStart = 20;                                                                     // E5/B1: zapasy startowe kies ludu z daru (raz) albo z nadwyzki (stary zapis)
         // E5/B6 (201): zasada "pierwszy wolny (M18) + 15" = M33; M21-M32 wolne (zaslepki drukowane tylko != 0; scalenie B: bez kolizji z B1 - bez przenumerowania)
+        internal const int MKs = 22;                                                                            // KS (kalibracja startu): przebudowa zajec wsi (kiesy wsi -> kasy miast targowych) i plon pol mieszczan (kasy miast -> kiesy ludu)
         internal const int MZc6 = 21;                                                                           // ZC6 (DailyLife.Mobility): kupno ziemi przy awansie do szlachty (kiesy wsi -> panowie) i odkup przy spadku (panowie -> kiesy wsi; wolne M21 z rezerwy E5/B)
         internal const int MVetPurse = 33;                                                                      // E5/B6 (201): pula sakiewek weteranow w karczmach -> kasy miast karczm ("zycie")
         private const int Marks = 34;                                                                           // scalenie porcji A: M12-M13 A1, M14-M16 rezerwa A1 (nieuzywane), M17 A3; E5/B1 M18-M20; E5/B6 M33
@@ -120,7 +121,7 @@ namespace Armoury
                                                    "kiesa ludu (E5/B1): place, robocizna, obrot P, roboty gminy, zakupy wsi, dziesiecina (E5/C3), zwrot przy wylaczeniu (kasy osad <-> kiesy ludu i wsi)",
                                                    "zawor dla ludu (E5/B1): 5% zaworu kas miast i 15% zaworu kas zamkow -> kiesy ludu",
                                                    "zapasy startowe kies ludu (E5/B1, raz): z daru kas albo z nadwyzki (stary zapis)",
-                                                   "awans stanow (ZC6): kupno i odkup ziemi - kiesy wsi i panowie ziemi", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",   // 21: ZC6; 22-32: wolne (nieuzywane, drukowane tylko != 0)
+                                                   "awans stanow (ZC6): kupno i odkup ziemi - kiesy wsi i panowie ziemi", "kalibracja startu (KS): przebudowa zajec wsi (kiesy wsi -> kasy miast) i pola mieszczan (kasy miast -> kiesy ludu)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",   // 21: ZC6; 22: KS; 23-32: wolne (nieuzywane, drukowane tylko != 0)
                                                    "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
                                                    "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)", "(zarezerwowane E5/B)",
                                                    "weterani (E5/B6): pula sakiewek weteranow w karczmach -> kasy miast karczm (zycie)" };

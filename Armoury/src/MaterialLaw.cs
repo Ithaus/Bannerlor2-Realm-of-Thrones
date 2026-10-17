@@ -177,6 +177,10 @@ namespace Armoury
             try
             {
                 if (item == null) return;
+                // KS (kalibracja startu, projekt rozdz. 11.2): wies zastosowana - towar KS = stawka z rak i ziemi okregu (sztuki/d na targ, z zima i rekami E4/5, E4/7),
+                // zastepuje caly lancuch nizej (typ, ludzie P1, stawki GL5, mnozniki kopalni i lasu, owoce, jaja, wielblady, regulator, hodowla, W2, ZC1); sufity kruszcow
+                // i ksiega rudy w ProdStep; wies poza KS i towar spoza KS - lancuch jak dotad
+                if (StartCalibration.ProdStep(village, item, ref __result)) return;
                 CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
                 VillageFruit.Base(village, item, ref __result);     // noc 15/16.10 (placek i marchew): owoce i miod wsi wedlug wag BK - baza przed mnoznikami (P1, rece, regulator, zima)
                 var s = Settings.Current;

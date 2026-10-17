@@ -193,6 +193,21 @@ namespace Armoury
             return v != null ? d * ClimateFactor(v) * HarvestValve.Factor(wood) * VillageByPeople.WoodFactor(v) : d;
         }
 
+        /// <summary>KS (kalibracja startu, Plan): drewno lasu tej wsi na dobe w sztukach (jak tick: wies Normal, bez drwali, x udzial ludzi w domu E4/5); 0 - las nieczynny.
+        /// Plan liczy je jako podaz spoza tabeli (wyrab drewna na sprzedaz - regale - dopelnia reszte potrzeby). Nie rzuca.</summary>
+        internal static float KsPiecesPerDay(Village v)
+        {
+            try
+            {
+                if (!On || v == null || v.Settlement == null || IsLumber(v) || v.VillageState != Village.VillageStates.Normal) return 0f;
+                var wood = Wood();
+                if (wood == null) return 0f;
+                float d = PiecesPerDay(wood, v) * Devastation.YieldFactor(v);
+                return d > 0f && !float.IsInfinity(d) && !float.IsNaN(d) ? d : 0f;
+            }
+            catch { return 0f; }
+        }
+
         /// <summary>Postfiks VillageGoodProductionCampaignBehavior.TickGoodProduction(Village, bool): gra wola go raz na dobe dla wsi
         /// nieopuszczonej, gdy magazyn jest ponizej 1.5 W (TickProductions). Rozdanie startowe nowej kampanii (initialProductionForTowns,
         /// 5 przebiegow gry): drewno lasu - jak w grze reszta plonu - do miasta handlowego wsi (TradeBound), bez ksiegi (gra i BK tez go

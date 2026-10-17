@@ -6648,6 +6648,26 @@ namespace Armoury
         [SettingPropertyGroup("Daily life - rise, fall and war")]
         public bool DailyLifeWarScar { get; set; } = false;
 
+        [SettingPropertyBool("Start Calibration", HintText = "Start calibration (the plan only): once a week the hands and the land of every district - the game village, its side villages and the fields of the townsfolk - are reckoned with one table of what a worker makes on his land, and who does what is chosen the way families choose it: where the work pays best after the cost of the herd, the boat or the grove. Written to the log and to ks-plan.csv only - nothing in the game changes. On a save where the calibration was already applied, off = from the next day the villages produce as before (the state stays in the save)")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibration { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Start Calibration Map Inertia", 1.00f, 2.00f, "0.00", HintText = "with Start Calibration: how much better another work must pay before a block of land leaves the work the map gives it (1.25 = 25% better, Jeff's threshold; 1.0-2.0)")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public float StartCalibrationMapInertia { get; set; } = 1.25f;
+
+        [SettingPropertyBool("Start Calibration Town Fields", HintText = "with Start Calibration: the peasants of a town, half the work of its slaves and a fifth of its labourers at harvest till the fields around the stronghold (the town's own land, like the agro-towns of old); off = towns have no fields of their own")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationTownFields { get; set; } = true;
+
+        [SettingPropertyBool("Start Calibration Switch Rule", HintText = "with Start Calibration applied: a village part changes its work only when another work has paid at least 25% better for about 60 days, one part of a district at a time and at most 5% of the region's hands a season; the village pays the town's craftsmen for the new gear and the hands move over 60 days (vineyards, groves, orchards and date palms a year); off = the works stay as the calibration set them")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationSwitchRule { get; set; } = true;
+
+        [SettingPropertyBool("Start Calibration Autotest Apply", HintText = "FOR THE AUTOTEST ONLY: right after the first finished plan the calibration is applied to the running game (village output from hands and land, town fields, the switching rule, the granary floor). Works only while the CrashScribe autotest is running; in a normal game it does nothing")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationAutotestApply { get; set; } = false;
+
         [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: step by step over 60 days, up to about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool WhaleMeatFromWhalersOnly { get; set; } = true;
@@ -8361,6 +8381,11 @@ namespace Armoury
             s.DailyLifeFreedom = DailyLifeFreedom;
             s.DailyLifeProsperityLink = DailyLifeProsperityLink;
             s.DailyLifeWarScar = DailyLifeWarScar;
+            s.StartCalibration = StartCalibration;
+            s.StartCalibrationMapInertia = StartCalibrationMapInertia;
+            s.StartCalibrationTownFields = StartCalibrationTownFields;
+            s.StartCalibrationSwitchRule = StartCalibrationSwitchRule;
+            s.StartCalibrationAutotestApply = StartCalibrationAutotestApply;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;

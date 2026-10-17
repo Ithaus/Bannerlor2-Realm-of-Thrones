@@ -278,6 +278,7 @@ namespace Armoury
             try
             {
                 var v = __instance;
+                if (StartCalibration.CapOverride(v, ref __result)) return;   // KS: wies zastosowana - 5 dob towarow KS spoza typu zamiast owocow i jaj BK
                 if (v == null || v.VillageState != Village.VillageStates.Normal || v.TradeBound == null || v.VillageType == null) return;
                 var s = Settings.Current;
                 if (s == null || MaterialLaw.ProdModels <= 0) return;

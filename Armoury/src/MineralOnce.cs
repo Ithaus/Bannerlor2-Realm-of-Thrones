@@ -146,7 +146,8 @@ namespace Armoury
                 bool camel = CamelLaw.On;                                                     // E6/M2 (208): wielblady tylko w Qarthu - trzecia bramka (nowa kampania)
                 bool hamlet = HamletKinds.On;                                                 // E6/W2 (210): ryby wiosek rybackich za zbozem - czwarta bramka (ostatni krok listy)
                 bool eggs = VillageFruit.EggsOn;                                              // N2-E1 (noc-ekonomia2): jaja wsi z drobiem BK - piata bramka (pozycja dopisana na koncu listy)
-                if (!crop && !mineral && !camel && !hamlet && !eggs) return;                  // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
+                bool ks = StartCalibration.Applied;                                           // KS (kalibracja startu): lista wsi zastosowanej - towary KS ze stawka (szosta bramka)
+                if (!crop && !mineral && !camel && !hamlet && !eggs && !ks) return;           // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
                 var list = __result;
                 if (list == null) return;
                 v = VillageOf(__0);
@@ -169,14 +170,21 @@ namespace Armoury
                     try { list = CamelLaw.ListFilter(v, list); }
                     catch (Exception mex) { CamelLaw.Forget(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.CamelLaw", mex); }
                 }
-                if (eggs)
+                bool ksv = false;
+                if (ks)
+                {
+                    // KS: wies zastosowana - towary KS ze stawka > 0 na liscie (brakujace z waga 0), jaja BK i krok W2 pominiete (KS liczy jaja i ryby sam); potkniecie - lista jak dotad
+                    try { var kl = StartCalibration.ListStep(v, list); if (kl != null) { list = kl; ksv = true; HamletKinds.Forget(v); VillageFruit.ForgetEgg(v); } }
+                    catch (Exception kex) { int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.KS", kex); }
+                }
+                if (eggs && !ksv)
                 {
                     // N2-E1: jaja na koncu listy (po filtrze klimatu i wielbladach, przed petla powtorzen - jaj na liscie nie bylo, wiec powtorzeniem nie beda);
                     // potkniecie - lista bez jaj (jak z BK), model nie dopisze jaj tej wsi
                     try { list = VillageFruit.EggStep(v, list); }
                     catch (Exception gex) { VillageFruit.ForgetEgg(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.Eggs", gex); }
                 }
-                if (!mineral) { __result = HamletKinds.ListStep(v, list); return; }         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia)
+                if (!mineral) { __result = ksv ? list : HamletKinds.ListStep(v, list); return; }         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia); KS - bez W2
                 int n = list.Count;
                 List<(ItemObject, float)> res = null;      // nowa lista dopiero przy pierwszym powtorzeniu - zwykla wies kosztuje tylko odczyt osady (ok. 0.1 mikrosekundy)
                 Dictionary<ItemObject, int> extra = null;  // przedmiot -> ile powtorzen zdjeto w tym zlozeniu listy
@@ -210,7 +218,7 @@ namespace Armoury
                     if (extra != null) { _dup[v] = extra; _lists++; }
                     else if (_dup.Count > 0) _dup.Remove(v);
                 }
-                __result = HamletKinds.ListStep(v, res ?? list);   // list = lista BK albo lista po filtrze klimatu (T8); E6/W2 - ryby za zbozem PO powtorzeniach (bez mnoznika Times dla ryb)
+                __result = ksv ? (res ?? list) : HamletKinds.ListStep(v, res ?? list);   // list = lista BK albo lista po filtrze klimatu (T8); E6/W2 - ryby za zbozem PO powtorzeniach (bez mnoznika Times dla ryb); KS - bez W2
             }
             catch (Exception ex)
             {
