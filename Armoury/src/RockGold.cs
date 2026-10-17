@@ -39,6 +39,21 @@ namespace Armoury
 
         private static bool On { get { var s = Settings.Current; return s != null && s.CasterlyGoldExhausted; } }
 
+        /// <summary>KS (kalibracja startu, Plan - recenzja 16.10): sufit 0 tej reguly dla towaru id we wsi v (srebro i ruda zlota wsi Skaly, ruda zlota wsi Zachodu) -
+        /// Plan daje tym zlozom L = 0, jak wsi bez zloza. Ten sam warunek co Cap. Nie rzuca.</summary>
+        internal static bool Blocks(Village v, string id)
+        {
+            try
+            {
+                if (v == null || !On || v.Settlement == null) return false;
+                bool silver = id == "silver", gold = id == "gold_ore";
+                if (!silver && !gold) return false;
+                bool rock = v.Bound != null && v.Bound.StringId == RockId;
+                return rock || (gold && PeopleBook.CultureAtCalibration(v.Settlement) == Westerlands);
+            }
+            catch { return false; }
+        }
+
         /// <summary>Wolane z MaterialLaw.ProdPostfix (zewnetrzne wywolanie modelu, _depth 1) jako ostatni krok przed ksiega rudy: sufit 0 dla kruszcow Skaly
         /// i rudy zlota Zachodu.</summary>
         internal static void Cap(Village village, ItemObject item, ref ExplainedNumber result)

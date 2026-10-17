@@ -577,6 +577,7 @@ namespace Armoury
                     double q = level >= 0 ? f / (level + 1) * FreeHands.FamineFix(v) : 0.0;
                     x.Q = double.IsNaN(q) || double.IsInfinity(q) || q < 0.0 ? 0.0 : Math.Min(QMax, q);
                     x.Harvest = yield * x.L * x.Q;
+                    x.Harvest = StartCalibration.GranaryFloor(v, x.Harvest);   // KS (rozdz. 8): wies zastosowana - max(racje z czesci domowej KS, wzor dzis)
                     x.Feed = yield * x.Q / Math.Max(1e-3, Devastation.YieldFactor(v));    // plon na gospodarza (bramka powrotu)
                     x.Cap = years * yd * x.L;
                     x.Winter = WinterBite.VillageCut(v) > 0f;

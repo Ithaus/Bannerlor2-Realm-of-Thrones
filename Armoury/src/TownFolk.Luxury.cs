@@ -230,7 +230,8 @@ namespace Armoury
                     if (!(q > 0)) continue;
                     var c = _lxCats[i];
                     float v = dict[c];
-                    double x = off * q;
+                    double x = off * q * StartCalibration.Zc4OfferFactor(town, c);   // ZC4: kategorie koszyka x (1 - lambda) - reszta zostaje w kiesie
+                    if (!(x > 0)) continue;
                     if (cl && _lxCloth[i])                               // (c) plotno i skora z oferty tylko ponad prog polki (reszta zostaje w kiesie)
                     {
                         double room = ClothRoom(f, town, c, v);
@@ -400,14 +401,14 @@ namespace Armoury
 
         /// <summary>Villages (po koszyku dnia): wies wydaje 1/T kiesy ponad 15 dni zakupow (liczonej przed koszykiem, jak dotad nadwyzka) z listy dostatku na polce
         /// miasta targowego. `gold` - kiesa wsi przed koszykiem.</summary>
-        private static void VillageLadder(Folk f, Village vil, Settlement mk, int gold, double buy1, double nv)
+        private static void VillageLadder(Folk f, Village vil, Settlement mk, int gold, double buy1, double nv, double share = 1.0)
         {
             if (!WardsShopOn) return;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
                 double avail = Math.Min(gold - buy1, vil.Gold);           // recenzja WAZNE 2: po koszyku dnia (sol i narzedzia z nadwyzki) - kiesa TERAZ
-                double want = Math.Max(0, avail - RdV * nv) / LxDays(Settings.Current);
+                double want = Math.Max(0.0, Math.Min(1.0, share)) * Math.Max(0, avail - RdV * nv) / LxDays(Settings.Current);   // ZC4: share = 1 - lambda
                 f.DLxOff = want; f.DLxBuy = 0; f.LxSeen = _liveDay;
                 if (want < 1) return;
                 _lxVN++; _lxVWant += want;

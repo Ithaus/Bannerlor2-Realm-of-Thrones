@@ -1751,6 +1751,30 @@ namespace Armoury
             catch (Exception e) { Stumble("VillageBook.LookOf", e); return false; }
         }
 
+        /// <summary>KS (kalibracja startu): udzialy osad okregu - wioski poboczne (uid -> osady wioski / osady okregu) i wies gry (main). Udzial z osad (Nw), nie z ludzi
+        /// w domu: ubytek rak (uchodzcy) robi czynnik E4/5 w modelu produkcji. false - ksiega nieczynna, wies nieznana albo okreg bez n. Sam odczyt pod Gate, nie rzuca.</summary>
+        internal static bool KsShares(Village v, Dictionary<string, double> side, out double main)
+        {
+            main = 1.0;
+            if (side != null) side.Clear();
+            if (v == null || side == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    Dist d;
+                    if (!_byV.TryGetValue(v, out d) || d == null || !EnsureN(d) || d.Nw == null || d.Uid == null) return false;
+                    double n = 0.0;
+                    for (int w = 0; w <= d.W; w++) n += Math.Max(0.0, d.Nw[w]);
+                    if (!(n > Eps)) return false;
+                    for (int w = 0; w < d.W; w++) if (d.Uid[w] != null) side[d.Uid[w]] = Math.Max(0.0, d.Nw[w]) / n;
+                    main = Math.Max(0.0, d.Nw[d.W]) / n;
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.KsShares", e); return false; }
+        }
+
         /// <summary>E6/W2 (210): udzial ludzi W DOMU wiosek rybackich w ludziach w domu okregu tej wsi gry (People: dom wioski ~ osady - puste, ten sam mianownik
         /// dla calego okregu). 0 - ksiega nieczynna, wies nieznana, okreg bez wiosek albo bez n. Sam odczyt pod Gate, nie rzuca (lista produkcji BK).</summary>
         internal static double FishersShare(Village v)

@@ -1047,7 +1047,7 @@ namespace Armoury
 
         public static void DemandPrefix() { _demandDepth++; }
         public static Exception DemandFinalizer(Exception __exception) { if (_demandDepth > 0) _demandDepth--; return __exception; }
-        public static void DemandPostfix(Town __0, ItemCategory __1, ref float __result)
+        public static void DemandPostfix(Town __0, ItemCategory __1, int __2, ref float __result)
         {
             if (_demandDepth > 1 || __1 == null) return;
             if (_applied)
@@ -1063,6 +1063,9 @@ namespace Armoury
             // (GetEstimatedDemandForCategory) i czesc domowa RawPrice.UseDemand; zewnetrzne wywolanie (zagniezdzone - wyzej) raz; 1 = klucz MarketByPeople wylaczony
             float k = PeopleMarket.DemandScale(__0);
             if (k != 1f) __result *= k;
+            // ZC4 (KS etap 2): szacunek popytu do wzoru ceny (wywolanie z dodatkiem dobrobytu) w kategoriach koszyka stanow = (1 - lambda) x dzis + lambda x potrzeba miasta
+            // i wsi kupujacych w nim x wartosc sztuki; budzet dnia (bez dodatku) - StartCalibration.Zc4DictPostfix; poza zastosowana kalibracja startu - nic
+            if (__2 > 0) StartCalibration.Zc4Demand(__0, __1, __2, ref __result);
         }
 
         // ------------------------------------------------------------ zakupy mieszczan (wpis 53, docs/BILANS-ZUZYCIA.md)
@@ -1251,7 +1254,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("HistoricalPrices.Books", e); }
                 Log.Info("HistoricalPrices: XP kowalstwa od dawnych wartosci w " + n + "/3 metodach.");
-                int d = 0;
+                int d = 0, dBad = 0;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     Type[] types;
@@ -1268,10 +1271,10 @@ namespace Armoury
                                        finalizer: new HarmonyMethod(typeof(HistoricalPrices), nameof(DemandFinalizer)));
                             d++;
                         }
-                        catch { }
+                        catch (Exception pe) { dBad++; if (dBad <= 2) Log.Error("HistoricalPrices.DemandPatch " + (ty != null ? ty.FullName : "?"), pe); }   // KS recenzja 16.10: nieudana latka widoczna (DemandPostfix ma parametr int __2)
                     }
                 }
-                Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad.");
+                Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad" + (dBad > 0 ? " (NIEUDANE " + dBad + " - ERROR wyzej)" : "") + ".");
                 var vs = AccessTools.PropertySetter(typeof(ItemObject), "Value");
                 if (vs != null) h.Patch(vs, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(ValueSetPrefix)) { priority = Priority.First });
                 // wpis 75: winowajca 7 lukow i strzal - ROT.CampaignBehaviors.ROTRBMCompatibility.ModifyBowsAndArrows (przy RBM, na

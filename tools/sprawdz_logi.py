@@ -933,6 +933,17 @@ Uzycie (Python 3, tylko odczyt):
                     kupcy -10-20% w miescie, NZC7-3 po najezdzie D okregu -30-60% w 7 dob (epizody z trafionymi >= 20%; same male najazdy - DECYZJA), NZC7-4 >= 50%
                     powrotu w rok bez wojny (krotszy bieg - INFO), NZC7-5 obieg zamkniety (kontrola kies 0), NZC7-6 potkniecia i ERROR 0, NZC7-7..12 INFO. Razem
                     z --grupa nzc6 (granice pasm, limit 0.2%), nzc2 (zapis v4 + wczytanie) i nzc0 (czas bloku).
+--grupa nks       : (16.10, Jeff "produkcja tylko z prawdziwych rak i ziemi, start zbilansowany"; galaz w-toku/noc-ks, Armoury/src/StartCalibration*.cs; projekt
+                    docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14; poprawki po recenzji 16.10) python -I tools/sprawdz_logi.py --grupa nks <Armoury-*.log>
+                    [--baza-doby <Armoury-*.log bazy>] (strumieniowo). NKS-0 start sesji, NKS-1 Plany bez bledu, NKS-1b Plan wlaczenia z ksiega >= 28 dob, NKS-2 czas Planu
+                    <= 30 s, NKS-3 bilans Planu, NKS-4 linia produkcji co dobe, NKS-5 podaz/zuzycie NA RYNEK (linia "KS: rynki") w oknie KS-M D+22..D+49 0.95-1.05
+                    (towary rak z miesem; 5b wyjatki +-10% Planu; 5c przetwory, 5u bez rynku, 5w swiat, 5d 28 dob po wlaczeniu - INFO), NKS-6 zapasy miast rynku +-2%
+                    zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
+                    pieniadze (KS 0; 8b swiat wobec bazy +-0.5%; 8c koszyk niekupiony z braku pieniedzy <= 5%; 8d reszta - INFO), NKS-9 doba KS <= 3 ms (9b z hakami ZC4/ZC5
+                    <= 10 ms, 9c takt doby <= +10% bazy), NKS-10 ERROR i potkniecia 0, NKS-11 wlaczenie, NKS-12 lambda 0 w D i 1 w D+14, polki w D, NKS-13 koszyk ZC4
+                    (wsie >= 50%, stac na jedzenie >= 95%), NKS-14 przetwory ZC5 (INFO), NKS-15 glod (zmarli poza oblezeniami 0), NKS-16 kasy kupcow < 7 dob spadku,
+                    NKS-17 Dostatek (chlopi i biedota >= 1.0), NKS-18 Food miast BK +-10% bazy, NKS-19 A7 (nacisk INFO, zmiany w oknie <= 1% wiosek), NKS-20 arm_ks <= 150 KB,
+                    NKS-21 modele popytu HistoricalPrices = baza.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -33720,6 +33731,651 @@ def nzc1_main(logp, bdp=None):
     return 0
 
 
+# ------------------------------------------------------------ nks (16.10, kalibracja startu KS - etap 1 rdzen, etap 2, poprawki po recenzji; projekt docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14)
+NKS_P = "Kalibracja startu (KS): "
+NKS_K = "KS: "
+NKS_START = re.compile(r"Kalibracja startu \(KS\): start sesji \| klucz Start Calibration (?P<k>TAK|NIE)")
+NKS_LAND = re.compile(r"plik arm_ks_land\.tsv: wsi gry (?P<v>\d+), wiosek pobocznych (?P<s>\d+), pol mieszczan (?P<t>\d+) miast")
+NKS_PLAN = re.compile(r"Kalibracja startu \(KS\): plan doba (?P<day>-?\d+) \| plan nr (?P<nr>\d+) tego zapisu .*?\| rund (?P<r>\d+) \(pierwsza (?P<r1>\d+), lepszy stol R8 (?P<r8>\d+), R8b (?P<r8b>\d+)\), czas (?P<s>[\d.]+) s")
+NKS_PLANERR = re.compile(r"Kalibracja startu \(KS\): plan doba (?P<day>-?\d+) \| BLAD rachunku")
+NKS_PLANEMA = re.compile(r"ksiega towarow (?P<e>\d+) dob w sredniej")
+NKS_BIL = re.compile(r"KS: bilans (?P<mk>Westeros|Essos) \(plan doba (?P<day>-?\d+), podaz/popyt; popyt t/d\):(?P<body>[^|]*)\|")
+NKS_BILITEM = re.compile(r"(?P<g>[A-Za-z_]+) (?P<q>[\d.]+|-) \((?P<d>\d+)\)")
+NKS_ON = re.compile(r"KS: WLACZONE doba (?P<day>-?\d+)")
+NKS_ONEMA = re.compile(r"Plan z ksiega towarow (?P<e>\d+) dob")
+NKS_PROD = re.compile(r"KS: produkcja \(zastosowane\) dzien (?P<day>-?\d+) \|")
+NKS_PRODV = re.compile(r"wsie ze stawkami KS (?P<v>\d+)")
+NKS_PRODST = re.compile(r"potkniecia dzis (?P<a>\d+) \(sesja (?P<b>\d+), haki (?P<h>\d+), okregi bez obiektu gry (?P<o>\d+)\)\.$")
+NKS_COF = re.compile(r"kasy kupcow \(kasy miast\): Westeros (?P<w>-?\d+) zl \([+-]?\d+, spadek (?P<wd>\d+) dob z rzedu\), Essos (?P<e>-?\d+) zl \([+-]?\d+, spadek (?P<ed>\d+) dob z rzedu\)")
+NKS_A7 = re.compile(r"nacisk A7 na zmiane .*?przegladow ponad progiem (?P<p>\d+), najdluzej (?P<h>\d+) dob, po 60 dobach \(zmiana bylaby, klucz (?P<k>TAK|WYLACZONY)[^)]*\) (?P<w>\d+) \| zmiany zajec: zaczete (?P<s>\d+) \(od D razem (?P<sd>\d+)\)")
+NKS_DAY = re.compile(r"Kalibracja startu \(KS\): dzien (?P<day>-?\d+) \| stan (?P<st>ZASTOSOWANY od doby -?\d+|Plan) .*czas doby KS (?P<ms>[\d.]+) ms .*potkniecia dzis (?P<a>\d+) \(sesja (?P<b>\d+)\)\.$")
+NKS_MONEY = re.compile(r"kontrola pieniedzy KS: przebudowa kiesy wsi -(?P<a>\d+) / kasy miast \+(?P<b>-?\d+) \(roznica (?P<d1>-?\d+)\), pola mieszczan kasy miast -(?P<c>-?\d+) / kiesy ludu \+(?P<e>\d+) \(roznica (?P<d2>-?\d+)\)")
+NKS_PRICE = re.compile(r"KS: ceny miast dzien (?P<day>-?\d+) \(mediana indeksu 28 dob, miast (?P<n>\d+), dob sredniej (?P<k>\d+)\):(?P<body>.*)$")
+NKS_PRICEMK = re.compile(r"\| (?P<mk>Westeros|Essos):(?P<body>[^|]*)")
+NKS_PRICEIT = re.compile(r"(?P<g>[A-Za-z_]+) (?P<x>[\d.]+) \(s(?P<s>\d+|-) p(?P<p>\d+|-)\)")
+NKS_GOODS = re.compile(r"Towary: dzien (?P<day>-?\d+) - (?P<g>[A-Za-z_0-9]+) \([^)]*\): zapas (?P<st>-?\d+) \([^)]*\) \| produkcja (?P<p>-?\d+)(?: \[[^\]]*\])? \| zuzycie (?P<c>-?\d+)")
+NKS_MKT = re.compile(r"KS: rynki dzien (?P<day>-?\d+) ")
+NKS_MKTSEG = re.compile(r"\| (?P<mk>Westeros|Essos|bez rynku \(produkcja/zuzycie\)):(?P<body>[^|]*)")
+NKS_MKTIT = re.compile(r"(?P<g>[A-Za-z_]+) (?P<p>-?\d+)/(?P<c>-?\d+)(?:/(?P<s>-?\d+))?")
+NKS_SAVE = re.compile(r"KS: zapis arm_ks doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB \(paczek SaveText (?P<n>\d+)")
+NKS_ERR = ("ERROR in StartCalibration", "ERROR in SyncData.arm_ks", "ERROR in MineralOnce.KS", "ERROR in StartCalibration.Zc4ApplyAll")
+NKS_WORLD = re.compile(r"Pieniadz swiata: dzien (?P<day>-?\d+) \| razem (?P<x>-?\d+)")
+NKS_REST = re.compile(r"Pieniadz swiata \(bilans - przyczyny\): dzien (?P<day>-?\d+) \| zmiana sumy [+-]?\d+ \[P\] = .*? \+ reszta (?P<r>[+-]?\d+) \[R\]")
+NKS_FAM = re.compile(r"Spichlerze \(E4/6\): dzien (?P<day>-?\d+) .*?okregi glodne (?P<n>\d+): oblezone (?P<o>\d+), spustoszone (?P<s>\d+), tylko zima (?P<z>\d+), bez przyczyny (?P<b>\d+) \| zmarli z glodu: gospodarze (?P<g>[\d.]+), uchodzcy (?P<u>[\d.]+), mieszczanie (?P<m>[\d.]+)")
+NKS_ZC0 = re.compile(r"Zycie \(ZC0\): dzien (?P<day>-?\d+) .*?\(mediana chlopow wsi (?P<peas>-?[\d.]+|-),.*?stany: (?P<dest>[^|]*)\|.*?\| D policzone (?P<dn>\d+)/(?P<dall>\d+) osad")
+NKS_BKF = re.compile(r"Zadowolenie BK \(E5/0\): dzien (?P<day>-?\d+) \| srednie Food / Industrial / General / Luxury \(0\.\.1\) miasta (?P<f>[\d.]+) / ")
+NKS_HPM = re.compile(r"HistoricalPrices: popyt miast w nowej monecie wpiety w (?P<n>\d+) modelach(?P<bad> ekonomii osad \(NIEUDANE (?P<nb>\d+))?")
+NKS_PROF = re.compile(r"Profil doby \(E8/0\): dzien (?P<day>-?\d+) \| takt doby (?P<ms>[\d.]+) ms")
+NKS_ZC4HOOK = re.compile(r"czas hakow od ostatniej linii: .*?razem (?P<ms>[\d.]+) ms")
+NKS_ZC4AFF = re.compile(r"stac na cale jedzenie: miasta (?P<a>[\d.]+|-)% \((?P<k>\d+)/(?P<n>\d+)\), jedzenie niekupione z braku pieniedzy: miasta (?P<mt>[\d.]+|-)% budzetu jedzenia \((?P<mz>-?\d+) zl\), wsie (?P<mv>[\d.]+|-)% chcianych sztuk \((?P<vs>-?\d+) szt\.\)")
+# towary rak (osobne rece - pasmo 0.95-1.05; recenzja 16.10: mieso z miesem wieloryba w towarach rak - projekt 4.1) i wyjatki projektu 14.1 (marchew, jablka, futra, miod,
+# przyprawy, tran) + to, co Plan oznacza jako uboczne (C# BandExceptions: kiel, jaja, skory) - kazdy wyjatek najwyzej +-10% stosunku Planu; konie - poza KS (INFO)
+NKS_MAIN = ("grain", "fish", "meat", "cheese", "butter", "grape", "olives", "orange", "date_fruit", "salt", "wool", "flax", "cotton", "hardwood", "clay", "limestone", "marble",
+            "iron", "silver", "gold_ore", "cow", "hog", "sheep")
+NKS_EXC = ("carrot", "apple", "fur", "honey", "spice", "whale_oil", "walrus_tusk", "Egg", "hides")
+# KS etap 2: przetwory miast (ZC5) i wyroby koszyka - stosunek podaz/zuzycie INFO (robia je tez warsztaty gry)
+NKS_PROC = ("bread", "pie", "beer", "wine", "oil", "mead", "pottery", "garum", "linen", "felt", "leather", "tools")
+NKS_RAMP = re.compile(r"KS: rampa dzien (?P<day>-?\d+) \| doba rampy (?P<t>-?\d+) \(A (?P<a>-?\d+), D (?P<d>-?\d+), koniec popytu (?P<e>-?\d+)\) \| lambda popytu koszyka (?P<l>[\d.]+)")
+NKS_SHELF = re.compile(r"KS: polki startu doba (?P<day>-?\d+): miast (?P<n>\d+), kategorii (?P<c>\d+) \((?P<p>\d+) pozycji\), srednia indeksu (?P<i0>[\d.\-]+) -> (?P<i1>[\d.\-]+)")
+NKS_SHELFP = re.compile(r"ceny startu (?P<mk>Westeros|Essos):(?P<body>[^|]*)")
+NKS_ZC4 = re.compile(r"Koszyk stanow \(ZC4\): dzien (?P<day>-?\d+) \| lambda Westeros (?P<lw>[\d.]+) \((?P<nw>\d+) miast\), Essos (?P<le>[\d.]+) \((?P<ne>\d+) miast\)")
+NKS_ZC4V = re.compile(r"\| wsie: zakupow (?P<n>\d+) za (?P<g>-?\d+) zl, sztuk (?P<p>-?\d+) \(chciane (?P<w>-?\d+), kupione (?P<k>-?\d+);")
+NKS_ZC4S = re.compile(r"\| potkniecia (?P<s>\d+)\.$")
+NKS_ZC5 = re.compile(r"Przetwory miast \(ZC5\): dzien (?P<day>-?\d+) \| miast-dob (?P<n>\d+)")
+NKS_ZC5P = re.compile(r"(?P<name>[a-z +]+ -> [a-z +]+) (?P<m>\d+) szt\.")
+NKS_ARM = re.compile(r"KS: uzbrojony zapis doba (?P<day>-?\d+)")
+NKS_CONF = re.compile(r"KS: potwierdzone doba (?P<day>-?\d+)")
+NKS_ONSRC = re.compile(r"KS: WLACZONE doba (?P<day>-?\d+) \((?P<src>autotest|gra)")
+
+
+def nks_side(logp):
+    """Liczby ogolne biegu do porownania z baza (nks): modele popytu HistoricalPrices, takt doby, pieniadz swiata, Food miast BK (wedlug doby)."""
+    out = {"hpm": None, "hpm_bad": 0, "prof": {}, "world": {}, "bkf": {}}
+    if not logp or not os.path.isfile(logp):
+        return out
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("HistoricalPrices: popyt miast"):
+                mm = NKS_HPM.match(s)
+                if mm:
+                    out["hpm"] = int(mm.group("n")); out["hpm_bad"] = int(mm.group("nb") or 0)
+            elif s.startswith("Profil doby (E8/0): dzien"):
+                mm = NKS_PROF.match(s)
+                if mm:
+                    out["prof"][int(mm.group("day"))] = float(mm.group("ms"))
+            elif s.startswith("Pieniadz swiata: dzien"):
+                mm = NKS_WORLD.match(s)
+                if mm:
+                    out["world"][int(mm.group("day"))] = int(mm.group("x"))
+            elif s.startswith("Zadowolenie BK (E5/0): dzien"):
+                mm = NKS_BKF.match(s)
+                if mm:
+                    out["bkf"][int(mm.group("day"))] = float(mm.group("f"))
+    return out
+
+
+def nks_med(v):
+    v = sorted(v)
+    if not v:
+        return None
+    n = len(v)
+    return v[n // 2] if n % 2 else 0.5 * (v[n // 2 - 1] + v[n // 2])
+
+
+def nks_main(logp, until=120, bdp=None):
+    """nks (16.10; Armoury/src/StartCalibration*.cs, klucze Start Calibration, Arm This Save, Confirm, Autotest Apply, Town Crafts, Switch Rule): KS - kalibracja startu,
+    etap 1 (rdzen), etap 2 (uzbrojenie w zapisie, rampa, popyt koszyka ZC4, przetwory ZC5, polki startu) i poprawki po recenzji 16.10. Progi projektu rozdz. 14:
+    NKS-0 linia startu (klucz TAK, plik ziemi >= 500 wsi gry, uklad wiosek zgodny), NKS-1 Plany bez bledu, NKS-1b Plan wlaczenia z dojrzala ksiega (>= 28 dob),
+    NKS-2 czas Planu <= 30 s (cieply start), NKS-3 bilans Planu - towary rak 0.95-1.05 (NKS-3b wyjatki - INFO), NKS-4 linia produkcji co dobe po wlaczeniu,
+    NKS-5 podaz/zuzycie z ksiegi towarow NA RYNEK (Westeros, Essos - linia "KS: rynki") w oknie odbioru KS-M D+22..D+49 w 0.95-1.05 dla towarow rak (mieso z miesem
+    wieloryba), NKS-5b wyjatki najwyzej +-10% stosunku Planu tego rynku, NKS-5c przetwory (INFO), NKS-5w swiat (INFO), NKS-5d pierwsze 28 dob po wlaczeniu (INFO -
+    w calosci w rampie: podaz D-14..D, popyt D..D+14; odbior ze stanu zbilansowanego to okno KS-M), NKS-6 zapasy miast rynku: zmiana <= 2% zuzycia na dobe,
+    NKS-7 ceny na rynek: mediana z linii cen okna w pasmie ceny startu +-0.3, <= 20% miast na suficie/podlodze, nachylenie <= 0.5%/d, NKS-8 pieniadze: kontrola KS 0,
+    pieniadz swiata wobec bazy +-0.5% (bez bazy INFO), jedzenie niekupione z braku pieniedzy <= 5% (miasta i wsie), reszta bilansu (INFO), NKS-9 koszt: doba KS <= 3 ms,
+    doba KS + haki ZC4/ZC5 <= 10 ms, takt doby wobec bazy <= +10%, NKS-10 ERROR i potkniecia KS 0 (bez linii KS - INFO), NKS-11 wlaczenie, NKS-12 rampa (lambda 0 w D,
+    1 w D+14) i polki startu w D, NKS-13 koszyk ZC4 (linia co dobe, wsie >= 50%, stac na jedzenie >= 95% miast), NKS-14 przetwory ZC5 (INFO), NKS-15 glod: zmarli
+    z glodu poza oblezeniami i spustoszeniem 0, okregi glodne bez przyczyny 0, NKS-16 kasy kupcow: zaden rynek nie traci 7 dob z rzedu, NKS-17 Dostatek: policzony dla
+    wszystkich osad, mediana chlopow wsi i biedoty >= 1.0, NKS-18 Food miast BK wobec bazy +-10% (bez bazy INFO), NKS-19 A7: nacisk (INFO), prawdziwe zmiany w oknie
+    <= 1% wiosek, NKS-20 arm_ks <= 150 KB, NKS-21 modele popytu HistoricalPrices = baza, nieudane 0."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NKS-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, plans, perr, bil, prod_days, days_ms, money, prices, errs = [], [], 0, {}, set(), [], [], [], 0
+    on_day, on_src, on_ema, arm_day, conf_day = None, None, None, None, None
+    ramp_a, ramp_d, ramp_e, ramp_lam_end, ramp_lam = None, None, None, None, {}
+    shelf_day, shelf_txt, start_px = None, None, {}
+    zc4_days, zc4_stum, zc4_v, zc4_hook, zc4_aff = set(), 0, {}, {}, {}
+    zc5 = {}
+    goods = {}         # (dzien, towar) -> (zapas, produkcja, zuzycie) - swiat
+    mkt = {}           # (dzien, rynek 0/1/2) -> {towar: (p, c, s)}
+    saves, cof, a7, villages, fam, zc0, rest = [], {}, {}, {}, {}, {}, {}
+    stum_sess = 0
+    stum_hooks = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if s.startswith(NKS_ERR):
+                    errs += 1
+                continue
+            if s.startswith("Towary: dzien "):
+                mm = NKS_GOODS.match(s)
+                if mm:
+                    goods[(int(mm.group("day")), mm.group("g"))] = (int(mm.group("st")), int(mm.group("p")), int(mm.group("c")))
+                continue
+            if s.startswith("Koszyk stanow (ZC4): dzien "):
+                mm = NKS_ZC4.match(s)
+                if mm:
+                    d = int(mm.group("day"))
+                    zc4_days.add(d)
+                    mv = NKS_ZC4V.search(s)
+                    if mv:
+                        zc4_v[d] = (int(mv.group("w")), int(mv.group("k")), int(mv.group("g")))
+                    ms3 = NKS_ZC4S.search(s)
+                    if ms3:
+                        zc4_stum += int(ms3.group("s"))
+                    mh = NKS_ZC4HOOK.search(s)
+                    if mh:
+                        zc4_hook[d] = float(mh.group("ms"))
+                    ma = NKS_ZC4AFF.search(s)
+                    if ma:
+                        zc4_aff[d] = (int(ma.group("k")), int(ma.group("n")), ma.group("mt"), ma.group("mv"))
+                continue
+            if s.startswith("Przetwory miast (ZC5): dzien "):
+                mm = NKS_ZC5.match(s)
+                if mm:
+                    d = int(mm.group("day"))
+                    zc5[d] = {it.group("name").strip(): int(it.group("m")) for it in NKS_ZC5P.finditer(s)}
+                continue
+            if s.startswith("Pieniadz swiata (bilans - przyczyny): dzien"):
+                mm = NKS_REST.match(s)
+                if mm:
+                    rest[int(mm.group("day"))] = int(mm.group("r"))
+                continue
+            if s.startswith("Spichlerze (E4/6): dzien"):
+                mm = NKS_FAM.match(s)
+                if mm:
+                    fam[int(mm.group("day"))] = {k: float(v) for k, v in mm.groupdict().items() if k != "day"}
+                continue
+            if s.startswith("Zycie (ZC0): dzien"):
+                mm = NKS_ZC0.match(s)
+                if mm:
+                    mb = re.search(r"biedota (-?[\d.]+)", mm.group("dest"))
+                    zc0[int(mm.group("day"))] = (mm.group("peas"), mb.group(1) if mb else "-", int(mm.group("dn")), int(mm.group("dall")))
+                continue
+            if s.startswith(NKS_P):
+                if s.startswith(NKS_P + "start sesji"):
+                    starts.append(s)
+                elif s.startswith(NKS_P + "plan doba"):
+                    mm = NKS_PLAN.match(s)
+                    if mm:
+                        p = {k: (float(v) if k == "s" else int(v)) for k, v in mm.groupdict().items()}
+                        me = NKS_PLANEMA.search(s)
+                        p["ema"] = int(me.group("e")) if me else None
+                        plans.append(p)
+                    elif NKS_PLANERR.match(s):
+                        perr += 1
+                elif s.startswith(NKS_P + "dzien "):
+                    mm = NKS_DAY.match(s)
+                    if mm:
+                        days_ms.append((int(mm.group("day")), float(mm.group("ms")), int(mm.group("b"))))
+                        stum_sess = max(stum_sess, int(mm.group("b")))
+                    mo = NKS_MONEY.search(s)
+                    if mo:
+                        money.append((int(mo.group("d1")), int(mo.group("d2")), int(mo.group("a")), int(mo.group("e"))))
+                continue
+            if s.startswith(NKS_K):
+                if s.startswith(NKS_K + "bilans "):
+                    mm = NKS_BIL.match(s)
+                    if mm:
+                        items = {}
+                        for it in NKS_BILITEM.finditer(mm.group("body")):
+                            try:
+                                items[it.group("g")] = (float(it.group("q")), int(it.group("d")))
+                            except ValueError:
+                                pass
+                        bil[(int(mm.group("day")), mm.group("mk"))] = items
+                elif s.startswith(NKS_K + "rynki dzien"):
+                    mm = NKS_MKT.match(s)
+                    if mm:
+                        d = int(mm.group("day"))
+                        for sg in NKS_MKTSEG.finditer(s):
+                            k = 0 if sg.group("mk") == "Westeros" else (1 if sg.group("mk") == "Essos" else 2)
+                            dd = {}
+                            for it in NKS_MKTIT.finditer(sg.group("body")):
+                                dd[it.group("g")] = (int(it.group("p")), int(it.group("c")), int(it.group("s")) if it.group("s") else None)
+                            mkt[(d, k)] = dd
+                elif s.startswith(NKS_K + "zapis arm_ks"):
+                    mm = NKS_SAVE.match(s)
+                    if mm:
+                        saves.append((int(mm.group("day")), float(mm.group("kb")), int(mm.group("n"))))
+                elif s.startswith(NKS_K + "WLACZONE"):
+                    mm = NKS_ON.match(s)
+                    if mm and on_day is None:
+                        on_day = int(mm.group("day"))
+                        mo2 = NKS_ONSRC.match(s)
+                        on_src = mo2.group("src") if mo2 else "?"
+                        me = NKS_ONEMA.search(s)
+                        on_ema = int(me.group("e")) if me else None
+                elif s.startswith(NKS_K + "uzbrojony zapis"):
+                    mm = NKS_ARM.match(s)
+                    if mm and arm_day is None:
+                        arm_day = int(mm.group("day"))
+                elif s.startswith(NKS_K + "potwierdzone"):
+                    mm = NKS_CONF.match(s)
+                    if mm and conf_day is None:
+                        conf_day = int(mm.group("day"))
+                elif s.startswith(NKS_K + "rampa dzien"):
+                    mm = NKS_RAMP.match(s)
+                    if mm:
+                        ramp_a, ramp_d, ramp_e = int(mm.group("a")), int(mm.group("d")), int(mm.group("e"))
+                        ramp_lam[int(mm.group("t"))] = float(mm.group("l"))
+                        if float(mm.group("l")) >= 0.999 and ramp_lam_end is None:
+                            ramp_lam_end = int(mm.group("day"))
+                elif s.startswith(NKS_K + "polki startu"):
+                    mm = NKS_SHELF.match(s)
+                    if mm and shelf_day is None:
+                        shelf_day = int(mm.group("day"))
+                        shelf_txt = f"doba {shelf_day}, miast {mm.group('n')}, kategorii {mm.group('c')}, srednia indeksu {mm.group('i0')} -> {mm.group('i1')}"
+                        for mp in NKS_SHELFP.finditer(s):
+                            k = 0 if mp.group("mk") == "Westeros" else 1
+                            for part in mp.group("body").split(","):
+                                p = part.strip().split(" ")
+                                if len(p) == 2:
+                                    try:
+                                        start_px[(k, p[0])] = float(p[1])
+                                    except ValueError:
+                                        pass
+                elif s.startswith(NKS_K + "produkcja (zastosowane)"):
+                    mm = NKS_PROD.match(s)
+                    if mm:
+                        d = int(mm.group("day"))
+                        prod_days.add(d)
+                        mc = NKS_COF.search(s)
+                        if mc:
+                            cof[d] = (int(mc.group("w")), int(mc.group("wd")), int(mc.group("e")), int(mc.group("ed")))
+                        ma = NKS_A7.search(s)
+                        if ma:
+                            a7[d] = {k: (v if k == "k" else int(v)) for k, v in ma.groupdict().items()}
+                        mv = NKS_PRODV.search(s)
+                        if mv:
+                            villages[d] = int(mv.group("v"))
+                    ms2 = NKS_PRODST.search(s)
+                    if ms2:
+                        stum_hooks = max(stum_hooks, int(ms2.group("h")))
+                elif s.startswith(NKS_K + "ceny miast"):
+                    mm = NKS_PRICE.match(s)
+                    if mm:
+                        body = mm.group("body")
+                        vals = {}
+                        for sg in NKS_PRICEMK.finditer(body):
+                            k = 0 if sg.group("mk") == "Westeros" else 1
+                            for it in NKS_PRICEIT.finditer(sg.group("body")):
+                                sp = int(it.group("s")) if it.group("s") != "-" else None
+                                pp = int(it.group("p")) if it.group("p") != "-" else None
+                                vals[(k, it.group("g"))] = (float(it.group("x")), sp, pp)
+                        if not vals:      # linia sprzed recenzji: sam swiat
+                            for part in body.split("|")[0].rstrip(".").split(","):
+                                p = part.strip().split(" ")
+                                if len(p) == 2:
+                                    try:
+                                        vals[(-1, p[0])] = (float(p[1]), None, None)
+                                    except ValueError:
+                                        pass
+                        prices.append((int(mm.group("day")), vals))
+    side = nks_side(logp)
+    base = nks_side(bdp) if bdp else None
+    print(f"plik: {logp} | linii startu {len(starts)}, planow {len(plans)}, wlaczenie {on_day}, linie rynkow {len(set(d for d, _ in mkt))}, baza {bdp or '-'}")
+    if not starts and not plans and not prod_days:
+        rep.add("NKS-0: linie KS", "brak w logu", "INFO (log sprzed paczki KS albo klucz Start Calibration wylaczony)", None)
+        rep.add("NKS-10: ERROR KS i potkniecia", f"ERROR {errs}", "0 (bez linii KS - INFO)", None if errs == 0 else False)
+        rep.show()
+        return 0
+    # NKS-0
+    st_ok = [s for s in starts if NKS_START.match(s) and NKS_START.match(s).group("k") == "TAK"]
+    land = None
+    for s in starts:
+        mm = NKS_LAND.search(s)
+        if mm:
+            land = mm.groupdict()
+    lay = any("uklad wiosek tej sesji zgodny z plikiem" in s for s in starts)
+    if not starts:
+        rep.add("NKS-0: linia startu sesji KS", "brak linii", "linia 'Kalibracja startu (KS): start sesji' z kluczem TAK", None)
+    else:
+        rep.add("NKS-0: linia startu sesji KS", f"sesji {len(starts)}, klucz TAK {len(st_ok)}, plik ziemi {land if land else 'BRAK'}, uklad wiosek {'zgodny' if lay else 'NIEZGODNY'}",
+                "klucz TAK, wsi gry >= 500, uklad zgodny", bool(st_ok) and land is not None and int(land["v"]) >= 500 and lay)
+    # NKS-1/2
+    rep.add("NKS-1: Plany bez bledu", f"planow {len(plans)}, z bledem {perr}" + (f" (doby {plans[0]['day']}..{plans[-1]['day']})" if plans else ""), ">= 1, bledow 0",
+            (len(plans) >= 1 and perr == 0) if (plans or perr) else None)
+    if on_day is not None:
+        rep.add("NKS-1b: Plan wlaczenia z dojrzala ksiega towarow (recenzja 16.10)", f"wlaczenie doba {on_day}, Plan z {on_ema if on_ema is not None else '?'} dob ksiegi", ">= 28 dob",
+                (on_ema >= 28) if on_ema is not None else False)
+    warm = [p for p in plans if p["nr"] >= 2]
+    if plans:
+        rep.add("NKS-2: czas Planu (watek roboczy)", f"pierwszy {plans[0]['s']:.1f} s ({plans[0]['r']} rund); cieple: " + (f"max {max(p['s'] for p in warm):.1f} s, mediana {sorted(p['s'] for p in warm)[len(warm) // 2]:.1f} s ({len(warm)} planow)" if warm else "brak"),
+                "<= 30 s (cieply start; pierwszy - INFO)", (max(p["s"] for p in warm) <= 30.0) if warm else None)
+    else:
+        rep.add("NKS-2: czas Planu (watek roboczy)", "brak linii", "<= 30 s", None)
+    # NKS-3: bilans Planu wlaczenia (ostatni przed wlaczeniem) albo ostatni
+    plan_q = {}
+    if bil:
+        cand = sorted(d for d, _ in bil)
+        lastd = max([d for d in cand if on_day is None or d <= on_day] or cand)
+        bad, exc, n = [], [], 0
+        for mk in ("Westeros", "Essos"):
+            for g, (q, dt) in sorted(bil.get((lastd, mk), {}).items()):
+                plan_q[(0 if mk == "Westeros" else 1, g)] = q
+                if dt < 50:
+                    continue
+                if g in NKS_EXC:
+                    if q < 0.95 or q > 1.05:
+                        exc.append(f"{mk} {g} {q:.2f}")
+                    continue
+                n += 1
+                if q < 0.95 or q > 1.05:
+                    bad.append(f"{mk} {g} {q:.2f}")
+        rep.add("NKS-3: bilans Planu (towary rak, popyt >= 50 t/d)", f"plan doba {lastd}: towarow {n}, poza pasmem {len(bad)}" + (f" ({', '.join(bad)})" if bad else ""),
+                "kazdy w 0.95-1.05", len(bad) == 0)
+        rep.add("NKS-3b: wyjatki projektu poza pasmem (Plan)", ", ".join(exc) if exc else "brak", "INFO (marchew, jablka, futra, miod, przyprawy, tran, kiel, jaja, skory)", None)
+    else:
+        rep.add("NKS-3: bilans Planu", "brak linii 'KS: bilans'", "kazdy towar rak w 0.95-1.05", None)
+
+    def window_ratios(w0, w1):
+        agg = {}
+        for (d, g), (stk, p, c) in goods.items():
+            if w0 <= d <= w1:
+                a = agg.setdefault(g, [0, 0, None, None, None, None, 0])
+                a[0] += p; a[1] += c; a[6] += 1
+                if a[2] is None or d < a[4]:
+                    a[2], a[4] = stk, d
+                if a[3] is None or d > a[5]:
+                    a[3], a[5] = stk, d
+        for g2 in ("meat",):       # mieso z miesem wieloryba (jeden towar Planu)
+            if "WhaleMeat" in agg and g2 in agg:
+                a, b = agg[g2], agg["WhaleMeat"]
+                a[0] += b[0]; a[1] += b[1]
+        return agg
+
+    def window_market(w0, w1, k):
+        agg = {}
+        for (d, kk), dd in mkt.items():
+            if kk != k or not (w0 <= d <= w1):
+                continue
+            for g, (p, c, st) in dd.items():
+                a = agg.setdefault(g, [0, 0, None, None, None, None, 0])
+                a[0] += p; a[1] += c; a[6] += 1
+                if st is not None:
+                    if a[2] is None or d < a[4]:
+                        a[2], a[4] = st, d
+                    if a[3] is None or d > a[5]:
+                        a[3], a[5] = st, d
+        if "WhaleMeat" in agg:
+            b = agg["WhaleMeat"]; a = agg.setdefault("meat", [0, 0, None, None, None, None, b[6]])
+            a[0] += b[0]; a[1] += b[1]
+        return agg
+
+    # NKS-4..8 po wlaczeniu
+    if on_day is None:
+        for name in ("NKS-4: produkcja po wlaczeniu", "NKS-5: podaz/zuzycie na rynek w oknie odbioru", "NKS-6: zapasy w oknie odbioru", "NKS-7: ceny miast po wlaczeniu", "NKS-8: pieniadze",
+                     "NKS-11: wlaczenie", "NKS-12: rampa i polki startu", "NKS-13: koszyk ZC4", "NKS-14: przetwory ZC5", "NKS-15: glod", "NKS-16: kasy kupcow", "NKS-17: Dostatek",
+                     "NKS-18: Food miast BK", "NKS-19: A7", "NKS-20: rozmiar arm_ks"):
+            rep.add(name, "bez wlaczenia (sam Plan)", "INFO", None)
+    else:
+        lastp = max(prod_days) if prod_days else on_day
+        want = set(range(on_day, lastp + 1))
+        gaps = sorted(want - prod_days)
+        rep.add("NKS-4: produkcja po wlaczeniu (linia w kazdej dobie)", f"wlaczone doba {on_day} ({on_src}), linii {len(prod_days)}, luk {len(gaps)}" + (f" (np. {gaps[:5]})" if gaps else ""), "bez luk", len(prod_days) > 0 and not gaps)
+        a = ramp_a if ramp_a is not None else on_day
+        dd = ramp_d if ramp_d is not None else a + 14
+        w0, w1 = dd + 22, dd + 49
+        last_goods = max((d for d, _ in goods), default=None)
+        if last_goods is not None and last_goods < w1:
+            w1 = last_goods
+        win_txt = f"doby {w0}..{w1}"
+        # NKS-5 na rynek
+        mk_names = ("Westeros", "Essos")
+        have_mkt = any(w0 <= d <= w1 for d, _ in mkt)
+        bad, exc, stk_bad, proc, n, nd_win = [], [], [], [], 0, 0
+        if have_mkt:
+            for k in (0, 1):
+                agg = window_market(w0, w1, k)
+                nd_win = max([v[6] for v in agg.values()] + [nd_win])
+                for g in NKS_MAIN + NKS_EXC + NKS_PROC:
+                    if g not in agg:
+                        continue
+                    p, c, s0, s1, d0, d1, ndd = agg[g]
+                    if c <= 0:
+                        continue
+                    q = p / c
+                    if g in NKS_MAIN:
+                        n += 1
+                        if q < 0.95 or q > 1.05:
+                            bad.append(f"{mk_names[k]} {g} {q:.2f}")
+                        if s0 is not None and s1 is not None and d1 > d0:
+                            ch = (s1 - s0) / (d1 - d0) / (c / max(1, ndd))
+                            if abs(ch) > 0.02:
+                                stk_bad.append(f"{mk_names[k]} {g} {100 * ch:+.0f}%")
+                    elif g in NKS_EXC:
+                        pq = plan_q.get((k, g))
+                        lo, hi = (pq * 0.9, pq * 1.1) if pq else (0.95, 1.05)
+                        if q < lo or q > hi:
+                            exc.append(f"{mk_names[k]} {g} {q:.2f} (Plan {pq:.2f})" if pq else f"{mk_names[k]} {g} {q:.2f}")
+                    else:
+                        proc.append(f"{mk_names[k]} {g} {q:.2f}")
+            ub = window_market(w0, w1, 2)
+            ub_txt = ", ".join(f"{g} {v[0]}/{v[1]}" for g, v in sorted(ub.items()) if g in NKS_MAIN and (v[0] or v[1]))[:300]
+        else:
+            ub_txt = "brak linii 'KS: rynki'"
+        ok5 = (len(bad) == 0) if (n and nd_win >= 7) else None
+        rep.add("NKS-5: podaz/zuzycie NA RYNEK w oknie odbioru KS-M (D+22..D+49)", f"{win_txt} ({nd_win} dob z linia 'KS: rynki'): towarow rak x rynek {n}, poza 0.95-1.05 {len(bad)}" + (f" ({', '.join(bad)})" if bad else ""),
+                "kazdy towar rak kazdego rynku w 0.95-1.05 (okno < 7 dob - INFO)", ok5)
+        rep.add("NKS-5b: wyjatki projektu (+-10% stosunku Planu tego rynku)", ", ".join(exc) if exc else ("w pasmie" if have_mkt else "brak linii"), "kazdy wyjatek w +-10% Planu",
+                (len(exc) == 0) if (have_mkt and nd_win >= 7) else None)
+        rep.add("NKS-5c: przetwory i wyroby koszyka na rynek (podaz/zuzycie)", ", ".join(proc) if proc else "brak linii", "INFO (robia je tez warsztaty gry)", None)
+        rep.add("NKS-5u: bez rynku (partie poza osada, zrodla bez ramki) w oknie", ub_txt or "-", "INFO", None)
+        aggw = window_ratios(w0, w1)
+        outw = [f"{g} {aggw[g][0] / aggw[g][1]:.2f}" for g in NKS_MAIN if g in aggw and aggw[g][1] > 0 and not (0.95 <= aggw[g][0] / aggw[g][1] <= 1.05)]
+        rep.add("NKS-5w: swiat (linie 'Towary') w oknie", ", ".join(outw) if outw else "w pasmie (albo brak linii)", "INFO (odbior - na rynek, NKS-5)", None)
+        agg2 = window_ratios(on_day, on_day + 27)
+        out2 = [f"{g} {agg2[g][0] / agg2[g][1]:.2f}" for g in NKS_MAIN if g in agg2 and agg2[g][1] > 0 and not (0.95 <= agg2[g][0] / agg2[g][1] <= 1.05)]
+        rep.add("NKS-5d: pierwsze 28 dob po wlaczeniu (A..A+27, swiat)", ", ".join(out2) if out2 else "w pasmie (albo brak linii)",
+                "INFO: okno w calosci w rampie (podaz A..D, popyt D..D+14) - stan zbilansowany sprawdza NKS-5 w D+22..D+49", None)
+        rep.add("NKS-6: zapasy miast rynku (zmiana na dobe / zuzycie dobowe, okno odbioru)", f"poza +-2%: {len(stk_bad)}" + (f" ({', '.join(stk_bad)})" if stk_bad else ""), "<= 2% na dobe",
+                (len(stk_bad) == 0) if (n and nd_win >= 7) else None)
+        # NKS-7 ceny na rynek
+        pr = [(d, v) for d, v in prices if w0 <= d <= w1 + 7]
+        if pr:
+            far, cf, sl = [], [], []
+            per_mk = any(k >= 0 for _, v in pr for (k, _g) in v)
+            for k in ((0, 1) if per_mk else (-1,)):
+                for g in NKS_MAIN:
+                    ser = [(d, v[(k, g)]) for d, v in pr if (k, g) in v]
+                    if not ser:
+                        continue
+                    med = nks_med([x[0] for _, x in ser])
+                    sp = start_px.get((k, g)) if k >= 0 else None
+                    lo, hi = (sp - 0.3, sp + 0.3) if sp is not None else (0.7, 1.3)
+                    nm = (mk_names[k] + " " if k >= 0 else "") + g
+                    if med < lo or med > hi:
+                        far.append(f"{nm} {med:.2f} ({lo:.2f}-{hi:.2f})")
+                    capf = [max(x[1] or 0, x[2] or 0) for _, x in ser if x[1] is not None]
+                    if capf and max(capf) > 20:
+                        cf.append(f"{nm} {max(capf)}%")
+                    if len(ser) >= 3:
+                        xs = [d for d, _ in ser]; ys = [x[0] for _, x in ser]
+                        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+                        den = sum((x - mx) ** 2 for x in xs)
+                        slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den if den > 0 else 0.0
+                        if my > 0 and abs(slope / my) > 0.005:
+                            sl.append(f"{nm} {100 * slope / my:+.2f}%/d")
+            rep.add("NKS-7: ceny na rynek (mediana linii okna w pasmie ceny startu +-0.3)", f"linii {len(pr)}: poza pasmem {len(far)}" + (f" ({', '.join(far[:12])})" if far else "")
+                    + ("" if start_px else " (bez linii cen startu - pasmo 0.7-1.3)"), "towary rak kazdego rynku w pasmie", len(far) == 0)
+            rep.add("NKS-7b: sufit / podloga wzoru ceny", ", ".join(cf) if cf else "<= 20% miast", "zaden towar w > 20% miast", len(cf) == 0 if per_mk else None)
+            rep.add("NKS-7c: nachylenie ceny w oknie", ", ".join(sl[:12]) if sl else "<= 0.5%/d", "|nachylenie| <= 0.5%/d", (len(sl) == 0) if len(pr) >= 3 else None)
+        else:
+            rep.add("NKS-7: ceny na rynek", "brak linii 'KS: ceny miast' w oknie", "towary rak w pasmie ceny startu +-0.3", None)
+        # NKS-8 pieniadze
+        if money:
+            nz = [m for m in money if m[0] != 0 or m[1] != 0]
+            rep.add("NKS-8: kontrola pieniedzy KS (przebudowa, pola mieszczan)", f"linii {len(money)}, z roznica {len(nz)}; przebudowa razem {sum(m[2] for m in money)} zl, pola mieszczan {sum(m[3] for m in money)} zl",
+                    "roznica 0", len(nz) == 0)
+        else:
+            rep.add("NKS-8: kontrola pieniedzy KS", "brak linii", "roznica 0", None)
+        wm = side["world"]
+        wd = [d for d in sorted(wm) if w0 <= d <= w1]
+        if len(wd) >= 2:
+            ch = (wm[wd[-1]] - wm[wd[0]]) / max(1, wm[wd[0]])
+            if base and base["world"]:
+                bw = base["world"]; bd = [d for d in sorted(bw) if w0 <= d <= w1] or sorted(bw)[-len(wd):]
+                bch = (bw[bd[-1]] - bw[bd[0]]) / max(1, bw[bd[0]]) if len(bd) >= 2 else 0.0
+                rep.add("NKS-8b: pieniadz swiata w oknie wobec bazy", f"zmiana {100 * ch:+.2f}%, baza {100 * bch:+.2f}%", "|roznica| <= 0.5%", abs(ch - bch) <= 0.005)
+            else:
+                rep.add("NKS-8b: pieniadz swiata w oknie", f"zmiana {100 * ch:+.2f}% (doby {wd[0]}..{wd[-1]})", "INFO bez --baza-doby (prog: jak baza +-0.5%)", None)
+        else:
+            rep.add("NKS-8b: pieniadz swiata", "brak linii 'Pieniadz swiata' w oknie", "jak baza +-0.5%", None)
+        affw = [v for d, v in zc4_aff.items() if w0 <= d <= w1]
+        if affw:
+            def fl(x):
+                try:
+                    return float(x)
+                except ValueError:
+                    return None
+            mt = [fl(v[2]) for v in affw if fl(v[2]) is not None]; mvv = [fl(v[3]) for v in affw if fl(v[3]) is not None]
+            mtm, mvm = (sum(mt) / len(mt) if mt else 0.0), (sum(mvv) / len(mvv) if mvv else 0.0)
+            rep.add("NKS-8c: koszyk niekupiony z braku pieniedzy (projekt 9.4)", f"miasta {mtm:.1f}% budzetu jedzenia, wsie {mvm:.1f}% chcianych sztuk (srednio w oknie)", "<= 5% (rynek, stan)", mtm <= 5.0 and mvm <= 5.0)
+        else:
+            rep.add("NKS-8c: koszyk niekupiony z braku pieniedzy", "brak liczb w linii ZC4", "<= 5%", None)
+        rs = [rest[d] for d in rest if w0 <= d <= w1]
+        rep.add("NKS-8d: reszta bilansu pieniadza swiata [R] w oknie", f"suma {sum(rs)} zl w {len(rs)} dobach" if rs else "brak linii", "INFO (zloto bez wyjasnienia - jak baza)", None)
+        # NKS-11 wlaczenie
+        if on_src == "autotest":
+            rep.add("NKS-11: wlaczenie (autotest albo uzbrojenie w zapisie)", f"autotest doba {on_day}", "autotest; w grze: uzbrojony -> potwierdzone (Confirm w grze odrzucany do bramki krainy)", True)
+        else:
+            ok11 = arm_day is not None and conf_day is not None and conf_day > arm_day
+            rep.add("NKS-11: wlaczenie (autotest albo uzbrojenie w zapisie)", f"uzbrojony {arm_day}, potwierdzone {conf_day}, wlaczone {on_day}", "uzbrojony -> potwierdzone (doba pozniej)", ok11)
+        # NKS-12 rampa i polki: lambda 0 w D (t 14), 1 w D+14 (t 28)
+        l14, l28 = ramp_lam.get(14), ramp_lam.get(28)
+        ok12 = l14 is not None and l14 <= 0.01 and l28 is not None and l28 >= 0.999 and shelf_day is not None and shelf_day <= dd + 1
+        rep.add("NKS-12: rampa (lambda 0 w D, 1 w D+14) i polki startu w dobie D", f"A {a}, D {dd}, lambda w D {l14}, w D+14 {l28} (1 od doby {ramp_lam_end}), polki: {shelf_txt or 'brak linii'}",
+                "lambda 0 w D, 1 w D+14, polki w D", ok12 if (lastp >= a + 29) else None)
+        # NKS-13 koszyk ZC4
+        zwant = [d for d in range(on_day + 1, lastp + 1)]
+        zgaps = [d for d in zwant if d not in zc4_days]
+        vw = sum(zc4_v[d][0] for d in zc4_v if w0 <= d <= w1)
+        vk = sum(zc4_v[d][1] for d in zc4_v if w0 <= d <= w1)
+        vg = sum(zc4_v[d][2] for d in zc4_v if w0 <= d <= w1)
+        share = vk / vw if vw > 0 else None
+        afk = sum(v[0] for v in affw); afn = sum(v[1] for v in affw)
+        aff = afk / afn if afn > 0 else None
+        rep.add("NKS-13: koszyk ZC4 (linia co dobe, wsie kupuja, stac na jedzenie, potkniecia)",
+                (f"linii {len(zc4_days)}, luk {len(zgaps)}; wsie w oknie: chciane {vw} szt., kupione {vk} ({(100 * share):.0f}%) za {vg} zl" if share is not None else f"linii {len(zc4_days)}, luk {len(zgaps)}; wsie w oknie: brak liczb")
+                + (f"; miasta stac na cale jedzenie {100 * aff:.1f}%" if aff is not None else "") + f"; potkniecia {zc4_stum}",
+                "bez luk, wsie >= 50% chcianego, stac na jedzenie >= 95% miast (ZC4), potkniecia 0",
+                (not zgaps and zc4_stum == 0 and (share is None or share >= 0.5) and (aff is None or aff >= 0.95)) if zc4_days else None)
+        # NKS-14 przetwory ZC5
+        tot = {}
+        for d, v in zc5.items():
+            if w0 <= d <= w1:
+                for k2, x in v.items():
+                    tot[k2] = tot.get(k2, 0) + x
+        key = ("ziarno -> chleb", "ziarno -> piwo", "winogrona -> wino", "oliwki -> oliwa")
+        miss = [k2 for k2 in key if tot.get(k2, 0) <= 0]
+        rep.add("NKS-14: przetwory ZC5 w oknie (chleb, piwo, wino, oliwa, uboj, narzedzia)", (", ".join(f"{k2} {x}" for k2, x in sorted(tot.items())) if tot else "brak linii") + (f"; bez produkcji: {', '.join(miss)}" if tot and miss else ""),
+                "INFO (robione, gdy wyrob placi wsad i prace)", None)
+        # NKS-15 glod
+        fw = {d: v for d, v in fam.items() if on_day <= d <= w1}
+        if fw:
+            dead_cause = sum(v["g"] + v["u"] + v["m"] for v in fw.values() if v["o"] + v["s"] == 0)
+            dead_all = sum(v["g"] + v["u"] + v["m"] for v in fw.values())
+            nocause = sum(v["b"] for v in fw.values())
+            rep.add("NKS-15: glod po wlaczeniu (projekt 14.5)", f"zmarli z glodu {dead_all:.0f} (w dobach bez oblezen i spustoszen {dead_cause:.0f}), okrego-dni glodnych bez przyczyny {nocause:.0f}",
+                    "zmarli poza oblezeniami i najazdami 0, glodne bez przyczyny 0", dead_cause == 0 and nocause == 0)
+        else:
+            rep.add("NKS-15: glod po wlaczeniu", "brak linii 'Spichlerze (E4/6)'", "zmarli z glodu poza oblezeniami 0", None)
+        # NKS-16 kasy kupcow
+        cw = {d: v for d, v in cof.items() if on_day <= d <= w1}
+        if cw:
+            mw, me = max(v[1] for v in cw.values()), max(v[3] for v in cw.values())
+            rep.add("NKS-16: kasy kupcow (kasy miast) na rynek (projekt 9.2, 14.4)", f"najdluzszy spadek z rzedu: Westeros {mw} dob, Essos {me} dob", "< 7 dob z rzedu", mw < 7 and me < 7)
+        else:
+            rep.add("NKS-16: kasy kupcow", "brak liczb w linii produkcji", "< 7 dob spadku z rzedu", None)
+        # NKS-17 Dostatek
+        zw = [(d, v) for d, v in sorted(zc0.items()) if w0 <= d <= w1]
+        if zw:
+            d, v = zw[-1]
+            try:
+                pe, bi = float(v[0]), float(v[1])
+            except ValueError:
+                pe, bi = None, None
+            ok17 = v[2] == v[3] and pe is not None and pe >= 1.0 and bi is not None and bi >= 1.0
+            rep.add("NKS-17: Dostatek (projekt 14.8)", f"doba {d}: D policzone {v[2]}/{v[3]} osad, mediana chlopow wsi {v[0]}, biedota {v[1]}", "wszystkie osady, chlopi i biedota >= 1.0", ok17)
+        else:
+            rep.add("NKS-17: Dostatek", "brak linii 'Zycie (ZC0)' w oknie", "chlopi i biedota >= 1.0", None)
+        # NKS-18 Food miast BK
+        bf = [side["bkf"][d] for d in side["bkf"] if w0 <= d <= w1]
+        if bf and base and base["bkf"]:
+            bb = [base["bkf"][d] for d in base["bkf"] if w0 <= d <= w1] or list(base["bkf"].values())
+            mf, mb = sum(bf) / len(bf), sum(bb) / len(bb)
+            rep.add("NKS-18: Food miast BK wobec bazy (projekt 14.9)", f"srednio {mf:.3f}, baza {mb:.3f}", "+-10% bazy", abs(mf - mb) <= 0.1 * max(mb, 1e-6))
+        else:
+            rep.add("NKS-18: Food miast BK (projekt 14.9)", (f"srednio {sum(bf) / len(bf):.3f} w oknie" if bf else "brak linii") + " (stabilnosc i satysfakcja BK - porownanie na kopii zapisu)", "INFO bez --baza-doby (prog +-10% bazy)", None)
+        # NKS-19 A7
+        aw = {d: v for d, v in a7.items() if on_day <= d <= w1}
+        if aw:
+            press = sum(v["p"] for v in aw.values()); held = max(v["h"] for v in aw.values()); would = sum(v["w"] for v in aw.values())
+            started = sum(v["s"] for d, v in aw.items() if w0 <= d <= w1)
+            nv = max([villages[d] for d in villages if w0 <= d <= w1] or [max(villages.values()) if villages else 0])
+            key_on = any(v["k"] == "TAK" for v in aw.values())
+            rep.add("NKS-19a: nacisk A7 (projekt 14.7)", f"przegladow ponad progiem {press}, najdluzej {held} dob, zmian bylo by (po 60 dobach) {would}; klucz Switch Rule {'TAK' if key_on else 'WYLACZONY (sam pomiar)'}", "INFO (raport, bez progu)", None)
+            rep.add("NKS-19b: prawdziwe zmiany A7 w oknie", f"zaczete {started} przy {nv} wsiach ({(100.0 * started / nv) if nv else 0:.2f}%)", "<= 1% wiosek", (started <= 0.01 * nv) if nv else None)
+        else:
+            rep.add("NKS-19: A7", "brak liczb nacisku w linii produkcji", "INFO", None)
+        # NKS-20 rozmiar arm_ks
+        if saves:
+            mx = max(saves, key=lambda x: x[1])
+            rep.add("NKS-20: rozmiar arm_ks (projekt 12)", f"najwiekszy {mx[1]:.1f} KB ({mx[2]} paczek SaveText, doba {mx[0]}), zapisow {len(saves)}", "<= 150 KB", mx[1] <= 150.0)
+        else:
+            rep.add("NKS-20: rozmiar arm_ks", "brak linii 'KS: zapis arm_ks' (bez zapisu w stanie zastosowanym)", "<= 150 KB", None)
+    # NKS-9 koszt
+    if days_ms:
+        v = sorted(x[1] for x in days_ms)
+        med = v[len(v) // 2]
+        rep.add("NKS-9: koszt doby KS (bez watku roboczego)", f"mediana {med:.2f} ms, max {v[-1]:.2f} ms ({len(v)} dob)", "mediana <= 3 ms", med <= 3.0)
+        dm = {d: ms for d, ms, _ in days_ms}
+        tot2 = [dm[d] + zc4_hook[d] for d in zc4_hook if d in dm]
+        if tot2:
+            m2 = nks_med(tot2)
+            rep.add("NKS-9b: doba KS + haki ZC4/ZC5 (popyt ceny, slowniki, drabina, wsie, przetwory)", f"mediana {m2:.2f} ms ({len(tot2)} dob)", "<= 10 ms", m2 <= 10.0)
+        else:
+            rep.add("NKS-9b: doba KS + haki ZC4/ZC5", "brak liczb czasu hakow w linii ZC4", "<= 10 ms", None)
+        pf = side["prof"]
+        if pf and base and base["prof"]:
+            mt, mb = nks_med(list(pf.values())), nks_med(list(base["prof"].values()))
+            rep.add("NKS-9c: takt doby (Profil doby E8/0) wobec bazy", f"mediana {mt:.1f} ms, baza {mb:.1f} ms ({100 * (mt / mb - 1):+.1f}%)", "<= +10% bazy", mt <= 1.10 * mb)
+        else:
+            rep.add("NKS-9c: takt doby wobec bazy", f"mediana {nks_med(list(pf.values())):.1f} ms" if pf else "brak linii 'Profil doby'", "INFO bez --baza-doby (prog <= +10%)", None)
+    else:
+        rep.add("NKS-9: koszt doby KS", "brak linii 'Kalibracja startu (KS): dzien'", "mediana <= 3 ms", None)
+    rep.add("NKS-10: ERROR KS i potkniecia", f"ERROR {errs}, potkniecia sesji {stum_sess}, haki {stum_hooks}", "0", errs == 0 and stum_sess == 0 and stum_hooks == 0)
+    # NKS-21 modele popytu HistoricalPrices (DemandPostfix z parametrem int __2)
+    if side["hpm"] is not None:
+        if base and base["hpm"] is not None:
+            rep.add("NKS-21: popyt miast w nowej monecie - modele (wobec bazy)", f"wpiety w {side['hpm']} modelach (nieudane {side['hpm_bad']}), baza {base['hpm']}", "= baza, nieudane 0",
+                    side["hpm"] == base["hpm"] and side["hpm_bad"] == 0)
+        else:
+            rep.add("NKS-21: popyt miast w nowej monecie - modele", f"wpiety w {side['hpm']} modelach (nieudane {side['hpm_bad']})", "nieudane 0 (liczba = baza - podaj --baza-doby)",
+                    False if side["hpm_bad"] else None)
+    else:
+        rep.add("NKS-21: popyt miast w nowej monecie - modele", "brak linii HistoricalPrices", "= baza", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -33913,6 +34569,8 @@ def main(argv):
         return nzc6_main(logp, bdp, until_arg)   # nzc6 (16.10, zycie codzienne ZC6): Dostatek czynny - awans i spadek, wyzwolenie, dobrobyt (DailyLife.Mobility.cs, DailyLife.Prosperity.cs)
     if group == "nzc7" and logp:
         return nzc7_main(logp, bdp, until_arg)   # nzc7 (16.10, zycie codzienne ZC7): wojna i blizna - ruina przy zlupieniu, blizna najazdu, powrot (DailyLife.War.cs)
+    if group == "nks" and logp:
+        return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
