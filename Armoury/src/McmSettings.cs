@@ -6658,7 +6658,7 @@ namespace Armoury
 
         [SettingPropertyBool("Silk To Weavers", HintText = "craftsmen first: the townsfolk buy raw silk for their homes only from what lies on the stall beyond two days of work for the town's velvet weavers, so the weavers always find their silk (until now the townsfolk took about 43 of the 47 bales the world brings in each day and the weavers 3). Comes in step by step over 60 days; what lies beyond the weavers' share still goes to the homes as before, so the silk farms keep their market. The coin the townsfolk do not spend on silk stays in their purse (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
-        public bool SilkToWeavers { get; set; } = true;
+        public bool SilkToWeavers { get; set; } = false;
 
         [SettingPropertyBool("Silver Ore To Smiths", HintText = "craftsmen first: the townsfolk buy silver ore only from what lies on the stall beyond two days of work for the town's workshops that work it, so they find their ore first. Comes in step by step over 60 days. Where no workshop works silver ore (there is no mint or silversmith line yet in most towns), the townsfolk buy it as before, so the silver mines keep their market; the coin they do not spend stays in their purse (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
@@ -6678,7 +6678,7 @@ namespace Armoury
 
         [SettingPropertyBool("Bk Side Goods Origin", HintText = "the side goods Banner Kings gives some villages come from where they belong, step by step over 60 days: the marble of the silver mines moves to the clay and limestone pits (the world keeps as much marble), and the woodcutters make less mead only by as much mead as the towns brewed from honey the day before - in its place they bring in wild forest honey (half as much by weight, mead is honey and water). While no town brews mead, the woodcutters keep making it, so mead never runs out. Papyrus already grows only in the hot south and the gold of the West stays exhausted (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
-        public bool BkSideGoodsOrigin { get; set; } = true;
+        public bool BkSideGoodsOrigin { get; set; } = false;
 
         [SettingPropertyBool("Cart Price By Destination", HintText = "a village cart gets the town's going price for as much of its salt, tools, linen, pots and beer as the villages trading in that town really bought there the day before, and for as much iron bloom as the town's smiths and bloomeries use in a day; only what is beyond that sells cheaper and cheaper as the stall fills up (until now every sack was priced as if nobody would ever buy it, and a salt cart got a fraction of the town's price). Comes in step by step over 60 days (off = every piece cheaper as the stall fills, as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
