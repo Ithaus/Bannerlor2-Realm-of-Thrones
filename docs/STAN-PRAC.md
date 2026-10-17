@@ -2702,3 +2702,5 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   kupcow (Ship bez zaplaty z kasy celu, fracht z kasy zrodla, zaplata przy dostawie, rachunek, 30 dni zwloki = brak dostaw; KsFoodCore budzet = limit kredytu); (4) najpierw
   wyzywic siebie + hodowla/ryby/owies w zimnym klimacie (P0/ziemia snieg); (5) dowoz na Polnoc + danina zbozowa dla Muru; (6) tanszy koszyk biednych Essos; (7) koszt.
   Testy 120 dob bez bitwy; flaga armoury-ks-wlacz.flag; ocena nks + nds (baza 18-23-34).
+- 16:35 PDT: n-ks4 efbbf0dc (KS r4 cz. 5): drabina 2 wsi DS tylko ponad skrzynie (DsVillage.Chest); spichlerz bez podlogi przy KS (klucz KsGranaryNoFloor). Test fin79 120 dob
+  BEZ bitwy (Armoury aff494d1 = KsRecipes + skrzynia + bez podlogi), flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC!), at-fin79-ks4b.out.txt. Dalej: KS-H kredyt kupcow (krok 3).
