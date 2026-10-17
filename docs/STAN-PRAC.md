@@ -2568,3 +2568,14 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - Workflow wf_f0b8b65e-89a (daniny-sredniowieczne, TYLKO projekt, bez kodu): spis wszystkich przeplywow kies wsi i kas miast/korony + historia (czynsz, dziesiecina, podatki
   krolewskie od ruchomosci, cla, oplaty mlynskie, zaleglosci, kapital kupcow) -> 2 projekty -> ocena -> scratchpad daniny/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md.
 - Rownolegle konczy sie runda 3 KS (wf_0342c556-72c, symulacja 3 -> recenzje -> poprawki). Runda 4 = kod danin + alfa bez petli + kupcy z kapitalem, symulator, test w grze.
+
+### 70. DANINY DS - projekt gotowy, kod w toku (17.10 ok. 09:05 PDT) - NASTEPNY KROK TUTAJ
+- Projekt: docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md (wf_797e320c-8bc) + docs/DANINY-TERAZ-KROLESTWA-2026-10-16.csv (kampania Jeffa doba 109025: wojsko 212k ludzi,
+  koszt 784k/d, staly dochod rodow 1.14M/d, korona 601k/d w tym danina P1 od oszczednosci 151k, skarbce 48.7M, Bank 233k).
+- DS: wies przy wozie (pan bez zmian ~45% utargu, dziesiecina 5% z polowa jalmuzny, korona g/10 w wojnie), czynsz 4 zl/glowe/rok PIERWSZY + zaleglosci (darowane po roku),
+  kolejnosc: daniny -> czynsz -> koszyk -> skrzynia 21 dni -> zbytki z nadwyzki; znikaja pobory resztowe. Wsie oddaja 38% plonu -> 24-26%. Miasta: firmy = dzisiejszy zawor,
+  nadania wojenne g 0.5-2 co kwartal, pomoc od sprzedazy, 184 wedlug g, dziesiata od ruchomosci, clo x2, pomoc lennikow 10%; luka: skarbiec ponad zapas -> zaliczka mieszczan
+  10% -> Bank 20-30% (nie daruje). Przy g=2 korona 91-93% dzisiejszych wplywow, luka 12.4k/d w 7 malych krolestwach (dzis Bank daje 9.6k/d).
+- Kod: workflow wf_9ea032ce-160 (daniny-kod), galaz `w-toku/noc-ds` (worktree zb/n-ds) OD fe1b271e (WGRANIE 74), DS BEZ KS (On = klucz && wies); F1 wsie -> F3 miasta/korona/kredyt
+  -> model pieniedzy + grupa nds -> 2 recenzje -> poprawki. Potem test 120 dob w grze (gdy wolna), wgranie DOPIERO po slowie Jeffa (duza zmiana ekonomii).
+- KS runda 3 (wf_0342c556-72c): symulacja 3 nie przeszla (16/26 towarow w pasmie, kiesy wsi -0.2..-0.4%/d), recenzje 1 krytyczna + 22 wazne, poprawki w toku. KS runda 4 po DS.
