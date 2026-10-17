@@ -180,6 +180,7 @@ namespace Armoury
                 _hDay = int.MinValue;   // GL-2/GL-3: srednie glow swiata od nowa (TownFolk.Market.cs)
                 ResetLive();   // E5/B1: kiesy czynne, flagi zapasow startowych, liczniki (zapis wczytuje Import po konstruktorze)
                 ResetCraftSale();   // N4 (noc 16.10): pula wyrobow niesprzedanych (zapis arm_craft_sale wczytuje Import po konstruktorze)
+                KsReset();          // KS (recenzja 17.10): pamiec miast obok wsi (F2) i ulamki koszyka ZC4 od nowa
             }
             catch { }
         }

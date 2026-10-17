@@ -268,11 +268,16 @@ namespace Armoury
             try
             {
                 if (town == null || !town.IsTown || Campaign.Current == null || !Campaign.Current.GameStarted) return;
-                if (!Active) return;
+                bool act = Active, ks = StartCalibration.CraftsWanted(town);   // KS etap 2 (ZC5): przetwory jedzenia, napojow i garnkow przy zastosowanej kalibracji startu
+                if (!act && !ks) return;
                 int day = (int)CampaignTime.Now.ToDays;
-                if (_dayStamp != day) { Flush(); _dayStamp = day; }
+                if (act && _dayStamp != day) { Flush(); _dayStamp = day; }
                 var gf = GoodsLedger.Begin(GoodsLedger.FTownCraft, town);   // ksiega towarow (146): przerob tego miasta jako osobna pozycja (tylko licznik)
-                try { Work(town); }
+                try
+                {
+                    if (act) Work(town);
+                    if (ks) StartCalibration.TownCraftsDay(town);
+                }
                 finally { GoodsLedger.End(gf); }
             }
             catch (Exception e) { Stumble("OnDailyTickTown", e); }
@@ -314,7 +319,8 @@ namespace Armoury
                 var made = new int[n]; var taken = new int[n]; var reason = new int[n];   // powod konca: 1 bez zysku, 2 brak surowca, 3 rece
                 var acc = new float[n][];
                 var labor = new float[n];                // praca na sztuke przy dzisiejszej dniowce (suwak MCM dziala od razu)
-                for (int i = 0; i < n; i++) { acc[i] = st.Of(pairs[i].Key); labor[i] = LaborShare * pairs[i].Out.Value / wage; }
+                var ratio = new float[n];                // KS etap 2: wsad wedlug tabel KS przy zastosowanej kalibracji (len 1.25, welna 1.45, skory 2.4 kg na kg), inaczej proporcja 148
+                for (int i = 0; i < n; i++) { acc[i] = st.Of(pairs[i].Key); labor[i] = LaborShare * pairs[i].Out.Value / wage; ratio[i] = StartCalibration.TextileRatio(pairs[i].In, pairs[i].Out, pairs[i].Ratio); }
                 // plotno 14.10 (poprawka 2): cena wywozu plotna i prog polki - raz na miasto i dobe, tylko gdy na polce jest len, a plotna mniej niz prog
                 // Towary 2 / K3: to samo dla skory (garbarz, TannerExportPrice) - ExportKind; liczniki osobno
                 var expP = new float[n]; var expCap = new int[n]; var expK = new int[n];
@@ -341,14 +347,14 @@ namespace Armoury
                     {
                         var p = pairs[i];
                         reason[i] = 0;                    // powod liczy sie z ostatniej oceny (ceny po poprzednim kroku)
-                        int take = (int)Math.Floor(acc[i][0] + p.Ratio);
+                        int take = (int)Math.Floor(acc[i][0] + ratio[i]);
                         if (take < 1) take = 1;
                         if (shelf.GetItemNumber(p.In) < take) { reason[i] = 2; continue; }
                         float pin = Index(town, p.In, false) * p.In.Value;
                         float pout = Index(town, p.Out, true) * p.Out.Value;
                         float local = pout;
                         if (expP[i] > pout && shelf.GetItemNumber(p.Out) < expCap[i]) pout = expP[i];   // plotno 14.10: cena wywozu do progu polki
-                        float cost = p.Ratio * pin + labor[i] * pay;
+                        float cost = ratio[i] * pin + labor[i] * pay;
                         if (pout < cost * margin) { reason[i] = 1; continue; }
                         float score = (pout - cost) / labor[i];
                         if (score > bestScore) { bestScore = score; best = p; bestTake = take; bestEx = local < cost * margin; }   // tylko dzieki cenie wywozu
@@ -358,7 +364,7 @@ namespace Armoury
                     shelf.AddToCounts(best.In, -bestTake);
                     MaterialOrders.NoteUse(town, best.In, bestTake);   // 174.2: zmierzone zuzycie miasta
                     shelf.AddToCounts(best.Out, 1);
-                    a[0] = a[0] + best.Ratio - bestTake;
+                    a[0] = a[0] + ratio[best.Ix] - bestTake;
                     hands -= labor[best.Ix];
                     made[best.Ix]++; taken[best.Ix] += bestTake;
                     if (bestEx && expK[best.Ix] >= 0) { int k = expK[best.Ix]; exMade[k]++; _dExp[k]++; _dExpPrice[k] += expP[best.Ix]; }
@@ -375,7 +381,7 @@ namespace Armoury
                 for (int i = 0; i < n; i++)
                 {
                     var p = pairs[i]; var a = acc[i];
-                    float used = made[i] * p.Ratio;
+                    float used = made[i] * ratio[i];
                     a[1] += (used - a[1]) / UseDays; a[2] = 1f;   // srednia od zera (nowa kampania / stary zapis): pierwszy dzien z zapasem lezacym od dawna nie udaje stalego zuzycia
                     _dMade[i] += made[i]; _dTaken[i] += taken[i]; _dWanted[i] += used;
                     if (made[i] > 0)

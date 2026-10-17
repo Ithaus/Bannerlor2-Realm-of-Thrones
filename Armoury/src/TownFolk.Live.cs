@@ -157,7 +157,7 @@ namespace Armoury
             _vwCur = new Dictionary<Settlement, Dictionary<ItemCategory, double>>(); _vwPrev = new Dictionary<Settlement, Dictionary<ItemCategory, double>>();   // ZC1: zakupy wsi wedlug targu - sesja
             _w1Owed.Clear(); W1Zero(); _w1NgCur.Clear(); _w1Served.Clear(); _w1NgLastN = -1; _w1ServedLastN = 0; _w1NgRan = false;                                 // E3-W1: zaleglosci koszyka wsi i liczniki - sesja
             _seedT = _seedC = 0; _pending = null; _orphan = 0; _stateKey = null;
-            _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear();
+            _tickTown = null; _tickPaid = 0; _brFacFood = _brFacRest = 1; _brAnchor = false; _keys.Clear(); _zcCarry.Clear(); _zcLad.Clear();   // ZC4 (KS etap 2): ulamki koszyka wsi - sesja
             _better = null; _villCats = null; _betterText = _villText = "-"; _villBy = null;
             _ctlStock0 = long.MinValue; _ctlIn = _ctlOut = 0;
             _win = new LWin(); _ld = null; _lw = null; _liveDay = -1;
@@ -402,25 +402,40 @@ namespace Armoury
             }
             double ff = s.TownFolkAnchorBasket ? Clamp01(f.FacFood) : 1.0, fr = s.TownFolkAnchorBasket ? Clamp01(f.FacRest) : 1.0;
             f.FacFoodUsed = ff; f.FacRestUsed = fr; f.OfferFood = f.OfferRest = 0;
+            // ZC4 (KS etap 2): kategorie koszyka stanow - jedynym sufitem jest kiesa (Afford, bez sufitu "koszyk / wydatek"), z waga lambda; jedzenie koszyka przy braku
+            // pieniedzy dzieli drabina zakupow (StartCalibration.Zc4Ladder: przetrwanie, sol, napoj, bialko, reszta); poza ZC4 - jak dotad
+            double zl = 0; var zc = _zcCls;
+            bool zon = f.Kind == 0 && s.TownFolkAnchorBasket && StartCalibration.Zc4ClassCost(f.St, zc, out zl) && zl > 0;
+            if (!zon) zl = 0;
+            double ffz = zon ? (1 - zl) * ff + zl * Clamp01(f.AffFood) : ff, frz = zon ? (1 - zl) * fr + zl * Clamp01(f.AffRest) : fr;
+            if (zon) { f.FacFoodUsed = ffz; f.FacRestUsed = frz; }   // przewidywanie wydatku bez kotwicy (Predict) - czynnik, ktory naprawde cial koszyk (inaczej m malaloby co dobe)
             double after = g0;
-            if (ff < 1 || fr < 1)
+            if (ff < 1 || fr < 1 || ffz < 1 || frz < 1)
             {
                 _keys.Clear();
                 foreach (var kv in dict) _keys.Add(kv.Key);
                 after = 0;
+                _zcLad.Clear();
                 foreach (var k in _keys)
                 {
                     float v;
                     if (k == null || !dict.TryGetValue(k, out v) || !(v > 0)) continue;
-                    float nv = (float)(v * (GroupOf(k) == 0 ? ff : fr));
+                    bool zk = zon && StartCalibration.Zc4OfferFactor(town, k) < 1.0;   // kategoria koszyka (zastepowana) w tym miescie
+                    double fk = GroupOf(k) == 0 ? (zk ? ffz : ff) : (zk ? frz : fr);
+                    if (zk && GroupOf(k) == 0 && ffz < 1 && StartCalibration.Zc4LadderCat(town, k)) { _zcLad.Add(k); continue; }
+                    float nv = (float)(v * fk);
                     dict[k] = nv; after += nv;
                 }
+                if (_zcLad.Count > 0) { try { after += StartCalibration.Zc4Ladder(town, dict, _zcLad, ffz); } catch (Exception e) { Stumble("Zc4Ladder", e); foreach (var k in _zcLad) { float v; if (dict.TryGetValue(k, out v)) { dict[k] = (float)(v * ffz); after += v * ffz; } } } }
             }
             long off = f.Offer[0] + f.Offer[1] + f.Offer[2];
             if (off > 0 || LadderOn) after += AddOffer(f, town, dict, off);   // P3: przy liscie dostatku takze oferta 0 - podzial targu na jutro (sygnal P4, zakupy P5)
             f.G0a += after;
             _brFacFood = ff; _brFacRest = fr; _brAnchor = ff < 1 || fr < 1;
         }
+
+        private static readonly double[] _zcCls = new double[3];          // ZC4: koszt koszyka klas W/R/P (StartCalibration.Zc4ClassCost)
+        private static readonly List<ItemCategory> _zcLad = new List<ItemCategory>();   // ZC4: kategorie jedzenia koszyka do drabiny zakupow tego nawiasu
 
         private static double Clamp01(double v) { return double.IsNaN(v) ? 1.0 : (v < 0 ? 0 : (v > 1 ? 1 : v)); }
 
@@ -454,7 +469,8 @@ namespace Armoury
                 float v;
                 bi++;
                 if (!dict.TryGetValue(c, out v) || !(v > 0)) continue;
-                double x = off * v / sum;
+                double x = off * v / sum * StartCalibration.Zc4OfferFactor(town, c);   // ZC4: kategorie koszyka x (1 - lambda) - reszta zostaje w kiesie
+                if (!(x > 0)) continue;
                 if (cl && IsClothCat(c))
                 {
                     double room = ClothRoom(f, town, c, v);
@@ -842,6 +858,13 @@ namespace Armoury
             double r = Scale(f);
             double bW = f.HW * r * BW * idx, bR = f.HR * r * BR * idx, bP = f.HP * r * BP * idx;
             if (f.Slave) { double sl = f.HS * r * BS * idx; bR += sl * OwnR; bP += sl * OwnP; }
+            // ZC4 (KS etap 2): koszyki klas BW/BR/BP/BS zastapione kosztem koszyka stanow po cenach targu (W: wyrobnicy i chlopi miasta, R: rzemieslnicy + 40% niewolnych,
+            // P: kupcy i szlachta + 60% niewolnych) z waga lambda; poza ZC4 - jak dotad
+            double zl; var zc = _zcCls;
+            if (StartCalibration.Zc4ClassCost(f.St, zc, out zl) && zl > 0)
+            {
+                bW = (1 - zl) * bW + zl * zc[0]; bR = (1 - zl) * bR + zl * zc[1]; bP = (1 - zl) * bP + zl * zc[2];
+            }
             double Bt = bW + bR + bP;
             if (!(Bt > 0))
             {
@@ -1143,30 +1166,68 @@ namespace Armoury
                     bool ds = DsVillage.On(f.St);
                     double oldK = ds ? DsVillage.OldShare(f.St) : 1.0;
                     if (ds) vilDs = vil;
+                    // ZC4 (KS etap 2): koszyk wsi ze stanow (to, czego wies nie zjada z wlasnego pola) x lambda - z kiesy wsi w miescie targowym, po kolei drabiny zakupow,
+                    // PRZED starym koszykiem dnia (sol, narzedzia, len, garnki, piwo), ktory zostaje x (1 - lambda); poza ZC4 - jak dotad
+                    double zl; var zq = StartCalibration.Zc4VillageNeed(vil, out zl);
+                    var mk0 = vil.TradeBound ?? vil.Bound;
+                    long zSpent = 0;
+                    bool zc4 = zq != null && zl > 0 && mk0 != null && mk0.Town != null;
+                    if (zc4)
+                    {
+                        // KS-R3 H1 (klucz Ks Village Buy Every 2): koszyk co 2. doba za dwie doby (wies wedlug Fnv), ulamki przechodza dalej
+                        int every = StartCalibration.SwBuyEvery2 ? 2 : 1;
+                        if (every == 1 || ((KsFnv(vil.Settlement.StringId) + (uint)_liveDay) & 1u) == 0u)
+                        {
+                            long zt0 = Stopwatch.GetTimestamp();
+                            zSpent = Zc4BuyVillage(vil, mk0, zq, zl * every, d, every);
+                            StartCalibration.Zc4NoteTime(Stopwatch.GetTimestamp() - zt0);
+                            Folk mz; if (zSpent > 0 && _f.TryGetValue(mk0, out mz)) mz.VillWin += zSpent;
+                        }
+                    }
+                    else zl = 0;
+                    double nvo = nv * (1 - zl);
                     int gold = vil.Gold;
-                    double buy1 = Math.Min(nv, Math.Max(0, gold));
-                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv) * oldK;   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%)
+                    double buy1 = Math.Min(nvo, Math.Max(0, gold));
+                    // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%). KS recenzja 16.10: ZC4 zastepuje koszyk BV, NIE wydatek z nadwyzki (projekt ZC 8.5) -
+                    // bez (1 - lambda): inaczej przy lambda 1 wies wydawala tylko koszyk, a ok. 67 tys. zl/d utargu Essos zostawalo w kiesach wsi (obieg sie zatykal)
+                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv) * oldK;   // DS: x (1 - rampa)
+                    // KS-R3 G4 (klucz Ks Village Paid First): wies z koszykiem ZC4 - bez wydatku z nadwyzki na stara liste i bez P5 (luksusy); zostaje stary koszyk x (1 - lambda)
+                    // i podatek od nadwyzki (PayHoardVillage) - kiesa idzie na koszyk z Planu (alfa netto liczy tylko to, co zostaje)
+                    bool leakCut = zc4 && StartCalibration.SwPaidFirst;
+                    if (leakCut) extra = 0;
                     if (ds) DsVillage.NoteOldExtras(extra, 0);
                     double wx = VillWorkOnly() ? extra : 0;            // P5 (zbytki, recenzja WAZNE 2): nadwyzka na koszyk tylko dla soli i narzedzi (len, garnki, piwo - lista)
                     double want = buy1 + extra;
-                    d.VNeed += nv; d.VWant += want;
+                    d.VNeed += nvo; d.VWant += want;
                     f.DVNeed = nv; f.ADay = _liveDay;                  // E5/C4
+                    f.DVBuy = Math.Max(0, zSpent);
                     if (want < 1) continue;
-                    var mk = vil.TradeBound ?? vil.Bound;
+                    var mk = mk0;
                     if (mk == null || mk.Town == null) { d.NoTrade++; continue; }
                     List<EquipmentElement> list;
                     if (!shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); shelf[mk] = list; }
-                    long spent = BuyGoods(vil, mk, list, want - wx, d, wx);
-                    f.DVBuy = Math.Max(0, spent);                      // E5/C4
+                    long spent;
+                    var gfv = GoodsLedger.Begin(GoodsLedger.FFolkVill, mk);   // KS F0: ksiega towarow na rynek miasta targowego (dotad ramka bez osady - "bez rynku")
+                    try { spent = BuyGoods(vil, mk, list, want - wx, d, wx); }
+                    finally { GoodsLedger.End(gfv); }
+                    // KS-R3 P2: stara lista wsi zastosowanej - wydatek spoza koszyka (alfa netto). Recenzja runda 3 (drobne): tylko bez ciecia starej listy i przy pelnej lambdzie (w rampie
+                    // A..D+14 stara lista to jeszcze koszyk starej gospodarki - dotad szla do wydatkow spoza koszyka i zanizala alfe Planow D..D+42)
+                    if (spent > 0 && !leakCut && zl >= 0.999 && StartCalibration.AppliedFor(vil)) StartCalibration.KsVilOut(vil.Settlement, spent);
+                    f.DVBuy = Math.Max(0, spent) + Math.Max(0, zSpent);    // E5/C4
                     // E3-W1: potrzeba dnia niekupiona w miescie targowym czeka na woz tej wsi w innym miescie (najwyzej W1Days dni potrzeby; PRZED "wsi bez towaru")
                     if (W1On)
                     {
                         double un = Math.Max(0, buy1 - Math.Max(0, spent)), ow;
                         _w1Owed.TryGetValue(vil, out ow);
-                        ow = Math.Min(W1Days * nv, ow + un);
+                        ow = Math.Min(W1Days * nvo, ow + un);
                         if (ow >= 1) _w1Owed[vil] = ow; else _w1Owed.Remove(vil);
                     }
-                    VillageLadder(f, vil, mk, gold, buy1, nv, oldK);   // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian); DS x (1 - rampa)
+                    if (!leakCut)
+                    {
+                        int vg0 = vil.Gold;
+                        VillageLadder(f, vil, mk, gold, buy1, nv, oldK); // P5 (DS x (1 - rampa)) (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian; KS recenzja 16.10: nadwyzka poza koszykiem ZC4 - bez (1 - lambda))
+                        if (vg0 > vil.Gold && zl >= 0.999 && StartCalibration.AppliedFor(vil)) StartCalibration.KsVilOut(vil.Settlement, vg0 - vil.Gold);   // KS-R3 P2: luksusy wsi zastosowanej - spoza koszyka (pelna lambda)
+                    }
                     if (spent <= 0) { d.VNoGoods++; _w1NgCur.Add(vil); continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }
@@ -1297,7 +1358,7 @@ namespace Armoury
                 var list = ShelfOf(st);
                 if (list.Count == 0) { _w1NoGoods++; return; }
                 long p0 = _w1d.VPieces;
-                var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill);
+                var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill, st);   // KS F0: na rynek miasta sprzedazy wozu
                 long spent;
                 try { spent = BuyGoods(vil, st, list, budget, _w1d); }
                 finally { GoodsLedger.End(gf); }

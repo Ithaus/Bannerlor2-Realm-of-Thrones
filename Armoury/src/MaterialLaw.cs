@@ -177,6 +177,10 @@ namespace Armoury
             try
             {
                 if (item == null) return;
+                // KS (kalibracja startu, projekt rozdz. 11.2): wies zastosowana - towar KS = stawka z rak i ziemi okregu (sztuki/d na targ, z zima i rekami E4/5, E4/7),
+                // zastepuje caly lancuch nizej (typ, ludzie P1, stawki GL5, mnozniki kopalni i lasu, owoce, jaja, wielblady, regulator, hodowla, W2, ZC1); sufity kruszcow
+                // i ksiega rudy w ProdStep; wies poza KS i towar spoza KS - lancuch jak dotad
+                if (StartCalibration.ProdStep(village, item, ref __result)) return;
                 CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
                 VillageFruit.Base(village, item, ref __result);     // noc 15/16.10 (placek i marchew): owoce i miod wsi wedlug wag BK - baza przed mnoznikami (P1, rece, regulator, zima)
                 var s = Settings.Current;
@@ -238,6 +242,9 @@ namespace Armoury
                 // E6/W2 (210): wioski poboczne wedlug rodzaju - OSTATNI krok, nie czynnik: zboze x (1 - u) od wyniku koncowego, ryby + zdjete zboze tej wsi
                 // z tej doby (dopisek bazy). Po nim nikt juz nie mnozy (E4/11 umowilo "bez trzeciego czynnika" - swiadomie dopisany krok, projekt E6 v2)
                 HamletKinds.Step(village, item, ref __result);
+                // KS etap 2 (rampa podazy, rozdz. 6): wies zastosowana w rampie - wynik = (1 - beta) x lancuch gry (wyzej) + beta x stawka KS, PRZED sufitem dymarki i RockGold
+                // (sufity tna wynik mieszany); poza rampa tej wsi i towaru - nic
+                StartCalibration.BlendStep(village, item, ref __result);
                 // E6/R1 (214): dymarka kopalni bez drewna - w ticku produkcji tej wsi lupy najwyzej tyle, na ile starczy drewna w dymarce (sufit, nie czynnik;
                 // tylko "iron" i tylko w ticku TickGoodProduction tej wsi - podpowiedzi i magazyn wsi widza wynik bez sufitu)
                 Bloomery.Cap(village, item, ref __result);

@@ -442,7 +442,7 @@ namespace Armoury
                                 if (town) TownLevyToday[st] = x;                                       // 162m: zloto wyszlo z kasy miasta (tarcza dworu)
                                 if (town) TownPurse.NoteTake(st, x);                                   // E5/A1: udzial zysku kupcow (tylko licznik)
                                 if (town) { try { TownFolk.NoteTake(st, x, TownFolk.TLevy); } catch { } }   // E5/0 (195): pobor z kasy miasta - udzial zysku kupcow, pas ponizej zapasu (tylko licznik)
-                                else DailyLife.NoteVillageLevy(st, x);                                 // ZC0 (DailyLife): danina z kiesy wsi do Dostatku wsi (tylko licznik, wlasny try)
+                                else { DailyLife.NoteVillageLevy(st, x); try { StartCalibration.KsVilOut(st, x); } catch { } }   // ZC0 (DailyLife): danina z kiesy wsi do Dostatku wsi (tylko licznik, wlasny try); KS-R3 P2: wydatek wsi spoza koszyka
                             }
                         }
                         if (!town) continue;

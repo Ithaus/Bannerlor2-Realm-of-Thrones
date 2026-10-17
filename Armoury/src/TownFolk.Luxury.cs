@@ -230,7 +230,8 @@ namespace Armoury
                     if (!(q > 0)) continue;
                     var c = _lxCats[i];
                     float v = dict[c];
-                    double x = off * q;
+                    double x = off * q * StartCalibration.Zc4OfferFactor(town, c);   // ZC4: kategorie koszyka x (1 - lambda) - reszta zostaje w kiesie
+                    if (!(x > 0)) continue;
                     if (cl && _lxCloth[i])                               // (c) plotno i skora z oferty tylko ponad prog polki (reszta zostaje w kiesie)
                     {
                         double room = ClothRoom(f, town, c, v);
@@ -408,7 +409,7 @@ namespace Armoury
             {
                 double avail = Math.Min(gold - buy1, vil.Gold);           // recenzja WAZNE 2: po koszyku dnia (sol i narzedzia z nadwyzki) - kiesa TERAZ
                 double want = Math.Max(0, avail - RdV * nv) / LxDays(Settings.Current) * Math.Max(0.0, Math.Min(1.0, scale));
-                if (scale < 1.0) DsVillage.NoteOldExtras(0, want);       // DS: stara drabina w rampie (licznik linii "Daniny wsi (DS)")
+                if (scale < 1.0 && DsVillage.On(vil.Settlement)) DsVillage.NoteOldExtras(0, want);       // DS: stara drabina w rampie (licznik linii "Daniny wsi (DS)")
                 f.DLxOff = want; f.DLxBuy = 0; f.LxSeen = _liveDay;
                 if (want < 1) return;
                 _lxVN++; _lxVWant += want;
@@ -450,6 +451,13 @@ namespace Armoury
         /// Oferta liczy sie do sygnalu popytu tego targu (P4). Zwraca zaplacone; -2 - miasto bez podzialu (pierwsza doba, bez konsumpcji), -1 - brak polki.
         /// </summary>
         private static long BuyLadder(Village vil, Folk cf, Settlement mk, double want, ref long pieces)
+        {
+            var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill, mk);      // KS F0: ksiega towarow na rynek miasta zakupu (dotad ramka bez osady - "bez rynku")
+            try { return BuyLadderCore(vil, cf, mk, want, ref pieces); }
+            finally { GoodsLedger.End(gf); }
+        }
+
+        private static long BuyLadderCore(Village vil, Folk cf, Settlement mk, double want, ref long pieces)
         {
             Folk mf;
             if (!_f.TryGetValue(mk, out mf) || mf == null || mf.Kind != 0 || mf.LxFrac == null || mf.LxFrac.Length != _lxCats.Count

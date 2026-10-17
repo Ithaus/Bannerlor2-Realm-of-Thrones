@@ -122,6 +122,20 @@ namespace Armoury
             catch { return 0f; }
         }
 
+        /// <summary>KS (kalibracja startu): ciecie plonu pol mieszczan zima - ten sam procent co wsi x gradient polnocy w polozeniu miasta x czynnik krainy miasta
+        /// (WinterRealm.OfTown). 0 poza zima. Nie rzuca.</summary>
+        internal static float TownCut(Town town)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || !WinterNow() || town == null || town.Settlement == null) return 0f;
+                float cut = Math.Max(0, Math.Min(90, s.WinterVillageOutputCutPercent)) / 100f * Northness(town.Settlement.GetPosition2D.Y) * WinterRealm.OfTown(town);
+                return MBMath.ClampFloat(cut, 0f, 0.95f);
+            }
+            catch { return 0f; }
+        }
+
         /// <summary>E4/0 (pomiar, tylko odczyt): dodatek jedzenia partii zima - ten sam rachunek co FoodPostfix (0 poza zima; od E4/1 z czynnikiem krainy).</summary>
         internal static float PartyFoodBonus(MobileParty party)
         {

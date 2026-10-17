@@ -56,15 +56,15 @@ namespace Armoury
         // ------------------------------------------------------------ rodzaje ramek
         internal const int FVillage = 0, FVillageFood = 1, FCycle = 2, FCons = 3, FFood = 4, FSupplyUse = 5, FSupplyBuy = 6, FBkSettle = 7,
                            FBkParty = 8, FWagon = 9, FSell = 10, FCaravanLeave = 11, FBuild = 12, FForage = 13, FBee = 14,
-                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, FFish = 29, FSack = 30, FDragon = 31, FCourt = 32, FZc1 = 33, Kinds = 34;   // FZc1: ZC1 (16.10, GoodsPaths) - drogi towarow: mieso wieloryba z polowu, miod lesny, marmur glinanek, wegiel drwali, sztaby z polek -> zelazo;   // FCourt: E3-P1 (noc-ekonomia3 czesc 2) - dwor pana i krola kupuje towar z polki siedziby (CourtGoods) - ujscie;   // FDragon: 24c (14.10) - smoki jedza zwierzeta z taborow i stad wsi (DragonFeed) - ujscie;   // FSack: L7 lupu miast (CitySack.Goods.cs) - polka zdobytej osady -> tabory zwyciezcow znosi sie do zera, reszta (-) = spalone przy spustoszeniu miasta;   // FFish: m6b (5) - polow lodzi rybackich NavalDLC (FishingPartyCampaignBehavior.CatchFish, tick godzinowy - dotad poza ramkami, "bez wyjasnienia");   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
+                           FTickParty = 15, FTickSettle = 16, FTickTown = 17, FTownCraft = 18, FArmyCloth = 19, FMend = 20, FFletch = 21, FDecay = 22, FArmsBuy = 23, FScrap = 24, FDrill = 25, FFolkVill = 26, FBloom = 27, FRaid = 28, FFish = 29, FSack = 30, FDragon = 31, FCourt = 32, FZc1 = 33, FKs = 34, FKsOwn = 35, FKsH = 36, Kinds = 37;   // FZc1: ZC1 (16.10, GoodsPaths) - drogi towarow: mieso wieloryba z polowu, miod lesny, marmur glinanek, wegiel drwali, sztaby z polek -> zelazo;   // FCourt: E3-P1 (noc-ekonomia3 czesc 2) - dwor pana i krola kupuje towar z polki siedziby (CourtGoods) - ujscie;   // FDragon: 24c (14.10) - smoki jedza zwierzeta z taborow i stad wsi (DragonFeed) - ujscie;   // FSack: L7 lupu miast (CitySack.Goods.cs) - polka zdobytej osady -> tabory zwyciezcow znosi sie do zera, reszta (-) = spalone przy spustoszeniu miasta;   // FFish: m6b (5) - polow lodzi rybackich NavalDLC (FishingPartyCampaignBehavior.CatchFish, tick godzinowy - dotad poza ramkami, "bez wyjasnienia");   // FRaid: E7/R1 (235) - rabunek osada po osadzie: spalone z magazynu wsi (ujscie), zboze ze spichlerza okregu dla napastnikow (zrodlo);   // FBloom: E6/R1 (214) - drewno dymarek przy kopalniach (Bloomery: zakup z polki miasta handlowego, kopalnia BK w miescie); FFolkVill: E5/B1 - zakupy wsi w miescie targowym (TownFolk.Villages);   // FDrill: musztra (zlom z cwiczen - ruda kowalom, ujscie uzbrojenia z zapasu); FDecay, FArmsBuy: paczka 174.0 (kasowanie gry DeleteOverproducedItems; zakupy uzbrojenia Armoury w tickach dobowych - AiGear, notable), FScrap: 174 pytanie 4 (zlom); FFletch: paczka 172 (strzelarze miasta - ruda i drewno); FTownCraft: paczka 148 (rzemioslo miasta), FArmyCloth: paczka 150 (odziez wojska), FMend: material napraw kowali miasta (135, poprawka po audycie TOWARY 3)
         private static readonly string[] KindName = { "produkcja wsi", "zywnosc wsi", "cykle warsztatow", "konsumpcja osad", "jedzenie partii",
             "zaopatrzenie BK (zuzycie)", "zaopatrzenie BK (zakupy)", "tick osady BK", "tick partii BK", "sprzedaz wozow", "handel partii",
-            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)", "polow lodzi rybackich (NavalDLC)", "lup miast (L7)", "smoki (24c)", "dwory (E3-P1)", "drogi towarow (ZC1)" };
+            "wyjazd karawany (BK)", "budowy", "furaz", "BetterEconomy", "tick partii", "tick osady", "tick miasta", "rzemioslo miasta (148)", "odziez wojska (150)", "naprawy kowali miasta", "strzelarze (172)", "kasowanie gry", "zakupy uzbrojenia Armoury", "zlom z nadmiaru (174)", "zlom z cwiczen (musztra)", "zakupy wsi w miastach (E5/B1)", "dymarki przy kopalniach (214)", "rabunek osada po osadzie (E7/R1)", "polow lodzi rybackich (NavalDLC)", "lup miast (L7)", "smoki (24c)", "dwory (E3-P1)", "drogi towarow (ZC1)", "pola mieszczan (KS)", "wies je wlasny towar (KS)", "kupcy zywnosci (KS-H) zakup/przyjazd" };
 
         // ------------------------------------------------------------ posiadacze zapasu
         // P3/Z1 (TRIAZ-3 O2-1 P1): HCart - surowiec w wozach kupcow w drodze (MaterialCarts; poza rosterami - bez tego posiadacza zakup wozem bylby "bez wyjasnienia")
-        private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, HCart = 10, Holders = 11;
-        private static readonly string[] HolderName = { "miasta", "zamki", "wsie", "schowki osad", "inne osady", "wozy", "karawany", "lordowie", "gracz", "inne partie", "wozy surowcow" };
+        private const int HTown = 0, HCastle = 1, HVillage = 2, HStash = 3, HOtherSettl = 4, HWagon = 5, HCaravan = 6, HLord = 7, HPlayer = 8, HOtherParty = 9, HCart = 10, HKsCart = 11, Holders = 12;
+        private static readonly string[] HolderName = { "miasta", "zamki", "wsie", "schowki osad", "inne osady", "wozy", "karawany", "lordowie", "gracz", "inne partie", "wozy surowcow", "kupcy zywnosci w drodze" };
 
         // ------------------------------------------------------------ przewoz (handel miedzy osada a partia)
         // P3/Z4 (TRIAZ-3 O2-7): TDiscard - towar skasowany lordowi przez gre ponad udzwig i polozony na polce miasta (LordDiscard; przewoz, nie ujscie)
@@ -78,9 +78,12 @@ namespace Armoury
                              GDiscard = "porzucone przez lordow (gra)",
                              GTick = "inne ticki dobowe", GRest = "handel (reszta)", GArmyCloth = "odziez wojska (150)", GMend = "naprawy kowali miasta (135)", GFletch = "strzelarze (172)", GDecay = "kasowanie gry (5% stosow z modyfikatorem)", GScrap = "zlom z nadmiaru (174)", GDrill = "zlom z cwiczen (musztra)", GFolkVill = "wsie (zakupy w miescie, E5/B1)", GBloom = "dymarki przy kopalniach (214)", GRaid = "rabunek osada po osadzie (E7/R1)", GSack = "lup miast (L7)", GDragon = "zjedzone przez smoka (24c)", GCourt = "dwory (E3-P1)",
                              GFish = "lodzie rybackie (NavalDLC, polow)", GSpawn = "nowe druzyny lordow (zboze gry)", GRemoved = "przepadlo z partiami usunietymi bez zniszczenia (RemoveParty)",   // m6b (5)
-                             GZc1 = "drogi towarow (ZC1)";   // ZC1 (16.10): przemiana towaru we wsi i w osadzie (opis w podpozycji)
-        private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GZc1, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
-        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
+                             GZc1 = "drogi towarow (ZC1)",   // ZC1 (16.10): przemiana towaru we wsi i w osadzie (opis w podpozycji)
+                             GKs = "pola mieszczan (KS)",    // KS (kalibracja startu): plon pol mieszczan na polke miasta (StartCalibration.TownFields) - zrodlo
+                             GKsOwn = "wies je wlasny towar (KS)",   // KS-R3 G3: wies zjadla towar z magazynu (czekajacy na woz), gdy kupila mniej kcal niz zaplacone z Planu - ujscie
+                             GKsLost = "kupcy zywnosci (KS-H): stracone w drodze";   // recenzja runda 3: psucie w drodze, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty - ujscie
+        private static readonly string[] SrcOrder = { GVil, GWoodlot, GFish, GShop, GArt, GTanW, GCraft, GZc1, GKs, GScrap, GDrill, GSlaughter, GSpawn, GBkParty, GBkSettle, GBee, GForage, GTick };
+        private static readonly string[] SinkOrder = { GShopIn, GArt, GTanW, GCraft, GZc1, GArms, GBuild, GTown, GCastle, GDecay, GArmyCloth, GMend, GFletch, GDrill, GFolkVill, GCourt, GKsOwn, GKsLost, GBloom, GFood, GSupply, GBkSettle, GBkParty, GBee, GLost, GRemoved, GDiscard, GNoBuyer, GTick };
 
         // ------------------------------------------------------------ ramka
         internal sealed class Frame
@@ -150,11 +153,15 @@ namespace Armoury
             public long Extra;                   // ponad recepture u ukrytych rzemieslnikow (mnoznik BK count)
             public long WagonUnits, WagonGold;
             public long Last = -1;               // zapas wczoraj (-1 = nieznany: pierwsza doba sesji)
+            // KS (kalibracja startu, recenzja 16.10 - odbior na rynek): produkcja i zuzycie doby wedlug rynku osady ramki (0 Westeros, 1 Essos, 2 bez rynku: partie
+            // poza osada, zrodla bez ramki) i zapas na polkach miast rynku; tylko przy kluczu Start Calibration (tylko licznik)
+            public readonly long[] MkP = new long[3], MkC = new long[3], MkS = new long[2];
 
             public void NewDay()
             {
                 Src.Clear(); Sink.Clear(); Array.Clear(Tr, 0, Tr.Length); Array.Clear(Hold, 0, Hold.Length);
                 Extra = 0; WagonUnits = 0; WagonGold = 0;
+                Array.Clear(MkP, 0, 3); Array.Clear(MkC, 0, 3);
             }
         }
 
@@ -286,11 +293,11 @@ namespace Armoury
                     var inner = _top;
                     _orphans++;
                     _top = inner.Parent; _depth--;
-                    try { Settle(inner); } catch (Exception e) { Stumble("Settle(sierota)", e); }
+                    try { SettleMk(inner); } catch (Exception e) { Stumble("Settle(sierota)", e); }
                     inner.Clean();
                 }
                 _top = f.Parent; _depth = f.Depth;
-                Settle(f);
+                SettleMk(f);
             }
             catch (Exception e) { Stumble("End", e); }
             finally
@@ -346,6 +353,20 @@ namespace Armoury
                 Book(i, GDiscard, null, -n);
             }
             catch (Exception e) { Stumble("NoteDiscard", e); }
+        }
+
+        /// <summary>Recenzja runda 3 (KS-H): towar wozu kupcow zywnosci stracony w drodze (psucie, woz bez celu i zrodla, zawrocony bez zwrotu zaplaty) - posiadacz "kupcy zywnosci
+        /// w drodze" maleje bez zmiany rostera; ujscie (rynek 2 - poza targiem).</summary>
+        internal static void NoteKsLoss(ItemObject item, int n, string sub)
+        {
+            try
+            {
+                if (n <= 0 || item == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(item, out i)) return;
+                Book(i, GKsLost, sub, -n);
+            }
+            catch (Exception e) { Stumble("NoteKsLoss", e); }
         }
 
         /// <summary>A17 (A17Diag): nazwa rodzaju ramki do linii diagnozy.</summary>
@@ -540,10 +561,94 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ksiegowanie
+        private static int _settleMk = -1;       // KS: rynek osady rozliczanej ramki (-1 poza ramka)
+        private static bool _mkOn;               // KS: podzial na rynki czynny (klucz Start Calibration, ustawiany co dobe)
+
+        /// <summary>Rozliczenie ramki z rynkiem osady ramki (KS - recenzja 16.10, odbior KS-M na rynek).</summary>
+        private static void SettleMk(Frame f)
+        {
+            _settleMk = _mkOn ? MkOfFrame(f) : -1;
+            try { Settle(f); } finally { _settleMk = -1; }
+            if (_mkOn) { try { KsTake(f); } catch (Exception e) { Stumble("KsTake", e); } }
+        }
+
+        /// <summary>KS-R3 (odbior miasta, StartCalibration.KsTakeNote): zuzycie z polki miasta w ramkach z osada-miastem - panowie kupili (handel partii: sprzedawca
+        /// miasto, kupujacy lord albo gracz), dwory, mieszczanie, wsie, rzemioslo miasta (wsad ZC5). Tylko przy kluczu Start Calibration (podzial na rynki).</summary>
+        private static void KsTake(Frame f)
+        {
+            if (f.Touched.Count == 0) return;
+            switch (f.Kind)
+            {
+                case FSell:
+                    {
+                        var seller = f.A as PartyBase; var buyer = f.B as PartyBase;
+                        if (seller == null || buyer == null || !buyer.IsMobile || seller.Settlement == null || !seller.Settlement.IsTown) return;
+                        int bc = PartyClass(buyer.MobileParty);
+                        if (bc != HLord && bc != HPlayer) return;
+                        foreach (var i in f.Touched) if (f.InB[i] > 0) StartCalibration.KsTakeNote(seller.Settlement, _items[i], 0, f.InB[i]);
+                        return;
+                    }
+                case FCourt: case FCons: case FFolkVill: case FTownCraft:
+                    {
+                        Settlement st = f.A as Settlement;
+                        if (st == null) { var t = f.A as Town; if (t != null) st = t.Settlement; }
+                        if (st == null || !st.IsTown) return;
+                        int code = f.Kind == FCourt ? 2 : f.Kind == FCons ? 3 : f.Kind == FFolkVill ? 4 : 5;
+                        foreach (var i in f.Touched) if (f.Net[i] < 0) StartCalibration.KsTakeNote(st, _items[i], code, -f.Net[i]);
+                        return;
+                    }
+            }
+        }
+
+        private static int MkOfFrame(Frame f)
+        {
+            int m = MkOf(f.A);
+            if (m == 2 && f.B != null) { int m2 = MkOf(f.B); if (m2 != 2) m = m2; }
+            return m;
+        }
+
+        /// <summary>Rynek (0 Westeros, 1 Essos) osady obiektu ramki: wies - jej miasto targowe, warsztat - jego osada, partia - osada, w ktorej jest, albo ostatnio
+        /// odwiedzona; 2 - nie wiadomo.</summary>
+        private static int MkOf(object o)
+        {
+            try
+            {
+                if (o == null) return 2;
+                Settlement st = null;
+                var v = o as Village;
+                if (v != null) st = v.Settlement;
+                else
+                {
+                    var t = o as Town;
+                    if (t != null) st = t.Settlement;
+                    else
+                    {
+                        st = o as Settlement;
+                        if (st == null)
+                        {
+                            var w = o as Workshop;
+                            if (w != null) st = w.Settlement;
+                            else
+                            {
+                                var mp = o as MobileParty;
+                                if (mp == null) { var pb = o as PartyBase; if (pb != null) { st = pb.Settlement; mp = pb.MobileParty; } }
+                                if (st == null && mp != null) st = mp.CurrentSettlement ?? mp.LastVisitedSettlement;
+                            }
+                        }
+                    }
+                }
+                int m = StartCalibration.MarketOfSettlement(st);
+                return m == 0 || m == 1 ? m : 2;
+            }
+            catch { return 2; }
+        }
+
         private static void Book(int i, string group, string sub, long n)
         {
             if (n == 0 || _acc == null) return;
             var a = _acc[i];
+            // recenzja runda 3 (drobne): wies je swoje z magazynu (G3) - poza targiem (rynek 2): nie jest zuzyciem rynku (sterowanie P4, NKS-5), towar nie doszedl do straganu
+            if (_mkOn) { int m = _settleMk >= 0 && !ReferenceEquals(group, GKsOwn) ? _settleMk : 2; if (n > 0) a.MkP[m] += n; else a.MkC[m] -= n; }
             var d = n > 0 ? a.Src : a.Sink;
             Dictionary<string, long> subs;
             if (!d.TryGetValue(group, out subs)) { subs = new Dictionary<string, long>(); d[group] = subs; }
@@ -613,6 +718,7 @@ namespace Armoury
                             string sub;
                             if (start) sub = "rozdanie startowe";
                             else if (f.Kind == FVillageFood) sub = "zywnosc wsi";
+                            else if (StartCalibration.AppliedFor(v)) sub = InType(v, it) ? "KS: " + v.VillageType.StringId : "KS: zajecia okregu";   // KS: plon z rak i ziemi okregu (projekt KS 11.2)
                             else if (InType(v, it)) sub = v.VillageType.StringId;
                             else if (it.StringId == "leather") sub = "garbarnia BK";
                             else if (it.StringId == "tools") sub = "kuznia BK";
@@ -729,6 +835,14 @@ namespace Armoury
                     return;
                 case FZc1:         // ZC1 (16.10, GoodsPaths): przemiana towaru (wsad -, wyrob +) - etykieta w Info
                     foreach (var i in f.Touched) Book(i, GZc1, f.Info as string, f.Net[i]);
+                    return;
+                case FKs:          // KS (kalibracja startu): plon pol mieszczan (chlopi miasta, niewolni latyfundiow, wyrobnicy przy zniwach) na polke miasta - zrodlo
+                    foreach (var i in f.Touched) Book(i, GKs, f.Info as string, f.Net[i]);
+                    return;
+                case FKsOwn:       // KS-R3 G3: wies je swoj towar z magazynu - ujscie (rynek wsi: miasto targowe)
+                    foreach (var i in f.Touched) Book(i, GKsOwn, null, f.Net[i]);
+                    return;
+                case FKsH:         // KS-R3 KS-H: zakup z polki zrodla / przyjazd na polke celu - przewoz (towar w drodze to posiadacz "kupcy zywnosci w drodze"), bez ksiegowania
                     return;
                 case FFish:        // m6b (5): ryby zlowione przez lodzie rybackie NavalDLC (produkcja ludzi wsi rybackiej na morzu) - zrodlo
                     foreach (var i in f.Touched) Book(i, GFish, null, f.Net[i]);
@@ -1143,6 +1257,47 @@ namespace Armoury
             catch { dst.Clear(); return -1; }
         }
 
+        // ------------------------------------------------------------ KS (kalibracja startu): liczby doby wedlug towaru do Planu (StartCalibration)
+        /// <summary>KS: indeksy tablicy doby towaru: produkcja wsi, zuzycie wojska (jedzenie partii), zamkow, dworow, budow, warsztatow (linie, zbrojne, rzemieslnicy BK,
+        /// rzemioslo miasta, naprawy, strzelarze, dymarki), zuzycie razem, mieszczanie, zapas w miastach, las wsi, lodzie rybackie NavalDLC.</summary>
+        internal const int KsVil = 0, KsArmy = 1, KsCastle = 2, KsCourt = 3, KsBuild = 4, KsShop = 5, KsCons = 6, KsTown = 7, KsStockTown = 8, KsWoodlot = 9, KsFishBoats = 10, KsN = 11;
+        private static readonly Dictionary<string, double[]> _ksDay = new Dictionary<string, double[]>(StringComparer.Ordinal);
+        private static int _ksDayN = -1;
+
+        private static void KsNote(ItemObject it, Acc a, long stock, long prod, long cons)
+        {
+            if (it == null || it.StringId == null || (prod == 0 && cons == 0 && a.Hold[HTown] == 0)) return;
+            var v = new double[KsN];
+            v[KsVil] = Group(a.Src, GVil); v[KsArmy] = Group(a.Sink, GFood); v[KsCastle] = Group(a.Sink, GCastle); v[KsCourt] = Group(a.Sink, GCourt);
+            v[KsBuild] = Group(a.Sink, GBuild);
+            v[KsShop] = Group(a.Sink, GShopIn) + Group(a.Sink, GArms) + Group(a.Sink, GArt) + Group(a.Sink, GCraft) + Group(a.Sink, GMend) + Group(a.Sink, GFletch) + Group(a.Sink, GBloom);
+            v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
+            _ksDay[it.StringId] = v;
+            if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1] };
+        }
+
+        // KS: produkcja, zuzycie i zapas miast doby wedlug rynku (P W/E/bez, C W/E/bez, S W/E) - linia "KS: rynki" (StartCalibration.MarketLine)
+        private static readonly Dictionary<string, long[]> _ksMk = new Dictionary<string, long[]>(StringComparer.Ordinal);
+        private static bool _ksMkOn;
+
+        /// <summary>KS: kopia liczb doby wedlug rynku (StringId -> 8 liczb); zwraca dzien (-1 - brak liczb albo podzial nieczynny tej doby). Nie rzuca.</summary>
+        internal static int KsMarketTake(Dictionary<string, long[]> dst)
+        {
+            if (dst == null) return -1;
+            dst.Clear();
+            try { if (!_ksMkOn) return -1; foreach (var kv in _ksMk) dst[kv.Key] = kv.Value; return _ksDayN; }
+            catch { dst.Clear(); return -1; }
+        }
+
+        /// <summary>KS: kopia liczb doby ostatniej linii ksiegi (StringId -> KsN liczb); zwraca dzien (-1 - brak liczb). Nie rzuca.</summary>
+        internal static int KsTake(Dictionary<string, double[]> dst)
+        {
+            if (dst == null) return -1;
+            dst.Clear();
+            try { foreach (var kv in _ksDay) dst[kv.Key] = kv.Value; return _ksDayN; }
+            catch { dst.Clear(); return -1; }
+        }
+
         private static long Group(Dictionary<string, Dictionary<string, long>> d, string g)
         {
             Dictionary<string, long> subs;
@@ -1200,6 +1355,7 @@ namespace Armoury
                 _wasOn = false; _lastDay = -1;
                 if (_acc != null) foreach (var a in _acc) { a.NewDay(); a.Last = -1; }
                 _zcCivil.Clear(); _zcDay = -1;   // ZC0: bez ksiegi - targ dzis nieznany
+                _ksDay.Clear(); _ksDayN = -1;
                 return;
             }
             long t0 = Stopwatch.GetTimestamp();
@@ -1210,13 +1366,25 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var inv = CultureInfo.InvariantCulture;
                 // ---- zapas wedlug posiadacza
-                foreach (var a in _acc) Array.Clear(a.Hold, 0, Holders);
+                foreach (var a in _acc) { Array.Clear(a.Hold, 0, Holders); Array.Clear(a.MkS, 0, 2); }
+                bool mkOn = _mkOn;
+                _mkOn = StartCalibration.KeyOn;                // KS: podzial na rynki od jutra wedlug klucza (dzisiejsze liczby - wedlug wczorajszego)
                 int armsStacks = 0; long armsPieces = 0;
                 foreach (var st in Settlement.All)
                 {
                     if (st == null) continue;
                     int c = SettlClass(st);
                     Count(st.ItemRoster, c);
+                    if (mkOn && c == HTown && st.ItemRoster != null)
+                    {
+                        int mk = StartCalibration.MarketOfSettlement(st);
+                        if (mk == 0 || mk == 1)
+                            for (int k = 0; k < st.ItemRoster.Count; k++)
+                            {
+                                var el = st.ItemRoster.GetElementCopyAtIndex(k); var itm = el.EquipmentElement.Item; int ii;
+                                if (itm != null && el.Amount > 0 && _idx.TryGetValue(itm, out ii)) _acc[ii].MkS[mk] += el.Amount;
+                            }
+                    }
                     if ((c == HTown || c == HCastle) && st.ItemRoster != null)   // 174.0: stosy uzbrojenia na polkach (przedmiot + modyfikator)
                         for (int k = 0; k < st.ItemRoster.Count; k++)
                         {
@@ -1233,10 +1401,15 @@ namespace Armoury
                 // P3/Z1: surowiec w wozach kupcow w drodze (zdjety z polki zrodla, jeszcze nie na polce celu)
                 try { MaterialCarts.ForEachInTransit((it, n) => { int i; if (it != null && n > 0 && _idx.TryGetValue(it, out i)) _acc[i].Hold[HCart] += n; }); }
                 catch (Exception e) { Stumble("Daily(wozy surowcow)", e); }
+                // KS-R3: jedzenie w wozach KS-H w drodze (zdjete z polki zrodla, jeszcze nie na polce celu)
+                try { KsFoodCarts.ForEachInTransit((it, n, m) => { int i; if (it != null && n > 0 && _idx.TryGetValue(it, out i)) _acc[i].Hold[HKsCart] += n; }); }
+                catch (Exception e) { Stumble("Daily(kupcy zywnosci)", e); }
                 long tStock = Stopwatch.GetTimestamp() - t0;
 
                 // ---- linie towarow
                 _zcCivil.Clear(); _zcDay = day;   // ZC0 (DailyLife "Spizarnia (ZC)"): zuzycie doby ludu wedlug towaru - tylko kopia liczb ksiegi
+                _ksDay.Clear(); _ksDayN = day;    // KS: ta sama doba
+                _ksMk.Clear(); _ksMkOn = mkOn;
                 string ts = DateTime.Now.ToString("HH:mm:ss");
                 var all = new StringBuilder();
                 long sumP = 0, sumC = 0, sumD = 0, sumU = 0; int moving = 0, closed = 0;
@@ -1252,6 +1425,7 @@ namespace Armoury
                     foreach (var h in a.Hold) now += h;
                     long p = Sum(a.Src), c = Sum(a.Sink);
                     if (c > 0) ZcNote(it, a.Sink);
+                    KsNote(it, a, now, p, c);   // KS (kalibracja startu): zuzycie 1:1 i produkcja wsi doby wedlug towaru - tylko kopia liczb
                     bool trade = false;
                     foreach (var t in a.Tr) if (t != 0) { trade = true; break; }
                     if (now == 0 && p == 0 && c == 0 && !trade && a.Last <= 0) { a.Last = now; a.NewDay(); continue; }

@@ -73,6 +73,7 @@ namespace Armoury
                     m.ItemRoster.AddToCounts(before.EquipmentElement, gone);
                     _dToShelf += gone; if (iron) _dIronShelf += gone;
                     GoodsLedger.NoteDiscard(it, gone, true);
+                    try { StartCalibration.KsTakeNote(m, it, 1, gone); } catch { }   // KS-R3 P3: porzucone na polce miasta - odbior panow netto (kupione - porzucone)
                 }
                 else
                 {

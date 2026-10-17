@@ -100,6 +100,30 @@ namespace Armoury
         private static int _stumbles;
 
         // odczyt dla ksiegi pieniadza (MoneyLedger.Daily biegnie tuz przed naszym Daily - te same granice doby)
+        /// <summary>KS krok 8 (pieniadze Planu): utarg oddany przez powracajace tabory od ostatniego Daily i czesc, ktora zostala we wsi (kiesa od BK + dopisane + zwrot za drewno).
+        /// Wolane przed VillageTakings.Daily tej samej doby (StartCalibration.Daily) - okno pelnej doby.</summary>
+        internal static void SplitToday(out long handed, out long village) { handed = _tHanded; village = _tKept + _tAddPurse + _tCoalBack; }
+
+        // KS krok 8 (recenzja 17.10, wazne): utarg doby wedlug wsi macierzystej - oddane przez tabory i sprzedaz z magazynu wsi (zaplacone) oraz to, co z tego weszlo do kiesy
+        // wsi (kiesa od BK, dopisek 112, zwrot za drewno, sakwa rozbitego taboru do kiesy, cena towaru kupionego we wsi) - alfa okregu Planu (StartCalibration.Money.cs)
+        private static readonly Dictionary<Village, long[]> _tByV = new Dictionary<Village, long[]>();
+        private static long _fByVPaid;
+        private static void NoteV(Village v, long handed, long purse)
+        {
+            if (v == null || (handed <= 0 && purse <= 0)) return;
+            long[] a;
+            if (!_tByV.TryGetValue(v, out a)) { a = new long[2]; _tByV[v] = a; }
+            if (handed > 0) a[0] += handed;
+            if (purse > 0) a[1] += purse;
+        }
+        /// <summary>KS krok 8: utarg doby wedlug wsi (oddane / do kiesy) - wolane przed VillageTakings.Daily tej samej doby (StartCalibration.Daily). Bez kopii.</summary>
+        internal static void ForEachVillageToday(Action<Village, long, long> f)
+        {
+            if (f == null) return;
+            foreach (var kv in _tByV) f(kv.Key, kv.Value[0], kv.Value[1]);
+        }
+        /// <summary>KS krok 8: oddane razem doby (tabory + zaplacone za towar kupiony we wsiach) - licznik alfy.</summary>
+        internal static long HandedAllToday { get { return _tHanded + _fByVPaid + _cHomePurse + _cHomeTax; } }
         internal static long TakingsToPurse { get { return _tAddPurse; } }
         internal static long TakingsToTax { get { return _tAddTax; } }
         internal static long FoodToPurse { get { return _fAddPurse; } }
@@ -127,6 +151,7 @@ namespace Armoury
             _cFoughtN = _cDisbandN = _cToHeroN = _cToBandN = _cSpareN = 0;
             _cFought = _cDisband = _cToHero = _cToBand = _cToPlayer = _cHomeTax = _cHomePurse = _cSpare = _cLost = 0;
             _stumbles = 0;
+            _tByV.Clear(); _fByVPaid = 0;
         }
 
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
@@ -252,6 +277,7 @@ namespace Armoury
                 }
                 long gone = handed - kept - tax - estates;
                 _tReturns++; _tHanded += handed; _tKept += kept; _tTax += tax; _tEstates += estates;
+                NoteV(home, handed, kept);
                 if (gone <= 0) { if (gone < 0) _tOver++; else _tNoLoss++; return true; }
                 _tGone += gone;
                 // oddajemy tylko to, co wyszlo z sakwy taboru i nie ma odbiorcy; ubytek kiesy albo licznika zrobiony w tym oknie
@@ -273,7 +299,7 @@ namespace Armoury
                 if (room < 0) room = 0;
                 if (purse > room) { _tLeft += purse - room; purse = room; }
                 if (miss > 0) { home.TradeTaxAccumulated += (int)miss; _tAddTax += miss; _tAddTaxN++; }
-                if (purse > 0) { home.ChangeGold((int)purse); _tAddPurse += purse; }
+                if (purse > 0) { home.ChangeGold((int)purse); _tAddPurse += purse; NoteV(home, 0, purse); }
                 if (miss > 0 && _tNoBk.Count < 5)            // nazwa wsi do linii logu - dopiero po ruchu zlota, we wlasnym try
                 {
                     try { string n = home.Name != null ? home.Name.ToString() : "?"; if (!_tNoBk.Contains(n)) _tNoBk.Add(n); }
@@ -321,7 +347,7 @@ namespace Armoury
                     home.ChangeGold((int)back);
                     long put = Math.Max(0L, (long)home.Gold - had);
                     if (put < back) back = put;                           // z licznika schodzi najwyzej tyle, ile kiesa przyjela
-                    if (back > 0) { home.TradeTaxAccumulated -= (int)back; _tCoalBack += back; _tCoalN++; }
+                    if (back > 0) { home.TradeTaxAccumulated -= (int)back; _tCoalBack += back; _tCoalN++; NoteV(home, 0, back); }
                 }
                 _tCoalBill += d;
                 Bloomery.BillSettled(home, d, back);
@@ -388,6 +414,7 @@ namespace Armoury
                 long gone = paid - kept;
                 if (paid == 0 && kept == 0) return;          // nic nie sprzedano (brak kupca i sprzedawcy-partii)
                 _fN++; _fPaid += paid;
+                if (paid > 0) { _fByVPaid += paid; NoteV(v, paid, kept); }
                 if (gone <= 0) return;
                 if (gone > paid) _fShort++;                  // kupiec zaplacil mniej, niz gra zdjela wsi - ubylo z wlasnej kiesy wsi
                 if (gone > int.MaxValue) gone = int.MaxValue;
@@ -397,6 +424,7 @@ namespace Armoury
                 // 112-p: cala skasowana cena do kiesy wsi - jak przy zakupie gracza z ekranu handlu (gra: 100% ceny do kiesy wsi)
                 v.ChangeGold((int)gone);
                 _fAddPurse += gone;
+                NoteV(v, 0, gone);
             }
             catch (Exception e) { Stumble("VillageTakings.SalePostfix", e); }
         }
@@ -459,6 +487,7 @@ namespace Armoury
                 int tax, purse;
                 Split(home, g, g, out tax, out purse);
                 _cHomeTax += tax; _cHomePurse += purse;
+                NoteV(home, g, purse);
                 if (purse > 0) MoneyLedger.Note169(MoneyLedger.N169CartPurse, home.Settlement, purse);   // kiesa wsi poza oknami ksiegi (tylko licznik)
             }
             catch (Exception e) { Stumble("VillageTakings.OnPartyDestroyed", e); }

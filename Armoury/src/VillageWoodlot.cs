@@ -184,13 +184,30 @@ namespace Armoury
 
         /// <summary>Sztuki drewna na dobe w jednostce chwili (ladunek 100 kg = 1 sztuka po HistoricalPrices, 10 sztuk przed).
         /// T8: dla wsi (v != null) razy mnoznik klimatu ClimateFactor; v = null - stawka swiata bez klimatu (linia dnia).</summary>
-        private static float PiecesPerDay(ItemObject wood, Village v)
+        private static float PiecesPerDay(ItemObject wood, Village v, bool ks = false)
         {
             float kg = wood != null && wood.Weight > 0.05f ? wood.Weight : LoadKg;
             float d = Rate * LoadKg / kg;
             // E6/W3 (221): x mnoznik regulatora wsi dla drewna (tick lasu i magazyn wsi); GL-1 (P1): x u_v x g(las) - las wsi od ludzi, klimat zostaje (1 przy
             // wylaczonym kluczu VillageOutputByPeople i dla wsi poza regula)
-            return v != null ? d * ClimateFactor(v) * HarvestValve.Factor(wood) * VillageByPeople.WoodFactor(v) : d;
+            // KS (recenzja 16.10, projekt KS 11.2 i 15): HarvestValve = 1 dla towarow KS - we wsi zastosowanej i w Planie (las wsi to podaz spoza tabeli w bilansie Planu)
+            float hv = ks || StartCalibration.AppliedFor(v) ? 1f : HarvestValve.Factor(wood);
+            return v != null ? d * ClimateFactor(v) * hv * VillageByPeople.WoodFactor(v) : d;
+        }
+
+        /// <summary>KS (kalibracja startu, Plan): drewno lasu tej wsi na dobe w sztukach (jak tick: wies Normal, bez drwali, x udzial ludzi w domu E4/5); 0 - las nieczynny.
+        /// Plan liczy je jako podaz spoza tabeli (wyrab drewna na sprzedaz - regale - dopelnia reszte potrzeby). Nie rzuca.</summary>
+        internal static float KsPiecesPerDay(Village v)
+        {
+            try
+            {
+                if (!On || v == null || v.Settlement == null || IsLumber(v) || v.VillageState != Village.VillageStates.Normal) return 0f;
+                var wood = Wood();
+                if (wood == null) return 0f;
+                float d = PiecesPerDay(wood, v, true) * Devastation.YieldFactor(v);
+                return d > 0f && !float.IsInfinity(d) && !float.IsNaN(d) ? d : 0f;
+            }
+            catch { return 0f; }
         }
 
         /// <summary>Postfiks VillageGoodProductionCampaignBehavior.TickGoodProduction(Village, bool): gra wola go raz na dobe dla wsi
