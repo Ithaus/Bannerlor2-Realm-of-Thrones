@@ -451,6 +451,13 @@ namespace Armoury
         /// </summary>
         private static long BuyLadder(Village vil, Folk cf, Settlement mk, double want, ref long pieces)
         {
+            var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill, mk);      // KS F0: ksiega towarow na rynek miasta zakupu (dotad ramka bez osady - "bez rynku")
+            try { return BuyLadderCore(vil, cf, mk, want, ref pieces); }
+            finally { GoodsLedger.End(gf); }
+        }
+
+        private static long BuyLadderCore(Village vil, Folk cf, Settlement mk, double want, ref long pieces)
+        {
             Folk mf;
             if (!_f.TryGetValue(mk, out mf) || mf == null || mf.Kind != 0 || mf.LxFrac == null || mf.LxFrac.Length != _lxCats.Count
                 || (int)CampaignTime.Now.ToDays - mf.LxFracDay > 2) return -2;

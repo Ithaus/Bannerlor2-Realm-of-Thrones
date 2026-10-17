@@ -32,8 +32,6 @@ namespace Armoury
         private static Dictionary<Town, int> _townMk;
         private static readonly Dictionary<Settlement, int> _setMk = new Dictionary<Settlement, int>();   // zamki i inne osady: rynek z kultury (GoodsLedger - podzial na rynki)
         private static string _shelfNote;
-        private static readonly HashSet<string> Perish = new HashSet<string>(StringComparer.Ordinal) { "fish", "meat", "WhaleMeat", "Egg", "butter", "apple", "carrot", "orange", "grape", "date_fruit" };
-        private static readonly HashSet<string> PriceOne = new HashSet<string>(StringComparer.Ordinal) { "Egg", "honey", "carrot", "apple", "hides", "cow", "hog", "sheep", "spice", "whale_oil", "walrus_tusk" };
 
         private static void RampReset()
         {
@@ -110,16 +108,8 @@ namespace Armoury
         /// <summary>Cena startu towaru KS i na rynku m (rozdz. 6): cena cienia Planu w 0.7-1.5; psujace sie >= 1.0; domowe, uboczne, zwierzeta, regale - 1.0.</summary>
         private static double StartPrice(int m, int i)
         {
-            string id = ItemIds[i];
-            if (PriceOne.Contains(id)) return 1.0;
-            int g;
-            if (!KsTab.GoodIndex.TryGetValue(id == "WhaleMeat" ? "meat" : id, out g) || KsTab.RegGoodMask[g]) return 1.0;
             var r = _plan;
-            double p = r != null && r.P != null && r.P.Length == 2 * KsTab.NG ? r.P[(m == 0 ? 0 : 1) * KsTab.NG + g] : 1.0;
-            if (!(p > 0) || double.IsNaN(p)) p = 1.0;
-            p = Math.Max(0.7, Math.Min(1.5, p));
-            if (Perish.Contains(id)) p = Math.Max(1.0, p);
-            return p;
+            return KsCore.StartIndex(ItemIds[i], r != null ? r.P : null, m);   // ta sama regula co krok 8 Planu (KsCore.StartIndex)
         }
 
         /// <summary>Dni polki startu: 7 x cena^(-1/0.6) (wzor ceny gry z wykladnikiem 0.6).</summary>
@@ -182,7 +172,7 @@ namespace Armoury
             var cats = new Dictionary<ItemCategory, int>();                      // kategoria -> towar KS (cena startu) albo -1 (1.0)
             for (int i = 0; i < ItemCount; i++) { var it = _items[i]; if (it != null && it.ItemCategory != null && !cats.ContainsKey(it.ItemCategory)) cats[it.ItemCategory] = i; }
             foreach (var c in _zCats.Keys) if (!cats.ContainsKey(c)) cats[c] = -1;
-            int towns = 0, cells = 0, stum = 0, lift = 0; double sumIdx0 = 0, sumIdx1 = 0; int nIdx = 0;
+            int towns = 0, cells = 0, stum = 0, lift = 0, noShelf = 0; double sumIdx0 = 0, sumIdx1 = 0; int nIdx = 0;
             foreach (var town in Town.AllTowns)
             {
                 try
@@ -198,6 +188,9 @@ namespace Armoury
                         double p = kv.Value >= 0 ? StartPrice(m, kv.Value) : 1.0;
                         // wzor ceny: 0.1 x podaz + 0.04 x wartosc polki; cel 0.14 x dni x popyt - podaz dopelnia to, czego brakuje realnej polce (najwyzej x1.4 dni x popyt)
                         double days = ShelfDays(p), sv = Math.Max(0.0, d.InStoreValue);
+                        // F2 (poprawka po autotescie 16.10): bez sztucznych polek - wygladzona podaz tylko tam, gdzie prawdziwa polka ma co najmniej polowe celu
+                        // (dotad 3295 z 3977 pozycji mialo polke ponizej celu, indeks 3.87 -> 0.98 w D i wracal do 2-5); reszta - cena wzoru gry z prawdziwej polki
+                        if (sv < 0.5 * days * dem) { noShelf++; continue; }
                         double want = (0.14 * days * dem - 0.04 * sv) / 0.1;
                         float sup = (float)Math.Max(0.1, Math.Min(1.4 * days * dem, Math.Max(days * dem * 0.5, want)));
                         if (sup > days * dem * 1.001) lift++;
@@ -212,7 +205,8 @@ namespace Armoury
                 catch (Exception e) { if (stum++ < 1) Stumble("StartShelves(miasto)", e); }
             }
             _shelfNote = "doba " + today + ": miast " + towns + ", kategorii " + cats.Count + " (" + cells + " pozycji), srednia indeksu " + (nIdx > 0 ? (sumIdx0 / nIdx).ToString("0.00", Inv) : "-")
-                         + " -> " + (nIdx > 0 ? (sumIdx1 / nIdx).ToString("0.00", Inv) : "-") + ", pozycji z podaza ponad dni x popyt (polka realna ponizej celu) " + lift + ", potkniecia " + stum;
+                         + " -> " + (nIdx > 0 ? (sumIdx1 / nIdx).ToString("0.00", Inv) : "-") + ", pozycji z podaza ponad dni x popyt (polka realna ponizej celu) " + lift
+                         + ", bez ustawienia (prawdziwa polka ponizej polowy celu - cena z polki) " + noShelf + ", potkniecia " + stum;
             var ps = new StringBuilder(1200);
             for (int m = 0; m < 2; m++)
             {
@@ -296,6 +290,61 @@ namespace Armoury
             var nb = new float[2 * ItemCount];
             for (int k = 0; k < nb.Length; k++) nb[k] = 1f;
             _beta = nb; _lam[0] = _lam[1] = 1.0; _rampDay = _applyDay - RampDemand;
+        }
+
+        // ============================================================ kontrola wczesna D+7 (recenzja 17.10, wazne)
+        // ceny na rynek jak NKS-7 (mediana indeksu miast od D wobec ceny startu +-0.3) i sufit wzoru ceny (> 20% miast) dla towarow rak; wiecej niz polowa par rynek x towar
+        // poza pasmem - wynik biegu 120 dob znany z gory: w autotescie plik-przelacznik armoury-ks-przerwij.flag (lancuch przerywa bieg), w grze - tylko linia
+        internal const int EarlyDays = 7;
+        internal const string AbortFlagName = "armoury-ks-przerwij.flag";
+        private static bool _earlyDone;
+        private static readonly int[] EarlyItems = { IGrain, KsDeliver.IFish, IMeat, KsDeliver.ICheese, KsDeliver.IButter, KsDeliver.IGrape, KsDeliver.IOlives, KsDeliver.IOrange, KsDeliver.IDate,
+                                                     KsDeliver.ISalt, KsDeliver.IWool, KsDeliver.IFlax };
+
+        private static void EarlyCheck(int day)
+        {
+            if (_earlyDone) return;
+            _earlyDone = true;
+            var vals = new List<double>(64);
+            int n = 0, far = 0, ceilBad = 0;
+            var bad = new List<string>(); var cb = new List<string>();
+            for (int m = 0; m < 2; m++)
+                foreach (int i in EarlyItems)
+                {
+                    vals.Clear(); int ceil = 0, cnt = 0;
+                    foreach (var kv in _px)
+                    {
+                        if (kv.Key == null || kv.Value == null || i >= kv.Value.Length || TownMarket(kv.Key) != m) continue;
+                        vals.Add(kv.Value[i]);
+                        double[] now;
+                        if (_pxNow.TryGetValue(kv.Key, out now) && now != null && i < now.Length) { cnt++; if (now[i] >= CeilIx) ceil++; }
+                    }
+                    if (vals.Count < 3) continue;
+                    double med = Med(vals), sp = StartPrice(m, i);
+                    n++;
+                    string nm = (m == 0 ? "Westeros " : "Essos ") + ItemIds[i];
+                    if (med < sp - 0.3 || med > sp + 0.3) { far++; bad.Add(nm + " " + med.ToString("0.00", Inv) + " (start " + sp.ToString("0.00", Inv) + ")"); }
+                    if (cnt > 0 && 100.0 * ceil / cnt > 20.0) { ceilBad++; cb.Add(nm + " " + (100 * ceil / cnt).ToString(Inv) + "%"); }
+                }
+            bool stop = n > 0 && 2 * far > n;
+            bool flag = false;
+            if (stop && AutotestMode())
+            {
+                try
+                {
+                    var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    string dir = System.IO.Path.Combine(System.IO.Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe");
+                    if (System.IO.Directory.Exists(dir))
+                    {
+                        System.IO.File.WriteAllText(System.IO.Path.Combine(dir, AbortFlagName), "KS kontrola wczesna D+7 (dzien " + day + "): ceny poza pasmem " + far + " z " + n + "\r\n");
+                        flag = true;
+                    }
+                }
+                catch (Exception e) { Stumble("EarlyCheck(plik)", e); }
+            }
+            Log.Info(PK + "kontrola wczesna D+" + EarlyDays + " dzien " + day + " (D " + DDay + ") | ceny na rynek (mediana indeksu miast od D wobec ceny startu +-0.3, towary rak): w pasmie " + (n - far) + " z " + n
+                     + (bad.Count > 0 ? " (poza: " + string.Join(", ", bad.ToArray()) + ")" : "") + " | sufit wzoru ceny w > 20% miast: " + ceilBad + (cb.Count > 0 ? " (" + string.Join(", ", cb.ToArray()) + ")" : "")
+                     + " | WYNIK: " + (stop ? "PRZERWAC - ponad polowa poza pasmem, bieg 120 dob nie przejdzie NKS-7" + (flag ? " (autotest: plik " + AbortFlagName + " zapisany)" : (AutotestMode() ? " (pliku nie zapisano)" : " (gra - tylko linia)")) : "dalej") + ".");
         }
     }
 }
