@@ -85,6 +85,9 @@ namespace Armoury
             public double KcalW, KcalG, ZlW, ZlG;                        // recenzja 17.10: kcal i wartosc (ceny polki) chciane / kupione - jedzenie robione w domu, linia ZC4
             // KS-R3 G2: drabina 2 - kupuje tylko z kiesy ponad Lim i tylko ponad cel polki miasta (Pass2); liczniki drabiny 2 (INFO)
             public long Lim; public bool Pass2; public double P2Got, P2Shelf, P2Gold;
+            // KS-R3 (port symulatora 17.10, runda 2): drabina 2 w miastach obok (F2) - kcal i wartosc chciane juz policzone w miescie targowym (bez drugiego liczenia)
+            public bool Alt;
+            public bool P1;                                              // recenzja runda 3: drabina 1 koszyka zaplaconego z Planu (wartosc kupiona do NKS-13)
         }
 
         /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
@@ -97,9 +100,16 @@ namespace Armoury
             e = new EquipmentElement(it, null, null, false);
             // koszt (poprawka po autotescie 16.10: ok. 45 szukan liniowych na wies, 3.5 ms/d): wiersz z doby (Zc4Build), sprawdzony; inaczej szukanie
             // KS-R3 H2: -1 z mapy doby = towaru nie bylo na polce (ufamy na cala dobe - bez szukania); przyjazd KS-H zmienia wiersz na -2 (szukanie)
-            int ix = StartCalibration.ZRow(b.T, z);
+            // recenzja runda 3 (wazne, H2): -1 tylko przy tej samej liczbie wierszy polki co przy ostatnim sprawdzeniu braku (nowy wiersz - towar przyjechal - szukany);
+            // wynik szukania zapisany w mapie doby (nastepne wsie bez szukania)
+            int rc = b.R.Count;
+            int ix = StartCalibration.ZRow(b.T, z, rc);
             if (ix == -1 && StartCalibration.SwBuyEvery2) return 0;
-            if (ix < 0 || ix >= b.R.Count || !ReferenceEquals(b.R.GetElementCopyAtIndex(ix).EquipmentElement.Item, it) || b.R.GetElementCopyAtIndex(ix).EquipmentElement.ItemModifier != null) ix = b.R.FindIndexOfElement(e);
+            if (ix < 0 || ix >= rc || !ReferenceEquals(b.R.GetElementCopyAtIndex(ix).EquipmentElement.Item, it) || b.R.GetElementCopyAtIndex(ix).EquipmentElement.ItemModifier != null)
+            {
+                ix = b.R.FindIndexOfElement(e);
+                StartCalibration.ZRowSet(b.T, z, ix, rc);
+            }
             if (ix < 0) return 0;
             int keep = ShelfKeep;
             if (z == StartCalibration.ZLinen && VillClothOn) { int r = MaterialOrders.ShelfReserve(b.T, it); if (r > keep) keep = r; }
@@ -140,20 +150,30 @@ namespace Armoury
             b.Spent += paid; b.Pcs += k; b.Got += k; b.Rg[rung] += k;
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
+            if (b.P1) StartCalibration.Zc4NotePass1Zl(b.Mk, paid);        // recenzja runda 3: wartosc kupiona drabiny 1 (NKS-13)
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
             return k;
         }
 
-        /// <summary>KS-R3 G2 drabina 2 (reszta pelnego koszyka ponad zaplacone z Planu): tylko z kiesy ponad Lim (7 dob budzetu Planu) i tylko ze stanu polki ponad cel
-        /// polki miasta (T* x popyt zaplacony) - liczniki INFO, bez "chcianych" i bez miary bledu drabiny 1.</summary>
+        /// <summary>KS-R3 G2 drabina 2 (reszta pelnego koszyka ponad zaplacone z Planu): tylko z kiesy ponad Lim (7 dob budzetu Planu) i tylko ze stanu polki ponad 1.5 x cel
+        /// polki miasta (T* x popyt zaplacony; KS-R3 runda 3 - pas do 1.5 x celu dla kupcow KS-H) - liczniki INFO, bez "chcianych" i bez miary bledu drabiny 1.</summary>
         private static int ZcTake2(ZcBuy b, int z, int n, int rung)
         {
             EquipmentElement e; int have;
             int price = ZcPrice(b, z, out e, out have);
-            b.KcalW += n * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
-            b.ZlW += (double)n * (price > 0 ? price : 0);
+            // KS-R3 (port symulatora 17.10, runda 2): chciane kcal i wartosc tylko w miescie targowym - reszta szukana w miastach obok (F2) to ta sama potrzeba (dotad
+            // kazde miasto obok dopisywalo ja jeszcze raz: kcal chciane wsi do 2-3 razy koszyka, "kupione" w linii ZC4 i NKS-8c o polowe za nisko, czesc kupiona wsi
+            // _zvBought za niska - racje z pracy domowej za wysokie; symulator: bez pokrycia Westeros 14.4% -> 7.6%, Essos 11.3% -> 3.4% przy tych samych zakupach)
+            if (!b.Alt)
+            {
+                b.KcalW += n * StartCalibration.ZKg(z) * KsBasket.Kcal[z];
+                b.ZlW += (double)n * (price > 0 ? price : 0);
+            }
             if (price <= 0 || have <= 0) { b.P2Shelf += n; return 0; }
-            int above = (int)Math.Floor(have + ShelfKeep - StartCalibration.ZStallTarget(b.T, z));   // have = polka - 5; nad celem polki miasta
+            // recenzja runda 3 (drobne): drabine 2 racjonuje CENA - wies z oszczednosciami kupuje ponad plan, dopoki cena polki dzis jest najwyzej 0.8 x ceny startu (krainy)
+            // i najwyzej do polki, przy ktorej cena doszlaby do 0.8 x startu (dni polki przy indeksie 0.8 x startu x popyt zaplacony - ok. 1.45 x cel); bez stalego pasa dla kupcow
+            if (price > StartCalibration.ZPass2Price(b.T, z)) { b.P2Shelf += n; return 0; }
+            int above = (int)Math.Floor(have + ShelfKeep - StartCalibration.ZPass2Floor(b.T, z));   // have = polka - 5
             int k = Math.Min(n, Math.Min(have, above));
             if (k <= 0) { b.P2Shelf += n; return 0; }
             if (k < n) b.P2Shelf += n - k;
@@ -170,6 +190,7 @@ namespace Armoury
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
+            StartCalibration.KsTakeP2(b.Mk, e.Item, k);           // KS-R3 runda 3: poza odbiorem 7 dob zamowienia KS-H (ponad plan)
             return k;
         }
 
@@ -238,7 +259,9 @@ namespace Armoury
                 double perDay = lam / Math.Max(1, days);
                 resGS = (long)Math.Round(7.0 * perDay * ((StartCalibration.ZGrain < qp.Length ? qp[StartCalibration.ZGrain] : 0f) * pg + (StartCalibration.ZSalt < qp.Length ? qp[StartCalibration.ZSalt] : 0f) * ps));
             }
+            b.P1 = qp != null;
             ZcLadder(b, vil, mk, n, resGS);
+            b.P1 = false;
             if (qp != null)
             {
                 // drabina 1: bez towaru po miastach obok i bez kiesy - miary bledu (brak zaplaconego popytu do sterowania rynku P4)
@@ -250,7 +273,7 @@ namespace Armoury
                     miss += b.Miss[z];
                     if (StartCalibration.ZFood(z) && StartCalibration.SwMarketControl) StartCalibration.KsUnmet(m, z, b.Miss[z]);
                 }
-                StartCalibration.Zc4NotePass1(b.Want, miss, b.UnGold);
+                StartCalibration.Zc4NotePass1(b.Want, miss, b.UnGold, m);
                 // drabina 2 (ponad plan)
                 b.Pass2 = true; b.Lim = (long)Math.Round(7.0 * Math.Max(0.0, budgetDay)); b.Broke = false;
                 var left = new int[NZq]; bool any = false;
@@ -268,7 +291,7 @@ namespace Armoury
                         {
                             if (alt.Town == null || alt.ItemRoster == null) continue;
                             var keepT = b.T; var keepR = b.R; var keepM = b.Mk;
-                            b.T = alt.Town; b.R = alt.ItemRoster; b.Mk = alt;
+                            b.T = alt.Town; b.R = alt.ItemRoster; b.Mk = alt; b.Alt = true;
                             var gf2 = GoodsLedger.Begin(GoodsLedger.FFolkVill, alt);
                             long s0 = b.Spent; bool rest = false;
                             try
@@ -283,7 +306,7 @@ namespace Armoury
                             }
                             finally
                             {
-                                GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM;
+                                GoodsLedger.End(gf2); b.T = keepT; b.R = keepR; b.Mk = keepM; b.Alt = false;
                                 long sp = b.Spent - s0;
                                 if (sp > 0) { Folk ma, mm; if (_f.TryGetValue(alt, out ma)) ma.VillWin += sp; if (_f.TryGetValue(mk, out mm)) mm.VillWin -= sp; }
                             }

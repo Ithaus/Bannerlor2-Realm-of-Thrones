@@ -221,9 +221,10 @@ namespace Armoury
                         double baseV = dem;
                         if (SwMarketControl) { double dv = DpValue(town, kv.Key); if (dv > 0.01) baseV = dv; }
                         if (sv < 0.5 * days * baseV) { noShelf++; continue; }
-                        double want = (0.14 * days * dem - 0.04 * sv) / 0.1;
-                        float sup = (float)Math.Max(0.1, Math.Min(1.4 * days * dem, Math.Max(days * dem * 0.5, want)));
-                        if (sup > days * dem * 1.001) lift++;
+                        // recenzja runda 3 (drobne): ta sama podstawa w calym celu polki startu (dotad bramka z popytu zaplaconego, a want/sup z wygladzonego popytu gry)
+                        double want = (0.14 * days * baseV - 0.04 * sv) / 0.1;
+                        float sup = (float)Math.Max(0.1, Math.Min(1.4 * days * baseV, Math.Max(days * baseV * 0.5, want)));
+                        if (sup > days * baseV * 1.001) lift++;
                         float i0 = md.GetPriceFactor(kv.Key);
                         md.SetSupplyDemand(kv.Key, sup, dem);
                         float i1 = md.GetPriceFactor(kv.Key);
@@ -243,8 +244,8 @@ namespace Armoury
                 ps.Append(m == 0 ? " | ceny startu Westeros:" : " | ceny startu Essos:");
                 for (int i = 0; i < ItemCount; i++) ps.Append(i == 0 ? " " : ", ").Append(ItemIds[i]).Append(' ').Append(StartPrice(m, i).ToString("0.00", Inv));
             }
-            Log.Info(PK + "polki startu " + _shelfNote + ps + " | wygladzona podaz = (0.14 x dni polki startu (7 x cena^(-1/0.6)) x wygladzony popyt - 0.04 x wartosc polki) / 0.1, w pasmie 0.5-1.4 x dni x popyt;"
-                     + " towaru i zlota nie przybywa, gra wygladza podaz 15% dziennie do prawdziwej polki | popyt koszyka ZC4 od tej doby przez " + (RampDemand - RampSupply) + " dob; srednie cen A7 i regale od zera.");
+            Log.Info(PK + "polki startu " + _shelfNote + ps + " | wygladzona podaz = (0.14 x dni polki startu (7 x cena^(-1/0.6)) x popyt (zaplacony miasta przy lambda 1, inaczej wygladzony popyt gry) - 0.04 x wartosc polki) / 0.1, w pasmie 0.5-1.4 x dni x popyt;"
+                     + " to dzwignia CENY (ItemData.Supply - wygladzona podaz wzoru ceny gry), nie towar: na polki towaru i zlota nie przybywa, gra wygladza podaz 15% dziennie do prawdziwej polki (wygladzenie startu) | popyt koszyka ZC4 od tej doby przez " + (RampDemand - RampSupply) + " dob; srednie cen A7 i regale od zera.");
         }
 
         /// <summary>KS-R3 P5: popyt zaplacony miasta przy lambda 1 w wartosci kategorii (sztuki x wartosc) - podstawa celu polki startu; 0 - miasto poza mapa ZC4.</summary>

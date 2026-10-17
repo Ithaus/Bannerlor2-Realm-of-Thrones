@@ -354,6 +354,7 @@ namespace Armoury
             var inp = _wIn; _wIn = null;
             if (inp == null) return;
             if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; _planEma = _wEma; if (_firstPlanDay < 0) _firstPlanDay = _wDay; TownPaidFromPlan(r); }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
+            MarketFactorCommit(r);                                 // recenzja runda 3: czynnik sterowania rynku tylko z Planu bez bledu
             // recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu co 7 dob, nie zamrozony z dnia wlaczenia
             if (r.Error == null && _state == StateApplied) { try { RefreshNeedMult(r, inp); } catch (Exception e) { Stumble("RefreshNeedMult", e); } }
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
@@ -516,6 +517,9 @@ namespace Armoury
         /// <summary>KS-R3 C2: tekst ks-plan.csv (watek roboczy - bez obiektow gry; nazwy osad ze zrzutu na watku glownym).</summary>
         private static string PlanCsvText(int day, KsResult r, KsInput inp, Dictionary<string, string> names, out int rowsOut)
         {
+            // recenzja runda 3 (drobne): watek roboczy - bez leniwego zaladowania tabel towarow z gry (MBObjectManager); tabele zerowane (nowa sesja) - bez pliku
+            rowsOut = -1;
+            if (_itemIx == null || _items == null || _itemKg == null) return null;
             var live = BuildLive(r, inp, false);
             var byId = new Dictionary<string, KsDistrict>(StringComparer.Ordinal);
             foreach (var d in inp.Districts) byId[d.Id] = d;

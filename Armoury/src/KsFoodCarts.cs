@@ -18,16 +18,20 @@ namespace Armoury
     ///  - TOWARY: zboze, ryby, mieso i mieso wieloryba, ser, maslo, jaja, jablka, marchew, pomarancze, winogrona, oliwki, daktyle, miod, sol, przyprawy. Chleba, placka,
     ///    piwa, wina, oliwy i miodu pitnego nie wozi (robi je ZC5 na miejscu), ani zywca, koni i broni. Psujace sie najwyzej 7 dob drogi, reszta 30; bez psucia w drodze.
     ///  - DOBY: droga ladowa (MapDistanceModel) / tempo wozu wsi (MarketCarts.PerDay); para morzem, gdy drogi ladowej nie ma albo jest dluzsza niz 1.15 x droga ladem
-    ///    i morzem. Tylko pary tego samego rynku; tabela liczona w stanie Plan najwyzej 200 wywolan na dobe (w zapisie arm_ks z ukladem miast); do czasu - prosta x 1.25.
-    ///  - DECYZJA (cel co 2. doba wedlug Fnv): zamowienie Dz = max(popyt zaplacony miasta przy lambda 1, odbior 7 dob) x kx (kx: doba z pusta polka x1.10, do 2.5,
-    ///    inaczej x0.98, od 1); polka celu T* = 7 x cena startu^(-1/0.6) dni; zrodlo sprzedaje najwyzej polowe nadwyzki ponad 1.25 x T* x Dz + 5 szt. na dobe (bez
-    ///    oblezonych i wrogich celowi); kandydaci - 12 najblizszych miast rynku; koszt na miejscu c = indeks zrodla x (1 + tau x doby), tau 0.010 ladem / 0.005 morzem;
-    ///    zrodla od najtanszego, dopoki indeks celu >= 1.03 x c, najwyzej 3; ilosc q = min(oferta, (T* + doby + 2) x Dz - polka z droga), najmniej max(5, Dz/2).
+    ///    i morzem - wtedy statkiem: droga / (4 x tempo wozu) + 1 doba portu (recenzja rundy 3). Tylko pary tego samego rynku; tabela liczona najwyzej 200 wywolan na dobe
+    ///    (w zapisie arm_ks_r3 z ukladem miast, wersja "S" - stara tabela z dobami wozu morzem liczona od nowa); do czasu - prosta x 1.25.
+    ///  - DECYZJA (cel co 2. doba wedlug Fnv; czysty rdzen KsFoodCore - ten sam w tescie portu kmoney/port4): zamowienie Dz = max(popyt zaplacony miasta przy lambda 1,
+    ///    odbior 7 dob) x kx (kx x1.10 do 2.5 tylko przy prawdziwym braku: pusta polka i polka + w drodze < (T* + doby najblizszego zrodla) x popyt; stoi przy dowozie
+    ///    w drodze; inaczej x0.98, od 1); polka celu T* = 7 x cena startu^(-1/0.6) dni; zrodlo sprzedaje najwyzej polowe nadwyzki ponad 1.25 x T* x popyt (bez kx)
+    ///    + 5 szt. na dobe (bez oblezonych i wrogich celowi); kandydaci - 12 najblizszych miast rynku (gdy nic - do 4 dalszych); koszt na miejscu c = indeks zrodla
+    ///    x (1 + tau x doby), tau 0.025 ladem / 0.0025 morzem; zrodla od najtanszego, dopoki indeks celu >= 1.03 x c, najwyzej 3; ilosc q = min(oferta, (T* + doby + 2)
+    ///    x Dz - polka z droga), najmniej max(5, Dz/2); lot tylko z ZYSKIEM kupca (koszt z frachtem <= 97% ceny polki celu, do 3 polowien lotu).
     ///  - ZLOTO (kazda moneta ma platnika i odbiorce): kasa celu -> kasa zrodla (towar, przy wyjezdzie, sztuka po sztuce - cena pierwszej sztuki dla 1/8 lotu, przy 1/8
     ///    do polowy, przy polowie reszta; 1 lot na 64 liczony sztuka po sztuce - blad w linii), fracht = wartosc x tau x doby z kasy celu: woz ladem - kiesy wsi
     ///    miasta zrodla (wedlug ognisk, najwyzej 8 wsi, reszta najwiekszej; raz na zrodlo i dobe), morzem - kiesa wyrobnikow miasta zrodla (zaloga); najwyzej 15%
-    ///    kasy celu ponad zapas kupcow na dobe (reszta czeka - licznik). Powrot 30 dob po terminie albo przy utracie celu: towar na polke zrodla, zwrot zaplaty z kasy
-    ///    zrodla (najwyzej kasa), frachtu nie. Cel oblezony - woz czeka.
+    ///    kasy celu ponad zapas kupcow na dobe (przy pustej polce zboza i soli - do polowy zapasu, najwyzej 5% zapasu na dobe ponad to; reszta czeka - licznik). Powrot
+    ///    30 dob po terminie albo przy utracie celu: zwrot zaplaty z kasy zrodla (najwyzej kasa), frachtu nie; na polke zrodla tylko towar odpowiadajacy zwrotowi, reszta -
+    ///    strata wozu (ujscie). Cel oblezony - woz czeka. Psujace sie traca 1.5% sztuk na dobe drogi (ujscie). Wynik kupca lotu przy przyjezdzie w linii.
     ///  - KSIEGI: towar w drodze - posiadacz "kupcy zywnosci w drodze" (GoodsLedger), ramki bez ksiegowania (przewoz); zloto - pozycja MKsH "Przeplywy osad".
     ///  - KONTROLA DOBY: w drodze wczoraj + kupione - dowiezione - zawrocone - odrzucone = w drodze dzis (reszta 0); zloto: - cel + zrodla + furmani + zalogi + zwroty = 0.
     /// </summary>
@@ -44,8 +48,17 @@ namespace Armoury
         // towar Planu (KsTab) pozycji - do korytarzy (przyprawy - -1)
         private static readonly int[] PlanG = { KsTab.GGrain, KsTab.GFish, KsTab.GMeat, KsTab.GMeat, KsTab.GCheese, KsTab.GButter, KsTab.GEgg, KsTab.GApple, KsTab.GCarrot, KsTab.GOrange,
                                                 KsTab.GGrape, KsTab.GOlives, KsTab.GDate, KsTab.GHoney, KsTab.GSalt, -1 };
-        private const double TauLand = 0.010, TauSea = 0.005, Margin = 0.03, SrcKeep = 1.25, OfferShare = 0.5, KxUp = 1.10, KxDown = 0.98, KxMax = 2.5, CofferShare = 0.15;
+        // recenzja runda 3 (wazne): fracht ladem 2.5% wartosci na dobe, morzem 0.25% (dotad 1.0% / 0.5% - morze tylko 2 x taniej niz woz); te same stale co krok 5 Planu
+        private const double TauLand = KsCore.CorrTauLand, TauSea = KsCore.CorrTauSea, Margin = 0.03, SrcKeep = 1.25, OfferShare = 0.5, KxUp = 1.10, KxDown = 0.98, KxMax = 2.5, CofferShare = 0.15;
         private const int MaxSrc = 3, NCand = 12, Keep = 5, ReturnDays = 30, CallsPerDay = 200;
+        // recenzja runda 3 (wazne): kasa celu - zapas kupcow zostaje podloga; przy pustej polce zboza i soli najwyzej do polowy zapasu i najwyzej 5% zapasu na dobe ponad zwykly budzet
+        private const double ReserveFloorShort = 0.5, ReserveDayShort = 0.05;
+        // recenzja runda 3 (drobne): psucie w drodze - psujace sie traca 1.5% sztuk na dobe drogi (ujscie w ksiedze towarow)
+        private const double SpoilPerDay = 0.015;
+        private const int SampleCap = 256;                                  // probka wyceny: sztuka po sztuce najwyzej pierwsze 256 sztuk lotu (koszt)
+        // KS-R3 (port symulatora 17.10, runda 2): gdy zadne z 12 najblizszych miast nie moze wyslac (bez nadwyzki, poza zasiegiem, wojna, cena) - najwyzej 4 dalsze miasta
+        // rynku z nadwyzka w zasiegu (wedlug dob; Qarth, Meereen, Polnoc: nadwyzka zboza Volantis i Reach lezala poza 12 najblizszymi - 191 z 240 prob "bez nadwyzki")
+        private const int NCandFar = 4;
         private const double MaxDur = 30.0, MaxPer = 7.0;
 
         internal static bool SwitchOn { get { var s = Settings.Current; return s == null || s.KsFoodCarts; } }
@@ -59,6 +72,7 @@ namespace Armoury
         private static int[] _pairs;                  // pary tego samego rynku (a * nt + b, a < b) w stalej kolejnosci
         private static int _cursor, _pairsDone;
         private static int[][] _cand;                 // 12 najblizszych miast rynku wedlug dob
+        private static int[][] _candFar;              // KS-R3 runda 2: reszta miast rynku wedlug dob (szukane tylko, gdy 12 najblizszych nic nie da)
         private static bool _candDirty = true;
         private static string _pendingDays;
         private static float[] _kx;                   // [nt * NZ] sterowanie brakiem
@@ -81,28 +95,42 @@ namespace Armoury
         // liczniki doby (linia)
         private static int _dLots, _dLand, _dSea, _dArrCarts, _dBack, _dWaitSiege, _dStum, _dSample;
         private static long _dBought, _dGold, _dFreight, _dFrV, _dFrP, _dArr, _dBackPcs, _dRefund, _dDrop, _dPoor, _dOrdered, _dLost;
+        private static int _dFar, _dRes; private static long _dResGold;   // KS-R3 runda 2: loty z dalszych miast, loty z zapasu kupcow (pusta polka) i ich zloto
         private static long _gDst, _gSrc, _gCarters, _gCrews, _gRefSrc, _gRefDst;
         private static readonly long[] _dByZ = new long[NZ];
-        private static double _dSampleErr, _dSampleMax; private static long _dTicks;
+        private static double _dSampleErr, _dSampleMax; private static long _dTicks, _dSampleTicks;
+        // recenzja runda 3: kupcy - wynik lotow przy przyjezdzie (wartosc u celu - zaplata - fracht), loty bez zysku pominiete, kasy miast z brakiem wobec zapasu, psucie
+        private static long _dMarVal, _dMarCost, _dNoProfit, _dSpoil, _dRetLost; private static int _dMarLots, _dMarLoss;
+        private static readonly List<double> _dMarPct = new List<double>(), _dCofShort = new List<double>();
+        private static long _daysTicks; private static int _daysCalls;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static int _ranDay = -1;
 
         internal static void Reset()
         {
-            _t = null; _st = null; _nt = 0; _tHash = 0; _ix = null; _mk = null; _days = null; _sea = null; _pairs = null; _cursor = _pairsDone = 0; _cand = null; _candDirty = true;
+            _t = null; _st = null; _nt = 0; _tHash = 0; _ix = null; _mk = null; _days = null; _sea = null; _pairs = null; _cursor = _pairsDone = 0; _cand = null; _candFar = null; _candDirty = true;
             _pendingDays = null; _kx = null; _pendingKx = null; _vilOf = null; _vilDay = -1;
             _carts.Clear(); _inc = null; _pending = null; _prevTransit = -1;
-            _delEma.Clear(); _delDay.Clear(); _delN = 0; Array.Clear(_shipEma, 0, _shipEma.Length); Array.Clear(_daysEma, 0, _daysEma.Length); _shipN = 0;
+            _delEma.Clear(); _delDay.Clear(); _delN = 0; Array.Clear(_shipEma, 0, _shipEma.Length); Array.Clear(_daysEma, 0, _daysEma.Length); _shipN = 0; _exportLogged = -1; _daysTicks = 0; _daysCalls = 0;
             Array.Clear(_shipDay, 0, _shipDay.Length); Array.Clear(_shipDaysDay, 0, _shipDaysDay.Length);
             ClearDay(); _err.Clear(); _ranDay = -1;
         }
 
         private static void ClearDay()
         {
-            _dLots = _dLand = _dSea = _dArrCarts = _dBack = _dWaitSiege = _dStum = _dSample = 0;
+            _dLots = _dLand = _dSea = _dArrCarts = _dBack = _dWaitSiege = _dStum = _dSample = 0; _dFar = _dRes = 0; _dResGold = 0;
             _dBought = _dGold = _dFreight = _dFrV = _dFrP = _dArr = _dBackPcs = _dRefund = _dDrop = _dPoor = _dOrdered = _dLost = 0;
             _gDst = _gSrc = _gCarters = _gCrews = _gRefSrc = _gRefDst = 0;
-            Array.Clear(_dByZ, 0, NZ); _dSampleErr = _dSampleMax = 0; _dTicks = 0;
+            Array.Clear(_dByZ, 0, NZ); _dSampleErr = _dSampleMax = 0; _dTicks = 0; _dSampleTicks = 0;
+            _dMarVal = _dMarCost = _dNoProfit = _dSpoil = _dRetLost = 0; _dMarLots = _dMarLoss = 0; _dMarPct.Clear(); _dCofShort.Clear();
+        }
+
+        /// <summary>Recenzja runda 3 (drobne): czas tabeli dob (MapDistanceModel) od ostatniego odczytu (ms) i liczba wywolan - linia doby KS, NKS-9b; zeruje.</summary>
+        internal static double TakeDaysMs(out int calls)
+        {
+            calls = _daysCalls; double ms = _daysTicks * 1000.0 / Stopwatch.Frequency;
+            _daysTicks = 0; _daysCalls = 0;
+            return ms;
         }
 
         private static void Stumble(string where, Exception e)
@@ -149,6 +177,8 @@ namespace Armoury
         }
 
         internal static int TownCount { get { EnsureTowns(); return _nt; } }
+        /// <summary>Rynek (0 Westeros, 1 Essos) miasta o indeksie KS-H t albo -1.</summary>
+        internal static int MarketOfIndex(int t) { return EnsureTowns() && t >= 0 && t < _nt ? _mk[t] : -1; }
         internal static int IndexOf(Settlement s) { int i; return s != null && EnsureTowns() && _ix.TryGetValue(s, out i) ? i : -1; }
         internal static bool DaysComplete { get { return EnsureTowns() && _pairsDone >= _pairs.Length; } }
         internal static int DaysPairs { get { EnsureTowns(); return _pairs != null ? _pairs.Length : 0; } }
@@ -175,6 +205,7 @@ namespace Armoury
         /// <summary>Stan Plan i zastosowany (StartCalibration.Daily): do 200 wywolan MapDistanceModel na dobe - nastepne pary tabeli dob.</summary>
         internal static void DaysTick()
         {
+            long t0 = Stopwatch.GetTimestamp();
             try
             {
                 if (!EnsureTowns() || _pairsDone >= _pairs.Length) return;
@@ -196,22 +227,26 @@ namespace Armoury
                     bool allOk = da >= 0f && da < CartTownExit.BkLimit;
                     bool sea = !landOk || (allOk && dl > 1.15f * da);
                     float road = sea ? (allOk ? da : -1f) : dl;
-                    float days = road >= 0f ? (float)Math.Max(1.0, Math.Ceiling(road / per)) : -1f;
+                    // recenzja runda 3 (wazne): para morzem - statek (ShipSpeedK x tempo wozu) + doba portu; ladem - tempo wozu wsi
+                    float days = road < 0f ? -1f : (sea ? (float)(Math.Max(1.0, Math.Ceiling(road / (per * KsCore.ShipSpeedK))) + KsCore.PortDays) : (float)Math.Max(1.0, Math.Ceiling(road / per)));
                     _days[k] = days; _days[b * _nt + a] = days; _sea[k] = sea && days >= 0f; _sea[b * _nt + a] = _sea[k];
                     _pairsDone++;
                     _candDirty = true;
                 }
+                _daysCalls += calls;
             }
             catch (Exception e) { Stumble("DaysTick", e); }
+            finally { _daysTicks += Stopwatch.GetTimestamp() - t0; }
         }
 
         // tabela dob w zapisie arm_ks (KS-R3 ks4): hash ukladu miast | liczba par | doby*2+morze w 2 znakach base36 dla par po kolei ("--" - nie liczone)
         private const string B36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+        private const string DaysVer = "S";
         internal static string ExportDays()
         {
             if (_t == null) return _pendingDays ?? "";
             var sb = new StringBuilder(_pairs.Length * 2 + 32);
-            sb.Append(_tHash.ToString("X8")).Append(':').Append(_pairs.Length).Append(':');
+            sb.Append(DaysVer).Append(_tHash.ToString("X8")).Append(':').Append(_pairs.Length).Append(':');
             foreach (int k in _pairs)
             {
                 float d = _days[k];
@@ -228,7 +263,9 @@ namespace Armoury
         {
             try
             {
-                var p = s.Split(':');
+                // recenzja runda 3: tabela z dobami statku (prefiks "S"); stara tabela (doby wozu morzem) - liczona od nowa
+                if (!s.StartsWith(DaysVer, StringComparison.Ordinal)) return;
+                var p = s.Substring(DaysVer.Length).Split(':');
                 uint h; int n;
                 if (p.Length < 3 || !uint.TryParse(p[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out h) || h != _tHash || !int.TryParse(p[1], out n) || n != _pairs.Length || p[2].Length != 2 * n) return;
                 int done = 0;
@@ -276,7 +313,7 @@ namespace Armoury
         {
             if (!_candDirty && _cand != null) return;
             _candDirty = false;
-            _cand = new int[_nt][];
+            _cand = new int[_nt][]; _candFar = new int[_nt][];
             var l = new List<KeyValuePair<float, int>>(_nt);
             for (int t = 0; t < _nt; t++)
             {
@@ -286,6 +323,9 @@ namespace Armoury
                 var c = new int[Math.Min(NCand, l.Count)];
                 for (int i = 0; i < c.Length; i++) c[i] = l[i].Value;
                 _cand[t] = c;
+                var cf = new int[Math.Max(0, l.Count - c.Length)];
+                for (int i = 0; i < cf.Length; i++) cf[i] = l[c.Length + i].Value;
+                _candFar[t] = cf;
             }
         }
 
@@ -354,22 +394,47 @@ namespace Armoury
                     {
                         try { if (c.Src.MapFaction != null && c.Dst.MapFaction != null && FactionManager.IsAtWarAgainstFaction(c.Src.MapFaction, c.Dst.MapFaction)) dstOk = false; } catch { }
                     }
-                    if (!dstOk && !srcOk) { _dLost += c.N; AddInc(c, -1); c.N = 0; done.Add(c); continue; }
+                    if (!dstOk && !srcOk)
+                    {
+                        // recenzja runda 3 (drobne): towar wozu bez celu i bez zrodla - ujscie w ksiedze towarow (dotad znikal "bez wyjasnienia")
+                        GoodsLedger.NoteKsLoss(StartCalibration.ZItem(Z[c.Z]), c.N, "woz bez celu i zrodla");
+                        _dLost += c.N; AddInc(c, -1); c.N = 0; done.Add(c); continue;
+                    }
                     if (!dstOk || (today > c.DayDue + ReturnDays && srcOk)) { Back(c); done.Add(c); continue; }
                     if (c.Dst.IsUnderSiege) { _dWaitSiege++; continue; }
                     var it = StartCalibration.ZItem(Z[c.Z]);
                     if (it == null) { Back(c); done.Add(c); continue; }
-                    var gf = GoodsLedger.Begin(GoodsLedger.FKsH, c.Dst);
-                    try { c.Dst.ItemRoster.AddToCounts(it, c.N); }
-                    finally { GoodsLedger.End(gf); }
-                    StartCalibration.ZRowDirty(c.Dst, it);              // wiersz polki z mapy ZC4 nieaktualny (H2) - zakupy wsi szukaja go same
                     AddInc(c, -1);
-                    _dArr += c.N; _dArrCarts++;
+                    int n = c.N;
+                    // recenzja runda 3 (drobne): psucie w drodze - psujace sie traca 1.5% sztuk na dobe drogi (ujscie)
+                    if (Per[c.Z] && n > 0)
+                    {
+                        int dd = Math.Max(1, c.DayDue - c.DayBought);
+                        int sp = Math.Min(n, (int)Math.Floor(n * Math.Min(0.5, SpoilPerDay * dd)));
+                        if (sp > 0) { GoodsLedger.NoteKsLoss(it, sp, "psucie w drodze"); _dSpoil += sp; n -= sp; }
+                    }
+                    // recenzja runda 3 (wazne): wynik kupca lotu - wartosc u celu (cena polki celu dzis) wobec zaplaty i frachtu
+                    try
+                    {
+                        int up = DestUnit(c.Dst.Town, c.Z, it);
+                        long val = (long)n * Math.Max(0, up), cost = c.Paid + c.Freight;
+                        _dMarVal += val; _dMarCost += cost; _dMarLots++; if (val < cost) _dMarLoss++;
+                        if (cost > 0) _dMarPct.Add((val - cost) / (double)cost);
+                    }
+                    catch { }
+                    if (n > 0)
+                    {
+                        var gf = GoodsLedger.Begin(GoodsLedger.FKsH, c.Dst);
+                        try { c.Dst.ItemRoster.AddToCounts(it, n); }
+                        finally { GoodsLedger.End(gf); }
+                        StartCalibration.ZRowDirty(c.Dst, it);          // wiersz polki z mapy ZC4 nieaktualny (H2) - zakupy wsi szukaja go same
+                    }
+                    _dArr += n; _dArrCarts++;
                     int g = PlanG[c.Z];
                     if (g >= 0)
                     {
                         string key = StartCalibration.TownLandOf(c.Src) + "|" + StartCalibration.TownLandOf(c.Dst) + "|" + g.ToString(CultureInfo.InvariantCulture);
-                        double v; _delDay.TryGetValue(key, out v); _delDay[key] = v + c.N;
+                        double v; _delDay.TryGetValue(key, out v); _delDay[key] = v + n;
                     }
                     c.N = 0;
                     done.Add(c);
@@ -384,33 +449,53 @@ namespace Armoury
         {
             AddInc(c, -1);
             var it = StartCalibration.ZItem(Z[c.Z]);
-            if (it != null && c.Src != null && c.Src.ItemRoster != null && c.N > 0)
+            _dBack++;
+            // zwrot zaplaty z kasy zrodla (najwyzej kasa zrodla), frachtu nie
+            long got = 0;
+            if (c.Src != null && c.Src.Town != null && c.Dst != null && c.Dst.Town != null)
+            {
+                long r = Math.Min(c.Paid, Math.Max(0, c.Src.Town.Gold));
+                if (r > 0)
+                {
+                    int h0 = c.Src.Town.Gold;
+                    c.Src.Town.ChangeGold(-(int)r);
+                    got = h0 - c.Src.Town.Gold;
+                    if (got > 0) { int d0 = c.Dst.Town.Gold; c.Dst.Town.ChangeGold((int)got); _gRefSrc += got; _gRefDst += c.Dst.Town.Gold - d0; _dRefund += got; }
+                    else got = 0;
+                }
+            }
+            // recenzja runda 3 (drobne): zrodlo odbiera tylko towar odpowiadajacy oddanej zaplacie (dotad caly towar i czesc zaplaty przy pustej kasie); reszta - strata wozu
+            int nBack = c.N;
+            if (c.Paid > 0) nBack = (int)Math.Min(c.N, Math.Floor(c.N * (double)got / c.Paid + 1e-9));
+            if (it != null && c.Src != null && c.Src.ItemRoster != null && nBack > 0)
             {
                 var gf = GoodsLedger.Begin(GoodsLedger.FKsH, c.Src);
-                try { c.Src.ItemRoster.AddToCounts(it, c.N); }
+                try { c.Src.ItemRoster.AddToCounts(it, nBack); }
                 finally { GoodsLedger.End(gf); }
-                _dBackPcs += c.N;
+                _dBackPcs += nBack;
             }
-            else _dLost += c.N;
-            _dBack++;
+            else nBack = 0;
+            int lost = c.N - nBack;
+            if (lost > 0) { GoodsLedger.NoteKsLoss(it, lost, "zawrocony woz bez zwrotu zaplaty"); _dRetLost += lost; }
             c.N = 0;
-            if (c.Src == null || c.Src.Town == null || c.Dst == null || c.Dst.Town == null) return;
-            long r = Math.Min(c.Paid, Math.Max(0, c.Src.Town.Gold));
-            if (r <= 0) return;
-            int h0 = c.Src.Town.Gold;
-            c.Src.Town.ChangeGold(-(int)r);
-            long got = h0 - c.Src.Town.Gold;
-            if (got <= 0) return;
-            int d0 = c.Dst.Town.Gold;
-            c.Dst.Town.ChangeGold((int)got);
-            _gRefSrc += got; _gRefDst += c.Dst.Town.Gold - d0; _dRefund += got;
         }
 
-        /// <summary>Decyzje doby: zakupy jedzenia dla miast z brakiem (cel co 2. doba). Tylko stan zastosowany od doby A, klucz Ks Food Carts.</summary>
+        /// <summary>Recenzja runda 3: cena sztuki towaru KS-H k na polce miasta celu (cena doby z mapy ZC4, inaczej gra; 0 - brak).</summary>
+        private static int DestUnit(Town t, int k, ItemObject it)
+        {
+            if (t == null || it == null) return 0;
+            int p = StartCalibration.ZPrice(t, Z[k]);
+            if (p <= 0) { try { p = t.MarketData.GetPrice(it, null, false, null); } catch { p = 0; } }
+            return Math.Max(0, p);
+        }
+
+        /// <summary>Decyzje doby: zakupy jedzenia dla miast z brakiem (cel co 2. doba). Tylko stan zastosowany od doby A, klucz Ks Food Carts.
+        /// Recenzja runda 3: decyzje liczy czysty rdzen KsFoodCore (ten sam co w tescie portu kmoney/port4): kx tylko przy prawdziwym braku, zapas zrodla bez kx, kasa celu z zapasem
+        /// kupcow jako podloga (zboze i sol przy pustej polce do polowy zapasu, najwyzej 5% zapasu na dobe ponad to), lot tylko z zyskiem kupca; probka wyceny poza czasem doby.</summary>
         internal static void Daily()
         {
             if (!SwitchOn || !StartCalibration.Applied || StartCalibration.RampDayA < 0 || Today() < StartCalibration.RampDayA) return;
-            long t0 = Stopwatch.GetTimestamp();
+            long t0 = Stopwatch.GetTimestamp(), sample0 = _dSampleTicks;
             var pendFreight = new Dictionary<int, long>();
             try
             {
@@ -420,120 +505,58 @@ namespace Armoury
                 var items = new ItemObject[NZ]; var cats = new ItemCategory[NZ];
                 var ixOf = new Dictionary<ItemObject, int>();
                 for (int k = 0; k < NZ; k++) { items[k] = StartCalibration.ZItem(Z[k]); cats[k] = items[k] != null ? items[k].ItemCategory : null; if (items[k] != null && !ixOf.ContainsKey(items[k])) ixOf[items[k]] = k; }
-                var sh = new int[nt * NZ]; var ix = new float[nt * NZ]; var dz = new double[nt * NZ]; var dp = new double[nt * NZ];
-                var budget = new double[nt]; var siege = new bool[nt];
+                var a = new KsFoodCore.In
+                {
+                    NT = nt, NK = NZ, Today = today, Mk = _mk, Siege = new bool[nt], Review = new bool[nt],
+                    Sh = new double[nt * NZ], Inc = new double[nt * NZ], Ix = new double[nt * NZ], Dp = new double[nt * NZ], Off = new double[nt * NZ], Ts = new double[2 * NZ],
+                    Gold = new double[nt], Res = new double[nt], Kx = _kx, Per = Per, Staple = new bool[NZ], Cand = _cand, CandFar = _candFar
+                };
+                for (int k = 0; k < NZ; k++) a.Staple[k] = (Z[k] == KsBasket.Grain || Z[k] == KsBasket.Salt) && items[k] != null;
+                for (int m = 0; m < 2; m++) for (int k = 0; k < NZ; k++) a.Ts[m * NZ + k] = StartCalibration.ZTstar(m, Z[k]);
                 for (int i = 0; i < nt; i++)
                 {
                     var t = _t[i]; var st = _st[i];
-                    siege[i] = st.IsUnderSiege;
+                    a.Siege[i] = st.IsUnderSiege;
+                    a.Review[i] = (Fnv(st.StringId) & 1u) == (uint)(today & 1);
                     var ro = st.ItemRoster;
                     if (ro != null)
                         for (int r = 0; r < ro.Count; r++)
                         {
                             var el = ro.GetElementCopyAtIndex(r); int k;
-                            if (el.Amount > 0 && el.EquipmentElement.ItemModifier == null && el.EquipmentElement.Item != null && ixOf.TryGetValue(el.EquipmentElement.Item, out k)) sh[i * NZ + k] += el.Amount;
+                            if (el.Amount > 0 && el.EquipmentElement.ItemModifier == null && el.EquipmentElement.Item != null && ixOf.TryGetValue(el.EquipmentElement.Item, out k)) a.Sh[i * NZ + k] += el.Amount;
                         }
                     for (int k = 0; k < NZ; k++)
                     {
+                        int o = i * NZ + k;
+                        a.Inc[o] = _inc[o];
+                        if (items[k] == null) continue;                  // towar spoza swiata gry - bez popytu (zadnych lotow)
                         float x = 1f;
                         if (cats[k] != null) { try { x = t.GetItemCategoryPriceIndex(cats[k]); } catch { x = 1f; } }
-                        ix[i * NZ + k] = x > 0f && !float.IsInfinity(x) ? x : 1f;
-                        double p = StartCalibration.ZDp(t, Z[k]);
-                        dp[i * NZ + k] = p;
-                        double off = StartCalibration.ZOff7(st, Z[k]);
-                        double kxv = _kx[i * NZ + k];
-                        // sterowanie brakiem (codziennie): pusta polka przy popycie - x1.10 (do 2.5), inaczej x0.98 (od 1)
-                        if (p > 0 && sh[i * NZ + k] <= Keep + 1) kxv = Math.Min(KxMax, kxv * KxUp); else kxv = Math.Max(1.0, kxv * KxDown);
-                        _kx[i * NZ + k] = (float)kxv;
-                        dz[i * NZ + k] = Math.Max(p, off) * kxv;
+                        a.Ix[o] = x > 0f && !float.IsInfinity(x) ? x : 1f;
+                        a.Dp[o] = StartCalibration.ZDp(t, Z[k]);
+                        a.Off[o] = StartCalibration.ZOff7(st, Z[k]);
                     }
                     long res = 0; try { res = Seal31.TownReserve(t); } catch { res = 0; }
-                    budget[i] = CofferShare * Math.Max(0, t.Gold - res);
+                    a.Gold[i] = t.Gold; a.Res[i] = Math.Max(0, res);
                 }
-                var offer = new double[nt * NZ];
-                var tstar = new double[2 * NZ];
-                for (int m = 0; m < 2; m++) for (int k = 0; k < NZ; k++) tstar[m * NZ + k] = StartCalibration.ZTstar(m, Z[k]);
-                for (int i = 0; i < nt; i++)
-                    for (int k = 0; k < NZ; k++)
-                    {
-                        if (siege[i]) continue;
-                        double sur = sh[i * NZ + k] - SrcKeep * tstar[_mk[i] * NZ + k] * dz[i * NZ + k] - Keep;
-                        if (sur > 1) offer[i * NZ + k] = Math.Floor(OfferShare * sur);
-                    }
-                var dst = new List<int>(nt);
-                var cand = new List<KeyValuePair<double, int>>(NCand);
-                for (int k = 0; k < NZ; k++)
-                {
-                    if (items[k] == null) continue;
-                    double lim = Per[k] ? MaxPer : MaxDur;
-                    dst.Clear();
-                    for (int i = 0; i < nt; i++)
-                    {
-                        if (siege[i] || (Fnv(_st[i].StringId) & 1u) != (uint)(today & 1)) continue;
-                        double d = dz[i * NZ + k]; if (!(d > 0)) continue;
-                        double H = sh[i * NZ + k] + _inc[i * NZ + k];
-                        if (H >= (tstar[_mk[i] * NZ + k] + lim + 2) * d) continue;
-                        dst.Add(i);
-                    }
-                    dst.Sort((a, b) => ix[b * NZ + k].CompareTo(ix[a * NZ + k]));
-                    foreach (int t in dst)
-                    {
-                        double d = dz[t * NZ + k], T = tstar[_mk[t] * NZ + k];
-                        double Hc = sh[t * NZ + k] + _inc[t * NZ + k];
-                        cand.Clear();
-                        var ct = _cand[t];
-                        for (int ci = 0; ci < ct.Length; ci++)
-                        {
-                            int s = ct[ci];
-                            if (offer[s * NZ + k] < 1 || siege[s]) continue;
-                            float L = Days(s, t); if (!(L >= 0f) || L > lim) continue;
-                            bool war = false;
-                            try { war = _st[s].MapFaction != null && _st[t].MapFaction != null && FactionManager.IsAtWarAgainstFaction(_st[s].MapFaction, _st[t].MapFaction); } catch { war = false; }
-                            if (war) continue;
-                            double tau = _sea[s * nt + t] ? TauSea : TauLand;
-                            double c = ix[s * NZ + k] * (1.0 + tau * L);
-                            if (ix[t * NZ + k] < c * (1.0 + Margin)) continue;
-                            cand.Add(new KeyValuePair<double, int>(c, s));
-                        }
-                        if (cand.Count == 0) continue;
-                        cand.Sort((a, b) => a.Key != b.Key ? a.Key.CompareTo(b.Key) : a.Value.CompareTo(b.Value));
-                        int used = 0;
-                        foreach (var kv in cand)
-                        {
-                            if (used >= MaxSrc) break;
-                            int s = kv.Value; float L = Days(s, t);
-                            double want = (T + L + 2) * d - Hc;
-                            double q = Math.Min(offer[s * NZ + k], want);
-                            if (q < Math.Max(5.0, 0.5 * d)) continue;
-                            int n = (int)Math.Floor(q);
-                            _dOrdered += n;
-                            bool sea = _sea[s * nt + t];
-                            double tau = sea ? TauSea : TauLand;
-                            long cost = LotPrice(_t[s], items[k], n, false);
-                            long fr = (long)Math.Round(cost * tau * L);
-                            if (cost + fr > budget[t])
-                            {
-                                int nf = cost + fr > 0 ? (int)Math.Floor(n * budget[t] / (double)(cost + fr)) : 0;
-                                if (nf < Math.Max(5.0, 0.5 * d)) { _dPoor += n; continue; }
-                                _dPoor += n - nf; n = nf;
-                                cost = LotPrice(_t[s], items[k], n, false); fr = (long)Math.Round(cost * tau * L);
-                                if (cost + fr > budget[t] + 1) { _dPoor += n; continue; }
-                            }
-                            if (n <= 0 || cost <= 0) continue;
-                            if ((Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u) Sample(_t[s], items[k], n, cost);
-                            int got = Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
-                            if (got <= 0) continue;
-                            used++;
-                            offer[s * NZ + k] -= got; sh[s * NZ + k] -= got; Hc += got; budget[t] -= cost + fr;
-                        }
-                    }
-                }
+                a.Days = (s, t) => Days(s, t);
+                a.Sea = (s, t) => _sea[s * nt + t];
+                a.War = (s, t) => { try { return _st[s].MapFaction != null && _st[t].MapFaction != null && FactionManager.IsAtWarAgainstFaction(_st[s].MapFaction, _st[t].MapFaction); } catch { return false; } };
+                a.LotPrice = (s, k, n) => LotPrice(_t[s], items[k], n, false);
+                a.DestUnit = (t, k) => DestUnit(_t[t], k, items[k]);
+                a.SampleAt = (s, t, k) => (Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u;
+                a.Sample = (s, k, n) => { long s0 = Stopwatch.GetTimestamp(); Sample(_t[s], items[k], Math.Min(n, SampleCap)); _dSampleTicks += Stopwatch.GetTimestamp() - s0; };
+                a.Ship = (s, t, k, n, cost, fr, sea, L) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
+                var stt = new KsFoodCore.Stats();
+                KsFoodCore.Decide(a, stt);
+                _dOrdered += stt.Ordered; _dPoor += stt.Poor; _dNoProfit += stt.NoProfit; _dFar += stt.Far; _dRes += stt.ResLots; _dResGold += stt.ResGold;
+                _dCofShort.AddRange(stt.CofShort);
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally
             {
                 try { PayCarters(pendFreight); } catch (Exception e) { Stumble("PayCarters", e); }
-                _dTicks += Stopwatch.GetTimestamp() - t0;
+                _dTicks += Stopwatch.GetTimestamp() - t0 - (_dSampleTicks - sample0);   // probka wyceny poza czasem doby (osobny czas w linii)
             }
         }
 
@@ -559,10 +582,11 @@ namespace Armoury
             return m1 * P(0) + (m2 - m1) * P(m1) + (n - m2) * P(m2);
         }
 
-        private static void Sample(Town src, ItemObject it, int n, long approx)
+        private static void Sample(Town src, ItemObject it, int n)
         {
             try
             {
+                long approx = LotPrice(src, it, n, false);
                 long ex = LotPrice(src, it, n, true);
                 if (ex <= 0) return;
                 double e = Math.Abs(approx - ex) / (double)ex;
@@ -577,16 +601,24 @@ namespace Armoury
         {
             var src = _st[s]; var dstS = _st[t]; var srcT = _t[s]; var dstT = _t[t];
             var ro = src.ItemRoster;
-            if (ro == null || dstT.Gold < cost + fr) { _dPoor += n; return 0; }
-            int before = ro.GetItemNumber(it);
+            if (ro == null || dstT.Gold < cost + fr) return 0;
+            // recenzja runda 3 (drobne): sztuki bez modyfikatora (jak polka w Daily), cena i fracht za sztuki naprawde zdjete z polki
+            var el = new EquipmentElement(it, null, null, false);
+            int ei = ro.FindIndexOfElement(el), before = ei >= 0 ? ro.GetElementNumber(ei) : 0;
             int take = Math.Min(n, Math.Max(0, before - Keep));
             if (take <= 0) return 0;
             if (take < n) { cost = (long)Math.Round(cost * (double)take / n); fr = (long)Math.Round(fr * (double)take / n); n = take; }
             var gf = GoodsLedger.Begin(GoodsLedger.FKsH, src);
-            try { ro.AddToCounts(it, -n); }
+            try { ro.AddToCounts(el, -n); }
             finally { GoodsLedger.End(gf); }
-            int removed = before - ro.GetItemNumber(it);
-            if (removed != n) { _dDrop += Math.Max(0, n - removed); n = Math.Max(0, removed); if (n <= 0) return 0; }
+            int ea = ro.FindIndexOfElement(el), after = ea >= 0 ? ro.GetElementNumber(ea) : 0;
+            int removed = before - after;
+            if (removed != n)
+            {
+                _dDrop += Math.Max(0, n - removed);                  // zamowione, a nie zdjete z polki (nie weszlo do drogi - poza kontrola towaru)
+                if (removed <= 0) return 0;
+                cost = (long)Math.Round(cost * (double)removed / n); fr = (long)Math.Round(fr * (double)removed / n); n = removed;
+            }
             // zloto: towar
             int d0 = dstT.Gold; dstT.ChangeGold(-(int)cost); long paidG = d0 - dstT.Gold;
             int s0 = srcT.Gold; srcT.ChangeGold((int)paidG); long gotS = srcT.Gold - s0;
@@ -718,13 +750,24 @@ namespace Armoury
                   .Append(" | w drodze ").Append(now).Append(" szt. w ").Append(_carts.Count).Append(" wozach");
                 if (_prevTransit >= 0)
                 {
-                    long rest = _prevTransit + _dBought - _dArr - _dBackPcs - _dLost - _dDrop - now;
+                    // recenzja runda 3 (drobne): bez odrzuconych przy zaladunku (nie weszly do drogi); psucie i strata zawroconych - ujscia ksiegi towarow
+                    long rest = _prevTransit + _dBought - _dArr - _dBackPcs - _dLost - _dSpoil - _dRetLost - now;
                     long gold = -_gDst + _gSrc + _gCarters + _gCrews + (_gRefDst - _gRefSrc);
-                    sb.Append(" | kontrola towaru reszta ").Append(rest).Append(" (bez celu ").Append(_dLost).Append(", odrzucone przy zaladunku ").Append(_dDrop).Append("), zlota reszta ").Append(gold)
+                    sb.Append(" | kontrola towaru reszta ").Append(rest).Append(" (bez celu ").Append(_dLost).Append(", psucie w drodze ").Append(_dSpoil).Append(", zawrocone bez zwrotu zaplaty ").Append(_dRetLost)
+                      .Append("; odrzucone przy zaladunku ").Append(_dDrop).Append(" - nie weszly do drogi), zlota reszta ").Append(gold)
                       .Append(" (cel -").Append(_gDst).Append(", zrodla +").Append(_gSrc).Append(", furmani +").Append(_gCarters).Append(", zalogi +").Append(_gCrews).Append(", zwroty ").Append(_gRefDst).Append('/').Append(_gRefSrc).Append(')');
                 }
                 else sb.Append(" | kontrola od nastepnej doby");
-                sb.Append(" | probka wyceny 1/64 ").Append(_dSample > 0 ? (100.0 * _dSampleErr / _dSample).ToString("0.00", inv) + "% (max " + (100.0 * _dSampleMax).ToString("0.00", inv) + "%, lotow " + _dSample + ")" : "-")
+                // KS-R3 runda 2 symulatora: loty z dalszych miast i z zapasu kupcow (przed "probka" - regex NKS-22 bez zmian)
+                sb.Append(" | z dalszych miast (12 najblizszych bez nadwyzki) ").Append(_dFar).Append(" wozow, z zapasu kupcow (polka zboza i soli ponizej T* x popyt, najwyzej do polowy zapasu) ").Append(_dRes).Append(" wozow, ").Append(_dResGold).Append(" zl");
+                // recenzja runda 3 (wazne): wynik kupcow (loty dowiezione: wartosc u celu przy cenie polki dzis wobec zaplaty i frachtu) i loty pominiete bez zysku
+                _dMarPct.Sort();
+                sb.Append(" | kupcy: dowiezione loty ").Append(_dMarLots).Append(", wartosc u celu ").Append(_dMarVal).Append(" zl, zaplata + fracht ").Append(_dMarCost).Append(" zl, wynik ").Append(_dMarVal - _dMarCost)
+                  .Append(" zl, mediana marzy ").Append(_dMarPct.Count > 0 ? (100.0 * _dMarPct[_dMarPct.Count / 2]).ToString("0.0", inv) + "%" : "-").Append(", ze strata ").Append(_dMarLoss).Append(", pominiete bez zysku ").Append(_dNoProfit);
+                // recenzja runda 3 (wazne): kasy miast z pusta polka (cel KS-H dzis) wobec zapasu kupcow
+                _dCofShort.Sort();
+                sb.Append(" | kasy miast z brakiem / zapas kupcow: ").Append(_dCofShort.Count > 0 ? "q10 " + _dCofShort[(int)(0.1 * (_dCofShort.Count - 1))].ToString("0.00", inv) + ", mediana " + _dCofShort[(_dCofShort.Count - 1) / 2].ToString("0.00", inv) + " (" + _dCofShort.Count + " miast)" : "-");
+                sb.Append(" | probka wyceny 1/64 ").Append(_dSample > 0 ? (100.0 * _dSampleErr / _dSample).ToString("0.00", inv) + "% (max " + (100.0 * _dSampleMax).ToString("0.00", inv) + "%, lotow " + _dSample + ", pierwsze " + SampleCap + " szt., czas " + (_dSampleTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv) + " ms poza czasem)" : "-")
                   .Append(" | tabela dob ").Append(_pairsDone).Append('/').Append(_pairs != null ? _pairs.Length : 0)
                   .Append(" | czas ").Append((_dTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv)).Append(" ms | potkniecia ").Append(_dStum).Append('.');
                 if (Today() % 7 == 0 && _delEma.Count > 0)
@@ -760,7 +803,65 @@ namespace Armoury
                 sb.Append(c.Src.StringId).Append('|').Append(c.Dst.StringId).Append('|').Append(KsBasket.Ids[Z[c.Z]]).Append('|').Append(c.N).Append('|').Append(c.DayBought).Append('|')
                   .Append(c.DayDue).Append('|').Append(c.Paid).Append('|').Append(c.Freight).Append('|').Append(c.Sea ? 1 : 0).Append('~');
             }
+            string res = sb.ToString();
+            // recenzja runda 3 (drobne): rozmiar arm_ks_kupcy w linii (NKS-20)
+            try
+            {
+                int today = Today();
+                if (res.Length > 0 && today != _exportLogged)
+                {
+                    _exportLogged = today;
+                    Log.Info("KS: zapis arm_ks_kupcy doba " + today + " | " + (res.Length / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " KB (wozow " + _carts.Count + ", paczek SaveText " + ((res.Length + 7999) / 8000) + ").");
+                }
+            }
+            catch { }
+            return res;
+        }
+        private static int _exportLogged = -1;
+
+        // recenzja runda 3 (wazne): srednie dowozu korytarzy (CorrDelivered Planu po D) i rurociagu rampy w zapisie (arm_ks_r3, sekcja H) - Plan pierwszej doby po wczytaniu
+        // nie widzial dowozu (kazdy korytarz 20 szt./d, krainy w tryb "kraina", gradient skakal o ok. 25%)
+        internal static string ExportEma()
+        {
+            var sb = new StringBuilder(_delEma.Count * 32 + 512);
+            sb.Append(_delN).Append(';').Append(_shipN).Append(';');
+            bool f = true;
+            foreach (var kv in _delEma) { if (kv.Value < 0.01) continue; if (!f) sb.Append(','); f = false; sb.Append(kv.Key.Replace('|', '>')).Append('=').Append(kv.Value.ToString("0.##", CultureInfo.InvariantCulture)); }
+            sb.Append(';');
+            f = true;
+            for (int i = 0; i < _shipEma.Length; i++)
+            {
+                if (_shipEma[i] <= 0 && _daysEma[i] <= 0) continue;
+                if (!f) sb.Append(','); f = false;
+                sb.Append(i).Append(':').Append(_shipEma[i].ToString("0.##", CultureInfo.InvariantCulture)).Append(':').Append(_daysEma[i].ToString("0.##", CultureInfo.InvariantCulture));
+            }
             return sb.ToString();
+        }
+
+        internal static void ImportEma(string s)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(s)) return;
+                var p = s.Split(';'); if (p.Length < 4) return;
+                int dn, sn; if (!int.TryParse(p[0], out dn) || !int.TryParse(p[1], out sn)) return;
+                _delEma.Clear();
+                foreach (var e in p[2].Split(','))
+                {
+                    int q = e.LastIndexOf('='); double v;
+                    if (q <= 0 || !double.TryParse(e.Substring(q + 1), NumberStyles.Float, CultureInfo.InvariantCulture, out v)) continue;
+                    _delEma[e.Substring(0, q).Replace('>', '|')] = Math.Max(0.0, v);
+                }
+                Array.Clear(_shipEma, 0, _shipEma.Length); Array.Clear(_daysEma, 0, _daysEma.Length);
+                foreach (var e in p[3].Split(','))
+                {
+                    var q = e.Split(':'); int i; double a, b;
+                    if (q.Length != 3 || !int.TryParse(q[0], out i) || i < 0 || i >= _shipEma.Length || !double.TryParse(q[1], NumberStyles.Float, CultureInfo.InvariantCulture, out a) || !double.TryParse(q[2], NumberStyles.Float, CultureInfo.InvariantCulture, out b)) continue;
+                    _shipEma[i] = Math.Max(0.0, a); _daysEma[i] = Math.Max(0.0, b);
+                }
+                _delN = Math.Max(0, Math.Min(28, dn)); _shipN = Math.Max(0, Math.Min(7, sn));
+            }
+            catch (Exception e) { Stumble("ImportEma", e); }
         }
 
         internal static void Import(string s) { _carts.Clear(); _prevTransit = -1; _pending = string.IsNullOrEmpty(s) ? null : s; }

@@ -111,6 +111,12 @@ namespace Armoury
             var md = town.MarketData;
             var made = Produced(_getProductions.Invoke(pm, new[] { data }));
             int budget = (int)(village.Gold * 0.05f);                                               // BK: 5% kiesy - nie maleje w petli (jak w BK)
+            // KS-R3 (recenzja runda 3, wazne): wies kalibracji z koszykiem ZC4 - rynek wsi BK najwyzej z kiesy ponad 7 dob budzetu koszyka z Planu (koszyk najpierw) i bez jedzenia
+            // (jedzenie kupuje drabina ZC4 i liczy kcal; dotad rynek BK bral 1 sztuke kazdego jedzenia, ktore znikalo bez kcal - ok. 14% wplywu do kies wsi w rundzie 3)
+            double ksBud = 0; bool ks = false;
+            try { ks = StartCalibration.SwPaidFirst && StartCalibration.Zc4BasketBudget(village, out ksBud); if (!ks) ksBud = 0; } catch { ks = false; ksBud = 0; }
+            long ksRoom = ks ? (long)village.Gold - (long)Math.Ceiling(7.0 * Math.Max(0.0, ksBud)) : long.MaxValue;
+            if (ks) budget = (int)Math.Max(0, Math.Min(budget, ksRoom));
             var roster = town.Owner.ItemRoster;
             bool any = false;
             for (int i = roster.Count - 1; i >= 0; i--)
@@ -120,16 +126,19 @@ namespace Armoury
                 var el = e.EquipmentElement;
                 var item = el.Item;
                 if (item == null || item.ItemCategory == null || made.Contains(item)) continue;
+                if (ks && StartCalibration.ZFoodItem(item)) continue;
                 var cd = md.GetCategoryData(item.ItemCategory);
                 if (cd.Supply <= cd.Demand) continue;
                 int price = md.GetPrice(el, null, false, null);
                 if (budget < price) continue;
                 if (village.Gold < price) { _vSkip++; _vSkipValue += price; continue; }             // 3.4: dotad kasa dostawala te cene z niczego
+                if (ks) { if (ksRoom < price) continue; ksRoom -= price; }
                 village.ChangeGold(-price);
                 town.ChangeGold(price);
                 roster.AddToCounts(el, -1);
                 _vBuys++; _vPaid += price; any = true;
-                try { StartCalibration.KsVilOut(village.Settlement, price); } catch { }   // KS-R3 P2: rynek wsi BK - wydatek wsi spoza koszyka (alfa netto)
+                // KS-R3 P2: rynek wsi BK - wydatek wsi spoza koszyka (alfa netto); wies z koszykiem ZC4 - z nadwyzki ponad koszyk (nie z pieniedzy koszyka: bez odjecia w alfie)
+                try { if (ks) StartCalibration.NoteBkVillageMarket(village, price); else StartCalibration.KsVilOut(village.Settlement, price); } catch { }
                 if (town.IsCastle) _vCastle += price;
             }
             if (any) _vVillages++;

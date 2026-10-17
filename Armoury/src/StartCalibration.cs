@@ -40,9 +40,11 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const string P = "Kalibracja startu (KS): ";
         private const string PK = "KS: ";
-        // KS-R3: ks4 = ks3 + pole dodatkowe (gradient krain, czynnik popytu targu, ciecie i polki krain, srednie sterowania, kx KS-H, tabela dob miast, podloga spichlerza wsi,
-        // wydatki wsi spoza koszyka, odbior miast, kasa 28 dob) przed cialem okregow; ks3 czytany (gradient 1, kx 1, podloga wlaczona)
+        // KS-R3 (recenzja runda 3, wazne): zapis arm_ks dalej w formacie ks3 (starsza DLL czyta go jak dotad), stan rundy 3 (gradient krain, czynnik popytu targu, ciecie i polki
+        // krain, srednie sterowania, kx KS-H, tabela dob miast, podloga spichlerza wsi, wydatki wsi spoza koszyka, odbior miast, kasa 28 dob, srednie dowozu KS-H) w osobnym
+        // kluczu arm_ks_r3 (starsza DLL go pomija); ks4 (pole dodatkowe w arm_ks - DLL z 17.10 rano) czytany
         private const string SaveVersion = "ks4", SaveVersion3 = "ks3", SaveVersion2 = "ks2", SaveVersion1 = "ks1";
+        private static string _r3Pending, _r3Keep;          // arm_ks_r3 z zapisu (do rozwiazania przy starcie sesji) i zachowany bez zmian (zapis zastosowany bez pliku ziemi)
         internal const int StatePlan = 0, StateApplied = 1, StateArmed = 2;
         internal const int RampSupply = 14, RampDemand = 28;     // rampa: podaz A..A+14 (= D), popyt koszyka D..A+28 (= D+14)
         private const int MinPlanDays = 7;                        // potwierdzenie najwczesniej po 7 dobach Planu tego zapisu
@@ -113,7 +115,7 @@ namespace Armoury
                 if (_keepRaw != null) return _keepRaw;            // zapis zastosowany bez pliku ziemi / ukladu - oddany bez zmian (nie nadpisany Planem)
                 if (_state == StatePlan && _plans == 0) return "";
                 var sb = new StringBuilder(96 * 1024);
-                sb.Append(SaveVersion).Append('|').Append(_state).Append('|').Append(Clean(_campaign)).Append('|').Append(_applyDay).Append('|').Append(_plans).Append('|')
+                sb.Append(SaveVersion3).Append('|').Append(_state).Append('|').Append(Clean(_campaign)).Append('|').Append(_applyDay).Append('|').Append(_plans).Append('|')
                   .Append(_firstPlanDay).Append('|').Append(_saveLandCrc.ToString("X8")).Append('|').Append(_saveLayoutCrc.ToString("X8")).Append('|').Append(_saveSigma).Append('|')
                   .Append(_armDay).Append('|').Append(_armHash.ToString("X8")).Append('|').Append(_applyHash.ToString("X8")).Append('|')
                   .Append((_autotest ? 1 : 0) | (_shelvesDone ? 2 : 0)).Append('|');
@@ -121,8 +123,6 @@ namespace Armoury
                 sb.Append(_armLandCrc.ToString("X8")).Append('|');
                 if (_state == StateApplied) RuleExport(sb);
                 sb.Append('|');
-                string extra = ""; try { extra = ExportExtra(); } catch (Exception xe) { Stumble("ExportExtra", xe); extra = ""; }
-                sb.Append(extra).Append('|');                       // KS-R3 ks4: pole dodatkowe (spakowane; bez '|')
                 int rawLive = 0, packed = 0;
                 if (_state == StateApplied)
                 {
@@ -139,14 +139,33 @@ namespace Armoury
                 {
                     _exportLogged = today;
                     int parts = (res.Length + 7999) / 8000;
+                    int r3 = _r3Size;
                     Log.Info(PK + "zapis arm_ks doba " + today + " | " + (res.Length / 1024.0).ToString("0.0", Inv) + " KB (paczek SaveText " + parts + "; okregi " + (rawLive / 1024.0).ToString("0.0", Inv)
-                             + " KB tekstu -> " + (packed / 1024.0).ToString("0.0", Inv) + " KB po kompresji) | limit projektu 150 KB " + (res.Length <= 150 * 1024 ? "TAK" : "PRZEKROCZONY") + ".");
+                             + " KB tekstu -> " + (packed / 1024.0).ToString("0.0", Inv) + " KB po kompresji) | limit projektu 150 KB " + (res.Length <= 150 * 1024 ? "TAK" : "PRZEKROCZONY")
+                             + " | arm_ks_r3 (stan rundy 3, osobny klucz) " + (r3 >= 0 ? (r3 / 1024.0).ToString("0.0", Inv) + " KB" : "-") + ", razem " + ((res.Length + Math.Max(0, r3)) / 1024.0).ToString("0.0", Inv) + " KB.");
                 }
                 return res;
             }
             catch (Exception e) { Stumble("Export", e); return ""; }
         }
-        private static int _exportLogged = -1;
+        private static int _exportLogged = -1, _r3Size = -1;
+
+        /// <summary>Recenzja runda 3 (wazne): stan rundy 3 w osobnym kluczu arm_ks_r3 (starsza DLL czyta arm_ks ks3 i pomija ten klucz). Zapis zastosowany zachowany bez
+        /// zmian (bez pliku ziemi) - oddany jak byl.</summary>
+        internal static string ExportR3()
+        {
+            try
+            {
+                if (_keepRaw != null) { _r3Size = _r3Keep != null ? _r3Keep.Length : -1; return _r3Keep ?? ""; }
+                if (_state == StatePlan && _plans == 0) { _r3Size = -1; return ""; }
+                string s = ExportExtra();
+                _r3Size = s != null ? s.Length : -1;
+                return s ?? "";
+            }
+            catch (Exception e) { Stumble("ExportR3", e); _r3Size = -1; return ""; }
+        }
+
+        internal static void ImportR3(string data) { _r3Pending = string.IsNullOrEmpty(data) ? null : data; }
 
         /// <summary>Cialo okregow w zapisie: "Z" + base64(deflate(UTF-8)) albo sam tekst (krotki). Base64 bez '|'.</summary>
         private static string Pack(string s)
@@ -182,8 +201,11 @@ namespace Armoury
         /// produkcja jak dzis, dopoki plik / ksiega nie wroci; stan porzucony tylko przy INNYM crc pliku ziemi, innym znanym ukladzie wiosek albo innym id kampanii.</summary>
         private static void ResolvePending()
         {
-            if (_pending == null) return;
+            if (_pending == null) { if (_r3Pending != null) { string x0 = _r3Pending; _r3Pending = null; try { ImportExtra(x0); } catch (Exception xe) { Stumble("ImportExtra", xe); } } return; }
             string data = _pending; _pending = null;
+            // recenzja runda 3 (drobne): stan rundy 3 dopiero po przyjeciu naglowka (dotad przed sprawdzeniem kampanii i ukladu - z odrzuconego zapisu zostawal gradient, kx ...)
+            string extra = _r3Pending; _r3Pending = null;
+            int r3 = 0;                                          // 0 - porzucony, 1 - wczytany, 2 - zachowany bez zmian (zapis zastosowany bez pliku ziemi albo ukladu)
             try
             {
                 bool v4 = data.StartsWith(SaveVersion + "|", StringComparison.Ordinal);
@@ -194,7 +216,7 @@ namespace Armoury
                 if ((v3 || v2 ? h.Length < nf : (h.Length < 10 || h[0] != SaveVersion1)) || !int.TryParse(h[1], NumberStyles.Integer, Inv, out st) || !int.TryParse(h[3], NumberStyles.Integer, Inv, out ad)
                     || !int.TryParse(h[4], NumberStyles.Integer, Inv, out pl) || !int.TryParse(h[5], NumberStyles.Integer, Inv, out fp)
                     || !uint.TryParse(h[6], NumberStyles.HexNumber, Inv, out lc) || !uint.TryParse(h[7], NumberStyles.HexNumber, Inv, out yc) || !int.TryParse(h[8], NumberStyles.Integer, Inv, out sg))
-                { _loadNote = "zapis arm_ks w nieznanym formacie - pominiety (Plan od nowa, produkcja jak dzis)"; return; }
+                { _loadNote = "zapis arm_ks w nieznanym formacie - pominiety (Plan od nowa, produkcja jak dzis)"; r3 = 0; return; }
                 int armDay = -1, flags = 0; uint armHash = 0, applyHash = 0, armLand = 0;
                 string body = h[9], rule = null;
                 if (v3 || v2)
@@ -205,31 +227,32 @@ namespace Armoury
                     if (v3) { uint.TryParse(h[15], NumberStyles.HexNumber, Inv, out armLand); rule = h[16]; body = v4 ? h[18] : h[17]; }
                     else body = h[15];
                 }
-                if (v4) { try { ImportExtra(h[17]); } catch (Exception xe) { Stumble("ImportExtra", xe); } }   // KS-R3: gradient, sterowanie, kx, tabela dob, podloga ... (kazdy stan)
+                if (v4 && extra == null) extra = h[17];               // zapis ks4 (DLL z 17.10 rano): pole dodatkowe w arm_ks
                 _plans = Math.Max(0, pl); _firstPlanDay = fp; _campaign = h[2] == "-" ? "" : h[2];
                 string gid = "";
                 try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId ?? "" : ""; } catch { gid = ""; }
                 if (st == StateArmed)
                 {
-                    if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { _loadNote = "zapis UZBROJONY innej kampanii (id " + _campaign + ", gra " + gid + ") - uzbrojenie pominiete, Plan"; _campaign = ""; return; }
+                    if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { _loadNote = "zapis UZBROJONY innej kampanii (id " + _campaign + ", gra " + gid + ") - uzbrojenie pominiete, Plan"; _campaign = ""; r3 = 0; return; }
+                    r3 = 1;
                     _state = StateArmed; _armDay = armDay; _armHash = armHash; _armLandCrc = armLand;
                     _loadNote = "zapis UZBROJONY od doby " + armDay + " (skrot planu " + armHash.ToString("X8") + ", plik ziemi " + armLand.ToString("X8") + "; " + _plans + " planow od doby " + _firstPlanDay + ") - czeka na Confirm";
                     return;
                 }
-                if (st != StateApplied) { _loadNote = "zapis: Plan (" + _plans + " planow od doby " + _firstPlanDay + ")"; return; }
+                if (st != StateApplied) { _loadNote = "zapis: Plan (" + _plans + " planow od doby " + _firstPlanDay + ")"; r3 = 1; return; }
                 if (gid.Length > 0 && _campaign.Length > 0 && gid != _campaign) { _loadNote = "zapis ZASTOSOWANY innej kampanii (id " + _campaign + ", gra " + gid + ") - stan pominiety, produkcja jak dzis"; _plans = 0; return; }
                 EnsureLand();
                 uint lay;
-                if (!LandReady) { _keepRaw = data; _loadNote = "zapis ZASTOSOWANY, ale BRAK pliku ziemi " + LandFile + " - stan ZACHOWANY w zapisie bez zmian (produkcja i popyt jak dzis, Plan tylko liczy), wroci, gdy plik wroci do ModuleData"; return; }
+                if (!LandReady) { _keepRaw = data; r3 = 2; _loadNote = "zapis ZASTOSOWANY, ale BRAK pliku ziemi " + LandFile + " - stan ZACHOWANY w zapisie bez zmian (produkcja i popyt jak dzis, Plan tylko liczy), wroci, gdy plik wroci do ModuleData"; return; }
                 if (lc != _landCrc) { _loadNote = "zapis ZASTOSOWANY z innym plikiem ziemi (crc " + lc.ToString("X8") + ", plik " + _landCrc.ToString("X8") + ") - stan pominiety, produkcja jak dzis, Plan od nowa"; _plans = 0; return; }
                 uint known;
-                if (!VillageBook.LayoutCrcNow(out known)) { _keepRaw = data; _loadNote = "zapis ZASTOSOWANY, ale ksiega wiosek nieczynna (uklad nieznany) - stan ZACHOWANY w zapisie bez zmian, produkcja jak dzis, wroci przy czynnej ksiedze"; return; }
+                if (!VillageBook.LayoutCrcNow(out known)) { _keepRaw = data; r3 = 2; _loadNote = "zapis ZASTOSOWANY, ale ksiega wiosek nieczynna (uklad nieznany) - stan ZACHOWANY w zapisie bez zmian, produkcja jak dzis, wroci przy czynnej ksiedze"; return; }
                 if (!LayoutMatches(out lay) || yc != lay) { _loadNote = "zapis ZASTOSOWANY z innym ukladem wiosek (crc " + yc.ToString("X8") + ", gra " + lay.ToString("X8") + ") - stan pominiety, produkcja jak dzis, Plan od nowa"; _plans = 0; return; }
                 int nd, nb, badD;
                 string live;
                 try { live = Unpack(body); } catch (Exception ue) { Stumble("Unpack", ue); _loadNote = "zapis ZASTOSOWANY - blad rozpakowania zajec blokow - stan pominiety, produkcja jak dzis"; LiveReset(); return; }
                 if (!ImportLive(live, out nd, out nb, out badD)) { _loadNote = "zapis ZASTOSOWANY - blad odczytu zajec blokow - stan pominiety, produkcja jak dzis"; LiveReset(); return; }
-                _state = StateApplied; _applyDay = ad; _saveLandCrc = lc; _saveLayoutCrc = yc; _saveSigma = sg;
+                _state = StateApplied; _applyDay = ad; _saveLandCrc = lc; _saveLayoutCrc = yc; _saveSigma = sg; r3 = 1;
                 _armDay = armDay; _armHash = armHash; _armLandCrc = armLand; _applyHash = applyHash; _autotest = (flags & 1) != 0;
                 if (v3 || v2) { _shelvesDone = (flags & 2) != 0; RampImport(h[13], h[14]); }
                 else { _shelvesDone = true; RampImportFull(); }      // ks1: zapis etapu 1 (wlaczony bez rampy) - rampa i polki za nami
@@ -238,7 +261,13 @@ namespace Armoury
                             + ", " + (_autotest ? "autotest" : "uzbrojenie doba " + armDay) + " | pamiec reguly: " + rn
                             + " | pierwsza doba po wczytaniu - stawki KS i koszyk ZC4 od pierwszej doby ze stanami ZC (do tego czasu produkcja i popyt jak dzis)";
             }
-            catch (Exception e) { _loadNote = "blad odczytu arm_ks - stan pominiety"; LiveReset(); _state = StatePlan; Stumble("ResolvePending", e); }
+            catch (Exception e) { _loadNote = "blad odczytu arm_ks - stan pominiety"; LiveReset(); _state = StatePlan; Stumble("ResolvePending", e); r3 = 0; }
+            finally
+            {
+                if (r3 == 1 && extra != null) { try { ImportExtra(extra); } catch (Exception xe) { Stumble("ImportExtra", xe); } }
+                else if (r3 == 2) _r3Keep = extra;
+                else if (r3 == 0 && extra != null) _loadNote += " | stan rundy 3 (arm_ks_r3) pominiety z zapisem";
+            }
         }
 
         // ============================================================ start sesji i doba
@@ -336,6 +365,7 @@ namespace Armoury
                 AddMs(ms);
                 // KS-R3 G1: tabela dob miast KS-H (najwyzej 200 wywolan drogi na dobe, gotowa w ok. 25 dob stanu Plan) - poza czasem doby KS (osobny czas w linii KS-H)
                 try { KsFoodCarts.DaysTick(); } catch (Exception e) { Stumble("DaysTick", e); }
+                int dCalls; double dMs = KsFoodCarts.TakeDaysMs(out dCalls);     // recenzja runda 3 (drobne): czas tabeli dob KS-H osobno (NKS-9b)
                 if (LogGate.Lines)
                 {
                     Log.Info(P + "dzien " + day + " | stan " + (_state == StateApplied ? "ZASTOSOWANY od doby " + _applyDay : (_state == StateArmed ? "Plan (UZBROJONY doba " + _armDay + ")" : "Plan"))
@@ -343,6 +373,7 @@ namespace Armoury
                              + ", ostatni gotowy doba " + _planDay + " (planow tego zapisu " + _plans + ", od doby " + _firstPlanDay + "; ksiega towarow " + _planEma + " dob w Planie, " + _emaDays + " w sesji, dojrzaly " + (PlanMature() ? "TAK" : "NIE") + ")"
                              + (_state == StateApplied ? " | " + RampText(today) + " | " + MoneyText() : "")
                              + " | czas doby KS " + ms.ToString("0.00", Inv) + " ms (mediana " + MedianMs().ToString("0.00", Inv) + " ms z " + _msN + " dob; bez watku roboczego)"
+                             + " | tabela dob KS-H " + dMs.ToString("0.00", Inv) + " ms (" + dCalls + " wywolan drogi, " + KsFoodCarts.DaysPairsDone + "/" + KsFoodCarts.DaysPairs + " par)"
                              + " | potkniecia dzis " + _stumblesDay + " (sesja " + _stumbles + ").");
                     if (day % 7 == 0) { try { Log.Info(PriceLine(day)); } catch (Exception e) { Stumble("PriceLine", e); } }
                     try { string ml = MarketLine(); if (ml != null) Log.Info(ml); } catch (Exception e) { Stumble("MarketLine", e); }

@@ -1195,7 +1195,9 @@ namespace Armoury
                     var gfv = GoodsLedger.Begin(GoodsLedger.FFolkVill, mk);   // KS F0: ksiega towarow na rynek miasta targowego (dotad ramka bez osady - "bez rynku")
                     try { spent = BuyGoods(vil, mk, list, want - wx, d, wx); }
                     finally { GoodsLedger.End(gfv); }
-                    if (spent > 0 && StartCalibration.AppliedFor(vil)) StartCalibration.KsVilOut(vil.Settlement, spent);   // KS-R3 P2: stara lista wsi zastosowanej - wydatek spoza koszyka (alfa netto)
+                    // KS-R3 P2: stara lista wsi zastosowanej - wydatek spoza koszyka (alfa netto). Recenzja runda 3 (drobne): tylko bez ciecia starej listy i przy pelnej lambdzie (w rampie
+                    // A..D+14 stara lista to jeszcze koszyk starej gospodarki - dotad szla do wydatkow spoza koszyka i zanizala alfe Planow D..D+42)
+                    if (spent > 0 && !leakCut && zl >= 0.999 && StartCalibration.AppliedFor(vil)) StartCalibration.KsVilOut(vil.Settlement, spent);
                     f.DVBuy = Math.Max(0, spent) + Math.Max(0, zSpent);    // E5/C4
                     // E3-W1: potrzeba dnia niekupiona w miescie targowym czeka na woz tej wsi w innym miescie (najwyzej W1Days dni potrzeby; PRZED "wsi bez towaru")
                     if (W1On)
@@ -1209,7 +1211,7 @@ namespace Armoury
                     {
                         int vg0 = vil.Gold;
                         VillageLadder(f, vil, mk, gold, buy1, nv); // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian; KS recenzja 16.10: nadwyzka poza koszykiem ZC4 - bez (1 - lambda))
-                        if (vg0 > vil.Gold && StartCalibration.AppliedFor(vil)) StartCalibration.KsVilOut(vil.Settlement, vg0 - vil.Gold);   // KS-R3 P2: luksusy wsi zastosowanej - spoza koszyka
+                        if (vg0 > vil.Gold && zl >= 0.999 && StartCalibration.AppliedFor(vil)) StartCalibration.KsVilOut(vil.Settlement, vg0 - vil.Gold);   // KS-R3 P2: luksusy wsi zastosowanej - spoza koszyka (pelna lambda)
                     }
                     if (spent <= 0) { d.VNoGoods++; _w1NgCur.Add(vil); continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
