@@ -6754,7 +6754,7 @@ namespace Armoury
 
         [SettingPropertyBool("Ds Towns", HintText = "towns, castles and the crown pay as they did in the Middle Ages: after Ds Farm Measure Days of watching what the town and castle purses give up today, each town and castle owes its lord and its king a fixed farm (paid every week); the daily valve, the war aid from the people's savings, the hoard tax on the people and the purses, the war levy on town purses and the lords' war levy on the people stop; in war the realm grants the king a war grant each quarter (aids on sales, a tax on earnings, a tenth of movables, double customs, a larger vassal aid), and a king short of money for the wage refunds spends his treasure above the war reserve, then borrows from his burghers against the grant, and only then from the Iron Bank (needs Town Folk Live and Crown Current Income; off = the old rules from the next day)")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
-        public bool DsTowns { get; set; } = false;
+        public bool DsTowns { get; set; } = true;
 
         [SettingPropertyInteger("Ds Farm Measure Days", 7, 91, "0", HintText = "with Ds Towns: for how many days the old valve of every town and castle (with the lord's part of the hoard tax and the lords' war levy on the people) is watched before the farms are set at what it gave on average - the farm is the old sum in a new form")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
