@@ -110,16 +110,19 @@ namespace Armoury
             if (town == null) return;
             var md = town.MarketData;
             var made = Produced(_getProductions.Invoke(pm, new[] { data }));
-            // DS (F1, rozdz. 3.2 pkt 5): wies DS - rynek BK nie jest osobnym poborem 5% kiesy, tylko "sklepem" kroku 5: budzet = (1 - rampa) x 5% kiesy (stary, w rampie)
-            // + odlozona czesc zbytkow z nadwyzki ponad skrzynie (DsVillage.SurplusDay); budzet maleje z kazdym zakupem (prawdziwy budzet). Inne wsie - BK jak dotad
+            // DS (F1, rozdz. 3.2 pkt 5): wies DS - rynek BK nie jest osobnym poborem 5% kiesy, tylko "sklepem" kroku 5. Stary pulap BK na sztuke (5% kiesy, nie maleje -
+            // jak w BK) slabnie z rampa: x (1 - rampa), przy rampie 0 rynek kupuje dokladnie jak przed DS (model 17.10: budzet malejacy od pierwszej doby obcinal zakupy
+            // bogatszych wsi juz w dobie wlaczenia); nowy budzet = odlozona czesc zbytkow z nadwyzki ponad skrzynie (DsVillage.SurplusDay) - maleje z kazdym zakupem.
+            // Sztuka idzie najpierw w starym pulapie (bez ruszania nowego budzetu), drozsza - z nowego budzetu. Inne wsie - BK jak dotad
             bool ds = DsVillage.On(st);
-            int budget = ds ? DsVillage.BkBudget(st, village.Gold) : (int)(village.Gold * 0.05f);   // BK: 5% kiesy - nie maleje w petli (jak w BK)
+            int fresh = 0;
+            int budget = ds ? DsVillage.BkBudget(st, village.Gold, out fresh) : (int)(village.Gold * 0.05f);   // BK: 5% kiesy - nie maleje w petli (jak w BK)
             var roster = town.Owner.ItemRoster;
             bool any = false;
-            long dsSpent = 0;
+            long dsSpent = 0, dsOld = 0;
             for (int i = roster.Count - 1; i >= 0; i--)
             {
-                if (budget <= 10) break;
+                if (budget <= 10 && fresh <= 10) break;
                 var e = roster.GetElementCopyAtIndex(i);
                 var el = e.EquipmentElement;
                 var item = el.Item;
@@ -127,17 +130,18 @@ namespace Armoury
                 var cd = md.GetCategoryData(item.ItemCategory);
                 if (cd.Supply <= cd.Demand) continue;
                 int price = md.GetPrice(el, null, false, null);
-                if (budget < price) continue;
+                bool inOld = budget > 10 && budget >= price;                                         // stary pulap na sztuke (BK; wies spoza DS - jedyny)
+                if (!inOld && !(ds && fresh >= price)) continue;
                 if (village.Gold < price) { _vSkip++; _vSkipValue += price; continue; }             // 3.4: dotad kasa dostawala te cene z niczego
                 village.ChangeGold(-price);
                 town.ChangeGold(price);
                 roster.AddToCounts(el, -1);
                 _vBuys++; _vPaid += price; any = true;
                 if (town.IsCastle) _vCastle += price;
-                if (ds) { budget -= price; dsSpent += price; }
+                if (ds) { dsSpent += price; if (inOld) dsOld += price; else fresh -= price; }
             }
             if (any) _vVillages++;
-            if (ds) DsVillage.NoteBkSpent(dsSpent);
+            if (ds) DsVillage.NoteBkSpent(dsSpent, dsOld);
         }
 
         private static object Marketplace()

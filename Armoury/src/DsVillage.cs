@@ -46,6 +46,7 @@ namespace Armoury
 
         // ------------------------------------------------------------ sesja
         private static readonly Dictionary<string, int> _bk = new Dictionary<string, int>();     // id wsi -> polowa kroku 5 na rynek BK (do najblizszego ticku BK wsi)
+        private static readonly Dictionary<string, int> _bkTick = new Dictionary<string, int>(); // id wsi -> doba ostatniego ticku rynku BK wsi (wies bez rynku BK - krok 5 caly na P5)
         private static bool _startLogged;
         private static int _stumbles, _stumblesSess;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
@@ -57,7 +58,7 @@ namespace Armoury
         private static int _rN, _rRemitN, _rRemitRaid, _rRemitSiege, _rRemitFam, _rForgivenN;
         private static double _rDue, _rPaid, _rArrPaid, _rNewArr, _rForgiven, _rRemit, _rLost;
         private static int _kVill; private static double _kGold, _kChest, _kOver, _kBudget, _kP5Plan, _kBkPlan, _kP5, _kOldExtra, _kOldLadder;
-        private static long _kBkSpent, _kBkOldPlan, _kBkNewPlan; private static int _kBkTicks;
+        private static long _kBkSpent, _kBkOldPlan, _kBkNewPlan, _kBkOldSpent, _kBkNoMkt; private static int _kBkTicks, _kBkNoMktN;
         private static long _oLevy, _oHoard, _oW7; private static int _oLevyN, _oHoardN, _oW7N;
         private static long _payOut, _payIn, _flushed;
 
@@ -69,7 +70,7 @@ namespace Armoury
             _rN = _rRemitN = _rRemitRaid = _rRemitSiege = _rRemitFam = _rForgivenN = 0;
             _rDue = _rPaid = _rArrPaid = _rNewArr = _rForgiven = _rRemit = _rLost = 0;
             _kVill = 0; _kGold = _kChest = _kOver = _kBudget = _kP5Plan = _kBkPlan = _kP5 = _kOldExtra = _kOldLadder = 0;
-            _kBkSpent = _kBkOldPlan = _kBkNewPlan = 0; _kBkTicks = 0;
+            _kBkSpent = _kBkOldPlan = _kBkNewPlan = _kBkOldSpent = _kBkNoMkt = 0; _kBkTicks = _kBkNoMktN = 0;
             _oLevy = _oHoard = _oW7 = 0; _oLevyN = _oHoardN = _oW7N = 0;
             _payOut = _payIn = _flushed = 0;
             _stumbles = 0;
@@ -78,7 +79,7 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior: nowa sesja (zapis wczytuje Import po konstruktorze).</summary>
         internal static void Reset()
         {
-            _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _startLogged = false;
+            _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _bkTick.Clear(); _startLogged = false;
             _stumblesSess = 0; _errOnce.Clear();
             ClearCounters();
         }
@@ -427,7 +428,8 @@ namespace Armoury
 
         // ============================================================ 4-5. skrzynia i zbytki z nadwyzki (TownFolk.Villages)
         /// <summary>TownFolk.Villages (wies DS, po koszyku dnia): budzet zbytkow tej doby = Ramp x max(0, kiesa - skrzynia) / DsSurplusSpendDays; czesc DsSurplusBkShare
-        /// odlozona na najblizszy tick rynku BK wsi (BkSeal34; bez latki albo wylaczony - calosc na P5). Zwraca czesc P5 do wydania teraz.</summary>
+        /// odlozona na najblizszy tick rynku BK wsi (BkSeal34; bez latki albo wylaczony, albo wies bez ticku rynku BK w ostatnich 2 dobach - bez budynku targu BK, nie Normal -
+        /// calosc na P5; model 17.10: rynek BK kupuje dziennie w ok. 65 z 571 wsi, reszta zostawialaby polowe kroku 5 w kiesie na zawsze). Zwraca czesc P5 do wydania teraz.</summary>
         internal static double SurplusDay(Settlement st, int gold, double chest)
         {
             try
@@ -442,6 +444,11 @@ namespace Armoury
                 double budget = ramp * over / sd;
                 double bkShare = Unit(s.DsSurplusBkShare);
                 if (!BkSeal34.VillageHooked || !BkSeal34.VillageOn) bkShare = 0;
+                else if (bkShare > 0)
+                {
+                    int tick;
+                    if (!_bkTick.TryGetValue(st.StringId, out tick) || Today - tick > 2) { _kBkNoMktN++; _kBkNoMkt += (long)Math.Floor(budget * bkShare); bkShare = 0; }
+                }
                 double bk = Math.Floor(budget * bkShare), p5 = budget - bk;
                 if (bk >= 1) _bk[st.StringId] = (int)Math.Min(int.MaxValue, bk); else _bk.Remove(st.StringId);
                 _kBudget += budget; _kBkPlan += bk; _kP5Plan += p5;
@@ -456,21 +463,31 @@ namespace Armoury
         /// <summary>TownFolk.Villages: stare wydatki z nadwyzki wsi DS w rampie (15%/d na stara liste, stara drabina P5) - liczniki "chciane".</summary>
         internal static void NoteOldExtras(double extra, double ladder) { if (extra > 0) _kOldExtra += extra; if (ladder > 0) _kOldLadder += ladder; }
 
-        /// <summary>BkSeal34.RunVillage (tick BK wsi DS): budzet rynku wsi = (1 - Ramp) x 5% kiesy (stary) + odlozona polowa kroku 5 (nowy, zuzyta).</summary>
-        internal static int BkBudget(Settlement st, int gold)
+        /// <summary>
+        /// BkSeal34.RunVillage (tick BK wsi DS): zwraca STARY pulap BK na sztuke = (1 - Ramp) x 5% kiesy (jak w BK - nie maleje w petli; w rampie slabnie liniowo, przy
+        /// rampie 0 rynek kupuje co do sztuki jak przed DS), `fresh` - NOWY budzet = odlozona czesc kroku 5 (maleje z kazdym zakupem). Zapisuje dobe ticku (SurplusDay).
+        /// </summary>
+        internal static int BkBudget(Settlement st, int gold, out int fresh)
         {
+            fresh = 0;
             try
             {
                 double old = (1.0 - Ramp) * Math.Max(0, gold) * BkOldShare;
                 int nw = 0;
-                if (st != null && st.StringId != null && _bk.TryGetValue(st.StringId, out nw)) _bk.Remove(st.StringId);
-                _kBkTicks++; _kBkOldPlan += (long)old; _kBkNewPlan += nw;
-                return (int)Math.Min(int.MaxValue, Math.Floor(old) + Math.Max(0, nw));
+                if (st != null && st.StringId != null)
+                {
+                    if (_bk.TryGetValue(st.StringId, out nw)) _bk.Remove(st.StringId);
+                    _bkTick[st.StringId] = Today;
+                }
+                fresh = Math.Max(0, nw);
+                _kBkTicks++; _kBkOldPlan += (long)old; _kBkNewPlan += fresh;
+                return (int)Math.Min(int.MaxValue, Math.Floor(old));
             }
-            catch (Exception e) { Stumble("BkBudget", e); return 0; }
+            catch (Exception e) { Stumble("BkBudget", e); fresh = 0; return 0; }
         }
 
-        internal static void NoteBkSpent(long spent) { if (spent > 0) _kBkSpent += spent; }
+        /// <summary>BkSeal34.RunVillage: zakupy wsi DS na rynku BK - razem i w tym w starym pulapie na sztuke (oczekiwane 0 po rampie).</summary>
+        internal static void NoteBkSpent(long spent, long oldCap) { if (spent > 0) _kBkSpent += spent; if (oldCap > 0) _kBkOldSpent += oldCap; }
 
         // ============================================================ stare pobory wsi DS w rampie (oczekiwane 0 po rampie)
         /// <summary>KingdomTreasury.Levies (galaz wsi): danina korony od kiesy ponad 15 dni zakupow - wies DS x (1 - Ramp). Zwraca kwote po rampie.</summary>
@@ -517,7 +534,7 @@ namespace Armoury
                     if (_dayOn >= 0 || _startLogged)
                         Log.Info("Daniny wsi (DS): dzien " + day + " | WYLACZONE (" + (s != null && s.DuesMedieval ? "kiesa ludu nieczynna" : "klucz Dues Medieval") + ") - stare pobory wsi od tej doby; zaleglosci czynszu "
                                  + _arr.Count + " wsi zostaja w zapisie bez skutku; ponowne wlaczenie = nowa rampa.");
-                    _dayOn = -1; _startLogged = false; _bk.Clear();
+                    _dayOn = -1; _startLogged = false; _bk.Clear(); _bkTick.Clear();
                     ClearCounters();
                     return;
                 }
@@ -563,8 +580,9 @@ namespace Armoury
                   .Append(s.DsRentArrears ? "" : ", przepadlo bez ksiegi " + N0(_rLost))
                   .Append(" | skrzynia: wsi ").Append(_kVill).Append(", kiesy ").Append(N0(_kGold)).Append(", cel skrzyni ").Append(N0(_kChest)).Append(", ponad skrzynia ").Append(N0(_kOver))
                   .Append(", zbytki z nadwyzki ").Append(N0(_kBudget)).Append(" (P5 ").Append(N0(_kP5Plan)).Append(" - kupione ").Append(N0(_kP5))
-                  .Append(" / rynek BK ").Append(N0(_kBkPlan)).Append(" odlozone; ticki BK wsi DS ").Append(_kBkTicks).Append(": budzet stary ").Append(_kBkOldPlan).Append(" + nowy ").Append(_kBkNewPlan)
-                  .Append(", kupione ").Append(_kBkSpent).Append("), rampa ").Append(ramp.ToString("0.000", Inv)).Append(" (od doby ").Append(_dayOn).Append(")")
+                  .Append(" / rynek BK ").Append(N0(_kBkPlan)).Append(" odlozone; wsi bez rynku BK (krok 5 caly na P5) ").Append(_kBkNoMktN).Append(" - ").Append(_kBkNoMkt)
+                  .Append("; ticki BK wsi DS ").Append(_kBkTicks).Append(": pulap stary na sztuke ").Append(_kBkOldPlan).Append(", budzet nowy ").Append(_kBkNewPlan)
+                  .Append(", kupione ").Append(_kBkSpent).Append(" (w starym pulapie ").Append(_kBkOldSpent).Append(")), rampa ").Append(ramp.ToString("0.000", Inv)).Append(" (od doby ").Append(_dayOn).Append(")")
                   .Append(" | stare pobory wsi DS (oczekiwane 0 po rampie): danina ").Append(_oLevy).Append(" (").Append(_oLevyN).Append(" wsi), podatek od nadwyzki ").Append(_oHoard).Append(" (").Append(_oHoardN)
                   .Append(" wsi), W7 ").Append(_oW7).Append(" (").Append(_oW7N).Append(" zrodel), 15%/d nadwyzki na stara liste (chciane) ").Append(N0(_kOldExtra)).Append(", stara drabina P5 (chciane) ").Append(N0(_kOldLadder))
                   .Append(" | korona: W4 do wplywu dnia (LeviesToday) ").Append(_flushed).Append(", czeka w skarbcach do nastepnego Levies ").Append(PendSum())
