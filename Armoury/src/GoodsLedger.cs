@@ -161,6 +161,7 @@ namespace Armoury
         // ------------------------------------------------------------ stan
         private static ItemObject[] _items;
         private static int[] _horseCat;          // ZC1: rodzaj konia (HorseBook.Cat) dla koni w ksiedze, -1 = towar (linia "Towary:")
+        private static bool _horsesIn;           // ZC1: konie w ksiedze w tej sesji (klucz GoodsLedgerHorses przy budowie listy towarow - zmiana dziala po wczytaniu)
         private static readonly string[] HorseCatName = { "zwykle", "bojowe", "szlachetne", "juczne", "egzotyczne" };
         private static Dictionary<ItemObject, int> _idx;
         private static Acc[] _acc;
@@ -194,8 +195,8 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _items = null; _idx = null; _acc = null; _top = null; _depth = 0; _lines.Clear(); _horseCat = null;
-            _tickAuth.Clear(); _authNames.Clear(); _authIx.Clear(); _authCache.Clear(); _authTraces = 0; _authCapped = 0; _authTicks = 0;   // K4 (Towary 2): autorzy zmian w tickach
+            _items = null; _idx = null; _acc = null; _top = null; _depth = 0; _lines.Clear(); _horseCat = null; _horsesIn = false;
+            _tickAuth.Clear(); _authNames.Clear(); _authIx.Clear(); _authCache.Clear(); _authTraces = 0; _authCapped = 0; _authTracesF = 0; _authCappedF = 0; _authTicks = 0;   // K4 (Towary 2): autorzy zmian w tickach
             for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
             _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _stumbles = _offThread = 0;
             _woodLeft = 0; _armsLeft = 0; _wagonGold = 0; _wagonSales = 0;
@@ -236,8 +237,8 @@ namespace Armoury
                 for (int i = 0; i < acc.Length; i++) acc[i] = new Acc();
                 for (int d = 0; d < MaxDepth; d++) { if (_pool[d] == null) _pool[d] = new Frame(); _pool[d].Size(list.Count); _pool[d].Clean(); }
                 var hc = new int[list.Count];
-                for (int i = 0; i < list.Count; i++) hc[i] = list[i].ItemType == ItemObject.ItemTypeEnum.Horse ? HorseBook.Cat(list[i]) : -1;
-                _horseCat = hc;
+                for (int i = 0; i < list.Count; i++) hc[i] = horses && list[i].ItemType == ItemObject.ItemTypeEnum.Horse ? HorseBook.Cat(list[i]) : -1;
+                _horseCat = hc; _horsesIn = horses;
                 _idx = idx; _acc = acc; _items = list.ToArray();
                 return true;
             }
@@ -376,7 +377,8 @@ namespace Armoury
                 if (it == null || _idx == null || !_idx.TryGetValue(it, out i)) return;
                 _tapRec++;
                 f.Rec(r, i, n);
-                if ((f.Kind == FTickSettle || f.Kind == FTickTown) && AuthorsOn) NoteAuthor(f.Kind, i, n);   // K4 (Towary 2): kto dopisal towar w ticku osady / miasta (tylko log)
+                // K4 (Towary 2): kto dopisal towar w ticku osady / miasta (tylko log); ZC1: konie bez sladow (linia koni nie uzywa K4 - nie zjadaja limitu doby)
+                if ((f.Kind == FTickSettle || f.Kind == FTickTown) && AuthorsOn && (_horseCat == null || i >= _horseCat.Length || _horseCat[i] < 0)) NoteAuthor(f.Kind, i, n, it != null && it.IsFood);
             }
             catch (Exception e) { Stumble("Tap", e); }
         }
@@ -387,22 +389,27 @@ namespace Armoury
         // nie zlapala), slad stosu: pierwsza metoda poza ItemRoster, ksiega, Harmony i System - zachowanie kampanii (CampaignBehaviorBase, z typu zewnetrznego dla
         // lambd) albo typ.metoda, z nazwa zestawu (mod). Najwyzej AuthCap sladow na dobe (reszta "(limit sladow doby)"), czas w linii. TYLKO LOG - klucz
         // GoodsLedgerTickAuthors (wylaczony = bez sladow, jak 449d453). Ticki partii (BK ser i jaja w partiach - znane) nie sa liczone (koszt).
-        private const int AuthCap = 1500;   // ok. 10-30 us na slad - najwyzej ok. 50 ms na dobe
+        private const int AuthCap = 1500;   // ok. 10-30 us na slad - najwyzej ok. 50 ms na dobe; ZC1: jedzenie ma osobny limit AuthCap (autor ryb "(nieznany)" - ZC1-14)
         private static readonly Dictionary<long, long> _tickAuth = new Dictionary<long, long>();   // (autor << 24 | miasto << 23 | towar) -> zmiana sztuk netto doby
         private static readonly List<string> _authNames = new List<string>();
         private static readonly Dictionary<string, int> _authIx = new Dictionary<string, int>();
         private static readonly Dictionary<MethodBase, string> _authCache = new Dictionary<MethodBase, string>();   // null = pomin ramke, "!" + nazwa = zachowanie (koniec), reszta = kandydat
-        private static int _authTraces, _authCapped; private static long _authTicks;
+        private static int _authTraces, _authCapped, _authTracesF, _authCappedF; private static long _authTicks;   // F - jedzenie (wlasny limit, ZC1)
         // NW O4 (ciche logi): slady stosu tylko w dobie pomiaru (LogGate.Today), linia w takcie nastepnej doby (LogGate.Lines); zerowanie w Daily codziennie
         private static bool AuthorsOn { get { var s = Settings.Current; return s != null && s.GoodsLedgerTickAuthors && LogGate.Today; } }
 
-        private static void NoteAuthor(int kind, int i, int n)
+        private static void NoteAuthor(int kind, int i, int n, bool food)
         {
             long t0 = Stopwatch.GetTimestamp();
             try
             {
                 string who;
-                if (_authTraces >= AuthCap) { who = "(limit sladow doby)"; _authCapped++; }
+                if (food)
+                {
+                    if (_authTracesF >= AuthCap) { who = "(limit sladow doby)"; _authCappedF++; }
+                    else { _authTracesF++; who = AuthorOf(new StackTrace(2, false)); }
+                }
+                else if (_authTraces >= AuthCap) { who = "(limit sladow doby)"; _authCapped++; }
                 else { _authTraces++; who = AuthorOf(new StackTrace(2, false)); }
                 int ai;
                 if (!_authIx.TryGetValue(who, out ai)) { ai = _authNames.Count; _authNames.Add(who); _authIx[who] = ai; }
@@ -526,7 +533,8 @@ namespace Armoury
                 items++;
             }
             if (items == 0) sb.Append("brak zmian");
-            sb.Append(" | sladow stosu ").Append(_authTraces).Append(" (limit ").Append(AuthCap).Append(", ponad limit ").Append(_authCapped).Append("), czas ")
+            sb.Append(" | sladow stosu ").Append(_authTraces + _authTracesF).Append(" (limit ").Append(AuthCap).Append(", ponad limit ").Append(_authCapped)
+              .Append("; jedzenie ").Append(_authTracesF).Append(" z wlasnym limitem ").Append(AuthCap).Append(", ponad limit ").Append(_authCappedF).Append("), czas ")
               .Append((_authTicks * 1000.0 / Stopwatch.Frequency).ToString("0.0", inv)).Append(" ms.");
             return sb.ToString();
         }
@@ -1342,7 +1350,7 @@ namespace Armoury
                 for (int k = 0; k < Kinds; k++) _framesN[k] = 0;
                 _tapAll = _tapIn = _tapRec = _tapArms = _ticksFrames = _lostParties = 0; _orphans = _overflow = _offThread = _stumbles = 0; _woodLeft = 0; _armsLeft = 0;
                 _wagonGold = 0; _wagonSales = 0;
-                _tickAuth.Clear(); _authTraces = 0; _authCapped = 0; _authTicks = 0;   // K4: autorzy doby (nazwy i pamiec metod zostaja na sesje)
+                _tickAuth.Clear(); _authTraces = 0; _authCapped = 0; _authTracesF = 0; _authCappedF = 0; _authTicks = 0;   // K4: autorzy doby (nazwy i pamiec metod zostaja na sesje)
                 _lastDay = day; _wasOn = true;
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -1375,8 +1383,7 @@ namespace Armoury
 
         private static string HorseLine(int day, HorseAgg[] hz)
         {
-            var s0 = Settings.Current;
-            if (s0 == null || !s0.GoodsLedgerHorses || _horseCat == null) return null;
+            if (!_horsesIn || _horseCat == null) return null;   // ZC1: klucz z budowy listy towarow tej sesji (wylaczenie w trakcie - po wczytaniu, jak lista)
             var sb = new StringBuilder(1200);
             sb.Append("Towary (konie jako kapital, ZC1): dzien ").Append(day).Append(" - konie, wielblady i juczne (sztuki; wartosc = zapas x cena sztuki)");
             long tv = 0, tn = 0;

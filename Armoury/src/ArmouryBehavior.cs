@@ -514,7 +514,8 @@ namespace Armoury
             // GL-5 (P5): stan wsi lnianych kampanii "1|stan|dzien" - brak klucza (stary zapis) = kampania w toku, bez podmian lnu (GoodsRates.Import)
             try { string gr = dataStore.IsSaving ? GoodsRates.Export() : null; SaveText.Sync(dataStore, "arm_goodsrates", ref gr); if (dataStore.IsLoading) GoodsRates.Import(gr); }
             catch (Exception e) { Log.Error("SyncData.arm_goodsrates", e); }
-            // ZC1 (GoodsPaths): start przejscia towarow ubocznych BK, ladunki gliny i wapna kampanii (tylko zaczeta z kluczem), marmur do rozdania - brak klucza = stary zapis
+            // ZC1 (GoodsPaths): starty przejsc 60 dob (towary uboczne BK, jedwab, ruda srebra, deski, woz, wieloryb, piwo), ladunki gliny i wapna kampanii (tylko zaczeta
+            // z kluczem), marmur do rozdania, miod pitny drwali i miast z wczoraj - brak klucza = stary zapis
             try { string zc1 = dataStore.IsSaving ? GoodsPaths.Export() : null; SaveText.Sync(dataStore, "arm_zc1", ref zc1); if (dataStore.IsLoading) GoodsPaths.Import(zc1); }
             catch (Exception e) { Log.Error("SyncData.arm_zc1", e); }
             // B6: stan winnic i gajow kampanii "1|stan|dzien" - brak klucza (stary zapis) = kampania w toku, bez podmian (VineOlive.Import)
@@ -793,6 +794,7 @@ namespace Armoury
             CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => VineOlive.OnNewGame());   // B6: winnice i gaje tylko w kampanii zaczetej z kluczem (flaga w zapisie arm_vineolive)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, OnDailyTick);
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, OreLedger.OnProduced);   // wpis 98: ksiega rudy i drewna - sztuki faktycznie dopisane osadom
+            CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, GoodsPaths.OnItemProduced);   // ZC1 (BkSideGoodsOrigin): miod pitny zrobiony w miastach - o tyle drwale robia go mniej
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, TownFolk.OnItemProduced);   // E5/0 (195): wartosc wyrobow miast i zamkow - place rzemiosla 35% (kiesa ludu na sucho, tylko log)
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, Stage6Measure.OnItemProduced);   // E6/0 (206): wyroby miast wedlug krainy i konie ze stadnin wsi (tylko log)
             CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, VillageByPeople.OnItemProduced);   // GL-1 (P1): towar glowny wsi dopisany wsi - plon faktyczny do plon-wsi.csv (tylko licznik, przy kluczu VillageOutputByPeople)

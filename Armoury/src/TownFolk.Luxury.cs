@@ -191,7 +191,6 @@ namespace Armoury
                     w[i] = 0; f.LxWide[i] = false;
                     float v;
                     if (!dict.TryGetValue(_lxCats[i], out v) || !(v > 0)) continue;
-                    if (GoodsPaths.NoFolkLuxury(_lxCats[i])) continue;   // ZC1 (SilkToWeavers / SilverOreToSmiths): jedwab i ruda srebra poza lista - ich czesc grupy na reszte grupy
                     int g = _lxGroup[i];
                     bool c = cl && _lxCloth[i];
                     _lxGa[g] += v;                                       // (b) suma grupy razem z kategoriami, ktore wypadna ponad cena graniczna
@@ -239,6 +238,12 @@ namespace Armoury
                         if (f.Kind == 0) _lxw.ClOff += x;
                         if (!(x >= 1)) continue;
                     }
+                    if (GoodsPaths.CraftFirst(c))                        // ZC1 (SilkToWeavers / SilverOreToSmiths): jedwab i ruda srebra z oferty tylko ponad zapas warsztatow miasta (reszta w kiesie)
+                    {
+                        double room = CraftRoom(town, c, v);
+                        if (x > room) x = room;
+                        if (!(x >= 1)) continue;
+                    }
                     double idx = Math.Max(0.01, town.GetItemCategoryPriceIndex(c));
                     double hs = Math.Max(0.05, HistoricalPrices.HouseShare(c));
                     double add = x / (Math.Pow(idx, OfferIdxPow) * hs);
@@ -256,6 +261,17 @@ namespace Armoury
             }
             catch (Exception e) { LxStumble("LadderOffer", e); return 0; }
             finally { _lxw.Ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>ZC1 (rzemioslo pierwsze): ile zlota oferty listy moze pojsc na jedwab surowy / rude srebra - polka ponad zapas warsztatow miasta x cena (GoodsPaths.FolkCap)
+        /// minus to, co z tej polki wezmie budzet gry (wzor jak ClothRoom). Miasto bez zapasu warsztatow - bez granicy.</summary>
+        private static double CraftRoom(Town town, ItemCategory c, double v)
+        {
+            float cap = GoodsPaths.FolkCap(town, c, float.MaxValue);
+            if (cap >= float.MaxValue) return double.PositiveInfinity;
+            double idx = Math.Max(0.01, town.GetItemCategoryPriceIndex(c));
+            double game = Math.Max(0, v) * Math.Pow(idx, OfferIdxPow) * Math.Max(0, HistoricalPrices.HouseShare(c)) + Math.Max(0, HistoricalPrices.ProsperityPart(town, c));
+            return Math.Max(0, cap - game);
         }
 
         /// <summary>Plotno 14.10 (poprawka 1c): plotno albo skora (LxNoSignal) - takze dla starej reguly BetterIds (AddOffer).</summary>

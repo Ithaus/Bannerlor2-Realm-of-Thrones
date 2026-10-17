@@ -1,5 +1,42 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-16 (noc, ZC1 - poprawki po recenzji) - PRZEJSCIA 60 DOB, RZEMIOSLO PIERWSZE ZAMIAST ZAKAZU, MIOD PITNY BEZ UCIECIA DO ZERA, MIESO WIELORYBA U ZRODLA, DAR BK ZDJETY WSZYSTKIM PARTIOM, KTORE NIE JEDZA
+
+**Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-zc1` (na 3c258689) | **Tor:** M (bez gry; autotest 120 dob po scaleniu) | **Klucze:** bez nowych, opisy MCM 11 kluczy ZC1 poprawione (`python tools/gen_mcm.py`) | **Zapis:** `arm_zc1` w formacie "2|..." (starty przejsc, miod pitny z wczoraj); "1|..." czytany (przejscie BK i marmur), brak klucza = stary zapis.
+
+**Dla Jeffa (prosto):**
+- Kazda zmiana produkcji, zakupow i cen z ZC1 wchodzi powoli przez 60 dni od pierwszego dnia z kluczem (jak marmur): drugi dzban piwa, mieso wieloryba u wielorybnikow, deski, cena wozu, jedwab i ruda srebra. Na Twoim zapisie nic nie skacze z dnia na dzien.
+- Jedwab i ruda srebra: mieszczanie nie maja zakazu, tylko kolejke. Kupuja je tylko z tego, co lezy na polce ponad dwa dni pracy tkalni aksamitu (i warsztatow rudy) w tym miescie. Tkacze zawsze maja jedwab, nadwyzka idzie do domow jak dotad - wsie jedwabne i kopalnie srebra nie traca rynku, polki nie zalewaja sie towarem. Gdzie zaden warsztat nie bierze rudy srebra (mennicy i zlotnika jeszcze nie ma), mieszczanie kupuja ja jak dotad.
+- Miod pitny: drwale robia go mniej tylko o tyle, ile miodu pitnego zrobily dzien wczesniej miasta (z miodu). Dopoki miasta go nie robia, drwale robia go jak dotad - miod pitny sie nie skonczy.
+- Wegiel: drwale wypalaja go, gdy wegiel z ladunku placi w miescie wiecej niz sam ladunek drewna (bez stalego progu "8 bryl"); zalany wegiel tanieje i wypal staje.
+- Woz wsi dostaje cene miasta za tyle soli, narzedzi, plotna, garnkow i piwa, ile wsie naprawde kupily tam wczoraj (nie ile chcialy), a za lupe zelaza - ile kowale i dymarki miasta zuzywaja w dzien.
+- Jedzenie z niczego zdjete tez milicjom, majatkom i wolnym kompaniom BK (nikt go nie jadl). Karawany zywnosci BK nie dosypuja juz jedzenia z niczego do spichlerzy miast, do ktorych jada - linia podaje ile i czy te miasta glodowaly.
+- Sztaby z polek: kowale przekuwaja je na zelazo (opis w MCM byl nieprawdziwy - kowale miasta uzywali ich przy naprawach; naprawy biora teraz rude i drewno).
+
+**Problem (recenzja ZC1, 18 uwag):** miod pitny drwali ciety do zera w 60 dob przy 0 miodu pitnego z warsztatow (zapas 34 dni, potem indeks 10); budzet mieszczan na jedwab, rude srebra i deski 0 od pierwszej doby (jedwab i ruda bez ujscia - zapas +30-45/d i +120/d, kasy miast -30-40 tys. zl/d utargu), a kotwica kiesy (`AnchorBudgetPostfix`) i tak go przywracala (`ProsperityPart` bez `NoTownBudget`); woz za cena celu od pierwszej doby i z koszyka "chcianego" (wsie kupuja ok. 14% tego); mieso wieloryba podmieniane w argumencie `ProduceAnOutputToTown` - gra i tak wysylala `OnItemProduced(WhaleMeat)`, pula doplaty 35% dostawala sztuke-widmo (ok. 600/d), warsztat gracza dalej robil WhaleMeat; konie zjadaly limit sladow K4 (autor ryb "(nieznany)" nie mogl wyjsc); dar BK zostawal milicjom, majatkom i wolnym kompaniom; wieloryb i drugie piwo bez przejscia; staly prog 8 bryl wegla; marmur dla spladrowanych glinanek przepadal, `_clayMines` 0 po wczytaniu; wsad gliny z magazynu gracza i koszt z rosteru miasta; koszyk wozu zuzyty przed kontrola sprzedazy; `GoodsLedgerHorses` czytany raz na sesje, linia co dobe; nieprawdziwe opisy MCM (SilkToWeavers, IronIngotsOffShelf); lupa zelaza bez koszyka.
+
+**Zmiana:**
+- `GoodsPaths.cs`: przejscia `Ramp(k)` dla 7 poprawek (start w zapisie, klucz wylaczony - od nowa); `ItemsPost` - postfiks `WorkshopsCampaignBehavior.GetItemsToProduce` zamienia WhaleMeat na meat w liscie wyrobow cyklu i przelicza utarg (wszystko dalej widzi meat; `WorkshopTrade.OutPrefix` wraca do wersji sprzed ZC1); wielorybnicy `WhaleShare x przejscie`; `MeadT` = miod pitny miast wczoraj / miod pitny drwali wczoraj (najwyzej przejscie), sluchacz `OnItemProduced` (miasta i zamki) i `NoteMeadBase`; `CraftFirst` / `CraftReserve` / `FolkCap` - zapas warsztatow miasta = 2 doby wsadu linii, ktore biora jedwab / rude srebra (szybkosc z modelu warsztatu), x przejscie; `FolkFactor` - deski x (1 - przejscie); wegiel tylko z ceny; marmur - budzet / glinanki z tickiem wczoraj, reszta na nastepna dobe, liczba glinanek leniwie po wczytaniu; dar BK: prefiks (stan) + postfiks (zdjecie dopisanego) `GiveFood` dla kazdej partii BK, ktora nie je (karawany niewolnikow i zywnosci, milicje, majatki, wolne kompanie; wedrowcy - 36b), liczniki wedlug rodzaju, cele karawan zywnosci bez zapasu; `BulkInPre` takze na `ConsumeInputFromWarehouse`, `BulkCostPost` z rosteru `__1`; linia ZC1: przejscia, indeks zboza i miodu pitnego, rzemioslo pierwsze (zapas, polki), kasy miast targowych wsi solnych, niezgodne sprzedaze wozow.
+- `GoodsRates.cs`: `SideStep` - miod pitny x (1 - MeadT), marmur x (1 - SideT).
+- `HistoricalPrices.cs`: `BudgetPostfix` - deski x `FolkFactor`, jedwab i ruda srebra `FolkCap` (polka ponad zapas warsztatow x cena), takze bez cen historycznych; `ProsperityPart` x `FolkFactor`.
+- `TownFolk.Live.cs`: `AnchorBudgetPostfix` (galaz "w gore") tnie wynik ta sama granica `FolkCap`; `VillageBought` - zloto zakupow wsi wedlug miasta i kategorii (`BuyGoods`: koszyk dnia i zakupy wozem W1) z ostatniej doby zamiast "chcianego" koszyka.
+- `TownFolk.Luxury.cs`: lista dostatku nie pomija jedwabiu i rudy srebra - oferta tylko ponad zapas warsztatow (`CraftRoom`), reszta w kiesie. `NoMakerBudget.cs` - wersja sprzed ZC1 (granice daje wiersz BK).
+- `MarketCarts.cs`: `Absorb(town, cat, item, p0)` - wczorajsze zakupy wsi / cena, lupa - `CaravanBulk.UseNow`, x `CartT`; koszyk dopisany do zuzytego dopiero po kontrolach sprzedazy; sprzedaz z odtworzeniem niewiernym poza licznikami ZC1 (licznik).
+- `ArtisanInputs.cs`: piwo `1 + BeerT` sztuk na cykl (losowo), `CycleIncome` tak samo; `YieldOf` (ksiega) 2 tylko po starcie przejscia.
+- `GoodsLedger.cs`: konie bez sladow K4; jedzenie z wlasnym limitem sladow doby (linia K4: "jedzenie N z wlasnym limitem 1500, ponad limit M"); konie w ksiedze wedlug klucza z budowy listy (`_horsesIn`) - linia koni tak samo.
+- `ArmouryBehavior.cs`: sluchacz `GoodsPaths.OnItemProduced`. `Settings.cs`: opisy 11 kluczy ZC1 (przejscia, rzemioslo pierwsze, miod pitny, wegiel z ceny, sztaby, woz, partie BK, konie po wczytaniu).
+- `tools/sprawdz_logi.py`: grupa `nzc1` od nowa (ZC1-0..19, `--baza-doby` dla progow "wobec bazy"): sol po przejsciu woza, kasy miast solnych, miod pitny (produkcja >= 80% bazy, indeks <= x1.10), cele karawan zywnosci, slady K4 jedzenia ponad limit 0, zboze, zapas jedwabiu i rudy srebra (przyrost <= 10% produkcji), utarg wozow jedwabiu i rudy, 'nie do wydania', reszta bilansu pieniadza, mieszczanie bez desek po przejsciu.
+
+**Czego NIE zrobilem:** ryby "(nieznany)" w tickach osad (70-130/d) - zrodlo dalej otwarte, autora poda K4 w nastepnym biegu (konie nie zjadaja juz sladow, jedzenie ma wlasny limit - prog ZC1-14); zamknac jak konwoje DTE, gdy bedzie nazwany. Para miod -> miod pitny i mennica / zlotnik - ZC5 i pozniej (do tego czasu drwale robia miod pitny, a mieszczanie kupuja rude srebra jak dotad).
+
+**Ryzyko / co sprawdzic (autotest 120 dob):**
+- ZC1-4 aksamit: przy "rzemioslo pierwsze" tkalnie maja jedwab, ale jest ich malo (najwyzej ok. 15 jedwabiu/d) - prog projektu moze nie przejsc; to decyzja o liczbie tkalni, nie o jedwabiu.
+- ZC1-5 sol 0.6-1.2: liczona tylko po pelnym przejsciu woza (60 dob), a koszyk to wczorajsze zakupy wsi - pierwszy dzien po wczytaniu (bez zakupow wczoraj) woz dostaje stara cene.
+- `FolkCap` liczy polke przy kazdym wywolaniu wiersza jedwabiu i rudy srebra (petla po rosterze miasta) - czas w "Koszt" doby.
+- Przejscia startuja przy pierwszej dobie z kluczem; wylaczenie klucza zeruje start (ponowne wlaczenie - 60 dob od nowa).
+
+**Status:** DO SPRAWDZENIA (nie wgrane; build kod 0; autotest 120 dob po scaleniu).
+
 ## 2026-10-16 (noc, ZC1 - drogi towarow; projekt ZYCIE CODZIENNE rozdz. 13-14) - MIESO WIELORYBA TYLKO OD WIELORYBNIKOW, JEDWAB DLA TKACZY, DESKI DLA BUDOW, WEGIEL Z DREWNA, SZTABY Z POLEK, WOZ ZA CENA CELU, JEDZENIE Z NICZEGO ZAMKNIETE
 
 **Mod:** Armoury + narzedzie | **Galaz:** `w-toku/noc-zc1` (na c4932168 = WGRANIE 73) | **Tor:** M (bez gry; autotest 120 dob po scaleniu) | **Klucze (nowe, domyslnie tak):** `WhaleMeatFromWhalersOnly`, `BkRecipeYieldByWorkshop`, `SilkToWeavers`, `SilverOreToSmiths`, `PlanksToBuilding`, `CharcoalBurners`, `IronIngotsOffShelf`, `BkSideGoodsOrigin`, `CartPriceByDestination`, `DteConvoyNoFreeFood`, `BkCaravanNoFreeFood`, `GoodsLedgerHorses`; `BulkClayLimeCharcoal` (tylko kampania zaczeta z kluczem); `python -I tools/gen_mcm.py` (1665 ustawien) | **Zapis:** nowy klucz `arm_zc1` (stary zapis bez klucza = glina w workach na stale, przejscie BK od pierwszej doby z kluczem) | **Progi:** `python -I tools/sprawdz_logi.py --grupa nzc1 <Armoury-*.log>`
@@ -47,7 +84,7 @@
 - Ladunki gliny i wapna - tylko nowa kampania; autotest na zapisie F ich nie widzi. Przy wylaczonym PaidConstruction BK liczy material budow w sztukach (wapien x10 kg) - przy PaidConstruction (domyslnie) BK materialow nie bierze.
 - K4: `Harmony.GetOriginalMethodFromStackframe` raz na metode (pamiec) - czas linii K4 w "Towary (inne ticki dobowe)".
 
-**Status:** DO SPRAWDZENIA (nie wgrane; build kod 0; autotest 120 dob po scaleniu).
+**Status:** DO SPRAWDZENIA (nie wgrane; build kod 0; autotest 120 dob po scaleniu). **Uwaga:** czesc punktow zmieniona w "ZC1 - poprawki po recenzji" (wyzej) - przejscia 60 dob, rzemioslo pierwsze zamiast budzetu 0 dla jedwabiu i rudy srebra, miod pitny, wegiel bez progu 8 bryl, mieso wieloryba w GetItemsToProduce, koszyk wozu z zakupow wsi.
 
 ## 2026-10-16 (noc, herby D2 - poprawki po recenzji) - RODY KANONU BLISKO SWOICH SIEDZIB, WYSPY DLA WYSPIARZY, HERBY BLIZEJ KANONU, LIMITY PROPORCZYKOW
 

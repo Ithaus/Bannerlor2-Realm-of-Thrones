@@ -1081,21 +1081,27 @@ namespace Armoury
                 // K1-3a krok 2: przy regule koni roboczych (TownsfolkBuyOnlyWorkHorses i czynna kiesa ludu) koszyk BK nie kupuje koni zadnej z czterech kategorii
                 // targu - wymiane padlych koni roboczych robi TownFolk.WorkHorsesDaily (jeden zakup, jedna zaplata); takze bez cen historycznych
                 if (TownFolk.NoHorseBasket(town, category, true)) { __result = 0f; return; }
-                // ZC1 (SilkToWeavers / SilverOreToSmiths / PlanksToBuilding): jedwab surowy dla tkalni aksamitu, ruda srebra dla zlotnikow i dworow, deski dla budow -
-                // mieszczanie tych kategorii nie kupuja (budzet wiersza 0, jak bron i zbroja); takze bez cen historycznych
-                if (GoodsPaths.NoTownBudget(category)) { __result = 0f; return; }
-                if (!_applied) return;
-                var s = Settings.Current;
-                float idx = Math.Max(0.01f, town.GetItemCategoryPriceIndex(category));
-                float extra = town.Prosperity / 1000f / idx;
-                float r;
-                if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f)
-                    __result = __result - extra + extra / r;
-                if (s.TownHouseholdUse) __result *= TownUse(category.StringId);
-                // paczka 172: strzaly i belty (kategoria "arrows" - BK ma ja za towar z popytem 10/10) mieszczanie zjadali z polek w nicosc;
-                // przy czynnych strzelarzach miasta budzet 0 - takze przy wylaczonym TownHouseholdUse (mysliwskie strzaly sa poza skala)
-                else if (category.StringId == "arrows") __result *= TownFletchers.HouseUse();
-                if (category.StringId == "arrows") TownFletchers.NoteHouse();   // licznik linii 172 tylko tu (TownUse/HouseShare bez efektu ubocznego)
+                // ZC1 (PlanksToBuilding): deski dla budow - budzet wiersza mieszczan x (1 - przejscie 60 dob), do 0; takze bez cen historycznych
+                float zf = GoodsPaths.FolkFactor(category);
+                if (!(zf > 0f)) { __result = 0f; return; }
+                if (_applied)
+                {
+                    var s = Settings.Current;
+                    float idx = Math.Max(0.01f, town.GetItemCategoryPriceIndex(category));
+                    float extra = town.Prosperity / 1000f / idx;
+                    float r;
+                    if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f)
+                        __result = __result - extra + extra / r;
+                    if (s.TownHouseholdUse) __result *= TownUse(category.StringId);
+                    // paczka 172: strzaly i belty (kategoria "arrows" - BK ma ja za towar z popytem 10/10) mieszczanie zjadali z polek w nicosc;
+                    // przy czynnych strzelarzach miasta budzet 0 - takze przy wylaczonym TownHouseholdUse (mysliwskie strzaly sa poza skala)
+                    else if (category.StringId == "arrows") __result *= TownFletchers.HouseUse();
+                    if (category.StringId == "arrows") TownFletchers.NoteHouse();   // licznik linii 172 tylko tu (TownUse/HouseShare bez efektu ubocznego)
+                }
+                if (zf < 1f) __result *= zf;
+                // ZC1 (SilkToWeavers / SilverOreToSmiths): rzemioslo pierwsze - jedwab surowy i ruda srebra tylko z polki ponad zapas warsztatow miasta (2 doby wsadu x przejscie);
+                // miasto bez warsztatu tej kategorii - bez zmian. Kotwica kiesy (TownFolk.AnchorBudgetPostfix, po nas) tnie swoj wynik ta sama granica
+                __result = GoodsPaths.FolkCap(town, category, __result);
             }
             catch { }
         }
@@ -1103,21 +1109,24 @@ namespace Armoury
         /// <summary>
         /// E5/B1 (kotwica, K1): czlon dobrobytu w budzecie wiersza BK CalculateBudget tak, jak go zostawil BudgetPostfix - jedno zrodlo prawdy dla
         /// TownFolk.AnchorBudgetPostfix (Priority.Low, po nas): BK dobrobyt/1000/indeks, przy HistDemandScaling / przelicznik kategorii, x czesc domowa
-        /// (TownUse; strzaly HouseUse), bron i zbroja 0 (ZeroTownBudget), konie przy regule koni roboczych 0 (TownFolk.NoHorseBasket). Sam odczyt (bez licznikow 172). Wyjatek - 0 (kotwica nie tnie).
+        /// (TownUse; strzaly HouseUse), bron i zbroja 0 (ZeroTownBudget), konie przy regule koni roboczych 0 (TownFolk.NoHorseBasket), deski x (1 - przejscie) (ZC1 PlanksToBuilding). Sam odczyt (bez licznikow 172). Wyjatek - 0 (kotwica nie tnie).
         /// </summary>
         internal static float ProsperityPart(Town town, ItemCategory category)
         {
             try
             {
                 if (town == null || category == null || ArmsLeaks.ZeroTownBudget(category) || TownFolk.NoHorseBasket(town, category, false)) return 0f;   // K1-3a krok 2: konie jak bron - 0
+                float zf = GoodsPaths.FolkFactor(category);   // ZC1 (PlanksToBuilding): deski x (1 - przejscie), jak wiersz w BudgetPostfix (granice "rzemioslo pierwsze" daje kotwica)
+                if (!(zf > 0f)) return 0f;
                 float raw = town.GetItemCategoryPriceIndex(category);
-                if (!_applied) return raw > 0f ? town.Prosperity / 1000f / raw : 0f;
+                if (!_applied) return raw > 0f ? zf * town.Prosperity / 1000f / raw : 0f;
                 var s = Settings.Current;
                 float extra = town.Prosperity / 1000f / Math.Max(0.01f, raw);
                 float r;
                 if (s.HistDemandScaling && _catRatio.TryGetValue(category, out r) && r > 1f) extra /= r;
                 if (s.TownHouseholdUse) extra *= TownUse(category.StringId);
                 else if (category.StringId == "arrows") extra *= TownFletchers.HouseUse();
+                extra *= zf;
                 return extra > 0f && !float.IsInfinity(extra) ? extra : 0f;
             }
             catch { return 0f; }

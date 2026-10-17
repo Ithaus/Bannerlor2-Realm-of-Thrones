@@ -89,7 +89,7 @@ namespace Armoury
         internal static void Reset()
         {
             _hauls.Clear(); _news.Clear(); _errSites.Clear();
-            _absUsed.Clear(); _absDay = -1; Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2);   // ZC1
+            _absUsed.Clear(); _absDay = -1; Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2); _zMis = 0;   // ZC1
             ClearDay();
         }
 
@@ -214,7 +214,7 @@ namespace Armoury
                 gold -= (long)sold * p0;
                 if (fair)
                 {
-                    int a = Math.Min(sold, Absorb(town, cat, p0));   // ZC1 (CartPriceByDestination): koszyk dnia wsi tego targu po cenie z chwili wjazdu
+                    int a = Math.Min(sold, Absorb(town, cat, it, p0));   // ZC1 (CartPriceByDestination): wczorajsze zakupy wsi tego targu (lupa - zuzycie kowali) po cenie z chwili wjazdu
                     total += (long)a * p0 + SumRun(model, load[i].El, cart, inStore, d.Supply, d.Demand, HistoricalPrices.ShelfWorth(it), sold - a, p0);   // paczka 121: jednostka polki = waga sztuki (kategorie mieszane)
                 }
                 else total += (long)sold * p0;
@@ -248,7 +248,7 @@ namespace Armoury
                 long p0 = Math.Max(0, Price(model, load[i].El, cart, inStore, d.Supply, d.Demand));
                 if (fair && p0 > 0)
                 {
-                    int a = Math.Min(n, Absorb(town, cat, (int)Math.Min(int.MaxValue, p0)));   // ZC1: czesc do koszyka wsi po cenie pierwszej sztuki (gorna granica tak samo jak wycena)
+                    int a = Math.Min(n, Absorb(town, cat, it, (int)Math.Min(int.MaxValue, p0)));   // ZC1: czesc do koszyka wsi po cenie pierwszej sztuki (gorna granica tak samo jak wycena)
                     total += a * p0; n -= a;
                     if (n <= 0) continue;
                 }
@@ -599,16 +599,23 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ZC1 (CartPriceByDestination): koszyk dnia wsi targu
-        /// <summary>Ile sztuk tej kategorii wsie, ktore kupuja w tym miescie, biora z jego polki w dobe (koszyk dnia: sol, narzedzia, len, garnki, piwo - TownFolk.VillageWant
-        /// / cena sztuki). Klucz wylaczony, kategoria poza koszykiem, brak danych - 0 (wycena jak dotad).</summary>
-        private static int Absorb(Town town, ItemCategory cat, int p0)
+        /// <summary>Ile sztuk ladunku miasto przyjmuje dzis po cenie z chwili wjazdu: zloto, ktore wsie handlujace w tym miescie NAPRAWDE wydaly tam wczoraj na te kategorie
+        /// koszyka dnia (sol, narzedzia, len, garnki, piwo - TownFolk.VillageBought) / cena sztuki, a lupa zelaza ("iron") - dzienne zuzycie kowali i dymarek miasta
+        /// (CaravanBulk.UseNow); x przejscie CartT (60 dob od pierwszej doby z kluczem - stara i nowa wycena laczone), minus czesc wzieta juz dzis przez inne wozy.
+        /// Klucz wylaczony, kategoria poza koszykiem, brak danych - 0 (wycena jak dotad).</summary>
+        private static int Absorb(Town town, ItemCategory cat, ItemObject it, int p0)
         {
             try
             {
                 if (p0 <= 0 || town == null || cat == null || !GoodsPaths.CartOn) return 0;
-                double want = TownFolk.VillageWant(town.Settlement, cat);
-                if (!(want >= p0)) return 0;
-                int all = (int)Math.Min(100000.0, Math.Floor(want / p0));
+                float t = GoodsPaths.CartT;
+                if (!(t > 0f)) return 0;
+                double units;
+                double bought = TownFolk.VillageBought(town.Settlement, cat);
+                if (bought >= p0) units = bought / p0;
+                else if (it != null && it.StringId == "iron") units = Math.Max(0f, CaravanBulk.UseNow(town, it));   // ZC1: lupa - kowale i dymarki miasta biora ja co dobe
+                else return 0;
+                int all = (int)Math.Min(100000.0, Math.Floor(t * units));
                 return Math.Max(0, all - AbsUsed(town, cat));   // czesc koszyka wziely juz dzis inne wozy w tym miescie
             }
             catch (Exception e) { Stumble("MarketCarts.Absorb", e); return 0; }
@@ -645,6 +652,7 @@ namespace Armoury
 
         // linia ZC1: sol [0] i zelazo [1] sprzedane przez wozy wsi - sztuki, cena pierwszej sztuki x sztuki (cena miasta przy wjezdzie), zaplata, zaplata stara regula
         private static readonly long[] _zN = new long[2], _zFirst = new long[2], _zFair = new long[2], _zOld = new long[2];
+        private static long _zMis;   // sprzedaze wozow wsi z odtworzeniem niewiernym (zaplata nieznana) - poza licznikami ZC1
         private static int Zc1Kind(ItemObject it)
         {
             string id = it != null ? it.StringId : null;
@@ -658,11 +666,12 @@ namespace Armoury
         }
 
         /// <summary>GoodsPaths.Daily: liczby doby sprzedazy soli i zelaza wozami wsi (zeruje).</summary>
-        internal static void TakeZc1(out long saltN, out long saltFirst, out long saltFair, out long saltOld, out long ironN, out long ironFirst, out long ironFair, out long ironOld)
+        internal static void TakeZc1(out long saltN, out long saltFirst, out long saltFair, out long saltOld, out long ironN, out long ironFirst, out long ironFair, out long ironOld, out long mismatch)
         {
             saltN = _zN[0]; saltFirst = _zFirst[0]; saltFair = _zFair[0]; saltOld = _zOld[0];
             ironN = _zN[1]; ironFirst = _zFirst[1]; ironFair = _zFair[1]; ironOld = _zOld[1];
-            Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2);
+            mismatch = _zMis;
+            Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2); _zMis = 0;
         }
 
         // ------------------------------------------------------------ czesc 3: uczciwa cena ladunku
@@ -718,6 +727,7 @@ namespace Armoury
                 var added = new Dictionary<ItemCategory, int>();
                 long first = 0, fair = 0;
                 long[] zn = null, zf = null, zp = null, zo = null;   // ZC1: sol i zelazo tej sprzedazy (linia doby dopiero, gdy wiadomo, co woz naprawde dostal)
+                List<KeyValuePair<ItemCategory, int>> absN = null;   // ZC1: sztuki koszyka miasta tej sprzedazy - dopisane do zuzytego koszyka dopiero po kontrolach
                 for (int i = __state.El.Length - 1; i >= 0; i--)
                 {
                     var el = __state.El[i];
@@ -736,8 +746,8 @@ namespace Armoury
                     first += (long)sold * p0;
                     int wv = HistoricalPrices.ShelfWorth(it);   // paczka 121: jednostka polki = waga sztuki (tak samo dopisuje ja gra w danych rynku)
                     // ZC1 (CartPriceByDestination): sztuki do dziennego koszyka wsi tego targu po cenie z chwili wjazdu, reszta sztuka po sztuce od tej ceny w dol
-                    int a = Math.Min(sold, Absorb(__state.Town, cat, p0));
-                    if (a > 0) AbsAdd(__state.Town, cat, a);   // ta czesc koszyka wsi tego miasta jest dzis zaspokojona (nastepny woz - reszta)
+                    int a = Math.Min(sold, Absorb(__state.Town, cat, it, p0));
+                    if (a > 0) (absN ?? (absN = new List<KeyValuePair<ItemCategory, int>>())).Add(new KeyValuePair<ItemCategory, int>(cat, a));   // koszyk zuzyty dopiero po kontrolach (nizej)
                     long one = (long)a * p0;
                     for (int k = 0; k < sold - a; k++) one += k == 0 ? p0 : model.GetPrice(el, __1, null, true, inStore + k * wv, d.Supply, d.Demand);
                     fair += one;
@@ -752,10 +762,11 @@ namespace Armoury
                     }
                     added[cat] = off + sold * wv;
                 }
-                if (first != paid) { _mismatch++; ZNote(zn, zf, zf, zo); return; }       // odtworzenie niewierne (inna sprzedaz niz gry / BK) - nie ruszamy (woz dostal cene pierwszej sztuki)
+                if (first != paid) { _mismatch++; _zMis++; return; }                     // odtworzenie niewierne (inna sprzedaz niz gry / BK) - nie ruszamy; zaplata nieznana - poza licznikami ZC1
                 long refund = paid - fair;
-                if (refund < 0) { _rising++; ZNote(zn, zf, zf, zo); return; }           // cena rosla z polka (inny model cen) - nie dokladamy z kasy osady
+                if (refund < 0) { _rising++; ZNote(zn, zf, zf, zo); return; }           // cena rosla z polka (inny model cen) - nie dokladamy z kasy osady (woz dostal cene pierwszej sztuki)
                 ZNote(zn, zf, zp, zo);
+                if (absN != null) foreach (var kv in absN) AbsAdd(__state.Town, kv.Key, kv.Value);   // ta czesc koszyka miasta jest dzis zaspokojona (nastepny woz - reszta)
                 _fairN++; _fairFirst += paid; _fairPaid += fair;
                 if (refund == 0) return;
                 __1.PartyTradeGold -= (int)refund;                                      // sakwa taboru -> kasa osady: zloto nie powstaje i nie znika

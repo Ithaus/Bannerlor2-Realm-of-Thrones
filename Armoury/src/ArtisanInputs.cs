@@ -199,13 +199,13 @@ namespace Armoury
                         _dMulti++; _dCap += surplus;
                         remove = surplus - Decide(beh, w, town, roster, surplus);
                     }
-                    // ZC1 (BkRecipeYieldByWorkshop): linia zboze -> piwo daje YieldNow sztuk na cykl (warzelnia gry: 1 zboze -> 2 piwa). Druga sztuka cyklu wraca najpierw
-                    // z naddatku BK zdjetego z polki (te sztuki kasa miasta juz zaplacila - mniej zwrotu), brak dopisuje Byproduct (kasa miasta placi tylko z nadwyzki
-                    // ponad zapas kupcow, inaczej sztuka nie powstaje). Chleb i reszta linii - 1 sztuka na cykl jak dotad.
-                    int y = YieldNow(_item.ItemCategory);
-                    if (y > 1 && _cycles > 0)
+                    // ZC1 (BkRecipeYieldByWorkshop): linia zboze -> piwo daje YieldNow sztuk na cykl (1 + przejscie 60 dob; warzelnia gry: 1 zboze -> 2 piwa). Druga sztuka
+                    // cyklu wraca najpierw z naddatku BK zdjetego z polki (te sztuki kasa miasta juz zaplacila - mniej zwrotu), brak dopisuje Byproduct (kasa miasta placi
+                    // tylko z nadwyzki ponad zapas kupcow, inaczej sztuka nie powstaje). Chleb i reszta linii - 1 sztuka na cykl jak dotad.
+                    float y = YieldNow(_item.ItemCategory);
+                    int want = y > 1f && _cycles > 0 ? MBRandom.RoundRandomized((y - 1f) * _cycles) : 0;
+                    if (want > 0)
                     {
-                        int want = (y - 1) * _cycles;
                         int keep = Math.Min(want, Math.Max(0, remove));
                         if (keep > 0) { roster.AddToCounts(new EquipmentElement(_item), keep); remove -= keep; want -= keep; }
                         int unsold0 = _bUnsold, add0 = _bAdd;
@@ -284,18 +284,19 @@ namespace Armoury
             return made;
         }
 
-        /// <summary>ZC1 (BkRecipeYieldByWorkshop): sztuk wyrobu kategorii outCat na cykl biezacej linii - 2 dla piwa z linii ze zbozem na wsadzie, inaczej 1.</summary>
-        private static int YieldNow(ItemCategory outCat)
+        /// <summary>ZC1 (BkRecipeYieldByWorkshop): sztuk wyrobu kategorii outCat na cykl biezacej linii - 1 + przejscie (do 2 po 60 dobach) dla piwa z linii ze zbozem
+        /// na wsadzie, inaczej 1.</summary>
+        private static float YieldNow(ItemCategory outCat)
         {
-            if (!GoodsPaths.BeerOn || outCat == null || outCat.StringId != "beer" || _p.Inputs == null) return 1;
-            foreach (var i in _p.Inputs) if (i.Item1 != null && i.Item1.StringId == "grain") return 2;
-            return 1;
+            if (!GoodsPaths.BeerOn || outCat == null || outCat.StringId != "beer" || _p.Inputs == null) return 1f;
+            foreach (var i in _p.Inputs) if (i.Item1 != null && i.Item1.StringId == "grain") return 1f + GoodsPaths.BeerT;
+            return 1f;
         }
 
-        /// <summary>ZC1: to samo dla ksiegi towarow (GoodsLedger - linia z wsadem wedlug kategorii).</summary>
+        /// <summary>ZC1: to samo dla ksiegi towarow (GoodsLedger - linia z wsadem wedlug kategorii) - gorna granica sztuk na cykl (2 w przejsciu, losowo do 2).</summary>
         internal static int YieldOf(IDictionary<ItemCategory, int> ins, ItemCategory outCat)
         {
-            if (!GoodsPaths.BeerOn || outCat == null || outCat.StringId != "beer" || ins == null) return 1;
+            if (!GoodsPaths.BeerOn || outCat == null || outCat.StringId != "beer" || ins == null || !(GoodsPaths.BeerT > 0f)) return 1;
             foreach (var k in ins.Keys) if (k != null && k.StringId == "grain") return 2;
             return 1;
         }
@@ -310,7 +311,7 @@ namespace Armoury
                 if (o.Item1 == null || o.Item2 <= 0) continue;
                 var it = _item != null && _item.ItemCategory == o.Item1 ? _item : WorkshopTrade.Sample(o.Item1);
                 if (it == null) continue;
-                sum += o.Item2 * YieldNow(o.Item1) * town.GetItemPrice(new EquipmentElement(it), null, true);
+                sum += (int)Math.Round(o.Item2 * YieldNow(o.Item1) * town.GetItemPrice(new EquipmentElement(it), null, true));
             }
             return sum;
         }
