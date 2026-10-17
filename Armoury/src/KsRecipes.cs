@@ -41,6 +41,16 @@ namespace Armoury
             { "chicken>meat", new KeyValuePair<int, int>(3, 1) },    // 15 kg zywca -> 10 kg miesa (ok. 2/3 - tuszka drobiu)
             { "goose>meat", new KeyValuePair<int, int>(3, 1) },
             { "*>pie", new KeyValuePair<int, int>(0, 2) },           // zboze + nadzienie (20 kg) -> 2 pierogi (20 kg); wsad bez zmian
+            // Jeff 17.10 "przejrzyj wszystkie surowce, nie tylko jedzenie": przetwory poza bronia i zbroja (te - WorkshopLaw); te same stale co Plan (KsTab)
+            { "iron>tools", new KeyValuePair<int, int>(4, 5) },      // lupka zelaza 15 kg, ToolsIron 1.2 kg na kg narzedzi (kucie, zgorzelina): 60 kg -> 50 kg (gra 1 -> 2 / kuznia 1 -> 4)
+            { "clay>pottery", new KeyValuePair<int, int>(6, 5) },    // PotClay 1.2 kg gliny na kg naczyn (woda i wypal) (gra 1 -> 1 / garncarnia 1 -> 2)
+            { "flax>linen", new KeyValuePair<int, int>(5, 4) },      // LinenFlax 1.25 kg lnu na kg plotna (tkalnia 1 -> 2)
+            { "cotton>velvet", new KeyValuePair<int, int>(6, 5) },   // surowy jedwab, VelvetSilk 1.2 kg na kg aksamitu (1 -> 2)
+            { "wool>garment", new KeyValuePair<int, int>(3, 2) },    // FeltWool 1.45 kg welny (pranie, gremplowanie) na kg sukna (1 -> 2)
+            { "wool>felt", new KeyValuePair<int, int>(3, 2) },
+            { "hides>leather", new KeyValuePair<int, int>(5, 2) },   // LeatherHide 2.4 kg skory surowej na kg wyprawionej (garbarnia 1 -> 2)
+            { "hardwood>planks", new KeyValuePair<int, int>(1, 5) }, // pien 100 kg -> deski ok. 50% (tartak reczny) = 5 x 10 kg (gra 1 -> 2 = 20%)
+            { "silver>jewelry", new KeyValuePair<int, int>(25, 1) }, // ruda srebra, JewelSilver 25 kg rudy na kg wyrobu (gra 1 -> 2)
         };
 
         private static bool KeyOn { get { var s = Settings.Current; return s == null || s.KsRealRecipes; } }
