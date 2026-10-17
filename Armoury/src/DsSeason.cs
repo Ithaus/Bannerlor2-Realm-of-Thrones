@@ -41,6 +41,7 @@ namespace Armoury
             public double G; public int Serial, Day = -1, Peace, War;
             public double URentSum; public int URentN; public double URent = double.NaN;
             public readonly double[] RNeed = new double[Ring], RInc = new double[Ring], RS = new double[Ring], RE = new double[Ring], RM = new double[Ring], RV = new double[Ring], RRent = new double[Ring];
+            public readonly double[] ROth = new double[Ring];   // fin75: 'inne' (d.Other + trzecie 178) osobno - w prognozie mediana (jednorazowe lupy / wyrownania nie zawyzaja)
             public readonly bool[] RW = new bool[Ring]; public int H, F;
             public double DSales, DEarn, DMov, DVil;          // bazy doby (zerowane po probce)
             public long DAides, DW4, DCust;                   // Levies (zerowane w LeviesBegin)
@@ -301,6 +302,17 @@ namespace Armoury
 
         /// <summary>Bieg fin74 (17.10): srednia z OSTATNICH 'last' probek wojny (pierscien od glowy H) - sesja 'po rampie' liczy zwykle wplywy juz bez starych poborow
         /// (P1, zawor, podatek od skarbca ludu), ktore w oknie pomiaru firm zawyzaly prognoze (np. King's Landing: 85k prognozy wobec ok. 25k po rampie, g zostalo 0.5).</summary>
+        /// <summary>fin75: mediana z ostatnich 'last' probek wojny (pierscien od glowy H); brak - 0.</summary>
+        private static double MedWar(double[] a, GK g, int last)
+        {
+            var v = new List<double>(Ring);
+            for (int j = 1; j <= Math.Min(last, g.F); j++) { int i = (g.H - j + Ring * 2) % Ring; if (g.RW[i]) v.Add(a[i]); }
+            if (v.Count == 0) return 0;
+            v.Sort();
+            int m = v.Count / 2;
+            return v.Count % 2 == 1 ? v[m] : 0.5 * (v[m - 1] + v[m]);
+        }
+
         private static double AvgLast(double[] a, GK g, int last, out int used)
         {
             double t = 0; used = 0;
@@ -344,8 +356,10 @@ namespace Armoury
                 double w0 = Math.Max(0.01, (double)s.CrownDuesWarPercent);
                 vav *= Math.Max(0, (double)s.DsVassalAidWarPercent) / w0;
             }
-            double inc = farmT + farmC + cust + vav + Ransom178.ThirdsOf(k) + d.Other + d.Release;
+            double oth = Ransom178.ThirdsOf(k) + d.Other;
+            double inc = farmT + farmC + cust + vav + d.Release;   // fin75: bez 'inne' (osobno w ROth, mediana w sesji)
             int h = g.H;
+            g.ROth[h] = oth;
             g.RNeed[h] = need; g.RInc[h] = inc; g.RS[h] = g.DSales; g.RE[h] = g.DEarn; g.RM[h] = g.DMov; g.RV[h] = g.DVil; g.RRent[h] = d.Rent; g.RW[h] = war;
             g.H = (g.H + 1) % Ring; if (g.F < Ring) g.F++;
         }
@@ -361,6 +375,7 @@ namespace Armoury
                 double step = StepOf(s), max = MaxOf(s);
                 need = last > 0 ? AvgLast(g.RNeed, g, last, out n) : Avg(g.RNeed, g.RW, g.F, true, out n);
                 inc = last > 0 ? AvgLast(g.RInc, g, last, out n) : Avg(g.RInc, g.RW, g.F, true, out n);
+                inc += MedWar(g.ROth, g, last > 0 ? last : Ring);   // fin75: 'inne' mediana z dob wojny (jednorazowy lup 793k w King's Landing dal srednia 149k)
                 int n2;
                 double S = last > 0 ? AvgLast(g.RS, g, last, out n2) : Avg(g.RS, g.RW, g.F, true, out n2), E = last > 0 ? AvgLast(g.RE, g, last, out n2) : Avg(g.RE, g.RW, g.F, true, out n2),
                        M = last > 0 ? AvgLast(g.RM, g, last, out n2) : Avg(g.RM, g.RW, g.F, true, out n2), V = last > 0 ? AvgLast(g.RV, g, last, out n2) : Avg(g.RV, g.RW, g.F, true, out n2);
@@ -431,7 +446,7 @@ namespace Armoury
                             long farmT, farmC; TownPurse.CrownToday.TryGetValue(k, out farmT); CastlePurse.CrownToday.TryGetValue(k, out farmC);
                             long va; KingdomTreasury.DuesToday.TryGetValue(k, out va);
                             int last = (g.H + Ring - 1) % Ring;
-                            double need = g.F > 0 ? g.RNeed[last] : 0, inc = g.F > 0 ? g.RInc[last] : 0;
+                            double need = g.F > 0 ? g.RNeed[last] : 0, inc = g.F > 0 ? g.RInc[last] + g.ROth[last] : 0;   // linia: zwykle wplywy doby z 'inne'
                             long warIn = Math.Max(0, d.DsMov) + Math.Max(0, d.WarTax) + g.DAides + g.DW4;
                             double gapD = need - inc - warIn;
                             wNeed += need; wInc += inc; wFarm += farmT + farmC; wCust += g.DCust; wVa += va; wAid += g.DAides; wTal += d.WarTax; wMov += d.DsMov; wW4 += g.DW4;
