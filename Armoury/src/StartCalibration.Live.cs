@@ -586,35 +586,12 @@ namespace Armoury
         /// swiatlo, futra - z targu (jak popyt Planu). Ten sam rachunek co bilans Planu: podaz targu (produkcja - zjedzone) = popyt targu.</summary>
         private static float[] VillageBasket(LiveDist ld, DistResult res)
         {
-            var q = new float[ZN];
-            var N = ld.FullNeed; var K = ld.OwnNeed; var own = res.Own;
+            Zc4EnsureMap();
+            var kg = new double[ZN];
+            KsBasket.VillageKg(ld.FullNeed, ld.OwnNeed, res.Own, kg);
             double sigma = Math.Max(1, DailyLife.KsSigma);
-            Action<int, double> put = (z, kg) => { if (kg > 1e-6) q[z] += (float)(kg / (sigma * ZKg(z))); };
-            put(ZGrain, N[KsTab.NG_] + K[KsTab.NBeer] * KsTab.BeerGrain - own[IGrain]);
-            put(ZBeer, N[KsTab.NBeer] - K[KsTab.NBeer]);
-            put(ZGrape, N[KsTab.NGrape] + K[KsTab.NWine] * KsTab.WineGrape - own[KsDeliver.IGrape]);
-            put(ZWine, N[KsTab.NWine] - K[KsTab.NWine]);
-            put(ZOlives, N[KsTab.NOlives] + K[KsTab.NOil] * KsTab.OilOlive - own[KsDeliver.IOlives]);
-            put(ZOil, N[KsTab.NOil] - K[KsTab.NOil] + N[KsTab.NSwOlej]);
-            put(ZHoney, N[KsTab.NHoney] + K[KsTab.NMead] * KsTab.MeadHoney - own[IHoney]);
-            put(ZMead, N[KsTab.NMead] - K[KsTab.NMead]);
-            put(ZFlax, K[KsTab.NPlotno] * KsTab.LinenFlax - own[KsDeliver.IFlax]);
-            put(ZLinen, N[KsTab.NPlotno] - K[KsTab.NPlotno]);
-            put(ZWool, K[KsTab.NSukno] * KsTab.FeltWool - own[KsDeliver.IWool]);
-            put(ZFelt, N[KsTab.NSukno] - K[KsTab.NSukno]);
-            put(ZFish, N[KsTab.NFish] - own[KsDeliver.IFish]);
-            put(ZCheese, N[KsTab.NCheese] - own[KsDeliver.ICheese]);
-            put(ZButter, N[KsTab.NButter] - own[KsDeliver.IButter]);
-            put(ZEgg, N[KsTab.NEgg] - own[IEgg]);
-            put(ZApple, N[KsTab.NApple] - own[KsDeliver.IApple]);
-            put(ZCarrot, N[KsTab.NCarrot] - own[KsDeliver.ICarrot]);
-            put(ZOrange, N[KsTab.NOrange] - own[KsDeliver.IOrange]);
-            put(ZDate, N[KsTab.NDate] - own[KsDeliver.IDate]);
-            double meatOwn = own[IMeat] + own[IWhaleMeat] + (own[KsDeliver.ICow] + own[KsDeliver.IHog] + own[KsDeliver.ISheep]) * KsTab.MeatOfLive;
-            put(ZMeat, N[KsTab.NMeat] - meatOwn);
-            put(ZSalt, N[KsTab.NSalt]); put(ZSpice, N[KsTab.NSpice]);
-            put(ZLeather, N[KsTab.NSkora]); put(ZTools, N[KsTab.NNarz]); put(ZPottery, N[KsTab.NGarnki]);
-            put(ZWhaleOil, N[KsTab.NSwTran]); put(ZFur, N[KsTab.NFutro]);
+            var q = new float[ZN];
+            for (int z = 0; z < ZN; z++) if (kg[z] > 0) q[z] = (float)(kg[z] / (sigma * ZKg(z)));
             return q;
         }
 

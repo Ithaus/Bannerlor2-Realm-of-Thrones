@@ -146,4 +146,73 @@ namespace Armoury
             lb.Rent = (float)R.Rent[b];
         }
     }
+
+    /// <summary>
+    /// KS etap 2 - KOSZYK TARGU W KG (czysty C#, ZC4; ten sam w grze i w tescie portu): to, co lud kupuje na targu, wedlug towaru gry (Ids), z potrzeb osady (NeedsOf):
+    ///  - miasto (TownKg): cala potrzeba z targu; zboze - ziarno 45%, chleb 45%, placek 10% (rozdz. 8.1 ZC); mieso / mieso wieloryba wedlug udzialu wieloryba w podazy
+    ///    rynku; oliwa z oliwa lampowa, tran; opal (1.5 kg na osobe) osobno;
+    ///  - wies (VillageKg): pelna potrzeba ludzi w domu minus zjedzone z wlasnego pola i domu (KsDeliver.Own): ziarno z czescia na piwo domowe, reszta piwa jako piwo;
+    ///    winogrona i oliwki na wino i oliwe domowe, reszta jako wino i oliwa; miod i miod pitny; len i welna na przedze domowa, reszta plotna i sukna; mieso - dziczyzna,
+    ///    wieloryb i polowa wlasnego zywca; sol, przyprawy, skora, narzedzia, garnki, swiatlo, futra - cale z targu (jak popyt Planu).
+    /// Suma: podaz KS na targ (produkcja - zjedzone) = koszyk miast + koszyk wsi + wsady przetworow (te same proporcje) + 1:1 - tozsamosc bilansu Planu.
+    /// </summary>
+    internal static class KsBasket
+    {
+        internal static readonly string[] Ids =
+        {
+            "grain", "bread", "pie", "meat", "WhaleMeat", "fish", "cheese", "butter", "Egg", "apple", "carrot", "orange", "grape", "olives", "date_fruit", "oil", "salt", "honey",
+            "spice", "beer", "wine", "mead", "linen", "felt", "leather", "tools", "pottery", "whale_oil", "hardwood", "fur", "flax", "wool", "hides", "iron", "clay", "limestone", "marble"
+        };
+        internal const int N = 37;
+        internal const int Grain = 0, Bread = 1, Pie = 2, Meat = 3, Whale = 4, Fish = 5, Cheese = 6, Butter = 7, Egg = 8, Apple = 9, Carrot = 10, Orange = 11, Grape = 12,
+                           Olives = 13, Date = 14, Oil = 15, Salt = 16, Honey = 17, Spice = 18, Beer = 19, Wine = 20, Mead = 21, Linen = 22, Felt = 23, Leather = 24, Tools = 25,
+                           Pottery = 26, WhaleOil = 27, Wood = 28, Fur = 29, Flax = 30, Wool = 31, Hides = 32, Iron = 33, Clay = 34, Lime = 35, Marble = 36;
+
+        private static void Put(double[] q, int z, double kg) { if (kg > 1e-9) q[z] += kg; }
+
+        /// <summary>Koszyk miasta w kg/d (dodaje do q); opal w kg/d osobno.</summary>
+        internal static void TownKg(double[] n, double whaleShare, double[] q, out double fireKg)
+        {
+            Put(q, Grain, 0.45 * n[KsTab.NG_]); Put(q, Bread, 0.45 * n[KsTab.NG_]); Put(q, Pie, 0.10 * n[KsTab.NG_]);
+            Put(q, Meat, n[KsTab.NMeat] * (1 - whaleShare)); Put(q, Whale, n[KsTab.NMeat] * whaleShare);
+            Put(q, Fish, n[KsTab.NFish]); Put(q, Cheese, n[KsTab.NCheese]); Put(q, Butter, n[KsTab.NButter]); Put(q, Egg, n[KsTab.NEgg]);
+            Put(q, Apple, n[KsTab.NApple]); Put(q, Carrot, n[KsTab.NCarrot]); Put(q, Orange, n[KsTab.NOrange]); Put(q, Grape, n[KsTab.NGrape]); Put(q, Olives, n[KsTab.NOlives]); Put(q, Date, n[KsTab.NDate]);
+            Put(q, Oil, n[KsTab.NOil] + n[KsTab.NSwOlej]); Put(q, Salt, n[KsTab.NSalt]); Put(q, Honey, n[KsTab.NHoney]); Put(q, Spice, n[KsTab.NSpice]);
+            Put(q, Beer, n[KsTab.NBeer]); Put(q, Wine, n[KsTab.NWine]); Put(q, Mead, n[KsTab.NMead]);
+            Put(q, Linen, n[KsTab.NPlotno]); Put(q, Felt, n[KsTab.NSukno]); Put(q, Leather, n[KsTab.NSkora]); Put(q, Tools, n[KsTab.NNarz]); Put(q, Pottery, n[KsTab.NGarnki]);
+            Put(q, WhaleOil, n[KsTab.NSwTran]); Put(q, Fur, n[KsTab.NFutro]);
+            fireKg = Math.Max(0.0, n[KsTab.NDrewno]);
+        }
+
+        /// <summary>Koszyk wsi w kg/d (dodaje do q): N - pelna potrzeba ludzi w domu (x lepszy stol), K - czesc z wlasnego pola (NeedsOfKeep x lepszy stol), own - zjedzone
+        /// z wlasnego (KsDeliver.Own, indeksy KsDeliver).</summary>
+        internal static void VillageKg(double[] N, double[] K, double[] own, double[] q)
+        {
+            Put(q, Grain, N[KsTab.NG_] + K[KsTab.NBeer] * KsTab.BeerGrain - own[KsDeliver.IGrain]);
+            Put(q, Beer, N[KsTab.NBeer] - K[KsTab.NBeer]);
+            Put(q, Grape, N[KsTab.NGrape] + K[KsTab.NWine] * KsTab.WineGrape - own[KsDeliver.IGrape]);
+            Put(q, Wine, N[KsTab.NWine] - K[KsTab.NWine]);
+            Put(q, Olives, N[KsTab.NOlives] + K[KsTab.NOil] * KsTab.OilOlive - own[KsDeliver.IOlives]);
+            Put(q, Oil, N[KsTab.NOil] - K[KsTab.NOil] + N[KsTab.NSwOlej]);
+            Put(q, Honey, N[KsTab.NHoney] + K[KsTab.NMead] * KsTab.MeadHoney - own[KsDeliver.IHoney]);
+            Put(q, Mead, N[KsTab.NMead] - K[KsTab.NMead]);
+            Put(q, Flax, K[KsTab.NPlotno] * KsTab.LinenFlax - own[KsDeliver.IFlax]);
+            Put(q, Linen, N[KsTab.NPlotno] - K[KsTab.NPlotno]);
+            Put(q, Wool, K[KsTab.NSukno] * KsTab.FeltWool - own[KsDeliver.IWool]);
+            Put(q, Felt, N[KsTab.NSukno] - K[KsTab.NSukno]);
+            Put(q, Fish, N[KsTab.NFish] - own[KsDeliver.IFish]);
+            Put(q, Cheese, N[KsTab.NCheese] - own[KsDeliver.ICheese]);
+            Put(q, Butter, N[KsTab.NButter] - own[KsDeliver.IButter]);
+            Put(q, Egg, N[KsTab.NEgg] - own[KsDeliver.IEgg]);
+            Put(q, Apple, N[KsTab.NApple] - own[KsDeliver.IApple]);
+            Put(q, Carrot, N[KsTab.NCarrot] - own[KsDeliver.ICarrot]);
+            Put(q, Orange, N[KsTab.NOrange] - own[KsDeliver.IOrange]);
+            Put(q, Date, N[KsTab.NDate] - own[KsDeliver.IDate]);
+            double meatOwn = own[KsDeliver.IMeat] + own[KsDeliver.IWhaleMeat] + (own[KsDeliver.ICow] + own[KsDeliver.IHog] + own[KsDeliver.ISheep]) * KsTab.MeatOfLive;
+            Put(q, Meat, N[KsTab.NMeat] - meatOwn);
+            Put(q, Salt, N[KsTab.NSalt]); Put(q, Spice, N[KsTab.NSpice]);
+            Put(q, Leather, N[KsTab.NSkora]); Put(q, Tools, N[KsTab.NNarz]); Put(q, Pottery, N[KsTab.NGarnki]);
+            Put(q, WhaleOil, N[KsTab.NSwTran]); Put(q, Fur, N[KsTab.NFutro]);
+        }
+    }
 }

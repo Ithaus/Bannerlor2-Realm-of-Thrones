@@ -33,15 +33,14 @@ namespace Armoury
     internal static partial class StartCalibration
     {
         private const string PZ = "Koszyk stanow (ZC4): ";
-        internal static readonly string[] ZIds =
-        {
-            "grain", "bread", "pie", "meat", "WhaleMeat", "fish", "cheese", "butter", "Egg", "apple", "carrot", "orange", "grape", "olives", "date_fruit", "oil", "salt", "honey",
-            "spice", "beer", "wine", "mead", "linen", "felt", "leather", "tools", "pottery", "whale_oil", "hardwood", "fur", "flax", "wool", "hides", "iron", "clay", "limestone", "marble"
-        };
-        internal const int ZN = 37;
-        internal const int ZGrain = 0, ZBread = 1, ZPie = 2, ZMeat = 3, ZWhale = 4, ZFish = 5, ZCheese = 6, ZButter = 7, ZEgg = 8, ZApple = 9, ZCarrot = 10, ZOrange = 11, ZGrape = 12,
-                           ZOlives = 13, ZDate = 14, ZOil = 15, ZSalt = 16, ZHoney = 17, ZSpice = 18, ZBeer = 19, ZWine = 20, ZMead = 21, ZLinen = 22, ZFelt = 23, ZLeather = 24, ZTools = 25,
-                           ZPottery = 26, ZWhaleOil = 27, ZWood = 28, ZFur = 29, ZFlax = 30, ZWool = 31, ZHides = 32, ZIron = 33, ZClay = 34, ZLime = 35, ZMarble = 36;
+        internal static readonly string[] ZIds = KsBasket.Ids;
+        internal const int ZN = KsBasket.N;
+        internal const int ZGrain = KsBasket.Grain, ZBread = KsBasket.Bread, ZPie = KsBasket.Pie, ZMeat = KsBasket.Meat, ZWhale = KsBasket.Whale, ZFish = KsBasket.Fish, ZCheese = KsBasket.Cheese,
+                           ZButter = KsBasket.Butter, ZEgg = KsBasket.Egg, ZApple = KsBasket.Apple, ZCarrot = KsBasket.Carrot, ZOrange = KsBasket.Orange, ZGrape = KsBasket.Grape,
+                           ZOlives = KsBasket.Olives, ZDate = KsBasket.Date, ZOil = KsBasket.Oil, ZSalt = KsBasket.Salt, ZHoney = KsBasket.Honey, ZSpice = KsBasket.Spice, ZBeer = KsBasket.Beer,
+                           ZWine = KsBasket.Wine, ZMead = KsBasket.Mead, ZLinen = KsBasket.Linen, ZFelt = KsBasket.Felt, ZLeather = KsBasket.Leather, ZTools = KsBasket.Tools,
+                           ZPottery = KsBasket.Pottery, ZWhaleOil = KsBasket.WhaleOil, ZWood = KsBasket.Wood, ZFur = KsBasket.Fur, ZFlax = KsBasket.Flax, ZWool = KsBasket.Wool,
+                           ZHides = KsBasket.Hides, ZIron = KsBasket.Iron, ZClay = KsBasket.Clay, ZLime = KsBasket.Lime, ZMarble = KsBasket.Marble;
         // dodatek do dzisiejszego popytu (zbytki sterowane pieniedzmi + kozuchy KS-K i przyprawy koszyka) - reszta kategorii koszyka ZASTEPUJE dzisiejszy popyt
         private static bool ZAdd(int z) { return z == ZSpice || z == ZFur; }
         // kolejnosc drabiny zakupow wsi (przetrwanie, sol, napoj, bialko, reszta jedzenia, przedza, rzeczy)
@@ -160,7 +159,7 @@ namespace Armoury
                 whale[m] = wk + mk > 0 ? wk / (wk + mk) : 0.0;
             }
             bool fireOn = FirewoodMechanism();
-            var n = new double[KsTab.NN]; var one = new double[6];
+            var n = new double[KsTab.NN]; var one = new double[6]; var px = new double[ZN];
             foreach (var r in recs)
             {
                 if (r == null || !r.Town || r.St == null || r.St.Town == null) continue;
@@ -178,9 +177,10 @@ namespace Armoury
                     zt.Garum = r.Cul != null && KsTab.GarumLands.Contains(r.Cul);
                     double surv = 0; for (int e = 0; e < 6; e++) surv += Math.Max(0, r.N[e]);
                     zt.Surv = surv * 0.47 / (sigma * _zKg[ZGrain]);
-                    // koszt klas (zl/d przy cenach targu): kazdy stan osobno
+                    // koszt klas (zl/d przy cenach targu): kazdy stan osobno; ceny miasta raz (sztuka koszyka)
                     var md = t.MarketData;
                     var q1 = new double[ZN];
+                    for (int z = 0; z < ZN; z++) { var it = _zItems[z]; int p = 1; if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } } px[z] = Math.Max(1, p); }
                     for (int e = 0; e < 6; e++)
                     {
                         if (!(r.N[e] > 0)) continue;
@@ -189,7 +189,7 @@ namespace Armoury
                         double f0; Array.Clear(q1, 0, ZN);
                         TownItems(n, q1, whale[zt.Market], sigma, true, out f0);
                         double cost = 0;
-                        for (int z = 0; z < ZN; z++) { if (q1[z] <= 0 || _zItems[z] == null) continue; int p = 0; try { p = md.GetPrice(_zItems[z], null, false, null); } catch { p = _zItems[z].Value; } cost += q1[z] * Math.Max(1, p); }
+                        for (int z = 0; z < ZN; z++) if (q1[z] > 0 && _zItems[z] != null) cost += q1[z] * px[z];
                         if (e == KsTab.ELabour || e == KsTab.EPeasant) zt.Cls[0] += cost;
                         else if (e == KsTab.ECraft) zt.Cls[1] += cost;
                         else if (e == KsTab.EMerchant || e == KsTab.EGentry) zt.Cls[2] += cost;
@@ -217,16 +217,10 @@ namespace Armoury
         /// opal - osobno, do zakupu opalu, albo do kategorii drewna, gdy zakup opalu nieczynny).</summary>
         private static void TownItems(double[] n, double[] q, double whaleShare, double sigma, bool fireOn, out double fire)
         {
-            Action<int, double> put = (z, kg) => { if (kg > 1e-9) q[z] += kg / (sigma * _zKg[z]); };
-            put(ZGrain, 0.45 * n[KsTab.NG_]); put(ZBread, 0.45 * n[KsTab.NG_]); put(ZPie, 0.10 * n[KsTab.NG_]);
-            put(ZMeat, n[KsTab.NMeat] * (1 - whaleShare)); put(ZWhale, n[KsTab.NMeat] * whaleShare);
-            put(ZFish, n[KsTab.NFish]); put(ZCheese, n[KsTab.NCheese]); put(ZButter, n[KsTab.NButter]); put(ZEgg, n[KsTab.NEgg]);
-            put(ZApple, n[KsTab.NApple]); put(ZCarrot, n[KsTab.NCarrot]); put(ZOrange, n[KsTab.NOrange]); put(ZGrape, n[KsTab.NGrape]); put(ZOlives, n[KsTab.NOlives]); put(ZDate, n[KsTab.NDate]);
-            put(ZOil, n[KsTab.NOil] + n[KsTab.NSwOlej]); put(ZSalt, n[KsTab.NSalt]); put(ZHoney, n[KsTab.NHoney]); put(ZSpice, n[KsTab.NSpice]);
-            put(ZBeer, n[KsTab.NBeer]); put(ZWine, n[KsTab.NWine]); put(ZMead, n[KsTab.NMead]);
-            put(ZLinen, n[KsTab.NPlotno]); put(ZFelt, n[KsTab.NSukno]); put(ZLeather, n[KsTab.NSkora]); put(ZTools, n[KsTab.NNarz]); put(ZPottery, n[KsTab.NGarnki]);
-            put(ZWhaleOil, n[KsTab.NSwTran]); put(ZFur, n[KsTab.NFutro]);
-            fire = n[KsTab.NDrewno] > 0 ? n[KsTab.NDrewno] / (sigma * _zKg[ZWood]) : 0.0;
+            var kg = new double[ZN]; double fk;
+            KsBasket.TownKg(n, whaleShare, kg, out fk);
+            for (int z = 0; z < ZN; z++) if (kg[z] > 0) q[z] += kg[z] / (sigma * _zKg[z]);
+            fire = fk > 0 ? fk / (sigma * _zKg[ZWood]) : 0.0;
             if (!fireOn) { q[ZWood] += fire; fire = 0; }
         }
 
