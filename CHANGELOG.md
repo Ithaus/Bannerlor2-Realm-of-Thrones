@@ -33,6 +33,8 @@
 - Bilans NKS-5 liczy caly swiat (warsztaty gry, rzemieslnicy BK, wojsko); towary poza pasmem w oknie - prawdziwy wynik, nie latany.
 - Przetwory ZC5 obok warsztatow gry (browary, winiarnie) - nadwyzka wyrobow mozliwa (NKS-5c INFO).
 - Drabina dziala tylko przy braku pieniedzy (ff < 1) - poza tym caly koszyk.
+- Po wczytaniu zapisu zastosowanego: do pierwszej doby gry (OnDailyTick) popyt koszyka i koszyk wsi czekaja na stany ZC tej sesji (dzisiejszy popyt), a produkcja idzie ze stawek z zapisu - do 1 doby nadwyzki po kazdym wczytaniu.
+- Ludzie poza domem (uchodzcy) sa w potrzebie Planu okregu, a koszyk wsi liczy ludzi w domu - jesli uchodzcy nie sa w stanach miast, ich koszyk nie trafia na targ (nadwyzka tam, gdzie wojna).
 
 **Status:** DO SPRAWDZENIA (nie wgrane; build kod 0; autotest 120 dob w lancuchu).
 
