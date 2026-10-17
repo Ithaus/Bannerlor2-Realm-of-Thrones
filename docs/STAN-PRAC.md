@@ -2526,3 +2526,13 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   wsie kupuja 30% chcianego (NKS-8c, NKS-13). Koszt doby 4.1 ms (+ZC4/ZC5 14.6 ms) ponad prog. Wniosek: Plan liczy popyt = potrzeba, a ludzie nie maja pieniedzy, zeby ja kupic
   (kiesy nie kalibrowane, ceny nie moga spasc ponizej podlogi) -> nadwyzka. Do naprawy: sila nabywcza (kiesy wg stanow), skala sigma, podloga ceny, kotwica popytu.
 - W grze zostaje WGRANIE 74 (bez KS). KS tylko po udanym tescie.
+
+### 66. KS naprawa sily nabywczej (17.10 ok. 01:15 PDT) - test 120 dob w toku - NASTEPNY KROK TUTAJ
+- Workflow wf_ead3c4d8-484 (diagnoza -> naprawa -> recenzja ekonomii -> poprawki): galaz `w-toku/noc-ks` a74f1e92 (krok 8 "pieniadze" w Planie: popyt tylko zaplacony,
+  czego wsi nie stac - praca domowa z wlasnej ziemi i rak) + 336aeee5 (14 uwag recenzji, 1 krytyczna: konie stadnin w sprzedazy wsi; alfa kazdej wsi z pomiaru; bilans NA TARG
+  (podaz - zjedzone)/(popyt - zjedzone); margines 1.03 do D+28; kontrola D+7 -> plik CrashScribe/armoury-ks-przerwij.flag; koszt: okreg i ceny co 7 dob, ZC5 co 2 doby).
+  Diagnoza z logu 22:15: podaz KS doszla zgodnie z Planem (0.89-1.10); winny popyt: wsie stac na ok. 63% koszyka (74% luki), towary nie jezdza miedzy miastami (kupcy wozili
+  tylko bron), cena liczona z popytu, ktorego nikt nie placi, blad pomiaru (zakupy wsi ksiegowane "bez rynku"). Kiesy ludu: BEZ jednorazowego zastrzyku (to przeplyw, nie stan).
+- Uprzaz (kmoney/h na ks_dump): Westeros 45% koszyka wsi zaplacone, 17.9% rak praca domowa, targ 1.00-1.05; Essos 57%, targ 1.00-1.02, zbiezne. Plan 8-11 s.
+- Ryzyka: Essos 22% kcal wsi bez pokrycia (NKS-8c/NKS-17 moga nie przejsc); sprzedaz wsi na targ Westeros ok. -19% (mniej utargu panow) - powiedziec Jeffowi prosto.
+- Scalone int **2cfaaf86** (build rc 0). Test: test/fin69 (Armoury A6A2391E), flaga armoury-ks-wlacz.flag UTWORZONA 01:15 (USUNAC po tescie!), at-fin69-ks120.out.txt.
