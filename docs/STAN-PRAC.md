@@ -2517,3 +2517,4 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - DALEJ: scalic noc-ks do int (scal1.sh ks fe1b271e); dopisac arm_ks_land.tsv do test/bieg-bitwa.ps1 ($rel) i test/wgraj-v5.ps1; test 120 dob z flaga; grupy nks, nzc0-2,
   nbitwa; ocenic bilans (NKS-5..7 - kazdy towar 0.95-1.05 w 28 dobach po Apply). Decyzja SilkToWeavers (Essos jedwab). Potem ZC6/ZC7 + ProsperityLink, test koncowy, wgranie.
 - Recenzje: krytyczne (popyt w formule ceny, Apply na Planie z 1 doby danych) - poprawione w bc1aaa16 (sprawdzic w tescie).
+- 22:05 PDT: noc-ks scalony int **a816074d**; skrypty test/bieg-bitwa.ps1 i test/wgraj-v5.ps1 przenosza arm_ks_land.tsv; flaga armoury-ks-wlacz.flag UTWORZONA (usunac po tescie!); test 120 dob z KS Apply + 1 bitwa w toku: test/fin68 (Armoury 19540e74), at-fin68-ks120.out.txt.
