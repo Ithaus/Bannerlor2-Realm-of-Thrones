@@ -399,6 +399,7 @@ namespace Armoury
                 }
                 _vhTake += x; _vhE1 += room - x; _vhGold1 += vil.Gold;
                 if (x > 0) { _vhN++; LnNoteTaxed(f.St, x); }          // N8: podatek tej doby z kiesy wsi (pozyczka liczy nadwyzke sprzed niego)
+                if (x > 0) { try { StartCalibration.KsVilOut(vil.Settlement, x); } catch { } }   // KS-R3 P2: podatek od nadwyzki - wydatek wsi spoza koszyka (alfa netto)
                 try
                 {
                     if (lp > 0)

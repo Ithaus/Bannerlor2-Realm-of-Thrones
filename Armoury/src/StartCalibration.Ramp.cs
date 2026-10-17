@@ -149,11 +149,35 @@ namespace Armoury
             var nb = new float[2 * ItemCount];
             var ob = _beta;
             int held = 0, stocked = 0;
+            // KS-R3 P5 (klucz Ks Market Control): ta sama podstawa co polki startu - popyt zaplacony miast przy lambda 1 x dni polki startu; zapas = polki miast + towar w drodze
+            // KS-H, cel = polki + rurociag KS-H (wyslane 7 dob x srednie doby); towar spoza koszyka ZC4 - jak dotad (przeplyw na targ przy pelnej stawce KS)
+            double[] dpM = null; var pipe = new double[2 * ItemCount];
+            if (SwMarketControl && _zt.Count > 0)
+            {
+                dpM = new double[2 * ItemCount];
+                foreach (var zt in _zt.Values)
+                {
+                    if (zt == null) continue;
+                    int mo = (zt.Market == 0 ? 0 : 1) * ItemCount;
+                    for (int i = 0; i < ItemCount; i++) { int z = RampZ(i); if (z >= 0) dpM[mo + i] += zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z]; }
+                }
+                try
+                {
+                    KsFoodCarts.ForEachInTransit((it, n, mk) =>
+                    {
+                        int ii; if (it == null || mk < 0 || mk > 1 || ix == null || !ix.TryGetValue(it, out ii)) return;
+                        _rampStock[mk * ItemCount + ii] += n;
+                    });
+                }
+                catch (Exception e) { Stumble("RampDaily(w drodze)", e); }
+                for (int m = 0; m < 2; m++) for (int i = 0; i < ItemCount; i++) { int z = RampZ(i); if (z >= 0) pipe[m * ItemCount + i] = KsFoodCarts.Pipeline(m, z); }
+            }
             for (int m = 0; m < 2; m++)
                 for (int i = 0; i < ItemCount; i++)
                 {
                     int k = m * ItemCount + i;
-                    double target = ShelfDays(StartPrice(m, i)) * Math.Max(0.0, full != null && k < full.Length ? full[k] : 0.0);
+                    double baseD = dpM != null && RampZ(i) >= 0 ? dpM[k] : Math.Max(0.0, full != null && k < full.Length ? full[k] : 0.0);
+                    double target = ShelfDays(StartPrice(m, i)) * baseD + pipe[k];
                     _rampTarget[k] = target;
                     double b;
                     if (t >= RampDemand) b = 1.0;
@@ -164,6 +188,9 @@ namespace Armoury
             _beta = nb;
             _rampHeld = held; _rampStocked = stocked;
         }
+
+        /// <summary>KS-R3 P5: pozycja koszyka ZC4 towaru KS i (ten sam przedmiot) albo -1.</summary>
+        private static int RampZ(int i) { return i >= 0 && i < ItemCount ? Array.IndexOf(ZIds, ItemIds[i]) : -1; }
 
         /// <summary>Polki startu w dobie D (rozdz. 6): ItemData.Supply miast = dni polki startu x wygladzony popyt kategorii, dla kategorii towarow KS i koszyka ZC4.</summary>
         private static void StartShelves(int today)
@@ -190,7 +217,10 @@ namespace Armoury
                         double days = ShelfDays(p), sv = Math.Max(0.0, d.InStoreValue);
                         // F2 (poprawka po autotescie 16.10): bez sztucznych polek - wygladzona podaz tylko tam, gdzie prawdziwa polka ma co najmniej polowe celu
                         // (dotad 3295 z 3977 pozycji mialo polke ponizej celu, indeks 3.87 -> 0.98 w D i wracal do 2-5); reszta - cena wzoru gry z prawdziwej polki
-                        if (sv < 0.5 * days * dem) { noShelf++; continue; }
+                        // KS-R3 P5: cel polki z tej samej podstawy co rampa - popyt zaplacony miasta przy lambda 1 (wartosc kategorii), gdy miasto jest w mapie ZC4
+                        double baseV = dem;
+                        if (SwMarketControl) { double dv = DpValue(town, kv.Key); if (dv > 0.01) baseV = dv; }
+                        if (sv < 0.5 * days * baseV) { noShelf++; continue; }
                         double want = (0.14 * days * dem - 0.04 * sv) / 0.1;
                         float sup = (float)Math.Max(0.1, Math.Min(1.4 * days * dem, Math.Max(days * dem * 0.5, want)));
                         if (sup > days * dem * 1.001) lift++;
@@ -215,6 +245,16 @@ namespace Armoury
             }
             Log.Info(PK + "polki startu " + _shelfNote + ps + " | wygladzona podaz = (0.14 x dni polki startu (7 x cena^(-1/0.6)) x wygladzony popyt - 0.04 x wartosc polki) / 0.1, w pasmie 0.5-1.4 x dni x popyt;"
                      + " towaru i zlota nie przybywa, gra wygladza podaz 15% dziennie do prawdziwej polki | popyt koszyka ZC4 od tej doby przez " + (RampDemand - RampSupply) + " dob; srednie cen A7 i regale od zera.");
+        }
+
+        /// <summary>KS-R3 P5: popyt zaplacony miasta przy lambda 1 w wartosci kategorii (sztuki x wartosc) - podstawa celu polki startu; 0 - miasto poza mapa ZC4.</summary>
+        private static double DpValue(Town t, ItemCategory c)
+        {
+            ZTown zt; int[] zs;
+            if (t == null || t.Settlement == null || c == null || !_zt.TryGetValue(t.Settlement, out zt) || zt == null || !_zCats.TryGetValue(c, out zs)) return 0.0;
+            double v = 0;
+            foreach (int z in zs) { var it = _zItems[z]; if (it == null) continue; v += (zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z]) * Math.Max(1, it.Value); }
+            return v;
         }
 
         private static string RampText(int today)

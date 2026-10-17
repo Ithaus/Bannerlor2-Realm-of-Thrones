@@ -6676,6 +6676,46 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationConfirm { get; set; } = false;
 
+        [SettingPropertyBool("Ks Food Carts", HintText = "with the calibration applied: a town short of food buys grain, fish, meat, cheese, salt and the other foods in a town of the same market that has more than it needs, and the cart goes for as many days as the road (to the islands by sea through the ports). The buying town pays the selling town for every piece and the carters of the seller's villages (by sea - its dock hands) for the haul. Fish, meat, fruit and the other perishables go at most 7 days; off = no new food carts (carts on the road still arrive)")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsFoodCarts { get; set; } = true;
+
+        [SettingPropertyBool("Ks Land Gradient", HintText = "with Start Calibration: the weekly plan sees the road - where food must come from far away it is dearer by the cost of the haul, so the peasants there grow more of it, and where it cannot be sold it is cheaper. The work of a hand stays the same, only how many hands work at each thing changes; off = the plan prices every market as one place")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsLandGradient { get; set; } = true;
+
+        [SettingPropertyBool("Ks Alpha Net", HintText = "with Start Calibration: the plan gives each village only the money it really has for its basket - its takings plus haulage pay, less the war levy, dues, market buying and taxes on its savings - and what it cannot buy and cannot grow itself it makes at home from its cheapest own food (grain, fish, game or dates) of the same worth in food; off = takings only, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsAlphaNet { get; set; } = true;
+
+        [SettingPropertyBool("Ks Village Paid First", HintText = "with the calibration applied: a village first buys the part of its basket the plan says it can pay for (bread and salt first, then drink, meat and the rest), and the rest only from money beyond a week of its basket and only from stock beyond what the town needs on its stall; its old daily shopping list beyond the basket stops; off = the whole basket along the ladder and the old list, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillagePaidFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ks Own Food First", HintText = "with the calibration applied: a village that could not buy the food the plan counted on eats from its own store waiting for the cart (grain first, at most half of each good a day) instead of sending it to market; off = it sells everything and goes without")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsOwnFoodFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ks Perish Reach", HintText = "with Start Calibration: fish, meat, fruit and the other goods that spoil are not counted on in a town that has none of its own and no town with plenty within 7 days by cart - its people buy other food instead; off = every town counts on every food")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsPerishReach { get; set; } = true;
+
+        [SettingPropertyBool("Ks Real Offtake", HintText = "with the calibration applied: the stall price of a town counts what lords and courts really buy in that town (not a share of the whole world's armies and castles), and the town's bakers and brewers only what their hands can make; they keep 6 days of the grain and fruit people buy and make at most 4 days of bread and beer ahead; off = as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsRealOfftake { get; set; } = true;
+
+        [SettingPropertyBool("Ks Market Control", HintText = "with the calibration applied: from two weeks after the start the weekly plan sends to market what people really bought and wanted, not what it reckoned they would, so that the stalls hold their starting stock; a land whose stalls fill up and keep filling (no way out - war or no buyer) moves a tenth of that work to home work each week; off = the plan keeps its own reckoning")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsMarketControl { get; set; } = true;
+
+        [SettingPropertyBool("Ks Village Buy Every2", HintText = "with the calibration applied: villages shop for their basket every second day for two days at once (half the work for the game); off = every day")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsVillageBuyEvery2 { get; set; } = true;
+
+        [SettingPropertyBool("Ks Granary Release", HintText = "with the calibration applied: a village's granary floor (the old harvest formula as the least it gets) comes off after 14 days in a row in which the village bought and ate what it needed, and comes back after 3 days of short rations; the granary then counts what the village bought and ate from its store, and beer and the better table are counted the same way on both sides; off = the floor stays on, as before")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsGranaryRelease { get; set; } = true;
+
         [SettingPropertyBool("Start Calibration Town Crafts", HintText = "with the calibration applied: the town's craftsmen bake bread and pies and brew beer from the grain on the stall, press wine from grapes and oil from olives, make mead from honey, pots from clay and (in Lys, Volantis, Myr, Tyrosh and Pentos) garum from fish and salt - only while the product pays for its goods and work and the stall wants it (at most a week of what the town buys); off = only the workshops do it, as before")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationTownCrafts { get; set; } = true;
@@ -8400,6 +8440,16 @@ namespace Armoury
             s.StartCalibrationAutotestApply = StartCalibrationAutotestApply;
             s.StartCalibrationArmThisSave = StartCalibrationArmThisSave;
             s.StartCalibrationConfirm = StartCalibrationConfirm;
+            s.KsFoodCarts = KsFoodCarts;
+            s.KsLandGradient = KsLandGradient;
+            s.KsAlphaNet = KsAlphaNet;
+            s.KsVillagePaidFirst = KsVillagePaidFirst;
+            s.KsOwnFoodFirst = KsOwnFoodFirst;
+            s.KsPerishReach = KsPerishReach;
+            s.KsRealOfftake = KsRealOfftake;
+            s.KsMarketControl = KsMarketControl;
+            s.KsVillageBuyEvery2 = KsVillageBuyEvery2;
+            s.KsGranaryRelease = KsGranaryRelease;
             s.StartCalibrationTownCrafts = StartCalibrationTownCrafts;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;

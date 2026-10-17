@@ -40,7 +40,9 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const string P = "Kalibracja startu (KS): ";
         private const string PK = "KS: ";
-        private const string SaveVersion = "ks3", SaveVersion2 = "ks2", SaveVersion1 = "ks1";
+        // KS-R3: ks4 = ks3 + pole dodatkowe (gradient krain, czynnik popytu targu, ciecie i polki krain, srednie sterowania, kx KS-H, tabela dob miast, podloga spichlerza wsi,
+        // wydatki wsi spoza koszyka, odbior miast, kasa 28 dob) przed cialem okregow; ks3 czytany (gradient 1, kx 1, podloga wlaczona)
+        private const string SaveVersion = "ks4", SaveVersion3 = "ks3", SaveVersion2 = "ks2", SaveVersion1 = "ks1";
         internal const int StatePlan = 0, StateApplied = 1, StateArmed = 2;
         internal const int RampSupply = 14, RampDemand = 28;     // rampa: podaz A..A+14 (= D), popyt koszyka D..A+28 (= D+14)
         private const int MinPlanDays = 7;                        // potwierdzenie najwczesniej po 7 dobach Planu tego zapisu
@@ -88,6 +90,7 @@ namespace Armoury
             Zc4Reset();
             CraftsReset();
             MoneyReset();
+            R3Reset();
         }
 
         private static void Stumble(string where, Exception e)
@@ -99,8 +102,8 @@ namespace Armoury
         private static int Today() { return (int)CampaignTime.Now.ToDays; }
 
         // ============================================================ zapis
-        // ks3|stan|kampania|doba A|plany|pierwszy plan|crc ziemi|crc ukladu|sigma|doba uzbrojenia|skrot uzbrojenia|skrot wlaczenia|flagi|beta|lambda|crc ziemi uzbrojenia
-        //    |regula (srednie cen miast, rece regionu w sezonie)|okregi (Z + base64 deflate albo tekst)
+        // ks4|stan|kampania|doba A|plany|pierwszy plan|crc ziemi|crc ukladu|sigma|doba uzbrojenia|skrot uzbrojenia|skrot wlaczenia|flagi|beta|lambda|crc ziemi uzbrojenia
+        //    |regula (srednie cen miast, rece regionu w sezonie)|KS-R3 pole dodatkowe (Z + base64 deflate)|okregi (Z + base64 deflate albo tekst)
         // recenzja 16.10 (wazne): rozmiar arm_ks w linii przy zapisie (projekt rozdz. 12: <= 150 KB); stawki wsi nie ida do zapisu (pierwsza doba po wczytaniu -
         // jak Undo, LiveDaily liczy nowe ze stanow ZC doby), lepszy stol w 3 znakach na pozycje, blok "sam start" jako *, cialo okregow skompresowane
         internal static string Export()
@@ -118,6 +121,8 @@ namespace Armoury
                 sb.Append(_armLandCrc.ToString("X8")).Append('|');
                 if (_state == StateApplied) RuleExport(sb);
                 sb.Append('|');
+                string extra = ""; try { extra = ExportExtra(); } catch (Exception xe) { Stumble("ExportExtra", xe); extra = ""; }
+                sb.Append(extra).Append('|');                       // KS-R3 ks4: pole dodatkowe (spakowane; bez '|')
                 int rawLive = 0, packed = 0;
                 if (_state == StateApplied)
                 {
@@ -181,8 +186,9 @@ namespace Armoury
             string data = _pending; _pending = null;
             try
             {
-                bool v3 = data.StartsWith(SaveVersion + "|", StringComparison.Ordinal), v2 = data.StartsWith(SaveVersion2 + "|", StringComparison.Ordinal);
-                int nf = v3 ? 18 : (v2 ? 16 : 10);
+                bool v4 = data.StartsWith(SaveVersion + "|", StringComparison.Ordinal);
+                bool v3 = v4 || data.StartsWith(SaveVersion3 + "|", StringComparison.Ordinal), v2 = data.StartsWith(SaveVersion2 + "|", StringComparison.Ordinal);
+                int nf = v4 ? 19 : (v3 ? 18 : (v2 ? 16 : 10));
                 var h = data.Split(new[] { '|' }, nf);
                 int st, ad, pl, fp, sg; uint lc, yc;
                 if ((v3 || v2 ? h.Length < nf : (h.Length < 10 || h[0] != SaveVersion1)) || !int.TryParse(h[1], NumberStyles.Integer, Inv, out st) || !int.TryParse(h[3], NumberStyles.Integer, Inv, out ad)
@@ -196,9 +202,10 @@ namespace Armoury
                     int.TryParse(h[9], NumberStyles.Integer, Inv, out armDay);
                     uint.TryParse(h[10], NumberStyles.HexNumber, Inv, out armHash); uint.TryParse(h[11], NumberStyles.HexNumber, Inv, out applyHash);
                     int.TryParse(h[12], NumberStyles.Integer, Inv, out flags);
-                    if (v3) { uint.TryParse(h[15], NumberStyles.HexNumber, Inv, out armLand); rule = h[16]; body = h[17]; }
+                    if (v3) { uint.TryParse(h[15], NumberStyles.HexNumber, Inv, out armLand); rule = h[16]; body = v4 ? h[18] : h[17]; }
                     else body = h[15];
                 }
+                if (v4) { try { ImportExtra(h[17]); } catch (Exception xe) { Stumble("ImportExtra", xe); } }   // KS-R3: gradient, sterowanie, kx, tabela dob, podloga ... (kazdy stan)
                 _plans = Math.Max(0, pl); _firstPlanDay = fp; _campaign = h[2] == "-" ? "" : h[2];
                 string gid = "";
                 try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId ?? "" : ""; } catch { gid = ""; }
@@ -300,6 +307,10 @@ namespace Armoury
                 long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
                 try { LedgerEma(); } catch (Exception e) { Stumble("LedgerEma", e); }   // srednia ksiegi towarow - co dobe (popyt 1:1 Planu)
                 try { MoneyEma(today); } catch (Exception e) { Stumble("MoneyEma", e); }   // krok 8: udzial kiesy wsi w utargu, zarobek klas miast (srednie 28 dob)
+                // KS-R3: odbior miast (P3, KS-H), kasa 28 dob (krok 5), sterowanie rynku (P4), tabela dob miast KS-H (najwyzej 200 wywolan drogi na dobe)
+                try { TakeDaily(today); } catch (Exception e) { Stumble("TakeDaily", e); }
+                try { GoldDaily(today); } catch (Exception e) { Stumble("GoldDaily", e); }
+                try { ControlDaily(today); } catch (Exception e) { Stumble("ControlDaily", e); }
                 PricesDaily(today);                                   // indeksy cen miast (stan zastosowany - co 7 dob na zmiane; Plan - tylko w doby linii cen)
                 PlanCollect(day);                                     // wynik Planu z watku roboczego (linie i ks-plan.csv)
                 if (_keepRaw != null)
@@ -323,6 +334,8 @@ namespace Armoury
                 }
                 double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
                 AddMs(ms);
+                // KS-R3 G1: tabela dob miast KS-H (najwyzej 200 wywolan drogi na dobe, gotowa w ok. 25 dob stanu Plan) - poza czasem doby KS (osobny czas w linii KS-H)
+                try { KsFoodCarts.DaysTick(); } catch (Exception e) { Stumble("DaysTick", e); }
                 if (LogGate.Lines)
                 {
                     Log.Info(P + "dzien " + day + " | stan " + (_state == StateApplied ? "ZASTOSOWANY od doby " + _applyDay : (_state == StateArmed ? "Plan (UZBROJONY doba " + _armDay + ")" : "Plan"))

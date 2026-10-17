@@ -74,6 +74,7 @@ namespace Armoury
                 if (m >= 0 && m < 2) _inflowDay[m] += k;
             });
             foreach (var kv in _vilTake) if (!seen.Contains(kv.Key)) { kv.Value[0] *= 1.0 - wv; kv.Value[1] *= 1.0 - wv; }
+            VilOutDaily(wv);                                    // KS-R3 P2: wydatki wsi spoza koszyka i fracht KS-H (ta sama waga co utarg)
             // utarg swiata wobec wartosci bazowej produkcji wsi (ksiega towarow - doba wczorajsza, raz na nowa dobe ksiegi)
             int ld = _emaLastDay;
             if (ld >= 0 && ld != _phiLedgerDay && _ledgerTmp.Count > 0)
@@ -127,8 +128,24 @@ namespace Armoury
         {
             double[] a;
             if (v == null || !_vilTake.TryGetValue(v, out a) || a == null || _vtDays < 7 || a[0] * Math.Min(28, _vtDays) < VilTakeMin || !(a[0] > 0)) return -1;
+            if (SwAlphaNet)
+            {
+                // KS-R3 P2 (klucz Ks Alpha Net): ALFA NETTO = 0.95 x (wplyw do kiesy + fracht KS-H - wydatki spoza koszyka: danina wojenna, rynek wsi BK, oplata stala,
+                // stara lista, podatek od nadwyzki) / wartosc bazowa produkcji wsi (utarg / Phi) - Plan daje wsi tylko pieniadze, ktore naprawde zostaja na koszyk
+                double[] o; _vilOut.TryGetValue(v, out o);
+                double inflow = a[1] + (o != null ? o[1] : 0.0), outflow = o != null ? o[0] : 0.0;
+                double baseV = a[0] / Math.Max(1e-6, PhiNow());
+                return Math.Max(0.0, Math.Min(0.95, 0.95 * Math.Max(0.0, inflow - outflow) / Math.Max(1e-6, baseV)));
+            }
             double sh = Math.Max(0.0, Math.Min(1.0, a[1] / a[0]));
             return Math.Max(0.0, Math.Min(0.95, sh * PhiNow() * (1.0 - VilReserve)));
+        }
+
+        /// <summary>KS-R3 P2: wydatki spoza koszyka i fracht wsi swiata (srednie 28 dob, zl/d) - linia pieniedzy Planu.</summary>
+        private static void VilOutTotals(out double outflow, out double freight, out int n)
+        {
+            outflow = freight = 0; n = 0;
+            foreach (var kv in _vilOut) { if (kv.Value == null) continue; outflow += kv.Value[0]; freight += kv.Value[1]; n++; }
         }
 
         /// <summary>Krok 8 Planu z pomiaru: >= 7 dob utargu wsi i jego wartosci bazowej, >= 3 doby udzialu kiesy, budzety >= 90% miast.</summary>
@@ -277,7 +294,14 @@ namespace Armoury
                 }
                 sb.Append("; nadwyzka targu w cenach cienia ").Append(F0(M.Excess[m])).Append(" (").Append(P1(100 * M.ExcessRel[m])).Append("% popytu targu), poprawka rynku G srednio ").Append(M.Global[m].ToString("0.000", Inv))
                   .Append(", zmiana sum w ostatniej rundzie ").Append(M.DTot[m] >= 0 ? P1(100 * M.DTot[m]) + "%" : "-").Append(" (okregi ze zmiana pracy domowej >= 0.05: ").Append(M.DHwN[m]).Append(')');
+                // KS-R3: kcal zastepcze kroku 8b (wlasny towar za pozycje spoza HomeMask), Plan bez pokrycia (cel W <= 3.0%, E <= 3.5%), czynnik popytu targu, regula zasiegu
+                sb.Append("; KS-R3: kcal zastepcze 8b ").Append(P1(100 * M.VSubKcal[m] / fk)).Append("%, Plan bez pokrycia ").Append(P1(100 * Math.Max(0.0, M.VUnpaidKcal[m] - M.VHomeKcal[m]) / fk))
+                  .Append("% (cel ").Append(m == 0 ? "3.0" : "3.5").Append("%), czynnik popytu targu ").Append(M.MfMin[m].ToString("0.000", Inv)).Append('-').Append(M.MfMax[m].ToString("0.000", Inv))
+                  .Append(", wsie z wycietymi psujacymi sie ").Append(M.ReachCut[m]);
             }
+            double vo, vf; int vn; VilOutTotals(out vo, out vf, out vn);
+            sb.Append(" | alfa ").Append(SwAlphaNet ? "NETTO (wplyw + fracht KS-H - wydatki spoza koszyka)" : "z utargu (klucz Ks Alpha Net wylaczony)").Append(": wydatki wsi spoza koszyka ").Append(F0(vo))
+              .Append(" zl/d, fracht KS-H do wsi ").Append(F0(vf)).Append(" zl/d (wsi z liczbami ").Append(vn).Append(')');
             sb.Append(" | praca domowa razem ").Append((r.HomeWorkLabour / 1e6).ToString("0.00", Inv)).Append(" mln rak (te same rece i ziemia, nigdy na targ)")
               .Append(" | utarg wozow i podatek panow od niego ida za sprzedaza wsi na targ (wyzej: mniej o ... wobec tych samych zajec bez pracy domowej).");
             Log.Info(sb.ToString());
@@ -314,36 +338,49 @@ namespace Armoury
         private const string BudgetCsvHeader = "dzien;osada_id;rodzaj;rynek;budzet_W_zl_d;budzet_R_zl_d;budzet_P_zl_d;odczytow;alfa;utarg_28d_zl_d;do_kiesy_28d_zl_d";
 
         /// <summary>Wiersz na miasto (budzety klas W/R/P z zarobku netto x 0.90 - to, co dostaje Plan) i na wies (alfa Planu, srednie 28 dob utargu i wplywu do kiesy) -
-        /// plik do testu portu kroku 8 (harness: budzety miast i alfa okregow z gry zamiast scenariusza).</summary>
-        private static void BudgetsCsv(int day, KsInput inp)
+        /// plik do testu portu kroku 8 (harness: budzety miast i alfa okregow z gry zamiast scenariusza). KS-R3 C2: zrzut liczb na watku glownym (PlanStart),
+        /// tekst wierszy na watku roboczym (BudgetsText).</summary>
+        private static List<object[]> BudgetsRows(int day, KsInput inp)
         {
-            if (!LogGate.Lines || inp == null) return;
-            var sb = new StringBuilder(64 * 1024);
-            int rows = 0;
+            if (!LogGate.Lines || inp == null) return null;
+            var raw = new List<object[]>(inp.Towns.Count + inp.Districts.Count);
             foreach (var t in inp.Towns)
             {
                 if (t.Budget == null || t.Budget.Length < 3) continue;
                 var st = Settlement.Find(t.Id); double[] a = null; if (st != null) _earn.TryGetValue(st, out a);
-                sb.Append(day).Append(';').Append(t.Id).Append(";miasto;").Append(t.Market == 0 ? "Westeros" : "Essos").Append(';').Append(F0(t.Budget[0])).Append(';').Append(F0(t.Budget[1])).Append(';')
-                  .Append(F0(t.Budget[2])).Append(';').Append(a != null ? ((int)a[3]).ToString(Inv) : "-").Append(";;;").Append(Environment.NewLine);
-                rows++;
+                raw.Add(new object[] { t.Id, 0, t.Market, t.Budget[0], t.Budget[1], t.Budget[2], a != null ? (int)a[3] : -1, -1.0, -1.0, -1.0 });
             }
             foreach (var d in inp.Districts)
             {
                 if (d.TownFields) continue;
                 var st = Settlement.Find(d.Id); double[] a = null; if (st != null && st.Village != null) _vilTake.TryGetValue(st.Village, out a);
-                sb.Append(day).Append(';').Append(d.Id).Append(";wies;").Append(d.Market == 0 ? "Westeros" : "Essos").Append(";;;;;").Append(d.Alpha >= 0 ? d.Alpha.ToString("0.0000", Inv) : "-").Append(';')
-                  .Append(a != null ? a[0].ToString("0.0", Inv) : "-").Append(';').Append(a != null ? a[1].ToString("0.0", Inv) : "-").Append(Environment.NewLine);
-                rows++;
+                raw.Add(new object[] { d.Id, 1, d.Market, 0.0, 0.0, 0.0, -1, d.Alpha, a != null ? a[0] : -1.0, a != null ? a[1] : -1.0 });
             }
-            string path = Log.Csv(BudgetCsvName, BudgetCsvHeader, sb.ToString());
-            Log.Info(PK + BudgetCsvName + " " + (path != null ? rows + " wierszy (doba " + day + "; " + MoneyNote() + ")" : "NIE ZAPISANY (log wylaczony albo brak katalogu sesji)") + ".");
+            return raw;
+        }
+
+        /// <summary>Wiersze ks-budzety.csv z liczb zrzutu (czysty tekst).</summary>
+        private static List<string> BudgetsText(int day, List<object[]> raw)
+        {
+            var rows = new List<string>(raw.Count);
+            foreach (var x in raw)
+            {
+                string id = (string)x[0]; int kind = (int)x[1], mk = (int)x[2];
+                if (kind == 0)
+                    rows.Add(day + ";" + id + ";miasto;" + (mk == 0 ? "Westeros" : "Essos") + ";" + F0((double)x[3]) + ";" + F0((double)x[4]) + ";" + F0((double)x[5]) + ";" + ((int)x[6] >= 0 ? ((int)x[6]).ToString(Inv) : "-") + ";;;");
+                else
+                {
+                    double al = (double)x[7], a0 = (double)x[8], a1 = (double)x[9];
+                    rows.Add(day + ";" + id + ";wies;" + (mk == 0 ? "Westeros" : "Essos") + ";;;;;" + (al >= 0 ? al.ToString("0.0000", Inv) : "-") + ";" + (a0 >= 0 ? a0.ToString("0.0", Inv) : "-") + ";" + (a1 >= 0 ? a1.ToString("0.0", Inv) : "-"));
+                }
+            }
+            return rows;
         }
 
         // ============================================================ ks-miasta.csv (co 7 dob, stan zastosowany)
         private const string TownCsvName = "ks-miasta.csv";
         private const string TownCsvHeader = "dzien;miasto_id;miasto;rynek;lambda;ludzie;indeks_jedzenia_mediana;jedzenie_na_suficie;jedzenie_na_podlodze;zboze_indeks;zboze_polka_szt;zboze_popyt_zaplacony_szt_d;zboze_dni_polki;"
-                                           + "czesc_zaplacona_koszyka_miasta;wsie_chciane_szt_7d;wsie_kupione_szt_7d;wsie_bez_kiesy_szt_7d;wsie_bez_towaru_szt_7d;wsie_w_innym_miescie_szt_7d;kiesy_wsi_zl;kiesy_wsi_zmiana_7d_zl";
+                                           + "czesc_zaplacona_koszyka_miasta;wsie_chciane_szt_7d;wsie_kupione_szt_7d;wsie_bez_kiesy_szt_7d;wsie_bez_towaru_szt_7d;wsie_w_innym_miescie_szt_7d;kiesy_wsi_zl;kiesy_wsi_zmiana_7d_zl;kraina;zboze_w_drodze_szt";
         private static readonly Dictionary<Settlement, double[]> _ztWeek = new Dictionary<Settlement, double[]>();   // [chciane, kupione, bez kiesy, bez towaru, w innym miescie]
         private static readonly Dictionary<Settlement, long> _vilPurse = new Dictionary<Settlement, long>();
         private static int _csvTownDay = -1;
@@ -409,6 +446,7 @@ namespace Armoury
                       .Append(gd > 0 ? (gs / gd).ToString("0.0", Inv) : "-").Append(';').Append(tpf.ToString("0.000", Inv)).Append(';')
                       .Append(w != null ? F0(w[0]) : "0").Append(';').Append(w != null ? F0(w[1]) : "0").Append(';').Append(w != null ? F0(w[2]) : "0").Append(';')
                       .Append(w != null ? F0(w[3]) : "0").Append(';').Append(w != null ? F0(w[4]) : "0").Append(';').Append(pv).Append(';').Append(had ? (pv - p0).ToString(Inv) : "-")
+                      .Append(';').Append(TownLandOf(st)).Append(';').Append(KsFoodCarts.Incoming(st, ZGrain))   // KS-R3: kraina miasta (NKS-23 - krainy bez ujscia) i zboze w drodze KS-H
                       .Append(Environment.NewLine);
                     rows++;
                 }

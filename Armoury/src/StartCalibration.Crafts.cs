@@ -155,6 +155,7 @@ namespace Armoury
                 double pay = wage * TownCrafts.WageIndex(town);
                 double margin = 1.0 + Math.Max(0f, s != null ? s.SmithProfitPercent : 20f) / 100.0;
                 double hands = 2.0 * zt.Hands, lam = zt.Lam;
+                bool real = SwRealOfftake;
                 _kDayTowns += 2; _kHands += hands;                       // miasto-doby: jedna przerobka za dwie doby
                 var made = new int[n]; var taken = new int[n * 2]; var side = new int[n];
                 // kolejnosc par: zysk na roboczodzien przy cenach miasta (najlepsza pierwsza)
@@ -174,7 +175,8 @@ namespace Armoury
                     // na zbyt: wyrob do tygodnia zakupow miasta
                     double dOut = (p.ZOut >= 0 ? lam * (zt.Q[p.ZOut] + zt.QV[p.ZOut]) : 0.0) + (1 - lam) * SoldYesterday(town, p.OutIt.ItemCategory);
                     if (p.Garum) dOut = Math.Max(dOut, SoldYesterday(town, p.OutIt.ItemCategory) + 1.0);
-                    int room = (int)Math.Ceiling(7.0 * dOut) - shelf.GetItemNumber(p.OutIt);
+                    // KS-R3 G5 (klucz Ks Real Offtake): wyrob najwyzej do 4 dni zakupow (dotad 7) - swiezy lot ziarna nie staje sie tygodniem chleba przy pustej polce zboza
+                    int room = (int)Math.Ceiling((real ? 4.0 : 7.0) * dOut) - shelf.GetItemNumber(p.OutIt);
                     if (room <= 0) { _kFull[pi]++; continue; }
                     int batch = Math.Max(1, (int)Math.Ceiling(room / 6.0));
                     int steps = 0, why = 0;
@@ -182,13 +184,19 @@ namespace Armoury
                     {
                         steps++;
                         int k = Math.Min(batch, room);
-                        // wsad: ponad 2 dni bezposredniej potrzeby ludu na ten towar i ponad 5 sztuk
+                        // wsad: ponad 2 dni (KS-R3 G5: 6 dni) bezposredniej potrzeby ludu na ten towar i ponad 5 sztuk
+                        int kw = k;
                         for (int j = 0; j < p.InIt.Length && k > 0; j++)
                         {
-                            double reserve = 5 + (p.ZIn[j] >= 0 ? 2.0 * lam * (zt.Q[p.ZIn[j]] + zt.QV[p.ZIn[j]]) : 0.0);
+                            double reserve = 5 + (p.ZIn[j] >= 0 ? (real ? 6.0 : 2.0) * lam * (zt.Q[p.ZIn[j]] + zt.QV[p.ZIn[j]]) : 0.0);
                             double avail = shelf.GetItemNumber(p.InIt[j]) - reserve;
                             int kj = (int)Math.Floor((avail - acc[pi * 2 + j]) / p.Ratio[j]);
-                            if (kj < k) k = Math.Max(0, kj);
+                            if (kj < k)
+                            {
+                                // KS-R3 P4: brak wsadu ZC5 - brak zaplaconego popytu (sterowanie rynku)
+                                if (kj <= 0 && p.ZIn[j] >= 0 && SwMarketControl) KsUnmet(zt.Market, p.ZIn[j], kw * p.Ratio[j]);   // raz: partia bez wsadu (petla konczy sie)
+                                k = Math.Max(0, kj);
+                            }
                         }
                         if (k <= 0) { why = 2; break; }
                         int kh = (int)Math.Floor(hands / p.Labor);

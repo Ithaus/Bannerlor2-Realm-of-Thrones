@@ -566,9 +566,14 @@ namespace Armoury
         {
             HarnessOnShelves = -1;
             try { TradeCarts.Arrivals(); } catch (Exception e) { Log.Error("TradeCarts.Arrivals", e); }
+            // KS-R3 G1: kupcy zywnosci (KS-H) - dostawy i zakupy jedzenia PRZED wywozem broni; wlasna pozycja "Przeplywy osad" (MKsH) w oknie MTrade
+            try { MoneyLedger.Mark(MoneyLedger.MTrade); } catch { }
+            try { KsFoodCarts.Arrivals(); } catch (Exception e) { Log.Error("KsFoodCarts.Arrivals", e); }
+            try { KsFoodCarts.Daily(); } catch (Exception e) { Log.Error("KsFoodCarts.Daily", e); }
+            try { MoneyLedger.Mark(MoneyLedger.MKsH); } catch { }
             int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CExport;   // E8/0 (242): wolajacy cen - wywoz kupcow (tylko pomiar)
             try { DailyTradeCore(); }
-            finally { DayProfile.Caller = pc; try { TradeCarts.Flush(); } catch (Exception e) { Log.Error("TradeCarts.Flush", e); } }
+            finally { DayProfile.Caller = pc; try { TradeCarts.Flush(); } catch (Exception e) { Log.Error("TradeCarts.Flush", e); } try { KsFoodCarts.Flush(); } catch (Exception e) { Log.Error("KsFoodCarts.Flush", e); } }
             TradeExportMemo.Daily();   // E8/O3 (267): linia doby "Wywoz kupcow (E8/O3)" (sam log) - takze gdy wywozu nie bylo
         }
 
