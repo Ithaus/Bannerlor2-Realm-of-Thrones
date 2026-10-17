@@ -2597,3 +2597,7 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - Runda 4 = scalenie DS (galaz noc-ds) z KS r3 + budzet wsi z praw DS (koniec alfy netto) + KS-H na kredycie kupcow + rzeznie wedlug Planu + B2 wylaczony przy KS + bez darmowej
   podlogi spichlerza + koszt; najpierw symulator (S-0 kalibracja do gry, S-1 Plan h5, S-2 prototypy), potem 1 test 120 dob. Oczekiwane 8-12 z 53 niezaliczonych (dzis 24).
 - DO DECYZJI JEFFA: glod Polnocy (36% kcal bez pokrycia w Planie), Wolnych Ludzi (47%), Nocnej Strazy (70%) - ziemia nie wyzywi; biedni rzemieslnicy Essos (R/P stac na 41-54% koszyka).
+- DECYZJE JEFFA 17.10 ok. 10:35 PDT (wiazace): (1) glod Polnocy / Wolnych Ludzi / Nocnej Strazy = "Dowoz jak w ksiazkach": kupcy i statki wioza zboze z poludnia (White Harbor,
+  Eastwatch), Nocna Straz dostaje danine w naturze od lordow Polnocy (zboze do Muru), Wolnych Ludzi glod pcha do najazdow na poludnie; czego nie da sie dowiezc - prawdziwy glod
+  (ludzi powoli ubywa). (2) biedni rzemieslnicy Essos = "Tanszy koszyk": biedni jedza tansze (chleb, kasza, ryby zamiast miesa i wina), koszyk dopasowuje sie do kieszeni,
+  place rosna same tam, gdzie brakuje rak. -> do rundy 4.
