@@ -2655,3 +2655,6 @@ B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na P
   PRZYCZYNA korony 0.873: sesja przelaczenia liczy zwykle wplywy z okna pomiaru ze STARYMI poborami (P1, zawor) - King's Landing prognoza 85k, po rampie ok. 25k -> g 0.5 przy luce
   45k/d; nastepna sesja dopiero w dzien kwartalu (109200 - po tescie). POPRAWKA ac170b34 (noc-ds-f3): swobodna sesja "po rampie" 7 dob po koncu rampy z 7 ostatnich probek.
   Test fin75 160 dob (Armoury eaebcd63), flaga armoury-dst-wlacz.flag UTWORZONA (USUNAC!), at-fin75-f3b.out.txt.
+- 14:30 PDT: test F3 fin75 160 dob (Armoury-2026-10-17_13-37-03.log): 0 ERROR, bitwa OK, nds 38/40; NIE: NDS-7b po rampie 0.869, NDS-9 0.935. Dobre: zwrot 100%, Bank 13% pokrycia,
+  dlug koron w Banku +370/d (baza +6340/d), krolestwo-doby z Bankiem 2.8% (baza 16.1%). PRZYCZYNA: sesja "po rampie" liczyla srednia z 'inne' - King's Landing doba 109161
+  jednorazowo 793k -> prognoza 149k/d -> g zostalo 0.5. POPRAWKA 0564a5a5: 'inne' mediana z dob wojny. Test fin76 160 dob (Armoury 2a1ce0d5), flaga armoury-dst-wlacz.flag (USUNAC!).
