@@ -6740,6 +6740,106 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public int DsRampDays { get; set; } = 28;
 
+        [SettingPropertyBool("Ds Towns", HintText = "towns, castles and the crown pay as they did in the Middle Ages: after Ds Farm Measure Days of watching what the town and castle purses give up today, each town and castle owes its lord and its king a fixed farm (paid every week); the daily valve, the war aid from the people's savings, the hoard tax on the people and the purses, the war levy on town purses and the lords' war levy on the people stop; in war the realm grants the king a war grant each quarter (aids on sales, a tax on earnings, a tenth of movables, double customs, a larger vassal aid), and a king short of money for the wage refunds spends his treasure above the war reserve, then borrows from his burghers against the grant, and only then from the Iron Bank (needs Town Folk Live and Crown Current Income; off = the old rules from the next day)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsTowns { get; set; } = false;
+
+        [SettingPropertyInteger("Ds Farm Measure Days", 7, 91, "0", HintText = "with Ds Towns: for how many days the old valve of every town and castle (with the lord's part of the hoard tax and the lords' war levy on the people) is watched before the farms are set at what it gave on average - the farm is the old sum in a new form")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsFarmMeasureDays { get; set; } = 28;
+
+        [SettingPropertyInteger("Ds Farm Renew Days", 0, 728, "0", HintText = "with Ds Towns: every this many days a farm is renewed towards the same share of what the merchants of the town or castle have taken in over the last 28 days as when it was set (0 = never renewed)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsFarmRenewDays { get; set; } = 364;
+
+        [SettingPropertyFloatingInteger("Ds Farm Renew Max", 0.00f, 0.50f, "0.00", HintText = "with Ds Towns: a renewal moves a farm by at most this share up or down")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsFarmRenewMax { get; set; } = 0.15f;
+
+        [SettingPropertyInteger("Ds Farm Distraint Terms", 1, 8, "0", HintText = "with Ds Towns: after a town has owed part of its farm over this many quarter days in a row, its lord and king take the arrears from the commune's purse (at most two thirds of it on a farm day)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsFarmDistraintTerms { get; set; } = 2;
+
+        [SettingPropertyInteger("Ds Farm Forgive Weeks", 0, 156, "0", HintText = "with Ds Towns: arrears of a farm beyond this many weekly instalments are forgiven (0 = never forgiven)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsFarmForgiveWeeks { get; set; } = 52;
+
+        [SettingPropertyFloatingInteger("Ds Farm Floor Share", 0.00f, 1.00f, "0.00", HintText = "with Ds Towns: a town or castle pays its farm, the aids and its tenth from its purse only down to this share of the merchants' working coin; what it cannot pay is written in the book of arrears")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsFarmFloorShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Ds Merchant Draw Days", 0, 120, "0", HintText = "with Ds Towns: each day the merchants take one part in this many of what the purse holds beyond one and a half times their working coin as their own earnings (in a town 70 percent to the patricians, 30 to the craftsmen; in a castle to the castle folk) - in place of the people's share of the old valve (0 = nothing)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsMerchantDrawDays { get; set; } = 28;
+
+        [SettingPropertyFloatingInteger("Ds Merchant Draw P Share", 0.00f, 1.00f, "0.00", HintText = "with Ds Towns: the patricians' share of the merchants' draw in a town; the craftsmen get the rest")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsMerchantDrawPShare { get; set; } = 0.7f;
+
+        [SettingPropertyFloatingInteger("Ds Aides Rate", 0.000f, 0.100f, "0.000", HintText = "with Ds Towns: the war aid on sales (the aides, the alcabala) for each step of war grant - a share of what the town or castle purse sold that day")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsAidesRate { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Ds Aides Max", 0.00f, 0.30f, "0.00", HintText = "with Ds Towns: the highest war aid on sales")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsAidesMax { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Ds Tallage Rate", 0.000f, 0.100f, "0.000", HintText = "with Ds Towns: the war tax on the people's earnings for each step of war grant (labourers pay half of it, craftsmen all of it, patricians one and a half times it; castle folk all of it) - set once a quarter in place of the weekly step")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsTallageRate { get; set; } = 0.05f;
+
+        [SettingPropertyFloatingInteger("Ds Tallage Max", 0.00f, 0.30f, "0.00", HintText = "with Ds Towns: the highest war tax on earnings without the War Tax policy")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsTallageMax { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Ds Tallage Max Policy", 0.00f, 0.30f, "0.00", HintText = "with Ds Towns: the highest war tax on earnings with the War Tax policy")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsTallageMaxPolicy { get; set; } = 0.15f;
+
+        [SettingPropertyFloatingInteger("Ds Movables Rate", 0.00f, 0.30f, "0.00", HintText = "with Ds Towns: the tenth of movables - for each step of war grant, this share of the people's savings above their reserve days (and of the purse above one and a half times the merchants' working coin) is granted for the quarter and paid in 13 weekly instalments")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsMovablesRate { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Ds Customs War Multiplier", 1.00f, 6.00f, "0.0", HintText = "with Ds Towns: in war the customs are this many times heavier (the maltolt; with Crown Duty on top)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsCustomsWarMultiplier { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Ds Vassal Aid War Percent", 0.00f, 33.00f, "0.0", HintText = "with Ds Towns: the vassal aid owed to the crown in war, as a share of a house's daily income from its lands (in peace - Crown Dues Peace Percent)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsVassalAidWarPercent { get; set; } = 10f;
+
+        [SettingPropertyFloatingInteger("Ds Grant Max", 0.50f, 4.00f, "0.0", HintText = "with Ds Towns: the highest war grant a realm may get in a quarter")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsGrantMax { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Ds Grant Step", 0.10f, 1.00f, "0.0", HintText = "with Ds Towns: war grants are whole steps of this size, and a grant changes by at most one step from one quarter to the next (the first grant of a war is set freely)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsGrantStep { get; set; } = 0.5f;
+
+        [SettingPropertyFloatingInteger("Ds Grant Rents Keep", 0.00f, 1.00f, "0.00", HintText = "with Ds Towns: when the crown reckons what it will need in the quarter, it counts this share of the rents it paid its houses before the farms were set")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsGrantRentsKeep { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Ds Grant Session Days", 1, 91, "0", HintText = "with Ds Towns: after this many days of peace the war grant ends, and after this many days of a new war the realm grants a first war grant, without waiting for the next quarter day")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsGrantSessionDays { get; set; } = 14;
+
+        [SettingPropertyBool("Ds Refund Treasury First", HintText = "with Ds Towns: a crown short of money for the wage refunds first spends its treasure above the war reserve, before it borrows")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsRefundTreasuryFirst { get; set; } = true;
+
+        [SettingPropertyBool("Ds Anticipation Loans", HintText = "with Ds Towns: then the burghers of the realm lend the crown against the instalments of the war grant not yet paid (Crown Town Loan Rate Year a year); the loan is repaid first from those instalments, and what is left after the quarter becomes ordinary crown debt to the towns (needs Crown Town Loans)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsAnticipationLoans { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ds Crown Loan Limit Days Pledged", 0.00f, 728.00f, "0", HintText = "with Ds Towns: a crown borrowing from the Iron Bank pledges its customs - it may owe the Bank this many days of its average taxes, and while it is in arrears the Bank takes its customs until it has paid in full for 28 days (the Bank never forgives)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public float DsCrownLoanLimitDaysPledged { get; set; } = 365f;
+
+        [SettingPropertyInteger("Ds Folk Surplus Spend Days", 0, 120, "0", HintText = "with Ds Towns: townsfolk spend each day one part in this many of what they hold above their reserve days (in place of Folk Surplus Spend Share), coming in over Ds Ramp Days after the farms are set (0 = as before)")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public int DsFolkSurplusSpendDays { get; set; } = 15;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8424,6 +8524,31 @@ namespace Armoury
             s.DsSurplusSpendDays = DsSurplusSpendDays;
             s.DsSurplusBkShare = DsSurplusBkShare;
             s.DsRampDays = DsRampDays;
+            s.DsTowns = DsTowns;
+            s.DsFarmMeasureDays = DsFarmMeasureDays;
+            s.DsFarmRenewDays = DsFarmRenewDays;
+            s.DsFarmRenewMax = DsFarmRenewMax;
+            s.DsFarmDistraintTerms = DsFarmDistraintTerms;
+            s.DsFarmForgiveWeeks = DsFarmForgiveWeeks;
+            s.DsFarmFloorShare = DsFarmFloorShare;
+            s.DsMerchantDrawDays = DsMerchantDrawDays;
+            s.DsMerchantDrawPShare = DsMerchantDrawPShare;
+            s.DsAidesRate = DsAidesRate;
+            s.DsAidesMax = DsAidesMax;
+            s.DsTallageRate = DsTallageRate;
+            s.DsTallageMax = DsTallageMax;
+            s.DsTallageMaxPolicy = DsTallageMaxPolicy;
+            s.DsMovablesRate = DsMovablesRate;
+            s.DsCustomsWarMultiplier = DsCustomsWarMultiplier;
+            s.DsVassalAidWarPercent = DsVassalAidWarPercent;
+            s.DsGrantMax = DsGrantMax;
+            s.DsGrantStep = DsGrantStep;
+            s.DsGrantRentsKeep = DsGrantRentsKeep;
+            s.DsGrantSessionDays = DsGrantSessionDays;
+            s.DsRefundTreasuryFirst = DsRefundTreasuryFirst;
+            s.DsAnticipationLoans = DsAnticipationLoans;
+            s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
+            s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;
         }
 
         internal static void Apply()

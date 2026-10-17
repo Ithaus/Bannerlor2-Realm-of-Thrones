@@ -346,6 +346,7 @@ namespace Armoury
         private static long PayCrown(Folk f, int c, int cls, long earned)
         {
             if (earned <= 0) return 0;
+            DsSeason.NoteEarn(f.St, cls, earned);   // DS F3: zarobek wazony klasy - podstawa plonu nadania (prognoza; tylko licznik)
             int t = KingdomTreasury.FolkWarTax(f.St, cls, earned, Math.Max(0, PurseOf(f, c)));
             if (t <= 0) return 0;
             AddPurse(f, c, -t);
@@ -911,6 +912,7 @@ namespace Armoury
             double turn = Math.Max(0f, Math.Min(0.2f, s.TownFolkMerchantDraw)) * turnBase;
             double top = Math.Max(0, Unit(s.TownFolkCraftWageShare) * f.ProdV - f.Win[KCraftPaid]);
             d.BaseFolk += fp; d.BaseVill += f.VillWin; d.BaseLife += (1 - svc) * life; d.BaseCourt += (1 - cs) * court; d.BaseSale += sale; d.BaseCar += car; d.BaseGm += f.GmMatWin;
+            DsTowns.NoteSales(st, life + court + sale + fp + f.VillWin);   // DS F3 (M7): sprzedaz kasy w oknie (zolnierze i partie, dwor, sprzedaz, lud, wsie) - podstawa pomocy od sprzedazy
             d.LabF += lf * rf; d.LabG += lg * rg; d.LabA += la * ra;
             f.VillWin = 0; f.GmMatWin = 0;
             double all = lab + turn + top, k = 1;
@@ -972,6 +974,8 @@ namespace Armoury
             // ---- 5. zapas i nadwyzka (potrzeba z wczorajszej kotwicy): W ponad TownFolkReserveDays dni - FolkSurplusSpendShare (15%; dotad 7%) na towar jutro;
             //         R ponad 21, P ponad 30 dni - ten sam udzial: 70% place, 30% towar (decyzja Jeffa 12.10 (3))
             double rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays)), sr = SpendRate(s);
+            // DS F3: zbytki z prawdziwej nadwyzki - 1/DsFolkSurplusSpendDays dziennie oszczednosci ponad zapas dni zamiast udzialu FolkSurplusSpendShare, rampa DsRampDays od ustalenia firm
+            if (DsTowns.FarmsLive && s.DsFolkSurplusSpendDays > 0) { double rp = DsTowns.FolkRamp; sr = (1 - rp) * sr + rp / Math.Min(120, s.DsFolkSurplusSpendDays); }
             f.Offer[0] = f.Offer[1] = f.Offer[2] = 0;
             // P1 (szczebel 4 drabiny nadwyzki): w wojnie i przy potrzebie korony klasa oddaje skarbcowi krolestwa czesc kiesy PONAD zapas dni (PayAid - po robotach gminy,
             // przed oferta na jutro i placami z nadwyzki, ktore licza sie od reszty); wylaczone, pokoj, s = 0 - PayAid zwraca 0 i krok jest co do monety jak przed paczka
@@ -1066,6 +1070,7 @@ namespace Armoury
             double lab = (1 - svc) * life * rf + (1 - cs) * court * (0.5 * rf + 0.2 * rg + 0.3 * ra);
             for (int mi = 0; mi < Mixes; mi++) lab += f.Sale[mi] * (MixOf[mi][0] * rf + MixOf[mi][1] * rg + MixOf[mi][2] * ra);
             lab += f.PaidKeep * (0.8 * rf + 0.2 * rg) + f.VillWin * (0.2 * rf + 0.8 * rg);
+            if (DsTowns.On) { double dsSale = 0; for (int mi = 0; mi < Mixes; mi++) dsSale += f.Sale[mi]; DsTowns.NoteSales(st, life + court + dsSale + f.PaidKeep + f.VillWin); }   // DS F3 (M7): sprzedaz kasy zamku w oknie
             f.VillWin = 0;
             d.LabC += FromCoffer(f, (long)Math.Min(lab, Math.Max(0, town.Gold)), ELabour);
             // ---- 5. nadwyzka ponad 10 dni potrzeby: 7% na towar jutro (konsumpcja zamku)

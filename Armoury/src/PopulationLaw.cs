@@ -1339,7 +1339,19 @@ namespace Armoury
                 try { if (c != null && Table.ContainsKey(c)) { float p = PeopleOf(st); if (p > 0f) due = (long)DailyRent(p); } } catch { }
                 float decree = TaxDecree(st);
                 int lp, lb, cr; long spare;
-                if (!TownPurse.Valve(st, decree, due, out lp, out lb, out cr, out spare)) continue;
+                if (DsTowns.FarmsLive)
+                {
+                    // DS F3 (M2/M3, M6, M9): firma miasta zamiast zaworu - w dzien raty pan i korona dostaja rate firmy (i zaleglosc), korona zaleglosc pomocy od sprzedazy
+                    // i dziesiata kasy; co dobe wyplata kupcom do P / R. Zapisy rent ponizej jak dotad (czesc pana); czesc korony do ksiegi MTownCrown w ValveDay
+                    int crF, crM;
+                    if (!DsTowns.TownDay(st, out lp, out crF, out crM, out spare)) continue;
+                    cr = crF + crM;
+                }
+                else
+                {
+                    if (!TownPurse.Valve(st, decree, due, out lp, out lb, out cr, out spare)) continue;
+                    DsTowns.TownWindow(st, lp, cr);   // DS F3: okno pomiaru firm (stare zasady) - czesc pana i korony zaworu tej doby (poza oknem nic)
+                }
                 crownSum += cr;
                 if (lp > 0 || spare > 0) _rentBy[st] = new long[] { lp, Math.Max(0L, spare) };   // 169c i rada 3.5: czesc pana i nadwyzka, z ktorej ja wzieto
                 if (lp <= 0) continue;

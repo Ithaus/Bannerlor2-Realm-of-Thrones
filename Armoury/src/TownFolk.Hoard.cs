@@ -90,6 +90,7 @@ namespace Armoury
         private static long PayHoard(Folk f, int c, int slot, double ov, long aid, double rd)
         {
             if (!HoardKey) return 0;
+            if (DsTowns.FarmsLive) return 0;   // DS F3: podatek od skarbca ludu miast i zamkow zniesiony (czesc pana wliczona w firme M2)
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -160,6 +161,7 @@ namespace Armoury
                         int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0);
                         PopulationLaw.RentToday[clan] = (int)Math.Min(int.MaxValue, (long)r0 + lp);   // dochod ziemi D rodu (jak podatki panu PayLord)
                         CirculationWindows.NoteHeroGold(lord, lp);
+                        DsTowns.MeasureHoard(st, lp);                          // DS F3: okno pomiaru firm - czesc pana podatku od skarbca ludu tej osady
                         _hdLord += lp; _hdClans.Add(clan);
                         if (lord == Hero.MainHero) _hdPlayer += lp;
                     }

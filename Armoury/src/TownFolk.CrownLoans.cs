@@ -71,6 +71,7 @@ namespace Armoury
         {
             _kl.Clear(); _klBan.Clear(); _klInc.Clear();
             _klStartDone = false; _klDebtPrev = double.NaN; _klStumbleSess = 0;
+            ResetAnt();   // DS F3 (L1): zaliczki mieszczan pod nadanie (TownFolk.CrownLoans.Ds.cs) - zapis w tym samym kluczu
             KlDayZero();
             LastCrownLoanLent = LastCrownLoanRepaid = 0;
         }
@@ -80,6 +81,7 @@ namespace Armoury
             _klLent = _klLentKasa = _klLentW = _klLentR = _klLentP = _klPaidInc = _klPaidStock = _klPaidKasa = _klPaidPurse = _klWritten = _klLost = 0;
             _klInt = _klWrittenD = _klLostD = _klDust = _klGap = 0;
             _klLentN = _klWar = _klCand = _klBlkBan = _klBlkWarm = _klBlkLimit = _klBlkNoSrc = _klMissedN = _klDefaultN = _klLoyN = _klLostN = _klAbove = _klStumbles = 0;
+            _klFromAnt = 0;   // DS F3 (L1): dlug przeniesiony z zaliczek po kwartale
             foreach (var kv in _kl) { kv.Value.DLent = 0; kv.Value.DPaid = 0; }
         }
 
@@ -114,9 +116,10 @@ namespace Armoury
         {
             try
             {
-                if (k == null || k.StringId == null || _kl.Count == 0 || !CrownLoansOn) return 0;
-                KlDebtK x;
-                return _kl.TryGetValue(k.StringId, out x) ? (long)Math.Ceiling(KlDebt(x) - 1e-9) : 0;
+                if (k == null || k.StringId == null || (_kl.Count == 0 && _kla.Count == 0) || !CrownLoansOn) return 0;
+                KlDebtK x, a;
+                double t = (_kl.TryGetValue(k.StringId, out x) ? KlDebt(x) : 0) + (_kla.TryGetValue(k.StringId, out a) ? KlDebt(a) : 0);   // DS F3 (L1): zaliczki mieszczan to tez dlug u miast
+                return t > 0 ? (long)Math.Ceiling(t - 1e-9) : 0;
             }
             catch { return 0; }
         }
@@ -283,6 +286,8 @@ namespace Armoury
                     foreach (var kv in _klBan) if (kv.Value <= today) old.Add(kv.Key);
                     foreach (var id in old) _klBan.Remove(id);
                 }
+                // DS F3 (L1): zaliczki mieszczan pod nadanie - odsetki i splata PIERWSZA z rat nadania wplaconych dzis (dziesiata + W4), przed zwyklym dlugiem korona2
+                try { AntRepay(s); } catch (Exception e) { KlStumble("Pay(zaliczki)", e); }
                 double rate = KlRate(s) / YearDays;
                 int dflt = KlDefault(s);
                 var drop = new List<string>();
@@ -494,7 +499,7 @@ namespace Armoury
                 long paid = _klPaidInc + _klPaidStock;
                 string ctl = "-";
                 if (!double.IsNaN(_klDebtPrev))
-                    ctl = Math.Round(debt - (_klDebtPrev + _klLent + _klInt - paid - _klWrittenD - _klLostD - _klDust)).ToString("0", KlInv);
+                    ctl = Math.Round(debt - (_klDebtPrev + _klLent + _klFromAnt + _klInt - paid - _klWrittenD - _klLostD - _klDust)).ToString("0", KlInv);   // DS F3: + zaliczki przeniesione po kwartale
                 _klDebtPrev = loans ? debt : double.NaN;
                 LastCrownLoanLent = _klLent; LastCrownLoanRepaid = paid;
                 double share = _gdShares && _gdWorld > 0 ? (double)_gdCrowns / _gdWorld : double.NaN;
@@ -517,6 +522,7 @@ namespace Armoury
                       .Append(" | dlug koron u miast ").Append(N0(debt)).Append(" (krolestw ").Append(_kl.Count).Append(", miast ").Append(places.Count).Append(", czesci ").Append(parts)
                       .Append("; kasy ").Append(N0(debtKasa)).Append(" / kiesy ").Append(N0(debt - debtKasa)).Append("), limit krolestw z dlugiem ").Append(N0(limAll))
                       .Append(", dlug / limit najwyzej ").Append(worst.ToString("0.000", KlInv)).Append(", zakazow ").Append(_klBan.Count)
+                      .Append(_klFromAnt >= 0.5 ? " | z zaliczek mieszczan pod nadanie (DS, po kwartale) " + N0(_klFromAnt) : "")
                       .Append(" | kontrola: dlug - (wczoraj + zawarte + odsetki - splacone - umorzone - przepadle) ").Append(ctl)
                       .Append(", skarbiec po pozyczce ponad zapas wojny ").Append(_klAbove).Append(" (oczekiwane 0 / 0)")
                       .Append(" | czesc korony podatku od nadwyzki do zapasu (A, Folk Guard Crown To Reserve ").Append(s.FolkGuardCrownToReserve ? "tak" : "nie").Append("): dzis ")
@@ -549,6 +555,7 @@ namespace Armoury
                     foreach (var p in x.Parts) sb.Append(";P,").Append(p.St).Append(',').Append(p.Kind).Append(',').Append(p.Left.ToString("R", KlInv));
                 }
                 foreach (var kv in _klBan) sb.Append(";B,").Append(kv.Key).Append(',').Append(kv.Value);
+                ExportAnt(sb);   // DS F3 (L1): rekordy A / Q na koncu (starsza wersja moda je pomija)
                 return sb.ToString();
             }
             catch (Exception e) { Log.Error("TownFolk.ExportKorona2", e); return ""; }
@@ -559,11 +566,12 @@ namespace Armoury
             try
             {
                 if (string.IsNullOrEmpty(data) || !data.StartsWith("k2v1", StringComparison.Ordinal)) return;
-                KlDebtK cur = null;
+                KlDebtK cur = null, curA = null;
                 foreach (var rec in data.Split(';'))
                 {
                     var f = rec.Split(',');
                     if (f.Length == 0) continue;
+                    if ((f[0] == "A" || f[0] == "Q") && f.Length >= 2) { curA = ImportAnt(f, curA); continue; }   // DS F3 (L1): zaliczki mieszczan
                     if (f[0] == "I" && f.Length >= 4)
                     {
                         var a = new KlInc();
@@ -599,6 +607,9 @@ namespace Armoury
                 var empty = new List<string>();
                 foreach (var kv in _kl) if (kv.Value.Parts.Count == 0) empty.Add(kv.Key);
                 foreach (var k in empty) _kl.Remove(k);
+                var emptyA = new List<string>();
+                foreach (var kv in _kla) if (kv.Value.Parts.Count == 0) emptyA.Add(kv.Key);
+                foreach (var k in emptyA) _kla.Remove(k);
             }
             catch (Exception e) { Log.Error("TownFolk.ImportKorona2", e); }
         }

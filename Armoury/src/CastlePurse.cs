@@ -381,6 +381,7 @@ namespace Armoury
                 if (s == null || st == null || !st.IsCastle || st.Town == null) return false;
                 if (!s.CastlePurseEnabled || !s.CastleGarrisonPayComesHome) return false;
                 if (float.IsNaN(s.CastleDuesShare) || s.CastleDuesShare <= 0f) return false;
+                if (DsTowns.FarmsLive) return false;             // DS F3: firma zamku stala - zold zalogi nie wraca panu zaworem (zwrot korony z calosci)
                 var clan = st.OwnerClan;
                 if (clan == null) return false;
                 var k = clan.Kingdom;
@@ -610,9 +611,39 @@ namespace Armoury
                         try
                         {
                             int before = town.Gold;
+                            DsTowns.CastleSample(st, town, reserve);     // DS F3 (okno pomiaru i firmy): probka doplywu netto zamku przed poborem tej doby
+                            if (DsTowns.FarmsLive)
+                            {
+                                // DS F3 (M4, M6, M9): firma zamku zamiast zaworu - pan i korona w dzien raty, dziesiata kasy, wyplata do kiesy podzamcza co dobe;
+                                // zapisy jak zaworu (RentToday, LordDuesToday, D 169c, CrownToday) - dziesiata poza CrownToday (wplyw dnia przez DsSeason)
+                                int dLord, dCrown, dMov, dSub; Kingdom dk;
+                                DsTowns.CastleDay(st, reserve, out dLord, out dCrown, out dMov, out dSub, out dk);
+                                var dClan = st.OwnerClan;
+                                var dHead = dClan != null ? dClan.Leader : null;
+                                suburbKept += dSub;
+                                if (dLord > 0 && dClan != null)
+                                {
+                                    int r0; PopulationLaw.RentToday.TryGetValue(dClan, out r0); PopulationLaw.RentToday[dClan] = r0 + dLord;
+                                    int l0; LordDuesToday.TryGetValue(dClan, out l0); LordDuesToday[dClan] = l0 + dLord;
+                                    long c0; perClan.TryGetValue(dClan, out c0); perClan[dClan] = c0 + dLord;
+                                    _duesBy[st] = new long[] { dLord, (long)before - reserve };
+                                    paid += dLord; payers++;
+                                    if (dHead == Hero.MainHero) playerPaid += dLord;
+                                }
+                                if (dCrown > 0 && dk != null)
+                                {
+                                    crownPaid += dCrown; crownPayers++;
+                                    long k0; CrownToday.TryGetValue(dk, out k0); CrownToday[dk] = k0 + dCrown;
+                                    if (dHead == Hero.MainHero) playerCrown += dCrown;
+                                }
+                                if (dMov > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MCastleCrown, dMov);   // kasa -> skarbiec (dziesiata) w pozycji korony
+                            }
+                            else
+                            {
                             int pay = Dues(before, reserve, share);
                             var clan = st.OwnerClan;
                             var lord = clan != null ? clan.Leader : null;
+                            int wLord = 0, wCrown = 0, wSub = 0;   // DS F3: okno pomiaru firm
                             if (before <= reserve) below++;
                             else if (lord == null || !lord.IsAlive) noLord++;
                             else if (st.IsUnderSiege) siege++;
@@ -621,7 +652,7 @@ namespace Armoury
                                 // hak KL / E5/B1 (R12): czesc podzamcza (15% przy kiesie czynnej) z kasy zamku do kiesy podzamcza; kiesa wylaczona - 0
                                 int suburb = suburbShare > 0f ? (int)Math.Min(pay, (long)(pay * (double)suburbShare)) : 0;
                                 if (suburb > 0) suburb = TownFolk.EarnCastleValve(st, suburb);
-                                suburbKept += suburb;
+                                suburbKept += suburb; wSub = suburb;
                                 // 114: podzial ValveSplit - korona (1 - udzial pana) do najblizszej zlotowki (B-4; dotad w dol), pan reszte; suma = pay - suburb.
                                 // Zamek rodu bez krolestwa i wylaczony podzial: calosc dla pana
                                 var k = clan.Kingdom;
@@ -633,6 +664,7 @@ namespace Armoury
                                 {
                                     // przelew kasa zamku -> pan (ta sama akcja gry co renty PopulationLaw; kwota nigdy nie przekracza kasy)
                                     GiveGoldAction.ApplyForSettlementToCharacter(st, lord, lordPay, true);
+                                    wLord = lordPay;
                                     int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = r0 + lordPay;
                                     int l0; LordDuesToday.TryGetValue(clan, out l0); LordDuesToday[clan] = l0 + lordPay;
                                     long c0; perClan.TryGetValue(clan, out c0); perClan[clan] = c0 + lordPay;
@@ -649,11 +681,13 @@ namespace Armoury
                                     int taken = had - town.Gold;
                                     if (taken > 0)
                                     {
-                                        k.KingdomBudgetWallet += taken; crownPaid += taken; crownPayers++;
+                                        k.KingdomBudgetWallet += taken; crownPaid += taken; crownPayers++; wCrown = taken;
                                         long k0; CrownToday.TryGetValue(k, out k0); CrownToday[k] = k0 + taken;
                                         if (lord == Hero.MainHero) playerCrown += taken;
                                     }
                                 }
+                            }
+                            DsTowns.CastleWindow(st, wLord, wCrown, wSub);   // DS F3: okno pomiaru firm (poza oknem nic)
                             }
                         }
                         catch (Exception e) { Stumble("CastlePurse.Dues(" + st.StringId + ")", e); }   // ten jeden zamek; stan kasy i tak wchodzi do linii

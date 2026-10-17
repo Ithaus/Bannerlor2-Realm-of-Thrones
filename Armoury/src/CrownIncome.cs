@@ -57,6 +57,8 @@ namespace Armoury
             public long ScutIn, ScutOut;  // W6: tarczowe tej doby - pobrane (glowy platnikow -> skarbiec) i wyplacone przez W5 ponad danine (skarbiec -> glowy rodow); POZA wplywami dnia (Spend / Left)
             public long ValveKept; public double ValveR;   // E3-G5: czesc korony z zaworu miast zatrzymana w zapasie (z puli rent, po M3) i jej udzial r tej doby
             public long Court;            // E3-P1 (b): dwor krolewski - towar z polki stolicy z reszty wplywow dnia (po M3 i G5, przed rentami; skarbiec -> kasa stolicy)
+            public long DsMov;            // DS F3 (M9): dziesiata od ruchomosci od wczorajszego zamkniecia korony (kiesy ludu i kasy -> skarbiec) - w Own
+            public long DsTreas, DsAnt;   // DS F3 (K5): brak zwrotu zoldu pokryty ze skarbca ponad zapas wojny (poza wplywami dnia) i zaliczka mieszczan pod nadanie (L1)
             public bool Snap;
         }
 
@@ -243,7 +245,9 @@ namespace Armoury
                         d.WarTax = wt;
                         long wa = KingdomTreasury.FolkWarAidWindow(k);   // P1: danina z oszczednosci ludu pobrana w dobie ludu (TownFolk.PayAid) od wczorajszego End
                         d.WarAid = wa;
-                        d.Own = dues + lev + cas + tow + thirds + wt + wa;
+                        long dm = DsSeason.MovWindow(k);                 // DS F3 (M9): dziesiata od ruchomosci (kiesy ludu w dobie ludu, kasy w dzien raty) od wczorajszego End
+                        d.DsMov = dm;
+                        d.Own = dues + lev + cas + tow + thirds + wt + wa + dm;
                         long w0;
                         if (snapOk && _wEnd.TryGetValue(k.StringId, out w0)) { d.Snap = true; d.Other = w - w0 - d.Own; }
                         else d.Other = 0;                               // brak wczorajszej migawki (wczytanie starego zapisu, nowe krolestwo) - tylko nasze liczniki
@@ -362,6 +366,7 @@ namespace Armoury
                 foreach (var k in Kingdom.All) if (k != null && !k.IsEliminated && k.StringId != null) _wEnd[k.StringId] = k.KingdomBudgetWallet;
                 _wEndDay = today;
                 KingdomTreasury.FolkWarTaxWindowClear();   // E5/B2 (184): okno wplywow dnia zamkniete razem z migawka (pobor po Begin jest juz w migawce - zapas)
+                DsSeason.WindowClear();                    // DS F3 (M9): okno dziesiatej zamkniete razem z oknem 184
                 LastAdvanceRepaid = _dAdvRepaid; LastAdvanceNew = _dAdvNew; _dAdvRepaid = 0; _dAdvNew = 0;   // recenzja C1 (OBIEG-1): zaliczka gry (licznik doby)
                 LastKingRansomPaid = _dKingRansomPaid; _dKingRansomPaid = 0;   // 178: raty okupu krola ze skarbca (licznik doby)
                 _refDueY.Clear(); _refDueYDay = _open ? today : -1;   // M2b: migawka zwrotu naleznego (wezwania 168 jutro czytaja ja przed zwrotem)
@@ -370,6 +375,7 @@ namespace Armoury
                 long meas = 0, own = 0, oth = 0, rel = 0, spend = 0, gift = 0, giftIn = 0, repO = 0, repI = 0, con = 0, refD = 0, refG = 0, left = 0, rent = 0, rentH = 0, ctw = 0, loanIn = 0, loanOut = 0; int noSnap = 0;
                 long wtax = 0;   // E5/B2 (184)
                 long waid = 0;   // P1: danina z oszczednosci ludu
+                long dmov = 0, dtre = 0, dant = 0;   // DS F3: dziesiata od ruchomosci, brak zwrotu ze skarbca ponad zapas wojny i z zaliczek mieszczan
                 long kingO = 0;    // L1: raty okupow krolow (178) w racie dlugow koron
                 long naRent = 0;   // M1: czesc doplaty W5 z reszty wplywow dnia
                 long bread = 0;    // M3: chleb dla glodnych osad z reszty wplywow dnia
@@ -384,7 +390,7 @@ namespace Armoury
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; dmov += d.DsMov; dtre += d.DsTreas; dant += d.DsAnt; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
                     if (d.ValveKept > 0) { vKept += d.ValveKept; vKeptN++; vR = Math.Max(vR, d.ValveR); }
                     if (d.Court > 0) { court += d.Court; courtN++; }
                     if (!d.Snap) noSnap++;
@@ -413,6 +419,7 @@ namespace Armoury
                       .Append(" | wplywy dnia ").Append(meas).Append(" (nasze: powinnosci, danina wojenna, podatek wojenny ludu (184), clo, czesc korony z zaworu zamkow i miast (E5/B3: miast 1/2 przy wyrownaniu), 1/9 prawa trzecich (178) ").Append(own)
                       .Append(", w tym podatek wojenny ludu (184) ").Append(wtax)
                       .Append(", danina z oszczednosci ludu (P1) ").Append(waid)
+                      .Append(DsTowns.On || dmov > 0 ? ", dziesiata od ruchomosci (DS M9) " + dmov : "")
                       .Append("; inne do skarbcow od wczoraj - gra, BK, Diplomacy, splata dlugu wobec korony ").Append(oth).Append(")")
                       .Append(" + 1/").Append(Math.Max(1f, s.CrownReserveReleaseDays).ToString("0", Inv)).Append(" zapasu ponad ").Append(Math.Max(0, s.CrownReserveGold)).Append(' ').Append(rel)
                       .Append(" = do wydania ").Append(spend)
@@ -423,7 +430,7 @@ namespace Armoury
                       .Append(", wezwania sojusznikow do wojny (168) ").Append(ctw).Append(" (porozumien zerwanych z braku wplywow ").Append(CrownCallToWar.LastEndedN)
                       .Append(", niedoplata ").Append(CrownCallToWar.LastUnpaid).Append(CrownCallToWar.On ? ")" : "; wylaczone - placa rody jak w grze)")
                       .Append(", zwrot zoldu ").Append(refG).Append(" (nalezny ").Append(refD).Append(refD > 0 ? ", wyplacone " + (100.0 * refG / refD).ToString("0.0", Inv) + "%" : "")
-                      .Append("; w tym z kredytu Banku (186) ").Append(loanIn).Append(")")
+                      .Append("; w tym z kredytu Banku (186) ").Append(loanIn).Append(DsTowns.FarmsLive ? ", ze skarbca ponad zapas wojny (DS K5) " + dtre + ", z zaliczek mieszczan (DS L1) " + dant : "").Append(")")
                       .Append(", renty (180) ").Append(rent).Append(" (wstrzymane w skarbcach - rody bez warunku i zaokraglenia ").Append(rentH).Append(CrownRents.On ? ")" : "; renty wylaczone)")
                       .Append(", doplata do zoldu wedlug potrzeby (W5, przed rentami) ").Append(naid).Append(", doplata z reszty wplywow dnia przed rentami (M1) ").Append(naRent)
                       .Append(", chleb dla glodnych osad (M3, z reszty wplywow przed rentami) ").Append(bread)

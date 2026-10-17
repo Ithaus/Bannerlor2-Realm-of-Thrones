@@ -94,7 +94,8 @@ namespace Armoury
                         if (income <= 0f) continue;
                         bool war = false;
                         try { foreach (var k in TaleWorlds.CampaignSystem.Kingdom.All) if (k != c.Kingdom && !k.IsEliminated && c.Kingdom.IsAtWarWith(k)) { war = true; break; } } catch { }
-                        float rate = (war ? s.CrownDuesWarPercent : s.CrownDuesPeacePercent) / 100f;
+                        // DS F3 (K1): przy ustalonych firmach pomoc lennikow w wojnie DsVassalAidWarPercent (10% - "dziesiata" panow), w pokoju jak dotad (2%)
+                        float rate = (war ? (DsTowns.FarmsLive ? Math.Max(0f, Math.Min(33f, s.DsVassalAidWarPercent)) : s.CrownDuesWarPercent) : s.CrownDuesPeacePercent) / 100f;
                         int pay = (int)Math.Min(income * rate, Math.Max(0, c.Leader.Gold));
                         if (pay <= 0) continue;
                         c.Leader.ChangeHeroGold(-pay);
@@ -253,6 +254,7 @@ namespace Armoury
                     // E5/B3 TownRentLordShareWithFolk) - tyle tniemy; korona swojej czesci nie oddaje drugi raz
                     float cs = TownPurse.ValveLive ? cutShare * TownPurse.LordShare(k) : cutShare;
                     if (TownPurse.ValveLive && TownFolk.Live) cs *= 1f - ValveSplit.Unit(Settings.Current.TownFolkMerchantProfitShare);   // E5/B1 (R4): 5% zaworu do ludu - pan dostaje udzial z reszty
+                    if (DsTowns.FarmsLive) cs = 0f;   // DS F3: firma miasta stala - zold wydany we wlasnym miescie nie wraca rodowi (zaworu nie ma), cala podstawa zwrotu
                     if (cur && cs > 0f && ownSpend.TryGetValue(c, out own) && own > 0)
                     {
                         // K3 (Z8): zold, ktory ludzie partii wydali we wlasnym miescie rodu, wrocil rodowi zaworem miasta - nie jest podstawa zwrotu
@@ -290,6 +292,23 @@ namespace Armoury
                     {
                         stumbles++;
                         if (!_refundErr) { _refundErr = true; Log.Error("KingdomTreasury.WageRefund(" + (k != null && k.Name != null ? k.Name.ToString() : "?") + ")", e); }
+                    }
+                }
+                // DS F3 (K5): brak zwrotu najpierw ze skarbca ponad zapas wojny (skarb krola), potem zaliczka mieszczan pod nadanie (L1) - dopiero reszta w Banku 186.
+                // Zwrot nietkniety (nalezny jak dotad); zmienia sie tylko zrodlo braku. Kazde krolestwo we wlasnym try.
+                if (cur && rows.Count > 0 && DsTowns.FarmsLive)
+                {
+                    foreach (var rc in rows)
+                    {
+                        try
+                        {
+                            if (rc.Due == null || rc.Want <= rc.Have) continue;
+                            long gap = rc.Want - rc.Have;
+                            long tr = DsSeason.TreasuryForRefund(rc.K, gap);
+                            if (tr > 0) { rc.Have += tr; gap -= tr; }
+                            if (gap > 0) { long an = TownFolk.Anticipate(rc.K, gap); if (an > 0) rc.Have += an; }
+                        }
+                        catch (Exception e) { Log.Error("KingdomTreasury.WageRefund(DS K5)", e); }
                     }
                 }
                 // 186: korona w wojnie bez reszty wplywow na caly zwrot pozycza brak w Banku (kapital -> skarbiec); pieniadz idzie tylko na ten zwrot
@@ -370,6 +389,7 @@ namespace Armoury
         internal static void Levies()
         {
             LeviesToday.Clear(); TownLevyToday.Clear();
+            DsSeason.LeviesBegin();              // DS F3: liczniki Levies tej doby (W4, clo, pomoc od sprzedazy) od zera - przed FlushCrown
             DsVillage.FlushCrown(LeviesToday);   // DS (F1): udzial korony przy wozie i od markietanow (W4) wplacony do skarbcow od ostatniego Levies - wplyw dnia (165)
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
@@ -382,6 +402,7 @@ namespace Armoury
                 bool single = CrownIncome.On && s.CrownCustomsSingleTake;
                 long[] p2 = s.Stage8MeasureLog ? P2MonopolyScan() : null;   // E8/P2 (244, PLAN 8.7b): stan warsztatow PRZED poborem (tylko odczyt)
                 bool monoNew = s.MonopolyFromDailyProfit;   // E8/R (254, PLAN 8.7b): monopol od dziennej wyplaty wlascicielowi (MonopolyDue)
+                bool dsLive = DsTowns.FarmsLive;            // DS F3: danina miast 1%/d zastapiona pomoca od sprzedazy (M7, DsTowns.AidesDay); clo x DsCustomsWarMultiplier w wojnie (M10)
                 long monShops = 0, monPayout = 0, monOld = 0;   // E8/R: liczniki linii "Rynek i korona (E8/R)" (tylko log)
                 foreach (var k in Kingdom.All)
                 {
@@ -402,7 +423,7 @@ namespace Armoury
                         int gold = st.SettlementComponent.Gold;
                         int spare = town ? Math.Max(0, gold - TownPurse.TaxFloor(st.Town, (int)floor)) : Math.Max(0, gold - TownFolk.VillageFloor(st));   // E5/A1 (D4): miasto ponad zapas kupcow; E5/B1 (R15a): wies ponad 15 dni zakupow (0 bez kiesy)
                         // danina wojenna (lay subsidy)
-                        if (s.LaySubsidyEnabled && war && spare > 0)
+                        if (s.LaySubsidyEnabled && war && spare > 0 && !(town && dsLive))
                         {
                             float share = (town ? s.LaySubsidyTownShare : s.LaySubsidyVillageShare) * (warTax ? Math.Max(1f, s.LaySubsidyWarTaxMultiplier) : 1f);
                             int x = (int)Math.Min(spare, spare * Math.Max(0f, share));
@@ -422,6 +443,7 @@ namespace Armoury
                         if (s.CrownCustomsEnabled && st.Town.TradeTaxAccumulated > 0)
                         {
                             float share = Math.Max(0f, s.CrownCustomsShare) * (duty ? Math.Max(1f, s.CrownCustomsDutyMultiplier) : 1f);
+                            if (dsLive && war) share *= Math.Max(1f, Math.Min(6f, s.DsCustomsWarMultiplier));   // DS F3 (M10): clo wojenne (maltolt)
                             int x = (int)(st.Town.TradeTaxAccumulated * Math.Min(1f, share));
                             // wpis 90 (audyt, kod gry): licznik cel to MIARA handlu (prowizja dopisywana, nikt jej nie placi) -
                             // do skarbca idzie tyle, ile realnie odda kasa miasta ponad prog
@@ -431,13 +453,20 @@ namespace Armoury
                             if (single)
                             {
                                 // 165 (D-7): to, co zeszlo z licznika cel, idzie do skarbca w calosci - kasa miasta nie placi drugi raz
-                                if (x > 0) { k.KingdomBudgetWallet += x; cus += x; single1 += x; long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + x; }
+                                // DS F3 (L3): korona w zaleglosci wobec Banku - clo zastawione, Bank bierze je na splate (CrownBorrow.SeizeCustoms; Bank nie daruje)
+                                long seized = x > 0 && dsLive ? CrownBorrow.SeizeCustoms(k, x) : 0;
+                                long xk = x - seized;
+                                if (xk > 0) { k.KingdomBudgetWallet += (int)xk; cus += xk; single1 += xk; long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + xk; DsSeason.NoteCustoms(k, xk); }
                             }
                             else if (paid > 0)
                             {
-                                st.SettlementComponent.ChangeGold(-paid); k.KingdomBudgetWallet += paid; cus += paid; spare -= paid;
+                                st.SettlementComponent.ChangeGold(-paid);
+                                long seized = dsLive ? CrownBorrow.SeizeCustoms(k, paid) : 0;        // DS F3 (L3): clo zastawione w Banku przy zaleglosci korony
+                                long pk = paid - seized;
+                                k.KingdomBudgetWallet += (int)pk; cus += pk; spare -= paid;
                                 TownPurse.NoteTake(st, paid);                                          // E5/A1: udzial zysku kupcow (tylko licznik)
-                                long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + paid;   // 165: wplyw dnia (gdy 165 wylaczone - tylko licznik)
+                                long lk; LeviesToday.TryGetValue(k, out lk); LeviesToday[k] = lk + pk;   // 165: wplyw dnia (gdy 165 wylaczone - tylko licznik)
+                                DsSeason.NoteCustoms(k, pk);
                                 try { TownFolk.NoteTake(st, paid, TownFolk.TCustoms); } catch { }   // E5/0 (195): clo z kasy miasta (tylko licznik)
                             }
                         }
@@ -466,6 +495,7 @@ namespace Armoury
                             }
                     }
                 }
+                if (dsLive) DsTowns.AidesDay(LeviesToday);   // DS F3 (M7): pomoc od sprzedazy z kas miast i zamkow (sprzedaz z doby ludu) - wplyw dnia
                 LastSubsidy = sub; LastCustoms = cus; LastCustomsTaken = taken; LastMint = deb; LastMonopoly = mon;   // paczka 169: linia "Obieg" (tylko log)
                 LastCustomsSingle = single1;                // 165 (D-7): clo z licznika cel prosto do skarbcow (w LastCustoms; w LastCustomsTaken 0 - nic nie zniklo)
                 Log.Info("Korona: dzien " + (int)CampaignTime.Now.ToDays + " - danina wojenna z kas osad " + sub + ", clo od handlu miast " + cus

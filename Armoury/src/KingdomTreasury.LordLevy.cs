@@ -246,7 +246,7 @@ namespace Armoury
                     if (t.InRebelliousState) { _lvRebel++; continue; }
                     if (t.Loyalty < minLoy) { _lvLowLoy++; continue; }
                     var fief = new LvFief { St = st, T = t };
-                    if (TownFolk.LevyRoom(st, room))
+                    if (!DsTowns.FarmsLive && TownFolk.LevyRoom(st, room))   // DS F3: lud miast i zamkow nie jest zrodlem W7 (wliczone w firme miasta / zamku)
                         for (int k = 0; k < 3; k++) if (room[k] >= 1) { src.Add(new LvSrc { St = st, Cls = k, Room = room[k], F = fief }); fief.Room += room[k]; }
                     var bv = st.BoundVillages;
                     if (bv != null)
@@ -312,6 +312,7 @@ namespace Armoury
                     {
                         double aid = TownFolk.LevyAfterAid(x.St, x.Cls);
                         x.Took = TownFolk.LevyTake(x.St, x.Cls, x.Want);
+                        DsTowns.MeasureW7(x.St, x.Took);                                                // DS F3: okno pomiaru firm - W7 z ludu tej osady do firmy pana
                         if (x.Took > 0 && (aid < 0 || x.Took > aid + 0.5)) _lvOverAid++;               // kontrola: P1 i W7 bez podwojnego poboru (oczekiwane 0)
                         if (x.Took > 0 && TownFolk.LevyBelowReserve(x.St, x.Cls)) _lvBelowRes++;       // kontrola: kiesa ponizej zapasu dni po poborze (oczekiwane 0)
                         folk += x.Took;

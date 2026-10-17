@@ -37,7 +37,7 @@ namespace Armoury
     internal static partial class TownFolk
     {
         // ---- klucze i granice (zakresy jak w tools/gen_mcm.py)
-        private static bool GuardOn { get { var s = Settings.Current; return s != null && s.FolkHoardTax && s.FolkCirculationGuard; } }
+        private static bool GuardOn { get { var s = Settings.Current; return s != null && s.FolkHoardTax && s.FolkCirculationGuard && !DsTowns.FarmsLive; } }   // DS F3 (projekt 10.3): straznik obiegu wylaczony przy firmach (stawka podstawowa, bez czesci korony)
         private static bool HoardVillOn { get { var s = Settings.Current; return s != null && s.FolkHoardTax && s.FolkHoardVillages; } }
         private static double GdLo(Settings s) { return HdClamp(s.FolkGuardBandLow, 1.0, 3.0); }
         private static double GdHi(Settings s) { return Math.Max(GdLo(s), HdClamp(s.FolkGuardBandHigh, 1.0, 5.0)); }

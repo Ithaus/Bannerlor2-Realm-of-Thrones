@@ -127,12 +127,15 @@ namespace Armoury
         internal static double OldShare(Settlement st) { return On(st) ? 1.0 - Ramp : 1.0; }
 
         // ============================================================ API (KS krok 8 "alfa z praw" pozniej; rozdz. 4.1)
-        /// <summary>Nadanie wojenne g krolestwa (F1): wojna - 1 (z polityka War Tax 1.5), pokoj albo bez krolestwa - 0. F3 da g z DsSeason.</summary>
+        /// <summary>Nadanie wojenne g krolestwa: przy ustalonych firmach F3 - nadanie na kwartal z DsSeason (0, 0.5 .. 2); inaczej (F1) wojna - 1 (z polityka War Tax 1.5),
+        /// pokoj albo bez krolestwa - 0.</summary>
         internal static double G(Kingdom k)
         {
             try
             {
-                if (k == null || k.IsEliminated || !KingdomTreasury.AtWar(k)) return 0;
+                if (k == null || k.IsEliminated) return 0;
+                if (DsSeason.Live) return DsSeason.GrantOf(k);   // DS F3 (K2): g z nadania wojennego (stale przez kwartal)
+                if (!KingdomTreasury.AtWar(k)) return 0;
                 bool wt = false;
                 try { wt = k.ActivePolicies.Contains(DefaultPolicies.WarTax); } catch { wt = false; }
                 return wt ? 1.5 : 1.0;
@@ -281,10 +284,12 @@ namespace Armoury
                 var k = KingdomOf(st);
                 double g = G(k);
                 long crown = 0;
+                bool dsOn = DsTowns.On;
+                int why = g > 0 || dsOn ? Remit(home, true, true) : 0;
+                if (why == 0 && k != null && dsOn) DsSeason.NoteVillageBase(k, Math.Max(0, part - tithe) * WarShare(Settings.Current) * Ramp);   // DS F3: plon W4 na jednostke g (prognoza nadania)
                 if (g <= 0) _cPeaceN++;
                 else
                 {
-                    int why = Remit(home, true, true);
                     if (why == 1) _cRemitRaid++; else if (why == 2) _cRemitSiege++; else if (why == 3) _cRemitFam++;
                     if (why == 0)
                     {
@@ -317,9 +322,12 @@ namespace Armoury
                 if (!SutlerDuesOn(st)) return 0;
                 var k = KingdomOf(st);
                 double g = G(k);
+                bool dsOn = DsTowns.On;
+                bool remit = (g > 0 || dsOn) && Remit(v, true, true) != 0;
+                if (!remit && k != null && dsOn) DsSeason.NoteVillageBase(k, purse * WarShare(Settings.Current) * Ramp);   // DS F3: plon W4 na jednostke g (prognoza nadania)
                 if (g <= 0) return 0;
                 _sBase += purse;
-                if (Remit(v, true, true) != 0) { _sRemit++; return 0; }
+                if (remit) { _sRemit++; return 0; }
                 long want = (long)Math.Floor(purse * g * WarShare(Settings.Current) * Ramp);
                 long wIn;
                 long got = ToCrown(v, k, Math.Min(want, purse), out wIn);
@@ -343,6 +351,7 @@ namespace Armoury
                     if (!_pend.TryGetValue(k.StringId, out x) || x <= 0) continue;
                     long lk; levies.TryGetValue(k, out lk); levies[k] = lk + x;
                     _flushed += x;
+                    DsSeason.NoteW4(k, x);                                          // DS F3 (K3): W4 tej doby - garnek W5 i splata zaliczek mieszczan
                 }
                 _pend.Clear();                                                   // krolestwo zniklo - zloto zostaje w jego skarbcu, licznik wplywu przepada (tylko licznik)
             }

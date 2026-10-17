@@ -115,6 +115,7 @@ namespace Armoury
             k = st.OwnerClan != null ? st.OwnerClan.Kingdom : null;
             if (k == null || k.IsEliminated) { why = WaNoRealm; return 0; }
             why = WaNoNeed;
+            if (DsTowns.FarmsLive) return 0;   // DS F3: danina z oszczednosci P1 zastapiona dziesiata od ruchomosci (M9, DsSeason.FolkMovables); danina pokoju M4 dalej ta droga
             var w = WtOf(k, false);
             double sv = WtAidS(w);   // W5b regula 1: wieksza z s korony i stawki z braku wojska u panow (klucz wylaczony albo bez W5 = samo s, jak przed paczka)
             if (w == null || sv <= 0 || !(peek ? WaAtWarPeek(k) : WtAtWar(k))) return 0;

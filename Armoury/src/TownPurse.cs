@@ -501,6 +501,47 @@ namespace Armoury
             LastTiny = _vTiny; LastExempt = _vExempt; LastNoCrown = _vNoCrown; LastUnpaid = _vUnpaid;
         }
 
+        /// <summary>DS F3 (DsTowns.TownDay - firma miasta zamiast zaworu): liczniki zaworu (linia 169c, LordsEvenUp), pobrane z kasy (udzial zysku kupcow, doplyw netto)
+        /// i czesc korony jako wplyw dnia (CrownToday - CrownIncome.Begin "nasze"). Zloto przelal juz DsTowns. Tylko liczniki.</summary>
+        internal static void DsNoteFarm(Settlement st, int lord, int crown, Kingdom k)
+        {
+            try
+            {
+                if (st == null || st.Town == null) return;
+                var town = st.Town;
+                if (lord > 0)
+                {
+                    _vLord += lord; _vLordBase += lord; _vPayers++;
+                    var c = st.OwnerClan; if (c != null && c.Leader == Hero.MainHero) _vPlayer += lord;
+                    if (k != null) _vLordBaseK += lord;
+                    Add(_takeWin, town, lord);
+                }
+                if (crown > 0 && k != null)
+                {
+                    _vCrown += crown; _vKingdoms.Add(k);
+                    long k0; CrownToday.TryGetValue(k, out k0); CrownToday[k] = k0 + crown;
+                    int c0; _crownBy.TryGetValue(town, out c0); _crownBy[town] = c0 + crown;
+                    Add(_takeWin, town, crown);
+                }
+            }
+            catch (Exception e) { Stumble("TownPurse.DsNoteFarm", e); }
+        }
+
+        /// <summary>DS F3 (zajecie zaleglosci firmy z kiesy gminy): czesc korony jako wplyw dnia krolestwa (CrownToday) - bez ruchu kasy miasta. Tylko licznik.</summary>
+        internal static void DsCrownFolk(Kingdom k, long x)
+        {
+            try { if (k == null || x <= 0) return; long k0; CrownToday.TryGetValue(k, out k0); CrownToday[k] = k0 + x; }
+            catch (Exception e) { Stumble("TownPurse.DsCrownFolk", e); }
+        }
+
+        /// <summary>DS F3 (odnowa firm): doplyw netto kupcow miasta z ostatniego okna blok-blok (CloseWindow) - false, gdy brak pomiaru.</summary>
+        internal static bool NetOf(Town t, out long net)
+        {
+            net = 0;
+            try { return t != null && _netLast.TryGetValue(t, out net); }
+            catch { net = 0; return false; }
+        }
+
         /// <summary>Licznik pobran z kasy miasta poza zaworem (danina, clo z kasy, mennica, Crown Duty, War Tax, Road Tolls) - udzial zysku kupcow (tylko liczba).</summary>
         internal static void NoteTake(Settlement st, int x)
         {

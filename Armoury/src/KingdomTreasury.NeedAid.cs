@@ -177,7 +177,8 @@ namespace Armoury
                 var day = CrownIncome.DayOf(k);
                 if (day == null || !AtWar(k)) return 0;                  // pokoj = brak doplaty (resztka daniny z doby zawarcia pokoju idzie w renty jak dotad)
                 double target = NaTarget(s), step = NaStep(s);
-                var row = new NaK { K = k, Name = k.Name != null ? k.Name.ToString() : k.StringId, Aid = Math.Max(0, day.WarAid) };
+                // DS F3 (K3): garnek = wplywy wojenne dnia DS (dziesiata od ruchomosci, 184, pomoc od sprzedazy, W4) zamiast daniny P1
+                var row = new NaK { K = k, Name = k.Name != null ? k.Name.ToString() : k.StringId, Aid = Math.Max(0, DsTowns.FarmsLive ? DsSeason.WarPot(k, day) : day.WarAid) };
                 row.Pot = Math.Max(0, Math.Min(row.Aid, CrownIncome.LeftFor(k)));   // danina tej doby, najwyzej reszta wplywow dnia po zwrocie zoldu
                 _naRows.Add(row);
                 if (!(target > 0)) return 0;
@@ -363,6 +364,13 @@ namespace Armoury
         /// <summary>W5b regula 1 (KingdomTreasury.WarTaxDaily - biegnie po kroku W5 tej samej doby): pomiar krolestwa z dzisiejszego kroku W5 - niepokryta
         /// potrzeba po wszystkich zrodlach garnka (danina, skarbiec ponad zapas wojny, tarczowe), potrzeba W5, garnek daniny i danina dnia.
         /// false - doba bez pomiaru (pokoj, W5 nieczynne, krok dzis nie biegl, budzet 166 jeszcze nie policzony w tej sesji). Tylko odczyt.</summary>
+        /// <summary>DS F3 (DsSeason - prognoza nadania): potrzeba W5 krolestwa z dzisiejszego kroku W5 (koszt do celu ponad pulapy wlasne rodow); 0 bez pomiaru. Tylko odczyt.</summary>
+        internal static double DsW5Need(Kingdom k)
+        {
+            try { double u, n, p, a; return NeedAidMeasure(k, (int)CampaignTime.Now.ToDays, out u, out n, out p, out a) ? Math.Max(0, n) : 0; }
+            catch { return 0; }
+        }
+
         private static bool NeedAidMeasure(Kingdom k, int today, out double uncovered, out double need, out double pot, out double aid)
         {
             uncovered = 0; need = 0; pot = 0; aid = 0;

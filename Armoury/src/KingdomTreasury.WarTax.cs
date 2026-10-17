@@ -106,11 +106,11 @@ namespace Armoury
         /// TownFolkMode >= 1 i A1 cofa zakupy, TownPurse.NoMint), NIE sam warunek z ustawien (K3). Ta sama funkcja w LordsEvenUp.FolkLive i CourtFull.FolkShare.</summary>
         private static bool WtFolkLive { get { return TownFolk.Live; } }
 
-        private static bool WtOn { get { var s = Settings.Current; return s != null && s.WarTaxFromFolk && WtFolkLive && CrownIncome.On; } }
+        private static bool WtOn { get { var s = Settings.Current; return s != null && (s.WarTaxFromFolk || DsTowns.FarmsLive) && WtFolkLive && CrownIncome.On; } }   // DS F3 (M8): podatek od zarobku czesc nadania - bez klucza 184
 
         /// <summary>W5b regula 1: brak wojska u panow liczy sie do stawki daniny - klucz WarAidFollowsLordsShortfall, czynny tylko z danina P1 (FolkWarAid) i doplata
         /// wedlug potrzeby W5 (bez niej nie ma miary potrzeby). Wylaczony = stawka daniny idzie za samym s korony, jak przed paczka.</summary>
-        private static bool LnOn { get { var s = Settings.Current; return s != null && s.WarAidFollowsLordsShortfall && s.FolkWarAid && NeedAidOn; } }
+        private static bool LnOn { get { var s = Settings.Current; return s != null && s.WarAidFollowsLordsShortfall && s.FolkWarAid && NeedAidOn && !DsTowns.FarmsLive; } }   // DS F3: bez P1 - bez stawki daniny z braku wojska
 
         /// <summary>Niepokryta potrzeba ponizej tej kwoty na dobe nie jest powodem (zold ok. 40 ludzi - jeden maly poczet, szum pomiaru).</summary>
         private const double LnFloor = 250;
@@ -130,6 +130,7 @@ namespace Armoury
         /// <summary>Pulap s krolestwa: WarTaxMax, z polityka War Tax - wiekszy z (WarTaxMax, WarTaxMaxWithPolicy). Obie przyciete do 0..0.2.</summary>
         private static double WtCap(Kingdom k, Settings s)
         {
+            if (DsTowns.FarmsLive) return DsSeason.TallageCap(k, s);   // DS F3 (M8): pulap DsTallageMax (z polityka War Tax DsTallageMaxPolicy)
             double cap = WtClamp(s.WarTaxMax, 0, 0.2);
             bool pol = false;
             try { pol = k != null && k.ActivePolicies.Contains(DefaultPolicies.WarTax); } catch { pol = false; }
@@ -238,7 +239,8 @@ namespace Armoury
             try
             {
                 int today = (int)CampaignTime.Now.ToDays;
-                bool key = s.WarTaxFromFolk, folk = WtFolkLive, on = key && folk, inc = CrownIncome.On, step = today % 7 == 0;
+                bool ds = DsTowns.FarmsLive;                       // DS F3 (M8): s z nadania wojennego na kwartal (DsSeason.TallageS) zamiast kroku tygodnia
+                bool key = s.WarTaxFromFolk || ds, folk = WtFolkLive, on = key && folk, inc = CrownIncome.On, step = today % 7 == 0 && !ds;
                 _wtWar.Clear(); _wtWarDay = today;                 // stan wojny tej doby - od nowa (pobor do jutrzejszego bloku czyta te liczbe)
                 double stepV = WtClamp(s.WarTaxStep, 0, 0.05);
                 double capHi = Math.Max(WtClamp(s.WarTaxMax, 0, 0.2), WtClamp(s.WarTaxMaxWithPolicy, 0, 0.2));
@@ -281,6 +283,7 @@ namespace Armoury
                         bool arrears = CrownBorrow.InArrears(k);
                         double eff0 = Math.Min(WtAidS(w), cap);        // W5b: stawka, od ktorej dzis liczyla sie danina (przed krokiem)
                         if (!on) w.S = 0;                              // wylaczone albo kiesa ludu nieczynna (K3) = stan sprzed paczki (wlaczenie zaczyna od zera)
+                        else if (ds) { double sd = Math.Min(cap, DsSeason.TallageS(k)); if (Math.Abs(sd - w.S) > 1e-9) { w.DStep = true; w.DMove = sd - w.S; } w.S = sd; }   // DS F3: s = min(pulap, g x DsTallageRate)
                         else if (w.S > cap + 1e-6) w.S = Math.Round(cap, 6);   // recenzja B2: pulap spadl miedzy krokami (zdjeta polityka War Tax, MCM) - codziennie, przed krokiem
                         if (on && step)
                         {
