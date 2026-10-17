@@ -55,6 +55,7 @@ namespace Armoury
             public double[] FullNeed = new double[KsTab.NN];   // ZC4: pelna potrzeba ludzi w domu (x lepszy stol) - koszyk wsi = pelna - zjedzone z wlasnego
             public double Rations = -1; public double Wf;
             public float[] Saved;                              // stawki z zapisu (pierwsza doba po wczytaniu, przed LiveDaily)
+            public DistResult Res; public float[] Basket; public int Slot = -1;   // rachunek okregu z ostatniego przeliczenia (co LiveEvery dob, na zmiane) i koszyk wsi
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed; }
@@ -77,7 +78,7 @@ namespace Armoury
         {
             _live = new Dictionary<string, LiveDist>(StringComparer.Ordinal);
             _rates = new Dictionary<Village, VRate>();
-            _itemIx = null; _items = null; _itemKg = null; _liveStumbles = 0;
+            _itemIx = null; _items = null; _itemKg = null; _liveStumbles = 0; _liveFull = true; _liveRedone = 0;
             RuleReset();
         }
 
@@ -345,6 +346,7 @@ namespace Armoury
             RuleReset();
             RampStart(today);
             ResolveLive();
+            _liveFull = true;
             Log.Info(PK + "WLACZONE doba " + today + " (" + (autotest ? "autotest: klucz Start Calibration Autotest Apply albo plik " + ApplyFlagName : "gra: zapis uzbrojony doba " + _armDay + " i Confirm") + ") - zajecia blokow z Planu doby " + _planDay
                      + " (plan nr " + _plans + ", skrot " + _applyHash.ToString("X8") + "): okregow " + map.Count + ", blokow " + nb
                      + " | rampa: podaz KS doby " + today + ".." + DDay + " (D), popyt koszyka ZC4 lambda doby " + today + ".." + (today + RampDemand) + ", polki startu w dobie D"
@@ -388,6 +390,7 @@ namespace Armoury
                 catch (Exception e) { bad++; ld.St = null; Stumble("ResolveLive", e); }
             }
             _resolveBad = bad;
+            _liveFull = true;
             // stawki z zapisu - od razu (pierwsza doba po wczytaniu), LiveDaily policzy nowe w pierwszym takcie doby
             var rates = new Dictionary<Village, VRate>();
             foreach (var ld in _live.Values) if (!ld.TF && ld.V != null && ld.Saved != null) rates[ld.V] = new VRate { A = ld.Saved, M = ld.Market };
@@ -423,13 +426,24 @@ namespace Armoury
             _granFloorUp = _granKsAbove = 0;
             var regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
             var tfList = new List<KeyValuePair<LiveDist, DistResult>>();
+            bool full = _liveFull; _liveFull = false;
+            int redone = 0;
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null) continue;
                 try
                 {
+                    // koszt doby (projekt rozdz. 11.3: doba KS <= 3 ms): okreg przeliczany co LiveEvery dob na zmiane (ludzie, udzialy osad, zima i rece zmieniaja sie powoli;
+                    // wies najezdzana albo spladrowana ma 0 od razu - ProdStep); pierwsza doba sesji, wlaczenie i ponowne wlaczenie - wszystkie
+                    if (ld.Slot < 0) ld.Slot = (int)(Fnv(ld.Id) % (uint)LiveEvery);
+                    if (!full && ld.Res != null && (today + ld.Slot) % LiveEvery != 0)
+                    {
+                        LiveReuse(ld, rates, mkByM, mk, zv, tfList, regionHands, ref nv, ref ntf, ref ownKcal, ref kcalNeed);
+                        continue;
+                    }
                     DailyLife.KsRec rec;
-                    if (!byS.TryGetValue(ld.TF ? ld.T.Settlement : ld.V.Settlement, out rec)) { stale++; if (!ld.TF && ld.V != null) { VRate old; if (_ratesKeep.TryGetValue(ld.V, out old)) rates[ld.V] = old; } continue; }
+                    if (!byS.TryGetValue(ld.TF ? ld.T.Settlement : ld.V.Settlement, out rec)) { stale++; if (ld.Res != null) LiveReuse(ld, rates, mkByM, mk, zv, tfList, regionHands, ref nv, ref ntf, ref ownKcal, ref kcalNeed); else if (!ld.TF && ld.V != null) { VRate old; if (_ratesKeep.TryGetValue(ld.V, out old)) rates[ld.V] = old; } continue; }
+                    redone++;
                     var bask = DailyLife.KsBasket(rec.Cul, true);
                     bool oil = DailyLife.OilProf(rec.ProfId), north = DailyLife.NorthFur(rec.ProfId);
                     var kd = ld.K;
@@ -468,6 +482,7 @@ namespace Armoury
                     ld.Wf = kd.Wf;
                     var res = ComputeDistrict(ld, true, null);
                     if (res == null) continue;
+                    ld.Res = res;
                     string reg = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
                     double rh; regionHands.TryGetValue(reg ?? "-", out rh); regionHands[reg ?? "-"] = rh + kd.Wf;
                     int m = ld.Market == 0 ? 0 : 1;
@@ -479,10 +494,11 @@ namespace Armoury
                     rates[ld.V] = new VRate { A = a, M = m };
                     ld.Rations = res.KcalNeed > 0 ? ld.PeopleHome * Math.Min(1.5, res.OwnKcal / res.KcalNeed) : -1;
                     ownKcal += res.OwnKcal; kcalNeed += res.KcalNeed;
-                    try { zv[ld.V] = VillageBasket(ld, res); } catch (Exception e) { Stumble("VillageBasket", e); }
+                    try { ld.Basket = VillageBasket(ld, res); zv[ld.V] = ld.Basket; } catch (Exception e) { Stumble("VillageBasket", e); }
                 }
                 catch (Exception e) { Stumble("LiveDaily(okreg)", e); }
             }
+            _liveRedone = redone;
             _ratesKeep = rates;
             _rates = rates;
             _regionHands = regionHands;
@@ -506,6 +522,7 @@ namespace Armoury
             if (!LogGate.Lines) return;
             var sb = new StringBuilder(2500);
             sb.Append(PK).Append("produkcja (zastosowane) dzien ").Append(day).Append(" | od doby ").Append(_applyDay).Append(" | wsie ze stawkami KS ").Append(nv).Append(", pola mieszczan ").Append(ntf)
+              .Append(", przeliczone dzis ").Append(_liveRedone).Append(" (co ").Append(LiveEvery).Append(" doby na zmiane)")
               .Append(stale > 0 ? ", bez stanow ZC dzis " + stale + " (stawki wczorajsze)" : "").Append(fresh ? "" : " (stany ZC nieswieze)")
               .Append(" | na targ jutro szt./d przy pelnej stawce KS (wsie; w nawiasie wsie wczoraj z ksiegi towarow):");
             bool first = true;
@@ -528,6 +545,30 @@ namespace Armoury
             try { string cl = CraftsLine(day); if (cl != null) Log.Info(cl); } catch (Exception e) { Stumble("CraftsLine", e); }
         }
         private static Dictionary<Village, VRate> _ratesKeep = new Dictionary<Village, VRate>();
+        private const int LiveEvery = 3;                   // okreg przeliczany co 3 doby (na zmiane) - koszt doby KS
+        private static bool _liveFull = true;              // nastepna doba - wszystkie okregi (sesja, wlaczenie, ponowne wlaczenie)
+        private static int _liveRedone;
+
+        private static uint Fnv(string s) { uint h = 2166136261; if (s != null) unchecked { foreach (char c in s) h = (h ^ c) * 16777619; } return h; }
+
+        /// <summary>Okreg bez przeliczenia tej doby: wynik ostatniego rachunku (stawki, przeplyw na targ, pola mieszczan, koszyk wsi, rece regionu).</summary>
+        private static void LiveReuse(LiveDist ld, Dictionary<Village, VRate> rates, double[] mkByM, double[] mk, Dictionary<Village, float[]> zv, List<KeyValuePair<LiveDist, DistResult>> tfList,
+                                      Dictionary<string, double> regionHands, ref int nv, ref int ntf, ref double ownKcal, ref double kcalNeed)
+        {
+            var res = ld.Res;
+            int m = ld.Market == 0 ? 0 : 1;
+            string reg = ld.TF ? ld.St.StringId : (ld.V.Bound != null ? ld.V.Bound.StringId : ld.St.StringId);
+            double rh; regionHands.TryGetValue(reg ?? "-", out rh); regionHands[reg ?? "-"] = rh + ld.Wf;
+            for (int i = 0; i < ItemCount; i++) mkByM[m * ItemCount + i] += res.Market[i];
+            if (ld.TF) { ntf++; tfList.Add(new KeyValuePair<LiveDist, DistResult>(ld, res)); return; }
+            nv++;
+            VRate old;
+            if (_ratesKeep.TryGetValue(ld.V, out old) && old != null) rates[ld.V] = old;
+            else { var a = new float[ItemCount]; for (int i = 0; i < ItemCount; i++) a[i] = (float)res.Market[i]; rates[ld.V] = new VRate { A = a, M = m }; }
+            for (int i = 0; i < ItemCount; i++) mk[i] += res.Market[i];
+            ownKcal += res.OwnKcal; kcalNeed += res.KcalNeed;
+            if (ld.Basket != null) zv[ld.V] = ld.Basket;
+        }
         private static Dictionary<string, double> _regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
 
         private static double LastLedger(string id, int k) { double[] a; return _ledgerTmp.TryGetValue(id, out a) && a != null && k < a.Length ? a[k] : 0.0; }

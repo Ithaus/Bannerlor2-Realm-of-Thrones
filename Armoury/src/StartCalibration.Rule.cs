@@ -25,6 +25,7 @@ namespace Armoury
         private const int HoldDays = 60, StepDays = 7, CostDays = 28, Season = 91, RegCycle = 28;
         private const double RegionShare = 0.05;
         private static readonly Dictionary<Town, double[]> _px = new Dictionary<Town, double[]>();
+        private static readonly Dictionary<Town, int> _pxN = new Dictionary<Town, int>();
         private static int _pxDays, _pxDay = -1;
         private static ItemObject _hides;
         private static double[] _mv, _valKg;
@@ -35,7 +36,7 @@ namespace Armoury
 
         private static void RuleReset()
         {
-            _px.Clear(); _pxDays = 0; _pxDay = -1; _hides = null; _mv = null; _valKg = null;
+            _px.Clear(); _pxN.Clear(); _pxDays = 0; _pxDay = -1; _hides = null; _mv = null; _valKg = null;
             _regionMoved.Clear(); _regionSeason = -1;
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = 0; _rPaid = 0;
         }
@@ -49,15 +50,19 @@ namespace Armoury
             EnsureItems();
             if (_hides == null) _hides = ItemOf("hides");
             _pxDays++;
-            double w = 1.0 / Math.Min(28, _pxDays);
             try
             {
+                int k = 0;
                 foreach (var t in Town.AllTowns)
                 {
                     if (t == null || t.Settlement == null) continue;
                     double[] a;
                     bool fresh = !_px.TryGetValue(t, out a);
+                    // koszt doby KS: miasto co 2 doby na zmiane (srednia z 14 odczytow = ok. 28 dob), nowe miasto od razu
+                    if (!fresh && ((k++ + today) & 1) != 0) continue;
                     if (fresh) { a = new double[ItemCount]; _px[t] = a; }
+                    int nu; _pxN.TryGetValue(t, out nu); nu++; _pxN[t] = nu;
+                    double w = 1.0 / Math.Min(14, nu);
                     for (int i = 0; i < ItemCount; i++)
                     {
                         var it = _items[i];
@@ -102,7 +107,7 @@ namespace Armoury
         /// <summary>Dochod rodziny na pracujacego zajecia c w bloku przy indeksach cen miasta (regula 3.1 przy cenach gry).</summary>
         private static double Income(LiveBlock b, string type, int c, double[] px)
         {
-            double L = KsCore.LandEff(b.K, c, type);
+            double L = b.L(c, type);
             double v = 0; int o = c * KsTab.NG;
             for (int g = 0; g < KsTab.NG; g++) { double m = _mv[o + g]; if (m != 0) v += m * Px(px, g); }
             return L * v - KsTab.KCost[c] - b.Rent * KsTab.HaPerWorker[c];

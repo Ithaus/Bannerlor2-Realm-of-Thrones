@@ -10,6 +10,32 @@ namespace Armoury
         public float Rent;                                 // renta ziemi z Planu (d/ha/d)
         public KsBlock K;                                  // ziemia, udzial w okregu, zajecie startowe (pamiec sesji)
         public double Hands, HomeFrac;                     // rece bloku i czesc rak domu (ostatni rachunek)
+        // pamiec przydatnosci ziemi bloku (ziemia sie nie zmienia): L zajecia c (NaN - jeszcze nie liczone), L zboza; klucz - blok ziemi K (nowy K = od nowa)
+        internal double[] LC; internal double LG = double.NaN; internal object LKey;
+
+        /// <summary>Przydatnosc ziemi zajecia c w tym bloku (LandEff zajec pola; regale - land2, a w bloku wsi gry przy typie wsi LandEff) - z pamieci bloku.</summary>
+        internal double L(int c, string type)
+        {
+            var kb = K;
+            if (!ReferenceEquals(LKey, kb)) { LKey = kb; LC = null; LG = double.NaN; }
+            if (LC == null) { LC = new double[KsTab.NC]; for (int i = 0; i < LC.Length; i++) LC[i] = double.NaN; }
+            double v = LC[c];
+            if (double.IsNaN(v))
+            {
+                v = KsTab.IsRegale[c] ? ((kb.Main && KsTab.Crafts[c] == type) ? KsCore.LandEff(kb, c, type) : KsTab.Land2(c, kb.O, type)) : KsCore.LandEff(kb, c, type);
+                LC[c] = v;
+            }
+            return v;
+        }
+
+        /// <summary>Przydatnosc ziemi zboza (land2 wheat_farm) - z pamieci bloku.</summary>
+        internal double LGrain(string type)
+        {
+            var kb = K;
+            if (!ReferenceEquals(LKey, kb)) { LKey = kb; LC = null; LG = double.NaN; }
+            if (double.IsNaN(LG)) LG = KsTab.Land2(KsTab.CWheat, kb.O, type);
+            return LG;
+        }
     }
 
     /// <summary>
@@ -58,7 +84,9 @@ namespace Armoury
                 if (lb == null || lb.K == null || lb.C == null) continue;
                 var kb = lb.K;
                 double W, wH, lg, lh;
-                KsCore.HomeLabour(d.Wf, kb.Share, d.Need0[KsTab.NH], kb.O, type, out W, out wH, out lg, out lh);
+                // KsCore.HomeLabour z przydatnoscia zboza z pamieci bloku (ten sam wzor)
+                W = d.Wf * kb.Share; lg = lb.LGrain(type); lh = 0.5 + 0.5 * Math.Min(1.0, lg);
+                wH = Math.Min(W, d.Need0[KsTab.NH] * kb.Share / (KsTab.PH * lh)); if (!(wH >= 0)) wH = 0;
                 lb.Hands = W; lb.HomeFrac = W > 0 ? wH / W : 0;
                 double rsum = 0; if (lb.RF != null) for (int j = 0; j < lb.RF.Length; j++) rsum += lb.RF[j];
                 double scale = Math.Max(0.0, 1.0 - rsum);
@@ -75,7 +103,7 @@ namespace Armoury
                         prod[IGrain] += x * sub * KsTab.PGrainSub * lg;
                     }
                     double cl = rem - sub;
-                    double L = KsCore.LandEff(kb, c, type);
+                    double L = lb.L(c, type);
                     foreach (var kv in KsTab.P0[c])
                     {
                         int it = kv.Key == KsTab.GWhaleMeat && c == KsTab.CHunter ? IMeat : GoodToItem[kv.Key];
@@ -86,7 +114,7 @@ namespace Armoury
                     for (int j = 0; j < lb.RC.Length; j++)
                     {
                         int c = lb.RC[j]; double lab = lb.RF[j] * W;
-                        double L = (kb.Main && KsTab.Crafts[c] == type) ? KsCore.LandEff(kb, c, type) : KsTab.Land2(c, kb.O, type);
+                        double L = lb.L(c, type);
                         foreach (var kv in KsTab.P0[c]) { int it = GoodToItem[kv.Key]; if (it >= 0) prod[it] += lab * kv.Value * L; }
                     }
             }

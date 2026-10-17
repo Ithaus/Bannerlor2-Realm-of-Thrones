@@ -259,6 +259,7 @@ namespace Armoury
         private static void RampRestart(int today)
         {
             RampStart(today);
+            _liveFull = true;
             Log.Info(PK + "klucz Start Calibration znow wlaczony doba " + today + " na zapisie zastosowanym od doby " + _applyDay + " - rampa od nowa: podaz KS doby " + today + ".." + (today + RampSupply)
                      + ", popyt koszyka ZC4 doby " + today + ".." + (today + RampDemand) + " (bez skoku produkcji i popytu); polki startu nie sa ustawiane drugi raz.");
         }
