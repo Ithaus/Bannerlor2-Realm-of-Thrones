@@ -231,6 +231,7 @@ namespace Armoury
                 }
                 else
                 {
+                    KeysApplied(day);                                   // klucze uzbrojenia na zapisie juz zastosowanym - Off (inny zapis nigdy ich nie zobaczy)
                     if (_wasOff) RampRestart(today);                   // klucz znow wlaczony po przerwie (Undo -> Redo) - rampa od nowa, bez skoku
                     LiveDaily(today);
                     if (day - _lastPlanDay >= 7 || _lastPlanDay == int.MinValue) PlanStart(day);   // Plan dalej co 7 dob - pomiar nacisku (gra bez zmian)
@@ -329,6 +330,16 @@ namespace Armoury
             KeyOff(true); KeyOff(false);
             Log.Info(PK + "dzien " + day + " | klucz " + (a ? "Arm This Save" : "Confirm") + " przy " + (KeyOn ? "braku pliku ziemi" : "wylaczonym Start Calibration") + " - nic nie robie, klucz wraca na Off.");
             Tell("Start calibration: " + (KeyOn ? "the land file is missing" : "Start Calibration is off") + " - nothing done, the switch is off again.");
+        }
+
+        /// <summary>Stan zastosowany: klucze Arm This Save i Confirm nic nie robia - wracaja na Off z linia i komunikatem.</summary>
+        private static void KeysApplied(int day)
+        {
+            var s = Settings.Current;
+            if (s == null || (!s.StartCalibrationArmThisSave && !s.StartCalibrationConfirm)) return;
+            KeyOff(true); KeyOff(false);
+            Log.Info(PK + "dzien " + day + " | klucz Arm This Save / Confirm na zapisie juz zastosowanym od doby " + _applyDay + " - nic nie robie, klucze wracaja na Off.");
+            Tell("Start calibration is already running on this save - nothing done, the switch is off again.");
         }
 
         /// <summary>Doba w stanie Plan albo Uzbrojony: klucz Arm This Save (uzbraja ten zapis), Confirm (wlacza od nastepnej doby). Kazdy klucz po jednej dobie wraca na Off.</summary>
