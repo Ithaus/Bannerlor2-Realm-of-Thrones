@@ -17,6 +17,9 @@ namespace Armoury
         public Dictionary<string, double> WarmRent;                   // uid bloku -> renta ziemi z poprzedniego Planu
         public bool StopAfterFirst = false;                           // test portu: tylko pierwsza rownowaga (bez lepszego stolu)
         public readonly Dictionary<string, double[]> ExoLand = new Dictionary<string, double[]>(StringComparer.Ordinal);   // kraina -> podaz spoza tabeli [NG] kg/d (las wsi, lodzie NavalDLC)
+        // recenzja 16.10 (3): mieszczanie jedza wprost surowy jedwab / rude srebra, dopoki poprawki ZC1 tych drog sa wylaczone (SilkToWeavers; srebro - bez klucza) -
+        // popyt Planu z prawdziwego zuzycia mieszczan (inaczej Plan zaklada drogi, ktorych w grze nie ma, i start nie jest zbilansowany)
+        public bool SilkTownDirect, SilverTownDirect;
     }
 
     /// <summary>Towar gry: kg sztuki, wartosc, zuzycie dnia w sztukach (wojsko, zamki, dwory, budowy, warsztaty, razem, mieszczanie).</summary>
@@ -37,6 +40,7 @@ namespace Armoury
         public double Wf;                                             // rece w polu (ludzie x udzial pracy stanu)
         public double Area;                                           // ziemia uzytkowa okregu, ha
         public bool TownFields;
+        public long NoReg;                                            // recenzja 16.10 (drobne): zajecia regale zablokowane w tym okregu (bit zajecia; RockGold - zloza Skaly i zloto Zachodu)
         public readonly List<KsBlock> Blocks = new List<KsBlock>();
         public double[] PplHome; public KsCore.Basket[] Bask; public bool Oil;   // gra: ludzie w domu wedlug stanu i koszyki (zjedzone w okregu) - rdzen ich nie czyta
     }
@@ -417,6 +421,7 @@ namespace Armoury
                 double craftLab = Math.Max(0.0, x.W[i] - x.WH[i]);
                 foreach (int c in KsTab.Regale)
                 {
+                    if ((d.NoReg & (1L << c)) != 0) continue;              // zloze zablokowane w grze (RockGold) - L = 0, jak wies bez zloza
                     double L = (b.Main && KsTab.Crafts[c] == d.Type) ? LandEff(b, c, d.Type) : KsTab.Land2(c, b.O, d.Type);
                     if (c == KsTab.CLumber && L < 0.8) continue;
                     if (L < 0.5) continue;
@@ -503,13 +508,15 @@ namespace Armoury
                 foreach (var id in new[] { "fur", "cotton", "spice", "walrus_tusk", "gold_ore" })
                 {
                     KsItem it; if (!x.In.Items.TryGetValue(id, out it) || it == null) continue;
-                    double cons = it.Cons - (id == "cotton" ? it.Town : 0.0);
+                    double cons = it.Cons - (id == "cotton" && !x.In.SilkTownDirect ? it.Town : 0.0);   // jedwab mieszczan odjety tylko przy czynnym SilkToWeavers
                     D[KsTab.GoodIndex[id]] += Math.Max(0.0, cons) * sigma * it.Kg * sh;
                 }
                 KsItem vel, jew;
                 if (x.In.Items.TryGetValue("velvet", out vel) && vel != null) D[KsTab.GCotton] += vel.Cons * sigma * vel.Kg * KsTab.VelvetSilk * sh;
                 if (x.In.Items.TryGetValue("jewelry", out jew) && jew != null) D[KsTab.GSilver] += jew.Cons * sigma * jew.Kg * KsTab.JewelSilver / 100.0 * sh;
                 D[KsTab.GSilver] += o("silver");
+                // recenzja 16.10 (3): ruda srebra jedzona wprost przez mieszczan (116 z 165 szt./d) - prawdziwe zuzycie, dopoki brak poprawki ZC1 (srebro do zlotnikow)
+                KsItem sil; if (x.In.SilverTownDirect && x.In.Items.TryGetValue("silver", out sil) && sil != null) D[KsTab.GSilver] += Math.Max(0.0, sil.Town) * sigma * sil.Kg * sh;
                 D[KsTab.GHorse] += KsTab.HorseGameDay * sigma * sh;
                 if (KsTab.GarumLands.Contains(l)) { D[KsTab.GFish] += KsTab.Garum * 2.0 / KsTab.GarumLands.Count; D[KsTab.GSalt] += KsTab.Garum * 0.4 / KsTab.GarumLands.Count; }
                 x.DL[l] = D;

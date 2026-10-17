@@ -151,11 +151,15 @@ namespace Armoury
             public long Extra;                   // ponad recepture u ukrytych rzemieslnikow (mnoznik BK count)
             public long WagonUnits, WagonGold;
             public long Last = -1;               // zapas wczoraj (-1 = nieznany: pierwsza doba sesji)
+            // KS (kalibracja startu, recenzja 16.10 - odbior na rynek): produkcja i zuzycie doby wedlug rynku osady ramki (0 Westeros, 1 Essos, 2 bez rynku: partie
+            // poza osada, zrodla bez ramki) i zapas na polkach miast rynku; tylko przy kluczu Start Calibration (tylko licznik)
+            public readonly long[] MkP = new long[3], MkC = new long[3], MkS = new long[2];
 
             public void NewDay()
             {
                 Src.Clear(); Sink.Clear(); Array.Clear(Tr, 0, Tr.Length); Array.Clear(Hold, 0, Hold.Length);
                 Extra = 0; WagonUnits = 0; WagonGold = 0;
+                Array.Clear(MkP, 0, 3); Array.Clear(MkC, 0, 3);
             }
         }
 
@@ -287,11 +291,11 @@ namespace Armoury
                     var inner = _top;
                     _orphans++;
                     _top = inner.Parent; _depth--;
-                    try { Settle(inner); } catch (Exception e) { Stumble("Settle(sierota)", e); }
+                    try { SettleMk(inner); } catch (Exception e) { Stumble("Settle(sierota)", e); }
                     inner.Clean();
                 }
                 _top = f.Parent; _depth = f.Depth;
-                Settle(f);
+                SettleMk(f);
             }
             catch (Exception e) { Stumble("End", e); }
             finally
@@ -541,10 +545,64 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ ksiegowanie
+        private static int _settleMk = -1;       // KS: rynek osady rozliczanej ramki (-1 poza ramka)
+        private static bool _mkOn;               // KS: podzial na rynki czynny (klucz Start Calibration, ustawiany co dobe)
+
+        /// <summary>Rozliczenie ramki z rynkiem osady ramki (KS - recenzja 16.10, odbior KS-M na rynek).</summary>
+        private static void SettleMk(Frame f)
+        {
+            _settleMk = _mkOn ? MkOfFrame(f) : -1;
+            try { Settle(f); } finally { _settleMk = -1; }
+        }
+
+        private static int MkOfFrame(Frame f)
+        {
+            int m = MkOf(f.A);
+            if (m == 2 && f.B != null) { int m2 = MkOf(f.B); if (m2 != 2) m = m2; }
+            return m;
+        }
+
+        /// <summary>Rynek (0 Westeros, 1 Essos) osady obiektu ramki: wies - jej miasto targowe, warsztat - jego osada, partia - osada, w ktorej jest, albo ostatnio
+        /// odwiedzona; 2 - nie wiadomo.</summary>
+        private static int MkOf(object o)
+        {
+            try
+            {
+                if (o == null) return 2;
+                Settlement st = null;
+                var v = o as Village;
+                if (v != null) st = v.Settlement;
+                else
+                {
+                    var t = o as Town;
+                    if (t != null) st = t.Settlement;
+                    else
+                    {
+                        st = o as Settlement;
+                        if (st == null)
+                        {
+                            var w = o as Workshop;
+                            if (w != null) st = w.Settlement;
+                            else
+                            {
+                                var mp = o as MobileParty;
+                                if (mp == null) { var pb = o as PartyBase; if (pb != null) { st = pb.Settlement; mp = pb.MobileParty; } }
+                                if (st == null && mp != null) st = mp.CurrentSettlement ?? mp.LastVisitedSettlement;
+                            }
+                        }
+                    }
+                }
+                int m = StartCalibration.MarketOfSettlement(st);
+                return m == 0 || m == 1 ? m : 2;
+            }
+            catch { return 2; }
+        }
+
         private static void Book(int i, string group, string sub, long n)
         {
             if (n == 0 || _acc == null) return;
             var a = _acc[i];
+            if (_mkOn) { int m = _settleMk >= 0 ? _settleMk : 2; if (n > 0) a.MkP[m] += n; else a.MkC[m] -= n; }
             var d = n > 0 ? a.Src : a.Sink;
             Dictionary<string, long> subs;
             if (!d.TryGetValue(group, out subs)) { subs = new Dictionary<string, long>(); d[group] = subs; }
@@ -1164,6 +1222,20 @@ namespace Armoury
             v[KsShop] = Group(a.Sink, GShopIn) + Group(a.Sink, GArms) + Group(a.Sink, GArt) + Group(a.Sink, GCraft) + Group(a.Sink, GMend) + Group(a.Sink, GFletch) + Group(a.Sink, GBloom);
             v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
             _ksDay[it.StringId] = v;
+            if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1] };
+        }
+
+        // KS: produkcja, zuzycie i zapas miast doby wedlug rynku (P W/E/bez, C W/E/bez, S W/E) - linia "KS: rynki" (StartCalibration.MarketLine)
+        private static readonly Dictionary<string, long[]> _ksMk = new Dictionary<string, long[]>(StringComparer.Ordinal);
+        private static bool _ksMkOn;
+
+        /// <summary>KS: kopia liczb doby wedlug rynku (StringId -> 8 liczb); zwraca dzien (-1 - brak liczb albo podzial nieczynny tej doby). Nie rzuca.</summary>
+        internal static int KsMarketTake(Dictionary<string, long[]> dst)
+        {
+            if (dst == null) return -1;
+            dst.Clear();
+            try { if (!_ksMkOn) return -1; foreach (var kv in _ksMk) dst[kv.Key] = kv.Value; return _ksDayN; }
+            catch { dst.Clear(); return -1; }
         }
 
         /// <summary>KS: kopia liczb doby ostatniej linii ksiegi (StringId -> KsN liczb); zwraca dzien (-1 - brak liczb). Nie rzuca.</summary>
@@ -1243,13 +1315,25 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays - 1;
                 var inv = CultureInfo.InvariantCulture;
                 // ---- zapas wedlug posiadacza
-                foreach (var a in _acc) Array.Clear(a.Hold, 0, Holders);
+                foreach (var a in _acc) { Array.Clear(a.Hold, 0, Holders); Array.Clear(a.MkS, 0, 2); }
+                bool mkOn = _mkOn;
+                _mkOn = StartCalibration.KeyOn;                // KS: podzial na rynki od jutra wedlug klucza (dzisiejsze liczby - wedlug wczorajszego)
                 int armsStacks = 0; long armsPieces = 0;
                 foreach (var st in Settlement.All)
                 {
                     if (st == null) continue;
                     int c = SettlClass(st);
                     Count(st.ItemRoster, c);
+                    if (mkOn && c == HTown && st.ItemRoster != null)
+                    {
+                        int mk = StartCalibration.MarketOfSettlement(st);
+                        if (mk == 0 || mk == 1)
+                            for (int k = 0; k < st.ItemRoster.Count; k++)
+                            {
+                                var el = st.ItemRoster.GetElementCopyAtIndex(k); var itm = el.EquipmentElement.Item; int ii;
+                                if (itm != null && el.Amount > 0 && _idx.TryGetValue(itm, out ii)) _acc[ii].MkS[mk] += el.Amount;
+                            }
+                    }
                     if ((c == HTown || c == HCastle) && st.ItemRoster != null)   // 174.0: stosy uzbrojenia na polkach (przedmiot + modyfikator)
                         for (int k = 0; k < st.ItemRoster.Count; k++)
                         {
@@ -1271,6 +1355,7 @@ namespace Armoury
                 // ---- linie towarow
                 _zcCivil.Clear(); _zcDay = day;   // ZC0 (DailyLife "Spizarnia (ZC)"): zuzycie doby ludu wedlug towaru - tylko kopia liczb ksiegi
                 _ksDay.Clear(); _ksDayN = day;    // KS: ta sama doba
+                _ksMk.Clear(); _ksMkOn = mkOn;
                 string ts = DateTime.Now.ToString("HH:mm:ss");
                 var all = new StringBuilder();
                 long sumP = 0, sumC = 0, sumD = 0, sumU = 0; int moving = 0, closed = 0;

@@ -55,11 +55,12 @@ namespace Armoury
         private sealed class ZcBuy
         {
             public Village V; public Settlement Mk; public Town T; public TaleWorlds.CampaignSystem.Roster.ItemRoster R; public LDay D;
-            public long Spent, Pcs; public double Want, Got; public int NoGold, NoGoods; public bool Broke;
+            public long Spent, Pcs, UnGold; public double Want, Got; public int NoGold, NoGoods; public bool Broke;   // UnGold: sztuki niekupione z braku kiesy
             public readonly double[] Rw = new double[3], Rg = new double[3];
         }
 
-        /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny).</summary>
+        /// <summary>Cena sztuki towaru koszyka na polce miasta (0 - brak wiersza albo ceny): cena miasta z doby (StartCalibration.ZPrice - recenzja 16.10, koszt),
+        /// bez niej - gra. Plotno: tylko ponad prog polki miasta (MaterialOrders.ShelfReserve - zapas wojska), jak BuyGoods przy VillageClothAboveReserve.</summary>
         private static int ZcPrice(ZcBuy b, int z, out EquipmentElement e, out int have)
         {
             e = default(EquipmentElement); have = 0;
@@ -68,8 +69,11 @@ namespace Armoury
             e = new EquipmentElement(it, null, null, false);
             int ix = b.R.FindIndexOfElement(e);
             if (ix < 0) return 0;
-            have = b.R.GetElementNumber(ix) - ShelfKeep;
-            int p = b.T.MarketData.GetPrice(e);
+            int keep = ShelfKeep;
+            if (z == StartCalibration.ZLinen && VillClothOn) { int r = MaterialOrders.ShelfReserve(b.T, it); if (r > keep) keep = r; }
+            have = b.R.GetElementNumber(ix) - keep;
+            int p = StartCalibration.ZPrice(b.T, z);
+            if (p <= 0) p = b.T.MarketData.GetPrice(e);
             return p > 0 ? p : 0;
         }
 
@@ -78,13 +82,13 @@ namespace Armoury
         {
             if (n <= 0) return 0;
             if (count) { b.Want += n; b.Rw[rung] += n; }
-            if (b.Broke) return 0;
+            if (b.Broke) { if (count) b.UnGold += n; return 0; }
             EquipmentElement e; int have;
             int price = ZcPrice(b, z, out e, out have);
             if (price <= 0 || have <= 0) { b.NoGoods++; return 0; }
             int k = Math.Min(n, have);
             int had = b.V.Gold;
-            if ((long)k * price > had) { k = had / price; if (k <= 0) { b.NoGold++; b.Broke = true; return 0; } }
+            if ((long)k * price > had) { if (count) b.UnGold += k - had / price; k = had / price; if (k <= 0) { b.NoGold++; b.Broke = true; return 0; } }
             b.V.ChangeGold(-k * price);
             int paid = had - b.V.Gold;
             if (paid <= 0) { b.NoGold++; b.Broke = true; return 0; }
@@ -141,7 +145,7 @@ namespace Armoury
                 done[z] = true;
                 ZcTake(b, z, n[z], StartCalibration.ZFood(z) ? 1 : 2);
             }
-            StartCalibration.Zc4NoteVillage(b.Spent, b.Pcs, b.Want, b.Got, b.NoGold, b.NoGoods, b.Rw, b.Rg, _zcBrewV);
+            StartCalibration.Zc4NoteVillage(b.Spent, b.Pcs, b.Want, b.Got, b.NoGold, b.NoGoods, b.Rw, b.Rg, _zcBrewV, b.UnGold);
             _zcBrewV = 0;
             return b.Spent;
         }

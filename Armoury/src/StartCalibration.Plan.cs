@@ -36,13 +36,14 @@ namespace Armoury
         // srednia 28 dob liczb ksiegi towarow (zuzycie 1:1, produkcja wsi, las wsi, lodzie)
         private static readonly Dictionary<string, double[]> _ema = new Dictionary<string, double[]>(StringComparer.Ordinal);
         private static int _emaDays, _emaLastDay = -1;
+        private static int _wEma, _planEma;              // doby ksiegi towarow w sredniej Planu w toku i ostatniego gotowego (recenzja 16.10: wlaczenie tylko z dojrzala ksiega)
         private static readonly Dictionary<string, double[]> _ledgerTmp = new Dictionary<string, double[]>(StringComparer.Ordinal);
 
         private static void PlanReset()
         {
             Interlocked.Increment(ref _gen);
             _plan = null; _planIn = null; _planDay = -1; _wOut = null; _wIn = null; _wBusy = false; _waitNote = null;   // _worker zostaje - PlanStart czeka, az stary watek sie skonczy
-            _ema.Clear(); _emaDays = 0; _emaLastDay = -1;
+            _ema.Clear(); _emaDays = 0; _emaLastDay = -1; _wEma = _planEma = 0;
         }
 
         private static void PlanCancel() { Interlocked.Increment(ref _gen); }
@@ -87,6 +88,9 @@ namespace Armoury
             info.Zc = zcDay;
             var s = Settings.Current;
             var inp = new KsInput { Sigma = DailyLife.KsSigma, Inert = Math.Max(1.0, Math.Min(2.0, s != null ? s.StartCalibrationMapInertia : 1.25f)), Beta = 10.0, Ksk = true };
+            // recenzja 16.10 (3): bez poprawek ZC1 (SilkToWeavers wylaczony; srebro - bez klucza) mieszczanie jedza jedwab i rude srebra wprost - popyt Planu z tego zuzycia
+            inp.SilkTownDirect = s == null || !s.SilkToWeavers;
+            inp.SilverTownDirect = true;
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
             foreach (var id in ids)
@@ -147,6 +151,8 @@ namespace Armoury
                     var ppl = new double[6];
                     for (int e = 0; e < 6; e++) ppl[e] = all * r.Share[e];
                     var kd = new KsDistrict { Id = r.St.StringId, Type = type, Land = land, Market = ld.Market, People = all, Area = ld.Area };
+                    // recenzja 16.10 (drobne): zloza, ktore RockGold w grze tnie do 0 (Skala: srebro i zloto, Zachod: zloto) - L = 0 w Planie
+                    try { if (RockGold.Blocks(v, "silver")) kd.NoReg |= 1L << KsTab.CSilver; if (RockGold.Blocks(v, "gold_ore")) kd.NoReg |= 1L << KsTab.CGoldM; } catch { }
                     KsCore.NeedsOf(ppl, bask, oil, north, true, false, all, kd.Need0);
                     kd.PplHome = new double[6]; for (int e = 0; e < 6; e++) kd.PplHome[e] = Math.Max(0.0, r.L) * r.Share[e];
                     kd.Bask = bask; kd.Oil = oil;
@@ -178,10 +184,45 @@ namespace Armoury
                 inp.WarmPrices = (double[])_plan.P.Clone();
                 inp.WarmRent = new Dictionary<string, double>(StringComparer.Ordinal);
                 for (int b = 0; b < _plan.NB; b++) if (_plan.Blocks[b].Uid != null) inp.WarmRent[_plan.Blocks[b].Uid] = _plan.Rent[b];
-                inp.RoundsFirst = 3000;
+                inp.RoundsFirst = _plan.Open.Count > 0 ? 6000 : 3000;     // recenzja 16.10 (drobne): poprzedni Plan niezbiezny - wiecej rund rownowagi
             }
             if (inp.Districts.Count == 0) { note = "zaden okreg z ziemia z pliku (plik ziemi nie pasuje do wsi gry)"; return null; }
             return inp;
+        }
+
+        // ============================================================ linia rynkow (recenzja 16.10: odbior KS-M na rynek - Westeros, Essos)
+        private static readonly Dictionary<string, long[]> _mkTmp = new Dictionary<string, long[]>(StringComparer.Ordinal);
+        private static int _mkLineDay = -1;
+        private static readonly string[] MarketExtra = { "WhaleMeat", "bread", "pie", "beer", "wine", "oil", "mead", "pottery", "tools", "linen", "felt", "leather" };
+
+        /// <summary>Linia "KS: rynki dzien N": produkcja / zuzycie / zapas miast doby z ksiegi towarow wedlug rynku osady (0 Westeros, 1 Essos; bez rynku - partie poza
+        /// osada i zrodla bez ramki) dla towarow KS i przetworow; null - brak liczb (ksiega wylaczona albo podzial od jutra).</summary>
+        private static string MarketLine()
+        {
+            int d = GoodsLedger.KsMarketTake(_mkTmp);
+            if (d < 0 || d == _mkLineDay || _mkTmp.Count == 0) return null;
+            _mkLineDay = d;
+            var sb = new StringBuilder(5000);
+            sb.Append(PK).Append("rynki dzien ").Append(d).Append(" (ksiega towarow wedlug rynku osady; produkcja/zuzycie/zapas miast w sztukach)");
+            var ids = new List<string>(ItemIds); foreach (var x in MarketExtra) if (!ids.Contains(x)) ids.Add(x);
+            for (int m = 0; m < 3; m++)
+            {
+                sb.Append(m == 0 ? " | Westeros:" : (m == 1 ? " | Essos:" : " | bez rynku (produkcja/zuzycie):"));
+                bool first = true;
+                foreach (var id in ids)
+                {
+                    long[] a;
+                    if (!_mkTmp.TryGetValue(id, out a) || a == null || a.Length < 8) continue;
+                    long p = a[m], c = a[3 + m];
+                    if (p == 0 && c == 0 && (m == 2 || a[6 + m] == 0)) continue;
+                    sb.Append(first ? " " : ", ").Append(id).Append(' ').Append(p).Append('/').Append(c);
+                    if (m < 2) sb.Append('/').Append(a[6 + m]);
+                    first = false;
+                }
+                if (first) sb.Append(" -");
+            }
+            sb.Append('.');
+            return sb.ToString();
         }
 
         private static void AddExo(KsInput inp, string land, int g, double kg)
@@ -236,7 +277,7 @@ namespace Armoury
             _waitNote = null;
             _lastPlanDay = day;
             int gen = Volatile.Read(ref _gen);
-            _wIn = inp; _wDay = day; _wBusy = true;
+            _wIn = inp; _wDay = day; _wBusy = true; _wEma = _emaDays;
             _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
@@ -269,7 +310,9 @@ namespace Armoury
             _wOut = null;
             var inp = _wIn; _wIn = null;
             if (inp == null) return;
-            if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; if (_firstPlanDay < 0) _firstPlanDay = _wDay; }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
+            if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; _planEma = _wEma; if (_firstPlanDay < 0) _firstPlanDay = _wDay; }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
+            // recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu co 7 dob, nie zamrozony z dnia wlaczenia
+            if (r.Error == null && _state == StateApplied) { try { RefreshNeedMult(r, inp); } catch (Exception e) { Stumble("RefreshNeedMult", e); } }
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
             // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku)
             if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { PlanCsv(_wDay, r, inp); } catch (Exception e) { Stumble("PlanCsv", e); } }
@@ -291,6 +334,7 @@ namespace Armoury
             int nv = 0, nt = 0; foreach (var d in inp.Districts) if (d.TownFields) nt++; else nv++;
             var sb = new StringBuilder(4000);
             sb.Append(P).Append("plan doba ").Append(_wDay).Append(" | plan nr ").Append(_plans).Append(" tego zapisu (od doby ").Append(_firstPlanDay).Append(")")
+              .Append(", ksiega towarow ").Append(_wEma).Append(" dob w sredniej (wlaczenie wymaga >= ").Append(MinLedgerDays).Append(_wEma >= MinLedgerDays ? " - Plan dojrzaly)" : " - Plan NIEDOJRZALY: popyt 1:1 z za krotkiej ksiegi)")
               .Append(" | rund ").Append(r.Rounds).Append(" (pierwsza ").Append(r.RoundsFirst).Append(", lepszy stol R8 ").Append(r.R8Rounds).Append(", R8b ").Append(r.R8bRounds).Append(")")
               .Append(", czas ").Append((r.Ms / 1000).ToString("0.0", Inv)).Append(" s (watek roboczy)")
               .Append(" | okregi ").Append(r.NDist).Append(" (wsie ").Append(nv).Append(", pola mieszczan ").Append(nt).Append("), bloki ").Append(r.NB).Append(", pary blok-zajecie ").Append(r.NP)

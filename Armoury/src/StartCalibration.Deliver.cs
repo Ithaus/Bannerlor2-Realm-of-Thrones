@@ -10,6 +10,16 @@ namespace Armoury
         public float Rent;                                 // renta ziemi z Planu (d/ha/d)
         public KsBlock K;                                  // ziemia, udzial w okregu, zajecie startowe (pamiec sesji)
         public double Hands, HomeFrac;                     // rece bloku i czesc rak domu (ostatni rachunek)
+        // recenzja 16.10 (ziemia): ziemia zajeta bloku w ha (dom, zboze wlasne, rece zajec x ha na pracujacego - jak LandP Planu) i liczby do ziemi innego zajecia
+        public double LandUse; internal double WH, SubNW, Lg = double.NaN;
+
+        /// <summary>Ziemia (ha), ktora blok zajmowalby przy calych rekach w zajeciu c (ostatni rachunek rak): dom + zboze wlasne + reszta rak x ha na pracujacego.</summary>
+        internal double LandOf(int c, string type)
+        {
+            double rem = Math.Max(0.0, Hands - WH);
+            double sub = c != KsTab.CWheat && Lg > 0 ? Math.Min(rem, SubNW) : 0.0;
+            return WH * KsTab.HaHome + sub * KsTab.HaOwnGrain + (rem - sub) * KsTab.HaPerWorker[c];
+        }
         // pamiec przydatnosci ziemi bloku (ziemia sie nie zmienia): L zajecia c (NaN - jeszcze nie liczone), L zboza; klucz - blok ziemi K (nowy K = od nowa)
         internal double[] LC; internal double LG = double.NaN; internal object LKey;
 
@@ -88,6 +98,9 @@ namespace Armoury
                 W = d.Wf * kb.Share; lg = lb.LGrain(type); lh = 0.5 + 0.5 * Math.Min(1.0, lg);
                 wH = Math.Min(W, d.Need0[KsTab.NH] * kb.Share / (KsTab.PH * lh)); if (!(wH >= 0)) wH = 0;
                 lb.Hands = W; lb.HomeFrac = W > 0 ? wH / W : 0;
+                lb.WH = wH; lb.Lg = lg; lb.SubNW = lg > 0 ? KsTab.OwnGrainShare(lg) * KsCore.GrainOwnNeed(d.Need0) * kb.Share / (KsTab.PGrainSub * lg) : 0.0;
+                double land = 0; for (int j = 0; j < lb.C.Length; j++) if (lb.X[j] > 0) land += lb.X[j] * lb.LandOf(lb.C[j], type);
+                lb.LandUse = land;
                 double rsum = 0; if (lb.RF != null) for (int j = 0; j < lb.RF.Length; j++) rsum += lb.RF[j];
                 double scale = Math.Max(0.0, 1.0 - rsum);
                 double rem = W - wH;

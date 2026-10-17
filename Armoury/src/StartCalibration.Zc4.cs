@@ -11,7 +11,12 @@ namespace Armoury
 {
     /// <summary>
     /// ZC4 - POPYT OD KOSZYKA (projekt ZYCIE CODZIENNE rozdz. 8 i 14 "ZC4"; KS rozdz. 11.2 "KS i ZC4 jednym kluczem"): czynny TYLKO w stanie zastosowanym KS
-    /// (klucz Start Calibration, zapis zastosowany), lambda 0 -> 1 przez 28 dob od wlaczenia (StartCalibration.Ramp.cs).
+    /// (klucz Start Calibration, zapis zastosowany), lambda 0 do D, potem 0 -> 1 przez 14 dob (StartCalibration.Ramp.cs).
+    /// RECENZJA 16.10 (krytyczne): szacunek popytu do wzoru ceny = to, co lud je i zuzywa (miasto + wsie) + WSAD przetworow (pary ZC5: ziarno na chleb, placek i piwo,
+    /// winogrona na wino, oliwki na oliwe, miod na miod pitny, glina na garnki, zywiec na mieso z uboju - z wyrobu, ktory kupuje lud) + 1:1 (wojsko, zamki, dwory -
+    /// srednia ksiegi towarow swiata x udzial ludzi rynku miasta; glina, wapien, marmur i narzedzia takze budowy - jak 1:1 Planu); zywiec - dzisiejszy popyt + lambda x wsad
+    /// (bez tego cena gliny, wapienia i marmuru szla na podloge, a regale scinaly rece bez konca). Ceny miasta liczone raz na dobe (koszt) i uzyte w slowniku budzetu,
+    /// drabinie i zakupach wsi; czas hakow w linii ZC4.
     ///  - POTRZEBA (raz na dobe, po stawkach KS): miasto - ludzie stanow z ksiegi stanow x koszyk stanu krainy (KS-K) w kg, cala z targu (rozdz. 8.1), zboze miasta: chleb 45%,
     ///    placek 10%, ziarno 45%; wies zastosowana - to, czego nie zjada z wlasnego pola (StartCalibration.Live.cs VillageBasket); w sztukach gry = kg / (sigma x kg sztuki).
     ///    Ta sama potrzeba co popyt Planu (cywile), wiec podaz KS na targ = popyt targu.
@@ -43,6 +48,8 @@ namespace Armoury
                            ZHides = KsBasket.Hides, ZIron = KsBasket.Iron, ZClay = KsBasket.Clay, ZLime = KsBasket.Lime, ZMarble = KsBasket.Marble;
         // dodatek do dzisiejszego popytu (zbytki sterowane pieniedzmi + kozuchy KS-K i przyprawy koszyka) - reszta kategorii koszyka ZASTEPUJE dzisiejszy popyt
         private static bool ZAdd(int z) { return z == ZSpice || z == ZFur; }
+        // kategorie bez udzialu w koszyku ludu - budowy i rzemioslo: popyt ceny = wsad przetworow + 1:1 z budowami (jak Plan; recenzja 16.10), lud ich nie kupuje (jak Plan)
+        private static bool BuildUse(int z) { return z == ZClay || z == ZLime || z == ZMarble || z == ZTools; }
         // kolejnosc drabiny zakupow wsi (przetrwanie, sol, napoj, bialko, reszta jedzenia, przedza, rzeczy)
         internal static readonly int[] ZLadder =
         {
@@ -66,12 +73,22 @@ namespace Armoury
             public readonly double[] QV = new double[ZN];        // wsie kupujace w tym miescie (sztuki/d, pelna lambda)
             public double Fire;                                  // opal (ladunki/d, pelna lambda)
             public readonly double[] Cls = new double[3];        // koszt koszyka klas W/R/P (zl/d przy cenach targu, pelna lambda, bez opalu)
+            public readonly double[] Der = new double[ZN];       // wsad przetworow ZC5 z wyrobu, ktory kupuje lud miasta i wsi (sztuki/d, pelna lambda)
+            public readonly double[] One = new double[ZN];       // 1:1 (wojsko, zamki, dwory) - srednia swiata x udzial ludzi rynku miasta (sztuki/d)
+            public readonly double[] DerLive = new double[3];    // zywiec (krowy, swinie, owce) na mieso z uboju (sztuki/d, pelna lambda)
+            public readonly int[] Px = new int[ZN];              // cena sztuki na polce miasta (raz na dobe, Zc4Build)
         }
 
         private static ItemObject[] _zItems;
         private static double[] _zKg;
         private static Dictionary<ItemCategory, int[]> _zCats = new Dictionary<ItemCategory, int[]>();
         private static Dictionary<ItemObject, int> _zIx;
+        private static Dictionary<ItemCategory, int> _zLiveCats = new Dictionary<ItemCategory, int>();   // kategoria zywca -> 0 krowy, 1 swinie, 2 owce
+        private static ItemObject[] _zLive;
+        private static readonly string[] ZLiveIds = { "cow", "hog", "sheep" };
+        private static readonly int[] ZLiveItem = { KsDeliver.ICow, KsDeliver.IHog, KsDeliver.ISheep };
+        private static long _zTkDemand, _zTkDict, _zTkVill, _zTkLadder; private static int _zDemandN;   // czas hakow (Stopwatch) od ostatniej linii
+        private static double _zFoodBud, _zLadCut; private static long _zvUnGold;
         private static volatile Dictionary<Settlement, ZTown> _zt = new Dictionary<Settlement, ZTown>();
         private static volatile Dictionary<Village, float[]> _zv = new Dictionary<Village, float[]>();
         private static Town _zcDictTown;                                     // miasto, ktorego slownik budzetu dnia jest juz w zlocie (BK CalculateBudget - bez zmian)
@@ -87,7 +104,7 @@ namespace Armoury
         private static void Zc4Reset()
         {
             _zt = new Dictionary<Settlement, ZTown>(); _zv = new Dictionary<Village, float[]>(); _zcDictTown = null;
-            _zItems = null; _zKg = null; _zCats = new Dictionary<ItemCategory, int[]>(); _zIx = null;
+            _zItems = null; _zKg = null; _zCats = new Dictionary<ItemCategory, int[]>(); _zIx = null; _zLiveCats = new Dictionary<ItemCategory, int>(); _zLive = null;
             Zc4Zero();
         }
 
@@ -96,6 +113,7 @@ namespace Armoury
             _zDictN = _zLadderN = _zBrewN = _zBreadN = 0; _zBrewPcs = _zBreadPcs = _zDictOld = _zDictNew = 0;
             _zvGold = _zvPcs = _zvBrew = 0; _zvN = _zvNoGold = _zvNoGoods = 0; _zvWant = _zvGot = 0;
             Array.Clear(_zvRung, 0, 3); Array.Clear(_zvRungWant, 0, 3);
+            System.Threading.Interlocked.Exchange(ref _zTkDemand, 0); _zTkDict = _zTkVill = _zTkLadder = 0; _zDemandN = 0; _zFoodBud = _zLadCut = 0; _zvUnGold = 0;
         }
 
         private static void Zc4Off()
@@ -124,7 +142,9 @@ namespace Armoury
             }
             var cm = new Dictionary<ItemCategory, int[]>();
             foreach (var kv in cats) cm[kv.Key] = kv.Value.ToArray();
-            _zKg = kg; _zIx = ix; _zCats = cm; _zItems = items;
+            var live = new ItemObject[3]; var lc = new Dictionary<ItemCategory, int>();
+            for (int k = 0; k < 3; k++) { live[k] = ItemOf(ZLiveIds[k]); if (live[k] != null && live[k].ItemCategory != null && !cm.ContainsKey(live[k].ItemCategory) && !lc.ContainsKey(live[k].ItemCategory)) lc[live[k].ItemCategory] = k; }
+            _zKg = kg; _zIx = ix; _zCats = cm; _zLive = live; _zLiveCats = lc; _zItems = items;
         }
 
         internal static void Zc4ApplyAll(Harmony h)
@@ -143,23 +163,57 @@ namespace Armoury
 
         // ============================================================ doba: potrzeba miast i wsi (po stawkach KS)
         /// <summary>Potrzeba koszyka na jutro: miasta (stany ksiegi x koszyk krainy, cala z targu), wsie zastosowane (vil - z rachunku okregu), koszt klas W/R/P, opal;
-        /// lambda rynku z rampy. full - przeplyw na targ KS [rynek x towar] (podzial miesa: mieso / mieso wieloryba wedlug podazy rynku).</summary>
-        private static void Zc4Build(int today, List<DailyLife.KsRec> recs, Dictionary<Village, float[]> vil, double[] full)
+        /// lambda rynku z rampy; ceny miasta (raz na dobe); wsad przetworow ZC5 z wyrobu ludu i 1:1 swiata wedlug ludzi rynku miasta (popyt ceny - recenzja 16.10).
+        /// full - przeplyw na targ KS [rynek x towar] (podzial miesa: mieso / mieso wieloryba / zywiec wedlug podazy rynku). fresh = false (stany ZC nieswieze) -
+        /// ostatnia mapa miast z biezaca lambda (recenzja 16.10: nie pusta mapa - bez niej popyt wracal do dzisiejszego przy podazy KS).</summary>
+        private static void Zc4Build(int today, List<DailyLife.KsRec> recs, Dictionary<Village, float[]> vil, double[] full, bool fresh)
         {
             Zc4EnsureMap();
+            if (!fresh && _zt.Count > 0)
+            {
+                var old = _zt;
+                foreach (var zt in old.Values) { zt.Lam = Lam(zt.Market); Array.Clear(zt.QV, 0, ZN); }
+                if (vil != null)
+                    foreach (var kv in vil)
+                    {
+                        var v = kv.Key; if (v == null) continue;
+                        var mk0 = v.TradeBound ?? v.Bound; ZTown z0;
+                        if (mk0 != null && old.TryGetValue(mk0, out z0)) for (int z = 0; z < ZN; z++) z0.QV[z] += kv.Value[z];
+                    }
+                _zv = vil ?? new Dictionary<Village, float[]>();
+                return;
+            }
             var map = new Dictionary<Settlement, ZTown>();
             double sigma = Math.Max(1, DailyLife.KsSigma);
-            // udzial miesa wieloryba w miesie rynku (kg): wieloryb / (mieso + wieloryb + polowa zywca)
-            var whale = new double[2];
+            // udzial miesa wieloryba w miesie rynku (kg): wieloryb / (mieso + wieloryb + polowa zywca); udzial zywca w miesie z targu (bez wieloryba)
+            var whale = new double[2]; var liveSh = new double[6];
             for (int m = 0; m < 2; m++)
             {
                 int o = m * ItemCount;
-                double wk = full[o + IWhaleMeat] * _itemKg[IWhaleMeat];
-                double mk = full[o + IMeat] * _itemKg[IMeat] + (full[o + KsDeliver.ICow] * _itemKg[KsDeliver.ICow] + full[o + KsDeliver.IHog] * _itemKg[KsDeliver.IHog] + full[o + KsDeliver.ISheep] * _itemKg[KsDeliver.ISheep]) * KsTab.MeatOfLive;
+                double wk = full[o + IWhaleMeat] * _itemKg[IWhaleMeat], md = full[o + IMeat] * _itemKg[IMeat], lt = 0;
+                var w = new double[3];
+                for (int k = 0; k < 3; k++) { w[k] = full[o + ZLiveItem[k]] * _itemKg[ZLiveItem[k]] * KsTab.MeatOfLive; lt += w[k]; }
+                double mk = md + lt;
                 whale[m] = wk + mk > 0 ? wk / (wk + mk) : 0.0;
+                for (int k = 0; k < 3; k++) liveSh[m * 3 + k] = mk > 0 ? w[k] / mk : 0.0;
             }
+            // 1:1 swiata (sztuki/d - srednia ksiegi towarow) i ludzie rynku kazdego miasta (miasto + wsie z tym miastem targowym)
+            double world = 0; var mkPeople = new Dictionary<Settlement, double>();
+            foreach (var r in recs)
+            {
+                if (r == null || r.St == null) continue;
+                double l = Math.Max(0, r.L); world += l;
+                var mkS = r.Town ? r.St : r.Market;
+                if (mkS == null) continue;
+                double v0; mkPeople.TryGetValue(mkS, out v0); mkPeople[mkS] = v0 + l;
+            }
+            var one = new double[ZN];
+            for (int z = 0; z < ZN; z++)
+                if (!ZAdd(z)) one[z] = Math.Max(0.0, Ema(ZIds[z], GoodsLedger.KsArmy) + Ema(ZIds[z], GoodsLedger.KsCastle) + Ema(ZIds[z], GoodsLedger.KsCourt) + (BuildUse(z) ? Ema(ZIds[z], GoodsLedger.KsBuild) : 0.0));
+            List<KPair> pairs = null;
+            try { pairs = KPairs(); } catch (Exception e) { Stumble("Zc4Build(pary)", e); }
             bool fireOn = FirewoodMechanism();
-            var n = new double[KsTab.NN]; var one = new double[6]; var px = new double[ZN];
+            var n = new double[KsTab.NN]; var one6 = new double[6]; var px = new double[ZN];
             foreach (var r in recs)
             {
                 if (r == null || !r.Town || r.St == null || r.St.Town == null) continue;
@@ -177,15 +231,15 @@ namespace Armoury
                     zt.Garum = r.Cul != null && KsTab.GarumLands.Contains(r.Cul);
                     double surv = 0; for (int e = 0; e < 6; e++) surv += Math.Max(0, r.N[e]);
                     zt.Surv = surv * 0.47 / (sigma * _zKg[ZGrain]);
-                    // koszt klas (zl/d przy cenach targu): kazdy stan osobno; ceny miasta raz (sztuka koszyka)
+                    // ceny miasta raz na dobe (koszt klas, slownik budzetu, drabina, zakupy wsi)
                     var md = t.MarketData;
                     var q1 = new double[ZN];
-                    for (int z = 0; z < ZN; z++) { var it = _zItems[z]; int p = 1; if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } } px[z] = Math.Max(1, p); }
+                    for (int z = 0; z < ZN; z++) { var it = _zItems[z]; int p = 1; if (it != null) { try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; } } px[z] = Math.Max(1, p); zt.Px[z] = (int)px[z]; }
                     for (int e = 0; e < 6; e++)
                     {
                         if (!(r.N[e] > 0)) continue;
-                        Array.Clear(one, 0, 6); one[e] = r.N[e];
-                        KsCore.NeedsOf(one, bask, oil, north, true, false, r.N[e], n);   // bez opalu (opal placi kiesa ponad koszyk - TownFolk.FirewoodDaily)
+                        Array.Clear(one6, 0, 6); one6[e] = r.N[e];
+                        KsCore.NeedsOf(one6, bask, oil, north, true, false, r.N[e], n);   // bez opalu (opal placi kiesa ponad koszyk - TownFolk.FirewoodDaily)
                         double f0; Array.Clear(q1, 0, ZN);
                         TownItems(n, q1, whale[zt.Market], sigma, true, out f0);
                         double cost = 0;
@@ -195,6 +249,9 @@ namespace Armoury
                         else if (e == KsTab.EMerchant || e == KsTab.EGentry) zt.Cls[2] += cost;
                         else { zt.Cls[1] += 0.4 * cost; zt.Cls[2] += 0.6 * cost; }      // niewolni: wlasciciele R 40% / P 60% (jak kiesa ludu)
                     }
+                    double pp; mkPeople.TryGetValue(r.St, out pp);
+                    double sh = world > 0 ? pp / world : 0.0;
+                    for (int z = 0; z < ZN; z++) zt.One[z] = one[z] * sh;
                     map[r.St] = zt;
                 }
                 catch (Exception e) { _zStum++; Stumble("Zc4Build(miasto)", e); }
@@ -209,8 +266,32 @@ namespace Armoury
                     if (mk == null || !map.TryGetValue(mk, out zt)) continue;
                     for (int z = 0; z < ZN; z++) zt.QV[z] += kv.Value[z];
                 }
+            // wsad przetworow z wyrobu, ktory kupuje lud miasta i wsi (popyt ceny; budzet ludu bez zmian - lud nie kupuje ziarna na chleb)
+            foreach (var zt in map.Values) { try { Zc4Derived(zt, pairs, liveSh); } catch (Exception e) { _zStum++; Stumble("Zc4Derived", e); } }
             _zt = map;
             _zv = vil ?? new Dictionary<Village, float[]>();
+        }
+
+        /// <summary>Wsad przetworow ZC5 z wyrobu ludu (sztuki wsadu na dobe przy pelnej lambdzie): chleb, placek i piwo -> ziarno, wino -> winogrona, oliwa -> oliwki,
+        /// miod pitny -> miod, garnki -> glina, mieso -> zywiec (czesc miesa z zywca wedlug podazy rynku). Bez garum (wyrob spoza koszyka) i bez zelaza na narzedzia
+        /// (zuzycie rzemiosla zelaza liczy RawPrice z prawdziwego zuzycia).</summary>
+        private static void Zc4Derived(ZTown zt, List<KPair> pairs, double[] liveSh)
+        {
+            Array.Clear(zt.Der, 0, ZN); Array.Clear(zt.DerLive, 0, 3);
+            if (pairs == null) return;
+            foreach (var p in pairs)
+            {
+                if (p.Garum || p.ZOut < 0) continue;
+                double outD = zt.Q[p.ZOut] + zt.QV[p.ZOut];
+                if (!(outD > 0)) continue;
+                if (p.Live >= 0) outD *= liveSh[(zt.Market == 0 ? 0 : 3) + p.Live];
+                for (int j = 0; j < p.InIt.Length; j++)
+                {
+                    double x = outD * p.Ratio[j];
+                    if (p.Live >= 0) zt.DerLive[p.Live] += x;
+                    else if (p.ZIn[j] >= 0 && p.ZIn[j] != ZIron) zt.Der[p.ZIn[j]] += x;
+                }
+            }
         }
 
         /// <summary>Potrzeby osady (NeedsOf, kg/d) -> sztuki gry na dobe wedlug ZIds (miasto: zboze 45% ziarno, 45% chleb, 10% placek; mieso / wieloryb wedlug podazy rynku;
@@ -244,25 +325,49 @@ namespace Armoury
             if (extra <= 0 || cat == null) return;
             ZTown zt;
             if (!ZTownOf(town, out zt)) return;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
-                int[] zs;
-                if (!_zCats.TryGetValue(cat, out zs)) return;
-                double v = 0; bool add = false;
-                foreach (int z in zs)
+                int[] zs; int lk;
+                double lam = zt.Lam, r;
+                if (_zCats.TryGetValue(cat, out zs))
                 {
-                    var it = _zItems[z]; if (it == null) continue;
-                    double q = zt.Q[z] + zt.QV[z] + (z == ZWood ? zt.Fire : 0.0);
-                    v += q * Math.Max(1, it.Value);
-                    if (ZAdd(z)) add = true;
+                    double v = 0; bool add = false;
+                    foreach (int z in zs)
+                    {
+                        var it = _zItems[z]; if (it == null) continue;
+                        double q = zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z] + (z == ZWood ? zt.Fire : 0.0);
+                        v += q * Math.Max(1, it.Value);
+                        if (ZAdd(z)) add = true;
+                    }
+                    if (RawPrice.UseOn) { float hs = HistoricalPrices.HouseShare(cat); if (hs > 0.05f && hs < 0.999f) v /= hs; }   // RawPrice mnozy popyt domowy surowcow masowych przez czesc domowa
+                    r = add ? result + lam * v : (1 - lam) * result + lam * v;
                 }
-                if (RawPrice.UseOn) { float hs = HistoricalPrices.HouseShare(cat); if (hs > 0.05f && hs < 0.999f) v /= hs; }   // RawPrice mnozy popyt domowy surowcow masowych przez czesc domowa
-                double lam = zt.Lam;
-                double r = add ? result + lam * v : (1 - lam) * result + lam * v;
+                else if (_zLiveCats.TryGetValue(cat, out lk) && _zLive != null && _zLive[lk] != null)
+                    r = result + lam * zt.DerLive[lk] * Math.Max(1, _zLive[lk].Value);                     // zywiec na mieso z uboju (dzis + lambda x wsad)
+                else return;
                 if (r >= 0 && !double.IsNaN(r) && !double.IsInfinity(r)) result = (float)r;
             }
-            catch { }
+            catch (Exception e) { Zc4HookStumble("Zc4Demand", e); }
+            finally { System.Threading.Interlocked.Add(ref _zTkDemand, System.Diagnostics.Stopwatch.GetTimestamp() - t0); System.Threading.Interlocked.Increment(ref _zDemandN); }
         }
+
+        /// <summary>Potkniecie haka ZC4 (moze isc z watkow AI): licznik linii ZC4, pierwsze 3 w logu.</summary>
+        private static void Zc4HookStumble(string where, Exception e)
+        {
+            int n = System.Threading.Interlocked.Increment(ref _zStum);
+            if (n <= 3) { try { Log.Error("StartCalibration." + where, e); } catch { } }
+        }
+
+        /// <summary>TownFolk.Zc4BuyVillage: cena sztuki towaru koszyka z na polce miasta (raz na dobe, Zc4Build); 0 - poza ZC4 (wolajacy pyta gre).</summary>
+        internal static int ZPrice(Town t, int z)
+        {
+            ZTown zt;
+            return z >= 0 && z < ZN && ZTownOf(t, out zt) ? zt.Px[z] : 0;
+        }
+
+        /// <summary>TownFolk.Villages: czas zakupow wsi (Stopwatch) do linii ZC4.</summary>
+        internal static void Zc4NoteTime(long ticks) { _zTkVill += ticks; }
 
         /// <summary>BK CalculateBudget przez lancuch Armoury, z pominieciem wiersza koszyka (budzet BK dzisiejszej czesci kategorii).</summary>
         private static float ChainBudget(Town t, float demand, ItemCategory c)
@@ -292,6 +397,7 @@ namespace Armoury
         {
             ZTown zt;
             if (__0 == null || __1 == null || !ZTownOf(__0, out zt)) return;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
                 if (Campaign.Current == null || !Campaign.Current.GameStarted) return;
@@ -327,14 +433,14 @@ namespace Armoury
                 foreach (var kv in _zCats)
                 {
                     var c = kv.Key;
-                    double bz = 0; bool add = false;
+                    double bz = 0; bool add = false, food = false;
                     foreach (int z in kv.Value)
                     {
                         var it = _zItems[z]; if (it == null) continue;
                         if (ZAdd(z)) add = true;
+                        if (Rung(z) >= 0) food = true;
                         if (q[z] <= 0) continue;
-                        int p = 0; try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; }
-                        bz += q[z] * Math.Max(1, p);
+                        bz += q[z] * Math.Max(1, zt.Px[z]);                          // cena miasta z doby (Zc4Build) - recenzja 16.10, koszt
                     }
                     float old; __1.TryGetValue(c, out old);
                     double bOld = old > 0.01f ? ChainBudget(__0, old, c) : 0.0;
@@ -342,11 +448,13 @@ namespace Armoury
                     if (!(nv >= 0) || double.IsInfinity(nv)) continue;
                     __1[c] = (float)nv;
                     _zDictOld += bOld; _zDictNew += nv;
+                    if (food) _zFoodBud += nv;
                 }
                 _zcDictTown = __0;
                 _zDictN++;
             }
             catch (Exception e) { _zStum++; Stumble("Zc4DictPostfix", e); }
+            finally { _zTkDict += System.Diagnostics.Stopwatch.GetTimestamp() - t0; }
         }
 
         /// <summary>Postfiks BK CalculateBudget (VeryLow, po kotwicy wiersza i przed pomiarem nawiasu): w miescie, ktorego slownik dnia jest juz w zlocie (Zc4DictPostfix), wiersz
@@ -361,7 +469,7 @@ namespace Armoury
                 if (!ZTownOf(__0, out zt)) return;
                 __result = __1 > 0f ? __1 : 0f;
             }
-            catch { }
+            catch (Exception e) { Zc4HookStumble("Zc4BudgetPostfix", e); }
         }
 
         /// <summary>Koniec konsumpcji miasta: slownik w zlocie tylko w tym nawiasie (inne wywolania CalculateBudget - jak dotad).</summary>
@@ -407,6 +515,7 @@ namespace Armoury
             foreach (var c in keys) { float v; if (dict.TryGetValue(c, out v) && v > 0) tot += v; }
             ZTown zt;
             if (!(tot > 0) || !ZTownOf(town, out zt)) { foreach (var c in keys) { float v; if (dict.TryGetValue(c, out v) && v > 0) dict[c] = (float)(v * ff); } return tot * ff; }
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             double B = Math.Max(0.0, ff) * tot, left = B;
             var md = town.MarketData; var ro = town.Settlement.ItemRoster;
             var need = new Dictionary<ItemCategory, double>(); var give = new Dictionary<ItemCategory, double>();
@@ -423,7 +532,7 @@ namespace Armoury
                     foreach (int z in zs)
                     {
                         var it = _zItems[z]; if (it == null) continue;
-                        int p = 1; try { p = md.GetPrice(it, null, false, null); } catch { p = it.Value; }
+                        int p = zt.Px[z];
                         double per = Math.Max(1, p) / _zKg[z];                                         // zl za kg (litr)
                         if (ZKcalKg[z] > 0 && (rg == 3)) per /= ZKcalKg[z] / 1000.0;                   // bialko: zl za 1000 kcal
                         if (per < best) best = per;
@@ -437,7 +546,7 @@ namespace Armoury
             double grainNeed = 0; foreach (var c in keys) if (rung[c] == 0) grainNeed += need[c];
             if (cheap != null)
             {
-                int pz = 1; var ci = _zItems[_zCats[cheap][0]]; try { pz = md.GetPrice(ci, null, false, null); } catch { pz = ci.Value; }
+                int pz = Math.Max(1, zt.Px[_zCats[cheap][0]]);
                 double surv = Math.Min(grainNeed, zt.Surv * zt.Lam * Math.Max(1, pz));
                 double g = Math.Min(left, surv);
                 give[cheap] += g; left -= g; grainNeed -= g;
@@ -459,6 +568,8 @@ namespace Armoury
             double after = 0;
             foreach (var c in keys) { dict[c] = (float)give[c]; after += give[c]; }
             _zLadderN++;
+            _zLadCut += Math.Max(0.0, tot - after);                                                     // jedzenie koszyka niekupione z braku pieniedzy (zl)
+            _zTkLadder += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
             return after;
         }
 
@@ -486,12 +597,14 @@ namespace Armoury
             return Math.Max(0.0, 1.0 - zt.Lam);
         }
 
-        /// <summary>TownFolk.FirewoodDaily: potrzeba opalu miasta (ladunki/d) = (1 - lambda) x dzis + lambda x 1.5 kg na osobe (tabela KS); poza ZC4 - dzis.</summary>
-        internal static double Zc4Firewood(Town town, double old)
+        /// <summary>TownFolk.FirewoodDaily: potrzeba opalu miasta (ladunki/d) = (1 - lambda) x dzis + lambda x 1.5 kg na osobe (tabela KS) x czynnik zimy (ten sam, co dzis:
+        /// 1 + kraina x polnoc; recenzja 16.10 - bez niego zima nie dokladala opalu przy lambda 1); poza ZC4 - dzis.</summary>
+        internal static double Zc4Firewood(Town town, double old, double winterK)
         {
             ZTown zt;
             if (!ZTownOf(town, out zt)) return old;
-            return (1 - zt.Lam) * old + zt.Lam * zt.Fire;
+            double k = winterK > 0 && !double.IsNaN(winterK) && !double.IsInfinity(winterK) ? winterK : 1.0;
+            return (1 - zt.Lam) * old + zt.Lam * zt.Fire * k;
         }
 
         /// <summary>TownFolk.Villages: koszyk wsi zastosowanej (sztuki/d przy pelnej lambdzie, ZIds) i lambda jej miasta targowego; null - poza ZC4.</summary>
@@ -509,9 +622,9 @@ namespace Armoury
         }
 
         /// <summary>TownFolk.Zc4BuyVillage: liczniki zakupow wsi (zl, sztuki, chciane / kupione sztuki wedlug szczebla: 0 zboze i sol, 1 reszta jedzenia, 2 rzeczy).</summary>
-        internal static void Zc4NoteVillage(long gold, long pcs, double want, double got, int noGold, int noGoods, double[] rw, double[] rg, long brew)
+        internal static void Zc4NoteVillage(long gold, long pcs, double want, double got, int noGold, int noGoods, double[] rw, double[] rg, long brew, long unGold)
         {
-            _zvGold += gold; _zvPcs += pcs; _zvWant += want; _zvGot += got; _zvN++; _zvNoGold += noGold; _zvNoGoods += noGoods; _zvBrew += brew;
+            _zvGold += gold; _zvPcs += pcs; _zvWant += want; _zvGot += got; _zvN++; _zvNoGold += noGold; _zvNoGoods += noGoods; _zvBrew += brew; _zvUnGold += unGold;
             for (int i = 0; i < 3; i++) { _zvRungWant[i] += rw[i]; _zvRung[i] += rg[i]; }
         }
 
@@ -551,7 +664,29 @@ namespace Armoury
               .Append(" | miasta: slowniki budzetu ").Append(_zDictN).Append(" (budzet kategorii koszyka dzis ").Append(F0(_zDictOld)).Append(" -> ").Append(F0(_zDictNew)).Append(" zl)")
               .Append(", drabina (kiesy nie stac na cale jedzenie) ").Append(_zLadderN).Append(", piwo domowe w ").Append(_zBrewN).Append(" (ziarna ").Append(F0(_zBrewPcs)).Append(" szt.)")
               .Append(", brak chleba i placka - ziarno w ").Append(_zBreadN).Append(" (").Append(F0(_zBreadPcs)).Append(" szt.)")
-              .Append(" | latki: ").Append(_zHook).Append(" | potkniecia ").Append(_zStum).Append('.');
+              .Append(" | stac na cale jedzenie: miasta ").Append(_zDictN > 0 ? (100.0 * (_zDictN - _zLadderN) / _zDictN).ToString("0.0", Inv) : "-").Append("% (").Append(_zDictN - _zLadderN).Append('/').Append(_zDictN)
+              .Append("), jedzenie niekupione z braku pieniedzy: miasta ").Append(_zFoodBud > 0 ? (100.0 * _zLadCut / _zFoodBud).ToString("0.0", Inv) : "-").Append("% budzetu jedzenia (").Append(F0(_zLadCut)).Append(" zl)")
+              .Append(", wsie ").Append(_zvWant > 0 ? (100.0 * _zvUnGold / _zvWant).ToString("0.0", Inv) : "-").Append("% chcianych sztuk (").Append(_zvUnGold).Append(" szt.)");
+            // wsad przetworow i 1:1 w popycie ceny (sztuki/d przy lambdzie, wszystkie miasta)
+            var der = new double[ZN]; var one = new double[ZN]; var dl = new double[3];
+            foreach (var zt in map.Values) { for (int z = 0; z < ZN; z++) { der[z] += zt.Der[z] * zt.Lam; one[z] += zt.One[z] * zt.Lam; } for (int k = 0; k < 3; k++) dl[k] += zt.DerLive[k] * zt.Lam; }
+            sb.Append(" | popyt ceny ponad koszyk (szt./d przy lambdzie): wsad przetworow");
+            bool fd = true;
+            foreach (int z in new[] { ZGrain, ZGrape, ZOlives, ZHoney, ZClay }) { if (der[z] < 0.5) continue; sb.Append(fd ? " " : ", ").Append(ZIds[z]).Append(' ').Append(F0(der[z])); fd = false; }
+            for (int k = 0; k < 3; k++) { if (dl[k] < 0.5) continue; sb.Append(fd ? " " : ", ").Append(ZLiveIds[k]).Append(' ').Append(F0(dl[k])); fd = false; }
+            if (fd) sb.Append(" -");
+            sb.Append("; 1:1 (wojsko, zamki, dwory)");
+            fd = true;
+            foreach (int z in new[] { ZGrain, ZFish, ZMeat, ZCheese, ZBeer, ZWine, ZLinen, ZLeather, ZTools, ZWood, ZClay, ZLime, ZMarble })
+            { if (one[z] < 0.5) continue; sb.Append(fd ? " " : ", ").Append(ZIds[z]).Append(' ').Append(F0(one[z])); fd = false; }
+            if (fd) sb.Append(" -");
+            double tf = System.Diagnostics.Stopwatch.Frequency / 1000.0;
+            double msDem = System.Threading.Interlocked.Read(ref _zTkDemand) / tf, msDict = _zTkDict / tf, msVill = _zTkVill / tf, msLad = _zTkLadder / tf, msCraft = _kTicks / tf;
+            sb.Append(" | czas hakow od ostatniej linii: popyt ceny ").Append(msDem.ToString("0.00", Inv)).Append(" ms (").Append(_zDemandN).Append(" wywolan), slowniki budzetu ").Append(msDict.ToString("0.00", Inv))
+              .Append(" ms, drabina ").Append(msLad.ToString("0.00", Inv)).Append(" ms, zakupy wsi ").Append(msVill.ToString("0.00", Inv)).Append(" ms, przetwory ZC5 ").Append(msCraft.ToString("0.00", Inv))
+              .Append(" ms, razem ").Append((msDem + msDict + msVill + msLad + msCraft).ToString("0.00", Inv)).Append(" ms");
+            _kTicks = 0;
+            sb.Append(" | latki: ").Append(_zHook).Append(" | potkniecia ").Append(_zStum).Append('.');
             Zc4Zero(); _zStum = 0;
             return sb.ToString();
         }

@@ -1159,14 +1159,18 @@ namespace Armoury
                     long zSpent = 0;
                     if (zq != null && zl > 0 && mk0 != null && mk0.Town != null)
                     {
+                        long zt0 = Stopwatch.GetTimestamp();
                         zSpent = Zc4BuyVillage(vil, mk0, zq, zl, d);
+                        StartCalibration.Zc4NoteTime(Stopwatch.GetTimestamp() - zt0);
                         Folk mz; if (zSpent > 0 && _f.TryGetValue(mk0, out mz)) mz.VillWin += zSpent;
                     }
                     else zl = 0;
                     double nvo = nv * (1 - zl);
                     int gold = vil.Gold;
                     double buy1 = Math.Min(nvo, Math.Max(0, gold));
-                    double extra = (1 - zl) * SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);   // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%); ZC4 - x (1 - lambda)
+                    // decyzja Jeffa 12.10 (3): 15%/d ponad 15 dni zakupow (dotad 7%). KS recenzja 16.10: ZC4 zastepuje koszyk BV, NIE wydatek z nadwyzki (projekt ZC 8.5) -
+                    // bez (1 - lambda): inaczej przy lambda 1 wies wydawala tylko koszyk, a ok. 67 tys. zl/d utargu Essos zostawalo w kiesach wsi (obieg sie zatykal)
+                    double extra = SpendRate(s) * Math.Max(0, gold - buy1 - RdV * nv);
                     double wx = VillWorkOnly() ? extra : 0;            // P5 (zbytki, recenzja WAZNE 2): nadwyzka na koszyk tylko dla soli i narzedzi (len, garnki, piwo - lista)
                     double want = buy1 + extra;
                     d.VNeed += nvo; d.VWant += want;
@@ -1187,7 +1191,7 @@ namespace Armoury
                         ow = Math.Min(W1Days * nvo, ow + un);
                         if (ow >= 1) _w1Owed[vil] = ow; else _w1Owed.Remove(vil);
                     }
-                    VillageLadder(f, vil, mk, gold, buy1, nv, 1 - zl); // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian; ZC4 - x (1 - lambda): koszyk stanow ma juz lepszy stol)
+                    VillageLadder(f, vil, mk, gold, buy1, nv); // P5 (zbytki): nadwyzka wsi na liste dostatku w miescie targowym (koszyk dnia wyzej bez zmian; KS recenzja 16.10: nadwyzka poza koszykiem ZC4 - bez (1 - lambda))
                     if (spent <= 0) { d.VNoGoods++; _w1NgCur.Add(vil); continue; }
                     Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += spent;
                 }

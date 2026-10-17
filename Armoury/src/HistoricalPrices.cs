@@ -1254,7 +1254,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Log.Error("HistoricalPrices.Books", e); }
                 Log.Info("HistoricalPrices: XP kowalstwa od dawnych wartosci w " + n + "/3 metodach.");
-                int d = 0;
+                int d = 0, dBad = 0;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     Type[] types;
@@ -1271,10 +1271,10 @@ namespace Armoury
                                        finalizer: new HarmonyMethod(typeof(HistoricalPrices), nameof(DemandFinalizer)));
                             d++;
                         }
-                        catch { }
+                        catch (Exception pe) { dBad++; if (dBad <= 2) Log.Error("HistoricalPrices.DemandPatch " + (ty != null ? ty.FullName : "?"), pe); }   // KS recenzja 16.10: nieudana latka widoczna (DemandPostfix ma parametr int __2)
                     }
                 }
-                Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad.");
+                Log.Info("HistoricalPrices: popyt miast w nowej monecie wpiety w " + d + " modelach ekonomii osad" + (dBad > 0 ? " (NIEUDANE " + dBad + " - ERROR wyzej)" : "") + ".");
                 var vs = AccessTools.PropertySetter(typeof(ItemObject), "Value");
                 if (vs != null) h.Patch(vs, prefix: new HarmonyMethod(typeof(HistoricalPrices), nameof(ValueSetPrefix)) { priority = Priority.First });
                 // wpis 75: winowajca 7 lukow i strzal - ROT.CampaignBehaviors.ROTRBMCompatibility.ModifyBowsAndArrows (przy RBM, na

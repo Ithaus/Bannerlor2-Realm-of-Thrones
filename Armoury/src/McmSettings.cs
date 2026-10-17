@@ -6660,19 +6660,19 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationTownFields { get; set; } = true;
 
-        [SettingPropertyBool("Start Calibration Switch Rule", HintText = "with Start Calibration applied: a village part changes its work only when another work has paid at least 25% better for about 60 days, one part of a district at a time and at most 5% of the region's hands a season; the village pays the town's craftsmen for the new gear and the hands move over 60 days (vineyards, groves, orchards and date palms a year); off = the works stay as the calibration set them")]
+        [SettingPropertyBool("Start Calibration Switch Rule", HintText = "with Start Calibration applied: a village part changes its work only when another work has paid at least 25% better for about 60 days, one part of a district at a time, within the land of that part and at most 5% of the region's hands a season; the village pays the town's craftsmen for the new gear and the hands move over 60 days (vineyards, groves, orchards and date palms a year). Off (default for the first season) = the works stay as the calibration set them and the pressure to change is only measured in the log")]
         [SettingPropertyGroup("Start calibration (KS)")]
-        public bool StartCalibrationSwitchRule { get; set; } = true;
+        public bool StartCalibrationSwitchRule { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Autotest Apply", HintText = "FOR THE AUTOTEST ONLY: right after the first finished plan the calibration is applied to the running game (village output from hands and land, town fields, the switching rule, the granary floor, the people's daily basket at the market and the town food crafts). Works only while the CrashScribe autotest is running; in a normal game it does nothing")]
+        [SettingPropertyBool("Start Calibration Autotest Apply", HintText = "FOR THE AUTOTEST ONLY: at the first finished plan built on 28 days of the goods ledger the calibration is applied to the running game (village output from hands and land, town fields, the switching rule, the granary floor, the people's daily basket at the market and the town food crafts). Works only while the CrashScribe autotest is running; in a normal game it does nothing")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationAutotestApply { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan) and this switch turns itself off again, so another save is never touched. Nothing in the game changes yet")]
+        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan, land file) and this switch turns itself off again, so another save is never touched. Needs a plan built on 28 days of the goods ledger in this session, Daily Life Measure, Bk Recipe Yield By Workshop and Whale Meat From Whalers Only, and not in winter. Nothing in the game changes yet")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationArmThisSave { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Confirm", HintText = "Step 2 of 2: on a save marked with Arm This Save and after at least 7 days of weekly plans on it, the calibration starts the next day: for 14 days the villages move from today's output to what their hands make on their land, the people's daily basket comes to the market over 28 days, and the stalls get their starting prices. Cannot undo goods already made and sold, nor gold that changed hands in trade. This switch turns itself off again; to undo later switch Start Calibration off (from the next day output and demand are as before)")]
+        [SettingPropertyBool("Start Calibration Confirm", HintText = "Step 2 of 2: on a save marked with Arm This Save (a later day, the same plan and land file) and after at least 7 days of weekly plans on it, the calibration starts the next day: for 14 days the villages move from today's output to what their hands make on their land, then the people's daily basket comes to the market over 14 days, and the stalls get their starting prices. Not yet in a campaign: until the famine safeguards are finished this switch only reports and turns itself off. Cannot undo goods already made and sold, nor gold that changed hands in trade. To undo later switch Start Calibration off (from the next day output and demand are as before)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationConfirm { get; set; } = false;
 

@@ -44,6 +44,7 @@ namespace Armoury
             public sbyte Cur = -1, Target = -1; public int TStart = -1, TEnd = -1; public float X0, Cost, Paid, H0;
             // pamiec sesji
             public string Uid; public List<int> Cand;
+            public bool Pure;                                  // z zapisu "*": cale rece w zajeciu startowym bloku (ResolveLive ustawia C i X)
         }
 
         private sealed class LiveDist
@@ -54,7 +55,7 @@ namespace Armoury
             public double[] OwnNeed = new double[KsTab.NN]; public double PeopleHome; public double[] Frac = new double[ItemCount];
             public double[] FullNeed = new double[KsTab.NN];   // ZC4: pelna potrzeba ludzi w domu (x lepszy stol) - koszyk wsi = pelna - zjedzone z wlasnego
             public double Rations = -1; public double Wf;
-            public float[] Saved;                              // stawki z zapisu (pierwsza doba po wczytaniu, przed LiveDaily)
+            public float[] Saved;                              // stawki z zapisu ks2 (czytane, nieuzywane - recenzja 16.10: pierwsza doba po wczytaniu jak Undo)
             public DistResult Res; public float[] Basket; public int Slot = -1;   // rachunek okregu z ostatniego przeliczenia (co LiveEvery dob, na zmiane) i koszyk wsi
         }
 
@@ -153,7 +154,7 @@ namespace Armoury
                 float x = (1f - _blendBeta) * g + _blendBeta * _blendKs;
                 r = new ExplainedNumber(x > 0f ? x : 0f, false, null);
             }
-            catch { }
+            catch (Exception e) { HookStumble("BlendStep", e); }
         }
 
         /// <summary>MineralOnce.Postfix: lista produkcji BK wsi zastosowanej - towary spoza KS bez zmian (konie, drob, papirus ...), towary KS ze stawka > 0 (brakujace
@@ -196,7 +197,7 @@ namespace Armoury
                 int add = (int)Math.Ceiling(5.0 * x - 1e-4);
                 if (add > 0) result += add;
             }
-            catch { }
+            catch (Exception e) { HookStumble("CapOverride", e); }
             return true;
         }
 
@@ -215,7 +216,7 @@ namespace Armoury
                 uint h = unchecked((uint)(__0.GetHashCode() * 31 + Today() * 7919));
                 return (h % 1000) / 1000f >= b;
             }
-            catch { return true; }
+            catch (Exception e) { HookStumble("TickFoodPrefix", e); return true; }
         }
 
         /// <summary>Famine.Daily: plon spichlerza wsi zastosowanej = max(racje KS z czesci domowej okregu, wzor dzis) - podloga (KS nikogo nie zaglodzi).</summary>
@@ -230,7 +231,14 @@ namespace Armoury
                 _granFloorUp++;
                 return harvest;
             }
-            catch { return harvest; }
+            catch (Exception e) { HookStumble("GranaryFloor", e); return harvest; }
+        }
+
+        /// <summary>Potkniecie haka (moga isc z watkow AI): licznik "haki" w linii produkcji, pierwsze 3 w logu (wzorzec ProdStep).</summary>
+        private static void HookStumble(string where, Exception e)
+        {
+            int n = Interlocked.Increment(ref _liveStumbles);
+            if (n <= 3) { try { Log.Error("StartCalibration." + where, e); } catch { } }
         }
         private static int _granFloorUp, _granKsAbove;
 
@@ -347,9 +355,10 @@ namespace Armoury
             RampStart(today);
             ResolveLive();
             _liveFull = true;
+            if (autotest) ConsumeApplyFlag();
             Log.Info(PK + "WLACZONE doba " + today + " (" + (autotest ? "autotest: klucz Start Calibration Autotest Apply albo plik " + ApplyFlagName : "gra: zapis uzbrojony doba " + _armDay + " i Confirm") + ") - zajecia blokow z Planu doby " + _planDay
                      + " (plan nr " + _plans + ", skrot " + _applyHash.ToString("X8") + "): okregow " + map.Count + ", blokow " + nb
-                     + " | rampa: podaz KS doby " + today + ".." + DDay + " (D), popyt koszyka ZC4 lambda doby " + today + ".." + (today + RampDemand) + ", polki startu w dobie D"
+                     + " | Plan z ksiega towarow " + _planEma + " dob | rampa: podaz KS doby " + today + ".." + DDay + " (D), popyt koszyka ZC4 lambda 0 do D, potem doby " + DDay + ".." + (today + RampDemand) + ", polki startu, A7 i regale od doby D"
                      + " | od jutra wsie przechodza na to, co daja ich rece na ich ziemi (stawki KS), zywnosc wsi gry z niczego gasnie razem z rampa, pola mieszczan na polki miast, przetwory miast (ZC5)"
                      + " | nieodwracalne: towar juz wyprodukowany i sprzedany (i zloto, ktore przy tym przeszlo zwyklym handlem); KS nie rusza kies ludu ani racji spichlerzy"
                      + " | wylacznik: Start Calibration = off (nastepna doba produkcja i popyt jak dzis).");
@@ -382,6 +391,8 @@ namespace Armoury
                         if (!ld.TF && i == 0 && IsFishType(type) && o.DSea <= 12 && o.Kind != "coast") { o = o.Clone(); o.Kind = "coast"; }
                         if (ld.B[i] == null) continue;
                         var kb = new KsBlock { Uid = row.Uid, Main = i < 20, Block0 = !ld.TF && i == 0, Start = i < 20 ? (ld.TF ? "garden" : type) : row.Start, O = o, Share = i < 20 ? 0.05 : 0.0 };
+                        kb.Area = land.Area * kb.Share;
+                        if (ld.B[i].Pure) { ld.B[i].C = new[] { (byte)StartCraft(kb.Start) }; ld.B[i].X = new[] { 1f }; ld.B[i].Pure = false; }
                         kd.Blocks.Add(kb);
                         ld.B[i].K = kb; ld.B[i].Uid = row.Uid; ld.B[i].Cand = KsCore.Candidates(kb, type);
                     }
@@ -391,10 +402,17 @@ namespace Armoury
             }
             _resolveBad = bad;
             _liveFull = true;
-            // stawki z zapisu - od razu (pierwsza doba po wczytaniu), LiveDaily policzy nowe w pierwszym takcie doby
-            var rates = new Dictionary<Village, VRate>();
-            foreach (var ld in _live.Values) if (!ld.TF && ld.V != null && ld.Saved != null) rates[ld.V] = new VRate { A = ld.Saved, M = ld.Market };
-            if (rates.Count > 0) { _rates = rates; _ratesKeep = rates; }
+            // recenzja 16.10: stawek z zapisu NIE publikujemy - do pierwszej doby ze stanami ZC (LiveDaily) produkcja i popyt jak dzis po obu stronach (jak Undo),
+            // zamiast doby podazy KS przy dzisiejszym popycie (mapa koszyka ZC4 powstaje dopiero w LiveDaily)
+            _rates = new Dictionary<Village, VRate>(); _ratesKeep = new Dictionary<Village, VRate>();
+        }
+
+        /// <summary>Zajecie startowe bloku (jak BuildLive): typ wsi / ogrod pol mieszczan / zajecie wioski pobocznej; brak albo regale - owce.</summary>
+        private static int StartCraft(string start)
+        {
+            int st;
+            if (start == null || !KsTab.CraftIndex.TryGetValue(start, out st) || KsTab.IsRegale[st]) st = KsTab.CSheep;
+            return st;
         }
         private static int _resolveBad;
 
@@ -412,6 +430,21 @@ namespace Armoury
             int day = today - 1;
             var recs = new List<DailyLife.KsRec>(900); int zc;
             bool fresh = DailyLife.KsSnapshot(recs, today, out zc);
+            // recenzja 16.10: KS i ZC4 stoja na stanach ZC. Daily Life Measure wylaczony albo stanow brak (pierwsza doba po wczytaniu bez mapy koszyka, dluzej niz 3 doby) -
+            // doba jak Undo: stawki KS i koszyk ZC4 zdjete, produkcja i popyt jak dzis (bez zalewu towaru przy dzisiejszym popycie); stan zostaje
+            if (!fresh) _zcStale++; else _zcStale = 0;
+            if (!DailyLife.KeyOn || (!fresh && (_zt.Count == 0 || _zcStale > 3)))
+            {
+                LivePublishOff();
+                if (!_undoLogged)
+                {
+                    _undoLogged = true;
+                    Log.Info(PK + "dzien " + day + " | bez stanow ZC (" + (!DailyLife.KeyOn ? "Daily Life Measure wylaczony" : (_zt.Count == 0 ? "pierwsza doba bez mapy koszyka" : "stany nieswieze " + _zcStale + " dob")) + ", doba stanow " + zc
+                             + ") - doba jak Undo: stawki KS i koszyk ZC4 zdjete, produkcja i popyt jak dzis; stan zastosowany zostaje.");
+                }
+                return;
+            }
+            _undoLogged = false;
             var byS = new Dictionary<Settlement, DailyLife.KsRec>();
             foreach (var r in recs) if (r.St != null) byS[r.St] = r;
             var rates = new Dictionary<Village, VRate>();
@@ -450,7 +483,7 @@ namespace Armoury
                     if (ld.TF)
                     {
                         kd.Wf = KsCore.TownFieldHands(rec.N);
-                        foreach (var b in kd.Blocks) b.Share = 0.05;
+                        foreach (var b in kd.Blocks) { b.Share = 0.05; b.Area = kd.Area * 0.05; }
                         Array.Clear(kd.Need0, 0, KsTab.NN);
                     }
                     else
@@ -478,6 +511,7 @@ namespace Armoury
                             lb.K.Share = sh > 0 ? sh : 0; tot += lb.K.Share;
                         }
                         if (tot > 0) foreach (var b in kd.Blocks) b.Share /= tot;
+                        foreach (var b in kd.Blocks) b.Area = kd.Area * b.Share;       // ziemia bloku (regula A7 - recenzja 16.10)
                     }
                     ld.Wf = kd.Wf;
                     var res = ComputeDistrict(ld, true, null);
@@ -515,15 +549,16 @@ namespace Armoury
                 catch (Exception e) { Stumble("DeliverTownFields(okreg)", e); }
             }
             try { RuleDaily(today); } catch (Exception e) { Stumble("RuleDaily", e); }
-            // ZC4: koszyk dnia miast i wsi na jutro (popyt targu, kotwica, zakupy wsi) - po stawkach i rampie
-            try { Zc4Build(today, recs, zv, mkByM); } catch (Exception e) { Stumble("Zc4Build", e); }
-            // polki startu w dobie D (rozdz. 6) - raz
-            if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; }
+            // ZC4: koszyk dnia miast i wsi na jutro (popyt targu, kotwica, zakupy wsi) - po stawkach i rampie; stany nieswieze - ostatnia mapa miast (lambda biezaca)
+            try { Zc4Build(today, recs, zv, mkByM, fresh); } catch (Exception e) { Stumble("Zc4Build", e); }
+            // polki startu w dobie D (rozdz. 6) - raz; potem srednie cen od zera (A7 i regale od D na cenach po rampie)
+            if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; RulePxReset(); }
+            string coffers = CoffersDaily(day);
             if (!LogGate.Lines) return;
             var sb = new StringBuilder(2500);
             sb.Append(PK).Append("produkcja (zastosowane) dzien ").Append(day).Append(" | od doby ").Append(_applyDay).Append(" | wsie ze stawkami KS ").Append(nv).Append(", pola mieszczan ").Append(ntf)
               .Append(", przeliczone dzis ").Append(_liveRedone).Append(" (co ").Append(LiveEvery).Append(" doby na zmiane)")
-              .Append(stale > 0 ? ", bez stanow ZC dzis " + stale + " (stawki wczorajsze)" : "").Append(fresh ? "" : " (stany ZC nieswieze)")
+              .Append(stale > 0 ? ", bez stanow ZC dzis " + stale + " (stawki wczorajsze)" : "").Append(fresh ? "" : " (stany ZC nieswieze " + _zcStale + " dob - ostatnia mapa koszyka)")
               .Append(" | na targ jutro szt./d przy pelnej stawce KS (wsie; w nawiasie wsie wczoraj z ksiegi towarow):");
             bool first = true;
             for (int i = 0; i < ItemCount; i++)
@@ -534,15 +569,55 @@ namespace Armoury
                 first = false;
             }
             int tfn; long tfp2 = TownFolk.KsTakePaid(out tfn);
-            sb.Append(" | pola mieszczan: na polki ").Append(tfPieces).Append(" szt., zaplacone ludowi ").Append(tfPaid).Append(" zl (").Append(tfp2).Append(" zl w ").Append(tfn).Append(" przelewach kiesy), bez zaplaty (kasa pusta) ").Append(tfUnpaid).Append(" szt.");
+            sb.Append(" | pola mieszczan: na polki ").Append(tfPieces).Append(" szt., zaplacone ludowi ").Append(tfPaid).Append(" zl (").Append(tfp2).Append(" zl w ").Append(tfn).Append(" przelewach kiesy), bez zaplaty (kasa pusta - czekaja w polu, najwyzej 7 dob plonu) ").Append(tfUnpaid).Append(" szt.");
             sb.Append(" | spichlerz: racje KS ponad wzor dzis w ").Append(granAbove).Append(" wsiach, podloga (wzor dzis) w ").Append(granUp)
               .Append(" (kcal z wlasnego pola i domu ").Append(kcalNeed > 0 ? (100 * ownKcal / kcalNeed).ToString("0", Inv) : "-").Append("% potrzeby)");
+            sb.Append(" | ").Append(coffers);
             sb.Append(" | ").Append(RuleText()).Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (sesja ").Append(_stumbles).Append(", haki ").Append(_liveStumbles)
               .Append(", okregi bez obiektu gry ").Append(_resolveBad).Append(").");
             Log.Info(sb.ToString());
             try { Log.Info(RampLine(day)); } catch (Exception e) { Stumble("RampLine", e); }
             try { Log.Info(Zc4Line(day)); } catch (Exception e) { Stumble("Zc4Line", e); }
             try { string cl = CraftsLine(day); if (cl != null) Log.Info(cl); } catch (Exception e) { Stumble("CraftsLine", e); }
+        }
+        private static int _zcStale; private static bool _undoLogged;
+
+        // recenzja 16.10 (projekt rozdz. 9.2 i 14.4): kasy kupcow (kasy miast) wedlug rynku - spadek 7 dob z rzedu = linia "KS: kupcy traca" (pamiec sesji)
+        private static readonly long[] _cofLast = { -1, -1 };
+        private static readonly int[] _cofDown = new int[2];
+
+        private static string CoffersDaily(int day)
+        {
+            var cof = new long[2];
+            foreach (var t in Town.AllTowns) { if (t == null || !t.IsTown) continue; cof[TownMarket(t) == 0 ? 0 : 1] += Math.Max(0, t.Gold); }
+            var sb = new StringBuilder(200);
+            sb.Append("kasy kupcow (kasy miast):");
+            for (int m = 0; m < 2; m++)
+            {
+                if (_cofLast[m] >= 0 && cof[m] < _cofLast[m]) _cofDown[m]++; else _cofDown[m] = 0;
+                long d = _cofLast[m] >= 0 ? cof[m] - _cofLast[m] : 0;
+                _cofLast[m] = cof[m];
+                sb.Append(m == 0 ? " Westeros " : ", Essos ").Append(cof[m]).Append(" zl (").Append(d >= 0 ? "+" : "").Append(d).Append(", spadek ").Append(_cofDown[m]).Append(" dob z rzedu)");
+                if (_cofDown[m] == 7) Log.Info(PK + "kupcy traca - rynek " + (m == 0 ? "Westeros" : "Essos") + ": kasy miast spadaja 7 dob z rzedu (dzien " + day + ", razem " + cof[m] + " zl) - projekt rozdz. 9.2: sprawdzic zakupy od wozow i polki.");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu z dojrzala ksiega (co 7 dob), nie zamrozony z dnia wlaczenia; nastepna doba
+        /// przelicza wszystkie okregi.</summary>
+        private static void RefreshNeedMult(KsResult R, KsInput inp)
+        {
+            if (_wEma < MinLedgerDays || R == null || inp == null) return;
+            int n = 0;
+            foreach (var d in inp.Districts)
+            {
+                LiveDist ld; double[] need;
+                if (!_live.TryGetValue(d.Id, out ld) || !R.DistNeed.TryGetValue(d.Id, out need) || need == null) continue;
+                for (int k = 0; k < KsTab.NN; k++) ld.NeedMult[k] = d.Need0[k] > 1e-9 ? (float)Math.Max(0.25, Math.Min(4.0, need[k] / d.Need0[k])) : 1f;
+                n++;
+            }
+            if (n > 0) _liveFull = true;
+            Log.Info(PK + "lepszy stol (NeedMult) z Planu doby " + _wDay + " - okregow " + n + " (co 7 dob z Planem; nastepna doba przelicza wszystkie okregi).");
         }
         private static Dictionary<Village, VRate> _ratesKeep = new Dictionary<Village, VRate>();
         private const int LiveEvery = 3;                   // okreg przeliczany co 3 doby (na zmiane) - koszt doby KS
@@ -595,7 +670,8 @@ namespace Armoury
                 {
                     var it = _items[i];
                     if (it == null) continue;
-                    ld.Frac[i] += res.Market[i] * Beta(m, i);
+                    double flow = res.Market[i] * Beta(m, i);
+                    ld.Frac[i] += flow;
                     int n = (int)Math.Floor(ld.Frac[i]);
                     if (n <= 0) continue;
                     ld.Frac[i] -= n;
@@ -603,14 +679,17 @@ namespace Armoury
                     try { price = town.MarketData.GetPrice(it, null, true, null); } catch { price = Math.Max(1, it.Value); }
                     if (price < 1) price = 1;
                     int can = (int)Math.Min(n, Math.Max(0, town.Gold) / price);   // tyle sztuk, na ile kasa ma - placone co do grosza
-                    if (can < n) unpaid += n - can;
-                    if (can <= 0) continue;
-                    long want = (long)can * price;
-                    int coffer0 = town.Gold;
-                    long got = TownFolk.KsFieldPay(town.Settlement, want);
-                    _mTfTown += coffer0 - town.Gold; _mTfFolk += got;
-                    int ok = got >= want ? can : 0;                                // kiesa nieczynna albo czesciowa zaplata - towar nie wchodzi
-                    if (ok < can) unpaid += can - ok;
+                    int ok = 0; long got = 0;
+                    if (can > 0)
+                    {
+                        long want = (long)can * price;
+                        int coffer0 = town.Gold;
+                        got = TownFolk.KsFieldPay(town.Settlement, want);
+                        _mTfTown += coffer0 - town.Gold; _mTfFolk += got;
+                        ok = got >= want ? can : 0;                                // kiesa nieczynna albo czesciowa zaplata - towar nie wchodzi
+                    }
+                    // recenzja 16.10 (drobne): sztuki bez zaplaty nie przepadaja - czekaja w polu na jutro (najwyzej 7 dob plonu; reszta gnije jak niezebrane)
+                    if (ok < n) { unpaid += n - ok; ld.Frac[i] = Math.Min(ld.Frac[i] + (n - ok), Math.Max(1.0, 7.0 * flow)); }
                     if (ok <= 0) continue;
                     town.Settlement.ItemRoster.AddToCounts(it, ok);
                     pieces += ok; paid += got; made[i] += ok;
@@ -641,20 +720,32 @@ namespace Armoury
         private static string E36(int v, int w) { var c = new char[w]; for (int i = w - 1; i >= 0; i--) { c[i] = B36[v % 36]; v /= 36; } return new string(c); }
         private static int D36(string s, int a, int w) { int v = 0; for (int i = 0; i < w; i++) { int d = B36.IndexOf(s[a + i]); if (d < 0) return -1; v = v * 36 + d; } return v; }
 
-        private static string BlockText(LiveBlock b)
+        /// <summary>Blok w zapisie: zajecia i udzialy (promile), regale, renta, stan przebudowy; blok "sam start" (cale rece w zajeciu startowym, bez regale i przebudowy) - "*" + renta.</summary>
+        private static string BlockText(LiveBlock b, int start)
         {
             if (b == null || b.C == null) return "-";
+            string rent = E36(Math.Max(0, Math.Min(1295, (int)Math.Round(b.Rent * 2000))), 2);
+            if (start >= 0 && b.C.Length == 1 && b.C[0] == start && b.RC == null && b.Held <= 0 && b.Target < 0) return "*" + rent;
             var sb = new StringBuilder(24);
             for (int i = 0; i < b.C.Length; i++) sb.Append(B36[b.C[i]]).Append(E36(Math.Max(0, Math.Min(1295, (int)Math.Round(b.X[i] * 1000))), 2));
             sb.Append('^');
             if (b.RC != null) for (int i = 0; i < b.RC.Length; i++) sb.Append(B36[b.RC[i]]).Append(E36(Math.Max(0, Math.Min(46655, (int)Math.Round(b.RF[i] * 40000))), 3));
-            sb.Append('^').Append(E36(Math.Max(0, Math.Min(1295, (int)Math.Round(b.Rent * 2000))), 2));
+            sb.Append('^').Append(rent);
             if (b.Held > 0 || b.Target >= 0)
                 sb.Append('^').Append(b.Held.ToString(Inv)).Append(',').Append(b.Cur).Append(',').Append(b.Target).Append(',').Append(b.TStart).Append(',').Append(b.TEnd).Append(',')
                   .Append(b.X0.ToString("0.####", Inv)).Append(',').Append(b.Cost.ToString("0.#", Inv)).Append(',').Append(b.Paid.ToString("0.#", Inv)).Append(',').Append(b.H0.ToString("0", Inv));
             return sb.ToString();
         }
 
+        /// <summary>Zajecie startowe bloku i okregu ld (z pliku ziemi, jak BuildLive) albo -1, gdy okreg bez obiektu gry.</summary>
+        private static int StartOf(LiveDist ld, int i)
+        {
+            if (ld == null || ld.L == null || ld.K == null) return -1;
+            string start = i < 20 ? (ld.TF ? "garden" : ld.K.Type) : (i - 20 < ld.L.Side.Count ? ld.L.Side[i - 20].Start : null);
+            return StartCraft(start);
+        }
+
+        // okreg: id~T/V~rynek~lepszy stol (#: znak klucza + 2 znaki base36 x 100)~bloki (! - kolejny, = - jak poprzedni blok wsi gry, * - sam start)~ (stawki wsi - od ks3 puste)
         private static void ExportLive(StringBuilder sb)
         {
             bool firstD = true;
@@ -665,30 +756,34 @@ namespace Armoury
                 sb.Append(Clean(ld.Id)).Append('~').Append(ld.TF ? 'T' : 'V').Append('~').Append(ld.Market).Append('~');
                 bool fm = true;
                 for (int k = 0; k < KsTab.NN; k++)
-                    if (Math.Abs(ld.NeedMult[k] - 1f) > 1e-4f) { if (!fm) sb.Append(','); fm = false; sb.Append(k).Append(':').Append(ld.NeedMult[k].ToString("0.####", Inv)); }
+                {
+                    int v = Math.Max(0, Math.Min(1295, (int)Math.Round(ld.NeedMult[k] * 100)));
+                    if (v == 100) continue;
+                    if (fm) sb.Append('#'); fm = false;
+                    sb.Append(B36[k]).Append(E36(v, 2));
+                }
                 sb.Append('~');
                 string prev = null;
                 for (int i = 0; i < ld.B.Length; i++)
                 {
                     if (i > 0) sb.Append('!');
-                    string t = BlockText(ld.B[i]);
+                    string t = BlockText(ld.B[i], StartOf(ld, i));
                     if (prev != null && t == prev && i < 20) sb.Append('='); else sb.Append(t);
                     prev = t;
                 }
-                // stawki na jutro (wies) - po wczytaniu dzialaja od razu, zanim pierwsza doba policzy nowe
                 sb.Append('~');
-                VRate r;
-                if (!ld.TF && ld.V != null && _rates.TryGetValue(ld.V, out r) && r != null && r.A != null)
-                {
-                    bool fr = true;
-                    for (int i = 0; i < r.A.Length; i++) if (r.A[i] > 0.0005f) { if (!fr) sb.Append(','); fr = false; sb.Append(i).Append(':').Append(r.A[i].ToString("0.####", Inv)); }
-                }
             }
         }
 
         private static LiveBlock ParseBlock(string t)
         {
             if (t == "-" || t.Length == 0) return null;
+            if (t[0] == '*')
+            {
+                int rr = t.Length >= 3 ? D36(t, 1, 2) : -1;
+                if (rr < 0) throw new FormatException("blok startu");
+                return new LiveBlock { Pure = true, Rent = rr / 2000f };
+            }
             var p = t.Split('^');
             if (p.Length < 3) throw new FormatException("blok");
             var b = new LiveBlock();
@@ -726,7 +821,16 @@ namespace Armoury
                     if (f.Length < 5) { bad++; continue; }
                     var ld = new LiveDist { Id = f[0], TF = f[1] == "T" };
                     int mk; int.TryParse(f[2], NumberStyles.Integer, Inv, out mk); ld.Market = mk == 0 ? 0 : 1;
-                    if (f[3].Length > 0)
+                    if (f[3].Length > 0 && f[3][0] == '#')
+                    {
+                        // ks3: znak klucza + 2 znaki base36 (x 100)
+                        for (int j = 1; j + 3 <= f[3].Length; j += 3)
+                        {
+                            int k = B36.IndexOf(f[3][j]); int v = D36(f[3], j + 1, 2);
+                            if (k >= 0 && k < KsTab.NN && v > 0) ld.NeedMult[k] = v / 100f;
+                        }
+                    }
+                    else if (f[3].Length > 0)
                         foreach (var kv in f[3].Split(','))
                         {
                             var q = kv.Split(':'); int k; float v;
