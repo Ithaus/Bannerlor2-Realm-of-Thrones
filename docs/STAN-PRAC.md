@@ -2518,3 +2518,11 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   nbitwa; ocenic bilans (NKS-5..7 - kazdy towar 0.95-1.05 w 28 dobach po Apply). Decyzja SilkToWeavers (Essos jedwab). Potem ZC6/ZC7 + ProsperityLink, test koncowy, wgranie.
 - Recenzje: krytyczne (popyt w formule ceny, Apply na Planie z 1 doby danych) - poprawione w bc1aaa16 (sprawdzic w tescie).
 - 22:05 PDT: noc-ks scalony int **a816074d**; skrypty test/bieg-bitwa.ps1 i test/wgraj-v5.ps1 przenosza arm_ks_land.tsv; flaga armoury-ks-wlacz.flag UTWORZONA (usunac po tescie!); test 120 dob z KS Apply + 1 bitwa w toku: test/fin68 (Armoury 19540e74), at-fin68-ks120.out.txt.
+
+### 65. TEST KS z Apply (16.10 22:15-22:52 PDT, Armoury-2026-10-16_22-15-00.log, kopia logi-testow) - NIE PRZESZEDL, NIE WGRYWAC KS
+- Flaga armoury-ks-wlacz.flag USUNIETA. 0 ERROR, bitwa OK, nzc0 19/0, nzc2 14/0, nbitwa 17/0. Apply wszedl po dojrzalym Planie (>= 28 dob ksiegi).
+- Plan sam: bilans 30 towarow w pasmie poza welna Westeros 1.07 (NKS-3). ALE RYNEK po Apply: podaz/zuzycie zboze 2.03, ryby 4.51, mieso 2.16, ser 2.92, maslo 2.35... (42 z 46 poza
+  0.95-1.05), zapasy miast rosna (+77% zboze, +252% ryby), ceny poza pasmem i na podlodze/suficie wzoru (NKS-7b), koszyk niekupiony z braku pieniedzy: miasta 11.7% budzetu jedzenia,
+  wsie kupuja 30% chcianego (NKS-8c, NKS-13). Koszt doby 4.1 ms (+ZC4/ZC5 14.6 ms) ponad prog. Wniosek: Plan liczy popyt = potrzeba, a ludzie nie maja pieniedzy, zeby ja kupic
+  (kiesy nie kalibrowane, ceny nie moga spasc ponizej podlogi) -> nadwyzka. Do naprawy: sila nabywcza (kiesy wg stanow), skala sigma, podloga ceny, kotwica popytu.
+- W grze zostaje WGRANIE 74 (bez KS). KS tylko po udanym tescie.
