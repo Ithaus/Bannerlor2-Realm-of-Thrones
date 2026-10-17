@@ -479,7 +479,7 @@ namespace Armoury
             foreach (var kv in KsTab.P0[c]) outv[kv.Key] += (kv.Key == KsTab.GHorse ? rem - sub : cl) * kv.Value * L;
             foreach (int a in new[] { KsTab.GCow, KsTab.GHog, KsTab.GSheep })
             {
-                outv[KsTab.GMeat] += outv[a] * KsTab.MeatOfLive;
+                outv[KsTab.GMeat] += outv[a] * KsTab.TownMeatOfLive(a);   // KS r4: mieso z zywca na targ wedlug rzezni miast (r3 final 50% Planu)
                 outv[KsTab.GHides] += outv[a] * KsTab.HideOfLive(a);
             }
             outv[KsTab.GMeat] += outv[KsTab.GWhaleMeat];
@@ -629,7 +629,7 @@ namespace Armoury
                     int g = kv.Key; double r = kv.Value;
                     if (g == KsTab.GCow || g == KsTab.GHog || g == KsTab.GSheep)
                     {
-                        mv[c * KsTab.NG + KsTab.GMeat] += r * KsTab.MeatOfLive * val[KsTab.GMeat];
+                        mv[c * KsTab.NG + KsTab.GMeat] += r * KsTab.TownMeatOfLive(g) * val[KsTab.GMeat];   // KS r4: rzeznie miast
                         mv[c * KsTab.NG + KsTab.GHides] += r * KsTab.HideOfLive(g) * val[KsTab.GHides];
                     }
                     else if (g == KsTab.GWhaleMeat) mv[c * KsTab.NG + KsTab.GMeat] += r * val[KsTab.GMeat];
@@ -1615,9 +1615,10 @@ namespace Armoury
             // recenzja runda 3 (krytyczne): mieso na targu to prawie cale ZYWIEC - uboczny towar gospodarstw zbozowych (swinie, owce, krowy przy chacie), stad mlecznych
             // i owczych (harness: dziczyzna i wieloryb ok. 0, zywiec 100% miesa na targ; cena miesa na podlodze, a rece trzyma zboze, ser i welna). Okreg, ktory wiezie
             // zywiec na targ, ubija go na wlasny stol (KsDeliver.Own: mieso - dziczyzna, wieloryb, potem uboj wlasnego zywca) - mieso = polowa zywca
-            foreach (int it in LiveItems) { mk += Math.Max(0.0, prod[it] - own[it]) * KsTab.MeatOfLive; ow += own[it] * KsTab.MeatOfLive; }
+            for (int li = 0; li < LiveItems.Length; li++) { int it = LiveItems[li]; mk += Math.Max(0.0, prod[it] - own[it]) * KsTab.TownMeatOfLive(LiveGoods[li]); ow += own[it] * KsTab.MeatOfLive; }   // KS r4: na targ - rzeznie miast
         }
         private static readonly int[] LiveItems = { KsDeliver.ICow, KsDeliver.IHog, KsDeliver.ISheep };
+        private static readonly int[] LiveGoods = { KsTab.GCow, KsTab.GHog, KsTab.GSheep };
         internal static double TableAlpha = 3.0;                     // ponad dzisiejszy wlasny stol (x wlasny stol bazowy); razem najwyzej 4 x (mnoznik gry)
         internal static bool TableOn = true;                          // harness: proba bez kroku 8d
         internal static Action<int, string, double, double, double> TableDebug = null;   // harness: krok 8d - rynek, towar, nadwyzka, popyt targu, pokoj stolu

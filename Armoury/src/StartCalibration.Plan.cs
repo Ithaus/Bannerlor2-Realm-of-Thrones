@@ -98,7 +98,7 @@ namespace Armoury
             // krok 8 (pieniadze, poprawka po autotescie 16.10): budzet wsi z utargu wozow (udzial kiesy wsi x cena wozu / cena polki x (1 - zapas na oplaty)),
             // koszyk z wlasnego pola (udzialy stanow ZC), budzety klas miast z zarobku netto (28 dob)
             inp.Money = true; inp.Keep = _keep;
-            double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va;
+            double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
             foreach (var id in ids)
@@ -317,7 +317,7 @@ namespace Armoury
             _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
-                        + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + "; krok 8: alfa wsi rynku " + inp.VilAlpha[0].ToString("0.000", Inv) + " (" + MoneyNote() + "), budzety klas miast " + info.Budgets + "/" + info.Towns
+                        + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + "; krok 8: alfa wsi rynku " + inp.VilAlpha[0].ToString("0.000", Inv) + " (wsi z alfa z praw DS " + _alphaDsN + "; " + MoneyNote() + "), budzety klas miast " + info.Budgets + "/" + info.Towns
                         + ", z pomiaru " + (inp.MoneyMeasured ? "TAK" : "NIE") + ", margines popytu targu x" + inp.MarketMargin.ToString("0.00", Inv)
                         + (inp.WarmHome != null ? ", praca domowa z poprzedniego Planu" : "") + ")";
             try

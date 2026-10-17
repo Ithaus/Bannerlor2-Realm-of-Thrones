@@ -149,7 +149,7 @@ namespace Armoury
                 foreach (var kv in KsTab.P0[c])
                 {
                     int g = kv.Key; double r = kv.Value;
-                    if (g == KsTab.GCow || g == KsTab.GHog || g == KsTab.GSheep) mv[c * KsTab.NG + g] += r * (KsTab.MeatOfLive * val[KsTab.GMeat] + KsTab.HideOfLive(g) * val[KsTab.GHides]);
+                    if (g == KsTab.GCow || g == KsTab.GHog || g == KsTab.GSheep) mv[c * KsTab.NG + g] += r * (KsTab.TownMeatOfLive(g) * val[KsTab.GMeat] + KsTab.HideOfLive(g) * val[KsTab.GHides]);   // KS r4: rzeznie miast
                     else if (g == KsTab.GWhaleMeat) mv[c * KsTab.NG + KsTab.GMeat] += r * val[KsTab.GMeat];
                     else mv[c * KsTab.NG + g] += r * val[g];
                 }

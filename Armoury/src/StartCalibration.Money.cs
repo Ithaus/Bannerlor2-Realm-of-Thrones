@@ -137,10 +137,21 @@ namespace Armoury
 
         /// <summary>Alfa okregu wsi v (recenzja 17.10): udzial kiesy TEJ wsi w jej utargu (28 dob; dekret pana wprost) x utarg / wartosc bazowa produkcji wsi swiata x (1 - zapas);
         /// wies z utargiem 28 dob ponizej 300 zl - -1 (Plan bierze alfe rynku).</summary>
+        internal static int _alphaDsN;   // KS r4: wsi z alfa z praw DS w ostatnim Planie (licznik linii)
         private static double VilAlphaFor(Village v)
         {
             double[] a;
             if (v == null || !_vilTake.TryGetValue(v, out a) || a == null || _vtDays < 7 || a[0] * Math.Min(28, _vtDays) < VilTakeMin || !(a[0] > 0)) return -1;
+            if (v.Settlement != null && DsVillage.On(v.Settlement))
+            {
+                // KS runda 4 (17.10, STAN-PRAC 68/72): ALFA Z PRAW DS - budzet koszyka = czesc wsi z oddanego utargu po panu, dziesiecinie (polowa wraca jako jalmuzna)
+                // i udziale korony w wojnie (DsVillage.BudgetShare) minus czynsz staly dnia; bez poborow resztowych, wiec bez petli alfa -> 0 (runda 3: 0.47 -> 0.00 w 5 Planach)
+                double shDs = DsVillage.BudgetShare(v, v.Settlement.MapFaction as Kingdom);
+                double rentDs = DsVillage.RentPerDay(v);
+                double baseDs = a[0] / Math.Max(1e-6, PhiNow());
+                _alphaDsN++;
+                return Math.Max(0.0, Math.Min(0.95, (1.0 - VilReserve) * Math.Max(0.0, shDs * a[0] - rentDs) / Math.Max(1e-6, baseDs)));
+            }
             if (SwAlphaNet)
             {
                 // KS-R3 P2 (klucz Ks Alpha Net): ALFA NETTO = 0.95 x (wplyw do kiesy + fracht KS-H - wydatki spoza koszyka: danina wojenna, rynek wsi BK, oplata stala,

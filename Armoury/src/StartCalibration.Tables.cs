@@ -51,6 +51,10 @@ namespace Armoury
         internal const double LinenFlax = 1.25, FeltWool = 1.45, LeatherHide = 2.4, ToolsIron = 1.2, PotClay = 1.2, JewelSilver = 25.0, VelvetSilk = 1.2;
         internal const double MeatOfLive = 0.50;
         internal static double HideOfLive(int g) { return g == GCow ? 0.08 : g == GSheep ? 0.10 : g == GHog ? 0.05 : 0.0; }
+        /// <summary>KS runda 4 (17.10, PLAN-KS-RUNDA4 P-mieso): mieso z kg zywca SPRZEDANEGO NA TARG - ubija go ukryty warsztat miasta (rzemieslnicy gry/BK) z receptura gry:
+        /// r3 final (Armoury-2026-10-17_09-07-09): 6 / 2 / 1 sztuk miesa z krowy / swini / owcy wobec 10 / 6 / 2 w Planie (MeatOfLive 0.5) - realnie 50% miesa Planu. Plan liczy podaz
+        /// miesa na targ i dochod zajec zywca ta wydajnoscia (rece przy zywcu dobiera wiecej); uboj na wlasny stol wsi zostaje MeatOfLive (0.5).</summary>
+        internal static double TownMeatOfLive(int g) { return MeatOfLive * (g == GCow ? 0.60 : g == GHog ? 1.0 / 3.0 : g == GSheep ? 0.50 : 1.0); }
         internal const double HaHome = 0.3, HaOwnGrain = 4.0, HaPerCell = 807.0, FirewoodTown = 1.5;
         internal const double HorseVal = 120.0, HorseGameDay = 150.0;
         internal const double Garum = 1637.0 / 20.0 * 37.0 * 10.0;   // GARUM modelu (sigma 37 w liczbie - jak w ks_model2.py)
