@@ -6702,7 +6702,7 @@ namespace Armoury
 
         [SettingPropertyBool("Dues Medieval", HintText = "the villages pay their lords and their king as they did in the Middle Ages: the lord's share, the tithe and - in war - the crown's share are taken from what the carts bring home, the moment they bring it, and a small fixed rent is paid first; nothing is taken any more as 'a share a day of whatever the village has saved' (the crown's war levy on village savings, the hoard tax, the lords' war levy from villages, the 5 percent Banner Kings village market). A village keeps three weeks of its needs and rent in its chest and spends on finer goods only what lies beyond it. The old takings fade out over Ds Ramp Days from the first day with this on (needs Town Folk Live; off by default until it is tested together with the village basket of the start calibration; off = the old rules from the next day)")]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
-        public bool DuesMedieval { get; set; } = false;
+        public bool DuesMedieval { get; set; } = true;
 
         [SettingPropertyBool("Ds Village Cart Dues", HintText = "with Dues Medieval: the tithe (Tithe Village Share of the takings, half of it back as alms for the village poor, half to build septs) and, in war, the crown's share are taken at the cart, from the village's part of the takings, the moment the cart comes home; the crown's share is also taken from what soldiers pay a village for lodging and services. Off = the tithe is taken from the village purse once a day as before and the crown takes no share from villages")]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
