@@ -48,7 +48,7 @@ namespace Armoury
             public long DMovPaid, DTreas, DAnt; public double DMovRemit, DMovShort, DMovAssess;
             public double LNeed, LInc, LY, LG0; public int LDays;
         }
-        private sealed class Mov { public string K; public double Left, Per; public int Serial; }
+        private sealed class Mov { public string K; public double Left, Per, Cur; public int Serial; }   // Cur - wymiar biezacej sesji nadania (limit L1, recenzja 17.10)
 
         private static readonly Dictionary<string, GK> _k = new Dictionary<string, GK>();
         private static readonly Dictionary<string, Mov> _mov = new Dictionary<string, Mov>();   // "osada~klasa" -> dziesiata ludu
@@ -181,20 +181,22 @@ namespace Armoury
 
         // ============================================================ K5: skarbiec ponad zapas wojny i limit zaliczki
         /// <summary>K5 krok 1 (KingdomTreasury.WageRefund, przed zaliczka i Bankiem): ile brakujacego zwrotu pokryje skarbiec ponad zapas wojny - bez reszty wplywow dnia
-        /// (juz w "have"), bez zlota winnego Bankowi i miastom. Tylko rachunek i licznik; wyplaca WageRefund.</summary>
+        /// (juz w "have"). Recenzja 17.10: czynne przy firmach F3 ALBO przy samym F1 (DuesMedieval); dlugi NIE sa odejmowane od skarbca (dlug to roszczenie, a zwrot ze
+        /// skarbca kosztuje mniej niz Bank na 20-30%) - poduszka tylko na raty Banku z najblizszych 28 dob. Tylko rachunek i licznik; wyplaca WageRefund.</summary>
         internal static long TreasuryForRefund(Kingdom k, long gap)
         {
             try
             {
                 var s = Settings.Current;
-                if (!Live || s == null || !s.DsRefundTreasuryFirst || k == null || gap <= 0) return 0;
+                if (!(Live || DsVillage.Live) || s == null || !s.DsRefundTreasuryFirst || k == null || gap <= 0) return 0;
                 long res = KingdomTreasury.WarReserveFor(k);
                 if (res < 0) return 0;
-                double free = (double)k.KingdomBudgetWallet - CrownIncome.LeftFor(k) - res - CrownBorrow.DebtOf(k) - TownFolk.CrownTownDebt(k);
+                double free = (double)k.KingdomBudgetWallet - Math.Max(0, CrownIncome.LeftFor(k)) - res - CrownBorrow.InstalmentsAhead(k, Ring);
                 long x = (long)Math.Floor(Math.Min((double)gap, free));
                 if (x <= 0) return 0;
-                var g = GkOf(k, true); if (g != null) g.DTreas += x;
+                var g = GkOf(k, Live); if (g != null) g.DTreas += x;     // przy samym F1 bez stanu F3 (zapis arm_daniny_miasta bez wpisow)
                 var d = CrownIncome.DayOf(k); if (d != null) d.DsTreas += x;
+                if (!Live) DsVillage.NoteK5(x);
                 return x;
             }
             catch (Exception e) { Stumble("TreasuryForRefund", e); return 0; }
@@ -207,16 +209,18 @@ namespace Armoury
             var d = CrownIncome.DayOf(k); if (d != null) d.DsAnt += x;
         }
 
-        /// <summary>L1 limit (przed odjeciem dlugu zaliczek): niezebrana dziesiata od ruchomosci krolestwa (kiesy i kasy) + prognoza W4 do konca kwartalu.</summary>
+        /// <summary>L1 limit (przed odjeciem dlugu zaliczek): niezebrana dziesiata od ruchomosci krolestwa (kiesy i kasy) z wymiaru BIEZACEJ sesji nadania (recenzja 17.10:
+        /// reszty z poprzednich kwartalow nie sa podstawa zaliczki - moga nigdy nie wplynac) + prognoza W4 do konca kwartalu.</summary>
         internal static double AnticipationRoom(Kingdom k)
         {
             try
             {
                 if (!Live || k == null || k.StringId == null) return 0;
-                double left = 0;
-                foreach (var m in _mov.Values) if (m.K == k.StringId && m.Left > 0) left += m.Left;
-                left += DsTowns.MovLeftOf(k.StringId);
                 var g = GkOf(k, false);
+                int serial = g != null ? g.Serial : -1;
+                double left = 0;
+                foreach (var m in _mov.Values) if (m.K == k.StringId && m.Serial == serial && m.Left > 0) left += Math.Min(m.Left, Math.Max(0, m.Cur));
+                left += DsTowns.MovLeftOf(k.StringId, serial);
                 if (g != null && g.G > 0 && g.F > 0)
                 {
                     double v = 0; for (int i = 0; i < g.F; i++) v += g.RV[i];
@@ -250,22 +254,30 @@ namespace Armoury
                 {
                     double a = g.G * Cl(s.DsMovablesRate, 0, 0.3) * ov;
                     if (m == null) { m = new Mov { K = k.StringId }; _mov[key] = m; }
-                    m.Left += a; m.Per = m.Left / DsTowns.Instalments; m.Serial = g.Serial;
+                    m.Left += a; m.Per = m.Left / DsTowns.Instalments; m.Cur = a; m.Serial = g.Serial;
                     g.DMovAssess += a;
                 }
                 if (m == null || m.Left < 1 || !DsTowns.PayDay(st)) return 0;
                 double inst = Math.Min(m.Per, m.Left);
                 if (DsTowns.RemitOf(st) != 0)
                 {
-                    m.Left -= inst; if (g != null) g.DMovRemit += inst;
+                    m.Left -= inst; m.Cur = Math.Max(0, m.Cur - inst); if (g != null) g.DMovRemit += inst;
                     if (m.Left < 1) _mov.Remove(key);
                     return 0;
+                }
+                // recenzja 17.10: w przejsciu F3 rata x rampa (P1 x (1 - rampa) dalej bierze ze starej drogi) - reszta raty darowana, nie dlug
+                double rn = DsTowns.NewShare;
+                if (rn < 1)
+                {
+                    double off = inst * (1 - rn);
+                    m.Left -= off; m.Cur = Math.Max(0, m.Cur - off); inst -= off; if (g != null) g.DMovRemit += off;
+                    if (m.Left < 1) { _mov.Remove(key); return 0; }
                 }
                 long pay = (long)Math.Floor(Math.Min(inst, Math.Min(ov, (double)Math.Max(0, avail))));
                 if (pay > int.MaxValue) pay = int.MaxValue;
                 if (g != null && pay + 0.5 < inst) g.DMovShort += inst - pay;
                 if (pay <= 0) return 0;
-                m.Left -= pay;
+                m.Left -= pay; m.Cur = Math.Max(0, m.Cur - pay);
                 if (m.Left < 1) _mov.Remove(key);
                 k.KingdomBudgetWallet += (int)pay;                   // odbiorca: skarbiec (platnik - kiesa klasy u wolajacego, to samo zloto) - ostatni krok
                 NoteMovables(k, pay);
@@ -489,7 +501,7 @@ namespace Armoury
                     string st = kv.Key.Substring(0, t), cls = kv.Key.Substring(t + 1);
                     if (BadId(st)) continue;
                     sb.Append("|v~").Append(st).Append('~').Append(cls).Append('~').Append(m.K).Append('~').Append(Math.Round(m.Left, 2).ToString("R", Inv)).Append('~')
-                      .Append(Math.Round(m.Per, 2).ToString("R", Inv)).Append('~').Append(m.Serial.ToString(Inv));
+                      .Append(Math.Round(m.Per, 2).ToString("R", Inv)).Append('~').Append(m.Serial.ToString(Inv)).Append('~').Append(Math.Round(m.Cur, 2).ToString("R", Inv));
                 }
             }
             catch (Exception e) { Stumble("Export", e); }
@@ -520,6 +532,7 @@ namespace Armoury
                     if (!double.TryParse(a[4], NumberStyles.Float, Inv, out m.Left) || !(m.Left >= 1) || double.IsInfinity(m.Left)) return;
                     if (!double.TryParse(a[5], NumberStyles.Float, Inv, out m.Per) || !(m.Per > 0) || double.IsInfinity(m.Per)) m.Per = m.Left / DsTowns.Instalments;
                     if (int.TryParse(a[6], NumberStyles.Integer, Inv, out n)) m.Serial = n;
+                    if (!(a.Length >= 8 && double.TryParse(a[7], NumberStyles.Float, Inv, out m.Cur) && m.Cur >= 0 && !double.IsInfinity(m.Cur))) m.Cur = m.Left;   // starszy zapis - cala reszta
                     _mov[a[1] + "~" + a[2]] = m;
                 }
             }

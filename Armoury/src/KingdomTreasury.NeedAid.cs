@@ -178,7 +178,7 @@ namespace Armoury
                 if (day == null || !AtWar(k)) return 0;                  // pokoj = brak doplaty (resztka daniny z doby zawarcia pokoju idzie w renty jak dotad)
                 double target = NaTarget(s), step = NaStep(s);
                 // DS F3 (K3): garnek = wplywy wojenne dnia DS (dziesiata od ruchomosci, 184, pomoc od sprzedazy, W4) zamiast daniny P1
-                var row = new NaK { K = k, Name = k.Name != null ? k.Name.ToString() : k.StringId, Aid = Math.Max(0, DsTowns.FarmsLive ? DsSeason.WarPot(k, day) : day.WarAid) };
+                var row = new NaK { K = k, Name = k.Name != null ? k.Name.ToString() : k.StringId, Aid = Math.Max(0, DsTowns.FarmsLive ? DsSeason.WarPot(k, day) + Math.Max(0, day.WarAid) : day.WarAid) };   // przejscie F3: P1 x (1 - rampa) tez w garnku
                 row.Pot = Math.Max(0, Math.Min(row.Aid, CrownIncome.LeftFor(k)));   // danina tej doby, najwyzej reszta wplywow dnia po zwrocie zoldu
                 _naRows.Add(row);
                 if (!(target > 0)) return 0;

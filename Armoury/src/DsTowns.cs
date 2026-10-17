@@ -26,6 +26,14 @@ namespace Armoury
     ///    w zamku do kiesy podzamcza (zamiast "5% zaworu dla ludu" i 15% zaworu zamku).
     ///  - M7 POMOC OD SPRZEDAZY: w Levies min(DsAidesMax, g x DsAidesRate) sprzedazy kasy z doby ludu (lud, markietani i zycie partii, dwor, sprzedaz okna, wsie);
     ///    brak -> ksiega (splacana w dzien raty PRZED firma). M9 dziesiata od ruchomosci kasy: kasa ponad 1.5 x zapas x g x DsMovablesRate, 13 rat co 7 dob.
+    /// RECENZJA 17.10 (poprawki):
+    ///  - okno pomiaru startuje dopiero po rampie F1 (projekt 11), mierzy osobno czesc pana z kasy (zawor) i z OSZCZEDNOSCI LUDU (podatek od skarbca ludu, W7 z ludu) -
+    ///    ta druga (FLf) placi lud z kies ponad zapas dni ("scot and lot", DsFarmFolkFromSavings), nie kasa kupcow; sprzedaz kasy i danine miasta 1%/d - pomoc od sprzedazy
+    ///    przy g = 1 ponad dawna danine zdjeta z firmy korony (kasa przy g = 1 placi tyle, co w oknie);
+    ///  - podstawa M7 = WLASNA sprzedaz kasy (bez czesci uslug ludu z zycia i dworu);
+    ///  - PRZEJSCIE z rampa DsRampDays od ustalenia firm (wymog Jeffa): stare pobory x (1 - rampa), firmy, wyplata kupcom, pomoc, raty dziesiatej x rampa (NewShare/OldShare);
+    ///  - zaleglosc pomocy splacana w dzien raty idzie do wplywu dnia przez LeviesToday (nie jako firma), darowana ponad DsFarmForgiveWeeks tygodni pomocy;
+    ///  - podloga kasy = caly zapas kupcow przy regulatorze w trybie 1; odnowa firm juz od 7 dob pamieci doplywu (pamiec sesyjna).
     /// Zamknieta ekonomia: kazdy przelew mierzony u platnika i odbiorcy (kontrola linii "Firmy miast i zamkow (DS)": platnicy - odbiorcy = 0); zaleglosc to roszczenie,
     /// nie pieniadz. Zapis arm_daniny_miasta (SaveText): brak klucza (stary zapis) = start okna pomiaru przy wlaczonym kluczu. Wylaczenie klucza - stare zasady od nastepnej
     /// doby, zaleglosci zostaja w zapisie bez skutku, zaliczki mieszczan przechodza do zwyklego dlugu korona2. Kazde zdarzenie we wlasnym try, potkniecia liczone.
@@ -40,15 +48,20 @@ namespace Armoury
         private sealed class Farm
         {
             public Settlement St;                                  // sesja
-            public double ML, MC;                                  // okno pomiaru: pan, korona
-            public double FL, FC;                                  // firmy roczne (rata = F / 52)
+            public double ML, MC;                                  // okno pomiaru: pan (zawor po dekrecie), korona (zawor)
+            public double MLf;                                     // okno pomiaru: pan z oszczednosci ludu (czesc pana podatku od skarbca ludu + W7 z ludu) - recenzja 17.10
+            public double SW, LW;                                  // okno pomiaru: sprzedaz kasy (podstawa M7) i danina miasta 1%/d (recenzja 17.10: pomoc ponad nia zdjeta z firmy korony)
+            public double FL, FC;                                  // firmy roczne z kasy (rata = F / 52): pan, korona
+            public double FLf;                                     // firma pana z oszczednosci ludu (DsFarmFolkFromSavings - "scot and lot"; wylaczony - z kasy)
+            public double AidCut;                                  // przy ustaleniu: firma korony zmniejszona o pomoc od sprzedazy (g = 1) ponad dawna danine miasta (zl/rok)
             public int Fixed = -1;                                 // doba ustalenia albo ostatniej odnowy
             public double Share = double.NaN;                      // firma na dobe / doplyw netto na dobe przy ustaleniu
-            public double AL, AC;                                  // zaleglosci firm: pan, korona
+            public double AL, AC, ALf;                             // zaleglosci firm: pan, korona, pan z oszczednosci ludu
             public int ATerms;                                     // dni kwartalu z rzedu z zaleglosciami
             public double AidArr; public string AidK;              // pomoc od sprzedazy niezaplacona (M7) i krolestwo
             public double AidCarry;                                // ulamek pomocy ponizej 1 zl (sesja)
-            public double MovLeft, MovPer; public string MovK; public int MovSerial = -1;   // dziesiata od ruchomosci kasy (M9)
+            public double AidLast;                                 // pomoc nalezna ostatniej doby (miara darowania zaleglosci; sesja)
+            public double MovLeft, MovPer, MovCur; public string MovK; public int MovSerial = -1;   // dziesiata od ruchomosci kasy (M9); MovCur - wymiar biezacej sesji (limit L1)
             // sesja
             public readonly double[] Net = new double[NetDays]; public int NH, NF;
             public long G0 = long.MinValue, PaidWin;               // zamek: kasa przy poprzedniej probce, pobory od niej
@@ -67,18 +80,20 @@ namespace Armoury
         private static int _stumbles, _stumblesSess;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _events = new List<string>();
+        private static readonly Dictionary<string, long> _aidPend = new Dictionary<string, long>();   // id krolestwa -> zaleglosc pomocy zaplacona w dzien raty (w skarbcu) - do LeviesToday w AidesDay
+        private static bool _waitLogged;                                                              // okno pomiaru czeka na koniec rampy F1 (linia raz)
 
         // ------------------------------------------------------------ liczniki od ostatniej linii
-        private static int _nDue, _nDueT, _remitSiege, _remitCap, _noLord, _distN, _forgN, _renewN, _renewUp, _renewDown, _aidRemit;
-        private static double _dueL, _dueC, _remit, _noLordAmt, _arrNew, _arrPaid, _forgiven, _aidArrNew, _aidLost, _movAssess, _movRemit, _movShort, _movLost;
-        private static long _paidL, _paidC, _distL, _distC, _drawT, _drawC, _aidPaid, _aidArrPaid, _movPaid;
+        private static int _nDue, _nDueT, _remitSiege, _remitCap, _noLord, _distN, _forgN, _renewN, _renewUp, _renewDown, _aidRemit, _aidForgN;
+        private static double _dueL, _dueC, _dueLf, _remit, _noLordAmt, _arrNew, _arrPaid, _forgiven, _aidArrNew, _aidLost, _aidForg, _movAssess, _movRemit, _movRamp, _movShort, _movLost;
+        private static long _paidL, _paidC, _paidLf, _distL, _distC, _drawT, _drawC, _aidPaid, _aidArrPaid, _movPaid;
         private static long _payOut, _payIn;
 
         private static void ClearCounters()
         {
-            _nDue = _nDueT = _remitSiege = _remitCap = _noLord = _distN = _forgN = _renewN = _renewUp = _renewDown = _aidRemit = 0;
-            _dueL = _dueC = _remit = _noLordAmt = _arrNew = _arrPaid = _forgiven = _aidArrNew = _aidLost = _movAssess = _movRemit = _movShort = _movLost = 0;
-            _paidL = _paidC = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
+            _nDue = _nDueT = _remitSiege = _remitCap = _noLord = _distN = _forgN = _renewN = _renewUp = _renewDown = _aidRemit = _aidForgN = 0;
+            _dueL = _dueC = _dueLf = _remit = _noLordAmt = _arrNew = _arrPaid = _forgiven = _aidArrNew = _aidLost = _aidForg = _movAssess = _movRemit = _movRamp = _movShort = _movLost = 0;
+            _paidL = _paidC = _paidLf = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
             _payOut = _payIn = 0;
             _stumbles = 0;
         }
@@ -87,7 +102,7 @@ namespace Armoury
         internal static void Reset()
         {
             _dayOn = -1; _fixDay = -1; _mDays = 0; _worldShare = double.NaN; _farm.Clear();
-            SwitchDue = false; _stumblesSess = 0; _err.Clear(); _events.Clear();
+            SwitchDue = false; _stumblesSess = 0; _err.Clear(); _events.Clear(); _aidPend.Clear(); _waitLogged = false;
             ClearCounters();
         }
 
@@ -115,7 +130,9 @@ namespace Armoury
         private static int DrawDays(Settings s) { return Math.Max(0, Math.Min(120, s.DsMerchantDrawDays)); }
         private static int ForgiveWeeks(Settings s) { return Math.Max(0, Math.Min(156, s.DsFarmForgiveWeeks)); }
 
-        /// <summary>Rampa zbytkow ludu (DsRampDays od doby ustalenia firm): 0..1; poza F3 - 0.</summary>
+        /// <summary>Rampa przejscia F3 (DsRampDays od doby ustalenia firm): 0..1; poza F3 - 0. Recenzja 17.10 (wymog Jeffa "przejscie z rampa 28 dob"): stare pobory miast,
+        /// zamkow i ludu x (1 - rampa) - zawor, P1, podatek od skarbca ludu, danina miast, W7 z ludu; nowe x rampa - firmy, wyplata kupcom, pomoc od sprzedazy, raty dziesiatej,
+        /// clo wojenne, pomoc lennikow, s 184 (liniowo), g udzialu korony przy wozie, zbytki ludu. W dobie ustalenia rampa 0 - stare zasady co do monety.</summary>
         internal static double FolkRamp
         {
             get
@@ -125,6 +142,24 @@ namespace Armoury
                 int days = Math.Max(0, Math.Min(364, s.DsRampDays));
                 if (days <= 0) return 1;
                 return Unit((Today - _fixDay) / (double)days);
+            }
+        }
+
+        /// <summary>Czesc NOWYCH zasad F3 w przejsciu (= FolkRamp; 0 poza firmami).</summary>
+        internal static double NewShare { get { return FolkRamp; } }
+
+        /// <summary>Czesc STARYCH poborow miast, zamkow i ludu w przejsciu F3 (1 poza firmami, 0 po rampie).</summary>
+        internal static double OldShare { get { return FarmsLive ? 1.0 - FolkRamp : 1.0; } }
+
+        /// <summary>Doby do konca przejscia F3 (0 po rampie albo poza firmami) - s 184 idzie liniowo do s z nadania.</summary>
+        internal static double RampDaysLeft
+        {
+            get
+            {
+                var s = Settings.Current;
+                if (s == null || !FarmsLive) return 0;
+                int days = Math.Max(0, Math.Min(364, s.DsRampDays));
+                return Math.Max(0, days - (Today - _fixDay));
             }
         }
 
@@ -206,16 +241,24 @@ namespace Armoury
                                     + "zostaja w zapisie bez skutku (ponowne wlaczenie = nowe okno pomiaru), dziesiata od ruchomosci niezebrana przepada, zaliczki mieszczan -> zwykly dlug korona2");
                         try { TownFolk.AntAllToNormal(); } catch (Exception e) { Stumble("DayStart(zaliczki)", e); }
                         try { DsSeason.Off(); } catch (Exception e) { Stumble("DayStart(nadania)", e); }
-                        foreach (var f in _farm.Values) { f.ML = f.MC = 0; f.MovLeft = 0; f.MovPer = 0; f.MovK = null; f.MovSerial = -1; f.AidArr = 0; f.AidK = null; f.AidCarry = 0; }
+                        foreach (var f in _farm.Values) { f.ML = f.MC = f.MLf = f.SW = f.LW = 0; f.MovLeft = 0; f.MovPer = 0; f.MovCur = 0; f.MovK = null; f.MovSerial = -1; f.AidArr = 0; f.AidK = null; f.AidCarry = 0; }
+                        _aidPend.Clear();
                     }
-                    _dayOn = -1; _fixDay = -1; _mDays = 0; SwitchDue = false;
+                    _dayOn = -1; _fixDay = -1; _mDays = 0; SwitchDue = false; _waitLogged = false;
                     return;
                 }
                 Owners(today);
                 if (_dayOn < 0)
                 {
+                    // recenzja 17.10 (projekt 11: "okno F3 ma byc PO co najmniej 28 dobach F1"): przy F1 w rampie okno czeka - firmy z przejsciowych przeplywow bylyby zle
+                    if (DsVillage.Live && DsVillage.Ramp < 1)
+                    {
+                        if (!_waitLogged) { _waitLogged = true; _events.Add("okno pomiaru firm CZEKA na koniec rampy danin wsi (F1, rampa " + DsVillage.Ramp.ToString("0.000", Inv) + ") - firmy maja zawierac pieniadz wsi, ktory wrocil przez miasta (projekt 11); stare zasady"); }
+                        return;
+                    }
+                    _waitLogged = false;
                     _dayOn = today; _mDays = 0; _fixDay = -1;
-                    foreach (var f in _farm.Values) { f.ML = f.MC = 0; }
+                    foreach (var f in _farm.Values) { f.ML = f.MC = f.MLf = f.SW = f.LW = 0; }
                     _events.Add("start okna pomiaru firm - " + MeasureDays(s) + " dob starych zasad (zawor miast i zamkow, czesc pana podatku od skarbca ludu, W7 z ludu), potem firmy stale i nadania wojenne");
                 }
                 if (_fixDay < 0)
@@ -252,8 +295,9 @@ namespace Armoury
         private static void Fix(int today, Settings s)
         {
             int days = Math.Max(1, _mDays);
-            double sF = 0, sN = 0, tL = 0, tC = 0, cL = 0, cC = 0;
-            int nT = 0, nC = 0, zT = 0, zC = 0;
+            double sF = 0, sN = 0, tL = 0, tC = 0, cL = 0, cC = 0, tLf = 0, cLf = 0, cut = 0;
+            int nT = 0, nC = 0, zT = 0, zC = 0, nCut = 0;
+            double rate1 = Math.Min(Math.Max(0, Math.Min(0.3, (double)s.DsAidesMax)), Math.Max(0, Math.Min(0.1, (double)s.DsAidesRate)));   // pomoc od sprzedazy przy g = 1
             foreach (var st in Settlement.All)
             {
                 try
@@ -261,27 +305,34 @@ namespace Armoury
                     if (st == null || !(st.IsTown || st.IsCastle) || st.Town == null) continue;
                     var f = FarmOf(st, true);
                     if (f == null) continue;
-                    f.FL = YearDays * Math.Max(0, f.ML) / days; f.FC = YearDays * Math.Max(0, f.MC) / days;
-                    f.ML = f.MC = 0; f.Fixed = today; f.ATerms = 0;
+                    f.FL = YearDays * Math.Max(0, f.ML) / days; f.FC = YearDays * Math.Max(0, f.MC) / days; f.FLf = YearDays * Math.Max(0, f.MLf) / days;
+                    // recenzja 17.10: kasa placi firme (ok. 96% doplywu netto) i pomoc od sprzedazy - przy g = 1 razem tyle, ile w oknie zawor i danina miasta 1%/d:
+                    // pomoc (g = 1) ponad dawna danine tej osady zdjeta z firmy korony (najwyzej do 0); w ciezkiej wojnie (g > 1) kasa placi wiecej - nadanie
+                    double aidPlus = Math.Max(0, rate1 * Math.Max(0, f.SW) / days - Math.Max(0, f.LW) / days) * YearDays;
+                    f.AidCut = Math.Min(f.FC, aidPlus); f.FC -= f.AidCut;
+                    if (f.AidCut > 0) { cut += f.AidCut; nCut++; }
+                    f.ML = f.MC = f.MLf = f.SW = f.LW = 0; f.Fixed = today; f.ATerms = 0;
                     double net = NetAvg(f, NetMinDays), dayF = (f.FL + f.FC) / YearDays;
                     if (net > 0 && dayF > 0) { f.Share = dayF / net; sF += dayF; sN += net; } else f.Share = double.NaN;
-                    if (st.IsTown) { nT++; tL += f.FL; tC += f.FC; if (dayF <= 0) zT++; }
-                    else { nC++; cL += f.FL; cC += f.FC; if (dayF <= 0) zC++; }
+                    if (st.IsTown) { nT++; tL += f.FL; tC += f.FC; tLf += f.FLf; if (dayF <= 0) zT++; }
+                    else { nC++; cL += f.FL; cC += f.FC; cLf += f.FLf; if (dayF <= 0) zC++; }
                 }
                 catch (Exception e) { Stumble("Fix(osada)", e); }
             }
             _worldShare = sN > 0 ? sF / sN : double.NaN;
-            _events.Add("FIRMY USTALONE po " + days + " dobach pomiaru: " + nT + " miast (panom " + N0(tL) + " zl/rok, koronie " + N0(tC) + " zl/rok; bez firmy " + zT + "), " + nC + " zamkow (panom "
-                        + N0(cL) + ", koronie " + N0(cC) + "; bez firmy " + zC + "), rata 1/" + Weeks + " co 7 dob; udzial firmy w doplywie netto swiata "
-                        + (double.IsNaN(_worldShare) ? "-" : _worldShare.ToString("0.000", Inv)) + "; od tej doby bez zaworu, P1, podatku od skarbca ludu, daniny miast i W7 z ludu; nadania wojenne - sesja dzis");
+            _events.Add("FIRMY USTALONE po " + days + " dobach pomiaru: " + nT + " miast (z kasy panom " + N0(tL) + " zl/rok, koronie " + N0(tC) + " zl/rok; z oszczednosci ludu panom " + N0(tLf)
+                        + "; bez firmy " + zT + "), " + nC + " zamkow (z kasy panom " + N0(cL) + ", koronie " + N0(cC) + "; z oszczednosci podzamcza panom " + N0(cLf) + "; bez firmy " + zC
+                        + "), rata 1/" + Weeks + " co 7 dob; firma korony zmniejszona o pomoc od sprzedazy przy g = 1 ponad dawna danine miast " + N0(cut) + " zl/rok (" + nCut + " osad)"
+                        + "; udzial firmy w doplywie netto swiata " + (double.IsNaN(_worldShare) ? "-" : _worldShare.ToString("0.000", Inv))
+                        + "; przejscie " + Math.Max(0, Math.Min(364, s.DsRampDays)) + " dob: zawor, P1, podatek od skarbca ludu, danina miast i W7 z ludu x (1 - rampa), nowe x rampa; nadania wojenne - sesja dzis");
         }
 
         private static void Terms()
         {
             foreach (var f in _farm.Values)
             {
-                double inst = (f.FL + f.FC) / Weeks;
-                if (f.AL + f.AC >= Math.Max(1.0, inst)) f.ATerms++; else f.ATerms = 0;
+                double inst = (f.FL + f.FC + f.FLf) / Weeks;
+                if (f.AL + f.AC + f.ALf >= Math.Max(1.0, inst)) f.ATerms++; else f.ATerms = 0;
             }
         }
 
@@ -294,16 +345,18 @@ namespace Armoury
             {
                 try
                 {
-                    if (f.Fixed < 0 || today - f.Fixed < rd || f.NF < NetDays) continue;   // pamiec 28 dob niepelna (po wczytaniu) - odnowa czeka
+                    // pamiec doplywu netto jest sesyjna (bez zapisu): recenzja 17.10 - odnowa juz od NetMinDays (7) dob pomiaru, nie dopiero od pelnych 28 (krotkie sesje
+                    // Jeffa nigdy by jej nie doczekaly); ograniczenie +-DsFarmRenewMax zostaje
+                    if (f.Fixed < 0 || today - f.Fixed < rd || f.NF < NetMinDays) continue;
                     double F = f.FL + f.FC;
                     f.Fixed = today; _renewN++;
                     if (F <= 0) continue;
                     double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
                     if (double.IsNaN(share) || share <= 0) continue;
-                    double target = Math.Max(0, NetAvg(f, NetDays)) * share * YearDays;
+                    double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
                     double nf = Math.Max(F * (1 - m), Math.Min(F * (1 + m), target));
                     double r = nf / F;
-                    f.FL *= r; f.FC *= r;
+                    f.FL *= r; f.FC *= r; f.FLf *= r;
                     if (r > 1 + 1e-9) _renewUp++; else if (r < 1 - 1e-9) _renewDown++;
                 }
                 catch (Exception e) { Stumble("Renew", e); }
@@ -341,16 +394,41 @@ namespace Armoury
             catch (Exception e) { Stumble("CastleWindow", e); }
         }
 
-        /// <summary>TownFolk.PayHoard (okno pomiaru): czesc pana podatku od skarbca ludu tej osady.</summary>
+        /// <summary>TownFolk.PayHoard (okno pomiaru): czesc pana podatku od skarbca ludu tej osady - do czesci firmy z oszczednosci ludu (MLf, recenzja 17.10).</summary>
         internal static void MeasureHoard(Settlement st, long lord)
         {
-            try { if (lord > 0 && InWindow) { var f = FarmOf(st, true); if (f != null) f.ML += lord; } } catch (Exception e) { Stumble("MeasureHoard", e); }
+            try { if (lord > 0 && InWindow) { var f = FarmOf(st, true); if (f != null) f.MLf += lord; } } catch (Exception e) { Stumble("MeasureHoard", e); }
         }
 
-        /// <summary>KingdomTreasury.LvCollect (okno pomiaru): W7 z ludu tej osady (do pana).</summary>
+        /// <summary>KingdomTreasury.LvCollect (okno pomiaru): W7 z ludu tej osady (do pana) - do czesci firmy z oszczednosci ludu (MLf).</summary>
         internal static void MeasureW7(Settlement st, long took)
         {
-            try { if (took > 0 && InWindow && st != null && (st.IsTown || st.IsCastle)) { var f = FarmOf(st, true); if (f != null) f.ML += took; } } catch (Exception e) { Stumble("MeasureW7", e); }
+            try { if (took > 0 && InWindow && st != null && (st.IsTown || st.IsCastle)) { var f = FarmOf(st, true); if (f != null) f.MLf += took; } } catch (Exception e) { Stumble("MeasureW7", e); }
+        }
+
+        /// <summary>KingdomTreasury.Levies (okno pomiaru): danina wojenna miasta 1%/d z kasy - miara do zdjecia pomocy od sprzedazy ponad nia z firmy korony (Fix).</summary>
+        internal static void MeasureLevy(Settlement st, long x)
+        {
+            try { if (x > 0 && InWindow) { var f = FarmOf(st, true); if (f != null) f.LW += x; } } catch (Exception e) { Stumble("MeasureLevy", e); }
+        }
+
+        /// <summary>CastlePurse.Daily (przejscie F3): pobory zaworu zamku x (1 - rampa) - do probki doplywu netto (jak CastleWindow w oknie).</summary>
+        internal static void CastleValvePaid(Settlement st, long x)
+        {
+            try { if (x > 0 && FarmsLive) { var f = FarmOf(st, true); if (f != null) f.PaidWin += x; } } catch (Exception e) { Stumble("CastleValvePaid", e); }
+        }
+
+        /// <summary>SoldierPay (Z8, przez CastlePurse.FarmDayEq): rownowaznik dnia firmy pana z kasy zamku (F_L / 364 x rampa przejscia); 0 bez firmy, oblezenie, zdobycie.</summary>
+        internal static double LordFarmPerDay(Settlement st)
+        {
+            try
+            {
+                if (!FarmsLive || st == null) return 0;
+                var f = FarmOf(st, false);
+                if (f == null || !(f.FL > 0) || RemitOf(st) != 0) return 0;
+                return f.FL / YearDays * NewShare;
+            }
+            catch (Exception e) { Stumble("LordFarmPerDay", e); return 0; }
         }
 
         private static void SampleTown(Settlement st, Town t, Farm f, int reserve)
@@ -408,13 +486,15 @@ namespace Armoury
 
         // ============================================================ firmy: miasto (PopulationLaw.ValveTowns) i zamek (CastlePurse.Daily)
         /// <summary>
-        /// PopulationLaw.ValveTowns przy ustalonych firmach (zamiast TownPurse.Valve): probka doplywu, w dzien raty zaleglosc pomocy M7, firma M2/M3 (pan / korona),
-        /// dziesiata od ruchomosci kasy M9, zajecie i darowanie zaleglosci; co dobe wyplata kupcom M6. lordPay - kasa -> pan (wolajacy: RentToday, DayTownRent),
-        /// crownFarm - kasa -> skarbiec w TownPurse.CrownToday (wplyw dnia), crownMov - kasa -> skarbiec dziesiata (wplyw dnia przez DsSeason). Nie rzuca.
+        /// PopulationLaw.ValveTowns przy ustalonych firmach (w przejsciu obok zaworu x (1 - rampa)): probka doplywu, w dzien raty zaleglosc pomocy M7, firma M2/M3 (pan /
+        /// korona) x rampa, czesc pana z oszczednosci ludu, dziesiata od ruchomosci kasy M9, zajecie i darowanie zaleglosci; co dobe wyplata kupcom M6 x rampa. lordPay - kasa ->
+        /// pan (wolajacy: RentToday, DayTownRent), crownFarm - kasa -> skarbiec w TownPurse.CrownToday (wplyw dnia, "firmy korony"), crownMov - kasa -> skarbiec dziesiata
+        /// (wplyw dnia przez DsSeason), crownAid - kasa -> skarbiec zaleglosc pomocy od sprzedazy (recenzja 17.10: wplyw dnia przez LeviesToday w AidesDay, nie jako firma -
+        /// prognoza nadania liczyla ja dwa razy). Nie rzuca.
         /// </summary>
-        internal static bool TownDay(Settlement st, out int lordPay, out int crownFarm, out int crownMov, out long spare)
+        internal static bool TownDay(Settlement st, out int lordPay, out int crownFarm, out int crownMov, out int crownAid, out long spare)
         {
-            lordPay = crownFarm = crownMov = 0; spare = 0;
+            lordPay = crownFarm = crownMov = crownAid = 0; spare = 0;
             try
             {
                 var t = st != null ? st.Town : null;
@@ -426,20 +506,21 @@ namespace Armoury
                 SampleTown(st, t, f, reserve);
                 spare = (long)t.Gold - reserve;
                 Kingdom k;
-                Pay(st, t, f, reserve, s, true, out lordPay, out crownFarm, out crownMov, out k);
+                Pay(st, t, f, reserve, s, true, out lordPay, out crownFarm, out crownMov, out crownAid, out k);
                 if (lordPay > 0 || crownFarm > 0) TownPurse.DsNoteFarm(st, lordPay, crownFarm, k);
                 if (crownMov > 0) TownPurse.NoteTake(st, crownMov);
+                if (crownAid > 0) { TownPurse.NoteTake(st, crownAid); try { TownFolk.NoteTake(st, crownAid, TownFolk.TLevy); } catch { } }
                 Draw(st, t, f, reserve, s, true);
                 return true;
             }
-            catch (Exception e) { Stumble("TownDay", e); return lordPay + crownFarm + crownMov > 0; }
+            catch (Exception e) { Stumble("TownDay", e); return lordPay + crownFarm + crownMov + crownAid > 0; }
         }
 
-        /// <summary>CastlePurse.Daily przy ustalonych firmach (zamiast zaworu zamku): to samo co miasto (bez zajecia - zamek nie ma gminy); suburb - M6 do kiesy podzamcza.
-        /// Wolajacy: RentToday / LordDuesToday (pan), CastlePurse.CrownToday (crownFarm), ksiega MCastleCrown (crownFarm + crownMov) i MFolkValve (suburb).</summary>
-        internal static void CastleDay(Settlement st, int reserve, out int lordPay, out int crownFarm, out int crownMov, out int suburb, out Kingdom k)
+        /// <summary>CastlePurse.Daily przy ustalonych firmach (w przejsciu obok zaworu x (1 - rampa)): to samo co miasto (bez zajecia - zamek nie ma gminy); suburb - M6 do kiesy
+        /// podzamcza. Wolajacy: RentToday / LordDuesToday (pan), CastlePurse.CrownToday (crownFarm), ksiega MCastleCrown (crownMov + crownAid) i MFolkValve (suburb).</summary>
+        internal static void CastleDay(Settlement st, int reserve, out int lordPay, out int crownFarm, out int crownMov, out int crownAid, out int suburb, out Kingdom k)
         {
-            lordPay = crownFarm = crownMov = suburb = 0; k = null;
+            lordPay = crownFarm = crownMov = crownAid = suburb = 0; k = null;
             try
             {
                 var t = st != null ? st.Town : null;
@@ -447,58 +528,73 @@ namespace Armoury
                 if (t == null || s == null) return;
                 var f = FarmOf(st, true);
                 if (f == null) return;
-                Pay(st, t, f, reserve, s, false, out lordPay, out crownFarm, out crownMov, out k);
-                f.PaidWin += lordPay + crownFarm + crownMov;
+                Pay(st, t, f, reserve, s, false, out lordPay, out crownFarm, out crownMov, out crownAid, out k);
+                f.PaidWin += lordPay + crownFarm + crownMov + crownAid;
                 suburb = (int)Math.Min(int.MaxValue, Draw(st, t, f, reserve, s, false));
             }
             catch (Exception e) { Stumble("CastleDay", e); }
         }
 
-        private static void Pay(Settlement st, Town t, Farm f, int reserve, Settings s, bool town, out int lordPay, out int crownFarm, out int crownMov, out Kingdom kOut)
+        /// <summary>Podloga kasy dla firm, pomocy i dziesiatej: DsFarmFloorShare zapasu kupcow; przy regulatorze kas w trybie 1 (doplata do zapasu z niczego) - caly zapas
+        /// (recenzja 17.10: inaczej gra dosypywalaby zloto do kasy oproznionej przez korone).</summary>
+        private static double FloorOf(Settings s, int reserve)
         {
-            lordPay = crownFarm = crownMov = 0; kOut = null;
+            double share = s.TownPurseRegulator == 1 ? 1.0 : Unit(s.DsFarmFloorShare);
+            return share * Math.Max(0, reserve);
+        }
+
+        private static void Pay(Settlement st, Town t, Farm f, int reserve, Settings s, bool town, out int lordPay, out int crownFarm, out int crownMov, out int crownAid, out Kingdom kOut)
+        {
+            lordPay = crownFarm = crownMov = crownAid = 0; kOut = null;
             var clan = st.OwnerClan;
             var lord = clan != null ? clan.Leader : null;
             var k = clan != null ? clan.Kingdom : null;
             if (k != null && k.IsEliminated) k = null;
             kOut = k;
             if (!PayDay(st)) return;
-            double iL = f.FL / Weeks, iC = f.FC / Weeks;
+            double rn = NewShare;                                   // przejscie: raty firm x rampa (reszta - stary zawor u wolajacego)
+            double iL = f.FL / Weeks * rn, iC = f.FC / Weeks * rn, iLf = f.FLf / Weeks * rn;
             if (k == null) { iL += iC; iC = 0; if (f.AC > 0) { f.AL += f.AC; f.AC = 0; } }   // rod bez krolestwa - calosc panu (jak zawor)
+            bool folkPays = s.DsFarmFolkFromSavings;
+            if (!folkPays) { iL += iLf; iLf = 0; if (f.ALf > 0) { f.AL += f.ALf; f.ALf = 0; } }   // klucz wylaczony - cala firma pana z kasy
             int serial;
             double g = DsSeason.GrantNow(k, out serial);
             bool assess = k != null && g > 0 && serial > 0 && f.MovSerial != serial;
-            if (iL + iC <= 0 && f.AL + f.AC < 1 && f.AidArr < 1 && f.MovLeft < 1 && !assess) return;   // osada bez firmy i bez naleznosci
+            if (iL + iC + iLf <= 0 && f.AL + f.AC + f.ALf < 1 && f.AidArr < 1 && f.MovLeft < 1 && !assess) return;   // osada bez firmy i bez naleznosci
             _nDue++; if (town) _nDueT++;
-            _dueL += iL; _dueC += iC;
+            _dueL += iL; _dueC += iC; _dueLf += iLf;
             int why = RemitOf(st);
             if (why != 0)
             {
-                _remit += iL + iC; if (why == 1) _remitSiege++; else _remitCap++;
+                _remit += iL + iC + iLf; if (why == 1) _remitSiege++; else _remitCap++;
                 if (f.MovLeft >= 1) { double m = Math.Min(f.MovPer, f.MovLeft); f.MovLeft -= m; _movRemit += m; }
                 return;
             }
-            double before = f.AL + f.AC;
+            double before = f.AL + f.AC + f.ALf;
             if (lord == null || !lord.IsAlive)
             {
-                f.AL += iL; f.AC += iC; _noLord++; _noLordAmt += iL + iC;   // bez zywego pana - rata czeka (jak zawor)
-                _arrNew += iL + iC;
+                f.AL += iL; f.AC += iC; f.ALf += iLf; _noLord++; _noLordAmt += iL + iC + iLf;   // bez zywego pana - rata czeka (jak zawor)
+                _arrNew += iL + iC + iLf;
                 return;
             }
-            double floor = Unit(s.DsFarmFloorShare) * reserve;
+            double floor = FloorOf(s, reserve);
             long avail = Math.Max(0L, (long)Math.Floor(t.Gold - floor));
-            // 1. zaleglosc pomocy od sprzedazy (M7) - przed firma
+            // 1. zaleglosc pomocy od sprzedazy (M7) - przed firma; recenzja 17.10: do skarbca jako wplyw dnia przez LeviesToday (AidesDay), nie jako "firmy korony"
             if (f.AidArr >= 1)
             {
                 if (k == null || f.AidK != k.StringId) { _aidLost += f.AidArr; f.AidArr = 0; f.AidK = null; }
                 else if (avail > 0)
                 {
                     long got = ToCrown(t, k, (long)Math.Floor(Math.Min(f.AidArr, avail)));
-                    if (got > 0) { f.AidArr -= got; avail -= got; crownFarm += (int)got; _aidArrPaid += got; DsSeason.NoteAides(k, got); }
+                    if (got > 0)
+                    {
+                        f.AidArr -= got; avail -= got; crownAid += (int)got; _aidArrPaid += got; DsSeason.NoteAides(k, got);
+                        long p0; _aidPend.TryGetValue(k.StringId, out p0); _aidPend[k.StringId] = p0 + got;
+                    }
                     if (f.AidArr < 1) { f.AidArr = 0; f.AidK = null; }
                 }
             }
-            // 2. firma: zaleglosc i rata (pan i korona w stosunku naleznosci)
+            // 2. firma z kasy: zaleglosc i rata (pan i korona w stosunku naleznosci)
             double wantL = f.AL + iL, wantC = f.AC + iC, tot = wantL + wantC;
             if (tot >= 1)
             {
@@ -512,52 +608,83 @@ namespace Armoury
                 _paidL += gL; _paidC += gC;
             }
             else { f.AL = wantL; f.AC = wantC; }
-            // 3. dziesiata od ruchomosci kasy (M9): wymiar w pierwszy dzien raty po nadaniu wojennym, potem 1/13 co 7 dob
+            // 2b. czesc pana z oszczednosci ludu (recenzja 17.10, "scot and lot"): to, co pan bral dotad z oszczednosci ludu tej osady (podatek od skarbca ludu, W7), placi lud
+            //     z kies ponad zapas dni - nie kasa kupcow; brak - zaleglosc (splacana pierwsza, zajecie z kiesy gminy jak firma)
+            double wantLf = f.ALf + iLf;
+            if (wantLf >= 1)
+            {
+                long gF = FolkToLord(st, lord, (long)Math.Floor(wantLf));
+                f.ALf = Math.Max(0, wantLf - gF);
+                _paidLf += gF;
+            }
+            else f.ALf = wantLf;
+            // 3. dziesiata od ruchomosci kasy (M9): wymiar w pierwszy dzien raty po nadaniu wojennym, potem 1/13 co 7 dob; w przejsciu rata x rampa (reszta darowana)
             if (assess)
             {
                 double baseM = Math.Max(0, t.Gold - OverReserve * reserve);
                 if (f.MovK != null && f.MovK != k.StringId && f.MovLeft > 0) { _movLost += f.MovLeft; f.MovLeft = 0; }
                 double a = g * Math.Max(0, Math.Min(0.3, (double)s.DsMovablesRate)) * baseM;
-                f.MovLeft += a; f.MovPer = f.MovLeft / Instalments; f.MovK = k.StringId; f.MovSerial = serial; _movAssess += a;
+                f.MovLeft += a; f.MovPer = f.MovLeft / Instalments; f.MovCur = a; f.MovK = k.StringId; f.MovSerial = serial; _movAssess += a;
             }
             if (f.MovLeft >= 1)
             {
-                if (k == null || f.MovK != k.StringId) { _movLost += f.MovLeft; f.MovLeft = 0; f.MovPer = 0; f.MovK = null; }
+                if (k == null || f.MovK != k.StringId) { _movLost += f.MovLeft; f.MovLeft = 0; f.MovPer = 0; f.MovCur = 0; f.MovK = null; }
                 else
                 {
                     double inst = Math.Min(f.MovPer, f.MovLeft);
-                    long got = ToCrown(t, k, (long)Math.Floor(Math.Min(inst, avail)));
-                    if (got > 0) { f.MovLeft -= got; avail -= got; crownMov += (int)got; _movPaid += got; DsSeason.NoteMovables(k, got); }
-                    if (got + 0.5 < inst) _movShort += inst - got;
-                    if (f.MovLeft < 1) { f.MovLeft = 0; f.MovPer = 0; }
+                    double instR = inst * rn;
+                    if (inst - instR > 0) { f.MovLeft -= inst - instR; f.MovCur = Math.Max(0, f.MovCur - (inst - instR)); _movRamp += inst - instR; }   // przejscie: czesc raty darowana
+                    long got = ToCrown(t, k, (long)Math.Floor(Math.Min(instR, avail)));
+                    if (got > 0) { f.MovLeft -= got; f.MovCur = Math.Max(0, f.MovCur - got); avail -= got; crownMov += (int)got; _movPaid += got; DsSeason.NoteMovables(k, got); }
+                    if (got + 0.5 < instR) _movShort += instR - got;
+                    if (f.MovLeft < 1) { f.MovLeft = 0; f.MovPer = 0; f.MovCur = 0; }
                 }
             }
             // 4. zajecie (miasto): zaleglosc przez DsFarmDistraintTerms dni kwartalu - z kiesy gminy (najwyzej 2/3 jej stanu)
-            if (town && f.ATerms >= Math.Max(1, Math.Min(8, s.DsFarmDistraintTerms)) && f.AL + f.AC >= 1) Distrain(st, f, lord, k);
-            double after = f.AL + f.AC;
+            if (town && f.ATerms >= Math.Max(1, Math.Min(8, s.DsFarmDistraintTerms)) && f.AL + f.AC + f.ALf >= 1) Distrain(st, f, lord, k);
+            double after = f.AL + f.AC + f.ALf;
             if (after > before) _arrNew += after - before; else _arrPaid += before - after;
             // 5. darowanie zaleglosci ponad DsFarmForgiveWeeks rat (licznik osobno - nie "splacone")
             int fw = ForgiveWeeks(s);
-            double instAll = (f.FL + f.FC) / Weeks;
+            double instAll = (f.FL + f.FC + f.FLf) / Weeks;
             if (fw > 0 && instAll > 0)
             {
-                double cap = fw * instAll, arr = f.AL + f.AC;
-                if (arr > cap) { double r = cap / arr; _forgiven += arr - cap; _forgN++; f.AL *= r; f.AC *= r; }
+                double cap = fw * instAll, arr = f.AL + f.AC + f.ALf;
+                if (arr > cap) { double r = cap / arr; _forgiven += arr - cap; _forgN++; f.AL *= r; f.AC *= r; f.ALf *= r; }
             }
         }
 
+        /// <summary>Czesc firmy pana z oszczednosci ludu: kiesy ludu osady ponad zapas dni (TownFolk.DsFolkRate) -> glowa rodu (RentToday - D "ziemia", jak podatki panu).
+        /// Wyjatek przy przelewie oddaje zloto ludowi. Zwraca zaplacone.</summary>
+        private static long FolkToLord(Settlement st, Hero lord, long want)
+        {
+            if (want <= 0 || lord == null) return 0;
+            long took = TownFolk.DsFolkRate(st, want);
+            if (took <= 0) return 0;
+            int h0 = lord.Gold;
+            try { lord.ChangeHeroGold((int)Math.Min(int.MaxValue, took)); }
+            catch (Exception e) { TownFolk.DsFolkRateUndo(st, took); Stumble("FolkToLord", e); return 0; }
+            long inL = (long)lord.Gold - h0;
+            var clan = st.OwnerClan;
+            if (clan != null) { int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = (int)Math.Min(int.MaxValue, (long)r0 + took); }
+            CirculationWindows.NoteHeroGold(lord, (int)Math.Min(int.MaxValue, took));
+            _payOut += took; _payIn += inL;
+            return took;
+        }
+
         /// <summary>Zajecie: zaleglosc firmy z kiesy gminy miasta (najwyzej 2/3 jej stanu) - kiesa gminy -> pan (RentToday, D "ziemia") i skarbiec (wplyw dnia przez
-        /// TownPurse.CrownToday). Wyjatek przy przelewie oddaje zloto gminie.</summary>
+        /// TownPurse.CrownToday). Zaleglosc pana z oszczednosci ludu (ALf) jak zaleglosc pana. Wyjatek przy przelewie oddaje zloto gminie.</summary>
         private static void Distrain(Settlement st, Farm f, Hero lord, Kingdom k)
         {
             try
             {
-                double arr = f.AL + f.AC;
+                double arr = f.AL + f.AC + f.ALf;
                 if (arr < 1) return;
                 if (k == null) { f.AL += f.AC; f.AC = 0; }
-                long took = TownFolk.DistrainCommune(st, (long)Math.Ceiling(f.AL + f.AC));
+                double aL = f.AL + f.ALf;
+                long took = TownFolk.DistrainCommune(st, (long)Math.Ceiling(aL + f.AC));
                 if (took <= 0) return;
-                long dL = k == null ? took : (long)Math.Floor(took * f.AL / (f.AL + f.AC)), dC = took - dL;
+                long dL = k == null ? took : (long)Math.Floor(took * aL / (aL + f.AC)), dC = took - dL;
                 long inL = 0, inC = 0;
                 if (dL > 0)
                 {
@@ -568,7 +695,8 @@ namespace Armoury
                     var clan = st.OwnerClan;
                     if (clan != null) { int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = (int)Math.Min(int.MaxValue, (long)r0 + dL); }
                     CirculationWindows.NoteHeroGold(lord, (int)dL);
-                    f.AL = Math.Max(0, f.AL - dL); _distL += dL;
+                    double fromLf = Math.Min(f.ALf, dL);                    // najpierw zaleglosc z oszczednosci ludu (gmina placi za swoich mieszczan), potem z kasy
+                    f.ALf = Math.Max(0, f.ALf - fromLf); f.AL = Math.Max(0, f.AL - (dL - fromLf)); _distL += dL;
                 }
                 if (dC > 0)
                 {
@@ -582,14 +710,16 @@ namespace Armoury
             catch (Exception e) { Stumble("Distrain", e); }
         }
 
-        /// <summary>M6: 1/DsMerchantDrawDays kasy ponad 1.5 x zapas kupcow - miasto do P i R (zarobek), zamek do kiesy podzamcza. Zwraca wyplacone.</summary>
+        /// <summary>M6: 1/DsMerchantDrawDays kasy ponad 1.5 x zapas kupcow - miasto do P i R (zarobek), zamek do kiesy podzamcza; w przejsciu x rampa (stary zawor daje ludowi
+        /// swoja czesc x (1 - rampa)). Zwraca wyplacone.</summary>
         private static long Draw(Settlement st, Town t, Farm f, int reserve, Settings s, bool town)
         {
             int days = DrawDays(s);
             if (days <= 0) return 0;
             double over = t.Gold - OverReserve * reserve;
             if (over < days) return 0;
-            long x = (long)Math.Floor(over / days);
+            long x = (long)Math.Floor(over / days * NewShare);
+            if (x <= 0) return 0;
             if (town)
             {
                 long got = TownFolk.EarnDraw(st, x, Unit(s.DsMerchantDrawPShare));
@@ -607,7 +737,8 @@ namespace Armoury
         }
 
         // ============================================================ M7 pomoc od sprzedazy (Levies)
-        /// <summary>TownLive / CastleLiveDay (krok 2 doby ludu): sprzedaz kasy w oknie (zycie i zolnierze, dwor, sprzedaz, zaplata ludu, wsie) - podstawa M7 i prognozy nadania.</summary>
+        /// <summary>TownLive / CastleLiveDay (krok 2 doby ludu): sprzedaz WLASNA kasy w oknie (recenzja 17.10: zycie i zolnierze bez uslug ludu, dwor bez czesci ludu, sprzedaz,
+        /// zaplata ludu, wsie - te same liczby co podstawa robocizny BaseLife / BaseCourt) - podstawa M7 i prognozy nadania; w oknie pomiaru takze srednia do ustalenia firm.</summary>
         internal static void NoteSales(Settlement st, double sales)
         {
             try
@@ -616,21 +747,40 @@ namespace Armoury
                 var f = FarmOf(st, true);
                 if (f == null) return;
                 f.Sales = sales; f.SalesDay = Today;
+                if (InWindow)
+                {
+                    // tylko doby wojny wlasciciela - pomoc od sprzedazy przy g = 1, jaka bylaby w oknie (w pokoju kasa nie placila daniny i nie placi pomocy - bez ciecia firmy)
+                    var oc = st.OwnerClan; var ok = oc != null ? oc.Kingdom : null;
+                    if (ok != null && !ok.IsEliminated && KingdomTreasury.AtWar(ok)) f.SW += sales;
+                }
                 DsSeason.NoteSales(st, sales);
             }
             catch (Exception e) { Stumble("NoteSales", e); }
         }
 
-        /// <summary>KingdomTreasury.Levies (F3 czynne, po petli osad): pomoc od sprzedazy min(DsAidesMax, g x DsAidesRate) z kasy (ponad DsFarmFloorShare zapasu) do skarbca
-        /// - wplyw dnia (LeviesToday) i garnek W5; brak - do ksiegi (dzien raty, przed firma). Oblezone - darowane.</summary>
+        /// <summary>KingdomTreasury.Levies (F3 czynne, po petli osad): pomoc od sprzedazy min(DsAidesMax, g x DsAidesRate) x rampa przejscia z kasy (ponad podloge FloorOf) do
+        /// skarbca - wplyw dnia (LeviesToday) i garnek W5; brak - do ksiegi (dzien raty, przed firma), zaleglosc ponad DsFarmForgiveWeeks tygodni pomocy - darowana (recenzja
+        /// 17.10: bez limitu rosla bez konca). Oblezone - darowane. Na poczatku: zaleglosc pomocy zaplacona w dniu raty (Pay) do wplywu dnia krolestwa.</summary>
         internal static void AidesDay(Dictionary<Kingdom, long> levies)
         {
             try
             {
                 var s = Settings.Current;
                 if (s == null || !FarmsLive || levies == null) return;
+                if (_aidPend.Count > 0)
+                {
+                    foreach (var k0 in Kingdom.All)
+                    {
+                        if (k0 == null || k0.StringId == null) continue;
+                        long x;
+                        if (!_aidPend.TryGetValue(k0.StringId, out x) || x <= 0) continue;
+                        long lk; levies.TryGetValue(k0, out lk); levies[k0] = lk + x;   // zloto juz w skarbcu (Pay) - tu tylko wplyw dnia 165
+                    }
+                    _aidPend.Clear();
+                }
                 int today = Today;
-                double rate1 = Math.Max(0, Math.Min(0.1, (double)s.DsAidesRate)), max = Math.Max(0, Math.Min(0.3, (double)s.DsAidesMax)), fl = Unit(s.DsFarmFloorShare);
+                double rate1 = Math.Max(0, Math.Min(0.1, (double)s.DsAidesRate)), max = Math.Max(0, Math.Min(0.3, (double)s.DsAidesMax)), rn = NewShare;
+                int fw = ForgiveWeeks(s);
                 foreach (var f in _farm.Values)
                 {
                     try
@@ -645,12 +795,14 @@ namespace Armoury
                         double g = DsSeason.GrantOf(k);
                         if (g <= 0) continue;
                         if (st.IsUnderSiege) { _aidRemit++; continue; }
-                        double due = sales * Math.Min(max, g * rate1) + f.AidCarry;
+                        double day = sales * Math.Min(max, g * rate1) * rn;
+                        f.AidLast = day;
+                        double due = day + f.AidCarry;
                         long want = (long)Math.Floor(due);
                         f.AidCarry = due - want;
                         if (want <= 0) continue;
                         int reserve = st.IsTown ? TownPurse.Reserve(t) : CastlePurse.Reserve(t);
-                        long avail = Math.Max(0L, (long)Math.Floor(t.Gold - fl * reserve));
+                        long avail = Math.Max(0L, (long)Math.Floor(t.Gold - FloorOf(s, reserve)));
                         long got = ToCrown(t, k, Math.Min(want, avail));
                         if (got > 0)
                         {
@@ -665,6 +817,11 @@ namespace Armoury
                             if (f.AidK != null && f.AidK != k.StringId) { _aidLost += f.AidArr; f.AidArr = 0; }
                             f.AidArr += want - got; f.AidK = k.StringId; _aidArrNew += want - got;
                         }
+                        if (fw > 0 && f.AidArr >= 1 && day > 0)
+                        {
+                            double cap = fw * 7.0 * day;                    // najwyzej DsFarmForgiveWeeks tygodni pomocy tej osady - reszta darowana (jak zaleglosc firmy)
+                            if (f.AidArr > cap) { _aidForg += f.AidArr - cap; _aidForgN++; f.AidArr = cap; }
+                        }
                     }
                     catch (Exception e) { Stumble("AidesDay(osada)", e); }
                 }
@@ -672,12 +829,13 @@ namespace Armoury
             catch (Exception e) { Stumble("AidesDay", e); }
         }
 
-        /// <summary>L1 (limit zaliczki): niezebrana dziesiata od ruchomosci kas osad krolestwa.</summary>
-        internal static double MovLeftOf(string kid)
+        /// <summary>L1 (limit zaliczki): niezebrana dziesiata od ruchomosci kas osad krolestwa - tylko z wymiaru biezacej sesji nadania `serial` (recenzja 17.10: reszta
+        /// z poprzednich kwartalow to roszczenie, ktorego moze nie byc - nie podstawa zaliczki).</summary>
+        internal static double MovLeftOf(string kid, int serial)
         {
             double t = 0;
             if (kid == null) return 0;
-            foreach (var f in _farm.Values) if (f.MovK == kid && f.MovLeft > 0) t += f.MovLeft;
+            foreach (var f in _farm.Values) if (f.MovK == kid && f.MovSerial == serial && f.MovLeft > 0) t += Math.Min(f.MovLeft, Math.Max(0, f.MovCur));
             return t;
         }
 
@@ -700,36 +858,43 @@ namespace Armoury
                 sb.Append("Firmy miast i zamkow (DS): dzien ").Append(day);
                 if (_fixDay < 0)
                 {
-                    double mL = 0, mC = 0; foreach (var f in _farm.Values) { mL += f.ML; mC += f.MC; }
-                    sb.Append(" | POMIAR dzien ").Append(_mDays).Append('/').Append(MeasureDays(s)).Append(" (od doby ").Append(_dayOn).Append(") - stare zasady; zmierzone: panom ")
-                      .Append(N0(mL)).Append(" (zawor po dekrecie, czesc pana podatku od skarbca ludu, W7 z ludu), koronie ").Append(N0(mC))
-                      .Append(" (zawor) - srednio ").Append(N0(_mDays > 0 ? (mL + mC) / _mDays : 0)).Append(" zl/d");
+                    double mL = 0, mC = 0, mLf = 0, mS = 0, mLw = 0; foreach (var f in _farm.Values) { mL += f.ML; mC += f.MC; mLf += f.MLf; mS += f.SW; mLw += f.LW; }
+                    sb.Append(" | POMIAR dzien ").Append(_mDays).Append('/').Append(MeasureDays(s)).Append(" (od doby ").Append(_dayOn).Append(") - stare zasady; zmierzone: panom z kas ")
+                      .Append(N0(mL)).Append(" (zawor po dekrecie) + z oszczednosci ludu ").Append(N0(mLf)).Append(" (czesc pana podatku od skarbca ludu, W7 z ludu), koronie ").Append(N0(mC))
+                      .Append(" (zawor) - srednio ").Append(N0(_mDays > 0 ? (mL + mC + mLf) / _mDays : 0)).Append(" zl/d; sprzedaz kas ").Append(N0(mS)).Append(", danina miast ").Append(N0(mLw));
                 }
                 else
                 {
-                    double fT = 0, fC = 0, aL = 0, aC = 0, aid = 0, mov = 0; int arrN = 0, distReady = 0, nT = 0, nC = 0;
+                    double fT = 0, fC = 0, fLf = 0, aL = 0, aC = 0, aLf = 0, aid = 0, mov = 0, cut = 0; int arrN = 0, distReady = 0, nT = 0, nC = 0;
                     foreach (var f in _farm.Values)
                     {
                         bool isT = f.St != null && f.St.IsTown;
                         if (isT) { fT += f.FL + f.FC; nT++; } else { fC += f.FL + f.FC; nC++; }
-                        aL += f.AL; aC += f.AC; aid += f.AidArr; mov += f.MovLeft;
-                        if (f.AL + f.AC >= 1) arrN++;
-                        if (f.ATerms >= Math.Max(1, s.DsFarmDistraintTerms) && f.AL + f.AC >= 1) distReady++;
+                        fLf += f.FLf; cut += f.AidCut;
+                        aL += f.AL; aC += f.AC; aLf += f.ALf; aid += f.AidArr; mov += f.MovLeft;
+                        if (f.AL + f.AC + f.ALf >= 1) arrN++;
+                        if (f.ATerms >= Math.Max(1, s.DsFarmDistraintTerms) && f.AL + f.AC + f.ALf >= 1) distReady++;
                     }
                     sb.Append(" | firmy od doby ").Append(_fixDay).Append(": miasta ").Append(nT).Append(" - ").Append(N0(fT)).Append(" zl/rok, zamki ").Append(nC).Append(" - ").Append(N0(fC))
-                      .Append(" zl/rok (rata 1/").Append(Weeks).Append(" co 7 dob)")
+                      .Append(" zl/rok z kas (rata 1/").Append(Weeks).Append(" co 7 dob); panom z oszczednosci ludu ").Append(N0(fLf)).Append(" zl/rok (")
+                      .Append(s.DsFarmFolkFromSavings ? "placi lud ponad zapas dni" : "klucz wylaczony - placi kasa").Append("); firma korony zmniejszona o pomoc od sprzedazy ").Append(N0(cut)).Append(" zl/rok")
+                      .Append(" | przejscie: rampa ").Append(NewShare.ToString("0.000", Inv)).Append(" (zawor, P1, podatek od skarbca ludu, danina miast, W7 z ludu x ").Append(OldShare.ToString("0.000", Inv)).Append(")")
                       .Append(" | raty dzis: osad ").Append(_nDue).Append(" (miast ").Append(_nDueT).Append("), nalezne panom ").Append(N0(_dueL)).Append(", koronie ").Append(N0(_dueC))
-                      .Append("; zaplacone z kas panom ").Append(_paidL).Append(", koronie ").Append(_paidC)
+                      .Append(", panom z oszczednosci ludu ").Append(N0(_dueLf))
+                      .Append("; zaplacone z kas panom ").Append(_paidL).Append(", koronie ").Append(_paidC).Append(", z oszczednosci ludu panom ").Append(_paidLf)
                       .Append("; darowane ").Append(N0(_remit)).Append(" (oblezenie ").Append(_remitSiege).Append(", zdobycie / lup ").Append(_remitCap).Append(")")
                       .Append(", bez zywego pana (czeka) ").Append(N0(_noLordAmt)).Append(" (").Append(_noLord).Append(")")
                       .Append(" | zaleglosci: nowe ").Append(N0(_arrNew)).Append(", splacone ").Append(N0(_arrPaid)).Append(", razem panom ").Append(N0(aL)).Append(" + koronie ").Append(N0(aC))
+                      .Append(" + panom z oszczednosci ludu ").Append(N0(aLf))
                       .Append(" u ").Append(arrN).Append(" osad (do zajecia ").Append(distReady).Append("), zajete z kies gmin ").Append(_distL + _distC).Append(" (panom ").Append(_distL).Append(", koronie ").Append(_distC)
                       .Append("; ").Append(_distN).Append("), darowane ponad ").Append(ForgiveWeeks(s)).Append(" rat ").Append(N0(_forgiven)).Append(" (").Append(_forgN).Append(")")
                       .Append(" | odnowy ").Append(_renewN).Append(" (w gore ").Append(_renewUp).Append(", w dol ").Append(_renewDown).Append(")")
                       .Append(" | wyplata kupcom M6: miasta ").Append(_drawT).Append(" (P / R), zamki ").Append(_drawC).Append(" (podzamcza)")
                       .Append(" | pomoc od sprzedazy M7: do skarbcow ").Append(_aidPaid).Append(", nowa zaleglosc ").Append(N0(_aidArrNew)).Append(", zaleglosc splacona ").Append(_aidArrPaid)
                       .Append(", przepadla (zmiana krolestwa) ").Append(N0(_aidLost)).Append(", oblezone bez poboru ").Append(_aidRemit).Append(", zaleglosci razem ").Append(N0(aid))
+                      .Append(", darowane ponad ").Append(ForgiveWeeks(s)).Append(" tygodni pomocy ").Append(N0(_aidForg)).Append(" (").Append(_aidForgN).Append(")")
                       .Append(" | dziesiata od ruchomosci kas M9: wymiar ").Append(N0(_movAssess)).Append(", zaplacone ").Append(_movPaid).Append(", darowane ").Append(N0(_movRemit))
+                      .Append(" (w przejsciu ").Append(N0(_movRamp)).Append(")")
                       .Append(", niezaplacone (na nastepne raty) ").Append(N0(_movShort)).Append(", przepadle (zmiana krolestwa) ").Append(N0(_movLost)).Append(", niezebrane ").Append(N0(mov))
                       .Append(" | rampa zbytkow ludu ").Append(FolkRamp.ToString("0.000", Inv));
                 }
@@ -757,12 +922,14 @@ namespace Armoury
                 {
                     var f = kv.Value;
                     if (BadId(kv.Key)) continue;
-                    bool any = f.FL > 0 || f.FC > 0 || f.ML > 0 || f.MC > 0 || f.AL > 0 || f.AC > 0 || f.AidArr > 0 || f.MovLeft > 0 || f.Fixed >= 0;
+                    bool any = f.FL > 0 || f.FC > 0 || f.FLf > 0 || f.ML > 0 || f.MC > 0 || f.MLf > 0 || f.SW > 0 || f.AL > 0 || f.AC > 0 || f.ALf > 0 || f.AidArr > 0 || f.MovLeft > 0 || f.Fixed >= 0;
                     if (!any) continue;
                     sb.Append("|f~").Append(kv.Key).Append('~').Append(R(f.FL)).Append('~').Append(R(f.FC)).Append('~').Append(f.Fixed.ToString(Inv)).Append('~')
                       .Append(double.IsNaN(f.Share) ? "-" : f.Share.ToString("R", Inv)).Append('~').Append(R(f.AL)).Append('~').Append(R(f.AC)).Append('~').Append(f.ATerms.ToString(Inv))
                       .Append('~').Append(R(f.AidArr)).Append('~').Append(BadId(f.AidK) ? "-" : f.AidK).Append('~').Append(R(f.MovLeft)).Append('~').Append(R(f.MovPer))
-                      .Append('~').Append(BadId(f.MovK) ? "-" : f.MovK).Append('~').Append(f.MovSerial.ToString(Inv)).Append('~').Append(R(f.ML)).Append('~').Append(R(f.MC));
+                      .Append('~').Append(BadId(f.MovK) ? "-" : f.MovK).Append('~').Append(f.MovSerial.ToString(Inv)).Append('~').Append(R(f.ML)).Append('~').Append(R(f.MC))
+                      .Append('~').Append(R(f.FLf)).Append('~').Append(R(f.ALf)).Append('~').Append(R(f.MLf)).Append('~').Append(R(f.SW)).Append('~').Append(R(f.LW))
+                      .Append('~').Append(R(f.AidCut)).Append('~').Append(R(f.MovCur));   // recenzja 17.10: pola 17-23 (starszy zapis bez nich = 0)
                 }
                 DsSeason.Export(sb);
                 return sb.ToString();
@@ -801,6 +968,11 @@ namespace Armoury
                                 AidArr = D0(a[9]), AidK = a[10] == "-" ? null : a[10], MovLeft = D0(a[11]), MovPer = D0(a[12]), MovK = a[13] == "-" ? null : a[13],
                                 MovSerial = I(a[14], -1), ML = D0(a[15]), MC = D0(a[16])
                             };
+                            if (a.Length >= 24)
+                            {
+                                f.FLf = D0(a[17]); f.ALf = D0(a[18]); f.MLf = D0(a[19]); f.SW = D0(a[20]); f.LW = D0(a[21]); f.AidCut = D0(a[22]); f.MovCur = D0(a[23]);
+                            }
+                            else f.MovCur = f.MovLeft;   // zapis sprzed recenzji: cala niezebrana dziesiata jak wymiar biezacy
                             if (f.AidArr <= 0) f.AidK = null;
                             if (f.MovLeft <= 0) { f.MovLeft = 0; f.MovPer = 0; }
                             _farm[a[1]] = f;

@@ -181,7 +181,8 @@ namespace Armoury
                     wk.Unc += unc;
                     // zrodla: wlasne lenna rodu (miasta, zamki) i ich wsie - nadwyzka ponad zapas po daninach tej doby
                     var fiefs = new List<LvFief>(); var src = new List<LvSrc>();
-                    double E = LvSources(x.C, s, fiefs, src);
+                    double eFull;
+                    double E = LvSources(x.C, s, fiefs, src, out eFull);
                     double cap = rate * E;
                     if (!(cap >= 1)) { _lvNoSrcN++; continue; }
                     // poziom W7: najwyzszy f w [poziom W5, cel], przy ktorym koszt ponad poziom W5 miesci sie w stawce nadwyzki lenn
@@ -198,6 +199,9 @@ namespace Armoury
                     if (_naDay == today) { _naPaid.TryGetValue(x.C, out paid5); _naBoost.TryGetValue(x.C, out boost5); }
                     long want = Math.Max(0, c7 - paid5);                      // gotowka tylko za ludzi, ktorzy dzis sa w druzynach, ponad gotowke W5
                     if (want > (long)Math.Floor(cap)) want = (long)Math.Floor(cap);
+                    // DS (F1, recenzja 17.10): wsie DS wypadaja ze zrodel W7 (w rampie czesciowo) - potrzeba rodu pomniejszona o czesc wsi (want x E_po / E_przed), zeby ten sam pobor
+                    // nie przeszedl na lud miast i zamkow (bez wsi DS: E_po = E_przed, nic sie nie zmienia)
+                    if (eFull > E + 0.5 && want > 0) { long w0 = want; want = (long)Math.Floor(want * Math.Max(0, E) / eFull); DsVillage.NoteW7Cut(w0 - want); }
                     if (want > (long)Math.Floor(unc)) want = (long)Math.Floor(unc);
                     long got = want > 0 ? LvCollect(x.C, src, fiefs, E, want, rate, s, wk) : 0;
                     if (got > 0)
@@ -229,9 +233,10 @@ namespace Armoury
 
         /// <summary>Zrodla poboru rodu: jego miasta i zamki (bez oblezonych, zbuntowanych i z lojalnoscia ponizej progu - razem z ich wsiami) - kiesa ludu ponad
         /// zapas po daninie P1 (TownFolk.LevyRoom) i wsie (stan Normal, wlasciciel = rod) ponad 15 dni zakupow. Zwraca sume nadwyzki. Tylko odczyt.</summary>
-        private static double LvSources(Clan c, Settings s, List<LvFief> fiefs, List<LvSrc> src)
+        private static double LvSources(Clan c, Settings s, List<LvFief> fiefs, List<LvSrc> src, out double eFull)
         {
             double E = 0, minLoy = LvMinLoy(s);
+            eFull = 0;                                                            // DS (F1): nadwyzka zrodel bez obciecia wsi DS (do potrzeby rodu)
             var fl = c.Fiefs;
             if (fl == null) return 0;
             var room = new double[3];
@@ -246,8 +251,16 @@ namespace Armoury
                     if (t.InRebelliousState) { _lvRebel++; continue; }
                     if (t.Loyalty < minLoy) { _lvLowLoy++; continue; }
                     var fief = new LvFief { St = st, T = t };
-                    if (!DsTowns.FarmsLive && TownFolk.LevyRoom(st, room))   // DS F3: lud miast i zamkow nie jest zrodlem W7 (wliczone w firme miasta / zamku)
-                        for (int k = 0; k < 3; k++) if (room[k] >= 1) { src.Add(new LvSrc { St = st, Cls = k, Room = room[k], F = fief }); fief.Room += room[k]; }
+                    // DS F3: lud miast i zamkow nie jest zrodlem W7 (wliczone w firme miasta / zamku); recenzja 17.10: w przejsciu x (1 - rampa), potrzeba rodu tez (eFull)
+                    double lvOld = DsTowns.OldShare;
+                    if (lvOld > 0 && TownFolk.LevyRoom(st, room))
+                        for (int k = 0; k < 3; k++)
+                        {
+                            if (room[k] < 1) continue;
+                            eFull += room[k];
+                            double rk = lvOld < 1 ? Math.Floor(room[k] * lvOld) : room[k];
+                            if (rk >= 1) { src.Add(new LvSrc { St = st, Cls = k, Room = rk, F = fief }); fief.Room += rk; }
+                        }
                     var bv = st.BoundVillages;
                     if (bv != null)
                         for (int j = 0; j < bv.Count; j++)
@@ -259,6 +272,7 @@ namespace Armoury
                             int floor = TownFolk.VillageFloor(vs);
                             if (floor <= 0) continue;                         // wies bez miary zapasu (nieskalibrowana) - bez poboru
                             double ex = Math.Floor((double)v.Gold - floor);
+                            if (ex >= 1) eFull += ex;
                             if (ex >= 1) ex = DsVillage.OldW7Room(vs, ex);    // DS (F1): wies DS jako zrodlo W7 x (1 - rampa), po rampie nie jest zrodlem
                             if (ex >= 1) { src.Add(new LvSrc { St = vs, V = v, Cls = -1, Room = ex, F = fief }); fief.Room += ex; }
                         }

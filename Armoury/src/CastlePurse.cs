@@ -114,6 +114,10 @@ namespace Armoury
         // ------------------------------------------------------------ odczyty dnia dla innych modulow (169c D staly, ksiega pieniadza)
         /// <summary>Czesc pana z zaworu dzis, na rod (to samo, co dopisane do PopulationLaw.RentToday) - 169c: "zawor zamkow" w ziemi D stalego.</summary>
         internal static readonly Dictionary<Clan, int> LordDuesToday = new Dictionary<Clan, int>();
+        /// <summary>DS F3 (recenzja 17.10): rownowaznik dnia firm zamkow rodu (F_L / 364 x rampa) i rata firmy zaplacona dzis (w LordDuesToday) - SoldierPay tnie zwrot zoldu zalog
+        /// o rownowaznik dnia, nie o rate tygodnia (regula Z8 jak przy zaworze).</summary>
+        internal static readonly Dictionary<Clan, double> FarmDayEq = new Dictionary<Clan, double>();
+        internal static readonly Dictionary<Clan, int> FarmPaidToday = new Dictionary<Clan, int>();
         // na zamek: [czesc pana, nadwyzka kasy ponad zapas przed zaworem] - 169c: czesc "wlasne" (pieniadze rodu, ktore wrocily zaworem)
         private static readonly Dictionary<Settlement, long[]> _duesBy = new Dictionary<Settlement, long[]>();
         /// <summary>Liczby ostatniego Daily (ksiega pieniadza drukuje je po nas w tym samym ticku); zeruje MoneyLedger.ClearLast169 na poczatku bloku.</summary>
@@ -129,7 +133,7 @@ namespace Armoury
         {
             _trimDone = false; _liveAge = double.NaN; _trimSkip = false; _offLogged = false; _errLogged = false;
             _consTown = null; _regDue = null;
-            LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
+            LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear(); FarmDayEq.Clear(); FarmPaidToday.Clear();
             ZeroLast();
             ClearDay();
             TownPurse.Reset();                                   // E5/A1: stan kas miast czyszczony razem z zamkami (bez nowej linii w konstruktorze ArmouryBehavior)
@@ -381,7 +385,8 @@ namespace Armoury
                 if (s == null || st == null || !st.IsCastle || st.Town == null) return false;
                 if (!s.CastlePurseEnabled || !s.CastleGarrisonPayComesHome) return false;
                 if (float.IsNaN(s.CastleDuesShare) || s.CastleDuesShare <= 0f) return false;
-                if (DsTowns.FarmsLive) return false;             // DS F3: firma zamku stala - zold zalogi nie wraca panu zaworem (zwrot korony z calosci)
+                // DS F3 (recenzja 17.10): przy firmach zold zalogi dalej "wraca" - w racie firmy zamku (srednia zaworu z okna pomiaru); SoldierPay tnie zwrot o rownowaznik dnia
+                // firmy pana (CastlePurse.FarmDayEq), nie o rate tygodnia - regula zwrotu jak dzis
                 var clan = st.OwnerClan;
                 if (clan == null) return false;
                 var k = clan.Kingdom;
@@ -585,7 +590,7 @@ namespace Armoury
         // ------------------------------------------------------------ raz na dobe: zawor i linia "Zawor zamkow (110)"
         internal static void Daily()
         {
-            LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear();
+            LordDuesToday.Clear(); _duesBy.Clear(); CrownToday.Clear(); FarmDayEq.Clear(); FarmPaidToday.Clear();
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             int day = (int)CampaignTime.Now.ToDays - 1;          // 110-p: numer doby jak w ksiedze pieniadza ("Przeplywy osad") i w linii "Utarg wsi (112)" - doba zakonczona
@@ -612,15 +617,24 @@ namespace Armoury
                         {
                             int before = town.Gold;
                             DsTowns.CastleSample(st, town, reserve);     // DS F3 (okno pomiaru i firmy): probka doplywu netto zamku przed poborem tej doby
-                            if (DsTowns.FarmsLive)
+                            bool farms = DsTowns.FarmsLive;
+                            double oldK = DsTowns.OldShare;                // DS F3 (recenzja 17.10): przejscie - zawor x (1 - rampa), firma x rampa (poza F3: 1)
+                            if (farms)
                             {
                                 // DS F3 (M4, M6, M9): firma zamku zamiast zaworu - pan i korona w dzien raty, dziesiata kasy, wyplata do kiesy podzamcza co dobe;
-                                // zapisy jak zaworu (RentToday, LordDuesToday, D 169c, CrownToday) - dziesiata poza CrownToday (wplyw dnia przez DsSeason)
-                                int dLord, dCrown, dMov, dSub; Kingdom dk;
-                                DsTowns.CastleDay(st, reserve, out dLord, out dCrown, out dMov, out dSub, out dk);
+                                // zapisy jak zaworu (RentToday, LordDuesToday, D 169c, CrownToday) - dziesiata i zaleglosc pomocy od sprzedazy poza CrownToday (wplyw dnia przez
+                                // DsSeason / LeviesToday); FarmDayEq - rownowaznik dnia firmy pana (ciecie zwrotu zoldu zalog Z8, SoldierPay)
+                                int dLord, dCrown, dMov, dAid, dSub; Kingdom dk;
+                                DsTowns.CastleDay(st, reserve, out dLord, out dCrown, out dMov, out dAid, out dSub, out dk);
                                 var dClan = st.OwnerClan;
                                 var dHead = dClan != null ? dClan.Leader : null;
                                 suburbKept += dSub;
+                                if (dClan != null)
+                                {
+                                    double eq = DsTowns.LordFarmPerDay(st);
+                                    if (eq > 0) { double e0; FarmDayEq.TryGetValue(dClan, out e0); FarmDayEq[dClan] = e0 + eq; }
+                                    if (dLord > 0) { int fp0; FarmPaidToday.TryGetValue(dClan, out fp0); FarmPaidToday[dClan] = fp0 + dLord; }
+                                }
                                 if (dLord > 0 && dClan != null)
                                 {
                                     int r0; PopulationLaw.RentToday.TryGetValue(dClan, out r0); PopulationLaw.RentToday[dClan] = r0 + dLord;
@@ -636,15 +650,17 @@ namespace Armoury
                                     long k0; CrownToday.TryGetValue(dk, out k0); CrownToday[dk] = k0 + dCrown;
                                     if (dHead == Hero.MainHero) playerCrown += dCrown;
                                 }
-                                if (dMov > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MCastleCrown, dMov);   // kasa -> skarbiec (dziesiata) w pozycji korony
+                                if (dMov + dAid > 0) MoneyLedger.SplitCastleMark(MoneyLedger.MCastle, MoneyLedger.MCastleCrown, dMov + dAid);   // kasa -> skarbiec (dziesiata, zaleglosc pomocy) w pozycji korony
                             }
-                            else
+                            if (!farms || oldK > 0)
                             {
-                            int pay = Dues(before, reserve, share);
+                            int vb = farms ? town.Gold : before;               // przejscie F3: po racie firmy kasa juz mniejsza
+                            int pay = Dues(vb, reserve, share);
+                            if (farms && oldK < 1) pay = (int)Math.Floor(pay * oldK);
                             var clan = st.OwnerClan;
                             var lord = clan != null ? clan.Leader : null;
                             int wLord = 0, wCrown = 0, wSub = 0;   // DS F3: okno pomiaru firm
-                            if (before <= reserve) below++;
+                            if (vb <= reserve) below++;
                             else if (lord == null || !lord.IsAlive) noLord++;
                             else if (st.IsUnderSiege) siege++;
                             else if (pay > 0)
@@ -668,7 +684,8 @@ namespace Armoury
                                     int r0; PopulationLaw.RentToday.TryGetValue(clan, out r0); PopulationLaw.RentToday[clan] = r0 + lordPay;
                                     int l0; LordDuesToday.TryGetValue(clan, out l0); LordDuesToday[clan] = l0 + lordPay;
                                     long c0; perClan.TryGetValue(clan, out c0); perClan[clan] = c0 + lordPay;
-                                    _duesBy[st] = new long[] { lordPay, (long)before - reserve };
+                                    long[] db0; long prevL = _duesBy.TryGetValue(st, out db0) && db0 != null ? db0[0] : 0;
+                                    _duesBy[st] = new long[] { prevL + lordPay, (long)before - reserve };
                                     paid += lordPay; payers++;
                                     if (lord == Hero.MainHero) playerPaid += lordPay;
                                 }
@@ -687,7 +704,8 @@ namespace Armoury
                                     }
                                 }
                             }
-                            DsTowns.CastleWindow(st, wLord, wCrown, wSub);   // DS F3: okno pomiaru firm (poza oknem nic)
+                            if (farms) DsTowns.CastleValvePaid(st, wLord + wCrown + wSub);   // przejscie F3: pobory zaworu do probki doplywu netto
+                            else DsTowns.CastleWindow(st, wLord, wCrown, wSub);   // DS F3: okno pomiaru firm (poza oknem nic)
                             }
                         }
                         catch (Exception e) { Stumble("CastlePurse.Dues(" + st.StringId + ")", e); }   // ten jeden zamek; stan kasy i tak wchodzi do linii

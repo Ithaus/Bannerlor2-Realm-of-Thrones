@@ -6700,9 +6700,9 @@ namespace Armoury
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool GoodsLedgerHorses { get; set; } = true;
 
-        [SettingPropertyBool("Dues Medieval", HintText = "the villages pay their lords and their king as they did in the Middle Ages: the lord's share, the tithe and - in war - the crown's share are taken from what the carts bring home, the moment they bring it, and a small fixed rent is paid first; nothing is taken any more as 'a share a day of whatever the village has saved' (the crown's war levy on village savings, the hoard tax, the lords' war levy from villages, the 5 percent Banner Kings village market). A village keeps three weeks of its needs and rent in its chest and spends on finer goods only what lies beyond it. The old takings fade out over Ds Ramp Days from the first day with this on (needs Town Folk Live; off = the old rules from the next day)")]
+        [SettingPropertyBool("Dues Medieval", HintText = "the villages pay their lords and their king as they did in the Middle Ages: the lord's share, the tithe and - in war - the crown's share are taken from what the carts bring home, the moment they bring it, and a small fixed rent is paid first; nothing is taken any more as 'a share a day of whatever the village has saved' (the crown's war levy on village savings, the hoard tax, the lords' war levy from villages, the 5 percent Banner Kings village market). A village keeps three weeks of its needs and rent in its chest and spends on finer goods only what lies beyond it. The old takings fade out over Ds Ramp Days from the first day with this on (needs Town Folk Live; off by default until it is tested together with the village basket of the start calibration; off = the old rules from the next day)")]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
-        public bool DuesMedieval { get; set; } = true;
+        public bool DuesMedieval { get; set; } = false;
 
         [SettingPropertyBool("Ds Village Cart Dues", HintText = "with Dues Medieval: the tithe (Tithe Village Share of the takings, half of it back as alms for the village poor, half to build septs) and, in war, the crown's share are taken at the cart, from the village's part of the takings, the moment the cart comes home; the crown's share is also taken from what soldiers pay a village for lodging and services. Off = the tithe is taken from the village purse once a day as before and the crown takes no share from villages")]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
@@ -6739,6 +6739,14 @@ namespace Armoury
         [SettingPropertyInteger("Ds Ramp Days", 0, 112, "0", HintText = "with Dues Medieval: over how many days the old takings from village savings fade out and the crown's share at the cart and the spending beyond the chest come in, from the first day with Dues Medieval on - a running campaign (an old save) changes over step by step (0 = at once)")]
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public int DsRampDays { get; set; } = 28;
+
+        [SettingPropertyBool("Ds Communal Works", HintText = "with Dues Medieval: what a village means to spend beyond its chest but finds no goods for on the shelves of its market town is spent on communal works - the church fabric, the mill, a bridge, the roads: three quarters as wages to the masons and carpenters of the market town, a quarter as material bought from its merchants (as the septs are built from the tithe). Off = what finds no goods stays in the village purse")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public bool DsCommunalWorks { get; set; } = true;
+
+        [SettingPropertyInteger("Ds Rent Arrears Pay Days", 0, 364, "0", HintText = "with Ds Rent Arrears: a village pays off its rent arrears at one part in this many a day (at least one day's rent), and only from what its purse holds beyond the day's needs - the arrears never take its bread (0 = all at once, as far as the purse goes)")]
+        [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
+        public int DsRentArrearsPayDays { get; set; } = 28;
 
         [SettingPropertyBool("Ds Towns", HintText = "towns, castles and the crown pay as they did in the Middle Ages: after Ds Farm Measure Days of watching what the town and castle purses give up today, each town and castle owes its lord and its king a fixed farm (paid every week); the daily valve, the war aid from the people's savings, the hoard tax on the people and the purses, the war levy on town purses and the lords' war levy on the people stop; in war the realm grants the king a war grant each quarter (aids on sales, a tax on earnings, a tenth of movables, double customs, a larger vassal aid), and a king short of money for the wage refunds spends his treasure above the war reserve, then borrows from his burghers against the grant, and only then from the Iron Bank (needs Town Folk Live and Crown Current Income; off = the old rules from the next day)")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
@@ -6824,7 +6832,7 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsGrantSessionDays { get; set; } = 14;
 
-        [SettingPropertyBool("Ds Refund Treasury First", HintText = "with Ds Towns: a crown short of money for the wage refunds first spends its treasure above the war reserve, before it borrows")]
+        [SettingPropertyBool("Ds Refund Treasury First", HintText = "with Dues Medieval or Ds Towns: a crown short of money for the wage refunds first spends its treasure above the war reserve, before it borrows (debts are not taken off the treasure - only the Iron Bank instalments due in the next 28 days are kept back)")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsRefundTreasuryFirst { get; set; } = true;
 
@@ -6839,6 +6847,10 @@ namespace Armoury
         [SettingPropertyInteger("Ds Folk Surplus Spend Days", 0, 120, "0", HintText = "with Ds Towns: townsfolk spend each day one part in this many of what they hold above their reserve days (in place of Folk Surplus Spend Share), coming in over Ds Ramp Days after the farms are set (0 = as before)")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFolkSurplusSpendDays { get; set; } = 15;
+
+        [SettingPropertyBool("Ds Farm Folk From Savings", HintText = "with Ds Towns: the part of a town's or castle's farm that stands for what the lord used to take from the people's savings (his part of the hoard tax and his war levy on the people) is raised from the people's savings above their reserve days, as a commune raised its farm from its burgesses (scot and lot); the merchants' purse pays only the part that stands for the old valve. Off = the merchants' purse pays the whole farm")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool DsFarmFolkFromSavings { get; set; } = true;
 
         public void ApplyTo(Settings s)
         {
@@ -8524,6 +8536,8 @@ namespace Armoury
             s.DsSurplusSpendDays = DsSurplusSpendDays;
             s.DsSurplusBkShare = DsSurplusBkShare;
             s.DsRampDays = DsRampDays;
+            s.DsCommunalWorks = DsCommunalWorks;
+            s.DsRentArrearsPayDays = DsRentArrearsPayDays;
             s.DsTowns = DsTowns;
             s.DsFarmMeasureDays = DsFarmMeasureDays;
             s.DsFarmRenewDays = DsFarmRenewDays;
@@ -8549,6 +8563,7 @@ namespace Armoury
             s.DsAnticipationLoans = DsAnticipationLoans;
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;
+            s.DsFarmFolkFromSavings = DsFarmFolkFromSavings;
         }
 
         internal static void Apply()

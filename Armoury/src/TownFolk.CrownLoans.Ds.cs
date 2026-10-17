@@ -90,7 +90,19 @@ namespace Armoury
             catch (Exception e) { AntStumble("Anticipate", e); return 0; }
         }
 
-        /// <summary>CrownLoansPay (pierwszy krok, dzien korony otwarty): odsetki zaliczek i splata z rat nadania wplaconych dzis (dziesiata + W4), z wplywow dnia.</summary>
+        /// <summary>
+        /// ArmouryBehavior (po KingdomTreasury.WageRefund i CrownBorrow.SeizePledged, przed CrownRents - W5 i renty 180; dzien korony otwarty): odsetki zaliczek i splata z rat
+        /// nadania wplaconych dzis (dziesiata + W4), najwyzej z tego, co ZOSTALO z wplywow dnia po zwrocie zoldu. Recenzja 17.10: dotad splata szla przed zwrotem (CrownLoansPay)
+        /// - korona splacala tania zaliczke, a wiekszy brak zwrotu brala w Banku na 20-30%; w dobie, w ktorej brak zwrotu pokryl skarbiec, zaliczka albo Bank - bez splaty
+        /// (same odsetki). Nie rzuca.
+        /// </summary>
+        internal static void AntRepayDay()
+        {
+            var s = Settings.Current;
+            if (s == null || Campaign.Current == null || !CrownLoansOn) return;
+            try { AntRepay(s); } catch (Exception e) { AntStumble("RepayDay", e); }
+        }
+
         private static void AntRepay(Settings s)
         {
             if (_kla.Count == 0) return;
@@ -107,7 +119,7 @@ namespace Armoury
                     foreach (var p in x.Parts) { double a = Math.Max(0, p.Left) * rate; p.Left += a; it += a; }
                     x.Interest += it; _kaInt += it;
                     var d = CrownIncome.DayOf(k);
-                    if (d != null)
+                    if (d != null && d.DsTreas <= 0 && d.DsAnt <= 0 && d.LoanIn <= 0)
                     {
                         long inst = DsSeason.InstalmentsToday(k);
                         long pay = Math.Min(Math.Min((long)Math.Ceiling(KlDebt(x) - 1e-9), inst), Math.Min(CrownIncome.LeftFor(k), (long)Math.Max(0, k.KingdomBudgetWallet)));

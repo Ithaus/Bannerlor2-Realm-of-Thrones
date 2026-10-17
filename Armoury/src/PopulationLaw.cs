@@ -1342,10 +1342,15 @@ namespace Armoury
                 if (DsTowns.FarmsLive)
                 {
                     // DS F3 (M2/M3, M6, M9): firma miasta zamiast zaworu - w dzien raty pan i korona dostaja rate firmy (i zaleglosc), korona zaleglosc pomocy od sprzedazy
-                    // i dziesiata kasy; co dobe wyplata kupcom do P / R. Zapisy rent ponizej jak dotad (czesc pana); czesc korony do ksiegi MTownCrown w ValveDay
-                    int crF, crM;
-                    if (!DsTowns.TownDay(st, out lp, out crF, out crM, out spare)) continue;
-                    cr = crF + crM;
+                    // i dziesiata kasy; co dobe wyplata kupcom do P / R. Zapisy rent ponizej jak dotad (czesc pana); czesc korony do ksiegi MTownCrown w ValveDay.
+                    // Recenzja 17.10 (przejscie z rampa, wymog Jeffa): przez DsRampDays od ustalenia firm najpierw stary zawor x (1 - rampa), potem firma x rampa
+                    int lpV = 0, crV = 0, lpF, crF, crM, crA; long spV = 0, spF;
+                    bool vOk = false;
+                    double oldK = DsTowns.OldShare;
+                    if (oldK > 0) vOk = TownPurse.Valve(st, decree, due, out lpV, out lb, out crV, out spV, oldK);
+                    bool fOk = DsTowns.TownDay(st, out lpF, out crF, out crM, out crA, out spF);
+                    if (!vOk && !fOk) continue;
+                    lp = lpV + lpF; cr = crV + crF + crM + crA; spare = vOk ? spV : spF;
                 }
                 else
                 {

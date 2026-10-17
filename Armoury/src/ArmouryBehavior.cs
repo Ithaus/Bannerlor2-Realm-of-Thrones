@@ -1955,6 +1955,10 @@ namespace Armoury
             try { CrownCallToWar.Daily(); } catch (Exception e) { Log.Error("CrownCallToWar.Daily", e); } DayProfile.Lap("CrownCallToWar.Daily");
             try { Ransom178.CrownStep(); } catch (Exception e) { Log.Error("Ransom178.CrownStep", e); } DayProfile.Lap("Ransom178.CrownStep");                // 178: nagroda za wielkiego jenca ze skarbca (wplywy dnia, potem zapas ponad rezerwe), srednia wplywow korony              // 168 dodatek: czesc dnia ceny wezwania sojusznika do wojny ze skarbca (linia "Wezwania do wojny (168)")
             try { KingdomTreasury.WageRefund(); } catch (Exception e) { Log.Error("KingdomTreasury.WageRefund", e); } DayProfile.Lap("KingdomTreasury.WageRefund");  // zwrot zoldu w wojnie (i linia niedoplaty 169c)
+            // DS F3 (recenzja 17.10): po zwrocie zoldu (zawsze pierwszy z wydatkow wojska), przed W5 i rentami 180 - Bank bierze zastawione clo korony w zaleglosci, potem splata
+            // zaliczek mieszczan z rat nadania; oba najwyzej z reszty wplywow dnia (bez F3 i bez dlugow - nic)
+            try { CrownBorrow.SeizePledged(); } catch (Exception e) { Log.Error("CrownBorrow.SeizePledged", e); }
+            try { TownFolk.AntRepayDay(); } catch (Exception e) { Log.Error("TownFolk.AntRepayDay", e); }   // (bez wlasnego okrazenia profilu - linia profilu jak WGRANIE 74)
             try { CrownRents.Daily(); } catch (Exception e) { Log.Error("CrownRents.Daily", e); } DayProfile.Lap("CrownRents.Daily");                    // 180: reszta wplywow dnia do rodow wedlug lenn, za sluzbe (linia "Renty korony (180)")
             try { TownFolk.BreadRest(); } catch (Exception e) { Log.Error("TownFolk.BreadRest", e); } DayProfile.Lap("TownFolk.BreadRest");              // M3: chleb - korony bez kroku rent, pan zastepczo, linia "Chleb biedoty (M3)" (przed CrownIncome.End)
             try { KingdomTreasury.NeedAidDay(); } catch (Exception e) { Log.Error("KingdomTreasury.NeedAidDay", e); } DayProfile.Lap("KingdomTreasury.NeedAidDay");        // W5: linia "Doplata wedlug potrzeby (W5)" - krok biegnie w CrownRents.Daily (po warunkach rodow, przed podzialem rent); tu tylko linia doby

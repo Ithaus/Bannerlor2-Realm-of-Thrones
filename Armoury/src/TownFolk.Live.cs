@@ -99,6 +99,7 @@ namespace Armoury
             public long Seed, Orphan;
             // dziesiecina (E5/C3, TownFolk.Tithe.cs): wsie (nalezne / zaplacone), lud miast W/R/P, jalmuzna miast / wsi, place i material septow, bez kaplana, bez miasta targowego
             public long TiVDue, TiV, TiW, TiR, TiP, TiAlmsT, TiAlmsV, TiWage, TiMat, TiNoPriestT, TiNoPriestV, TiNoMarket; public int TiPriestN, TiNoPriestN, TiVN;
+            public long TiVDsRest; public int TiVDsRestN;   // DS (F1): utarg okna wsi DS bez dziesieciny przy wozie (VillageTithe bierze ja po staremu)
             // P1 (obieg kiesy ludu): danina z oszczednosci do korony wedlug klasy (W, R, P, podzamcze) i kiesa ponad zapas dni przed / po daninie (klasy z nadwyzka)
             public readonly long[] Aid = new long[4]; public readonly double[] Ov0 = new double[4], Ov1 = new double[4];
         }
@@ -912,7 +913,9 @@ namespace Armoury
             double turn = Math.Max(0f, Math.Min(0.2f, s.TownFolkMerchantDraw)) * turnBase;
             double top = Math.Max(0, Unit(s.TownFolkCraftWageShare) * f.ProdV - f.Win[KCraftPaid]);
             d.BaseFolk += fp; d.BaseVill += f.VillWin; d.BaseLife += (1 - svc) * life; d.BaseCourt += (1 - cs) * court; d.BaseSale += sale; d.BaseCar += car; d.BaseGm += f.GmMatWin;
-            DsTowns.NoteSales(st, life + court + sale + fp + f.VillWin);   // DS F3 (M7): sprzedaz kasy w oknie (zolnierze i partie, dwor, sprzedaz, lud, wsie) - podstawa pomocy od sprzedazy
+            // DS F3 (M7): sprzedaz WLASNA kasy w oknie - recenzja 17.10: bez czesci uslug ludu z zycia (svc) i ludu z dworu (cs), ktore ida prosto do kies ludu (te same liczby co
+            // BaseLife / BaseCourt podstawy robocizny), plus sprzedaz, zaplata ludu i wsie - podstawa pomocy od sprzedazy (kasa nie placi od pieniedzy, ktorych nie dostala)
+            DsTowns.NoteSales(st, (1 - svc) * life + (1 - cs) * court + sale + fp + f.VillWin);
             d.LabF += lf * rf; d.LabG += lg * rg; d.LabA += la * ra;
             f.VillWin = 0; f.GmMatWin = 0;
             double all = lab + turn + top, k = 1;
@@ -1070,7 +1073,7 @@ namespace Armoury
             double lab = (1 - svc) * life * rf + (1 - cs) * court * (0.5 * rf + 0.2 * rg + 0.3 * ra);
             for (int mi = 0; mi < Mixes; mi++) lab += f.Sale[mi] * (MixOf[mi][0] * rf + MixOf[mi][1] * rg + MixOf[mi][2] * ra);
             lab += f.PaidKeep * (0.8 * rf + 0.2 * rg) + f.VillWin * (0.2 * rf + 0.8 * rg);
-            if (DsTowns.On) { double dsSale = 0; for (int mi = 0; mi < Mixes; mi++) dsSale += f.Sale[mi]; DsTowns.NoteSales(st, life + court + dsSale + f.PaidKeep + f.VillWin); }   // DS F3 (M7): sprzedaz kasy zamku w oknie
+            if (DsTowns.On) { double dsSale = 0; for (int mi = 0; mi < Mixes; mi++) dsSale += f.Sale[mi]; DsTowns.NoteSales(st, (1 - svc) * life + (1 - cs) * court + dsSale + f.PaidKeep + f.VillWin); }   // DS F3 (M7): sprzedaz WLASNA kasy zamku w oknie (bez czesci ludu - recenzja 17.10)
             f.VillWin = 0;
             d.LabC += FromCoffer(f, (long)Math.Min(lab, Math.Max(0, town.Gold)), ELabour);
             // ---- 5. nadwyzka ponad 10 dni potrzeby: 7% na towar jutro (konsumpcja zamku)
@@ -1178,8 +1181,9 @@ namespace Armoury
 
         /// <summary>
         /// DS (F1) krok 5 (Villages, wies DS, po koszyku dnia i zaleglosci koszyka): skrzynia = DsVillageChestDays x (koszyk dnia + czynsz dnia); zbytki dnia =
-        /// rampa x (kiesa - skrzynia) / DsSurplusSpendDays (DsVillage.SurplusDay) - czesc P5 teraz: lista dostatku na polce miasta targowego (BuyLadder, jak P5), bez
-        /// podzialu miasta albo bez towaru na liscie - lista wsi (BuyGoods); czesc rynku BK odlozona do ticku BK wsi. Ponizej skrzyni nic. Nie rzuca.
+        /// rampa x (kiesa - skrzynia) / DsSurplusSpendDays (DsVillage.SurplusDay) - czesc P5 teraz: 1. lista dostatku na polce miasta targowego (BuyLadder, jak P5);
+        /// 2. RESZTA budzetu (recenzja 17.10: dotad tylko gdy lista dostatku nie kupila nic) - lista wsi (BuyGoods; przy VillWorkOnly najpierw sol i narzedzia, jak dawne
+        /// 15%/d z nadwyzki); 3. czego nie ma na polkach - ROBOTY GMINY (DsCommunalWorks; DsWorks). Czesc rynku BK odlozona do ticku BK wsi. Ponizej skrzyni nic. Nie rzuca.
         /// </summary>
         private static void DsSurplus(Folk f, Village vil, double nv, LDay d, Dictionary<Settlement, List<EquipmentElement>> shelf)
         {
@@ -1191,7 +1195,7 @@ namespace Armoury
                 double p5 = DsVillage.SurplusDay(f.St, vil.Gold, chest);
                 if (p5 < 1) return;
                 var mk = vil.TradeBound ?? vil.Bound;
-                if (mk == null || mk.Town == null) return;
+                if (mk == null || mk.Town == null) { DsVillage.NoteP5(0, 0, 0, 0, p5); return; }
                 long got = 0;
                 if (WardsShopOn && mk.IsTown && _lxCats != null)
                 {
@@ -1202,17 +1206,48 @@ namespace Armoury
                     long g1 = BuyLadder(vil, null, mk, p5, ref pcs);
                     if (g1 > 0) { got = g1; _lxVBuy += g1; _lxVPcs += pcs; f.DLxBuy += g1; }
                 }
-                if (got <= 0)
+                double rest = p5 - got;
+                if (rest >= 1)
                 {
                     List<EquipmentElement> list;
                     if (shelf == null || !shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); if (shelf != null) shelf[mk] = list; }
-                    long g2 = BuyGoods(vil, mk, list, p5, d);
-                    if (g2 > 0) { got = g2; Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += g2; }
+                    bool wo = VillWorkOnly();                                     // jak dawne 15%/d z nadwyzki (wx): sol i narzedzia
+                    long g2 = BuyGoods(vil, mk, list, wo ? 0 : rest, d, wo ? rest : 0);
+                    if (g2 > 0) { got += g2; Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += g2; }
                 }
-                if (got > 0) f.DVBuy += got;                                      // E5/C4: zakupy tej doby
-                DsVillage.NoteP5(got);
+                rest = p5 - got;
+                long works = 0, wage = 0, mat = 0;
+                if (rest >= 1 && s.DsCommunalWorks) works = DsWorks(vil, mk, rest, out wage, out mat);
+                if (got > 0) f.DVBuy += got;                                      // E5/C4: zakupy tej doby (towar; roboty gminy - nie towar)
+                DsVillage.NoteP5(got, works, wage, mat, rest - works);
             }
             catch (Exception e) { Stumble("DsSurplus", e); }
+        }
+
+        /// <summary>
+        /// DS (F1) krok 5 - ROBOTY GMINY WSI (DsCommunalWorks, recenzja 17.10): czesc zbytkow, ktorej wies nie wydala na towar (brak na polkach miasta targowego), idzie na
+        /// wspolne roboty - fabryka kosciola, mlyn, most, drogi. Ta sama regula co budowa septow z dziesieciny (VillageTithe / TitheVillageAtCart): kiesa wsi -> 3/4 place
+        /// ludu miasta targowego (Credit KBuildLabour - murarze i ciesle; zarobek, podatek jutro) i 1/4 material do kasy tego miasta (sprzedaz kupcow MixBuild - podstawa
+        /// robocizny; jak material robot gminy - bez zdejmowania towaru z polki). Miasto targowe bez kiesy ludu (albo zamek przy zaworze zamku wylaczonym) - nic (zostaje
+        /// w kiesie). W bloku doby ludu (migawka M18 ksiegi - jak dziesiecina i zakupy wsi). Zwraca zdjete z kiesy wsi = wage + mat.
+        /// </summary>
+        private static long DsWorks(Village vil, Settlement mk, double want, out long wage, out long mat)
+        {
+            wage = mat = 0;
+            if (vil == null || mk == null || mk.Town == null || !(want >= 1)) return 0;
+            Folk mf = null;
+            _f.TryGetValue(mk, out mf);                                          // TryGetValue - iterujemy _f.Values (jak VillageTithe)
+            if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive)) return 0;
+            long x = (long)Math.Floor(Math.Min(want, (double)Math.Max(0, vil.Gold)));
+            if (x <= 0) return 0;
+            int had = vil.Gold;
+            vil.ChangeGold(-(int)Math.Min(int.MaxValue, x));
+            long got = Math.Max(0, (long)had - vil.Gold);
+            if (got <= 0) return 0;
+            wage = (long)Math.Round(got * TitheWage); mat = got - wage;
+            if (wage > 0) { Credit(mf, wage, KBuildLabour); _ctlIn += wage; }   // kiesa wsi -> kiesa ludu miasta targowego
+            if (mat > 0) { mk.Town.ChangeGold((int)mat); mf.Sale[MixBuild] += mat; }
+            return got;
         }
 
         /// <summary>Towar dla wsi na polce miasta targowego (kategorie sol, narzedzia, len, garnki, piwo) - raz na dobe na targ.</summary>

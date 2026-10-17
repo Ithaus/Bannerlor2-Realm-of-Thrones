@@ -55,6 +55,72 @@ namespace Armoury
             catch (Exception e) { Stumble("DistrainCommune", e); return 0; }
         }
 
+        private static readonly long[] _dsFr = new long[3];   // ostatnie zdjecie DsFolkRate wedlug klasy (zwrot po wyjatku przelewu)
+
+        /// <summary>
+        /// DS F3 (recenzja 17.10, "scot and lot"): czesc firmy pana z oszczednosci ludu (dawny podatek od skarbca ludu - czesc pana - i W7 z ludu) placi lud osady: kiesy
+        /// W / R / P miasta (zamek: kiesa podzamcza) ponad zapas dni (W TownFolkReserveDays / R 21 / P 30 / podzamcze 10) i ponad oferte nadwyzki na jutro - ta sama miara
+        /// co W7 (LevyRoom), bez wymogu dzisiejszej doby ludu (dzien raty biegnie przed doba ludu); proporcjonalnie do nadwyzki klas. Zwraca zdjete (wolajacy przelewa
+        /// DOKLADNIE tyle panu). Ksiega kies: _ctlOut / LDayOut. Nie rzuca.
+        /// </summary>
+        internal static long DsFolkRate(Settlement st, long want)
+        {
+            _dsFr[0] = _dsFr[1] = _dsFr[2] = 0;
+            try
+            {
+                if (want <= 0 || st == null || !Live || OffMain()) return 0;
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind < 0 || f.Kind > 1 || !f.Cal) return 0;
+                if (f.Kind == 1 && !CastleLive) return 0;
+                var s = Settings.Current;
+                double rdW = Math.Max(1, Math.Min(60, s != null ? s.TownFolkReserveDays : 10));
+                int n = f.Kind == 1 ? 1 : 3;
+                var room = new double[3];
+                double e = 0;
+                for (int c = 0; c < n; c++)
+                {
+                    double rd = f.Kind == 1 ? RdC : (c == 0 ? rdW : c == 1 ? RdR : RdP);
+                    double now = PurseOf(f, c) - rd * Math.Max(0, f.Need[c]) - Math.Max(0, f.Offer[c]);
+                    room[c] = now >= 1 ? Math.Floor(now) : 0;
+                    e += room[c];
+                }
+                if (e < 1) return 0;
+                long goal = (long)Math.Min((double)want, e);
+                long took = 0;
+                for (int c = 0; c < n; c++)
+                {
+                    long x = (long)Math.Min(Math.Floor(goal * room[c] / e), room[c]);
+                    if (x <= 0) continue;
+                    AddPurse(f, c, -x); _dsFr[c] += x; took += x; room[c] -= x;
+                }
+                for (int c = 0; c < n && took < goal; c++)                 // reszta z zaokraglen - z klas, ktorym jeszcze zostala nadwyzka
+                {
+                    long x = (long)Math.Min(goal - took, room[c]);
+                    if (x <= 0) continue;
+                    AddPurse(f, c, -x); _dsFr[c] += x; took += x;
+                }
+                if (took > 0) { _ctlOut += took; f.LDayOut += took; }
+                return took;
+            }
+            catch (Exception ex) { Stumble("DsFolkRate", ex); return 0; }
+        }
+
+        /// <summary>Zwrot zdjetego przez DsFolkRate (wyjatek przy przelewie do pana - zloto wraca do tych samych klas; nic w nicosc).</summary>
+        internal static void DsFolkRateUndo(Settlement st, long x)
+        {
+            try
+            {
+                if (x <= 0 || st == null) return;
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null) return;
+                long back = 0;
+                for (int c = 0; c < 3; c++) { if (_dsFr[c] > 0) { AddPurse(f, c, _dsFr[c]); back += _dsFr[c]; _dsFr[c] = 0; } }
+                if (back < x) { AddPurse(f, 0, x - back); back = x; }
+                _ctlOut -= back; f.LDayOut -= back;
+            }
+            catch (Exception e) { Stumble("DsFolkRateUndo", e); }
+        }
+
         /// <summary>Zwrot zdjetego z kiesy gminy (wyjatek przy przelewie - nic w nicosc).</summary>
         internal static void DistrainUndo(Settlement st, long x)
         {

@@ -309,6 +309,7 @@ RANGES = {
     'DsSurplusSpendDays': (0, 120, "0"),
     'DsSurplusBkShare': (0.0, 1.0, "0.00"),
     'DsRampDays': (0, 112, "0"),
+    'DsRentArrearsPayDays': (0, 364, "0"),   # recenzja 17.10: rata zaleglosci czynszu 1/N dziennie (DsVillage.ArrPayDays przycina 0..364)
     # DS F3 (17.10): miasta, zamki, korona, kredyt - zgodnie z przycieciem w kodzie (DsTowns / DsSeason)
     'DsFarmMeasureDays': (7, 91, "0"),
     'DsFarmRenewDays': (0, 728, "0"),

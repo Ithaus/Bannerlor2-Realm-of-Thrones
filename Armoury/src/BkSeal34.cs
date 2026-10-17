@@ -141,7 +141,7 @@ namespace Armoury
                 if (ds) { dsSpent += price; if (inOld) dsOld += price; else fresh -= price; }
             }
             if (any) _vVillages++;
-            if (ds) DsVillage.NoteBkSpent(dsSpent, dsOld);
+            if (ds) DsVillage.NoteBkSpent(st, dsSpent, dsOld, fresh);   // fresh - nowy budzet niewydany w tym ticku (jutro P5 / roboty gminy)
         }
 
         private static object Marketplace()

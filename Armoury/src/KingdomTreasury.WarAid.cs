@@ -115,11 +115,14 @@ namespace Armoury
             k = st.OwnerClan != null ? st.OwnerClan.Kingdom : null;
             if (k == null || k.IsEliminated) { why = WaNoRealm; return 0; }
             why = WaNoNeed;
-            if (DsTowns.FarmsLive) return 0;   // DS F3: danina z oszczednosci P1 zastapiona dziesiata od ruchomosci (M9, DsSeason.FolkMovables); danina pokoju M4 dalej ta droga
+            // DS F3: danina z oszczednosci P1 zastapiona dziesiata od ruchomosci (M9, DsSeason.FolkMovables); danina pokoju M4 dalej ta droga. Recenzja 17.10: w przejsciu
+            // (rampa DsRampDays od ustalenia firm) P1 x (1 - rampa) ze starym pulapem s (WtCapOld), po rampie 0
+            double dsOld = DsTowns.OldShare;
+            if (!(dsOld > 0)) return 0;
             var w = WtOf(k, false);
             double sv = WtAidS(w);   // W5b regula 1: wieksza z s korony i stawki z braku wojska u panow (klucz wylaczony albo bez W5 = samo s, jak przed paczka)
             if (w == null || sv <= 0 || !(peek ? WaAtWarPeek(k) : WtAtWar(k))) return 0;
-            double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * Math.Min(sv, WtCap(k, s)) / WaBaseCap(s);
+            double rate = WtClamp(s.FolkWarAidShare, 0, 0.2) * Math.Min(sv, DsTowns.FarmsLive ? WtCapOld(k, s) : WtCap(k, s)) / WaBaseCap(s) * dsOld;
             if (!(rate > 0)) return 0;
             // P1b (FolkAidLoyalty, klucz FolkWarAidLoyalty): osada na skraju buntu (lojalnosc <= FolkWarAidMinLoyalty) nie placi - poborcy wychodza; klucz
             // wylaczony = bez progu (stan sprzed P1b)

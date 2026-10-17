@@ -493,7 +493,7 @@ namespace Armoury
                 {
                     long v = _n169In[c, k] - _n169Out[c, k];
                     armSum += v;
-                    if (c == CTown || v != 0) arm.Add(N169Name[k] + " " + S(v));
+                    if ((c == CTown && k != N169Dues) || v != 0) arm.Add(N169Name[k] + " " + S(v));   // DS (recenzja 17.10): pozycja DS tylko gdy != 0 - log przy wylaczonym DS jak WGRANIE 74
                 }
                 fresh += armSum;
                 if (arm.Count > 0) parts.Add("Armoury bez licznika: " + string.Join(", ", arm.ToArray()));

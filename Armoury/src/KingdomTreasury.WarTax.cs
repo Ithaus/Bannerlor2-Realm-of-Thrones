@@ -131,6 +131,12 @@ namespace Armoury
         private static double WtCap(Kingdom k, Settings s)
         {
             if (DsTowns.FarmsLive) return DsSeason.TallageCap(k, s);   // DS F3 (M8): pulap DsTallageMax (z polityka War Tax DsTallageMaxPolicy)
+            return WtCapOld(k, s);
+        }
+
+        /// <summary>Pulap s sprzed DS F3 (WarTaxMax / z polityka WarTaxMaxWithPolicy) - takze danina P1 w przejsciu F3 (recenzja 17.10: P1 x (1 - rampa) ze starym pulapem).</summary>
+        private static double WtCapOld(Kingdom k, Settings s)
+        {
             double cap = WtClamp(s.WarTaxMax, 0, 0.2);
             bool pol = false;
             try { pol = k != null && k.ActivePolicies.Contains(DefaultPolicies.WarTax); } catch { pol = false; }
@@ -283,7 +289,15 @@ namespace Armoury
                         bool arrears = CrownBorrow.InArrears(k);
                         double eff0 = Math.Min(WtAidS(w), cap);        // W5b: stawka, od ktorej dzis liczyla sie danina (przed krokiem)
                         if (!on) w.S = 0;                              // wylaczone albo kiesa ludu nieczynna (K3) = stan sprzed paczki (wlaczenie zaczyna od zera)
-                        else if (ds) { double sd = Math.Min(cap, DsSeason.TallageS(k)); if (Math.Abs(sd - w.S) > 1e-9) { w.DStep = true; w.DMove = sd - w.S; } w.S = sd; }   // DS F3: s = min(pulap, g x DsTallageRate)
+                        else if (ds)
+                        {
+                            // DS F3: s = min(pulap, g x DsTallageRate); recenzja 17.10: w przejsciu (rampa DsRampDays od ustalenia firm) s idzie liniowo od stawki sprzed firm do s z nadania
+                            double sd = Math.Min(cap, DsSeason.TallageS(k)), left = DsTowns.RampDaysLeft;
+                            double s1 = left > 0 ? w.S + (sd - w.S) / (left + 1) : sd;
+                            s1 = Math.Round(WtClamp(s1, 0, cap), 6);
+                            if (Math.Abs(s1 - w.S) > 1e-9) { w.DStep = true; w.DMove = s1 - w.S; }
+                            w.S = s1;
+                        }
                         else if (w.S > cap + 1e-6) w.S = Math.Round(cap, 6);   // recenzja B2: pulap spadl miedzy krokami (zdjeta polityka War Tax, MCM) - codziennie, przed krokiem
                         if (on && step)
                         {

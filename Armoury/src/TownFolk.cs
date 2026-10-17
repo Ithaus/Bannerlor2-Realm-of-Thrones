@@ -105,6 +105,7 @@ namespace Armoury
             public readonly long[] ZcE = new long[3]; public int ZcDay = -1;   // ZC0 (DailyLife, tylko odczyt): zarobek okna klas z ostatniej doby kiesy czynnej (zamek: [0]) i jej dzien; bez zapisu
             public long ZcTiV; public int ZcTiDay = -1;                        // ZC0 (DailyLife, tylko odczyt): dziesiecina, ktora wyszla z kiesy wsi tej doby (budowa septow) i jej dzien; bez zapisu
             public long DsTiCart;                                             // DS (F1): dziesiecina wsi zdjeta przy wozie od ostatniej doby ludu (budowa septow) - do ZcTiV w DailyLive; bez zapisu
+            public double DsTiSeen;                                           // DS (F1): utarg okna, od ktorego dziesiecine wzial woz (TitheVillageAtCart) - VillageTithe bierze tylko reszte; okno jak VHanded, bez zapisu
             public readonly long[] PaidG = new long[3];               // zaplacone za towar w oknie (czynsz, leczenie, sluzba - w dobie)
             public readonly long[] Offer = new long[3];               // nadwyzka oferowana na towar jutro (nie przelew - budzet "lepszych" kategorii)
             public long PaidKeep, VillWin, GmMatWin;                  // okno: zaplata ludu do kasy, zakupy wsi w tym miescie, material robot gminy (podstawa robocizny)
@@ -449,7 +450,7 @@ namespace Armoury
         private static void ClearWindow(Folk f)
         {
             Array.Clear(f.Win, 0, Kinds); Array.Clear(f.Sale, 0, Mixes);
-            f.ProdV = f.CarBuy = f.CarSell = f.VTrans = f.VHanded = 0;
+            f.ProdV = f.CarBuy = f.CarSell = f.VTrans = f.VHanded = 0; f.DsTiSeen = 0;
             f.G0 = f.G1 = f.SpendGame = f.SpendFood = f.ConsumedBk = f.ConsGold = 0; Array.Clear(f.Grp, 0, 3); f.Rows = 0;
             f.TakeWin = f.RegIn = f.RegOut = 0;
         }

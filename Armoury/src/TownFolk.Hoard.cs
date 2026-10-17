@@ -90,7 +90,8 @@ namespace Armoury
         private static long PayHoard(Folk f, int c, int slot, double ov, long aid, double rd)
         {
             if (!HoardKey) return 0;
-            if (DsTowns.FarmsLive) return 0;   // DS F3: podatek od skarbca ludu miast i zamkow zniesiony (czesc pana wliczona w firme M2)
+            double dsOld = DsTowns.OldShare;   // DS F3: podatek od skarbca ludu miast i zamkow zniesiony (czesc pana w firmie M2); recenzja 17.10: w przejsciu x (1 - rampa)
+            if (!(dsOld > 0)) return 0;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
@@ -110,6 +111,7 @@ namespace Armoury
                 if (!(due >= 1)) { if (aid > 0) _hdCovered++; _hdE0 += room; _hdE1 += room; return 0; }
                 long x = (long)Math.Floor(Math.Min(due, room));
                 x = Math.Min(x, purse0);
+                if (dsOld < 1) x = (long)Math.Floor(x * dsOld);          // DS F3: przejscie
                 if (x > int.MaxValue) x = int.MaxValue;
                 if (x <= 0) { _hdE0 += room; _hdE1 += room; return 0; }
                 var st = f.St;

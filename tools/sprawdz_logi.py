@@ -33735,7 +33735,10 @@ def nzc1_main(logp, bdp=None):
 NDS_HEAD = "Daniny wsi (DS): "
 NDS_ERR = ("ERROR in DsVillage.", "ERROR in DsTowns.", "ERROR in DsSeason.", "ERROR in SyncData.arm_daniny", "ERROR in VillageTakings.DsDues", "ERROR in TownFolk.DsSurplus",
            "ERROR in TownFolk.TitheVillageAtCart", "ERROR in TownFolk.DsVillageDay", "ERROR in TownFolk.DsCartTitheZc", "ERROR in TownFolk.CrownLoans.Ant.",
-           "ERROR in TownFolk.EarnDraw", "ERROR in TownFolk.DistrainCommune", "ERROR in TownFolk.DistrainUndo", "ERROR in KingdomTreasury.WageRefund(DS K5)", "ERROR in TownPurse.Ds")
+           "ERROR in TownFolk.EarnDraw", "ERROR in TownFolk.DistrainCommune", "ERROR in TownFolk.DistrainUndo", "ERROR in KingdomTreasury.WageRefund(DS K5)", "ERROR in TownPurse.Ds",
+           # recenzja 17.10: zastaw cla (stary SeizeCustoms i nowy SeizePledged / NotePledged), splata zaliczek (stara sciezka KlStumble i nowa AntRepayDay), czesc firmy z oszczednosci ludu
+           "ERROR in CrownBorrow.SeizeCustoms", "ERROR in CrownBorrow.SeizePledged", "ERROR in CrownBorrow.NotePledged", "ERROR in TownFolk.CrownLoans.Pay(zaliczki)",
+           "ERROR in TownFolk.AntRepayDay", "ERROR in TownFolk.DsFolkRate", "ERROR in TownFolk.DsFolkRateUndo")
 _NI = r"(-?\d+)"
 NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy kawalek osobno (odporne na dopiski)
     "carts": re.compile(r"\| wozy: powrotow (\d+), oddane " + _NI + r", pan i majatki \(bez zmian\) " + _NI + r", czesc wsi " + _NI + r" \(bez przyrostu kiesy (\d+)\)"),
@@ -33756,13 +33759,18 @@ NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy 
     "w4": re.compile(r"\| korona: W4 do wplywu dnia \(LeviesToday\) " + _NI + r", czeka w skarbcach do nastepnego Levies " + _NI),
     "ctl": re.compile(r"\| kontrola: platnicy - odbiorcy = " + _NI),
     "stum": re.compile(r"\| potkniecia (\d+) \(w sesji (\d+)\)"),
+    # recenzja 17.10 (poprawki): czynsz przepadly (rampa ksiegi / bez ksiegi), krok 5 wydany (towar, roboty gminy, niewydane), K5 przy samym F1
+    "rlost": re.compile(r", przepadlo \((?:rampa ksiegi|bez ksiegi)\) " + _NI),
+    "works": re.compile(r"\| krok 5 wydany: towar " + _NI + r", roboty gminy " + _NI + r" \((\d+) wsi: place ludu miast targowych " + _NI + r" \+ material do kas " + _NI
+                        + r"\), niewydane " + _NI + r" \((\d+) wsi\)"),
+    "k5": re.compile(r"brak zwrotu zoldu ze skarbca ponad zapas wojny \(K5, bez firm F3\) " + _NI + r" \((\d+) krolestw\)"),
 }
 
 
 def _nds_scan(path, full):
     """Jeden przebieg po logu: linie DS i linie niezalezne (stare pobory, ksiegi, korona, Bank, kiesy wsi, koszt). full=False (baza) - tylko liczby odniesienia."""
     D = {"ds": {}, "dsbad": [], "start": [], "off": [], "n_err": 0, "err1": None, "inc": {}, "refund": {}, "bankkd": {}, "kd": {}, "D": {}, "takt": {}, "bank": {}, "bil": {},
-         "vil": {}, "hv": {}, "vkor": {}, "w7v": {}, "extra": {}, "titheold": {}, "ut": {}, "utbez": {}, "tw1": {}, "fee": {}, "firmy": {}, "zal": {}, "korona": {}}
+         "vil": {}, "hv": {}, "vkor": {}, "w7v": {}, "extra": {}, "titheold": {}, "tithedsrest": {}, "ut": {}, "utbez": {}, "tw1": {}, "fee": {}, "firmy": {}, "zal": {}, "korona": {}}
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -33857,6 +33865,7 @@ def _nds_scan(path, full):
                 v = num(r"= wsie (\d+)", s)
                 if v is not None:
                     D["titheold"][day] = v
+                    D["tithedsrest"][day] = num(r"wsie DS - utarg bez dziesieciny przy wozie (\d+)", s) or 0   # recenzja 17.10: VillageTithe bierze reszte po staremu
             elif s.startswith("Utarg wsi (112)"):
                 v = num(r"oddane (\d+) =", s); b = num(r"bez odbiorcy razem \([^)]*\) (-?\d+)", s)
                 if v is not None:
@@ -33938,13 +33947,16 @@ def nds_main(logp, bdp=None, until=120):
         rep.add("NDS-1a: stare pobory wsi DS po rampie (linia DS: danina, podatek od nadwyzki, W7, 15%/d chciane, stara drabina)",
                 f"dob po rampie {len(full)}, z poborem {len(bad)}" + (f" (np. dzien {bad[0][0]}: {bad[0][1:]})" if bad else ""), "0 kazdej doby", not bad)
         chk = []
+        # recenzja 17.10: bez "Kiesa ludu: chciane z nadwyzka" (to koszyk dnia + nadwyzka - koszyk jest zawsze > 0; stare 15%/d sprawdza NDS-1a); linii brak (klucz wylaczony) - INFO
         for name, key, rule in (("podatek od nadwyzki wsi (obieg2) pobrano", "hv", 0), ("kiesy wsi: korona (danina, clo, mennica) w Przeplywy osad", "vkor", 0),
-                                ("W7 ze wsi", "w7v", 0), ("Kiesa ludu: wsie chciane z nadwyzka (15%/d)", "extra", 0)):
+                                ("W7 ze wsi", "w7v", 0)):
             v = [(d, D[key][d]) for d in full if d in D[key]]
             nz = [x for x in v if abs(x[1]) > rule]
             chk.append((name, len(v), nz))
-        txt = "; ".join(f"{n}: dob {k}, niezerowych {len(z)}" + (f" (dzien {z[0][0]}: {z[0][1]})" if z else "") for n, k, z in chk)
-        rep.add("NDS-1b: to samo z linii niezaleznych (obieg2, Przeplywy osad, W7, Kiesa ludu)", txt, "0 we wszystkich (bez linii - brak)", all(k > 0 and not z for _, k, z in chk))
+        txt = "; ".join(f"{n}: dob {k}" + (f", niezerowych {len(z)}" + (f" (dzien {z[0][0]}: {z[0][1]})" if z else "") if k else " (brak linii - INFO)") for n, k, z in chk)
+        have = [x for x in chk if x[1] > 0]
+        rep.add("NDS-1b: to samo z linii niezaleznych (obieg2, Przeplywy osad, W7)", txt, "0 we wszystkich liniach obecnych (brak linii - INFO)",
+                (all(not z for _, _, z in have)) if have else None)
         bkb = []
         for d in full:
             if "bk" in D["ds"][d]:
@@ -34030,9 +34042,10 @@ def nds_main(logp, bdp=None, until=120):
         rep.add("NDS-6a: wsi z zaleglosci ponad 91 rat czynszu (najgorsza doba)", f"{100 * worst91[0]:.1f}% (dzien {worst91[1]}); koniec: {a91:.0f} z {rN:.0f}", "<= 10%", worst91[0] <= 0.10)
         dd = due / max(1, len(win))
         rep.add("NDS-6b: zaleglosci czynszu razem na koniec (w dniach czynszu swiata)", f"{arrS:.0f} zl u {arrN:.0f} wsi = {arrS / dd if dd > 0 else 0:.1f} dni", "<= 30 dni", dd > 0 and arrS / dd <= 30)
-        col = paid / max(1.0, due - remit)
-        rep.add("NDS-6c: czynsz zaplacony / (nalezny - wstrzymany) w biegu (z zaleglosciami splaconymi)", f"{paid:.0f} / {due - remit:.0f} = {col:.3f} (nowe zaleglosci {newa:.0f}, darowane po roku {forg:.0f})",
-                ">= 0.95", col >= 0.95)
+        lost = sum(R(d, "rlost", 0) for d in win if "rlost" in D["ds"][d])
+        col = paid / max(1.0, due - remit - lost)
+        rep.add("NDS-6c: czynsz zaplacony / (nalezny - wstrzymany - przepadly w rampie ksiegi) w biegu (z zaleglosciami splaconymi)",
+                f"{paid:.0f} / {due - remit - lost:.0f} = {col:.3f} (nowe zaleglosci {newa:.0f}, darowane po roku {forg:.0f}, przepadlo w rampie {lost:.0f})", ">= 0.95", col >= 0.95)
     # NDS-7 korona
     ref_days = [d for d in win if d in D["refund"]]
     short = [(d, D["refund"][d]) for d in ref_days if D["refund"][d][0] < D["refund"][d][1]]
@@ -34128,9 +34141,13 @@ def nds_main(logp, bdp=None, until=120):
     th = sum(R(d, "tithe", 0) for d in win); hd = sum(R(d, "carts", 1) for d in win); prt = sum(R(d, "carts", 3) for d in win)
     if hd > 0:
         rep.add("NDS-14b: dziesiecina przy wozie / oddane (TitheVillageShare 5%, najwyzej czesc wsi)", f"{th:.0f} / {hd:.0f} = {th / hd:.4f}", "0.040-0.0505", 0.040 <= th / hd <= 0.0505)
-    to = [(d, D["titheold"][d]) for d in win[1:] if d in D["titheold"] and D["titheold"][d] > 0]
-    rep.add("NDS-14c: stara dziesiecina wsi z kiesy po oknie ('Dziesiecina (E5/C3)' wsie) przy DS", f"dob z > 0: {len(to)}" + (f" (dzien {to[0][0]}: {to[0][1]})" if to else ""),
-            "0 (wsie DS placa przy wozie; pierwsza doba DS - INFO)", not to)
+    # recenzja 17.10: VillageTithe bierze dziesiecine po staremu tylko od utargu, od ktorego woz jej nie wzial (okno nadpisane, obca wies, lista kaplanow nieznana) -
+    # najwyzej TitheVillageShare tej reszty (linia 'wsie DS - utarg bez dziesieciny przy wozie')
+    to = [(d, D["titheold"][d], D["tithedsrest"].get(d, 0)) for d in win[1:] if d in D["titheold"] and D["titheold"][d] > 0.0505 * D["tithedsrest"].get(d, 0) + 100]
+    rest = sum(D["tithedsrest"].get(d, 0) for d in win)
+    rep.add("NDS-14c: stara dziesiecina wsi z kiesy po oknie ('Dziesiecina (E5/C3)' wsie) przy DS - tylko od utargu bez dziesieciny przy wozie",
+            f"dob ponad 5% reszty + 100: {len(to)}" + (f" (dzien {to[0][0]}: {to[0][1]} przy reszcie {to[0][2]})" if to else "") + f"; reszta utargu razem {rest:.0f}",
+            "0 (pierwsza doba DS - INFO)", not to)
     wb = []
     for d in win:
         rr = R(d, "ramp")
@@ -34156,6 +34173,14 @@ def nds_main(logp, bdp=None, until=120):
         n = len(win)
         sp5 = sum(R(d, "chest", 6) for d in win); bks = sum(D["ds"][d]["bk"][3] for d in win if "bk" in D["ds"][d]); bud = sum(R(d, "chest", 4) for d in win)
         nm = sum(D["ds"][d]["nomkt"][0] for d in win if "nomkt" in D["ds"][d]) / n
+        wk = [D["ds"][d]["works"] for d in win if "works" in D["ds"][d]]
+        if wk:
+            gd, wo, nw = sum(x[0] for x in wk) / n, sum(x[1] for x in wk) / n, sum(x[5] for x in wk) / n
+            rep.add("NDS-17: krok 5 - towar, roboty gminy, niewydane (recenzja 17.10: odplyw bez towaru)", f"na dobe: towar {gd:.0f}, roboty gminy {wo:.0f} (place {sum(x[3] for x in wk) / n:.0f} + material {sum(x[4] for x in wk) / n:.0f}), niewydane {nw:.0f}",
+                    "niewydane <= 10% kroku 5 (bez kiesy ludu w miescie targowym)", nw <= 0.10 * max(1.0, gd + wo + nw))
+        k5 = [D["ds"][d]["k5"] for d in win if "k5" in D["ds"][d]]
+        if k5:
+            rep.add("NDS-18: K5 przy samym F1 - brak zwrotu pokryty ze skarbca ponad zapas wojny (INFO; Bank w NDS-7c)", f"razem {sum(x[0] for x in k5):.0f} zl, krolestwo-dob {sum(x[1] for x in k5):.0f}", "INFO", None)
         rep.add("NDS-16: przeplywy DS na dobe (INFO)", f"oddane {hd / n:.0f}, czesc wsi {prt / n:.0f}, dziesiecina {th / n:.0f}, korona przy wozie {cr / n:.0f} + markietani {sc / n:.0f}, "
                 f"czynsz {sum(R(d, 'rent', 2) for d in win) / n:.0f}, zbytki z nadwyzki {bud / n:.0f} (P5 kupione {sp5 / n:.0f}, rynek BK kupione {bks / n:.0f}; wsi bez rynku BK {nm:.0f}/d), "
                 f"skrzynia swiata {R(win[-1], 'chest', 2):.0f}, kiesy {R(win[-1], 'chest', 1):.0f}, ponad skrzynia {R(win[-1], 'chest', 3):.0f}", "INFO", None)

@@ -286,8 +286,7 @@ namespace Armoury
                     foreach (var kv in _klBan) if (kv.Value <= today) old.Add(kv.Key);
                     foreach (var id in old) _klBan.Remove(id);
                 }
-                // DS F3 (L1): zaliczki mieszczan pod nadanie - odsetki i splata PIERWSZA z rat nadania wplaconych dzis (dziesiata + W4), przed zwyklym dlugiem korona2
-                try { AntRepay(s); } catch (Exception e) { KlStumble("Pay(zaliczki)", e); }
+                // DS F3 (L1): zaliczki mieszczan pod nadanie - recenzja 17.10: odsetki i splata PO zwrocie zoldu (TownFolk.AntRepayDay, ArmouryBehavior), nie tutaj
                 double rate = KlRate(s) / YearDays;
                 int dflt = KlDefault(s);
                 var drop = new List<string>();

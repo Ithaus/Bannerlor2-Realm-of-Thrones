@@ -23,8 +23,12 @@ namespace Armoury
     ///     spladrowanie (wies), oblezenie miasta targowego, glod - rata dnia darowana; zaleglosc ponad DsRentForgiveDays rat - darowana ("decasus", licznik);
     ///  2. koszyk dnia (stara lista, buy1 - bez zmian); 3. zaleglosc koszyka wozem (E3-W1, bez zmian);
     ///  4. skrzynia na czarna godzine Chest = DsVillageChestDays x (koszyk dnia + czynsz dnia); ponizej niej nic wiecej nie idzie;
-    ///  5. zbytki tylko z nadwyzki: rampa x (kiesa - skrzynia) / DsSurplusSpendDays dziennie - (1 - DsSurplusBkShare) na liste dostatku P5 w miescie targowym (bez P5 -
-    ///     lista wsi), DsSurplusBkShare na rynek wsi BK (BkSeal34, najblizszy tick BK). Pozyczki ludu dla panow (TownFolk.Loans) - tylko ponad skrzynie.
+    ///  5. zbytki tylko z nadwyzki: rampa x (kiesa - skrzynia) / DsSurplusSpendDays dziennie - (1 - DsSurplusBkShare) na liste dostatku P5 w miescie targowym, reszta
+    ///     tego budzetu na liste wsi (najpierw sol i narzedzia przy VillWorkOnly), a czego nie ma na polkach - ROBOTY GMINY (DsCommunalWorks, recenzja 17.10: fabryka
+    ///     kosciola, mlyn, most, drogi - 3/4 place ludu miasta targowego, 1/4 material do jego kasy; bez tego pieniadz wsi bez towaru zostawal w kiesie na zawsze);
+    ///     DsSurplusBkShare na rynek wsi BK (BkSeal34, najblizszy tick BK; niewydane w ticku - nastepnego dnia do czesci P5). Pozyczki ludu dla panow (TownFolk.Loans) -
+    ///     w rampie prog (1 - rampa) x stary + rampa x skrzynia.
+    /// KLUCZ DuesMedieval DOMYSLNIE WYLACZONY (recenzja 17.10, krytyczne): bez koszyka KS wies nie ma na co wydac uwolnionych pieniedzy - wlaczenie tylko po autotescie.
     /// Pobory "resztowe" kiesy wsi DS (danina korony od kiesy w Levies, podatek od nadwyzki PayHoardVillage, stawka wojenna pana W7, rynek BK 5% kiesy, 15%/d nadwyzki
     /// na stara liste i stara drabina P5) slabna liniowo przez rampe DsRampDays (28 dob) od pierwszej doby z kluczem (DayOn w zapisie) - x (1 - Ramp); nowe (W4,
     /// krok 5) rosna x Ramp. Wylaczenie klucza - stare zasady od razu, DayOn od nowa (ponowne wlaczenie = nowa rampa); zaleglosci zostaja w zapisie bez skutku.
@@ -47,6 +51,7 @@ namespace Armoury
         // ------------------------------------------------------------ sesja
         private static readonly Dictionary<string, int> _bk = new Dictionary<string, int>();     // id wsi -> polowa kroku 5 na rynek BK (do najblizszego ticku BK wsi)
         private static readonly Dictionary<string, int> _bkTick = new Dictionary<string, int>(); // id wsi -> doba ostatniego ticku rynku BK wsi (wies bez rynku BK - krok 5 caly na P5)
+        private static readonly Dictionary<string, int> _bkLeft = new Dictionary<string, int>(); // id wsi -> nowy budzet BK niewydany w ostatnim ticku (brak towaru z nadwyzka podazy) - jutro P5 / roboty
         private static bool _startLogged;
         private static int _stumbles, _stumblesSess;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
@@ -58,9 +63,11 @@ namespace Armoury
         private static int _rN, _rRemitN, _rRemitRaid, _rRemitSiege, _rRemitFam, _rForgivenN;
         private static double _rDue, _rPaid, _rArrPaid, _rNewArr, _rForgiven, _rRemit, _rLost;
         private static int _kVill; private static double _kGold, _kChest, _kOver, _kBudget, _kP5Plan, _kBkPlan, _kP5, _kOldExtra, _kOldLadder;
-        private static long _kBkSpent, _kBkOldPlan, _kBkNewPlan, _kBkOldSpent, _kBkNoMkt; private static int _kBkTicks, _kBkNoMktN;
-        private static long _oLevy, _oHoard, _oW7; private static int _oLevyN, _oHoardN, _oW7N;
+        private static long _kBkSpent, _kBkOldPlan, _kBkNewPlan, _kBkOldSpent, _kBkNoMkt, _kBkLeft, _kBkCarry; private static int _kBkTicks, _kBkNoMktN, _kBkCarryN;
+        private static long _kGoods, _kWorks, _kWorksWage, _kWorksMat; private static double _kWorksNo; private static int _kWorksN, _kWorksNoN;
+        private static long _oLevy, _oHoard, _oW7, _oW7Cut; private static int _oLevyN, _oHoardN, _oW7N, _oW7CutN;
         private static long _payOut, _payIn, _flushed;
+        private static long _k5Treas; private static int _k5N;                                   // K5 przy samym F1: brak zwrotu pokryty ze skarbca ponad zapas wojny (DsSeason.TreasuryForRefund)
 
         private static void ClearCounters()
         {
@@ -70,16 +77,18 @@ namespace Armoury
             _rN = _rRemitN = _rRemitRaid = _rRemitSiege = _rRemitFam = _rForgivenN = 0;
             _rDue = _rPaid = _rArrPaid = _rNewArr = _rForgiven = _rRemit = _rLost = 0;
             _kVill = 0; _kGold = _kChest = _kOver = _kBudget = _kP5Plan = _kBkPlan = _kP5 = _kOldExtra = _kOldLadder = 0;
-            _kBkSpent = _kBkOldPlan = _kBkNewPlan = _kBkOldSpent = _kBkNoMkt = 0; _kBkTicks = _kBkNoMktN = 0;
-            _oLevy = _oHoard = _oW7 = 0; _oLevyN = _oHoardN = _oW7N = 0;
+            _kBkSpent = _kBkOldPlan = _kBkNewPlan = _kBkOldSpent = _kBkNoMkt = _kBkLeft = _kBkCarry = 0; _kBkTicks = _kBkNoMktN = _kBkCarryN = 0;
+            _kGoods = _kWorks = _kWorksWage = _kWorksMat = 0; _kWorksNo = 0; _kWorksN = _kWorksNoN = 0;
+            _oLevy = _oHoard = _oW7 = _oW7Cut = 0; _oLevyN = _oHoardN = _oW7N = _oW7CutN = 0;
             _payOut = _payIn = _flushed = 0;
+            _k5Treas = 0; _k5N = 0;
             _stumbles = 0;
         }
 
         /// <summary>Konstruktor ArmouryBehavior: nowa sesja (zapis wczytuje Import po konstruktorze).</summary>
         internal static void Reset()
         {
-            _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _bkTick.Clear(); _startLogged = false;
+            _dayOn = -1; _arr.Clear(); _pend.Clear(); _bk.Clear(); _bkTick.Clear(); _bkLeft.Clear(); _startLogged = false;
             _stumblesSess = 0; _errOnce.Clear();
             ClearCounters();
         }
@@ -92,6 +101,9 @@ namespace Armoury
 
         // ============================================================ przelaczniki
         internal static bool Key { get { var s = Settings.Current; return s != null && s.DuesMedieval; } }
+
+        /// <summary>F1 czynne (klucz DuesMedieval i kiesa ludu) - bez wzgledu na osade. Korona (K5 krok 1 przy samym F1: KingdomTreasury.WageRefund, DsSeason.TreasuryForRefund).</summary>
+        internal static bool Live { get { return Key && TownFolk.Live; } }
 
         /// <summary>Wies DS: klucz DuesMedieval, wies, kiesa ludu czynna (oplata stala zamiast renty 20% - VillageTakings.VillageRentYieldsToFees). Bez KS (odstepstwo).</summary>
         internal static bool On(Settlement st) { return Key && st != null && st.IsVillage && st.Village != null && TownFolk.Live; }
@@ -108,6 +120,7 @@ namespace Armoury
         private static int ForgiveDays(Settings s) { return s != null ? Math.Max(0, Math.Min(3640, s.DsRentForgiveDays)) : 364; }
         private static int ChestDays(Settings s) { return s != null ? Math.Max(0, Math.Min(364, s.DsVillageChestDays)) : 21; }
         private static int SpendDays(Settings s) { return s != null ? Math.Max(0, Math.Min(364, s.DsSurplusSpendDays)) : 15; }
+        private static int ArrPayDays(Settings s) { return s != null ? Math.Max(0, Math.Min(364, s.DsRentArrearsPayDays)) : 28; }
 
         /// <summary>Rampa 0..1 od pierwszej doby DS (DsRampDays; 0 = od razu 1). Klucz albo kiesa ludu wylaczone - 0 (stare zasady). Pierwsze wywolanie z kluczem ustala DayOn.</summary>
         internal static double Ramp
@@ -135,11 +148,17 @@ namespace Armoury
             try
             {
                 if (k == null || k.IsEliminated) return 0;
-                if (DsSeason.Live) return DsSeason.GrantOf(k);   // DS F3 (K2): g z nadania wojennego (stale przez kwartal)
-                if (!KingdomTreasury.AtWar(k)) return 0;
-                bool wt = false;
-                try { wt = k.ActivePolicies.Contains(DefaultPolicies.WarTax); } catch { wt = false; }
-                return wt ? 1.5 : 1.0;
+                double g1 = 0;
+                if (KingdomTreasury.AtWar(k))
+                {
+                    bool wt = false;
+                    try { wt = k.ActivePolicies.Contains(DefaultPolicies.WarTax); } catch { wt = false; }
+                    g1 = wt ? 1.5 : 1.0;
+                }
+                if (!DsSeason.Live) return g1;
+                // DS F3 (K2): g z nadania wojennego (stale przez kwartal); recenzja 17.10 - w przejsciu F3 liniowo od g F1 do g nadania (rampa DsRampDays od ustalenia firm)
+                double gs = DsSeason.GrantOf(k), rn = DsTowns.NewShare;
+                return rn >= 1 ? gs : (1 - rn) * g1 + rn * gs;
             }
             catch { return 0; }
         }
@@ -197,6 +216,15 @@ namespace Armoury
             double r = Math.Max(0, rentBeforeDecree) * Decree(st);
             double c = days * (Math.Max(0, nv) + r);
             return double.IsNaN(c) || double.IsInfinity(c) ? 0 : c;
+        }
+
+        /// <summary>TownFolk.Loans (zrodlo wies DS): prog pozyczek panom w rampie - (1 - Ramp) x stary prog (zapas dni zakupow) + Ramp x skrzynia; przy rampie 0 stare zasady.</summary>
+        internal static double LoanFloor(Settlement st, double oldNorm, double nv, double rentBeforeDecree)
+        {
+            double r = Ramp;
+            if (r <= 0) return oldNorm;
+            double c = ChestOf(st, nv, rentBeforeDecree);
+            return (1.0 - r) * oldNorm + r * c;
         }
 
         private static double Decree(Settlement st)
@@ -362,8 +390,10 @@ namespace Armoury
         // ============================================================ 1. czynsz staly i zaleglosci (PopulationLaw.Daily)
         /// <summary>
         /// PopulationLaw.Daily, wies DS (oplata stala): `due` - rata dnia po dekrecie, `gold` - kiesa wsi. Oblezenie miasta targowego albo glod (DsRentRemitRaided) - rata
-        /// darowana, zaleglosc czeka. Inaczej: rata + zaleglosc, najwyzej kiesa; najpierw najstarsza zaleglosc. Reszta - do ksiegi (DsRentArrears; wylaczone - przepada
-        /// jak dotad). Zaleglosc ponad DsRentForgiveDays rat - darowana ("decasus"). Zwraca kwote do zaplaty teraz (wolajacy przelewa ja panu). Nie rzuca.
+        /// darowana, zaleglosc czeka. Inaczej (recenzja 17.10): 1. rata dnia pierwsza, najwyzej kiesa (jak przed DS); 2. zaleglosc - rata zaleglosci (1/DsRentArrearsPayDays,
+        /// najmniej rata dnia) tylko z kiesy PONAD koszyk dnia (zaleglosc nigdy nie zabiera chleba - projekt 3.3); 3. niezaplacona rata dnia do ksiegi x Ramp (DsRentArrears;
+        /// przy rampie 0 i przy wylaczonej ksiedze przepada jak przed DS - licznik "przepadlo"). Zaleglosc ponad DsRentForgiveDays rat - darowana ("decasus").
+        /// Zwraca kwote do zaplaty teraz (wolajacy przelewa ja panu). Nie rzuca.
         /// </summary>
         internal static int RentPay(Settlement st, float due, int gold)
         {
@@ -383,14 +413,27 @@ namespace Armoury
                 }
                 Arr a = null; double owed = 0;
                 if (s.DsRentArrears && _arr.TryGetValue(st.StringId, out a)) owed = Math.Max(0, a.Owed);
-                double want = d + owed;
-                long pay = (long)Math.Min(Math.Floor(want), Math.Max(0, (long)gold));
-                if (pay < 0) pay = 0;
-                double toArr = Math.Min(pay, owed);
-                double left = want - pay;
-                _rPaid += pay; _rArrPaid += toArr;
-                if (!s.DsRentArrears) { _rLost += Math.Max(0, left); return (int)Math.Min(int.MaxValue, pay); }
-                _rNewArr += Math.Max(0, d - (pay - toArr));
+                long g = Math.Max(0, (long)gold);
+                long payDay = (long)Math.Max(0, Math.Min(Math.Floor(d), (double)g));          // 1. rata dnia - pierwsza, najwyzej kiesa
+                long payArr = 0;
+                if (owed >= 1)
+                {
+                    // 2. rata zaleglosci tylko z kiesy ponad koszyk dnia (TownFolk.Villages kupuje go po czynszu)
+                    double nv, r1;
+                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, nv) : 0;
+                    int pd = ArrPayDays(s);
+                    double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
+                    double room = g - payDay - basket;
+                    payArr = (long)Math.Floor(Math.Max(0, Math.Min(Math.Min(owed, inst), room)));
+                }
+                long pay = payDay + payArr;
+                _rPaid += pay; _rArrPaid += payArr;
+                double shortDay = Math.Max(0, d - payDay);
+                if (!s.DsRentArrears) { _rLost += shortDay; return (int)Math.Min(int.MaxValue, pay); }
+                // 3. ksiega zaleglosci w rampie (krytyczne recenzji: przy rampie 0 stare zasady - niezaplacona rata przepada)
+                double toBook = shortDay * Ramp;
+                _rNewArr += toBook; _rLost += shortDay - toBook;
+                double left = owed - payArr + toBook;
                 // ulamek zlotowki (rata po dekrecie, wyplata w calych) przechodzi na nastepna dobe w tej samej ksiedze - zaleglosc "prawdziwa" od 1 zl
                 if (left > 1e-6)
                 {
@@ -413,7 +456,8 @@ namespace Armoury
             catch (Exception e) { Stumble("RentPay", e); return 0; }
         }
 
-        /// <summary>PopulationLaw.Daily: wies DS spladrowana albo w rabunku - rata dnia darowana (bez zaleglosci; wies i tak nie placila). Tylko licznik.</summary>
+        /// <summary>PopulationLaw.Daily: wies DS spladrowana albo w rabunku - rata dnia darowana (bez zaleglosci; wies i tak nie placila). Tylko licznik: nalezna i wstrzymana
+        /// (recenzja 17.10: bez "nalezny" bramka NDS-6c zanizala mianownik).</summary>
         internal static void RentRemit(Settlement st)
         {
             try
@@ -421,6 +465,7 @@ namespace Armoury
                 if (!On(st)) return;
                 double nv, rent;
                 double d = TownFolk.DsVillageDay(st, out nv, out rent) ? rent * Decree(st) : 0;
+                _rN++; _rDue += d;
                 _rRemit += d; _rRemitN++; _rRemitRaid++;
             }
             catch (Exception e) { Stumble("RentRemit", e); }
@@ -429,7 +474,9 @@ namespace Armoury
         // ============================================================ 4-5. skrzynia i zbytki z nadwyzki (TownFolk.Villages)
         /// <summary>TownFolk.Villages (wies DS, po koszyku dnia): budzet zbytkow tej doby = Ramp x max(0, kiesa - skrzynia) / DsSurplusSpendDays; czesc DsSurplusBkShare
         /// odlozona na najblizszy tick rynku BK wsi (BkSeal34; bez latki albo wylaczony, albo wies bez ticku rynku BK w ostatnich 2 dobach - bez budynku targu BK, nie Normal -
-        /// calosc na P5; model 17.10: rynek BK kupuje dziennie w ok. 65 z 571 wsi, reszta zostawialaby polowe kroku 5 w kiesie na zawsze). Zwraca czesc P5 do wydania teraz.</summary>
+        /// calosc na P5; model 17.10: rynek BK kupuje dziennie w ok. 65 z 571 wsi, reszta zostawialaby polowe kroku 5 w kiesie na zawsze). Recenzja 17.10: nowy budzet BK niewydany
+        /// w ostatnim ticku (brak towaru z nadwyzka podazy) dochodzi dzis do czesci P5 (najwyzej kiesa ponad skrzynie) - krok 5 wydaje caly budzet, nie polowe.
+        /// Zwraca czesc P5 do wydania teraz (TownFolk.DsSurplus: lista dostatku, lista wsi, reszta - roboty gminy DsCommunalWorks).</summary>
         internal static double SurplusDay(Settlement st, int gold, double chest)
         {
             try
@@ -440,6 +487,8 @@ namespace Armoury
                 _kVill++; _kGold += Math.Max(0, gold); _kChest += chest; _kOver += over;
                 int sd = SpendDays(s);
                 double ramp = Ramp;
+                int carry;
+                if (_bkLeft.TryGetValue(st.StringId, out carry)) _bkLeft.Remove(st.StringId); else carry = 0;
                 if (sd <= 0 || ramp <= 0 || over < 1) { _bk.Remove(st.StringId); return 0; }
                 double budget = ramp * over / sd;
                 double bkShare = Unit(s.DsSurplusBkShare);
@@ -450,6 +499,8 @@ namespace Armoury
                     if (!_bkTick.TryGetValue(st.StringId, out tick) || Today - tick > 2) { _kBkNoMktN++; _kBkNoMkt += (long)Math.Floor(budget * bkShare); bkShare = 0; }
                 }
                 double bk = Math.Floor(budget * bkShare), p5 = budget - bk;
+                double cy = Math.Floor(Math.Min(Math.Max(0, carry), Math.Max(0, over - budget)));
+                if (cy >= 1) { p5 += cy; _kBkCarry += (long)cy; _kBkCarryN++; }
                 if (bk >= 1) _bk[st.StringId] = (int)Math.Min(int.MaxValue, bk); else _bk.Remove(st.StringId);
                 _kBudget += budget; _kBkPlan += bk; _kP5Plan += p5;
                 return p5;
@@ -457,8 +508,17 @@ namespace Armoury
             catch (Exception e) { Stumble("SurplusDay", e); return 0; }
         }
 
-        /// <summary>TownFolk.Villages: zaplacone z czesci P5 kroku 5 (lista dostatku albo lista wsi).</summary>
-        internal static void NoteP5(long got) { if (got > 0) _kP5 += got; }
+        /// <summary>TownFolk.Villages: zaplacone z czesci P5 kroku 5 - towar (lista dostatku i lista wsi, `goods`) i roboty gminy (`works` = place `wage` + material `mat`);
+        /// `noWorks` - czesc niewydana (bez towaru i bez robot: klucz wylaczony, miasto targowe bez kiesy ludu).</summary>
+        internal static void NoteP5(long goods, long works, long wage, long mat, double noWorks)
+        {
+            if (goods > 0) { _kP5 += goods; _kGoods += goods; }
+            if (works > 0) { _kP5 += works; _kWorks += works; _kWorksWage += wage; _kWorksMat += mat; _kWorksN++; }
+            if (noWorks >= 1) { _kWorksNo += noWorks; _kWorksNoN++; }
+        }
+
+        /// <summary>DsSeason.TreasuryForRefund przy samym F1 (bez firm F3): brak zwrotu pokryty ze skarbca ponad zapas wojny - licznik linii.</summary>
+        internal static void NoteK5(long x) { if (x > 0) { _k5Treas += x; _k5N++; } }
 
         /// <summary>TownFolk.Villages: stare wydatki z nadwyzki wsi DS w rampie (15%/d na stara liste, stara drabina P5) - liczniki "chciane".</summary>
         internal static void NoteOldExtras(double extra, double ladder) { if (extra > 0) _kOldExtra += extra; if (ladder > 0) _kOldLadder += ladder; }
@@ -486,8 +546,20 @@ namespace Armoury
             catch (Exception e) { Stumble("BkBudget", e); fresh = 0; return 0; }
         }
 
-        /// <summary>BkSeal34.RunVillage: zakupy wsi DS na rynku BK - razem i w tym w starym pulapie na sztuke (oczekiwane 0 po rampie).</summary>
-        internal static void NoteBkSpent(long spent, long oldCap) { if (spent > 0) _kBkSpent += spent; if (oldCap > 0) _kBkOldSpent += oldCap; }
+        /// <summary>BkSeal34.RunVillage: zakupy wsi DS na rynku BK - razem i w tym w starym pulapie na sztuke (oczekiwane 0 po rampie); `freshLeft` - nowy budzet niewydany
+        /// (jutro do czesci P5 kroku 5 - SurplusDay).</summary>
+        internal static void NoteBkSpent(Settlement st, long spent, long oldCap, int freshLeft)
+        {
+            if (spent > 0) _kBkSpent += spent;
+            if (oldCap > 0) _kBkOldSpent += oldCap;
+            try
+            {
+                if (st == null || st.StringId == null) return;
+                if (freshLeft >= 1) { _bkLeft[st.StringId] = freshLeft; _kBkLeft += freshLeft; }
+                else _bkLeft.Remove(st.StringId);
+            }
+            catch (Exception e) { Stumble("NoteBkSpent", e); }
+        }
 
         // ============================================================ stare pobory wsi DS w rampie (oczekiwane 0 po rampie)
         /// <summary>KingdomTreasury.Levies (galaz wsi): danina korony od kiesy ponad 15 dni zakupow - wies DS x (1 - Ramp). Zwraca kwote po rampie.</summary>
@@ -516,6 +588,9 @@ namespace Armoury
         }
         internal static void NoteOldW7(Settlement st, long took) { if (took > 0 && On(st)) { _oW7 += took; _oW7N++; } }
 
+        /// <summary>KingdomTreasury.LvKingdom: potrzeba W7 rodu pomniejszona o czesc wsi DS (bez przerzucania na lud miast) - licznik linii.</summary>
+        internal static void NoteW7Cut(long x) { if (x > 0) { _oW7Cut += x; _oW7CutN++; } }
+
         // ============================================================ linia doby
         private static string N0(double v) { return double.IsNaN(v) || double.IsInfinity(v) ? "0" : Math.Round(v).ToString("0", Inv); }
 
@@ -534,7 +609,7 @@ namespace Armoury
                     if (_dayOn >= 0 || _startLogged)
                         Log.Info("Daniny wsi (DS): dzien " + day + " | WYLACZONE (" + (s != null && s.DuesMedieval ? "kiesa ludu nieczynna" : "klucz Dues Medieval") + ") - stare pobory wsi od tej doby; zaleglosci czynszu "
                                  + _arr.Count + " wsi zostaja w zapisie bez skutku; ponowne wlaczenie = nowa rampa.");
-                    _dayOn = -1; _startLogged = false; _bk.Clear(); _bkTick.Clear();
+                    _dayOn = -1; _startLogged = false; _bk.Clear(); _bkTick.Clear(); _bkLeft.Clear();
                     ClearCounters();
                     return;
                 }
@@ -577,15 +652,20 @@ namespace Armoury
                   .Append(", nowa zaleglosc ").Append(N0(_rNewArr)).Append(", zaleglosci ").Append(N0(arrSum)).Append(" u ").Append(arrN).Append(" wsi (ponad 91 rat ").Append(arr91).Append(")")
                   .Append(", darowane po roku ").Append(N0(_rForgiven)).Append(" (").Append(_rForgivenN).Append(" wsi), wstrzymane ").Append(N0(_rRemit)).Append(" (").Append(_rRemitN)
                   .Append(": rabunek ").Append(_rRemitRaid).Append(", oblezenie ").Append(_rRemitSiege).Append(", glod ").Append(_rRemitFam).Append(")")
-                  .Append(s.DsRentArrears ? "" : ", przepadlo bez ksiegi " + N0(_rLost))
+                  .Append(", przepadlo (" + (s.DsRentArrears ? "rampa ksiegi" : "bez ksiegi") + ") ").Append(N0(_rLost))
                   .Append(" | skrzynia: wsi ").Append(_kVill).Append(", kiesy ").Append(N0(_kGold)).Append(", cel skrzyni ").Append(N0(_kChest)).Append(", ponad skrzynia ").Append(N0(_kOver))
                   .Append(", zbytki z nadwyzki ").Append(N0(_kBudget)).Append(" (P5 ").Append(N0(_kP5Plan)).Append(" - kupione ").Append(N0(_kP5))
                   .Append(" / rynek BK ").Append(N0(_kBkPlan)).Append(" odlozone; wsi bez rynku BK (krok 5 caly na P5) ").Append(_kBkNoMktN).Append(" - ").Append(_kBkNoMkt)
                   .Append("; ticki BK wsi DS ").Append(_kBkTicks).Append(": pulap stary na sztuke ").Append(_kBkOldPlan).Append(", budzet nowy ").Append(_kBkNewPlan)
                   .Append(", kupione ").Append(_kBkSpent).Append(" (w starym pulapie ").Append(_kBkOldSpent).Append(")), rampa ").Append(ramp.ToString("0.000", Inv)).Append(" (od doby ").Append(_dayOn).Append(")")
+                  .Append(" | krok 5 wydany: towar ").Append(_kGoods).Append(", roboty gminy ").Append(_kWorks).Append(" (").Append(_kWorksN).Append(" wsi: place ludu miast targowych ").Append(_kWorksWage)
+                  .Append(" + material do kas ").Append(_kWorksMat).Append("), niewydane ").Append(N0(_kWorksNo)).Append(" (").Append(_kWorksNoN).Append(" wsi)")
+                  .Append("; budzet BK niewydany w ticku ").Append(_kBkLeft).Append(", z poprzedniego ticku do P5 ").Append(_kBkCarry).Append(" (").Append(_kBkCarryN).Append(" wsi)")
                   .Append(" | stare pobory wsi DS (oczekiwane 0 po rampie): danina ").Append(_oLevy).Append(" (").Append(_oLevyN).Append(" wsi), podatek od nadwyzki ").Append(_oHoard).Append(" (").Append(_oHoardN)
                   .Append(" wsi), W7 ").Append(_oW7).Append(" (").Append(_oW7N).Append(" zrodel), 15%/d nadwyzki na stara liste (chciane) ").Append(N0(_kOldExtra)).Append(", stara drabina P5 (chciane) ").Append(N0(_kOldLadder))
+                  .Append(" | W7: potrzeba rodow pomniejszona o czesc wsi DS ").Append(_oW7Cut).Append(" (").Append(_oW7CutN).Append(" rodow)")
                   .Append(" | korona: W4 do wplywu dnia (LeviesToday) ").Append(_flushed).Append(", czeka w skarbcach do nastepnego Levies ").Append(PendSum())
+                  .Append("; brak zwrotu zoldu ze skarbca ponad zapas wojny (K5, bez firm F3) ").Append(_k5Treas).Append(" (").Append(_k5N).Append(" krolestw)")
                   .Append(" | kontrola: platnicy - odbiorcy = ").Append(ctl);
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');

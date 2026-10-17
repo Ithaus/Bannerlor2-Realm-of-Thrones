@@ -141,12 +141,15 @@ namespace Armoury
             foreach (var f in _f.Values)
             {
                 if (f.Kind != 2 || !(f.VHanded > 0)) continue;
-                if (DsVillage.CartDuesOn(f.St)) continue;                     // DS (F1): dziesiecina wsi DS zdjeta juz przy wozie (TitheVillageAtCart)
+                // DS (F1): dziesiecina wsi DS zdjeta juz przy wozie (TitheVillageAtCart) - tu tylko utarg okna, od ktorego DS jej NIE wzial (recenzja 17.10: okno wozu
+                // nadpisane, woz oddal utarg w obcej wsi, lista kaplanow doby nieznana, woz bez przyrostu kiesy) - ta sama regula co przed DS, nic nie ginie bez licznika
+                double vh = f.VHanded;
+                if (DsVillage.CartDuesOn(f.St)) { vh -= f.DsTiSeen; if (!(vh >= 1)) continue; d.TiVDsRest += (long)Math.Round(vh); d.TiVDsRestN++; }
                 try
                 {
                     var vil = f.St.Village;
                     if (vil == null) continue;
-                    long due = (long)Math.Round(f.VHanded * share);
+                    long due = (long)Math.Round(vh * share);
                     if (due <= 0) continue;
                     d.TiVDue += due;
                     long x = Math.Min(due, Math.Max(0, vil.Gold));
@@ -199,6 +202,8 @@ namespace Armoury
                 long x = Math.Min((long)Math.Round(handed * share), part);
                 if (x <= 0) return 0;
                 var st = vil.Settlement;
+                Folk sf;                                                            // utarg okna, od ktorego DS wzial dziesiecine (VillageTithe bierze tylko reszte)
+                if (_f.TryGetValue(st, out sf) && sf != null) sf.DsTiSeen += handed;
                 if (!_priests.Contains(st)) { state = 1; return x; }
                 alms = (long)Math.Round(x * TitheAlms);
                 long build = x - alms;
@@ -250,6 +255,7 @@ namespace Armoury
             long town = d.TiW + d.TiR + d.TiP, all = d.TiV + town, viaPriest = all - d.TiNoPriestT - d.TiNoPriestV;
             return "Dziesiecina (E5/C3): dzien " + day + (_priests == null ? " | POMINIETA tej doby (" + _relWhy + "; nieudane odczyty kaplanow BK " + _priestFail + ", w sesji " + _priestFailSess + ")" : "")
                    + " | razem " + all + " = wsie " + d.TiV + " (" + d.TiVN + " wsi; nalezne " + d.TiVDue + " = " + F2(TitheVillage(Settings.Current)) + " utargu okna, niezaplacone " + Math.Max(0, d.TiVDue - d.TiV)
+                   + (d.TiVDsRestN > 0 ? "; wsie DS - utarg bez dziesieciny przy wozie " + d.TiVDsRest + " (" + d.TiVDsRestN + " wsi)" : "")
                    + ") + lud miast " + town + " (W " + d.TiW + " / R " + d.TiR + " / P " + d.TiP + ")"
                    + " | przez kaplanow " + viaPriest + " (osad " + d.TiPriestN + "): jalmuzna " + (d.TiAlmsT + d.TiAlmsV) + " (kiesy W miast " + d.TiAlmsT + ", kiesy wsi " + d.TiAlmsV
                    + "), budowa septow " + (d.TiWage + d.TiMat + d.TiNoMarket) + ": place ludu " + d.TiWage + ", material do kas miast " + d.TiMat + ", wsie bez miasta targowego (zostalo w kiesie) " + d.TiNoMarket

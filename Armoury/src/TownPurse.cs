@@ -417,7 +417,7 @@ namespace Armoury
         /// liczba do linii). Pan dostaje przelew GiveGoldAction (osada -> glowa rodu, jak dotad renty), korona: kasa -> skarbiec (bez zdarzenia gry,
         /// jak danina i zawor zamku). Zapis rent (RentToday, _rentBy, DayTownRent) robi PopulationLaw. Wyjatek - to jedno miasto, licznik potkniec.
         /// </summary>
-        internal static bool Valve(Settlement st, float decree, long due, out int lordPay, out int lordBase, out int crown, out long spare)
+        internal static bool Valve(Settlement st, float decree, long due, out int lordPay, out int lordBase, out int crown, out long spare, double scale = 1.0)
         {
             lordPay = 0; lordBase = 0; crown = 0; spare = 0;
             try
@@ -433,6 +433,7 @@ namespace Armoury
                 var lord = clan != null ? clan.Leader : null;
                 if (lord == null || !lord.IsAlive) { _vNoLord++; return true; }   // martwy / brak pana - nic nie schodzi (czeka)
                 int pay = CastlePurse.Dues(gold, reserve, ValveSplit.Unit(s.TownRentShare));
+                if (scale < 1.0) pay = (int)Math.Floor(pay * Math.Max(0.0, scale));   // DS F3 (recenzja 17.10): przejscie na firmy - zawor x (1 - rampa), firma x rampa
                 if (BesiegedPay.Holds(st, BesiegedPay.KTownRent, pay, true)) { _vSiege++; return true; }   // oblezone - nic (E5/A4 R22: bramka z kluczem i licznikiem; scalenie porcji A)
                 if (pay <= 0) { _vTiny++; return true; }
                 // E5/B1 (R4, KL L6): najpierw czesc ludu (TownFolkMerchantProfitShare, 5%) - kasa -> kiesy W20/R10/P70; pan i korona dziela reszte jak A1

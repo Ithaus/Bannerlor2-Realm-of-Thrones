@@ -555,6 +555,12 @@ namespace Armoury
                     if (c != null && h == c.Leader && v > 0 && _castlePay.TryGetValue(c, out pay) && pay > 0 && RefundedClan(c))
                     {
                         int dues; CastlePurse.LordDuesToday.TryGetValue(c, out dues);
+                        // DS F3 (recenzja 17.10): przy firmach zamkow rata firmy przychodzi co 7 dob - zamiast niej rownowaznik dnia firmy pana (F_L / 364 x rampa), jak zawor co dobe
+                        if (DsTowns.FarmsLive)
+                        {
+                            int fp; double eq; CastlePurse.FarmPaidToday.TryGetValue(c, out fp); CastlePurse.FarmDayEq.TryGetValue(c, out eq);
+                            dues = (int)Math.Max(0, Math.Min(int.MaxValue, (double)dues - fp + eq));
+                        }
                         // E5 Z8 (decyzja 7 Jeffa 12.10): zwrot wlasnych pieniedzy spoza zoldu zalog (wplaty gracza, dwor, sprzet, budowy - zapas CourtFull) to nie
                         // zold, ktory wrocil zaworem - nie obniza zwrotu korony; zold zalog dalej obniza (Z8 < 1). Licznik "zawor panom" - bez tej czesci
                         long ownBack = CourtFull.Z8On ? Math.Min((long)Math.Max(0, dues), CourtFull.CastleOwnBackNotWage(c)) : 0;

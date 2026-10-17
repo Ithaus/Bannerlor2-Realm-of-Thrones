@@ -67,7 +67,7 @@ namespace Armoury
         internal static void Reset()
         {
             _tax.Clear(); _loans.Clear(); _lost = 0; _arrK.Clear(); _arrDirty = true;
-            _dSeized = 0; _dSeizedN = 0;
+            _dSeized = 0; _dSeizedN = 0; _dSeizeShort = 0; _pledged.Clear();
             ZeroDay(); ZeroLast(); _stumbles = 0; _importN = -1; _importBad = 0; _err.Clear();
         }
 
@@ -102,26 +102,64 @@ namespace Armoury
         private static double LimitDays(Settings s) { return Math.Max(0f, DsTowns.FarmsLive ? Math.Min(728f, s.DsCrownLoanLimitDaysPledged) : s.CrownLoanLimitDays); }
 
         /// <summary>
-        /// DS F3 (L3, KingdomTreasury.Levies): korona w ZALEGLOSCI wobec Banku - Bank bierze zastawione clo (`x` - clo tej doby dla skarbca) na splate dlugu, az bedzie 28 dob pelnych
-        /// rat (koniec zaleglosci jak dotad). Bank NIGDY nie daruje. Zloto: licznik cel / kasa miasta -> kapital Banku (zamiast skarbca). Zwraca wziete przez Bank (wolajacy daje
-        /// skarbcowi reszte). Poza F3, bez kredytu albo bez zaleglosci - 0. Nie rzuca.
+        /// DS F3 (L3, KingdomTreasury.Levies): korona w ZALEGLOSCI wobec Banku zastawila clo - tu tylko zapis cla tej doby (zloto idzie do skarbca jako wplyw dnia jak dotad).
+        /// Recenzja 17.10: Bank nie bierze juz cla w Levies, PRZED zwrotem zoldu (zwrot zostawal bez pokrycia, a korona w zaleglosci nie moze pozyczyc) - bierze je po zwrocie
+        /// (SeizePledged). Poza F3, bez kredytu albo bez zaleglosci - nic. Nie rzuca.
         /// </summary>
-        internal static long SeizeCustoms(Kingdom k, long x)
+        internal static void NotePledged(Kingdom k, long x)
         {
             try
             {
                 Loan l;
-                if (x <= 0 || !On || !DsTowns.FarmsLive || k == null || k.StringId == null || !_loans.TryGetValue(k.StringId, out l) || !l.Arrears || l.Principal < 1) return 0;
-                long y = Math.Min(x, (long)Math.Ceiling(l.Principal));
-                if (y <= 0) return 0;
-                IronBank.CapitalAdd(y);
-                l.Principal = Math.Max(0, l.Principal - y); l.Repaid += y; l.Seized += y;
-                _dSeized += y; _dSeizedN++;
-                return y;
+                if (x <= 0 || !On || !DsTowns.FarmsLive || k == null || k.StringId == null || !_loans.TryGetValue(k.StringId, out l) || !l.Arrears || l.Principal < 1) return;
+                long p; _pledged.TryGetValue(k.StringId, out p); _pledged[k.StringId] = p + x;
             }
-            catch (Exception e) { Stumble("SeizeCustoms", e); return 0; }
+            catch (Exception e) { Stumble("NotePledged", e); }
         }
-        private static long _dSeized; private static int _dSeizedN;
+
+        /// <summary>
+        /// DS F3 (L3; ArmouryBehavior: po KingdomTreasury.WageRefund, przed zaliczkami mieszczan i rentami): Bank bierze zastawione clo tej doby na splate dlugu korony w
+        /// zaleglosci - najwyzej clo dnia, dlug, reszta wplywow dnia PO zwrocie zoldu (zwrot zawsze pierwszy) i udzial CrownLoanMaxIncomeShare sredniego podatku razem z rata
+        /// dnia (jak rata). Bank NIGDY nie daruje: czego dzis nie wzial, bierze z nastepnych dob, az bedzie 28 dob pelnych rat. Zloto: skarbiec -> kapital Banku (wydatek dnia,
+        /// "raty 186"). Nie rzuca.
+        /// </summary>
+        internal static void SeizePledged()
+        {
+            if (_pledged.Count == 0) return;
+            try
+            {
+                var s = Settings.Current;
+                double share = s != null ? Math.Max(0f, Math.Min(1f, s.CrownLoanMaxIncomeShare)) : 0.3;
+                foreach (var kv in _pledged)
+                {
+                    try
+                    {
+                        Loan l;
+                        var k = FindKingdom(kv.Key);
+                        if (k == null || k.IsEliminated || !_loans.TryGetValue(kv.Key, out l) || !l.Arrears || l.Principal < 1) continue;
+                        var cd = CrownIncome.DayOf(k);
+                        if (cd == null) { _dSeizeShort += kv.Value; continue; }
+                        double room = share * TaxAvg(kv.Key) - Math.Max(0, l.DPaid);
+                        double y = Math.Min(Math.Min((double)kv.Value, Math.Ceiling(l.Principal)), Math.Min((double)Math.Max(0, CrownIncome.LeftFor(k)), Math.Max(0, room)));
+                        y = Math.Min(Math.Floor(y), (double)Math.Max(0, k.KingdomBudgetWallet));
+                        int iy = (int)Math.Max(0, Math.Min(int.MaxValue, y));
+                        if (iy < kv.Value) _dSeizeShort += kv.Value - iy;
+                        if (iy <= 0) continue;
+                        k.KingdomBudgetWallet -= iy;                     // najpierw skarbiec, potem Bank (jak rata)
+                        IronBank.CapitalAdd(iy);
+                        l.Principal = Math.Max(0, l.Principal - iy); l.Repaid += iy; l.Seized += iy;
+                        CrownIncome.Spent(k, iy);
+                        cd.LoanOut += iy;
+                        _dSeized += iy; _dSeizedN++;
+                    }
+                    catch (Exception e) { Stumble("SeizePledged(krolestwo)", e); }
+                }
+            }
+            catch (Exception e) { Stumble("SeizePledged", e); }
+            finally { _pledged.Clear(); }
+        }
+        private static readonly Dictionary<string, long> _pledged = new Dictionary<string, long>();   // DS F3 (L3): clo dnia krolestw w zaleglosci (Levies) - Bank bierze po zwrocie zoldu
+        private static long _dSeized, _dSeizeShort; private static int _dSeizedN;
 
         private static double RateFor(Loan l)
         {
@@ -180,6 +218,22 @@ namespace Armoury
                 return 1f;
             }
             catch { return 1f; }
+        }
+
+        /// <summary>DS K5 krok 1 (DsSeason.TreasuryForRefund): raty Banku nalezne w najblizszych `days` dobach wedlug dzisiejszej reguly raty (1/CrownLoanRepayDays najwiekszego
+        /// dlugu, najwyzej CrownLoanMaxIncomeShare sredniego podatku), najwyzej dlug - poduszka skarbca zamiast calego dlugu. 0 bez dlugu. Tylko odczyt.</summary>
+        internal static long InstalmentsAhead(Kingdom k, int days)
+        {
+            try
+            {
+                var s = Settings.Current;
+                Loan l;
+                if (s == null || k == null || k.StringId == null || days <= 0 || !_loans.TryGetValue(k.StringId, out l) || l.Principal < 1) return 0;
+                double share = Math.Max(0f, Math.Min(1f, s.CrownLoanMaxIncomeShare)), rd = Math.Max(1f, s.CrownLoanRepayDays);
+                double want = Math.Min(Math.Min(l.Peak / rd, share * TaxAvg(k.StringId)), l.Principal);
+                return (long)Math.Ceiling(Math.Min(l.Principal, Math.Max(0, want) * days));
+            }
+            catch { return 0; }
         }
 
         /// <summary>E5/B2 (184): dlug korony krolestwa w Banku (0 - bez kredytu albo 186 bez wpisu). Tylko odczyt - potrzeba korony w KingdomTreasury.WarTaxDaily.</summary>
@@ -431,7 +485,7 @@ namespace Armoury
             {
                 var s = Settings.Current;
                 LastLent = _dLent; LastLentN = _dLentN; LastRepaid = _dRepaid; LastLost = _dLost;
-                long seizedD = _dSeized; int seizedN = _dSeizedN; _dSeized = 0; _dSeizedN = 0;   // DS F3 (L3): okno od poprzedniej linii
+                long seizedD = _dSeized, seizeShort = _dSeizeShort; int seizedN = _dSeizedN; _dSeized = 0; _dSeizedN = 0; _dSeizeShort = 0;   // DS F3 (L3): okno od poprzedniej linii
                 if (s == null || !s.LogEnabled || Campaign.Current == null) return;
                 bool on = On;
                 if (!on && _loans.Count == 0) return;
@@ -470,7 +524,8 @@ namespace Armoury
                   .Append(" | Bank: kapital ").Append((long)cap).Append(", prog kredytu koron ").Append(Math.Max(0, s.CrownLoanBankFloor))
                   .Append(", Bank stracil (krolestwa zniszczone) dzis ").Append(_dLost).Append(" (").Append(_dLostN).Append("), razem ").Append(_lost)
                   .Append(", splata ze skarbcow upadajacych krolestw (G14) dzis ").Append(_dFallPaid).Append(" (").Append(_dFallPaidN).Append(')')
-                  .Append(DsTowns.FarmsLive || seizedD > 0 ? " | DS L3: clo zastawione (limit " + LimitDays(s).ToString("0", Inv) + " dob podatku), wziete przez Bank przy zaleglosci " + seizedD + " (" + seizedN + " poborow)" : "")
+                  .Append(DsTowns.FarmsLive || seizedD > 0 ? " | DS L3: clo zastawione (limit " + LimitDays(s).ToString("0", Inv) + " dob podatku), wziete przez Bank przy zaleglosci " + seizedD + " (" + seizedN
+                          + " poborow; po zwrocie zoldu, z reszty wplywow dnia, z rata najwyzej " + (Math.Max(0f, Math.Min(1f, s.CrownLoanMaxIncomeShare)) * 100).ToString("0", Inv) + "% podatku - niewziete dzis " + seizeShort + ")" : "")
                   .Append(" | od poczatku: pozyczono ").Append(borrowed).Append(", splacono ").Append(repaid)
                   .Append(" | na krolestwo (dlug/limit, oprocentowanie, rata zaplacona/nalezna, +pozyczone dzis, raty 28 dob): ").Append(txt.Count > 0 ? string.Join(", ", txt.ToArray()) : "-")
                   .Append(_stumbles > 0 ? " | potkniecia " + _stumbles : "").Append('.');

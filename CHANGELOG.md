@@ -1,5 +1,164 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-17 (DS - poprawki po recenzji: Dues Medieval domyslnie WYLACZONE, roboty gminy wsi, czynsz bez zabierania chleba, skarbiec przed Bankiem takze przy F1, splaty po zwrocie zoldu, F3 z rampa 28 dob i czescia firmy z oszczednosci ludu)
+
+**Mod:** Armoury + `tools/sprawdz_logi.py` + `tools/gen_mcm.py` | **Galaz:** `w-toku/noc-ds` (na 28613422) | **Tor:** L (bez gry; model offline v2, bramki nds; autotest 120 dob przed wlaczeniem) | **Klucze:** `DuesMedieval` domyslnie NIE (bylo tak); nowe `DsCommunalWorks` (tak), `DsRentArrearsPayDays` 28, `DsFarmFolkFromSavings` (tak, tylko przy DsTowns); `DsRefundTreasuryFirst` dziala teraz takze przy samym Dues Medieval | **Zapis:** `arm_daniny` bez zmian; `arm_daniny_miasta` - rekord firmy `f~` dostaje pola 17-23 (czesc pana z oszczednosci ludu, jej zaleglosc i pomiar, sprzedaz i danina miasta z okna, ciecie firmy korony, wymiar dziesiatej biezacej sesji), dziesiata ludu `v~` pole 7 (wymiar biezacej sesji) - starszy zapis bez nich czyta sie jak dotad (zera / cala reszta jako wymiar biezacy).
+
+**Dla Jeffa (prosto):**
+- Nowe daniny wsi sa w tej DLL WYLACZONE. Wgranie jej niczego nie zmienia w Twojej grze, dopoki sam nie wlaczysz "Dues Medieval" (zrobimy to dopiero po tescie 120 dob).
+- Kiedy daniny wsi beda wlaczone, a wies ma pieniadze ponad zapas na trzy tygodnie i nie znajdzie na nie towaru w miescie, wydaje je na wspolne roboty: kosciol, mlyn, most, drogi. Trzy czwarte to place murarzy i ciesli z miasta targowego, jedna czwarta to material kupiony u kupcow tego miasta. Pieniadze wracaja wtedy przez miasta do panow i do korony, zamiast lezec w kiesach wsi. Model: kiesy wsi stoja w miejscu zamiast rosnac 4 razy, korona po 2 miesiacach jest na plusie.
+- Zaleglosci czynszu wies splaca po troche, 1/28 dziennie, i tylko z tego, co zostaje ponad dzienne jedzenie. Dlug nigdy nie zabiera chleba.
+- Krol, ktoremu brakuje na zwrot zoldu, najpierw siega do skarbca ponad zapas wojenny, a dopiero potem pozycza w Banku. Dotad bogate krolestwa pozyczaly na 20-30% przy pelnym skarbcu.
+- Miasta (F3, nadal wylaczone): przejscie trwa 28 dni, jak we wsiach. Te czesc firmy, ktora pan bral dotad z oszczednosci mieszczan, placa mieszczanie, a nie kasa kupcow. Zwrot zoldu liczy sie dokladnie jak dzis.
+- Jedna sprawa do Twojej decyzji (opis nizej): zaliczki mieszczan dla korony, ktore przechodza w zwykly dlug, sa umarzane po 90 dniach pokoju, jak kazdy dlug korony u miast.
+
+**Problem (recenzja galezi, 2 krytyczne, 13 waznych, 13 drobnych):**
+- KRYTYCZNE: `DuesMedieval` bylo domyslnie wlaczone, a sprawdzalo tylko klucz i to, ze kiesa ludu dziala, bez wymogu KS. Wgranie wlaczyloby F1 na zapisie Jeffa (rampa 28 dob od pierwszego dnia). Model: kiesy wsi 4.5 -> 17.6 mln w 120 dob (+1.27%/d, 7.9% zlota swiata), korona -9.8% wplywu dnia, panowie -9.6% D stalego, krolestwo-doby z Bankiem 6.8 -> 16.2%. Od pierwszej doby, bez rampy, dzialaly tez ksiega zaleglosci i prog pozyczek wsi.
+- WAZNE F1:
+  - krok 5 nie mial ujscia niezaleznego od towaru: lista wsi tylko gdy lista dostatku nie kupila nic, polowa BK niewydana na zawsze;
+  - czynsz bral cala zaleglosc z kiesy przed koszykiem;
+  - K5 (skarbiec przed Bankiem) dzialal tylko przy firmach F3, a jego "wolny skarbiec" odejmowal caly dlug;
+  - bramka NDS-1b zawsze dawala NIE, bo "chciane z nadwyzka" zawiera koszyk dnia.
+- WAZNE korona: splata zaliczek L1 szla przed zwrotem zoldu, a Bank bral zastawione clo w Levies, takze przed zwrotem.
+- WAZNE F3:
+  - przy firmach ciecie zwrotu K3 / Z8 = 0, czyli podwojny powrot zoldu (zwrot nalezny +33..45 tys./d);
+  - podstawa pomocy od sprzedazy liczyla tez uslugi ludu (1.25-1.56 mln/d);
+  - kasa kupcow placila w firmie takze to, co pan bral dotad z oszczednosci ludu;
+  - przejscie na firmy nastepowalo w jednym dniu.
+
+**Zmiana (F1, wsie):**
+- `Settings.cs` / `McmSettings.cs` (gen_mcm): `DuesMedieval = false` (opis: domyslnie wylaczone do testu z koszykiem KS). Brak klucza w Armoury.json Jeffa = domyslna NIE.
+- `TownFolk.Live.cs` `DsSurplus` (krok 5): najpierw lista dostatku (BuyLadder). Reszta budzetu idzie na liste wsi, przy `VillWorkOnly` najpierw sol i narzedzia, jak dawne 15%/d. Czego nie ma na polkach, to roboty gminy `DsWorks` (`DsCommunalWorks`): kiesa wsi -> 3/4 place ludu miasta targowego (Credit KBuildLabour) i 1/4 material do kasy (sprzedaz MixBuild). To ta sama regula co budowa septow z dziesieciny, w bloku doby ludu (migawka M18).
+- `DsVillage.cs`:
+  - `SurplusDay` dolicza do P5 nowy budzet BK niewydany w ostatnim ticku (`NoteBkSpent(st, spent, oldCap, freshLeft)`, slownik sesji `_bkLeft`).
+  - `RentPay`:
+    1. rata dnia pierwsza, najwyzej kiesa (jak przed DS);
+    2. rata zaleglosci `max(rata dnia, zaleglosc / DsRentArrearsPayDays)`, tylko z kiesy ponad koszyk dnia;
+    3. niezaplacona rata do ksiegi x rampa; reszta przepada jak przed DS (licznik "przepadlo (rampa ksiegi)").
+  - `RentRemit` liczy tez "nalezny".
+  - `LoanFloor`: prog pozyczek wsi dla panow = (1 - rampa) x stary + rampa x skrzynia.
+  - Linia "Daniny wsi (DS)": nowe segmenty "krok 5 wydany: towar, roboty gminy, niewydane" i "W7: potrzeba rodow pomniejszona o czesc wsi DS", oraz K5 przy samym F1.
+- `KingdomTreasury.LordLevy.cs`: wsie DS wypadaja ze zrodel W7, wiec potrzeba rodu maleje razem z nimi (want x E_po / E_przed). Ten sam pobor nie przechodzi na lud miast.
+- `TownFolk.Tithe.cs`: `VillageTithe` dla wsi DS bierze dziesiecine po staremu tylko od utargu okna, od ktorego woz jej nie wzial (`DsTiSeen`). Dotyczy to okna nadpisanego, utargu w obcej wsi, nieznanej listy kaplanow i wozu bez przyrostu kiesy. Licznik w linii "Dziesiecina (E5/C3)".
+- `MoneyLedger.Obieg.cs`: pozycja "daniny wsi przy wozie (DS)" pojawia sie w "Przeplywy osad (przyczyny)" tylko gdy != 0, wiec przy wylaczonym DS linia jest taka jak w WGRANIU 74.
+
+**Zmiana (korona, F1 i F3):**
+- `KingdomTreasury.WageRefund`: K5 krok 1 (skarbiec ponad zapas wojny) dziala takze przy samym `DuesMedieval`. L1 (zaliczki) zostaje tylko przy F3.
+- `DsSeason.TreasuryForRefund`: wolny skarbiec = skarbiec - reszta wplywow dnia - zapas wojny - raty Banku z 28 dob (`CrownBorrow.InstalmentsAhead`). Dlugu nie odejmuje juz w calosci.
+- `TownFolk.CrownLoans.Ds.cs` `AntRepayDay` (`ArmouryBehavior`: po `WageRefund`, przed `CrownRents`): splata zaliczek mieszczan z rat nadania, najwyzej z tego, co zostalo po zwrocie. W dobie, w ktorej brak zwrotu pokryl skarbiec, zaliczka albo Bank, splaty nie ma (zostaja odsetki).
+- `CrownBorrow`: `SeizeCustoms` w Levies zastapione przez `NotePledged` (clo idzie do skarbca jako wplyw dnia) i `SeizePledged` po zwrocie zoldu. Bank bierze najwyzej:
+  - clo dnia;
+  - dlug;
+  - reszte wplywow dnia;
+  - `CrownLoanMaxIncomeShare` podatku razem z rata.
+
+  Bank nie daruje: czego nie wezmie dzis, wezmie w nastepnych dniach.
+
+**Zmiana (F3, miasta i zamki - klucz `DsTowns` dalej domyslnie NIE):**
+- Ciecie zwrotu K3 zostaje przy firmach (`KingdomTreasury.cs`), regula zwrotu nietknieta. `CastlePurse.ComesHome` zostaje; `SoldierPay` tnie zwrot zoldu zalog o rownowaznik dnia firmy pana (`CastlePurse.FarmDayEq` = F_L/364 x rampa), nie o rate tygodnia.
+- Podstawa pomocy od sprzedazy to wlasna sprzedaz kasy: (1 - svc) x zycie + (1 - cs) x dwor + sprzedaz + lud + wsie (`TownFolk.Live.cs`, miasto i zamek).
+- Okno pomiaru (`DsTowns`):
+  - startuje dopiero po rampie F1 (wpis w linii, gdy czeka);
+  - mierzy osobno czesc pana z kasy (zawor, `ML`) i z oszczednosci ludu (podatek od skarbca ludu i W7, `MLf`);
+  - liczy sprzedaz kasy w dobach wojny i danine miasta 1%/d (`MeasureLevy`);
+  - przy ustaleniu firma korony maleje o pomoc przy g = 1 ponad dawna danine (kasa przy g = 1 placi tyle, co w oknie).
+- `FLf` (czesc firmy pana z oszczednosci ludu) placi lud z kies ponad zapas dni i oferte (`TownFolk.DsFolkRate`, "scot and lot", `DsFarmFolkFromSavings`). Ma wlasna zaleglosc `ALf`, a zajecie z kiesy gminy obejmuje ja tak jak firme.
+- Przejscie z rampa `DsRampDays` od ustalenia firm (`NewShare` / `OldShare`; w dobie ustalenia stare zasady co do monety):
+  - stare x (1 - rampa): zawor miast (`TownPurse.Valve(..., scale)`) i zamkow, P1 (ze starym pulapem s), podatek od skarbca ludu, danina miast, W7 z ludu;
+  - nowe x rampa: firmy, wyplata kupcom M6, pomoc od sprzedazy, raty dziesiatej (reszta raty darowana);
+  - liniowo: clo wojenne, pomoc lennikow, s 184 (do s z nadania), g udzialu korony przy wozie.
+- Zaleglosc pomocy splacona w dniu raty idzie do wplywu dnia przez LeviesToday (`_aidPend`), nie jako "firmy korony". Ponad `DsFarmForgiveWeeks` tygodni pomocy zaleglosc jest darowana.
+- Pozostale zmiany F3:
+  - limit zaliczek L1 liczy tylko wymiar dziesiatej z biezacej sesji;
+  - podloga kasy to caly zapas kupcow przy `TownPurseRegulator` = 1;
+  - odnowa firm juz od 7 dob pamieci doplywu.
+
+**Wynik modelu v2** (scratchpad sesji 6ba92574: `daniny/final/dsmodel.py`, wynik `model_ds_out.txt`; v1 w `dsmodel_v1.py` / `model_ds_out_v1.txt`). Ostatnie 28 dob, tys. zl/d, KS / BAZA / JEFF; F1 zawsze z rampa 28 dob.
+
+- **F1, kiesy wsi z robotami gminy:**
+  - stan kies wsi w dobach 28 / 56 / 90 / 120:
+
+    | bieg | start | doba 28 | doba 56 | doba 90 | doba 120 |
+    |---|---|---|---|---|---|
+    | KS | 2.61 mln | 2.75 | 2.95 | 2.98 | 2.98 |
+    | BAZA | 4.26 mln | 4.25 | 4.27 | 4.28 | 4.28 |
+    | JEFF | 4.52 mln | 4.13 | 4.10 | 4.10 | 4.10 |
+
+  - dryf w dobach 61-120: +0.01 / 0.00 / -0.00%/d (bez robot +1.10 / +1.26 / +1.27%/d);
+  - kiesy wsi w zlocie swiata: 1.4 / 2.0 / 1.8%;
+  - roboty gminy: 53 / 125 / 127, z tego place ludu 40 / 94 / 95 i material 13 / 31 / 32; towar z rynku BK i P5 jak dzis: 30 / 44 / 38.
+- **F1, korona z obiegiem przez dzisiejsze pobory miast** (udzial korony 0.59, opoznienie 28 dob):
+
+  | bieg | doba 28 | doba 56 | doba 90 | doba 120 |
+  |---|---|---|---|---|
+  | KS | -18 | +2 | +12 | +15 |
+  | BAZA | -23 | +16 | +31 | +36 |
+  | JEFF | -28 | +9 | +24 | +27 |
+
+  Bez robot (stary kod): stale -32 / -60 / -66.
+- **F1, panowie:**
+
+  | bieg | doba 28 | doba 56 | doba 90 |
+  |---|---|---|---|
+  | KS | -13 | +20 | +37 |
+  | BAZA | -10 | +56 | +82 |
+  | JEFF | -25 | +38 | +63 |
+
+  Bez robot: -36 / -73 / -89.
+- **F1, K5 (skarbiec przed Bankiem):**
+  - krolestwo-doby z Bankiem: 0.4 / 1.6 / 0.0% (bez K5 16.3 / 22.7 / 16.2%, dzis 13.9 / 15.4 / 6.8%); liczone na wplywie bez obiegu, czyli ostroznie;
+  - skarbiec pokrywa 8.4 / 19.3 / 9.1;
+  - dlug koron w Banku w dobie 90: 0.66 / 0.99 / 0.28 mln (bez DS 1.12 / 1.73 / 0.51).
+- **F3, korona (po rampie, statycznie):**
+  - wlasna sprzedaz kas: 1.35 / 1.23 / 1.08 mln (v1 1.56 / 1.44 / 1.25);
+  - firma korony mniejsza o 24 / 23 / 18;
+  - potrzeba sesji: 586 / 606 / 562 (zwrot 328 / 333 / 316, bez +33..45 z v1);
+  - zwykle wplywy + nadanie: 570 / 561 / 553 = 86 / 87 / 82% dzisiejszego wplywu;
+  - g = 2 w 18 / 19 / 13 krolestwach;
+  - renty 180: 226 -> 116 / 231 -> 134 / 285 -> 158;
+  - luka zwrotu po nadaniu: 3.2 / 12.4 / 1.6 w 3 / 5 / 4 krolestwach (Lorath, Lys, Dragonstone, Pentos, Braavos, Norvos). Skarbiec ponad zapas pokrywa ja przez 22-6399 dob, potem L1 i Bank.
+- **F3, kasy miast:**
+  - statycznie +61 / +65 / +50 wiecej niz dzis: pomoc 105 / 95 / 74, minus danina miast 43 / 38 / 36, minus ciecie firmy korony, plus utracony udzial kas w podatku od skarbca ludu 23 / 32 / 29;
+  - z drugim rzedem (lud wydaje zatrzymane, 30% na towar do kas): -4 / +9 / -4, czyli neutralnie.
+- **F3, lud miast:**
+  - zatrzymuje 217 / 189 / 179 statycznie: P1, czesc korony i kas podatku od skarbca ludu, 184, minus nowe 184 i dziesiata;
+  - po jednym obrocie +139 / +120 / +115;
+  - wiele obrotow przy tempie zbytkow 1/15: +10.9 / +9.5 / +8.9 mln w stanie ustalonym (stala 50 dob), w 92 doby lud ok. 9.7 / 8.7 / 8.6% zlota swiata (bramka ND3-3 <= 12%); przy 15%/d: 7.7 / 7.0 / 6.9%.
+
+**Bramki (`sprawdz_logi --grupa nds`):**
+- NDS-1b bez "chciane z nadwyzka"; brak linii daje INFO.
+- NDS-6c: mianownik bez czesci przepadlej w rampie ksiegi.
+- NDS-14c: stara dziesiecina wsi DS najwyzej 5% utargu bez dziesieciny przy wozie + 100.
+- Nowe: NDS-17 (krok 5: niewydane <= 10%) i NDS-18 (K5 przy F1, INFO).
+- NDS-12 obejmuje tez ERROR z CrownBorrow.SeizePledged/NotePledged/SeizeCustoms, TownFolk.AntRepayDay, TownFolk.CrownLoans.Pay(zaliczki) i TownFolk.DsFolkRate.
+- Sprawdzone: log Jeffa bez DS (INFO, rc 0), brak pliku, log BAZY z liniami DS w nowym formacie (121 dob, 0 nierozpoznanych, nowe segmenty czytane; NIE tylko tam, gdzie baza ma stare pobory).
+
+**Ryzyko / co sprawdzic:**
+- Kontrola przy wylaczonych kluczach (domyslnie), kazdy haczyk sprawdzony w kodzie. Wszystkie nowe sciezki sa bramkowane `DsVillage.Live` / `On(st)` / `DsTowns.FarmsLive` / `InWindow`; mnozniki rampy wynosza wtedy 1.0 / 0.0, a sumy W7 sa liczone w tej samej kolejnosci. Jedyne roznice w logu wzgledem WGRANIA 74:
+  - klucze zapisu `arm_daniny` i `arm_daniny_miasta` (juz od 4e07277c i 2d2ab146, bez skutku przy wylaczonych kluczach);
+  - linie DS tylko przy wlaczonych kluczach.
+
+  Profil doby bez nowego okrazenia.
+- Roboty gminy:
+  - material do kasy miasta jest "bez towaru z polki", tak jak material septow;
+  - place podnosza zarobek ludu miast targowych (podatek pana, 184 i dziesiecina jutro);
+  - miasto targowe bez kiesy ludu - pieniadze zostaja w kiesie (licznik "niewydane").
+
+  Sprawdzic NDS-2b (reszta kies wsi), NDS-3a/3b, NDS-17 i "Kiesa ludu" kontrole zamknieta.
+- K5 przy F1 zmienia zrodlo pokrycia braku zwrotu, nie zwrot: zwrot dalej 100% i pierwszy. Mniej kredytu w Banku oznacza tez mniejszy zysk Banku; kapital Banku kontroluje NDS-10b.
+- `SeizePledged` po zwrocie: korona w zaleglosci splaca zastaw wolniej (najwyzej udzial podatku z rata, z reszty wplywow dnia). Koniec zaleglosci nadal wymaga 28 dob pelnych rat.
+- F3 jest nadal statyczny (bez dsim):
+  - przejscie z rampa nie bylo jeszcze uruchomione;
+  - podzial firmy ladnie pracuje tylko wtedy, gdy lud ma oszczednosci ponad zapas (inaczej zaleglosc ALf i zajecie z kiesy gminy);
+  - g = 2 w wiekszosci krolestw.
+
+  Przed wlaczeniem DsTowns potrzebny jest symulator dsim i autotest (projekt R5).
+- Nie wdrozone (opcja recenzji): pietnasta wiejska w wojnie (g x 1/15 nadwyzki ponad skrzynie na kwartal). Roboty gminy wystarczaja w modelu na NDS-3; do decyzji po autotescie.
+- DO DECYZJI JEFFA: zaliczki mieszczan (L1) niesplacone w kwartale przechodza do zwyklego dlugu korony u miast (korona2). Ten dlug jest umarzany, gdy korona w pokoju nie splaca go przez 90 dob: przepada, a miasta traca 10 lojalnosci (tak jest od paczki korona2). Pytanie: czy dlug z zaliczek ma byc z tego wylaczony ("dlugi trzeba splacac")? Na razie bez zmian.
+- Gra nie byla uruchamiana; build Armoury kod 0 (pelny, bez przyrostow); gen_mcm uruchomiony (Armoury 1710 ustawien).
+
+**Status:** DO SPRAWDZENIA (nie wgrane; Dues Medieval i Ds Towns domyslnie wylaczone - wgranie tej DLL nie zmienia gry Jeffa; wlaczenie po autotescie 120 dob z bramkami nds).
+
 ## 2026-10-17 (DS - model pieniadza zasad ZAIMPLEMENTOWANYCH na trzech logach, bramki sprawdz_logi grupa nds, poprawka F1: rynek BK wsi w rampie i wies bez rynku BK)
 
 **Mod:** Armoury + `tools/sprawdz_logi.py` | **Galaz:** `w-toku/noc-ds` (na 2d2ab146 = DS F1 + F3) | **Tor:** L (bez gry; model offline + bramki do autotestu 120 dob) | **Klucze:** bez nowych | **Zapis:** bez zmian (slownik doby ticku rynku BK - tylko sesja).
