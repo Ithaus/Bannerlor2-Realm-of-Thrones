@@ -406,6 +406,7 @@ namespace Armoury
             bool zon = f.Kind == 0 && s.TownFolkAnchorBasket && StartCalibration.Zc4ClassCost(f.St, zc, out zl) && zl > 0;
             if (!zon) zl = 0;
             double ffz = zon ? (1 - zl) * ff + zl * Clamp01(f.AffFood) : ff, frz = zon ? (1 - zl) * fr + zl * Clamp01(f.AffRest) : fr;
+            if (zon) { f.FacFoodUsed = ffz; f.FacRestUsed = frz; }   // przewidywanie wydatku bez kotwicy (Predict) - czynnik, ktory naprawde cial koszyk (inaczej m malaloby co dobe)
             double after = g0;
             if (ff < 1 || fr < 1 || ffz < 1 || frz < 1)
             {
