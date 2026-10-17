@@ -2673,3 +2673,13 @@ clo x2 w wojnie, pomoc lennikow; brak na zwrot: skarbiec ponad zapas -> zaliczki
 Jeffa: rampa F1 28 dob (od pierwszego wczytania 75/76) -> okno pomiaru firm 28 dob -> rampa F3 28 dob -> sesja "po rampie" (+7). Wylaczniki MCM: Dues Medieval, Ds Towns.
 DO SPRAWDZENIA U JEFFA: "Daniny wsi (DS)" (start), po ~28 dobach "Firmy miast i zamkow (DS)" okno pomiaru, po ~56 "Korona: nadanie wojenne (DS)" przelaczenie, zwrot zoldu 100%.
 DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic noc-ks3), potem ZC6/ZC7, kolejka. Przekazanie: PRZEKAZANIE-DRUGIE-KONTO-2026-10-17.md (stan 75 -> 76).
+
+### 79. KS RUNDA 4 - kod na linii WGRANIA 76 (17.10 ok. 15:50 PDT) - w toku
+- Galaz `w-toku/noc-ks4` (worktree zb/n-ks4, od noc-wgranie-76 725150ad): e91f8063 scalenie noc-ks3 (konflikty: ArmouryBehavior, BkSeal34 budzet DS + limit KS, Guard, TownFolk.Live
+  DS oldK + ZC4, Luxury; sprawdz_logi i gen_mcm = wersja DS + latka KS; nks 24/53 i nds 38/38 na starych logach jak przed scaleniem); 5d56ff24 alfa wsi Z PRAW DS
+  (DsVillage.BudgetShare x utarg - czynsz; koniec petli alfa -> 0) + B2 FoodSubstitute wylaczony przy KS; a6c56999 KsMeatRecipe - rzeznie miast wedlug wagi zywca przy KS
+  (BK artisans: krowa 6->10, swinia 2->6, owca 1->2 miesa; mieso 10 kg, krowa 200, swinia 120, owca 40 kg; realny uzysk ok. 50%); poza KS receptura BK przywracana.
+  Jeff pytal "a czemu tak jest" (rzeznie slabsze od uboju domowego): to receptura BK z balansu gry, nie fizyka - poprawiona gra, nie Plan.
+- Test fin78 120 dob (Armoury cfd3fb51, KS flaga armoury-ks-wlacz.flag UTWORZONA - USUNAC!), at-fin78-ks4.out.txt; ocena nks + nds.
+- DALEJ (runda 4): KS-H na kapitale kupcow (zaplata przy dostawie, rachunek, 30 dni zwloki = brak dostaw), najpierw wyzywic siebie + hodowla/ryby w zimnym klimacie,
+  dowoz na Polnoc + danina zbozowa dla Muru, tanszy koszyk biednych Essos, rynek BK wsi wedlug potrzeb, bez darmowej podlogi spichlerza, koszt.
