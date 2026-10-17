@@ -276,6 +276,9 @@ namespace Armoury
                 StartCalibration.Zc4NotePass1(b.Want, miss, b.UnGold, m);
                 // drabina 2 (ponad plan)
                 b.Pass2 = true; b.Lim = (long)Math.Round(7.0 * Math.Max(0.0, budgetDay)); b.Broke = false;
+                // KS runda 4 (fin78: kiesy wsi -0.37%/d, mediana -30%): wies DS kupuje ponad koszyk zaplacony tylko z kiesy ponad SKRZYNIE na czarna godzine
+                // (DsVillage.Chest: 21 dob koszyka i czynszu) - jak sredniowieczny chlop: najpierw zapas, potem lepszy stol
+                if (vil.Settlement != null && DsVillage.On(vil.Settlement)) b.Lim = Math.Max(b.Lim, (long)Math.Ceiling(Math.Max(0.0, DsVillage.Chest(vil))));
                 var left = new int[NZq]; bool any = false;
                 foreach (int z in StartCalibration.ZLadder)
                 {

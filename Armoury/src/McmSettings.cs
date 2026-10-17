@@ -6832,6 +6832,10 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool KsRealRecipes { get; set; } = true;
 
+        [SettingPropertyBool("Ks Granary No Floor", HintText = "with Start Calibration applied: a village's granary gets only what its people really grow at home, buy and take from their own store - no longer the game's formula as a floor (food from nothing); a shortfall eats into the granary's store (about two years) and shows slowly, as a hungry spring; off = the old floor")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool KsGranaryNoFloor { get; set; } = true;
+
         [SettingPropertyInteger("Ds Farm Measure Days", 7, 91, "0", HintText = "with Ds Towns: for how many days the old valve of every town and castle (with the lord's part of the hoard tax and the lords' war levy on the people) is watched before the farms are set at what it gave on average - the farm is the old sum in a new form")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFarmMeasureDays { get; set; } = 28;
@@ -8639,6 +8643,7 @@ namespace Armoury
             s.DsRentArrearsPayDays = DsRentArrearsPayDays;
             s.DsTowns = DsTowns;
             s.KsRealRecipes = KsRealRecipes;
+            s.KsGranaryNoFloor = KsGranaryNoFloor;
             s.DsFarmMeasureDays = DsFarmMeasureDays;
             s.DsFarmRenewDays = DsFarmRenewDays;
             s.DsFarmRenewMax = DsFarmRenewMax;
