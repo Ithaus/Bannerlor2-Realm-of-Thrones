@@ -2644,3 +2644,9 @@ B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na P
 - docs/PRZEKAZANIE-DRUGIE-KONTO-2026-10-17.md (stan, galezie, narzedzia, kolejnosc: DS F3 -> KS runda 4 -> ZC6/ZC7 -> kolejka). Galezie w-toku/noc-ds, noc-wgranie-75, noc-ks3,
   zbior-e8 wypchniete na GitHub. Skrypty autotestu: tools/autotest-2026-10-17/; zrodla symulatorow: tools/ekonomia-symulatory-2026-10-17/; pelne kopie z danymi
   D:/Backup-Bannerlord/scratch-2026-10-17/. W grze WGRANIE 75.
+
+### 77. DS F3 test (17.10 ok. 13:20 PDT) - w toku
+- Galaz `w-toku/noc-ds-f3` 9e471a96 (od fa4416f5 = WGRANIE 75): klucz CrownTownLoanNoWriteOff (domyslnie TAK; Jeff "dlugi trzeba splacac") - dlug korony u miast po 90 dobach
+  zwloki w pokoju NIE jest umarzany: -10 lojalnosci miast-wierzycieli, zakaz pozyczek od miast, dlug zostaje i idzie z wplywow (kara co 90 dob dalszej zwloki); plik-przelacznik
+  autotestu armoury-dst-wlacz.flag dla DsTowns (tylko autotest). Build rc 0, gen_mcm 1711.
+- Test 120 dob F1 (domyslnie) + F3 (flaga): test/fin74 (Armoury 64541221), flaga armoury-dst-wlacz.flag UTWORZONA (USUNAC po tescie!), at-fin74-f3.out.txt; ocena nds (z baza 18-23-34).
