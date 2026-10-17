@@ -2508,3 +2508,12 @@ ProsperityLink) do kalibracji. Test 120 dob + bitwa (Armoury-2026-10-16_18-23-34
 nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 179/d, miod pitny x1.39, jedwab wsi 64%) - trendy, nie blad; do kalibracji.
 - 19:45 PDT: bieg bazowy WGRANIE 73 120 dob (Armoury-2026-10-16_19-02-22.log, logi-testow): rozliczenia rodow doba 120 -868882 vs paczka 1 -866215 - praktycznie to samo; paczka 1 nie psuje ekonomii.
 - 19:40 PDT: limit tygodnia 74% (5h 18%) - drogi/zajazdy/przysiolki ODLOZONE, tylko 8 krokow. PO KS (wf_6cd6abd8-33e, galaz w-toku/noc-ks): scal do int (baza fe1b271e), test 120 dob z KS Apply w autotescie (grupy nks, nzc0-2, nbitwa), potem wlaczyc ZC6/ZC7 (Mobility, Freedom, WarScar) i ProsperityLink osobnym biegiem, test koncowy, wgranie. Przy 99% tygodnia - przekazanie (STAN-PRAC + push).
+
+### 64. KS (kalibracja startu) - kod gotowy (16.10 ok. 21:55 PDT) - NASTEPNY KROK TUTAJ
+- Galaz `w-toku/noc-ks` (worktree zb/n-ks, od fe1b271e): 24466ecb (rdzen: arm_ks_land.tsv 15317 wierszy - NOWY PLIK DANYCH do wgrania!, StartCalibration*.cs, Plan co 7 dob w watku
+  tla ~20 s), ebadb69e (ZC4 popyt z koszykow, ZC5 przetwory, Apply), bc1aaa16 (poprawki po 2 recenzjach). Build rc 0.
+- STAN: bezpieczny w grze Jeffa w trybie samego Planu (Apply w grze Jeffa zablokowane: LandGateReady=false; Arm/Confirm wymagaja 28 dob sesji). Apply tylko w autotescie:
+  plik-flaga Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-ks-wlacz.flag albo klucz StartCalibrationAutotestApply. Po tescie flage USUNAC.
+- DALEJ: scalic noc-ks do int (scal1.sh ks fe1b271e); dopisac arm_ks_land.tsv do test/bieg-bitwa.ps1 ($rel) i test/wgraj-v5.ps1; test 120 dob z flaga; grupy nks, nzc0-2,
+  nbitwa; ocenic bilans (NKS-5..7 - kazdy towar 0.95-1.05 w 28 dobach po Apply). Decyzja SilkToWeavers (Essos jedwab). Potem ZC6/ZC7 + ProsperityLink, test koncowy, wgranie.
+- Recenzje: krytyczne (popyt w formule ceny, Apply na Planie z 1 doby danych) - poprawione w bc1aaa16 (sprawdzic w tescie).
