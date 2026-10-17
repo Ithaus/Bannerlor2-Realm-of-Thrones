@@ -2608,3 +2608,15 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   (jedna tabela swiata, poprawione wartosci dla zimnej ziemi, bez mnoznikow okregu; pustki za Murem 69% ladu); (3) reszta - dowoz z poludnia + danina zbozowa dla Muru; (4) reszta - glod.
 - Jeff 17.10 "ok" (rynek wsi BK): runda 4 / DS - rynek wsi BK tylko z nadwyzki ponad skrzynie 21 dni i WEDLUG POTRZEB (sol, zelazo na narzedzia, sukno/len, garnki;
   zbytki - wino, przyprawy - tylko wies bogata), zamiast "po sztuce kazdego towaru z nadmiarem miasta" (NKS-29: 17% W / 24% E wplywu kies wsi).
+
+### 73. DS KOD GOTOWY (17.10 ok. 11:50 PDT) - test F1 w grze w toku - NASTEPNY KROK TUTAJ
+- Workflow wf_9ea032ce-160: galaz `w-toku/noc-ds` (zb/n-ds, od fe1b271e = WGRANIE 74): 4e07277c+66484cd2 F1 wsie (DsVillage.cs), 2d2ab146 F3 miasta/zamki/korona/kredyt
+  (DsTowns.cs, DsSeason.cs, TownFolk.CrownLoans.Ds.cs), d062d894 model + grupa nds w sprawdz_logi, 1704ba33 poprawki po 2 recenzjach (2 krytyczne): DuesMedieval i DsTowns
+  DOMYSLNIE WYLACZONE, ROBOTY GMINY WSI (uwolnione pieniadze wsi wracaja do miast: place 40-95k/d, material 13-32k/d - bez tego kiesy wsi rosly +1.3%/d), czynsz bez zabierania.
+  14f1a2f7 (moje): plik-przelacznik autotestu armoury-ds-wlacz.flag (tylko tryb autotestu, raz na sesje). Build rc 0.
+- Model v2 (scratchpad daniny/final/dsmodel.py): F1 - kiesy wsi plasko (dryf 0.00%/d), korona doba 28 -18..-28k, doba 56 +2..+16k, doba 90 +12..+31k; panowie doba 28 -10..-25k,
+  potem +20..+82k; Bank dla koron prawie 0 (K5). F3 statycznie 82-87% dzisiejszych wplywow korony, g=2 w 13-19 krolestwach, renty 180 spadaja o ok. polowe - F3 dopiero po symulatorze.
+- PYTANIE z recenzji (DO DECYZJI): zaliczki mieszczan (L1) po 90 dniach pokoju bez splaty sa darowane (lojalnosc -10) - kloci sie z "dlugi trzeba splacac". Moja decyzja (zasada Jeffa):
+  BEZ darowania - splata z wplywow w pokoju; zwloka = miasta-wierzyciele nie pozyczaja, lojalnosc spada, dlug zostaje. Do wprowadzenia razem z F3.
+- Test F1 120 dob: test/fin72 (Armoury B646874C z n-ds 14f1a2f7), flaga armoury-ds-wlacz.flag UTWORZONA (USUNAC po tescie!), at-fin72-ds.out.txt; ocena: sprawdz_logi --grupa nds
+  --baza-doby D:/Backup-Bannerlord/logi-testow/Armoury-2026-10-16_18-23-34.log (bieg WGRANIA 74 bez DS) + nzc0/nzc2/nbitwa.
