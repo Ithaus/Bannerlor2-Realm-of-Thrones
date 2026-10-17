@@ -84,6 +84,7 @@ namespace Armoury
         public double HomeWork;                                       // krok 8: czesc rak zajec w pracy domowej (koszyk, na ktory wsi nie stac - nigdy na targ); 0 - jak dotad
         public double Alpha = -1;                                     // recenzja 17.10: alfa okregu z pomiaru (wplyw do kiesy / wartosc bazowa sprzedazy); < 0 - VilAlpha rynku
         internal int CorrLand = -1;                                   // KS-R3 krok 5: kraina miasta targowego okregu (indeks krain Planu; -1 - wlasna)
+        internal int CorrTown = -1;                                   // KS-R3 runda 3 symulatora: miasto targowe okregu (indeks Towns; -1 - brak) - gradient miasta psujacych sie
     }
 
     internal sealed class KsBlock
@@ -167,6 +168,7 @@ namespace Armoury
         public int[] ReachCut = new int[2];
         public double[] DHwM = new double[2]; public int[] DHwN = new int[2];   // ostatnia runda: najwieksza zmiana pracy domowej okregu i okregi ze zmiana >= 0.05
         public double[] DTot = { -1, -1 };                              // ostatnia runda: najwieksza wzgledna zmiana sum rynku (sprzedaz, zaplacone, rece w pracy domowej)
+        public double[] TableKg = new double[2], TableKcal = new double[2];   // KS-R3 runda 3 symulatora, krok 8d: ubocze zjedzone na stole okregu (kg/d) i kcal pokryte w domu
     }
 
     /// <summary>
@@ -326,6 +328,8 @@ namespace Armoury
                 }
                 // krok 8: pieniadze - popyt tylko zaplacony, praca domowa wsi, ktorych nie stac na koszyk (projekt rozdz. 9, 11.1)
                 if (inp.Money) { MoneyStep(x, ref p, ref xs, ref S, cancel); if (cancel != null && cancel()) { R.Error = "przerwane"; return R; } }
+                // KS-R3 (port symulatora 17.10, runda 3) krok 8d: lepszy stol po pieniadzach - ubocze ponad popyt zaplacony targu zostaje na stole okregu (klucz Ks Alpha Net)
+                if (inp.Money && inp.HomeSub) ByproductTable(x, p, xs, S);
                 if (inp.Corridors || inp.Reach) { try { CorridorLine(x); } catch (Exception ce) { R.CorrLine = "KS: korytarze planu - blad linii (" + ce.GetType().Name + ")"; } }
                 Finish(x, p, xs, S);
             }
@@ -1425,6 +1429,125 @@ namespace Armoury
                 bool stuck = rel < 0 && M.HwLeft[m] < 0.05 * Math.Abs(M.Excess[m]);      // praca domowa do oddania (G > 0, wartosc) mniejsza niz 5% braku - nie ma czego oddac
                 M.Conv[m] = M.DTot[m] >= 0 && M.DTot[m] < 0.01 && (Math.Abs(rel) < 0.01 || stuck);
                 M.NoHands[m] = stuck;
+            }
+        }
+
+        // KS-R3 (port symulatora 17.10, runda 3) KROK 8d - LEPSZY STOL PO PIENIADZACH: towary domowe i uboczne (jaja, miod, marchew, jablka - wyjatki pasma projektu)
+        // i mieso (dziczyzna i wieloryb - cena rynku na podlodze, rece go nie zdejma; zywiec to osobne towary Planu - bez zmian)
+        private static readonly int[] TableGoods = { KsTab.GEgg, KsTab.GHoney, KsTab.GCarrot, KsTab.GApple, KsTab.GMeat };
+        private static readonly int[] TableItem = { KsDeliver.IEgg, KsDeliver.IHoney, KsDeliver.ICarrot, KsDeliver.IApple, KsDeliver.IMeat };
+        private static readonly int[] MeatItems = { KsDeliver.IMeat, KsDeliver.IWhaleMeat };
+        /// <summary>Krok 8d: na targ i zjedzone w okregu (kg/d) towaru stolu a (mieso: dziczyzna i wieloryb; okreg z ich nadwyzka nie ubija zywca na wlasny stol).</summary>
+        private static void TableOf(int a, double[] prod, double[] own, out double mk, out double ow)
+        {
+            if (TableGoods[a] != KsTab.GMeat) { int it = TableItem[a]; mk = Math.Max(0.0, prod[it] - own[it]); ow = own[it]; return; }
+            mk = 0; ow = 0;
+            foreach (int it in MeatItems) { mk += Math.Max(0.0, prod[it] - own[it]); ow += own[it]; }
+        }
+        internal static double TableAlpha = 3.0;                     // ponad dzisiejszy wlasny stol (x wlasny stol bazowy); razem najwyzej 4 x (mnoznik gry)
+        internal static bool TableOn = true;                          // harness: proba bez kroku 8d
+
+        /// <summary>
+        /// KROK 8d (klucz Ks Alpha Net jak 8b i 8c): R8 (lepszy stol) liczy nadwyzke uboczna przed krokiem 8 - wobec PELNEGO popytu; krok 8 zostawia na targu tylko popyt
+        /// zaplacony, wiec jaja, miod i marchew ida na targ 1.3-2.9 x popytu (harness rundy 2: Westeros jaja 2.92, miod 1.56, marchew 1.29; Essos jaja 1.78, miod 2.05)
+        /// - na polkach rosna (symulator: jaja Essos +60%/d zuzycia), cena na podloge, a drabina 2 wsi zjada je z oszczednosci. Ubocze gospodarstw zostaje na stole
+        /// okregu, ktory je zrobil (projekt rozdz. 3.3 R8; mieso - cena rynku na podlodze, wiec rece go nie zdejma): nadwyzka na targ ponad czynnik popytu targu
+        /// (margines / sterowanie) x popyt zaplacony targu - wsie rynku, ktore wioza ten towar na targ, jedza wiecej wlasnego (najwyzej to, co wioza, i najwyzej 4 x wlasny
+        /// stol bazowy - mnoznik gry NeedMult), w proporcji do tego, co wioza (harness: z pokojem R8 jaja +100%, miod +30% zostawaly marchew 1.15 i miod 1.24-1.76). Kcal tego - czesc pokryta w domu (DistHomeKcal, najwyzej niezaplacona czesc koszyka) - wies je, czego nie kupila. Rece, ceny
+        /// i ziarno bez zmian (zadna nowa praca - towar juz jest; nic z niczego), popyt Planu i zjedzone w okregach w gore o to samo.
+        /// </summary>
+        private static void ByproductTable(Ctx x, double[] p, double[] xs, double[] S)
+        {
+            var inp = x.In; var R = x.R; var M = R.Money;
+            if (!TableOn || M == null || !M.On || inp.Keep == null || R.Eaten == null) return;
+            int NI = KsDeliver.ItemCount, NZ = KsBasket.N, NG = KsTab.NG;
+            var view = new KsResult();
+            view.BlockStart = x.BStart; view.X = xs; view.PairCraft = x.Pc; view.BlockW = x.W; view.RegHands = x.RegHands; view.Rent = x.Rent;
+            var prod = new double[NI]; var own = new double[NI]; var keep = new double[KsTab.NN]; var keepR = new double[KsTab.NN]; var full = new double[KsTab.NN];
+            var vq = new double[NZ];
+            var dl = new List<KsDistrict>(); var mkt = new List<double[]>(); var ownL = new List<double[]>(); var kr = new List<double[]>(); var fkL = new List<double>(); var pkL = new List<double>();
+            foreach (var d in x.D)
+            {
+                if (d.TownFields || d.PplHome == null || d.Bask == null || d.Blocks.Count == 0 || d.NeedR8 == null) continue;
+                var parts = new KsPart[d.Blocks.Count];
+                for (int j = 0; j < parts.Length; j++) { parts[j] = new KsPart { K = d.Blocks[j] }; KsDeliver.FromPlan(view, d.Blocks[j].Index, parts[j]); }
+                KsDeliver.Produce(d, parts, prod);
+                double home = 0; foreach (var e in d.PplHome) home += Math.Max(0.0, e);
+                double hr = d.People > 0 ? Math.Min(1.0, home / d.People) : 0.0;
+                NeedsOfKeep(d.PplHome, d.Bask, inp.Keep, d.Oil, home, keepR);
+                for (int k = 0; k < KsTab.NN; k++)
+                {
+                    double mult = d.Need0[k] > 1e-9 ? Math.Max(0.25, Math.Min(4.0, d.NeedR8[k] / d.Need0[k])) : 1.0;
+                    keep[k] = keepR[k] * mult; full[k] = d.NeedR8[k] * hr;
+                }
+                KsDeliver.Own(prod, keep, own);
+                Array.Clear(vq, 0, NZ);
+                KsBasket.VillageKg(full, keep, own, vq);
+                float[] pz; R.DistPaid.TryGetValue(d.Id, out pz);
+                double fk = 0, pkc = 0;
+                for (int z = 0; z < NZ; z++) { double kc = KsBasket.Kcal[z]; if (!(kc > 0)) continue; fk += vq[z] * kc; pkc += vq[z] * kc * (pz != null && z < pz.Length ? pz[z] : 1f); }
+                var mk = new double[TableGoods.Length]; var ow = new double[TableGoods.Length]; var ke = new double[TableGoods.Length];
+                bool any = false;
+                for (int a = 0; a < TableGoods.Length; a++)
+                {
+                    int key = NeedOfGood(TableGoods[a]);
+                    TableOf(a, prod, own, out mk[a], out ow[a]); ke[a] = keepR[key];
+                    if (mk[a] > 1e-6) any = true;
+                }
+                if (!any) continue;
+                dl.Add(d); mkt.Add(mk); ownL.Add(ow); kr.Add(ke); fkL.Add(fk); pkL.Add(fk > 0 ? pkc / fk : 0.0);
+            }
+            var mf = R.MarketFactor;
+            var credit = new Dictionary<string, double>(StringComparer.Ordinal);
+            for (int m = 0; m < NM; m++)
+                for (int a = 0; a < TableGoods.Length; a++)
+                {
+                    int g = TableGoods[a], i = m * NG + g, key = NeedOfGood(g);
+                    double E = R.Eaten[i], dm = x.Dm[i] - E;
+                    if (!(dm > 1.0)) continue;
+                    double f = mf != null && i < mf.Length && mf[i] > 0 ? mf[i] : 1.0;
+                    double A = (S[i] - E) - f * dm;
+                    if (!(A > 0.02 * dm)) continue;
+                    // pokoj stolu okregu: najwyzej alfa R8 x wlasny stol bazowy ponad dzisiejszy wlasny i najwyzej 4 x potrzeba bazowa (mnoznik gry), najwyzej to, co wiezie
+                    double tot = 0;
+                    var room = new double[dl.Count];
+                    for (int j = 0; j < dl.Count; j++)
+                    {
+                        var d = dl[j];
+                        if ((d.Market == 0 ? 0 : 1) != m || !(mkt[j][a] > 0) || !(kr[j][a] > 1e-9) || !(d.Need0[key] > 1e-9)) continue;
+                        double cap = Math.Min(TableAlpha * kr[j][a], 4.0 * kr[j][a] - ownL[j][a]);
+                        double r = Math.Max(0.0, Math.Min(mkt[j][a], cap));
+                        room[j] = r; tot += r;
+                    }
+                    if (!(tot > 0)) continue;
+                    double take = Math.Min(1.0, A / tot), absd = 0;
+                    for (int j = 0; j < dl.Count; j++)
+                    {
+                        if (!(room[j] > 0)) continue;
+                        var d = dl[j];
+                        double av = room[j] * take;
+                        // wlasny stol = keep x mnoznik (NeedR8 / Need0): nowy wlasny = dzisiejszy + av
+                        double newOwn = ownL[j][a] + av;
+                        d.NeedR8[key] = d.Need0[key] * newOwn / kr[j][a];
+                        ownL[j][a] = newOwn; mkt[j][a] -= av;
+                        absd += av;
+                        double c; credit.TryGetValue(d.Id, out c); credit[d.Id] = c + av * KsDeliver.ItemKcal[TableItem[a]];
+                    }
+                    R.Eaten[i] += absd; x.Dm[i] += absd;
+                    M.TableKg[m] += absd;
+                }
+            // kcal stolu - czesc pokryta w domu (najwyzej niezaplacona czesc koszyka)
+            for (int j = 0; j < dl.Count; j++)
+            {
+                var d = dl[j]; double c;
+                if (!credit.TryGetValue(d.Id, out c) || !(c > 0) || !(fkL[j] > 0)) continue;
+                float hk; R.DistHomeKcal.TryGetValue(d.Id, out hk);
+                double room = Math.Max(0.0, 1.0 - pkL[j] - hk);
+                double add = Math.Min(room, c / fkL[j]);
+                if (!(add > 0)) continue;
+                R.DistHomeKcal[d.Id] = (float)(hk + add);
+                int m = d.Market == 0 ? 0 : 1;
+                M.VHomeKcal[m] += add * fkL[j]; M.TableKcal[m] += add * fkL[j];
             }
         }
 

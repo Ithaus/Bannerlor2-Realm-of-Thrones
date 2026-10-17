@@ -69,7 +69,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ odbior miasta (KsTownTake): [miasto KS-H x ZN]
-        private const int TkLord = 0, TkDisc = 1, TkCourt = 2, TkCons = 3, TkVill = 4, TkZc5 = 5, TkN = 6;
+        // KS-R3 (port symulatora 17.10, runda 3): TkP2 - drabina 2 wsi (ponad plan, z nadmiaru polki) - odejmowana od odbioru 7 dob zamowienia KS-H (zostaje w zuzyciu rynku)
+        private const int TkLord = 0, TkDisc = 1, TkCourt = 2, TkCons = 3, TkVill = 4, TkZc5 = 5, TkP2 = 6, TkN = 7;
         private static double[] _tk, _one28, _off7;   // _tk [TkN][nt * ZN] doba; srednie [nt * ZN]
         private static int _tkN, _tkDay = -1, _tkNt;
 
@@ -99,6 +100,9 @@ namespace Armoury
             catch { }
         }
 
+        /// <summary>KS-R3 (port symulatora 17.10, runda 3): drabina 2 wsi (TownFolk.ZcTake2) - sztuki kupione ponad plan z nadmiaru polki miasta st (poza zamowieniem KS-H).</summary>
+        internal static void KsTakeP2(Settlement st, ItemObject it, int n) { KsTakeNote(st, it, TkP2, n); }
+
         /// <summary>Raz na dobe (Daily): srednia 28 dob odbioru panow (kupione - porzucone na polce) i dworow, srednia 7 dob calego odbioru polki.</summary>
         private static void TakeDaily(int today)
         {
@@ -111,7 +115,10 @@ namespace Armoury
             {
                 double lord = _tk[TkLord * n + i] - _tk[TkDisc * n + i], court = _tk[TkCourt * n + i];
                 double one = Math.Max(0.0, lord) + court;
-                double all = one + _tk[TkCons * n + i] + _tk[TkVill * n + i] + _tk[TkZc5 * n + i];
+                // KS-R3 (port symulatora 17.10, runda 3): bez drabiny 2 wsi - zakupy ponad plan z nadmiaru polki zrodla podnosily jego zamowienie Dz (odbior 7 dob), a z nim
+                // zapas zrodla 1.25 x T* x Dz: miasto z nadwyzka nie mialo oferty dla kupcow (symulator: ryby, ser, maslo Westeros - "bez nadwyzki" w 95% prob)
+                double vill = Math.Max(0.0, _tk[TkVill * n + i] - _tk[TkP2 * n + i]);
+                double all = one + _tk[TkCons * n + i] + vill + _tk[TkZc5 * n + i];
                 _one28[i] += (one - _one28[i]) * w28; _off7[i] += (all - _off7[i]) * w7;
             }
             Array.Clear(_tk, 0, _tk.Length);
@@ -802,11 +809,20 @@ namespace Armoury
         private static readonly double[] _p2 = new double[3];
         internal static void Zc4NotePass2(double got, double notOffered, double noGold) { _p2[0] += got; _p2[1] += notOffered; _p2[2] += noGold; }
 
-        /// <summary>Cel polki pozycji z miasta t (szt.): T* x popyt zaplacony przy lambda 1 (drabina 2 wsi kupuje tylko ponad niego).</summary>
+        /// <summary>Cel polki pozycji z miasta t (szt.): T* x popyt zaplacony przy lambda 1.</summary>
         internal static double ZStallTarget(Town t, int z)
         {
             if (t == null) return 0.0;
             return ZTstar(TownMarket(t), z) * ZDp(t, z);
         }
+
+        // KS-R3 (port symulatora 17.10, runda 3): drabina 2 wsi kupuje tylko nadmiar polki ponad 1.5 x cel (cena najmniej ok. 1/4 ponizej startu) - pas 1.25-1.5 x cel
+        // zostaje kupcom zywnosci KS-H (ich zrodlo trzyma 1.25 x T* x Dz i sprzedaje polowe reszty na dobe). Dotad drabina 2 brala wszystko ponad 1.0 x cel PRZED KS-H
+        // (zakupy wsi w TownFolk.Daily, KS-H w SupplyDemand.DailyTrade): wsie przy miastach z nadwyzka zjadaly z oszczednosci towar, ktory kupcy wiezliby do miast pustych
+        // (symulator, okno D+22..D+49: mediany cen w pasmie 12 -> 17 z 26 towarow, miasta z ziarnem < 2 dni 18% -> 13%, kiesy wsi -0.39/-0.55 -> -0.28/-0.43 %/d)
+        internal const double P2ShelfK = 1.5;
+
+        /// <summary>Prog drabiny 2 wsi w miescie t (szt.): P2ShelfK x cel polki (KS-R3 runda 3).</summary>
+        internal static double ZPass2Floor(Town t, int z) { return P2ShelfK * ZStallTarget(t, z); }
     }
 }

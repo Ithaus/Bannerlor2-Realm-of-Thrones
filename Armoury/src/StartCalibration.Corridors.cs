@@ -40,6 +40,11 @@ namespace Armoury
             foreach (int g in new[] { KsTab.GFish, KsTab.GMeat, KsTab.GEgg, KsTab.GButter, KsTab.GApple, KsTab.GCarrot, KsTab.GOrange, KsTab.GGrape, KsTab.GDate }) a[g] = true;
             return a;
         }
+        // KS-R3 runda 3 symulatora: psujace sie na poziomie miast. W GRZE tylko pomiar (linia korytarzy: stojace i bez dowozu wedlug miast); gradient miast (TownGrad:
+        // eksporter TownExport z najnizszym TownExportMin, premia braku z wlasnej podazy TownImport) i regula zasiegu po przewozie miast (TownReach) - WYLACZONE, wlacza
+        // je tylko harness do prob (port symulatora 17.10, runda 3: eksporter zabieral Arbor utarg ryb - Plan bez pokrycia Westeros 3.8% -> 6.0%; premia i regula
+        // zasiegu po przewozie - mediany cen bez zmiany ponad szum 3 ziaren, bez pokrycia Westeros +0.3..+0.9 pkt). Wylaczone - Plan bit w bit jak bez kroku miast.
+        internal static bool TownGrad = false, TownExport = true, TownImport = true, TownReach = false; internal static double TownExportMin = 0.6;
         internal const double CorrTauLand = 0.010, CorrTauSea = 0.005, CorrMargin = 0.03, CorrMaxG = 1.5, CorrMinG = 0.6, CorrDurableDays = 30.0, CorrPerishDays = 7.0;
 
         private sealed partial class Ctx
@@ -55,6 +60,13 @@ namespace Armoury
             public Dictionary<string, bool[]> ReachT, ReachD;           // regula zasiegu: miasto / okreg -> pozycje koszyka wyciete
             public int[] TownLand;                                     // [nt] kraina miasta
             public double[] FlowPcs = new double[NM * KsTab.NG], FlowDays = new double[NM * KsTab.NG], FlowSea = new double[NM * KsTab.NG];
+            // KS-R3 runda 3 symulatora: PSUJACE SIE NA POZIOMIE MIAST (okregi miasta targowego) - wezly dochodu: krainy x rynek [0, NodeTown), miasta x rynek
+            // [NodeTown, NodeTown + NT x NM), wiersz zerowy na koncu; gradient miasta towaru psujacego sie (tlumiony, cieply z Planu do Planu), stojace i niedowiezione
+            public int NT, NodeTown;
+            public double[] TGradBase;                                 // [NT * NG] gradient miasta (tylko psujace sie; reszta 1)
+            public double[] TUnmet;                                    // [NT * NG] czesc popytu miasta psujacego sie bez dowozu w 7 dobach po przewozie miast (regula zasiegu)
+            public double[] TStuck = new double[NM * KsTab.NG], TSup = new double[NM * KsTab.NG], TMoved = new double[NM * KsTab.NG], TShort = new double[NM * KsTab.NG], TDem = new double[NM * KsTab.NG];
+            public double TGMin = 1.0, TGMax = 1.0; public int TGN; public bool TownPerishDone;
         }
 
         /// <summary>Kraina okregu: kraina miasta targowego (CorrLand) albo wlasna; -1 - nieznana.</summary>
@@ -78,10 +90,11 @@ namespace Armoury
             for (int t = 0; t < nt; t++) { int l; x.TownLand[t] = x.LandIx.TryGetValue(inp.Towns[t].Land ?? "?", out l) ? l : -1; }
             foreach (var d in x.D)
             {
-                d.CorrLand = -1;
+                d.CorrLand = -1; d.CorrTown = -1;
                 int t;
-                if (inp.DistTown != null && inp.DistTown.TryGetValue(d.Id, out t) && t >= 0 && t < nt) d.CorrLand = x.TownLand[t];
+                if (inp.DistTown != null && inp.DistTown.TryGetValue(d.Id, out t) && t >= 0 && t < nt) { d.CorrLand = x.TownLand[t]; d.CorrTown = t; }
             }
+            x.NT = nt; x.NodeTown = x.Lands.Count * NM;
             // MV jedzenia zajec (rzadko)
             x.MVFood = new List<KeyValuePair<int, double>>[KsTab.NC];
             for (int c = 0; c < KsTab.NC; c++)
@@ -118,7 +131,16 @@ namespace Armoury
                     double[] gp; if (!inp.GradPrev.TryGetValue(x.Lands[l], out gp) || gp == null) continue;
                     foreach (int g in Food) if (g < gp.Length && gp[g] > 0 && !double.IsNaN(gp[g])) x.GradBase[l * KsTab.NG + g] = Math.Max(CorrMinG, Math.Min(CorrMaxG, gp[g]));
                 }
-            x.GradDelta = new double[nl * NM * KsTab.NC];
+            // KS-R3 runda 3 symulatora: gradient miast psujacych sie z poprzedniego Planu (wpisy "@" + miasto w tym samym slowniku)
+            x.TGradBase = new double[nt * KsTab.NG]; x.TUnmet = new double[nt * KsTab.NG];
+            for (int i = 0; i < x.TGradBase.Length; i++) x.TGradBase[i] = 1.0;
+            if (inp.Corridors && inp.GradPrev != null)
+                for (int t = 0; t < nt; t++)
+                {
+                    double[] gp; if (!inp.GradPrev.TryGetValue("@" + inp.Towns[t].Id, out gp) || gp == null) continue;
+                    foreach (int g in Food) if (PerishG[g] && g < gp.Length && gp[g] > 0 && !double.IsNaN(gp[g])) x.TGradBase[t * KsTab.NG + g] = Math.Max(CorrMinG, Math.Min(CorrMaxG, gp[g]));
+                }
+            x.GradDelta = new double[(x.NodeTown + nt * NM + 1) * KsTab.NC];
             RefreshGradEff(x);
             BuildPl(x);
         }
@@ -145,6 +167,17 @@ namespace Armoury
                 }
                 if (act) { any = true; for (int m = 0; m < NM; m++) x.GradActive.Add(l * NM + m); }
             }
+            // KS-R3 runda 3 symulatora: wezly miast (okregi z miastem targowym) - czynne, gdy czynna kraina miasta albo gradient miasta psujacego sie rozny od 1
+            if (x.TGradBase != null)
+                for (int t = 0; t < x.NT; t++)
+                {
+                    int l = x.TownLand[t];
+                    if (l < 0) continue;                                // miasto bez krainy - jego okregi zostaja w wezle wlasnej krainy (BuildPl)
+                    bool act = false;
+                    if (l >= 0) for (int g = 0; g < KsTab.NG && !act; g++) if (x.GradEff[l * KsTab.NG + g] != 1.0) act = true;
+                    if (!act && inp.Corridors) foreach (int g in Food) if (PerishG[g] && x.TGradBase[t * KsTab.NG + g] != 1.0) { act = true; break; }
+                    if (act) { any = true; for (int m = 0; m < NM; m++) x.GradActive.Add(x.NodeTown + t * NM + m); }
+                }
             x.GradOn = any;
         }
 
@@ -156,12 +189,14 @@ namespace Armoury
             for (int k = 0; k < x.NP; k++)
             {
                 var d = x.BD[x.Pb[k]];
+                // KS-R3 runda 3 symulatora: okreg z miastem targowym - wezel miasta (kraina miasta + gradient miasta psujacych sie); bez miasta - wezel krainy
+                if (d.CorrTown >= 0 && d.CorrTown < x.NT && x.TGradBase != null && x.TownLand[d.CorrTown] >= 0) { pl[k] = x.NodeTown + d.CorrTown * NM + x.Pm[k]; continue; }
                 int l = LandOfD(x, d);
                 pl[k] = l >= 0 ? l * NM + x.Pm[k] : 0;
                 if (l < 0) pl[k] = -1;
             }
-            // okreg bez krainy - wiersz zerowy (dodatek 0): osobny indeks za ostatnia kraina
-            int zero = x.NL * NM;
+            // okreg bez krainy - wiersz zerowy (dodatek 0): osobny indeks za ostatnim miastem
+            int zero = x.NodeTown + x.NT * NM;
             for (int k = 0; k < x.NP; k++) if (pl[k] < 0) pl[k] = zero;
             if (x.GradDelta == null || x.GradDelta.Length < (zero + 1) * KsTab.NC) x.GradDelta = new double[(zero + 1) * KsTab.NC];
             x.Pl = pl;
@@ -174,7 +209,25 @@ namespace Armoury
             Array.Clear(d, 0, d.Length);
             foreach (int lm in x.GradActive)
             {
-                int l = lm / NM, m = lm % NM, o = lm * KsTab.NC, pm = m * KsTab.NG, lo = l * KsTab.NG;
+                int o = lm * KsTab.NC;
+                if (lm >= x.NodeTown)
+                {
+                    // wezel miasta: gradient krainy miasta x gradient miasta (towary psujace sie)
+                    int t = (lm - x.NodeTown) / NM, mt = (lm - x.NodeTown) % NM, lt = x.TownLand[t], pmt = mt * KsTab.NG, to = t * KsTab.NG;
+                    for (int c = 0; c < KsTab.NC; c++)
+                    {
+                        double s = 0;
+                        foreach (var kv in x.MVFood[c])
+                        {
+                            double gr = lt >= 0 ? x.GradEff[lt * KsTab.NG + kv.Key] : 1.0;
+                            if (PerishG[kv.Key] && x.In.Corridors) gr *= x.TGradBase[to + kv.Key];
+                            if (gr != 1.0) s += p[pmt + kv.Key] * (gr - 1.0) * kv.Value;
+                        }
+                        d[o + c] = s;
+                    }
+                    continue;
+                }
+                int l = lm / NM, m = lm % NM, pm = m * KsTab.NG, lo = l * KsTab.NG;
                 for (int c = 0; c < KsTab.NC; c++)
                 {
                     double s = 0;
@@ -353,6 +406,9 @@ namespace Armoury
                 }
             }
             R.Kraina.AddRange(kraina);
+            // KS-R3 runda 3 symulatora: psujace sie na poziomie miast (przewoz miast w 7 dobach, gradient miasta, niedowiezione do reguly zasiegu)
+            double[] tgraw = null;
+            try { tgraw = TownPerish(x, p, prod); } catch (Exception te) { tgraw = null; x.TownPerishDone = false; R.Kraina.Add("blad przewozu miast " + te.GetType().Name); }
             // tlumienie i gradient skuteczny
             double dmax = 0, gmax = 1.0; int dbig = 0;
             if (inp.Corridors)
@@ -369,6 +425,23 @@ namespace Armoury
                         x.GradBase[i] = nv;
                         if (Math.Abs(nv - 1.0) > Math.Abs(gmax - 1.0)) gmax = nv;
                     }
+                // KS-R3 runda 3 symulatora: gradient miast psujacych sie - to samo tlumienie (0.5 poprzedni + 0.5 nowy); blizej 1 niz 0.5% - 1 (miasto bez dodatku)
+                x.TGMin = x.TGMax = 1.0; x.TGN = 0;
+                if (tgraw != null)
+                    for (int t = 0; t < x.NT; t++)
+                        foreach (int g in Food)
+                        {
+                            if (!PerishG[g]) continue;
+                            int i = t * NG + g;
+                            double nv = Math.Max(CorrMinG, Math.Min(CorrMaxG, 0.5 * x.TGradBase[i] + 0.5 * tgraw[i]));
+                            if (Math.Abs(nv - 1.0) < 0.005) nv = 1.0;
+                            double dd = Math.Abs(nv - x.TGradBase[i]) / Math.Max(1e-9, x.TGradBase[i]);
+                            if (dd > dmax) dmax = dd;
+                            if (dd > 0.05) dbig++;
+                            x.TGradBase[i] = nv;
+                            if (nv != 1.0) { x.TGN++; if (nv < x.TGMin) x.TGMin = nv; if (nv > x.TGMax) x.TGMax = nv; }
+                            if (Math.Abs(nv - 1.0) > Math.Abs(gmax - 1.0)) gmax = nv;
+                        }
                 RefreshGradEff(x);
                 var gd = new Dictionary<string, double[]>(StringComparer.Ordinal);
                 for (int l = 0; l < nl; l++)
@@ -378,12 +451,131 @@ namespace Armoury
                     var a = new double[NG]; for (int g = 0; g < NG; g++) a[g] = FoodMask[g] ? x.GradBase[l * NG + g] : 1.0;
                     gd[x.Lands[l]] = a;
                 }
+                for (int t = 0; t < x.NT; t++)
+                {
+                    bool any = false; foreach (int g in Food) if (PerishG[g] && x.TGradBase[t * NG + g] != 1.0) { any = true; break; }
+                    if (!any) continue;
+                    var a = new double[NG]; for (int g = 0; g < NG; g++) a[g] = PerishG[g] && FoodMask[g] ? x.TGradBase[t * NG + g] : 1.0;
+                    gd["@" + inp.Towns[t].Id] = a;
+                }
                 R.Grad = gd;
             }
             R.GradDMax = dmax; R.GradMax = gmax; R.GradDBig = dbig;
             // regula zasiegu psujacych sie
             if (inp.Reach) ReachRule(x, prod);
             R.CorrMs += sw.Elapsed.TotalMilliseconds;
+        }
+
+        /// <summary>
+        /// KS-R3 (port symulatora 17.10, runda 3): PSUJACE SIE NA POZIOMIE MIAST. Krainy zbieraja podaz i popyt calej kultury, a towar psujacy sie jedzie najwyzej 7 dob:
+        /// ryby Westeros lezaly na Arbor (okreg winnicy Ramsport z 300 tys. ludzi - polowa ryb Westeros), Essos - na Nowym Ghis, a Plan widzial "nadwyzke Reach"
+        /// wywozona przez najlepsza brame krainy (Highgarden - Dorzecze 4 doby), ktorej z Arbor nikt nie dowiezie (symulator: 61% ryb, 55-64% owocow, 34% winogron,
+        /// 32-51% masla rynku bez odbiorcy w 7 dobach). Dla kazdego towaru psujacego sie i rynku: podaz okregow miasta targowego (z polami mieszczan) i popyt miasta
+        /// z jego okregami (potrzeby + 1:1 wedlug ludzi - to, co okreg zjada sam, jest po obu stronach); problem przewozu miast (kolejne najkrotsze sciezki): luk
+        /// najwyzej 7 dob wozem (tabela dob KS-H), nie w wojnie, przepustowosc z kasy miasta celu (polowa kasy 28 dob na towar w drodze - jak przed D krok 5).
+        /// GRADIENT MIASTA (cena towaru w dochodzie bloku okregow miasta, razem z gradientem krainy): nadwyzka bez odbiorcy w 7 dobach (> 5% podazy miasta) -
+        /// 1 - stojace / podaz, najmniej 0.6 (rece odchodza od towaru, ktorego nikt nie kupi); dowoz - 1.03 + tau x srednie doby; brak bez dowozu (> 5% popytu)
+        /// przy wlasnej podazy >= 5% popytu - 1 + brak / popyt, najwyzej 1.5 (rece miasta, ktore umie to robic, ida do towaru). Bez gradientu: towary uboczne
+        /// (ExcessSkip) i cena rynku na podlodze (jak krok 5 krain). NIEDOWIEZIONE (czesc popytu bez dowozu) - do reguly zasiegu (TUnmet).
+        /// Wydajnosc bez zmian - zmienia sie tylko liczba rak przy towarze.
+        /// </summary>
+        private static double[] TownPerish(Ctx x, double[] p, Dictionary<string, double[]> prod)
+        {
+            var inp = x.In;
+            int nt = x.NT, NG = KsTab.NG;
+            x.TownPerishDone = false;
+            if (nt <= 0 || x.TGradBase == null || inp.TownDays == null || inp.TownDays.Length != nt * nt) return null;
+            var sup = new double[nt * NG]; var dem = new double[nt * NG]; var tmp = new double[NG];
+            double wpop = Math.Max(1.0, x.WPop);
+            foreach (var d in x.D)
+            {
+                int t = d.CorrTown; if (t < 0 || t >= nt) continue;
+                double[] a;
+                if (prod.TryGetValue(d.Id, out a)) foreach (int g in Food) if (PerishG[g]) sup[t * NG + g] += a[g];
+                Array.Clear(tmp, 0, NG);
+                CivilGoods(d.Need, tmp);
+                OneGoods(x, d.People / wpop, tmp);
+                foreach (int g in Food) if (PerishG[g]) dem[t * NG + g] += tmp[g];
+            }
+            for (int t = 0; t < nt; t++)
+            {
+                var ts = inp.Towns[t];
+                Array.Clear(tmp, 0, NG);
+                CivilGoods(ts.Need, tmp);
+                OneGoods(x, ts.People / wpop, tmp);
+                foreach (int g in Food) if (PerishG[g]) dem[t * NG + g] += tmp[g];
+            }
+            var graw = new double[nt * NG]; for (int i = 0; i < graw.Length; i++) graw[i] = 1.0;
+            Array.Clear(x.TUnmet, 0, x.TUnmet.Length);
+            Array.Clear(x.TStuck, 0, x.TStuck.Length); Array.Clear(x.TSup, 0, x.TSup.Length); Array.Clear(x.TMoved, 0, x.TMoved.Length); Array.Clear(x.TShort, 0, x.TShort.Length); Array.Clear(x.TDem, 0, x.TDem.Length);
+            var nodes = new List<int>(nt);
+            foreach (int g in Food)
+            {
+                if (!PerishG[g]) continue;
+                for (int m = 0; m < NM; m++)
+                {
+                    nodes.Clear();
+                    for (int t = 0; t < nt; t++) if (inp.Towns[t].Market == m && (sup[t * NG + g] > 1.0 || dem[t * NG + g] > 1.0)) nodes.Add(t);
+                    int n = nodes.Count;
+                    if (n < 1) continue;
+                    var ex = new double[n];
+                    for (int i = 0; i < n; i++) ex[i] = sup[nodes[i] * NG + g] - dem[nodes[i] * NG + g];
+                    double idx = StartIndex(KsTab.Goods[g], p, m), zl = ZlPerKg(inp, KsTab.Goods[g], idx);
+                    var cost = new double[n * n]; var cap = new double[n * n];
+                    for (int i = 0; i < n; i++)
+                        for (int j = 0; j < n; j++)
+                        {
+                            int k = i * n + j;
+                            cost[k] = -1; cap[k] = 0;
+                            if (i == j || ex[i] <= 0 || ex[j] >= 0) continue;
+                            int ti = nodes[i], tj = nodes[j];
+                            float dd = inp.TownDays[ti * nt + tj];
+                            if (!(dd >= 0f) || dd > CorrPerishDays) continue;
+                            if (inp.TownWar != null && inp.TownWar[ti * nt + tj]) continue;
+                            double c = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? 0.5 * Math.Max(0.0, inp.TownGold28[tj]) / (zl * Math.Max(1.0, dd)) : 1e12;
+                            if (!(c > 0)) continue;
+                            cost[k] = Math.Max(1.0, dd); cap[k] = c;
+                        }
+                    var flow = KsCorridors.Transport(n, ex, cost, cap);
+                    var inF = new double[n]; var inT = new double[n]; var outF = new double[n];
+                    for (int i = 0; i < n; i++)
+                        for (int j = 0; j < n; j++)
+                        {
+                            double f = flow[i * n + j];
+                            if (!(f > 1e-9)) continue;
+                            int ti = nodes[i], tj = nodes[j];
+                            bool sea = inp.TownSea != null && inp.TownSea[ti * nt + tj];
+                            inF[j] += f; inT[j] += f * (sea ? CorrTauSea : CorrTauLand) * cost[i * n + j]; outF[i] += f;
+                        }
+                    bool ng = !TownGrad || ExcessSkip(g) || p[m * NG + g] <= 2.0 * PLo;
+                    int o = m * NG + g;
+                    for (int i = 0; i < n; i++)
+                    {
+                        int t = nodes[i]; double s = sup[t * NG + g], dm = dem[t * NG + g], gr = 1.0;
+                        x.TSup[o] += s; x.TDem[o] += dm;
+                        if (ex[i] > 0)
+                        {
+                            double u = Math.Max(0.0, ex[i] - outF[i]);
+                            x.TStuck[o] += u; x.TMoved[o] += outF[i];
+                            if (!ng && TownExport && s > 20.0 && u > 0.05 * s) gr = Math.Max(Math.Max(CorrMinG, TownExportMin), 1.0 - u / s);
+                        }
+                        else if (ex[i] < 0)
+                        {
+                            double r = Math.Max(0.0, -ex[i] - inF[i]);
+                            x.TUnmet[t * NG + g] = dm > 0 ? r / dm : 0.0;
+                            x.TShort[o] += r;
+                            if (!ng)
+                            {
+                                if (inF[i] > 1e-9) gr = Math.Min(CorrMaxG, 1.0 + CorrMargin + inT[i] / inF[i]);
+                                if (TownImport && dm > 20.0 && r > 0.05 * dm && s >= 0.05 * dm) gr = Math.Min(CorrMaxG, Math.Max(gr, 1.0 + r / dm));
+                            }
+                        }
+                        graw[t * NG + g] = gr;
+                    }
+                }
+            }
+            x.TownPerishDone = true;
+            return graw;
         }
 
         /// <summary>Pozycje koszyka ZC4 towaru psujacego sie KsTab g (mieso - mieso i mieso wieloryba).</summary>
@@ -464,6 +656,10 @@ namespace Armoury
                     double dm = dem[t * NG + g];
                     if (!(dm > 1.0) || sup[t * NG + g] >= 0.05 * dm) continue;
                     bool ok = false;
+                    // KS-R3 runda 3 symulatora: po przewozie miast (TownPerish) - wyciete, gdy ponad polowa popytu miasta zostaje bez dowozu w 7 dobach (dotad: jakiekolwiek
+                    // miasto z nadwyzka w 7 dobach - jedno male miasto rybackie "zasilalo" kilkanascie miast w glebi ladu); bez przewozu miast - jak dotad
+                    if (TownReach && x.TUnmet != null && x.TownPerishDone) ok = x.TUnmet[t * NG + g] <= 0.5;
+                    else
                     for (int u = 0; u < nt && !ok; u++)
                     {
                         if (u == t || inp.Towns[u].Market != ts.Market || !(sup[u * NG + g] > dem[u * NG + g])) continue;
@@ -520,6 +716,26 @@ namespace Armoury
                 sb.Append(i == 0 ? " " : ", ").Append(k.From).Append('>').Append(k.To).Append(' ').Append(KsTab.Goods[k.G]).Append(' ').Append(k.Pcs.ToString("0", inv)).Append(" (").Append(k.Days.ToString("0", inv)).Append(k.Sea ? " d morzem)" : " d)");
             }
             if (big.Count > 80) sb.Append(", inne ").Append(big.Count - 80);
+            // KS-R3 runda 3 symulatora: psujace sie na poziomie miast - stojace (nadwyzka miasta bez odbiorcy w 7 dobach) i bez dowozu (% podazy / popytu rynku), gradient miast
+            if (x.TownPerishDone)
+            {
+                sb.Append(" | miasta (psujace sie, 7 dob):");
+                for (int m = 0; m < NM; m++)
+                {
+                    sb.Append(m == 0 ? " Westeros" : "; Essos");
+                    bool f3 = true;
+                    foreach (int g in Food)
+                    {
+                        if (!PerishG[g]) continue;
+                        int o = m * KsTab.NG + g;
+                        if (!(x.TSup[o] > 1.0)) continue;
+                        sb.Append(f3 ? " " : ", ").Append(KsTab.Goods[g]).Append(" stoi ").Append((100.0 * x.TStuck[o] / x.TSup[o]).ToString("0", inv)).Append("% bez dowozu ")
+                          .Append((100.0 * x.TShort[o] / Math.Max(1.0, x.TDem[o])).ToString("0", inv)).Append("% popytu");
+                        f3 = false;
+                    }
+                }
+                sb.Append("; gradient miast ").Append(x.TGN).Append(" komorek, ").Append(x.TGMin.ToString("0.00", inv)).Append("-").Append(x.TGMax.ToString("0.00", inv));
+            }
             sb.Append(" | kraina-tryb: ").Append(R.Kraina.Count > 0 ? string.Join(", ", R.Kraina.ToArray()) : "brak");
             sb.Append(" | bez zrodla: ").Append(R.Unreached.Count > 0 ? string.Join(", ", R.Unreached.ToArray()) : "brak");
             sb.Append(" | gradient max ").Append(R.GradMax.ToString("0.000", inv)).Append(" (zmiana ostatniej rundy ").Append((100 * R.GradDMax).ToString("0.0", inv)).Append("%, komorek kraina x towar ze zmiana > 5%: ").Append(R.GradDBig).Append(')');

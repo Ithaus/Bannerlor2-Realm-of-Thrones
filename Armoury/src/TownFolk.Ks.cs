@@ -146,8 +146,8 @@ namespace Armoury
             return k;
         }
 
-        /// <summary>KS-R3 G2 drabina 2 (reszta pelnego koszyka ponad zaplacone z Planu): tylko z kiesy ponad Lim (7 dob budzetu Planu) i tylko ze stanu polki ponad cel
-        /// polki miasta (T* x popyt zaplacony) - liczniki INFO, bez "chcianych" i bez miary bledu drabiny 1.</summary>
+        /// <summary>KS-R3 G2 drabina 2 (reszta pelnego koszyka ponad zaplacone z Planu): tylko z kiesy ponad Lim (7 dob budzetu Planu) i tylko ze stanu polki ponad 1.5 x cel
+        /// polki miasta (T* x popyt zaplacony; KS-R3 runda 3 - pas do 1.5 x celu dla kupcow KS-H) - liczniki INFO, bez "chcianych" i bez miary bledu drabiny 1.</summary>
         private static int ZcTake2(ZcBuy b, int z, int n, int rung)
         {
             EquipmentElement e; int have;
@@ -161,7 +161,7 @@ namespace Armoury
                 b.ZlW += (double)n * (price > 0 ? price : 0);
             }
             if (price <= 0 || have <= 0) { b.P2Shelf += n; return 0; }
-            int above = (int)Math.Floor(have + ShelfKeep - StartCalibration.ZStallTarget(b.T, z));   // have = polka - 5; nad celem polki miasta
+            int above = (int)Math.Floor(have + ShelfKeep - StartCalibration.ZPass2Floor(b.T, z));   // have = polka - 5; nad 1.5 x celem polki miasta (KS-R3 runda 3)
             int k = Math.Min(n, Math.Min(have, above));
             if (k <= 0) { b.P2Shelf += n; return 0; }
             if (k < n) b.P2Shelf += n - k;
@@ -178,6 +178,7 @@ namespace Armoury
             b.KcalG += k * StartCalibration.ZKg(z) * KsBasket.Kcal[z]; b.ZlG += paid;
             b.D.VBuy += paid; b.D.VPieces += k;
             NoteVillBought(b.Mk, e.Item.ItemCategory, paid);
+            StartCalibration.KsTakeP2(b.Mk, e.Item, k);           // KS-R3 runda 3: poza odbiorem 7 dob zamowienia KS-H (ponad plan)
             return k;
         }
 

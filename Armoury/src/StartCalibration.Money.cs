@@ -297,7 +297,9 @@ namespace Armoury
                 // KS-R3: kcal zastepcze kroku 8b (wlasny towar za pozycje spoza HomeMask), Plan bez pokrycia (cel W <= 3.0%, E <= 3.5%), czynnik popytu targu, regula zasiegu
                 sb.Append("; KS-R3: kcal zastepcze 8b ").Append(P1(100 * M.VSubKcal[m] / fk)).Append("%, Plan bez pokrycia ").Append(P1(100 * Math.Max(0.0, M.VUnpaidKcal[m] - M.VHomeKcal[m]) / fk))
                   .Append("% (cel ").Append(m == 0 ? "3.0" : "3.5").Append("%), czynnik popytu targu ").Append(M.MfMin[m].ToString("0.000", Inv)).Append('-').Append(M.MfMax[m].ToString("0.000", Inv))
-                  .Append(", wsie z wycietymi psujacymi sie ").Append(M.ReachCut[m]);
+                  .Append(", wsie z wycietymi psujacymi sie ").Append(M.ReachCut[m])
+                  // KS-R3 (port symulatora 17.10, runda 3) krok 8d: ubocze (jaja, miod, marchew, jablka, dziczyzna) ponad popyt zaplacony targu zostaje na stole okregu
+                  .Append(", stol 8d ").Append(F0(M.TableKg[m])).Append(" kg Planu/d (kcal w domu ").Append(P1(100 * M.TableKcal[m] / fk)).Append("%)");
             }
             double vo, vf; int vn; VilOutTotals(out vo, out vf, out vn);
             sb.Append(" | alfa ").Append(SwAlphaNet ? "NETTO (wplyw + fracht KS-H - wydatki spoza koszyka)" : "z utargu (klucz Ks Alpha Net wylaczony)").Append(": wydatki wsi spoza koszyka ").Append(F0(vo))
