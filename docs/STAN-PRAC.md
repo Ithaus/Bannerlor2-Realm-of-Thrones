@@ -2722,7 +2722,7 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
 - Jeff ok. 16:50 PDT: "chce abys wszystko co zostalo do zrobienia wgral, WSZYSKO i punkt 14 tez ... nie patrz na godzine, masz robic az wszystko bedzie zrobione" -> zakres = cala
   lista (noc + reszta CO-ZOSTALO 14.10), bez terminu; gdy Jeff chce grac - wgrac to, co przeszlo testy, i stop. Pytania do Jeffa (wyjasnione): ForgeLikeTownSmith (kod jest, WYL.),
   uchodzcy do miast (brak kodu). VeteranTakesKit i PlayerArmoryLikeAiLord juz TAK (decyzje 14.10, w grze).
-- 16:58 PDT: workflow wf_666681e9-1fe (noc-1718-fala1): 10 paczek w worktree zb/<nazwa> (galezie w-toku/<nazwa> od efbbf0dc): r4-kupcy (H1-H8 kredyt + dowoz na Polnoc),
+- 16:35 PDT: workflow wf_666681e9-1fe (noc-1718-fala1): 10 paczek w worktree zb/<nazwa> (galezie w-toku/<nazwa> od efbbf0dc): r4-kupcy (H1-H8 kredyt + dowoz na Polnoc),
   r4-polnoc (najpierw wyzywic siebie + zimna ziemia), r4-mur (danina zbozowa Muru + glod Wolnych Ludzi -> najazdy), r4-koszyk (tanszy koszyk + place za brak rak), r4-bkwies
   (rynek wsi BK wedlug potrzeb, B1-B4, G1), r4-ceny (P3-P10, C1-C3, ser/maslo/sol/Essos), sw-drogi (+15% na drogach ROT, plik arm_map_roads_geo.tsv), sw-zajazdy (zajazdy +
   noclegi + plotki, takze w miescie), sw-przysiolki (uklad wiosek v6), sw-herby (limit 160 tekstur); kazda: kod -> recenzja -> poprawki; potem scalenie do w-toku/noc-ks4
