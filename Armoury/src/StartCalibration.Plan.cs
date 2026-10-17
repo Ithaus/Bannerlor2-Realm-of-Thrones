@@ -269,8 +269,7 @@ namespace Armoury
             _wOut = null;
             var inp = _wIn; _wIn = null;
             if (inp == null) return;
-            _plan = r; _planIn = inp; _planDay = _wDay;
-            if (r.Error == null) { _plans++; if (_firstPlanDay < 0) _firstPlanDay = _wDay; }
+            if (r.Error == null) { _plan = r; _planIn = inp; _planDay = _wDay; _plans++; if (_firstPlanDay < 0) _firstPlanDay = _wDay; }   // Plan z bledem nie zastepuje dobrego (cieply start, wlaczenie)
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
             // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku)
             if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { PlanCsv(_wDay, r, inp); } catch (Exception e) { Stumble("PlanCsv", e); } }
