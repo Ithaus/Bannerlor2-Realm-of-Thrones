@@ -294,6 +294,7 @@ namespace Armoury
             int day = (int)CampaignTime.Now.ToDays - 1;
             _stumblesDay = 0;
             FoldNoteStumbles();
+            try { ClearProsperityTerms(); } catch { }      // ZC6: czlon dobrobytu tylko z tej doby (doba przerwana wyjatkiem albo bez pomiaru - bez czlonu, nie wczorajszy)
             try
             {
                 if (!KeyOn)
@@ -341,6 +342,7 @@ namespace Armoury
             _eDay = day; _eSeedDay = 0;                    // ZC2: doba zasiewu ksiegi stanow
             long t1 = Stopwatch.GetTimestamp();
             PeopleDay();
+            WarSeed(day);                                  // ZC7: doba wlaczenia w kampanii (klucz off - od nowa przy nastepnym wlaczeniu); nie rzuca
             if (EstatesOn) { try { WarFlush(day); WarPeople(); } catch (Exception e) { _wStum++; Stumble("WarFlush", e); } }   // ZC7: blizna najazdow doby (przed dochodem doby), uchodzcy w mianowniku
             long t2 = Stopwatch.GetTimestamp();
             PricesDay();                                   // po ludziach doby: koszyk zamku wazony ludzmi wsi regionu
@@ -356,8 +358,9 @@ namespace Armoury
                 // doba bez linii (ciche logi, log wylaczony): bez Spizarni i linii; ZC2 - Dostatek do widoku co dobe (i pamiec Dostatku co 7 dob)
                 if (estates)
                 {
-                    try { LivelihoodDay(); ViewDay(day); } catch (Exception e) { Stumble("LivelihoodDay(widok)", e); }
-                    try { ActiveDay(day); } catch (Exception e) { Stumble("ActiveDay", e); }   // ZC6: awans i spadek, wyzwolenie, dobrobyt na jutro (co dobe, takze bez linii)
+                    bool live = false;
+                    try { LivelihoodDay(); live = true; ViewDay(day); } catch (Exception e) { Stumble("LivelihoodDay(widok)", e); }
+                    if (live) { try { ActiveDay(day); } catch (Exception e) { Stumble("ActiveDay", e); } }   // ZC6: awans i spadek, wyzwolenie, dobrobyt na jutro (co dobe, takze bez linii); bez Dostatku doby - nic
                 }
                 AddMs((Stopwatch.GetTimestamp() - t0) * f);
                 return;

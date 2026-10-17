@@ -914,14 +914,15 @@ Uzycie (Python 3, tylko odczyt):
                     python -I tools/sprawdz_logi.py --grupa nzc6 <Armoury-*.log> [--do-doby 120] (strumieniowo). NZC6-0 start sesji (klucze), NZC6-0b postfiks dobrobytu
                     na czynnym modelu, NZC6-1 linia "Awans (ZC6)" w kazdej dobie z linia ZC0, NZC6-2 ruch <= 0.2% ludzi osady na tydzien, NZC6-3 swiat netto w gore
                     0.5-3%/rok (DECYZJA przy D chlopow ponizej progu awansu), NZC6-4 mediany D stanow (DECYZJA poza - ZC4), NZC6-5 max/min D regionow <= 8 (DECYZJA),
-                    NZC6-6 udzialy w pasmach, NZC6-7 obieg zamkniety (roznica 0, kiesy = panowie), NZC6-8 srednia zmiana dobrobytu z czlonu <= 0.5/d, NZC6-9 wplyw na
-                    mediany dobrobytu krain +-5%, NZC6-10 potkniecia i ERROR 0, NZC6-11..13 INFO. Razem z --grupa nzc0 (czas bloku) i nzc2 (zapis + wczytanie).
+                    NZC6-6 udzialy w pasmach, NZC6-7 obieg zamkniety (roznica 0, kupno i odkup ziemi), NZC6-8 srednie |czlon| dobrobytu <= 0.5/d, NZC6-8b sufit <= 10%,
+                    NZC6-9 dryf krain +-5% (wszystkie), NZC6-9b zbieznosc (seria znaku <= 28 dob), NZC6-10 potkniecia i ERROR 0, NZC6-11..13 INFO (Prosperity Link
+                    domyslnie wylaczony - progi dobrobytu tylko w biegu z kluczem). Razem z --grupa nzc0 (czas bloku) i nzc2 (zapis v4 + wczytanie).
 --grupa nzc7      : (16.10, Jeff "wojny niszcza dobrobyt"; galaz w-toku/noc-zc267, Armoury/src/DailyLife.War.cs, CitySack.People.cs, Devastation.cs; projekt
                     docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 11 i 14 ZC7) python -I tools/sprawdz_logi.py --grupa nzc7 <Armoury-*.log> [--do-doby 120]
                     (strumieniowo). NZC7-0 start sesji (klucz Daily Life War Scar), NZC7-1 linia "Blizna wojny (ZC7)" w kazdej dobie z linia ZC0, NZC7-2 po zlupieniu
                     kupcy -10-20% w miescie, NZC7-3 po najezdzie D okregu -30-60% w 7 dob (epizody z trafionymi >= 20%; same male najazdy - DECYZJA), NZC7-4 >= 50%
                     powrotu w rok bez wojny (krotszy bieg - INFO), NZC7-5 obieg zamkniety (kontrola kies 0), NZC7-6 potkniecia i ERROR 0, NZC7-7..12 INFO. Razem
-                    z --grupa nzc6 (granice pasm, limit 0.2%), nzc2 (zapis v3 + wczytanie) i nzc0 (czas bloku).
+                    z --grupa nzc6 (granice pasm, limit 0.2%), nzc2 (zapis v4 + wczytanie) i nzc0 (czas bloku).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -32620,12 +32621,12 @@ NZC2_DAY = re.compile(r"Stany \(ZC2\): dzien (?P<day>-?\d+) \| stany w ksiedze (
                       r"\| suma kontrolna (?P<hash>[0-9A-F]{8}) "
                       r"\| pamiec Dostatku: tygodni (?P<weeks>\d+) \(ostatni dzien (?P<wday>-?\d+)\) "
                       r"\| widok od ostatniej linii: dymki osad (?P<tip>\d+) \(w tym zamki - region (?P<tipc>\d+)\), dymki wiosek pobocznych (?P<side>\d+), People of this land (?P<ppl>\d+), "
-                      r"Look over the district (?P<dist>\d+), Realm ledger (?P<realm>\d+) \| potkniecia widoku (?P<vst>\d+) \(od wczytania (?P<vsta>\d+)\)\.$")
+                      r"Look over the district (?P<dist>\d+), Realm ledger (?P<realm>\d+)(?:, Estates and livelihood (?P<est>\d+))? \| potkniecia widoku (?P<vst>\d+) \(od wczytania (?P<vsta>\d+)\)\.$")
 NZC2_SEED = re.compile(r"Stany \(ZC2\): dzien (?P<day>-?\d+) \| zasiano (?P<n>\d+) osad \(miasta (?P<t>\d+), wsie (?P<v>\d+)\) z pasm x klasy BK \(pochylonych (?P<tilt>\d+), bez klas BK (?P<nobk>\d+)\)")
 NZC2_SAVE = re.compile(r"Stany \(ZC2\): zapis \| dzien (?P<day>-?\d+) \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), z pamiecia Dostatku (?P<nr>\d+)\) \| (?P<kb>[\d.]+) KB "
                        r"\((?P<chars>\d+) znakow, kawalkow (?P<parts>\d+)\) \| suma kontrolna (?P<hash>[0-9A-F]{8})")
-NZC2_LOAD = re.compile(r"Stany \(ZC2\): wczytanie \| format v[123] \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), pominiete wpisy (?P<bad>\d+), zle udzialy - zasiew od nowa (?P<badp>\d+)\) "
-                       r"\| pamiec Dostatku z dob (?P<rd>[-\d,]+) \| suma kontrolna (?P<hash>[0-9A-F]{8})\.")
+NZC2_LOAD = re.compile(r"Stany \(ZC2\): wczytanie \| format v[1234] \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), pominiete wpisy (?P<bad>\d+), zle udzialy - zasiew od nowa (?P<badp>\d+)\) "
+                       r"\| pamiec Dostatku z dob (?P<rd>[-\d,]+) \| suma kontrolna (?P<hash>[0-9A-F]{8})(?:\.| \| v4: )")   # recenzja 16.10: v4 (kotwice dobrobytu, wolnosc, naglowek ZC)
 NZC2_TIP = "Stany (ZC2): dymek osady - linie stanow i Dostatku wpiete w: "
 NZC2_MENU = "Stany (ZC2): pozycja \"Realm ledger\""
 NZC2_ERR = ("ERROR in DailyLife.", "ERROR in SyncData.arm_estates", "ERROR in PeopleMenu.Estates", "ERROR in DistrictMenu.Estates")
@@ -32740,7 +32741,7 @@ def nzc2_main(logp, bdp=None, until=120):
         rep.add("NZC2-0b: dymek osady wpiety (postfiks dymka gry i NavalDLC)", t[:200], "TooltipRefresherCollection (z NavalDLC - takze NavalTooltipRefresherCollection)", okt)
     else:
         rep.add("NZC2-0b: dymek osady wpiety", "brak linii wpiecia (log otwarty po menu glownym?)", "INFO (linia przy starcie gry)", None)
-    rep.add("NZC2-0c: pozycja 'Realm ledger' w menu miasta i zamku", (menus[-1][len(NZC2_HEAD):][:200] if menus else "brak linii"), "linia wpiecia przy starcie sesji", bool(menus))
+    rep.add("NZC2-0c: pozycje 'Realm ledger' i 'Estates and livelihood' w menu", (menus[-1][len(NZC2_HEAD):][:220] if menus else "brak linii"), "linia wpiecia przy starcie sesji", bool(menus))
     # NZC2-1
     dd = sorted(days)
     if not dd:
@@ -32837,9 +32838,10 @@ def nzc2_main(logp, bdp=None, until=120):
     rep.add("NZC2-10: swiat wedlug stanow (ostatnia doba, ksiega)", f"chlopi {last['peas']}, mieszczanie {last['burgh']} (biedota {last['lab']}, rzemieslnicy {last['craft']}, kupcy {last['merch']}), "
             f"szlachta {last['gent']}, wielkie rody {last['house']}, niewolni {last['slave']}; pamiec Dostatku tygodni {last['weeks']} (ostatni dzien {last['wday']}); "
             f"pochylonych BK przy zasiewie {last['tilt']}, bez klas BK {last['nobk']}", "INFO (udzialy swiata: grupa nzc0 NZC0-3)", None)
-    tot = {k: sum(int(days[d][k]) for d in dd) for k in ("tip", "tipc", "side", "ppl", "dist", "realm")}
+    tot = {k: sum(int(days[d][k] or 0) for d in dd) for k in ("tip", "tipc", "side", "ppl", "dist", "realm", "est")}
     rep.add("NZC2-11: uzycie widoku w biegu", f"dymki osad {tot['tip']} (zamki - region {tot['tipc']}), dymki wiosek pobocznych {tot['side']}, People of this land {tot['ppl']}, "
-            f"Look over the district {tot['dist']}, Realm ledger {tot['realm']}", "INFO (autotest nie najezdza dymkow i nie otwiera menu - sprawdzenie w grze)", None)
+            f"Look over the district {tot['dist']}, Realm ledger {tot['realm']}, Estates and livelihood {tot['est']}",
+            "INFO (autotest nie najezdza dymkow i nie otwiera menu - sprawdzenie w grze: okna Estates and livelihood i Realm ledger to listy przewijane, People of this land - 2 linie na gorze)", None)
     rep.show()
     return 0
 
@@ -32854,6 +32856,10 @@ NZC6_ERR = ("ERROR in DailyLife.", "ERROR in TownFolk.ZcCarry", "ERROR in TownFo
 NZC6_RANGE = (("chlopi", 1.3, 2.5), ("biedota", 1.4, 2.5), ("rzemieslnicy", 2.2, 4.5), ("kupcy", 4.0, 10.0), ("szlachta", 6.0, 15.0))
 NZC6_ZC0REG = re.compile(r"Zycie \(ZC0\): dzien (?P<day>-?\d+) \|.*?; regiony (?P<n>\d+): D min (?P<mn>[-\d.]+) / mediana (?P<md>[-\d.]+) / max (?P<mx>[-\d.]+)")
 NZC6_MOVE_TOL = 0.001      # % - zaokraglenie milionowej (najwyzej +1 ppm na przejscie) ponad 0.2%/tydz.
+NZC6_PABS = 0.5            # recenzja 16.10 / projekt rozdz. 14 ZC6: srednie |czlon| dobrobytu <= 0.5/d (srednia ze znakiem - INFO: plus i minus sie znosza)
+NZC6_PCAP = 10.0           # % warowni na suficie 2 pkt na dobe
+NZC6_PDRIFT = 5.0          # % - dryf krainy (suma czlonow / dobrobyt bez czlonow), wszystkie krainy i rodzaje (takze 1-2 warownie)
+NZC6_PRUN = 28             # dob - mediana czlonu krainy tego samego znaku bez malejacej |mediany| = brak zbieznosci
 NZC6_FIELDS = (
     ("up", r"\| w gore (\d+), w dol \d+, netto"), ("down", r"\| w gore \d+, w dol (\d+), netto"),
     ("upS", r"od wczytania \(\d+ dob\): w gore (\d+)"), ("downS", r"od wczytania \(\d+ dob\): w gore \d+, w dol (\d+)"),
@@ -32865,12 +32871,18 @@ NZC6_FIELDS = (
     ("purseOut", r"kontrola obiegu: kiesy ludu -(\d+)"), ("vilOut", r", kiesy wsi -(\d+)"), ("lordIn", r", panowie \+(\d+)"), ("ctl", r", roznica (\d+)"),
     ("noPurse", r"zapas nieznany \(kiesa nieczynna\) (\d+)"), ("noLord", r"bez zywego pana (\d+)"), ("short", r"\(brak pieniedzy\) (\d+)"), ("war", r"oblezenie / najazd (\d+)"),
     ("capHit", r"osad z cieciem (\d+)"), ("maxMove", r"najwiekszy ruch ([-\d.]+)%"),
-    ("bandCut", r"granice pasm: ciecia (\d+)"), ("outBand", r"osad poza pasmem (\d+)"), ("outFree", r"po wyzwoleniu przez zdobywce (\d+)\)"), ("freeSt", r"osad pod wladca bez niewoli (\d+)"),
+    ("bandCut", r"granice pasm: ciecia (\d+)"), ("outBand", r"osad poza pasmem (\d+)"), ("outFree", r"po wyzwoleniu przez zdobywce (\d+)[,)]"), ("freeSt", r"osad pod wladca bez niewoli (\d+)"),
+    ("outMig", r"od przybyszy ze wsi (\d+)\)"), ("freeOld", r"zastane od wlaczenia - bez wyzwalania (\d+)\)"),
+    ("backT", r"odkup ziemi przy spadku szlachty: miasta (\d+) \("), ("backV", r"odkupow\), wsie (\d+) \("), ("landNet", r"netto do panow (-?\d+)"),
+    ("lordOut", r"; odkup: panowie -(\d+)"), ("purseIn", r", kiesy ludu \+(\d+)"), ("vilIn", r", kiesy wsi \+(\d+)"), ("landMsg", r"komunikaty gracza o ziemi (\d+)"),
     ("dPeas", r"mediany D stanow \(wazone ludzmi, osady z wlasnym D\): chlopi ([-\d.]+)"), ("dLab", r", biedota ([-\d.]+), rzemieslnicy"),
     ("dCraft", r", rzemieslnicy ([-\d.]+), kupcy"), ("dMerch", r", kupcy ([-\d.]+), szlachta"), ("dGent", r", szlachta ([-\d.]+) \| dobrobyt"),
     ("pN", r"warowni z czlonem (\d+) w"), ("pKr", r"warowni z czlonem \d+ w (\d+) krainach"), ("pNoD", r"\(bez D regionu (\d+)\)"),
     ("pMean", r"czlon srednio ([-\d.]+)/d"), ("pAbs", r"srednio \|czlon\| ([-\d.]+)/d"), ("pCap", r"na suficie 2 pkt (\d+)"),
-    ("pOurs", r"wplyw czlonow od wczytania najwiekszy ([-\d.]+)%"), ("pGame", r"\(z gra\) najwieksza ([-\d.]+)%"),
+    ("pCapPct", r"na suficie 2 pkt \d+ \(([-\d.]+)% warowni\)"), ("pAnch", r"kotwice nowe dzis (\d+)"), ("pReAnch", r"ponowne przy zmianie ZC7 (\d+)\)"),
+    ("pDrift", r"dryf krain [^:]*: najwiekszy ([-\d.]+)% \("), ("pDriftExp", r"; z Dostatku krainy ([-\d.]+)%\)"), ("pDriftN", r"krain ponad 5%: (\d+) z"),
+    ("pLands", r"krain ponad 5%: \d+ z (\d+)"), ("pRun", r"tego samego znaku najdluzsza (\d+) dob"), ("pRunA0", r"\|mediana\| na poczatku ([-\d.]+) ->"),
+    ("pRunA1", r" -> dzis ([-\d.]+)\)"),
     ("pCalls", r"wywolan postfiksu (\d+)"), ("pStum", r"potkniec postfiksu (\d+)"), ("stum", r"potkniecia przegladu (\d+)\.$"),
 )
 
@@ -32891,6 +32903,10 @@ def nzc6_parse(s):
                 v = None
         d[k] = v
     d["state"] = "liczony" if "dobrobyt (liczony" in s else ("rozgrzewka" if "dobrobyt (rozgrzewka" in s else ("wylaczony" if "dobrobyt (wylaczony" in s else "-"))
+    mk = re.search(r"dryf krain [^:]*: najwiekszy [-\d.]+% \(([^;]*);", s)
+    d["pDriftKey"] = mk.group(1) if mk else "-"
+    mr = re.search(r"tego samego znaku najdluzsza \d+ dob \(([^;]*);", s)
+    d["pRunKey"] = mr.group(1) if mr else "-"
     return d
 
 
@@ -32901,8 +32917,10 @@ def nzc6_main(logp, bdp=None, until=120):
     (od wczytania; ponizej - DECYZJA, gdy mediany D stanow ponizej progow awansu: dochody stanow to ZC4), NZC6-4 mediany D stanow: chlopi 1.3-2.5, biedota 1.4-2.5,
     rzemieslnicy 2.2-4.5, kupcy 4-10, szlachta 6-15 (poza - DECYZJA: kalibracja dochodu stanow ZC4, projekt: ZC6 po 120 dobach ZC4), NZC6-5 max/min D regionow <= 8
     (linia ZC0; dzis ok. 90 - DECYZJA, ta sama przyczyna), NZC6-6 udzialy stanow w pasmach (osad poza pasmem 0; po wyzwoleniu przez zdobywce - INFO), NZC6-7 obieg
-    zamkniety (roznica 0 i kiesy ludu + kiesy wsi = panowie w kazdej linii), NZC6-8 srednia zmiana dobrobytu z czlonu <= 0.5/d (srednia ze znakiem; |czlon| - w wierszu),
-    NZC6-9 wplyw czlonu na mediany dobrobytu krain +-5%, NZC6-10 potkniecia (przeglad, postfiks) i ERROR 0, NZC6-11..13 INFO (przejscia, pieniadze, blokady).
+    zamkniety (roznica 0, kupno: kiesy ludu + kiesy wsi = panowie, odkup: panowie = kiesy ludu + kiesy wsi w kazdej linii), NZC6-8 srednie |czlon| dobrobytu <= 0.5/d,
+    NZC6-8b warownie na suficie 2 pkt <= 10%, NZC6-8c srednia ze znakiem (INFO), NZC6-9 dryf krain +-5% (wszystkie krainy; wiecej w granicy rownowagi z Dostatku - DECYZJA),
+    NZC6-9b zbieznosc (seria znaku mediany czlonu krainy <= 28 dob albo malejaca |mediana| - inaczej DECYZJA) - recenzja 16.10 (Prosperity Link domyslnie wylaczony:
+    bez czlonu wiersze INFO), NZC6-10 potkniecia (przeglad, postfiks) i ERROR 0, NZC6-11..13 INFO (przejscia, pieniadze, blokady).
     Czas bloku - grupa nzc0 (NZC0-6, blok ZC zawiera ZC6); zapis + wczytanie udzialow - grupa nzc2 (NZC2-4). Log bez paczki: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -32944,8 +32962,8 @@ def nzc6_main(logp, bdp=None, until=120):
     if sess:
         mm = NZC6_START.match(sess[-1])
         keys = mm.groupdict() if mm else None
-        ok = bool(mm) and all(mm.group(k) == "tak" for k in ("m", "f", "p", "e", "z"))
-        rep.add("NZC6-0: linia startu sesji (klucze ZC6)", sess[-1][len(NZC6_HEAD):][:300], "Mobility, Freedom, Prosperity Link tak (z Estates i Measure)",
+        ok = bool(mm) and all(mm.group(k) == "tak" for k in ("m", "f", "e", "z"))
+        rep.add("NZC6-0: linia startu sesji (klucze ZC6)", sess[-1][len(NZC6_HEAD):][:300], "Mobility, Freedom tak (z Estates i Measure); Prosperity Link domyslnie WYLACZONE - na test wlaczyc w MCM",
                 True if ok else (None if mm else False))
         w = sess[-1].split("| dobrobyt: ", 1)[1] if "| dobrobyt: " in sess[-1] else ""
         okp = w.startswith("postfiks Last w ")
@@ -33006,32 +33024,54 @@ def nzc6_main(logp, bdp=None, until=120):
     else:
         rep.add("NZC6-5: rozrzut Dostatku regionow", "brak linii ZC0 z regionami", "<= 8", None)
     # NZC6-6
-    ob, of = int(sum(vals("outBand"))), int(sum(vals("outFree")))
-    rep.add("NZC6-6: udzialy stanow w pasmach (0.5-1.5 x pasma)", f"przegladow z osada poza pasmem {ob} (po wyzwoleniu przez zdobywce osobno: {of}), ciec granica {int(sum(vals('bandCut')))}, "
-            f"osad pod wladca bez niewoli (ostatnia linia) {int(last.get('freeSt') or 0)}", "0 (bez wyzwolenia przez zdobywce)", ob == 0)
+    ob, of, om = int(sum(vals("outBand"))), int(sum(vals("outFree"))), int(sum(vals("outMig")))
+    rep.add("NZC6-6: udzialy stanow w pasmach (0.5-1.5 x pasma)", f"przegladow z osada poza pasmem {ob} (osobno: po wyzwoleniu przez zdobywce {of}, od przybyszy ze wsi {om} - etykieta migracji, "
+            f"nie awans), ciec granica {int(sum(vals('bandCut')))}, osad pod wladca bez niewoli (ostatnia linia) {int(last.get('freeSt') or 0)}, zastanych bez wyzwalania {int(last.get('freeOld') or 0)}",
+            "0 (bez wyzwolenia przez zdobywce i przybyszy)", ob == 0)
     # NZC6-7
-    badc = [d for d in dd if (days[d].get("ctl") or 0) != 0 or (days[d].get("purseOut") or 0) + (days[d].get("vilOut") or 0) != (days[d].get("lordIn") or 0)]
+    badc = [d for d in dd if (days[d].get("ctl") or 0) != 0 or (days[d].get("purseOut") or 0) + (days[d].get("vilOut") or 0) != (days[d].get("lordIn") or 0)
+            or (days[d].get("lordOut") or 0) != (days[d].get("purseIn") or 0) + (days[d].get("vilIn") or 0)]
     po, vo, li = sum(vals("purseOut")), sum(vals("vilOut")), sum(vals("lordIn"))
-    rep.add("NZC6-7: obieg zamkniety (pieniadze z ludzmi, ziemia do panow)", f"kiesy ludu -{po:.0f}, kiesy wsi -{vo:.0f}, panowie +{li:.0f}; dob z roznica {len(badc)}"
-            + (f" (np. dzien {badc[0]})" if badc else ""), "roznica 0 i kiesy = panowie w kazdej linii", not badc)
-    # NZC6-8
-    pm = [(d, days[d]["pMean"], days[d].get("pAbs")) for d in dd if days[d].get("pMean") is not None and (days[d].get("pN") or 0) > 0]
-    if pm:
-        w8 = max(pm, key=lambda x: abs(x[1]))
-        aa = [x[2] for x in pm if x[2] is not None]
-        rep.add("NZC6-8: srednia zmiana dobrobytu z czlonu Dostatku (ze znakiem)", f"najwieksza |srednia| {w8[1]:+.3f}/d (dzien {w8[0]}); srednio |czlon| {st.mean(aa):.3f}/d, "
-                f"na suficie 2 pkt (ostatnia) {int(last.get('pCap') or 0)} z {int(last.get('pN') or 0)} warowni", "|srednia| <= 0.5/d (przy NIE: DailyLifeProsperityLink = false przed wgraniem)",
-                abs(w8[1]) <= 0.5)
+    lo, pi, vi = sum(vals("lordOut")), sum(vals("purseIn")), sum(vals("vilIn"))
+    rep.add("NZC6-7: obieg zamkniety (pieniadze z ludzmi, ziemia do panow i odkup od panow)", f"kupno: kiesy ludu -{po:.0f}, kiesy wsi -{vo:.0f}, panowie +{li:.0f}; odkup: panowie -{lo:.0f}, "
+            f"kiesy ludu +{pi:.0f}, kiesy wsi +{vi:.0f}; netto do panow {li - lo:.0f}; dob z roznica {len(badc)}" + (f" (np. dzien {badc[0]})" if badc else ""),
+            "roznica 0, kiesy = panowie w kazdej linii (kupno i odkup osobno)", not badc)
+    # NZC6-8 (recenzja 16.10): srednie |czlon| i udzial warowni na suficie - srednia ze znakiem tylko INFO (plus i minus sie znosza)
+    pd = [d for d in dd if (days[d].get("pN") or 0) > 0]
+    hint = " (przy NIE: DailyLifeProsperityLink zostaje false - nie wlaczac)"
+    if pd:
+        wa = max(pd, key=lambda d: days[d].get("pAbs") or 0.0)
+        a8 = days[wa].get("pAbs") or 0.0
+        rep.add("NZC6-8: srednie |czlon| dobrobytu z Dostatku (najwieksze w linii)", f"{a8:.3f}/d (dzien {wa}); srednio w biegu {st.mean(days[d].get('pAbs') or 0.0 for d in pd):.3f}/d; "
+                f"dob z czlonem {len(pd)}, kotwic nowych w biegu {int(sum(vals('pAnch')))} (ponownych przy zmianie ZC7 {int(sum(vals('pReAnch')))})", f"<= {NZC6_PABS}/d" + hint, a8 <= NZC6_PABS)
+        cp = [(d, days[d].get("pCapPct")) for d in pd if days[d].get("pCapPct") is not None]
+        wc = max(cp, key=lambda x: x[1]) if cp else None
+        rep.add("NZC6-8b: warownie na suficie 2 pkt na dobe (najwiecej w linii)", (f"{wc[1]:.1f}% warowni (dzien {wc[0]}; {int(days[wc[0]].get('pCap') or 0)} z {int(days[wc[0]].get('pN') or 0)})" if wc else "brak liczb"),
+                f"<= {NZC6_PCAP:.0f}%" + hint, (wc[1] <= NZC6_PCAP) if wc else None)
+        wm = max(pd, key=lambda d: abs(days[d].get("pMean") or 0.0))
+        rep.add("NZC6-8c: srednia zmiana dobrobytu ze znakiem", f"najwieksza |srednia| {(days[wm].get('pMean') or 0.0):+.3f}/d (dzien {wm})", "INFO (plus i minus sie znosza - progi wyzej)", None)
     else:
-        rep.add("NZC6-8: srednia zmiana dobrobytu z czlonu", f"brak dob z czlonem (stan ostatniej linii: {last.get('state')})", "INFO (klucz wylaczony / rozgrzewka)", None)
-    # NZC6-9
-    po9 = [(d, days[d]["pOurs"]) for d in dd if days[d].get("pOurs") is not None]
-    if po9 and pm:
-        w9 = max(po9, key=lambda x: abs(x[1]))
-        rep.add("NZC6-9: wplyw czlonu na mediany dobrobytu krain (od wczytania)", f"najwiekszy {w9[1]:+.2f}% (dzien {w9[0]}); zmiana z gra wobec pierwszej doby (ostatnia) "
-                f"{last.get('pGame') if last.get('pGame') is not None else '-'}%", "+-5%", abs(w9[1]) <= 5.0)
+        rep.add("NZC6-8: czlon dobrobytu z Dostatku", f"brak dob z czlonem (stan ostatniej linii: {last.get('state')})",
+                "INFO (klucz Prosperity Link wylaczony - domyslnie; test z kluczem wlaczonym przed wlaczeniem w grze)", None)
+    # NZC6-9 (recenzja 16.10): dryf krain - wszystkie krainy i rodzaje (takze 1-2 warownie); serie znaku mediany czlonu (brak zbieznosci)
+    if pd:
+        wd = max(pd, key=lambda d: abs(days[d].get("pDrift") or 0.0))
+        dr, ex = days[wd].get("pDrift") or 0.0, days[wd].get("pDriftExp") or 0.0
+        nover = int(last.get("pDriftN") or 0)
+        explained = abs(dr) > NZC6_PDRIFT and dr * ex > 0 and abs(dr) <= abs(ex) + 0.5
+        rep.add("NZC6-9: dryf krain (suma czlonow od kotwicy / dobrobyt bez czlonow)", f"najwiekszy {dr:+.2f}% ({days[wd].get('pDriftKey')}, dzien {wd}); rownowaga z Dostatku tej krainy {ex:+.2f}%; "
+                f"krain ponad 5% (ostatnia linia) {nover} z {int(last.get('pLands') or 0)}"
+                + ("; dryf idzie za prawdziwa zmiana Dostatku krainy (np. wojna) - do decyzji, czy tak ma byc" if explained else ""),
+                f"+-{NZC6_PDRIFT:.0f}% (wiecej, ale w granicy rownowagi z Dostatku - DECYZJA)" + hint, abs(dr) <= NZC6_PDRIFT, decide=explained)
+        wr = max(pd, key=lambda d: days[d].get("pRun") or 0)
+        rl = int(days[wr].get("pRun") or 0)
+        a0, a1 = days[wr].get("pRunA0") or 0.0, days[wr].get("pRunA1") or 0.0
+        conv = rl <= NZC6_PRUN or a1 < a0
+        rep.add("NZC6-9b: zbieznosc - seria mediany czlonu krainy tego samego znaku", f"najdluzsza {rl} dob ({days[wr].get('pRunKey')}, dzien {wr}; |mediana| na poczatku {a0:.3f} -> {a1:.3f})"
+                + ("" if conv else "; mediana nie maleje - brak zbieznosci (D regionow krainy idzie w jedna strone albo petla sie rozbujala)"),
+                f"<= {NZC6_PRUN} dob albo |mediana| maleje (inaczej DECYZJA)", True if conv else False, decide=not conv)
     else:
-        rep.add("NZC6-9: wplyw czlonu na mediany krain", "brak liczb", "INFO", None)
+        rep.add("NZC6-9: dryf krain i zbieznosc", "brak dob z czlonem", "INFO (klucz Prosperity Link wylaczony)", None)
     # NZC6-10
     stum, pst = int(sum(vals("stum"))), int(sum(vals("pStum")))
     rep.add("NZC6-10: potkniecia ZC6 i ERROR", f"przeglad {stum}, postfiks dobrobytu {pst}, ERROR (DailyLife, ZcCarry, ZcPayLand) {n_err}", "0 / 0 / 0", stum == 0 and pst == 0 and n_err == 0)
@@ -33039,7 +33079,8 @@ def nzc6_main(logp, bdp=None, until=120):
     rep.add("NZC6-11: przejscia od wczytania (ostatnia linia)", f"w gore {last.get('upS')}, w dol {last.get('downS')}, wyzwoleni {last.get('freedS')}, przybysze ze wsi do biedoty {last.get('migS')}; "
             f"ostatnia linia: {last.get('tr', '')[:300]}", "INFO", None)
     rep.add("NZC6-12: pieniadze (suma linii, zl gry)", f"W->R {sum(vals('w2r')):.0f} (oplaty cechowe {sum(vals('fee')):.0f}), R->P {sum(vals('r2p')):.0f}, R->W {sum(vals('r2w')):.0f}, "
-            f"P->R {sum(vals('p2r')):.0f}; ziemia: miasta {sum(vals('landT')):.0f} ({sum(vals('landTN')):.0f} kupna), wsie {sum(vals('landV')):.0f} ({sum(vals('landVN')):.0f} kupna)", "INFO", None)
+            f"P->R {sum(vals('p2r')):.0f}; ziemia: miasta {sum(vals('landT')):.0f} ({sum(vals('landTN')):.0f} kupna), wsie {sum(vals('landV')):.0f} ({sum(vals('landVN')):.0f} kupna); "
+            f"odkup od panow: miasta {sum(vals('backT')):.0f}, wsie {sum(vals('backV')):.0f}; netto do panow {sum(vals('landNet')):.0f}; komunikaty gracza o ziemi {sum(vals('landMsg')):.0f}", "INFO", None)
     rep.add("NZC6-13: blokady (suma linii)", f"zapas nieznany {sum(vals('noPurse')):.0f}, bez zywego pana {sum(vals('noLord')):.0f}, brak pieniedzy na ziemie {sum(vals('short')):.0f}, "
             f"oblezenie / najazd {sum(vals('war')):.0f}; przegladow osad {sum(int(days[d]['seen']) for d in dd)}, w rozgrzewce {sum(int(days[d]['warm']) for d in dd)}; "
             f"wywolan postfiksu dobrobytu {sum(vals('pCalls')):.0f}", "INFO (czas bloku - nzc0 NZC0-6; zapis + wczytanie - nzc2 NZC2-4)", None)
@@ -33075,6 +33116,8 @@ NZC7_FIELDS = (
     ("awayV", r"\| uchodzcy w mianowniku Dostatku: wsi (\d+), ludzie"), ("awayP", r"Dostatku: wsi \d+, ludzie (\d+) \("), ("awayPct", r"ludzie \d+ \(([-\d.]+)% ludzi tych wsi"),
     ("epi", r"\| epizody wojny w ksiedze (\d+) \("), ("epiNew", r"nowe od ostatniej linii (\d+)\)"), ("ctl", r"\| kontrola kies roznica (\d+) \|"),
     ("saveFlush", r"\| rozliczenie przy zapisie (\d+) \|"), ("msg", r"\| komunikaty gracza (\d+) \|"), ("stum", r"\| potkniecia (\d+)\.$"),
+    ("offN", r"\| dlug odpisany: ponizej progu (\d+) \("), ("offP", r"ponizej progu \d+ \((\d+) ludzi\)"), ("forgetN", r"po 2 latach spokoju (\d+) osad"),
+    ("holdV", r"liczniki spadku wsi stoja \d+ dob: przegladow (\d+)\)"), ("sackLate", r"zlupienia przed pierwszym switem po wczytaniu (\d+)"),
 )
 NZC7_DROP = (30.0, 60.0)    # projekt rozdz. 14 ZC7: po najezdzie D okregu -30-60% w 7 dob
 NZC7_FBIG = 20.0            # zdarzenie na skale okregu: trafieni >= 20% ludzi w domu (spadek D idzie za udzialem trafionych)
@@ -33263,8 +33306,10 @@ def nzc7_main(logp, bdp=None, until=120):
     rep.add("NZC7-10: uchodzcy w mianowniku Dostatku (ostatnia linia)", f"wsi {last.get('awayV')}, ludzie {last.get('awayP')} ({last.get('awayPct')}% ludzi tych wsi w domu)",
             "INFO (okreg biedniejszy o udzial ludzi w ucieczce)", None)
     rep.add("NZC7-11: komunikaty gracza (suma linii)", f"{sum(vals('msg')):.0f}", "INFO (najazd na wies rodu gracza / najazd gracza, zlupienie z udzialem gracza)", None)
-    rep.add("NZC7-12: zapis arm_estates v3", f"wczytania: {', '.join(loads) if loads else 'brak'}; rozliczenia uderzen przy zapisie {sum(vals('saveFlush')):.0f}",
-            "INFO (wczytanie v1/v2/v3; zapis + wczytanie - nzc2 NZC2-4)", None)
+    rep.add("NZC7-12: zapis arm_estates v4", f"wczytania: {', '.join(loads) if loads else 'brak'}; rozliczenia uderzen przy zapisie {sum(vals('saveFlush')):.0f}; "
+            f"dlug odpisany ponizej progu {sum(vals('offN')):.0f} ({sum(vals('offP')):.0f} ludzi), po 2 latach spokoju {sum(vals('forgetN')):.0f} osad; "
+            f"liczniki spadku wsi wstrzymane po wlaczeniu ZC7 (przegladow) {sum(vals('holdV')):.0f}; zlupienia przed pierwszym switem po wczytaniu {sum(vals('sackLate')):.0f}",
+            "INFO (wczytanie v1/v2/v3/v4; zapis + wczytanie - nzc2 NZC2-4, rozmiar - NZC2-5)", None)
     rep.show()
     return 0
 

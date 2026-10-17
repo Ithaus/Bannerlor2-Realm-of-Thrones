@@ -1853,6 +1853,35 @@ namespace Armoury
             catch (Exception e) { Stumble("ZcPayLand", e); return 0; }
         }
 
+        /// <summary>ZC6 (recenzja 16.10): odkup ziemi przy spadku szlachty miasta ("sprzedane majatki") - glowa rodu pana miasta -> kiesa P, najwyzej `lordShare` kiesy pana
+        /// (ChangeHeroGold w try: wyjatek - nic nie wchodzi); bez zywego pana i w oblezeniu - nic. Pan -> kiesa jak splata do kiesy (_ctlIn, LDayIn, okna obiegu). Zwraca
+        /// zaplacone; lord - kto zaplacil.</summary>
+        internal static long ZcLandBack(Settlement st, long x, double lordShare, out Hero lord)
+        {
+            lord = null;
+            try
+            {
+                if (x <= 0 || st == null || !Live || OffMain() || st.IsUnderSiege || !(lordShare > 0)) return 0;
+                if (_pending != null) EnsureImported();
+                Folk f;
+                if (!_f.TryGetValue(st, out f) || f == null || f.Kind != 0) return 0;
+                var clan = st.OwnerClan;
+                var h = clan != null ? clan.Leader : null;
+                if (h == null || !h.IsAlive) return 0;
+                long cap = (long)Math.Floor(Math.Max(0, h.Gold) * Math.Min(1.0, lordShare));
+                long y = Math.Min(x, cap);
+                if (y <= 0) return 0;
+                int ix = (int)Math.Min(int.MaxValue, y);
+                try { h.ChangeHeroGold(-ix); } catch (Exception e) { Stumble("ZcLandBack", e); return 0; }
+                AddPurse(f, 2, ix);
+                _ctlIn += ix; f.LDayIn += ix;
+                CirculationWindows.NoteHeroGold(h, -ix);
+                lord = h;
+                return ix;
+            }
+            catch (Exception e) { Stumble("ZcLandBack", e); return 0; }
+        }
+
         // ============================================================ E5/C4 (205, PLAN 5.13): zdanie "czy ludzi stac na chleb" w oknie People of this land
         /// <summary>E5/C4: zdanie do okna "People of this land" (PeopleMenu) dla osady, w ktorej stoi gracz - liczby kiesy czynnej z ostatniej doby tej osady:
         /// miasto i zamek DAffF / DAff (te same co kolumny stac_jedzenie / stac_pelny kiesa-ludu.csv i skladniki sum "stac jedzenie" / "pelny" / "stac" linii "Kiesa ludu:"),

@@ -298,7 +298,9 @@ namespace Armoury
 
         // ============================================================ ZC2: ksiega stanow (udzialy w zapisie arm_estates) i pamiec Dostatku
         private const string PE = "Stany (ZC2): ";
-        private const string EVersion = "v3";      // v3|bazowa doba zasiewu|5 dob pamieci D|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4:bbb:blizna;... (v1 - bez pol bbb i blizna, v2 - bez pola blizna - czytane)
+        // v4|bazowa doba zasiewu|5 dob pamieci D|ZC7 od doby,ostatnia doba z czlonem dobrobytu,doba czlonow|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4:bbb:blizna:dobrobyt:wolnosc;...
+        // (v1 - bez pol bbb, blizna i dalszych, v2 - bez pola blizna i dalszych, v3 - bez naglowka ZC i pol dobrobyt, wolnosc - czytane)
+        private const string EVersion = "v4";
         private const int PpmAll = 1000000;        // udzialy w milionowych
         private const int RingN = 5;               // pamiec Dostatku: 5 tygodni (strzalka "w 28 dob" ma zawsze wpis sprzed >= 28 dob)
 
@@ -321,6 +323,14 @@ namespace Armoury
             public float ScarD = float.NaN, ScarMin = float.NaN, ScarF;
             public readonly int[] Debt = new int[2];
             public bool Rep7;                                // pamiec sesji: epizod juz w linii "d+7"
+            // ZC6 dobrobyt (DailyLife.Prosperity.cs; zapis v4, pole "dobrobyt" - takze zamki): kotwica warowni - D0 regionu w dniu wlaczenia klucza, suma naszych
+            // czlonow od kotwicy, czlon ostatniej doby, kotwica z uchodzcami ZC7 w mianowniku
+            public double PD0 = double.NaN, PCum;
+            public float PTerm;
+            public bool PWar;
+            // ZC6 wyzwolenie przez zdobywce (DailyLife.Mobility.cs; zapis v4, pole "wolnosc"): 0 - jeszcze nie widziany, 1 - region byl pod wladca z niewola od wlaczenia
+            // (zdobycie przez wladce bez niewoli wyzwala), 2 - od wlaczenia tylko pod wladca bez niewoli (stan zastany - bez wyzwalania)
+            public byte FreeBase;
         }
 
         private static readonly Dictionary<string, EBook> _eb = new Dictionary<string, EBook>(StringComparer.Ordinal);
@@ -328,6 +338,7 @@ namespace Armoury
         private static int _eDay = -1;                              // doba pomiaru (zasiew)
         private static int _eSeedDay, _eSeedSess, _eSeedTiltSess, _eSeedNoBkSess;   // zasiane w tej dobie / od wczytania
         private static int _eLoadN, _eLoadP, _eLoadBad, _eLoadBadP;
+        private static int _eLoadPros, _eLoadBadPros, _eLoadFree;   // v4: kotwice dobrobytu (zle pola), znana wolnosc regionu
         private static bool _eLoaded;
         private static uint _eLoadHash;
         private static string _eLoadNote;
@@ -378,10 +389,33 @@ namespace Armoury
             try
             {
                 Log.Info(PE + "dzien " + _eDay + " | zasiano " + (towns + vils) + " osad (miasta " + towns + ", wsie " + vils + ") z pasm x klasy BK (pochylonych " + tilt + ", bez klas BK " + noBk
-                         + ") - od teraz stany w ksiedze i w zapisie (arm_estates), udzialy stoja (bez awansu - ZC6) | " + (_eLoaded ? "zapis mial ksiege stanow " + _eLoadP + " osad" : "zapis bez ksiegi stanow (sprzed ZC2) albo nowa kampania")
-                         + " | ksiega stanow teraz " + CountP() + " osad, zapis ok. " + F1(EstimateKb()) + " KB | gra bez zmian.");
+                         + ") - od teraz stany w ksiedze i w zapisie (arm_estates), " + (MobOn || FreeOn || WarOn ? "udzialy przesuwaja: " + MoversText() : "udzialy stoja (awans ZC6 i blizna ZC7 wylaczone)")
+                         + " | " + (_eLoaded ? "zapis mial ksiege stanow " + _eLoadP + " osad" : "zapis bez ksiegi stanow (sprzed ZC2) albo nowa kampania")
+                         + " | ksiega stanow teraz " + CountP() + " osad, zapis ok. " + F1(EstimateKb()) + " KB | " + GameEffectText() + ".");
             }
             catch (Exception e) { Stumble("SeedNote", e); }
+        }
+
+        /// <summary>Kto przesuwa udzialy stanow (klucze czynne): awans i spadek ZC6, wyzwolenie przez zdobywce, blizna wojny ZC7.</summary>
+        private static string MoversText()
+        {
+            var l = new List<string>(3);
+            if (MobOn) l.Add("awans i spadek (ZC6)");
+            if (FreeOn) l.Add("wyzwolenie przez zdobywce (ZC6)");
+            if (WarOn) l.Add("blizna wojny (ZC7)");
+            return l.Count > 0 ? string.Join(", ", l.ToArray()) : "nikt";
+        }
+
+        /// <summary>Skutek w grze kluczy ZC6 / ZC7 (zamiast stalego "gra bez zmian"): ZC2 sam to etykiety i widok.</summary>
+        private static string GameEffectText()
+        {
+            var l = new List<string>(4);
+            if (MobOn) l.Add("awans i spadek stanow z pieniedzmi ludzi, oplata cechowa i kupno ziemi do panow (Mobility)");
+            if (FreeOn) l.Add("wyzwolenia przez zdobywce (Freedom)");
+            if (ProsOn) l.Add("dobrobyt warowni za Dostatkiem regionu (Prosperity Link)");
+            if (WarOn) l.Add("blizna wojny w stanach i Dostatku (War Scar)");
+            return l.Count == 0 ? "gra bez zmian (etykiety ludzi i widok - zloto, towar, ceny, dobrobyt, AI nietkniete)"
+                                : "ZC2 to etykiety i widok, ale w grze dzialaja: " + string.Join("; ", l.ToArray());
         }
 
         private static int CountP() { int n = 0; foreach (var kv in _eb) if (kv.Value.P != null) n++; return n; }
@@ -453,8 +487,8 @@ namespace Armoury
         {
             WarFlushSave();                                 // ZC7: uderzenia od switu (rabunek w toku) do ksiegi przed zapisem - zapis wczytany daje te same liczby
             if (_eb.Count == 0) return "";
-            var sb = new StringBuilder(_eb.Count * 64 + 64);
-            int n = 0, np = 0, nr = 0;
+            var sb = new StringBuilder(_eb.Count * 72 + 96);
+            int n = 0, np = 0, nr = 0, npr = 0;
             try
             {
                 // bazowa doba zasiewu = najczestsza (wpis z ta doba nie powtarza jej)
@@ -465,13 +499,17 @@ namespace Armoury
                 sb.Append(EVersion).Append('|').Append(seedBase.ToString(Inv)).Append('|');
                 for (int i = 0; i < RingN; i++) { if (i > 0) sb.Append(','); sb.Append(_ringDays[i].ToString(Inv)); }
                 sb.Append('|');
+                // v4: naglowek ZC - doba wlaczenia ZC7 (uchodzcy w mianowniku: 28 dob bez licznikow spadku wsi), ostatnia doba z czlonem dobrobytu, doba czlonow w zapisie
+                int termDay = _pTerm != null && _pTerm.Count > 0 ? _pTermDay : (_pTermSaved != null ? _pTermSavedDay : -1);
+                sb.Append(_warSeedDay.ToString(Inv)).Append(',').Append(_pLastOn.ToString(Inv)).Append(',').Append((termDay == int.MinValue ? -1 : termDay).ToString(Inv)).Append('|');
                 foreach (var kv in _eb)
                 {
                     var b = kv.Value;
                     if (!SafeId(kv.Key)) continue;
                     bool ring = false;
                     for (int i = 0; i < RingN; i++) if (!float.IsNaN(b.Ring[i])) { ring = true; break; }
-                    if (b.P == null && !ring) continue;
+                    bool pros = Fin(b.PD0) && b.PD0 > 0;
+                    if (b.P == null && !ring && !pros) continue;
                     if (n > 0) sb.Append(';');
                     sb.Append(kv.Key).Append(':');
                     if (b.P != null)
@@ -495,6 +533,10 @@ namespace Armoury
                         for (int i = 0; i < 3; i++) sb.Append((char)('0' + Math.Min((byte)9, b.Below[i])));   // ZC6: tygodnie ponizej progu spadku
                     sb.Append(':');
                     if (b.P != null) AppendScar(sb, b);              // ZC7: epizod wojny i dlug blizny (puste - bez wojny)
+                    sb.Append(':');
+                    if (pros) { AppendPros(sb, b); npr++; }          // ZC6: kotwica dobrobytu warowni (puste - bez kotwicy)
+                    sb.Append(':');
+                    if (b.P != null && (b.FreeBase == 1 || b.FreeBase == 2)) sb.Append((char)('0' + b.FreeBase));   // ZC6: wladca z niewola od wlaczenia (1) / zastany bez niewoli (2)
                     if (ring) nr++;
                     n++;
                 }
@@ -506,7 +548,8 @@ namespace Armoury
             {
                 int parts = s.Length <= 8000 ? 1 : (s.Length + 7999) / 8000;
                 Log.Info(PE + "zapis | dzien " + ((int)CampaignTime.Now.ToDays).ToString(Inv) + " | osad " + n + " (z udzialami " + np + ", z pamiecia Dostatku " + nr + ") | "
-                         + F1(s.Length / 1024.0) + " KB (" + s.Length + " znakow, kawalkow " + parts + ") | suma kontrolna " + Hex(EstatesHash()) + " | zapis nr " + _eSaves + " w tej sesji.");
+                         + F1(s.Length / 1024.0) + " KB (" + s.Length + " znakow, kawalkow " + parts + ") | suma kontrolna " + Hex(EstatesHash()) + " | zapis nr " + _eSaves + " w tej sesji"
+                         + " | v4: kotwice dobrobytu " + npr + ", ZC7 od dnia " + _warSeedDay + ", czlon dobrobytu ostatnio dnia " + _pLastOn + ".");
             }
             catch { }
             return s;
@@ -517,7 +560,8 @@ namespace Armoury
             _eb.Clear();
             for (int i = 0; i < RingN; i++) _ringDays[i] = -1;
             _eLoaded = false; _eLoadN = _eLoadP = _eLoadBad = _eLoadBadP = 0; _eLoadHash = 0; _eLoadNote = null;
-            _eLoadBadScar = 0; _eLoadVer = null;
+            _eLoadBadScar = 0; _eLoadVer = null; _eLoadPros = _eLoadBadPros = _eLoadFree = 0;
+            _warSeedDay = -1; _pLastOn = -1; _pTermSaved = null; _pTermSavedDay = int.MinValue;   // v1-v3: ZC7 i kotwice dobrobytu od pierwszej doby z kluczem
             if (string.IsNullOrEmpty(data))
             {
                 _eLoadNote = "brak klucza arm_estates (zapis sprzed ZC2 albo kampania bez klucza) - stany zasiane w pierwszej dobie pomiaru z kluczem";
@@ -526,12 +570,14 @@ namespace Armoury
             }
             try
             {
-                var a = data.Split(new[] { '|' }, 4);
+                bool v4 = data.StartsWith(EVersion + "|", StringComparison.Ordinal);
+                var a = data.Split(new[] { '|' }, v4 ? 5 : 4);
                 int seedBase;
-                bool v1 = a.Length == 4 && a[0] == "v1", v2 = a.Length == 4 && a[0] == "v2";   // v1 - bez pol ZC6 i ZC7, v2 - bez pola ZC7 (blizna)
-                string ver = v1 ? "v1" : v2 ? "v2" : EVersion;
-                int fields = v1 ? 5 : v2 ? 6 : 7;
-                if (a.Length != 4 || (a[0] != EVersion && !v1 && !v2) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
+                bool v1 = a.Length == 4 && a[0] == "v1", v2 = a.Length == 4 && a[0] == "v2", v3 = a.Length == 4 && a[0] == "v3";   // v1 - bez pol ZC6 i ZC7, v2 - bez blizny, v3 - bez dobrobytu i wolnosci
+                v4 = v4 && a.Length == 5;
+                string ver = v1 ? "v1" : v2 ? "v2" : v3 ? "v3" : EVersion;
+                int fields = v1 ? 5 : v2 ? 6 : v3 ? 7 : 9;
+                if (!(v1 || v2 || v3 || v4) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
                 {
                     _eLoadNote = "arm_estates w nieznanym formacie - pominiety, stany zasiane od nowa";
                     Log.Info(PE + "wczytanie | " + _eLoadNote + ".");
@@ -540,8 +586,17 @@ namespace Armoury
                 var rd = a[2].Split(',');
                 if (rd.Length == RingN)
                     for (int i = 0; i < RingN; i++) { int x; _ringDays[i] = int.TryParse(rd[i], NumberStyles.Integer, Inv, out x) ? x : -1; }
-                if (a[3].Length > 0)
-                    foreach (var ent in a[3].Split(';'))
+                if (v4)
+                {
+                    var hz = a[3].Split(',');
+                    int x;
+                    if (hz.Length >= 1 && int.TryParse(hz[0], NumberStyles.Integer, Inv, out x)) _warSeedDay = x;
+                    if (hz.Length >= 2 && int.TryParse(hz[1], NumberStyles.Integer, Inv, out x)) _pLastOn = x;
+                    if (hz.Length >= 3 && int.TryParse(hz[2], NumberStyles.Integer, Inv, out x) && x >= 0) _pTermSavedDay = x;
+                }
+                string ents = v4 ? a[4] : a[3];
+                if (ents.Length > 0)
+                    foreach (var ent in ents.Split(';'))
                     {
                         if (ent.Length == 0) continue;
                         var p = ent.Split(':');
@@ -577,16 +632,25 @@ namespace Armoury
                         if (!v1 && b.P != null && p[5].Length == 3)
                             for (int i = 0; i < 3; i++) { int x = p[5][i] - '0'; b.Below[i] = (byte)(x >= 0 && x <= 9 ? x : 0); }   // ZC6: tygodnie ponizej progu spadku
                         if (fields >= 7 && b.P != null && p[6].Length > 0 && !ParseScar(p[6], b)) _eLoadBadScar++;   // ZC7: epizod wojny i dlug blizny
+                        if (fields >= 9)
+                        {
+                            if (p[7].Length > 0) { if (ParsePros(p[7], b, p[0])) _eLoadPros++; else _eLoadBadPros++; }   // ZC6: kotwica dobrobytu (zle pole - kotwica od nowa)
+                            if (b.P != null && p[8].Length == 1 && (p[8][0] == '1' || p[8][0] == '2')) { b.FreeBase = (byte)(p[8][0] - '0'); _eLoadFree++; }
+                        }
                         _eb[p[0]] = b;
                         _eLoadN++; if (b.P != null) _eLoadP++;
                     }
+                if (_pTermSavedDay == int.MinValue) _pTermSaved = null;
                 _eLoaded = true; _eLoadHash = EstatesHash(); _eLoadVer = ver;
                 Log.Info(PE + "wczytanie | format " + ver + " | osad " + _eLoadN + " (z udzialami " + _eLoadP + ", pominiete wpisy " + _eLoadBad + ", zle udzialy - zasiew od nowa " + _eLoadBadP
-                         + ") | pamiec Dostatku z dob " + string.Join(",", Array.ConvertAll(_ringDays, x => x.ToString(Inv))) + " | suma kontrolna " + Hex(_eLoadHash) + ".");
+                         + ") | pamiec Dostatku z dob " + string.Join(",", Array.ConvertAll(_ringDays, x => x.ToString(Inv))) + " | suma kontrolna " + Hex(_eLoadHash)
+                         + " | v4: kotwice dobrobytu " + _eLoadPros + " (zle " + _eLoadBadPros + "), czlony doby " + (_pTermSaved != null ? _pTermSaved.Count : 0) + " (dnia " + (_pTermSavedDay == int.MinValue ? -1 : _pTermSavedDay)
+                         + "), wolnosc znana " + _eLoadFree + ", ZC7 od dnia " + _warSeedDay + ", czlon dobrobytu ostatnio dnia " + _pLastOn + ".");
             }
             catch (Exception e)
             {
                 _eb.Clear(); for (int i = 0; i < RingN; i++) _ringDays[i] = -1; _eLoaded = false;
+                _warSeedDay = -1; _pLastOn = -1; _pTermSaved = null; _pTermSavedDay = int.MinValue;
                 _eLoadNote = "blad odczytu arm_estates - stany zasiane od nowa";
                 Stumble("ImportEstates", e);
             }
@@ -602,7 +666,7 @@ namespace Armoury
                          + (EstatesOn ? "" : " - stany jak ZC0 z pasm co dobe, ksiega stanow nietknieta, bez widoku")
                          + " | ksiega stanow z zapisu: " + (_eLoaded ? _eLoadP + " osad z udzialami, " + _eLoadN + " wpisow, suma kontrolna " + Hex(_eLoadHash) : (_eLoadNote ?? "brak"))
                          + " | widok: dymki osad gry (miasta, zamki, wsie: " + TipWhere + ") i wiosek pobocznych, People of this land, Look over the district, Realm ledger (menu miasta i zamku)"
-                         + " - okna ShowInquiry, bez GameMenu.SwitchToMenu | gra bez zmian (etykiety ludzi i widok - zloto, towar, ceny, dobrobyt, AI nietkniete).");
+                         + " i Estates and livelihood (menu wsi, miasta i zamku) - okna ShowInquiry / ShowMultiSelectionInquiry, bez GameMenu.SwitchToMenu | " + GameEffectText() + ".");
             }
             catch (Exception e) { Stumble("EstatesSessionStart", e); }
         }

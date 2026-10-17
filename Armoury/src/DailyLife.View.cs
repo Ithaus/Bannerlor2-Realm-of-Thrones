@@ -22,12 +22,15 @@ namespace Armoury
     ///    "Security" (warownia) albo pod "People of this land" / "Primary Production" (wies); zamek - region (zamek + jego wsie); po Alt - liczby ludzi i mieszczanie
     ///    wedlug stanow; osada ukryta dla gracza (IsSettlementInformationHidden) - bez linii;
     ///  - dymek wioski pobocznej (MapVillageTooltip i zapas w MapVillagesView): jedna linia - sklad okregu (wies gry) i jego Dostatek;
-    ///  - "People of this land" (PeopleMenu): sekcja "Estates and livelihood (book)" - wiersz na stan (ludzie, %, Dostatek, dochod na glowe, stol w kg),
-    ///    osada ze strzalka 28 dob (pamiec Dostatku co 7 dob), linia regionu, stol doby osady (z pola i domu / z targu), objasnienie skali i probki targu;
+    ///  - "People of this land" (PeopleMenu): na gorze okna 2 linie - sklad stanow i Dostatek (recenzja 16.10: dluga sekcja wychodzila poza 480 px okna ROT);
+    ///  - "Estates and livelihood" (wlasna pozycja w menu wsi, miasta i zamku, MBInformationManager.ShowMultiSelectionInquiry - lista przewijana): w opisie osada
+    ///    ze strzalka 28 dob (pamiec Dostatku co 7 dob), wiersz na stan (ludzie, %, Dostatek; dymek - dochod na glowe, stol w kg), region, awans i spadek (ZC6),
+    ///    wojna (ZC7), dobrobyt (ZC6), stol doby osady (z pola i domu / z targu), objasnienie skali i probki targu;
     ///  - "Look over the district" (DistrictMenu): w naglowku sklad i Dostatek okregu, w dymku wiersza wioski - jej ludzie wedlug stanow (dom wioski z ksiegi wiosek);
-    ///  - "Realm ledger" (wlasna pozycja w menu miasta i zamku, ShowInquiry): krolestwo wlasciciela osady - razem, regiony (warownia + wsie) wedlug ludzi
-    ///    i wiersz swiata.
-    /// ZC7 (DailyLife.War.cs): w People of this land zdanie blizny wojny (Dostatek przed i po najezdzie / zlupieniu, uchodzcy poza domem, zrujnowani bez zawodu);
+    ///  - "Realm ledger" (wlasna pozycja w menu miasta i zamku, ShowMultiSelectionInquiry): w opisie krolestwo wlasciciela osady i swiat, w liscie region
+    ///    (warownia + wsie) na wiersz wedlug ludzi, sklad z liczbami w dymku.
+    /// Napisy okien i dymkow bez '&lt;' i '&gt;' (RichTextParser: '&lt;' bez zamkniecia skleja reszte tekstu w jedno slowo).
+    /// ZC7 (DailyLife.War.cs): w oknie Estates and livelihood wiersz blizny wojny (Dostatek przed i po najezdzie / zlupieniu, uchodzcy poza domem, zrujnowani bez zawodu);
     /// Dostatek wszedzie z uchodzcami okregu w mianowniku (Rec.AwayE - te same liczby co w logu).
     /// Klucz DailyLifeEstates (z DailyLifeMeasure) wylaczony - nic (pozycja Realm ledger ukryta, linie dymkow i sekcje nie powstaja). Przed pierwsza doba pomiaru
     /// w sesji - zdanie "not reckoned yet". Bledy liczone (potkniecia widoku w linii "Stany (ZC2)"), pierwszy w miejscu do logu; nic sie nie gasi.
@@ -35,7 +38,7 @@ namespace Armoury
     internal static partial class DailyLife
     {
         private static int _viewDay = int.MinValue;          // doba pomiaru, ktorej liczby czyta widok (sesja)
-        private static int _vTip, _vTipCastle, _vSide, _vPeople, _vDistrict, _vRealm, _vSt, _vStAll;
+        private static int _vTip, _vTipCastle, _vSide, _vPeople, _vDistrict, _vRealm, _vEst, _vSt, _vStAll;
         private static readonly HashSet<string> _vErr = new HashSet<string>();
         private static bool _tipWired;                       // proces
         private static string _tipWhere = "nie wpiety";      // proces
@@ -54,7 +57,7 @@ namespace Armoury
         private static void ResetView()
         {
             _viewDay = int.MinValue;
-            _vTip = _vTipCastle = _vSide = _vPeople = _vDistrict = _vRealm = _vSt = _vStAll = 0;
+            _vTip = _vTipCastle = _vSide = _vPeople = _vDistrict = _vRealm = _vEst = _vSt = _vStAll = 0;
             _vErr.Clear();
         }
 
@@ -75,8 +78,8 @@ namespace Armoury
         private static string ViewText()
         {
             string s = "dymki osad " + _vTip + " (w tym zamki - region " + _vTipCastle + "), dymki wiosek pobocznych " + _vSide + ", People of this land " + _vPeople
-                       + ", Look over the district " + _vDistrict + ", Realm ledger " + _vRealm + " | potkniecia widoku " + _vSt + " (od wczytania " + _vStAll + ")";
-            _vTip = _vTipCastle = _vSide = _vPeople = _vDistrict = _vRealm = _vSt = 0;
+                       + ", Look over the district " + _vDistrict + ", Realm ledger " + _vRealm + ", Estates and livelihood " + _vEst + " | potkniecia widoku " + _vSt + " (od wczytania " + _vStAll + ")";
+            _vTip = _vTipCastle = _vSide = _vPeople = _vDistrict = _vRealm = _vEst = _vSt = 0;
             return s;
         }
 
@@ -164,7 +167,7 @@ namespace Armoury
         {
             if (!(all > 0) || !Fin(part)) return "-";
             double p = 100.0 * part / all;
-            if (p > 0 && p < 0.01) return "<0.01%";
+            if (p > 0 && p < 0.01) return "under 0.01%";            // bez '<' - RichTextParser skleja reszte tekstu w jedno slowo
             return p.ToString(p >= 10 ? "0" : p >= 1 ? "0.#" : "0.##", Inv) + "%";
         }
 
@@ -210,6 +213,30 @@ namespace Armoury
             return parts.Count > 0 ? string.Join(", ", parts.ToArray()) : null;
         }
 
+        /// <summary>Dymek osady: wiersz na grupe stanow (chlopi, mieszczanie, szlachta, niewolni) od najwiekszej - sam %, po Alt "41,213 (95%)" i wszystkie grupy;
+        /// bez Alt najwyzej 3 grupy od 0.1%.</summary>
+        private static void GroupRows(List<TooltipProperty> rows, double[] n, string suffix, bool ext)
+        {
+            double tot = People(n);
+            if (!(tot > 0)) return;
+            var items = new List<KeyValuePair<double, string>>(4)
+            {
+                new KeyValuePair<double, string>(n[EPeasant], "Peasants"),
+                new KeyValuePair<double, string>(n[ELabour] + n[ECraft] + n[EMerchant], "Burghers"),
+                new KeyValuePair<double, string>(n[EGentry], "Gentry"),
+                new KeyValuePair<double, string>(n[ESlave], "Slaves"),
+            };
+            items.Sort((x, y) => y.Key.CompareTo(x.Key));
+            int shown = 0;
+            foreach (var it in items)
+            {
+                if (!(it.Key >= 0.5)) continue;
+                if (!ext && (shown >= 3 || it.Key < 0.001 * tot)) continue;
+                rows.Add(new TooltipProperty(it.Value + suffix, ext ? Num(it.Key) + " (" + PctOf(it.Key, tot) + ")" : PctOf(it.Key, tot), 0));
+                shown++;
+            }
+        }
+
         /// <summary>"41,213 peasants, 1,383 burghers, 648 gentry" (po Alt w dymku).</summary>
         private static string CountsText(double[] n)
         {
@@ -221,14 +248,6 @@ namespace Armoury
             if (n[ESlave] >= 0.5) parts.Add(Num(n[ESlave]) + " slaves");
             if (n[EHouse] >= 0.5) parts.Add(Num(n[EHouse]) + " of the great houses");
             return parts.Count > 0 ? string.Join(", ", parts.ToArray()) : null;
-        }
-
-        /// <summary>"labourers 60%, craftsmen 30%, merchants 6%" - udzial w calej osadzie.</summary>
-        private static string BurghText(double[] n)
-        {
-            double tot = People(n);
-            if (!(tot > 0) || !(n[ELabour] + n[ECraft] + n[EMerchant] >= 0.5)) return null;
-            return "labourers " + PctOf(n[ELabour], tot) + ", craftsmen " + PctOf(n[ECraft], tot) + ", merchants " + PctOf(n[EMerchant], tot);
         }
 
         // ------------------------------------------------------------ dymek osady gry (latka UI - SubModuleMain, po VillageByPeople.ApplyTip)
@@ -292,28 +311,41 @@ namespace Armoury
                 int at = TipAnchor(list, st);
                 if (at < 0) return;
                 bool ext = __0.IsExtended;
-                var rows = new List<TooltipProperty>(5);
+                var rows = new List<TooltipProperty>(10);
+                // krotkie wiersze (recenzja 16.10: wartosc w jednej linii bez MaxWidth poszerzala dymek ok. 2 x): stan na wiersz, sam %; po Alt - liczby, dochod, mieszczanie
                 if (r.Kind == KCastle)
                 {
                     var g = RegionAgg(r);
-                    string gl = GroupsText(g.N, false, true);
-                    if (gl != null) rows.Add(new TooltipProperty("Region estates (book)", gl, 0));
-                    rows.Add(new TooltipProperty("Region livelihood", LivText(Div(g.YK, g.Nv)) + ", " + IncShort(Div(g.Y, g.Nv)), 0));
-                    if (ext) { string c = CountsText(g.N); if (c != null) rows.Add(new TooltipProperty("Region people (book)", c, 0)); }
+                    GroupRows(rows, g.N, " (region)", ext);
+                    rows.Add(new TooltipProperty("Livelihood (region)", LivText(Div(g.YK, g.Nv)), 0));
+                    if (ext)
+                    {
+                        double inc = Div(g.Y, g.Nv);
+                        if (Fin(inc)) rows.Add(new TooltipProperty("Income per head", Num(inc * 364.0) + " denars a year", 0));
+                        if (g.N[EHouse] >= 0.5) rows.Add(new TooltipProperty("Great houses", Num(g.N[EHouse]), 0));
+                    }
                     _vTipCastle++;
                 }
                 else
                 {
-                    string gl = GroupsText(r.N, false, true);
-                    if (gl != null) rows.Add(new TooltipProperty("Estates (book)", gl, 0));
+                    GroupRows(rows, r.N, " (book)", ext);
                     double d, inc; bool reg;
                     LivOf(r, out d, out inc, out reg);
-                    rows.Add(new TooltipProperty("Livelihood", LivText(d) + (Fin(inc) ? ", " + IncShort(inc) : "") + (reg ? " (the region's)" : ""), 0));
+                    rows.Add(new TooltipProperty(reg ? "Livelihood (region)" : "Livelihood", LivText(d), 0));
                     if (ext)
                     {
-                        string c = CountsText(r.N);
-                        if (c != null) rows.Add(new TooltipProperty("People (book)", c, 0));
-                        if (r.Kind == KTown) { string b = BurghText(r.N); if (b != null) rows.Add(new TooltipProperty("Burghers", b, 0)); }
+                        if (Fin(inc)) rows.Add(new TooltipProperty("Income per head", Num(inc * 364.0) + " denars a year", 0));
+                        if (r.Kind == KTown)
+                        {
+                            double tot = People(r.N);
+                            if (tot > 0 && r.N[ELabour] + r.N[ECraft] + r.N[EMerchant] >= 0.5)
+                            {
+                                rows.Add(new TooltipProperty("Labourers", PctOf(r.N[ELabour], tot), 0));
+                                rows.Add(new TooltipProperty("Craftsmen", PctOf(r.N[ECraft], tot), 0));
+                                rows.Add(new TooltipProperty("Merchants", PctOf(r.N[EMerchant], tot), 0));
+                            }
+                        }
+                        if (r.N[EHouse] >= 0.5) rows.Add(new TooltipProperty("Great houses", Num(r.N[EHouse]), 0));
                     }
                 }
                 for (int i = 0; i < rows.Count; i++) list.Insert(at + 1 + i, rows[i]);
@@ -380,58 +412,95 @@ namespace Armoury
             catch (Exception e) { ViewStumble("DistrictRowCounts", e); return null; }
         }
 
-        // ------------------------------------------------------------ "People of this land" (PeopleMenu)
-        /// <summary>Sekcja "Estates and livelihood (book)" okna People of this land: osada (zamek - region) wiersz na stan, region, stol doby, skala. null - klucz off.</summary>
-        internal static string MenuSection(Settlement st)
+        // ------------------------------------------------------------ "People of this land" (PeopleMenu) - krotko na gorze okna
+        /// <summary>Jedna-dwie linie na GORZE okna People of this land: sklad stanow osady (zamek - regionu) i Dostatek; reszta w oknie "Estates and livelihood"
+        /// (recenzja 16.10: dluga sekcja w oknie ShowInquiry wychodzila poza 480 px prefabu ROT, gdzie Gauntlet nie lamie juz wierszy). null - klucz off.</summary>
+        internal static string MenuSummary(Settlement st)
         {
             if (st == null || !EstatesOn) return null;
             try
             {
                 _vPeople++;
-                var sb = new StringBuilder(1800);
-                sb.Append("Estates and livelihood (book):\n");
                 Rec r;
-                if (!ViewReady || !_byS.TryGetValue(st, out r) || r == null) { sb.Append(NotYet); return sb.ToString(); }
-                if (r.Kind == KCastle)
-                {
-                    sb.Append("The people of this castle live in its villages.\n");
-                    if (r.N[EHouse] >= 0.5)
-                        sb.Append("Great houses: ").Append(Num(r.N[EHouse])).Append(" folk of the lords who hold fiefs here - kin and households, living off their lord's purse.\n");
-                    var g = RegionAgg(r);
-                    RegionLine(sb, r, g);
-                    EstateRows(sb, g, null);
-                    string pv = ProsperityViewText(r);           // ZC6: dobrobyt za Dostatkiem regionu
-                    if (pv != null) sb.Append(pv).Append('\n');
-                }
-                else
-                {
-                    var a = new Agg(); AddTo(a, r);
-                    double d, inc; bool reg;
-                    LivOf(r, out d, out inc, out reg);
-                    string tr = Trend1(r, d);
-                    sb.Append("Here: ").Append(Num(People(r.N))).Append(" people of the book - Livelihood ").Append(LivText(d)).Append(reg ? " (the region's)" : "")
-                      .Append(tr != null ? ", " + tr : "").Append(Fin(inc) ? "; income per head " + Num(inc * 364.0) + " denars a year" : "")
-                      .Append(r.YDays > 0 && r.YDays < WarmDays ? " (reckoned over " + r.YDays + (r.YDays == 1 ? " day" : " days") + " only - rough)" : "").Append(".\n");
-                    EstateRows(sb, a, r);
-                    var reg0 = r.Region ?? r;
-                    if (r.Kind == KTown || !ReferenceEquals(reg0, r)) RegionLine(sb, reg0, RegionAgg(r));
-                    string mt = MobilityText(r);                 // ZC6: kto awansowal i spadl w ostatnich 28 dobach
-                    if (mt != null) sb.Append(mt).Append('\n');
-                    string wt = WarViewText(r);                  // ZC7: blizna wojny - Dostatek przed i po, uchodzcy, zrujnowani bez zawodu
-                    if (wt != null) sb.Append(wt).Append('\n');
-                    string pv = ProsperityViewText(r);           // ZC6: dobrobyt za Dostatkiem regionu
-                    if (pv != null) sb.Append(pv).Append('\n');
-                    TableLine(sb, r);
-                }
-                sb.Append(Legend).Append('\n');
-                sb.Append("One sack on the market stands for about ").Append(_sigma > 0 ? _sigma : 37).Append(" sacks of the land's real trade; the book counts all the people of the land, not only the village or town on the map.");
-                return sb.ToString();
+                if (!ViewReady || !_byS.TryGetValue(st, out r) || r == null) return "Estates (book): " + NotYet;
+                bool castle = r.Kind == KCastle;
+                double[] n; double d;
+                if (castle) { var g = RegionAgg(r); n = g.N; d = Div(g.YK, g.Nv); }
+                else { double inc; bool reg; LivOf(r, out d, out inc, out reg); n = r.N; }
+                string gl = GroupsText(n, false, false);
+                return (castle ? "Estates of the region (book): " : "Estates (book): ") + (gl ?? "no people of the book") + " - Livelihood " + LivText(d)
+                       + ".\nThe whole book of the estates: 'Estates and livelihood' in this menu.";
             }
-            catch (Exception e) { ViewStumble("MenuSection", e); return null; }
+            catch (Exception e) { ViewStumble("MenuSummary", e); return null; }
         }
 
-        /// <summary>Wiersze stanow: ludzie, %, Dostatek, dochod na glowe; own - osada (stol w kg, konto niewolnych ksiegi).</summary>
-        private static void EstateRows(StringBuilder sb, Agg a, Rec own)
+        // ------------------------------------------------------------ "Estates and livelihood" (menu wsi, miasta i zamku) - lista przewijana
+        /// <summary>Wiersz okna z lista (MultiSelection): krotki tytul (dwie linie w wierszu 65 px) i dymek ze szczegolami. Bez znakow '&lt;' i '&gt;' (RichText).</summary>
+        private static InquiryElement Row(string title, string hint)
+        {
+            return new InquiryElement(title, title, null, true, hint);
+        }
+
+        /// <summary>Okno "Estates and livelihood": opis - osada w jednym zdaniu; wiersze - stany (ludzie, %, Dostatek; dymek: dochod, stol), region, awans i spadek,
+        /// wojna, dobrobyt, stol doby, objasnienie liczb. Lista przewijana (MultiSelectionQueryPopup), wiec dlugosc nie wychodzi poza okno.</summary>
+        private static void EstatesWindow(Settlement st)
+        {
+            string name = st.Name != null ? st.Name.ToString() : "this place";
+            string title = "Estates and livelihood - " + name;
+            Rec r;
+            if (!ViewReady || !_byS.TryGetValue(st, out r) || r == null)
+            {
+                InformationManager.ShowInquiry(new InquiryData(title, NotYet, true, false, "Close", null, delegate { }, null), true);
+                return;
+            }
+            var list = new List<InquiryElement>(16);
+            var desc = new StringBuilder(400);
+            if (r.Kind == KCastle)
+            {
+                var g = RegionAgg(r);
+                double d = Div(g.YK, g.Nv), inc = Div(g.Y, g.Nv);
+                string tr = Trend(g);
+                desc.Append("The people of this castle live in its villages: ").Append(Num(People(g.N))).Append(" people of the book - Livelihood ").Append(LivText(d))
+                    .Append(tr != null ? ", " + tr : "").Append(Fin(inc) ? "; income per head " + Num(inc * 364.0) + " denars a year" : "").Append('.');
+                EstateElements(list, g, null);
+            }
+            else
+            {
+                var a = new Agg(); AddTo(a, r);
+                double d, inc; bool reg;
+                LivOf(r, out d, out inc, out reg);
+                string tr = Trend1(r, d);
+                desc.Append("Here: ").Append(Num(People(r.N))).Append(" people of the book - Livelihood ").Append(LivText(d)).Append(reg ? " (the region's)" : "")
+                    .Append(tr != null ? ", " + tr : "").Append(Fin(inc) ? "; income per head " + Num(inc * 364.0) + " denars a year" : "")
+                    .Append(r.YDays > 0 && r.YDays < WarmDays ? " (reckoned over " + r.YDays + (r.YDays == 1 ? " day" : " days") + " only - rough)" : "").Append('.');
+                EstateElements(list, a, r);
+                var reg0 = r.Region ?? r;
+                if (r.Kind == KTown || !ReferenceEquals(reg0, r)) RegionElement(list, reg0, RegionAgg(r));
+                string mt = MobilityText(r);                 // ZC6: kto awansowal i spadl w ostatnich 28 dobach
+                if (mt != null)
+                {
+                    int c = mt.IndexOf(": ", StringComparison.Ordinal);
+                    if (c > 0) list.Add(Row(mt.Substring(0, c), mt.Substring(c + 2).Replace(", ", ",\n")));
+                    else list.Add(Row("Rose and fell between the estates", mt));
+                }
+                string wt = WarViewText(r);                  // ZC7: blizna wojny - Dostatek przed i po, uchodzcy, zrujnowani bez zawodu
+                if (wt != null) list.Add(Row("War has left its mark here", (wt.StartsWith("War: ", StringComparison.Ordinal) ? wt.Substring(5) : wt).Replace(". ", ".\n")));
+            }
+            string ps = ProsperityShort(r);                  // ZC6: dobrobyt za Dostatkiem regionu
+            if (ps != null) list.Add(Row("Prosperity of the stronghold: " + ps, ProsperityViewText(r)));
+            if (r.Kind != KCastle) { string tt = TableText(r); if (tt != null) list.Add(Row("Daily table here today", tt)); }
+            list.Add(Row("What the numbers mean", Legend + "\n" + ScaleText()));
+            desc.Append("\nHover over a row for more.");
+            MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(title, desc.ToString(), list, false, 0, 1, "Close", null, delegate { }, null), false);
+        }
+
+        private static string ScaleText()
+        {
+            return "One sack on the market stands for about " + (_sigma > 0 ? _sigma : 37) + " sacks of the land's real trade; the book counts all the people of the land, not only the village or town on the map.";
+        }
+
+        /// <summary>Wiersze stanow: tytul - ludzie, %, Dostatek; dymek - Dostatek, dochod na glowe, stol w kg (osada), konto niewolnych ksiegi.</summary>
+        private static void EstateElements(List<InquiryElement> list, Agg a, Rec own)
         {
             double tot = People(a.N);
             if (!(tot > 0)) return;
@@ -442,45 +511,50 @@ namespace Armoury
                 if (!(n >= 0.5)) continue;
                 if (e == EHouse)
                 {
-                    sb.Append("  Great houses: ").Append(Num(n)).Append(" - kin and households of the lords who hold fiefs here (three for each living member of the house); they live off their lord's purse.\n");
+                    list.Add(Row("Great houses: " + Num(n), "Kin and households of the lords who hold fiefs here (three for each living member of the house); they live off their lord's purse."));
                     continue;
                 }
-                sb.Append("  ").Append(EstEnCap[e]).Append(": ").Append(Num(n)).Append(" (").Append(PctOf(n, tot)).Append(')');
+                var hint = new List<string>(4);
+                string t = EstEnCap[e] + ": " + Num(n) + " (" + PctOf(n, tot) + ")";
                 if (e == ESlave)
                 {
-                    sb.Append(" - fed by their owners");
-                    if (own != null && own.Thralls >= 0.5) sb.Append("; ").Append(Num(own.Thralls)).Append(" of them taken in raids and wars");
+                    hint.Add("Fed by their owners.");
+                    if (own != null && own.Thralls >= 0.5) hint.Add(Num(own.Thralls) + " of them were taken in raids and wars.");
                 }
                 else
                 {
                     double de = Div(a.YKE[e], a.NE[e]), ie = Div(a.YE[e], a.NE[e]);
-                    sb.Append(" - Livelihood ").Append(LivText(de));
-                    if (Fin(ie)) sb.Append(", ").Append(IncShort(ie));
+                    t += " - " + LivText(de);
+                    hint.Add("Livelihood " + LivText(de));
+                    if (Fin(ie)) hint.Add(IncShort(ie));
                 }
                 if (b != null)
                 {
                     double kg = 0, l = 0;
                     for (int g = 0; g < Groups; g++) { if (IsDrink(g)) l += b[e][g]; else kg += b[e][g]; }
-                    sb.Append("; table ").Append(kg.ToString("0.00", Inv)).Append(" kg and ").Append(l.ToString("0.00", Inv)).Append(" l a day");
+                    hint.Add("Daily table: " + kg.ToString("0.00", Inv) + " kg of food and " + l.ToString("0.00", Inv) + " l of drink a head");
                 }
-                sb.Append('\n');
+                list.Add(Row(t, string.Join("\n", hint.ToArray())));
             }
         }
 
-        /// <summary>Linia regionu (warownia i jej wsie): ludzie, sklad, Dostatek ze strzalka, dochod na glowe.</summary>
-        private static void RegionLine(StringBuilder sb, Rec reg, Agg g)
+        /// <summary>Wiersz regionu (warownia i jej wsie): tytul - ludzie i Dostatek; dymek - sklad z liczbami, strzalka 28 dob, dochod na glowe.</summary>
+        private static void RegionElement(List<InquiryElement> list, Rec reg, Agg g)
         {
             double tot = People(g.N);
             if (!(tot > 0)) return;
             double d = Div(g.YK, g.Nv), inc = Div(g.Y, g.Nv);
-            string tr = Trend(g), gl = GroupsText(g.N, false, true);
-            sb.Append("The region of ").Append(reg.Name).Append(reg.Kind == KVillage ? "" : " (the stronghold and its villages)").Append(": ").Append(Num(tot)).Append(" people")
-              .Append(gl != null ? " - " + gl : "").Append(" - Livelihood ").Append(LivText(d)).Append(tr != null ? ", " + tr : "")
-              .Append(Fin(inc) ? "; income per head " + Num(inc * 364.0) + " denars a year" : "").Append(".\n");
+            string tr = Trend(g), gl = GroupsText(g.N, true, true);
+            var hint = new List<string>(4);
+            hint.Add(reg.Kind == KVillage ? "This district." : "The stronghold and its villages.");
+            if (gl != null) hint.Add(gl);
+            hint.Add("Livelihood " + LivText(d) + (tr != null ? ", " + tr : ""));
+            if (Fin(inc)) hint.Add(IncShort(inc));
+            list.Add(Row("The region of " + reg.Name + ": " + Num(tot) + " people - " + LivText(d), string.Join("\n", hint.ToArray())));
         }
 
         /// <summary>Stol doby osady (koszyki stanow x ludzie): jedzenie w t i napoje w l, z pola i domu / z targu (wies - z pola tylko najedzeni ze spichlerza).</summary>
-        private static void TableLine(StringBuilder sb, Rec r)
+        private static string TableText(Rec r)
         {
             var b = BasketOf(r.Cul);
             bool town = r.Kind == KTown;
@@ -499,24 +573,30 @@ namespace Armoury
                     kg += q; kgM += m; kgF += (q - m) * fed;
                 }
             }
-            if (!(kg > 0)) return;
+            if (!(kg > 0)) return null;
             double t = kg / 1000.0;
-            sb.Append("Daily table here today: ").Append(t >= 10 ? Num(t) : t.ToString("0.0", Inv)).Append(" t of food and ").Append(Num(l)).Append(" l of drink - own fields and homes ")
-              .Append(PctOf(kg - kgM, kg)).Append(", market ").Append(PctOf(kgM, kg));
+            var sb = new StringBuilder(240);
+            sb.Append(t >= 10 ? Num(t) : t.ToString("0.0", Inv)).Append(" t of food and ").Append(Num(l)).Append(" l of drink.\nOwn fields and homes ")
+              .Append(PctOf(kg - kgM, kg)).Append(", market ").Append(PctOf(kgM, kg)).Append('.');
             double hungry = kg - kgM - kgF;
-            if (hungry > 0.005 * kg) sb.Append("; the granary falls short of ").Append(PctOf(hungry, kg)).Append(" of it");
-            sb.Append(".\n");
+            if (hungry > 0.005 * kg) sb.Append("\nThe granary falls short of ").Append(PctOf(hungry, kg)).Append(" of it.");
+            return sb.ToString();
         }
 
-        // ------------------------------------------------------------ "Realm ledger" (menu miasta i zamku)
-        /// <summary>OnSessionLaunched (po DistrictMenu.AddMenus): pozycja "Realm ledger" w menu miasta i zamku za "People of this land" (index 7).</summary>
+        // ------------------------------------------------------------ pozycje menu: "Estates and livelihood" (wies, miasto, zamek) i "Realm ledger" (miasto i zamek)
+        /// <summary>OnSessionLaunched (po DistrictMenu.AddMenus): "Estates and livelihood" w menu wsi (takze spladrowanej), miasta i zamku za "People of this land"
+        /// i "Realm ledger" w menu miasta i zamku za nim. Okna ShowMultiSelectionInquiry (lista przewijana), bez GameMenu.SwitchToMenu.</summary>
         internal static void AddMenus(CampaignGameStarter starter)
         {
             try
             {
                 foreach (var menu in new[] { "town", "castle" })
                     starter.AddGameMenuOption(menu, "arm_realm_ledger_" + menu, "{=!}Realm ledger", RealmCondition, RealmConsequence, false, 7);
-                Log.Info(PE + "pozycja \"Realm ledger\" w menu miasta i zamku wpieta (okno ShowInquiry, bez GameMenu.SwitchToMenu; widoczna przy kluczu Daily Life Estates).");
+                foreach (var menu in new[] { "village", "town", "castle" })
+                    starter.AddGameMenuOption(menu, "arm_estates_" + menu, "{=!}Estates and livelihood", RealmCondition, EstatesConsequence, false, 7);
+                starter.AddGameMenuOption("village_looted", "arm_estates_village_looted", "{=!}Estates and livelihood", RealmCondition, EstatesConsequence, false, 2);
+                Log.Info(PE + "pozycja \"Realm ledger\" w menu miasta i zamku i \"Estates and livelihood\" w menu wsi, miasta i zamku wpiete (okna ShowMultiSelectionInquiry - lista przewijana,"
+                         + " bez GameMenu.SwitchToMenu; widoczne przy kluczu Daily Life Estates).");
             }
             catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }
         }
@@ -531,6 +611,18 @@ namespace Armoury
             catch { return false; }
         }
 
+        private static void EstatesConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                if (st == null) return;
+                _vEst++;
+                EstatesWindow(st);
+            }
+            catch (Exception e) { ViewStumble("EstatesConsequence", e); }
+        }
+
         private static void RealmConsequence(MenuCallbackArgs args)
         {
             try
@@ -538,21 +630,22 @@ namespace Armoury
                 var st = Settlement.CurrentSettlement;
                 if (st == null) return;
                 _vRealm++;
-                string title, body;
-                RealmText(st, out title, out body);
-                InformationManager.ShowInquiry(new InquiryData(title, body, true, false, "Close", null, delegate { }, null), true);
+                string title, desc;
+                var list = new List<InquiryElement>(64);
+                RealmText(st, out title, out desc, list);
+                if (list.Count == 0) { InformationManager.ShowInquiry(new InquiryData(title, desc, true, false, "Close", null, delegate { }, null), true); return; }
+                MBInformationManager.ShowMultiSelectionInquiry(new MultiSelectionInquiryData(title, desc, list, false, 0, 1, "Close", null, delegate { }, null), false);
             }
             catch (Exception e) { ViewStumble("RealmConsequence", e); }
         }
 
-        private const int RealmRows = 30;
-
-        /// <summary>Okno Realm ledger: krolestwo wlasciciela osady (region osady liczy sie do krolestwa wlasciciela warowni) - razem, regiony wedlug ludzi, swiat.</summary>
-        private static void RealmText(Settlement st, out string title, out string body)
+        /// <summary>Okno Realm ledger: krolestwo wlasciciela osady (region osady liczy sie do krolestwa wlasciciela warowni) - w opisie krolestwo i swiat, w liscie
+        /// region na wiersz (wedlug ludzi; dymek - sklad z liczbami, Dostatek, dochod) i objasnienie liczb.</summary>
+        private static void RealmText(Settlement st, out string title, out string desc, List<InquiryElement> list)
         {
             title = "Realm ledger";
             Rec r;
-            if (!ViewReady || !_byS.TryGetValue(st, out r) || r == null) { body = NotYet; return; }
+            if (!ViewReady || !_byS.TryGetValue(st, out r) || r == null) { desc = NotYet; return; }
             string kid = r.KingdomId ?? "-";
             string kname = kid == "-" ? "the lands without a realm" : r.KingdomName;
             title = "Realm ledger - " + (kid == "-" ? "lands without a realm" : kname);
@@ -569,33 +662,36 @@ namespace Armoury
                 if (!regs.TryGetValue(reg, out a)) { a = new Agg(); regs[reg] = a; }
                 AddTo(a, x);
             }
-            var sb = new StringBuilder(4000);
+            var sb = new StringBuilder(800);
             sb.Append("The people of ").Append(kname).Append(" (book), as reckoned at the last dawn:\n");
-            AggLine(sb, "The whole realm", realm, true);
-            sb.Append(regs.Count).Append(regs.Count == 1 ? " region" : " regions").Append(" (the stronghold and its villages), most people first:\n");
-            var list = new List<KeyValuePair<Rec, Agg>>(regs);
-            list.Sort((x, y) => People(y.Value.N).CompareTo(People(x.Value.N)));
-            double restP = 0; int restN = 0;
-            for (int i = 0; i < list.Count; i++)
+            AggLine(sb, "The whole realm", realm);
+            AggLine(sb, "The whole world", world);
+            sb.Append(regs.Count).Append(regs.Count == 1 ? " region" : " regions").Append(" (the stronghold and its villages), most people first - hover over a row for its estates.");
+            desc = sb.ToString();
+            var lst = new List<KeyValuePair<Rec, Agg>>(regs);
+            lst.Sort((x, y) => People(y.Value.N).CompareTo(People(x.Value.N)));
+            foreach (var kv in lst)
             {
-                if (i >= RealmRows) { restP += People(list[i].Value.N); restN++; continue; }
-                AggLine(sb, list[i].Key.Name, list[i].Value, false);
+                var a = kv.Value;
+                double tot = People(a.N), d = Div(a.YK, a.Nv), inc = Div(a.Y, a.Nv);
+                string tr = Trend(a), gl = GroupsText(a.N, true, true);
+                var hint = new List<string>(4);
+                if (gl != null) hint.Add(gl);
+                hint.Add("Livelihood " + LivText(d) + (tr != null ? ", " + tr : ""));
+                if (Fin(inc)) hint.Add(IncShort(inc));
+                list.Add(Row(kv.Key.Name + ": " + Num(tot) + " people - " + LivText(d), string.Join("\n", hint.ToArray())));
             }
-            if (restN > 0) sb.Append("  and ").Append(restN).Append(" smaller regions: ").Append(Num(restP)).Append(" people\n");
-            AggLine(sb, "The whole world", world, true);
-            sb.Append(Legend).Append('\n');
-            sb.Append("One sack on the market stands for about ").Append(_sigma > 0 ? _sigma : 37).Append(" sacks of the land's real trade; the book counts all the people of the land.");
-            body = sb.ToString();
+            if (list.Count > 0) list.Add(Row("What the numbers mean", Legend + "\n" + ScaleText()));
         }
 
-        /// <summary>Wiersz zbioru: ludzie, sklad (head - z liczbami), Dostatek ze strzalka, dochod na glowe.</summary>
-        private static void AggLine(StringBuilder sb, string name, Agg a, bool head)
+        /// <summary>Linia zbioru w opisie okna: ludzie, sklad w %, Dostatek ze strzalka, dochod na glowe.</summary>
+        private static void AggLine(StringBuilder sb, string name, Agg a)
         {
             double tot = People(a.N);
             double d = Div(a.YK, a.Nv), inc = Div(a.Y, a.Nv);
-            string tr = Trend(a), gl = GroupsText(a.N, head, true);
-            sb.Append(head ? "" : "  ").Append(name).Append(": ").Append(Num(tot)).Append(" people").Append(gl != null ? " - " + gl : "")
-              .Append(" - ").Append(LivText(d)).Append(tr != null ? ", " + tr : "").Append(Fin(inc) ? "; " + IncShort(inc) : "").Append(head ? ".\n" : "\n");
+            string tr = Trend(a), gl = GroupsText(a.N, false, true);
+            sb.Append(name).Append(": ").Append(Num(tot)).Append(" people").Append(gl != null ? " - " + gl : "")
+              .Append(" - ").Append(LivText(d)).Append(tr != null ? ", " + tr : "").Append(Fin(inc) ? "; " + IncShort(inc) : "").Append(".\n");
         }
     }
 }

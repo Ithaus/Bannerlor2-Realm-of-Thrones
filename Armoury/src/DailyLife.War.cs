@@ -47,7 +47,9 @@ namespace Armoury
         private const int WarShowDays = 364;                             // widok: epizod do roku od ostatniego zdarzenia
         private const int SkRaid = 1, SkPillage = 2, SkDevastate = 3;
         private const int WarListN = 20, WarEvKeep = 400;
-        private const int WarForget = 728;                              // epizod bez dlugu i bez zdarzenia od 2 lat - z ksiegi (zapis nie rosnie bez konca)
+        private const int WarForget = 728;                              // epizod bez zdarzenia od 2 lat - z ksiegi razem z reszta dlugu (zapis nie rosnie bez konca)
+        private const int DebtFloorPpm = 50;                            // dlug blizny ponizej 50 milionowych albo ponizej 1 czlowieka - odpisany (rozpad wykladniczy nie konczy sie)
+        private const int WarSeedHold = 28;                             // 28 dob od wlaczenia ZC7: liczniki spadku ZC6 wsi stoja (uchodzcy z dawnych wojn wchodza do mianownika naraz)
         private const double MsgMinF = 0.001;                           // komunikat gracza od 0.1% ludzi w domu trafionych (albo zrujnowanych rzemieslnikow)
         private static readonly string[] SkName = { "-", "najazd", "grabiez", "spustoszenie" };
 
@@ -69,6 +71,8 @@ namespace Armoury
         // doba (stan dzisiejszy): uchodzcy w mianowniku Dostatku
         private static int _wAwayV; private static double _wAwayP, _wAwayHome;
         private static int _eLoadBadScar; private static string _eLoadVer;
+        private static int _warSeedDay = -1;                            // doba wlaczenia ZC7 w kampanii (zapis v4; -1 - klucz wylaczony / jeszcze nie)
+        private static int _wOffN, _wForgetN, _wHoldV, _wSackLate; private static double _wOffP;
         private static readonly double[] _wBand = new double[6];
         private static readonly long[] _wPurse = new long[3];
 
@@ -80,6 +84,7 @@ namespace Armoury
         {
             lock (StrikeGate) { _strike = new Dictionary<Settlement, double[]>(); }
             Interlocked.Exchange(ref _strikeFails, 0); Interlocked.Exchange(ref _strikeErr, null);
+            _warSeedDay = -1;                                           // zapis v4 wczytuje ImportEstates po konstruktorze
             ZeroWarLine();
             _wMsgQ.Clear();
             _wAwayV = 0; _wAwayP = _wAwayHome = 0;
@@ -91,6 +96,7 @@ namespace Armoury
             _wSack = _wSackPill = _wSackDev = _wSackMercy = _wSackCastle = _wSackNoCap = _wSackNoBook = _wSackOff = 0;
             _wStruck = _wDead = _wCraftV = _wSackM = _wSackC = _wRuinDown = _wBackV = _wBackC = _wBackM = _wFMax = 0;
             _wP2R = _wR2W = _wCtl = _wBW2R = _wBR2P = 0;
+            _wOffN = _wForgetN = _wHoldV = _wSackLate = 0; _wOffP = 0;
             _wF.Clear(); _wEv.Clear();
         }
 
@@ -152,6 +158,17 @@ namespace Armoury
                 catch (Exception e) { _wStum++; Stumble("Blizna(wies)", e); }
             }
         }
+
+        /// <summary>Compute (blok ZC7 doby): doba wlaczenia ZC7 w kampanii - pierwsza doba z kluczem (zapis v4); klucz wylaczony - od nowa przy nastepnym wlaczeniu.</summary>
+        private static void WarSeed(int day)
+        {
+            if (!WarOn) { _warSeedDay = -1; return; }
+            if (_warSeedDay < 0) _warSeedDay = day;
+        }
+
+        /// <summary>28 dob od wlaczenia ZC7: uchodzcy z dawnych wojn weszli do mianownika Dostatku wsi naraz (zmiana pomiaru, nie zdarzenie) - liczniki spadku ZC6
+        /// wsi stoja i bez spadkow wsi (recenzja 16.10: start neutralny na starym zapisie).</summary>
+        private static bool WarHoldBelow(int day) { return WarOn && _warSeedDay >= 0 && day >= _warSeedDay && day - _warSeedDay < WarSeedHold; }
 
         /// <summary>Export / ExportEstates: uderzenia od switu do ksiegi stanow i sredniej dochodu PRZED zapisem (zapis wczytany ponownie daje te same liczby). Nie rzuca.</summary>
         private static void WarFlushSave()
@@ -259,17 +276,29 @@ namespace Armoury
             if (!WarOn || _recs == null) { _wMsgQ.Clear(); return; }
             foreach (var r in _recs)
             {
-                if (r.Kind == KCastle || r.DSrc != 0 || !Fin(r.D0) || Math.Abs(r.D0) >= 1e6 || !SafeId(r.Id)) continue;
+                if (r.Kind == KCastle || !SafeId(r.Id)) continue;
                 EBook eb;
-                if (!_eb.TryGetValue(r.Id, out eb) || eb == null || eb.ScarFrom < 0) continue;
+                if (!_eb.TryGetValue(r.Id, out eb) || eb == null) continue;
+                // dlug blizny ponizej progu (50 milionowych albo mniej niz 1 czlowiek) - odpisany: rozpad 25%/rok nie dochodzi do zera, a wpis zostalby w zapisie na zawsze
+                for (int k = 0; k < 2; k++)
+                {
+                    int dv = eb.Debt[k];
+                    if (dv <= 0) continue;
+                    double ppl = r.L > 0 ? dv * r.L / PpmAll : double.NaN;
+                    if (dv < DebtFloorPpm || (Fin(ppl) && ppl < 1.0)) { eb.Debt[k] = 0; _wOffN++; if (Fin(ppl)) _wOffP += ppl; }
+                }
+                if (r.DSrc != 0 || !Fin(r.D0) || Math.Abs(r.D0) >= 1e6 || eb.ScarFrom < 0) continue;
                 float d = (float)(Math.Round(r.D0 * 100.0) / 100.0);
                 if (float.IsNaN(eb.ScarMin) || d < eb.ScarMin) eb.ScarMin = d;
             }
-            // epizod zamkniety: 2 lata bez zdarzenia i bez dlugu - z ksiegi (widok pokazuje rok, linia powrotu - spokoj do 2 lat)
+            // epizod zamkniety: 2 lata bez zdarzenia - z ksiegi razem z reszta dlugu (zrujnowani zostaja w nowym stanie - dalej zwykly awans ZC6; widok pokazuje rok,
+            // linia powrotu - spokoj do 2 lat); zapis nie rosnie o wpis kazdej wsi kiedykolwiek najechanej
             foreach (var kv in _eb)
             {
                 var b = kv.Value;
-                if (b == null || b.ScarFrom < 0 || b.Debt[0] > 0 || b.Debt[1] > 0 || b.ScarDay < 0 || day - b.ScarDay <= WarForget) continue;
+                if (b == null || b.ScarDay < 0 || day - b.ScarDay <= WarForget || (b.ScarFrom < 0 && b.Debt[0] <= 0 && b.Debt[1] <= 0)) continue;
+                if (b.Debt[0] > 0 || b.Debt[1] > 0) _wForgetN++;
+                b.Debt[0] = b.Debt[1] = 0;
                 b.ScarFrom = b.ScarDay = -1; b.ScarKind = 0; b.ScarD = b.ScarMin = float.NaN; b.ScarF = 0f; b.Rep7 = false;
             }
             if (_wMsgQ.Count == 0) return;
@@ -310,6 +339,11 @@ namespace Armoury
                 if (kind != 1 && kind != 2) { _wSackMercy++; return; }
                 if (!st.IsTown) { _wSackCastle++; return; }
                 if (!captured) { _wSackNoCap++; return; }
+                if (_recs == null && PopulationLaw.Calibrated)
+                {
+                    // zlupienie przed pierwszym switem po wczytaniu: spis osad teraz (jak pierwsza doba - srednia dochodu z zapisu), zeby wynik nie zalezal od wczytania
+                    try { EnsureItems(); EnsureRecs(day); _wSackLate++; } catch (Exception e2) { _wStum++; Stumble("SackScar(spis)", e2); }
+                }
                 Rec r; EBook eb;
                 if (_recs == null || !_byS.TryGetValue(st, out r) || r == null || r.Kind != KTown || !SafeId(r.Id) || !_eb.TryGetValue(r.Id, out eb) || eb == null || eb.P == null)
                 { _wSackNoBook++; return; }
@@ -348,7 +382,9 @@ namespace Armoury
                 eb.Debt[1] = (int)Math.Min(PpmAll, (long)eb.Debt[1] + qC);
                 RefreshRec(r, eb);
                 Episode(eb, r, day, kind == 1 ? SkPillage : SkDevastate, share);
-                double L = r.L, pM = qM * L / PpmAll, pC = qC * L / PpmAll;
+                double L = r.L;
+                if (!(L > 0)) { try { double pl = PopulationLaw.PeopleOf(st); L = pl > 0 && Fin(pl) ? pl : 0; } catch { L = 0; } }   // przed pierwsza doba sesji - ludzie ksiegi teraz
+                double pM = qM * L / PpmAll, pC = qC * L / PpmAll;
                 _wSack++; if (kind == 1) _wSackPill++; else _wSackDev++;
                 _wSackM += pM; _wSackC += pC; _wP2R += gP2R; _wR2W += gR2W;
                 bool playerIn = false, mine = false, lost = false;
@@ -538,6 +574,9 @@ namespace Armoury
               .Append(" | powrot blizny (spokoj >= ").Append(WarQuiet).Append(" dob, 25%/rok): chlopi->rzemieslnicy wsi ").Append(N0(_wBackV)).Append(", biedota->rzemieslnicy ").Append(N0(_wBackC))
               .Append(", rzemieslnicy->kupcy ").Append(N0(_wBackM)).Append("; pieniadze W->R ").Append(_wBW2R).Append(", R->P ").Append(_wBR2P).Append("; bez Dostatku do powrotu ").Append(_wBackNoD)
               .Append(" | dlug blizny: wsie ").Append(dV).Append(" (").Append(N0(dVp)).Append(" ludzi), miasta ").Append(dT).Append(" (kupcy ").Append(N0(dTm)).Append(", rzemieslnicy ").Append(N0(dTc)).Append(')')
+              .Append(" | dlug odpisany: ponizej progu ").Append(_wOffN).Append(" (").Append(N0(_wOffP)).Append(" ludzi), po 2 latach spokoju ").Append(_wForgetN).Append(" osad")
+              .Append(" | ZC7 od dnia ").Append(_warSeedDay).Append(" (liczniki spadku wsi stoja ").Append(WarSeedHold).Append(" dob: przegladow ").Append(_wHoldV).Append(')')
+              .Append(" | zlupienia przed pierwszym switem po wczytaniu ").Append(_wSackLate)
               .Append(" | uchodzcy w mianowniku Dostatku: wsi ").Append(_wAwayV).Append(", ludzie ").Append(N0(_wAwayP)).Append(" (").Append(F2(_wAwayHome > 0 ? 100 * _wAwayP / _wAwayHome : 0))
               .Append("% ludzi tych wsi w domu)")
               .Append(" | epizody wojny w ksiedze ").Append(epi).Append(" (nowe od ostatniej linii ").Append(_wEpisodes).Append(')')

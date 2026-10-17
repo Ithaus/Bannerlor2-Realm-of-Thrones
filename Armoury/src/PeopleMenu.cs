@@ -67,6 +67,10 @@ namespace Armoury
                 string title = "The people of " + name + (st.IsVillage ? " and its villages" : "");
                 var v = PeopleBook.ViewOf(region);
                 var sb = new StringBuilder(800);
+                // ZC2 (projekt ZC rozdz. 12 pkt 2; recenzja 16.10): na GORZE okna 2 linie - sklad stanow osady (zamek - regionu) i Dostatek; cala ksiega stanow w osobnym
+                // oknie "Estates and livelihood" (lista przewijana) - dluga sekcja na dole wychodzila poza 480 px okna ROT; klucz DailyLifeEstates off - bez linii
+                try { string zc = DailyLife.MenuSummary(st); if (!string.IsNullOrEmpty(zc)) sb.Append(zc).Append("\n\n"); }
+                catch (Exception e) { Log.Error("PeopleMenu.Estates", e); }
                 if (v == null || !PeopleBook.OriginLive)
                 {
                     sb.Append("The people of this land have not been reckoned yet.\n");     // recenzja E4/10 R1-4: dalej moze isc linia karczmy miasta (TrimEnd na koncu)
@@ -177,10 +181,6 @@ namespace Armoury
                 // lup miast L5: przez 30 dob po lupie - ile stracili kupcy i mieszczanie (tylko odczyt; klucz Sack Window Real Coin)
                 try { string sk = CitySack.MenuLine(st); if (!string.IsNullOrEmpty(sk)) sb.Append(sk).Append('\n'); }
                 catch (Exception e) { Log.Error("PeopleMenu.Sack", e); }
-                // ZC2 (projekt ZC rozdz. 12 pkt 2): sekcja "Estates and livelihood (book)" - stany osady (zamek - regionu), Dostatek i dochod na glowe, stol doby
-                // z ostatniej doby pomiaru (tylko odczyt); klucz DailyLifeEstates off - bez sekcji
-                try { string zc = DailyLife.MenuSection(st); if (!string.IsNullOrEmpty(zc)) sb.Append('\n').Append(zc).Append('\n'); }
-                catch (Exception e) { Log.Error("PeopleMenu.Estates", e); }
                 string body = sb.ToString().TrimEnd('\n');
                 // E4/11: sekcja okregu (wies) albo okregi regionu (miasto, zamek) z ksiegi wiosek - liczby na zywo, bez stanu menu
                 try { string dist = VillageBook.MenuSection(st); if (!string.IsNullOrEmpty(dist)) body += "\n\n" + dist; }
