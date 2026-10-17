@@ -4,7 +4,7 @@
 
 ## Najkrocej
 
-- W grze jest **WGRANIE 74**. Gra sie uruchamia, autotesty przeszly, w logach Armoury 0 bledow. **Mozesz wczytac zapis i grac.**
+- W grze jest **WGRANIE 75** (od 17.10 12:40 zegara komp.: WGRANIE 74 + daniny sredniowieczne wsi). Gra sie uruchamia, autotesty przeszly, w logach Armoury 0 bledow. **Mozesz wczytac zapis i grac.**
 - Twoj zapis Ironman jest nietkniety - autotesty uzywaja wylacznie zapisu testowego F.
 - **Kalibracja startu rynku (KS - "kazdy towar 95-105%") NIE jest jeszcze w grze.** Pierwszy test 120 dni jej nie przeszedl, wiec jej nie wgralem. Naprawa trwa (rozdz. 3).
 - Kazda nowa rzecz ma wlasny wylacznik w MCM (Armoury).
@@ -52,3 +52,10 @@
 - +15% predkosci na drogach ROT (dane drog juz zebrane z mapy).
 - Uchodzcy z palonych wsi ida do miast (czeka na Twoje slowo).
 - Mobilnosc spoleczna i blizny wojny (kod gotowy, wylaczony do czasu udanej KS).
+
+## 5. Dopisane 17.10 po poludniu
+
+- **WGRANIE 75 - daniny sredniowieczne wsi** (Twoje "Tak, wgraj"): wies placi przy wozie - pan jak dotad, dziesiecina 5% (polowa wraca biednym), w wojnie korona 1/10 czesci wsi;
+  czynsz staly pierwszy, zaleglosci zamiast zabierania; znikaja sztuczne pobory (danina od kiesy, podatek od oszczednosci, rynek BK 5% kiesy). Przejscie 28 dni gry.
+  Test 120 dni: 38/38 bramek, korona 97-100% dochodu, zold zawsze 100%, krolestwa 4x rzadziej w Banku, kiesy wsi stabilne. Wylacznik: MCM Armoury "Dues Medieval".
+- **Dalej:** miasta, korona i podatki wojenne (z pozyczkami od mieszczan i Banku, bez darowania dlugow), potem KS runda 4 (Twoje decyzje: dowoz na Polnoc i danina dla Muru, tanszy koszyk biednych).

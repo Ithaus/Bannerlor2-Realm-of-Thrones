@@ -2628,3 +2628,14 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
   Banku 4.2% (baza 16.1%); dlug koron w Banku +871/d (baza +6402/d); D staly rodow 1.022; kiesy wsi 3.97 -> 4.04 mln (+0.03%/d), mediana +18%, wsi < 1000 zl 5.1%; czynsz zaplacony
   99.2%, zaleglosci 10 wsi / 0.9 dnia; dziesiecina przy wozie dokladnie 5%; roboty gminy 115k/d (place 86k + material 29k); takt doby 517.6 ms (baza 493.0).
 - WGRANIE 75 (propozycja) = WGRANIE 74 + DS F1 (DuesMedieval domyslnie TAK, DsTowns NIE, bez KS) - CZEKA NA SLOWO JEFFA (duza zmiana ekonomii).
+
+### 75. WGRANIE 75 (17.10 ok. 12:40 PDT) - DANINY SREDNIOWIECZNE WSI (DS F1) - START TUTAJ
+W grze: `w-toku/noc-wgranie-75` **fa4416f5** (= n-ds 0a5842e7 + DuesMedieval domyslnie TAK) | Armoury **ce1e0343** (bylo 1d4daf68); CrashScribe da755a8a, RC 7e0e462e, GT 035878c4,
+ForgeView 19aa052a bez zmian; pliki danych bez zmian. Kopie *.bak-2026-10-17-wgranie75-przed i D:/Backup-Bannerlord/wgrane/2026-10-17-wgranie75-przed; zapis Jeffa
+zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-17-przed-wgraniem75.sav (md5 2ad40e43). Jeff: "Tak, wgraj" (AskUserQuestion po tescie fin72 38/38).
+= 74 + DS F1: wies przy wozie (pan bez zmian, dziesiecina 5% z polowa jalmuzny, korona g/10 w wojnie), czynsz pierwszy + zaleglosci, skrzynia 21 dni, roboty gminy, rynek BK wsi tylko
+z nadwyzki, bez poborow resztowych (rampa 28 dob od pierwszej doby z nowa DLL). DsTowns (F3) WYL., KS nie w tej galezi. Test dokladnej DLL: 5 dob + bitwa (Armoury-2026-10-17_12-30-06.log)
+0 ERROR, linie DS czynne domyslnie. Wylacznik: MCM Armoury "Dues Medieval".
+DO SPRAWDZENIA U JEFFA (pierwsze wczytanie): linia "Daniny wsi (DS)" (start rampy, DayOn), "Korona: wplywy dnia" (zwrot zoldu 100%), kiesy wsi w "Przeplywy osad".
+DALEJ: (1) F3 miasta/korona/kredyt - symulator + test (bez darowania zaliczek mieszczan); (2) KS runda 4 na bazie WGRANIA 75 (DS BudgetShare zamiast alfy, kredyt kupcow KS-H, rzeznie,
+B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na Polnoc i danina dla Muru, tanszy koszyk biednych, rynek BK wedlug potrzeb, koszt).
