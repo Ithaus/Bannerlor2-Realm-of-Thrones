@@ -288,6 +288,7 @@ namespace Armoury
         /// na wsadzie, inaczej 1.</summary>
         private static float YieldNow(ItemCategory outCat)
         {
+            if (KsRecipes.Active) return 1f;   // KS runda 4: receptura piwa juz wedlug wagi (KsRecipes 2 zboza -> 5 piw) - bez drugiej sztuki ZC1
             if (!GoodsPaths.BeerOn || outCat == null || outCat.StringId != "beer" || _p.Inputs == null) return 1f;
             foreach (var i in _p.Inputs) if (i.Item1 != null && i.Item1.StringId == "grain") return 1f + GoodsPaths.BeerT;
             return 1f;

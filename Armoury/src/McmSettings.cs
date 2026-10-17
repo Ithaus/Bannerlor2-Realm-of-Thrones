@@ -6828,6 +6828,10 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsTowns { get; set; } = true;
 
+        [SettingPropertyBool("Ks Real Recipes", HintText = "with Start Calibration applied: the workshops (and the hidden town artisans) turn food by weight, as the Plan counts it - 5 kg of olives for 1 kg of oil, 1.3 kg of grapes for 1 kg of wine, 1 kg of grain for 2.5 kg of ale or 1 kg of bread, half a beast's weight as meat - instead of the game's round numbers (1 olive -> 2 oil); off = the game's recipes")]
+        [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
+        public bool KsRealRecipes { get; set; } = true;
+
         [SettingPropertyInteger("Ds Farm Measure Days", 7, 91, "0", HintText = "with Ds Towns: for how many days the old valve of every town and castle (with the lord's part of the hoard tax and the lords' war levy on the people) is watched before the farms are set at what it gave on average - the farm is the old sum in a new form")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFarmMeasureDays { get; set; } = 28;
@@ -8634,6 +8638,7 @@ namespace Armoury
             s.DsCommunalWorks = DsCommunalWorks;
             s.DsRentArrearsPayDays = DsRentArrearsPayDays;
             s.DsTowns = DsTowns;
+            s.KsRealRecipes = KsRealRecipes;
             s.DsFarmMeasureDays = DsFarmMeasureDays;
             s.DsFarmRenewDays = DsFarmRenewDays;
             s.DsFarmRenewMax = DsFarmRenewMax;

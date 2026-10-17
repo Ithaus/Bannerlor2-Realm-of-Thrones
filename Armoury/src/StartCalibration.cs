@@ -320,7 +320,7 @@ namespace Armoury
             _stumblesDay = 0;
             try
             {
-                KsMeatRecipe.Ensure(Applied);   // KS runda 4: receptura uboju miast wedlug wagi zywca przy KS zastosowanym, poza nim - BK (wlasny try)
+                KsRecipes.Ensure(Applied);   // KS runda 4: receptury jedzenia warsztatow wedlug wagi (jak tabela przetworow Planu) przy KS zastosowanym, poza nim - gra (wlasny try)
                 if (!KeyOn)
                 {
                     if (_state == StateApplied) _wasOff = true;     // Undo: przy ponownym wlaczeniu rampa od nowa
