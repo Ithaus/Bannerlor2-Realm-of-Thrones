@@ -326,7 +326,10 @@ namespace Armoury
                         if (r > 0 && H / r <= Math.Min(B * ms, mFor)) nHands++;
                         else if (capD < rem && mFor <= B * ms) nSlow++;
                         if (mT < 1) { rec.Why = H < 1 ? WhyNoCoin : WhyLevel; if (H < 1) nNoCoin++; else nLevel++; continue; }
-                        int m = FolkBuy(market, mT, pieces);
+                        int m;
+                        var gfm = GoodsLedger.Begin(GoodsLedger.FBuild, market);   // KS-R3 G7: material robot ludu ksiegowany na osade targu (rynek osady)
+                        try { m = FolkBuy(market, mT, pieces); }
+                        finally { GoodsLedger.End(gfm); }
                         if (m <= 0) { rec.Why = WhyNoMat; nNoMat++; continue; }
                         double w = Math.Min(Math.Min(r * m, H), Math.Min(B - m, Math.Max(0, (remD * ppp - m) * idx)));
                         long wl = Math.Max(0, (long)Math.Floor(w));

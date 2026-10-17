@@ -129,6 +129,7 @@ namespace Armoury
                 town.ChangeGold(price);
                 roster.AddToCounts(el, -1);
                 _vBuys++; _vPaid += price; any = true;
+                try { StartCalibration.KsVilOut(village.Settlement, price); } catch { }   // KS-R3 P2: rynek wsi BK - wydatek wsi spoza koszyka (alfa netto)
                 if (town.IsCastle) _vCastle += price;
             }
             if (any) _vVillages++;

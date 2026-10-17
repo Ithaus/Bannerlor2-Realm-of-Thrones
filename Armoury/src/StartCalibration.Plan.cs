@@ -118,6 +118,7 @@ namespace Armoury
             var side = new Dictionary<string, double>(StringComparer.Ordinal);
             var woodKg = 0.0; KsItem wi; if (inp.Items.TryGetValue("hardwood", out wi)) woodKg = wi.Kg * inp.Sigma;
             var seenV = new HashSet<Village>();   // ROT-Map: dwie osady na jednym Village (Kurbok/Guntak, Thupak/Volug) - okreg raz, pierwszy w Settlement.All (jak ksiega wiosek)
+            var tst = new List<Settlement>(120); var distMk = new Dictionary<string, Settlement>(StringComparer.Ordinal);   // KS-R3 krok 5: miasta wejscia i miasto targowe okregu
             foreach (var r in recs)
             {
                 try
@@ -135,7 +136,7 @@ namespace Armoury
                         KsCore.NeedsOf(r.N, bask, oil, north, true, true, r.L, t.Need0);
                         var bud = TownBudget(r.St);
                         if (bud != null) { t.ClassNeed = ClassNeeds(r.N, bask, oil, north); t.Budget = bud; info.Budgets++; }
-                        inp.Towns.Add(t);
+                        inp.Towns.Add(t); tst.Add(r.St);
                         info.Towns++;
                         if (fields && hasLand)
                         {
@@ -145,7 +146,7 @@ namespace Armoury
                                 var d = new KsDistrict { Id = r.St.StringId + "#pola", Type = "town_fields", Land = land, Market = tl.Market, People = 0, Wf = wf, Area = tl.Area, TownFields = true };
                                 for (int k = 0; k < 20; k++)
                                     d.Blocks.Add(new KsBlock { Uid = tl.Main[k].Uid, Share = 0.05, Area = tl.Area * 0.05, Main = true, Block0 = false, Start = "garden", O = tl.Main[k].O });
-                                inp.Districts.Add(d);
+                                inp.Districts.Add(d); distMk[d.Id] = r.St;
                                 info.TF++;
                             }
                         }
@@ -172,6 +173,7 @@ namespace Armoury
                     kd.Alpha = VilAlphaFor(v);                            // recenzja 17.10: alfa tej wsi z pomiaru (dekret pana); -1 - alfa rynku
                     BuildBlocks(kd, ld, v, type, info.Layout, side, info);
                     inp.Districts.Add(kd);
+                    try { distMk[kd.Id] = TradeTownOf(v); } catch { }
                     info.Vil++;
                     // las wsi - podaz drewna spoza tabeli (wies bez drwali)
                     double wood = VillageWoodlot.KsPiecesPerDay(v) * woodKg;
@@ -203,6 +205,8 @@ namespace Armoury
             // margines popytu targu (zapas na polki): Plan do wlaczenia i Plany do D+28 - praca domowa oddaje rece na targ, az podaz targu = 1.03 x popyt targu
             inp.MoneyMeasured = MoneyMeasuredNow(info.Towns, info.Budgets);
             inp.MarketMargin = _state != StateApplied || (DDay >= 0 && day < DDay + ShelfMarginDays) ? ShelfMargin : 1.0;
+            try { R3PlanInputs(inp, day, tst, distMk); } catch (Exception e) { Stumble("R3PlanInputs", e); }   // KS-R3: krok 5, P2, P3, P4
+            EnsureItems();                                        // C2: tabele towarow gotowe przed plikiem ks-plan.csv na watku roboczym
             return inp;
         }
 
@@ -219,7 +223,10 @@ namespace Armoury
             if (d < 0 || d == _mkLineDay || _mkTmp.Count == 0) return null;
             _mkLineDay = d;
             var sb = new StringBuilder(5000);
-            sb.Append(PK).Append("rynki dzien ").Append(d).Append(" (ksiega towarow wedlug rynku osady; produkcja/zuzycie/zapas miast w sztukach)");
+            // KS-R3: czwarta liczba - jedzenie w wozach KS-H w drodze do miast rynku (NKS-6: zapas miast + w drodze)
+            var tr = new Dictionary<string, long[]>(StringComparer.Ordinal);
+            try { KsFoodCarts.ForEachInTransit((it, n, mk) => { if (it == null || mk < 0 || mk > 1) return; long[] a0; if (!tr.TryGetValue(it.StringId, out a0)) { a0 = new long[2]; tr[it.StringId] = a0; } a0[mk] += n; }); } catch { }
+            sb.Append(PK).Append("rynki dzien ").Append(d).Append(" (ksiega towarow wedlug rynku osady; produkcja/zuzycie/zapas miast/w drodze KS-H w sztukach)");
             var ids = new List<string>(ItemIds); foreach (var x in MarketExtra) if (!ids.Contains(x)) ids.Add(x);
             for (int m = 0; m < 3; m++)
             {
@@ -232,7 +239,7 @@ namespace Armoury
                     long p = a[m], c = a[3 + m];
                     if (p == 0 && c == 0 && (m == 2 || a[6 + m] == 0)) continue;
                     sb.Append(first ? " " : ", ").Append(id).Append(' ').Append(p).Append('/').Append(c);
-                    if (m < 2) sb.Append('/').Append(a[6 + m]);
+                    if (m < 2) { long[] t0; sb.Append('/').Append(a[6 + m]).Append('/').Append(tr.TryGetValue(id, out t0) ? t0[m] : 0); }
                     first = false;
                 }
                 if (first) sb.Append(" -");
@@ -294,6 +301,19 @@ namespace Armoury
             _lastPlanDay = day;
             int gen = Volatile.Read(ref _gen);
             _wIn = inp; _wDay = day; _wBusy = true; _wEma = _emaDays;
+            // KS-R3 C2: pliki ks-plan.csv i ks-budzety.csv formatowane na watku roboczym (nazwy osad i liczby pomiaru - zrzut tutaj)
+            bool csv = _plans + 1 == 1 || (_plans + 1) % 4 == 0;
+            Dictionary<string, string> names = null; List<object[]> budRows = null;
+            if (csv)
+            {
+                names = new Dictionary<string, string>(StringComparer.Ordinal);
+                foreach (var d in inp.Districts)
+                {
+                    try { var st = Settlement.Find(d.TownFields ? d.Id.Replace("#pola", "") : d.Id); if (st != null && st.Name != null) names[d.Id] = st.Name.ToString().Replace(';', ','); } catch { }
+                }
+                try { budRows = BudgetsRows(day, inp); } catch (Exception e) { Stumble("BudgetsRows", e); }
+            }
+            int csvDay = day;
             _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
@@ -307,6 +327,11 @@ namespace Armoury
                     KsResult r = null;
                     try { r = KsCore.Solve(inp, () => gen != Volatile.Read(ref _gen)); }
                     catch (Exception e) { r = new KsResult { Error = e.GetType().Name + ": " + e.Message }; }
+                    if (csv && r != null && r.Error == null)
+                    {
+                        try { int rows; r.CsvPlan = PlanCsvText(csvDay, r, inp, names, out rows); r.CsvPlanRows = rows; } catch (Exception e) { r.CsvPlan = null; r.CsvPlanRows = -1; r.CorrLine = (r.CorrLine ?? "") + " [ks-plan.csv: " + e.GetType().Name + "]"; }
+                        if (budRows != null) { var rowsB = BudgetsText(csvDay, budRows); var sb = new StringBuilder(rowsB.Count * 64); foreach (var x in rowsB) sb.Append(x).Append(Environment.NewLine); r.CsvBudgets = sb.ToString(); r.CsvBudgetRows = rowsB.Count; }
+                    }
                     try { if (gen == Volatile.Read(ref _gen)) _wOut = r; } catch { }
                     _wBusy = false;
                 });
@@ -332,10 +357,20 @@ namespace Armoury
             // recenzja 16.10 (drobne): stan zastosowany - lepszy stol (NeedMult) z nowego Planu co 7 dob, nie zamrozony z dnia wlaczenia
             if (r.Error == null && _state == StateApplied) { try { RefreshNeedMult(r, inp); } catch (Exception e) { Stumble("RefreshNeedMult", e); } }
             try { PlanLines(day, r, inp); } catch (Exception e) { Stumble("PlanLines", e); }
-            // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku)
-            if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { PlanCsv(_wDay, r, inp); } catch (Exception e) { Stumble("PlanCsv", e); } }
+            // ks-plan.csv: pierwszy Plan zapisu, potem co 4. (ok. 1.5 MB na Plan - 120 dob = 5 planow w pliku); KS-R3 C2: tekst z watku roboczego
+            if (r.Error == null && r.CsvPlan != null)
+            {
+                try { string path = Log.Csv(CsvName, CsvHeader, r.CsvPlan); Log.Info(PK + CsvName + " " + (path != null ? r.CsvPlanRows + " wierszy (doba " + _wDay + ", tekst z watku roboczego)" : "NIE ZAPISANY (log wylaczony albo brak katalogu sesji)") + "."); }
+                catch (Exception e) { Stumble("PlanCsv", e); }
+            }
             // recenzja 17.10 (wazne): zmierzone budzety klas miast i alfa wsi tego Planu - wejscie testu portu (harness kmoney) zamiast budzetow z umowy
-            if (r.Error == null && (_plans == 1 || _plans % 4 == 0)) { try { BudgetsCsv(_wDay, inp); } catch (Exception e) { Stumble("BudgetsCsv", e); } }
+            if (r.Error == null && r.CsvBudgets != null && LogGate.Lines)
+            {
+                try { string path = Log.Csv(BudgetCsvName, BudgetCsvHeader, r.CsvBudgets); Log.Info(PK + BudgetCsvName + " " + (path != null ? r.CsvBudgetRows + " wierszy (doba " + _wDay + "; " + MoneyNote() + ")" : "NIE ZAPISANY (log wylaczony albo brak katalogu sesji)") + "."); }
+                catch (Exception e) { Stumble("BudgetsCsv", e); }
+            }
+            // KS-R3: gradient krain z Planu (cieply start, zapis) - tylko Plan bez bledu z krokiem 5
+            if (r.Error == null && r.Grad != null) _grad = r.Grad;
         }
 
         private static string F2(double x) { return double.IsNaN(x) || double.IsInfinity(x) ? "-" : x.ToString("0.00", Inv); }
@@ -383,6 +418,9 @@ namespace Armoury
             sb.Append(" | ").Append(_snapNote).Append(" | gra bez zmian (Plan).");
             Log.Info(sb.ToString());
             try { MoneyLines(r); } catch (Exception e) { Stumble("MoneyLines", e); }
+            // KS-R3: linie kroku 5 (korytarze i krainy - tekst z watku roboczego) i sterowania rynku (P4 - liczone przy zrzucie)
+            if (r.CorrLine != null) Log.Info(r.CorrLine.Replace("{DOBA}", _wDay.ToString(Inv)));
+            if (_ctlLine != null) Log.Info(_ctlLine);
             for (int m = 0; m < 2; m++)
             {
                 var b = new StringBuilder(1500);
@@ -475,7 +513,8 @@ namespace Armoury
             return D - E > 1e-9 ? (S - E) / (D - E) : (D > 0 ? S / D : 0.0);
         }
 
-        private static void PlanCsv(int day, KsResult r, KsInput inp)
+        /// <summary>KS-R3 C2: tekst ks-plan.csv (watek roboczy - bez obiektow gry; nazwy osad ze zrzutu na watku glownym).</summary>
+        private static string PlanCsvText(int day, KsResult r, KsInput inp, Dictionary<string, string> names, out int rowsOut)
         {
             var live = BuildLive(r, inp, false);
             var byId = new Dictionary<string, KsDistrict>(StringComparer.Ordinal);
@@ -488,7 +527,7 @@ namespace Armoury
                 if (res == null) continue;
                 KsDistrict kd; byId.TryGetValue(ld.Id, out kd);
                 string name = ld.Id;
-                try { var st = Settlement.Find(ld.TF ? ld.Id.Replace("#pola", "") : ld.Id); if (st != null && st.Name != null) name = st.Name.ToString().Replace(';', ','); } catch { }
+                string nm0; if (names != null && names.TryGetValue(ld.Id, out nm0) && nm0 != null) name = nm0;
                 // glowne zajecie okregu (najwiecej rak)
                 var lab = new double[KsTab.NC]; double tot = 0;
                 foreach (var b in ld.B) if (b != null && b.C != null) for (int j = 0; j < b.C.Length; j++) { lab[b.C[j]] += b.X[j] * b.Hands; tot += b.X[j] * b.Hands; }
@@ -505,8 +544,8 @@ namespace Armoury
                     rows++;
                 }
             }
-            string path = Log.Csv(CsvName, CsvHeader, sb.ToString());
-            Log.Info(PK + CsvName + " " + (path != null ? rows + " wierszy (doba " + day + ")" : "NIE ZAPISANY (log wylaczony albo brak katalogu sesji)") + ".");
+            rowsOut = rows;
+            return sb.ToString();
         }
     }
 }

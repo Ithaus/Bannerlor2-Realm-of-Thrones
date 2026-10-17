@@ -268,9 +268,16 @@ namespace Armoury
                     // materialy z targu (miasto - swoj, zamek - najblizsze miasto)
                     var market = st.IsTown ? st : NearestTown(st);
                     float matBudget = budget * MBMath.ClampFloat(s.BuildMaterialShare, 0f, 1f);
-                    int matSpent = BuyMaterials(market, matBudget);
-                    // wpis 86 (audyt pkt 15): towar jest, tylko drozszy niz dzienny budzet - jedna najtansza sztuka, jesli pana stac
-                    if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, Math.Max(0, lord.Gold));
+                    // KS-R3 G7: material budow ksiegowany na osade targu (ramka FBuild z osada - rynek osady w linii "KS: rynki"; dotad ramka bez osady - "bez rynku")
+                    int matSpent;
+                    var gfm = GoodsLedger.Begin(GoodsLedger.FBuild, market);
+                    try
+                    {
+                        matSpent = BuyMaterials(market, matBudget);
+                        // wpis 86 (audyt pkt 15): towar jest, tylko drozszy niz dzienny budzet - jedna najtansza sztuka, jesli pana stac
+                        if (matBudget > 0f && matSpent <= 0) matSpent = BuyOneCheapest(market, Math.Max(0, lord.Gold));
+                    }
+                    finally { GoodsLedger.End(gfm); }
                     if (matBudget > 0f && matSpent <= 0) { _stalledNoMat++; continue; }   // nie ma z czego budowac
                     float labour = Math.Min(budget - matBudget, matSpent * Math.Max(0f, (1f - s.BuildMaterialShare) / Math.Max(0.01f, s.BuildMaterialShare)));
                     int labourI = MBRandom.RoundRandomized(labour);

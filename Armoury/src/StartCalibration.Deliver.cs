@@ -177,7 +177,7 @@ namespace Armoury
         /// <summary>To, co okreg zje sam (kg/d na towar), z potrzeb domowych (NeedsOfKeep x lepszy stol): zboze z piwem domowym, ryby, nabial, owoce, winogrona na wino,
         /// oliwki na oliwe, miod na miod pitny, len i welna przedzione w domu; mieso - dziczyzna i wieloryb, potem uboj zywca (mieso = polowa zywca; skory tego uboju
         /// dopisane do produkcji - na targ). Zwraca kcal zjedzone z wlasnego pola i domu (z warstwa dom).</summary>
-        internal static double Own(double[] prod, double[] n, double[] own)
+        internal static double Own(double[] prod, double[] n, double[] own, bool beerKcal = false)
         {
             Array.Clear(own, 0, own.Length);
             var want = new double[ItemCount];
@@ -201,6 +201,13 @@ namespace Armoury
             }
             double kc = n[KsTab.NH] * 1200.0;
             for (int i = 0; i < ItemCount; i++) kc += own[i] * ItemKcal[i];
+            if (beerKcal)
+            {
+                // KS-R3 G6: ziarno na piwo domowe liczone jak piwo (400 kcal/l), nie jak chleb (3300 kcal/kg x 0.4 kg/l = 1320) - te same kcal co potrzeba (KcalNeed)
+                double food = Math.Min(own[IGrain], n[KsTab.NG_]), beer = Math.Max(0.0, own[IGrain] - food);
+                kc -= beer * ItemKcal[IGrain];
+                kc += beer / KsTab.BeerGrain * 400.0;
+            }
             return kc;
         }
 

@@ -62,6 +62,7 @@ namespace Armoury
             // recenzja 17.10: czesc kcal pelnego koszyka, ktora praca domowa naprawde robi (Plan: pozycje, ktore okreg moze zrobic sam x czesc pokryta; w zapisie) i koszyk
             // zaplacony z Planu (popyt ceny, wsad ZC5 - gra kupuje pelny koszyk z kiesy wsi drabina)
             public float HomeKcalFrac; public float[] BasketPaid; public double WantKcal;
+            public double PaidKcal;                            // KS-R3 G6: kcal koszyka zaplaconego z Planu na dobe (przy lambda 1)
         }
 
         private sealed class DistResult { public double[] Prod = new double[ItemCount], Own = new double[ItemCount], MarketKg = new double[ItemCount], Market = new double[ItemCount]; public double OwnKcal, KcalNeed; }
@@ -233,6 +234,8 @@ namespace Armoury
                 var st = v.Settlement; LiveDist ld;
                 if (st == null || st.StringId == null || !_live.TryGetValue(st.StringId, out ld) || !(ld.Rations >= 0)) return harvest;
                 if (ld.Rations > harvest) { _granKsAbove++; return ld.Rations; }
+                // KS-R3 G6 (klucz Ks Granary Release): podloga zdjeta (14 dob z rzedu wies kupila i zjadla, co trzeba) - racje KS (z kupionym i zjedzonym z magazynu)
+                if (!FloorOn(v)) { _granReleased++; return ld.Rations; }
                 _granFloorUp++;
                 return harvest;
             }
@@ -245,7 +248,7 @@ namespace Armoury
             int n = Interlocked.Increment(ref _liveStumbles);
             if (n <= 3) { try { Log.Error("StartCalibration." + where, e); } catch { } }
         }
-        private static int _granFloorUp, _granKsAbove;
+        private static int _granFloorUp, _granKsAbove, _granReleased;
 
         internal static void ApplyAll(Harmony h)
         {
@@ -330,9 +333,12 @@ namespace Armoury
             // co okreg zje sam (wies; pola mieszczan - nic, ich ludzie sa w potrzebach miasta)
             if (!ld.TF)
             {
-                res.OwnKcal = KsDeliver.Own(prod, ld.OwnNeed, res.Own);
+                // KS-R3 G6 (klucz Ks Granary Release): piwo 400 kcal/l po obu stronach (ziarno na piwo domowe nie liczy sie jak chleb) i lepszy stol (NeedMult) po obu stronach
+                bool fix = factors && SwGranaryRelease;
+                res.OwnKcal = KsDeliver.Own(prod, ld.OwnNeed, res.Own, fix);
                 // pelna potrzeba kcal ludzi w domu (caly koszyk - takze to, co z targu): racja = jedzenie jednego czlowieka na dobe
-                res.KcalNeed = d.People > 0 ? KsDeliver.KcalNeed(d.Need0) * Math.Min(1.0, ld.PeopleHome / d.People) : 0.0;
+                double fn = 0; if (fix) foreach (var x in ld.FullNeed) fn += x;
+                res.KcalNeed = fix && fn > 0 ? KsDeliver.KcalNeed(ld.FullNeed) : (d.People > 0 ? KsDeliver.KcalNeed(d.Need0) * Math.Min(1.0, ld.PeopleHome / d.People) : 0.0);
             }
             double sigma = Math.Max(1, DailyLife.KsSigma);
             for (int i = 0; i < ItemCount; i++)
@@ -462,8 +468,8 @@ namespace Armoury
             var zvp = new Dictionary<Village, float[]>();                  // ZC4: koszyk zaplacony z Planu - popyt ceny i wsad ZC5 (recenzja 17.10)
             int nv = 0, ntf = 0, stale = 0; long tfPaid = 0; int tfPieces = 0, tfUnpaid = 0;
             double ownKcal = 0, kcalNeed = 0;
-            int granUp = _granFloorUp, granAbove = _granKsAbove;          // Famine.Daily biegnie wczesniej w tej samej dobie
-            _granFloorUp = _granKsAbove = 0;
+            int granUp = _granFloorUp, granAbove = _granKsAbove, granRel = _granReleased;          // Famine.Daily biegnie wczesniej w tej samej dobie
+            _granFloorUp = _granKsAbove = _granReleased = 0;
             var regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
             var tfList = new List<KeyValuePair<LiveDist, DistResult>>();
             bool full = _liveFull; _liveFull = false;
@@ -560,10 +566,14 @@ namespace Armoury
             try { RuleDaily(today); } catch (Exception e) { Stumble("RuleDaily", e); }
             // ZC4: koszyk dnia miast i wsi na jutro (popyt targu, kotwica, zakupy wsi) - po stawkach i rampie; stany nieswieze - ostatnia mapa miast (lambda biezaca)
             long zb0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            try { Zc4Build(today, recs, zv, zvp, mkByM, fresh); } catch (Exception e) { Stumble("Zc4Build", e); }
+            try { Zc4Build(today, recs, zv, zvp, mkByM, fresh, full || _zt.Count == 0); } catch (Exception e) { Stumble("Zc4Build", e); }
             _zTkBuild += System.Diagnostics.Stopwatch.GetTimestamp() - zb0;
             if (DDay >= 0 && today == DDay + EarlyDays) { try { EarlyCheck(day); } catch (Exception e) { Stumble("EarlyCheck", e); } }
             if (today >= DDay) { try { TownsCsv(day); } catch (Exception e) { Stumble("TownsCsv", e); } }   // F0 (poprawka po autotescie): ks-miasta.csv co 7 dob od D
+            // KS-R3: podloga spichlerza (G6), linia polek miast, ks-miasta-towary.csv (co 7 dob od D), wies je swoje (G3)
+            try { FloorDaily(day); } catch (Exception e) { Stumble("FloorDaily", e); }
+            if (today >= DDay) { try { ShelfLine(day); } catch (Exception e) { Stumble("ShelfLine", e); } try { GoodsCsv(day); } catch (Exception e) { Stumble("GoodsCsv", e); } }
+            try { OwnLine(day); } catch (Exception e) { Stumble("OwnLine", e); }
             // polki startu w dobie D (rozdz. 6) - raz; potem srednie cen od zera (A7 i regale od D na cenach po rampie)
             if (!_shelvesDone && today >= DDay) { try { StartShelves(today); } catch (Exception e) { Stumble("StartShelves", e); } _shelvesDone = true; RulePxReset(); }
             string coffers = CoffersDaily(day);
@@ -583,7 +593,7 @@ namespace Armoury
             }
             int tfn; long tfp2 = TownFolk.KsTakePaid(out tfn);
             sb.Append(" | pola mieszczan: na polki ").Append(tfPieces).Append(" szt., zaplacone ludowi ").Append(tfPaid).Append(" zl (").Append(tfp2).Append(" zl w ").Append(tfn).Append(" przelewach kiesy), bez zaplaty (kasa pusta - czekaja w polu, najwyzej 7 dob plonu) ").Append(tfUnpaid).Append(" szt.");
-            sb.Append(" | spichlerz: racje KS ponad wzor dzis w ").Append(granAbove).Append(" wsiach, podloga (wzor dzis) w ").Append(granUp)
+            sb.Append(" | spichlerz: racje KS ponad wzor dzis w ").Append(granAbove).Append(" wsiach, podloga (wzor dzis) w ").Append(granUp).Append(", podloga zdjeta (KS-R3) w ").Append(granRel)
               .Append(" (kcal z wlasnego pola i domu ").Append(kcalNeed > 0 ? (100 * ownKcal / kcalNeed).ToString("0", Inv) : "-").Append("% potrzeby)");
             sb.Append(" | ").Append(coffers);
             sb.Append(" | ").Append(RuleText()).Append(" | potkniecia dzis ").Append(_stumblesDay).Append(" (sesja ").Append(_stumbles).Append(", haki ").Append(_liveStumbles)
@@ -630,8 +640,8 @@ namespace Armoury
                 MoneyFromPlan(R, ld);                                   // krok 8: praca domowa i czesc zaplacona koszyka z nowego Planu
                 n++;
             }
-            if (n > 0) _liveFull = true;
-            Log.Info(PK + "lepszy stol (NeedMult) z Planu doby " + _wDay + " - okregow " + n + " (co 7 dob z Planem; nastepna doba przelicza wszystkie okregi).");
+            // KS-R3 C2 (koszt): bez przeliczenia wszystkich okregow nastepnej doby - nowy lepszy stol i krok 8 wchodza z przeliczeniem okregu (co 7 dob na zmiane)
+            Log.Info(PK + "lepszy stol (NeedMult) z Planu doby " + _wDay + " - okregow " + n + " (co 7 dob z Planem; okregi przyjmuja go przy swoim przeliczeniu, co 7 dob na zmiane).");
         }
         private static Dictionary<Village, VRate> _ratesKeep = new Dictionary<Village, VRate>();
         private const int LiveEvery = 7;                   // okreg przeliczany co 7 dob (na zmiane) - koszt doby KS (poprawka po autotescie 16.10: 3 -> 7, okregi zmieniaja sie powoli)
@@ -745,7 +755,7 @@ namespace Armoury
             double bought = ld.V != null && _zvBought.TryGetValue(ld.V, out bs) && bs >= 0f ? bs : (want > 0 ? paidK / want : 1.0);
             double frac = Math.Max(0.0, Math.Min(1.0, ld.HomeKcalFrac));
             ld.HomeKcal = want * Math.Max(0.0, Math.Min(frac, 1.0 - Math.Max(0.0, Math.Min(1.0, bought))));
-            ld.WantKcal = want;
+            ld.WantKcal = want; ld.PaidKcal = paidK;
             return q;
         }
 

@@ -1300,6 +1300,7 @@ namespace Armoury
                         {
                             DayVillageRent += pay; int v0; RentVillageToday.TryGetValue(st.OwnerClan, out v0); RentVillageToday[st.OwnerClan] = v0 + pay;   // paczka 169 (tylko licznik)
                             if (fee) TownFolk.NoteVillageFee(pay);   // E5/B1: linia "Prawa panskie" (tylko licznik); recenzja B1 (1-1): w bloku wsi - "else" nizej znow nalezy do IsVillage
+                            try { StartCalibration.KsVilOut(st, pay); } catch { }   // KS-R3 P2: oplata stala / renta wsi - wydatek spoza koszyka (alfa netto)
                         }
                         else DayTownRent += pay;
                         paid.TryGetValue(c, out v); paid[c] = v + pay;
