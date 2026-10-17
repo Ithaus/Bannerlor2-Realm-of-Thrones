@@ -2506,3 +2506,4 @@ W grze: `w-toku/zbior-e8` **fe1b271e** (= `w-toku/noc-wgranie-74`) | Armoury 1d4
 SilkToWeavers i BkSideGoodsOrigin WYL.) + ZC2 (stany w zapisie arm_estates, dymki, menu "People of this land", Realm ledger) + ZC6/ZC7 w kodzie, WYL. (Mobility, Freedom, WarScar,
 ProsperityLink) do kalibracji. Test 120 dob + bitwa (Armoury-2026-10-16_18-23-34.log, kopia logi-testow): 0 ERROR; nzc0 19/0, nzc2 14/0, nbitwa 17/0, nturniej 7/0, nkarczmy 7/0;
 nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 179/d, miod pitny x1.39, jedwab wsi 64%) - trendy, nie blad; do kalibracji.
+- 19:45 PDT: bieg bazowy WGRANIE 73 120 dob (Armoury-2026-10-16_19-02-22.log, logi-testow): rozliczenia rodow doba 120 -868882 vs paczka 1 -866215 - praktycznie to samo; paczka 1 nie psuje ekonomii.
