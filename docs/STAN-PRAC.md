@@ -2589,3 +2589,11 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - DALEJ NIE: ceny miesa/nabialu/owocow/oliwek 2-3x startu (NKS-7, 23b), korytarze 71/80 ponizej 0.8 Planu (NKS-24), podloga spichlerza 51% wsi (NKS-26), sterowanie Essos x0.85 (NKS-27),
   rynek BK wsi 17-24% wplywu (NKS-29), alfa wsi dalej 0 (NKS-3c - naprawi DS), koszt 4.9 / 14.5 ms (NKS-9/9b), KS-H 1.76 ms (NKS-28).
 - Rozpoznanie rundy 4 (tylko odczyt) rownolegle z kodem DS; runda 4 = DS (budzet wsi z praw) + kredyt kupcow KS-H + poprawki z tego testu.
+
+### 72. PLAN KS RUNDA 4 (17.10 ok. 10:30 PDT) - docs/PLAN-KS-RUNDA4-2026-10-17.md (wf_9f7f1fe3-a5b, tylko odczyt)
+- Przyczyny cen 2-3x: MIESO - rzeznie miast (vanilla/BK) biora 79-97% zywca i daja 6/2/1 miesa na sztuke, Plan liczy 10/6/2 (realnie 50% planu); B2 FoodSubstitute dziala pod KS
+  i dopisuje sztuczny popyt do ItemData.Demand (ser +45%, winogrona +33%, mieso +29%; maslo/daktyle -30%) - wylaczyc przy KS; polki w D na 7-53% celu (T*), margines 3%; towar nie
+  wychodzi z krain (KS-H kupuje tylko ponad 1.25 x T* zrodla, krainy-producenci maja 10-11 dni); wsad oliwy ZC5 fantomowy (23-33% popytu oliwek).
+- Runda 4 = scalenie DS (galaz noc-ds) z KS r3 + budzet wsi z praw DS (koniec alfy netto) + KS-H na kredycie kupcow + rzeznie wedlug Planu + B2 wylaczony przy KS + bez darmowej
+  podlogi spichlerza + koszt; najpierw symulator (S-0 kalibracja do gry, S-1 Plan h5, S-2 prototypy), potem 1 test 120 dob. Oczekiwane 8-12 z 53 niezaliczonych (dzis 24).
+- DO DECYZJI JEFFA: glod Polnocy (36% kcal bez pokrycia w Planie), Wolnych Ludzi (47%), Nocnej Strazy (70%) - ziemia nie wyzywi; biedni rzemieslnicy Essos (R/P stac na 41-54% koszyka).
