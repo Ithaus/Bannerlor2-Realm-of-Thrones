@@ -60,6 +60,10 @@ namespace Armoury
             public double Nv, YSum, YK, NvH, YKH;            // doba linii: ludzie z liczbami dochodu, suma Y, suma Y/K (H - bez rodow)
             public string KingdomId, KingdomName;
             public double Clans;                             // wielkie rody: ile rodow ma tu lenno (ulamek przy kilku lennach)
+            // ZC7 (DailyLife.War.cs): wies - uchodzcy okregu poza domem (PeopleBook "u:") w mianowniku Dostatku bez dochodu, wedlug stanow wolnych (chlopi, rzemieslnicy,
+            // kupcy, szlachta - wedlug ludzi w domu); poza ksiega stanow (N - ludzie w domu, suma stanow = ksiega)
+            public double Away;
+            public readonly double[] AwayE = new double[Estates];
         }
 
         private static List<Rec> _recs;
@@ -106,7 +110,7 @@ namespace Armoury
                     r.West = r.Cul != null && PopulationLaw.WesterosCultures.Contains(r.Cul);
                     Rec o;
                     double[] sv;
-                    if (old != null && old.TryGetValue(st, out o) && o != null && o.Kind == kind) { Array.Copy(o.YAvg, r.YAvg, Estates); r.YDays = o.YDays; }
+                    if (old != null && old.TryGetValue(st, out o) && o != null && o.Kind == kind) { Array.Copy(o.YAvg, r.YAvg, Estates); r.YDays = o.YDays; r.D0 = o.D0; r.DSrc = o.DSrc; }   // ZC7: Dostatek ostatniego pomiaru do blizny przed LivelihoodDay
                     else if (saved != null && saved.TryGetValue(r.Id, out sv) && sv != null && sv.Length > Estates)
                     { Array.Copy(sv, r.YAvg, Estates); r.YDays = Math.Max(0, Math.Min(AvgDays, (int)sv[Estates])); restored++; }
                     recs.Add(r); _byS[st] = r;
@@ -168,6 +172,7 @@ namespace Armoury
             foreach (var r in _recs)
             {
                 Array.Clear(r.N, 0, Estates); Array.Clear(r.Y, 0, Estates); r.Thralls = 0; r.L = 0; r.Upper = double.NaN; r.Clans = 0;
+                r.Away = 0; Array.Clear(r.AwayE, 0, Estates);   // ZC7: uchodzcy w mianowniku - WarPeople po PeopleDay (klucz DailyLifeWarScar)
                 if (r.Kind == KCastle) continue;
                 try
                 {
@@ -293,7 +298,7 @@ namespace Armoury
 
         // ============================================================ ZC2: ksiega stanow (udzialy w zapisie arm_estates) i pamiec Dostatku
         private const string PE = "Stany (ZC2): ";
-        private const string EVersion = "v2";      // v2|bazowa doba zasiewu|5 dob pamieci D|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4:bbb;... (v1 - bez pola bbb - czytany)
+        private const string EVersion = "v3";      // v3|bazowa doba zasiewu|5 dob pamieci D|id:p0,...,p5:doba zasiewu:pochylenie:d0,...,d4:bbb:blizna;... (v1 - bez pol bbb i blizna, v2 - bez pola blizna - czytane)
         private const int PpmAll = 1000000;        // udzialy w milionowych
         private const int RingN = 5;               // pamiec Dostatku: 5 tygodni (strzalka "w 28 dob" ma zawsze wpis sprzed >= 28 dob)
 
@@ -309,6 +314,13 @@ namespace Armoury
             public readonly byte[] Below = new byte[3];
             // ZC6, pamiec sesji (widok "w ostatnich 28 dobach"): ludzie przesunieci w 4 ostatnich przegladach (przeglad x przejscie), doby przegladow, przybysze od przegladu
             public float[] Mv; public int[] MvDay; public float MigAcc;
+            // ZC7 (DailyLife.War.cs; zapis v3, pole "blizna"): epizod wojny osady - ostatnie zdarzenie (najazd na wies, zlupienie miasta), poczatek epizodu (pierwsze
+            // zdarzenie po 30 dobach spokoju), rodzaj (1 najazd, 2 grabiez, 3 spustoszenie), Dostatek osady przed epizodem i najnizszy od niego (setne), udzial
+            // trafionych ludzi w epizodzie; dlug blizny w milionowych: wies [0] rzemieslnicy -> chlopi, miasto [0] kupcy -> rzemieslnicy, [1] rzemieslnicy -> biedota
+            public int ScarDay = -1, ScarFrom = -1, ScarKind;
+            public float ScarD = float.NaN, ScarMin = float.NaN, ScarF;
+            public readonly int[] Debt = new int[2];
+            public bool Rep7;                                // pamiec sesji: epizod juz w linii "d+7"
         }
 
         private static readonly Dictionary<string, EBook> _eb = new Dictionary<string, EBook>(StringComparer.Ordinal);
@@ -332,6 +344,7 @@ namespace Armoury
             _eLoadN = _eLoadP = _eLoadBad = _eLoadBadP = 0; _eLoaded = false; _eLoadHash = 0; _eLoadNote = null; _eSaves = 0;
             ResetView();
             ResetMobility();                                // ZC6: liczniki awansu i dobrobytu sesji (stan kampanii - pole "bbb" w arm_estates)
+            ResetWar();                                     // ZC7: uderzenia czekajace na dobe, liczniki blizny sesji (stan kampanii - pole "blizna" w arm_estates)
         }
 
         /// <summary>Udzialy (suma 1) -> milionowe z suma dokladnie 1 000 000 (reszta zaokraglen do stanu rest; gdyby rest mial za malo - do najwiekszego).</summary>
@@ -438,6 +451,7 @@ namespace Armoury
         // ------------------------------------------------------------ zapis arm_estates
         internal static string ExportEstates()
         {
+            WarFlushSave();                                 // ZC7: uderzenia od switu (rabunek w toku) do ksiegi przed zapisem - zapis wczytany daje te same liczby
             if (_eb.Count == 0) return "";
             var sb = new StringBuilder(_eb.Count * 64 + 64);
             int n = 0, np = 0, nr = 0;
@@ -479,6 +493,8 @@ namespace Armoury
                     sb.Append(':');
                     if (b.P != null && (b.Below[0] | b.Below[1] | b.Below[2]) != 0)
                         for (int i = 0; i < 3; i++) sb.Append((char)('0' + Math.Min((byte)9, b.Below[i])));   // ZC6: tygodnie ponizej progu spadku
+                    sb.Append(':');
+                    if (b.P != null) AppendScar(sb, b);              // ZC7: epizod wojny i dlug blizny (puste - bez wojny)
                     if (ring) nr++;
                     n++;
                 }
@@ -501,6 +517,7 @@ namespace Armoury
             _eb.Clear();
             for (int i = 0; i < RingN; i++) _ringDays[i] = -1;
             _eLoaded = false; _eLoadN = _eLoadP = _eLoadBad = _eLoadBadP = 0; _eLoadHash = 0; _eLoadNote = null;
+            _eLoadBadScar = 0; _eLoadVer = null;
             if (string.IsNullOrEmpty(data))
             {
                 _eLoadNote = "brak klucza arm_estates (zapis sprzed ZC2 albo kampania bez klucza) - stany zasiane w pierwszej dobie pomiaru z kluczem";
@@ -511,8 +528,10 @@ namespace Armoury
             {
                 var a = data.Split(new[] { '|' }, 4);
                 int seedBase;
-                bool v1 = a.Length == 4 && a[0] == "v1";
-                if (a.Length != 4 || (a[0] != EVersion && !v1) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
+                bool v1 = a.Length == 4 && a[0] == "v1", v2 = a.Length == 4 && a[0] == "v2";   // v1 - bez pol ZC6 i ZC7, v2 - bez pola ZC7 (blizna)
+                string ver = v1 ? "v1" : v2 ? "v2" : EVersion;
+                int fields = v1 ? 5 : v2 ? 6 : 7;
+                if (a.Length != 4 || (a[0] != EVersion && !v1 && !v2) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out seedBase))
                 {
                     _eLoadNote = "arm_estates w nieznanym formacie - pominiety, stany zasiane od nowa";
                     Log.Info(PE + "wczytanie | " + _eLoadNote + ".");
@@ -526,7 +545,7 @@ namespace Armoury
                     {
                         if (ent.Length == 0) continue;
                         var p = ent.Split(':');
-                        if (p.Length != (v1 ? 5 : 6) || !SafeId(p[0])) { _eLoadBad++; continue; }
+                        if (p.Length != fields || !SafeId(p[0])) { _eLoadBad++; continue; }
                         var b = new EBook();
                         if (p[1].Length > 0)
                         {
@@ -557,11 +576,12 @@ namespace Armoury
                             }
                         if (!v1 && b.P != null && p[5].Length == 3)
                             for (int i = 0; i < 3; i++) { int x = p[5][i] - '0'; b.Below[i] = (byte)(x >= 0 && x <= 9 ? x : 0); }   // ZC6: tygodnie ponizej progu spadku
+                        if (fields >= 7 && b.P != null && p[6].Length > 0 && !ParseScar(p[6], b)) _eLoadBadScar++;   // ZC7: epizod wojny i dlug blizny
                         _eb[p[0]] = b;
                         _eLoadN++; if (b.P != null) _eLoadP++;
                     }
-                _eLoaded = true; _eLoadHash = EstatesHash();
-                Log.Info(PE + "wczytanie | format " + (v1 ? "v1" : EVersion) + " | osad " + _eLoadN + " (z udzialami " + _eLoadP + ", pominiete wpisy " + _eLoadBad + ", zle udzialy - zasiew od nowa " + _eLoadBadP
+                _eLoaded = true; _eLoadHash = EstatesHash(); _eLoadVer = ver;
+                Log.Info(PE + "wczytanie | format " + ver + " | osad " + _eLoadN + " (z udzialami " + _eLoadP + ", pominiete wpisy " + _eLoadBad + ", zle udzialy - zasiew od nowa " + _eLoadBadP
                          + ") | pamiec Dostatku z dob " + string.Join(",", Array.ConvertAll(_ringDays, x => x.ToString(Inv))) + " | suma kontrolna " + Hex(_eLoadHash) + ".");
             }
             catch (Exception e)

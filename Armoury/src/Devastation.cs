@@ -325,6 +325,9 @@ namespace Armoury
             PeopleBook.Devastated(v, refugees * f, dead * f, region, day);
             if (fled > 0.0) OutlawLaw.AddFled(v.Settlement, (float)(fled * f));   // pula regionu 1:1, bez hearth (zdjal Move)
             if (lBefore > 0.0) Famine.Burn(v, hit * f / lBefore);         // E4/6 (GL 2.2 pkt 6): spichlerz okregu traci ten sam ulamek co ludzie; po kontach, nie rzuca
+            // ZC7 (DailyLife.War.cs, klucz DailyLifeWarScar): trafieni wobec ludzi w domu przed uderzeniem - blizna okregu o swicie (dochod trafionych, rzemieslnicy wsi);
+            // tylko licznik pod zamkiem, nie rzuca
+            try { DailyLife.NoteStrike(v, hit * f, lBefore - away, dead * f, src); } catch (Exception e) { Stumble("Devastation.Strike(ZC7)", e); }
             // E4/11 (Z1, U24): trafieni na spalone osady wiosek pobocznych - po kontach, wlasny try (OnStrike nie rzuca); rabunek - klucz sesji, zerowanie - oboz armii
             // E7/W1 (232): + zabici tego uderzenia (pamiec wojny wioski - te same liczby, ktore nizej dopisuje rs.Dead)
             try { VillageBook.OnStrike(v, hit * f, refugees * f, dead * f, kind != KForage, rs != null ? rs.Comp : null, src, lBefore); }

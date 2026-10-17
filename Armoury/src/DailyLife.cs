@@ -33,6 +33,8 @@ namespace Armoury
     /// Realm ledger), pamiec Dostatku co 7 dob, linia "Stany (ZC2): dzien N" w dobie linii. Bez klucza - jak ZC0.
     /// ZC6 (klucze DailyLifeMobility, DailyLifeFreedom, DailyLifeProsperityLink; DailyLife.Mobility.cs, DailyLife.Prosperity.cs): po Dostatku doby (kazdej doby) awans
     /// i spadek osad koszyka tygodnia, etykieta migracji miast, wyzwolenie, czlon dobrobytu na jutro; linia "Awans (ZC6): dzien N" w dobie linii.
+    /// ZC7 (klucz DailyLifeWarScar; DailyLife.War.cs): po ludziach doby (przed dochodem doby) blizna uderzen najazdow od wczoraj (Devastation -> NoteStrike) i uchodzcy
+    /// okregow w mianowniku Dostatku; ruina przy zlupieniu miasta w chwili wyboru (CitySack.People.cs); linia "Blizna wojny (ZC7): dzien N" w dobie linii.
     /// </summary>
     internal static partial class DailyLife
     {
@@ -159,6 +161,7 @@ namespace Armoury
 
         internal static string Export()
         {
+            WarFlushSave();                                 // ZC7: uderzenia od switu do ksiegi i sredniej dochodu przed zapisem (arm_dailylife idzie przed arm_estates)
             if (_sigma <= 0) return "";
             var sb = new StringBuilder(64 * 1024);
             sb.Append(Version).Append('|').Append(_sigma.ToString(Inv)).Append('|').Append(_sigmaDay.ToString(Inv)).Append('|');
@@ -338,6 +341,7 @@ namespace Armoury
             _eDay = day; _eSeedDay = 0;                    // ZC2: doba zasiewu ksiegi stanow
             long t1 = Stopwatch.GetTimestamp();
             PeopleDay();
+            if (EstatesOn) { try { WarFlush(day); WarPeople(); } catch (Exception e) { _wStum++; Stumble("WarFlush", e); } }   // ZC7: blizna najazdow doby (przed dochodem doby), uchodzcy w mianowniku
             long t2 = Stopwatch.GetTimestamp();
             PricesDay();                                   // po ludziach doby: koszyk zamku wazony ludzmi wsi regionu
             long t3 = Stopwatch.GetTimestamp();
@@ -386,6 +390,7 @@ namespace Armoury
             if (pantry != null) Log.Info(pantry);
             if (estates) { try { Log.Info(EstatesLine(day)); } catch (Exception e) { Stumble("EstatesLine", e); } }   // ZC2: linia "Stany (ZC2): dzien N"
             if (estates) { try { Log.Info(MobilityLine(day)); } catch (Exception e) { Stumble("MobilityLine", e); } }   // ZC6: linia "Awans (ZC6): dzien N" (liczniki od ostatniej linii)
+            if (estates) { try { Log.Info(WarLine(day)); } catch (Exception e) { Stumble("WarLine", e); } }   // ZC7: linia "Blizna wojny (ZC7): dzien N" (liczniki od ostatniej linii)
         }
 
         // ------------------------------------------------------------ linie
@@ -509,6 +514,7 @@ namespace Armoury
                 else if (r.L <= 0) notes.Add("bez ludzi ksiegi - D " + (r.DSrc == 1 ? "regionu" : r.DSrc == 2 ? "krolestwa" : "swiata"));
                 if (r.NoEarn) notes.Add("miasto bez liczb kiesy ludu dzis - D regionu, W/R/P bez sredniej");
                 if (r.YDays < WarmDays) notes.Add("srednia z " + r.YDays + " dob (rozgrzewka)");
+                if (r.Away >= 0.5) notes.Add("uchodzcy poza domem " + N0(r.Away) + " w mianowniku D (ZC7)");
                 sb.Append(day).Append(';').Append(r.Id).Append(';').Append(r.Name).Append(';').Append(r.Kind == KTown ? "miasto" : r.Kind == KCastle ? "zamek" : "wies").Append(';')
                   .Append(r.KingdomName).Append(';').Append(r.Cul).Append(';').Append(Profs[r.Prof].Id).Append(';').Append(r.Region != null ? r.Region.Id : "-").Append(';')
                   .Append(N0(r.L));

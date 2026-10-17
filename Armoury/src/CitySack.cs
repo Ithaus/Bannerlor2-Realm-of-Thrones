@@ -383,6 +383,7 @@ namespace Armoury
             {
                 k = Read(__1);                              // stan PRZED kara gry i PRZED lupem (prefiks)
                 captured = _me != null ? (_me.IsSiegeAssault || _me.IsSallyOut || _me.IsBlockadeSallyOut) : (__0 != null && __1.MapFaction == __0.MapFaction);
+                _zcSt = __1; _zcCap = captured;              // ZC7 (CitySack.People.cs ZcScarPost): zdobycie tego wywolania - ten sam wzor co L0
                 _dGame[kind]++;
                 if (MeasureOn) MeasureLine(__instance, __0, __1, kind, __4, k, captured);
             }
@@ -578,7 +579,7 @@ namespace Armoury
             _pending = null;
             Last = null;
             _l5Last = null;
-            _me = null; _wsSt = null; _wsOwners = null; _bSt = null; _l6St = null; _l6Pop0 = -1;
+            _me = null; _wsSt = null; _wsOwners = null; _bSt = null; _l6St = null; _l6Pop0 = -1; _zcSt = null;
             RuinsReset();
             _stumbles = 0; _err.Clear();
         }
@@ -597,6 +598,7 @@ namespace Armoury
             L4Patch();
             L5Patch();
             L6Patch();
+            ZcPatch();                                   // ZC7: ruina przy zlupieniu (DailyLife.War.cs) - postfiks OnSiegeAftermathApplied
             LBPatch();
         }
     }

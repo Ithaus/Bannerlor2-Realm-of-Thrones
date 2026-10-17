@@ -6644,6 +6644,10 @@ namespace Armoury
         [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
         public bool DailyLifeProsperityLink { get; set; } = true;
 
+        [SettingPropertyBool("Daily Life War Scar", HintText = "with Daily Life Estates: war leaves a scar on the people. When a town is sacked a tenth of its merchants fall to a craft and a tenth of its craftsmen to day labour at once (a fifth of each when it is devastated), and for a month after more of them fall; when raiders or a foraging army strike a village's countryside, the people struck lose their living at once, the district counts its people driven from home in its Livelihood with no income until they come back, and some of its craftsmen lose their trade. In peace the ruined win their trades back slowly. Their savings go with them, nothing is made or lost (off = war takes coin, crops and lives as before, but the estates and their Livelihood carry no scar)")]
+        [SettingPropertyGroup("Daily life, estates and livelihood (measure only)")]
+        public bool DailyLifeWarScar { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8304,6 +8308,7 @@ namespace Armoury
             s.DailyLifeMobility = DailyLifeMobility;
             s.DailyLifeFreedom = DailyLifeFreedom;
             s.DailyLifeProsperityLink = DailyLifeProsperityLink;
+            s.DailyLifeWarScar = DailyLifeWarScar;
         }
 
         internal static void Apply()

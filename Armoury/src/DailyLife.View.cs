@@ -27,6 +27,8 @@ namespace Armoury
     ///  - "Look over the district" (DistrictMenu): w naglowku sklad i Dostatek okregu, w dymku wiersza wioski - jej ludzie wedlug stanow (dom wioski z ksiegi wiosek);
     ///  - "Realm ledger" (wlasna pozycja w menu miasta i zamku, ShowInquiry): krolestwo wlasciciela osady - razem, regiony (warownia + wsie) wedlug ludzi
     ///    i wiersz swiata.
+    /// ZC7 (DailyLife.War.cs): w People of this land zdanie blizny wojny (Dostatek przed i po najezdzie / zlupieniu, uchodzcy poza domem, zrujnowani bez zawodu);
+    /// Dostatek wszedzie z uchodzcami okregu w mianowniku (Rec.AwayE - te same liczby co w logu).
     /// Klucz DailyLifeEstates (z DailyLifeMeasure) wylaczony - nic (pozycja Realm ledger ukryta, linie dymkow i sekcje nie powstaja). Przed pierwsza doba pomiaru
     /// w sesji - zdanie "not reckoned yet". Bledy liczone (potkniecia widoku w linii "Stany (ZC2)"), pierwszy w miejscu do logu; nic sie nie gasi.
     /// </summary>
@@ -86,6 +88,7 @@ namespace Armoury
             public double Nv, Y, YK;                                                                  // bez wielkich rodow (D0)
             public double CurYK, PastYK;                                                              // strzalka: osady z wlasnym D i wpisem pamieci
             public int PastDays = -1, Places;
+            public double Away;                                                                       // ZC7: uchodzcy okregow poza domem (w mianowniku D, nie w N)
         }
 
         private static void AddTo(Agg a, Rec r)
@@ -101,9 +104,11 @@ namespace Armoury
                 if (!(n > 0) || !HasY(r, e) || !(k > 0)) continue;
                 double y = r.YAvg[e];
                 if (!Fin(y)) continue;
-                a.NE[e] += n; a.YE[e] += y; a.YKE[e] += y / k;
-                if (e != EHouse) { a.Nv += n; a.Y += y; a.YK += y / k; }
+                double nd = n + r.AwayE[e];                  // ZC7: uchodzcy okregu w mianowniku bez dochodu (te same liczby co w logu)
+                a.NE[e] += nd; a.YE[e] += y; a.YKE[e] += y / k;
+                if (e != EHouse) { a.Nv += nd; a.Y += y; a.YK += y / k; }
             }
+            if (r.Away > 0) a.Away += r.Away;
             double pd; int days;
             if (r.DSrc == 0 && r.NvH > 0 && Fin(r.YKH) && PastD0(r, out pd, out days))
             {
@@ -412,6 +417,8 @@ namespace Armoury
                     if (r.Kind == KTown || !ReferenceEquals(reg0, r)) RegionLine(sb, reg0, RegionAgg(r));
                     string mt = MobilityText(r);                 // ZC6: kto awansowal i spadl w ostatnich 28 dobach
                     if (mt != null) sb.Append(mt).Append('\n');
+                    string wt = WarViewText(r);                  // ZC7: blizna wojny - Dostatek przed i po, uchodzcy, zrujnowani bez zawodu
+                    if (wt != null) sb.Append(wt).Append('\n');
                     string pv = ProsperityViewText(r);           // ZC6: dobrobyt za Dostatkiem regionu
                     if (pv != null) sb.Append(pv).Append('\n');
                     TableLine(sb, r);

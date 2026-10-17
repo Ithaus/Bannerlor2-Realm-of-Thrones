@@ -916,6 +916,12 @@ Uzycie (Python 3, tylko odczyt):
                     0.5-3%/rok (DECYZJA przy D chlopow ponizej progu awansu), NZC6-4 mediany D stanow (DECYZJA poza - ZC4), NZC6-5 max/min D regionow <= 8 (DECYZJA),
                     NZC6-6 udzialy w pasmach, NZC6-7 obieg zamkniety (roznica 0, kiesy = panowie), NZC6-8 srednia zmiana dobrobytu z czlonu <= 0.5/d, NZC6-9 wplyw na
                     mediany dobrobytu krain +-5%, NZC6-10 potkniecia i ERROR 0, NZC6-11..13 INFO. Razem z --grupa nzc0 (czas bloku) i nzc2 (zapis + wczytanie).
+--grupa nzc7      : (16.10, Jeff "wojny niszcza dobrobyt"; galaz w-toku/noc-zc267, Armoury/src/DailyLife.War.cs, CitySack.People.cs, Devastation.cs; projekt
+                    docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 11 i 14 ZC7) python -I tools/sprawdz_logi.py --grupa nzc7 <Armoury-*.log> [--do-doby 120]
+                    (strumieniowo). NZC7-0 start sesji (klucz Daily Life War Scar), NZC7-1 linia "Blizna wojny (ZC7)" w kazdej dobie z linia ZC0, NZC7-2 po zlupieniu
+                    kupcy -10-20% w miescie, NZC7-3 po najezdzie D okregu -30-60% w 7 dob (epizody z trafionymi >= 20%; same male najazdy - DECYZJA), NZC7-4 >= 50%
+                    powrotu w rok bez wojny (krotszy bieg - INFO), NZC7-5 obieg zamkniety (kontrola kies 0), NZC7-6 potkniecia i ERROR 0, NZC7-7..12 INFO. Razem
+                    z --grupa nzc6 (granice pasm, limit 0.2%), nzc2 (zapis v3 + wczytanie) i nzc0 (czas bloku).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -32618,7 +32624,7 @@ NZC2_DAY = re.compile(r"Stany \(ZC2\): dzien (?P<day>-?\d+) \| stany w ksiedze (
 NZC2_SEED = re.compile(r"Stany \(ZC2\): dzien (?P<day>-?\d+) \| zasiano (?P<n>\d+) osad \(miasta (?P<t>\d+), wsie (?P<v>\d+)\) z pasm x klasy BK \(pochylonych (?P<tilt>\d+), bez klas BK (?P<nobk>\d+)\)")
 NZC2_SAVE = re.compile(r"Stany \(ZC2\): zapis \| dzien (?P<day>-?\d+) \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), z pamiecia Dostatku (?P<nr>\d+)\) \| (?P<kb>[\d.]+) KB "
                        r"\((?P<chars>\d+) znakow, kawalkow (?P<parts>\d+)\) \| suma kontrolna (?P<hash>[0-9A-F]{8})")
-NZC2_LOAD = re.compile(r"Stany \(ZC2\): wczytanie \| format v[12] \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), pominiete wpisy (?P<bad>\d+), zle udzialy - zasiew od nowa (?P<badp>\d+)\) "
+NZC2_LOAD = re.compile(r"Stany \(ZC2\): wczytanie \| format v[123] \| osad (?P<n>\d+) \(z udzialami (?P<np>\d+), pominiete wpisy (?P<bad>\d+), zle udzialy - zasiew od nowa (?P<badp>\d+)\) "
                        r"\| pamiec Dostatku z dob (?P<rd>[-\d,]+) \| suma kontrolna (?P<hash>[0-9A-F]{8})\.")
 NZC2_TIP = "Stany (ZC2): dymek osady - linie stanow i Dostatku wpiete w: "
 NZC2_MENU = "Stany (ZC2): pozycja \"Realm ledger\""
@@ -32712,6 +32718,8 @@ def nzc2_main(logp, bdp=None, until=120):
                 n_err += 1
             elif s.startswith("Awans (ZC6): start sesji") and ("Daily Life Mobility tak" in s or "Daily Life Freedom tak" in s):
                 zc6_moves = True
+            elif s.startswith("Blizna wojny (ZC7): start sesji") and "Daily Life War Scar tak" in s:
+                zc6_moves = True   # ZC7 (16.10): blizna wojny przesuwa udzialy (ruina przy zlupieniu, rzemieslnicy wsi po najezdzie, powrot) - NZC2-6 INFO
     print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Stany {len(days)} (nierozpoznanych {len(bad)}), zasiewow {len(seeds)}, zapisow {len(saves)}, "
           f"wczytan {len(loads)} (bez ksiegi stanow {len(loads_other)}), doby Zycie (ZC0) {len(zc0)}")
     if not sess and not days and not bad and not saves and not loads and not loads_other:
@@ -32797,7 +32805,7 @@ def nzc2_main(logp, bdp=None, until=120):
         prev = (d, h)
     if zc6_moves:
         rep.add("NZC2-6: udzialy stanow (ZC6 - awans, spadek, wyzwolenia, przybysze)", f"zmiany sumy kontrolnej poza dobami zasiewu {len(changes)}; ostatnia {last['hash']}",
-                "INFO (ZC6 przesuwa udzialy - kontrola w --grupa nzc6)", None)
+                "INFO (ZC6 / ZC7 przesuwaja udzialy - kontrola w --grupa nzc6 i nzc7)", None)
     else:
         rep.add("NZC2-6: udzialy stanow stoja (ZC2 bez awansu i spadku)", f"zmiany sumy kontrolnej poza dobami zasiewu {len(changes)}" + (f" (np. dzien {changes[0][0]}: {changes[0][1]} -> {changes[0][2]})" if changes else "")
                 + f"; ostatnia {last['hash']}", "0", not changes)
@@ -33039,6 +33047,228 @@ def nzc6_main(logp, bdp=None, until=120):
     return 0
 
 
+# ------------------------------------------------------------ nzc7 (16.10, zycie codzienne ZC7 - wojna i blizna; projekt ZC rozdz. 11, 14)
+NZC7_HEAD = "Blizna wojny (ZC7): "
+NZC7_START = re.compile(r"Blizna wojny \(ZC7\): start sesji \| klucz Daily Life War Scar (?P<w>tak|WYLACZONE) \(Daily Life Estates (?P<e>tak|WYLACZONE), "
+                        r"Daily Life Measure (?P<z>tak|WYLACZONE)\)")
+NZC7_DAY = re.compile(r"Blizna wojny \(ZC7\): dzien (?P<day>-?\d+) \| klucz (?P<k>tak|nie) \| od ostatniej linii (?P<dd>\d+) dob \| najazdy: ")
+NZC7_SACK = re.compile(r"Blizna wojny \(ZC7\): zlupienie \| dzien (?P<day>-?\d+) \| osada (?P<id>\S+) .*?\| (?P<kind>grabiez|spustoszenie) (?P<share>[\d.]+)% "
+                       r"\| kupcy (?P<m0>\d+) -> (?P<m1>\d+) ppm \(-(?P<mp>[\d.]+)%\)(?P<cutm> \[granica pasma\])?, rzemieslnicy (?P<c0>\d+) -> (?P<c1>\d+) ppm "
+                       r"\(odeszlo -(?P<cp>[\d.]+)%\)(?P<cutc> \[granica pasma\])?")
+NZC7_ERR = ("ERROR in DailyLife.", "ERROR in CitySack.ZcScarPost", "ERROR in Devastation.Strike(ZC7)", "ERROR in TownFolk.ZcCarry")
+NZC7_D7 = re.compile(r"(?P<id>\S+) (?P<kind>najazd|grabiez|spustoszenie) od (?P<from>-?\d+) F (?P<f>[\d.]+)% D (?P<d0>[-\d.]+)->(?P<d1>[-\d.]+) \((?P<ch>[-+\d.]+%|-)\)")
+NZC7_BACK = re.compile(r"(?P<id>\S+) (?P<kind>najazd|grabiez|spustoszenie) od (?P<from>-?\d+) \(wiek (?P<age>\d+), spokoj (?P<quiet>\d+)\) D (?P<d0>[-\d.]+)/(?P<dmin>[-\d.]+)/(?P<d1>[-\d.]+) "
+                       r"powrot (?P<rec>[-\d.]+)%")
+NZC7_FIELDS = (
+    ("raidV", r"\| najazdy: wsi (\d+) \("), ("strikes", r"\(uderzen (\d+)\), trafieni"), ("struck", r"\), trafieni (\d+) \(zabici"), ("dead", r"\(zabici (\d+)\), udzial"),
+    ("fMed", r"z ludzi w domu: mediana ([-\d.]+)%"), ("fMax", r"%, max ([-\d.]+)%; rzemieslnicy wsi"), ("craftV", r"rzemieslnicy wsi -> chlopi (\d+) ludzi"),
+    ("cut", r"ucieta trafionym: wsi (\d+);"), ("noBook", r"; bez ksiegi stanow (\d+) \|"),
+    ("sack", r"\| zlupienia: miast (\d+) \("), ("sackPill", r"\(grabiez (\d+), spustoszenie"), ("sackDev", r", spustoszenie (\d+)\), pominiete"),
+    ("mercy", r"pominiete: laska (\d+)"), ("castle", r", zamki (\d+), bez zdobycia"), ("noCap", r", bez zdobycia (\d+), bez ksiegi"), ("sackNoBook", r", bez ksiegi (\d+), klucz wylaczony"),
+    ("sackM", r"; kupcy -> rzemieslnicy (\d+) ludzi"), ("sackC", r", rzemieslnicy -> biedota (\d+) ludzi"), ("p2r", r"pieniadze z ludzmi P->R (\d+)"), ("r2w", r", R->W (\d+), kiesa nieczynna"),
+    ("noPurse", r"kiesa nieczynna (\d+) \|"), ("bandCut", r"\| granice pasm: ciecia (\d+)"),
+    ("ruinT", r"spadki x4\): miast teraz (\d+)"), ("ruinDown", r"spadki w oknie (\d+) ludzi"),
+    ("backV", r"chlopi->rzemieslnicy wsi (\d+)"), ("backC", r", biedota->rzemieslnicy (\d+), rzemieslnicy->kupcy"), ("backM", r", rzemieslnicy->kupcy (\d+); pieniadze W->R"),
+    ("bw2r", r"; pieniadze W->R (\d+), R->P"), ("br2p", r", R->P (\d+); bez Dostatku"), ("backNoD", r"bez Dostatku do powrotu (\d+)"),
+    ("debtV", r"\| dlug blizny: wsie (\d+) \("), ("debtVp", r"\| dlug blizny: wsie \d+ \((\d+) ludzi\)"), ("debtT", r", miasta (\d+) \(kupcy"),
+    ("debtTm", r"\(kupcy (\d+), rzemieslnicy \d+\) \|"), ("debtTc", r"\(kupcy \d+, rzemieslnicy (\d+)\) \|"),
+    ("awayV", r"\| uchodzcy w mianowniku Dostatku: wsi (\d+), ludzie"), ("awayP", r"Dostatku: wsi \d+, ludzie (\d+) \("), ("awayPct", r"ludzie \d+ \(([-\d.]+)% ludzi tych wsi"),
+    ("epi", r"\| epizody wojny w ksiedze (\d+) \("), ("epiNew", r"nowe od ostatniej linii (\d+)\)"), ("ctl", r"\| kontrola kies roznica (\d+) \|"),
+    ("saveFlush", r"\| rozliczenie przy zapisie (\d+) \|"), ("msg", r"\| komunikaty gracza (\d+) \|"), ("stum", r"\| potkniecia (\d+)\.$"),
+)
+NZC7_DROP = (30.0, 60.0)    # projekt rozdz. 14 ZC7: po najezdzie D okregu -30-60% w 7 dob
+NZC7_FBIG = 20.0            # zdarzenie na skale okregu: trafieni >= 20% ludzi w domu (spadek D idzie za udzialem trafionych)
+NZC7_SACKP = (10.0, 20.0)   # po zlupieniu: kupcy -10-20% w miescie (grabiez 10%, spustoszenie 20%)
+
+
+def nzc7_parse(s):
+    """Linia 'Blizna wojny (ZC7): dzien N' -> slownik (None przy nierozpoznanej glowie): pola, zdarzenia d+7 i powrot epizodow."""
+    m = NZC7_DAY.match(s)
+    if not m:
+        return None
+    d = m.groupdict()
+    for k, pat in NZC7_FIELDS:
+        mm = re.search(pat, s)
+        v = None
+        if mm:
+            try:
+                v = float(mm.group(1))
+            except ValueError:
+                v = None
+        d[k] = v
+    d7, back = [], []
+    if "| zdarzenia d+7 (D przed -> teraz): " in s:
+        part = s.split("| zdarzenia d+7 (D przed -> teraz): ", 1)[1].split(" | ", 1)[0]
+        lst = part.split("]: ", 1)[1] if "]: " in part else ""
+        for e in lst.split("; "):
+            mm = NZC7_D7.match(e.strip())
+            if mm:
+                d7.append(mm.groupdict())
+    if "| powrot (>= 60 dob od poczatku" in s:
+        part = s.split("| powrot (>= 60 dob od poczatku", 1)[1].split(" | ", 1)[0]
+        lst = part.split("): ", 1)[1] if "): " in part else ""
+        lst = lst.split(": ", 1)[1] if ": " in lst else ""
+        for e in lst.split("; "):
+            mm = NZC7_BACK.match(e.strip())
+            if mm:
+                back.append(mm.groupdict())
+    d["d7"], d["back"] = d7, back
+    return d
+
+
+def nzc7_main(logp, bdp=None, until=120):
+    """nzc7 (16.10; Armoury/src/DailyLife.War.cs, CitySack.People.cs ZcScarPost, Devastation.Hit -> NoteStrike, klucz DailyLifeWarScar): ZC7 - wojna i blizna.
+    Progi projektu rozdz. 14 (ZC7) i wspolne: NZC7-0 linia startu sesji (klucz tak z Estates i Measure), NZC7-1 linia 'Blizna wojny (ZC7): dzien N' w kazdej dobie
+    z linia 'Zycie (ZC0)' (nierozpoznane 0), NZC7-2 po zlupieniu kupcy -10-20% w miescie (linie zdarzenia; granica pasma - DECYZJA), NZC7-3 po najezdzie D okregu
+    -30-60% w 7 dob (epizody z trafionymi >= 20% ludzi w domu; same male najazdy - DECYZJA: spadek idzie za udzialem trafionych), NZC7-4 >= 50% powrotu w rok
+    bez wojny (epizody ze spokojem >= 364 dob; krotszy bieg - INFO z powrotem czesciowym), NZC7-5 obieg zamkniety (kontrola kies 0 w kazdej linii), NZC7-6 potkniecia
+    i ERROR 0, NZC7-7..12 INFO (najazdy, zlupienia i okno ruiny, powrot blizny i dlug, uchodzcy w mianowniku, komunikaty gracza, zapis v3). Granice pasm - grupa nzc6
+    (NZC6-6), zapis + wczytanie - grupa nzc2 (NZC2-4), czas bloku - grupa nzc0 (NZC0-6). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NZC7-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess, days, bad, sacks, zc0, loads = [], {}, [], [], set(), []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NZC7_HEAD):
+                if s.startswith(NZC7_HEAD + "start sesji"):
+                    sess.append(s)
+                elif s.startswith(NZC7_HEAD + "zlupienie"):
+                    mm = NZC7_SACK.match(s)
+                    if mm:
+                        sacks.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+                elif s.startswith(NZC7_HEAD + "dzien "):
+                    d = nzc7_parse(s)
+                    if d is None:
+                        bad.append(s)
+                    else:
+                        days[int(d["day"])] = d
+                else:
+                    bad.append(s)
+            elif s.startswith("Zycie (ZC0): dzien "):
+                mm = re.match(r"Zycie \(ZC0\): dzien (-?\d+) \|", s)
+                if mm:
+                    zc0.add(int(mm.group(1)))
+            elif s.startswith("Stany (ZC2): wczytanie | format "):
+                loads.append(s[len("Stany (ZC2): wczytanie | format "):][:2])
+            elif s.startswith(NZC7_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Blizna {len(days)} (nierozpoznanych {len(bad)}), zlupien {len(sacks)}, doby Zycie (ZC0) {len(zc0)}")
+    if not sess and not days and not bad and not sacks:
+        rep.add("NZC7-0: linie 'Blizna wojny (ZC7)'", "brak w logu", "INFO (log sprzed paczki ZC7)", None)
+        rep.show()
+        return 0
+    if sess:
+        mm = NZC7_START.match(sess[-1])
+        ok = bool(mm) and all(mm.group(k) == "tak" for k in ("w", "e", "z"))
+        rep.add("NZC7-0: linia startu sesji (klucz ZC7)", sess[-1][len(NZC7_HEAD):][:300], "Daily Life War Scar tak (z Estates i Measure)", True if ok else (None if mm else False))
+    else:
+        rep.add("NZC7-0: linia startu sesji", "brak", "linia przy kazdym starcie sesji", False)
+    dd = sorted(days)
+    if not dd:
+        rep.add("NZC7-1: linie 'Blizna wojny (ZC7): dzien N'", f"brak rozpoznanych linii doby (nierozpoznane {len(bad)})" + (f": {bad[0][:220]}" if bad else ""), "linia kazdej doby", False)
+        rep.show()
+        return 0
+    zd = sorted(d for d in zc0 if dd[0] <= d <= dd[-1])
+    miss = [d for d in zd if d not in days]
+    span = dd[-1] - dd[0] + 1
+    rep.add("NZC7-1: linia 'Blizna wojny (ZC7)' w kazdej dobie z linia 'Zycie (ZC0)'", f"doby Blizna {len(dd)} (dzien {dd[0]}-{dd[-1]}), doby Zycie bez Blizna {len(miss)}"
+            + (f" (np. {miss[:5]})" if miss else "") + f", nierozpoznane {len(bad)}" + (f" (np. {bad[0][:200]})" if bad else "")
+            + (f"; dob w logu mniej niz {until} (bieg krotszy)" if span < until else ""), "0 dob bez linii, nierozpoznane 0", not miss and not bad)
+    last = days[dd[-1]]
+
+    def vals(k):
+        return [days[d][k] for d in dd if days[d].get(k) is not None]
+    # NZC7-2: zlupienia - kupcy -10-20%
+    if sacks:
+        mp = [float(x["mp"]) for x in sacks]
+        cut = [x for x in sacks if x.get("cutm")]
+        lo, hi = NZC7_SACKP
+        outs = [x for x in sacks if not x.get("cutm") and not (lo - 0.05 <= float(x["mp"]) <= hi + 0.05)]
+        rep.add("NZC7-2: po zlupieniu kupcy w miescie (linie zdarzenia)", f"zlupien {len(sacks)} (grabiez {sum(1 for x in sacks if x['kind'] == 'grabiez')}, spustoszenie "
+                f"{sum(1 for x in sacks if x['kind'] == 'spustoszenie')}): kupcy -{min(mp):.2f}% .. -{max(mp):.2f}%, rzemieslnicy odeszlo -{min(float(x['cp']) for x in sacks):.2f}% .. "
+                f"-{max(float(x['cp']) for x in sacks):.2f}%; ciete granica pasma {len(cut)}" + (f"; poza progiem: {', '.join(x['id'] + ' ' + x['mp'] + '%' for x in outs[:5])}" if outs else ""),
+                f"-{lo:.0f}..-{hi:.0f}% (granica pasma - do decyzji)", not outs and not cut, decide=bool(cut) and not outs)
+    else:
+        rep.add("NZC7-2: po zlupieniu kupcy w miescie", f"brak zlupien zdobytych miast w biegu (pominiete w liniach: laska {sum(vals('mercy')):.0f}, zamki {sum(vals('castle')):.0f}, "
+                f"bez zdobycia {sum(vals('noCap')):.0f})", f"INFO (-{NZC7_SACKP[0]:.0f}..-{NZC7_SACKP[1]:.0f}% przy zlupieniu)", None)
+    # NZC7-3: najazdy - D okregu -30-60% w 7 dob (epizody na skale okregu)
+    ev = {}
+    for d in dd:
+        for e in days[d]["d7"]:
+            ev[(e["id"], e["from"])] = e
+    raids = [e for e in ev.values() if e["kind"] == "najazd"]
+
+    def drop(e):
+        try:
+            return -float(e["ch"].rstrip("%")) if e["ch"] != "-" else None
+        except ValueError:
+            return None
+    big = [e for e in raids if float(e["f"]) >= NZC7_FBIG and drop(e) is not None]
+    allr = [e for e in raids if drop(e) is not None]
+    if big:
+        mdrop = st.median(drop(e) for e in big)
+        rep.add("NZC7-3: po najezdzie Dostatek okregu w 7 dob (trafieni >= 20% ludzi w domu)", f"epizodow {len(big)}: mediana spadku {mdrop:.1f}% (mediana F {st.median(float(e['f']) for e in big):.1f}%); "
+                f"wszystkie najazdy d+7: {len(allr)}" + (f", mediana spadku {st.median(drop(e) for e in allr):.1f}%" if allr else ""),
+                f"-{NZC7_DROP[0]:.0f}..-{NZC7_DROP[1]:.0f}%", NZC7_DROP[0] <= mdrop <= NZC7_DROP[1])
+    elif allr:
+        mf = st.median(float(e["f"]) for e in allr)
+        md = st.median(drop(e) for e in allr)
+        ratio = [drop(e) / float(e["f"]) for e in allr if float(e["f"]) > 0.05]
+        rep.add("NZC7-3: po najezdzie Dostatek okregu w 7 dob", f"najazdow d+7 {len(allr)}, zaden na skale okregu (F >= {NZC7_FBIG:.0f}%): mediana F {mf:.2f}%, mediana spadku D {md:.2f}%"
+                + (f", spadek / F mediana {st.median(ratio):.2f}" if ratio else "") + " - najazd AI trafia czesc okregu (osada po osadzie), Dostatek spada o udzial trafionych; "
+                "prog projektu (-30-60%) dla najazdu na caly okreg - do decyzji", f"-{NZC7_DROP[0]:.0f}..-{NZC7_DROP[1]:.0f}%", False, decide=True)
+    else:
+        rep.add("NZC7-3: po najezdzie Dostatek okregu w 7 dob", f"brak epizodow najazdu z wiekiem 7-13 dob w liniach (najazdow wsi w liniach {sum(vals('raidV')):.0f})",
+                f"INFO (-{NZC7_DROP[0]:.0f}..-{NZC7_DROP[1]:.0f}%)", None)
+    # NZC7-4: powrot >= 50% w rok bez wojny
+    bk = {}
+    for d in dd:
+        for e in days[d]["back"]:
+            bk[(e["id"], e["from"])] = e
+    year = [e for e in bk.values() if int(e["quiet"]) >= 364]
+    if year:
+        okn = [e for e in year if float(e["rec"]) >= 50.0]
+        rep.add("NZC7-4: powrot Dostatku w rok bez wojny", f"epizodow ze spokojem >= 364 dob {len(year)}: z powrotem >= 50% {len(okn)} (mediana {st.median(float(e['rec']) for e in year):.1f}%)",
+                ">= 50% (kazdy)", len(okn) == len(year))
+    elif bk:
+        rep.add("NZC7-4: powrot Dostatku w rok bez wojny", f"bieg krotszy niz rok spokoju - epizodow >= 60 dob ze spokojem >= 30 dob {len(bk)}: powrot mediana "
+                f"{st.median(float(e['rec']) for e in bk.values()):.1f}% (najdluzszy spokoj {max(int(e['quiet']) for e in bk.values())} dob)", "INFO (>= 50% po roku spokoju)", None)
+    else:
+        rep.add("NZC7-4: powrot Dostatku w rok bez wojny", "brak epizodow >= 60 dob ze spokojem w liniach", "INFO (>= 50% po roku spokoju)", None)
+    # NZC7-5: obieg zamkniety
+    badc = [d for d in dd if (days[d].get("ctl") or 0) != 0]
+    rep.add("NZC7-5: obieg zamkniety (oszczednosci z ludzmi miedzy kiesami miasta)", f"P->R {sum(vals('p2r')):.0f}, R->W {sum(vals('r2w')):.0f}, powrot W->R {sum(vals('bw2r')):.0f}, "
+            f"R->P {sum(vals('br2p')):.0f} zl gry; dob z roznica kontroli {len(badc)}" + (f" (np. dzien {badc[0]})" if badc else ""), "roznica 0 w kazdej linii", not badc)
+    # NZC7-6: potkniecia i ERROR
+    stum = int(sum(vals("stum")))
+    rep.add("NZC7-6: potkniecia ZC7 i ERROR", f"potkniecia linii {stum}, ERROR (DailyLife, ZcScarPost, Strike ZC7, ZcCarry) {n_err}", "0 / 0", stum == 0 and n_err == 0)
+    # INFO
+    rep.add("NZC7-7: najazdy (suma linii)", f"wsi {sum(vals('raidV')):.0f} (uderzen {sum(vals('strikes')):.0f}), trafieni {sum(vals('struck')):.0f} (zabici {sum(vals('dead')):.0f}), "
+            f"F max {max(vals('fMax') or [0]):.2f}%, rzemieslnicy wsi -> chlopi {sum(vals('craftV')):.0f}, bez ksiegi stanow {sum(vals('noBook')):.0f}, ciecia granica pasma {sum(vals('bandCut')):.0f}",
+            "INFO", None)
+    rep.add("NZC7-8: zlupienia i okno ruiny (suma linii)", f"miast {sum(vals('sack')):.0f} (grabiez {sum(vals('sackPill')):.0f}, spustoszenie {sum(vals('sackDev')):.0f}), kupcy -> rzemieslnicy "
+            f"{sum(vals('sackM')):.0f}, rzemieslnicy -> biedota {sum(vals('sackC')):.0f}; spadki ZC6 w oknie ruiny (x4) {sum(vals('ruinDown')):.0f} ludzi; kiesa nieczynna {sum(vals('noPurse')):.0f}",
+            "INFO", None)
+    rep.add("NZC7-9: powrot blizny i dlug (ostatnia linia)", f"powrot (suma): wsie {sum(vals('backV')):.0f}, biedota->rzemieslnicy {sum(vals('backC')):.0f}, rzemieslnicy->kupcy {sum(vals('backM')):.0f}, "
+            f"bez Dostatku do powrotu {sum(vals('backNoD')):.0f}; dlug: wsie {last.get('debtV')} ({last.get('debtVp')} ludzi), miasta {last.get('debtT')} (kupcy {last.get('debtTm')}, "
+            f"rzemieslnicy {last.get('debtTc')}); epizodow w ksiedze {last.get('epi')}", "INFO (25%/rok po 30 dobach spokoju)", None)
+    rep.add("NZC7-10: uchodzcy w mianowniku Dostatku (ostatnia linia)", f"wsi {last.get('awayV')}, ludzie {last.get('awayP')} ({last.get('awayPct')}% ludzi tych wsi w domu)",
+            "INFO (okreg biedniejszy o udzial ludzi w ucieczce)", None)
+    rep.add("NZC7-11: komunikaty gracza (suma linii)", f"{sum(vals('msg')):.0f}", "INFO (najazd na wies rodu gracza / najazd gracza, zlupienie z udzialem gracza)", None)
+    rep.add("NZC7-12: zapis arm_estates v3", f"wczytania: {', '.join(loads) if loads else 'brak'}; rozliczenia uderzen przy zapisie {sum(vals('saveFlush')):.0f}",
+            "INFO (wczytanie v1/v2/v3; zapis + wczytanie - nzc2 NZC2-4)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -33228,6 +33458,8 @@ def main(argv):
         return nzc2_main(logp, bdp, until_arg)   # nzc2 (16.10, zycie codzienne ZC2): stany w ksiedze i w zapisie (arm_estates) + widok (DailyLife.Estates.cs, DailyLife.View.cs)
     if group == "nzc6" and logp:
         return nzc6_main(logp, bdp, until_arg)   # nzc6 (16.10, zycie codzienne ZC6): Dostatek czynny - awans i spadek, wyzwolenie, dobrobyt (DailyLife.Mobility.cs, DailyLife.Prosperity.cs)
+    if group == "nzc7" and logp:
+        return nzc7_main(logp, bdp, until_arg)   # nzc7 (16.10, zycie codzienne ZC7): wojna i blizna - ruina przy zlupieniu, blizna najazdu, powrot (DailyLife.War.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
