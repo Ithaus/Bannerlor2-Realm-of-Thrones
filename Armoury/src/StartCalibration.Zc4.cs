@@ -81,7 +81,7 @@ namespace Armoury
         // liczniki od ostatniej linii
         private static int _zDictN, _zLadderN, _zBrewN, _zBreadN, _zStum; private static double _zBrewPcs, _zBreadPcs, _zDictOld, _zDictNew;
         private static readonly int[] BreadForms = { ZBread, ZPie };
-        private static long _zvGold, _zvPcs; private static int _zvN, _zvNoGold, _zvNoGoods; private static double _zvWant, _zvGot;
+        private static long _zvGold, _zvPcs, _zvBrew; private static int _zvN, _zvNoGold, _zvNoGoods; private static double _zvWant, _zvGot;
         private static readonly double[] _zvRung = new double[3], _zvRungWant = new double[3];
 
         private static void Zc4Reset()
@@ -94,7 +94,7 @@ namespace Armoury
         private static void Zc4Zero()
         {
             _zDictN = _zLadderN = _zBrewN = _zBreadN = 0; _zBrewPcs = _zBreadPcs = _zDictOld = _zDictNew = 0;
-            _zvGold = _zvPcs = 0; _zvN = _zvNoGold = _zvNoGoods = 0; _zvWant = _zvGot = 0;
+            _zvGold = _zvPcs = _zvBrew = 0; _zvN = _zvNoGold = _zvNoGoods = 0; _zvWant = _zvGot = 0;
             Array.Clear(_zvRung, 0, 3); Array.Clear(_zvRungWant, 0, 3);
         }
 
@@ -509,9 +509,9 @@ namespace Armoury
         }
 
         /// <summary>TownFolk.Zc4BuyVillage: liczniki zakupow wsi (zl, sztuki, chciane / kupione sztuki wedlug szczebla: 0 zboze i sol, 1 reszta jedzenia, 2 rzeczy).</summary>
-        internal static void Zc4NoteVillage(long gold, long pcs, double want, double got, int noGold, int noGoods, double[] rw, double[] rg)
+        internal static void Zc4NoteVillage(long gold, long pcs, double want, double got, int noGold, int noGoods, double[] rw, double[] rg, long brew)
         {
-            _zvGold += gold; _zvPcs += pcs; _zvWant += want; _zvGot += got; _zvN++; _zvNoGold += noGold; _zvNoGoods += noGoods;
+            _zvGold += gold; _zvPcs += pcs; _zvWant += want; _zvGot += got; _zvN++; _zvNoGold += noGold; _zvNoGoods += noGoods; _zvBrew += brew;
             for (int i = 0; i < 3; i++) { _zvRungWant[i] += rw[i]; _zvRung[i] += rg[i]; }
         }
 
@@ -547,7 +547,7 @@ namespace Armoury
             }
             sb.Append(" | wsie: zakupow ").Append(_zvN).Append(" za ").Append(_zvGold).Append(" zl, sztuk ").Append(_zvPcs).Append(" (chciane ").Append(F0(_zvWant)).Append(", kupione ").Append(F0(_zvGot))
               .Append("; zboze i sol ").Append(F0(_zvRung[0])).Append('/').Append(F0(_zvRungWant[0])).Append(", reszta jedzenia ").Append(F0(_zvRung[1])).Append('/').Append(F0(_zvRungWant[1]))
-              .Append(", rzeczy ").Append(F0(_zvRung[2])).Append('/').Append(F0(_zvRungWant[2])).Append("), bez kiesy ").Append(_zvNoGold).Append(", bez towaru ").Append(_zvNoGoods)
+              .Append(", rzeczy ").Append(F0(_zvRung[2])).Append('/').Append(F0(_zvRungWant[2])).Append("), ziarno na piwo domowe ").Append(_zvBrew).Append(" szt., bez kiesy ").Append(_zvNoGold).Append(", bez towaru ").Append(_zvNoGoods)
               .Append(" | miasta: slowniki budzetu ").Append(_zDictN).Append(" (budzet kategorii koszyka dzis ").Append(F0(_zDictOld)).Append(" -> ").Append(F0(_zDictNew)).Append(" zl)")
               .Append(", drabina (kiesy nie stac na cale jedzenie) ").Append(_zLadderN).Append(", piwo domowe w ").Append(_zBrewN).Append(" (ziarna ").Append(F0(_zBrewPcs)).Append(" szt.)")
               .Append(", brak chleba i placka - ziarno w ").Append(_zBreadN).Append(" (").Append(F0(_zBreadPcs)).Append(" szt.)")
