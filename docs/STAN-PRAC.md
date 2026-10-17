@@ -2579,3 +2579,5 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - Kod: workflow wf_9ea032ce-160 (daniny-kod), galaz `w-toku/noc-ds` (worktree zb/n-ds) OD fe1b271e (WGRANIE 74), DS BEZ KS (On = klucz && wies); F1 wsie -> F3 miasta/korona/kredyt
   -> model pieniedzy + grupa nds -> 2 recenzje -> poprawki. Potem test 120 dob w grze (gdy wolna), wgranie DOPIERO po slowie Jeffa (duza zmiana ekonomii).
 - KS runda 3 (wf_0342c556-72c): symulacja 3 nie przeszla (16/26 towarow w pasmie, kiesy wsi -0.2..-0.4%/d), recenzje 1 krytyczna + 22 wazne, poprawki w toku. KS runda 4 po DS.
+- 09:15 PDT: KS runda 3 SKONCZONA (wf_0342c556-72c): 5c895704 na w-toku/noc-ks3 (41 uwag recenzji), scalone int **ed949c36** (build rc 0). Symulacja 3: S-G1/5/6/8/9 TAK,
+  S-G2/3/4/7 NIE. Test w grze 120 dob: test/fin71 (Armoury z int ed949c36), flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC po tescie!), at-fin71-r3f.out.txt.
