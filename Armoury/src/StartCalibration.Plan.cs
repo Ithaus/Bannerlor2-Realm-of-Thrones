@@ -76,7 +76,7 @@ namespace Armoury
         { "battania", "freefolk", "nightswatch", "skagosi", "sturgia", "river", "vale", "vlandia", "crownlands", "stormlands", "dragonstone", "reach", "aserai" };
 
         // ============================================================ zrzut (watek glowny)
-        private sealed class SnapInfo { public int Vil, NoLand, NoRec, Towns, TF, SideIn, SideOut; public double Woodlot, Boats; public bool Layout; public int Zc; }
+        private sealed class SnapInfo { public int Vil, NoLand, NoRec, Towns, TF, SideIn, SideOut, Dup; public double Woodlot, Boats; public bool Layout; public int Zc; }
 
         private static KsInput BuildInput(int day, out string note, out SnapInfo info)
         {
@@ -105,6 +105,7 @@ namespace Armoury
             bool fields = s == null || s.StartCalibrationTownFields;
             var side = new Dictionary<string, double>(StringComparer.Ordinal);
             var woodKg = 0.0; KsItem wi; if (inp.Items.TryGetValue("hardwood", out wi)) woodKg = wi.Kg * inp.Sigma;
+            var seenV = new HashSet<Village>();   // ROT-Map: dwie osady na jednym Village (Kurbok/Guntak, Thupak/Volug) - okreg raz, pierwszy w Settlement.All (jak ksiega wiosek)
             foreach (var r in recs)
             {
                 try
@@ -139,6 +140,7 @@ namespace Armoury
                     var v = r.St.Village;
                     LandDist ld;
                     if (v == null || r.St.StringId == null || !_landVil.TryGetValue(r.St.StringId, out ld)) { info.NoLand++; continue; }
+                    if (!seenV.Add(v)) { info.Dup++; continue; }
                     string type = v.VillageType != null ? v.VillageType.StringId : "wheat_farm";
                     double away = 0; try { away = PeopleBook.RefugeesOf(v); } catch { away = 0; }
                     double all = Math.Max(0.0, r.L) + Math.Max(0.0, away);
@@ -235,7 +237,7 @@ namespace Armoury
             _lastPlanDay = day;
             int gen = Volatile.Read(ref _gen);
             _wIn = inp; _wDay = day; _wBusy = true;
-            _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
+            _snapNote = "zrzut " + snapMs.ToString("0", Inv) + " ms (wsie " + info.Vil + ", bez ziemi " + info.NoLand + ", druga osada tej samej wsi gry " + info.Dup + ", potkniecia " + info.NoRec + ", miasta " + info.Towns + ", pola mieszczan "
                         + info.TF + ", wioski poboczne w blokach " + info.SideIn + ", poza (osady 0 albo uklad) " + info.SideOut + ", uklad wiosek " + (info.Layout ? "zgodny" : "NIEZGODNY")
                         + ", stany ZC z doby " + info.Zc + ", ksiega towarow " + _emaDays + " dob, las wsi " + (info.Woodlot / 1000).ToString("0", Inv) + " t/d, lodzie " + (info.Boats / 1000).ToString("0.0", Inv) + " t/d"
                         + (inp.WarmPrices != null ? ", cieply start" : ", start zimny") + ")";
