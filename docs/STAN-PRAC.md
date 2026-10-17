@@ -2560,3 +2560,11 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - Inne: podloga spichlerza w 61% wsi (prog 20%), sterowanie rynku Essos x0.85 na granicy, korytarze 60 z 80 ponizej 0.8 Planu, koszt 4.36 / 12.45 ms.
 - Workflow wf_0342c556-72c dalej: symulacja runda 3 -> 2 recenzje -> poprawki (galaz w-toku/noc-ks3, n-ks HEAD c1f61987). Po nim runda 4 z danymi z tego testu, potem test w grze.
 - W grze WGRANIE 74 (bez KS).
+
+### 69. DANINY SREDNIOWIECZNE (17.10 ok. 07:05 PDT) - decyzja Jeffa
+- Jeff (doslownie): "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu, wczesniej dawalismy te 'sztuczne' zasady, a teraz robimy system dynamiczny jak symulacja
+  prawdziwej ekonomii sredniowiecza". -> kolejnosc wydatkow wsi (renta stala, jedzenie, potem reszta), bez poborow resztowych (danina od nadwyzki ponad zapas, podatek od skarbca,
+  zbytki z nadwyzki), kupcy jedzenia na wlasnym kapitale.
+- Workflow wf_f0b8b65e-89a (daniny-sredniowieczne, TYLKO projekt, bez kodu): spis wszystkich przeplywow kies wsi i kas miast/korony + historia (czynsz, dziesiecina, podatki
+  krolewskie od ruchomosci, cla, oplaty mlynskie, zaleglosci, kapital kupcow) -> 2 projekty -> ocena -> scratchpad daniny/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md.
+- Rownolegle konczy sie runda 3 KS (wf_0342c556-72c, symulacja 3 -> recenzje -> poprawki). Runda 4 = kod danin + alfa bez petli + kupcy z kapitalem, symulator, test w grze.
