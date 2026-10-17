@@ -2499,3 +2499,10 @@ ZMIANA (Jeff ~15:45 PDT): "wszystkie 8 rob, najwyzej bedziesz jeszcze w trakcie 
 - 18:30 PDT: ZC2/ZC6/ZC7 gotowe (0469148c, 8d2ad404, e93e3fef + add10789 po 2 recenzjach; ProsperityLink domyslnie WYL. - dryf przy medianie, osobny bieg z kluczem). Scalone int 40d725e7; 9918213b: DailyLifeMobility/Freedom/WarScar domyslnie WYL. do kalibracji. test/fin67 = int 9918213b (czeka na koniec testu fin66).
 - 18:45 PDT: test 120 dob ZC0+ZC1 (Armoury-2026-10-16_17-46-14.log, kopia D:/Backup-Bannerlord/logi-testow): 0 ERROR; nzc0 19/0 NIE; nzc1 5 NIE (aksamit 25%, sol woz/miasto 0.17, ryby bez nazwy 131/d, miod pitny x1.34, jedwab wsi -46%) -> fe1b271e SilkToWeavers i BkSideGoodsOrigin WYL. Test paczki 1 (ZC0+ZC1+ZC2, 120 dob + 1 bitwa) w toku: test/fin67 = int fe1b271e.
 - 18:50 PDT: PROJEKT-KALIBRACJA-STARTU gotowy (wf_ef9562a5-85b; model roz/kalibracja, wariant kosz_in1.25: targ +-3%, wsie Westeros ~6% wolnych rak, handel konieczny). Kod KS+ZC3+ZC4+ZC5: workflow wf_6cd6abd8-33e (galaz w-toku/noc-ks, worktree zb/n-ks od fe1b271e). Test paczki 1 (fin67) w toku.
+
+### 63. WGRANIE 74 (16.10 ok. 19:10 PDT) - ZC0 pomiar + ZC1 drogi towarow + ZC2 stany na ekranie - START TUTAJ
+W grze: `w-toku/zbior-e8` **fe1b271e** (= `w-toku/noc-wgranie-74`) | Armoury 1d4daf68. Kopie *.bak-2026-10-16-wgranie74-przed i D:/Backup-Bannerlord/wgrane/2026-10-16-wgranie74-przed.
+= 73 + ZC0 (DailyLife*: stany, Dostatek, Spizarnia - tylko pomiar) + ZC1 (GoodsPaths: wieloryb, piwo x2, deski, wegiel, sztabki, cena wozu, DTE/BK jedzenie z niczego zamkniete;
+SilkToWeavers i BkSideGoodsOrigin WYL.) + ZC2 (stany w zapisie arm_estates, dymki, menu "People of this land", Realm ledger) + ZC6/ZC7 w kodzie, WYL. (Mobility, Freedom, WarScar,
+ProsperityLink) do kalibracji. Test 120 dob + bitwa (Armoury-2026-10-16_18-23-34.log, kopia logi-testow): 0 ERROR; nzc0 19/0, nzc2 14/0, nbitwa 17/0, nturniej 7/0, nkarczmy 7/0;
+nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 179/d, miod pitny x1.39, jedwab wsi 64%) - trendy, nie blad; do kalibracji.
