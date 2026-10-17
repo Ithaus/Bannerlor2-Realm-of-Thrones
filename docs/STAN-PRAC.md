@@ -2536,3 +2536,14 @@ nzc1 5 NIE jak w biegu bez dwoch kluczy (aksamit 26%, sol 0.16, ryby bez nazwy 1
 - Uprzaz (kmoney/h na ks_dump): Westeros 45% koszyka wsi zaplacone, 17.9% rak praca domowa, targ 1.00-1.05; Essos 57%, targ 1.00-1.02, zbiezne. Plan 8-11 s.
 - Ryzyka: Essos 22% kcal wsi bez pokrycia (NKS-8c/NKS-17 moga nie przejsc); sprzedaz wsi na targ Westeros ok. -19% (mniej utargu panow) - powiedziec Jeffowi prosto.
 - Scalone int **2cfaaf86** (build rc 0). Test: test/fin69 (Armoury A6A2391E), flaga armoury-ks-wlacz.flag UTWORZONA 01:15 (USUNAC po tescie!), at-fin69-ks120.out.txt.
+
+### 67. TEST KS runda 2 (17.10 01:15-01:53 PDT, Armoury-2026-10-17_01-15-30.log + folder CSV, kopia logi-testow) - NIE PRZESZEDL, NIE WGRYWAC KS
+- Flagi armoury-ks-wlacz.flag i armoury-ks-przerwij.flag USUNIETE. 0 ERROR, bitwa OK (kod 0), nzc0 19/0, nzc2 14/0, nbitwa 17/0. nks 15 NIE z 41.
+- Plan na swiat w pasmie (na targ 1.00-1.05, poza mieso 1.33/1.54), ALE ROZKLAD MIEDZY MIASTAMI: zboze dni polki q10 0 / mediana 1.5 / q90 60 / max 302 (Vaes Dothrak);
+  indeks zboza mediana 1.57, q90 sufit 10. Puste miasta (Pyke, Deepwood, Thenn, Sunspear, Lys, Qarkash, Meereen) na suficie, przepelnione (Vaes Dothrak, Lord Hewett, Tumbleton)
+  na podlodze. Wsie: kupione 28%, bez kiesy 39%, bez towaru 34%; kcal wsi BEZ POKRYCIA Westeros 34%, Essos 40% (Plan zakladal 11%) = glod. Koszt doby 3.75 ms, z hakami 12.4 ms.
+  Sprzedaz wsi na targ -38% (utarg panow tak samo) - do powiedzenia Jeffowi.
+- D+7 kontrola wczesna zadzialala (22 z 24 cen poza pasmem), ale bieg puszczony do konca dla danych.
+- RUNDA 3: workflow wf_0342c556-72c (ks-rozklad-miast): rozpoznanie (rozklad, glod wsi, ceny/koszt) -> 3 projekty (Plan na miasto / kupcy zbozowi / hybryda) + symulator
+  97 miast offline (scratchpad ksim) -> ocena -> kod na w-toku/noc-ks -> symulacja do 3 rund -> 2 recenzje -> poprawki. Test w grze dopiero po przejsciu symulatora.
+- W grze dalej WGRANIE 74 (bez KS). Jeff moze grac.

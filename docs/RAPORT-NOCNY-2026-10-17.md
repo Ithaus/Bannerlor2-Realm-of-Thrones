@@ -1,6 +1,6 @@
 # Raport nocny 16/17.10.2026 (dla Jeffa)
 
-> SZKIC - uzupelniany w nocy. Ostatnia aktualizacja: 16.10 ok. 23:00 zegara komp. (PDT).
+> SZKIC - uzupelniany. Ostatnia aktualizacja: 17.10 ok. 02:00 zegara komp. (PDT) = 11:00 u Ciebie.
 
 ## Najkrocej
 
@@ -41,7 +41,9 @@
 - Po wlaczeniu produkcja wychodzi 2-4 razy wieksza niz zakupy, a zapasy w miastach rosna.
 - Przyczyna: plan liczyl, ile ludzie *potrzebuja*, a nie ile *moga kupic za swoje pieniadze*. Kiesy ludzi sa za male na pelny koszyk.
 
-**Co robie:** naprawiam sile nabywcza w ramach istniejacych pieniedzy (bez zlota z niczego), granice cen i koszt obliczen. Potem nowy test 120 dni. Wgrywam tylko, gdy kazdy towar miesci sie w 95-105%.
+**Druga proba (noc, test 01:15-01:53):** plan liczy juz tylko to, za co ktos placi; czego wsi nie stac - robia w domu z wlasnej ziemi. Na calym swiecie wychodzi rowno (100-105%), ale **towar nie dojezdza tam, gdzie sa ludzie**: polowa miast ma zboza na mniej niz 1,5 dnia (ceny pod sufitem), a kilka miast tonie (Vaes Dothrak - 302 dni zapasu). Wsie przy pustych miastach nie maja gdzie kupic - ok. 1/3 ich jedzenia bez pokrycia. Tego nie wgrywam.
+
+**Trzecia proba (w toku):** rozklad miedzy miastami - kazde miasto liczone osobno (jego wsie + to, co realnie da sie przywiezc) i kupcy zbozowi wozacy jedzenie tam, gdzie drogie. Najpierw sprawdzam to na symulatorze 97 miast poza gra (nie zajmuje gry - mozesz grac), dopiero potem test w grze. Wgrywam tylko, gdy kazdy towar miesci sie w 95-105% i nikt nie glodzi.
 
 ## 4. Co zostalo na pozniej (kolejka)
 
