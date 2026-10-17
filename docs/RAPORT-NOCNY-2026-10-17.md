@@ -59,3 +59,6 @@
   czynsz staly pierwszy, zaleglosci zamiast zabierania; znikaja sztuczne pobory (danina od kiesy, podatek od oszczednosci, rynek BK 5% kiesy). Przejscie 28 dni gry.
   Test 120 dni: 38/38 bramek, korona 97-100% dochodu, zold zawsze 100%, krolestwa 4x rzadziej w Banku, kiesy wsi stabilne. Wylacznik: MCM Armoury "Dues Medieval".
 - **Dalej:** miasta, korona i podatki wojenne (z pozyczkami od mieszczan i Banku, bez darowania dlugow), potem KS runda 4 (Twoje decyzje: dowoz na Polnoc i danina dla Muru, tanszy koszyk biednych).
+- **WGRANIE 76 - daniny miast, korony i podatki wojenne** (Twoje "Tak, wgraj"): stale oplaty miast i zamkow, podatek wojenny co kwartal tyle, ile trzeba, pozyczki od mieszczan
+  i Banku na braki, dlugi korony u miast nie przepadaja. Testy 160 dni: zold 100%, korona ok. 97% dzisiejszego dochodu, panowie 99%, dlug koron w Banku rosnie 6x wolniej.
+  W Twojej grze zmiana idzie etapami: ok. 3 miesiace gry do pelnej. Wylacznik: MCM Armoury "Ds Towns".

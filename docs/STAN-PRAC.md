@@ -2663,3 +2663,13 @@ B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na P
   g: 22 krolestwa ponad 1, King's Landing 0.5 -> 1.5, Dorne 1 -> 2. nzc0/nzc2/nbitwa 0 NIE.
 - WGRANIE 76 PRZYGOTOWANE: `w-toku/noc-wgranie-76` 725150ad (= noc-ds-f3 0564a5a5 + DsTowns domyslnie TAK), Armoury d84f7b66; test dokladnej DLL 5 dob + bitwa 0 ERROR.
   CZEKA NA SLOWO JEFFA (duza zmiana: daniny miast, korony, podatki wojenne, kredyt; dlugi korony u miast bez umorzenia).
+
+### 78. WGRANIE 76 (17.10 ok. 15:20 PDT) - DANINY MIAST, KORONY, PODATKI WOJENNE, KREDYT (DS F3) - START TUTAJ
+W grze: `w-toku/noc-wgranie-76` **725150ad** (= w-toku/noc-ds-f3 0564a5a5 + DsTowns domyslnie TAK; na GitHub) | Armoury **d84f7b66** (bylo ce1e0343); reszta bez zmian.
+Kopie *.bak-2026-10-17-wgranie76-przed i D:/Backup-Bannerlord/wgrane/2026-10-17-wgranie76-przed; zapis Jeffa zapisy-jeffa/...-przed-wgraniem76.sav (md5 2ad40e43 - Jeff nie gral od 06:05).
+Jeff: "Tak, wgraj" (AskUserQuestion po testach fin74-76).
+= 75 + F3: firmy miast i zamkow (= dzisiejszy zawor), nadania wojenne g co kwartal + sesja "po rampie" (z mediana 'inne'), pomoc od sprzedazy, 184 wedlug g, dziesiata od ruchomosci,
+clo x2 w wojnie, pomoc lennikow; brak na zwrot: skarbiec ponad zapas -> zaliczki mieszczan -> Bank; dlugi korony u miast BEZ umorzenia (CrownTownLoanNoWriteOff). Kolejnosc w grze
+Jeffa: rampa F1 28 dob (od pierwszego wczytania 75/76) -> okno pomiaru firm 28 dob -> rampa F3 28 dob -> sesja "po rampie" (+7). Wylaczniki MCM: Dues Medieval, Ds Towns.
+DO SPRAWDZENIA U JEFFA: "Daniny wsi (DS)" (start), po ~28 dobach "Firmy miast i zamkow (DS)" okno pomiaru, po ~56 "Korona: nadanie wojenne (DS)" przelaczenie, zwrot zoldu 100%.
+DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic noc-ks3), potem ZC6/ZC7, kolejka. Przekazanie: PRZEKAZANIE-DRUGIE-KONTO-2026-10-17.md (stan 75 -> 76).

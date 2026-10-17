@@ -11,7 +11,13 @@ Godziny w dokumentach = zegar komputera (PDT, UTC-7). Jeff jest w Polsce (CEST =
 
 ---
 
-## 1. Co jest w grze: WGRANIE 75 (17.10 ok. 12:40)
+## 1. Co jest w grze: WGRANIE 76 (17.10 ok. 15:20) - AKTUALIZACJA
+
+- **WGRANIE 76** = galaz `w-toku/noc-wgranie-76` `725150ad` (= `w-toku/noc-ds-f3` 0564a5a5 + DsTowns domyslnie TAK), Armoury **d84f7b66**. = 75 + DS F3 (miasta, zamki, korona,
+  podatki wojenne, kredyt; dlugi korony u miast bez umorzenia). Testy fin74-76 (160 dob): zwrot zoldu 100%, korona po sesji "po rampie" 0.965-0.971 bazy, D staly rodow 0.991.
+  Kopie *.bak-2026-10-17-wgranie76-przed. Punkt 4.1 ponizej (DS F3) - ZROBIONY. Ponizej opis WGRANIA 75 (historia).
+
+### WGRANIE 75 (17.10 ok. 12:40)
 
 - Kod: galaz **`w-toku/noc-wgranie-75`** `fa4416f5` (na GitHub). = WGRANIE 74 (`fe1b271e`) + daniny sredniowieczne wsi (DS F1).
 - Armoury.dll **ce1e0343** (bylo 1d4daf68); CrashScribe da755a8a, RealisticCaptivity 7e0e462e, GrandTourney 035878c4, ForgeView 19aa052a; pliki danych jak w 74
