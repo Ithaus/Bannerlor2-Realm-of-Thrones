@@ -2639,3 +2639,8 @@ z nadwyzki, bez poborow resztowych (rampa 28 dob od pierwszej doby z nowa DLL). 
 DO SPRAWDZENIA U JEFFA (pierwsze wczytanie): linia "Daniny wsi (DS)" (start rampy, DayOn), "Korona: wplywy dnia" (zwrot zoldu 100%), kiesy wsi w "Przeplywy osad".
 DALEJ: (1) F3 miasta/korona/kredyt - symulator + test (bez darowania zaliczek mieszczan); (2) KS runda 4 na bazie WGRANIA 75 (DS BudgetShare zamiast alfy, kredyt kupcow KS-H, rzeznie,
 B2 wyl. przy KS, najpierw wyzywic siebie + hodowla w zimnym klimacie, dowoz na Polnoc i danina dla Muru, tanszy koszyk biednych, rynek BK wedlug potrzeb, koszt).
+
+### 76. PRZEKAZANIE (17.10 ok. 13:00 PDT) - limit tygodnia 94%
+- docs/PRZEKAZANIE-DRUGIE-KONTO-2026-10-17.md (stan, galezie, narzedzia, kolejnosc: DS F3 -> KS runda 4 -> ZC6/ZC7 -> kolejka). Galezie w-toku/noc-ds, noc-wgranie-75, noc-ks3,
+  zbior-e8 wypchniete na GitHub. Skrypty autotestu: tools/autotest-2026-10-17/; zrodla symulatorow: tools/ekonomia-symulatory-2026-10-17/; pelne kopie z danymi
+  D:/Backup-Bannerlord/scratch-2026-10-17/. W grze WGRANIE 75.
