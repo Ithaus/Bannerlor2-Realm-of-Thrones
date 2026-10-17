@@ -1,0 +1,52 @@
+# Raport nocny 16/17.10.2026 (dla Jeffa)
+
+> SZKIC - uzupelniany w nocy. Ostatnia aktualizacja: 16.10 ok. 23:00 zegara komp. (PDT).
+
+## Najkrocej
+
+- W grze jest **WGRANIE 74**. Gra sie uruchamia, autotesty przeszly, w logach Armoury 0 bledow. **Mozesz wczytac zapis i grac.**
+- Twoj zapis Ironman jest nietkniety - autotesty uzywaja wylacznie zapisu testowego F.
+- **Kalibracja startu rynku (KS - "kazdy towar 95-105%") NIE jest jeszcze w grze.** Pierwszy test 120 dni jej nie przeszedl, wiec jej nie wgralem. Naprawa trwa (rozdz. 3).
+- Kazda nowa rzecz ma wlasny wylacznik w MCM (Armoury).
+
+## 1. Co jest w grze (wgrania 16.10)
+
+| Wgranie | Co |
+|---|---|
+| 67 | SI walki Realistic. Twoja kampania juz miala wszystko na Realistic, wiec nic sie nie zmienilo. |
+| 68 | Bitwa: panika i ucieczka rannych. Battle Atmosphere i Immersive Battlefields wlaczone i ustawione. Nasze okrzyki ustepuja tym modom. Autotest gra teraz prawdziwe bitwy (lapie crashe w misji). |
+| 69 | Turniej: nagrode i zaklad placi kasa miasta, potem rod gospodarza, potem rod panujacy. Czego nie maja, to dlug wobec Ciebie, splacany codziennie. Wyrownanie Seagard 1522 zlota (raz). |
+| 70 | Wioski: o 20% mniej, nie tak gesto, rozne wielkosci (6-36 osad). Herb gospodarza (rycerza albo pana), nie tylko krolestwa. Stary zapis przechodzi na nowy uklad. |
+| 71 | Kaluze krwi na ziemi (wlasne, poprawne - bez crasha MoreBloodPoolMod, ktory zostaje wylaczony). |
+| 72 | Karczmy w miescie, 3 jakosci. Ludzie placa za siebie i swoje konie, Ty za siebie i konie luzem. Premia do predkosci i morale do zmierzchu. |
+| 73 | Herby kanoniczne GoT: 540 rodow, 1188 wiosek z 319 rodow. Dwie flagi: gospodarz i senior. |
+| 74 | Zycie codzienne - pomiar (stany: chlopi, mieszczanie, szlachta...; Dostatek, spizarnia). Naprawy dziwnych drog towarow (mieso wieloryba, piwo, deski, wegiel, sztabki, jedzenie z niczego). Stany ludzi na ekranie wioski i miasta. |
+
+## 2. Na co patrzec przy pierwszym wczytaniu
+
+- Turniej: komunikat o wyrownaniu Seagard (1522) i splaty w kolejnych dniach.
+- Karczma: rachunek w menu, pobudka o swicie, premia do predkosci.
+- Bitwa: krzyk paniki raz na czlowieka, ranni uciekaja, czy dzwiekow nie jest za duzo.
+- Wioski: herby rycerzy i dwie flagi. Po dlugim zwiedzaniu bez bitwy czesc wiosek moze pokazac herb pana (limit 160 tekstur herbow - znane, do poprawki).
+
+## 3. Kalibracja startu (KS) - stan
+
+**Cel (Twoje slowa):** "musimy zaczac rynkowo ... czegos moze byc mniej o 5%, czegos wiecej o 5%". Produkcja z prawdziwych rak do pracy i ziemi, bez sztucznych mnoznikow.
+
+**Co dziala:**
+- Plan liczy dla kazdego okregu, ilu ludzi pracuje i przy czym (miejsca pracy x wydajnosc ziemi).
+- Na papierze 30 towarow wychodzi w pasmie 95-105%. Poza nim jest tylko welna Westeros (107%).
+
+**Co nie przeszlo w tescie 120 dni:**
+- Po wlaczeniu produkcja wychodzi 2-4 razy wieksza niz zakupy, a zapasy w miastach rosna.
+- Przyczyna: plan liczyl, ile ludzie *potrzebuja*, a nie ile *moga kupic za swoje pieniadze*. Kiesy ludzi sa za male na pelny koszyk.
+
+**Co robie:** naprawiam sile nabywcza w ramach istniejacych pieniedzy (bez zlota z niczego), granice cen i koszt obliczen. Potem nowy test 120 dni. Wgrywam tylko, gdy kazdy towar miesci sie w 95-105%.
+
+## 4. Co zostalo na pozniej (kolejka)
+
+- Inwestycje w okreg i specjalizacja wiosek (projekt zatwierdzony; lordowie AI na razie nie inwestuja).
+- Przysiolki na pustkowiach, zajazdy przy drogach z plotkami (bandy, kryjowki, skarby).
+- +15% predkosci na drogach ROT (dane drog juz zebrane z mapy).
+- Uchodzcy z palonych wsi ida do miast (czeka na Twoje slowo).
+- Mobilnosc spoleczna i blizny wojny (kod gotowy, wylaczony do czasu udanej KS).
