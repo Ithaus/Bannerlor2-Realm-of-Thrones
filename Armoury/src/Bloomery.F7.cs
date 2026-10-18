@@ -85,7 +85,7 @@ namespace Armoury
                     f.Ks = StartCalibration.AppliedFor(v);
                     f.R = f.Ks ? StartCalibration.F7CollierRatio(v, out hpb, out ll) : 0f;
                     f.Hpb = hpb; f.LumberL = ll;
-                    if (f.Ks) { if (f.R > 0f) { forest++; lsum += ll; } else none++; }
+                    if (f.Ks && f.Hpb > 0f) { if (f.R > 0f) { forest++; lsum += ll; } else none++; }   // Hpb 0 - okreg bez rak przy zelazie w KS albo bez danych (pierwsza doba po wczytaniu)
                 }
                 catch (Exception e) { F7Stumble("Refresh", e); F7Mine f; if (_f7.TryGetValue(v, out f) && f != null) f.R = 0f; }
             }
@@ -105,7 +105,7 @@ namespace Armoury
                 if (v == null || m == null || wpb <= 0 || !_f7.TryGetValue(v, out f) || f == null) return cap;
                 if (!(f.R > 0f))
                 {
-                    if (f.Ks) { _f7NoLand += x - cap; _f7NoLandV.Add(v); }   // kopalnia KS bez lasu (pustynia, step) - jak dotad
+                    if (f.Ks && f.Hpb > 0f) { _f7NoLand += x - cap; _f7NoLandV.Add(v); }   // kopalnia KS bez lasu (pustynia, step) - jak dotad; bez danych KS - nie liczona
                     return cap;
                 }
                 int avail = Math.Max(0, m.Bank - _tvReserved * wpb);
