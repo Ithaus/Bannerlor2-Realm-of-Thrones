@@ -50,6 +50,17 @@
 - Bandy Wolnych Ludzi nie dochodza do celow na poludniu (moze brak przejscia przez Mur na mapie) - poprawka w toku.
 - W tescie bitwy "mocna" druzyna dalej przegrywa z bandytami (panika) - stara sprawa, do zbadania.
 
+
+## Koncowy przeglad ekonomii (o co prosiles) - wynik prosto
+Pelny opis: `docs/PRZEGLAD-EKONOMII-2026-10-18.md`.
+- **Ekonomia jest szczelna**: w 160 dniach ubylo 0,23% zlota swiata, ksiega towarow zgadza sie co do sztuki. Nic nie powstaje z niczego i nie znika.
+- **Problem to kierunek, w ktorym plyna pieniadze:**
+  1. **Robotnicy w miastach** po wlaczeniu nowej ekonomii maja tanszy koszyk przy tych samych zarobkach, wiec odkladaja (ok. 100 dni zapasu zamiast 10). Dzis trzyma ich w miejscu danina od majatku. Robie poprawke u zrodla: zarobek dopasowany do koszyka i place, ktore spadaja tam, gdzie jest duzo wolnych rak (druga strona Twojego "place rosna przy braku rak"). Potem danina od majatku moze byc rzadka i mala, jak w sredniowieczu.
+  2. **Korona zwraca 70% zoldu takze najbogatszym rodom** (ok. 65 rodow siedzi na 37 mln), a skarbce krolow chudna o 65-80 tys. dziennie i krolowie zaczynaja pozyczac w Banku. **TO TWOJA DECYZJA** (15.10 powiedziales "zwrot bez zmian"). Moja rada: zwrot wedlug potrzeby - bogaty rod placi za swoja wojne sam, sredni dostaje czesc, biedny calosc. Napisz "zwrot wedlug potrzeby: tak/nie".
+- **Pod nowa ekonomia wioski nie zmieniaja zajec** (ta regula jest wylaczona od 16.10), wiec produkcja nie reaguje na ceny. Samo wlaczenie dzis by nie pomoglo (92% wiosek chcialoby uciec do towarow z cenami na suficie) - najpierw tydzien pomiaru, potem jedna regula z Twoim hamulcem zmian.
+- **Opal i ruda**: pod nowa ekonomia mieszczanie pala duzo wiecej drewna (zgubione letnie zmniejszenie), a ruda znika z polowy miast - to odczujesz w kuzni. Poprawka w toku.
+- Do tego w toku: limit uchodzcow, ktory naprawde chroni male miasta; przezbrajanie warsztatow liczone uczciwie; kasy miast i kupcy zywnosci; skory, sol i drewno.
+
 ## Co czeka na Twoje slowo (nic z tego nie robilem)
 - Kasy miast z dlugami i podatkiem nadzwyczajnym (F1), pozyczka miejska dla pana i Ciebie (F2), karta miejska (F3), sakiewka turniejowa od mieszczan (F4).
 - Duchowni jako osobny stan, pory roku w koszykach, kolor mapy wedlug zamoznosci, niewola za dlugi (ZC8).
