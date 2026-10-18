@@ -2977,3 +2977,7 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   namalowac" -> paczka f11-drogi (boczne drogi od traktow do dalszych wiosek, nowa technika rysowania, DOMYSLNIE WYL. - najpierw zdjecia z autotestu dla Jeffa; 14.10 drogi-decale "fatalne").
 - Jeff 18.10 ok. 09:50 PDT: "wykorzystaj mase terenu ... boczne wioski naprawde masz gdzie, zeby to wygladalo naturalnie, a nie jak blad ... nawet tam gdzie jest duzo ludzi" ->
   f10-uklad zatrzymany i puszczony od nowa z dopiskiem (wioski po calym ladzie okregu, naturalnie: woda, pola, skraj lasu, wzgorza; bez siatek; pokrycie ladu przed/po): wf_ca258789-6e9.
+- 10:00 PDT: ANALIZA Polnoc/Lannister (wf_8990abef-633, scratchpad analiza-polnoc.json): normalny bieg wojny/fabuly ROT (Korona vlandia na 2 frontach od RiverlandsDeclareWar; Dorzecze
+  wykrwawilo ja 108982-109019; Polnoc 12.0k + Dorzecze ~7.5k vs Korona 8.2k; w sesji 0 bitew Polnoc-Korona, Robb oblega KL od 109029, mury 82%), NIE ekonomia (Korona 7.47 mln, zold 40%
+  pulapu; f6 hamuje bardziej Polnoc: pulap 111k -> 91k). Do sprawdzenia: (1) regula odsieczy OB5 (BesiegedReliefCapitalForce 2.0 - wymagane 24.2k, zebrane 11.2k; druzyny stoja pod
+  murami zamiast werbowac?), (2) ryzyko zdobycia KL przed fabula "KingsLanding". -> paczka f12-odsiecz.
