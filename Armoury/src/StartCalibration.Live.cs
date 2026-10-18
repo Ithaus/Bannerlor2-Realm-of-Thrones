@@ -237,7 +237,7 @@ namespace Armoury
             {
                 var st = v.Settlement; LiveDist ld;
                 if (st == null || st.StringId == null || !_live.TryGetValue(st.StringId, out ld) || !(ld.Rations >= 0)) return harvest;
-                GranNote(st, people, barnFood);                    // r4-bkwies: potrzeba i zapas spichlerzy wsi KS (tylko licznik linii podlogi)
+                GranNote(st, people, barnFood, ld.K != null ? ld.K.Land : null);   // r4-bkwies: potrzeba i zapas spichlerzy wsi KS wedlug rynku i krainy (tylko licznik linii podlogi)
                 if (ld.Rations > harvest) { _granKsAbove++; return ld.Rations; }
                 var s0 = Settings.Current;
                 bool noFloor = s0 == null || s0.KsGranaryNoFloor;

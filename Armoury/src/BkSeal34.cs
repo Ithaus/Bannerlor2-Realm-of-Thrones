@@ -162,7 +162,7 @@ namespace Armoury
         /// r4-bkwies (KS runda 4 B1-B4, klucz Ks Bk Village Needs; Jeff 17.10 "ok"): rynek wsi BK dla wsi DS i wsi KS z koszykiem ZC4 WEDLUG POTRZEB zamiast "po sztuce
         /// kazdego towaru z nadwyzka podazy miasta":
         ///  - potrzeby (sol, narzedzia albo zelazo kowala, len, sukno, garnki) - najwyzej do zapasu potrzeb wsi (VillNeeds.Room: ludzie x potrzeba dnia x dni zapasu),
-        ///    tylko ponad 5 ostatnich sztuk polki (lud miasta), bez warunku nadwyzki podazy miasta (wies kupuje to, czego potrzebuje);
+        ///    tylko ponad 5 ostatnich sztuk polki (lud miasta; plotno ponad prog polki K2 - recenzja), bez warunku nadwyzki podazy miasta (wies kupuje to, czego potrzebuje);
         ///  - zbytki (wino, przyprawy, klejnoty, aksamit, futra) - tylko wies bogata (kiesa >= Ks Bk Rich Chests skrzyn), po 1 sztuce kategorii, tylko z nadwyzka podazy (jak BK);
         ///  - wies z koszykiem ZC4: bez jedzenia i bez towarow koszyka (kupuje je drabina z limitem potrzeby i ceny - jedna zasada na jedno zjawisko); zostaja zbytki spoza
         ///    koszyka (klejnoty, aksamit);
@@ -212,8 +212,12 @@ namespace Armoury
                     }
                     else
                     {
-                        int have = e.Amount - NeedShelfKeep;
-                        if (have <= 0) continue;
+                        // recenzja r4-bkwies: plotno (len) najwyzej ponad prog polki K2 (zapas miasta dla wojska; E3-W1b - od polowy tam, gdzie tanie) - ta sama regula co
+                        // koszyk dnia i krok 5 wsi (TownFolk.VillShelfKeepRow); inne potrzeby - 5 ostatnich sztuk
+                        bool half;
+                        int keepRow = Math.Max(NeedShelfKeep, TownFolk.VillShelfKeepRow(town, item, out half));
+                        int have = e.Amount - keepRow;
+                        if (have <= 0) { if (keepRow > NeedShelfKeep && e.Amount > NeedShelfKeep) VillNeeds.BkClothHeld(); continue; }
                         int room = VillNeeds.Room(village, item);
                         if (room <= 0) { VillNeeds.BkRefused(1); continue; }                       // zapas potrzeb w domu pelny
                         n = Math.Min(room, have);

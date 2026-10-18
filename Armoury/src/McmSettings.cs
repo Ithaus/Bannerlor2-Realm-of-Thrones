@@ -6836,15 +6836,15 @@ namespace Armoury
         [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
         public int VillageNeedCoverDays { get; set; } = 7;
 
-        [SettingPropertyBool("Ks Surplus Skips Basket", HintText = "with the start calibration: a village that buys its basket from the plan spends what lies beyond its chest on the finer goods of its market town and on communal works, no longer on more salt, tools, linen, pots and ale than its basket needs (the basket already buys them - one rule for one thing). Off = as before")]
+        [SettingPropertyBool("Ks Surplus Skips Basket", HintText = "with the start calibration: a village that buys its basket from the plan spends what lies beyond its chest on the finer goods of its market town and on communal works, no longer on more salt, tools, linen, pots and ale than its basket needs (the basket already buys them - one rule for one thing); the coin it would have spent on them stays in its purse. Off = as before")]
         [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
         public bool KsSurplusSkipsBasket { get; set; } = true;
 
-        [SettingPropertyBool("Ds Surplus Need Limit", HintText = "with Dues Medieval: a village without the calibration basket spends what lies beyond its chest on salt and tools only up to what its people use (Village Need Cover Days), no longer stripping the market stall to the last five sacks at any price; the coin it does not spend on them stays in its purse. Off = as before")]
+        [SettingPropertyBool("Ds Surplus Need Limit", HintText = "with Dues Medieval: a village without the calibration basket spends what lies beyond its chest on salt and tools only up to what its people use (Village Need Cover Days), no longer stripping the market stall to the last five sacks at any price; the coin meant for a need already met stays in its purse (only coin for a need still open that finds no goods goes to communal works). Off = as before")]
         [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
         public bool DsSurplusNeedLimit { get; set; } = true;
 
-        [SettingPropertyBool("Ds Surplus Ledger Frame", HintText = "with Dues Medieval: the salt and tools a village buys from what lies beyond its chest are counted in the goods ledger as bought in its market town (until now as bought 'nowhere', so the start calibration saw too little salt eaten in the markets and too much salt left over). Changes the count only. Off = as before")]
+        [SettingPropertyBool("Ds Surplus Ledger Frame", HintText = "with Dues Medieval: the salt and tools a village buys from what lies beyond its chest are counted in the goods ledger as bought in its market town (until now as bought 'nowhere', so the start calibration saw too little salt eaten in the markets and too much salt left over). Without the start calibration it changes the count only; with it, these purchases also count as village demand in the market town, so the calibration's merchants bring that much more. Off = as before")]
         [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
         public bool DsSurplusLedgerFrame { get; set; } = true;
 

@@ -1247,6 +1247,8 @@ namespace Armoury
         /// rampa x (kiesa - skrzynia) / DsSurplusSpendDays (DsVillage.SurplusDay) - czesc P5 teraz: 1. lista dostatku na polce miasta targowego (BuyLadder, jak P5);
         /// 2. RESZTA budzetu (recenzja 17.10: dotad tylko gdy lista dostatku nie kupila nic) - lista wsi (BuyGoods; przy VillWorkOnly najpierw sol i narzedzia, jak dawne
         /// 15%/d z nadwyzki); 3. czego nie ma na polkach - ROBOTY GMINY (DsCommunalWorks; DsWorks). Czesc rynku BK odlozona do ticku BK wsi. Ponizej skrzyni nic. Nie rzuca.
+        /// r4-bkwies (recenzja): czesc listy wsi przeznaczona na potrzebe JUZ POKRYTA (wies z koszykiem ZC4 - towary koszyka; krok 5 do potrzeby - zapas w domu pelny; plotno
+        /// zatrzymane progiem K2) ZOSTAJE W KIESIE (keep, linia DS "zostalo w kiesie (potrzeba pokryta)") - do robot gminy tylko to, co nie znalazlo towaru.
         /// </summary>
         private static void DsSurplus(Folk f, Village vil, double nv, LDay d, Dictionary<Settlement, List<EquipmentElement>> shelf, bool basketCut = false)
         {
@@ -1273,14 +1275,15 @@ namespace Armoury
                 double rest = p5 - got, keep = 0;
                 if (rest >= 1)
                 {
+                    List<EquipmentElement> list;
+                    if (shelf == null || !shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); if (shelf != null) shelf[mk] = list; }
+                    bool wo = VillWorkOnly();                                         // jak dawne 15%/d z nadwyzki (wx): sol i narzedzia
                     // r4-bkwies (Ks Surplus Skips Basket; diagnoza fin80 "sol"): wies z koszykiem ZC4 (Ks Village Paid First) - sol, narzedzia, len, garnki i piwo kupuje drabina
-                    // koszyka z limitem potrzeby i ceny; krok 5 nie kupuje ich drugi raz (jedna zasada na jedno zjawisko) - budzet idzie dalej (roboty gminy albo kiesa)
-                    if (basketCut && VillNeeds.SkipBasketOn) VillNeeds.S5Skip(rest);
+                    // koszyka z limitem potrzeby i ceny; krok 5 nie kupuje ich drugi raz (jedna zasada na jedno zjawisko). Recenzja: czesc, ktora lista wsi dostalaby (podzial
+                    // BuyGoods), ZOSTAJE W KIESIE (keep - potrzeba pokryta); reszta (czego lista dostatku nie znalazla na polkach) - jak dotad roboty gminy
+                    if (basketCut && VillNeeds.SkipBasketOn) { keep = Math.Min(rest, DsSkipShare(list, wo ? 0 : rest, wo ? rest : 0)); VillNeeds.S5Skip(rest, keep); }
                     else
                     {
-                        List<EquipmentElement> list;
-                        if (shelf == null || !shelf.TryGetValue(mk, out list)) { list = ShelfOf(mk); if (shelf != null) shelf[mk] = list; }
-                        bool wo = VillWorkOnly();                                     // jak dawne 15%/d z nadwyzki (wx): sol i narzedzia
                         // r4-bkwies (Ds Surplus Ledger Frame): ramka ksiegi towarow na rynek miasta targowego (dotad jedyny zakup wsi bez ramki z osada - "bez rynku")
                         var gf5 = VillNeeds.FrameOn ? GoodsLedger.Begin(GoodsLedger.FFolkVill, mk) : null;
                         if (gf5 != null) VillNeeds.S5Frame();
@@ -1295,11 +1298,12 @@ namespace Armoury
                         if (g2 > 0) { got += g2; Folk mf; if (_f.TryGetValue(mk, out mf)) mf.VillWin += g2; }
                     }
                 }
-                rest = p5 - got - keep;                                           // keep = 0 bez limitu potrzeby (jak dotad)
+                rest = p5 - got - keep;                                           // keep = 0 bez limitu potrzeby i bez pominiecia koszyka (jak dotad)
                 long works = 0, wage = 0, mat = 0;
                 if (rest >= 1 && s.DsCommunalWorks) works = DsWorks(vil, mk, rest, out wage, out mat);
                 if (got > 0) f.DVBuy += got;                                      // E5/C4: zakupy tej doby (towar; roboty gminy - nie towar)
                 DsVillage.NoteP5(got, works, wage, mat, rest - works);
+                if (keep >= 1) DsVillage.NoteP5Kept(keep);                        // r4-bkwies (recenzja): P5 = towar + roboty + niewydane + zostalo w kiesie (potrzeba pokryta)
             }
             catch (Exception e) { Stumble("DsSurplus", e); }
         }

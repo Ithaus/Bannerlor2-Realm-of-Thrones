@@ -959,6 +959,9 @@ Uzycie (Python 3, tylko odczyt):
                     jak dotad. NKS-29 przy linii B1 z rynkiem BK wedlug potrzeb TAK - kiesa po zakupie BK nigdy ponizej skrzyni, bez jedzenia u wsi z koszykiem ZC4,
                     kontrola kiesy - kasy 0 w kazdej dobie okna, udzial rynku BK w wplywie do kies <= 10% w ostatnich 28 dobach; log z DS bez linii B1 - INFO;
                     bez DS - jak dotad (<= 2%).
+                    Recenzja r4-bkwies: NKS-26 INFO - zejscie spichlerzy wedlug krain (dopisek "wedlug krain (dni)": najwiekszy spadek w oknie, najnizszy zapas);
+                    NKS-29b INFO - krok 5 DS z linii B1 (wsi ZC4: czesc listy wsi w kiesach; wsi do potrzeby: sol + narzedzia, odmowione, w kiesach, kategorie pokryte);
+                    nds NDS-17 - skladnik "zostalo w kiesie (potrzeba pokryta)" poza progiem niewydanego, P5 plan - (towar + roboty + niewydane + w kiesie) INFO.
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -33790,6 +33793,8 @@ NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy 
     "works": re.compile(r"\| krok 5 wydany: towar " + _NI + r", roboty gminy " + _NI + r" \((\d+) wsi: place ludu miast targowych " + _NI + r" \+ material do kas " + _NI
                         + r"\), niewydane " + _NI + r" \((\d+) wsi\)"),
     "k5": re.compile(r"brak zwrotu zoldu ze skarbca ponad zapas wojny \(K5, bez firm F3\) " + _NI + r" \((\d+) krolestw\)"),
+    # r4-bkwies (recenzja): czesc P5, ktora zostaje w kiesie wsi, bo potrzeba pokryta (krok 5 do potrzeby, wies z koszykiem ZC4, plotno K2) - tylko gdy > 0
+    "kept": re.compile(r", zostalo w kiesie \(potrzeba pokryta\) " + _NI + r" \((\d+) wsi\)"),
 }
 
 
@@ -34218,7 +34223,12 @@ def nds_main(logp, bdp=None, until=120):
         wk = [D["ds"][d]["works"] for d in win if "works" in D["ds"][d]]
         if wk:
             gd, wo, nw = sum(x[0] for x in wk) / n, sum(x[1] for x in wk) / n, sum(x[5] for x in wk) / n
-            rep.add("NDS-17: krok 5 - towar, roboty gminy, niewydane (recenzja 17.10: odplyw bez towaru)", f"na dobe: towar {gd:.0f}, roboty gminy {wo:.0f} (place {sum(x[3] for x in wk) / n:.0f} + material {sum(x[4] for x in wk) / n:.0f}), niewydane {nw:.0f}",
+            # r4-bkwies (recenzja): czesc zostawiona w kiesie (potrzeba pokryta) - osobny skladnik, poza progiem niewydanego; P5 = towar + roboty + niewydane + w kiesie
+            kp = sum(D["ds"][d]["kept"][0] for d in win if "kept" in D["ds"][d]) / n
+            p5p = sum(R(d, "chest", 5) for d in win) / n
+            ktxt = (f", zostalo w kiesie (potrzeba pokryta) {kp:.0f}; P5 plan {p5p:.0f} - (towar + roboty + niewydane + w kiesie) = {p5p - gd - wo - nw - kp:+.0f} (INFO)"
+                    if any("kept" in D["ds"][d] for d in win) else "")
+            rep.add("NDS-17: krok 5 - towar, roboty gminy, niewydane (recenzja 17.10: odplyw bez towaru)", f"na dobe: towar {gd:.0f}, roboty gminy {wo:.0f} (place {sum(x[3] for x in wk) / n:.0f} + material {sum(x[4] for x in wk) / n:.0f}), niewydane {nw:.0f}" + ktxt,
                     "niewydane <= 10% kroku 5 (bez kiesy ludu w miescie targowym)", nw <= 0.10 * max(1.0, gd + wo + nw))
         k5 = [D["ds"][d]["k5"] for d in win if "k5" in D["ds"][d]]
         if k5:
@@ -34305,8 +34315,12 @@ NKS_PRODFLOOR = re.compile(r"\| spichlerz: racje KS ponad wzor dzis w (?P<ab>\d+
 NKS_VN = re.compile(r"Potrzeby wsi \(B1\): dzien (?P<day>-?\d+) \| klucze: rynek BK wedlug potrzeb (?P<bk>TAK|NIE), krok 5 bez koszyka ZC4 (?P<skip>TAK|NIE), krok 5 do potrzeby (?P<lim>TAK|NIE)")
 NKS_VNBK = re.compile(r"kiesy wsi -> kasy (?P<s>\d+) zl = potrzeby (?P<nz>\d+) zl \+ zbytki (?P<lz>\d+) zl;.*?jedzenie kupione u wsi ZC4 (?P<food>\d+); kiesa ponizej skrzyni po zakupie (?P<viol>\d+); "
                       r"najmniejszy zapas ponad skrzynie (?P<mm>-?\d+|-) zl; kontrola kiesy wsi - kasy = (?P<ctl>-?\d+)")
-NKS_VNS5 = re.compile(r"\| krok 5 \(DS\): wsi z koszykiem ZC4 bez listy wsi (?P<skn>\d+) \(budzet dalej do robot gminy (?P<skz>\d+) zl\), wsi do potrzeby (?P<ln>\d+): sol (?P<salt>\d+) "
-                      r"\+ narzedzia (?P<tools>\d+) szt\. za (?P<lzl>\d+) zl, ponad potrzebe odmowione (?P<ref>\d+) szt\., zostalo w kiesach (?P<keep>\d+) zl")
+NKS_VNS5 = re.compile(r"\| krok 5 \(DS\): wsi z koszykiem ZC4 bez listy wsi (?P<skn>\d+) \((?:budzet dalej do robot gminy (?P<skz>\d+) zl|reszta kroku 5 (?P<skr>\d+) zl, "
+                      r"z niej czesc listy wsi zostaje w kiesach (?P<skk>\d+) zl, reszta jak dotad)\), wsi do potrzeby (?P<ln>\d+): sol (?P<salt>\d+) "
+                      r"\+ narzedzia (?P<tools>\d+) szt\. za (?P<lzl>\d+) zl, ponad potrzebe odmowione (?P<ref>\d+) szt\., zostalo w kiesach (?P<keep>\d+) zl"
+                      r"(?: \(kategorii z potrzeba pokryta (?P<cov>\d+)\))?")
+# recenzja r4-bkwies: zapas spichlerzy wsi KS wedlug krain (dopisek linii podlogi, INFO NKS-26 - zejscie w oknie)
+NKS_FLOORLAND = re.compile(r"; wedlug krain \(dni\): (?P<body>[^|]*)")
 NKS_DSDAY = re.compile(r"Daniny wsi \(DS\): dzien (?P<day>-?\d+) \|")
 NKS_OWN = re.compile(r"KS: wies je swoje dzien (?P<day>-?\d+) \| wsi (?P<v>\d+), szt\. (?P<p>\d+), kcal (?P<k>[\d.]+|-)% koszyka.*?wsi > 30% koszyka 14 dob z rzedu: (?P<s>\d+)")
 NKS_P1 = re.compile(r"\| drabina 1 \(zaplacone z Planu\): chciane (?P<w>-?\d+) szt\., bez towaru (?P<ng>-?\d+) \([^)]*\), bez kiesy (?P<nm>-?\d+)")
@@ -34538,11 +34552,32 @@ def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor,
         short = [floor[d][2] for d in days26 if d in floor]
         b0, b1 = f2w[days26[0]], f2w[days26[-1]]
         ok26 = not up_bad and em_max <= 0.02 and (ep_mean is None or ep_mean <= 0.5)
+        # recenzja r4-bkwies (PLAN rozdz. 11): zejscie spichlerzy wedlug krain - INFO (pierwsza i ostatnia doba okna z dopiskiem krain)
+        def _lands(txt):
+            out = {}
+            for part in (txt or "").split(","):
+                bits = part.strip().rsplit(" ", 1)
+                if len(bits) == 2:
+                    try:
+                        out[bits[0]] = float(bits[1])
+                    except ValueError:
+                        pass
+            return out
+        ldays = [d for d in days26 if f2w[d].get("lands")]
+        if ldays:
+            l0, l1 = _lands(f2w[ldays[0]]["lands"]), _lands(f2w[ldays[-1]]["lands"])
+            span = max(1, ldays[-1] - ldays[0])
+            drop = sorted(((k, l0[k], l1[k]) for k in l1 if k in l0), key=lambda x: (x[2] - x[1]))
+            low = sorted(l1.items(), key=lambda x: x[1])[:3]
+            land_txt = (f"; INFO zejscie wedlug krain (doby {ldays[0]}..{ldays[-1]}): najwiekszy spadek " + ", ".join(f"{k} {a:.0f} -> {b:.0f} ({(b - a) / span:+.1f} dni/dobe)" for k, a, b in drop[:3])
+                        + "; najnizszy zapas " + ", ".join(f"{k} {v:.0f} dni" for k, v in low))
+        else:
+            land_txt = "; INFO zejscie wedlug krain: brak dopisku krain w linii podlogi"
         rep.add("NKS-26: spichlerz bez darmowej podlogi (G1, Ks Granary No Floor TAK)",
                 f"doby {days26[0]}..{days26[-1]} ({len(days26)}): podloga dana (wzor gry) > 0 w {len(up_bad)} dobach" + (f" ({up_bad[:6]})" if up_bad else "")
                 + f"; awaryjna (z niczego, spichlerz < {b1['ed']} dni): wsi max {100 * em_max:.1f}%, kcal srednio {('%.3f' % ep_mean) if ep_mean is not None else '-'}% potrzeby"
                 + f"; bez podlogi (brak z zapasu spichlerza) srednio {sum(nf26) / max(1, len(nf26)):.0f} wsi/dobe; INFO: kcal braku {short[0] if short else '-'} -> {short[-1] if short else '-'}% potrzeby"
-                + f" (NKS-8c, NKS-15), zapas spichlerzy wsi KS Westeros {b0['bw']} -> {b1['bw']} dni, Essos {b0['be']} -> {b1['be']} dni",
+                + f" (NKS-8c, NKS-15), zapas spichlerzy wsi KS Westeros {b0['bw']} -> {b1['bw']} dni, Essos {b0['be']} -> {b1['be']} dni" + land_txt,
                 "podloga dana 0 w kazdej dobie okna; awaryjna <= 2% wsi i <= 0.5% kcal (brak i zapas spichlerzy - INFO)", ok26)
     else:
         fw = [(d, v) for d, v in sorted(floor.items()) if d <= dd + 49]
@@ -34873,6 +34908,9 @@ def nks_main(logp, until=120, bdp=None):
                         mf2 = NKS_FLOOR2.search(s)
                         if mf2:
                             floor2[int(mm.group("day"))] = mf2.groupdict()
+                            mfl = NKS_FLOORLAND.search(s)
+                            if mfl:
+                                floor2[int(mm.group("day"))]["lands"] = mfl.group("body")
                 elif s.startswith(NKS_K + "wies je swoje"):
                     mm = NKS_OWN.match(s)
                     if mm:
@@ -35372,6 +35410,16 @@ def nks_main(logp, until=120, bdp=None):
             if bz > 0.10 * inf:
                 ok28 = False
         sh28_txt = ("udzial w ostatnich 28 dobach (" + (f"doby {bl28[0]}..{bl28[-1]}" if bl28 else "-") + "): " + ("; ".join(sh28) if sh28 else "brak liczb"))
+        # recenzja r4-bkwies: krok 5 DS z linii B1 - INFO (wsi z koszykiem ZC4: czesc listy wsi zostaje w kiesach; wsi do potrzeby: sol i narzedzia, odmowione, w kiesach)
+        v5 = {d: v for d, v in vneeds.items() if w0 <= d <= w1 and v.get("ln") is not None}
+        if v5:
+            n5 = len(v5)
+            def _s5(k):
+                return sum(int(v5[d].get(k) or 0) for d in v5) / n5
+            rep.add("NKS-29b: krok 5 DS wedlug potrzeb (linia B1, INFO)",
+                    f"doby {min(v5)}..{max(v5)} ({n5}), na dobe: wsi ZC4 bez listy wsi {_s5('skn'):.0f} (reszta {_s5('skr') or _s5('skz'):.0f} zl, w kiesach {_s5('skk'):.0f} zl); "
+                    f"wsi do potrzeby {_s5('ln'):.0f}: sol {_s5('salt'):.0f} + narzedzia {_s5('tools'):.0f} szt. za {_s5('lzl'):.0f} zl, odmowione {_s5('ref'):.0f} szt., w kiesach {_s5('keep'):.0f} zl"
+                    f" (kategorii pokrytych {_s5('cov'):.0f})", "INFO (sol i narzedzia 'bez rynku' - NKS-5u; ceny soli - NKS-27)", None)
         if vnw:
             dv = sorted(vnw)
             miss_bk = [d for d in dv if vnw[d].get("viol") is None]

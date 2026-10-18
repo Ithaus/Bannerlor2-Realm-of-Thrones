@@ -187,6 +187,7 @@ namespace Armoury
         private static double _bBudget; private static long _bMinMargin = long.MaxValue;
         private static readonly long[] _bPcs = new long[NG];
         private static int _sSkipN, _sLimN, _sRefused, _sFrames; private static double _sSkipZl, _sKeep; private static long _sZl, _sTk;
+        private static int _sCovered, _bClothHeld; private static double _sSkipKeep;          // recenzja r4-bkwies: kategorie potrzeby pokryte (krok 5), czesc listy wsi w kiesie u wsi ZC4, plotno K2 na rynku BK
         private static readonly long[] _sPcs = new long[NG];
         private static int _cN; private static double _cOld, _cNew;
 
@@ -196,6 +197,7 @@ namespace Armoury
             _bSpent = _bNeedZl = _bLuxZl = _bLuxPcs = _bRefused = _bOut = _bIn = _bTk = 0; _bBudget = 0; _bMinMargin = long.MaxValue;
             Array.Clear(_bPcs, 0, NG);
             _sSkipN = _sLimN = _sRefused = _sFrames = 0; _sSkipZl = _sKeep = 0; _sZl = _sTk = 0;
+            _sCovered = _bClothHeld = 0; _sSkipKeep = 0;
             Array.Clear(_sPcs, 0, NG);
             _cN = 0; _cOld = _cNew = 0;
             _stumbles = 0;
@@ -221,17 +223,20 @@ namespace Armoury
         internal static void BkRefused(int n) { if (n > 0) _bRefused += n; }
         internal static void BkSkipBasket() { _bSkipBasket++; }
         internal static void BkPoor() { _bPoor++; }
+        /// <summary>BkSeal34.RunVillageNeeds: wiersz plotna zatrzymany progiem polki K2 (zapas miasta dla wojska; recenzja r4-bkwies - jak BuyGoods).</summary>
+        internal static void BkClothHeld() { _bClothHeld++; }
         internal static void BkChestStop() { _bChestStop++; }
         /// <summary>Po zakupach wsi w ticku: zapas kiesy ponad skrzynie (bramka NKS-29: nigdy ponizej) - najmniejszy zapas doby i liczba naruszen.</summary>
         internal static void BkMargin(long margin) { if (margin < 0) _bViol++; if (margin < _bMinMargin) _bMinMargin = margin; }
         internal static void BkTime(long ticks) { if (ticks > 0) _bTk += ticks; }
 
-        /// <summary>TownFolk.DsSurplus: wies z koszykiem ZC4 - krok 5 bez listy wsi (budzet dalej do robot gminy / kiesy).</summary>
-        internal static void S5Skip(double zl) { _sSkipN++; if (zl > 0) _sSkipZl += zl; }
+        /// <summary>TownFolk.DsSurplus: wies z koszykiem ZC4 - krok 5 bez listy wsi; `zl` - reszta kroku 5 po liscie dostatku, `kept` - czesc listy wsi (podzial BuyGoods),
+        /// ktora zostaje w kiesie (recenzja r4-bkwies); reszta jak dotad (roboty gminy).</summary>
+        internal static void S5Skip(double zl, double kept) { _sSkipN++; if (zl > 0) _sSkipZl += zl; if (kept > 0 && !double.IsInfinity(kept)) _sSkipKeep += kept; }
         /// <summary>TownFolk.DsBuyNeeds: krok 5 do potrzeby - sztuki wedlug grupy, zl, odmowione ponad zapas i zl zostawione w kiesie.</summary>
-        internal static void S5Limit(int[] pcs, long zl, int refused, double keep)
+        internal static void S5Limit(int[] pcs, long zl, int refused, double keep, int covered)
         {
-            _sLimN++; _sZl += Math.Max(0, zl); _sRefused += Math.Max(0, refused); if (keep > 0) _sKeep += keep;
+            _sLimN++; if (covered > 0) _sCovered += covered; _sZl += Math.Max(0, zl); _sRefused += Math.Max(0, refused); if (keep > 0) _sKeep += keep;
             if (pcs != null) for (int g = 0; g < NG && g < pcs.Length; g++) _sPcs[g] += pcs[g];
         }
         internal static void S5Frame() { _sFrames++; }
@@ -264,12 +269,14 @@ namespace Armoury
                 for (int g = 0; g < NG; g++) sb.Append(g == 0 ? " " : ", ").Append(GName[g]).Append(' ').Append(_bPcs[g]);
                 sb.Append("; zbytki ").Append(_bLuxPcs).Append(" szt. w ").Append(_bLuxVil).Append(" wsiach (tickow wsi bogatych ").Append(_bRich).Append(")")
                   .Append("; zapas potrzeb w domu pelny ").Append(_bRefused).Append(" wierszy; pominiete: towary koszyka ZC4 ").Append(_bSkipBasket).Append(" wierszy, za drogo na budzet ").Append(_bPoor)
-                  .Append(", stop na skrzyni ").Append(_bChestStop).Append("; jedzenie kupione u wsi ZC4 ").Append(_bFoodZc4)
+                  .Append(", stop na skrzyni ").Append(_bChestStop).Append(", plotno ponizej progu polki K2 ").Append(_bClothHeld).Append("; jedzenie kupione u wsi ZC4 ").Append(_bFoodZc4)
                   .Append("; kiesa ponizej skrzyni po zakupie ").Append(_bViol).Append("; najmniejszy zapas ponad skrzynie ").Append(_bMinMargin == long.MaxValue ? "-" : _bMinMargin.ToString(Inv)).Append(" zl")
                   .Append("; kontrola kiesy wsi - kasy = ").Append(_bOut - _bIn)
-                  .Append(" | krok 5 (DS): wsi z koszykiem ZC4 bez listy wsi ").Append(_sSkipN).Append(" (budzet dalej do robot gminy ").Append(N0(_sSkipZl)).Append(" zl)")
+                  .Append(" | krok 5 (DS): wsi z koszykiem ZC4 bez listy wsi ").Append(_sSkipN).Append(" (reszta kroku 5 ").Append(N0(_sSkipZl)).Append(" zl, z niej czesc listy wsi zostaje w kiesach ")
+                  .Append(N0(_sSkipKeep)).Append(" zl, reszta jak dotad)")
                   .Append(", wsi do potrzeby ").Append(_sLimN).Append(": sol ").Append(_sPcs[GSalt]).Append(" + narzedzia ").Append(_sPcs[GTools]).Append(" szt. za ").Append(_sZl).Append(" zl")
-                  .Append(", ponad potrzebe odmowione ").Append(_sRefused).Append(" szt., zostalo w kiesach ").Append(N0(_sKeep)).Append(" zl, ramek ksiegi ").Append(_sFrames)
+                  .Append(", ponad potrzebe odmowione ").Append(_sRefused).Append(" szt., zostalo w kiesach ").Append(N0(_sKeep)).Append(" zl (kategorii z potrzeba pokryta ").Append(_sCovered)
+                  .Append("), ramek ksiegi ").Append(_sFrames)
                   .Append(" | skrzynia z koszyka Planu: wsi ").Append(_cN).Append(", koszyk dnia stary ").Append(N0(_cOld)).Append(" zl -> skrzyniowy ").Append(N0(_cNew)).Append(" zl")
                   .Append(" | czas: rynek BK ").Append((_bTk * f).ToString("0.00", Inv)).Append(" ms, krok 5 ").Append((_sTk * f).ToString("0.00", Inv)).Append(" ms");
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (sesja ").Append(_stumblesSess).Append(')');
