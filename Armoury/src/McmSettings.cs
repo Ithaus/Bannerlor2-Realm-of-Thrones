@@ -6680,6 +6680,10 @@ namespace Armoury
         [SettingPropertyGroup("Relief of besieged towns")]
         public bool BesiegedReliefKingsArmy { get; set; } = true;
 
+        [SettingPropertyBool("Besieged Relief Only When Reachable", HintText = "with Besieged Relief First: the lords are held to the relief of a besieged town or castle only while their realm can gather a relief the game will lead against the siege camp - all the lords of the realm within reach of it together (those already marching included) must be at least as strong as the smaller of the relief it calls for and 1.2 times the besiegers' strength (the game's own rule before a relief falls on a camp). A realm that cannot gather that much leaves its lords to their own judgement - they go to recruit, buy food or relieve another besieged fortress of the realm within reach - and calls them again once it is strong enough. Checked from the thirteenth hour of the siege, when every lord within reach has weighed it once. The same rule for every realm. Off = the lords stay by the besieged walls until the full relief is gathered, however long that takes")]
+        [SettingPropertyGroup("Relief of besieged towns")]
+        public bool BesiegedReliefOnlyWhenReachable { get; set; } = true;
+
         [SettingPropertyBool("Siege Phantom Lift", HintText = "A siege camp in which fewer than Siege Phantom Min Men men are able to fight (all its parties together, the wounded not counted), or whose parties together have a strength below 1 in the game's own reckoning, for Siege Phantom Lift Days days in a row breaks up: its parties leave the siege, as when peace is made, and choose a new aim. Not a camp with the player's own party, the player's army or a party of the player's clan, not a siege with the player inside the walls, not the sieges of the Realm of Thrones story, not the Others, never during a battle. The count of days is not saved - after loading a game it starts again. Off = such a camp stays until something else ends the siege")]
         [SettingPropertyGroup("Siege camps without fighting men")]
         public bool SiegePhantomLift { get; set; } = true;
@@ -9529,6 +9533,7 @@ namespace Armoury
             s.BesiegedReliefTownForce = BesiegedReliefTownForce;
             s.BesiegedReliefCastleForce = BesiegedReliefCastleForce;
             s.BesiegedReliefKingsArmy = BesiegedReliefKingsArmy;
+            s.BesiegedReliefOnlyWhenReachable = BesiegedReliefOnlyWhenReachable;
             s.SiegePhantomLift = SiegePhantomLift;
             s.SiegePhantomLiftDays = SiegePhantomLiftDays;
             s.SiegePhantomMinMen = SiegePhantomMinMen;
