@@ -2993,3 +2993,10 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   BanditLimitPerHideout domyslnie 12, suwak 12-48) + recenzja calosci (4 poprawione: KTown nie robi dluznika 166; korona2 bierze z kasy kupcow ponad prog gersumy + NoteCofferLoan;
   licznik linii scalenia; NeedReserveUncut - R miary potrzeby bez ciec f6/f7, koniec sprzezenia D -> R -> f). + f12-odsiecz -> **8cd7b556** (1963 ustawien, build rc 0, Armoury 997b14b7).
 - 09:36 PDT: TEST fin92 = 8cd7b556 (test/fin92), armoury-ks-auto.flag (USUNAC!), 160 dob sciezki Jeffa, at-fin92-fala67.out.txt. f9/f10/f11 jeszcze w kodzie (bez gry).
+- 09:55 PDT: f9-predkosc GOTOWE (wf_da8d5c48-9fa) w-toku/f9-predkosc **889f0b74**: przyciski x1/x4/x8 nad zegarem mapy (UIExtenderEx MapBar + mixin MapTimeControlVM, klawisze 4/5/6),
+  MapSpeedPerf (namioty AI po 8 na klatke, cache FindType, siatka band, zegar 10/s), linia "Predkosc mapy (f9)". FastMode NIE zmienia predkosci (x8 to nasz FastForwardMultiplier).
+  Wgranie wymaga Armoury.dll + Armoury/SubModule.xml (UIExtenderEx LoadBeforeThis optional). Recenzja 2 drobne poprawione. NAJWIEKSZE szarpniecie przy x8 = NASZ takt doby 512-757 ms w
+  jednej klatce (+ Swaty ROT CrashScribe ~290 ms) -> nowa paczka **f13-doba** (wf_de2e2ab7-36e, worktree zb/f13-doba od adbed122 = 8cd7b556 + f9): klucz DayTickSmooth, wyniki co do monety.
+- 09:55 PDT: f11-drogi GOTOWE (wf_2770bede-551) w-toku/f11-drogi **a27ae6d1**: drogi boczne kalkomaniami (jak piana NavalDLC; material mainmap_decal_undervillage ROT), tylko do dalszych
+  wiosek (blisko traktu - bez drogi; < 4 j. - bez), Dijkstra po ladzie, laczenie w siec, MapSideRoads domyslnie NIE; plik arm_map_side_roads_grid.tsv (dopisac do wgraj/bieg!); zdjecia:
+  armoury-drogi-boczne.flag + -PhotosFile tools/drogi/zdjecia-drogi-boczne.json + -ExtraAdd grid. Koszt klatki 14-20k kalkomanii nieznany (NBC-6 w biegu zdjec).
