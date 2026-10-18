@@ -2869,3 +2869,8 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   (7) firmy DS miast; (8) skory, sol, drewno bez odbiorcy; karawany traca.
 - 01:05 PDT: workflow wf_72bdc183-328 (fala 4, worktree zb/<nazwa> od f5fd0ae3): f4-ksiega-i-skory, f4-opal, f4-uchodzcy, f4-warsztaty, f4-kasy-miast-i-kupcy-z, f4-pomiary (A7 pomiar,
   regale, karawany, drewno), f4-place-ludu (symetryczne place + zarobek W do koszyka KS, potem nizsza danina). Bez rzeczy "po decyzji Jeffa".
+- 01:15 PDT: TEST fin87 (f5fd0ae3 = fala 3, sciezka Jeffa z armoury-ks-auto.flag - usuniety, 160 dob, Armoury-2026-10-18_00-26-23.log; wyniki scratchpad fin87/*.txt): kod 0, ERROR 0, KS sam
+  wlaczony 109109. LEPIEJ: KS q95 33.5 -> 12.9 ms, nuchodzcy 20/20, nmur 31/31, nzc1 1 NIE (bylo 4), wsie kupuja 90%. REGRESJE (NIE WGRYWAC 79 w tej postaci): NKS-15 zmarli z glodu 163
+  poza oblezeniami (fin86: 0), NZW-1 neutralny start zajec (silk_plant +27%), NZW-3 ikony 362 okregow (40-130), NPERF-4 pamiec zoldu markietanow 44/2141 rozjazdow (nie bit w bit),
+  ZAP-4 napisy zapisu 7.5 MB (> 5 MB), NDS-3a kiesy wsi -0.446%/d, korona 0.855, D 0.852; ARM-3 prog 35 vs kod 33. W grze zostaje WGRANIE 78.
+- 01:17 PDT: workflow wf_639d1725-f6f (fala 4b, zb/f4b-* od f5fd0ae3): f4b-glod, f4b-inwest, f4b-perf, f4b-zapis. Potem scalenie fali 4 + 4b, test, WGRANIE 79 (gdy Jeff nie gra).
