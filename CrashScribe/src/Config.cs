@@ -150,6 +150,12 @@ namespace CrashScribe
         public static bool RotEventHeirKeepsTitles = true;  // glowa rodu wyznaczona przez wydarzenie ROT (Cersei po Joffreyu, Bran po Robbie...) dziedziczy tytuly BK zabitego (suweren bez linii sukcesji / wyborow BK, reszta tytulow); false = BK wybiera dziedzica jak dotad (KL: Meryn Trant krolem)
         public static bool RotEventRulerInKingdom = true;   // tron z wydarzenia ROT dla rodu spoza krolestwa: rod niezalezny najpierw dolacza, rod w innym krolestwie / wybity / najemny / gracza - przekazanie pominiete; false = jak dotad (krolestwo moze dostac wladce spoza siebie - Nocna Straz w tescie 4 lat)
 
+        // --- noc 17/18.10, paczka f19-kanon-a (Jeff: "stannis nie ma sojuszu z dorzeczem to bzdura!"; CanonAlliances.cs, PovertyPeace.cs) ---
+        public static bool CanonAlliances = true;             // (2) sojusze jak w kronikach: w Westeros AI zawiera tylko Polnoc + Dorzecze, Stormlands + Reach (za zycia Renly'ego), Korona + Reach (po jego smierci); Stannis i Nocna Straz zadnych; Essos wolne; krolestwo gracza (gracz krolem) poza regula; false = sojusze jak w grze
+        public static bool CanonAlliancesBreakOnLoad = true;  // (3) tylko z CanonAlliances: w pierwszej godzinie po wczytaniu sojusze AI spoza listy zerwane (EndAlliance gry - bez kary relacji; porozumienia wezwan zamkniete przed nim, kazde osobno); false = istniejace sojusze trwaja do konca
+        public static bool CanonReachNorthWar = true;         // (4) po smierci Renly'ego (ROT OnRenlysDeath) wlaczona wojna fabularna ROT FIVE_KINGS_REACH_NORTH (Reach - Polnoc), ktora ROT ma zapisana, ale nigdy jej nie wlacza; wypowiada ja ROT (EnforceWars), raz; false = jak w ROT
+        public static bool PovertyPeaceSkipOneOff = true;     // (5) E1: ubytek skarbca na dobe bez jednorazowych odplywow (przelew skarbca stolicy, okup) - doba ze spadkiem ponad 3 x max(mediana zmian z 7 dob, sasiednie doby, 1000) nie wchodzi do sredniej, ubytek nigdy wiekszy niz dotad; ta sama regula dla wszystkich krolestw; false = srednia z pierwszej i ostatniej doby jak dotad
+
         internal static void Load(string moduleDataDir)
         {
             try
@@ -255,6 +261,10 @@ namespace CrashScribe
                         case "RotEventDeathNow": RotEventDeathNow = B(v); break;
                         case "RotEventHeirKeepsTitles": RotEventHeirKeepsTitles = B(v); break;
                         case "RotEventRulerInKingdom": RotEventRulerInKingdom = B(v); break;
+                        case "CanonAlliances": CanonAlliances = B(v); break;
+                        case "CanonAlliancesBreakOnLoad": CanonAlliancesBreakOnLoad = B(v); break;
+                        case "CanonReachNorthWar": CanonReachNorthWar = B(v); break;
+                        case "PovertyPeaceSkipOneOff": PovertyPeaceSkipOneOff = B(v); break;
                     }
                 }
             }

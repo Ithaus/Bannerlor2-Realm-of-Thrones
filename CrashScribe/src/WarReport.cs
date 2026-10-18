@@ -166,6 +166,8 @@ namespace CrashScribe
                     }
                 }
                 if (wars == 0) sb.Append("POKOJ WSZEDZIE - zadne krolestwo nie prowadzi wojny.");
+                // f19-kanon-a (1): kazda para sojuszu w tej samej linii - po "; " i bez " vs " (parsery kroniki licza tylko czesci z " vs ")
+                sb.Append(wars > 0 ? "; " : " ").Append(CanonAlliances.AlliancesPart());
                 Scribe.Line(sb.ToString());
 
                 ReportRotEvents();
