@@ -1316,6 +1316,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool VeteransByTier { get; set; } = true;
 
+        [SettingPropertyBool("Autotest Battle Kit", HintText = "test runs only (the CrashScribe autotest build) - no effect in your game: before a test battle the test company's men get the missing pieces of their own troop kit into the company stores, as recruits bring theirs, so the battle test fights armed; after the battle the same pieces are taken away again. Off = test men fight with whatever the stores hold, as before")]
+        [SettingPropertyGroup("The master's parry")]
+        public bool AutotestBattleKit { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Auto Parry Full Diff", 0.00f, 100.00f, "0.00", HintText = "your lead IS your chance: each point of skill lead gives (100 / this) % odds per swing, certain at this many points (25 = 4% a point: 13 pts -> 52%, 1 pt -> 4%)")]
         [SettingPropertyGroup("The master's parry")]
         public float AutoParryFullDiff { get; set; } = 25f;
@@ -7988,6 +7992,7 @@ namespace Armoury
             s.FleeAwayFromEnemies = FleeAwayFromEnemies;
             s.CommanderTactics = CommanderTactics;
             s.VeteransByTier = VeteransByTier;
+            s.AutotestBattleKit = AutotestBattleKit;
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;

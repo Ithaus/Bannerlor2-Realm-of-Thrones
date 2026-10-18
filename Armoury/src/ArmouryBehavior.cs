@@ -731,6 +731,9 @@ namespace Armoury
         // wspolnej linii konstruktora, ktora dopisuja inne paczki)
         private readonly bool _inwestReset = InwestReset();
         private static bool InwestReset() { try { VillageCrafts.Reset(); DistrictIcon.Reset(); DistrictWorks.Reset(); } catch (Exception e) { Log.Error("InwestReset", e); } return true; }
+        // f5-bitwa (noc 17/18.10): zestaw bitwy autotestu - stan poprzedniej kampanii od zera (osobna linia, jak inwest)
+        private readonly bool _f5BitwaReset = F5BitwaReset();
+        private static bool F5BitwaReset() { try { AutotestBattleKit.Reset(); } catch (Exception e) { Log.Error("F5BitwaReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1253,6 +1256,8 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, WorldClock7.OnMakePeace);
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, WorldClock7.OnKingdomDestroyed);
             CampaignEvents.TournamentStarted.AddNonSerializedListener(this, WorldClock7.OnTournamentStarted);
+            // f5-bitwa: zestaw bitwy autotestu czekajacy na zdjecie schodzi PRZED sprzedaza nadwyzek ludzi (MenPurse.OnEntered) - tylko autotest
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, delegate (MobileParty p, Settlement st, Hero h) { try { if (p != null && p.IsMainParty) AutotestBattleKit.OnMainEntered(); } catch { } });
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("MenPurse.OnEntered", MenPurse.OnEntered));   // wpis 84: nadwyzki ludzi PRZED zakupami
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("AiGear.OnSettlementEntered", AiGear.OnSettlementEntered));
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanAmmo.OnEntered", CaravanAmmo.OnEntered));   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
@@ -1418,6 +1423,9 @@ namespace Armoury
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("GatherFallen+WearKeep+AmmoRecovery",
                 delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } try { if (me != null && me.IsPlayerMapEvent) AmmoRecovery.AfterBattle(); } catch { } }));
+            // f5-bitwa (noc 17/18.10): zestaw bitwy autotestu zdjety po GatherFallen (ksiega przycieta ReconcileStock); misja otwarta - pierwsza godzina; tylko autotest
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AutotestBattleKit.OnMapEventEnded", AutotestBattleKit.OnMapEventEnded));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AutotestBattleKit.Hourly", AutotestBattleKit.Hourly));
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
             // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
             // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry
