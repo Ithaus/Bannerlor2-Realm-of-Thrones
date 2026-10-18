@@ -2874,3 +2874,9 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   poza oblezeniami (fin86: 0), NZW-1 neutralny start zajec (silk_plant +27%), NZW-3 ikony 362 okregow (40-130), NPERF-4 pamiec zoldu markietanow 44/2141 rozjazdow (nie bit w bit),
   ZAP-4 napisy zapisu 7.5 MB (> 5 MB), NDS-3a kiesy wsi -0.446%/d, korona 0.855, D 0.852; ARM-3 prog 35 vs kod 33. W grze zostaje WGRANIE 78.
 - 01:17 PDT: workflow wf_639d1725-f6f (fala 4b, zb/f4b-* od f5fd0ae3): f4b-glod, f4b-inwest, f4b-perf, f4b-zapis. Potem scalenie fali 4 + 4b, test, WGRANIE 79 (gdy Jeff nie gra).
+- 02:05 PDT: FALA 4 GOTOWA (wf_72bdc183-328, 21 agentow, 7/7 build rc 0; scratchpad fala4-wynik.json): f4-ksiega-i-skory 2de889dc (ksiega z aktualnych receptur KS - koniec falszywego
+  "mnoznik BK +1860/d"; skory z uboju wedlug tabeli swiata 1.6/0.6/0.4, grupa nskory), f4-opal a660940b (pora roku w opale KS, popyt opalu do dowozu, drewno dla dymarek; OBOWIAZKOWY test zimy:
+  plik armoury-zima-teraz.flag), f4-uchodzcy c41f3160 (dozowanie przyjec RaidRefugeesIntakeMeter), f4-warsztaty 35b7dcff (przezbrojenie liczy zysk ta sama cena i wsadem), f4-kasy-miast 
+  ab50e3a4 (przeglad firm DS co 91 dob w obie strony, w dol od razu przy zaleglosciach; pan splaca rachunki zywnosci wczesniej; zawrocony woz nie niszczy towaru), f4-pomiary c361458a
+  (tylko pomiary: A7, regale, karawany, zelazo/drewno), f4-place-ludu a30493d2 (place w dol do 0.6 przy wolnych rekach, zarobek W do koszyka KS 15-30 dni). Galezie na GitHub.
+  Jeff nie gra (02:02 PDT, zapis z 06:05). Okno 5 h 76% - scalenie po resecie 02:20.
