@@ -719,6 +719,107 @@ namespace Armoury
             Add(region, troop.StringId, n);
         }
 
+        /// <summary>
+        /// r4-mur (glod Wolnych Ludzi -> najazdy, FreeFolkRaids): ludzie do bandy najazdu z regionu `region` - najpierw ci, ktorzy wrocili z poprzednich najazdow
+        /// (klucz najnizszego bandyty klanu w puli regionu - RaidDisband), potem prosci z puli regionu (poszli w las z biedy), brak - z domow wsi regionu (TakeCommoners,
+        /// przyczyna "bieda i wojna do lasu" - glod; wies nie schodzi ponizej 50 hearth). Narodziny bandy jak RosterPostfix: z puli schodzi `n` ludzi (licznik
+        /// "narodziny band"), banda dostaje n x najnizszy bandyta klanu (CommonerFor), udzialy pochodzenia jak DrawOnly. Mniej niz `min` - nikt nie rusza (zabrani
+        /// z domow zostaja w puli jak wygnani bieda).
+        /// fromPool / fromHome - z puli i z domow (zabrani z domow ponad potrzebe zostaja w puli). Prawo wyrzutkow wylaczone - 0 (bez puli nie ma skad wziac ludzi).
+        /// </summary>
+        internal static int RaidDraw(Settlement region, int want, int min, Clan clan, PeopleBook.Shares org, out TroopRoster roster, out float fromPool, out float fromHome)
+        {
+            roster = TroopRoster.CreateDummyTroopRoster();
+            fromPool = 0f; fromHome = 0f;
+            if (!On || region == null || region.StringId == null || want <= 0) return 0;
+            Seed();
+            var commoner = CommonerFor(clan);
+            if (commoner == null) return 0;
+            var d = PoolOf(region);
+            string ck = commoner.StringId;
+            // 1. wrocili z poprzednich najazdow (klucz najnizszego bandyty klanu - tak wracaja z RaidDisband), 2. prosci, 3. z domow
+            float kv = 0f, cm;
+            if (ck != Commoner && !SkipUndeadKey(ck)) d.TryGetValue(ck, out kv);
+            d.TryGetValue(Commoner, out cm);
+            float cmBefore = cm;
+            int nk = Math.Min(want, (int)Math.Floor(kv));
+            int lack = want - nk - (int)Math.Floor(cm);
+            if (lack > 0)
+            {
+                float t = TakeCommoners(region, lack, PeopleBook.MMisery);     // dopisani do puli w TakeCommoners (Add -> naplyw)
+                _inMisery += t; fromHome = t;
+                d.TryGetValue(Commoner, out cm);
+            }
+            int nc = Math.Min(want - nk, (int)Math.Floor(cm));
+            int n = nk + nc;
+            if (n < Math.Max(1, min)) return 0;                                 // za malo - nikt nie rusza (zabrani z domow zostaja w puli)
+            if (nk > 0)
+            {
+                if (org != null) { try { org.AddAll(PeopleBook.PoolTake(region, nk, PoolTroopsOf(d))); } catch { } }   // E4/7: przed zdjeciem (jak DrawOnly)
+                d[ck] = kv - nk;
+                if (d[ck] < 0.01f) { _pTrim += d[ck]; d.Remove(ck); }
+            }
+            if (nc > 0)
+            {
+                d[Commoner] = cm - nc;
+                if (d[Commoner] < 0.01f) { _pTrim += d[Commoner]; d.Remove(Commoner); }
+                if (org != null) org.Add(region.StringId, nc);                // prosci - pochodzenie = region puli (jak DrawOnly)
+            }
+            roster.AddToCounts(commoner, n);
+            _pBirth += n; _bornBands++; _bornMen += n;
+            fromPool = nk + Math.Min(nc, cmBefore);
+            return n;
+        }
+
+        /// <summary>
+        /// r4-mur: banda najazdu wrocila do domu (albo czas powrotu minal) - rozwiazanie bez sprawcy (DestroyPartyAction), a OnPartyDestroyed oddaje jej ludzi
+        /// i jencow do puli regionu ZRODLA najazdu (zamiast regionu miejsca) z licznikiem "rozwiazane bandy" i udzialami pochodzenia - ta sama droga co kazda
+        /// rozwiazana banda (sklad czytaja tez ksiega ludzi E4/0 i ksiega pochodzenia). Zloto i towar bandy wolajacy oddaje wczesniej (kiesa 0 - bez dziury
+        /// "kiesy rozwiazanych band"), bohaterow-jencow uwalnia wczesniej. Zwraca ludzi skladu (bez jencow); -1 - prawo wyrzutkow wylaczone (banda zostaje w polu).
+        /// </summary>
+        internal static int RaidDisband(Settlement region, MobileParty party)
+        {
+            if (!On || region == null || party == null) return -1;
+            int men = party.MemberRoster.TotalRegulars;
+            _raidHome[party] = region;
+            try
+            {
+                if (party.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(party);
+                DestroyPartyAction.Apply(null, party);
+            }
+            finally { _raidHome.Remove(party); }
+            return men;
+        }
+        private static readonly Dictionary<MobileParty, Settlement> _raidHome = new Dictionary<MobileParty, Settlement>(PeopleBook.RefEq.I);   // tylko na czas RaidDisband
+
+        /// <summary>r4-mur (recenzja): nadmiar bandy najazdu ponad sufit ludzi (FreeFolkRaids.Trim) do puli regionu zrodla - naplyw "rozwiazane bandy" linii
+        /// "Pula wyrzutkow (E4/3)" (ludzie z bandy do lasu, jak przy rozwiazaniu), nie reszta "inne (uwolnieni jency...)".</summary>
+        internal static void RaidTrimAdd(Settlement region, CharacterObject troop, int n)
+        {
+            if (region == null || troop == null || troop.IsHero || n <= 0) return;
+            Add(region, troop.StringId, n);
+            _inDisband += n;
+        }
+
+        /// <summary>r4-mur (recenzja): banda najazdu nie powstala (wyjatek gry przy tworzeniu) - ludzie z RaidDraw wracaja do puli regionu, a liczniki dnia sa cofniete
+        /// (naplyw i "narodziny band" bez tych ludzi - jakby nikt nie ruszyl; zabrani z domow zostaja w puli jako "bieda/wojna", jak przy "za malo ludzi").
+        /// Wolane w tej samej dobie co RaidDraw (FreeFolkRaids.Daily przed OutlawLaw.Daily) - liczniki dnia jeszcze nie wyzerowane.</summary>
+        internal static void RaidUndraw(Settlement region, TroopRoster roster)
+        {
+            if (region == null || roster == null) return;
+            int n = 0;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                Add(region, el.Character.StringId, el.Number);
+                n += el.Number;
+            }
+            if (n <= 0) return;
+            _pAdd -= n; _pBirth -= n; _bornMen -= n;
+            if (_bornBands > 0) _bornBands--;
+        }
+
         /// <summary>N7: rozbici, ktorzy po czasie czekania w osadzie zbiorki ida do lasu (StragglersRally.Disperse) - do puli regionu i do naplywu
         /// "rozbici z bitew w las i bez domu" (linia "Pula wyrzutkow (E4/3)").</summary>
         internal static void RallyWoods(Settlement region, CharacterObject troop, int n)
@@ -902,7 +1003,9 @@ namespace Armoury
                     if (destroyer != null) _goneFought += party.PartyTradeGold; else _goneDisbanded += party.PartyTradeGold;
                 }
                 if (destroyer != null) return;
-                var region = NearestNode(party.Position.ToVec2());
+                Settlement region;
+                if (_raidHome.Count == 0 || !_raidHome.TryGetValue(party, out region) || region == null)      // r4-mur: banda najazdu - do puli okregu zrodla
+                    region = NearestNode(party.Position.ToVec2());
                 // E4/2 (e): druga droga wightow do puli zamknieta (jak W4b dla dezercji) - przy OthersRiseOnlyFromFallen wighty skladu i lochu do niczego
                 bool noDead = Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen;
                 AddRoster(region, party.MemberRoster, 1f, ref _inDisband, noDead);
@@ -1183,6 +1286,7 @@ namespace Armoury
                     try
                     {
                         if (p == null || !p.IsActive || p.MapEvent != null) continue;
+                        if (FreeFolkRaids.Owns(p)) continue;      // r4-mur: banda najazdu Wolnych Ludzi ma twardy sufit ludzi - nie werbuje z puli ani z jencow
                         // jency przechodza do bandy w swoim sprzecie (gorsi chetniej)
                         if (join > 0f && p.PrisonRoster != null && p.PrisonRoster.TotalRegulars > 0)
                         {

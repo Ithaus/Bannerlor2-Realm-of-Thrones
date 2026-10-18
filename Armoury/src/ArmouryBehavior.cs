@@ -392,6 +392,11 @@ namespace Armoury
         }
         private Dictionary<string,int> _prisonerBaseline;
 
+        // r4-mur (danina zbozowa Muru, glod Wolnych Ludzi -> najazdy): reset stanu kampanii w inicjalizatorze pola (biegnie przy kazdym konstruktorze ArmouryBehavior,
+        // przed jego cialem) - osobna linia zamiast dopisku do jednolinijkowego konstruktora (scalenia paczek nocy)
+        private readonly bool _r4MurReset = R4MurReset();
+        private static bool R4MurReset() { WallTribute.Reset(); FreeFolkRaids.Reset(); return true; }
+
         public ArmouryBehavior() { Instance = this; HistoricalPrices.Reset(); MaterialLaw.Reset(); WesterosClimate.Reset(); OutlawLaw.Reset(); PopulationLaw.Reset(); WorkshopLaw.Reset(); IronBank.Reset(); MarketGlut.Reset(); ArmsPricing.Reset(); StartKit.Reset(); AiGear.Reset(); Levy.Reset(); VolunteerKit.Reset(); LevyGold.Reset(); WearKeep.Reset(); UniqueSpoils.Reset(); BuildDiary.Reset(); BuildFunding.Reset(); WarFront.Reset(); KingdomLedger.Reset(); ColdStart.Reset(); MenPurse.Reset(); ArmyClothing.Reset(); AiWear.Reset(); SmithHours.Reset(); RecruitKit.Reset(); OreLedger.Reset(); GoodsLedger.Reset(); FreeSupplies.Reset(); VillageWoodlot.Reset(); SpoilsSeal.Reset(); MarketRoad.Reset(); MarketCarts.Reset(); VillageClogDiag.Reset(); CartTownExit.Reset(); MoneyLedger.Reset(); PeopleLedger.Reset(); CaravanBulk.Reset(); StartStock.Reset(); MineralOnce.Reset(); SoldierPay.Reset(); KingdomTreasury.Reset(); RecruitCost.Reset(); NightRest.ResetWorld(); WorldMeasure.Reset(); CirculationWindows.Reset(); ClanIncomeBook.Reset(); LosersFlee.Reset(); StragglersRally.Reset(); PrisonerLaw.Reset(); RecruitSources.Reset(); GarrisonCarts.Reset(); GarrisonArmory.Reset(); ArmsDrill.Reset(); CaravanAmmo.Reset(); ArmsLeaks.Reset(); SupplyDemand.ResetOrders(); MaterialOrders.Reset(); RawNoRot.Reset(); ArmsScrap.Reset(); MenUpgrade.Reset(); GarrisonKit.Reset(); QuartermasterLaw.Reset(); ShelfBuy.Reset(); Measure174b.Reset(); ShelfIndex.Reset(); Cost174.Reset(); DayProfile.Reset(); SkillLedger.Reset(); Drill.Reset(); HorseCensus.Reset(); KingdomBalance.Reset(); NorthHomeEdge.Reset(); ArmoryFit.Reset(); CastleSteel.Reset(); ValyrianBlades.Reset(); QohorMasters.Reset(); Measure169c.Reset(); Measure40.Reset(); CastlePurse.Reset(); VillageTakings.Reset(); BeatenPurse.Reset(); DefeatMorale.Reset(); CrownIncome.Reset(); CrownGifts.Reset(); ClanBudget.Reset(); MercContract.Reset(); CrownRents.Reset(); GentryService.Reset(); DebtLadder.Reset(); CrownCallToWar.Reset(); Ransom178.Reset(); CrownBorrow.Reset(); PeopleBook.Reset(); PeopleUnit.Reset(); OthersRise.Reset(); Devastation.Reset(); ScorchedEarth.Reset(); ArmsFromPeople.Reset(); TownGrowth.Reset(); VillageBook.Reset(); WatchLaw.Reset(); ThrallLaw.Reset(); TownFolk.Reset(); Sutlers.Reset(); NotableGold.Reset(); SmallGold.Reset(); BkDipGold.Reset(); BesiegedPay.Reset(); GarrisonRecruitFee.Reset(); Stage6Measure.Reset(); WorkshopInputs.Reset(); CamelLaw.Reset(); LordsEvenUp.Reset(); CastleMarket.Reset(); VetPurse.Reset(); HorseState.Reset(); HamletKinds.Reset(); HorseFate.Reset(); SpareHorses.Reset(); PackMarket.Reset(); PackSources.Reset(); AlleyProbe.Reset(); Bloomery.Reset(); TradeCarts.Reset(); ToolsByUse.Reset(); WorkshopRecipes.Reset(); SlaughterHides.Reset(); WorkshopInputsFix.Reset(); HarvestValve.Reset(); CavalryTemplate.Reset(); WorldClock7.Reset(); TerrainEase.Reset(); WorldTime7.Reset(); TwinsCrossing.Reset(); VillageNews.Reset(); DistrictRaid.Reset(); MapVillageLore.Reset(); VillageHolders.Reset(); DistrictMenu.Reset(); MapRoadsProbe.Reset(); CitySack.Reset(); PeopleScale.Reset(); VillageByPeople.Reset(); PeopleMarket.Reset(); PeopleLevy.Reset(); GoodsRates.Reset(); GoodsPaths.Reset(); TownInns.Reset(); BulkUnit.Reset(); NightEcon.Reset(); GentryNames.Reset(); FiefGrants.Reset(); ReaverLaw.Reset(); DoomedPartyMen.Reset(); UniqueShelf.Reset(); OthersDuel.Reset(); A17Diag.Reset(); SiegeRansom.Reset(); VineOlive.Reset(); DayHeld.Reset(); FallenCrown.Reset(); RockGold.Reset(); DragonFeed.Reset(); MercTenure.Reset(); RansomRepeat.Reset(); PeaceHold.Reset(); TaxCounterGuard.Reset(); CaptiveArmory.Reset(); VetKit.Reset(); GearFit.Reset(); CaravanGoods.Reset(); TownToll.Reset(); CourtGoods.Reset(); MenUpgradeOrders.Reset(); DailyLife.Reset(); DsVillage.Reset(); DsTowns.Reset(); DsSeason.Reset(); StartCalibration.Reset(); KsFoodCarts.Reset(); RoadsideInns.Reset(); Rumours.Reset(); TownInns.RoadDayReset(); }
 
         public override void SyncData(IDataStore dataStore)
@@ -539,6 +544,12 @@ namespace Armoury
             // B6: stan winnic i gajow kampanii "1|stan|dzien" - brak klucza (stary zapis) = kampania w toku, bez podmian (VineOlive.Import)
             try { string vo = dataStore.IsSaving ? VineOlive.Export() : null; SaveText.Sync(dataStore, "arm_vineolive", ref vo); if (dataStore.IsLoading) VineOlive.Import(vo); }
             catch (Exception e) { Log.Error("SyncData.arm_vineolive", e); }
+            // r4-mur: danina zbozowa Muru - wozy w drodze i liczniki od poczatku (arm_mur_danina); bandy najazdu Wolnych Ludzi (arm_mur_najazdy). Wlasne try;
+            // brak klucza (stary zapis, Ironman Jeffa) = pusto; starszy DLL ignoruje klucze (zboze w drodze przepada, bandy zostaja zwyklymi bandami)
+            try { string md = dataStore.IsSaving ? WallTribute.Export() : null; SaveText.Sync(dataStore, "arm_mur_danina", ref md); if (dataStore.IsLoading) WallTribute.Import(md); }
+            catch (Exception e) { Log.Error("SyncData.arm_mur_danina", e); }
+            try { string mn = dataStore.IsSaving ? FreeFolkRaids.Export() : null; SaveText.Sync(dataStore, "arm_mur_najazdy", ref mn); if (dataStore.IsLoading) FreeFolkRaids.Import(mn); }
+            catch (Exception e) { Log.Error("SyncData.arm_mur_najazdy", e); }
             try
             {
                 dataStore.SyncData("arm_condition", ref _condition);
@@ -1009,6 +1020,11 @@ namespace Armoury
             CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, WatchLaw.OnRaidCompleted);   // E4/9 (H1): rabunki z napastnikiem frakcji Strazy - tylko licznik
             CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur (I1b: w krainie z niewola do domu)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("OutlawLaw.Hourly", delegate { try { OutlawLaw.Hourly(); } catch { } }));
+            // r4-mur (recenzja): flaga "bez nowych decyzji" band najazdu w marszu / powrocie nigdy w zapisie gry (MobilePartyAi.DoNotMakeNewDecisions jest zapisywana) -
+            // zdjeta przed zapisem, przywrocona po nim i w pierwszej godzinie po wczytaniu; bez band najazdu - nic
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { FreeFolkRaids.BeforeSave(); } catch (Exception e) { Log.Error("FreeFolkRaids.BeforeSave", e); } });
+            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { FreeFolkRaids.SaveOver(); } catch (Exception e) { Log.Error("FreeFolkRaids.SaveOver", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
@@ -1875,6 +1891,8 @@ namespace Armoury
             finally { GoodsLedger.End(gfForage); } DayProfile.Lap("ScorchedEarth.OnDaily");
             try { Devastation.Daily(); } catch (Exception e) { Log.Error("Devastation.Daily", e); } DayProfile.Lap("Devastation.Daily");   // E4/5 (113n): smierc i powrot uchodzcow - PO zerowaniu armii (zegar regionu widzi dzisiejsze zerowanie)
             try { Famine.Daily(); } catch (Exception e) { Log.Error("Famine.Daily", e); } DayProfile.Lap("Famine.Daily");   // E4/6 (191): spichlerze okregow, glod, uchodzcy z glodu - PO spustoszeniu i powrocie uchodzcow, PRZED ksiega ludzi (PeopleBook.Daily zamyka dobe konta UCHODZCY)
+            // r4-mur: danina zbozowa Muru (spichlerze Polnocy -> wozy -> spichlerze Strazy) - PO Famine.Daily (migawka spichlerzy tej doby)
+            try { WallTribute.Daily(); } catch (Exception e) { Log.Error("WallTribute.Daily", e); } DayProfile.Lap("WallTribute.Daily");
             try { VillageBook.Daily(); } catch (Exception e) { Log.Error("VillageBook.Daily", e); } DayProfile.Lap("VillageBook.Daily");   // E4/11 (193, Z6): puste osady wiosek uzgodnione z kontem PO powrotach i ucieczkach z glodu tej doby; czyta licznik trafionych Devastation PRZED DayLine
             try { Leaks310.Daily(); } catch (Exception e) { Log.Error("Leaks310.Daily", e); } DayProfile.Lap("Leaks310.Daily");   // 3.10: zold zaciagu ROT od pana i linia "Drobne z niczego (3.10)" (furaz tej doby)
             try { WarLedger.OnDaily(); } catch (Exception e) { Log.Error("WarLedger", e); } DayProfile.Lap("WarLedger.OnDaily");
@@ -2025,6 +2043,9 @@ namespace Armoury
             try { FolkAidLoyalty.Daily(); } catch (Exception e) { Log.Error("FolkAidLoyalty.Daily", e); } DayProfile.Lap("FolkAidLoyalty.Daily");
             try { SoldierPay.Daily(); } catch (Exception e) { Log.Error("SoldierPay.Daily", e); } DayProfile.Lap("SoldierPay.Daily");   // zold do obiegu: linia "Zold:" i liczniki doby (po zwrocie ze skarbca)
             try { ArmyClothing.Daily(); } catch (Exception e) { Log.Error("ArmyClothing.Daily", e); } DayProfile.Lap("ArmyClothing.Daily");   // 150: linia "Odziez wojska (150):" (zlota nie rusza)
+            // r4-mur: najazdy glodnych Wolnych Ludzi (migawka spichlerzy z Famine.Daily tej doby) - tuz PRZED OutlawLaw.Daily: ludzie z domow do puli i z puli do band
+            // w tym samym miejscu doby co naplyw biedy OutlawLaw, a linia puli wyrzutkow liczy dzisiejsze narodziny i rozwiazania band najazdu
+            try { FreeFolkRaids.Daily(); } catch (Exception e) { Log.Error("FreeFolkRaids.Daily", e); } DayProfile.Lap("FreeFolkRaids.Daily");
             try { OutlawLaw.Daily(); } catch (Exception e) { Log.Error("OutlawLaw.Daily", e); } DayProfile.Lap("OutlawLaw.Daily");   // wyrzutki: bieda, powroty, werbunek band
             try { IronBank.Daily(); } catch (Exception e) { Log.Error("IronBank.Daily", e); } DayProfile.Lap("IronBank.Daily");   // Bank Zelazny: pozyczki AI, raty, bankructwa
             // 166 + 162m (projekt etapu 2, 2.0b): budzet rodow po Banku, przed ksiega rodow (na D z wczoraj); osobna pozycja ksiegi pieniadza (dwor do kas siedzib,

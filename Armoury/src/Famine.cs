@@ -77,6 +77,9 @@ namespace Armoury
             // (decyzja Jeffa 11.10). FamN = uchodzcy z glodu przy stanie konta FamAt; ubytek konta (smierc 1.3%/rok, glod, podloga 10) schodzi z obu czesci
             // proporcjonalnie (FamPart), powrot - wedlug czesci (Returned), doplyw rabunku nie rusza FamN; synchronizacja raz na dobe (CleanAccounts)
             public double FamN, FamAt;
+            // r4-mur (danina zbozowa Muru, glod Wolnych Ludzi): migawka ostatniego Daily - ludzie w domu, plon doby (po GranaryFloor KS), doba; bez zapisu
+            // (pierwsze Daily po wczytaniu wypelnia ja przed WallTribute.Daily i FreeFolkRaids.Daily)
+            public double LastHome, LastHarvest, LastCap; public int LastDay = int.MinValue;
         }
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, Barn> _barns = new Dictionary<string, Barn>();   // id osady wsi -> spichlerz
@@ -344,6 +347,66 @@ namespace Armoury
             catch (Exception e) { Stumble("Famine.Take", e); return 0; }
         }
 
+        // ------------------------------------------------------------ r4-mur: danina zbozowa Muru i glod Wolnych Ludzi (WallTribute.cs, FreeFolkRaids.cs)
+        /// <summary>r4-mur: migawka spichlerza wsi z ostatniego Daily - ludzie w domu, plon doby (racje, po GranaryFloor KS), racje w spichlerzu teraz, brak jedzenia
+        /// gospodarzy (u), sufit spichlerza (racje) i doba migawki. false - wylaczone, spichlerz nie zalozony albo bez migawki. Nie rzuca.</summary>
+        internal static bool DayOf(Village v, out double home, out double harvest, out double food, out double cap, out float u, out int day)
+        {
+            home = harvest = food = cap = 0.0; u = 0f; day = int.MinValue;
+            if (v == null || v.Settlement == null || v.Settlement.StringId == null) return false;
+            try
+            {
+                if (!On) return false;
+                lock (Gate)
+                {
+                    Barn b;
+                    if (!_barns.TryGetValue(v.Settlement.StringId, out b) || double.IsNaN(b.Food) || double.IsInfinity(b.Food) || b.LastDay == int.MinValue) return false;
+                    home = b.LastHome; harvest = b.LastHarvest; food = b.Food; cap = b.LastCap; u = b.U; day = b.LastDay;
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("Famine.DayOf", e); return false; }
+        }
+
+        /// <summary>r4-mur: danina w naturze - zdejmuje ze spichlerza wsi najwyzej `rations` racji (nie wiecej niz lezy). Zwraca, ile zdjeto (0 - wylaczone albo
+        /// spichlerz nie zalozony). Miedzy dobami Famine - kontrola spichlerzy liczy od stanu na poczatku Daily, wiec jej nie zaburza. Nie rzuca.</summary>
+        internal static double TributeTake(Village v, double rations)
+        {
+            if (v == null || v.Settlement == null || v.Settlement.StringId == null || !(rations > 0.0) || double.IsInfinity(rations)) return 0.0;
+            try
+            {
+                if (!On) return 0.0;
+                lock (Gate)
+                {
+                    Barn b;
+                    if (!_barns.TryGetValue(v.Settlement.StringId, out b) || double.IsNaN(b.Food) || !(b.Food > 0.0)) return 0.0;
+                    double t = Math.Min(rations, b.Food);
+                    b.Food -= t;
+                    return t;
+                }
+            }
+            catch (Exception e) { Stumble("Famine.TributeTake", e); return 0.0; }
+        }
+
+        /// <summary>r4-mur: dowieziona danina do spichlerza wsi (racje). false - wylaczone albo spichlerz nie zalozony (wolajacy szuka innej wsi; nic nie ginie).
+        /// Ponad sufit spichlerza nadwyzka odejdzie przy nastepnym Daily jak plon (towar na wozy). Nie rzuca.</summary>
+        internal static bool TributeGive(Village v, double rations)
+        {
+            if (v == null || v.Settlement == null || v.Settlement.StringId == null || !(rations > 0.0) || double.IsInfinity(rations)) return false;
+            try
+            {
+                if (!On) return false;
+                lock (Gate)
+                {
+                    Barn b;
+                    if (!_barns.TryGetValue(v.Settlement.StringId, out b) || double.IsNaN(b.Food) || double.IsInfinity(b.Food)) return false;
+                    b.Food += rations;
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("Famine.TributeGive", e); return false; }
+        }
+
         /// <summary>
         /// Devastation.Daily (powrot uchodzcow, GL 2.6), `away` = konto wsi teraz: 0 = moga wracac; 1 = wies nie przyjmuje (Accepts: gospodarze gloduja, a dla konta
         /// w innym regionie takze pole nie karmi i spichlerz ponizej FamineReturnMinDays dni dla gospodarzy) - nikt z konta; 2 = siedza w murach oblezonej warowni
@@ -589,6 +652,7 @@ namespace Armoury
                         if (!_barns.TryGetValue(x.Id, out b)) _barns[x.Id] = b = new Barn();
                         if (double.IsNaN(b.Food) || double.IsInfinity(b.Food) || b.Food < 0.0) { b.Food = start * x.Cap; seeded++; seededFood += b.Food; }
                         x.B = b;
+                        b.LastHome = x.Home; b.LastHarvest = x.Harvest; b.LastCap = x.Cap; b.LastDay = today;   // r4-mur: migawka doby (tylko odczyt WallTribute / FreeFolkRaids)
                     }
                     x.Node = OutlawLaw.RegionFor(st) ?? st;
                     Reg r;

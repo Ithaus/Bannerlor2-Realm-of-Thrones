@@ -1027,6 +1027,19 @@ Uzycie (Python 3, tylko odczyt):
                     bazy + 2), NKS-30f bilans NA TARG jedzenia (INFO, wiaze NKS-3), NKS-30g A7 przy progu (INFO), NKS-30h Plan bez pokrycia wedlug krainy (INFO),
                     NKS-30i rece przesuniete (INFO), NKS-30j ziemia: prog nie bierze ziemi ponad 0.98 powierzchni bloku (przyrost <= 1e-6 powierzchni; bloki ponad
                     granica przed/po progu i okregi z ruchem ucietym ziemia - w wierszu). Brak linii - INFO. Opcja --baza-doby <log bez r4-polnoc>: jak NKS-30e.
+--grupa nmur      : (17.10, decyzja Jeffa "dowoz jak w ksiazkach" - STAN-PRAC ### 72; galaz w-toku/r4-mur, Armoury/src/WallTribute.cs, FreeFolkRaids.cs, klucze Wall Grain
+                    Tribute i Free Folk Hunger Raids) python -I tools/sprawdz_logi.py --grupa nmur <Armoury-*.log> (strumieniowo). DANINA ZBOZOWA MURU (linia "Danina Muru
+                    (r4-mur)"): NMUR-1 linia czynna kazdej doby, NMUR-2 kontrola drogi (w drodze wczoraj + wyslane - zepsute - dostarczone - oddane dawcom = w drodze dzis,
+                    |reszta| <= max(1, 1e-6 w drodze)), NMUR-3 zboze od poczatku (wyslane = dostarczone + zepsute + oddane dawcom + w drodze), NMUR-4 psucie <= 8%,
+                    NMUR-5 danina dojechala (> 0), NMUR-6 pokrycie Strazy z pola i daniny >= 0.90 (mediana 28 ostatnich dob z oferta; z pola - INFO), NMUR-7 spichlerze Strazy
+                    w dniach - spadek <= 5% w biegu, NMUR-8 wyslane <= oferta Polnocy kazdej doby (dawca nie glodzi), NMUR-9 zadanie/wyslane/niedobor (INFO), NMUR-10 koszt
+                    <= 5 ms mediana, NMUR-11 potkniecia 0, NMUR-12 zboze przepadle u bram (30 dob bez miejsca) <= 5% wyslanego. NAJAZDY WOLNYCH LUDZI (linia "Najazdy Wolnych Ludzi (r4-mur)"): NMUR-20 linia czynna, NMUR-21 ludzie od poczatku
+                    (wyruszylo + przybyli = wrocili + straty + przyciete + puszczone + w polu, reszta 0), NMUR-22 ludzie wzieci = ludzie w najazdach (z puli + z domow =
+                    wyruszylo), NMUR-23 sufit band i ludzi, NMUR-24 indeks 0 -> zadnej nowej bandy, NMUR-25 proby nowych band wobec sumy szans (+-3 sigma; INFO przy
+                    oczekiwanych < 3), NMUR-26/27 indeks i bandy (INFO), NMUR-28 bandy wracaja (bieg >= 90 dob), NMUR-29 kontrola linii "Pula wyrzutkow (E4/3)" w dobach
+                    narodzin i powrotow band najazdu (dzien puli = dzien linii najazdow + 1), NMUR-30 koszt <= 5 ms, NMUR-31 potkniecia 0, NMUR-32 wymarsz (bandy dochodza
+                    do celu - >= 1 przy >= 3 bandach i biegu >= 60 dob; bez segmentu - INFO), NMUR-E ERROR paczki 0.
+                    Log bez linii (sprzed paczki albo KS niezastosowany) - INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -36426,6 +36439,221 @@ def nks_main(logp, until=120, bdp=None):
     return 0
 
 
+# ------------------------------------------------------------ nmur (17.10, r4-mur: danina zbozowa Muru i glod Wolnych Ludzi -> najazdy; Armoury/src/WallTribute.cs, FreeFolkRaids.cs)
+NMUR_TRIB = "Danina Muru (r4-mur): dzien "
+NMUR_RAID = "Najazdy Wolnych Ludzi (r4-mur): dzien "
+NMUR_POOL = "Pula wyrzutkow (E4/3): dzien "
+NMUR_ERR = ("ERROR in WallTribute", "ERROR in FreeFolkRaids", "ERROR in SyncData.arm_mur", "ERROR in Famine.DayOf", "ERROR in Famine.TributeTake", "ERROR in Famine.TributeGive")
+NMUR_SPOIL_MAX = 0.08      # zepsute / (dostarczone + zepsute) od poczatku - przy 0.25%/d i drodze 10-20 dob ok. 2.5-5%
+NMUR_COV_MIN = 0.90        # pokrycie Strazy z pola i daniny (mediana ostatnich 28 dob czynnych z oferta Polnocy)
+NMUR_BARN_DROP = 0.05      # spichlerze Strazy (dni) od pierwszej do ostatniej doby czynnej: spadek najwyzej 5%
+NMUR_MS = 5.0              # koszt linii (mediana ms) - kazda z dwoch
+NMUR_ROT_MAX = 0.05        # zboze przepadle u bram (woz 30 dob bez rozladunku) / wyslane od poczatku - tylko utrata okregu Strazy przy pelnych spichlerzach dawcow
+
+
+def nmur_main(logp, until=120):
+    """nmur (17.10; r4-mur, klucze Wall Grain Tribute i Free Folk Hunger Raids): danina zbozowa lordow Polnocy dla Nocnej Strazy (zamkniety przeplyw racji spichlerzy
+    Polnoc -> wozy -> Straz) i glod Wolnych Ludzi -> najazdy band przez Mur. Wejscie: log Armoury (strumieniowo). Brak linii (log sprzed paczki, KS niezastosowany) - INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NMUR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    trib, trib_off, raid, raid_off, pool, n_err = {}, [], {}, [], {}, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NMUR_TRIB):
+                d = num(r"dzien (\d+)", s)
+                if d is None:
+                    continue
+                if "| WYLACZONA (" in s and "bez wozow w drodze" in s:
+                    trib_off.append(s)
+                else:
+                    trib[d] = s
+            elif s.startswith(NMUR_RAID):
+                d = num(r"dzien (\d+)", s)
+                if d is None:
+                    continue
+                if "| WYLACZONE (" in s and "bez band w polu" in s:
+                    raid_off.append(s)
+                else:
+                    raid[d] = s
+            elif s.startswith(NMUR_POOL):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    pool[d] = s
+            elif s.startswith(NMUR_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linie daniny {len(trib)} (wylaczona {len(trib_off)}), linie najazdow {len(raid)} (wylaczone {len(raid_off)}), linie puli wyrzutkow {len(pool)}")
+    if not trib and not raid:
+        why = "linie 'WYLACZONA/WYLACZONE' (klucz albo KS niezastosowany)" if (trib_off or raid_off) else "brak w logu (log sprzed paczki r4-mur)"
+        rep.add("NMUR-0: linie 'Danina Muru' i 'Najazdy Wolnych Ludzi'", why, "INFO", None)
+        rep.add("NMUR-E: ERROR paczki (WallTribute, FreeFolkRaids, Famine.Tribute*, SyncData.arm_mur_*)", n_err, "0", n_err == 0)
+        rep.show()
+        return 0
+
+    # ---------------- danina
+    td = sorted(trib)
+    on = [d for d in td if "| CZYNNA" in trib[d]]
+    rep.add("NMUR-1: linia 'Danina Muru' kazdej doby (czynna)", f"czynna {len(on)} z {len(td)} dob" + (f" (d{td[0]}-d{td[-1]})" if td else ""), "czynna kazdej doby z KS", (len(on) == len(td) and len(td) > 0) if td else None)
+    if td:
+        bad, worst = [], 0.0
+        for d in td:
+            c = fnum(r"kontrola drogi " + SF, trib[d])
+            tr = fnum(r"\| w drodze " + F_, trib[d]) or 0.0
+            if c is None:
+                bad.append(d); continue
+            if abs(c) > max(1.0, 1e-6 * tr):
+                bad.append(d)
+            worst = max(worst, abs(c))
+        rep.add("NMUR-2: kontrola drogi (wczoraj + wyslane - zepsute - dostarczone - oddane = dzis)", f"poza tolerancja {len(bad)} dob (najwieksza |reszta| {worst:.3f})", "|reszta| <= max(1, 1e-6 w drodze) kazdej doby", not bad)
+        last = trib[td[-1]]
+        m = re.search(r"od poczatku: wyslane " + F_ + r" = dostarczone " + F_ + r" \+ zepsute " + F_ + r" \+ oddane dawcom " + F_ + r" \+ w drodze " + F_ + r" \(reszta " + SF + r"\)", last)
+        if m:
+            out, inn, sp, bk, tr, rr = (float(m.group(i)) for i in range(1, 7))
+            ok = abs(rr) <= max(1.0, 1e-6 * out) and abs(out - inn - sp - bk - tr) <= max(2.0, 1e-6 * out)
+            rep.add("NMUR-3: zboze od poczatku (wyslane = dostarczone + zepsute + oddane dawcom + w drodze)", f"{out:.0f} = {inn:.0f} + {sp:.0f} + {bk:.0f} + {tr:.0f} (reszta {rr:.3f})", "reszta ~0 (nic z niczego, nic w nicosc)", ok)
+            share = sp / (inn + sp) if inn + sp > 0 else None
+            rep.add("NMUR-4: psucie w drodze (zepsute / (dostarczone + zepsute))", f"{100.0 * share:.2f}%" if share is not None else "nic nie dojechalo", f"<= {100 * NMUR_SPOIL_MAX:.0f}%", (share <= NMUR_SPOIL_MAX) if share is not None else None)
+            rep.add("NMUR-5: danina dojechala do Strazy", f"dostarczone {inn:.0f} racji (ok. {inn / 20.0:.0f} szt. zboza), wyslane {out:.0f}", "> 0 przy czynnej danini i ofercie Polnocy",
+                    (inn > 0) if on else None)
+        else:
+            rep.add("NMUR-3: zboze od poczatku", "brak segmentu 'od poczatku' w ostatniej linii", "segment w linii", False)
+        # pokrycie Strazy przed / po danine
+        cov = [(d, fnum(r"z pola " + F_ + r", z pola i daniny", trib[d]), fnum(r"z pola i daniny " + F_, trib[d]), fnum(r"oferta " + F_ + r"/d", trib[d]) or 0.0) for d in on]
+        cov = [c for c in cov if c[1] is not None and c[2] is not None]
+        tail = [c for c in cov if c[3] > 0][-28:]
+        if tail:
+            med0 = st.median(c[1] for c in tail); med1 = st.median(c[2] for c in tail)
+            rep.add("NMUR-6: pokrycie Strazy (kcal ludzi wsi Strazy) przed / po danine", f"z pola {med0:.3f} -> z pola i daniny {med1:.3f} (mediana {len(tail)} ostatnich dob z oferta)",
+                    f"po danine >= {NMUR_COV_MIN:.2f} (przed - INFO)", med1 >= NMUR_COV_MIN)
+        else:
+            rep.add("NMUR-6: pokrycie Strazy przed / po danine", "brak dob czynnych z oferta Polnocy", "INFO", None)
+        days = [(d, fnum(r"racji = " + F_ + r" dni", trib[d])) for d in on]
+        days = [x for x in days if x[1] is not None and x[1] > 0]
+        if len(days) >= 2:
+            a, b = days[0][1], days[-1][1]
+            rep.add("NMUR-7: spichlerze Strazy (dni) - pierwsza / ostatnia doba czynna", f"{a:.1f} -> {b:.1f} ({100.0 * (b - a) / a:+.1f}%)", f"spadek <= {100 * NMUR_BARN_DROP:.0f}% (danina zatrzymuje glod Muru)", b >= a * (1.0 - NMUR_BARN_DROP))
+        over = []
+        for d in on:
+            w = fnum(r"\| wyslane " + F_ + r" racji", trib[d]); o = fnum(r"oferta " + F_ + r"/d", trib[d])
+            if w is not None and o is not None and w > o + 1.0:
+                over.append(d)
+        rep.add("NMUR-8: dawcy nie oddaja ponad oferte (nadwyzka ponad rezerwe x udzial)", f"dob z wyslanym > oferta: {len(over)}", "0 (nigdy nie glodzi dawcy)", not over if on else None)
+        tot_w = sum(fnum(r"\| wyslane " + F_ + r" racji", trib[d]) or 0.0 for d in on)
+        tot_z = sum(fnum(r"zadanie " + F_ + r" racji", trib[d]) or 0.0 for d in on)
+        tot_n = sum(fnum(r"niedobor " + F_, trib[d]) or 0.0 for d in on)
+        rep.add("NMUR-9: zadanie Strazy / wyslane / niedobor (suma dob czynnych)", f"zadanie {tot_z:.0f}, wyslane {tot_w:.0f}, niedobor {tot_n:.0f}", "INFO", None)
+        ms = [fnum(r"czas " + F_ + r" ms", trib[d]) for d in td]
+        ms = [x for x in ms if x is not None]
+        if ms:
+            rep.add("NMUR-10: koszt linii daniny", f"mediana {st.median(ms):.2f} ms (max {max(ms):.2f})", f"<= {NMUR_MS:.0f} ms mediana", st.median(ms) <= NMUR_MS)
+        stb = num(r"potkniecia (\d+)", trib[td[-1]])
+        rep.add("NMUR-11: potkniecia daniny (od wczytania)", stb, "0", stb == 0 if stb is not None else None)
+        rot = [fnum(r"przepadle u bram po \d+ dobach bez miejsca " + F_, trib[d]) for d in td]
+        if any(x is not None for x in rot):
+            rot_s = sum(x or 0.0 for x in rot)
+            out_s = fnum(r"od poczatku: wyslane " + F_, trib[td[-1]]) or 0.0
+            share = rot_s / out_s if out_s > 0 else 0.0
+            rep.add("NMUR-12: zboze przepadle u bram (woz 30 dob bez rozladunku)", f"{rot_s:.0f} racji = {100.0 * share:.2f}% wyslanego ({out_s:.0f})", f"<= {100 * NMUR_ROT_MAX:.0f}% (zwykle 0)", share <= NMUR_ROT_MAX)
+        else:
+            rep.add("NMUR-12: zboze przepadle u bram", "brak segmentu (linia sprzed recenzji r4-mur)", "INFO", None)
+    else:
+        rep.add("NMUR-1..11: danina", "brak linii czynnych" + (f" (wylaczona: {trib_off[-1][len(NMUR_TRIB):][:120]})" if trib_off else ""), "INFO", None)
+
+    # ---------------- najazdy
+    rd = sorted(raid)
+    ron = [d for d in rd if "| CZYNNE" in raid[d]]
+    rep.add("NMUR-20: linia 'Najazdy Wolnych Ludzi' kazdej doby (czynne)", f"czynne {len(ron)} z {len(rd)} dob", "czynne kazdej doby z KS", (len(ron) == len(rd) and len(rd) > 0) if rd else None)
+    if rd:
+        bad_id, bad_pop, bad_cap, bad_big = [], [], [], []
+        hz_spawn, exp_e, succ, spawned, idx = 0, 0.0, 0, 0, []
+        for d in rd:
+            s = raid[d]
+            r1 = num(r"w polu \d+ \(reszta (-?\d+)\)", s)
+            if r1 is None or r1 != 0:
+                bad_id.append(d)
+            r2 = fnum(r"= wyruszylo \d+ \(reszta " + SF + r"\)", s)
+            if r2 is None or abs(r2) > 0.5:
+                bad_pop.append(d)
+            m = re.search(r"w polu (\d+)/(\d+) band", s)
+            if m and int(m.group(1)) > int(m.group(2)):
+                bad_cap.append(d)
+            m = re.search(r"najwieksza (\d+)/(\d+)", s)
+            if m and int(m.group(1)) > int(m.group(2)):
+                bad_big.append(d)
+            h = fnum(r"glod: indeks " + F_, s); ch = fnum(r"szansa " + F_, s)
+            nw = num(r"nowe dzis (\d+)", s) or 0
+            nr = num(r"bez drogi (\d+)", s) or 0; nf = num(r"za malo ludzi (\d+)", s) or 0
+            if h is not None:
+                idx.append(h)
+                if h <= 0.0 and nw > 0:
+                    hz_spawn += 1
+            spawned += nw
+            if ch is not None and "[sufit band]" not in s and "[bez prawa wyrzutkow" not in s and "[brak klanu" not in s and "| CZYNNE" in s:
+                exp_e += ch; succ += nw + nr + nf
+        rep.add("NMUR-21: ludzie najazdow od poczatku (wyruszylo + przybyli = wrocili + straty + przyciete + puszczone + w polu)", f"doby z reszta != 0: {len(bad_id)}" + (f" (d{bad_id[0]})" if bad_id else ""), "0", not bad_id)
+        rep.add("NMUR-22: ludzie wzieci = ludzie w najazdach (z puli + z domow = wyruszylo)", f"doby z |reszta| > 0.5: {len(bad_pop)}" + (f" (d{bad_pop[0]})" if bad_pop else ""), "0 (nikt z niczego)", not bad_pop)
+        rep.add("NMUR-23: sufit band i ludzi (w polu <= Max Parties, najwieksza <= Max Men)", f"ponad sufit band {len(bad_cap)} dob, ponad sufit ludzi {len(bad_big)} dob", "0 / 0", not bad_cap and not bad_big)
+        rep.add("NMUR-24: bez glodu bez najazdow (indeks 0 -> nowe 0)", f"doby z indeksem 0 i nowa banda: {hz_spawn}", "0", hz_spawn == 0)
+        if exp_e >= 3.0:
+            lo, hi = exp_e - 3.0 * exp_e ** 0.5 - 1.0, exp_e + 3.0 * exp_e ** 0.5 + 1.0
+            rep.add("NMUR-25: proby nowych band wobec indeksu glodu (suma szans dob bez sufitu)", f"proby {succ} (nowe {spawned}) wobec oczekiwanych {exp_e:.1f} (przedzial {max(0.0, lo):.1f}-{hi:.1f})",
+                    "w przedziale +-3 sigma (losowanie uczciwe)", lo <= succ <= hi)
+        else:
+            rep.add("NMUR-25: proby nowych band wobec indeksu glodu", f"oczekiwanych {exp_e:.2f} (za malo do testu), nowe {spawned}", "INFO (oczekiwane >= 3)", None)
+        if idx:
+            rep.add("NMUR-26: indeks glodu Wolnych Ludzi (doby czynne)", f"srednio {st.mean(idx):.3f} (min {min(idx):.3f}, max {max(idx):.3f})", "INFO", None)
+        last = raid[rd[-1]]
+        m = re.search(r"band: wyruszylo (\d+), wrocilo (\d+), zginelo (\d+)", last)
+        if m:
+            ns, nr, nl = (int(m.group(i)) for i in (1, 2, 3))
+            rep.add("NMUR-27: bandy najazdu - wyruszylo / wrocilo / zginelo", f"{ns} / {nr} / {nl}", "INFO (powrot po Free Folk Raid Days + droga)", None)
+            if ns > 0 and len(rd) >= 90:
+                rep.add("NMUR-28: bandy wracaja (cykl najazdu domkniety)", f"wrocilo {nr} + zginelo {nl} z {ns}", ">= 1 przy biegu >= 90 dob z najazdami", nr + nl >= 1)
+        # pula wyrzutkow w dobach z narodzinami / powrotami band najazdu (linia puli ma dzien gry = dzien linii najazdow + 1)
+        badp, seen = [], 0
+        for d in rd:
+            s = raid[d]
+            nw = num(r"nowe dzis (\d+)", s) or 0
+            rt = num(r"wrocilo (\d+) band", s) or 0
+            if nw + rt == 0:
+                continue
+            p = pool.get(d + 1)
+            if p is None:
+                continue
+            seen += 1
+            c = fnum(r"kontrola: zmiana - \(naplyw - odplyw\) = " + SF, p)
+            if c is not None and abs(c) > 1.0:
+                badp.append(d)
+        rep.add("NMUR-29: pula wyrzutkow zamknieta w dobach najazdow (kontrola linii 'Pula wyrzutkow (E4/3)')", f"doby z narodzinami/powrotami {seen}, z |kontrola| > 1: {len(badp)}", "0", (not badp) if seen else None)
+        ms = [fnum(r"czas " + F_ + r" ms", raid[d]) for d in rd]
+        ms = [x for x in ms if x is not None]
+        if ms:
+            rep.add("NMUR-30: koszt linii najazdow", f"mediana {st.median(ms):.2f} ms (max {max(ms):.2f})", f"<= {NMUR_MS:.0f} ms mediana", st.median(ms) <= NMUR_MS)
+        stb = num(r"potkniecia (\d+)", last)
+        rep.add("NMUR-31: potkniecia najazdow (od wczytania)", stb, "0", stb == 0 if stb is not None else None)
+        arr = [num(r"doszly dzis (\d+)", raid[d]) for d in rd]
+        if any(x is not None for x in arr):
+            arr_s = sum(x or 0 for x in arr)
+            mar = num(r"w marszu (\d+)", last) or 0
+            m = re.search(r"band: wyruszylo (\d+)", last)
+            ns = int(m.group(1)) if m else 0
+            capm = sum(num(r"marsz ponad \d+ dob (\d+)", raid[d]) or 0 for d in rd)
+            ok = (arr_s >= 1) if (ns >= 3 and len(rd) >= 60) else None
+            rep.add("NMUR-32: wymarsz band do celu (bez napadow po drodze; u celu patrol)", f"doszly do celu {arr_s} z {ns} band, marsz ponad 30 dob {capm}, w marszu teraz {mar}",
+                    ">= 1 przy >= 3 bandach i biegu >= 60 dob (inaczej INFO)", ok)
+        else:
+            rep.add("NMUR-32: wymarsz band do celu", "brak segmentu (linia sprzed recenzji r4-mur)", "INFO", None)
+    else:
+        rep.add("NMUR-20..31: najazdy", "brak linii czynnych" + (f" (wylaczone: {raid_off[-1][len(NMUR_RAID):][:120]})" if raid_off else ""), "INFO", None)
+    rep.add("NMUR-E: ERROR paczki (WallTribute, FreeFolkRaids, Famine.Tribute*, SyncData.arm_mur_*)", n_err, "0", n_err == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -36631,6 +36859,8 @@ def main(argv):
         return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
     if group == "npolnoc" and logp:
         return npolnoc_main(logp, bdp)   # npolnoc (r4-polnoc, noc 17/18.10): najpierw wyzywic siebie i zimna ziemia - wyzywienie krain z Planu (NKS-30), zbieznosc, tozsamosc rak
+    if group == "nmur" and logp:
+        return nmur_main(logp, until_arg)   # nmur (17.10, r4-mur): danina zbozowa Muru (WallTribute.cs) i glod Wolnych Ludzi -> najazdy (FreeFolkRaids.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

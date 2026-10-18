@@ -346,6 +346,17 @@ RANGES = {
     # r4-koszyk (17.10 noc): place za brak rak - zgodnie z przycieciem w kodzie (KsWageHands: krok 0..10%, sufit 1..2)
     'KsWageHandsStepPercent': (0.0, 10.0, "0.0"),
     'KsWageHandsMax': (1.0, 2.0, "0.00"),
+    # r4-mur (17.10): danina zbozowa Muru i najazdy Wolnych Ludzi - zgodnie z przycieciem w kodzie (WallTribute: udzial 0..100%, psucie 0..50%/d; FreeFolkRaids: szansa 0..1, band 0..64)
+    'WallTributeTargetDays': (0, 728, "0"),
+    'WallTributeRefillDays': (1, 364, "0"),
+    'WallTributeGiverReserveDays': (0, 728, "0"),
+    'WallTributeGiverSharePercent': (0.0, 10.0, "0.00"),
+    'WallTributeSpoilPercentPerDay': (0.0, 2.0, "0.00"),
+    'FreeFolkRaidMaxParties': (0, 20, "0"),
+    'FreeFolkRaidMaxMen': (1, 120, "0"),
+    'FreeFolkRaidMinMen': (1, 120, "0"),
+    'FreeFolkRaidDays': (1, 120, "0"),
+    'FreeFolkRaidDailyChance': (0.0, 1.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):
