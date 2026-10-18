@@ -309,6 +309,7 @@ namespace Armoury
             int shops;
             float use = ClayUse(town, clay.ItemCategory, out shops);
             if (use <= 0f) return 0;
+            if (GoodsPaths.BulkClay) use /= Math.Max(1f, HistoricalPrices.CountScale(clay));   // ZC1 (kampania z glina w ladunkach): cykl bierze liczbe z receptury / czynnik ladunku
             var s = Settings.Current;
             return (int)Math.Ceiling(use * Math.Max(1, s != null ? s.CaravanBulkStockDays : 10));
         }
@@ -369,8 +370,6 @@ namespace Armoury
             int potTowns = 0, potShops = 0; double potNeed = 0; long potKeep = 0, potShelf = 0;
             var types = new int[Daily4.Length];
             Items();
-            var s = Settings.Current;
-            int stockDays = Math.Max(1, s != null ? s.CaravanBulkStockDays : 10);
             foreach (var t in Town.AllTowns)
             {
                 if (t == null || !t.IsTown) continue;
@@ -390,7 +389,7 @@ namespace Armoury
                         float use = ClayUse(t, _clay.ItemCategory, out shops);
                         if (use > 0f)
                         {
-                            potTowns++; potShops += shops; potNeed += use; potKeep += (long)Math.Ceiling(use * stockDays);
+                            potTowns++; potShops += shops; potNeed += use; potKeep += ClayKeep(t, _clay);   // ten sam prog co ClayHold (z czynnikiem ladunku ZC1)
                             if (t.Owner != null && t.Owner.ItemRoster != null) potShelf += t.Owner.ItemRoster.GetItemNumber(_clay);
                         }
                     }
