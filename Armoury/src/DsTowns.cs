@@ -20,8 +20,8 @@ namespace Armoury
     ///    Zaleglosc przez DsFarmDistraintTerms dni kwartalu z rzedu - ZAJECIE: pan i korona biora zaleglosc z kiesy gminy miasta (najwyzej 2/3 jej stanu w dzien raty).
     ///    Zaleglosc ponad DsFarmForgiveWeeks rat - darowana (licznik). ODNOWA co DsFarmRenewDays: firma w strone (doplyw netto kupcow 28 dob x udzial z dnia ustalenia),
     ///    najwyzej +-DsFarmRenewMax (miasto bez udzialu - udzial swiata).
-    ///    f4 P5 (przeglad ekonomii 18.10): przy Ds Farm Review Days > 0 (91) zamiast odnowy - PRZEGLAD co kwartal w obie strony (w gore tylko bez zaleglosci), w dol od razu
-    ///    przy zaleglosciach przez Ds Farm Arrears Review Terms dni kwartalu z rzedu (Review).
+    ///    f4 P5 (przeglad ekonomii 18.10): przy Ds Farm Review Days > 0 (91) zamiast odnowy - PRZEGLAD co kwartal w obie strony (w gore tylko bez zaleglosci), przy
+    ///    zaleglosciach przez Ds Farm Arrears Review Terms dni kwartalu z rzedu - w dol WYMUSZONY o pelne Ds Farm Renew Max, najwyzej jedna zmiana na kwartal (Review).
     ///  - Po ustaleniu NIE biegna: zawor miast (TownPurse.Valve) i zamkow (CastlePurse), danina z oszczednosci P1 (KingdomTreasury.WaRate), podatek od skarbca ludu miast
     ///    i zamkow (TownFolk.PayHoard), danina wojenna miast 1%/d (Levies), W7 z ludu (LvSources). Zostaja: czynsz gruntowy M1, akcyza M5, myto, clo (x2 w wojnie - Levies).
     ///  - M6 WYPLATA KUPCOM: co dobe 1/DsMerchantDrawDays kasy ponad 1.5 x zapas kupcow - w miescie P (DsMerchantDrawPShare) i R jako zarobek (placa podatek pana i 184),
@@ -90,9 +90,10 @@ namespace Armoury
         private static double _dueL, _dueC, _dueLf, _remit, _noLordAmt, _arrNew, _arrPaid, _forgiven, _aidArrNew, _aidLost, _aidForg, _movAssess, _movRemit, _movRamp, _movShort, _movLost;
         private static long _paidL, _paidC, _paidLf, _distL, _distC, _drawT, _drawC, _aidPaid, _aidArrPaid, _movPaid;
         private static long _payOut, _payIn;
-        // f4 P5 (przeglad ekonomii 18.10): przeglad firm co kwartal (Ds Farm Review Days) - w dol od razu przy zaleglosciach, w gore wstrzymane przy zaleglosciach,
-        // bez zmiany, zmiana firm w gore / w dol (zl/rok, z czescia z oszczednosci ludu)
-        private static int _revArrN, _revHeld, _revSame;
+        // f4 P5 (przeglad ekonomii 18.10): przeglad firm co kwartal (Ds Farm Review Days) - w dol wymuszone przy zaleglosciach (tylko te, ktore naprawde obnizyly firme),
+        // w gore wstrzymane przy zaleglosciach, bez zmiany, zmiana firm w gore / w dol (zl/rok, z czescia z oszczednosci ludu); recenzja f4: wymuszone przed wlasna doba
+        // przegladu (tylko przy Ds Farm Review Days > kwartal) i najkrotszy odstep miedzy przegladami tej samej osady (kontrola limitu: najwyzej jedna zmiana na kwartal)
+        private static int _revArrN, _revHeld, _revSame, _revEarly, _revMinGap = int.MaxValue;
         private static double _revUpAmt, _revDownAmt;
 
         private static void ClearCounters()
@@ -101,7 +102,7 @@ namespace Armoury
             _dueL = _dueC = _dueLf = _remit = _noLordAmt = _arrNew = _arrPaid = _forgiven = _aidArrNew = _aidLost = _aidForg = _movAssess = _movRemit = _movRamp = _movShort = _movLost = 0;
             _paidL = _paidC = _paidLf = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
             _payOut = _payIn = 0;
-            _revArrN = _revHeld = _revSame = 0; _revUpAmt = _revDownAmt = 0;
+            _revArrN = _revHeld = _revSame = _revEarly = 0; _revUpAmt = _revDownAmt = 0; _revMinGap = int.MaxValue;
             _stumbles = 0;
         }
 
@@ -409,9 +410,14 @@ namespace Armoury
         /// udzialu - udzial swiata) w doplywie netto kupcow ostatnich 28 dob (pamiec sesji, najmniej 7 dob), najwyzej +-Ds Farm Renew Max - poziom firmy bez zmian, firma
         /// idzie za zyskiem (bogate wiecej, biedne mniej). Dwie zmiany wobec odnowy: (1) osada z zaleglosciami (>= jednej raty) nie dostaje podwyzki (podwyzka przy
         /// zaleglosci tylko powiekszalaby zaleglosc - oscylacja); (2) osada z zaleglosciami przez Ds Farm Arrears Review Terms dni kwartalu z rzedu (ATerms, liczone w Terms
-        /// w dzien kwartalu) dostaje przeglad W DOL od razu - raz na dzien kwartalu (tylko gdy od ostatniego dnia kwartalu nie bylo przegladu), bez czekania na swoja dobe.
-        /// Firma pana, korony i czesc z oszczednosci ludu w tym samym stosunku (jak Renew). Zloto sie nie rusza - zmienia sie tylko nalezna rata (zamknieta ekonomia: platnik
-        /// i odbiorca bez zmian, kontrola linii "platnicy - odbiorcy" jak dotad). Kazda osada we wlasnym try, potkniecia liczone.
+        /// w dzien kwartalu) i z dniem kwartalu po ostatnim przegladzie dostaje przeglad WYMUSZONY w dol o pelne Ds Farm Renew Max, bez wzgledu na doplyw netto: zaleglosc
+        /// trwa przez dwa dni kwartalu tylko wtedy, gdy kasa stoi na podlodze (rata placi najpierw zaleglosc i rate z calego zlota ponad podloge - Pay; wyjatki: oblezenie
+        /// i zmiana krolestwa do 28 dob, osada bez zywego pana - w logach 0), wiec firma jest ponad sily miasta, nawet gdy doplyw netto (cel) tego nie widzi (wyplywy kasy). Recenzja f4: (a) wymuszone obniza ZAWSZE (dotad cel >= firma dawal "bez zmiany", a linia liczyla
+        /// to jako "w dol od razu"); licznik tylko przy r &lt; 1; (b) najwyzej jedna zmiana na kwartal: wymuszone przed wlasna doba przegladu tylko po >= kwartale od
+        /// ostatniego przegladu (przy Ds Farm Review Days 91 zawsze we wlasna dobe; dotad przeglad we wlasna dobe i drugi w najblizszy dzien kwartalu dawaly do -27,75%
+        /// w 1..90 dob). Firma pana, korony i czesc z oszczednosci ludu w tym samym stosunku (jak Renew). Zloto sie nie rusza - zmienia sie tylko nalezna rata (zamknieta
+        /// ekonomia: platnik i odbiorca bez zmian, kontrola linii "platnicy - odbiorcy" jak dotad). ATerms bez zerowania (zajecie DsFarmDistraintTerms liczy dalej jak dotad).
+        /// Kazda osada we wlasnym try, potkniecia liczone.
         /// </summary>
         private static void Review(int today, Settings s, int qd)
         {
@@ -425,24 +431,33 @@ namespace Armoury
                     if (f.Fixed < 0 || f.NF < NetMinDays) continue;
                     double inst = (f.FL + f.FC + f.FLf) / Weeks;
                     bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
-                    bool due = today - f.Fixed >= qd;
-                    bool downNow = !due && at > 0 && arrears && f.ATerms >= at && f.Fixed < lastTerms;
-                    if (!due && !downNow) continue;
+                    int gap = today - f.Fixed;                          // dob od ostatniego przegladu (albo ustalenia firmy)
+                    bool due = gap >= qd;
+                    // zaleglosci przez at dni kwartalu z rzedu, nadal >= raty, i dzien kwartalu po ostatnim przegladzie (ATerms zmienione od tamtej doby)
+                    bool forced = at > 0 && arrears && f.ATerms >= at && f.Fixed < lastTerms;
+                    // przed wlasna doba (tylko przy Ds Farm Review Days > kwartal): najwyzej jedna zmiana na kwartal
+                    bool early = !due && forced && gap >= Quarter;
+                    if (!due && !early) continue;
                     double F = f.FL + f.FC, all0 = F + f.FLf;
                     f.Fixed = today; _renewN++;
-                    if (downNow) _revArrN++;
+                    if (gap < _revMinGap) _revMinGap = gap;
                     if (F <= 0) continue;
-                    double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
-                    if (double.IsNaN(share) || share <= 0) { _revSame++; continue; }
-                    double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
-                    double hi = arrears ? F : F * (1 + m);                 // przy zaleglosci bez podwyzki
-                    if (arrears && target > F + 1e-9) _revHeld++;
-                    double nf = Math.Max(F * (1 - m), Math.Min(hi, target));
-                    double r = nf / F;
+                    double r;
+                    if (forced) r = 1 - m;                              // wymuszone w dol o pelny limit - bez wzgledu na cel
+                    else
+                    {
+                        double share = !double.IsNaN(f.Share) ? f.Share : _worldShare;
+                        if (double.IsNaN(share) || share <= 0) { _revSame++; continue; }
+                        double target = Math.Max(0, NetAvg(f, NetMinDays)) * share * YearDays;
+                        double hi = arrears ? F : F * (1 + m);             // przy zaleglosci bez podwyzki
+                        if (arrears && target > F + 1e-9) _revHeld++;
+                        double nf = Math.Max(F * (1 - m), Math.Min(hi, target));
+                        r = nf / F;
+                    }
                     f.FL *= r; f.FC *= r; f.FLf *= r;
                     double d = all0 * (r - 1);
                     if (r > 1 + 1e-9) { _renewUp++; _revUpAmt += d; }
-                    else if (r < 1 - 1e-9) { _renewDown++; _revDownAmt -= d; }
+                    else if (r < 1 - 1e-9) { _renewDown++; _revDownAmt -= d; if (forced) { _revArrN++; if (early) _revEarly++; } }
                     else _revSame++;
                 }
                 catch (Exception e) { Stumble("Review", e); }
@@ -1005,10 +1020,14 @@ namespace Armoury
                     {
                         int at = Math.Max(0, Math.Min(8, s.DsFarmArrearsReviewTerms));
                         int aq = 0; foreach (var f in _farm.Values) if (f.ATerms >= 1 && f.AL + f.AC + f.ALf >= 1) aq++;
-                        sb.Append(" | przeglad firm co ").Append(qd).Append(" dob (f4): w dol od razu przy zaleglosciach przez ").Append(at).Append(" dni kwartalu z rzedu ").Append(_revArrN)
+                        double mr = Math.Max(0, Math.Min(0.5, (double)s.DsFarmRenewMax));
+                        sb.Append(" | przeglad firm co ").Append(qd).Append(" dob (f4): w dol wymuszone (-").Append((mr * 100).ToString("0.##", Inv)).Append("%) przy zaleglosciach przez ")
+                          .Append(at).Append(" dni kwartalu z rzedu ").Append(_revArrN).Append(" (z tego przed wlasna doba ").Append(_revEarly).Append(")")
                           .Append(", w gore wstrzymane przy zaleglosciach ").Append(_revHeld).Append(", bez zmiany ").Append(_revSame)
                           .Append("; firmy w gore +").Append(N0(_revUpAmt)).Append(" zl/rok, w dol -").Append(N0(_revDownAmt)).Append(" zl/rok")
-                          .Append("; osad z zaleglosciami w ostatnim dniu kwartalu ").Append(aq);
+                          .Append("; osad z zaleglosciami w ostatnim dniu kwartalu ").Append(aq)
+                          .Append("; najkrotszy odstep przegladow tej samej osady ").Append(_revMinGap == int.MaxValue ? "-" : _revMinGap.ToString(Inv))
+                          .Append(" dob (limit: najwyzej jedna zmiana na ").Append(Math.Min(qd, Quarter)).Append(" dob)");
                     }
                 }
                 sb.Append(" | kontrola: platnicy - odbiorcy = ").Append(_payOut - _payIn);

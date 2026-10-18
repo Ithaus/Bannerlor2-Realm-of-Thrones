@@ -1270,6 +1270,8 @@ Uzycie (Python 3, tylko odczyt):
                     paczki (INFO), NKA-1 zaleglosci firm DS (panom + koronie + z oszczednosci ludu): wzrost na dobe po pierwszym przegladzie <= max(10 tys., 0.5 x wzrost
                     28 dob przed nim) - po >= 7 dobach od przegladu (krocej albo bez przegladu - INFO; pierwszy przeglad 91 dob po ustaleniu firm), NKA-2 zmiana sumy firm
                     (miasta + zamki + z oszczednosci ludu) w dobie przegladu <= 15.5% (Ds Farm Renew Max 0.15), NKA-2b kierunek kolejnych przegladow (oscylacja - INFO),
+                    NKA-2c (recenzja f4) najwyzej jedna zmiana firmy na kwartal: "najkrotszy odstep przegladow tej samej osady" >= min(Ds Farm Review Days, 91) dob kazdej
+                    doby z przegladem (segment bez odstepu - INFO) i liczba "w dol wymuszone" (INFO, tylko te, ktore obnizyly firme),
                     NKA-3 miasta z kasa ponizej zapasu kupcow (linia "Kasy zaulkow (m6b)"): na koniec <= max(12, liczba w dobie pierwszego przegladu) po >= 28 dobach od
                     przegladu (krocej - INFO), NKA-4 rachunki zywnosci KS-H starsze niz zwloka 0 zl kazdej doby i najstarszy rachunek <= zwloka (segment f4 linii KS-H),
                     NKA-5 wczesna splata panow: kontrola zlota linii pana 0 i "przed zwloka" <= "splacone przez panow miast" (KS-H), NKA-5b kwoty (INFO), NKA-6 kontrole
@@ -41003,8 +41005,11 @@ def _nka_scan(logp):
         "farms": re.compile(r"\| firmy od doby (-?\d+): miasta (\d+) - (\d+) zl/rok, zamki (\d+) - (\d+) zl/rok z kas .*?panom z oszczednosci ludu (\d+) zl/rok"),
         "arr": re.compile(r"\| zaleglosci: nowe " + i_ + r", splacone " + i_ + r", razem panom " + i_ + r" \+ koronie " + i_ + r" \+ panom z oszczednosci ludu " + i_ + r" u (\d+) osad"),
         "ren": re.compile(r"\| odnowy (\d+) \(w gore (\d+), w dol (\d+)\)"),
-        "rev": re.compile(r"\| przeglad firm co (\d+) dob \(f4\): w dol od razu przy zaleglosciach przez (\d+) dni kwartalu z rzedu (\d+), w gore wstrzymane przy zaleglosciach (\d+),"
+        "rev": re.compile(r"\| przeglad firm co (\d+) dob \(f4\): w dol (?:od razu|wymuszone \(-[\d.]+%\)) przy zaleglosciach przez (\d+) dni kwartalu z rzedu (\d+)"
+                          r"(?: \(z tego przed wlasna doba \d+\))?, w gore wstrzymane przy zaleglosciach (\d+),"
                           r" bez zmiany (\d+); firmy w gore \+" + i_ + r" zl/rok, w dol -" + i_ + r" zl/rok; osad z zaleglosciami w ostatnim dniu kwartalu (\d+)"),
+        "revx": re.compile(r"w dol wymuszone \(-([\d.]+)%\) przy zaleglosciach przez \d+ dni kwartalu z rzedu \d+ \(z tego przed wlasna doba (\d+)\)"),
+        "gap": re.compile(r"; najkrotszy odstep przegladow tej samej osady (\d+|-) dob \(limit: najwyzej jedna zmiana na (\d+) dob\)"),
         "ctl": re.compile(r"\| kontrola: platnicy - odbiorcy = " + i_),
         "stum": re.compile(r"\| potkniecia (\d+) \(w sesji"),
     }
@@ -41165,7 +41170,7 @@ def nkasy_main(logp):
         arrn = sum(gi(DS[d], "rev", 2) for d in revd); held = sum(gi(DS[d], "rev", 3) for d in revd); same = sum(gi(DS[d], "rev", 4) for d in revd)
         pu = sum(gi(DS[d], "rev", 5) for d in revd); pd = sum(gi(DS[d], "rev", 6) for d in revd)
         rep.add("NKA-2: przeglad firm w limicie (zmiana sumy firm w dobie przegladu <= Ds Farm Renew Max)",
-                f"dob z przegladem {len(rev_days)}, przegladow razem {sum(gi(DS[d], 'ren', 0) for d in rev_days)} (w gore {up}, w dol {dn}, bez zmiany {same}; w dol od razu przy zaleglosciach"
+                f"dob z przegladem {len(rev_days)}, przegladow razem {sum(gi(DS[d], 'ren', 0) for d in rev_days)} (w gore {up}, w dol {dn}, bez zmiany {same}; w dol wymuszone przy zaleglosciach"
                 f" {arrn}, w gore wstrzymane przy zaleglosciach {held}); firmy +{pu} / -{pd} zl/rok; najwieksza zmiana sumy "
                 + (f"{max(abs(s[1]) for s in steps) * 100:.1f}% (doba {max(steps, key=lambda s: abs(s[1]))[0]})" if steps else "-")
                 + (f"; ponad limit {len(bad)} ({bad[0][0]}: {bad[0][1] * 100:.1f}%)" if bad else ""),
@@ -41173,6 +41178,20 @@ def nkasy_main(logp):
         dirs = [f"{d}: " + ("+" if gi(DS[d], "rev", 5) > gi(DS[d], "rev", 6) else ("-" if gi(DS[d], "rev", 6) > gi(DS[d], "rev", 5) else "0")) for d in revd if gi(DS[d], "ren", 0) > 0]
         rep.add("NKA-2b: kierunek przegladow po kolei (oscylacja - INFO)", ", ".join(dirs) if dirs else "brak doby z przegladem",
                 "INFO (naprzemienne +/- w kolejnych kwartalach = oscylacja do obejrzenia)", None)
+        # NKA-2c (recenzja f4): najwyzej jedna zmiana firmy na kwartal - najkrotszy odstep przegladow tej samej osady >= min(Ds Farm Review Days, 91)
+        gaps = [(d, gi(DS[d], "gap", 0, -1), gi(DS[d], "gap", 1, 91)) for d in revd if gi(DS[d], "ren", 0) > 0 and "gap" in DS[d]]
+        gaps = [g for g in gaps if g[1] >= 0]
+        forced = sum(gi(DS[d], "rev", 2) for d in revd if "revx" in DS[d]); early = sum(gi(DS[d], "revx", 1) for d in revd if "revx" in DS[d])
+        if gaps:
+            badg = [g for g in gaps if g[1] < g[2]]
+            gmin = min(gaps, key=lambda g: g[1])
+            rep.add("NKA-2c: najwyzej jedna zmiana firmy na kwartal (odstep przegladow tej samej osady)",
+                    f"dob z przegladem i odstepem {len(gaps)}, najkrotszy odstep {gmin[1]} dob (doba {gmin[0]}, limit {gmin[2]})"
+                    + (f"; ponizej limitu {len(badg)} ({badg[0][0]}: {badg[0][1]} < {badg[0][2]})" if badg else "")
+                    + f"; w dol wymuszone przy zaleglosciach (obnizone) {forced}, z tego przed wlasna doba {early}",
+                    "odstep >= min(Ds Farm Review Days, 91) dob kazdej doby z przegladem", not badg)
+        else:
+            rep.add("NKA-2c: najwyzej jedna zmiana firmy na kwartal", "brak segmentu 'najkrotszy odstep przegladow' (log sprzed recenzji f4)", "INFO", None)
     else:
         rep.add("NKA-2: przeglad firm w limicie", "brak doby z przegladem (odnowy > 0) z segmentem f4", "INFO (pierwszy przeglad 91 dob po ustaleniu firm)", None)
 

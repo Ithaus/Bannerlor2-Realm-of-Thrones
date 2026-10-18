@@ -7300,7 +7300,7 @@ namespace Armoury
         [SettingPropertyGroup("Town purses and food merchants (economy review 18.10)")]
         public int DsFarmReviewDays { get; set; } = 91;
 
-        [SettingPropertyInteger("Ds Farm Arrears Review Terms", 0, 8, "0", HintText = "with Ds Farm Review Days: a town or castle that has owed part of its farm over this many quarter days in a row has its farm reviewed downward at once instead of waiting for its next review (0 = it waits like any other)")]
+        [SettingPropertyInteger("Ds Farm Arrears Review Terms", 0, 8, "0", HintText = "with Ds Farm Review Days: a town or castle that has owed part of its farm over this many quarter days in a row, and still owes it, has its farm lowered by the full Ds Farm Renew Max at its next review, whatever its merchants have taken in - or already on a quarter day, if its own review is further off and a quarter has passed since the last one. A farm never changes more than once a quarter (0 = it is reviewed like any other)")]
         [SettingPropertyGroup("Town purses and food merchants (economy review 18.10)")]
         public int DsFarmArrearsReviewTerms { get; set; } = 2;
 
