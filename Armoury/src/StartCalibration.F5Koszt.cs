@@ -132,6 +132,9 @@ namespace Armoury
             public List<double> CurG = new List<double>(16000), BestG = new List<double>(16000), RatioG = new List<double>(16000);
             public double LvC, KC, RC, LvB, KB, RB;
             public int InTrans, Locked, NoCand, Back, NoPx; public bool Record;
+            // scalenie fali 5 (f5-a7 + f5-koszt): wariant "sygnal KS" diagnozy liczony na watku glownym w F5Prep (A7sRow / A7sVRow / A7sRent to stan reguly A7 i jej pamiec
+            // wierszy) - na watek z puli idzie tylko gotowy licznik (VN) do napisu; ta sama kolejnosc wpisow co w F4A7Old
+            public bool SigOn; public int NNoSig; public F4Var VN = new F4Var();
             public int N; public int[] Cur = new int[16384], Mk = new int[16384], Sc = new int[16384], Off = new int[16385];
             public double[] Hands = new double[16384], Lc = new double[16384], Rc = new double[16384];
             public int M; public int[] C = new int[131072]; public double[] L = new double[131072], R = new double[131072];
@@ -184,6 +187,8 @@ namespace Armoury
             }
             job.Inert = _planIn != null ? Math.Max(1.0, _planIn.Inert) : 1.25;
             bool s2 = job.VPlan != null;
+            bool sigOn = job.SigOn = A7sOn;                                // scalenie fali 5: sygnal KS f5-a7 (jak F4A7Old)
+            if (sigOn) A7sEnsureMv();
             var rows = new Dictionary<double[], double[]>();
             var vG = job.VG; var kcost = KsTab.KCost; var mv = job.Mv;
             int cap = 32; var cs = new int[cap]; var ls = new double[cap]; var rs = new double[cap];
@@ -241,6 +246,21 @@ namespace Armoury
                             if (record) { b.F5Day = today; b.F5Cur = cur; b.F5Best = best; b.F5Ic = ic; b.F5Ib = ib; b.F5Px = px; }   // F2: dla reguly A7 tej doby
                         }
                         else job.NoPx++;
+                        if (sigOn && hasPx)
+                        {
+                            // scalenie fali 5 (f5-a7): sygnal KS - te same wywolania, kolejnosc i pamiec wierszy co F4A7Old i regula A7 tej doby (watek glowny); przed AddBlock jak w
+                            // F4A7Old przed zestawami B/T/S1/S2 (potkniecie w okregu - te same bloki poza zestawami)
+                            var sRow = A7sRow(mt);
+                            if (sRow == null) job.NNoSig++;
+                            else
+                            {
+                                var sV = A7sVRow(sRow);
+                                double rent = A7sRent(b);
+                                double sic = A7sIncome(b, type, cur, sRow, sV, rent), sib = double.NegativeInfinity; int sbest = -1;
+                                foreach (int c in cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent); if (v > sib) { sib = v; sbest = c; } }
+                                job.VN.Note(cur, sbest, sic, sib, hands, SwitchRatio);
+                            }
+                        }
                         job.AddBlock(cur, m, sc, hands, lc, rc, cs, ls, rs, n);
                     }
                 }
@@ -325,6 +345,14 @@ namespace Armoury
                 else sb.Append(" | wzor Planu: brak wartosci kg Planu");
             }
             else sb.Append(" | ceny startu i cienia: brak Planu bez bledu");
+            if (job.SigOn)
+            {
+                // scalenie fali 5 (f5-a7): wariant sygnalu KS - ten sam napis co w F4A7Old (licznik policzony na watku glownym w F5Prep)
+                var vN = job.VN;
+                sb.Append(" | sygnal KS (f5-a7; regula liczy ten sygnal; cena cienia Planu x gradient krainy x rynek miasta, srednia 4 krokow): ocenionych ").Append(vN.N).Append(", bez sygnalu miasta ").Append(job.NNoSig);
+                F4VarText(sb, ", ", vN); sb.Append(", na podlodze ").Append(vN.Floor).Append(", <= 0 ").Append(vN.Neg).Append(", biezace najlepsze ").Append(vN.Agree).Append(" (").Append(Pc(vN.Agree, vN.N)).Append("%)")
+                  .Append(", przejscia (top 5): ").Append(F4Top(vN, 5));
+            }
             sb.Append(" | sklad dochodu (suma blokow, ceny gry): biezace L*v ").Append(job.LvC.ToString("0", Inv)).Append(", koszt K ").Append(job.KC.ToString("0", Inv)).Append(", renta ").Append(job.RC.ToString("0", Inv))
               .Append("; najlepsze inne L*v ").Append(job.LvB.ToString("0", Inv)).Append(", koszt K ").Append(job.KB.ToString("0", Inv)).Append(", renta ").Append(job.RB.ToString("0", Inv));
             sb.Append(" | przejscia (ceny gry, top 10, blokow/rak): ").Append(F4Top(fG, 10));
@@ -494,7 +522,7 @@ namespace Armoury
                 {
                     _f5Checked = true;
                     long q0 = Stopwatch.GetTimestamp();
-                    var s = Settings.Current; bool rule = s != null && s.StartCalibrationSwitchRule;
+                    bool rule = A7RuleOn;                                  // scalenie fali 5: ta sama regula co RuleDaily po f5-a7 (dawny klucz albo sygnal KS z Ks Switch Signal Rule)
                     string a = F4A7Old(today, d0, rule, true), b = F4A7Fast(today, d0, rule, true, false);
                     _f5ChkMs = (Stopwatch.GetTimestamp() - q0) * 1000.0 / Stopwatch.Frequency;
                     string na = F5NoTime(a), nb = F5NoTime(b);

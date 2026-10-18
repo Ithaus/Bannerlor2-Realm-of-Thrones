@@ -1219,6 +1219,11 @@ namespace Armoury
             catch (Exception e) { Log.Error("SyncData.arm_crafts", e); }
             try { string po = dataStore.IsSaving ? DistrictWorks.Export() : null; SaveText.Sync(dataStore, "arm_works", ref po); if (dataStore.IsLoading) DistrictWorks.Import(po); }
             catch (Exception e) { Log.Error("SyncData.arm_works", e); }
+            // f5-a7 (noc 17/18.10): sygnal KS reguly zmiany zajec A7 - srednie ceny sygnalu miast, rodzaj Held, liczniki sezonu ("a7s1|...", straznik 64 KB); pisany tylko
+            // z danymi (bez sygnalu - bez klucza, zapis jak dotad); wlasny try; brak klucza (stary zapis, Ironman Jeffa) = srednia od pierwszego kroku, Held od zera;
+            // starsza DLL klucz pomija. Reset przed SyncData (konstruktor -> StartCalibration.Reset -> RuleReset -> A7sReset)
+            try { string a7 = dataStore.IsSaving ? StartCalibration.ExportA7s() : null; if (!dataStore.IsSaving || a7 != null) SaveText.Sync(dataStore, "arm_ks_a7", ref a7); if (dataStore.IsLoading) StartCalibration.ImportA7s(a7); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_a7", e); }
         }
 
         public override void RegisterEvents()

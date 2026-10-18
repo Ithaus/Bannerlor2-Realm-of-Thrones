@@ -7664,6 +7664,22 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool MeasureIronWoodFlow { get; set; } = true;
 
+        [SettingPropertyBool("Ks Switch Signal", HintText = "with Start Calibration applied: a village part judges its works by what they really fetch under the calibration - the calibration's own price of each good where the part sells it (the price of its land after carting), nudged by how short or plentiful that good is at its market town compared with the town's other goods, averaged over about a month, minus the work's own costs and the rent of its land - instead of by the raw game price index, which tops out at ten times the base price and made nine parts in ten want to change. Side villages outside the calibration use the same reckoning when Side Village Craft Ks Signal is on. Off = the raw game price index, as before")]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool KsSwitchSignal { get; set; } = true;
+
+        [SettingPropertyBool("Ks Switch Signal Rule", HintText = "with Ks Switch Signal: village parts really change their work by that reckoning, with the same brake as Start Calibration Switch Rule - another work must pay at least 25% better for about 60 days, one part of a district at a time, within what its land allows, at most 5% of the region's hands a season; the village pays for timber, tools and stone really bought at its market town's stall and for the town craftsmen, and the hands move over 60 days (vineyards, groves, orchards and date palms a year). AI villages and the player's villages alike. Off = works stay as the calibration set them (only the pressure to change is written to the log), unless Start Calibration Switch Rule is on")]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool KsSwitchSignalRule { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Ks Switch Market Band", 0.00f, 0.50f, "0.00", HintText = "with Ks Switch Signal: how far a good's shortage or glut at the market town may move its price in the reckoning, compared with the town's other goods (0.15 = at most 15% up or down; 0 = the calibration's own prices only)")]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public float KsSwitchMarketBand { get; set; } = 0.15f;
+
+        [SettingPropertyBool("Side Village Craft Ks Signal", HintText = "with Side Village Crafts and Ks Switch Signal: a side village outside the calibration weighs its crafts by the same reckoning as the calibrated village parts (land suitability x output x the calibration's prices at its market town, minus costs and land rent) instead of land suitability x the square root of the game price index, while the calibration has a plan to price from. Off = land suitability x price index, as before")]
+        [SettingPropertyGroup("Village works follow prices (18.10)")]
+        public bool SideVillageCraftKsSignal { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9579,6 +9595,10 @@ namespace Armoury
             s.MeasureRegaleShelf = MeasureRegaleShelf;
             s.MeasureCaravanTrade = MeasureCaravanTrade;
             s.MeasureIronWoodFlow = MeasureIronWoodFlow;
+            s.KsSwitchSignal = KsSwitchSignal;
+            s.KsSwitchSignalRule = KsSwitchSignalRule;
+            s.KsSwitchMarketBand = KsSwitchMarketBand;
+            s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
         }
 
         internal static void Apply()
