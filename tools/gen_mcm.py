@@ -353,6 +353,11 @@ RANGES = {
     'DsGrantSessionDays': (1, 91, "0"),
     'DsCrownLoanLimitDaysPledged': (0.0, 728.0, "0"),
     'DsFolkSurplusSpendDays': (0, 120, "0"),
+    # f4-kasy-miast-i-kupcy-z (18.10): przeglad firm co kwartal i wczesna splata rachunkow zywnosci - zgodnie z przycieciem w kodzie (DsTowns.Review 0..364, 0..8;
+    # KsLordFood.EarlyShare 0..1)
+    'DsFarmReviewDays': (0, 364, "0"),
+    'DsFarmArrearsReviewTerms': (0, 8, "0"),
+    'KsLordFoodBillsEarlyShare': (0.0, 1.0, "0.00"),
     # r4-bkwies (KS runda 4, 17.10): przycinane w kodzie (VillNeeds.RichChests 1..20, CoverDays 1..91; spichlerz awaryjny 0..364)
     'KsBkRichChests': (1.0, 20.0, "0.0"),
     'VillageNeedCoverDays': (1, 91, "0"),

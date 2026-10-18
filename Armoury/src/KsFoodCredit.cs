@@ -40,6 +40,9 @@ namespace Armoury
         // scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): doba - zalegle rachunki splacone przez panow glodnych miast (KsLordFood tryb RACHUNKI; w DRepaid tez),
         // zloto od panow przyjete przez kasy zrodel (w GSrcGot tez - kontrola zlota linii KS-H: cel - panowie + zrodla), splat (miasto-doby)
         internal static long DLordRepaid, GLordPaid; internal static int DLordN;
+        // f4 P5 (przeglad ekonomii 18.10, uwaga 6): z tego splacone przez panow PRZED zwloka (rachunki mlodsze niz Ks Consign Overdue Days - wczesna splata, klucz
+        // Ks Lord Food Bills Early Share; w DLordRepaid tez) i liczba takich splat
+        internal static long DLordEarly; internal static int DLordEarlyN;
         // KS-R5 ceny-r5 (zadatek kupcow celu): roszczenia celu wobec zrodla (nadplacony albo niezwrocony zadatek, ktorego kasa zrodla nie oddala od razu) - rachunek
         // odwrotny (wierzyciel = miasto celu, dluznik = miasto zrodla), splacany jak kazdy rachunek; w kontroli rachunkow obok "nowe" (nie w "u celu")
         internal static long DClaimNew; internal static int DClaimN;
@@ -56,6 +59,7 @@ namespace Armoury
         {
             DNew = DPaidNow = DBilled = DRepaid = DForfeit = 0; DNewN = DForfeitN = DDeliv = 0; GDstPaid = GSrcGot = 0;
             DLordRepaid = GLordPaid = 0; DLordN = 0;
+            DLordEarly = 0; DLordEarlyN = 0;
             DClaimNew = 0; DClaimN = 0;
         }
 
@@ -214,23 +218,69 @@ namespace Armoury
         // i do zlota linii KS-H (panowie -, zrodla +). Nic z niczego: zloto glowa -> kasy zrodel, roszczenie maleje o tyle samo.
 
         /// <summary>KsLordFood.FoodBillsOpen: zalegle rachunki zywnosci miasta `dst` jako celu (zl) - starsze niz zwloka (KsConsignOverdueDays); 0 - brak.</summary>
-        internal static long OverdueOf(Settlement dst)
+        internal static long OverdueOf(Settlement dst) { return OlderThanOf(dst, OverdueDays); }
+
+        /// <summary>f4 P5: rachunki zywnosci miasta `dst` jako celu starsze niz `age` dni (zl; bez roszczen z zadatkow i rachunkow par w wojnie) - OverdueOf przy age =
+        /// Ks Consign Overdue Days (bit w bit jak dotad).</summary>
+        internal static long OlderThanOf(Settlement dst, int age)
         {
             Resolve();
             if (dst == null || _acc.Count == 0) return 0;
-            int today = Today(), od = OverdueDays; long s = 0;
+            int today = Today(); long s = 0;
             foreach (var a in _acc.Values)
             {
                 if (a.Claim || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow
-                foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) s += b.Left;
+                foreach (var b in a.B) if (b.Left > 0 && today - b.Day > age) s += b.Left;
             }
             return s;
+        }
+
+        /// <summary>f4 P5 (wczesna splata panow): jeden przebieg po rachunkach - miasta celu z rachunkiem zywnosci starszym niz `age` dni (te same filtry co OlderThanOf):
+        /// kwota takich rachunkow i doba najstarszego. Rachunki w wojnie i roszczenia z zadatkow pominiete (pan ich nie placi).</summary>
+        internal static void OlderThanByDst(int age, Dictionary<Settlement, long> sum, Dictionary<Settlement, int> oldest)
+        {
+            sum.Clear(); oldest.Clear();
+            Resolve();
+            if (_acc.Count == 0) return;
+            int today = Today();
+            foreach (var a in _acc.Values)
+            {
+                if (a.Claim || a.Dst == null || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
+                foreach (var b in a.B)
+                {
+                    if (b.Left <= 0 || today - b.Day <= age) continue;
+                    long v; sum.TryGetValue(a.Dst, out v); sum[a.Dst] = v + b.Left;
+                    int d; if (!oldest.TryGetValue(a.Dst, out d) || b.Day < d) oldest[a.Dst] = b.Day;
+                }
+            }
+        }
+
+        /// <summary>f4 P5 (linia KS-H): wiek najstarszego rachunku zywnosci (dni; -1 - brak) i kwota rachunkow starszych niz `age` dni (bez roszczen z zadatkow).</summary>
+        internal static void AgeStats(int today, int age, out int oldestAge, out long older)
+        {
+            Resolve();
+            oldestAge = -1; older = 0;
+            foreach (var a in _acc.Values)
+            {
+                if (a.Claim) continue;
+                foreach (var b in a.B)
+                {
+                    if (b.Left <= 0) continue;
+                    int g = today - b.Day;
+                    if (g > oldestAge) oldestAge = g;
+                    if (g > age) older += b.Left;
+                }
+            }
         }
 
         /// <summary>KsLordFood.FoodBillsPay: splata zaleglych rachunkow `dst` (najstarsze najpierw; ta sama doba - wedlug StringId zrodla, jak PayDaily) kwota `x` JUZ
         /// zdjeta panu - przelew do kas zrodel z pomiarem obu stron; zwraca to, co kasy zrodel przyjely (0..x; reszta wraca do pana). Wyjatek w srodku - zwraca to, co juz
         /// przeszlo (bez zwrotu panu pieniedzy, ktore dostal wierzyciel).</summary>
-        internal static long PayByLord(Settlement dst, long x)
+        internal static long PayByLord(Settlement dst, long x) { return PayByLordAge(dst, x, OverdueDays); }
+
+        /// <summary>f4 P5 (wczesna splata, klucz Ks Lord Food Bills Early Share): jak PayByLord, ale rachunki starsze niz `age` dni (PayByLord = age Ks Consign Overdue
+        /// Days, bit w bit jak dotad). Splata rachunku mlodszego niz zwloka liczy sie tez do DLordEarly (linia KS-H: "w tym przed zwloka").</summary>
+        internal static long PayByLordAge(Settlement dst, long x, int age)
         {
             Resolve();
             if (dst == null || x <= 0 || _acc.Count == 0) return 0;
@@ -242,11 +292,11 @@ namespace Armoury
                 foreach (var a in _acc.Values)
                 {
                     if (a.Claim || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow
-                    foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) l.Add(new KeyValuePair<Acct, Bill>(a, b));
+                    foreach (var b in a.B) if (b.Left > 0 && today - b.Day > age) l.Add(new KeyValuePair<Acct, Bill>(a, b));
                 }
                 if (l.Count == 0) return 0;
                 l.Sort((p, q) => p.Value.Day != q.Value.Day ? p.Value.Day.CompareTo(q.Value.Day) : string.CompareOrdinal(p.Key.Src.StringId, q.Key.Src.StringId));
-                long left = x;
+                long left = x; bool early = false;
                 foreach (var p in l)
                 {
                     if (left <= 0) break;
@@ -257,8 +307,10 @@ namespace Armoury
                     if (rec <= 0) continue;
                     b.Left -= rec; left -= rec; paid += rec;
                     DRepaid += rec; DLordRepaid += rec; GLordPaid += rec; GSrcGot += rec;
+                    if (today - b.Day <= od) { DLordEarly += rec; early = true; }   // f4 P5: rachunek jeszcze przed zwloka (tylko przy age < zwloka)
                 }
                 if (paid > 0) DLordN++;
+                if (early) DLordEarlyN++;
                 var gone = new List<string>();
                 foreach (var kv in _acc) { if (kv.Value.Dst != dst) continue; kv.Value.B.RemoveAll(b => b.Left <= 0); if (kv.Value.B.Count == 0) gone.Add(kv.Key); }
                 foreach (var k in gone) _acc.Remove(k);

@@ -51,6 +51,9 @@ namespace Armoury
     ///    ponizej kosztu + frachtu); "glod pierwszy: celow" = rozne miasta doby (zamowien glodu - pary osobno); linia mowi wprost o zamkach Muru poza KS-H (Eastwatch
     ///    by the Sea, Shadow Tower, Nightfort, The Wall - KS-H wozi tylko do miast, zboze do Muru daje danina r4-mur) i o wozach na kredyt w drodze (przed cofnieciem
     ///    DLL ponizej r4-kupcy: 0 wozow i 0 zl otwartych - starsza DLL dowiozlaby je bez rachunku).
+    /// f4 P5 (koncowy przeglad ekonomii 18.10, uwaga 11; klucz Ks Food Carts Return Keeps Goods): zawrocony woz oddaje CALY towar na polke zrodla, a zaplata, ktorej kasa
+    /// zrodla nie oddala, to roszczenie celu wobec zrodla (KsFoodCredit.OpenClaim, jak zwrot zadatku); woz bez celu i zrodla - polka najblizszego miasta (UnloadNearest)
+    /// w ramce ksiegi. Bez klucza - jak dotad (reszta towaru "zawrocone bez zwrotu zaplaty" / "bez celu" przez NoteKsLoss).
     /// </summary>
     internal static class KsFoodCarts
     {
@@ -91,6 +94,9 @@ namespace Armoury
         /// <summary>KS-R5 ceny-r5: zadatek kupcow celu (klucz Ks Consign Deposit, tylko z kredytem kupcow) i jego udzial w wartosci lotu u celu (0..1).</summary>
         internal static bool DepositKey { get { var s = Settings.Current; return s == null || s.KsConsignDeposit; } }
         internal static double DepositShare { get { var s = Settings.Current; return s == null ? 0.5 : Math.Max(0.0, Math.Min(1.0, s.KsConsignDepositShare)); } }
+        /// <summary>f4 P5: klucz Ks Food Carts Return Keeps Goods - zawrocony woz oddaje caly towar zrodlu (reszta zaplaty = roszczenie celu), woz bez celu i zrodla - polka
+        /// najblizszego miasta (brak ustawien - TAK).</summary>
+        private static bool ReturnKeepsGoods { get { var s = Settings.Current; return s == null || s.KsFoodCartsReturnKeepsGoods; } }
         /// <summary>Klucz Ks Ship By Days w tej chwili (Plan - wersja tabeli dob).</summary>
         internal static bool DaysByShipDays { get { return EnsureTowns() && _byDays; } }
 
@@ -152,6 +158,9 @@ namespace Armoury
         private static long _dDepPcs, _dDepGold, _dDepFreed, _dDepCred, _dDepOver, _dDepClaim, _dDepBack, _dDepLost, _dDepSettled; private static int _dDepLots;
         private static long _dReexp; private static int _dReexpLots;   // KS-R5 (pomiar): wyslane ze zrodla, do ktorego ten sam towar jest w drodze (KS-H) - reeksport
         private static long _dDepShort;                               // KS-R5: zadatek planu rdzenia ponad to, co kasa celu miala ponad podloge przy wysylce (reszte niesie kredyt zrodla)
+        // f4 P5 (klucz Ks Food Carts Return Keeps Goods): zawrocone - sztuki bez zwrotu zaplaty oddane na polke zrodla, roszczenia celu wobec zrodla (zl), zaplata bez
+        // wierzyciela (zl); wozy bez celu i zrodla - sztuki na polce najblizszego miasta i wozy
+        private static long _dRetKept, _dRetClaim, _dRetNoCred, _dNear; private static int _dNearCarts;
         private static long _depPrev = -1;
         private static long _lastDepPaid;                             // recenzja ceny-r5: zadatek zaplacony w ostatnim Ship (KsFoodCore.In.DepPaidLast - miejsce kredytu zrodla)
         // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny [t * NZ + k) * NMiss + przyczyna], suma od ostatniej linii tygodnia, doby w sumie
@@ -185,6 +194,7 @@ namespace Armoury
             Array.Clear(_dPoorByZ, 0, NZ); _dNorthBy.Clear();
             _dDepPcs = _dDepGold = _dDepFreed = _dDepCred = _dDepOver = _dDepClaim = _dDepBack = _dDepLost = _dDepSettled = 0; _dDepLots = 0;
             _dReexp = 0; _dReexpLots = 0; _dDepShort = 0;
+            _dRetKept = _dRetClaim = _dRetNoCred = _dNear = 0; _dNearCarts = 0;
             KsFoodCredit.ClearDay();
             KsCostKsh.Clear();                                  // ks-koszt: pod-czasy KS-H od nowa (doba bez linii)
         }
@@ -529,6 +539,13 @@ namespace Armoury
                     {
                         try { if (c.Src.MapFaction != null && c.Dst.MapFaction != null && FactionManager.IsAtWarAgainstFaction(c.Src.MapFaction, c.Dst.MapFaction)) dstOk = false; } catch { }
                     }
+                    if (!dstOk && !srcOk && ReturnKeepsGoods && UnloadNearest(c))
+                    {
+                        // f4 P5 (klucz Ks Food Carts Return Keeps Goods): woz bez celu i zrodla - towar na polke najblizszego miasta w ramce ksiegi (nic w nicosc); zaplata
+                        // i zadatek zostaja tam, gdzie sa (w kasie zrodla od wysylki) - jak dotad
+                        if (c.Dep > 0) { _dDepLost += c.Dep; _dDepSettled += c.Dep; c.Dep = 0; }
+                        AddInc(c, -1); c.N = 0; done.Add(c); continue;
+                    }
                     if (!dstOk && !srcOk)
                     {
                         // recenzja runda 3 (drobne): towar wozu bez celu i bez zrodla - ujscie w ksiedze towarow (dotad znikal "bez wyjasnienia")
@@ -623,7 +640,8 @@ namespace Armoury
         }
 
         /// <summary>Powrot wozu: towar na polke zrodla, zwrot zaplaty z kasy zrodla do kasy celu (najwyzej kasa zrodla), frachtu nie.
-        /// KS-R4 r4-kupcy H5: woz na kredyt (zaplata 0) - caly towar wraca na polke zrodla bez zwrotu (nic nie zaplacono), fracht stracony (zostal u furmanow).</summary>
+        /// KS-R4 r4-kupcy H5: woz na kredyt (zaplata 0) - caly towar wraca na polke zrodla bez zwrotu (nic nie zaplacono), fracht stracony (zostal u furmanow).
+        /// f4 P5 (klucz Ks Food Carts Return Keeps Goods): woz zaplacony przy wysylce - caly towar na polke zrodla, niezwrocona zaplata = roszczenie celu wobec zrodla.</summary>
         private static void Back(Cart c)
         {
             AddInc(c, -1);
@@ -653,6 +671,14 @@ namespace Armoury
             // recenzja runda 3 (drobne): zrodlo odbiera tylko towar odpowiadajacy oddanej zaplacie (dotad caly towar i czesc zaplaty przy pustej kasie); reszta - strata wozu
             int nBack = c.N;
             if (c.Paid > 0) nBack = (int)Math.Min(c.N, Math.Floor(c.N * (double)got / c.Paid + 1e-9));
+            // f4 P5 (koncowy przeglad ekonomii 18.10, uwaga 11; klucz Ks Food Carts Return Keeps Goods): oplacony towar nie znika - CALY ladunek wraca na polke zrodla,
+            // a zaplata, ktorej kasa zrodla nie oddala od razu, to roszczenie celu wobec zrodla (KsFoodCredit.OpenClaim, jak zwrot zadatku w DepositReturn: splata
+            // w PayDaily z kasy zrodla ponad podloge, przy wojnie czeka do pokoju). Zloto sie nie rusza (zaplata juz jest w kasie zrodla od wysylki), towar w ramce ksiegi.
+            int kept = 0; long owed = 0;
+            if (ReturnKeepsGoods && it != null && c.Src != null && c.Src.ItemRoster != null && nBack < c.N)
+            {
+                kept = c.N - nBack; owed = Math.Max(0, c.Paid - got); nBack = c.N;
+            }
             if (it != null && c.Src != null && c.Src.ItemRoster != null && nBack > 0)
             {
                 var gf = GoodsLedger.Begin(GoodsLedger.FKsH, c.Src);
@@ -661,9 +687,49 @@ namespace Armoury
                 _dBackPcs += nBack;
             }
             else nBack = 0;
+            if (kept > 0 && nBack > 0)
+            {
+                _dRetKept += kept;
+                if (owed > 0)
+                {
+                    if (c.Dst != null && c.Src != c.Dst) { KsFoodCredit.OpenClaim(c.Dst, c.Src, owed, Today()); _dRetClaim += owed; }
+                    else _dRetNoCred += owed;                           // bez wierzyciela (cel nie istnieje) - zaplata zostaje w kasie zrodla razem z towarem
+                }
+            }
             int lost = c.N - nBack;
             if (lost > 0) { GoodsLedger.NoteKsLoss(it, lost, "zawrocony woz bez zwrotu zaplaty"); _dRetLost += lost; }
             c.N = 0;
+        }
+
+        /// <summary>f4 P5 (koncowy przeglad ekonomii 18.10, uwaga 11): woz bez celu i bez zrodla (obie osady nie przyjma towaru) - caly ladunek na polke najblizszego
+        /// miasta (wedlug pozycji celu albo zrodla, ktore jeszcze istnieje; oblezone tylko, gdy nie ma innego; bez zadnej osady - miasto z najmniejszym zapasem tego
+        /// towaru) w ramce ksiegi towarow (FKsH, jak dostawa). False - brak towaru albo miasta (wolajacy - stara sciezka). Zloto sie nie rusza.</summary>
+        private static bool UnloadNearest(Cart c)
+        {
+            try
+            {
+                var it = StartCalibration.ZItem(Z[c.Z]);
+                if (it == null || c.N <= 0) return false;
+                Settlement anchor = c.Dst ?? c.Src;
+                Settlement best = null, bestSiege = null; double bd = double.MaxValue, bds = double.MaxValue;
+                foreach (var t in Town.AllTowns)
+                {
+                    var s = t != null ? t.Settlement : null;
+                    if (s == null || !t.IsTown || s.ItemRoster == null || s == anchor) continue;
+                    double d = anchor != null ? anchor.GetPosition2D.DistanceSquared(s.GetPosition2D) : s.ItemRoster.GetItemNumber(it);
+                    if (s.IsUnderSiege) { if (d < bds) { bds = d; bestSiege = s; } continue; }
+                    if (d < bd) { bd = d; best = s; }
+                }
+                var to = best ?? bestSiege;
+                if (to == null) return false;
+                var gf = GoodsLedger.Begin(GoodsLedger.FKsH, to);
+                try { to.ItemRoster.AddToCounts(it, c.N); }
+                finally { GoodsLedger.End(gf); }
+                _dNear += c.N; _dNearCarts++;                                // towar juz na polce - dalej nic nie cofa tej decyzji
+                try { StartCalibration.ZRowDirty(to, it); } catch (Exception e2) { Stumble("UnloadNearest.row", e2); }
+                return true;
+            }
+            catch (Exception e) { Stumble("UnloadNearest", e); return false; }
         }
 
         /// <summary>KS-R5 ceny-r5: zwrot zadatku (nadplata przy dostawie albo zawrocony woz) z kasy zrodla do kasy celu z pomiarem obu stron (pozycja "zwroty" kontroli zlota);
@@ -1184,7 +1250,7 @@ namespace Armoury
                 string depCtl = _depPrev < 0 ? "-" : (_depPrev + _dDepGold - _dDepSettled - depNow).ToString(CultureInfo.InvariantCulture);
                 _depPrev = depNow;
                 bool week = Today() % 7 == 0;
-                if (!active && _dBought + _dArr + _dBackPcs + _dLost == 0 && now == 0 && !credit) { _prevTransit = now; if (week) ClearMiss(); ClearDay(); return; }
+                if (!active && _dBought + _dArr + _dBackPcs + _dLost + _dNear == 0 && now == 0 && !credit) { _prevTransit = now; if (week) ClearMiss(); ClearDay(); return; }
                 if (!LogGate.Lines) { _prevTransit = now; if (week) ClearMiss(); ClearDay(); return; }
                 var inv = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder(1500);
@@ -1199,15 +1265,20 @@ namespace Armoury
                 if (_prevTransit >= 0)
                 {
                     // recenzja runda 3 (drobne): bez odrzuconych przy zaladunku (nie weszly do drogi); psucie i strata zawroconych - ujscia ksiegi towarow
-                    long rest = _prevTransit + _dBought - _dArr - _dBackPcs - _dLost - _dSpoil - _dRetLost - now;
+                    long rest = _prevTransit + _dBought - _dArr - _dBackPcs - _dLost - _dSpoil - _dRetLost - _dNear - now;   // f4 P5: _dNear - wozy bez celu i zrodla na polke najblizszego miasta (bez klucza 0)
                     // KS-R4 r4-kupcy H6: zloto z kredytem - fracht ze zrodel (furmani i zalogi), cel placi zrodlu przy dostawie i w splatach
                     long gold = -_gDst + _gSrc + _gCarters + _gCrews + (_gRefDst - _gRefSrc) - _gSrcFr - KsFoodCredit.GDstPaid - KsFoodCredit.GLordPaid + KsFoodCredit.GSrcGot;   // scalenie r4-glodbunt: panowie splacaja zalegle rachunki
-                    sb.Append(" | kontrola towaru reszta ").Append(rest).Append(" (bez celu ").Append(_dLost).Append(", psucie w drodze ").Append(_dSpoil).Append(", zawrocone bez zwrotu zaplaty ").Append(_dRetLost)
+                    sb.Append(" | kontrola towaru reszta ").Append(rest).Append(" (bez celu ").Append(_dLost).Append(", psucie w drodze ").Append(_dSpoil).Append(", zawrocone bez zwrotu zaplaty ").Append(_dRetLost).Append(ReturnKeepsGoods ? ", na polke najblizszego miasta " + _dNear.ToString(inv) : "")
                       .Append("; odrzucone przy zaladunku ").Append(_dDrop).Append(" - nie weszly do drogi), zlota reszta ").Append(gold)
                       .Append(" (cel -").Append(_gDst).Append(", zrodla +").Append(_gSrc).Append(", furmani +").Append(_gCarters).Append(", zalogi +").Append(_gCrews).Append(", zwroty ").Append(_gRefDst).Append('/').Append(_gRefSrc)
                       .Append(", fracht ze zrodel -").Append(_gSrcFr).Append(", rachunki cel -").Append(KsFoodCredit.GDstPaid).Append(" / panowie miast -").Append(KsFoodCredit.GLordPaid).Append(" / zrodla +").Append(KsFoodCredit.GSrcGot).Append(')');
                 }
                 else sb.Append(" | kontrola od nastepnej doby");
+                // f4 P5 (klucz Ks Food Carts Return Keeps Goods): zawrocone wozy oddaja caly towar zrodlu, reszta zaplaty = roszczenie celu (kontrola kredytu: w "nowe");
+                // wozy bez celu i zrodla - polka najblizszego miasta (w kontroli towaru wyzej)
+                if (ReturnKeepsGoods)
+                    sb.Append(" | zawrocone i bez celu (f4): na polke zrodla bez zwrotu zaplaty ").Append(_dRetKept).Append(" szt. (roszczenia celu wobec zrodla ").Append(_dRetClaim)
+                      .Append(" zl, bez wierzyciela ").Append(_dRetNoCred).Append(" zl), wozy bez celu i zrodla na polke najblizszego miasta ").Append(_dNearCarts).Append(" (").Append(_dNear).Append(" szt.)");
                 // KS-R3 runda 2 symulatora: loty z dalszych miast i z zapasu kupcow (przed "probka" - regex NKS-22 bez zmian)
                 sb.Append(" | z dalszych miast (12 najblizszych bez nadwyzki) ").Append(_dFar).Append(" wozow, z zapasu kupcow (polka zboza i soli ponizej T* x popyt, najwyzej do polowy zapasu) ").Append(_dRes).Append(" wozow, ").Append(_dResGold).Append(" zl");
                 // recenzja runda 3 (wazne): wynik kupcow (loty dowiezione: wartosc u celu przy cenie polki dzis wobec zaplaty i frachtu) i loty pominiete bez zysku
@@ -1269,6 +1340,14 @@ namespace Armoury
                   .Append(" (u celu - zaplacone przy dostawie - nowe), potkniecia kredytu ").Append(KsFoodCredit.TakeStumbles());
                 // scalenie r4-glodbunt + r4-kupcy: zalegle rachunki glodnych miast splacone przez ich panow (KsLordFood, tryb RACHUNKI) - w "splacone" wyzej i w zlocie (panowie -)
                 sb.Append(" | splacone przez panow miast (glod, zalegle rachunki) ").Append(KsFoodCredit.DLordRepaid).Append(" zl w ").Append(KsFoodCredit.DLordN).Append(" splatach, kasy zrodel przyjely ").Append(KsFoodCredit.GLordPaid).Append(" zl");
+                // f4 P5: wczesna splata panow (klucz Ks Lord Food Bills Early Share) - czesc "splacone przez panow" przed zwloka i wiek rachunkow (bez klucza - bez segmentu)
+                int eAge = KsLordFood.EarlyAge(Settings.Current);
+                if (eAge >= 0 && Settings.Current != null && Settings.Current.KsLordFundsFood)
+                {
+                    int oldAge; long older; KsFoodCredit.AgeStats(today, eAge, out oldAge, out older);
+                    sb.Append(", w tym przed zwloka (wczesna splata f4) ").Append(KsFoodCredit.DLordEarly).Append(" zl w ").Append(KsFoodCredit.DLordEarlyN).Append(" splatach")
+                      .Append("; najstarszy rachunek ").Append(oldAge).Append(" dni, rachunki starsze niz ").Append(eAge).Append(" dni ").Append(older).Append(" zl");
+                }
                 // recenzja r4-kupcy: wozy na kredyt w drodze - przed cofnieciem DLL ponizej r4-kupcy musza byc 0 (starsza DLL dowiozlaby je bez rachunku) i otwarte rachunki 0
                 long cN = 0, cPcs = 0, cVal = 0;
                 foreach (var c in _carts) { if (!c.Cons || c.N <= 0) continue; cN++; cPcs += c.N; cVal += Math.Max(0, c.Val); }

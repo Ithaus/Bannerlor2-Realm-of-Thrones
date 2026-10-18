@@ -7236,7 +7236,7 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFarmMeasureDays { get; set; } = 28;
 
-        [SettingPropertyInteger("Ds Farm Renew Days", 0, 728, "0", HintText = "with Ds Towns: every this many days a farm is renewed towards the same share of what the merchants of the town or castle have taken in over the last 28 days as when it was set (0 = never renewed)")]
+        [SettingPropertyInteger("Ds Farm Renew Days", 0, 728, "0", HintText = "with Ds Towns: every this many days a farm is renewed towards the same share of what the merchants of the town or castle have taken in over the last 28 days as when it was set (0 = never renewed). Used only when Ds Farm Review Days is 0")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFarmRenewDays { get; set; } = 364;
 
@@ -7331,6 +7331,22 @@ namespace Armoury
         [SettingPropertyBool("Ds Farm Folk From Savings", HintText = "with Ds Towns: the part of a town's or castle's farm that stands for what the lord used to take from the people's savings (his part of the hoard tax and his war levy on the people) is raised from the people's savings above their reserve days, as a commune raised its farm from its burgesses (scot and lot); the merchants' purse pays only the part that stands for the old valve. Off = the merchants' purse pays the whole farm")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsFarmFolkFromSavings { get; set; } = true;
+
+        [SettingPropertyInteger("Ds Farm Review Days", 0, 364, "0", HintText = "with Ds Towns: every this many days (a quarter) each farm of a town or castle is reviewed up or down towards the same share of what its merchants have taken in over the last 28 days as when it was set, by at most Ds Farm Renew Max - a town that does well pays more, a town that does badly pays less. A town that still owes part of its farm is never raised. 0 = the old renewal every Ds Farm Renew Days")]
+        [SettingPropertyGroup("Town purses and food merchants (economy review 18.10)")]
+        public int DsFarmReviewDays { get; set; } = 91;
+
+        [SettingPropertyInteger("Ds Farm Arrears Review Terms", 0, 8, "0", HintText = "with Ds Farm Review Days: a town or castle that has owed part of its farm over this many quarter days in a row, and still owes it, has its farm lowered by the full Ds Farm Renew Max at its next review, whatever its merchants have taken in - or already on a quarter day, if its own review is further off and a quarter has passed since the last one. A farm never changes more than once a quarter (0 = it is reviewed like any other)")]
+        [SettingPropertyGroup("Town purses and food merchants (economy review 18.10)")]
+        public int DsFarmArrearsReviewTerms { get; set; } = 2;
+
+        [SettingPropertyFloatingInteger("Ks Lord Food Bills Early Share", 0.00f, 1.00f, "0.00", HintText = "with Ks Lord Funds Food and Ks Food Carts Consign: the lord of a town pays the town's food bills that are older than this share of Ks Consign Overdue Days (0.67 of 30 days = 20 days), oldest first, from his gold above his war reserve and at the same pace as before - for every town of his, not only a hungry one - so that a bill never grows old enough to stop the food carts. Your own purse is never used. 0 = he pays only a hungry town's bills once they are overdue, as before")]
+        [SettingPropertyGroup("Town purses and food merchants (economy review 18.10)")]
+        public float KsLordFoodBillsEarlyShare { get; set; } = 0.67f;
+
+        [SettingPropertyBool("Ks Food Carts Return Keeps Goods", HintText = "a food merchants' cart that turns back (war, a lost town, too long on the road) puts its whole load back on the stall of the selling town; whatever of the price the selling town cannot hand back at once becomes a bill it owes the buying town, paid off day by day like any bill. A cart whose buying and selling towns are both gone unloads at the nearest town. Nothing paid for is lost. Off = the goods the selling town cannot repay are lost, as before")]
+        [SettingPropertyGroup("Town purses and food merchants (economy review 18.10)")]
+        public bool KsFoodCartsReturnKeepsGoods { get; set; } = true;
 
         [SettingPropertyBool("Ks Cheap Basket", HintText = "with Start Calibration applied: a household that cannot pay for its whole basket first buys enough of the cheapest food on its market (grain, bread, pie or fish - whichever gives the most calories for a coin and is on the stall) to feed everyone, then salt, protein (cheapest first), drink (cheapest first) and the rest; meat, wine and cheese come only from what is left. The market and the plan see the basket really bought, so prices and fields follow it. Off = the old basket ladder")]
         [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
@@ -9408,6 +9424,10 @@ namespace Armoury
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;
             s.DsFarmFolkFromSavings = DsFarmFolkFromSavings;
+            s.DsFarmReviewDays = DsFarmReviewDays;
+            s.DsFarmArrearsReviewTerms = DsFarmArrearsReviewTerms;
+            s.KsLordFoodBillsEarlyShare = KsLordFoodBillsEarlyShare;
+            s.KsFoodCartsReturnKeepsGoods = KsFoodCartsReturnKeepsGoods;
             s.KsCheapBasket = KsCheapBasket;
             s.KsWageByHands = KsWageByHands;
             s.KsWageHandsStepPercent = KsWageHandsStepPercent;
