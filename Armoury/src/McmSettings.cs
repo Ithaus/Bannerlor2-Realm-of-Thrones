@@ -7664,7 +7664,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsIronHandsFollowMarket { get; set; } = true;
 
-        [SettingPropertyBool("Bloomery Wood Credit", HintText = "under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, and only if the town's treasury can carry the debt; the village pays it back first from what its carts bring home (and a quarter of its purse each day), and a debt left unpaid for 60 days is lost by the merchants (no gold is made). Off = no new credit (debts already given are still paid back), as before")]
+        [SettingPropertyBool("Bloomery Wood Credit", HintText = "under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, only if the town's treasury can carry the debt and the village's oldest bill is not overdue (the same days as the merchants' food credit); the village pays back the oldest bill first from what its carts bring home (and a quarter of its purse each day); if the town goes to war with the village the merchants lose the debt (no gold is made). Off = no new credit (debts already given are still paid back), as before")]
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool BloomeryWoodCredit { get; set; } = true;
 

@@ -1406,10 +1406,10 @@ Uzycie (Python 3, tylko odczyt):
                     Ks Iron Hands Follow Market, Bloomery Wood Credit) python -I tools/sprawdz_logi.py --grupa nruda <Armoury-*.log> (strumieniowo). Linie "Ruda KS (f5-ruda):
                     dzien N" (co 7 dob od D - rece przy zlozach zelaza za ruda rynku: polki S / cel T = suma zapasow rzemiosla CaravanBulk; S < T brak - kopalnie z drewnem
                     x1.05, S > 2T pelny x0.95, dymarka bez drewna >= 50% tygodnia x0.95) i "Ruda kredyt drewna (f5-ruda): dzien N" (kredyt kupcow na drewno dymarek; tozsamosc
-                    otwarty wczoraj + nowy - splaty - odpisane = otwarty dzis). Okno konca biegu: ostatnie 28 dob pelnego KS (lambda ZC4 >= 0.99). NRU-0 linie paczki
+                    otwarty wczoraj + nowy - splaty - przepadle = otwarty dzis). Okno konca biegu: ostatnie 28 dob pelnego KS (lambda ZC4 >= 0.99). NRU-0 linie paczki
                     (0 nierozpoznanych), NRU-1 krok co 7 dob bez dziur, NRU-2 decyzje zgodne z rynkiem i suma decyzji = wpisy, NRU-3 rece przy zelazie >= +10% w biegu, gdy rynek
                     byl w braku w wiekszosci krokow (>= 3 kroki; inaczej INFO), NRU-4 stawka KS zelaza i wytop 7 dob (INFO), NRU-5 tozsamosc kredytu (reszta 0 w kazdej dobie),
-                    NRU-6 kredyt: otwarty na koniec <= 200000 zl i odpisane <= 20% udzielonego, NRU-7 = NOP-7 ruda: mediana indeksu <= 2.5 i miasta bez rudy <= 40 (ETAP lepiej
+                    NRU-6 kredyt: otwarty na koniec <= 200000 zl i przepadle (wojna) <= 20% udzielonego, NRU-7 = NOP-7 ruda: mediana indeksu <= 2.5 i miasta bez rudy <= 40 (ETAP lepiej
                     niz fin88 3.06/57.2; bez KS 0.63/12), NRU-8 = NOP-8 'kopalnia bez wegla' <= 28.1 lup/d (bez KS; ETAP < 45.4 fin88), NRU-9 zapas rudy na polkach miast
                     >= 1700 srednio okna i zapas swiata >= -5/d (ETAP > 1185 fin88; bez KS 5059), NRU-10 lupy wsi >= 255/d (ETAP > 248 fin88; bez KS 271), NRU-11 potkniecia
                     i ERROR 0, NRU-12 czas kroku <= 5 ms, NRU-13 zuzycie zelaza (warsztaty zbrojne, linie narzedzi - receptura KS 4:5 wedlug wagi) i popyt Planu (INFO).
@@ -43370,9 +43370,9 @@ NRU_W = re.compile(r"^Ruda KS \(f5-ruda\): dzien (\d+) \| klucz Ks Iron Hands Fo
  NW_MW, NW_UW, NW_ME, NW_UE, NW_OK, NW_PARTM, NW_BADM, NW_MS, NW_STUM) = range(47)
 NRU_CRED = "Ruda kredyt drewna (f5-ruda): dzien "
 NRU_C = re.compile(r"^Ruda kredyt drewna \(f5-ruda\): dzien (\d+) \| klucz Bloomery Wood Credit (TAK|NIE)[^|]*\| drewno na kredyt dzis (\d+) ladunkow za (\d+) zl w (\d+) kopalniach[^;]*; "
-                   r"odmowy \(ladunki\): bez zysku przy dzisiejszych cenach (\d+), limit \d+ dob potrzeby (\d+), inny wierzyciel albo bez splaty ponad \d+ dob (\d+), kasa miasta mniejsza od dlugu (\d+) \| "
-                   r"splaty \([^)]*\): przy powrocie wozu (\d+) zl \((\d+)\), z kiesy wsi (\d+) zl \((\d+)\) \| odpisane \([^)]*\) (\d+) zl \((\d+)\) \| otwarty kredyt (\d+) zl w (\d+) kopalniach; "
-                   r"(?:kontrola: otwarty wczoraj (\d+) \+ nowy \d+ - splaty \d+ - odpisane \d+ - otwarty dzis = reszta (-?\d+)|kontrola od nastepnej doby) \| najwieksze dlugi: .*? \| "
+                   r"odmowy \(ladunki\): bez zysku przy dzisiejszych cenach (\d+), limit \d+ dob potrzeby (\d+), inny wierzyciel albo rachunek starszy niz \d+ dob (\d+), kasa miasta mniejsza od dlugu (\d+) \| "
+                   r"splaty \([^)]*\): przy powrocie wozu (\d+) zl \((\d+)\), z kiesy wsi (\d+) zl \((\d+)\) \| przepadle \([^)]*\) (\d+) zl \((\d+)\) \| otwarty kredyt (\d+) zl w (\d+) kopalniach; "
+                   r"(?:kontrola: otwarty wczoraj (\d+) \+ nowy \d+ - splaty \d+ - przepadle \d+ - otwarty dzis = reszta (-?\d+)|kontrola od nastepnej doby) \| najwieksze dlugi: .*? \| "
                    r"potkniecia dzis (\d+) \(sesja (\d+)\)\.$")
 (NC_DAY, NC_KEY, NC_LENT, NC_LENTZL, NC_LENTN, NC_NOPROF, NC_CAP, NC_STALE, NC_POOR, NC_PAYC, NC_PAYCN, NC_PAYP, NC_PAYPN, NC_WR, NC_WRN, NC_OPEN, NC_OPENN, NC_PREV, NC_REST,
  NC_STUM, NC_STUMS) = range(21)
@@ -43388,7 +43388,7 @@ NRU_TOWN_MIN, NRU_TOWN_BASE = 1700, 1185         # NRU-9: zapas rudy na polkach 
 NRU_PROD_MIN, NRU_PROD_BASE = 255, 248           # NRU-10: lupy wsi na dobe (fin88 srednio 28 dob 248; bez KS 271)
 NRU_HANDS_UP = 0.10                               # NRU-3: rece przy zelazie w gore o >= 10% w biegu, gdy rynek byl w braku w wiekszosci krokow
 NRU_OPEN_MAX = 200000                             # NRU-6: otwarty kredyt drewna na koniec biegu (zl)
-NRU_WRITE_MAX = 0.2                               # NRU-6: odpisane najwyzej 20% udzielonego
+NRU_WRITE_MAX = 0.2                               # NRU-6: przepadle (wojna miasta-wierzyciela z wsia) najwyzej 20% udzielonego
 NRU_MS_MAX = 5.0                                  # NRU-12: czas kroku tygodniowego
 
 
@@ -43524,7 +43524,7 @@ def nruda_main(logp):
     if creds:
         chk = [(d, int(g[NC_REST])) for d, g in sorted(creds.items()) if g[NC_REST] is not None]
         badr = [(d, r) for d, r in chk if r != 0]
-        rep.add("NRU-5: kredyt drewna - otwarty wczoraj + nowy - splaty - odpisane = otwarty dzis", f"dob z kontrola {len(chk)}, reszta != 0: {len(badr)}" + (f" ({badr[:3]})" if badr else ""),
+        rep.add("NRU-5: kredyt drewna - otwarty wczoraj + nowy - splaty - przepadle = otwarty dzis", f"dob z kontrola {len(chk)}, reszta != 0: {len(badr)}" + (f" ({badr[:3]})" if badr else ""),
                 "0", (not badr) if chk else None)
         lent = sum(int(g[NC_LENTZL]) for g in creds.values())
         paid = sum(int(g[NC_PAYC]) + int(g[NC_PAYP]) for g in creds.values())
@@ -43534,9 +43534,9 @@ def nruda_main(logp):
         loads = sum(int(g[NC_LENT]) for g in creds.values())
         nop = sum(int(g[NC_NOPROF]) for g in creds.values())
         okv = op <= NRU_OPEN_MAX and (wr <= NRU_WRITE_MAX * lent if lent > 0 else True)
-        rep.add("NRU-6: kredyt drewna - udzielony, splacony, odpisany, otwarty na koniec",
-                f"udzielono {loads} ladunkow za {lent} zl, splacono {paid} zl, odpisano {wr} zl, otwarty {op} zl w {last[NC_OPENN]} kopalniach; odmowy bez zysku {nop} ladunkow",
-                f"otwarty <= {NRU_OPEN_MAX} zl i odpisane <= {100 * NRU_WRITE_MAX:.0f}% udzielonego", okv if lent > 0 or op > 0 else None)
+        rep.add("NRU-6: kredyt drewna - udzielony, splacony, przepadly, otwarty na koniec",
+                f"udzielono {loads} ladunkow za {lent} zl, splacono {paid} zl, przepadlo {wr} zl, otwarty {op} zl w {last[NC_OPENN]} kopalniach; odmowy bez zysku {nop} ladunkow",
+                f"otwarty <= {NRU_OPEN_MAX} zl i przepadle <= {100 * NRU_WRITE_MAX:.0f}% udzielonego", okv if lent > 0 or op > 0 else None)
     else:
         rep.add("NRU-5: kredyt drewna - tozsamosc", "brak linii", "INFO (log sprzed paczki albo KS niezastosowany)", None)
         rep.add("NRU-6: kredyt drewna - ryzyko", "brak linii", "INFO", None)

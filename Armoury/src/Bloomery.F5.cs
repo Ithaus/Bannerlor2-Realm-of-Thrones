@@ -18,31 +18,35 @@ namespace Armoury
     /// drewna, bez drewna nie wytopi lup, bez lup nie ma utargu (Bir Seif: utarg 28-254 zl/d przy potrzebie drewna 85 ladunkow po 15 zl) - zamkniete kolo, choc lupa
     /// w polowie miast idzie po 3-10 x wartosci (Ceny surowcow: mediana indeksu rudy 3.18, za pierwsza sztuke 140 d).
     ///
-    /// 1. KREDYT KUPCOW NA DREWNO (klucz Bloomery Wood Credit, tylko wsie z KS zastosowanym): w Bloomery.Daily, gdy kiesa wsi nie starcza na drewno z polki miasta
-    ///    handlowego, kupcy tego miasta (kasa miasta) daja brakujace drewno na kredyt - drewno z polki do dymarki (ramka ksiegi towarow FBloom, jak zakup), bez zaplaty
-    ///    w tej chwili; wies jest winna kupcom wartosc po cenie targu. Warunki: lupa sprzedana temu miastu (cena sprzedazy gry) jest warta wiecej niz drewno, ktore
-    ///    spala (WoodPerBloom x cena drewna) - kredyt tylko na wytop, ktory sie oplaca przy dzisiejszych cenach; dlug najwyzej 7 dob potrzeby dymarki ponad las okregu;
-    ///    kasa miasta >= dlug (kupcy maja z czego czekac); jeden wierzyciel naraz; bez splaty od 30 dob - nowego kredytu nie ma.
-    ///    Splata (zawsze, gdy jest dlug - takze przy kluczu wylaczonym: drewno juz wydane): (a) przy powrocie wozu do wsi macierzystej (VillageTakings, po F4b, przed
-    ///    pracami okregu i danina DS - koszt wytopu pierwszy, jak rachunek F4b) - z przyrostu kiesy w tym oknie; (b) w Bloomery.Daily przed nowym zakupem - najwyzej
-    ///    1/4 kiesy (jak rata przebudowy A7). Zloto: kiesa wsi -> kasa miasta-wierzyciela (TownFolk.Sale - jak zaplata za drewno z polki). Splacone zloto to
-    ///    zaplata za drewno - przy F4b dopisane do rachunku (pan bierze dzialke od utargu bez kosztu drewna, jak przy zakupie za gotowke).
-    ///    Odpis: 60 dob bez splaty albo wierzyciel nie jest juz miastem - dlug znika (kupcy wydali drewno bez zaplaty; zadna moneta nie powstaje ani nie znika).
-    ///    Zapis: nowy klucz arm_f5_woodcredit ("f5c1|wies:wierzyciel:dlug:ostatnia splata:od"); stary zapis bez klucza - bez dlugow; starsza DLL klucza nie czyta.
+    /// 1. KREDYT KUPCOW NA DREWNO (klucz Bloomery Wood Credit, tylko wsie z KS zastosowanym) - ta sama regula co kredyt kupiecki KS-H (KsFoodCredit): w Bloomery.Daily,
+    ///    gdy kiesa wsi nie starcza na drewno z polki miasta handlowego, kupcy tego miasta daja brakujace drewno na kredyt - drewno z polki do dymarki (ramka ksiegi
+    ///    towarow FBloom, jak zakup), bez zaplaty w tej chwili; wies ma RACHUNEK u kupcow (wartosc po cenie targu, doba). Warunki: lupa sprzedana temu miastu (cena
+    ///    sprzedazy gry) warta wiecej niz drewno, ktore spala (WoodPerBloom x cena drewna) - kredyt tylko na wytop, ktory sie oplaca przy dzisiejszych cenach; dlug
+    ///    najwyzej 7 dob potrzeby dymarki ponad las okregu; kasa miasta >= dlug (kupcy maja z czego czekac); jeden wierzyciel naraz; najstarszy rachunek starszy niz
+    ///    Ks Consign Overdue Days (jak KS-H) - nowego kredytu nie ma.
+    ///    Splata od najstarszego rachunku (zawsze, gdy jest dlug - takze przy kluczu wylaczonym: drewno juz wydane): (a) przy powrocie wozu do wsi macierzystej
+    ///    (VillageTakings, ostatni krok okna - po F4b, pracach okregu i daninie DS, ktorych podstawa i liczniki zostaja bez zmian) - z reszty przyrostu kiesy w tym oknie;
+    ///    (b) w Bloomery.Daily przed nowym zakupem - najwyzej 1/4 kiesy (jak rata przebudowy A7). Zloto: kiesa wsi -> kasa miasta-wierzyciela (TownFolk.Sale - jak
+    ///    zaplata za drewno z polki). Splacone zloto to zaplata za drewno - przy F4b dopisane do rachunku za drewno (pan bierze dzialke od utargu bez kosztu drewna, jak
+    ///    przy zakupie za gotowke). Przepadek jak w KS-H: wojna miedzy miastem-wierzycielem a wsia albo wierzyciel nie jest juz miastem - roszczenie znika ("kupcy
+    ///    stracili"; zloto nie powstaje i nie ginie). Bez terminu wygasniecia (jak KS-H) - zaleglosc blokuje tylko nowy kredyt.
+    ///    Zapis: nowy klucz arm_f5_woodcredit ("f5c2|wies:wierzyciel:doba~zostalo;doba~zostalo..." - najwyzej 8 rachunkow na wies, nowy przy pelnej liscie do najnowszego);
+    ///    stary zapis bez klucza - bez dlugow; starsza DLL klucza nie czyta.
     /// 2. POMIAR WYTOPU 7 DOB (dla StartCalibration.F5IronWeek, klucz Ks Iron Hands Follow Market): z Cap - model (lupy chciane) i lupy bez drewna kazdej kopalni;
     ///    pierscien 7 dob w pamieci sesji (bez zapisu).
-    /// Linia doby "Ruda kredyt drewna (f5-ruda): dzien N" z tozsamoscia: otwarty wczoraj + nowy - splaty - odpisane = otwarty dzis (reszta 0).
+    /// Linia doby "Ruda kredyt drewna (f5-ruda): dzien N" z tozsamoscia: otwarty wczoraj + nowy - splaty - przepadle = otwarty dzis (reszta 0).
     /// Wyjatki liczone per kopalnia (pierwsze w logu), bez globalnych wylacznikow.
     /// </summary>
     internal static partial class Bloomery
     {
         private const int F5Window = 7;            // doby pierscienia wytopu
         private const int F5CreditDays = 7;        // dlug najwyzej tyle dob potrzeby dymarki ponad las okregu (po cenie drewna dnia kredytu)
-        private const int F5StaleDays = 30;        // bez splaty od tylu dob - bez nowego kredytu
-        private const int F5WriteOffDays = 60;     // bez splaty od tylu dob - odpis (strata kupcow)
+        private const int F5MaxBills = 8;          // rachunkow na wies (jak KS-H na pare miast)
+        private const string F5Ver = "f5c2";
 
         internal static bool F5RingOn { get { var s = Settings.Current; return _applied && s != null && s.KsIronHandsFollowMarket; } }
         internal static bool F5CreditOn { get { var s = Settings.Current; return _applied && s != null && s.BloomeryWoodCredit; } }
+        private static int F5OverdueDays { get { var s = Settings.Current; return s != null ? Math.Max(1, s.KsConsignOverdueDays) : 30; } }   // ta sama zwloka co KS-H
 
         // ------------------------------------------------------------ pierscien wytopu (pamiec sesji)
         private sealed class F5Ring
@@ -57,19 +61,26 @@ namespace Armoury
         private static readonly Dictionary<Village, F5Ring> _f5ring = new Dictionary<Village, F5Ring>();
 
         // ------------------------------------------------------------ kredyt kupcow (w zapisie arm_f5_woodcredit)
-        private sealed class F5Credit { public int Owed; public Settlement Creditor; public int LastPay = -1; public int Since = -1; }
+        private sealed class F5Bill { public int Day; public int Left; }
+        private sealed class F5Credit
+        {
+            public Settlement Creditor;
+            public readonly List<F5Bill> B = new List<F5Bill>(F5MaxBills);
+            public int Owed { get { int s = 0; foreach (var b in B) s += b.Left; return s; } }
+            public int Oldest { get { int d = int.MaxValue; foreach (var b in B) if (b.Left > 0 && b.Day < d) d = b.Day; return d == int.MaxValue ? -1 : d; } }
+        }
         private static readonly Dictionary<Village, F5Credit> _f5cred = new Dictionary<Village, F5Credit>();
         private static string _f5pending;
         // liczniki doby (linia) i stan "otwarty wczoraj" (-1 = pierwsza linia sesji)
-        private static int _f5Lent, _f5LentN, _f5NoProfit, _f5AtCap, _f5Stale, _f5TownPoor, _f5PayCartN, _f5PayPurseN, _f5WriteN, _f5Stum, _f5StumDay;
-        private static long _f5LentZl, _f5PayCart, _f5PayPurse, _f5Write, _f5Prev = -1;
+        private static int _f5Lent, _f5LentN, _f5NoProfit, _f5AtCap, _f5Stale, _f5TownPoor, _f5PayCartN, _f5PayPurseN, _f5LostN, _f5Stum, _f5StumDay;
+        private static long _f5LentZl, _f5PayCart, _f5PayPurse, _f5Lost, _f5Prev = -1;
         private static readonly HashSet<Village> _f5LentV = new HashSet<Village>();
 
         private static void F5Reset()
         {
             _f5ring.Clear(); _f5cred.Clear(); _f5pending = null; _f5LentV.Clear();
-            _f5Lent = _f5LentN = _f5NoProfit = _f5AtCap = _f5Stale = _f5TownPoor = _f5PayCartN = _f5PayPurseN = _f5WriteN = _f5Stum = _f5StumDay = 0;
-            _f5LentZl = _f5PayCart = _f5PayPurse = _f5Write = 0; _f5Prev = -1;
+            _f5Lent = _f5LentN = _f5NoProfit = _f5AtCap = _f5Stale = _f5TownPoor = _f5PayCartN = _f5PayPurseN = _f5LostN = _f5Stum = _f5StumDay = 0;
+            _f5LentZl = _f5PayCart = _f5PayPurse = _f5Lost = 0; _f5Prev = -1;
         }
 
         private static void F5Stumble(string where, Exception e)
@@ -124,6 +135,11 @@ namespace Armoury
             }
         }
 
+        private static bool F5AtWar(Settlement a, Settlement b)
+        {
+            try { return a != null && b != null && a.MapFaction != null && b.MapFaction != null && FactionManager.IsAtWarAgainstFaction(a.MapFaction, b.MapFaction); } catch { return false; }
+        }
+
         // ------------------------------------------------------------ kredyt: udzielenie (Bloomery.Daily, brak zlota)
         /// <summary>Bloomery.Daily (krok b): wies nie ma zlota na `shortN` ladunkow drewna z polki miasta handlowego (cena `price`) - kupcy daja na kredyt, ile wolno.
         /// Drewno z polki do dymarki w ramce ksiegi FBloom (jak zakup), bez zlota w tej chwili; liczniki doby kopalni (Got, NoGold) i linii (brak zlota) przesuniete
@@ -138,21 +154,23 @@ namespace Armoury
                 int today = Today5;
                 F5Credit c;
                 _f5cred.TryGetValue(v, out c);
-                if (c != null && c.Owed > 0)
+                int owed0 = c != null ? c.Owed : 0;
+                if (owed0 > 0)
                 {
                     if (!ReferenceEquals(c.Creditor, mk)) { _f5Stale += shortN; return; }                 // jeden wierzyciel naraz (miasto handlowe sie zmienilo)
-                    if (c.LastPay >= 0 && today - c.LastPay > F5StaleDays) { _f5Stale += shortN; return; }
+                    int old = c.Oldest;
+                    if (old >= 0 && today - old > F5OverdueDays) { _f5Stale += shortN; return; }         // zaleglosc jak KS-H: bez nowego kredytu
                 }
+                if (F5AtWar(mk, v.Settlement)) return;                                                     // wojna z miastem handlowym - bez kredytu (i tak przepadlby)
                 // oplaca sie: lupa sprzedana temu miastu warta wiecej niz drewno, ktore spala
                 int wpb = WoodPerBloom();
                 int sell = _iron != null ? Math.Max(0, town.MarketData.GetPrice(_iron, null, true, null)) : 0;
                 if (wpb <= 0 || sell <= wpb * price) { _f5NoProfit += shortN; return; }
                 float need = m.Want - Math.Min(m.ForAvg, m.Want);   // potrzeba doby ponad las okregu (ta sama miara co linia "kiesy kopaln")
                 long cap = (long)F5CreditDays * Math.Max(1, (int)Math.Ceiling(need)) * price;
-                long owed = c != null ? c.Owed : 0;
-                long room = cap - owed;
+                long room = cap - owed0;
                 if (room < price) { _f5AtCap += shortN; return; }
-                long townRoom = (long)town.Gold - owed;                                                   // kupcy maja z czego czekac: kasa miasta >= dlug
+                long townRoom = (long)town.Gold - owed0;                                                  // kupcy maja z czego czekac: kasa miasta >= dlug
                 if (townRoom < price) { _f5TownPoor += shortN; return; }
                 int k = (int)Math.Min(shortN, Math.Min(room / price, townRoom / price));
                 k = Math.Min(k, shelf.GetItemNumber(wood));
@@ -167,38 +185,45 @@ namespace Armoury
                 m.Got += k; m.NoGold -= k; _dShortGold -= k;
                 OreLedger.NoteBloomeryWood(wood, k);
                 if (c == null) { c = new F5Credit(); _f5cred[v] = c; }
-                if (c.Owed <= 0) { c.Since = today; c.LastPay = today; c.Creditor = mk; }   // zegar zaleglosci od pierwszego kredytu
-                c.Owed += k * price;
-                _f5Lent += k; _f5LentZl += (long)k * price;
+                if (owed0 <= 0) { c.B.Clear(); c.Creditor = mk; }
+                int zl = k * price;
+                var last = c.B.Count > 0 ? c.B[c.B.Count - 1] : null;
+                if (last != null && (last.Day == today || c.B.Count >= F5MaxBills)) last.Left += zl;   // ta sama doba albo pelna lista - do najnowszego (jak KS-H)
+                else c.B.Add(new F5Bill { Day = today, Left = zl });
+                _f5Lent += k; _f5LentZl += zl;
                 if (_f5LentV.Add(v)) _f5LentN++;
             }
             catch (Exception e) { F5Stumble("Lend", e); }
         }
 
         // ------------------------------------------------------------ kredyt: splata
-        /// <summary>Splata `ask` zl dlugu wsi v: kiesa wsi -> kasa miasta-wierzyciela (najwyzej tyle, ile kiesa ma); przy F4b splacone zloto dopisane do rachunku
-        /// za drewno (jak zaplata za drewno z polki). Zwraca zaplacone.</summary>
-        private static int F5Pay(Village v, F5Credit c, int ask, int today)
+        /// <summary>Splata `ask` zl dlugu wsi v od najstarszego rachunku: kiesa wsi -> kasa miasta-wierzyciela (najwyzej tyle, ile kiesa ma); przy F4b splacone zloto
+        /// dopisane do rachunku za drewno (jak zaplata za drewno z polki). Zwraca zaplacone.</summary>
+        private static int F5Pay(Village v, F5Credit c, int ask)
         {
-            if (v == null || c == null || ask <= 0 || c.Owed <= 0) return 0;
+            if (v == null || c == null || ask <= 0) return 0;
+            int owed = c.Owed;
+            if (owed <= 0) return 0;
             var town = c.Creditor != null ? c.Creditor.Town : null;
             if (town == null) return 0;
-            ask = Math.Min(ask, Math.Min(c.Owed, Math.Max(0, v.Gold)));
+            ask = Math.Min(ask, Math.Min(owed, Math.Max(0, v.Gold)));
             if (ask <= 0) return 0;
             int had = v.Gold;
             v.ChangeGold(-ask);
             int paid = had - v.Gold;
             if (paid <= 0) return 0;
             town.ChangeGold(paid);
-            c.Owed -= paid; c.LastPay = today;
-            if (c.Owed <= 0) { c.Owed = 0; c.Since = -1; }
+            int rest = paid;
+            c.B.Sort((x, y) => x.Day.CompareTo(y.Day));
+            foreach (var b in c.B) { if (rest <= 0) break; int t = Math.Min(rest, b.Left); b.Left -= t; rest -= t; }
+            c.B.RemoveAll(b => b.Left <= 0);
             try { TownFolk.Sale(c.Creditor, paid, TownFolk.MixGoods); } catch { }   // drewno zaplacone kupcom miasta (tylko licznik) - jak zakup za gotowke
             Mine m;
             if (CoalFirst && _mines.TryGetValue(v, out m)) { m.Bill += paid; m.BuyDay += paid; _bAdded += paid; }   // F4b: koszt drewna przed dzialka pana
             return paid;
         }
 
-        /// <summary>Bloomery.Daily (przed zakupem): splata dlugu z kiesy wsi - najwyzej 1/4 kiesy (odpis - F5Roll). Dziala przy kazdym dlugu (takze przy kluczu
+        /// <summary>Bloomery.Daily (przed zakupem): splata dlugu z kiesy wsi - najwyzej 1/4 kiesy (przepadek - F5Roll). Dziala przy kazdym dlugu (takze przy kluczu
         /// wylaczonym - drewno juz wydane). Nie rzuca.</summary>
         private static void F5RepayPurse(Village v, Mine m)
         {
@@ -207,16 +232,15 @@ namespace Armoury
             {
                 if (_f5pending != null) F5Resolve();
                 F5Credit c;
-                if (!_f5cred.TryGetValue(v, out c) || c.Owed <= 0) return;
-                int today = Today5;
-                int paid = F5Pay(v, c, Math.Max(0, v.Gold) / 4, today);
+                if (!_f5cred.TryGetValue(v, out c) || c.B.Count == 0) return;
+                int paid = F5Pay(v, c, Math.Max(0, v.Gold) / 4);
                 if (paid > 0) { _f5PayPurse += paid; _f5PayPurseN++; }
             }
             catch (Exception e) { F5Stumble("RepayPurse", e); }
         }
 
-        /// <summary>VillageTakings.EnterPostfix (woz oddal utarg we wsi MACIERZYSTEJ, po F4b, przed pracami okregu i danina DS): splata dlugu z przyrostu kiesy w tym oknie
-        /// (`grown` - utarg wsi po dzialce pana, 112 i zwrocie F4b). Brak dlugu - nic. Nie rzuca.</summary>
+        /// <summary>VillageTakings.EnterPostfix (woz oddal utarg we wsi MACIERZYSTEJ; ostatni krok okna - po F4b, pracach okregu i daninie DS): splata dlugu z reszty
+        /// przyrostu kiesy w tym oknie (`grown` - utarg wsi po dzialce pana, 112, zwrocie F4b, pracach okregu i daninie). Brak dlugu - nic. Nie rzuca.</summary>
         internal static void F5CreditAtCart(Village home, long grown)
         {
             if (home == null || grown <= 0 || (_f5cred.Count == 0 && _f5pending == null)) return;
@@ -224,8 +248,8 @@ namespace Armoury
             {
                 if (_f5pending != null) F5Resolve();
                 F5Credit c;
-                if (!_f5cred.TryGetValue(home, out c) || c.Owed <= 0) return;
-                int paid = F5Pay(home, c, (int)Math.Min(int.MaxValue, grown), Today5);
+                if (!_f5cred.TryGetValue(home, out c) || c.B.Count == 0) return;
+                int paid = F5Pay(home, c, (int)Math.Min(int.MaxValue, grown));
                 if (paid > 0) { _f5PayCart += paid; _f5PayCartN++; }
             }
             catch (Exception e) { F5Stumble("CreditAtCart", e); }
@@ -234,69 +258,75 @@ namespace Armoury
         private static long F5Open(out int n)
         {
             long s = 0; n = 0;
-            foreach (var c in _f5cred.Values) if (c.Owed > 0) { s += c.Owed; n++; }
+            foreach (var c in _f5cred.Values) { int o = c.Owed; if (o > 0) { s += o; n++; } }
             return s;
         }
 
         // ------------------------------------------------------------ koniec doby (NewDay - po linii "Zelazo (lupy)")
-        /// <summary>Bloomery.NewDay: pierscien wytopu (przy kluczu Ks Iron Hands Follow Market) i linia kredytu drewna (gdy klucz kredytu TAK albo jest dlug); liczniki od zera.</summary>
+        /// <summary>Bloomery.NewDay: pierscien wytopu (przy kluczu Ks Iron Hands Follow Market), przepadek rachunkow (wojna, wierzyciel nie jest miastem) i linia kredytu
+        /// drewna (gdy KS zastosowany przy kluczu TAK albo jest dlug / ruch); liczniki od zera.</summary>
         private static void F5Roll()
         {
             if (F5RingOn) foreach (var r in _f5ring.Values) r.Push();
             if (!_applied) return;
             if (_f5pending != null) F5Resolve();
-            // odpis: 60 dob bez splaty albo wierzyciel nie jest juz miastem - kupcy wydali drewno bez zaplaty (zloto sie nie rusza)
-            int today = Today5;
-            foreach (var c in _f5cred.Values)
+            // przepadek jak KS-H: wojna miedzy miastem-wierzycielem a wsia albo wierzyciel nie jest juz miastem - roszczenie znika (zloto sie nie rusza)
+            foreach (var kv in _f5cred)
             {
-                if (c == null || c.Owed <= 0) continue;
-                if (c.Creditor == null || c.Creditor.Town == null || (c.LastPay >= 0 && today - c.LastPay > F5WriteOffDays))
+                var c = kv.Value;
+                if (c == null || c.B.Count == 0) continue;
+                if (kv.Key == null || c.Creditor == null || c.Creditor.Town == null || F5AtWar(c.Creditor, kv.Key.Settlement))
                 {
-                    _f5Write += c.Owed; _f5WriteN++;
-                    c.Owed = 0; c.Since = -1;
+                    _f5Lost += c.Owed; _f5LostN++;
+                    c.B.Clear();
                 }
             }
             int openN;
             long open = F5Open(out openN);
             bool on = F5CreditOn;
             // linia: KS zastosowany (kredyt mozliwy) albo jest dlug / ruch; gra przed KS i klucz NIE bez dlugu - bez linii
-            if ((on && StartCalibration.Applied) || open > 0 || _f5Prev > 0 || _f5PayCart + _f5PayPurse + _f5Write > 0)
+            if ((on && StartCalibration.Applied) || open > 0 || _f5Prev > 0 || _f5PayCart + _f5PayPurse + _f5Lost > 0)
             {
                 var inv = CultureInfo.InvariantCulture;
+                int today = Today5;
                 var sb = new StringBuilder(700);
-                sb.Append("Ruda kredyt drewna (f5-ruda): dzien ").Append(Today5).Append(" | klucz Bloomery Wood Credit ").Append(on ? "TAK" : "NIE (bez nowego kredytu, splaty dalej)")
+                sb.Append("Ruda kredyt drewna (f5-ruda): dzien ").Append(today).Append(" | klucz Bloomery Wood Credit ").Append(on ? "TAK" : "NIE (bez nowego kredytu, splaty dalej)")
                   .Append(" | drewno na kredyt dzis ").Append(_f5Lent).Append(" ladunkow za ").Append(_f5LentZl).Append(" zl w ").Append(_f5LentN).Append(" kopalniach (z polki miasta handlowego do dymarki, bez zaplaty w tej chwili)")
                   .Append("; odmowy (ladunki): bez zysku przy dzisiejszych cenach ").Append(_f5NoProfit).Append(", limit ").Append(F5CreditDays).Append(" dob potrzeby ").Append(_f5AtCap)
-                  .Append(", inny wierzyciel albo bez splaty ponad ").Append(F5StaleDays).Append(" dob ").Append(_f5Stale).Append(", kasa miasta mniejsza od dlugu ").Append(_f5TownPoor)
+                  .Append(", inny wierzyciel albo rachunek starszy niz ").Append(F5OverdueDays).Append(" dob ").Append(_f5Stale).Append(", kasa miasta mniejsza od dlugu ").Append(_f5TownPoor)
                   .Append(" | splaty (kiesy wsi -> kasy miast-wierzycieli): przy powrocie wozu ").Append(_f5PayCart).Append(" zl (").Append(_f5PayCartN).Append("), z kiesy wsi ")
                   .Append(_f5PayPurse).Append(" zl (").Append(_f5PayPurseN).Append(")")
-                  .Append(" | odpisane (").Append(F5WriteOffDays).Append(" dob bez splaty albo wierzyciel nie jest miastem - drewno wydane bez zaplaty, strata kupcow, zadna moneta nie powstaje) ")
-                  .Append(_f5Write).Append(" zl (").Append(_f5WriteN).Append(")")
+                  .Append(" | przepadle (wojna miasta-wierzyciela z wsia albo wierzyciel nie jest miastem - kupcy stracili, zadna moneta nie powstaje) ")
+                  .Append(_f5Lost).Append(" zl (").Append(_f5LostN).Append(")")
                   .Append(" | otwarty kredyt ").Append(open).Append(" zl w ").Append(openN).Append(" kopalniach");
                 if (_f5Prev >= 0)
                     sb.Append("; kontrola: otwarty wczoraj ").Append(_f5Prev).Append(" + nowy ").Append(_f5LentZl).Append(" - splaty ").Append(_f5PayCart + _f5PayPurse)
-                      .Append(" - odpisane ").Append(_f5Write).Append(" - otwarty dzis = reszta ").Append(_f5Prev + _f5LentZl - _f5PayCart - _f5PayPurse - _f5Write - open);
+                      .Append(" - przepadle ").Append(_f5Lost).Append(" - otwarty dzis = reszta ").Append(_f5Prev + _f5LentZl - _f5PayCart - _f5PayPurse - _f5Lost - open);
                 else sb.Append("; kontrola od nastepnej doby");
                 // najwieksze dlugi (3)
                 var top = new List<KeyValuePair<Village, F5Credit>>();
-                foreach (var kv in _f5cred) if (kv.Key != null && kv.Value.Owed > 0) top.Add(kv);
+                foreach (var kv in _f5cred) if (kv.Key != null && kv.Value.B.Count > 0) top.Add(kv);
                 top.Sort((a, b) => b.Value.Owed.CompareTo(a.Value.Owed));
                 sb.Append(" | najwieksze dlugi: ");
                 if (top.Count == 0) sb.Append("-");
                 for (int i = 0; i < top.Count && i < 3; i++)
                 {
                     var v = top[i].Key; var c = top[i].Value;
+                    int old = c.Oldest;
                     if (i > 0) sb.Append(", ");
                     sb.Append(v.Name != null ? v.Name.ToString() : "?").Append(" [").Append(c.Creditor != null && c.Creditor.Name != null ? c.Creditor.Name.ToString() : "?").Append("] ")
-                      .Append(c.Owed).Append(" zl (od ").Append(c.Since >= 0 ? (Today5 - c.Since).ToString(inv) : "-").Append(" dob, splata ")
-                      .Append(c.LastPay >= 0 ? (Today5 - c.LastPay).ToString(inv) : "-").Append(" dob temu, kiesa ").Append(v.Gold).Append(")");
+                      .Append(c.Owed).Append(" zl (rachunkow ").Append(c.B.Count).Append(", najstarszy ").Append(old >= 0 ? (today - old).ToString(inv) : "-").Append(" dob, kiesa ")
+                      .Append(v.Gold).Append(")");
                 }
                 sb.Append(" | potkniecia dzis ").Append(_f5StumDay).Append(" (sesja ").Append(_f5Stum).Append(").");
                 Log.Info(sb.ToString());
             }
             _f5Prev = open;
-            _f5Lent = _f5LentN = _f5NoProfit = _f5AtCap = _f5Stale = _f5TownPoor = _f5PayCartN = _f5PayPurseN = _f5WriteN = _f5StumDay = 0;
-            _f5LentZl = _f5PayCart = _f5PayPurse = _f5Write = 0; _f5LentV.Clear();
+            _f5Lent = _f5LentN = _f5NoProfit = _f5AtCap = _f5Stale = _f5TownPoor = _f5PayCartN = _f5PayPurseN = _f5LostN = _f5StumDay = 0;
+            _f5LentZl = _f5PayCart = _f5PayPurse = _f5Lost = 0; _f5LentV.Clear();
+            var gone = new List<Village>();
+            foreach (var kv in _f5cred) if (kv.Value == null || kv.Value.B.Count == 0) gone.Add(kv.Key);
+            foreach (var v in gone) _f5cred.Remove(v);
         }
 
         // ------------------------------------------------------------ zapis (arm_f5_woodcredit)
@@ -305,18 +335,25 @@ namespace Armoury
             try
             {
                 if (_f5pending != null) return _f5pending;   // wczytane, jeszcze nie rozwiazane - oddajemy jak bylo
-                var sb = new StringBuilder("f5c1");
+                var inv = CultureInfo.InvariantCulture;
+                var sb = new StringBuilder(F5Ver);
                 int n = 0;
                 foreach (var kv in _f5cred)
                 {
                     var st = kv.Key != null ? kv.Key.Settlement : null; var c = kv.Value;
-                    if (st == null || st.StringId == null || c == null || c.Owed <= 0 || c.Creditor == null || c.Creditor.StringId == null) continue;
-                    sb.Append('|').Append(st.StringId).Append(':').Append(c.Creditor.StringId).Append(':').Append(c.Owed.ToString(CultureInfo.InvariantCulture))
-                      .Append(':').Append(c.LastPay.ToString(CultureInfo.InvariantCulture)).Append(':').Append(c.Since.ToString(CultureInfo.InvariantCulture));
+                    if (st == null || st.StringId == null || c == null || c.B.Count == 0 || c.Creditor == null || c.Creditor.StringId == null) continue;
+                    sb.Append('|').Append(st.StringId).Append(':').Append(c.Creditor.StringId).Append(':');
+                    bool first = true;
+                    foreach (var b in c.B)
+                    {
+                        if (b.Left <= 0) continue;
+                        if (!first) sb.Append(';');
+                        sb.Append(b.Day.ToString(inv)).Append('~').Append(b.Left.ToString(inv));
+                        first = false;
+                    }
                     n++;
-                    if (sb.Length > 60000) { Log.Info("Bloomery (f5-ruda): zapis kredytu drewna ponad 60000 znakow - reszta dlugow pominieta (" + n + " zapisanych)."); break; }   // straznik rozmiaru
                 }
-                return n > 0 ? sb.ToString() : "";
+                return n > 0 ? sb.ToString() : "";   // najwyzej ok. 30 kopaln x 8 rachunkow - kilka KB (SaveText dzieli dlugie napisy)
             }
             catch (Exception e) { F5Stumble("Export", e); return ""; }
         }
@@ -324,7 +361,7 @@ namespace Armoury
         internal static void F5Import(string s)
         {
             _f5cred.Clear();
-            _f5pending = !string.IsNullOrEmpty(s) && s.StartsWith("f5c1", StringComparison.Ordinal) ? s : null;
+            _f5pending = !string.IsNullOrEmpty(s) && s.StartsWith(F5Ver, StringComparison.Ordinal) ? s : null;   // inny format (przyszla wersja) - bez dlugow, jak brak klucza
         }
 
         private static void F5Resolve()
@@ -332,7 +369,7 @@ namespace Armoury
             var p = _f5pending;
             if (p == null) return;
             _f5pending = null;
-            int ok = 0, bad = 0; long sum = 0;
+            int ok = 0, bad = 0, bills = 0; long sum = 0;
             var inv = CultureInfo.InvariantCulture;
             var recs = p.Split('|');
             for (int i = 1; i < recs.Length; i++)
@@ -340,16 +377,26 @@ namespace Armoury
                 try
                 {
                     var f = recs[i].Split(':');
-                    if (f.Length != 5) { bad++; continue; }
+                    if (f.Length != 3) { bad++; continue; }
                     var vs = Settlement.Find(f[0]); var cs = Settlement.Find(f[1]);
-                    int owed = int.Parse(f[2], inv);
-                    if (vs == null || vs.Village == null || cs == null || owed <= 0) { bad++; continue; }
-                    _f5cred[vs.Village] = new F5Credit { Owed = owed, Creditor = cs, LastPay = int.Parse(f[3], inv), Since = int.Parse(f[4], inv) };
-                    ok++; sum += owed;
+                    if (vs == null || vs.Village == null || cs == null) { bad++; continue; }
+                    var c = new F5Credit { Creditor = cs };
+                    foreach (var e in f[2].Split(';'))
+                    {
+                        var q = e.Split('~');
+                        if (q.Length != 2) continue;
+                        int d = int.Parse(q[0], inv), left = int.Parse(q[1], inv);
+                        if (left <= 0) continue;
+                        if (c.B.Count >= F5MaxBills) c.B[c.B.Count - 1].Left += left; else c.B.Add(new F5Bill { Day = d, Left = left });
+                        bills++; sum += left;
+                    }
+                    if (c.B.Count == 0) { bad++; continue; }
+                    _f5cred[vs.Village] = c;
+                    ok++;
                 }
                 catch { bad++; }
             }
-            Log.Info("Bloomery (f5-ruda): z zapisu kredyt drewna kupcow - dlugow " + ok + " (" + sum + " zl)" + (bad > 0 ? ", nieczytelnych " + bad : "") + ".");
+            Log.Info("Bloomery (f5-ruda): z zapisu kredyt drewna kupcow - wsi z dlugiem " + ok + ", rachunkow " + bills + " (" + sum + " zl)" + (bad > 0 ? ", nieczytelnych " + bad : "") + ".");
         }
     }
 }

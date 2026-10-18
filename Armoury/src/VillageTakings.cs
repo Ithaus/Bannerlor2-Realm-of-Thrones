@@ -226,21 +226,23 @@ namespace Armoury
         }
 
         /// <summary>Po latce BK i po cudzych postfiksach (Priority.Last): dopisuje wsi to, co z oddanej gotowki nie trafilo nigdzie (Whole112),
-        /// potem - F4b - rachunek za drewno kopalni przed dzialka pana (CoalFirst), a na samym koncu - DS (F1) - daniny wsi przy wozie (DsDues).</summary>
+        /// potem - F4b - rachunek za drewno kopalni przed dzialka pana (CoalFirst), potem - DS (F1) - daniny wsi przy wozie (DsDues), a na samym koncu - f5-ruda -
+        /// splata kredytu kupcow na drewno dymarki z reszty przyrostu kiesy (F5WoodCredit).</summary>
         public static void EnterPostfix(Entry __state)
         {
             if (__state == null) return;
             long estates;
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
-            F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z przyrostu kiesy (koszt wytopu przed pracami okregu i danina DS)
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             DsDues(__state, works);
+            F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z reszty przyrostu kiesy (PO pracach okregu i daninie DS - ich podstawa bez zmian)
         }
 
-        /// <summary>f5-ruda (klucz Bloomery Wood Credit; splata takze przy kluczu wylaczonym, gdy dlug jest): woz wrocil do wsi MACIERZYSTEJ - przyrost kiesy w oknie (BK + 112 +
-        /// zwrot F4b) splaca najpierw dlug za drewno dymarki u kupcow miasta handlowego (Bloomery.F5CreditAtCart: kiesa wsi -> kasa miasta-wierzyciela). Bez dlugu albo
-        /// woz w obcej wsi - nic. Wlasny try.</summary>
+        /// <summary>f5-ruda (klucz Bloomery Wood Credit; splata takze przy kluczu wylaczonym, gdy dlug jest): woz wrocil do wsi MACIERZYSTEJ - to, co z przyrostu kiesy w oknie
+        /// (BK + 112 + zwrot F4b) zostalo po pracach okregu i daninie DS, splaca dlug za drewno dymarki u kupcow miasta handlowego (Bloomery.F5CreditAtCart: kiesa wsi -> kasa
+        /// miasta-wierzyciela). Ostatni krok okna: podstawa prac okregu i daniny DS (przyrost kiesy) i ich liczniki "udzial pana" bez zmian. Bez dlugu albo woz w obcej wsi -
+        /// nic. Wlasny try.</summary>
         private static void F5WoodCredit(Entry st)
         {
             try
