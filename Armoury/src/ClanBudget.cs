@@ -430,20 +430,7 @@ namespace Armoury
                 if (s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c)) return false;   // Straz (182) i Wolni Ludzie (WL1) bez zoldu - jak b.Zero u AI (najemnik WL - z miara)
                 long G = ClanIncomeBook.FamilyGoldOf(c);
                 int adults = AdultsOf(c);
-                // D: ta sama droga co DOf rodu AI; "D z zapisu" (D0) = D169 ksiegi dochodu (zapisana), bez niej G/60 (start 166)
-                double d0 = ClanIncomeBook.StableIncome(c);
-                if (!(d0 >= 0)) d0 = Math.Max(0, G / 60.0);
-                double d; int days; double once;
-                if (s.ClanBudgetStableD && ClanIncomeBook.StableDWithDays(c, out d, out days, out once))
-                {
-                    if (Array.IndexOf(Raiders, c.Kingdom.StringId) >= 0) d += once;   // najezdzcy: lup w D (wyjatek lore W-1, jak AI)
-                    days = Math.Max(0, Math.Min(Days28, days));
-                    D = (days * d + (Days28 - days) * d0) / Days28;
-                }
-                else D = d0;
-                D = Math.Max(0, D);
-                // 168: rod w zajeciu - D bez dochodu wsi (jak AI; W5 i W6 i tak go pomijaja)
-                if (DebtLadder.On && DebtLadder.IsSeized(c)) D = Math.Max(0, D - Math.Min(D, ClanIncomeBook.VillageIncomeOf(c)));
+                D = PlayerD(c, s, G);   // f7-renty: wyjete do PlayerD (te same linie co do bitu) - ten sam D dla PlayerReserve (renty f7 gracza w pokoju)
                 double R, f, chest;
                 double cap = Ceiling(D, LootFreeG(c, G), true, adults, out R, out f, out chest);   // recenzja R1-7: G bez lupu okna jeszcze nierozpisanego (jak AI)
                 // udzial dworu ustepujacy zoldowi (jak AI w wojnie): dwor i wyzywienie minus jedzenie partii, gdy jest siedziba z kasa
@@ -481,6 +468,47 @@ namespace Armoury
                 return true;
             }
             catch (Exception e) { Stumble("PlayerCaps", e); return false; }
+        }
+
+        /// <summary>W6b / f7-renty: D staly rodu gracza - ta sama droga co DOf rodu AI; "D z zapisu" (D0) = D169 ksiegi dochodu (zapisana), bez niej G/60 (start 166);
+        /// 168: rod w zajeciu - D bez dochodu wsi. Wyjete z PlayerCaps bez zmiany liczb (wola PlayerCaps i PlayerReserve).</summary>
+        private static double PlayerD(Clan c, Settings s, long G)
+        {
+            double D;
+            double d0 = ClanIncomeBook.StableIncome(c);
+            if (!(d0 >= 0)) d0 = Math.Max(0, G / 60.0);
+            double d; int days; double once;
+            if (s.ClanBudgetStableD && ClanIncomeBook.StableDWithDays(c, out d, out days, out once))
+            {
+                if (Array.IndexOf(Raiders, c.Kingdom.StringId) >= 0) d += once;   // najezdzcy: lup w D (wyjatek lore W-1, jak AI)
+                days = Math.Max(0, Math.Min(Days28, days));
+                D = (days * d + (Days28 - days) * d0) / Days28;
+            }
+            else D = d0;
+            D = Math.Max(0, D);
+            // 168: rod w zajeciu - D bez dochodu wsi (jak AI; W5 i W6 i tak go pomijaja)
+            if (DebtLadder.On && DebtLadder.IsSeized(c)) D = Math.Max(0, D - Math.Min(D, ClanIncomeBook.VillageIncomeOf(c)));
+            return D;
+        }
+
+        /// <summary>f7-renty (CrownRents.Need.cs): rezerwa wojny R rodu gracza TYM SAMYM wzorem co PlayerCaps (W6b) i rod AI - D z PlayerD, R z Ceiling (R nie zalezy
+        /// ani od wojny, ani od G) - takze w POKOJU: renty 180 ida i w pokoju, a PlayerCaps (miara W5 / W6 / f6 zwrotu) liczy tylko w wojnie. false: 166 wylaczone,
+        /// budzet jeszcze nie policzony w tej sesji (jak AI - od jutra), nie gracz, bez glowy albo krolestwa, Straz i Wolni Ludzie bez zoldu. Dlug i zajecie (168) -
+        /// sprawdza wolajacy (jak RefundNeed). Tylko odczyt.</summary>
+        internal static bool PlayerReserve(Clan c, out double reserve)
+        {
+            reserve = 0;
+            try
+            {
+                var s = Settings.Current;
+                if (s == null || c == null || c != Clan.PlayerClan || !On || Pending || c.Leader == null || c.Kingdom == null) return false;
+                if (s.UnpaidTroopsCapInMen && CrownGifts.IsUnpaidClan(c)) return false;   // jak PlayerCaps
+                long G = ClanIncomeBook.FamilyGoldOf(c);
+                double D = PlayerD(c, s, G), f, chest;
+                Ceiling(D, LootFreeG(c, G), AtWar(c), AdultsOf(c), out reserve, out f, out chest);   // R jak w PlayerCaps (wojna i G nie zmieniaja R)
+                return reserve > 0;
+            }
+            catch (Exception e) { Stumble("PlayerReserve", e); return false; }
         }
 
         internal static int AdultsOf(Clan c)

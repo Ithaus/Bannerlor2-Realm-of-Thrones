@@ -27,6 +27,10 @@ namespace Armoury
     /// Kaskada braku (skarbiec ponad zapas K5, zaliczka mieszczan L1, kredyt Banku 186), podzial Split, wyplata, liczniki CrownIncome - bez zmian: dostaja mniejszy
     /// nalezny. Renty 180 NIETKNIETE (nie byly czescia decyzji Jeffa) - uwaga: roznica zwrotu zostaje w reszcie wplywow dnia, z ktorej po W5/M1/M3/E3-P1 tej
     /// samej doby biora renty 180 wedlug lenn (CrownRents.Daily - LeftFor), wiec czesc wraca do rodow z lennami, takze bogatych. Regula dla rent - decyzja Jeffa.
+    /// f7-renty (decyzja Jeffa 18.10 ok. 07:28 PDT "Renty wedlug potrzeby ... to robimy"): renty 180 ta sama regula (klucz CrownRentsByNeed, CrownRents.Need.cs) -
+    /// NeedBand (wzor) i NeedOfClan (ta sama pamiec doby _rbn); czego rod nie dostanie, zostaje w skarbcu krolestwa.
+    /// Recenzja f7: przy czynnym kluczu f7 komunikat gracza o zwrocie idzie przez CrownRents.QueueWageMsg (jeden wspolny z komunikatem renty w tym samym pasmie)
+    /// i pasmo komunikatu ma martwa strefe 5% R (CrownRents.MsgBand); klucz f7 wylaczony - komunikat jak dotad.
     ///
     /// Klucz wylaczony (albo budzet 166 wylaczony) = pelny zwrot co do zlotowki jak dotad; linia "Korona: zwrot wedlug potrzeby (f6)" liczy wtedy skutek na sucho.
     /// Zloto nie powstaje i nie znika: mniej przelewu skarbiec -> kiesa platnika. Stan tylko w pamieci doby (bez zapisu); Reset czysci wszystko i pasmo gracza.
@@ -95,14 +99,41 @@ namespace Armoury
                 if (ok && R > 0 && !double.IsNaN(G) && !double.IsInfinity(G))
                 {
                     n.G = G; n.R = R;
-                    n.F = Math.Max(0.0, Math.Min(1.0, (2.0 * R - G) / R));
-                    n.Band = G <= R ? NbBelow : (G >= 2.0 * R ? NbAbove : NbMid);
-                    if (n.Band == NbAbove) n.F = 0;
-                    else if (n.Band == NbBelow) n.F = 1;
+                    double f; n.Band = NeedBand(G, R, out f); n.F = f;   // f7-renty: wzor w jednym miejscu (NeedBand) - ten sam dla zwrotu i rent
                 }
             }
             catch (Exception e) { n.F = 1; n.Band = NbNone; RbnStumble("Of", e); }
             return n;
+        }
+
+        /// <summary>f7-renty: JEDNA regula mnoznika potrzeby (zwrot f6 i renty f7): f = clamp((2R - G) / R, 0, 1); pasmo 0 ponizej R (f = 1), 1 R-2R (liniowo),
+        /// 2 ponad 2R (f = 0). R > 0 (wolajacy sprawdza). Te same liczby co dotad w RbnOf co do bitu.</summary>
+        internal static int NeedBand(double G, double R, out double f)
+        {
+            f = Math.Max(0.0, Math.Min(1.0, (2.0 * R - G) / R));
+            int band = G <= R ? NbBelow : (G >= 2.0 * R ? NbAbove : NbMid);
+            if (band == NbAbove) f = 0;
+            else if (band == NbBelow) f = 1;
+            return band;
+        }
+
+        /// <summary>f7-renty (CrownRents.Need.cs): mnoznik f, G i R rodu z TEJ SAMEJ pamieci doby co zwrot zoldu (RbnOf - budzet 166 z wczoraj: ChestOf / PendingChestOf,
+        /// te same wykluczenia: bez budzetu, dluznik i zajecie 168, Straz bez zoldu, najemnik; gracz w wojnie z PlayerCaps). Krok rent biegnie po zwrocie, wiec rod
+        /// policzony przy zwrocie ma te same liczby. Doba bez kroku zwrotu (Crown Wage Refund wylaczony) - pamiec doby od zera tutaj (liczniki f6 dzis i tak bez linii).
+        /// Zwraca pasmo: 0 ponizej R, 1 R-2R, 2 ponad 2R, 3 bez miary (f = 1). Nie rzuca.</summary>
+        internal static int NeedOfClan(Clan c, out double f, out double G, out double R)
+        {
+            f = 1; G = 0; R = 0;
+            try
+            {
+                if (c == null || Campaign.Current == null) return NbNone;
+                if (_rbnDay != (int)CampaignTime.Now.ToDays) RbnBegin();
+                var n = RbnOf(c);
+                if (n == null) return NbNone;
+                f = n.F; G = n.G; R = n.R;
+                return n.Band;
+            }
+            catch (Exception e) { RbnStumble("NeedOfClan", e); f = 1; G = 0; R = 0; return NbNone; }
         }
 
         /// <summary>WageRefund, krolestwo w wojnie, wiersz platnika (zold v po cieciach W5/W7/K3): pelny = (int)(v x pct), wedlug potrzeby = (int)(pelny x f).
@@ -187,20 +218,32 @@ namespace Armoury
                       .Append(", f ").Append(p.F.ToString("0.00", inv)).Append(", G ").Append(Math.Round(p.G).ToString("0", inv)).Append(", R ").Append(Math.Round(p.R).ToString("0", inv))
                       .Append(", pelny ").Append(p.Full).Append(", wedlug potrzeby ").Append(p.Need);
                 else sb.Append(" | rod gracza: bez zwrotu dzis");
-                sb.Append(" | renty 180 bez zmian (roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn)")
+                sb.Append(CrownRents.NeedOn   // f7-renty: renty 180 ta sama regula - czesc rodow bogatych zostaje w skarbcu (linia "Korona: renty wedlug potrzeby (f7)")
+                    ? " | renty 180 wedlug potrzeby (f7, ta sama regula; roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn x f, reszta w skarbcu)"
+                    : " | renty 180 bez zmian (roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn)")
                   .Append(" | zapas wojny korony (184, W5b, K5, DS, L5b-1, korona2) z pelnego zwrotu - jak przed f6")
                   .Append(" | potkniecia ").Append(_rbnStumbles).Append(" (sesja ").Append(_rbnStumblesSess).Append(").");
                 Log.Info(sb.ToString());
                 // komunikat gracza - tylko przy zmianie pasma (klucz czynny, rod gracza z naleznym dzis)
-                if (_rbnApply && p != null && p.Counted && p.Band != NbNone && p.Band != _rbnPlayerBand)
+                // recenzja f7: przy czynnych rentach wedlug potrzeby (CrownRents.NeedOn) pasmo komunikatu ma martwa strefe (CrownRents.MsgBand - 5% R przy progach R
+                // i 2R), a komunikat idzie do kroku rent tej doby (CrownRents.QueueWageMsg): to samo pasmo renty tego dnia - JEDEN wspolny komunikat zamiast dwoch
+                // (w wojnie pasmo zwrotu i renty liczy ten sam wiersz RbnOf). Klucz f7 wylaczony - warunek, napisy i kolejnosc jak dotad co do znaku.
+                if (_rbnApply && p != null && p.Counted && p.Band != NbNone)
                 {
-                    if (p.Band == NbAbove)
-                        Log.Player("The crown no longer repays your wages: your house holds more than twice its war reserve and pays for its own war.");
-                    else if (p.Band == NbMid)
-                        Log.Player("The crown now repays only part of your wages: your house holds more than its war reserve - the richer the house, the smaller the share, and nothing above twice the reserve.");
-                    else if (_rbnPlayerBand == NbMid || _rbnPlayerBand == NbAbove)
-                        Log.Player("The crown again repays your wages in full: your house's gold is below its war reserve.");
-                    _rbnPlayerBand = p.Band;
+                    bool f7 = CrownRents.NeedOn;
+                    int band = f7 ? CrownRents.MsgBand(_rbnPlayerBand, p.G, p.R, p.Band) : p.Band;
+                    if (band != _rbnPlayerBand)
+                    {
+                        string msg = null;
+                        if (band == NbAbove)
+                            msg = "The crown no longer repays your wages: your house holds more than twice its war reserve and pays for its own war.";
+                        else if (band == NbMid)
+                            msg = "The crown now repays only part of your wages: your house holds more than its war reserve - the richer the house, the smaller the share, and nothing above twice the reserve.";
+                        else if (_rbnPlayerBand == NbMid || _rbnPlayerBand == NbAbove)
+                            msg = "The crown again repays your wages in full: your house's gold is below its war reserve.";
+                        if (msg != null) { if (f7) CrownRents.QueueWageMsg(band, msg); else Log.Player(msg); }
+                        _rbnPlayerBand = band;
+                    }
                 }
             }
             catch (Exception e) { RbnStumble("Line", e); }

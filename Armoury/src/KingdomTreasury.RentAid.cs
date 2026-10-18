@@ -152,7 +152,9 @@ namespace Armoury
                 for (int i = 0; i < list.Count && i < wts.Count && i < ok.Length; i++)
                 {
                     if (!ok[i] || list[i] == null) continue;
-                    if (_raNeed.Contains(list[i])) wNeed += wts[i]; else wNo += wts[i];
+                    // f7-renty: przy czynnym kluczu renta rodu = udzial x f (ta sama regula co zwrot) - czesc zatrzymana zostalaby w skarbcu (RentFromHeld); wylaczony - f = 1
+                    double w = wts[i] * CrownRents.NeedFactor(list[i]);
+                    if (_raNeed.Contains(list[i])) wNeed += w; else wNo += w;
                 }
                 row.RentFromNeed = (long)Math.Round(row.RentPaid * Math.Min(1.0, wNeed / div));
                 row.RentFromNo = (long)Math.Round(row.RentPaid * Math.Min(1.0, wNo / div));
