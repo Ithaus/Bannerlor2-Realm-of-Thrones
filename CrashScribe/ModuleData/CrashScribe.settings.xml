@@ -504,4 +504,22 @@
        another realm, a destroyed house, a mercenary house or your own house outside the realm does not get that throne. Set to false for the old
        behaviour. -->
   <RotEventRulerInKingdom>true</RotEventRulerInKingdom>
+  <!-- Alliances as in the chronicles. In Westeros the AI realms may only form the alliances of the War of the Five Kings: the North with the
+       Riverlands, Renly's Stormlands with the Reach while Renly lives, and King's Landing with the Reach after Renly's death. Stannis
+       (Dragonstone), the Night's Watch and every other Westeros realm form no alliances. The realms of Essos ally as the game decides, and a
+       realm you rule yourself is never affected. Set to false to let the game form any alliance (old behaviour). -->
+  <CanonAlliances>true</CanonAlliances>
+  <!-- Only with CanonAlliances: in the first hour after loading a save, every alliance between AI realms that is not on the list above is
+       ended the way the game ends an expired alliance - no relation penalty, and the call-to-war agreements of that alliance are closed
+       first. Wars already going on are not touched. Set to false to let existing alliances run until they expire. -->
+  <CanonAlliancesBreakOnLoad>true</CanonAlliancesBreakOnLoad>
+  <!-- Realm of Thrones has a story war "the Reach against the North" after Renly's death, but nothing ever starts it. With this on, it is
+       switched on at Renly's death, exactly like the Reach's war against the Riverlands, and Realm of Thrones declares it the same way.
+       It happens once. Set to false to leave it as in Realm of Thrones. -->
+  <CanonReachNorthWar>true</CanonReachNorthWar>
+  <!-- "Peace from poverty": a one-off payment out of a realm's treasury (a captured capital's treasury, a ransom) used to be counted as a
+       daily loss, so a rich realm could look like it would be broke in days. With this on, a single day with a drop far bigger than the
+       usual daily change is left out of the daily trend, the same way for every realm; the treasury itself still counts, and the daily loss
+       is never measured higher than before. Set to false for the old measure. -->
+  <PovertyPeaceSkipOneOff>true</PovertyPeaceSkipOneOff>
 </CrashScribe>

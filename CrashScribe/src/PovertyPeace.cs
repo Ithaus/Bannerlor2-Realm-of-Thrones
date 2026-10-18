@@ -42,6 +42,7 @@ namespace CrashScribe
     ///
     /// Miara biedy (raz na dobe, krolestwa nie zniszczone):
     ///  - bieda skarbca T: zapas = skarbiec / max(sredni ubytek z 7 dob, 1000 zl/d); zapas <= 28 dob -> 1, >= 91 dob -> 0, liniowo.
+    ///    f19-kanon-a (klucz PovertyPeaceSkipOneOff): sredni ubytek bez jednorazowych odplywow (przelew skarbca stolicy, okup) - DrainNoOneOff.
     ///    (miesiac zoldu / sezon kampanii w roku Armoury 364 = 4 x 91; 1000 zl/d - prawie pusty skarbiec bez ruchu tez jest pusty).
     ///  - bieda rodu P: kiesa glowy na kazda wojne krolestwa (jak BK "cannot afford a war": zloto / (1 + wrogie krolestwa));
     ///    < 5000 -> 1 (prog zapomogi korony w grze), >= 50000 -> 0 (prog BK), liniowo.
@@ -116,6 +117,7 @@ namespace CrashScribe
         private const float RunwayFull = 91f;
         private const float DrainFloor = 1000f;
         private const int DrainDays = 7;
+        private const float OneOffTimes = 3f;   // f19-kanon-a (5): skok jednej doby - ponad 3 x max(mediana, sasiednie doby, DrainFloor)
         private const float HeadPoor = 5000f;
         private const float HeadRich = 50000f;
         private const float WarWeight = 0.75f;
@@ -139,6 +141,7 @@ namespace CrashScribe
             public readonly List<KeyValuePair<int, int>> Hist = new List<KeyValuePair<int, int>>();   // (doba, skarbiec >= 0)
             public float T, Drain, Runway;
             public float N = -1f;   // E1b: niedoplata korony z 28 dob (-1 = brak naleznego zwrotu w oknie albo miara skarbca)
+            public int OneOffN; public long OneOffSum;   // f19-kanon-a (5): doby pominiete jako skok jednej doby i suma ich zmian skarbca (tylko log)
             public int W, Enemies, Clans, Poor, ForPeace;
         }
 
@@ -563,6 +566,8 @@ namespace CrashScribe
             while (s.Hist.Count > 1 && s.Hist[0].Key < absDay - DrainDays) s.Hist.RemoveAt(0);
             int span = absDay - s.Hist[0].Key;
             float drain = span > 0 ? (s.Hist[0].Value - wp) / (float)span : 0f;
+            s.OneOffN = 0; s.OneOffSum = 0;
+            if (Config.PovertyPeaceSkipOneOff) drain = DrainNoOneOff(s, drain);   // f19-kanon-a (5): bez skokow jednej doby
             s.Drain = drain > 0f ? drain : 0f;
             s.Runway = wp / Math.Max(s.Drain, DrainFloor);
             s.T = Clamp01((RunwayFull - s.Runway) / (RunwayFull - RunwayEmpty));
@@ -578,6 +583,51 @@ namespace CrashScribe
                 if (c != Clan.PlayerClan && s.T + ClanPoverty(c.Gold, s.Enemies) > 1f) forPeace++;
             }
             s.Clans = clans; s.Poor = poor; s.ForPeace = forPeace;
+        }
+
+        /// <summary>f19-kanon-a (5): ubytek na dobe bez skokow jednej doby (sesja 18.10: przelew skarbca stolicy L5b-1 1 125 434 przy zdobyciu
+        /// King's Landing liczony jako ubytek 362 794/d - 44 z 56 rodow Korony "za pokojem z biedy", a skarbiec rosl ok. 45 tys./d).
+        /// Zmiany doby z okna (do 7) na dobe; zmiana doby i jest skokiem, gdy jest ujemna i |z_i| > 3 x max(mediana |z| pozostalych dob okna,
+        /// |z_(i-1)|, |z_(i+1)|, 1000) - prog 3 x mediana jak jednorazowe "inne" Armoury (CrownIncome.WindfallOf), sasiednie doby jak tam "doba poprzednia":
+        /// nowy staly poziom (wojna, nowy zold) ma od drugiej doby sasiada tej samej wielkosci i wchodzi do sredniej, ostatnia doba nowego
+        /// poziomu czeka dobe. Tylko skoki W DOL (jednorazowy odplyw): skok w gore pominiety zawyzalby ubytek krolestwom z wplywem co kilka dob
+        /// (sezonowe daniny, okupy) - nowy falszywy sygnal biedy. Ubytek = -(suma zmian dob bez skoku) / ich doby, nigdy wiekszy niz wzor
+        /// dotychczasowy (regula moze tylko zdjac falszywa biede). Najmniej 2 zmiany w oknie (przy jednej - pierwsza doba po wczytaniu - skoku
+        /// nie odroznic od trendu, wzor jak dotad). Skarbiec (zapas = skarbiec / ubytek) liczy sie dalej w calosci. Ta sama regula dla
+        /// wszystkich krolestw. Pod _lock.</summary>
+        private static float DrainNoOneOff(KState s, float drainOld)
+        {
+            int m = s.Hist.Count - 1;
+            if (m < 2) return drainOld;
+            var z = new float[m];
+            var absZ = new float[m];
+            for (int i = 0; i < m; i++)
+            {
+                int days = Math.Max(1, s.Hist[i + 1].Key - s.Hist[i].Key);
+                z[i] = (s.Hist[i + 1].Value - s.Hist[i].Value) / (float)days;
+                absZ[i] = Math.Abs(z[i]);
+            }
+            long kept = 0; int keptDays = 0;
+            var others = new List<float>(m);
+            for (int i = 0; i < m; i++)
+            {
+                // mediana pozostalych dob (bez samej badanej - przy krotkim oknie skok nie podnosi sobie progu)
+                others.Clear();
+                for (int j = 0; j < m; j++) if (j != i) others.Add(absZ[j]);
+                others.Sort();
+                int o = others.Count;
+                float med = o % 2 == 1 ? others[o / 2] : 0.5f * (others[o / 2 - 1] + others[o / 2]);
+                float near = Math.Max(med, DrainFloor);
+                if (i > 0) near = Math.Max(near, absZ[i - 1]);
+                if (i < m - 1) near = Math.Max(near, absZ[i + 1]);
+                long delta = (long)s.Hist[i + 1].Value - s.Hist[i].Value;
+                if (z[i] < 0f && absZ[i] > OneOffTimes * near) { s.OneOffN++; s.OneOffSum += delta; continue; }
+                kept += delta;
+                keptDays += Math.Max(1, s.Hist[i + 1].Key - s.Hist[i].Key);
+            }
+            float drainNew = keptDays > 0 ? -kept / (float)keptDays : 0f;
+            if (drainNew > drainOld) { s.OneOffN = 0; s.OneOffSum = 0; return drainOld; }   // straz: nigdy wiecej biedy niz dotad
+            return drainNew;
         }
 
         /// <summary>Stan wszystkich krolestw (start sesji i linia dobowa).</summary>
@@ -673,7 +723,8 @@ namespace CrashScribe
 
         private static string Desc(KState s)
         {
-            return "bieda skarbca " + s.T.ToString("0.00") + " (skarbiec " + s.W + ", ubytek " + (int)s.Drain + "/d, zapas " + (s.Runway > 9999f ? ">9999" : ((int)s.Runway).ToString())
+            return "bieda skarbca " + s.T.ToString("0.00") + " (skarbiec " + s.W + ", ubytek " + (int)s.Drain + "/d"
+                   + (s.OneOffN > 0 ? " bez skokow jednej doby: " + s.OneOffN + " (razem " + s.OneOffSum + ")" : "") + ", zapas " + (s.Runway > 9999f ? ">9999" : ((int)s.Runway).ToString())
                    + " dob" + (Config.PovertyPeaceArrearsMeasure && _fRefund != null ? ", niedoplata korony " + Pct(s.N) + " (srednia krolestw " + Pct(_nWorld) + ")" : "")
                    + ", wrogow " + s.Enemies + "; glow < " + (int)HeadPoor + ": " + s.Poor + "/" + s.Clans + ", rodow za pokojem z biedy " + s.ForPeace + "/" + s.Clans + ")";
         }
@@ -761,6 +812,9 @@ namespace CrashScribe
                     var poor = list.Where(p => p.Value.T > 0f).OrderByDescending(p => p.Value.T).ThenBy(p => p.Value.Runway).ToList();
                     var parts = poor.Take(12).Select(p => N(p.Key) + " " + Desc(p.Value)).ToList();
                     int heads = list.Sum(p => p.Value.Clans), headsPoor = list.Sum(p => p.Value.Poor), forPeace = list.Sum(p => p.Value.ForPeace);
+                    // f19-kanon-a (5): krolestwa, ktorym miara pominela skok jednej doby (takze bogate - widac, co regula zdjela)
+                    var skips = list.Where(p => p.Value.OneOffN > 0).OrderBy(p => p.Value.OneOffSum).Take(8)
+                                    .Select(p => N(p.Key) + " " + p.Value.OneOffN + " (razem " + p.Value.OneOffSum + ")").ToList();
                     string sumW;
                     lock (_lock)
                     {
@@ -778,7 +832,9 @@ namespace CrashScribe
                                 + (ArrearsOn ? "niedoplata korony z " + ArrearsDays + " dob ponad max(" + (int)(ArrearsFloor * 100f) + "%, srednia krolestw " + Pct(_nWorld) + ")" : "zapas skarbca < " + (int)RunwayFull + " dob")
                                 + ") " + poor.Count + " z " + list.Count
                                 + (parts.Count > 0 ? ": " + string.Join("; ", parts.ToArray()) + (poor.Count > parts.Count ? "; i " + (poor.Count - parts.Count) + " innych" : "") : "")
-                                + " | glowy rodow (bez najemnikow): " + heads + ", < " + (int)HeadPoor + ": " + headsPoor + ", za pokojem z biedy: " + forPeace + " | " + sumW + ".");
+                                + " | glowy rodow (bez najemnikow): " + heads + ", < " + (int)HeadPoor + ": " + headsPoor + ", za pokojem z biedy: " + forPeace
+                                + (skips.Count > 0 ? " | skoki jednej doby poza ubytkiem (PovertyPeaceSkipOneOff, okno 7 dob): " + string.Join("; ", skips.ToArray()) : "")
+                                + " | " + sumW + ".");
                     if (_diagOn || _bkOn || _propOn) Scribe.Line(E1bLine());
                 }
             }

@@ -119,19 +119,48 @@ namespace CrashScribe
             try
             {
                 if (ev == null) return false;
-                if (_pTotal == null || _pActive == null)
-                {
-                    // z KLASY BAZOWEJ, nie z pierwszego napotkanego wydarzenia
-                    var tBase = Type.GetType("ROT.Events.EventBase, ROT") ?? ev.GetType();
-                    _pTotal = AccessTools.Property(tBase, "TotalEvents");
-                    _pActive = AccessTools.Property(tBase, "IsActive");
-                    if (_pTotal == null || _pActive == null) return false;
-                }
+                if (!Props(ev)) return false;
                 int total = _pTotal != null ? Convert.ToInt32(_pTotal.GetValue(ev, null)) : 0;
                 bool active = _pActive != null && Convert.ToBoolean(_pActive.GetValue(ev, null));
                 return total == 0 && !active;
             }
             catch { return false; }
+        }
+
+        /// <summary>Wlasciwosci TotalEvents / IsActive z klasy bazowej wydarzen ROT (leniwie, raz).</summary>
+        private static bool Props(object ev)
+        {
+            if (_pTotal == null || _pActive == null)
+            {
+                // z KLASY BAZOWEJ, nie z pierwszego napotkanego wydarzenia
+                var tBase = Type.GetType("ROT.Events.EventBase, ROT") ?? ev.GetType();
+                _pTotal = AccessTools.Property(tBase, "TotalEvents");
+                _pActive = AccessTools.Property(tBase, "IsActive");
+                if (_pTotal == null || _pActive == null) return false;
+            }
+            return true;
+        }
+
+        /// <summary>f19-kanon-a: stan wydarzenia ROT po nazwie typu (np. "RenlyDeathEvent"): -1 = nie widac listy wydarzen ROT
+        /// albo tego wydarzenia, 0 = czeka (nie wystartowalo), 1 = trwa (IsActive), 2 = zakonczone (TotalEvents > 0, nie trwa).
+        /// Tylko odczyt - ta sama lista i te same wlasciwosci, z ktorych korzysta rozrusznik.</summary>
+        internal static int EventState(string typeName)
+        {
+            try
+            {
+                var list = Events();
+                if (list == null) return -1;
+                foreach (var ev in list)
+                {
+                    if (ev == null || ev.GetType().Name != typeName) continue;
+                    if (!Props(ev)) return -1;
+                    int total = Convert.ToInt32(_pTotal.GetValue(ev, null));
+                    bool active = Convert.ToBoolean(_pActive.GetValue(ev, null));
+                    return active ? 1 : (total > 0 ? 2 : 0);
+                }
+                return -1;
+            }
+            catch { return -1; }
         }
 
         /// <summary>
