@@ -1259,9 +1259,10 @@ Uzycie (Python 3, tylko odczyt):
                     przelezal cale okno ponad 1.5 x zapas kupcow + Ks Farm Catch Up Keep Days firmy, rachunki zywnosci najpierw; Armoury/src/DsTowns.cs; linia "Gersuma kas
                     miast (f7-kasy)"; fin91 bez f7: kasy miast z KS +57 tys./d, ponad 1.5 x zapas 1.95 -> 12.89 mln): okno - ostatnie 28 dob, nie wczesniej niz 14 dob od
                     pierwszej linii f7 (bez linii - INFO). NAKUM-24 linia kazdej doby (luk 0, nierozpoznane 0), NAKUM-25 zloto: zdjete z kas (zmierzone na kasie) = panom +
-                    koronie (zmierzone u odbiorcow) kazdej doby i "czeka na zaplate" 0 (gersuma postanowiona w DayStart placona w TownDay tej doby), NAKUM-26 kasy miast z KS
+                    koronie (zmierzone u odbiorcow) kazdej doby i reszta do zaplaty <= gersumy postanowione w ostatnim oknie przegladu (gersuma rozlozona na okno
+                    przegladu, czesc doby placi TownDay, czego kasa nie ma - przepada), NAKUM-26 kasy miast z KS
                     i ich zapas ponad 1.5 x zapas kupcow (linia f7) - przyrost <= +30 tys./d kazde, NAKUM-27 miasta z KS ponizej zapasu kupcow - mediana ostatnich 7 dob <=
-                    mediana 7 dob przed pierwsza zaplacona gersuma + 2 (gersuma nie oproznia kas), NAKUM-28 skutek (INFO: panom / koronie na dobe, przeglady, nie zaplacone,
+                    mediana 7 dob przed pierwsza zaplacona gersuma + 2 (gersuma nie oproznia kas), NAKUM-28 skutek (INFO: panom / koronie na dobe, przeglady, przepadlo,
                     powody bez przegladu, sesja), NAKUM-29 czas (mediana) <= 1 ms i potkniecia 0.
 --grupa nglod     : (noc 17/18.10, r4-glodbunt; Jeff "jak nie ma jedzenia to bedzie bunt; w interesie miasta lorda jest aby dowiesc jedzenie"; Armoury/src/KsHunger.cs,
                     KsLordFood.cs, StartCalibration.Glod.cs) python -I tools/sprawdz_logi.py --grupa nglod [--do-doby N] <Armoury-*.log> (strumieniowo). NGL-0 linie doby
@@ -37627,12 +37628,12 @@ NAK_RX = {
 NAK7_HEAD = "Gersuma kas miast (f7-kasy): dzien "
 NAK7_RX = {
     "day": re.compile(r"dzien (\d+)"),
-    "key": re.compile(r"klucz Ks Farm Catch Up (TAK|NIE) \(udzial ([\d.]+), prog 1\.5 x zapas kupcow \+ (\d+) dob firmy z kasy; co (\d+) dob"),
+    "key": re.compile(r"klucz Ks Farm Catch Up (TAK|NIE) \(udzial ([\d.]+), prog 1\.5 x zapas kupcow \+ (\d+) dob firmy z kasy; co (\d+) dob, z przegladem wedlug nadwyzki, rozlozona na (\d+) dob\)"),
     "dec": re.compile(r"\| przeglady dzis (\d+): gersuma postanowiona (\d+) \((\d+) zl; rachunki zywnosci odjete (\d+)\), zapas okna do progu (\d+), kasa bez przyrostu (\d+), bez firmy (\d+)"),
     "why": re.compile(r"\| bez przegladu \(miasto-doby\): kasa do 1\.5 x zapas (\d+), oblezenie / zdobycie (\d+), zaleglosci firmy (\d+), domy najpierw \(R/P ponizej pasma\) (\d+)"),
     "paid": re.compile(r"\| zaplacone dzis: zdjete z kas (\d+) = panom (\d+) \+ koronie (\d+) \(kontrola zdjete - panom - koronie = (-?\d+); miast (\d+)\)"),
-    "short": re.compile(r"nie zaplacone \([^)]*\) (\d+) \((\d+); bez zywego pana (\d+)\), czeka na zaplate (\d+)"),
-    "sess": re.compile(r"\| od startu sesji: panom (\d+), koronie (\d+) \(gersum (\d+)\)"),
+    "short": re.compile(r"przepadlo \([^)]*\) (\d+) \((\d+); bez zywego pana (\d+)\), do zaplaty w kolejnych dobach (\d+) zl \((\d+) miast\)"),
+    "sess": re.compile(r"\| od startu sesji: panom (\d+), koronie (\d+) \(czesci gersum (\d+)\)"),
     "towns": re.compile(r"\| miasta z KS (\d+): kasy razem (-?\d+), zapas kupcow razem (\d+), ponad 1\.5 x zapas (\d+) \((\d+) miast\), ponad prog gersumy (\d+) \((\d+) miast\), ponizej zapasu kupcow (\d+) miast"),
     "time": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+) \(sesja (\d+)\)"),
 }
@@ -38072,10 +38073,17 @@ def nakum_main(logp, until=None):
         rep.add("NAKUM-24 (f7): linia 'Gersuma kas miast (f7-kasy)' kazdej doby", f"dob {len(d7)} ({d7[0]}-{d7[-1]}), luk {len(gaps7)}, nierozpoznanych {D['f7bad']}",
                 "luk 0, nierozpoznane 0", not gaps7 and D["f7bad"] == 0)
         bad7 = [d for d in d7 if g7(d, "paid", 3) != 0]
-        pend7 = [d for d in d7 if "short" in F7[d] and g7(d, "short", 3) != 0]
-        rep.add("NAKUM-25 (f7): zloto gersumy - zdjete z kas = panom + koronie kazdej doby, nic nie czeka na zaplate po dobie",
-                f"dob z rozjazdem {len(bad7)}" + (f" (dzien {bad7[0]})" if bad7 else "") + f", dob z gersuma czekajaca {len(pend7)}" + (f" (dzien {pend7[0]})" if pend7 else ""),
-                "0 / 0", not bad7 and not pend7)
+        pend7 = []
+        for d in d7:
+            if "short" not in F7[d] or "dec" not in F7[d]:
+                continue
+            win = int(F7[d]["key"][4]) if "key" in F7[d] else 14
+            decw = sum(g7(x, "dec", 2) or 0 for x in d7 if d - win < x <= d and "dec" in F7[x])
+            if g7(d, "short", 3) > decw + 1:
+                pend7.append(d)
+        rep.add("NAKUM-25 (f7): zloto gersumy - zdjete z kas (zmierzone na kasie) = panom + koronie (u odbiorcow) kazdej doby; reszta do zaplaty <= gersumy z ostatniego okna",
+                f"dob z rozjazdem {len(bad7)}" + (f" (dzien {bad7[0]})" if bad7 else "") + f", dob z reszta ponad gersumy okna {len(pend7)}" + (f" (dzien {pend7[0]})" if pend7 else ""),
+                "0 / 0 (gersuma rozlozona na okno przegladu konczy sie w oknie)", not bad7 and not pend7)
         w7 = [d for d in d7 if max(d7[0] + 14, last - 27) <= d <= last]
         if len(w7) >= 14:
             gk = _nak_growth({d: g7(d, "towns", 1) for d in w7}, w7); go7 = _nak_growth({d: g7(d, "towns", 3) for d in w7}, w7)
@@ -38095,10 +38103,11 @@ def nakum_main(logp, until=None):
             pl = sum(g7(d, "paid", 1) for d in w7) / nw; pc = sum(g7(d, "paid", 2) for d in w7) / nw
             dec = sum(g7(d, "dec", 1) or 0 for d in w7 if "dec" in F7[d]); rev = sum(g7(d, "dec", 0) or 0 for d in w7 if "dec" in F7[d])
             sh = sum(g7(d, "short", 0) or 0 for d in w7 if "short" in F7[d]) / nw
+            lf = g7(w7[-1], "short", 3) if "short" in F7[w7[-1]] else 0
             why = [sum(g7(d, "why", i) or 0 for d in w7 if "why" in F7[d]) for i in range(4)]
             b = F7[d7[-1]]
-            rep.add("NAKUM-28 (f7): skutek (INFO) - gersuma w oknie (panom / koronie), przeglady, nie zaplacone, powody bez przegladu, sesja",
-                    f"panom {pl:.0f}/d + koronie {pc:.0f}/d; przeglady {rev}, gersum {dec}; nie zaplacone {sh:.0f}/d; bez przegladu (miasto-doby): kasa do 1.5 x zapas {why[0]}, "
+            rep.add("NAKUM-28 (f7): skutek (INFO) - gersuma w oknie (panom / koronie), przeglady, przepadlo, powody bez przegladu, sesja",
+                    f"panom {pl:.0f}/d + koronie {pc:.0f}/d; przeglady {rev}, gersum {dec}; przepadlo {sh:.0f}/d, do zaplaty na koniec {lf}; bez przegladu (miasto-doby): kasa do 1.5 x zapas {why[0]}, "
                     f"oblezenie {why[1]}, zaleglosci {why[2]}, domy najpierw {why[3]}; od startu sesji panom {b['sess'][0] if 'sess' in b else '-'}, koronie {b['sess'][1] if 'sess' in b else '-'}",
                     "INFO", None)
         else:
