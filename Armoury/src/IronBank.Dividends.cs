@@ -16,7 +16,9 @@ namespace Armoury
     ///    Dlug, ktory znika bez zaplaty (rod wymarly bez wsi - "dlug bez platnika" 168, stary bankrut wymarly, krolestwo zniszczone 186), zdejmuje koszt bez
     ///    wplywu - strata: zysk doby ujemny, pula maleje (straty pokrywa zysk, zanim cokolwiek wyjdzie do Braavos). Dlug wymarlego rodu przechodzi na dziedzicow
     ///    razem z kosztem (MoveCost w DebtLadder.Inherit). Dlug sprzed klucza (start na starym zapisie): koszt = caly dzisiejszy dlug (ostroznie - narosle odsetki
-    ///    starych pozyczek nie licza sie jako zysk). Reszta skarbca upadlego krolestwa bez odbiorcy (FallenCrown) to wplyw bez kosztu - zysk.
+    ///    starych pozyczek nie licza sie jako zysk). Reszta skarbca upadlego krolestwa bez odbiorcy (FallenCrown) to NIE zysk (ani odsetki, ani oplata) -
+    ///    kapital wlasny Banku (NoteCapitalNoProfit: migawka podniesiona o te kwote, wplyw doby jej nie widzi; recenzja f20-d3 - bez jednorazowego przelewu
+    ///    1-3 mln do Braavos). Linia doby: "zmiana kapitalu X - kapital wlasny Y + pozyczone Z".
     ///  - REZERWA = max(BankFreeCapitalFloor, CrownLoanBankFloor) (ponizej nich Bank nie daje kredytu wojennego / nie pozycza koronom) + wszystko, co Bank
     ///    pozyczyl (rodom i koronom) w ostatnich IronBankReserveLendDays dobach - tyle trzyma na kredyt nastepnego okresu.
     ///  - WYPLATA co IronBankDividendDays (28) dob: min(pula, kapital - rezerwa). Kapital nigdy nie schodzi ponizej rezerwy; kapital wlasny Banku (start
@@ -29,7 +31,7 @@ namespace Armoury
     ///  - Zastepuje stara regule "kapital ponad IronBankCapital -> kasa Braavos po 1/BankProfitToBraavosDays dziennie" (DebtLadder.Daily krok 3) - jedna
     ///    regula na zjawisko; klucz wylaczony = stara regula jak dotad (stan f20-d3 czyszczony, przy ponownym wlaczeniu start od zera).
     /// Platnik -> odbiorca: kapital Banku -> glowy rodow Braavos, kiesy ludu i kasa kupcow miasta Braavos; kapital zmniejszany o to, co odbiorca naprawde dostal
-    /// (Bank -x = odbiorcy +x co do zlotowki). Rozliczenie na poczatku IronBank.Daily (przed drabina 168 i kredytem dnia 166).
+    /// (Bank -x = odbiorcy +x co do zlotowki). Wyplata glowie (nie graczowi) - wplyw jednorazowy w ksiedze dochodu (ClanIncomeBook.NoteInflow KRansom, jak okup). Rozliczenie na poczatku IronBank.Daily (przed drabina 168 i kredytem dnia 166).
     /// Linie "Bank Zelazny - zysk (f20-d3): dzien N" (co dobe) i "Bank Zelazny - wyplata do Braavos (f20-d3): dzien N" (w dobie wyplaty); checker --grupa nbank.
     /// Zapis "arm_bankdiv" (brak klucza = start od zera w pierwszej dobie). Wyjatki liczone (potkniecia w linii), bez globalnego wylacznika (CLAUDE.md 7).
     /// </summary>
@@ -42,6 +44,7 @@ namespace Armoury
         private static double _dvPool;                                                             // zysk zrealizowany niewyplacony (ujemny - straty do pokrycia)
         private static double _dvSnap;                                                             // kapital przy ostatnim rozliczeniu (po wyplacie)
         private static double _dvWinLent;                                                          // pozyczone z kapitalu od ostatniego rozliczenia (rody + korony)
+        private static double _dvOwnIn;                                                            // wplyw do kapitalu poza zyskiem od ostatniego rozliczenia (kapital wlasny - FallenCrown bez odbiorcy)
         private static int _dvLastPay = -1, _dvInitDay = -1;                                       // doba ostatniej wyplaty (albo startu), doba startu
         private static double _dvProfitAll, _dvPaidAll;                                            // od startu (linia)
         private static readonly Dictionary<string, double> _dvCost = new Dictionary<string, double>();    // rod (StringId) -> koszt pozyczek (kapital niezwrocony)
@@ -57,7 +60,7 @@ namespace Armoury
 
         private static void DvClear()
         {
-            _dvInit = false; _dvPool = 0; _dvSnap = 0; _dvWinLent = 0; _dvLastPay = -1; _dvInitDay = -1; _dvProfitAll = 0; _dvPaidAll = 0;
+            _dvInit = false; _dvPool = 0; _dvSnap = 0; _dvWinLent = 0; _dvOwnIn = 0; _dvLastPay = -1; _dvInitDay = -1; _dvProfitAll = 0; _dvPaidAll = 0;
             _dvCost.Clear(); _dvCostK.Clear(); _dvRing.Clear();
         }
 
@@ -90,6 +93,19 @@ namespace Armoury
                 _dvWinLent += amount;
             }
             catch (Exception e) { DvStumble("NoteCrownLent", e); }
+        }
+
+        /// <summary>Recenzja f20-d3: wplyw do kapitalu, ktory NIE jest zyskiem (ani odsetki, ani oplata) - reszta skarbca upadlego krolestwa bez odbiorcy
+        /// (FallenCrown, zaraz po IronBank.CapitalAdd). Migawka kapitalu rosnie o te kwote - wplyw doby (zmiana kapitalu od migawki) jej nie widzi; zostaje w Banku
+        /// jako kapital wlasny (nie wychodzi do Braavos). Bez startu f20-d3 - nic (start bierze migawke z dzisiejszego kapitalu).</summary>
+        internal static void NoteCapitalNoProfit(double amount)
+        {
+            try
+            {
+                if (!_dvInit || !(amount > 0)) return;
+                _dvSnap += amount; _dvOwnIn += amount;
+            }
+            catch (Exception e) { DvStumble("NoteCapitalNoProfit", e); }
         }
 
         /// <summary>DebtLadder.Inherit: czesc dlugu wymarlego rodu (part z tego, co z niego jeszcze zostalo - left) przechodzi na dziedzica - koszt w tej samej
@@ -169,6 +185,7 @@ namespace Armoury
                 double backK = DvClamp(_dvCostK, delegate (string id) { double p; return crown.TryGetValue(id, out p) ? p : 0; }, setK, dropK);
                 // 2. wplywy i zysk doby
                 double lent = _dvWinLent;
+                double own = _dvOwnIn;                                               // recenzja f20-d3: kapital wlasny (juz w migawce - poza wplywem doby)
                 double cashIn = (_capital - _dvSnap) + lent;
                 double profit = cashIn - (backC + backK);
                 // zatwierdzenie
@@ -180,7 +197,7 @@ namespace Armoury
                 _dvRing.Add((long)Math.Round(lent));
                 int keep = Math.Max(1, Math.Min(364, s.IronBankReserveLendDays));
                 while (_dvRing.Count > keep) _dvRing.RemoveAt(0);
-                _dvWinLent = 0; _dvSnap = _capital;
+                _dvWinLent = 0; _dvOwnIn = 0; _dvSnap = _capital;
                 // 3. wyplata co IronBankDividendDays
                 int every = Math.Max(1, s.IronBankDividendDays);
                 long floor, lentN;
@@ -199,7 +216,8 @@ namespace Armoury
                 foreach (var v in crown.Values) if (v >= 1) debtK += v;
                 var sb = new StringBuilder(700);
                 sb.Append("Bank Zelazny - zysk (f20-d3): dzien ").Append(today)
-                  .Append(" | wplywy ").Append(L(cashIn)).Append(" (zmiana kapitalu ").Append(L(cashIn - lent)).Append(" + pozyczone ").Append(L(lent)).Append(")")
+                  .Append(" | wplywy ").Append(L(cashIn)).Append(" (zmiana kapitalu ").Append(L(cashIn - lent + own)).Append(" - kapital wlasny ").Append(L(own))
+                  .Append(" + pozyczone ").Append(L(lent)).Append(")")
                   .Append(", zwrot kosztu pozyczek ").Append(L(backC + backK)).Append(" (rody ").Append(L(backC)).Append(", korony ").Append(L(backK)).Append(")")
                   .Append(", zysk zrealizowany dzis ").Append(L(profit))
                   .Append(" | pula ").Append(L(_dvPool))
@@ -275,7 +293,7 @@ namespace Armoury
                 return sb.ToString();
             }
             // klucznicy
-            long paidKeys = 0, given = 0; int wsum = 0;
+            long paidKeys = 0, given = 0, noted = 0; int wsum = 0;
             foreach (var kv in keys) wsum += kv.Value;
             var parts = new List<string>();
             for (int i = 0; i < keys.Count && xKeys > 0; i++)
@@ -293,8 +311,12 @@ namespace Armoury
                     if (got <= 0) continue;
                     _capital -= got; _dvSnap -= got; _dvPool -= got; _dvPaidAll += got; paidKeys += got;
                     CirculationWindows.NoteHeroGold(h, got);   // glowa poza swiatem - tylko licznik (wyplacamy tylko zywym)
-                    parts.Add((c.Name != null ? c.Name.ToString() : c.StringId) + " " + got + " (waga " + keys[i].Value + ")");
-                    if (h == Hero.MainHero)
+                    // recenzja f20-d3: jednorazowy wplyw od prawdziwego platnika - jak okup, skarbiec upadlego krolestwa (FallenCrown), zajecie (DebtLadder):
+                    // ksiega dochodu widzi go w OnceToday (168: splata kredytu wojennego z jednorazowych, limit KW), D staly nie (QOnce poza D - Braavos nie jest najezdzca)
+                    bool pl = h == Hero.MainHero;
+                    if (!pl && ClanIncomeBook.On) { ClanIncomeBook.NoteInflow(h, (int)Math.Min(int.MaxValue, got), ClanIncomeBook.KRansom); noted += got; }
+                    parts.Add((c.Name != null ? c.Name.ToString() : c.StringId) + " " + got + " (waga " + keys[i].Value + (pl ? ", gracz" : "") + ")");
+                    if (pl)
                         Log.Player("The keyholders of the Iron Bank share out the Bank's profit: " + got.ToString("N0", DvInv) + " denars come to you from Braavos.");
                 }
                 catch (Exception e) { DvStumble("Pay(rod)", e); }
@@ -320,7 +342,7 @@ namespace Armoury
             long paid = paidKeys + folk + coffer;
             double dcap = cap0 - _capital;
             sb.Append(" | wyplacone ").Append(paid).Append(": klucznicy ").Append(paidKeys).Append(" (krolestwo ").Append(kname).Append(", rodow ").Append(parts.Count)
-              .Append(parts.Count > 0 ? ": " + string.Join(", ", parts.ToArray()) : "").Append(")")
+              .Append(parts.Count > 0 ? ": " + string.Join(", ", parts.ToArray()) : "").Append("; w ksiedze dochodu jako jednorazowe ").Append(noted).Append(")")
               .Append(", miasto Braavos ").Append(folk + coffer).Append(" (kiesy ludu ").Append(folk).Append(", kasa kupcow ").Append(coffer).Append(townOk ? "" : "; miasta brak").Append(")")
               .Append(" | kontrola: kapital ").Append(L(cap0)).Append(" -> ").Append(L(_capital)).Append(" (Bank -").Append(L(dcap)).Append("), odbiorcy +").Append(paid)
               .Append(", roznica ").Append(L(dcap) - paid)
@@ -336,7 +358,8 @@ namespace Armoury
                 if (!_dvInit) return "";
                 var sb = new StringBuilder(256 + 40 * (_dvCost.Count + _dvCostK.Count) + 12 * _dvRing.Count);
                 sb.Append("1|").Append(_dvPool.ToString("R", DvInv)).Append(';').Append(_dvSnap.ToString("R", DvInv)).Append(';').Append(_dvWinLent.ToString("R", DvInv))
-                  .Append(';').Append(_dvLastPay).Append(';').Append(_dvInitDay).Append(';').Append(_dvProfitAll.ToString("R", DvInv)).Append(';').Append(_dvPaidAll.ToString("R", DvInv));
+                  .Append(';').Append(_dvLastPay).Append(';').Append(_dvInitDay).Append(';').Append(_dvProfitAll.ToString("R", DvInv)).Append(';').Append(_dvPaidAll.ToString("R", DvInv))
+                  .Append(';').Append(_dvOwnIn.ToString("R", DvInv));   // recenzja f20-d3: pole 8 (kapital wlasny od rozliczenia - tylko linia doby; starsza DLL go nie czyta)
                 sb.Append("|r");
                 for (int i = 0; i < _dvRing.Count; i++) sb.Append(i == 0 ? ":" : ",").Append(_dvRing[i]);
                 sb.Append("|c");
@@ -367,6 +390,7 @@ namespace Armoury
                 _dvInitDay = int.Parse(h[4], DvInv);
                 _dvProfitAll = double.Parse(h[5], NumberStyles.Float, DvInv);
                 _dvPaidAll = double.Parse(h[6], NumberStyles.Float, DvInv);
+                if (h.Length >= 8) _dvOwnIn = double.Parse(h[7], NumberStyles.Float, DvInv);   // recenzja f20-d3: zapis sprzed poprawki - 7 pol, kapital wlasny 0
                 if (sec[2].Length > 2 && sec[2].StartsWith("r:"))
                     foreach (var v in sec[2].Substring(2).Split(',')) _dvRing.Add(long.Parse(v, DvInv));
                 DvReadCosts(sec[3], "c", _dvCost);
