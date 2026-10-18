@@ -6732,7 +6732,11 @@ namespace Armoury
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsSelfFeedEverywhere { get; set; } = false;
 
-        [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt). Off = the old table")]
+        [SettingPropertyBool("Ks Self Feed Own Food Only", HintText = "with Ks Self Feed First: the rule word for word - a hungry village of the cold lands counts only the food it grows itself and puts its hands to food first, even where its furs, wool or flax would buy more grain than its fields give (in the plan: more of the Free Folk fed from their own herds, but the North, the Iron Islands and Ib a little hungrier and less meat at market); off = a village counts what its goods buy after its lord's, the church's and the crown's share, and keeps its trappers where they feed more mouths")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsSelfFeedOwnFoodOnly { get; set; } = false;
+
+        [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter in the cold lands needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt; hunters of the warm lands as before). Off = the old table")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsColdLand { get; set; } = true;
 
@@ -8630,6 +8634,7 @@ namespace Armoury
             s.StartCalibrationTownCrafts = StartCalibrationTownCrafts;
             s.KsSelfFeedFirst = KsSelfFeedFirst;
             s.KsSelfFeedEverywhere = KsSelfFeedEverywhere;
+            s.KsSelfFeedOwnFoodOnly = KsSelfFeedOwnFoodOnly;
             s.KsColdLand = KsColdLand;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;

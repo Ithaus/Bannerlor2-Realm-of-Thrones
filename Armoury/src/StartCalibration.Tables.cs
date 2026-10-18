@@ -138,20 +138,25 @@ namespace Armoury
             return k;
         }
 
-        /// <summary>ha na pracujacego (ks_tabele2.py HA_PER_WORKER); brak = 0 (las dziki, morze, zloza). r4-polnoc: przy ZIMNEJ ZIEMI (ColdLand) mysliwy potrzebuje dzikiej
-        /// ziemi (HuntHa) - zwierzyny jest tyle, ile ziemi (bez tego cala Polnoc moglaby polowac bez konca: 145 tys. mysliwych Wolnych Ludzi = 290 kg dziczyzny z km2 na rok,
-        /// 10-30 razy wiecej niz daje tajga).</summary>
-        internal static double[] HaPerWorker { get { return ColdLand ? HaCold : HaBase; } }
-        private static readonly double[] HaBase = BuildHa(false), HaCold = BuildHa(true);
-        private static double[] BuildHa(bool cold)
+        /// <summary>ha na pracujacego (ks_tabele2.py HA_PER_WORKER); brak = 0 (las dziki, morze, zloza). Tabela bazowa - ha zajecia na ziemi bloku daje Ha(c, strefa)
+        /// (r4-polnoc: mysliwy na zimnej ziemi).</summary>
+        internal static readonly double[] HaPerWorker = BuildHa();
+        private static double[] BuildHa()
         {
             var a = new double[33];
             a[CWheat] = 4.0; a[CGarden] = 1.0; a[CVine] = 1.2; a[COlive] = 3.5; a[CCitrus] = 1.0; a[CFlax] = 1.4; a[CSilk] = 1.0; a[CSpice] = 1.0; a[CDate] = 0.7;
             a[CSheep] = 120.0; a[CCattle] = 18.0; a[CCattleB] = 18.0;
             for (int h = CHorse0; h <= CHorse5; h++) a[h] = 25.0;
-            if (cold) a[CHunter] = HuntHa;
             return a;
         }
+
+        /// <summary>r4-polnoc (recenzja): ha na pracujacego zajecia c na ziemi strefy zone. Przy ZIMNEJ ZIEMI (klucz Ks Cold Land) mysliwy w STREFACH ZIMNYCH (1-arktyka,
+        /// 2-wyspy, 2-zimno) potrzebuje dzikiej ziemi HuntHa - zwierzyny jest tyle, ile ziemi (bez tego cala Polnoc moglaby polowac bez konca: 145 tys. mysliwych Wolnych
+        /// Ludzi = 290 kg dziczyzny z km2 na rok, 10-30 razy wiecej niz daje tajga). Poza strefami zimnymi i bez klucza - tabela bazowa (mysliwy bez ziemi, jak dotad):
+        /// gestosc zwierzyny tajgi nie jest miara lasu umiarkowanego ani tropiku (recenzja: dotad HuntHa szlo na caly swiat, ok. 1570 blokow ciepla z mysliwym w kandydatach).</summary>
+        internal static double Ha(int c, string zone) { return c == CHunter && _coldLand && ColdZone(zone) ? HuntHa : HaPerWorker[c]; }
+        /// <summary>Ha zajecia c na ziemi bloku k (strefa bloku; blok bez ziemi - tabela bazowa).</summary>
+        internal static double Ha(int c, KsBlock k) { return Ha(c, k != null && k.O != null ? k.O.Zone : null); }
 
         // ------------------------------------------------------------ r4-polnoc (Jeff 17.10 "najpierw wyzywic siebie" + prawdziwe plony zimnej ziemi; klucz MCM Ks Cold Land)
         // JEDNA TABELA SWIATA - poprawione wartosci dla zimnej ziemi (teren "snieg" wystepuje tylko w strefach 1-arktyka, 2-wyspy, 2-zimno; zadnego czynnika na okreg).
@@ -170,7 +175,7 @@ namespace Armoury
         //  - POLOWANIE: mysliwy na tajdze bierze 1-1.2 kg miesa na dobe (los ok. 200 kg miesa, renifer 30-50 kg) - tabela mysliwego bez zmian (P0 1.2 kg x strefa x teren:
         //    za Murem na sniegu 0.8 = 0.96 kg/d, 2100 kcal - "nie 54 g na mysliwego"), ALE zwierzyny jest tyle, ile ziemi: tajga i tundra daja trwale 10-30 kg dziczyzny z km2
         //    na rok (los 0.2-0.5 szt./km2, renifer), lowcy-zbieracze polnocy 0.01-0.1 czlowieka z km2 -> mysliwy potrzebuje HuntHa = 1500 ha dzikiej ziemi (0.96 kg x 364 /
-        //    15 km2 = 23 kg/km2/rok).
+        //    15 km2 = 23 kg/km2/rok) - TYLKO w strefach zimnych (Ha(c, strefa)); las umiarkowany i tropik bez zmian (mysliwy bez ziemi jak dotad).
         internal const double HuntHa = 1500.0;
         internal const double ColdSnowWheat = 0.35, ColdSnowCattle = 0.5, ColdSnowSheep = 0.75, ColdRiverFish = 0.7;
         private static bool _coldLand;

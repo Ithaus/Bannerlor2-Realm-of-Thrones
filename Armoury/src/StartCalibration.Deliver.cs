@@ -20,7 +20,7 @@ namespace Armoury
             double rem = Math.Max(0.0, Hands - WH);
             double sub = c != KsTab.CWheat && Lg > 0 ? Math.Min(rem, SubNW) : 0.0;
             double hw = HW > 0 ? Math.Min(0.95, HW) : 0.0;
-            return WH * KsTab.HaHome + sub * KsTab.HaOwnGrain + (rem - sub) * ((1.0 - hw) * KsTab.HaPerWorker[c] + hw * KsTab.HaHome);
+            return WH * KsTab.HaHome + sub * KsTab.HaOwnGrain + (rem - sub) * ((1.0 - hw) * KsTab.Ha(c, K) + hw * KsTab.HaHome);   // r4-polnoc: ha wedlug strefy bloku (mysliwy na zimnej ziemi)
         }
         // pamiec przydatnosci ziemi bloku (ziemia sie nie zmienia): L zajecia c (NaN - jeszcze nie liczone), L zboza; klucz - blok ziemi K (nowy K = od nowa)
         internal double[] LC; internal double LG = double.NaN; internal object LKey;

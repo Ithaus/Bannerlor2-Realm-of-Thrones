@@ -13,6 +13,9 @@ namespace Armoury
         /// <summary>r4-polnoc "najpierw wyzywic siebie": 0 - wylaczone (Plan jak dotad, bit w bit), 1 - okregi wsi stref zimnych (1-arktyka, 2-wyspy, 2-zimno: Polnoc,
         /// za Murem, Nocna Straz, Skagos, Zelazne Wyspy, Ib), 2 - wszystkie okregi wsi swiata (klucz Ks Self Feed Everywhere).</summary>
         public int SelfFeed;
+        /// <summary>r4-polnoc (recenzja, decyzja Jeffa): true - prog na samym wlasnym jedzeniu (regula doslownie: okreg najpierw rece przy jedzeniu, nawet gdy futra kupia
+        /// wiecej zboza, niz da pole; klucz Ks Self Feed Own Food Only); false - na kcal dostepu (jedzenie + alfa x utarg bez jedzenia / cena kcal zboza).</summary>
+        public bool SelfFeedOwn;
     }
 
     /// <summary>r4-polnoc: wyzywienie krainy w Planie (kcal surowca na dobe): potrzeba jedzenia wsi i miast, produkcja jedzenia okregow (zajecia z rak i ziemi), praca
@@ -21,20 +24,23 @@ namespace Armoury
     {
         public string Land; public int M;
         public double VilPeople, TownPeople, VilNeed, TownNeed, VilProd, TfProd, Home, Hands, FloorHands, Target, Cap, Got;
-        public double Unc, DietNeed;                                  // krok 8: kcal koszyka wsi bez pokrycia i pelna potrzeba kcal ludzi w domu (KsDeliver.KcalNeed)
-        public double Diet { get { return DietNeed > 0 ? Math.Max(0.0, 1.0 - Unc / DietNeed) : 0.0; } }   // jedzenie wsi: wlasne + kupione + dom (1 - bez pokrycia)
-        public int Dist, DistFloor, DistShort;
+        public double Unc, DietNeed;                                  // krok 8: kcal koszyka wsi bez pokrycia i pelna potrzeba kcal ludzi w domu (ta sama miara co koszyk - KsBasket.Kcal, potrzeby R8)
+        public double Diet { get { return DietNeed > 0 ? Math.Max(0.0, Math.Min(1.0, 1.0 - Unc / DietNeed)) : 0.0; } }   // jedzenie wsi: wlasne + kupione + dom (1 - bez pokrycia)
+        public int Dist, DistFloor, DistShort, LandCut;               // LandCut: okregi, w ktorych ziemia bloku ucina ruch progu (recenzja)
         public double Vil { get { return VilNeed > 0 ? (VilProd + Home) / VilNeed : 0.0; } }
         public double All { get { double n = VilNeed + TownNeed; return n > 0 ? (VilProd + TfProd + Home) / n : 0.0; } }
     }
 
     internal sealed partial class KsResult
     {
-        public int SelfFeed = -1; public bool ColdLand;
+        public int SelfFeed = -1; public bool ColdLand, SelfFeedOwn;
         public Dictionary<string, double> DistHomeKcalAbs = new Dictionary<string, double>(StringComparer.Ordinal);   // krok 8: kcal/d robione w domu (ostatnia runda)
         public Dictionary<string, double> DistUncKcal = new Dictionary<string, double>(StringComparer.Ordinal);       // krok 8: kcal/d koszyka bez pokrycia (ostatnia runda)
+        public Dictionary<string, double> DistDietKcal = new Dictionary<string, double>(StringComparer.Ordinal);      // krok 8: pelna potrzeba kcal ludzi w domu w mierze koszyka (recenzja)
         public List<KsFeedLand> Feed;                                     // wyzywienie krain (Finish)
         public int FeedBlocks, FeedBind; public double FeedSumDev, FeedHandsAll, FeedFloorHands;
+        public int FeedOver0, FeedOver1, FeedLandCut; public double FeedLandInc;   // ziemia blokow w zakresie: ponad 0.98 powierzchni przed / po progu, okregi z ruchem ucietym ziemia, przyrost ziemi z progu ponad granice
+        public HashSet<string> FeedShort;                                 // okregi z brakiem kcal dostepu przy udzialach rynku (prog czynny) - A7 trzyma tam rece przy jedzeniu (gra)
     }
 
     internal static partial class KsCore
@@ -51,6 +57,11 @@ namespace Armoury
             public int[] FdB0, FdB1; public KsDistrict[] FdD; public double[] FdNeed, FdDef, FdCap, FdGot;   // okregi w zakresie: bloki, potrzeba bez daktyli regale, brak, zdolnosc, z progu
             public int Fd;
             public int[] IB, IK; public double[] IG, IE;               // bufor kolejki przesuniec okregu (blok, para dawcy, zysk kcal na udzial, zysk na reke)
+            public double[] PHa;                                       // ha na pracujacego pary (Pairs: KsTab.Ha zajecia na strefie bloku - mysliwy na zimnej ziemi)
+            public double[] FM, FH, FL0;                               // blok (recenzja): ha mieszanki na udzial (LandP), wolna ziemia do 0.98 x powierzchni, ha zajete przed progiem (ostatnia runda)
+            public int[] FdCut;                                        // okreg: ruch progu uciety ziemia bloku (ostatnia runda)
+            public double[] BkLam, BkL0, BkDef, BkCap, BkGot; public int[] BkCut; public bool BkOn;   // liczby progu z punktu kontrolnego rownowagi (najlepszy stan)
+            public double[] FZq, FZo;                                  // bufory pelnej potrzeby kcal (krok 8): koszyk przy zerze z wlasnego
         }
 
         internal static HashSet<string> FeedOnlyLands;                    // harness: prog tylko w tych krainach (diagnoza); w grze null
@@ -96,7 +107,9 @@ namespace Armoury
             {
                 x.FA = new int[NB]; x.FB = new int[NB]; x.FSa = new double[NB]; x.FSb = new double[NB]; x.FSum = new double[NB]; x.FK = new double[NB];
                 x.Lam = new double[NB]; x.FC = new double[NB]; x.FG = new double[NB];
+                x.FM = new double[NB]; x.FH = new double[NB]; x.FL0 = new double[NB];
             }
+            x.BkOn = false;
             for (int b = 0; b < NB; b++) { x.FA[b] = x.FB[b] = -1; x.FSa[b] = x.FSb[b] = x.FSum[b] = x.FK[b] = x.Lam[b] = 0; }
             var b0l = new List<int>(); var b1l = new List<int>(); var dl = new List<KsDistrict>(); var nl = new List<double>();
             var ml = new List<int>(); var ll = new List<int>(); var al = new List<double>(); var rl = new List<double>();
@@ -151,7 +164,7 @@ namespace Armoury
             x.Fd = dl.Count;
             x.FdB0 = b0l.ToArray(); x.FdB1 = b1l.ToArray(); x.FdD = dl.ToArray(); x.FdNeed = nl.ToArray();
             x.FdM = ml.ToArray(); x.FdL = ll.ToArray(); x.FdAlpha = al.ToArray(); x.FdRegV = rl.ToArray();
-            x.FdDef = new double[x.Fd]; x.FdCap = new double[x.Fd]; x.FdGot = new double[x.Fd];
+            x.FdDef = new double[x.Fd]; x.FdCap = new double[x.Fd]; x.FdGot = new double[x.Fd]; x.FdCut = new int[x.Fd];
             if (x.IB == null || x.IB.Length < maxP) { x.IB = new int[maxP]; x.IK = new int[maxP]; x.IG = new double[maxP]; x.IE = new double[maxP]; }
             x.FeedOn = x.Fd > 0;
         }
@@ -161,7 +174,7 @@ namespace Armoury
         /// BlockOutput (praca domowa okregu na chwile 0, jak w kroku 8). Harness FeedFullWork = false - z OUTP (z praca domowa).</summary>
         private static void PairFood(Ctx x, KsDistrict d, int b0, int b1)
         {
-            var fk = KsTab.FoodKcal; var ha = KsTab.HaPerWorker; var o = x.FOut;
+            var fk = KsTab.FoodKcal; var ha = x.PHa; var o = x.FOut;
             double hw0 = d.HomeWork;
             if (FeedFullWork) d.HomeWork = 0.0;
             try
@@ -181,7 +194,7 @@ namespace Armoury
                         double s = 0, v = 0;
                         for (int g = 0; g < KsTab.NG; g++) if (o[g] != 0.0) { s += o[g] * fk[g]; if (NonFoodSold(g)) v += o[g] * x.Val[g]; }
                         x.PairKcal[k] = s; x.PairNf[k] = v;
-                        x.PairLand[k] = wH * KsTab.HaHome + sub * KsTab.HaOwnGrain + cl * ha[x.Pc[k]];
+                        x.PairLand[k] = wH * KsTab.HaHome + sub * KsTab.HaOwnGrain + cl * ha[k];
                     }
             }
             finally { d.HomeWork = hw0; }
@@ -193,18 +206,22 @@ namespace Armoury
         /// rece do mieszanki jedzenia bloku (zadanie liniowe bloku) - tylko z par, ktore daja mniej kcal dostepu niz mieszanka (najpierw futra i len biednej wsi,
         /// potem jedzenie o mniejszej liczbie kcal na reke), od najwiekszego zysku na reke, tylko tyle, ile brakuje, i najwyzej do udzialow mieszanki (ziemia bloku).
         /// Wies, ktora za futra kupi wiecej jedzenia, niz urodzi jej ziemia, zostaje przy futrach (prog nie robi nikogo glodniejszym); wies wyzywiona - bez zmian.
-        /// Suma udzialow bloku = 1. Harness FeedAccess = false - same kcal jedzenia (alfa 0).</summary>
+        /// ZIEMIA (recenzja): ha zajete bloku (suma udzial x LandP - ta sama miara co renta i LandBind Planu) po progu najwyzej 0.98 x powierzchni bloku; blok, ktory
+        /// logit juz wypchnal ponad granice (renta do 0.5), prog nie powieksza - ruch z dawcy na mieszanke, ktora bierze wiecej ziemi niz dawca, jest uciety do wolnej ziemi
+        /// (mieszanka zadania liniowego liczy tylko siebie; pary, ktore zostaja - obora, owce, konie, mysliwy na 1500 ha - tez zajmuja ziemie). Prog nie daje jedzenia
+        /// z ziemi, ktorej blok nie ma. Suma udzialow bloku = 1. Harness FeedAccess = false - same kcal jedzenia (alfa 0).</summary>
         private static void ApplyFloors(Ctx x, double[] p, double[] xs)
         {
             if (!x.FeedOn) return;
             var pk = x.PairKcal; var pv = x.PairNf; var sc = x.BlockScale; var C = x.FC; var cap = x.FG;
+            var lp = x.LandP; var fm = x.FM; var fh = x.FH; var l0 = x.FL0;
             var ib = x.IB; var ik = x.IK; var ig = x.IG; var ie = x.IE;
             double vg = x.Val[KsTab.GGrain];
             for (int di = 0; di < x.Fd; di++)
             {
                 int b0 = x.FdB0[di], b1 = x.FdB1[di];
                 double conv = 0;
-                if (FeedAccess && vg > 0)
+                if (FeedAccess && !x.In.SelfFeedOwn && vg > 0)                 // klucz Ks Self Feed Own Food Only - same kcal jedzenia (alfa 0), jak harness FeedAccess = false
                 {
                     int m = x.FdM[di];
                     double pg = p != null && p.Length == NM * KsTab.NG ? p[m * KsTab.NG + KsTab.GGrain] : 1.0;
@@ -222,12 +239,12 @@ namespace Armoury
                 double tot = 0;
                 for (int b = b0; b < b1; b++)
                 {
-                    double c = 0;
-                    for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++) c += xs[k] * (pk[k] + conv * pv[k]);
-                    c *= sc[b]; C[b] = c; tot += c; x.Lam[b] = 0;
+                    double c = 0, lu = 0;
+                    for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++) { c += xs[k] * (pk[k] + conv * pv[k]); lu += xs[k] * lp[k]; }
+                    c *= sc[b]; C[b] = c; tot += c; x.Lam[b] = 0; l0[b] = lu;
                 }
                 double def = x.FdNeed[di] - conv * x.FdRegV[di] - tot;
-                x.FdDef[di] = def > 0 ? def : 0; x.FdGot[di] = 0; x.FdCap[di] = 0;
+                x.FdDef[di] = def > 0 ? def : 0; x.FdGot[di] = 0; x.FdCap[di] = 0; x.FdCut[di] = 0;
                 if (!(def > 1e-6)) continue;
                 int n = 0; double capK = 0;
                 for (int b = b0; b < b1; b++)
@@ -237,6 +254,8 @@ namespace Armoury
                     double room = x.FSum[b] - xs[fa] - (fb >= 0 ? xs[fb] : 0.0);
                     cap[b] = room;
                     if (!(room > 1e-12)) continue;
+                    fh[b] = 0.98 * x.Area[b] - l0[b];                                                   // wolna ziemia bloku (ha) do granicy renty
+                    fm[b] = (x.FSa[b] * lp[fa] + (fb >= 0 ? x.FSb[b] * lp[fb] : 0.0)) / x.FSum[b];      // ha mieszanki na przesuniety udzial
                     double vm = x.FSa[b] * pv[fa] + (fb >= 0 ? x.FSb[b] * pv[fb] : 0.0);
                     double M = (x.FK[b] + conv * vm) / x.FSum[b], hands = x.W[b] * sc[b];   // kcal dostepu mieszanki na udzial
                     double rb = 0;
@@ -254,20 +273,64 @@ namespace Armoury
                     capK += rb;
                 }
                 x.FdCap[di] = capK;
-                double rem = def, got = 0;
+                double rem = def, got = 0; int cut = 0;
                 for (int t = 0; t < n && rem > 1e-6; t++)
                 {
                     int b = ib[t], k = ik[t];
                     double avail = Math.Min(xs[k], cap[b]);
                     if (!(avail > 1e-15)) continue;
                     double g = ig[t], dlt = Math.Min(avail, rem / g);
+                    double dl = fm[b] - lp[k];                                 // ha na przesuniety udzial: mieszanka - dawca (> 0 - ruch bierze ziemie)
+                    if (dl > 1e-12)
+                    {
+                        double lim = fh[b] > 0 ? fh[b] / dl : 0.0;
+                        if (lim < dlt) { dlt = lim; cut = 1; }
+                        if (!(dlt > 1e-15)) continue;
+                    }
                     xs[k] -= dlt;
                     xs[x.FA[b]] += dlt * x.FSa[b] / x.FSum[b];
                     if (x.FB[b] >= 0) xs[x.FB[b]] += dlt * x.FSb[b] / x.FSum[b];
+                    fh[b] -= dlt * dl;
                     cap[b] -= dlt; x.Lam[b] += dlt; rem -= dlt * g; got += dlt * g;
                 }
-                x.FdGot[di] = got;
+                x.FdGot[di] = got; x.FdCut[di] = cut;
             }
+        }
+
+        /// <summary>Recenzja: liczby progu (udzial przesuniety bloku, ziemia przed progiem, brak, zdolnosc, z progu, ruchy uciete ziemia) zapisane razem z punktem kontrolnym
+        /// rownowagi - rownowaga bez zbieznosci oddaje najlepszy stan, a linia wyzywienia krain i A7 maja liczby tego samego stanu co udzialy (dotad - ostatniej rundy).</summary>
+        private static void FeedSave(Ctx x)
+        {
+            if (!x.FeedOn) return;
+            int nb = x.NB, nd = x.Fd;
+            if (x.BkLam == null || x.BkLam.Length != nb) { x.BkLam = new double[nb]; x.BkL0 = new double[nb]; }
+            if (x.BkDef == null || x.BkDef.Length != nd) { x.BkDef = new double[nd]; x.BkCap = new double[nd]; x.BkGot = new double[nd]; x.BkCut = new int[nd]; }
+            Array.Copy(x.Lam, x.BkLam, nb); Array.Copy(x.FL0, x.BkL0, nb);
+            Array.Copy(x.FdDef, x.BkDef, nd); Array.Copy(x.FdCap, x.BkCap, nd); Array.Copy(x.FdGot, x.BkGot, nd); Array.Copy(x.FdCut, x.BkCut, nd);
+            x.BkOn = true;
+        }
+
+        private static void FeedRestore(Ctx x)
+        {
+            if (!x.FeedOn || !x.BkOn || x.BkLam == null || x.BkLam.Length != x.NB || x.BkDef == null || x.BkDef.Length != x.Fd) return;
+            int nb = x.NB, nd = x.Fd;
+            Array.Copy(x.BkLam, x.Lam, nb); Array.Copy(x.BkL0, x.FL0, nb);
+            Array.Copy(x.BkDef, x.FdDef, nd); Array.Copy(x.BkCap, x.FdCap, nd); Array.Copy(x.BkGot, x.FdGot, nd); Array.Copy(x.BkCut, x.FdCut, nd);
+        }
+
+        /// <summary>Recenzja: pelna potrzeba kcal ludzi wsi w domu w TEJ SAMEJ mierze co koszyk kroku 8 (KsBasket.Kcal, potrzeby R8 x ludzie w domu, piwo z wlasnego ziarna) -
+        /// koszyk przy zerze z wlasnego pola. Mianownik "jedzenie" linii wyzywienia krain: jedzenie = 1 - kcal bez pokrycia / ta potrzeba (licznik i mianownik tej samej
+        /// miary; "Plan bez pokrycia wedlug krainy" dzieli te same kcal bez pokrycia przez koszyk ponad wlasne - kcal / koszyk kupowany).</summary>
+        private static double DietKcal(Ctx x, double[] full, double[] keep)
+        {
+            int nz = KsBasket.N, ni = KsDeliver.ItemCount;
+            if (x.FZq == null || x.FZq.Length != nz) x.FZq = new double[nz];
+            if (x.FZo == null || x.FZo.Length != ni) x.FZo = new double[ni];           // zero: nic z wlasnego pola - pelna potrzeba
+            Array.Clear(x.FZq, 0, nz);
+            KsBasket.VillageKg(full, keep, x.FZo, x.FZq);
+            double s = 0;
+            for (int z = 0; z < nz; z++) { double kc = KsBasket.Kcal[z]; if (kc > 0) s += x.FZq[z] * kc; }
+            return s;
         }
 
         /// <summary>Wyzywienie krain z wyniku (Finish): produkcja jedzenia okregow (DistProd, kcal surowca), praca domowa (krok 8), potrzeba wsi i miast, prog (ostatnia
@@ -275,7 +338,7 @@ namespace Armoury
         private static void FeedStats(Ctx x, double[] xs)
         {
             var R = x.R;
-            R.SelfFeed = x.In.SelfFeed; R.ColdLand = KsTab.ColdLand;
+            R.SelfFeed = x.In.SelfFeed; R.ColdLand = KsTab.ColdLand; R.SelfFeedOwn = x.In.SelfFeedOwn || !FeedAccess;
             var fk = KsTab.FoodKcal;
             var map = new Dictionary<string, KsFeedLand>(StringComparer.Ordinal);
             Func<string, int, KsFeedLand> get = (l, m) =>
@@ -292,15 +355,12 @@ namespace Armoury
                 if (d.TownFields) { f.TfProd += kc; continue; }
                 f.VilProd += kc; f.VilNeed += KsTab.FoodNeedKcal(d.Need0); f.VilPeople += d.People; f.Dist++;
                 double h; if (R.DistHomeKcalAbs.TryGetValue(d.Id, out h)) f.Home += h;
-                double u;
-                if (R.DistUncKcal.TryGetValue(d.Id, out u) && d.PplHome != null && d.People > 0)
-                {
-                    double home = 0; foreach (var e in d.PplHome) home += Math.Max(0.0, e);
-                    f.Unc += u; f.DietNeed += KsDeliver.KcalNeed(d.Need0) * Math.Min(1.0, home / d.People);
-                }
+                double u, fa;
+                if (R.DistUncKcal.TryGetValue(d.Id, out u) && R.DistDietKcal.TryGetValue(d.Id, out fa) && fa > 0) { f.Unc += u; f.DietNeed += fa; }   // recenzja: ta sama miara kcal
             }
             foreach (var t in x.In.Towns) { var f = get(t.Land, t.Market); f.TownNeed += KsTab.FoodNeedKcal(t.Need0); f.TownPeople += t.People; }
-            double dev = 0, hall = 0, hfl = 0; int nb = 0, nbind = 0;
+            double dev = 0, hall = 0, hfl = 0, linc = 0; int nb = 0, nbind = 0, ov0 = 0, ov1 = 0, ncut = 0;
+            var shortSet = new HashSet<string>(StringComparer.Ordinal);
             for (int b = 0; b < x.NB; b++)
             {
                 var d = x.BD[b];
@@ -312,14 +372,20 @@ namespace Armoury
                 {
                     var d = x.FdD[di]; var f = get(d.Land, d.Market);
                     f.Target += x.FdDef[di]; f.Cap += x.FdCap[di]; f.Got += x.FdGot[di];
-                    if (x.FdDef[di] > 1.0) f.DistFloor++;
-                    if (x.FdDef[di] > x.FdCap[di] * 1.0001 + 1.0) f.DistShort++;
+                    if (x.FdDef[di] > 1.0) { f.DistFloor++; shortSet.Add(d.Id); }
+                    if (x.FdDef[di] - x.FdGot[di] > x.FdDef[di] * 1e-4 + 1.0) f.DistShort++;   // recenzja: brak po progu (rece albo ziemia nie starcza)
+                    if (x.FdCut[di] > 0) { f.LandCut++; ncut++; }
                     for (int b = x.FdB0[di]; b < x.FdB1[di]; b++)
                     {
                         nb++;
-                        double s = 0;
-                        for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++) s += xs[k];
+                        double s = 0, lu = 0;
+                        for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++) { s += xs[k]; lu += xs[k] * x.LandP[k]; }
                         dev = Math.Max(dev, Math.Abs(s - 1.0));
+                        // ziemia (recenzja): ha zajete bloku przed progiem (logit) i po progu wobec 0.98 x powierzchni; prog nie bierze ziemi ponad granice
+                        double A = 0.98 * x.Area[b];
+                        if (x.FL0[b] > A * (1.0 + 1e-9)) ov0++;
+                        if (lu > A * (1.0 + 1e-9)) ov1++;
+                        if (x.Lam[b] > 0 && x.Area[b] > 0) { double e = (lu - Math.Max(x.FL0[b], A)) / x.Area[b]; if (e > linc) linc = e; }
                         if (x.Lam[b] > 0)
                         {
                             nbind++;
@@ -330,6 +396,7 @@ namespace Armoury
                 }
             }
             R.FeedBlocks = nb; R.FeedBind = nbind; R.FeedSumDev = dev; R.FeedHandsAll = hall; R.FeedFloorHands = hfl;
+            R.FeedOver0 = ov0; R.FeedOver1 = ov1; R.FeedLandCut = ncut; R.FeedLandInc = linc; R.FeedShort = shortSet;
             var list = new List<KsFeedLand>(map.Values);
             list.Sort((p, q) => p.All.CompareTo(q.All));
             R.Feed = list;
@@ -345,9 +412,10 @@ namespace Armoury
             var inv = CultureInfo.InvariantCulture;
             var sb = new StringBuilder(4200);
             sb.Append("KS: wyzywienie krain (plan doba ").Append(day).Append("; najpierw wyzywic siebie ")
-              .Append(r.SelfFeed <= 0 ? "WYLACZONE" : (r.SelfFeed >= 2 ? "TAK (wszystkie okregi wsi)" : "TAK (okregi wsi stref zimnych)"))
+              .Append(r.SelfFeed <= 0 ? "WYLACZONE" : (r.SelfFeed >= 2 ? "TAK (wszystkie okregi wsi" : "TAK (okregi wsi stref zimnych")
+                      + (r.SelfFeedOwn ? "; prog na samym wlasnym jedzeniu)" : "; prog na kcal dostepu)"))
               .Append(", zimna ziemia ").Append(r.ColdLand ? "TAK" : "WYLACZONA")
-              .Append(") | jedzenie = 1 - kcal koszyka wsi bez pokrycia (krok 8) / pelna potrzeba kcal ludzi wsi w domu (wlasne + kupione + dom); kcal wlasne / potrzeba jedzenia:")
+              .Append(") | jedzenie = 1 - kcal koszyka wsi bez pokrycia (krok 8) / pelna potrzeba kcal ludzi wsi w domu w tej samej mierze (kcal koszyka, potrzeby R8; wlasne + kupione + dom); kcal wlasne / potrzeba jedzenia:")
               .Append(" wsie = (produkcja okregow wsi + praca domowa) / potrzeba wsi, kraina = (wsie + pola mieszczan) / (potrzeba wsi + miast);")
               .Append(" reszta = dowoz kupcow, danina dla Muru, glod");
             var done = new HashSet<string>(StringComparer.Ordinal);
@@ -364,7 +432,8 @@ namespace Armoury
                   .Append(" + dom ").Append((f.Home / 1e9).ToString("0.000", inv)).Append(" / potrzeba ").Append((f.VilNeed / 1e9).ToString("0.000", inv)).Append(" + ").Append((f.TownNeed / 1e9).ToString("0.000", inv))
                   .Append(" mld kcal/d; prog: okregi z brakiem przy rynku ").Append(f.DistFloor).Append('/').Append(f.Dist).Append(", ziemia i rece nie starcza ").Append(f.DistShort)
                   .Append(", brak przy rynku ").Append((f.Target / 1e9).ToString("0.000", inv)).Append(" z progu ").Append((f.Got / 1e9).ToString("0.000", inv))
-                  .Append(", rece przesuniete do jedzenia ").Append(f.Hands > 0 ? (100 * f.FloorHands / f.Hands).ToString("0.0", inv) : "-").Append("%)");
+                  .Append(", rece przesuniete do jedzenia ").Append(f.Hands > 0 ? (100 * f.FloorHands / f.Hands).ToString("0.0", inv) : "-").Append("%")
+                  .Append(", okregi z ruchem ucietym ziemia ").Append(f.LandCut).Append(")");
             }
             sb.Append(" | reszta krain (jedzenie/wsie/kraina):");
             bool first = true;
@@ -375,6 +444,9 @@ namespace Armoury
                   .Append(f.Vil.ToString("0.00", inv)).Append('/').Append(f.All.ToString("0.00", inv));
                 first = false;
             }
+            sb.Append(" | ziemia blokow w zakresie (ha zajete / powierzchnia - miara renty Planu): ponad 0.98 przed progiem ").Append(r.FeedOver0).Append(", po progu ").Append(r.FeedOver1)
+              .Append(", okregi z ruchem progu ucietym ziemia ").Append(r.FeedLandCut).Append(", najwiekszy przyrost ziemi z progu ponad granice ").Append(r.FeedLandInc.ToString("0.0E+0", inv))
+              .Append(" powierzchni bloku (prog nie bierze ziemi, ktorej blok nie ma)");
             sb.Append(" | rece: bloki okregow w zakresie ").Append(r.FeedBlocks).Append(" (z przesunieciem ").Append(r.FeedBind).Append("), rece przesuniete do jedzenia ")
               .Append(r.FeedHandsAll > 0 ? (100 * r.FeedFloorHands / r.FeedHandsAll).ToString("0.00", inv) : "-").Append("% rak pola wsi swiata")
               .Append(", najwieksze odchylenie sumy udzialow bloku od 1 ").Append(r.FeedSumDev.ToString("0.0E+0", inv))

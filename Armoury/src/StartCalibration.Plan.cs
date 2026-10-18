@@ -98,7 +98,7 @@ namespace Armoury
             // krok 8 (pieniadze, poprawka po autotescie 16.10): budzet wsi z utargu wozow (udzial kiesy wsi x cena wozu / cena polki x (1 - zapas na oplaty)),
             // koszyk z wlasnego pola (udzialy stanow ZC), budzety klas miast z zarobku netto (28 dob)
             inp.Money = true; inp.Keep = _keep;
-            SyncColdLand(); inp.SelfFeed = SelfFeedMode();            // r4-polnoc: zimna ziemia (tabela swiata) i najpierw wyzywic siebie (prog Planu)
+            SyncColdLand(); inp.SelfFeed = SelfFeedMode(); inp.SelfFeedOwn = SelfFeedOwnOnly();   // r4-polnoc: zimna ziemia (tabela swiata) i najpierw wyzywic siebie (prog Planu)
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");

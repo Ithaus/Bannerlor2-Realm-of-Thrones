@@ -162,7 +162,7 @@ namespace Armoury
             double L = b.L(c, type);
             double v = 0; int o = c * KsTab.NG;
             for (int g = 0; g < KsTab.NG; g++) { double m = _mv[o + g]; if (m != 0) v += m * Px(px, g); }
-            return L * v - KsTab.KCost[c] - b.Rent * KsTab.HaPerWorker[c];
+            return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);      // r4-polnoc: ha wedlug strefy bloku (bez klucza Ks Cold Land - HaPerWorker[c])
         }
 
         private static bool Tree(int c) { return c == KsTab.CVine || c == KsTab.COlive || c == KsTab.CDate || c == KsTab.CCitrus; }
