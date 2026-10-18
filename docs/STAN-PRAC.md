@@ -3009,3 +3009,9 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   (fin91 0.767 - skutek rent wedlug potrzeby?), NDS-7b 0.804/0.693. Lepiej, ale NIE: NKA-1 zaleglosci firm 1.03 mln -> 627k (+10.9k/d po przegladzie). Bez zmian: NKU-12, NDS-11 takt doby 566 ms.
 - 10:30 PDT: workflow f14-fin92 (wf_83181c62-398): 4 paczki od 8cd7b556 - f14-ksiega (NF4-8/NSK-3/ZC1-19), f14-wsie (NDS-3a odplyw kies wsi), f14-rynek (NWAR-15 + NKS-3/27 Essos),
   f14-miary (NDS-9/7b po decyzji o rentach - sprawdzic armie; NKA-1; NBD-2). Rownolegle: f10-uklad (wf_ca258789-6e9), f13-doba (wf_de2e2ab7-36e).
+- 11:00 PDT: f13-doba GOTOWE (wf_de2e2ab7-36e) w-toku/f13-doba **7bae337c** (= 8cd7b556 + f9 + f13; CrashScribe tez zmieniony - GameState.Describe nie czyta gry z watku logu):
+  DayTickSmooth: zapis logu Armoury w tle (kolejnosc zachowana, bledy oprozniaja kolejke), Stage6Measure jedno przejscie swiata (dzien kontrolny co 28 dob), linia "Doba gladko (f13)".
+  Zysk tylko ~7-12 ms z ~520 ms. DIAGNOZA: takt doby to w ~390 ms gospodarka (ClanIncomeBook 89, KingdomTreasury 72 - wywolania modelu dochodu PISZA stan BK: DueWage rady,
+  workshopTaxes -, SupplyDemand 52-64, Sutlers 38, BuildFunding 27, WarLedger 23, ClanBudget 23...); bez zmiany wynikow nie da sie jej przesunac. CrashScribe EconomyAudit co 7 dob +200 ms
+  w tej samej klatce (i jego wywolania modelu tez zmieniaja stan BK - pomiar wplywa na gre!). "Swaty ROT" 296 ms/d NIE jest w szczycie (DailyTickClan rozlozony po dobie).
+  DO DECYZJI JEFFA: rozlozyc kroki gospodarki doby na pierwsze godziny dnia (ta sama kolejnosc, wyniki minimalnie inne) -> szczyt ~0.5 s -> ~0.1 s.
