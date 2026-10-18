@@ -6316,6 +6316,10 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfProbeEachPlace { get; set; } = true;
 
+        [SettingPropertyBool("Day Tick Smooth", HintText = "less work in the one frame where the day ends, the same game: the mod's log file is written by a background thread (the game thread only queues the line; errors are written at once), and the daily arms and horse books count the world's stocks in one pass instead of two - the same numbers. Adds one diagnostic line a day with the split. Off = the log is written on the game thread and the books count twice, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool DayTickSmooth { get; set; } = true;
+
         [SettingPropertyBool("State Hygiene Enabled", HintText = "starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before")]
         [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
         public bool StateHygieneEnabled { get; set; } = true;
@@ -9462,6 +9466,7 @@ namespace Armoury
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.PerfSutlerWageExact = PerfSutlerWageExact;
             s.PerfProbeEachPlace = PerfProbeEachPlace;
+            s.DayTickSmooth = DayTickSmooth;
             s.StateHygieneEnabled = StateHygieneEnabled;
             s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;
