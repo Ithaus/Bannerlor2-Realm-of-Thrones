@@ -264,7 +264,11 @@ namespace Armoury
                 double nf = r.N[EPeasant] + r.N[ECraft] + r.N[EMerchant] + r.N[EGentry];
                 if (!(nf > 0)) continue;
                 r.Away = a;
-                for (int e = EPeasant; e <= EGentry; e++) if (e != ELabour) r.AwayE[e] = a * r.N[e] / nf;
+                // sw-uchodzcy (RaidRefugeesToTowns): w mianowniku okregu tylko uchodzcy w regionie - czesc w miescie pobytu jest w mianowniku biedoty miasta (TownGuests);
+                // Away (widok "away from home") - cale konto. Wylaczone: ar = a (jak dotad)
+                double ar = a;
+                try { ar = Math.Max(0.0, a - RaidRefugees.InTown(r.St.Village)); } catch (Exception e) { ar = a; Stumble("RaidRefugees.InTown", e); }
+                for (int e = EPeasant; e <= EGentry; e++) if (e != ELabour) r.AwayE[e] = ar * r.N[e] / nf;
                 _wAwayV++; _wAwayP += a; _wAwayHome += r.L;
             }
         }
@@ -633,8 +637,30 @@ namespace Armoury
                         parts.Add("For a month after a sack its burghers fall faster: those who cannot keep themselves drop a step down at four times the usual pace.");
                 }
                 if (r.Away >= 0.5)
-                    parts.Add(Num(r.Away) + " of its people are away from home, driven off by war - the district counts them in its livelihood with no income until they come home, "
-                              + "and they start coming home once the region has had a month of peace.");
+                {
+                    // sw-uchodzcy (recenzja, drobne 4; RaidRefugeesToTowns): czesc w miescie pobytu nie jest w mianowniku okregu (WarPeople) - widok mowi, ilu mieszka w miescie,
+                    // a ilu liczy okreg. Klucz wylaczony / nikt w miescie - tekst co do znaku jak dotad
+                    double inT = 0; string host = null;
+                    try
+                    {
+                        if (!town && r.St != null && r.St.Village != null)
+                        {
+                            inT = Math.Min(r.Away, RaidRefugees.InTown(r.St.Village));
+                            if (inT >= 0.5) host = RaidRefugees.HostName(r.St.Village);
+                        }
+                    }
+                    catch (Exception e) { inT = 0; ViewStumble("WarViewText(RT)", e); }
+                    if (inT >= 0.5)
+                    {
+                        double rg = Math.Max(0.0, r.Away - inT);
+                        parts.Add(Num(r.Away) + " of its people are away from home, driven off by war: " + Num(inT) + " live in " + (host ?? "a town") + " among its labourers, where they work and buy their bread"
+                                  + (rg >= 0.5 ? ", and the district counts the other " + Num(rg) + " in its livelihood with no income until they come home" : "")
+                                  + "; they start coming home once the region has had a month of peace.");
+                    }
+                    else
+                        parts.Add(Num(r.Away) + " of its people are away from home, driven off by war - the district counts them in its livelihood with no income until they come home, "
+                                  + "and they start coming home once the region has had a month of peace.");
+                }
                 if (eb != null && eb.P != null && (eb.Debt[0] > 0 || eb.Debt[1] > 0) && r.L > 0)
                 {
                     if (town)

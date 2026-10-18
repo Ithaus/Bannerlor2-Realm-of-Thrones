@@ -137,6 +137,12 @@ namespace Armoury
                                    .Append(days).Append(days == 1 ? " day." : " days.").Append('\n');
                     else sb.Append("No veterans wait in this town's tavern.\n");
                 }
+                // sw-uchodzcy (RaidRefugeesToTowns): uchodzcy z najazdu mieszkajacy w tym miescie (biedota) - liczba z kont ksiegi ludzi w tej chwili; nikt / wylaczone - bez linii
+                if (st.IsTown)
+                {
+                    try { string rl = RaidRefugees.MenuLine(st); if (!string.IsNullOrEmpty(rl)) sb.Append(rl).Append('\n'); }
+                    catch (Exception e) { Log.Error("PeopleMenu.RaidRefugees", e); }
+                }
                 // E5/C4 (205, PLAN 5.13): czy ludzi tej osady stac na chleb - liczby kiesy ludu z ostatniej doby (tylko odczyt), linia do logu przy kazdym otwarciu
                 var s1 = Settings.Current;
                 if (s1 != null && s1.PeopleMenuShowsBread)

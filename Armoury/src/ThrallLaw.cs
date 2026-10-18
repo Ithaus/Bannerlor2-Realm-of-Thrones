@@ -218,6 +218,7 @@ namespace Armoury
                         }
                     }
                 }
+                RaidRefugees.Track(__3, RaidRefugees.CCapt);       // sw-uchodzcy: pojmani z konta (takze z czesci w miescie pobytu); Track nie rzuca
                 Devastation.NoteCapture(found, plan, taken, leave, noChar, few, slaver, player);
                 if (player && taken > 0)
                 {

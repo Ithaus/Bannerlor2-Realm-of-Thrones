@@ -164,10 +164,16 @@ namespace Armoury
                     double all = Math.Max(0.0, r.L) + Math.Max(0.0, away);
                     var ppl = new double[6];
                     for (int e = 0; e < 6; e++) ppl[e] = all * r.Share[e];
-                    var kd = new KsDistrict { Id = r.St.StringId, Type = type, Land = land, Market = ld.Market, People = all, Area = ld.Area };
+                    // sw-uchodzcy (RaidRefugeesToTowns): uchodzcy w miescie pobytu jedza w miescie (biedota miasta w KsSnapshot) - ludzie i potrzeba okregu bez nich; rece okregu
+                    // (VillageHands z ppl x mnoznik rak spustoszenia) bez zmian. Wylaczone: awayE = away (co do liczby jak dotad)
+                    double awayE = away; try { awayE = RaidRefugees.AwayInRegion(v); } catch { awayE = away; }
+                    double allE = Math.Max(0.0, r.L) + Math.Max(0.0, awayE);
+                    var pplE = ppl;
+                    if (allE != all) { pplE = new double[6]; for (int e = 0; e < 6; e++) pplE[e] = allE * r.Share[e]; }
+                    var kd = new KsDistrict { Id = r.St.StringId, Type = type, Land = land, Market = ld.Market, People = allE, Area = ld.Area };
                     // recenzja 16.10 (drobne): zloza, ktore RockGold w grze tnie do 0 (Skala: srebro i zloto, Zachod: zloto) - L = 0 w Planie
                     try { if (RockGold.Blocks(v, "silver")) kd.NoReg |= 1L << KsTab.CSilver; if (RockGold.Blocks(v, "gold_ore")) kd.NoReg |= 1L << KsTab.CGoldM; } catch { }
-                    KsCore.NeedsOf(ppl, bask, oil, north, true, false, all, kd.Need0);
+                    KsCore.NeedsOf(pplE, bask, oil, north, true, false, allE, kd.Need0);
                     kd.PplHome = new double[6]; for (int e = 0; e < 6; e++) kd.PplHome[e] = Math.Max(0.0, r.L) * r.Share[e];
                     kd.Bask = bask; kd.Oil = oil;
                     double hands = 1.0;

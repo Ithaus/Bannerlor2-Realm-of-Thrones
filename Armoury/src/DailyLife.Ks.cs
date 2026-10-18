@@ -17,6 +17,7 @@ namespace Armoury
             public Settlement St; public bool Town, Castle; public string Cul, ProfId; public double L, Away;
             public readonly double[] Share = new double[6]; public readonly double[] N = new double[6];
             public Settlement Region, Market;
+            public double Guests;     // sw-uchodzcy (recenzja): miasto - uchodzcy z najazdu dopisani do biedoty (ZC4 przelicza potrzebe miasta po ich zmianie); wylaczone - 0
         }
 
         /// <summary>KS: stany wszystkich miast i wsi z ostatniej doby pomiaru ZC (dzien w day). false - ZC nie liczylo (klucz wylaczony, log wylaczony bez ZC2,
@@ -33,6 +34,9 @@ namespace Armoury
                     if (r == null || r.St == null) continue;
                     var k = new KsRec { St = r.St, Town = r.Kind == KTown, Castle = r.Kind == KCastle, Cul = r.Cul, ProfId = Profs[r.Prof].Id, L = r.L, Away = r.Away };
                     for (int e = 0; e < 6; e++) { k.Share[e] = r.Share[e]; k.N[e] = r.N[e]; }
+                    // sw-uchodzcy (RaidRefugeesToTowns): uchodzcy z najazdu w miescie - biedota miasta w stanach KS (potrzeba targu, koszyk klasy W, rece pol mieszczan);
+                    // okreg wsi traci ich w potrzebie jedzenia (RaidRefugees.AwayInRegion w Planie i stawkach). Wylaczone: Guests = 0
+                    if (r.Kind == KTown && r.Guests > 0 && Fin(r.Guests)) { k.N[ELabour] += r.Guests; k.L += r.Guests; k.Guests = r.Guests; }
                     k.Region = r.Region != null ? r.Region.St : null; k.Market = r.Market != null ? r.Market.St : null;
                     into.Add(k);
                 }

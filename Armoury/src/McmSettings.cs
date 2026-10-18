@@ -3072,6 +3072,22 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool FamineSiegeShelter { get; set; } = true;
 
+        [SettingPropertyBool("Raid Refugees To Towns", HintText = "the people a raid drives from their homes go to the nearest town of their realm (else of a realm not at war with it, within Raid Refugees Town Radius) and live there among its labourers until they go home: they work for the town's wages, buy their food at its market like the town poor and bring their share of their village's purse with them (what is left goes home with them). They go home by the same rules as before (Refugee Return Quiet Days, Refugee Return Days); a siege of the town keeps them inside its walls, where they eat from its food stores and starve with the townsfolk when the food runs out. A town takes them in only when its people buy their food by the market basket of the start calibration and the town folk purses are on (otherwise nobody would feed them there); a town that can no longer take them in, or that goes to war with their realm, sends them back to their own land. With no such town in reach they stay in their own land as before. Works only with Devastation Enabled; off = raid refugees stay in their own land as before")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool RaidRefugeesToTowns { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Raid Refugees Town Radius", 0.00f, 1000.00f, "0", HintText = "how far raid refugees go looking for a town (map distance from their village; 0 = they never leave their land)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float RaidRefugeesTownRadius { get; set; } = 250f;
+
+        [SettingPropertyFloatingInteger("Raid Refugees Purse Share", 0.00f, 1.00f, "0.00", HintText = "the share of their village purse that raid refugees take with them: 1 = all of their own share (the village purse divided by its people), 0 = nothing")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float RaidRefugeesPurseShare { get; set; } = 1f;
+
+        [SettingPropertyInteger("Raid Refugees Message Min", 0, 10000, "0", HintText = "a message tells you when at least this many raid refugees reach in one day a town you own or the town you are in (0 = no message)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public int RaidRefugeesMessageMin { get; set; } = 500;
+
         [SettingPropertyBool("People Origin Enabled", HintText = "every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleOriginEnabled { get; set; } = true;
@@ -7943,6 +7959,10 @@ namespace Armoury
             s.FamineMoveDays = FamineMoveDays;
             s.FamineReturnMinDays = FamineReturnMinDays;
             s.FamineSiegeShelter = FamineSiegeShelter;
+            s.RaidRefugeesToTowns = RaidRefugeesToTowns;
+            s.RaidRefugeesTownRadius = RaidRefugeesTownRadius;
+            s.RaidRefugeesPurseShare = RaidRefugeesPurseShare;
+            s.RaidRefugeesMessageMin = RaidRefugeesMessageMin;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;

@@ -344,6 +344,7 @@ namespace Armoury
             PeopleDay();
             WarSeed(day);                                  // ZC7: doba wlaczenia w kampanii (klucz off - od nowa przy nastepnym wlaczeniu); nie rzuca
             if (EstatesOn) { try { WarFlush(day); WarPeople(); } catch (Exception e) { _wStum++; Stumble("WarFlush", e); } }   // ZC7: blizna najazdow doby (przed dochodem doby), uchodzcy w mianowniku
+            try { TownGuests(day); } catch (Exception e) { Stumble("TownGuests", e); }   // sw-uchodzcy: uchodzcy z najazdu w miastach - biedota (mianownik Dostatku, stany KS); klucz wylaczony - nic
             long t2 = Stopwatch.GetTimestamp();
             PricesDay();                                   // po ludziach doby: koszyk zamku wazony ludzmi wsi regionu
             long t3 = Stopwatch.GetTimestamp();

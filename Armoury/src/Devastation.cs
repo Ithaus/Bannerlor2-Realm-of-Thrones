@@ -323,6 +323,7 @@ namespace Armoury
             var region = OutlawLaw.RegionFor(v.Settlement);
             int day = (int)CampaignTime.Now.ToDays;
             PeopleBook.Devastated(v, refugees * f, dead * f, region, day);
+            RaidRefugees.Track(v, RaidRefugees.CArrive, refugees * f);   // sw-uchodzcy: konto z miastem pobytu - nowi uchodzcy ida do tego miasta (Track nie rzuca)
             if (fled > 0.0) OutlawLaw.AddFled(v.Settlement, (float)(fled * f));   // pula regionu 1:1, bez hearth (zdjal Move)
             if (lBefore > 0.0) Famine.Burn(v, hit * f / lBefore);         // E4/6 (GL 2.2 pkt 6): spichlerz okregu traci ten sam ulamek co ludzie; po kontach, nie rzuca
             // ZC7 (DailyLife.War.cs, klucz DailyLifeWarScar): trafieni wobec ludzi w domu przed uderzeniem - blizna okregu o swicie (dochod trafionych, rzemieslnicy wsi);
@@ -779,6 +780,7 @@ namespace Armoury
                         {
                             double died = PeopleBook.RefugeesDie(v, away * q);
                             _dDied += died; away -= died;
+                            if (died > 0.0) RaidRefugees.Track(v, RaidRefugees.CDied);   // sw-uchodzcy: smierc w drodze takze w miescie pobytu (ta sama stopa)
                         }
                         if (!(away > 0.0)) continue;
                         var region = OutlawLaw.RegionFor(v.Settlement);
@@ -794,6 +796,8 @@ namespace Armoury
                         if (clock && today - last < Q) { _dStopQuiet++; NoteStop(kv.Key, StopQuiet); continue; }                    // 30 dob spokoju po najezdzie w regionie - dla calego konta
                         if (region != null && region.IsUnderSiege) { _dStopSiege++; NoteStop(kv.Key, StopSiege); continue; }       // HR 2.8: uchodzcy siedza w oblezonej warowni
                         double raidAway = Math.Max(0.0, away - famAway), backR = 0.0, backF = 0.0;
+                        // sw-uchodzcy (RaidRefugeesToTowns): miasto pobytu oblezone - czesc z najazdu siedzi w jego murach (wzor dogania po oblezeniu jak HR 2.8)
+                        if (raidAway > 0.0 && RaidRefugees.HostBesieged(v)) { raidAway = 0.0; NoteStop(kv.Key, StopSiege); }
                         if (raidAway > 0.0)
                         {
                             if (!clock) { last = today - Q; _dNoClock++; }                             // nie powinno sie zdarzyc (zegar rusza razem z kontem rabunku)
@@ -813,6 +817,7 @@ namespace Armoury
                         if (!(back > 0.0)) continue;
                         double got = PeopleBook.RefugeesHome(v, back, PeopleBook.MRefugeeHome, PeopleUnit.GamePerMan);
                         if (famAway > 0.0) Famine.Returned(v, famAway, got > 0.0 ? got * (backF / back) : 0.0);   // czesc z glodu po powrocie (nie rzuca)
+                        if (got > 0.0) RaidRefugees.Track(v, RaidRefugees.CHome);     // sw-uchodzcy: PO Famine.Returned (czesc z glodu juz uzgodniona) - powracajacy z miasta, ich czesc salda kiesy
                         double err = Math.Abs(got - back) / Math.Max(1.0, back);                       // kontrola liniowosci: 0 poza dnem konta
                         if (err > _dLinErr) _dLinErr = err;
                         if (got > 0.0)

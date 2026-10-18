@@ -519,8 +519,13 @@ namespace Armoury
                         double home = Math.Max(0.0, rec.L), all = home + Math.Max(0.0, away);
                         var ppl = new double[6]; var pplH = new double[6];
                         for (int e = 0; e < 6; e++) { ppl[e] = all * rec.Share[e]; pplH[e] = home * rec.Share[e]; }
-                        KsCore.NeedsOf(ppl, bask, oil, north, true, false, all, kd.Need0);
-                        kd.People = all; kd.Wf = KsCore.VillageHands(ppl);
+                        // sw-uchodzcy (RaidRefugeesToTowns): potrzeba i ludzie okregu bez uchodzcow w miescie pobytu (jedza w miescie - KsSnapshot); rece z calego ppl jak dotad
+                        double awayE = away; try { awayE = RaidRefugees.AwayInRegion(ld.V); } catch { awayE = away; }
+                        double allE = home + Math.Max(0.0, awayE);
+                        var pplE = ppl;
+                        if (allE != all) { pplE = new double[6]; for (int e = 0; e < 6; e++) pplE[e] = allE * rec.Share[e]; }
+                        KsCore.NeedsOf(pplE, bask, oil, north, true, false, allE, kd.Need0);
+                        kd.People = allE; kd.Wf = KsCore.VillageHands(ppl);
                         KsCore.NeedsOfKeep(pplH, bask, _keep, oil, home, ld.OwnNeed);
                         KsCore.NeedsOf(pplH, bask, oil, north, true, false, home, ld.FullNeed);
                         for (int k = 0; k < KsTab.NN; k++) { ld.OwnNeed[k] *= ld.NeedMult[k]; ld.FullNeed[k] *= ld.NeedMult[k]; }

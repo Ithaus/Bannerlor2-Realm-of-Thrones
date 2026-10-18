@@ -523,6 +523,10 @@ namespace Armoury
             // flagi - zgubiona flaga i wczytanie w pierwszych 2 dobach kampanii to drugi bilans otwarcia (616 cial z niczego)
             try { string people = dataStore.IsSaving ? PeopleBook.Export() : null; SaveText.Sync(dataStore, "arm_people", ref people); if (dataStore.IsLoading) PeopleBook.Import(people); }
             catch (Exception e) { Log.Error("SyncData.arm_people", e); }
+            // sw-uchodzcy (noc 17/18.10): uchodzcy z najazdu w miastach - miasto konta, saldo kiesy W, migawki (format "v1|"); wlasny try, PO arm_people (konto UCHODZCY);
+            // brak klucza (stary zapis) = pusto - przydzial w pierwszej dobie; starsza DLL klucz pomija
+            try { string rr = dataStore.IsSaving ? RaidRefugees.Export() : null; SaveText.Sync(dataStore, "arm_raidref", ref rr); if (dataStore.IsLoading) RaidRefugees.Import(rr); }
+            catch (Exception e) { Log.Error("SyncData.arm_raidref", e); }
             // E4/11 (193): ksiega wiosek pobocznych - n okregow, puste osady, stany wiosek (osobny klucz; Import tylko odklada napis do Resolve w OnSessionLaunched)
             try { string ds = dataStore.IsSaving ? VillageBook.Export() : null; SaveText.Sync(dataStore, "arm_district", ref ds); if (dataStore.IsLoading) VillageBook.Import(ds); }
             catch (Exception e) { Log.Error("SyncData.arm_district", e); }
@@ -1948,6 +1952,10 @@ namespace Armoury
             try { MoneyLedger.Mark(MoneyLedger.MCastle); } catch { }
             // E5/0 (195): kiesa ludu na sucho (tylko log) - po rentach i zaworze zamkow (RentOf, CastlePurse.DuesOf czytelne), przed budowami; E5/B1 (173): przy kiesie
             // czynnej prawdziwe przelewy (podatki panu -> RentToday przed budowami i powinnosciami, place z kas, zakupy wsi z polki - ramka ksiegi towarow F26) i migawka M18
+            // sw-uchodzcy (RaidRefugeesToTowns): przydzial miast uchodzcom z najazdu, kiesa przybylych (kiesy wsi -> kiesy W miast) i powracajacych (z powrotem), udzial
+            // salda w kiesie W, linia "Uchodzcy do miast (RT)" - PO powrocie i glodzie tej doby (Devastation, Famine), PRZED kiesa ludu (kotwica jutra liczy ich glowy),
+            // w pozycji MFolk ksiegi pieniadza (Mark ponizej)
+            try { RaidRefugees.Daily(); } catch (Exception e) { Log.Error("RaidRefugees.Daily", e); } DayProfile.Lap("RaidRefugees.Daily");
             var gfFolk = GoodsLedger.Begin(GoodsLedger.FFolkVill);
             try { TownFolk.Daily(); } catch (Exception e) { Log.Error("TownFolk.Daily", e); }
             finally { GoodsLedger.End(gfFolk); } DayProfile.Lap("TownFolk.Daily");
