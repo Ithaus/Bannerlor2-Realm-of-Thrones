@@ -65,6 +65,9 @@ class P:
         self.grow = False         # f5: szybki przeglad wedlug przyrostu kasy z 28 dob (firma rosnie o przyrost kasy na dobe), nie wedlug doplywu netto
         self.noDown = False       # f5: przeglad kwartalny nie obniza firmy miasta z kasa ponad 1.5 x zapas (oprocz wymuszonego przy zaleglosciach)
         self.m6cut = True         # f5: kappa R/P tnie tez wyplate kupcom M6 (reszta zostaje w kasie)
+        self.housesQ = False      # f5: takze przeglad zwykly (kwartalny) bez podwyzki przy R/P ponizej pasma
+        self.share = False        # f5: nieprzyjete przez klase bogata z zarobku z zewnatrz - do biednych klas tego samego miasta (wedlug potrzeby), reszta do kasy
+        self.houses = False       # f5: bez podwyzki firmy wedlug nadwyzki, dopoki R albo P miasta sa ponizej dolnej granicy pasma (nadwyzka kupcow najpierw do ich domow przez M6)
         self.lo = {'W': 15.0, 'R': 21.0, 'P': 30.0}
         self.hi = {'W': 30.0, 'R': 42.0, 'P': 60.0}
         self.mn = 0.10
@@ -130,6 +133,17 @@ def run(towns, p, days=DAYS, calib=None):
             extP = 0.1 * svc
             inW = extW * kW2; inR = extR * kR; inP = extP * kP
             cutExt = extW * (1 - kW2) + extR * (1 - kR) + extP * (1 - kP)          # nieprzyjete - wolajacy daje kasie miasta
+            if p.share and cutExt > 0:
+                # f5: czesc nieprzyjeta przez klase ponad pasmem idzie do klas tego miasta ponizej dolnej granicy pasma (wedlug potrzeby), reszta do kasy
+                poor = [c for c in 'WRP' if s['N' + c] > 0 and s['K' + c] < p.lo[c] * s['N' + c]]
+                if poor:
+                    tn = sum(s['N' + c] for c in poor)
+                    for c in poor:
+                        g = cutExt * s['N' + c] / tn
+                        if c == 'W': inW += g
+                        elif c == 'R': inR += g
+                        else: inP += g
+                    cutExt = 0.0
             labW = 0.9 * s['labFull'] * fA * kW; labR = 0.1 * s['labFull'] * kR
             topW = 0.7 * s['topFull'] * fA * kW; topR = 0.3 * s['topFull'] * kR
             turn = s['z_obrotu'] * kP
@@ -219,12 +233,15 @@ def run(towns, p, days=DAYS, calib=None):
                 due = day - s['lastRev'] >= p.review
                 fastOk = p.fast > 0 and (p.grow or day - s['lastFast'] >= p.fast) and s['G'] > 1.5 * s['Rv']
                 surplus = s['G'] > 1.5 * s['Rv']
+                poorRP = p.houses and ((s['NR'] > 0 and s['KR'] / s['NR'] < p.lo['R']) or (s['NP'] > 0 and s['KP'] / s['NP'] < p.lo['P']))
                 if due:
                     nf = max(-p.revMax * F, min(p.revMax * F, tgt - s['farmX']))
                     if p.noDown and surplus and nf < 0: nf = 0.0
+                    if p.housesQ and poorRP and nf > 0: nf = 0.0     # f5: przeglad zwykly bez podwyzki, dopoki R/P ponizej pasma (nadwyzka najpierw do ich domow przez M6)
                     s['farmX'] += nf; s['lastRev'] = day
                     if not p.grow: s['lastFast'] = day
-                if fastOk and p.grow and len(s['Gh']) > p.fast:
+                if poorRP: s['Gh'] = []                    # jak KsFolkIncome.HousesFirst: pomiar od nowa
+                if fastOk and p.grow and not poorRP and len(s['Gh']) > p.fast:
                     g = (s['Gh'][-1] - s['Gh'][0]) / (len(s['Gh']) - 1)
                     s['Gh'] = [s['G']]                     # przyrost liczony od tej doby (bez liczenia drugi raz tych samych dob) - takze bez podwyzki
                     if g > 0:
@@ -277,20 +294,32 @@ if __name__ == '__main__':
         sum(t['dKW'] for t in towns), sum(t['dKR'] for t in towns), sum(t['dKP'] for t in towns), sum(t['dG'] for t in towns)))
     S0, _ = run(towns, P(), calib=cal)
     show('S0 STARE (f4 jak w fin88, danina R/P 3%):', S0)
+    F5 = dict(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, houses=True)
     sc = [
         ('S1 tylko W2 (caly dochod W wedlug koszyka):', P(ext=True, zero=True)),
         ('S2 W2 + R/P + danina R/P z kappa, BEZ przegladu wedlug nadwyzki (kasa = nowy akumulator):', P(ext=True, rp=True, rpHoard=True, zero=True)),
-        ('F5 WDROZONE: S2 + przeglad firmy wedlug nadwyzki kasy co 14 dob (najwyzej +25%), zwykly bez obnizki przy nadwyzce:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25)),
-        ('czulosc: F5, przeglad co 28 dob:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=28, grow=True, noDown=True, fastMax=0.25)),
-        ('czulosc: F5, najwyzej +15%:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.15)),
-        ('czulosc: F5 bez ciecia M6 (P trzyma przejscie):', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, m6cut=False)),
-        ('czulosc: F5, R/P najnizej 0.25:', P(ext=True, rp=True, rpHoard=True, zero=True, fast=14, grow=True, noDown=True, fastMax=0.25, mn=0.25)),
+        ('F5 WDROZONE: S2 + przeglad firmy wedlug nadwyzki kasy co 14 dob (najwyzej +25%, domy najpierw), zwykly bez obnizki przy nadwyzce:', P(**F5)),
+        ('F5 + podzial nieprzyjetego miedzy biedne klasy miasta:', P(**dict(F5, share=True))),
+        ('czulosc: F5 bez "domy najpierw":', P(**dict(F5, houses=False))),
+        ('czulosc: F5, przeglad co 28 dob:', P(**dict(F5, fast=28))),
+        ('czulosc: F5, najwyzej +15%:', P(**dict(F5, fastMax=0.15))),
+        ('czulosc: F5 bez ciecia M6 (P trzyma przejscie):', P(**dict(F5, m6cut=False))),
+        ('czulosc: F5, R/P najnizej 0.25:', P(**dict(F5, mn=0.25))),
     ]
     res = {}
     for tag, p in sc:
         o, _ = run(towns, p, calib=cal)
         res[tag] = o
         show(tag, o, S0)
+    poorR = {t['id'] for t in towns if t['NR'] > 0 and t['KR'] / t['NR'] < 21}
+    poorP = {t['id'] for t in towns if t['NP'] > 0 and t['KP'] / t['NP'] < 30}
+    nr = sum(t['NR'] for t in towns if t['id'] in poorR) or 1.0; npp = sum(t['NP'] for t in towns if t['id'] in poorP) or 1.0
+    print('biedne R (%d miast ponizej 21 dni na starcie) / biedne P (%d miast ponizej 30 dni) - dni koszyka na starcie %.1f / %.1f:' % (
+        len(poorR), len(poorP), sum(t['KR'] for t in towns if t['id'] in poorR) / nr, sum(t['KP'] for t in towns if t['id'] in poorP) / npp))
+    for tag, p in [('S0', P())] + sc:
+        for dd in (160, 364):
+            _, st = run(towns, p, days=dd, calib=cal)
+            print('  %-75s d%d: R %5.1f dni, P %5.1f dni' % (tag[:75], dd, sum(x['KR'] for x in st if x['id'] in poorR) / nr, sum(x['KP'] for x in st if x['id'] in poorP) / npp))
     print('trendy ostatnich 28 dob przed d160 i d364 (zl/d): kiesy W, R, P, kasy')
     for tag, o in [('S0', S0)] + list(res.items()):
         print('  %-75s d132-160: W %+7.0f R %+7.0f P %+7.0f kasy %+7.0f | d336-364: W %+7.0f R %+7.0f P %+7.0f kasy %+7.0f' % (

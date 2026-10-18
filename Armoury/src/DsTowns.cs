@@ -490,7 +490,8 @@ namespace Armoury
         /// z KS, ktorego kasa stoi ponad 1.5 x zapas kupcow, ma co Ks Farm Surplus Review Days przeglad W GORE o przyrost kasy na dobe od poprzedniego przegladu (x 364 =
         /// zl/rok), najwyzej Ks Farm Surplus Review Max firmy; firma pana i korony w tym samym stosunku (czesc z oszczednosci ludu bez zmiany). Przyrost liczony od ostatniej
         /// podwyzki (bez liczenia drugi raz tych samych dob); kasa nie ponad progiem, oblezenie, zmiana krolestwa, zaleglosci - pomiar od nowa. Pamiec sesyjna (po wczytaniu
-        /// pierwszy przeglad po Ks Farm Surplus Review Days). Zloto sie nie rusza - zmienia sie nalezna rata (kontrola linii "platnicy - odbiorcy" jak dotad). Kazda osada
+        /// pierwszy przeglad po Ks Farm Surplus Review Days). Domy najpierw: miasto, w ktorym R albo P maja mniej niz dolna granica swojego pasma (KsFolkIncome.HousesFirst),
+        /// nie dostaje podwyzki - nadwyzka kupcow idzie do ich domow wyplata kupcom M6 (kappa 1). Zloto sie nie rusza - zmienia sie nalezna rata (kontrola linii "platnicy - odbiorcy" jak dotad). Kazda osada
         /// we wlasnym try, potkniecia liczone.
         /// </summary>
         private static void SurplusReview(int today, Settings s)
@@ -511,6 +512,9 @@ namespace Armoury
                     double inst = (f.FL + f.FC + f.FLf) / Weeks;
                     bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
                     if (g <= OverReserve * TownPurse.Reserve(t) || RemitOf(st) != 0 || arrears) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
+                    // domy najpierw: R albo P miasta ponizej dolnej granicy pasma - nadwyzka kupcow idzie do nich wyplata kupcom M6 (pelna stawka), firma bez podwyzki (model
+                    // simlud: biedne R/P 35 miast Essos d160 8.3 zamiast 5.6 dnia koszyka); pomiar od nowa
+                    if (KsFolkIncome.HousesFirst(st)) { f.SG0 = long.MinValue; f.SGDay = -1; KsFolkIncome.NoteHousesHeld(); continue; }
                     if (f.SG0 == long.MinValue || f.SGDay < 0) { f.SG0 = g; f.SGDay = today; continue; }
                     int span = today - f.SGDay;
                     if (span < days) continue;

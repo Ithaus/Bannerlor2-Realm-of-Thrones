@@ -36624,7 +36624,7 @@ NLU_RX = re.compile(
     r"stawka efektywna (?P<her>[\d.]+|-)%/d; stawka R/P dzis srednio (?P<hrr>[\d.]+|-)/(?P<hrp>[\d.]+|-)% \(od (?P<hhi>[\d.]+)% do (?P<hlo>[\d.]+)%\) "
     r"\| kasy miast z KS razem (?P<gold>-?\d+) \(miast (?P<nt>\d+), ponad 1\.5 x zapas kupcow (?P<nover>\d+), nadwyzka ponad 1\.5 x zapas (?P<over>-?\d+)\) "
     r"\| przeglad firmy wedlug nadwyzki kasy: podwyzek dzis (?P<rn>\d+) \(\+(?P<ra>-?\d+) zl/rok\), od startu sesji (?P<rns>\d+) \(\+(?P<ras>-?\d+) zl/rok\), "
-    r"przeglad zwykly bez obnizki przy nadwyzce dzis (?P<rnc>\d+) "
+    r"przeglad zwykly bez obnizki przy nadwyzce dzis (?P<rnc>\d+)(?:, wstrzymane - R/P miasta ponizej pasma \(nadwyzka najpierw do ich domow przez M6\) dzis (?P<rnh>\d+))? "
     r"\| czas (?P<ms>[\d.]+) ms \| potkniecia (?P<stum>\d+)")
 NLU_ERR = ("ERROR in KsFolkIncome", "ERROR in TownFolk.KsFolkIncome", "ERROR in SyncData.arm_ks_dochod", "ERROR in DsTowns.SurplusReview", "ERROR in DsTowns.SurplusHolds")
 

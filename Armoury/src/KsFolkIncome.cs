@@ -58,7 +58,9 @@ namespace Armoury
         private static readonly double[] _sumK = new double[3], _sumN = new double[3];
         private static long _ticks;
         // przeglad firmy wedlug nadwyzki kasy (DsTowns): doba (DayLine zeruje) i sesja
-        private static int _revN, _revNoCut, _revNS; private static double _revAmt, _revAmtS;
+        private static int _revN, _revNoCut, _revNS, _revHouse; private static double _revAmt, _revAmtS;
+        // miasta, w ktorych R albo P (z potrzeba) maja mniej niz dolna granica pasma - nadwyzka kupcow najpierw do ich domow (M6), bez podwyzki firmy wedlug nadwyzki
+        private static readonly HashSet<string> _poorRP = new HashSet<string>(StringComparer.Ordinal);
 
         // ------------------------------------------------------------ klucze
         private static Settings S { get { return Settings.Current; } }
@@ -102,7 +104,7 @@ namespace Armoury
         internal static void Reset()
         {
             for (int c = 0; c < 3; c++) _k[c].Clear();
-            _err.Clear(); _stum = 0; Zero(); _revNS = 0; _revAmtS = 0;
+            _err.Clear(); _stum = 0; Zero(); _revNS = 0; _revAmtS = 0; _poorRP.Clear();
         }
 
         private static void Zero()
@@ -116,7 +118,7 @@ namespace Armoury
             }
             _mFull[0] = _mFull[1] = _mRule[0] = _mRule[1] = _mPaid[0] = _mPaid[1] = 0;
             _hFull = _hPaid = 0; _hrR = _hrP = 0; _hrN = 0; _dTowns = 0; _ticks = 0;
-            _revN = _revNoCut = 0; _revAmt = 0;
+            _revN = _revNoCut = _revHouse = 0; _revAmt = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -152,6 +154,9 @@ namespace Armoury
                 _dTowns++;
                 string id = st.StringId ?? "";
                 bool zero = ZeroOn && facOk;
+                // domy najpierw (DsTowns.SurplusReview): R albo P z potrzeba ponizej dolnej granicy pasma - stan wczorajszej kotwicy, odswiezany co dobe
+                bool poorRP = (nR > 0 && Math.Max(0L, kr) < Lo(1) * nR) || (nP > 0 && Math.Max(0L, kp) < Lo(2) * nP);
+                if (id.Length > 0) { if (poorRP && RPOn) _poorRP.Add(id); else _poorRP.Remove(id); }
                 for (int c = 0; c < 3; c++)
                 {
                     bool on = c == 0 ? AllKindsOn : RPOn;
@@ -299,6 +304,17 @@ namespace Armoury
         /// <summary>DsTowns.Review / Renew: obnizka firmy wstrzymana przy nadwyzce kasy.</summary>
         internal static void NoteNoCut() { _revNoCut++; }
 
+        /// <summary>DsTowns.SurplusReview: R albo P miasta (z potrzeba) ponizej dolnej granicy pasma wedlug ostatniej doby ludu - nadwyzka kupcow idzie najpierw do ich domow
+        /// wyplata kupcom M6 (kappa R/P 1), bez podwyzki firmy; Ks Folk Income R P wylaczony - false (przeglad jak bez tej reguly).</summary>
+        internal static bool HousesFirst(Settlement st)
+        {
+            try { return RPOn && st != null && st.StringId != null && _poorRP.Contains(st.StringId); }
+            catch (Exception e) { Stumble("HousesFirst", e); return false; }
+        }
+
+        /// <summary>DsTowns.SurplusReview: podwyzka wstrzymana (domy najpierw).</summary>
+        internal static void NoteHousesHeld() { _revHouse++; }
+
         private static float Med(List<float> v) { if (v.Count == 0) return float.NaN; v.Sort(); return v[v.Count / 2]; }
         private static float MinOf(List<float> v) { if (v.Count == 0) return float.NaN; float m = v[0]; foreach (var x in v) if (x < m) m = x; return m; }
         private static string F(double v, string fmt) { return double.IsNaN(v) || double.IsInfinity(v) ? "-" : v.ToString(fmt, Inv); }
@@ -311,7 +327,7 @@ namespace Armoury
             {
                 var s = S;
                 if (s == null) return;
-                if (_dTowns == 0 && _revN == 0 && _revNoCut == 0) return;
+                if (_dTowns == 0 && _revN == 0 && _revNoCut == 0 && _revHouse == 0) return;
                 long t0 = Stopwatch.GetTimestamp();
                 long gold = 0, over = 0; int nT = 0, nOver = 0;
                 foreach (var t in Town.AllTowns)
@@ -369,6 +385,7 @@ namespace Armoury
                   .Append(" | kasy miast z KS razem ").Append(gold).Append(" (miast ").Append(nT).Append(", ponad 1.5 x zapas kupcow ").Append(nOver).Append(", nadwyzka ponad 1.5 x zapas ").Append(over).Append(')')
                   .Append(" | przeglad firmy wedlug nadwyzki kasy: podwyzek dzis ").Append(_revN).Append(" (+").Append(L(_revAmt)).Append(" zl/rok), od startu sesji ").Append(_revNS)
                   .Append(" (+").Append(L(_revAmtS)).Append(" zl/rok), przeglad zwykly bez obnizki przy nadwyzce dzis ").Append(_revNoCut)
+                  .Append(", wstrzymane - R/P miasta ponizej pasma (nadwyzka najpierw do ich domow przez M6) dzis ").Append(_revHouse)
                   .Append(" | czas ").Append(((_ticks + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_stum).Append('.');
                 Log.Info(sb.ToString());
             }
