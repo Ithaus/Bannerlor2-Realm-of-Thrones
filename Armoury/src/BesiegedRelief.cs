@@ -54,6 +54,15 @@ namespace Armoury
     ///    zwykly koszt wplywu), chyba ze armia krolestwa juz zbiera sie albo idzie na odsiecz tej osady.
     ///  - Odsiecz pod murami - droga gry: czekaja w pozycji obrony, ruszaja na oboz, gdy razem maja 1.2 x jego sile (a SCA145 zdejmuje oblezenie, gdy wrogie
     ///    druzyny w 95 jedn. maja 1.25 x sile obozu).
+    ///  - f12-odsiecz (18.10, klucz BesiegedReliefOnlyWhenReachable; diagnoza logu Jeffa WGRANIE 80: Krolewska Przystan wymagana 24.2k, zebrane 11.2k = cala armia
+    ///    Korony, 14 dob pod murami, werbunek regionow Korony 70 -> 3.5 na dobe): ODSIECZ BEZ SZANS ZWALNIA DRUZYNY. Zasieg krolestwa Z = zebrana odsiecz C + sila
+    ///    druzyn krolestwa, ktore przy swojej ostatniej mysli (najwyzej 24 h temu) dostaly od gry ocene obrony tej osady, a nie sa w zebranej odsieczy (czlonek armii
+    ///    liczony w armii wodza; przy zamku bez druzyn oblegajacych twierdze wroga - tych OB5 do zamku nie podbija). Prog P = min(R, 1.2 x sila obozu) - 1.2 to
+    ///    prog gry na atak odsieczy na oboz (MobilePartyAi.GetNearbyPartyDataWhileDefendingSettlement, num15 = 1.2f dla twierdzy). Gdy Z < P, krolestwo nie zbierze
+    ///    odsieczy, ktora gra rzuci na oboz - OB5 nie podbija ocen obrony tej osady (ani opcji armii wladcy): wracaja oceny gry (werbunek w osadzie, jedzenie,
+    ///    odsiecz innej oblezonej twierdzy krolestwa, ktora jest w zasiegu). Gdy krolestwo urosnie (Z >= P), regula wlacza sie sama. Pierwsze 13 h od wykrycia
+    ///    oblezenia bez tej bramki (wolna druzyna mysli co 6 h zegara AI - AiPartyThinkBehavior / ROT AIThinkPatch, DefaultThinkingPeriodInHours = 6 - a w oboz
+    ///    swiata 0-6 jej AI spi; po 13 h kazda druzyna w zasiegu juz raz pomyslala). Wylaczony klucz = jak przed f12 (podbicie az do zebrania R).
     /// Latka: postfiks Low na CampaignEventDispatcher.AiHourlyTick (po wszystkich nasluchach i po filtrze ROT AIThinkPatch.Patch1; tak jak WatchLaw) - wpieta
     /// zawsze, dziala przy kluczu. Stan oblezen liczony raz na godzine gry (lista oblezen gry + partie wojenne krolestw z oblezona twierdza). Bez zapisu.
     /// Linie: "Odsiecz (OB5): start sesji", "Odsiecz (OB5) poczatek", "Odsiecz (OB5) armia krola", "Odsiecz (OB5) koniec", "Odsiecz (OB5): dzien" (doba).
@@ -66,6 +75,10 @@ namespace Armoury
         private static readonly float[] Prio = { 1.5f, 1.3f, 1.1f };   // pierwszenstwo klasy (kazde > 1)
         private const float FloorBase = 0.5f;                            // najnizsza podstawa B (prog zmiany celu gry)
         private const float KingArmyEdge = 1.05f;                        // opcja armii wladcy ponad jego wlasna obrone
+        // f12-odsiecz: bramka zasiegu krolestwa
+        private const float GameEngage = 1.2f;                           // gra rzuca odsiecz na oboz twierdzy przy 1.2 x jego sile (MobilePartyAi, num15)
+        private const double ReachWindowHours = 24.0;                    // ocena obrony od gry starsza niz doba - druzyna poza zasiegiem
+        private const double ReachWarmupHours = 13.0;                    // 6 h zegara mysli AI + 6 h obozu swiata + 1 h zapasu: pierwsze godziny bez bramki
 
         private sealed class Siege
         {
@@ -74,6 +87,8 @@ namespace Armoury
             public readonly HashSet<MobileParty> In = new HashSet<MobileParty>();   // zebrani przy przeliczeniu godziny (+ zarezerwowani w tej godzinie)
             public bool ArmyOnWay;                                                   // armia krolestwa zbiera sie / idzie na odsiecz
             public Track T;
+            public float Reach, Floor;   // f12: zasieg krolestwa (zebrana + druzyny z ocena obrony od gry) i prog min(R, 1.2 x oboz) - przeliczane raz na godzine
+            public bool Ready;           // f12: minelo ReachWarmupHours od wykrycia (zasieg policzony ze wszystkich druzyn w zasiegu)
         }
 
         private sealed class Track
@@ -81,6 +96,9 @@ namespace Armoury
             public string Id, Name, KName, BesFaction, BesLeader; public Kingdom K; public Settlement St; public int Cls, Day0;
             public float Bes0, BesMax, Need0, CMax, LastC, LastNeed;
             public bool Captured;
+            public double Hour0;                                                          // f12: godzina wykrycia (pelna godzina gry)
+            public readonly Dictionary<MobileParty, double> EligAt = new Dictionary<MobileParty, double>();   // f12: druzyna -> godzina ostatniej mysli z ocena obrony od gry
+            public readonly HashSet<MobileParty> DayRel = new HashSet<MobileParty>();    // f12: druzyny zwolnione dzis bramka zasiegu (linia doby)
             public readonly HashSet<MobileParty> Eligible = new HashSet<MobileParty>();   // druzyny z ocena obrony od gry (w zasiegu)
             public readonly HashSet<MobileParty> Pulled = new HashSet<MobileParty>();     // druzyny podbite przez OB5
             public readonly HashSet<MobileParty> Seen = new HashSet<MobileParty>();       // druzyny kiedykolwiek w zebranej odsieczy
@@ -99,8 +117,10 @@ namespace Armoury
         private static readonly List<int> _tmpIdx = new List<int>();
         private static readonly List<Siege> _tmpSg = new List<Siege>();
         private static readonly HashSet<MobileParty> _dParties = new HashSet<MobileParty>();
+        private static readonly HashSet<MobileParty> _dRelParties = new HashSet<MobileParty>();   // f12: druzyny zwolnione dzis bramka zasiegu (bez podbicia gdzie indziej)
+        private static readonly List<MobileParty> _tmpGone = new List<MobileParty>();
         private static double _hour = -1.0;
-        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege;
+        private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege, _dRel;
         private static bool _patched; private static string _missing; private static MethodBase _target;
 
         private static Settings S { get { return Settings.Current; } }
@@ -110,7 +130,8 @@ namespace Armoury
         internal static void Reset()
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = 0;
+            _dRelParties.Clear(); _tmpGone.Clear();
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = 0;
         }
 
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -221,7 +242,7 @@ namespace Armoury
                         {
                             Id = st.StringId, Name = Nm(st), KName = Nm(k), K = k, St = st, Cls = cls, Day0 = Today,
                             BesFaction = Nm(camp.MapFaction), BesLeader = lead.LeaderHero != null ? Nm(lead.LeaderHero) : (lead.Name != null ? lead.Name.ToString() : "-"),
-                            Bes0 = bes, Need0 = sg.Need
+                            Bes0 = bes, Need0 = sg.Need, Hour0 = _hour
                         };
                         _tracks[ev] = t;
                         _dStarted++;
@@ -287,6 +308,8 @@ namespace Armoury
                         t.LastC = list[j].Committed;
                         if (list[j].Committed > t.CMax) t.CMax = list[j].Committed;
                     }
+                    // f12: zasieg krolestwa i prog (liczone zawsze - przy wylaczonym kluczu tylko nieuzywane)
+                    for (int j = 0; j < list.Count; j++) Reach(list[j]);
                 }
                 catch (Exception e) { Stumble("Rebuild.relief", e); }
             }
@@ -297,6 +320,38 @@ namespace Armoury
                 foreach (var kv in _tracks) if (!live.Contains(kv.Key) && (kv.Key == null || kv.Key.ReadyToBeRemoved || !Active(kv.Key))) gone.Add(kv.Key);
                 foreach (var ev in gone) Finish(ev, "bez zdarzenia konca (lista oblezen gry)");
             }
+        }
+
+        /// <summary>f12-odsiecz: zasieg krolestwa Z = zebrana C + sila druzyn krolestwa z ocena obrony tej osady od gry przy ostatniej mysli (najwyzej ReachWindowHours
+        /// temu), spoza zebranej odsieczy; czlonek armii liczy sie w armii wodza (Contrib), przy zamku bez druzyn oblegajacych twierdze wroga (OB5 ich do zamku nie
+        /// podbija). Prog P = min(R, 1.2 x sila obozu). Wpisy starsze niz okno, druzyny nieczynne i z innej frakcji wypadaja ze slownika. Blad - Ready = false
+        /// (bez bramki, droga sprzed f12), potkniecie liczone. Nie rzuca.</summary>
+        private static void Reach(Siege sg)
+        {
+            sg.Floor = Math.Min(sg.Need, GameEngage * sg.Besiegers);
+            sg.Reach = sg.Committed;
+            sg.Ready = false;
+            var t = sg.T;
+            if (t == null) return;
+            try
+            {
+                float r = sg.Committed;
+                _tmpGone.Clear();
+                foreach (var kv in t.EligAt)
+                {
+                    var mp = kv.Key;
+                    if (!mp.IsActive || _hour - kv.Value > ReachWindowHours || !ReferenceEquals(mp.MapFaction, t.K)) { _tmpGone.Add(mp); continue; }
+                    if (sg.In.Contains(mp)) continue;                                  // juz w zebranej odsieczy (C)
+                    if (mp.Army != null && mp.Army.LeaderParty != mp) continue;        // czlonek armii - w sile wodza albo idzie z armia gdzie indziej
+                    if (sg.Cls == CCastle && mp.BesiegedSettlement != null) continue;  // recenzja 14.10: oblegajacy twierdze wroga nie idzie do zamku
+                    r += Contrib(mp);
+                }
+                for (int i = 0; i < _tmpGone.Count; i++) t.EligAt.Remove(_tmpGone[i]);
+                _tmpGone.Clear();
+                sg.Reach = r;
+                sg.Ready = _hour - t.Hour0 >= ReachWarmupHours;
+            }
+            catch (Exception e) { sg.Ready = false; Stumble("Reach", e); }
         }
 
         private static bool Active(SiegeEvent ev)
@@ -353,12 +408,20 @@ namespace Armoury
                     if (sg != null) { _tmpIdx.Add(i); _tmpSg.Add(sg); if (e.Item2 > dMax) dMax = e.Item2; }
                     else if (e.Item2 > other) other = e.Item2;
                 }
+                // f12: ocena obrony od gry przy tej mysli - wpis do zasiegu krolestwa (godzina); oblezona twierdza krolestwa bez tej oceny - druzyna poza zasiegiem
+                for (int j = 0; j < list.Count; j++)
+                {
+                    var t = list[j].T;
+                    if (t == null) continue;
+                    if (_tmpSg.Contains(list[j])) { t.Eligible.Add(party); t.EligAt[party] = _hour; }
+                    else t.EligAt.Remove(party);
+                }
                 if (_tmpIdx.Count == 0) return;
-                for (int j = 0; j < _tmpSg.Count; j++) if (_tmpSg[j].T != null) _tmpSg[j].T.Eligible.Add(party);
                 if (party.Party.IsStarving) { _dStarve++; return; }   // najpierw jedzenie - droga gry
 
                 float b = Math.Max(Math.Max(other, FloorBase), dMax);
                 bool ownSiege = party.BesiegedSettlement != null;   // druzyna (wodz armii) sama oblega twierdze wroga
+                bool gateOn = s.BesiegedReliefOnlyWhenReachable, gated = false, raisedAny = false;
                 Siege top = null; float topScore = -1f; AIBehaviorData topData = default(AIBehaviorData);
                 for (int j = 0; j < _tmpIdx.Count; j++)
                 {
@@ -368,18 +431,26 @@ namespace Armoury
                     if (ownSiege && sg.Cls == CCastle) { _dOwnSiege++; continue; }
                     float rest = sg.Committed - (sg.In.Contains(party) ? Contrib(party) : 0f);
                     if (rest >= sg.Need) continue;   // odsiecz wystarczy bez tej druzyny
+                    // f12: krolestwo nie zbierze odsieczy, ktora gra rzuci na oboz (zasieg < min(R, 1.2 x oboz)) - bez podbicia, wracaja oceny gry
+                    if (gateOn && sg.Ready && sg.Reach < sg.Floor)
+                    {
+                        gated = true;
+                        if (sg.T != null) sg.T.DayRel.Add(party);
+                        continue;
+                    }
                     var e = scores[_tmpIdx[j]];
                     float nv = Prio[sg.Cls] * b + 0.01f * e.Item2;
                     if (nv > e.Item2)
                     {
                         var d = e.Item1;
                         partyThinkParams.SetBehaviorScore(in d, nv);
-                        _dRaised++; _dParties.Add(party);
+                        _dRaised++; _dParties.Add(party); raisedAny = true;
                         if (sg.T != null) { sg.T.Raised++; if (!sg.In.Contains(party)) sg.T.Pulled.Add(party); }
                     }
                     else nv = e.Item2;
                     if (nv > topScore) { topScore = nv; top = sg; topData = e.Item1; }
                 }
+                if (gated && !raisedAny) { _dRel++; _dRelParties.Add(party); }   // f12: zwolniona - bez podbicia do zadnej odsieczy
                 if (top == null) return;
 
                 // armia wladcy na odsiecz (gra zaklada ja sama w AiPartyThinkBehavior: WillGatherArmy + DefendSettlement -> Kingdom.CreateArmy, typ Defender)
@@ -548,6 +619,8 @@ namespace Armoury
                          + ", miasto " + (s != null ? s.BesiegedReliefTownForce : 0f).ToString("0.0#", Inv)
                          + ", zamek " + (s != null ? s.BesiegedReliefCastleForce : 0f).ToString("0.0#", Inv) + " (0 = klasa poza regula)"
                          + "; pierwszenstwo 1.5 / 1.3 / 1.1, podstawa >= 0.5; armia wladcy " + (s != null && s.BesiegedReliefKingsArmy ? "TAK" : "NIE")
+                         + "; odsiecz bez szans zwalnia druzyny (f12: zasieg krolestwa < min(wymagana, 1.2 x oboz), od 13 h po wykryciu) "
+                         + (s != null && s.BesiegedReliefOnlyWhenReachable ? "TAK" : "NIE")
                          + " | model oceny celu: " + tsm + ", model armii: " + amm + ".");
             }
             catch (Exception e) { Stumble("SessionStart", e); }
@@ -559,6 +632,7 @@ namespace Armoury
             {
                 if (!On) { ClearDay(); return; }
                 EnsureHour();
+                bool gateOn = S != null && S.BesiegedReliefOnlyWhenReachable;
                 int cap = 0, town = 0, castle = 0;
                 var sb = new StringBuilder(900);
                 var rows = new StringBuilder(600);
@@ -573,6 +647,13 @@ namespace Armoury
                             if (shown > 0) rows.Append("; ");
                             rows.Append(Nm(sg.St)).Append(" (").Append(ClassName[sg.Cls]).Append(", ").Append(Nm(sg.K)).Append(") zebrane ").Append(F0(sg.Committed))
                                 .Append(" / wymagane ").Append(F0(sg.Need)).Append(" (druzyn ").Append(sg.In.Count).Append(sg.ArmyOnWay ? ", z armia" : "").Append(")");
+                            // f12: zasieg krolestwa wobec progu (tylko przy kluczu; bez znakow ";" i "|" - czytniki dziela wiersze po nich)
+                            if (gateOn)
+                            {
+                                rows.Append(", zasieg krolestwa ").Append(F0(sg.Reach)).Append(" / prog ").Append(F0(sg.Floor));
+                                if (!sg.Ready) rows.Append(" (rozruch - pierwsze 13 h)");
+                                else if (sg.Reach < sg.Floor) rows.Append(" BEZ SZANS - zwolnionych dzis ").Append(sg.T != null ? sg.T.DayRel.Count : 0);
+                            }
                             shown++;
                         }
                     }
@@ -585,6 +666,8 @@ namespace Armoury
                   .Append(", oceny obrony podbite ").Append(_dRaised).Append(" razy u ").Append(_dParties.Count).Append(" druzyn, pominiete z glodu ").Append(_dStarve)
                   .Append(", opcje armii wladcy ").Append(_dKingOffer).Append(" (wladca bez druzyn do wezwania ").Append(_dKingNoCall).Append("), armie wladcy zalozone ").Append(_dArmies)
                   .Append(" (odsiecz zamku pominieta przy wlasnym oblezeniu druzyny ").Append(_dOwnSiege).Append(")")
+                  .Append(", odsiecz bez szans (zasieg krolestwa < min(wymagana, 1.2 x oboz)): zwolnione ").Append(_dRel).Append(" razy u ").Append(_dRelParties.Count).Append(" druzyn")
+                  .Append(gateOn ? "" : " (Besieged Relief Only When Reachable NIE - bez zwalniania)")
                   .Append(" | trwajace oblezenia: podbite druzyny potem w odsieczy ").Append(redir)
                   .Append(" | ").Append(shown > 0 ? rows.ToString() : "-")
                   .Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(").");
@@ -596,8 +679,9 @@ namespace Armoury
 
         private static void ClearDay()
         {
-            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = 0;
-            _dParties.Clear(); _endedRelief.Clear();
+            _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _dStumbles = _dOwnSiege = _dRel = 0;
+            _dParties.Clear(); _endedRelief.Clear(); _dRelParties.Clear();
+            foreach (var kv in _tracks) kv.Value.DayRel.Clear();
         }
     }
 
