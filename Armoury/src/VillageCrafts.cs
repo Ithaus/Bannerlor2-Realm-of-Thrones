@@ -227,6 +227,7 @@ namespace Armoury
                 _worksOnly = 0; _w2Skip = 0; _measDay = -1; _meas.Clear(); _deferLogged = false;
                 _measRound = 0; _owner = null;                                // f4b-inwest
                 _tally.Clear(); _w2Note = ""; _measW2 = null;
+                F4ZwClear();                                   // recenzja f4-pomiary: nacisk ZW od zera po wczytaniu / nowej kampanii (bez licznikow poprzedniej sesji)
             }
         }
 
@@ -1514,6 +1515,7 @@ namespace Armoury
                     double v = StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
                     if (v > best) { best = v; bc = c; }
                 }
+                if (F4On) { try { double h0; home.TryGetValue(s.Uid, out h0); F4ZwNote(s.Craft, bc, cur, best, sw, h0 * 0.5); } catch (Exception e) { Stumble("F4ZwNote", e); } }   // f4-pomiary: nacisk i przejscia (tylko liczniki; blad nie przerywa reguly)
                 if (bc < 0 || best < sw * Math.Max(0.02, cur)) { s.Held = 0; continue; }
                 s.Held += StepDays; _dPress++;
                 if (s.Held < hold) continue;
@@ -1534,6 +1536,58 @@ namespace Armoury
                 if (_notes.Count < 10) _notes.Add(nm + " (" + Name(di) + ") " + KsTab.Crafts[s.Craft] + "->" + KsTab.Crafts[bc] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(s.Cost) + " zl)");
                 Notify(di, s, bc, mt);
             }
+        }
+
+        // ------------------------------------------------------------ f4-pomiary (noc 17/18.10, przeglad ekonomii): nacisk reguly ZW i przejscia - tylko liczniki do linii
+        // Regula ZW porownuje przydatnosc ziemi x sqrt(indeks cen towarow zajecia) - bez ilosci, wartosci, kosztu i renty (inna niz A7 pod KS). Przeglad: NIE przepinac jej
+        // na obecne Income z A7 (przenioslo by nacisk 92% na droge bez KS) - najpierw pomiar: ile wiosek przy progu i dokad chca (z rekami: polowa ludzi w domu).
+        private static bool F4On { get { var s = Settings.Current; return s != null && s.MeasureCraftRule; } }
+        private static int _f4N, _f4Press; private static double _f4Hands, _f4PressHands;
+        private static readonly List<double> _f4Ratio = new List<double>();
+        private static readonly Dictionary<int, double[]> _f4Tr = new Dictionary<int, double[]>();
+
+        private static void F4ZwNote(int from, int to, double cur, double best, float sw, double hands)
+        {
+            _f4N++; _f4Hands += hands;
+            if (to < 0) return;
+            if (_f4Ratio.Count < 100000) _f4Ratio.Add(best / Math.Max(0.02, cur));
+            if (best < sw * Math.Max(0.02, cur)) return;
+            _f4Press++; _f4PressHands += hands;
+            double[] t; int k = from * 64 + to;
+            if (!_f4Tr.TryGetValue(k, out t)) { t = new double[2]; _f4Tr[k] = t; }
+            t[0] += 1; t[1] += hands;
+        }
+
+        private static void F4ZwClear() { _f4N = _f4Press = 0; _f4Hands = _f4PressHands = 0; _f4Ratio.Clear(); _f4Tr.Clear(); }
+
+        private static string F4ZwText()
+        {
+            if (!F4On) return "";
+            var sb = new StringBuilder(600);
+            var s = Settings.Current;
+            float sw = Math.Max(1.0f, s != null ? s.SideVillageCraftSwitch : 1.25f);
+            sb.Append(" | nacisk ZW (f4-pomiary, kroki od ostatniej linii): ocenionych ").Append(_f4N);
+            if (_f4Ratio.Count > 0)
+            {
+                _f4Ratio.Sort();
+                sb.Append(", iloraz najlepsze/max(0.02, biezace) med ").Append(_f4Ratio[(_f4Ratio.Count - 1) / 2].ToString("0.00", Inv)).Append(" q90 ").Append(_f4Ratio[(int)(0.9 * (_f4Ratio.Count - 1))].ToString("0.00", Inv));
+            }
+            sb.Append(", nad progiem x").Append(sw.ToString("0.00", Inv)).Append(' ').Append(_f4Press).Append(" wiosek (").Append(_f4N > 0 ? (100.0 * _f4Press / _f4N).ToString("0.0", Inv) : "-").Append("%), rak ")
+              .Append(_f4PressHands.ToString("0", Inv)).Append(" (").Append(_f4Hands > 0 ? (100.0 * _f4PressHands / _f4Hands).ToString("0.0", Inv) : "-").Append("%)")
+              .Append(", przejscia (top 10, wiosek/rak):");
+            if (_f4Tr.Count == 0) sb.Append(" -");
+            else
+            {
+                var l = new List<KeyValuePair<int, double[]>>(_f4Tr);
+                l.Sort((x, y) => y.Value[0] != x.Value[0] ? y.Value[0].CompareTo(x.Value[0]) : y.Value[1].CompareTo(x.Value[1]));
+                for (int i = 0; i < l.Count && i < 10; i++)
+                {
+                    int a = l[i].Key / 64, b = l[i].Key % 64;
+                    sb.Append(i == 0 ? " " : "; ").Append(a >= 0 && a < KsTab.NC ? KsTab.Crafts[a] : "?").Append("->").Append(b >= 0 && b < KsTab.NC ? KsTab.Crafts[b] : "?")
+                      .Append(' ').Append(l[i].Value[0].ToString("0", Inv)).Append('/').Append(l[i].Value[1].ToString("0", Inv));
+                }
+            }
+            return sb.ToString();
         }
 
         private static Dictionary<string, double> _rh; private static int _rhDay = -1;
@@ -1643,6 +1697,7 @@ namespace Armoury
               .Append(" | zmiany: nacisk ").Append(_dPress).Append(", zaczete ").Append(_dStarted).Append(", skonczone ").Append(_dDone).Append(", wstrzymane (inna wioska okregu) ").Append(_dBusy)
               .Append(", (udzial regionu) ").Append(_dBudget).Append(", zamrozone pracami ").Append(_dLocked).Append(", doby bez pelnej zaplaty ").Append(_dStall).Append(", porzucone ").Append(_dCancel)
               .Append(", zaplacone ").Append(_dPaid).Append(" zl").Append(_notes.Count > 0 ? " (" + string.Join("; ", _notes.ToArray()) + ")" : "")
+              .Append(F4ZwText())                                   // f4-pomiary (klucz Measure Craft Rule): nacisk ZW i przejscia "z -> na" (pusty napis przy kluczu wylaczonym)
               .Append(" | n(typ) z doby ").Append(_onDay).Append(':');
             f = true;
             var n = _n;
@@ -1658,7 +1713,7 @@ namespace Armoury
               .Append(" | ikona: ").Append(DistrictIcon.DayText())
               .Append(" | koszt ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia dzis ").Append(_st).Append(" (od wczytania ").Append(_stAll).Append(").");
             Log.Info(sb.ToString());
-            ZeroDay(); _notes.Clear(); _st = 0; _tally.Clear();
+            ZeroDay(); _notes.Clear(); _st = 0; _tally.Clear(); F4ZwClear();
         }
 
         /// <summary>Linia startu sesji (po KS i ksiedze wiosek): plik ziemi, wioski, zapis.</summary>

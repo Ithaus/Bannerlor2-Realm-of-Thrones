@@ -104,6 +104,8 @@ namespace Armoury
         // E3/4
         private static long _notWage, _notFromCar, _notFromNot, _notSkipped, _lordCarWage, _carSpent, _carPurseHero, _carPurseBand, _carPurseParty, _carPurseSettl, _carPurseTown;
         private static long _allPurseBand, _allPurseParty, _allPurseSettl, _carPurseOdd, _carPurseOddLost;
+        /// <summary>f4-pomiary (recenzja): zold karawan notabli z kas karawan oddany do sakiewek ludzi - licznik doby (MoneyLedger.Daily czyta przed Seal31B.Daily/ZeroDay; tylko odczyt).</summary>
+        internal static long NotFromCarToday { get { return _notFromCar; } }
         private static int _notN, _notMismatch, _lordCarN, _carSpentN, _carPurseN, _carPurseOddN;
         // E3/8a
         private static long _taxSeen, _taxZ, _taxToLords, _taxToTowns, _taxNoLord, _taxShort, _taxLinesCut, _unpaidCut;

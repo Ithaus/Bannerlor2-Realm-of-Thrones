@@ -224,6 +224,7 @@ namespace Armoury
             _clanNow = null; _clanErrLogged = false; _c4Lines = 0;
             ClearDay();
             Reset169();                                     // paczka 169: pierscien reszty 28 dob, zloto swiata na poczatku bloku
+            try { F4Reset(); } catch { }                    // f4-pomiary: okno wyniku handlowego karawan od zera (MoneyLedger.F4.cs)
         }
 
         private static void ClearDay()
@@ -1276,6 +1277,7 @@ namespace Armoury
                         try { Log.Info(ObiegWindowsLine(day, t169)); } catch (Exception e) { Log.Error("MoneyLedger.ObiegWindowsLine", e); }   // dolicza wlasny czas
                     }
                     try { Log.Info(PumpsLine(day)); } catch (Exception e) { Log.Error("MoneyLedger.PumpsLine", e); }   // N1(a) (noc 16.10): "Pompy - sztuczne przelewy (nekon)" - te same liczniki co "Obieg" (tylko log)
+                    try { F4CaravanDay(day, hold, _lastHold); } catch (Exception e) { Log.Error("MoneyLedger.F4CaravanDay", e); }   // f4-pomiary (klucz Measure Caravan Trade): wynik handlowy karawan co 7 dob (tylko log, przed ClearDay)
                 }
                 _lastSnap = end; _lastHold = hold; _first = false;
             }

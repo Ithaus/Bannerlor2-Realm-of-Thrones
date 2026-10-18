@@ -1477,6 +1477,7 @@ namespace Armoury
                     long p = Sum(a.Src), c = Sum(a.Sink);
                     if (c > 0) ZcNote(it, a.Sink);
                     KsNote(it, a, now, p, c);   // KS (kalibracja startu): zuzycie 1:1 i produkcja wsi doby wedlug towaru - tylko kopia liczb
+                    F4Pomiary.LedgerItem(it, day, now, p, c, a.Hold, HolderName, a.Src, a.Sink, a.Tr[TWagon], a.Tr[TCarBuy], a.Tr[TCarSell]);   // f4-pomiary (Measure Iron Wood Flow): ruda i drewno - kopia liczb (wlasny try)
                     bool trade = false;
                     foreach (var t in a.Tr) if (t != 0) { trade = true; break; }
                     if (now == 0 && p == 0 && c == 0 && !trade && a.Last <= 0) { a.Last = now; a.NewDay(); continue; }
@@ -1534,6 +1535,7 @@ namespace Armoury
                     }
                 }
                 string horseLine = HorseLine(day, hz);   // ZC1: linia koni (null - klucz wylaczony albo koni nie ma w ksiedze)
+                F4Pomiary.LedgerDayEnd(day);             // f4-pomiary (Measure Iron Wood Flow): tabory wsi, wsie i miasta raz na dobe, co 7 dob linie (wlasny try)
                 // ---- utarg wozow wedlug towaru
                 wagonLines.Sort((x, y) => y.Key.CompareTo(x.Key));
                 var wl = new StringBuilder();

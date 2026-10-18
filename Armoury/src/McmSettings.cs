@@ -7644,6 +7644,22 @@ namespace Armoury
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool DistrictIconPartCrafts { get; set; } = true;
 
+        [SettingPropertyBool("Measure Craft Rule", HintText = "log only, nothing in the game changes: once a week, and on the day the start calibration fills the stalls, the log gets a diagnosis of the rule that would let village parts change their work under the start calibration - how many parts would want to change at today's prices, at base prices and at the calibration's own prices, the ten most wanted changes with their hands, and a plain note that works are frozen while that rule is off; side villages outside the calibration get the same numbers in their daily line (off = no such lines)")]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool MeasureCraftRule { get; set; } = true;
+
+        [SettingPropertyBool("Measure Regale Shelf", HintText = "log only: every 28 days, when the hands at mines, salt pans, quarries and woods move with prices, the log also counts how many of those moves agree with the market town's stall (stall below its target - more hands, above twice the target - fewer hands) (off = no such line)")]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool MeasureRegaleShelf { get; set; } = true;
+
+        [SettingPropertyBool("Measure Caravan Trade", HintText = "log only: every 7 days the log gets the caravans' trading result - what they sold to and bought from towns, castles and villages, the wages they owe, the value of the goods in their packs, the notables' top-ups and the profit handed to their owners (off = no such line)")]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool MeasureCaravanTrade { get; set; } = true;
+
+        [SettingPropertyBool("Measure Iron Wood Flow", HintText = "log only: every 7 days the log gets where iron ore and hardwood went - stock by holder (town stalls, villages, village carts, merchant carts, caravans) and who used them up - and where the village carts carrying hardwood are heading, how long the wood has been on the road, and which towns have no firewood beyond their craftsmen's stock (off = no such lines)")]
+        [SettingPropertyGroup("Economy measurements (18.10)")]
+        public bool MeasureIronWoodFlow { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9554,6 +9570,10 @@ namespace Armoury
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
             s.DistrictIconPartCrafts = DistrictIconPartCrafts;
+            s.MeasureCraftRule = MeasureCraftRule;
+            s.MeasureRegaleShelf = MeasureRegaleShelf;
+            s.MeasureCaravanTrade = MeasureCaravanTrade;
+            s.MeasureIronWoodFlow = MeasureIronWoodFlow;
         }
 
         internal static void Apply()
