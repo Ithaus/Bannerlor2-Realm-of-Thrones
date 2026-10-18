@@ -2914,3 +2914,9 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
   Plany niezbiezne 18 (Essos -11.9% -> -7.5%). Skrajny test (wieczna zima) - do fali 5/6: ruda i akumulator zima.
 - 04:45 PDT: TEST ROCZNY fin90 = WGRANIE 79 DLL, armoury-ks-auto.flag (USUNAC!), 364 dob (sciezka Jeffa przez caly rok), at-fin90-rok.out.txt. Przerwac, gdyby Jeff chcial grac
   (zamknac gre, test/autotest-bitwa.ps1 -RestoreOnly, flagi usunac).
+- 05:25 PDT: FALA 5 GOTOWA (wf_9399700d-d24, 18 agentow, 6/6 build rc 0; scratchpad fala5-wynik.json): f5-a7 6873c428 (sygnal KS dla A7: cena cienia Planu x gradient ziemi x odchylka rynku
+  +-15%, wygladzony; KsSwitchSignalRule TAK - zajecia pod KS zmieniaja sie z hamulcem Jeffa; fin88: pod presja 2.6-9.5% blokow zamiast 90%; szacunek 1-4% na pore roku), f5-ruda 958a15f3
+  (rece przy zlozach za rynkiem, drewno dla dymarek na kredyt, minerały w rampie KS), f5-lud 0054baca (zarobek wszystkich rodzajow + R/P do koszyka KS, danina 1% w miastach KS, firmy za nadwyzka),
+  f5-zajecia dff070cd (neutralny start: pomiar pomijal wsie z pelnym magazynem; SideVillageCrafts/DistrictIconFromSum z powrotem TAK), f5-koszt 1db490b9 (szczyt A7: diagnoza na watku, KsCostFast2),
+  f5-bitwa 8ffc7695 (przegrane w testach = UKLAD TESTU: czempioni bez kompletu, piescia i bez zbroi, kara DTE morale 20; AutotestBattleKit - tylko autotest). Galezie na GitHub.
+- 05:27 PDT: workflow wf_d01b4c76-eca (scalenie4: 6 galezi fali 5 do noc-ks4 od ac03aa25 + 3 recenzje). Test roczny fin90 (WGRANIE 79) w toku.
