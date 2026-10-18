@@ -230,6 +230,7 @@ namespace Armoury
                     if (hk != _hourKey) { _hourKey = hk; _hourAcc = 0; }
                     _hourAcc += d;
                     if (_hourAcc > _hourMaxAcc) _hourMaxAcc = _hourAcc;
+                    MapSpeedProfile.HourCost(hk, d);   // f9-predkosc: koszt wedlug godziny doby i flaga "klatka z godzina" (tylko log)
                 }
             };
         }

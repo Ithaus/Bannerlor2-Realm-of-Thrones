@@ -39,7 +39,13 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Log.Error("OnSubModuleLoad", e); }
+            // f9-predkosc: przyciski biegu na pasku mapy (UIExtenderEx: wstawka prefabu MapBar + mixin MapTimeControlVM) - rejestracja przed pierwszym ruchem paska,
+            // wlasny try i metoda NoInlining (brak zestawu UIExtenderEx = linia w logu, reszta modulu bez zmian)
+            try { SpeedUiRegister(); } catch (Exception e) { Log.Error("MapSpeedUi.Register (UIExtenderEx)", e); }
         }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void SpeedUiRegister() { MapSpeedUi.Register(); }
 
         /// <summary>Modele lataamy dopiero gdy wszystkie mody sa zaladowane.</summary>
         protected override void OnBeforeInitialModuleScreenSetAsRoot()
@@ -139,6 +145,7 @@ namespace Armoury
                 // E4/3 (108n): 1 czlowiek = 1/k osady (tabory wsi, lodzie rybackie, pobor wymuszony, zadania gracza); we wlasnym try - jej wywrotka nie moze zatrzymac latek ponizej
                 try { PeopleUnit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleUnit.ApplyAll", e); }
                 MapClock.ApplyAll(_harmony);
+                try { MapSpeed.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapSpeed.ApplyAll", e); }   // f9-predkosc: przyciski biegu x1 / x4 / x8 - postfiks MapTimeControlVM.Tick (po zegarze paska)
                 Levy.ApplyAll(_harmony);
                 try { PeopleLevy.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PeopleLevy.ApplyAll", e); }   // GL-4 (P4): tylko Harmony - latki modelu milicji gry i BK zaklada PeopleLevy.EnsureHooks W KAMPANII (CLAUDE.md 7: pole statyczne GameTexts w modelu gry)
                 VolunteerKit.ApplyAll(_harmony);

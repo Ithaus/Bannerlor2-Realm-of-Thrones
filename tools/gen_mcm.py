@@ -425,6 +425,9 @@ RANGES = {
     'DistrictWorksAiWorldPace': (0.0, 0.1, "0.000"),
     # f5-a7 (noc 17/18.10): pasmo odchylenia rynku w sygnale A7 - kod przycina do 0..0.5 (StartCalibration.A7sBand)
     'KsSwitchMarketBand': (0.0, 0.5, "0.00"),
+    # f9-predkosc (18.10): biegi przyciskow mapy - kod przycina do 2..16 i 2..32 (MapSpeed.FastOf / VeryFastOf)
+    'MapSpeedFast': (2, 16, "0"),
+    'MapSpeedVeryFast': (2, 32, "0"),
 }
 
 def gen(module_dir, ns, display):
