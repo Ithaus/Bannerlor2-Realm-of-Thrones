@@ -3031,3 +3031,10 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
 - 12:20 PDT: drogi2 (2 biegi zdjec, kod 0, ERROR 0, zapisy nietkniete, flaga usunieta): wariant A (gesto, alfa 0.55, FF7E7466) - ciagla, miekka sciezka ziemi, wyglada naturalnie;
   wariant B (mud_a) prawie niewidoczny. Wariant A wpisany jako domyslny wyglad w w-toku/f11-drogi **2f24caa6** (69k decali, stawianie 75 ms raz na mape). MapSideRoads dalej NIE.
   Zdjecia A pokazane Jeffowi.
+- 12:40 PDT: f14-fin92 GOTOWE (wf_83181c62-398; scratchpad f14-wynik.txt): f14-ksiega 16b4917c (mieso +3 = dar BK GiveFood dla bandy herszta - nazwany w ksiedze; deski ZC1-19 = przesuniecie
+  dnia w checkerze; drewno -51 NIEZNALEZIONE - linia diagnozy A17 D5); f14-wsie 9e84ca34 (BEZ zmiany gry: brak wycieku - kiesy wsi rosly do 7.46 mln przed koszykiem KS i schodza; checker
+  NDS-3a z nachylenia; na koncu biegu nadal -0.22%/d, wsi < 1000 zl 2.7% -> 11.5%; nizszy zold armii = mniej dla wsi); f14-rynek 896412ee (K4 ClothExportInPrice - rzemioslo 148 liczy
+  skore/plotno po cenie wlasnego targu po pomiarze wywozu; KsCtlOwnFood - Essos fish; welna Essos NIENAPRAWIONA - chroniczna niezbieznosc Planu); f14-miary 38013810 (NDS-9/7b: przyczyna
+  potwierdzona - renty/zwrot wedlug potrzeby; armie -7% (108k vs 117k), nie gloduja (niezaplacony zold 0.03%), skarbce +17k/d (57.2 mln); NKA-1 diagnoza; NBD-2 to zachowanie gry).
+  DO DECYZJI JEFFA (po WGRANIU 81): skarbiec krolestwa rosnie, armie -7% - czy skarbiec ma w wojnie doplacac takze srednim rodom (wieksze W5b)? welna Essos; dar BK herszta z niczego.
+- 12:45 PDT: SCALENIE6 (scalenie6.js): f13-doba (z f9) + f14 x4 + f10-uklad + f11-drogi do noc-ks4 8cd7b556, 3 recenzje + weryfikacja + poprawki.
