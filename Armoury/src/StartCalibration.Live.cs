@@ -473,15 +473,16 @@ namespace Armoury
                 return;
             }
             _undoLogged = false;
-            var byS = new Dictionary<Settlement, DailyLife.KsRec>();
+            int cap = SwCostFast ? _live.Count : 0;                 // ks-koszt T10: slowniki doby od razu w rozmiarze (bez przebudow; kolejnosc wpisow - kolejnosc dopisania, jak dotad)
+            var byS = new Dictionary<Settlement, DailyLife.KsRec>(cap > 0 ? recs.Count : 0);
             foreach (var r in recs) if (r.St != null) byS[r.St] = r;
-            var rates = new Dictionary<Village, VRate>();
+            var rates = new Dictionary<Village, VRate>(cap);
             var side = new Dictionary<string, double>(StringComparer.Ordinal);
             uint lay; bool layout = LayoutMatches(out lay);
             var mk = new double[ItemCount]; var tfMade = new double[ItemCount];
             var mkByM = new double[2 * ItemCount];                         // na targ jutro (pelna stawka KS) wedlug rynku - zapas celu rampy
-            var zv = new Dictionary<Village, float[]>();                   // ZC4: koszyk wsi (sztuki/d, pelna lambda) - zakupy (pelny; kiesa i drabina decyduja)
-            var zvp = new Dictionary<Village, float[]>();                  // ZC4: koszyk zaplacony z Planu - popyt ceny i wsad ZC5 (recenzja 17.10)
+            var zv = new Dictionary<Village, float[]>(cap);                // ZC4: koszyk wsi (sztuki/d, pelna lambda) - zakupy (pelny; kiesa i drabina decyduja)
+            var zvp = new Dictionary<Village, float[]>(cap);               // ZC4: koszyk zaplacony z Planu - popyt ceny i wsad ZC5 (recenzja 17.10)
             int nv = 0, ntf = 0, stale = 0; long tfPaid = 0; int tfPieces = 0, tfUnpaid = 0;
             double ownKcal = 0, kcalNeed = 0;
             int granUp = _granFloorUp, granAbove = _granKsAbove, granRel = _granReleased;          // Famine.Daily biegnie wczesniej w tej samej dobie
