@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
@@ -22,10 +23,14 @@ namespace Armoury
     ///    gdy kiesa wsi nie starcza na drewno z polki miasta handlowego, kupcy tego miasta daja brakujace drewno na kredyt - drewno z polki do dymarki (ramka ksiegi
     ///    towarow FBloom, jak zakup), bez zaplaty w tej chwili; wies ma RACHUNEK u kupcow (wartosc po cenie targu, doba). Warunki: lupa sprzedana temu miastu (cena
     ///    sprzedazy gry) warta wiecej niz drewno, ktore spala (WoodPerBloom x cena drewna) - kredyt tylko na wytop, ktory sie oplaca przy dzisiejszych cenach; dlug
-    ///    najwyzej 7 dob potrzeby dymarki ponad las okregu; kasa miasta >= dlug (kupcy maja z czego czekac); jeden wierzyciel naraz; najstarszy rachunek starszy niz
+    ///    najwyzej 7 dob potrzeby dymarki ponad las okregu; kasa miasta >= caly otwarty kredyt kupcow tego miasta (drewno dymarek wszystkich kopaln + rachunki jedzenia
+    ///    KS-H, KsFoodCredit.OwedBySource - recenzja: dotad tylko dlug tej wsi) - kupcy maja z czego czekac; jeden wierzyciel naraz; najstarszy rachunek starszy niz
     ///    Ks Consign Overdue Days (jak KS-H) - nowego kredytu nie ma.
     ///    Splata od najstarszego rachunku (zawsze, gdy jest dlug - takze przy kluczu wylaczonym: drewno juz wydane): (a) przy powrocie wozu do wsi macierzystej
     ///    (VillageTakings, ostatni krok okna - po F4b, pracach okregu i daninie DS, ktorych podstawa i liczniki zostaja bez zmian) - z reszty przyrostu kiesy w tym oknie;
+    ///    w ksiedze pieniadza jak daniny DS i prace okregu (recenzja): migawka kiesy okna przesunieta o splate (MoneyLedger.CartWorksInWindow - utarg wsi brutto,
+    ///    splata nie jest "zniklo"; TownFolk/DailyLife.NoteVillageReturn widza brutto) i przelew poza tickiem nazwany po obu stronach (Note169 "inne": kiesa wsi -,
+    ///    kasa miasta-wierzyciela +);
     ///    (b) w Bloomery.Daily przed nowym zakupem - najwyzej 1/4 kiesy (jak rata przebudowy A7). Zloto: kiesa wsi -> kasa miasta-wierzyciela (TownFolk.Sale - jak
     ///    zaplata za drewno z polki). Splacone zloto to zaplata za drewno - przy F4b dopisane do rachunku za drewno (pan bierze dzialke od utargu bez kosztu drewna, jak
     ///    przy zakupie za gotowke). Przepadek jak w KS-H: wojna miedzy miastem-wierzycielem a wsia albo wierzyciel nie jest juz miastem - roszczenie znika ("kupcy
@@ -75,10 +80,13 @@ namespace Armoury
         private static int _f5Lent, _f5LentN, _f5NoProfit, _f5AtCap, _f5Stale, _f5TownPoor, _f5PayCartN, _f5PayPurseN, _f5LostN, _f5Stum, _f5StumDay;
         private static long _f5LentZl, _f5PayCart, _f5PayPurse, _f5Lost, _f5Prev = -1;
         private static readonly HashSet<Village> _f5LentV = new HashSet<Village>();
+        // recenzja (kasa miasta >= kredyt): otwarty kredyt kupcow wedlug miasta-wierzyciela - drewno dymarek (_f5cred) + rachunki jedzenia KS-H (KsFoodCredit.OwedBySource);
+        // liczone raz na dobe przy pierwszym kredycie, potem + udzielone; splaty tej doby nie zmniejszaja (strona ostrozna)
+        private static Dictionary<Settlement, long> _f5Exp; private static int _f5ExpDay = -1;
 
         private static void F5Reset()
         {
-            _f5ring.Clear(); _f5cred.Clear(); _f5pending = null; _f5LentV.Clear();
+            _f5ring.Clear(); _f5cred.Clear(); _f5pending = null; _f5LentV.Clear(); _f5Exp = null; _f5ExpDay = -1;
             _f5Lent = _f5LentN = _f5NoProfit = _f5AtCap = _f5Stale = _f5TownPoor = _f5PayCartN = _f5PayPurseN = _f5LostN = _f5Stum = _f5StumDay = 0;
             _f5LentZl = _f5PayCart = _f5PayPurse = _f5Lost = 0; _f5Prev = -1;
         }
@@ -170,7 +178,8 @@ namespace Armoury
                 long cap = (long)F5CreditDays * Math.Max(1, (int)Math.Ceiling(need)) * price;
                 long room = cap - owed0;
                 if (room < price) { _f5AtCap += shortN; return; }
-                long townRoom = (long)town.Gold - owed0;                                                  // kupcy maja z czego czekac: kasa miasta >= dlug
+                long exp = F5Exposure(mk, today);                                                         // recenzja: caly otwarty kredyt kupcow tego miasta (z dlugiem tej wsi)
+                long townRoom = (long)town.Gold - exp;                                                    // kupcy maja z czego czekac: kasa miasta >= caly kredyt
                 if (townRoom < price) { _f5TownPoor += shortN; return; }
                 int k = (int)Math.Min(shortN, Math.Min(room / price, townRoom / price));
                 k = Math.Min(k, shelf.GetItemNumber(wood));
@@ -191,9 +200,32 @@ namespace Armoury
                 if (last != null && (last.Day == today || c.B.Count >= F5MaxBills)) last.Left += zl;   // ta sama doba albo pelna lista - do najnowszego (jak KS-H)
                 else c.B.Add(new F5Bill { Day = today, Left = zl });
                 _f5Lent += k; _f5LentZl += zl;
+                if (_f5Exp != null) _f5Exp[mk] = exp + zl;
                 if (_f5LentV.Add(v)) _f5LentN++;
             }
             catch (Exception e) { F5Stumble("Lend", e); }
+        }
+
+        /// <summary>Recenzja (kasa miasta >= kredyt): otwarty kredyt kupcow miasta `mk` - drewno dymarek wszystkich kopaln z tym wierzycielem i rachunki jedzenia KS-H,
+        /// w ktorych to miasto jest zrodlem (KsFoodCredit.OwedBySource). Pamiec doby (zbudowana raz, przy pierwszym kredycie doby). Nie rzuca.</summary>
+        private static long F5Exposure(Settlement mk, int today)
+        {
+            if (mk == null) return 0;
+            if (_f5Exp == null || _f5ExpDay != today)
+            {
+                var e = new Dictionary<Settlement, long>();
+                try { foreach (var kv in KsFoodCredit.OwedBySource()) if (kv.Key != null && kv.Value > 0) e[kv.Key] = kv.Value; }
+                catch (Exception ex) { F5Stumble("Exposure(KS-H)", ex); }
+                foreach (var c in _f5cred.Values)
+                {
+                    if (c == null || c.Creditor == null) continue;
+                    int o = c.Owed; if (o <= 0) continue;
+                    long v; e.TryGetValue(c.Creditor, out v); e[c.Creditor] = v + o;
+                }
+                _f5Exp = e; _f5ExpDay = today;
+            }
+            long r; _f5Exp.TryGetValue(mk, out r);
+            return r;
         }
 
         // ------------------------------------------------------------ kredyt: splata
@@ -240,8 +272,10 @@ namespace Armoury
         }
 
         /// <summary>VillageTakings.EnterPostfix (woz oddal utarg we wsi MACIERZYSTEJ; ostatni krok okna - po F4b, pracach okregu i daninie DS): splata dlugu z reszty
-        /// przyrostu kiesy w tym oknie (`grown` - utarg wsi po dzialce pana, 112, zwrocie F4b, pracach okregu i daninie). Brak dlugu - nic. Nie rzuca.</summary>
-        internal static void F5CreditAtCart(Village home, long grown)
+        /// przyrostu kiesy w tym oknie (`grown` - utarg wsi po dzialce pana, 112, zwrocie F4b, pracach okregu i daninie). Ksiega pieniadza (recenzja) jak daniny DS
+        /// (DsVillage.DuesAtCart) i prace okregu (DistrictWorks.OnCartReturn): migawka kiesy okna powrotu wozu przesunieta o splate (utarg wsi brutto - splata nie jest
+        /// "z utargu wsi zniklo"), przelew poza tickiem nazwany Note169 "inne" po obu stronach (kiesa wsi -, kasa miasta-wierzyciela +). Brak dlugu - nic. Nie rzuca.</summary>
+        internal static void F5CreditAtCart(Village home, long grown, MobileParty cart)
         {
             if (home == null || grown <= 0 || (_f5cred.Count == 0 && _f5pending == null)) return;
             try
@@ -249,8 +283,15 @@ namespace Armoury
                 if (_f5pending != null) F5Resolve();
                 F5Credit c;
                 if (!_f5cred.TryGetValue(home, out c) || c.B.Count == 0) return;
+                var creditor = c.Creditor;
                 int paid = F5Pay(home, c, (int)Math.Min(int.MaxValue, grown));
-                if (paid > 0) { _f5PayCart += paid; _f5PayCartN++; }
+                if (paid > 0)
+                {
+                    _f5PayCart += paid; _f5PayCartN++;
+                    MoneyLedger.CartWorksInWindow(cart, paid, 0);                              // okno powrotu wozu: kiesa wsi z utargu brutto (splata nie jest "zniklo")
+                    MoneyLedger.Note169(MoneyLedger.N169Other, home.Settlement, -paid);        // kiesa wsi poza tickiem - nazwane ("inne")
+                    if (creditor != null) MoneyLedger.Note169(MoneyLedger.N169Other, creditor, paid);   // kasa miasta-wierzyciela poza tickiem - nazwane ("inne")
+                }
             }
             catch (Exception e) { F5Stumble("CreditAtCart", e); }
         }
@@ -293,7 +334,7 @@ namespace Armoury
                 sb.Append("Ruda kredyt drewna (f5-ruda): dzien ").Append(today).Append(" | klucz Bloomery Wood Credit ").Append(on ? "TAK" : "NIE (bez nowego kredytu, splaty dalej)")
                   .Append(" | drewno na kredyt dzis ").Append(_f5Lent).Append(" ladunkow za ").Append(_f5LentZl).Append(" zl w ").Append(_f5LentN).Append(" kopalniach (z polki miasta handlowego do dymarki, bez zaplaty w tej chwili)")
                   .Append("; odmowy (ladunki): bez zysku przy dzisiejszych cenach ").Append(_f5NoProfit).Append(", limit ").Append(F5CreditDays).Append(" dob potrzeby ").Append(_f5AtCap)
-                  .Append(", inny wierzyciel albo rachunek starszy niz ").Append(F5OverdueDays).Append(" dob ").Append(_f5Stale).Append(", kasa miasta mniejsza od dlugu ").Append(_f5TownPoor)
+                  .Append(", inny wierzyciel albo rachunek starszy niz ").Append(F5OverdueDays).Append(" dob ").Append(_f5Stale).Append(", kasa miasta mniejsza od calego kredytu jej kupcow (drewno + jedzenie KS-H) ").Append(_f5TownPoor)
                   .Append(" | splaty (kiesy wsi -> kasy miast-wierzycieli): przy powrocie wozu ").Append(_f5PayCart).Append(" zl (").Append(_f5PayCartN).Append("), z kiesy wsi ")
                   .Append(_f5PayPurse).Append(" zl (").Append(_f5PayPurseN).Append(")")
                   .Append(" | przepadle (wojna miasta-wierzyciela z wsia albo wierzyciel nie jest miastem - kupcy stracili, zadna moneta nie powstaje) ")

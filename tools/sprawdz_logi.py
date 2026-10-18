@@ -1408,7 +1408,9 @@ Uzycie (Python 3, tylko odczyt):
                     x1.05, S > 2T pelny x0.95, dymarka bez drewna >= 50% tygodnia x0.95) i "Ruda kredyt drewna (f5-ruda): dzien N" (kredyt kupcow na drewno dymarek; tozsamosc
                     otwarty wczoraj + nowy - splaty - przepadle = otwarty dzis). Okno konca biegu: ostatnie 28 dob pelnego KS (lambda ZC4 >= 0.99). NRU-0 linie paczki
                     (0 nierozpoznanych), NRU-1 krok co 7 dob bez dziur, NRU-2 decyzje zgodne z rynkiem i suma decyzji = wpisy, NRU-3 rece przy zelazie >= +10% w biegu, gdy rynek
-                    byl w braku w wiekszosci krokow (>= 3 kroki; inaczej INFO), NRU-4 stawka KS zelaza i wytop 7 dob (INFO), NRU-5 tozsamosc kredytu (reszta 0 w kazdej dobie),
+                    byl w braku w wiekszosci krokow (>= 3 kroki; inaczej INFO); recenzja: obok sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem) - zamierzony wzrost
+                    (po mnoznikach) wobec rak zjedzonych sufitem, rece innych zloz oddane zelazu, odsetek rak zelaza na suficie przed krokiem; NIE przy sufcie, ktory zjada
+                    >= 50% zamiaru albo trzyma >= 50% rak zelaza = DECYZJA (sufit na wpis jak w Planie albo pierwszenstwo zelaza - decyzja Jeffa), NRU-4 stawka KS zelaza i wytop 7 dob (INFO), NRU-5 tozsamosc kredytu (reszta 0 w kazdej dobie),
                     NRU-6 kredyt: otwarty na koniec <= 200000 zl i przepadle (wojna) <= 20% udzielonego, NRU-7 = NOP-7 ruda: mediana indeksu <= 2.5 i miasta bez rudy <= 40 (ETAP lepiej
                     niz fin88 3.06/57.2; bez KS 0.63/12), NRU-8 = NOP-8 'kopalnia bez wegla' <= 28.1 lup/d (bez KS; ETAP < 45.4 fin88), NRU-9 zapas rudy na polkach miast
                     >= 1700 srednio okna i zapas swiata >= -5/d (ETAP > 1185 fin88; bez KS 5059), NRU-10 lupy wsi >= 255/d (ETAP > 248 fin88; bez KS 271), NRU-11 potkniecia
@@ -43363,16 +43365,20 @@ NRU_W = re.compile(r"^Ruda KS \(f5-ruda\): dzien (\d+) \| klucz Ks Iron Hands Fo
                    r"Essos: polki (\d+) / cel (\d+) \(([^)]*)\), brak (\d+) w (\d+) miastach, bez rudy (\d+) z (\d+) miast -> (BRAK|PELNY|PASMO|BEZ CELU)[^|]*\| "
                    r"wpisow zelaza (\d+): w gore (\d+), w dol \(rynek pelny\) (\d+), w dol \(dymarka bez drewna\) (\d+), bez zmian: dymarka czesciowo bez drewna (\d+), "
                    r"bez danych wytopu (\d+), pasmo (\d+), bez celu (\d+); bloki przyciete sufitem (\d+), w przebudowie \(pominiete\) (\d+) \| "
-                   r"rece przy zelazie: Westeros (\d+) -> (\d+), Essos (\d+) -> (\d+) \(razem ([^)]*)\) \| "
+                   r"sufit bloku \([^)]*\): blokow z zelazem (\d+), na suficie przed krokiem (\d+) \(rece przy zelazie (\d+) = (\d+)% rak zelaza\), "
+                   r"przyciete po wzroscie (\d+) \(zelazo -(\d+) rak z zamiaru, inne zloza -(\d+) rak -> do zelaza\), nad sufitem bez wzrostu \([^)]*\) (\d+) \| "
+                   r"rece przy zelazie: Westeros (\d+) -> (\d+), Essos (\d+) -> (\d+) \(razem ([^;)]*); zamiar po mnoznikach ([^)]*)\) \| "
                    r"stawka KS zelaza na jutro \(wsie, szt\./d\): Westeros (\d+) w (\d+) wsiach, Essos (\d+) w (\d+) wsiach \| "
                    r"wytop 7 dob \(dymarki\): Westeros model (\d+), bez drewna (\d+) \(\d+%\), Essos model (\d+), bez drewna (\d+) \(\d+%\); kopalnie z drewnem (\d+), czesciowo (\d+), bez drewna (\d+) \| "
                    r"pieniadze i towar: [^|]*\| czas (\S+) ms \| potkniecia (\d+)\.$")
 (NW_DAY, NW_EVERY, NW_D0, NW_SW, NW_TW, NW_RW, NW_DW, NW_NSW, NW_NEW, NW_NTW, NW_DECW, NW_SE, NW_TE, NW_RE, NW_DE, NW_NSE, NW_NEE, NW_NTE, NW_DECE,
- NW_IN, NW_UP, NW_DNF, NW_DNS, NW_PART, NW_NODATA, NW_BAND, NW_NOT, NW_CAP, NW_BUSY, NW_H0W, NW_H1W, NW_H0E, NW_H1E, NW_HPCT, NW_RATEW, NW_RNW, NW_RATEE, NW_RNE,
- NW_MW, NW_UW, NW_ME, NW_UE, NW_OK, NW_PARTM, NW_BADM, NW_MS, NW_STUM) = range(47)
+ NW_IN, NW_UP, NW_DNF, NW_DNS, NW_PART, NW_NODATA, NW_BAND, NW_NOT, NW_CAP, NW_BUSY,
+ NW_BLK, NW_ATCAP, NW_HAT, NW_HATPCT, NW_CAPN, NW_CAPIRON, NW_CAPOTHER, NW_OVER,
+ NW_H0W, NW_H1W, NW_H0E, NW_H1E, NW_HPCT, NW_HMIDPCT, NW_RATEW, NW_RNW, NW_RATEE, NW_RNE,
+ NW_MW, NW_UW, NW_ME, NW_UE, NW_OK, NW_PARTM, NW_BADM, NW_MS, NW_STUM) = range(56)
 NRU_CRED = "Ruda kredyt drewna (f5-ruda): dzien "
 NRU_C = re.compile(r"^Ruda kredyt drewna \(f5-ruda\): dzien (\d+) \| klucz Bloomery Wood Credit (TAK|NIE)[^|]*\| drewno na kredyt dzis (\d+) ladunkow za (\d+) zl w (\d+) kopalniach[^;]*; "
-                   r"odmowy \(ladunki\): bez zysku przy dzisiejszych cenach (\d+), limit \d+ dob potrzeby (\d+), inny wierzyciel albo rachunek starszy niz \d+ dob (\d+), kasa miasta mniejsza od dlugu (\d+) \| "
+                   r"odmowy \(ladunki\): bez zysku przy dzisiejszych cenach (\d+), limit \d+ dob potrzeby (\d+), inny wierzyciel albo rachunek starszy niz \d+ dob (\d+), kasa miasta mniejsza od calego kredytu jej kupcow \(drewno \+ jedzenie KS-H\) (\d+) \| "
                    r"splaty \([^)]*\): przy powrocie wozu (\d+) zl \((\d+)\), z kiesy wsi (\d+) zl \((\d+)\) \| przepadle \([^)]*\) (\d+) zl \((\d+)\) \| otwarty kredyt (\d+) zl w (\d+) kopalniach; "
                    r"(?:kontrola: otwarty wczoraj (\d+) \+ nowy \d+ - splaty \d+ - przepadle \d+ - otwarty dzis = reszta (-?\d+)|kontrola od nastepnej doby) \| najwieksze dlugi: .*? \| "
                    r"potkniecia dzis (\d+) \(sesja (\d+)\)\.$")
@@ -43393,6 +43399,7 @@ NRU_COAL_MAX, NRU_COAL_BASE = 28.1, 45.4         # NRU-8 = NOP-8 (fin88 45.4; be
 NRU_TOWN_MIN, NRU_TOWN_BASE = 1700, 1185         # NRU-9: zapas rudy na polkach miast (fin88 srednio 28 dob 1185, na koniec 1151; bez KS 5059)
 NRU_PROD_MIN, NRU_PROD_BASE = 255, 248           # NRU-10: lupy wsi na dobe (fin88 srednio 28 dob 248; bez KS 271)
 NRU_HANDS_UP = 0.10                               # NRU-3: rece przy zelazie w gore o >= 10% w biegu, gdy rynek byl w braku w wiekszosci krokow
+NRU_CAP_BIND = 0.5                                # NRU-3 (recenzja): sufit bloku wiaze, gdy zjada >= 50% zamierzonego wzrostu rak albo >= 50% rak zelaza stoi na suficie przed krokiem
 NRU_OPEN_MAX = 200000                             # NRU-6: otwarty kredyt drewna na koniec biegu (zl)
 NRU_WRITE_MAX = 0.2                               # NRU-6: przepadle (wojna miasta-wierzyciela z wsia) najwyzej 20% udzielonego
 NRU_MS_MAX = 5.0                                  # NRU-12: czas kroku tygodniowego
@@ -43528,8 +43535,32 @@ def nruda_main(logp):
         short = sum(1 for d in wd if "BRAK" in (weeks[d][NW_DECW], weeks[d][NW_DECE]))
         ch = (h1 - h0) / h0 if h0 > 0 else 0.0
         need = short > len(wd) / 2 and len(wd) >= 3
-        rep.add("NRU-3: rece przy zelazie (pierwszy -> ostatni krok)", f"{h0} -> {h1} ({100 * ch:+.1f}%); krokow z brakiem rudy {short} z {len(wd)}",
-                f">= +{100 * NRU_HANDS_UP:.0f}%, gdy rynek w braku w wiekszosci krokow (>= 3 kroki); inaczej INFO", (ch >= NRU_HANDS_UP) if need else None)
+        # recenzja: sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem) - zamierzony wzrost (po mnoznikach) wobec zjedzonego sufitem i rece na suficie
+        want_up = cap_iron = cap_other = 0.0
+        at_pct = []
+        for d in wd:
+            g = weeks[d]
+            hs0 = int(g[NW_H0W]) + int(g[NW_H0E])
+            try:
+                mp_ = float(g[NW_HMIDPCT].strip().rstrip("%"))
+            except ValueError:
+                mp_ = 0.0
+            if mp_ > 0:
+                want_up += hs0 * mp_ / 100.0
+            cap_iron += int(g[NW_CAPIRON]); cap_other += int(g[NW_CAPOTHER])
+            at_pct.append(int(g[NW_HATPCT]))
+        at_avg = sum(at_pct) / len(at_pct) if at_pct else 0.0
+        eaten = cap_iron / want_up if want_up > 0 else 0.0
+        bind = eaten >= NRU_CAP_BIND or at_avg >= 100 * NRU_CAP_BIND
+        okh = ch >= NRU_HANDS_UP
+        rep.add("NRU-3: rece przy zelazie (pierwszy -> ostatni krok) i sufit bloku",
+                f"{h0} -> {h1} ({100 * ch:+.1f}%); krokow z brakiem rudy {short} z {len(wd)}; zamierzony wzrost {want_up:.0f} rak, sufit zjadl {cap_iron:.0f} ({100 * eaten:.0f}%), "
+                f"inne zloza oddaly zelazu {cap_other:.0f} rak; rak zelaza na suficie przed krokiem srednio {at_avg:.0f}% (pierwszy krok {at_pct[0]}%, blokow {g0[NW_ATCAP]} z {g0[NW_BLK]})"
+                + (" - SUFIT BLOKU WIAZE: wzrost bierze rece innych zloz albo nie przechodzi; sufit na wpis jak w Planie (Core: craftLab x 0.5 na wiersz) albo pierwszenstwo"
+                   " zelaza - decyzja Jeffa" if bind else ""),
+                f">= +{100 * NRU_HANDS_UP:.0f}%, gdy rynek w braku w wiekszosci krokow (>= 3 kroki; inaczej INFO); NIE przy sufcie bloku (>= {100 * NRU_CAP_BIND:.0f}% zamiaru zjedzone"
+                f" albo >= {100 * NRU_CAP_BIND:.0f}% rak na suficie) = DECYZJA",
+                okh if need else None, decide=bind)
         r0 = int(g0[NW_RATEW]) + int(g0[NW_RATEE]); r1 = int(g1[NW_RATEW]) + int(g1[NW_RATEE])
         rep.add("NRU-4: stawka KS zelaza na jutro (wsie, szt./d; pierwszy -> ostatni krok)",
                 f"{r0} -> {r1} (Westeros {g0[NW_RATEW]} -> {g1[NW_RATEW]}, Essos {g0[NW_RATEE]} -> {g1[NW_RATEE]}); wytop 7 dob ostatni: model W {g1[NW_MW]} / bez drewna {g1[NW_UW]}, "

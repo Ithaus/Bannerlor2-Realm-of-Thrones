@@ -28,7 +28,12 @@ namespace Armoury
     ///   S &lt; T  - rynek w braku: kopalnia, ktorej dymarka miala drewno (lupy bez drewna &lt; 10% modelu w ostatnich 7 dobach, Bloomery.F5Starved) - rece przy zlozu x1.05;
     ///   S &gt; 2T - rynek pelny: x0.95;  T..2T - bez zmian;
     ///   kopalnia z dymarka bez drewna przez pol tygodnia (&gt;= 50%) - x0.95 niezaleznie od rynku (rece, ktore nie wytopia lup, wracaja do pola);
-    ///   10-50% albo brak danych wytopu - bez zmian. Sufit jak RegaleCycle: suma rak przy zlozach bloku &lt;= polowa rak bloku poza domem. Bez nowych zloz (tylko wpisy
+    ///   10-50% albo brak danych wytopu - bez zmian. Sufit jak RegaleCycle: suma rak przy zlozach bloku &lt;= polowa rak bloku poza domem - przycinany TYLKO w bloku,
+    ///   w ktorym krok podniosl zelazo, i najwyzej do sumy sprzed kroku (recenzja: inaczej krok co 7 dob przycinal inne zloza blokow z zelazem, gdy praca domowa
+    ///   urosla miedzy cyklami RegaleCycle, a w bloku juz nad sufitem "wzrost" obnizal zelazo; blok nad sufitem przycina RegaleCycle co 28 dob jak dotad). Przy suficie wzrost zelaza bierze rece innych zloz bloku, nie pol - linia
+    ///   pokazuje to osobno: bloki z zelazem na suficie PRZED krokiem (i ich rece przy zelazie), rece zelaza po mnoznikach (zamiar) i po suficie, rece innych zloz
+    ///   oddane zelazu. Recenzja (f4 fin88: wpisy w gore 227/356 przy rekach -1.5%/+3.1%): czy sufit bloku wiaze, pokaze pierwsza linia (D+7); gdy wiaze - sufit
+    ///   na wpis jak w Planie (Core: craftLab x 0.5 na wiersz) albo pierwszenstwo zelaza to decyzja Jeffa (NRU-3 DECYZJA). Bez nowych zloz (tylko wpisy
     ///   z Planu wlaczenia). Wpisy zelaza nie biora juz progu indeksu w RegaleCycle (inne zloza bez zmian). Pola mieszczan (zelazo bez dymarki, fin88 0 szt./d) -
     ///   bez wzrostu, w dol tylko przy rynku pelnym; kampania bez wytopu przy kopalni (Bloomery nieczynne) - wsie sam rynek.
     /// Rece przesuwaja sie tylko w bloku (rece zelaza + rece reszty zajec = rece bloku) - zadnego zlota ani towaru (produkcja z prawdziwych rak i ziemi, jedna tabela
@@ -77,7 +82,9 @@ namespace Armoury
             for (int m = 0; m < 2; m++) dec[m] = T[m] <= 0 ? 2 : S[m] < T[m] ? 1 : S[m] > 2 * T[m] ? -1 : 0;
             // 2. bloki z zelazem
             int nIn = 0, nUp = 0, nDnFull = 0, nDnStarv = 0, nPart = 0, nBand = 0, nNoT = 0, nNoData = 0, nCap = 0, nBusy = 0;
-            var h0 = new double[2]; var h1 = new double[2];
+            int nBlk = 0, nAtCap0 = 0, nOver = 0;                  // recenzja: bloki z zelazem, na suficie przed krokiem, nad sufitem bez wzrostu zelaza (bez przyciecia)
+            var h0 = new double[2]; var h1 = new double[2]; var hMid = new double[2]; var hAt0 = new double[2];
+            double capIron = 0, capOther = 0;                      // rece zdjete sufitem po wzroscie: zelazu (z zamiaru) i innym zlozom bloku (oddane zelazu)
             foreach (var ld in _live.Values)
             {
                 if (ld == null || ld.St == null || ld.K == null || ld.B == null) continue;
@@ -95,13 +102,16 @@ namespace Armoury
                         for (int j = 0; j < b.RC.Length; j++) if (b.RC[j] == KsTab.CIron) { has = true; break; }
                         if (!has) continue;
                         if (b.Target >= 0) { nBusy++; continue; }       // blok w przebudowie A7 - RegaleCycle tez go pomija
-                        double sum = 0;
+                        nBlk++;
+                        double sum = 0, sum0 = 0, ironB0 = 0, ironMid = 0;
+                        bool raised = false;
                         for (int j = 0; j < b.RC.Length && j < b.RF.Length; j++)
                         {
+                            sum0 += b.RF[j];
                             if (b.RC[j] == KsTab.CIron)
                             {
                                 nIn++;
-                                h0[m] += b.Hands * b.RF[j];
+                                h0[m] += b.Hands * b.RF[j]; ironB0 += b.Hands * b.RF[j];
                                 float f = 1f;
                                 if (starv >= F5StarvDown) { f = F5Down; nDnStarv++; }
                                 else if (dec[m] == 2) nNoT++;
@@ -114,12 +124,30 @@ namespace Armoury
                                 }
                                 else nBand++;
                                 if (f != 1f) b.RF[j] *= f;
+                                if (f > 1f) raised = true;
+                                ironMid += b.Hands * b.RF[j];
                             }
                             sum += b.RF[j];
                         }
+                        hMid[m] += ironMid;
                         double cap = 0.5 * Math.Max(0.0, 1.0 - b.HomeFrac);   // ten sam sufit co RegaleCycle
-                        if (sum > cap && sum > 0) { float k = (float)(cap / sum); for (int j = 0; j < b.RF.Length; j++) b.RF[j] *= k; nCap++; }
-                        for (int j = 0; j < b.RC.Length && j < b.RF.Length; j++) if (b.RC[j] == KsTab.CIron) h1[m] += b.Hands * b.RF[j];
+                        if (cap > 0 && sum0 >= cap * 0.999) { nAtCap0++; hAt0[m] += ironB0; }
+                        // recenzja: sufit tylko po wzroscie zelaza w tym bloku i najwyzej do sumy sprzed kroku (lim = max(sufit, suma przed krokiem)) - krok nie robi pracy
+                        // RegaleCycle (przyciecie bloku, ktory wyszedl nad sufit, bo urosla praca domowa) i wzrost nigdy nie obniza zelaza; rece innych zloz oddane zelazu osobno
+                        double lim = Math.Max(cap, sum0);
+                        if (raised && sum > lim && sum > 0)
+                        {
+                            float k = (float)(lim / sum);
+                            double other0 = Math.Max(0.0, sum * b.Hands - ironMid);   // rece innych zloz bloku przed sufitem
+                            for (int j = 0; j < b.RF.Length; j++) b.RF[j] *= k;
+                            nCap++;
+                            capOther += other0 * (1.0 - k);
+                        }
+                        else if (!raised && sum > cap) nOver++;            // nad sufitem bez wzrostu zelaza - bez przyciecia (RegaleCycle co 28 dob jak dotad)
+                        double ironB1 = 0;
+                        for (int j = 0; j < b.RC.Length && j < b.RF.Length; j++) if (b.RC[j] == KsTab.CIron) ironB1 += b.Hands * b.RF[j];
+                        h1[m] += ironB1;
+                        if (ironMid > ironB1) capIron += ironMid - ironB1;
                     }
                 }
                 catch (Exception e) { _f5Stum++; Stumble("F5IronWeek(okreg)", e); }
@@ -155,9 +183,15 @@ namespace Armoury
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
               .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
               .Append("; bloki przyciete sufitem ").Append(nCap).Append(", w przebudowie (pominiete) ").Append(nBusy);
+            // recenzja: czy sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem) wiaze zelazo
+            double hAll0 = h0[0] + h0[1], hAt = hAt0[0] + hAt0[1];
+            sb.Append(" | sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem): blokow z zelazem ").Append(nBlk).Append(", na suficie przed krokiem ").Append(nAtCap0)
+              .Append(" (rece przy zelazie ").Append(hAt.ToString("0", inv)).Append(" = ").Append(hAll0 > 0 ? (100.0 * hAt / hAll0).ToString("0", inv) : "0").Append("% rak zelaza)")
+              .Append(", przyciete po wzroscie ").Append(nCap).Append(" (zelazo -").Append(capIron.ToString("0", inv)).Append(" rak z zamiaru, inne zloza -").Append(capOther.ToString("0", inv))
+              .Append(" rak -> do zelaza), nad sufitem bez wzrostu (bez przyciecia - RegaleCycle co 28 dob) ").Append(nOver);
             sb.Append(" | rece przy zelazie: Westeros ").Append(h0[0].ToString("0", inv)).Append(" -> ").Append(h1[0].ToString("0", inv))
               .Append(", Essos ").Append(h0[1].ToString("0", inv)).Append(" -> ").Append(h1[1].ToString("0", inv))
-              .Append(" (razem ").Append(Pct5(h0[0] + h0[1], h1[0] + h1[1])).Append(")");
+              .Append(" (razem ").Append(Pct5(h0[0] + h0[1], h1[0] + h1[1])).Append("; zamiar po mnoznikach ").Append(Pct5(h0[0] + h0[1], hMid[0] + hMid[1])).Append(")");
             sb.Append(" | stawka KS zelaza na jutro (wsie, szt./d): Westeros ").Append(rate[0].ToString("0", inv)).Append(" w ").Append(rateN[0]).Append(" wsiach, Essos ")
               .Append(rate[1].ToString("0", inv)).Append(" w ").Append(rateN[1]).Append(" wsiach");
             sb.Append(" | wytop 7 dob (dymarki): Westeros model ").Append(wm[0].ToString("0", inv)).Append(", bez drewna ").Append(wu[0].ToString("0", inv))

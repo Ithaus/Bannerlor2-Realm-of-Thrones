@@ -241,15 +241,15 @@ namespace Armoury
 
         /// <summary>f5-ruda (klucz Bloomery Wood Credit; splata takze przy kluczu wylaczonym, gdy dlug jest): woz wrocil do wsi MACIERZYSTEJ - to, co z przyrostu kiesy w oknie
         /// (BK + 112 + zwrot F4b) zostalo po pracach okregu i daninie DS, splaca dlug za drewno dymarki u kupcow miasta handlowego (Bloomery.F5CreditAtCart: kiesa wsi -> kasa
-        /// miasta-wierzyciela). Ostatni krok okna: podstawa prac okregu i daniny DS (przyrost kiesy) i ich liczniki "udzial pana" bez zmian. Bez dlugu albo woz w obcej wsi -
-        /// nic. Wlasny try.</summary>
+        /// miasta-wierzyciela; w ksiedze pieniadza jak daniny DS - migawka okna przesunieta, Note169 po obu stronach). Ostatni krok okna: podstawa prac okregu i daniny DS
+        /// (przyrost kiesy) i ich liczniki "udzial pana" bez zmian. Bez dlugu albo woz w obcej wsi - nic. Wlasny try.</summary>
         private static void F5WoodCredit(Entry st)
         {
             try
             {
                 if (st == null || st.Here != null || st.Home == null) return;
                 long grown = (long)st.Home.Gold - st.HomeGold;
-                if (grown > 0) Bloomery.F5CreditAtCart(st.Home, grown);
+                if (grown > 0) Bloomery.F5CreditAtCart(st.Home, grown, st.Party);   // woz - okno powrotu w ksiedze pieniadza (splata jak daniny DS)
             }
             catch (Exception e) { Stumble("VillageTakings.F5WoodCredit", e); }
         }
