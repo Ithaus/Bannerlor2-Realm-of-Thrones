@@ -730,6 +730,12 @@ Uzycie (Python 3, tylko odczyt):
                     i plotno / len) na koniec >= 0.9 x poczatek (fin91 bez paczki: 0.49 -> 0.25 i 0.52 -> 0.34; z --baza-doby gorzej od poczatku, ale nie gorzej niz koniec bazy - ETAP), NWAR-16a K3 glina dla garncarzy (INFO: miast z garncarzami,
                     prog, glina na ich polkach, budowy zostawily; warsztaty codzienne swiata z linii f7), NWAR-16b cykle garbarni / tkalni lnu / garncarzy / browarow na dobe
                     biegu z 'Warsztaty towarowe' (INFO, z --baza-doby porownanie). Log bez paczki f7: INFO, bez wyjatku.
+                    Recenzja f7 (noc 18.10): NWAR-14b w popycie ceny wojsko+naprawy <= liczone <= wojsko+naprawy + wsie+dwory w kazdej linii, a pod KS (miast z koszykiem
+                    ZC4 > 0) czesc wsi i dworow pominieta (sa juz w popycie koszyka ZC4: wsie QV, dwory 1:1 - bez tego liczone drugi raz); NWAR-16a dopisuje glina
+                    zostawiona przez przetwory KS (ZC5, ten sam prog K3); NWAR-16c cztery typy PO ROZRUCHU - od doby wlaczenia KS (pierwsza linia "Koszyk stanow (ZC4)"
+                    z lambda > 0; bez KS pierwsza doba + 33) do konca: koniec >= rozruch - 2 albo >= 0.9 x rozruch (baza fin91 pod KS 22 -> 23), z liczba przezbrojen Z
+                    tych typow po rozruchu. MIARA PACZKI f7 to NWAR-13..16c, nie NWAR-4b: przezbrojenia pierwszych tygodni biora warsztaty, ktore w zapisie startowym
+                    od >= 60 dob mialy 0 cykli (srednia roku sprzed paczki), a browary przed KS stoja z reguly plac (decyzja Jeffa) - NWAR-4b moze zostac NIE.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -32509,6 +32515,12 @@ NWAR_F7_K1 = re.compile(r"\| K1 rzemioslo miasta po warsztatach \(Town Crafts Af
 NWAR_F7_K2 = re.compile(r"\| K2 popyt skory i plotna z odbioru \(Cloth Demand From Offtake\) (tak|nie) \(ksiega towarow (tak|nie)\): dzis skora (\d+) \[wojsko (\d+), naprawy (\d+), wsie (\d+), dwory (\d+)\], plotno (\d+) \[wojsko (\d+), naprawy (\d+), wsie (\d+), dwory (\d+)\] szt\. w (\d+) miastach; srednia ok\. 14 dob swiat: skora ([\d.]+), plotno ([\d.]+) szt\./d w (\d+) miastach \(dob pomiaru (\d+)")
 NWAR_F7_K3 = re.compile(r"\| K3 glina budow ponad potrzebe garncarzy \(Build Clay For Potters\) (tak|nie): miast z garncarzami (\d+) \(warsztatow (\d+), potrzeba ([\d.]+) szt\./d, prog (\d+) szt\.\), glina na ich polkach (\d+) szt\.; budowy zostawily gline - pan na (\d+) targach \((\d+) szt\.\), lud na (\d+) targach \((\d+) szt\.\)")
 NWAR_F7_TYPES = re.compile(r"\| warsztaty codzienne swiata: brewery (\d+), tannery (\d+), pottery_shop (\d+), linen_weavery (\d+) \(razem (\d+)\)")
+# recenzja f7 (uwaga 1): podzial sredniej (wojsko+naprawy / wsie+dwory) i to, co idzie do popytu ceny (wsie i dwory x (1 - lambda) w miastach z koszykiem ZC4)
+NWAR_F7_K2B = re.compile(r"; w tym wojsko\+naprawy skora ([\d.]+), plotno ([\d.]+), wsie\+dwory skora ([\d.]+), plotno ([\d.]+); w popycie ceny skora ([\d.]+), plotno ([\d.]+) szt\./d"
+                         r" \(wsie i dwory x \(1 - lambda\) w (\d+) miastach z koszykiem ZC4")
+NWAR_F7_K2C = re.compile(r"; w tych miastach wsie\+dwory skora ([\d.]+), plotno ([\d.]+), pominiete skora ([\d.]+), plotno ([\d.]+)\)")   # tozsamosc NWAR-14b
+NWAR_F7_K3KS = re.compile(r", przetwory KS \(ZC5\) na (\d+) targach \((\d+) szt\.\)")   # recenzja f7 (uwaga 2): przetwory KS zostawily gline garncarzom
+NWAR_ZC4 = re.compile(r"^Koszyk stanow \(ZC4\): dzien (\d+) \| lambda Westeros ([\d.]+) \(\d+ miast\), Essos ([\d.]+)")   # NWAR-16c: doba wlaczenia KS (lambda > 0)
 NWAR_F7_ST = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
 NWAR_F7_ERR = ("ERROR in F7Workshops", "ERROR in TownCrafts.SyncData(arm_f7_cloth)")
 NWAR_TC = re.compile(r"^Rzemioslo miasta \(148\): dzien (\d+) ")
@@ -32561,6 +32573,11 @@ def _nwar_read(logp, ks=None, f7=None):
                 continue
             if f7 is not None and any(s.startswith(e) for e in NWAR_F7_ERR):
                 f7["err"] = f7.get("err", 0) + 1
+                continue
+            if f7 is not None and "ks_on" not in f7 and s.startswith("Koszyk stanow (ZC4): dzien "):
+                mm = NWAR_ZC4.match(s)
+                if mm and max(float(mm.group(2)), float(mm.group(3))) > 0:
+                    f7["ks_on"] = int(mm.group(1))   # pierwsza doba z lambda > 0 (KS czynny) - NWAR-16c
                 continue
             if f7 is not None and s.startswith("Rzemioslo miasta (148): dzien "):
                 mm = NWAR_TC.match(s)
@@ -32642,7 +32659,7 @@ def nwar_main(logp, bdp=None):
           f" | f7-browary: linii doby {len(f7.get('days', {}))}, startow {len(f7.get('starts', []))}")
     if not d3 and not ws:
         rep.add("NWAR-0: linie 'Warsztaty za cena (E3-D3)' i 'Warsztaty towarowe'", "brak w logu", "INFO (log bez paczek warsztatow)", None)
-        _nwar_f7(rep, f7, ws, bdp)
+        _nwar_f7(rep, f7, ws, bdp, d3)
         rep.show()
         return 0
     # NWAR-0 start
@@ -32808,7 +32825,7 @@ def nwar_main(logp, bdp=None):
             rep.add("NWAR-10: pola mieszczan KS w pomiarze wsadu F4 (bez zdarzenia gry)", txt, "> 0 i <= 1.05 x KS + najwieksza doba (kategorie wsadu to czesc plonu)", 0 < a <= 1.05 * n_tf + mx_tf)
         else:
             rep.add("NWAR-10: surowiec bez zdarzenia gry w pomiarze wsadu", txt, "INFO (bez pol mieszczan KS w dobach F4 - droga bez KS)", None)
-    _nwar_f7(rep, f7, ws, bdp)
+    _nwar_f7(rep, f7, ws, bdp, d3)
     rep.show()
     return 0
 
@@ -32838,7 +32855,7 @@ def _nwar_ws_cycles(ws):
     return {t: (v[0] / n, v[1] / n) for t, v in tot.items()} if n else {}
 
 
-def _nwar_f7(rep, f7, ws, bdp=None):
+def _nwar_f7(rep, f7, ws, bdp=None, d3=None):
     """f7-browary (noc 18.10): NWAR-11..16 - linia "Warsztaty codzienne (f7-browary)" (F7Workshops.cs), klin cen skora/skory i plotno/len z linii
     "Rzemioslo miasta (148)", odbior skory i plotna z ksiegi towarow ("Towary: ... leather/linen"). Log bez paczki: INFO, bez wyjatku."""
     days = f7.get("days", {})
@@ -32859,6 +32876,7 @@ def _nwar_f7(rep, f7, ws, bdp=None):
         rep.add("NWAR-12..14: f7-browary linie doby", "brak linii 'Warsztaty codzienne (f7-browary)'" + (f", ERROR F7 {err}" if err else ""),
                 "INFO (log sprzed paczki f7-browary albo klucze wylaczone)", None if err == 0 else False)
         _nwar_f7_wedge_cycles(rep, f7, ws, bdp, False)
+        _nwar_f7_after(rep, f7, ws, d3, False)
         return
     # NWAR-12 rozpoznanie i potkniecia
     parsed, bad = {}, []
@@ -32900,6 +32918,34 @@ def _nwar_f7(rep, f7, ws, bdp=None):
             rep.add("NWAR-14: K2 odbior skory i plotna", txt, "> 0 (bez linii 'Towary' leather/linen - bez porownania z ksiega)", meas > 0)
     else:
         rep.add("NWAR-14: K2 odbior skory i plotna", "klucz wylaczony albo ksiega towarow wylaczona", "INFO", None)
+    # NWAR-14b (recenzja f7, uwaga 1): w popycie ceny wojsko+naprawy zawsze, wsie+dwory x (1 - lambda) w miastach z koszykiem ZC4 - nie liczone drugi raz pod KS
+    k2b = [(x, NWAR_F7_K2B.search(days[x])) for x, _m in on2]
+    k2b = [(x, m) for x, m in k2b if m]
+    if k2b:
+        badb, bad_ks = [], []
+        for x, m in k2b:
+            am = float(m.group(1)) + float(m.group(2)); vc = float(m.group(3)) + float(m.group(4)); cnt = float(m.group(5)) + float(m.group(6))
+            if not (am - 0.25 <= cnt <= am + vc + 0.25):
+                badb.append(x)
+            mc = NWAR_F7_K2C.search(days[x])
+            if mc:
+                vks = float(mc.group(1)) + float(mc.group(2)); skip = float(mc.group(3)) + float(mc.group(4))
+                # tozsamosc: wojsko+naprawy + wsie+dwory - pominiete = w popycie ceny (zaokraglenia 6 liczb do 0.1); pod KS ich wsie+dwory > 0 -> pominiete > 0
+                if abs(am + vc - skip - cnt) > 0.35 or (cnt > 0 and int(m.group(7)) > 0 and vks > 0.05 and skip <= 0):
+                    bad_ks.append(x)
+        xl, ml = k2b[-1]
+        am = float(ml.group(1)) + float(ml.group(2)); vc = float(ml.group(3)) + float(ml.group(4)); cnt = float(ml.group(5)) + float(ml.group(6)); ksn = int(ml.group(7))
+        ks_days = sum(1 for _x, m in k2b if int(m.group(7)) > 0)
+        mcl = NWAR_F7_K2C.search(days[xl])
+        cut = (am + vc - cnt) / vc if vc > 0 else 0.0
+        rep.add("NWAR-14b: K2 w popycie ceny - wsie i dwory pod KS nie drugi raz (juz w koszyku ZC4)",
+                f"{len(k2b)} linii, poza przedzialem {len(badb)}" + (f" (pierwsza d{badb[0]})" if badb else "") + f", tozsamosc/pominiecie zle {len(bad_ks)}" + (f" (pierwsza d{bad_ks[0]})" if bad_ks else "")
+                + f"; d{xl}: wojsko+naprawy {am:.1f}, wsie+dwory {vc:.1f}, w popycie ceny {cnt:.1f} szt./d (wsie+dwory pominiete w {cut:.0%}; miast z koszykiem ZC4 {ksn}"
+                + (f", ich wsie+dwory {float(mcl.group(1)) + float(mcl.group(2)):.1f}, pominiete {float(mcl.group(3)) + float(mcl.group(4)):.1f}" if mcl else "") + f"; dob z KS {ks_days})",
+                "wojsko+naprawy <= w popycie <= wojsko+naprawy + wsie+dwory; wojsko+naprawy + wsie+dwory - pominiete = w popycie; pod KS (wsie+dwory miast ZC4 > 0) pominiete > 0",
+                not badb and not bad_ks)
+    elif on2:
+        rep.add("NWAR-14b: K2 podzial wojsko+naprawy / wsie+dwory", "brak segmentu podzialu (DLL sprzed recenzji f7)", "INFO", None)
     # NWAR-16a K3 (INFO)
     on3 = [(x, parsed[x]["k3"]) for x in sorted(parsed) if parsed[x]["k3"] and parsed[x]["k3"].group(1) == "tak"]
     tys = [parsed[x]["types"] for x in sorted(parsed) if parsed[x]["types"]]
@@ -32908,11 +32954,15 @@ def _nwar_f7(rep, f7, ws, bdp=None):
     if on3:
         lastx, lm = on3[-1]
         held = sum(int(m.group(8)) + int(m.group(10)) for _x, m in on3)
+        ksh = [NWAR_F7_K3KS.search(days[x]) for x, _m in on3]
+        ksh = [m for m in ksh if m]
+        kstxt = f"; przetwory KS (ZC5) zostawily gline w biegu {sum(int(m.group(2)) for m in ksh)} szt. ({len(ksh)} linii)" if ksh else ""
         rep.add("NWAR-16a: K3 glina dla garncarzy", f"d{lastx}: miast z garncarzami {lm.group(2)} (warsztatow {lm.group(3)}, potrzeba {lm.group(4)} szt./d, prog {lm.group(5)}), glina na ich polkach "
-                f"{lm.group(6)}; budowy zostawily gline w biegu {held} szt." + ttxt, "INFO", None)
+                f"{lm.group(6)}; budowy zostawily gline w biegu {held} szt." + kstxt + ttxt, "INFO", None)
     else:
         rep.add("NWAR-16a: K3 glina dla garncarzy", "klucz wylaczony" + ttxt, "INFO", None)
     _nwar_f7_wedge_cycles(rep, f7, ws, bdp, True)
+    _nwar_f7_after(rep, f7, ws, d3, True)
 
 
 def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
@@ -32950,6 +33000,62 @@ def _nwar_f7_wedge_cycles(rep, f7, ws, bdp, has_f7):
             bb = base.get(t) if base else None
             parts.append(f"{t} {c:.1f} cyk/d ({w:.1f} pracuje)" + (f" [baza {bb[0]:.1f} / {bb[1]:.1f}]" if bb else ""))
         rep.add("NWAR-16b: cykle garbarni, tkalni lnu, garncarzy i browarow na dobe biegu ('Warsztaty towarowe')", "; ".join(parts), "INFO", None)
+
+
+def _nwar_f7_after(rep, f7, ws, d3, has_f7):
+    """NWAR-16c (recenzja f7, uwaga 3): browary + garbarnie + garncarze + tkalnie lnu PO ROZRUCHU - od doby wlaczenia KS (pierwsza linia ZC4 z lambda > 0),
+    bez KS od pierwszej doby + 33. NWAR-4b liczy od poczatku biegu, a przezbrojenia pierwszych tygodni wybieraja warsztaty, ktore w zapisie startowym od >= 60 dob
+    mialy 0 cykli (srednia roku sprzed paczki) - tego K1..K3 w kilka dob nie zmienia. Tu: liczba czterech typow na dobe rozruchu i na koniec (linia f7, inaczej segment
+    F4 albo 'Warsztaty towarowe') i przezbrojenia Z tych typow po rozruchu (probki 'zmiany [...]' E3-D3). Prog: koniec >= rozruch - 2 albo >= 0.9 x rozruch
+    (baza fin91 bez paczki pod KS: 22 -> 23); log bez paczki f7 - INFO."""
+    seq = []
+    for x in sorted(f7.get("days", {})):
+        m = NWAR_F7_TYPES.search(f7["days"][x])
+        if m:
+            seq.append((x, sum(int(m.group(i)) for i in range(1, 5))))
+    src = "linia f7"
+    if len(seq) < 2 and d3:
+        seq = []
+        for x in sorted(d3):
+            t = _nwar_types_from_f4(d3[x])
+            if t:
+                seq.append((x, sum(t.get(k, 0) for k in NWAR_DAILY_GOODS)))
+        src = "segment F4 'typy (swiat)'"
+    if len(seq) < 2 and ws:
+        seq = []
+        for x in sorted(ws):
+            t = _nwar_types_from_ws(ws[x])
+            if t:
+                seq.append((x, sum(t[k][0] for k in NWAR_DAILY_GOODS if k in t)))
+        src = "'Warsztaty towarowe'"
+    if len(seq) < 2:
+        rep.add("NWAR-16c: cztery typy po rozruchu", "za malo linii z liczba typow", "INFO", None)
+        return
+    ks_on = f7.get("ks_on")
+    split = ks_on if ks_on is not None else seq[0][0] + 33
+    why = f"KS czynny (lambda > 0) od d{ks_on}" if ks_on is not None else f"bez KS: d{seq[0][0]} + 33"
+    after = [(x, n) for x, n in seq if x >= split]
+    if len(after) < 2:
+        rep.add("NWAR-16c: cztery typy po rozruchu", f"{why}; za malo dob po rozruchu ({len(after)})", "INFO", None)
+        return
+    out_n, outs = 0, {}
+    for x in sorted(d3 or {}):
+        if x < split:
+            continue
+        a = NWAR_CH.search(d3[x])
+        if not a or not a.group(2):
+            continue
+        for one in a.group(2).split("; "):
+            o = NWAR_ONE.match(one)
+            if o and o.group(2) in NWAR_DAILY_GOODS:
+                out_n += 1
+                outs[o.group(2)] = outs.get(o.group(2), 0) + 1
+    (x0, n0), (x1, n1) = after[0], after[-1]
+    ok = (n1 >= n0 - 2 or n1 >= 0.9 * n0) if has_f7 else None
+    rep.add("NWAR-16c: browary + garbarnie + garncarze + tkalnie lnu PO ROZRUCHU (miara paczki f7 zamiast NWAR-4b od poczatku)",
+            f"{why} ({src}): d{seq[0][0]} {seq[0][1]} -> rozruch d{x0} {n0} -> koniec d{x1} {n1}; przezbrojone Z tych typow po rozruchu {out_n}"
+            + (" (" + ", ".join(f"{k} {v}" for k, v in sorted(outs.items())) + ")" if outs else ""),
+            ">= rozruch - 2 albo >= 0.9 x rozruch (baza fin91 pod KS 22 -> 23)" + ("" if has_f7 else " - INFO bez paczki f7"), ok)
 
 
 # ============================================================ nekon3 czesc 2 (noc-ekonomia3 16.10: produkcja idzie za cena i ludzmi, panowie, korony i zolnierze kupuja)

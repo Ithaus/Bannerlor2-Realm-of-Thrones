@@ -131,7 +131,8 @@ namespace Armoury
         /// (TownUse* - ten sam mnoznik, ktorym BudgetPostfix tnie ich budzet; ruda 0, len, welna i skory surowe 2%).
         /// Rzemioslo: zuzycie dobowe z tabeli karawan bez jej stalej czesci domowej (rece rzemieslnikow, garbowanie i tkanie,
         /// linie towarowe warsztatow) x wartosc sztuki. Ujemny = kategoria spoza tabeli albo zamek (zostaje popyt gry).
-        /// f7-browary K2 (klucz ClothDemandFromOfftake): skora i plotno - do tego odbior z polki na odziez wojska, naprawy kowali, zakupy wsi i dwory (F7Workshops.UseOf,
+        /// f7-browary K2 (klucz ClothDemandFromOfftake): skora i plotno - do tego odbior z polki na odziez wojska, naprawy kowali, zakupy wsi i dwory (F7Workshops.UseOf;
+        /// recenzja: wsie i dwory x (1 - lambda) w miastach z koszykiem ZC4 - tam "home" ma juz koszyk wsi QV i 1:1 dworow ze Zc4Demand,
         /// srednia ok. 14 dob) x wartosc sztuki ("off"); sama cena - zapas karawan, progi polki i zamowienia (CaravanBulk.Use) bez zmian. Klucz wylaczony - 0 (jak dotad).</summary>
         internal static float UseDemand(Town town, ItemCategory cat, out float home, out float craft)
         {
@@ -317,7 +318,7 @@ namespace Armoury
                       .Append(", z nadwyzka ").Append(ng).Append(" miast").Append(ng > 0 ? " - sprzedaja po " + F(Mid(glut), "0.#") + " d" : "")
                       .Append(", popyt dobowy miasta: mieszczan ").Append(F(Mid(home), "0.#")).Append(" d + rzemiosla ").Append(F(Mid(craft), "0.#"))
                       .Append(" d, w danych rynku ").Append(F(Mid(stored), "0.#")).Append(" d, sam szacunek gry ").Append(F(Mid(game), "0.#")).Append(" d");
-                    if (offs.Count > 0) sb.Append(" (f7: odbior wojska, napraw, wsi i dworow w ").Append(offs.Count).Append(" miastach, mediana ").Append(F(Mid(offs), "0.#")).Append(" d - w danych rynku, poza mieszczanami i rzemioslem)");
+                    if (offs.Count > 0) sb.Append(" (f7: odbior wojska i napraw, wsi i dworow poza koszykiem ZC4 w ").Append(offs.Count).Append(" miastach, mediana ").Append(F(Mid(offs), "0.#")).Append(" d - w danych rynku, poza mieszczanami i rzemioslem)");
                 }
                 // przyklady innych przeliczonych towarow handlowych: te sama stala w nowej monecie (A) widac po max indeksu
                 var other = new StringBuilder();
