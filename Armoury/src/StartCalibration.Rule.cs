@@ -185,6 +185,7 @@ namespace Armoury
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null || ld.B == null) continue;
+                if (LandBackOf(ld.St)) continue;                         // ks-arm: kraina wrocona przez bramke krainy - bez reguly zmiany zajec i regali
                 try
                 {
                     Town mt = ld.TF ? ld.T : (ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V.Bound != null ? ld.V.Bound.Town : null));

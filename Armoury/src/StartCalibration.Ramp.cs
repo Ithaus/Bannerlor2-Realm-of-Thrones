@@ -205,6 +205,7 @@ namespace Armoury
                 try
                 {
                     if (town == null || !town.IsTown || town.MarketData == null) continue;
+                    if (LandBackOf(town.Settlement)) continue;           // ks-arm: kraina wrocona przez bramke krainy - bez polek startu
                     int m = TownMarket(town);
                     var md = town.MarketData;
                     foreach (var kv in cats)

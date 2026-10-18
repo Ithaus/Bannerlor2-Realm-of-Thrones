@@ -1139,6 +1139,27 @@ namespace Armoury
             catch (Exception e) { Stumble("NoteSource", e); }
         }
 
+        // ks-arm (recenzja, noc 17/18.10): zrodla znane z nazwy dla twardej bramki KS (projekt rozdz. 10 pkt 3 - "inne ticki dobowe" maja byc tylko zrodlami nieznanymi):
+        // ryby z perku Night Raider (NavalDLC), zboze nowych druzyn patrolowych miast, ryby portow BK miast - wlasna grupa (poza SrcOrder - drukowana po "inne ticki"),
+        // nie wchodzi do liczb Planu KS (KsNote) ani do bramki (KsGateTake liczy tylko GTick)
+        internal const string GKnown = "zrodla znane z nazwy (KS)";
+
+        /// <summary>ks-arm: jak NoteSource (przyrost zdjety z otwartej ramki, zeby nie poszedl do "inne ticki"), ale grupa GKnown i bez klucza FoodSourcesInLedger
+        /// (decyduja klucze KS wolajacego). Nie rzuca.</summary>
+        internal static void NoteKnownSource(ItemObject it, int n, string sub)
+        {
+            try
+            {
+                if (n == 0 || it == null || !On || !EnsureItems()) return;
+                int i;
+                if (!_idx.TryGetValue(it, out i)) return;
+                var f = _top;
+                if (f != null && Environment.CurrentManagedThreadId == f.Thread) { f.Touch(i); f.Net[i] -= n; }
+                Book(i, GKnown, sub, n);
+            }
+            catch (Exception e) { Stumble("NoteKnownSource", e); }
+        }
+
         /// <summary>m6b (5): MobileParty.RemoveParty bez zdarzenia zniszczenia (konwoje DTE - CutTheirSupplyBehavior.CleanupCaravan): roster znika bez sladu
         /// (G MobileParty.cs:3525 ItemRoster.Clear - nie przez AddToCounts) - towar jako ujscie. Po zdarzeniu zniszczenia liczy OnPartyDestroyed (GLost).</summary>
         internal static void OnPartyRemoved(MobileParty mp)
@@ -1278,6 +1299,8 @@ namespace Armoury
             v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
             v[KsCloth] = Group(a.Sink, GArmyCloth) + Group(a.Sink, GArms) + Group(a.Sink, GMend);
             _ksDay[it.StringId] = v;
+            long gt = Group(a.Src, GTick), gr = Group(a.Sink, GRemoved);   // ks-arm: twarde bramki KS (projekt rozdz. 10 pkt 2-3)
+            if (gt > 0 || gr > 0) _ksGate[it.StringId] = new[] { gt, gr };
             // KS r4 P10 (r4-ceny): [8..10] - wies je swoje W/E (czesc "bez rynku" z magazynu wsi) i stracone w drodze KS-H (czesc "bez rynku"); [0..7] bez zmian
             if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1], a.MkOwn[0], a.MkOwn[1], Group(a.Sink, GKsLost) };
         }
@@ -1301,6 +1324,19 @@ namespace Armoury
             if (dst == null) return -1;
             dst.Clear();
             try { foreach (var kv in _ksDay) dst[kv.Key] = kv.Value; return _ksDayN; }
+            catch { dst.Clear(); return -1; }
+        }
+
+        // ks-arm (17.10, twarde bramki KS - projekt KS rozdz. 10 pkt 2 i 3): zrodla "bez nazwy" (inne ticki dobowe) i ujscie RemoveParty doby wedlug towaru - tylko kopia liczb
+        private static readonly Dictionary<string, long[]> _ksGate = new Dictionary<string, long[]>(StringComparer.Ordinal);
+
+        /// <summary>ks-arm: kopia liczb doby ostatniej linii ksiegi - towar -> [zrodla bez nazwy (inne ticki dobowe), ujscie RemoveParty] (tylko towary z liczba > 0);
+        /// zwraca dzien (-1 - brak liczb). Nie rzuca.</summary>
+        internal static int KsGateTake(Dictionary<string, long[]> dst)
+        {
+            if (dst == null) return -1;
+            dst.Clear();
+            try { foreach (var kv in _ksGate) dst[kv.Key] = kv.Value; return _ksDayN; }
             catch { dst.Clear(); return -1; }
         }
 
@@ -1362,6 +1398,7 @@ namespace Armoury
                 if (_acc != null) foreach (var a in _acc) { a.NewDay(); a.Last = -1; }
                 _zcCivil.Clear(); _zcDay = -1;   // ZC0: bez ksiegi - targ dzis nieznany
                 _ksDay.Clear(); _ksDayN = -1;
+                _ksGate.Clear();   // ks-arm: bramki KS (zrodla bez nazwy, RemoveParty)
                 return;
             }
             long t0 = Stopwatch.GetTimestamp();
@@ -1415,6 +1452,7 @@ namespace Armoury
                 // ---- linie towarow
                 _zcCivil.Clear(); _zcDay = day;   // ZC0 (DailyLife "Spizarnia (ZC)"): zuzycie doby ludu wedlug towaru - tylko kopia liczb ksiegi
                 _ksDay.Clear(); _ksDayN = day;    // KS: ta sama doba
+                _ksGate.Clear();                  // ks-arm: bramki KS (zrodla bez nazwy, RemoveParty) - ta sama doba
                 _ksMk.Clear(); _ksMkOn = mkOn;
                 string ts = DateTime.Now.ToString("HH:mm:ss");
                 var all = new StringBuilder();

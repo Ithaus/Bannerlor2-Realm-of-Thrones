@@ -255,6 +255,7 @@ namespace Armoury
             foreach (var r in recs)
             {
                 if (r == null || !r.Town || r.St == null || r.St.Town == null) continue;
+                if (LandBackOf(r.St)) continue;                          // ks-arm: kraina wrocona przez bramke krainy - miasto poza ZC4 (popyt, budzet, przetwory jak dzis)
                 try
                 {
                     var t = r.St.Town;

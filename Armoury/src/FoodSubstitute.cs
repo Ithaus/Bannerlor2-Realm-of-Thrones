@@ -145,7 +145,7 @@ namespace Armoury
                 if (!Campaign.Current.GameStarted) return;
                 // KS runda 4 (17.10, PLAN-KS-RUNDA4 P-B2): przy KS zastosowanym zamiana robi drabina koszykow ZC4 (z kcal i pieniedzmi ludzi) - B2 dopisywal sztuczny popyt
                 // do ItemData.Demand wedlug slownika BK sprzed ZC4 (r3 final: ser +45%, winogrona +33%, mieso +29%, maslo i daktyle -30%) - wylaczony.
-                if (StartCalibration.Applied) return;
+                if (StartCalibration.Applied && !StartCalibration.LandBackOf(__0.Settlement)) return;   // ks-arm: miasto krainy wroconej przez bramke krainy - B2 jak dzis
                 EnsureMap();
                 Shift(__0, __1, s);
             }
