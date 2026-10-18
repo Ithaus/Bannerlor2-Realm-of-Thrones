@@ -781,7 +781,19 @@ namespace Armoury
                     if (s0 != null && s0.SideVillageCraftNeutralFix && vil > 0 && calls > 0 && _n != null)
                     {
                         int changed;
-                        string fx = FixFromMeasure(bef, aft, unsc, scl, meta, out changed);
+                        string fx;
+                        if (PerGoodOn)
+                        {
+                            // f5-zajecia: n na towar czynne (Side Village Craft Measure Now wylaczony) - plany licza n towaru, wiec poprawka tez na towarach (n zajecia
+                            // nic by w produkcji nie zmienilo); czesc bez n z rozbicia SplitAfter
+                            var ms5 = new MeasSum();
+                            foreach (var kv in bef) ms5.Bef[kv.Key] = kv.Value;
+                            foreach (var kv in aft) ms5.Aft[kv.Key] = kv.Value;
+                            foreach (var kv in unsc) ms5.UnG[kv.Key] = kv.Value;
+                            string f5t = FixPerGood(ms5, meta, out changed);
+                            fx = "zajec poprawionych " + changed + " (f5, n na towar - liczba to towary: " + f5t + ")";
+                        }
+                        else fx = FixFromMeasure(bef, aft, unsc, scl, meta, out changed);
                         sb.Append(" | poprawka n z pomiaru (f4b, Side Village Craft Neutral Fix): ").Append(fx);
                         if (changed > 0) again = true;
                     }
