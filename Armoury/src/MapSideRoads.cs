@@ -444,7 +444,8 @@ namespace Armoury
                 if (_wasOff)
                 {
                     _wasOff = false; _next = 0; _built = false; _visKnown = false;
-                    Log.Info(MapSideRoads.P + "wlaczone w MCM - drogi wracaja (ten sam plan).");
+                    bool sameRule = _job == null || _job.KeyAll == MapSideRoads.KeyAll;   // f19: klucz przelaczony przy wylaczonych drogach - plan od nowa (KeyChanged ponizej)
+                    Log.Info(MapSideRoads.P + "wlaczone w MCM - drogi wracaja (" + (sameRule ? "ten sam plan" : "regula 'kazda wioska' zmieniona - plan od nowa") + ").");
                 }
                 if (_job == null)
                 {
@@ -458,7 +459,10 @@ namespace Armoury
                     return;
                 }
                 if (!_job.Done) return;
-                if (!_loggedPlan) { _loggedPlan = true; LogPlan(); if (_job.Res == null) { _failedPlan = true; return; } }
+                if (!_loggedPlan) { _loggedPlan = true; LogPlan(); if (_job.Res == null) _failedPlan = true; }
+                // f19 po recenzji: klucz MapSideRoadsAllVillages sprawdzany PRZED stawianiem - przelaczony przy wylaczonych drogach, w trakcie planu albo stawiania
+                // nie stawia juz starego planu (wczesniej ok. 74 tys. decali szlo na mape i zaraz z niej schodzilo); takze po planie NIEUDANYM (inna regula = inny plan)
+                if (KeyChanged()) return;
                 if (_job.Res == null) return;
                 // widocznosc takze PRZED kazda porcja stawiania: kamera wysoko = nowe decale od razu schowane (bez kilku sekund drog przy oddalonej kamerze);
                 // przelacza tylko juz postawione i tylko przy przejsciu progu
@@ -638,21 +642,28 @@ namespace Armoury
             _visible = want;
         }
 
+        /// <summary>f19: klucz MapSideRoadsAllVillages inny niz przy starcie planu - decale zdjete (jesli sa) i plan od nowa, raz na zmiane (porownanie z kluczem
+        /// przy starcie planu, nie z plikiem-przelacznikiem autotestu - ten nadpisuje tylko regule planu). Wolane po skonczonym planie, PRZED stawianiem
+        /// i sprawdzianem ukladu - takze po planie nieudanym (nowa regula moze sie udac; jeden plan naraz - nowy dopiero po skonczeniu biezacego).</summary>
+        private bool KeyChanged()
+        {
+            var j = _job;
+            if (j == null) return false;
+            bool keyAll = MapSideRoads.KeyAll;
+            if (keyAll == j.KeyAll) return false;
+            int n0 = RemoveAll();
+            _replans++;
+            Log.Info(MapSideRoads.P + "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE") + " - zdjete decale " + n0
+                     + (j.Res == null ? " (plan byl NIEUDANY)" : "") + ", plan od nowa.");
+            _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f; _failedPlan = false;
+            return true;
+        }
+
         /// <summary>Uklad wiosek inny niz w planie (crc ksiegi) - decale zdjete, plan od nowa (raz na zmiane).</summary>
         private void CheckLayout()
         {
             var j = _job;
             if (j == null) return;
-            bool keyAll = MapSideRoads.KeyAll;
-            if (keyAll != j.KeyAll)
-            {
-                // f19: klucz MapSideRoadsAllVillages przelaczony na mapie - raz na zmiane (plik-przelacznik autotestu porownywany nie jest: nadpisuje tylko regule planu)
-                int n0 = RemoveAll();
-                _replans++;
-                Log.Info(MapSideRoads.P + "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE") + " - zdjete decale " + n0 + ", plan od nowa.");
-                _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f;
-                return;
-            }
             if (!j.HasLayout) return;
             uint crc;
             if (!VillageBook.LayoutCrcNow(out crc) || crc == j.LayoutCrc) return;

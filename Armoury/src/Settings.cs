@@ -2459,7 +2459,8 @@ namespace Armoury
         // f19-drogi (Jeff 18.10 wieczorem: "kazda wioska powinna miec droge do siebie"): MapSideRoads.All.cs - kazda wioska ukladu dostaje droge (siec od traktow,
         // miast, zamkow i wsi gry; wioska blisko traktu - laczka pod katem; bez drogi tylko obrazek na farbie traktu i wioska bez trasy po ladzie). NOWY klucz, domyslnie
         // TAK - dociera do gry Jeffa (jego plik MCM ma juz MapSideRoads = TAK, a zmiana domyslnej istniejacego klucza by nie dotarla). NIE = plan f11 bez zmian.
-        // Przelaczony na mapie - plan i decale od nowa (MapSideRoadsView.CheckLayout). Sam widok: predkosc, trasy i zapis bez zmian.
+        // Przelaczony na mapie - plan i decale od nowa (MapSideRoadsView.KeyChanged, przed stawianiem - takze po przelaczeniu przy wylaczonych drogach i po planie
+        // nieudanym). Sam widok: predkosc, trasy i zapis bez zmian.
         public bool MapSideRoadsAllVillages = true;        // with Map Side Roads on, every village of the map gets a lane of its own, however deep in a forest or a plain it lies: lanes lead from the main roads, the towns, the castles and the game's own villages, a village behind another joins its lane, and a village close to a main road gets a short lane that leaves the road at a gentle angle - only a village standing right on the road paint has none. Changed on the map, the lanes are drawn anew within a few seconds. Off = lanes lead only to the villages that lie farther from a main road, as before
         // --- Speed of the day (night 17/18.10) ---
         // perf-d2d3 (CO-ZOSTALO D2/D3; PerfD2.cs): te same wyniki, mniej pracy - kazdy klucz osobno, wylaczony = kod jak dotad; kontrola R9 w probce 1/64 (rozjazdy
