@@ -1335,6 +1335,14 @@ Uzycie (Python 3, tylko odczyt):
                     odchylka (INFO); NZW-1f kazdy TOWAR (sztuki przed -> po, produkcja >= 1 szt./d) w 1% (prog); NZW-1g pomiar pelny: wywolan modelu > 0 i wsi poza
                     pomiarem 0 (prog). NZW-3 bez zmian (40-130, ostatnia linia ikon); NZW-3b dopisuje regule F17 pod KS i licznik reguly f4b (sprzedaz KS) dla porownania.
                     Logi sprzed f5 (fin86, fin88) - NZW-1f/1g INFO, bez wyjatku.
+                    Recenzja f5: NZW-1 / NZW-1f to tozsamosc pomiaru (poprawka dokladna na tych samych wywolaniach modelu - przechodza z konstrukcji poza przycietymi,
+                    nieliniowoscia i towarami bez n); NZW-1f dodatkowo: towary nowe z niczego (przed < 1, po o >= 1 szt./d wiecej) = 0. NZW-1g: wsi poza pomiarem to
+                    prawdziwa liczba (krok zajec je rusza, a wywolanie modelu rzucilo; prog 0), pominiete przez krok zajec (nie Normal / bez targu, pod KS, prace, tylko
+                    prace) i magazyn pelny / przywrocony pojemnoscia dopiskow - INFO w wierszu. AKCEPTACJA SWIATA - NZW-1h: ksiega towarow (linie "Towary: dzien N",
+                    produkcja wsi) w dobach od wlaczenia + 1 do + 28 (najdalej doba przed "KS: WLACZONE" ktoregokolwiek logu) wobec biegu BEZ zajec z tego samego zapisu:
+                    python -I tools/sprawdz_logi.py --grupa nzw --baza-doby <log bez zajec> <log>; kazdy towar z baza >= 5 szt./d i >= 200 zl/d w +-12% (szum trzech biegow
+                    bez zajec 21-11-36 / 22-00-21 / 23-22-37, doby 109077-109104: do 8.9% krowy, zwykle 1-5%; fin88 wobec bazy: papirus +95%, srebro -14%). Bez
+                    --baza-doby - INFO z papirusem na dobe (oczekiwane ok. 10/d: bez zajec 9.8-10.3/d).
 --grupa nf4       : (noc 17/18.10, paczka f4-pomiary - koncowy przeglad ekonomii 18.10, pakiet P6: SAME POMIARY, zero zmian zachowania; Armoury/src/StartCalibration.F4.cs,
                     MoneyLedger.F4.cs, F4Pomiary.cs, VillageCrafts.cs - klucze Measure Craft Rule, Measure Regale Shelf, Measure Caravan Trade, Measure Iron Wood Flow)
                     python -I tools/sprawdz_logi.py --grupa nf4 <Armoury-*.log> (strumieniowo). NF4-0 linie paczki (brak - INFO, log sprzed paczki), NF4-1 diagnoza A7
@@ -42381,13 +42389,20 @@ NZW_W2 = re.compile(r"Wioski wedlug rodzaju \(210\): dzien (?P<day>-?\d+) \| (?P
 NZW_W2P = re.compile(r"proba W2 \(inwest etap 0\): wywolania kroku zboza (?P<g>\d+), ryb (?P<f>\d+), wsi bez u (?P<nu>\d+), przy kroku nieczynnym (?P<off>\d+), ciche wyjatki modelu \(MaterialLaw\) (?P<silent>\d+)")
 NZW_ERR = ("ERROR in VillageCrafts.", "ERROR in DistrictIcon.", "ERROR in SyncData.arm_crafts", "ERROR in StartCalibration.WorksKs", "ERROR in StartCalibration.KsPartsOf", "ERROR in StartCalibration.SideRows")
 # f5-zajecia: pomiar pelny w dobie wlaczenia (stan po poprawce), odchylka kazdego towaru, przed poprawka, poprawka n na towar, ikona F17 pod KS
-NZW_F5 = re.compile(r"\| pomiar pelny w dobie wlaczenia \(f5, Side Village Craft Measure Now\): wywolan modelu (?P<c0>\d+) \+ (?P<c1>\d+) \(wsi pytanych (?P<asked>\d+)\), wsi poza pomiarem (?P<part>\d+), n (?P<mode>na towar|zajecia), plany od nowa (?P<plans>\d+)"
+NZW_F5 = re.compile(r"\| pomiar pelny w dobie wlaczenia \(f5, Side Village Craft Measure Now\): wywolan modelu (?P<c0>\d+) \+ (?P<c1>\d+) \(wsi pytanych (?P<asked>\d+)\), wsi poza pomiarem (?P<part>\d+)(?: \((?P<skip>[^()]*)\))?, n (?P<mode>na towar|zajecia), plany od nowa (?P<plans>\d+)"
                     r", przed poprawka: najwieksza odchylka produkcji typu (?P<dev0>[\d.]+)% w (?P<t0>\S+), towar (?P<g0>[\d.]+)% w (?P<gt0>\S+) \(ponad 1%: (?P<go0>\d+)\), koszt (?P<ms>[\d.]+) ms")
 NZW_F5G = re.compile(r"\| towary \(f5\): najwieksza odchylka (?P<dev>[\d.]+)% w (?P<g>\S+), towarow (?P<n>\d+) \(produkcja przed >= 1 szt\./d\), ponad 1%: (?P<over>\d+)(?P<rest>[^|]*)")
 NZW_F5FIX = re.compile(r"\| poprawka n z pomiaru \(f5(?P<kind>[^)]*)\): (?P<text>[^|]*)")
 NZW_F5PRED = re.compile(r"przewidywana odchylka po poprawce (?P<pred>[\d.]+)% w (?P<pt>[^\s;,]+?)\.?(?:$|[\s;,])")
 NZW_F5ICON = re.compile(r"\| ikona F17 pod KS \(f5\): regula f4b \(sprzedaz KS\) dla porownania - inna niz typ pod KS (?P<alt>\d+|-)")
 NZW_DEVG_MAX = 1.0                      # f5: kazdy towar w 1% w dobie wlaczenia (zadanie f5: "within 1% for every good")
+# recenzja f5: towary nowe z niczego w pomiarze (NZW-1f), akceptacja swiata z ksiegi towarow wobec biegu bez zajec (NZW-1h)
+NZW_F5NEW = re.compile(r"nowe z niczego \([^)]*\): (?P<new>\d+)")
+NZW_LED = re.compile(r"Towary: dzien (?P<day>-?\d+) - (?P<it>\S+) \((?P<val>\d+) d\): zapas [^|]*\| produkcja \d+ \[(?:wsie (?P<vil>\d+))?")
+NZW_KSON = re.compile(r"KS: WLACZONE doba (?P<day>-?\d+)")
+NZW_LED_MAX = 12.0                      # % - szum dwoch biegow bez zajec z tego samego zapisu (doby 109077-109104): do 8.9% (krowy), zwykle 1-5%; fin88: papirus +95%, srebro -14%
+NZW_LED_MINPCS, NZW_LED_MINVAL = 5.0, 200.0   # towar w NZW-1h: baza >= 5 szt./d i >= 200 zl/d (jak tools/inwest/ksiega_porownanie.py)
+NZW_LED_DAYS = 28                       # okno NZW-1h: doby wlaczenia + 1 .. + 28 (najdalej doba przed KS: WLACZONE)
 NZW_ICON_LO, NZW_ICON_HI = 40, 130      # projekt TESTS 2: ikona inna niz typ w 40-130 okregach (oczekiwane 81 z 558)
 NZW_DEV_MAX = 1.0                       # projekt TESTS 2: w dobie wlaczenia swiat kazdego typu w 1%
 NZW_MS_MAX = 5.0                        # koszt doby zajec (ms, mediana)
@@ -42396,7 +42411,72 @@ NZW_GAP_MAX = 0.1                       # f4b recenzja: luka rozbicia wyniku "po
 NZW_PACE = 0.01                         # zmiany zajec bez KS: najwyzej 1% wiosek na 7 dob (hamulec Jeffa: 60 dob + 1 wioska okregu + 5% regionu na sezon)
 
 
-def nzw_main(logp):
+def nzw_ledger(path):
+    """recenzja f5 (NZW-1h): ksiega towarow logu - ({towar: {doba: produkcja wsi}}, {towar: wartosc}, pierwsza doba 'KS: WLACZONE' albo None). Strumieniowo."""
+    led, val, kson = {}, {}, None
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "Towary: dzien" in ln:
+                m = NZW_LED.search(ln)
+                if m:
+                    led.setdefault(m.group("it"), {})[int(m.group("day"))] = int(m.group("vil") or 0)
+                    val[m.group("it")] = int(m.group("val"))
+            elif kson is None and "KS: WLACZONE doba" in ln:
+                m = NZW_KSON.search(ln)
+                if m:
+                    kson = int(m.group("day"))
+    return led, val, kson
+
+
+def nzw_ledger_check(rep, logp, bdp, sday):
+    """recenzja f5 (NZW-1h): akceptacja swiata - ksiega towarow (produkcja wsi) w dobach sday + 1 .. + 28 (najdalej doba przed KS: WLACZONE) wobec biegu bez zajec (bdp)."""
+    if sday is None:
+        rep.add("NZW-1h: ksiega towarow wobec biegu bez zajec", "brak doby wlaczenia (linia pomiaru / startu neutralnego)", "INFO", None)
+    else:
+        led, val, kson = nzw_ledger(logp)
+        bled, bval, bks = ({}, {}, None)
+        if bdp and os.path.isfile(bdp):
+            bled, bval, bks = nzw_ledger(bdp)
+        a1, z1 = sday + 1, sday + NZW_LED_DAYS
+        for k in (kson, bks):
+            if k is not None and k > sday:
+                z1 = min(z1, k - 1)
+
+        def lmean(d, it):
+            xs = [v for x, v in d.get(it, {}).items() if a1 <= x <= z1]
+            return (sum(xs) / len(xs), len(xs)) if xs else (None, 0)
+        pt, npt = lmean(led, "Papyrus")
+        ptxt = f"papirus {pt:.1f}/d ({npt} dob)" if pt is not None else "papirus - brak linii"
+        if z1 < a1:
+            rep.add("NZW-1h: ksiega towarow wobec biegu bez zajec", f"okno puste (doba wlaczenia {sday}, KS: WLACZONE {kson} / baza {bks})", "INFO", None)
+        elif bdp and bled:
+            rows = []
+            for it in bled:
+                b, nb = lmean(bled, it)
+                t, nt = lmean(led, it)
+                if b is None or t is None:
+                    continue
+                v = max(1, bval.get(it, val.get(it, 1)))
+                if b < NZW_LED_MINPCS or b * v < NZW_LED_MINVAL:
+                    continue
+                rows.append((100.0 * (t - b) / b, it, t, b))
+            rows.sort(key=lambda r: -abs(r[0]))
+            bad = [r for r in rows if abs(r[0]) > NZW_LED_MAX]
+            pb, _ = lmean(bled, "Papyrus")
+            top = ", ".join(f"{r[1]} {r[0]:+.1f}% ({r[2]:.1f} wobec {r[3]:.1f}/d)" for r in rows[:6])
+            if rows:
+                rep.add("NZW-1h: ksiega towarow (produkcja wsi) wobec biegu bez zajec - akceptacja swiata",
+                        f"doby {a1}-{z1}, towarow {len(rows)}, najwieksze: {top}; ponad {NZW_LED_MAX:.0f}%: {len(bad)}"
+                        + (f" ({', '.join(r[1] for r in bad[:8])})" if bad else "") + f"; {ptxt}" + (f" wobec {pb:.1f}/d" if pb is not None else ""),
+                        f"kazdy towar (baza >= {NZW_LED_MINPCS:.0f} szt./d i >= {NZW_LED_MINVAL:.0f} zl/d) w +-{NZW_LED_MAX:.0f}% (szum dwoch biegow bez zajec do 8.9%)", not bad)
+            else:
+                rep.add("NZW-1h: ksiega towarow wobec biegu bez zajec", f"brak wspolnych towarow w dobach {a1}-{z1} (baza {bdp})", "INFO", None)
+        else:
+            rep.add("NZW-1h: ksiega towarow wobec biegu bez zajec", f"bez --baza-doby (albo baza bez linii Towary); doby {a1}-{z1}: {ptxt}",
+                    "INFO (podaj --baza-doby <log bez zajec z tego samego zapisu>; papirus oczekiwany ok. 10/d - bez zajec 9.8-10.3/d, fin88 20.1/d)", None)
+
+
+def nzw_main(logp, bdp=None):
     """nzw (noc 17/18.10, paczka inwest - zajecia wiosek pobocznych, ikona okregu, etap 0 W2). Wejscie: log Armoury (strumieniowo).
     NZW-0 linia startu (klucz Side Village Crafts; WYLACZONE albo "neutralny start odlozony" - INFO), NZW-1 neutralny start NA TOWARACH: produkcja typu we wsiach
     z planem w dobie wlaczenia w 1% (linia "pomiar neutralnosci (A6, TESTS 2)", projekt TESTS 2; recenzja), NZW-1b rece swiata po x n / przed (z definicji n - INFO),
@@ -42406,7 +42486,9 @@ def nzw_main(logp):
     gdy wszystkie wsie z rybakami maja plan - INFO), NZW-11 tabliczka ikony wpieta (INFO bez linii). Log bez paczki: INFO, bez wyjatku.
     f4b-inwest: NZW-1 = PIERWSZA linia pomiaru (doba wlaczenia), NZW-1c poprawka n z pomiaru i linia "po poprawce" (w 1%; bez poprawki - INFO), NZW-1d sposob
     liczenia n (INFO), NZW-3b ikony bez KS i zmiany typ->ikona (INFO). Recenzja f4b: NZW-1e uklad liniowy poprawki n - luka rozbicia wyniku "po" <= 0.1%
-    (przewidywana odchylka po poprawce - w opisie); NZW-3b dopisuje ikony inne niz typ przy wartosci typu 0 (okreg nic nie sprzedaje z typu - bez progu zmiany)."""
+    (przewidywana odchylka po poprawce - w opisie); NZW-3b dopisuje ikony inne niz typ przy wartosci typu 0 (okreg nic nie sprzedaje z typu - bez progu zmiany).
+    Recenzja f5: NZW-1f takze towary nowe z niczego = 0; NZW-1g wsi poza pomiarem - prawdziwa liczba (przyczyny pominiec i magazyn - INFO); NZW-1h akceptacja swiata:
+    ksiega towarow wobec biegu bez zajec (bdp = --baza-doby) w +-12% na towar, bez bazy - INFO z papirusem na dobe."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NZW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -42547,15 +42629,23 @@ def nzw_main(logp):
         g5 = meas[0].get("f5g")
         if g5:
             dg = float(g5["dev"])
-            rep.add("NZW-1f: kazdy towar w dobie wlaczenia (f5, sztuki przed -> po)", f"najwieksza odchylka {dg:.3f}% w {g5['g']}, towarow {g5['n']}, ponad 1%: {g5['over']}{g5['rest'][:160]}",
-                    f"<= {NZW_DEVG_MAX:.0f}% (zadanie f5: kazdy towar)", dg <= NZW_DEVG_MAX)
+            nw = NZW_F5NEW.search(g5["rest"])                 # recenzja f5: towary nowe z niczego (przed < 1, po o >= 1 szt./d wiecej)
+            nnew = int(nw.group("new")) if nw else 0
+            rep.add("NZW-1f: kazdy towar w dobie wlaczenia (f5, sztuki przed -> po; tozsamosc pomiaru - akceptacja swiata w NZW-1h)",
+                    f"najwieksza odchylka {dg:.3f}% w {g5['g']}, towarow {g5['n']}, ponad 1%: {g5['over']}{g5['rest'][:220]}"
+                    + ("" if nw else " (linia bez licznika towarow nowych - DLL sprzed recenzji f5)"),
+                    f"<= {NZW_DEVG_MAX:.0f}% (zadanie f5: kazdy towar) i towarow nowych z niczego 0", dg <= NZW_DEVG_MAX and nnew == 0)
         else:
             rep.add("NZW-1f: kazdy towar w dobie wlaczenia", "brak dopisku 'towary (f5)'", "INFO", None)
         c0, part = int(f5["c0"]), int(f5["part"])
-        rep.add("NZW-1g: pomiar pelny w dobie wlaczenia (f5) - wsi i wywolania", f"wywolan modelu {f5['c0']} + {f5['c1']} (wsi pytanych {f5['asked']}), wsi poza pomiarem {part}, plany od nowa {f5['plans']}, koszt {f5['ms']} ms",
-                "wywolan > 0 i wsi poza pomiarem 0", c0 > 0 and part == 0)
+        sk = f5.get("skip")
+        rep.add("NZW-1g: pomiar pelny w dobie wlaczenia (f5) - wsi i wywolania", f"wywolan modelu {f5['c0']} + {f5['c1']} (wsi pytanych {f5['asked']}), wsi poza pomiarem {part}, plany od nowa {f5['plans']}, koszt {f5['ms']} ms"
+                + (f"; {sk.strip()[:300]}" if sk else " (DLL sprzed recenzji f5 - liczba 0 wpisana na sztywno, bez przyczyn)"),
+                "wywolan > 0 i wsi poza pomiarem 0 (krok zajec je rusza, a wywolanie rzucilo; pominiete i magazyn - INFO)", c0 > 0 and part == 0)
     elif meas:
         rep.add("NZW-1f: kazdy towar w dobie wlaczenia", "pomiar bez dopisku f5 (ticki gry doby nastepnej)", "INFO (DLL sprzed f5 albo Side Village Craft Measure Now wylaczony)", None)
+    # recenzja f5: NZW-1h - akceptacja swiata: ksiega towarow (produkcja wsi) od doby wlaczenia + 1 wobec biegu bez zajec z tego samego zapisu (--baza-doby)
+    nzw_ledger_check(rep, logp, bdp, int(meas[0]["day"]) if meas else (int(neutral[0]["day"]) if neutral else None))   # zmienne lokalne w funkcji (nie nadpisuja bad / rows nzw_main)
     # f4b-inwest: NZW-1c poprawka n z pomiaru doby wlaczenia i pomiar po poprawce; NZW-1d sposob liczenia n
     if f5:
         pass
@@ -43620,7 +43710,7 @@ def main(argv):
     if group == "nksarm" and logp:
         return nksarm_main(logp)   # nksarm (noc 17/18.10, paczka ks-arm): samo uzbrojenie KS, twarde bramki rozdz. 10, bramka krainy rozdz. 8, zrodla z niczego znane z nazwy (StartCalibration.Arm.cs)
     if group == "nzw" and logp:
-        return nzw_main(logp)   # nzw (noc 17/18.10, inwest): zajecia wiosek pobocznych, neutralny start, uprawy na sniegu, ikona okregu, etap 0 W2 (VillageCrafts, DistrictIcon, HamletKinds)
+        return nzw_main(logp, bdp)   # nzw (noc 17/18.10, inwest): zajecia wiosek pobocznych, neutralny start, uprawy na sniegu, ikona okregu, etap 0 W2 (VillageCrafts, DistrictIcon, HamletKinds)
     if group == "npo" and logp:
         return npo_main(logp)   # npo (noc 17/18.10, inwest): prace okregu gracza - pieniadze zakupu i wyplat, pula, oczekiwane, proba autotestu (DistrictWorks)
     if group == "nherby" and logp:

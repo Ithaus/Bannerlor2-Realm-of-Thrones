@@ -165,6 +165,10 @@ namespace Armoury
         // f5-zajecia (noc 17/18.10, fin88: NZW-1 13.3% w daktylach, papirus +98% w ksiedze towarow): n na TOWAR (klucz Side Village Craft Neutral Per Good) - towar -> n;
         // null = n zajecia (jak dotad). Jedna referencja podmieniana (odczyt z watkow modelu bez zamka). Zapis: arm_crafts_g (osobny klucz - starsza DLL go nie zna).
         private static volatile Dictionary<ItemObject, double> _ng;
+        // recenzja f5: towary bez produkcji "przed" w dobie wlaczenia (zadna wies typu poza KS ich nie rodzila - np. wszystkie wsie typu zlupione albo pod KS), a z dopiskami
+        // "po" - dopiski tych towarow 0 (n na towar nie ma czym ich zrownowazyc: przy n zajecia wchlanialy je inne towary zajecia, przy n na towar powstawalyby z niczego);
+        // towar typu zostaje przy n 1 (wies typu, ktora wroci do Normal, rodzi jak w grze). null - brak. Zapis: arm_crafts_g, wpisy "!towar".
+        private static volatile HashSet<ItemObject> _ngNoAdd;
         private static string _ngPending;           // arm_crafts_g z wczytania - do rozwiazania przy pierwszej dobie sesji (przedmioty gry)
         private static string _ngNote = "";         // opis n na towar (linia startu neutralnego)
         private static int _measNowDay = -1;        // f5: doba pomiaru pelnego (Side Village Craft Measure Now) - doba wlaczenia, zaraz po planach
@@ -243,6 +247,7 @@ namespace Armoury
                 _worksOnly = 0; _w2Skip = 0; _measDay = -1; _meas.Clear(); _deferLogged = false;
                 _measRound = 0; _owner = null;                                // f4b-inwest
                 _ng = null; _ngPending = null; _ngNote = ""; _measNowDay = -1; // f5-zajecia
+                _ngNoAdd = null;                                              // recenzja f5
                 _tally.Clear(); _w2Note = ""; _measW2 = null;
                 F4ZwClear();                                   // recenzja f4-pomiary: nacisk ZW od zera po wczytaniu / nowej kampanii (bez licznikow poprzedniej sesji)
             }
@@ -487,7 +492,7 @@ namespace Armoury
                     {
                         float cur; add.TryGetValue(m.Goods[i], out cur);
                         // poprawka stawki typu (sol wsi solnych, futra trapperow - GoodsRates): lancuch patrzy na typ wsi gry, wioska z tym zajeciem dostaje ja w bazie
-                        if (pg) add[m.Goods[i]] = cur + (float)(k0 * NGc(c, m.Goods[i]) * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId));
+                        if (pg) add[m.Goods[i]] = cur + (float)(k0 * NGa(c, m.Goods[i]) * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId));   // recenzja f5: towar bez "przed" - 0
                         else add[m.Goods[i]] = cur + (float)(k * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId));
                     }
                 });
@@ -529,6 +534,15 @@ namespace Armoury
             var ng = _ng; double x;
             if (ng != null && it != null && PerGoodKey && ng.TryGetValue(it, out x) && x > 0 && !double.IsInfinity(x) && !double.IsNaN(x)) return x;
             return N(c);
+        }
+
+        /// <summary>recenzja f5: n DOPISKU towaru it zajecia c (zajecie inne niz typ okregu) - towar bez produkcji "przed" w dobie wlaczenia (_ngNoAdd): 0, dopisek nie
+        /// powstaje z niczego; inaczej NGc. Bez n na towar (klucz albo liczby) - NGc (n zajecia, jak dotad).</summary>
+        private static double NGa(int c, ItemObject it)
+        {
+            var na = _ngNoAdd;
+            if (na != null && it != null && _ng != null && PerGoodKey && na.Contains(it)) return 0.0;
+            return NGc(c, it);
         }
 
         // ============================================================ haki produkcji (moga isc z innych watkow - sam odczyt planu, pamiec pod Gate)
@@ -982,6 +996,9 @@ namespace Armoury
             public readonly Dictionary<ItemObject, double> Unsc = new Dictionary<ItemObject, double>(), UnG = new Dictionary<ItemObject, double>();
             public readonly Dictionary<ItemObject, double[]> Scl = new Dictionary<ItemObject, double[]>();
             public int Vil, Calls, NoFinal, NoMult, Works, Asked, AskVil; public double W2g;
+            // recenzja f5: wsie z planem poza pomiarem wedlug przyczyny (Miss - krok zajec je rusza, a wywolanie modelu rzucilo; reszte krok zajec pomija takze w ticku)
+            // i magazyn wsi pytanych (tick gry: zapas >= 1.5 x pojemnosci - wies nic nie rodzi; pomiar to potencjal - roznice widac tylko w ksiedze towarow)
+            public int Miss, SkState, SkKs, SkWorks, SkWorksOnly, Full, FullBack;
         }
 
         /// <summary>f5: model produkcji pytany wprost o kazdy towar typu (bez papirusu zdjetego z listy BK filtrem klimatu) i kazdy dopisek (bez zabronionych filtrem
@@ -999,19 +1016,43 @@ namespace Armoury
                 var v = kv.Key; var pl = kv.Value;
                 try
                 {
-                    if (v == null || pl == null || pl.WorksOnly || UnderKs(v) || DistrictWorks.HasWorks(v)) continue;
-                    if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null) continue;
+                    // recenzja f5: pominiete liczone wedlug przyczyny (krok zajec - Base - pomija je takze w ticku: tylko prace, pod KS, nie Normal / bez targu; prace okregu -
+                    // pominiete w pomiarze jak dotad, premia prac nie jest startem)
+                    if (v == null || pl == null) continue;
+                    if (pl.WorksOnly) { s.SkWorksOnly++; continue; }
+                    if (UnderKs(v)) { s.SkKs++; continue; }
+                    if (DistrictWorks.HasWorks(v)) { s.SkWorks++; continue; }
+                    if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null) { s.SkState++; continue; }
                     items.Clear();
                     if (pl.TypeGoods != null) foreach (var it in pl.TypeGoods) if (it != null && !MineralOnce.CropBlocks(v, it)) items.Add(it);
                     if (pl.Add != null) foreach (var ad in pl.Add) if (ad.Key != null && ad.Value > 0f && (pl.TypeGoods == null || !pl.TypeGoods.Contains(ad.Key)) && !CropBlocked(v, ad.Key)) items.Add(ad.Key);
                     s.AskVil++;
+                    // recenzja f5: magazyn - tick gry (VillageGoodProductionCampaignBehavior.TickProductions) nie rodzi nic, gdy suma sztuk magazynu >= 1.5 x pojemnosci
+                    // (Village.GetWarehouseCapacity: model x 5 dob + nasze postfiksy, w tym CapAdd dopiskow). Full - stoi mimo dopiskow; FullBack - stalaby bez pojemnosci
+                    // dopiskow (CapAdd), a z nia rodzi: w ksiedze swiata dochodzi cala jej produkcja, ktorej pomiar nie widzi. Wywolania modelu z pojemnosci (towary listy
+                    // typu, takze papirus zdjety filtrem) poza pomiarem: _measDay na czas odczytu -1 (Base / After nic nie zapisza), potem przywrocone.
+                    int mdSave = _measDay;
+                    try
+                    {
+                        int stock = 0; var ro = v.Owner != null ? v.Owner.ItemRoster : null;
+                        if (ro != null) for (int i = 0; i < ro.Count; i++) stock += ro[i].Amount;
+                        _measDay = -1;
+                        int cap = v.GetWarehouseCapacity();
+                        _measDay = mdSave;
+                        if (stock >= cap * 1.5f) s.Full++;
+                        else { int ca = CapAdd(v); if (ca > 0 && stock >= (cap - ca) * 1.5f) s.FullBack++; }
+                    }
+                    catch (Exception e) { Stumble("MeasureNow(magazyn)", e); }
+                    finally { _measDay = mdSave; }
+                    bool bad = false;
                     foreach (var it in items)
                     {
                         try { model.CalculateDailyProductionAmount(v, it); calls++; }
-                        catch (Exception e) { Stumble("MeasureNow(model)", e); }
+                        catch (Exception e) { bad = true; Stumble("MeasureNow(model)", e); }
                     }
+                    if (bad) s.Miss++;
                 }
-                catch (Exception e) { Stumble("MeasureNow(wies)", e); }
+                catch (Exception e) { s.Miss++; Stumble("MeasureNow(wies)", e); }
             }
             s.Asked += calls;
             return calls;
@@ -1083,10 +1124,18 @@ namespace Armoury
             if (sb != null && f) sb.Append(" -");
         }
 
-        /// <summary>f5: odchylka kazdego towaru (sztuki przed -> po, towary z produkcja przed >= 1 szt./d): najwieksza, liczba ponad 1% i lista (najwyzej 6).</summary>
-        private static string GoodDevs(MeasSum s, out double worst, out string worstG, out int over)
+        /// <summary>f5: odchylka kazdego towaru (sztuki przed -> po, towary z produkcja przed >= 1 szt./d): najwieksza, liczba ponad 1% i lista (najwyzej 6).
+        /// Recenzja f5: takze towary nowe z niczego (przed < 1 szt./d, po o >= 1 szt./d wiecej) - poza odchylka procentowa, liczone osobno (newG).</summary>
+        private static string GoodDevs(MeasSum s, out double worst, out string worstG, out int over, out int newG)
         {
-            worst = 0; worstG = "-"; over = 0; int n = 0;
+            worst = 0; worstG = "-"; over = 0; int n = 0; newG = 0;
+            var fresh = new List<string>();
+            foreach (var kv in s.Aft)
+            {
+                if (kv.Key == null) continue;
+                double b; s.Bef.TryGetValue(kv.Key, out b);
+                if (b < 1.0 && kv.Value - b >= 1.0) { newG++; if (fresh.Count < 6) fresh.Add(kv.Key.StringId + " " + b.ToString("0.0", Inv) + "->" + kv.Value.ToString("0.0", Inv)); }
+            }
             var bad = new List<KeyValuePair<string, double>>();
             foreach (var kv in s.Bef)
             {
@@ -1100,7 +1149,8 @@ namespace Armoury
             bad.Sort((x, y) => Math.Abs(y.Value).CompareTo(Math.Abs(x.Value)));
             var sb = new StringBuilder();
             for (int i = 0; i < bad.Count && i < 6; i++) { if (sb.Length > 0) sb.Append(", "); sb.Append(bad[i].Key).Append(' ').Append((100 * bad[i].Value).ToString("+0.00;-0.00;0.00", Inv)).Append('%'); }
-            return "towarow " + n + " (produkcja przed >= 1 szt./d), ponad 1%: " + over + (sb.Length > 0 ? " (" + sb + ")" : "");
+            return "towarow " + n + " (produkcja przed >= 1 szt./d), ponad 1%: " + over + (sb.Length > 0 ? " (" + sb + ")" : "")
+                   + ", nowe z niczego (przed < 1 szt./d, po o >= 1 szt./d wiecej): " + newG + (fresh.Count > 0 ? " - " + string.Join(", ", fresh.ToArray()) : "");
         }
 
         /// <summary>f5: poprawka n NA TOWAR z pomiaru pelnego - dokladna: wynik "po" towaru g = czesc bez n (UnG) + czesc skalowana n_g (reszta), wiec r_g = (przed_g - bez_n_g)
@@ -1114,7 +1164,7 @@ namespace Armoury
             var ng = new Dictionary<ItemObject, double>(ng0);
             var r = new Dictionary<ItemObject, double>();
             var notes = new List<KeyValuePair<double, string>>();
-            int noN = 0, noScaled = 0, clip = 0; double worstP = 0; string worstPG = "-";
+            int noN = 0, noScaled = 0, clip = 0, atLim = 0; double worstP = 0; string worstPG = "-";
             var keys = new HashSet<ItemObject>(s.Bef.Keys); foreach (var k in s.Aft.Keys) keys.Add(k);
             foreach (var it in keys)
             {
@@ -1124,11 +1174,22 @@ namespace Armoury
                 double S = a - u;
                 double dev = (a - b) / b;
                 if (Math.Abs(dev) <= 0.001) continue;                         // poprawka dokladna (liniowa) - prog 0.1% (f4b: 0.5% przy ukladzie przyblizonym)
-                if (!(S > 1e-9)) { noScaled++; continue; }
-                double x; if (!ng.TryGetValue(it, out x) || !(x > 0)) { noN++; continue; }
+                // recenzja f5: towar, ktorego poprawka nie ruszy (bez czesci skalowanej n, bez n na towar, n juz na granicy widelek), zostaje z odchylka - w przewidywanej
+                if (!(S > 1e-9)) { noScaled++; if (Math.Abs(dev) > Math.Abs(worstP)) { worstP = dev; worstPG = it.StringId; } continue; }
+                double x; if (!ng.TryGetValue(it, out x) || !(x > 0)) { noN++; if (Math.Abs(dev) > Math.Abs(worstP)) { worstP = dev; worstPG = it.StringId; } continue; }
                 double rr = (b - u) / S, rc = Math.Max(0.5, Math.Min(2.0, rr));
                 double nn = Math.Max(NgMin, Math.Min(NgMax, x * rc));
-                if (Math.Abs(nn - x) < 1e-9) continue;
+                if (Math.Abs(nn - x) < 1e-9)
+                {
+                    // recenzja f5: n juz na granicy (0.2 / 5.0) - bez zmiany, ale przyciety i w przewidywanej odchylce (to samo, co pokaze drugi pomiar w NZW-1f)
+                    clip++; atLim++;
+                    double pl0 = (u + S - b) / b;
+                    if (Math.Abs(pl0) > Math.Abs(worstP)) { worstP = pl0; worstPG = it.StringId; }
+                    notes.Add(new KeyValuePair<double, string>(Math.Abs(dev) * b * Math.Max(1, it.Value),
+                        it.StringId + " " + (100 * dev).ToString("+0.00;-0.00;0.00", Inv) + "% bez zmiany (n " + x.ToString("0.000", Inv) + " na granicy " + NgMin.ToString("0.0", Inv) + "-" + NgMax.ToString("0.0", Inv)
+                        + ", potrzebne x" + rr.ToString("0.000", Inv) + ")"));
+                    continue;
+                }
                 bool cut = Math.Abs(rc - rr) > 1e-9 || Math.Abs(nn - x * rc) > 1e-9;
                 if (cut) clip++;
                 ng[it] = nn; r[it] = nn / x; changed++;
@@ -1157,7 +1218,8 @@ namespace Armoury
             notes.Sort((x, y) => y.Key.CompareTo(x.Key));
             var sb = new StringBuilder();
             for (int i = 0; i < notes.Count && i < 12; i++) { if (sb.Length > 0) sb.Append(", "); sb.Append(notes[i].Value); }
-            return "towarow poprawionych " + changed + (changed > 0 ? " (najwieksze: " + sb + ")" : " (wszystkie w 0.1%)") + ", przycietych " + clip + ", bez czesci z n " + noScaled + ", bez n na towar " + noN
+            return "towarow poprawionych " + changed + (notes.Count > 0 ? " (najwieksze: " + sb + ")" : " (wszystkie w 0.1%)") + ", przycietych " + clip + " (w tym n na granicy bez zmiany " + atLim + ")"
+                   + ", bez czesci z n " + noScaled + ", bez n na towar " + noN
                    + "; tozsamosc: po = bez n + skalowana n towaru (dokladnie liniowe), przewidywana odchylka po poprawce " + (100 * Math.Abs(worstP)).ToString("0.000", Inv) + "% w " + worstPG;
         }
 
@@ -1198,14 +1260,15 @@ namespace Armoury
                 bool ledOk = ld == today - 1;
                 double w0, ww0; string wt0, wwt0;
                 TypeDevs(s0, meta, led, ledOk, null, out w0, out wt0, out ww0, out wwt0);
-                double gw0; string gwt0; int go0; GoodDevs(s0, out gw0, out gwt0, out go0);
+                double gw0; string gwt0; int go0, gn0; GoodDevs(s0, out gw0, out gwt0, out go0, out gn0);
                 // poprawka (klucz Side Village Craft Neutral Fix): n na towar - dokladna; bez n na towar - uklad liniowy f4b na zajeciach (ten sam FixFromMeasure)
                 var sx = Settings.Current;
                 string fixText; int changed = 0; bool pg = PerGoodOn;
                 if (sx != null && sx.SideVillageCraftNeutralFix && s0.Vil > 0 && s0.Calls > 0 && _n != null)
                 {
                     if (pg) fixText = "poprawka n z pomiaru (f5, pomiar pelny, n na towar): " + FixPerGood(s0, meta, out changed);
-                    else fixText = "poprawka n z pomiaru (f5, pomiar pelny - uklad liniowy f4b na zajeciach): " + FixFromMeasure(s0.Bef, s0.Aft, s0.Unsc, s0.Scl, meta, out changed);
+                    else fixText = "poprawka n z pomiaru (f5, pomiar pelny - uklad liniowy f4b na zajeciach): " + FixFromMeasure(s0.Bef, s0.Aft, s0.Unsc, s0.Scl, meta, out changed)
+                                   .Replace("pomiar po poprawce w linii doby nastepnej", "pomiar po poprawce w tej linii");   // recenzja f5: pomiar pelny powtarza pomiar w tej dobie
                 }
                 else fixText = "poprawka n z pomiaru (f5): " + (sx != null && sx.SideVillageCraftNeutralFix ? "bez pomiaru (wsi 0)" : "WYLACZONA (Side Village Craft Neutral Fix)");
                 var fin = s0; int c1 = 0, plans1 = 0;
@@ -1225,14 +1288,20 @@ namespace Armoury
                   .Append(" | zmiana produkcji typu we wsiach z planem (wartosc, przed z W2 dnia wczesniej -> po; W2 zboze -> ryby ").Append(fin.W2g.ToString("0", Inv)).Append(" szt.):");
                 double w1, ww1; string wt1, wwt1;
                 TypeDevs(fin, meta, led, ledOk, sb, out w1, out wt1, out ww1, out wwt1);
-                double gw1; string gwt1; int go1; string gtext = GoodDevs(fin, out gw1, out gwt1, out go1);
+                double gw1; string gwt1; int go1, gn1; string gtext = GoodDevs(fin, out gw1, out gwt1, out go1, out gn1);
                 sb.Append(" | najwieksza odchylka produkcji typu ").Append((100 * Math.Abs(w1)).ToString("0.000", Inv)).Append("% (prog 1%) w ").Append(wt1)
                   .Append(" | wobec swiata (ksiega towarow doby ").Append(ledOk ? (today - 1).ToString(Inv) : "BRAK").Append("): najwieksza ").Append((100 * Math.Abs(ww1)).ToString("0.000", Inv)).Append("% w ").Append(wwt1)
                   .Append(" | towar: najwieksza zmiana ").Append((100 * gw1).ToString("+0.0;-0.0;0.0", Inv)).Append("% (").Append(gwt1).Append(")")
                   .Append(" | towary (f5): najwieksza odchylka ").Append((100 * Math.Abs(gw1)).ToString("0.000", Inv)).Append("% w ").Append(gwt1).Append(", ").Append(gtext)
                   .Append(" | W2 (zboze -> ryby) dnia wczesniej w 'przed' (recenzja calosci) - zajecia go zastepuja")
                   .Append(" | pomiar pelny w dobie wlaczenia (f5, Side Village Craft Measure Now): wywolan modelu ").Append(c0).Append(" + ").Append(c1).Append(" (wsi pytanych ").Append(s0.AskVil)
-                  .Append("), wsi poza pomiarem 0, n ").Append(pg ? "na towar" : "zajecia").Append(", plany od nowa ").Append(plans1)
+                  // recenzja f5: wsi poza pomiarem - prawdziwa liczba (krok zajec je rusza, a wywolanie rzucilo); pominiete przez krok zajec i magazyn - w nawiasie (bez nawiasow w srodku)
+                  .Append("), wsi poza pomiarem ").Append(Math.Max(s0.Miss, fin.Miss))
+                  .Append(" (wywolanie z bledem; pominiete - krok zajec ich nie rusza: nie Normal / bez targu ").Append(s0.SkState).Append(", pod KS ").Append(s0.SkKs)
+                  .Append(", prace okregu ").Append(s0.SkWorks).Append(", tylko prace ").Append(s0.SkWorksOnly)
+                  .Append("; magazyn pelny ").Append(fin.Full).Append(" wsi - tick nic nie rodzi, pomiar to potencjal; przywrocone do produkcji pojemnoscia dopiskow ").Append(fin.FullBack)
+                  .Append(" wsi - ich produkcja dochodzi tylko w ksiedze towarow; akceptacja swiata - ksiega towarow wobec biegu bez zajec, NZW-1h)")
+                  .Append(", n ").Append(pg ? "na towar" : "zajecia").Append(", plany od nowa ").Append(plans1)
                   .Append(", przed poprawka: najwieksza odchylka produkcji typu ").Append((100 * Math.Abs(w0)).ToString("0.000", Inv)).Append("% w ").Append(wt0)
                   .Append(", towar ").Append((100 * Math.Abs(gw0)).ToString("0.000", Inv)).Append("% w ").Append(gwt0).Append(" (ponad 1%: ").Append(go0).Append(")")
                   .Append(", koszt ").Append(ms.ToString("0.0", Inv)).Append(" ms")
@@ -1329,23 +1398,23 @@ namespace Armoury
         internal static bool CraftIconKey { get { var s = Settings.Current; return s != null && s.DistrictIconCraftValue; } }
 
         /// <summary>f5-zajecia (District Icon Craft Value): wartosc dnia czesci okregu wedlug F17 projektu (A5 x cena) - udzial ludzi w domu x M wsi x g(zajecie)/g(typ)
-        /// x n towaru x stawka typu zajecia x poprawka stawki x cena miasta targowego; ta sama regula co droga bez KS (PartsOf ponizej), ale zajecie czesci to zajecie jej
-        /// ziemi (wies gry - typ okregu), nie rece bloku KS. Towar zabroniony filtrem klimatu upraw (papirus poza goracym poludniem) - bez wartosci. n tylko po wlaczeniu
-        /// zajec (bez - 1). Sam odczyt, nie rzuca.</summary>
+        /// x stawka typu zajecia x poprawka stawki x cena miasta targowego; ta sama regula co droga bez KS (PartsOf ponizej) dla wsi pod KS (tam on = false, n = 1), ale
+        /// zajecie czesci to zajecie jej ziemi (wies gry - typ okregu), nie rece bloku KS. Towar zabroniony filtrem klimatu upraw (papirus poza goracym poludniem) - bez
+        /// wartosci. Recenzja f5: BEZ n neutralnego startu - n wyrownuje lancuch modelu wsi poza KS, produkcja KS go nie stosuje (towar z duzym n, np. przyprawy, przewazalby
+        /// ikone okregu KS bez zarobku). Sam odczyt, nie rzuca.</summary>
         private static double F17Value(Village v, int c, int D, double share, float M, float gD, Town town, CraftMeta[] meta)
         {
             try
             {
                 var m = meta != null && c >= 0 && c < meta.Length ? meta[c] : null;
                 if (m == null || m.Type == null || !(share > 0)) return 0.0;
-                bool nOn = _n != null;
                 double k0 = share * M * (c == D ? 1.0 : VillageByPeople.GOf(m.Type) / Math.Max(1e-3f, gD));
                 double val = 0;
                 for (int i = 0; i < m.Goods.Length; i++)
                 {
                     var it = m.Goods[i];
                     if (it == null || (c == D ? MineralOnce.CropBlocks(v, it) : CropBlocked(v, it))) continue;
-                    val += k0 * (nOn ? NGc(c, it) : 1.0) * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, it.StringId) * Price(town, it);
+                    val += k0 * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, it.StringId) * Price(town, it);   // recenzja f5: n = 1 (KS bez n)
                 }
                 return val > 0 && !double.IsNaN(val) && !double.IsInfinity(val) ? val : 0.0;
             }
@@ -1452,7 +1521,11 @@ namespace Armoury
                             double val = 0;
                             for (int i = 0; i < m.Goods.Length; i++)
                             {
-                                double pcs = pgv ? k0 * NGc(c, m.Goods[i]) * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId)
+                                // recenzja f5 (klucz Side Village Craft Crop Filter): towar zabroniony filtrem klimatu upraw (papirus poza goracym poludniem - farma zboza i dopisek
+                                // zajecia zboza go nie rodza: lista BK, ListStep, Base, CapAdd, NeutralGoods) - bez wartosci w opisie, ikonie i wycenie prac (jak F17Value pod KS)
+                                if (CropBlocked(v, m.Goods[i])) continue;
+                                // recenzja f5: dopisek (zajecie inne niz typ) towaru bez "przed" - 0, jak w planie (NGa)
+                                double pcs = pgv ? k0 * (c == D ? NGc(c, m.Goods[i]) : NGa(c, m.Goods[i])) * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId)
                                                  : k * m.Rates[i] * GoodsRates.TypeRateFactor(m.Type.StringId, m.Goods[i].StringId);
                                 double cur; pc.Pcs.TryGetValue(m.Goods[i], out cur); pc.Pcs[m.Goods[i]] = cur + pcs;
                                 val += pcs * Price(town, m.Goods[i]);
@@ -1660,16 +1733,17 @@ namespace Armoury
             double[] nHands = n; string goodsNote = null; bool goods = false;
             var s0 = Settings.Current;
             Dictionary<ItemObject, double> ngood = null;                  // f5-zajecia: n na towar (klucz Side Village Craft Neutral Per Good)
+            HashSet<ItemObject> nadd = null;                              // recenzja f5: towary bez "przed" - dopiski 0
             if (s0 != null && s0.SideVillageCraftNeutralGoods)
             {
                 double[] ng = null;
-                try { ng = NeutralGoods(out goodsNote, out ngood); }
-                catch (Exception e) { Stumble("NeutralGoods", e); ng = null; ngood = null; goodsNote = "BLAD rachunku - n z rak"; }
+                try { ng = NeutralGoods(out goodsNote, out ngood, out nadd); }
+                catch (Exception e) { Stumble("NeutralGoods", e); ng = null; ngood = null; nadd = null; goodsNote = "BLAD rachunku - n z rak"; }
                 if (ng != null) { n = ng; goods = true; }
             }
             else goodsNote = "WYLACZONE (Side Village Craft Neutral Goods) - n z rak";
             _n = n; _onDay = today;
-            if (goods && ngood != null && PerGoodKey) _ng = ngood;
+            if (goods && ngood != null && PerGoodKey) { _ngNoAdd = nadd != null && nadd.Count > 0 ? nadd : null; _ng = ngood; }
             _measDay = today; _measRound = 0; lock (Gate) { _meas.Clear(); _measW2 = measW2; }   // recenzja: pomiar na towarach w tej dobie (linia "pomiar neutralnosci" doby nastepnej)
             if (MeasureNowKey)
             {
@@ -1763,9 +1837,9 @@ namespace Armoury
         /// x ten sam mnoznik lancucha wsi gospodarza. n(T) = wartosc przed / wartosc po przy n = 1 (wartosc = szt. x Value, jak pomiar neutralnosci). W2 dnia wczesniej:
         /// zboze swiata x (1 - u) i ryby + u x zboze (ten sam W2 co pomiar), w okregach, ktore dostana plan (okreg bez innych zajec i z n typu 1 - W2 zostaje, poza rachunkiem).
         /// Wsie nie Normal / bez targu - krok zajec ich nie rusza (wynik gry 0, bez dopiskow). null - brak modelu (n z rak). Watek glowny, raz na kampanie.</summary>
-        private static double[] NeutralGoods(out string note, out Dictionary<ItemObject, double> ngOut)
+        private static double[] NeutralGoods(out string note, out Dictionary<ItemObject, double> ngOut, out HashSet<ItemObject> noAddOut)
         {
-            note = ""; ngOut = null;
+            note = ""; ngOut = null; noAddOut = null;
             // f5-zajecia: n na towar (klucz Side Village Craft Neutral Per Good) - te same sztuki towaru przed i po, osobno dla kazdego towaru (sztuki, nie wartosc);
             // przy nim sufit Skaly / zlota Zachodu (RockGold) w rachunku, przy filtrze dopiskow (Side Village Craft Crop Filter) - filtr klimatu upraw (papirus). Klucze
             // wylaczone = rachunek jak w f4b.
@@ -1918,8 +1992,9 @@ namespace Armoury
             if (pgk)
             {
                 var ng = new Dictionary<ItemObject, double>();
+                var noAdd = new HashSet<ItemObject>();                   // recenzja f5: towary bez "przed" z dopiskami "po" - dopiski 0, n typu 1
                 var keys = new HashSet<ItemObject>(tgtG.Keys); foreach (var k in aftTG.Keys) keys.Add(k); foreach (var k in aftAG.Keys) keys.Add(k);
-                double vB = 0, vA = 0; int w2g = 0;
+                double vB = 0, vA = 0, vNo = 0; int w2g = 0;
                 for (int pass = 0; pass < 2; pass++)
                 {
                     var t = new Dictionary<ItemObject, double>(tgtG);
@@ -1933,13 +2008,21 @@ namespace Armoury
                             double fq; t.TryGetValue(fishIt, out fq); t[fishIt] = fq + w[4];
                             keys.Add(grainIt); keys.Add(fishIt); w2g++;
                         }
-                    ng.Clear(); vB = 0; vA = 0;
+                    ng.Clear(); noAdd.Clear(); vB = 0; vA = 0; vNo = 0;
                     foreach (var it in keys)
                     {
                         double b, a1, a2; t.TryGetValue(it, out b); aftTG.TryGetValue(it, out a1); aftAG.TryGetValue(it, out a2);
                         double a = a1 + a2;
+                        double val = Math.Max(1, it.Value);
+                        if (!(b > 0) && a2 > 0)
+                        {
+                            // recenzja f5: zaden typ nie rodzil towaru w dobie wlaczenia, a dopiski go daja - przy n 1 powstawalby z niczego (przy n zajecia wchlanialy go
+                            // inne towary zajecia); dopiski 0 (NGa), towar typu n 1 (wies typu po powrocie do Normal rodzi jak w grze). Po = a1 (czesc typu, tu 0) - tozsamosc
+                            ng[it] = 1.0; noAdd.Add(it); vA += a1 * val; vNo += a2 * val;
+                            continue;
+                        }
                         ng[it] = b > 0 && a > 0 ? b / a : 1.0;
-                        double val = Math.Max(1, it.Value); vB += b * val; vA += a * ng[it] * val;
+                        vB += b * val; vA += a * ng[it] * val;
                     }
                 }
                 var cl = new List<string>();
@@ -1952,11 +2035,14 @@ namespace Armoury
                 items.Sort((a, b) => string.CompareOrdinal(a.StringId, b.StringId));
                 var lst = new StringBuilder();
                 foreach (var it in items) { if (lst.Length > 0) lst.Append(", "); lst.Append(it.StringId).Append(' ').Append(ng[it].ToString("0.000", Inv)); }
-                ngOut = ng;
+                ngOut = ng; noAddOut = noAdd;
+                var naL = new List<string>(); foreach (var it in noAdd) naL.Add(it.StringId); naL.Sort(StringComparer.Ordinal);
                 // tozsamosc: dla kazdego towaru sztuki przed = sztuki po przy n na towar (z definicji, poza przycietymi) - suma wartosci w linii
                 _ngNote = "towarow " + ng.Count + ": " + lst + " | wartosc dnia: przed " + vB.ToString("0", Inv) + ", po przy n na towar " + vA.ToString("0", Inv) + " (tozsamosc, poza przycietymi)"
                           + " | W2 w 'przed': okregow " + w2g + " | przyciete do " + NgMin.ToString("0.0", Inv) + "-" + NgMax.ToString("0.0", Inv) + ": " + (cl.Count > 0 ? string.Join(", ", cl.ToArray()) : "zadne")
-                          + " | poza rachunkiem (0 przed i po): filtr klimatu upraw " + blockedCrop + ", sufit RockGold " + blockedRock;
+                          + " | poza rachunkiem (0 przed i po): filtr klimatu upraw " + blockedCrop + ", sufit RockGold " + blockedRock
+                          + " | bez 'przed' z dopiskami (recenzja f5 - dopiski 0, n typu 1; nic z niczego): " + noAdd.Count + (naL.Count > 0 ? " (" + string.Join(", ", naL.ToArray()) + ")" : "")
+                          + ", wartosc dopiskow przy n 1, ktora by powstala z niczego " + vNo.ToString("0", Inv);
             }
             var ownMap = new Dictionary<ItemObject, int>();
             foreach (var kv in own) { int b = -1; double bv = 0; for (int c = 0; c < KsTab.NC; c++) if (kv.Value[c] > bv) { bv = kv.Value[c]; b = c; } if (b >= 0) ownMap[kv.Key] = b; }
@@ -2317,6 +2403,7 @@ namespace Armoury
 
         // ============================================================ f5-zajecia: zapis arm_crafts_g (n na towar)
         // zg1|towar=n|towar=n...  (StringId przedmiotu; n > 0). Osobny klucz: starsza DLL go nie zna (zostaje przy n zajecia z arm_crafts); brak klucza = n zajecia (jak dotad).
+        // Recenzja f5: |!towar - towar bez "przed" w dobie wlaczenia (dopiski 0, _ngNoAdd); zapis bez takich wpisow czyta sie jak dotad.
         private const string SaveVerG = "zg1";
         private const int SaveGMax = 64 * 1024;                     // straznik rozmiaru (ok. 50 towarow x 25 znakow = ok. 1.3 KB)
 
@@ -2337,6 +2424,8 @@ namespace Armoury
                         if (kv.Key == null || kv.Key.StringId == null || !(kv.Value > 0) || double.IsInfinity(kv.Value)) continue;
                         sb.Append('|').Append(kv.Key.StringId.Replace('|', '/').Replace('=', '-')).Append('=').Append(kv.Value.ToString("R", Inv));
                     }
+                    var na = _ngNoAdd;                                          // recenzja f5: towary bez "przed" - dopiski 0
+                    if (na != null) foreach (var it in na) if (it != null && it.StringId != null) sb.Append("|!").Append(it.StringId.Replace('|', '/').Replace('=', '-'));
                     string res = sb.ToString();
                     if (res.Length > SaveGMax) { Log.Info(P + "zapis arm_crafts_g za duzy (" + res.Length + " znakow) - pominiety (n zajecia po wczytaniu)."); return null; }
                     return res;
@@ -2354,20 +2443,28 @@ namespace Armoury
                 var p = t.Split('|');
                 if (p.Length < 2 || p[0] != SaveVerG) { _loadNote += " | arm_crafts_g: nieznany format - n zajecia"; _st++; return; }
                 var ng = new Dictionary<ItemObject, double>();
+                var na = new HashSet<ItemObject>();
                 int bad = 0;
                 var om = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
                 for (int i = 1; i < p.Length; i++)
                 {
+                    if (p[i].Length > 1 && p[i][0] == '!')
+                    {
+                        // recenzja f5: towar bez "przed" (dopiski 0)
+                        ItemObject ni = null; try { ni = om != null ? om.GetObject<ItemObject>(p[i].Substring(1)) : null; } catch { ni = null; }
+                        if (ni == null) bad++; else na.Add(ni);
+                        continue;
+                    }
                     int q = p[i].IndexOf('='); double v;
                     if (q <= 0 || !double.TryParse(p[i].Substring(q + 1), NumberStyles.Float, Inv, out v) || !(v > 0) || v > 20) { bad++; continue; }
                     ItemObject it = null; try { it = om != null ? om.GetObject<ItemObject>(p[i].Substring(0, q)) : null; } catch { it = null; }
                     if (it == null) { bad++; continue; }
                     ng[it] = v;
                 }
-                if (ng.Count > 0) _ng = ng;
-                _loadNote += " | arm_crafts_g: n na towar " + ng.Count + (bad > 0 ? " (zlych " + bad + ")" : "");
+                if (ng.Count > 0) { _ngNoAdd = na.Count > 0 ? na : null; _ng = ng; }
+                _loadNote += " | arm_crafts_g: n na towar " + ng.Count + (na.Count > 0 ? ", bez 'przed' (dopiski 0) " + na.Count : "") + (bad > 0 ? " (zlych " + bad + ")" : "");
             }
-            catch (Exception e) { _ng = null; _loadNote += " | arm_crafts_g: blad odczytu - n zajecia"; Stumble("ImportGoods", e); }
+            catch (Exception e) { _ng = null; _ngNoAdd = null; _loadNote += " | arm_crafts_g: blad odczytu - n zajecia"; Stumble("ImportGoods", e); }
         }
 
         // ============================================================ odczyty dla opisu i prac okregu

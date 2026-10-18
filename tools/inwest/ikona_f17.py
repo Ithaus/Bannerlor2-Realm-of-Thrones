@@ -1,11 +1,13 @@
-"""Uzycie: python -I tools/inwest/ikona_f17.py <Armoury/ModuleData> <Logs/<test>> <Armoury-*.log> <doba ks-plan> <doba indeksow cen KS albo 0> [filtr papirusu 0/1]
+"""Uzycie: python -I tools/inwest/ikona_f17.py <Armoury/ModuleData> <Logs/<test>> <Armoury-*.log> <doba ks-plan> <doba indeksow cen KS albo 0> [filtr papirusu 0/1] [n = 1: 0/1]
 
 f5-zajecia (noc 17/18.10): szacunek offline ikony okregu wedlug F17 projektu (A9) - czesc okregu = osady wioski (v6) z zajeciem ziemi (start), wies gry = typ;
 wartosc = udzial x g(zajecie)/g(typ) x n(zajecie) x suma(stawka x Value x indeks ceny). Prog x1.10. Indeks 0 = ceny bazowe (gra przed KS), inaczej mediana
-swiata z ks-miasta-towary.csv tej doby. Przyklad (fin88): ... Logs/2026-10-18_03-13-38 D:/Backup-Bannerlord/logi-testow/Armoury-2026-10-18_03-13-38.log 109075 109151 1"""
+swiata z ks-miasta-towary.csv tej doby. Recenzja f5: ostatni argument 1 - n = 1 (ikona pod KS bez n neutralnego startu - KS go nie stosuje; tak liczy
+VillageCrafts.F17Value po recenzji). Przyklad (fin88): ... Logs/2026-10-18_03-13-38 D:/Backup-Bannerlord/logi-testow/Armoury-2026-10-18_03-13-38.log 109075 109151 1"""
 import csv, sys, re, collections, statistics
 md, logs, logp, dplan, dpr = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 FILT = int(sys.argv[6]) if len(sys.argv) > 6 else 0
+N1 = int(sys.argv[7]) if len(sys.argv) > 7 else 0          # recenzja f5: 1 - n = 1 (F17Value pod KS po recenzji)
 RATES = {
  'wheat_farm': {'grain': 50, 'cow': 0.2, 'sheep': 0.4, 'hog': 0.8, 'Papyrus': 0.5},
  'lumberjack': {'hardwood': 18, 'mead': 2}, 'clay_mine': {'clay': 10, 'limestone': 8}, 'salt_mine': {'salt': 15},
@@ -31,6 +33,7 @@ with open(logp, encoding='utf-8', errors='replace') as f:
         if 'start neutralny (A6)' in line:
             for m in re.finditer(r"(\w+) ([\d.]+) \(([\d.]+): ", line): nmap[m.group(1)] = float(m.group(2))
             break
+if N1: nmap = {}
 g = {}
 with open(logs + '/plon-wsi.csv', encoding='utf-8') as f:
     r = csv.reader(f, delimiter=';'); next(r)
