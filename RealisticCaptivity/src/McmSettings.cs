@@ -12,451 +12,451 @@ namespace RealisticCaptivity
         public override string FolderName => "RealisticCaptivity";
         public override string FormatType => "json2";
 
-        [SettingPropertyBool("Strip Equipment", HintText = "your captor takes your armour and weapons")]
+        [SettingPropertyBool("Strip Equipment", HintText = "your captor takes your armour and weapons (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool StripEquipment { get; set; } = true;
 
-        [SettingPropertyBool("Keep Civilian Clothes", HintText = "you are left your plain clothes")]
+        [SettingPropertyBool("Keep Civilian Clothes", HintText = "you are left your plain clothes (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool KeepCivilianClothes { get; set; } = true;
 
-        [SettingPropertyBool("Leave In Rags", HintText = "even the clothes go - you are left in rags")]
+        [SettingPropertyBool("Leave In Rags", HintText = "even the clothes go - you are left in rags (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool LeaveInRags { get; set; } = true;
 
-        [SettingPropertyInteger("Loot Party Inventory Percent", 0, 300, "0", HintText = "percent of the baggage train they seize")]
+        [SettingPropertyInteger("Loot Party Inventory Percent", 0, 300, "0", HintText = "percent of the baggage train they seize (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public int LootPartyInventoryPercent { get; set; } = 75;
 
-        [SettingPropertyInteger("Loot Gold Percent", 0, 240, "0", HintText = "percent of the gold on your person they take")]
+        [SettingPropertyInteger("Loot Gold Percent", 0, 240, "0", HintText = "percent of the gold on your person they take (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public int LootGoldPercent { get; set; } = 60;
 
-        [SettingPropertyBool("Captor Takes All From Player", HintText = "whoever takes you - outlaws, a lord, a town's militia or garrison - takes every coin you carry and all your war gear: the gold goes to the lord's purse, to the band's purse, or to the coffers of the settlement whose men took you (overrides Loot Gold Percent and Strip Equipment); the baggage they seize goes to them too, never to nobody (off = Loot Gold Percent, and with no lord to take it the gold simply vanishes, as before)")]
+        [SettingPropertyBool("Captor Takes All From Player", HintText = "whoever takes you - outlaws, a lord, a town's militia or garrison - takes every coin you carry and all your war gear: the gold goes to the lord's purse, to the band's purse, or to the coffers of the settlement whose men took you (overrides Loot Gold Percent and Strip Equipment); the baggage they seize goes to them too, never to nobody (off = Loot Gold Percent, and with no lord to take it the gold simply vanishes, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool CaptorTakesAllFromPlayer { get; set; } = true;
 
-        [SettingPropertyBool("Player Loses Like Ai Lord", HintText = "when you are taken captive you lose what a beaten AI lord loses, no more and no less: your captors keep you in your own arms and clothes (a lord's renowned arms still go by the custom of war), your purse pays only the battle's toll as any lord's does (a twentieth, at most 10000), and your whole baggage train is theirs as a broken lord's company is; your companions keep their gear too (overrides Captor Takes All From Player, Strip Equipment, Strip Companions and Loot Gold Percent; off = as before)")]
+        [SettingPropertyBool("Player Loses Like Ai Lord", HintText = "when you are taken captive you lose what a beaten AI lord loses, no more and no less: your captors keep you in your own arms and clothes (a lord's renowned arms still go by the custom of war), your purse pays only the battle's toll as any lord's does (a twentieth, at most 10000), and your whole baggage train is theirs as a broken lord's company is; your companions keep their gear too (overrides Captor Takes All From Player, Strip Equipment, Strip Companions and Loot Gold Percent; off = as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool PlayerLosesLikeAiLord { get; set; } = true;
 
-        [SettingPropertyBool("Captor Takes All Baggage", HintText = "with Captor Takes All From Player on, your captor also takes your whole baggage train - goods, food and pack animals - not just Loot Party Inventory Percent; a lord or a band puts it in their own packs, a settlement whose men took you (militia, garrison or dungeon) in its own stores, like your gold (off = Loot Party Inventory Percent, as before)")]
+        [SettingPropertyBool("Captor Takes All Baggage", HintText = "with Captor Takes All From Player on, your captor also takes your whole baggage train - goods, food and pack animals - not just Loot Party Inventory Percent; a lord or a band puts it in their own packs, a settlement whose men took you (militia, garrison or dungeon) in its own stores, like your gold (off = Loot Party Inventory Percent, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool CaptorTakesAllBaggage { get; set; } = true;
 
-        [SettingPropertyBool("Buyback Enabled", HintText = "your gear can be bought back from whoever holds it")]
+        [SettingPropertyBool("Buyback Enabled", HintText = "your gear can be bought back from whoever holds it (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public bool BuybackEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Buyback Price Multiplier", 0.00f, 6.40f, "0.00", HintText = "times the market value they ask for it")]
+        [SettingPropertyFloatingInteger("Buyback Price Multiplier", 0.00f, 6.40f, "0.00", HintText = "times the market value they ask for it (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Gear and plunder")]
         public float BuybackPriceMultiplier { get; set; } = 1.6f;
 
-        [SettingPropertyInteger("Min Days Before Escape", 0, 48, "0", HintText = "days behind the door before escape is possible at all")]
+        [SettingPropertyInteger("Min Days Before Escape", 0, 48, "0", HintText = "days behind the door before escape is possible at all (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Escape")]
         public int MinDaysBeforeEscape { get; set; } = 12;
 
-        [SettingPropertyFloatingInteger("Escape Chance Multiplier", 0.00f, 1.00f, "0.00", HintText = "escape odds against vanilla (1.0 = unchanged)")]
+        [SettingPropertyFloatingInteger("Escape Chance Multiplier", 0.00f, 1.00f, "0.00", HintText = "escape odds against vanilla (1.0 = unchanged) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Escape")]
         public float EscapeChanceMultiplier { get; set; } = 0.2f;
 
-        [SettingPropertyInteger("Failed Escape Health Loss Percent", 0, 140, "0", HintText = "health lost when they catch you at it")]
+        [SettingPropertyInteger("Failed Escape Health Loss Percent", 0, 140, "0", HintText = "health lost when they catch you at it (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Escape")]
         public int FailedEscapeHealthLossPercent { get; set; } = 35;
 
-        [SettingPropertyInteger("Failed Escape Relation Penalty", -24, 0, "0", HintText = "relation lost with your captor for trying")]
+        [SettingPropertyInteger("Failed Escape Relation Penalty", -24, 0, "0", HintText = "relation lost with your captor for trying (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Escape")]
         public int FailedEscapeRelationPenalty { get; set; } = -8;
 
-        [SettingPropertyBool("Parole Enabled", HintText = "a captor may accept your word not to flee")]
+        [SettingPropertyBool("Parole Enabled", HintText = "a captor may accept your word not to flee (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public bool ParoleEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Parole Requires Status", HintText = "parole only for someone of standing - land, title or renown")]
+        [SettingPropertyBool("Parole Requires Status", HintText = "parole only for someone of standing - land, title or renown (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public bool ParoleRequiresStatus { get; set; } = true;
 
-        [SettingPropertyInteger("Parole Min Renown", 0, 600, "0", HintText = "renown at which you count as somebody")]
+        [SettingPropertyInteger("Parole Min Renown", 0, 600, "0", HintText = "renown at which you count as somebody (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public int ParoleMinRenown { get; set; } = 150;
 
-        [SettingPropertyFloatingInteger("Lowborn Ransom Delay", 0.00f, 8.00f, "0.00", HintText = "a nobody waits this many times longer for a ransom offer")]
+        [SettingPropertyFloatingInteger("Lowborn Ransom Delay", 0.00f, 8.00f, "0.00", HintText = "a nobody waits this many times longer for a ransom offer (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public float LowbornRansomDelay { get; set; } = 2.0f;
 
-        [SettingPropertyInteger("Parole Renown Loss", 0, 320, "0", HintText = "renown lost for breaking your word")]
+        [SettingPropertyInteger("Parole Renown Loss", 0, 320, "0", HintText = "renown lost for breaking your word (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public int ParoleRenownLoss { get; set; } = 80;
 
-        [SettingPropertyInteger("Parole Relation Penalty", -120, 0, "0", HintText = "relation lost for breaking your word")]
+        [SettingPropertyInteger("Parole Relation Penalty", -120, 0, "0", HintText = "relation lost for breaking your word (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public int ParoleRelationPenalty { get; set; } = -40;
 
-        [SettingPropertyFloatingInteger("Parole Ransom Discount", 0.00f, 3.00f, "0.00", HintText = "ransom is cheaper once you have given your word")]
+        [SettingPropertyFloatingInteger("Parole Ransom Discount", 0.00f, 3.00f, "0.00", HintText = "ransom is cheaper once you have given your word (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Word of honour")]
         public float ParoleRansomDiscount { get; set; } = 0.75f;
 
-        [SettingPropertyFloatingInteger("Ransom Multiplier", 0.00f, 20.00f, "0.00", HintText = "times the vanilla ransom sum")]
+        [SettingPropertyFloatingInteger("Ransom Multiplier", 0.00f, 20.00f, "0.00", HintText = "times the vanilla ransom sum (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom")]
         public float RansomMultiplier { get; set; } = 5.0f;
 
-        [SettingPropertyFloatingInteger("Ransom Renown Factor", 0.00f, 120.00f, "0.00", HintText = "extra gold demanded per point of your renown")]
+        [SettingPropertyFloatingInteger("Ransom Renown Factor", 0.00f, 120.00f, "0.00", HintText = "extra gold demanded per point of your renown (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom")]
         public float RansomRenownFactor { get; set; } = 30f;
 
-        [SettingPropertyInteger("Min Days Before Ransom Offer", 0, 16, "0", HintText = "days before anyone bothers to name a price")]
+        [SettingPropertyInteger("Min Days Before Ransom Offer", 0, 16, "0", HintText = "days before anyone bothers to name a price (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom")]
         public int MinDaysBeforeRansomOffer { get; set; } = 4;
 
-        [SettingPropertyBool("Prisoner Sale Floor", HintText = "BannerKings pays the local slave price for common prisoners - in a slave-glutted town that is zero; guarantee at least the old broker rate")]
+        [SettingPropertyBool("Prisoner Sale Floor", HintText = "BannerKings pays the local slave price for common prisoners - in a slave-glutted town that is zero; guarantee at least the old broker rate (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Selling prisoners")]
         public bool PrisonerSaleFloor { get; set; } = true;
 
-        [SettingPropertyBool("Prisoner Geo Sale", HintText = "slavery is outlawed in Westeros: selling captives there pays a fence's cut, while Essosi slave markets pay in full")]
+        [SettingPropertyBool("Prisoner Geo Sale", HintText = "slavery is outlawed in Westeros: selling captives there pays a fence's cut, while Essosi slave markets pay in full (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Selling prisoners")]
         public bool PrisonerGeoSale { get; set; } = true;
 
-        [SettingPropertyInteger("Westeros Fence Percent", 0, 80, "0", HintText = "what a Westerosi fence pays for a captive, as percent of the full Essosi price")]
+        [SettingPropertyInteger("Westeros Fence Percent", 0, 80, "0", HintText = "what a Westerosi fence pays for a captive, as percent of the full Essosi price (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Selling prisoners")]
         public int WesterosFencePercent { get; set; } = 20;
 
-        [SettingPropertyFloatingInteger("Prisoner Sale Floor Factor", 0.00f, 4.00f, "0.00", HintText = "times the vanilla broker rate (a quarter of the man's recruitment cost)")]
+        [SettingPropertyFloatingInteger("Prisoner Sale Floor Factor", 0.00f, 4.00f, "0.00", HintText = "times the vanilla broker rate (a quarter of the man's recruitment cost) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Selling prisoners")]
         public float PrisonerSaleFloorFactor { get; set; } = 1f;
 
-        [SettingPropertyBool("Lord Ransom By Rank", HintText = "a lord YOU hold is worth his station: kings, heads of houses and landed lords fetch ransoms fit for their rank (couriers, brokers, barter)")]
+        [SettingPropertyBool("Lord Ransom By Rank", HintText = "a lord YOU hold is worth his station: kings, heads of houses and landed lords fetch ransoms fit for their rank (couriers, brokers, barter) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public bool LordRansomByRank { get; set; } = true;
 
-        [SettingPropertyInteger("Lord Ransom King", 0, 400000, "0", HintText = "base ransom for a king or queen held by you")]
+        [SettingPropertyInteger("Lord Ransom King", 0, 400000, "0", HintText = "base ransom for a king or queen held by you (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public int LordRansomKing { get; set; } = 100000;
 
-        [SettingPropertyInteger("Lord Ransom Clan Leader", 0, 100000, "0", HintText = "base ransom for the head of a noble house held by you")]
+        [SettingPropertyInteger("Lord Ransom Clan Leader", 0, 100000, "0", HintText = "base ransom for the head of a noble house held by you (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public int LordRansomClanLeader { get; set; } = 25000;
 
-        [SettingPropertyInteger("Lord Ransom Lord", 0, 32000, "0", HintText = "base ransom for any other lord or lady of a noble house held by you")]
+        [SettingPropertyInteger("Lord Ransom Lord", 0, 32000, "0", HintText = "base ransom for any other lord or lady of a noble house held by you (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public int LordRansomLord { get; set; } = 8000;
 
-        [SettingPropertyFloatingInteger("Lord Ransom Per Clan Tier", 0.00f, 1.00f, "0.00", HintText = "each tier of the prisoner's house adds this share of the base")]
+        [SettingPropertyFloatingInteger("Lord Ransom Per Clan Tier", 0.00f, 1.00f, "0.00", HintText = "each tier of the prisoner's house adds this share of the base (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public float LordRansomPerClanTier { get; set; } = 0.25f;
 
-        [SettingPropertyInteger("Lord Ransom Per Town", 0, 40000, "0", HintText = "a king or head of house is worth this much more for every town his house holds")]
+        [SettingPropertyInteger("Lord Ransom Per Town", 0, 40000, "0", HintText = "a king or head of house is worth this much more for every town his house holds (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public int LordRansomPerTown { get; set; } = 10000;
 
-        [SettingPropertyInteger("Lord Ransom Per Castle", 0, 20000, "0", HintText = "a king or head of house is worth this much more for every castle his house holds")]
+        [SettingPropertyInteger("Lord Ransom Per Castle", 0, 20000, "0", HintText = "a king or head of house is worth this much more for every castle his house holds (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Lord ransom")]
         public int LordRansomPerCastle { get; set; } = 5000;
 
-        [SettingPropertyBool("Fence Gear When No Lord", HintText = "bandits sell your gear at the nearest market")]
+        [SettingPropertyBool("Fence Gear When No Lord", HintText = "bandits sell your gear at the nearest market (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Bandit plunder")]
         public bool FenceGearWhenNoLord { get; set; } = true;
 
-        [SettingPropertyBool("Escape Bribe To Captor", HintText = "the bribe for your escape goes into the purse of the party holding you - the guard is its man; on parole you pay only when you really run (off = the coin vanishes, as before, and is paid before you choose to keep your word)")]
+        [SettingPropertyBool("Escape Bribe To Captor", HintText = "the bribe for your escape goes into the purse of the party holding you - the guard is its man; on parole you pay only when you really run (off = the coin vanishes, as before, and is paid before you choose to keep your word) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Bandit plunder")]
         public bool EscapeBribeToCaptor { get; set; } = true;
 
-        [SettingPropertyBool("Gear To Captor Packs", HintText = "the war gear stripped from you is your captors' plunder like any other: it goes into their packs, and with Armoury the bands' law decides its fate as for any band's loot (the fence buys only spare horses, body armour waits for promotions, the rest stays in the packs) - run them down to take it back; with your captors gone you take your gear back (off = the gear lands on the market for free, as before)")]
+        [SettingPropertyBool("Gear To Captor Packs", HintText = "the war gear stripped from you is your captors' plunder like any other: it goes into their packs, and with Armoury the bands' law decides its fate as for any band's loot (the fence buys only spare horses, body armour waits for promotions, the rest stays in the packs) - run them down to take it back; with your captors gone you take your gear back (off = the gear lands on the market for free, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Bandit plunder")]
         public bool GearToCaptorPacks { get; set; } = true;
 
-        [SettingPropertyBool("Starvation Enabled", HintText = "poor food and cold cells wear a prisoner down")]
+        [SettingPropertyBool("Starvation Enabled", HintText = "poor food and cold cells wear a prisoner down (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public bool StarvationEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Starvation Health Per Day", 0, 16, "0", HintText = "health lost per day in the cells")]
+        [SettingPropertyInteger("Starvation Health Per Day", 0, 16, "0", HintText = "health lost per day in the cells (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public int StarvationHealthPerDay { get; set; } = 4;
 
-        [SettingPropertyFloatingInteger("Starvation Lowborn Factor", 0.00f, 7.00f, "0.00", HintText = "a nobody is fed worse - times the damage")]
+        [SettingPropertyFloatingInteger("Starvation Lowborn Factor", 0.00f, 7.00f, "0.00", HintText = "a nobody is fed worse - times the damage (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public float StarvationLowbornFactor { get; set; } = 1.75f;
 
-        [SettingPropertyFloatingInteger("Starvation Parole Factor", 0.00f, 1.60f, "0.00", HintText = "on parole the conditions are lighter")]
+        [SettingPropertyFloatingInteger("Starvation Parole Factor", 0.00f, 1.60f, "0.00", HintText = "on parole the conditions are lighter (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public float StarvationParoleFactor { get; set; } = 0.4f;
 
-        [SettingPropertyInteger("Atrophy Chance Percent Per Day", 0, 100, "0", HintText = "daily chance the wasting costs you a point of a physical skill")]
+        [SettingPropertyInteger("Atrophy Chance Percent Per Day", 0, 100, "0", HintText = "daily chance the wasting costs you a point of a physical skill (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public int AtrophyChancePercentPerDay { get; set; } = 25;
 
-        [SettingPropertyInteger("Atrophy Points Per Hit", 0, 10, "0", HintText = "points lost at once when it happens")]
+        [SettingPropertyInteger("Atrophy Points Per Hit", 0, 10, "0", HintText = "points lost at once when it happens (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public int AtrophyPointsPerHit { get; set; } = 1;
 
-        [SettingPropertyInteger("Atrophy Min Skill Value", 0, 80, "0", HintText = "the wasting will not take a skill below this")]
+        [SettingPropertyInteger("Atrophy Min Skill Value", 0, 80, "0", HintText = "the wasting will not take a skill below this (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Hunger in the cells")]
         public int AtrophyMinSkillValue { get; set; } = 20;
 
-        [SettingPropertyBool("Homes Enabled", HintText = "houses to own in towns and villages")]
+        [SettingPropertyBool("Homes Enabled", HintText = "houses to own in towns and villages (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public bool HomesEnabled { get; set; } = true;
 
-        [SettingPropertyBool("Family Home Free", HintText = "the hearth you were born under is yours from the start")]
+        [SettingPropertyBool("Family Home Free", HintText = "the hearth you were born under is yours from the start (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public bool FamilyHomeFree { get; set; } = true;
 
-        [SettingPropertyInteger("Home Price Town", 0, 16000, "0", HintText = "base price of a town house (not used while Historical Town Rates is on)")]
+        [SettingPropertyInteger("Home Price Town", 0, 16000, "0", HintText = "base price of a town house (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public int HomePriceTown { get; set; } = 4000;
 
-        [SettingPropertyFloatingInteger("Home Price Prosperity Factor", 0.00f, 2.00f, "0.00", HintText = "plus this per point of prosperity (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Home Price Prosperity Factor", 0.00f, 2.00f, "0.00", HintText = "plus this per point of prosperity (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public float HomePriceProsperityFactor { get; set; } = 0.5f;
 
-        [SettingPropertyInteger("Home Price Village", 0, 6000, "0", HintText = "base price of a village house (not used while Historical Town Rates is on)")]
+        [SettingPropertyInteger("Home Price Village", 0, 6000, "0", HintText = "base price of a village house (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public int HomePriceVillage { get; set; } = 1500;
 
-        [SettingPropertyFloatingInteger("Home Price Hearth Factor", 0.00f, 6.00f, "0.00", HintText = "plus this per hearth of the village (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Home Price Hearth Factor", 0.00f, 6.00f, "0.00", HintText = "plus this per hearth of the village (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public float HomePriceHearthFactor { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Home Sell Factor", 0.00f, 2.40f, "0.00", HintText = "a buyer gives this share of the price")]
+        [SettingPropertyFloatingInteger("Home Sell Factor", 0.00f, 2.40f, "0.00", HintText = "a buyer gives this share of the price (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public float HomeSellFactor { get; set; } = 0.6f;
 
-        [SettingPropertyInteger("Home Town Pence", 0, 9600, "0", HintText = "with historical town rates: a modest town house in a middling town, pence (about 10 pounds c.1300), as dear as the town is prosperous")]
+        [SettingPropertyInteger("Home Town Pence", 0, 9600, "0", HintText = "with historical town rates: a modest town house in a middling town, pence (about 10 pounds c.1300), as dear as the town is prosperous (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public int HomeTownPence { get; set; } = 2400;
 
-        [SettingPropertyInteger("Home Village Pence", 0, 1920, "0", HintText = "with historical town rates: a village cottage, pence (about 2 pounds), by the wage level of its market town")]
+        [SettingPropertyInteger("Home Village Pence", 0, 1920, "0", HintText = "with historical town rates: a village cottage, pence (about 2 pounds), by the wage level of its market town (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A roof of your own")]
         public int HomeVillagePence { get; set; } = 480;
 
-        [SettingPropertyBool("Bandit Dump Enabled", HintText = "brigands do not feed a worthless mouth for weeks")]
+        [SettingPropertyBool("Bandit Dump Enabled", HintText = "brigands do not feed a worthless mouth for weeks (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Cast out by brigands")]
         public bool BanditDumpEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Bandit Dump After Days", 0, 20, "0", HintText = "they give a ransom this many days to appear")]
+        [SettingPropertyInteger("Bandit Dump After Days", 0, 20, "0", HintText = "they give a ransom this many days to appear (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Cast out by brigands")]
         public int BanditDumpAfterDays { get; set; } = 5;
 
-        [SettingPropertyInteger("Bandit Dump Worthless Gold", 0, 3200, "0", HintText = "under this much coin you are not worth holding")]
+        [SettingPropertyInteger("Bandit Dump Worthless Gold", 0, 3200, "0", HintText = "under this much coin you are not worth holding (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Cast out by brigands")]
         public int BanditDumpWorthlessGold { get; set; } = 800;
 
-        [SettingPropertyInteger("Bandit Dump Chance Percent Per Day", 0, 80, "0", HintText = "then, each day, they may simply cut you loose")]
+        [SettingPropertyInteger("Bandit Dump Chance Percent Per Day", 0, 80, "0", HintText = "then, each day, they may simply cut you loose (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Cast out by brigands")]
         public int BanditDumpChancePercentPerDay { get; set; } = 20;
 
-        [SettingPropertyFloatingInteger("Bandit Dump Dying Factor", 0.00f, 8.00f, "0.00", HintText = "a prisoner near death is dumped twice as eagerly")]
+        [SettingPropertyFloatingInteger("Bandit Dump Dying Factor", 0.00f, 8.00f, "0.00", HintText = "a prisoner near death is dumped twice as eagerly (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Cast out by brigands")]
         public float BanditDumpDyingFactor { get; set; } = 2f;
 
-        [SettingPropertyBool("Sell Prisoner Enabled", HintText = "a captor may sell you on to someone else")]
+        [SettingPropertyBool("Sell Prisoner Enabled", HintText = "a captor may sell you on to someone else (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Being sold on")]
         public bool SellPrisonerEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Sell Chance Percent Per Day", 0, 32, "0", HintText = "daily chance of being sold on")]
+        [SettingPropertyInteger("Sell Chance Percent Per Day", 0, 32, "0", HintText = "daily chance of being sold on (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Being sold on")]
         public int SellChancePercentPerDay { get; set; } = 8;
 
-        [SettingPropertyInteger("Sell Min Days", 0, 20, "0", HintText = "days before anyone thinks of selling you")]
+        [SettingPropertyInteger("Sell Min Days", 0, 20, "0", HintText = "days before anyone thinks of selling you (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Being sold on")]
         public int SellMinDays { get; set; } = 5;
 
-        [SettingPropertyBool("Strip Companions", HintText = "captured companions are stripped as well")]
+        [SettingPropertyBool("Strip Companions", HintText = "captured companions are stripped as well (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Companions")]
         public bool StripCompanions { get; set; } = true;
 
-        [SettingPropertyBool("Ransom Debt Enabled", HintText = "you may pledge the ransom as a debt and walk out today")]
+        [SettingPropertyBool("Ransom Debt Enabled", HintText = "you may pledge the ransom as a debt and walk out today (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public bool RansomDebtEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Debt Offer After Days", 0, 80, "0", HintText = "days before the offer of credit is made")]
+        [SettingPropertyInteger("Debt Offer After Days", 0, 80, "0", HintText = "days before the offer of credit is made (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public int DebtOfferAfterDays { get; set; } = 20;
 
-        [SettingPropertyFloatingInteger("Debt Interest", 0.00f, 5.60f, "0.00", HintText = "times more than a ransom paid in coin")]
+        [SettingPropertyFloatingInteger("Debt Interest", 0.00f, 5.60f, "0.00", HintText = "times more than a ransom paid in coin (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public float DebtInterest { get; set; } = 1.4f;
 
-        [SettingPropertyInteger("Debt Daily Instalment", 0, 1000, "0", HintText = "gold taken from you each day until it is cleared")]
+        [SettingPropertyInteger("Debt Daily Instalment", 0, 1000, "0", HintText = "gold taken from you each day until it is cleared (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public int DebtDailyInstalment { get; set; } = 250;
 
-        [SettingPropertyInteger("Debt Grace Days", 0, 240, "0", HintText = "days of missed payment before the disgrace lands")]
+        [SettingPropertyInteger("Debt Grace Days", 0, 240, "0", HintText = "days of missed payment before the disgrace lands (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public int DebtGraceDays { get; set; } = 60;
 
-        [SettingPropertyInteger("Debt Default Renown Loss", 0, 200, "0", HintText = "renown lost for defaulting on the debt")]
+        [SettingPropertyInteger("Debt Default Renown Loss", 0, 200, "0", HintText = "renown lost for defaulting on the debt (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public int DebtDefaultRenownLoss { get; set; } = 50;
 
-        [SettingPropertyBool("Debt To Captor Home", HintText = "when no living lord stands behind your captor, the daily instalment on your ransom debt and the price of buying back your war gear go to whoever holds the claim: the head of a dead captor's house, the coffers of the settlement whose militia, garrison or dungeon held you, or the purse of the band that took you; with no one left to take it nothing is taken and the debt waits (off = that coin simply vanishes, as before)")]
+        [SettingPropertyBool("Debt To Captor Home", HintText = "when no living lord stands behind your captor, the daily instalment on your ransom debt and the price of buying back your war gear go to whoever holds the claim: the head of a dead captor's house, the coffers of the settlement whose militia, garrison or dungeon held you, or the purse of the band that took you; with no one left to take it nothing is taken and the debt waits (off = that coin simply vanishes, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Ransom debt")]
         public bool DebtToCaptorHome { get; set; } = true;
 
-        [SettingPropertyBool("Escape Needs Help", HintText = "no one walks out of a cell alone - it takes help")]
+        [SettingPropertyBool("Escape Needs Help", HintText = "no one walks out of a cell alone - it takes help (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Escape needs help")]
         public bool EscapeNeedsHelp { get; set; } = true;
 
-        [SettingPropertyInteger("Escape Bribe Gold", 0, 3200, "0", HintText = "what your clan pays the gaoler")]
+        [SettingPropertyInteger("Escape Bribe Gold", 0, 3200, "0", HintText = "what your clan pays the gaoler (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Escape needs help")]
         public int EscapeBribeGold { get; set; } = 800;
 
-        [SettingPropertyBool("Rescue Enabled", HintText = "your people ride out to free you or to talk terms")]
+        [SettingPropertyBool("Rescue Enabled", HintText = "your people ride out to free you or to talk terms (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Rescue")]
         public bool RescueEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Rescue Arrival Distance", 0.00f, 12.00f, "0.00", HintText = "how close they must get before they act")]
+        [SettingPropertyFloatingInteger("Rescue Arrival Distance", 0.00f, 12.00f, "0.00", HintText = "how close they must get before they act (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Rescue")]
         public float RescueArrivalDistance { get; set; } = 3.0f;
 
-        [SettingPropertyFloatingInteger("Rescue Strength Ratio", 0.00f, 4.40f, "0.00", HintText = "how many times stronger they must be to storm a bandit camp")]
+        [SettingPropertyFloatingInteger("Rescue Strength Ratio", 0.00f, 4.40f, "0.00", HintText = "how many times stronger they must be to storm a bandit camp (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Rescue")]
         public float RescueStrengthRatio { get; set; } = 1.1f;
 
-        [SettingPropertyFloatingInteger("Negotiation Max Discount", 0.00f, 2.40f, "0.00", HintText = "the best discount your envoy can talk a lord down to")]
+        [SettingPropertyFloatingInteger("Negotiation Max Discount", 0.00f, 2.40f, "0.00", HintText = "the best discount your envoy can talk a lord down to (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Rescue")]
         public float NegotiationMaxDiscount { get; set; } = 0.6f;
 
-        [SettingPropertyInteger("Rescue Retry Days", 0, 16, "0", HintText = "days before they try again after being driven off")]
+        [SettingPropertyInteger("Rescue Retry Days", 0, 16, "0", HintText = "days before they try again after being driven off (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Rescue")]
         public int RescueRetryDays { get; set; } = 4;
 
-        [SettingPropertyBool("Humiliation Enabled", HintText = "captivity itself costs you standing")]
+        [SettingPropertyBool("Humiliation Enabled", HintText = "captivity itself costs you standing (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Humiliation")]
         public bool HumiliationEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Humiliation Renown Loss", 0, 60, "0", HintText = "renown lost for having been taken")]
+        [SettingPropertyInteger("Humiliation Renown Loss", 0, 60, "0", HintText = "renown lost for having been taken (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Humiliation")]
         public int HumiliationRenownLoss { get; set; } = 15;
 
-        [SettingPropertyBool("Clean Break Enabled", HintText = "a fully mounted party that flees a battle cannot be run down by pursuers on foot")]
+        [SettingPropertyBool("Clean Break Enabled", HintText = "a fully mounted party that flees a battle cannot be run down by pursuers on foot (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A clean break")]
         public bool CleanBreakEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Clean Break Hours", 0, 16, "0", HintText = "for this many hours that band cannot force another fight on you")]
+        [SettingPropertyInteger("Clean Break Hours", 0, 16, "0", HintText = "for this many hours that band cannot force another fight on you (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A clean break")]
         public int CleanBreakHours { get; set; } = 4;
 
-        [SettingPropertyBool("Clean Break Needs Standing", HintText = "the clean break belongs to a man who ACTUALLY RODE OFF - he sounded the retreat or rode away from the encounter. Cut down on the field, he is taken like anyone else")]
+        [SettingPropertyBool("Clean Break Needs Standing", HintText = "the clean break belongs to a man who ACTUALLY RODE OFF - he sounded the retreat or rode away from the encounter. Cut down on the field, he is taken like anyone else (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A clean break")]
         public bool CleanBreakNeedsStanding { get; set; } = true;
 
-        [SettingPropertyBool("Mounted Encounter Flight", HintText = "whole party in the saddle may try to ride away from an encounter - rearguard only against the enemy horse")]
+        [SettingPropertyBool("Mounted Encounter Flight", HintText = "whole party in the saddle may try to ride away from an encounter - rearguard only against the enemy horse (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("A clean break")]
         public bool MountedEncounterFlight { get; set; } = true;
 
-        [SettingPropertyBool("Work Enabled", HintText = "day labour and guard work for hire in settlements")]
+        [SettingPropertyBool("Work Enabled", HintText = "day labour and guard work for hire in settlements (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public bool WorkEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Work Max Party Size", 0, 20, "0", HintText = "with more mouths than this behind you, no one hires you as a hand")]
+        [SettingPropertyInteger("Work Max Party Size", 0, 20, "0", HintText = "with more mouths than this behind you, no one hires you as a hand (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int WorkMaxPartySize { get; set; } = 5;
 
-        [SettingPropertyInteger("Work Only Below Gold", 0, 10000, "0", HintText = "day labour offered only while your purse is under this (0 = always)")]
+        [SettingPropertyInteger("Work Only Below Gold", 0, 10000, "0", HintText = "day labour offered only while your purse is under this (0 = always) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int WorkOnlyBelowGold { get; set; } = 2500;
 
-        [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 4.00f, "0.00", HintText = "village day wage before the hearth bonus (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Work Pay Village Base", 0.00f, 4.00f, "0.00", HintText = "village day wage before the hearth bonus (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayVillageBase { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Work Pay Village Hearth Div", 0.00f, 4000.00f, "0.00", HintText = "village hearths divided by this are added to the wage (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Work Pay Village Hearth Div", 0.00f, 4000.00f, "0.00", HintText = "village hearths divided by this are added to the wage (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayVillageHearthDiv { get; set; } = 1000f;
 
-        [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 6.00f, "0.00", HintText = "town day wage before the prosperity bonus (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Work Pay Town Base", 0.00f, 6.00f, "0.00", HintText = "town day wage before the prosperity bonus (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayTownBase { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Work Pay Town Prosperity Div", 0.00f, 20000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Work Pay Town Prosperity Div", 0.00f, 20000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float WorkPayTownProsperityDiv { get; set; } = 5000f;
 
-        [SettingPropertyInteger("Work Athletics Xp Per Day", 0, 100, "0", HintText = "athletics practice from a day of hard graft")]
+        [SettingPropertyInteger("Work Athletics Xp Per Day", 0, 100, "0", HintText = "athletics practice from a day of hard graft (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int WorkAthleticsXpPerDay { get; set; } = 25;
 
-        [SettingPropertyInteger("Work Saturation Days", 0, 40, "0", HintText = "after this many days in one place the wage halves")]
+        [SettingPropertyInteger("Work Saturation Days", 0, 40, "0", HintText = "after this many days in one place the wage halves (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int WorkSaturationDays { get; set; } = 10;
 
-        [SettingPropertyInteger("Work Saturation Rest Days", 0, 20, "0", HintText = "days away before the place forgets you and pays full again")]
+        [SettingPropertyInteger("Work Saturation Rest Days", 0, 20, "0", HintText = "days away before the place forgets you and pays full again (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int WorkSaturationRestDays { get; set; } = 5;
 
-        [SettingPropertyBool("Guard Work Enabled", HintText = "night-watch work for hire in towns")]
+        [SettingPropertyBool("Guard Work Enabled", HintText = "night-watch work for hire in towns (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public bool GuardWorkEnabled { get; set; } = true;
 
-        [SettingPropertyInteger("Guard Only Below Gold", 0, 40000, "0", HintText = "guard work offered only while your purse is under this (0 = always)")]
+        [SettingPropertyInteger("Guard Only Below Gold", 0, 40000, "0", HintText = "guard work offered only while your purse is under this (0 = always) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int GuardOnlyBelowGold { get; set; } = 10000;
 
-        [SettingPropertyInteger("Guard Skill Required", 0, 160, "0", HintText = "best weapon skill the merchants demand of a hired guard")]
+        [SettingPropertyInteger("Guard Skill Required", 0, 160, "0", HintText = "best weapon skill the merchants demand of a hired guard (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int GuardSkillRequired { get; set; } = 40;
 
-        [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 8.00f, "0.00", HintText = "night-watch wage before the prosperity bonus (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Guard Pay Base", 0.00f, 8.00f, "0.00", HintText = "night-watch wage before the prosperity bonus (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float GuardPayBase { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Guard Pay Prosperity Div", 0.00f, 16000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage (not used while Historical Town Rates is on)")]
+        [SettingPropertyFloatingInteger("Guard Pay Prosperity Div", 0.00f, 16000.00f, "0.00", HintText = "town prosperity divided by this is added to the wage (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float GuardPayProsperityDiv { get; set; } = 4000f;
 
-        [SettingPropertyInteger("Guard Weapon Xp Per Day", 0, 160, "0", HintText = "weapon practice from a night on the walls")]
+        [SettingPropertyInteger("Guard Weapon Xp Per Day", 0, 160, "0", HintText = "weapon practice from a night on the walls (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int GuardWeaponXpPerDay { get; set; } = 40;
 
-        [SettingPropertyInteger("Guard Brawl Chance Percent", 0, 60, "0", HintText = "nightly chance of trouble at the gates")]
+        [SettingPropertyInteger("Guard Brawl Chance Percent", 0, 60, "0", HintText = "nightly chance of trouble at the gates (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int GuardBrawlChancePercent { get; set; } = 15;
 
-        [SettingPropertyInteger("Guard Brawl Bonus", 0, 200, "0", HintText = "extra pay for cracking heads when trouble comes (not used while Historical Town Rates is on)")]
+        [SettingPropertyInteger("Guard Brawl Bonus", 0, 200, "0", HintText = "extra pay for cracking heads when trouble comes (not used while Historical Town Rates is on) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int GuardBrawlBonus { get; set; } = 50;
 
-        [SettingPropertyInteger("Guard Brawl Health Loss", 0, 120, "0", HintText = "health lost when the toughs get the better of you")]
+        [SettingPropertyInteger("Guard Brawl Health Loss", 0, 120, "0", HintText = "health lost when the toughs get the better of you (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public int GuardBrawlHealthLoss { get; set; } = 30;
 
-        [SettingPropertyBool("Historical Town Rates", HintText = "wages and house prices at historical rates, as dear as the town is prosperous (the town wage level of Armoury), and paid by the settlement's coffers - not out of thin air (off = the old formulas, gold from nobody and to nobody)")]
+        [SettingPropertyBool("Historical Town Rates", HintText = "wages and house prices at historical rates, as dear as the town is prosperous (the town wage level of Armoury), and paid by the settlement's coffers - not out of thin air (off = the old formulas, gold from nobody and to nobody) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public bool HistoricalTownRates { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Labourer Day Wage", 0.00f, 6.00f, "0.00", HintText = "an unskilled labourer's day in a middling town, pence (England c.1300: a labourer about 1.5 d, a craftsman 3 d); a night on the watch pays the same")]
+        [SettingPropertyFloatingInteger("Labourer Day Wage", 0.00f, 6.00f, "0.00", HintText = "an unskilled labourer's day in a middling town, pence (England c.1300: a labourer about 1.5 d, a craftsman 3 d); a night on the watch pays the same (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float LabourerDayWage { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Village Wage Share", 0.00f, 3.00f, "0.00", HintText = "a day's hire in a village pays this share of the wage in its market town")]
+        [SettingPropertyFloatingInteger("Village Wage Share", 0.00f, 3.00f, "0.00", HintText = "a day's hire in a village pays this share of the wage in its market town (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float VillageWageShare { get; set; } = 0.75f;
 
-        [SettingPropertyFloatingInteger("Guard Brawl Bonus Days", 0.00f, 12.00f, "0.00", HintText = "cracking heads when trouble comes pays this many days' wages on top")]
+        [SettingPropertyFloatingInteger("Guard Brawl Bonus Days", 0.00f, 12.00f, "0.00", HintText = "cracking heads when trouble comes pays this many days' wages on top (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public float GuardBrawlBonusDays { get; set; } = 3f;
 
-        [SettingPropertyBool("Work Respects Reserve", HintText = "with Historical Town Rates on, day labour and the night watch are paid only out of what a town can spare above its merchants' reserve (the town surplus of Armoury; a village pays from its whole purse): with nothing to spare no one hires, work under way stops and an unpaid day does not count towards the half-pay limit; a wage under one stag is no longer rounded up to a full stag every day (off = paid down to the last coin of the coffers and never less than 1 stag a day, as before)")]
+        [SettingPropertyBool("Work Respects Reserve", HintText = "with Historical Town Rates on, day labour and the night watch are paid only out of what a town can spare above its merchants' reserve (the town surplus of Armoury; a village pays from its whole purse): with nothing to spare no one hires, work under way stops and an unpaid day does not count towards the half-pay limit; a wage under one stag is no longer rounded up to a full stag every day (off = paid down to the last coin of the coffers and never less than 1 stag a day, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Honest work")]
         public bool WorkRespectsReserve { get; set; } = true;
 
-        [SettingPropertyBool("Enlisted Honest Wounds", HintText = "no miracle full-heal after enlisted battles - wounds mend with rest, as they should")]
+        [SettingPropertyBool("Enlisted Honest Wounds", HintText = "no miracle full-heal after enlisted battles - wounds mend with rest, as they should (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("In the lord's service")]
         public bool EnlistedHonestWounds { get; set; } = true;
 
-        [SettingPropertyInteger("Enlisted Post Battle Heal Hp", 0, 40, "0", HintText = "a field dressing after the fight - this many hit points, no more")]
+        [SettingPropertyInteger("Enlisted Post Battle Heal Hp", 0, 40, "0", HintText = "a field dressing after the fight - this many hit points, no more (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("In the lord's service")]
         public int EnlistedPostBattleHealHp { get; set; } = 10;
 
-        [SettingPropertyInteger("Enlisted Daily Care Hp", 0, 60, "0", HintText = "the army medicus can restore this much each day")]
+        [SettingPropertyInteger("Enlisted Daily Care Hp", 0, 60, "0", HintText = "the army medicus can restore this much each day (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("In the lord's service")]
         public int EnlistedDailyCareHp { get; set; } = 15;
 
-        [SettingPropertyBool("Rot Enlist Loot Game Price", HintText = "while you serve enlisted under a lord, a captured lord in your share of the loot is valued at the game's ransom price or at the ransom his house would pay you, whichever is lower - nobody pays that ransom here, the value only turns into goods for you (off = valued at the ransom his house would pay you, as before)")]
+        [SettingPropertyBool("Rot Enlist Loot Game Price", HintText = "while you serve enlisted under a lord, a captured lord in your share of the loot is valued at the game's ransom price or at the ransom his house would pay you, whichever is lower - nobody pays that ransom here, the value only turns into goods for you (off = valued at the ransom his house would pay you, as before) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Realm of Thrones without gold from nowhere (3.7)")]
         public bool RotEnlistLootGamePrice { get; set; } = true;
 
-        [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder")]
+        [SettingPropertyBool("Log Enabled", HintText = "write a log file in the module folder (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Other")]
         public bool LogEnabled { get; set; } = true;
 

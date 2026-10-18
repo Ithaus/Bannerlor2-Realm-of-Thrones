@@ -15,12 +15,15 @@ namespace Armoury
     {
         private static PropertyInfo _itemProp;
 
+        /// <summary>f18-mcm: klucz TidyBannerKingsArmourList na zywo (wartosc z MCM po McmSettings.Apply).</summary>
+        private static bool On { get { var s = Settings.Current; return s == null || s.TidyBannerKingsArmourList; } }
+
         internal static void ApplyAll(Harmony h)
         {
             try
             {
-                if (!Settings.Current.TidyBannerKingsArmourList) return;
-
+                // f18-mcm (recenzja): latka zakladana bez klucza - dotad decydowal o niej tylko Armoury.settings.xml przy starcie i przelacznik MCM
+                // nic nie zmienial; klucz TidyBannerKingsArmourList czytaja teraz oba postfiksy na zywo (McmSettings.Apply co godzine gry)
                 var t = FindType("BannerKings.UI.Crafting.ArmorItemVM");
                 if (t == null) { Log.Info("Panel zbroi Banner Kings nieobecny - pomijam porzadkowanie listy."); return; }
 
@@ -59,6 +62,7 @@ namespace Armoury
         {
             try
             {
+                if (!On) return;   // f18-mcm: klucz na zywo - wylaczony = podpis Banner Kings
                 var item = ItemOf(__instance);
                 if (item == null) return;
                 __result = Category(item);
@@ -71,6 +75,7 @@ namespace Armoury
         {
             try
             {
+                if (!On) return;   // f18-mcm: klucz na zywo - wylaczony = nazwa Banner Kings bez poziomu
                 var item = ItemOf(__instance);
                 if (item == null || string.IsNullOrEmpty(__result)) return;
                 if (__result.Length > 2 && __result[0] == '[') return;      // juz podpisane
