@@ -21,6 +21,8 @@ namespace Armoury
     {
         public string Land; public int M;
         public double VilPeople, TownPeople, VilNeed, TownNeed, VilProd, TfProd, Home, Hands, FloorHands, Target, Cap, Got;
+        public double Unc, DietNeed;                                  // krok 8: kcal koszyka wsi bez pokrycia i pelna potrzeba kcal ludzi w domu (KsDeliver.KcalNeed)
+        public double Diet { get { return DietNeed > 0 ? Math.Max(0.0, 1.0 - Unc / DietNeed) : 0.0; } }   // jedzenie wsi: wlasne + kupione + dom (1 - bez pokrycia)
         public int Dist, DistFloor, DistShort;
         public double Vil { get { return VilNeed > 0 ? (VilProd + Home) / VilNeed : 0.0; } }
         public double All { get { double n = VilNeed + TownNeed; return n > 0 ? (VilProd + TfProd + Home) / n : 0.0; } }
@@ -30,6 +32,7 @@ namespace Armoury
     {
         public int SelfFeed = -1; public bool ColdLand;
         public Dictionary<string, double> DistHomeKcalAbs = new Dictionary<string, double>(StringComparer.Ordinal);   // krok 8: kcal/d robione w domu (ostatnia runda)
+        public Dictionary<string, double> DistUncKcal = new Dictionary<string, double>(StringComparer.Ordinal);       // krok 8: kcal/d koszyka bez pokrycia (ostatnia runda)
         public List<KsFeedLand> Feed;                                     // wyzywienie krain (Finish)
         public int FeedBlocks, FeedBind; public double FeedSumDev, FeedHandsAll, FeedFloorHands;
     }
@@ -40,6 +43,8 @@ namespace Armoury
         {
             public bool FeedOn;                                        // r4-polnoc: prog "najpierw wyzywic siebie" czynny w tej rownowadze
             public double[] PairKcal, PairLand;                        // kcal jedzenia i ziemia (ha) pary przy udziale 1 i pelnej pracy (bez pracy domowej kroku 8)
+            public double[] PairNf;                                    // wartosc bazowa towarow bez jedzenia pary (futra, welna, len, skory, konie) przy udziale 1 i pelnej pracy
+            public int[] FdM, FdL; public double[] FdAlpha, FdRegV;   // okreg w zakresie: rynek, kraina (krok 5), alfa (czesc utargu na koszyk), wartosc bazowa regale bez jedzenia
             public double[] FOut;                                      // bufor produkcji pary
             public int[] FA, FB; public double[] FSa, FSb, FSum, FK;  // blok: zadanie liniowe bloku - pary jedzenia (najwyzej dwie), udzialy, suma udzialow, kcal (bez skali regale)
             public double[] Lam, FC, FG;                               // blok: udzial przesuniety w ostatniej rundzie, kcal bloku przy logicie, wolne miejsce mieszanki
@@ -50,6 +55,14 @@ namespace Armoury
 
         internal static HashSet<string> FeedOnlyLands;                    // harness: prog tylko w tych krainach (diagnoza); w grze null
         internal static bool FeedFullWork = true;                         // harness: false - zdolnosc pary z praca domowa kroku 8 (OUTP), true - przy pelnej pracy (domyslnie)
+        internal static bool FeedAccess = true;                           // harness: false - prog na samych kcal jedzenia; true - na kcal dostepu (jedzenie + alfa x utarg bez jedzenia / cena kcal zboza)
+
+        /// <summary>Towar Planu bez jedzenia, ktory wies sprzedaje (futra, welna, len, skory, konie, drewno...): bez towarow z kcal, bez zywca i miesa wieloryba (ich mieso
+        /// jest w towarze meat, skory w hides).</summary>
+        private static bool NonFoodSold(int g)
+        {
+            return KsTab.FoodKcal[g] <= 0 && g != KsTab.GCow && g != KsTab.GHog && g != KsTab.GSheep && g != KsTab.GWhaleMeat;
+        }
 
         /// <summary>Okreg objety progiem: wies z ludzmi (pola mieszczan nie - miasto zyje z targu), zakres 1 - strefa zimna (strefa z kultury, ta sama dla calego okregu).</summary>
         private static bool InFeedScope(KsDistrict d, int mode, KsBlock b0)
@@ -77,7 +90,7 @@ namespace Armoury
             if (mode <= 0) return;
             int NP = x.NP, NB = x.NB;
             var fk = KsTab.FoodKcal;
-            if (x.PairKcal == null || x.PairKcal.Length != NP) { x.PairKcal = new double[NP]; x.PairLand = new double[NP]; }
+            if (x.PairKcal == null || x.PairKcal.Length != NP) { x.PairKcal = new double[NP]; x.PairLand = new double[NP]; x.PairNf = new double[NP]; }
             if (x.FOut == null) x.FOut = new double[KsTab.NG];
             if (x.FA == null || x.FA.Length != NB)
             {
@@ -86,6 +99,7 @@ namespace Armoury
             }
             for (int b = 0; b < NB; b++) { x.FA[b] = x.FB[b] = -1; x.FSa[b] = x.FSb[b] = x.FSum[b] = x.FK[b] = x.Lam[b] = 0; }
             var b0l = new List<int>(); var b1l = new List<int>(); var dl = new List<KsDistrict>(); var nl = new List<double>();
+            var ml = new List<int>(); var ll = new List<int>(); var al = new List<double>(); var rl = new List<double>();
             int maxP = 1, b0 = 0;
             while (b0 < NB)
             {
@@ -95,9 +109,10 @@ namespace Armoury
                 if (InFeedScope(d, mode, x.B[b0]))
                 {
                     PairFood(x, d, b0, b1);
-                    double need = KsTab.FoodNeedKcal(d.Need0);
+                    double need = KsTab.FoodNeedKcal(d.Need0), regV = 0;
                     double[] rb;
-                    if (x.RegByDist != null && x.RegByDist.TryGetValue(d.Id, out rb) && rb != null) for (int g = 0; g < KsTab.NG; g++) need -= rb[g] * fk[g];
+                    if (x.RegByDist != null && x.RegByDist.TryGetValue(d.Id, out rb) && rb != null)
+                        for (int g = 0; g < KsTab.NG; g++) { need -= rb[g] * fk[g]; if (NonFoodSold(g)) regV += rb[g] * x.Val[g]; }
                     for (int b = b0; b < b1; b++)
                     {
                         int a = x.BStart[b], e = x.BStart[b + 1];
@@ -122,12 +137,20 @@ namespace Armoury
                         if (pi < 0 || !(best > 0)) continue;
                         x.FA[b] = pi; x.FSa[b] = qi; x.FB[b] = pj; x.FSb[b] = qj; x.FSum[b] = qi + qj; x.FK[b] = best;
                     }
-                    if (need > 0) { b0l.Add(b0); b1l.Add(b1); dl.Add(d); nl.Add(need); int np = x.BStart[b1] - x.BStart[b0]; if (np > maxP) maxP = np; }
+                    if (need > 0)
+                    {
+                        b0l.Add(b0); b1l.Add(b1); dl.Add(d); nl.Add(need); int np = x.BStart[b1] - x.BStart[b0]; if (np > maxP) maxP = np;
+                        int m0 = d.Market == 0 ? 0 : 1;
+                        bool meas = d.Alpha >= 0 && !double.IsNaN(d.Alpha) && !double.IsInfinity(d.Alpha);   // alfa jak krok 8 (pomiar wsi albo alfa rynku)
+                        ml.Add(m0); al.Add(Math.Max(0.0, Math.Min(0.95, meas ? d.Alpha : x.In.VilAlpha[m0]))); rl.Add(regV);
+                        ll.Add(x.LandIx != null ? LandOfD(x, d) : -1);
+                    }
                 }
                 b0 = b1;
             }
             x.Fd = dl.Count;
             x.FdB0 = b0l.ToArray(); x.FdB1 = b1l.ToArray(); x.FdD = dl.ToArray(); x.FdNeed = nl.ToArray();
+            x.FdM = ml.ToArray(); x.FdL = ll.ToArray(); x.FdAlpha = al.ToArray(); x.FdRegV = rl.ToArray();
             x.FdDef = new double[x.Fd]; x.FdCap = new double[x.Fd]; x.FdGot = new double[x.Fd];
             if (x.IB == null || x.IB.Length < maxP) { x.IB = new int[maxP]; x.IK = new int[maxP]; x.IG = new double[maxP]; x.IE = new double[maxP]; }
             x.FeedOn = x.Fd > 0;
@@ -148,42 +171,62 @@ namespace Armoury
                     {
                         if (!FeedFullWork)
                         {
-                            double s0 = 0;
-                            for (int j = x.OStart[k]; j < x.OStart[k + 1]; j++) s0 += x.OVal[j] * fk[x.OGood[j]];
-                            x.PairKcal[k] = s0; x.PairLand[k] = x.LandP[k];
+                            double s0 = 0, v0 = 0;
+                            for (int j = x.OStart[k]; j < x.OStart[k + 1]; j++) { int g = x.OGood[j]; s0 += x.OVal[j] * fk[g]; if (NonFoodSold(g)) v0 += x.OVal[j] * x.Val[g]; }
+                            x.PairKcal[k] = s0; x.PairLand[k] = x.LandP[k]; x.PairNf[k] = v0;
                             continue;
                         }
                         double wH, sub, cl, W;
                         BlockOutput(d, x.B[b], x.Pc[k], o, out wH, out sub, out cl, out W);
-                        double s = 0;
-                        for (int g = 0; g < KsTab.NG; g++) if (o[g] != 0.0) s += o[g] * fk[g];
-                        x.PairKcal[k] = s;
+                        double s = 0, v = 0;
+                        for (int g = 0; g < KsTab.NG; g++) if (o[g] != 0.0) { s += o[g] * fk[g]; if (NonFoodSold(g)) v += o[g] * x.Val[g]; }
+                        x.PairKcal[k] = s; x.PairNf[k] = v;
                         x.PairLand[k] = wH * KsTab.HaHome + sub * KsTab.HaOwnGrain + cl * ha[x.Pc[k]];
                     }
             }
             finally { d.HomeWork = hw0; }
         }
 
-        /// <summary>Prog w udzialach rownowagi (po logicie, kazda runda): okreg, ktoremu przy udzialach rynku brakuje jedzenia, przesuwa rece do mieszanki jedzenia bloku
-        /// (zadanie liniowe bloku) - najpierw z zajec bez jedzenia (futra, len, drewno...), potem z jedzenia o mniejszej liczbie kcal na reke; kolejnosc w okregu wedlug
-        /// zysku kcal na przesunieta reke, tylko tyle, ile brakuje, i najwyzej do udzialow mieszanki (ziemia bloku). Zajecia jedzenia, ktore rynek juz wybral (bydlo,
-        /// owce, swinie przy zbozu), zostaja, dopoki sa reka bez jedzenia do przesuniecia. Okreg wyzywiony przez rynek - udzialy bez zmian. Suma udzialow bloku = 1.</summary>
-        private static void ApplyFloors(Ctx x, double[] xs)
+        /// <summary>Prog w udzialach rownowagi (po logicie, kazda runda). KCAL DOSTEPU pary = kcal jedzenia, ktore rodzina zje sama, + to, co kupi za towar bez jedzenia
+        /// (futra, welna, len, skory, konie): alfa okregu (czesc utargu, ktora zostaje wsi na koszyk - reszta to pan, dziesiecina, korona, kupiec, jak w kroku 8)
+        /// x wartosc bazowa / cena kcal zboza (cena startu: cena cienia w 0.7-1.5, x gradient krainy kroku 5 jak koszyk wsi). Okreg, ktoremu przy udzialach rynku brakuje kcal dostepu do potrzeby, przesuwa
+        /// rece do mieszanki jedzenia bloku (zadanie liniowe bloku) - tylko z par, ktore daja mniej kcal dostepu niz mieszanka (najpierw futra i len biednej wsi,
+        /// potem jedzenie o mniejszej liczbie kcal na reke), od najwiekszego zysku na reke, tylko tyle, ile brakuje, i najwyzej do udzialow mieszanki (ziemia bloku).
+        /// Wies, ktora za futra kupi wiecej jedzenia, niz urodzi jej ziemia, zostaje przy futrach (prog nie robi nikogo glodniejszym); wies wyzywiona - bez zmian.
+        /// Suma udzialow bloku = 1. Harness FeedAccess = false - same kcal jedzenia (alfa 0).</summary>
+        private static void ApplyFloors(Ctx x, double[] p, double[] xs)
         {
             if (!x.FeedOn) return;
-            var pk = x.PairKcal; var sc = x.BlockScale; var C = x.FC; var cap = x.FG;
+            var pk = x.PairKcal; var pv = x.PairNf; var sc = x.BlockScale; var C = x.FC; var cap = x.FG;
             var ib = x.IB; var ik = x.IK; var ig = x.IG; var ie = x.IE;
+            double vg = x.Val[KsTab.GGrain];
             for (int di = 0; di < x.Fd; di++)
             {
                 int b0 = x.FdB0[di], b1 = x.FdB1[di];
+                double conv = 0;
+                if (FeedAccess && vg > 0)
+                {
+                    int m = x.FdM[di];
+                    double pg = p != null && p.Length == NM * KsTab.NG ? p[m * KsTab.NG + KsTab.GGrain] : 1.0;
+                    if (!(pg > 0) || double.IsNaN(pg)) pg = 1.0;
+                    pg = Math.Max(0.7, Math.Min(1.5, pg));
+                    // cena zboza w krainie okregu (krok 5: gradient krainy - jak koszyk wsi w kroku 8; wojna i daleka droga = drogie zboze, np. Wolni Ludzie)
+                    int l = x.FdL[di];
+                    if (x.GradOn && R4LandPrice && l >= 0 && x.GradEff != null && l * KsTab.NG + KsTab.GGrain < x.GradEff.Length)
+                    {
+                        double gr = x.GradEff[l * KsTab.NG + KsTab.GGrain];
+                        if (gr > 0 && !double.IsNaN(gr)) pg *= gr;
+                    }
+                    conv = x.FdAlpha[di] / (vg * pg / 3300.0);            // kcal zboza za 1 d wartosci bazowej utargu (alfa wsi)
+                }
                 double tot = 0;
                 for (int b = b0; b < b1; b++)
                 {
                     double c = 0;
-                    for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++) c += xs[k] * pk[k];
+                    for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++) c += xs[k] * (pk[k] + conv * pv[k]);
                     c *= sc[b]; C[b] = c; tot += c; x.Lam[b] = 0;
                 }
-                double def = x.FdNeed[di] - tot;
+                double def = x.FdNeed[di] - conv * x.FdRegV[di] - tot;
                 x.FdDef[di] = def > 0 ? def : 0; x.FdGot[di] = 0; x.FdCap[di] = 0;
                 if (!(def > 1e-6)) continue;
                 int n = 0; double capK = 0;
@@ -194,12 +237,13 @@ namespace Armoury
                     double room = x.FSum[b] - xs[fa] - (fb >= 0 ? xs[fb] : 0.0);
                     cap[b] = room;
                     if (!(room > 1e-12)) continue;
-                    double M = x.FK[b] / x.FSum[b], hands = x.W[b] * sc[b];
+                    double vm = x.FSa[b] * pv[fa] + (fb >= 0 ? x.FSb[b] * pv[fb] : 0.0);
+                    double M = (x.FK[b] + conv * vm) / x.FSum[b], hands = x.W[b] * sc[b];   // kcal dostepu mieszanki na udzial
                     double rb = 0;
                     for (int k = x.BStart[b]; k < x.BStart[b + 1]; k++)
                     {
                         if (k == fa || k == fb || !(xs[k] > 1e-12)) continue;
-                        double g = (M - pk[k]) * sc[b];
+                        double g = (M - pk[k] - conv * pv[k]) * sc[b];
                         if (!(g > 1e-9)) continue;
                         double e = hands > 1e-9 ? g / hands : 0.0;
                         int t = n++;
@@ -248,6 +292,12 @@ namespace Armoury
                 if (d.TownFields) { f.TfProd += kc; continue; }
                 f.VilProd += kc; f.VilNeed += KsTab.FoodNeedKcal(d.Need0); f.VilPeople += d.People; f.Dist++;
                 double h; if (R.DistHomeKcalAbs.TryGetValue(d.Id, out h)) f.Home += h;
+                double u;
+                if (R.DistUncKcal.TryGetValue(d.Id, out u) && d.PplHome != null && d.People > 0)
+                {
+                    double home = 0; foreach (var e in d.PplHome) home += Math.Max(0.0, e);
+                    f.Unc += u; f.DietNeed += KsDeliver.KcalNeed(d.Need0) * Math.Min(1.0, home / d.People);
+                }
             }
             foreach (var t in x.In.Towns) { var f = get(t.Land, t.Market); f.TownNeed += KsTab.FoodNeedKcal(t.Need0); f.TownPeople += t.People; }
             double dev = 0, hall = 0, hfl = 0; int nb = 0, nbind = 0;
@@ -297,7 +347,8 @@ namespace Armoury
             sb.Append("KS: wyzywienie krain (plan doba ").Append(day).Append("; najpierw wyzywic siebie ")
               .Append(r.SelfFeed <= 0 ? "WYLACZONE" : (r.SelfFeed >= 2 ? "TAK (wszystkie okregi wsi)" : "TAK (okregi wsi stref zimnych)"))
               .Append(", zimna ziemia ").Append(r.ColdLand ? "TAK" : "WYLACZONA")
-              .Append(") | kcal wlasne / potrzeba jedzenia: wsie = (produkcja okregow wsi + praca domowa) / potrzeba wsi, kraina = (wsie + pola mieszczan) / (potrzeba wsi + miast);")
+              .Append(") | jedzenie = 1 - kcal koszyka wsi bez pokrycia (krok 8) / pelna potrzeba kcal ludzi wsi w domu (wlasne + kupione + dom); kcal wlasne / potrzeba jedzenia:")
+              .Append(" wsie = (produkcja okregow wsi + praca domowa) / potrzeba wsi, kraina = (wsie + pola mieszczan) / (potrzeba wsi + miast);")
               .Append(" reszta = dowoz kupcow, danina dla Muru, glod");
             var done = new HashSet<string>(StringComparer.Ordinal);
             foreach (var l in FeedFirst)
@@ -306,7 +357,8 @@ namespace Armoury
                 foreach (var q in r.Feed) if (q.Land == l) { f = q; break; }
                 if (f == null) continue;
                 done.Add(l);
-                sb.Append(" | ").Append(f.M == 0 ? "W " : "E ").Append(f.Land).Append(" wsie ").Append(f.Vil.ToString("0.00", inv)).Append(" kraina ").Append(f.All.ToString("0.00", inv))
+                sb.Append(" | ").Append(f.M == 0 ? "W " : "E ").Append(f.Land).Append(" jedzenie ").Append(f.DietNeed > 0 ? f.Diet.ToString("0.00", inv) : "-")
+                  .Append(" wsie ").Append(f.Vil.ToString("0.00", inv)).Append(" kraina ").Append(f.All.ToString("0.00", inv))
                   .Append(" (ludzie wsi ").Append((f.VilPeople / 1000).ToString("0", inv)).Append(" tys., miast ").Append((f.TownPeople / 1000).ToString("0", inv))
                   .Append(" tys.; produkcja ").Append((f.VilProd / 1e9).ToString("0.000", inv)).Append(" + pola ").Append((f.TfProd / 1e9).ToString("0.000", inv))
                   .Append(" + dom ").Append((f.Home / 1e9).ToString("0.000", inv)).Append(" / potrzeba ").Append((f.VilNeed / 1e9).ToString("0.000", inv)).Append(" + ").Append((f.TownNeed / 1e9).ToString("0.000", inv))
@@ -314,12 +366,13 @@ namespace Armoury
                   .Append(", brak przy rynku ").Append((f.Target / 1e9).ToString("0.000", inv)).Append(" z progu ").Append((f.Got / 1e9).ToString("0.000", inv))
                   .Append(", rece przesuniete do jedzenia ").Append(f.Hands > 0 ? (100 * f.FloorHands / f.Hands).ToString("0.0", inv) : "-").Append("%)");
             }
-            sb.Append(" | reszta krain (wsie/kraina):");
+            sb.Append(" | reszta krain (jedzenie/wsie/kraina):");
             bool first = true;
             foreach (var f in r.Feed)
             {
                 if (done.Contains(f.Land) || !(f.VilNeed + f.TownNeed > 0)) continue;
-                sb.Append(first ? " " : ", ").Append(f.M == 0 ? "W " : "E ").Append(f.Land).Append(' ').Append(f.Vil.ToString("0.00", inv)).Append('/').Append(f.All.ToString("0.00", inv));
+                sb.Append(first ? " " : ", ").Append(f.M == 0 ? "W " : "E ").Append(f.Land).Append(' ').Append(f.DietNeed > 0 ? f.Diet.ToString("0.00", inv) : "-").Append('/')
+                  .Append(f.Vil.ToString("0.00", inv)).Append('/').Append(f.All.ToString("0.00", inv));
                 first = false;
             }
             sb.Append(" | rece: bloki okregow w zakresie ").Append(r.FeedBlocks).Append(" (z przesunieciem ").Append(r.FeedBind).Append("), rece przesuniete do jedzenia ")

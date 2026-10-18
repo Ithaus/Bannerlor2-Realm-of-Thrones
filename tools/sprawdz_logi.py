@@ -965,10 +965,11 @@ Uzycie (Python 3, tylko odczyt):
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
 --grupa npolnoc   : (r4-polnoc, noc 17/18.10, Jeff 17.10 "Polnoc i za Murem - najpierw wyzywic siebie (hodowla, ryby, owies)"; Armoury/src/StartCalibration.Feed.cs,
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
-                    NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85, NKS-30b Wolni Ludzie >= 0.55,
-                    Skagos >= 0.80, Ib >= 0.70, Zelazne Wyspy >= 0.75 (Nocna Straz, Lorath - INFO); kraina = (produkcja okregow wsi + pola mieszczan + praca domowa) /
-                    potrzeba jedzenia wsi i miast w kcal surowca; progi z harnessu Planu (przed -> po: Polnoc 1.00 -> 1.03, Wolni 0.35 -> 0.69, Straz 0.33 -> 0.48,
-                    Skagos 0.82 -> 0.88, Ib 0.69 -> 0.76, Wyspy 0.78 -> 0.83) 10-20% nizej; NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia, NKS-30d tozsamosc rak
+                    NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
+                    wsi + pola mieszczan + praca domowa) / potrzeba jedzenia wsi i miast w kcal surowca), NKS-30b jedzenie wsi (1 - kcal koszyka bez pokrycia kroku 8 /
+                    pelna potrzeba kcal ludzi wsi): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93, Zelazne Wyspy >= 0.90 (Nocna Straz, Lorath - INFO);
+                    progi z harnessu Planu (jedzenie przed -> po: Polnoc 0.91 -> 0.96, Wolni 0.52 -> 0.79, Straz 0.27 -> 0.39, Skagos 0.91 -> 0.85, Ib 1.00 -> 0.98,
+                    Wyspy 0.93 -> 0.97) ok. 5-10% nizej; NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia, NKS-30d tozsamosc rak
                     (suma udzialow bloku = 1 - nic z niczego), NKS-30e Plany zbiezne (mediana niezbieznych <= 8), NKS-30f bilans NA TARG jedzenia (INFO, wiaze NKS-3),
                     NKS-30g A7 przy progu (INFO), NKS-30h Plan bez pokrycia wedlug krainy (INFO). Brak linii - INFO. Opcja --baza-doby <log bez r4-polnoc>:
                     NKS-30e <= mediana bazy + 2 (bez bazy <= 10).
@@ -36351,16 +36352,25 @@ def main(argv):
 
 
 # ---------------------------------------------------------------- npolnoc (r4-polnoc, noc 17/18.10)
-# Progi wyzywienia krain z liczb Planu (harness kmoney na ks_dump 16.10, 5 Planow cieplych; przed -> po, kraina = (wsie + pola mieszczan + praca domowa) / potrzeba
-# wsi + miast): Polnoc 1.00 -> 1.03, Wolni Ludzie 0.35 -> 0.69, Nocna Straz 0.33 -> 0.48, Skagos 0.82 -> 0.88, Ib 0.69 -> 0.76, Zelazne Wyspy 0.78 -> 0.83,
-# Lorath/Nord 0.87 -> 0.86. Progi 10-20% ponizej "po" (gra ma innych ludzi i inna prace domowa niz zrzut 16.10); Polnoc >= 0.85 z zadania (Jeff: Polnoc wyzywia
-# sie sama, dowoz tylko na reszte).
+# Progi wyzywienia krain z liczb Planu (harness kmoney na ks_dump 16.10, 5 Planow cieplych, klucze wylaczone -> wlaczone). "jedzenie" = 1 - kcal koszyka wsi bez
+# pokrycia (krok 8) / pelna potrzeba kcal ludzi wsi (wlasne + kupione + robione w domu); "kraina" = kcal wlasne (wsie + pola mieszczan + praca domowa) / potrzeba
+# wsi + miast. Jedzenie: Polnoc 0.91 -> 0.96, Wolni Ludzie 0.52 -> 0.79, Nocna Straz 0.27 -> 0.39, Skagos 0.91 -> 0.85, Ib 1.00 -> 0.98, Zelazne Wyspy 0.93 -> 0.97,
+# Lorath 1.00 -> 1.00. Kraina: Polnoc 1.00 -> 1.08, Wolni 0.35 -> 0.41, Straz 0.33 -> 0.45, Skagos 0.82 -> 0.70, Ib 0.69 -> 0.75, Wyspy 0.78 -> 0.82, Lorath 0.87 -> 0.86.
+# (Skagos nizej: mysliwy potrzebuje dzikiej ziemi - 6 tys. km2 wyspy nie wyzywi 50 tys. ludzi polowaniem.) Progi ok. 5-10% ponizej "po" (gra ma innych ludzi
+# i inna prace domowa niz zrzut 16.10); Polnoc kraina >= 0.85 z zadania (Jeff: Polnoc wyzywia sie sama, dowoz tylko na reszte).
 # Nocna Straz - INFO (garnizony na Murze: 0.32 reki na czlowieka; reszta to danina Muru r4-mur i dowoz).
 NPN_LINE = re.compile(r"KS: wyzywienie krain \(plan doba (?P<day>\d+); najpierw wyzywic siebie (?P<sf>[^,]+), zimna ziemia (?P<cl>[A-Z]+)\)")
-NPN_LAND = re.compile(r"(?P<m>[WE]) (?P<land>[a-z_]+) wsie (?P<v>[\d.]+) kraina (?P<a>[\d.]+) \((?P<rest>[^|]*)\)")
-NPN_REST = re.compile(r"(?P<m>[WE]) (?P<land>[a-z_]+) (?P<v>[\d.]+)/(?P<a>[\d.]+)")
-NPN_THR = (("battania", 0.85, "Polnoc"), ("freefolk", 0.55, "Wolni Ludzie"), ("skagosi", 0.80, "Skagos"), ("ibbenese", 0.70, "Ib"), ("sturgia", 0.75, "Zelazne Wyspy"))
-NPN_INFO = (("nightswatch", 0.40, "Nocna Straz"), ("nord", 0.80, "Lorath/Nord"))
+NPN_LAND = re.compile(r"(?P<m>[WE]) (?P<land>[a-z_]+) jedzenie (?P<d>[\d.]+|-) wsie (?P<v>[\d.]+) kraina (?P<a>[\d.]+) \((?P<rest>[^|]*)\)")
+NPN_REST = re.compile(r"(?P<m>[WE]) (?P<land>[a-z_]+) (?P<d>[\d.]+|-)/(?P<v>[\d.]+)/(?P<a>[\d.]+)")
+NPN_THR = (("battania", 0.90, "Polnoc"), ("freefolk", 0.70, "Wolni Ludzie"), ("skagosi", 0.80, "Skagos"), ("ibbenese", 0.93, "Ib"), ("sturgia", 0.90, "Zelazne Wyspy"))
+NPN_INFO = (("nightswatch", 0.35, "Nocna Straz"), ("nord", 0.95, "Lorath/Nord"))
+
+
+def npolnoc_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
 
 
 def npolnoc_plans(logp):
@@ -36388,8 +36398,8 @@ def npolnoc_med(plans):
 
 def npolnoc_main(logp, bdp=None):
     """npolnoc (r4-polnoc, noc 17/18.10; Armoury/src/StartCalibration.Feed.cs, Tables.cs, Polnoc.cs; klucze Ks Self Feed First, Ks Self Feed Everywhere, Ks Cold Land):
-    [--baza-doby <log biegu bez r4-polnoc>] NKS-30-0 linie "KS: wyzywienie krain" przy Planach (klucze TAK), NKS-30a Polnoc kraina >= 0.85, NKS-30b Wolni Ludzie >= 0.55, Skagos >= 0.80, Ib >= 0.70,
-    Zelazne Wyspy >= 0.75 (Nocna Straz i Lorath - INFO), NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia (z progu > 0), NKS-30d tozsamosc rak (odchylenie sumy
+    [--baza-doby <log biegu bez r4-polnoc>] NKS-30-0 linie "KS: wyzywienie krain" przy Planach (klucze TAK), NKS-30a Polnoc kraina (kcal wlasne) >= 0.85,
+    NKS-30b jedzenie wsi (1 - kcal bez pokrycia / potrzeba): Polnoc >= 0.90, Wolni Ludzie >= 0.70, Skagos >= 0.80, Ib >= 0.93, Zelazne Wyspy >= 0.90 (Nocna Straz i Lorath - INFO), NKS-30c prog przesuwa rece tam, gdzie rynek nie wyzywia (z progu > 0), NKS-30d tozsamosc rak (odchylenie sumy
     udzialow bloku od 1 <= 1e-6 - nic z niczego), NKS-30e Plany zbiezne (mediana niezbieznych towarow Planow po pierwszym <= 8), NKS-30f bilans jedzenia NA TARG
     ostatniego Planu (INFO - wiaze NKS-3 w --grupa nks), NKS-30g A7 przy progu (INFO), NKS-30h Plan bez pokrycia wedlug krainy (INFO), NKS-30i rece przesuniete do jedzenia (INFO). Brak linii - INFO, nigdy wyjatek."""
     rep = Report()
@@ -36409,7 +36419,7 @@ def npolnoc_main(logp, bdp=None):
                 lands = {}
                 for x in NPN_LAND.finditer(s):
                     rest = x.group("rest")
-                    lands[x.group("land")] = dict(m=x.group("m"), v=float(x.group("v")), a=float(x.group("a")),
+                    lands[x.group("land")] = dict(m=x.group("m"), d=npolnoc_f(x.group("d")), v=float(x.group("v")), a=float(x.group("a")),
                                                   got=num(r"z progu ([\d.]+)", rest, float, 0.0), brak=num(r"brak przy rynku ([\d.]+)", rest, float, 0.0),
                                                   rece=num(r"rece przesuniete do jedzenia ([\d.]+)%", rest, float, None), detail=True)
                 seg = ""
@@ -36417,7 +36427,7 @@ def npolnoc_main(logp, bdp=None):
                     if part.startswith("reszta krain"):
                         seg = part
                 for x in NPN_REST.finditer(seg):
-                    lands.setdefault(x.group("land"), dict(m=x.group("m"), v=float(x.group("v")), a=float(x.group("a")), got=0.0, brak=0.0, rece=None, detail=False))
+                    lands.setdefault(x.group("land"), dict(m=x.group("m"), d=npolnoc_f(x.group("d")), v=float(x.group("v")), a=float(x.group("a")), got=0.0, brak=0.0, rece=None, detail=False))
                 feed.append(dict(day=int(mm.group("day")), sf=mm.group("sf").strip(), cl=mm.group("cl"), lands=lands,
                                  dev=num(r"odchylenie sumy udzialow bloku od 1 ([-+\d.Ee]+)", s, float, None),
                                  moved=num(r"rece przesuniete do jedzenia ([\d.]+)% rak pola wsi swiata", s, float, None)))
@@ -36447,27 +36457,34 @@ def npolnoc_main(logp, bdp=None):
                     unc = mm.group(1).strip()
     if not feed:
         rep.add("NKS-30-0: linie 'KS: wyzywienie krain'", "brak linii", "linia przy kazdym Planie (log sprzed r4-polnoc albo Start Calibration wylaczony)", None)
+        rep.add("NKS-30a: Polnoc (battania) kraina (kcal wlasne / potrzeba)", "brak linii", ">= 0.85", None)
         for name, thr, pl in NPN_THR:
-            rep.add(f"NKS-30a/b: {pl} ({name}) kraina", "brak linii", f">= {thr:.2f}", None)
+            rep.add(f"NKS-30b: {pl} ({name}) jedzenie wsi", "brak linii", f">= {thr:.2f}", None)
     else:
         last = feed[-1]
         on = last["sf"].startswith("TAK") and last["cl"] == "TAK"
         rep.add("NKS-30-0: linie 'KS: wyzywienie krain'", f"{len(feed)} Planow (doby {feed[0]['day']}-{last['day']}); ostatni: najpierw wyzywic siebie {last['sf']}, zimna ziemia {last['cl']}",
                 "linia przy kazdym Planie, klucze Ks Self Feed First i Ks Cold Land TAK", on)
         L = last["lands"]
+        xn = L.get("battania")
+        rep.add("NKS-30a: Polnoc (battania) kraina (kcal wlasne / potrzeba wsi i miast)", f"kraina {xn['a']:.2f}, wsie {xn['v']:.2f}" if xn else "brak krainy w linii",
+                ">= 0.85 (Polnoc wyzywia sie sama tam, gdzie ziemia pozwala)", (xn["a"] >= 0.85) if (xn and on) else None)
         for name, thr, pl in NPN_THR:
             x = L.get(name)
             if x is None:
-                rep.add(f"NKS-30{'a' if name == 'battania' else 'b'}: {pl} ({name}) kraina (kcal wlasne / potrzeba)", "brak krainy w linii", f">= {thr:.2f}", None)
+                rep.add(f"NKS-30b: {pl} ({name}) jedzenie wsi (wlasne + kupione + dom)", "brak krainy w linii", f">= {thr:.2f}", None)
                 continue
             first = feed[0]["lands"].get(name)
-            hist = f" (pierwszy Plan {first['a']:.2f})" if first is not None and len(feed) > 1 else ""
-            rep.add(f"NKS-30{'a' if name == 'battania' else 'b'}: {pl} ({name}) kraina (kcal wlasne / potrzeba)",
-                    f"wsie {x['v']:.2f}, kraina {x['a']:.2f}{hist}" + (f", rece przesuniete do jedzenia {x['rece']:.1f}%" if x.get("rece") is not None else ""),
-                    f">= {thr:.2f} (harness: przed/po w komentarzu grupy; reszta - dowoz, danina Muru, glod)", (x["a"] >= thr) if on else None)
+            hist = f" (pierwszy Plan {first['d']:.2f})" if first is not None and first.get("d") is not None and len(feed) > 1 else ""
+            dv = x.get("d")
+            rep.add(f"NKS-30b: {pl} ({name}) jedzenie wsi (wlasne + kupione + dom)",
+                    (f"jedzenie {dv:.2f}{hist}" if dv is not None else "jedzenie - (brak kroku 8)") + f"; kcal wlasne: wsie {x['v']:.2f}, kraina {x['a']:.2f}"
+                    + (f"; rece przesuniete do jedzenia {x['rece']:.1f}%" if x.get("rece") is not None else ""),
+                    f">= {thr:.2f} (harness przed/po w komentarzu grupy; reszta - dowoz, danina Muru, glod)", (dv >= thr) if (on and dv is not None) else None)
         for name, thr, pl in NPN_INFO:
             x = L.get(name)
-            rep.add(f"NKS-30b: {pl} ({name}) kraina", f"wsie {x['v']:.2f}, kraina {x['a']:.2f}" if x else "brak krainy w linii", f"INFO (odniesienie {thr:.2f}; reszta - danina Muru r4-mur, dowoz)", None)
+            rep.add(f"NKS-30b: {pl} ({name}) jedzenie wsi", (f"jedzenie {x['d']:.2f}, " if x and x.get("d") is not None else "") + (f"wsie {x['v']:.2f}, kraina {x['a']:.2f}" if x else "brak krainy w linii"),
+                    f"INFO (odniesienie {thr:.2f}; reszta - danina Muru r4-mur, dowoz)", None)
         cold = [L[n] for n in ("battania", "freefolk", "nightswatch", "skagosi", "ibbenese", "sturgia", "nord") if n in L and L[n].get("detail")]
         brak = sum(c["brak"] for c in cold); got = sum(c["got"] for c in cold)
         rep.add("NKS-30c: prog przesuwa rece tam, gdzie rynek nie wyzywia (krainy zimne, mld kcal/d)", f"brak przy rynku {brak:.3f}, z progu {got:.3f}",
