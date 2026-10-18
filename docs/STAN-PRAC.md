@@ -2896,3 +2896,13 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   sprowadzily W w 160 dobach), NZW-1 neutralny start 13.3% (date_farm), NZW-3 ikony 177, NOP-7 ruda 3.06 / 57 miast bez rudy, NOP-8, NWAR-2 0.354/d, NKS-9 q95 21.7 ms, NKA-1, ZC1 aksamit/jedwab.
 - 04:10 PDT: ac03aa25 (noc-ks4): SideVillageCrafts i DistrictIconFromSum domyslnie WYL. (inwestycje w okreg dzialaja na typie wsi) -> Armoury 5a3dd15a; test 5 dob + bitwa (test/wgr79)
   przed WGRANIEM 79.
+
+### 85. WGRANIE 79 (18.10 ok. 04:10 PDT = 13:10 CEST) - FALE 3 i 4 (przeglad ekonomii) - START TUTAJ
+W grze: `w-toku/noc-wgranie-79` = w-toku/noc-ks4 **ac03aa25** (GitHub) | Armoury **5a3dd15a** (bylo f02b7c5d); CrashScribe 5258adcd, RC/GT/FV i pliki danych jak WGRANIE 77/78.
+Kopie *.bak-2026-10-18-wgranie79-przed i D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie79-przed; zapis Jeffa bez zmian (md5 2ad40e43, kopia ...-przed-wgraniem77.sav; Jeff nie gral).
+= 78 + fala 3 (wyzywic siebie dla calego swiata, koszt KS T0-T10, ceny r5, poprawki uchodzcow/Muru/ksiegi, przyspieszenie bit w bit (pamiec zoldu tylko pewna), mniejsze logi, inwestycje w okreg)
++ fala 4 (ksiega i skory, opal z pora roku, dozowanie uchodzcow, warsztaty, przeglad firm DS co 91 dob, pan splaca rachunki zywnosci wczesniej, place w dol przy wolnych rekach + zarobek do koszyka KS,
+pomiary A7/regale/karawany/zelazo) + fala 4b (pomiar zgonow wedlug przyczyny, KS wlacza sie po 28+7 dobach). SideVillageCrafts i DistrictIconFromSum WYL. (neutralny start 13.3% - do poprawy).
+Testy: fin88 (sciezka Jeffa 160 dob) 0 ERROR, zgony z glodu 0, KS sam po 35 dobach; 5 dob + bitwa: kod 0, ERROR 0, bitwa 0 bledow.
+OTWARTE: akumulator ludu miast (W 80 dni, lud +60k/d - trzyma go danina od majatku), ruda pod KS (57 miast bez rudy), koszt KS 4.8 ms (q95 21.7), zajecia wiosek pod KS zamrozone (A7 - pomiar
+w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jeffa o zwrocie zoldu wedlug potrzeby, test zimy (armoury-zima-teraz.flag) nie zrobiony.
