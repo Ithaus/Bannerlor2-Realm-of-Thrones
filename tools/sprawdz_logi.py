@@ -1610,7 +1610,7 @@ Uzycie (Python 3, tylko odczyt):
                     tygodniowy f5-ruda: wpisy bez wzrostu tylko przez rece weglarzy ("w tym przez rece weglarzy f7-wegiel N" - do wzrostu rece weglarzy licza sie jak brak
                     drewna; INFO, obserwowac razem z NRU-3 i nglod w krainach gorniczych).
 --grupa nbandy    : (noc 18.10, paczka f8-bandy - decyzja Jeffa "7. b ale o ile spowolni to gre gdy damy 2200 band?"; Armoury/src/BanditLimit.cs, klucze Bandit Limit Per Hideout
-                    (domyslnie 24 zamiast 12 ROT), Bandit Births Where People, Bandit Cost Log) python -I tools/sprawdz_logi.py --grupa nbandy <Armoury-*.log> [--baza-doby <log bazy>]
+                    (domyslnie 12 = ROT, decyzja nocy 18.10; paczka 24), Bandit Births Where People, Bandit Cost Log) python -I tools/sprawdz_logi.py --grupa nbandy <Armoury-*.log> [--baza-doby <log bazy>]
                     (strumieniowo). Linie "Bandy i limit (f8-bandy): start sesji" i "...: dzien N" (bandy wobec celu klan po klanie, narodziny wedlug strefy starego celu,
                     koszt doby w ms: rodzenie band, mysl AI godzinowa, AI taktyczne, tiki partii - bandy i inne partie, OutlawLaw.Daily; doba realna i ms/klatke) oraz "Wyrzutki:
                     dzien N" (band, narodziny, puste; znaczniki czasu = doba realna takze bez paczki). NBD-0 linie paczki (0 nieczytelnych), NBD-B bandy i doba realna z linii
@@ -46850,7 +46850,7 @@ def _nbd_legs(D):
 
 
 def nbandy_main(logp, bdp=None):
-    """nbandy (noc 18.10, paczka f8-bandy): limit band ROT na zajeta kryjowke (klucz Bandit Limit Per Hideout, domyslnie 24 zamiast 12), narodziny tylko przy kryjowce
+    """nbandy (noc 18.10, paczka f8-bandy): limit band ROT na zajeta kryjowke (klucz Bandit Limit Per Hideout, domyslnie 12 = cel ROT - decyzja nocy 18.10; paczka 24), narodziny tylko przy kryjowce
     z ludzmi (Bandit Births Where People), koszt AI band i doba realna (Bandit Cost Log). Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log biegu bazowego>
     (NBD-7: doba realna tych samych dob gry). Progi NBD-0..NBD-10 - opis w naglowku pliku (--grupa nbandy). Log bez paczki: liczby bazowe z linii Wyrzutki (INFO), bez wyjatku."""
     rep = Report()

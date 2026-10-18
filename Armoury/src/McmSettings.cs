@@ -7846,7 +7846,7 @@ namespace Armoury
 
         [SettingPropertyInteger("Bandit Limit Per Hideout", 12, 48, "0", HintText = "most bandit bands the game keeps for each hideout their clan holds - the bands roaming around it plus those inside; Realm of Thrones keeps 12 (6 around, 6 inside). The extra bands roam around the hideout (the hideout fight stays as it was) and are still born only from real outlaws - deserters, routed soldiers, the hungry and the burnt out - so where there are no such men no band forms. Works only with Outlaw Law Enabled; 12 = Realm of Thrones' own limit")]
         [SettingPropertyGroup("Bandit numbers (night 18.10)")]
-        public int BanditLimitPerHideout { get; set; } = 24;
+        public int BanditLimitPerHideout { get; set; } = 12;
 
         [SettingPropertyBool("Bandit Births Where People", HintText = "with Bandit Limit Per Hideout above Realm of Thrones' own: every band the game raises for a clan with hideouts is born at one of the clan's hideouts whose land has outlaws enough for a band (chosen the way the game chooses), never as an empty band that is removed at once; where none of the clan's hideouts has such men, no band is born. Off = the game picks the hideout as before, and births where no men are come out empty and are removed")]
         [SettingPropertyGroup("Bandit numbers (night 18.10)")]

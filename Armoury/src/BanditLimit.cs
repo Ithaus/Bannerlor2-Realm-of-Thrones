@@ -28,7 +28,7 @@ namespace Armoury
     /// (BanditSpawnCampaignBehavior._numberOfMaxBanditPartiesAroundEachHideout); "w srodku" czytaja tez AI odwiedzin kryjowek (gra, BK) i misja kryjowki -
     /// tego nie ruszamy. BK lata DefaultBanditDensityModel (+2 wokol) - pod ROT bez skutku, jak dotad.
     ///
-    /// 1. BanditLimitPerHideout (domyslnie 24, MCM 12-48): postfiks gettera "wokol" czynnego modelu (DeclaredPropertyGetter na klasie deklarujacej - pulapka
+    /// 1. BanditLimitPerHideout (domyslnie 12 = cel ROT - decyzja prowadzacego noc 18.10 po skardze Jeffa na przycinanie przy x8; paczka miala 24; MCM 12-48): postfiks gettera "wokol" czynnego modelu (DeclaredPropertyGetter na klasie deklarujacej - pulapka
     ///    CLAUDE.md 15.10), wynik = max(ROT, limit - w srodku). Dziala tylko przy czynnym prawie wyrzutkow (OutlawLaw - nowe bandy tylko z puli ludzi);
     ///    limit <= ROT (12) albo prawo wylaczone = wynik ROT bez zmian (stara droga co do liczby).
     /// 2. BanditBirthsWherePeople (tylko przy celu podniesionym): kazda proba narodzin bandy klanu z kryjowkami (ponizej i ponad stary cel ROT - obie strefy
