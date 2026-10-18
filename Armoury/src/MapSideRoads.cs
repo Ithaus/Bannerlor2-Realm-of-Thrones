@@ -441,7 +441,9 @@ namespace Armoury
                 if (!_job.Done) return;
                 if (!_loggedPlan) { _loggedPlan = true; LogPlan(); if (_job.Res == null) { _failedPlan = true; return; } }
                 if (_job.Res == null) return;
-                if (!_built) Build();
+                // widocznosc takze PRZED kazda porcja stawiania: kamera wysoko = nowe decale od razu schowane (bez kilku sekund drog przy oddalonej kamerze);
+                // przelacza tylko juz postawione i tylko przy przejsciu progu
+                if (!_built) { UpdateVisibility(screen); Build(); }
                 if (_built) { UpdateVisibility(screen); CheckLayout(); }
                 if (_sinceSummary >= SummaryEvery)
                 {
@@ -515,7 +517,7 @@ namespace Armoury
             bool now = MapSideRoads.AutotestFlag;   // bieg zdjec: bez budzetu (jedno stawianie zaraz po planie)
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             int made = 0;
-            bool hidden = _visKnown && !_visible;
+            bool hidden = _visKnown && !_visible;   // _visKnown ustawia UpdateVisibility tuz przed Build (brak kamery = jak dotad: widoczne)
             while (_next < res.Stamps.Count)
             {
                 if (!now && made > 0 && System.Diagnostics.Stopwatch.GetTimestamp() - t0 > BuildBudgetTicks) break;

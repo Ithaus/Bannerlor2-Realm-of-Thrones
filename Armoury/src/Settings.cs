@@ -2392,7 +2392,7 @@ namespace Armoury
         public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
         // --- Side roads to far villages ---
         // f11-drogi (Jeff 18.10: drogi do wiosek odchodzace od traktu, bez drogi do wioski blisko traktu - "krotka kreska"): MapSideRoads.cs + MapSideRoads.Plan.cs,
-        // ModuleDatarm_map_side_roads_grid.tsv (tools/drogi/drogi_boczne_siatka.py); DOMYSLNIE NIE - Jeff decyduje po zdjeciach z autotestu
+        // ModuleData\arm_map_side_roads_grid.tsv (tools/drogi/drogi_boczne_siatka.py); DOMYSLNIE NIE - Jeff decyduje po zdjeciach z autotestu
         // (plik-przelacznik armoury-drogi-boczne.flag w Documents\...\CrashScribe wlacza je tylko w trybie autotestu). Sam widok: predkosc, trasy i zapis bez zmian.
         public bool MapSideRoads = false;                  // dirt lanes on the campaign map lead from the main painted roads to the villages that lie farther away - a village close to a main road gets no lane of its own, villages behind it join its lane, and the lanes wind along the land around water, mountains and towns. Visual only - lanes do not change speed or routes. Turned on, the lanes appear on the map within a few seconds; turned off, they are taken away. Off = no lanes are drawn
         // --- Speed of the day (night 17/18.10) ---
