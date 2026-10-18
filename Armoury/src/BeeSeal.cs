@@ -137,6 +137,9 @@ namespace Armoury
                 bool vis = false;
                 try { vis = _orig != null && _orig(args); }
                 catch (Exception e) { Stumble("menu " + _id, e); vis = false; }
+                // inwest (recenzja): przy kluczu District Works opcje BEE 5/15/30 tys. ukryte niezaleznie od Living Economy Sealed (zastepuje je "Invest in the district's works")
+                try { if (_id != null && _id.StartsWith("bee_village_invest_", StringComparison.Ordinal) && DistrictWorks.HidesBeeInvest) return false; }
+                catch (Exception e) { Stumble("menu " + _id, e); }
                 if (!On) return vis;
                 try
                 {
@@ -316,7 +319,14 @@ namespace Armoury
         }
         private static void ArmoryPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_ARMORY); }
         private static void TownInvestPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TOWN_INVEST); }
-        private static void VillageInvestPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_VILLAGE_INVEST); }
+        private static void VillageInvestPost(ref bool __result, ref string reason)
+        {
+            // inwest (recenzja, projekt ui_text 1): przy kluczu District Works ekran Demesne BK i konsola tez zamkniete z odeslaniem do prac okregu - takze bez Living Economy Sealed
+            bool works = false;
+            try { works = DistrictWorks.HidesBeeInvest; } catch { works = false; }
+            if (works) { try { __result = false; reason = DistrictWorks.BeeClosedText; } catch (Exception e) { Stumble("Can*", e); } return; }
+            Close(ref __result, ref reason, T_VILLAGE_INVEST);
+        }
         private static void MarketPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_MARKET); }
         private static void CampPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_CAMP); }
         private static void TrainPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TRAIN); }
@@ -354,6 +364,8 @@ namespace Armoury
                 }
                 try { BeeGifts.OnSession(__0, mgr); }   // E5/A5: okno kwot wplaty i dar dla notabli w menu BEE (wlasne try w srodku)
                 catch (Exception e) { Stumble("menu E5/A5", e); }
+                try { DistrictWorks.OnBeeSession(__0, mgr); }   // inwest: "Invest in the district's works" w menu BEE wsi przed "Back" (wlasne try w srodku)
+                catch (Exception e) { Stumble("menu inwest", e); }
                 Log.Info(CampaignLine(per, miss));
             }
             catch (Exception e) { Stumble("menu BEE", e); }

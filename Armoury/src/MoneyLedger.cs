@@ -355,6 +355,22 @@ namespace Armoury
             catch { _stumbles++; }
         }
 
+        /// <summary>
+        /// inwest (prace okregu, DistrictWorks.OnCartReturn): wyplata inwestorom zdjeta z kiesy wsi i z licznika podatku wsi macierzystej W SRODKU okna powrotu wozu
+        /// (po 112 i F4b) - jak CartDuesInWindow: migawki kiesy i licznika przesuniete o wyplate, wiec "kiesa wsi z utargu" i "podatek" sa brutto, a wyplata nie jest
+        /// "zniklo" (zloto jest u glowy rodu inwestora). Tylko licznik - nie rzuca.
+        /// </summary>
+        internal static void CartWorksInWindow(MobileParty cart, int fromPurse, int fromTax)
+        {
+            try
+            {
+                if (cart == null || !WinOpen || !_winVillage || !ReferenceEquals(_winParty, cart)) return;
+                if (fromPurse > 0) _winHomeGold -= fromPurse;
+                if (fromTax > 0) _winHomeTax -= fromTax;
+            }
+            catch { _stumbles++; }
+        }
+
         /// <summary>Sztuki towaru, ktore zostaly w taborze po sprzedazy (bez zwierzat jucznych, ktore tabor zatrzymuje).</summary>
         private static int Unsold(MobileParty mp)
         {

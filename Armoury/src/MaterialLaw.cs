@@ -183,6 +183,9 @@ namespace Armoury
                 if (StartCalibration.ProdStep(village, item, ref __result)) return;
                 CamelLaw.QarthBase(village, item, ref __result);   // E6/M2 (208): wielblad stadniny Qarthu - baza z udzialu konia-gospodarza (przed mnoznikami, jak kazdy towar)
                 VillageFruit.Base(village, item, ref __result);     // noc 15/16.10 (placek i marchew): owoce i miod wsi wedlug wag BK - baza przed mnoznikami (P1, rece, regulator, zima)
+                // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - czynnik towarow typu okregu i baza towarow innych zajec PRZED mnoznikami (kopalnie, las, P1, rece,
+                // regulator towaru) - dopisany towar dostaje te same mnozniki co we wsi tego typu; wies pod KS, klucz wylaczony, wies bez planu - nic (wlasny try)
+                VillageCrafts.Base(village, item, ref __result);
                 var s = Settings.Current;
                 string id = item.StringId ?? "";
                 float m = 1f;
@@ -250,10 +253,14 @@ namespace Armoury
                 Bloomery.Cap(village, item, ref __result);
                 RockGold.Cap(village, item, ref __result);   // 24d (14.10, klucz CasterlyGoldExhausted): kruszce Casterly Rock i ruda zlota Zachodu - sufit 0, ostatni krok przed ksiega
                 GoodsRates.SideStep(village, item, ref __result);   // ZC1 (BkSideGoodsOrigin): marmur kopaln srebra i miod pitny drwali x (1 - przejscie) - po wszystkich krokach, przed ksiega
+                VillageCrafts.After(village, item, __result.ResultNumber);   // inwest (recenzja): pomiar neutralnosci zajec na towarach - wynik koncowy (tylko doba wlaczenia; sam odczyt)
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
-            catch { }
+            catch { System.Threading.Interlocked.Increment(ref _silent); }   // inwest etap 0 (proba W2): ciche wyjatki lancucha tylko liczone (linia W2)
         }
+        private static int _silent;
+        /// <summary>inwest etap 0: ciche wyjatki ProdPostfix od ostatniego odczytu (lancuch modelu przerwany - kroki po wyjatku nie biegly dla tego wywolania).</summary>
+        internal static int TakeSilent() { return System.Threading.Interlocked.Exchange(ref _silent, 0); }
 
         internal static void ApplyAll(Harmony h)
         {

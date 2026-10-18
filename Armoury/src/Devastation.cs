@@ -333,6 +333,8 @@ namespace Armoury
             // E7/W1 (232): + zabici tego uderzenia (pamiec wojny wioski - te same liczby, ktore nizej dopisuje rs.Dead)
             try { VillageBook.OnStrike(v, hit * f, refugees * f, dead * f, kind != KForage, rs != null ? rs.Comp : null, src, lBefore); }
             catch (Exception e) { Stumble("Devastation.Strike(E4/11)", e); }
+            // inwest (noc 17/18.10): prace okregu - osady oproznione tym uderzeniem zabieraja swoja czesc prac (stado do napastnika), po ksiedze wiosek; nie rzuca
+            try { DistrictWorks.OnStrike(v, rs != null ? rs.Comp : null, src); } catch (Exception e) { Stumble("Devastation.Strike(inwest)", e); }
             // pojmani przy uderzeniu = 0 na stale (E4/9: z konta UCHODZCY przy koncu rabunku); CapWould - plan pojmanych calego rabunku
             double h = hit * f;
             if (rs != null) { rs.Hit += h; rs.Dead += dead * f; rs.CapWould += h * capW; }

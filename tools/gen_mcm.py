@@ -379,6 +379,26 @@ RANGES = {
     'RaidRefugeesPurseShare': (0.0, 1.0, "0.00"),
     'RaidRefugeesMessageMin': (0, 10000, "0"),
     'RaidRefugeesTownIntake': (0.0, 0.2, "0.000"),   # recenzja calosci: dobowy limit przyjec nowych kont (udzial ludzi miasta; 0 = bez limitu)
+    # inwest (noc 17/18.10): zajecia wiosek i prace okregu - zgodnie z przycieciem w kodzie (VillageCrafts.Rule: prog >= 1, doby >= 7, udzial regionu 0..1;
+    # DistrictIcon 0..1; DistrictWorks: udzial 0..1, dodatek 0..2, lata sprzetu 0.1..10, doby >= 1 / >= 0; DistrictWorksAi: zwrot 0.01..2, udzial 0..1, tempo 0..0.1)
+    'SideVillageCraftSwitch': (1.0, 3.0, "0.00"),
+    'SideVillageCraftHoldDays': (7, 364, "0"),
+    'SideVillageCraftChangeDays': (7, 364, "0"),
+    'SideVillageCraftTreeDays': (7, 728, "0"),
+    'SideVillageCraftRegionShare': (0.0, 1.0, "0.000"),
+    'DistrictIconMargin': (0.0, 1.0, "0.00"),
+    'DistrictWorksShare': (0.0, 1.0, "0.00"),
+    'DistrictWorksBonusSide': (0.0, 2.0, "0.00"),
+    'DistrictWorksBonusMain': (0.0, 2.0, "0.00"),
+    'DistrictWorksKitYears': (0.1, 10.0, "0.0"),
+    'DistrictWorksMinGold': (0, 10000, "0"),
+    'DistrictWorksRebuildDays': (1, 728, "0"),
+    'DistrictWorksKeepWageDays': (0, 364, "0"),
+    'DistrictWorksAiMinReturn': (0.01, 2.0, "0.00"),
+    'DistrictWorksAiSurplusShare': (0.0, 1.0, "0.00"),
+    'DistrictWorksAiReserveDays': (0, 364, "0"),
+    'DistrictWorksAiReserveFlat': (0, 200000, "0"),
+    'DistrictWorksAiWorldPace': (0.0, 0.1, "0.000"),
 }
 
 def gen(module_dir, ns, display):

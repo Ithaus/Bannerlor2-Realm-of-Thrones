@@ -123,6 +123,18 @@ namespace Armoury
             catch (Exception e) { ReadStumble(e); factor = 1f; return false; }
         }
 
+        /// <summary>inwest (zajecia wiosek pobocznych bez KS): g(typ) reguly dla typu wsi; 1 - klucz wylaczony, brak kalibracji albo typ spoza niej. Sam odczyt, nie rzuca.</summary>
+        internal static float GOf(VillageType t)
+        {
+            try
+            {
+                if (t == null || !KeyOn) return 1f;
+                var m = _mem; float g;
+                return m != null && m.G != null && m.G.TryGetValue(t, out g) && g > 0f && !float.IsInfinity(g) ? g : 1f;
+            }
+            catch { return 1f; }
+        }
+
         /// <summary>MaterialLaw.ProdPostfix (najbardziej zewnetrzny model wsi, _depth 1): czynnik reguly wzorem "czynnik x suma" - po mnozniku wydobycia
         /// i powtorzen BK, przed rekami spustoszenia. Wlasny try - wyjatek tutaj nie zabiera dalszych krokow postfiksu.</summary>
         internal static void ProdStep(Village village, ref ExplainedNumber r)

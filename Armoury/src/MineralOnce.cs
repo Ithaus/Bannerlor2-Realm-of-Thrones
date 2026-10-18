@@ -147,7 +147,8 @@ namespace Armoury
                 bool hamlet = HamletKinds.On;                                                 // E6/W2 (210): ryby wiosek rybackich za zbozem - czwarta bramka (ostatni krok listy)
                 bool eggs = VillageFruit.EggsOn;                                              // N2-E1 (noc-ekonomia2): jaja wsi z drobiem BK - piata bramka (pozycja dopisana na koncu listy)
                 bool ks = StartCalibration.Applied;                                           // KS (kalibracja startu): lista wsi zastosowanej - towary KS ze stawka (szosta bramka)
-                if (!crop && !mineral && !camel && !hamlet && !eggs && !ks) return;           // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
+                bool crafts = VillageCrafts.On;                                               // inwest (noc 17/18.10): zajecia wiosek pobocznych bez KS - siodma bramka (ostatni krok listy)
+                if (!crop && !mineral && !camel && !hamlet && !eggs && !ks && !crafts) return;           // HamletKinds.Step sam czyta klucz - u z dawnej listy przy kluczu wylaczonym nie dziala
                 var list = __result;
                 if (list == null) return;
                 v = VillageOf(__0);
@@ -185,7 +186,7 @@ namespace Armoury
                     try { list = VillageFruit.EggStep(v, list); }
                     catch (Exception gex) { VillageFruit.ForgetEgg(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.Eggs", gex); }
                 }
-                if (!mineral) { __result = ksv ? list : HamletKinds.ListStep(v, list); return; }         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia); KS - bez W2
+                if (!mineral) { __result = ksv ? list : VillageCrafts.ListStep(v, HamletKinds.ListStep(v, list)); return; }   // inwest: zajecia wiosek (droga bez KS) - towary innych zajec z waga 0 na koncu         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia); KS - bez W2
                 int n = list.Count;
                 List<(ItemObject, float)> res = null;      // nowa lista dopiero przy pierwszym powtorzeniu - zwykla wies kosztuje tylko odczyt osady (ok. 0.1 mikrosekundy)
                 Dictionary<ItemObject, int> extra = null;  // przedmiot -> ile powtorzen zdjeto w tym zlozeniu listy
@@ -219,7 +220,7 @@ namespace Armoury
                     if (extra != null) { _dup[v] = extra; _lists++; }
                     else if (_dup.Count > 0) _dup.Remove(v);
                 }
-                __result = ksv ? (res ?? list) : HamletKinds.ListStep(v, res ?? list);   // list = lista BK albo lista po filtrze klimatu (T8); E6/W2 - ryby za zbozem PO powtorzeniach (bez mnoznika Times dla ryb); KS - bez W2
+                __result = ksv ? (res ?? list) : VillageCrafts.ListStep(v, HamletKinds.ListStep(v, res ?? list));   // inwest: zajecia wiosek (droga bez KS) po W2 (W2 milknie przy tym kluczu)   // list = lista BK albo lista po filtrze klimatu (T8); E6/W2 - ryby za zbozem PO powtorzeniach (bez mnoznika Times dla ryb); KS - bez W2
             }
             catch (Exception ex)
             {

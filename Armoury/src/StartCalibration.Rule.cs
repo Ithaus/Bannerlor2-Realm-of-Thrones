@@ -222,6 +222,7 @@ namespace Armoury
                         if (b == null || b.K == null || b.C == null) continue;
                         if (b.Target >= 0) { Progress(ld, b, today, mt); active++; continue; }
                         if (reg && b.RC != null) RegaleCycle(b, px);
+                        if (KsWorksLock(ld, b)) { b.Held = 0; continue; }   // inwest: czesc z pracami okregu nie zmienia zajecia (projekt A7)
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
                         int cur = b.C[ci];

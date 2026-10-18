@@ -239,6 +239,9 @@ namespace Armoury
             if (est != null) t.Add(est);
             if (state != null) t.Add(state);
             if (fire != null) t.Add(fire);
+            // inwest (ui_text 5): co robi wioska, jaki to procent produkcji okregu, prace (wszystkie i gracza), po ogniu - strata i odbudowa; "Kit in place" po Alt
+            foreach (string wl in DistrictWorks.PartLines(district, uid, true))
+                t.Add(wl, TooltipProperty.TooltipPropertyFlags.MultiLine, wl.StartsWith("Kit in place", StringComparison.Ordinal) ? MapVillageTip.OnlyExtended : MapVillageTip.Always);
             string bkId;
             string faith = MapVillageLore.FaithLine(district, out bkId);
             if (faith != null) t.Add(faith);

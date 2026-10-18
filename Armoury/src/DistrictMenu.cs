@@ -90,6 +90,9 @@ namespace Armoury
                 // ZC2: w naglowku sklad stanow i Dostatek okregu (tylko odczyt; klucz DailyLifeEstates off - null)
                 try { string zc = DailyLife.DistrictLine(st); if (!string.IsNullOrEmpty(zc)) head = (head ?? "") + "\n" + zc; }
                 catch (Exception e) { Stumble("Estates " + st.StringId, e); }
+                // inwest (ui_text 4): produkcja okregu wedlug zajec, glowny towar i prace gracza (null - nic)
+                try { string po = DistrictWorks.HeadText(st); if (!string.IsNullOrEmpty(po)) head = (head ?? "") + "\n" + po; }
+                catch (Exception e) { Stumble("Works " + st.StringId, e); }
                 _dOpen++;
                 if (rows.Count > _dRowsMax) _dRowsMax = rows.Count;
                 string title = VillageTexts.Make(VillageTexts.DistTitle, "DISTRICT", name ?? "?").ToString();
@@ -152,6 +155,7 @@ namespace Armoury
                 if (it.Lore != null && it.Lore.Livelihood.Length > 0) hint.Add(VineOlive.Livelihood(st, GoodsRates.Livelihood(st, r.Uid, it.Lore.Livelihood)));   // GL-5 (P5): wies lniana - zdanie lnu
                 string mem = Memory(r, it.Lore);
                 if (mem != null) hint.Add(mem);
+                hint.AddRange(DistrictWorks.PartLines(st, r.Main ? null : r.Uid, false));   // inwest (ui_text 4): zajecie, udzial w produkcji okregu, prace
             }
             catch (Exception e) { Stumble("wiersz " + (r.Uid ?? r.Name ?? "?"), e); }
             if (b == null) _dNone++;
@@ -201,6 +205,7 @@ namespace Armoury
                 }
                 string mem = Memory(it.R, row);
                 if (mem != null) more.Add(mem);
+                more.AddRange(DistrictWorks.PartLines(st, it.R.Main ? null : it.R.Uid, false));   // inwest (ui_text 4): zajecie i prace w "Hear more"
                 if (more.Count > 0) sb.Append("\n\n").Append(string.Join("\n", more.ToArray()));
                 InformationManager.ShowInquiry(new InquiryData(it.R.Name ?? "?", sb.ToString(), true, true, VillageTexts.Make(VillageTexts.DistBack).ToString(),
                     VillageTexts.Make(VillageTexts.DistClose).ToString(), delegate { Open(st); }, null), true);

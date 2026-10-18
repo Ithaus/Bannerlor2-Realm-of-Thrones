@@ -233,6 +233,7 @@ namespace Armoury
             long estates;
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
+            WorksPay(__state);                               // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             DsDues(__state);
         }
 
@@ -252,6 +253,20 @@ namespace Armoury
                 DsVillage.DuesAtCart(st.Party, st.Home, part, handed);
             }
             catch (Exception e) { Stumble("VillageTakings.DsDues", e); }
+        }
+
+        /// <summary>inwest (prace okregu, money_routes 2): woz wrocil do wsi MACIERZYSTEJ - przyrost licznika pana i kiesy wsi w oknie (BK + 112 + F4b) to podstawa puli prac;
+        /// DistrictWorks.OnCartReturn (wlasny try - nie rzuca). Woz w obcej wsi - bez wyplaty.</summary>
+        private static void WorksPay(Entry st)
+        {
+            try
+            {
+                if (st == null || st.Here != null || st.Home == null || st.Party == null) return;
+                int handed = st.Gold - st.Party.PartyTradeGold;
+                if (handed <= 0) return;
+                DistrictWorks.OnCartReturn(st.Party, st.Home, handed, (long)st.Home.TradeTaxAccumulated - st.HomeTax, (long)st.Home.Gold - st.HomeGold);
+            }
+            catch (Exception e) { Stumble("VillageTakings.WorksPay", e); }
         }
 
         /// <summary>112 pkt 1 (bez zmian): reszta utargu do kiesy wsi. Zwraca true, gdy okno bylo nasze i krok przeszedl bez wyjatku; estates = wyplaty
