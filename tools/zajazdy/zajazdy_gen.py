@@ -28,9 +28,14 @@ Regula (jedna dla calego swiata):
   5. budynek ok. OFFSET jedn. obok drogi (z 8 kierunkow: na ladzie, z dala od srodka drogi, najdalej od wiosek), front do postoju; postoj = punkt na drodze;
   6. jakosci: 1 (wspolna izba) zawsze; 2 (porzadna karczma) od P_MID ludzi; 3 (dobry dom) tylko rozstaje od P_RICH ludzi;
   7. okreg = wies gry najblizsza budynkowi (siatka wies_gry) - do jej kiesy ida pieniadze za noclegi.
-Uzycie (z katalogu repo):
-  python -I tools/zajazdy/zajazdy_gen.py --geo D:/Backup-Bannerlord/geo-dane-2026-10-16 --teren D:/Backup-Bannerlord/drogi-siec/a-teren
-      --wioski Armoury/ModuleData/arm_map_villages.tsv --drogi Armoury/ModuleData/arm_map_roads_geo.tsv --out Armoury/ModuleData/arm_roadside_inns.tsv
+Potok f10-uklad (trzy kroki, z katalogu repo; G = --geo D:/Backup-Bannerlord/geo-dane-2026-10-16 --teren D:/Backup-Bannerlord/drogi-siec/a-teren
+--drogi Armoury/ModuleData/arm_map_roads_geo.tsv):
+  1. plan miejsc (ludzie z ukladu v6; bez sprawdzania wiosek pobocznych - uklad v7 dopiero je postawi; wsie gry omijane od razu):
+     python -I tools/zajazdy/zajazdy_gen.py G --wioski Armoury/ModuleData/arm_map_villages_v6.tsv --plan-out tools/zajazdy/zajazdy-miejsca.tsv
+  2. uklad wiosek v7 (trzyma wioski >= min_village planu od budynku i postoju): python -I tools/wioski-v7/v7_uklad.py
+  3. plik zajazdow (miejsca planu, ludzie z ukladu v7, pelne sprawdzenie - budynek >= MIN_VIL od kazdej wioski i wsi gry):
+     python -I tools/zajazdy/zajazdy_gen.py G --wioski Armoury/ModuleData/arm_map_villages.tsv --plan-in tools/zajazdy/zajazdy-miejsca.tsv --out Armoury/ModuleData/arm_roadside_inns.tsv
+  Dawny plik (sw-zajazdy, uklad v5/v6) zostaje jako arm_roadside_inns_v6.tsv - RoadsideInns czyta go przy ukladzie wiosek v6 i starszym.
 """
 import argparse
 import io

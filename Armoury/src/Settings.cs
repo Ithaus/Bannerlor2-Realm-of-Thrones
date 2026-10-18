@@ -2392,7 +2392,8 @@ namespace Armoury
         // ks_*: teren, miejsce, obrazek, odleglosc od morza / rzeki / gor) i zajecie startowe z tej samej tabeli swiata (owce, drwal, traper, rybak); strefa klimatu z wiersza
         // bez zmian. Tylko przy ukladzie v6 (inny uklad - wiersze z pliku). Off = przysiolek w KS na ziemi starego miejsca wioski (zajecie przysiolka tylko w opisie).
         // Recenzja: nakladka wchodzi w crc ziemi KS (StartCalibration.Hamlets.cs) - przelaczenie po wlaczeniu KS = "inny plik ziemi": stan KS pominiety, Plan od nowa
-        public bool VillageHamletKsLand = true;            // with Start Calibration, the people of a hamlet work the land where the hamlet stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from
+        // f10-uklad: przy ukladzie v7 nakladka bierze kazdy wiersz z ziemia w kolumnach ks_* (kazda przeniesiona wioska, nie tylko przysiolki)
+        public bool VillageHamletKsLand = true;            // with Start Calibration, the people of a hamlet - and of every village the newest layout moved - work the land where it stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from
         // --- Map roads (test) ---
         // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,
         // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)

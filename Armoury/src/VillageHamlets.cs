@@ -51,7 +51,7 @@ namespace Armoury
         internal static void Reset()
         {
             _hamlets.Clear();
-            _lastDay = -1; _stumbles = 0; _stumblesAll = 0; _started = false;
+            _lastDay = -1; _stumbles = 0; _stumblesAll = 0; _started = false; _prev = null;
             lock (_errSites) _errSites.Clear();
             _ksNote = "nakladka KS jeszcze nie liczona (KS start sesji)";
         }

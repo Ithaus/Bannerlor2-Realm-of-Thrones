@@ -34834,7 +34834,7 @@ def nkarczmy_main(logp):
 NZJ_HEAD = "Zajazdy (ZJ): "
 NZJ_PHEAD = "Plotki (PL): "
 NZJ_START = re.compile(r"zajazdow (?P<n>\d+) \(odrzucone: zly wiersz (?P<bad>\d+), brak wsi gry (?P<novil>\d+), przy wiosce na mapie (?P<near>\d+)")
-NZJ_FILE = re.compile(r"plik arm_roadside_inns\.tsv \(crc32 (?P<crc>[0-9A-F]{8}), wierszy (?P<rows>\d+)\)")
+NZJ_FILE = re.compile(r"plik arm_roadside_inns(?:_v6)?\.tsv \(crc32 (?P<crc>[0-9A-F]{8}), wierszy (?P<rows>\d+)\)")   # f10-uklad: _v6 przy ukladzie wiosek v6
 NZJ_BAND = re.compile(r"(?P<band><30k|30-60k|60-90k|>=90k): (?P<n>\d+), (?P<med>[\d.]+|-);")
 NZJ_NN = re.compile(r"najblizszy sasiad min (?P<nn>[\d.]+) \(prog 25\)")
 NZJ_PEO = re.compile(r"ludzie wokol min/mediana/maks (?P<mn>\d+)/(?P<md>\d+)/(?P<mx>\d+)")

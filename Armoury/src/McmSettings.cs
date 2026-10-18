@@ -6224,7 +6224,7 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV7 { get; set; } = true;
 
-        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet work the land where the hamlet stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from")]
+        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet - and of every village the newest layout moved - work the land where it stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageHamletKsLand { get; set; } = true;
 

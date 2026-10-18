@@ -34,6 +34,22 @@ namespace Armoury
     {
         private const string P = "Zajazdy (ZJ): ";
         internal const string FileName = "arm_roadside_inns.tsv";
+        // f10-uklad: zajazdy ukladu v7 (z dala od wiosek v7) w FileName; dawny plik (sw-zajazdy, z ukladu v5/v6) - przy ukladzie wiosek v6 i starszym (klucz VillageLayoutV7 NIE),
+        // zeby zajazdy z ukladu v7 nie stanely w wioskach v6. Brak pliku _v6 - FileName jak dotad
+        internal const string FileNameV6 = "arm_roadside_inns_v6.tsv";
+        private static string _fileUsed = FileName;
+
+        /// <summary>f10-uklad: plik zajazdow tej sesji wedlug ukladu wiosek (v7 - FileName; v6 i starszy - FileNameV6, gdy jest w module).</summary>
+        private static string UsedFile()
+        {
+            try
+            {
+                if (MapVillageData.LayoutVersion >= 7) return FileName;
+                string p = MapVillageData.DataPathFor(FileNameV6);
+                return p != null && System.IO.File.Exists(p) ? FileNameV6 : FileName;
+            }
+            catch { return FileName; }
+        }
         internal const string Menu = "arm_roadinn";
         internal const float EnterR = 1.6f;          // partia najwyzej tyle od miejsca postoju = przy zajezdzie
         private const float LeaveR = 3.5f;           // pytanie wraca dopiero po odjechaniu dalej niz tyle
@@ -160,12 +176,12 @@ namespace Armoury
             _loadText += "; czas " + sw.ElapsedMilliseconds + " ms";
         }
 
-        private static string DataPath() { return MapVillageData.DataPathFor(FileName); }
+        private static string DataPath() { _fileUsed = UsedFile(); return MapVillageData.DataPathFor(_fileUsed); }
 
         private static void Load()
         {
             string path = DataPath();
-            if (path == null || !System.IO.File.Exists(path)) { _loadText = "brak pliku " + FileName + " - zajazdow brak (gra bez zmian)"; return; }
+            if (path == null || !System.IO.File.Exists(path)) { _loadText = "brak pliku " + _fileUsed + " - zajazdow brak (gra bez zmian)"; return; }
             byte[] bytes = System.IO.File.ReadAllBytes(path);
             uint crc = MapVillageData.Crc32(bytes);
             string text = Encoding.UTF8.GetString(bytes);
@@ -201,7 +217,7 @@ namespace Armoury
                 if (hasScene && ms != null)
                 {
                     uint sc = ms.GetSceneXmlCrc();
-                    if (sc != fileScene) { _sceneBad = rows.Count; _loadText = "plik " + FileName + " (crc32 " + crc.ToString("X8") + ") z innej mapy (CRC sceny pliku " + fileScene + ", gry " + sc + ") - zajazdy WYLACZONE"; return; }
+                    if (sc != fileScene) { _sceneBad = rows.Count; _loadText = "plik " + _fileUsed + " (crc32 " + crc.ToString("X8") + ") z innej mapy (CRC sceny pliku " + fileScene + ", gry " + sc + ") - zajazdy WYLACZONE"; return; }
                     sceneNote = "CRC sceny zgodne (" + sc + ")";
                 }
             }
@@ -245,7 +261,7 @@ namespace Armoury
                 _tierN[Math.Max(1, Math.Min(3, inn.Tiers))]++;
             }
             string farText = FarText();
-            _loadText = "plik " + FileName + " (crc32 " + crc.ToString("X8") + ", wierszy " + _rows + "), " + sceneNote + "; zajazdow " + _inns.Count
+            _loadText = "plik " + _fileUsed + " (crc32 " + crc.ToString("X8") + ", wierszy " + _rows + "), " + sceneNote + "; zajazdow " + _inns.Count
                         + " (odrzucone: zly wiersz " + _bad + ", brak wsi gry " + _noVillage + ", przy wiosce na mapie " + _nearVillage + " - uklad " + layout + ")"
                         + "; jakosci 1/2/3: " + _tierN[1] + "/" + _tierN[2] + "/" + _tierN[3] + "; " + DensityText() + farText;
             _sideAll = null;

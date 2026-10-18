@@ -10,25 +10,36 @@
 # Wyjscie: Armoury/ModuleData/arm_map_villages.tsv (v7), arm_map_village_lore.tsv (lore v7), tools/wioski-v7/raport-v7.txt, wioski-v7.tsv (przeniesione wioski)
 #   i (opcja --png <katalog>) obrazki v6 / v7 do przegladu. Przebieg deterministyczny (te same wejscia = te same pliki).
 #
-# Uzycie (z katalogu repo): python -I tools/wioski-v7/v7_uklad.py [--teren <a-teren>] [--geo <geo-siatka.tsv>] [--png <katalog>]
+# Uzycie (z katalogu repo): python -I tools/wioski-v7/v7_uklad.py [--teren <a-teren>] [--geo <geo-siatka.tsv>] [--png <katalog>] [--zajazdy <plan>]
+#   Potok z zajazdami (Jeff 18.10 "zajazdy nie sa obok wiosek"): najpierw plan miejsc zajazdow (tools/zajazdy/zajazdy_gen.py --plan-out, ludzie z v6),
+#   potem ten skrypt (wioski >= min_village planu, 10 jedn., od budynku i postoju zajazdu), na koncu plik zajazdow (zajazdy_gen.py --plan-in) - opis w zajazdy_gen.py.
+#
+# WYNIK (raport-v7.txt): wioska-wioska min 6.13 -> 9.21, mediana 9.50 -> 12.91, wiosek ponizej D 1436 -> 242 (7%; wybrzeza i waskie pasy ladu Doliny,
+#   Reach, Westerlands, Dorzecza, Lys / Tyrosh - ziemia nie miesci wszystkich wiosek przy D, obnizenie do 0.85..0.95 D, pojedyncze nizej); skupiska 47 -> 0;
+#   lad okregow w 12 jedn. od osady 69.6% -> 78.4%, w 8 jedn. 50.3% -> 60.4%; 10% okregow z najgorszym pokryciem (15 jedn.) 78% -> 94%.
 #
 # REGULA:
 #  1. Odleglosc minimalna D = 2 x najmniejsza odleglosc wioska-wioska ukladu v6 (6.13 -> 12.26 jedn.) - miedzy kazdymi dwiema wioskami pobocznymi i miedzy wioska
 #     poboczna a wsia gry (v6: 6.00). Wsie gry stoja tam, gdzie postawila je gra (pary wies gry - wies gry ponizej D zostaja - dane ROT).
-#  2. Ziemia okregu: raster okregow KS (okregi.npz label; ziemia dalej niz 45 jedn. drogi - do najblizszej wsi gry do 60 jedn., jak v6). Miejsce pod wioske:
-#     lad przejezdny w rastrze (bez bagna, rzeki, stromizny >= 0.35 w kwadracie 3x3; bez morza i gor - w ROT takze klify brzegu - w kwadracie 3x3) i w sondzie gry
-#     (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9), od miasta >= 14, zamku >= 11, kryjowki >= 5, poza malowana droga (>= 1.5 jedn. od jej srodka).
+#  2. Miejsce pod wioske: lad przejezdny w rastrze (bez bagna, rzeki, stromizny >= 0.35, morza i ladu nieprzejezdnego w kwadracie 3x3; gora - w ROT takze
+#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9), od miasta >= 10, zamku >= 8, kryjowki >= 5,
+#     poza malowana droga (>= 1.5 jedn. od jej srodka), >= 10 od zajazdu z planu (budynek i postoj).
+#     Ziemia okregu v7 = Voronoi wazony wsi gry na tym samym ladzie (spojna skladowa) do 100 jedn.: waga rosnie okregowi, ktorego ziemia nie miesci jego wiosek
+#     (pojemnosc = komorki / 120), maleje okregowi z zapasem - gesty okreg dostaje pas ziemi sasiadow; ziemia miedzy okregami (droga > 45 jedn.) tez ma gospodarza.
 #  3. Docelowy odstep okregu S = 1.07 x sqrt(ziemia okregu / (wioski + wies gry)) w granicach D..45 (rownomierne pokrycie ziemi okregu).
-#  4. Zostaja na miejscu (kolejnosc: wezly H - skrzyzowania, mosty, porty; przysiolki v6; wieksze; uid): wioska, ktora stoi >= D od wsi gry i >= max(D, 0.75 x S)
-#     od wiosek juz zostawionych - reszta skupiska idzie na wolny lad.
-#  5. Nowe miejsca (okregi od najciasniejszego): zachlannie komorka o najwiekszym wyniku = min(odleglosc od najblizszej wioski, S) / S + 0.35 x atrakcyjnosc
-#     + 0.12 x szum (deterministyczny) przy odleglosci >= D. Atrakcyjnosc miejsca (jak prawdziwe siedliska): rzeka 1.0, brzeg morza / jeziora 0.9, pola i laki 0.55,
-#     step 0.45, skraj lasu 0.5 (drwale, weglarze), wzgorza 0.4 (pasterze), gleboka puszcza 0.25, snieg 0.25, piasek 0.1; dojazd z malowanej drogi (3..12 jedn.)
-#     +0.1. Pustka idzie pierwsza (do odstepu S nic poza nia sie nie liczy), wiec wioski rozchodza sie po calym ladzie okregu bez siatek i pierscieni.
-#     Okreg bez miejsca na swojej ziemi: ziemia sasiadow na tym samym ladzie (spojna skladowa ladu ze wsia gry, do 75 jedn. od wsi gry); dalej odleglosc
-#     minimalna obnizana stopniami (0.9 D ... do odleglosci v6) - kazdy taki przypadek w raporcie; bez zadnego miejsca - wioska zostaje w miejscu v6.
+#  4. Zostaja na miejscu (kolejnosc: wioski rybackie; wezly H - skrzyzowania, mosty, porty; przysiolki v6; wieksze; uid): wioska, ktora stoi na ziemi swojego okregu,
+#     >= D od wsi gry, >= 10 od zajazdu i >= max(D, 0.75 x S) od wiosek juz zostawionych. Okreg ciasny (wiosek > 0.8 x pojemnosci jego ziemi przy D) ukladany od
+#     nowa (zostaja tylko rybacy na brzegu) - zostawione stoja byle jak i zabieraja miejsce.
+#  5. (a) Upakowanie: okregi od najciasniejszego, kazda przeniesiona wioska na komorke tuz ponad D od sasiadow (najpierw rybacy na brzegu - do 4 jedn. od wody),
+#     swoja ziemia, potem ziemia sasiadow na tym samym ladzie do 100 jedn. od wsi gry; bez miejsca - odleglosc 0.95 / 0.90 / 0.85 D (do 100 jedn.), 0.85 D do
+#     120 jedn., na koncu nizej, az do odleglosci v6 (wyspy, waskie pasy ladu) - kazdy przypadek w raporcie.
+#     (b) Rozproszenie (6 przebiegow): kazda przeniesiona wioska przechodzi na najlepsza komorke swojej ziemi = min(odleglosc od najblizszej osady, S x 0.8..1.2)
+#     / S + 0.35 x atrakcyjnosc + 0.25 x szum (deterministyczny, gladki), zawsze >= D od wszystkich (obnizone - najpierw proba D). Atrakcyjnosc miejsca (jak
+#     prawdziwe siedliska): rzeka 1.0, brzeg morza / jeziora 0.9, pola i laki 0.55, step 0.45, skraj lasu 0.5 (drwale, weglarze), wzgorza 0.4 (pasterze),
+#     gleboka puszcza 0.25, snieg 0.25, piasek 0.1; dojazd z malowanej drogi (3..12 jedn.) +0.1. Pustka idzie pierwsza, wiec wioski rozchodza sie po calym
+#     ladzie okregu bez siatek i pierscieni.
 #  6. Ktora wioska na ktore miejsce: najmniejszy koszt (metoda wegierska w okregu): przesuniecie / S + 1.5 (wioska rybacka v6 nie nad woda) + 0.4 (przysiolek v6
-#     nie na dzikiej ziemi). uid bez zmian (zapis v6 / v5 / v4 przechodzi po uid - VillageBook.OldLayout).
+#     nie na dzikiej ziemi); potem rozproszenie (5b). uid bez zmian (zapis v6 / v5 / v4 przechodzi po uid - VillageBook.OldLayout).
 #  7. Przeniesiona wioska dostaje miejsce (kind) i obrazek z ziemi: brzeg / jezioro (rybacka tylko, gdy byla rybacka w v6), rzeka (mlyn wodny albo wies), pole
 #     (zagroda, wiatrak, spichlerz, wies wedlug wielkosci); na dzikiej ziemi (las, wzgorza, step, snieg, piasek) - przysiolek z zajeciem z ziemi jak v6
 #     (owce / kozy, bydlo, swinie, drwale / weglarze, traperzy, mysliwi). Ludzie: osady okregu przeniesionych wiosek rozdzielone na nie wedlug miejsca
