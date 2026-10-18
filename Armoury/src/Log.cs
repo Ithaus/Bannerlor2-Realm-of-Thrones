@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 using TaleWorlds.Library;
 
 namespace Armoury
@@ -41,10 +42,225 @@ namespace Armoury
         private static int _sampleDone, _controlTried;
         private static long _gapSum, _gapFilesSum, _mainLines;
 
-        /// <summary>E8/0: czas zapisu (ticki zegara) i zapisow od poprzedniego odczytu; zeruje.</summary>
+        /// <summary>E8/0: czas zapisu (ticki zegara) i zapisow od poprzedniego odczytu; zeruje. f13-doba: liczniki atomowe (Append pod Gate dodaje Interlocked) -
+        /// odczyt bez Gate, zeby watek gry nie czekal na porcje pisana w tle; te same liczby co pod blokada.</summary>
         internal static void TakeWrite(out long ticks, out long lines)
         {
-            lock (Gate) { ticks = _wTicks; lines = _wLines; _wTicks = 0; _wLines = 0; }
+            ticks = Interlocked.Exchange(ref _wTicks, 0L); lines = Interlocked.Exchange(ref _wLines, 0L);
+        }
+
+        // ================================================================ f13-doba (klucz DayTickSmooth): ZAPIS W TLE
+        // Na watku wolajacego zostaje to, co czyta stan (bramka LogEnabled, LogGate.DropMore - doba gry, tryb), znacznik czasu DateTime.Now i kultura watku;
+        // reszta (TopicOf, napis "[HH:mm:ss] ...", Path.Combine, zapis pliku tym samym rdzeniem Append pod Gate) robi watek "Armoury log" w kolejnosci kolejki.
+        // Kazde oproznienie kolejki (watek tla albo watek gry) zdejmuje porcje i pisze ja POD Gate - wiec linie trafiaja do pliku w kolejnosci wywolan
+        // takze wtedy, gdy watek gry oproznia kolejke sam: Log.Error (blad w pliku od razu, przed ewentualnym CTD), linia "Log (E8/O6)" (proba bajtow
+        // i linii po komplecie zapisow), wyjscie z gry (Close), Init, wylaczenie klucza w trakcie gry, wyjscie procesu i nieobsluzony wyjatek. Watek tla nie
+        // dotyka obiektow gry (dostaje gotowe napisy, znacznik czasu i kulture). Potkniecia watku liczone (start, petla), bez wylacznika: po nieudanym starcie
+        // linie pisze watek wolajacy, nowa proba co 256 linii. Ryzyko: przy CTD silnika (bez kodu zarzadzanego) linie jeszcze w kolejce gina (zwykle ulamek ms).
+        private struct QItem
+        {
+            public bool Csv;          // false = Info: A tekst, B glowny plik, C katalog tematow; true = Csv: A plik, B wiersze, C naglowek
+            public string A, B, C;
+            public DateTime T;        // znacznik czasu z chwili wywolania
+            public CultureInfo Ci;    // kultura watku wolajacego: format HH:mm:ss i porownania TopicOf jak u niego (te same bajty co dotad)
+            public bool InTick;       // linia z taktu doby (tylko pomiar)
+        }
+        private static readonly object QLock = new object(), StartLock = new object();
+        private static List<QItem> _q = new List<QItem>(512), _qSpare = new List<QItem>(512);
+        private static int _qPending;                 // w kolejce albo w porcji w trakcie zapisu (pod QLock; odczyt Volatile)
+        private static bool _qWaiting;
+        private static Thread _qThread;
+        private static int _qRetryIn;
+        private const int QHardCap = 20000;           // kolejka dluzsza (watek tla stoi) - wolajacy oproznia ja sam (pamiec ograniczona)
+        private static bool _qExitHooked;
+        // pomiar (linia "Doba gladko (f13)"): od poprzedniego odczytu TakeSmooth; pod Gate (zapis) / QLock (kolejka) / Interlocked (watek gry)
+        private static long _sEnq, _sEnqTicks, _sEnqTick, _sEnqTickTicks, _sMax;
+        private static long _sBgItems, _sBgTicks, _sBgTickItems, _sBgTickTicks, _sFgItems, _sFgTicks, _sFgDrains;
+        private static long _sStartFails, _sLoopFails, _sRestarts, _sCap;   // od startu procesu
+        private static string _sFirst;
+        /// <summary>f13-doba: takt doby w toku (ustawia DayProfile przy wlaczonym kluczu) - linie oznaczone do pomiaru "w takcie".</summary>
+        internal static volatile bool TickWindow;
+
+        private static bool Smooth { get { var s = Settings.Current; return s != null && s.DayTickSmooth; } }
+
+        internal struct SmoothStats
+        {
+            public long Enq, EnqTick, Max, BgItems, BgTickItems, FgItems, FgDrains, StartFails, LoopFails, Restarts, Cap;
+            public double EnqMs, EnqTickMs, BgMs, BgTickMs, FgMs;
+            public bool Alive; public string First;
+        }
+
+        /// <summary>f13-doba: liczniki zapisu w tle od poprzedniego odczytu (zeruje okresowe; potkniecia od startu procesu). Tylko pomiar.</summary>
+        internal static SmoothStats TakeSmooth()
+        {
+            var r = new SmoothStats();
+            double f = 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            r.Enq = Interlocked.Exchange(ref _sEnq, 0L); r.EnqMs = Interlocked.Exchange(ref _sEnqTicks, 0L) * f;
+            r.EnqTick = Interlocked.Exchange(ref _sEnqTick, 0L); r.EnqTickMs = Interlocked.Exchange(ref _sEnqTickTicks, 0L) * f;
+            lock (QLock) { r.Max = _sMax; _sMax = 0; }
+            lock (Gate)
+            {
+                r.BgItems = _sBgItems; r.BgMs = _sBgTicks * f; r.BgTickItems = _sBgTickItems; r.BgTickMs = _sBgTickTicks * f;
+                r.FgItems = _sFgItems; r.FgMs = _sFgTicks * f; r.FgDrains = _sFgDrains;
+                _sBgItems = _sBgTicks = _sBgTickItems = _sBgTickTicks = _sFgItems = _sFgTicks = _sFgDrains = 0;
+            }
+            r.StartFails = Interlocked.Read(ref _sStartFails); r.LoopFails = Interlocked.Read(ref _sLoopFails); r.Restarts = Interlocked.Read(ref _sRestarts);
+            r.Cap = Interlocked.Read(ref _sCap); r.First = _sFirst;
+            var t = _qThread; r.Alive = t != null && t.IsAlive;
+            return r;
+        }
+
+        private static void NoteQ(string what, Exception e)
+        {
+            if (_sFirst != null) return;
+            try
+            {
+                string m = what + " - " + (e != null ? e.GetType().Name + ": " + e.Message : "?");
+                _sFirst = (m.Length > 200 ? m.Substring(0, 200) : m).Replace('\r', ' ').Replace('\n', ' ').Replace('|', '/');
+            }
+            catch { _sFirst = what; }
+        }
+
+        /// <summary>f13-doba: linia (Info) albo wiersze CSV do kolejki - na watku wolajacego tylko znacznik czasu, kultura i dopisanie do listy.</summary>
+        private static void Enqueue(bool csv, string a, string b, string c)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            bool tick = TickWindow;
+            var it = new QItem { Csv = csv, A = a, B = b, C = c, InTick = tick };
+            if (!csv) { it.T = DateTime.Now; it.Ci = CultureInfo.CurrentCulture; }
+            int n;
+            lock (QLock)
+            {
+                _q.Add(it); _qPending++;
+                n = _q.Count;
+                if (n > _sMax) _sMax = n;
+                if (_qWaiting) Monitor.Pulse(QLock);
+            }
+            if (n > QHardCap) { Interlocked.Increment(ref _sCap); DrainNow(); }
+            else EnsureWorker();
+            long d = System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+            Interlocked.Increment(ref _sEnq); Interlocked.Add(ref _sEnqTicks, d);
+            if (tick) { Interlocked.Increment(ref _sEnqTick); Interlocked.Add(ref _sEnqTickTicks, d); }
+        }
+
+        private static void EnsureWorker()
+        {
+            var t = _qThread;
+            if (t != null && t.IsAlive) return;
+            bool sync = false;
+            lock (StartLock)
+            {
+                t = _qThread;
+                if (t != null && t.IsAlive) return;
+                if (_qRetryIn > 0) { _qRetryIn--; sync = true; }
+                else
+                {
+                    try
+                    {
+                        if (!_qExitHooked)
+                        {
+                            _qExitHooked = true;
+                            // wyjscie procesu zabija watki tla - linie z kolejki najpierw do pliku (wyjatek nieobsluzony tez; CTD silnika - nie)
+                            try { AppDomain.CurrentDomain.ProcessExit += delegate { DrainNow(); }; } catch { }
+                            try { AppDomain.CurrentDomain.UnhandledException += delegate { DrainNow(); }; } catch { }
+                        }
+                        // nazwe "Armoury log" sprawdza CrashScribe GameState.Describe: blad IO tego watku (FirstChance -> Scribe.Report) nie czyta stanu gry poza watkiem gry
+                        var nt = new Thread(QLoop) { IsBackground = true, Name = "Armoury log" };
+                        nt.Start();
+                        if (t != null) Interlocked.Increment(ref _sRestarts);
+                        _qThread = nt;
+                    }
+                    catch (Exception e) { Interlocked.Increment(ref _sStartFails); NoteQ("start watku zapisu", e); _qRetryIn = 256; sync = true; }
+                }
+            }
+            if (sync) DrainNow();   // bez watku tla - ta linia (i reszta kolejki) pisana tu, jak przed paczka
+        }
+
+        private static void QLoop()
+        {
+            while (true)
+            {
+                try
+                {
+                    lock (QLock)
+                    {
+                        while (_q.Count == 0) { _qWaiting = true; Monitor.Wait(QLock); _qWaiting = false; }
+                    }
+                    lock (Gate) { DrainLocked(true); }
+                }
+                catch (ThreadAbortException) { throw; }
+                catch (Exception e)
+                {
+                    Interlocked.Increment(ref _sLoopFails); NoteQ("petla watku zapisu", e);
+                    try { Thread.Sleep(5); } catch { }
+                }
+            }
+        }
+
+        /// <summary>f13-doba: oproznienie kolejki na watku wolajacego (pod Gate - po porcji, ktora pisze watek tla). Nie rzuca.</summary>
+        private static void DrainNow()
+        {
+            try { lock (Gate) { DrainLocked(false); } } catch { }
+        }
+
+        /// <summary>f13-doba: wolane POD Gate. Porcje zdejmowane z GLOWY kolejki tylko pod Gate i pisane w calosci przed zwolnieniem Gate - kolejnosc w pliku =
+        /// kolejnosc wywolan. Watek tla bierze najwyzej QBatch linii na jedno wejscie pod Gate (watek gry czeka na Gate najwyzej jedna porcje); watek gry - wszystko.</summary>
+        private static void DrainLocked(bool worker)
+        {
+            if (!worker && Volatile.Read(ref _qPending) <= 0) return;
+            if (!worker) _sFgDrains++;
+            while (true)
+            {
+                List<QItem> b;
+                lock (QLock)
+                {
+                    if (_q.Count == 0) return;
+                    if (!worker || _q.Count <= QBatch) { b = _q; _q = _qSpare ?? new List<QItem>(512); _qSpare = null; }
+                    else
+                    {
+                        b = _qSpare ?? new List<QItem>(512); _qSpare = null;
+                        for (int i = 0; i < QBatch; i++) b.Add(_q[i]);
+                        _q.RemoveRange(0, QBatch);
+                    }
+                }
+                try
+                {
+                    for (int i = 0; i < b.Count; i++) Process(b[i], worker);
+                }
+                finally
+                {
+                    int n = b.Count;
+                    b.Clear();
+                    lock (QLock) { if (_qSpare == null) _qSpare = b; _qPending -= n; }
+                }
+                if (worker) return;   // watek tla: jedna porcja na wejscie pod Gate (QLoop wraca po nastepna bez czekania)
+            }
+        }
+        private const int QBatch = 256;
+
+        /// <summary>f13-doba: jedna pozycja kolejki - ten sam napis i ten sam rdzen zapisu co Info / Csv przed paczka (pod Gate). Nie rzuca.</summary>
+        private static void Process(QItem it, bool worker)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                if (it.Csv) Append(it.A, it.B, it.C ?? "");
+                else
+                {
+                    string topic = TopicOf(it.A, it.Ci);
+                    string file = topic != null && it.C != null ? Path.Combine(it.C, topic + ".log") : it.B;
+                    string text = "[" + it.T.ToString("HH:mm:ss", it.Ci) + "] " + it.A + Environment.NewLine;
+                    Append(file, text, null);
+                }
+            }
+            catch { }   // jak catch Info / Csv przed paczka: zapis stracony policzony w Append (_nLost)
+            long d = System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+            if (worker)
+            {
+                _sBgItems++; _sBgTicks += d;
+                if (it.InTick) { _sBgTickItems++; _sBgTickTicks += d; }
+            }
+            else { _sFgItems++; _sFgTicks += d; }
         }
 
         /// <summary>
@@ -62,6 +278,7 @@ namespace Armoury
             {
                 lock (Gate)
                 {
+                    DrainLocked(false);   // f13-doba: linie poprzedniej sesji z kolejki najpierw (pelne sciezki - do starych plikow)
                     CloseAllLocked();
                     _kOpened = _kClosed = _kOpenFails = _kWriteFails = _nKept = _nOld = _nLost = _dKept = _dOld = 0; _kFirst = null;
                     Sent.Clear(); _sampling = true; _sampleDone = 0; _controlTried = 0; _gapSum = 0; _gapFilesSum = 0; _mainLines = 0;
@@ -111,9 +328,11 @@ namespace Armoury
         {
             if (_path == null || !Settings.Current.LogEnabled) return;
             if (LogGate.DropMore(msg)) return;   // zapis-d4: ciche logi wiecej (QuietLogMore) - dzienna linia pomiaru tylko-log poza doba pomiaru w grze
+            if (Smooth) { try { Enqueue(false, msg, _path, _topicDir); } catch { } return; }   // f13-doba: plik pisze watek tla
+            if (Volatile.Read(ref _qPending) > 0) DrainNow();   // f13-doba: klucz wylaczony w trakcie gry - linie z kolejki najpierw (kolejnosc w pliku)
             try
             {
-                string topic = TopicOf(msg);
+                string topic = TopicOf(msg, CultureInfo.CurrentCulture);
                 string file = topic != null && _topicDir != null ? Path.Combine(_topicDir, topic + ".log") : _path;
                 string text = "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg + Environment.NewLine;
                 lock (Gate) { Append(file, text, null); }
@@ -132,6 +351,9 @@ namespace Armoury
             {
                 if (!Settings.Current.LogEnabled) return null;
                 string file = Path.Combine(_topicDir, name);
+                // f13-doba: wiersze do kolejki (ta sama sciezka zwracana od razu - Path.Combine; blad zapisu w tle liczony jako zapis stracony w linii O6)
+                if (Smooth) { Enqueue(true, file, rows, header ?? ""); return file; }
+                if (Volatile.Read(ref _qPending) > 0) DrainNow();
                 lock (Gate) { Append(file, rows, header ?? ""); }
                 return file;
             }
@@ -168,7 +390,7 @@ namespace Armoury
             }
             finally
             {
-                _wTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0; _wLines++;
+                Interlocked.Add(ref _wTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0); Interlocked.Increment(ref _wLines);   // f13-doba: atomowo (TakeWrite bez Gate)
                 if (!done) _nLost++;
                 if (sample)
                 {
@@ -241,7 +463,7 @@ namespace Armoury
         /// linia zapisana pozniej otworzy plik od nowa.</summary>
         internal static void Close()
         {
-            try { lock (Gate) { CloseAllLocked(); } } catch { }
+            try { lock (Gate) { DrainLocked(false); CloseAllLocked(); } } catch { }   // f13-doba: kolejka najpierw
         }
 
         private static int CountNl(string s)
@@ -288,6 +510,7 @@ namespace Armoury
             }
             lock (Gate)
             {
+                DrainLocked(false);   // f13-doba: komplet zapisow przed liczeniem (pisarze, zapisy doby, proba bajtow i linii) - liczby jak przy zapisie synchronicznym
                 var inv = CultureInfo.InvariantCulture;
                 var sb = new StringBuilder(640);
                 sb.Append('[').Append(DateTime.Now.ToString("HH:mm:ss")).Append("] ")
@@ -336,22 +559,23 @@ namespace Armoury
         }
 
         /// <summary>Plik tematyczny dla szczegolowej linii (null = glowny log). Podsumowania dnia zostaja w glownym.</summary>
-        private static string TopicOf(string m)
+        /// <summary>f13-doba: ci = kultura watku wolajacego (porownania StartsWith(x, false, ci) = StartsWith(x) na tym watku - te same tematy na watku tla).</summary>
+        private static string TopicOf(string m, CultureInfo ci)
         {
             if (m == null) return null;
-            if (m.StartsWith("Kronika unikatow") || m.StartsWith("UniqueSpoils")) return "unikaty";
-            if (m.StartsWith("Bitwa:")) return "bitwy";
-            if (m.StartsWith("Balans krolestw (175) wedlug krolestw")) return "balans";   // 175.0: szczegoly wedlug krolestw (krotka linia dnia zostaje w glownym)
-            if (m.StartsWith("Budowa:")) return "budowy";
-            if (m.StartsWith("Finanse:")) return "finanse";
-            if (m.StartsWith("ZakupyAI: dzien") || m.StartsWith("PodazPopyt: kupcy")) return null;
-            if (m.StartsWith("ZakupyAI:") || m.StartsWith("Stajnia AI:") || m.StartsWith("Oferta:")) return "zakupy";
-            if (m.StartsWith("PodazPopyt:")) return "handel";
-            if (m.StartsWith("Warsztaty (diagnoza)")) return "warsztaty";
-            if (m.StartsWith("AiNightCamp")) return "noc";
-            if (m.StartsWith("Wioski: ogien") || m.StartsWith("Wioski: zgaszony") || m.StartsWith("Wioski: drzewo")) return "wioski";   // W2: kazdy rabunek i drzewa wsi-matek (diagnostyka) - do pliku tematycznego; start, wypelnienie i podsumowania w glownym
-            if (m.StartsWith("UniqueLaw: zamiennik") || m.StartsWith("LegendaryLaw: zamiennik") || m.StartsWith("TroopFit:   ")
-                || m.StartsWith("Uniques: ") || m.StartsWith("Rozrzut miotanych:") || m.StartsWith("Podloga zlomu:")) return "start";
+            if (m.StartsWith("Kronika unikatow", false, ci) || m.StartsWith("UniqueSpoils", false, ci)) return "unikaty";
+            if (m.StartsWith("Bitwa:", false, ci)) return "bitwy";
+            if (m.StartsWith("Balans krolestw (175) wedlug krolestw", false, ci)) return "balans";   // 175.0: szczegoly wedlug krolestw (krotka linia dnia zostaje w glownym)
+            if (m.StartsWith("Budowa:", false, ci)) return "budowy";
+            if (m.StartsWith("Finanse:", false, ci)) return "finanse";
+            if (m.StartsWith("ZakupyAI: dzien", false, ci) || m.StartsWith("PodazPopyt: kupcy", false, ci)) return null;
+            if (m.StartsWith("ZakupyAI:", false, ci) || m.StartsWith("Stajnia AI:", false, ci) || m.StartsWith("Oferta:", false, ci)) return "zakupy";
+            if (m.StartsWith("PodazPopyt:", false, ci)) return "handel";
+            if (m.StartsWith("Warsztaty (diagnoza)", false, ci)) return "warsztaty";
+            if (m.StartsWith("AiNightCamp", false, ci)) return "noc";
+            if (m.StartsWith("Wioski: ogien", false, ci) || m.StartsWith("Wioski: zgaszony", false, ci) || m.StartsWith("Wioski: drzewo", false, ci)) return "wioski";   // W2: kazdy rabunek i drzewa wsi-matek (diagnostyka) - do pliku tematycznego; start, wypelnienie i podsumowania w glownym
+            if (m.StartsWith("UniqueLaw: zamiennik", false, ci) || m.StartsWith("LegendaryLaw: zamiennik", false, ci) || m.StartsWith("TroopFit:   ", false, ci)
+                || m.StartsWith("Uniques: ", false, ci) || m.StartsWith("Rozrzut miotanych:", false, ci) || m.StartsWith("Podloga zlomu:", false, ci)) return "start";
             return null;
         }
 
@@ -366,7 +590,7 @@ namespace Armoury
         private static void ErrorText(string body)
         {
             string text = "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + body + Environment.NewLine;
-            lock (Gate) { Append(_path, text, null); }
+            lock (Gate) { DrainLocked(false); Append(_path, text, null); }   // f13-doba: kolejka najpierw - blad w pliku od razu i po liniach sprzed niego
         }
 
         internal static void Player(string text, bool bad = false)

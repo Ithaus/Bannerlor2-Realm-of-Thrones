@@ -41,6 +41,8 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="MCMv5"><HintPath>$(GameLibs)/MCMv5.dll</HintPath><Private>false</Private></Reference>
+    <!-- f9-predkosc: przyciski biegu na pasku mapy (MapSpeedUi.cs - wstawka prefabu MapBar i mixin MapTimeControlVM); modul Bannerlord.UIExtenderEx laduje sie przed Armoury -->
+    <Reference Include="Bannerlord.UIExtenderEx"><HintPath>$(GameLibs)/Bannerlord.UIExtenderEx.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="0Harmony"><HintPath>$(GameLibs)/0Harmony.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.CampaignSystem"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="TaleWorlds.Core"><HintPath>$(GameLibs)/TaleWorlds.Core.dll</HintPath><Private>false</Private></Reference>

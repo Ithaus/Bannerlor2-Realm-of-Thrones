@@ -1515,7 +1515,7 @@ namespace Armoury
         public int CampBackground = 1;                     // picture behind the camp menu: 0 = your culture's riders (old), 1 = an army camp before the walls, 2-10 = Realm of Thrones pictures of army life - try them and keep the one you like
         public bool MapClockEnabled = true;                // the hour of the day next to the date on the map bar ("Year 299, Day 256, Autumn - 14:30")
         public bool ReadableDateEnabled = true;            // dates read "Year 299, Day 256, Autumn": the year, the day of that year (1 to 364) and the season - on the map bar, in the encyclopedia and war logs, in the notices with a scene and in the Iron Bank's terms; the day turns at midnight sharp; off = the old "Day 3659 of Summer, 299 AC" (which now turns at midnight too)
-        public float FastForwardMultiplier = 8f;           // how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock
+        public float FastForwardMultiplier = 8f;           // how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock; with Map Speed Buttons on, the chosen Fast / Very Fast speed is used instead
         public float SleepHoursNeeded = 6f;                // base hours of sleep per day; sleep debt adds interest on top (1 night owed: +3h, 2: +9h, 3: +15h) and only the full sum clears it
         public float DayRestFactor = 0.6f;                 // sleep by daylight counts at this rate (camp noise, heat, light) - night hours count in full
         public bool QuickCampKey = true;                   // press O on the campaign map to pitch the BannerKings camp on the spot
@@ -1581,6 +1581,17 @@ namespace Armoury
         public bool SightCycleEnabled = true;              // eyes follow the sun: every party sees further by day and shorter after dark
         public float DaySightFactor = 1.15f;               // spotting range in daylight, times this
         public float NightSightFactor = 0.65f;             // spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud
+
+        // --- Map speed buttons ---
+        // f9-predkosc (Jeff 18.10: "przy x8 gra zwalnia i sie przycina ... jest mod, ktory daje trzy buttony x1, x4 i x8"): MapSpeed.cs, MapSpeedUi.cs, MapSpeedProfile.cs.
+        // Przyciski nad zegarem paska mapy (UIExtenderEx), klawisze 4/5/6, wybrany bieg dziala tylko w biegu szybkim (x1 = zwykle play). Wylaczone MapSpeedButtons =
+        // mnoznik z FastForwardMultiplier jak dotad. MapSpeedPerf - oszczedne liczenie bez zmiany wyniku gry (pamiec FindType, siatka band w spoczynku) i widoku
+        // tylko w szczegolach (namioty AI po kilka na klatke, zegar paska najwyzej 10 razy na sekunde przy biegu szybkim); wylaczone = kod jak przed f9.
+        public bool MapSpeedButtons = true;                // three speed buttons above the clock on the campaign map: x1 (normal play), Fast and Very Fast. The chosen fast speed is used only while time runs fast - also by the game's own fast-forward button, key 3 and holding space; off = the fast-forward speed comes from Fast Forward Multiplier as before
+        public int MapSpeedFast = 4;                       // the Fast button: how many times faster than normal play
+        public int MapSpeedVeryFast = 8;                   // the Very Fast button: how many times faster than normal play
+        public bool MapSpeedKeys = true;                   // keys 4, 5 and 6 on the campaign map pick Normal, Fast and Very Fast speed (keys 1, 2, 3 and space keep their usual jobs)
+        public bool MapSpeedPerf = true;                   // leaner bookkeeping at high map speed, same outcome: AI camp tents near you go up and come down a few per frame instead of all in one frame, the map clock text refreshes at most ten times a second while time runs fast, resting bands look for nearby lords through a map grid; off = the old way
 
         // --- The worth of a lesson ---
         public bool CombatXpFixEnabled = true;             // RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions
@@ -2437,6 +2448,12 @@ namespace Armoury
         // licznik 1/64 przy 4 hakach na liczenie sprawdzal tylko rade (TownBase). Wylaczone = jak w perf-d2d3. Nowe klucze - nie ma ich w Armoury.json Jeffa
         public bool PerfSutlerWageExact = true;            // with Perf Sutler Wage Once, the wage is kept only for bands whose wage comes out the same every time it is worked out: a band carrying companions or kin besides its leader (Banner Kings rounds their pay up or down by a dice roll each time) or one whose wage rolled any dice is worked out at every step, as without the shortcut - the same coin and the same dice as before the shortcut; off = every band's wage is kept after the first count, even when it rolled dice
         public bool PerfProbeEachPlace = true;             // the spot checks of the faster town tax (Perf Town Tax Fast Hooks: every 64th time the old slow way is worked out beside it and compared) are counted for each of its places on its own - the lines somebody really pays, the notables' lines, the owners' lines and the council wages; before, one shared count always landed on the council wages and the other three were never checked. Checks only - the tax is the same; off = one shared count, as before
+        // f13-doba (18.10, Jeff: "przy max x8 predkosci strasznie gra zwalnia i sie przycina"): mniej pracy w klatce konca doby, gra i gospodarka bez zmian - (1) zapis
+        // logu Armoury (Log.Info / Log.Csv) watkiem w tle: na watku gry tylko bramka logu, znacznik czasu i kolejka, plik pisze watek "Armoury log" w tej samej kolejnosci
+        // (Log.Error, linia "Log (E8/O6)" i wyjscie z gry najpierw oprozniaja kolejke - bledy w pliku od razu); (2) ksiega uzbrojenia i ksiega koni (Stage6Measure) jednym
+        // przegladem rosterow swiata zamiast dwoch (te same sumy; kontrola starej drogi w pierwszej dobie sesji i co 28 dob); (3) nowa linia "Doba gladko (f13)" -
+        // watek gry / w tle / odlozone, GC w takcie, odcinki >= 1 ms. Off = kod jak przed paczka (zapis synchroniczny, dwa przeglady, bez nowej linii).
+        public bool DayTickSmooth = true;                  // less work in the one frame where the day ends, the same game: the mod's log file is written by a background thread (the game thread only queues the line; errors are written at once), and the daily arms and horse books count the world's stocks in one pass instead of two - the same numbers. Adds one diagnostic line a day with the split. Off = the log is written on the game thread and the books count twice, as before
         // --- A clean slate between campaigns (stage 8) ---
         // E8/S (246, PLAN 8.11; rozpoznanie C poz. 11, 15, 17): porzadek stanu (StateHygiene.cs) - przy nowej kampanii i kazdym wczytaniu zerowana pamiec, ktora dotad
         // zyla do konca procesu: przeszukanie i odwet kryjowki (HideoutPurge), oboz gracza (potkniecia namiotu, pytanie o nocleg, flaga obozu), dzien audytu

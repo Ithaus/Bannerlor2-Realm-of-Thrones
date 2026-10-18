@@ -4420,7 +4420,7 @@ namespace Armoury
         [SettingPropertyGroup("A night's rest")]
         public bool ReadableDateEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Fast Forward Multiplier", 0.00f, 32.00f, "0.00", HintText = "how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock")]
+        [SettingPropertyFloatingInteger("Fast Forward Multiplier", 0.00f, 32.00f, "0.00", HintText = "how fast the fast-forward button runs (vanilla 4) - a 364-day year and slow marches need a quicker clock; with Map Speed Buttons on, the chosen Fast / Very Fast speed is used instead")]
         [SettingPropertyGroup("A night's rest")]
         public float FastForwardMultiplier { get; set; } = 8f;
 
@@ -4635,6 +4635,26 @@ namespace Armoury
         [SettingPropertyFloatingInteger("Night Sight Factor", 0.00f, 2.60f, "0.00", HintText = "spotting range at night - the cut is mild, for you HEAR more after dark: a marching column is loud")]
         [SettingPropertyGroup("A night's rest")]
         public float NightSightFactor { get; set; } = 0.65f;
+
+        [SettingPropertyBool("Map Speed Buttons", HintText = "three speed buttons above the clock on the campaign map: x1 (normal play), Fast and Very Fast. The chosen fast speed is used only while time runs fast - also by the game's own fast-forward button, key 3 and holding space; off = the fast-forward speed comes from Fast Forward Multiplier as before")]
+        [SettingPropertyGroup("Map speed buttons")]
+        public bool MapSpeedButtons { get; set; } = true;
+
+        [SettingPropertyInteger("Map Speed Fast", 2, 16, "0", HintText = "the Fast button: how many times faster than normal play")]
+        [SettingPropertyGroup("Map speed buttons")]
+        public int MapSpeedFast { get; set; } = 4;
+
+        [SettingPropertyInteger("Map Speed Very Fast", 2, 32, "0", HintText = "the Very Fast button: how many times faster than normal play")]
+        [SettingPropertyGroup("Map speed buttons")]
+        public int MapSpeedVeryFast { get; set; } = 8;
+
+        [SettingPropertyBool("Map Speed Keys", HintText = "keys 4, 5 and 6 on the campaign map pick Normal, Fast and Very Fast speed (keys 1, 2, 3 and space keep their usual jobs)")]
+        [SettingPropertyGroup("Map speed buttons")]
+        public bool MapSpeedKeys { get; set; } = true;
+
+        [SettingPropertyBool("Map Speed Perf", HintText = "leaner bookkeeping at high map speed, same outcome: AI camp tents near you go up and come down a few per frame instead of all in one frame, the map clock text refreshes at most ten times a second while time runs fast, resting bands look for nearby lords through a map grid; off = the old way")]
+        [SettingPropertyGroup("Map speed buttons")]
+        public bool MapSpeedPerf { get; set; } = true;
 
         [SettingPropertyBool("Combat Xp Fix Enabled", HintText = "RBM pays the same XP for an arena tap and a battlefield kill - restore the proportions")]
         [SettingPropertyGroup("The worth of a lesson")]
@@ -6295,6 +6315,10 @@ namespace Armoury
         [SettingPropertyBool("Perf Probe Each Place", HintText = "the spot checks of the faster town tax (Perf Town Tax Fast Hooks: every 64th time the old slow way is worked out beside it and compared) are counted for each of its places on its own - the lines somebody really pays, the notables' lines, the owners' lines and the council wages; before, one shared count always landed on the council wages and the other three were never checked. Checks only - the tax is the same; off = one shared count, as before")]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfProbeEachPlace { get; set; } = true;
+
+        [SettingPropertyBool("Day Tick Smooth", HintText = "less work in the one frame where the day ends, the same game: the mod's log file is written by a background thread (the game thread only queues the line; errors are written at once), and the daily arms and horse books count the world's stocks in one pass instead of two - the same numbers. Adds one diagnostic line a day with the split. Off = the log is written on the game thread and the books count twice, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool DayTickSmooth { get; set; } = true;
 
         [SettingPropertyBool("State Hygiene Enabled", HintText = "starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before")]
         [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
@@ -9022,6 +9046,11 @@ namespace Armoury
             s.SightCycleEnabled = SightCycleEnabled;
             s.DaySightFactor = DaySightFactor;
             s.NightSightFactor = NightSightFactor;
+            s.MapSpeedButtons = MapSpeedButtons;
+            s.MapSpeedFast = MapSpeedFast;
+            s.MapSpeedVeryFast = MapSpeedVeryFast;
+            s.MapSpeedKeys = MapSpeedKeys;
+            s.MapSpeedPerf = MapSpeedPerf;
             s.CombatXpFixEnabled = CombatXpFixEnabled;
             s.ArenaXpPercent = ArenaXpPercent;
             s.TournamentXpPercent = TournamentXpPercent;
@@ -9437,6 +9466,7 @@ namespace Armoury
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.PerfSutlerWageExact = PerfSutlerWageExact;
             s.PerfProbeEachPlace = PerfProbeEachPlace;
+            s.DayTickSmooth = DayTickSmooth;
             s.StateHygieneEnabled = StateHygieneEnabled;
             s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;

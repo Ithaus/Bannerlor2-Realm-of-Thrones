@@ -734,6 +734,9 @@ namespace Armoury
         // f5-bitwa (noc 17/18.10): zestaw bitwy autotestu - stan poprzedniej kampanii od zera (osobna linia, jak inwest)
         private readonly bool _f5BitwaReset = F5BitwaReset();
         private static bool F5BitwaReset() { try { AutotestBattleKit.Reset(); } catch (Exception e) { Log.Error("F5BitwaReset", e); } return true; }
+        // f9-predkosc: liczniki linii "Predkosc mapy (f9)" od zera przy nowej kampanii / wczytaniu (osobna linia, jak inwest)
+        private readonly bool _f9Reset = F9Reset();
+        private static bool F9Reset() { try { MapSpeedProfile.Reset(); } catch (Exception e) { Log.Error("F9Reset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1528,14 +1531,22 @@ namespace Armoury
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("VillageNews.Hourly", delegate { try { VillageNews.Hourly(); } catch (Exception e) { Log.Error("VillageNews.Hourly", e); } }));
             // pas bezpieczenstwa depozytu kwatermistrza: czas plynie = ekran
             // zbrojowni zamkniety; gdyby domkniecie nie oddalo sprzetu, oddajemy tu
+            // f9-predkosc: znaczniki czasu miedzy czesciami tego sluchacza (najwiekszy w "Profil doby") - rozbicie w linii "Predkosc mapy (f9)", tylko log
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("Kwatermistrz+projekty+MaterialOrders.Hourly",
                 delegate
                 {
+                    var qt = _qtSplit;
+                    qt[0] = System.Diagnostics.Stopwatch.GetTimestamp();
                     try { QuartermasterEscrow.SafetyRelease(); } catch { }
+                    qt[1] = System.Diagnostics.Stopwatch.GetTimestamp();
                     try { AdvanceProjects(); } catch (Exception e) { Log.Error("AdvanceProjects(h)", e); }
+                    qt[2] = System.Diagnostics.Stopwatch.GetTimestamp();
                     try { TryStripNewCaptives("hourly"); } catch { }
+                    qt[3] = System.Diagnostics.Stopwatch.GetTimestamp();
                     try { NightRest.OnHourly(); } catch { }
+                    qt[4] = System.Diagnostics.Stopwatch.GetTimestamp();
                     try { MaterialOrders.Hourly(); } catch (Exception e) { Log.Error("MaterialOrders.Hourly", e); }   // 174b.1: kontrakt surowca trzyma cel - ZARAZ PO obozie tej godziny
+                    qt[5] = System.Diagnostics.Stopwatch.GetTimestamp();
                     try
                     {
                         // ekran lupow nie odebral kolejki w godzine - do sakw z nia
@@ -1556,6 +1567,8 @@ namespace Armoury
                         }
                     }
                     catch { }
+                    qt[6] = System.Diagnostics.Stopwatch.GetTimestamp();
+                    MapSpeedProfile.HourSplit(qt);
                 }));
         }
 
@@ -2282,8 +2295,11 @@ namespace Armoury
         }
 
         // E8/0 (242): profil doby - linia za poprzedni okres i stoper calego taktu (jedna klatka); odcinki DayProfile.Lap po kazdym wywolaniu (tylko pomiar)
+        private readonly long[] _qtSplit = new long[MapSpeedProfile.QParts + 1];   // f9-predkosc: znaczniki czasu czesci sluchacza godziny (tylko log)
+
         private void OnDailyTick()
         {
+            MapSpeedProfile.Daily();   // f9-predkosc: linia "Predkosc mapy (f9)" za okres od poprzedniego taktu (tylko log) - przed profilem doby, poza jego stoperem
             DayProfile.TickBegin();
             try { OnDailyTickBody(); }
             finally { DayProfile.TickEnd(); }

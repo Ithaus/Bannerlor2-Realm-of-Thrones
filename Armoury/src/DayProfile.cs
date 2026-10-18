@@ -115,6 +115,12 @@ namespace Armoury
         private static bool _inWorkOpen;
         private static readonly long[] _cwCalls = new long[2], _cwTicks = new long[2], _cwSampled = new long[2];
 
+        // ---- f13-doba (klucz DayTickSmooth): GC i pamiec na granicach taktu doby, znacznik "takt z kluczem" - do linii "Doba gladko (f13)" (tylko pomiar)
+        private static readonly int[] _sgc0 = new int[3], _sgc1 = new int[3];
+        private static long _smem0, _smem1;
+        private static bool _sTick, _sHad;
+        private static bool SmoothOn { get { var s = Settings.Current; return s != null && s.DayTickSmooth; } }
+
         /// <summary>Nowa gra / wczytanie (konstruktor ArmouryBehavior): liczniki i stan okresu od zera; nazwy slotow zostaja (opakowania z RegisterEvents).</summary>
         internal static void Reset()
         {
@@ -122,6 +128,7 @@ namespace Armoury
             _inTick = false; _hadTick = false; _lastDay = -1; Depth = 0; _gcSet = false; _selfTicks = 0; _nsWrap = -1.0; _nsTs = -1.0;
             _hourKey = int.MinValue; _hourAcc = 0;
             _inLive = false; _inWorkOpen = false;   // Z.3 poz. 3: stopery wnetrza stoja do EnsureHooks tej kampanii (latki z poprzedniej kampanii zostaja w procesie)
+            _sTick = false; _sHad = false; Log.TickWindow = false;   // f13-doba
         }
 
         private static void ClearPeriod()
@@ -147,7 +154,7 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             _inTick = false;
             _inWorkOpen = false;   // Z.3 poz. 3: takt doby nie biegnie w srodku tiku warsztatow - znacznik po wyjatku w tym tiku (postfiks nie pobiegl) nie przezyje doby
-            if (!On) { _hadTick = false; _inLive = false; return; }   // Z.3 poz. 3: wylaczenie w trakcie gry gasi tez stopery wnetrza (od tego taktu)
+            if (!On) { _hadTick = false; _inLive = false; _sTick = false; _sHad = false; Log.TickWindow = false; return; }   // Z.3 poz. 3: wylaczenie w trakcie gry gasi tez stopery wnetrza (od tego taktu); f13-doba: okno taktu tez
             try
             {
                 if (_hadTick) Line();
@@ -163,6 +170,14 @@ namespace Armoury
             _hadTick = true;
             _inLive = _inHooked[IWork] || _inHooked[ITrain];   // Z.3 poz. 3: klucz wlaczony na nowo w trakcie gry - stopery wnetrza licza od tego taktu (gdy latki sa juz w procesie)
             try { _lastDay = (int)CampaignTime.Now.ToDays; } catch { }
+            // f13-doba: GC i pamiec przed taktem, linie logu od teraz oznaczone "w takcie" (tylko przy kluczu; wylaczony - jak dotad)
+            _sTick = SmoothOn;
+            if (_sTick)
+            {
+                _sgc0[0] = GC.CollectionCount(0); _sgc0[1] = GC.CollectionCount(1); _sgc0[2] = GC.CollectionCount(2);
+                _smem0 = GC.GetTotalMemory(false);
+                Log.TickWindow = true;
+            }
             long now = Stopwatch.GetTimestamp();
             _selfTicks = now - t0;           // koszt linii i zerowania - do nastepnej linii (ta jest juz wypisana)
             _inTick = true; Depth++;
@@ -186,6 +201,14 @@ namespace Armoury
             _tickTicks = Stopwatch.GetTimestamp() - _tickT0;
             _inTick = false;
             if (Depth > 0) Depth--;
+            if (_sTick)
+            {
+                // f13-doba: po stoperze taktu (odczyty GC poza zmierzonym czasem)
+                Log.TickWindow = false;
+                _sgc1[0] = GC.CollectionCount(0); _sgc1[1] = GC.CollectionCount(1); _sgc1[2] = GC.CollectionCount(2);
+                _smem1 = GC.GetTotalMemory(false);
+                _sHad = true; _sTick = false;
+            }
         }
 
         private static int Slot(string[] names, ref int n, int max, string name)
@@ -230,6 +253,7 @@ namespace Armoury
                     if (hk != _hourKey) { _hourKey = hk; _hourAcc = 0; }
                     _hourAcc += d;
                     if (_hourAcc > _hourMaxAcc) _hourMaxAcc = _hourAcc;
+                    MapSpeedProfile.HourCost(hk, d);   // f9-predkosc: koszt wedlug godziny doby i flaga "klatka z godzina" (tylko log)
                 }
             };
         }
@@ -672,6 +696,46 @@ namespace Armoury
             }
             try { TailNw(sb); } catch (Exception e) { sb.Append(" | NW: blad ").Append(e.GetType().Name); }   // NW O4 + O6: na koncu linii
             Log.Info(sb.ToString());
+            // f13-doba: osobna NOWA linia (pola linii E8/0 bez zmian - czytaja je narzedzia); tylko przy kluczu i po takcie z kluczem
+            if (_sHad && SmoothOn) { try { Log.Info(SmoothLine(tick)); } catch (Exception e) { Log.Error("DayProfile.SmoothLine", e); } }
+            _sHad = false;
+        }
+
+        /// <summary>
+        /// f13-doba: linia "Doba gladko (f13): dzien N" za poprzedni takt doby - podzial na watek gry / w tle / odlozone, zapis logu w tle w okresie, przeglad wspolny
+        /// Stage6Measure, GC i pamiec na granicach taktu, wszystkie odcinki taktu >= 1 ms (linia E8/0 podaje tylko 15). Tylko pomiar.
+        /// </summary>
+        private static string SmoothLine(double tick)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            var st = Log.TakeSmooth();
+            var sb = new StringBuilder(2048);
+            sb.Append("Doba gladko (f13): dzien ").Append(_lastDay).Append(" | DayTickSmooth [WL]")
+              .Append(" | takt doby ").Append(F1(tick)).Append(" ms na watku gry (w tym kolejka logu ").Append(F2(st.EnqTickMs)).Append(" ms / ").Append(st.EnqTick)
+              .Append(" linii) + w tle ").Append(F1(st.BgTickMs)).Append(" ms (").Append(st.BgTickItems)
+              .Append(" linii z taktu: napis, temat i zapis pliku - poza klatka) + odlozone 0.0 ms (nic - odczyty stanu gry i gospodarka zostaja w tej samej klatce, zasady f13)");
+            sb.Append(" | log w okresie: linii ").Append(st.Enq).Append(" (kolejka na watkach wolajacych ").Append(F1(st.EnqMs)).Append(" ms), w tle ").Append(F1(st.BgMs)).Append(" ms / ")
+              .Append(st.BgItems).Append(" linii, na watku gry przy oproznieniach ").Append(F1(st.FgMs)).Append(" ms / ").Append(st.FgItems).Append(" linii (oproznien ").Append(st.FgDrains)
+              .Append("), kolejka maks. ").Append(st.Max).Append(", watek zapisu ").Append(st.Alive ? "zyje" : "STOI").Append(", potkniecia: start ").Append(st.StartFails)
+              .Append(", petla ").Append(st.LoopFails).Append(", ponowne starty ").Append(st.Restarts).Append(", przepelnienia ").Append(st.Cap);
+            if (st.First != null) sb.Append(" [pierwsze: ").Append(st.First).Append(']');
+            try { sb.Append(Stage6Measure.F13Text()); } catch (Exception e) { sb.Append(" | Stage6Measure: blad ").Append(e.GetType().Name); }
+            sb.Append(" | GC w takcie 0/1/2 +").Append(_sgc1[0] - _sgc0[0]).Append("/+").Append(_sgc1[1] - _sgc0[1]).Append("/+").Append(_sgc1[2] - _sgc0[2])
+              .Append(", pamiec przed / po takcie ").Append((_smem0 / 1048576L).ToString(inv)).Append(" / ").Append((_smem1 / 1048576L).ToString(inv)).Append(" MB");
+            // wszystkie odcinki >= 1 ms (malejaco), reszta jako suma
+            int n = 0;
+            for (int i = 0; i < _lN; i++) _ord[n++] = i;
+            Array.Sort(_ord, 0, n, new ByTicks(_lTicks));
+            int big = 0; double bigMs = 0, smallMs = 0;
+            var lb = new StringBuilder(1024);
+            for (int i = 0; i < n; i++)
+            {
+                double m = Ms(_lTicks[_ord[i]]);
+                if (m >= 1.0) { if (big > 0) lb.Append(", "); lb.Append(_lName[_ord[i]]).Append(' ').Append(F1(m)); big++; bigMs += m; }
+                else smallMs += m;
+            }
+            sb.Append(" | odcinki >= 1 ms: ").Append(big).Append(" z ").Append(n).Append(" (razem ").Append(F1(bigMs)).Append(" ms; krotsze razem ").Append(F1(smallMs)).Append(" ms): ").Append(lb);
+            return sb.ToString();
         }
 
         /// <summary>f8-bandy (BanditLimit.Daily): czas odcinka taktu doby o tej nazwie w BIEZACYM takcie (odcinek juz zamkniety Lap); -1 = profil wylaczony,

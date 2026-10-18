@@ -17,7 +17,7 @@ namespace Armoury
     /// </summary>
     internal static class Stage6Measure
     {
-        internal static void Reset() { ArmsBook.Reset(); HorseBook.Reset(); CraftRealm.Reset(); }
+        internal static void Reset() { ArmsBook.Reset(); HorseBook.Reset(); CraftRealm.Reset(); _tSeen = 0; _tCheckNext = false; _tChecks = _tBad = _tFails = 0; _tRows = _tRosters = _tArmRows = 0; _tMs = 0; _tMode = 0; }
 
         /// <summary>Nasluch OnItemProducedEvent: wyroby miast wedlug krainy (CraftRealm) i konie ze stadnin wsi (HorseBook) - tylko liczniki.</summary>
         internal static void OnItemProduced(ItemObject it, Settlement st, int n)
@@ -29,10 +29,110 @@ namespace Armoury
         internal static void Daily()
         {
             var sw = Stopwatch.StartNew();
-            try { ArmsBook.Daily(); } catch (Exception e) { Log.Error("ArmsBook.Daily", e); }
-            try { HorseBook.Daily(); } catch (Exception e) { Log.Error("HorseBook.Daily", e); }
+            // f13-doba (DayTickSmooth): jeden przeglad rosterow swiata i zbrojowni DTE dla obu ksiag (dotad ArmsBook i HorseBook przegladaly te same rostery po
+            // kolei - miedzy nimi same odczyty i linie logu, wiec stan ten sam). Doba kontrolna (druga w sesji - pierwsza po wczytaniu i tak najciezsza, co 28 dob i nastepna po rozjezdzie): obie ksiegi
+            // licza stara droga (linie z niej), a przeglad wspolny liczony obok i porownany pole po polu. Wyjatek przegladu wspolnego = potkniecie, stara droga.
+            Tally use = null, check = null;
+            _tMode = 0;
+            var s = Settings.Current;
+            if (s != null && s.DayTickSmooth && s.Stage6MeasureLog)
+            {
+                int day = 0; try { day = (int)CampaignTime.Now.ToDays; } catch { }
+                _tSeen++;
+                bool chk = _tSeen == 2 || _tCheckNext || day % 28 == 0;
+                long t0 = Stopwatch.GetTimestamp();
+                Tally t = null;
+                try { t = Take(); }
+                catch (Exception e) { _tFails++; t = null; if (_tFails == 1) Log.Error("Stage6Measure.Take (f13)", e); }
+                _tMs = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+                if (t != null)
+                {
+                    _tRows = t.Rows; _tRosters = t.Rosters; _tArmRows = t.ArmRows;
+                    if (chk) { check = t; _tCheckNext = false; _tChecks++; _tMode = 2; }
+                    else { use = t; _tMode = 1; }
+                }
+            }
+            try { ArmsBook.Daily(use, check); } catch (Exception e) { Log.Error("ArmsBook.Daily", e); }
+            try { HorseBook.Daily(use, check); } catch (Exception e) { Log.Error("HorseBook.Daily", e); }
             try { CraftRealm.Daily(); } catch (Exception e) { Log.Error("CraftRealm.Daily", e); }
             ArmsBook.LastCostMs = sw.Elapsed.TotalMilliseconds;
+        }
+
+        // ------------------------------------------------------------ f13-doba: przeglad wspolny (tylko odczyt, tylko log)
+        /// <summary>Sumy ksiegi uzbrojenia i ksiegi koni z jednego przegladu rosterow (ForEachRoster) i zbrojowni DTE - te same pola, ktore obie ksiegi
+        /// licza w swoich przegladach (ArmsBook: now, hz, polki, tabory, zbrojownie; HorseBook: polki / magazyny wsi / schowki / tabory, zbrojownie).</summary>
+        internal sealed class Tally
+        {
+            internal readonly long[] ArmsNow = new long[ArmsBook.SlotCount], ArmsHz = new long[ArmsBook.HPlaceCount];
+            internal long ArmsShelves, ArmsParties, ArmsArmories;
+            internal readonly long[][] Horse = { new long[HorseBook.CatCount], new long[HorseBook.CatCount], new long[HorseBook.CatCount], new long[HorseBook.CatCount] };
+            internal readonly long[] HorseArm = new long[HorseBook.CatCount];
+            internal long Rosters, Rows, ArmRows;
+        }
+
+        private static bool _tCheckNext;
+        private static int _tSeen;   // doby z przegladem wspolnym w sesji (kontrola w drugiej)
+        private static int _tChecks, _tBad, _tFails, _tMode;   // _tMode: 0 stara droga, 1 przeglad wspolny, 2 doba kontrolna
+        private static long _tRows, _tRosters, _tArmRows;
+        private static double _tMs;
+
+        private static Tally Take()
+        {
+            var t = new Tally();
+            ForEachRoster((r, kind) =>
+            {
+                t.Rosters++;
+                var dst = t.Horse[kind];
+                for (int i = 0; i < r.Count; i++)
+                {
+                    var el = r.GetElementCopyAtIndex(i);
+                    if (el.Amount <= 0) continue;
+                    t.Rows++;
+                    var it = el.EquipmentElement.Item;
+                    ArmsBook.TallyRow(t, it, el.Amount, kind);
+                    int c = HorseBook.Cat(it);
+                    if (c >= 0) dst[c] += el.Amount;
+                }
+            });
+            var all = AiGear.Armories();
+            if (all != null)
+                foreach (var arm in all.Values)
+                {
+                    if (arm == null) continue;
+                    foreach (var kv in arm)
+                    {
+                        if (kv.Value <= 0) continue;
+                        t.ArmRows++;
+                        ArmsBook.TallyArmory(t, kv.Key, kv.Value);
+                        int c = HorseBook.Cat(kv.Key);
+                        if (c >= 0) t.HorseArm[c] += kv.Value;
+                    }
+                }
+            return t;
+        }
+
+        internal static bool Same(long[] a, long[] b)
+        {
+            if (a == null || b == null || a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++) if (a[i] != b[i]) return false;
+            return true;
+        }
+
+        /// <summary>Doba kontrolna: ksiega policzyla stara droga i porownala z przegladem wspolnym; rozjazd - licznik, nastepna doba tez kontrolna (stara droga).</summary>
+        internal static void CheckResult(string book, bool same)
+        {
+            if (same) return;
+            _tBad++; _tCheckNext = true;
+            Log.Info("Stage6Measure (f13): ROZJAZD przegladu wspolnego w ksiedze " + book + " - linie z dzisiejszej starej drogi, jutro znow kontrola (rozjazdow w sesji " + _tBad + ").");
+        }
+
+        /// <summary>Odcinek linii "Doba gladko (f13)".</summary>
+        internal static string F13Text()
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            string mode = _tMode == 1 ? "przeglad wspolny" : _tMode == 2 ? "doba kontrolna (linie ze starej drogi, wspolny obok)" : "stara droga (dwa przeglady)";
+            return " | Stage6Measure: " + mode + ", przeglad wspolny " + _tMs.ToString("0.0", inv) + " ms (rosterow " + _tRosters + ", wierszy " + _tRows + ", wierszy zbrojowni DTE " + _tArmRows
+                   + "); kontroli w sesji " + _tChecks + ", rozjazdow " + _tBad + ", potkniec przegladu " + _tFails;
         }
 
         /// <summary>Przeglad rosterow swiata raz na dobe: polki osad (miasta, zamki, wsie), schowki osad, tabory partii.</summary>
@@ -66,6 +166,7 @@ namespace Armoury
         internal const int KScrap = 0, KRaid = 1, KSack = 2, KBkVillage = 3, Sinks = 4;   // KSack: L7 lupu miast (CitySack.Goods.cs) - uzbrojenie z polki zdobytej osady spalone przy spustoszeniu (nie unioslo sie);   // KRaid: E7/R1 (235) - uzbrojenie spalone w rabunku osada po osadzie (z magazynu wsi, nie unioslo sie)
         internal const int TTrade = 0, TPurse = 1, TGarrison = 2, Transfers = 3;
         private const int Kinds = 10, Bands = 3, Slots = Kinds * Bands;
+        internal const int SlotCount = Slots, HPlaceCount = HPlaces;   // f13-doba: rozmiary pol przegladu wspolnego (Stage6Measure.Tally)
         private static readonly string[] KindNames = { "korpus", "helm", "nogi", "rece", "plaszcz", "tarcza", "bron biala", "strzelecka", "amunicja", "uprzaz" };
         private static readonly long[,] _src = new long[Sources, Slots], _sink = new long[Sinks, Slots], _xfer = new long[Transfers, Slots];
         private static long[] _prev;
@@ -173,13 +274,37 @@ namespace Armoury
             return VillageSinkOn ? ", zjedzone na rynku wsi BK (A12) " + Sum(_sink, KBkVillage) : "";
         }
 
-        internal static void Daily()
+        /// <summary>f13-doba: wiersz rosteru w przegladzie wspolnym - ta sama regula co petla przegladu w Daily (stan, polki/tabory, uprzaz wedlug miejsca).</summary>
+        internal static void TallyRow(Stage6Measure.Tally t, ItemObject it, int amount, int kind)
+        {
+            int sl = Slot(it);
+            if (sl < 0) return;
+            t.ArmsNow[sl] += amount;
+            if (kind == 3) t.ArmsParties += amount; else t.ArmsShelves += amount;
+            if (sl / Bands == HKind) t.ArmsHz[kind == 3 ? 2 : kind == 2 ? 1 : 0] += amount;
+        }
+
+        /// <summary>f13-doba: wiersz zbrojowni DTE w przegladzie wspolnym - ta sama regula co petla zbrojowni w Daily.</summary>
+        internal static void TallyArmory(Stage6Measure.Tally t, ItemObject it, int n)
+        {
+            int sl = Slot(it);
+            if (sl < 0) return;
+            t.ArmsNow[sl] += n; t.ArmsArmories += n;
+            if (sl / Bands == HKind) t.ArmsHz[3] += n;
+        }
+
+        /// <summary>use != null (f13-doba) - stan z przegladu wspolnego zamiast wlasnego przegladu rosterow i zbrojowni; check != null - doba kontrolna: liczy
+        /// stara droga i porownuje z przegladem wspolnym (linia z wlasnej liczby). Oba null - jak przed paczka.</summary>
+        internal static void Daily(Stage6Measure.Tally use, Stage6Measure.Tally check)
         {
             if (!On) { _prev = null; _hPrev = null; Array.Clear(_src, 0, _src.Length); Array.Clear(_sink, 0, _sink.Length); Array.Clear(_xfer, 0, _xfer.Length); return; }
             int day = (int)CampaignTime.Now.ToDays;
-            var now = new long[Slots];
-            var hz = new long[HPlaces];      // drobne2 (H-4b): uprzaz wedlug miejsca
+            var now = use != null ? use.ArmsNow : new long[Slots];
+            var hz = use != null ? use.ArmsHz : new long[HPlaces];      // drobne2 (H-4b): uprzaz wedlug miejsca
             long shelves = 0, parties = 0, armories = 0;
+            if (use != null) { shelves = use.ArmsShelves; parties = use.ArmsParties; armories = use.ArmsArmories; }
+            else
+            {
             Stage6Measure.ForEachRoster((r, kind) =>
             {
                 for (int i = 0; i < r.Count; i++)
@@ -211,6 +336,10 @@ namespace Armoury
                     }
             }
             catch (Exception e) { Stumble("Armories", e); }
+            if (check != null)
+                Stage6Measure.CheckResult("uzbrojenia", Stage6Measure.Same(now, check.ArmsNow) && Stage6Measure.Same(hz, check.ArmsHz)
+                                          && shelves == check.ArmsShelves && parties == check.ArmsParties && armories == check.ArmsArmories);
+            }
             // E6/R3 (215): hurt kupcow wozem - sztuki w drodze sa czescia stanu (zeszly z polki zrodla, na polke celu jeszcze nie weszly)
             long road = 0;
             try { TradeCarts.ForEachInTransit((it, n) => { int sl = Slot(it); if (sl >= 0) { now[sl] += n; road += n; if (sl / Bands == HKind) hz[4] += n; } }); }
@@ -274,6 +403,7 @@ namespace Armoury
     internal static class HorseBook
     {
         private const int Cats = 5;
+        internal const int CatCount = Cats;   // f13-doba: rozmiar pol przegladu wspolnego (Stage6Measure.Tally)
         private static readonly string[] CatNames = { "zwykly", "bojowy", "szlachetny", "juczny", "egzotyczny" };
         private static readonly long[] _prod = new long[Cats], _prod7 = new long[Cats];
         private static long _camelQarth, _camelElse, _camelQarth7, _camelElse7;
@@ -405,11 +535,16 @@ namespace Armoury
             return string.Join("/", p);
         }
 
-        internal static void Daily()
+        /// <summary>use != null (f13-doba) - polki, magazyny wsi, schowki, tabory i zbrojownie DTE z przegladu wspolnego; check != null - doba kontrolna (stara droga
+        /// i porownanie, linia z wlasnej liczby). Oba null - jak przed paczka.</summary>
+        internal static void Daily(Stage6Measure.Tally use, Stage6Measure.Tally check)
         {
             if (!On) { _prev = null; Array.Clear(_prod, 0, Cats); Array.Clear(_prod7, 0, Cats); _camelQarth = _camelElse = _camelQarth7 = _camelElse7 = 0; _days7 = 0; ClearSinks(); try { PackSources.TakeBook(null, null, null, null); } catch { } return; }
             int day = (int)CampaignTime.Now.ToDays;
             var shelf = new long[Cats]; var vil = new long[Cats]; var stash = new long[Cats]; var party = new long[Cats]; var arm = new long[Cats]; var hero = new long[Cats];
+            if (use != null) { shelf = use.Horse[0]; vil = use.Horse[1]; stash = use.Horse[2]; party = use.Horse[3]; arm = use.HorseArm; }
+            else
+            {
             Stage6Measure.ForEachRoster((r, kind) =>
             {
                 var dst = kind == 0 ? shelf : kind == 1 ? vil : kind == 2 ? stash : party;
@@ -432,6 +567,10 @@ namespace Armoury
                     }
             }
             catch (Exception e) { Stumble("Armories", e); }
+            if (check != null)
+                Stage6Measure.CheckResult("koni", Stage6Measure.Same(shelf, check.Horse[0]) && Stage6Measure.Same(vil, check.Horse[1]) && Stage6Measure.Same(stash, check.Horse[2])
+                                          && Stage6Measure.Same(party, check.Horse[3]) && Stage6Measure.Same(arm, check.HorseArm));
+            }
             try
             {
                 foreach (var h in Hero.AllAliveHeroes)
