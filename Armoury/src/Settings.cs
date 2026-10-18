@@ -3122,6 +3122,9 @@ namespace Armoury
         // i zaplaty), dlatego domyslnie NIE - wlaczyc po tescie, gdy T0 pokaze mediane ponad 3 ms.
         public bool KsTownFieldsEvery2 = false;            // with Start Calibration applied: the townsfolk's own fields bring their crop to the town stall every second day (two days' crop at once, each town on its own day, paid in full by the town purse as before) instead of every day - half the daily work, the same crop and money over time; off = every day
         public bool KsCostFast = true;                     // with Start Calibration: the daily work of the calibration is done in quicker ways that give exactly the same results - the weekly plan's market totals are counted on the plan's own thread, prices, stall rows and price thresholds are looked up once a day instead of again for every village, and road distances from villages to nearby towns are remembered for the session; off = the old, slower way
+        // Paczka f5-koszt (noc 17/18.10, fala 5; StartCalibration.F5Koszt.cs): kolce doby KS z fin88 - diagnoza A7 (f4-pomiary) liczona raz na czesc okregu dla pieciu
+        // zestawow cen, regula A7 bierze dochody z diagnozy tej doby, kwantyle przez wybor zamiast sortowania. Te same wyniki co do bitu (te same linie logu poza czasem).
+        public bool KsCostFast2 = true;                    // with Start Calibration applied: the weekly work-rule check and the weekly work rule itself are counted in a quicker way that gives exactly the same numbers - each district part's land and rent are looked up once instead of once for every set of prices, and the rule reuses the incomes the check counted the same day; off = the old, slower way
 
         // --- District works and side-village crafts (18.10) ---
         // Paczka inwest (noc 17/18.10; projekt docs/PROJEKT-INWESTYCJE-OKREGU-2026-10-16.md zatwierdzony przez Jeffa z dopiskiem o wolnej zmianie zajecia; Jeff 16.10 "na razie nie
