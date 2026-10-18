@@ -23,12 +23,12 @@
 - **Zasieg krolestwa Z** (nowa metoda `Reach`, raz na godzine w `Rebuild` po zebranej odsieczy) = zebrana C + `Contrib` druzyn ze slownika `Track.EligAt`, ktore nie sa w zebranej odsieczy. `EligAt` to druzyna i godzina jej ostatniej mysli z ocena obrony tej osady od gry, wpisywane w `ThinkPostfix` przy kazdej mysli. Druzyna, ktora przy swojej mysli tej oceny nie dostala, wypada (wyszla z zasiegu). Wpisy starsze niz 24 h, druzyny nieczynne i z innej frakcji tez wypadaja. Czlonek armii liczy sie w sile wodza (`Contrib` wodza liczy cala armie z wezwanymi), sam nie. Przy zamku pomijane sa druzyny oblegajace twierdze wroga, bo OB5 i tak nie sciaga ich do zamku (recenzja 14.10).
 - **Prog P** = min(R, 1.2 x sila obozu); 1.2 to stala gry `num15`.
 - **Bramka** w petli `ThinkPostfix`, po `rest >= sg.Need`: gdy klucz TAK, minelo 13 h od wykrycia oblezenia i Z < P, ta osada nie jest podbijana i nie zostaje `top`. Wtedy nie ma tez opcji armii wladcy ani rezerwacji godziny. Wracaja oceny gry. Inne oblezone twierdze krolestwa, osiagalne, sa podbijane jak dotad (pierwszenstwo stolica > miasto > zamek bez zmian). Gdy Z >= P, wszystko jak przed f12: druzyny ida, az zebrana >= R albo przyjda wszyscy w zasiegu.
-- **13 h rozruchu** (`ReachWarmupHours`) = 6 h zegara mysli + 6 h obozu swiata + 1 h zapasu. W tym czasie kazda druzyna w zasiegu zdazy raz pomyslec, a do tego momentu dziala droga sprzed f12. Bez rozruchu Z byloby zanizone w pierwszych godzinach i bramka moglaby zamknac odsiecz osiagalna.
+- **13 h rozruchu** (`ReachWarmupHours`) = 6 h zegara mysli + 6 h obozu swiata + 1 h zapasu. W tym czasie kazda druzyna w zasiegu zdazy raz pomyslec, a do tego momentu dziala droga sprzed f12. Bez rozruchu Z byloby zanizone w pierwszych godzinach i bramka moglaby zamknac odsiecz osiagalna. Wodz armii mysli co 1 h, takze w czasie zbiorki (patrz "Recenzja" nizej).
 - **Blad liczenia** Z daje `Ready = false`, czyli droge sprzed f12, i potkniecie w linii doby. Bramka nie gasi niczego globalnie.
 - **Linie:**
   - start sesji: "; odsiecz bez szans zwalnia druzyny (f12: zasieg krolestwa < min(wymagana, 1.2 x oboz), od 13 h po wykryciu) TAK/NIE";
-  - linia doby: ", odsiecz bez szans (zasieg krolestwa < min(wymagana, 1.2 x oboz)): zwolnione N razy u M druzyn" (zwolniona = mysl, w ktorej bramka zamknela co najmniej jedna osade, a druzyna nie zostala podbita do zadnej odsieczy), przy kluczu NIE z dopiskiem "(Besieged Relief Only When Reachable NIE - bez zwalniania)";
-  - wiersz oblezenia (tylko przy kluczu): ", zasieg krolestwa Z / prog P" + " BEZ SZANS - zwolnionych dzis K" albo " (rozruch - pierwsze 13 h)". Linie "poczatek", "armia krola" i "koniec" bez zmian.
+  - linia doby: ", odsiecz bez szans (zasieg krolestwa < min(wymagana, 1.2 x oboz)): zwolnione N razy u M druzyn" (zwolniona = mysl, w ktorej bramka zamknela co najmniej jedna osade, a OB5 nie zostawil druzynie zadnej odsieczy, czyli `top == null`; recenzja ponizej), przy kluczu NIE z dopiskiem "(Besieged Relief Only When Reachable NIE - bez zwalniania)";
+  - wiersz oblezenia (tylko przy kluczu): ", zasieg krolestwa Z / prog P" + " BEZ SZANS - zwolnionych dzis K" (K = druzyny zwolnione w mysli, w ktorej bramka zamknela te osade) albo " (rozruch - pierwsze 13 h)". Linie "poczatek", "armia krola" i "koniec" bez zmian.
 
 **Ryzyko / co sprawdzic (kontrola calosci, CLAUDE.md 8.0):**
 - **Regresje:**
@@ -67,7 +67,29 @@
   - gdy Korona dorosnie do progu, wiersz KP bez "BEZ SZANS", zebrane rosnie, a bitwa pod murami / zdjecie oblezenia przez SCA145 (1.25 x);
   - Stoney Sept: zebrane > 0;
   - Stonedance / Tolos / Starfall: ten sam wzor;
+  - przy armii (BK albo gry) zbieranej dluzej niz doba w zasiegu twierdzy: zasieg krolestwa w wierszu doby nie spada o sile tej armii w 2.-3. dobie zbiorki (recenzja 1);
   - potkniecia OB5 = 0.
+
+**Recenzja (18.10, 2 uwagi "minor" - obie potwierdzone w kodzie i poprawione):**
+1. **Armia gry albo BK typu Defender w zbiorce dluzszej niz 24 h wypadala z zasiegu Z.**
+   - Sprawdzone w dekompilacji gry 1.4.8:
+     - `AiMilitaryBehavior.AiHourlyTick` (l. 496-499) ustawia `p.DoNotChangeBehavior = true` wodzowi armii, gdy `Army.IsWaitingForArmyMembers()`. To jedyne miejsce w grze, ktore to pole wlacza. W modulach odwoluje sie do niego tylko ROT (czyta je w kopii mysli) i Armoury. Metoda nie konczy sie na tym: liczy dalej oceny 4 typow misji, w tym obrone (Defender) dla wodza armii.
+     - Wodz armii mysli co 1 h (ROT `AIThinkPatch.PartyHourlyAiTick`: `flag` -> `num = 1`).
+     - Zbiorka trwa do `MaximumWaitTime` = 3 x 24 h, a potem az armia ma ponad 0.75 - 0.01/h sily (`Army.IsWaitingForArmyMembers`). `StrategicArmyManagementModel` (SCA145, model armii u Jeffa) dziedziczy po `DefaultArmyManagementCalculationModel` i tego nie zmienia. Przed dojsciem wodza do miejsca zbiorki (`_armyGatheringStartTime = 0`) armia tez "czeka".
+     - Miejscem zbiorki (`Army.FindBestGatheringSettlementAndMoveTheLeader`) nigdy nie jest oblegana twierdza (`IsUnderSiege` pominiete, cel tez). Dlatego `Rebuild` wlicza armie w zbiorce do C tylko przez `_armyFor` (armia krola OB5).
+   - Skutek przed poprawka: `ThinkPostfix` wychodzil na `DoNotChangeBehavior` przed odswiezeniem `EligAt`. Po 24 h zbiorki wpis wodza sie przedawnial, a czlonkowie sa pomijani jako czlonkowie, wiec Z tracilo cala armie. Bramka mogla wtedy pokazac BEZ SZANS i zwolnic wolnych lordow odsieczy, ktora jest osiagalna. Trwalo to najwyzej ok. 48 h na armie, do konca zbiorki.
+   - Poprawka (`ThinkPostfix`): `DoNotChangeBehavior` jest zapamietane (`dnc`) i sprawdzane dopiero PO odswiezeniu `EligAt`. Wodz w zbiorce z ocena obrony od gry ma wiec swiezy wpis i wnosi do Z cala armie (`Contrib`), a gdy tej oceny nie dostaje (poza zasiegiem), wypada od razu.
+   - Bez zmian zostaje:
+     - podbicie: `if (dnc) return;` stoi przed `_tmpIdx.Count == 0` i przed glodem, wiec licznik "pominiete z glodu" liczy jak dotad;
+     - `Eligible` (linia "koniec", OD-2b): wodz w zbiorce do niego nie wchodzi (`if (!dnc)`), tak jak przed f12;
+     - wyjscia dla bitwy, oblezonej osady i pustych ocen.
+   - Wybrany wariant "odswiez przed wyjsciem" zamiast "licz ostatni wpis bez limitu 24 h": gra liczy wodzowi oceny co godzine, wiec zasieg jest swiezy, a nie przeterminowany. Dziala tez dla armii Besieger, bo jej wodz po zbiorce mysli co 1 h i OB5 moze go podbic, tak jak liczylo sie go wczesniej jako wolnego lorda.
+   - Uwaga, bez zmian: ROT `AIThinkPatch.Patch1` (postfiks na tym samym celu, przed naszym Low) przy odfiltrowaniu celu wola `partyThinkParams.Reset`, a to zeruje `DoNotChangeBehavior`. Tak bylo i przed f12.
+2. **Liczniki "zwolnione" liczyly tez lordow, ktorzy i tak szli na inna odsiecz.**
+   - Gdy bramka zamknela KP, a dla innej osady (np. Stoney Sept) ocena gry byla juz >= `nv`, ta osada zostawala `top`. Lord byl na nia rezerwowany (`top.In.Add`), a `raisedAny` zostawalo false. Lord liczyl sie wtedy w `_dRel` / `_dRelParties` i w `DayRel` KP jako zwolniony. Takiej ocenie (>= `Prio x b`, gdzie `b` >= najlepszy inny cel) nic nie dorownuje, wiec lord idzie na te odsiecz.
+   - Poprawka: osady zamkniete bramka trafiaja w petli do `_tmpGated`. Po petli lord jest liczony jako zwolniony (`_dRel`, `_dRelParties`, `DayRel` kazdej zamknietej osady) tylko przy `top == null`. `raisedAny` i `gated` usuniete, bo sluzyly tylko licznikom.
+   - Zachowanie bez zmian: `top`, podbicia, opcja armii wladcy i rezerwacja licza sie jak dotad. Format linii tez sie nie zmienia. `sprawdz_logi.py` i inne narzedzia tych licznikow nie czytaja (grep `zwolnion` w `tools/` - tylko inne linie).
+- Build Armoury: kod 0. `gen_mcm` niepotrzebny, bo `Settings.cs` bez zmian.
 
 **Nie zrobione (poza zadaniem):**
 - limit czasu odsieczy (wariant 3 diagnozy);
@@ -76,4 +98,4 @@
 - zmiana progow OD-2 w checkerze;
 - ochrona fabuly KP (decyzja: bez ochrony).
 
-**Status:** DO SPRAWDZENIA (kod, build Armoury kod 0, `gen_mcm` uruchomiony: 1 nowe ustawienie w Armoury; bez testu w grze).
+**Status:** DO SPRAWDZENIA (kod, build Armoury kod 0, `gen_mcm` uruchomiony: 1 nowe ustawienie w Armoury; po recenzji 2 poprawki w `BesiegedRelief.cs`, build kod 0; bez testu w grze).

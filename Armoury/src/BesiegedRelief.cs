@@ -62,7 +62,9 @@ namespace Armoury
     ///    odsieczy, ktora gra rzuci na oboz - OB5 nie podbija ocen obrony tej osady (ani opcji armii wladcy): wracaja oceny gry (werbunek w osadzie, jedzenie,
     ///    odsiecz innej oblezonej twierdzy krolestwa, ktora jest w zasiegu). Gdy krolestwo urosnie (Z >= P), regula wlacza sie sama. Pierwsze 13 h od wykrycia
     ///    oblezenia bez tej bramki (wolna druzyna mysli co 6 h zegara AI - AiPartyThinkBehavior / ROT AIThinkPatch, DefaultThinkingPeriodInHours = 6 - a w oboz
-    ///    swiata 0-6 jej AI spi; po 13 h kazda druzyna w zasiegu juz raz pomyslala). Wylaczony klucz = jak przed f12 (podbicie az do zebrania R).
+    ///    swiata 0-6 jej AI spi; po 13 h kazda druzyna w zasiegu juz raz pomyslala). Wodz armii mysli co 1 h, takze w czasie zbiorki (DoNotChangeBehavior -
+    ///    bez podbicia, ale wpis zasiegu odswiezany; recenzja f12: inaczej po 24 h zbiorki Z tracilo cala armie). Zwolniona = bramka zamknela co najmniej
+    ///    jedna osade, a OB5 nie zostawil druzynie zadnej odsieczy. Wylaczony klucz = jak przed f12 (podbicie az do zebrania R).
     /// Latka: postfiks Low na CampaignEventDispatcher.AiHourlyTick (po wszystkich nasluchach i po filtrze ROT AIThinkPatch.Patch1; tak jak WatchLaw) - wpieta
     /// zawsze, dziala przy kluczu. Stan oblezen liczony raz na godzine gry (lista oblezen gry + partie wojenne krolestw z oblezona twierdza). Bez zapisu.
     /// Linie: "Odsiecz (OB5): start sesji", "Odsiecz (OB5) poczatek", "Odsiecz (OB5) armia krola", "Odsiecz (OB5) koniec", "Odsiecz (OB5): dzien" (doba).
@@ -116,8 +118,9 @@ namespace Armoury
         private static readonly Dictionary<SiegeEvent, float[]> _endedRelief = new Dictionary<SiegeEvent, float[]>();
         private static readonly List<int> _tmpIdx = new List<int>();
         private static readonly List<Siege> _tmpSg = new List<Siege>();
+        private static readonly List<Siege> _tmpGated = new List<Siege>();   // f12: osady, ktorym bramka zasiegu zamknela podbicie w tej mysli
         private static readonly HashSet<MobileParty> _dParties = new HashSet<MobileParty>();
-        private static readonly HashSet<MobileParty> _dRelParties = new HashSet<MobileParty>();   // f12: druzyny zwolnione dzis bramka zasiegu (bez podbicia gdzie indziej)
+        private static readonly HashSet<MobileParty> _dRelParties = new HashSet<MobileParty>();   // f12: druzyny zwolnione dzis bramka zasiegu (bez zadnej odsieczy od OB5)
         private static readonly List<MobileParty> _tmpGone = new List<MobileParty>();
         private static double _hour = -1.0;
         private static int _dRaised, _dStarve, _dKingOffer, _dKingNoCall, _dArmies, _dStarted, _dEnded, _dCaptured, _undeadNow, _offClassNow, _stumbles, _dStumbles, _dOwnSiege, _dRel;
@@ -130,7 +133,7 @@ namespace Armoury
         internal static void Reset()
         {
             _byK.Clear(); _tracks.Clear(); _armyFor.Clear(); _tmpIdx.Clear(); _tmpSg.Clear(); _dParties.Clear(); _hour = -1.0; _endedRelief.Clear();
-            _dRelParties.Clear(); _tmpGone.Clear();
+            _dRelParties.Clear(); _tmpGone.Clear(); _tmpGated.Clear();
             _dRaised = _dStarve = _dKingOffer = _dKingNoCall = _dArmies = _dStarted = _dEnded = _dCaptured = _undeadNow = _offClassNow = _stumbles = _dStumbles = _dOwnSiege = _dRel = 0;
         }
 
@@ -388,7 +391,9 @@ namespace Armoury
                 List<Siege> list;
                 if (!_byK.TryGetValue(k, out list) || list.Count == 0) return;
                 if (party.Army != null && party.Army.LeaderParty != party) return;
-                if (partyThinkParams.DoNotChangeBehavior) return;
+                // f12 recenzja: DoNotChangeBehavior (gra 1.4.8 ustawia je tylko w AiMilitaryBehavior.AiHourlyTick - wodz armii czekajacej na czlonkow, oceny celow
+                // i tak liczone) sprawdzane nizej, PO odswiezeniu zasiegu - inaczej wpis wodza w EligAt starzeje sie przez cala zbiorke (do 72 h i dluzej)
+                bool dnc = partyThinkParams.DoNotChangeBehavior;
                 if (party.MapEvent != null && !party.MapEvent.IsRaid) return;
                 if (party.CurrentSettlement != null && party.CurrentSettlement.SiegeEvent != null) return;
                 var scores = partyThinkParams.AIBehaviorScores;
@@ -408,21 +413,24 @@ namespace Armoury
                     if (sg != null) { _tmpIdx.Add(i); _tmpSg.Add(sg); if (e.Item2 > dMax) dMax = e.Item2; }
                     else if (e.Item2 > other) other = e.Item2;
                 }
-                // f12: ocena obrony od gry przy tej mysli - wpis do zasiegu krolestwa (godzina); oblezona twierdza krolestwa bez tej oceny - druzyna poza zasiegiem
+                // f12: ocena obrony od gry przy tej mysli - wpis do zasiegu krolestwa (godzina); oblezona twierdza krolestwa bez tej oceny - druzyna poza zasiegiem.
+                // Wodz armii w zbiorce (dnc) tez odswieza wpis (mysli co 1 h), ale nie wchodzi do Eligible (linia "koniec" liczy jak przed f12).
                 for (int j = 0; j < list.Count; j++)
                 {
                     var t = list[j].T;
                     if (t == null) continue;
-                    if (_tmpSg.Contains(list[j])) { t.Eligible.Add(party); t.EligAt[party] = _hour; }
+                    if (_tmpSg.Contains(list[j])) { if (!dnc) t.Eligible.Add(party); t.EligAt[party] = _hour; }
                     else t.EligAt.Remove(party);
                 }
+                if (dnc) return;   // wodz armii czekajacej na czlonkow - bez podbicia (jak przed f12)
                 if (_tmpIdx.Count == 0) return;
                 if (party.Party.IsStarving) { _dStarve++; return; }   // najpierw jedzenie - droga gry
 
                 float b = Math.Max(Math.Max(other, FloorBase), dMax);
                 bool ownSiege = party.BesiegedSettlement != null;   // druzyna (wodz armii) sama oblega twierdze wroga
-                bool gateOn = s.BesiegedReliefOnlyWhenReachable, gated = false, raisedAny = false;
+                bool gateOn = s.BesiegedReliefOnlyWhenReachable;
                 Siege top = null; float topScore = -1f; AIBehaviorData topData = default(AIBehaviorData);
+                _tmpGated.Clear();
                 for (int j = 0; j < _tmpIdx.Count; j++)
                 {
                     var sg = _tmpSg[j];
@@ -434,8 +442,7 @@ namespace Armoury
                     // f12: krolestwo nie zbierze odsieczy, ktora gra rzuci na oboz (zasieg < min(R, 1.2 x oboz)) - bez podbicia, wracaja oceny gry
                     if (gateOn && sg.Ready && sg.Reach < sg.Floor)
                     {
-                        gated = true;
-                        if (sg.T != null) sg.T.DayRel.Add(party);
+                        _tmpGated.Add(sg);
                         continue;
                     }
                     var e = scores[_tmpIdx[j]];
@@ -444,13 +451,20 @@ namespace Armoury
                     {
                         var d = e.Item1;
                         partyThinkParams.SetBehaviorScore(in d, nv);
-                        _dRaised++; _dParties.Add(party); raisedAny = true;
+                        _dRaised++; _dParties.Add(party);
                         if (sg.T != null) { sg.T.Raised++; if (!sg.In.Contains(party)) sg.T.Pulled.Add(party); }
                     }
                     else nv = e.Item2;
                     if (nv > topScore) { topScore = nv; top = sg; topData = e.Item1; }
                 }
-                if (gated && !raisedAny) { _dRel++; _dRelParties.Add(party); }   // f12: zwolniona - bez podbicia do zadnej odsieczy
+                // f12: zwolniona = bramka zamknela co najmniej jedna osade, a OB5 nie zostawil druzynie zadnej odsieczy (top == null). Recenzja: przy top != null
+                // druzyna idzie na inna odsiecz (podbita albo z ocena gry juz >= nv - i tak najwyzsza) - to nie zwolnienie; DayRel tylko dla zwolnionych
+                if (_tmpGated.Count > 0 && top == null)
+                {
+                    _dRel++; _dRelParties.Add(party);
+                    for (int j = 0; j < _tmpGated.Count; j++) if (_tmpGated[j].T != null) _tmpGated[j].T.DayRel.Add(party);
+                }
+                _tmpGated.Clear();
                 if (top == null) return;
 
                 // armia wladcy na odsiecz (gra zaklada ja sama w AiPartyThinkBehavior: WillGatherArmy + DefendSettlement -> Kingdom.CreateArmy, typ Defender)
