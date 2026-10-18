@@ -138,7 +138,8 @@ namespace Armoury
             return k;
         }
 
-        /// <summary>ha na pracujacego (ks_tabele2.py HA_PER_WORKER); brak = 0 (las dziki, morze, zloza).</summary>
+        /// <summary>ha na pracujacego (ks_tabele2.py HA_PER_WORKER); brak = 0 (las dziki, morze, zloza). Tabela bazowa - ha zajecia na ziemi bloku daje Ha(c, strefa)
+        /// (r4-polnoc: mysliwy na zimnej ziemi).</summary>
         internal static readonly double[] HaPerWorker = BuildHa();
         private static double[] BuildHa()
         {
@@ -147,6 +148,60 @@ namespace Armoury
             a[CSheep] = 120.0; a[CCattle] = 18.0; a[CCattleB] = 18.0;
             for (int h = CHorse0; h <= CHorse5; h++) a[h] = 25.0;
             return a;
+        }
+
+        /// <summary>r4-polnoc (recenzja): ha na pracujacego zajecia c na ziemi strefy zone. Przy ZIMNEJ ZIEMI (klucz Ks Cold Land) mysliwy w STREFACH ZIMNYCH (1-arktyka,
+        /// 2-wyspy, 2-zimno) potrzebuje dzikiej ziemi HuntHa - zwierzyny jest tyle, ile ziemi (bez tego cala Polnoc moglaby polowac bez konca: 145 tys. mysliwych Wolnych
+        /// Ludzi = 290 kg dziczyzny z km2 na rok, 10-30 razy wiecej niz daje tajga). Poza strefami zimnymi i bez klucza - tabela bazowa (mysliwy bez ziemi, jak dotad):
+        /// gestosc zwierzyny tajgi nie jest miara lasu umiarkowanego ani tropiku (recenzja: dotad HuntHa szlo na caly swiat, ok. 1570 blokow ciepla z mysliwym w kandydatach).</summary>
+        internal static double Ha(int c, string zone) { return c == CHunter && _coldLand && ColdZone(zone) ? HuntHa : HaPerWorker[c]; }
+        /// <summary>Ha zajecia c na ziemi bloku k (strefa bloku; blok bez ziemi - tabela bazowa).</summary>
+        internal static double Ha(int c, KsBlock k) { return Ha(c, k != null && k.O != null ? k.O.Zone : null); }
+
+        // ------------------------------------------------------------ r4-polnoc (Jeff 17.10 "najpierw wyzywic siebie" + prawdziwe plony zimnej ziemi; klucz MCM Ks Cold Land)
+        // JEDNA TABELA SWIATA - poprawione wartosci dla zimnej ziemi (teren "snieg" wystepuje tylko w strefach 1-arktyka, 2-wyspy, 2-zimno; zadnego czynnika na okreg).
+        // Zrodla i zalozenia (sredniowiecze polnocy Europy):
+        //  - ZBOZE NA ZIMNEJ ZIEMI = jeczmien, owies, zyto krotkiego lata (zajecie wheat_farm, towar grain - gra ma jedno zboze): Norwegia i Islandia XI-XV w. siewy jeczmienia
+        //    i owsa, plon 3-5 z ziarna (Holmsen; Byock "Viking Age Iceland" - jeczmien na Islandii do ok. 1500), Szkocja gorska i Hebrydy - owies i jeczmien bere 3:1
+        //    (Dodgshon "From Chiefs to Landlords"); na reke ok. 1/3 plonu niziny (krotkie lato, przymrozki, kamienista gleba) -> snieg x0.35 (2-zimno: 0.35 - pole na
+        //    oslonietych dolinach; za Murem 0.25 x 0.35 = 0.09 - pola nie ma, jak w Laponii; wyspy 0.12);
+        //  - BYDLO MLECZNE: Norwegia i Islandia zyly z obory - krowy w oborze 6-8 miesiecy na sianie, latem na halach (seter, shieling), maslo jako danina i pieniadz
+        //    (smorskatt); krowa 400-800 l mleka na rok (Myrdal "Jordbruket i Sverige") -> snieg x0.5 (dotad 0.3): wiecej rak na siano, mniej mleka z krowy;
+        //  - OWCE I KOZY (kozy = zajecie sheep_farm, towar sheep - gra nie ma kozy): Islandia, Wyspy Owcze, Szetlandy (owce przez zime na pastwisku), Norwegia - kozy
+        //    na ser (geitost) w gorach -> snieg x0.75 (dotad 0.6); za Murem 0.6 x 0.75 = 0.45 - pasterstwo jak u Saamow: ok. 0.5 czlowieka z km2 (Islandia sredniowieczna
+        //    0.5-0.7 z km2 ziemi uzytkowej);
+        //  - RYBY: rzeki i jeziora polnocy bogate w lososie, troc, golce, sieje (lososie Szkocji i Norwegii, jeziora Finlandii, sztokfisz Lofotow od XII w.) -> rzeka
+        //    (i jezioro przy rzece - plik ziemi nie zna jezior osobno; woda w odleglosci <= 3 to brzeg albo rzeka) w strefach zimnych x0.7 zamiast 0.4; brzeg morza bez zmian (1.0);
+        //  - POLOWANIE: mysliwy na tajdze bierze 1-1.2 kg miesa na dobe (los ok. 200 kg miesa, renifer 30-50 kg) - tabela mysliwego bez zmian (P0 1.2 kg x strefa x teren:
+        //    za Murem na sniegu 0.8 = 0.96 kg/d, 2100 kcal - "nie 54 g na mysliwego"), ALE zwierzyny jest tyle, ile ziemi: tajga i tundra daja trwale 10-30 kg dziczyzny z km2
+        //    na rok (los 0.2-0.5 szt./km2, renifer), lowcy-zbieracze polnocy 0.01-0.1 czlowieka z km2 -> mysliwy potrzebuje HuntHa = 1500 ha dzikiej ziemi (0.96 kg x 364 /
+        //    15 km2 = 23 kg/km2/rok) - TYLKO w strefach zimnych (Ha(c, strefa)); las umiarkowany i tropik bez zmian (mysliwy bez ziemi jak dotad).
+        internal const double HuntHa = 1500.0;
+        internal const double ColdSnowWheat = 0.35, ColdSnowCattle = 0.5, ColdSnowSheep = 0.75, ColdRiverFish = 0.7;
+        private static bool _coldLand;
+        /// <summary>Klucz Ks Cold Land (ustawia gra przed Planem i co dobe; test portu - false = tabela v2 bez zmian). Zmiana podbija LandGen (pamiec przydatnosci blokow od nowa).</summary>
+        internal static bool ColdLand { get { return _coldLand; } set { if (value != _coldLand) { _coldLand = value; LandGen++; } } }
+        internal static int LandGen;
+        internal static bool ColdZone(string z) { return z == "1-arktyka" || z == "2-wyspy" || z == "2-zimno"; }
+
+        /// <summary>kcal na kg towaru Planu (jedzenie; zywiec i mieso wieloryba 0 - ich mieso jest juz w towarze meat produkcji pary). Te same liczby co KsDeliver.ItemKcal.</summary>
+        internal static readonly double[] FoodKcal = BuildFoodKcal();
+        private static double[] BuildFoodKcal()
+        {
+            var k = new double[NG];
+            k[GGrain] = 3300; k[GFish] = 1100; k[GMeat] = 2200; k[GCheese] = 3600; k[GButter] = 7200; k[GEgg] = 1450; k[GApple] = 500; k[GCarrot] = 400; k[GOrange] = 450;
+            k[GGrape] = 700; k[GOlives] = 1150; k[GDate] = 2800; k[GHoney] = 3000;
+            return k;
+        }
+
+        /// <summary>Potrzeba jedzenia osady w kcal surowca na dobe (z potrzeb NeedsOf): zboze z ziarnem na piwo, mieso, ryby, nabial, owoce, winogrona z winem, oliwki z oliwa,
+        /// miod z miodem pitnym - ta sama miara co produkcja (FoodKcal); bez warstwy dom (H robi dom, nie zajecie).</summary>
+        internal static double FoodNeedKcal(double[] n)
+        {
+            if (n == null) return 0.0;
+            return (n[NG_] + n[NBeer] * BeerGrain) * 3300 + n[NMeat] * 2200 + n[NFish] * 1100 + n[NCheese] * 3600 + n[NButter] * 7200 + n[NEgg] * 1450
+                   + n[NApple] * 500 + n[NCarrot] * 400 + n[NOrange] * 450 + (n[NGrape] + n[NWine] * WineGrape) * 700 + (n[NOlives] + n[NOil] * OilOlive) * 1150
+                   + n[NDate] * 2800 + (n[NHoney] + n[NMead] * MeadHoney) * 3000;
         }
 
         /// <summary>Regale (ks_tabele2.py REGALE, REG_GOOD): zloza, las na sprzedaz, oazy, ogrody przypraw - rece ida za cena (prawo pana).</summary>
@@ -268,7 +323,12 @@ namespace Armoury
             int ct = CraftIndex[t];
             if (IsCrop[ct])
             {
-                double w = Get(ZW, o.Zone, t, 0.0) * Get(TW, o.Terr, t, 1.0) * WaterMult(t, o);
+                double tw = Get(TW, o.Terr, t, 1.0);
+                if (_coldLand && o.Terr == "snieg")                    // r4-polnoc: jeczmien i owies, obora, owce i kozy na zimnej ziemi (zrodla wyzej)
+                {
+                    if (t == "wheat_farm") tw = ColdSnowWheat; else if (t == "cattle_farm") tw = ColdSnowCattle; else if (t == "sheep_farm") tw = ColdSnowSheep;
+                }
+                double w = Get(ZW, o.Zone, t, 0.0) * tw * WaterMult(t, o);
                 if (o.Model == "fishing" && (t == "wheat_farm" || t == "flax_plant" || t == "silk_plant" || t == "vineyard" || t == "olive_trees" || t == "date_farm" || t == "cattle_farm" || t == "swine_farm"))
                     w *= 0.5;
                 return Math.Min(1.5, w);
@@ -276,7 +336,7 @@ namespace Armoury
             if (IsFish(c))
             {
                 if (c != CFisher && dtype != t) return 0.0;
-                double b = Coast(o) ? 1.0 : (River(o) ? 0.4 : 0.0);
+                double b = Coast(o) ? 1.0 : (River(o) ? (_coldLand && ColdZone(o.Zone) ? ColdRiverFish : 0.4) : 0.0);   // r4-polnoc: lososie i sieje rzek polnocy
                 if (o.Zone == "2-wyspy" && b > 0) b *= 1.2;
                 return b;
             }

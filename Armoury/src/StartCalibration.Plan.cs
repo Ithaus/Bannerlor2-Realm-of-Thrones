@@ -99,6 +99,7 @@ namespace Armoury
             // koszyk z wlasnego pola (udzialy stanow ZC), budzety klas miast z zarobku netto (28 dob)
             inp.Money = true; inp.Keep = _keep;
             inp.ClothDemand = SwClothDemand;                          // KS r4 P8 (r4-ceny): plotno, sukno, skora z odziezy wojska i warsztatow zbrojnych w popycie Planu
+            SyncColdLand(); inp.SelfFeed = SelfFeedMode(); inp.SelfFeedOwn = SelfFeedOwnOnly();   // r4-polnoc: zimna ziemia (tabela swiata) i najpierw wyzywic siebie (prog Planu)
             double va = VilAlphaNow(); inp.VilAlpha[0] = inp.VilAlpha[1] = va; _alphaDsN = 0;   // KS r4: licznik wsi z alfa z praw DS (VilAlphaFor)
             // towary: waga, wartosc, zuzycie 1:1 (srednia ksiegi towarow)
             var ids = new List<string>(KsTab.Goods); ids.AddRange(PlanItemIds); ids.Add("WhaleMeat");
@@ -434,6 +435,7 @@ namespace Armoury
             sb.Append(" | ").Append(_snapNote).Append(" | gra bez zmian (Plan).");
             Log.Info(sb.ToString());
             try { MoneyLines(r); } catch (Exception e) { Stumble("MoneyLines", e); }
+            try { FeedLineLog(r); } catch (Exception e) { Stumble("FeedLine", e); }   // r4-polnoc: wyzywienie krain (NKS-30)
             // KS-R3: linie kroku 5 (korytarze i krainy - tekst z watku roboczego) i sterowania rynku (P4 - liczone przy zrzucie)
             if (r.CorrLine != null) Log.Info(r.CorrLine.Replace("{DOBA}", _wDay.ToString(Inv)));
             if (_ctlLine != null) Log.Info(_ctlLine);

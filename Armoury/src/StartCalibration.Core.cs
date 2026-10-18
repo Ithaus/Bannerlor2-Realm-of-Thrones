@@ -5,7 +5,7 @@ using System.Diagnostics;
 namespace Armoury
 {
     /// <summary>KS: wejscie Planu (zrzut na watku glownym - same liczby, bez obiektow gry).</summary>
-    internal sealed class KsInput
+    internal sealed partial class KsInput
     {
         public double Sigma = 37.0, Inert = 1.25, Beta = 10.0;
         public bool Ksk = true;                                       // KS-K (koszyk: kozuchy Polnocy w popycie futer)
@@ -102,7 +102,7 @@ namespace Armoury
     }
 
     /// <summary>KS: wynik Planu (wszystko w prawdziwych kg na dobe, ceny cienia wzgledem wartosci bazowej).</summary>
-    internal sealed class KsResult
+    internal sealed partial class KsResult
     {
         public string Error;
         public int Rounds, RoundsFirst, R8Rounds, R8bRounds; public double Ms;
@@ -601,6 +601,7 @@ namespace Armoury
             var pb = new List<int>(120000); var pc = new List<int>(120000); var pm = new List<int>(120000);
             var lp = new List<double>(120000); var st = new List<double>(120000); var landp = new List<double>(120000);
             var os = new List<int>(120000); var og = new List<int>(600000); var ov = new List<double>(600000);
+            var pha = new List<double>(120000);                         // r4-polnoc (recenzja): ha na pracujacego pary (strefa bloku - mysliwy na zimnej ziemi)
             var bstart = new int[x.NB + 1];
             var outv = new double[KsTab.NG];
             for (int i = 0; i < x.NB; i++)
@@ -616,8 +617,9 @@ namespace Armoury
                     lp.Add(Math.Max(1e-6, LandEff(b, c, d.Type)));
                     st.Add(!d.TownFields && b.Start == KsTab.Crafts[c] ? 1.0 : 0.0);
                     // praca domowa (krok 8) na ziemi domu
-                    double hwk = Math.Max(0.0, W - wH - sub - cl);
-                    landp.Add(wH * KsTab.HaHome + sub * KsTab.HaOwnGrain + cl * KsTab.HaPerWorker[c] + hwk * KsTab.HaHome);
+                    double hwk = Math.Max(0.0, W - wH - sub - cl), haC = KsTab.Ha(c, b);   // r4-polnoc: bez klucza Ks Cold Land = HaPerWorker[c] (bit w bit)
+                    landp.Add(wH * KsTab.HaHome + sub * KsTab.HaOwnGrain + cl * haC + hwk * KsTab.HaHome);
+                    pha.Add(haC);
                     os.Add(og.Count);
                     for (int g = 0; g < KsTab.NG; g++) if (outv[g] != 0.0) { og.Add(g); ov.Add(outv[g]); }
                 }
@@ -627,6 +629,7 @@ namespace Armoury
             x.NP = pb.Count;
             x.Pb = pb.ToArray(); x.Pc = pc.ToArray(); x.Pm = pm.ToArray(); x.Lp = lp.ToArray(); x.St = st.ToArray(); x.LandP = landp.ToArray();
             x.OStart = os.ToArray(); x.OGood = og.ToArray(); x.OVal = ov.ToArray(); x.BStart = bstart;
+            x.PHa = pha.ToArray();
             if (x.LandIx != null) BuildPl(x);                          // KS-R3 krok 5: para -> kraina x rynek (pary od nowa w kroku 8)
         }
 
@@ -803,6 +806,7 @@ namespace Armoury
             // KS-R3 krok 5: cena krainy (gradient Grad x ciecie nadmiaru) - dodatek do dochodu zajecia na pracujacego w krainie i rynku bloku; bez gradientu (null) -
             // dochod jak dotad, bit w bit (Rm bez dodatku)
             double[] dl = x.GradOn ? LandDelta(x, p) : null;
+            var pha = x.PHa;                                           // r4-polnoc: ha na pracujacego pary (Pairs; mysliwy na zimnej ziemi - HuntHa tylko w strefach zimnych)
             if (beta == 10.0)
             {
                 // koszt Planu (poprawka po autotescie 16.10 - krok 8 doklada rund): exp(beta (ln u - ln umax)) = (u / umax)^10 mnozeniem, u = dochod x premia mapy^start -
@@ -818,7 +822,7 @@ namespace Armoury
                         int c = x.Pc[k];
                         double rmc = Rm[x.Pm[k] * KsTab.NC + c];
                         if (dl != null) rmc += dl[x.Pl[k] * KsTab.NC + c];
-                        double inc = x.Lp[k] * rmc - KsTab.KCost[c] - rent[b] * KsTab.HaPerWorker[c];
+                        double inc = x.Lp[k] * rmc - KsTab.KCost[c] - rent[b] * pha[k];
                         if (inc < 0.02) inc = 0.02;
                         double u = x.St[k] > 0 ? inc * inert : inc;
                         xs[k] = u;
@@ -829,6 +833,7 @@ namespace Armoury
                     double isum = 1.0 / sum;
                     for (int k = a; k < e; k++) xs[k] *= isum;
                 }
+                if (x.FeedOn) ApplyFloors(x, p, xs);                   // r4-polnoc: najpierw wyzywic siebie (prog rak przy jedzeniu)
                 return;
             }
             for (int b = 0; b < x.NB; b++)
@@ -841,7 +846,7 @@ namespace Armoury
                     int c = x.Pc[k];
                     double rmc = Rm[x.Pm[k] * KsTab.NC + c];
                     if (dl != null) rmc += dl[x.Pl[k] * KsTab.NC + c];
-                    double inc = x.Lp[k] * rmc - KsTab.KCost[c] - rent[b] * KsTab.HaPerWorker[c];
+                    double inc = x.Lp[k] * rmc - KsTab.KCost[c] - rent[b] * pha[k];
                     if (inc < 0.02) inc = 0.02;
                     double z = beta * (Math.Log(inc) + x.St[k] * lnI);
                     xs[k] = z;
@@ -851,6 +856,7 @@ namespace Armoury
                 for (int k = a; k < e; k++) { double v = Math.Exp(xs[k] - zmax); xs[k] = v; sum += v; }
                 for (int k = a; k < e; k++) xs[k] /= sum;
             }
+            if (x.FeedOn) ApplyFloors(x, p, xs);                       // r4-polnoc: najpierw wyzywic siebie
         }
 
         private static void Supply(Ctx x, double[] xs, double[] S)
@@ -872,6 +878,7 @@ namespace Armoury
             var act = new bool[n];
             for (int m = 0; m < NM; m++) for (int g = 0; g < KsTab.NG; g++) act[m * KsTab.NG + g] = !KsTab.RegGoodMask[g] && x.Dm[m * KsTab.NG + g] > 1.0;
             var rr = (double[])x.Rent.Clone();
+            FloorStep(x);                                              // r4-polnoc: prog "najpierw wyzywic siebie" z par i ziemi tej rownowagi (po RegaleStep)
             xs = new double[x.NP]; S = new double[n];
             var dem = new double[x.NB];
             var stall = new double[StallN];
@@ -930,6 +937,7 @@ namespace Armoury
                         bestMt = mt;
                         if (bp == null) { bp = new double[n]; bxs = new double[x.NP]; bS = new double[n]; brr = new double[x.NB]; }
                         Array.Copy(p, bp, n); Array.Copy(xs, bxs, x.NP); Array.Copy(S, bS, n); Array.Copy(rr, brr, x.NB);
+                        if (x.FeedOn) FeedSave(x);                     // r4-polnoc (recenzja): liczby progu tego samego stanu co udzialy punktu kontrolnego
                     }
                     if (cancel != null && cancel()) break;
                     // koszt Planu (poprawka po autotescie 16.10): rownowaga, ktora stoi (suma odchylen towarow poza granica ceny zmienila sie przez 500 rund o mniej niz 0.5%) -
@@ -947,6 +955,7 @@ namespace Armoury
             if (!conv && bp != null && bestMt < lastMt)
             {
                 Array.Copy(bp, p, n); Array.Copy(bxs, xs, x.NP); Array.Copy(bS, S, n); Array.Copy(brr, rr, x.NB);
+                if (x.FeedOn) FeedRestore(x);                          // r4-polnoc (recenzja): liczby progu z punktu kontrolnego (linia wyzywienia krain, A7)
             }
             x.Rent = rr;
             // stan zbieznosci do wyniku
@@ -1017,6 +1026,7 @@ namespace Armoury
             }
             R.BlockSub = sub;
             foreach (var d in x.D) if (d.TownFields) R.TownFieldHands += d.Wf;
+            try { FeedStats(x, xs); } catch (Exception e) { R.Feed = null; R.CorrLine = (R.CorrLine ?? "") + " [wyzywienie krain: " + e.GetType().Name + "]"; }   // r4-polnoc
         }
 
         // ============================================================ 8. pieniadze (projekt rozdz. 9 i 11.1 krok 8; poprawka po autotescie 16.10)
@@ -1109,8 +1119,8 @@ namespace Armoury
             }
             double p0 = 0; foreach (var kv in KsTab.P0[c]) if (kv.Key == g) p0 = kv.Value;
             if (!(p0 > 0) || parts == null) return;
-            bool land = c == KsTab.CWheat || c == KsTab.CDate;
-            double haX = Math.Max(0.1, KsTab.HaPerWorker[c] - KsTab.HaHome), capKg = 0; bool anyArea = false;
+            // r4-polnoc (recenzja): ziemia wedlug bloku - mysliwy na zimnej ziemi (HuntHa w strefach zimnych) tez na ziemi; bez klucza - jak dotad (zboze i daktyle)
+            double capKg = 0; bool anyArea = false, anyFree = false;
             string type = d.Type;
             foreach (var lb in parts)
             {
@@ -1126,9 +1136,13 @@ namespace Armoury
                 double L = c == KsTab.CWheat ? lb.LGrain(type) : lb.L(c, type);
                 if (!(L > 0) || !(occ > 0)) continue;
                 y += occ * p0 * L;
-                if (land && lb.K.Area > 0) { anyArea = true; capKg += Math.Max(0.0, lb.K.Area - lb.LandUse) / haX * p0 * L; }
+                double haC = KsTab.Ha(c, lb.K);
+                bool land = c == KsTab.CWheat || c == KsTab.CDate || haC > 0;
+                if (!land) { anyFree = true; continue; }                  // blok bez ziemi pod plon (ryby, dziczyzna poza zimna ziemia) - bez sufitu, jak dotad
+                double haX = Math.Max(0.1, haC - KsTab.HaHome);
+                if (lb.K.Area > 0) { anyArea = true; capKg += Math.Max(0.0, lb.K.Area - lb.LandUse) / haX * p0 * L; }
             }
-            if (land && anyArea) cap = capKg;
+            if (anyArea && !anyFree) cap = capKg;
         }
 
         /// <summary>Krok 8 (recenzja 17.10, wazne): pozycje koszyka wsi, ktore okreg moze zrobic W DOMU - z towarow wlasnych zajec (blok ma zajecie: land2 > 0 albo zajecie
@@ -1488,6 +1502,9 @@ namespace Armoury
                         }
                         hkc = cov * (hkc + subKeff);                              // KS-R3 krok 8b: kcal zastepcze tez robione w domu (ta sama czesc pokryta; z plonu - recenzja runda 3)
                         R.DistHomeKcal[d.Id] = fk > 0 ? (float)Math.Max(0.0, Math.Min(1.0, hkc / fk)) : 0f;
+                        R.DistHomeKcalAbs[d.Id] = Math.Max(0.0, Math.Min(fk, hkc));   // r4-polnoc: wyzywienie krain (kcal/d robione w domu)
+                        R.DistUncKcal[d.Id] = Math.Max(0.0, uk - hkc);                 // r4-polnoc: kcal koszyka bez pokrycia (niezaplacone i nie robione w domu)
+                        R.DistDietKcal[d.Id] = DietKcal(x, full, keep);                 // r4-polnoc (recenzja): pelna potrzeba kcal ludzi w domu w mierze koszyka (mianownik "jedzenie")
                         M.VFullKcal[m] += fk; M.VUnpaidKcal[m] += uk; M.VHomeKcal[m] += hkc; M.VSubKcal[m] += cov * (subKeff + stK);   // 8b + 8c (kcal robione towarem zastepczym)
                         // recenzja runda 3: Plan bez pokrycia wedlug krainy (kraina miasta targowego okregu) - linia pieniedzy Planu
                         string lnm = x.LandIx != null && LandOfD(x, d) >= 0 ? x.Lands[LandOfD(x, d)] : (d.Land ?? "?");

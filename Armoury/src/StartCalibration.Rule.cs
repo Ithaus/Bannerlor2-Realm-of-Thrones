@@ -49,7 +49,7 @@ namespace Armoury
         private static void RuleReset()
         {
             _px.Clear(); _pxNow.Clear(); _pxN.Clear(); _pxLoad = null; _pxDays = 0; _pxDay = -1; _hides = null; _mv = null; _valKg = null;
-            _regionMoved.Clear(); _regionSeason = -1;
+            _regionMoved.Clear(); _regionSeason = -1; _rFeed = 0;
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
             _pxRestartDay = -1; _pxRestartEnd = -1;               // KS r4 P7 (r4-ceny): restart srednich cen od nowa przy wlaczeniu
         }
@@ -163,7 +163,7 @@ namespace Armoury
             double L = b.L(c, type);
             double v = 0; int o = c * KsTab.NG;
             for (int g = 0; g < KsTab.NG; g++) { double m = _mv[o + g]; if (m != 0) v += m * Px(px, g); }
-            return L * v - KsTab.KCost[c] - b.Rent * KsTab.HaPerWorker[c];
+            return L * v - KsTab.KCost[c] - b.Rent * KsTab.Ha(c, b.K);      // r4-polnoc: ha wedlug strefy bloku (bez klucza Ks Cold Land - HaPerWorker[c])
         }
 
         private static bool Tree(int c) { return c == KsTab.CVine || c == KsTab.COlive || c == KsTab.CDate || c == KsTab.CCitrus; }
@@ -209,6 +209,7 @@ namespace Armoury
                         if (b.Held < HoldDays) continue;
                         if (!rule) { _rWould++; continue; }                  // klucz wylaczony - sam pomiar nacisku (zmiana bylaby tu)
                         if (busy) { _rBusy++; continue; }
+                        if (FeedKeeps(ld, cur, best)) { _rFeed++; continue; }   // r4-polnoc: najpierw wyzywic siebie - czesc przy jedzeniu nie idzie na zajecie tylko na targ
                         // ziemia bloku: po zmianie rak X0 z cur na best ziemia zajeta nie moze przekroczyc powierzchni bloku
                         double area = BlockArea(ld, b);
                         double after = b.LandUse + b.X[ci] * (b.LandOf(best, type) - b.LandOf(cur, type));
@@ -375,7 +376,8 @@ namespace Armoury
               .Append(", przejscia stojace na ziemi ").Append(_rLandStall)
               .Append(", dob bez pelnej zaplaty ").Append(_rStall).Append(", porzucone (rok po terminie) ").Append(_rCancel).Append(", zaplacone z kies wsi do kas miast ").Append(_rPaid).Append(" zl")
               .Append(_startNotes.Count > 0 ? " (" + string.Join("; ", _startNotes.ToArray()) + ")" : "")
-              .Append(" | regale (co ").Append(RegCycle).Append(" dob od D): rece przy zlozu w gore ").Append(_rUp).Append(", w dol ").Append(_rDown);
+              .Append(" | regale (co ").Append(RegCycle).Append(" dob od D): rece przy zlozu w gore ").Append(_rUp).Append(", w dol ").Append(_rDown)
+              .Append(FeedRuleText());                                  // r4-polnoc
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _startNotes.Clear();
             return sb.ToString();
         }
