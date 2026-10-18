@@ -1126,6 +1126,12 @@ Uzycie (Python 3, tylko odczyt):
                     - dopisani| <= prog przeliczenia, dopisani = uchodzcy ZC tej doby, doby z ludzmi w miastach bez przeliczenia ZC4 <= 1), RT-15 miasta zdolne przyjac (kiesa
                     ludu + pelny koszyk ZC4; bez KS 0 - uchodzcy w regionie jak dotad; INFO), RT-16 oblezone miasta pobytu (w murach jedza z Food, zmarli z glodu miasta; INFO).
                     Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku.
+                    fix-uchodzcy (noc 17/18.10, fala 3; test fin83): RT-1 roznice ze znakiem albo bez ("+0" i stare "0" - Sg gubil znak przy szumie -1e-11, 76 z 121 linii
+                    fin83 nierozpoznanych), prog bez zmian: nierozpoznane 0. RT-5 nowy pomiar (pole "konta bez wsi X (bez czesci w miastach Y)": X = konta bez wsi
+                    z przelicznikiem Famine tylko poza miastem, Y = ich czesc w miastach, juz w "w miastach") - prog scisly |roznica| <= max(1, 0.01% konta) kazdej doby;
+                    stary pomiar (log sprzed poprawki, cale konto bez wsi w sumie) - roznica w [-prog, konta bez wsi + prog] = ten pomiar, nie podwojne jedzenie (fin83:
+                    roznica = konta bez wsi od doby przydzialu 109133); RT-5b INFO konta bez wsi poza miastem / w miastach (fin83: Kurbok, Thupak - 2 wsie ROT ze wspolnym
+                    obiektem Village).
 --grupa nksarm    : (noc 17/18.10, paczka ks-arm, Jeff "ma byc gra rano ... z poprawnie dzialajaca ekonomia"; Armoury/src/StartCalibration.Arm.cs - samo uzbrojenie KS,
                     twarde bramki rozdz. 10, bramka krainy rozdz. 8, ryby z niczego perku Night Raider) python -I tools/sprawdz_logi.py --grupa nksarm <Armoury-*.log>
                     (strumieniowo; te same wiersze NKS-ARM-* dopisuje grupa nks). ARM-0 linia startu (klucz Auto Arm, droga gra / autotest z plikiem
@@ -38473,7 +38479,9 @@ def nglod_main(logp, until=100000):
 # TownFolk.Refugees.cs, DailyLife.Guests.cs; klucz RaidRefugeesToTowns)
 NRT_HEAD = "Uchodzcy do miast (RT): "
 _NRT_N = r"-?\d+(?:\.\d+)?"
-_NRT_S = r"[+-]\d+(?:\.\d+)?"
+# fix-uchodzcy (RT-1): znak opcjonalny - Sg w RaidRefugees dawal przy szumie -1e-11 "0" bez znaku (.NET Framework gubi minus przy zerze, "(roznica 0)"),
+# 76 z 121 linii doby fin83 nie pasowalo; od fix-uchodzcy zero zawsze "+0", stare logi tez czytelne
+_NRT_S = r"[+-]?\d+(?:\.\d+)?"
 _NRT_I = r"-?\d+"
 
 
@@ -38520,6 +38528,8 @@ NRT_DAY = re.compile(
     + r", netto w miescie " + _nrt_i("snet") + r", saldo i nalezne " + _nrt_i("s1") + r" \(wydane netto w miastach " + _nrt_i("sspent") + r"\)"
     r" \| kiesa ludu (?P<live>czynna|NIECZYNNA - kiesa zostaje we wsi)"
     r"(?: \| spichlerze \(E4/6\): w regionach " + _nrt_n("fg") + r" \+ w murach " + _nrt_n("fs") + r" \+ w miastach " + _nrt_n("ft") + r" \+ konta bez wsi " + _nrt_n("fl")
+    # fix-uchodzcy (RT-5): czesc kont bez wsi z przelicznikiem w miastach (jest w "w miastach"; konta bez wsi = tylko reszta) - pole opcjonalne (log sprzed poprawki bez niego)
+    + r"(?: \(bez czesci w miastach " + _nrt_n("flt") + r"\))?"
     + r" = " + _nrt_n("fsum") + r" wobec konta " + _nrt_n("fled") + r" \(roznica " + _nrt_s("fdiff") + r"\)| \| spichlerze \(E4/6\): brak migawki tej doby)"
     r"(?: \| oblezone miasta pobytu: w murach jedza z Food " + _nrt_n("sgp") + r" ludzi w (?P<sgt>\d+) miastach, zmarli z glodu miasta " + _nrt_n("sgd")
     + r"| \| oblezone miasta pobytu: brak migawki tej doby)"
@@ -38547,7 +38557,9 @@ def nuchodzcy_main(logp):
     oddanego, RT-9 potkniecia i ERROR paczki 0, RT-10 czas <= 5 ms/d srednio, RT-11..13 ruch, kiesa i miejsca (INFO), RT-14 ujscie jedzenia (recenzja: uchodzcy
     w miescie jedza z targu - liczeni w potrzebie koszyka ZC4: |liczeni - dopisani| <= prog przeliczenia; dopisani = uchodzcy ZC tej samej doby; doby z ludzmi
     w miastach bez przeliczenia ZC4 <= 1), RT-15 miasta zdolne przyjac (kiesa ludu + pelny ZC4; bez KS - 0 miast, uchodzcy zostaja w regionie jak dotad - INFO),
-    RT-16 oblezone miasta pobytu (w murach jedza z Food, zmarli z glodu miasta - INFO). Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku."""
+    RT-16 oblezone miasta pobytu (w murach jedza z Food, zmarli z glodu miasta - INFO). Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku.
+    fix-uchodzcy: RT-1 znak roznicy opcjonalny (stare "0" bez znaku); RT-5 nowy pomiar (konta bez wsi tylko poza miastem, pole "bez czesci w miastach") scisle,
+    stary pomiar - roznica w [-prog, konta bez wsi + prog]; RT-5b INFO konta bez wsi poza miastem / w miastach."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("RT-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -38623,11 +38635,30 @@ def nuchodzcy_main(logp):
     # RT-5 nikt dwa razy - spichlerze
     fam = [g for g in days if g.get("fdiff") is not None]
     if fam:
-        fb = [g for g in fam if abs(f(g, "fdiff")) > max(1.0, 0.0001 * f(g, "fled"))]
-        rep.add("RT-5: nikt dwa razy - spichlerze (goscie regionow + w murach + w miastach + konta bez wsi = konto)",
-                f"doby z migawka {len(fam)}, ponad prog {len(fb)}" + (f" (np. dzien {fb[0]['day']}: roznica {fb[0]['fdiff']})" if fb else "")
-                + f"; ostatnia: regiony {fam[-1]['fg']}, w murach {fam[-1]['fs']}, miasta {fam[-1]['ft']}, konto {fam[-1]['fled']}",
-                "|roznica| <= max(1, 0.01% konta) kazdej doby", not fb)
+        # fix-uchodzcy (RT-5): nowy pomiar (pole "bez czesci w miastach") - konta bez wsi z przelicznikiem tylko poza miastem: prog scisly. Stary pomiar (log sprzed
+        # poprawki) liczyl cale takie konto, takze czesc w miescie (ta jest w "w miastach") - roznica w [0, konta bez wsi] to ten pomiar, nie podwojne jedzenie
+        # (Famine takiego konta i tak nie karmi); poza tym przedzialem - NIE jak dotad
+        def _thr(g):
+            return max(1.0, 0.0001 * f(g, "fled"))
+        fnew = [g for g in fam if g.get("flt") is not None]
+        fold = [g for g in fam if g.get("flt") is None]
+        fb = [g for g in fnew if abs(f(g, "fdiff")) > _thr(g)]
+        fo_over = [g for g in fold if abs(f(g, "fdiff")) > _thr(g)]
+        fo_bad = [g for g in fo_over if not (-_thr(g) <= f(g, "fdiff") <= f(g, "fl") + _thr(g))]
+        bad5 = fb + fo_bad
+        rep.add("RT-5: nikt dwa razy - spichlerze (goscie regionow + w murach + w miastach + konta bez wsi poza miastem = konto)",
+                f"doby z migawka {len(fam)} (nowy pomiar {len(fnew)}, stary {len(fold)}), ponad prog: nowy {len(fb)}"
+                + (f"; stary {len(fo_over)} (wyjasnione kontami bez wsi liczonymi tez w miastach {len(fo_over) - len(fo_bad)} - pomiar sprzed fix-uchodzcy, nie podwojne jedzenie)"
+                   if fold else "")
+                + (f" (np. dzien {bad5[0]['day']}: roznica {bad5[0]['fdiff']}, konta bez wsi {bad5[0]['fl']})" if bad5 else "")
+                + f"; ostatnia: regiony {fam[-1]['fg']}, w murach {fam[-1]['fs']}, miasta {fam[-1]['ft']}, konta bez wsi {fam[-1]['fl']}"
+                + (f" (w miastach z nich {fam[-1]['flt']})" if fam[-1].get("flt") is not None else "") + f", konto {fam[-1]['fled']}",
+                "|roznica| <= max(1, 0.01% konta) kazdej doby (stary pomiar: roznica w [-prog, konta bez wsi + prog])", not bad5)
+        if fnew:
+            ln5 = fnew[-1]
+            rep.add("RT-5b: konta bez wsi z przelicznikiem Famine (INFO, ostatnia doba nowego pomiaru)",
+                    f"dzien {ln5['day']}: poza miastem {ln5['fl']} (spichlerze ich nie karmia - jak dotad), w miastach {ln5['flt']} (jedza z targu jak biedota)",
+                    "INFO (fin83: 2 wsie ROT ze wspolnym obiektem Village - Kurbok, Thupak)", None)
     else:
         rep.add("RT-5: nikt dwa razy - spichlerze", "brak migawki spichlerzy w liniach", "INFO (Famine wylaczone)", None)
     # RT-6 zmiana klasy biedoty miast = obecni uchodzcy

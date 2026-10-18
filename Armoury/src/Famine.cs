@@ -740,12 +740,28 @@ namespace Armoury
             var shelter = new Dictionary<Town, double>();
             int lostAcc = 0;
             double lostPeople = 0;                               // sw-uchodzcy: ludzie kont bez wsi z przelicznikiem (kontrola "nikt dwa razy" linii RT)
+            double lostTown = 0;                                 // fix-uchodzcy (RT-5): ich czesc w miescie pobytu (RaidRefugees) - jest juz w "w miastach" linii RT
+            bool rtOn = RaidRefugees.On;
             foreach (var kv in accounts)
             {
                 try
                 {
                     Vil x;
-                    if (!byId.TryGetValue(kv.Key, out x)) { lostAcc++; lostPeople += kv.Value; continue; }
+                    if (!byId.TryGetValue(kv.Key, out x))
+                    {
+                        // konto bez wsi z przelicznikiem (fin83: 2 wsie ROT, Kurbok i Thupak - jeden obiekt Village dla dwoch osad, klucz konta = druga osada) - spichlerze go
+                        // nie karmia (jak dotad). fix-uchodzcy (RT-5): RaidRefugees znajduje wies po kluczu i przenosi czesc z najazdu do miasta - ta czesc jest w "w miastach",
+                        // wiec tu tylko reszta (dotad cale konto: roznica linii RT = konta bez wsi od doby przydzialu, pomiar, nie podwojne jedzenie). Klucz RT wylaczony - jak dotad
+                        lostAcc++;
+                        double lp = kv.Value, lt = 0.0;
+                        if (rtOn)
+                        {
+                            try { var lst = Settlement.Find(kv.Key); var lv = lst != null ? lst.Village : null; if (lv != null) lt = Math.Min(lp, Math.Max(0.0, RaidRefugees.InTown(lv))); }
+                            catch (Exception e) { lt = 0.0; Stumble("Famine.Daily(RT konto bez wsi)", e); }
+                        }
+                        lostPeople += lp - lt; lostTown += lt;
+                        continue;
+                    }
                     // sw-uchodzcy (RaidRefugeesToTowns): czesc konta w miescie pobytu je z targu miasta (biedota, kiesa ludu) - spichlerze karmia tylko reszte (wylaczone: 0)
                     double gAway = kv.Value, inTown = RaidRefugees.InTown(x.V);
                     if (inTown > 0.0) { gAway -= inTown; if (!(gAway > 1e-9)) continue; }
@@ -771,7 +787,7 @@ namespace Armoury
             {
                 double gp = 0, gs = 0;
                 foreach (var g in guests) { if (g.R != null) gp += g.Away; else if (g.Shelter != null) gs += g.Away; }
-                RaidRefugees.NoteFamine(gp, gs, lostPeople);
+                RaidRefugees.NoteFamine(gp, gs, lostPeople, lostTown);
             }
             catch (Exception e) { Stumble("Famine.Daily(RT)", e); }
             double eatRef = 0, presentAll = 0;
