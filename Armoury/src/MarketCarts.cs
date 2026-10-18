@@ -61,7 +61,24 @@ namespace Armoury
         /// <summary>Wiesc z drogi: dokad jedzie woz i ile wartosci towaru (Item.Value x sztuki - jednostka polki; paczka 121: waga sztuki) wiezie w kazdej kategorii.</summary>
         private sealed class Haul { public Town To; public Dictionary<ItemCategory, int> Value; public double Day; }
 
-        private sealed class Cand { public Town T; public float D; public double Rate; public double Ub; public List<Line> Load; public bool Full; public Dictionary<ItemCategory, int> News; }
+        private sealed class Cand { public Town T; public float D; public double Rate; public double Ub; public List<Line> Load; public bool Full; public Dictionary<ItemCategory, int> News; public float D0; public bool Byp; }   // f19-e2: D0 - odleglosc przed obcieciem do 0, Byp - wlasne miasto mimo d <= 0 albo poza zasiegiem
+
+        /// <summary>f19-e2 (pomiar, klucz Measure Iron Wood Flow): ostatni wybor miasta wozu - linia "Drewno w wozach wsi (f4-pomiary)" pokazuje go dla wozow stojacych w domu
+        /// ponad 14 dob. To = null - wybor bez miasta (Why: powod); D0 - odleglosc gry przed obcieciem (&lt;= 0 - bez drogi ladowej), Byp - wlasne miasto wsi miejskiej przeszlo
+        /// bez testu zasiegu (d &lt;= 0 albo ponad zasieg), Moved - sztuk doladowanych z magazynu wsi (TopUp). Tylko odczyt - wybor sie nie zmienia.</summary>
+        internal sealed class LastPick { public int Day; public Settlement To; public float D0; public bool Byp; public int Moved; public string Why; }
+        private static readonly Dictionary<MobileParty, LastPick> _last = new Dictionary<MobileParty, LastPick>();
+        internal static LastPick LastOf(MobileParty mp) { LastPick p; return mp != null && _last.TryGetValue(mp, out p) ? p : null; }
+        private static void NotePick(MobileParty cart, Settlement to, float d0, bool byp, int moved, string why)
+        {
+            try
+            {
+                if (cart == null || !F4Pomiary.IronWoodOn) return;
+                LastPick p; if (!_last.TryGetValue(cart, out p)) { p = new LastPick(); _last[cart] = p; }
+                p.Day = (int)CampaignTime.Now.ToDays; p.To = to; p.D0 = d0; p.Byp = byp; p.Moved = moved; p.Why = why;
+            }
+            catch (Exception e) { Stumble("MarketCarts.NotePick", e); }
+        }
 
         private static MethodInfo _sell;
         private static bool _wired;                          // latka sprzedazy wpieta (czesc 3 i skreslanie wiesci przy wjezdzie)
@@ -90,7 +107,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            _hauls.Clear(); _news.Clear(); _errSites.Clear();
+            _hauls.Clear(); _news.Clear(); _errSites.Clear(); _last.Clear();   // f19-e2: _last - pomiar ostatniego wyboru
             _absUsed.Clear(); _absDay = -1; Array.Clear(_zN, 0, 2); Array.Clear(_zFirst, 0, 2); Array.Clear(_zFair, 0, 2); Array.Clear(_zOld, 0, 2); _zMis = 0;   // ZC1
             ClearDay();
         }
@@ -399,16 +416,16 @@ namespace Armoury
             try
             {
                 var at = cart.CurrentSettlement;
-                if (at != null && at.IsTown) { _inTown++; return null; }              // tabor w miescie: jak dotad (gra / BK)
+                if (at != null && at.IsTown) { _inTown++; NotePick(cart, null, -1f, false, 0, "w miescie"); return null; }   // tabor w miescie: jak dotad (gra / BK); f19-e2: pomiar
                 bool castle = v.Bound.IsCastle;
-                if (castle && !s.CastleVillagesSellInTown) return null;              // wsie zamkowe wylaczone z targow miast (wpis 100)
+                if (castle && !s.CastleVillagesSellInTown) { NotePick(cart, null, -1f, false, 0, "wies zamkowa bez targu miasta"); return null; }   // wsie zamkowe wylaczone z targow miast (wpis 100)
                 Forget(cart);                                                          // poprzednia wiesc tego wozu wygasa
                 var load = LoadOf(cart.ItemRoster);
                 // recenzja: wycena = to, co tabor NAPRAWDE dostanie - sztuka po sztuce tylko wtedy, gdy latka sprzedazy jest wpieta
                 // (bez niej osada placi cene pierwszej sztuki za stos, a woz liczylby na mniej niz dostanie)
                 bool bk = BkSells(), fair = s.VillageCartFairPrice && _wired;
                 int uStd = SellUnits(cart, load, bk);
-                if (uStd <= 0) return null;                                            // nic do sprzedania (same zwierzeta juczne) - jak dotad
+                if (uStd <= 0) { NotePick(cart, null, -1f, false, 0, "nic do sprzedania w jukach"); return null; }   // nic do sprzedania (same zwierzeta juczne) - jak dotad
                 var own = castle ? v.TradeBound : v.Bound;                            // "wlasne" miasto do porownania w logu
                 if (own != null && !own.IsTown) own = null;
                 float max = s.MarketMaxDistance > 0f ? s.MarketMaxDistance : GameRange();          // 0 = zasieg gry dla targu wsi (TradeBound)
@@ -441,6 +458,7 @@ namespace Armoury
                     bool isOwn = !castle && st == v.Bound;                             // wies miejska: swoje miasto zawsze kandydatem
                     float d = Dist(cart, at, st);
                     if (!isOwn && (d <= 0f || (max > 0f && d > max))) continue;
+                    float d0 = d; bool byp = isOwn && (d <= 0f || (max > 0f && d > max));   // f19-e2 (pomiar): wlasne miasto bez testu zasiegu
                     if (d < 0f) d = 0f;
                     double T = 2.0 * d / perDay + wait;
                     bool useFull = full != null && (whole || T > tfree);
@@ -449,13 +467,13 @@ namespace Armoury
                     // miernik: utarg na sztuke x czesc kursu, w ktorej wies dalej produkuje (min(1, doby magazynu / doby kursu)) -
                     // dlugookresowy utarg wsi na dobe; dla zwyklego ladunku ta sama kolejnosc co wartosc / max(kurs, doby magazynu)
                     double tf = Math.Max(0.25, useFull ? tfreeFull : tfree);              // co najmniej 6 godzin: zatkany magazyn - wtedy liczy sie utarg na dobe drogi
-                    var c = new Cand { T = t, D = d, Load = ld, Full = useFull, News = news };
+                    var c = new Cand { T = t, D = d, Load = ld, Full = useFull, News = news, D0 = d0, Byp = byp };
                     c.Rate = (T > tf ? tf / T : 1.0) / (useFull ? uFull : uStd);
                     c.Ub = Upper(t, cart, ld, news, bk, fair) * c.Rate;
                     cands.Add(c);
                     if (own != null && st == own) ownC = c;
                 }
-                if (cands.Count == 0) { _noTown++; return null; }
+                if (cands.Count == 0) { _noTown++; NotePick(cart, null, -1f, false, 0, "bez miasta w zasiegu"); return null; }
                 cands.Sort((a, b) => a.Ub != b.Ub ? b.Ub.CompareTo(a.Ub) : a.D.CompareTo(b.D));
                 Cand best = null; double bestSc = 0.0; long bestVal = 0;
                 foreach (var c in cands)
@@ -481,9 +499,11 @@ namespace Armoury
                     }
                 }
                 if (!fibreSent) FibreToMarket.Forget(cart, best.T.Settlement);
+                int movedN = 0;                                                        // f19-e2 (pomiar): sztuk doladowanych z magazynu
                 if (best.Full && plan != null)
                 {
                     int moved = TopUp(cart, home.ItemRoster, plan);
+                    movedN = moved;
                     if (moved > 0)
                     {
                         _full++; _fullUnits += moved;
@@ -501,9 +521,10 @@ namespace Armoury
                     _sumOwn += ReferenceEquals(ownC, best) ? bestVal : Value(ownC.T, cart, ownC.Load, fair, ownC.News, bk);
                 }
                 OreNote(best.T, best.Load);
+                NotePick(cart, best.T.Settlement, best.D0, best.Byp, movedN, null);   // f19-e2 (pomiar)
                 return best.T.Settlement;
             }
-            catch (Exception e) { Stumble("MarketCarts.Choose", e); return null; }
+            catch (Exception e) { Stumble("MarketCarts.Choose", e); NotePick(cart, null, -1f, false, 0, "blad wyboru"); return null; }
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
@@ -794,6 +815,17 @@ namespace Armoury
                 if (kv.Key == null || !kv.Key.IsActive || now - kv.Value.Day > 30.0 || Turned(kv.Key, kv.Value)) { if (stale == null) stale = new List<MobileParty>(); stale.Add(kv.Key); }
             if (stale != null) foreach (var mp in stale) Forget(mp);
             int dropped = stale != null ? stale.Count : 0;                         // wiesci skreslone przy porzadkach (woz zniknal, skrecil, 30 dob)
+            // f19-e2: pomiar ostatniego wyboru - wozy nieczynne (rozbite, rozwiazane) wypadaja; klucz pomiaru wylaczony - pamiec pusta
+            if (_last.Count > 0)
+            {
+                if (!F4Pomiary.IronWoodOn) _last.Clear();
+                else
+                {
+                    List<MobileParty> gone = null;
+                    foreach (var kv in _last) if (kv.Key == null || !kv.Key.IsActive) { if (gone == null) gone = new List<MobileParty>(); gone.Add(kv.Key); }
+                    if (gone != null) foreach (var mp in gone) _last.Remove(mp);
+                }
+            }
             int day = (int)now - 1;
             var inv = CultureInfo.InvariantCulture;
             float lim = GameRange();

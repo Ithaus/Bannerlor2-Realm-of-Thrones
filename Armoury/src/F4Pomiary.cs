@@ -57,7 +57,7 @@ namespace Armoury
         private static readonly Flow[] _flow = { new Flow { Id = "iron" }, new Flow { Id = "hardwood" } };
 
         // ------------------------------------------------------------ (2) wozy wsi
-        private sealed class Wag { public int Wood = -1, Iron = -1, WoodSince = -1; }
+        private sealed class Wag { public int Wood = -1, Iron = -1, WoodSince = -1, HomeSince = -1; }   // f19-e2: HomeSince - pierwsza doba z rzedu, w ktorej woz stal we wsi domowej (od wczytania)
         private static Dictionary<MobileParty, Wag> _wag = new Dictionary<MobileParty, Wag>();
         private static readonly Dictionary<Town, long> _deliv = new Dictionary<Town, long>();
         private static readonly HashSet<Village> _woodVil = new HashSet<Village>();
@@ -198,6 +198,10 @@ namespace Armoury
                         if (w > 0) { if (rec.WoodSince < 0) rec.WoodSince = day; var hv = mp.HomeSettlement != null ? mp.HomeSettlement.Village : null; if (hv != null) _woodVil.Add(hv); }
                         else rec.WoodSince = -1;
                         rec.Wood = w; rec.Iron = fe;
+                        // f19-e2 (pomiar): doby z rzedu we wsi domowej - "wiek ladunku" liczy doby od ostatniej doby z pustym wozem (woz, ktory zawsze wraca z resztka drewna,
+                        // starzeje sie, choc jezdzi), wiec dopiero ta liczba mowi, ze woz naprawde stoi
+                        var hc = mp.CurrentSettlement;
+                        if (hc != null && ReferenceEquals(hc, mp.HomeSettlement)) { if (rec.HomeSince < 0) rec.HomeSince = day; } else rec.HomeSince = -1;
                         next[mp] = rec;
                     }
                     catch (Exception e) { Stumble("LedgerDayEnd(tabor)", e); }
@@ -258,6 +262,7 @@ namespace Armoury
             var ages = new List<int>(512); var speeds = new List<float>(512);
             long old14 = 0;
             var inbound = new Dictionary<Town, long>();
+            var stuck = new List<KeyValuePair<MobileParty, Wag>>();               // f19-e2: wozy z drewnem stojace we wsi domowej ponad StuckDays dob z rzedu
             foreach (var kv in _wag)
             {
                 var mp = kv.Key; var rec = kv.Value;
@@ -272,7 +277,7 @@ namespace Armoury
                     var cur = mp.CurrentSettlement; var tg = mp.TargetSettlement;
                     if (cur != null)
                     {
-                        if (ReferenceEquals(cur, mp.HomeSettlement)) { atHome += rec.Wood; nAtHome++; }
+                        if (ReferenceEquals(cur, mp.HomeSettlement)) { atHome += rec.Wood; nAtHome++; if (rec.HomeSince >= 0 && day - rec.HomeSince > StuckDays) stuck.Add(new KeyValuePair<MobileParty, Wag>(mp, rec)); }
                         else if (cur.IsTown) atTown += rec.Wood;
                         else atOther += rec.Wood;
                     }
@@ -351,10 +356,67 @@ namespace Armoury
               .Append(" | najwiekszy brak (polka/zapas): ");
             for (int i = 0; i < worst.Count && i < 5; i++) sb.Append(i > 0 ? "; " : "").Append(worst[i].Value);
             if (worst.Count == 0) sb.Append('-');
+            try { StuckText(sb, day, stuck); } catch (Exception e) { Stumble("WoodLine(stoi w domu)", e); }   // f19-e2 (pomiar)
             sb.Append(" | ruda w wozach wsi ").Append(ironWag).Append(" (").Append(nIron).Append(" wozow, w drodze do miast ").Append(ironToTown).Append("), zeszlo z wozow w miastach w oknie ").Append(_ironSoldTown)
               .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms (").Append((ms / Math.Max(1, _winDays)).ToString("0.00", Inv)).Append(" ms/d), potkniecia ").Append(_stDay).Append(" (sesja ").Append(_st).Append(")")
               .Append(", przerwy ksiegi towarow w sesji (okno i pamiec wozow od nowa) ").Append(_gaps).Append('.');
             return sb.ToString();
+        }
+
+        // ------------------------------------------------------------ f19-e2 (pomiar): wozy stojace w domu
+        private const int StuckDays = 14;
+
+        /// <summary>f19-e2 (noc 18/19.10, fin93: drewno "stoi we wsi domowej" 3.7 -> 32.2 tys. szt., q90 wieku ladunku +7 dob na tydzien): wozy z drewnem stojace we wsi domowej
+        /// ponad 14 dob z rzedu - wedlug warunku, ktory gra sprawdza przed wyslaniem wozu z domu (VillagerCampaignBehavior.TickVillageThink / ThinkAboutSendingItemToTown,
+        /// dekompilacja 1.4.8: wies w stanie Normal, bez bitwy wozu i wsi, magazyn wsi co najmniej W = GetWarehouseCapacity, potem 15% na godzine), oraz przyklady: wies, stan wsi,
+        /// zachowanie wozu (DefaultBehavior) i cel (TargetSettlement), rodzaje w jukach, magazyn/W, doby w domu i ostatni wybor miasta (MarketCarts.Choose: cel, odleglosc gry
+        /// przed obcieciem, wlasne miasto bez testu zasiegu, doladowanie). Tylko log.</summary>
+        private static void StuckText(StringBuilder sb, int day, List<KeyValuePair<MobileParty, Wag>> stuck)
+        {
+            long wood = 0, wNotNormal = 0, wBattle = 0, wLowStore = 0, wRest = 0;
+            int nNotNormal = 0, nBattle = 0, nLowStore = 0, nRest = 0, nOrderTown = 0, nByp = 0, nNoPick = 0;
+            var ex = new List<KeyValuePair<long, string>>();
+            foreach (var kv in stuck)
+            {
+                var mp = kv.Key; var rec = kv.Value;
+                try
+                {
+                    wood += rec.Wood;
+                    var hs = mp.HomeSettlement; var v = hs != null ? hs.Village : null;
+                    int store = 0, W = 0;
+                    if (v != null && hs.ItemRoster != null) { var r = hs.ItemRoster; for (int i = 0; i < r.Count; i++) store += r.GetElementNumber(i); W = v.GetWarehouseCapacity(); }
+                    bool battle = mp.MapEvent != null || (hs != null && hs.Party != null && hs.Party.MapEvent != null);
+                    string why;
+                    if (v == null || v.VillageState != Village.VillageStates.Normal) { nNotNormal++; wNotNormal += rec.Wood; why = "wies nie Normal"; }
+                    else if (battle) { nBattle++; wBattle += rec.Wood; why = "bitwa"; }
+                    else if (store < W) { nLowStore++; wLowStore += rec.Wood; why = "magazyn < W"; }
+                    else { nRest++; wRest += rec.Wood; why = "reszta"; }
+                    var tg = mp.TargetSettlement;
+                    if (mp.DefaultBehavior == AiBehavior.GoToSettlement && tg != null && tg.IsTown) nOrderTown++;
+                    var lp = MarketCarts.LastOf(mp);
+                    if (lp == null) nNoPick++; else if (lp.To != null && lp.Byp) nByp++;
+                    var e = new StringBuilder(220);
+                    e.Append(hs != null ? hs.StringId : "?").Append(" (").Append(why).Append(": wies ").Append(v != null ? v.VillageState.ToString() : "-")
+                     .Append(", zachowanie ").Append(mp.DefaultBehavior.ToString()).Append(" -> ").Append(tg != null ? tg.StringId : "-")
+                     .Append(", rodzajow w jukach ").Append(mp.ItemRoster != null ? mp.ItemRoster.Count : 0).Append(", drewna ").Append(rec.Wood)
+                     .Append(", magazyn ").Append(store).Append('/').Append(W).Append(", w domu ").Append(day - rec.HomeSince).Append(" dob; ostatni wybor ");
+                    if (lp == null) e.Append("- (od wczytania brak)");
+                    else if (lp.To == null) e.Append('d').Append(lp.Day).Append(" brak miasta: ").Append(lp.Why ?? "?");
+                    else e.Append('d').Append(lp.Day).Append(' ').Append(lp.To.StringId).Append(" d ").Append(lp.D0.ToString("0.0", Inv)).Append(lp.Byp ? " wlasne bez testu zasiegu" : "")
+                          .Append(", doladowano ").Append(lp.Moved);
+                    e.Append(')');
+                    ex.Add(new KeyValuePair<long, string>((long)(day - rec.HomeSince) * 1000000L + rec.Wood, e.ToString()));
+                }
+                catch (Exception e2) { Stumble("WoodLine(stoi w domu, woz)", e2); }
+            }
+            sb.Append(" | stoi w domu ponad ").Append(StuckDays).Append(" dob z rzedu (f19-e2; od wczytania; warunek gry przed wyslaniem z domu): wozow ").Append(stuck.Count).Append(", drewna ").Append(wood)
+              .Append("; wies nie Normal ").Append(nNotNormal).Append(" (").Append(wNotNormal).Append(" szt.), bitwa ").Append(nBattle).Append(" (").Append(wBattle).Append(" szt.)")
+              .Append(", magazyn wsi ponizej W - gra nie wysyla ").Append(nLowStore).Append(" (").Append(wLowStore).Append(" szt.), reszta ").Append(nRest).Append(" (").Append(wRest).Append(" szt.)")
+              .Append("; z rozkazem jazdy do miasta ").Append(nOrderTown).Append(", ostatni wybor - wlasne miasto bez testu zasiegu ").Append(nByp).Append(", bez wyboru od wczytania ").Append(nNoPick);
+            ex.Sort((a, b) => b.Key.CompareTo(a.Key));
+            sb.Append(" | stoi w domu - przyklady (najdluzej): ");
+            for (int i = 0; i < ex.Count && i < 5; i++) sb.Append(i > 0 ? "; " : "").Append(ex[i].Value);
+            if (ex.Count == 0) sb.Append('-');
         }
 
         private static string Top(Dictionary<string, long> d, int k)

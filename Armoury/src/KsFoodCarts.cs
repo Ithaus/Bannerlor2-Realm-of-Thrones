@@ -89,6 +89,7 @@ namespace Armoury
         internal static bool ConsignOn { get { return ConsignKey; } }
         private static bool DestValueKey { get { var s = Settings.Current; return s == null || s.KsDestValue; } }
         private static bool LotPowKey { get { var s = Settings.Current; return s == null || s.KsLotPricePow; } }
+        private static bool MinLotKey { get { var s = Settings.Current; return s == null || s.KsCartsMinLotTrueDemand; } }   // f19-e2
         /// <summary>Miejsce kredytu zrodla: najwyzej ten udzial kasy zrodla w towarze w drodze, frachcie i rachunkach (0..1).</summary>
         private static double SrcExposureShare { get { var s = Settings.Current; return s == null ? 0.5 : Math.Max(0.0, Math.Min(1.0, s.KsConsignSourceExposure)); } }
         /// <summary>KS-R5 ceny-r5: zadatek kupcow celu (klucz Ks Consign Deposit, tylko z kredytem kupcow) i jego udzial w wartosci lotu u celu (0..1).</summary>
@@ -874,6 +875,7 @@ namespace Armoury
                 a.FarAlways = s0 == null || s0.KsFarAlways;
                 a.RelKeep = s0 == null || s0.KsRelKeep;
                 a.ByNeed = s0 == null || s0.KsCartsBudgetByNeed;
+                a.MinLotTrue = MinLotKey;                                // f19-e2 (Ks Carts Min Lot True Demand): najmniejszy lot z prawdziwego popytu (bez kx)
                 a.Famine = s0 == null || s0.KsFaminePriority;
                 if (a.Famine)
                 {
@@ -1428,7 +1430,8 @@ namespace Armoury
                 AppendOfferLeft(sb, inv);
                 // przyczyny braku dowozu (pomiar KsFoodCore.Miss)
                 var m = _miss; int NR = KsFoodCore.NMiss;
-                sb.Append(" | bez dowozu wedlug przyczyny (").Append(_missDays).Append(" dob, brak do T* szt.; kraina celu x towar):");
+                sb.Append(" | bez dowozu wedlug przyczyny (").Append(_missDays).Append(" dob, brak do T* szt.; kraina celu x towar; najmniejszy lot z prawdziwego popytu Ks Carts Min Lot True Demand ")
+                  .Append(MinLotKey ? "TAK" : "NIE").Append("):");   // f19-e2: stan klucza w naglowku (checker NKS_KSHMISS: [^)]* - bez nawiasow w srodku)
                 if (m == null || _t == null || m.Length != _nt * NZ * NR) { sb.Append(" -"); return; }
                 var tot = new double[NR];
                 var by = new Dictionary<string, double[]>(StringComparer.Ordinal);

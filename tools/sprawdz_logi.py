@@ -45519,6 +45519,11 @@ def nf4_main(logp):
         rep.add("NF4-9b: drewno w wozach (ostatnie okno) - dokad i ile dob", f"stan: {(st.group(1).strip() if st else '-')[:260]}; wiek {(ag.group(1).strip() if ag else '-')[:160]}; {(ok.group(1).strip() if ok else '-')[:220]}"
                 + (f"; przerwy ksiegi towarow w sesji {gaps}" if gaps is not None else ""), "INFO", None)
         rep.add("NF4-9c: miasta bez opalu - przyczyna (ostatnie okno)", (df.group(1).strip() if df else "-")[:420], "INFO (czemu drewno nie trafia do miast z pusta polka ponad zapas rzemiosla)", None)
+        # NF4-9d (f19-e2, pomiar): wozy z drewnem stojace we wsi domowej ponad 14 dob z rzedu wedlug warunku gry przed wyslaniem z domu i przyklady (log sprzed f19-e2 - brak)
+        sk = re.search(r"\| stoi w domu ponad \d+ dob z rzedu \([^)]*\): ([^|]*)", s); skx = re.search(r"\| stoi w domu - przyklady \(najdluzej\): ([^|]*)", s)
+        rep.add("NF4-9d: wozy z drewnem stojace w domu ponad 14 dob (ostatnie okno; f19-e2)",
+                ((sk.group(1).strip() if sk else "brak segmentu (log sprzed f19-e2)") + (f" | przyklady: {skx.group(1).strip()}" if skx else ""))[:700],
+                "INFO (wies nie Normal / bitwa / magazyn wsi < W - gra nie wysyla wozu z domu; reszta - przyczyna poza warunkiem gry)", None)
         wms = [num(r"\(([\d.]+) ms/d\)", x, float) or 0.0 for x in wood]
         wst = [num(r"potkniecia (\d+) \(sesja", x, int) or 0 for x in wood]
         rep.add("NF4-10b: drewno w wozach - koszt i potkniecia", f"najwyzej {max(wms):.2f} ms/d, potkniecia {sum(wst)}", f"<= {NF4_WOOD_MS_MAX:.0f} ms/d, potkniecia 0", max(wms) <= NF4_WOOD_MS_MAX and sum(wst) == 0)
