@@ -48,6 +48,7 @@ namespace Armoury
 
         private static void RuleReset()
         {
+            _k4Clean = false; _k4Live = null;                     // ks-koszt T10 (K4a)
             _px.Clear(); _pxNow.Clear(); _pxN.Clear(); _pxLoad = null; _pxDays = 0; _pxDay = -1; _hides = null; _mv = null; _valKg = null;
             _regionMoved.Clear(); _regionSeason = -1; _rFeed = 0;
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
@@ -198,6 +199,9 @@ namespace Armoury
             int active = 0;
             // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
             var vTab = step && SwCostFast ? new Dictionary<double[], double[]>() : null;
+            // ks-koszt T10 (K4a, klucz Ks Cost Fast): doba bez kroku A7 i bez cyklu regali, a ostatni pelny przeglad tego stanu blokow nie mial zadnej przebudowy w toku -
+            // petla nic by nie zrobila (przebudowy zaczynaja sie tylko w dobie kroku; Target zmienia tylko ta funkcja, a odczyt zapisu daje nowa mape okregow) - bez petli
+            if (!step && !reg && SwCostFast && _k4Clean && ReferenceEquals(_k4Live, _live)) { _rActive = 0; return; }
             foreach (var ld in _live.Values)
             {
                 if (ld.St == null || ld.K == null || ld.B == null) continue;
@@ -254,6 +258,20 @@ namespace Armoury
                 catch (Exception e) { Stumble("RuleDaily(okreg)", e); }
             }
             _rActive = active;
+            _k4Live = _live; _k4Clean = active == 0 && K4NoTransition();   // ks-koszt T10 (K4a): pelny przeglad bez przebudowy w toku (w zadnym bloku - takze okregow pominietych)
+        }
+        private static bool _k4Clean; private static object _k4Live;
+
+        /// <summary>ks-koszt T10 (K4a): zaden blok zadnego okregu nie jest w przebudowie (Target &lt; 0 wszedzie).</summary>
+        private static bool K4NoTransition()
+        {
+            if (!SwCostFast) return false;
+            foreach (var ld in _live.Values)
+            {
+                if (ld == null || ld.B == null) continue;
+                foreach (var b in ld.B) if (b != null && b.Target >= 0) return false;
+            }
+            return true;
         }
         private static readonly List<string> _startNotes = new List<string>();
 

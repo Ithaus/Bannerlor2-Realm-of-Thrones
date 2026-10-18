@@ -400,6 +400,7 @@ namespace Armoury
             T0Lap(T0CCsv, tc);
             // KS-R3: gradient krain z Planu (cieply start, zapis) - tylko Plan bez bledu z krokiem 5
             if (r.Error == null && r.Grad != null) _grad = r.Grad;
+            T4Bump();                                             // ks-koszt T4: nowy Plan i gradient - pamiec progow od zera
         }
 
         private static string F2(double x) { return double.IsNaN(x) || double.IsInfinity(x) ? "-" : x.ToString("0.00", Inv); }
