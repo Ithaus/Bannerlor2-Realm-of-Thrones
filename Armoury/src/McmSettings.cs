@@ -7000,6 +7000,18 @@ namespace Armoury
         [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
         public bool KsLordFundsFood { get; set; } = true;
 
+        [SettingPropertyBool("Ks Consign Deposit", HintText = "with Ks Food Carts Consign: when a selling town has no more room to let food out on credit, the merchants of the buying town pay earnest money when the cart sets out - a share of what the load is worth at their own stall, only from gold above the floor of their reserve - and the seller carries only the rest on credit; on arrival the earnest money counts towards the price, anything paid in excess goes back (what the seller cannot repay at once becomes a bill he owes), and a cart that turns back returns it. The weekly plan counts the routes the same way. Gold only moves between the two towns - nothing is made or lost; off = the seller carries the whole load on credit or the cart does not go, as before")]
+        [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
+        public bool KsConsignDeposit { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Consign Deposit Share", 0.00f, 1.00f, "0.00", HintText = "with Ks Consign Deposit: the share of what the load is worth at the buying town's stall paid as earnest money when the cart sets out (0.5 = half now, half on arrival, as in a medieval grain contract)")]
+        [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
+        public float KsConsignDepositShare { get; set; } = 0.5f;
+
+        [SettingPropertyBool("Ks Corridors War Cut", HintText = "with Ks Corridors Credit: the weekly plan does not count a land route on which every town with food to spare is at war with every town that needs it - the merchants cannot trade across the war - instead of taking the nearest pair of towns of the two lands that are at peace, and it counts the sellers' credit on a route only from the towns that are at peace with the buyers; off = as before")]
+        [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
+        public bool KsCorridorsWarCut { get; set; } = true;
+
         [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: step by step over 60 days, up to about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool WhaleMeatFromWhalersOnly { get; set; } = true;
@@ -9109,6 +9121,9 @@ namespace Armoury
             s.KsHungerSecurityMax = KsHungerSecurityMax;
             s.KsHungerTolerance = KsHungerTolerance;
             s.KsLordFundsFood = KsLordFundsFood;
+            s.KsConsignDeposit = KsConsignDeposit;
+            s.KsConsignDepositShare = KsConsignDepositShare;
+            s.KsCorridorsWarCut = KsCorridorsWarCut;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;

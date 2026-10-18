@@ -16,6 +16,7 @@
     <Compile Include="../../../../Armoury/src/StartCalibration.Core.cs" />
     <Compile Include="../../../../Armoury/src/StartCalibration.Deliver.cs" />
     <Compile Include="../../../../Armoury/src/StartCalibration.Corridors.cs" />
+    <!-- recenzja ceny-r5: Core.cs potrzebuje Feed.cs i KsCheap.cs (od scalenia nocy 17/18.10); feed-swiat: takze Clear.cs -->
     <Compile Include="../../../../Armoury/src/StartCalibration.Feed.cs" />
     <Compile Include="../../../../Armoury/src/StartCalibration.Clear.cs" />
     <Compile Include="../../../../Armoury/src/KsCheap.cs" />

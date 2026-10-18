@@ -312,6 +312,8 @@ RANGES = {
     'KsConsignFloorShare': (0.0, 1.0, "0.00"),
     'KsConsignSourceExposure': (0.0, 1.0, "0.00"),
     'KsConsignOverdueDays': (1, 364, "0"),
+    # KS-R5 ceny-r5 (noc 17/18.10): zadatek kupcow celu - udzial przycinany w kodzie do 0..1 (KsFoodCarts.DepositShare)
+    'KsConsignDepositShare': (0.0, 1.0, "0.00"),
     # KS (16.10): premia mapy - kod przycina do 1.0..2.0 (StartCalibration.BuildInput)
     'StartCalibrationMapInertia': (1.0, 2.0, "0.00"),
     # ks-arm (noc 17/18.10): prog zapasu bramki krainy - kod przycina do 0..728 (StartCalibration.ReserveDaysKey)
