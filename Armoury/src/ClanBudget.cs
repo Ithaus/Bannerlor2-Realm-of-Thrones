@@ -768,6 +768,9 @@ namespace Armoury
                         // warunek co KW (wojna, G < R), miejsce w pulapie najwyzej 0.40 D w granicy limitu i nadwyzki ludu ponad poziom normalny; wyplata - brak do zoldu ponad
                         // pulap bez kredytu (kiesy ludu -> glowa); KW Banku dostaje reszte braku. Klucz FolkLoans wylaczony - 0 i budzet co do zlotowki jak dotad
                         double folkLent = 0;
+                        // f15 W5c: zold oplacony dzis gotowka skarbca dla srednich nie jest brakiem do pozyczki (KW Banku, od ludu, miejskiej) - ta sama zlotowka nie jest
+                        // pozyczana drugi raz; klucz CrownWarAidMiddle wylaczony albo rod bez W5c - 0 i pozyczki co do zlotowki jak dotad
+                        double midCash = !merc && !b.Zero ? KingdomTreasury.MidAidCashOf(c) : 0;
                         if (!merc && !b.Zero)
                         {
                             try
@@ -776,7 +779,7 @@ namespace Armoury
                                 if (fr > 0)
                                 {
                                     b.FolkRoom = fr; b.Cap += fr;
-                                    double gap0 = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow;
+                                    double gap0 = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - midCash;   // f15: bez zoldu oplaconego W5c (0 - jak dotad)
                                     if (gap0 >= 1) { folkLent = TownFolk.FolkLoanLend(c, Math.Min(gap0, fr)); b.FolkLent = (long)folkLent; }
                                 }
                             }
@@ -795,7 +798,7 @@ namespace Armoury
                                 if (tr > 0)
                                 {
                                     b.TownRoom = tr; b.Cap += tr;
-                                    double gapT = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent;
+                                    double gapT = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent - midCash;   // f15: bez zoldu oplaconego W5c (0 - jak dotad)
                                     if (gapT >= 1) { townLent = TownFolk.TownLoanLend(c, Math.Min(gapT, tr)); b.TownLent = (long)townLent; }
                                 }
                             }
@@ -810,7 +813,7 @@ namespace Armoury
                                 if (kw > 0)
                                 {
                                     b.KwRoom = kw; b.Cap += kw; _dKwRoom += (long)kw; _dKwRoomN++;
-                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent - townLent;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad); obieg2: bez czesci pozyczonej od ludu (0 - jak dotad); f8: bez czesci pozyczonej od rady (0 - jak dotad)
+                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent - townLent - midCash;   // f15: bez zoldu oplaconego W5c (0 - jak dotad); WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad); obieg2: bez czesci pozyczonej od ludu (0 - jak dotad); f8: bez czesci pozyczonej od rady (0 - jak dotad)
                                     if (gap >= 1)
                                     {
                                         int lent = DebtLadder.LendWar(c, (int)Math.Min(gap, kw));

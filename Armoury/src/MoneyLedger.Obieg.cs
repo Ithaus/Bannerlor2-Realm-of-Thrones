@@ -584,6 +584,7 @@ namespace Armoury
               .Append(", gotowka korony na zold druzyn ze skarbca ponad zapas wojny (W5b) ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: szczebel skarbca doplaty W5 (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn z tarczowego (W6) ").Append(KingdomTreasury.LastScutageOut)   // W6: szczebel tarczowego doplaty W5 (skarbce -> glowy rodow)
               .Append(", gotowka korony na zold druzyn z reszty wplywow przed rentami (M1) ").Append(KingdomTreasury.LastNeedAidRent)   // M1: czwarty szczebel W5 (skarbce -> glowy rodow)
+              .Append(KingdomTreasury.LastMidAid != 0 || (Settings.Current != null && Settings.Current.CrownWarAidMiddle) ? ", gotowka skarbca dla srednich na zold druzyn (W5c) " + KingdomTreasury.LastMidAid : "")   // f15 W5c: skarbce -> glowy rodow (klucz wylaczony i 0 - napis jak dotad)
               .Append(", stawka wojenna pana (W7) kiesy ludu i wsi -> glowy rodow ").Append(KingdomTreasury.LastLordLevy)   // W7: pobor z wlasnych lenn na zold druzyn
               .Append(" (z ludu ").Append(KingdomTreasury.LastLordLevyFolk).Append(", ze wsi ").Append(KingdomTreasury.LastLordLevyVill).Append(')')
               .Append(", podatek od nadwyzki ludu (kiesa2) kiesy ludu -> glowy rodow ").Append(TownFolk.LastHoardLord)   // kiesa2: przelew miedzy posiadaczami (kiesa ludu -> glowa)
@@ -665,6 +666,7 @@ namespace Armoury
               .Append(" i skarbce -> glowy rodow z doplata W5 ").Append(KingdomTreasury.LastScutageOut)
               .Append(", doplata ze skarbcow ponad zapas wojny (W5b) skarbce -> glowy rodow ").Append(KingdomTreasury.LastCrownSurplusAid)   // W5b regula 2: z zapasu skarbca, poza wplywami dnia
               .Append(", doplata z reszty wplywow dnia przed rentami (M1) skarbce -> glowy rodow ").Append(KingdomTreasury.LastNeedAidRent)   // M1: z wplywow dnia, przed rentami 180
+              .Append(KingdomTreasury.LastMidAid != 0 || (Settings.Current != null && Settings.Current.CrownWarAidMiddle) ? ", skarbiec dla srednich (W5c) skarbce ponad zapas wojny -> glowy rodow " + KingdomTreasury.LastMidAid : "")   // f15 W5c: z zapasu skarbca, poza wplywami dnia
               .Append(", chleb biedoty (M3) skarbce -> kiesy ludu ").Append(TownFolk.LastBreadCrown).Append(" i glowy rodow -> kiesy ludu ").Append(TownFolk.LastBreadLord)   // M3: przelew miedzy posiadaczami
               .Append(", dwor krolewski (E3-P1) skarbce -> kasy stolic ").Append(CourtGoods.LastCrown).Append(" (towar z polki; dwor pana za towar ").Append(CourtGoods.LastLord).Append(" - czesc wplaty dworu do kas siedzib)")   // E3-P1: przelew miedzy posiadaczami
               .Append("; skarbce razem ").Append(Dl(now, last, HKingdoms)).Append(", ponizej 0.5 mln: ").Append(kPoor).Append(" z ").Append(kAll)

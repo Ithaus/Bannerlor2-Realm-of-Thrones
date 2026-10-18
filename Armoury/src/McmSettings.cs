@@ -5912,6 +5912,10 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public int CrownSurplusAidDays { get; set; } = 30;
 
+        [SettingPropertyBool("Crown War Aid Middle", HintText = "in war the realm's treasury also helps the houses of modest means, not only the poor: above the crown's war aid by need (which keeps companies up to Crown War Aid Fill Target of their size), the treasury pays a share of the wages a house still lacks for its companies up to their full size - the whole lack while the house's gold is below its war reserve, a smaller share the richer the house, and nothing above twice the reserve (the same measure of need as the wage refund and the fief rents). Paid only from what the treasury holds above its war reserve and its debts, together with Crown Surplus Feeds Need Aid never more in a day than one part in Crown Surplus Aid Days of that surplus; coin only for men already in the companies, and room in the wage ceiling to recruit a step more. Never in peace, never to a house with spare room under its own ceiling or that paid scutage that day, and these wages are not repaid by the crown a second time. Your house the same way. Needs Crown Surplus Feeds Need Aid. Off = the crown helps only up to Crown War Aid Fill Target, as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool CrownWarAidMiddle { get; set; } = true;
+
         [SettingPropertyBool("Lord War Levy", HintText = "in war a lord whose own wage ceiling cannot keep his field companies up to Crown War Aid Fill Target of their size, and whom the crown's war aid by need (the people's war aid, the spare treasure and the shield money) did not fully help that day, raises a war levy in his own towns, castles and villages: up to Lord War Levy Rate a day of the coin the townsfolk, castle folk and villagers still hold above their reserve after the crown's war aid and war subsidy. The coin goes to his purse for the wages of the men already in his companies and raises his wage ceiling by as much; for men he has yet to recruit he gets only room in his ceiling, as with the crown's aid. Never more than the house still lacks, never from the reserve, never in peace, and these wages are not repaid by the crown a second time. Each fief pays in loyalty and prosperity in proportion to how hard it is taxed; a town or castle with loyalty under Lord War Levy Min Loyalty, in revolt or under siege pays nothing (nor do its villages), nor does a looted village. Not your house - see Player War Levy. Needs Crown War Aid By Need and the people's purses (Town Folk Live). Off = no war levy, as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool LordWarLevy { get; set; } = true;
@@ -9341,6 +9345,7 @@ namespace Armoury
             s.NeedAidFromRents = NeedAidFromRents;
             s.CrownSurplusFeedsNeedAid = CrownSurplusFeedsNeedAid;
             s.CrownSurplusAidDays = CrownSurplusAidDays;
+            s.CrownWarAidMiddle = CrownWarAidMiddle;
             s.LordWarLevy = LordWarLevy;
             s.PlayerWarLevy = PlayerWarLevy;
             s.LordWarLevyRate = LordWarLevyRate;
