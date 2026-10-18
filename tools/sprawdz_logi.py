@@ -903,9 +903,11 @@ Uzycie (Python 3, tylko odczyt):
                     f4b-perf (noc 17/18.10, klucze PerfSutlerWageExact, PerfProbeEachPlace - segment "kontrola dokladnosci (f4b-perf)" linii doby): NPERF-4b zold
                     markietanow tylko pewny: losowanie w probce 0 (straznik generatora gry), straznik losowania CZYNNY (BRAK - INFO: sam warunek bohaterow),
                     partie z bohaterem poza wodzem i z losowaniem bez pamieci (INFO z udzialem); NPERF-11b probki hakow osobno na miejsce: kazde miejsce z
-                    >= 128 wywolaniami ma >= 1 probke (wspolny licznik perf-d2d3 trafial zawsze w rade TownBase); NPERF-12 rozjazdy KAZDEJ pamieci i skrotu
+                    >= 128 wywolaniami w dobach z kluczem [WL] ma >= 1 probke (wspolny licznik perf-d2d3 trafial zawsze w rade TownBase; klucz [wyl] we
+                    wszystkich dobach - INFO, wspolny licznik jak dotad); NPERF-12 rozjazdy KAZDEJ pamieci i skrotu
                     perf-d2d3 osobno (spis VS bohaterowie i rostery, zold markietanow, 4 haki podatku miast, zachowanie BK z pamieci, rada przy pominietym
-                    ciele BK): rozjazdow 0 w kazdej, miejsce z wywolaniami bez probek - NIE (log bez liczby wywolan - INFO). Log bez segmentu f4b-perf: INFO.
+                    ciele BK): rozjazdow 0 w kazdej, miejsce z wywolaniami bez probek przy kluczu [WL] - NIE (log bez liczby wywolan albo klucz
+                    PerfProbeEachPlace [wyl] - INFO). Log bez segmentu f4b-perf: INFO.
 --grupa nmisje    : (noc 15/16.10, bledy misji z sesji Jeffa 15.10; galaz w-toku/noc-misje, MissionTeams.cs) python -I tools/sprawdz_logi.py
                     --grupa nmisje <Armoury-*.log> (log czytany strumieniowo). Druzyny w misji i ucieczka rannych tylko w bitwie: NM-0 linia startu
                     (klucz WoundedFleeBattlesOnly TAK), NM-1 ERROR in HideoutAlarm / BrokenMen / FleeTheField / GuardMaster.Tick / BattlefieldLaw.CountKill 0,
@@ -31164,12 +31166,19 @@ def _npf_f4b(rep, days):
         guard = ex[-1]["guard"]; key = ex[-1]["key"]
         parts_bad = sum(1 for x in ex if int(x["first"]) != int(x["sure"]) + int(x["hero"]) + int(x["drew"]))   # tozsamosc: pierwsze = z pamiecia + bohater + losowanie
         share = f" ({100.0 * (hero + drew) / first:.1f}% partii)" if first else ""
+        # werdykt (recenzja f4b-perf): losowanie w probce albo czesci != calosc - NIE; straznik BRAK/nieuzyty przy pierwszych liczeniach - INFO (bezpieczny
+        # odwrot: pamiec tylko z warunkiem bohaterow, wynik pamieci sprawdza NPERF-4), zgodnie z progiem i opisem grupy; klucz [wyl] - INFO (liczniki puste)
+        if key == "[WL]":
+            v4b = False if (pdrew or parts_bad) else (True if (guard == "CZYNNY" or first == 0) else None)
+        else:
+            v4b = False if parts_bad else None
         rep.add("NPERF-4b: zold markietanow tylko pewny (PerfSutlerWageExact) - losowanie w probce i straznik",
                 f"klucz {key}; pierwszych liczen {first}, z pamiecia {sure}, bez pamieci {hero + drew}{share}: bohater poza wodzem (zold BK losowany) {hero}, "
                 f"losowanie przy liczeniu {drew}; odczytow liczonych jak dotad {raw}; losowanie w probce {pdrew}; bez straznika {nog}; straznik losowania {guard}; "
-                f"pierwsze != z pamiecia + bohater + losowanie w {parts_bad} dobach",
+                f"pierwsze != z pamiecia + bohater + losowanie w {parts_bad} dobach"
+                + ("; straznik niedostepny - pamiec tylko z warunkiem bohaterow (wynik pamieci sprawdza NPERF-4)" if (key == "[WL]" and v4b is None) else ""),
                 "losowanie w probce 0; czesci = calosc; straznik CZYNNY (BRAK/nieuzyty - INFO: decyduje sam warunek bohaterow); bez pamieci - INFO",
-                (pdrew == 0 and parts_bad == 0 and (guard == "CZYNNY" or first == 0)) if key == "[WL]" else (parts_bad == 0 if parts_bad else None))
+                v4b)
     else:
         rep.add("NPERF-4b: zold markietanow tylko pewny (PerfSutlerWageExact)", "brak segmentu 'kontrola dokladnosci (f4b-perf)' w liniach doby",
                 "INFO (log sprzed f4b-perf - pamiec zoldu dla kazdej partii, takze z losowanym zoldem BK)", None)
@@ -31183,20 +31192,43 @@ def _npf_f4b(rep, days):
             k = mm.group("name").strip()
             a = per.setdefault(k, [0, 0])
             a[0] += int(mm.group("p")); a[1] += int(mm.group("d"))
+    # recenzja f4b-perf: wywolania i probki liczone osobno dla dob z kluczem PerfProbeEachPlace [WL] (licznik na miejsce) - przy [wyl] wspolny licznik 1/64
+    # jak w perf-d2d3 trafia zawsze w rade TownBase, wiec miejsca bez probek sa oczekiwane (INFO, nie NIE); PerfD2 liczy wywolania przy kazdym kluczu
     calls, each_days, each_key = {}, 0, None
+    calls_on, per_on, on_days, off_days = {}, {}, 0, 0
     for g in days:
         e = g.get("each")
         if not e:
             continue
         each_days += 1; each_key = e["key"]
+        on = e["key"] == "[WL]"
+        if on:
+            on_days += 1
+        else:
+            off_days += 1
         for k, v in e["calls"].items():
             calls[k] = calls.get(k, 0) + v
-    if each_days:
-        low = [k for k in NPF_SITES if calls.get(k, 0) >= NPF_EACH_MIN and per.get(k, [0, 0])[0] == 0]
+            if on:
+                calls_on[k] = calls_on.get(k, 0) + v
+        fx = g.get("fast")
+        if on and fx:
+            for mm in NPF_FAST_SITE.finditer(fx["sites"]):
+                a = per_on.setdefault(mm.group("name").strip(), [0, 0])
+                a[0] += int(mm.group("p")); a[1] += int(mm.group("d"))
+    low = [k for k in NPF_SITES if calls_on.get(k, 0) >= NPF_EACH_MIN and per_on.get(k, [0, 0])[0] == 0]   # niesprawdzane przy kluczu [WL]
+    if on_days:
+        keytxt = each_key if not off_days else f"mieszany ([WL] {on_days} dob, [wyl] {off_days} dob - liczone doby [WL])"
         rep.add("NPERF-11b: probki hakow podatku miast osobno na miejsce (PerfProbeEachPlace) - kazde wolane miejsce sprawdzone",
-                f"klucz {each_key}; " + ", ".join(f"{k}: wywolan {calls.get(k, 0)}, probek {per.get(k, [0, 0])[0]}" for k in NPF_SITES)
+                f"klucz {keytxt}; " + ", ".join(f"{k}: wywolan {calls_on.get(k, 0)}, probek {per_on.get(k, [0, 0])[0]}" for k in NPF_SITES)
                 + (f"; bez probek przy >= {NPF_EACH_MIN} wywolaniach: {', '.join(low)}" if low else ""),
-                f"miejsce z >= {NPF_EACH_MIN} wywolaniami ma >= 1 probke", not low)
+                f"miejsce z >= {NPF_EACH_MIN} wywolaniami (doby z kluczem [WL]) ma >= 1 probke", not low)
+    elif each_days:
+        zero = [k for k in NPF_SITES if calls.get(k, 0) >= NPF_EACH_MIN and per.get(k, [0, 0])[0] == 0]
+        rep.add("NPERF-11b: probki hakow podatku miast osobno na miejsce (PerfProbeEachPlace)",
+                f"klucz [wyl] we wszystkich {off_days} dobach - wspolny licznik 1/64 jak w perf-d2d3; "
+                + ", ".join(f"{k}: wywolan {calls.get(k, 0)}, probek {per.get(k, [0, 0])[0]}" for k in NPF_SITES)
+                + (f"; bez probek (oczekiwane przy wspolnym liczniku): {', '.join(zero)}" if zero else ""),
+                "INFO (klucz wylaczony - stara droga probek perf-d2d3, miejsca bez probek oczekiwane)", None)
     elif per:
         zero = [k for k in NPF_SITES if k in per and per[k][0] == 0]
         rep.add("NPERF-11b: probki hakow podatku miast osobno na miejsce", "brak liczby wywolan miejsc w liniach doby"
@@ -31224,11 +31256,13 @@ def _npf_f4b(rep, days):
         items.append(f"hak {k} {p_}/{d_}" + (f" (wywolan {c_})" if c_ is not None else ""))
         if d_:
             bad.append(k)
+        elif k in low:
+            bad.append(k + " - niesprawdzane")   # klucz [WL], >= 128 wywolan, probek 0
         elif p_ == 0:
             if c_ is None:
                 unk.append(k)
             elif c_ >= NPF_EACH_MIN:
-                bad.append(k + " - niesprawdzane")
+                unk.append(k + " (PerfProbeEachPlace [wyl] - wspolny licznik)")
     tx = [g["tax"] for g in days]
     su = sum(int(t["su"]) for t in tx); pu = sum(int(t["pu"]) for t in tx); sk = sum(int(t["skip"]) for t in tx); pr = sum(int(t["probe"]) for t in tx)
     items.append(f"podatek miast - cialo BK pominiete: rada niepokryta przy pominieciu {su} / w probkach {pu} (pominiec {sk}, probek {pr})")
@@ -31236,8 +31270,8 @@ def _npf_f4b(rep, days):
         bad.append("podatek miast (rada niepokryta)")
     verdict = False if bad else (None if unk else True)
     rep.add("NPERF-12: rozjazdy kazdej pamieci i skrotu perf-d2d3 osobno (probek/rozjazdow)",
-            "; ".join(items) + (f" | ROZJAZD/NIESPRAWDZANE: {', '.join(bad)}" if bad else "") + (f" | bez liczby wywolan, probek 0: {', '.join(unk)}" if unk else ""),
-            "rozjazdow 0 w kazdej; miejsce z wywolaniami ma probki (log bez liczby wywolan, probek 0 - INFO)", verdict)
+            "; ".join(items) + (f" | ROZJAZD/NIESPRAWDZANE: {', '.join(bad)}" if bad else "") + (f" | probek 0 bez dowodu wywolan (log bez liczby wywolan albo PerfProbeEachPlace [wyl]): {', '.join(unk)}" if unk else ""),
+            "rozjazdow 0 w kazdej; miejsce z >= 128 wywolaniami przy PerfProbeEachPlace [WL] ma probki (log bez liczby wywolan albo klucz [wyl], probek 0 - INFO)", verdict)
 
 
 def nperf_main(logp, csp=None, bdp=None):
