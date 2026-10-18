@@ -606,6 +606,7 @@ namespace Armoury
             Log.Info(sb.ToString());
             try { Log.Info(RampLine(day)); } catch (Exception e) { Stumble("RampLine", e); }
             try { Log.Info(Zc4Line(day)); } catch (Exception e) { Stumble("Zc4Line", e); }
+            try { string kl = CheapLine(day); if (kl != null) Log.Info(kl); } catch (Exception e) { Stumble("CheapLine", e); }   // r4-koszyk: drabina tanszego koszyka (gra)
             try { string cl = CraftsLine(day); if (cl != null) Log.Info(cl); } catch (Exception e) { Stumble("CraftsLine", e); }
         }
         private static int _zcStale; private static bool _undoLogged;

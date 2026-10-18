@@ -282,6 +282,7 @@ namespace Armoury
             if (r == null || r.TownPaid == null || r.TownPaid.Count == 0) return;
             if (_state == StateApplied && (!r.MoneyMeasured || _wEma < MinLedgerDays)) return;
             _townPaid = new Dictionary<string, float[]>(r.TownPaid, StringComparer.Ordinal);
+            _townExtra = new Dictionary<string, float[]>(r.TownExtra ?? new Dictionary<string, float[]>(), StringComparer.Ordinal);   // r4-koszyk: dokupiona podstawa (ten sam Plan)
         }
 
         private static string P1(double x) { return double.IsNaN(x) || double.IsInfinity(x) ? "-" : x.ToString("0.0", Inv); }
@@ -346,6 +347,7 @@ namespace Armoury
             sb.Append(" | praca domowa razem ").Append((r.HomeWorkLabour / 1e6).ToString("0.00", Inv)).Append(" mln rak (te same rece i ziemia, nigdy na targ)")
               .Append(" | utarg wozow i podatek panow od niego ida za sprzedaza wsi na targ (wyzej: mniej o ... wobec tych samych zajec bez pracy domowej).");
             Log.Info(sb.ToString());
+            try { P9Line(r); } catch (Exception e) { Stumble("P9Line", e); }   // r4-koszyk: podzial P9 koszyka klas miast (kcal jedzenia / rzeczy), sklad kcal, dokupiona podstawa
             var ub = new StringBuilder(1500);
             ub.Append(PK).Append("koszyk niezaplacony (plan doba ").Append(_wDay).Append(", szt. gry/d; wsie - robione w domu, miasta - odpada z popytu):");
             double sigma = Math.Max(1, DailyLife.KsSigma);

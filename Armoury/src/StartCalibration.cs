@@ -93,6 +93,8 @@ namespace Armoury
             CraftsReset();
             MoneyReset();
             R3Reset();
+            CheapReset();          // r4-koszyk: dokupiona podstawa z Planu i liczniki drabiny tanszego koszyka
+            KsWageHands.Reset();   // r4-koszyk: wskazniki plac za brak rak (pamiec i zapis arm_ks_koszyk)
         }
 
         private static void Stumble(string where, Exception e)

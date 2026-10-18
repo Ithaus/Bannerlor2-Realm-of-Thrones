@@ -939,7 +939,8 @@ Uzycie (Python 3, tylko odczyt):
                     <= 30 s, NKS-3 bilans Planu, NKS-4 linia produkcji co dobe, NKS-5 podaz/zuzycie NA RYNEK (linia "KS: rynki") w oknie KS-M D+22..D+49 0.95-1.05
                     (towary rak z miesem; 5b wyjatki +-10% Planu; 5e pierwszy tydzien po rampie D+14..D+21; 5u zuzycie bez rynku <= 2%; 5c przetwory, 5w swiat,
                     5d 28 dob po wlaczeniu - INFO), NKS-3 NA TARG ((podaz - zjedzone w okregach) / (popyt - zjedzone), recenzja 17.10), NKS-3c pieniadze
-                    Planu (krok 8: R i P >= 95%, punkt staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru), NKS-6 zapasy miast rynku +-2%
+                    Planu (krok 8: R i P >= 95% - od r4-koszyk wedlug P9: kcal JEDZENIA z linii "KS: tanszy koszyk miast (P9)", rzeczy INFO; log bez linii P9 - wartosc koszyka; punkt
+                    staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru), NKS-6 zapasy miast rynku +-2%
                     zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
                     pieniadze (KS 0; 8b swiat wobec bazy +-0.5%; 8c koszyk niekupiony z braku pieniedzy: miasta <= 5%, wsie - kcal bez pokrycia (niekupione i nie robione
                     w domu) <= 5%; 8d reszta - INFO; 8e utarg wozow i podatek panow przed wlaczeniem i w oknie - INFO), NKS-7e kontrola wczesna D+7, NKS-9 doba KS <= 3 ms (9b z hakami ZC4/ZC5
@@ -963,6 +964,14 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
+--grupa nkoszyk   : (r4-koszyk, noc 17/18.10; Jeff 17.10 "Tanszy koszyk" i "Poprawka 2 - tak", STAN-PRAC ### 72 i ### 82, PLAN-KS-RUNDA4 rozdz. 4 P9; Armoury/src/KsCheapBasket.cs,
+                    KsWageHands.cs; klucze Ks Cheap Basket, Ks Wage By Hands) python -I tools/sprawdz_logi.py --grupa nkoszyk <Armoury-*.log> [--do-doby 120] (strumieniowo).
+                    NKO-0 linie paczki (INFO), NKO-1 (P9) klasy R i P miast - kcal jedzenia kupione >= 95% na obu rynkach (linia "KS: tanszy koszyk miast (P9)" ostatniego Planu),
+                    NKO-2 sklad kcal kupione R/P Essos/Westeros (zboze/bialko/napoje/reszta) wobec koszyka i dokupiona podstawa (INFO), NKO-3 rzeczy zaplacone (INFO - P9), NKO-4 straznik
+                    "stara drabina lepsza w kcal" (INFO), NKO-5 drabina w grze - kcal kupione >= 95% potrzebnych w miasto-dobach drabiny (bez drabiny INFO), NKO-6 tozsamosc drabiny
+                    (budzet = wydane + niewydane, wydane <= budzet, +-2 zl), NKO-7 dokupiona podstawa Planu w popycie miast (INFO), NKO-8 potkniecia 0, NKO-9 place: zaplacone z kas =
+                    przyjete w kiesach kazdej doby (roznica 0), NKO-10 wskaznik plac w [1, sufit], NKO-11 krok miasta miedzy dobami <= krok tygodnia, NKO-12 wskaznik wedlug miast i udzial
+                    plac ponad stawke (INFO), NKO-13 potkniecia 0, NKO-14 ERROR paczki 0. Brak linii (log sprzed r4-koszyk) = INFO, nigdy wyjatek.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -33935,6 +33944,195 @@ def _ds_f3_seen(logp):
     return False
 
 
+# r4-koszyk (noc 17/18.10): tanszy koszyk (KsCheapBasket.cs) i place za brak rak (KsWageHands.cs) - linie dzienne gry
+NKO_CH = re.compile(r"Tanszy koszyk \(r4-koszyk\): dzien (?P<day>-?\d+) \| klucz Ks Cheap Basket (?P<key>TAK|NIE)")
+NKO_CHMK = re.compile(r"(?P<mk>Westeros|Essos): drabina w (?P<n>\d+) miasto-dobach \(bez podstawy na polce - stara drabina (?P<old>\d+)\), kcal jedzenia kupione (?P<k>[\d.]+|-)% potrzebnych, "
+                      r"budzet (?P<b>-?\d+|-) zl = wydane (?P<sp>-?\d+|-) \+ niewydane (?P<un>-?\d+|-) zl \(wydane: zboze i ryby \(podstawa\) (?P<g0>-?\d+|-), bialko (?P<g1>-?\d+|-), "
+                      r"napoje (?P<g2>-?\d+|-), reszta (?P<g3>-?\d+|-); podstawa ponad koszyk (?P<x>-?\d+|-) zl; niekupione: bialko (?P<c1>-?\d+|-), napoje (?P<c2>-?\d+|-), reszta (?P<c3>-?\d+|-)\)")
+NKO_STUM = re.compile(r"\| potkniecia (?P<s>\d+)\.\s*$")
+NKO_PLANX = re.compile(r"\| Plan: dokupiona podstawa w popycie miast \(szt\./d przy lambdzie\) w (?P<n>\d+) miastach:(?P<x>[^|]*)")
+NKO_WG = re.compile(r"Place za brak rak \(r4-koszyk\): dzien (?P<day>-?\d+) \| klucz Ks Wage By Hands (?P<key>TAK|NIE), krok (?P<step>[\d.]+)%/7 dob, sufit x(?P<max>[\d.]+) \| miasta z KS (?P<n>\d+), "
+                    r"decyzja tygodnia dnia (?P<dd>-?\d+): brak rak (?P<sh>\d+) \(wolne rece regionu a >= f (?P<shf>\d+), przetwory ZC5 zajete >= 90% (?P<shc>\d+)\), duzo wolnych rak (?P<sl>\d+), "
+                    r"bez zmiany (?P<ho>\d+) \| wskaznik plac min (?P<mn>[\d.]+) / mediana (?P<md>[\d.]+) / max (?P<mx>[\d.]+), miasta > 1: (?P<up>\d+)(?: \((?P<list>[^)]*)\))? \| "
+                    r"doba: kasy miast zaplacily robocizne i doplate (?P<paid>-?\d+) zl, kiesy ludu przyjely (?P<recv>-?\d+) zl \(roznica (?P<diff>-?\d+)\), z tego ponad stawke \(place za brak rak\) "
+                    r"(?P<ex>-?\d+) zl w (?P<exn>\d+) miastach \(miast z placami (?P<tn>\d+)\) \| potkniecia (?P<st>\d+)")
+NKO_ERR = ("ERROR in KsWageHands", "ERROR in StartCalibration.Zc4LadderCheap", "ERROR in StartCalibration.CheapLine", "ERROR in StartCalibration.P9Line")
+
+
+def nkoszyk_main(logp, until=120):
+    """nkoszyk (r4-koszyk, noc 17/18.10; Jeff 17.10 "Tanszy koszyk" + "Poprawka 2 - tak"; Armoury/src/KsCheapBasket.cs, KsWageHands.cs): progi paczki - patrz docstring modulu."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NKO-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    p9, ch, wg, errs = {}, {}, {}, 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NKO_ERR):
+                errs += 1
+                continue
+            if s.startswith("KS: tanszy koszyk miast"):
+                r9 = p9_parse(s)
+                if r9:
+                    p9[r9[0]] = (r9[1], r9[2])
+                continue
+            if s.startswith("Tanszy koszyk (r4-koszyk): dzien "):
+                mm = NKO_CH.match(s)
+                if mm:
+                    d = int(mm.group("day"))
+                    dd = {"key": mm.group("key"), "mk": {x.group("mk"): x.groupdict() for x in NKO_CHMK.finditer(s)}}
+                    st = NKO_STUM.search(s)
+                    dd["stum"] = int(st.group("s")) if st else 0
+                    px = NKO_PLANX.search(s)
+                    dd["planx"] = (int(px.group("n")), px.group("x").strip()) if px else None
+                    ch[d] = dd
+                continue
+            if s.startswith("Place za brak rak (r4-koszyk): dzien "):
+                mm = NKO_WG.match(s)
+                if mm:
+                    wg[int(mm.group("day"))] = mm.groupdict()
+                continue
+    # NKO-0 linie
+    rep.add("NKO-0: linie paczki (P9 Planu, tanszy koszyk w grze, place za brak rak)",
+            f"P9 {len(p9)} Planow, tanszy koszyk {len(ch)} dob, place {len(wg)} dob", "INFO (BRAK - log sprzed r4-koszyk albo KS niezastosowane)", None)
+    # NKO-1 / NKS-3c P9: R i P - kcal jedzenia >= 95% (ostatni Plan)
+    if p9:
+        d9 = max(p9)
+        key9, v9 = p9[d9]
+        bad, inf = [], []
+        for mk in ("Westeros", "Essos"):
+            c9 = v9.get(mk) or {}
+            for cl in ("R", "P"):
+                k = (c9.get(cl) or {}).get("k", "-")
+                try:
+                    if float(k) < 95.0:
+                        bad.append(f"{mk} {cl} {float(k):.1f}%")
+                except ValueError:
+                    bad.append(f"{mk} {cl} brak")
+            inf.append(f"{mk} W/R/P kcal " + "/".join(f"{(c9.get(c) or {}).get('k', '-')}" for c in ("W", "R", "P")) + "%")
+        rep.add("NKO-1 (P9): klasy R i P miast - kcal jedzenia kupione (Plan)", f"plan doba {d9}, klucz {key9}: " + "; ".join(inf) + (f" | poza progiem: {', '.join(bad)}" if bad else ""),
+                "R i P >= 95% kcal jedzenia na obu rynkach", len(bad) == 0)
+        comp, goods, old = [], [], []
+        for mk in ("Westeros", "Essos"):
+            c9 = v9.get(mk) or {}
+            for cl in ("R", "P"):
+                x = c9.get(cl) or {}
+                comp.append(f"{mk} {cl} {x.get('sk', '-')} (koszyk {x.get('sn', '-')})")
+                goods.append(f"{mk} {cl} {x.get('g', '-')}%")
+                try:
+                    old.append(int(x.get("old", "0") or 0))
+                except ValueError:
+                    old.append(0)
+            comp.append(f"{mk} dokupiona podstawa: {v9.get(mk + '_x', '-')}")
+        rep.add("NKO-2: sklad kcal kupione R/P (zboze/bialko/napoje/reszta %)", "; ".join(comp), "INFO (koszyk biednych Essos i Westeros)", None)
+        rep.add("NKO-3: rzeczy zaplacone R/P (Plan)", ", ".join(goods), "INFO (P9: rzeczy poza progiem)", None)
+        rep.add("NKO-4: straznik - stara drabina lepsza w kcal (klasy-miasta)", str(sum(old)), "INFO (0 oczekiwane; > 0 - ceny, przy ktorych zboze nie jest najtansze)", None)
+    else:
+        rep.add("NKO-1 (P9): klasy R i P miast - kcal jedzenia kupione (Plan)", "BRAK linii 'KS: tanszy koszyk miast (P9)'", "R i P >= 95% kcal jedzenia", None)
+    # NKO-5..8 drabina w grze
+    d0 = min(ch) if ch else 0
+    days = sorted(d for d in ch if until is None or d - d0 + 1 <= until)
+    if days:
+        tot = {"Westeros": [0, 0.0, 0, 0, 0, 0, 0, 0], "Essos": [0, 0.0, 0, 0, 0, 0, 0, 0]}
+        badid, stum = [], 0
+        for d in days:
+            stum += ch[d]["stum"]
+            for mk, x in ch[d]["mk"].items():
+                t = tot[mk]
+                n = int(x["n"])
+                t[0] += n
+                t[3] += int(x["old"])
+                try:
+                    k = float(x["k"])
+                except ValueError:
+                    k = None
+                try:
+                    b, sp, un = int(x["b"]), int(x["sp"]), int(x["un"])
+                except ValueError:
+                    b = sp = un = None
+                if b is not None:
+                    t[4] += b
+                    t[5] += sp
+                    t[6] += un
+                    try:
+                        t[7] += int(x["x"])
+                    except ValueError:
+                        pass
+                    if abs(b - sp - un) > 2 or sp > b + 2:
+                        badid.append(f"d{d} {mk} {b}!={sp}+{un}")
+                if k is not None and n > 0:
+                    t[1] += k * n
+                    t[2] += n
+        inf, bad = [], []
+        for mk in ("Westeros", "Essos"):
+            t = tot[mk]
+            if t[2] > 0:
+                kk = t[1] / t[2]
+                inf.append(f"{mk} {t[0]} miasto-dob, kcal {kk:.1f}% (srednia), stara drabina {t[3]}, wydane {t[5]} z {t[4]} zl, podstawa ponad koszyk {t[7]} zl")
+                if kk < 95.0:
+                    bad.append(f"{mk} {kk:.1f}%")
+            else:
+                inf.append(f"{mk} bez miasto-dob drabiny")
+        anyn = tot["Westeros"][2] + tot["Essos"][2] > 0
+        rep.add("NKO-5: drabina w grze - kcal jedzenia kupione w miastach, ktorych nie stac na koszyk", "; ".join(inf) + (f" | ponizej: {', '.join(bad)}" if bad else ""),
+                "kcal >= 95% potrzebnych (srednia miasto-dob; bez drabiny - INFO)", (len(bad) == 0) if anyn else None)
+        rep.add("NKO-6: tozsamosc drabiny (budzet = wydane + niewydane, wydane <= budzet)", f"{len(days)} dob, odstepstw {len(badid)}" + (f" ({', '.join(badid[:5])})" if badid else ""),
+                "0 odstepstw (+-2 zl zaokraglenia)", len(badid) == 0)
+        px = [ch[d]["planx"] for d in days if ch[d]["planx"]]
+        rep.add("NKO-7: dokupiona podstawa z Planu w popycie miast (ostatnia doba)", f"{px[-1][0]} miast: {px[-1][1]}" if px else "-", "INFO", None)
+        rep.add("NKO-8: potkniecia linii tanszego koszyka", str(stum), "0", stum == 0)
+    else:
+        rep.add("NKO-5: drabina w grze", "BRAK linii 'Tanszy koszyk (r4-koszyk)'", "kcal >= 95%", None)
+    # NKO-9..13 place za brak rak
+    wd = sorted(wg)
+    if wd:
+        badid, badb, badstep, stum, ex, paid = [], [], [], 0, 0, 0
+        prev = None
+        for d in wd:
+            x = wg[d]
+            stum += int(x["st"])
+            if int(x["diff"]) != 0 or int(x["paid"]) != int(x["recv"]):
+                badid.append(f"d{d} {x['paid']}/{x['recv']}")
+            mx, mn, cap = float(x["mx"]), float(x["mn"]), float(x["max"])
+            if mn < 0.9995 or mx > cap + 0.0015:
+                badb.append(f"d{d} {mn:.3f}-{mx:.3f} (sufit {cap:.2f})")
+            cur = {}
+            for it in (x.get("list") or "").split(", "):
+                q = it.rsplit(" ", 1)
+                if len(q) == 2:
+                    try:
+                        cur[q[0]] = float(q[1])
+                    except ValueError:
+                        pass
+            if prev is not None:
+                stp = float(x["step"]) / 100.0
+                for nm, v in cur.items():
+                    if nm in prev and abs(v - prev[nm]) > prev[nm] * stp + 0.0015:
+                        badstep.append(f"d{d} {nm} {prev[nm]:.3f}->{v:.3f}")
+            prev = cur
+            ex += int(x["ex"])
+            paid += int(x["paid"])
+        last = wg[wd[-1]]
+        rep.add("NKO-9: place - zaplacone z kas = przyjete w kiesach (kazda doba)", f"{len(wd)} dob, odstepstw {len(badid)}" + (f" ({', '.join(badid[:5])})" if badid else ""),
+                "roznica 0", len(badid) == 0)
+        rep.add("NKO-10: wskaznik plac w granicach [1, sufit]", f"{len(wd)} dob, poza {len(badb)}" + (f" ({', '.join(badb[:5])})" if badb else ""), "1.0 <= wskaznik <= sufit", len(badb) == 0)
+        rep.add("NKO-11: krok wskaznika miasta miedzy dobami <= krok tygodnia", f"zmian ponad krok {len(badstep)}" + (f" ({', '.join(badstep[:5])})" if badstep else ""),
+                "<= krok (miasta z lista > 1)", len(badstep) == 0)
+        rep.add("NKO-12: wskaznik plac wedlug miast (ostatnia doba)",
+                f"dzien {wd[-1]}, klucz {last['key']}, miasta z KS {last['n']}, decyzja dnia {last['dd']}: brak rak {last['sh']} (wolne rece {last['shf']}, ZC5 {last['shc']}), "
+                f"duzo wolnych rak {last['sl']}, bez zmiany {last['ho']}; min/mediana/max {last['mn']}/{last['md']}/{last['mx']}, > 1: {last['up']} ({last.get('list') or '-'}); "
+                f"ponad stawke razem {ex} zl z {paid} zl plac ({(100.0 * ex / paid) if paid else 0:.2f}%)", "INFO", None)
+        rep.add("NKO-13: potkniecia linii plac", str(stum), "0", stum == 0)
+    else:
+        rep.add("NKO-9: place za brak rak", "BRAK linii 'Place za brak rak (r4-koszyk)'", "zaplacone = przyjete", None)
+    rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line)", str(errs), "0", errs == 0)
+    rep.show()
+    return 0
+
+
 def nds_main(logp, bdp=None, until=120):
     """nds (17.10; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md rozdz. 3, 9, 14; galaz w-toku/noc-ds: Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs, BkSeal34.cs).
     Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log biegu bez DS z tego samego zapisu> (odniesienie korony, D stalego, Banku, kosztu, reszty bilansu).
@@ -34263,6 +34461,28 @@ NKS_ZC4HOOK = re.compile(r"czas hakow od ostatniej linii: .*?razem (?P<ms>[\d.]+
 NKS_ZC4PURSE = re.compile(r"kiesy wsi zastosowanych razem (?P<g>-?\d+) zl")
 NKS_MONEY8 = re.compile(r"KS: pieniadze planu \(krok 8\) doba (?P<day>-?\d+) \| rund punktu stalego (?P<it>\d+)"
                         r"(?:, zbiezny Westeros (?P<cw>TAK|NIE)[^,]*, Essos (?P<ce>TAK|NIE)[^|]*\| z pomiaru (?P<meas>TAK|NIE))?")
+# r4-koszyk (noc 17/18.10, P9): linia "KS: tanszy koszyk miast (P9, r4-koszyk) plan doba N" - klasy miast: kcal jedzenia i rzeczy zaplacone, sklad kcal, stara drabina lepsza
+NKS_P9 = re.compile(r"KS: tanszy koszyk miast \(P9, r4-koszyk\) plan doba (?P<day>-?\d+) \| klucz Ks Cheap Basket (?P<key>TAK|NIE)")
+NKS_P9CL = re.compile(r"(?P<c>[WRP]) kcal jedzenia (?P<k>[\d.]+|-)%, rzeczy (?P<g>[\d.]+|-)%, sklad kcal kupione/koszyk \(zboze/bialko/napoje/reszta\) (?P<sk>[\d/-]+) vs (?P<sn>[\d/-]+)%, "
+                      r"stara drabina lepsza (?P<old>\d+)")
+NKS_P9X = re.compile(r"dokupiona podstawa \(szt\. gry/d\):(?P<x>[^|;]*)")
+
+
+def p9_parse(s):
+    """Linia P9 -> (doba, klucz, {rynek: {klasa: dict}, rynek + '_x': tekst dokupionej podstawy}) albo None."""
+    mm = NKS_P9.match(s)
+    if not mm:
+        return None
+    out = {}
+    for seg in s.split(" | ")[1:]:
+        for mk in ("Westeros", "Essos"):
+            if seg.startswith(mk + ":"):
+                out[mk] = {c.group("c"): c.groupdict() for c in NKS_P9CL.finditer(seg)}
+                mx = NKS_P9X.search(seg)
+                out[mk + "_x"] = mx.group("x").strip() if mx else "-"
+    return int(mm.group("day")), mm.group("key"), out
+
+
 # recenzja 17.10: linia pieniedzy Planu - sprzedaz wsi w wartosci bazowej (z konmi; bez pracy domowej), alfa okregow, kcal koszyka (niezaplacone / robione w domu / bez pokrycia)
 NKS_MONEY8MK = re.compile(r"\| (?P<mk>Westeros|Essos): wsie (?P<n>\d+) \(koszyk ponad budzet (?P<sh>\d+)\), sprzedaz wsi na targ (?P<s>-?\d+) \(konie (?P<ho>-?\d+); bez pracy domowej "
                           r"(?P<s0>-?\d+), mniej o (?P<cut>[\d.-]+)%\), budzet (?P<b>-?\d+) \(alfa (?P<a>[^,]*), z pomiaru wsi (?P<an>\d+)\), koszyk (?P<k>-?\d+), zaplacony (?P<p>-?\d+) "
@@ -34592,6 +34812,7 @@ def nks_main(logp, until=120, bdp=None):
     early = []         # (doba, k, w pasmie, n, wynik)
     ut112 = {}         # doba -> (oddane, pan)
     money8 = {}       # doba Planu -> {rynek: dict} (linia "KS: pieniadze planu (krok 8)")
+    p9 = {}            # r4-koszyk (P9): doba Planu -> (klucz, {rynek: {klasa: dict}})
     zc5 = {}
     ksh = {}           # KS-R3: doba -> liczby linii KS-H
     ksh_cor = {}       # doba -> {(a, b, towar): szt./d dowiezione (srednia 28 dob)}
@@ -34755,6 +34976,10 @@ def nks_main(logp, until=120, bdp=None):
                             for it in NKS_MKTIT.finditer(sg.group("body")):
                                 dd[it.group("g")] = (int(it.group("p")), int(it.group("c")), int(it.group("s")) if it.group("s") else None, int(it.group("t")) if it.group("t") else 0)
                             mkt[(d, k)] = dd
+                elif s.startswith(NKS_K + "tanszy koszyk miast"):
+                    r9 = p9_parse(s)
+                    if r9:
+                        p9[r9[0]] = (r9[1], r9[2])
                 elif s.startswith(NKS_K + "pieniadze planu"):
                     mm = NKS_MONEY8.match(s)
                     if mm:
@@ -34964,22 +35189,40 @@ def nks_main(logp, until=120, bdp=None):
                 bad8.append(f"{mk8} punkt staly niezbiezny")
         if on_day is not None and hd8.get("meas") == "NIE":
             bad8.append("Plan wlaczenia bez pomiaru pieniedzy")
+        # r4-koszyk (P9, PLAN-KS-RUNDA4 rozdz. 4 i 11): R/P wedlug kcal JEDZENIA z linii P9 (>= 95%), rzeczy - INFO; bez linii P9 (log sprzed r4-koszyk) - dawna regula (wartosc koszyka)
+        d9 = max([d for d in p9 if d <= d8] or [None], key=lambda x: -1e18 if x is None else x)
+        v9 = p9.get(d9) if d9 is not None else None
         for mk8 in ("Westeros", "Essos"):
             v8 = money8[d8].get(mk8)
             if not v8:
                 bad8.append(f"{mk8} brak liczb")
                 continue
-            for cl8 in ("r", "pc"):
-                try:
-                    x8 = float(v8[cl8])
-                except ValueError:
-                    continue
-                if x8 < 95.0:
-                    bad8.append(f"{mk8} {'R' if cl8 == 'r' else 'P'} {x8:.1f}%")
+            c9 = v9[1].get(mk8) if v9 else None
+            if c9:
+                for cl9 in ("R", "P"):
+                    k9 = (c9.get(cl9) or {}).get("k", "-")
+                    try:
+                        if float(k9) < 95.0:
+                            bad8.append(f"{mk8} {cl9} kcal jedzenia {float(k9):.1f}%")
+                    except ValueError:
+                        bad8.append(f"{mk8} {cl9} kcal jedzenia brak")
+                g9 = "/".join(f"{c}:{(c9.get(c) or {}).get('k', '-')}%/{(c9.get(c) or {}).get('g', '-')}%" for c in ("W", "R", "P"))
+            else:
+                for cl8 in ("r", "pc"):
+                    try:
+                        x8 = float(v8[cl8])
+                    except ValueError:
+                        continue
+                    if x8 < 95.0:
+                        bad8.append(f"{mk8} {'R' if cl8 == 'r' else 'P'} {x8:.1f}%")
+                g9 = "-"
             inf8.append(f"{mk8}: wsie zaplacony koszyk {v8['pp']}%, praca domowa {v8['hw']}% rak, kcal bez pokrycia {v8.get('kz', '-')}%, sprzedaz na targ mniej o {v8.get('cut', '-')}% "
-                        f"(podatek panow od utargu podobnie), alfa {v8.get('a', '-')} (z pomiaru wsi {v8.get('an', '-')}), W/R/P {v8['w']}/{v8['r']}/{v8['pc']}%")
-        rep.add("NKS-3c: pieniadze Planu (krok 8; projekt 9, 11.1)", f"plan doba {d8}: " + "; ".join(inf8) + (f" | poza progiem: {', '.join(bad8)}" if bad8 else ""),
-                "klasy R i P >= 95% koszyka przy cenach startu, punkt staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru", len(bad8) == 0)
+                        f"(podatek panow od utargu podobnie), alfa {v8.get('a', '-')} (z pomiaru wsi {v8.get('an', '-')}), W/R/P {v8['w']}/{v8['r']}/{v8['pc']}% wartosci"
+                        + (f", P9 kcal jedzenia/rzeczy (INFO) {g9}" if c9 else ""))
+        rule9 = ("P9: klasy R i P - kcal jedzenia >= 95% (rzeczy INFO; linia 'KS: tanszy koszyk miast (P9)' doby " + str(d9) + (", klucz Ks Cheap Basket " + v9[0] if v9 else "") + ")"
+                 if v9 else "klasy R i P >= 95% koszyka przy cenach startu (log bez linii P9 - dawna regula)")
+        rep.add("NKS-3c: pieniadze Planu (krok 8; projekt 9, 11.1; P9)", f"plan doba {d8}: " + "; ".join(inf8) + (f" | poza progiem: {', '.join(bad8)}" if bad8 else ""),
+                rule9 + ", punkt staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru", len(bad8) == 0)
     else:
         rep.add("NKS-3c: pieniadze Planu (krok 8)", "brak linii 'KS: pieniadze planu' (log sprzed poprawki po autotescie 16.10)", "R i P >= 95%, punkt staly zbiezny", None)
 
@@ -35618,6 +35861,8 @@ def main(argv):
         return nzc7_main(logp, bdp, until_arg)   # nzc7 (16.10, zycie codzienne ZC7): wojna i blizna - ruina przy zlupieniu, blizna najazdu, powrot (DailyLife.War.cs)
     if group == "nks" and logp:
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
+    if group == "nkoszyk" and logp:
+        return nkoszyk_main(logp, until_arg)   # nkoszyk (r4-koszyk, noc 17/18.10): tanszy koszyk P9 (Plan i gra), place za brak rak (KsCheapBasket.cs, KsWageHands.cs)
     if group == "nds" and logp:
         return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
     if group != "etap2" or not logp:

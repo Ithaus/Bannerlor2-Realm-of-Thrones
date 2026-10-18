@@ -335,6 +335,9 @@ RANGES = {
     'DsGrantSessionDays': (1, 91, "0"),
     'DsCrownLoanLimitDaysPledged': (0.0, 728.0, "0"),
     'DsFolkSurplusSpendDays': (0, 120, "0"),
+    # r4-koszyk (17.10 noc): place za brak rak - zgodnie z przycieciem w kodzie (KsWageHands: krok 0..10%, sufit 1..2)
+    'KsWageHandsStepPercent': (0.0, 10.0, "0.0"),
+    'KsWageHandsMax': (1.0, 2.0, "0.00"),
 }
 
 def gen(module_dir, ns, display):

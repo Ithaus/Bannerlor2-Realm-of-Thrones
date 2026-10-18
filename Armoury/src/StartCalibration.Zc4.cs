@@ -79,6 +79,7 @@ namespace Armoury
             public readonly int[] Px = new int[ZN];              // cena sztuki na polce miasta (raz na dobe, Zc4Build)
             public readonly int[] Ix = new int[ZN];              // koszt zakupow wsi (poprawka po autotescie 16.10): indeks wiersza towaru na polce (raz na dobe; -1 - brak)
             public float[] Paid;                                 // krok 8: czesc zaplacona koszyka miasta (Plan) - Q juz pomnozone; null - cala
+            public float[] Extra;                                // r4-koszyk: dokupiona podstawa z Planu (czesc koszyka ponad 1; Q juz pomnozone) - null: brak
             // KS-R3: polka miasta przy budowie mapy (szt.; KS-H, linia polek, sterowanie rynku), koszyk klas W/R/P w sztukach [klasa * ZN + z] (koszt klas codziennie z cen doby,
             // potrzeby co 7 dob na zmiane - C1)
             public readonly int[] Cnt = new int[ZN];
@@ -268,8 +269,10 @@ namespace Armoury
                         // KS-R3 C1: potrzeby i koszyk klas z poprzedniej mapy (ludzie i stany zmieniaja sie powoli; ceny, polka i wiersze - codziennie nizej)
                         Array.Copy(pz0.Q, zt.Q, ZN); Array.Copy(pz0.QC, zt.QC, zt.QC.Length);
                         zt.Fire = pz0.Fire; zt.Paid = pz0.Paid; zt.Hands = pz0.Hands; zt.Garum = pz0.Garum; zt.Surv = pz0.Surv; zt.People = pz0.People;
+                        zt.Extra = pz0.Extra;   // r4-koszyk
                     }
                     var tp = redo ? TownPaidOf(r.St) : zt.Paid;
+                    var tx = redo ? TownExtraOf(r.St) : zt.Extra;   // r4-koszyk: dokupiona podstawa z Planu (klucz Ks Cheap Basket; null - jak dotad)
                     long tn0 = System.Diagnostics.Stopwatch.GetTimestamp();
                     if (redo)
                     {
@@ -278,8 +281,10 @@ namespace Armoury
                     KsCore.NeedsOf(r.N, bask, oil, north, true, true, r.L, n);
                     TownItems(n, zt.Q, whale[zt.Market], sigma, fireOn, out zt.Fire);
                     // krok 8 (pieniadze Planu): koszyk miasta tylko w czesci, za ktora klasy W/R/P zaplaca z zarobku - popyt ceny, slownik budzetu, przetwory i koszt klas
-                    zt.Paid = tp;
+                    zt.Paid = tp; zt.Extra = tx;
                     if (tp != null) for (int z = 0; z < ZN && z < tp.Length; z++) zt.Q[z] *= Math.Max(0f, Math.Min(1f, tp[z]));
+                    // r4-koszyk: koszyk naprawde kupiony - podstawa ponad koszyk (ta sama potrzeba x czesc ponad 1); bez dokupionej podstawy - nic
+                    if (tx != null) for (int z = 0; z < ZN && z < tx.Length; z++) if (tx[z] > 0f) { double pz = tp != null && z < tp.Length ? Math.Max(0f, Math.Min(1f, tp[z])) : 1.0; if (pz > 0) zt.Q[z] *= (pz + tx[z]) / pz; }
                     zt.Hands = Math.Max(0, r.N[KsTab.ECraft]) * 0.55 / sigma * 0.5;      // ZC5: polowa rak rzemieslnikow miasta (praca stanu w miescie 0.55)
                     zt.Garum = r.Cul != null && KsTab.GarumLands.Contains(r.Cul);
                     double surv = 0; for (int e = 0; e < 6; e++) surv += Math.Max(0, r.N[e]);
@@ -328,6 +333,7 @@ namespace Armoury
                             {
                                 if (!(q1[z] > 0) || _zItems[z] == null) continue;
                                 double qz = q1[z] * (tp != null && z < tp.Length ? Math.Max(0f, Math.Min(1f, tp[z])) : 1f);
+                                if (tx != null && z < tx.Length && tx[z] > 0f) qz += q1[z] * tx[z];   // r4-koszyk: podstawa ponad koszyk w koszcie klas
                                 if (e == KsTab.ELabour || e == KsTab.EPeasant) zt.QC[z] += qz;
                                 else if (e == KsTab.ECraft) zt.QC[ZN + z] += qz;
                                 else if (e == KsTab.EMerchant || e == KsTab.EGentry) zt.QC[2 * ZN + z] += qz;
@@ -700,6 +706,9 @@ namespace Armoury
             foreach (var c in keys) { float v; if (dict.TryGetValue(c, out v) && v > 0) tot += v; }
             ZTown zt;
             if (!(tot > 0) || !ZTownOf(town, out zt)) { foreach (var c in keys) { float v; if (dict.TryGetValue(c, out v) && v > 0) dict[c] = (float)(v * ff); } return tot * ff; }
+            // r4-koszyk (klucz Ks Cheap Basket): drabina tanszego koszyka - najpierw kalorie z najtanszej podstawy na polce, potem bialko, napoj, reszta (StartCalibration
+            // KsCheapBasket.cs); -1 - zadna podstawa nie lezy na polce: drabina jak dotad
+            if (SwCheapBasket) { try { double ca = Zc4LadderCheap(town, zt, dict, keys, ff, tot); if (ca >= 0) return ca; } catch (Exception e) { _chStum++; Stumble("Zc4LadderCheap", e); } }
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             double B = Math.Max(0.0, ff) * tot, left = B;
             var md = town.MarketData; var ro = town.Settlement.ItemRoster;
