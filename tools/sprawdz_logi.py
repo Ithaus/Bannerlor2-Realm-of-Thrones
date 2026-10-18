@@ -938,6 +938,10 @@ Uzycie (Python 3, tylko odczyt):
                     jedwabiu i rudy srebra <= 10% produkcji, ZC1-16b utarg wozow jedwabiu i rudy >= 0.8 x baza, ZC1-17 'nie do wydania' <= 1.05 x baza, ZC1-18 reszta
                     bilansu pieniadza wobec bazy, ZC1-19 mieszczanie bez desek po przejsciu; reszta INFO. Bez --baza-doby progi "wobec bazy" - wobec poczatku biegu
                     albo INFO. Log bez paczki: INFO.
+                    fix-ksiega (noc 17/18.10, klucz OreLedgerTownCraftsColumn): ZC1-8a kolumna "przetwory miast" kontroli (wsad rzemiosla miasta - przetwory ZC5 i 148 -
+                    w ksiedze towarow i w ksiedze rudy) zgodna w kazdej dobie (0 dob z roznica; log bez kolumny - INFO), ZC1-8b diagnoza NIEZGODNA: ile dob roznica
+                    = sam wsad zelaza ZC5 w "linie" (stara DLL - INFO); INFO z przyczyna rynkowa: ZC1-4b aksamit (wyrob, wsad tkalni, jedwab mieszczan, receptura KS),
+                    ZC1-9e miod pitny (zapas, produkcja, zuzycie wedlug ujscia), ZC1-16c jedwab (czesc z pol mieszczan KS bez wozu wsi, wozy szt./d i cena, polki miast).
 --grupa nbitwa    : (16.10, Jeff 'krzyk paniki zapetlony, ranni ida w moja strone, bija piescia' i 'wysoki tier traci zielony pasek'; galaz
                     w-toku/noc-bitwa, Armoury/src/RoutHold.cs, BattleWind.cs) python -I tools/sprawdz_logi.py --grupa nbitwa <Armoury-*.log> (strumieniowo).
                     Progi: NBW-0 linia 'Bitwa (NB2): start sesji' (Broken Men Never Rally, Flee Away From Enemies, postura wg tieru, latka postury RBM
@@ -34793,6 +34797,11 @@ NZ1_INGOT = re.compile(r"sztaby z polek \(Iron Ingots Off Shelf (?:tak|nie)\): o
 NZ1_BEER = re.compile(r"drugie piwo z cyklu (?P<extra>\d+), niesprzedane \(kasa bez nadwyzki\) (?P<unsold>\d+)")
 NZ1_STUM = re.compile(r"\| potkniecia (?P<st>\d+) \(sesja \d+\), czas ticku wsi (?P<tick>[\d.]+) ms, linia (?P<line>[\d.]+) ms\.$")
 NZ1_CTL = re.compile(r"kontrola z ksiega rudy i drewna: ruda (?P<ore>ZGODNA|NIEZGODNA).*?drewno (?P<wood>ZGODNA|NIEZGODNA)")
+# fix-ksiega (noc 17/18.10): liczby kontroli (towary / ruda) - kolumna "przetwory miast" tylko przy kluczu OreLedgerTownCraftsColumn
+NZ1_CTLN = re.compile(r"(?P<g>ruda|drewno) (?P<ok>ZGODNA|NIEZGODNA) \(wsie (\d+)/(\d+), las (\d+)/(\d+), zbrojne (\d+)/(\d+), linie (\d+)/(\d+), budowy (\d+)/(\d+)"
+                      r"(?:, przetwory miast (?P<ca>\d+)/(?P<cb>\d+))?, zapas (\d+)/(\d+)")
+NZ1_ZC5IRON = re.compile(r"^Przetwory miast \(ZC5\): dzien (?P<day>-?\d+) .*?zelazo -> narzedzia \d+ szt\. \(wsad (?P<iron>\d+);")
+NZ1_VELREC = re.compile(r"velvet_weavery cotton->velvet (\d+):(\d+)")
 NZ1_K4F = re.compile(r"; jedzenie (\d+) z wlasnym limitem \d+, ponad limit (\d+)\)")
 NZ1_ND = re.compile(r"budzet mieszczan (\d+) d \(przy dzisiejszych polkach do (\d+) d\)")
 NZ1_RESZTA = re.compile(r"\+ reszta ([+-]?\d+) \[R\]")
@@ -34807,7 +34816,8 @@ def _nz1_wagon(s, gid):
 
 def _nz1_scan(path, full):
     """Jeden przebieg logu: linie wspolne z biegiem bazowym (Towary, utarg wozow, Ceny surowcow, bilans pieniadza) i - przy full - linie paczki ZC1."""
-    D = {"hooks": [], "days": [], "bad": [], "goods": {}, "ctl": [], "unknown_food": 0, "horses": 0, "n_err": 0, "k4f": [], "wagon": {}, "nd": {}, "reszta": {}, "fishauth": "", "a17f2": []}
+    D = {"hooks": [], "days": [], "bad": [], "goods": {}, "ctl": [], "unknown_food": 0, "horses": 0, "n_err": 0, "k4f": [], "wagon": {}, "nd": {}, "reszta": {}, "fishauth": "", "a17f2": [],
+         "ctln": [], "zc5iron": {}, "velrec": None}   # fix-ksiega: liczby kontroli wedlug doby, wsad zelaza ZC5 wedlug doby, receptura aksamitu KS
     with open(path, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -34842,6 +34852,21 @@ def _nz1_scan(path, full):
                 mm = NZ1_CTL.search(s)
                 if mm:
                     D["ctl"].append((mm.group("ore"), mm.group("wood")))
+                    md = NZ1_DAY.search(s)
+                    row = {"day": int(md.group(1)) if md else None}
+                    for mc in NZ1_CTLN.finditer(s):   # fix-ksiega: (towary, ruda) dla kazdej kolumny
+                        n = [int(x) for x in mc.groups()[2:12]]
+                        row[mc.group("g")] = {"ok": mc.group("ok"), "wsie": (n[0], n[1]), "las": (n[2], n[3]), "zbrojne": (n[4], n[5]), "linie": (n[6], n[7]), "budowy": (n[8], n[9]),
+                                              "przetwory": (int(mc.group("ca")), int(mc.group("cb"))) if mc.group("ca") is not None else None}
+                    D["ctln"].append(row)
+            elif s.startswith("Przetwory miast (ZC5): dzien "):
+                mm = NZ1_ZC5IRON.match(s)
+                if mm:
+                    D["zc5iron"][int(mm.group("day"))] = int(mm.group("iron"))
+            elif s.startswith("KS: receptury jedzenia wedlug wagi"):
+                mm = NZ1_VELREC.search(s)
+                if mm:
+                    D["velrec"] = f"{mm.group(1)}:{mm.group(2)}"
             elif s.startswith("Towary (inne ticki dobowe): dzien "):
                 for f in NZ1_FOOD:
                     mm = re.search(r"(?:^|; |: )" + re.escape(f) + r" \[([^\]]*)\]", s)
@@ -34873,6 +34898,105 @@ def _nz1_ramp(s, name):
 def _nz1_mean(v):
     v = [x for x in v if x is not None]
     return sum(v) / len(v) if v else None
+
+
+def _nz1_ctl_fix(rep, D):
+    """fix-ksiega (noc 17/18.10): ZC1-8a kolumna 'przetwory miast' kontroli (wsad rzemiosla miasta - przetwory ZC5 i rzemioslo 148 - w obu ksiegach), ZC1-8b diagnoza
+    NIEZGODNA - ile dob roznica to sam wsad zelaza ZC5 liczony przez ksiege rudy w 'linie' (stara DLL / klucz OreLedgerTownCraftsColumn wylaczony)."""
+    rows = [r for r in D["ctln"][1:] if r.get("ruda") and r.get("drewno")]
+    withc = [r for r in rows if r["ruda"]["przetwory"] is not None and r["drewno"]["przetwory"] is not None]
+    if withc:
+        badk = [r["day"] for r in withc if r["ruda"]["przetwory"][0] != r["ruda"]["przetwory"][1] or r["drewno"]["przetwory"][0] != r["drewno"]["przetwory"][1]]
+        oa = sum(r["ruda"]["przetwory"][0] for r in withc); ob = sum(r["ruda"]["przetwory"][1] for r in withc)
+        wa = sum(r["drewno"]["przetwory"][0] for r in withc); wb = sum(r["drewno"]["przetwory"][1] for r in withc)
+        zc5 = sum(D["zc5iron"].get(r["day"], 0) for r in withc)
+        rep.add("ZC1-8a: kontrola - przetwory miast (ZC5/148) w ksiedze towarow i w ksiedze rudy (fix-ksiega, bez pierwszej linii)",
+                f"dob z kolumna {len(withc)} z {len(rows)}, z roznica {len(badk)}" + (f" (np. doba {badk[0]})" if badk else "")
+                + f"; ruda {oa}/{ob} (wsad zelaza z linii ZC5 {zc5}), drewno {wa}/{wb}",
+                "0 dob z roznica (jeden ruch = jedna pozycja w obu ksiegach)", not badk)
+    else:
+        rep.add("ZC1-8a: kontrola - przetwory miast (ZC5/148)", "brak kolumny 'przetwory miast' w kontroli",
+                "INFO (DLL sprzed fix-ksiega albo klucz Ore Ledger Town Crafts Column wylaczony)", None)
+    bad = [r for r in rows if r["ruda"]["ok"] != "ZGODNA" or r["drewno"]["ok"] != "ZGODNA"]
+    if not bad:
+        rep.add("ZC1-8b: NIEZGODNA wyjasnione wsadem zelaza ZC5 (diagnoza)", "brak dob NIEZGODNA", "INFO", None)
+        return
+    keys = ("wsie", "las", "zbrojne", "linie", "budowy")
+    zc5only = 0
+    other = []
+    for r in bad:
+        o, w = r["ruda"], r["drewno"]
+        diff = [k for k in keys if o[k][0] != o[k][1]]
+        wdiff = [k for k in keys if w[k][0] != w[k][1]]
+        if diff == ["linie"] and not wdiff and w["ok"] == "ZGODNA" and o["linie"][1] - o["linie"][0] == D["zc5iron"].get(r["day"], -1):
+            zc5only += 1
+        else:
+            other.append(r["day"])
+    rep.add("ZC1-8b: NIEZGODNA wyjasnione wsadem zelaza ZC5 (diagnoza)",
+            f"{zc5only} z {len(bad)} dob NIEZGODNA: roznica tylko w 'linie' rudy = wsad zelaza ZC5 tej doby (ksiega rudy - linie towarowe, ksiega towarow - rzemioslo miasta)"
+            + (f"; inne przyczyny {len(other)} (np. doba {other[0]})" if other else ""),
+            "INFO (przyczyna naprawiona kluczem Ore Ledger Town Crafts Column - fix-ksiega; inne przyczyny do zbadania)", None)
+
+
+def _nz1_sinkn(text, name):
+    """Liczba pozycji ujscia/zrodla linii 'Towary:' (np. 'mieszczanie 41', 'linie warsztatow 6', 'pola mieszczan (KS) 9'); 0 - brak."""
+    m = re.search(r"(?:^|; )" + re.escape(name) + r" (\d+)", text or "")
+    return int(m.group(1)) if m else 0
+
+
+def _nz1_market_info(rep, D):
+    """fix-ksiega (noc 17/18.10): INFO z przyczyna rynkowa trzech progow ZC1 (aksamit, miod pitny, jedwab) - same liczby ksiegi towarow, bez progow."""
+    goods = D["goods"]
+    ds = sorted(goods)[1:]
+    if len(ds) < 14:
+        rep.add("ZC1-4b/9e/16c: przyczyny rynkowe aksamitu, miodu pitnego i jedwabiu", f"dob ksiegi {len(ds)} (za malo)", "INFO", None)
+        return
+    first, last = ds[:7], ds[-28:]
+
+    def avg(gid, f, dd):
+        v = [f(goods[d][gid]) for d in dd if gid in goods[d]]
+        return sum(v) / len(v) if v else 0.0
+
+    def vp(g):
+        return g[0]
+
+    def cons(name):
+        return lambda g: _nz1_sinkn(g[2], name)
+    # aksamit: wyrob (warsztaty), wsad tkalni, jedwab mieszczan, receptura KS
+    rep.add("ZC1-4b: aksamit - wyrob na dobe, jedwab tkalni i mieszczan (7 pierwszych / 28 ostatnich dob ksiegi)",
+            f"aksamit {avg('velvet', vp, first):.1f} -> {avg('velvet', vp, last):.1f}/d; jedwab tkalni {avg('cotton', cons('linie warsztatow'), first):.1f} -> "
+            f"{avg('cotton', cons('linie warsztatow'), last):.1f}/d, jedwab mieszczan {avg('cotton', cons('mieszczanie'), first):.1f} -> {avg('cotton', cons('mieszczanie'), last):.1f}/d; "
+            f"receptura tkalni przy KS {D['velrec'] or '- (gry)'} (jedwab:aksamit)",
+            "INFO (indeks < 10 nie doszedl w zadnym biegu od 16.10, takze bez KS: 10 tkalni; przy KS receptura wedlug wagi 6:5 zamiast 1:2 i 6 szt. jedwabiu naraz)", None)
+    # miod pitny: zapas, produkcja, zuzycie wedlug ujscia
+    mk = [d for d in ds if "mead" in goods[d]]
+    if mk:
+        rep.add("ZC1-9e: miod pitny - zapas swiata, produkcja i zuzycie wedlug ujscia (7 pierwszych / 28 ostatnich dob)",
+                f"zapas {goods[mk[0]]['mead'][4]} -> {goods[mk[-1]]['mead'][4]}; produkcja {avg('mead', vp, first):.0f} -> {avg('mead', vp, last):.0f}/d; zuzycie "
+                f"{avg('mead', lambda g: g[5], first):.0f} -> {avg('mead', lambda g: g[5], last):.0f}/d (mieszczanie {avg('mead', cons('mieszczanie'), first):.0f} -> "
+                f"{avg('mead', cons('mieszczanie'), last):.0f}, dwory {avg('mead', cons('dwory (E3-P1)'), first):.0f} -> {avg('mead', cons('dwory (E3-P1)'), last):.0f}, "
+                f"wsie {avg('mead', cons('wsie (zakupy w miescie, E5/B1)'), first):.0f} -> {avg('mead', cons('wsie (zakupy w miescie, E5/B1)'), last):.0f})",
+                "INFO (indeks rosnie, gdy zapas startowy schodzi do rownowagi - takze bez KS)", None)
+    # jedwab: czesc z pol mieszczan KS (bez wozu wsi), wozy (szt./d i cena), polki miast
+    pa, pb = avg("cotton", vp, first), avg("cotton", vp, last)
+    fld = lambda g: _nz1_sinkn(g[1], "pola mieszczan (KS)")
+    fa, fb = avg("cotton", fld, first), avg("cotton", fld, last)
+
+    def shelf(g):
+        m = re.search(r"posiadacze \[miasta (\d+)", g[3])
+        return int(m.group(1)) if m else 0
+    wg = D["wagon"]
+    wf = [wg[d]["cotton"] for d in first if d in wg]
+    wl = [wg[d]["cotton"] for d in last if d in wg]
+
+    def wav(v):
+        u = sum(x[0] for x in v); g = sum(x[1] for x in v)
+        return (u / len(v) if v else 0.0), (g / u if u else 0.0)
+    (ua, ga), (ub, gb) = wav(wf), wav(wl)
+    rep.add("ZC1-16c: jedwab - z pol mieszczan KS (bez wozu wsi), wozy wsi i polki miast (7 pierwszych / 28 ostatnich dob)",
+            f"produkcja {pa:.1f} -> {pb:.1f}/d, z pol mieszczan {fa:.1f} -> {fb:.1f}/d ({(fb / pb if pb else 0):.0%}); wozy wsi {ua:.1f} -> {ub:.1f} szt./d po {ga:.0f} -> {gb:.0f} d/szt.; "
+            f"polki miast {avg('cotton', shelf, first):.0f} -> {avg('cotton', shelf, last):.0f} szt.",
+            "INFO (przy KS czesc jedwabiu rosnie na polach mieszczan - prosto na polke miasta, bez utargu wozow wsi; ZC1-16b porownuje z dobami 2-8 sprzed wlaczenia)", None)
 
 
 def nzc1_main(logp, bdp=None):
@@ -35002,6 +35126,7 @@ def nzc1_main(logp, bdp=None):
     if ctl:
         badc = [c for c in ctl[1:] if c[0] != "ZGODNA" or c[1] != "ZGODNA"]
         rep.add("ZC1-8: kontrola ksiegi towarow z ksiega rudy i drewna (bez pierwszej linii)", f"NIEZGODNA {len(badc)} z {max(0, len(ctl) - 1)}", "0", not badc)
+        _nz1_ctl_fix(rep, D)
     # ZC1-9 przejscie BK: marmur, miod pitny
     sides = [NZ1_SIDE.search(s) for s in days]
     mcut = sum(float(m.group("mcut")) for m in sides); mgive = sum(float(m.group("mgive")) for m in sides)
@@ -35131,6 +35256,7 @@ def nzc1_main(logp, bdp=None):
                 how = "doby 2-8 tego biegu"
             rep.add(f"ZC1-16b: utarg wozow wsi - {nm} (srednia 28 ostatnich dob, d/d)", f"{b:.0f} / {a:.0f} ({how})" if a else f"{b:.0f} / 0",
                     ">= 0.80 x baza (wsie jedwabne i kopalnie srebra nie traca rynku)", (b >= 0.8 * a) if a and a > 0 else None)
+    _nz1_market_info(rep, D)   # fix-ksiega: ZC1-4b, ZC1-9e, ZC1-16c (INFO - przyczyny rynkowe)
     # ZC1-17 'nie do wydania' mieszczan
     nd = {d: v for d, v in D["nd"].items() if v > 0}
     if len(nd) >= 14:
