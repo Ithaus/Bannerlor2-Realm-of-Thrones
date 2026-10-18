@@ -3197,8 +3197,9 @@ namespace Armoury
         public float KsFarmSurplusReviewMax = 0.25f;       // with Ks Farm Follows Surplus: the largest raise of a town's farm at one such review (share of the farm)
         // Paczka f16-akum (fin93 Armoury-2026-10-18_12-18-40.log, NKA-1: zaleglosci firm po pierwszym przegladzie +32.2 tys./d, z tego ok. 60% Starfall): przeglad kwartalny
         // nie obnizal firmy ponad doplyw miasta, bo "nadwyzka kasy" (SurplusHolds) liczyla cala kase - takze doplyw tygodnia zebrany na najblizsza rate (Starfall: kasa 231 tys.
-        // w dobie przegladu wobec progu 53 tys., rata 298 tys./tydz, doplyw 225 tys./tydz). Klucz wylaczony = cala kasa jak dotad. DsTowns.cs.
-        public bool KsFarmSurplusNetOfDues = true;         // with Ks Farm Follows Surplus: the regular review counts a town's purse as holding a surplus only above what the purse owes in the coming week (the next farm instalment, unpaid farm and sales aid, the next war tithe instalment and the rest of a catch-up), so the coin gathered for the next instalment does not keep a farm the town cannot carry from being lowered. Off = the whole purse counts, as before
+        // w dobie przegladu wobec progu 53 tys., rata 298 tys./tydz, doplyw 225 tys./tydz). Z raty firmy odejmowana tylko czesc zebrana od ostatniego dnia raty (recenzja f16:
+        // cala rata tuz po dniu raty liczyla ja drugi raz i ciela miasta placace w pelni). Klucz wylaczony = cala kasa jak dotad. DsTowns.cs.
+        public bool KsFarmSurplusNetOfDues = true;         // with Ks Farm Follows Surplus: the regular review counts a town's purse as holding a surplus only above the coin it already holds for its dues: the part of the next farm instalment gathered since the last payday (the whole instalment on payday, a seventh of it the day after), unpaid farm and sales aid, the next war tithe instalment and the rest of a catch-up. So the coin gathered for the next instalment does not keep a farm the town cannot carry from being lowered. Off = the whole purse counts, as before
 
         // --- Town purses: the farm catches up with the merchants' idle coin (18.10) ---
         // Paczka f7-kasy (noc 17/18.10; fin91 Armoury-2026-10-18_06-29-09.log: kasy miast z KS +52.6 tys./d (NAKUM-7), ponad 1.5 x zapas kupcow 1.95 -> 12.89 mln (NAKUM-16)

@@ -497,28 +497,41 @@ namespace Armoury
             {
                 if (s == null || !s.KsFarmFollowsSurplus || f == null || f.St == null || !f.St.IsTown || f.St.Town == null) return false;
                 var t = f.St.Town;
-                // f16-akum (Ks Farm Surplus Net Of Dues): nadwyzka kasy PO tym, co kasa jest winna w najblizszym tygodniu - kasa przed dniem raty trzyma doplyw zebrany
+                // f16-akum (Ks Farm Surplus Net Of Dues): nadwyzka kasy PO tym, co kasa juz trzyma na swoje naleznosci - kasa przed dniem raty trzyma doplyw zebrany
                 // na te rate, wiec miasto z firma ponad doplyw mialo "nadwyzke" i przeglad nie obnizal firmy (fin93 Starfall: kasa 231 tys. wobec progu 53 tys., rata
-                // 298 tys./tydz, doplyw 225 tys./tydz - zaleglosci +136 tys. w tydzien). Klucz wylaczony - cala kasa jak dotad
+                // 298 tys./tydz, doplyw 225 tys./tydz - zaleglosci +136 tys. w tydzien). Z raty firmy tylko czesc zebrana od ostatniego dnia raty (GatheredShare) - tuz
+                // po racie kasa juz ja oddala, cala rata odjeta drugi raz ciela miasta placace w pelni wedlug dnia raty z hasza id (recenzja f16). Klucz wylaczony - cala kasa jak dotad
                 double owes = s.KsFarmSurplusNetOfDues ? CofferOwes(f, s) : 0.0;
                 return StartCalibration.KsTownApplied(t) && t.Gold - owes > OverReserve * TownPurse.Reserve(t);
             }
             catch (Exception e) { Stumble("SurplusHolds", e); return false; }
         }
 
-        /// <summary>f16-akum: zobowiazania kasy kupcow miasta na najblizszy tydzien - to samo, co Pay zdejmie z kasy w dniu raty: rata firmy z kasy (pan i korona; czesc
-        /// z oszczednosci ludu tylko przy wylaczonym DsFarmFolkFromSavings - inaczej placi ja lud) x rampa przejscia, zaleglosc firmy z kasy, zaleglosc pomocy od sprzedazy M7,
-        /// rata dziesiatej M9 x rampa i reszta gersumy f7 (placona z kasy w oknie przegladu). Tylko odczyt; wolajacy w try.</summary>
+        /// <summary>f16-akum: czesc kasy kupcow miasta zwiazana naleznosciami, ktore Pay zdejmie z kasy w dniu raty: rata firmy z kasy (pan i korona; czesc z oszczednosci
+        /// ludu tylko przy wylaczonym DsFarmFolkFromSavings - inaczej placi ja lud) x rampa przejscia x czesc zebrana od ostatniego dnia raty (GatheredShare - rata idzie
+        /// z doplywu tygodnia), oraz cale: zaleglosc firmy z kasy, zaleglosc pomocy od sprzedazy M7, rata dziesiatej M9 x rampa i reszta gersumy f7 (placona z kasy
+        /// w oknie przegladu) - te sa juz nalezne albo wymierzone od zapasu kasy, nie zbierane z doplywu. Tylko odczyt; wolajacy w try.</summary>
         private static double CofferOwes(Farm f, Settings s)
         {
             bool folkPays = s.DsFarmFolkFromSavings;
             double rn = NewShare;
-            double owe = (Math.Max(0, f.FL) + Math.Max(0, f.FC) + (folkPays ? 0 : Math.Max(0, f.FLf))) / Weeks * rn;
+            double owe = (Math.Max(0, f.FL) + Math.Max(0, f.FC) + (folkPays ? 0 : Math.Max(0, f.FLf))) / Weeks * rn * GatheredShare(f.St);
             owe += Math.Max(0, f.AL) + Math.Max(0, f.AC) + (folkPays ? 0 : Math.Max(0, f.ALf));
             owe += Math.Max(0, f.AidArr);
             if (f.MovLeft >= 1) owe += Math.Min(Math.Max(0, f.MovPer), f.MovLeft) * rn;
             owe += Math.Max(0, f.CLeft);
             return double.IsNaN(owe) || double.IsInfinity(owe) ? 0.0 : owe;
+        }
+
+        /// <summary>f16-akum (recenzja): czesc najblizszej raty firmy zebrana w kasie od ostatniego dnia raty, liczona w DayStart - przeglad (Review / Renew) idzie PRZED
+        /// Pay tej doby: dzien raty 7/7 (rata wyjdzie dzis), doba po racie 1/7, ..., doba przed rata 6/7. Ten sam dzien raty co PayDay (Today + FNV id mod 7). Przy
+        /// kwartale 91 = 13 x 7 przeglad miasta wypada zawsze w tej samej fazie tygodnia - bez tego udzialu cala rata dawala stale, zalezne od hasza id odchylenie.
+        /// Bez id - 1 (cala rata, ostroznie).</summary>
+        private static double GatheredShare(Settlement st)
+        {
+            if (st == null || st.StringId == null) return 1.0;
+            int p = (Today + (int)(Fnv(st.StringId) % 7u)) % 7;
+            return p == 0 ? 1.0 : p / 7.0;
         }
 
         /// <summary>

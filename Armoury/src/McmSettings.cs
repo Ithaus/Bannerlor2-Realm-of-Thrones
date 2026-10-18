@@ -7584,7 +7584,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public float KsFarmSurplusReviewMax { get; set; } = 0.25f;
 
-        [SettingPropertyBool("Ks Farm Surplus Net Of Dues", HintText = "with Ks Farm Follows Surplus: the regular review counts a town's purse as holding a surplus only above what the purse owes in the coming week (the next farm instalment, unpaid farm and sales aid, the next war tithe instalment and the rest of a catch-up), so the coin gathered for the next instalment does not keep a farm the town cannot carry from being lowered. Off = the whole purse counts, as before")]
+        [SettingPropertyBool("Ks Farm Surplus Net Of Dues", HintText = "with Ks Farm Follows Surplus: the regular review counts a town's purse as holding a surplus only above the coin it already holds for its dues: the part of the next farm instalment gathered since the last payday (the whole instalment on payday, a seventh of it the day after), unpaid farm and sales aid, the next war tithe instalment and the rest of a catch-up. So the coin gathered for the next instalment does not keep a farm the town cannot carry from being lowered. Off = the whole purse counts, as before")]
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public bool KsFarmSurplusNetOfDues { get; set; } = true;
 
