@@ -2760,3 +2760,8 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   + linia NKS-26, r4-ceny P7 w D+14 + KsCloth, r4-koszyk bez regul jednej krainy) + 5 nowych (ks-arm, zbrojownia, stare-a12, stare-a17, rot-wydarzenia). Skrypty testu/wgrania
   (test/ i tools/autotest-2026-10-17/): kazdy Armoury/ModuleData/arm_*.tsv z drzewa idzie do gry (zajazdy, drogi geo, uklad v6).
 - 18:00 PDT: test fin81 = n-ks4 4bfd840c (KS r4 cz. 1-5 + zajazdy/plotki), Armoury 90e1e80c, 120 dob bez bitwy, flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC!), at-fin81-zajazdy.out.txt.
+- 18:05 PDT: FALA 2a GOTOWA (wf_278cdd52-962): w-toku/sw-uchodzcy fb2a7d84 (RaidRefugeesToTowns + Radius 250, PurseShare 1.0, MessageMin 500; uchodzcy z najazdu do najblizszego
+  nieoblezonego miasta krolestwa, biedota = klasa W, kiesa z wsi jako saldo w kiesie W, zapis arm_raidref, linia "Uchodzcy do miast (RT)", grupa nuchodzcy) i w-toku/r4-glodbunt 253dc851
+  (KsHungerUnrest: pozycja "Hunger" w czynnym modelu lojalnosci BK i bezpieczenstwa NavalDLC, bez podwojnego Starving; bunt mechanizmem gry; KsLordFundsFood: glowa rodu doplaca
+  do budzetu KS-H ponad rezerwe wojny, tempo skrzyni wspolne z chlebem M3; tryb RACHUNKI czeka na API kredytu r4-kupcy - do polaczenia przy scaleniu; grupa nglod). Obie: build rc 0,
+  recenzja + poprawki. Ryzyko: uchodzcy obciaza kiese W miast frontu; glod moze dac bunty Zelaznych Wysp/Dorne po rampie KS (progi w MCM).
