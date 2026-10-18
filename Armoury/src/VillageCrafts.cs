@@ -2309,6 +2309,16 @@ namespace Armoury
             catch (Exception e) { Stumble("Notify", e); }
         }
 
+        /// <summary>f19-e4 (audyt gospodarki 18/19.10): opis okregow pod KS w linii ZW. Jedyna regula zmiany zajec pod KS to A7 (StartCalibration.A7RuleOn), a ZW
+        /// pomija kazda wies pod KS (UnderKs) - przy A7 wylaczonej zajecia pod KS stoja tak, jak je ustawila kalibracja (fin93: pod KS 569 z 569 okregow, zmiany 0,
+        /// linia A7 "regula: WYLACZONA - sam pomiar"). Linia mowi to wprost. Bez nawiasow w tekscie (wzorzec NZW_DAY checkera czyta do pierwszego ')'). Tylko napis.</summary>
+        private static string KsWorksText(int ks)
+        {
+            try { if (ks > 0 && !StartCalibration.A7RuleOn) return " - zajecia z blokow KS; regula A7 WYLACZONA - zajecia pod KS zamrozone"; }
+            catch (Exception e) { Stumble("KsWorksText", e); }
+            return " - zajecia z blokow KS i reguly A7";
+        }
+
         private static void Line(int day, int fall, int ks, int other, int inTrans, int[] countBy, int plans, double ms, int snow)
         {
             var sb = new StringBuilder(1600);
@@ -2324,7 +2334,7 @@ namespace Armoury
                 }
             }
             sb.Append(P).Append("dzien ").Append(day).Append(" | ").Append(On ? "CZYNNE" : "NIECZYNNE (ksiega wiosek / lista BK / MaterialLaw)").Append(" | okregow z wioskami ").Append(_dist.Count)
-              .Append(" (bez KS ").Append(fall).Append(", pod KS ").Append(ks).Append(" - zajecia z blokow KS i reguly A7), wiosek ").Append(_builtSide)
+              .Append(" (bez KS ").Append(fall).Append(", pod KS ").Append(ks).Append(KsWorksText(ks)).Append("), wiosek ").Append(_builtSide)
               .Append(" (bez wiersza ziemi ").Append(_builtNoRow).Append(", start poprawiony na typ okregu ").Append(_builtStartFix).Append(")")
               .Append(" | zajecia wiosek bez KS:");
             bool f = true;
