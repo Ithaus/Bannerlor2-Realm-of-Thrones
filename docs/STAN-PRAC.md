@@ -2959,3 +2959,6 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
 - 08:45 PDT: FALA 6 GOTOWA (wf_a61661c1-43f, 4/4 build rc 0; scratchpad fala6-wynik.json): f7-renty 3e695188 (CrownRentsByNeed - ten sam f co zwrot, reszta zostaje w skarbcu; szacunek fin91:
   renty 283.6k -> 144.5k/d, w skarbcach ~139k/d; grupa nrenty), f7-kasy (KsFarmCatchUp - "gersuma": jednorazowe doplaty firmy z zapasu kasy ponad 1.5 x zapas, polowa, 28 dni; model fin91:
   kasy przestaja rosnac), f7-wegiel, f7-browary. Galezie na GitHub. Jeff gra - scalenie (kod) po fali 7, testy po jego sygnale.
+- 09:00 PDT: JEFF SKONCZYL GRE (sesja 07:43-08:37 PDT, doby 109020-109043, WGRANIE 80): 0 ERROR, KS uzbrojony 109020 (samo). Kopie: D:/Backup-Bannerlord/logi-jeffa/2026-10-18 (Armoury,
+  CrashScribe, RC), zapis zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-18-po-grze-80.sav (md5 3f02b5d1). Jeff pyta: "Polnoc miazdzy Lannisterow i Krolewska Przystan - czemu, jaka sila obu stron?"
+  -> analiza wf_8990abef-633 (podejrzenie: zwrot wedlug potrzeby obcina bogatym Lannisterom zwrot -> D -> R -> pulap zoldu maleje). Wolno testowac i wgrywac (Jeff skonczyl).
