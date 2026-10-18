@@ -1155,7 +1155,7 @@ Uzycie (Python 3, tylko odczyt):
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
                     rampie = 0 (linia DS i linie niezalezne: obieg2, Przeplywy osad, W7, Kiesa ludu, rynek BK tylko z kroku 5), NDS-2 ksiegi (kontrola DS 0, przyczyny kies wsi,
-                    112 bez odbiorcy, reszta bilansu swiata, firmy F3 i zaliczki L1), NDS-3 kiesy wsi (dryf -0.2..+0.2%/d - MNK ostatnich 26 dob okna, f14-wsie; mediana kiesa / skrzynia >= 0.9, < 1000 zl
+                    112 bez odbiorcy, reszta bilansu swiata, firmy F3 i zaliczki L1), NDS-3 kiesy wsi (dryf -0.2..+0.2%/d - MNK 26 dob w 5 oknach konczacych sie w 5 ostatnich dobach, f14-wsie; mediana kiesa / skrzynia >= 0.9, < 1000 zl
                     <= 15%, <= 3% zlota swiata - bez zlewu pieniadza we wsiach), NDS-6 zaleglosci czynszu (ponad 91 rat <= 10% wsi, razem <= 30 dni, zebrane >= 95%), NDS-7 korona
                     (zwrot 100% kazdej doby, wplyw dnia >= 0.85 / 0.95 odniesienia w rampie / po niej, krolestwo-doby z Bankiem <= 15%, F3: kaskada pokrycia), NDS-9 D staly
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
@@ -1264,10 +1264,14 @@ Uzycie (Python 3, tylko odczyt):
                     ds-akumulator (18.10): NDS-3a/3b dryf kies wsi w oknie od konca rampy KS (koniec popytu) albo DS F1 (DayOn + 28) + 2 x 15 dob (za krotkie - ostatnie 30 dob),
                     NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
                     jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
-                    f14-wsie (18.10): NDS-3a/3b = nachylenie MNK stanu kies wsi z OSTATNICH 26 dob okna (nie wczesniej niz koniec rampy + 2 x 15) - stan ustalony; dawny
-                    pomiar od konca rampy do konca okna (dwa konce) - NDS-3a0 INFO (przejscie: kiesy schodza z nadwyzki rampy KS ze stala ok. 55-70 dob, nie 15). NDS-3f INFO
-                    rownowaga z blokow 14 dob od konca rampy (dryf = a + b x kiesa; odplyw krancowy, stala zejscia, S* wobec startu i skrzyni swiata; >= 5 blokow), NDS-3g INFO
-                    trend wsi z kiesa < 1000 zl od konca rampy. Bieg dluzszy niz 120 dob: --do-doby <dlugosc biegu> (domyslne 120 tnie okno - stan ustalony na koncu biegu).
+                    f14-wsie (18.10, z poprawka recenzji): NDS-3a/3b = nachylenie MNK stanu kies wsi w 5 oknach 26 dob konczacych sie w 5 ostatnich dobach okna (nie
+                    wczesniej niz koniec rampy + 2 x 15) - prog musi przejsc w KAZDYM oknie (jedna doba nie przestawia wyniku); dawny pomiar od konca rampy do konca okna (dwa
+                    konce) - NDS-3a0 INFO (przejscie: kiesy schodza z nadwyzki rampy KS ze stala ok. 55-65 dob, nie 15). NDS-3f INFO rownowaga z blokow 14 dob od konca rampy
+                    (dryf = a + b x kiesa; odplyw krancowy, stala zejscia, S* wobec startu i skrzyni swiata; >= 5 blokow), NDS-3g INFO wsie z kiesa < 1000 zl - 7 pierwszych
+                    dob okna -> 7 ostatnich (koniec rampy osobno) i MNK liczby takich wsi z 28 ostatnich dob, NDS-3h INFO ogon biednych wsi wies po wsi z wsie-kiesy.csv
+                    (MoneyLedger.Villages.cs, co 7 dob; plik z katalogu CSV obok logu albo z --csv <katalog>/budzet-rodow.csv; log sprzed f14-wsie - "brak pliku").
+                    OKNO NDS-3: bez --do-doby - do konca logu (stan kies samego biegu, bez bazy); z --do-doby N - jak reszta grupy. Reszta grupy bez --do-doby zostaje przy
+                    120 dobach (NDS-7b, NDS-9, NDS-11 porownuja z baza 120 dob - przy oknie 160 dob traca odniesienie bazy).
 --grupa nakum     : (noc 17/18.10, paczka ds-akumulator; Jeff "czy nie ma stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac"; Armoury/src/TownFolk.DsAkum.cs) python -I
                     tools/sprawdz_logi.py --grupa nakum <Armoury-*.log> [--do-doby N] (strumieniowo). Okno: od firm F3 + 28 + 7 dob (bez F3 - ostatnie 28 dob). NAKUM-0 linia
                     'Akumulator kies' kazdej doby, NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy < +30 tys./d (1b R/P INFO, 1c zapas dni W koniec <= 1.1 x poczatek), NAKUM-2
@@ -38087,7 +38091,7 @@ def nkoszyk_main(logp, until=120):
     return 0
 
 
-def nds_main(logp, bdp=None, until=120):
+def nds_main(logp, bdp=None, until=120, until3=None, csvp=None):
     """nds (17.10; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md rozdz. 3, 9, 14; galaz w-toku/noc-ds: Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs, BkSeal34.cs).
     Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log biegu bez DS z tego samego zapisu> (odniesienie korony, D stalego, Banku, kosztu, reszty bilansu).
     NDS-0 linie DS, NDS-1 stare pobory wsi po rampie (linie niezalezne: obieg2, Przeplywy osad, W7, Kiesa ludu, rynek BK), NDS-2 ksiegi (kontrola DS, przyczyny kies wsi,
@@ -38190,43 +38194,67 @@ def nds_main(logp, bdp=None, until=120):
         zb = [(d, v) for d, v in sorted(D["zal"].items()) if v is not None and abs(v) > 1]
         rep.add("NDS-2f: 'Pozyczki zaliczkowe (DS)' kontrola dlugu (F3 L1)", f"dob {len(D['zal'])}, |kontrola| > 1: {len(zb)}" + (f" (dzien {zb[0][0]}: {zb[0][1]})" if zb else ""), "0", not zb)
     # NDS-3 kiesy wsi
-    vd = [d for d in win if d in D["vil"] and "stan" in D["vil"][d]]
+    # f14-wsie poprawka (recenzja 18.10): NDS-3 to stan kies wsi SAMEGO biegu (bez odniesienia do bazy) - bez --do-doby okno do konca logu (until3 z main), z --do-doby
+    # jak reszta grupy. Reszta grupy zostaje przy 120 dobach: NDS-7b, NDS-9 i NDS-11 porownuja z baza 120 dob - przy oknie 160 dob traca odniesienie bazy (fin92/fin91:
+    # NDS-9 "pierwsze doby DS tego biegu ... bez bazy - slabe odniesienie", NDS-11 bez wiersza bazy), wiec domyslnego okna calej grupy nie zmieniamy.
+    u3 = until3 if until3 is not None else until
+    win3 = [d for d in ds if d - first + 1 <= u3]
+    vd = [d for d in win3 if d in D["vil"] and "stan" in D["vil"][d]]
     if len(vd) >= 30:
         # ds-akumulator (18.10, diagnoza fin80 "kiesy"): okno dryfu od konca rampy KS (koniec popytu, linia "KS: rampa") albo rampy DS F1 (DayOn + 28) + 2 x DsSurplusSpendDays
         # (15 - krok 5 reaguje na nowy odplyw ze stala 15 dob; dotad okno 60 dob lapalo jednorazowy uskok po starcie koszyka ZC4); za krotkie (< 14 dob) - ostatnie 30 dob
-        f1on = [R(d, "ramp", 1) for d in win if R(d, "ramp", 1) > 0]
+        f1on = [R(d, "ramp", 1) for d in win3 if R(d, "ramp", 1) > 0]
         f1end = (min(f1on) + 28) if f1on else None
         ends = [x for x in (D.get("ksend"), f1end) if x is not None]
         w0_ = (max(ends) + 2 * 15) if ends else None
         tail = [d for d in vd if w0_ is not None and d >= w0_]
         how3 = f"od doby {w0_} (koniec rampy {'KS ' + str(D.get('ksend')) if D.get('ksend') is not None else ''}{' / ' if D.get('ksend') is not None and f1end is not None else ''}{'DS F1 ' + str(f1end) if f1end is not None else ''} + 2 x 15)" if w0_ is not None else ""
-        if len(tail) < 14:
+        fb3 = len(tail) < 14
+        if fb3:
             tail = vd[-30:]
             how3 = "ostatnie 30 dob (okno od konca rampy za krotkie)"
-        # f14-wsie (18.10, fin92 NDS-3a -0.466%/d): kiesy wsi po rampie KS nie odplywaja, tylko schodza z nadwyzki zebranej w rampie (DS F1 zdjal stare pobory od doby 1,
-        # koszyk wsi ZC4 rusza dopiero z rampa KS: fin92 0 zl/d do 109124, 115 tys./d od 109140; kiesy 3.70 -> 7.46 mln). Zejscie ma stala ok. 55-70 dob, nie 15:
-        # krok 5 planuje (kiesa - skrzynia) / 15 dziennie, ale wydaje z tego ok. 1/5 (niewydane - brak towaru i materialu, potrzeba pokryta), a danina od skarbca wsi
-        # 3%/d bierze tylko ponad 3 x skrzynia - krancowy odplyw z kiesy ok. 1.5-1.8%/d (bloki 14 dob fin91/fin92). Okno od konca rampy + 2 x 15 dob mierzylo wiec
-        # przejscie, nie stan ustalony. Teraz: dryf = nachylenie MNK stanu z OSTATNICH 26 dob okna (nie wczesniej niz w0_) - stan ustalony na koncu biegu; jedna doba
-        # (np. +74 tys. w ostatniej dobie fin92) nie przestawia wyniku, jak przy dwoch koncach. Pomiar od w0_ do konca (dotychczasowy) - NDS-3a0 (INFO, przejscie).
+        # f14-wsie (18.10, fin92 NDS-3a -0.466%/d przy --do-doby 120): po rampie KS kiesy wsi schodza z nadwyzki zebranej w oknie DS bez koszyka ZC4 (DS F1 zdjal stare
+        # pobory od doby 1, koszyk wsi ZC4 rusza dopiero z rampa KS: fin92 0 zl/d do 109124, 115 tys./d od 109140; kiesy 3.70 -> 7.46 mln). Krancowy odplyw z kiesy ok.
+        # 1.6-1.8%/d (bloki 14 dob), czyli stala zejscia ok. 55-65 dob, nie 15 (krok 5 wydaje ok. 1/5 planu, danina od skarbca tylko ponad 3 x skrzynia). Pomiar od w0_
+        # do konca okna (dwa konce) - NDS-3a0 (INFO, przejscie). NDS-3a/3b - stan na koncu okna: nachylenie MNK 26 dob.
+        # Recenzja f14-wsie (18.10): wynik z JEDNEGO okna MNK zalezal od ostatniej doby (fin92: okna 26 dob konczace sie w 109230-109233 -0.242..-0.214%/d, w 109234
+        # -0.191%/d - TAK tylko przez +74.6 tys. ostatniej doby, 0.009 pp od progu). Teraz 5 okien 26 dob konczacych sie w 5 ostatnich dobach okna; prog musi przejsc
+        # w KAZDYM (wiersz pokazuje wszystkie 5, mediane i najgorsze). Okno krotsze niz 30 dob - tyle okien 26 dob, ile sie miesci (najmniej jedno >= 14 dob).
+        n0 = len(tail)
         a0, b0 = D["vil"][tail[0]]["stan"], D["vil"][tail[-1]]["stan"]
         drift0 = (b0 - a0) / max(1, tail[-1] - tail[0]) / max(1.0, (a0 + b0) / 2)
         how0 = how3
-        if len(tail) > 26:
-            tail = tail[-26:]
-            how3 = f"ostatnie 26 dob okna {tail[0]}-{tail[-1]} (stan ustalony; " + (f"okno od doby {w0_})" if w0_ is not None and tail[0] >= w0_ else "z ostatnich 30 dob)")
-        xs3 = tail; ys3 = [D["vil"][d]["stan"] for d in xs3]
-        mx3, my3 = sum(xs3) / len(xs3), sum(ys3) / len(ys3)
-        sxx3 = sum((x - mx3) ** 2 for x in xs3)
-        slope3 = (sum((x - mx3) * (y - my3) for x, y in zip(xs3, ys3)) / sxx3) if sxx3 > 0 else 0.0
-        drift = slope3 / max(1.0, my3)
-        a, b = ys3[0], ys3[-1]
-        rep.add(f"NDS-3a0: kiesy wsi - dryf {len([d for d in vd if w0_ is not None and d >= w0_]) or len(tail)} dob {how0} - przejscie po rampie (dwa konce)",
-                f"{a0 / 1e6:.2f} -> {b0 / 1e6:.2f} mln = {100 * drift0:+.3f}%/d", "INFO (zejscie nadwyzki z rampy KS - stan ustalony w NDS-3a)", None)
-        rep.add(f"NDS-3a: kiesy wsi - dryf {how3} (dol)", f"{a / 1e6:.2f} -> {b / 1e6:.2f} mln, nachylenie MNK {slope3:+.0f}/d = {100 * drift:+.3f}%/d",
-                ">= -0.2%/d (projekt 14; MNK z 26 dob)", drift >= -0.002)
-        rep.add(f"NDS-3b: kiesy wsi - dryf {how3} (gora: wies bez towaru nie moze chomikowac wolnego pieniadza)", f"{100 * drift:+.3f}%/d",
-                "<= +0.2%/d (projekt 9.3: kiesy plaskie po skrzyni; model 17.10 bez KS: +1.1..+1.3%/d)", drift <= 0.002)
+
+        def _ols3(xs):
+            ys = [D["vil"][d]["stan"] for d in xs]
+            mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+            sxx = sum((x - mx) ** 2 for x in xs)
+            sl = (sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx) if sxx > 0 else 0.0
+            return sl / max(1.0, my), sl, ys[0], ys[-1]
+        wins3 = []
+        for k in range(5):
+            sub = tail[:n0 - k]
+            if len(sub) >= 26:
+                wins3.append(sub[-26:])
+            elif k == 0:
+                wins3.append(sub)
+        res3 = [_ols3(w) for w in wins3]                     # [0] - okno konczace sie w ostatniej dobie, dalej wstecz
+        drs3 = [x[0] for x in res3]
+        med3 = st.median(drs3)
+        lw3 = wins3[0]
+        if len(wins3) > 1:
+            how3 = f"MNK {len(wins3)} okien 26 dob konczacych sie w dobach {wins3[-1][-1]}-{lw3[-1]} (stan na koncu biegu; " + ("z ostatnich 30 dob)" if fb3 else f"okno od doby {w0_})")
+        else:
+            how3 = f"MNK okna {lw3[0]}-{lw3[-1]} ({len(lw3)} dob; za krotko na 5 okien 26 dob)"
+        drt3 = " / ".join(f"{100 * x:+.3f}" for x in reversed(drs3))
+        rep.add(f"NDS-3a0: kiesy wsi - dryf {n0} dob {how0} - przejscie po rampie (dwa konce)",
+                f"{a0 / 1e6:.2f} -> {b0 / 1e6:.2f} mln = {100 * drift0:+.3f}%/d", "INFO (zejscie nadwyzki z rampy KS - stan na koncu biegu w NDS-3a)", None)
+        rep.add(f"NDS-3a: kiesy wsi - dryf {how3} (dol)",
+                f"{drt3}%/d (mediana {100 * med3:+.3f}, najgorsze {100 * min(drs3):+.3f}); ostatnie okno {res3[0][2] / 1e6:.2f} -> {res3[0][3] / 1e6:.2f} mln, nachylenie {res3[0][1]:+.0f}/d",
+                ">= -0.2%/d w kazdym oknie (projekt 14; MNK 26 dob, 5 koncow okna)", min(drs3) >= -0.002)
+        rep.add(f"NDS-3b: kiesy wsi - dryf {how3} (gora: wies bez towaru nie moze chomikowac wolnego pieniadza)",
+                f"najwyzsze {100 * max(drs3):+.3f}%/d (mediana {100 * med3:+.3f})",
+                "<= +0.2%/d w kazdym oknie (projekt 9.3: kiesy plaskie po skrzyni; model 17.10 bez KS: +1.1..+1.3%/d)", max(drs3) <= 0.002)
         # f14-wsie: rownowaga kies wsi - bloki 14 dob od konca rampy (max(KS, DS F1)): dryf bloku = a + b x sredni stan; b < 0 - odplyw rosnie z kiesa (powrot do
         # rownowagi), S* = -a/b, stala zejscia 1/(-b). Szacunek (wplywy wsi zmieniaja sie z wojna) - INFO; mniej niz 5 blokow - za krotko na szacunek.
         r0_ = max(ends) if ends else None
@@ -38273,11 +38301,22 @@ def nds_main(logp, bdp=None, until=120):
         if lo:
             x = sum(lo) / len(lo)
             rep.add("NDS-3d: wsi z kiesa < 1000 zl (7 ostatnich dob)", f"{100 * x:.1f}%", "<= 15%", x <= 0.15)
-            # f14-wsie: ogon biednych wsi rosnie przy plaskiej sumie (fin91: 11 -> 79 wsi przy kiesach 5.04 mln) - rozklad, nie suma; trend od konca rampy (INFO)
+            # f14-wsie: ogon biednych wsi rosnie przy plaskiej sumie (fin91: 59 -> 81 wsi w 109203-109234 przy kiesach 5.02-5.06 mln) - rozklad, nie suma (INFO).
+            # Recenzja: odniesienie = 7 PIERWSZYCH dob okna (jak NDS-3e; start fin92 10.5%, fin91 10.7%), nie dolek konca rampy (nadwyzka rampy zbila wtedy liczbe biednych
+            # wsi do 11-14) - koniec rampy osobno; trend 28 ostatnich dob (MNK liczby wsi < 1000 zl na dobe) pokazuje, czy ogon dalej rosnie.
+            lo_s = [D["vil"][d]["lo"] / max(1, D["vil"][d].get("n") or 571) for d in vd[:7] if D["vil"][d].get("lo") is not None]
             lo0 = [D["vil"][d]["lo"] / max(1, D["vil"][d].get("n") or 571) for d in vd if r0_ is not None and r0_ <= d < r0_ + 7 and D["vil"][d].get("lo") is not None]
-            if lo0:
-                rep.add("NDS-3g: wsi z kiesa < 1000 zl - trend od konca rampy (7 dob od konca rampy -> 7 ostatnich dob)",
-                        f"{100 * sum(lo0) / len(lo0):.1f}% -> {100 * x:.1f}%", "INFO (rozklad kies: wsie z utargiem ponizej koszyka i czynszu schodza do zera, bogate placa danine od skarbca)", None)
+            l28 = [(d, D["vil"][d]["lo"]) for d in vd[-28:] if D["vil"][d].get("lo") is not None]
+            lsl = None
+            if len(l28) >= 14:
+                lmx, lmy = sum(q for q, _ in l28) / len(l28), sum(y for _, y in l28) / len(l28)
+                lsx = sum((q - lmx) ** 2 for q, _ in l28)
+                lsl = (sum((q - lmx) * (y - lmy) for q, y in l28) / lsx) if lsx > 0 else 0.0
+            if lo_s:
+                rep.add("NDS-3g: wsi z kiesa < 1000 zl - trend (7 pierwszych dob okna -> 7 ostatnich dob; koniec rampy i 28 ostatnich dob osobno)",
+                        f"{100 * sum(lo_s) / len(lo_s):.1f}% -> {100 * x:.1f}%" + (f" (7 dob od konca rampy {r0_}: {100 * sum(lo0) / len(lo0):.1f}%)" if lo0 else "")
+                        + (f"; 28 ostatnich dob {l28[0][1]:.0f} -> {l28[-1][1]:.0f} wsi, MNK {lsl:+.2f} wsi/d" if lsl is not None else ""),
+                        "INFO (rozklad kies: liczba wsi bez grosza przy plaskiej sumie - przyczyna wies po wsi w wsie-kiesy.csv, NDS-3h)", None)
         sh = [D["vil"][d]["stan"] / D["vil"][d]["world"] for d in vd[-7:] if D["vil"][d].get("world")]
         sh0 = [D["vil"][d]["stan"] / D["vil"][d]["world"] for d in vd[:7] if D["vil"][d].get("world")]
         if sh:
@@ -38285,6 +38324,68 @@ def nds_main(logp, bdp=None, until=120):
             rep.add("NDS-3e: kiesy wsi w zlocie swiata (7 ostatnich dob)", f"{100 * x:.2f}%" + (f" (start {100 * sum(sh0) / len(sh0):.2f}%)" if sh0 else ""), "<= 3% (dzis 1.2-2.2%)", x <= 0.03)
     else:
         rep.add("NDS-3: kiesy wsi", f"dob z linia 'Przeplywy osad (kiesy wsi)' {len(vd)}", "INFO (za malo dob, >= 30)", None)
+    # f14-wsie poprawka (recenzja 18.10): ogon biednych wsi wies po wsi - plik wsie-kiesy.csv (MoneyLedger.Villages.cs, co 7 dob): ostatnie 4 okna pliku (ok. 28 dob),
+    # wsie z kiesa < 1000 zl na koncu wobec reszty - przeplywy na wies i dobe (woz netto, poza tickiem, pozycje ticku), stan wsi i targu, targi z najwiecej biednymi
+    # wsiami. INFO - rozpoznanie przyczyny (utarg ponizej koszyka i czynszu? wojna? tani targ?), nie prog. Log sprzed f14-wsie - "brak pliku".
+    try:
+        vcp = os.path.join(os.path.dirname(csvp), "wsie-kiesy.csv") if csvp else session_file_find(logp, "wsie-kiesy.csv")   # uklad archiwum albo gry (Logs/<sesja>/)
+    except Exception:
+        vcp = None
+    if not vcp or not os.path.isfile(vcp):
+        rep.add("NDS-3h: kiesy wsi wies po wsi (wsie-kiesy.csv, f14-wsie)", f"brak pliku {vcp}", "INFO (log sprzed f14-wsie albo log wylaczony)", None)
+    else:
+        byd3 = {}
+        with open(vcp, encoding="utf-8", errors="replace", newline="") as fh3:
+            for r3 in csv.DictReader(fh3, delimiter=";"):
+                try:
+                    byd3.setdefault(int(r3["dzien"]), []).append(r3)
+                except (KeyError, TypeError, ValueError):
+                    continue
+        dd3 = sorted(d for d in byd3 if not ds or d <= ds[0] + u3 - 1)
+        l4 = dd3[-4:]
+        if not l4:
+            rep.add("NDS-3h: kiesy wsi wies po wsi (wsie-kiesy.csv, f14-wsie)", f"plik bez wierszy w oknie ({vcp})", "INFO", None)
+        else:
+            def _f3(r, k):
+                try:
+                    return float(r.get(k) or 0)
+                except (TypeError, ValueError):
+                    return 0.0
+            span3 = max(1, sum(int(_f3(byd3[d][0], "dob_okna")) for d in l4))
+            fl3 = ("zmiana_okna", "woz_netto_do_kiesy", "poza_tickiem", "tick_renty", "tick_kiesa_ludu", "tick_budowy", "tick_korona", "tick_markietani", "tick_budzet166",
+                   "tick_ks", "tick_ksh", "tick_zc6", "tick_inne")
+            acc3, hit3, mk3 = {}, {}, {}
+            for d in l4:
+                for r3 in byd3[d]:
+                    vid = r3.get("wies_id")
+                    a3 = acc3.setdefault(vid, [0.0] * len(fl3))
+                    for j, k in enumerate(fl3):
+                        a3[j] += _f3(r3, k)
+                    if r3.get("stan") not in (None, "", "normalna") or r3.get("targ_oblezony") == "1":
+                        hit3[vid] = 1
+                    mk3[vid] = r3.get("miasto_targowe_id") or "-"
+            end3 = {r3.get("wies_id"): r3 for r3 in byd3[l4[-1]]}
+            beg3 = {r3.get("wies_id"): _f3(r3, "kiesa_poczatek_okna") for r3 in byd3[l4[0]]}
+            poor3 = [v for v, r3 in end3.items() if _f3(r3, "kiesa") < 1000 and v in acc3]
+            rest3 = [v for v in end3 if v not in poor3 and v in acc3]
+            fell3 = [v for v in poor3 if beg3.get(v, 0) >= 1000]
+
+            def _avg3(grp, j):
+                return sum(acc3[v][j] for v in grp) / len(grp) / span3 if grp else 0.0
+            short = ("zmiana", "woz netto", "poza tickiem", "renty", "kiesa ludu", "budowy", "korona", "markietani", "166", "KS", "KS-H", "ZC6", "inne")
+            parts3 = [f"{short[j]} {_avg3(poor3, j):+.0f} / {_avg3(rest3, j):+.0f}" for j in range(len(fl3))
+                      if abs(_avg3(poor3, j)) >= 0.5 or abs(_avg3(rest3, j)) >= 0.5]
+            hp = sum(1 for v in poor3 if v in hit3) / len(poor3) if poor3 else 0.0
+            hr = sum(1 for v in rest3 if v in hit3) / len(rest3) if rest3 else 0.0
+            cnt3 = {}
+            for v in poor3:
+                cnt3[mk3.get(v, "-")] = cnt3.get(mk3.get(v, "-"), 0) + 1
+            top3 = ", ".join(f"{k} {n}" for k, n in sorted(cnt3.items(), key=lambda x: -x[1])[:5])
+            w0d = l4[0] - int(_f3(byd3[l4[0]][0], "dob_okna"))
+            rep.add(f"NDS-3h: kiesy wsi wies po wsi (wsie-kiesy.csv, {len(l4)} okien {w0d}-{l4[-1]}, {span3} dob): biedne (< 1000 zl na koncu) / reszta - zl na wies i dobe",
+                    f"biednych {len(poor3)} z {len(end3)} (zeszlo ponizej 1000 w tych oknach {len(fell3)}); " + "; ".join(parts3)
+                    + f" | najazd, grabiez albo oblezony targ: {100 * hp:.0f}% / {100 * hr:.0f}% | targi z najwiecej biednymi: {top3 or '-'}",
+                    "INFO (rozpoznanie ogona biednych wsi - poza tickiem = utarg wozow po daninach przy wozie, przelewy gry, sakiewki rozbitych partii)", None)
     rep.add("NDS-4/5: KS - alfa z praw i bilans startu (nks)", "galaz bez KS (DsVillage.BudgetShare tylko API)", "INFO (bramki w galezi KS)", None)
     rep.add("NDS-8: KS-H kredyt kupiecki (F2)", "nie wdrozone w tej galezi", "INFO", None)
     # NDS-6 zaleglosci czynszu
@@ -47305,7 +47406,7 @@ def main(argv):
     if group == "nprzysiolki" and logp:
         return nprzysiolki_main(logp)   # nprzysiolki (17/18.10, sw-przysiolki): uklad wiosek v6 - przysiolki na pustkowiach, ludzie okregow jak v5, ksiega / lore / widok / KS (VillageHamlets.cs)
     if group == "nds" and logp:
-        return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
+        return nds_main(logp, bdp, until_arg, until_arg if "--do-doby" in args else 100000, csvp)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona; f14-wsie: NDS-3 bez --do-doby - do konca logu): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
     if group == "npolnoc" and logp:
         return npolnoc_main(logp, bdp)   # npolnoc (r4-polnoc, noc 17/18.10): najpierw wyzywic siebie i zimna ziemia - wyzywienie krain z Planu (NKS-30), zbieznosc, tozsamosc rak
     if group == "nmur" and logp:
