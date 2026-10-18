@@ -16,8 +16,10 @@ namespace Armoury
     /// (KsFoodCore DstOverdue). Wojna miedzy zrodlem a celem - rachunek przepada ("kupcy stracili": znika roszczenie, zloto nie powstaje i nie ginie; licznik).
     /// Zmiana wlasciciela w jednym krolestwie (i pokoj) - rachunek zostaje. Najwyzej 8 wpisow na pare (zrodlo, cel): nowy przy pelnej liscie dopisywany do najnowszego.
     /// ZLOTO: kazda moneta cel -> zrodlo (ChangeGold z pomiarem obu stron); kontrola doby: otwarte wczoraj + nowe - splacone - przepadle = otwarte dzis (reszta 0).
-    /// ZAPIS: klucz arm_daniny_kupcy "kk1|zrodlo~cel~zostalo~doba|..." (najwyzej 64 KB - wiecej: wpisy pary scalane w jeden, najstarsza doba; nic nie przepada); brak klucza
-    /// (stary zapis) = brak rachunkow; starsza DLL klucza nie czyta.
+    /// ZAPIS: klucz arm_daniny_kupcy "kk1|zrodlo~cel~zostalo~doba|..." (ponad 64 KB - wpisy pary scalane w jeden, najstarsza doba; nic nie przepada); brak klucza
+    /// (stary zapis) = brak rachunkow; starsza DLL klucza nie czyta. Recenzja r4-kupcy: 64 KB to limit MIEKKI - po scaleniu zostaje jeden wpis (ok. 40 znakow) na pare
+    /// (zrodlo, cel) z rachunkiem; par nie da sie scalic bez utraty odbiorcy splaty, wiec ponad ok. 1600 par zapis zostaje wiekszy (SaveText dzieli go na paczki) i linia
+    /// zapisu mowi "NADAL PONAD 64 KB" (NKU-10 NIE). Gorna granica: pary miast tego samego rynku, w praktyce do 20 zrodel na miasto (12 najblizszych + 8 dalszych).
     /// </summary>
     internal static class KsFoodCredit
     {
@@ -241,7 +243,9 @@ namespace Armoury
             {
                 // rozmiar ponad 64 KB - wpisy pary scalane w jeden (najstarsza doba, suma); nic nie przepada
                 s = Build(true);
-                try { Log.Info("KS: zapis arm_daniny_kupcy - wpisy par scalone (rozmiar ponad 64 KB), teraz " + (s.Length / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " KB."); } catch { }
+                // recenzja r4-kupcy: limit miekki - po scaleniu jeden wpis na pare; wiecej par = wiekszy zapis (roszczenia nie przepadaja), linia mowi to wprost
+                bool over = s.Length > SaveCapChars;
+                try { Log.Info("KS: zapis arm_daniny_kupcy - wpisy par scalone (rozmiar ponad 64 KB), teraz " + (s.Length / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " KB" + (over ? " - NADAL PONAD 64 KB (limit miekki: jeden wpis na pare, " + _acc.Count + " par; roszczenia nie przepadaja)" : "") + "."); } catch { }
             }
             try { Log.Info("KS: zapis arm_daniny_kupcy doba " + Today() + " | " + (s.Length / 1024.0).ToString("0.0", CultureInfo.InvariantCulture) + " KB (par " + _acc.Count + ")."); } catch { }
             return s;

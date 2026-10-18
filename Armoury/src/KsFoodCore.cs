@@ -18,6 +18,8 @@ namespace Armoury
     ///  - FarAlways (H2): do 8 dalszych miast z oferta w zasiegu ZAWSZE (nie tylko, gdy 12 najblizszych nic nie da); najpierw tani test oferty, potem doby i wojna;
     ///  - RelKeep (H3): zapas zrodla wzgledny - max(0.5 T*, min(1.25 T*, 1.1 x mediana dni polki rynku)), sprzedaje cala nadwyzke zboza i soli, 2/3 reszty;
     ///  - DestValue (H4): wartosc n sztuk u celu (cena polki celu schodzi z kazda sztuka, najwyzej 3 x cena startu, x 0.97) - ta sama liczba w decyzji i w rachunku;
+    ///    recenzja r4-kupcy: drugi i trzeci lot doby do tego samego (cel, towar) wyceniany ZA sztukami lotow wczesniejszych tej doby (calka od j0 = juz wyslane do j0 + n),
+    ///    jak rachunek przy dostawie, gdy wczesniejszy woz lezy juz na polce celu;
     ///  - Consign (H5): kredyt kupcow - cel nie placi przy wyjezdzie (bez budzetu kasy celu), limit = miejsce kredytu zrodla SrcRoom[s] (towar + fracht), cel z rachunkiem
     ///    starszym niz zwloka (DstOverdue) - bez nowych dostaw (licznik "cel z zaleglym");
     ///  - ByNeed (diagnoza fin80 "ceny"): kolejka zamowien wszystkich towarow wedlug pokrycia H / (T* x Dz) rosnaco (najkrotsze pierwsze) - budzet kasy celu i miejsce
@@ -56,17 +58,18 @@ namespace Armoury
             public double[] SrcRoom;                           // [nt] Consign: miejsce kredytu zrodla (zl: towar + fracht)
             public bool[] DstOverdue;                          // [nt] Consign: cel z rachunkiem starszym niz zwloka
             public bool[] FamineGood;                          // [NK] towar glodu (zboze, ryby, mieso)
-            public Func<int, int, int, long> DestValue;        // (cel, k, n) - wartosc n sztuk u celu po marzy (null - n x cena polki x 0.97)
+            public Func<int, int, int, int, long> DestValue;   // (cel, k, j0, n) - wartosc n sztuk u celu po marzy za j0 sztukami juz wyslanymi dzis do (cel, k) (null - n x cena polki x 0.97)
             public Func<int, int, double> IxAt;                // (miasto, k) - indeks ceny na zadanie (T9; null - tablica Ix pelna)
         }
 
         /// <summary>Liczniki doby: zamowione, kasa celu za mala, loty bez zysku, z dalszych miast, z zapasu kupcow (loty, zl), kasy miast z brakiem / zapas.
-        /// KS-R4 r4-kupcy: zrodlo bez miejsca kredytu, cel z zaleglym (szt.), zablokowane z braku pieniedzy wedlug towaru, glod (celow, zamowione, wyslane).</summary>
+        /// KS-R4 r4-kupcy: zrodlo bez miejsca kredytu, cel z zaleglym (szt.), zablokowane z braku pieniedzy wedlug towaru, glod (celow - rozne miasta doby, zamowien
+        /// glodu - pary (cel, towar), zamowione, wyslane).</summary>
         internal sealed class Stats
         {
             public long Ordered, Poor, NoProfit, ResGold; public int Far, ResLots;
             public readonly List<double> CofShort = new List<double>();
-            public long SrcCap, Overdue, FamineOrd, FamineGot; public int FamineReq;
+            public long SrcCap, Overdue, FamineOrd, FamineGot; public int FamineReq, FamineReqK;
             public long[] PoorByK;
         }
 
@@ -75,7 +78,7 @@ namespace Armoury
         {
             public In A; public Stats St;
             public double[] Dz, DzB, Sh, Offer, Budget, BudgetShort, Spent, SrcSpent;
-            public bool[] ShortSeen, FarMark;
+            public bool[] ShortSeen, FarMark, FamSeen;
             public readonly List<KeyValuePair<double, int>> Cand = new List<KeyValuePair<double, int>>(24);
         }
 
@@ -168,7 +171,7 @@ namespace Armoury
                         if (need) a.Ix[o] = a.IxAt(i, k);
                     }
             }
-            var r = new Run { A = a, St = st, Dz = dz, DzB = dzB, Sh = sh, Offer = offer, Budget = budget, BudgetShort = budgetShort, Spent = spent, ShortSeen = shortSeen, SrcSpent = new double[nt], FarMark = new bool[nt] };
+            var r = new Run { A = a, St = st, Dz = dz, DzB = dzB, Sh = sh, Offer = offer, Budget = budget, BudgetShort = budgetShort, Spent = spent, ShortSeen = shortSeen, SrcSpent = new double[nt], FarMark = new bool[nt], FamSeen = new bool[nt] };
             if (!a.ByNeed)
             {
                 var dst = new List<int>(nt);
@@ -269,7 +272,8 @@ namespace Armoury
                     }
                 }
             }
-            if (fam) st.FamineReq++;
+            // recenzja r4-kupcy: "celow" = rozne miasta glodu doby (miasto bez zboza i ryb liczone raz), zamowienia glodu (cel, towar) osobno
+            if (fam) { st.FamineReqK++; if (!r.FamSeen[t]) { r.FamSeen[t] = true; st.FamineReq++; } }
             if (cand.Count == 0) { ClearFar(r); return; }
             cand.Sort((x, y) => x.Key != y.Key ? x.Key.CompareTo(y.Key) : x.Value.CompareTo(y.Value));
             if (a.Consign && a.DstOverdue != null && a.DstOverdue[t])
@@ -305,16 +309,17 @@ namespace Armoury
                 double tau = sea ? TauSea : TauLand;
                 long cost = a.LotPrice(s, k, n);
                 long fr = (long)Math.Round(cost * tau * L);
+                int j0 = (int)Math.Min(int.MaxValue, got0);         // H4: sztuki wczesniejszych lotow tej doby do (t, k) - na polce celu przed tym lotem
                 if (destUnit > 0)
                 {
                     int tries = 0;
-                    while (n > 0 && cost + fr > Val(a, t, k, n, destUnit) && tries < 3)
+                    while (n > 0 && cost + fr > Val(a, t, k, j0, n, destUnit) && tries < 3)
                     {
                         n /= 2; tries++;
                         if (n < Math.Max(5.0, 0.5 * d)) { n = 0; break; }
                         cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
                     }
-                    if (n <= 0 || cost + fr > Val(a, t, k, n, destUnit)) { st.NoProfit++; continue; }
+                    if (n <= 0 || cost + fr > Val(a, t, k, j0, n, destUnit)) { st.NoProfit++; continue; }
                 }
                 // kasa celu (runda 3) albo miejsce kredytu zrodla (H5: towar + fracht, cel placi dopiero przy dostawie)
                 double avail = a.Consign ? (a.SrcRoom != null && s < a.SrcRoom.Length ? a.SrcRoom[s] : 0.0) - r.SrcSpent[s]
@@ -355,10 +360,10 @@ namespace Armoury
             ClearFar(r);
         }
 
-        /// <summary>Wartosc n sztuk u celu po marzy: H4 (DestValue) albo runda 3 - n x cena polki celu x 0.97.</summary>
-        private static long Val(In a, int t, int k, int n, int destUnit)
+        /// <summary>Wartosc n sztuk u celu po marzy: H4 (DestValue, za j0 sztukami wczesniejszych lotow doby) albo runda 3 - n x cena polki celu x 0.97 (bez j0, bit w bit).</summary>
+        private static long Val(In a, int t, int k, int j0, int n, int destUnit)
         {
-            if (a.DestValue != null) return a.DestValue(t, k, n);
+            if (a.DestValue != null) return a.DestValue(t, k, j0, n);
             return (long)Math.Floor(n * (double)destUnit * (1.0 - Margin));
         }
 
@@ -378,6 +383,24 @@ namespace Armoury
             }
             sum += p0 * Math.Pow(A0, 0.6) / (0.4 * c) * (Math.Pow(A0 + c * n, 0.4) - Math.Pow(A0 + c * j0, 0.4));
             return Math.Max(sum, n);                       // najmniej 1 zl za sztuke (cena gry >= 1)
+        }
+
+        /// <summary>Recenzja r4-kupcy (H4): suma cen sztuk j0 .. j0 + n - 1 dowiezionych na polke celu za j0 sztukami wczesniejszych lotow doby - ta sama calka zamknieta
+        /// co DestIntegral od j0 (sufit cap do j*, potem wzor), najmniej 1 zl za sztuke; j0 <= 0 - DestIntegral bit w bit.</summary>
+        internal static double DestIntegralFrom(double p0, double A0, double c, double cap, int j0, int n)
+        {
+            if (j0 <= 0) return DestIntegral(p0, A0, c, cap, n);
+            if (n <= 0 || !(p0 > 0)) return 0.0;
+            if (!(A0 > 0) || !(c > 0)) return n * (cap > 0 ? Math.Min(p0, cap) : p0);
+            double ja = j0, jb = (double)j0 + n, lo = ja, sum = 0.0;
+            if (cap > 0 && p0 > cap)
+            {
+                double js = A0 * (Math.Pow(p0 / cap, 1.0 / 0.6) - 1.0) / c;
+                if (js >= jb) return n * cap;
+                if (js > ja) { sum += cap * (js - ja); lo = js; }
+            }
+            sum += p0 * Math.Pow(A0, 0.6) / (0.4 * c) * (Math.Pow(A0 + c * jb, 0.4) - Math.Pow(A0 + c * lo, 0.4));
+            return Math.Max(sum, n);
         }
 
         /// <summary>T9b (czysty C#, test portu): suma cen n sztuk z polki zrodla przy cenie sztuki Q(k) = ceil(q x (D / (0.1 S + 0.04 max(0, V - k x wv) + 2))^0.6)

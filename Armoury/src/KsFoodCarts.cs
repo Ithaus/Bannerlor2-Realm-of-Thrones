@@ -47,6 +47,10 @@ namespace Armoury
     ///    schodkami wzoru gry (dwie ceny gry - pierwsza i ostatnia sztuka - sprawdzaja wzor; inny wzor - trzy ceny jak dotad);
     ///  - linia: kredyt kupiecki (otwarte, nowe, zaplacone przy dostawie, splacone, starsze niz zwloka, przepadle), kontrole rachunkow i zlota, zablokowane z braku
     ///    pieniedzy wedlug towaru, glod pierwszy, Polnoc i Mur (battania, nightswatch, freefolk, skagosi).
+    ///  - recenzja r4-kupcy: H4 - drugi i trzeci lot doby do (cel, towar) wyceniany za sztukami wczesniejszych lotow doby (port5: dotad 418 z 1021 takich lotow z rachunkiem
+    ///    ponizej kosztu + frachtu); "glod pierwszy: celow" = rozne miasta doby (zamowien glodu - pary osobno); linia mowi wprost o zamkach Muru poza KS-H (Eastwatch
+    ///    by the Sea, Shadow Tower, Nightfort, The Wall - KS-H wozi tylko do miast, zboze do Muru daje danina r4-mur) i o wozach na kredyt w drodze (przed cofnieciem
+    ///    DLL ponizej r4-kupcy: 0 wozow i 0 zl otwartych - starsza DLL dowiozlaby je bez rachunku).
     /// </summary>
     internal static class KsFoodCarts
     {
@@ -127,10 +131,13 @@ namespace Armoury
         private static long _daysTicks; private static int _daysCalls;
         // KS-R4 r4-kupcy: kredyt (wyslane na kredyt, wartosc zrodla, fracht ze zrodel), zablokowane (zrodlo bez miejsca, cel z zaleglym, z braku pieniedzy wedlug towaru),
         // glod pierwszy, Polnoc i Mur; tabela dob wedlug dob (wersja, przelacznik klucza, pierwsza doba naraz)
-        private static long _dConsPcs, _dConsVal, _gSrcFr, _dSrcCap, _dOverdue, _dFamOrd, _dFamGot, _dNorthShip, _dNorthArr; private static int _dConsLots, _dFamReq;
+        private static long _dConsPcs, _dConsVal, _gSrcFr, _dSrcCap, _dOverdue, _dFamOrd, _dFamGot, _dNorthShip, _dNorthArr; private static int _dConsLots, _dFamReq, _dFamReqK;
         private static readonly long[] _dPoorByZ = new long[NZ];
         private static readonly Dictionary<string, long> _dNorthBy = new Dictionary<string, long>(StringComparer.Ordinal);
         private static bool[] _north;                 // [nt] miasto Polnocy, Muru albo za Murem (kultura battania, nightswatch, freefolk, wildlings, skagosi)
+        // recenzja r4-kupcy: zamki Muru (kultura nightswatch: Eastwatch by the Sea, Shadow Tower, Nightfort, The Wall) - KS-H obsluguje tylko miasta (wiersz ZC4: popyt
+        // zaplacony, T*, odbior 7 dob; indeksy miast wspolne z Planem i zapisem), zboze do Muru wiezie danina r4-mur do spichlerzy okregow Strazy - linia to mowi wprost
+        private static int _wallCastles; private static string _wallCastleNames = "-";
         private static bool _byDays, _daysSlow;       // tabela dob liczona regula H1 (wersja "T"); pierwsza doba naraz przekroczyla 20 ms - dalej 200 wywolan na dobe
         private static bool _consignNow;              // klucz Ks Food Carts Consign w tej dobie (Ship)
         private static string _creditCtl = "-"; private static long _creditOpen;   // kontrola rachunkow doby (KsFoodCredit.EndDay) i otwarte na koniec doby
@@ -156,7 +163,7 @@ namespace Armoury
             _gDst = _gSrc = _gCarters = _gCrews = _gRefSrc = _gRefDst = 0;
             Array.Clear(_dByZ, 0, NZ); _dSampleErr = _dSampleMax = 0; _dTicks = 0; _dSampleTicks = 0;
             _dMarVal = _dMarCost = _dNoProfit = _dSpoil = _dRetLost = 0; _dMarLots = _dMarLoss = 0; _dMarPct.Clear(); _dCofShort.Clear();
-            _dConsPcs = _dConsVal = _gSrcFr = _dSrcCap = _dOverdue = _dFamOrd = _dFamGot = _dNorthShip = _dNorthArr = 0; _dConsLots = _dFamReq = 0;
+            _dConsPcs = _dConsVal = _gSrcFr = _dSrcCap = _dOverdue = _dFamOrd = _dFamGot = _dNorthShip = _dNorthArr = 0; _dConsLots = _dFamReq = _dFamReqK = 0;
             Array.Clear(_dPoorByZ, 0, NZ); _dNorthBy.Clear();
             KsFoodCredit.ClearDay();
         }
@@ -201,6 +208,7 @@ namespace Armoury
                 string cu = null; try { cu = _st[i].Culture != null ? _st[i].Culture.StringId : null; } catch { cu = null; }
                 _north[i] = cu == "battania" || cu == "nightswatch" || cu == "freefolk" || cu == "wildlings" || cu == "skagosi";
             }
+            WallCastles();
             _byDays = ShipByDaysKey; _daysSlow = false;
             _days = new float[_nt * _nt]; _sea = new bool[_nt * _nt];
             var pairs = new List<int>();
@@ -218,6 +226,26 @@ namespace Armoury
             if (_pendingKx != null) { string p = _pendingKx; _pendingKx = null; ImportKxNow(p); }
             _candDirty = true;
             return _nt > 0;
+        }
+
+        /// <summary>Recenzja r4-kupcy: zamki Muru (zamek kultury nightswatch) poza KS-H - liczba i nazwy do linii (raz na sesje, z listy miast).</summary>
+        private static void WallCastles()
+        {
+            _wallCastles = 0; _wallCastleNames = "-";
+            try
+            {
+                var names = new List<string>();
+                foreach (var t in Town.AllCastles)                 // Town.AllTowns to same miasta (Campaign.AllTowns), zamki - Campaign.AllCastles
+                {
+                    if (t == null || !t.IsCastle || t.Settlement == null) continue;
+                    string cu = null; try { cu = t.Settlement.Culture != null ? t.Settlement.Culture.StringId : null; } catch { cu = null; }
+                    if (cu != "nightswatch") continue;
+                    names.Add(t.Settlement.Name != null ? t.Settlement.Name.ToString() : t.Settlement.StringId);
+                }
+                names.Sort(StringComparer.Ordinal);
+                _wallCastles = names.Count; if (names.Count > 0) _wallCastleNames = string.Join(", ", names);
+            }
+            catch (Exception e) { Stumble("WallCastles", e); }
         }
 
         internal static int TownCount { get { EnsureTowns(); return _nt; } }
@@ -676,7 +704,7 @@ namespace Armoury
                 if (DestValueKey)
                 {
                     var dv = new double[nt * NZ * 4]; var dvOk = new sbyte[nt * NZ];
-                    a.DestValue = (t, k, n) => DestValueDay(t, k, items[k], n, dv, dvOk);
+                    a.DestValue = (t, k, j0, n) => DestValueDay(t, k, items[k], j0, n, dv, dvOk);
                 }
                 _consignNow = ConsignKey;
                 a.Consign = _consignNow;
@@ -705,7 +733,7 @@ namespace Armoury
                 KsFoodCore.Decide(a, stt);
                 _dOrdered += stt.Ordered; _dPoor += stt.Poor; _dNoProfit += stt.NoProfit; _dFar += stt.Far; _dRes += stt.ResLots; _dResGold += stt.ResGold;
                 _dCofShort.AddRange(stt.CofShort);
-                _dSrcCap += stt.SrcCap; _dOverdue += stt.Overdue; _dFamReq += stt.FamineReq; _dFamOrd += stt.FamineOrd; _dFamGot += stt.FamineGot;
+                _dSrcCap += stt.SrcCap; _dOverdue += stt.Overdue; _dFamReq += stt.FamineReq; _dFamReqK += stt.FamineReqK; _dFamOrd += stt.FamineOrd; _dFamGot += stt.FamineGot;
                 if (stt.PoorByK != null) for (int k = 0; k < NZ && k < stt.PoorByK.Length; k++) _dPoorByZ[k] += stt.PoorByK[k];
             }
             catch (Exception e) { Stumble("Daily", e); }
@@ -766,8 +794,9 @@ namespace Armoury
             return KsFoodCore.LotSteps(p0, pl, n, val * (1.0 + pen), ins0, sup, dem, wv, Q, out sum);
         }
 
-        /// <summary>KS-R4 r4-kupcy H4: wartosc n sztuk u celu po marzy - pamiec doby (cena pierwszej sztuki, polka wzoru, sufit) na (cel, towar), decyzja KsFoodCore.</summary>
-        private static long DestValueDay(int t, int k, ItemObject it, int n, double[] dv, sbyte[] ok)
+        /// <summary>KS-R4 r4-kupcy H4: wartosc n sztuk u celu po marzy - pamiec doby (cena pierwszej sztuki, polka wzoru, sufit) na (cel, towar), decyzja KsFoodCore;
+        /// recenzja: za j0 sztukami lotow wczesniejszych tej doby do (cel, towar) (jak rachunek przy dostawie, gdy wczesniejszy woz lezy juz na polce).</summary>
+        private static long DestValueDay(int t, int k, ItemObject it, int j0, int n, double[] dv, sbyte[] ok)
         {
             if (it == null || n <= 0 || t < 0 || t >= _nt) return 0;
             int o = t * NZ + k;
@@ -778,7 +807,7 @@ namespace Armoury
                 dv[4 * o] = p0; dv[4 * o + 1] = a0; dv[4 * o + 2] = c; dv[4 * o + 3] = cap;
             }
             if (ok[o] != 1) return 0;
-            return (long)Math.Floor(KsFoodCore.DestIntegral(dv[4 * o], dv[4 * o + 1], dv[4 * o + 2], dv[4 * o + 3], n) * (1.0 - Margin));
+            return (long)Math.Floor(KsFoodCore.DestIntegralFrom(dv[4 * o], dv[4 * o + 1], dv[4 * o + 2], dv[4 * o + 3], j0, n) * (1.0 - Margin));
         }
 
         /// <summary>KS-R4 r4-kupcy H4: wartosc n sztuk u celu po marzy przy cenie tej chwili (rachunek przy dostawie - przed polozeniem towaru na polce).</summary>
@@ -1069,11 +1098,15 @@ namespace Armoury
                   .Append(" wozach (wartosc zrodla ").Append(_dConsVal).Append(" zl, fracht ze zrodel ").Append(_gSrcFr).Append(" zl), zablokowane: zrodlo bez miejsca ").Append(_dSrcCap).Append(" szt., cel z zaleglym ")
                   .Append(_dOverdue).Append(" szt. | kontrola kredytu reszta ").Append(ctl).Append(" (otwarte wczoraj + nowe - splacone - przepadle - otwarte dzis), u celu reszta ").Append(rest2)
                   .Append(" (u celu - zaplacone przy dostawie - nowe), potkniecia kredytu ").Append(KsFoodCredit.TakeStumbles());
+                // recenzja r4-kupcy: wozy na kredyt w drodze - przed cofnieciem DLL ponizej r4-kupcy musza byc 0 (starsza DLL dowiozlaby je bez rachunku) i otwarte rachunki 0
+                long cN = 0, cPcs = 0, cVal = 0;
+                foreach (var c in _carts) { if (!c.Cons || c.N <= 0) continue; cN++; cPcs += c.N; cVal += Math.Max(0, c.Val); }
+                sb.Append(" | kredyt w drodze: wozow ").Append(cN).Append(" (").Append(cPcs).Append(" szt., wartosc zrodla ").Append(cVal).Append(" zl; przed cofnieciem DLL ponizej r4-kupcy: 0 wozow i 0 zl otwartych)");
                 sb.Append(" | zablokowane z braku pieniedzy wedlug towaru (szt.):");
                 bool f = true;
                 for (int k = 0; k < NZ; k++) { if (_dPoorByZ[k] <= 0) continue; sb.Append(f ? " " : ", ").Append(KsBasket.Ids[Z[k]]).Append(' ').Append(_dPoorByZ[k]); f = false; }
                 if (f) sb.Append(" -");
-                sb.Append(" | glod pierwszy: celow ").Append(_dFamReq).Append(" (zboze, ryby, mieso ponizej 0.5 T*), zamowione ").Append(_dFamOrd).Append(" szt., wyslane ").Append(_dFamGot).Append(" szt.");
+                sb.Append(" | glod pierwszy: celow ").Append(_dFamReq).Append(" (rozne miasta; zamowien glodu ").Append(_dFamReqK).Append(" - pary miasto i towar; zboze, ryby, mieso ponizej 0.5 T*), zamowione ").Append(_dFamOrd).Append(" szt., wyslane ").Append(_dFamGot).Append(" szt.");
                 long inN = 0; int nN = 0;
                 if (_north != null) { for (int i = 0; i < _nt && i < _north.Length; i++) if (_north[i]) { nN++; inN += _inc != null ? SumInc(i) : 0; } }
                 sb.Append(" | Polnoc i Mur (").Append(nN).Append(" miast): wyslane ").Append(_dNorthShip).Append(" szt., dowiezione ").Append(_dNorthArr).Append(" szt. do ").Append(_dNorthBy.Count).Append(" miast");
@@ -1085,6 +1118,7 @@ namespace Armoury
                     sb.Append(')');
                 }
                 sb.Append(", w drodze ").Append(inN).Append(" szt.");
+                sb.Append(" | zamki Muru poza KS-H ").Append(_wallCastles).Append(" (").Append(_wallCastleNames).Append("; KS-H wozi tylko do miast - zboze do zamkow Muru: danina Muru r4-mur do spichlerzy okregow Strazy)");
             }
             catch (Exception e) { Stumble("AppendR4", e); }
         }
