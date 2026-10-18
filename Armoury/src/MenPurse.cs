@@ -370,6 +370,30 @@ namespace Armoury
             return t;
         }
 
+        /// <summary>sw-zajazdy (TownInns.RoadCommit): nocleg w zajezdzie przy szlaku - sakiewka ludzi -> wies okregu zajazdu. Ta sama regula co czesc wsi markietanow
+        /// (Sutlers.One): podatek pana z czynnego modelu na licznik podatku wsi, reszta do kiesy (VillageTakings.Split - razem dokladnie zdjete); wies rodu partii -
+        /// calosc do kiesy (K3); potem udzial korony DS od czesci w kiesie (DsVillage.WarShareSutlers - jak markietani; wies spoza DS - 0). Zwraca zdjete z sakiewki;
+        /// `tax` - czesc na licznik podatku, `crown` - przelane z kiesy wsi do korony. Licznik "zycie w miastach" linii "Sakiewka ludzi" jak karczma miasta.
+        /// Recenzja: podatek pana tylko przy kluczu VillageTributeFromSutlers (jak Sutlers.One - wylaczony = calosc do kiesy, udzial korony DS od calosci); zmiany
+        /// kiesy wsi poza tickiem dobowym nazwane w ksiedze (MoneyLedger.Note169 "inne" - jak HideoutPurge), udzial korony na osobnym liczniku zajazdow linii DS.</summary>
+        internal static int InnPayVillage(MobileParty mp, Settlement st, int amount, out int tax, out int crown)
+        {
+            tax = 0; crown = 0;
+            if (!On || mp == null || st == null || st.Village == null || amount <= 0) return 0;
+            Day();
+            int t = Take(mp, amount);
+            if (t <= 0) return 0;
+            var v = st.Village;
+            int purse = t;
+            if (TownInns.RoadTributeOn && !ReferenceEquals(st.OwnerClan, mp.ActualClan)) VillageTakings.Split(v, t, t, out tax, out purse);
+            else v.ChangeGold(t);
+            if (purse > 0) MoneyLedger.Note169(MoneyLedger.N169Other, st, purse);   // ksiega przeplywow osad: sakiewka ludzi -> kiesa wsi (tylko licznik)
+            if (purse > 0) crown = DsVillage.WarShareSutlers(v, purse, true);         // wlasny try - nie rzuca
+            if (crown > 0) MoneyLedger.Note169(MoneyLedger.N169Other, st, -crown);    // kiesa wsi -> skarbiec korony (tylko licznik)
+            _dayLife += t;
+            return t;
+        }
+
         /// <summary>
         /// E5/A3 (paczka 163, R9) - markietani: doba partii w POLU. Ta sama kolejnosc rezerw co OnLeft - zalegle naprawy (robocizna, bez szacunku materialu:
         /// poza miastem nie ma polki - jak zaopatrzenie BK D11-4), odziez czekajaca na zakup (150) i oszczednosci K1 juz odlozone zostaja w sakiewce;

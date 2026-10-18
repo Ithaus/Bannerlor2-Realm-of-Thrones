@@ -353,6 +353,17 @@ namespace Armoury
                     Log.Error("MapRoadsProbe: komponent widoku nie laduje sie (proba " + _mapRoadsLoadFails + "/3)", e);
                 }
             }
+            // sw-zajazdy: zajazdy przy szlakach - osobna rejestracja widoku przed wylacznikiem wiosek, ta sama ochrona przed bledem ladowania typu (po 3 probach
+            // zajazdy na mapie nie startuja do konca sesji; menu i plotki dzialaja dalej); przy kluczu RoadsideInns = off typ widoku sie nie laduje
+            if (_innsLoadFails < 3 && Settings.Current.RoadsideInns)
+            {
+                try { RoadsideInnsTick(); }
+                catch (Exception e)
+                {
+                    _innsLoadFails++;
+                    Log.Error("RoadsideInns: komponent widoku nie laduje sie (proba " + _innsLoadFails + "/3)", e);
+                }
+            }
             if (_mapVillagesLoadFails >= 3 || !Settings.Current.MapVillagesEnabled) return;
             try { MapVillagesTick(); }
             catch (Exception e)
@@ -372,6 +383,13 @@ namespace Armoury
         }
 
         private static int _mapRoadsLoadFails;
+        private static int _innsLoadFails;
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static void RoadsideInnsTick()
+        {
+            RoadsideInnsView.EnsureRegistered();
+        }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         private static void MapRoadsTick()

@@ -877,6 +877,15 @@ Uzycie (Python 3, tylko odczyt):
                     KA-2 linie doby i noclegu rozpoznane, KA-3 kontrola obiegu (roznica 0), KA-4 rachunek noclegu spojny, KA-5 premie w granicach projektu,
                     KA-6 wypoczeci do zmierzchu 18:00, najwyzej 12 h od pobudki, KA-7 potkniecia (takze w predkosci i morale) i ERROR paczki 0,
                     KA-8 noclegi i zaplata (INFO). Bez noclegu w logu KA-3..6 - INFO; log tylko z linia latek (menu glowne) - KA-1 INFO.
+--grupa nzajazdy  : (17.10, sw-zajazdy - Jeff 16.10 "tawerny, do ktorych mozna wjechac na mapie, mozna spac, posluchac gossip", "nie za gesto, im mniej ludzi tym mniej
+                    zajazdow"; Armoury/src/RoadsideInns.cs, RoadsideInnsView.cs, TownInns.Road.cs, Rumours.cs; klucze RoadsideInns / InnGossip)
+                    python -I tools/sprawdz_logi.py --grupa nzajazdy <Armoury-*.log> (strumieniowo). ZJ-0 linia startu sesji (klucze, plik arm_roadside_inns.tsv),
+                    ZJ-1 zajazdy utworzone (>= 100; zly wiersz 0, brak wsi gry 0), ZJ-2 gestosc wedlug ludzi (najblizszy sasiad >= 25; mediana sasiada w pasmie <30k
+                    ludzi >= w pasmie >=90k), ZJ-3 linie doby rozpoznane, ZJ-4 nocleg zaplacony = odebrany (razem = ludzie + towarzysze + gracz = kiesa wsi + podatek
+                    pana + korona DS; kontrola obiegu 0), ZJ-4b premie noclegu w granicach karczm, ZJ-4c korona DS z noclegow = dopisek "w tym zajazdy" linii
+                    "Daniny wsi (DS)" (recenzja), ZJ-5 plotki bez wyjatkow (+ ZJ-5b czas budowy <= 50 ms), ZJ-6 obrazek
+                    raz na mape (przebudowy 0, postawione <= zajazdy), ZJ-7 koszt sprawdzania dojazdu <= 0.05 ms, ZJ-8 potkniecia i ERROR paczki 0, ZJ-9 wejscia,
+                    noclegi, plotki (INFO). Autotest nie klika zajazdow - bez noclegu i sluchania te progi INFO. Log bez paczki: INFO, bez wyjatku.
 --grupa nzc1      : (16.10, projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md paczka ZC1 "drogi towarow"; galaz w-toku/noc-zc1, Armoury/src/GoodsPaths.cs)
                     python -I tools/sprawdz_logi.py --grupa nzc1 [--baza-doby <log biegu bazowego bez ZC1>] <Armoury-*.log> (strumieniowo). ZC1-0 latki, ZC1-1 linie
                     doby, ZC1-2 potkniecia i ERROR 0, ZC1-3 mieso wieloryba <= 10% miesa, ZC1-4 indeks aksamitu < 10 w >= 50% miast, ZC1-5 sol: cena wozu / cena miasta
@@ -32335,6 +32344,206 @@ def nkarczmy_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nzajazdy (17.10, sw-zajazdy: zajazdy przy szlakach + noclegi + plotki; Armoury/src/RoadsideInns.cs, RoadsideInnsView.cs,
+# TownInns.Road.cs, Rumours.cs; klucze RoadsideInns / InnGossip)
+NZJ_HEAD = "Zajazdy (ZJ): "
+NZJ_PHEAD = "Plotki (PL): "
+NZJ_START = re.compile(r"zajazdow (?P<n>\d+) \(odrzucone: zly wiersz (?P<bad>\d+), brak wsi gry (?P<novil>\d+), przy wiosce na mapie (?P<near>\d+)")
+NZJ_FILE = re.compile(r"plik arm_roadside_inns\.tsv \(crc32 (?P<crc>[0-9A-F]{8}), wierszy (?P<rows>\d+)\)")
+NZJ_BAND = re.compile(r"(?P<band><30k|30-60k|60-90k|>=90k): (?P<n>\d+), (?P<med>[\d.]+|-);")
+NZJ_NN = re.compile(r"najblizszy sasiad min (?P<nn>[\d.]+) \(prog 25\)")
+NZJ_PEO = re.compile(r"ludzie wokol min/mediana/maks (?P<mn>\d+)/(?P<md>\d+)/(?P<mx>\d+)")
+NZJ_LAND = re.compile(r"lad: Westeros (?P<w>\d+), Essos (?P<e>\d+)")
+NZJ_DAY = re.compile(r"Zajazdy \(ZJ\): dzien (?P<day>-?\d+) \| .*?\| zajazdow (?P<inns>\d+).*?\| wejscia (?P<enter>\d+) \(po kliku (?P<click>\d+), z pytania (?P<askyes>\d+)\), "
+                     r"pytania (?P<ask>\d+), odmowy (?P<no>\d+), kliki na zajazd (?P<clicks>\d+) "
+                     r"\| noclegi (?P<stays>\d+): .*?\| zaplacone (?P<paid>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+) \(z sakiewki ludzi (?P<cpurse>\d+)\), gracz (?P<pl>\d+)\) "
+                     r"-> kiesy wsi (?P<purse>-?\d+), podatek panow wsi (?P<tax>\d+), korona \(DS\) (?P<crown>\d+) \(razem (?P<rec>-?\d+)\) "
+                     r"\| kontrola obiegu \(prog 0\): roznica (?P<diff>-?\d+), zaplacone - odebrane (?P<gap>-?\d+) \| potkniecia noclegu (?P<lstum>\d+) "
+                     r"\| widok: obrazki postawione (?P<made>\d+) \(dzis (?P<madeday>\d+)\), pokazane najwiecej naraz (?P<shownmax>\d+), pokaz/schowaj dzis (?P<show>\d+)/(?P<hide>\d+), "
+                     r"przebudowy (?P<rebuild>\d+) .*?pominiete (?P<failed>\d+), brak siatek (?P<miss>\d+), .*?sredni czas obrazka (?P<pms>[\d.]+) ms, kliki (?P<vclicks>\d+) "
+                     r"\| potkniecia widoku: tworzenie (?P<vc>\d+), widocznosc (?P<vv>\d+), dymek (?P<vh>\d+), klik (?P<vk>\d+) "
+                     r"\| tick dojazdu: (?P<ticks>\d+) sprawdzen, srednio (?P<tms>[\d.]+) ms \| potkniecia dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\)\.$")
+NZJ_STAY = re.compile(r"Zajazdy \(ZJ\): nocleg w .*?\| razem (?P<tot>\d+) \(ludzie (?P<men>\d+), towarzysze (?P<comp>\d+), gracz (?P<pl>\d+)\) -> kiesa wsi (?P<purse>-?\d+), "
+                      r"podatek pana wsi (?P<tax>\d+), korona \(DS\) (?P<crown>\d+) \| kontrola obiegu: roznica (?P<diff>-?\d+) \| osoby .*?"
+                      r"\| premia po snie: predkosc \+(?P<sp>\d+\.\d)%, morale \+(?P<mo>\d+\.\d), sen x(?P<sl>\d+\.\d\d), gojenie \+(?P<he>\d+)%\.$")
+NZJ_MAPEND = re.compile(r"Zajazdy \(ZJ\): koniec mapy - zdjete obrazki (?P<rem>\d+).*?postawione od wczytania (?P<made>\d+)\.")
+NZJ_VIEW = re.compile(r"Zajazdy \(ZJ\): widok mapy - zajazdow (?P<n>\d+);")
+NZJ_PDAY = re.compile(r"Plotki \(PL\): dzien (?P<day>-?\d+) \| klucz Inn Gossip tak \| sluchane (?P<heard>\d+) \(zajazdy (?P<road>\d+), karczmy miast (?P<town>\d+)\), plotek (?P<items>\d+) "
+                      r"\(bandy (?P<c0>\d+), kryjowki (?P<c1>\d+), wojska (?P<c2>\d+), karawany (?P<c3>\d+), ceny (?P<c4>\d+), wojny (?P<c5>\d+)\), bez plotek (?P<empty>\d+), "
+                      r"budowa srednio (?P<bms>[\d.]+) ms \| ksiega band: zywych w swiecie (?P<alive>\d+), wpisow (?P<entries>\d+) .*?"
+                      r"\| wiesci (?P<news>\d+) \(nowe dzis (?P<newsday>\d+)\) \| porzadki (?P<pms>\d+) ms \| wyjatki budowy dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\)\.$")
+NZJ_ERR = ("ERROR in RoadsideInns", "ERROR in Rumours.", "ERROR in SyncData.arm_rumours", "ERROR in TownInns.Road", "ERROR in TownInns.RoadQCondition",
+           "ERROR in TownInns.RoadCommit", "ERROR in RoadsideInns: komponent")
+# recenzja sw-zajazdy: udzial korony DS od noclegow w zajazdach w linii "Daniny wsi (DS)" (DsVillage.WarShareSutlers inn - dopisek tylko przy noclegach)
+NZJ_DSINN = re.compile(r", w tym zajazdy przy szlakach \(ZJ\): czesc wsi (?P<base>\d+), korona (?P<crown>\d+) \((?P<n>\d+) wplat\)")
+NZJ_TICK_MS = 0.05      # ms na sprawdzenie dojazdu (jedna partia, siatka 3x3)
+NZJ_NN_MIN = 25.0       # najblizszy sasiad - nie "armia zajazdow"
+NZJ_MIN_INNS = 100      # plik 17.10: 196 zajazdow (bez wiosek v6 moze ubyc kilka)
+
+
+def nzajazdy_main(logp):
+    """nzajazdy (17.10, sw-zajazdy; klucze RoadsideInns / InnGossip): zajazdy przy szlakach z pliku arm_roadside_inns.tsv (odstep z ludzi wokol), nocleg za pieniadze
+    do kiesy wsi okregu, plotki z prawdziwego stanu swiata (takze w karczmie miasta). Wejscie: log Armoury (strumieniowo).
+    ZJ-0 linia startu sesji (klucze, plik), ZJ-1 zajazdy utworzone (>= 100; zly wiersz 0, brak wsi gry 0), ZJ-2 gestosc wedlug ludzi: najblizszy sasiad >= 25,
+    mediana najblizszego sasiada w pasmie najrzadszym (<30k ludzi) >= w pasmie najgestszym (>=90k), ZJ-3 linie doby rozpoznane, ZJ-4 nocleg zaplacony = odebrany
+    (razem = ludzie + towarzysze + gracz = kiesa wsi + podatek pana + korona DS; kontrola obiegu roznica 0, takze suma dob), ZJ-5 plotki bez wyjatkow (wyjatki
+    budowy 0, ERROR Rumours 0), ZJ-6 obrazek raz na mape (przebudowy 0, postawione <= zajazdy na mape), ZJ-7 koszt sprawdzania dojazdu <= 0.05 ms, ZJ-8 potkniecia
+    i ERROR paczki 0, ZJ-9 wejscia, noclegi, plotki (INFO). Autotest nie klika zajazdow ani plotek - bez nich ZJ-4/ZJ-5 (czesc) INFO. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ZJ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sess, days, bad, stays, bad_stays, pdays, pbad, mapends, views, heard = [], [], [], [], [], [], [], [], [], []
+    n_err = 0
+    ds_lines, ds_inn = 0, []   # linie "Daniny wsi (DS)" i ich dopisek zajazdow (ZJ-4c)
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NZJ_HEAD):
+                if s.startswith(NZJ_HEAD + "start sesji"):
+                    sess.append(s)
+                elif s.startswith(NZJ_HEAD + "dzien "):
+                    mm = NZJ_DAY.match(s)
+                    (days.append(mm.groupdict()) if mm else bad.append(s))
+                elif s.startswith(NZJ_HEAD + "nocleg w "):
+                    mm = NZJ_STAY.match(s)
+                    (stays.append(mm.groupdict()) if mm else bad_stays.append(s))
+                elif s.startswith(NZJ_HEAD + "koniec mapy"):
+                    mm = NZJ_MAPEND.match(s)
+                    if mm:
+                        mapends.append(mm.groupdict())
+                elif s.startswith(NZJ_HEAD + "widok mapy"):
+                    mm = NZJ_VIEW.match(s)
+                    if mm:
+                        views.append(mm.groupdict())
+            elif s.startswith(NZJ_PHEAD):
+                if s.startswith(NZJ_PHEAD + "dzien "):
+                    mm = NZJ_PDAY.match(s)
+                    (pdays.append(mm.groupdict()) if mm else pbad.append(s))
+                elif s.startswith(NZJ_PHEAD + "sluchane w "):
+                    heard.append(s)
+            elif s.startswith("Daniny wsi (DS): "):
+                ds_lines += 1
+                mm = NZJ_DSINN.search(s)
+                if mm:
+                    ds_inn.append(mm.groupdict())
+            elif s.startswith(NZJ_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(sess)}, doby {len(days)} (nierozpoznanych {len(bad)}), noclegow {len(stays)} (nierozpoznanych {len(bad_stays)}), "
+          f"plotek doby {len(pdays)} (nierozpoznanych {len(pbad)}), sluchania {len(heard)}, koncow mapy {len(mapends)}")
+    if not sess and not days and not bad and not stays and not pdays and not pbad and not heard and n_err == 0:
+        rep.add("ZJ-0: linie 'Zajazdy (ZJ)' / 'Plotki (PL)'", "brak w logu", "INFO (log sprzed paczki sw-zajazdy)", None)
+        rep.show()
+        return 0
+    # ZJ-0 / ZJ-1 / ZJ-2: linia startu
+    if sess:
+        s0 = sess[-1]
+        off = [k for k in ("Roadside Inns", "Inn Gossip", "Town Inns", "Night Rest") if k + " WYLACZONE" in s0]
+        rep.add("ZJ-0: linia startu sesji - klucze i plik", s0[len(NZJ_HEAD):][:240], "klucze tak (WYLACZONE - INFO)", None if off else True)
+        ms = NZJ_START.search(s0)
+        fm = NZJ_FILE.search(s0)
+        if ms:
+            n, badr, novil, near = (int(ms.group(k)) for k in ("n", "bad", "novil", "near"))
+            rep.add("ZJ-1: zajazdy utworzone z pliku", f"zajazdow {n} (wierszy {fm.group('rows') if fm else '?'}, zly wiersz {badr}, brak wsi gry {novil}, przy wiosce na mapie {near})",
+                    f">= {NZJ_MIN_INNS}, zly wiersz 0, brak wsi gry 0", n >= NZJ_MIN_INNS and badr == 0 and novil == 0)
+            bands = {b.group("band"): (int(b.group("n")), b.group("med")) for b in NZJ_BAND.finditer(s0)}
+            nn = NZJ_NN.search(s0)
+            peo = NZJ_PEO.search(s0)
+            land = NZJ_LAND.search(s0)
+            lo, hi = bands.get("<30k"), bands.get(">=90k")
+            dens_ok = None
+            if lo and hi and lo[1] != "-" and hi[1] != "-":
+                dens_ok = float(lo[1]) >= float(hi[1])
+            nn_ok = float(nn.group("nn")) >= NZJ_NN_MIN if nn else None
+            ok2 = None if nn_ok is None and dens_ok is None else (nn_ok is not False and dens_ok is not False)
+            rep.add("ZJ-2: gestosc wedlug ludzi (nie 'armia zajazdow')",
+                    f"najblizszy sasiad min {nn.group('nn') if nn else '?'}; pasma (zajazdow, mediana sasiada): "
+                    + ", ".join(f"{k} {v[0]}/{v[1]}" for k, v in bands.items())
+                    + (f"; ludzie wokol {peo.group('mn')}/{peo.group('md')}/{peo.group('mx')}" if peo else "")
+                    + (f"; Westeros {land.group('w')}, Essos {land.group('e')}" if land else ""),
+                    f"najblizszy sasiad >= {NZJ_NN_MIN:.0f}; mediana sasiada <30k >= >=90k (mniej ludzi - rzadziej)", ok2)
+        elif "zajazdy wylaczone" in s0:
+            rep.add("ZJ-1: zajazdy", "klucz Roadside Inns WYLACZONE - plik nie czytany", "INFO", None)
+        else:
+            rep.add("ZJ-1: zajazdy utworzone z pliku", s0[len(NZJ_HEAD):][:200], "linia z liczba zajazdow (brak pliku / CRC sceny - NIE)", False)
+    else:
+        rep.add("ZJ-0: linia startu sesji", "brak (sa inne linie ZJ/PL)", "linia przy kazdym starcie sesji", False)
+    # ZJ-3: linie doby
+    rep.add("ZJ-3: linie doby rozpoznane", f"zajazdy {len(days)} (nierozpoznane {len(bad)}), plotki {len(pdays)} (nierozpoznane {len(pbad)}), noclegi {len(stays)} "
+            f"(nierozpoznane {len(bad_stays)})" + (f" (np. {(bad or pbad or bad_stays)[0][:160]})" if bad or pbad or bad_stays else ""),
+            "nierozpoznane 0", not bad and not pbad and not bad_stays)
+    # ZJ-4: nocleg zaplacony = odebrany
+    stay_bad = [g for g in stays if int(g["tot"]) != int(g["men"]) + int(g["comp"]) + int(g["pl"])
+                or int(g["tot"]) != int(g["purse"]) + int(g["tax"]) + int(g["crown"]) or int(g["diff"]) != 0 or int(g["purse"]) < 0]
+    day_diff = sum(int(g["diff"]) for g in days)
+    day_gap = sum(int(g["gap"]) for g in days)
+    if stays or days:
+        rep.add("ZJ-4: nocleg zaplacony = odebrany (kiesa wsi + podatek pana + korona DS; kontrola obiegu)",
+                f"noclegi niespojne {len(stay_bad)} z {len(stays)}; suma dob: roznica {day_diff}, zaplacone - odebrane {day_gap}"
+                + (f" (np. razem {stay_bad[0]['tot']} -> {stay_bad[0]['purse']}+{stay_bad[0]['tax']}+{stay_bad[0]['crown']}, roznica {stay_bad[0]['diff']})" if stay_bad else ""),
+                "0 / 0 / 0", not stay_bad and day_diff == 0 and day_gap == 0)
+        if stays:
+            over = [g for g in stays if float(g["sp"]) > 12.05 or float(g["mo"]) > 8.05 or float(g["sl"]) > 1.255 or float(g["he"]) > 50]
+            rep.add("ZJ-4b: premie noclegu w granicach karczm miasta", f"ponad granice {len(over)} z {len(stays)}", "predkosc <= 12%, morale <= 8, sen <= x1.25, gojenie <= 50%", not over)
+    else:
+        rep.add("ZJ-4: noclegi w zajazdach", "brak linii doby i noclegu", "INFO (sesja krotsza niz doba)", None)
+    # ZJ-4c (recenzja): korona DS z noclegow (linie doby ZJ) = dopisek "w tym zajazdy" linii "Daniny wsi (DS)" (te same zlote, suma logu; granica ostatniej doby -
+    # dozwolona roznica najwyzej korona jednej doby ZJ)
+    zj_crown = sum(int(g["crown"]) for g in days)
+    ds_crown = sum(int(g["crown"]) for g in ds_inn)
+    if zj_crown == 0 and ds_crown == 0:
+        rep.add("ZJ-4c: korona DS z noclegow = dopisek zajazdow w linii 'Daniny wsi (DS)'", f"korona z noclegow 0 (linii DS {ds_lines})",
+                "INFO (bez noclegu w wojnie albo DS wylaczone)", None)
+    else:
+        edge = max([int(g["crown"]) for g in days] + [0])
+        rep.add("ZJ-4c: korona DS z noclegow = dopisek zajazdow w linii 'Daniny wsi (DS)'",
+                f"linie ZJ {zj_crown}, linie DS {ds_crown} ({len(ds_inn)} dob z dopiskiem z {ds_lines}), roznica {zj_crown - ds_crown:+d}",
+                f"|roznica| <= korona jednej doby ZJ ({edge}) - granica doby", abs(zj_crown - ds_crown) <= edge)
+    # ZJ-5: plotki bez wyjatkow
+    if pdays:
+        pst = sum(int(g["stum"]) for g in pdays)
+        rep.add("ZJ-5: plotki zbudowane bez wyjatkow (suma dob)", f"sluchane {sum(int(g['heard']) for g in pdays)}, plotek {sum(int(g['items']) for g in pdays)}, wyjatki budowy {pst}",
+                "wyjatki 0", pst == 0)
+        bms = max(float(g["bms"]) for g in pdays)
+        rep.add("ZJ-5b: czas budowy plotek (najgorsza doba, srednio na sluchanie)", f"{bms:.2f} ms", "<= 50 ms (INFO bez sluchania)",
+                None if sum(int(g["heard"]) for g in pdays) == 0 else bms <= 50.0)
+    else:
+        rep.add("ZJ-5: linie doby plotek", "brak", "INFO (klucz Inn Gossip wylaczony albo sesja krotsza niz doba)", None)
+    # ZJ-6: obrazek raz na mape
+    if days or mapends:
+        rebuild = sum(int(g["rebuild"]) for g in days)
+        inns = max([int(g["inns"]) for g in days] + [int(v["n"]) for v in views] + [0])
+        over_map = [e for e in mapends if inns and int(e["made"]) > inns]
+        rep.add("ZJ-6: obrazek zajazdu raz na mape (bez przebudowy co klatke)",
+                f"przebudowy {rebuild}; konce mapy {len(mapends)}, postawione ponad liczbe zajazdow {len(over_map)}"
+                + (f"; najwiecej naraz {max(int(g['shownmax']) for g in days)}" if days else ""), "0 / 0", rebuild == 0 and not over_map)
+    else:
+        rep.add("ZJ-6: widok zajazdow", "brak linii", "INFO", None)
+    # ZJ-7: koszt
+    if days:
+        tms = max(float(g["tms"]) for g in days)
+        rep.add("ZJ-7: koszt sprawdzania dojazdu (najgorsza doba, ms na sprawdzenie)", f"{tms:.4f} ms (sprawdzen najwiecej {max(int(g['ticks']) for g in days)}/d)",
+                f"<= {NZJ_TICK_MS} ms", tms <= NZJ_TICK_MS)
+    # ZJ-8: potkniecia i ERROR
+    stum = sum(int(g["stum"]) for g in days) + sum(int(g["lstum"]) for g in days)
+    vst = sum(int(g["vc"]) + int(g["vv"]) + int(g["vh"]) + int(g["vk"]) for g in days[-1:]) if days else 0
+    rep.add("ZJ-8: potkniecia zajazdow, noclegu i widoku, ERROR paczki (RoadsideInns*, Rumours.*, SyncData.arm_rumours, TownInns.Road*)",
+            f"potkniecia {stum}, widoku (od wczytania mapy) {vst}, ERROR {n_err}", "0 / 0 / 0", stum == 0 and vst == 0 and n_err == 0)
+    # ZJ-9: INFO
+    if days:
+        def tot(k):
+            return sum(int(g[k]) for g in days)
+        rep.add("ZJ-9: wejscia, noclegi, plotki (suma dob)",
+                f"wejscia {tot('enter')} (po kliku {tot('click')}, z pytania {tot('askyes')}), pytania {tot('ask')}, odmowy {tot('no')}; noclegi {tot('stays')}, zaplacone {tot('paid')} "
+                f"-> kiesy wsi {tot('purse')}, podatek {tot('tax')}, korona {tot('crown')}; obrazki postawione {max(int(g['made']) for g in days)}, brak siatek "
+                f"{max(int(g['miss']) for g in days)}, pominiete {max(int(g['failed']) for g in days)}"
+                + (f"; plotki: sluchane {sum(int(g['heard']) for g in pdays)}, bandy w ksiedze {pdays[-1]['entries']} z {pdays[-1]['alive']}, wiesci {pdays[-1]['news']}" if pdays else ""),
+                "INFO", None)
+    rep.show()
+    return 0
+
 # ------------------------------------------------------------ nzc0 (16.10, zycie codzienne ZC0 - pomiar na sucho; docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 14)
 NZC0_HEAD = "Zycie (ZC0): "
 NZC0_PHEAD = "Spizarnia (ZC): "
@@ -35606,6 +35815,8 @@ def main(argv):
         return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group == "nkarczmy" and logp:
         return nkarczmy_main(logp)   # nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie"): nocleg w trzech jakosciach, kto placi, kontrola obiegu, premia do zmierzchu (TownInns)
+    if group == "nzajazdy" and logp:
+        return nzajazdy_main(logp)   # nzajazdy (17.10, sw-zajazdy): zajazdy przy szlakach wedlug ludzi, nocleg -> kiesa wsi, plotki bez wyjatkow, obrazek raz na mape (RoadsideInns, Rumours)
     if group == "nzc1" and logp:
         return nzc1_main(logp, bdp)   # nzc1 (16.10, projekt ZYCIE CODZIENNE paczka ZC1): drogi towarow - wieloryb, jedwab, deski, wegiel, sztaby, BK, woz za cena celu, jedzenie z niczego
     if group == "nzc0" and logp:

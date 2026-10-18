@@ -1,0 +1,797 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
+
+namespace Armoury
+{
+    /// <summary>
+    /// PL - PLOTKI (sw-zajazdy, Jeff 16.10: "gdzie sa bandyci lub jacys zboje i ich kryjowki, a moze skarby; slyszalem, ze banda Lysego Johna rabuje od miesiaca,
+    /// oblowila sie tak mocno, ze ciezko ich bedzie teraz wykurzyc"; STAN-PRAC 52 pkt 2). Klucz InnGossip. "Listen to the gossip" w menu zajazdu przy szlaku
+    /// (RoadsideInns) i w menu karczmy miasta (TownInns, "arm_inn") - okno z tekstem (InformationManager.ShowInquiry), zadnej zmiany menu, nic nie kosztuje.
+    /// Wszystko z PRAWDZIWEGO stanu swiata, nic nie jest losowane poza slowami i przesada:
+    ///  - bandy w okolicy (do 70 jedn.): ludzie (MemberRoster), zloto = kiesa bandy (PartyTradeGold - bandy maja tylko to, co zrabuja: OutlawLaw), od ilu dni rabuja
+    ///    (ksiega ponizej: doba narodzin bandy z MobilePartyCreated, zapis arm_rumours), herszt: bohater BK albo przezwisko deterministyczne (imie z listy kultury
+    ///    krainy + przydomek z ziarna id bandy - ta sama banda zawsze tak samo);
+    ///  - kryjowki (do 160 jedn., zajete przez bandy): miejsce, ile band, skarbiec = kasa kryjowki (SettlementComponent.Gold - skarbiec band OutlawLaw "nskarbiec",
+    ///    to zabiera ten, kto kryjowke oczysci - HideoutPurge);
+    ///  - wojska panow (armie do 180 jedn., inaczej najwiekszy oddzial pana): wodz, krolestwo, ludzie, co robia (oblezenie / marsz na / zbiorka);
+    ///  - karawany (do 90 jedn.): wlasciciel, dokad, straz;
+    ///  - ceny w 3 najblizszych miastach (do 260 jedn.): towar o najwiekszej roznicy ceny (Town.GetItemPrice - ta sama cena co w ekranie handlu);
+    ///  - wiesci z wojen (ksiega 60 dni: wojny, pokoje, zdobyte twierdze, spalone wsie, wielkie bitwy, oblezenia) i trwajace oblezenia; bez wiesci - kto z kim wojuje.
+    /// Dokladnosc: q = 1 - odleglosc/skala - wiek/30 (bandy, kryjowki, wojska skala 150, wiesci 600). q >= 0.75 - liczby zaokraglone ("about 40"), >= 0.45 - "some 40",
+    /// nizej - przesada x1.4-3.0 ("hundreds of men", "a king's ransom"); miejsce: blisko i dokladnie - najblizsza nazwana osada, inaczej kierunek i dni jazdy.
+    /// Te same plotki w tym samym miejscu tego samego dnia (ziarno = miejsce + doba). Ksiega: zapis "arm_rumours" (v1, straznik rozmiaru); brak klucza = bandy
+    /// "od dawna" (bez liczby dni), wiesci od zera. Linia "Plotki (PL): dzien N"; tools/sprawdz_logi.py --grupa nzajazdy.
+    /// </summary>
+    internal static class Rumours
+    {
+        private const string P = "Plotki (PL): ";
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        internal static bool On { get { var s = Settings.Current; return s != null && s.InnGossip; } }
+
+        // ------------------------------------------------------------ ksiega (zapis arm_rumours)
+        private sealed class Band { public int First; public bool Known; public int Raids; }
+        private sealed class News { public int Kind, Day, N; public float X, Y; public string A = "", B = "", C = ""; }
+        private const int NWar = 1, NPeace = 2, NCaptured = 3, NRaided = 4, NBattle = 5, NSiege = 6;
+        private const int NewsMax = 60, NewsDays = 60, BandsMax = 6000, SaveMaxChars = 400000;
+        private static readonly Dictionary<string, Band> _bands = new Dictionary<string, Band>(StringComparer.Ordinal);
+        private static readonly List<News> _news = new List<News>();
+
+        // liczniki doby i sesji
+        private static int _dHeard, _dHeardRoad, _dHeardTown, _dItems, _dEmpty, _dBandsNew, _dBandsGone, _dNews, _dStumbles, _stumbles;
+        private static readonly int[] _dCat = new int[7];   // 0 bandy, 1 kryjowki, 2 wojska, 3 karawany, 4 ceny, 5 wojny, 6 pusto
+        private static long _dBuildTicks;
+        private static bool _errLogged;
+        private static string _importNote = "brak klucza (stary zapis albo nowa kampania)";
+
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++; _dStumbles++;
+            if (!_errLogged) { _errLogged = true; Log.Error("Rumours." + where, e); }
+        }
+
+        internal static void Reset()
+        {
+            _bands.Clear(); _news.Clear();
+            _priceItems = null;   // recenzja: przedmioty gry z MBObjectManager tej kampanii - nastepna kampania (nowa gra / wczytanie) buduje liste od nowa
+            _stumbles = 0; _errLogged = false; _importNote = "brak klucza (stary zapis albo nowa kampania)";
+            DayReset();
+        }
+
+        private static void DayReset()
+        {
+            _dHeard = _dHeardRoad = _dHeardTown = _dItems = _dEmpty = _dBandsNew = _dBandsGone = _dNews = _dStumbles = 0;
+            Array.Clear(_dCat, 0, _dCat.Length);
+            _dBuildTicks = 0;
+        }
+
+        private static int Today { get { return (int)CampaignTime.Now.ToDays; } }
+
+        // ------------------------------------------------------------ zdarzenia (ArmouryBehavior.RegisterEvents)
+        internal static void OnPartyCreated(MobileParty mp)
+        {
+            if (!On || mp == null) return;
+            try { if (mp.IsBandit && !string.IsNullOrEmpty(mp.StringId) && _bands.Count < BandsMax) { _bands[mp.StringId] = new Band { First = Today, Known = true }; _dBandsNew++; } }
+            catch (Exception e) { Stumble("OnPartyCreated", e); }
+        }
+
+        internal static void OnPartyDestroyed(MobileParty mp, PartyBase by)
+        {
+            if (!On || mp == null) return;
+            try { if (!string.IsNullOrEmpty(mp.StringId) && _bands.Remove(mp.StringId)) _dBandsGone++; }
+            catch (Exception e) { Stumble("OnPartyDestroyed", e); }
+        }
+
+        private static string Clean(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            var sb = new StringBuilder(s.Length);
+            foreach (char ch in s) sb.Append(ch == ',' || ch == ';' || ch == '|' || ch == '\n' || ch == '\r' ? ' ' : ch);
+            return sb.Length > 60 ? sb.ToString(0, 60) : sb.ToString();
+        }
+
+        private static void AddNews(int kind, Vec2 at, string a, string b, string c, int n)
+        {
+            _news.Add(new News { Kind = kind, Day = Today, X = at.x, Y = at.y, A = Clean(a), B = Clean(b), C = Clean(c), N = n });
+            _dNews++;
+            while (_news.Count > NewsMax) _news.RemoveAt(0);
+        }
+
+        internal static void OnRaidCompleted(BattleSideEnum winner, RaidEventComponent raid)
+        {
+            if (!On || raid == null) return;
+            try
+            {
+                var st = raid.MapEventSettlement;
+                if (st == null || winner != BattleSideEnum.Attacker) return;
+                var lp = raid.AttackerSide != null ? raid.AttackerSide.LeaderParty : null;
+                var mp = lp != null ? lp.MobileParty : null;
+                if (mp != null && mp.IsBandit && !string.IsNullOrEmpty(mp.StringId)) { Band b; if (_bands.TryGetValue(mp.StringId, out b)) b.Raids++; }
+                string who = lp != null && lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : lp != null ? lp.Name.ToString() : "raiders";
+                string fac = lp != null && lp.MapFaction != null ? lp.MapFaction.Name.ToString() : "";
+                AddNews(NRaided, st.GetPosition2D, who, fac, st.Name.ToString(), 0);
+            }
+            catch (Exception e) { Stumble("OnRaidCompleted", e); }
+        }
+
+        internal static void OnWarDeclared(IFaction a, IFaction b, DeclareWarAction.DeclareWarDetail d)
+        {
+            if (!On || a == null || b == null || !a.IsKingdomFaction || !b.IsKingdomFaction) return;
+            try { AddNews(NWar, FactionPos(a), a.Name.ToString(), b.Name.ToString(), "", 0); }
+            catch (Exception e) { Stumble("OnWarDeclared", e); }
+        }
+
+        internal static void OnMakePeace(IFaction a, IFaction b, MakePeaceAction.MakePeaceDetail d)
+        {
+            if (!On || a == null || b == null || !a.IsKingdomFaction || !b.IsKingdomFaction) return;
+            try { AddNews(NPeace, FactionPos(a), a.Name.ToString(), b.Name.ToString(), "", 0); }
+            catch (Exception e) { Stumble("OnMakePeace", e); }
+        }
+
+        internal static void OnOwnerChanged(Settlement st, bool openToClaim, Hero newOwner, Hero oldOwner, Hero capturer, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail detail)
+        {
+            if (!On || st == null || detail != ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail.BySiege || !st.IsFortification) return;
+            try
+            {
+                var who = capturer ?? newOwner;
+                string fac = who != null && who.MapFaction != null ? who.MapFaction.Name.ToString() : "";
+                AddNews(NCaptured, st.GetPosition2D, who != null ? who.Name.ToString() : "", fac, st.Name.ToString(), st.IsTown ? 1 : 0);
+            }
+            catch (Exception e) { Stumble("OnOwnerChanged", e); }
+        }
+
+        internal static void OnMapEventEnded(MapEvent me)
+        {
+            if (!On || me == null) return;
+            try
+            {
+                if (!me.IsFieldBattle || !me.HasWinner) return;
+                var w = me.Winner;
+                var l = w == me.AttackerSide ? me.DefenderSide : me.AttackerSide;
+                if (w == null || l == null || w.LeaderParty == null || l.LeaderParty == null) return;
+                int men = w.HealthyTroopCountAtMapEventStart + l.HealthyTroopCountAtMapEventStart;
+                if (men < 200) return;
+                var wm = w.LeaderParty.MobileParty; var lm = l.LeaderParty.MobileParty;
+                if ((wm == null || !wm.IsLordParty) && (lm == null || !lm.IsLordParty)) return;   // wielkie bitwy panow, nie potyczki band
+                string wn = w.LeaderParty.LeaderHero != null ? w.LeaderParty.LeaderHero.Name.ToString() : w.LeaderParty.Name.ToString();
+                string ln = l.LeaderParty.LeaderHero != null ? l.LeaderParty.LeaderHero.Name.ToString() : l.LeaderParty.Name.ToString();
+                Vec2 pos = me.Position.ToVec2();
+                var near = NearestNamed(pos, 40f);
+                AddNews(NBattle, pos, wn, ln, near != null ? near.Name.ToString() : "", men);
+            }
+            catch (Exception e) { Stumble("OnMapEventEnded", e); }
+        }
+
+        internal static void OnSiegeStarted(SiegeEvent se)
+        {
+            if (!On || se == null || se.BesiegedSettlement == null) return;
+            try
+            {
+                var lp = se.BesiegerCamp != null ? se.BesiegerCamp.LeaderParty : null;
+                string who = lp != null && lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : lp != null ? lp.Name.ToString() : "";
+                string fac = lp != null && lp.MapFaction != null ? lp.MapFaction.Name.ToString() : "";
+                AddNews(NSiege, se.BesiegedSettlement.GetPosition2D, who, fac, se.BesiegedSettlement.Name.ToString(), 0);
+            }
+            catch (Exception e) { Stumble("OnSiegeStarted", e); }
+        }
+
+        private static Vec2 FactionPos(IFaction f)
+        {
+            try
+            {
+                var k = f as Kingdom;
+                var leader = k != null ? k.Leader : null;
+                var seat = leader != null ? leader.HomeSettlement : null;
+                if (seat != null) return seat.GetPosition2D;
+                var mp = MobileParty.MainParty;
+                return mp != null ? mp.GetPosition2D : Vec2.Zero;
+            }
+            catch { return Vec2.Zero; }
+        }
+
+        // ------------------------------------------------------------ doba
+        /// <summary>Doba: ksiega band zgodna ze swiatem (zywe bandy bez wpisu - "od dawna", martwe - usuniete), wiesci starsze niz 60 dni - usuniete; linia logu.</summary>
+        internal static void Daily(int day)
+        {
+            if (!On) { DayReset(); return; }
+            var sw = Stopwatch.StartNew();
+            int alive = 0, added = 0, removed = 0;
+            try
+            {
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var p in MobileParty.AllBanditParties)
+                {
+                    if (p == null || string.IsNullOrEmpty(p.StringId)) continue;
+                    alive++;
+                    seen.Add(p.StringId);
+                    if (!_bands.ContainsKey(p.StringId) && _bands.Count < BandsMax) { _bands[p.StringId] = new Band { First = Today, Known = false }; added++; }
+                }
+                var dead = new List<string>();
+                foreach (var k in _bands.Keys) if (!seen.Contains(k)) dead.Add(k);
+                foreach (var k in dead) _bands.Remove(k);
+                removed = dead.Count;
+                _news.RemoveAll(n => Today - n.Day > NewsDays);
+            }
+            catch (Exception e) { Stumble("Daily", e); }
+            try
+            {
+                int known = 0; long ageSum = 0;
+                foreach (var b in _bands.Values) if (b.Known) { known++; ageSum += Today - b.First; }
+                double buildMs = _dHeard > 0 ? _dBuildTicks * 1000.0 / Stopwatch.Frequency / _dHeard : 0.0;
+                Log.Info(P + "dzien " + day + " | klucz Inn Gossip tak | sluchane " + _dHeard + " (zajazdy " + _dHeardRoad + ", karczmy miast " + _dHeardTown + "), plotek " + _dItems
+                         + " (bandy " + _dCat[0] + ", kryjowki " + _dCat[1] + ", wojska " + _dCat[2] + ", karawany " + _dCat[3] + ", ceny " + _dCat[4] + ", wojny " + _dCat[5] + "), bez plotek " + _dEmpty
+                         + ", budowa srednio " + buildMs.ToString("0.00", Inv) + " ms"
+                         + " | ksiega band: zywych w swiecie " + alive + ", wpisow " + _bands.Count + " (z doba narodzin " + known + ", srednio " + (known > 0 ? (ageSum / (double)known).ToString("0.0", Inv) : "-")
+                         + " dni), nowe dzis " + _dBandsNew + ", rozbite dzis " + _dBandsGone + ", dopisane bez doby " + added + ", usuniete martwe " + removed
+                         + " | wiesci " + _news.Count + " (nowe dzis " + _dNews + ")"
+                         + " | porzadki " + sw.ElapsedMilliseconds + " ms | wyjatki budowy dzis " + _dStumbles + " (od wczytania " + _stumbles + ").");
+            }
+            catch (Exception e) { Stumble("DailyLog", e); }
+            finally { DayReset(); }
+        }
+
+        internal static void SessionStart()
+        {
+            try
+            {
+                Log.Info(P + "start sesji | klucz Inn Gossip " + (On ? "tak" : "WYLACZONE") + " | ksiega z zapisu: " + _importNote + " | potkniecia " + _stumbles + ".");
+            }
+            catch (Exception e) { Stumble("SessionStart", e); }
+        }
+
+        // ------------------------------------------------------------ zapis
+        /// <summary>"v1|id,doba,znana,napady;...|rodzaj,doba,x,y,n,a,b,c;..." - straznik rozmiaru (najwyzej BandsMax band, wiesci NewsMax; ponad SaveMaxChars bandy pominiete).
+        /// Klucz wylaczony - "" (nic do zapisu).</summary>
+        internal static string Export()
+        {
+            if (!On) return "";
+            try
+            {
+                var sb = new StringBuilder("v1|");
+                int n = 0;
+                foreach (var kv in _bands)
+                {
+                    if (kv.Key.IndexOfAny(new[] { ',', ';', '|' }) >= 0 || kv.Key.Length > 80) continue;
+                    if (n++ > 0) sb.Append(';');
+                    sb.Append(kv.Key).Append(',').Append(kv.Value.First.ToString(Inv)).Append(',').Append(kv.Value.Known ? '1' : '0').Append(',').Append(kv.Value.Raids.ToString(Inv));
+                    if (sb.Length > SaveMaxChars) { sb.Length = 3; break; }   // straznik: bandy pominiete (wiesci zostaja)
+                }
+                sb.Append('|');
+                for (int i = 0; i < _news.Count; i++)
+                {
+                    var w = _news[i];
+                    if (i > 0) sb.Append(';');
+                    sb.Append(w.Kind.ToString(Inv)).Append(',').Append(w.Day.ToString(Inv)).Append(',').Append(w.X.ToString("0.0", Inv)).Append(',').Append(w.Y.ToString("0.0", Inv))
+                      .Append(',').Append(w.N.ToString(Inv)).Append(',').Append(w.A).Append(',').Append(w.B).Append(',').Append(w.C);
+                }
+                return sb.ToString();
+            }
+            catch (Exception e) { Stumble("Export", e); return ""; }
+        }
+
+        internal static void Import(string data)
+        {
+            _bands.Clear(); _news.Clear();
+            if (string.IsNullOrEmpty(data)) { _importNote = "brak klucza (stary zapis albo nowa kampania)"; return; }
+            if (data.Length > SaveMaxChars * 3) { _importNote = "zapis za dlugi (" + data.Length + ") - pominiety"; return; }
+            try
+            {
+                var parts = data.Split('|');
+                if (parts.Length < 3 || parts[0] != "v1") { _importNote = "nieznany format - pominiety"; return; }
+                int bad = 0;
+                foreach (var e in parts[1].Split(';'))
+                {
+                    if (e.Length == 0) continue;
+                    var a = e.Split(',');
+                    int first, raids;
+                    if (a.Length < 4 || !int.TryParse(a[1], NumberStyles.Integer, Inv, out first) || !int.TryParse(a[3], NumberStyles.Integer, Inv, out raids)) { bad++; continue; }
+                    if (_bands.Count < BandsMax) _bands[a[0]] = new Band { First = first, Known = a[2] == "1", Raids = Math.Max(0, raids) };
+                }
+                foreach (var e in parts[2].Split(';'))
+                {
+                    if (e.Length == 0) continue;
+                    var a = e.Split(',');
+                    int kind, day, n; float x, y;
+                    if (a.Length < 8 || !int.TryParse(a[0], NumberStyles.Integer, Inv, out kind) || !int.TryParse(a[1], NumberStyles.Integer, Inv, out day)
+                        || !float.TryParse(a[2], NumberStyles.Float, Inv, out x) || !float.TryParse(a[3], NumberStyles.Float, Inv, out y)
+                        || !int.TryParse(a[4], NumberStyles.Integer, Inv, out n) || kind < NWar || kind > NSiege) { bad++; continue; }
+                    if (_news.Count < NewsMax) _news.Add(new News { Kind = kind, Day = day, X = x, Y = y, N = n, A = a[5], B = a[6], C = a[7] });
+                }
+                _importNote = "band " + _bands.Count + ", wiesci " + _news.Count + (bad > 0 ? ", zlych wpisow " + bad : "");
+            }
+            catch (Exception e) { _bands.Clear(); _news.Clear(); _importNote = "blad odczytu - pominiety"; Stumble("Import", e); }
+        }
+
+        // ------------------------------------------------------------ menu
+        internal static bool TownGossipCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Conversation;
+                var st = Settlement.CurrentSettlement;
+                if (!On || !TownInns.On || st == null || !st.IsTown) return false;
+                args.Tooltip = new TextObject("{=!}Sit by the fire with a cup and listen to what the drinkers and the innkeeper say - outlaws, lairs, hosts on the march, caravans, prices and the wars.");
+                return true;
+            }
+            catch (Exception e) { Stumble("TownGossipCondition", e); return false; }
+        }
+
+        internal static void TownGossipConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var st = Settlement.CurrentSettlement;
+                if (st == null) return;
+                _dHeardTown++;
+                Show(st.GetPosition2D, st.StringId, st.Name.ToString(), true);
+            }
+            catch (Exception e) { Stumble("TownGossipConsequence", e); }
+        }
+
+        internal static bool RoadGossipCondition(MenuCallbackArgs args)
+        {
+            try
+            {
+                args.optionLeaveType = GameMenuOption.LeaveType.Conversation;
+                if (!On || !RoadsideInns.On) return false;
+                var inn = RoadsideInns.CurrentOrNear();
+                if (inn == null) return false;
+                args.Tooltip = new TextObject("{=!}Drovers, pilgrims and pedlars by the hearth trade the news of the road - the nearer and fresher, the truer.");
+                return true;
+            }
+            catch (Exception e) { Stumble("RoadGossipCondition", e); return false; }
+        }
+
+        internal static void RoadGossipConsequence(MenuCallbackArgs args)
+        {
+            try
+            {
+                var inn = RoadsideInns.CurrentOrNear();
+                if (inn == null) return;
+                _dHeardRoad++;
+                Show(new Vec2(inn.X, inn.Y), inn.Uid, inn.Name, false);
+            }
+            catch (Exception e) { Stumble("RoadGossipConsequence", e); }
+        }
+
+        // ------------------------------------------------------------ plotki
+        private sealed class Item { public int Cat; public float Score; public string Text; }
+
+        private static void Show(Vec2 at, string key, string place, bool town)
+        {
+            long t0 = Stopwatch.GetTimestamp();
+            List<Item> items;
+            try { items = Build(at, key); }
+            catch (Exception e) { Stumble("Build", e); items = new List<Item>(); }
+            _dBuildTicks += Stopwatch.GetTimestamp() - t0;
+            _dHeard++;
+            var sb = new StringBuilder(town ? "The innkeeper leans on his counter, and the drinkers are happy to talk:" : "By the hearth, drovers, pilgrims and pedlars trade the news of the road:");
+            var cats = new int[7];
+            if (items.Count == 0)
+            {
+                _dEmpty++; cats[6]++;
+                sb.Append("\n\nThe talk is all of the weather and the harvest - nothing worth a copper.");
+            }
+            foreach (var it in items) { sb.Append("\n\n- ").Append(it.Text); cats[it.Cat]++; _dCat[it.Cat]++; _dItems++; }
+            double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
+            Log.Info(P + "sluchane w " + place + " (" + (town ? "karczma miasta" : "zajazd") + ", " + key + ") dzien " + Today + " - plotek " + items.Count + " (bandy " + cats[0] + ", kryjowki " + cats[1]
+                     + ", wojska " + cats[2] + ", karawany " + cats[3] + ", ceny " + cats[4] + ", wojny " + cats[5] + "), czas " + ms.ToString("0.0", Inv) + " ms.");
+            InformationManager.ShowInquiry(new InquiryData(place + " - gossip", sb.ToString(), true, false, "Enough talk", null, null, null), true);
+        }
+
+        /// <summary>Plotki dla miejsca (deterministycznie: miejsce + doba). Najwyzej 2 o bandach, 1 o kryjowce, 1 o wojsku, 1 o karawanie, 1 o cenach, 2 o wojnach.</summary>
+        private static List<Item> Build(Vec2 at, string key)
+        {
+            int today = Today;
+            uint seed = MapVillageData.Fnv(key + "|" + today.ToString(Inv));
+            var all = new List<Item>();
+            try { Bandits(all, at, seed, today); } catch (Exception e) { Stumble("Bandits", e); }
+            try { Hideouts(all, at, seed); } catch (Exception e) { Stumble("Hideouts", e); }
+            try { Armies(all, at, seed); } catch (Exception e) { Stumble("Armies", e); }
+            try { Caravans(all, at, seed); } catch (Exception e) { Stumble("Caravans", e); }
+            try { Prices(all, at, seed); } catch (Exception e) { Stumble("Prices", e); }
+            try { Wars(all, at, seed, today); } catch (Exception e) { Stumble("Wars", e); }
+            all.Sort((x1, x2) => x2.Score.CompareTo(x1.Score));
+            var res = new List<Item>();
+            var cap = new[] { 2, 1, 1, 1, 1, 2 };
+            var used = new int[6];
+            foreach (var it in all)
+            {
+                if (res.Count >= 6) break;
+                if (used[it.Cat] >= cap[it.Cat]) continue;
+                used[it.Cat]++;
+                res.Add(it);
+            }
+            return res;
+        }
+
+        // ------------------------------------------------------------ dokladnosc, liczby, miejsca
+        private static float Exact(float dist, int age, float scale) { return Math.Max(0.05f, Math.Min(1f, 1f - dist / scale - age / 30f)); }
+
+        internal static int Round(int n)
+        {
+            if (n < 20) return n;
+            if (n < 100) return (int)(Math.Round(n / 5.0) * 5);
+            if (n < 1000) return (int)(Math.Round(n / 10.0) * 10);
+            if (n < 10000) return (int)(Math.Round(n / 100.0) * 100);
+            return (int)(Math.Round(n / 1000.0) * 1000);
+        }
+
+        private static int Coarse(int n)
+        {
+            if (n < 10) return n;
+            double m = Math.Pow(10, Math.Floor(Math.Log10(n)));
+            return (int)(Math.Round(n / m) * m);
+        }
+
+        private static double Blow(uint seed) { return 1.4 + (seed % 100u) / 100.0 * 1.6; }
+
+        /// <summary>Liczba ludzi wedlug dokladnosci: "about 40" / "some 40" / przesada ("as many as 90", "hundreds of", "thousands of"); dalej idzie rzeczownik.</summary>
+        private static string Men(int n, float q, uint seed)
+        {
+            if (n <= 0) return "a handful of";
+            if (q >= 0.75f) return "about " + Round(n).ToString("N0", Inv);
+            if (q >= 0.45f) return "some " + Coarse(n).ToString("N0", Inv);
+            int e = (int)(n * Blow(seed));
+            if (e >= 1000) return "thousands of";
+            if (e >= 200) return "hundreds of";
+            return "as many as " + Coarse(e).ToString("N0", Inv);
+        }
+
+        private static string Coin(int g, float q, uint seed)
+        {
+            if (q >= 0.75f) return "about " + Round(g).ToString("N0", Inv) + " denars";
+            if (q >= 0.45f) return "near " + Coarse(g).ToString("N0", Inv) + " denars";
+            int e = (int)(g * Blow(seed));
+            if (e >= 20000) return "a king's ransom";
+            if (e >= 5000) return "chests of silver";
+            return "as much as " + Coarse(e).ToString("N0", Inv) + " denars";
+        }
+
+        private static string Dir(Vec2 from, Vec2 to)
+        {
+            double a = Math.Atan2(to.y - from.y, to.x - from.x) * 180.0 / Math.PI;   // x na wschod, y na polnoc (mapa ROT: Polnoc u gory, Essos na wschodzie)
+            string[] d = { "east", "north-east", "north", "north-west", "west", "south-west", "south", "south-east" };
+            int i = (int)Math.Floor(((a + 360.0 + 22.5) % 360.0) / 45.0);
+            return d[Math.Max(0, Math.Min(7, i))];
+        }
+
+        private static string Days(float d)
+        {
+            if (d < 22f) return "half a day's ride";
+            if (d < 60f) return "a day's ride";
+            if (d < 110f) return "two days' ride";
+            if (d < 160f) return "three days' ride";
+            return "many days' ride";
+        }
+
+        /// <summary>Najblizsza nazwana osada (miasto, zamek, wies - bez kryjowek) do r jedn.</summary>
+        private static Settlement NearestNamed(Vec2 p, float r)
+        {
+            Settlement best = null;
+            float bd = r;
+            foreach (var s in Settlement.All)
+            {
+                if (s == null || !(s.IsTown || s.IsCastle || s.IsVillage)) continue;
+                float d = s.GetPosition2D.Distance(p);
+                if (d < bd) { bd = d; best = s; }
+            }
+            return best;
+        }
+
+        /// <summary>Miejsce: blisko i dokladnie - "near X" (najblizsza osada); inaczej "two days' ride to the north-east".</summary>
+        private static string Where(Vec2 at, Vec2 p, float q)
+        {
+            float d = at.Distance(p);
+            if (q >= 0.5f && d <= 70f)
+            {
+                var s = NearestNamed(p, 25f);
+                if (s != null) return "near " + s.Name;
+            }
+            if (d < 6f) return "close by";
+            return Days(d) + " to the " + Dir(at, p);
+        }
+
+        // ------------------------------------------------------------ bandy
+        private static readonly string[] Pre = { "Bald", "Red", "Black", "Mad", "Old", "Lame", "Long", "Big", "Little", "Grim", "Crooked", "Toothless", "Pale", "Ugly",
+                                                 "Fat", "Dirty", "Quiet", "Grey", "One-Eyed", "Scarred" };
+        private static readonly string[] Post = { "the Butcher", "Crowfoot", "Half-Ear", "the Flayer", "Sweetbread", "the Knife", "Ironjaw", "the Weasel", "Stonehand",
+                                                  "the Toad", "Pigface", "the Fox", "Three-Fingers", "No-Nose", "the Hangman", "Kettlebelly" };
+        private static readonly string[] Plain = { "Jon", "Will", "Tom", "Harry", "Jory", "Rolf", "Dick", "Wat", "Hal", "Ned", "Gerold", "Osric", "Hugh", "Alyn" };
+
+        private static Settlement NearestTown(Vec2 p)
+        {
+            Settlement best = null; float bd = float.MaxValue;
+            foreach (var t in Town.AllTowns)
+            {
+                var s = t != null ? t.Settlement : null;
+                if (s == null) continue;
+                float d = s.GetPosition2D.Distance(p);
+                if (d < bd) { bd = d; best = s; }
+            }
+            return best;
+        }
+
+        /// <summary>Herszt bandy: bohater (BK) albo przezwisko deterministyczne z id bandy - imie z listy kultury krainy (najblizsze miasto), przydomek z listy.</summary>
+        private static string Leader(MobileParty p)
+        {
+            if (p.LeaderHero != null) return p.LeaderHero.Name.ToString();
+            uint h = MapVillageData.Fnv(p.StringId ?? "band");
+            string first = null;
+            try
+            {
+                var town = NearestTown(p.GetPosition2D);
+                var c = town != null ? town.Culture : null;
+                var list = c != null ? c.MaleNameList : null;
+                if (list != null && list.Count > 0) first = list[(int)(h % (uint)list.Count)].ToString();
+            }
+            catch { first = null; }
+            if (string.IsNullOrEmpty(first) || first.IndexOf('{') >= 0) first = Plain[h % (uint)Plain.Length];
+            return ((h >> 9) & 1u) == 0 ? Pre[(h >> 10) % (uint)Pre.Length] + " " + first : first + " " + Post[(h >> 10) % (uint)Post.Length];
+        }
+
+        private static string Since(Band b, int today)
+        {
+            if (b == null || !b.Known) return "for a good while now";
+            int d = today - b.First;
+            if (d < 3) return "these last few days";
+            if (d < 10) return "for a week or so";
+            if (d < 21) return "for a fortnight";
+            if (d < 45) return "for a month now";
+            if (d < 120) return "for months";
+            return "for as long as anyone remembers";
+        }
+
+        private static void Bandits(List<Item> all, Vec2 at, uint seed, int today)
+        {
+            const float R = 70f;
+            var found = new List<KeyValuePair<float, MobileParty>>();
+            foreach (var p in MobileParty.AllBanditParties)
+            {
+                if (p == null || !p.IsActive || p.CurrentSettlement != null || p.MemberRoster == null) continue;
+                int men = p.MemberRoster.TotalManCount;
+                if (men < 5) continue;
+                float d = p.GetPosition2D.Distance(at);
+                if (d > R) continue;
+                float score = (men + Math.Max(0, p.PartyTradeGold) / 50f) / (1f + d / 15f);
+                found.Add(new KeyValuePair<float, MobileParty>(score, p));
+            }
+            found.Sort((x1, x2) => x2.Key.CompareTo(x1.Key));
+            for (int i = 0; i < found.Count && i < 2; i++)
+            {
+                var p = found[i].Value;
+                float d = p.GetPosition2D.Distance(at);
+                float q = Exact(d, 0, 150f);
+                uint s = seed ^ MapVillageData.Fnv(p.StringId ?? "");
+                Band b; _bands.TryGetValue(p.StringId ?? "", out b);
+                int men = p.MemberRoster.TotalManCount, gold = Math.Max(0, p.PartyTradeGold);
+                bool rich = gold >= Math.Max(1500, 40 * men);
+                string kind = p.ActualClan != null ? p.ActualClan.Name.ToString() : "outlaws";
+                var t = new StringBuilder();
+                t.Append(i == 0 ? "They say " : "Others speak of how ").Append(Leader(p)).Append(" and his ").Append(kind).Append(" have been robbing the roads ").Append(Where(at, p.GetPosition2D, q))
+                 .Append(' ').Append(Since(b, today)).Append(" - ").Append(Men(men, q, s)).Append(" men");
+                if (gold <= 50) t.Append(", but poor as church mice.");
+                else t.Append(rich ? ", and fat with plunder: " : ", with ").Append(Coin(gold, q, s >> 3)).Append(" in their purses.");
+                if (b != null && b.Raids > 0) t.Append(" They have burned ").Append(b.Raids == 1 ? "a village" : b.Raids + " villages").Append(" already.");
+                if (rich) t.Append(" It will be hard to smoke them out now.");
+                all.Add(new Item { Cat = 0, Score = 3f + found[i].Key / 10f, Text = t.ToString() });
+            }
+        }
+
+        // ------------------------------------------------------------ kryjowki
+        private static void Hideouts(List<Item> all, Vec2 at, uint seed)
+        {
+            const float R = 160f;
+            Settlement best = null; float bs = -1f; int bestBands = 0;
+            foreach (var h in Hideout.All)
+            {
+                var st = h != null ? h.Settlement : null;
+                if (st == null) continue;
+                float d = st.GetPosition2D.Distance(at);
+                if (d > R) continue;
+                int bands = 0;
+                foreach (var p in st.Parties) if (p != null && p.IsBandit) bands++;
+                if (bands == 0) continue;
+                int gold = st.SettlementComponent != null ? Math.Max(0, st.SettlementComponent.Gold) : 0;
+                float score = (gold / 200f + bands * 5f) / (1f + d / 40f);
+                if (score > bs) { bs = score; best = st; bestBands = bands; }
+            }
+            if (best == null) return;
+            float dd = best.GetPosition2D.Distance(at);
+            float q = Exact(dd, 0, 150f);
+            uint s = seed ^ MapVillageData.Fnv(best.StringId ?? "");
+            int g = best.SettlementComponent != null ? Math.Max(0, best.SettlementComponent.Gold) : 0;
+            var t = new StringBuilder("There is an outlaw lair in the wilds ");
+            t.Append(Where(at, best.GetPosition2D, q)).Append(" - ").Append(q >= 0.45f ? (bestBands == 1 ? "one band goes" : bestBands + " bands go") : "many bands go").Append(" in and out of it");
+            if (g < 100) t.Append(", though folk say there is little worth taking.");
+            else t.Append(", and folk swear ").Append(Coin(g, q, s)).Append(" lies hidden there for whoever clears it out.");
+            all.Add(new Item { Cat = 1, Score = 2.5f + bs / 10f, Text = t.ToString() });
+        }
+
+        // ------------------------------------------------------------ wojska
+        private static void Armies(List<Item> all, Vec2 at, uint seed)
+        {
+            Army best = null; float bd = 180f;
+            foreach (var k in Kingdom.All)
+            {
+                if (k == null || k.IsEliminated) continue;
+                foreach (var a in k.Armies)
+                {
+                    if (a == null || a.LeaderParty == null) continue;
+                    float d = a.LeaderParty.GetPosition2D.Distance(at);
+                    if (d < bd) { bd = d; best = a; }
+                }
+            }
+            if (best != null)
+            {
+                var lp = best.LeaderParty;
+                float q = Exact(bd, 0, 150f);
+                uint s = seed ^ MapVillageData.Fnv(lp.StringId ?? "");
+                string leader = lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : lp.Name.ToString();
+                string realm = best.Kingdom != null ? " of " + best.Kingdom.Name : "";
+                string doing;
+                if (lp.SiegeEvent != null && lp.SiegeEvent.BesiegedSettlement != null) doing = "laying siege to " + lp.SiegeEvent.BesiegedSettlement.Name;
+                else
+                {
+                    var target = best.AiBehaviorObject as Settlement;
+                    if (target != null && best.Kingdom != null && target.MapFaction != null && FactionManager.IsAtWarAgainstFaction(best.Kingdom, target.MapFaction)) doing = "marching on " + target.Name;
+                    else if (target != null) doing = "gathering by " + target.Name;
+                    else doing = "on the march";
+                }
+                all.Add(new Item { Cat = 2, Score = 2.8f + (1f - bd / 180f), Text = "The host of " + leader + realm + " - " + Men(best.TotalManCount, q, s) + " men - is " + doing + ", " + Where(at, lp.GetPosition2D, q) + "." });
+                return;
+            }
+            MobileParty big = null; float bb = 120f;
+            foreach (var p in MobileParty.AllLordParties)
+            {
+                if (p == null || !p.IsActive || p.LeaderHero == null || p.CurrentSettlement != null || p.MemberRoster == null || p.MemberRoster.TotalManCount < 80) continue;
+                float d = p.GetPosition2D.Distance(at);
+                if (d < bb) { bb = d; big = p; }
+            }
+            if (big == null) return;
+            float q2 = Exact(bb, 0, 150f);
+            string fac = big.MapFaction != null ? " of " + big.MapFaction.Name : "";
+            all.Add(new Item { Cat = 2, Score = 2f + (1f - bb / 120f), Text = big.LeaderHero.Name + fac + " rides with " + Men(big.MemberRoster.TotalManCount, q2, seed ^ MapVillageData.Fnv(big.StringId ?? "")) + " men " + Where(at, big.GetPosition2D, q2) + "." });
+        }
+
+        // ------------------------------------------------------------ karawany
+        private static void Caravans(List<Item> all, Vec2 at, uint seed)
+        {
+            MobileParty best = null; float bd = 90f; int near = 0;
+            foreach (var p in MobileParty.AllCaravanParties)
+            {
+                if (p == null || !p.IsActive || p.CurrentSettlement != null) continue;
+                float d = p.GetPosition2D.Distance(at);
+                if (d > 90f) continue;
+                near++;
+                if (p.TargetSettlement != null && d < bd) { bd = d; best = p; }
+            }
+            if (best == null) return;
+            float q = Exact(bd, 0, 150f);
+            string owner = best.Party != null && best.Party.Owner != null ? best.Party.Owner.Name.ToString() : best.ActualClan != null ? best.ActualClan.Name.ToString() : "a merchant";
+            int guards = best.MemberRoster != null ? best.MemberRoster.TotalManCount : 0;
+            string text = "A caravan of " + owner + " passed " + Where(at, best.GetPosition2D, q) + ", bound for " + best.TargetSettlement.Name + " with " + Men(guards, q, seed ^ MapVillageData.Fnv(best.StringId ?? "")) + " guards."
+                          + (near >= 3 ? " The roads are busy - " + near + " caravans are about." : "");
+            all.Add(new Item { Cat = 3, Score = 1.8f + (1f - bd / 90f), Text = text });
+        }
+
+        // ------------------------------------------------------------ ceny
+        private static readonly string[] PriceIds = { "grain", "fish", "meat", "cheese", "butter", "beer", "wine", "oil", "salt", "linen", "wool", "hides", "tools", "iron", "pottery", "fur", "velvet" };
+        private static List<ItemObject> _priceItems;
+
+        private static void Prices(List<Item> all, Vec2 at, uint seed)
+        {
+            if (_priceItems == null)
+            {
+                _priceItems = new List<ItemObject>();
+                foreach (var id in PriceIds) { try { var it = MBObjectManager.Instance.GetObject<ItemObject>(id); if (it != null) _priceItems.Add(it); } catch { } }
+            }
+            if (_priceItems.Count == 0) return;
+            var towns = new List<KeyValuePair<float, Town>>();
+            foreach (var t in Town.AllTowns)
+            {
+                var st = t != null ? t.Settlement : null;
+                if (st == null || !st.IsTown || st.IsUnderSiege) continue;
+                float d = st.GetPosition2D.Distance(at);
+                if (d <= 260f) towns.Add(new KeyValuePair<float, Town>(d, t));
+            }
+            if (towns.Count < 2) return;
+            towns.Sort((x1, x2) => x1.Key.CompareTo(x2.Key));
+            if (towns.Count > 3) towns.RemoveRange(3, towns.Count - 3);
+            ItemObject bi = null; Town hiT = null, loT = null; int hiP = 0, loP = 0; double br = 1.25;
+            foreach (var it in _priceItems)
+            {
+                Town h = null, l = null; int hp = 0, lp = int.MaxValue;
+                foreach (var kv in towns)
+                {
+                    int pr = kv.Value.GetItemPrice(it, null, false);
+                    if (pr <= 0) continue;
+                    if (pr > hp) { hp = pr; h = kv.Value; }
+                    if (pr < lp) { lp = pr; l = kv.Value; }
+                }
+                if (h == null || l == null || h == l || lp <= 0) continue;
+                double r = hp / (double)lp;
+                if (r > br) { br = r; bi = it; hiT = h; loT = l; hiP = hp; loP = lp; }
+            }
+            if (bi == null) return;
+            float far = Math.Max(hiT.Settlement.GetPosition2D.Distance(at), loT.Settlement.GetPosition2D.Distance(at));
+            bool exact = Exact(far, 0, 600f) >= 0.75f;
+            string a = exact ? hiP.ToString(Inv) : "about " + Round(hiP).ToString(Inv);
+            string b = exact ? loP.ToString(Inv) : "about " + Round(loP).ToString(Inv);
+            all.Add(new Item { Cat = 4, Score = 1.5f + (float)Math.Min(2.0, br - 1.0), Text = bi.Name + " fetches " + a + " in " + hiT.Name + ", but only " + b + " in " + loT.Name + " - a carter could do well." });
+        }
+
+        // ------------------------------------------------------------ wojny
+        private static void Wars(List<Item> all, Vec2 at, uint seed, int today)
+        {
+            var cands = new List<KeyValuePair<float, string>>();
+            foreach (var n in _news)
+            {
+                int age = Math.Max(0, today - n.Day);
+                if (age > NewsDays) continue;
+                var p = new Vec2(n.X, n.Y);
+                float d = p.Distance(at);
+                float q = Exact(d, age, 600f);
+                string when = age <= 1 ? "Just yesterday" : age < 7 ? "A few days ago" : age < 21 ? "Some weeks ago" : "A month or more ago";
+                string place = q >= 0.35f && n.C.Length > 0 ? n.C : null;
+                string text = null;
+                switch (n.Kind)
+                {
+                    case NWar: text = when + " " + n.A + " declared war on " + n.B + "."; break;
+                    case NPeace: text = when + " " + n.A + " and " + n.B + " made peace" + (age < 7 ? " - may it last." : "."); break;
+                    case NCaptured:
+                        text = when + " " + (place ?? (n.N == 1 ? "a town" : "a castle") + " " + Days(d) + " to the " + Dir(at, p)) + " fell to " + (n.A.Length > 0 ? n.A : "its besiegers")
+                               + (n.B.Length > 0 ? " of " + n.B : "") + ".";
+                        break;
+                    case NRaided:
+                        text = when + " " + (n.A.Length > 0 ? n.A : "raiders") + (n.B.Length > 0 && n.B != n.A ? " of " + n.B : "") + " burned " + (place ?? "a village " + Days(d) + " to the " + Dir(at, p)) + ".";
+                        break;
+                    case NBattle:
+                        text = when + " " + n.A + " beat " + n.B + " in a great battle " + (place != null ? "near " + place : Days(d) + " to the " + Dir(at, p)) + " - "
+                               + Men(n.N, q, seed ^ (uint)(n.Day * 7919)) + " men took the field.";
+                        break;
+                    case NSiege:
+                        text = when + " " + (n.A.Length > 0 ? n.A : "a host") + (n.B.Length > 0 ? " of " + n.B : "") + " laid siege to " + (place ?? "a stronghold " + Days(d) + " to the " + Dir(at, p)) + ".";
+                        break;
+                }
+                if (text == null) continue;
+                float score = 1.2f + (1f - age / (float)NewsDays) * (1f / (1f + d / 250f)) * (n.Kind == NWar || n.Kind == NPeace ? 1.3f : 1f);
+                cands.Add(new KeyValuePair<float, string>(score, text));
+            }
+            // trwajace oblezenia w poblizu (stan teraz)
+            foreach (var st in Settlement.All)
+            {
+                if (st == null || !st.IsFortification || st.SiegeEvent == null) continue;
+                float d = st.GetPosition2D.Distance(at);
+                if (d > 300f) continue;
+                var lp = st.SiegeEvent.BesiegerCamp != null ? st.SiegeEvent.BesiegerCamp.LeaderParty : null;
+                string who = lp != null && lp.LeaderHero != null ? lp.LeaderHero.Name.ToString() : "a great host";
+                cands.Add(new KeyValuePair<float, string>(2.2f + (1f - d / 300f), st.Name + " is under siege - " + who + (lp != null && lp.MapFaction != null ? " of " + lp.MapFaction.Name : "") + " sits before its walls."));
+            }
+            if (cands.Count == 0)
+            {
+                var town = NearestTown(at);
+                var k = town != null ? town.MapFaction as Kingdom : null;
+                if (k == null) return;
+                var foes = new List<string>();
+                foreach (var o in Kingdom.All) if (o != null && o != k && !o.IsEliminated && FactionManager.IsAtWarAgainstFaction(k, o)) foes.Add(o.Name.ToString());
+                cands.Add(new KeyValuePair<float, string>(1f, foes.Count == 0 ? k.Name + " is at peace, the gods be thanked." : "Folk say " + k.Name + " is at war with " + string.Join(", ", foes.ToArray()) + "."));
+            }
+            cands.Sort((x1, x2) => x2.Key.CompareTo(x1.Key));
+            for (int i = 0; i < cands.Count && i < 2; i++) all.Add(new Item { Cat = 5, Score = cands[i].Key, Text = cands[i].Value });
+        }
+    }
+}
