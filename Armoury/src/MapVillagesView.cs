@@ -92,6 +92,10 @@ namespace Armoury
         public string Hamlet = "";        // shepherds / goatherds / drovers / swineherds / woodcutters / charcoal / trappers / hunters / fishers
         public string KsStart = "", KsTerr = "", KsKind = "", KsModel = "";
         public float KsDSea = -1f, KsDRiver = -1f, KsDMount = -1f;
+        // sw-przysiolki (recenzja): wiersz tej wioski w ukladzie v5 (kolumny v5_order / v5_x / v5_y / v5_settlements pliku v6; V5Settlements -1 = brak) - zapis v5
+        // przechodzi na v6 po uid z samego pliku ukladu, bez arm_map_villages_v5.tsv w module (VillageBook.OldLayout, MapVillageData.V5Of)
+        public int V5Order = -1, V5Settlements = -1;
+        public float V5X = -1f, V5Y = -1f;
     }
 
     /// <summary>Wynik wczytania pliku: wiersze, naglowek, odrzucone wiersze z powodami.</summary>
@@ -349,7 +353,34 @@ namespace Armoury
                     r.KsStart = ks; r.KsTerr = kt; r.KsKind = kk; r.KsModel = km; r.KsDSea = a; r.KsDRiver = b; r.KsDMount = d;
                 }
             }
+            // sw-przysiolki (recenzja): wiersz v5 (kolumny opcjonalne; brak albo zla liczba = brak wiersza v5 - wiersz NIE odrzucany)
+            {
+                int vo, vs; float vx, vy;
+                if (Int(Get(c, col, "v5_order"), out vo) && Int(Get(c, col, "v5_settlements"), out vs) && Num(Get(c, col, "v5_x"), out vx) && Num(Get(c, col, "v5_y"), out vy)
+                    && vo >= 0 && vs >= 1 && vx >= 0f && vy >= 0f && vx <= 100000f && vy <= 100000f)
+                {
+                    r.V5Order = vo; r.V5Settlements = vs; r.V5X = vx; r.V5Y = vy;
+                }
+            }
             return null;
+        }
+
+        /// <summary>sw-przysiolki (recenzja): uklad v5 odtworzony z kolumn v5_* pliku v6 - kopie wierszy (id, wies gry, uid, nazwa jak v6; polozenie, osady i kolejnosc
+        /// z v5), w kolejnosci pliku (ta sama co v5 - crc "uid:osady;" = crc v5). null - choc jeden wiersz bez kolumn v5_* (plik v5 / v4 albo plik reczny).</summary>
+        internal static List<MapVillageRecord> V5Of(List<MapVillageRecord> recs)
+        {
+            if (recs == null || recs.Count == 0) return null;
+            var outl = new List<MapVillageRecord>(recs.Count);
+            foreach (var r in recs)
+            {
+                if (r == null || r.V5Settlements < 1) return null;
+                outl.Add(new MapVillageRecord
+                {
+                    Id = r.Id, VillageId = r.VillageId, Uid = r.Uid, Name = r.Name, Line = r.Line,
+                    X = r.V5X, Y = r.V5Y, Settlements = r.V5Settlements, Order = r.V5Order
+                });
+            }
+            return outl;
         }
 
         /// <summary>Sciezka pliku w module (Modules\Armoury\ModuleData). E4/11: przeniesione z widoku - ten sam plik czyta ksiega wiosek po stronie kampanii.

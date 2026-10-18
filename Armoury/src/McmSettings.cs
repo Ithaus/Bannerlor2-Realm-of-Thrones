@@ -6068,7 +6068,7 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageTwoPennants { get; set; } = true;
 
-        [SettingPropertyBool("Village Layout V5", HintText = "a fifth fewer map villages, none crowded against its neighbour, and each of its own size - from about 1,500 souls in a farm by the fields to 9,000 at a crossroads; the people of a district stay the same. It takes effect when a campaign is loaded. Off = the earlier layout, 2,446 villages of about 4,000 souls each")]
+        [SettingPropertyBool("Village Layout V5", HintText = "a fifth fewer map villages, none crowded against its neighbour, and each of its own size - from about 1,500 souls in a farm by the fields to 9,000 at a crossroads; the people of a district stay the same. It takes effect when a campaign is loaded. Off = the earlier layout, 2,446 villages of about 4,000 souls each. Used only when Village Layout V6 is off")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV5 { get; set; } = true;
 
@@ -6076,7 +6076,7 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV6 { get; set; } = true;
 
-        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet work the land where the hamlet stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Off = they count as working the fields of the village they came from")]
+        [SettingPropertyBool("Village Hamlet Ks Land", HintText = "with Start Calibration, the people of a hamlet work the land where the hamlet stands - the sheep of the hills, the timber of the forest, the fish of the shore - by the same yields as everywhere else. Changing it after Start Calibration is applied drops the applied calibration and starts the plan again. Off = they count as working the fields of the village they came from")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageHamletKsLand { get; set; } = true;
 

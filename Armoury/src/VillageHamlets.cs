@@ -110,6 +110,11 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("VillageHamlets.SessionStart(v5)", e); }
                 }
+                // recenzja: wiersz v5 kazdej wioski w samym pliku v6 (kolumny v5_*) - ksiega przenosi nim zapis v5 po uid bez pliku _v5; tu jego crc (= v5) i zapas porownania
+                List<MapVillageRecord> v5e = null;
+                if (ver >= 6) { try { v5e = MapVillageData.V5Of(recs); } catch (Exception e) { Stumble("VillageHamlets.SessionStart(v5_*)", e); } }
+                string v5src = MapVillageData.FileNameV5;
+                if (v5 == null && v5e != null) { v5 = v5e; v5src = "kolumny v5_* pliku ukladu"; }
                 if (v5 != null)
                 {
                     var by5 = MapVillageData.ByDistrict(v5);
@@ -130,11 +135,12 @@ namespace Armoury
                     }
                     var u5 = new HashSet<string>(StringComparer.Ordinal); foreach (var r in v5) u5.Add(r.Uid);
                     int uidMiss = 0; foreach (var r in recs) if (!u5.Contains(r.Uid)) uidMiss++;
-                    sb.Append(" | v5 (").Append(MapVillageData.FileNameV5).Append(" crc ").Append(CrcOf(v5).ToString("X8")).Append("): wiosek ").Append(v5.Count).Append(", okregow ").Append(by5.Count)
+                    sb.Append(" | v5 (").Append(v5src).Append(" crc ").Append(CrcOf(v5).ToString("X8")).Append("): wiosek ").Append(v5.Count).Append(", okregow ").Append(by5.Count)
                       .Append(", okregow z inna liczba wiosek ").Append(diffN).Append(", z inna suma osad ").Append(diffS).Append(", uid spoza v5 ").Append(uidMiss)
                       .Append(", osad wiosek v6 ").Append(s6).Append(" / v5 ").Append(s5);
                 }
                 else sb.Append(ver >= 6 ? " | v5: BRAK pliku " + MapVillageData.FileNameV5 + " (bez porownania)" : " | v5: uklad tej sesji v" + ver + " (bez porownania)");
+                if (ver >= 6) sb.Append(" | kolumny v5_* (zapis v5 po uid bez pliku _v5): crc ").Append(v5e != null ? CrcOf(v5e).ToString("X8") : "BRAK");
                 // najblizsza sasiadka i skupiska
                 double mn, p10, med; int crowd;
                 NearStats(recs, out mn, out p10, out med, out crowd);
@@ -249,7 +255,47 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ 2. KS: ziemia punktu przysiolka (StartCalibration.HamletLandOverlay, po EnsureLand)
-        internal static void OverlayKs(Dictionary<string, StartCalibration.LandDist> vil)
+        /// <summary>Nakladka ziemi przysiolkow na wiersze S pliku ziemi. fileCrc - crc danych pliku ziemi (EnsureLand). Zwraca crc ziemi KS tej sesji: bez nakladki = fileCrc,
+        /// z nakladka = crc32(fileCrc + podpis nadpisanych wierszy) - recenzja: zapis KS zastosowany / uzbrojony przy innej nakladce (klucz Village Hamlet Ks Land
+        /// przelaczony, inny uklad) idzie droga "inny plik ziemi" (stan pominiety, Plan od nowa), zamiast cicho przebudowac bloki przysiolkow na innej ziemi.</summary>
+        internal static uint OverlayKs(Dictionary<string, StartCalibration.LandDist> vil, uint fileCrc)
+        {
+            OverlayRows(vil);
+            uint eff = fileCrc;
+            try
+            {
+                if (_orig.Count == 0) eff = fileCrc;
+                else
+                {
+                    var rows = new List<StartCalibration.LandRow>(_orig.Keys);
+                    rows.Sort((a, b) => string.CompareOrdinal(a.Uid, b.Uid));
+                    var sb = new StringBuilder(rows.Count * 64 + 16);
+                    sb.Append(fileCrc.ToString("X8")).Append("|przysiolki:");
+                    foreach (var r in rows)
+                    {
+                        var o = r.O;
+                        sb.Append(r.Uid).Append(':').Append(r.Start ?? "-").Append(':').Append(o != null ? o.Terr : "-").Append(':').Append(o != null ? o.Kind : "-").Append(':')
+                          .Append(o != null ? o.Model : "-").Append(':').Append(o != null ? o.DSea.ToString("R", Inv) : "-").Append(':').Append(o != null ? o.DRiver.ToString("R", Inv) : "-")
+                          .Append(':').Append(o != null ? o.DMount.ToString("R", Inv) : "-").Append(';');
+                    }
+                    eff = MapVillageData.Crc32(Encoding.UTF8.GetBytes(sb.ToString()));
+                }
+            }
+            catch (Exception e)
+            {
+                // podpis nie policzony - nakladka zdjeta (wiersze z pliku), crc pliku: stan zgodny z tym, co KS naprawde czyta
+                Stumble("VillageHamlets.OverlayKs(crc)", e);
+                foreach (var kv in _orig) { kv.Key.O = kv.Value.Key; kv.Key.Start = kv.Value.Value; }
+                _orig.Clear(); _ksRows = 0; eff = fileCrc;
+                _ksNote = "blad podpisu nakladki - nakladka zdjeta, wiersze pliku ziemi";
+            }
+            if (vil != null)
+                Log.Info(P + "KS crc ziemi | crc ziemi KS tej sesji " + eff.ToString("X8") + (eff == fileCrc ? " = plik " : " (z nakladka przysiolkow, wierszy " + _orig.Count + "; plik ") + fileCrc.ToString("X8")
+                         + (eff == fileCrc ? " (bez nakladki)" : ")") + " | zapis KS zastosowany albo uzbrojony przy innej nakladce (klucz Village Hamlet Ks Land, uklad wiosek) idzie droga 'inny plik ziemi': stan pominiety, Plan od nowa.");
+            return eff;
+        }
+
+        private static void OverlayRows(Dictionary<string, StartCalibration.LandDist> vil)
         {
             int restored = 0;
             try

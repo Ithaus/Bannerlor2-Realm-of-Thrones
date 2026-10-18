@@ -287,10 +287,13 @@ namespace Armoury
 
         /// <summary>Crc ukladu z uid i osad wierszy w kolejnosci pliku ("uid:osady;" - ten sam napis co "L:" zapisu i naglowek layout_crc lore) - niezalezne od CRLF/LF,
         /// komentarzy i kolumn samego widoku.</summary>
-        private static uint LayoutCrcOf(MapVillageFile f)
+        private static uint LayoutCrcOf(MapVillageFile f) { return LayoutCrcOf(f.Records); }
+
+        /// <summary>sw-przysiolki (recenzja): to samo dla listy wierszy (uklad v5 z kolumn v5_* pliku v6 - MapVillageData.V5Of).</summary>
+        private static uint LayoutCrcOf(List<MapVillageRecord> recs)
         {
-            var sb = new StringBuilder(f.Records.Count * 40);
-            foreach (var r in f.Records) sb.Append(r.Uid).Append(':').Append(r.Settlements.ToString(Inv)).Append(';');
+            var sb = new StringBuilder(recs.Count * 40);
+            foreach (var r in recs) sb.Append(r.Uid).Append(':').Append(r.Settlements.ToString(Inv)).Append(';');
             return MapVillageData.Crc32(Encoding.UTF8.GetBytes(sb.ToString()));
         }
 
@@ -315,20 +318,39 @@ namespace Armoury
                     if (path == null || !System.IO.File.Exists(path)) continue;
                     var f = MapVillageData.Parse(Encoding.UTF8.GetString(System.IO.File.ReadAllBytes(path)));
                     if (f.MissingColumns.Length > 0 || f.Records.Count == 0 || LayoutCrcOf(f) != crc) continue;
-                    var map = new Dictionary<string, OldDist>(StringComparer.Ordinal);
-                    foreach (var kv in MapVillageData.ByDistrict(f.Records))
-                    {
-                        int n = kv.Value.Count;
-                        var od = new OldDist { Uid = new string[n], X = new float[n], Y = new float[n], F = new double[n + 1] };
-                        for (int i = 0; i < n; i++) { var r = kv.Value[i]; od.Uid[i] = r.Uid; od.X[i] = r.X; od.Y[i] = r.Y; od.F[i] = Math.Max(1, r.Settlements); }
-                        map[kv.Key] = od;
-                    }
                     name = cand;
-                    return map;
+                    return OldMap(f.Records);
                 }
                 catch (Exception e) { Stumble("VillageBook.OldLayout", e); }
             }
+            // sw-przysiolki (recenzja): zaden plik modulu nie ma crc zapisu - plik ukladu tej sesji (v6) niesie wiersz v5 kazdej wioski (kolumny v5_*): zapis v5 po uid
+            // takze wtedy, gdy wgranie nie przenioslo arm_map_villages_v5.tsv (dotad: sumy okregow, flagi spalonych i pamiec wojny tracone)
+            try
+            {
+                var cur = _file;
+                var v5 = cur != null ? MapVillageData.V5Of(cur.Records) : null;
+                if (v5 != null && LayoutCrcOf(v5) == crc)
+                {
+                    name = (_fileName ?? MapVillageData.FileName) + " (kolumny v5_*)";
+                    return OldMap(v5);
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.OldLayout(v5_*)", e); }
             return null;
+        }
+
+        /// <summary>Okregi ukladu zapisu z wierszy (ByDistrict: order, potem id - jak Build przy zapisie). Wydzielone z OldLayout (sw-przysiolki, recenzja) bez zmian.</summary>
+        private static Dictionary<string, OldDist> OldMap(List<MapVillageRecord> recs)
+        {
+            var map = new Dictionary<string, OldDist>(StringComparer.Ordinal);
+            foreach (var kv in MapVillageData.ByDistrict(recs))
+            {
+                int n = kv.Value.Count;
+                var od = new OldDist { Uid = new string[n], X = new float[n], Y = new float[n], F = new double[n + 1] };
+                for (int i = 0; i < n; i++) { var r = kv.Value[i]; od.Uid[i] = r.Uid; od.X[i] = r.X; od.Y[i] = r.Y; od.F[i] = Math.Max(1, r.Settlements); }
+                map[kv.Key] = od;
+            }
+            return map;
         }
 
         private static Dist Build(Settlement st, List<MapVillageRecord> recs)

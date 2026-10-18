@@ -19,4 +19,5 @@ kultura okregu: norvos 27, reach 24, battania 24, river 22, qohorik 15, volantin
 wioski z obrazkiem rybackim (HamletKinds poza KS): v5 319, v6 318
 nazwy: nowe (Westeros) 97, stare (Essos) 118; rycerz 'of <nazwa>' przemianowany 66
 crc ukladu (uid:osady; jak VillageBook): v5 68BB06AD, v6 F5456602
+kolumny v5_* pliku v6 (zapis v5 po uid bez arm_map_villages_v5.tsv): crc 68BB06AD - = v5
 lore v6: wierszy 1957 (wiosek v6 1957, bez lore 0, przysiolkow z nowym zajeciem 215), bramka layout_crc F5456602

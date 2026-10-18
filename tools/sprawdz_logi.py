@@ -971,7 +971,9 @@ Uzycie (Python 3, tylko odczyt):
                     gry) = wszystkie, NPR-6 od miasta >= 12 i od zamku >= 9 jedn., NPR-7 ksiega wiosek na crc v6 i zapis innego ukladu przeniesiony po uid (plik _v5 / _v4),
                     NPR-8 lore v6 (bramka zgodna, bez lore 0), NPR-9 widok (uklad v6, odrzucone wiersze 0), NPR-10 KS: uklad wiosek tej sesji zgodny z plikiem ziemi (uid),
                     NPR-11 nakladka ziemi KS (nadpisane wiersze S = przysiolki; brak pliku ziemi / klucz NIE - INFO), NPR-12 linia co 7 dob (ludzie w domu przysiolkow > 0,
-                    udzial < 10%), NPR-13 potkniecia i ERROR VillageHamlets 0. Log bez linii paczki: INFO (stan ksiegi i lore jako odczyt), bez wyjatku.
+                    udzial < 10%), NPR-13 potkniecia i ERROR VillageHamlets 0, NPR-14 (recenzja) kolumny v5_* pliku v6 - crc = v5 68BB06AD (zapis v5 po uid bez pliku
+                    _v5), NPR-15 (recenzja) crc ziemi KS z nakladka przysiolkow: inny niz plik, gdy nadpisane wiersze > 0, rowny plikowi bez nakladki (zapis KS przy innej
+                    nakladce - droga 'inny plik ziemi'). Log bez linii paczki: INFO (stan ksiegi i lore jako odczyt), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -35439,13 +35441,14 @@ NPR_CRC5 = "68BB06AD"
 
 def nprzysiolki_main(logp):
     """nprzysiolki (17/18.10, paczka sw-przysiolki; Armoury/src/VillageHamlets.cs, MapVillagesView.cs MapVillageData, VillageBook.cs, MapVillageLore.cs):
-    uklad wiosek v6 - przysiolki na pustkowiach tego samego okregu, ludzie okregu bez zmian. Wejscie: log Armoury (strumieniowo). Opis progow w __doc__ (NPR-0..13)."""
+    uklad wiosek v6 - przysiolki na pustkowiach tego samego okregu, ludzie okregu bez zmian. Wejscie: log Armoury (strumieniowo). Opis progow w __doc__ (NPR-0..15)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NPR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
     starts, ks_lines, weeks, book, lore, view, ks_start = [], [], [], [], [], [], []
+    ks_crc = []                # recenzja: "KS crc ziemi" (crc ziemi KS z nakladka przysiolkow)
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -35458,6 +35461,8 @@ def nprzysiolki_main(logp):
                     ks_lines.append(t)
                 elif t.startswith(NPR_HEAD + "dzien "):
                     weeks.append(t)
+                elif t.startswith(NPR_HEAD + "KS crc ziemi"):
+                    ks_crc.append(t)
             elif t.startswith("Ksiega wiosek (E4/11): start sesji"):
                 book.append(t)
             elif t.startswith("Dymek wioski (E7/W2): start"):
@@ -35468,7 +35473,7 @@ def nprzysiolki_main(logp):
                 ks_start.append(t)
             elif "VillageHamlets" in t and ("ERROR" in t or "Exception" in t):
                 n_err += 1
-    print(f"plik: {logp} | linii startu {len(starts)}, KS ziemia {len(ks_lines)}, co 7 dob {len(weeks)}, ksiega {len(book)}, lore {len(lore)}, widok {len(view)}, KS start {len(ks_start)}")
+    print(f"plik: {logp} | linii startu {len(starts)}, KS ziemia {len(ks_lines)}, co 7 dob {len(weeks)}, ksiega {len(book)}, lore {len(lore)}, widok {len(view)}, KS start {len(ks_start)}, KS crc ziemi {len(ks_crc)}")
 
     def g(rx, txt, cast=str):
         mm = re.search(rx, txt or "")
@@ -35544,6 +35549,8 @@ def nprzysiolki_main(logp):
         unknown = "uklad zapisu nieznany" in b0
         newc = "brak klucza arm_district" in b0
         how = "zgodny" if same else ("przeniesiony po uid z " + (g(r"= (arm_map_villages[_v45]*\.tsv)", b0) or "?") if mapped else ("NIEZNANY - sumy okregow" if unknown else ("nowa kampania" if newc else "?")))
+        if mapped and "(kolumny v5_*)" in b0:
+            how += " (kolumny v5_* - bez pliku _v5 w module)"
         rep.add("NPR-7: ksiega wiosek - crc v6 i zapis", f"crc ukladu ksiegi {bcrc}, zapis: {how}", f"crc = linia startu ({crc}); zapis zgodny, po uid albo nowa kampania",
                 bcrc == crc and (same or mapped is not None or newc))
     else:
@@ -35601,6 +35608,23 @@ def nprzysiolki_main(logp):
     stum = [g(r"potkniecia (\d+)", x, int) for x in starts + weeks]
     stum = [x for x in stum if x is not None]
     rep.add("NPR-13: potkniecia i ERROR VillageHamlets", f"potkniecia max {max(stum) if stum else 0}, ERROR {n_err}", "0 i 0", (not stum or max(stum) == 0) and n_err == 0)
+    # recenzja (sw-przysiolki): wiersz v5 w pliku v6 i crc ziemi KS z nakladka
+    c5e = g(r"kolumny v5_\* \(zapis v5 po uid bez pliku _v5\): crc ([0-9A-F]{8}|BRAK)", s0)
+    if c5e is None:
+        rep.add("NPR-14: kolumny v5_* pliku v6", "brak w linii startu (log sprzed recenzji albo uklad nie v6)", "INFO", None)
+    else:
+        rep.add("NPR-14: kolumny v5_* pliku v6 (zapis v5 po uid bez pliku _v5)", f"crc {c5e}", f"= v5 {NPR_CRC5}", None if key_off else c5e == NPR_CRC5)
+    if ks_crc:
+        kc = ks_crc[-1]
+        eff = g(r"crc ziemi KS tej sesji ([0-9A-F]{8})", kc)
+        filec = g(r"plik ([0-9A-F]{8})", kc)
+        withov = "z nakladka przysiolkow" in kc
+        kn2 = g(r"nadpisane wiersze S ziemi (\d+)", ks_lines[-1], int) if ks_lines else None
+        want_ov = kn2 is not None and kn2 > 0
+        rep.add("NPR-15: crc ziemi KS z nakladka przysiolkow", f"crc {eff}, plik {filec}, nakladka {'TAK' if withov else 'NIE'}, nadpisane wiersze {kn2 if kn2 is not None else 0}",
+                "nakladka -> crc inny niz plik; bez nakladki -> crc = plik", eff is not None and filec is not None and (withov == want_ov) and ((eff != filec) == withov))
+    else:
+        rep.add("NPR-15: crc ziemi KS", "brak linii 'KS crc ziemi' (brak pliku ziemi albo log sprzed recenzji)", "INFO", None)
     rep.add("NPR-I: zajecia przysiolkow (odczyt)", g(r"\| zajecia: ([^|]+)", s0) or "-", "INFO", None)
     rep.show()
     return 0

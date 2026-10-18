@@ -29,7 +29,8 @@
 #  4. Osady: przysiolek 4..9 osad (6 x czynnik z uid 0.75..1.4); zwolnione osady do pozostalych wiosek okregu wedlug wielkosci (sufit 36, L4: wioski +
 #     najwieksza <= n okregu) - SUMA OSAD WIOSEK OKREGU = v5 (wies gry i ludzie okregu bez zmian; reszta, ktorej nie da sie dac, zostaje w przysiolku -
 #     przy sprawdzeniu miejsca w kroku 2 zawsze 0).
-#  5. uid bez zmian (przysiolek to ta sama wioska z ludzmi przeniesiona w nowe miejsce) - zapis v5 przechodzi na v6 po uid (VillageBook.OldLayout).
+#  5. uid bez zmian (przysiolek to ta sama wioska z ludzmi przeniesiona w nowe miejsce) - zapis v5 przechodzi na v6 po uid (VillageBook.OldLayout; recenzja:
+#     kolumny v5_order / v5_x / v5_y / v5_settlements = wiersz v5 kazdej wioski, wiec wystarczy sam arm_map_villages.tsv - bez pliku _v5 w module).
 #     Nazwa: Westeros - nowa nazwa z zajecia i ziemi (angielska), Essos - stara nazwa; rycerz "of <stara nazwa>" -> "of <nowa>". Lore: livelihood i historia
 #     przysiolka nowe (angielskie), reszta wiersza bez zmian. order / toward_village / neighbors / level - regula generatora v4 (jak v5_uklad.py).
 import argparse, io, json, math, os, sys, zlib
@@ -845,6 +846,9 @@ def main():
 
     # ---------- zapis ukladu v6 (kolejnosc wierszy jak v5; nowe kolumny na koncu)
     newcols = ["hamlet", "ks_start", "ks_terr", "ks_kind", "ks_model", "ks_dsea", "ks_driver", "ks_dmount"]
+    # recenzja (sw-przysiolki): wiersz v5 kazdej wioski (order, x, y, settlements - napisy z pliku v5 bez zmian) - zapis v5 przechodzi na v6 po uid z samego
+    # arm_map_villages.tsv (VillageBook.OldLayout), takze gdy wgranie nie przeniesie arm_map_villages_v5.tsv
+    v5cols = ["v5_order", "v5_x", "v5_y", "v5_settlements"]
     out = ["# Armoury: named map villages (layout v6: hamlets in empty land - from layout v5, the same villages and people per district). One row = one map village"]
     for hline in head[1:]:
         if hline[1:].startswith("id\t"):
@@ -852,7 +856,8 @@ def main():
             out.append("# district as small hamlets (shepherds, goatherds, drovers, swineherds, woodcutters, charcoal burners, trappers, hunters, fishers); the freed")
             out.append("# settlements went to the other villages of the district (district sum = v5). hamlet = occupation; ks_* = land of the hamlet point for KS")
             out.append("# (start craft, terrain, place, picture, distances to sea / river / mountains) - the same world table as arm_ks_land.tsv; '-' = not a hamlet.")
-            out.append(hline + "\t" + "\t".join(newcols))
+            out.append("# v5_order / v5_x / v5_y / v5_settlements = the same row in layout v5 (every row): a save of layout v5 maps by uid from this file alone.")
+            out.append(hline + "\t" + "\t".join(newcols) + "\t" + "\t".join(v5cols))
             continue
         out.append(hline)
     for r in rows:
@@ -881,11 +886,13 @@ def main():
             c[ci["model"]] = h["model"]
             o = h["o"]
             c += [h["occ"], h["start"], o["terr"], o["kind"], o["model"], "%.1f" % o["d_sea"], "%.1f" % o["d_river"], "%.1f" % o["d_mount"]]
+        c += [r["_c"][ci[k]] for k in ("order", "x", "y", "settlements")]
         out.append("\t".join(c))
     with io.open(OUT_LAYOUT, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(out) + "\n")
     crc6 = zlib.crc32("".join("%s:%d;" % (r["uid"], r["_s6"]) for r in rows).encode("utf-8")) & 0xFFFFFFFF
     crc5 = zlib.crc32("".join("%s:%d;" % (r["uid"], r["_s"]) for r in rows).encode("utf-8")) & 0xFFFFFFFF
+    crc5c = zlib.crc32("".join("%s:%d;" % (r["uid"], int(r["_c"][ci["settlements"]])) for r in rows).encode("utf-8")) & 0xFFFFFFFF   # kolumny v5_* (jak OldLayout)
 
     # ---------- lore v6: wiersze v5, przysiolki - nowe zajecie i historia, rycerz "of <nowa nazwa>"
     lore_out, lore_rows, lore_seen, lore_h, knight_ren = [], 0, set(), 0, 0
@@ -988,12 +995,13 @@ def main():
     rep.append("nazwy: nowe (Westeros) %d, stare (Essos) %d; rycerz 'of <nazwa>' przemianowany %d" % (
         sum(1 for i in moved if rows[i]["_h"]["name"] != rows[i]["name"]), sum(1 for i in moved if rows[i]["_h"]["name"] == rows[i]["name"]), knight_ren))
     rep.append("crc ukladu (uid:osady; jak VillageBook): v5 %08X, v6 %08X" % (crc5, crc6))
+    rep.append("kolumny v5_* pliku v6 (zapis v5 po uid bez arm_map_villages_v5.tsv): crc %08X - %s" % (crc5c, "= v5" if crc5c == crc5 else "INNY NIZ v5 (BLAD)"))
     rep.append("lore v6: wierszy %d (wiosek v6 %d, bez lore %d, przysiolkow z nowym zajeciem %d), bramka layout_crc %08X" % (
         lore_rows, len(rows), len(set(by_uid) - lore_seen), lore_h, crc6))
     with io.open(OUT_REPORT, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(rep) + "\n")
     print("\n".join(rep))
-    badrun = dsum_bad > 0 or lore_rows != len(rows) or any(not probe_ok(rows[i]["_h"]["x"], rows[i]["_h"]["y"]) for i in moved) or crc6 == crc5
+    badrun = dsum_bad > 0 or lore_rows != len(rows) or any(not probe_ok(rows[i]["_h"]["x"], rows[i]["_h"]["y"]) for i in moved) or crc6 == crc5 or crc5c != crc5
     return 1 if badrun else 0
 
 
