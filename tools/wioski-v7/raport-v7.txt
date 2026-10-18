@@ -1,29 +1,30 @@
 UKLAD v7 (tools/wioski-v7/v7_uklad.py) z arm_map_villages_v6.tsv
-odleglosc minimalna D = 2 x min v6 wioska-wioska 6.13 = 12.26 jedn. (v6 wioska-wies gry min 6.00); odstep docelowy okregu S = 1.07 x sqrt(ziemia / (wioski + wies gry)) w granicach D..45: mediana 12.3, 10% 12.3, 90% 18.2
-wiosek pobocznych 1957 (te same uid, okregow 425); zostaly w miejscu v6 473, przeniesione 1484 = 75.8% (bez miejsca - zostaly w v6 mimo regul 0)
-przeniesione na: ziemie swojego okregu 919, ziemie sasiada na tym samym ladzie 458, z obnizona odlegloscia 107 (far-relax0.85 5, fb-relax0.80 2, fb-relax0.85 16, fb-relax0.90 39, fb-relax0.95 28, relax0.60 1, relax0.70 1, relax0.80 1, relax0.85 3, relax0.90 5, relax0.95 6)
-przesuniecie: min 0.3, mediana 24.2, 90% 70.7, max 116.1 jedn.
-najblizsza wioska (wioska-wioska): v6 min 6.13 / 10% 6.58 / mediana 9.50 / srednia 10.76; v7 min 10.20 / 10% 12.29 / mediana 12.99 / srednia 14.15
-najblizsza wies gry (wioska-wies gry): v6 min 6.00 / 10% 7.01 / mediana 15.46; v7 min 7.67 / 10% 12.53 / mediana 17.47
-pary ponizej D: wioska-wioska v6 1436 -> v7 157, wioska-wies gry v6 667 -> v7 62; wies gry - wies gry (dane ROT, bez zmian) 63 wsi ponizej D, min 4.80
-skupiska (wiosek z >= 3 sasiadami w 10 jedn.): v6 47, v7 0; najwiecej sasiadow v6 4, v7 0; srednio v6 0.73, v7 0.00
+odleglosc minimalna D = 2 x min v6 wioska-wioska 6.13 = 12.26 jedn. (v6 wioska-wies gry min 6.00); odstep docelowy okregu S = 1.07 x sqrt(ziemia / (wioski + wies gry)) w granicach D..45: mediana 12.3, 10% 12.3, 90% 16.9
+wiosek pobocznych 1957 (te same uid, okregow 425); zostaly w miejscu v6 411, przeniesione 1546 = 79.0% (bez miejsca - zostaly w v6 mimo regul 0)
+przeniesione na: ziemie swojego okregu 963, ziemie sasiada na tym samym ladzie 447, z obnizona odlegloscia 136 (far-relax0.85 11, fb-relax0.80 11, fb-relax0.85 36, fb-relax0.90 33, fb-relax0.95 20, relax0.60 1, relax0.70 1, relax0.75 1, relax0.80 1, relax0.85 7, relax0.90 7, relax0.95 7)
+przesuniecie: min 0.3, mediana 25.3, 90% 73.9, max 119.7 jedn.
+najblizsza wioska (wioska-wioska): v6 min 6.13 / 10% 6.58 / mediana 9.50 / srednia 10.76; v7 min 9.21 / 10% 11.83 / mediana 12.91 / srednia 14.02
+najblizsza wies gry (wioska-wies gry): v6 min 6.00 / 10% 7.01 / mediana 15.46; v7 min 7.67 / 10% 12.52 / mediana 17.46
+pary ponizej D: wioska-wioska v6 1436 -> v7 242, wioska-wies gry v6 667 -> v7 72; wies gry - wies gry (dane ROT, bez zmian) 63 wsi ponizej D, min 4.80
+skupiska (wiosek z >= 3 sasiadami w 10 jedn.): v6 47, v7 0; najwiecej sasiadow v6 4, v7 1; srednio v6 0.73, v7 0.00
 pokrycie ladu okregow (v6; osady = wioski, wsie gry, miasta, zamki): w 8 jedn. 50.3%, 12 69.6%, 16 79.8%, 20 86.4%, 25 91.6%; odleglosc do osady 95% 30.2, 99% 46.1; udzial ziemi okregu w 15 jedn. od osady: 10% okregow 78%, mediana 100%
 najwieksze pustki v6 (odleglosc do osady, x, y, kultura okregu): 60.0 @ 1538,500 khuzait; 60.0 @ 294,1136 freefolk; 60.0 @ 488,1278 freefolk; 60.0 @ 1492,500 khuzait; 60.0 @ 434,1296 freefolk; 60.0 @ 186,984 battania; 60.0 @ 224,1088 battania; 59.9 @ 1546,680 ibbenese
-pokrycie ladu okregow (v7; osady = wioski, wsie gry, miasta, zamki): w 8 jedn. 60.6%, 12 78.2%, 16 85.5%, 20 90.4%, 25 94.2%; odleglosc do osady 95% 26.4, 99% 41.1; udzial ziemi okregu w 15 jedn. od osady: 10% okregow 94%, mediana 100%
+pokrycie ladu okregow (v7; osady = wioski, wsie gry, miasta, zamki): w 8 jedn. 60.4%, 12 78.4%, 16 85.9%, 20 90.5%, 25 94.3%; odleglosc do osady 95% 26.3, 99% 41.2; udzial ziemi okregu w 15 jedn. od osady: 10% okregow 94%, mediana 100%
 najwieksze pustki v7 (odleglosc do osady, x, y, kultura okregu): 60.0 @ 294,1136 freefolk; 60.0 @ 488,1278 freefolk; 60.0 @ 434,1296 freefolk; 60.0 @ 186,984 battania; 60.0 @ 224,1088 battania; 59.5 @ 286,1094 freefolk; 58.9 @ 1546,684 ibbenese; 54.1 @ 1442,482 khuzait
 okregow o innej liczbie wiosek niz v6 0 (uid bez zmian); okregow o innej sumie osad wiosek niz v6 0; L4 zlamane przez v7 0; okregow z osadami v6 (bez miejsca na podzial) 0
-osady wiosek swiata: v6 41316, v7 41316; osady przeniesionych wiosek: min 7, mediana 21, max 36 (v6: mediana 21)
-miejsce przeniesionych: field 895, forest 194, coast 145, desert 117, river 79, hills 26, moor 25, lake 3; obrazek: farm 577, village 489, windmill 158, fishing 128, granary 95, mill 37
-zajecia przysiolkow (przeniesione na dzika ziemie): woodcutters 37, goatherds 21, shepherds 9, charcoal 8, trappers 3
-przysiolkow: v6 215, v7 160 (zostale v6 82 + nowe na dzikiej ziemi 78)
-zajecie startowe KS przeniesionych (ks_start): v6 wheat_farm 743, fisherman 203, sheep_farm 127, olive_trees 85, lumberjack 67, vineyard 42, desert_horse_ranch 32, europe_horse_ranch 29, cattle_farm 24, vlandian_horse_ranch 20 -> v7 wheat_farm 740, sheep_farm 182, olive_trees 147, fisherman 124, lumberjack 45, vineyard 37, desert_horse_ranch 31, cattle_farm 29, europe_horse_ranch 26, swine_farm 21
-ludzie wioskowi wedlug zajecia startowego KS (udzial osad, wszystkie wioski): wheat_farm 51.6% -> 49.4%, fisherman 16.7% -> 13.1%, olive_trees 6.1% -> 9.0%, sheep_farm 3.7% -> 9.2%, vineyard 3.2% -> 2.8%, lumberjack 3.7% -> 2.0%, desert_horse_ranch 2.2% -> 2.0%, cattle_farm 1.9% -> 2.2%, europe_horse_ranch 1.7% -> 1.5%
-od wlasnej wsi gry: v6 mediana 15.6 / 90% 28.0 / max 60.0, v7 mediana 25.5 / 90% 63.8 / max 117.9 jedn.; poza ziemia okregu KS (raster okregow) v6 0, v7 802; poza ziemia okregu v7 (Voronoi wazony, okregow ponad pojemnosc 290 z 571) 525
-wioski z obrazkiem rybackim (HamletKinds poza KS): v6 318, v7 244
-wioski z ziemia KS (kolumny ks_*): v6 215, v7 1566
-nazwy: zmienione 50 (Westeros - przysiolki z nowym zajeciem); rycerz 'of <nazwa>' przemianowany 37
-lore v7: wierszy 1957 (wiosek 1957, bez lore 0), przeniesionych z nowym zdaniem miejsca 1484 (mlyn bez wody 226, rybacy bez wody 107, historia 'o drodze' 147), bramka layout_crc 75676C58
-od warowni (przeniesione): miasto min 10.0 (prog 10), zamek min 8.0 (8), kryjowka min 5.0 (5); od malowanej drogi min 2.0 (1.5)
-na ladzie (przeniesione): raster 1484/1484, sonda gry 1484/1484
-crc ukladu (uid:osady; jak VillageBook): v6 F5456602, v7 75676C58; kolumny v5_* pliku v7 crc 68BB06AD (v5 68BB06AD)
-obnizona odleglosc (po rozproszeniu 107 wiosek) wedlug kultury okregu: vale 25, reach 19, vlandia 18, river 15, dragonstone 5, crownlands 4, tyroshi 4, myrish 4, sturgia 4, lyseni 4, stormlands 3, aserai 1, empire 1 | okregi: castle_village_S1_2 6, ROT_town6_village1 5, castle_village_V3_2 5, castle_village_V2_1 4, ROT_castle22_village1 3, ROT_town18_village2 3, ROT_town29_village2 3, ROT_town32_village3 3, ROT_town3_village1 3, castle_village_EN4_1 3, castle_village_EN8_2 3, castle_village_K6_1 3, castle_village_V7_1 3, village_V6_2 3, ROT_castle47_village1 2, ROT_town12_village3 2, ROT_town5_village2 2, castle_village_A2_2 2, castle_village_A5_1 2, village_A4_4 2, village_A8_3 2, village_EN1_2 2, village_EN1_3 2, village_V5_2 2, village_V8_2 2
+osady wiosek swiata: v6 41316, v7 41316; osady przeniesionych wiosek: min 6, mediana 21, max 36 (v6: mediana 22)
+miejsce przeniesionych: field 925, forest 208, coast 142, desert 123, river 79, hills 35, moor 31, lake 3; obrazek: farm 606, village 509, windmill 174, fishing 129, granary 91, mill 37
+zajecia przysiolkow (przeniesione na dzika ziemie): woodcutters 42, goatherds 23, charcoal 13, shepherds 5, trappers 4
+przysiolkow: v6 215, v7 159 (zostale v6 72 + nowe na dzikiej ziemi 87)
+zajecie startowe KS przeniesionych (ks_start): v6 wheat_farm 771, fisherman 208, sheep_farm 130, olive_trees 89, lumberjack 74, vineyard 47, desert_horse_ranch 34, europe_horse_ranch 28, trapper 25, cattle_farm 24 -> v7 wheat_farm 780, sheep_farm 188, olive_trees 153, fisherman 124, lumberjack 55, vineyard 42, desert_horse_ranch 33, europe_horse_ranch 25, cattle_farm 25, vlandian_horse_ranch 19
+ludzie wioskowi wedlug zajecia startowego KS (udzial osad, wszystkie wioski): wheat_farm 51.6% -> 50.1%, fisherman 16.7% -> 13.1%, olive_trees 6.1% -> 9.0%, sheep_farm 3.7% -> 9.5%, vineyard 3.2% -> 2.7%, lumberjack 3.7% -> 2.0%, desert_horse_ranch 2.2% -> 2.0%, cattle_farm 1.9% -> 1.8%, europe_horse_ranch 1.7% -> 1.6%
+od wlasnej wsi gry: v6 mediana 15.6 / 90% 28.0 / max 60.0, v7 mediana 26.3 / 90% 72.0 / max 119.3 jedn.; poza ziemia okregu KS (raster okregow) v6 0, v7 887; poza ziemia okregu v7 (Voronoi wazony, okregow ponad pojemnosc 303 z 571) 530
+zajazdy (plan zajazdy-miejsca.tsv, 144 miejsc, rezerwa 10.0 jedn.): najblizsza wioska poboczna min 10.33 (ponizej rezerwy 0), wies gry min 11.50
+wioski z obrazkiem rybackim (HamletKinds poza KS): v6 318, v7 239
+wioski z ziemia KS (kolumny ks_*): v6 215, v7 1618
+nazwy: zmienione 51 (Westeros - przysiolki z nowym zajeciem); rycerz 'of <nazwa>' przemianowany 34
+lore v7: wierszy 1957 (wiosek 1957, bez lore 0), przeniesionych z nowym zdaniem miejsca 1546 (mlyn bez wody 236, rybacy bez wody 115, historia 'o drodze' 154), bramka layout_crc 7BC2310D
+od warowni (przeniesione, dokladnie): miasto min 10.01 (prog 10), zamek min 8.04 (8), kryjowka min 5.0 (5); od malowanej drogi min 2.0 (1.5)
+na ladzie (przeniesione): raster 1546/1546, sonda gry 1546/1546
+crc ukladu (uid:osady; jak VillageBook): v6 F5456602, v7 7BC2310D; kolumny v5_* pliku v7 crc 68BB06AD (v5 68BB06AD)
+obnizona odleglosc (po rozproszeniu 136 wiosek) wedlug kultury okregu: vale 34, reach 28, vlandia 21, river 18, tyroshi 12, lyseni 7, dragonstone 5, sturgia 4, crownlands 3, myrish 1, pentoshi 1, empire 1, volantine 1 | okregi: castle_village_S1_2 11, ROT_castle47_village1 6, ROT_town6_village1 6, village_V5_2 6, ROT_castle50_village1 5, castle_village_A5_2 4, castle_village_EN4_1 4, castle_village_N8_1 4, castle_village_V2_1 4, village_V5_1 4, ROT_castle22_village1 3, ROT_castle64_village2 3, ROT_town29_village3 3, castle_village_EN8_2 3, castle_village_V6_2 3, village_B1_1 3, village_EN3_1 3, ROT_castle23_village2 2, ROT_castle62_village1 2, ROT_town3_village1 2, ROT_town5_village2 2, castle_village_A5_1 2, castle_village_EN4_2 2, castle_village_EN6_1 2, castle_village_N9_1 2

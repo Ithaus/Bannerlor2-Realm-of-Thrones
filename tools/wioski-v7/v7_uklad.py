@@ -51,6 +51,7 @@ IN_LAYOUT = os.path.join(MD, "arm_map_villages_v6.tsv")
 IN_LORE = os.path.join(MD, "arm_map_village_lore_v6.tsv")
 IN_KSLAND = os.path.join(MD, "arm_ks_land.tsv")
 IN_NGEN = os.path.join(REPO, "tools", "wioski-v5", "okregi_n_v4.tsv")
+IN_INNS = os.path.join(REPO, "tools", "zajazdy", "zajazdy-miejsca.tsv")    # miejsca zajazdow zarezerwowane przed ukladem (zajazdy_gen.py --plan-out)
 OUT_LAYOUT = os.path.join(MD, "arm_map_villages.tsv")
 OUT_LORE = os.path.join(MD, "arm_map_village_lore.tsv")
 OUT_REPORT = os.path.join(HERE, "raport-v7.txt")
@@ -63,6 +64,7 @@ ap.add_argument("--png", default=None)
 ap.add_argument("--dry", action="store_true", help="bez zapisu plikow danych (proba parametrow)")
 ap.add_argument("--dump", default=None, help="zrzut rastrow do .npz (proby)")
 ap.add_argument("--diag", action="store_true", help="okregi bez miejsca przy D (proby)")
+ap.add_argument("--zajazdy", default=None, help="plan miejsc zajazdow (domyslnie tools/zajazdy/zajazdy-miejsca.tsv)")
 A = ap.parse_args()
 
 SLOPE_MAX = 0.35
@@ -606,6 +608,13 @@ def main():
         return d
 
     d_town = dist_raster(towns, 20); d_castle = dist_raster(castles, 20); d_hide = dist_raster(hides, 10)
+    TWX = np.array(towns, dtype=np.float64); CSX = np.array(castles, dtype=np.float64)
+
+    def fort_ok(x, y):
+        # dokladnie (raster liczy od srodka komorki, punkt ma rozrzut w komorce): miasto >= D_TOWN, zamek >= D_CASTLE
+        if INX is not None and np.hypot(INX[:, 0] - x, INX[:, 1] - y).min() < inn_min:
+            return False                 # zajazd (budynek albo postoj) blizej niz rezerwa
+        return (np.hypot(TWX[:, 0] - x, TWX[:, 1] - y).min() >= D_TOWN) and (np.hypot(CSX[:, 0] - x, CSX[:, 1] - y).min() >= D_CASTLE)
     painted = DR["painted"]
     d_paint = np.full((H, W), 1e6, dtype=np.float32)
     pys, pxs = np.nonzero(painted)
@@ -685,7 +694,30 @@ def main():
     sm = (coarse[iy0, ix0] * (1 - tx) * (1 - ty) + coarse[iy0, ix0 + 1] * tx * (1 - ty) + coarse[iy0 + 1, ix0] * (1 - tx) * ty + coarse[iy0 + 1, ix0 + 1] * tx * ty)
     noise = (0.7 * sm + 0.3 * fine).astype(np.float32)
 
-    site_ok = (~badw) & probe_r & (d_town >= D_TOWN) & (d_castle >= D_CASTLE) & (d_hide >= D_HIDE) & (d_paint >= D_PAINT) & (tlab != -2)
+    # zajazdy (Jeff 18.10: "zajazdy nie sa obok wiosek") - miejsca zarezerwowane przed ukladem: wioska nie blizej niz min_village planu od budynku i postoju
+    inn_pts, inn_min = [], 10.0
+    inn_path = A.zajazdy or IN_INNS
+    if os.path.exists(inn_path):
+        for raw in io.open(inn_path, encoding="utf-8"):
+            if raw.startswith("# min_village:"):
+                try:
+                    inn_min = float(raw.split(":", 1)[1])
+                except ValueError:
+                    pass
+                continue
+            if raw.startswith("#") or not raw.strip():
+                continue
+            c_ = raw.rstrip("\r\n").split("\t")
+            try:
+                inn_pts.append((float(c_[1]), float(c_[2]), float(c_[3]), float(c_[4])))
+            except (IndexError, ValueError):
+                pass
+    INX = np.array([(p_[0], p_[1]) for p_ in inn_pts] + [(p_[2], p_[3]) for p_ in inn_pts], dtype=np.float64) if inn_pts else None
+    d_inn = np.full((H, W), 1e6, dtype=np.float32)
+    for (x_, y_, bx_, by_) in inn_pts:
+        stamp(d_inn, x_, y_, inn_min + 4)
+        stamp(d_inn, bx_, by_, inn_min + 4)
+    site_ok = (~badw) & probe_r & (d_town >= D_TOWN) & (d_castle >= D_CASTLE) & (d_hide >= D_HIDE) & (d_paint >= D_PAINT) & (tlab != -2) & (d_inn >= inn_min + 0.5)
     if A.dump:
         np.savez_compressed(A.dump, site_ok=site_ok, tlab=tlab, comp=comp, attr=attr, noise=noise, badw=badw, probe_r=probe_r, d_town=d_town, d_castle=d_castle,
                             d_paint=d_paint, passable=passable, CODE=CODE, slope=slope, dmnt=dmnt, driv=driv, dsea=dsea, near=near, bad=bad)
@@ -820,6 +852,8 @@ def main():
     for i in order_keep:
         r = rows[i]
         x, y = r["_x"], r["_y"]
+        if inn_pts and float(d_inn[min(H - 1, int(r["_y"])), min(W - 1, int(r["_x"]))]) < inn_min + 0.8:
+            continue                                  # przy miejscu zajazdu (rezerwa) - wioska idzie dalej
         if r["village_id"] in tight_full and r["model"] != "fishing":
             continue                                  # okreg ciasny - ukladany od nowa (rybacy na brzegu zostaja, gdy maja miejsce)
         if not in_terr(r["village_id"], r["_x"], r["_y"]):
@@ -908,7 +942,7 @@ def main():
             jy = (u01("%s|%d|%d|jy" % (did, xs[k], ys[k])) - 0.5) * 0.6
             x1, y1 = x0 + jx, y0 + jy
             jxi, jyi = int(math.floor(x1)), int(math.floor(y1))
-            if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1):
+            if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1) or not fort_ok(x1, y1):
                 continue
             if grid.nearest(x1, y1, rmax=dmin + 1) < dmin:
                 continue
@@ -1145,7 +1179,7 @@ def main():
                     jy = (u01("%s|%d|%d|ry" % (r["uid"], xs[k], ys[k])) - 0.5) * 0.6
                     x1, y1 = float(xs[k]) + 0.5 + jx, float(ys[k]) + 0.5 + jy
                     jxi, jyi = int(math.floor(x1)), int(math.floor(y1))
-                    if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1):
+                    if not (0 <= jxi < W and 0 <= jyi < H) or not site_ok[jyi, jxi] or not probe_ok(x1, y1) or not fort_ok(x1, y1):
                         continue
                     dd_ = np.sqrt((PX - x1) ** 2 + (PY - y1) ** 2)
                     dd_[k0] = 1e9
@@ -1619,6 +1653,16 @@ def main():
                " poza ziemia okregu v7 (Voronoi wazony, okregow ponad pojemnosc %d z %d) %d" % (
                    float(np.median(dmain6)), float(np.percentile(dmain6, 90)), max(dmain6), float(np.median(dmain7)), float(np.percentile(dmain7, 90)), max(dmain7),
                    out_lab7, terr_hist[-1] if terr_hist else -1, len(wins), out_ter7))
+    if inn_pts:
+        di = []
+        for k, r in enumerate(rows):
+            px_, py_ = pos7[k]
+            di.append(min(min(math.hypot(px_ - a_, py_ - b_), math.hypot(px_ - c_, py_ - d_)) for (a_, b_, c_, d_) in inn_pts))
+        mi = [min(min(math.hypot(mx_ - a_, my_ - b_), math.hypot(mx_ - c_, my_ - d_)) for (a_, b_, c_, d_) in inn_pts) for (mx_, my_) in mains]
+        rep.append("zajazdy (plan %s, %d miejsc, rezerwa %.1f jedn.): najblizsza wioska poboczna min %.2f (ponizej rezerwy %d), wies gry min %.2f" % (
+            os.path.basename(inn_path), len(inn_pts), inn_min, min(di), sum(1 for v in di if v < inn_min - 1e-6), min(mi)))
+    else:
+        rep.append("zajazdy: brak planu miejsc %s - wioski bez rezerwy zajazdow" % os.path.basename(inn_path))
     fish6 = sum(1 for r in rows if r["model"] == "fishing")
     fish7 = sum(1 for r in rows if (r["_n"]["model"] if r["uid"] in mset else r["model"]) == "fishing")
     rep.append("wioski z obrazkiem rybackim (HamletKinds poza KS): v6 %d, v7 %d" % (fish6, fish7))
@@ -1627,8 +1671,9 @@ def main():
     rep.append("nazwy: zmienione %d (Westeros - przysiolki z nowym zajeciem); rycerz 'of <nazwa>' przemianowany %d" % (renamed, knight_ren))
     rep.append("lore v7: wierszy %d (wiosek %d, bez lore %d), przeniesionych z nowym zdaniem miejsca %d (mlyn bez wody %d, rybacy bez wody %d, historia 'o drodze' %d), bramka layout_crc %08X" % (
         lore_rows, len(rows), len(set(by_uid) - lore_seen), lore_moved, lore_mill, lore_fish, lore_hist, crc7))
-    rep.append("od warowni (przeniesione): miasto min %.1f (prog %.0f), zamek min %.1f (%.0f), kryjowka min %.1f (%.0f); od malowanej drogi min %.1f (%.1f)" % (
-        min(float(d_town[rows[i]["_n"]["iy"], rows[i]["_n"]["ix"]]) for i in moved), D_TOWN, min(float(d_castle[rows[i]["_n"]["iy"], rows[i]["_n"]["ix"]]) for i in moved), D_CASTLE,
+    rep.append("od warowni (przeniesione, dokladnie): miasto min %.2f (prog %.0f), zamek min %.2f (%.0f), kryjowka min %.1f (%.0f); od malowanej drogi min %.1f (%.1f)" % (
+        min(float(np.hypot(TWX[:, 0] - rows[i]["_n"]["x"], TWX[:, 1] - rows[i]["_n"]["y"]).min()) for i in moved), D_TOWN,
+        min(float(np.hypot(CSX[:, 0] - rows[i]["_n"]["x"], CSX[:, 1] - rows[i]["_n"]["y"]).min()) for i in moved), D_CASTLE,
         min(float(d_hide[rows[i]["_n"]["iy"], rows[i]["_n"]["ix"]]) for i in moved), D_HIDE, min(float(d_paint[rows[i]["_n"]["iy"], rows[i]["_n"]["ix"]]) for i in moved), D_PAINT))
     rep.append("na ladzie (przeniesione): raster %d/%d, sonda gry %d/%d" % (
         sum(1 for i in moved if not badw[rows[i]["_n"]["iy"], rows[i]["_n"]["ix"]]), len(moved), sum(1 for i in moved if probe_ok(rows[i]["_n"]["x"], rows[i]["_n"]["y"])), len(moved)))

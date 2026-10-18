@@ -366,9 +366,10 @@ namespace Armoury
             r.Uid = string.IsNullOrEmpty(uid) || uid == "-" ? r.VillageId + "#" + r.Id.ToString(CultureInfo.InvariantCulture) : uid;
             // sw-przysiolki (v6): kolumny opcjonalne przysiolka - "-" albo brak = zwykla wioska; zly wiersz ziemi KS = przysiolek bez ziemi KS (KS bierze wiersz z arm_ks_land.tsv)
             string hm = Get(c, col, "hamlet");
-            if (!string.IsNullOrEmpty(hm) && hm != "-")
+            if (!string.IsNullOrEmpty(hm) && hm != "-") r.Hamlet = hm;
+            // f10-uklad (v7): ziemia KS (kolumny ks_*) niezaleznie od kolumny hamlet - v7 daje ja kazdej przeniesionej wiosce (takze nie-przysiolkom); plik v6 ma ks_*
+            // tylko u przysiolkow (reszta "-"), wiec w v6 te same wiersze co dotad
             {
-                r.Hamlet = hm;
                 string ks = Get(c, col, "ks_start"), kt = Get(c, col, "ks_terr"), kk = Get(c, col, "ks_kind"), km = Get(c, col, "ks_model");
                 float a, b, d;
                 if (!string.IsNullOrEmpty(ks) && ks != "-" && !string.IsNullOrEmpty(kt) && kt != "-" && !string.IsNullOrEmpty(kk) && kk != "-" && !string.IsNullOrEmpty(km) && km != "-"

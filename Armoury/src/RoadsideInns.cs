@@ -39,6 +39,7 @@ namespace Armoury
         private const float LeaveR = 3.5f;           // pytanie wraca dopiero po odjechaniu dalej niz tyle
         private const float ArriveEps = 0.25f;       // partia u celu ruchu (stanela)
         private const float NearMapVillage = 2.2f;   // budynek zajazdu blizej wioski na mapie - pominiety
+        private const float FarVillage = 10f;        // f10-uklad (Jeff 18.10 "zajazdy nie sa obok wiosek"): generator stawia budynek >= 10 jedn. od wioski i wsi gry - linia startu liczy, ile blizej
         private const float Cell = 25f;
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -222,6 +223,8 @@ namespace Armoury
                         l.Add(new Vec2(r.X, r.Y));
                     }
                     layout = MapVillageData.LayoutFileName + " (" + vf.Records.Count + " wiosek)";
+                    _sideAll = new List<Vec2>(vf.Records.Count);
+                    foreach (var r in vf.Records) _sideAll.Add(new Vec2(r.X, r.Y));
                 }
             }
             catch (Exception e) { layout = "blad odczytu (" + e.GetType().Name + ")"; }
@@ -241,9 +244,47 @@ namespace Armoury
                 gl.Add(inn);
                 _tierN[Math.Max(1, Math.Min(3, inn.Tiers))]++;
             }
+            string farText = FarText();
             _loadText = "plik " + FileName + " (crc32 " + crc.ToString("X8") + ", wierszy " + _rows + "), " + sceneNote + "; zajazdow " + _inns.Count
                         + " (odrzucone: zly wiersz " + _bad + ", brak wsi gry " + _noVillage + ", przy wiosce na mapie " + _nearVillage + " - uklad " + layout + ")"
-                        + "; jakosci 1/2/3: " + _tierN[1] + "/" + _tierN[2] + "/" + _tierN[3] + "; " + DensityText();
+                        + "; jakosci 1/2/3: " + _tierN[1] + "/" + _tierN[2] + "/" + _tierN[3] + "; " + DensityText() + farText;
+            _sideAll = null;
+        }
+
+        private static List<Vec2> _sideAll;      // wioski ukladu tej sesji - tylko na czas Load (linia odleglosci od wiosek)
+
+        /// <summary>f10-uklad: odleglosc budynku kazdego zajazdu od najblizszej wioski pobocznej (uklad tej sesji) i wsi gry - min, mediana i ile zajazdow blizej niz
+        /// FarVillage (generator: 0; klucz VillageLayoutV7 NIE - plik zajazdow z ukladu v7 przy wioskach v6, wiec moga byc). Raz na sesje, n x wiosek. Nie rzuca.</summary>
+        private static string FarText()
+        {
+            try
+            {
+                if (_inns.Count == 0) return "";
+                var mains = new List<Vec2>();
+                var seen = new HashSet<Village>();
+                foreach (var st in Settlement.All)
+                    if (st != null && st.IsVillage && st.Village != null && seen.Add(st.Village)) mains.Add(st.GetPosition2D);
+                var side = _sideAll ?? new List<Vec2>();
+                var ds = new List<float>(_inns.Count);
+                float minS = float.MaxValue, minM = float.MaxValue;
+                int near = 0;
+                foreach (var inn in _inns)
+                {
+                    var b = new Vec2(inn.Bx, inn.By);
+                    float s = float.MaxValue, m = float.MaxValue;
+                    foreach (var v in side) { float d = v.Distance(b); if (d < s) s = d; }
+                    foreach (var v in mains) { float d = v.Distance(b); if (d < m) m = d; }
+                    minS = Math.Min(minS, s); minM = Math.Min(minM, m);
+                    float both = Math.Min(s, m);
+                    ds.Add(both);
+                    if (both < FarVillage - 0.01f) near++;
+                }
+                ds.Sort();
+                return "; od wiosek (f10-uklad): budynek - najblizsza wioska poboczna min " + (side.Count > 0 ? minS.ToString("0.0", Inv) : "-") + ", wies gry min "
+                       + (mains.Count > 0 ? minM.ToString("0.0", Inv) : "-") + ", mediana " + ds[ds.Count / 2].ToString("0.0", Inv) + ", blizej niz " + FarVillage.ToString("0", Inv)
+                       + " jedn. " + near + " zajazdow";
+            }
+            catch (Exception e) { Stumble("FarText", e); return "; od wiosek (f10-uklad): blad"; }
         }
 
         private static bool NearAny(Dictionary<long, List<Vec2>> g, float x, float y, float r)
