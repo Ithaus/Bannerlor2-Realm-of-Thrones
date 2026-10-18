@@ -857,7 +857,7 @@ namespace Armoury
         {
             public string Uid, Name, Kind; public bool Main, Ks; public int Craft = -1, Target = -1; public float F; public double Share, ValDay; public VillageBook.PartView Book;
             public double[] CraftVal = new double[KsTab.NC]; public Dictionary<ItemObject, double> Pcs = new Dictionary<ItemObject, double>();
-            // f4b-inwest (District Icon Part Crafts, tylko pod KS): wlasne zajecie czesci i wartosc dnia jego towarow sprzedanych (sztuki z kg tabeli KS x cena miasta targowego);
+            // f4b-inwest (District Icon Part Crafts, tylko pod KS): wlasne zajecie czesci i wartosc dnia jego towarow sprzedanych (sztuki przelicznikiem wozow KS x cena miasta targowego);
             // IconVal < 0 - nie liczone (klucz wylaczony albo droga bez KS - tam CraftVal to juz wlasne zajecie czesci)
             public int IconCraft = -1; public double IconVal = -1;
         }
@@ -900,7 +900,7 @@ namespace Armoury
                             }
                             double cv = 0; for (int c = 0; c < KsTab.NC; c++) cv += kp.CraftVal[c];
                             if (cv > 0) for (int c = 0; c < KsTab.NC; c++) pc.CraftVal[c] = pc.ValDay * kp.CraftVal[c] / cv;
-                            // f4b-inwest (District Icon Part Crafts): wlasne zajecie czesci - to, co z niego sprzedaje, przy cenie miasta targowego za sztuke (sztuki z kg tabeli KS)
+                            // f4b-inwest (District Icon Part Crafts): wlasne zajecie czesci - to, co z niego sprzedaje, przy cenie miasta targowego za sztuke (sztuki przelicznikiem wozow KS)
                             if (kp.IconKg != null)
                             {
                                 pc.IconCraft = kp.IconCraft; double iv = 0;

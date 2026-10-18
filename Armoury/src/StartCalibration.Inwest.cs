@@ -26,7 +26,7 @@ namespace Armoury
             // (kg zajecia bloku x czesc sprzedana okregu - bez tego, co okreg zje sam); null - klucz wylaczony
             public int IconCraft = -1; public double[] IconKg; }
 
-        /// <summary>f4b-inwest: kg jednej sztuki gry towaru dostawy KS (zwierzeta - kg tabeli KS, nie waga przedmiotu gry); 10 bez tabeli.</summary>
+        /// <summary>f4b-inwest: kg jednej sztuki gry towaru dostawy KS - ten sam przelicznik kg -> sztuka co wozy KS (Market = kg / (sigma x kg sztuki)); 10 bez tabeli.</summary>
         internal static double ItemKgOf(int i)
         {
             try { EnsureItems(); } catch { }
