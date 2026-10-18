@@ -2962,3 +2962,7 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
 - 09:00 PDT: JEFF SKONCZYL GRE (sesja 07:43-08:37 PDT, doby 109020-109043, WGRANIE 80): 0 ERROR, KS uzbrojony 109020 (samo). Kopie: D:/Backup-Bannerlord/logi-jeffa/2026-10-18 (Armoury,
   CrashScribe, RC), zapis zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-18-po-grze-80.sav (md5 3f02b5d1). Jeff pyta: "Polnoc miazdzy Lannisterow i Krolewska Przystan - czemu, jaka sila obu stron?"
   -> analiza wf_8990abef-633 (podejrzenie: zwrot wedlug potrzeby obcina bogatym Lannisterom zwrot -> D -> R -> pulap zoldu maleje). Wolno testowac i wgrywac (Jeff skonczyl).
+- 09:20 PDT: FALA 7 GOTOWA (wf_e82bf741-4cc, 4/4 build rc 0; scratchpad fala7-wynik.json): f8-pozyczka 0227d13e (TownLoan 10%, zastepuje obieg2; uwaga: ok. 70-90 rodow staje sie dluznikami
+  168 w dniu 1 - TownLoanTakesFolkLoans; regula swiatowa, nie tylko KS), f8-sakiewka a95a5d97 (tylko przy KS), f8-niewola b01e5b8b, f8-bandy cc02e85d.
+- Jeff 18.10 ok. 09:15: "przy max x8 predkosci strasznie gra zwalnia i sie przycina tam gdzie jest duzo jednostek ... czy mozemy dodac trzy buttony x1, x4, x8?" -> paczka f9-predkosc
+  (przyciski predkosci + odchudzenie pracy godzinnej naszych modow: Profil doby 'godzina: suma 114-166 ms'). Limit band: rada - zostawic x12 domyslnie (suwak w MCM), czeka na slowo Jeffa.
