@@ -3117,3 +3117,11 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
 - 15:00 PDT: **WGRANIE 82** = noc-ks4 5086a630 (Armoury **aa1c01dc**; reszta jak 81b) po tescie 5 dob + bitwa (Armoury-2026-10-18_14-18-10.log: kod 0, ERROR 0, bitwa WYGRANA, misje
   sprawdzone, latka "karawany gry wpiete"). Kopie *.bak-2026-10-18-wgranie82-przed + D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie82-przed. Galaz w-toku/noc-wgranie-82.
   = 81b + f16-akum (NKA-1 nadwyzka netto rat), f16-ksiega (zrzut karawany gry na polke), f16-ks/f16-drobne (checker), pomiar f9 przy Better Time. f18-mcm jeszcze nie (w toku).
+- 15:20 PDT: ANALIZA kanon/Polnoc (wf_568b42ee-ac1; scratchpad analiza-kanon.json): Robb ZDOBYL KROLEWSKA PRZYSTAN (+ Czerwona Twierdza) dzien kampanii 210 = 109046 (2 doby po
+  wczytaniu WGRANIA 81b; OB5 zebrane 7277/23209; zaloga 549 + milicja vs 8929); Harrenhal u Boltona (skrypt ROT, kanon); Renly zabral Stannisowi 5 zamkow (Sharp Point, Stonedance,
+  Sweetport, Cape Wrath, Fellwood); Reach zabral Dorne Starfall. Sojusz Dorzecze-Stannis: wbudowane AI sojuszy gry 1.3+ (DefaultAllianceModel.CanMakeAlliance), ok. dzien 75 (wniosek ze
+  sladow). Sily: Polnoc 11.0k + Dorzecze 7.8k vs Korona 9.0k; glowna przyczyna - rozciagniecie fabuly x4.33 (Korona sama na 2 frontach ~325 dni zamiast ~70). Werbunek Korony po f12 dziala
+  (+812 w 11 dob). DECYZJE NOCY (w duchu polecen Jeffa "cofniecie polnocy", "stannis nie ma sojuszu z dorzeczem"): oddac 8 twierdz wedlug tabeli (Fellwood -> Stannis, Essos zostaje),
+  zwrot 1.125 mln Koronie, zaloga Polnocy z KL do druzyn Polnocy, druzyny Polnocy spod KL do domu (jednorazowo), sojusze tylko kanoniczne + zerwanie Dorzecze-Stannis, Tyrellowie vs Polnoc
+  po smierci Renly'ego (wojna z ROT bez wyzwalacza), falszywy sygnal biedy Korony - poprawka. NIE dzis: osobny mnoznik wojen x2 (wojny Stannisa i Renly'ego z Korona przyszlyby PRZED
+  smiercia Renly'ego - Korona na 4 frontach) i regula skarbca stolicy - do decyzji Jeffa rano. Paczki f19-kanon-a (sojusze, Tyrellowie, bieda) i f19-kanon-b (przywrocenie wlosci).
