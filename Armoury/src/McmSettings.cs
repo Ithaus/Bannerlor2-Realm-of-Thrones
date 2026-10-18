@@ -7200,7 +7200,7 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFarmMeasureDays { get; set; } = 28;
 
-        [SettingPropertyInteger("Ds Farm Renew Days", 0, 728, "0", HintText = "with Ds Towns: every this many days a farm is renewed towards the same share of what the merchants of the town or castle have taken in over the last 28 days as when it was set (0 = never renewed)")]
+        [SettingPropertyInteger("Ds Farm Renew Days", 0, 728, "0", HintText = "with Ds Towns: every this many days a farm is renewed towards the same share of what the merchants of the town or castle have taken in over the last 28 days as when it was set (0 = never renewed). Used only when Ds Farm Review Days is 0")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public int DsFarmRenewDays { get; set; } = 364;
 
