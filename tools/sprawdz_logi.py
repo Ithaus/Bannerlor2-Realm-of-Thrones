@@ -1161,7 +1161,7 @@ Uzycie (Python 3, tylko odczyt):
                     gospodarza jako INFO), bez wyjatku.
 --grupa nzapis    : (noc 17/18.10, paczka zapis-d4, CO-ZOSTALO D4 "logi ciszej i rozmiar zapisu"; Armoury/src/SaveSize.cs, SaveText.cs, LogGate.cs - klucze Save Size Log,
                     Save Compact, Save Compact Min Kb, Quiet Log More) python -I tools/sprawdz_logi.py --grupa nzapis <Armoury-*.log> (strumieniowo). Linie "Zapis i logi (D4)"
-                    (start sesji), "Zapis (D4)" (po kazdym zapisie gry), "Ciche logi (NW)", znacznik zapisu "Zbrojownie zalog (171): zapis". ZAP-0 linia startu (brak - INFO,
+                    (start sesji), "Zapis (D4)" (po kazdym zapisie gry), "Ciche logi (NW)", znacznik zapisu "Zbrojownie zalog (171): zapis - ". ZAP-0 linia startu (brak - INFO,
                     log sprzed paczki), ZAP-1 stan kluczy (INFO), ZAP-2 linia "Zapis (D4)" przy kazdym zapisie gry (liczba >= znacznikow zapisu; bez zapisu - INFO),
                     ZAP-3 probny odczyt spakowanych kluczy zgodny w kazdym zapisie (ok = proby, niezgodne 0; nic ponad prog - INFO), ZAP-4 nasze napisy do zapisu po
                     spakowaniu <= 5120 KB (ostatni zapis; tekst przed spakowaniem INFO), ZAP-5 spakowanie >= x3.0, ZAP-6 czas pakowania <= 500 ms (najwiecej), ZAP-7 bledy:
@@ -39345,12 +39345,12 @@ def nherby_main(logp):
 # MUSI byc ta sama co LogGate.More).
 ZAP_SESSION = "Zapis i logi (D4): "
 ZAP_SAVE = "Zapis (D4): "
-ZAP_SAVE_MARK = "Zbrojownie zalog (171): zapis"
+ZAP_SAVE_MARK = "Zbrojownie zalog (171): zapis - "   # linia GarrisonArmory.Export przy kazdym zapisie (nie linie wczytania "zapis zrobiony bez ..." / "zapis ma ...")
 ZAP_MORE = ("Kiesy rozbitych (3.2): dzien", "Wedrowcy BK - prawdziwy towar (36b): dzien", "Wedrowcy BK - towar (3.6): dzien", "Wedrowcy BK: dzien",
-            "Wozy w miastach: dzien", "Rada (3.5): dzien", "Zaopatrzenie zamkow (171): dzien", "Spoils - klan najemnikow: dzien",
+            "Wozy w miastach: dzien", "Zaopatrzenie zamkow (171): dzien", "Spoils - klan najemnikow: dzien",
             "Spoils - naprawa u kwatermistrza: dzien", "Spoils of War (128): dzien", "Dosypka z niczego (RealisticBannerlord): dzien", "Zold konnych (160",
             "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Skale ludzi wedlug krolestw (GL0): dzien", "Balans krolestw (175): dzien",
-            "Zaopatrzenie BK - kara morale (W1): dzien", "Majatki BK (187): dzien", "Rzemieslnicy BK (147): dzien", "Morale AI (183d): dzien",
+            "Zaopatrzenie BK - kara morale (W1): dzien", "Rzemieslnicy BK (147): dzien", "Morale AI (183d): dzien",
             "ROT szczelnosc (3.7): dzien", "Rynek surowcow: zapasy na targach miast", "Rezerwa napraw AI - pamiec dopasowania (F6): dzien",
             "Pule ochotnikow (171): dzien", "PodazPopyt: kupcy wywiezli", "Miasta bez strzal - powod (172): dzien", "Warsztaty wedlug krainy (E6/0",
             "Drobne z niczego (3.10): dzien", "Konie rekrutow (160", "Ceny hurtu (09.10", "Stajnia AI (sklad7b-p): dzien", "Wierzchowce kanonu (208): dzien",

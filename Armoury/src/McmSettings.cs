@@ -4924,7 +4924,7 @@ namespace Armoury
         [SettingPropertyGroup("Grateful villages")]
         public int QuietLogEveryDays { get; set; } = 7;
 
-        [SettingPropertyBool("Quiet Log More", HintText = "with quiet measurement logs: 47 more daily diagnostic-only lines that no test tool reads (village woodlots, wandering Banner Kings parties, council, estates, drill of the player, deserters, clogged villages and the like) are also written on one day in every N; errors and all lines the tests read stay daily, automatic tests always write everything (off = these lines every day, as before)")]
+        [SettingPropertyBool("Quiet Log More", HintText = "with quiet measurement logs: 45 more daily diagnostic-only lines that no test tool reads (village woodlots, wandering Banner Kings parties, castle supplies, craftsmen, drill of the player, deserters, clogged villages and the like) are also written on one day in every N; errors and all lines the tests read stay daily, automatic tests always write everything (off = these lines every day, as before)")]
         [SettingPropertyGroup("Grateful villages")]
         public bool QuietLogMore { get; set; } = true;
 
