@@ -1273,6 +1273,7 @@ namespace Armoury
             CampaignEvents.MakePeace.AddNonSerializedListener(this, WorldClock7.OnMakePeace);
             CampaignEvents.KingdomDestroyedEvent.AddNonSerializedListener(this, WorldClock7.OnKingdomDestroyed);
             CampaignEvents.TournamentStarted.AddNonSerializedListener(this, WorldClock7.OnTournamentStarted);
+            CampaignEvents.TournamentFinished.AddNonSerializedListener(this, TourneyFolkPurse.OnTournamentFinished);   // f8-sakiewka (18.10): sakiewka mieszczan miasta-gospodarza dla zwyciezcy (klucz TourneyFolkPurse; po GivePrizeToWinner - poza RealPayer i oknem O11)
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("MenPurse.OnEntered", MenPurse.OnEntered));   // wpis 84: nadwyzki ludzi PRZED zakupami
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("AiGear.OnSettlementEntered", AiGear.OnSettlementEntered));
             CampaignEvents.SettlementEntered.AddNonSerializedListener(this, DayProfile.Settle("CaravanAmmo.OnEntered", CaravanAmmo.OnEntered));   // paczka 172b: amunicja z taborow karawany na polke miasta (cena rynkowa, kasa miasta); dopisana PRZED CaravanBulk, wiec idzie PO nim - surowce, ktorych miastu brakuje, pierwsze do kasy miasta
@@ -2504,6 +2505,7 @@ namespace Armoury
             // TP (16.10, recenzja): splata dlugow osad wobec gracza (kasa osady, gospodarz, panujacy) i linia "Turniej-platnik (TP): dzien N" - PO ClanBudget.Daily,
             // zeby rody placily z budzetu 166 TEJ doby (takze pierwsza polnoc po wczytaniu); PO Mark(MBudget) - przelewy kas osad w "pozostale moduly ticku", nie w budzecie
             try { TourneyPay.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("TourneyPay.Daily", e); } DayProfile.Lap("TourneyPay.Daily");
+            try { TourneyFolkPurse.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("TourneyFolkPurse.Daily", e); } DayProfile.Lap("TourneyFolkPurse.Daily");   // f8-sakiewka (18.10): linia "Sakiewka turniejowa (f8): dzien N" (tylko log; przelewy biegna przy turnieju)
             try { TownInns.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("TownInns.Daily", e); } DayProfile.Lap("TownInns.Daily");   // KA (16.10): linia "Karczmy (KA): dzien N" - noclegi, zaplata, kontrola obiegu, premia (tylko log)
             try { RoadsideInns.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("RoadsideInns.Daily", e); } DayProfile.Lap("RoadsideInns.Daily");   // sw-zajazdy: linia "Zajazdy (ZJ): dzien N" - wejscia, noclegi, kiesy wsi, kontrola obiegu, widok
             try { Rumours.Daily((int)CampaignTime.Now.ToDays - 1); } catch (Exception e) { Log.Error("Rumours.Daily", e); } DayProfile.Lap("Rumours.Daily");   // sw-zajazdy: linia "Plotki (PL): dzien N" - sluchane, ksiega band, wiesci

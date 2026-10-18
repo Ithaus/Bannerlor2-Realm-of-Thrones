@@ -1717,6 +1717,17 @@ namespace Armoury
         // Seagard +1522, komunikat i splata w pierwszej godzinie regula wyplaty (pelna podloga, bez tempa - zalegla wyplata z turnieju), reszta jak kazdy dlug
         public bool TourneySeagardCatchUp = true;          // one-time amends for the Seagard tournament of 16 October in Ithauser's campaign: Seagard owes you the 1,300 of prize money and the 222 of your bet it could not pay, and Seagard, its lord and the ruler pay it in the first hour as a prize would be paid; whatever is left is paid off like any other town debt. Only for a save made before this change, with the hero Ithauser, after that tournament - decided once, at the first load (needs Tourney Debts). Off = no amends
 
+        // --- Tournament purse of the townsfolk (18.10) ---
+        // Paczka f8-sakiewka (noc 17/18.10, decyzja Jeffa 18.10 "4 tak"; projekt docs/kiesa-ludu/PROJEKT-WYDATKI-2026-10-13.md P5): mieszczanie miasta-gospodarza
+        // dokladaja do nagrody turnieju jedna dzienna oferte swojego ludu (oferta nadwyzki W/R/P z ostatniej doby ludu x Tourney Folk Purse Days) - z kies klas ponad
+        // zapas dni i ponad oferte na jutro, do glowy rodu zwyciezcy (jak cena nagrody w grze), graczowi, gdy wygra on albo ktos z jego druzyny. Miasto bez nadwyzki
+        // nic nie daje. Tylko przy zastosowanym KS (StartCalibration.Applied) i czynnej kiesie ludu. TourneyFolkPurse.cs + TownFolk.Tourney.cs; sluchacz
+        // CampaignEvents.TournamentFinished (po GivePrizeToWinner - poza kontekstem RealPayer i oknem O11). Linia "Sakiewka turniejowa (f8): dzien N" (tozsamosc:
+        // zdjete z kies = przelane + zwrocone). Wylaczony klucz = sluchacz wraca od razu, bez linii - jak przed paczka. Nic w zapisie
+        public bool TourneyFolkPurse = true;               // the townsfolk of the town that hosts a tournament put up a purse for the champion: one day of what they spend from their savings on better living - a rich town gives a fat purse, a town with nothing to spare gives none - paid out of their own purses above their reserve for hard times to the head of the champion's house (to you, if you or one of your party win). You are told when the purse is yours or when you are in the town. Works once the start calibration is applied. Off = no purse, as before
+        public float TourneyFolkPurseDays = 1.0f;          // with Tourney Folk Purse: how many days of the townsfolk's spending from their savings go into the purse (1 = one day; at most 4)
+        public int TourneyFolkPurseMin = 20;               // with Tourney Folk Purse: a purse smaller than this is not put up - the coin stays with the townsfolk
+
         // --- Hideout spotted ---
         public bool HideoutFlagEnabled = true;             // a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there
         public int HideoutFlagDays = 3;                    // how many days the flag stays on the map
