@@ -772,43 +772,25 @@ namespace Armoury
         }
 
         /// <summary>
-        /// r4-mur: banda najazdu wrocila do domu (albo czas powrotu minal) - jej ludzie i jency do puli regionu ZRODLA najazdu (nie regionu miejsca, jak
-        /// OnPartyDestroyed przy rozwiazaniu) z licznikiem "rozwiazane bandy" i udzialami pochodzenia; sklad i loch czyszczone, wiec OnPartyDestroyed przy
-        /// DestroyPartyAction nic juz nie dopisze. Zwraca ludzi skladu (bez jencow). Bohaterow-jencow wolajacy uwalnia wczesniej. Prawo wyrzutkow wylaczone -
-        /// -1 (wolajacy zostawia bande w polu jak kazda inna).
+        /// r4-mur: banda najazdu wrocila do domu (albo czas powrotu minal) - rozwiazanie bez sprawcy (DestroyPartyAction), a OnPartyDestroyed oddaje jej ludzi
+        /// i jencow do puli regionu ZRODLA najazdu (zamiast regionu miejsca) z licznikiem "rozwiazane bandy" i udzialami pochodzenia - ta sama droga co kazda
+        /// rozwiazana banda (sklad czytaja tez ksiega ludzi E4/0 i ksiega pochodzenia). Zloto i towar bandy wolajacy oddaje wczesniej (kiesa 0 - bez dziury
+        /// "kiesy rozwiazanych band"), bohaterow-jencow uwalnia wczesniej. Zwraca ludzi skladu (bez jencow); -1 - prawo wyrzutkow wylaczone (banda zostaje w polu).
         /// </summary>
         internal static int RaidDisband(Settlement region, MobileParty party)
         {
             if (!On || region == null || party == null) return -1;
             int men = party.MemberRoster.TotalRegulars;
-            bool noDead = Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen;
+            _raidHome[party] = region;
             try
             {
-                if (PeopleBook.OriginLive)
-                {
-                    PeopleBook.PoolShares(region, PeopleBook.Take(party.MemberRoster, PeopleBook.Men(party.MemberRoster), PeopleBook.FBandDisband));
-                    PeopleBook.PoolShares(region, PeopleBook.Take(party.PrisonRoster, PeopleBook.Men(party.PrisonRoster), PeopleBook.FBandDisband));
-                }
+                if (party.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(party);
+                DestroyPartyAction.Apply(null, party);
             }
-            catch { }
-            AddRoster(region, party.MemberRoster, 1f, ref _inDisband, noDead);
-            AddRoster(region, party.PrisonRoster, 1f, ref _inDisband, noDead);
-            ClearRegulars(party.MemberRoster);
-            ClearRegulars(party.PrisonRoster);
+            finally { _raidHome.Remove(party); }
             return men;
         }
-
-        /// <summary>r4-mur: zdejmuje z rosteru wszystkich szeregowych (bohaterowie zostaja) - od konca, bo AddToCountsAtIndex usuwa puste pozycje.</summary>
-        private static void ClearRegulars(TroopRoster r)
-        {
-            if (r == null) return;
-            for (int i = r.Count - 1; i >= 0; i--)
-            {
-                var e = r.GetElementCopyAtIndex(i);
-                if (e.Character == null || e.Character.IsHero || e.Number <= 0) continue;
-                r.AddToCountsAtIndex(i, -e.Number, -e.WoundedNumber);
-            }
-        }
+        private static readonly Dictionary<MobileParty, Settlement> _raidHome = new Dictionary<MobileParty, Settlement>(PeopleBook.RefEq.I);   // tylko na czas RaidDisband
 
         /// <summary>N7: rozbici, ktorzy po czasie czekania w osadzie zbiorki ida do lasu (StragglersRally.Disperse) - do puli regionu i do naplywu
         /// "rozbici z bitew w las i bez domu" (linia "Pula wyrzutkow (E4/3)").</summary>
@@ -993,7 +975,9 @@ namespace Armoury
                     if (destroyer != null) _goneFought += party.PartyTradeGold; else _goneDisbanded += party.PartyTradeGold;
                 }
                 if (destroyer != null) return;
-                var region = NearestNode(party.Position.ToVec2());
+                Settlement region;
+                if (_raidHome.Count == 0 || !_raidHome.TryGetValue(party, out region) || region == null)      // r4-mur: banda najazdu - do puli okregu zrodla
+                    region = NearestNode(party.Position.ToVec2());
                 // E4/2 (e): druga droga wightow do puli zamknieta (jak W4b dla dezercji) - przy OthersRiseOnlyFromFallen wighty skladu i lochu do niczego
                 bool noDead = Settings.Current != null && Settings.Current.OthersRiseOnlyFromFallen;
                 AddRoster(region, party.MemberRoster, 1f, ref _inDisband, noDead);

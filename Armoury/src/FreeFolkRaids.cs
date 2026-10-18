@@ -462,8 +462,9 @@ namespace Armoury
             return cut;
         }
 
-        /// <summary>Banda w domu: bohaterowie-jency uciekaja, zloto do kiesy wsi zrodla, towar do jej magazynu, ludzie i jency do puli okregu zrodla
-        /// (OutlawLaw.RaidDisband), banda rozwiazana. Zwraca ludzi skladu; -1 - prawo wyrzutkow wylaczone (banda zostaje w polu, bez zarzadu).</summary>
+        /// <summary>Banda w domu: bohaterowie-jency uciekaja, zloto do kiesy wsi zrodla, towar do jej magazynu, banda rozwiazana (OutlawLaw.RaidDisband -
+        /// DestroyPartyAction bez sprawcy; ludzie i jency do puli okregu zrodla ta sama droga co kazda rozwiazana banda). Zwraca ludzi skladu; -1 - prawo
+        /// wyrzutkow wylaczone (banda zostaje w polu, bez zarzadu).</summary>
         private static int Home(MobileParty mp, Settlement src, Settlement region, out long gold, out long items)
         {
             gold = 0; items = 0;
@@ -496,11 +497,7 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Home(towar)", e); }
-            int men = OutlawLaw.RaidDisband(region, mp);
-            if (men < 0) return -1;
-            if (mp.CurrentSettlement != null) { try { LeaveSettlementAction.ApplyForParty(mp); } catch (Exception e) { Stumble("Home(osada)", e); } }
-            DestroyPartyAction.Apply(null, mp);
-            return men;
+            return OutlawLaw.RaidDisband(region, mp);                         // rozwiazanie: ludzie i jency do puli okregu zrodla (OnPartyDestroyed), -1 bez prawa wyrzutkow
         }
 
         private static string F(double x, string f) { return (double.IsNaN(x) || double.IsInfinity(x) ? 0.0 : x).ToString(f, Inv); }
