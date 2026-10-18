@@ -1,5 +1,159 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-17/18 (noc, sw-zajazdy: zajazdy przy szlakach - budynek na mapie, wejscie, nocleg za pieniadze do kiesy wsi, plotki z prawdziwego stanu swiata, takze w karczmie miasta)
+
+**Scalenie:** `w-toku/sw-zajazdy` -> `w-toku/noc-ks4` (commit scalenia f1637625, build Armoury kod 0). Zrodlo wpisu: `docs/noc-1718/sw-zajazdy-CHANGELOG.md`.
+
+**Mod:** Armoury + `tools/sprawdz_logi.py` (grupa `nzajazdy`) + `tools/gen_mcm.py` (przebieg) + nowy `tools/zajazdy/zajazdy_gen.py` | **Galaz:** `w-toku/sw-zajazdy` (od `efbbf0dc` = noc-ks4 "KS runda 4 cz. 5") | **Tor:** M (bez gry; build kod 0; checker na logu 15-37-31 i na logu syntetycznym) | **Klucze (nowe, domyslnie TAK):** `RoadsideInns`, `InnGossip` (grupa MCM "A night's rest"); nocleg w zajezdzie wymaga dodatkowo `TownInns` i `NightRestEnabled` | **Zapis:** `arm_inns` - pole 16 (uid zajazdu) tylko przy noclegu w zajezdzie (karczma miasta pisze 15 pol jak dotad, starsza DLL pole 16 pomija; straznik dlugosci 4096); nowy klucz `arm_rumours` "v1|bandy|wiesci" (straznik: najwyzej 6000 band, 60 wiesci, 400 tys. znakow; brak klucza = bandy "od dawna", wiesci od zera; starsza DLL go nie czyta) | **Dane (NOWY plik do wgrania):** `Armoury/ModuleData/arm_roadside_inns.tsv` (196 zajazdow, scene_xml_crc 146201570 = ROT 8.1.8; bez pliku zajazdow po prostu nie ma).
+
+**Dla Jeffa (prosto):**
+- Przy drogach miedzy miastami i zamkami stoja zajazdy - osobne budynki (gospoda, stajnia, zagroda dla koni, woz, beczki). Jest ich 196 na calej mapie: gesto tam, gdzie mieszka duzo ludzi (co ok. 30-40 jednostek drogi), rzadko na pustkowiach (do 110), wcale za Murem i tam, gdzie wokol mniej niz 12 tys. ludzi. Zadne dwa nie stoja blizej niz 30 jednostek - nie bedzie "armii zajazdow".
+- Najedz myszka na zajazd - zobaczysz nazwe (np. "The Laughing Kettle", "Crossroads Inn", w Essos "Caravanserai of the Silver Camel"), czyje to ziemie, jakie sa lozka i ceny. Kliknij - druzyna jedzie do zajazdu i po dojechaniu wchodzi do srodka. Jesli staniesz tuz przy zajezdzie bez klikania, gra zapyta: "Go in / Ride on".
+- W srodku: nocleg za te same ceny i z tym samym wypoczynkiem co karczma w miescie (wspolna izba 1/1/3, porzadna karczma 2/2/8, dobry dom 4/3/20 - czlowiek / kon / Twoj pokoj). W wiekszosci zajazdow jest tylko wspolna izba albo wspolna izba i porzadna karczma (dobry dom - tylko 3 zajazdy na wielkich rozdrozach). Ludzie placa sami za siebie, Ty za siebie i konie bez jezdzca. Pieniadze dostaje wies, na ktorej ziemiach stoi zajazd (pan bierze swoja zwykla czesc - ta sama regula co u markietanow, opcja "Village Tribute From Sutlers"). Spisz jak w obozie (namiot przy zajezdzie), budzisz sie wypoczety do zmierzchu.
+- "Listen to the gossip" - w zajezdzie i w karczmie miasta. Plotki sa z tego, co sie naprawde dzieje: bandy w okolicy (ilu ich, od kiedy rabuja, ile maja w sakwach - prawdziwe zloto bandy), kryjowki i skarb w nich (prawdziwa kasa kryjowki - dostanie ja ten, kto kryjowke oczysci), wojska panow, karawany, ceny w pobliskich miastach, wiesci z wojen. Im dalej i im starsza wiesc, tym mniej dokladna: liczby rosna w opowiesci ("hundreds of men", "a king's ransom"), zamiast miejsca jest kierunek ("two days' ride to the north-east"). Herszt bandy ma przezwisko (np. "Bald Jon", "Osric Three-Fingers") - ta sama banda zawsze tak samo.
+
+**Problem:** Jeff 16.10 (STAN-PRAC 52 pkt 1-2, 58, 59): "tawerny gdzie mozna sie zatrzymac, zaplacic za nocleg ... do ktorych mozna wjechac na mapie, mozna spac, posluchac gossip"; "osobne budynki przy szlakach, ale nie za gesto, im mniej ludzi tym mniej zajazdow, zeby nie wygladalo jak armia zajazdow"; plotki: "gdzie sa bandyci lub jacys zboje i ich kryjowki, a moze skarby; slyszalem, ze banda Lysego Johna rabuje od miesiaca, oblowila sie tak mocno, ze ciezko ich bedzie teraz wykurzyc"; takze karczmarz w miescie. Dotad: karczmy tylko w miastach (TownInns, WGRANIE 72), zadnych plotek, zadnego miejsca na mapie poza osadami gry, do ktorego mozna wjechac.
+
+**Przyczyna:** brak funkcji (nowa paczka). Gotowego moda brak (szukane 16.10). Dane do miejsc byly: sonda geografii 16.10 (`D:/Backup-Bannerlord/geo-dane-2026-10-16`: trasy AI miedzy twierdzami, punkty tras, siatka 2 jedn. z najblizsza wsia gry) i uklad wiosek v5 (ludzie okregu).
+
+**Zmiana:**
+- `tools/zajazdy/zajazdy_gen.py` (nowy, offline): plik `arm_roadside_inns.tsv`. Jedna regula dla swiata: kandydaci = punkty tras lad twierdza-twierdza (564 trasy, 59 669 punktow), nie blizej niz 10 jedn. od twierdzy (miasta maja karczmy), 5 od wsi gry, 2.6 od wioski na mapie, na ladzie przejezdnym, nie za Murem (freefolk, nightswatch); ludzie wokol = suma osad wiosek v5 x 250 w promieniu 30; odstep = 45 x sqrt(40000 / ludzie) w granicach 30..110, ponizej 12 000 ludzi - bez zajazdu; wybor zachlanny: rozdroza (>= 3 trasy w 1.6 jedn.), malowana droga, wiecej ludzi; budynek 0.9 jedn. w bok od drogi, front do drogi; jakosci: 1 zawsze, 2 od 45 000 ludzi, 3 tylko rozdroze od 110 000; okreg = najblizsza wies gry. Wynik: 196 zajazdow (jakosci 1/2/3: 51/142/3; rozdroza 99, droga 16, trakt 81; ludzie wokol 12 000 / 59 750 / 118 250; kultury: Polnoc 27, Reach 19, Riverlands 19, Myr 12 ...). Deterministyczne - ten sam plik = te same zajazdy w kazdej kampanii.
+- `RoadsideInns.cs` (nowy): wczytanie RAZ na sesje (SessionStart / pierwsze uzycie; CRC sceny - inna mapa = zajazdy wylaczone; wiersz bez wsi gry - pominiety; budynek blizej niz 2.2 jedn. od wioski z ukladu tej sesji (v5, przysiolki v6) - pominiety); siatka 25 jedn.; dojazd w `CampaignEvents.TickEvent` 4 razy na sekunde (zegar rzeczywisty, jedna partia, komorki 3 x 3): po kliku na zajazd menu po dojechaniu, po zwyklym postoju przy zajezdzie (u celu ruchu, do 1.6 jedn.) pytanie raz na postoj; menu `arm_roadinn` (zwykle menu) przez `GameMenu.ActivateGameMenu` tylko bez otwartego menu i spotkania, poza osada, bitwa, morzem, niewola; "Ride on" = `ExitToLast`. Linie "Zajazdy (ZJ): start sesji" (plik, liczby wedlug pasm ludzi z mediana najblizszego sasiada, najblizszy sasiad min, Westeros / Essos), "wejscie do", "dzien N".
+- `RoadsideInnsView.cs` (nowy, komponent widoku jak MapVillagesView, rejestracja z `SubModuleMain.OnApplicationTick` przez metode NoInlining, 3 proby): obrazek zajazdu z KOPII SIATEK po nazwie (dom kultury krainy `mi_*` jako gospoda 0.8 jedn., stodola stylu jako stajnia, `mi_cattle_farm_a` zagroda, `mi_cart_a`, `mi_barrels_a`, `mi_straw_pile`, `mi_sack_a`; przy 2 jakosciach przybudowka, przy 3 studnia), skala z BB do wielkosci w jedn. mapy, dol BB na najnizszym gruncie pod elementem, element poza ladem (poza gospoda) zdjety; bez fizyki, skryptow, czastek. Obrazek powstaje RAZ przy kamerze (najwyzej 6 na cwierc sekundy, 6 ms), potem tylko pokaz / schowaj przy zmianie stanu (mgla zwiadu wsi okregu, wysokosc kamery jak wioski). Dymek i klik (`selectedVisual` -> `OnMapClick` -> `MapState.ProcessTravel` do miejsca postoju). Liczniki w `InnViewStats` (RoadsideInns.cs - linia doby nie laduje typu widoku).
+- `TownInns.Road.cs` (nowy, `partial`): nocleg w zajezdzie tym samym rachunkiem `Plan` co karczma miasta (bez okna lupu i bez premii cen), tylko jakosci zajazdu; pieniadze do WSI okregu: szeregowi `MenPurse.InnPayVillage` (nowa metoda: sakiewka -> `VillageTakings.Split` - podatek pana z czynnego `SettlementTaxModel` na `TradeTaxAccumulated`, reszta do kiesy; wies rodu gracza - calosc do kiesy; potem `DsVillage.WarShareSutlers` od czesci w kiesie - ta sama regula co czesc wsi markietanow), bohaterowie `GiveGoldAction` do wsi + ten sam podzial podatku i udzial korony DS; kontrola obiegu przy kazdym noclegu (sakiewki + kiesy gracza i towarzyszy + kiesa wsi + licznik podatku wsi, plus przelane do korony - roznica 0); sen `NightRest.BeginInnSleep` (menu snu jak w obozie, namiot), pobudka nie przed switem, premia jak po karczmie.
+- `TownInns.cs`: `partial`; `Rest.RoadUid` (null = karczma miasta - stara sciezka bez zmian); `OnSleepInit` / `InnSleep` dla zajazdu po polozeniu partii (do 3 jedn. od zajazdu, poza osada); `Export` dopisuje pole 16 tylko dla zajazdu, `Import` je czyta (straznik dlugosci); opcja "Listen to the gossip" w menu karczmy miasta (`arm_inn`, klucz InnGossip).
+- `Rumours.cs` (nowy): plotki (okno `InformationManager.ShowInquiry`, bez zmiany menu, za darmo): bandy do 70 jedn. (ludzie, `PartyTradeGold`, dni od narodzin z ksiegi, napady, herszt BK albo przezwisko z listy imion kultury krainy + przydomek z ziarna id bandy), kryjowki zajete do 160 jedn. (ile band, kasa kryjowki = skarbiec band OutlawLaw), armie do 180 (wodz, krolestwo, ludzie, oblezenie / marsz na / zbiorka) albo najwiekszy oddzial pana do 120, karawany do 90 (wlasciciel, cel, straz), ceny 3 najblizszych miast do 260 (towar o najwiekszej roznicy, `Town.GetItemPrice`), wiesci z wojen (ksiega 60 dni: wojny, pokoje, twierdze zdobyte oblezeniem, spalone wsie, bitwy >= 200 ludzi z udzialem pana, oblezenia) i trwajace oblezenia do 300; bez wiesci - z kim wojuje krolestwo najblizszego miasta. Dokladnosc q = 1 - odleglosc/150 (wiesci /600) - wiek/30: liczby "about" / "some" / przesada x1.4-3.0; miejsce "near X" albo kierunek + dni jazdy. Ziarno = miejsce + doba (te same plotki tego dnia). Ksiega `arm_rumours`; linie "Plotki (PL): start sesji", "sluchane w", "dzien N".
+- `MenPurse.cs`: `InnPayVillage` (wyzej). `ArmouryBehavior.cs`: Reset, SyncData `arm_rumours`, zdarzenia (TickEvent, MobilePartyCreated / Destroyed, RaidCompleted, WarDeclared, MakePeace, OnSettlementOwnerChanged, MapEventEnded, OnSiegeEventStarted), SessionStart, AddMenus, Daily (nowe bloki, istniejace bez zmian). `SubModuleMain.cs`: rejestracja widoku. `Settings.cs` + `McmSettings.cs` (gen_mcm): klucze `RoadsideInns`, `InnGossip`.
+- `tools/sprawdz_logi.py --grupa nzajazdy`: ZJ-0 start sesji, ZJ-1 zajazdy >= 100 (zly wiersz 0, brak wsi gry 0), ZJ-2 gestosc wedlug ludzi (najblizszy sasiad >= 25; mediana sasiada <30k >= >=90k), ZJ-3 linie rozpoznane, ZJ-4 nocleg zaplacony = odebrany (kiesa wsi + podatek + korona; roznica 0), ZJ-4b premie, ZJ-5 plotki bez wyjatkow (+ czas <= 50 ms), ZJ-6 obrazek raz na mape, ZJ-7 koszt dojazdu <= 0.05 ms, ZJ-8 potkniecia i ERROR 0, ZJ-9 INFO. Na logu 15-37-31 (sprzed paczki): INFO, bez wyjatku.
+
+**Ryzyko / co sprawdzic (kontrola calosci w kodzie):**
+- Regresje: karczma miasta - `RoadUid == null` na kazdej starej sciezce (Town, OnSleepInit, InnSleep, Export 15 pol identyczne, Import), jedyna zmiana widoczna przy domyslnych kluczach to nowa opcja "Listen to the gossip" w menu karczmy miasta (InnGossip). Liczniki karczm miasta (linia KA, nkarczmy) bez noclegow w zajazdach; pobudki z zajazdu ida przez ten sam `Wake` (linia "Karczmy (KA): pobudka ... -> wypoczeci do" - KA-6 ta sama regula). Nocleg w zajezdzie stawia namiot (NightRest.SleepInit poza osada) - to zamierzone (sen = namiot), zwijany przy pobudce.
+- Kolizje: `DsVillage.WarShareSutlers` liczy pieniadze z noclegow w zajazdach w licznikach markietanow DS (`_sBase`, `_sN`) - nocleg to wydatek zolnierzy we wsi, ta sama regula; tylko gracz, male kwoty. Po recenzji linia "Daniny wsi (DS)" dopisuje przy noclegach ", w tym zajazdy przy szlakach (ZJ): czesc wsi X, korona Y (N wplat)" (bez noclegow linia bajt w bajt jak dotad; regex NDS "sut" i kontrola NDS-14e bez zmian - W4 zajazdow idzie do skarbca i `Pend` jak markietani). `TickEvent` - nowy sluchacz (4/s, bez petli po swiecie). Klik: komponent ustawia `selectedVisual` tylko nad zajazdem (1.15 jedn. od budynku) i tylko gdy nikt inny (partia, osada, wioska) nie trafil. Przy scalaniu z `sw-przysiolki` (uklad v6): zajazdy blizej niz 2.2 jedn. od nowej wioski wypadaja same (linia startu "przy wiosce na mapie N"); generator mozna puscic na v6 (ludzie z nowego pliku).
+- Zamknieta ekonomia: platnik sakiewka ludzi / kiesy gracza i towarzyszy -> odbiorca kiesa wsi okregu, licznik podatku pana tej wsi, skarbiec korony (DS); kontrola obiegu w kazdej linii noclegu i doby (prog 0). Plotki i wejscie nic nie kosztuja. Nic z niczego.
+- Cudzy kod sprawdzony w dekompilacji (TaleWorlds.CampaignSystem / SandBox.View 1.4.8): `GameMenu.ActivateGameMenu` (MapState.EnterMenuMode, bez spotkania), `ExitToLast`, `GiveGoldAction.ApplyInternal` (wies = SettlementComponent.ChangeGold), `MapScreen.HandleLeftMouseButtonClick` (selectedVisual -> OnMapClick po sprawdzeniu sciezki), `MapState.ProcessTravel`, `MobileParty.IsMoving/TargetPosition`, `Hideout.IsInfested`, `CultureObject.MaleNameList`, `Town.GetItemPrice`, `Army` / `MapEvent` / `RaidEventComponent` / `SiegeEvent` / `ChangeOwnerOfSettlementDetail`. Latki gry: brak nowych.
+- NIE sprawdzone w grze (autotest nie klika): wyglad budynku (skala `mi_*` z BB do 0.8 jedn. - wioska ok. 2.2 jedn.; siatki stylu: brak = element pominiety, linia "brak siatki"), wejscie po kliku i pytanie przy postoju, menu z `TickEvent`, sen w zajezdzie z pobudka, tekst plotek. W pierwszym tescie: obejrzec 2-3 zajazdy przy kamerze, kliknac jeden, przespac noc (linia "Zajazdy (ZJ): nocleg w ... kontrola obiegu: roznica 0"), posluchac plotek w zajezdzie i w miescie.
+- Wydajnosc: wczytanie pliku + najblizszy sasiad O(n^2) = 38 tys. odleglosci raz na sesje (linia startu "czas N ms"); dojazd ZJ-7; widok: 196 zajazdow na cwierc sekundy, tworzenie z budzetem; plotki tylko na klik (ZJ-5b).
+- Zapis Ironman Jeffa (WGRANIE 76): stary zapis bez `arm_rumours` - bandy "od dawna"; zajazdy nic nie zapisuja poza stanem noclegu w `arm_inns` (pole 16). Wylaczenie kluczy w dowolnej chwili - bez sladu w zapisie.
+- Do decyzji Jeffa (nie blokuje): gestosc (196 zajazdow; parametry w generatorze P_REF 40000, SP_MIN 30, SP_MAX 110, P_MIN 12000), plotki za darmo (mozna dodac kolejke dla gosci za 1-2 d do kiesy karczmarza), czy plotka ma "odkrywac" kryjowke na mapie (dzis tylko tekst).
+
+**Recenzja (17.10, krok poprawek):** Recenzja: 5 uwag, poprawione 5, odrzucone 0 (uwaga 5 w polowie juz zalatwiona - patrz nizej).
+- (wazne) `Rumours._priceItems` - statyczna lista `ItemObject` z `MBObjectManager` przezywala zmiane kampanii w tym samym uruchomieniu gry (nowa gra / wczytanie innego zapisu): `Town.GetItemPrice` dostawal przedmioty poprzedniej gry. Poprawka: `Rumours.Reset` zeruje liste (konstruktor `ArmouryBehavior`, przed SyncData) - pierwsza plotka o cenach w nowej kampanii buduje ja od nowa z biezacego `MBObjectManager`. Inne pola statyczne nowych plikow przejrzane: tylko liczniki, tablice stalych i slaba referencja rejestracji widoku.
+- (drobne) Pytanie "Go in / Ride on" i menu zajazdu bez strazy okna, rozmowy i autotestu. Poprawka: `RoadsideInns.PopupBlocked()` wzorem `SiegeRansom.CanShow` - tick dojazdu nic nie robi, gdy `InformationManager.IsAnyInquiryActive()` (np. `NightfallAsk` przy postoju o zmroku - dwa okna z pauza), gdy trwa rozmowa (`ConversationManager.IsConversationInProgress / IsConversationFlowActive` - rozmowa na mapie bez `PlayerEncounter`), gdy aktywny stan to nie `MapState`, albo gdy biegnie autotest CrashScribe (ta sama proba refleksji co `SiegeRansom.AutotestActive`; nikt nie kliknie okna z pauza). `Open` i odpowiedz "Go in" sprawdzaja jeszcze raz rozmowe. Autotest: zajazdy nie pytaja i nie otwieraja menu (i tak nie klika).
+- (drobne) Pieniadze noclegu w ksiedze. Poprawka: zmiany kiesy wsi poza tickiem dobowym nazwane `MoneyLedger.Note169(N169Other, ...)` jak w `HideoutPurge`: `InnPayVillage` (+ czesc do kiesy, - udzial korony), `RoadHeroPays` (- czesc na licznik podatku, - udzial korony); przelew gry bohater -> wies ksiega widzi sama (GiveGoldAction). W linii "Przeplywy osad (przyczyny)" pieniadze zajazdow sa teraz w "Armoury bez licznika: inne" kies wsi, nie w reszcie [R]. Linia DS: nowy argument `WarShareSutlers(v, purse, inn: true)` - te same liczniki markietanow (zeby NDS-14e zostala dokladna) plus dopisek "w tym zajazdy" (wyzej). Checker: nowy prog ZJ-4c - suma "korona (DS)" linii doby ZJ = suma dopiskow "w tym zajazdy" linii DS (roznica najwyzej korona jednej doby - granica doby); log syntetyczny: zgodne - TAK, korona DS 9 przy ZJ 4 - NIE.
+- (drobne) Podatek pana od noclegu zawsze, a markietani tylko przy kluczu `VillageTributeFromSutlers`. Poprawka: `TownInns.RoadTributeOn` (ten sam klucz) w `MenPurse.InnPayVillage` i `TownInns.RoadTax` - klucz wylaczony = calosc do kiesy wsi, udzial korony DS od calosci (jak `Sutlers.One`). Domyslnie klucz TAK - przy domyslnych ustawieniach rachunek bez zmian. Podpowiedz opcji noclegu pisze "(its lord takes his share)" tylko gdy pan naprawde bierze; tooltip `RoadsideInns` (Settings.cs + gen_mcm) dopowiada "the same rule as for the sutlers - Village Tribute From Sutlers".
+- (drobne) Liczniki doby po zmianie kampanii. Czesc o licznikach noclegu (`_rdStays` ...) NIEAKTUALNA: konstruktor `ArmouryBehavior` juz wola `TownInns.RoadDayReset()` (koniec linii Reset, obok `RoadsideInns.Reset(); Rumours.Reset();`). Czesc o licznikach doby widoku (`InnViewStats.CreatedDay / ShowDay / HideDay / ClicksDay`) prawdziwa - poprawka: `InnViewStats.DayZero()` z `RoadsideInns.Reset`.
+- Ryzyko poprawek: straz okna wstrzymuje pytanie przy zajezdzie, dopoki stoi inne okno - po jego zamknieciu (partia dalej stoi) pytanie przyjdzie w nastepnej cwierci sekundy; rozmowa / autotest - bez pytania. `Note169` to tylko licznik (wraca przy `_inBlock` i przy wylaczonych oknach obiegu); dla wsi nie wola diagnozy C-4b ani `TownFolk.OnTownCoin` (oba tylko miasta - sprawdzone w kodzie). `WarShareSutlers` z domyslnym `inn = false` - wywolania markietanow (Sutlers.cs) bez zmian. Build kod 0; checker nzajazdy na logu 15-37-31 - INFO, bez wyjatku.
+
+**Status:** DO SPRAWDZENIA (nie wgrane; build kod 0; gra nie uruchamiana; nowy plik danych `arm_roadside_inns.tsv` do skopiowania do `Modules/Armoury/ModuleData` razem z DLL).
+
+## 2026-10-17/18 (noc, KS runda 4 - "Tanszy koszyk biednych w Essos + place rosna, gdzie brakuje rak": TYLKO WYJASNIENIE, kod bez zmian)
+
+**Scalenie:** `w-toku/r4-koszyk` -> `w-toku/noc-ks4` (commit scalenia 217b7c2b, build Armoury kod 0). Zrodlo wpisu: `docs/noc-1718/r4-koszyk-CHANGELOG.md`.
+
+**Mod:** brak zmian w kodzie (Armoury, `tools/sprawdz_logi.py`, `tools/gen_mcm.py` - nietkniete) | **Galaz:** `w-toku/r4-koszyk` (na efbbf0dc = `w-toku/noc-ks4` "KS runda 4 cz. 5") | **Tor:** S (sam dokument) | **Klucze:** brak (`KsCheapBasket`, `KsWageByHands` NIE dodane) | **Zapis:** bez zmian.
+
+Jeff w tym przebiegu napisal: "Tanszy koszyk dla biednych w Essos, place rosna tam, gdzie brakuje rak - wyjasnij mi to". Zrobione samo wyjasnienie, oparte na kodzie (efbbf0dc, build rc 0) i na logu fin78 (`D:\Backup-Bannerlord\logi-testow\Armoury-2026-10-17_15-37-31.log` + CSV). Wdrozenie czeka na slowo Jeffa i na decyzje z punktu 6.
+
+Recenzja: 1 uwaga, poprawione 1, odrzucone 0 (opis dwoch drabin - Planu i gry - byl wrzucony do jednego worka; ponizej rozdzielone, sprawdzone w kodzie).
+
+**Dla Jeffa (prosto):**
+
+1. **O co chodzi.** Plan KS liczy, czy kazda klasa w miescie stac na swoj koszyk: W = wyrobnicy, R = rzemieslnicy, P = kupcy i szlachta. Jedzenie niewolnikow placa ich wlasciciele: R 40%, P 60%. W Essos R i P nie stac na caly koszyk, wiec Plan uznaje, ze sa "na pol glodni". Prawdziwy biedak kupilby tansze kalorie: wiecej chleba i ziarna, mniej miesa i wina. Twoja decyzja z 17.10 miala dwie czesci: (a) koszyk dopasowuje sie do kieszeni, (b) tam, gdzie pracodawcom brakuje rak, dniowka powoli rosnie.
+
+2. **Jak jest dzis (fin78, 120 dob).**
+   - Plan: w Essos R placi 42% -> 73% koszyka, P 35% -> 68%. W Westeros R i P placa 89-97%.
+   - W miastach Essos zboze i chleb sa zaplacone prawie w calosci (niezaplacone 13 szt./d). Brakuje bialka (mieso 202, ryby 382, ser i maslo 75), oliwy 238, piwa i wina 473, owocow ok. 700 szt./d.
+   - W grze 71 z 97 miast stac na cale jedzenie. W 26 miastach dziala drabina. Lud nie kupuje 4.6% budzetu jedzenia miast (16 592 zl/d).
+   - **Sa DWIE drabiny i dzialaja inaczej** (poprawka po recenzji):
+     - **Drabina Planu** (`KsBasket.Ladder`, `StartCalibration.Deliver.cs:296`, szczeble `Rungs` :287). Szczeble po kolei: (1) CALE zboze, chleb, placek i sol, (2) napoje, (3) bialko, (4) reszta jedzenia (owoce, oliwa, miod, przyprawy), (5) przedza domowa, (6) rzeczy. Szczebel kupowany jest w calosci. Na szczeblu, na ktory nie starcza pieniedzy, kazdy towar dostaje ten sam ulamek, a dalsze szczeble dostaja zero. W szczeblu nie ma wyboru najtanszego, nic tez nie jest zamieniane miedzy szczeblami. Cale zboze idzie pierwsze, dlatego w Planie Essos zboze jest zaplacone prawie w calosci.
+     - **Drabina w grze** (`Zc4Ladder`, `StartCalibration.Zc4.cs:697`). Wlacza sie tylko wtedy, gdy kiesy nie stac na cale jedzenie koszyka; wolanie w `TownFolk.Live.cs:429`. Kolejnosc:
+       1. Przetrwanie: 0.47 kg ziarna na osobe (x lambda), w tej formie z ziarna / chleba / placka, ktora jest najtansza za kg i lezy na polce. Ta jedna forma moze wziac potrzebe pozostalych form zboza, wiec tu jest mala zamiana, ale tylko wewnatrz zboza.
+       2. Sol.
+       3. Napoje, najtansze za litr najpierw.
+       4. Bialko, najtansze za kcal najpierw.
+       5. Reszta po rowno: zboze ponad 0.47 kg oraz owoce, oliwa, miod i przyprawy.
+
+       W krokach 2-4 kazdy towar dostaje najwyzej swoja potrzebe. Tanszy jest kupowany pierwszy, ale nie dostaje wiecej sztuk w zastepstwie drozszego.
+   - Wspolne dla obu drabin: kalorie nie sa zamieniane miedzy kategoriami. Kto nie ma na mieso, nie kupi w zamian wiecej chleba. Napoj (w Essos czesto drogie wino) jest kupowany przed bialkiem.
+   - Roznica, ktora wyszla przy sprawdzaniu: w grze zboze ponad 0.47 kg jest kupowane DOPIERO NA KONCU, po napoju i bialku, razem z owocami. W Planie cale zboze jest pierwsze. Opis `Rungs` ("ta sama kolejnosc co drabina zakupow ZC4") zgadza sie co do kolejnosci kategorii, ale nie co do zboza.
+
+3. **Tanszy koszyk - co by robil.** Gdy klasy nie stac na pelny koszyk, kupuje w tej kolejnosci:
+   1. kalorie z najtanszego zrodla na swoim targu, az do pelnej potrzeby kcal;
+   2. bialko;
+   3. napoj;
+   4. reszta.
+
+   Mieso, wino i ser dopiero z tego, co zostanie. Ile kcal daje 1 zl (wartosc bazowa gry, sztuka 10 kg): ziarno ok. 11 000, chleb 5 500, mieso 2 400, oliwa 2 200, piwo 1 300, ryby 1 100, wino 540, daktyle 470. Ryby nie sa tanimi kaloriami: weszlyby tylko tam, gdzie na miejscu sa tanie (porty). "Kasza" w grze liczy sie jako ziarno, a straczki sa domowe i nie ida przez targ. Rynek i Plan widzialyby koszyk naprawde kupiony: w Essos wiecej zboza, mniej wina i miesa. Za tym poszlyby ceny i Plan, czyli wiecej pol zboza i mniej winnic. Ekonomia zostaje zamknieta: ta sama kiesa kupuje inny towar.
+   - **Zakres po recenzji:**
+     - W grze to NIE jest przepisanie wyboru najtanszego w kategorii, bo on juz jest. Brakuje zamiany miedzy kategoriami: dodatkowe zboze lub chleb ponad 0.47 kg, gdy nie stac na bialko i napoj, reszta zboza przed napojem i bialko przed napojem.
+     - W Planie trzeba dodac jedno i drugie: najtanszy najpierw w szczeblu (dzis rowne ciecie) i zamiane kcal miedzy szczeblami.
+     - Wiekszosc luki jest w Planie.
+
+4. **Place rosna, gdzie brakuje rak - co by robilo.**
+   - Dzis dniowka = stawka historyczna x poziom plac miasta (`TownWage`: dobrobyt / 4800, w granicach 0.5-1.5). Nic nie patrzy na brak rak.
+   - Lud zarabia glownie udzialami, a nie dniowka (`TownFolk.Live.cs:176` SplitOf):
+     - robocizna handlu W90/R10;
+     - doplata do wartosci wyrobow W70/R30;
+     - wydatki zolnierzy W80/R10/P10;
+     - obrot P.
+   - Pomysl: tam, gdzie warsztaty i przetwory ZC5 nie maja rak, wskaznik plac rosnie o kilka % na tydzien, do gornej granicy. Placa pracodawcy: kasa miasta i wlasciciele warsztatow. Gdzie wolnych rak jest duzo, wskaznik wraca do 1.0.
+   - Dzis braku rak prawie nie ma. W ZC5 zajete jest 1 791 z 20 610 roboczodni (9%), a koniec "brak rak" zdarza sie ok. 5 miasto-dob na pare. Place prawie by sie nie ruszyly, a podwyzka trafilaby glownie do W.
+
+5. **Najwazniejsze: dlaczego R i P w Essos sa naprawde biedni.** Niewolnikow liczymy dwiema roznymi liczbami.
+   - Koszyk liczy niewolnikow z ksiegi stanow (`StartCalibration.Zc4.cs:334`: 40% do R, 60% do P). W Volantis to 230 820 niewolnych na 329 391 ludzi (70%).
+   - Zarobek z pracy niewolnikow idzie do wlascicieli wedlug glow BK (`TownFolk.Live.cs:202` Credit: udzial W x HS / (HS + HW); `TownFolk.cs:60` OwnR 0.4 / OwnP 0.6). W Volantis to 2 853 niewolnych na 25 676 wyrobnikow, czyli 10%.
+   - Wlasciciele karmia wiec 70% miasta, a zaplate dostaja za prace 10%. Reszta tych pieniedzy trafia do wolnych W.
+   - Skutki w Essos:
+     - W ma budzet 283 tys. zl/d przy koszyku 69 tys.;
+     - kiesy w Volantis: W 387 937, R 3 683, P 2 501;
+     - dostatek biedoty w Volantis to 27.7 razy koszyk przetrwania.
+   - Pieniedzy w miastach Essos jest dosc: 427 tys. zl/d budzetu na 224 tys. koszyka. Leza tylko w zlej kiesie.
+   - Druga przyczyna dotyczy takze wolnych miast (Pentos 0.66, Braavos 0.71): rzemieslnicy to 30-33% ludzi, a staly podzial daje R tylko 10-30% zarobku.
+   - Tanszy koszyk glownie zamaskuje ten problem, a place za brak rak dalyby wiecej glownie W.
+
+6. **Propozycja (do Twojej decyzji, jedna zmiana naraz):**
+   1. Jedna liczba niewolnikow: zarobek z pracy niewolnych przenosic do wlascicieli wedlug udzialu z ksiegi stanow, tego samego, z ktorego placa ich koszyk. Te same pieniadze przechodza od W do R i P, nic nie powstaje.
+   2. Potem tanszy koszyk (`KsCheapBasket`), w zakresie z punktu 3.
+   3. Place za brak rak (`KsWageByHands`) na pozniej albo z innym sygnalem, np. FreeHands, czyli straty mezczyzn na wojnie.
+
+**Problem:** Jeff prosi o wyjasnienie dwoch pomyslow z decyzji 17.10 (tanszy koszyk biednych w Essos, place za brak rak). Dowod z logu fin78:
+- "Koszyk stanow (ZC4): dzien 109195 ... drabina (kiesy nie stac na cale jedzenie) 26 ... stac na cale jedzenie: miasta 73.2% (71/97), jedzenie niekupione z braku pieniedzy: miasta 4.6% budzetu jedzenia (16592 zl)";
+- Plan Essos R 73.2%, P 68.0% koszyka w dniu 120;
+- `kiesa-ludu.csv` Volantis: kiesy W 387937 / R 3683 / P 2501.
+
+**Przyczyna:**
+- (a) Obie drabiny (Plan i gra) nie zamieniaja kalorii miedzy kategoriami, a napoj stawiaja przed bialkiem. Gra kupuje zboze ponad 0.47 kg dopiero na koncu.
+- (b) Niewolni sa liczeni dwiema liczbami: koszyk z ksiegi stanow (70% w Volantis), zarobek wedlug glow BK (10%). Pieniadze wlascicieli R i P przeciekaja do W.
+- (c) W ZC5 prawie nie ma sygnalu braku rak.
+
+**Zmiana:** brak zmian w kodzie. Dodany tylko ten dokument (wyjasnienie + poprawka recenzji: rozdzielony opis drabiny Planu `KsBasket.Ladder` i drabiny gry `Zc4Ladder`).
+
+**Ryzyko / co sprawdzic:**
+- Do gry nic nie idzie, DLL bez zmian. Build rc 0. `sprawdz_logi.py --grupa nks` na fin78 przechodzi bez wyjatku (53 progi, NIE 18 - bez zmian, kod nietkniety). Grupa `nkoszyk` nie powstala, bo nie ma czego sprawdzac.
+- Na wypadek wdrozenia (kontrola z zasady 0, w kodzie):
+  1. `KsCheapBasket` zmienia znaczenie `TownPaid`. Zboze kupione ponad potrzebe da wartosc > 1, a dzis jest przyciete do 0..1 (`Zc4.cs:281` i :330 `Math.Min(1f, tp[z])`). `TownPaid` siedzi w zapisie stanu zastosowanego. Starsza DLL przytnie to do 1, ale trzeba sprawdzic eksport i import wpisow '@'.
+  2. Wiekszy popyt na zboze w Essos podniesie cene zboza i zjedzie czesc taniosci. Przesunie sie bilans Planu NKS-3, a pary ZC5 wino i oliwa straca zbyt.
+  3. W grze zamiana miedzy kategoriami zmienia `_zLadCut` (linia "jedzenie niekupione z braku pieniedzy") i podzial targu. W Planie najtanszy najpierw zmienia `paid[]` z jednego ulamka na szczebel na ulamek na towar, a czytaja go `StartCalibration.Core.cs:1350` i :1543.
+  4. `KsWageByHands`: wyzszy WageIndex podnosi tez utrzymanie warsztatow (`WorkshopTrade.UpkeepAt`) i dniowke ZC5, wiec mniej par sie oplaca i powstaje petla zwrotna. Pieniadze ida glownie do W.
+  5. Poprawka liczby niewolnych (pkt 6.1) to najwiekszy przeplyw: W w Essos traci wiekszosc dochodu z pracy niewolnych. W Volantis udzial przenoszony skacze z ok. 0.1 do ok. 0.7-0.8. Trzeba sprawdzic, czy W dalej stac na koszyk, oraz zadowolenie R14, mobilnosc ZC6 i suchy model `TownFolk.cs` z ta sama regula.
+- Liczby pochodza z fin78 (stan a6c56999, sprzed KsRecipes). Test efbbf0dc (fin80) moze je przesunac.
+
+**Status:** DO SPRAWDZENIA (samo wyjasnienie; kod czeka na decyzje Jeffa: najpierw pkt 6.1 czy od razu tanszy koszyk, jaki sygnal braku rak).
+
+## 2026-10-17/18 (noc, scalenie paczek nocy do w-toku/noc-ks4 - 8 paczek bez commitow)
+
+**Mod:** brak zmian | **Galaz:** `w-toku/noc-ks4` (efbbf0dc) | **Klucze:** brak | **Zapis:** bez zmian.
+
+**Problem:** plan nocy mial 10 paczek; scalone byly tylko dwie z commitami (`sw-zajazdy`, `r4-koszyk` - wpisy wyzej).
+
+**Przyczyna:** galezie `w-toku/r4-kupcy` (KS-H kupcy: kredyt kupiecki, trasy, dowoz na Polnoc), `w-toku/r4-polnoc` (najpierw wyzywic siebie + zimny klimat), `w-toku/r4-mur` (danina zbozowa dla Muru + glod Wolnych Ludzi -> najazdy), `w-toku/r4-bkwies` (rynek wsi BK wedlug potrzeb + kolejnosc wydatkow wsi), `w-toku/r4-ceny` (ceny, sterowanie rynku, sol, ser i maslo), `w-toku/sw-drogi` (drogi ROT +15% predkosci), `w-toku/sw-przysiolki` (przysiolki na pustkowiach), `w-toku/sw-herby` (limit 160 tekstur proporczykow) stoja na efbbf0dc bez zadnego commitu i z czystym drzewem roboczym - `git merge --no-ff` dal "Already up to date".
+
+**Zmiana:** brak (nic do scalenia).
+
+**Ryzyko / co sprawdzic:** te funkcje NIE sa w tej DLL - nie szukac ich w logu testu. Do zrobienia w kolejnym przebiegu albo do decyzji Jeffa.
+
+**Status:** NIE WYKONANE (paczki puste).
+
 ## 2026-10-17 (DS - poprawki po recenzji: Dues Medieval domyslnie WYLACZONE, roboty gminy wsi, czynsz bez zabierania chleba, skarbiec przed Bankiem takze przy F1, splaty po zwrocie zoldu, F3 z rampa 28 dob i czescia firmy z oszczednosci ludu)
 
 **Mod:** Armoury + `tools/sprawdz_logi.py` + `tools/gen_mcm.py` | **Galaz:** `w-toku/noc-ds` (na 28613422) | **Tor:** L (bez gry; model offline v2, bramki nds; autotest 120 dob przed wlaczeniem) | **Klucze:** `DuesMedieval` domyslnie NIE (bylo tak); nowe `DsCommunalWorks` (tak), `DsRentArrearsPayDays` 28, `DsFarmFolkFromSavings` (tak, tylko przy DsTowns); `DsRefundTreasuryFirst` dziala teraz takze przy samym Dues Medieval | **Zapis:** `arm_daniny` bez zmian; `arm_daniny_miasta` - rekord firmy `f~` dostaje pola 17-23 (czesc pana z oszczednosci ludu, jej zaleglosc i pomiar, sprzedaz i danina miasta z okna, ciecie firmy korony, wymiar dziesiatej biezacej sesji), dziesiata ludu `v~` pole 7 (wymiar biezacej sesji) - starszy zapis bez nich czyta sie jak dotad (zera / cala reszta jako wymiar biezacy).
