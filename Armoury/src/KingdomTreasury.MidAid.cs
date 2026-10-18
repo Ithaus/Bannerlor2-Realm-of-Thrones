@@ -176,7 +176,7 @@ namespace Armoury
                     var m = el[i]; var x = m.X;
                     double a1, b1; long c1;
                     NaAt(x, phi, step, out a1, out b1, out c1);
-                    long had; _naPaid.TryGetValue(x.C, out had);
+                    long had = AnBase(x.C);   // f20-d1: juz dane = pelne uprawnienie W5 tej doby (bez dopelniania czesci zatrzymanej; klucz wylaczony - gotowka, jak dotad)
                     double ob; _naBoost.TryGetValue(x.C, out ob);
                     long e = (long)Math.Floor(m.F * Math.Max(0, c1 - had));             // tylko za ludzi, ktorzy dzis sa - czesc f ponad gotowke korony tej doby
                     if (e > pool - planned) e = pool - planned;
@@ -211,9 +211,10 @@ namespace Armoury
                             if (x.Pl) _mcPlGot += ip;
                             CirculationWindows.NoteHeroGold(h, ip);                             // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
+                            AnNote(x, ip, ip, AnTierX);                                         // f20-d1: W5c bez ciecia f20 (wlasne f) - tylko do uprawnienia doby (baza W7)
                         }
                         // przydzial w pulapie: nigdy ponizej gotowki; tylko gdy rosnie (rod gracza - bez pulapu 166, przydzial bez znaczenia dla budzetu)
-                        double nb = Math.Max(nbs[i], had), ob;
+                        double nb = Math.Max(nbs[i], AnBase(x.C)), ob;   // f20-d1: podloga - pelne uprawnienie (klucz wylaczony - gotowka, jak dotad)
                         _naBoost.TryGetValue(x.C, out ob);
                         if (nb > ob)
                         {

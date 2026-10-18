@@ -1611,6 +1611,18 @@ Uzycie (Python 3, tylko odczyt):
                     na krolestwo, rody z lennem i warunkiem rent w wojnie, f z G i R miary f6/f7; szczebel 168 bez zajecia - f z G i R budzetu tym samym wzorem, jak kod po
                     recenzji; miejsce w pulapie tylko ponad gotowke - nie narasta; INFO). Log sprzed paczki (np. fin92 Armoury-2026-10-18_09-33-39.log): NSK-0 INFO, NSK-D
                     z liczbami, bez wyjatku.
+--grupa ndoplata  : (18.10, paczka f20-d1 - decyzja Jeffa "1.b": bogate rody a pomoc koronna do zoldu - "ta sama miara co przy rentach: bogaty nic, sredni czesc,
+                    biedny calosc. Zloto zostaje w skarbcu na wojne."; Armoury/src/KingdomTreasury.AidNeed.cs, klucz Crown War Aid Cash By Need) python -I tools/sprawdz_logi.py
+                    --grupa ndoplata <Armoury-*.log> [--csv budzet-rodow.csv] (strumieniowo; bez --csv budzet-rodow.csv obok logu). NDP-0 linie "Doplata wedlug potrzeby rodu
+                    (f20)" (INFO), NDP-0b nieczytelne 0, NDP-1 linia f20 w kazdej dobie z linia W5, NDP-2 PIENIADZ ZAMKNIETY co do zlotowki (pasma = razem; pelna = wyplacone +
+                    zatrzymane na pasmo i szczebel; wyplacone szczebli = linia W5 - wyplacono, ze skarbca, M1; zatrzymane = dopisek i wiersze krolestw linii W5; zatrzymane z
+                    wplywow dnia = linia 165; skarbce w krokach W5 przed - po = wyplacone + tarczowe netto - zatrzymane nie wyszlo ze skarbca; klucz wylaczony - 0), NDP-3
+                    REGULA "bogaty nic, sredni czesc, biedny calosc" (kontrole linii i pasma; CSV: wyplacona = floor(pelna x f) na szczebel do 3 zl, pasmo 2 - 0, pasmo 0 / f = 1 -
+                    bez zatrzymanego, na sucho - pelna), NDP-3b ta sama miara (mnoznik f20 = mnoznik f6/f7 tej doby, dluznik 168 = mnoznik W5c), NDP-4 bez gotowki poza regula
+                    (doplata_w5 = f20 wyplacona + W6 + W5c co do zlotowki), NDP-5 sumy kolumn f20 = linia, NDP-6 srednie 28 dob (INFO), NDP-7 rod gracza (ponad 2R bez wyplaty,
+                    komunikaty), NDP-8 ERROR KingdomTreasury.AidNeed 0 i potkniecia 0, NDP-D regula na sucho z CSV (f z f6 / f7 / G i R; INFO). Log sprzed paczki (np. fin93
+                    Armoury-2026-10-18_12-18-40.log): NDP-0 INFO, NDP-D z liczbami, bez wyjatku. Paczka zmienila tez W5-1 (garnek = wyplacono + zatrzymane + reszta; wzor
+                    wiersza krolestwa zna "lup WW2" i "zatrzymane f20").
 --grupa nruda     : (noc 18.10, fala 5 paczka f5-ruda - ruda/zelazo pod KS; Armoury/src/StartCalibration.Ruda.cs, Bloomery.F5.cs, VillageTakings.F5WoodCredit; klucze
                     Ks Iron Hands Follow Market, Bloomery Wood Credit) python -I tools/sprawdz_logi.py --grupa nruda <Armoury-*.log> (strumieniowo). Linie "Ruda KS (f5-ruda):
                     dzien N" (co 7 dob od D - rece przy zlozach zelaza za ruda rynku: polki S / cel T = suma zapasow rzemiosla CaravanBulk; S < T brak - kopalnie z drewnem
@@ -16774,9 +16786,13 @@ def _w5_kingdoms(s):
     if seg.strip() in ("-", ""):
         return []
     # W5b: dopisek na koncu wiersza (gotowka ze skarbca ponad zapas wojny, pula, nadwyzka skarbca, zapas wojny, niepokryte po wszystkich zrodlach) - opcjonalny
+    # f20-d1: ", lup WW2 N" (dopisek kodu WW2 - dotad bez miejsca we wzorze: wiersze Iron Islands byly "nieodczytane" i W5-1 / W5b-1 dawaly NIE w kazdym biegu
+    # z lupem) i na koncu ", zatrzymane f20 X (W5b Y, M1 Z)" (gotowka wedlug potrzeby rodu - czesc uprawnien zostawiona w skarbcu; "reszta" jest juz po zatrzymanym)
     kre = re.compile(r"^(.*?): garnek (\d+) \(danina (\d+)\), potrzeba (\d+) u (\d+) rodow, poziom ([\d.]+%|-), wyplacono (\d+) \(rodow (\d+)\), reszta (-?\d+)"
+                     r"(?:, lup WW2 (\d+))?"
                      r"(?:, ze skarbca ponad zapas (\d+) z puli (\d+) \(nadwyzka (\d+), zapas wojny (\d+)\), niepokryte (\d+))?"
-                     r"(?:, z rent M1 (\d+) \(pula (\d+), reszta wplywow (\d+), przed M1 niepokryte (\d+)\))?$")   # M1 (pieniadze roku 2): dopisek opcjonalny
+                     r"(?:, z rent M1 (\d+) \(pula (\d+), reszta wplywow (\d+), przed M1 niepokryte (\d+)\))?"   # M1 (pieniadze roku 2): dopisek opcjonalny
+                     r"(?:, zatrzymane f20 (\d+) \(W5b (\d+), M1 (\d+)\))?$")                                       # f20-d1: dopisek opcjonalny
     out = []
     for part in seg.split(" ; "):
         m = kre.match(part)
@@ -16786,7 +16802,13 @@ def _w5_kingdoms(s):
         k = {"name": m.group(1), "pot": int(m.group(2)), "aid": int(m.group(3)), "need": int(m.group(4)), "needn": int(m.group(5)),
              "level": (float(m.group(6)[:-1]) if m.group(6) != "-" else None), "paid": int(m.group(7)), "paidn": int(m.group(8)), "rest": int(m.group(9))}
         if m.group(10) is not None:
-            k.update({"cpaid": int(m.group(10)), "cpool": int(m.group(11)), "csur": int(m.group(12)), "cres": int(m.group(13)), "unc": int(m.group(14))})
+            k["loot"] = int(m.group(10))
+        if m.group(11) is not None:
+            k.update({"cpaid": int(m.group(11)), "cpool": int(m.group(12)), "csur": int(m.group(13)), "cres": int(m.group(14)), "unc": int(m.group(15))})
+        if m.group(16) is not None:
+            k.update({"rpaid": int(m.group(16)), "rpool": int(m.group(17))})
+        if m.group(20) is not None:   # f20-d1: zatrzymane wedlug potrzeby rodu - szczebel daniny, W5b, M1
+            k.update({"kept": int(m.group(20)), "ckept": int(m.group(21)), "rkept": int(m.group(22))})
         out.append(k)
     return out
 
@@ -16822,10 +16844,12 @@ def w5_main(logp, start_arg, until=120, csvp=None):
     tre = re.compile(r"\| garnek (\d+) \(danina dnia (\d+)\), rodow z potrzeba (\d+) z (\d+) ocenianych .*?potrzeba razem (\d+), przydzial przy poziomie wyrownania (\d+)"
                      r", wyplacono (\d+) \(rodow (\d+)\), reszta do rent (-?\d+)")
     tot = {}
+    kept5 = {}   # f20-d1: zatrzymane wedlug potrzeby rodu na szczeblu daniny (dopisek za "reszta do rent"; log sprzed paczki albo klucz wylaczony - 0)
     for d in on:
         m = tre.search(w5[d])
         if m:
             tot[d] = [int(x) for x in m.groups()]   # garnek, danina, rodow z potrzeba, ocenianych, potrzeba, przydzial, wyplacono, rodow, reszta
+            kept5[d] = num(r", reszta do rent -?\d+ \(f20: zatrzymane w skarbcu wedlug potrzeby rodu (\d+)\)", w5[d]) or 0
     # ---- W5-0 linia i klucz
     if not win:
         late = sorted(d for d in w5 if run_day(d, start) > until)   # recenzja scalenia f15: pozniejsza kampania - linie poza oknem, nie "brak"
@@ -16842,13 +16866,14 @@ def w5_main(logp, start_arg, until=120, csvp=None):
                 "klucz i warunki tak przez caly bieg W5, wszystkie pola odczytane", (len(on) == len(win) and not offc and not unread) if on else None)
     # ---- W5-1 zamkniecie
     if tot:
-        bad_sum = [run_day(d, start) for d, t in tot.items() if t[6] + t[8] != t[0]]
+        bad_sum = [run_day(d, start) for d, t in tot.items() if t[6] + kept5.get(d, 0) + t[8] != t[0]]   # f20-d1: garnek = wyplacono + zatrzymane + reszta do rent
         bad_k, bad_row, bad_165, bad_obg, n165, nobg = [], 0, [], [], 0, 0
         for d, t in tot.items():
             ks = _w5_kingdoms(w5[d])
             bad_row += sum(1 for k in ks if "bad" in k)
             ks = [k for k in ks if "bad" not in k]
-            if sum(k["pot"] for k in ks) != t[0] or sum(k["paid"] for k in ks) != t[6] or any(k["paid"] + k["rest"] != k["pot"] for k in ks):
+            if (sum(k["pot"] for k in ks) != t[0] or sum(k["paid"] for k in ks) != t[6] or any(k["paid"] + k.get("kept", 0) + k["rest"] != k["pot"] for k in ks)
+                    or sum(k.get("kept", 0) for k in ks) != kept5.get(d, 0)):   # f20-d1: z zatrzymanym, suma krolestw = dopisek razem
                 bad_k.append(run_day(d, start))
             if d in kor:
                 v = num(r"doplata do zoldu wedlug potrzeby \(W5, przed rentami\) (\d+)", kor[d])
@@ -16863,7 +16888,7 @@ def w5_main(logp, start_arg, until=120, csvp=None):
                     if v != t[6]:
                         bad_obg.append(run_day(d, start))
         ok1 = not bad_sum and not bad_k and not bad_165 and not bad_obg and bad_row == 0 and n165 > 0
-        rep.add("W5-1: zamkniecie - wyplacono + reszta do rent = garnek; suma krolestw = razem; ta sama kwota w liniach 165 i Obieg",
+        rep.add("W5-1: zamkniecie - wyplacono + zatrzymane f20 + reszta do rent = garnek; suma krolestw = razem; ta sama kwota w liniach 165 i Obieg",
                 f"dob {len(tot)}: rozjazd sumy w {len(bad_sum)}, krolestw w {len(bad_k)} (wiersze nieodczytane {bad_row}), wobec linii 165 w {len(bad_165)} z {n165}"
                 f", wobec Obieg w {len(bad_obg)} z {nobg}" + (f"; pierwsze doby: {(bad_sum + bad_k + bad_165 + bad_obg)[:5]}" if not ok1 and (bad_sum or bad_k or bad_165 or bad_obg) else ""),
                 "0 rozjazdow, co do zlotowki (nic z niczego, nic w nicosc)", ok1)
@@ -46970,6 +46995,282 @@ def nsrednim_main(logp, bdp=None, csvp=None):
     return 0
 
 
+# ============================================================ ndoplata (18.10, paczka f20-d1 - decyzja Jeffa "1.b": bogate rody a pomoc koronna do zoldu - "ta sama miara co
+# przy rentach: bogaty nic, sredni czesc, biedny calosc. Zloto zostaje w skarbcu na wojne."); Armoury/src/KingdomTreasury.AidNeed.cs, klucz Crown War Aid Cash By Need
+NDP_LINE = "Doplata wedlug potrzeby rodu (f20): dzien "
+NDP_W5 = "Doplata wedlug potrzeby (W5): dzien "
+NDP_RX_KEY = re.compile(r"\| klucz Crown War Aid Cash By Need (tak \(czynny\)|tak, ale [^|]*|NIE \([^|]*\))")
+NDP_RX_BAND = re.compile(r"\| (ponizej R \(f = 1\)|R-2R \(f = \(2R - G\) / R\)|ponad 2R \(nic\)|dluznik 168 \(f z jego G i R, jak W5c\)|bez miary \(bez ciecia, f = 1\)): rodow (\d+)"
+                         r"(?: \(ponizej R (\d+), R-2R (\d+), ponad 2R (\d+)\))?, pelna (\d+), wedlug potrzeby (\d+), wyplacone (\d+), zatrzymane (-?\d+)")
+NDP_RX_TOT = re.compile(r"\| razem pelna (\d+), wedlug potrzeby (\d+), wyplacone (\d+) \(szczebel daniny (\d+), W5b (\d+), M1 (\d+)\), zatrzymane (-?\d+) \(szczebel daniny (-?\d+)"
+                        r" i M1 (-?\d+) - z reszty wplywow dnia, zdjete z wplywow: nie ida w renty; W5b (-?\d+) - zostaje w skarbcu ponad zapas\)")
+NDP_RX_WAL = re.compile(r"\| skarbce w krokach W5 \(danina, W5b, W6, M1; krolestw (\d+)\): przed (-?\d+), po (-?\d+), ubylo (-?\d+) = wyplacono W5 \+ W5b \+ M1 \+ tarczowe netto (-?\d+)"
+                        r" \(tarczowe wyplacone - pobrane (-?\d+)\); rozjazd krolestw (\d+), bez pomiaru (\d+)")
+NDP_RX_CTL = re.compile(r"\| kontrola: ponad 2R wyplacone (\d+) rodow \((\d+) zl\), wyplacone inne niz wedlug potrzeby (\d+) rodow, sumy rodow inne niz krolestw \(wyplacone (\d+), zatrzymane (\d+)\) \(oczekiwane 0\)")
+NDP_RX_PL = re.compile(r"\| gracz: (.*?), komunikat: ([^|]*?) \| potkniecia (\d+)\.\s*$")
+NDP_RX_DRY = re.compile(r"; na sucho zatrzymane byloby (-?\d+)")
+NDP_RX_165 = re.compile(r", zatrzymane wedlug potrzeby rodu z wplywow dnia \(f20 - szczebel daniny W5 i M1; zostaje w skarbcu, nie idzie w renty\) (\d+)")
+NDP_BANDS = ("ponizej", "R-2R", "ponad", "dluznik", "bez")
+
+
+def _ndp_scan(logp):
+    """ndoplata: strumieniowo linia f20, z linii W5 szczeble gotowki (danina, W5b, M1) i zatrzymane (dopisek razem i wiersze krolestw), linia 165 (zatrzymane z wplywow
+    dnia) i bledy KingdomTreasury.AidNeed."""
+    D = {"f": {}, "bad": [], "w5": {}, "k165": {}, "err": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in ") and "KingdomTreasury.AidNeed" in s:
+                D["err"].append(s[:200])
+                continue
+            if s.startswith(NDP_LINE):
+                day = num(r"dzien (\d+)", s)
+                key, tot, wal, ctl, pl = NDP_RX_KEY.search(s), NDP_RX_TOT.search(s), NDP_RX_WAL.search(s), NDP_RX_CTL.search(s), NDP_RX_PL.search(s)
+                bands = NDP_RX_BAND.findall(s)
+                if day is None or not key or not tot or not wal or not ctl or not pl or len(bands) != 5:
+                    D["bad"].append(s[:200]); continue
+                kk = key.group(1)
+                r = {"state": "on" if kk.startswith("tak (") else ("off" if kk.startswith("NIE") else "dep"),
+                     "bands": {NDP_BANDS[i]: tuple(int(x) for x in (b[1], b[5], b[6], b[7], b[8])) for i, b in enumerate(bands)},   # rodow, pelna, wedlug potrzeby, wyplacone, zatrzymane
+                     "debt": tuple(int(x or 0) for x in bands[3][2:5]),
+                     "full": int(tot.group(1)), "need": int(tot.group(2)), "paid": int(tot.group(3)), "pD": int(tot.group(4)), "pB": int(tot.group(5)), "pM": int(tot.group(6)),
+                     "kept": int(tot.group(7)), "kD": int(tot.group(8)), "kM": int(tot.group(9)), "kB": int(tot.group(10)),
+                     "kw": int(wal.group(1)), "w0": int(wal.group(2)), "w1": int(wal.group(3)), "wd": int(wal.group(4)), "out": int(wal.group(5)), "scnet": int(wal.group(6)),
+                     "wbad": int(wal.group(7)), "wno": int(wal.group(8)),
+                     "richn": int(ctl.group(1)), "richzl": int(ctl.group(2)), "offneed": int(ctl.group(3)), "offp": int(ctl.group(4)), "offk": int(ctl.group(5)),
+                     "pl": pl.group(1), "msg": pl.group(2).strip(), "st": int(pl.group(3))}
+                dm = NDP_RX_DRY.search(s); r["dry"] = int(dm.group(1)) if dm else None
+                D["f"][day] = r
+                continue
+            if s.startswith(NDP_W5):
+                day = num(r"dzien (\d+)", s)
+                if day is None:
+                    continue
+                ks = [k for k in _w5_kingdoms(s) if "bad" not in k]
+                D["w5"][day] = {"a5": num(r", wyplacono (\d+) \(rodow \d+\), reszta do rent", s), "b5": num(r", wyplacono ze skarbca (\d+) \(rodow", s) or 0,
+                                "m1": num(r"\(M1, Need Aid From Rents (?:tak|nie)\): pula \d+ w \d+ krolestwach, wyplacono (\d+)", s) or 0,
+                                "k5": num(r", reszta do rent -?\d+ \(f20: zatrzymane w skarbcu wedlug potrzeby rodu (\d+)\)", s),
+                                "kk": (sum(k.get("kept", 0) for k in ks), sum(k.get("ckept", 0) for k in ks), sum(k.get("rkept", 0) for k in ks))}
+                continue
+            if s.startswith(NZR_165):
+                day = num(r"dzien (\d+)", s)
+                mm = NDP_RX_165.search(s)
+                if day is not None:
+                    D["k165"][day] = int(mm.group(1)) if mm else None
+    return D
+
+
+def _ndp_f(r, k):
+    """Liczba z kolumny CSV albo None (puste pole)."""
+    v = (r.get(k) or "").strip()
+    if v == "":
+        return None
+    try:
+        return float(v)
+    except ValueError:
+        return None
+
+
+def _ndp_dry(csvd, days):
+    """NDP-D: skutek reguly na sucho z CSV (log sprzed paczki albo klucz wylaczony): gotowka szczebli z cieciem = doplata_w5 - doplata_z_tarczowego_w6 - doplata_srednim_w5c
+    (W6 i W5c bez ciecia f20); f i pasmo - zwrot_f6 (ta sama pamiec doby), inaczej renta_f7, inaczej z kolumn G i R budzetu tym samym wzorem (dluznik 168 - jak kod: f z G i R;
+    R budzetu <= R miary - przyblizenie). Srednie na dobe: pelna, wedlug potrzeby, zatrzymane na pasmo."""
+    acc = {}
+    for d in days:
+        for r in csvd.get(d, []):
+            cash = (_nsk_fv(r, "doplata_w5") - _nsk_fv(r, "doplata_z_tarczowego_w6") - _nsk_fv(r, "doplata_srednim_w5c"))
+            if cash <= 0:
+                continue
+            f, band = None, None
+            for pk, mk in (("zwrot_f6_pasmo", "zwrot_f6_mnoznik"), ("renta_f7_pasmo", "renta_f7_mnoznik")):
+                b = (r.get(pk) or "").strip()
+                if b in ("0", "1", "2") and _ndp_f(r, mk) is not None:
+                    f, band = _ndp_f(r, mk), ("ponizej", "R-2R", "ponad")[int(b)]
+                    break
+            if f is None:
+                G, R = _ndp_f(r, "G"), _ndp_f(r, "R")
+                if G is None or not R or R <= 0:
+                    f, band = 1.0, "bez"
+                else:
+                    f, band = max(0.0, min(1.0, (2 * R - G) / R)), "dluznik"
+                    if G <= R:
+                        f = 1.0
+                    elif G >= 2 * R:
+                        f = 0.0
+            a = acc.setdefault(band, [0.0, 0.0, 0.0])
+            a[0] += cash; a[1] += cash * f; a[2] += cash * (1 - f)
+    n = max(1, len(days))
+    return {b: [x / n for x in v] for b, v in acc.items()}
+
+
+def ndoplata_main(logp, bdp=None, csvp=None):
+    """ndoplata (18.10, paczka f20-d1): gotowka doplaty W5 (szczebel daniny), W5b i M1 x f - ta sama miara potrzeby co zwrot f6, renty f7 i W5c; reszta uprawnienia w skarbcu.
+    Wejscie: log Armoury (strumieniowo), budzet-rodow.csv (--csv albo obok logu). Progi NDP-0..NDP-7 i NDP-D - opis w naglowku pliku (--grupa ndoplata). Log bez paczki:
+    linie INFO, skutek na sucho z CSV (NDP-D), bez wyjatku."""
+    rep = Report()
+    D = _ndp_scan(logp)
+    if csvp is None:
+        csvp = csv_path_of(logp)
+    csvd, _has5c = _nsk_csv(csvp)
+    i0 = next((rs[0] for rs in csvd.values() if rs), None)
+    has = i0 is not None and "doplata_w5_f20_pelna" in i0
+    fd, w5 = D["f"], D["w5"]
+    days = sorted(fd)
+    on = [d for d in days if fd[d]["state"] == "on"]
+    rep.add("NDP-0: linie 'Doplata wedlug potrzeby rodu (f20)' (INFO)",
+            f"dob {len(days)}" + (f" (d{days[0]}-d{days[-1]})" if days else "") + f", z kluczem czynnym {len(on)}, wylaczonym (na sucho) {sum(1 for d in days if fd[d]['state'] == 'off')}"
+            + f", klucz bez W5 {sum(1 for d in days if fd[d]['state'] == 'dep')}; linii W5 {len(w5)}; CSV {'z kolumnami f20' if has else ('bez kolumn f20' if csvd else 'brak')}",
+            "INFO (log sprzed paczki - 0 linii)", None)
+    rep.add("NDP-0b: linie f20 nieczytelne", f"{len(D['bad'])}" + (f" (np. {D['bad'][0][:120]})" if D["bad"] else ""), "0", len(D["bad"]) == 0 if days or D["bad"] else None)
+    if days:
+        miss = [d for d in sorted(w5) if d not in fd]
+        rep.add("NDP-1: linia f20 w kazdej dobie z linia W5", f"dob z linia W5 {len(w5)}, bez linii f20 {len(miss)}" + (f" (np. d{miss[:5]})" if miss else ""), "0", len(miss) == 0)
+        # NDP-2 pieniadz zamkniety: pasma = razem, pelna = wyplacone + zatrzymane, szczeble = linia W5, zatrzymane z wplywow = linia 165, skarbce przed - po = wyplacone
+        bad, why = [], {}
+        for d in days:
+            r = fd[d]
+            b = r["bands"]
+            e = []
+            if sum(v[1] for v in b.values()) != r["full"] or sum(v[3] for v in b.values()) != r["paid"] or sum(v[2] for v in b.values()) != r["need"]:
+                e.append("pasma")
+            if any(v[1] != v[3] + v[4] for v in b.values()) or r["full"] != r["paid"] + r["kept"] or r["kept"] != r["kD"] + r["kB"] + r["kM"] or r["paid"] != r["pD"] + r["pB"] + r["pM"]:
+                e.append("pelna")
+            x = w5.get(d)
+            if x is not None:
+                if x["a5"] is not None and (x["a5"] != r["pD"] or x["b5"] != r["pB"] or x["m1"] != r["pM"]):
+                    e.append("W5")
+                if (x["k5"] or 0) != r["kD"] or x["kk"] != (r["kD"], r["kB"], r["kM"]):
+                    e.append("W5-zatrzymane")
+            k165 = D["k165"].get(d)
+            if k165 is not None and k165 != r["kD"] + r["kM"]:
+                e.append("165")
+            if r["state"] == "on" and k165 is None and d in D["k165"] and r["kD"] + r["kM"] > 0:
+                e.append("165-brak")
+            if r["w0"] - r["w1"] != r["wd"] or r["wd"] != r["out"] or r["wbad"] != 0:
+                e.append("skarbce")
+            if r["state"] != "on" and r["kept"] != 0:
+                e.append("wylaczony")
+            if e:
+                bad.append(d)
+                for t in e:
+                    why[t] = why.get(t, 0) + 1
+        rep.add("NDP-2: pieniadz zamkniety co do zlotowki - pasma = razem; pelna = wyplacone + zatrzymane (na pasmo i szczebel); wyplacone szczebli = linia W5 (wyplacono, ze skarbca, M1);"
+                " zatrzymane = dopisek i wiersze krolestw linii W5; zatrzymane z wplywow dnia (danina + M1) = linia 165; skarbce w krokach W5: przed - po = wyplacone + tarczowe netto"
+                " (zatrzymane nie wyszlo ze skarbca); klucz wylaczony - zatrzymane 0",
+                f"dob {len(days)}, rozjazdow {len(bad)}" + (f" (d{bad[:5]}; {why})" if bad else ""), "0", len(bad) == 0)
+        # NDP-3 regula: bogaty nic, sredni czesc, biedny calosc (kontrola linii) + CSV
+        rich = sum(fd[d]["richn"] for d in on); offn = sum(fd[d]["offneed"] for d in days); offs = sum(fd[d]["offp"] + fd[d]["offk"] for d in days)
+        low_kept = sum(fd[d]["bands"]["ponizej"][4] for d in on); rich_paid = sum(fd[d]["bands"]["ponad"][3] for d in on)
+        cbad, csame, cdiff, cn, cfirst = 0, 0, [], 0, None
+        if has:
+            for d in days:
+                st_on = fd[d]["state"] == "on"
+                for r in csvd.get(d, []):
+                    full = _ndp_f(r, "doplata_w5_f20_pelna")
+                    if not full or full <= 0:
+                        continue
+                    cn += 1
+                    f, band = _ndp_f(r, "doplata_w5_f20_mnoznik"), (r.get("doplata_w5_f20_pasmo") or "").strip()
+                    paid, kept = _ndp_f(r, "doplata_w5_f20_wyplacona") or 0.0, _ndp_f(r, "doplata_w5_f20_zatrzymana") or 0.0
+                    ok = abs(full - paid - kept) < 0.5 and f is not None
+                    if ok and st_on:
+                        ok = paid <= full * f + 1e-4 * full + 0.5 and paid >= full * f - 3 - 1e-4 * full   # floor na kazdym z 3 szczebli, mnoznik z 4 miejscami
+                        if band == "2" and paid > 0:
+                            ok = False
+                        if (band == "0" or f >= 1.0) and kept > 0:
+                            ok = False
+                    elif ok:
+                        ok = abs(paid - full) < 0.5   # na sucho - gotowka pelna
+                    if not ok:
+                        cbad += 1; cfirst = cfirst or (d, r.get("rod_id"))
+                    # ta sama miara co zwrot f6 / renty f7 (ta sama pamiec doby) - pasma 0..2; dluznik 168 - jak W5c (mnoznik_w5c)
+                    ref = None
+                    if band in ("0", "1", "2"):
+                        for pk, mk in (("zwrot_f6_pasmo", "zwrot_f6_mnoznik"), ("renta_f7_pasmo", "renta_f7_mnoznik")):
+                            if (r.get(pk) or "").strip() in ("0", "1", "2") and _ndp_f(r, mk) is not None:
+                                ref = _ndp_f(r, mk); break
+                    elif band == "3" and _ndp_f(r, "mnoznik_w5c") is not None:
+                        ref = _ndp_f(r, "mnoznik_w5c")
+                    if ref is not None and f is not None:
+                        if abs(ref - f) <= 1e-3:
+                            csame += 1
+                        else:
+                            cdiff.append((d, r.get("rod_id"), f, ref))
+        rep.add("NDP-3: bogaty nic, sredni czesc, biedny calosc - kontrola linii (ponad 2R wyplacone, wyplacone inne niz wedlug potrzeby, sumy rodow / krolestw) i pasma linii"
+                " (ponad 2R wyplacone, ponizej R zatrzymane); CSV: wyplacona = floor(pelna x f) na szczebel (do 3 zl), pasmo 2 - 0, pasmo 0 / f = 1 - bez zatrzymanego, na sucho - pelna",
+                f"linia: ponad 2R z wyplata {rich}, inne niz wedlug potrzeby {offn}, sumy {offs}; pasma: ponad 2R wyplacone {rich_paid}, ponizej R zatrzymane {low_kept}; CSV "
+                + (f"rodo-dob {cn}, zlych {cbad}" + (f" (np. {cfirst})" if cfirst else "") if has else "bez kolumn f20"),
+                "0 / 0 / 0; 0 / 0; 0", rich == 0 and offn == 0 and offs == 0 and rich_paid == 0 and low_kept == 0 and cbad == 0)
+        rep.add("NDP-3b: ta sama miara co zwrot f6, renty f7 i W5c - mnoznik f20 = mnoznik f6/f7 tej doby (pasma 0..2) albo mnoznik W5c (dluznik 168) w tym samym wierszu CSV",
+                (f"porownan {csame + len(cdiff)}, zgodnych {csame}, innych {len(cdiff)}" + (f" (np. {cdiff[:2]})" if cdiff else "")) if has else "bez kolumn f20",
+                "0 innych (jedna regula na jedno zjawisko)", (len(cdiff) == 0) if has and (csame or cdiff) else None)
+        # NDP-4 bez podwojnego ciecia i bez gotowki poza regula: gotowka korony rodu tej doby = szczeble z cieciem (f20 wyplacona) + W6 + W5c, co do zlotowki
+        ibad, icmp, ifirst = 0, 0, None
+        if has:
+            for d in days:
+                for r in csvd.get(d, []):
+                    tot = _nsk_fv(r, "doplata_w5")
+                    pf = _ndp_f(r, "doplata_w5_f20_wyplacona") or 0.0
+                    if tot <= 0 and pf <= 0:
+                        continue
+                    icmp += 1
+                    if abs(tot - _nsk_fv(r, "doplata_z_tarczowego_w6") - _nsk_fv(r, "doplata_srednim_w5c") - pf) >= 0.5:
+                        ibad += 1; ifirst = ifirst or (d, r.get("rod_id"))
+        rep.add("NDP-4: kazda zlotowka gotowki korony rodu ma szczebel - doplata_w5 = f20 wyplacona (W5, W5b, M1 po cieciu) + doplata_z_tarczowego_w6 + doplata_srednim_w5c (CSV, AI i gracz)",
+                f"rodo-dob {icmp}, rozjazdow {ibad}" + (f" (np. {ifirst})" if ifirst else "") if has else "bez kolumn f20",
+                "0 (zadna gotowka W5/W5b/M1 poza regula f20; W5c i W6 osobno)", (ibad == 0) if has and icmp else None)
+        # NDP-5 CSV = linia (sumy doby)
+        if has:
+            sbad, ncmp = [], 0
+            for d in days:
+                if d not in csvd:
+                    continue
+                ncmp += 1
+                cf = sum(_ndp_f(r, "doplata_w5_f20_pelna") or 0 for r in csvd[d]); cp = sum(_ndp_f(r, "doplata_w5_f20_wyplacona") or 0 for r in csvd[d])
+                ck = sum(_ndp_f(r, "doplata_w5_f20_zatrzymana") or 0 for r in csvd[d])
+                if int(round(cf)) != fd[d]["full"] or int(round(cp)) != fd[d]["paid"] or int(round(ck)) != fd[d]["kept"]:
+                    sbad.append(d)
+            rep.add("NDP-5: sumy kolumn doplata_w5_f20_pelna / _wyplacona / _zatrzymana (AI i gracz) = razem z linii f20", f"dob porownanych {ncmp}, rozjazdow {len(sbad)}" + (f" (d{sbad[:5]})" if sbad else ""),
+                    "0", len(sbad) == 0 if ncmp else None)
+        else:
+            rep.add("NDP-5: sumy kolumn f20 = linia", "CSV bez kolumn f20" if csvd else f"brak CSV ({csvp})", "0", None)
+        # NDP-6 skutek (INFO, ostatnie 28 dob z kluczem czynnym) i gracz
+        t28 = on[-28:]
+        if t28:
+            n = len(t28)
+            bp = {b: sum(fd[d]["bands"][b][3] for d in t28) / n for b in NDP_BANDS}
+            bk = {b: sum(fd[d]["bands"][b][4] for d in t28) / n for b in NDP_BANDS}
+            av = lambda k: sum(fd[d][k] for d in t28) / n
+            rep.add("NDP-6: gotowka wedlug potrzeby rodu srednio na dobe (ostatnie %d dob z kluczem; INFO)" % n,
+                    f"pelna {av('full'):.0f}, wyplacone {av('paid'):.0f}, zatrzymane {av('kept'):.0f} (szczebel daniny {av('kD'):.0f}, W5b {av('kB'):.0f}, M1 {av('kM'):.0f}); wyplacone wedlug pasm:"
+                    + ", ".join(f" {b} {bp[b]:.0f} (zatrzymane {bk[b]:.0f})" for b in NDP_BANDS),
+                    "INFO - szacunek na sucho z fin93 (NDP-D): zatrzymane ok. 72.8 tys. zl/d z 141 tys. (ponad 2R ok. 33.6, R-2R ok. 37.8)", None)
+        pls = [(d, fd[d]["pl"], fd[d]["msg"]) for d in days if not fd[d]["pl"].startswith("bez uprawnienia")]
+        prich = [d for d, p, _m in pls if fd[d]["state"] == "on" and p.startswith("ponad 2R") and not re.search(r", wyplacone 0, ", p)]   # na sucho - pelna (bez kontroli)
+        rep.add("NDP-7: rod gracza (pole linii): doby z uprawnieniem W5, ponad 2R z wyplata (kontrola), komunikaty przy zmianie pasma",
+                f"dob z uprawnieniem {len(pls)}, ponad 2R z wyplata {len(prich)}, komunikatow {sum(1 for _d, _p, m in pls if m != 'brak')}"
+                + (f" (np. d{pls[-1][0]}: {pls[-1][1][:90]})" if pls else ""),
+                "ponad 2R z wyplata 0 (gracz bez uprawnienia W5 - INFO)", (len(prich) == 0) if pls else None)
+        st = sum(fd[d]["st"] for d in days)
+        rep.add("NDP-8: ERROR KingdomTreasury.AidNeed 0 i potkniecia f20 0", f"bledow {len(D['err'])}, potkniec {st}" + (f" ({D['err'][0][:120]})" if D["err"] else ""), "0 / 0",
+                len(D["err"]) == 0 and st == 0)
+    else:
+        rep.add("NDP-1..8: linie f20", "brak linii (log sprzed paczki)", "INFO", None)
+    # NDP-D skutek na sucho z CSV (zawsze - w logu z paczka porownanie z wyplata linii)
+    if csvd:
+        dd = sorted(d for d in csvd if d in w5)[-28:] or sorted(csvd)[-28:]
+        if dd:
+            dry = _ndp_dry(csvd, dd)
+            tf = sum(v[0] for v in dry.values()); tk = sum(v[2] for v in dry.values())
+            rep.add(f"NDP-D: regula na sucho z CSV (ostatnie {len(dd)} dob; gotowka W5+W5b+M1 = doplata_w5 - W6 - W5c, f z f6 / f7 / G i R; INFO)",
+                    f"pelna {tf:.0f}, zatrzymane byloby {tk:.0f} zl/d:" + ", ".join(f" {b} pelna {dry[b][0]:.0f} -> wedlug potrzeby {dry[b][1]:.0f} (zatrzymane {dry[b][2]:.0f})"
+                                                                          for b in NDP_BANDS if b in dry),
+                    "INFO - w logu z paczka CSV jest juz po cieciu (szacunek ponizej wyplaty linii)", None)
+    rep.show()
+    return 0
+
+
 # ============================================================ f5-ruda (noc 18.10, fala 5): ruda/zelazo pod KS - grupa nruda
 # Armoury/src/StartCalibration.Ruda.cs (linia "Ruda KS (f5-ruda): dzien N" co 7 dob od D - rece przy zlozach zelaza za ruda rynku), Bloomery.F5.cs (linia doby
 # "Ruda kredyt drewna (f5-ruda): dzien N" - kredyt kupcow na drewno dymarek), VillageTakings.F5WoodCredit; skutki z linii "Zelazo (lupy) (214)", "Ceny surowcow",
@@ -48446,6 +48747,8 @@ def main(argv):
         return nrenty_main(logp, bdp, csvp)   # nrenty (18.10, paczka f7-renty): renty 180 wedlug potrzeby rodu - ta sama regula co zwrot f6, reszta w skarbcu (CrownRents.Need.cs)
     if group == "nsrednim" and logp:
         return nsrednim_main(logp, bdp, csvp)   # nsrednim (18.10, paczka f15-skarbiec; recenzja - dawniej "nskarbiec", zajete przez skarbiec kryjowki): skarbiec krolestwa w wojnie doplaca takze srednim rodom - W5c ponad W5, f jak f6/f7 (KingdomTreasury.MidAid.cs)
+    if group == "ndoplata" and logp:
+        return ndoplata_main(logp, bdp, csvp)   # ndoplata (18.10, paczka f20-d1 - decyzja Jeffa "1.b"): gotowka W5/W5b/M1 wedlug potrzeby rodu - ta sama miara co f6/f7/W5c, reszta w skarbcu (KingdomTreasury.AidNeed.cs)
     if group == "npozyczka" and logp:
         return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
     if group == "nbandy" and logp:

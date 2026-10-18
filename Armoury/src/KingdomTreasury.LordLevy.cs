@@ -196,7 +196,8 @@ namespace Armoury
                     double a7, b7; long c7;
                     NaAt(x, f7, step, out a7, out b7, out c7);
                     long paid5 = 0; double boost5 = 0;
-                    if (_naDay == today) { _naPaid.TryGetValue(x.C, out paid5); _naBoost.TryGetValue(x.C, out boost5); }
+                    // f20-d1: gotowka W5 = pelne uprawnienie doby (AnBase): pan nie bierze od ludu czesci, ktora korona zatrzymala wedlug potrzeby rodu (klucz wylaczony - _naPaid)
+                    if (_naDay == today) { paid5 = AnBase(x.C); _naBoost.TryGetValue(x.C, out boost5); }
                     long want = Math.Max(0, c7 - paid5);                      // gotowka tylko za ludzi, ktorzy dzis sa w druzynach, ponad gotowke W5
                     if (want > (long)Math.Floor(cap)) want = (long)Math.Floor(cap);
                     // DS (F1, recenzja 17.10): wsie DS wypadaja ze zrodel W7 (w rampie czesciowo) - potrzeba rodu pomniejszona o czesc wsi (want x E_po / E_przed), zeby ten sam pobor

@@ -26,6 +26,7 @@ namespace Armoury
     /// Platnik -> odbiorca: Kingdom.KingdomBudgetWallet -> kiesa glowy rodu z potrzeba W5 (najpierw skarbiec, potem glowa; wyjatek = zloto wraca). Zapis gry: nic
     /// nowego (stan doby w pamieci sesji). Linia: dopiski w "Doplata wedlug potrzeby (W5)"; kolumna budzet-rodow.csv doplata_ze_skarbca_w5b.
     /// Wyjatek per krolestwo / per rod - licznik potkniec (pierwszy do pliku), bez globalnych wylacznikow (CLAUDE.md 7).
+    /// f20-d1 (KingdomTreasury.AidNeed.cs): gotowka tego szczebla = uprawnienie x f rodu; zatrzymane nie wychodzi ze skarbca (pula i budzet W5c bez zmian).
     /// </summary>
     internal static partial class KingdomTreasury
     {
@@ -154,9 +155,13 @@ namespace Armoury
                         long e = extra[i];
                         long wallet = Math.Max(0, (long)k.KingdomBudgetWallet);
                         if (e > wallet) e = wallet;
-                        if (e > 0)
+                        if (e > int.MaxValue) e = int.MaxValue;
+                        // f20-d1: e = uprawnienie rodu na tym szczeblu (rachunek jak dotad); wyplata = e x f (klucz wylaczony - e). Zatrzymane po prostu nie wychodzi ze
+                        // skarbca (szczebel poza wplywami dnia - bez Spent); pula i budzet W5c bez zmian
+                        long pay = AnPay(x, e);
+                        if (pay > 0)
                         {
-                            int ip = (int)Math.Min(int.MaxValue, e);
+                            int ip = (int)pay;
                             var h = x.C.Leader;
                             k.KingdomBudgetWallet -= ip;                  // najpierw skarbiec, potem glowa - dostaje dokladnie tyle, ile zeszlo
                             try { h.ChangeHeroGold(ip); } catch { k.KingdomBudgetWallet += ip; throw; }   // wyjatek - zloto wraca do skarbca (nic w nicosc)
@@ -168,8 +173,10 @@ namespace Armoury
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
                         }
+                        if (e > 0) { long kept = AnNote(x, e, pay, AnTierB); if (kept > 0) row.CrownKept += kept; }   // f20-d1: uprawnienie i gotowka do pamieci doby
                         // przydzial w pulapie przy nowym poziomie (gotowka + miejsce na krok werbunku), nigdy ponizej gotowki; tylko gdy rosnie
-                        double nb = Math.Max(boost1[i], had), ob;
+                        // f20-d1: podloga - pelne uprawnienie (AnBase; klucz wylaczony - gotowka, jak dotad): przydzial co do zlotowki jak bez paczki
+                        double nb = Math.Max(boost1[i], AnBase(x.C)), ob;
                         _naBoost.TryGetValue(x.C, out ob);
                         if (nb > ob)
                         {
