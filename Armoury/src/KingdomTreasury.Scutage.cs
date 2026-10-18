@@ -262,6 +262,7 @@ namespace Armoury
                     try
                     {
                         long had; _naPaid.TryGetValue(x.C, out had);
+                        long base0 = AnBase(x.C);   // f20-d1: "bez gotowki z daniny" wedlug uprawnienia (klucz wylaczony - gotowka, jak dotad): linia W6 jak bez paczki
                         long e = Math.Min(extra[i], left);
                         if (e > 0)
                         {
@@ -269,16 +270,18 @@ namespace Armoury
                             var h = x.C.Leader;
                             k.KingdomBudgetWallet -= ip;                  // najpierw skarbiec, potem glowa - dostaje dokladnie tyle, ile zeszlo
                             try { h.ChangeHeroGold(ip); } catch { k.KingdomBudgetWallet += ip; throw; }   // wyjatek - zloto zostaje w skarbcu (licznik "zostalo w skarbcach")
-                            left -= ip; paid += ip; sc.RecN++; if (had <= 0) sc.NewN++;
+                            left -= ip; paid += ip; sc.RecN++; if (base0 <= 0) sc.NewN++;
                             long cc; _naCash.TryGetValue(x.C, out cc); _naCash[x.C] = cc + ip;   // gotowka W5: nastepny zwrot 70% zdejmuje ja z podstawy
                             _naPaid[x.C] = had + ip;                                             // gotowka korony tej doby razem (ClanBudget.AidCash, CSV doplata_w5)
                             long sp; _scCash.TryGetValue(x.C, out sp); _scCash[x.C] = sp + ip;
                             if (x.W <= x.Pc0) _scNotAtCap++;              // kontrola: gotowka tylko rodom, ktorych zold druzyn przekracza pulap wlasny (oczekiwane 0)
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
+                            AnNote(x, ip, ip, AnTierX);                   // f20-d1: W6 bez ciecia - tylko do uprawnienia doby (baza M1, W5c, W7)
                         }
                         // przydzial w pulapie przy nowym poziomie (gotowka + miejsce na krok werbunku), nigdy ponizej gotowki; tylko gdy rosnie
-                        double nb = Math.Max(boost1[i], had), ob;
+                        // f20-d1: podloga - pelne uprawnienie (AnBase; klucz wylaczony - gotowka, jak dotad)
+                        double nb = Math.Max(boost1[i], AnBase(x.C)), ob;
                         _naBoost.TryGetValue(x.C, out ob);
                         if (nb > ob)
                         {

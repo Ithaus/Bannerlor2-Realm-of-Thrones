@@ -35,10 +35,12 @@ namespace Armoury
         /// M1 - szczebel reszty wplywow dnia kroku krolestwa W5 (wola NeedAidKingdom PO szczeblach danina / W5b / W6). aidPaid - gotowka szczebla daniny (jeszcze nie
         /// zdjeta z reszty wplywow - ksiegowana w finally kroku W5), scRoom - pula W6, level0 - poziom po ostatnim nizszym szczeblu. Zwraca poziom po M1 i gotowke
         /// (out paid; zaksiegowana tu: Spent, KDay.NeedAid, KDay.NeedAidRent). Nie rzuca.
+        /// f20-d1 (KingdomTreasury.AidNeed.cs): plaster rodu liczony od pelnego uprawnienia tej doby (AnBase - nie dopelnia czesci zatrzymanej na nizszych szczeblach),
+        /// gotowka = plaster x f; out kept - czesc zatrzymana (zdjeta z reszty wplywow dnia bez przelewu, KDay.NeedAidKept - nie idzie w renty). Klucz wylaczony - jak dotad.
         /// </summary>
-        private static double RentAidStep(Kingdom k, List<NaClan> cand, NaK row, double scRoom, long aidPaid, double level0, double target, double step, int today, out long paid)
+        private static double RentAidStep(Kingdom k, List<NaClan> cand, NaK row, double scRoom, long aidPaid, double level0, double target, double step, int today, out long paid, out long kept)
         {
-            paid = 0;
+            paid = 0; kept = 0;
             double level1 = level0;
             try
             {
@@ -75,9 +77,9 @@ namespace Armoury
                 long want = 0;
                 for (int i = 0; i < cand.Count; i++)
                 {
-                    double a1, b1; long c1, had;
+                    double a1, b1; long c1;
                     NaAt(cand[i], level1, step, out a1, out b1, out c1);
-                    _naPaid.TryGetValue(cand[i].C, out had);
+                    long had = AnBase(cand[i].C);   // f20-d1: juz dane = pelne uprawnienie (klucz wylaczony - gotowka _naPaid, jak dotad)
                     long e = Math.Max(0, c1 - had);
                     if (e > room - want) e = room - want;
                     extra[i] = e; want += e; boost1[i] = b1;
@@ -91,9 +93,11 @@ namespace Armoury
                         long e = extra[i];
                         long wallet = Math.Max(0, (long)k.KingdomBudgetWallet);
                         if (e > wallet) e = wallet;
-                        if (e > 0)
+                        if (e > int.MaxValue) e = int.MaxValue;
+                        long pay = AnPay(x, e);   // f20-d1: wyplata = uprawnienie x f (klucz wylaczony - e)
+                        if (pay > 0)
                         {
-                            int ip = (int)Math.Min(int.MaxValue, e);
+                            int ip = (int)pay;
                             var h = x.C.Leader;
                             k.KingdomBudgetWallet -= ip;                  // najpierw skarbiec, potem glowa - dostaje dokladnie tyle, ile zeszlo
                             try { h.ChangeHeroGold(ip); } catch { k.KingdomBudgetWallet += ip; throw; }   // wyjatek - zloto wraca do skarbca (nic w nicosc)
@@ -105,7 +109,8 @@ namespace Armoury
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                             had += ip;
                         }
-                        double nb = Math.Max(boost1[i], had), ob;
+                        if (e > 0) { long kp = AnNote(x, e, pay, AnTierM); if (kp > 0) { kept += kp; row.RentKept += kp; } }   // f20-d1: zatrzymane - zdjete z wplywow w finally
+                        double nb = Math.Max(boost1[i], AnBase(x.C)), ob;   // f20-d1: podloga - pelne uprawnienie (klucz wylaczony - gotowka, jak dotad)
                         _naBoost.TryGetValue(x.C, out ob);
                         if (nb > ob)
                         {
@@ -128,6 +133,17 @@ namespace Armoury
                         if (dk != null) dk.NeedAidRent += paid;          // osobna pozycja 165 (NeedAid = szczebel daniny - linia W5 "wyplacono", zamkniecie W5-1)
                     }
                     catch (Exception e) { NaStumble("RentAidStep(ksiega)", e); }
+                }
+                // f20-d1: czesc uprawnien M1 zatrzymana wedlug potrzeby rodu - zdjeta z reszty wplywow dnia BEZ przelewu (zloto zostaje w skarbcu, renty jej nie dziela)
+                if (kept > 0)
+                {
+                    try
+                    {
+                        CrownIncome.Spent(k, kept);
+                        var dk = CrownIncome.DayOf(k);
+                        if (dk != null) dk.NeedAidKept += kept;
+                    }
+                    catch (Exception e) { NaStumble("RentAidStep(ksiega f20)", e); }
                 }
             }
             return level1;

@@ -625,7 +625,9 @@ namespace Armoury
                     if (c == null || c.IsEliminated || c == pc) continue;
                     // recenzja f15: miara W5 bez czesci W5c (skarbiec dla srednich pisze do tych samych slownikow przydzialu i gotowki); klucz wylaczony - 0, linia jak dotad
                     double b = KingdomTreasury.NeedAidBoostOf(c) - KingdomTreasury.MidAidBoostOf(c);
-                    long cash = KingdomTreasury.NeedAidCashOf(c) - KingdomTreasury.MidAidCashOf(c);
+                    // f20-d1: gotowka bez ciecia wedlug potrzeby rodu (pelne uprawnienie) - czesc zatrzymana to zold, ktory rod placi sam, nie miejsce na werbunek;
+                    // klucz Crown War Aid Cash By Need wylaczony - NeedAidCashOf, linia jak dotad
+                    long cash = KingdomTreasury.NeedAidFullCashOf(c) - KingdomTreasury.MidAidCashOf(c);
                     if (!(b > cash + 0.5)) continue;
                     int men, lim, parties, arm;
                     ClanMen(c, out men, out lim, out parties, out arm);

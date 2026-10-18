@@ -694,6 +694,7 @@ namespace Armoury
                     csv.Append(KingdomTreasury.RefundNeedCsv(c));     // f6-zwrot: mnoznik, G, R, pasmo, pelny i wedlug potrzeby zwrotu tej doby (za kolumna WW2)
                     csv.Append(CrownRents.NeedCsvCols(c));            // f7-renty: mnoznik, G, R, pasmo, pelna i wedlug potrzeby renty 180 tej doby (za kolumnami f6)
                     csv.Append(KingdomTreasury.MidAidCsv(c));         // f15 W5c: gotowka skarbca dla srednich (czesc doplata_w5), podniesienie pulapu ponad W5, mnoznik f (za kolumnami f7)
+                    csv.Append(KingdomTreasury.AidNeedCsv(c));        // f20-d1: gotowka W5/W5b/M1 wedlug potrzeby rodu - mnoznik, wiersz linii, pelna, wyplacona, zatrzymana (za kolumnami W5c)
                     csv.Append(Environment.NewLine);
                 }
                 catch (Exception e) { csv.Length = rowStart; Stumble("Report(rod)", e); }
@@ -704,7 +705,7 @@ namespace Armoury
             for (int i = 0; i < tops.Count && i < 3; i++) topTxt.Add(tops[i].Name + " " + N0(tops[i].V));
             string path = null;
             long tcsv = Stopwatch.GetTimestamp();
-            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader + KingdomTreasury.CrownSurplusCsvHeader + KingdomTreasury.LordLevyCsvHeader + KingdomTreasury.RentAidCsvHeader + ReaverLaw.LootCsvHeader + KingdomTreasury.RefundNeedCsvHeader + CrownRents.NeedCsvHeader + KingdomTreasury.MidAidCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
+            try { path = Log.Csv("budzet-rodow.csv", CsvHeader + CsvHeaderStable + CrownRents.CsvHeader + KingdomTreasury.NeedAidCsvHeader + KingdomTreasury.ScutageCsvHeader + KingdomTreasury.CrownSurplusCsvHeader + KingdomTreasury.LordLevyCsvHeader + KingdomTreasury.RentAidCsvHeader + ReaverLaw.LootCsvHeader + KingdomTreasury.RefundNeedCsvHeader + CrownRents.NeedCsvHeader + KingdomTreasury.MidAidCsvHeader + KingdomTreasury.AidNeedCsvHeader, csv.ToString()); } catch (Exception e) { Stumble("Report(csv)", e); }
             _ticksCsv = Stopwatch.GetTimestamp() - tcsv;
             if (path != null && path != _csvPath) { _csvPath = path; Log.Info("Budzet rodow: plik CSV " + path + "."); }
             var sb = new StringBuilder(2048);

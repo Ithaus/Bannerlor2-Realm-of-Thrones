@@ -50,10 +50,13 @@ namespace Armoury
     /// co poszlo w doplate (reszta garnka idzie w renty tej samej doby). Zapis gry: nic nowego (stan sesji: gotowka wczoraj, pierwsza doba doplaty rodu).
     /// Linia doby "Doplata wedlug potrzeby (W5): dzien N" (z ArmouryBehavior po rentach 180); kolumny budzet-rodow.csv doplata_w5, podniesienie_pulapu_w5.
     /// Wyjatek per krolestwo / per rod - licznik potkniec (pierwszy do pliku), bez globalnych wylacznikow (CLAUDE.md 7).
+    /// f20-d1 (KingdomTreasury.AidNeed.cs, klucz CrownWarAidCashByNeed): GOTOWKA szczebla daniny, W5b i M1 = uprawnienie x f (miara potrzeby f6/f7/W5c); reszta
+    /// uprawnienia zostaje w skarbcu (szczebel daniny i M1 - zdjeta z wplywow dnia bez przelewu, KDay.NeedAidKept); potrzeba, garnki, poziomy i przydzial w pulapie
+    /// bez zmian; kolejne szczeble i W7 licza od pelnego uprawnienia (AnBase). Klucz wylaczony - wszystko jak wyzej co do monety.
     /// </summary>
     internal static partial class KingdomTreasury
     {
-        private sealed class NaClan { public Clan C; public double Pc0, W, P; public int M, L; public bool Pl; }   // Pl - rod gracza (W6b): bez miejsca w pulapie, sama gotowka
+        private sealed class NaClan { public Clan C; public double Pc0, W, P; public int M, L; public bool Pl; public AnRow A; }   // Pl - rod gracza (W6b): bez miejsca w pulapie, sama gotowka; A - f20-d1: pasmo, f i uprawnienie doby (KingdomTreasury.AidNeed.cs)
         private sealed class NaK
         {
             public string Name = ""; public long Pot, Aid, Paid; public double Need, Alloc, Level, Boost;
@@ -70,6 +73,9 @@ namespace Armoury
             // recenzja M1: skad gotowka M1 - gdyby nie M1, poszlaby w renty 180 tej doby: rodom z potrzeba W5 (ta sama kiesa - zmiana etykiety), rodom bez potrzeby
             // (prawdziwy przelew miedzy rodami), udzialy rodow bez warunku rent (zostalyby w skarbcu) - wagi lenn z CrownRents (RentAidSplit)
             public long RentFromNeed, RentFromNo, RentFromHeld;
+            // f20-d1 (KingdomTreasury.AidNeed.cs): zatrzymane wedlug potrzeby rodu na szczeblu daniny, W5b i M1; skarbiec przed krokiem W5 i po M1 (przed W5c) oraz tarczowe
+            // netto (wyplacone - pobrane) - linia f20: przed - po = wyplacone + tarczowe netto (-1 - bez pomiaru, np. wyjatek w polowie kroku)
+            public long Kept, CrownKept, RentKept, AnW0 = -1, AnW1 = -1, ScNet;
         }
         private sealed class NaFirst { public int Day, Men, Limit, Last; }
 
@@ -97,6 +103,7 @@ namespace Armoury
             CrownSurplusReset();   // W5b regula 2: stan doby skarbca ponad zapas wojny czyszczony razem z W5
             LordLevyReset();       // W7: plan doby, gotowka wczoraj i sumy tygodnia stawki wojennej pana czyszczone razem z W5
             MidAidReset();         // f15 W5c: stan doby skarbca dla srednich czyszczony razem z W5
+            AidNeedReset();        // f20-d1: pamiec doby gotowki wedlug potrzeby rodu i pasmo gracza czyszczone razem z W5
         }
 
         private static void NaClearMeasure()
@@ -120,6 +127,7 @@ namespace Armoury
             ScClearDay();     // W6: platnicy, podstawy i gotowka tarczowego poprzedniej doby
             CsClearDay();     // W5b regula 2: gotowka ze skarbca ponad zapas wojny i kontrole poprzedniej doby
             McClearDay();     // f15 W5c: gotowka, przydzialy i kontrole skarbca dla srednich poprzedniej doby
+            AnClearDay();     // f20-d1: uprawnienia i gotowka wedlug potrzeby rodu poprzedniej doby; klucz tej doby (raz na dobe - W7 czyta te sama baze)
         }
 
         private static double NaTarget(Settings s) { return WtClamp(s.CrownWarAidFillTarget, 0, 1); }
@@ -163,12 +171,15 @@ namespace Armoury
 
         /// <summary>
         /// W5 - krok krolestwa (wola CrownRents.Daily w petli krolestw: po warunkach rent wszystkich rodow z lennem, PRZED odczytem reszty wplywow dnia do rent).
-        /// list / ok - rody z wierszem rent i wynik warunku rent (zaloga i sluzba). Zwraca gotowke wyplacona rodom tego krolestwa (0 - nic sie nie zmienilo).
+        /// list / ok - rody z wierszem rent i wynik warunku rent (zaloga i sluzba). Zwraca kwote zdjeta z reszty wplywow dnia tego krolestwa: gotowke szczebla daniny
+        /// i M1 oraz (f20-d1) czesc ich uprawnien zatrzymana wedlug potrzeby rodu (0 - reszta wplywow bez zmian; CrownRents.Daily odswieza wtedy pule rent - takze gdy
+        /// cala gotowka zostala zatrzymana). Bez f20 = gotowka wyplacona jak dotad.
         /// Nie rzuca (wlasny try; kazdy rod we wlasnym try - wyjatek przy wyplacie oddaje zloto skarbcowi).
         /// </summary>
         internal static long NeedAidKingdom(Kingdom k, List<Clan> list, bool[] ok)
         {
             long paidK = 0, paidR = 0;   // M1: gotowka szczebla reszty wplywow (ksiegowana w RentAidStep; zwracana razem - CrownRents odswieza pule rent)
+            long keptK = 0, keptR = 0;   // f20-d1: zatrzymane wedlug potrzeby rodu na szczeblu daniny (ksiegowane w finally) i na M1 (w RentAidStep) - zdjete z wplywow dnia
             try
             {
                 var s = Settings.Current;
@@ -182,6 +193,7 @@ namespace Armoury
                 // DS F3 (K3): garnek = wplywy wojenne dnia DS (dziesiata od ruchomosci, 184, pomoc od sprzedazy, W4) zamiast daniny P1
                 var row = new NaK { K = k, Name = k.Name != null ? k.Name.ToString() : k.StringId, Aid = Math.Max(0, DsTowns.FarmsLive ? DsSeason.WarPot(k, day) + Math.Max(0, day.WarAid) : day.WarAid) };   // przejscie F3: P1 x (1 - rampa) tez w garnku
                 row.Pot = Math.Max(0, Math.Min(row.Aid, CrownIncome.LeftFor(k)));   // danina tej doby, najwyzej reszta wplywow dnia po zwrocie zoldu
+                row.AnW0 = (long)k.KingdomBudgetWallet;                             // f20-d1: skarbiec przed jakimkolwiek zlotem kroku W5 (linia f20: przed - po = wyplacone)
                 _naRows.Add(row);
                 if (!(target > 0)) return 0;
                 row.Known = !ClanBudget.Pending;   // W5b: pierwsza doba sesji - budzet 166 jeszcze nie policzony, potrzeba nieznana (to nie jest "potrzeba 0")
@@ -213,6 +225,7 @@ namespace Armoury
                         if (!(need > 0)) continue;                                               // rod stac na cel z wlasnego pulapu - bez doplaty
                         row.NeedN++; row.Need += need; row.NeedMen += men; row.NeedLimit += limit;
                         cand.Add(x);
+                        AnMeasure(x);     // f20-d1: pasmo i f rodu (ta sama miara co f6/f7/W5c) - gotowka szczebli daniny, W5b i M1 x f; liczone takze przy kluczu wylaczonym (na sucho)
                         _raNeed.Add(c);   // recenzja M1: rody z potrzeba tej doby - skad gotowka M1 (RentAidSplit: renty tych samych rodow / rodow bez potrzeby)
                     }
                     catch (Exception e) { NaStumble("NeedAidKingdom(rod)", e); }
@@ -236,6 +249,7 @@ namespace Armoury
                 {
                     // f15 W5c: szczeble W5 nie maja co robic (zaden rod nie potrzebuje W5 albo brak zrodel) - skarbiec dla srednich liczy swoje (poziom W5 0; bez puli W5b
                     // budzet W5c jest 0, gdy nadwyzka skarbca nie starcza na 1 zl tempa - wtedy nic)
+                    row.AnW1 = (long)k.KingdomBudgetWallet;   // f20-d1: szczeble W5 bez zlota - skarbiec przed W5c
                     MidAidStep(k, all, cand, row, 0, step, 0, crown, today);
                     return 0;
                 }
@@ -272,18 +286,28 @@ namespace Armoury
                         long wallet = Math.Max(0, (long)k.KingdomBudgetWallet);
                         if (cash > wallet) cash = wallet;
                         if (cash > int.MaxValue) cash = int.MaxValue;
-                        if (cash > 0)
+                        // f20-d1: cash = uprawnienie rodu (rachunek jak dotad); wyplata = cash x f (klucz Crown War Aid Cash By Need; wylaczony - cash, co do zlotowki jak dotad)
+                        long pay = AnPay(x, cash);
+                        if (pay > 0)
                         {
-                            int ip = (int)cash;
+                            int ip = (int)pay;
                             var h = x.C.Leader;
                             k.KingdomBudgetWallet -= ip;                  // najpierw skarbiec, potem glowa - dostaje dokladnie tyle, ile zeszlo
                             try { h.ChangeHeroGold(ip); } catch { k.KingdomBudgetWallet += ip; throw; }   // wyjatek - zloto wraca do skarbca (nic w nicosc)
-                            left -= ip; paidK += ip; row.Paid += ip; row.PaidN++;
+                            paidK += ip; row.Paid += ip; row.PaidN++;
                             _naCash[x.C] = ip; _naPaid[x.C] = ip;
                             if (x.W <= x.Pc0) _naNotAtCap++;              // kontrola: gotowka tylko rodom, ktorych zold druzyn przekracza pulap wlasny (oczekiwane 0)
                             CirculationWindows.NoteHeroGold(h, ip);       // paczka 169b: glowa poza swiatem (Disabled) - zloto wyszlo ze swiata (tylko licznik)
                         }
-                        if (boost < cash) boost = cash;
+                        if (cash > 0)
+                        {
+                            // f20-d1: garnek schodzi o CALE uprawnienie - czesc zatrzymana nie idzie do innych rodow tego szczebla (zostaje w skarbcu: zdjeta z wplywow dnia
+                            // w finally, wiec nie idzie tez w renty 180). Klucz wylaczony: pay = cash, left -= cash jak dotad
+                            left -= cash;
+                            long kept = AnNote(x, cash, pay, AnTierD);
+                            if (kept > 0) { keptK += kept; row.Kept += kept; }
+                        }
+                        if (boost < cash) boost = cash;   // przydzial nigdy ponizej uprawnienia (f20-d1: miejsce w pulapie bez zmian - reszte zoldu rod placi sam)
                         if (boost > 0)
                         {
                             _naBoost[x.C] = boost; row.Boost += boost; row.BoostN++;
@@ -309,9 +333,12 @@ namespace Armoury
                 // M1 (NeedAidFromRents): czwarty szczebel - reszta wplywow dnia przed rentami; brak po nim tylko do linii (niepokryte "po M1")
                 if (m1 && row.UncovPre >= 1)
                 {
-                    lvl = RentAidStep(k, cand, row, sc != null ? sc.Room : 0, paidK, lvl, target, step, today, out paidR);
+                    lvl = RentAidStep(k, cand, row, sc != null ? sc.Room : 0, paidK, lvl, target, step, today, out paidR, out keptR);
                     row.Uncov = Math.Max(0, row.UncovPre - row.Rent);
                 }
+                // f20-d1: skarbiec po szczeblach W5 (przed W5c) i tarczowe netto - linia f20: przed - po = wyplacono W5 + W5b + M1 + tarczowe wyplacone - pobrane
+                row.ScNet = sc != null ? sc.Paid - sc.Got : 0;
+                row.AnW1 = (long)k.KingdomBudgetWallet;
                 // f15 W5c (CrownWarAidMiddle): PO wszystkich szczeblach W5 - skarbiec ponad zapas wojny placi f x brak zoldu ponad W5 do pelnego limitu (gotowka ze skarbca,
                 // poza wplywami dnia - jak W5b; wlasny try i ksiegowanie). paidK - gotowka szczebla daniny jeszcze w reszcie wplywow dnia (kontrola zapasu)
                 MidAidStep(k, all, cand, row, lvl, step, paidK, crown, today);
@@ -332,8 +359,20 @@ namespace Armoury
                     }
                     catch (Exception e) { NaStumble("NeedAidKingdom(ksiega)", e); }
                 }
+                // f20-d1: zatrzymane wedlug potrzeby rodu na szczeblu daniny - zdjete z reszty wplywow dnia BEZ przelewu (zloto zostaje w skarbcu): renty 180 tej doby nie
+                // dziela go, a M1, M3, E3-G5 i dwor krola widza reszte wplywow jak bez paczki (z wyplata calego uprawnienia). Takze po wyjatku w polowie petli
+                if (keptK > 0)
+                {
+                    try
+                    {
+                        CrownIncome.Spent(k, keptK);
+                        var dk = CrownIncome.DayOf(k);
+                        if (dk != null) dk.NeedAidKept += keptK;
+                    }
+                    catch (Exception e) { NaStumble("NeedAidKingdom(ksiega f20)", e); }
+                }
             }
-            return paidK + paidR;
+            return paidK + paidR + keptK + keptR;   // f20-d1: kwota zdjeta z wplywow dnia (klucz wylaczony: zatrzymane 0 - jak dotad)
         }
 
         /// <summary>Pomiar linii W5: stan druzyn rodu w dniu pierwszej doplaty (przerwa ponad 28 dob = nowy poczatek) i dzis - rod z przydzialem tej doby
@@ -458,7 +497,7 @@ namespace Armoury
             try
             {
                 NaRoll(today);                                           // renty dzis nie biegly (180 wylaczone) - stary stan znika
-                long pot = 0, aid = 0, paid = 0; double need = 0, alloc = 0, boost = 0;
+                long pot = 0, aid = 0, paid = 0, keptD = 0; double need = 0, alloc = 0, boost = 0;   // keptD - f20-d1: zatrzymane na szczeblu daniny (nie idzie w renty)
                 int kWar = 0, kPot = 0, kNeed = 0, needN = 0, paidN = 0, boostN = 0, cand = 0, needMen = 0, needLim = 0, noBudget = 0, shortK = 0;
                 // W5b: regula 2 (skarbiec ponad zapas wojny) i brak po wszystkich zrodlach (regula 1); dopisek wiersza krolestwa tylko przy czynnej paczce
                 long cPool = 0, cPaid = 0, cSur = 0; double cBoost = 0, uncAll = 0; int cSurK = 0, cPoolK = 0, cN = 0, uncK = 0;
@@ -469,7 +508,7 @@ namespace Armoury
                 for (int i = 0; i < _naRows.Count; i++)
                 {
                     var r = _naRows[i];
-                    kWar++; pot += r.Pot; aid += r.Aid; paid += r.Paid; need += r.Need; alloc += r.Alloc; boost += r.Boost;
+                    kWar++; pot += r.Pot; aid += r.Aid; paid += r.Paid; keptD += r.Kept; need += r.Need; alloc += r.Alloc; boost += r.Boost;
                     needN += r.NeedN; paidN += r.PaidN; boostN += r.BoostN; cand += r.Cand; needMen += r.NeedMen; needLim += r.NeedLimit; noBudget += r.NoBudget;
                     cPool += r.Crown; cPaid += r.CrownPaid; cN += r.CrownN; cBoost += r.CrownBoost; uncAll += Math.Floor(r.Uncov);
                     if (r.CrownSur > 0) { cSurK++; cSur += r.CrownSur; }
@@ -488,12 +527,13 @@ namespace Armoury
                     if (r.Pot <= 0 && r.NeedN <= 0) continue;
                     parts.Add(new KeyValuePair<double, string>(r.Need, r.Name + ": garnek " + r.Pot + " (danina " + r.Aid + "), potrzeba " + Math.Round(r.Need).ToString("0", WtInv) + " u " + r.NeedN
                               + " rodow, poziom " + (r.Pot > 0 && r.NeedN > 0 ? (100 * r.Level).ToString("0.0", WtInv) + "%" : "-") + ", wyplacono " + r.Paid + " (rodow " + r.PaidN
-                              + "), reszta " + (r.Pot - r.Paid)
+                              + "), reszta " + (r.Pot - r.Paid - r.Kept)   // f20-d1: reszta do rent po zatrzymanym (klucz wylaczony - Kept 0, jak dotad)
                               + (ClanBudget.LootOfKingdom(r.K) >= 1 ? ", lup WW2 " + Math.Round(ClanBudget.LootOfKingdom(r.K)).ToString("0", WtInv) : "")   // WW2: lup na zalogi w pulapie wlasnym rodow (wczoraj)
                               + (w5b ? ", ze skarbca ponad zapas " + r.CrownPaid + " z puli " + r.Crown + " (nadwyzka " + r.CrownSur + ", zapas wojny " + r.CrownRes + "), niepokryte "
                                        + Math.Floor(r.Uncov).ToString("0", WtInv) : "")
                               + (r.Rent > 0 || r.UncovPre >= 1 ? ", z rent M1 " + r.RentPaid + " (pula " + r.Rent + ", reszta wplywow " + r.RentAvail + ", przed M1 niepokryte "
-                                       + Math.Floor(r.UncovPre).ToString("0", WtInv) + ")" : "")));
+                                       + Math.Floor(r.UncovPre).ToString("0", WtInv) + ")" : "")
+                              + AnKingdomSeg(r)));   // f20-d1: ", zatrzymane f20 X (W5b Y, M1 Z)" - na koncu wiersza (klucz wylaczony i 0 - pusty)
                 }
                 LastNeedAid = paid; LastCrownSurplusAid = cPaid; LastNeedAidRent = rPaid;
                 // rody, ktore odeszly (pomiar pierwszej doplaty)
@@ -519,7 +559,8 @@ namespace Armoury
                       .Append(" | garnek ").Append(pot).Append(" (danina dnia ").Append(aid).Append("), rodow z potrzeba ").Append(needN).Append(" z ").Append(cand)
                       .Append(" ocenianych (z warunkiem rent i budzetem; pominiete - bez budzetu 166, Straz bez zoldu albo zajecie za dlugi: ").Append(noBudget).Append("), potrzeba razem ").Append(Math.Round(need).ToString("0", WtInv))
                       .Append(", przydzial przy poziomie wyrownania ").Append(Math.Round(alloc).ToString("0", WtInv))
-                      .Append(", wyplacono ").Append(paid).Append(" (rodow ").Append(paidN).Append("), reszta do rent ").Append(pot - paid)
+                      .Append(", wyplacono ").Append(paid).Append(" (rodow ").Append(paidN).Append("), reszta do rent ").Append(pot - paid - keptD)
+                      .Append(_anApply || keptD > 0 ? " (f20: zatrzymane w skarbcu wedlug potrzeby rodu " + keptD.ToString(WtInv) + ")" : "")   // f20-d1: garnek = wyplacono + zatrzymane + reszta do rent
                       // W5b regula 2: drugie zrodlo garnka - skarbiec ponad zapas wojny (poza wplywami dnia; liczby szczebla daniny wyzej bez zmian)
                       .Append(" | ze skarbca ponad zapas wojny (W5b): najwyzej 1/").Append(CsDays(s).ToString("0", WtInv))
                       .Append(" nadwyzki skarbca ponad zapas wojny, reszte wplywow dnia i dlug 186 na dobe, najwyzej niepokryta potrzeba po daninie; kolejnosc danina -> skarbiec -> tarczowe")
@@ -556,6 +597,7 @@ namespace Armoury
                       .Append(" | potkniecia ").Append(_naStumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
+                AidNeedDay(s, today);  // f20-d1: linia "Doplata wedlug potrzeby rodu (f20)" i komunikat gracza przy zmianie pasma (wlasny try; komunikat takze bez logu)
                 MidAidDay(s, today);   // f15 W5c: linia "Skarbiec dla srednich (W5c)", LastMidAid i komunikat gracza (wlasny try; takze bez logu)
             }
             catch (Exception e) { NaStumble("NeedAidDay", e); }

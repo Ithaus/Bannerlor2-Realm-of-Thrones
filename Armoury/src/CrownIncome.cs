@@ -57,6 +57,7 @@ namespace Armoury
             public long Bread;            // M3 (pieniadze roku 2): chleb dla glodnych osad krolestwa z reszty wplywow dnia przed rentami (TownFolk.BreadCrown; skarbiec -> kiesy ludu)
             public long KingOut;          // L1 (pieniadze roku 2): czesc RepOut - raty okupow krolow (178, dlug Kind 'k'); reszta RepOut to reparacje
             public long NeedAidRent;      // M1 (pieniadze roku 2): doplata W5 z reszty wplywow dnia przed rentami (KingdomTreasury.RentAid.cs) - obok NeedAid (szczebel daniny), nie w nim
+            public long NeedAidKept;      // f20-d1: zatrzymane wedlug potrzeby rodu z wplywow dnia (szczebel daniny W5 i M1 - uprawnienie x (1 - f)): zdjete z reszty wplywow (Spent), zloto zostaje w skarbcu - nie idzie w renty 180
             public long ScutIn, ScutOut;  // W6: tarczowe tej doby - pobrane (glowy platnikow -> skarbiec) i wyplacone przez W5 ponad danine (skarbiec -> glowy rodow); POZA wplywami dnia (Spend / Left)
             public long ValveKept; public double ValveR;   // E3-G5: czesc korony z zaworu miast zatrzymana w zapasie (z puli rent, po M3) i jej udzial r tej doby
             public long Court;            // E3-P1 (b): dwor krolewski - towar z polki stolicy z reszty wplywow dnia (po M3 i G5, przed rentami; skarbiec -> kasa stolicy)
@@ -446,6 +447,7 @@ namespace Armoury
                 long dmov = 0, dtre = 0, dant = 0;   // DS F3: dziesiata od ruchomosci, brak zwrotu ze skarbca ponad zapas wojny i z zaliczek mieszczan
                 long kingO = 0;    // L1: raty okupow krolow (178) w racie dlugow koron
                 long naRent = 0;   // M1: czesc doplaty W5 z reszty wplywow dnia
+                long naKept = 0;   // f20-d1: zatrzymane wedlug potrzeby rodu z wplywow dnia (szczebel daniny W5 i M1) - zostaje w skarbcu
                 long bread = 0;    // M3: chleb dla glodnych osad z reszty wplywow dnia
                 long naid = 0;   // W5: doplata do zoldu wedlug potrzeby
                 long scIn = 0, scOut = 0;   // W6: tarczowe (pobrane i wyplacone tej samej doby)
@@ -459,7 +461,7 @@ namespace Armoury
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; dmov += d.DsMov; dtre += d.DsTreas; dant += d.DsAnt; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid; mAid += d.MidAid;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; dmov += d.DsMov; dtre += d.DsTreas; dant += d.DsAnt; naid += d.NeedAid; naRent += d.NeedAidRent; naKept += d.NeedAidKept; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid; mAid += d.MidAid;
                     if (d.ValveKept > 0) { vKept += d.ValveKept; vKeptN++; vR = Math.Max(vR, d.ValveR); }
                     if (d.Court > 0) { court += d.Court; courtN++; }
                     if (!d.Snap) noSnap++;
@@ -505,6 +507,8 @@ namespace Armoury
                       .Append(DsTowns.FarmsLive || dant > 0 ? ", z zaliczek mieszczan (DS L1) " + dant : "").Append(")")
                       .Append(", renty (180) ").Append(rent).Append(" (wstrzymane w skarbcach - rody bez warunku i zaokraglenia ").Append(rentH).Append(CrownRents.NeedNote165()).Append(CrownRents.On ? ")" : "; renty wylaczone)")   // f7-renty: dopisek tylko przy czynnym kluczu
                       .Append(", doplata do zoldu wedlug potrzeby (W5, przed rentami) ").Append(naid).Append(", doplata z reszty wplywow dnia przed rentami (M1) ").Append(naRent)
+                      // f20-d1: klucz wylaczony i 0 - napis jak dotad; zatrzymane jest w "wydane z wplywow" (Spent bez przelewu) - zloto zostaje w skarbcu, renty 180 go nie dziela
+                      .Append(s.CrownWarAidCashByNeed || naKept > 0 ? ", zatrzymane wedlug potrzeby rodu z wplywow dnia (f20 - szczebel daniny W5 i M1; zostaje w skarbcu, nie idzie w renty) " + naKept : "")
                       .Append(", chleb dla glodnych osad (M3, z reszty wplywow przed rentami) ").Append(bread)
                       .Append(", E3-G5 z zaworu miast do zapasu (Crown Keeps Valve Share ").Append(s.CrownKeepsValveShare ? "tak" : "nie - dzwignia awaryjna").Append(", z puli rent po M3) ").Append(vKept)
                       .Append(" (krolestw ").Append(vKeptN).Append(", r najwyzej ").Append(vR.ToString("0.000", Inv)).Append(", udzial koron wczoraj ").Append(double.IsNaN(_dValveShare) ? "-" : (100 * _dValveShare).ToString("0.0", Inv) + "%")
