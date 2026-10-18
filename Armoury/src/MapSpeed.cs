@@ -31,7 +31,7 @@ namespace Armoury
     /// Widok: UIExtenderEx - wstawka do prefabu MapBar (siostra MapCurrentTimeVisualWidget, MapSpeedUi.cs) i mixin MapTimeControlVM z jedna
     /// wlasciwoscia ArmSpeed (nasz ViewModel). Widzety powstaja RAZ przy wczytaniu ruchu paska; co klatke (postfiks MapTimeControlVM.Tick) tylko
     /// porownanie stanu i ustawienie wlasciwosci przy zmianie (zadnej przebudowy widzetow - CLAUDE.md 7). Bez menu gry (zadnego SwitchToMenu).
-    /// Wylaczony MapSpeedButtons: przyciski schowane, klawisze nieczynne, mnoznik jak dotad z FastForwardMultiplier (co godzine gry).
+    /// Wylaczony MapSpeedButtons: przyciski schowane, klawisze nieczynne, mnoznik jak dotad z FastForwardMultiplier (co godzine gry; przy samym wylaczeniu od reki).
     /// </summary>
     internal static class MapSpeed
     {
@@ -39,6 +39,7 @@ namespace Armoury
         private static int _pick = PickVeryFast;   // wybor biegu szybkiego - na proces (start = dawne x8)
         private static readonly ConditionalWeakTable<MapTimeControlVM, ArmMapSpeedVM> _vms = new ConditionalWeakTable<MapTimeControlVM, ArmMapSpeedVM>();
         private static int _stumbles;
+        private static int _btnSeen = -1;   // ostatnio widziany MapSpeedButtons w klatce paska (-1 = jeszcze zaden, 0 NIE, 1 TAK)
         internal static bool Hooked;
 
         internal static int FastOf(Settings s) { int v = s.MapSpeedFast; return v < 2 ? 2 : v > 16 ? 16 : v; }
@@ -100,6 +101,11 @@ namespace Armoury
                 if (MapSpeedProfile.On) MapSpeedProfile.Frame(BinOf(state, c.SpeedUpMultiplier, fast, very), t0);
                 ArmMapSpeedVM vm;
                 if (!_vms.TryGetValue(__instance, out vm)) vm = null;
+                // f9 recenzja: MapSpeedButtons wylaczone w MCM - mnoznik starej drogi (FastForwardMultiplier) od reki, raz przy zmianie. Klucz wchodzi do Settings
+                // co godzine gry (McmSettings.Apply), a sluchacz godziny MapClock.ApplySpeed idzie PRZED nim (MbEvent dopisuje sluchacza na poczatek listy,
+                // wywoluje od konca rejestracji) - bez tego wybrany bieg x4 / x8 zostawalby jeszcze do nastepnej pelnej godziny.
+                int btn = s.MapSpeedButtons ? 1 : 0;
+                if (btn != _btnSeen) { _btnSeen = btn; if (btn == 0) MapClock.ApplySpeed(); }
                 if (!s.MapSpeedButtons) { if (vm != null) vm.IsShown = false; return; }
                 float m = _pick == PickFast ? fast : very;
                 if (Math.Abs(c.SpeedUpMultiplier - m) > 0.01f) c.SpeedUpMultiplier = m;   // suwak MCM i wybor od reki (co godzine gry robi to tez MapClock.ApplySpeed)
