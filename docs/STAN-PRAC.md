@@ -3082,3 +3082,10 @@ zastosowanym + nowy plik ziemi v7" (ponowne uzbrojenie KS od zera) - nie byla w 
 "Przysiolki ... uklad v7 (f10-uklad)" (migracja v6 -> v7 po uid), ERROR, zajazdy (przerwany nocleg), "Predkosc mapy (f9)", W5c.
 CZEKA (w tle, bez gry): f16-fin93 (wf_6598e0b6-c3e) - akumulatory/KS polki/ksiega/drobne -> nastepne wgranie. DO DECYZJI JEFFA: W5 dla rodow ponad 2R; welna Essos; dar BK herszta;
 rozlozenie gospodarki doby (Jeff: pozniej).
+- 14:45 PDT: Jeff: "jak wlaczylem drogi gra wyszla do pulpitu". DIAGNOZA: to NIE wywrotka - MCM (Bannerlord.MBOptionScreen ModOptionsVM:498-509) przy zmianie ustawienia z RequireRestart
+  pokazuje "Game Needs to Restart" i po OK wola Utilities.QuitGame(); MCM ma RequireRestart domyslnie TRUE (BaseSettingPropertyAttribute), a gen_mcm nie ustawia false -> KAZDA zmiana
+  naszego ustawienia zamyka gre. Log silnika: czyste zamkniecie (Start Game Final Cleanup, bez wyjatku), trail CrashScribe "game closed cleanly". Do nastepnej paczki: gen_mcm z
+  RequireRestart = false dla ustawien dzialajacych na zywo (MapSpeedButtons zostaje true - rejestracja UIExtenderEx przy starcie).
+  UWAGA: Armoury.json Jeffa ma teraz WSZYSTKIE 1975 kluczy (MCM zapisal calosc 13:35; jedyna zmiana wartosci: MapSideRoads true) - KAZDA przyszla zmiana domyslnej w Settings.cs
+  NIE zadziala u Jeffa bez zmiany jego pliku (CLAUDE.md pulapka MCM). Drogi boczne u Jeffa wlaczone (zaladuja sie od startu sesji - sciezka z biegow zdjec).
+  Jeff pyta o mod z dodatkowa strzalka predkosci (prawdopodobnie "Better Time", Shemiroth) - nasze przyciski x1/x4/x8 zarejestrowane w jego logu (13:30:33); czy widac - pytam Jeffa.
