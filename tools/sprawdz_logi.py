@@ -1516,7 +1516,8 @@ Uzycie (Python 3, tylko odczyt):
                     Wyrzutki (INFO - baza fin86 Armoury-2026-10-17_23-22-37.log: 809 -> 942 band, 15.7 s/dobe, 16 urodzonych i 33 puste na dobe), NBD-1 latka celu zalozona,
                     cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 band klanow z kryjowkami <= cel x 1.05, NBD-3 puste narodziny
                     przy celu podniesionym <= 5% urodzonych, NBD-4 bandy start -> koniec, pula, ludzie nowych band <= 'bandy nowe (ludzi)' z linii Wyrzutki, NBD-5 rodzenie band
-                    <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande), NBD-7 z --baza-doby: doba realna tych samych
+                    <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande; ruch partii Campaign.RealTick i udzial band
+                    liniowo wedlug liczby partii - INFO), NBD-7 z --baza-doby: doba realna tych samych
                     dob gry <= 1.15 x bazy (bez bazy INFO), NBD-8 ERROR BanditLimit i potkniecia 0, NBD-9 stopery z wywolaniami (0 = latka nie weszla), NBD-10 z --baza-doby:
                     koszt +100 band w s/dobe (INFO). Log sprzed paczki: NBD-B z liczbami, reszta INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -44958,7 +44959,7 @@ NBD_L = re.compile(
     r"\(puste: ponizej starego celu (\d+), ponad stary cel (\d+); ludzi: ponizej (\d+), ponad (\d+); bez sladu partii (\d+)\) \| "
     r"koszt doby \(ms\): rodzenie band (\S+) / (\d+) wywolan; mysl AI godzinowa: bandy (\S+) / (\d+) \(inne partie (\S+) / (\d+)\); "
     r"AI taktyczne: bandy (\S+) / (\d+) \(inne (\S+) / (\d+)\); tik godziny partii: bandy (\S+) \(inne (\S+)\); tik doby partii: bandy (\S+) \(inne (\S+)\); "
-    r"OutlawLaw\.Daily (\S+) \| razem bandy (\S+) ms \(inne partie (\S+) ms\), na bande (\S+) us, (\S+?)%? doby realnej \| "
+    r"OutlawLaw\.Daily (\S+); ruch partii \(Campaign\.RealTick, wszystkie partie\) (\S+) / (\d+) klatek, udzial band wedlug liczby partii ~(\S+) \| razem bandy (\S+) ms \(inne partie (\S+) ms\), na bande (\S+) us, (\S+?)%? doby realnej \| "
     r"doba realnie (\S+)(?: s| \(pierwsza linia sesji\)), klatek (\S+), (\S+) ms/klatke \(z pauzami gracza\) \| pieniadze i towar: [^|]*\| pomiar: [^|]*\| "
     r"potkniecia dzis (\d+) \(sesja (\d+)\) \| czas linii (\S+) ms\.$")
 NBD_F = ("day", "limit", "rot", "around0", "inside", "around", "raised", "people",
@@ -44967,7 +44968,7 @@ NBD_F = ("day", "limit", "rot", "around0", "inside", "around", "raised", "people
          "clanlist",
          "tries", "below", "bpick", "bref", "extra", "xpick", "xref", "born", "eb", "ex", "menb", "menx", "nf",
          "spawn", "spawnn", "thinkb", "thinkbn", "thinko", "thinkon", "tacb", "tacbn", "taco", "tacon", "hourb", "houro", "dayb", "dayo",
-         "outlaw", "bandms", "otherms", "perband", "pct", "wall", "frames", "msframe", "stum", "stums", "linems")
+         "outlaw", "real", "realn", "realband", "bandms", "otherms", "perband", "pct", "wall", "frames", "msframe", "stum", "stums", "linems")
 NBD_W = re.compile(r"^Wyrzutki: dzien (\d+) .*?bandy nowe (\d+) \((\d+) ludzi\), odmowione (\d+), puste usuniete (\d+).*?\| band (\d+), ludzi (\d+)")
 NBD_ERR = ("ERROR in BanditLimit",)
 NBD_EMPTY_MAX = 0.05          # NBD-3: puste narodziny przy celu podniesionym <= 5% urodzonych (dzis ok. 2/3 prob - 33 puste/d przy 16 urodzonych)
@@ -45138,9 +45139,13 @@ def nbandy_main(logp, bdp=None):
         tb = sum(_nbd_f(L[d]["tacb"]) or 0 for d in full) / len(full)
         hb = sum(_nbd_f(L[d]["thinkb"]) or 0 for d in full) / len(full)
         pa = sum(pct) / len(pct) if pct else 0.0
+        rl = sum(_nbd_f(L[d]["real"]) or 0 for d in full) / len(full)
+        rb = sum(_nbd_f(L[d]["realband"]) or 0 for d in full) / len(full)
+        wl = sum(_nbd_f(L[d]["wall"]) or 0 for d in full) / len(full)
         rep.add("NBD-6: AI i tiki band (mysl godzinowa, taktyczne, tiki partii, rodzenie) wobec doby realnej",
-                f"bandy {bm:.0f} ms/d ({pb:.0f} us na bande; mysl {hb:.0f}, taktyczne {tb:.0f}), inne partie {om:.0f} ms/d; {pa:.2f}% doby realnej srednio",
-                f"<= {NBD_PCT_MAX:.0f}% doby realnej (ruch po mapie i obraz bez stopera - NBD-7)", pa <= NBD_PCT_MAX)
+                f"bandy {bm:.0f} ms/d ({pb:.0f} us na bande; mysl {hb:.0f}, taktyczne {tb:.0f}), inne partie {om:.0f} ms/d; {pa:.2f}% doby realnej srednio"
+                f" | ruch partii (Campaign.RealTick) {rl:.0f} ms/d = {(100.0 * rl / (wl * 1000.0)) if wl else 0:.1f}% doby, udzial band liniowo ~{rb:.0f} ms/d (INFO)",
+                f"<= {NBD_PCT_MAX:.0f}% doby realnej (ruch po mapie - stoper calego RealTick bez podzialu, INFO; obraz i UI - tylko NBD-7)", pa <= NBD_PCT_MAX)
     else:
         rep.add("NBD-6: AI i tiki band wobec doby realnej", "brak pelnych dob (jedna linia sesji)", "INFO", None)
 
@@ -45186,7 +45191,7 @@ def nbandy_main(logp, bdp=None):
             "0 i 0", not D["errs"] and stum == 0)
 
     # NBD-9 stopery wpiete (wywolania > 0)
-    zero = [k for k, n in (("mysl AI", "thinkbn"), ("taktyczne", "tacbn")) if full and sum(int(L[d][n]) for d in full) == 0]
+    zero = [k for k, n in (("mysl AI", "thinkbn"), ("taktyczne", "tacbn"), ("ruch partii (RealTick)", "realn")) if full and sum(int(L[d][n]) for d in full) == 0]
     st_miss = [s.split("BRAK:")[1].split("|")[0].strip() for s in D["start"] if "stopery:" in s and "BRAK:" in s.split("stopery:")[1].split("|")[0]]
     rep.add("NBD-9: stopery kosztu band wpiete i licza",
             f"bez wywolan w pelnych dobach: {', '.join(zero) if zero else 'zadne'}; BRAK w linii startu: {st_miss[0] if st_miss else 'nic'}",

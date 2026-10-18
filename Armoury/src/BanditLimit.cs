@@ -47,7 +47,10 @@ namespace Armoury
     ///    AI taktyczne (MobilePartyAi.TickInternal - szukanie celow wokol partii, koszt rosnie z gestoscia partii), tiki partii (CampaignEventDispatcher.HourlyTickParty
     ///    i DailyTickParty - wszyscy sluchacze gry i modow), bandy wobec innych partii; OutlawLaw.Daily (nasza praca doby na bandach, z profilu doby); doba realna
     ///    (zegar sciany miedzy liniami) i klatki (Campaign.CurrentTickCount). Stopery w probkach 1/4-1/8 (czas x wywolan/probek), liczba wywolan pelna.
-    ///    Ruch po mapie (rownolegle tiki partii) i obraz - bez stopera: tylko w dobie realnej (porownanie biegu 12 i 24 tych samych dob).
+    ///    Ruch po mapie: stoper calego Campaign.RealTick (raz na klatke; ruch partii w rownoleglych zadaniach gry, czekanie WaitAsyncTasks, oblezenia) - bez podzialu
+    ///    na bandy, w linii udzial band liniowo wedlug liczby partii (szacunek). Obraz i interfejs - tylko w dobie realnej (porownanie biegu 12 i 24 tych samych dob).
+    ///    Profil klatki baza61 (16.10, 8 dob, ok. 5200 partii, 181 klatek na dobe): RealTick 36.4 ms/klatke (36%), sluchacze AiHourlyTick razem 16.6 ms (AiMilitary 11.2 -
+    ///    tylko lordowie), PartyHourlyAiTick 0.5 ms - stad szacunek przed testem: +1100 band = ok. +21% partii, ruch +1.0-2.0 s (stoja zalogi i milicje - ruchomych partii przybywa ok. 30%) i mysl AI +0.3 s na dobe gry (ok. +8-14% przy 15-16 s).
     /// Pieniadze i towar: bez zmian (latka zmienia tylko liczbe celu band); ludzie nowych band tylko z puli wyrzutkow (OutlawLaw.RosterPostfix / Draw) - nic z niczego.
     /// Latki zakladane W KAMPANII (SessionStart z OnSessionLaunched), raz na proces; wylaczony klucz = prefiks wraca od razu. Bez zapisu w grze (liczniki sesji).
     /// Wolane z watku gry (tikery gry z doParallel false, PartiesThink po kolei) - liczniki bez blokad (to log). Potkniecia liczone, nic nie gasnie globalnie.
@@ -97,6 +100,7 @@ namespace Armoury
 
         // stopery: rodzenie band (pelny), mierniki partii [miernik x 2]: 0 bandy, 1 inne
         private static long _dSpawnCalls, _dSpawnTicks;
+        private static long _dRealCalls, _dRealTicks;   // Campaign.RealTick (raz na klatke): ruch partii (rownolegle zadania - czekanie WaitAsyncTasks), oblezenia, komponenty
         private const int MThink = 0, MTac = 1, MHour = 2, MDay = 3, MN = 4;
         private static readonly int[] Mask = { 3, 7, 7, 0 };   // probka: mysl 1/4, taktyczne 1/8, tik godziny 1/8, tik doby - pelny
         private static readonly long[] _mCalls = new long[MN * 2], _mSampled = new long[MN * 2], _mTicks = new long[MN * 2];
@@ -117,6 +121,7 @@ namespace Armoury
             _dMenExtra = _dMenBelow = 0;
             _dBelowPicked = _dBelowRefused = 0;
             _dSpawnCalls = _dSpawnTicks = 0;
+            _dRealCalls = _dRealTicks = 0;
             Array.Clear(_mCalls, 0, _mCalls.Length); Array.Clear(_mSampled, 0, _mSampled.Length); Array.Clear(_mTicks, 0, _mTicks.Length);
             _dStumbles = 0;
         }
@@ -368,6 +373,14 @@ namespace Armoury
             _dSpawnTicks += Stopwatch.GetTimestamp() - __state; _dSpawnCalls++;
         }
 
+        public static void RealPre(out long __state) { __state = _costLive ? Stopwatch.GetTimestamp() : 0L; }
+
+        public static void RealPost(long __state)
+        {
+            if (__state == 0L) return;
+            _dRealTicks += Stopwatch.GetTimestamp() - __state; _dRealCalls++;
+        }
+
         private static long MBegin(int m, MobileParty p)
         {
             if (!_costLive || p == null) return 0L;
@@ -430,6 +443,8 @@ namespace Armoury
                       "tik godziny partii", nameof(HourPre), nameof(HourPost));
             HookTimed(AccessTools.DeclaredMethod(typeof(CampaignEventDispatcher), "DailyTickParty", new[] { typeof(MobileParty) }),
                       "tik doby partii", nameof(DayPre), nameof(DayPost));
+            // ruch partii po mapie: w Campaign.RealTick (raz na klatke) - bez podzialu na bandy (rownolegle zadania gry); w linii szacunek liniowy wedlug liczby partii
+            HookTimed(AccessTools.DeclaredMethod(typeof(Campaign), "RealTick", new[] { typeof(float) }), "ruch partii (Campaign.RealTick)", nameof(RealPre), nameof(RealPost));
         }
 
         // ------------------------------------------------------------ start sesji
@@ -534,13 +549,14 @@ namespace Armoury
                 double bandMs = spawnMs + thinkB + tacB + hourB + dayB;
                 double otherMs = thinkO + tacO + hourO + dayO;
 
-                var sb = new StringBuilder(1400);
+                int parties = MobileParty.All.Count;
+                var sb = new StringBuilder(1600);
                 sb.Append(P).Append("dzien ").Append(day)
                   .Append(" | limit na kryjowke ").Append(s.BanditLimitPerHideout).Append(" (ROT ").Append(BaseSum).Append(" = ").Append(_baseAround).Append(" wokol + ").Append(_inEach)
                   .Append(" w srodku; wokol teraz ").Append(curAround).Append("), cel podniesiony ").Append(t > 0 ? "TAK" : (OutlawLaw.On ? "NIE (limit <= ROT albo brak latki)" : "NIE (prawo wyrzutkow wylaczone)"))
                   .Append(", narodziny tylko przy kryjowce z ludzmi ").Append(s.BanditBirthsWherePeople && _spawnHooked ? (t > 0 ? "TAK" : "TAK (bez skutku - cel ROT)") : "NIE")
                   .Append(" | band ").Append(bands).Append(" (klanow z kryjowkami ").Append(bHide).Append(", lupiezcow ").Append(bLoot).Append(", inne ").Append(bOther)
-                  .Append("), ludzi ").Append(men).Append(", pula wyrzutkow ").Append((long)pool).Append(", partii swiata ").Append(MobileParty.All.Count)
+                  .Append("), ludzi ").Append(men).Append(", pula wyrzutkow ").Append((long)pool).Append(", partii swiata ").Append(parties)
                   .Append(" | kryjowki zajete ").Append(infestedAll).Append(" z ").Append(hideouts).Append(": klany z kryjowkami ").Append(clans).Append(" - zajete ").Append(sumInf)
                   .Append(", cel ").Append(sumTarget).Append(" (stary ").Append(sumOld).Append("), band klanow ").Append(sumClanBands).Append(", ponad stary cel ").Append(overOld)
                   .Append(", band/cel ").Append(sumTarget > 0 ? F2((double)sumClanBands / sumTarget) : "-")
@@ -557,13 +573,15 @@ namespace Armoury
                   .Append("; tik godziny partii: bandy ").Append(F1(hourB)).Append(" (inne ").Append(F1(hourO)).Append(')')
                   .Append("; tik doby partii: bandy ").Append(F1(dayB)).Append(" (inne ").Append(F1(dayO)).Append(')')
                   .Append("; OutlawLaw.Daily ").Append(outlawMs >= 0 ? F1(outlawMs) : "-")
+                  .Append("; ruch partii (Campaign.RealTick, wszystkie partie) ").Append(F1(Ms(_dRealTicks))).Append(" / ").Append(_dRealCalls).Append(" klatek, udzial band wedlug liczby partii ~")
+                  .Append(parties > 0 ? F1(Ms(_dRealTicks) * bands / parties) : "-")
                   .Append(" | razem bandy ").Append(F1(bandMs)).Append(" ms (inne partie ").Append(F1(otherMs)).Append(" ms), na bande ")
                   .Append(bands > 0 ? F1(bandMs * 1000.0 / bands) : "-").Append(" us, ")
                   .Append(wallS > 0 ? (100.0 * bandMs / (wallS * 1000.0)).ToString("0.00", Inv) + "% doby realnej" : "- doby realnej")
                   .Append(" | doba realnie ").Append(wallS > 0 ? F2(wallS) + " s" : "- (pierwsza linia sesji)").Append(", klatek ").Append(dFrames >= 0 ? dFrames.ToString(Inv) : "-")
                   .Append(", ").Append(wallS > 0 && dFrames > 0 ? F2(wallS * 1000.0 / dFrames) + " ms/klatke" : "- ms/klatke").Append(" (z pauzami gracza)")
                   .Append(" | pieniadze i towar: bez zmian (latka zmienia tylko cel liczby band); ludzie nowych band tylko z puli wyrzutkow (OutlawLaw)")
-                  .Append(" | pomiar: probki mysl 1/4, taktyczne 1/8, tik godziny 1/8, tik doby i rodzenie pelne").Append(firstLine ? "; okres niepelny (od startu sesji)" : "")
+                  .Append(" | pomiar: probki mysl 1/4, taktyczne 1/8, tik godziny 1/8, tik doby, rodzenie i ruch pelne").Append(firstLine ? "; okres niepelny (od startu sesji)" : "")
                   .Append(" | potkniecia dzis ").Append(_dStumbles).Append(" (sesja ").Append(_stumbles).Append(") | czas linii ")
                   .Append(F2(Ms(Stopwatch.GetTimestamp() - t0))).Append(" ms.");
                 Log.Info(sb.ToString());
