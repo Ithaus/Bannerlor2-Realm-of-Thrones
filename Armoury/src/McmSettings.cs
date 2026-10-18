@@ -6936,6 +6936,54 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsFarmFolkFromSavings { get; set; } = true;
 
+        [SettingPropertyBool("Wall Tribute Enabled", HintText = "with Start Calibration applied: the lords of the North send the Night's Watch part of their grain as a duty in kind - carts take it from the granaries of their villages (only from what lies beyond their own reserve, never from a hungry village) and bring it after the days of the road to the granaries of the Watch's villages, as much as the Watch's people lack each day; nobody pays for it, and a little spoils on the road. Off = no tribute (carts already on the road still arrive)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public bool WallTributeEnabled { get; set; } = true;
+
+        [SettingPropertyInteger("Wall Tribute Target Days", 0, 728, "0", HintText = "with Wall Tribute Enabled: besides the daily shortfall the North sends enough to bring each Watch village's granary up to this many days of its people's food (over Wall Tribute Refill Days)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int WallTributeTargetDays { get; set; } = 365;
+
+        [SettingPropertyInteger("Wall Tribute Refill Days", 1, 364, "0", HintText = "with Wall Tribute Enabled: over how many days a Watch granary below Wall Tribute Target Days is filled up again")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int WallTributeRefillDays { get; set; } = 60;
+
+        [SettingPropertyInteger("Wall Tribute Giver Reserve Days", 0, 728, "0", HintText = "with Wall Tribute Enabled: a village of the North gives only from what its granary holds beyond this many days of its own people's food")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int WallTributeGiverReserveDays { get; set; } = 364;
+
+        [SettingPropertyFloatingInteger("Wall Tribute Giver Share Percent", 0.00f, 10.00f, "0.00", HintText = "with Wall Tribute Enabled: at most this share (percent a day) of what a Northern granary holds beyond its reserve goes to the Wall; lands that cannot feed themselves give less, in proportion to how much of their food they grow")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public float WallTributeGiverSharePercent { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Wall Tribute Spoil Percent Per Day", 0.00f, 2.00f, "0.00", HintText = "with Wall Tribute Enabled: the share of the grain on the road that spoils each day (damp, rats); the rest reaches the Wall")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public float WallTributeSpoilPercentPerDay { get; set; } = 0.25f;
+
+        [SettingPropertyBool("Free Folk Hunger Raids", HintText = "with Start Calibration applied: when the Free Folk go hungry (their fields feed only part of them and their granaries run low), more and bigger bands of hungry men leave their villages and go south across the Wall to raid the Night's Watch and the North; they are real men taken from the villages (the villages lose them), they live off what they rob, and after Free Folk Raid Days they go home with their plunder (gold to the village purse, goods to its stores) - unless they die on the way. Off = no new raids (bands already out still come home)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public bool FreeFolkHungerRaids { get; set; } = true;
+
+        [SettingPropertyInteger("Free Folk Raid Max Parties", 0, 20, "0", HintText = "with Free Folk Hunger Raids: the most raiding bands out at the same time (a hard limit, for the map's sake)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int FreeFolkRaidMaxParties { get; set; } = 6;
+
+        [SettingPropertyInteger("Free Folk Raid Max Men", 1, 120, "0", HintText = "with Free Folk Hunger Raids: the most men in one raiding band (a band never takes in more men on the way)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int FreeFolkRaidMaxMen { get; set; } = 40;
+
+        [SettingPropertyInteger("Free Folk Raid Min Men", 1, 120, "0", HintText = "with Free Folk Hunger Raids: the fewest men a raiding band sets out with; the hungrier the land, the closer a band comes to Free Folk Raid Max Men")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int FreeFolkRaidMinMen { get; set; } = 12;
+
+        [SettingPropertyInteger("Free Folk Raid Days", 1, 120, "0", HintText = "with Free Folk Hunger Raids: how many days a band raids in the south before it turns home (a band that lost more than half of its men turns home at once)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public int FreeFolkRaidDays { get; set; } = 30;
+
+        [SettingPropertyFloatingInteger("Free Folk Raid Daily Chance", 0.00f, 1.00f, "0.00", HintText = "with Free Folk Hunger Raids: the chance a day that a new band sets out when the Free Folk are as hungry as they can be; it falls with their hunger (half as hungry - half the chance)")]
+        [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
+        public float FreeFolkRaidDailyChance { get; set; } = 0.5f;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -8669,6 +8717,18 @@ namespace Armoury
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;
             s.DsFarmFolkFromSavings = DsFarmFolkFromSavings;
+            s.WallTributeEnabled = WallTributeEnabled;
+            s.WallTributeTargetDays = WallTributeTargetDays;
+            s.WallTributeRefillDays = WallTributeRefillDays;
+            s.WallTributeGiverReserveDays = WallTributeGiverReserveDays;
+            s.WallTributeGiverSharePercent = WallTributeGiverSharePercent;
+            s.WallTributeSpoilPercentPerDay = WallTributeSpoilPercentPerDay;
+            s.FreeFolkHungerRaids = FreeFolkHungerRaids;
+            s.FreeFolkRaidMaxParties = FreeFolkRaidMaxParties;
+            s.FreeFolkRaidMaxMen = FreeFolkRaidMaxMen;
+            s.FreeFolkRaidMinMen = FreeFolkRaidMinMen;
+            s.FreeFolkRaidDays = FreeFolkRaidDays;
+            s.FreeFolkRaidDailyChance = FreeFolkRaidDailyChance;
         }
 
         internal static void Apply()
