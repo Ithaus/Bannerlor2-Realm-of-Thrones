@@ -2810,3 +2810,8 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
 - 21:13 PDT: TEST fin84 = TA SAMA DLL (fin83) BEZ FLAG, 160 dob = SCIEZKA GRY JEFFA (KS samo sie uzbraja, pomiar, przelaczenie; uklad wiosek v6 z zapisu F) - test przed WGRANIEM 77.
 - 21:23 PDT: okno 5 h zresetowane (0%, tydzien 22%). Workflow wf_1aec7e98-75c (fala 3, 9 paczek od 100eaedf): feed-swiat (+ zbieznosc Planu NKS-30e), ks-koszt, inwest, perf-d2d3,
   zapis-d4, fix-uchodzcy (RT-1/RT-5), fix-mur (NMUR-6/32), fix-ksiega (ZC1-8 + aksamit/miod/jedwab), ceny-r5 (zrodla bez miejsca kredytu, NKS-24, ceny 1.4-2x).
+- 22:00 PDT: TEST fin84 (DLL fin83 = 100eaedf, BEZ flag, 160 dob, Armoury-2026-10-17_21-11-36.log): kod 0, ERROR 0. UWAGA: w autotescie samo uzbrojenie KS jest WYL. bez pliku
+  armoury-ks-auto.flag (albo klucza StartCalibrationAutoArmAutotest) - fin84 = gra Jeffa BEZ KS + wszystkie inne paczki. Wynik: nakum 19/19 (danina wsi: kiesy wsi +0.297%/d,
+  bylo +0.69), nprzysiolki 17/17 (uklad v6 z zapisu F), nzajazdy, ndrogi, nherby, nzbroj, na12, na17, nrot, nzc0, nzc2, nkarczmy, nglod - 0 NIE; nds 5 NIE (3b +0.297%/d, 3e 4.0%,
+  korona 0.857, D 0.903, takt 566 ms vs 493); RT-1 (narzedzie). Uchodzcy do miast dzialaja tylko przy KS (Zc4Host) - w grze Jeffa po wlaczeniu KS.
+- 22:02 PDT: TEST fin85 = ta sama DLL + plik armoury-ks-auto.flag (USUNAC!), 160 dob = PELNA SCIEZKA GRY JEFFA (KS sam sie uzbraja, pomiar ~5 tyg., wlaczenie, rampa).
