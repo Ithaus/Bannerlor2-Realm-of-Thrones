@@ -264,7 +264,7 @@ namespace Armoury
                 if (st == null || st.Here != null || st.Home == null || st.Party == null) return;
                 int handed = st.Gold - st.Party.PartyTradeGold;
                 if (handed <= 0) return;
-                DistrictWorks.OnCartReturn(st.Home, handed, (long)st.Home.TradeTaxAccumulated - st.HomeTax, (long)st.Home.Gold - st.HomeGold);
+                DistrictWorks.OnCartReturn(st.Party, st.Home, handed, (long)st.Home.TradeTaxAccumulated - st.HomeTax, (long)st.Home.Gold - st.HomeGold);
             }
             catch (Exception e) { Stumble("VillageTakings.WorksPay", e); }
         }

@@ -677,7 +677,7 @@ namespace Armoury
         // ============================================================ wyplata przy powrocie wozu (money_routes 2)
         /// <summary>VillageTakings.EnterPostfix (woz wrocil do wsi macierzystej; po 112 i F4b, przed danina DS): pula prac okregu z licznika pana i z kiesy wsi w proporcji
         /// tego, co weszlo w tym oknie. handed - utarg oddany, tax / purse - przyrost licznika i kiesy w oknie.</summary>
-        internal static void OnCartReturn(Village home, int handed, long tax, long purse)
+        internal static void OnCartReturn(MobileParty cart, Village home, int handed, long tax, long purse)
         {
             if (home == null || home.Settlement == null || handed <= 0 || !On) return;
             string id = home.Settlement.StringId;
@@ -735,6 +735,8 @@ namespace Armoury
                     fromVil = Math.Min(fromVil, Math.Max(0, home.Gold));
                     if (fromTax > 0) { home.TradeTaxAccumulated -= (int)fromTax; leader.ChangeHeroGold((int)fromTax); }   // licznik pana -> glowa rodu (jak F4b: licznik -> kiesa)
                     if (fromVil > 0) GiveGoldAction.ApplyForSettlementToCharacter(home.Settlement, leader, (int)fromVil, true);   // kiesa wsi -> glowa rodu (zdarzenie gry)
+                    MoneyLedger.CartWorksInWindow(cart, (int)fromVil, (int)fromTax);   // okno powrotu wozu w ksiedze pieniadza: utarg wsi brutto (wyplata nie jest "zniklo")
+                    if (fromVil > 0) MoneyLedger.Note169(MoneyLedger.N169Other, home.Settlement, -(int)fromVil);   // kiesa wsi poza tickiem - nazwane ("inne")
                     paidTax += fromTax; paidVil += fromVil;
                     long got = fromTax + fromVil;
                     lock (Gate)
