@@ -2765,3 +2765,9 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   (KsHungerUnrest: pozycja "Hunger" w czynnym modelu lojalnosci BK i bezpieczenstwa NavalDLC, bez podwojnego Starving; bunt mechanizmem gry; KsLordFundsFood: glowa rodu doplaca
   do budzetu KS-H ponad rezerwe wojny, tempo skrzyni wspolne z chlebem M3; tryb RACHUNKI czeka na API kredytu r4-kupcy - do polaczenia przy scaleniu; grupa nglod). Obie: build rc 0,
   recenzja + poprawki. Ryzyko: uchodzcy obciaza kiese W miast frontu; glod moze dac bunty Zelaznych Wysp/Dorne po rampie KS (progi w MCM).
+- 18:30 PDT: FALA 2b GOTOWA (wf_a0c1cd77-ae0): w-toku/ds-akumulator (4 commity od efbbf0dc, build rc 0, recenzja 7 uwag - 7 poprawionych): DsHoardDue (tallage od kies ludu W/R/P i ludzi
+  zamkow ponad FolkHoardNormalTimes x zapas; pre = M9 + N8 + FLf/364; 67% pan, 33% osada, korona 0) z DsHoardDueRate 0.03 (symulacja: 1% za malo, 3% -> wzrost < +12k/d),
+  DsWorksRealMaterial (roboty gminy i septy tylko z prawdziwego materialu z polki, rzemieslnicy <= 0.5 x material, TownFolk.DaWorksRun po BuildFunding.Daily), FolkBetterTable (lepszy stol
+  pod KS do indeksu 1.5), CrownWindfallToReserve, nds NDS-3a/3c/7b/9 poprawione, grupa nakum, linia "Akumulator kies (ds-akumulator)". RYZYKO: bez wyjscia wydatkow we wsiach nadwyzka
+  przeniesie sie do kies wsi (+100-130k/d bez KS); DsHoardDueVillages WYL. UWAGA ZASADA: DS F1/F3 (Jeff 17.10) zniosl "podatek od skarbca" jako pobor resztowy - DsHoardDue go
+  przywraca jako tallage; do oceny po tescie (alternatywy: wyjscie wydatkow + ceny bez sufitu, dziesiata od ruchomosci tez w pokoju rzadziej, czynsz rosnacy z zamoznoscia wsi).
