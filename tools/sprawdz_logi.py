@@ -1264,6 +1264,18 @@ Uzycie (Python 3, tylko odczyt):
                     Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-po-test.flag, T0-T7: zakupy co do monety, ogien - stado przez HerdDriven jak w grze, odbudowa,
                     termin, wojna, zapis, uklad) NIE 0, NPO-7 koszt <= 5 ms, NPO-8 potkniecia i ERROR 0, NPO-9 ogien i stada (INFO), NPO-10 recenzja: powroty wozow bez drogi
                     produkcji (rampa KS, produkcja wsi niewpieta - bez wyplaty) i okregi ze zmienionym b (INFO). Bez prac i bez proby - INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa nkasy     : (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z - koncowy przeglad ekonomii 18.10 pakiet P5, uwagi 2, 6, 11; Armoury/src/DsTowns.cs Review,
+                    KsLordFood.cs BeforeEarly, KsFoodCredit.cs, KsFoodCarts.cs Back / UnloadNearest; klucze Ds Farm Review Days, Ds Farm Arrears Review Terms, Ks Lord Food
+                    Bills Early Share, Ks Food Carts Return Keeps Goods) python -I tools/sprawdz_logi.py --grupa nkasy <Armoury-*.log> (strumieniowo). NKA-0 linie i segmenty
+                    paczki (INFO), NKA-1 zaleglosci firm DS (panom + koronie + z oszczednosci ludu): wzrost na dobe po pierwszym przegladzie <= max(10 tys., 0.5 x wzrost
+                    28 dob przed nim) - po >= 7 dobach od przegladu (krocej albo bez przegladu - INFO; pierwszy przeglad 91 dob po ustaleniu firm), NKA-2 zmiana sumy firm
+                    (miasta + zamki + z oszczednosci ludu) w dobie przegladu <= 15.5% (Ds Farm Renew Max 0.15), NKA-2b kierunek kolejnych przegladow (oscylacja - INFO),
+                    NKA-3 miasta z kasa ponizej zapasu kupcow (linia "Kasy zaulkow (m6b)"): na koniec <= max(12, liczba w dobie pierwszego przegladu) po >= 28 dobach od
+                    przegladu (krocej - INFO), NKA-4 rachunki zywnosci KS-H starsze niz zwloka 0 zl kazdej doby i najstarszy rachunek <= zwloka (segment f4 linii KS-H),
+                    NKA-5 wczesna splata panow: kontrola zlota linii pana 0 i "przed zwloka" <= "splacone przez panow miast" (KS-H), NKA-5b kwoty (INFO), NKA-6 kontrole
+                    KS-H 0 (towar, zloto, kredyt - roszczenia zawroconych wozow w "nowe"), NKA-6b przy kluczu Ks Food Carts Return Keeps Goods "bez celu" i "zawrocone bez
+                    zwrotu zaplaty" 0 kazdej doby (towar wraca na polke zrodla albo najblizszego miasta), NKA-7 ERROR DsTowns / KsLordFood / KsFoodCarts / KsFoodCredit
+                    i potkniecia 0. Log bez paczki (np. Armoury-2026-10-17_23-22-37.log): segmenty f4 - INFO, reszta z linii niezaleznych, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -40972,6 +40984,289 @@ def npo_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ nkasy (noc 17/18.10, fala 4: f4-kasy-miast-i-kupcy-z - koncowy przeglad ekonomii, pakiet P5;
+# Armoury/src/DsTowns.cs Review, KsLordFood.cs BeforeEarly, KsFoodCredit.cs, KsFoodCarts.cs Back / UnloadNearest; klucze Ds Farm Review Days, Ds Farm Arrears
+# Review Terms, Ks Lord Food Bills Early Share, Ks Food Carts Return Keeps Goods)
+NKA_ARR_GROWTH_ABS = 10000.0     # zl/d - wzrost zaleglosci firm DS po pierwszym przegladzie kwartalnym (albo najwyzej NKA_ARR_GROWTH_REL x wzrost przed nim)
+NKA_ARR_GROWTH_REL = 0.5
+NKA_STEP_MAX = 0.155             # Ds Farm Renew Max 0.15 + zaokraglenia: zmiana sumy firm (miasta + zamki + z oszczednosci ludu) w dobie z przegladem
+NKA_AFTER_MIN_DAYS = 7           # najmniej dob po pierwszym przegladzie do NKA-1 (mniej - INFO)
+NKA_BELOW_AFTER_DAYS = 28        # NKA-3: miasta ponizej zapasu kupcow - prog dopiero po 28 dobach od pierwszego przegladu (mniej - INFO)
+NKA_BELOW_FLOOR = 12             # NKA-3: najwyzej max(12, liczba w dobie pierwszego przegladu)
+
+
+def _nka_scan(logp):
+    """nkasy: strumieniowo linie 'Firmy miast i zamkow (DS)', 'Kasy zaulkow (m6b)', 'Kupcy zywnosci (KS-H) dzien', 'Pan miasta placi za dowoz (KS)' i bledy."""
+    D = {"ds": {}, "m6b": {}, "ksh": {}, "pan": {}, "err": {}, "err1": ""}
+    i_ = r"(-?\d+)"
+    rx_ds = {
+        "farms": re.compile(r"\| firmy od doby (-?\d+): miasta (\d+) - (\d+) zl/rok, zamki (\d+) - (\d+) zl/rok z kas .*?panom z oszczednosci ludu (\d+) zl/rok"),
+        "arr": re.compile(r"\| zaleglosci: nowe " + i_ + r", splacone " + i_ + r", razem panom " + i_ + r" \+ koronie " + i_ + r" \+ panom z oszczednosci ludu " + i_ + r" u (\d+) osad"),
+        "ren": re.compile(r"\| odnowy (\d+) \(w gore (\d+), w dol (\d+)\)"),
+        "rev": re.compile(r"\| przeglad firm co (\d+) dob \(f4\): w dol od razu przy zaleglosciach przez (\d+) dni kwartalu z rzedu (\d+), w gore wstrzymane przy zaleglosciach (\d+),"
+                          r" bez zmiany (\d+); firmy w gore \+" + i_ + r" zl/rok, w dol -" + i_ + r" zl/rok; osad z zaleglosciami w ostatnim dniu kwartalu (\d+)"),
+        "ctl": re.compile(r"\| kontrola: platnicy - odbiorcy = " + i_),
+        "stum": re.compile(r"\| potkniecia (\d+) \(w sesji"),
+    }
+    rx_ksh = {
+        "credit": re.compile(r"\| kredyt kupiecki (TAK|NIE): otwarte " + i_ + r" zl"),
+        "over": re.compile(r", starsze niz (\d+) dni " + i_ + r" zl \((\d+) miast\)"),
+        "goods": re.compile(r"\| kontrola towaru reszta " + i_ + r" \(bez celu " + i_ + r", psucie w drodze " + i_ + r", zawrocone bez zwrotu zaplaty " + i_),
+        "near": re.compile(r"zawrocone bez zwrotu zaplaty -?\d+, na polke najblizszego miasta " + i_),
+        "gold": re.compile(r"zlota reszta " + i_),
+        "cred": re.compile(r"\| kontrola kredytu reszta (-?\d+|-)"),
+        "credst": re.compile(r"potkniecia kredytu (\d+)"),
+        "lords": re.compile(r"\| splacone przez panow miast \(glod, zalegle rachunki\) " + i_ + r" zl w (\d+) splatach"),
+        "early": re.compile(r", w tym przed zwloka \(wczesna splata f4\) " + i_ + r" zl w (\d+) splatach; najstarszy rachunek " + i_ + r" dni, rachunki starsze niz (\d+) dni " + i_ + r" zl"),
+        "back": re.compile(r"\| zawrocone i bez celu \(f4\): na polke zrodla bez zwrotu zaplaty " + i_ + r" szt\. \(roszczenia celu wobec zrodla " + i_ + r" zl, bez wierzyciela " + i_
+                           + r" zl\), wozy bez celu i zrodla na polke najblizszego miasta (\d+) \(" + i_ + r" szt\.\)"),
+        "stum": re.compile(r"\| czas [\d.]+ ms \| potkniecia (\d+)\."),
+    }
+    rx_pan = {
+        "paid": re.compile(r"zaplacone przez panow " + i_ + r" zl \(potrzeba " + i_ + r" zl\)"),
+        "room": re.compile(r"bez miejsca ponad rezerwe wojny i tempo skrzyni (\d+)"),
+        "bills": re.compile(r"\| rachunki: otwarte " + i_ + r" zl, splacone przez panow " + i_ + r" zl"),
+        "early": re.compile(r"\| wczesna splata \(f4, Ks Lord Food Bills Early Share ([\d.]+)\): prog (\d+) dni, miasta syte z rachunkami ponad prog (\d+) \(pan splacil (\d+)\),"
+                            r" rachunki ponad prog " + i_ + r" zl, splacone przez panow " + i_ + r" zl"),
+        "ctl": re.compile(r"\| kontrola: zloto panow " + i_ + r" \+ kasy miast " + i_ + r" \+ wierzyciele " + i_ + r" = " + i_ + r" \(oczekiwane 0\)"),
+        "stum": re.compile(r"\| czas [\d.]+ ms \| potkniecia (\d+)\."),
+    }
+    rx_m6b = re.compile(r"Kasy zaulkow \(m6b\): dzien (-?\d+) \|.*?miast z kasa ponizej zapasu kupcow (\d+)")
+    errs = ("ERROR in DsTowns", "ERROR in KsLordFood", "ERROR in KsFoodCarts", "ERROR in KsFoodCredit")
+    if not logp or not os.path.isfile(logp):
+        return D
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            if "ERROR in " in ln:
+                for e in errs:
+                    if e in ln:
+                        D["err"][e] = D["err"].get(e, 0) + 1
+                        if not D["err1"]:
+                            D["err1"] = ln.strip()[:160]
+                continue
+            if "Firmy miast i zamkow (DS): dzien " in ln:
+                m = re.search(r"Firmy miast i zamkow \(DS\): dzien (-?\d+) \| ", ln)
+                if not m or "| firmy od doby " not in ln:
+                    continue
+                rec = {}
+                for k, p in rx_ds.items():
+                    mm = p.search(ln)
+                    if mm:
+                        rec[k] = tuple(mm.groups())
+                D["ds"][int(m.group(1))] = rec
+            elif "Kasy zaulkow (m6b): dzien " in ln:
+                m = rx_m6b.search(ln)
+                if m:
+                    D["m6b"][int(m.group(1))] = int(m.group(2))
+            elif "Kupcy zywnosci (KS-H) dzien " in ln:
+                m = re.search(r"Kupcy zywnosci \(KS-H\) dzien (-?\d+) \| ", ln)
+                if not m:
+                    continue
+                rec = {}
+                for k, p in rx_ksh.items():
+                    mm = p.search(ln)
+                    if mm:
+                        rec[k] = tuple(mm.groups())
+                D["ksh"][int(m.group(1))] = rec
+            elif "Pan miasta placi za dowoz (KS): dzien " in ln:
+                m = re.search(r"Pan miasta placi za dowoz \(KS\): dzien (-?\d+) ", ln)
+                if not m:
+                    continue
+                rec = {}
+                for k, p in rx_pan.items():
+                    mm = p.search(ln)
+                    if mm:
+                        rec[k] = tuple(mm.groups())
+                D["pan"][int(m.group(1))] = rec
+    return D
+
+
+def nkasy_main(logp):
+    """nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z; koncowy przeglad ekonomii 18.10 pakiet P5 - uwagi 2, 6, 11): firmy DS miast przegladane co kwartal
+    w obie strony (DsTowns.Review), pan splaca rachunki zywnosci swojego miasta wczesniej (KsLordFood.BeforeEarly), zawrocony woz KS-H nie niszczy oplaconego towaru
+    (KsFoodCarts.Back / UnloadNearest). Wejscie: log Armoury (strumieniowo). Progi NKA-0..NKA-7 - opis w naglowku pliku (--grupa nkasy). Brak linii - INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NKA-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = _nka_scan(logp)
+    DS, KH, PN, M6 = D["ds"], D["ksh"], D["pan"], D["m6b"]
+
+    def gi(rec, k, i, default=0):
+        try:
+            v = rec[k][i]
+            return default if v in (None, "-") else int(v)
+        except (KeyError, IndexError, ValueError, TypeError):
+            return default
+
+    dsd = sorted(DS); khd = sorted(KH); pnd = sorted(PN)
+    revd = [d for d in dsd if "rev" in DS[d]]
+    khf4 = [d for d in khd if "back" in KH[d]]
+    khe = [d for d in khd if "early" in KH[d]]
+    pne = [d for d in pnd if "early" in PN[d]]
+    print(f"plik: {logp} | linii 'Firmy miast i zamkow (DS)' z firmami {len(dsd)} (z segmentem przegladu f4 {len(revd)}) | 'Kupcy zywnosci (KS-H)' {len(khd)}"
+          f" (z segmentem f4 zawroconych {len(khf4)}, wczesnej splaty {len(khe)}) | 'Pan miasta placi za dowoz (KS)' {len(pnd)} (z segmentem f4 {len(pne)}) | 'Kasy zaulkow (m6b)' {len(M6)}")
+    rep.add("NKA-0: linie paczki f4 (przeglad firm, wczesna splata panow, zawrocone wozy)",
+            f"DS z przegladem f4 {len(revd)} z {len(dsd)}; KS-H z segmentem zawroconych {len(khf4)} i wczesnej splaty {len(khe)} z {len(khd)}; pan z segmentem {len(pne)} z {len(pnd)}",
+            "INFO (brak segmentow = log sprzed paczki albo klucze wylaczone; DS bez firm = przed ustaleniem firm)", None)
+
+    # ---- NKA-1 zaleglosci firm DS: wzrost na dobe po pierwszym przegladzie wobec 28 dob przed nim
+    def arr_of(d):
+        r = DS[d]
+        return gi(r, "arr", 2) + gi(r, "arr", 3) + gi(r, "arr", 4) if "arr" in r else None
+    arrd = [d for d in dsd if arr_of(d) is not None]
+    rev_days = [d for d in dsd if gi(DS[d], "ren", 0) > 0]
+    first_rev = rev_days[0] if rev_days else None
+    if arrd:
+        a_last = arr_of(arrd[-1])
+
+        def growth(days):
+            dd = [d for d in days if d in arrd]
+            if len(dd) < 2:
+                return None
+            return (arr_of(dd[-1]) - arr_of(dd[0])) / max(1, dd[-1] - dd[0])
+        if first_rev is not None and revd:
+            before = growth([d for d in arrd if first_rev - 28 <= d <= first_rev - 1])
+            after_days = [d for d in arrd if d >= first_rev]
+            after = growth(after_days)
+            span = (after_days[-1] - after_days[0]) if after_days else 0
+            lim = NKA_ARR_GROWTH_ABS if before is None else max(NKA_ARR_GROWTH_ABS, NKA_ARR_GROWTH_REL * before) if before > 0 else NKA_ARR_GROWTH_ABS
+            val = (f"zaleglosci firm (panom + koronie + z oszczednosci ludu) na koniec {a_last} zl; wzrost przed pierwszym przegladem (28 dob) "
+                   f"{'-' if before is None else f'{before:.0f}'} zl/d, po nim {'-' if after is None else f'{after:.0f}'} zl/d w {span} dobach (pierwszy przeglad doba {first_rev})")
+            if after is None or span < NKA_AFTER_MIN_DAYS:
+                rep.add("NKA-1: zaleglosci firm DS nie rosna po przegladzie kwartalnym", val, f"INFO (po przegladzie < {NKA_AFTER_MIN_DAYS} dob)", None)
+            else:
+                rep.add("NKA-1: zaleglosci firm DS nie rosna po przegladzie kwartalnym", val, f"wzrost po <= max({NKA_ARR_GROWTH_ABS:.0f}, {NKA_ARR_GROWTH_REL} x wzrost przed) zl/d",
+                        after <= lim)
+        else:
+            g_all = growth(arrd[-28:])
+            rep.add("NKA-1: zaleglosci firm DS nie rosna po przegladzie kwartalnym",
+                    f"zaleglosci na koniec {a_last} zl, wzrost ostatnich 28 dob {'-' if g_all is None else f'{g_all:.0f}'} zl/d; przegladu w logu brak"
+                    + (" (segment f4 jest - pierwszy przeglad 91 dob po ustaleniu firm)" if revd else " (log sprzed paczki albo Ds Farm Review Days 0)"),
+                    "INFO (bez przegladu w logu)", None)
+    else:
+        rep.add("NKA-1: zaleglosci firm DS", "brak linii z firmami (DS przed ustaleniem firm albo wylaczone)", "INFO", None)
+
+    # ---- NKA-2 przeglad: zmiana sumy firm w dobie przegladu w limicie +-Ds Farm Renew Max
+    def tot_of(d):
+        r = DS[d]
+        return gi(r, "farms", 2) + gi(r, "farms", 4) + gi(r, "farms", 5) if "farms" in r else None
+    if rev_days and revd:
+        steps = []
+        for d in rev_days:
+            prev = [x for x in dsd if x < d and tot_of(x)]
+            if not prev or tot_of(d) is None:
+                continue
+            t0 = tot_of(prev[-1]); t1 = tot_of(d)
+            steps.append((d, (t1 - t0) / t0 if t0 > 0 else 0.0, gi(DS[d], "ren", 0), gi(DS[d], "ren", 1), gi(DS[d], "ren", 2)))
+        bad = [s for s in steps if abs(s[1]) > NKA_STEP_MAX]
+        up = sum(gi(DS[d], "ren", 1) for d in rev_days); dn = sum(gi(DS[d], "ren", 2) for d in rev_days)
+        arrn = sum(gi(DS[d], "rev", 2) for d in revd); held = sum(gi(DS[d], "rev", 3) for d in revd); same = sum(gi(DS[d], "rev", 4) for d in revd)
+        pu = sum(gi(DS[d], "rev", 5) for d in revd); pd = sum(gi(DS[d], "rev", 6) for d in revd)
+        rep.add("NKA-2: przeglad firm w limicie (zmiana sumy firm w dobie przegladu <= Ds Farm Renew Max)",
+                f"dob z przegladem {len(rev_days)}, przegladow razem {sum(gi(DS[d], 'ren', 0) for d in rev_days)} (w gore {up}, w dol {dn}, bez zmiany {same}; w dol od razu przy zaleglosciach"
+                f" {arrn}, w gore wstrzymane przy zaleglosciach {held}); firmy +{pu} / -{pd} zl/rok; najwieksza zmiana sumy "
+                + (f"{max(abs(s[1]) for s in steps) * 100:.1f}% (doba {max(steps, key=lambda s: abs(s[1]))[0]})" if steps else "-")
+                + (f"; ponad limit {len(bad)} ({bad[0][0]}: {bad[0][1] * 100:.1f}%)" if bad else ""),
+                f"|zmiana| <= {NKA_STEP_MAX * 100:.1f}% kazdej doby z przegladem", (not bad) if steps else None)
+        dirs = [f"{d}: " + ("+" if gi(DS[d], "rev", 5) > gi(DS[d], "rev", 6) else ("-" if gi(DS[d], "rev", 6) > gi(DS[d], "rev", 5) else "0")) for d in revd if gi(DS[d], "ren", 0) > 0]
+        rep.add("NKA-2b: kierunek przegladow po kolei (oscylacja - INFO)", ", ".join(dirs) if dirs else "brak doby z przegladem",
+                "INFO (naprzemienne +/- w kolejnych kwartalach = oscylacja do obejrzenia)", None)
+    else:
+        rep.add("NKA-2: przeglad firm w limicie", "brak doby z przegladem (odnowy > 0) z segmentem f4", "INFO (pierwszy przeglad 91 dob po ustaleniu firm)", None)
+
+    # ---- NKA-3 miasta ponizej zapasu kupcow (Kasy zaulkow m6b)
+    if M6:
+        md = sorted(M6)
+        fix = None
+        for d in dsd:
+            v = gi(DS[d], "farms", 0, -1)
+            if v >= 0:
+                fix = v
+                break
+        at_fix = M6.get(fix) if fix is not None else None
+        after_fix = [M6[d] for d in md if fix is not None and d >= fix]
+        at_rev = None
+        if first_rev is not None:
+            near = [d for d in md if d >= first_rev]
+            at_rev = M6[near[0]] if near else None
+        val = (f"na poczatku {M6[md[0]]}, w dobie ustalenia firm {'-' if at_fix is None else at_fix}, najwiecej po ustaleniu {max(after_fix) if after_fix else '-'}, "
+               f"w dobie pierwszego przegladu {'-' if at_rev is None else at_rev}, na koniec {M6[md[-1]]} (doba {md[-1]})")
+        if at_rev is not None and md[-1] - first_rev >= NKA_BELOW_AFTER_DAYS:
+            lim = max(NKA_BELOW_FLOOR, at_rev)
+            rep.add("NKA-3: miasta z kasa ponizej zapasu kupcow nie przybywa po przegladzie", val, f"na koniec <= max({NKA_BELOW_FLOOR}, liczba w dobie pierwszego przegladu)",
+                    M6[md[-1]] <= lim)
+        else:
+            rep.add("NKA-3: miasta z kasa ponizej zapasu kupcow", val, f"INFO (prog po >= {NKA_BELOW_AFTER_DAYS} dobach od pierwszego przegladu)", None)
+    else:
+        rep.add("NKA-3: miasta z kasa ponizej zapasu kupcow", "brak linii 'Kasy zaulkow (m6b)'", "INFO", None)
+
+    # ---- NKA-4 rachunki KS-H: zaden starszy niz zwloka; wiek najstarszego (segment f4)
+    cr = [d for d in khd if "credit" in KH[d] and KH[d]["credit"][0] == "TAK"]
+    if cr:
+        ov = [(d, gi(KH[d], "over", 1), gi(KH[d], "over", 2)) for d in cr if "over" in KH[d]]
+        badov = [x for x in ov if x[1] > 0]
+        odays = gi(KH[cr[-1]], "over", 0, 30) if "over" in KH[cr[-1]] else 30
+        opn = [gi(KH[d], "credit", 1) for d in cr]
+        ages = [(d, gi(KH[d], "early", 2, -1)) for d in khe]
+        amax = max(ages, key=lambda x: x[1]) if ages else None
+        val = (f"dob z kredytem {len(cr)}, otwarte na koniec {opn[-1]} zl (najwiecej {max(opn)}), dob z rachunkami starszymi niz {odays} dni {len(badov)}"
+               + (f" (pierwsza {badov[0][0]}: {badov[0][1]} zl u {badov[0][2]} miast)" if badov else "")
+               + (f"; najstarszy rachunek najwiecej {amax[1]} dni (doba {amax[0]})" if amax else "; wiek rachunkow - brak segmentu f4"))
+        ok = not badov and (amax is None or amax[1] <= odays)
+        rep.add("NKA-4: rachunki zywnosci KS-H nie dochodza do zwloki (dowoz nie staje)", val, f"starsze niz zwloka 0 zl kazdej doby; najstarszy rachunek <= {odays} dni", ok)
+    else:
+        rep.add("NKA-4: rachunki zywnosci KS-H", "brak linii KS-H z kredytem kupcow (TAK)", "INFO (KS nieczynne albo kredyt wylaczony)", None)
+
+    # ---- NKA-5 wczesna splata panow: kontrola zlota linii pana, czesc przed zwloka <= splacone przez panow (KS-H), INFO kwot
+    if pne:
+        ctl = [(d, gi(PN[d], "ctl", 3)) for d in pne if "ctl" in PN[d]]
+        badc = [x for x in ctl if x[1] != 0]
+        paid = sum(gi(PN[d], "early", 5) for d in pne); opn = [gi(PN[d], "early", 4) for d in pne]
+        sated = sum(gi(PN[d], "early", 2) for d in pne); spaid = sum(gi(PN[d], "early", 3) for d in pne)
+        room = sum(gi(PN[d], "room", 0) for d in pne)
+        e_ks = sum(gi(KH[d], "early", 0) for d in khe); l_ks = sum(gi(KH[d], "lords", 0) for d in khe)
+        rep.add("NKA-5: wczesna splata panow - zloto zamkniete i spojne z linia KS-H",
+                f"dob {len(pne)} (prog {gi(PN[pne[-1]], 'early', 1)} dni), kontrola zlota != 0: {len(badc)}" + (f" (doba {badc[0][0]}: {badc[0][1]})" if badc else "")
+                + f"; KS-H: przed zwloka {e_ks} zl z {l_ks} zl splaconych przez panow",
+                "kontrola 0 kazdej doby; przed zwloka <= splacone przez panow", not badc and e_ks <= l_ks)
+        rep.add("NKA-5b: wczesna splata panow (INFO)",
+                f"splacone przez panow (wczesna splata) {paid} zl; rachunki ponad prog: na koniec {opn[-1]} zl, najwiecej {max(opn)} zl; miasto-doby syte z rachunkami ponad prog {sated}"
+                f" (pan splacil {spaid}); bez miejsca ponad rezerwe wojny i tempo skrzyni {room}", "INFO", None)
+    else:
+        rep.add("NKA-5: wczesna splata panow", "brak segmentu 'wczesna splata (f4' w liniach pana", "INFO (log sprzed paczki, klucz 0, Ks Lord Funds Food albo kredyt kupcow wylaczony)", None)
+
+    # ---- NKA-6 kontrole KS-H 0 i nic w nicosc przy zawroconych (segment f4)
+    if khd:
+        gb = [(d, gi(KH[d], "goods", 0), gi(KH[d], "gold", 0), KH[d]["cred"][0] if "cred" in KH[d] else "-") for d in khd if "goods" in KH[d]]
+        bad = [x for x in gb if x[1] != 0 or x[2] != 0 or (x[3] not in ("-", "0"))]
+        rep.add("NKA-6: kontrole KS-H 0 (towar, zloto, kredyt z roszczeniami zawroconych wozow)",
+                f"dob z kontrolami {len(gb)}, z reszta != 0: {len(bad)}" + (f" ({bad[0][0]}: towar {bad[0][1]}, zloto {bad[0][2]}, kredyt {bad[0][3]})" if bad else ""),
+                "0 kazdej doby", (not bad) if gb else None)
+        if khf4:
+            lost = [(d, gi(KH[d], "goods", 1), gi(KH[d], "goods", 3)) for d in khf4 if "goods" in KH[d]]
+            badl = [x for x in lost if x[1] != 0 or x[2] != 0]
+            kept = sum(gi(KH[d], "back", 0) for d in khf4); clm = sum(gi(KH[d], "back", 1) for d in khf4); nocr = sum(gi(KH[d], "back", 2) for d in khf4)
+            nc = sum(gi(KH[d], "back", 3) for d in khf4); npcs = sum(gi(KH[d], "back", 4) for d in khf4)
+            rep.add("NKA-6b: zawrocony woz nie niszczy oplaconego towaru (klucz Ks Food Carts Return Keeps Goods)",
+                    f"dob z segmentem {len(khf4)}, z 'bez celu' albo 'zawrocone bez zwrotu zaplaty' != 0: {len(badl)}" + (f" ({badl[0][0]}: {badl[0][1]} / {badl[0][2]})" if badl else "")
+                    + f"; na polke zrodla bez zwrotu zaplaty {kept} szt. (roszczenia celu {clm} zl, bez wierzyciela {nocr} zl), wozy bez celu i zrodla na polke najblizszego miasta {nc} ({npcs} szt.)",
+                    "0 kazdej doby (towar wraca na polke, nie znika)", not badl)
+        else:
+            rep.add("NKA-6b: zawrocony woz nie niszczy oplaconego towaru", "brak segmentu 'zawrocone i bez celu (f4)'", "INFO (log sprzed paczki albo klucz wylaczony)", None)
+    else:
+        rep.add("NKA-6: kontrole KS-H", "brak linii 'Kupcy zywnosci (KS-H) dzien'", "INFO (KS nieczynne)", None)
+
+    # ---- NKA-7 bledy i potkniecia
+    pot = sum(gi(DS[d], "stum", 0) for d in dsd) + sum(gi(KH[d], "stum", 0) + gi(KH[d], "credst", 0) for d in khd) + sum(gi(PN[d], "stum", 0) for d in pnd)
+    ne = sum(D["err"].values())
+    rep.add("NKA-7: ERROR DsTowns / KsLordFood / KsFoodCarts / KsFoodCredit i potkniecia",
+            f"ERROR {ne}" + (f" ({D['err1']})" if D["err1"] else "") + f", potkniecia razem {pot}", "0 i 0", ne == 0 and pot == 0)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -41209,6 +41504,8 @@ def main(argv):
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
     if group == "nzapis" and logp:
         return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
+    if group == "nkasy" and logp:
+        return nkasy_main(logp)   # nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z): firmy DS miast przegladane co kwartal, pan splaca rachunki zywnosci wczesniej, zawrocony woz bez straty towaru (DsTowns, KsLordFood, KsFoodCarts)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
