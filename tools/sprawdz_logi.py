@@ -1628,6 +1628,19 @@ Uzycie (Python 3, tylko odczyt):
                     (fin88 0.55: lancuch gry w mieszance rampy liczyl dubel BK raz - 163 wobec 296; ETAP > 0.55), linie "Mineraly w rampie KS (f5-ruda)" (INFO).
                     Bazy: fin88 Armoury-2026-10-18_03-13-38.log (ac03aa25 = WGRANIE 79), fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin88):
                     NRU-7..10 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
+--grupa njedz     : (noc 18.10, paczka f20-d4 - decyzja Jeffa "4. b": rece zajec jedzenia i soli pod KS za polkami calego rynku; Armoury/src/StartCalibration.Jedzenie.cs,
+                    klucz Ks Food Hands Follow Market) python -I tools/sprawdz_logi.py --grupa njedz <Armoury-*.log> (strumieniowo). Linia "Jedzenie KS (f20-d4): dzien N" co 7 dob
+                    od D po D+49 (rynek x towar jedzenia KS: polki + w drodze KS-H / cel T* x popyt zaplacony, zapas za 8 tyg. przy tempie ostatnich krokow, decyzja BRAK /
+                    NADMIAR / PASMO / BEZ-CELU; wynik zajec;
+                    bloki; grupy zajec w brak i w nadmiarze - rece pola przed -> po; ruchy wedlug zajecia i towaru; regale soli i daktyli; przesunieto rak, najwiecej w okregu;
+                    czas, potkniecia). NJE-0 linie (0 nierozpoznanych), NJE-B baza z linii "KS: rynki" (produkcja/zuzycie/zapas+droga towarow audytu - INFO, takze log sprzed
+                    paczki), NJE-1 krok co 7 dob od D po D+49 bez dziur, NJE-2 decyzje zgodne z zapasem za 8 tyg. z linii (BRAK: polki+droga < 0.5 T*; NADMIAR: polki
+                    i polki+droga > 2 T*; PASMO pomiedzy), NJE-3 zajecia w brak (wynik >= 0.5) nie traca rak, w nadmiarze (<= -0.5) nie zyskuja (kazdy krok i rynek), NJE-4 najwyzej 5% rak poza domem
+                    okregu na krok (ponad limit 0), NJE-5 regale soli i daktyli w gore tylko przy BRAK, w dol tylko przy NADMIAR, NJE-6 bez przelewow, potkniecia 0, ERROR
+                    StartCalibration.F20Week 0, NJE-7 czas kroku <= 20 ms, NJE-8 bez przeskoku BRAK <-> NADMIAR miedzy kolejnymi krokami, NJE-9 RegaleCycle po pierwszym kroku bez
+                    soli i daktyli (linia f4 "regale wobec polki" - jedna regula), NJE-10 skutek dla towarow audytu (Essos oliwki, mieso, winogrona - polki+droga/T*; sol Essos,
+                    ryby Westeros - polki/T*; pierwszy -> ostatni krok, INFO), NJE-11 przebieg (INFO). Baza: fin93 Armoury-2026-10-18_12-18-40.log (6478f861 = WGRANIE 82 +
+                    f18-mcm; linii paczki brak - NJE-B z liczbami, reszta INFO, bez wyjatku).
 --grupa npozyczka : (18.10, paczka f8-pozyczka - decyzja Jeffa "2. tak" (10% rocznie): POZYCZKA MIEJSKA - pan w wojnie bez pieniedzy na zold pozycza najpierw od rady wlasnego
                     miasta / ludzi wlasnego zamku, drugi wierzyciel kredytu wojennego 168 przed Bankiem; Armoury/src/TownFolk.TownLoan.cs, DebtLadder.cs (roszczenie KTown, zapis arm_townloan),
                     ClanBudget.cs, TownFolk.Loans.cs (przejecie obieg2); klucze Town Loan, Town Loan Rate, Town Loan Rent Days, Town Loan Folk Reserve Times, Town Loan Coffer Reserve Times,
@@ -47280,6 +47293,257 @@ def nruda_main(logp):
     return 0
 
 
+# ============================================================ f20-d4 (noc 18.10, decyzja Jeffa "4. b"): jedzenie i sol pod KS za polkami rynku - grupa njedz
+# Armoury/src/StartCalibration.Jedzenie.cs (linia "Jedzenie KS (f20-d4): dzien N" co 7 dob od D po D+49 - rece zajec jedzenia i soli za polkami calego rynku za
+# 8 tygodni przy tempie ostatnich krokow: BRAK - polki + w drodze < 0.5 T*, NADMIAR - polki i polki + w drodze > 2 T*; zajecie x(1 + 0.05 x wynik), najwyzej 5% rak
+# zajecia na krok; regale soli i daktyli x1.05 / x0.95). Baza (log sprzed paczki): linia "KS: rynki dzien N" (produkcja / zuzycie / zapas miast / w drodze KS-H wedlug rynku) - fin93
+# Armoury-2026-10-18_12-18-40.log (6478f861 = WGRANIE 82, audyt 'towary': Essos oliwki 0.14 T*, mieso 0.20, winogrona 0.33; sol Essos 3.62 T*, ryby Westeros 3.28 T*).
+NJE_LINE = "Jedzenie KS (f20-d4): dzien "
+NJE_HEAD = re.compile(r"^Jedzenie KS \(f20-d4\): dzien (\d+) \| klucz Ks Food Hands Follow Market TAK, co (\d+) dob od D (-?\d+) po D\+(\d+) \(")
+NJE_SKIP = re.compile(r"^Jedzenie KS \(f20-d4\): dzien (\d+) \| klucz Ks Food Hands Follow Market TAK \| krok pominiety")
+NJE_MKT = re.compile(r"\| (Westeros|Essos) \(miast (\d+)\):([^|]*)")
+NJE_GOOD = re.compile(r"(\w+) (\d+)\+(\d+)/(\d+) \((-?[\d.]+|-) (-?[\d.]+|-), za (\d+) tyg\. (-?[\d.]+|-) (-?[\d.]+|-)\) (BRAK|NADMIAR|PASMO|BEZ-CELU)")
+NJE_BLK = re.compile(r"\| bloki (\d+): zmienione (\d+), rowny wynik (\d+), jedno zajecie albo bez rak do przesuniecia (\d+), ziemia skrocila (\d+), ziemia zatrzymala (\d+), "
+                     r"przebudowa A7 (\d+), prace okregu (\d+), bez rachunku rak (\d+); okregi w progu najpierw wyzywic siebie (\d+), krainy wrocone (\d+)")
+NJE_GRP = re.compile(r"(Westeros|Essos) w brak \(wynik >= [\d.]+\) (\d+) -> (\d+), w nadmiarze \(wynik <= -[\d.]+\) (\d+) -> (\d+)")
+NJE_CRAFTS = re.compile(r"\| rece pola wedlug zajecia \(zmienione, najwieksze\): Westeros([^;|]*); Essos([^|]*)")
+NJE_CRAFT = re.compile(r"(\w[\w:]*) (\d+) -> (\d+) \(")
+NJE_SCORE = re.compile(r"\| wynik zajec \(-1\.\.1, tylko != 0\): Westeros([^;|]*); Essos([^|]*)")
+NJE_SC = re.compile(r"(\w[\w:]*) ([+-][\d.]+)")
+NJE_GMOV = re.compile(r"\| ruchy rak wedlug towaru \([^)]*\): Westeros([^;|]*); Essos([^|]*)")
+NJE_GM = re.compile(r"(\w+) ([+-]\d+)")
+NJE_REG = re.compile(r"\| regale jedzenia \(wpisy w gore/w dol\): sol Westeros (\d+)/(\d+), Essos (\d+)/(\d+); daktyle Westeros (\d+)/(\d+), Essos (\d+)/(\d+); "
+                     r"sufit bloku przycial wzrost (\d+); rece przy soli Westeros (\d+) -> (\d+), Essos (\d+) -> (\d+); przy daktylach Westeros (\d+) -> (\d+), Essos (\d+) -> (\d+)")
+NJE_MOV = re.compile(r"\| przesunieto rak: Westeros (\d+), Essos (\d+); najwiecej w okregu ([\d.]+)% rak poza domem \(([^;]*); limit (\d+)%\), okregow ponad limit (\d+) z (\d+)")
+NJE_TAIL = re.compile(r"\| pieniadze i towar: bez przelewow - [^|]*\| czas ([\d.]+) ms \| potkniecia (\d+)\.$")
+NJE_F4 = re.compile(r"^KS: regale wobec polki \(f4-pomiary\) dzien (\d+) .*?\| wedlug towaru \([^)]*\): ([^|]*)")
+NJE_ERR = ("ERROR in StartCalibration.F20Week",)
+NJE_LO, NJE_HI, NJE_LOOK = 0.5, 2.0, 8
+NJE_PCT_MAX = 5.0                                  # NJE-4: najwiecej rak poza domem przesunietych w okregu na krok (decyzja Jeffa: najwyzej 5% rak w okregu)
+NJE_MS_MAX = 20.0                                  # NJE-7: czas kroku (raz na 7 dob, ok. 15 tys. blokow)
+NJE_TOL = 0.006                                    # NJE-2: tolerancja zaokraglen (zapas za 8 tygodni / T* w linii z 2 miejscami po przecinku)
+# NJE-10: towary audytu (rynek, towar, miara): brak - polki + w drodze / T*, nadmiar - polki / T*
+NJE_WATCH = (("Essos", "olives", "sum"), ("Essos", "meat", "sum"), ("Essos", "grape", "sum"), ("Essos", "salt", "shelf"), ("Westeros", "fish", "shelf"))
+NJE_BASE_MKT = re.compile(r"^KS: rynki dzien (-?\d+) ")
+
+
+def njedz_main(logp):
+    """njedz (noc 18.10, paczka f20-d4): rece zajec jedzenia i soli pod KS za polkami calego rynku (co 7 dob od D po D+49). Wejscie: log Armoury (strumieniowo).
+    Progi NJE-0..NJE-11 - opis w naglowku pliku (--grupa njedz). Log bez linii paczki: liczby bazowe z linii 'KS: rynki' (INFO), bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NJE-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    steps, skips, f4, base, errs = {}, [], {}, {}, []
+    bad = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NJE_LINE):
+                sk = NJE_SKIP.match(s)
+                if sk:
+                    skips.append(int(sk.group(1)))
+                    continue
+                h = NJE_HEAD.match(s)
+                blk, mov, tail, reg = NJE_BLK.search(s), NJE_MOV.search(s), NJE_TAIL.search(s), NJE_REG.search(s)
+                grp = NJE_GRP.findall(s)
+                mk = NJE_MKT.findall(s)
+                if not (h and blk and mov and tail and reg and len(grp) == 2 and len(mk) == 2):
+                    bad += 1
+                    continue
+                d = int(h.group(1))
+                goods = {}
+                for mname, _nt, body in mk:
+                    for g in NJE_GOOD.findall(body):
+                        goods[(mname, g[0])] = (int(g[1]), int(g[2]), int(g[3]), (g[7], g[8]), g[9])
+                if not goods and any(b.strip() for _m, _n, b in mk):
+                    bad += 1
+                    continue
+                crafts = {}
+                c = NJE_CRAFTS.search(s)
+                if c:
+                    for mi, body in (("Westeros", c.group(1)), ("Essos", c.group(2))):
+                        for cr in NJE_CRAFT.findall(body):
+                            crafts[(mi, cr[0])] = (int(cr[1]), int(cr[2]))
+                score = {}
+                c = NJE_SCORE.search(s)
+                if c:
+                    for mi, body in (("Westeros", c.group(1)), ("Essos", c.group(2))):
+                        for cr in NJE_SC.findall(body):
+                            score[(mi, cr[0])] = float(cr[1])
+                gmov = {}
+                c = NJE_GMOV.search(s)
+                if c:
+                    for mi, body in (("Westeros", c.group(1)), ("Essos", c.group(2))):
+                        for gm in NJE_GM.findall(body):
+                            gmov[(mi, gm[0])] = int(gm[1])
+                steps[d] = {"every": int(h.group(2)), "d0": int(h.group(3)), "end": int(h.group(4)), "goods": goods, "blk": [int(x) for x in blk.groups()],
+                            "grp": {g[0]: [int(x) for x in g[1:]] for g in grp}, "mov": mov.groups(), "ms": float(tail.group(1)), "stum": int(tail.group(2)),
+                            "reg": [int(x) for x in reg.groups()], "crafts": crafts, "score": score, "gmov": gmov}
+                continue
+            if s.startswith("KS: regale wobec polki (f4-pomiary) dzien "):
+                a = NJE_F4.match(s)
+                if a:
+                    f4[int(a.group(1))] = a.group(2)
+                continue
+            if s.startswith("KS: rynki dzien "):
+                a = NJE_BASE_MKT.match(s)
+                if a:
+                    vals = {}
+                    for mname in ("Westeros", "Essos"):
+                        seg = re.search(r"\| " + mname + r": ([^|]*)", s)
+                        if not seg:
+                            continue
+                        for g, p, cn, st, rd in re.findall(r"(\w+) (-?\d+)/(-?\d+)/(-?\d+)/(-?\d+)", seg.group(1)):
+                            vals[(mname, g)] = (int(p), int(cn), int(st), int(rd))
+                    base[int(a.group(1))] = vals
+                continue
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in NJE_ERR):
+                errs.append(s[:160])
+    days = sorted(steps)
+    print(f"plik: {logp} | linii kroku f20-d4 {len(days)} (nierozpoznanych {bad}, pominietych krokow {len(skips)}), linii f4 regali {len(f4)}, linii 'KS: rynki' {len(base)}, ERROR {len(errs)}")
+
+    # NJE-0 linie paczki
+    rep.add("NJE-0: linie 'Jedzenie KS (f20-d4)' (co 7 dob od D po D+49)", f"krokow {len(days)}, nierozpoznanych {bad}, pominietych (brak mapy ZC4) {len(skips)}",
+            "nierozpoznanych 0" if days or bad else "INFO (log sprzed paczki albo bieg krotszy niz D+56)", (bad == 0) if (days or bad) else None)
+    # NJE-B baza z linii KS: rynki (zawsze - takze log sprzed paczki)
+    if base:
+        bd = sorted(base)
+        dprev = min(bd, key=lambda x: abs(x - (bd[-1] - 28)))
+        b0, b1 = base[dprev], base[bd[-1]]
+        parts = []
+        for mname, g, _k in NJE_WATCH:
+            v0, v1 = b0.get((mname, g)), b1.get((mname, g))
+            if v1:
+                parts.append(f"{mname[0]} {g} {v1[0]}/{v1[1]}/{v1[2]}+{v1[3]}" + (f" (zapas+droga {v0[2] + v0[3]} -> {v1[2] + v1[3]})" if v0 else ""))
+        rep.add("NJE-B: baza 'KS: rynki' (produkcja/zuzycie/zapas miast+w drodze szt. w ostatniej linii; zapas+droga 28 dob wczesniej -> ostatnia)", f"doby {dprev} -> {bd[-1]}: " + "; ".join(parts), "INFO (towary audytu f20-d4)", None)
+    if not days:
+        rep.add("NJE-1..11: regula f20-d4", "brak linii kroku", "INFO (klucz Ks Food Hands Follow Market wylaczony, log sprzed paczki albo bieg krotszy niz D+56)", None)
+        rep.show()
+        return 0
+    # NJE-1 krok co 7 dob bez dziur, pierwszy po D+49
+    d0 = steps[days[0]]["d0"]
+    every = steps[days[0]]["every"]
+    alld = sorted(set(days) | set(skips))
+    holes = sum(1 for a, b in zip(alld, alld[1:]) if b - a != every)
+    offgrid = sum(1 for d in alld if (d - d0) % every != 0 or d <= d0 + steps[days[0]]["end"])
+    rep.add("NJE-1: krok co 7 dob od D po D+49 bez dziur", f"krokow {len(alld)} ({alld[0]}-{alld[-1]}), D {d0}, dziur {holes}, poza siatka albo przed D+49 {offgrid}", "dziur 0, poza siatka 0",
+            holes == 0 and offgrid == 0)
+    # NJE-2 decyzje zgodne z zapasem za 8 tygodni (polki S8 i polki + droga Z8 wobec T*, z linii)
+    nchk, nbad, ex = 0, 0, []
+    for d in days:
+        for (mname, g), (S, R, T, pr, dec) in steps[d]["goods"].items():
+            nchk += 1
+            if T < 1 or "-" in pr:
+                ok = dec == "BEZ-CELU"
+            else:
+                s8, z8 = float(pr[0]), float(pr[1])
+                up = z8 < NJE_LO
+                dn = s8 > NJE_HI and z8 > NJE_HI
+                near = abs(z8 - NJE_LO) <= NJE_TOL or abs(s8 - NJE_HI) <= NJE_TOL or abs(z8 - NJE_HI) <= NJE_TOL   # na granicy - zaokraglenie linii
+                if dec == "BRAK":
+                    ok = up or near
+                elif dec == "NADMIAR":
+                    ok = dn or near
+                elif dec == "PASMO":
+                    ok = (not up and not dn) or near
+                else:
+                    ok = False
+            if not ok:
+                nbad += 1
+                if len(ex) < 4:
+                    ex.append(f"{d} {mname[0]} {g} {S}+{R}/{T} {dec}")
+    rep.add("NJE-2: decyzje zgodne z zapasem za 8 tyg. (BRAK: polki+droga < 0.5 T*; NADMIAR: polki i polki+droga > 2 T*; PASMO pomiedzy)", f"wpisow {nchk}, niezgodnych {nbad}" + (f" ({'; '.join(ex)})" if ex else ""),
+            "niezgodnych 0", nbad == 0)
+    # NJE-3 kierunek ruchu: zajecia w brak (wynik >= 0.5) nie traca rak, w nadmiarze (<= -0.5) nie zyskuja (suma rynku - wlasnosc replikatora w bloku)
+    vb, vlist = 0, []
+    for d in days:
+        for mname, (p0, p1, n0, n1) in steps[d]["grp"].items():
+            if p1 < p0 - max(2.0, 1e-6 * p0) or n1 > n0 + max(2.0, 1e-6 * n0):   # tolerancja: zaokraglenie linii i float udzialow (renormalizacja bloku)
+                vb += 1
+                if len(vlist) < 3:
+                    vlist.append(f"{d} {mname} w brak {p0}->{p1}, w nadmiarze {n0}->{n1}")
+    last = steps[days[-1]]["grp"]
+    rep.add("NJE-3: rece pola - zajecia w brak (wynik >= 0.5) nie maleja, w nadmiarze (<= -0.5) nie rosna (kazdy krok, kazdy rynek)",
+            f"krokow x rynek {2 * len(days)}, naruszen {vb}" + (f" ({'; '.join(vlist)})" if vlist else "") + " | ostatni: " + ", ".join(f"{k} brak {v[0]}->{v[1]}, nadmiar {v[2]}->{v[3]}" for k, v in last.items()),
+            "naruszen 0", vb == 0)
+    # NJE-4 limit okregu
+    pmax = max(float(steps[d]["mov"][2]) for d in days)
+    over = sum(int(steps[d]["mov"][5]) for d in days)
+    mvw = [int(steps[d]["mov"][0]) for d in days]
+    mve = [int(steps[d]["mov"][1]) for d in days]
+    rep.add("NJE-4: najwyzej 5% rak poza domem okregu na krok (decyzja Jeffa)", f"najwiecej {pmax:.2f}% (okregow ponad limit razem {over}); przesunieto srednio W {sum(mvw) / len(mvw):.0f}, E {sum(mve) / len(mve):.0f} rak/krok",
+            f"<= {NJE_PCT_MAX}% i ponad limit 0", pmax <= NJE_PCT_MAX + 1e-6 and over == 0)
+    # NJE-5 regale soli i daktyli zgodne z decyzja rynku
+    rb, rlist = 0, []
+    for d in days:
+        r, gd = steps[d]["reg"], steps[d]["goods"]
+        for k, (mname, g) in enumerate((("Westeros", "salt"), ("Essos", "salt"), ("Westeros", "date_fruit"), ("Essos", "date_fruit"))):
+            up, dn = r[2 * k], r[2 * k + 1]
+            dec = gd.get((mname, g), (0, 0, 0, "-", "BEZ-CELU"))[4]
+            if (up > 0 and dec != "BRAK") or (dn > 0 and dec != "NADMIAR"):
+                rb += 1
+                if len(rlist) < 3:
+                    rlist.append(f"{d} {mname[0]} {g} {up}/{dn} przy {dec}")
+    rl = steps[days[-1]]["reg"]
+    rep.add("NJE-5: regale soli i daktyli - w gore tylko przy BRAK, w dol tylko przy NADMIAR", f"naruszen {rb}" + (f" ({'; '.join(rlist)})" if rlist else "")
+            + f" | ostatni: rece przy soli W {rl[9]}->{rl[10]}, E {rl[11]}->{rl[12]}, daktyle W {rl[13]}->{rl[14]}, E {rl[15]}->{rl[16]}", "naruszen 0", rb == 0)
+    # NJE-6 bez pieniedzy, potkniecia i ERROR
+    st = sum(steps[d]["stum"] for d in days)
+    rep.add("NJE-6: pieniadze i towar bez przelewow, potkniecia i ERROR reguly", f"linii z 'bez przelewow' {len(days)}, potkniecia {st}, ERROR {len(errs)}" + (f" ({errs[0]})" if errs else ""), "potkniecia 0, ERROR 0",
+            st == 0 and not errs)
+    # NJE-7 czas
+    ms = [steps[d]["ms"] for d in days]
+    rep.add("NJE-7: czas kroku (raz na 7 dob)", f"najwiecej {max(ms):.1f} ms, srednio {sum(ms) / len(ms):.1f} ms", f"<= {NJE_MS_MAX} ms", max(ms) <= NJE_MS_MAX)
+    # NJE-8 histereza: BRAK <-> NADMIAR miedzy kolejnymi krokami tego samego towaru
+    flips, fl = 0, []
+    for a, b in zip(days, days[1:]):
+        for key, v in steps[b]["goods"].items():
+            u = steps[a]["goods"].get(key)
+            if not u:
+                continue
+            if {u[4], v[4]} == {"BRAK", "NADMIAR"}:
+                flips += 1
+                if len(fl) < 3:
+                    fl.append(f"{a}->{b} {key[0][0]} {key[1]} {u[4]}->{v[4]}")
+    rep.add("NJE-8: bez skakania BRAK <-> NADMIAR miedzy kolejnymi krokami (histereza 0.5..2 T*)", f"przeskokow {flips}" + (f" ({'; '.join(fl)})" if fl else ""), "przeskokow 0", flips == 0)
+    # NJE-9 jedna regula: RegaleCycle (f4) po pierwszym kroku nie liczy soli ani daktyli
+    after = {d: t for d, t in f4.items() if d >= days[0]}
+    if after:
+        hit = [d for d, t in after.items() if re.search(r"(?:^|; )(salt|date_fruit) \d+ ", t.strip())]
+        rep.add("NJE-9: RegaleCycle po D+49 bez soli i daktyli (jedna regula - linia f4 'regale wobec polki')", f"cykli f4 po pierwszym kroku {len(after)}, z sola/daktylami {len(hit)}" + (f" ({hit[:3]})" if hit else ""),
+                "0", not hit)
+    else:
+        rep.add("NJE-9: RegaleCycle po D+49 bez soli i daktyli", "brak linii f4 po pierwszym kroku", "INFO (cykl co 28 dob albo klucz Measure Regale Shelf wylaczony)", None)
+    # NJE-10 skutek: towary audytu - pierwszy -> ostatni krok
+    parts, better, worse = [], 0, 0
+    for mname, g, kind in NJE_WATCH:
+        a, b = steps[days[0]]["goods"].get((mname, g)), steps[days[-1]]["goods"].get((mname, g))
+        if not a or not b or a[2] < 1 or b[2] < 1:
+            continue
+        ra = (a[0] + a[1]) / a[2] if kind == "sum" else a[0] / a[2]
+        rb2 = (b[0] + b[1]) / b[2] if kind == "sum" else b[0] / b[2]
+        parts.append(f"{mname[0]} {g} {'polki+droga' if kind == 'sum' else 'polki'}/T* {ra:.2f} -> {rb2:.2f} ({a[4]} -> {b[4]})")
+        if (kind == "sum" and rb2 > ra) or (kind == "shelf" and rb2 < ra):
+            better += 1
+        elif (kind == "sum" and rb2 < ra) or (kind == "shelf" and rb2 > ra):
+            worse += 1
+    rep.add("NJE-10: skutek - towary audytu (pierwszy -> ostatni krok)", "; ".join(parts) if parts else "brak towarow w linii",
+            f"INFO (lepiej {better}, gorzej {worse}; oczekiwanie z fin93: oliwki i winogrona Essos w gore po kilku tygodniach, mieso wolno - mieso to produkt uboczny zajec mieszanych; sol Essos i ryby Westeros przestaja rosnac po 4-11 tyg.)", None)
+    # NJE-11 przebieg (INFO): bloki zmienione, zajecia z najwiekszym ruchem, ruchy wedlug towaru w ostatnim kroku
+    bl = steps[days[-1]]["blk"]
+    cr = steps[days[-1]]["crafts"]
+    top = sorted(cr.items(), key=lambda kv: -abs(kv[1][1] - kv[1][0]))[:4]
+    gm = steps[days[-1]]["gmov"]
+    rep.add("NJE-11: przebieg (ostatni krok)", f"bloki {bl[0]}: zmienione {bl[1]}, rowny wynik {bl[2]}, jedno zajecie {bl[3]}, ziemia skrocila/zatrzymala {bl[4]}/{bl[5]}, A7 {bl[6]}, prace {bl[7]}, "
+            f"prog wyzywienia {bl[9]} okregow | zajecia: " + ", ".join(f"{k[0][0]} {k[1]} {v[0]}->{v[1]}" for k, v in top)
+            + " | towary: " + ", ".join(f"{k[0][0]} {k[1]} {v:+d}" for k, v in sorted(gm.items(), key=lambda kv: -abs(kv[1]))[:6]), "INFO", None)
+    rep.show()
+    return 0
+
+
 # ============================================================ npozyczka (18.10, paczka f8-pozyczka - decyzja Jeffa "2. tak": pozyczka miejska - rada wlasnego miasta /
 # ludzie wlasnego zamku drugim wierzycielem kredytu wojennego 168 przed Bankiem; Armoury/src/TownFolk.TownLoan.cs, DebtLadder.cs KTown, ClanBudget.cs, TownFolk.Loans.cs)
 NPZ_LINE = "Pozyczki miejskie (f8): dzien "
@@ -48428,6 +48692,8 @@ def main(argv):
         return nopal_main(logp)   # nopal (noc 17/18.10, fala 4 f4-opal): opal mieszczan pod KS - pora roku, limit dowozu drewna, popyt ceny, zapas dymarek; drewno, ruda, kopalnia bez wegla, zima
     if group == "nruda" and logp:
         return nruda_main(logp)   # nruda (noc 18.10, fala 5 f5-ruda): ruda/zelazo pod KS - rece przy zlozach zelaza za ruda rynku, kredyt kupcow na drewno dymarek; NOP-7/NOP-8, zapas rudy, lupy
+    if group == "njedz" and logp:
+        return njedz_main(logp)   # njedz (noc 18.10, f20-d4): rece zajec jedzenia i soli pod KS za polkami calego rynku po D+49 (StartCalibration.Jedzenie.cs); baza z linii 'KS: rynki'
     if group == "nwegiel" and logp:
         return nwegiel_main(logp)   # nwegiel (noc 18.10, f7-wegiel): weglarze przy kopalni pod KS - bezczynne rece pala wegiel z lasu okregu (tabela swiata), bez zlota; NOP-8 bez rak weglarzy, lupy, tozsamosci
     if group == "nzapis" and logp:
