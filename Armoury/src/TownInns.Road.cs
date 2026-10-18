@@ -32,6 +32,10 @@ namespace Armoury
         private static readonly int[] _rdPeople = new int[4];
         private static long _rdMen, _rdComp, _rdCompPurse, _rdPlayer, _rdPurse, _rdTax, _rdCrown, _rdDiff;
 
+        /// <summary>Recenzja: podatek pana od noclegu w zajezdzie tylko przy kluczu VillageTributeFromSutlers - ta sama regula co czesc wsi markietanow (Sutlers.One:
+        /// wylaczony = calosc do kiesy wsi, udzial korony DS od calosci). Jedna regula na jedno zjawisko (dochod wsi z uslug dla wojska).</summary>
+        internal static bool RoadTributeOn { get { var s = Settings.Current; return s != null && s.VillageTributeFromSutlers; } }
+
         internal static void RoadDayReset()
         {
             _rdStays = _rdStumbles = 0;
@@ -159,7 +163,7 @@ namespace Armoury
                  .Append(Clock(wake)).Append(") and wake rested until ").Append(Clock(RestedUntil(wake))).Append(": +").Append(F1(sp)).Append("% speed, +").Append(F1(mo)).Append(" morale");
                 if (sl > 1.001f) t.Append(", sleep x").Append(sl.ToString("0.00", Inv));
                 if (he > 0.001f) t.Append(", healing tonight +").Append((he * 100f).ToString("0", Inv)).Append("%");
-                t.Append(". The coin goes to the village of ").Append(inn.Village.Name).Append(" (its lord takes his share).");
+                t.Append(". The coin goes to the village of ").Append(inn.Village.Name).Append(RoadTax(inn.Village, 100) > 0 ? " (its lord takes his share)." : ".");
                 if (NightRest.Debt > 0) t.Append(" The men still owe sleep - the bed's comfort shows once it is paid off.");
                 if (!b.PlayerCan) { args.IsEnabled = false; t.Append("\nYou cannot pay your own part (").Append(b.PlayerCost).Append(" d)."); }
                 args.Tooltip = new TextObject("{=!}" + t.ToString());
@@ -178,11 +182,12 @@ namespace Armoury
         }
 
         /// <summary>Podatek pana od utargu wsi wedlug czynnego modelu (SettlementTaxModel.CalculateVillageTaxFromIncome - ta sama regula co VillageTakings / markietani),
-        /// w granicach 0..income. Wies rodu partii gracza - bez podatku (jak markietani, K3). Wyjatek modelu = 0 (calosc zostaje w kiesie).</summary>
+        /// w granicach 0..income. Wies rodu partii gracza - bez podatku (jak markietani, K3); klucz VillageTributeFromSutlers wylaczony - bez podatku (jak markietani,
+        /// recenzja). Wyjatek modelu = 0 (calosc zostaje w kiesie).</summary>
         private static int RoadTax(Settlement vs, int income)
         {
             var v = vs != null ? vs.Village : null;
-            if (v == null || income <= 0) return 0;
+            if (v == null || income <= 0 || !RoadTributeOn) return 0;
             if (MobileParty.MainParty != null && ReferenceEquals(vs.OwnerClan, MobileParty.MainParty.ActualClan)) return 0;
             try
             {
@@ -194,7 +199,8 @@ namespace Armoury
         }
 
         /// <summary>Bohater -> wies: przelew gry do kiesy wsi (GiveGoldAction), potem czesc podatku z kiesy na licznik podatku wsi (w obrebie wsi) i udzial korony DS od
-        /// reszty (DsVillage.WarShareSutlers - jak markietani). Zwraca zaplacone; `tax` - na licznik podatku, `crown` - do korony.</summary>
+        /// reszty (DsVillage.WarShareSutlers - jak markietani). Zwraca zaplacone; `tax` - na licznik podatku, `crown` - do korony. Recenzja: oba odplywy z kiesy wsi
+        /// (na licznik podatku i do korony) poza tickiem dobowym nazwane w ksiedze przeplywow osad (MoneyLedger.Note169 "inne"); przelew gry ksiega widzi sama.</summary>
         private static int RoadHeroPays(Hero h, Settlement vs, int cost, bool quiet, out int tax, out int crown)
         {
             tax = 0; crown = 0;
@@ -206,8 +212,9 @@ namespace Armoury
             {
                 var v = vs.Village;
                 int t = Math.Min(RoadTax(vs, paid), Math.Max(0, v.Gold));
-                if (t > 0) { v.ChangeGold(-t); v.TradeTaxAccumulated += t; tax = t; }
-                if (paid - tax > 0) crown = DsVillage.WarShareSutlers(v, paid - tax);   // wlasny try - nie rzuca
+                if (t > 0) { v.ChangeGold(-t); v.TradeTaxAccumulated += t; tax = t; MoneyLedger.Note169(MoneyLedger.N169Other, vs, -t); }   // kiesa -> licznik podatku (tylko licznik ksiegi)
+                if (paid - tax > 0) crown = DsVillage.WarShareSutlers(v, paid - tax, true);   // wlasny try - nie rzuca
+                if (crown > 0) MoneyLedger.Note169(MoneyLedger.N169Other, vs, -crown);       // kiesa wsi -> skarbiec korony (tylko licznik)
             }
             return paid;
         }

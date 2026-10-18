@@ -66,6 +66,7 @@ namespace Armoury
         internal static void Reset()
         {
             _bands.Clear(); _news.Clear();
+            _priceItems = null;   // recenzja: przedmioty gry z MBObjectManager tej kampanii - nastepna kampania (nowa gra / wczytanie) buduje liste od nowa
             _stumbles = 0; _errLogged = false; _importNote = "brak klucza (stary zapis albo nowa kampania)";
             DayReset();
         }

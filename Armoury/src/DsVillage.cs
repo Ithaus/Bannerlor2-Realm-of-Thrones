@@ -60,6 +60,7 @@ namespace Armoury
         private static int _cN, _cNoPart, _cPeaceN, _cRemitRaid, _cRemitSiege, _cRemitFam, _cTiNoList, _cTiNoPriest, _cTiNoMarket;
         private static long _cHanded, _cPart, _cLord, _cTithe, _cAlms, _cWage, _cMat, _cTiStay, _cCrown;
         private static int _sN, _sRemit; private static long _sBase, _sCrown;
+        private static int _iN; private static long _iBase, _iCrown;                            // sw-zajazdy (recenzja): czesc z tego - noclegi w zajazdach przy szlakach (WarShareSutlers inn)
         private static int _rN, _rRemitN, _rRemitRaid, _rRemitSiege, _rRemitFam, _rForgivenN;
         private static double _rDue, _rPaid, _rArrPaid, _rNewArr, _rForgiven, _rRemit, _rLost;
         private static int _kVill; private static double _kGold, _kChest, _kOver, _kBudget, _kP5Plan, _kBkPlan, _kP5, _kOldExtra, _kOldLadder;
@@ -74,6 +75,7 @@ namespace Armoury
             _cN = _cNoPart = _cPeaceN = _cRemitRaid = _cRemitSiege = _cRemitFam = _cTiNoList = _cTiNoPriest = _cTiNoMarket = 0;
             _cHanded = _cPart = _cLord = _cTithe = _cAlms = _cWage = _cMat = _cTiStay = _cCrown = 0;
             _sN = _sRemit = 0; _sBase = _sCrown = 0;
+            _iN = 0; _iBase = _iCrown = 0;
             _rN = _rRemitN = _rRemitRaid = _rRemitSiege = _rRemitFam = _rForgivenN = 0;
             _rDue = _rPaid = _rArrPaid = _rNewArr = _rForgiven = _rRemit = _rLost = 0;
             _kVill = 0; _kGold = _kChest = _kOver = _kBudget = _kP5Plan = _kBkPlan = _kP5 = _kOldExtra = _kOldLadder = 0;
@@ -367,8 +369,10 @@ namespace Armoury
             catch (Exception e) { Stumble("DuesAtCart", e); }
         }
 
-        /// <summary>Sutlers.One (blok doby, po wplacie czesci wsi markietanow do kiesy): udzial korony g/10 x Ramp od tej czesci. Zwraca przelane. Nie rzuca.</summary>
-        internal static int WarShareSutlers(Village v, int purse)
+        /// <summary>Sutlers.One (blok doby, po wplacie czesci wsi markietanow do kiesy): udzial korony g/10 x Ramp od tej czesci. Zwraca przelane. Nie rzuca.
+        /// sw-zajazdy: `inn` = nocleg w zajezdzie przy szlaku (MenPurse.InnPayVillage, TownInns.RoadHeroPays - poza blokiem doby, z menu) - ta sama regula i te same
+        /// liczniki markietanow (kontrola NDS-14e bez zmian), do tego osobny licznik "w tym zajazdy" w linii doby (recenzja: pieniadz zajazdow nazwany).</summary>
+        internal static int WarShareSutlers(Village v, int purse, bool inn = false)
         {
             try
             {
@@ -382,11 +386,13 @@ namespace Armoury
                 if (!remit && k != null && dsOn) DsSeason.NoteVillageBase(k, purse * WarShare(Settings.Current) * Ramp);   // DS F3: plon W4 na jednostke g (prognoza nadania)
                 if (g <= 0) return 0;
                 _sBase += purse;
+                if (inn) _iBase += purse;
                 if (remit) { _sRemit++; return 0; }
                 long want = (long)Math.Floor(purse * g * WarShare(Settings.Current) * Ramp);
                 long wIn;
                 long got = ToCrown(v, k, Math.Min(want, purse), out wIn);
                 if (got > 0) { _sN++; _sCrown += got; _payOut += got; _payIn += wIn; }
+                if (got > 0 && inn) { _iN++; _iCrown += got; }
                 return (int)got;
             }
             catch (Exception e) { Stumble("WarShareSutlers", e); return 0; }
@@ -674,6 +680,7 @@ namespace Armoury
                   .Append(", korona przy wozie ").Append(_cCrown).Append(" (g krolestw: 0 - ").Append(g0).Append(", 1 - ").Append(g1).Append(", 1.5 - ").Append(g15)
                   .Append("; wozow w pokoju ").Append(_cPeaceN).Append(", zwolnione: rabunek ").Append(_cRemitRaid).Append(", oblezenie ").Append(_cRemitSiege).Append(", glod ").Append(_cRemitFam).Append(")")
                   .Append(" | markietani: czesc wsi w wojnie ").Append(_sBase).Append(", korona ").Append(_sCrown).Append(" (").Append(_sN).Append(" wplat, zwolnione ").Append(_sRemit).Append(")")
+                  .Append(_iBase > 0 ? ", w tym zajazdy przy szlakach (ZJ): czesc wsi " + _iBase + ", korona " + _iCrown + " (" + _iN + " wplat)" : "")   // sw-zajazdy: tylko gdy byly noclegi - bez nich linia jak dotad
                   .Append(" | czynsz: nalezny ").Append(N0(_rDue)).Append(" (").Append(_rN).Append(" wsi), zaplacony ").Append(N0(_rPaid)).Append(" (w tym zaleglosci ").Append(N0(_rArrPaid)).Append(")")
                   .Append(", nowa zaleglosc ").Append(N0(_rNewArr)).Append(", zaleglosci ").Append(N0(arrSum)).Append(" u ").Append(arrN).Append(" wsi (ponad 91 rat ").Append(arr91).Append(")")
                   .Append(", darowane po roku ").Append(N0(_rForgiven)).Append(" (").Append(_rForgivenN).Append(" wsi), wstrzymane ").Append(N0(_rRemit)).Append(" (").Append(_rRemitN)

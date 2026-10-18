@@ -89,6 +89,7 @@ namespace Armoury
             _pendingUid = _askedUid = null; _current = null; _lastCheck = 0;
             _stumbles = 0; _errLogged = false;
             DayReset();
+            InnViewStats.DayZero();   // recenzja: liczniki doby widoku poprzedniej kampanii nie wchodza do pierwszej linii doby nowej (nowa gra / wczytanie bez konca doby)
         }
 
         private static void DayReset()
@@ -353,6 +354,7 @@ namespace Armoury
                 if (c == null || c.CurrentMenuContext != null) return;   // menu otwarte (takze nasze) - nic
                 _current = null;                                          // menu zamkniete - zaden zajazd nie jest otwarty (po snie, po "Ride on")
                 if (TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Current != null) return;   // spotkanie w toku - nic
+                if (PopupBlocked()) return;                                                          // recenzja: okno, rozmowa albo autotest - nic (jak SiegeRansom.CanShow)
                 var mp = MobileParty.MainParty;
                 if (mp == null || Hero.MainHero == null || !Hero.MainHero.IsAlive) return;
                 if (mp.CurrentSettlement != null || mp.MapEvent != null || mp.IsCurrentlyAtSea || TaleWorlds.CampaignSystem.PlayerCaptivity.IsCaptive
@@ -378,12 +380,61 @@ namespace Armoury
             finally { _dTickTicks += Stopwatch.GetTimestamp() - t0; _dTickN++; }
         }
 
+        /// <summary>Recenzja (wzor SiegeRansom.CanShow): nie otwieramy pytania ani menu, gdy stoi inne okno (np. NightfallAsk - dwa okna z pauza jedno na drugim),
+        /// trwa rozmowa na mapie (bez PlayerEncounter - ActivateGameMenu w srodku rozmowy), aktywny stan gry to nie mapa, albo biegnie autotest CrashScribe (nikt nie
+        /// kliknie okna z pauza, partia autotestu stajaca przy zajezdzie stalaby do konca). Tylko odczyt.</summary>
+        private static bool PopupBlocked()
+        {
+            if (AutotestActive()) return true;
+            if (InformationManager.IsAnyInquiryActive()) return true;
+            if (ConversationOn()) return true;
+            var ms = Game.Current != null && Game.Current.GameStateManager != null ? Game.Current.GameStateManager.ActiveState as TaleWorlds.CampaignSystem.GameState.MapState : null;
+            return ms == null;
+        }
+
+        private static bool ConversationOn()
+        {
+            var cm = Campaign.Current != null ? Campaign.Current.ConversationManager : null;
+            return cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive);
+        }
+
+        // autotest (CrashScribe.Autotest.Active - pole tylko w DLL autotestu; ta sama proba co SiegeRansom.AutotestActive, raz na sesje gry)
+        private static int _autotest = -1;
+
+        private static bool AutotestActive()
+        {
+            if (_autotest >= 0) return _autotest == 1;
+            _autotest = 0;
+            try
+            {
+                foreach (System.Reflection.Assembly asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (asm.GetName().Name != "CrashScribe") continue;
+                    Type t = asm.GetType("CrashScribe.Autotest", false);
+                    var f = t != null ? t.GetField("Active", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public) : null;
+                    if (f != null && f.FieldType == typeof(bool) && (bool)f.GetValue(null)) _autotest = 1;
+                    break;
+                }
+            }
+            catch { _autotest = 0; }
+            return _autotest == 1;
+        }
+
         private static void Ask(Inn inn)
         {
             _dAsk++;
             string body = "You draw rein by " + inn.Name + ", " + KindText(inn) + " on the lands of " + inn.Village.Name + ". " + BedsText(inn) + " Go in?";
             InformationManager.ShowInquiry(new InquiryData(inn.Name, body, true, true, "Go in", "Ride on",
-                delegate { try { _dAskYes++; Open(inn, "pytanie przy postoju"); } catch (Exception e) { Stumble("Ask.Yes", e); } },
+                delegate
+                {
+                    try
+                    {
+                        _dAskYes++;
+                        if (ConversationOn()) return;   // recenzja: w czasie okna zaczela sie rozmowa - bez menu (pytanie wroci po odjechaniu i ponownym postoju)
+                        Open(inn, "pytanie przy postoju");
+                    }
+                    catch (Exception e) { Stumble("Ask.Yes", e); }
+                },
                 delegate { _dAskNo++; }), true);
         }
 
@@ -392,6 +443,7 @@ namespace Armoury
             var c = Campaign.Current;
             if (c == null || c.CurrentMenuContext != null || inn == null) return;
             if (TaleWorlds.CampaignSystem.Encounters.PlayerEncounter.Current != null) return;
+            if (ConversationOn()) return;   // recenzja: nie w srodku rozmowy na mapie
             var mp = MobileParty.MainParty;
             if (mp == null || mp.CurrentSettlement != null || mp.MapEvent != null) return;
             _current = inn;
@@ -531,6 +583,9 @@ namespace Armoury
             Created = ShownMax = Failed = MeshMiss = PiecesWater = StCreate = StVis = StHover = StClick = Clicks = 0;
             CreateTicks = 0;
         }
+
+        /// <summary>Nowa kampania albo wczytanie (RoadsideInns.Reset - konstruktor ArmouryBehavior): liczniki doby od zera.</summary>
+        internal static void DayZero() { CreatedDay = ShowDay = HideDay = ClicksDay = 0; }
 
         /// <summary>Czesc linii doby zajazdow: obrazki postawione (od wczytania mapy i dzis), pokazane, przebudowy (zawsze 0 - obrazek powstaje raz), potkniecia.</summary>
         internal static string DayText()
