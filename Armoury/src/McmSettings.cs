@@ -7128,6 +7128,10 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsLotPricePow { get; set; } = true;
 
+        [SettingPropertyBool("Ks Carts Min Lot True Demand", HintText = "with Ks Food Carts: the smallest food cart the merchants send is half a day of what the buying town really buys (at least 5), also where its stall stands empty - before, a hungry town asking for up to two and a half times its daily need for a while also refused every offer below one and a quarter days of its need, so small sellers never served the towns that lacked most; off = the smallest cart grows with the town's extra order, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsCartsMinLotTrueDemand { get; set; } = true;
+
         [SettingPropertyBool("Ks Land Gradient", HintText = "with Start Calibration: the weekly plan sees the road - where food must come from far away it is dearer by the cost of the haul, so the peasants there grow more of it and their basket costs more, and where it cannot be sold it is cheaper. It counts what people there really pay for, and one purse per land for all its imports. The work of a hand stays the same, only how many hands work at each thing changes; off = the plan prices every market as one place", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsLandGradient { get; set; } = true;
@@ -7647,6 +7651,10 @@ namespace Armoury
         [SettingPropertyBool("Ks Ctl Own Food", HintText = "with Ks Market Control: the weekly market steering counts the food a village ate from its own store waiting for the cart (when it bought less than the plan paid for) as eaten from that market - it was grown for the market and it fed the market's buyers, it only never reached the stall; the part of a village's paid basket missing at the stall that it covered with the same food from its own store no longer counts as missing as well. Before, the plan's market supply held it but the market's use did not, so the steering cut foods the villages ate at home (Essos fish about 7%). Off = only what was bought at the stalls counts, as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsCtlOwnFood { get; set; } = true;
+
+        [SettingPropertyBool("Ks Ctl Own Same Food", HintText = "with Ks Ctl Own Food: the market steering counts as eaten from the market only the food a village ate from its own store in place of the same food missing at the stall (its own fish for the fish it could not buy). Food it ate in place of another missing food (its fish because there was no grain) no longer counts as fish eaten - the missing grain already counts as missing, so the same hunger was counted twice and the steering grew more fish while fish piled up on the stalls; off = all the food a village ate from its store counts, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
+        public bool KsCtlOwnSameFood { get; set; } = true;
 
         [SettingPropertyBool("Ks Cloth Demand", HintText = "with Start Calibration applied: the Plan counts the linen, felt and leather that army clothing, arms workshops and smiths' repairs use up, so villages grow enough flax and wool and keep enough hides for them (the town weavers' own flax and wool are already counted in the cloth); off = as before", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
@@ -9721,6 +9729,7 @@ namespace Armoury
             s.KsFaminePriority = KsFaminePriority;
             s.KsCorridorsCredit = KsCorridorsCredit;
             s.KsLotPricePow = KsLotPricePow;
+            s.KsCartsMinLotTrueDemand = KsCartsMinLotTrueDemand;
             s.KsLandGradient = KsLandGradient;
             s.KsAlphaNet = KsAlphaNet;
             s.KsVillagePaidFirst = KsVillagePaidFirst;
@@ -9851,6 +9860,7 @@ namespace Armoury
             s.KsLandGlutGuard = KsLandGlutGuard;
             s.KsMade7Derived = KsMade7Derived;
             s.KsCtlOwnFood = KsCtlOwnFood;
+            s.KsCtlOwnSameFood = KsCtlOwnSameFood;
             s.KsClothDemand = KsClothDemand;
             s.WallGrainTribute = WallGrainTribute;
             s.WallTributeTargetDays = WallTributeTargetDays;

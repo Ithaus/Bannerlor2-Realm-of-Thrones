@@ -78,6 +78,8 @@ namespace Armoury
             // minus zadatki doby) i zadatek naprawde zaplacony w ostatnim ShipDep (zl; null - zadatek planu x wyslane / zamowione)
             public Func<int, double> DstFreeNow;
             public Func<long> DepPaidLast;
+            // f19-e2 (klucz Ks Carts Min Lot True Demand; false = bit w bit jak dotad): najmniejszy lot = max(5, 0.5 x prawdziwy popyt DzB), nie 0.5 x Dz (popyt x kx)
+            public bool MinLotTrue;
             // recenzja ceny-r5 (pomiar NKS-7g, bez zmiany decyzji): oferta zrodel na poczatku doby i niesprzedana na koniec [t * NK + k] (szt., dodawane; null - bez pomiaru)
             public double[] Offer0, OfferLeft;
         }
@@ -271,6 +273,9 @@ namespace Armoury
             double lim = a.Per[k] ? MaxPer : MaxDur;
             double d = r.Dz[t * NK + k], T = a.Ts[a.Mk[t] * NK + k];
             double Hc = sh[t * NK + k] + a.Inc[t * NK + k];
+            // f19-e2 (Ks Carts Min Lot True Demand): najmniejszy lot z prawdziwego popytu (DzB) - kx (do 2.5 przy pustej polce) powieksza zamowienie (want), a nie prog
+            // odrzucenia ofert; dotad miasto glodne odrzucalo oferty ponizej 1.25 doby popytu (miasto syte - ponizej 0.5). Bez klucza 0.5 x d jak dotad (bit w bit)
+            double minQ = Math.Max(5.0, 0.5 * (a.MinLotTrue ? r.DzB[t * NK + k] : d));
             // KS-R5 ceny-r5 (pomiar Miss): brak do T* przy prawdziwym popycie (bez kx) i etap, do ktorego doszlo najlepsze zrodlo (0 bez oferty, 1 poza zasiegiem, 2 wojna, 3 marza)
             double deficit = a.Miss != null ? Math.Max(0.0, T * r.DzB[t * NK + k] - Hc) : 0.0;
             int stage = -1;
@@ -326,7 +331,7 @@ namespace Armoury
                 {
                     int s = kv.Value; float L = a.Days(s, t);
                     double q = Math.Min(offer[s * NK + k], (T + L + 2) * d - Hc);
-                    if (q < Math.Max(5.0, 0.5 * d)) continue;
+                    if (q < minQ) continue;
                     long n0 = (long)Math.Floor(q);
                     st.Ordered += n0; st.Overdue += n0;
                     if (fam) st.FamineOrd += n0;
@@ -348,7 +353,7 @@ namespace Armoury
                 int s = kv.Value; float L = a.Days(s, t);
                 double want = (T + L + 2) * d - Hc;
                 double q = Math.Min(offer[s * NK + k], want);
-                if (q < Math.Max(5.0, 0.5 * d)) continue;
+                if (q < minQ) continue;
                 int n = (int)Math.Floor(q);
                 if (ord0 < 0) ord0 = n;
                 bool sea = a.Sea(s, t);
@@ -362,7 +367,7 @@ namespace Armoury
                     while (n > 0 && cost + fr > Val(a, t, k, j0, n, destUnit) && tries < 3)
                     {
                         n /= 2; tries++;
-                        if (n < Math.Max(5.0, 0.5 * d)) { n = 0; break; }
+                        if (n < minQ) { n = 0; break; }
                         cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
                     }
                     if (n <= 0 || cost + fr > Val(a, t, k, j0, n, destUnit)) { st.NoProfit++; noProfitHit = true; continue; }
@@ -378,7 +383,7 @@ namespace Armoury
                     // zadatki doby, najwyzej kasa celu teraz); zrodlo niesie na kredyt tylko towar + fracht - zadatek.
                     // Recenzja ceny-r5 (wazne): lot za duzy takze z zadatkiem - ciety wobec zadatku, ktory MALEJE z lotem (DepCut; dotad ciecie do "miejsce + zadatek calego lotu"
                     // prawie zawsze odrzucalo lot); gdy lot z zadatkiem nie wyjdzie wiekszy niz ciecie r4-kupcy bez zadatku - ciecie r4-kupcy (zadatek 0), nigdy mniej niz bez klucza.
-                    double minLot = Math.Max(5.0, 0.5 * d);
+                    double minLot = minQ;
                     int nf0 = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
                     nNoDep = nf0 < minLot ? 0 : nf0;   // tyle pojechaloby bez zadatku (r4-kupcy) - "odblokowane" w linii
                     double dfree = Math.Max(0.0, a.DstFree[t] - r.DepSpent[t]);
@@ -403,7 +408,7 @@ namespace Armoury
                 {
                     int nf = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
                     if (a.Consign) srcHit = true; else poorHit = true;
-                    if (nf < Math.Max(5.0, 0.5 * d)) continue;
+                    if (nf < minQ) continue;
                     n = nf;
                     cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
                     if (cost + fr > avail + 1) continue;

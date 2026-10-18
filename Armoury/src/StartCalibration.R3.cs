@@ -36,6 +36,9 @@ namespace Armoury
         internal static bool SwMarketControl { get { var s = S3; return s == null || s.KsMarketControl; } }
         /// <summary>f14-rynek (klucz Ks Ctl Own Food): sterowanie rynku liczy "wies je swoje" (G3) rynku wsi w zuzyciu - podaz targu Planu, ktora nie doszla do straganu.</summary>
         internal static bool SwCtlOwnFood { get { var s = S3; return s == null || s.KsCtlOwnFood; } }
+        /// <summary>f19-e2 (klucz Ks Ctl Own Same Food, przy Ks Ctl Own Food): w zuzyciu sterowania tylko "wies je swoje" w miejsce braku TEGO SAMEGO towaru (min(brak, swoje)),
+        /// nie zastepcze kcal za inny brakujacy towar (te sa juz brakiem tamtego towaru).</summary>
+        internal static bool SwCtlOwnSameFood { get { var s = S3; return s == null || s.KsCtlOwnSameFood; } }
         internal static bool SwBuyEvery2 { get { var s = S3; return s == null || s.KsVillageBuyEvery2; } }
         internal static bool SwGranaryRelease { get { var s = S3; return s == null || s.KsGranaryRelease; } }
 
@@ -53,6 +56,7 @@ namespace Armoury
             _ownDay = new double[6]; _shelfLineDay = -1; _csvGoodsDay = -1; _outMkDay[0] = _outMkDay[1] = _frMkDay[0] = _frMkDay[1] = 0;
             Array.Clear(_p2, 0, _p2.Length); Array.Clear(_p2Mk, 0, _p2Mk.Length); _mfStage = null; _r3Pending = null; _r3Keep = null;
             _ownCov.Clear(); Array.Clear(_ovDay, 0, _ovDay.Length); Array.Clear(_ovTown, 0, _ovTown.Length); Array.Clear(_ov28, 0, _ov28.Length);   // f14-rynek (recenzja)
+            Array.Clear(_ownIn28, 0, _ownIn28.Length); Array.Clear(_ownAll28, 0, _ownAll28.Length);   // f19-e2
         }
 
         // ------------------------------------------------------------ kraina miasta (kultura z kalibracji - jak Plan)
@@ -211,6 +215,8 @@ namespace Armoury
             double w = 1.0 / Math.Min(28, _cN);
             var c = new double[2 * KsTab.NG]; var u = new double[2 * KsTab.NG];
             bool own = SwCtlOwnFood;
+            bool same = own && SwCtlOwnSameFood;                                      // f19-e2 (klucz Ks Ctl Own Same Food)
+            var ownAll = new double[2]; var ownIn = new double[2];                   // f19-e2: wies je swoje W/E - wszystko (MkOwn) i czesc w zuzyciu sterowania (szt.)
             foreach (var kv in _ctlTmp)
             {
                 int z = Array.IndexOf(ZIds, kv.Key); if (z < 0) continue;
@@ -218,15 +224,30 @@ namespace Armoury
                 for (int m = 0; m < 2; m++) c[m * KsTab.NG + g] += Math.Max(0, kv.Value[3 + m]);
                 // f14-rynek (klucz Ks Ctl Own Food): wies je swoje (G3) rynku wsi - KsMarketTake [8 + m] (MkOwn: z magazynu wsi, poza straganem). Podaz targu Planu (dm) ma ten
                 // towar w sobie (wies miala go sprzedac i kupic koszyk na targu), a zuzycie targu nie - bez niego sterowanie widzialo nadmiar tam, gdzie wies zjadla swoje
-                if (own && kv.Value.Length >= 10) for (int m = 0; m < 2; m++) c[m * KsTab.NG + g] += Math.Max(0, kv.Value[8 + m]);
+                // f19-e2 (klucz Ks Ctl Own Same Food): G3 (TownFolk.OwnFirst) je z magazynu wedlug braku KCAL w stalej kolejnosci (ziarno, ryby, mieso, ser ...), niezaleznie
+                // od tego, czego zabraklo na straganie - wies rybacka bez ziarna na targu je swoje ryby. Cale MkOwn ryb w zuzyciu ryb liczylo te same kcal drugi raz (brak ziarna
+                // jest juz w braku ziarna), a czynnik ryb rosl przy rosnacych polkach ryb (fin93: ryby Westeros x1.07-1.13, polki 0.93 -> 3.68 T*). Z kluczem do zuzycia idzie
+                // tylko czesc pokrywajaca brak TEGO SAMEGO towaru - nizej, z _ovDay (KsOwnCovered: min(brak, swoje) wedlug pozycji koszyka wsi)
+                if (own && kv.Value.Length >= 10)
+                    for (int m = 0; m < 2; m++)
+                    {
+                        double o = Math.Max(0, kv.Value[8 + m]);
+                        ownAll[m] += o;
+                        if (!same) { c[m * KsTab.NG + g] += o; ownIn[m] += o; }
+                    }
             }
             // f14-rynek (recenzja, Ks Ctl Own Food): brak drabiny 1 wsi pokryty swoim tym samym towarem (G3) jest juz w zuzyciu (wyzej) - bez niego w braku rynku
+            // f19-e2 (Ks Ctl Own Same Food): ta sama czesc (odjeta od braku) idzie do zuzycia - zuzycie + brak tego towaru bez zmiany, kcal zastepcze nie wchodza nigdzie drugi raz
             var ovMk = new double[2];
             for (int m = 0; m < 2; m++) for (int z = 0; z < ZN; z++)
             {
                 int g = CtlGood(z); if (g < 0) continue;
                 double ud = _uDay[m * ZN + z];
-                if (own) { double cut = Math.Min(ud, Math.Max(0.0, _ovDay[m * ZN + z])); ud -= cut; ovMk[m] += cut; }
+                if (own)
+                {
+                    double cut = Math.Min(ud, Math.Max(0.0, _ovDay[m * ZN + z])); ud -= cut; ovMk[m] += cut;
+                    if (same) { c[m * KsTab.NG + g] += cut; ownIn[m] += cut; }
+                }
                 u[m * KsTab.NG + g] += ud;
             }
             Array.Clear(_uDay, 0, _uDay.Length); Array.Clear(_ovDay, 0, _ovDay.Length);
@@ -236,6 +257,11 @@ namespace Armoury
             Array.Clear(_ovTown, 0, _ovTown.Length);
             try { R4cUnmetDaily(w, _cN <= 1); } catch (Exception e) { Stumble("R4cUnmetDaily", e); }   // KS r4 C1 (r4-ceny, klucz Ks Ctl Per Town): brak miasto po miescie
             for (int m = 0; m < 2; m++) { double v = SwCtlPerTown ? _ovTown[m] : ovMk[m]; _ov28[m] = _cN <= 1 ? v : _ov28[m] + (v - _ov28[m]) * w; }
+            for (int m = 0; m < 2; m++)   // f19-e2: srednie 28 dob do linii sterowania (tylko pomiar)
+            {
+                _ownIn28[m] = _cN <= 1 ? ownIn[m] : _ownIn28[m] + (ownIn[m] - _ownIn28[m]) * w;
+                _ownAll28[m] = _cN <= 1 ? ownAll[m] : _ownAll28[m] + (ownAll[m] - _ownAll28[m]) * w;
+            }
         }
 
         // ------------------------------------------------------------ f14-rynek (recenzja): brak wsi pokryty swoim tym samym towarem (klucz Ks Ctl Own Food)
@@ -247,6 +273,7 @@ namespace Armoury
         private static readonly Dictionary<Village, OwnCov> _ownCov = new Dictionary<Village, OwnCov>();   // wies -> pokryte swoim z ostatnich zakupow (szt./d wedlug pozycji)
         private static readonly double[] _ovDay = new double[2 * KsBasket.N];   // to samo wedlug rynku od ostatniej doby sterowania (szt.) - odejmowane od _uDay
         private static readonly double[] _ovTown = new double[2], _ov28 = new double[2];   // odjete od braku doby (szt./d) i srednia 28 dob - linia sterowania
+        private static readonly double[] _ownIn28 = new double[2], _ownAll28 = new double[2];   // f19-e2: wies je swoje W/E w zuzyciu sterowania i cale (srednie 28 dob, od wczytania)
 
         /// <summary>TownFolk.Zc4BuyVillage (G3, kazde zakupy z koszykiem zaplaconym): brak drabiny 1 (miss) i zjedzone swoje (own, null - nic) wedlug pozycji koszyka;
         /// pokryte = min(brak, swoje) tego samego towaru jedzenia. Zakupy co `days` dob - na dobe dzielone przez days. Nie rzuca.</summary>
@@ -379,8 +406,15 @@ namespace Armoury
                     sb.Append(' ').Append(KsTab.Goods[g]).Append(' ').Append(F0(_c28[i])).Append('/').Append(F0(SwCtlPerTown ? _ut28[i] : _u28[i])).Append('/').Append(F0(dm)).Append(" x").Append(k.ToString("0.000", Inv));
                 }
             }
-            sb.Append(SwCtlOwnFood ? " (towar: zuzycie bez drabiny 2 wsi + wies je swoje G3 (Ks Ctl Own Food) / brak bez czesci pokrytej swoim tym samym towarem / podaz targu Planu szt./d, czynnik)" : " (towar: zuzycie bez drabiny 2 wsi / brak / podaz targu Planu szt./d, czynnik)");
+            bool sameF = SwCtlOwnFood && SwCtlOwnSameFood;   // f19-e2 (Ks Ctl Own Same Food)
+            sb.Append(!SwCtlOwnFood ? " (towar: zuzycie bez drabiny 2 wsi / brak / podaz targu Planu szt./d, czynnik)"
+                : sameF ? " (towar: zuzycie bez drabiny 2 wsi + wies je swoje G3 tylko w miejsce braku tego samego towaru (Ks Ctl Own Same Food) / brak bez czesci pokrytej swoim tym samym towarem / podaz targu Planu szt./d, czynnik)"
+                : " (towar: zuzycie bez drabiny 2 wsi + wies je swoje G3 (Ks Ctl Own Food) / brak bez czesci pokrytej swoim tym samym towarem / podaz targu Planu szt./d, czynnik)");
             if (SwCtlOwnFood) sb.Append(" | brak wsi pokryty swoim tym samym towarem (G3, w zuzyciu - odjety od braku): W ").Append(F0(_ov28[0])).Append(", E ").Append(F0(_ov28[1])).Append(" szt./d (srednia 28 dob od wczytania)");   // f14-rynek (recenzja)
+            // f19-e2: ile "wies je swoje" weszlo do zuzycia sterowania wobec calego (z kluczem Ks Ctl Own Same Food reszta to kcal zastepcze za inny brakujacy towar)
+            if (SwCtlOwnFood) sb.Append(" | wies je swoje w zuzyciu sterowania (").Append(sameF ? "tylko w miejsce braku tego samego towaru, Ks Ctl Own Same Food" : "cale, bez Ks Ctl Own Same Food")
+                                .Append("): W ").Append(F0(_ownIn28[0])).Append(" z ").Append(F0(_ownAll28[0])).Append(", E ").Append(F0(_ownIn28[1])).Append(" z ").Append(F0(_ownAll28[1]))
+                                .Append(" szt./d (srednia 28 dob od wczytania)");
             sb.Append(R4cCtlNote(day));                            // KS r4 (r4-ceny): C1-C3
             _mfStage = stage;                                  // do _mf przy Planie bez bledu (PlanCollect)
             LandGlutWeekly(day, true);
