@@ -2890,3 +2890,9 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   przez pana liczona jako odplyw kasy miasta w przegladzie firm (TownPurse.NoteLordFood), place w dol tylko przy czynnych firmach DS (DsTowns.FarmsLive), wylaczenie dozowania uchodzcow nie
   wpuszcza wszystkich naraz). Armoury 366afa39 (1912 ustawien). Jeff nie gra (03:12 PDT).
 - 03:16 PDT: TEST fin88 = 7ce0c740, armoury-ks-auto.flag (USUNAC!), 160 dob (sciezka Jeffa); potem test zimy 120 dob (armoury-zima-teraz.flag + armoury-ks-wlacz.flag - zima ekonomii przez caly bieg).
+- 04:05 PDT: TEST fin88 (7ce0c740, sciezka Jeffa z armoury-ks-auto.flag - usuniety, 160 dob, Armoury-2026-10-18_03-13-38.log; wyniki scratchpad fin88/*.txt): kod 0, ERROR 0, KS sam wlaczony
+  po 35 dobach (nksarm 19/19), NKS-15 zgony 0 (15b TAK), TAK w calosci: nglod, nuchodzcy 27/27, nmur 31/31, nzajazdy, ndrogi, nprzysiolki, nherby, nzbroj, na12, nrot, nzc0, nzc2, npo,
+  nperf 26/26, nzapis 17/17, m6b, nskory 15/15. Korona 0.876 (fin87 0.855), D 0.896 (0.852), kiesy wsi -0.207%/d. NIE: nakum lud miast +59.6k/d (W 75.7 -> 80.8 dni - place ludu nie
+  sprowadzily W w 160 dobach), NZW-1 neutralny start 13.3% (date_farm), NZW-3 ikony 177, NOP-7 ruda 3.06 / 57 miast bez rudy, NOP-8, NWAR-2 0.354/d, NKS-9 q95 21.7 ms, NKA-1, ZC1 aksamit/jedwab.
+- 04:10 PDT: ac03aa25 (noc-ks4): SideVillageCrafts i DistrictIconFromSum domyslnie WYL. (inwestycje w okreg dzialaja na typie wsi) -> Armoury 5a3dd15a; test 5 dob + bitwa (test/wgr79)
+  przed WGRANIEM 79.
