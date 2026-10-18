@@ -225,7 +225,9 @@ namespace Armoury
                 if (f == null || f.Kind > 1) return 0;
                 long t = Stopwatch.GetTimestamp();
                 // f5-lud (KsFolkIncome, klucze Ks Folk Income All Kinds / R P): w miescie z KS czesci klas x kappa klas (W2 / R / P) - Earn zwraca przyjete, wolajacy daje
-                // kasie miasta reszte (ten sam protokol co przy kiesie nieczynnej); bez reguly albo wszystkie czynniki 1 - Credit co do monety jak dotad
+                // reszte temu, kto placil (ten sam protokol co przy kiesie nieczynnej): kasie miasta - wszyscy poza dwoma; kiesie wsi - roboty gminy DS (DaPayVillage)
+                // i przebudowa zajecia wioski (CraftsRebuildPay), oba przez EarnBack (recenzja f5: linia f5 liczy ich zwrot jako "wrocilo do wsi"); bez reguly albo wszystkie
+                // czynniki 1 - Credit co do monety jak dotad
                 long acc = amt;
                 double k0, k1, k2;
                 if (f.Kind == 0 && KsFolkIncome.Factors(st, out k0, out k1, out k2)) acc = CreditF5(f, amt, kind, k0, k1, k2);

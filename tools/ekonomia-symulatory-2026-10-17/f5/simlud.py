@@ -68,6 +68,8 @@ class P:
         self.housesQ = False      # f5: takze przeglad zwykly (kwartalny) bez podwyzki przy R/P ponizej pasma
         self.share = False        # f5: nieprzyjete przez klase bogata z zarobku z zewnatrz - do biednych klas tego samego miasta (wedlug potrzeby), reszta do kasy
         self.houses = False       # f5: bez podwyzki firmy wedlug nadwyzki, dopoki R albo P miasta sa ponizej dolnej granicy pasma (nadwyzka kupcow najpierw do ich domow przez M6)
+        self.shareUp = False      # recenzja f5 (uwaga 2): po podwyzce wedlug nadwyzki udzial firmy (Share) w gore - przeglad kwartalny celuje w ten sam poziom; zmiana firmy
+                                  # przegladem kwartalnym - pomiar przyrostu kasy od nowa (jak DsTowns po recenzji)
         self.lo = {'W': 15.0, 'R': 21.0, 'P': 30.0}
         self.hi = {'W': 30.0, 'R': 42.0, 'P': 60.0}
         self.mn = 0.10
@@ -95,7 +97,7 @@ def run(towns, p, days=DAYS, calib=None):
         s['topFull'] = top / (0.7 * f + 0.3)
         s['craftExt'] = s['z_warsztatow'] - top
         s['kW2'] = 1.0; s['kR'] = 1.0; s['kP'] = 1.0
-        s['farm'] = 0.0; s['farmX'] = 0.0; s['lastRev'] = 0; s['lastFast'] = 0; s['Gh'] = []
+        s['farm'] = 0.0; s['farmX'] = 0.0; s['lastRev'] = 0; s['lastFast'] = 0; s['Gh'] = []; s['shK'] = 1.0; s['raised'] = False
         st.append(s)
     totM6 = sum(max(0.0, s['G'] - 1.5 * s['Rv']) / 28.0 for s in st) or 1.0
     totZ = sum(s['z_zaworu'] for s in st) or 1.0
@@ -106,7 +108,7 @@ def run(towns, p, days=DAYS, calib=None):
     netHist = []
     for day in range(days + 1):
         agg = dict(day=day, KW=0, KR=0, KP=0, NW=0, NR=0, NP=0, G=0, S=0, m6=0, hW=0, hR=0, hP=0, lords=0, crown=0, farm=0, cutW=0, cutR=0, cutP=0,
-                   kW=[], kW2=[], kR=[], kP=[], dW=[], dR=[], dP=[], net=0.0)
+                   kW=[], kW2=[], kR=[], kP=[], dW=[], dR=[], dP=[], net=0.0, qUp=0, qDown=0, qCutAfter=0, fUp=0)
         nets = []
         for i, s in enumerate(st):
             d = {}
@@ -235,9 +237,18 @@ def run(towns, p, days=DAYS, calib=None):
                 surplus = s['G'] > 1.5 * s['Rv']
                 poorRP = p.houses and ((s['NR'] > 0 and s['KR'] / s['NR'] < p.lo['R']) or (s['NP'] > 0 and s['KP'] / s['NP'] < p.lo['P']))
                 if due:
-                    nf = max(-p.revMax * F, min(p.revMax * F, tgt - s['farmX']))
+                    if p.shareUp:
+                        nf = max(-p.revMax * F, min(p.revMax * F, s['shK'] * max(0.0, s['farm'] + tgt) - F))   # cel calej firmy = udzial (po podwyzkach) x doplyw
+                    else:
+                        nf = max(-p.revMax * F, min(p.revMax * F, tgt - s['farmX']))
                     if p.noDown and surplus and nf < 0: nf = 0.0
                     if p.housesQ and poorRP and nf > 0: nf = 0.0     # f5: przeglad zwykly bez podwyzki, dopoki R/P ponizej pasma (nadwyzka najpierw do ich domow przez M6)
+                    if nf > 1e-9: agg['qUp'] += 1
+                    elif nf < -1e-9:
+                        agg['qDown'] += 1
+                        if s['raised']: agg['qCutAfter'] += 1
+                    s['raised'] = False
+                    if p.shareUp and abs(nf) > 1e-9: s['Gh'] = []   # jak DsTowns po recenzji: pomiar przyrostu od nowa po zmianie firmy przegladem zwyklym
                     s['farmX'] += nf; s['lastRev'] = day
                     if not p.grow: s['lastFast'] = day
                 if poorRP: s['Gh'] = []                    # jak KsFolkIncome.HousesFirst: pomiar od nowa
@@ -246,6 +257,10 @@ def run(towns, p, days=DAYS, calib=None):
                     s['Gh'] = [s['G']]                     # przyrost liczony od tej doby (bez liczenia drugi raz tych samych dob) - takze bez podwyzki
                     if g > 0:
                         s['farmX'] += min(p.fastMax * F, g); s['lastFast'] = day
+                        s['raised'] = True; agg['fUp'] += 1
+                        if p.shareUp:
+                            tot = s['farm'] + tgt
+                            if tot > 0: s['shK'] = max(s['shK'], (s['farm'] + s['farmX']) / tot)
                 elif fastOk and not p.grow and not due and tgt > s['farmX']:
                     nf = min(p.fastMax * F, tgt - s['farmX'])
                     s['farmX'] += nf; s['lastFast'] = day
@@ -300,6 +315,7 @@ if __name__ == '__main__':
         ('S2 W2 + R/P + danina R/P z kappa, BEZ przegladu wedlug nadwyzki (kasa = nowy akumulator):', P(ext=True, rp=True, rpHoard=True, zero=True)),
         ('F5 WDROZONE: S2 + przeglad firmy wedlug nadwyzki kasy co 14 dob (najwyzej +25%, domy najpierw), zwykly bez obnizki przy nadwyzce:', P(**F5)),
         ('F5 + podzial nieprzyjetego miedzy biedne klasy miasta:', P(**dict(F5, share=True))),
+        ('F5 + recenzja (uwaga 2): udzial firmy idzie za podwyzka (jedna miara z przegladem kwartalnym):', P(**dict(F5, shareUp=True))),
         ('czulosc: F5 bez "domy najpierw":', P(**dict(F5, houses=False))),
         ('czulosc: F5, przeglad co 28 dob:', P(**dict(F5, fast=28))),
         ('czulosc: F5, najwyzej +15%:', P(**dict(F5, fastMax=0.15))),
@@ -320,6 +336,9 @@ if __name__ == '__main__':
         for dd in (160, 364):
             _, st = run(towns, p, days=dd, calib=cal)
             print('  %-75s d%d: R %5.1f dni, P %5.1f dni' % (tag[:75], dd, sum(x['KR'] for x in st if x['id'] in poorR) / nr, sum(x['KP'] for x in st if x['id'] in poorP) / npp))
+    print('przeglady firm (suma 364 dob): podwyzki wedlug nadwyzki / kwartalne w gore / kwartalne w dol / w dol w pierwszym kwartalnym po podwyzce (pila)')
+    for tag, o in [('S0', S0)] + list(res.items()):
+        print('  %-75s %5d / %4d / %4d / %4d' % (tag[:75], sum(a['fUp'] for a in o), sum(a['qUp'] for a in o), sum(a['qDown'] for a in o), sum(a['qCutAfter'] for a in o)))
     print('trendy ostatnich 28 dob przed d160 i d364 (zl/d): kiesy W, R, P, kasy')
     for tag, o in [('S0', S0)] + list(res.items()):
         print('  %-75s d132-160: W %+7.0f R %+7.0f P %+7.0f kasy %+7.0f | d336-364: W %+7.0f R %+7.0f P %+7.0f kasy %+7.0f' % (
