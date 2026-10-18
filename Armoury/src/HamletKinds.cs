@@ -62,8 +62,8 @@ namespace Armoury
             get
             {
                 var s = Settings.Current;
-                // inwest (noc 17/18.10): przy zajeciach wiosek pobocznych (Side Village Crafts, droga bez KS) W2 milknie - wioska rybacka to zajecie rybackie z pelnymi rekami
-                return s != null && s.HamletKindsInDistrict && VillageBook.Active && MineralOnce.Wired && MaterialLaw.ProdModels > 0 && !VillageCrafts.On;
+                // inwest (recenzja): W2 milknie tylko we wsiach z planem zajec wiosek (VillageCrafts.ReplacesW2 w ListStep i Step) - nie globalnie przy kluczu zajec
+                return s != null && s.HamletKindsInDistrict && VillageBook.Active && MineralOnce.Wired && MaterialLaw.ProdModels > 0;
             }
         }
 
@@ -113,6 +113,7 @@ namespace Armoury
             try
             {
                 if (!On || !Items()) { Forget(v); return list; }
+                if (VillageCrafts.ReplacesW2(v)) { Forget(v); return list; }   // inwest (recenzja): wies z planem zajec wiosek - rybacy to zajecie rybackie (bez W2)
                 int n = list.Count, gi = -1, fi = -1, fc = 0, gc = 0;
                 for (int i = 0; i < n; i++)
                 {
@@ -158,6 +159,7 @@ namespace Armoury
             try
             {
                 if (!On) { lock (Gate) _pOff++; return; }
+                if (VillageCrafts.ReplacesW2(v)) return;                   // inwest (recenzja): wies z planem zajec wiosek - bez W2 (liczone w VillageCrafts, linia W2)
                 float u;
                 lock (Gate)
                 {
@@ -215,7 +217,6 @@ namespace Armoury
             else if (!MineralOnce.Wired) state = "NIECZYNNE - brak listy produkcji BK (postfiks GetProductions nie wpiety)";
             else if (MaterialLaw.ProdModels <= 0) state = "NIECZYNNE - MaterialLaw poza modelami produkcji wsi";
             else if (_itemsTried && (_fish == null || _grain == null)) state = "NIECZYNNE - gra nie zna przedmiotu fish albo grain";
-            else if (VillageCrafts.On) state = "WYLACZONE - zajecia wiosek pobocznych (Side Village Crafts) zastepuja W2: wioska rybacka to zajecie rybackie (linia Zajecia wiosek (ZW))";
             else state = "CZYNNE";
             int n = 0, c = 0, fishOnly = 0, g = 0, listed;
             double a = 0.0, b = 0.0, su = 0.0, ga = 0.0;
@@ -243,6 +244,7 @@ namespace Armoury
                      + " | listy BK: ryby dopisane " + added + ", przeniesione za zboze " + moved + " wywolan"
                      + " | proba W2 (inwest etap 0): wywolania kroku zboza " + pg + ", ryb " + pf + ", wsi bez u " + pnu + ", przy kroku nieczynnym " + poff
                      + ", ciche wyjatki modelu (MaterialLaw) " + MaterialLaw.TakeSilent()
+                     + " | zajecia wiosek zamiast W2: wsi z planem zajec " + VillageCrafts.CraftPlanCount() + ", wywolan pominietych " + VillageCrafts.TakeW2Skip()   // inwest (recenzja): W2 milknie tylko tam
                      + " | potkniecia dzis " + st + ", od wczytania " + stAll);
         }
     }

@@ -159,10 +159,13 @@ namespace Armoury
                 add("T1 zakupy co do monety (zaplacone = place + material; kiesa wsi; kasa targu)", buys == 0 ? (bool?)null : badId == 0,
                     "zakupow " + buys + ", zaplacone " + paidAll + ", niezgodne " + badId + ", okregow kandydatow " + cand.Count + ", skala " + scale.ToString("0.00", Inv));
                 // 2: ogien na wierszu probnym - przesuniete = U x dE / S, L, stado
+                // recenzja: ten sam rachunek co Diff (jednostki ze zwierzetami PRZED przesunieciem, HerdDriven), nie wzor przepisany w tescie
                 var tr = new Row { Kind = KHerd, U = 10, Animals = 65, Animal = "cow" };
+                double holding = tr.U + tr.Building() + tr.I;
                 double moved = Move(tr, Math.Min(1.0, 12.0 / 20.0));
                 double lost = KL[tr.Kind] * moved;
-                double drive = Math.Floor(65.0 / 10.0 * lost + 0.5);
+                tr.Z += lost; tr.I += moved - lost;
+                double drive = HerdDriven(tr.Animals, holding, lost);
                 var tf = new Row { Kind = KFields, U = 10 };
                 double mf = Move(tf, 0.6), lf = KL[tf.Kind] * mf;
                 add("T2 ogien (stado 12 z 20 osad: stracone 6, 39 zwierzat; pola: polowa bezczynna)", Math.Abs(lost - 6.0) < 0.01 && Math.Abs(drive - 39) <= 1 && Math.Abs(lf - 3.0) < 0.01 && Math.Abs((mf - lf) - 3.0) < 0.01,

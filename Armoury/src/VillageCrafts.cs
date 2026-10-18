@@ -24,7 +24,8 @@ namespace Armoury
     ///    w domu); zboze kuchenne typu niezbozowego zostaje. Towary innych zajec - baza: suma(udzial wioski x stawka typu zajecia x (poziom + 1) x 0.5 x g(zajecie)/g(typ)
     ///    x n(zajecie) x (1 + premia prac)) - dalej te same mnozniki lancucha co we wsi tego typu (kopalnie i las, ludzie P1 - z g(typ) daje g(zajecie), rece E4/5 i E4/7,
     ///    regulator TEGO towaru, zima). Lista BK (MineralOnce, ostatni krok): towary innych zajec z waga 0.
-    ///    Magazyn wsi: + 5 dob dopisanych towarow (VillageFruit.CapPostfix). Krok W2 (HamletKinds) wylaczony przy tym kluczu - rybacy to zajecie rybackie (pelne rece).
+    ///    Magazyn wsi: + 5 dob dopisanych towarow (VillageFruit.CapPostfix). Krok W2 (HamletKinds) wylaczony we wsiach z planem zajec (ReplacesW2) - rybacy to zajecie
+    ///    rybackie (pelne rece); okreg bez planu (bez pliku ziemi, n = 1) i wies pod KS - W2 wedlug swojego klucza (recenzja).
     ///    NEUTRALNY START (A6): w pierwszej dobie klucza n(T) = rece swiata typu T przed / po (rece = ludzie w domu okregu x udzial czesci) - swiat ma tyle samo
     ///    kazdego typu, co dzien wczesniej; w zapisie (arm_crafts). Potem zmienia go tylko zysk.
     ///    WOLNA ZMIANA (dopisek Jeffa 16.10): co 7 dob od wlaczenia wynik zajecia = przydatnosc ziemi x sqrt(indeks cen towarow zajecia w miescie targowym, wagi stawka x wartosc);
@@ -33,7 +34,8 @@ namespace Armoury
     ///    najwyzej 1/4 kiesy na dobe, doba bez zaplaty = przebudowa stoi), okres przejsciowy Change Days (sady, winnice, gaje, daktyle - Tree Days): stary towar gasnie,
     ///    nowy rosnie. Wioska z pracami okregu nie zmienia zajecia.
     /// Obieg: zloto tylko w przebudowie (kiesa wsi -> kasa miasta targowego, kontrola w linii). Towar z rak - zadnej sztuki z niczego (rece zdjete = rece dodane).
-    /// Klucz Side Village Crafts wylaczony: lista, model, magazyn i W2 jak dotad; stan w zapisie zostaje (zamrozony).
+    /// Klucz Side Village Crafts wylaczony: lista, model, magazyn i W2 jak dotad; stan w zapisie zostaje (zamrozony). Prace okregu bez KS dostaja wtedy plan z samych
+    /// prac (premia prac w towarach typu, WorksOnlyPlans) - dodatek ma towar, a wyplata pokrycie (recenzja).
     /// Wyjatki per wies liczone (potkniecia) - bez globalnych wylacznikow.
     /// </summary>
     internal static class VillageCrafts
@@ -182,14 +184,15 @@ namespace Armoury
         private sealed class Plan
         {
             public float Other, NType, TypeBonus; public bool KitchenKeep; public VillageType Type;
+            public bool WorksOnly;                              // recenzja: plan z samych prac okregu (zajecia nieczynne - klucz albo zrodla) - tylko premia prac w towarach typu, n = 1
             public Dictionary<ItemObject, float> Add;          // towar -> M x ten mnoznik = dopisek (suma po zajeciach innych wiosek)
             public HashSet<ItemObject> TypeGoods;
             public Dictionary<ItemObject, float> TypeRate;     // stawka typu na towar (suma wag)
         }
         private static volatile Dictionary<Village, Plan> _plans = new Dictionary<Village, Plan>();
 
-        // pamiec doby modelu: M wsi (wynik towaru typu / stawka typu) - ostatnie wywolanie towaru typu tej doby
-        private sealed class Mem { public int Day = int.MinValue; public float M; public bool NoMem; public readonly Dictionary<ItemObject, float[]> X = new Dictionary<ItemObject, float[]>(); }   // X: towar -> [zdjete, dodane, premia] (wartosc bazowa, ostatnie wywolanie doby)
+        // pamiec doby modelu (recenzja: bez pamieci M - nigdy nie byla zapisywana; M to zawsze szacunek MOf)
+        private sealed class Mem { public int Day = int.MinValue; public readonly Dictionary<ItemObject, float[]> X = new Dictionary<ItemObject, float[]>(); }   // X: towar -> [zdjete, dodane, premia] (wartosc bazowa, ostatnie wywolanie doby)
         private static readonly Dictionary<Village, Mem> _mem = new Dictionary<Village, Mem>(new RefEq());
         private sealed class RefEq : IEqualityComparer<Village>
         {
@@ -198,7 +201,8 @@ namespace Armoury
         }
 
         // liczniki do linii (od ostatniej linii)
-        private static int _st, _stAll, _dLists, _dAdded, _dNoMem, _dSteps, _dStarted, _dDone, _dStall, _dBusy, _dBudget, _dLocked, _dPress, _dCancel, _dRedone;
+        private static int _st, _stAll, _dLists, _dAdded, _dSteps, _dStarted, _dDone, _dStall, _dBusy, _dBudget, _dLocked, _dPress, _dCancel, _dRedone;
+        private static int _worksOnly, _w2Skip;                // recenzja: plany z samych prac (zajecia nieczynne), wywolania W2 pominiete we wsiach z planem zajec
         private static long _dPaid, _mVil, _mTown;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static readonly List<string> _notes = new List<string>();
@@ -213,10 +217,86 @@ namespace Armoury
                 _plans = new Dictionary<Village, Plan>(); _mem.Clear(); _dirty.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _notes.Clear(); _offLogged = false;
                 _meta = null; _metaFor = null;
+                _worksOnly = 0; _w2Skip = 0; _measDay = -1; _meas.Clear(); _deferLogged = false;
             }
         }
 
-        private static void ZeroDay() { _dLists = _dAdded = _dNoMem = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; }
+        // ------------------------------------------------------------ recenzja: odczyty dla prac okregu i W2
+        /// <summary>Droga produkcji dodatku prac BEZ KS: plan wsi (zajecia albo same prace) liczy MaterialLaw.ProdPostfix - wies poza KS, ksiega wiosek czynna,
+        /// MaterialLaw w modelach produkcji. Klucz zajec NIE jest potrzebny (plan z samych prac). Nie rzuca.</summary>
+        internal static bool CarriesWorks(Village v)
+        {
+            try { return v != null && !UnderKs(v) && VillageBook.Active && MaterialLaw.ProdModels > 0; }
+            catch { return false; }
+        }
+
+        /// <summary>W2 (HamletKinds) milknie TYLKO we wsi, ktorej okreg ma czynny plan zajec (wioska rybacka to tam zajecie rybackie). Okreg bez planu (bez pliku ziemi,
+        /// n = 1 i same zajecia typu), plan z samych prac, wies pod KS (takze w rampie KS) - W2 wedlug swojego klucza. Sam odczyt (dowolny watek).</summary>
+        internal static bool ReplacesW2(Village v)
+        {
+            if (v == null) return false;
+            var plans = _plans; Plan pl;
+            if (plans.Count == 0 || !plans.TryGetValue(v, out pl) || pl == null || pl.WorksOnly) return false;
+            if (!On || UnderKs(v)) return false;
+            lock (Gate) _w2Skip++;
+            return true;
+        }
+
+        /// <summary>Wsie z planem zajec (bez KS) - do linii W2. Sam odczyt.</summary>
+        internal static int CraftPlanCount() { int n = 0; foreach (var p in _plans.Values) if (p != null && !p.WorksOnly) n++; return n; }
+
+        /// <summary>Do linii W2: wywolania W2 pominiete we wsiach z planem zajec od ostatniego odczytu.</summary>
+        internal static int TakeW2Skip() { lock (Gate) { int n = _w2Skip; _w2Skip = 0; return n; } }
+
+        /// <summary>Do linii PO: droga bez KS (plany z samych prac / zajecia).</summary>
+        internal static string WorksPathText()
+        {
+            return "droga bez KS: " + (On ? "plany zajec (premia prac w planie)" : "plany z samych prac " + _worksOnly + " (zajecia " + (KeyOn ? "NIECZYNNE - zrodla" : "wylaczone") + ")")
+                   + (VillageBook.Active && MaterialLaw.ProdModels > 0 ? "" : " - BRAK (ksiega wiosek albo MaterialLaw) - prace bez KS zamrozone");
+        }
+
+        /// <summary>recenzja (prace bez zajec): plany z samych prac okregu - wsie gry okregow z dodatkiem prac poza KS, gdy droga zajec nie liczy (klucz wylaczony albo
+        /// zrodla nieczynne). Premia prac tylko w towarach typu (czesci z pracami zajecia typu; prace innego zajecia - bez towaru i bez wyplaty: E = 0), n = 1, bez
+        /// dopiskow. Co dobe (malo okregow). Bez klucza District Works, bez ksiegi albo bez MaterialLaw - pusto.</summary>
+        private static Dictionary<Village, Plan> WorksOnlyPlans()
+        {
+            var res = new Dictionary<Village, Plan>();
+            _worksOnly = 0;
+            if (!DistrictWorks.On || !VillageBook.Active || MaterialLaw.ProdModels <= 0) return res;
+            var parts = new List<VillageBook.PartView>();
+            foreach (var v in DistrictWorks.BonusVillages())
+            {
+                try
+                {
+                    if (v == null || v.VillageType == null || UnderKs(v)) continue;
+                    int D = CraftOfType(v.VillageType);
+                    if (D < 0 || !VillageBook.PartsOf(v, parts) || parts.Count < 1) continue;
+                    double tot = 0; foreach (var p in parts) tot += p.Home;
+                    if (!(tot > 1e-6)) continue;
+                    double tb = 0;
+                    foreach (var p in parts)
+                    {
+                        int wc; double wb;
+                        if (DistrictWorks.BonusOf(v, p.Main ? null : p.Uid, out wc, out wb) && wc == D) tb += p.Home / tot * wb;
+                    }
+                    if (!(tb > 1e-9)) continue;
+                    var pl = new Plan { Other = 0f, NType = 1f, TypeBonus = (float)tb, Type = v.VillageType, Add = new Dictionary<ItemObject, float>(), KitchenKeep = v.VillageType.StringId != "wheat_farm",
+                                        TypeGoods = new HashSet<ItemObject>(), TypeRate = new Dictionary<ItemObject, float>(), WorksOnly = true };
+                    foreach (var pr in v.VillageType.Productions)
+                    {
+                        if (pr.Item1 == null || !(pr.Item2 > 0f)) continue;
+                        pl.TypeGoods.Add(pr.Item1);
+                        float r; pl.TypeRate.TryGetValue(pr.Item1, out r); pl.TypeRate[pr.Item1] = r + pr.Item2;
+                    }
+                    res[v] = pl;
+                }
+                catch (Exception e) { Stumble("WorksOnlyPlans(okreg)", e); }
+            }
+            _worksOnly = res.Count;
+            return res;
+        }
+
+        private static void ZeroDay() { _dLists = _dAdded = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -393,12 +473,14 @@ namespace Armoury
         /// wioski tego typu (ten sam wzor co owoce wsi BK). Towar w typie i w zajeciu - baza / czynnik (dopisek bez czynnika typu). Wies nie Normal albo bez targu - nic.</summary>
         internal static void Base(Village v, ItemObject item, ref ExplainedNumber r)
         {
-            if (v == null || item == null || !KeyOn) return;
+            if (v == null || item == null) return;
             try
             {
                 Plan pl;
                 var plans = _plans;
-                if (plans.Count == 0 || !plans.TryGetValue(v, out pl) || !On || UnderKs(v)) return;
+                if (plans.Count == 0 || !plans.TryGetValue(v, out pl) || pl == null) return;          // szybka droga: bez planow (klucz wylaczony i bez prac) - nic
+                if (pl.WorksOnly ? !DistrictWorks.On : !On) return;                                   // recenzja: plan z samych prac - wedlug klucza District Works
+                if (UnderKs(v)) return;
                 if (v.VillageState != Village.VillageStates.Normal || v.TradeBound == null) return;
                 int today = Today();
                 float addK = 0f; bool hasAdd = pl.Add != null && pl.Add.TryGetValue(item, out addK) && addK > 0f; if (!hasAdd) addK = 0f;
@@ -426,6 +508,7 @@ namespace Armoury
                         var m = MemFor(v, today);
                         Put(m, item, kitchen ? 0f : before * (1f - F + pl.TypeBonus) * item.Value, added * item.Value, kitchen ? 0f : before * pl.TypeBonus * item.Value);
                         _dSteps++;
+                        if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, before, r.ResultNumber);   // pomiar neutralnosci (A6): wynik przed i po kroku zajec
                     }
                     return;
                 }
@@ -433,7 +516,7 @@ namespace Armoury
                 float r1 = r.ResultNumber;
                 r.Add(A, _txtAdd);                                            // towar spoza typu: model gry dal baze 0 - te same czynniki, ktore juz sa, i dalsze kroki lancucha
                 float got = Math.Max(0f, r.ResultNumber - r1);
-                lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; }
+                lock (Gate) { var m = MemFor(v, today); Put(m, item, 0f, got * item.Value, 0f); _dAdded++; if (today == _measDay && !pl.WorksOnly) MeasPut(v, item, r1, r.ResultNumber); }
             }
             catch (Exception e) { Stumble("Base", e); }
         }
@@ -452,8 +535,109 @@ namespace Armoury
         {
             Mem m;
             if (!_mem.TryGetValue(v, out m)) { m = new Mem(); _mem[v] = m; }
-            if (m.Day != day) { m.Day = day; m.M = 0f; m.NoMem = false; m.X.Clear(); }
+            if (m.Day != day) { m.Day = day; m.X.Clear(); }
             return m;
+        }
+
+        // ------------------------------------------------------------ recenzja: pomiar neutralnosci startu (A6, projekt TESTS 2) na TOWARACH, nie na rekach
+        // W dobie wlaczenia (w tej sesji) kazde wywolanie modelu wsi z planem zajec zapisuje: wynik przed krokiem zajec, po nim i na koncu lancucha (MaterialLaw - After).
+        // Wynik bez zajec na koncu lancucha = przed x (koniec / po) - te same mnozniki (P1, rece, regulator, zima, kopalnie, powtorzenia BK, poprawki stawek). Ostatnie
+        // wywolanie doby na wies i towar (jak W2). Doba nastepna: zmiana produkcji wsi z planem wedlug towarow typu - linia "pomiar neutralnosci" (NZW-1).
+        private static int _measDay = -1;
+        private static readonly Dictionary<Village, Dictionary<ItemObject, float[]>> _meas = new Dictionary<Village, Dictionary<ItemObject, float[]>>(new RefEq());
+        private static bool _deferLogged;
+
+        /// <summary>Pod Gate: wynik przed i po kroku zajec (koniec lancucha - jeszcze nie).</summary>
+        private static void MeasPut(Village v, ItemObject it, float before, float mid)
+        {
+            Dictionary<ItemObject, float[]> d;
+            if (!_meas.TryGetValue(v, out d)) { d = new Dictionary<ItemObject, float[]>(); _meas[v] = d; }
+            float[] a; if (!d.TryGetValue(it, out a)) { a = new float[3]; d[it] = a; }
+            a[0] = before; a[1] = mid; a[2] = -1f;
+        }
+
+        /// <summary>MaterialLaw.ProdPostfix - koniec lancucha (przed ksiega rudy): wynik koncowy wywolania - tylko w dobie pomiaru neutralnosci. Nie rzuca.</summary>
+        internal static void After(Village v, ItemObject item, float final)
+        {
+            if (_measDay < 0 || v == null || item == null) return;
+            try
+            {
+                if (Today() != _measDay) return;
+                lock (Gate) { Dictionary<ItemObject, float[]> d; float[] a; if (_meas.TryGetValue(v, out d) && d.TryGetValue(item, out a) && a[2] < 0f) a[2] = Math.Max(0f, final); }
+            }
+            catch { }
+        }
+
+        /// <summary>Linia "pomiar neutralnosci (A6, TESTS 2)" - pierwsza doba po wlaczeniu (w tej sesji). Okregi z pracami okregu pominiete (premia prac nie jest startem).</summary>
+        private static void Measure(int day)
+        {
+            try
+            {
+                var meta = MetaAll();
+                var bef = new Dictionary<ItemObject, double>(); var aft = new Dictionary<ItemObject, double>();
+                int vil = 0, calls = 0, noFinal = 0, noMult = 0, works = 0;
+                lock (Gate)
+                {
+                    foreach (var kv in _meas)
+                    {
+                        if (DistrictWorks.HasWorks(kv.Key)) { works++; continue; }
+                        vil++;
+                        foreach (var x in kv.Value)
+                        {
+                            var a = x.Value;
+                            if (a[2] < 0f) { noFinal++; continue; }
+                            calls++;
+                            double b0 = Math.Max(0f, a[0]), mid = Math.Max(0f, a[1]), fin = a[2], bf;
+                            if (mid > 1e-6) bf = b0 * fin / mid;
+                            else if (b0 <= 1e-6) bf = 0;
+                            else { bf = b0; noMult++; }                        // czynnik zajec zjadl towar (u_inne = 1) - mnozniki lancucha nieznane: wynik przed krokiem
+                            double c;
+                            bef.TryGetValue(x.Key, out c); bef[x.Key] = c + bf;
+                            aft.TryGetValue(x.Key, out c); aft[x.Key] = c + fin;
+                        }
+                    }
+                    _meas.Clear();
+                }
+                // swiat: produkcja wsi tej doby z ksiegi towarow (wszystkie wsie, takze pod KS i bez planu) - tylko INFO
+                var led = new Dictionary<string, double[]>(StringComparer.Ordinal);
+                int ld = -1; try { ld = GoodsLedger.KsTake(led); } catch { ld = -1; }
+                bool ledOk = ld == day;
+                var sb = new StringBuilder(1600);
+                sb.Append(P).Append("pomiar neutralnosci (A6, TESTS 2) doba ").Append(day).Append(" | wsi zmierzonych ").Append(vil).Append(", wywolan ").Append(calls)
+                  .Append(" (bez konca lancucha ").Append(noFinal).Append(", bez mnoznika ").Append(noMult).Append("), okregi z pracami pominiete ").Append(works)
+                  .Append(" | zmiana produkcji typu we wsiach z planem (wartosc, przed -> po, bez W2):");
+                double worst = 0, worstW = 0; string worstT = "-", worstWT = "-"; bool f = true;
+                for (int c = 0; c < KsTab.NC; c++)
+                {
+                    var m = meta != null && c < meta.Length ? meta[c] : null;
+                    if (m == null || m.Type == null || m.Horse || m.Goods.Length == 0 || _typeUsed == null || c >= _typeUsed.Length || !_typeUsed[c]) continue;
+                    if (c == KsTab.CCattleB) continue;                         // maslo - ten sam typ gry co bydlo
+                    double vb = 0, va = 0, vw = 0;
+                    foreach (var it in m.Goods)
+                    {
+                        double b, a; bef.TryGetValue(it, out b); aft.TryGetValue(it, out a);
+                        double val = Math.Max(1, it.Value);
+                        vb += b * val; va += a * val;
+                        double[] w; if (ledOk && it.StringId != null && led.TryGetValue(it.StringId, out w) && w != null && w.Length > GoodsLedger.KsVil) vw += Math.Max(b, w[GoodsLedger.KsVil]) * val;
+                    }
+                    if (!(vb > 0) && !(va > 0)) continue;
+                    double dev = vb > 0 ? (va - vb) / vb : 1.0;
+                    sb.Append(f ? " " : ", ").Append(m.Id).Append(' ').Append((100 * dev).ToString("+0.00;-0.00;0.00", Inv)).Append('%');
+                    f = false;
+                    if (Math.Abs(dev) > Math.Abs(worst)) { worst = dev; worstT = m.Id; }
+                    if (vw > 0) { double dw = (va - vb) / vw; if (Math.Abs(dw) > Math.Abs(worstW)) { worstW = dw; worstWT = m.Id; } }
+                }
+                if (f) sb.Append(" -");
+                // towary: najwieksza zmiana pojedynczego towaru (INFO)
+                double wi = 0; string wit = "-";
+                foreach (var kv in bef) { double a; aft.TryGetValue(kv.Key, out a); if (kv.Value > 1) { double d = (a - kv.Value) / kv.Value; if (Math.Abs(d) > Math.Abs(wi)) { wi = d; wit = kv.Key.StringId; } } }
+                sb.Append(" | najwieksza odchylka produkcji typu ").Append((100 * Math.Abs(worst)).ToString("0.000", Inv)).Append("% (prog 1%) w ").Append(worstT)
+                  .Append(" | wobec swiata (ksiega towarow doby ").Append(ledOk ? day.ToString(Inv) : "BRAK").Append("): najwieksza ").Append((100 * Math.Abs(worstW)).ToString("0.000", Inv)).Append("% w ").Append(worstWT)
+                  .Append(" | towar: najwieksza zmiana ").Append((100 * wi).ToString("+0.0;-0.0;0.0", Inv)).Append("% (").Append(wit).Append(") | W2 (zboze -> ryby) poza pomiarem - zajecia go zastepuja.");
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("Measure", e); }
+            finally { _measDay = -1; lock (Gate) _meas.Clear(); }
         }
 
         private static void Put(Mem m, ItemObject it, float rem, float add, float bon)
@@ -479,11 +663,11 @@ namespace Armoury
             catch (Exception e) { Stumble("CapAdd", e); return 0; }
         }
 
-        /// <summary>M wsi (wynik towaru typu / stawka typu): pamiec ostatniej doby, bez niej szacunek u_v x g(typ) z reguly P1 albo (poziom + 1) x 0.5 gry.</summary>
+        /// <summary>M wsi (wynik towaru typu na jednostke stawki typu) - SZACUNEK: (poziom + 1) x 0.5 gry x czynnik ludzi P1 x zima x rece E4/5 i E4/7 (bez mnoznikow
+        /// konkretnego towaru: kopalnie, powtorzenia BK, regulator). recenzja: dawna "pamiec M" nie byla nigdy zapisywana (martwa droga) - zdjeta; linia mowi "M szacunek".</summary>
         internal static float MOf(Village v)
         {
             if (v == null) return 0f;
-            lock (Gate) { Mem m; if (_mem.TryGetValue(v, out m) && m.M > 0f && Today() - m.Day <= 2) return m.M; }
             try
             {
                 float f, u, g;
@@ -637,8 +821,11 @@ namespace Armoury
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             if (!KeyOn)
             {
-                if (_plans.Count > 0) _plans = new Dictionary<Village, Plan>();
-                if (!_offLogged) { _offLogged = true; Log.Info(P + "WYLACZONE w MCM (Side Village Crafts) - lista, model i magazyn wsi jak dotad, W2 (210) wedlug swojego klucza; stan w zapisie zamrozony."); }
+                // recenzja (prace bez zajec): plan z samych prac okregu - premia prac w towarach typu wsi okregow z pracami poza KS; bez prac - pusto (jak dotad)
+                var wp = WorksOnlyPlans();
+                if (wp.Count > 0 || _plans.Count > 0) _plans = wp;
+                if (_measDay >= 0) { _measDay = -1; lock (Gate) _meas.Clear(); }
+                if (!_offLogged) { _offLogged = true; Log.Info(P + "WYLACZONE w MCM (Side Village Crafts) - lista, model i magazyn wsi jak dotad, W2 (210) wedlug swojego klucza; stan w zapisie zamrozony; prace okregu bez KS - plan z samych prac (" + _worksOnly + " wsi)."); }
                 return;
             }
             _offLogged = false;
@@ -649,7 +836,18 @@ namespace Armoury
                 if (_pending != null) { string p = _pending; _pending = null; ImportNow(p); }
                 Build();
             }
-            if (_n == null) SwitchOn(today);
+            if (_n == null)
+            {
+                // recenzja (W2 / plik ziemi): neutralny start dopiero z wierszami ziemi wiosek - bez pliku arm_ks_land.tsv wszystkie wioski = typ okregu i n = 1 zapisane
+                // na zawsze zrobilyby swiat nieneutralnym, gdy plik przyjdzie z nastepnym wgraniem. Bez n zajecia = typ okregu (plan tylko z prac), W2 wedlug swojego klucza.
+                if (_builtSide - _builtNoRow > 0) SwitchOn(today);
+                else if (!_deferLogged)
+                {
+                    _deferLogged = true;
+                    Log.Info(P + "neutralny start odlozony | wiosek pobocznych " + _builtSide + ", z wierszem ziemi KS 0 (brak arm_ks_land.tsv albo okregow w pliku) - zajecia = typ okregu, W2 (210) wedlug swojego klucza; start w pierwszej dobie z plikiem ziemi.");
+                }
+            }
+            if (_measDay >= 0 && today > _measDay) Measure(_measDay);    // recenzja: pomiar neutralnosci na towarach (doba po wlaczeniu)
             int season = today / Season;
             if (season != _regionSeason) { _regionSeason = season; _regionMoved.Clear(); }
             bool step = _onDay >= 0 && today > _onDay && (today - _onDay) % StepDays == 0;
@@ -687,7 +885,9 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("Daily(okreg)", e); }
             }
-            _plans = plans;
+            // recenzja: zajecia nieczynne (lista BK albo MaterialLaw) - plan zajec nie liczy w modelu; prace okregu bez KS dostaja plan z samych prac
+            _plans = On ? plans : WorksOnlyPlans();
+            if (On) _worksOnly = 0;
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             if (LogGate.Lines) Line(today - 1, fall, ks, other, inTrans, countBy, plans.Count, ms, snow);
         }
@@ -729,6 +929,7 @@ namespace Armoury
                 n[c] = x;
             }
             _n = n; _onDay = today;
+            _measDay = today; lock (Gate) _meas.Clear();                    // recenzja: pomiar na towarach w tej dobie (linia "pomiar neutralnosci" doby nastepnej)
             var sb = new StringBuilder(1200);
             sb.Append(P).Append("start neutralny (A6) doba ").Append(today).Append(" | okregow ").Append(nd).Append(" | n(typ) = rece swiata przed / po:");
             bool first = true;
@@ -738,10 +939,11 @@ namespace Armoury
                 sb.Append(first ? " " : ", ").Append(KsTab.Crafts[c]).Append(' ').Append(n[c].ToString("0.000", Inv)).Append(" (").Append(Math.Round(before[c])).Append("->").Append(Math.Round(after[c])).Append(')');
                 first = false;
             }
-            // kontrola: rece swiata typu po x n = przed (co do zaokraglen) - swiat ma tyle samo kazdego typu w dobie wlaczenia
+            // rece swiata typu po x n / przed - z definicji n rowne (poza przycietymi); recenzja: to NIE jest kontrola produkcji - tylko INFO. Kontrola na towarach (TESTS 2):
+            // linia "pomiar neutralnosci (A6, TESTS 2)" doby nastepnej (wynik modelu kazdej wsi z planem przed i po kroku zajec, na koncu lancucha)
             double worst = 0;
             for (int c = 0; c < KsTab.NC; c++) if (before[c] > 0 && after[c] > 0) worst = Math.Max(worst, Math.Abs(after[c] * n[c] / before[c] - 1.0));
-            sb.Append(" | kontrola swiat typu po x n / przed: najwieksza odchylka ").Append((100 * worst).ToString("0.000", Inv)).Append("% (prog 1%)")
+            sb.Append(" | rece swiata typu po x n / przed (z definicji n, tylko przyciete): najwieksza odchylka ").Append((100 * worst).ToString("0.000", Inv)).Append("% (INFO; produkcja - linia pomiaru doby nastepnej)")
               .Append(" | n przyciete do ").Append(NMin.ToString("0.0", Inv)).Append('-').Append(NMax.ToString("0.0", Inv)).Append(": ").Append(clamped.Count > 0 ? string.Join(", ", clamped.ToArray()) : "zadne").Append('.');
             Log.Info(sb.ToString());
         }
@@ -884,7 +1086,7 @@ namespace Armoury
         {
             var sb = new StringBuilder(1600);
             var s = Settings.Current;
-            float addV = 0, remV = 0, bonV = 0; int mems = 0, nomem;
+            float addV = 0, remV = 0, bonV = 0; int mems = 0;
             lock (Gate)
             {
                 foreach (var m in _mem.Values)
@@ -893,7 +1095,6 @@ namespace Armoury
                     mems++;
                     foreach (var a in m.X.Values) { remV += a[0]; addV += a[1]; bonV += a[2]; }
                 }
-                nomem = _dNoMem;
             }
             sb.Append(P).Append("dzien ").Append(day).Append(" | ").Append(On ? "CZYNNE" : "NIECZYNNE (ksiega wiosek / lista BK / MaterialLaw)").Append(" | okregow z wioskami ").Append(_dist.Count)
               .Append(" (bez KS ").Append(fall).Append(", pod KS ").Append(ks).Append(" - zajecia z blokow KS i reguly A7), wiosek ").Append(_builtSide)
@@ -912,10 +1113,10 @@ namespace Armoury
             if (n != null) for (int c = 0; c < KsTab.NC; c++) { if (Math.Abs(n[c] - 1.0) < 1e-4) continue; sb.Append(f ? " " : ", ").Append(KsTab.Crafts[c]).Append(' ').Append(n[c].ToString("0.000", Inv)); f = false; }
             if (f) sb.Append(" 1");
             sb.Append(" | krok zajec (doba): wsi z planem ").Append(plans).Append(" (przeliczone dzis ").Append(_dRedone).Append(", co 7 dob na zmiane)").Append(", wsi z pamiecia ").Append(mems).Append(", listy BK z dopiskiem ").Append(_dLists).Append(", wywolan towaru typu ").Append(_dSteps)
-              .Append(", dopiskow ").Append(_dAdded).Append(" (bez pamieci M ").Append(nomem).Append(") | wartosc bazowa: zdjete z typu ").Append(remV.ToString("0", Inv)).Append(", dodane zajec ").Append(addV.ToString("0", Inv))
+              .Append(", dopiskow ").Append(_dAdded).Append(" (M szacunek: poziom x P1 x zima x rece) | wartosc bazowa: zdjete z typu ").Append(remV.ToString("0", Inv)).Append(", dodane zajec ").Append(addV.ToString("0", Inv))
               .Append(", premia prac w typie ").Append(bonV.ToString("0", Inv))
               .Append(" | kontrola pieniedzy: kiesy wsi -").Append(_mVil).Append(" / kasy miast +").Append(_mTown).Append(" (roznica ").Append(_mVil - _mTown).Append(")")
-              .Append(" | W2 (210) ").Append(On ? "wylaczony (zajecia go zastepuja)" : "wedlug swojego klucza")
+              .Append(" | W2 (210) ").Append(On ? "wylaczony we wsiach z planem zajec (" + plans + "), gdzie indziej wedlug swojego klucza" : "wedlug swojego klucza")
               .Append(" | ikona: ").Append(DistrictIcon.DayText())
               .Append(" | koszt ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia dzis ").Append(_st).Append(" (od wczytania ").Append(_stAll).Append(").");
             Log.Info(sb.ToString());

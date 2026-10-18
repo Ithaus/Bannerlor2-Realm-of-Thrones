@@ -137,10 +137,12 @@ namespace Armoury
                 bool vis = false;
                 try { vis = _orig != null && _orig(args); }
                 catch (Exception e) { Stumble("menu " + _id, e); vis = false; }
+                // inwest (recenzja): przy kluczu District Works opcje BEE 5/15/30 tys. ukryte niezaleznie od Living Economy Sealed (zastepuje je "Invest in the district's works")
+                try { if (_id != null && _id.StartsWith("bee_village_invest_", StringComparison.Ordinal) && DistrictWorks.HidesBeeInvest) return false; }
+                catch (Exception e) { Stumble("menu " + _id, e); }
                 if (!On) return vis;
                 try
                 {
-                    if (_id != null && _id.StartsWith("bee_village_invest_", StringComparison.Ordinal) && DistrictWorks.HidesBeeInvest) return false;   // inwest: zastapione przez "Invest in the district's works"
                     if (_real && BeeGifts.RealOn) return BeeGifts.PayCondition(args, vis, _castle);   // E5/A5: wplata czynna jako prawdziwy przelew
                     if (!vis) vis = Visible(_kind);
                     if (vis && args != null) { args.IsEnabled = false; args.Tooltip = _why; }
@@ -317,7 +319,14 @@ namespace Armoury
         }
         private static void ArmoryPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_ARMORY); }
         private static void TownInvestPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TOWN_INVEST); }
-        private static void VillageInvestPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, DistrictWorks.HidesBeeInvest ? DistrictWorks.BeeClosedText : T_VILLAGE_INVEST); }   // inwest: tekst z opcja prac okregu
+        private static void VillageInvestPost(ref bool __result, ref string reason)
+        {
+            // inwest (recenzja, projekt ui_text 1): przy kluczu District Works ekran Demesne BK i konsola tez zamkniete z odeslaniem do prac okregu - takze bez Living Economy Sealed
+            bool works = false;
+            try { works = DistrictWorks.HidesBeeInvest; } catch { works = false; }
+            if (works) { try { __result = false; reason = DistrictWorks.BeeClosedText; } catch (Exception e) { Stumble("Can*", e); } return; }
+            Close(ref __result, ref reason, T_VILLAGE_INVEST);
+        }
         private static void MarketPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_MARKET); }
         private static void CampPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_CAMP); }
         private static void TrainPost(ref bool __result, ref string reason) { Close(ref __result, ref reason, T_TRAIN); }

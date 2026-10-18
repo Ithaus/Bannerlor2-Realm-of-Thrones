@@ -2479,6 +2479,7 @@ namespace Armoury
             try { MoneyLedger.Mark(MoneyLedger.MZc6); } catch { }
             // KS (kalibracja startu): PO DailyLife.Daily (stany doby) - wynik Planu z watku roboczego, Plan co 7 dob, w stanie zastosowanym stawki wsi na jutro, regula zmiany zajec
             // (przebudowa: kiesa wsi -> kasa miasta), pola mieszczan (kasa miasta -> kiesy ludu) - wlasna pozycja "Przeplywy osad" (MKs)
+            try { DistrictWorks.BeforeProduction(); } catch (Exception e) { Log.Error("DistrictWorks.BeforeProduction", e); } DayProfile.Lap("DistrictWorks.BeforeProduction");   // inwest (recenzja): b prac okregu tej doby PRZED rachunkiem KS i planem zajec (ta sama doba co wyplaty przy wozach)
             try { StartCalibration.Daily(); } catch (Exception e) { Log.Error("StartCalibration.Daily", e); } DayProfile.Lap("StartCalibration.Daily");
             // inwest (noc 17/18.10): PO KS (bloki KS doby) - zajecia wiosek bez KS (plany produkcji, przebudowy: kiesa wsi -> kasa miasta), ikona okregu (co 28 dob), prace okregu
             // (rampa, roznice ksiegi wiosek PO VillageBook.Daily, odbudowa, linia PO) - przed znacznikiem MKs (ta sama natura przeplywu: przebudowa zajec wsi)

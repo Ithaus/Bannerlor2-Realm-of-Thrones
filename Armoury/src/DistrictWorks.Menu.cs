@@ -49,7 +49,7 @@ namespace Armoury
         private static string BeeText()
         {
             var s = Settings.Current;
-            return "opcja w bee_village_menu " + (_beeAdded > 0 ? "TAK" : "NIE (BEE nieobecny albo menu bez Back)") + ", inwestycje BEE 5/15/30 tys. " + (On && s != null && s.LivingEconomySealed ? "ukryte" : "jak dotad (zamkniete 170)");
+            return "opcja w bee_village_menu " + (_beeAdded > 0 ? "TAK" : "NIE (BEE nieobecny albo menu bez Back)") + ", inwestycje BEE 5/15/30 tys. " + (On ? "ukryte (takze bez Living Economy Sealed)" : (s != null && s.LivingEconomySealed ? "jak dotad (zamkniete 170)" : "jak dotad (otwarte - Living Economy Sealed wylaczony)"));
         }
 
         /// <summary>BeeSeal: przy kluczu District Works opcje BEE "Invest 5 000 / 15 000 / 30 000" sa ukryte (zastepuje je ta pozycja).</summary>
@@ -103,7 +103,7 @@ namespace Armoury
                 if (st == null || !st.IsVillage || st.Village == null || !VillageBook.Active) return false;
                 var s = Settings.Current;
                 if (s == null) return false;
-                if (!On) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}District works are switched off (mod settings)."); return false; }
+                if (!On) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}District works are switched off (mod settings)."); return true; }   // recenzja: projekt ui_text 1 - widoczna nieaktywna z powodem
                 string why;
                 if (!CanTrade(Clan.PlayerClan, st.Village, true, out why)) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}" + why); return true; }
                 if (!looted && st.Village.VillageState == Village.VillageStates.Looted) { args.IsEnabled = false; args.Tooltip = new TextObject("{=!}The village was plundered - wait until people return."); return true; }

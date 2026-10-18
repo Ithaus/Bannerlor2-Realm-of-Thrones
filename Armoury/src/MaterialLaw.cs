@@ -253,6 +253,7 @@ namespace Armoury
                 Bloomery.Cap(village, item, ref __result);
                 RockGold.Cap(village, item, ref __result);   // 24d (14.10, klucz CasterlyGoldExhausted): kruszce Casterly Rock i ruda zlota Zachodu - sufit 0, ostatni krok przed ksiega
                 GoodsRates.SideStep(village, item, ref __result);   // ZC1 (BkSideGoodsOrigin): marmur kopaln srebra i miod pitny drwali x (1 - przejscie) - po wszystkich krokach, przed ksiega
+                VillageCrafts.After(village, item, __result.ResultNumber);   // inwest (recenzja): pomiar neutralnosci zajec na towarach - wynik koncowy (tylko doba wlaczenia; sam odczyt)
                 OreLedger.NoteModel(village, item, __result.ResultNumber);   // wpis 98: wynik modelu PO mnozniku (ksiega - tylko log)
             }
             catch { System.Threading.Interlocked.Increment(ref _silent); }   // inwest etap 0 (proba W2): ciche wyjatki lancucha tylko liczone (linia W2)

@@ -34,13 +34,17 @@ namespace Armoury
     ///  - Rod wymarl - jednostki przechodza na wies (pracuja, dodatek idzie do zwyklego podzialu). Bez sprzedazy prac (v1). +1 relacji z notablami okregu, gdy prace gracza
     ///    przekraczaja 1% rocznej produkcji okregu (najwyzej raz na 28 dob).
     /// Zapis arm_works (SaveText, kawalki; zly wpis - pominiety i liczony, nigdy wywrotka; brak klucza = brak prac). Klucz District Works wylaczony - prace w zapisie zamrozone:
-    /// bez dodatku, bez wyplat, bez menu (BEE jak dotad). Wyjatki per okreg liczone (potkniecia) - nic sie nie gasi.
+    /// bez dodatku, bez wyplat, menu widoczne nieaktywne z powodem (BEE jak dotad). Wyjatki per okreg liczone (potkniecia) - nic sie nie gasi.
+    /// Recenzja (noc 17/18.10): jedna regula dodatku dla produkcji i wyplat - b liczone PRZED rachunkiem KS i planem zajec doby (BeforeProduction), zmiana b oznacza okreg
+    /// do przeliczenia (KS, plan zajec, wycena doby), wyplata bierze E z opublikowanego b; bez drogi produkcji (rampa KS, produkcja wsi niewpieta - PathOf) prace zamrozone
+    /// (bez zakupu i wyplat); bez zajec wiosek - plan z samych prac (VillageCrafts.WorksOnlyPlans); stado - zwierzeta z jednostek, za ktorymi stoja (HerdDriven); zapis w2
+    /// z cena sprzetu czesci (strata przy ogniu zaraz po wczytaniu).
     /// </summary>
     internal static partial class DistrictWorks
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal const string P = "Prace okregu (PO): ";
-        private const string SaveVer = "w1";
+        private const string SaveVer = "w2";                 // recenzja: w2 = w1 + cena sprzetu czesci (Kit, wartosc straty przy ogniu po wczytaniu); w1 czytany
         private const string MainPart = "#main", VillageClan = "#village";
         private const double DefaultH = 0.868;      // swiat: utarg oddany / wartosc produkcji okregow bez stadnin (projekt F10)
         private static readonly object Gate = new object();
@@ -134,6 +138,8 @@ namespace Armoury
 
         // liczniki do linii (od ostatniej linii)
         private static int _st, _stAll, _dNew, _dNewAi, _dPays, _dWar, _dBurnN, _dIdleN, _dBackN, _dRebN, _dExpN, _dRemN, _dLocked, _dHerdN, _dRel, _dViolate, _dNoCart;
+        private static int _dNoPath, _dDirty;                     // recenzja: powroty wozow bez drogi produkcji (bez wyplaty), okregi oznaczone do przeliczenia po zmianie b
+        private static int _preDay = int.MinValue; private static double _preMs;   // recenzja: krok przed produkcja doby (BeforeProduction) - raz na dobe, koszt do linii
         private static long _dWage, _dMatTown, _dMatVil, _dPaidTax, _dPaidVil, _dPool, _dHanded, _dExpected, _dRebG, _dIn, _dLostG, _dHerdPcs, _dMatPcs;
         private static double _dBurnU, _dIdleU, _dBackU, _dRebU, _dExpU, _dHerdU;
         private static readonly HashSet<string> _err = new HashSet<string>();
@@ -148,6 +154,7 @@ namespace Armoury
                 _rows.Clear(); _relDay.Clear(); _handed.Clear(); _handedDays.Clear(); _handToday.Clear(); _pending = null; _loadNote = "nowa kampania albo zapis bez arm_works"; _loadBad = 0;
                 _bonus = new Dictionary<Village, Dictionary<string, Bonus>>(); _val.Clear(); _ksExtra.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _dNotes.Clear(); _startLogged = false; _lastWeek = -1;
+                _preDay = int.MinValue; _preMs = 0;
             }
             MenuReset();
             DistrictWorksAi.Reset();
@@ -156,6 +163,7 @@ namespace Armoury
         private static void ZeroDay()
         {
             _dNew = _dNewAi = _dPays = _dWar = _dBurnN = _dIdleN = _dBackN = _dRebN = _dExpN = _dRemN = _dLocked = _dHerdN = _dRel = _dViolate = _dNoCart = 0;
+            _dNoPath = _dDirty = 0;
             _dWage = _dMatTown = _dMatVil = _dPaidTax = _dPaidVil = _dPool = _dHanded = _dExpected = _dRebG = _dIn = _dLostG = _dHerdPcs = _dMatPcs = 0;
             _dBurnU = _dIdleU = _dBackU = _dRebU = _dExpU = _dHerdU = 0;
         }
@@ -215,6 +223,27 @@ namespace Armoury
             lock (Gate) _ksExtra[v] = (double[])pcs.Clone();
         }
 
+        /// <summary>recenzja (wyplata bez towaru): okreg ma droge produkcji dodatku prac - pod KS okreg zywy KS z pelna stawka (WorksKs w rachunku okregu; w rampie KS
+        /// czesc gry stawki dodatku nie ma), bez KS plan produkcji wsi (zajecia albo same prace - VillageCrafts.CarriesWorks). Bez drogi prace sa zamrozone: bez zakupu
+        /// i bez wyplat (wyplata bez towaru = przelew bez pokrycia). Nie rzuca.</summary>
+        internal static bool PathOf(Village v)
+        {
+            if (v == null) return false;
+            try
+            {
+                if (StartCalibration.KsDistrictLive(v)) return StartCalibration.FullFor(v);
+                return VillageCrafts.CarriesWorks(v);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Wsie gry okregow z dodatkiem prac (opublikowane b) - dla planow samych prac bez zajec (VillageCrafts). Kopia.</summary>
+        internal static List<Village> BonusVillages()
+        {
+            var m = _bonus;
+            return m.Count == 0 ? new List<Village>() : new List<Village>(m.Keys);
+        }
+
         // ============================================================ wycena czesci (F4, F7, F11, F13)
         /// <summary>Wycena czesci okregu: zajecie prac, osady, stojace, cena pelnego sprzetu osady (c), jednostki wszystkich posiadaczy (pracujace z rampa) i trzymane,
         /// b dzis, wartosc dnia zajecia (v) i czesc zwykla pora roku.</summary>
@@ -247,6 +276,7 @@ namespace Armoury
                 double H = HOf(v, vd);
                 int today = Today();
                 bool watch = false; try { watch = PeopleScale.WatchException(v.Settlement); } catch { watch = false; }
+                bool path = PathOf(v);                                     // recenzja: bez drogi produkcji dodatku - bez nowych prac
                 string id = v.Settlement.StringId;
                 foreach (var pc in parts)
                 {
@@ -284,6 +314,7 @@ namespace Armoury
                     if (!On) { q.Allowed = false; q.Why = "District works are switched off (mod settings)."; }
                     else if (q.WKind < 0) { q.Allowed = false; q.Why = q.Craft >= KsTab.CHorse0 && q.Craft <= KsTab.CHorse5 ? "Horse herds: no works yet - village carts do not sell horses." : "No works for this craft yet."; }
                     else if (watch) { q.Allowed = false; q.Why = "The Night's Watch's gift villages make the same whatever is spent on them."; }
+                    else if (!path) { q.Allowed = false; q.Why = "Works here would make nothing now: the district's new economy is still settling in (or village production is not wired - see the Armoury log)."; }
                     else if (q.State == VillageBook.SBurned || q.State == VillageBook.SBurning || q.State == VillageBook.SAbandoned) { q.Allowed = false; q.Why = "No new works until it stands again."; }
                     else if (!(q.KitPer > 0)) { q.Allowed = false; q.Why = "Nobody works here now."; }
                     else if (held < 0 && (pc.Target >= 0 || (pc.Ks && pc.F > 0))) { q.Allowed = false; q.Why = "The village is changing its craft - wait until it is done."; }
@@ -340,6 +371,7 @@ namespace Armoury
                 Quote q = null; foreach (var x in qs) if (x.Uid == uid) { q = x; break; }
                 if (q == null) { res.Why = "This village is not part of the district."; return res; }
                 if (!rebuild && !q.Allowed) { res.Why = q.Why; return res; }
+                if (rebuild && !PathOf(v)) { res.Why = "Works here would make nothing now - rebuild later."; return res; }   // recenzja: odbudowa tez tylko z droga produkcji
                 if (q.WKind < 0 || !(q.KitPer > 0)) { res.Why = q.Why ?? "No works for this craft yet."; return res; }
                 double units;
                 if (rebuild) { units = rebuildUnits; amount = (int)Math.Ceiling(KR[q.WKind] * q.KitPer * units); }
@@ -503,12 +535,14 @@ namespace Armoury
         }
 
         // ============================================================ dodatek (b) wedlug czesci - publikacja dla produkcji
-        /// <summary>Przelicza b czesci z jednostek pracujacych (z rampa) i osad stojacych; publikuje jedna referencja. Wolane przy zakupie, uderzeniu i co dobe.</summary>
+        /// <summary>Przelicza b czesci z jednostek pracujacych (z rampa) i osad stojacych; publikuje jedna referencja. Wolane przy zakupie, uderzeniu, przed produkcja doby
+        /// (BeforeProduction) i co dobe. recenzja (dodatek produkcji spozniony do 7 dob wobec wyplat): okreg, ktorego b sie zmienilo (rampa lotu, bezczynne, powroty, ogien),
+        /// jest oznaczany do przeliczenia (KS - ld.Res, bez KS - plan zajec) i traci wycene doby (wyplata liczy E z tego samego b co produkcja).</summary>
         private static void RebuildBonus()
         {
             try
             {
-                if (!On) { if (_bonus.Count > 0) _bonus = new Dictionary<Village, Dictionary<string, Bonus>>(); return; }
+                if (!On) { if (_bonus.Count > 0) { var old0 = _bonus; _bonus = new Dictionary<Village, Dictionary<string, Bonus>>(); foreach (var v0 in old0.Keys) MarkChanged(v0); } return; }
                 var s = Settings.Current;
                 float bSide = s != null ? Math.Max(0f, Math.Min(2f, s.DistrictWorksBonusSide)) : 0.30f, bMain = s != null ? Math.Max(0f, Math.Min(2f, s.DistrictWorksBonusMain)) : 0.20f;
                 int today = Today();
@@ -544,9 +578,37 @@ namespace Armoury
                     }
                     if (d.Count > 0) map[v] = d;
                 }
+                var old = _bonus;
                 _bonus = map;
+                // okregi ze zmienionym b (takze nowe i znikniete) - przeliczenie produkcji tej doby / nastepnej i nowa wycena wyplat
+                foreach (var kv in map) if (Changed(old, kv.Key, kv.Value)) MarkChanged(kv.Key);
+                foreach (var kv in old) if (!map.ContainsKey(kv.Key)) MarkChanged(kv.Key);
             }
             catch (Exception e) { Stumble("RebuildBonus", e); }
+        }
+
+        private static bool Changed(Dictionary<Village, Dictionary<string, Bonus>> old, Village v, Dictionary<string, Bonus> now)
+        {
+            Dictionary<string, Bonus> was;
+            if (!old.TryGetValue(v, out was) || was == null || was.Count != now.Count) return true;
+            foreach (var kv in now)
+            {
+                Bonus b; if (!was.TryGetValue(kv.Key, out b) || b == null || b.Craft != kv.Value.Craft || Math.Abs(b.B - kv.Value.B) > 1e-6) return true;
+            }
+            return false;
+        }
+
+        /// <summary>Okreg z nowym b: KS przelicza go przy najblizszym rachunku doby, plan zajec bez KS tez, wycena doby (E dla wyplat) od nowa. Nie rzuca.</summary>
+        private static void MarkChanged(Village v)
+        {
+            try
+            {
+                if (v == null || v.Settlement == null) return;
+                StartCalibration.KsDirty(v);
+                VillageCrafts.MarkDirty(v);
+                lock (Gate) { _val.Remove(v.Settlement.StringId); _dDirty++; }
+            }
+            catch { }
         }
 
         // ============================================================ ogien, glod, powroty (burning)
@@ -574,7 +636,7 @@ namespace Armoury
                 int today = Today();
                 var s = Settings.Current;
                 int days = s != null ? Math.Max(1, s.DistrictWorksRebuildDays) : 91;
-                var herd = new List<KeyValuePair<Row, double>>();
+                var herd = new List<KeyValuePair<Row, int>>();
                 lock (Gate)
                 {
                     foreach (var r in _rows)
@@ -589,13 +651,15 @@ namespace Armoury
                         if (dR > 1e-6 && sBefore > 1e-6)
                         {
                             double frac = Math.Min(1.0, dR / sBefore);
+                            double holding = r.U + r.Building() + r.I;                    // recenzja: jednostki, za ktorymi stoja zwierzeta (przed przesunieciem; Z i odbudowy - bez zwierzat)
                             double moved = Move(r, frac);
                             double lost = KL[r.Kind] * moved;
                             r.Z += lost; r.I += moved - lost;
+                            int drive = r.Kind == KHerd ? HerdDriven(r.Animals, holding, lost) : 0;
                             _dBurnN++; _dBurnU += lost; _dIdleU += moved - lost;
                             long g = (long)Math.Round(lost * r.Kit);                     // ostatnia znana cena (bez wyceny pod blokada; czesc spalona ma dzis 0 osad stojacych)
                             r.LostG += g; _dLostG += g;
-                            if (r.Kind == KHerd && r.Animals > 0 && lost > 0) herd.Add(new KeyValuePair<Row, double>(r, lost));
+                            if (drive > 0) { herd.Add(new KeyValuePair<Row, int>(r, drive)); _dHerdU += lost; }
                             if (r.Clan == PlayerClanId() && lost > 1e-3)
                                 Msg("Raiders emptied " + Math.Round(dR) + " homesteads of " + (p.Name ?? "?") + " (" + Name(v) + "): " + (r.Kind == KHerd ? "your animals there were driven off" : "your " + KindShort[r.Kind] + " there burned")
                                     + " - " + g.ToString("N0", Inv) + " of works lost.", true);
@@ -634,14 +698,21 @@ namespace Armoury
             return m;
         }
 
-        /// <summary>Stado: zwierzeta z oproznionych osad do napastnika (bez niego - do magazynu wsi), ramka ksiegi towarow "rabunek osada po osadzie".</summary>
-        private static void DriveOff(Row r, double lost, Village v, MobileParty raider)
+        /// <summary>recenzja (stado - za malo zwierzat do napastnika): zwierzeta spedzone z utraconych jednostek = zwierzeta x stracone / jednostki, za ktorymi stoja zwierzeta
+        /// PRZED przesunieciem (pracujace + w budowie + bezczynne z glodu; stracone wczesniej i prawa odbudowy zwierzat juz nie maja). Najwyzej tyle, ile jest. Ten sam rachunek
+        /// w Diff i w probie T2.</summary>
+        internal static int HerdDriven(double animals, double holdingBefore, double lostUnits)
+        {
+            if (!(animals > 0) || !(holdingBefore > 1e-9) || !(lostUnits > 0)) return 0;
+            double n = Math.Floor(animals * Math.Min(1.0, lostUnits / holdingBefore) + 0.5);
+            return (int)Math.Max(0, Math.Min(Math.Floor(animals), n));
+        }
+
+        /// <summary>Stado: zwierzeta z oproznionych osad do napastnika (bez niego - do magazynu wsi), ramka ksiegi towarow "rabunek osada po osadzie". n - z HerdDriven.</summary>
+        private static void DriveOff(Row r, int n, Village v, MobileParty raider)
         {
             try
             {
-                double all = r.Held() + lost;
-                double perUnit = all > 0 ? r.Animals / all : 0;
-                int n = (int)Math.Floor(perUnit * lost + 0.5);
                 if (n <= 0 || r.Animal == null) return;
                 var it = MBObjectManager.Instance.GetObject<ItemObject>(r.Animal);
                 if (it == null) return;
@@ -652,7 +723,7 @@ namespace Armoury
                 if (f != null) f.Info = "prace okregu: stado do napastnika (inwest)";
                 try { to.AddToCounts(it, n); }
                 finally { GoodsLedger.End(f); }
-                lock (Gate) { r.Animals -= n; _dHerdN++; _dHerdPcs += n; _dHerdU += lost; }
+                lock (Gate) { r.Animals -= n; _dHerdN++; _dHerdPcs += n; }
             }
             catch (Exception e) { Stumble("DriveOff", e); }
         }
@@ -689,6 +760,7 @@ namespace Armoury
                     if (!any) return;                                 // okreg bez prac - nic (bez pamieci utargu: wycena bierze srednia swiata H)
                     double h; _handToday.TryGetValue(id, out h); _handToday[id] = h + handed;   // utarg doby (H okregu = utarg na dobe / wartosc produkcji dnia)
                 }
+                if (!PathOf(home)) { lock (Gate) _dNoPath++; return; }       // recenzja: bez drogi produkcji dodatku (rampa KS, produkcja wsi niewpieta) - bez wyplaty, zloto w zwyklym podziale
                 var s = Settings.Current;
                 double share = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictWorksShare)) : 0.5;
                 DistVal dv = ValOf(home);
@@ -752,7 +824,8 @@ namespace Armoury
             catch (Exception e) { Stumble("OnCartReturn", e); }
         }
 
-        /// <summary>Wartosc dnia okregu (V z dodatkiem) i E czesci z pracami (b x wartosc zajecia czesci) - pamiec doby (liczone raz na dobe na okreg z pracami).</summary>
+        /// <summary>Wartosc dnia okregu (V z dodatkiem) i E czesci z pracami (b x wartosc zajecia czesci) - pamiec doby (liczone raz na dobe na okreg z pracami; zmiana b kasuje
+        /// pamiec - MarkChanged). recenzja: b z OPUBLIKOWANEGO dodatku (_bonus - to samo b, ktore czyta produkcja: WorksKs i plan zajec), nie z jednostek chwili.</summary>
         private static DistVal ValOf(Village v)
         {
             string id = v.Settlement.StringId;
@@ -766,7 +839,8 @@ namespace Armoury
                 string part = PartKey(q.Uid);
                 d.VPart[part] = q.Pc != null ? q.Pc.ValDay : 0;
                 d.V += q.Pc != null ? q.Pc.ValDay : 0;
-                double e = q.B * q.V;
+                int pc; double pb;
+                double e = BonusOf(v, q.Uid, out pc, out pb) && pc == q.Craft ? pb * q.V : 0.0;
                 if (e > 0) { d.EPart[part] = e; d.E += e; }
             }
             d.V += d.E;
@@ -783,17 +857,20 @@ namespace Armoury
         }
 
         // ============================================================ doba
-        /// <summary>ArmouryBehavior.OnDailyTick: zapis z wczytania, rampa, roznice czesci (glod, powroty), odbudowa samoczynna, przypomnienia, wygasniecie prawa, wojna,
-        /// rod wymarly, relacja, linia "Prace okregu (PO)" (gdy cos sie stalo), co 7 dob CSV i komunikat tygodnia.</summary>
-        internal static void Daily()
+        /// <summary>recenzja (dodatek produkcji do 7 dob za wyplatami): ArmouryBehavior.OnDailyTick PRZED StartCalibration.Daily i VillageCrafts.Daily (PO VillageBook.Daily) -
+        /// zapis z wczytania, rampa lotow, rod wymarly, zmiana ukladu, roznice czesci (glod, powroty) i dodatek b DZISIEJSZEJ doby. Okregi ze zmienionym b oznaczone
+        /// (MarkChanged): rachunek KS i plan zajec tej doby licza z tym samym b, z ktorego wyplaty przy wozach biora E (ValOf). Raz na dobe; Daily wola go sam, gdy
+        /// ArmouryBehavior go nie wolal. Nie rzuca.</summary>
+        internal static void BeforeProduction()
         {
-            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             int today = Today();
+            if (_preDay == today) return;
+            _preDay = today;
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             try
             {
                 lock (Gate) { if (_pending != null) { string p = _pending; _pending = null; ImportNow(p); } }
-                if (!_startLogged) { _startLogged = true; StartLine(); }
-                if (!On) { if (_bonus.Count > 0) _bonus = new Dictionary<Village, Dictionary<string, Bonus>>(); return; }
+                if (!On) { RebuildBonus(); return; }                         // klucz wylaczony: dodatek zdjety (okregi oznaczone do przeliczenia), prace zamrozone
                 // rampa: loty gotowe -> pracujace
                 lock (Gate)
                     foreach (var r in _rows)
@@ -806,6 +883,35 @@ namespace Armoury
                         }
                     }
                 Remap(today);                                                // prace na wioskach spoza ukladu tej sesji - przy rownej wartosci
+                var dists = new HashSet<string>(StringComparer.Ordinal);
+                lock (Gate) foreach (var r in _rows) dists.Add(r.Dist);
+                foreach (var id in dists)
+                {
+                    var st = Settlement.Find(id); var v = st != null ? st.Village : null;
+                    if (v == null) continue;
+                    Diff(v, null, false);                                    // ksiega wiosek tej doby (VillageBook.Daily biegnie wczesniej)
+                }
+                RebuildBonus();                                              // b dzisiejszej doby (rampa lotow) - zmienione okregi do przeliczenia DZIS
+            }
+            catch (Exception e) { Stumble("BeforeProduction", e); }
+            _preMs = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        }
+
+        /// <summary>ArmouryBehavior.OnDailyTick (po KS i zajeciach): okno utargu, odbudowa samoczynna, przypomnienia, wygasniecie prawa, wojna, relacja, wycena doby, AI,
+        /// linia "Prace okregu (PO)" (gdy cos sie stalo), co 7 dob CSV i komunikat tygodnia. Rampa, roznice czesci i b doby - BeforeProduction (wolany tu, gdy go nie bylo).</summary>
+        internal static void Daily()
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            int today = Today();
+            double pre = 0;
+            try
+            {
+                lock (Gate) { if (_pending != null) { string p = _pending; _pending = null; ImportNow(p); } }
+                if (!_startLogged) { _startLogged = true; StartLine(); }
+                bool called = _preDay == today;
+                BeforeProduction();                                          // raz na dobe (gdy ArmouryBehavior wolal go przed KS - nic)
+                pre = called ? _preMs : 0;
+                if (!On) return;
                 var dists = new HashSet<string>(StringComparer.Ordinal);
                 lock (Gate)
                 {
@@ -824,7 +930,6 @@ namespace Armoury
                 {
                     var st = Settlement.Find(id); var v = st != null ? st.Village : null;
                     if (v == null) continue;
-                    Diff(v, null, false);
                     Rebuilds(v, today);
                     Relation(v, today);
                     WarCheck(v);
@@ -842,7 +947,8 @@ namespace Armoury
                 if (TestWanted(today)) Test(today);                         // proba autotestu (plik armoury-po-test.flag, tylko DLL autotestu)
             }
             catch (Exception e) { Stumble("Daily", e); }
-            double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            if (!On) return;
+            double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency + pre;   // z krokiem przed produkcja doby
             DayLine(today - 1, ms);
         }
 
@@ -1047,7 +1153,7 @@ namespace Armoury
             try
             {
                 bool any;
-                lock (Gate) any = _dNew + _dNewAi + _dPays + _dWar + _dBurnN + _dIdleN + _dBackN + _dRebN + _dExpN + _dRemN + _dHerdN + _dRel + _dViolate + _st > 0 || _dNotes.Count > 0 || _rows.Count > 0 && LogGate.Lines && day % 7 == 0;
+                lock (Gate) any = _dNew + _dNewAi + _dPays + _dWar + _dBurnN + _dIdleN + _dBackN + _dRebN + _dExpN + _dRemN + _dHerdN + _dRel + _dViolate + _dNoPath + _st > 0 || _dNotes.Count > 0 || _rows.Count > 0 && LogGate.Lines && day % 7 == 0;
                 if (!any) { lock (Gate) { ZeroDay(); _dNotes.Clear(); _st = 0; } return; }
                 var sb = new StringBuilder(1500);
                 lock (Gate)
@@ -1059,12 +1165,14 @@ namespace Armoury
                       .Append(" | nowe: gracz ").Append(_dNew).Append(", AI ").Append(_dNewAi).Append(", wplacone ").Append(_dIn).Append(" = place ").Append(_dWage).Append(" + material polka ").Append(_dMatTown)
                       .Append(" + material magazyn wsi ").Append(_dMatVil).Append(" (szt. ").Append(_dMatPcs).Append("; roznica ").Append(_dIn - paidIn).Append(")")
                       .Append(" | wyplaty: powrotow ").Append(_dPays).Append(", utarg ").Append(_dHanded).Append(", pula ").Append(_dPool).Append(", wyplacone ").Append(paidOut).Append(" = z licznika pana ").Append(_dPaidTax)
-                      .Append(" + z kiesy wsi ").Append(_dPaidVil).Append(" (oczekiwane ").Append(_dExpected).Append(", wstrzymane wojna ").Append(_dWar).Append(", powroty bez wyceny ").Append(_dNoCart).Append(")")
+                      .Append(" + z kiesy wsi ").Append(_dPaidVil).Append(" (oczekiwane ").Append(_dExpected).Append(", wstrzymane wojna ").Append(_dWar).Append(", powroty bez wyceny ").Append(_dNoCart)
+                      .Append(", bez drogi produkcji ").Append(_dNoPath).Append(")")
                       .Append(" | ogien: uderzen ").Append(_dBurnN).Append(", stracone ").Append(_dBurnU.ToString("0.00", Inv)).Append(" jedn. (").Append(_dLostG).Append(" zl), bezczynne ").Append(_dIdleU.ToString("0.00", Inv))
                       .Append(", stada do napastnikow ").Append(_dHerdN).Append(" (szt. ").Append(_dHerdPcs).Append("), wrocilo do pracy ").Append(_dBackU.ToString("0.00", Inv))
                       .Append(" | odbudowa: ").Append(_dRebN).Append(" (").Append(_dRebU.ToString("0.00", Inv)).Append(" jedn., ").Append(_dRebG).Append(" zl), przypomnienia ").Append(_dRemN).Append(", przepadlo ").Append(_dExpN)
                       .Append(" (").Append(_dExpU.ToString("0.00", Inv)).Append(" jedn.) | relacje +").Append(_dRel)
                       .Append(" | ").Append(StartCalibration.WorksKsText())
+                      .Append(" | b zmienione: okregow ").Append(_dDirty).Append(" (przeliczone w dobie zmiany: KS i plan zajec), ").Append(VillageCrafts.WorksPathText())
                       .Append(" | kontrole: wplacone - place - material ").Append(_dIn - paidIn).Append(", wyplacone - licznik - kiesa 0, naruszenia (wyplata > pula, pula > pol utargu, zakup != cena) ").Append(_dViolate)
                       .Append(_dNotes.Count > 0 ? " | " + string.Join("; ", _dNotes.ToArray()) : "")
                       .Append(" | ").Append(DistrictWorksAi.DayText())
@@ -1077,8 +1185,9 @@ namespace Armoury
         }
 
         // ============================================================ zapis arm_works
-        // w1|wiersz;wiersz;...|d:okreg=utarg:doba_relacji,...
-        // wiersz: rod~okreg~czesc~zajecie~rodzaj~U~I~Z~loty(u:doba:gotowosc,...)~odbudowy(u:termin:przypomniane,...)~zwierze~zwierzat~wplacone~place~material~wyplacone~stracone~doba0~Br~Bf
+        // w2|wiersz;wiersz;...|d:okreg=utarg:doba_relacji,...
+        // wiersz: rod~okreg~czesc~zajecie~rodzaj~U~I~Z~loty(u:doba:gotowosc,...)~odbudowy(u:termin:przypomniane,...)~zwierze~zwierzat~wplacone~place~material~wyplacone~stracone~doba0~Br~Bf~cena_sprzetu
+        // (w1 - bez ostatniego pola, czytany: cena sprzetu 0 do pierwszej wyceny)
         internal static string Export()
         {
             try
@@ -1099,7 +1208,7 @@ namespace Armoury
                         sb.Append('~');
                         for (int i = 0; i < r.Rebs.Count; i++) { if (i > 0) sb.Append(','); sb.Append(D(r.Rebs[i].Units)).Append(':').Append(r.Rebs[i].Deadline).Append(':').Append(r.Rebs[i].Reminded ? 1 : 0); }
                         sb.Append('~').Append(C(r.Animal ?? "-")).Append('~').Append(D(r.Animals)).Append('~').Append(r.In).Append('~').Append(r.InWage).Append('~').Append(r.InMat).Append('~').Append(r.Out)
-                          .Append('~').Append(r.LostG).Append('~').Append(r.Day0).Append('~').Append(D(r.SeenBr)).Append('~').Append(D(r.SeenBf));
+                          .Append('~').Append(r.LostG).Append('~').Append(r.Day0).Append('~').Append(D(r.SeenBr)).Append('~').Append(D(r.SeenBf)).Append('~').Append(D(r.Kit));
                     }
                     sb.Append("|d:"); f = true;
                     foreach (var kv in _handed)
@@ -1132,14 +1241,16 @@ namespace Armoury
             try
             {
                 var p = t.Split('|');
-                if (p.Length < 2 || p[0] != SaveVer) { _loadNote = "nieznany format arm_works (" + (p.Length > 0 ? p[0] : "?") + ") - bez prac"; _loadBad++; return; }
+                bool w1 = p.Length > 0 && p[0] == "w1";                          // recenzja: zapis sprzed ceny sprzetu (20 pol) - czytany
+                if (p.Length < 2 || (p[0] != SaveVer && !w1)) { _loadNote = "nieznany format arm_works (" + (p.Length > 0 ? p[0] : "?") + ") - bez prac"; _loadBad++; return; }
+                int fields = w1 ? 20 : 21;
                 if (p[1].Length > 0)
                     foreach (var e in p[1].Split(';'))
                     {
                         try
                         {
                             var q = e.Split('~');
-                            if (q.Length != 20) { _loadBad++; continue; }
+                            if (q.Length != fields) { _loadBad++; continue; }
                             int craft; if (!KsTab.CraftIndex.TryGetValue(q[3], out craft)) craft = -1;
                             int kind = PI(q[4], -1);
                             if (craft < 0 || kind < 0 || kind >= Kinds) { _loadBad++; continue; }
@@ -1149,6 +1260,7 @@ namespace Armoury
                             r.Animal = q[10] == "-" ? null : q[10]; r.Animals = Math.Max(0, PD(q[11]));
                             r.In = PL(q[12]); r.InWage = PL(q[13]); r.InMat = PL(q[14]); r.Out = PL(q[15]); r.LostG = PL(q[16]); r.Day0 = PI(q[17], -1);
                             r.SeenBr = PD(q[18]); r.SeenBf = PD(q[19]);
+                            if (!w1) r.Kit = Math.Max(0, PD(q[20]));                // cena sprzetu czesci - strata przy ogniu zaraz po wczytaniu (recenzja)
                             _rows.Add(r);
                         }
                         catch { _loadBad++; }
