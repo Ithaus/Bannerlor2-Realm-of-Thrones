@@ -32,8 +32,8 @@ namespace Armoury
     ///    kasy na dobe co Ks Farm Surplus Review Days (najwyzej Ks Farm Surplus Review Max firmy), przeglad kwartalny bez obnizki, dopoki nadwyzka trwa.
     /// ZAMKNIETY PIENIADZ: czego lud nie przyjal, zostaje u placacego - zarobek z zewnatrz: wolajacy Earn daje reszte placacemu (ten sam protokol co przy kiesie
     /// nieczynnej - Earn zwraca kwote przyjeta): kasie miasta (MenPurse x2, Sutlers, SoldierPay, Seal31B, OutlawLaw x2, VetPurse, BuildFunding x2, ClanBudget,
-    /// WorkshopLaw, WorkshopTrade, MendMaterial, A17Fix) albo kiesie wsi (roboty gminy DS - DaPayVillage, przebudowa zajecia wioski - CraftsRebuildPay; recenzja f5:
-    /// osobny licznik "wrocilo do wsi"); z kasy i M6: nigdy nie schodzi z kasy; od P dla R: zostaje w kiesie P. Kasy oddaja to panom i koronie firma (przeglad
+    /// WorkshopLaw, WorkshopTrade, MendMaterial, A17Fix; kiesa wsi - roboty gminy DS i przebudowa zajecia wioski - takze kasie miasta targowego, recenzja calosci fali 5:
+    /// TownFolk.PayVillageWage, jedna regula dla kazdego placacego); z kasy i M6: nigdy nie schodzi z kasy; od P dla R: zostaje w kiesie P. Kasy oddaja to panom i koronie firma (przeglad
     /// wedlug nadwyzki). Tozsamosci w linii doby: pelne = przyjete + zostalo u placacych (kazda droga).
     /// Linia doby "Dochod ludu wedlug koszyka (f5-lud): dzien N" (TownFolk.DailyLive po linii f4). Zapis arm_ks_dochod: "f5|W2:miasto:k,...|R:...|P:...".
     /// Wyjatek per miasto - licznik potkniec, bez globalnego wylacznika (CLAUDE.md 7).
@@ -48,7 +48,6 @@ namespace Armoury
         private static int _stum;
         // liczniki doby (DayLine zeruje) - klasy W, R, P
         private static readonly double[] _eFull = new double[3], _ePaid = new double[3];                              // z zewnatrz (Earn): pelne / przyjete
-        private static double _eVil;                                                                                   // recenzja f5 (uwaga 1): z tego nieprzyjete wrocilo do kiesy wsi (placacy spoza miasta)
         private static readonly double[] _cFull = new double[3], _cRule = new double[3], _cPaid = new double[3];      // z kas (krok 2 R i P, przelewy gracza): pelne / zlecone / zeszlo
         private static readonly double[] _mFull = new double[2], _mRule = new double[2], _mPaid = new double[2];      // M6: [0] P, [1] R
         private static double _hFull, _hPaid;                                                                          // place od P dla R z nadwyzki
@@ -122,7 +121,7 @@ namespace Armoury
                 for (int b = 0; b < 5; b++) _band[c, b] = 0;
             }
             _mFull[0] = _mFull[1] = _mRule[0] = _mRule[1] = _mPaid[0] = _mPaid[1] = 0;
-            _hFull = _hPaid = 0; _hrR = _hrP = 0; _hrN = 0; _dTowns = 0; _ticks = 0; _eVil = 0;
+            _hFull = _hPaid = 0; _hrR = _hrP = 0; _hrN = 0; _dTowns = 0; _ticks = 0;
             _revN = _revNoCut = _revHouse = 0; _revAmt = 0; _revShare = _revCutAfter = 0;
         }
 
@@ -277,9 +276,6 @@ namespace Armoury
             _eFull[0] += fW; _eFull[1] += fR; _eFull[2] += fP; _ePaid[0] += aW; _ePaid[1] += aR; _ePaid[2] += aP;
         }
 
-        /// <summary>Recenzja f5 (uwaga 1): TownFolk.EarnBack - czesc zatrzymana przez regule wrocila do kiesy wsi (roboty gminy DS, przebudowa zajecia), nie do kasy miasta.</summary>
-        internal static void NoteVillageBack(long x) { if (x > 0) _eVil += x; }
-
         internal static void NoteCoffer(int c, long full, long rule, long paid)
         {
             if (c < 0 || c > 2) return;
@@ -356,7 +352,7 @@ namespace Armoury
                     catch (Exception e) { Stumble("DayLine.kasa", e); }
                 }
                 long eF = L(_eFull[0] + _eFull[1] + _eFull[2]), eP = L(_ePaid[0] + _ePaid[1] + _ePaid[2]);
-                long eV = Math.Max(0L, Math.Min(eF - eP, L(_eVil))), eC = eF - eP - eV;   // recenzja f5 (uwaga 1): zwrot do kies wsi osobno - nie siedzi w kasach miast
+                long eC = eF - eP;   // recenzja calosci fali 5: nieprzyjete z zewnatrz - w kasach miast, takze od kies wsi (PayVillageWage; pole "wrocilo do wsi" zdjete - zawsze 0)
                 long cF = L(_cFull[0] + _cFull[1] + _cFull[2]), cQ = L(_cRule[0] + _cRule[1] + _cRule[2]), cP = L(_cPaid[0] + _cPaid[1] + _cPaid[2]), cC = cF - cQ;
                 long mF = L(_mFull[0] + _mFull[1]), mQ = L(_mRule[0] + _mRule[1]), mP = L(_mPaid[0] + _mPaid[1]), mC = mF - mQ;
                 long hF = L(_hFull), hP = L(_hPaid), hC = hF - hP;
@@ -384,7 +380,6 @@ namespace Armoury
                 sb.Append(", mediana ");
                 for (int c = 0; c < 3; c++) sb.Append(c > 0 ? "/" : "").Append(F(Med(_days[c]), "0.0"));
                 sb.Append(" | doba: z zewnatrz (uslugi, dwor, budowy, kopalnie, warsztaty) pelne ").Append(eF).Append(" = przyjete ").Append(eP).Append(" + oddane kasom miast ").Append(eC)
-                  .Append(" + wrocilo do wsi (roboty gminy, przebudowa zajec) ").Append(eV)
                   .Append(" (W ").Append(L(_eFull[0])).Append('/').Append(L(_ePaid[0])).Append(", R ").Append(L(_eFull[1])).Append('/').Append(L(_ePaid[1]))
                   .Append(", P ").Append(L(_eFull[2])).Append('/').Append(L(_ePaid[2])).Append(')')
                   .Append(" | z kas (robocizna i doplata R, obrot P, przelewy gracza) pelne ").Append(cF).Append(" = zlecone ").Append(cQ).Append(" + zostalo w kasach ").Append(cC)
@@ -393,7 +388,7 @@ namespace Armoury
                   .Append(" | wyplata kupcom M6 pelna ").Append(mF).Append(" = zlecona ").Append(mQ).Append(" + zostalo w kasach ").Append(mC).Append(", zaplacona ").Append(mP)
                   .Append(" (kontrola zlecona - zaplacona = ").Append(mQ - mP).Append("; P ").Append(L(_mFull[0])).Append('/').Append(L(_mPaid[0])).Append(", R ").Append(L(_mFull[1])).Append('/').Append(L(_mPaid[1])).Append(')')
                   .Append(" | place od P dla R pelne ").Append(hF).Append(" = zaplacone ").Append(hP).Append(" + zostalo u P ").Append(hC)
-                  .Append(" | razem niezaplacone ludowi: w kasach miast ").Append(eC + cC + mC).Append(", u P ").Append(hC).Append(", we wsiach ").Append(eV)
+                  .Append(" | razem niezaplacone ludowi: w kasach miast ").Append(eC + cC + mC).Append(", u P ").Append(hC)
                   .Append(" | danina od skarbca W/R/P w tych miastach: podstawa ").Append(L(hb)).Append(", pobrano ").Append(L(ht)).Append(" (W ").Append(L(_hbTake[0])).Append(" / R ").Append(L(_hbTake[1]))
                   .Append(" / P ").Append(L(_hbTake[2])).Append("), stawka efektywna ").Append(F(hb > 0 ? 100.0 * ht / hb : double.NaN, "0.00")).Append("%/d; stawka R/P dzis srednio ")
                   .Append(F(_hrN > 0 ? 100.0 * _hrR / _hrN : double.NaN, "0.00")).Append('/').Append(F(_hrN > 0 ? 100.0 * _hrP / _hrN : double.NaN, "0.00"))

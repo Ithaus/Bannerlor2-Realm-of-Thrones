@@ -214,7 +214,12 @@ namespace Armoury
             bool f4reg = reg && F4RegOn;                                     // f4-pomiary (klucz Measure Regale Shelf): regale wobec polki - tylko liczniki
             if (f4reg) F4RegBegin();
             // f5-ruda (klucz Ks Iron Hands Follow Market): rece przy zlozach zelaza co 7 dob od D za ruda rynku - przed wczesnym wyjsciem K4a (wlasny try)
-            if (F5IronDay(today, d0)) { try { F5IronWeek(today, d0); } catch (Exception e) { Stumble("F5IronWeek", e); } }
+            if (F5IronDay(today, d0))
+            {
+                long irt = sig ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+                try { F5IronWeek(today, d0); } catch (Exception e) { Stumble("F5IronWeek", e); }
+                if (sig) a7t0 += System.Diagnostics.Stopwatch.GetTimestamp() - irt;   // recenzja calosci fali 5: czas reguly A7 (f5-a7) bez kroku zelaza f5-ruda (jak bez diagnozy f4)
+            }
             double sigma = Math.Max(1, DailyLife.KsSigma);
             int active = 0;
             // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
@@ -452,10 +457,11 @@ namespace Armoury
         /// za plon pol mieszczan - roznice musza byc 0 (nic z niczego).</summary>
         private static string MoneyText()
         {
-            // recenzja calosci (noc 17/18.10): "kasy miast" przebudowy = kasy targow (material) + lud miast (rzemieslnicy) - te same liczby co dotad przy Ds Works Real Material wylaczonym
-            string t = "kontrola pieniedzy KS: przebudowa kiesy wsi -" + _tally.Vil + " / kasy miast +" + (_tally.Town + _tally.Folk) + " (roznica " + (_tally.Vil - _tally.Town - _tally.Folk) + "), pola mieszczan kasy miast -" + _mTfTown
+            // recenzja calosci (noc 17/18.10): "kasy miast" przebudowy = kasy targow (material) + lud miast (rzemieslnicy) - te same liczby co dotad przy Ds Works Real Material wylaczonym;
+            // recenzja calosci fali 5: + kasy targow z placy rzemieslnikow (czesc nieprzyjeta przez lud wedlug reguly f5 - TownFolk.PayVillageWage)
+            string t = "kontrola pieniedzy KS: przebudowa kiesy wsi -" + _tally.Vil + " / kasy miast +" + (_tally.Town + _tally.Folk + _tally.Cof) + " (roznica " + (_tally.Vil - _tally.Town - _tally.Folk - _tally.Cof) + "), pola mieszczan kasy miast -" + _mTfTown
                        + " / kiesy ludu +" + _mTfFolk + " (roznica " + (_mTfTown - _mTfFolk) + ")"
-                       + (_tally.Vil > 0 || _tally.NoMat > 0 ? ", przebudowa: material z polki +" + _tally.Mat + " (szt. " + _tally.Pcs + "), rzemieslnicy +" + _tally.Wage + ", bez materialu " + _tally.NoMat + " razy, droga dawna bez towaru +" + _tally.Old : "");
+                       + (_tally.Vil > 0 || _tally.NoMat > 0 ? ", przebudowa: material z polki +" + _tally.Mat + " (szt. " + _tally.Pcs + "), rzemieslnicy +" + _tally.Wage + (_tally.Cof > 0 ? " (z tego do kas miast - lud nie przyjal, regula f5 " + _tally.Cof + ")" : "") + ", bez materialu " + _tally.NoMat + " razy, droga dawna bez towaru +" + _tally.Old : "");
             _tally.Clear(); _mTfTown = _mTfFolk = 0;
             return t;
         }

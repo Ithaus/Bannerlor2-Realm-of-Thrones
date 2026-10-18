@@ -377,9 +377,12 @@ namespace Armoury
             }
             if (wagePaid > 0)
             {
-                long f5c;
-                fin = EarnBack(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour, out f5c);   // kiesa wsi -> lud targu (zarobek okna, podatek jutro)
-                if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); NoteF5VillageBack(Math.Min(wagePaid - fin, f5c)); _dwRefund += wagePaid - fin; got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi (recenzja f5: czesc reguly f5 w linii f5 "wrocilo do wsi")
+                // kiesa wsi -> lud targu (zarobek okna, podatek jutro); recenzja calosci fali 5: czesc zatrzymana przez regule f5 - kasie targu (jak u kazdego placacego),
+                // zwrot do wsi tylko przy innej przyczynie (wyjatek w Earn) - PayVillageWage
+                long cof, back;
+                PayVillageWage(vil, mk, wagePaid, out fin, out cof, out back);
+                cin += cof;
+                if (back > 0) { _dwRefund += back; got -= back; wagePaid -= back; }
             }
             if (o.Sept) { _dsMat += matPaid; _dsWage += wagePaid; _dsN++; _dsVilN++; _dsPayOut += got; _dsCofIn += cin; _dsFolkIn += fin; }
             else
@@ -391,18 +394,47 @@ namespace Armoury
         }
 
         /// <summary>
+        /// Recenzja calosci fali 5 (noc 17/18.10): wies placi rzemieslnikom miasta targowego (roboty gminy DS - DaPayVillage, przebudowa zajecia - CraftsRebuildPay) wedlug
+        /// JEDNEJ reguly z kazdym placacym: pelna cena. Earn zwraca przyjete; czesc zatrzymana przez regule f5 (lud miasta z KS ponad pasmem koszyka) idzie do kasy targu -
+        /// jak u zolnierza, karawany i pana (MenPurse, SoldierPay, BuildFunding ...). Dawny zwrot do wsi dawal wsi rabat zalezny od zamoznosci mieszczan, a przebudowa liczyla
+        /// postep w zlocie zaplaconym - rata bez zwroconej czesci kupowala dalej material z polki ponad koszt (ok. 0.95 zamiast 0.67 kosztu przy k 0.5 i kappa 0.1).
+        /// Reszta nieprzyjeta z innej przyczyny (wyjatek w Earn - kiesa sprawdzona przed zakupem) wraca do wsi jak dotad. `fin` - do ludu, `cof` - do kasy targu (zmierzone),
+        /// `back` - z powrotem w kiesie wsi. Watek glowny (wolajacy sprawdzil), nie rzuca poza wolajacego.
+        /// </summary>
+        private static void PayVillageWage(Village vil, Settlement mk, long wagePaid, out long fin, out long cof, out long back)
+        {
+            fin = cof = back = 0;
+            if (wagePaid <= 0) return;
+            long f5c;
+            fin = Math.Max(0, Math.Min(wagePaid, EarnBack(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour, out f5c)));
+            long rest = wagePaid - fin;
+            if (rest <= 0) return;
+            long toCof = Math.Min(rest, Math.Max(0, f5c));
+            if (toCof > 0)
+            {
+                int c0 = mk.Town.Gold;
+                mk.Town.ChangeGold((int)toCof);
+                cof = (long)mk.Town.Gold - c0;
+            }
+            back = rest - toCof;
+            if (back > 0) vil.ChangeGold((int)back);
+        }
+
+        /// <summary>
         /// Recenzja calosci (noc 17/18.10): rata przebudowy zajecia wioski pobocznej (VillageCrafts bez KS i regula A7 KS) - TA SAMA regula co roboty gminy wsi z prawdziwym
         /// materialem (DaRunOne / DaPayVillage), od razu, nie w kolejce: VillageCrafts.Daily i StartCalibration.Daily biegna w ArmouryBehavior PO BuildFunding.Daily
         /// i DaWorksRun, wiec przebudowa nie zabiera materialu budowom pana, ludu ani robotom gminy tej doby. Budzet = `amount`, najwyzej kiesa wsi ponad skrzynie tej doby
         /// (wies DS - regula efbbf0dc); material = budzet / (1 + k) z polki miasta targowego (BuildFunding.DsWorksBuy, ramka FBuild), rzemieslnicy miasta najwyzej
-        /// k x material (k = DsWorksWagePerMaterial). Kiesa wsi -> kasa targu (material, sprzedaz kupcow MixBuild) i lud targu (Earn KBuildLabour; czego lud nie przyjmie -
-        /// wraca do wsi). Brak materialu na polce albo targ bez kiesy ludu - nic nie schodzi (0: rata czeka, przebudowa stoi). Zwraca zloto, ktore zeszlo z kiesy wsi;
-        /// -1 - droga nieczynna (Ds Works Real Material wylaczone albo kiesa ludu nieczynna, poza watkiem glownym) - wolajacy jak dotad. Bez licznikow robot gminy DS
-        /// (osobne zjawisko - liczy wolajacy w swojej linii). Nie rzuca.
+        /// k x material (k = DsWorksWagePerMaterial). Kiesa wsi -> kasa targu (material, sprzedaz kupcow MixBuild) i lud targu (Earn KBuildLabour; czesc zatrzymana przez
+        /// regule f5 - kasie targu, recenzja calosci fali 5: PayVillageWage - wies placi pelna cene, a rata liczy sie w postepie w calosci). Brak materialu na polce albo targ
+        /// bez kiesy ludu - nic nie schodzi (0: rata czeka, przebudowa stoi). Zwraca zloto, ktore zeszlo z kiesy wsi; `matIn` - do kasy targu za material, `wage` - do ludu,
+        /// `wageCof` - do kasy targu z placy rzemieslnikow (czesc nieprzyjeta przez lud wedlug reguly f5; zmierzone po stronie kasy); -1 - droga nieczynna (Ds Works Real
+        /// Material wylaczone albo kiesa ludu nieczynna, poza watkiem glownym) - wolajacy jak dotad. Bez licznikow robot gminy DS (osobne zjawisko - liczy wolajacy w swojej
+        /// linii). Nie rzuca.
         /// </summary>
-        internal static long CraftsRebuildPay(Village vil, Settlement mk, long amount, out long mat, out long matIn, out long wage, out int pcs)
+        internal static long CraftsRebuildPay(Village vil, Settlement mk, long amount, out long mat, out long matIn, out long wage, out long wageCof, out int pcs)
         {
-            mat = matIn = wage = 0; pcs = 0;
+            mat = matIn = wage = wageCof = 0; pcs = 0;
             try
             {
                 if (!DaWorksOn || OffMain()) return -1;
@@ -442,9 +474,12 @@ namespace Armoury
                 }
                 if (wagePaid > 0)
                 {
-                    long f5c;
-                    long fin = EarnBack(mk, (int)Math.Min(int.MaxValue, wagePaid), KBuildLabour, out f5c);   // kiesa wsi -> lud targu (rzemieslnicy)
-                    if (fin < wagePaid) { vil.ChangeGold((int)(wagePaid - fin)); NoteF5VillageBack(Math.Min(wagePaid - fin, f5c)); got -= wagePaid - fin; wagePaid = fin; }   // lud nie przyjal - zloto wraca do wsi (recenzja f5: czesc reguly f5 w linii f5 "wrocilo do wsi")
+                    // kiesa wsi -> lud targu (rzemieslnicy); recenzja calosci fali 5: czesc zatrzymana przez regule f5 - kasie targu (PayVillageWage), rata w postepie
+                    // przebudowy (Paid) w calosci - bez materialu ponad koszt
+                    long fin, cof, back;
+                    PayVillageWage(vil, mk, wagePaid, out fin, out cof, out back);
+                    if (back > 0) got -= back;
+                    wageCof = cof; wagePaid = fin;
                 }
                 mat = matPaid; wage = wagePaid;
                 return Math.Max(0, got);

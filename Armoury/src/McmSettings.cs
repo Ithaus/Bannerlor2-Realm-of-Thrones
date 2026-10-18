@@ -7748,7 +7748,7 @@ namespace Armoury
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public float KsSwitchMarketBand { get; set; } = 0.15f;
 
-        [SettingPropertyBool("Side Village Craft Ks Signal", HintText = "with Side Village Crafts and Ks Switch Signal: a side village outside the calibration weighs its crafts by the same reckoning as the calibrated village parts (land suitability x output x the calibration's prices at its market town, minus costs and land rent) instead of land suitability x the square root of the game price index, while the calibration has a plan to price from. Off = land suitability x price index, as before")]
+        [SettingPropertyBool("Side Village Craft Ks Signal", HintText = "with Side Village Crafts and Ks Switch Signal: a side village outside the calibration weighs its crafts by the same reckoning as the calibrated village parts (land suitability x output x the calibration's prices at its market town, minus costs and land rent) instead of land suitability x the square root of the game price index, while the calibration has a plan to price from - but only while the calibrated village parts really change their work by that reckoning (Ks Switch Signal Rule or Start Calibration Switch Rule on), so side villages never move by a reckoning the calibration itself only measures. Off = land suitability x price index, as before")]
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public bool SideVillageCraftKsSignal { get; set; } = true;
 

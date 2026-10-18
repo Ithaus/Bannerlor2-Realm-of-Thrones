@@ -185,6 +185,9 @@ namespace Armoury
         private static int _regionSeason = -1;
         private static string _pending;             // zapis do rozwiazania przy pierwszej dobie sesji
         private static string _loadNote = "nowa kampania albo zapis bez arm_crafts";
+        // recenzja calosci fali 5: miara, wedlug ktorej liczony jest Held wiosek pobocznych - 0 przydatnosc x sqrt(indeks), 1 sygnal KS (StartCalibration.SideSignalKeys).
+        // Pierwszy krok z sygnalem zeruje Held raz (60 dob nacisku nowej miary, nie starej - jak A7sStepBegin pod KS). Zapis arm_crafts: pole "k:1" (brak pola = 0).
+        private static int _zwHeldKind;
 
         // pamiec sesji
         private sealed class DistInfo
@@ -227,6 +230,7 @@ namespace Armoury
 
         // liczniki do linii (od ostatniej linii)
         private static int _st, _stAll, _dLists, _dAdded, _dSteps, _dStarted, _dDone, _dStall, _dBusy, _dBudget, _dLocked, _dPress, _dCancel, _dRedone;
+        private static int _dHeldZero;                         // recenzja calosci fali 5: Held wyzerowane przy pierwszym kroku sygnalu KS (raz)
         private static int _worksOnly, _w2Skip;                // recenzja: plany z samych prac (zajecia nieczynne), wywolania W2 pominiete we wsiach z planem zajec
         private static long _dPaid;
         private static readonly RebuildTally _tally = new RebuildTally();   // recenzja calosci: rata przebudowy - material, rzemieslnicy, droga dawna (od ostatniej linii)
@@ -240,6 +244,7 @@ namespace Armoury
             lock (Gate)
             {
                 _side.Clear(); _n = null; _onDay = -1; _regionMoved.Clear(); _regionSeason = -1; _pending = null; _loadNote = "nowa kampania albo zapis bez arm_crafts";
+                _zwHeldKind = 0;                                              // recenzja calosci fali 5
                 _dist.Clear(); _built = false; _builtSide = _builtNoRow = _builtStartFix = 0;
                 _plans = new Dictionary<Village, Plan>(); _mem.Clear(); _dirty.Clear();
                 _st = _stAll = 0; ZeroDay(); _err.Clear(); _notes.Clear(); _offLogged = false;
@@ -254,12 +259,13 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ recenzja calosci (noc 17/18.10): rata przebudowy zajecia - jedna regula z robotami gminy DS
-        /// <summary>Liczniki raty przebudowy od ostatniej linii: z kies wsi, do kas miast (material, zmierzone), do ludu (rzemieslnicy), material zaplacony, sztuki, doby bez
-        /// materialu albo kiesy, droga dawna bez towaru.</summary>
+        /// <summary>Liczniki raty przebudowy od ostatniej linii: z kies wsi, do kas miast (material, zmierzone), do ludu (rzemieslnicy), do kas miast z placy rzemieslnikow
+        /// (Cof - czesc nieprzyjeta przez lud wedlug reguly f5, recenzja calosci fali 5; zmierzone), material zaplacony, placa rzemieslnikow (Wage = do ludu + Cof), sztuki,
+        /// doby bez materialu albo kiesy, droga dawna bez towaru.</summary>
         internal sealed class RebuildTally
         {
-            public long Vil, Town, Folk, Mat, Wage, Old; public int Pcs, NoMat;
-            public void Clear() { Vil = Town = Folk = Mat = Wage = Old = 0; Pcs = NoMat = 0; }
+            public long Vil, Town, Folk, Cof, Mat, Wage, Old; public int Pcs, NoMat;
+            public void Clear() { Vil = Town = Folk = Cof = Mat = Wage = Old = 0; Pcs = NoMat = 0; }
         }
 
         /// <summary>Rata przebudowy zajecia (ZW bez KS i regula A7 KS): TownFolk.CraftsRebuildPay - prawdziwy material z polki miasta targowego `mt` (kasa targu dostaje zaplate
@@ -270,11 +276,11 @@ namespace Armoury
             if (v == null || mt == null || mt.Settlement == null || ask <= 0 || t == null) return 0;
             try
             {
-                long mat, matIn, wage; int pcs;
-                long r = TownFolk.CraftsRebuildPay(v, mt.Settlement, ask, out mat, out matIn, out wage, out pcs);
+                long mat, matIn, wage, wageCof; int pcs;
+                long r = TownFolk.CraftsRebuildPay(v, mt.Settlement, ask, out mat, out matIn, out wage, out wageCof, out pcs);
                 if (r >= 0)
                 {
-                    t.Vil += r; t.Town += matIn; t.Folk += wage; t.Mat += mat; t.Wage += wage; t.Pcs += pcs;
+                    t.Vil += r; t.Town += matIn; t.Folk += wage; t.Cof += wageCof; t.Mat += mat; t.Wage += wage + wageCof; t.Pcs += pcs;
                     if (r == 0) t.NoMat++;
                     return r;
                 }
@@ -365,7 +371,7 @@ namespace Armoury
             return res;
         }
 
-        private static void ZeroDay() { _dLists = _dAdded = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; }
+        private static void ZeroDay() { _dLists = _dAdded = _dSteps = _dStarted = _dDone = _dStall = _dBusy = _dBudget = _dLocked = _dPress = _dCancel = _dRedone = 0; _dPaid = 0; _dHeldZero = 0; }
 
         private static void Stumble(string where, Exception e)
         {
@@ -1614,6 +1620,8 @@ namespace Armoury
             int season = today / Season;
             if (season != _regionSeason) { _regionSeason = season; _regionMoved.Clear(); }
             bool step = _onDay >= 0 && today > _onDay && (today - _onDay) % StepDays == 0;
+            // recenzja calosci fali 5: sygnal KS dla ZW wylaczony (klucze albo regula A7 przy sygnale) - Held liczy dawna miara, bez zerowania (jak A7sOff pod KS)
+            if (step && _zwHeldKind == 1 && !StartCalibration.SideSignalKeys()) _zwHeldKind = 0;
             var plans = new Dictionary<Village, Plan>();
             var parts = new List<VillageBook.PartView>();
             int fall = 0, ks = 0, other = 0, inTrans = 0, snow = 0;
@@ -2073,6 +2081,9 @@ namespace Armoury
             // f5-a7 (klucze Ks Switch Signal i Side Village Craft Ks Signal): ta sama funkcja dochodu co regula A7 pod KS (cena sygnalu KS miasta targowego, wartosc kg Planu,
             // koszt K, renta bloku Planu) - jedna regula na zjawisko; bez Planu albo z kluczem wylaczonym - przydatnosc x sqrt(indeks), jak dotad
             bool kss = StartCalibration.SideSignalReady(mt, today);
+            // recenzja calosci fali 5: SideSignalReady tylko przy regule A7 przy sygnale (SideSignalKeys) - pierwszy krok z sygnalem zeruje Held wszystkich wiosek pobocznych
+            // raz (nacisk 60 dob nowej miary, nie przydatnosci x sqrt(indeks)); miasto bez wiersza sygnalu (kss false przy kluczach) miary nie przelacza
+            if (kss && _zwHeldKind != 1) ZwHeldZero();
             foreach (var s in di.Sides)
             {
                 if (s.Target >= 0 || s.Cand == null || s.Cand.Count < 2 || s.Row == null) continue;
@@ -2108,6 +2119,14 @@ namespace Armoury
                 if (_notes.Count < 10) _notes.Add(nm + " (" + Name(di) + ") " + KsTab.Crafts[s.Craft] + "->" + KsTab.Crafts[bc] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(s.Cost) + " zl)");
                 Notify(di, s, bc, mt);
             }
+        }
+
+        /// <summary>Recenzja calosci fali 5: pierwszy krok ZW z sygnalem KS - Held wszystkich wiosek pobocznych od zera (raz; miara w zapisie arm_crafts). Watek glowny.</summary>
+        private static void ZwHeldZero()
+        {
+            int z = 0;
+            lock (Gate) foreach (var s in _side.Values) if (s != null && s.Held > 0) { s.Held = 0; z++; }
+            _zwHeldKind = 1; _dHeldZero += z;
         }
 
         // ------------------------------------------------------------ f4-pomiary (noc 17/18.10, przeglad ekonomii): nacisk reguly ZW i przejscia - tylko liczniki do linii
@@ -2268,6 +2287,7 @@ namespace Armoury
             sb.Append(" | inne niz typ okregu ").Append(other).Append(", w przebudowie ").Append(inTrans).Append(", uprawy na sniegu (inne niz typ okregu) ").Append(snow)
               .Append(" | zmiany: nacisk ").Append(_dPress).Append(", zaczete ").Append(_dStarted).Append(", skonczone ").Append(_dDone).Append(", wstrzymane (inna wioska okregu) ").Append(_dBusy)
               .Append(", (udzial regionu) ").Append(_dBudget).Append(", zamrozone pracami ").Append(_dLocked).Append(", doby bez pelnej zaplaty ").Append(_dStall).Append(", porzucone ").Append(_dCancel)
+              .Append(_dHeldZero > 0 ? ", Held wyzerowane (pierwszy krok sygnalu KS) " + _dHeldZero : "")   // recenzja calosci fali 5
               .Append(", zaplacone ").Append(_dPaid).Append(" zl").Append(_notes.Count > 0 ? " (" + string.Join("; ", _notes.ToArray()) + ")" : "")
               .Append(F4ZwText())                                   // f4-pomiary (klucz Measure Craft Rule): nacisk ZW i przejscia "z -> na" (pusty napis przy kluczu wylaczonym)
               .Append(" | n(typ) z doby ").Append(_onDay).Append(':');
@@ -2278,9 +2298,10 @@ namespace Armoury
             sb.Append(" | krok zajec (doba): wsi z planem ").Append(plans).Append(" (przeliczone dzis ").Append(_dRedone).Append(", co 7 dob na zmiane)").Append(", wsi z pamiecia ").Append(mems).Append(", listy BK z dopiskiem ").Append(_dLists).Append(", wywolan towaru typu ").Append(_dSteps)
               .Append(", dopiskow ").Append(_dAdded).Append(" (M szacunek: poziom x P1 x zima x rece) | wartosc bazowa: zdjete z typu ").Append(remV.ToString("0", Inv)).Append(", dodane zajec ").Append(addV.ToString("0", Inv))
               .Append(", premia prac w typie ").Append(bonV.ToString("0", Inv))
-              .Append(" | kontrola pieniedzy: kiesy wsi -").Append(_tally.Vil).Append(" / kasy i lud miast +").Append(_tally.Town + _tally.Folk).Append(" (roznica ").Append(_tally.Vil - _tally.Town - _tally.Folk).Append(")")
+              .Append(" | kontrola pieniedzy: kiesy wsi -").Append(_tally.Vil).Append(" / kasy i lud miast +").Append(_tally.Town + _tally.Folk + _tally.Cof).Append(" (roznica ").Append(_tally.Vil - _tally.Town - _tally.Folk - _tally.Cof).Append(")")
               .Append(" - przebudowa (Ds Works Real Material): material z polki +").Append(_tally.Mat).Append(" (szt. ").Append(_tally.Pcs).Append("), rzemieslnicy miasta +").Append(_tally.Wage)
               .Append(", doby bez materialu albo kiesy ponad skrzynie ").Append(_tally.NoMat).Append(", droga dawna bez towaru (klucz wylaczony / kiesa ludu nieczynna) +").Append(_tally.Old)
+              .Append(_tally.Cof > 0 ? ", z placy rzemieslnikow do kas miast (lud nie przyjal - regula f5) +" + _tally.Cof : "")   // recenzja calosci fali 5 (PayVillageWage)
               .Append(" | W2 (210) ").Append(On ? "wylaczony we wsiach z planem zajec (" + plans + "), gdzie indziej wedlug swojego klucza" : "wedlug swojego klucza")
               .Append(" | ikona: ").Append(DistrictIcon.DayText())
               .Append(" | koszt ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia dzis ").Append(_st).Append(" (od wczytania ").Append(_stAll).Append(").");
@@ -2313,7 +2334,8 @@ namespace Armoury
         }
 
         // ============================================================ zapis arm_crafts
-        // zw1|doba wlaczenia|sezon|n:typ=v,...|r:region=rece,...|s:uid~zajecie~start~cel~TStart~TEnd~F~held~koszt~zaplacone;...
+        // zw1|doba wlaczenia|sezon|n:typ=v,...|r:region=rece,...|s:uid~zajecie~start~cel~TStart~TEnd~F~held~koszt~zaplacone;...[|k:1]
+        // recenzja calosci fali 5: "|k:1" - Held liczony sygnalem KS (_zwHeldKind); pole tylko przy 1 (zapis bez sygnalu jak dotad); starsza DLL czyta pola 0-5 i je pomija
         internal static string Export()
         {
             try
@@ -2337,6 +2359,7 @@ namespace Armoury
                         sb.Append(Clean(s.Uid)).Append('~').Append(Id(s.Craft)).Append('~').Append(Id(s.Start)).Append('~').Append(Id(s.Target)).Append('~').Append(s.TStart).Append('~').Append(s.TEnd)
                           .Append('~').Append(s.F.ToString("R", Inv)).Append('~').Append(s.Held).Append('~').Append(Math.Round(s.Cost).ToString("0", Inv)).Append('~').Append(Math.Round(s.Paid).ToString("0", Inv));
                     }
+                    if (_zwHeldKind == 1) sb.Append("|k:1");                  // recenzja calosci fali 5: miara Held - sygnal KS
                     string res = sb.ToString();
                     // recenzja calosci (noc 17/18.10): bez twardego sufitu - dawne "" przy > 512 KB kasowalo stan (przebudowy, n(typ)) zamiast go trzymac; SaveText.Sync dzieli
                     // dlugi napis na kawalki, wiec duzy zapis tylko nazwany w logu
@@ -2399,9 +2422,11 @@ namespace Armoury
                         if (s.Target < 0) { s.TStart = s.TEnd = -1; s.F = 0f; }
                         _side[s.Uid] = s; ns++;
                     }
-                _loadNote = "arm_crafts: doba wlaczenia " + _onDay + ", n(typ) " + (_n != null ? "TAK" : "NIE") + ", wiosek ze stanem " + ns + (bad > 0 ? " (zlych " + bad + ")" : "") + ", regionow " + _regionMoved.Count;
+                _zwHeldKind = p.Length > 6 && p[6] == "k:1" ? 1 : 0;          // recenzja calosci fali 5: brak pola (zapis sprzed poprawki) - Held dawna miara
+                _loadNote = "arm_crafts: doba wlaczenia " + _onDay + ", n(typ) " + (_n != null ? "TAK" : "NIE") + ", wiosek ze stanem " + ns + (bad > 0 ? " (zlych " + bad + ")" : "") + ", regionow " + _regionMoved.Count
+                            + (_zwHeldKind == 1 ? ", Held wedlug sygnalu KS" : "");
             }
-            catch (Exception e) { _loadNote = "blad odczytu arm_crafts - od zera"; _side.Clear(); _n = null; _onDay = -1; Stumble("Import", e); }
+            catch (Exception e) { _loadNote = "blad odczytu arm_crafts - od zera"; _side.Clear(); _n = null; _onDay = -1; _zwHeldKind = 0; Stumble("Import", e); }
         }
 
         // ============================================================ f5-zajecia: zapis arm_crafts_g (n na towar)

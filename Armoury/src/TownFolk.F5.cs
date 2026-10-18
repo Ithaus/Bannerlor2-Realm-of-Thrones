@@ -14,14 +14,14 @@ namespace Armoury
     /// </summary>
     internal static partial class TownFolk
     {
-        // recenzja f5 (uwaga 1): czesc zatrzymana przez regule f5 w ostatnim CreditF5 (watek glowny) - czyta ja tylko EarnBack (wolajacy, ktory czesc nieprzyjeta oddaje
-        // placacemu spoza miasta - kiesie wsi), zeby linia f5 nie liczyla jej jako "oddane kasom miast"
+        // recenzja f5 (uwaga 1): czesc zatrzymana przez regule f5 w ostatnim CreditF5 (watek glowny) - czyta ja tylko EarnBack (placacy spoza miasta - kiesa wsi)
         private static long _f5Cut;
 
         /// <summary>
-        /// Recenzja f5 (uwaga 1): Earn dla placacego spoza miasta, ktory czesc nieprzyjeta bierze z powrotem (kiesa wsi: roboty gminy DS - DaPayVillage, przebudowa zajecia
-        /// wioski - CraftsRebuildPay). `f5Cut` - czesc zatrzymana w tym wywolaniu przez regule f5 (0 bez reguly albo przy kiesie nieczynnej). Wolajacy po zwrocie
-        /// do wsi wola NoteF5VillageBack(min(zwrot, f5Cut)). Zarobek co do monety jak Earn. Nie rzuca.
+        /// Recenzja f5 (uwaga 1): Earn dla placacego spoza miasta (kiesa wsi: roboty gminy DS - DaPayVillage, przebudowa zajecia wioski - CraftsRebuildPay, obie przez
+        /// PayVillageWage). `f5Cut` - czesc zatrzymana w tym wywolaniu przez regule f5 (0 bez reguly albo przy kiesie nieczynnej). Recenzja calosci fali 5: wolajacy daje te
+        /// czesc kasie miasta targowego (jak kazdy placacy - linia f5 liczy ja w "oddane kasom miast"); do wsi wraca tylko reszta nieprzyjeta z innej przyczyny.
+        /// Zarobek co do monety jak Earn. Nie rzuca.
         /// </summary>
         private static long EarnBack(Settlement st, int amt, int kind, out long f5Cut)
         {
@@ -30,13 +30,6 @@ namespace Armoury
             f5Cut = Math.Max(0, _f5Cut);
             _f5Cut = 0;
             return fin;
-        }
-
-        /// <summary>Recenzja f5 (uwaga 1): czesc zatrzymana przez regule f5 wrocila do kiesy wsi (placacego), nie do kasy miasta - licznik linii f5 "wrocilo do wsi".</summary>
-        private static void NoteF5VillageBack(long x)
-        {
-            if (x <= 0) return;
-            try { KsFolkIncome.NoteVillageBack(x); } catch (Exception e) { Stumble("KsFolkIncome.NoteVillageBack", e); }
         }
 
         /// <summary>Pelne czesci klas zarobku `amt` (jak Credit); `slaveR` / `slaveP` - czesc praca niewolnych (z czesci W) w czesciach R i P.</summary>
@@ -77,7 +70,7 @@ namespace Armoury
             long slave = (long)(sR * Clamp01(kr) + sP * Clamp01(kp));
             CreditParts(f, aW, aR, aP, kind, slave);
             try { KsFolkIncome.NoteExt(fW, fR, fP, aW, aR, aP); } catch (Exception e) { Stumble("KsFolkIncome.NoteExt", e); }
-            _f5Cut = Math.Max(0, amt - (aW + aR + aP));                 // recenzja f5 (uwaga 1): dla EarnBack (placacy spoza miasta)
+            _f5Cut = Math.Max(0, amt - (aW + aR + aP));                 // recenzja f5 (uwaga 1): dla EarnBack (placacy spoza miasta - czesc do kasy targu)
             return aW + aR + aP;
         }
 

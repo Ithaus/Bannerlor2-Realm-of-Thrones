@@ -25,7 +25,9 @@ namespace Armoury
     ///  - zmiany naprawde z kluczem Ks Switch Signal Rule (recenzja: domyslnie WYL. do pomiaru; autotest - plik armoury-a7-wlacz.flag) albo dawnym Start Calibration Switch
     ///    Rule - wartosc domyslna starego klucza zapisana w MCM Jeffa nie zmienilaby
     ///    sie (CLAUDE.md, pulapka Armoury.json), wiec nowy klucz;
-    ///  - droga bez KS (zajecia wiosek pobocznych, VillageCrafts.Rule): ta sama funkcja dochodu przy kluczu Side Village Craft Ks Signal (jedna regula na zjawisko).
+    ///  - droga bez KS (zajecia wiosek pobocznych, VillageCrafts.Rule): ta sama funkcja dochodu przy kluczu Side Village Craft Ks Signal (jedna regula na zjawisko) -
+    ///    recenzja calosci fali 5: TYLKO razem z regula A7 przy sygnale (A7RuleOn) - ZW zmienia zajecia naprawde, wiec niezmierzony sygnal nie moze jej prowadzic, dopoki
+    ///    A7 pod KS tylko mierzy nacisk (Ks Switch Signal Rule WYL.); do tego czasu ZW jak przed paczka (przydatnosc x sqrt(indeks)).
     /// POMIAR: linia "KS: A7 regula zajec (f5-a7)" w kazdej dobie kroku A7 (nacisk, trzymane 60 dob, zmiany sezonu z rekami wedlug rynku i regionu, przejscia, przebudowa:
     /// kiesy wsi = kasy targow + lud miast, material zaplacony = koszt zdjetego towaru, sztuki = zmiana polek), "KS: A7 sezon zamkniety (f5-a7)" przy zmianie sezonu,
     /// wariant "sygnal KS (f5-a7)" w diagnozie f4-pomiary. Zapis arm_ks_a7 (srednie cen sygnalu miast, rodzaj Held, liczniki sezonu; straznik rozmiaru) - brak klucza
@@ -98,7 +100,7 @@ namespace Armoury
         // liczniki od ostatniej linii kroku
         private static int _a7sN, _a7sNoSig, _a7sPress, _a7sHeld, _a7sStarted, _a7sDone, _a7sCancel, _a7sFlip, _a7sSt, _a7sNoShelf, _a7sNoMat, _a7sHeldZero, _a7sDays, _a7sSaveOver;
         private static double _a7sHands, _a7sPressH, _a7sHeldH, _a7sMsSum, _a7sMsMax;
-        private static long _a7sVil, _a7sTown, _a7sFolk, _a7sMatG, _a7sOld, _a7sPcs, _a7sDrop;
+        private static long _a7sVil, _a7sTown, _a7sFolk, _a7sCof, _a7sMatG, _a7sOld, _a7sPcs, _a7sDrop;   // recenzja calosci fali 5: _a7sCof - do kas targow z placy rzemieslnikow (regula f5)
         private static readonly List<string> _a7sNotes = new List<string>();
 
         private static void A7sReset()
@@ -113,7 +115,7 @@ namespace Armoury
         {
             _a7sN = _a7sNoSig = _a7sPress = _a7sHeld = _a7sStarted = _a7sDone = _a7sCancel = _a7sFlip = _a7sSt = _a7sNoShelf = _a7sNoMat = _a7sHeldZero = _a7sDays = 0;
             _a7sHands = _a7sPressH = _a7sHeldH = _a7sMsSum = _a7sMsMax = 0;
-            _a7sVil = _a7sTown = _a7sFolk = _a7sMatG = _a7sOld = _a7sPcs = _a7sDrop = 0;
+            _a7sVil = _a7sTown = _a7sFolk = _a7sCof = _a7sMatG = _a7sOld = _a7sPcs = _a7sDrop = 0;
             _a7sNotes.Clear();
         }
 
@@ -356,11 +358,11 @@ namespace Armoury
         /// <summary>Rata przebudowy (Progress): ta sama droga VillageCrafts.PayRebuild, do tego pomiar - zloto z kies wsi / do kas targu i ludu, material, sztuki = zmiana polek.</summary>
         private static long A7sPay(Village v, Town mt, int ask)
         {
-            long vil0 = _tally.Vil, town0 = _tally.Town, folk0 = _tally.Folk, mat0 = _tally.Mat, old0 = _tally.Old; int pcs0 = _tally.Pcs, nm0 = _tally.NoMat;
+            long vil0 = _tally.Vil, town0 = _tally.Town, folk0 = _tally.Folk, cof0 = _tally.Cof, mat0 = _tally.Mat, old0 = _tally.Old; int pcs0 = _tally.Pcs, nm0 = _tally.NoMat;
             int[] before = A7sShelf(mt);
             long got = VillageCrafts.PayRebuild(v, mt, ask, _tally);
             int[] after = A7sShelf(mt);
-            _a7sVil += _tally.Vil - vil0; _a7sTown += _tally.Town - town0; _a7sFolk += _tally.Folk - folk0; _a7sMatG += _tally.Mat - mat0; _a7sOld += _tally.Old - old0;
+            _a7sVil += _tally.Vil - vil0; _a7sTown += _tally.Town - town0; _a7sFolk += _tally.Folk - folk0; _a7sCof += _tally.Cof - cof0; _a7sMatG += _tally.Mat - mat0; _a7sOld += _tally.Old - old0;
             _a7sPcs += _tally.Pcs - pcs0; _a7sNoMat += _tally.NoMat - nm0;
             if (before != null && after != null) for (int k = 0; k < before.Length; k++) _a7sDrop += before[k] - after[k];
             else _a7sNoShelf++;
@@ -467,8 +469,8 @@ namespace Armoury
               .Append(", powroty (A->B->A w 364 dobach) ").Append(_a7sFlip)
               .Append(_a7sNotes.Count > 0 ? " (" + string.Join("; ", _a7sNotes.ToArray()) + ")" : "")
               .Append(" | przejscia sezonu (top 8, blokow/rak): ").Append(A7sTop(sea.Tr, 8))
-              .Append(" | przebudowa od linii: kiesy wsi -").Append(_a7sVil).Append(" / kasy targow +").Append(_a7sTown).Append(" / lud miast +").Append(_a7sFolk)
-              .Append(" (roznica ").Append(_a7sVil - _a7sTown - _a7sFolk).Append("); material zaplacony ").Append(_a7sMatG).Append(" zl (do kas targow ").Append(_a7sTown - _a7sOld)
+              .Append(" | przebudowa od linii: kiesy wsi -").Append(_a7sVil).Append(" / kasy targow +").Append(_a7sTown + _a7sCof).Append(" / lud miast +").Append(_a7sFolk)
+              .Append(" (roznica ").Append(_a7sVil - _a7sTown - _a7sCof - _a7sFolk).Append("); material zaplacony ").Append(_a7sMatG).Append(" zl (do kas targow ").Append(_a7sTown - _a7sOld)
               .Append(", roznica ").Append(_a7sMatG - (_a7sTown - _a7sOld)).Append("), sztuk ").Append(_a7sPcs).Append(", zmiana polek ").Append(_a7sDrop).Append(" (roznica ").Append(_a7sPcs - _a7sDrop)
               .Append(", bez odczytu polki ").Append(_a7sNoShelf).Append("); droga dawna bez towaru ").Append(_a7sOld).Append("; dob bez materialu albo kiesy ").Append(_a7sNoMat)
               .Append(" | czas reguly ").Append(_a7sDays > 0 ? (_a7sMsSum / _a7sDays).ToString("0.00", Inv) : "-").Append(" ms/d (najwiecej ").Append(_a7sMsMax.ToString("0.00", Inv)).Append(", dob ").Append(_a7sDays)
@@ -495,12 +497,22 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ droga bez KS (zajecia wiosek pobocznych, VillageCrafts.Rule)
-        /// <summary>ZW (klucze Ks Switch Signal i Side Village Craft Ks Signal): sygnal KS gotowy dla wioski z miastem targowym mt (Plan bez bledu albo srednia z zapisu).
-        /// Watek glowny, nie rzuca.</summary>
+        /// <summary>
+        /// ZW: klucze sygnalu dla wiosek pobocznych (Ks Switch Signal, Side Village Craft Ks Signal) i regula A7 przy sygnale czynna (A7RuleOn: Ks Switch Signal Rule, plik
+        /// autotestu albo dawny Start Calibration Switch Rule). Recenzja calosci fali 5: VillageCrafts.Rule zmienia zajecia naprawde (przebudowa, kiesa wsi, drewno z polki),
+        /// a recenzja f5-a7 wstrzymala zmiany sygnalem do pomiaru w grze (NA7-14) - ZW idzie za tym samym przelacznikiem co A7 pod KS (jedna regula na zjawisko); bez
+        /// niego przydatnosc x sqrt(indeks) jak przed paczka (WGRANIE 78 i wczesniej). Sam odczyt kluczy (plik autotestu - dysk raz na dobe), nie rzuca.
+        /// </summary>
+        internal static bool SideSignalKeys()
+        {
+            try { var s = Settings.Current; return s != null && s.KsSwitchSignal && s.SideVillageCraftKsSignal && A7RuleOn; }
+            catch (Exception e) { _a7sSt++; Stumble("SideSignalKeys", e); return false; }
+        }
+
+        /// <summary>ZW (SideSignalKeys): sygnal KS gotowy dla wioski z miastem targowym mt (Plan bez bledu albo srednia z zapisu). Watek glowny, nie rzuca.</summary>
         internal static bool SideSignalReady(Town mt, int today)
         {
-            var s = Settings.Current;
-            if (s == null || !s.KsSwitchSignal || !s.SideVillageCraftKsSignal || mt == null) return false;
+            if (mt == null || !SideSignalKeys()) return false;
             try { A7sEnsureMv(); A7sUpdate(today); return A7sRow(mt) != null; }
             catch (Exception e) { _a7sSt++; Stumble("SideSignalReady", e); return false; }
         }
