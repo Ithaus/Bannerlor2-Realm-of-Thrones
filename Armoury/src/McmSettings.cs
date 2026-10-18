@@ -7696,6 +7696,18 @@ namespace Armoury
         [SettingPropertyGroup("Village works follow prices (18.10)")]
         public bool SideVillageCraftKsSignal { get; set; } = true;
 
+        [SettingPropertyBool("Ks Iron Hands Follow Market", HintText = "under the start calibration: once a week the hands at iron mines follow the iron of the whole market (Westeros or Essos) instead of the price at the mine's own market town - while the towns of the market hold less iron than their smiths' stock, mines whose bloomeries had wood get 5% more hands; above twice that stock, or at a mine whose bloomery stood without wood half the week, 5% fewer (the hands go back to the fields; the mines of a part of the district never take more than half its hands - where they already do, the extra iron hands come from its other mines). Off = iron mines move with the price index every 28 days, as before")]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool KsIronHandsFollowMarket { get; set; } = true;
+
+        [SettingPropertyBool("Bloomery Wood Credit", HintText = "under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, only if the town's treasury covers all the credit its merchants have given (wood and food) and the village's oldest bill is not overdue (the same days as the merchants' food credit); the village pays back the oldest bill first from what its carts bring home (and a quarter of its purse each day); if the town goes to war with the village the merchants lose the debt (no gold is made). Off = no new credit (debts already given are still paid back), as before")]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool BloomeryWoodCredit { get; set; } = true;
+
+        [SettingPropertyBool("Ks Ramp Mineral Times", HintText = "under the start calibration, during its ramp (the weeks when the old and the calibrated output are blended): the game's share of a mining village's ore, salt, clay and silver counts the mineral as many times as Banner Kings lists it, as outside the calibration - until now the calibration's list dropped the double entry first and the game half of the blend gave half the ore (about a thousand iron blooms lost once). Off = as before")]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool KsRampMineralTimes { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9619,6 +9631,9 @@ namespace Armoury
             s.KsSwitchSignalRule = KsSwitchSignalRule;
             s.KsSwitchMarketBand = KsSwitchMarketBand;
             s.SideVillageCraftKsSignal = SideVillageCraftKsSignal;
+            s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
+            s.BloomeryWoodCredit = BloomeryWoodCredit;
+            s.KsRampMineralTimes = KsRampMineralTimes;
         }
 
         internal static void Apply()

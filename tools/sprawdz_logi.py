@@ -1444,6 +1444,23 @@ Uzycie (Python 3, tylko odczyt):
                     czy plik zimy dzialal (recenzja: tylko w autotescie - w grze "nie autotest - bez skutku"). Bazy: fin87 Armoury-2026-10-18_00-26-23.log (f5fd0ae3), fin86 Armoury-2026-10-17_23-22-37.log,
                     fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin87): NOP-5..8 jako liczby bazowe
                     (INFO), reszta brak linii (INFO), bez wyjatku.
+--grupa nruda     : (noc 18.10, fala 5 paczka f5-ruda - ruda/zelazo pod KS; Armoury/src/StartCalibration.Ruda.cs, Bloomery.F5.cs, VillageTakings.F5WoodCredit; klucze
+                    Ks Iron Hands Follow Market, Bloomery Wood Credit) python -I tools/sprawdz_logi.py --grupa nruda <Armoury-*.log> (strumieniowo). Linie "Ruda KS (f5-ruda):
+                    dzien N" (co 7 dob od D - rece przy zlozach zelaza za ruda rynku: polki S / cel T = suma zapasow rzemiosla CaravanBulk; S < T brak - kopalnie z drewnem
+                    x1.05, S > 2T pelny x0.95, dymarka bez drewna >= 50% tygodnia x0.95) i "Ruda kredyt drewna (f5-ruda): dzien N" (kredyt kupcow na drewno dymarek; tozsamosc
+                    otwarty wczoraj + nowy - splaty - przepadle = otwarty dzis). Okno konca biegu: ostatnie 28 dob pelnego KS (lambda ZC4 >= 0.99). NRU-0 linie paczki
+                    (0 nierozpoznanych), NRU-1 krok co 7 dob bez dziur, NRU-2 decyzje zgodne z rynkiem i suma decyzji = wpisy, NRU-3 rece przy zelazie >= +10% w biegu, gdy rynek
+                    byl w braku w wiekszosci krokow (>= 3 kroki; inaczej INFO); recenzja: obok sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem) - zamierzony wzrost
+                    (po mnoznikach) wobec rak zjedzonych sufitem, rece innych zloz oddane zelazu, odsetek rak zelaza na suficie przed krokiem; NIE przy sufcie, ktory zjada
+                    >= 50% zamiaru albo trzyma >= 50% rak zelaza = DECYZJA (sufit na wpis jak w Planie albo pierwszenstwo zelaza - decyzja Jeffa), NRU-4 stawka KS zelaza i wytop 7 dob (INFO), NRU-5 tozsamosc kredytu (reszta 0 w kazdej dobie),
+                    NRU-6 kredyt: otwarty na koniec <= 200000 zl i przepadle (wojna) <= 20% udzielonego, NRU-7 = NOP-7 ruda: mediana indeksu <= 2.5 i miasta bez rudy <= 40 (ETAP lepiej
+                    niz fin88 3.06/57.2; bez KS 0.63/12), NRU-8 = NOP-8 'kopalnia bez wegla' <= 28.1 lup/d (bez KS; ETAP < 45.4 fin88), NRU-9 zapas rudy na polkach miast
+                    >= 1700 srednio okna i zapas swiata >= -5/d (ETAP > 1185 fin88; bez KS 5059), NRU-10 lupy wsi >= 255/d (ETAP > 248 fin88; bez KS 271), NRU-11 potkniecia
+                    i ERROR 0, NRU-12 czas kroku <= 5 ms, NRU-13 zuzycie zelaza (warsztaty zbrojne, linie narzedzi - receptura KS 4:5 wedlug wagi) i popyt Planu (INFO),
+                    NRU-14 rampa KS (klucz Ks Ramp Mineral Times): najnizsza srednia 3 dob modelu lup w rampie (A..koniec popytu) >= 0.85 x srednia 7 dob przed A
+                    (fin88 0.55: lancuch gry w mieszance rampy liczyl dubel BK raz - 163 wobec 296; ETAP > 0.55), linie "Mineraly w rampie KS (f5-ruda)" (INFO).
+                    Bazy: fin88 Armoury-2026-10-18_03-13-38.log (ac03aa25 = WGRANIE 79), fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin88):
+                    NRU-7..10 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -43792,6 +43809,316 @@ def st_median(v):
     return st.median(v) if v else 0.0
 
 
+# ============================================================ f5-ruda (noc 18.10, fala 5): ruda/zelazo pod KS - grupa nruda
+# Armoury/src/StartCalibration.Ruda.cs (linia "Ruda KS (f5-ruda): dzien N" co 7 dob od D - rece przy zlozach zelaza za ruda rynku), Bloomery.F5.cs (linia doby
+# "Ruda kredyt drewna (f5-ruda): dzien N" - kredyt kupcow na drewno dymarek), VillageTakings.F5WoodCredit; skutki z linii "Zelazo (lupy) (214)", "Ceny surowcow",
+# "Towary: ... iron", Plan "iron/<rynek> popyt". Bazy (srednie ostatnich 28 dob pelnego KS): fin88 Armoury-2026-10-18_03-13-38.log (ac03aa25 = WGRANIE 79, baza paczki),
+# fin84 Armoury-2026-10-17_21-11-36.log (bez KS).
+NRU_WEEK = "Ruda KS (f5-ruda): dzien "
+NRU_W = re.compile(r"^Ruda KS \(f5-ruda\): dzien (\d+) \| klucz Ks Iron Hands Follow Market TAK, co (\d+) dob od D (-?\d+) \([^)]*\) \| "
+                   r"Westeros: polki (\d+) / cel (\d+) \(([^)]*)\), brak (\d+) w (\d+) miastach, bez rudy (\d+) z (\d+) miast -> (BRAK|PELNY|PASMO|BEZ CELU)[^|]*\| "
+                   r"Essos: polki (\d+) / cel (\d+) \(([^)]*)\), brak (\d+) w (\d+) miastach, bez rudy (\d+) z (\d+) miast -> (BRAK|PELNY|PASMO|BEZ CELU)[^|]*\| "
+                   r"wpisow zelaza (\d+): w gore (\d+), w dol \(rynek pelny\) (\d+), w dol \(dymarka bez drewna\) (\d+), bez zmian: dymarka czesciowo bez drewna (\d+), "
+                   r"bez danych wytopu (\d+), pasmo (\d+), bez celu (\d+); bloki przyciete sufitem (\d+), w przebudowie \(pominiete\) (\d+) \| "
+                   r"sufit bloku \([^)]*\): blokow z zelazem (\d+), na suficie przed krokiem (\d+) \(rece przy zelazie (\d+) = (\d+)% rak zelaza\), "
+                   r"przyciete po wzroscie (\d+) \(zelazo -(\d+) rak z zamiaru, inne zloza -(\d+) rak -> do zelaza\), nad sufitem bez wzrostu \([^)]*\) (\d+) \| "
+                   r"rece przy zelazie: Westeros (\d+) -> (\d+), Essos (\d+) -> (\d+) \(razem ([^;)]*); zamiar po mnoznikach ([^)]*)\) \| "
+                   r"stawka KS zelaza na jutro \(wsie, szt\./d\): Westeros (\d+) w (\d+) wsiach, Essos (\d+) w (\d+) wsiach \| "
+                   r"wytop 7 dob \(dymarki\): Westeros model (\d+), bez drewna (\d+) \(\d+%\), Essos model (\d+), bez drewna (\d+) \(\d+%\); kopalnie z drewnem (\d+), czesciowo (\d+), bez drewna (\d+) \| "
+                   r"pieniadze i towar: [^|]*\| czas (\S+) ms \| potkniecia (\d+)\.$")
+(NW_DAY, NW_EVERY, NW_D0, NW_SW, NW_TW, NW_RW, NW_DW, NW_NSW, NW_NEW, NW_NTW, NW_DECW, NW_SE, NW_TE, NW_RE, NW_DE, NW_NSE, NW_NEE, NW_NTE, NW_DECE,
+ NW_IN, NW_UP, NW_DNF, NW_DNS, NW_PART, NW_NODATA, NW_BAND, NW_NOT, NW_CAP, NW_BUSY,
+ NW_BLK, NW_ATCAP, NW_HAT, NW_HATPCT, NW_CAPN, NW_CAPIRON, NW_CAPOTHER, NW_OVER,
+ NW_H0W, NW_H1W, NW_H0E, NW_H1E, NW_HPCT, NW_HMIDPCT, NW_RATEW, NW_RNW, NW_RATEE, NW_RNE,
+ NW_MW, NW_UW, NW_ME, NW_UE, NW_OK, NW_PARTM, NW_BADM, NW_MS, NW_STUM) = range(56)
+NRU_CRED = "Ruda kredyt drewna (f5-ruda): dzien "
+NRU_C = re.compile(r"^Ruda kredyt drewna \(f5-ruda\): dzien (\d+) \| klucz Bloomery Wood Credit (TAK|NIE)[^|]*\| drewno na kredyt dzis (\d+) ladunkow za (\d+) zl w (\d+) kopalniach[^;]*; "
+                   r"odmowy \(ladunki\): bez zysku przy dzisiejszych cenach (\d+), limit \d+ dob potrzeby (\d+), inny wierzyciel albo rachunek starszy niz \d+ dob (\d+), kasa miasta mniejsza od calego kredytu jej kupcow \(drewno \+ jedzenie KS-H\) (\d+) \| "
+                   r"splaty \([^)]*\): przy powrocie wozu (\d+) zl \((\d+)\), z kiesy wsi (\d+) zl \((\d+)\) \| przepadle \([^)]*\) (\d+) zl \((\d+)\) \| otwarty kredyt (\d+) zl w (\d+) kopalniach; "
+                   r"(?:kontrola: otwarty wczoraj (\d+) \+ nowy \d+ - splaty \d+ - przepadle \d+ - otwarty dzis = reszta (-?\d+)|kontrola od nastepnej doby) \| najwieksze dlugi: .*? \| "
+                   r"potkniecia dzis (\d+) \(sesja (\d+)\)\.$")
+(NC_DAY, NC_KEY, NC_LENT, NC_LENTZL, NC_LENTN, NC_NOPROF, NC_CAP, NC_STALE, NC_POOR, NC_PAYC, NC_PAYCN, NC_PAYP, NC_PAYPN, NC_WR, NC_WRN, NC_OPEN, NC_OPENN, NC_PREV, NC_REST,
+ NC_STUM, NC_STUMS) = range(21)
+NRU_IRON = re.compile(r"^Zelazo \(lupy\) \(214\): dzien (\d+) - wsie dopisaly (\d+) lup .*?kopalnia bez wegla ([\d.]+) lup")
+NRU_ISTOCK = re.compile(r"zuzycie: warsztaty zbrojne (\d+), linie towarowe \(narzedzia\) (\d+).*?zapas: miasta (\d+) \([-+]?\d+\).*?razem (\d+) \(")
+NRU_PLAN = re.compile(r"iron/(Westeros|Essos) popyt ([\d.]+) t/d")
+NRU_MODEL = re.compile(r"model ([\d.]+) w \d+ wsiach")
+NRU_RAMP = re.compile(r"^KS: rampa dzien (\d+) \| doba rampy \d+ \(A (\d+), D (\d+), koniec popytu (\d+)\)")
+NRU_RAMPMIN = 0.85                                # NRU-14: model lup w rampie KS (srednia 3 dob, najnizsza) wobec 7 dob przed A (fin88 0.55: 163 wobec 296, fin86 0.54)
+NRU_RAMPMIN_BASE = 0.55
+NRU_ERR = ("ERROR in StartCalibration.F5IronWeek", "ERROR in Bloomery.F5", "ERROR in VillageTakings.F5WoodCredit", "ERROR in SyncData.arm_f5_woodcredit")
+NRU_WIN = 28
+NRU_ORE_MAX, NRU_ORE_EMPTY_MAX = 2.5, 40          # NRU-7 = NOP-7 (fin88 3.06 / 57.2; bez KS 0.63 / 12)
+NRU_ORE_BASE, NRU_ORE_EMPTY_BASE = 3.06, 57.2
+NRU_COAL_MAX, NRU_COAL_BASE = 28.1, 45.4         # NRU-8 = NOP-8 (fin88 45.4; bez KS 28.1)
+NRU_TOWN_MIN, NRU_TOWN_BASE = 1700, 1185         # NRU-9: zapas rudy na polkach miast (fin88 srednio 28 dob 1185, na koniec 1151; bez KS 5059)
+NRU_PROD_MIN, NRU_PROD_BASE = 255, 248           # NRU-10: lupy wsi na dobe (fin88 srednio 28 dob 248; bez KS 271)
+NRU_HANDS_UP = 0.10                               # NRU-3: rece przy zelazie w gore o >= 10% w biegu, gdy rynek byl w braku w wiekszosci krokow
+NRU_CAP_BIND = 0.5                                # NRU-3 (recenzja): sufit bloku wiaze, gdy zjada >= 50% zamierzonego wzrostu rak albo >= 50% rak zelaza stoi na suficie przed krokiem
+NRU_OPEN_MAX = 200000                             # NRU-6: otwarty kredyt drewna na koniec biegu (zl)
+NRU_WRITE_MAX = 0.2                               # NRU-6: przepadle (wojna miasta-wierzyciela z wsia) najwyzej 20% udzielonego
+NRU_MS_MAX = 5.0                                  # NRU-12: czas kroku tygodniowego
+
+
+def nruda_main(logp):
+    """nruda (noc 18.10, fala 5, paczka f5-ruda): ruda/zelazo pod KS - rece przy zlozach zelaza za ruda rynku (co 7 dob od D), kredyt kupcow na drewno dymarek;
+    skutki: mediana indeksu rudy i miasta bez rudy (NOP-7), 'kopalnia bez wegla' (NOP-8), zapas rudy w miastach, lupy wsi. Wejscie: log Armoury (strumieniowo).
+    Progi NRU-0..NRU-13 - opis w naglowku pliku (--grupa nruda). Log bez linii paczki: liczby bazowe jako INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NRU-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    weeks, creds, zc4, price, iron, istock, plan, errs = {}, {}, {}, {}, {}, {}, {}, []
+    imodel, ramp, rampl = {}, None, 0
+    bad_w = bad_c = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NRU_WEEK):
+                a = NRU_W.match(s)
+                if a:
+                    weeks[int(a.group(1))] = a.groups()
+                else:
+                    bad_w += 1
+                continue
+            if s.startswith(NRU_CRED):
+                a = NRU_C.match(s)
+                if a:
+                    creds[int(a.group(1))] = a.groups()
+                else:
+                    bad_c += 1
+                continue
+            if s.startswith("Koszyk stanow (ZC4): dzien "):
+                a = NOP_ZC4.match(s)
+                if a:
+                    try:
+                        zc4[int(a.group(1))] = min(float(a.group(2)), float(a.group(3)))
+                    except ValueError:
+                        pass
+                continue
+            if s.startswith("Ceny surowcow: dzien "):
+                a = NOP_PRICE.match(s)
+                if a:
+                    o = NOP_ORE.search(s)
+                    if o:
+                        price[int(a.group(1))] = (float(o.group(1)), int(o.group(2)))
+                continue
+            if s.startswith("Zelazo (lupy) (214): dzien "):
+                a = NRU_IRON.match(s)
+                if a:
+                    d = int(a.group(1))
+                    iron[d] = (int(a.group(2)), float(a.group(3)))
+                    mm = NRU_MODEL.search(s)
+                    if mm:
+                        imodel[d] = float(mm.group(1))
+                    b = NRU_ISTOCK.search(s)
+                    if b:
+                        istock[d] = (int(b.group(1)), int(b.group(2)), int(b.group(3)), int(b.group(4)))
+                continue
+            if s.startswith("KS: rampa dzien "):
+                a = NRU_RAMP.match(s)
+                if a and ramp is None:
+                    ramp = (int(a.group(2)), int(a.group(3)), int(a.group(4)))
+                continue
+            if s.startswith("Mineraly w rampie KS (f5-ruda): dzien "):
+                rampl += 1
+                continue
+            if "iron/Westeros popyt" in s or "iron/Essos popyt" in s:
+                dm = re.search(r"plan doba (\d+)", s)
+                pd = int(dm.group(1)) if dm else len(plan)
+                plan[pd] = {k: float(v) for k, v in NRU_PLAN.findall(s)}
+                continue
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in NRU_ERR):
+                errs.append(s[:160])
+    pkg = bool(weeks) or bool(creds)
+    print(f"plik: {logp} | linii tygodnia f5-ruda {len(weeks)} (nierozpoznanych {bad_w}), linii kredytu {len(creds)} (nierozpoznanych {bad_c}), ZC4 {len(zc4)},"
+          f" cen surowcow {len(price)}, zelaza {len(iron)}, Planow z popytem zelaza {len(plan)}, ERROR {len(errs)}")
+    base_note = "" if pkg else " - log sprzed paczki: liczba bazowa (INFO)"
+
+    def ok_or_info(v):
+        return v if pkg else None
+
+    full = sorted(d for d, l in zc4.items() if l >= 0.99)
+    win = full[-NRU_WIN:]
+    wnote = f"okno: ostatnie {len(win)} dob pelnego KS" + (f" ({win[0]}-{win[-1]})" if win else "")
+
+    # NRU-0 linie paczki
+    rep.add("NRU-0: linie 'Ruda KS (f5-ruda)' (co 7 dob od D) i 'Ruda kredyt drewna (f5-ruda)' (doba)",
+            f"tygodnia {len(weeks)} (nierozpoznanych {bad_w}), kredytu {len(creds)} (nierozpoznanych {bad_c})",
+            "obie sa przy KS zastosowanym (klucze TAK), 0 nierozpoznanych; brak - INFO (log sprzed paczki albo klucze NIE)",
+            (bad_w == 0 and bad_c == 0) if pkg else None)
+    # NRU-1 krok co 7 dob bez dziur
+    if weeks:
+        wd = sorted(weeks)
+        every = int(weeks[wd[0]][NW_EVERY])
+        gaps = [(a, b) for a, b in zip(wd, wd[1:]) if b - a != every]
+        rep.add("NRU-1: krok tygodniowy co 7 dob od D bez dziur", f"krokow {len(wd)} ({wd[0]}-{wd[-1]}), dziur {len(gaps)}" + (f" (np. {gaps[:3]})" if gaps else ""),
+                "0 dziur (sesja wczytana w srodku - dziura w dobie wczytania dopuszczalna, opis)", not gaps)
+    else:
+        rep.add("NRU-1: krok tygodniowy co 7 dob od D", "brak linii", "INFO (log sprzed paczki, KS niezastosowany albo klucz Ks Iron Hands Follow Market NIE)", None)
+    # NRU-2 decyzja zgodna z rynkiem
+    if weeks:
+        bad = []
+        for d, g in sorted(weeks.items()):
+            decs = (g[NW_DECW], g[NW_DECE])
+            up, dnf, dns = int(g[NW_UP]), int(g[NW_DNF]), int(g[NW_DNS])
+            if up > 0 and "BRAK" not in decs:
+                bad.append((d, "w gore bez braku"))
+            if dnf > 0 and "PELNY" not in decs:
+                bad.append((d, "w dol (rynek pelny) bez rynku pelnego"))
+            for side, (sv, tv, dec) in (("W", (g[NW_SW], g[NW_TW], g[NW_DECW])), ("E", (g[NW_SE], g[NW_TE], g[NW_DECE]))):
+                S_, T_ = int(sv), int(tv)
+                exp = "BEZ CELU" if T_ <= 0 else ("BRAK" if S_ < T_ else ("PELNY" if S_ > 2 * T_ else "PASMO"))
+                if exp != dec:
+                    bad.append((d, f"{side}: {S_}/{T_} -> {dec} (oczekiwane {exp})"))
+            n = int(g[NW_IN])
+            s_ = up + dnf + dns + int(g[NW_PART]) + int(g[NW_NODATA]) + int(g[NW_BAND]) + int(g[NW_NOT])
+            if s_ != n:
+                bad.append((d, f"suma decyzji {s_} != wpisow {n}"))
+        rep.add("NRU-2: decyzje kroku zgodne z rynkiem (S < T brak, S > 2T pelny) i suma decyzji = wpisy", f"krokow {len(weeks)}, niezgodnych {len(bad)}" + (f" ({bad[:3]})" if bad else ""),
+                "0", not bad)
+    else:
+        rep.add("NRU-2: decyzje kroku zgodne z rynkiem", "brak linii", "INFO", None)
+    # NRU-3 rece przy zelazie i NRU-4 stawka KS
+    if weeks:
+        wd = sorted(weeks)
+        g0, g1 = weeks[wd[0]], weeks[wd[-1]]
+        h0 = int(g0[NW_H0W]) + int(g0[NW_H0E])
+        h1 = int(g1[NW_H1W]) + int(g1[NW_H1E])
+        short = sum(1 for d in wd if "BRAK" in (weeks[d][NW_DECW], weeks[d][NW_DECE]))
+        ch = (h1 - h0) / h0 if h0 > 0 else 0.0
+        need = short > len(wd) / 2 and len(wd) >= 3
+        # recenzja: sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem) - zamierzony wzrost (po mnoznikach) wobec zjedzonego sufitem i rece na suficie
+        want_up = cap_iron = cap_other = 0.0
+        at_pct = []
+        for d in wd:
+            g = weeks[d]
+            hs0 = int(g[NW_H0W]) + int(g[NW_H0E])
+            try:
+                mp_ = float(g[NW_HMIDPCT].strip().rstrip("%"))
+            except ValueError:
+                mp_ = 0.0
+            if mp_ > 0:
+                want_up += hs0 * mp_ / 100.0
+            cap_iron += int(g[NW_CAPIRON]); cap_other += int(g[NW_CAPOTHER])
+            at_pct.append(int(g[NW_HATPCT]))
+        at_avg = sum(at_pct) / len(at_pct) if at_pct else 0.0
+        eaten = cap_iron / want_up if want_up > 0 else 0.0
+        bind = eaten >= NRU_CAP_BIND or at_avg >= 100 * NRU_CAP_BIND
+        okh = ch >= NRU_HANDS_UP
+        rep.add("NRU-3: rece przy zelazie (pierwszy -> ostatni krok) i sufit bloku",
+                f"{h0} -> {h1} ({100 * ch:+.1f}%); krokow z brakiem rudy {short} z {len(wd)}; zamierzony wzrost {want_up:.0f} rak, sufit zjadl {cap_iron:.0f} ({100 * eaten:.0f}%), "
+                f"inne zloza oddaly zelazu {cap_other:.0f} rak; rak zelaza na suficie przed krokiem srednio {at_avg:.0f}% (pierwszy krok {at_pct[0]}%, blokow {g0[NW_ATCAP]} z {g0[NW_BLK]})"
+                + (" - SUFIT BLOKU WIAZE: wzrost bierze rece innych zloz albo nie przechodzi; sufit na wpis jak w Planie (Core: craftLab x 0.5 na wiersz) albo pierwszenstwo"
+                   " zelaza - decyzja Jeffa" if bind else ""),
+                f">= +{100 * NRU_HANDS_UP:.0f}%, gdy rynek w braku w wiekszosci krokow (>= 3 kroki; inaczej INFO); NIE przy sufcie bloku (>= {100 * NRU_CAP_BIND:.0f}% zamiaru zjedzone"
+                f" albo >= {100 * NRU_CAP_BIND:.0f}% rak na suficie) = DECYZJA",
+                okh if need else None, decide=bind)
+        r0 = int(g0[NW_RATEW]) + int(g0[NW_RATEE]); r1 = int(g1[NW_RATEW]) + int(g1[NW_RATEE])
+        rep.add("NRU-4: stawka KS zelaza na jutro (wsie, szt./d; pierwszy -> ostatni krok)",
+                f"{r0} -> {r1} (Westeros {g0[NW_RATEW]} -> {g1[NW_RATEW]}, Essos {g0[NW_RATEE]} -> {g1[NW_RATEE]}); wytop 7 dob ostatni: model W {g1[NW_MW]} / bez drewna {g1[NW_UW]}, "
+                f"E {g1[NW_ME]} / {g1[NW_UE]}; kopalnie z drewnem {g1[NW_OK]}, czesciowo {g1[NW_PARTM]}, bez drewna {g1[NW_BADM]}",
+                "INFO (fin88: pelna stawka 307/d przy wytopie 241/d)", None)
+    else:
+        rep.add("NRU-3: rece przy zelazie", "brak linii", "INFO", None)
+        rep.add("NRU-4: stawka KS zelaza", "brak linii", "INFO", None)
+    # NRU-5 tozsamosc kredytu, NRU-6 ryzyko kredytu
+    if creds:
+        chk = [(d, int(g[NC_REST])) for d, g in sorted(creds.items()) if g[NC_REST] is not None]
+        badr = [(d, r) for d, r in chk if r != 0]
+        rep.add("NRU-5: kredyt drewna - otwarty wczoraj + nowy - splaty - przepadle = otwarty dzis", f"dob z kontrola {len(chk)}, reszta != 0: {len(badr)}" + (f" ({badr[:3]})" if badr else ""),
+                "0", (not badr) if chk else None)
+        lent = sum(int(g[NC_LENTZL]) for g in creds.values())
+        paid = sum(int(g[NC_PAYC]) + int(g[NC_PAYP]) for g in creds.values())
+        wr = sum(int(g[NC_WR]) for g in creds.values())
+        last = creds[max(creds)]
+        op = int(last[NC_OPEN])
+        loads = sum(int(g[NC_LENT]) for g in creds.values())
+        nop = sum(int(g[NC_NOPROF]) for g in creds.values())
+        okv = op <= NRU_OPEN_MAX and (wr <= NRU_WRITE_MAX * lent if lent > 0 else True)
+        rep.add("NRU-6: kredyt drewna - udzielony, splacony, przepadly, otwarty na koniec",
+                f"udzielono {loads} ladunkow za {lent} zl, splacono {paid} zl, przepadlo {wr} zl, otwarty {op} zl w {last[NC_OPENN]} kopalniach; odmowy bez zysku {nop} ladunkow",
+                f"otwarty <= {NRU_OPEN_MAX} zl i przepadle <= {100 * NRU_WRITE_MAX:.0f}% udzielonego", okv if lent > 0 or op > 0 else None)
+    else:
+        rep.add("NRU-5: kredyt drewna - tozsamosc", "brak linii", "INFO (log sprzed paczki albo KS niezastosowany)", None)
+        rep.add("NRU-6: kredyt drewna - ryzyko", "brak linii", "INFO", None)
+    # NRU-7 ruda (= NOP-7), NRU-8 kopalnia bez wegla (= NOP-8)
+    wp = [price[d] for d in win if d in price]
+    if wp:
+        ore = sum(p[0] for p in wp) / len(wp); empty = sum(p[1] for p in wp) / len(wp)
+        rep.add("NRU-7: ruda - mediana indeksu i miasta bez rudy (= NOP-7)" + base_note, f"mediana {ore:.2f}, bez towaru {empty:.1f} miast (srednio {len(wp)} dob; {wnote})",
+                f"<= {NRU_ORE_MAX} i <= {NRU_ORE_EMPTY_MAX} miast; ETAP lepiej niz fin88 ({NRU_ORE_BASE}/{NRU_ORE_EMPTY_BASE}); bez KS 0.63/12",
+                ok_or_info(ore <= NRU_ORE_MAX and empty <= NRU_ORE_EMPTY_MAX), etap=(ore < NRU_ORE_BASE and empty < NRU_ORE_EMPTY_BASE))
+    else:
+        rep.add("NRU-7: ruda (= NOP-7)", f"brak linii 'Ceny surowcow' w oknie ({wnote})", "INFO", None)
+    wi = [iron[d][1] for d in win if d in iron]
+    if wi:
+        coal = sum(wi) / len(wi)
+        rep.add("NRU-8: 'kopalnia bez wegla' (= NOP-8)" + base_note, f"{coal:.1f} lup/d (srednio {len(wi)} dob)",
+                f"<= {NRU_COAL_MAX} (bez KS); ETAP < {NRU_COAL_BASE} (fin88)", ok_or_info(coal <= NRU_COAL_MAX), etap=coal < NRU_COAL_BASE)
+    else:
+        rep.add("NRU-8: 'kopalnia bez wegla' (= NOP-8)", f"brak linii w oknie ({wnote})", "INFO", None)
+    # NRU-9 zapas rudy w miastach i swiata, NRU-10 lupy wsi
+    ws = [istock[d] for d in win if d in istock]
+    if ws:
+        town = sum(x[2] for x in ws) / len(ws)
+        wd_ = [d for d in win if d in istock]
+        slope = (istock[wd_[-1]][3] - istock[wd_[0]][3]) / max(1, wd_[-1] - wd_[0])
+        rep.add("NRU-9: zapas rudy na polkach miast (srednio okna) i zmiana zapasu swiata" + base_note,
+                f"miasta {town:.0f}; swiat {istock[wd_[0]][3]} -> {istock[wd_[-1]][3]} ({slope:+.1f}/d)",
+                f"miasta >= {NRU_TOWN_MIN} i swiat >= -5/d; ETAP miasta > {NRU_TOWN_BASE} (fin88); bez KS 5059",
+                ok_or_info(town >= NRU_TOWN_MIN and slope >= -5), etap=town > NRU_TOWN_BASE)
+        tools = sum(x[1] for x in ws) / len(ws); arms = sum(x[0] for x in ws) / len(ws)
+        pl = plan[max(plan)] if plan else {}
+        rep.add("NRU-13: zuzycie zelaza i popyt Planu (INFO)",
+                f"warsztaty zbrojne {arms:.0f}/d, linie narzedzi {tools:.0f}/d (fin88 147/93, bez KS 145/77 - receptura KS 4:5 wedlug wagi); Plan ostatni: "
+                + (", ".join(f"{k} {v:.1f} t/d" for k, v in pl.items()) if pl else "brak"),
+                "INFO (Plan liczy wszystkich odbiorcow zelaza: fin88 Westeros ok. 103 + Essos ok. 89 t/d = ok. 348 szt./d)", None)
+    else:
+        rep.add("NRU-9: zapas rudy na polkach miast", f"brak linii w oknie ({wnote})", "INFO", None)
+        rep.add("NRU-13: zuzycie zelaza i popyt Planu", "brak linii w oknie", "INFO", None)
+    wpd = [iron[d][0] for d in win if d in iron]
+    if wpd:
+        prod = sum(wpd) / len(wpd)
+        rep.add("NRU-10: lupy wsi na dobe (Zelazo (lupy) 'wsie dopisaly')" + base_note, f"{prod:.0f}/d (srednio {len(wpd)} dob)",
+                f">= {NRU_PROD_MIN}; ETAP > {NRU_PROD_BASE} (fin88); bez KS 271", ok_or_info(prod >= NRU_PROD_MIN), etap=prod > NRU_PROD_BASE)
+    else:
+        rep.add("NRU-10: lupy wsi na dobe", f"brak linii w oknie ({wnote})", "INFO", None)
+    # NRU-11 potkniecia i ERROR, NRU-12 czas
+    st_w = sum(int(g[NW_STUM]) for g in weeks.values())
+    st_c = max((int(g[NC_STUMS]) for g in creds.values()), default=0)
+    rep.add("NRU-11: potkniecia paczki i ERROR (StartCalibration.F5IronWeek, Bloomery.F5*, VillageTakings.F5WoodCredit, SyncData.arm_f5_woodcredit)",
+            f"ERROR {len(errs)}, potkniecia kroku {st_w}, kredytu (sesja, najwiecej) {st_c}" + (f" ({errs[0]})" if errs else ""), "0",
+            (not errs and st_w == 0 and st_c == 0) if pkg or errs else None)
+    # NRU-14 rampa KS: model lup (lancuch gry w mieszance) bez spadku o polowe - dubel BK w Times (klucz Ks Ramp Mineral Times)
+    if ramp and imodel:
+        A, Dd, E = ramp
+        pre = [imodel[d] for d in range(A - 7, A) if d in imodel]
+        days = [d for d in range(A + 1, E + 1) if d in imodel]
+        if pre and len(days) >= 3:
+            p0 = sum(pre) / len(pre)
+            mav = [(days[i], sum(imodel[x] for x in days[i - 2:i + 1]) / 3.0) for i in range(2, len(days))]
+            dmin, vmin = min(mav, key=lambda t: t[1])
+            r = vmin / p0 if p0 > 0 else 0.0
+            rep.add("NRU-14: model lup w rampie KS (najnizsza srednia 3 dob) wobec 7 dob przed A" + base_note,
+                    f"{vmin:.0f} wobec {p0:.0f} ({r:.2f}, doba {dmin}; rampa A {A}, D {Dd}, koniec {E}); linii 'Mineraly w rampie KS (f5-ruda)' {rampl}",
+                    f">= {NRU_RAMPMIN} (fin88 {NRU_RAMPMIN_BASE}: 163 wobec 296 - lancuch gry w rampie z mineralem raz); ETAP > {NRU_RAMPMIN_BASE}",
+                    ok_or_info(r >= NRU_RAMPMIN), etap=r > NRU_RAMPMIN_BASE)
+        else:
+            rep.add("NRU-14: model lup w rampie KS", f"za malo dob (przed A {len(pre)}, w rampie {len(days)})", "INFO (bieg wczytany po rampie)", None)
+    else:
+        rep.add("NRU-14: model lup w rampie KS", "brak linii rampy albo zelaza", "INFO (KS niezastosowany w biegu)", None)
+    if weeks:
+        ms = [float(g[NW_MS]) for g in weeks.values()]
+        rep.add("NRU-12: czas kroku tygodniowego", f"najwiecej {max(ms):.1f} ms, srednio {sum(ms) / len(ms):.2f} ms ({len(ms)} krokow)", f"<= {NRU_MS_MAX} ms", max(ms) <= NRU_MS_MAX)
+    else:
+        rep.add("NRU-12: czas kroku tygodniowego", "brak linii", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -44031,6 +44358,8 @@ def main(argv):
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
     if group == "nopal" and logp:
         return nopal_main(logp)   # nopal (noc 17/18.10, fala 4 f4-opal): opal mieszczan pod KS - pora roku, limit dowozu drewna, popyt ceny, zapas dymarek; drewno, ruda, kopalnia bez wegla, zima
+    if group == "nruda" and logp:
+        return nruda_main(logp)   # nruda (noc 18.10, fala 5 f5-ruda): ruda/zelazo pod KS - rece przy zlozach zelaza za ruda rynku, kredyt kupcow na drewno dymarek; NOP-7/NOP-8, zapas rudy, lupy
     if group == "nzapis" and logp:
         return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
     if group == "nskory" and logp:
