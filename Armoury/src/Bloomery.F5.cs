@@ -59,9 +59,12 @@ namespace Armoury
             public float ModelDay, UnwonDay;
             public readonly float[] M = new float[F5Window], U = new float[F5Window];
             public int N, At;
-            public void Push() { M[At] = ModelDay; U[At] = UnwonDay; At = (At + 1) % F5Window; if (N < F5Window) N++; ModelDay = 0f; UnwonDay = 0f; }
+            public float CollDay;                                    // f7-wegiel (recenzja): rece weglarzy doby (lupy modelu) - do decyzji o WZROSCIE licza sie jak brak drewna
+            public readonly float[] C = new float[F5Window];
+            public void Push() { M[At] = ModelDay; U[At] = UnwonDay; C[At] = CollDay; At = (At + 1) % F5Window; if (N < F5Window) N++; ModelDay = 0f; UnwonDay = 0f; CollDay = 0f; }
             public float SumM { get { float a = 0f; for (int i = 0; i < N; i++) a += M[i]; return a; } }
             public float SumU { get { float a = 0f; for (int i = 0; i < N; i++) a += U[i]; return a; } }
+            public float SumC { get { float a = 0f; for (int i = 0; i < N; i++) a += C[i]; return a; } }
         }
         private static readonly Dictionary<Village, F5Ring> _f5ring = new Dictionary<Village, F5Ring>();
 
@@ -100,7 +103,7 @@ namespace Armoury
         private static int Today5 { get { return (int)CampaignTime.Now.ToDays; } }
 
         /// <summary>Cap (tick produkcji tej wsi, watek glowny - _tv): model lup i lupy bez drewna do pierscienia doby kopalni. Klucz NIE - nic.</summary>
-        private static void F5Note(Village v, float model, float unwon)
+        private static void F5Note(Village v, float model, float unwon, float coll = 0f)
         {
             if (v == null || !(model > 0f) || !F5RingOn) return;
             try
@@ -108,6 +111,7 @@ namespace Armoury
                 F5Ring r;
                 if (!_f5ring.TryGetValue(v, out r)) { r = new F5Ring(); _f5ring[v] = r; }
                 r.ModelDay += model; if (unwon > 0f) r.UnwonDay += unwon;
+                if (coll > 0f) r.CollDay += coll;   // f7-wegiel (recenzja): rece weglarzy osobno (klucz Bloomery Colliers NIE - zawsze 0)
             }
             catch (Exception e) { F5Stumble("Note", e); }
         }
@@ -139,7 +143,8 @@ namespace Armoury
                 model[m] += sm; unwon[m] += su;
                 if (!(sm > 0.01f)) continue;
                 float f = su / sm;
-                if (f >= 0.5f) starv[m]++; else if (f >= 0.1f) part[m]++; else ok[m]++;
+                float fg = F7GrowShare(r, f);   // f7-wegiel (recenzja): "z drewnem" (dostaja rece) - bez drewna + rece weglarzy < 10%; klucz NIE - fg = f
+                if (f >= 0.5f) starv[m]++; else if (fg >= 0.1f) part[m]++; else ok[m]++;
             }
         }
 

@@ -7812,6 +7812,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsRampMineralTimes { get; set; } = true;
 
+        [SettingPropertyBool("Bloomery Colliers", HintText = "under the start calibration, with Bloomery At Mine: when a mine's bloomery has too little wood for the day's ore, the miners who would stand idle burn charcoal instead - they cut the district's own wood (the world's woodcutter output times how fit the mine's land is for timber: 0 in deserts and on the steppe) and char it for the bloomery. The mine smelts fewer blooms than with bought wood (part of its hands make charcoal), but no hands stand idle and no gold changes hands; bought, forest and credited wood still come first. Off = idle hands, as before")]
+        [SettingPropertyGroup("Charcoal for bloomeries under the start calibration (night 18.10)")]
+        public bool BloomeryColliers { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9764,6 +9768,7 @@ namespace Armoury
             s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
             s.BloomeryWoodCredit = BloomeryWoodCredit;
             s.KsRampMineralTimes = KsRampMineralTimes;
+            s.BloomeryColliers = BloomeryColliers;
         }
 
         internal static void Apply()
