@@ -13,7 +13,7 @@ namespace Armoury
     /// <summary>
     /// f8-pozyczka (decyzja Jeffa 18.10 "2. tak" po wyjasnieniu i radzie "10% rocznie"; projekt docs/kiesa-ludu/PROJEKT-POZYCZKI-2026-10-13.md R2 i wiersz K3) -
     /// POZYCZKA MIEJSKA. Klucz TownLoan (domyslnie TAK), TownLoanRate 0.10, TownLoanRentDays 120, TownLoanFolkReserveTimes 1.0, TownLoanCofferReserveTimes 1.5,
-    /// TownLoanTakesFolkLoans (TAK).
+    /// TownLoanTakesFolkLoans (NIE - recenzja f8, uwaga 1: przejecie dlugow obieg2 tylko na slowo Jeffa).
     ///  - KTO I KIEDY (AI): ten sam kredyt wojenny 168 z drugim wierzycielem PRZED Bankiem (ClanBudget.Daily, miejsce dawnego obieg2): rod AI krolestwa w wojnie, G &lt; R,
     ///    D &gt; 0, bez zaleglosci / zajecia / karencji po zajeciu / czarnej ksiegi Banku, D pokrywa dwor i powinnosci (DebtLadder.TownCreditBlock), bez zakazu po niesplacie
     ///    obieg2. Pozycza od WLASNYCH miast i zamkow (bez oblezonych): miasto - kiesy W / R / P ponad TownLoanFolkReserveTimes x zapas dni klasy (10 / 21 / 30 dni potrzeby)
@@ -27,8 +27,13 @@ namespace Armoury
     ///  - NIESPLATA: drabina 168 bez zmian (zaleglosc, trzecia z rzedu - zajecie dochodu wsi i kiesy ponad 38 000, wyprzedaz); dluznik - dwor -50%, budowy 0. Rod wymarly -
     ///    dlug na nowych panow jego wsi (Inherit). Bez umorzenia.
     ///  - ZLOTO WRACA do wierzycieli osady wedlug udzialow (kiesy W / R / P, kasa kupcow, podzamcze); kiesa nieczynna - kasa osady; osady nie ma - kasa najblizszego miasta.
-    ///  - JEDNA REGULA: przy kluczu nowe pozyczki obieg2 (Folk Loans) nie powstaja (FolkLoanRoom = 0); TownLoanTakesFolkLoans przenosi dlugi obieg2 zywych rodow do ksiegi
-    ///    rad (miasto - kiesa W, zamek - podzamcze, wies - kiesa wsi) w dobie ludu (LoansDay), przed odsetkami obieg2.
+    ///  - JEDNA REGULA: przy kluczu nowe pozyczki obieg2 (Folk Loans) nie powstaja (FolkLoanRoom = 0); stare dlugi obieg2 biegna wedlug zasad obieg2 do splaty.
+    ///    TownLoanTakesFolkLoans (domyslnie NIE) przenosi je do ksiegi rad (miasto - kiesa W, zamek - podzamcze, wies - kiesa wsi) w dobie ludu (LoansDay), przed odsetkami obieg2.
+    ///  - DZIENNY PULAP ZRODLA (recenzja f8, uwaga 2): "najwyzej polowa nadwyzki zrodla na dobe" liczona od nadwyzki SPRZED pozyczek tej doby - _tlTaken pamieta, ile
+    ///    kazde zrodlo osady juz dzis pozyczylo (AI i gracz), wiec kolejne pozyczki gracza z menu w tej samej dobie nie zjadaja kies do zapasu.
+    ///  - ODSETKI SA ZAROBKIEM LUDU (recenzja f8, uwaga 3; projekt R2 "pan i korona biora od nich swoje 1/2/3% i 184"): czesc odsetek splaty wplacona do kiesy klasy
+    ///    (W / R / P, podzamcze) idzie takze do zarobku okna tej klasy (EarnWin - podstawa podatku pana, cechu, 184 i dziesieciny nastepnej doby); kapital i czesc
+    ///    kasy kupcow - nie (kasa kupcow nie ma zarobku okna; zawor bierze swoje z jej nadwyzki).
     ///  - Gracz: w menu wlasnego miasta / zamku "Borrow from the town council" / "Borrow from the castle folk" (25 / 50 / 100% miejsca dnia) i "Repay ..." (takze po utracie
     ///    osady). Bez SwitchToMenu (okna ShowMultiSelectionInquiry).
     ///  - Nic z niczego: pozyczka i splata to przelewy kiesa ludu / kasa kupcow / podzamcze &lt;-&gt; glowa rodu; dlug to zapis. Ksiega kies _ctlOut / _ctlIn (kontrola r = 0),
@@ -54,6 +59,11 @@ namespace Armoury
         private static double _tlRoom, _tlDebtPrev = double.NaN, _tlMovedF;
         private static bool _tlStartDone, _tlOutside;
         private static readonly HashSet<string> _tlLentClans = new HashSet<string>();
+        // recenzja f8 (uwaga 2): ile kazde zrodlo osady pozyczylo DZIS (TlTake minus TlUndo; indeks Tl*) - pulap 50% nadwyzki zrodla liczony od nadwyzki sprzed pozyczek doby;
+        // czyszczone przy zmianie dnia (TlTakenOf) i w nowej sesji; poza zapisem (po wczytaniu w tej samej dobie - od zera, jak plan doby)
+        private static readonly Dictionary<Settlement, long[]> _tlTaken = new Dictionary<Settlement, long[]>();
+        private static int _tlTakenDay = int.MinValue;
+        private static long _tlIntEarn;   // recenzja f8 (uwaga 3): odsetki wplacone do kies klas zapisane jako zarobek okna (EarnWin) - okno linii
         /// <summary>"Obieg" (MoneyLedger.Daily po linii f8): pozyczki miejskie okna (kiesy ludu, kasy kupcow, podzamcza -> glowy rodow) i splaty (glowy -> wierzyciele i zapasowe kasy).</summary>
         internal static long LastTownLent, LastTownRepaid;
 
@@ -70,11 +80,12 @@ namespace Armoury
         private static void ResetTownLoan()
         {
             _tlPlan.Clear(); TlZero(); _tlDebtPrev = double.NaN; _tlStartDone = false; _tlStumbleSess = 0; _tlOutside = false;
+            _tlTaken.Clear(); _tlTakenDay = int.MinValue;   // recenzja f8 (uwaga 2)
         }
 
         private static void TlZero()
         {
-            _tlLent = _tlPlayerLent = _tlInt = _tlPaid = _tlPaidInt = _tlSpare = _tlPlayerPaid = _tlMoved = _tlOrphan = _tlTicks = 0;
+            _tlLent = _tlPlayerLent = _tlInt = _tlPaid = _tlPaidInt = _tlSpare = _tlPlayerPaid = _tlMoved = _tlOrphan = _tlTicks = _tlIntEarn = 0;
             Array.Clear(_tlLentK, 0, _tlLentK.Length); Array.Clear(_tlRepK, 0, _tlRepK.Length);
             _tlCand = _tlRoomN = _tlBlkBan = _tlBlkLadder = _tlBlkSeize = _tlBlkD = _tlBlkLimit = _tlBlkNoSrc = _tlOverAfter = _tlMovedN = _tlMovedParts = _tlPlayerN = 0;
             _tlStumbles = 0; _tlRoom = 0; _tlMovedF = 0;
@@ -87,6 +98,25 @@ namespace Armoury
         internal static void NoteTownOrphan(long x) { if (x > 0) _tlOrphan += x; }
 
         // ------------------------------------------------------------ zrodla jednej osady
+        /// <summary>Recenzja f8 (uwaga 2): ile zrodla osady st pozyczyly dzis (indeks Tl*); create - zaloz wpis. Zmiana dnia gry czysci pamiec. null - nic dzis.</summary>
+        private static long[] TlTakenOf(Settlement st, bool create)
+        {
+            if (st == null) return null;
+            int today = (int)CampaignTime.Now.ToDays;
+            if (today != _tlTakenDay) { _tlTaken.Clear(); _tlTakenDay = today; }
+            long[] a;
+            if (!_tlTaken.TryGetValue(st, out a) && create) { a = new long[TlKinds]; _tlTaken[st] = a; }
+            return a;
+        }
+
+        /// <summary>Recenzja f8 (uwaga 2): dzisiejsza oferta zrodla - polowa nadwyzki SPRZED pozyczek tej doby (stan + juz pozyczone dzis - prog) minus juz pozyczone dzis.
+        /// Pierwsza pozyczka doby: taken 0 - wzor jak dotad co do monety.</summary>
+        private static double TlOffer(double purse, double floor, long taken)
+        {
+            double t = Math.Max(0, taken);
+            return TlSrcShare * (purse + t - floor) - t;
+        }
+
         /// <summary>Miejsce i zrodla pozyczki rodu c w osadzie st (miasto albo zamek z czynna kiesa ludu, bez oblezenia); null - osada nie pozycza.</summary>
         private static TlPlace TlPlaceFor(Clan c, Settlement st, Settings s)
         {
@@ -99,6 +129,7 @@ namespace Armoury
             p.Debt = DebtLadder.TownDebt(c, st.StringId);
             p.Room = Math.Max(0, p.Limit - p.Debt);
             double times = TlFolkTimes(s);
+            var tk = TlTakenOf(st, false);   // recenzja f8 (uwaga 2): co zrodla tej osady juz dzis pozyczyly (null - nic)
             if (f.Kind == 0)
             {
                 double rdW = Math.Max(1, Math.Min(60, s.TownFolkReserveDays));
@@ -107,13 +138,13 @@ namespace Armoury
                     double need = f.Need[k];
                     if (!(need > 0)) continue;
                     double rd = k == 0 ? rdW : k == 1 ? RdR : RdP;
-                    double ex = TlSrcShare * (PurseOf(f, k) - times * rd * need);
+                    double ex = TlOffer(PurseOf(f, k), times * rd * need, tk != null ? tk[k] : 0);
                     if (ex >= 1) { p.Avail += ex; p.Src.Add(new TlSrc { F = f, Kind = k, Ex = ex }); }
                 }
                 var t = st.Town;
                 if (t != null)
                 {
-                    double ex = TlSrcShare * ((double)t.Gold - TlCofferTimes(s) * TownPurse.Reserve(t));
+                    double ex = TlOffer(t.Gold, TlCofferTimes(s) * TownPurse.Reserve(t), tk != null ? tk[TlKasa] : 0);
                     if (ex >= 1) { p.Avail += ex; p.Src.Add(new TlSrc { T = t, Kind = TlKasa, Ex = ex }); }
                 }
             }
@@ -122,7 +153,7 @@ namespace Armoury
                 double need = f.Need[0];
                 if (need > 0)
                 {
-                    double ex = TlSrcShare * (f.KW - times * RdC * need);
+                    double ex = TlOffer(f.KW, times * RdC * need, tk != null ? tk[TlCastle] : 0);
                     if (ex >= 1) { p.Avail += ex; p.Src.Add(new TlSrc { F = f, Kind = TlCastle, Ex = ex }); }
                 }
             }
@@ -144,6 +175,7 @@ namespace Armoury
                     x.T.ChangeGold(-w);
                     long got = Math.Max(0, had - x.T.Gold);
                     if (outside && got > 0) MoneyLedger.Note169(MoneyLedger.N169Other, st, -(int)got, -1);
+                    if (got > 0) { var tk = TlTakenOf(st, true); if (tk != null) tk[TlKasa] += got; }   // recenzja f8 (uwaga 2): pulap doby zrodla
                     return got;
                 }
                 if (x.F == null) return 0;
@@ -151,6 +183,7 @@ namespace Armoury
                 long t = Math.Min(amount, Math.Max(0, PurseOf(x.F, c)));
                 if (t <= 0) return 0;
                 AddPurse(x.F, c, -t); _ctlOut += t; x.F.LDayOut += t;
+                { var tk = TlTakenOf(st, true); if (tk != null) tk[x.Kind] += t; }   // recenzja f8 (uwaga 2): pulap doby zrodla
                 return t;
             }
             catch (Exception e) { TlStumble("Take", e); return 0; }
@@ -162,10 +195,16 @@ namespace Armoury
             try
             {
                 if (amount <= 0) return;
-                if (x.Kind == TlKasa) { if (x.T != null) { x.T.ChangeGold((int)amount); if (outside) MoneyLedger.Note169(MoneyLedger.N169Other, st, (int)amount, -1); } return; }
+                var tk = TlTakenOf(st, false);   // recenzja f8 (uwaga 2): zwrot zdejmuje tez z pulapu doby zrodla
+                if (x.Kind == TlKasa)
+                {
+                    if (x.T != null) { x.T.ChangeGold((int)amount); if (outside) MoneyLedger.Note169(MoneyLedger.N169Other, st, (int)amount, -1); if (tk != null) tk[TlKasa] = Math.Max(0, tk[TlKasa] - amount); }
+                    return;
+                }
                 if (x.F == null) return;
                 int c = x.Kind == TlCastle ? 0 : x.Kind;
                 AddPurse(x.F, c, amount); _ctlOut -= amount; x.F.LDayOut -= amount;
+                if (tk != null) tk[x.Kind] = Math.Max(0, tk[x.Kind] - amount);
             }
             catch (Exception e) { TlStumble("Undo", e); }
         }
@@ -306,6 +345,7 @@ namespace Armoury
                     var a = new long[TlKinds]; long given = 0; int big = 0;
                     for (int k = 0; k < TlKinds; k++) { a[k] = (long)Math.Floor(x * w[k] / tot); given += a[k]; if (w[k] > w[big]) big = k; }
                     a[big] += x - given;
+                    double ipShare = ip > 0 ? Math.Min(1.0, (double)ip / x) : 0;   // recenzja f8 (uwaga 3): czesc odsetek w tej wplacie (kazdy wierzyciel w tej samej proporcji)
                     for (int k = 0; k < TlKinds; k++)
                     {
                         long ak = a[k];
@@ -318,7 +358,12 @@ namespace Armoury
                         }
                         else
                         {
-                            AddPurse(f, k == TlCastle ? 0 : k, ak); _ctlIn += ak; f.LDayIn += ak;
+                            int ck = k == TlCastle ? 0 : k;
+                            AddPurse(f, ck, ak); _ctlIn += ak; f.LDayIn += ak;
+                            // recenzja f8 (uwaga 3, projekt R2): odsetki sa zarobkiem ludu - do zarobku okna klasy (podstawa podatku pana 1/2/3%, cechu, 184 i dziesieciny
+                            // nastepnej doby; zamek - [0], 3%); kapital nie. Zloto juz w kiesie wyzej - tu tylko podstawa podatkow (bez nowego przelewu)
+                            long ie = ipShare > 0 ? (long)Math.Floor(ak * ipShare) : 0;
+                            if (ie > 0 && ck >= 0 && ck < 3) { f.EarnWin[ck] += ie; _tlIntEarn += ie; }
                         }
                         _tlRepK[k] += ak; placed += ak;
                     }
@@ -459,6 +504,7 @@ namespace Armoury
                   .Append(" -> do wierzycieli ").Append(repAll).Append(" (kiesy W ").Append(_tlRepK[TlW]).Append(" / R ").Append(_tlRepK[TlR]).Append(" / P ").Append(_tlRepK[TlP])
                   .Append(", kasy kupcow ").Append(_tlRepK[TlKasa]).Append(", podzamcza ").Append(_tlRepK[TlCastle]).Append(", kiesy wsi (z obieg2) ").Append(_tlRepK[TlKinds])
                   .Append(", kasy osad (kiesa nieczynna) ").Append(_tlRepK[TlKinds + 1]).Append("), zapasowe kasy miast ").Append(_tlSpare)
+                  .Append("; odsetki zapisane jako zarobek ludu (podstawa podatkow pana, cechu, 184 i dziesieciny) ").Append(_tlIntEarn)   // recenzja f8 (uwaga 3): <= w tym odsetki
                   .Append(" | dlug wobec rad ").Append(debt).Append(" (rodow ").Append(clans).Append(", roszczen ").Append(claims).Append(", osad ").Append(places.Count)
                   .Append("; rody w zaleglosci ").Append(arrear).Append(", w zajeciu ").Append(seized).Append(')')
                   .Append(", dlug / limit najwyzej ").Append(worst.ToString("0.000", Inv)).Append(" (roszczen wobec osad rodu ").Append(owned).Append(", ponad limitem ").Append(over)
@@ -494,6 +540,34 @@ namespace Armoury
         private static string TlWhom(Settlement st) { return (st.IsTown ? "the council of " : "the folk of ") + (st.Name != null ? st.Name.ToString() : "this place"); }
 
         private static void TlSay(string text, bool good) { try { InformationManager.DisplayMessage(new InformationMessage(text, good ? Colors.Green : Colors.Red)); } catch { } }
+
+        /// <summary>
+        /// f8-pozyczka (projekt R2 rozdz. 7, "nie zrobione" pierwszego przebiegu): zdanie do okna "People of this land" - ile lud tej osady pozyczyl swojemu panu
+        /// (gracz - "you") i ile winni mu jeszcze inni panowie (dlug zostaje po utracie osady). Tylko odczyt ksiegi drabiny 168 (jedno przejscie po rodach). null - brak
+        /// dlugu wobec tej osady (okno jak dotad). Linia "PeopleMenu (f8)" do logu. Nie rzuca.
+        /// </summary>
+        internal static string TownLoanMenuLine(Settlement st)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (st == null || s == null || string.IsNullOrEmpty(st.StringId) || !DebtLadder.On) return null;
+                long own, others; int otherN;
+                DebtLadder.TownOwedTo(st.StringId, st.OwnerClan, out own, out others, out otherN);
+                if (own <= 0 && others <= 0) return null;
+                string rate = (100 * TlRate(s)).ToString("0.#", Inv) + " parts in 100 a year";
+                bool you = st.OwnerClan != null && st.OwnerClan == Clan.PlayerClan;
+                string t = own > 0
+                    ? "Lent to " + (you ? "you" : "their lord") + ": " + own.ToString("N0", Inv) + " denars at " + rate + "."
+                      + (others > 0 ? " Other lords still owe them " + others.ToString("N0", Inv) + " denars." : "")
+                    : "Lent to other lords: " + others.ToString("N0", Inv) + " denars at " + rate + ".";
+                if (s.LogEnabled)
+                    Log.Info("PeopleMenu (f8): " + (st.Name != null ? st.Name.ToString() : st.StringId) + " (" + st.StringId + ") | dlug pana osady wobec ludu " + own
+                             + " zl, innych rodow " + others + " zl (" + otherN + " rodow).");
+                return t;
+            }
+            catch (Exception e) { TlStumble("MenuLine", e); return null; }
+        }
 
         private static bool TlBorrowCond(MenuCallbackArgs args)
         {

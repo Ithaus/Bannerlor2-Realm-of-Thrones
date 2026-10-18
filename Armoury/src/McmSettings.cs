@@ -5844,9 +5844,9 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public float TownLoanCofferReserveTimes { get; set; } = 1.5f;
 
-        [SettingPropertyBool("Town Loan Takes Folk Loans", HintText = "with Town Loan and Folk Loans: the debts the lords already owe their people from the old Folk Loans move into the town loans (same purses, ten parts in a hundred a year, the instalments and arrears of the debt ladder instead of the write-off) - one rule for both. Off = the old debts run on by the Folk Loans rules (only new loans come from the councils)")]
+        [SettingPropertyBool("Town Loan Takes Folk Loans", HintText = "with Town Loan and Folk Loans: the debts the lords already owe their people from the old Folk Loans move into the town loans (same purses, ten parts in a hundred a year, the instalments and arrears of the debt ladder instead of the write-off) - one rule for both. Every lord who owed his people becomes a debtor of the debt ladder at once. Off (default) = the old debts run on by the Folk Loans rules until they are paid; only new loans come from the councils")]
         [SettingPropertyGroup("The townsfolk's purse")]
-        public bool TownLoanTakesFolkLoans { get; set; } = true;
+        public bool TownLoanTakesFolkLoans { get; set; } = false;
 
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]

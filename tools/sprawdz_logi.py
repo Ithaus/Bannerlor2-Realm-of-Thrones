@@ -1520,7 +1520,10 @@ Uzycie (Python 3, tylko odczyt):
                     NPZ-7 rody w zaleglosci z dlugiem wobec rad <= 3 naraz (projekt R2 prog 12; zajecie INFO), NPZ-8 dlug wobec rad na koniec <= 6 mln, NPZ-9 kredyt wojenny Banku
                     (srednia 28 dob, linia 168 "wyplacone") <= baza + 500 zl/d przy --baza-doby (bez bazy INFO), NPZ-10 jedna regula: nowe pozyczki obieg2 0 w dobach z Town Loan
                     (pierwsza doba pominieta), NPZ-11 przejecie obieg2 - przeniesione w linii f8 = w linii obieg2 (+- liczba czesci), NPZ-12 przeplywy i NPZ-12b zapasowi odbiorcy (INFO),
-                    NPZ-13 potkniecia i ERROR paczki 0, NPZ-14 czas <= 1 ms srednio i <= 5 ms najwiecej, NPZ-15 klucz (INFO). Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log):
+                    NPZ-13 potkniecia i ERROR paczki 0, NPZ-14 czas <= 1 ms srednio i <= 5 ms najwiecej, NPZ-15 klucz (INFO). Recenzja f8: NPZ-3b odsetki zapisane jako zarobek ludu
+                    <= odsetki splacone kazdej doby (projekt R2 - podstawa podatku pana, 184 i dziesieciny), NPZ-16 fala dluznikow 168: skok "dluznicy: kredyt" w jednej dobie <= 40
+                    (fin86 bez paczki najwiecej +3/d; przejecie obieg2 dawaloby ok. +88 naraz - doba z przejeciem INFO), NPZ-16b dluznicy / zaleglosci / zajecia w dobie
+                    pierwszej linii, +5 dob i ostatniej (INFO). Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log):
                     NPZ-D1..D3 z liczbami, kredyt wojenny Banku i obieg2 jako liczby bazowe (INFO), reszta INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -44959,6 +44962,7 @@ NPZ_RX = re.compile(
     r" \| splacone (\d+) \(w tym odsetki (\d+); z jednorazowych (\d+), raty z D (\d+), reczne gracza (\d+), zajecie i wyprzedaz (\d+)\)"
     r" -> do wierzycieli (\d+) \(kiesy W (\d+) / R (\d+) / P (\d+), kasy kupcow (\d+), podzamcza (\d+), kiesy wsi \(z obieg2\) (\d+), kasy osad \(kiesa nieczynna\) (\d+)\),"
     r" zapasowe kasy miast (\d+)"
+    r"(?:; odsetki zapisane jako zarobek ludu \(podstawa podatkow pana, cechu, 184 i dziesieciny\) (\d+))?"
     r" \| dlug wobec rad (\d+) \(rodow (\d+), roszczen (\d+), osad (\d+); rody w zaleglosci (\d+), w zajeciu (\d+)\), dlug / limit najwyzej ([\d.]+)"
     r" \(roszczen wobec osad rodu (\d+), ponad limitem (\d+)\), po pozyczce ponad limitem (\d+) \(oczekiwane 0\)"
     r" \| przeniesione z obieg2 (\d+) zl \(rodow (\d+), czesci (\d+)\)"
@@ -44969,13 +44973,15 @@ NPZ_RX = re.compile(
 NPZ_KEYS = ("on", "rate", "rdays", "lent", "lentn", "plent", "pn", "src", "sW", "sR", "sP", "sK", "sC",
             "cand", "roomn", "room", "bban", "blad", "bseize", "bd", "blim", "bnosrc",
             "int", "year", "paid", "paidint", "ploot", "pinst", "pman", "pseize",
-            "rep", "rW", "rR", "rP", "rK", "rC", "rV", "rO", "spare",
+            "rep", "rW", "rR", "rP", "rK", "rC", "rV", "rO", "spare", "intearn",
             "debt", "dclans", "dclaims", "dplaces", "arrear", "seized", "worst", "owned", "over", "overafter",
             "moved", "movedn", "movedp", "orph", "kw", "kwn", "both", "ctl", "ms", "st", "stsess")
 NPZ_RX_15 = re.compile(r"suma rat ponad (\d+)% D: (\d+) rodow \(kontrola - 0\)")
 NPZ_RX_NOREC = re.compile(r"bez odbiorcy (\d+) \(prog 0\)")
 NPZ_RX_KW = re.compile(r"KW \(166, dzis\): miejsce w pulapie u (\d+) rodow \((\d+) zl\), wyplacone (\d+) zl u (\d+) rodow")
 NPZ_RX_168ST = re.compile(r"\| potkniecia (\d+)\.")
+NPZ_RX_168DB = re.compile(r"dluznicy: kredyt (\d+) \(w tym kredyt wojenny (\d+)\), zaleglosc (\d+), zajecie (\d+), wyprzedaz (\d+)")
+NPZ_WAVE_MAX = 40           # recenzja f8 (uwaga 1): skok dluznikow 168 w jednej dobie (fin86 bez paczki najwyzej +3; przejecie obieg2 ok. +88)
 NPZ_RX_O2L = re.compile(r"zawarte w dobie (-?\d+) \([^)]*\): (\d+) zl u (\d+) rodow")
 NPZ_RX_O2MV = re.compile(r"przeniesione do pozyczek miejskich \(f8, Town Loan Takes Folk Loans\) (\d+) zl")
 NPZ_RX_O2DEBT = re.compile(r"\| dlug rodow u ludu (\d+|-) \(rodow (\d+)")
@@ -45007,7 +45013,7 @@ def _npz_scan(logp):
                 for k, v in zip(NPZ_KEYS, mm.groups()):
                     if k == "on":
                         r[k] = v == "tak"
-                    elif v == "-":
+                    elif v is None or v == "-":
                         r[k] = None
                     elif "." in v:
                         r[k] = float(v)
@@ -45023,10 +45029,12 @@ def _npz_scan(logp):
                 day = num(r"dzien (\d+)", s)
                 if day is None:
                     continue
-                a = NPZ_RX_15.search(s); b = NPZ_RX_NOREC.search(s); k = NPZ_RX_KW.search(s); st = NPZ_RX_168ST.search(s)
+                a = NPZ_RX_15.search(s); b = NPZ_RX_NOREC.search(s); k = NPZ_RX_KW.search(s); st = NPZ_RX_168ST.search(s); db = NPZ_RX_168DB.search(s)
                 D["d168"][day] = {"over15": int(a.group(2)) if a else None, "norec": int(b.group(1)) if b else None,
                                   "kw": int(k.group(3)) if k else None, "kwn": int(k.group(4)) if k else None, "kwroom": int(k.group(2)) if k else None,
-                                  "st": int(st.group(1)) if st else 0}
+                                  "st": int(st.group(1)) if st else 0,
+                                  "dkred": int(db.group(1)) if db else None, "darr": int(db.group(3)) if db else None,
+                                  "dseiz": (int(db.group(4)) + int(db.group(5))) if db else None}
                 continue
             if s.startswith(NPZ_O2):
                 day = num(r"dzien (\d+)", s)
@@ -45213,6 +45221,45 @@ def npozyczka_main(logp, bdp=None):
     ms = [T[d]["ms"] for d in td]
     rep.add("NPZ-14: czas paczki na dobe (pozyczki 166 + linia)", f"srednio {sum(ms) / len(ms):.3f} ms, najwiecej {max(ms):.3f} ms", "<= 1 ms srednio i <= 5 ms najwiecej",
             sum(ms) / len(ms) <= 1.0 and max(ms) <= 5.0)
+
+    # ---- NPZ-3b (recenzja f8, uwaga 3): odsetki jako zarobek ludu <= odsetki splacone
+    ie = [d for d in td if T[d].get("intearn") is not None]
+    if ie:
+        b3b = [d for d in ie if T[d]["intearn"] > T[d]["paidint"]]
+        rep.add("NPZ-3b: odsetki zapisane jako zarobek ludu (podstawa podatku pana, cechu, 184 i dziesieciny) <= odsetki splacone", f"suma {sum(T[d]['intearn'] for d in ie)}"
+                f" z odsetek splaconych {sum(T[d]['paidint'] for d in ie)}; niezgodne {len(b3b)} z {len(ie)} dob" + (f" (doby {b3b[:6]})" if b3b else ""),
+                "0 niezgodnych (reszta odsetek - kasy kupcow, kiesy wsi, kasy osad: bez zarobku okna)", len(b3b) == 0)
+    else:
+        rep.add("NPZ-3b: odsetki jako zarobek ludu", "brak segmentu w linii (linia sprzed recenzji f8)", "INFO", None)
+
+    # ---- NPZ-16 (recenzja f8, uwaga 1): fala dluznikow 168 - skok "dluznicy: kredyt" w jednej dobie
+    dk = [d for d in d168 if L168[d].get("dkred") is not None]
+    jumps = []
+    for i in range(1, len(dk)):
+        d0, d = dk[i - 1], dk[i]
+        if d - d0 != 1:
+            continue
+        j = L168[d]["dkred"] - L168[d0]["dkred"]
+        jumps.append((j, d, bool(T.get(d, {}).get("moved")) or bool(T.get(d0, {}).get("moved"))))
+    if jumps:
+        nomig = [x for x in jumps if not x[2]]
+        mig = [x for x in jumps if x[2]]
+        top = max(nomig) if nomig else (0, None, False)
+        rep.add("NPZ-16: fala dluznikow 168 - najwiekszy skok 'dluznicy: kredyt' w jednej dobie (bez doby przejecia obieg2)", f"+{top[0]} (doba {top[1]})"
+                + (f"; doba przejecia obieg2: +{max(mig)[0]} (INFO - Town Loan Takes Folk Loans)" if mig else ""),
+                f"<= {NPZ_WAVE_MAX} (fin86 bez paczki najwyzej +3/d; nowe pozyczki rad dokladaja dluznikow stopniowo)", top[0] <= NPZ_WAVE_MAX)
+        def dbt(d):
+            x = L168.get(d, {})
+            return f"d{d}: kredyt {x.get('dkred')}, zaleglosc {x.get('darr')}, zajecie {x.get('dseiz')}"
+        f5 = [d for d in dk if d >= first]
+        pts = []
+        for d in (f5[:1] + [x for x in f5 if x == first + 5] + dk[-1:]):
+            if d not in pts:
+                pts.append(d)
+        rep.add("NPZ-16b: dluznicy / zaleglosci / zajecia 168 (pierwsza doba linii paczki, +5 dob, ostatnia)", "; ".join(dbt(d) for d in pts),
+                "INFO (recenzja f8: patrzec na pierwsze 5 dob - zaleglosci i zajecia nie powinny skoczyc)", None)
+    else:
+        rep.add("NPZ-16: fala dluznikow 168", "brak liczb 'dluznicy:' w liniach 'Dlugi (168)'", "INFO", None)
 
     # ---- NPZ-15 klucz
     rep.add("NPZ-15: klucz Town Loan w dobach linii", f"tak {len(on_days)} z {len(td)} dob, stopa {T[last]['rate']}%, limit {T[last]['rdays']} dni renty",

@@ -431,6 +431,21 @@ namespace Armoury
             }
         }
 
+        /// <summary>f8-pozyczka (okno "People of this land"): dlug wobec rady osady stId - pana osady (owner) i pozostalych rodow (liczba rodow). Tylko odczyt.</summary>
+        internal static void TownOwedTo(string stId, Clan owner, out long ownerPart, out long others, out int otherClans)
+        {
+            ownerPart = 0; others = 0; otherClans = 0;
+            if (string.IsNullOrEmpty(stId)) return;
+            string oid = owner != null ? owner.StringId : null;
+            foreach (var kv in _l)
+            {
+                long t = 0;
+                foreach (var x in kv.Value.Claims) if (IsTownClaim(x) && x.Creditor == stId) t += x.Left;
+                if (t <= 0) continue;
+                if (oid != null && kv.Key == oid) ownerPart += t; else { others += t; otherClans++; }
+            }
+        }
+
         /// <summary>f8-pozyczka: liczniki doby drabiny dla pozyczek miejskich (zerowane na poczatku Daily): odsetki, z jednorazowych, raty z D, w zaleglosci,
         /// z zajecia i wyprzedazy (wszystko, co poszlo do rad).</summary>
         internal static long TownIntToday { get { return _dTownInt; } }
@@ -1499,32 +1514,44 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ f8-pozyczka: zapis pozyczek miejskich (SaveText, "arm_townloan"; po arm_debt168)
-        private const int TownMaxRecords = 4000, TownMaxChars = 600000;
+        // recenzja f8 (uwaga 4): JEDEN straznik dla zapisu i odczytu - zapis konczy PRZED przekroczeniem TownMaxChars / TownMaxRecords (pominiete roszczenia liczone
+        // i wypisane w logu), odczyt nigdy nie odrzuca calego klucza za dlugosc: czyta pelne rekordy do TownReadChars (zapas 4 x na zapisy innych wersji)
+        private const int TownMaxRecords = 4000, TownMaxChars = 600000, TownReadChars = 4 * TownMaxChars;
         internal static int LastTownImportN = -1, LastTownImportBad;
+        internal static int LastTownExportDropN; internal static long LastTownExportDropGold;
 
         /// <summary>"tl1|rod^osada^reszta^calosc^doba^odsetki^ulamek^udzial0^...^udzial4;..." - tylko roszczenia KTown; pusty napis - brak (klucz nie pisany).
-        /// Straznik rozmiaru: najwyzej 4000 roszczen.</summary>
+        /// Straznik rozmiaru (recenzja f8, uwaga 4): najwyzej 4000 roszczen i 600 000 znakow - rekord, ktory by go przekroczyl, nie wchodzi (licznik i linia w logu:
+        /// ten dlug zyje w biezacej sesji, po wczytaniu tego zapisu by go nie bylo).</summary>
         internal static string ExportTown()
         {
+            LastTownExportDropN = 0; LastTownExportDropGold = 0;
             try
             {
                 int n = 0;
                 var sb = new StringBuilder(64);
+                var rec = new StringBuilder(160);
                 foreach (var kv in _l)
                 {
                     if (kv.Key == null || kv.Key.IndexOfAny(Bad) >= 0) continue;
                     foreach (var c in kv.Value.Claims)
                     {
                         if (!IsTownClaim(c) || string.IsNullOrEmpty(c.Creditor) || c.Creditor.IndexOfAny(Bad) >= 0) continue;
-                        if (n >= TownMaxRecords) break;
-                        sb.Append(n == 0 ? "tl1|" : ";");
-                        sb.Append(kv.Key).Append('^').Append(c.Creditor).Append('^').Append(c.Left.ToString(Inv)).Append('^').Append(c.Total.ToString(Inv)).Append('^')
-                          .Append(c.Day.ToString(Inv)).Append('^').Append(Math.Max(0, c.Acc).ToString(Inv)).Append('^').Append(Math.Round(c.Frac, 3).ToString(Inv));
+                        rec.Length = 0;
+                        rec.Append(n == 0 ? "tl1|" : ";");
+                        rec.Append(kv.Key).Append('^').Append(c.Creditor).Append('^').Append(c.Left.ToString(Inv)).Append('^').Append(c.Total.ToString(Inv)).Append('^')
+                           .Append(c.Day.ToString(Inv)).Append('^').Append(Math.Max(0, c.Acc).ToString(Inv)).Append('^').Append(Math.Round(c.Frac, 3).ToString(Inv));
                         for (int k = 0; k < TownFolk.TlKinds; k++)
-                            sb.Append('^').Append(Math.Round(c.Sh != null && k < c.Sh.Length ? c.Sh[k] : 0, 5).ToString(Inv));
+                            rec.Append('^').Append(Math.Round(c.Sh != null && k < c.Sh.Length ? c.Sh[k] : 0, 5).ToString(Inv));
+                        if (n >= TownMaxRecords || sb.Length + rec.Length > TownMaxChars) { LastTownExportDropN++; LastTownExportDropGold += c.Left; continue; }
+                        sb.Append(rec);
                         n++;
                     }
                 }
+                if (LastTownExportDropN > 0)
+                    Log.Info("Pozyczki miejskie (f8): zapis arm_townloan - straznik rozmiaru (" + TownMaxRecords + " roszczen / " + TownMaxChars + " znakow): zapisane " + n
+                             + " roszczen (" + sb.Length + " znakow), POMINIETE " + LastTownExportDropN + " roszczen, dlug " + LastTownExportDropGold
+                             + " zl (zyje w tej sesji; po wczytaniu tego zapisu go nie bedzie - oczekiwane 0).");
                 return n > 0 ? sb.ToString() : "";
             }
             catch (Exception e) { Stumble("ExportTown", e); return ""; }
@@ -1537,7 +1564,14 @@ namespace Armoury
             try
             {
                 if (string.IsNullOrEmpty(data)) { LastTownImportN = -1; return; }
-                if (data.Length > TownMaxChars || !data.StartsWith("tl1|", StringComparison.Ordinal)) { LastTownImportBad++; return; }
+                if (!data.StartsWith("tl1|", StringComparison.Ordinal)) { LastTownImportBad++; return; }
+                // recenzja f8 (uwaga 4): za dlugi napis - pelne rekordy do TownReadChars (reszta liczona jako bledna), nie odrzucenie calego klucza (dlug ludu nie znika)
+                if (data.Length > TownReadChars)
+                {
+                    int cut = data.LastIndexOf(';', TownReadChars - 1);
+                    data = cut > 4 ? data.Substring(0, cut) : data.Substring(0, TownReadChars);
+                    LastTownImportBad++;
+                }
                 int n = 0;
                 foreach (var rec in data.Substring(4).Split(';'))
                 {
