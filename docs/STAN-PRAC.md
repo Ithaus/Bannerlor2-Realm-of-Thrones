@@ -2975,3 +2975,5 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   DALEJ: scalic f9 + f10 (+ ewentualna poprawka z analizy Polnocy) -> test sciezki Jeffa 160 dob (z armoury-a7-wlacz.flag dla A7) -> 5 dob + bitwa -> WGRANIE 81.
 - Jeff 18.10 ok. 09:40 PDT: "drogi do wiosek odchodzace od glownego traktu; jesli wioska blisko traktu - bez drogi (krotka kreska), tylko dalsze wioski, chyba ze potrafisz to dobrze
   namalowac" -> paczka f11-drogi (boczne drogi od traktow do dalszych wiosek, nowa technika rysowania, DOMYSLNIE WYL. - najpierw zdjecia z autotestu dla Jeffa; 14.10 drogi-decale "fatalne").
+- Jeff 18.10 ok. 09:50 PDT: "wykorzystaj mase terenu ... boczne wioski naprawde masz gdzie, zeby to wygladalo naturalnie, a nie jak blad ... nawet tam gdzie jest duzo ludzi" ->
+  f10-uklad zatrzymany i puszczony od nowa z dopiskiem (wioski po calym ladzie okregu, naturalnie: woda, pola, skraj lasu, wzgorza; bez siatek; pokrycie ladu przed/po): wf_ca258789-6e9.
