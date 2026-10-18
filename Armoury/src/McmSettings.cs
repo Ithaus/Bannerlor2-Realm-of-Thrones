@@ -6652,7 +6652,7 @@ namespace Armoury
         [SettingPropertyGroup("Daily life - rise, fall and war")]
         public bool DailyLifeWarScar { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration", HintText = "Start calibration (the plan only): once a week the hands and the land of every district - the game village, its side villages and the fields of the townsfolk - are reckoned with one table of what a worker makes on his land, and who does what is chosen the way families choose it: where the work pays best after the cost of the herd, the boat or the grove. Written to the log and to ks-plan.csv only - nothing in the game changes. On a save where the calibration was already applied, off = from the next day the villages produce as before (the state stays in the save)")]
+        [SettingPropertyBool("Start Calibration", HintText = "Start calibration (the plan only): once a week the hands and the land of every district - the game village, its side villages and the fields of the townsfolk - are reckoned with one table of what a worker makes on his land, and who does what is chosen the way families choose it: where the work pays best after the cost of the herd, the boat or the grove. The plan itself only writes the log and ks-plan.csv; the game changes only once the calibration is started - by itself after about five weeks of survey with Start Calibration Auto Arm (on), or with Arm This Save and Confirm. On a save where the calibration was already applied, off = from the next day the villages produce as before (the state stays in the save)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibration { get; set; } = true;
 
