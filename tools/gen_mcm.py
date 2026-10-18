@@ -335,6 +335,10 @@ RANGES = {
     'DsGrantSessionDays': (1, 91, "0"),
     'DsCrownLoanLimitDaysPledged': (0.0, 728.0, "0"),
     'DsFolkSurplusSpendDays': (0, 120, "0"),
+    # sw-uchodzcy (noc 17/18.10): uchodzcy z najazdu do miast - zgodnie z przycieciem w kodzie (RaidRefugees: promien >= 0, udzial kiesy 0..1, komunikat >= 0)
+    'RaidRefugeesTownRadius': (0.0, 1000.0, "0"),
+    'RaidRefugeesPurseShare': (0.0, 1.0, "0.00"),
+    'RaidRefugeesMessageMin': (0, 10000, "0"),
 }
 
 def gen(module_dir, ns, display):

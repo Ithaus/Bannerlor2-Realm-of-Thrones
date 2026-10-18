@@ -264,7 +264,11 @@ namespace Armoury
                 double nf = r.N[EPeasant] + r.N[ECraft] + r.N[EMerchant] + r.N[EGentry];
                 if (!(nf > 0)) continue;
                 r.Away = a;
-                for (int e = EPeasant; e <= EGentry; e++) if (e != ELabour) r.AwayE[e] = a * r.N[e] / nf;
+                // sw-uchodzcy (RaidRefugeesToTowns): w mianowniku okregu tylko uchodzcy w regionie - czesc w miescie pobytu jest w mianowniku biedoty miasta (TownGuests);
+                // Away (widok "away from home") - cale konto. Wylaczone: ar = a (jak dotad)
+                double ar = a;
+                try { ar = Math.Max(0.0, a - RaidRefugees.InTown(r.St.Village)); } catch (Exception e) { ar = a; Stumble("RaidRefugees.InTown", e); }
+                for (int e = EPeasant; e <= EGentry; e++) if (e != ELabour) r.AwayE[e] = ar * r.N[e] / nf;
                 _wAwayV++; _wAwayP += a; _wAwayHome += r.L;
             }
         }

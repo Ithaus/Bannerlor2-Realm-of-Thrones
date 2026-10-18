@@ -64,6 +64,9 @@ namespace Armoury
             // kupcy, szlachta - wedlug ludzi w domu); poza ksiega stanow (N - ludzie w domu, suma stanow = ksiega)
             public double Away;
             public readonly double[] AwayE = new double[Estates];
+            // sw-uchodzcy (RaidRefugeesToTowns, DailyLife.Guests.cs): miasto - uchodzcy z najazdu mieszkajacy w nim (biedota: mianownik Dostatku biedoty przez AwayE[ELabour],
+            // stany KS - KsSnapshot); poza ksiega stanow (N - mieszczanie ksiegi, suma stanow = ksiega)
+            public double Guests;
         }
 
         private static List<Rec> _recs;
@@ -173,6 +176,7 @@ namespace Armoury
             {
                 Array.Clear(r.N, 0, Estates); Array.Clear(r.Y, 0, Estates); r.Thralls = 0; r.L = 0; r.Upper = double.NaN; r.Clans = 0;
                 r.Away = 0; Array.Clear(r.AwayE, 0, Estates);   // ZC7: uchodzcy w mianowniku - WarPeople po PeopleDay (klucz DailyLifeWarScar)
+                r.Guests = 0;                                   // sw-uchodzcy: uchodzcy z najazdu w miescie - TownGuests po WarPeople
                 if (r.Kind == KCastle) continue;
                 try
                 {

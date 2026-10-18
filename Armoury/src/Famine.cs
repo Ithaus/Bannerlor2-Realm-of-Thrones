@@ -426,6 +426,32 @@ namespace Armoury
             catch (Exception e) { Stumble("Famine.Returned", e); }
         }
 
+        /// <summary>sw-uchodzcy (RaidRefugeesToTowns): konto wsi z ludzmi w miescie pobytu - czesc z glodu przed ubytkiem (TownKeepAfter); NaN - nie dotyczy (klucz
+        /// wylaczony, konto bez miasta - ubytek schodzi z obu czesci proporcjonalnie jak dotad). Nie rzuca.</summary>
+        private static double TownKeepBefore(Vil x)
+        {
+            try
+            {
+                if (x == null || x.V == null || x.B == null || !RaidRefugees.Owns(x.V)) return double.NaN;
+                double aw = PeopleBook.RefugeesOf(x.V);
+                lock (Gate) return x.B.FamOut ? FamPart(x.B, aw) : 0.0;
+            }
+            catch (Exception e) { Stumble("Famine.TownKeepBefore", e); return double.NaN; }
+        }
+
+        /// <summary>sw-uchodzcy: po ubytku konta - czesc z glodu = przed + famDelta (smierc gosci regionu: -zmarli; glod miasta: 0), zeby ubytek jednej czesci nie ruszal
+        /// drugiej (jedna ksiega, jedna regula na zjawisko). famB NaN - nic. Nie rzuca.</summary>
+        private static void TownKeepAfter(Vil x, double famB, double famDelta)
+        {
+            if (double.IsNaN(famB) || x == null || x.V == null || x.B == null) return;
+            try
+            {
+                double aw = PeopleBook.RefugeesOf(x.V);
+                lock (Gate) SyncFam(x.B, Math.Max(0.0, Math.Min(aw, famB + famDelta)), aw);
+            }
+            catch (Exception e) { Stumble("Famine.TownKeepAfter", e); }
+        }
+
         /// <summary>Pod Gate: czesc z glodu = f przy koncie `away`; pusta - flaga, zegar odzyskania i czesc od zera.</summary>
         private static void SyncFam(Barn b, double f, double away)
         {
@@ -631,29 +657,41 @@ namespace Armoury
             var guests = new List<Guest>(accounts.Count);
             var shelter = new Dictionary<Town, double>();
             int lostAcc = 0;
+            double lostPeople = 0;                               // sw-uchodzcy: ludzie kont bez wsi z przelicznikiem (kontrola "nikt dwa razy" linii RT)
             foreach (var kv in accounts)
             {
                 try
                 {
                     Vil x;
-                    if (!byId.TryGetValue(kv.Key, out x)) { lostAcc++; continue; }
+                    if (!byId.TryGetValue(kv.Key, out x)) { lostAcc++; lostPeople += kv.Value; continue; }
+                    // sw-uchodzcy (RaidRefugeesToTowns): czesc konta w miescie pobytu je z targu miasta (biedota, kiesa ludu) - spichlerze karmia tylko reszte (wylaczone: 0)
+                    double gAway = kv.Value, inTown = RaidRefugees.InTown(x.V);
+                    if (inTown > 0.0) { gAway -= inTown; if (!(gAway > 1e-9)) continue; }
                     var stay = StayNode(x, nodeById);
-                    var g = new Guest { Acc = x, Away = kv.Value };
+                    var g = new Guest { Acc = x, Away = gAway };
                     if (shelterOn && stay.Town != null && stay.IsUnderSiege)
                     {
                         g.Shelter = stay.Town;
-                        double v0; shelter.TryGetValue(stay.Town, out v0); shelter[stay.Town] = v0 + kv.Value;
+                        double v0; shelter.TryGetValue(stay.Town, out v0); shelter[stay.Town] = v0 + g.Away;     // sw-uchodzcy: g.Away = kv.Value przy wylaczonym kluczu
                     }
                     else
                     {
                         Reg r;
                         if (!regs.TryGetValue(stay, out r)) regs[stay] = r = new Reg { Node = stay };
-                        r.Present += kv.Value; g.R = r;
+                        r.Present += g.Away; g.R = r;
                     }
                     guests.Add(g);
                 }
                 catch (Exception e) { Stumble("Famine.Daily(konto)", e); }
             }
+            // sw-uchodzcy: migawka jedzacych ze spichlerzy (goscie regionow, schronieni w murach) wobec konta i czesci w miastach - kontrola "nikt dwa razy" (tylko licznik)
+            try
+            {
+                double gp = 0, gs = 0;
+                foreach (var g in guests) { if (g.R != null) gp += g.Away; else if (g.Shelter != null) gs += g.Away; }
+                RaidRefugees.NoteFamine(gp, gs, lostPeople);
+            }
+            catch (Exception e) { Stumble("Famine.Daily(RT)", e); }
             double eatRef = 0, presentAll = 0;
             foreach (var r in regs.Values)
             {
@@ -726,7 +764,9 @@ namespace Armoury
                     if (g.R == null || !(g.Away > 0.0) || !(g.R.URef > T)) continue;
                     refHungry++;
                     double d = g.Away * DeathRate(g.R.URef, T, dmax) / yd;
+                    double famB = d > 0.0 ? TownKeepBefore(g.Acc) : double.NaN;     // sw-uchodzcy: konto z czescia w miescie - gloduja goscie regionu (czesc z glodu), nie miasto
                     double got = d > 0.0 ? PeopleBook.RefugeesDie(g.Acc.V, d) : 0.0;
+                    if (got > 0.0) TownKeepAfter(g.Acc, famB, -got);
                     if (got > 0.0) { deadRef += got; lock (Gate) g.Acc.B.Starved += got; g.R.Dead += got; Touch(e46, g.Acc); }
                     if (fleeOn) TryRelocate(g, today, regs, nodeById, s, ref moves, ref noRefuge, ref blocked);
                 }
@@ -779,8 +819,31 @@ namespace Armoury
                     foreach (var g in guests)
                     {
                         if (g.Shelter != t || !(g.Away > 0.0)) continue;
+                        double famB = TownKeepBefore(g.Acc);                         // sw-uchodzcy: schronieni (czesc z glodu) gloduja bez ruszania czesci w miescie
                         double got = PeopleBook.RefugeesDie(g.Acc.V, g.Away * rate);
+                        if (got > 0.0) TownKeepAfter(g.Acc, famB, -got);
                         if (got > 0.0) { deadShelter += got; lock (Gate) g.Acc.B.Starved += got; Touch(e46, g.Acc); }
+                    }
+                    // sw-uchodzcy (RaidRefugeesToTowns): uchodzcy z najazdu mieszkajacy w tym miescie gloduja razem z mieszczanami (ta sama stopa co TownDie); czesc z glodu
+                    // ich kont bez zmian. Linia "Uchodzcy do miast (RT)" (glod miasta) - linia spichlerzy bez zmian formatu
+                    if (node.IsTown)
+                    {
+                        foreach (var rv in RaidRefugees.VillagesIn(node))
+                        {
+                            try
+                            {
+                                double inT = RaidRefugees.InTown(rv);
+                                if (!(inT > 0.0)) continue;
+                                Vil rx = null;
+                                if (rv.Settlement != null && rv.Settlement.StringId != null) byId.TryGetValue(rv.Settlement.StringId, out rx);
+                                double famB = rx != null ? TownKeepBefore(rx) : double.NaN;
+                                double got = PeopleBook.RefugeesDie(rv, inT * rate);
+                                if (!(got > 0.0)) continue;
+                                if (rx != null) { TownKeepAfter(rx, famB, 0.0); lock (Gate) rx.B.Starved += got; Touch(e46, rx); }
+                                RaidRefugees.Track(rv, RaidRefugees.CStarve);
+                            }
+                            catch (Exception e) { Stumble("Famine.Daily(RT glod miasta)", e); }
+                        }
                     }
                 }
                 catch (Exception e) { Stumble("Famine.Daily(warownia)", e); }
@@ -919,6 +982,8 @@ namespace Armoury
             var b = x.B; var home = x.Node;
             var cur = StayNode(x, nodeById);
             double away = PeopleBook.RefugeesOf(x.V);
+            // sw-uchodzcy (RaidRefugeesToTowns): goscie spichlerzy = konto bez czesci w miescie pobytu (ta czesc nie jest w regionie pobytu konta); wylaczone - cale konto
+            double guest = Math.Max(0.0, away - RaidRefugees.InTown(x.V));
             Settlement target;
             Reg cr;
             regs.TryGetValue(cur, out cr);
@@ -926,8 +991,8 @@ namespace Armoury
             if (join) target = cur;
             else
             {
-                if (away > 0.0 && cur.IsUnderSiege) { blocked++; return false; }      // konto w murach oblezonej warowni - nikt nie wychodzi (GL 2.6)
-                if (away > 0.0 && b.MoveDay != int.MinValue && today - b.MoveDay < Math.Max(0, s.FamineMoveDays)) { blocked++; return false; }
+                if (guest > 0.0 && cur.IsUnderSiege) { blocked++; return false; }      // konto w murach oblezonej warowni - nikt nie wychodzi (GL 2.6)
+                if (guest > 0.0 && b.MoveDay != int.MinValue && today - b.MoveDay < Math.Max(0, s.FamineMoveDays)) { blocked++; return false; }
                 target = FindRefuge(home, home != null ? home.MapFaction : null, regs, s, home, cur);
                 if (target == null) { noRefuge++; return false; }
             }
@@ -938,7 +1003,7 @@ namespace Armoury
             if (tr != null) tr.Present += n;
             if (target != cur)
             {
-                if (away > 0.0) { if (cr != null) cr.Present = Math.Max(0.0, cr.Present - away); if (tr != null) tr.Present += away; }
+                if (guest > 0.0) { if (cr != null) cr.Present = Math.Max(0.0, cr.Present - guest); if (tr != null) tr.Present += guest; }
                 moves++;
                 lock (Gate) { b.Stay = target == home ? null : target.StringId; b.MoveDay = today; }
             }

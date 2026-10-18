@@ -856,7 +856,9 @@ namespace Armoury
                 return;
             }
             double r = Scale(f);
-            double bW = f.HW * r * BW * idx, bR = f.HR * r * BR * idx, bP = f.HP * r * BP * idx;
+            // sw-uchodzcy (RaidRefugeesToTowns, TownFolk.Refugees.cs): uchodzcy z najazdu mieszkajacy w miescie to biedota - ich glowy w koszyku klasy W (kiesa W placi, jutro
+            // kupuja z targu jak biedota); nikt w miescie albo klucz wylaczony - 0 (kotwica co do monety jak dotad). Przy ZC4 koszt klasy W ze stanow juz ich ma (KsSnapshot)
+            double bW = (f.HW * r + RefugeeHeadsOf(f, r)) * BW * idx, bR = f.HR * r * BR * idx, bP = f.HP * r * BP * idx;
             if (f.Slave) { double sl = f.HS * r * BS * idx; bR += sl * OwnR; bP += sl * OwnP; }
             // ZC4 (KS etap 2): koszyki klas BW/BR/BP/BS zastapione kosztem koszyka stanow po cenach targu (W: wyrobnicy i chlopi miasta, R: rzemieslnicy + 40% niewolnych,
             // P: kupcy i szlachta + 60% niewolnych) z waga lambda; poza ZC4 - jak dotad

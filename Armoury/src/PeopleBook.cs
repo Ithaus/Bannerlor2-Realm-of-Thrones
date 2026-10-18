@@ -185,6 +185,7 @@ namespace Armoury
             try { ResetArms(); } catch (Exception e) { Stumble("Reset(E4/8)", e); }       // E4/8: odniesienia miast tr:, liczniki ruchow stanu miast
             try { ResetVeterans(); } catch (Exception e) { Stumble("Reset(E4/10)", e); }  // E4/10: konto WETERANI (pula karczm), siew, akumulatory - nowa kampania od zera
             try { ResetCanon(); } catch (Exception e) { Stumble("Reset(E4/9)", e); }      // E4/9: konta NIEWOLNI i MUR, bilans otwarcia, liczniki Strazy - nowa kampania od zera
+            try { RaidRefugees.Reset(); } catch (Exception e) { Stumble("Reset(RT)", e); }  // sw-uchodzcy: uchodzcy z najazdu w miastach (zapis "arm_raidref" wczytuje Import po konstruktorze)
         }
 
         /// <summary>E4/5: konto UCHODZCY, zegary regionow i liczniki doby od zera (Reset, Import).</summary>
@@ -470,6 +471,7 @@ namespace Armoury
                 {
                     // E4/5: najpierw uchodzcy tej wsi (ruch UCHODZCY -> DOM bez hearth - dopisala go gra), potem wyrzutki regionu
                     fromRef = RefugeesHome(v, men, MRefugeeFloor, 1f / k);
+                    if (fromRef > 0.0) RaidRefugees.Track(v, RaidRefugees.CFloor);     // sw-uchodzcy: wrocili z miasta pobytu (z czescia salda kiesy); Track nie rzuca
                     double left = men - fromRef;
                     if (left > 1e-9)
                     {
