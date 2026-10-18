@@ -54,6 +54,7 @@ namespace Armoury
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
             _pxRestartDay = -1; _pxRestartEnd = -1;               // KS r4 P7 (r4-ceny): restart srednich cen od nowa przy wlaczeniu
             _f4A7Day = -1;                                        // f4-pomiary: doba ostatniej diagnozy A7 (nowa kampania / wczytanie)
+            A7sReset();                                           // f5-a7: sygnal KS reguly (srednie cen miast, rodzaj Held, sezon) od nowa
         }
 
         /// <summary>Doba D (po polkach startu): srednie cen miast od zera - A7 i regale licza od D na cenach po rampie (recenzja 16.10).</summary>
@@ -189,13 +190,16 @@ namespace Armoury
         private static void RuleDaily(int today)
         {
             var s = Settings.Current;
-            bool rule = s != null && s.StartCalibrationSwitchRule;
+            bool rule = A7RuleOn;                                             // f5-a7: dawny klucz albo sygnal KS z kluczem Ks Switch Signal Rule (klucze f5 wylaczone = Start Calibration Switch Rule)
+            bool sig = A7sOn;                                                 // f5-a7 (klucz Ks Switch Signal): dochod przy cenach KS, nie przy indeksie gry
+            long a7t0 = sig ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             EnsureValues();
             int season = today / Season;
-            if (season != _regionSeason) { _regionSeason = season; _regionMoved.Clear(); }
+            if (season != _regionSeason) { if (sig) A7sSeasonClose(_regionSeason); _regionSeason = season; _regionMoved.Clear(); }   // f5-a7: linia sezonu zamknietego przed zerowaniem rak regionu
             int d0 = DDay;                                                    // recenzja 16.10: A7 i regale od D (nie od wlaczenia)
             bool step = d0 >= 0 && today > d0 && (today - d0) % StepDays == 0;
             bool reg = d0 >= 0 && today > d0 && (today - d0) % RegCycle == 0;
+            if (step) { if (sig) { try { A7sStepBegin(today); } catch (Exception e) { Stumble("A7sStepBegin", e); } } else A7sOff(); }   // f5-a7: srednia cen sygnalu, Held od zera przy pierwszym kroku sygnalu
             // f4-pomiary (klucz Measure Craft Rule): diagnoza A7 w dobie kroku i w dobie D - sam odczyt, przed petla reguly (niczego nie zmienia)
             if (d0 >= 0 && (step || today == d0) && F4A7On) { try { F4A7Diag(today, d0, rule, step); } catch (Exception e) { Stumble("F4A7Diag", e); } }
             bool f4reg = reg && F4RegOn;                                     // f4-pomiary (klucz Measure Regale Shelf): regale wobec polki - tylko liczniki
@@ -218,6 +222,7 @@ namespace Armoury
                     if (mt == null || !_px.TryGetValue(mt, out px)) continue;
                     double[] vRow = null;
                     if (vTab != null && !vTab.TryGetValue(px, out vRow)) { vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN; vTab[px] = vRow; }
+                    double[] sRow = sig && step ? A7sRow(mt) : null, sV = sRow != null ? A7sVRow(sRow) : null;   // f5-a7: cena sygnalu miasta targowego (srednia 4 krokow)
                     string type = ld.K.Type;
                     bool busy = false;
                     foreach (var b in ld.B) if (b != null && b.Target >= 0) { busy = true; break; }
@@ -231,10 +236,24 @@ namespace Armoury
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
                         int cur = b.C[ci];
-                        double incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px), incBest = double.NegativeInfinity; int best = -1;
-                        foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
+                        double incCur, incBest = double.NegativeInfinity; int best = -1;
+                        if (sig)
+                        {
+                            // f5-a7 (klucz Ks Switch Signal): dochod rodziny przy cenie sygnalu KS (wzor Planu); miasto bez sygnalu - blok bez oceny (Held bez zmian)
+                            if (sRow == null) { _a7sNoSig++; continue; }
+                            double rent = A7sRent(b);
+                            incCur = A7sIncome(b, type, cur, sRow, sV, rent);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent); if (v > incBest) { incBest = v; best = c; } }
+                            A7sNoteEval(b, ci);
+                        }
+                        else
+                        {
+                            incCur = vRow != null ? IncomeV(b, type, cur, px, vRow) : Income(b, type, cur, px);
+                            foreach (int c in b.Cand) { if (c == cur) continue; double v = vRow != null ? IncomeV(b, type, c, px, vRow) : Income(b, type, c, px); if (v > incBest) { incBest = v; best = c; } }
+                        }
                         if (best < 0 || incBest < SwitchRatio * Math.Max(0.02, incCur)) { b.Held = 0; continue; }
                         b.Held += StepDays; _rPress++; if (b.Held > _rMaxHeld) _rMaxHeld = b.Held;
+                        if (sig) A7sNotePress(b, ci);                    // f5-a7: rece pod naciskiem i trzymane >= 60 dob
                         if (b.Held < HoldDays) continue;
                         if (!rule) { _rWould++; continue; }                  // klucz wylaczony - sam pomiar nacisku (zmiana bylaby tu)
                         if (busy) { _rBusy++; continue; }
@@ -258,6 +277,7 @@ namespace Armoury
                             b.C = nc; b.X = nx;
                         }
                         busy = true; _rStarted++; _rWinStarted++; active++;
+                        if (sig) A7sNoteStart(ld, b, cur, best, hands, mt, T, today);   // f5-a7: sezon wedlug rynku i przejscia, powroty, komunikat gracza (jego wies)
                         if (_rStarted <= 12) _startNotes.Add((ld.St.Name != null ? ld.St.Name.ToString() : ld.Id) + " " + KsTab.Crafts[cur] + "->" + KsTab.Crafts[best] + " (" + Math.Round(hands) + " rak, " + T + " dob, " + Math.Round(b.Cost) + " zl)");
                     }
                 }
@@ -266,6 +286,11 @@ namespace Armoury
             if (f4reg) { try { F4RegLine(today); } catch (Exception e) { Stumble("F4RegLine", e); } }
             _rActive = active;
             _k4Live = _live; _k4Clean = active == 0 && K4NoTransition();   // ks-koszt T10 (K4a): pelny przeglad bez przebudowy w toku (w zadnym bloku - takze okregow pominietych)
+            if (sig)
+            {
+                A7sTime(a7t0);                                                // f5-a7: koszt reguly na dobe (doby z przebiegiem petli)
+                if (step) { try { A7sStepLine(today, d0, rule); } catch (Exception e) { Stumble("A7sStepLine", e); } }
+            }
         }
         private static bool _k4Clean; private static object _k4Live;
 
@@ -291,7 +316,7 @@ namespace Armoury
         private static void Progress(LiveDist ld, LiveBlock b, int today, Town mt)
         {
             int ci = IndexOfCraft(b, b.Cur), ti = IndexOfCraft(b, b.Target);
-            if (ci < 0 || ti < 0 || today > b.TEnd + 364) { b.Target = -1; b.Cur = -1; b.Held = 0; b.TStart = b.TEnd = -1; b.Cost = b.Paid = b.X0 = b.H0 = 0f; _rCancel++; return; }   // rok po terminie bez zaplaty - przebudowa porzucona (rece zostaja tam, gdzie doszly)
+            if (ci < 0 || ti < 0 || today > b.TEnd + 364) { b.Target = -1; b.Cur = -1; b.Held = 0; b.TStart = b.TEnd = -1; b.Cost = b.Paid = b.X0 = b.H0 = 0f; _rCancel++; _a7sCancel++; return; }   // rok po terminie bez zaplaty - przebudowa porzucona (rece zostaja tam, gdzie doszly); f5-a7: licznik linii
             string type = ld.K != null ? ld.K.Type : null;
             double area = BlockArea(ld, b);
             if (type != null && area > 0 && b.LandUse > area * 1.02 && b.LandOf(b.Target, type) > b.LandOf(b.Cur, type)) { _rLandStall++; return; }
@@ -305,7 +330,7 @@ namespace Armoury
                 double fTime = Math.Min(1.0, Math.Max(0, today - b.TStart) / (double)T);
                 double owe = Math.Min(b.Cost - b.Paid, fTime * b.Cost - b.Paid);
                 int ask = owe >= 0.5 ? (int)Math.Min(Math.Ceiling(owe), Math.Max(0, ld.V.Gold) / 4) : 0;
-                long got = ask > 0 && mt != null ? VillageCrafts.PayRebuild(ld.V, mt, ask, _tally) : 0;
+                long got = ask > 0 && mt != null ? (A7sOn ? A7sPay(ld.V, mt, ask) : VillageCrafts.PayRebuild(ld.V, mt, ask, _tally)) : 0;   // f5-a7: ta sama rata + pomiar (zloto, material, polka)
                 b.Paid += got; _rPaid += got;
                 double fPay = b.Paid >= b.Cost - 0.5 ? 1.0 : Math.Max(0.0, b.Paid / (double)b.Cost);
                 double moved = b.X0 > 1e-6f ? Math.Max(0.0, Math.Min(1.0, 1.0 - b.X[ci] / (double)b.X0)) : 1.0;
@@ -323,7 +348,7 @@ namespace Armoury
                 for (int i = 0; i < nx.Count; i++) nx[i] = (float)(nx[i] / (s > 0 ? s : 1));
                 b.C = nc.ToArray(); b.X = nx.ToArray();
                 b.Target = -1; b.Cur = -1; b.Held = 0; b.TStart = b.TEnd = -1; b.Cost = b.Paid = b.X0 = b.H0 = 0f;
-                _rDone++;
+                _rDone++; _a7sDone++;                                     // f5-a7: licznik linii
             }
         }
 
@@ -408,7 +433,7 @@ namespace Armoury
         private static string RuleText()
         {
             var s = Settings.Current;
-            bool rule = s != null && s.StartCalibrationSwitchRule;
+            bool rule = A7RuleOn;                                       // f5-a7: dawny klucz albo sygnal KS z kluczem Ks Switch Signal Rule
             var sb = new StringBuilder(800);
             sb.Append(F4FrozenText(rule));                              // f4-pomiary (klucz Measure Craft Rule): jawny stan "zajecia zamrozone" (pusty napis przy kluczu wylaczonym)
             sb.Append("nacisk A7 na zmiane (co ").Append(StepDays).Append(" dob od D ").Append(DDay).Append(", inne zajecie >= x").Append(SwitchRatio.ToString("0.00", Inv)).Append("): przegladow ponad progiem ").Append(_rPress)

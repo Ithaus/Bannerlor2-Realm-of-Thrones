@@ -1501,18 +1501,21 @@ namespace Armoury
             var vname = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var p in parts) if (!p.Main && p.Uid != null) { home[p.Uid] = p.Home; vname[p.Uid] = p.Name; }
             string dtype = di.Type != null ? di.Type.StringId : "wheat_farm";
+            // f5-a7 (klucze Ks Switch Signal i Side Village Craft Ks Signal): ta sama funkcja dochodu co regula A7 pod KS (cena sygnalu KS miasta targowego, wartosc kg Planu,
+            // koszt K, renta bloku Planu) - jedna regula na zjawisko; bez Planu albo z kluczem wylaczonym - przydatnosc x sqrt(indeks), jak dotad
+            bool kss = StartCalibration.SideSignalReady(mt, today);
             foreach (var s in di.Sides)
             {
                 if (s.Target >= 0 || s.Cand == null || s.Cand.Count < 2 || s.Row == null) continue;
                 if (DistrictWorks.Locks(di.V, s.Uid)) { s.Held = 0; _dLocked++; continue; }
                 var cm = meta[s.Craft];
                 if (cm == null) continue;
-                double cur = StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
+                double cur = kss ? StartCalibration.SideSignalIncome(mt, s.Row, s.Craft, dtype) : StartCalibration.Suit(s.Row, s.Craft, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, cm)));
                 double best = double.NegativeInfinity; int bc = -1;
                 foreach (int c in s.Cand)
                 {
                     if (c == s.Craft || meta[c] == null) continue;
-                    double v = StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
+                    double v = kss ? StartCalibration.SideSignalIncome(mt, s.Row, c, dtype) : StartCalibration.Suit(s.Row, c, dtype) * Math.Sqrt(Math.Max(0.01, CraftIndex(mt, meta[c])));
                     if (v > best) { best = v; bc = c; }
                 }
                 if (F4On) { try { double h0; home.TryGetValue(s.Uid, out h0); F4ZwNote(s.Craft, bc, cur, best, sw, h0 * 0.5); } catch (Exception e) { Stumble("F4ZwNote", e); } }   // f4-pomiary: nacisk i przejscia (tylko liczniki; blad nie przerywa reguly)

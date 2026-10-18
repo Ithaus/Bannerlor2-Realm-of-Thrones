@@ -91,6 +91,8 @@ namespace Armoury
                 return r;
             };
             var vG = new F4Var(); var vB = new F4Var(); var vT = new F4Var(); var vS1 = new F4Var(); var vS2 = new F4Var();
+            var vN = new F4Var(); int nNoSig = 0; bool sigOn = A7sOn;      // f5-a7: wariant "sygnal KS" (to, co liczy regula z kluczem Ks Switch Signal)
+            if (sigOn) A7sEnsureMv();
             int planAgree = 0, planN = 0;
             var curG = new List<double>(16000); var bestG = new List<double>(16000); var ratioG = new List<double>(16000);
             double lvC = 0, kC = 0, rC = 0, lvB = 0, kB = 0, rB = 0;
@@ -131,6 +133,20 @@ namespace Armoury
                             }
                         }
                         else noPx++;
+                        if (sigOn && hasPx)
+                        {
+                            // f5-a7: sygnal KS - ta sama funkcja, wiersz ceny i pamiec co regula w tej dobie (te same bloki: z cena miasta targowego i z sygnalem)
+                            var sRow = A7sRow(mt);
+                            if (sRow == null) nNoSig++;
+                            else
+                            {
+                                var sV = A7sVRow(sRow);
+                                double rent = A7sRent(b);
+                                double ic = A7sIncome(b, type, cur, sRow, sV, rent), ib = double.NegativeInfinity; int best = -1;
+                                foreach (int c in b.Cand) { if (c == cur) continue; double v = A7sIncome(b, type, c, sRow, sV, rent); if (v > ib) { ib = v; best = c; } }
+                                vN.Note(cur, best, ic, ib, hands, SwitchRatio);
+                            }
+                        }
                         F4Eval(vB, b, type, cur, hands, one, rowOf(one));
                         if (P != null)
                         {
@@ -181,6 +197,13 @@ namespace Armoury
                 else sb.Append(" | wzor Planu: brak wartosci kg Planu");
             }
             else sb.Append(" | ceny startu i cienia: brak Planu bez bledu");
+            if (sigOn)
+            {
+                // f5-a7: wariant sygnalu KS; "regula liczy ten sygnal" - licznik "przegladow ponad progiem" linii produkcji = ten nacisk (NF4-2), nie ceny gry
+                sb.Append(" | sygnal KS (f5-a7; regula liczy ten sygnal; cena cienia Planu x gradient krainy x rynek miasta, srednia 4 krokow): ocenionych ").Append(vN.N).Append(", bez sygnalu miasta ").Append(nNoSig);
+                F4VarText(sb, ", ", vN); sb.Append(", na podlodze ").Append(vN.Floor).Append(", <= 0 ").Append(vN.Neg).Append(", biezace najlepsze ").Append(vN.Agree).Append(" (").Append(Pc(vN.Agree, vN.N)).Append("%)")
+                  .Append(", przejscia (top 5): ").Append(F4Top(vN, 5));
+            }
             sb.Append(" | sklad dochodu (suma blokow, ceny gry): biezace L*v ").Append(lvC.ToString("0", Inv)).Append(", koszt K ").Append(kC.ToString("0", Inv)).Append(", renta ").Append(rC.ToString("0", Inv))
               .Append("; najlepsze inne L*v ").Append(lvB.ToString("0", Inv)).Append(", koszt K ").Append(kB.ToString("0", Inv)).Append(", renta ").Append(rB.ToString("0", Inv));
             sb.Append(" | przejscia (ceny gry, top 10, blokow/rak): ").Append(F4Top(vG, 10));

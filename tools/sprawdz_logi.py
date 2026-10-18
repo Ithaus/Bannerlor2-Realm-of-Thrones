@@ -1348,6 +1348,19 @@ Uzycie (Python 3, tylko odczyt):
                     StartCalibration.F4 / F4Pomiary. / MoneyLedger.F4 / VillageCrafts.F4" 0. NF4-5c pokazuje tez wpisy soli i daktyli bez celu z braku mapy koszyka ZC4
                     (pierwsza doba po wczytaniu - to nie "towar bez celu"). Grupy nks
                     (NKS-19c) i nzw (NZW-12) pokazuja to samo krotko (INFO). Log bez paczki (np. Armoury-2026-10-17_23-22-37.log): INFO / brak linii, bez wyjatku.
+                    f5-a7: NF4-2 z kluczem Ks Switch Signal porownuje licznik reguly z wariantem "sygnal KS (f5-a7)" diagnozy (dopisek "regula liczy ten sygnal"),
+                    NF4-12 (INFO) nacisk przy sygnale KS obok cen gry i wzoru Planu.
+--grupa na7       : (noc 17/18.10, fala 5, paczka f5-a7 - koncowy przeglad ekonomii: zajecia wiosek pod KS zamrozone, A7 przy surowych indeksach gry 92% nacisku;
+                    Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal, Ks Switch Signal Rule, Ks Switch Market Band,
+                    Side Village Craft Ks Signal) python -I tools/sprawdz_logi.py --grupa na7 <Armoury-*.log> (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba
+                    kroku A7 od D) i "KS: A7 sezon zamkniety (f5-a7)". NA7-0 linie paczki (nierozpoznanych 0; brak - INFO), NA7-1 linia w kazdej dobie kroku (co 7 dob od D,
+                    przerwy > 7 dob 0), NA7-2 nacisk przy sygnale KS (inne zajecie >= x1.25): mediana krokow od D+28 <= 15% blokow, najgorszy krok <= 25% (fin88 przy
+                    indeksach gry 92%), NA7-3 zmiany zaczete w sezonie <= 6% blokow i <= 5% rak pola swiata (linie kroku i sezonu zamknietego), NA7-4 najwiekszy udzial rak
+                    regionu w sezonie <= 5% (hamulec Jeffa), NA7-5 przebudowa: kiesy wsi = kasy targow + lud miast (roznica 0 w kazdej linii), NA7-6 material zaplacony =
+                    koszt zdjetego towaru (zloto do kas targow) i sztuki = zmiana polek (roznice 0), NA7-7 powroty A->B->A w 364 dobach <= 1% zmian, NA7-8 koszt reguly
+                    <= 5 ms/d (mediana okien) i doba <= 40 ms, NA7-9 potkniecia 0, NA7-10 oceny bez sygnalu miasta <= 5% (od 3. kroku), NA7-11 ostatni krok i przejscia
+                    sezonu (INFO), NA7-12 Held wyzerowane przy pierwszym kroku sygnalu (INFO), NA7-13 "ERROR in StartCalibration.A7s / SideSignal / ExportA7s / ImportA7s,
+                    SyncData.arm_ks_a7" 0. Log bez paczki (np. Armoury-2026-10-17_23-22-37.log): INFO, bez wyjatku.
 --grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
                     python -I tools/sprawdz_logi.py --grupa npo <Armoury-*.log> (strumieniowo). NPO-0 linia startu (klucz TAK, AI WYLACZONE, menu wpiete, opcje BEE 5/15/30
                     tys. ukryte, krok 112 wpiety), NPO-1 linie doby rozpoznane, NPO-2 wplacone = place + material (0), NPO-3 wyplacone = licznik pana + kiesa wsi, naruszenia 0,
@@ -43091,6 +43104,8 @@ def nf4_parse_a7(s):
     d["T"] = press("| przy cenach startu")
     d["S1"] = press("| regula przy cenach cienia Planu")
     d["S2"] = press("| wzor Planu przy cenach cienia")
+    d["N"] = press("| sygnal KS (f5-a7")                     # f5-a7: wariant sygnalu KS (brak w liniach sprzed paczki - None)
+    d["Nrule"] = "regula liczy ten sygnal" in s            # f5-a7: licznik reguly liczy sygnal KS, nie ceny gry (NF4-2)
     m2 = re.search(r"wybor Planu z premia mapy x[\d.]+ (\d+) z (\d+)", s)
     d["agree"] = (int(m2.group(1)), int(m2.group(2))) if m2 else None
     m3 = re.search(r"\| przejscia \(ceny gry, top 10, blokow/rak\): ([^|]*)", s)
@@ -43166,10 +43181,14 @@ def nf4_main(logp):
         rep.add("NF4-1: diagnoza A7", "brak linii" + (f" (nierozpoznanych {a7bad})" if a7bad else ""), "INFO (KS nie zastosowany albo klucz Measure Craft Rule wylaczony)", None if not a7bad else False)
     # NF4-2: nacisk przy cenach gry = licznik reguly (ta sama funkcja, te same bloki)
     # tylko doby z linia produkcji takze dzien wczesniej (licznik reguly z jednej doby - ciche logi w grze pisza linie co N dob i licznik zbiera kilka krokow)
-    pairs = [(d["day"], d["G"][0], prod[d["day"] - 1][0]) for d in a7 if d["step"] and d["G"] and (d["day"] - 1) in prod and (d["day"] - 2) in prod]
+    # f5-a7: z kluczem Ks Switch Signal regula liczy sygnal KS - porownanie z wariantem "sygnal KS (f5-a7)" diagnozy (dopisek "regula liczy ten sygnal")
+    def nf4_rule_var(d):
+        return d["N"] if d.get("Nrule") and d.get("N") else d["G"]
+    pairs = [(d["day"], nf4_rule_var(d)[0], prod[d["day"] - 1][0]) for d in a7 if d["step"] and nf4_rule_var(d) and (d["day"] - 1) in prod and (d["day"] - 2) in prod]
     if pairs:
         bad = [p for p in pairs if p[1] != p[2]]
-        rep.add("NF4-2: nacisk przy cenach gry = licznik reguly A7 (przegladow ponad progiem)", f"dob {len(pairs)}, rozne {len(bad)}" + (f" (np. dzien {bad[0][0]}: {bad[0][1]} wobec {bad[0][2]})" if bad else f" (ostatni {pairs[-1][1]})"),
+        nsig = sum(1 for d in a7 if d["step"] and d.get("Nrule"))
+        rep.add("NF4-2: nacisk przy cenach gry (z kluczem Ks Switch Signal: przy sygnale KS) = licznik reguly A7 (przegladow ponad progiem)", f"dob {len(pairs)} (z sygnalem KS {nsig}), rozne {len(bad)}" + (f" (np. dzien {bad[0][0]}: {bad[0][1]} wobec {bad[0][2]})" if bad else f" (ostatni {pairs[-1][1]})"),
                 "rozne 0 (diagnoza liczy dokladnie to co regula)", len(bad) == 0)
     else:
         rep.add("NF4-2: nacisk przy cenach gry = licznik reguly", "brak par (diagnoza i linia produkcji tej samej doby)", "INFO", None)
@@ -43329,6 +43348,166 @@ def nf4_main(logp):
                 (max(ms) if ms else 0) <= NF4_A7_MS_MAX and st == 0)
     # NF4-11: bledy paczki
     rep.add("NF4-11: ERROR paczki (StartCalibration.F4, F4Pomiary, MoneyLedger.F4, VillageCrafts.F4)", str(errs), "0", errs == 0)
+    # NF4-12 (f5-a7): wariant "sygnal KS" diagnozy - nacisk przy cenach KS obok cen gry i wzoru Planu (progi - --grupa na7)
+    an = [d for d in a7 if d["step"] and d.get("N")]
+    if an:
+        vals = [float(d["N"][1]) for d in an if d["N"][1] not in ("-", "")]
+        last = an[-1]
+        rep.add("NF4-12: nacisk przy sygnale KS (f5-a7) w diagnozie A7", f"krokow {len(an)}, ostatni dzien {last['day']} (D+{last['k']}): sygnal KS {last['N'][0]} blokow ({last['N'][1]}%), ceny gry "
+                f"{last['G'][0] if last['G'] else '-'} ({last['G'][1] if last['G'] else '-'}%), wzor Planu {last['S2'][0] if last['S2'] else '-'} ({last['S2'][1] if last['S2'] else '-'}%); mediana sygnalu KS "
+                f"{st_median(vals):.1f}%, najwiecej {max(vals) if vals else 0:.1f}%", "INFO (progi - --grupa na7: mediana <= 15%)", None)
+    else:
+        rep.add("NF4-12: nacisk przy sygnale KS (f5-a7)", "brak wariantu w diagnozie", "INFO (log sprzed paczki f5-a7 albo klucz Ks Switch Signal wylaczony)", None)
+    rep.show()
+    return 0
+
+
+# ============================================================ na7 (noc 17/18.10, fala 5, paczka f5-a7): regula zmiany zajec pod KS przy sygnale cen KS z hamulcem Jeffa
+NA7_STEP = "KS: A7 regula zajec (f5-a7) dzien"
+NA7_SEASON = "KS: A7 sezon zamkniety (f5-a7) sezon"
+NA7_ERR = ("ERROR in StartCalibration.A7s", "ERROR in StartCalibration.SideSignal", "ERROR in StartCalibration.ExportA7s", "ERROR in StartCalibration.ImportA7s", "ERROR in SyncData.arm_ks_a7")
+NA7_PRESS_MED_MAX = 15.0     # % blokow pod naciskiem (mediana krokow od D+28) - cel "kilka % na sezon", nie 92%
+NA7_PRESS_MAX = 25.0         # % blokow pod naciskiem w najgorszym kroku
+NA7_SEASON_BLOCKS_MAX = 6.0  # % blokow zaczetych w sezonie (najwyzej jedna czesc okregu naraz, 60 dob przejscia)
+NA7_SEASON_HANDS_MAX = 5.0   # % rak pola swiata zaczetych w sezonie (hamulec: 5% rak regionu na sezon)
+NA7_REGION_MAX = 5.0         # % rak regionu w sezonie (hamulec Jeffa)
+NA7_FLIP_MAX = 1.0           # % powrotow A->B->A w 364 dobach wsrod zmian zaczetych
+NA7_MS_AVG_MAX = 5.0         # ms/d reguly (srednia dob z przebiegiem petli)
+NA7_MS_MAX = 40.0            # ms najgorszej doby reguly
+NA7_NOSIG_MAX = 5.0          # % ocen bez sygnalu miasta (po pierwszych 2 krokach)
+
+
+def na7_parse(s):
+    """Linia "KS: A7 regula zajec (f5-a7)" -> slownik liczb (brak pola = None)."""
+    d = {"raw": s}
+    m = re.search(r"dzien (-?\d+) \| D (-?\d+) \(D\+(-?\d+)\)", s)
+    if not m:
+        return None
+    d["day"], d["d0"], d["k"] = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    d["rule"] = "regula: TAK" in s
+    d["n"] = num(r"\| ocenionych (\d+) blokow", s)
+    d["nosig"] = num(r"bez sygnalu miasta (\d+)", s)
+    mp = re.search(r"; nacisk \(>= x[\d.]+\) (\d+) blokow \(([\d.-]+)%\), rak (\d+) \(([\d.-]+)%\)", s)
+    d["press"] = (int(mp.group(1)), mp.group(2), int(mp.group(3)), mp.group(4)) if mp else None
+    d["held"] = num(r"; trzymane >= \d+ dob (\d+) blokow", s)
+    ms = re.search(r"\| sezon (-?\d+) \(doba sezonu (-?\d+)/\d+\): zaczete (\d+) blokow \(([\d.-]+)% blokow (\d+)\), rak (\d+) \(([\d.-]+)% rak pola swiata (\d+)\)", s)
+    d["season"] = (int(ms.group(1)), int(ms.group(3)), ms.group(4), int(ms.group(6)), ms.group(7)) if ms else None
+    d["regmax"] = num(r"najwiekszy udzial regionu ([\d.]+)%", s, float)
+    mo = re.search(r"\| od linii: zaczete (\d+), w toku (\d+), skonczone (\d+), porzucone (\d+), powroty \(A->B->A w 364 dobach\) (\d+)", s)
+    d["since"] = tuple(int(x) for x in mo.groups()) if mo else None
+    mm = re.search(r"\| przebudowa od linii: kiesy wsi -(-?\d+) / kasy targow \+(-?\d+) / lud miast \+(-?\d+) \(roznica (-?\d+)\); material zaplacony (-?\d+) zl \(do kas targow (-?\d+), roznica (-?\d+)\), "
+                   r"sztuk (-?\d+), zmiana polek (-?\d+) \(roznica (-?\d+), bez odczytu polki (\d+)\); droga dawna bez towaru (-?\d+); dob bez materialu albo kiesy (\d+)", s)
+    d["money"] = tuple(int(x) for x in mm.groups()) if mm else None
+    mt = re.search(r"\| czas reguly ([\d.-]+) ms/d \(najwiecej ([\d.]+), dob (\d+)\), potkniecia (\d+)\.$", s)
+    d["ms"] = (float(mt.group(1)) if mt.group(1) != "-" else None, float(mt.group(2)), int(mt.group(3)), int(mt.group(4))) if mt else None
+    mtr = re.search(r"\| przejscia sezonu \(top 8, blokow/rak\): ([^|]*)", s)
+    d["top"] = mtr.group(1).strip() if mtr else "-"
+    d["heldzero"] = num(r"Held wyzerowane \(pierwszy krok sygnalu KS\) (\d+) blokow", s)
+    return d
+
+
+def na7_main(logp):
+    """na7 (noc 17/18.10, fala 5, paczka f5-a7; Armoury/src/StartCalibration.A7s.cs, StartCalibration.Rule.cs, VillageCrafts.cs - klucze Ks Switch Signal,
+    Ks Switch Signal Rule, Ks Switch Market Band, Side Village Craft Ks Signal). Wejscie: log Armoury (strumieniowo). Linie "KS: A7 regula zajec (f5-a7)" (kazda doba kroku A7)
+    i "KS: A7 sezon zamkniety (f5-a7)". Progi NA7-0..NA7-13 - opis w naglowku pliku (--grupa na7). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NA7-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    steps, bad, seasons, errs = [], 0, [], 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NA7_STEP):
+                d = na7_parse(s)
+                if d:
+                    steps.append(d)
+                else:
+                    bad += 1
+            elif s.startswith(NA7_SEASON):
+                seasons.append(s)
+            elif s.startswith(NA7_ERR):
+                errs += 1
+    print(f"plik: {logp} | linii kroku {len(steps)} (nierozpoznanych {bad}), sezonow zamknietych {len(seasons)}, ERROR {errs}")
+    if not steps and not seasons:
+        rep.add("NA7-0: linie paczki f5-a7", "brak w logu" + (f" (nierozpoznanych {bad})" if bad else ""), "INFO (log sprzed paczki f5-a7, KS nie zastosowany albo klucz Ks Switch Signal wylaczony)", None if not bad else False)
+        rep.add("NA7-13: ERROR paczki (StartCalibration.A7s / SideSignal)", str(errs), "0", errs == 0)
+        rep.show()
+        return 0
+    rep.add("NA7-0: linie paczki f5-a7", f"krokow {len(steps)} (nierozpoznanych {bad}), sezonow zamknietych {len(seasons)}; regula {'TAK' if steps and steps[-1]['rule'] else 'WYLACZONA - sam pomiar'}",
+            "nierozpoznanych 0", bad == 0)
+    # NA7-1: linia w kazdej dobie kroku (co 7 dob od D, bez przerw w biegu)
+    days = [d["day"] for d in steps]
+    off = [d["day"] for d in steps if (d["day"] - d["d0"]) % 7 != 0]
+    gaps = [(a, b) for a, b in zip(days, days[1:]) if b - a > 7]
+    rep.add("NA7-1: linia w kazdej dobie kroku A7 (co 7 dob od D)", f"krokow {len(steps)} (dzien {days[0]}..{days[-1]}), poza krokiem {len(off)}, przerwy > 7 dob {len(gaps)}" + (f" ({gaps[:3]})" if gaps else ""),
+            "0 i 0 (przerwa po wczytaniu innego zapisu - sprawdzic recznie)", len(off) == 0 and len(gaps) == 0)
+    # NA7-2: nacisk przy sygnale KS (bloki %) - mediana krokow od D+28 i najgorszy krok
+    pv = [(d["k"], float(d["press"][1]), float(d["press"][3]) if d["press"][3] not in ("-", "") else 0.0) for d in steps if d["press"] and d["press"][1] not in ("-", "")]
+    late = [p for p in pv if p[0] >= 28] or pv
+    if late:
+        med = st_median([p[1] for p in late]); mx = max(p[1] for p in pv); medh = st_median([p[2] for p in late])
+        rep.add("NA7-2: nacisk przy sygnale KS (bloki z innym zajeciem >= x1.25)", f"mediana krokow od D+28 {med:.1f}% blokow ({medh:.1f}% rak), najgorszy krok {mx:.1f}% (krokow {len(pv)}; ostatni {pv[-1][1]:.1f}%)",
+                f"mediana <= {NA7_PRESS_MED_MAX:.0f}%, najgorszy <= {NA7_PRESS_MAX:.0f}% (przy indeksach gry fin88: 92%)", med <= NA7_PRESS_MED_MAX and mx <= NA7_PRESS_MAX)
+    else:
+        rep.add("NA7-2: nacisk przy sygnale KS", "brak ocen", "INFO", None)
+    # NA7-3: zmiany zaczete w sezonie (najwiecej w linii kroku i w liniach sezonu zamknietego)
+    sb, sh, worst = 0.0, 0.0, None
+    for d in steps:
+        if d["season"]:
+            b_, h_ = float(d["season"][2]) if d["season"][2] != "-" else 0.0, float(d["season"][4]) if d["season"][4] != "-" else 0.0
+            if b_ > sb or h_ > sh:
+                worst = (d["season"][0], d["season"][1], d["season"][3])
+            sb, sh = max(sb, b_), max(sh, h_)
+    for s in seasons:
+        b_ = num(r"zaczete \d+ blokow \(([\d.]+)% blokow", s, float) or 0.0
+        h_ = num(r"\(([\d.]+)% rak pola swiata", s, float) or 0.0
+        sb, sh = max(sb, b_), max(sh, h_)
+    started = sum(d["since"][0] for d in steps if d["since"])
+    rep.add("NA7-3: zmiany zaczete w sezonie (najwiecej)", f"{sb:.2f}% blokow, {sh:.2f}% rak pola swiata" + (f" (sezon {worst[0]}: {worst[1]} blokow, {worst[2]} rak)" if worst else "") + f"; zaczete w logu razem {started}",
+            f"<= {NA7_SEASON_BLOCKS_MAX:.0f}% blokow i <= {NA7_SEASON_HANDS_MAX:.0f}% rak na sezon (cel: kilka % na sezon)", sb <= NA7_SEASON_BLOCKS_MAX and sh <= NA7_SEASON_HANDS_MAX + 0.01)
+    # NA7-4: najwiekszy udzial regionu w sezonie (hamulec 5%)
+    rm = [d["regmax"] for d in steps if d["regmax"] is not None] + [num(r"najwiekszy udzial regionu ([\d.]+)%", s, float) or 0.0 for s in seasons]
+    rep.add("NA7-4: najwiekszy udzial rak regionu przeniesiony w sezonie", f"{max(rm) if rm else 0:.2f}%", f"<= {NA7_REGION_MAX:.0f}% (hamulec Jeffa)", (max(rm) if rm else 0) <= NA7_REGION_MAX + 0.01)
+    # NA7-5 / NA7-6: przebudowa - pieniadz i material
+    mon = [d["money"] for d in steps if d["money"]]
+    if mon:
+        vil = sum(x[0] for x in mon); twn = sum(x[1] for x in mon); flk = sum(x[2] for x in mon)
+        dmon = [x[3] for x in mon if x[3] != 0]
+        rep.add("NA7-5: przebudowa - kiesy wsi = kasy targow + lud miast", f"z kies wsi {vil}, do kas targow {twn}, do ludu {flk}; linii z roznica {len(dmon)}" + (f" (np. {dmon[0]})" if dmon else ""), "roznica 0 w kazdej linii (nic z niczego)", len(dmon) == 0)
+        dmat = [x[6] for x in mon if x[6] != 0]; dpcs = [x[9] for x in mon if x[9] != 0 and x[10] == 0]
+        mat = sum(x[4] for x in mon); pcs = sum(x[7] for x in mon); drop = sum(x[8] for x in mon); old = sum(x[11] for x in mon); nomat = sum(x[12] for x in mon)
+        rep.add("NA7-6: przebudowa - material zaplacony = koszt zdjetego towaru, sztuki = zmiana polek", f"material {mat} zl, sztuk {pcs}, zmiana polek {drop}; linii z roznica zlota {len(dmat)}, sztuk {len(dpcs)}; droga dawna bez towaru {old}, doby bez materialu {nomat}",
+                "roznice 0 (towar z polki, nic w nicosc; droga dawna tylko przy wylaczonym Ds Works Real Material)", len(dmat) == 0 and len(dpcs) == 0)
+    else:
+        rep.add("NA7-5: przebudowa - pieniadz", "brak liczb", "INFO", None)
+    # NA7-7: powroty A->B->A
+    flips = sum(d["since"][4] for d in steps if d["since"])
+    rep.add("NA7-7: powroty A->B->A w 364 dobach", f"{flips} przy {started} zmianach zaczetych", f"<= {NA7_FLIP_MAX:.0f}% zmian (chwilowy brak nie przestawia wsi)", (flips <= NA7_FLIP_MAX / 100.0 * started) if started else (flips == 0))
+    # NA7-8: koszt reguly
+    tm = [d["ms"] for d in steps if d["ms"]]
+    if tm:
+        avg = [x[0] for x in tm if x[0] is not None]
+        a_ = st_median(avg) if avg else 0.0; m_ = max(x[1] for x in tm)
+        rep.add("NA7-8: koszt reguly A7 (ms na dobe z przebiegiem petli)", f"mediana srednich okien {a_:.2f} ms/d, najgorsza doba {m_:.2f} ms", f"<= {NA7_MS_AVG_MAX:.0f} ms/d, doba <= {NA7_MS_MAX:.0f} ms", a_ <= NA7_MS_AVG_MAX and m_ <= NA7_MS_MAX)
+    # NA7-9: potkniecia
+    sts = sum(x[3] for x in tm) if tm else 0
+    rep.add("NA7-9: potkniecia paczki (linie kroku)", str(sts), "0", sts == 0)
+    # NA7-10: oceny bez sygnalu miasta (po pierwszych 2 krokach)
+    ns = [(d["nosig"] or 0, d["n"] or 0) for d in steps[2:]]
+    if ns:
+        tn = sum(a for a, _ in ns); tt = sum(a + b for a, b in ns)
+        pc = 100.0 * tn / tt if tt else 0.0
+        rep.add("NA7-10: oceny bez sygnalu miasta (od 3. kroku)", f"{tn} z {tt} ({pc:.2f}%)", f"<= {NA7_NOSIG_MAX:.0f}%", pc <= NA7_NOSIG_MAX)
+    # NA7-11: stan ostatniego kroku (INFO)
+    d = steps[-1]
+    rep.add("NA7-11: ostatni krok", f"dzien {d['day']} (D+{d['k']}): ocenionych {d['n']}, nacisk {d['press'][0] if d['press'] else '-'} ({d['press'][1] if d['press'] else '-'}%), trzymane >= 60 dob {d['held']}; "
+            + (f"od linii zaczete/w toku/skonczone/porzucone {d['since'][0]}/{d['since'][1]}/{d['since'][2]}/{d['since'][3]}; " if d["since"] else "") + f"przejscia sezonu: {d['top'][:300]}", "INFO", None)
+    hz = [x["heldzero"] for x in steps if x["heldzero"]]
+    rep.add("NA7-12: Held wyzerowane przy pierwszym kroku sygnalu KS", f"{hz[0] if hz else 0} blokow" + (f" (krokow z zerowaniem {len(hz)})" if hz else ""), "INFO (60 dob nacisku nowego sygnalu, nie starego)", None)
+    rep.add("NA7-13: ERROR paczki (StartCalibration.A7s / SideSignal)", str(errs), "0", errs == 0)
     rep.show()
     return 0
 
@@ -43582,6 +43761,8 @@ def main(argv):
         return nskory_main(logp)   # nskory (noc 17/18.10, f4-ksiega-i-skory): ksiega z aktualnych receptur KS (mnoznik BK 0), skory z uboju w miescie wedlug tabeli swiata (KsRecipes.cs, KsHides.cs)
     if group == "nkasy" and logp:
         return nkasy_main(logp)   # nkasy (noc 17/18.10, fala 4 f4-kasy-miast-i-kupcy-z): firmy DS miast przegladane co kwartal, pan splaca rachunki zywnosci wczesniej, zawrocony woz bez straty towaru (DsTowns, KsLordFood, KsFoodCarts)
+    if group == "na7" and logp:
+        return na7_main(logp)   # na7 (noc 17/18.10, fala 5, f5-a7): regula zmiany zajec pod KS przy sygnale cen KS - nacisk, zmiany na sezon, region 5%, przebudowa (pieniadz, material, polka), powroty, koszt
     if group == "nf4" and logp:
         return nf4_main(logp)   # nf4 (noc 17/18.10, f4-pomiary): diagnoza A7 i zajecia zamrozone, regale wobec polki, nacisk ZW, wynik handlowy karawan, zelazo i drewno z polek, drewno w wozach (same pomiary)
     if group != "etap2" or not logp:
