@@ -2940,3 +2940,12 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
   UWAGA: A7 w tym biegu WYLACZONE mimo DLL testowej - zmiana domyslnej w Settings.cs bez gen_mcm (domyslne niesie McmSettings.cs!). Do testu z prawdziwymi zmianami: plik armoury-a7-wlacz.flag.
   Pomiar A7: nacisk 11.7% blokow, trzymane >= 60 dob 6.9% (przed: 92%).
 - 07:22 PDT: test 5 dob + bitwa dokladnych DLL (test/wgr80: Armoury 7b9f9ad0 z 7ca98719) przed WGRANIEM 80. Decyzja Jeffa o rentach 180 (wedlug potrzeby?) - zapytana, brak odpowiedzi.
+
+### 86. WGRANIE 80 (18.10 ok. 07:28 PDT = 16:28 CEST) - FALA 5 + ZWROT ZOLDU WEDLUG POTRZEBY - START TUTAJ
+W grze: `w-toku/noc-wgranie-80` = w-toku/noc-ks4 **7ca98719** (GitHub) | Armoury **7b9f9ad0** (bylo 5a3dd15a); CrashScribe 5258adcd, RC/GT/FV i pliki danych bez zmian.
+Kopie *.bak-2026-10-18-wgranie80-przed i D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie80-przed; zapis Jeffa bez zmian (md5 2ad40e43).
+= 79 + fala 5 (zarobek ludu miast do koszyka KS - akumulator W naprawiony; specjalizacja wiosek z neutralnym startem 0.000% i ikonami okregu - WLACZONE; sygnal KS dla zajec (regula A7
+WYL. - sam pomiar, nacisk 11.7%); ruda za rynkiem; koszt KS bez szczytow; bitwa w autotescie z kompletem) + f6 (zwrot zoldu wedlug potrzeby - decyzja Jeffa; niewydany przydzial sprzetu tylko za towar).
+Testy: fin91 (sciezka Jeffa 160 dob) 0 ERROR, zgony 0; 5 dob + bitwa: kod 0, ERROR 0, bitwa WYGRANA (paniki 17).
+OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browary/garbarnie znikaja (NWAR-4b), korona 0.73 / D 0.77, kiesy wsi -0.38%/d; A7 do testu z armoury-a7-wlacz.flag.
+- DECYZJA JEFFA 18.10 ok. 07:28 PDT: "Renty wedlug potrzeby ... to robimy" (ta sama zasada co zwrot: bogaty bez renty, sredni czesc, biedny calosc; reszta zostaje w skarbcu krolestwa).
