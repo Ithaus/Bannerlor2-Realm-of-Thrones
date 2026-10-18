@@ -3125,3 +3125,6 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   zwrot 1.125 mln Koronie, zaloga Polnocy z KL do druzyn Polnocy, druzyny Polnocy spod KL do domu (jednorazowo), sojusze tylko kanoniczne + zerwanie Dorzecze-Stannis, Tyrellowie vs Polnoc
   po smierci Renly'ego (wojna z ROT bez wyzwalacza), falszywy sygnal biedy Korony - poprawka. NIE dzis: osobny mnoznik wojen x2 (wojny Stannisa i Renly'ego z Korona przyszlyby PRZED
   smiercia Renly'ego - Korona na 4 frontach) i regula skarbca stolicy - do decyzji Jeffa rano. Paczki f19-kanon-a (sojusze, Tyrellowie, bieda) i f19-kanon-b (przywrocenie wlosci).
+- 15:30 PDT: f18-mcm GOTOWE (wf_0e0e0567-597) 12e53b8e: gen_mcm daje RequireRestart = false wszystkim polom (Armoury 1975, RC 112, GT 40) poza MapSpeedButtons; dopiski "(takes effect after
+  loading a save)" / startowe; recenzja: SlowMuster (VolunteerRegenPercent) i BkArmourList bez bramki startowej (dzialaja na zywo), BattleStaminaEnabled - opis "read once at game start".
+  Scalone do noc-ks4 **6478f861**. W toku: f19-drogi, f19-ekonomia-audyt, f19-kanon (wf_449079c2-612: kanon-a sojusze/Tyrellowie/bieda, kanon-b przywrocenie 8 twierdz).
