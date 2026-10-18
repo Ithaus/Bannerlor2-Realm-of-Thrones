@@ -39347,7 +39347,7 @@ def nherby_main(logp):
 # DistrictIcon.cs, DistrictWorks*.cs, StartCalibration.Inwest.cs, HamletKinds.cs - etap 0)
 NZW_HEAD = "Zajecia wiosek (ZW): "
 NZW_START = re.compile(r"Zajecia wiosek \(ZW\): start \| wiosek pobocznych (?P<n>\d+) w (?P<d>\d+) okregach \(bez wiersza ziemi KS (?P<norow>\d+), zajecie startowe poprawione na typ okregu (?P<fix>\d+)\)")
-NZW_NEUTRAL = re.compile(r"Zajecia wiosek \(ZW\): start neutralny \(A6\) doba (?P<day>-?\d+) \| okregow (?P<d>\d+) \|.*najwieksza odchylka (?P<dev>[\d.]+)% \(prog 1%\)\.")
+NZW_NEUTRAL = re.compile(r"Zajecia wiosek \(ZW\): start neutralny \(A6\) doba (?P<day>-?\d+) \| okregow (?P<d>\d+) \|.*najwieksza odchylka (?P<dev>[\d.]+)% \(prog 1%\)")
 NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|NIECZYNNE[^|]*) \| okregow z wioskami (?P<d>\d+) \(bez KS (?P<fall>\d+), pod KS (?P<ks>\d+)[^)]*\), wiosek (?P<sides>\d+) "
                      r".*?\| inne niz typ okregu (?P<other>\d+), w przebudowie (?P<trans>\d+), uprawy na sniegu \(inne niz typ okregu\) (?P<snow>\d+) "
                      r"\| zmiany: nacisk (?P<press>\d+), zaczete (?P<started>\d+), skonczone (?P<done>\d+),"

@@ -42,6 +42,7 @@ namespace Armoury
         internal const string P = "Zajecia wiosek (ZW): ";
         private const string SaveVer = "zw1";
         private const int Season = 91, StepDays = 7, CostDays = 28;
+        private const double NMin = 0.5, NMax = 2.0;                     // widelki n(typ) neutralnego startu (straznik)
         private static readonly object Gate = new object();
 
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.SideVillageCrafts; } }
@@ -718,8 +719,15 @@ namespace Armoury
                 catch (Exception e) { Stumble("SwitchOn(okreg)", e); }
             }
             // okregi bez ludzi w domu poza rachunkiem; typ bez rak po (wszystkie wioski typu odeszly) - n 1
-            var n = new double[KsTab.NC];
-            for (int c = 0; c < KsTab.NC; c++) n[c] = before[c] > 0 && after[c] > 0 ? before[c] / after[c] : 1.0;
+            // straznik (Jeff: "nie chce, aby zabilo to ekonomie"): n w 0.5-2.0 - projekt oczekuje 0.76-1.70; typ poza widelkami - nazwany w linii (swiat tego typu nie jest
+            // wtedy dokladnie neutralny)
+            var n = new double[KsTab.NC]; var clamped = new List<string>();
+            for (int c = 0; c < KsTab.NC; c++)
+            {
+                double x = before[c] > 0 && after[c] > 0 ? before[c] / after[c] : 1.0;
+                if (x < NMin || x > NMax) { clamped.Add(KsTab.Crafts[c] + " " + x.ToString("0.00", Inv)); x = Math.Max(NMin, Math.Min(NMax, x)); }
+                n[c] = x;
+            }
             _n = n; _onDay = today;
             var sb = new StringBuilder(1200);
             sb.Append(P).Append("start neutralny (A6) doba ").Append(today).Append(" | okregow ").Append(nd).Append(" | n(typ) = rece swiata przed / po:");
@@ -733,7 +741,8 @@ namespace Armoury
             // kontrola: rece swiata typu po x n = przed (co do zaokraglen) - swiat ma tyle samo kazdego typu w dobie wlaczenia
             double worst = 0;
             for (int c = 0; c < KsTab.NC; c++) if (before[c] > 0 && after[c] > 0) worst = Math.Max(worst, Math.Abs(after[c] * n[c] / before[c] - 1.0));
-            sb.Append(" | kontrola swiat typu po x n / przed: najwieksza odchylka ").Append((100 * worst).ToString("0.000", Inv)).Append("% (prog 1%).");
+            sb.Append(" | kontrola swiat typu po x n / przed: najwieksza odchylka ").Append((100 * worst).ToString("0.000", Inv)).Append("% (prog 1%)")
+              .Append(" | n przyciete do ").Append(NMin.ToString("0.0", Inv)).Append('-').Append(NMax.ToString("0.0", Inv)).Append(": ").Append(clamped.Count > 0 ? string.Join(", ", clamped.ToArray()) : "zadne").Append('.');
             Log.Info(sb.ToString());
         }
 
