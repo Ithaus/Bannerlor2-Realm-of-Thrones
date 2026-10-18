@@ -92,6 +92,17 @@ namespace Armoury
             return pcs;
         }
 
+        /// <summary>f21-zaloga: ludzie z partii lorda do zalogi poza droga gry (BookHoldings - obsada przywroconej twierdzy) - sprzet idzie z ludzmi, ta sama regula
+        /// co LeavePostfix (MoveKits "leave", liczniki "partia -> zaloga"). Wolac PO zmianie rosterow. Zwraca sztuki; 0 przy wylaczonym KitMovesWithMen.</summary>
+        internal static int KitsToGarrison(MobileParty from, MobileParty garrison, Dictionary<CharacterObject, int> moved)
+        {
+            if (from == null || garrison == null || moved == null || moved.Count == 0 || !KitMoves) return 0;
+            int pcs = MoveKits(from, garrison, moved, "leave");
+            foreach (var v in moved.Values) _dLeftMen += v;
+            _dLeftPcs += pcs;
+            return pcs;
+        }
+
         private static int TierOf(ItemObject it) { try { return Math.Max(1, Math.Min(6, (int)it.Tier + 1)); } catch { return 1; } }
 
         private static Dictionary<ItemObject, int> ArmoryOf(MobileParty mp)

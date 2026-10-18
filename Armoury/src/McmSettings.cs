@@ -7956,6 +7956,10 @@ namespace Armoury
         [SettingPropertyGroup("Book holdings (night 18.10)")]
         public bool BookHoldingsRestore { get; set; } = true;
 
+        [SettingPropertyBool("Book Holdings Garrison", HintText = "with Book Holdings Restore: right after each returned keep changes hands, its new lord's realm marches men in to hold it - first from the parties of the new lord's own house, then from the nearest lords' parties of his realm - up to 400 men in a town and 200 in a castle, and never more than the game itself would keep there (its garrison limit, and the garrison the place can feed and the realm and the purses of its houses can bear - at least 125 in a town and 75 in a castle, as the game's own lords leave). No men are made: every soldier leaves a lord's party, and each lord keeps at least half of his men and never fewer than 20; the player's parties and parties in a battle, a siege, at sea or under contract as sellswords give none. If the realm has too few men to spare, the keep gets what there is. Only on the one-time restore - a save already restored is not touched; off = the returned keeps start with an empty garrison as before", RequireRestart = false)]
+        [SettingPropertyGroup("Book holdings (night 18.10)")]
+        public bool BookHoldingsGarrison { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9944,6 +9948,7 @@ namespace Armoury
             s.BanditBirthsWherePeople = BanditBirthsWherePeople;
             s.BanditCostLog = BanditCostLog;
             s.BookHoldingsRestore = BookHoldingsRestore;
+            s.BookHoldingsGarrison = BookHoldingsGarrison;
         }
 
         internal static void Apply()
