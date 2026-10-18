@@ -2922,3 +2922,7 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
 - 05:27 PDT: workflow wf_d01b4c76-eca (scalenie4: 6 galezi fali 5 do noc-ks4 od ac03aa25 + 3 recenzje). Test roczny fin90 (WGRANIE 79) w toku.
 - DECYZJA JEFFA 18.10 ok. 05:40 PDT (po wyjasnieniu na przykladzie): "tak, zwrot wedlug potrzeby" - ODWOLUJE decyzje 15.10 "zwrot zoldu bez zmian". Zwrot zoldu z korony: rod ponad 2 x
   rezerwa wojny - 0; miedzy 1 x a 2 x - liniowo; ponizej rezerwy - pelne 70% (dotyczy tez rodu gracza). Paczka f6-zwrot.
+- 06:10 PDT: SCALENIE4 GOTOWE (wf_d01b4c76-eca): w-toku/noc-ks4 **5a9149a0** = ac03aa25 + 6 galezi fali 5 + poprawka checkera (NW_*/NC_* nadpisane przez f5-ruda) + recenzja calosci (2 wazne
+  poprawione: placa rzemieslnikow od wsi ta sama regula co od innych placacych - nieprzyjeta czesc do kasy miasta, nie z powrotem do wsi; ZW pod KS tym samym przelacznikiem co A7). 1938 ustawien.
+  KsSwitchSignalRule = NIE (recenzja f5-a7: do pomiaru w grze), SideVillageCrafts i DistrictIconFromSum = TAK (f5-zajecia). Odrzucone: SurplusReview z zapasu (model: gorzej).
+  Plan: f6-zwrot (w toku) -> scalic -> test sciezki Jeffa 160 dob z DLL testowa KsSwitchSignalRule=TAK (pomiar A7 w grze) -> decyzja domyslnej -> 5 dob + bitwa -> WGRANIE 80.
