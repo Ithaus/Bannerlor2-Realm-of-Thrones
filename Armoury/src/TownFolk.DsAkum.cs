@@ -31,7 +31,7 @@ namespace Armoury
     ///     Zc4OfferFactor, o ile indeks kategorii nie przekracza ceny granicznej P4 (FolkLadderPriceCeiling - bazowej, bez zasobnosci: jedzenie biednych nie drozeje przez
     ///     bogatych); ponad nia - jak dotad (1 - lambda). Poza KS sciezka bez zmian (lepszy stol nie byl zerowany).
     ///  4. CrownWindfallToReserve (CrownIncome.cs): jednorazowe "inne" wplywy skarbca (ponad 3 x mediana 28 dob krolestwa) ida do zapasu (rozchodza sie 1/450), nie w renty tej doby.
-    /// Opcjonalnie DsHoardDueVillages (DOMYSLNIE NIE - decyzja Jeffa: DS F1 zniosl pobory od oszczednosci wsi): ta sama danina od kiesy wsi ponad FolkHoardNormalTimes x skrzynia,
+    /// DsHoardDueVillages (decyzja nocy 17/18.10: DOMYSLNIE TAK - jedna regula dla skarbcow miast i wsi; dawniej NIE: DS F1 zniosl pobory od oszczednosci wsi): ta sama danina od kiesy wsi ponad FolkHoardNormalTimes x skrzynia,
     /// tylko u wsi, ktore nie znalazly towaru (zlecenie robot w kroku 5) ani materialu (material na mniej niz polowe zlecenia - liczone PO wykonaniu zlecenia, recenzja).
     /// Wies DS placi zlecenia (roboty, septy) tylko z kiesy ponad skrzynie tej doby (DsVillage.ChestToday; regula efbbf0dc - wydatek ponad koszyk tylko ponad skrzynie):
     /// septy z wozow czekaja do bloku doby i nie siegaja do zapasu na czarna godzine (recenzja).
@@ -214,7 +214,7 @@ namespace Armoury
 
         /// <summary>Zlecenie robot: wies (kiesa wsi) albo lud miasta (septy z dziesieciny ludu: wagi klas w0..w2) placi za material z polki `mk` i rzemieslnikow - wykonanie
         /// w DaWorksRun. Zloto zostaje u placacego do wykonania. Wies z robotami gminy (nie septy), ktora nie wydala zlecenia w calosci - danina od skarbca wsi po wykonaniu
-        /// (DsHoardDueVillages, domyslnie nie; DaWorksRun).</summary>
+        /// (DsHoardDueVillages, domyslnie tak od decyzji nocy 17/18.10; DaWorksRun).</summary>
         private static void DaWorksQueue(Village vil, Folk payer, Settlement mk, long amount, bool sept, long w0 = 0, long w1 = 0, long w2 = 0)
         {
             try
@@ -401,7 +401,7 @@ namespace Armoury
             return got;
         }
 
-        // ============================================================ 2b. danina od skarbca wsi (DsHoardDueVillages - domyslnie NIE)
+        // ============================================================ 2b. danina od skarbca wsi (DsHoardDueVillages - domyslnie TAK, decyzja nocy 17/18.10)
         /// <summary>Wies DS, ktora nie znalazla towaru (zlecenie robot w kroku 5) ani materialu na wiecej niz polowe zlecenia (DaWorksRun - PO wykonaniu zlecenia; recenzja):
         /// stawka DsHoardDueRate od kiesy ponad FolkHoardNormalTimes x skrzynia tej doby, z pozyczka z tej kiesy wliczona (N8). Odbiorcy jak podatek od nadwyzki wsi: glowa rodu
         /// pana (RentToday) i kasa osady macierzystej; rabunek, spladrowanie, oblezenie - nic. Nie rzuca.</summary>

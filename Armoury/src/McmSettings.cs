@@ -6770,11 +6770,11 @@ namespace Armoury
 
         [SettingPropertyBool("Daily Life Mobility", HintText = "with Daily Life Estates: people rise and fall between the estates once a week in every town and village, by the Livelihood of their estate and the savings in their purse - a peasant takes up a craft, a labourer joins a guild (paying its fee to the craftsmen), a craftsman turns merchant, a merchant buys land from the lord of the land and joins the gentry; when an estate cannot keep itself for weeks it falls a step down, and gentry who fall sell their land back to the lord at the same price (as much as he can spare). The money goes with the people, nothing is made or lost; owners free a few slaves each year and the newcomers from the villages swell the town's labourers. Land bought or sold back in your own fiefs is told in one message a day. Slow: about 3% of the way up a year, at most 0.2% of a place's people a week (off = the estates stand still, as before)")]
         [SettingPropertyGroup("Daily life - rise, fall and war")]
-        public bool DailyLifeMobility { get; set; } = false;
+        public bool DailyLifeMobility { get; set; } = true;
 
         [SettingPropertyBool("Daily Life Freedom", HintText = "with Daily Life Estates: when a stronghold of a slaving land is won by a realm whose ruler is not of a slaving culture, a tenth of its region's slaves are set free every 28 days - to the labourers in the town and to the peasants in the villages. Places already under such a ruler on the day this is switched on are left as they are (off = the slaves stay slaves under any ruler)")]
         [SettingPropertyGroup("Daily life - rise, fall and war")]
-        public bool DailyLifeFreedom { get; set; } = false;
+        public bool DailyLifeFreedom { get; set; } = true;
 
         [SettingPropertyBool("Daily Life Prosperity Link", HintText = "with Daily Life Estates: the prosperity of towns and castles follows the changes in the Livelihood of their region from the day this is switched on - on that day nothing moves; a region that grows richer pulls its stronghold's prosperity up, one impoverished by war or want pulls it down, by 1% of the gap and at most 2 points a day, shown as 'Livelihood of the region' in the prosperity tooltip; while the Livelihood stays where it was, the game's own prosperity leads. Off until it has passed a long test (off = prosperity as before)")]
         [SettingPropertyGroup("Daily life - rise, fall and war")]
@@ -6782,7 +6782,7 @@ namespace Armoury
 
         [SettingPropertyBool("Daily Life War Scar", HintText = "with Daily Life Estates: war leaves a scar on the people. When a town is sacked a tenth of its merchants fall to a craft and a tenth of its craftsmen to day labour at once (a fifth of each when it is devastated), and for a month after more of them fall; when raiders or a foraging army strike a village's countryside, the people struck lose their living at once, the district counts its people driven from home in its Livelihood with no income until they come back, and some of its craftsmen lose their trade. In peace the ruined win their trades back slowly. Their savings go with them, nothing is made or lost (off = war takes coin, crops and lives as before, but the estates and their Livelihood carry no scar)")]
         [SettingPropertyGroup("Daily life - rise, fall and war")]
-        public bool DailyLifeWarScar { get; set; } = false;
+        public bool DailyLifeWarScar { get; set; } = true;
 
         [SettingPropertyBool("Start Calibration", HintText = "Start calibration (the plan only): once a week the hands and the land of every district - the game village, its side villages and the fields of the townsfolk - are reckoned with one table of what a worker makes on his land, and who does what is chosen the way families choose it: where the work pays best after the cost of the herd, the boat or the grove. The plan itself only writes the log and ks-plan.csv; the game changes only once the calibration is started - by itself after about five weeks of survey with Start Calibration Auto Arm (on), or with Arm This Save and Confirm. On a save where the calibration was already applied, off = from the next day the villages produce as before (the state stays in the save)")]
         [SettingPropertyGroup("Start calibration (KS)")]
@@ -7324,9 +7324,9 @@ namespace Armoury
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public float DsWorksWagePerMaterial { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Ds Hoard Due Villages", HintText = "with Ds Works Real Material: a village that finds neither goods nor material for what it means to spend beyond its chest also pays its lord the Ds Hoard Due Rate a day of what its purse holds above three times its chest (two thirds to the lord, the rest to its town or castle). Off by default - the medieval dues of the villages took every share of village savings away; Jeff decides")]
+        [SettingPropertyBool("Ds Hoard Due Villages", HintText = "with Ds Works Real Material: a village that finds neither goods nor material for what it means to spend beyond its chest also pays its lord the Ds Hoard Due Rate a day of what its purse holds above three times its chest (two thirds to the lord, the rest to its town or castle) - one rule for hoards in towns and villages. Off = village purses are never taxed on their savings, as the medieval dues of the villages first had it")]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
-        public bool DsHoardDueVillages { get; set; } = false;
+        public bool DsHoardDueVillages { get; set; } = true;
 
         [SettingPropertyBool("Folk Better Table", HintText = "with Start Calibration applied: townsfolk with savings above their reserve may buy a better table - meat, cheese, butter, beer, wine, mead, oil, honey - beyond what their basket holds, as long as the price stays at or below the price ceiling of Market Sees Purse (above it the rich do not outbid the poor for food). Until now the basket took all of it and the coin stayed in the purse (off = as before)")]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
