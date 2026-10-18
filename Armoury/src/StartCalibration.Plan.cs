@@ -350,7 +350,7 @@ namespace Armoury
                     KsResult r = null;
                     try { r = KsCore.Solve(inp, () => gen != Volatile.Read(ref _gen)); }
                     catch (Exception e) { r = new KsResult { Error = e.GetType().Name + ": " + e.Message }; }
-                    if (fastNt && r != null && r.Error == null) { try { PlanMarketSums(r, inp); } catch { r.NtMk = null; } }   // ks-koszt T1 (blad - odbior liczy na watku glownym)
+                    if (fastNt && r != null && r.Error == null) { try { PlanMarketSums(r, inp, () => gen != Volatile.Read(ref _gen)); } catch { r.NtMk = null; } }   // ks-koszt T1 (blad - odbior liczy na watku glownym)
                     if (csv && r != null && r.Error == null)
                     {
                         try { int rows; r.CsvPlan = PlanCsvText(csvDay, r, inp, names, out rows); r.CsvPlanRows = rows; } catch (Exception e) { r.CsvPlan = null; r.CsvPlanRows = -1; r.CorrLine = (r.CorrLine ?? "") + " [ks-plan.csv: " + e.GetType().Name + "]"; }

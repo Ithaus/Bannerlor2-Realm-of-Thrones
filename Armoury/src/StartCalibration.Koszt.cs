@@ -70,22 +70,28 @@ namespace Armoury
         // ============================================================ T1: "na targ" odbioru Planu na watku roboczym
         /// <summary>T1 (watek roboczy, po KsCore.Solve): sumy linii "KS: na targ (plan doba N)" - BuildLive + ComputeDistrict(bez czynnikow) kazdego okregu, w tej samej
         /// kolejnosci co PlanLines na watku glownym (te same liczby co do bitu: te same wejscia - wynik Planu, jego wejscie, tabele swiata; PlanCsvText liczy to samo
-        /// na tym watku od rundy 3). Tabele towarow niegotowe (nowa sesja) - nic (odbior liczy jak dotad na watku glownym). Nie rzuca na zewnatrz (wolajacy lapie).</summary>
-        private static void PlanMarketSums(KsResult r, KsInput inp)
+        /// na tym watku od rundy 3). Tabele towarow niegotowe (nowa sesja) - nic (odbior liczy jak dotad na watku glownym). Nie rzuca na zewnatrz (wolajacy lapie).
+        /// Recenzja ks-koszt: tabela kg sztuki zrzucona raz na wejsciu (BuildInput robi EnsureItems na watku glownym przed startem watku) i podana do ComputeDistrict -
+        /// watek roboczy nigdy nie laduje tabel towarow z gry (LiveReset przy wczytaniu kampanii w trakcie Planu zeruje je na watku glownym); Plan anulowany (nowa sesja,
+        /// PlanReset - gen) - koniec bez sum (wynik i tak odrzucony).</summary>
+        private static void PlanMarketSums(KsResult r, KsInput inp, Func<bool> cancelled)
         {
             if (r == null) return;
             r.NtMk = null;
-            if (inp == null || r.Error != null || _itemIx == null || _items == null || _itemKg == null) return;
+            var kg = _itemKg;
+            if (inp == null || r.Error != null || _itemIx == null || _items == null || kg == null) return;
             var mk = new double[ItemCount]; var tf = new double[ItemCount]; var own = new double[ItemCount]; double kcal = 0, need = 0; int nd = 0;
             var live = BuildLive(r, inp, false);
             foreach (var ld in live)
             {
-                var res = ComputeDistrict(ld, false, null);
+                if (cancelled != null && cancelled()) return;
+                var res = ComputeDistrict(ld, false, null, kg);
                 if (res == null) continue;
                 nd++;
                 for (int i = 0; i < ItemCount; i++) { if (ld.TF) tf[i] += res.Market[i]; else { mk[i] += res.Market[i]; own[i] += res.Own[i]; } }
                 kcal += res.OwnKcal; need += res.KcalNeed;
             }
+            if (cancelled != null && cancelled()) return;
             r.NtTf = tf; r.NtOwn = own; r.NtKcal = kcal; r.NtNeed = need; r.NtNd = nd;
             r.NtMk = mk;                                          // ostatnie - znacznik gotowych sum
         }

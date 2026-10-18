@@ -325,11 +325,16 @@ namespace Armoury
         }
 
         /// <summary>Produkcja okregu w kg/d na towar dostawy, zjedzone w okregu, na targ (kg i sztuki gry). factors - zima, E4/5 i E4/7 (w grze; Plan - nie: rece Planu juz z czynnikami rak).</summary>
-        private static DistResult ComputeDistrict(LiveDist ld, bool factors, string unused)
+        private static DistResult ComputeDistrict(LiveDist ld, bool factors, string unused) { return ComputeDistrict(ld, factors, unused, null); }
+
+        /// <summary>ks-koszt (recenzja): kgWorker - tabela kg sztuki zrzucona przez watek roboczy Planu (T1): bez EnsureItems (bez leniwego ladowania tabel towarow
+        /// z gry poza watkiem glownym); null - jak dotad (EnsureItems i _itemKg).</summary>
+        private static DistResult ComputeDistrict(LiveDist ld, bool factors, string unused, double[] kgWorker)
         {
             var d = ld.K;
             if (d == null || ld.B == null) return null;
-            EnsureItems();
+            if (kgWorker == null) EnsureItems();
+            var kgT = kgWorker ?? _itemKg;
             var res = new DistResult();
             var prod = res.Prod;
             KsDeliver.Produce(d, ld.B, prod);
@@ -360,7 +365,7 @@ namespace Armoury
             {
                 double m = Math.Max(0.0, prod[i] - res.Own[i]);
                 res.MarketKg[i] = m;
-                res.Market[i] = m / (sigma * _itemKg[i]);
+                res.Market[i] = m / (sigma * kgT[i]);
             }
             return res;
         }
