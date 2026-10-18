@@ -17,7 +17,8 @@ namespace Armoury
     /// Ten plik NIE zmienia ksiegi wiosek ani widoku (one czytaja plik ukladu jak dotad); robi trzy rzeczy:
     ///  1. SessionStart - linia sprawdzenia ukladu (raz na sesje): crc, wiosek i okregow, porownanie z v5 (arm_map_villages_v5.tsv: liczba wiosek i suma osad na okreg),
     ///     najblizsza sasiadka i skupiska v6 / v5, przysiolki na ladzie (sciana siatki nawigacyjnej gry pod punktem - IsLandGroup jak widok), odleglosc od miast i zamkow;
-    ///  2. OverlayKs - KS (kalibracja startu, StartCalibration.SessionStart po EnsureLand): wiersz S pliku ziemi arm_ks_land.tsv o uid przysiolka dostaje ziemie punktu
+    ///  2. OverlayKs - KS (kalibracja startu; StartCalibration.HamletLandOverlay z SessionStart ponizej - po McmSettings.Apply, PRZED StartCalibration.SessionStart,
+    ///     wiec przed ResolveLive i pierwszym Planem): wiersz S pliku ziemi arm_ks_land.tsv o uid przysiolka dostaje ziemie punktu
     ///     przysiolka z kolumn ks_* ukladu v6 (teren, miejsce, obrazek, odleglosc od morza / rzeki / gor) i zajecie startowe z tej samej tabeli swiata (KsTab.LandRaw;
     ///     generator liczy ja kopia ks_ziemia.py); strefa klimatu, rynek, powierzchnia okregu i udzial osad (KsShares z ksiegi) bez zmian - przysiolek nie dostaje ziemi
     ///     ani ludzi z niczego, tylko jego ludzie pracuja tam, gdzie stoja. Klucz VillageHamletKsLand, tylko uklad v6; inny uklad albo klucz wylaczony - wiersze z pliku
@@ -61,11 +62,17 @@ namespace Armoury
 
         private static string F(double v, string f) { return v.ToString(f, Inv); }
 
-        // ------------------------------------------------------------ 1. linia sprawdzenia ukladu (raz na sesje, po VillageBook.PlacePendingAll)
+        // ------------------------------------------------------------ 1. linia sprawdzenia ukladu (raz na sesje, po VillageBook.PlacePendingAll) i nakladka KS
         internal static void SessionStart()
         {
             if (_started) return;
             _started = true;
+            try { StartCalibration.HamletLandOverlay(); } catch (Exception e) { Stumble("VillageHamlets.SessionStart(KS)", e); }   // nakladka ziemi KS przed StartCalibration.SessionStart
+            SessionLine();
+        }
+
+        private static void SessionLine()
+        {
             var sw = Stopwatch.StartNew();
             try
             {
@@ -241,7 +248,7 @@ namespace Armoury
             mn = nn[0]; p10 = nn[n / 10]; med = n % 2 == 1 ? nn[n / 2] : 0.5 * (nn[n / 2 - 1] + nn[n / 2]);
         }
 
-        // ------------------------------------------------------------ 2. KS: ziemia punktu przysiolka (StartCalibration.SessionStart, po EnsureLand)
+        // ------------------------------------------------------------ 2. KS: ziemia punktu przysiolka (StartCalibration.HamletLandOverlay, po EnsureLand)
         internal static void OverlayKs(Dictionary<string, StartCalibration.LandDist> vil)
         {
             int restored = 0;

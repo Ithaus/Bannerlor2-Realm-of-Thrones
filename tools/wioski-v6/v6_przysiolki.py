@@ -16,15 +16,19 @@
 # REGULA:
 #  1. Gestosc wioski = ile osad (wioski poboczne, wsie gry, zamki, miasta) stoi w promieniu 12 jedn. Kandydaci: wioski klasy R/F (nie wezly H: skrzyzowania,
 #     mosty, porty zostaja) o gestosci >= DENS_MIN. Zachlannie od najgestszej (gestosc liczona od nowa po kazdym przeniesieniu - skupisko sie przerzedza).
-#  2. Miejsce: ten sam okreg (raster okregow KS - okregi.npz label, ta sama ziemia co ha_okregu KS), komorka 1 jedn. przejezdna w rastrze (walk, bez morza,
-#     gor, bagna, rzeki, nachylenie < 0.35 w kwadracie 5x5) i w sondzie gry (nawig = tak w 3x3 komorkach 2 jedn.); od wszystkich osad >= EMPTY (pustka),
-#     od miast >= 14, zamkow >= 10, wsi gry >= 8, kryjowek >= 5, innych wiosek i przysiolkow >= 10. Wybor: komorka najdalej od wszystkiego (pustka sie zapelnia).
-#     Okreg zostaje z co najmniej jedna wioska nie-przysiolkiem i najwyzej MAX_SHARE wiosek okregu idzie na pustkowie. Przeniesien najwyzej TARGET_SHARE.
+#  2. Miejsce: ten sam okreg (raster okregow KS - okregi.npz label, ta sama ziemia co ha_okregu KS; ziemia poza rastrem - droga > 45 jedn. - do najblizszej
+#     wsi gry do 60 jedn., Voronoi), komorka 1 jedn. przejezdna w rastrze (walk; bagno, rzeka, nachylenie >= 0.35 i lad nieprzejezdny poza kwadratem 5x5,
+#     morze i gory - w ROT takze klify brzegu - poza 3x3) i w sondzie gry (nawig = tak w srodku i w 7 z 9 komorek 2 jedn.; brzeg rybakow 5 z 9);
+#     od wszystkich osad >= EMPTY (pustka), od miast >= 14, zamkow >= 10, wsi gry >= 8, kryjowek >= 5, innych wiosek i przysiolkow >= 9, od starego miejsca
+#     >= 10. Wybor: komorka najdalej od wszystkiego (pustka sie zapelnia; ponad 30 jedn. bez roznicy) z premia brzegu (rybacy). Okreg zostaje z co najmniej
+#     jedna wioska nie-przysiolkiem, najwyzej MAX_SHARE wiosek okregu idzie na pustkowie i tylko wtedy, gdy pozostale wioski przyjma zwolnione osady
+#     (sufit 36, L4). Przeniesien najwyzej TARGET_SHARE.
 #  3. Zajecie przysiolka z ziemi miejsca - TA SAMA tabela swiata co KS (KsTab.LandRaw / ks_ziemia.py: strefa x teren x woda): najlepsze z zajec dzikiej ziemi
 #     (owce, bydlo, swinie, drwal - tylko las, traper - las i snieg, mysliwy; rybak tylko nad morzem/jeziorem do 3 jedn., brzeg z premia przy wyborze miejsca). Nazwa zajecia: owce na wzgorzach/piasku = kozy (goatherds),
 #     drwal w glebi puszczy co drugi = weglarze (charcoal burners). Kolumny ks_* = ziemia punktu dla KS (VillageHamlets.OverlayKs) - strefa zostaje z wiersza S.
 #  4. Osady: przysiolek 4..9 osad (6 x czynnik z uid 0.75..1.4); zwolnione osady do pozostalych wiosek okregu wedlug wielkosci (sufit 36, L4: wioski +
-#     najwieksza <= n okregu) - SUMA OSAD WIOSEK OKREGU = v5 (wies gry i ludzie okregu bez zmian; reszta, ktorej nie da sie dac, zostaje w przysiolku).
+#     najwieksza <= n okregu) - SUMA OSAD WIOSEK OKREGU = v5 (wies gry i ludzie okregu bez zmian; reszta, ktorej nie da sie dac, zostaje w przysiolku -
+#     przy sprawdzeniu miejsca w kroku 2 zawsze 0).
 #  5. uid bez zmian (przysiolek to ta sama wioska z ludzmi przeniesiona w nowe miejsce) - zapis v5 przechodzi na v6 po uid (VillageBook.OldLayout).
 #     Nazwa: Westeros - nowa nazwa z zajecia i ziemi (angielska), Essos - stara nazwa; rycerz "of <stara nazwa>" -> "of <nowa>". Lore: livelihood i historia
 #     przysiolka nowe (angielskie), reszta wiersza bez zmian. order / toward_village / neighbors / level - regula generatora v4 (jak v5_uklad.py).
