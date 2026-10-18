@@ -842,6 +842,17 @@ Uzycie (Python 3, tylko odczyt):
                     NIEUDANE i WSTRZYMANE (przepychanka, limit 3 na sesje) 0; DY-4 secesja S9 rodu clan_empire_south_1 z House Targaryen 0; DY-5 zywy wolny wladca ze startu w swoim krolestwie bez
                     tronu (ostatnia doba; tron oddany fabula ROT - Nocna Straz / Polnoc - poza lista) 0; DY-6 zablokowane wybory / abdykacje, pominiete zmiany
                     ustroju, S9 (INFO). Log bez paczki: INFO.
+--grupa nrot      : (noc 17/18.10, paczka rot-wydarzenia, RAPORT-4-LATA rozdz. 2 pkt 6 "Joffrey zyje po Purpurowych Godach"; CrashScribe/src/RotEventFx.cs)
+                    python -I tools/sprawdz_logi.py --grupa nrot <Armoury-*.log> [--crashscribe <session-*.log>] (albo sama sciezka logu CrashScribe; log sesji
+                    dobierany jak w etap4 - ten sam start +-5 s, katalog logu, potem Dokumenty). Skutki wydarzen fabuly ROT: RX-0 linia startu "ROT wydarzenia (RX):
+                    start sesji" (akcje 9/9, kontekst ROT >= 20 metod, koniec wydarzen >= 1, BK 2/2 przy kluczu RotEventHeirKeepsTitles), RX-1 potkniecia 0 i raporty
+                    bledow RotEventFx 0, RX-2 smierci z wydarzen ROT zablokowane (CanHeroDie / inna droga) 0, RX-3 smierci odroczone przez gre (znak smierci - druzyna
+                    w bitwie / oblezeniu): przy kluczu RotEventDeathNow kazda wykonana <= 26 h i czekajacych dluzej niz 2 doby w ostatniej linii RX 0 (bez klucza - INFO),
+                    RX-4 nastepcy z ROT: "glowa rodu" / "tron i tytul suwerena" / "tytuly BK" zablokowane 0 (klucz RotEventHeirKeepsTitles; naprawione - INFO),
+                    RX-5 tron: przekazanie z wydarzenia ROT rodowi spoza krolestwa wykonane ("UWAGA wladca spoza krolestwa") 0 i krolestwa z wladca spoza krolestwa
+                    w ostatniej linii RX 0, RX-6 inne skutki zablokowane (krolestwo rodu, wlasciciel osady, wolnosc, upadek rodu / krolestwa) 0, RX-7 koszt doby
+                    (godziny + doba) <= 5 ms, RX-8 wydarzenia zakonczone bez skutkow (np. ROT RooseDeathEvent - ConditionsHold = false w ROT) i starty FABULA bez
+                    linii "zakonczone" - INFO, RX-9 skutki wedlug wyniku (INFO). Log bez paczki (brak linii startu) - INFO, bez wyjatku.
 --grupa unikaty   : (14.10, decyzja Jeffa "jak jest martwy companion, to jest martwy"; CrashScribe/src/UniqueCompanions.cs) python -I tools/sprawdz_logi.py
                     --grupa unikaty --crashscribe <session-*.log> (albo sama sciezka logu CrashScribe). UN-0 wpiecie latek PODPIETE, UN-2 linie doby
                     "Unikaty ROT (UC)", UN-3 duplikaty 0, UN-4 odrodzenia 0 (klucze StayDead i Move), UN-5 wzory bez bohatera 0 ostatniej doby, UN-6 spadek
@@ -17091,6 +17102,149 @@ def daenerys_main(logp):
     rep.add("DY-6: od wczytania (INFO)", (f"zmiany ustroju BK pominiete (wywolania) {tot.group('g')}, wybory zablokowane {tot.group('v')}, powroty {tot.group('b')}, "
                                           f"S9 pominiete {tot.group('s')}" if tot else "-") + (f" | wybory: " + "; ".join(v[len("Tron fabularny (DY): wybor wladcy zablokowany - "):][:90] for v in votes[:3]) if votes else "")
             + (f" | S9: {len(s9skip)}" if s9skip else ""), "INFO", None)
+    rep.show()
+    return 0
+
+
+RX_EFF = re.compile(r"^ROT wydarzenie: (\S+) skutek (.+?) \| (.*?) \| (wykonany|odroczony|zablokowany|naprawiony|bez skutku)(.*) \| dzien (-?\d+)")
+RX_END = re.compile(r"^ROT wydarzenie: (\S+) zakonczone \| skutkow (\d+) \((.*?)\)(.*) \| dzien (-?\d+)")
+RX_DAY = re.compile(r"^ROT wydarzenia \(RX\): dzien (?P<d>-?\d+) .*?\| od wczytania: skutkow (?P<tot>\d+) \(.*?\), smierci po odroczeniu: przez CrashScribe (?P<us>\d+), "
+                    r"przez gre (?P<game>\d+) \| czekaja na smierc (?P<pend>\d+): \[(?P<pl>.*?)\] \| nastepcy z ROT (?P<heirs>\d+): \[(?P<hl>.*?)\] \| krolestwa z wladca spoza "
+                    r"krolestwa (?P<out>\d+): \[(?P<ol>.*?)\] \| koszt (?P<ms>[\d.]+) ms \| potkniecia (?P<st>\d+)\.")
+
+
+def nrot_main(logp, csp=None):
+    """nrot (noc 17/18.10, paczka rot-wydarzenia; CrashScribe/src/RotEventFx.cs, klucze RotEventFx, RotEventDeathNow, RotEventHeirKeepsTitles,
+    RotEventRulerInKingdom w CrashScribe.settings.xml): skutki wydarzen fabuly ROT. Wejscie: log sesji CrashScribe (--crashscribe albo dobrany do logu
+    Armoury - ten sam start +-5 s; sciezka session-*.log tez dziala). Progi RX-0..RX-9 - opis w naglowku pliku. Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if logp and os.path.basename(logp).startswith("session-") and os.path.isfile(logp):
+        sp, how = logp, "sciezka logu sesji"
+    elif logp:
+        sp, how = crashscribe_session_of(logp, csp)
+    else:
+        sp, how = (csp, "--crashscribe") if csp and os.path.isfile(csp) else (None, "brak logu")
+    if not sp or not os.path.isfile(sp):
+        rep.add("RX-0: log sesji CrashScribe", f"brak ({how})", "podaj --crashscribe <session-*.log> - bez logu sesji INFO", None)
+        rep.show()
+        return 0
+    lines = read(sp)
+    starts = [x for x in lines if x.startswith("ROT wydarzenia (RX): start sesji")]
+    effs, ends, days, bad = [], [], [], 0
+    for x in lines:
+        if x.startswith("ROT wydarzenie: "):
+            m = RX_EFF.match(x)
+            if m:
+                effs.append(m)
+                continue
+            m = RX_END.match(x)
+            if m:
+                ends.append(m)
+                continue
+            bad += 1
+        elif x.startswith("ROT wydarzenia (RX): dzien "):
+            m = RX_DAY.match(x)
+            if m:
+                days.append(m)
+            else:
+                bad += 1
+    fab = [x for x in lines if x.startswith("FABULA: wydarzenie ") and "WYSTARTOWALO" in x]
+    errs = [x for x in lines if "RotEventFx." in x and ("potkniecie" in x or "WHERE" in x)]
+    print(f"plik: {sp} ({how}) | linii startu {len(starts)}, skutkow {len(effs)}, zakonczen {len(ends)}, linii RX {len(days)}, nieczytelnych {bad}, startow FABULA {len(fab)}")
+    fired = [f.split("FABULA: wydarzenie ", 1)[1].split(" WYSTARTOWALO")[0] for f in fab]
+    if not starts:
+        rep.add("RX-0: linia startu (skutki wydarzen ROT)", "brak linii", "INFO (wersja sprzed paczki rot-wydarzenia albo klucz RotEventFx = false)", None)
+        rep.add("RX-8: starty FABULA (INFO)", f"{len(fired)}" + (" | " + "; ".join(fired[:8]) if fired else ""), "INFO", None)
+        rep.show()
+        return 0
+    st = starts[-1]
+    body = st[len("ROT wydarzenia (RX): start sesji | "):]
+    acts = re.search(r"akcje (\d+)/(\d+)", st)
+    ctx = num(r"kontekst ROT (\d+) metod", st, default=0)
+    endh = num(r"koniec wydarzen (\d+)", st, default=0)
+    bk = re.search(r"BK (\d+)/(\d+)", st)
+    heir_key = "RotEventHeirKeepsTitles TAK" in st
+    death_key = "RotEventDeathNow TAK" in st
+    ruler_key = "RotEventRulerInKingdom TAK" in st
+    bk_ok = (not heir_key) or (bk is not None and bk.group(1) == bk.group(2) and int(bk.group(2)) > 0) or "BRAK BannerKings" in st
+    ok0 = acts is not None and acts.group(1) == acts.group(2) == "9" and ctx >= 20 and endh >= 1 and bk_ok
+    rep.add("RX-0: linia startu (skutki wydarzen ROT)", body[:260], "akcje 9/9, kontekst ROT >= 20 metod, koniec wydarzen >= 1, BK 2/2 przy kluczu tytulow", ok0)
+    stum = int(days[-1].group("st")) if days else 0
+    rep.add("RX-1: potkniecia i raporty bledow RotEventFx", f"potkniecia (ostatnia linia RX) {stum}, linie bledow {len(errs)}, nieczytelne linie {bad}"
+            + (" | " + errs[0][:160] if errs else ""), "0, 0 i 0", stum == 0 and not errs and bad == 0)
+
+    def kind(m):
+        return m.group(2).strip()
+
+    def verdict(m):
+        return m.group(4)
+
+    def hours(m):
+        t = m.group(5)
+        h = re.search(r" po (\d+) h", t)
+        if h:
+            return float(h.group(1))
+        dd = re.search(r" po ([\d.]+) dob", t)
+        return float(dd.group(1)) * 24.0 if dd else None
+
+    deaths = [m for m in effs if kind(m) == "smierc"]
+    d_block = [m for m in deaths if verdict(m) == "zablokowany"]
+    rep.add("RX-2: smierci z wydarzen ROT zablokowane", f"{len(d_block)} z {len(deaths)} linii smierci"
+            + (" | " + "; ".join(f"{m.group(1)} {m.group(3)[:50]} {m.group(5)[:80]}" for m in d_block[:3]) if d_block else ""), "0", len(d_block) == 0)
+    deferred = [m for m in deaths if verdict(m) == "odroczony"]
+    done_after = [m for m in deaths if verdict(m) == "wykonany" and " po " in m.group(5)]
+    waits = [w for w in (hours(m) for m in done_after) if w is not None]
+    pend_old = 0
+    if days:
+        for it in [y.strip() for y in days[-1].group("pl").split(";") if y.strip()]:
+            h = re.search(r", (\d+) h, ", it)
+            dd = re.search(r", ([\d.]+) dob, ", it)
+            hh = float(h.group(1)) if h else (float(dd.group(1)) * 24.0 if dd else 0.0)
+            if hh > 48:
+                pend_old += 1
+    by_us = int(days[-1].group("us")) if days else 0
+    by_game = int(days[-1].group("game")) if days else 0
+    val3 = (f"odroczonych {len(deferred)}, wykonanych po odroczeniu {len(done_after)} (CrashScribe {by_us}, gra {by_game}), najdluzej "
+            + (f"{max(waits):.0f} h" if waits else "-") + f", czekajacych > 2 doby (ostatnia linia RX) {pend_old}")
+    if not deferred and not done_after:
+        rep.add("RX-3: smierci odroczone przez gre (znak smierci)", val3, "INFO (zadnej smierci odroczonej w biegu)", None)
+    elif death_key:
+        rep.add("RX-3: smierci odroczone przez gre (znak smierci)", val3, "kazda <= 26 h (RotEventDeathNow) i czekajacych > 2 doby 0",
+                (not waits or max(waits) <= 26) and pend_old == 0)
+    else:
+        rep.add("RX-3: smierci odroczone przez gre (znak smierci)", val3, "INFO (klucz RotEventDeathNow NIE - gra czeka do konca oblezenia)", None)
+    hk = [m for m in effs if kind(m) in ("glowa rodu", "tron i tytul suwerena", "tytuly BK")]
+    hk_block = [m for m in hk if verdict(m) == "zablokowany"]
+    hk_fix = [m for m in hk if verdict(m) == "naprawiony"]
+    sample = hk_block or hk_fix
+    val4 = (f"zablokowane {len(hk_block)}, naprawione {len(hk_fix)}, wykonane {sum(1 for m in hk if verdict(m) == 'wykonany')}"
+            + (" | " + "; ".join(f"{m.group(1)} {m.group(2)}: {m.group(3)[:60]} {m.group(5)[:90]}" for m in sample[:2]) if sample else ""))
+    rep.add("RX-4: nastepcy z ROT (glowa rodu, tytuly BK)", val4, "zablokowane 0 (klucz RotEventHeirKeepsTitles)" if heir_key else "INFO (klucz NIE)",
+            (len(hk_block) == 0) if heir_key else None)
+    thr = [m for m in effs if kind(m) == "tron"]
+    thr_out = [m for m in thr if "UWAGA wladca spoza krolestwa" in m.group(5)]
+    out_last = int(days[-1].group("out")) if days else 0
+    rep.add("RX-5: tron z wydarzenia ROT / wladca spoza krolestwa", f"przekazan {len(thr)}, do rodu spoza krolestwa wykonanych {len(thr_out)}, zablokowanych "
+            f"{sum(1 for m in thr if verdict(m) == 'zablokowany')}, naprawionych {sum(1 for m in thr if verdict(m) == 'naprawiony')} | krolestwa z wladca spoza krolestwa "
+            f"(ostatnia linia RX) {out_last}" + (f" [{days[-1].group('ol')[:120]}]" if days and out_last else ""),
+            "0 i 0" if ruler_key else "INFO (klucz NIE)", (len(thr_out) == 0 and out_last == 0) if ruler_key else None)
+    other = [m for m in effs if kind(m) not in ("smierc", "glowa rodu", "tron i tytul suwerena", "tytuly BK", "tron")]
+    o_block = [m for m in other if verdict(m) == "zablokowany"]
+    rep.add("RX-6: inne skutki zablokowane (krolestwo rodu, osada, wolnosc, upadek)", f"{len(o_block)} z {len(other)}"
+            + (" | " + "; ".join(f"{m.group(1)} {m.group(2)}: {m.group(3)[:60]} {m.group(5)[:80]}" for m in o_block[:3]) if o_block else ""), "0", len(o_block) == 0)
+    costs = [float(m.group("ms")) for m in days]
+    rep.add("RX-7: koszt doby (godziny + doba)", (f"najwiecej {max(costs):.2f} ms, srednio {sum(costs) / len(costs):.2f} ms ({len(costs)} linii RX)" if costs else "brak linii RX"),
+            "<= 5 ms", (max(costs) <= 5.0) if costs else None)
+    empty = [m for m in ends if m.group(2) == "0"]
+    ended = set(m.group(1) for m in ends)
+    no_end = [f for f in fired if f not in ended]
+    rep.add("RX-8: wydarzenia bez skutkow / starty bez konca (INFO)", f"zakonczonych {len(ends)}, bez skutkow {len(empty)}"
+            + (" [" + ", ".join(sorted(set(m.group(1) for m in empty))) + "]" if empty else "") + f" | startow FABULA {len(fired)}, bez linii zakonczone {len(no_end)}"
+            + (" [" + ", ".join(no_end[:8]) + "]" if no_end else ""), "INFO (ROT RooseDeathEvent konczy sie bez skutkow - blad ROT, fabuly nie ruszamy)", None)
+    cnt = {}
+    for m in effs:
+        cnt[verdict(m)] = cnt.get(verdict(m), 0) + 1
+    rep.add("RX-9: skutki wedlug wyniku (INFO)", ", ".join(f"{k} {v}" for k, v in sorted(cnt.items())) or "0", "INFO", None)
     rep.show()
     return 0
 
@@ -35528,6 +35682,8 @@ def main(argv):
         return spojnosc_main(logp)   # AC (Jeff 14.10): spojnosc armii x 84 / rok (Armoury ArmyCohesionYear) - log Armoury
     if group == "daenerys" and (csp or logp):
         return daenerys_main(csp or logp)   # 15.10 (test 6-letni "Denerys napraw"): tron fabularny ROT (CrashScribe StoryThrone) - log sesji CrashScribe
+    if group == "nrot" and (csp or logp):
+        return nrot_main(logp, csp)   # noc 17/18.10 (rot-wydarzenia): skutki wydarzen fabuly ROT (CrashScribe RotEventFx) - log sesji CrashScribe dobrany do logu Armoury
     if group == "b10b" and (csp or logp):
         return b10b_main(csp or logp)   # B10b (decyzja Jeffa 14.10): atuty BK z bitew (CrashScribe BkBattlePerks) - log sesji CrashScribe
     if group == "rozwoj" and logp:
