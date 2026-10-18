@@ -7580,7 +7580,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsMade7Derived { get; set; } = true;
 
-        [SettingPropertyBool("Ks Ctl Own Food", HintText = "with Ks Market Control: the weekly market steering counts the food a village ate from its own store waiting for the cart (when it bought less than the plan paid for) as eaten from that market - it was grown for the market and it fed the market's buyers, it only never reached the stall. Before, the plan's market supply held it but the market's use did not, so the steering cut foods the villages ate at home (Essos fish about 7%). Off = only what was bought at the stalls counts, as before")]
+        [SettingPropertyBool("Ks Ctl Own Food", HintText = "with Ks Market Control: the weekly market steering counts the food a village ate from its own store waiting for the cart (when it bought less than the plan paid for) as eaten from that market - it was grown for the market and it fed the market's buyers, it only never reached the stall; the part of a village's paid basket missing at the stall that it covered with the same food from its own store no longer counts as missing as well. Before, the plan's market supply held it but the market's use did not, so the steering cut foods the villages ate at home (Essos fish about 7%). Off = only what was bought at the stalls counts, as before")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsCtlOwnFood { get; set; } = true;
 

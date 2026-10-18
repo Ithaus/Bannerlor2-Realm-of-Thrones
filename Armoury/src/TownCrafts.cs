@@ -130,13 +130,6 @@ namespace Armoury
             return TannerOn ? 1 : -1;
         }
 
-        /// <summary>f14-rynek K4: napis klucza ceny wywozu w linii dnia - "tak" tylko, gdy cena wywozu naprawde dziala (przy K4 dojrzalym - "tak, zastapione ...").</summary>
-        private static string ExportState(bool key)
-        {
-            if (!key) return "nie";
-            return F7Workshops.CraftLocalOnly ? "tak, zastapione wywozem w cenie targu (f14 Cloth Export In Price)" : "tak";
-        }
-
         /// <summary>Nowa gra / wczytanie (z WorkshopLaw.Reset, czyli z konstruktora ArmouryBehavior - przed SyncData).</summary>
         internal static void Reset()
         {
@@ -512,7 +505,7 @@ namespace Armoury
                 Stocks(sb);
                 // plotno 14.10 (poprawka 2): dopisek wywozu (na koncu - stare wzorce linii bez zmian)
                 int asked = _dExpPriced[0] + _dExpNoDest[0] + _dExpFull[0];
-                sb.Append("; plotno na wywoz (WeaverExportPrice) ").Append(ExportState(ExportOn)).Append(": tkane tylko dzieki cenie wywozu ").Append(_dExp[0]).Append(" szt. w ")
+                sb.Append("; plotno na wywoz (WeaverExportPrice) ").Append(ExportOn ? "tak" : "nie").Append(": tkane tylko dzieki cenie wywozu ").Append(_dExp[0]).Append(" szt. w ")
                   .Append(_dExpTowns[0]).Append(" miastach (cena wywozu netto srednio ").Append(_dExp[0] > 0 ? (_dExpPrice[0] / _dExp[0]).ToString("0", CultureInfo.InvariantCulture) : "-")
                   .Append(" d); miast z lnem: z cena wywozu ").Append(_dExpPriced[0]).Append(" (celow w zasiegu srednio ")
                   .Append(_dExpPriced[0] > 0 ? (_dExpDests[0] / _dExpPriced[0]).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest[0])
@@ -520,12 +513,15 @@ namespace Armoury
                   .Append(asked > 0 ? (_dExpCap[0] / asked).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" szt.)");
                 // Towary 2 / K3: dopisek garbarza na wywoz (po dopisku plotna - wzorce plotna bez zmian)
                 int askedT = _dExpPriced[1] + _dExpNoDest[1] + _dExpFull[1];
-                sb.Append("; skora na wywoz (TannerExportPrice) ").Append(ExportState(TannerOn)).Append(": garbowane tylko dzieki cenie wywozu ").Append(_dExp[1]).Append(" szt. w ")
+                sb.Append("; skora na wywoz (TannerExportPrice) ").Append(TannerOn ? "tak" : "nie").Append(": garbowane tylko dzieki cenie wywozu ").Append(_dExp[1]).Append(" szt. w ")
                   .Append(_dExpTowns[1]).Append(" miastach (cena wywozu netto srednio ").Append(_dExp[1] > 0 ? (_dExpPrice[1] / _dExp[1]).ToString("0", CultureInfo.InvariantCulture) : "-")
                   .Append(" d); miast ze skorami: z cena wywozu ").Append(_dExpPriced[1]).Append(" (celow w zasiegu srednio ")
                   .Append(_dExpPriced[1] > 0 ? (_dExpDests[1] / _dExpPriced[1]).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append("), bez celu w zasiegu ").Append(_dExpNoDest[1])
                   .Append(", polka skory juz przy progu ").Append(_dExpFull[1]).Append(" (prog polki srednio ")
                   .Append(askedT > 0 ? (_dExpCap[1] / askedT).ToString("0.0", CultureInfo.InvariantCulture) : "-").Append(" szt.)");
+                // f14-rynek K4 (recenzja): stan zastapienia ceny wywozu osobnym dopiskiem na koncu - napisy kluczy "(WeaverExportPrice) tak:" i "(TannerExportPrice) tak:"
+                // zostaja jak dotad, wiec grupy plotno (PL-0..5) i Towary 2 (T2-K3-0..4) dalej wiaza po dojrzeniu K4 (straze wyniku: plotno i skora do wojska, miasta bez towaru)
+                sb.Append("; cena wywozu tkacza i garbarza zastapiona wywozem w cenie targu (f14 Cloth Export In Price): ").Append(F7Workshops.CraftLocalOnly ? "tak" : "nie");
                 sb.Append("; potkniecia ").Append(_dStumbles).Append(" (od startu ").Append(_stumblesAll).Append(").");
                 Log.Info(sb.ToString());
             }
