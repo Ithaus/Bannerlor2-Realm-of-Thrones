@@ -1566,7 +1566,8 @@ Uzycie (Python 3, tylko odczyt):
                     NSK-1 linia W5c w kazdej dobie z linia W5, NSK-2 tozsamosci co do zlotowki: skarbce przed - po = ubylo = wyplacono (skarbiec -x = rody +x), suma pasm =
                     wyplacono, wyplacono <= pula <= budzet, segment W5c linii W5 i linii 165 = wyplacono, klucz wylaczony - 0; NSK-3 tylko wojna i tylko ponizej 2R (kontrola
                     linii: w pokoju 0, ponad 2R 0; CSV: rod z doplata_srednim_w5c > 0 ma wojna 1, pasmo f6/f7 nie 2, mnoznik_w5c > 0); NSK-4 pomoc <= brak (kontrola linii:
-                    ponad f x brak 0, gotowka przy zoldzie w pulapie wlasnym 0; CSV: gotowka W5c <= doplata_w5 i <= zold_partii; f x (zold - pulap wlasny tej doby) - INFO);
+                    ponad f x brak 0, gotowka przy zoldzie w pulapie wlasnym 0; CSV: gotowka W5c <= doplata_w5 i <= 1.05 x zold_partii + 50 (zold z ticku); f x (zold - pulap
+                    wlasny tej doby) - INFO);
                     NSK-5 skarbiec nie ponizej zapasu wojny i dlugow po W5c (kontrola linii 0); NSK-6 suma kolumny doplata_srednim_w5c (AI i gracz) = wyplacono; NSK-7
                     srednie 28 dob (wyplacono wedlug pasm, podniesienie, budzet, chec, pula, zmiana skarbcow krolestw w wojnie i ich wojsko z linii "Skarbce:"; INFO),
                     NSK-7b z --baza-doby: zmiana skarbcow w wojnie i wojsko bieg / baza (INFO); NSK-8 ERROR KingdomTreasury.MidAid 0 i potkniecia 0; NSK-D skutek reguly na
@@ -46195,12 +46196,13 @@ def nskarbiec_main(logp, bdp=None, csvp=None):
                     if x <= 0:
                         continue
                     info_n += 1
-                    if x > _nsk_fv(r, "doplata_w5") + 0.5 or x > _nsk_fv(r, "zold_partii") + 0.5:
+                    zp = _nsk_fv(r, "zold_partii")   # zold partii z ostatniego ticku (krok liczy TotalWage w chwili kroku) - tolerancja 5% + 50 zl
+                    if x > _nsk_fv(r, "doplata_w5") + 0.5 or x > 1.05 * zp + 50:
                         obad.append((d, r.get("rod_id")))
                     own = max(0.0, _nsk_fv(r, "pulap") - _nsk_fv(r, "podniesienie_pulapu_w5") - _nsk_fv(r, "podniesienie_pulapu_w7") - _nsk_fv(r, "zold_zalog") - _nsk_fv(r, "zold_karawan"))
                     if x > _nsk_fv(r, "mnoznik_w5c") * max(0.0, _nsk_fv(r, "zold_partii") - own) + 1.0:
                         info_over += 1
-        rep.add("NSK-4: pomoc <= brak - kontrola linii (gotowka ponad f x brak zoldu ludzi, ktorzy sa; gotowka przy zoldzie w pulapie wlasnym) i CSV (gotowka W5c <= doplata_w5 i <= zold_partii)",
+        rep.add("NSK-4: pomoc <= brak - kontrola linii (gotowka ponad f x brak zoldu ludzi, ktorzy sa; gotowka przy zoldzie w pulapie wlasnym) i CSV (gotowka W5c <= doplata_w5 i <= 1.05 x zold_partii + 50)",
                 f"linia: ponad f x brak {ctl_over}, w pulapie wlasnym {ctl_nc}; CSV {'rodo-dob zlych ' + str(len(obad)) if has else 'bez kolumn W5c'}"
                 + (f"; INFO: ponad f x (zold - pulap wlasny z budzetu TEJ doby) {info_over} z {info_n} (krok liczy od budzetu z wczoraj - przyblizenie)" if has and info_n else ""),
                 "0 / 0 / 0", ctl_over == 0 and ctl_nc == 0 and not obad)
