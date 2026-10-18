@@ -3146,3 +3146,7 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   (Red Keep blizniak), Sharp Point/Stonedance/Sweetport/Cape Wrath/Fellwood -> rody Stannisa, Starfall -> Dayne; tylko na mapie, zaloga starego pana do partii jego krolestwa (albo do domu),
   bohaterowie bez druzyny teleport do swoich twierdz, partie Polnocy w promieniu 60 od KL pod Harrenhal, zwrot 1 125 434 Koronie; E1 nie liczy zwrotu jako biedy). Konflikt do scalenia:
   oba ruszaja CrashScribe PovertyPeace. Czekam na f20-decyzje (wf_0b2cd3b7-0f7), potem scalenie7 (scalenie7.js).
+- 17:10 PDT: f20-decyzje GOTOWE (wf_0b2cd3b7-0f7; scratchpad f20-wynik.txt): d1 79b129d5 (CrownWarAidCashByNeed - gotowka W5/W5b/M1 x f; zatrzymane w skarbcu; na sucho fin93 ponad 2R 33.7k +
+  R-2R 69.2k/d -> zatrzymane ~72.8k/d; grupa ndoplata), d2 bd2f2469 (GiftFreeCitiesToDothraki NIE; grupa ndothraki; Dothrakowie tracili ~15k/d), d3 46f8046f (IronBankDividends: zysk
+  zrealizowany ponad rezerwe co 28 dob - polowa do Braavos (lud + kasa kupcow), polowa glowom rodow bravos z lennem; stara regula 168 krok 3 wylaczona; zapis arm_bankdiv; grupa nbank),
+  d4 4eac902f (KsFoodHandsFollowMarket: co 7 dob po D+49, polki+droga < 0.5 T* / > 2 T*, <= 5% rak zajecia, bez zimy; KsFoodHandsGrowGroves TAK; grupa njedz). Do scalenia8 po scaleniu7.
