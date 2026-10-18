@@ -1,0 +1,240 @@
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text;
+using System.Threading;
+
+// uprzaz f5-koszt F1: prawdziwe ciala F4A7Old / F4A7Fast (wyciete z plikow zrodlowych) na zaslepkach typow gry i losowych danych - porownanie linii bez czasu
+namespace Armoury
+{
+    class Town { }
+    class Settlement { public Town Town; public string StringId = "s"; }
+    class Village { public Settlement TradeBound, Bound; }
+    class LandO { public string Zone; }
+    class KsBlock { public string Start; public LandO O; }
+    class KsDistrict { public string Type; }
+    class PlanR { public string Error; public double[] P, Val; }
+    class PlanIn { public double Inert = 1.25; }
+
+    static class KsDeliver { public const int IHides = 32; }
+    static class KsTab
+    {
+        public const int NC = 33, NG = 34, CHunter = 32, GMeat = 2, GHides = 18;
+        public static double[] KCost = new double[NC], HaPerWorker = new double[NC];
+        public static double HuntHa = 1500; public static bool _coldLand = true;
+        public static string[] Crafts = new string[NC];
+        public static Dictionary<string, int> CraftIndex = new Dictionary<string, int>(StringComparer.Ordinal);
+        public static bool ColdZone(string z) { return z == "1-arktyka" || z == "2-wyspy" || z == "2-zimno"; }
+        public static double Ha(int c, string zone) { return c == CHunter && _coldLand && ColdZone(zone) ? HuntHa : HaPerWorker[c]; }
+        public static double Ha(int c, KsBlock k) { return Ha(c, k != null && k.O != null ? k.O.Zone : null); }
+    }
+    static class KsCore
+    {
+        public static double StartIndex(string id, double[] P, int m) { int h = id.GetHashCode() & 0xffff; return 0.7 + 0.8 * ((h % 997) / 997.0) * (P[(h + m) % P.Length] > 0 ? 1 : 0.9); }
+        public static double ShadowIndex(string id, double[] P, int m) { int h = id.GetHashCode() & 0xffff; return 0.3 + 2.0 * ((h % 991) / 991.0) + P[(h * 7 + m) % P.Length] * 0.01; }
+        public static double[] CraftValue(double[] val) { var r = new double[KsTab.NC * KsTab.NG]; for (int c = 0; c < KsTab.NC; c++) for (int g = 0; g < KsTab.NG; g++) if (((c * 31 + g * 17) % 11) == 0) r[c * KsTab.NG + g] = val[g] * (1 + (c % 5) * 0.37); return r; }
+    }
+
+    class KsPart
+    {
+        public byte[] C; public float[] X; public float Rent; public KsBlock K; public double Hands;
+        public double[] LC; public int Seed; public static int NanEvery;
+        public double L(int c, string type)
+        {
+            if (LC == null) { LC = new double[KsTab.NC]; for (int i = 0; i < LC.Length; i++) LC[i] = double.NaN; }
+            double v = LC[c];
+            if (double.IsNaN(v))
+            {
+                uint h = (uint)(Seed * 2654435761u) ^ (uint)(c * 40503u) ^ (uint)(type != null ? type.Length * 977 : 0);
+                h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
+                v = (h % 10000) / 3000.0 - ((h % 37) == 0 ? 0.5 : 0.0);
+                if (NanEvery > 0 && (h % (uint)NanEvery) == 0) v = double.NaN;   // proba NaN (LandEff zepsuty) - ten sam NaN co dotad
+                LC[c] = v;
+            }
+            return v;
+        }
+    }
+    class LiveBlock : KsPart
+    {
+        public sbyte Target = -1; public List<int> Cand; public bool Lock;
+        public int F5Day = int.MinValue, F5Cur, F5Best; public double F5Ic, F5Ib; public double[] F5Px;
+    }
+    class LiveDist { public string Id; public bool TF; public int Market; public LiveBlock[] B; public Village V; public Town T; public Settlement St; public KsDistrict K; public bool Back; }
+
+    static class Log { public static void Info(string s) { } }
+
+    static class H
+    {
+        const string PK = "KS: ";
+        static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        const double SwitchRatio = 1.25;
+        public const int ItemCount = 33;
+        static string[] ItemIds = new string[ItemCount];
+        static int[] GoodToItem = new int[KsTab.NG];
+        const int IMeat = 31;
+        static double[] _mv;
+        static Dictionary<Town, double[]> _px = new Dictionary<Town, double[]>();
+        static Dictionary<string, LiveDist> _live = new Dictionary<string, LiveDist>();
+        static PlanR _plan; static PlanIn _planIn; static int _planDay = 109130;
+        static int _f4A7St;
+        static double _f5DiagMs = -1, _f5WorkMs = -1; static int _f5DiagDay = -1; static bool _f5DiagFast;
+        static HashSet<Settlement> _back = new HashSet<Settlement>();
+        static bool LandBackOf(Settlement st) { return st != null && _back.Contains(st); }
+        static bool KsWorksLock(LiveDist ld, LiveBlock b) { return b.Lock; }
+        static void EnsureValues() { }
+        static void Stumble(string w, Exception e) { Console.WriteLine("STUMBLE " + w + " " + e.Message); }
+
+//@@BODY@@
+
+        static void Setup(int seed, int nDist, bool plan, bool planVal, int nanEvery, bool dup)
+        {
+            var r = new Random(seed);
+            KsPart.NanEvery = nanEvery;
+            for (int i = 0; i < ItemCount; i++) ItemIds[i] = "item" + i;
+            for (int g = 0; g < KsTab.NG; g++) GoodToItem[g] = g < ItemCount && r.Next(9) != 0 ? g : -1;
+            for (int c = 0; c < KsTab.NC; c++) { KsTab.KCost[c] = r.NextDouble() * 0.4; KsTab.HaPerWorker[c] = 0.5 + r.NextDouble() * 30; KsTab.Crafts[c] = "craft" + c; KsTab.CraftIndex[KsTab.Crafts[c]] = c; }
+            _mv = new double[KsTab.NC * KsTab.NG];
+            for (int c = 0; c < KsTab.NC; c++) { int k = 1 + r.Next(3); for (int q = 0; q < k; q++) _mv[c * KsTab.NG + r.Next(KsTab.NG)] += r.NextDouble() * 5; }
+            _px.Clear(); _live.Clear(); _back.Clear();
+            var towns = new List<Town>();
+            for (int t = 0; t < 97; t++)
+            {
+                var tw = new Town(); towns.Add(tw);
+                if (r.Next(40) == 0) continue;     // miasto bez sredniej cen
+                var a = new double[ItemCount]; for (int i = 0; i < ItemCount; i++) a[i] = r.Next(25) == 0 ? 1.0 : 0.11 + r.NextDouble() * 9.4; _px[tw] = a;
+            }
+            var setts = new List<Settlement>(); foreach (var tw in towns) setts.Add(new Settlement { Town = tw });
+            string[] zones = { "1-arktyka", "2-wyspy", "2-zimno", "3-umiarkowany", null };
+            int seedB = 0;
+            for (int d = 0; d < nDist; d++)
+            {
+                var ld = new LiveDist { Id = "d" + d, TF = r.Next(9) == 0, Market = r.Next(3) == 0 ? 1 : 0, K = new KsDistrict { Type = "craft" + r.Next(KsTab.NC) } };
+                ld.St = new Settlement();
+                if (ld.TF) ld.T = towns[r.Next(towns.Count)];
+                else ld.V = new Village { TradeBound = r.Next(10) == 0 ? null : setts[r.Next(setts.Count)], Bound = setts[r.Next(setts.Count)] };
+                if (r.Next(150) == 0) _back.Add(ld.St);
+                int nb = 10 + r.Next(25);
+                ld.B = new LiveBlock[nb];
+                for (int i = 0; i < nb; i++)
+                {
+                    if (r.Next(200) == 0) continue;       // null
+                    var b = new LiveBlock { Seed = ++seedB, Rent = (float)(r.NextDouble() * 0.05), Hands = r.NextDouble() * 3000, K = new KsBlock { Start = r.Next(25) == 0 ? null : (r.Next(25) == 0 ? "inne" : new string(("craft" + r.Next(KsTab.NC)).ToCharArray())), O = r.Next(30) == 0 ? null : new LandO { Zone = zones[r.Next(zones.Length)] } } };
+                    int nc0 = 1 + r.Next(3);
+                    b.C = new byte[nc0]; b.X = new float[r.Next(150) == 0 ? 0 : nc0];
+                    for (int q = 0; q < nc0; q++) { b.C[q] = (byte)r.Next(KsTab.NC); if (q < b.X.Length) b.X[q] = (float)r.NextDouble(); }
+                    if (r.Next(60) == 0) b.Target = (sbyte)r.Next(KsTab.NC);
+                    b.Lock = r.Next(80) == 0;
+                    int ncand = r.Next(20) == 0 ? 1 : 2 + r.Next(12);
+                    b.Cand = new List<int>();
+                    for (int q = 0; q < ncand; q++) b.Cand.Add(r.Next(KsTab.NC));
+                    if (dup && ncand > 2) b.Cand.Add(b.Cand[1]);
+                    if (r.Next(3) == 0 && b.C.Length > 0 && !b.Cand.Contains(b.C[0])) b.Cand.Insert(r.Next(b.Cand.Count), b.C[0]);
+                    ld.B[i] = b;
+                }
+                _live["d" + d] = ld;
+            }
+            _plan = plan ? new PlanR { P = new double[2 * KsTab.NG], Val = planVal ? new double[KsTab.NG] : null } : null;
+            if (plan) { for (int i = 0; i < _plan.P.Length; i++) _plan.P[i] = r.NextDouble() * 3 - 0.2; if (planVal) for (int g = 0; g < KsTab.NG; g++) _plan.Val[g] = r.NextDouble() * 9; }
+            _planIn = r.Next(2) == 0 ? new PlanIn { Inert = 1.1 + r.NextDouble() } : null;
+        }
+
+        static void ClearMemo() { foreach (var ld in _live.Values) if (ld.B != null) foreach (var b in ld.B) if (b != null) b.LC = null; }
+
+        static int Main(string[] args)
+        {
+            int bad = 0, ok = 0;
+            // kwantyle: wybor wobec sortowania (NaN, -0/+0, powtorzenia, nieskonczonosci)
+            var rq = new Random(7);
+            for (int it = 0; it < 4000; it++)
+            {
+                int n = 1 + rq.Next(it < 3000 ? 60 : 20000);
+                var a = new double[n];
+                for (int i = 0; i < n; i++)
+                {
+                    int t = rq.Next(20);
+                    a[i] = t == 0 ? double.NaN : t == 1 ? 0.0 : t == 2 ? -0.0 : t == 3 ? double.PositiveInfinity : t == 4 ? double.NegativeInfinity : t < 9 ? Math.Round(rq.NextDouble() * 4, 1) : rq.NextDouble() * 100 - 50;
+                }
+                var s = (double[])a.Clone(); var l = new List<double>(s); l.Sort();
+                var w = (double[])a.Clone();
+                foreach (double q in new[] { 0.1, 0.5, 0.9, 0.0, 1.0 })
+                {
+                    int k = (int)(q * (n - 1));
+                    double x = F5Kth(w, n, k), y = l[k];
+                    bool same = BitConverter.DoubleToInt64Bits(x) == BitConverter.DoubleToInt64Bits(y) || (double.IsNaN(x) && double.IsNaN(y)) || (x == 0 && y == 0);
+                    if (!same) { bad++; if (bad < 5) Console.WriteLine($"kwantyl ROZNY n={n} k={k} wybor={x} sort={y}"); } else ok++;
+                }
+            }
+            for (int it = 0; it < 3000; it++)
+            {
+                int n = 1 + rq.Next(it < 2000 ? 50 : 20000);
+                var a = new double[n];
+                for (int i = 0; i < n; i++) { int t = rq.Next(20); a[i] = t == 0 ? double.NaN : t == 1 ? 0.0 : t < 9 ? Math.Round(rq.NextDouble() * 4, 1) : rq.NextDouble() * 100 - 50; }
+                var l = new List<double>(a); var l2 = new List<double>(a);
+                string want = Q3(l) + "|" + Qx(l2, 0.5) + "|" + Qx(l2, 0.9);
+                var w = (double[])a.Clone(); var q3 = F5Quant(w, n, 0.1, 0.5, 0.9); var w2 = (double[])a.Clone(); var q2 = F5Quant(w2, n, 0.5, 0.9);
+                string got = q3[0] + "/" + q3[1] + "/" + q3[2] + "|" + q2[0] + "|" + q2[1];
+                if (want == got) ok++; else { bad++; if (bad < 5) Console.WriteLine("F5Quant ROZNY n=" + n + ": " + want + " / " + got); }
+            }
+            Console.WriteLine($"kwantyle: zgodne {ok}, rozne {bad}");
+            int lb = 0, lo = 0;
+            var cases = new (int seed, int nd, bool plan, bool val, int nan, bool dup)[] {
+                (1, 880, true, true, 0, false), (2, 880, true, true, 0, true), (3, 880, true, false, 0, false), (4, 880, false, false, 0, false),
+                (5, 880, true, true, 997, true), (6, 300, true, true, 61, false), (7, 880, true, true, 0, true), (8, 50, true, true, 13, true) };
+            foreach (var cs in cases)
+            {
+                Setup(cs.seed, cs.nd, cs.plan, cs.val, cs.nan, cs.dup);
+                string a = F4A7Old(109132, 109125, false, true);
+                string a2 = F4A7Old(109132, 109125, false, true);     // z pamiecia L bloku (jak w grze po pierwszej dobie)
+                ClearMemo();
+                string b = F4A7Fast(109132, 109125, false, true, true);  // pamiec L od zera (kolejnosc wywolan L inna niz w starym)
+                string b2 = F4A7Fast(109132, 109125, true, false, false);
+                string a3 = F4A7Old(109132, 109125, true, false);
+                bool same = F5NoTime(a) == F5NoTime(b) && F5NoTime(a2) == F5NoTime(b) && F5NoTime(a3) == F5NoTime(b2);
+                if (same) lo++; else { lb++; int i = 0; string x = F5NoTime(a), y = F5NoTime(b); while (i < x.Length && i < y.Length && x[i] == y[i]) i++; Console.WriteLine($"przypadek {cs.seed}: ROZNE na znaku {i}: stary ...{x.Substring(Math.Max(0, i - 40), Math.Min(120, x.Length - Math.Max(0, i - 40)))}\n   szybki ...{y.Substring(Math.Max(0, i - 40), Math.Min(120, y.Length - Math.Max(0, i - 40)))}"); }
+                // F2: pamiec G w bloku wobec IncomeV
+                int g1 = 0, g2 = 0;
+                foreach (var ld in _live.Values)
+                {
+                    if (ld == null || ld.B == null || LandBackOf(ld.St)) continue;
+                    Town mt = ld.TF ? ld.T : (ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V.Bound != null ? ld.V.Bound.Town : null));
+                    double[] px; if (mt == null || !_px.TryGetValue(mt, out px)) continue;
+                    var vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN;
+                    foreach (var bb in ld.B)
+                    {
+                        if (bb == null || bb.K == null || bb.C == null || bb.Target >= 0 || bb.Lock || bb.Cand == null || bb.Cand.Count < 2 || bb.X == null || bb.X.Length == 0) continue;
+                        int ci = 0; for (int i = 1; i < bb.X.Length; i++) if (bb.X[i] > bb.X[ci]) ci = i;
+                        int cur = bb.C[ci];
+                        double incCur = IncomeV(bb, ld.K.Type, cur, px, vRow), incBest = double.NegativeInfinity; int best = -1;
+                        foreach (int c in bb.Cand) { if (c == cur) continue; double v = IncomeV(bb, ld.K.Type, c, px, vRow); if (v > incBest) { incBest = v; best = c; } }
+                        bool eq = bb.F5Day == 109132 && bb.F5Cur == cur && ReferenceEquals(bb.F5Px, px)
+                                  && BitConverter.DoubleToInt64Bits(bb.F5Ic) == BitConverter.DoubleToInt64Bits(incCur) && BitConverter.DoubleToInt64Bits(bb.F5Ib) == BitConverter.DoubleToInt64Bits(incBest) && bb.F5Best == best;
+                        if (eq) g1++; else g2++;
+                    }
+                }
+                Console.WriteLine($"przypadek {cs.seed}: linia {(same ? "TAK" : "NIE")} (znakow {F5NoTime(a).Length}), pamiec G zgodna {g1}, rozna {g2}");
+                if (g2 > 0) lb++;
+            }
+            // czas: 880 okregow ok. 15 tys. blokow (pamiec L juz wypelniona - jak w grze)
+            Setup(1, 880, true, true, 0, false);
+            F4A7Old(1, 0, false, true); F4A7Fast(1, 0, false, true, true);
+            var sw = new Stopwatch(); double tOld = 0, tNew = 0;
+            for (int rep = 0; rep < 20; rep++)
+            {
+                sw.Restart(); F4A7Old(1, 0, false, true); tOld += sw.Elapsed.TotalMilliseconds;
+                sw.Restart(); F4A7Fast(1, 0, false, true, true); tNew += sw.Elapsed.TotalMilliseconds;
+            }
+            Console.WriteLine($"czas (z linia): stary {tOld / 20:0.00} ms, szybki {tNew / 20:0.00} ms");
+            double tPrep = double.MaxValue, tFin = double.MaxValue, tO = double.MaxValue;
+            for (int rep = 0; rep < 30; rep++)
+            {
+                sw.Restart(); var jb = F5Prep(1, 0, false, true, true); tPrep = Math.Min(tPrep, sw.Elapsed.TotalMilliseconds);
+                sw.Restart(); F5Finish(jb); tFin = Math.Min(tFin, sw.Elapsed.TotalMilliseconds);
+                sw.Restart(); F4A7Old(1, 0, false, true); tO = Math.Min(tO, sw.Elapsed.TotalMilliseconds);
+            }
+            Console.WriteLine($"minimum z 30: stary {tO:0.00} ms | szybki watek glowny (F5Prep) {tPrep:0.00} ms, watek z puli (F5Finish) {tFin:0.00} ms");
+            Console.WriteLine($"linie: zgodne {lo}, rozne {lb}");
+            return bad + lb;
+        }
+    }
+}

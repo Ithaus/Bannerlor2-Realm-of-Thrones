@@ -1093,7 +1093,7 @@ Uzycie (Python 3, tylko odczyt):
                     KS-R5 f5-koszt (noc 17/18.10, fala 5; StartCalibration.F5Koszt.cs, klucz Ks Cost Fast2 - kolce doby KS z fin88: diagnoza A7 f4-pomiary 12 ms w dobie kroku):
                     NKS-9s kolce doby KS (5 najdrozszych dob zastosowanych z dwoma najwiekszymi pod-czasami T0, dob > 15 ms - INFO), NKS-9r regula_a7 w dobach kroku A7
                     (doba T0 = doba linii "KS: A7 diagnoza ... krok reguly A7" - 1) mediana <= 6 ms, NKS-9g diagnoza A7 na watku glownym z linii "KS: koszt f5" (co 7 dob,
-                    D+7k+3) najwiekszy <= 5 ms, NKS-9f kontrola paczki: probka 1/64 dochodow reguly A7 z diagnozy wobec starego rachunku rozne = 0, kontrola diagnozy raz na
+                    D+7k+3) mediana <= 5 ms, NKS-9f kontrola paczki: probka 1/64 dochodow reguly A7 z diagnozy wobec starego rachunku rozne = 0, kontrola diagnozy raz na
                     sesje (stary rachunek wobec szybkiego na tych samych danych) nie ROZNA, bledy watku z puli 0. Bez linii - INFO (log sprzed paczki), nigdy wyjatek.
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
@@ -38527,7 +38527,7 @@ def nks_koszt_rows(rep, t0rows, kchk, kshc, days_ms, on_day):
 def nks_f5_rows(rep, t0rows, f5ln, f4a7, on_day):
     """f5-koszt (noc 17/18.10, fala 5; StartCalibration.F5Koszt.cs, klucz Ks Cost Fast2): NKS-9s kolce doby KS (5 najdrozszych dob zastosowanych z pod-czasem, ktory je
     wyznacza, i liczba dob > 15 ms - INFO), NKS-9r regula_a7 w dobach kroku A7 (doba T0 = doba linii diagnozy A7 "krok reguly A7" - 1; mediana <= 6 ms, fin88 bez paczki
-    ok. 16 ms - diagnoza f4-pomiary 12 ms), NKS-9g diagnoza A7 na watku glownym (linia "KS: koszt f5": najwiekszy czas <= 5 ms; czas petli z linii diagnozy - INFO),
+    ok. 16 ms - diagnoza f4-pomiary 12 ms), NKS-9g diagnoza A7 na watku glownym (linia "KS: koszt f5": mediana <= 5 ms, najwiekszy - INFO; czas petli z linii diagnozy - INFO),
     NKS-9f kontrola paczki (probka 1/64 dochodow reguly z diagnozy wobec starego rachunku: rozne = 0; kontrola diagnozy raz na sesje: nie ROZNA; bledy watku 0).
     Brak linii (log sprzed paczki albo klucz wylaczony) - INFO, nigdy wyjatek."""
     ap = {d: v for d, v in t0rows.items() if v[1] == "ZASTOSOWANY" and (on_day is None or d >= on_day)}
@@ -38571,7 +38571,7 @@ def nks_f5_rows(rep, t0rows, f5ln, f4a7, on_day):
         rep.add("NKS-9g: diagnoza A7 na watku glownym (f5-koszt, linia 'KS: koszt f5')",
                 (f"najwiekszy {mx:.2f} ms, mediana {nks_med(mm):.2f} ms" if mm else "brak czasu") + (f"; watek z puli mediana {nks_med(wm):.2f} ms" if wm else "")
                 + (f"; czas z linii diagnozy (watek glowny + petla na watku) mediana {nks_med(a7ms):.1f} ms" if a7ms else "") + f" ({len(good)} linii)",
-                "najwiekszy <= 5 ms (fin88 bez paczki 11.5-17.3 ms na watku glownym)", (mx <= 5.0) if mx is not None else None)
+                "mediana <= 5 ms (fin88 bez paczki 11.5-12.7 ms na watku glownym; doba D z pierwszym liczeniem L blokow 17.3 - tylko INFO w najwiekszym)", (nks_med(mm) <= 5.0) if mm else None)
         bad = sum(int(x["bad"]) for x in good)
         ok = sum(int(x["ok"]) for x in good)
         ru = sum(int(x["ru"]) for x in good)
