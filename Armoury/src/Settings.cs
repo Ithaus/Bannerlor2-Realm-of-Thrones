@@ -2999,7 +2999,7 @@ namespace Armoury
         public float KsWageHandsStepPercent = 3f;          // with Ks Wage By Hands: how much the town's wage level moves in a week (percent), up where hands are short and back down where they are plentiful
         public float KsWageHandsMax = 1.3f;                // with Ks Wage By Hands: the highest wage level a shortage of hands can bring (times the usual wage of the town)
 
-        // --- Start calibration: labourers' wages follow their basket (f4-place-ludu) ---
+        // --- Start calibration: labourers' wages follow their basket (18.10) ---
         // Paczka f4-place-ludu (noc 17/18.10; przeglad koncowy ekonomii: "Wyrobnicy W w miastach to glowny akumulator" - fin86 kiesa W 14.1 mln = 103 dni zapasu, W zarabia ok.
         // 1.75 x tyle, ile wydaje, w miejscu trzyma ich tylko danina 3%/d; Jeff 17.10 noc "Poprawka 2 - tak"). Tylko miasta z zastosowana kalibracja startu (KS). Nowe klucze -
         // nie ma ich w Armoury.json Jeffa; wylaczone = kod co do monety jak dotad. KsWageHands.cs, KsFolkWage.cs, TownFolk.Live.cs (krok 2 i 5 doby ludu), TownFolk.F4.cs,
