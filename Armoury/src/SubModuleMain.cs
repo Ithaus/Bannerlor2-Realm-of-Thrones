@@ -314,6 +314,7 @@ namespace Armoury
                 BkrotChains.SetHarmony(_harmony);    // P4 audytu (AM-13, AM-09, AM-19): tylko zapamietanie - lancuchy modeli pod BKROT wpina EnsureHooks w kampanii (BKROTPatch laduje sie po Armoury)
                 EstateIncome187.SetHarmony(_harmony); // 3.1/3.3 (31b) E3/2: tylko zapamietanie - latki majatkow BK w kampanii
                 Seal31B.SetHarmony(_harmony);        // 3.1/3.3 (31b) E3/4, E3/8, E3/9: tylko zapamietanie - latki gry i BK w kampanii
+                PerfD2.SetHarmony(_harmony);         // perf-d2d3: tylko zapamietanie - prefiks podatku miast BK (PerfTownTaxSkipBk) w kampanii, po straznika
                 MercTenure.SetHarmony(_harmony);    // M6a-1: tylko zapamietanie - latki najmu gry i BK w kampanii
                 PeaceHold.SetHarmony(_harmony);     // M6a-3: tylko zapamietanie - latka pokoju gry w kampanii
                 MercContract.SetHarmony(_harmony);  // 185: tylko zapamietanie - latki modelu finansow w kampanii   // 169c: tylko zapamietanie - okna pomiaru wpina EnsureHooks w kampanii

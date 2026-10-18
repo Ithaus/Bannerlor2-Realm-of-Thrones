@@ -1962,6 +1962,7 @@ namespace Armoury
             try { CouncilWages35.EnsureHooks(); } catch (Exception e) { Log.Error("CouncilWages35.EnsureHooks", e); }   // 3.5: rada BK - platnik i urzad radnego (latki BK w kampanii), liczniki od zera
             try { EstateIncome187.EnsureHooks(); } catch (Exception e) { Log.Error("EstateIncome187.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/2: majatki BK bez dochodu z produkcji (latki w kampanii), srednie i liczniki od zera
             try { Seal31B.EnsureHooks(); } catch (Exception e) { Log.Error("Seal31B.EnsureHooks", e); }   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
+            try { PerfD2.EnsureHooks(); } catch (Exception e) { Log.Error("PerfD2.EnsureHooks", e); }   // perf-d2d3: straznik i prefiks podatku miast BK (PerfTownTaxSkipBk) - PO PopulationLaw (SubModule), CouncilWages35 i Seal31B; linia startowa "Szybkosc doby (perf-d2d3)"   // 3.1/3.3 (31b) E3/4, E3/8, E3/9: latki w kampanii, liczniki od zera
             try { FiefGrants.EnsureHooks(); } catch (Exception e) { Log.Error("FiefGrants.EnsureHooks", e); }   // PROJEKT-LENNA (14.10): regula N nadan zdobytych twierdz - latki na model BK / BKROT i decyzje gry w kampanii (raz na proces), linia "Nadania lenn (N)"
             try { BkrotChains.EnsureHooks(); } catch (Exception e) { Log.Error("BkrotChains.EnsureHooks", e); }   // P4 audytu (AM-13, AM-09, AM-19): lancuchy modeli pod BKROT (predkosc, mapa, morale w bitwie, zold) - latki raz na proces, linia "Lancuchy modeli BKROT (P4): start"
             try { ShipsToPort181.Reset(); } catch (Exception e) { Log.Error("ShipsToPort181.Reset", e); }   // 3.1/3.3 (33) 181: statki do portu - stan dzienny i konteksty od zera w kazdej kampanii (latki wpiete przy starcie gry)
@@ -2225,6 +2226,7 @@ namespace Armoury
         private void OnDailyTickBodyInner()
         {
             try { Cost174.Daily(); } catch (Exception e) { Log.Error("Cost174.Daily", e); } DayProfile.Lap("Cost174.Daily");   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
+            try { PerfD2.Daily(); } catch (Exception e) { Log.Error("PerfD2.Daily", e); } DayProfile.Lap("PerfD2.Daily");   // perf-d2d3: linia "Szybkosc doby (perf-d2d3)" za okres od poprzedniego taktu (tylko log) i straznik podatku miast raz na dobe   // 174b.5 F6: linia "Koszt 171-174 (doba)" za dobe od poprzedniego taktu (tylko log)
             try { CampFever.OnDaily(); } catch (Exception e) { Log.Error("CampFever", e); } DayProfile.Lap("CampFever.OnDaily");
             try { RecruitKit.Reconcile("doba"); } catch (Exception e) { Log.Error("RecruitKit.Reconcile", e); } DayProfile.Lap("RecruitKit.Reconcile");   // 161: komplety bez ochotnika w puli (sieroty)
             // audyt predkosci STAD, nie z postfixa - w postfixie SpeedExplained

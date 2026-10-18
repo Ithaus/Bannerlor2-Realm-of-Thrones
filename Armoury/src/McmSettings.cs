@@ -6176,6 +6176,22 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
+        [SettingPropertyBool("Perf Valyrian Census", HintText = "the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool PerfValyrianCensus { get; set; } = true;
+
+        [SettingPropertyBool("Perf Town Tax Skip Bk", HintText = "with town rents replacing the town tax (Population Rent Enabled and Rent Replaces Town Tax), the Banner Kings tax sum of a town is no longer worked out only to be replaced by the rent - the same tax, the same council wages, less work each time a clan's income is counted; it stands aside on its own (and says why in the log) when another mod changes that tax; off = Banner Kings works it out first, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool PerfTownTaxSkipBk { get; set; } = true;
+
+        [SettingPropertyBool("Perf Sutler Wage Once", HintText = "the sutlers in the field read a band's daily wage once instead of two or three times - the same coin, less work; off = the wage is worked out at each step, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool PerfSutlerWageOnce { get; set; } = true;
+
+        [SettingPropertyBool("Perf Town Tax Fast Hooks", HintText = "the town tax with rents (the lines somebody really pays, the council wages) asks Banner Kings directly instead of through slow reflection - the same numbers, less work each time a town's tax is counted; off = through reflection, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool PerfTownTaxFastHooks { get; set; } = true;
+
         [SettingPropertyBool("State Hygiene Enabled", HintText = "starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before")]
         [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
         public bool StateHygieneEnabled { get; set; } = true;
@@ -8883,6 +8899,10 @@ namespace Armoury
             s.VillageLayoutV6 = VillageLayoutV6;
             s.VillageHamletKsLand = VillageHamletKsLand;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
+            s.PerfValyrianCensus = PerfValyrianCensus;
+            s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
+            s.PerfSutlerWageOnce = PerfSutlerWageOnce;
+            s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
             s.StateHygieneEnabled = StateHygieneEnabled;
             s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;

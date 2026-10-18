@@ -349,6 +349,7 @@ namespace Armoury
                         catch { haveEn = false; }
                         long dt = Stopwatch.GetTimestamp() - ts;
                         tModel += dt; own++;
+                        PerfD2.NoteModel(c, dt);   // perf-d2d3: ten sam czas wedlug rodzaju rodu (krol / z lennami / bez lenn) - tylko liczniki linii "Szybkosc doby"
                         if (seenToday && _modelSeen.TryGetValue(c, out seen))
                         {
                             // porownanie (tylko log): liczba z chwili powinnosci minus liczba D; dt - koszt, ktorego by nie bylo przy jej wzieciu

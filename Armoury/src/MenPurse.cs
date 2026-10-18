@@ -334,7 +334,30 @@ namespace Armoury
             catch (Exception e) { Log.Error("MenPurse.OnLeft", e); }
         }
 
-        private static int Wage(MobileParty mp) { try { return mp.TotalWage; } catch { return 0; } }
+        private static int Wage(MobileParty mp)
+        {
+            // perf-d2d3 (PerfSutlerWageOnce): w zakresie jednej partii markietanow (Sutlers - WageMemoBegin/End) zold liczony raz; miedzy odczytami nie dzieje
+            // sie nic, co zmienia zold (rezerwy i sakiewka - same odczyty). Probka 1/64 liczy drugi raz i porownuje (PerfD2.WageHit)
+            if (_wMemoOn && ReferenceEquals(mp, _wMemoP))
+            {
+                if (_wMemoHas) return PerfD2.WageHit(mp, _wMemoV);
+                _wMemoV = WageRaw(mp); _wMemoHas = true;
+                return _wMemoV;
+            }
+            return WageRaw(mp);
+        }
+
+        internal static int WageRaw(MobileParty mp) { try { return mp.TotalWage; } catch { return 0; } }
+
+        [ThreadStatic] private static bool _wMemoOn, _wMemoHas;
+        [ThreadStatic] private static MobileParty _wMemoP;
+        [ThreadStatic] private static int _wMemoV;
+
+        /// <summary>perf-d2d3: poczatek zakresu jednej partii markietanow (Sutlers.Daily wokol One) - przy PerfSutlerWageOnce zold tej partii liczony raz.</summary>
+        internal static void WageMemoBegin(MobileParty mp) { _wMemoOn = PerfD2.SutlerWageOn; _wMemoP = mp; _wMemoHas = false; }
+
+        /// <summary>perf-d2d3: koniec zakresu (zawsze w finally) - poza nim zold liczony jak dotad przy kazdym odczycie.</summary>
+        internal static void WageMemoEnd() { _wMemoOn = false; _wMemoP = null; _wMemoHas = false; }
 
         /// <summary>
         /// KA (16.10, karczmy - TownInns.cs; Jeff "ludzie sami placa za siebie i za swoje konie, dostaja zold"): nocleg ludzi w karczmie z ich sakiewki.

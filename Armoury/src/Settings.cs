@@ -2339,6 +2339,13 @@ namespace Armoury
         // E7/D0 (239, PLAN 1.13 -> 7.5, R3): proba drog P2 (galaz w-toku/p2-drogi-proba 95f05be) - stemple sciezek ROT na 2 oknach 50 x 50 (MapRoadsProbe.cs,
         // Prefabs\arm_map_roads.xml, ModuleData\arm_map_roads_probe.tsv); domyslnie false, true TYLKO w konfiguracji krotkiego biegu zdjec autotestu (nie plik Jeffa)
         public bool MapRoadsProbeEnabled = false;          // TEST ONLY: unpaved roads drawn as path decals in two small map areas (around Fairmarket and Winterfell), read from the file arm_map_roads_probe.tsv in the module's ModuleData folder. Visual only - roads do not change speed or routes. Off = nothing drawn
+        // --- Speed of the day (night 17/18.10) ---
+        // perf-d2d3 (CO-ZOSTALO D2/D3; PerfD2.cs): te same wyniki, mniej pracy - kazdy klucz osobno, wylaczony = kod jak dotad; kontrola R9 w probce 1/64 (rozjazdy
+        // w linii "Szybkosc doby (perf-d2d3)", grupa progow nperf). Nowe klucze - nie ma ich w Armoury.json Jeffa, dzialaja domyslne.
+        public bool PerfValyrianCensus = true;             // the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before
+        public bool PerfTownTaxSkipBk = true;              // with town rents replacing the town tax (Population Rent Enabled and Rent Replaces Town Tax), the Banner Kings tax sum of a town is no longer worked out only to be replaced by the rent - the same tax, the same council wages, less work each time a clan's income is counted; it stands aside on its own (and says why in the log) when another mod changes that tax; off = Banner Kings works it out first, as before
+        public bool PerfSutlerWageOnce = true;             // the sutlers in the field read a band's daily wage once instead of two or three times - the same coin, less work; off = the wage is worked out at each step, as before
+        public bool PerfTownTaxFastHooks = true;           // the town tax with rents (the lines somebody really pays, the council wages) asks Banner Kings directly instead of through slow reflection - the same numbers, less work each time a town's tax is counted; off = through reflection, as before
         // --- A clean slate between campaigns (stage 8) ---
         // E8/S (246, PLAN 8.11; rozpoznanie C poz. 11, 15, 17): porzadek stanu (StateHygiene.cs) - przy nowej kampanii i kazdym wczytaniu zerowana pamiec, ktora dotad
         // zyla do konca procesu: przeszukanie i odwet kryjowki (HideoutPurge), oboz gracza (potkniecia namiotu, pytanie o nocleg, flaga obozu), dzien audytu
