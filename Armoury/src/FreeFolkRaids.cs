@@ -29,12 +29,19 @@ namespace Armoury
     ///    band"), banda = najnizszy lekki bandyta klanu "wildlings" (Wildling Renegades), udzialy pochodzenia = okreg zrodla. Banda bez zlota z niczego (kiesa 0),
     ///    bez jedzenia z niczego (bandy nie jedza). Bandy najazdu nie werbuja (OutlawLaw.Daily pomija je) - rozmiar nie rosnie ponad sufit; nadmiar (np. scalenie
     ///    HideoutPurge) zdejmowany co dobe do puli okregu zrodla.
+    ///  - WYMARSZ (recenzja r4-mur: klan bandycki jest w stalej wojnie z kazdym krolestwem, DefaultDiplomacyModel.GetShallowDiplomaticStance - takze z Wolnymi Ludzmi):
+    ///    banda idzie do bramy wsi celu rozkazem "idz do punktu" BEZ nowych decyzji AI (MobilePartyAi.GetBehaviors pomija wtedy inicjatywe - nie napada po drodze
+    ///    taborow i karawan wlasnych wsi Wolnych Ludzi). U celu (<= MarchArrive jednostek od bramy albo po ReturnMaxDays dobach marszu) - patrol; doby najazdu licza
+    ///    sie od dojscia (FreeFolkRaidDays: "ile dob banda rabuje na poludniu"). Banda rozbita w marszu (ponad polowa ludzi) od razu wraca.
     ///  - NAJAZD: banda bandycka (BanditPartyComponent.CreateLooterParty) z domem = wies celu - AI band patroluje wokol niej i napada tabory wsi, karawany i slabsze
     ///    partie (jak looterzy gry); lup sprzedaje paserowi (OutlawLaw) jak kazda banda. Po FreeFolkRaidDays dobach (albo gdy stracila ponad polowe ludzi) wraca:
     ///    rozkaz "idz do punktu" przy bramie wsi zrodla, bez nowych decyzji AI. W domu (najwyzej 30 dob drogi): bohaterowie-jency uciekaja, zloto bandy do kiesy wsi
     ///    zrodla, towar do jej magazynu, ludzie i jency do puli wyrzutkow okregu zrodla ("rozwiazane bandy" - stamtad wracaja do domow tempem puli albo ida w nastepny
     ///    najazd), banda rozwiazana (DestroyPartyAction bez sprawcy). Polegli i pojmani w drodze - straty (jak kazdej bandy).
     ///  - ZAPIS: arm_mur_najazdy (bandy najazdu, liczniki od poczatku); stary zapis bez klucza = brak band. Starszy DLL widzi zwykle bandy Wildling Renegades.
+    ///    Flaga "bez nowych decyzji" (MobilePartyAi.DoNotMakeNewDecisions to [SaveableProperty(11)] - idzie do zapisu gry) NIE trafia do zapisu: OnBeforeSave ja zdejmuje,
+    ///    OnSaveOver przywraca, po wczytaniu wraca w pierwszej godzinie (Hourly) - recenzja r4-mur: banda bez wpisu w arm_mur_najazdy (starszy DLL po cofnieciu,
+    ///    straznik rozmiaru, blad odczytu) nie stoi zamrozona na zawsze u bram, tylko zostaje zwykla banda.
     /// KONTROLA (linia "Najazdy Wolnych Ludzi (r4-mur)"): od poczatku wyruszylo + przybyli = wrocili + straty + przyciete + puszczone bez zarzadu + w polu;
     /// wyruszylo = z puli + z domow.
     /// Wylaczone (klucz albo KS) - nowych band nie ma, bandy w polu wracaja do domu; bez band w polu nic nie biegnie.
@@ -44,7 +51,8 @@ namespace Armoury
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const string ClanId = "wildlings";        // ROT spclans.xml: "Wildling Renegades" (is_bandit, kultura wildlings, kryjowki wight_hideout_*)
         private const float ArriveDist = 4f;              // jednostki mapy od bramy wsi zrodla = w domu
-        private const int ReturnMaxDays = 30;             // najdluzsza droga powrotu - potem banda rozwiazana tam, gdzie stoi (ludzie i tak do puli okregu zrodla)
+        private const int ReturnMaxDays = 30;             // najdluzsza droga powrotu - potem banda rozwiazana tam, gdzie stoi (ludzie i tak do puli okregu zrodla); tez najdluzszy marsz do celu
+        private const float MarchArrive = 6f;             // jednostki mapy od bramy wsi celu = banda doszla (wymarsz -> patrol)
         private const double StoreFloor = 0.5;            // waga zapasu przy pelnym spichlerzu
         private const double LowDays = 180.0;             // dni spichlerza, ponizej ktorych waga zapasu = 1
         private const int TargetNearest = 8;              // cel losowany z tylu najblizszych (droga) wsi Strazy / Polnocy
@@ -52,7 +60,9 @@ namespace Armoury
         private const int MaxImportChars = 200000;
         private const int MaxEntries = 64;
 
-        private sealed class Raid { public string Id, Src, Region, Target; public int Day, Men0, Phase, BackDay, Last; }
+        // Phase: 0 = najazd (patrol wokol wsi celu, AI gry), 1 = powrot (idz do bramy wsi zrodla, bez nowych decyzji), 2 = wymarsz (idz do bramy wsi celu, bez nowych decyzji).
+        // Day: doba wymarszu (faza 2), od dojscia do celu - doba poczatku najazdu (faza 0). P - partia (bez zapisu; po wczytaniu z MobileParty.AllBanditParties).
+        private sealed class Raid { public string Id, Src, Region, Target; public int Day, Men0, Phase, BackDay, Last; public MobileParty P; }
         private static readonly List<Raid> _raids = new List<Raid>();
         private static readonly HashSet<MobileParty> _owned = new HashSet<MobileParty>();
         // od poczatku kampanii (w zapisie)
@@ -63,6 +73,8 @@ namespace Armoury
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static bool _offLogged;
         private static Clan _clan; private static bool _clanTried;
+        private static bool _refreeze;                    // po wczytaniu: flaga "bez nowych decyzji" band w marszu / powrocie do przywrocenia w pierwszej godzinie (Hourly)
+        private static int _thawed;                       // ile band zdjal OnBeforeSave (OnSaveOver przywraca)
 
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.FreeFolkHungerRaids; } }
 
@@ -73,7 +85,7 @@ namespace Armoury
         {
             _raids.Clear(); _owned.Clear();
             _cStarted = _cReturned = _cLost = _cGained = _cTrim = _cLeft = 0; _nStarted = _nReturned = _nLost = 0; _cFromHome = _cFromPool = _cHomeLeft = 0.0; _cGold = _cItems = 0;
-            _stumbles = 0; _errSites.Clear(); _offLogged = false; _clan = null; _clanTried = false;
+            _stumbles = 0; _errSites.Clear(); _offLogged = false; _clan = null; _clanTried = false; _refreeze = false; _thawed = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -141,6 +153,7 @@ namespace Armoury
                     }
             }
             catch (Exception e) { Stumble("Import", e); _raids.Clear(); }
+            _refreeze = _raids.Any(r => r.Phase != 0);       // zapis nie niesie flagi "bez nowych decyzji" (BeforeSave) - wraca w pierwszej godzinie (Hourly)
         }
 
         private static long L(string[] a, int i) { long x; return a != null && i < a.Length && long.TryParse(a[i], NumberStyles.Integer, Inv, out x) && x > 0 ? x : 0; }
@@ -164,6 +177,96 @@ namespace Armoury
         }
 
         private static bool IsFreeFolk(Settlement n) { var f = n != null ? n.MapFaction : null; return f != null && f.StringId == CrownGifts.FreeFolkId; }
+
+        // ------------------------------------------------------------ flaga "bez nowych decyzji" (marsz i powrot) - nigdy w zapisie gry
+        /// <summary>Banda idzie do punktu bez nowych decyzji AI (bez napadow i ucieczek po drodze). force - rozkaz zawsze (zmiana fazy); inaczej tylko gdy zgubiony.</summary>
+        private static void Freeze(MobileParty mp, CampaignVec2 to, bool force)
+        {
+            if (!mp.Ai.DoNotMakeNewDecisions) mp.Ai.SetDoNotMakeNewDecisions(true);
+            if (force || mp.DefaultBehavior != AiBehavior.GoToPoint) mp.SetMoveGoToPoint(to, MobileParty.NavigationType.Default);
+        }
+
+        /// <summary>Banda puszczona jako zwykla banda (bez zarzadu): AI gry wraca i mysli od razu (jak MaterialOrders.Release).</summary>
+        private static void Release(MobileParty mp)
+        {
+            try { mp.Ai.SetDoNotMakeNewDecisions(false); mp.Ai.RethinkAtNextHourlyTick = true; } catch { }
+        }
+
+        private static Dictionary<string, MobileParty> BanditMap()
+        {
+            var map = new Dictionary<string, MobileParty>(StringComparer.Ordinal);
+            foreach (var mp in MobileParty.AllBanditParties) if (mp != null && mp.StringId != null) map[mp.StringId] = mp;
+            return map;
+        }
+
+        private static MobileParty PartyOf(Raid r, ref Dictionary<string, MobileParty> map)
+        {
+            var mp = r.P;
+            if (mp == null || mp.StringId != r.Id)
+            {
+                if (map == null) map = BanditMap();
+                map.TryGetValue(r.Id, out mp);
+                r.P = mp;
+            }
+            return mp != null && mp.IsActive ? mp : null;
+        }
+
+        /// <summary>CampaignEvents.OnBeforeSaveEvent: zdejmuje flage "bez nowych decyzji" z band w marszu i powrocie - gra zapisuje ja w partii
+        /// (MobilePartyAi.DoNotMakeNewDecisions, [SaveableProperty(11)]); bez wpisu arm_mur_najazdy (starszy DLL, straznik, blad) banda stalaby zamrozona na zawsze.</summary>
+        internal static void BeforeSave()
+        {
+            _thawed = 0;
+            if (_raids.Count == 0) return;
+            Dictionary<string, MobileParty> map = null;
+            foreach (var r in _raids)
+            {
+                try
+                {
+                    if (r.Phase == 0) continue;
+                    var mp = PartyOf(r, ref map);
+                    if (mp == null || mp.Ai == null || !mp.Ai.DoNotMakeNewDecisions) continue;
+                    mp.Ai.SetDoNotMakeNewDecisions(false);
+                    _thawed++;
+                }
+                catch (Exception e) { Stumble("BeforeSave", e); }
+            }
+        }
+
+        /// <summary>CampaignEvents.OnSaveOverEvent (takze po nieudanym zapisie): flaga i rozkaz wracaja bandom w marszu i powrocie.</summary>
+        internal static void SaveOver()
+        {
+            if (_thawed == 0) return;
+            _thawed = 0;
+            Refreeze();
+        }
+
+        /// <summary>CampaignEvents.HourlyTickEvent: po wczytaniu (Import z bandami w marszu / powrocie) flaga i rozkaz wracaja w pierwszej godzinie. Inaczej nic.</summary>
+        internal static void Hourly()
+        {
+            if (!_refreeze) return;
+            _refreeze = false;
+            Refreeze();
+        }
+
+        private static void Refreeze()
+        {
+            if (_raids.Count == 0) return;
+            Dictionary<string, MobileParty> map = null;
+            foreach (var r in _raids)
+            {
+                try
+                {
+                    if (r.Phase == 0) continue;
+                    var mp = PartyOf(r, ref map);
+                    if (mp == null || mp.Ai == null) continue;
+                    var to = Find(r.Phase == 1 ? r.Src : r.Target);
+                    if (to == null) continue;                                    // Daily rozstrzygnie (wies zniknela - banda puszczona)
+                    if (mp.MapEvent != null || mp.SiegeEvent != null) { if (!mp.Ai.DoNotMakeNewDecisions) mp.Ai.SetDoNotMakeNewDecisions(true); continue; }
+                    Freeze(mp, to.GatePosition, false);
+                }
+                catch (Exception e) { Stumble("Refreeze", e); }
+            }
+        }
 
         // ------------------------------------------------------------ doba
         private sealed class RegHunger { public Settlement N; public double Home, Harvest, Food, Cap, H; public Village Worst; public double WorstW; }
@@ -192,9 +295,8 @@ namespace Armoury
             int dLoss = 0, dGain = 0, dTrim = 0, dRetN = 0, dRetMen = 0, dLostN = 0, dLostMen = 0, dLeft = 0, dTurn = 0; long dGold = 0, dItems = 0;
 
             // 1. bandy w polu: straty, powrot, dom
-            var map = new Dictionary<string, MobileParty>(StringComparer.Ordinal);
-            if (_raids.Count > 0)
-                foreach (var mp in MobileParty.AllBanditParties) if (mp != null && mp.StringId != null) map[mp.StringId] = mp;
+            var map = _raids.Count > 0 ? BanditMap() : new Dictionary<string, MobileParty>(StringComparer.Ordinal);
+            int dArrive = 0, dMarchCap = 0;
             _owned.Clear();
             foreach (var r in _raids.ToList())
             {
@@ -207,6 +309,7 @@ namespace Armoury
                         _raids.Remove(r);
                         continue;
                     }
+                    r.P = mp;
                     _owned.Add(mp);
                     int men = mp.MemberRoster.TotalRegulars;
                     if (men < r.Last) { dLoss += r.Last - men; _cLost += r.Last - men; }
@@ -222,7 +325,31 @@ namespace Armoury
                     {
                         // wies zrodla zniknela z gry - banda zostaje zwykla banda (bez zarzadu), ludzie dalej w polu jak kazdej bandy
                         _cLeft += r.Last; dLeft++; _owned.Remove(mp); _raids.Remove(r);
-                        try { mp.Ai.SetDoNotMakeNewDecisions(false); } catch { }
+                        Release(mp);
+                        continue;
+                    }
+                    if (r.Phase == 2)
+                    {
+                        // wymarsz: do bramy wsi celu bez nowych decyzji (nie napada po drodze wlasnych wsi Wolnych Ludzi); u celu - patrol (AI band gry)
+                        if (mp.MapEvent != null || mp.SiegeEvent != null) continue;
+                        var tgt = Find(r.Target);
+                        bool beatenM = r.Last == 0 || (r.Men0 > 0 && r.Last * 2 < r.Men0);
+                        if (beatenM)
+                        {
+                            Freeze(mp, src.GatePosition, true);
+                            r.Phase = 1; r.BackDay = today; dTurn++;
+                            continue;
+                        }
+                        bool arrived = tgt != null && mp.GetPosition2D.Distance(tgt.GatePosition.ToVec2()) <= MarchArrive;
+                        if (arrived || tgt == null || today - r.Day >= ReturnMaxDays)
+                        {
+                            mp.Ai.SetDoNotMakeNewDecisions(false);
+                            if (tgt != null) mp.SetMovePatrolAroundSettlement(tgt, MobileParty.NavigationType.Default, false);
+                            else mp.Ai.RethinkAtNextHourlyTick = true;
+                            r.Phase = 0; r.Day = today;                               // doby najazdu od dojscia do celu
+                            if (arrived) dArrive++; else dMarchCap++;                 // marsz ponad ReturnMaxDays (albo cel zniknal) - patrol tam, gdzie stoi (AI band gry)
+                        }
+                        else Freeze(mp, tgt.GatePosition, false);                     // flaga i rozkaz (po wczytaniu / zapisie / bitwie)
                         continue;
                     }
                     if (r.Phase == 0)
@@ -231,8 +358,7 @@ namespace Armoury
                         bool beaten = r.Men0 > 0 && r.Last * 2 < r.Men0;
                         if ((timeUp || beaten) && mp.MapEvent == null && mp.SiegeEvent == null)
                         {
-                            mp.Ai.SetDoNotMakeNewDecisions(true);
-                            mp.SetMoveGoToPoint(src.GatePosition, MobileParty.NavigationType.Default);
+                            Freeze(mp, src.GatePosition, true);
                             r.Phase = 1; r.BackDay = today; dTurn++;
                         }
                         continue;
@@ -245,7 +371,7 @@ namespace Armoury
                         {
                             // banda w zadaniu gracza - nie rozwiazujemy (zadanie by sie zepsulo); zostaje zwykla banda w polu
                             _cLeft += r.Last; dLeft++; _owned.Remove(mp); _raids.Remove(r);
-                            try { mp.Ai.SetDoNotMakeNewDecisions(false); } catch { }
+                            Release(mp);
                             continue;
                         }
                         long g, it;
@@ -255,7 +381,7 @@ namespace Armoury
                         _owned.Remove(mp); _raids.Remove(r);
                         continue;
                     }
-                    if (mp.DefaultBehavior != AiBehavior.GoToPoint) mp.SetMoveGoToPoint(src.GatePosition, MobileParty.NavigationType.Default);
+                    Freeze(mp, src.GatePosition, false);                              // flaga i rozkaz (po wczytaniu / zapisie / bitwie)
                 }
                 catch (Exception e) { Stumble("Daily(banda)", e); }
             }
@@ -339,7 +465,7 @@ namespace Armoury
                                         // banda nie powstala (wyjatek gry) - ludzie wracaja do puli okregu (nikt nie znika); pusta partia rozwiazana
                                         if (mp == null || mp.MemberRoster.TotalRegulars == 0)
                                         {
-                                            for (int i = 0; i < roster.Count; i++) { var el = roster.GetElementCopyAtIndex(i); if (el.Character != null && el.Number > 0) OutlawLaw.PoolAdd(pick.N, el.Character, el.Number); }
+                                            OutlawLaw.RaidUndraw(pick.N, roster);           // ludzie z powrotem do puli, narodziny dnia cofniete (recenzja r4-mur: nie "inne" w linii puli)
                                             _cHomeLeft += homeUsed; tooFew++;
                                             if (mp != null) { try { DestroyPartyAction.Apply(null, mp); } catch (Exception e) { Stumble("Daily(pusta banda)", e); } }
                                             mp = null;
@@ -348,7 +474,7 @@ namespace Armoury
                                     if (mp != null)
                                     {
                                         int got = mp.MemberRoster.TotalRegulars;
-                                        _raids.Add(new Raid { Id = mp.StringId, Src = srcV.Settlement.StringId, Region = pick.N.StringId, Target = target.StringId, Day = today, Men0 = got, Phase = 0, BackDay = 0, Last = got });
+                                        _raids.Add(new Raid { Id = mp.StringId, Src = srcV.Settlement.StringId, Region = pick.N.StringId, Target = target.StringId, Day = today, Men0 = got, Phase = 2, BackDay = 0, Last = got, P = mp });
                                         _owned.Add(mp);
                                         spawnN++; spawnMen += got; fromPoolD += fp;
                                         _cStarted += got; _nStarted++; _cFromPool += fp; _cFromHome += homeUsed;
@@ -363,7 +489,7 @@ namespace Armoury
                                         catch (Exception e) { Stumble("Daily(ustawienia bandy)", e); }
                                         if (org != null && org.Total > 0) { try { PeopleBook.Give(mp.MemberRoster, org, PeopleBook.FPoolBand); } catch { } }
                                         try { PeopleLedger.FixCreatedMen(mp); } catch { }   // sklad dopisany po zdarzeniu utworzenia (ksiega ludzi E4/2)
-                                        try { mp.SetMovePatrolAroundSettlement(target, MobileParty.NavigationType.Default, false); } catch (Exception e) { Stumble("Daily(rozkaz)", e); }
+                                        try { Freeze(mp, target.GatePosition, true); } catch (Exception e) { Stumble("Daily(rozkaz)", e); }   // wymarsz bez napadow po drodze; u celu - patrol
                                     }
                                 }
                             }
@@ -376,8 +502,8 @@ namespace Armoury
             if (!s.LogEnabled) return;
             try
             {
-                int active = 0, activeMen = 0, biggest = 0, back = 0;
-                foreach (var r in _raids) { active++; activeMen += r.Last; if (r.Last > biggest) biggest = r.Last; if (r.Phase == 1) back++; }
+                int active = 0, activeMen = 0, biggest = 0, back = 0, march = 0;
+                foreach (var r in _raids) { active++; activeMen += r.Last; if (r.Last > biggest) biggest = r.Last; if (r.Phase == 1) back++; else if (r.Phase == 2) march++; }
                 long ctl = _cStarted + _cGained - _cReturned - _cLost - _cTrim - _cLeft - activeMen;
                 var sb = new StringBuilder(1400);
                 sb.Append("Najazdy Wolnych Ludzi (r4-mur): dzien ").Append(day).Append(on ? " | CZYNNE" : " | WYLACZONE (bandy w polu wracaja)");
@@ -387,7 +513,7 @@ namespace Armoury
                   .Append(F(hHome > 0 ? hFood / hHome : 0, "0")).Append(" dni, okregi ").Append(regs.Count).Append(", ludzie ").Append(F(hHome, "0")).Append(')');
                 sb.Append(" | szansa ").Append(F(chance, "0.000")).Append(", nowe dzis ").Append(spawnN).Append(" (").Append(spawnMen).Append(" ludzi: z puli ").Append(F(fromPoolD, "0.0"))
                   .Append(", zabrani z domow ").Append(F(fromHomeD, "0.0")).Append(spawnNote).Append(')');
-                sb.Append(" | w polu ").Append(active).Append('/').Append(maxP).Append(" band (wraca ").Append(back).Append("), ludzi ").Append(activeMen).Append(", najwieksza ").Append(biggest).Append('/').Append(maxMen)
+                sb.Append(" | w polu ").Append(active).Append('/').Append(maxP).Append(" band (wraca ").Append(back).Append(", w marszu ").Append(march).Append(", doszly dzis ").Append(dArrive).Append(dMarchCap > 0 ? ", marsz ponad " + ReturnMaxDays + " dob " + dMarchCap : "").Append("), ludzi ").Append(activeMen).Append(", najwieksza ").Append(biggest).Append('/').Append(maxMen)
                   .Append(capHit > 0 ? " [sufit band]" : "");
                 sb.Append(" | dzis: straty ").Append(dLoss).Append(", przybyli ").Append(dGain).Append(", przyciete ").Append(dTrim).Append(", zawrocily ").Append(dTurn)
                   .Append(", wrocilo ").Append(dRetN).Append(" band (").Append(dRetMen).Append(" ludzi, lup ").Append(dGold).Append(" zl i ").Append(dItems).Append(" szt. do wsi)")
@@ -456,7 +582,7 @@ namespace Armoury
                 try { if (PeopleBook.OriginLive) PeopleBook.PoolShares(region, PeopleBook.Take(r, n, PeopleBook.FBandDisband)); } catch { }
                 int wounded = Math.Min(e.WoundedNumber, n);
                 r.AddToCountsAtIndex(i, -n, -wounded);
-                OutlawLaw.PoolAdd(region, e.Character, n);
+                OutlawLaw.RaidTrimAdd(region, e.Character, n);               // naplyw "rozwiazane bandy" linii puli (recenzja r4-mur: nie reszta "inne")
                 cut += n;
             }
             return cut;
@@ -468,7 +594,7 @@ namespace Armoury
         private static int Home(MobileParty mp, Settlement src, Settlement region, out long gold, out long items)
         {
             gold = 0; items = 0;
-            if (!OutlawLaw.On) { try { mp.Ai.SetDoNotMakeNewDecisions(false); } catch { } return -1; }
+            if (!OutlawLaw.On) { Release(mp); return -1; }
             var pr = mp.PrisonRoster;
             for (int i = pr.Count - 1; i >= 0; i--)
             {

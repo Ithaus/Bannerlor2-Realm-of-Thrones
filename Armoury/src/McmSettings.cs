@@ -6936,27 +6936,27 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsFarmFolkFromSavings { get; set; } = true;
 
-        [SettingPropertyBool("Wall Tribute Enabled", HintText = "with Start Calibration applied: the lords of the North send the Night's Watch part of their grain as a duty in kind - carts take it from the granaries of their villages (only from what lies beyond their own reserve, never from a hungry village) and bring it after the days of the road to the granaries of the Watch's villages, as much as the Watch's people lack each day; nobody pays for it, and a little spoils on the road. Off = no tribute (carts already on the road still arrive)")]
+        [SettingPropertyBool("Wall Grain Tribute", HintText = "with Start Calibration applied: the lords of the North send the Night's Watch part of their grain as a duty in kind - carts take it from the granaries of their villages (only from what lies beyond their own reserve, never from a hungry village) and bring it after the days of the road to the granaries of the Watch's villages, as much as the Watch's people lack each day; nobody pays for it, and a little spoils on the road. Off = no tribute (carts already on the road still arrive)")]
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
-        public bool WallTributeEnabled { get; set; } = true;
+        public bool WallGrainTribute { get; set; } = true;
 
-        [SettingPropertyInteger("Wall Tribute Target Days", 0, 728, "0", HintText = "with Wall Tribute Enabled: besides the daily shortfall the North sends enough to bring each Watch village's granary up to this many days of its people's food (over Wall Tribute Refill Days)")]
+        [SettingPropertyInteger("Wall Tribute Target Days", 0, 728, "0", HintText = "with Wall Grain Tribute: besides the daily shortfall the North sends enough to bring each Watch village's granary up to this many days of its people's food (over Wall Tribute Refill Days)")]
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
         public int WallTributeTargetDays { get; set; } = 365;
 
-        [SettingPropertyInteger("Wall Tribute Refill Days", 1, 364, "0", HintText = "with Wall Tribute Enabled: over how many days a Watch granary below Wall Tribute Target Days is filled up again")]
+        [SettingPropertyInteger("Wall Tribute Refill Days", 1, 364, "0", HintText = "with Wall Grain Tribute: over how many days a Watch granary below Wall Tribute Target Days is filled up again")]
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
         public int WallTributeRefillDays { get; set; } = 60;
 
-        [SettingPropertyInteger("Wall Tribute Giver Reserve Days", 0, 728, "0", HintText = "with Wall Tribute Enabled: a village of the North gives only from what its granary holds beyond this many days of its own people's food")]
+        [SettingPropertyInteger("Wall Tribute Giver Reserve Days", 0, 728, "0", HintText = "with Wall Grain Tribute: a village of the North gives only from what its granary holds beyond this many days of its own people's food")]
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
         public int WallTributeGiverReserveDays { get; set; } = 364;
 
-        [SettingPropertyFloatingInteger("Wall Tribute Giver Share Percent", 0.00f, 10.00f, "0.00", HintText = "with Wall Tribute Enabled: at most this share (percent a day) of what a Northern granary holds beyond its reserve goes to the Wall; lands that cannot feed themselves give less, in proportion to how much of their food they grow")]
+        [SettingPropertyFloatingInteger("Wall Tribute Giver Share Percent", 0.00f, 10.00f, "0.00", HintText = "with Wall Grain Tribute: at most this share (percent a day) of what a Northern granary holds beyond its reserve goes to the Wall; lands that cannot feed themselves give less, in proportion to how much of their food they grow")]
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
         public float WallTributeGiverSharePercent { get; set; } = 1f;
 
-        [SettingPropertyFloatingInteger("Wall Tribute Spoil Percent Per Day", 0.00f, 2.00f, "0.00", HintText = "with Wall Tribute Enabled: the share of the grain on the road that spoils each day (damp, rats); the rest reaches the Wall")]
+        [SettingPropertyFloatingInteger("Wall Tribute Spoil Percent Per Day", 0.00f, 2.00f, "0.00", HintText = "with Wall Grain Tribute: the share of the grain on the road that spoils each day (damp, rats); the rest reaches the Wall")]
         [SettingPropertyGroup("The Wall: grain tribute and Free Folk hunger (r4-mur, 17.10)")]
         public float WallTributeSpoilPercentPerDay { get; set; } = 0.25f;
 
@@ -8717,7 +8717,7 @@ namespace Armoury
             s.DsCrownLoanLimitDaysPledged = DsCrownLoanLimitDaysPledged;
             s.DsFolkSurplusSpendDays = DsFolkSurplusSpendDays;
             s.DsFarmFolkFromSavings = DsFarmFolkFromSavings;
-            s.WallTributeEnabled = WallTributeEnabled;
+            s.WallGrainTribute = WallGrainTribute;
             s.WallTributeTargetDays = WallTributeTargetDays;
             s.WallTributeRefillDays = WallTributeRefillDays;
             s.WallTributeGiverReserveDays = WallTributeGiverReserveDays;

@@ -963,17 +963,18 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
---grupa nmur      : (17.10, decyzja Jeffa "dowoz jak w ksiazkach" - STAN-PRAC ### 72; galaz w-toku/r4-mur, Armoury/src/WallTribute.cs, FreeFolkRaids.cs, klucze Wall Tribute
-                    Enabled i Free Folk Hunger Raids) python -I tools/sprawdz_logi.py --grupa nmur <Armoury-*.log> (strumieniowo). DANINA ZBOZOWA MURU (linia "Danina Muru
+--grupa nmur      : (17.10, decyzja Jeffa "dowoz jak w ksiazkach" - STAN-PRAC ### 72; galaz w-toku/r4-mur, Armoury/src/WallTribute.cs, FreeFolkRaids.cs, klucze Wall Grain
+                    Tribute i Free Folk Hunger Raids) python -I tools/sprawdz_logi.py --grupa nmur <Armoury-*.log> (strumieniowo). DANINA ZBOZOWA MURU (linia "Danina Muru
                     (r4-mur)"): NMUR-1 linia czynna kazdej doby, NMUR-2 kontrola drogi (w drodze wczoraj + wyslane - zepsute - dostarczone - oddane dawcom = w drodze dzis,
                     |reszta| <= max(1, 1e-6 w drodze)), NMUR-3 zboze od poczatku (wyslane = dostarczone + zepsute + oddane dawcom + w drodze), NMUR-4 psucie <= 8%,
                     NMUR-5 danina dojechala (> 0), NMUR-6 pokrycie Strazy z pola i daniny >= 0.90 (mediana 28 ostatnich dob z oferta; z pola - INFO), NMUR-7 spichlerze Strazy
                     w dniach - spadek <= 5% w biegu, NMUR-8 wyslane <= oferta Polnocy kazdej doby (dawca nie glodzi), NMUR-9 zadanie/wyslane/niedobor (INFO), NMUR-10 koszt
-                    <= 5 ms mediana, NMUR-11 potkniecia 0. NAJAZDY WOLNYCH LUDZI (linia "Najazdy Wolnych Ludzi (r4-mur)"): NMUR-20 linia czynna, NMUR-21 ludzie od poczatku
+                    <= 5 ms mediana, NMUR-11 potkniecia 0, NMUR-12 zboze przepadle u bram (30 dob bez miejsca) <= 5% wyslanego. NAJAZDY WOLNYCH LUDZI (linia "Najazdy Wolnych Ludzi (r4-mur)"): NMUR-20 linia czynna, NMUR-21 ludzie od poczatku
                     (wyruszylo + przybyli = wrocili + straty + przyciete + puszczone + w polu, reszta 0), NMUR-22 ludzie wzieci = ludzie w najazdach (z puli + z domow =
                     wyruszylo), NMUR-23 sufit band i ludzi, NMUR-24 indeks 0 -> zadnej nowej bandy, NMUR-25 proby nowych band wobec sumy szans (+-3 sigma; INFO przy
                     oczekiwanych < 3), NMUR-26/27 indeks i bandy (INFO), NMUR-28 bandy wracaja (bieg >= 90 dob), NMUR-29 kontrola linii "Pula wyrzutkow (E4/3)" w dobach
-                    narodzin i powrotow band najazdu (dzien puli = dzien linii najazdow + 1), NMUR-30 koszt <= 5 ms, NMUR-31 potkniecia 0, NMUR-E ERROR paczki 0.
+                    narodzin i powrotow band najazdu (dzien puli = dzien linii najazdow + 1), NMUR-30 koszt <= 5 ms, NMUR-31 potkniecia 0, NMUR-32 wymarsz (bandy dochodza
+                    do celu - >= 1 przy >= 3 bandach i biegu >= 60 dob; bez segmentu - INFO), NMUR-E ERROR paczki 0.
                     Log bez linii (sprzed paczki albo KS niezastosowany) - INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
@@ -35444,10 +35445,11 @@ NMUR_SPOIL_MAX = 0.08      # zepsute / (dostarczone + zepsute) od poczatku - prz
 NMUR_COV_MIN = 0.90        # pokrycie Strazy z pola i daniny (mediana ostatnich 28 dob czynnych z oferta Polnocy)
 NMUR_BARN_DROP = 0.05      # spichlerze Strazy (dni) od pierwszej do ostatniej doby czynnej: spadek najwyzej 5%
 NMUR_MS = 5.0              # koszt linii (mediana ms) - kazda z dwoch
+NMUR_ROT_MAX = 0.05        # zboze przepadle u bram (woz 30 dob bez rozladunku) / wyslane od poczatku - tylko utrata okregu Strazy przy pelnych spichlerzach dawcow
 
 
 def nmur_main(logp, until=120):
-    """nmur (17.10; r4-mur, klucze Wall Tribute Enabled i Free Folk Hunger Raids): danina zbozowa lordow Polnocy dla Nocnej Strazy (zamkniety przeplyw racji spichlerzy
+    """nmur (17.10; r4-mur, klucze Wall Grain Tribute i Free Folk Hunger Raids): danina zbozowa lordow Polnocy dla Nocnej Strazy (zamkniety przeplyw racji spichlerzy
     Polnoc -> wozy -> Straz) i glod Wolnych Ludzi -> najazdy band przez Mur. Wejscie: log Armoury (strumieniowo). Brak linii (log sprzed paczki, KS niezastosowany) - INFO."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -35547,6 +35549,14 @@ def nmur_main(logp, until=120):
             rep.add("NMUR-10: koszt linii daniny", f"mediana {st.median(ms):.2f} ms (max {max(ms):.2f})", f"<= {NMUR_MS:.0f} ms mediana", st.median(ms) <= NMUR_MS)
         stb = num(r"potkniecia (\d+)", trib[td[-1]])
         rep.add("NMUR-11: potkniecia daniny (od wczytania)", stb, "0", stb == 0 if stb is not None else None)
+        rot = [fnum(r"przepadle u bram po \d+ dobach bez miejsca " + F_, trib[d]) for d in td]
+        if any(x is not None for x in rot):
+            rot_s = sum(x or 0.0 for x in rot)
+            out_s = fnum(r"od poczatku: wyslane " + F_, trib[td[-1]]) or 0.0
+            share = rot_s / out_s if out_s > 0 else 0.0
+            rep.add("NMUR-12: zboze przepadle u bram (woz 30 dob bez rozladunku)", f"{rot_s:.0f} racji = {100.0 * share:.2f}% wyslanego ({out_s:.0f})", f"<= {100 * NMUR_ROT_MAX:.0f}% (zwykle 0)", share <= NMUR_ROT_MAX)
+        else:
+            rep.add("NMUR-12: zboze przepadle u bram", "brak segmentu (linia sprzed recenzji r4-mur)", "INFO", None)
     else:
         rep.add("NMUR-1..11: danina", "brak linii czynnych" + (f" (wylaczona: {trib_off[-1][len(NMUR_TRIB):][:120]})" if trib_off else ""), "INFO", None)
 
@@ -35622,6 +35632,18 @@ def nmur_main(logp, until=120):
             rep.add("NMUR-30: koszt linii najazdow", f"mediana {st.median(ms):.2f} ms (max {max(ms):.2f})", f"<= {NMUR_MS:.0f} ms mediana", st.median(ms) <= NMUR_MS)
         stb = num(r"potkniecia (\d+)", last)
         rep.add("NMUR-31: potkniecia najazdow (od wczytania)", stb, "0", stb == 0 if stb is not None else None)
+        arr = [num(r"doszly dzis (\d+)", raid[d]) for d in rd]
+        if any(x is not None for x in arr):
+            arr_s = sum(x or 0 for x in arr)
+            mar = num(r"w marszu (\d+)", last) or 0
+            m = re.search(r"band: wyruszylo (\d+)", last)
+            ns = int(m.group(1)) if m else 0
+            capm = sum(num(r"marsz ponad \d+ dob (\d+)", raid[d]) or 0 for d in rd)
+            ok = (arr_s >= 1) if (ns >= 3 and len(rd) >= 60) else None
+            rep.add("NMUR-32: wymarsz band do celu (bez napadow po drodze; u celu patrol)", f"doszly do celu {arr_s} z {ns} band, marsz ponad 30 dob {capm}, w marszu teraz {mar}",
+                    ">= 1 przy >= 3 bandach i biegu >= 60 dob (inaczej INFO)", ok)
+        else:
+            rep.add("NMUR-32: wymarsz band do celu", "brak segmentu (linia sprzed recenzji r4-mur)", "INFO", None)
     else:
         rep.add("NMUR-20..31: najazdy", "brak linii czynnych" + (f" (wylaczone: {raid_off[-1][len(NMUR_RAID):][:120]})" if raid_off else ""), "INFO", None)
     rep.add("NMUR-E: ERROR paczki (WallTribute, FreeFolkRaids, Famine.Tribute*, SyncData.arm_mur_*)", n_err, "0", n_err == 0)

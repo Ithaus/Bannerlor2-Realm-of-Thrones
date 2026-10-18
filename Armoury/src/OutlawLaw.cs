@@ -792,6 +792,34 @@ namespace Armoury
         }
         private static readonly Dictionary<MobileParty, Settlement> _raidHome = new Dictionary<MobileParty, Settlement>(PeopleBook.RefEq.I);   // tylko na czas RaidDisband
 
+        /// <summary>r4-mur (recenzja): nadmiar bandy najazdu ponad sufit ludzi (FreeFolkRaids.Trim) do puli regionu zrodla - naplyw "rozwiazane bandy" linii
+        /// "Pula wyrzutkow (E4/3)" (ludzie z bandy do lasu, jak przy rozwiazaniu), nie reszta "inne (uwolnieni jency...)".</summary>
+        internal static void RaidTrimAdd(Settlement region, CharacterObject troop, int n)
+        {
+            if (region == null || troop == null || troop.IsHero || n <= 0) return;
+            Add(region, troop.StringId, n);
+            _inDisband += n;
+        }
+
+        /// <summary>r4-mur (recenzja): banda najazdu nie powstala (wyjatek gry przy tworzeniu) - ludzie z RaidDraw wracaja do puli regionu, a liczniki dnia sa cofniete
+        /// (naplyw i "narodziny band" bez tych ludzi - jakby nikt nie ruszyl; zabrani z domow zostaja w puli jako "bieda/wojna", jak przy "za malo ludzi").
+        /// Wolane w tej samej dobie co RaidDraw (FreeFolkRaids.Daily przed OutlawLaw.Daily) - liczniki dnia jeszcze nie wyzerowane.</summary>
+        internal static void RaidUndraw(Settlement region, TroopRoster roster)
+        {
+            if (region == null || roster == null) return;
+            int n = 0;
+            for (int i = 0; i < roster.Count; i++)
+            {
+                var el = roster.GetElementCopyAtIndex(i);
+                if (el.Character == null || el.Character.IsHero || el.Number <= 0) continue;
+                Add(region, el.Character.StringId, el.Number);
+                n += el.Number;
+            }
+            if (n <= 0) return;
+            _pAdd -= n; _pBirth -= n; _bornMen -= n;
+            if (_bornBands > 0) _bornBands--;
+        }
+
         /// <summary>N7: rozbici, ktorzy po czasie czekania w osadzie zbiorki ida do lasu (StragglersRally.Disperse) - do puli regionu i do naplywu
         /// "rozbici z bitew w las i bez domu" (linia "Pula wyrzutkow (E4/3)").</summary>
         internal static void RallyWoods(Settlement region, CharacterObject troop, int n)

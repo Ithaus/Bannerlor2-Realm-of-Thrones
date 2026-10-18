@@ -994,6 +994,11 @@ namespace Armoury
             CampaignEvents.RaidCompletedEvent.AddNonSerializedListener(this, WatchLaw.OnRaidCompleted);   // E4/9 (H1): rabunki z napastnikiem frakcji Strazy - tylko licznik
             CampaignEvents.OnPrisonerReleasedEvent.AddNonSerializedListener(this, PrisonerLaw.OnReleased);   // I1: gracz wypuscil jencow - w krainie bez niewoli do domu / na Mur (I1b: w krainie z niewola do domu)
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("OutlawLaw.Hourly", delegate { try { OutlawLaw.Hourly(); } catch { } }));
+            // r4-mur (recenzja): flaga "bez nowych decyzji" band najazdu w marszu / powrocie nigdy w zapisie gry (MobilePartyAi.DoNotMakeNewDecisions jest zapisywana) -
+            // zdjeta przed zapisem, przywrocona po nim i w pierwszej godzinie po wczytaniu; bez band najazdu - nic
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { FreeFolkRaids.BeforeSave(); } catch (Exception e) { Log.Error("FreeFolkRaids.BeforeSave", e); } });
+            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { FreeFolkRaids.SaveOver(); } catch (Exception e) { Log.Error("FreeFolkRaids.SaveOver", e); } });
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
