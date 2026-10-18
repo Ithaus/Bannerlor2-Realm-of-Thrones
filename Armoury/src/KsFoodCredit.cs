@@ -214,7 +214,7 @@ namespace Armoury
             {
                 ownedMax = top[0].Value;
                 var sb = new StringBuilder();
-                for (int i = 0; i < top.Count && i < 5; i++) sb.Append(i == 0 ? "" : ", ").Append(top[i].Key != null ? top[i].Key.Name.ToString() : "?").Append(' ').Append(top[i].Value);
+                for (int i = 0; i < top.Count && i < 5; i++) sb.Append(i == 0 ? "" : ", ").Append(top[i].Key == null ? "?" : (top[i].Key.Name != null ? top[i].Key.Name.ToString() : top[i].Key.StringId)).Append(' ').Append(top[i].Value);
                 topDst = sb.ToString();
             }
         }
