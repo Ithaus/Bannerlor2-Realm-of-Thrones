@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
@@ -119,6 +120,83 @@ namespace Armoury
                      + " - pomiary tylko-log (Ceny surowcow, Kary terenu, Dowoz wsi zamkowych, autorzy zmian w tickach towarow, raport Budzet rodow (na sucho))"
                      + (key ? " w takcie doby " + Every + "k+1 za dobe " + Every + "k" : "")
                      + " | tryb: " + ModeText() + " | dzialaja: " + (On ? "tak" : "nie - pelne") + ".");
+        }
+
+        // ================================================================ zapis-d4 (noc 17/18.10, CO-ZOSTALO D4): CICHE LOGI WIECEJ (klucz QuietLogMore)
+        // Zestaw 2: dzienne linie pomiarow, ktorych NIE czyta zadne narzedzie progow - sprawdzone 17/18.10 na logu fin81 (Armoury-2026-10-17_17-55-14.log,
+        // 497 KB/dobe): kazdy przedrostek przeszukany w tools/sprawdz_logi.py (doslownie, bez nawiasow z regexow i jako literal-przedrostek by_day/startswith)
+        // i w pozostalych skryptach tools/ (Zbrojownie zalog, Skup sprzetu, Zlom z nadmiaru czyta p174* - zostaja). Razem ok. 32 KB/dobe (6% logu); reszta
+        // (ok. 94%) to linie czytane przez progi - bez zmian. Filtr w Log.Info PO zbudowaniu linii: kod, liczniki i zerowania biegna jak dotad, nie powstaje
+        // tylko wpis w pliku. Tylko linia doby (przedrostki z ": dzien" itp.) - linie startu sesji i wczytania o tych samych nazwach zostaja. Cadencja jak
+        // zestaw 1 (Lines: takt doby S+1 za dobe S, S podzielne przez QuietLogEveryDays); autotest i tryb nie rozpoznany - zawsze pelne; linie z "ERROR"
+        // albo "BLAD" nigdy nie znikaja.
+        private static readonly string[] More =
+        {
+            "Kiesy rozbitych (3.2): dzien", "Wedrowcy BK - prawdziwy towar (36b): dzien", "Wedrowcy BK - towar (3.6): dzien", "Wedrowcy BK: dzien",
+            "Wozy w miastach: dzien", "Rada (3.5): dzien", "Zaopatrzenie zamkow (171): dzien", "Spoils - klan najemnikow: dzien",
+            "Spoils - naprawa u kwatermistrza: dzien", "Spoils of War (128): dzien", "Dosypka z niczego (RealisticBannerlord): dzien", "Zold konnych (160",
+            "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Skale ludzi wedlug krolestw (GL0): dzien", "Balans krolestw (175): dzien",
+            "Zaopatrzenie BK - kara morale (W1): dzien", "Majatki BK (187): dzien", "Rzemieslnicy BK (147): dzien", "Morale AI (183d): dzien",
+            "ROT szczelnosc (3.7): dzien", "Rynek surowcow: zapasy na targach miast", "Rezerwa napraw AI - pamiec dopasowania (F6): dzien",
+            "Pule ochotnikow (171): dzien", "PodazPopyt: kupcy wywiezli", "Miasta bez strzal - powod (172): dzien", "Warsztaty wedlug krainy (E6/0",
+            "Drobne z niczego (3.10): dzien", "Konie rekrutow (160", "Ceny hurtu (09.10", "Stajnia AI (sklad7b-p): dzien", "Wierzchowce kanonu (208): dzien",
+            "Cwiczenia (171): dzien", "Kara za przegrana (D11-1): dzien", "Mineraly (dubel BK): dzien", "Papirus wedlug klimatu (T8): dzien",
+            "HouseLevies: dzien", "WPLYW: stan", "Karawany (kierunek): dzien", "Ludzie (regiony): dzien", "Dezercja AI (183): dzien",
+            "Zatkane wsie (wozy w drodze): dzien", "Zatkane wsie (przyklad): dzien", "Spojnosc armii (AC wiek): dzien", "Ochotnicy (diagnoza):",
+            "Musztra (gracz): dzien", "Dowoz (wozy): dzien"
+        };
+        private static long _moreDropped;
+        // przedrostki zestawu 2 wedlug pierwszej litery - Log.Info sprawdza tylko te kilka, nie wszystkie 47 (wolane przy kazdej linii logu)
+        private static readonly Dictionary<char, string[]> MoreByFirst = BuildMoreByFirst();
+
+        private static Dictionary<char, string[]> BuildMoreByFirst()
+        {
+            var tmp = new Dictionary<char, List<string>>();
+            foreach (var p in More)
+            {
+                List<string> l;
+                if (!tmp.TryGetValue(p[0], out l)) tmp[p[0]] = l = new List<string>();
+                l.Add(p);
+            }
+            var d = new Dictionary<char, string[]>();
+            foreach (var kv in tmp) d[kv.Key] = kv.Value.ToArray();
+            return d;
+        }
+
+        internal static int MoreCount { get { return More.Length; } }
+        internal static long MoreDropped { get { return _moreDropped; } }
+
+        /// <summary>Start sesji (SaveSize.SessionLine): licznik pominietych linii od zera.</summary>
+        internal static void ResetMore() { _moreDropped = 0; }
+
+        /// <summary>Zestaw 2 czynny: klucz QuietLogMore i ciche logi czynne (QuietLog + tryb gry albo profilu).</summary>
+        internal static bool MoreActive
+        {
+            get
+            {
+                var s = Settings.Current;
+                return s != null && s.QuietLogMore && Campaign.Current != null && On;
+            }
+        }
+
+        /// <summary>Z Log.Info: true = linia zestawu 2 poza doba pomiaru (nie trafia do pliku). Najpierw przedrostek (tanie; linie startu gry przed kampania
+        /// nigdy nie pasuja - bez wykrywania trybu), potem klucz, tryb i doba. Wyjatek = linia zostaje.</summary>
+        internal static bool DropMore(string m)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(m)) return false;
+                string[] cand;
+                if (!MoreByFirst.TryGetValue(m[0], out cand)) return false;
+                bool hit = false;
+                for (int i = 0; i < cand.Length; i++) if (m.StartsWith(cand[i], StringComparison.Ordinal)) { hit = true; break; }
+                if (!hit) return false;
+                if (m.IndexOf("ERROR", StringComparison.Ordinal) >= 0 || m.IndexOf("BLAD", StringComparison.Ordinal) >= 0) return false;
+                if (!MoreActive || Lines) return false;
+                _moreDropped++;
+                return true;
+            }
+            catch { return false; }
         }
 
         /// <summary>Dopisek linii "Log (E8/O6)" (takt doby, dzien = doba gry - 1).</summary>

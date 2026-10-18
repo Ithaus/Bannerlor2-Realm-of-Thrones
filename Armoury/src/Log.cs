@@ -110,6 +110,7 @@ namespace Armoury
         internal static void Info(string msg)
         {
             if (_path == null || !Settings.Current.LogEnabled) return;
+            if (LogGate.DropMore(msg)) return;   // zapis-d4: ciche logi wiecej (QuietLogMore) - dzienna linia pomiaru tylko-log poza doba pomiaru w grze
             try
             {
                 string topic = TopicOf(msg);
