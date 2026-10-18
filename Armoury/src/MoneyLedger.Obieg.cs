@@ -591,6 +591,7 @@ namespace Armoury
               .Append(", pozyczki od ludu (obieg2) kiesy ludu i wsi -> glowy rodow ").Append(TownFolk.LastLoanLent)   // obieg2 (3b): wyplaty ClanBudget tej doby
               .Append(TownFolk.LastTownLent != 0 ? ", pozyczki miejskie (f8) kiesy ludu, kasy kupcow i podzamcza -> glowy rodow " + TownFolk.LastTownLent : "")   // f8-pozyczka: wyplaty ClanBudget tej doby i gracza z menu (bez pozyczek - napis jak dotad)
               .Append(", zelazna cena z nabrzeza (WW1) kiesy ludu -> wodzowie najezdzcow ").Append(ReaverLaw.DayWaterfront)   // WW1: przelew miedzy posiadaczami (kiesa ludu -> glowa)
+              .Append(TourneyFolkPurse.ObiegNote())   // f8 recenzja: sakiewka turniejowa ludu - przelew miedzy posiadaczami (kiesa ludu -> glowa / gracz); klucz wylaczony i 0 - pusto
               .Append(", dziesiecina korsarzy (WW4) kiesy band -> glowy rodow panow portow Wysp ").Append(OutlawLaw.LastHarbourTithe)   // WW4: przelew miedzy posiadaczami
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")
               .Append(", dochod modelu gry (naliczony, do D) ").Append(Opt(ClanIncomeBook.LastModelIncomeSum))

@@ -135,6 +135,7 @@ namespace Armoury
             _debts.Clear(); _flag = FOpen; _legacy = false; _pending = false; _catchNow = false; _catchMsg = null; _catchText = "nie sprawdzane"; _stumbles = 0;
             _repToday.Clear(); _repDay = -1;
             ClearDay();
+            try { TourneyFolkPurse.Reset(); } catch { }   // f8-sakiewka (18.10): liczniki sakiewki turniejowej od mieszczan od nowa (pamiec, nic w zapisie)
         }
 
         private static long DebtSum() { long s = 0; foreach (var r in _debts.Values) if (r.Amount > 0) s += r.Amount; return s; }

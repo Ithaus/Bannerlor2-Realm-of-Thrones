@@ -952,6 +952,17 @@ Uzycie (Python 3, tylko odczyt):
                     rozpoznane, TP-2 rachunek dlugow w dobie (roznica 0), TP-3 rod ponizej rezerwy po wyplacie 0, TP-4 potkniecia i ERROR paczki 0 (TourneyPay.*,
                     SyncData.arm_tp_debts, PlayerFees8.TourneyPay*, PlayerFees8.TownPays(TP), PlayerFees8.SettlePrize(TP), ClanBudget.PendingChestOf),
                     TP-5 wyplaty i splaty (INFO), TP-6 dlugi na koniec i wyrownanie Seagard (INFO). Log bez paczki: INFO, bez wyjatku.
+                    f8-sakiewka (18.10, decyzja Jeffa "4 tak" - sakiewka turniejowa od mieszczan; Armoury/src/TourneyFolkPurse.cs, TownFolk.Tourney.cs, klucze Tourney
+                    Folk Purse / Tourney Folk Purse Days / Tourney Folk Purse Min; projekt kiesa-ludu/PROJEKT-WYDATKI P5): linie "Sakiewka turniejowa (f8): dzien N"
+                    i "Sakiewka turniejowa (f8): <miasto>: lud W a / R b / P c = x -> <odbiorca> ...". TS-0 linie paczki (brak - INFO: log sprzed paczki albo klucz
+                    wylaczony), TS-1 linie rozpoznane (nierozpoznane 0), TS-2 tozsamosc zamknietego pieniadza: zdjete z kies ludu = przelane odbiorcom + zwrocone po
+                    wyjatku w kazdej dobie, przelane = zdjete w kazdej sakiewce (roznica 0), TS-3 rachunek (W + R + P = suma = zdjete; glowy rodow + gracz = przelane;
+                    liczba odbiorcow = sakiewki), TS-4 turnieje = sakiewki + powody braku + zwrocone, TS-5 kiesa klasy ponizej zapasu dni po sakiewce 0, TS-6 sakiewka
+                    <= oferta dnia ludu x dni (+3 na zaokraglenia), TS-7 pod KS z czynna kiesa ludu (>= 7 dob, >= 5 turniejow z odbiorca) sakiewki > 0 (inaczej INFO),
+                    TS-8 potkniecia i ERROR in TourneyFolkPurse.* / TownFolk.TourneyPurse* 0, TS-9 koszt sluchacza <= 1 ms/dobe, TS-10 sumy, powody, najwieksza
+                    sakiewka i nagrody turniejow AI z linii Szczelnosc (164a) (INFO), TS-11 (recenzja f8) wpis linii "Obieg" (rody dostaly) "sakiewka turniejowa ludu
+                    (f8)" = glowy rodow + gracz z linii doby sakiewki tej samej doby (roznica 0; brak wpisu - INFO). Log sprzed paczki (np. fin86
+                    Armoury-2026-10-17_23-22-37.log): TS-0 INFO, bez wyjatku.
 --grupa nzbroj    : (noc 17/18.10, przeglad 16.10 STAN-PRAC 46 - zbrojownia gracza; galaz w-toku/zbrojownia, Armoury/src/ArmouryZb.cs + ArmouryBehavior.cs ZB-1,
                     QuartermasterLaw.cs, MenPurse.cs, NightRest.cs, GearFit.cs, CrashScribe/src/Mends.cs) python -I tools/sprawdz_logi.py --grupa nzbroj <Armoury-*.log>
                     [--crashscribe <session-*.log>] (strumieniowo). Klucze ZB-1 ArmouryBookPerModifier (ksiega per id + modyfikator), ZB-2 ArmouryListSpareHorsesWhenKept,
@@ -34556,6 +34567,105 @@ NTU_DAY = re.compile(r"Turniej-platnik \(TP\): dzien (?P<day>-?\d+) \| klucze: T
 # recenzja TP-4: bledy paczki takze pod innymi przedrostkami (wczytanie dlugow z zapisu, potkniecia PlayerFees8 w lancuchu TP, budzet z zapisu)
 NTU_ERR = ("ERROR in TourneyPay.", "ERROR in SyncData.arm_tp_debts", "ERROR in PlayerFees8.TourneyPay", "ERROR in PlayerFees8.TownPays(TP)",
            "ERROR in PlayerFees8.SettlePrize(TP)", "ERROR in ClanBudget.PendingChestOf")
+# f8-sakiewka (18.10, decyzja Jeffa "4 tak"; Armoury/src/TourneyFolkPurse.cs, TownFolk.Tourney.cs, klucz TourneyFolkPurse): sakiewka mieszczan miasta-gospodarza
+NTS_HEAD = "Sakiewka turniejowa (f8): "
+NTS_DAY = re.compile(r"Sakiewka turniejowa \(f8\): dzien (?P<day>-?\d+) \| klucz Tourney Folk Purse tak, dni oferty (?P<days>\d+\.\d+), minimum (?P<min>\d+) "
+                     r"\| KS (?P<ks>zastosowany|NIEZASTOSOWANY), kiesa ludu (?P<folk>czynna|NIECZYNNA) "
+                     r"\| turnieje (?P<n>\d+): sakiewki (?P<k>\d+) na sume (?P<sum>\d+) \(lud W (?P<w>\d+), R (?P<r>\d+), P (?P<p>\d+)\) -> glowy rodow (?P<heads>\d+) \((?P<headsn>\d+)\), "
+                     r"gracz (?P<pl>\d+) \((?P<pln>\d+)\); oferta dnia ludu tych miast (?P<off>\d+); najwieksza (?P<max>\d+) \((?P<maxtown>.*?)\) "
+                     r"\| bez sakiewki (?P<none>\d+): bez miasta (?P<notown>\d+), KS niezastosowany (?P<noks>\d+), kiesa nieczynna (?P<nolive>\d+), zwyciezca nie bohater (?P<nohero>\d+), "
+                     r"bez odbiorcy (?P<norec>\d+), miasto bez kiesy (?P<nofolk>\d+), bez swiezej doby ludu (?P<stale>\d+), bez nadwyzki (?P<nooffer>\d+), nadwyzka zajeta (?P<noroom>\d+), "
+                     r"ponizej minimum (?P<belowmin>\d+) "
+                     r"\| tozsamosc \(prog 0\): zdjete z kies (?P<taken>\d+) - przelane (?P<given>\d+) - zwrocone po wyjatku (?P<undo>\d+) \((?P<undon>\d+)\) = (?P<diff>-?\d+) "
+                     r"\| kontrola \(prog 0\): klasy ponizej zapasu po sakiewce (?P<below>\d+) \| koszt (?P<ms>\d+\.\d+) ms/dobe "
+                     r"\| potkniecia dzis (?P<stum>\d+) \(od wczytania (?P<stumall>\d+)\)\.$")
+NTS_EV = re.compile(r"Sakiewka turniejowa \(f8\): (?P<town>.+?): lud W (?P<w>\d+) / R (?P<r>\d+) / P (?P<p>\d+) = (?P<x>\d+) -> (?P<rec>.*?) \((?P<who>gracz|glowa rodu)\) "
+                    r"\(zwyciezca (?P<win>.*?); oferta dnia ludu (?P<off>\d+) x dni (?P<days>\d+\.\d+), minimum (?P<min>\d+)\); przelane (?P<got>-?\d+), roznica (?P<diff>-?\d+)(?P<warn>.*)\.$")
+NTS_ERR = ("ERROR in TourneyFolkPurse.", "ERROR in TownFolk.TourneyPurse")
+NTS_PRIZE = re.compile(r"nagrody turniejow: gra chciala (\d+), zaplacili (\d+), uciete \d+ \((\d+) wyplat")
+NTS_MS_MAX = 1.0   # koszt sluchacza (kilka turniejow na dobe, jedna osada kazdy) - najwyzej 1 ms na dobe
+# recenzja f8: wpis linii "Obieg: dzien N" (rody dostaly [P]) - migawka TourneyFolkPurse.Daily tej samej doby (TourneyFolkPurse.ObiegNote)
+NTS_OBG = re.compile(r", sakiewka turniejowa ludu \(f8\) kiesy ludu -> glowy rodow i gracz (?P<all>\d+) \(glowy rodow (?P<heads>\d+) w (?P<headsn>\d+) sakiewkach, "
+                     r"gracz (?P<pl>\d+) w (?P<pln>\d+)\)")
+NTS_OBG_DAY = re.compile(r"Obieg: dzien (-?\d+) ")
+
+
+def nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, n_err, prize, tobg=0):
+    """f8-sakiewka: wiersze TS-0..TS-11 grupy nturniej (opis w naglowku pliku, --grupa nturniej). tdays / tev - slowniki rozpoznanych linii doby i sakiewek,
+    tbad / tevbad - nierozpoznane, n_err - ERROR paczki, prize - (nalezne, zaplacone, wyplat) nagrod turniejow AI z linii Szczelnosc (164a) - INFO,
+    tobg - liczba linii "Obieg" z wpisem "sakiewka turniejowa ludu (f8)"; wpis przypiety do linii doby sakiewki tej samej doby jako g["_obg"] (TS-11, recenzja f8;
+    brak - INFO). Bez wyjatku."""
+    if not tdays and not tbad and not tev and not tevbad:
+        rep.add("TS-0: linie 'Sakiewka turniejowa (f8)'", "brak w logu", "INFO (log sprzed paczki f8-sakiewka albo klucz Tourney Folk Purse WYLACZONY)", None)
+        if n_err:
+            rep.add("TS-8: ERROR paczki (TourneyFolkPurse.*, TownFolk.TourneyPurse*)", f"ERROR {n_err}", "0", False)
+        return
+    rep.add("TS-0: linie paczki", f"doby {len(tdays)}, sakiewki {len(tev)}", "linia doby przy kluczu tak (INFO)", None)
+    rep.add("TS-1: linie doby i sakiewek rozpoznane", f"doby: nierozpoznane {len(tbad)}, sakiewki: nierozpoznane {len(tevbad)}"
+            + (f" (np. {(tbad or tevbad)[0][:160]})" if tbad or tevbad else ""), "0 / 0", not tbad and not tevbad)
+
+    def i(g, k):
+        return int(g[k])
+    if tdays:
+        dd = [g for g in tdays if i(g, "diff") != 0 or i(g, "taken") != i(g, "given") + i(g, "undo")]
+        ed = [g for g in tev if i(g, "diff") != 0 or i(g, "x") != i(g, "got")]
+        rep.add("TS-2: tozsamosc zamknietego pieniadza: zdjete z kies ludu = przelane odbiorcom + zwrocone (kazda doba i kazda sakiewka)",
+                f"doby z roznica {len(dd)} z {len(tdays)}, sakiewki z roznica {len(ed)} z {len(tev)}"
+                + (f" (np. dzien {dd[0]['day']}: {dd[0]['diff']})" if dd else (f" (np. {ed[0]['town']}: {ed[0]['diff']})" if ed else "")), "0 / 0", not dd and not ed)
+        bd = [g for g in tdays if i(g, "w") + i(g, "r") + i(g, "p") != i(g, "sum") or i(g, "heads") + i(g, "pl") != i(g, "given") or i(g, "sum") != i(g, "taken")
+              or i(g, "headsn") + i(g, "pln") != i(g, "k")]
+        be = [g for g in tev if i(g, "w") + i(g, "r") + i(g, "p") != i(g, "x")]
+        rep.add("TS-3: rachunek sakiewek (W + R + P = suma = zdjete; glowy + gracz = przelane; sakiewki = odbiorcy)", f"doby niespojne {len(bd)}, sakiewki niespojne {len(be)}",
+                "0 / 0", not bd and not be)
+        cn = [g for g in tdays if i(g, "n") != i(g, "k") + i(g, "none") + i(g, "undon")
+              or i(g, "none") != sum(i(g, k) for k in ("notown", "noks", "nolive", "nohero", "norec", "nofolk", "stale", "nooffer", "noroom", "belowmin"))]
+        rep.add("TS-4: turnieje = sakiewki + bez sakiewki (suma powodow) + zwrocone po wyjatku", f"doby niespojne {len(cn)} z {len(tdays)}" + (f" (np. dzien {cn[0]['day']})" if cn else ""), "0", not cn)
+        below = sum(i(g, "below") for g in tdays)
+        warn = sum(1 for g in tev if "UWAGA" in g["warn"])
+        rep.add("TS-5: kiesa klasy ponizej zapasu dni po sakiewce (suma dob; sakiewki z UWAGA)", f"{below}; {warn}", "0 / 0", below == 0 and warn == 0)
+        over = [g for g in tev if i(g, "x") > int(float(g["days"]) * i(g, "off")) + 3]
+        rep.add("TS-6: sakiewka najwyzej oferta dnia ludu x dni (rozmiar wedlug zamoznosci miasta)", f"ponad oferte {len(over)} z {len(tev)}"
+                + (f" (np. {over[0]['town']}: {over[0]['x']} > {over[0]['off']} x {over[0]['days']})" if over else ""), "0", not over)
+        ksd = [g for g in tdays if g["ks"] == "zastosowany" and g["folk"] == "czynna"]
+        hero_ks = sum(i(g, "n") - i(g, "notown") - i(g, "nohero") - i(g, "norec") for g in ksd)
+        paid_ks = sum(i(g, "k") for g in ksd)
+        poor = sum(i(g, "nooffer") + i(g, "noroom") + i(g, "belowmin") for g in ksd)
+        if len(ksd) >= 7 and hero_ks >= 5:
+            rep.add("TS-7: pod KS z czynna kiesa ludu sakiewki naprawde ida (doby KS >= 7, turnieje z bohaterem >= 5)",
+                    f"dob KS {len(ksd)}, turnieje z odbiorca {hero_ks}, sakiewki {paid_ks} ({100.0 * paid_ks / max(1, hero_ks):.0f}%), bez nadwyzki / zajeta / ponizej minimum {poor}, "
+                    f"bez swiezej doby ludu {sum(i(g, 'stale') for g in ksd)}, miasto bez kiesy {sum(i(g, 'nofolk') for g in ksd)}", "sakiewki > 0", paid_ks > 0)
+        else:
+            rep.add("TS-7: sakiewki pod KS", f"dob KS z czynna kiesa {len(ksd)}, turnieje z odbiorca {hero_ks}, sakiewki {paid_ks}; KS niezastosowany w "
+                    f"{sum(i(g, 'noks') for g in tdays)} turniejach", "INFO (za malo dob KS albo turniejow - KS nie zastosowany w tym biegu?)", None)
+        stum = sum(i(g, "stum") for g in tdays)
+        rep.add("TS-8: potkniecia (suma dob) i ERROR paczki (TourneyFolkPurse.*, TownFolk.TourneyPurse*)", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+        ms = sorted(float(g["ms"]) for g in tdays)
+        rep.add("TS-9: koszt sluchacza turniejow (ms/dobe)", f"najwiecej {ms[-1]:.3f}, mediana {ms[len(ms) // 2]:.3f}", f"najwiecej <= {NTS_MS_MAX}", ms[-1] <= NTS_MS_MAX)
+
+        def tot(k):
+            return sum(i(g, k) for g in tdays)
+        mx = max(tdays, key=lambda g: i(g, "max"))
+        pr = f"; nagrody turniejow AI (164a): gra chciala {prize[0]}, zaplacili {prize[1]} ({prize[2]} wyplat)" if prize[2] else ""
+        rep.add("TS-10: sakiewki (suma dob)", f"turnieje {tot('n')}, sakiewki {tot('k')} na sume {tot('sum')} (lud W {tot('w')}, R {tot('r')}, P {tot('p')}) -> glowy rodow {tot('heads')} "
+                f"({tot('headsn')}), gracz {tot('pl')} ({tot('pln')}); najwieksza {mx['max']} ({mx['maxtown']}, dzien {mx['day']}); bez sakiewki: KS niezastosowany {tot('noks')}, "
+                f"kiesa nieczynna {tot('nolive')}, nie bohater {tot('nohero')}, bez odbiorcy {tot('norec')}, bez kiesy {tot('nofolk')}, bez swiezej doby {tot('stale')}, "
+                f"bez nadwyzki {tot('nooffer')}, zajeta {tot('noroom')}, ponizej minimum {tot('belowmin')}{pr}", "INFO", None)
+        # TS-11 (recenzja f8): wpis linii "Obieg" (rody dostaly) = glowy rodow + gracz z linii doby sakiewki tej samej doby
+        pairs = [(g, g["_obg"]) for g in tdays if "_obg" in g]
+        if pairs:
+            bad = [(g, o) for g, o in pairs if int(o["heads"]) != i(g, "heads") or int(o["pl"]) != i(g, "pl") or int(o["headsn"]) != i(g, "headsn")
+                   or int(o["pln"]) != i(g, "pln") or int(o["all"]) != int(o["heads"]) + int(o["pl"])]
+            rep.add("TS-11: wpis linii Obieg (rody dostaly) 'sakiewka turniejowa ludu (f8)' = glowy rodow + gracz z linii doby sakiewki",
+                    f"dob porownanych {len(pairs)} z {len(tdays)}, niezgodnych {len(bad)}"
+                    + (f" (np. dzien {bad[0][0]['day']}: Obieg glowy {bad[0][1]['heads']} / gracz {bad[0][1]['pl']}, linia doby {bad[0][0]['heads']} / {bad[0][0]['pl']})" if bad else ""),
+                    "0", not bad)
+        else:
+            rep.add("TS-11: wpis linii Obieg 'sakiewka turniejowa ludu (f8)'", f"brak wpisu w dobach linii sakiewki (linii Obieg z wpisem {tobg})",
+                    "INFO (Obieg bez wpisu - DLL sprzed recenzji f8 albo ksiega pieniadza wylaczona)", None)
+    else:
+        rep.add("TS-2..10: linie doby sakiewki", f"brak linii doby (sakiewek {len(tev)})", "INFO (sesja krotsza niz doba)", None)
+        if n_err:
+            rep.add("TS-8: ERROR paczki (TourneyFolkPurse.*, TownFolk.TourneyPurse*)", f"ERROR {n_err}", "0", False)
 
 
 def nturniej_main(logp):
@@ -34571,10 +34681,40 @@ def nturniej_main(logp):
         return 0
     sess, days, bad, pays, reps = [], [], [], 0, 0
     n_err = 0
+    tdays, tbad, tev, tevbad, ts_err, prize = [], [], [], [], 0, [0, 0, 0]   # f8-sakiewka (wiersze TS)
+    tobg = 0   # recenzja f8 (TS-11): linie "Obieg" z wpisem "sakiewka turniejowa ludu (f8)" (wpis przypiety do linii doby sakiewki tej samej doby)
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
             s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NTS_HEAD):
+                if s.startswith(NTS_HEAD + "dzien "):
+                    mm = NTS_DAY.match(s)
+                    (tdays if mm else tbad).append(mm.groupdict() if mm else s)
+                else:
+                    mm = NTS_EV.match(s)
+                    (tev if mm else tevbad).append(mm.groupdict() if mm else s)
+                continue
+            if s.startswith(NTS_ERR):
+                ts_err += 1
+                continue
+            if s.startswith("Obieg: dzien ") and "sakiewka turniejowa ludu (f8)" in s:
+                mo, md = NTS_OBG.search(s), NTS_OBG_DAY.match(s)
+                if mo and md:
+                    tobg += 1
+                    od_ = int(md.group(1))
+                    # linia doby sakiewki biegnie w tym samym ticku przed "Obieg" (TourneyFolkPurse.Daily przed MoneyLedger.Daily) - przypnij do ostatniej
+                    # linii tej doby bez wpisu (wczytanie zapisu i powtorzona doba - kazda para osobno)
+                    for g_ in reversed(tdays):
+                        if int(g_["day"]) == od_:
+                            if "_obg" not in g_:
+                                g_["_obg"] = mo.groupdict()
+                            break
+                continue
+            if s.startswith("Szczelnosc (164a): dzien") and "nagrody turniejow: gra chciala" in s:
+                mm = NTS_PRIZE.search(s)
+                if mm:
+                    prize[0] += int(mm.group(1)); prize[1] += int(mm.group(2)); prize[2] += int(mm.group(3))
             if s.startswith(NTU_HEAD):
                 if s.startswith(NTU_HEAD + "start sesji"):
                     sess.append(s)
@@ -34590,9 +34730,11 @@ def nturniej_main(logp):
                     reps += 1
             elif s.startswith(NTU_ERR):
                 n_err += 1
-    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby {len(days)}, nierozpoznanych linii doby {len(bad)}, wyplat lancuchem {pays}, splat {reps}")
+    print(f"plik: {logp} | linii startu sesji {len(sess)}, doby {len(days)}, nierozpoznanych linii doby {len(bad)}, wyplat lancuchem {pays}, splat {reps}"
+          f" | sakiewka mieszczan (f8): doby {len(tdays)} (nierozpoznane {len(tbad)}), sakiewki {len(tev)} (nierozpoznane {len(tevbad)})")
     if not sess and not days and not bad:
         rep.add("TP-0: linie 'Turniej-platnik (TP)'", "brak w logu", "INFO (log sprzed paczki TP)", None)
+        nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, ts_err, prize, tobg)
         rep.show()
         return 0
     if sess:
@@ -34625,6 +34767,7 @@ def nturniej_main(logp):
                 "INFO", None)
     else:
         rep.add("TP-2: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba)", None)
+    nturniej_purse_rows(rep, tdays, tbad, tev, tevbad, ts_err, prize, tobg)   # f8-sakiewka: wiersze TS-0..TS-11
     rep.show()
     return 0
 

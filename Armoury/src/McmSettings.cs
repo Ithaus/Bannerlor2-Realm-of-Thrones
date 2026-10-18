@@ -4900,6 +4900,18 @@ namespace Armoury
         [SettingPropertyGroup("Player fees and bets")]
         public bool TourneySeagardCatchUp { get; set; } = true;
 
+        [SettingPropertyBool("Tourney Folk Purse", HintText = "the townsfolk of the town that hosts a tournament put up a purse for the champion: one day of what they spend from their savings on better living - a rich town gives a fat purse, a town with nothing to spare gives none - paid out of their own purses above their reserve for hard times to the head of the champion's house (to you, if you or one of your party win). You are told when the purse is yours or when you are in the town. Works once the start calibration is applied. Off = no purse, as before")]
+        [SettingPropertyGroup("Tournament purse of the townsfolk (18.10)")]
+        public bool TourneyFolkPurse { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Tourney Folk Purse Days", 0.00f, 4.00f, "0.00", HintText = "with Tourney Folk Purse: how many days of the townsfolk's spending from their savings go into the purse (1 = one day; at most 4)")]
+        [SettingPropertyGroup("Tournament purse of the townsfolk (18.10)")]
+        public float TourneyFolkPurseDays { get; set; } = 1.0f;
+
+        [SettingPropertyInteger("Tourney Folk Purse Min", 0, 80, "0", HintText = "with Tourney Folk Purse: a purse smaller than this is not put up - the coin stays with the townsfolk")]
+        [SettingPropertyGroup("Tournament purse of the townsfolk (18.10)")]
+        public int TourneyFolkPurseMin { get; set; } = 20;
+
         [SettingPropertyBool("Hideout Flag Enabled", HintText = "a freshly spotted hideout gets a flag on the map and a report: distance, direction, nearest settlement, who nests there")]
         [SettingPropertyGroup("Hideout spotted")]
         public bool HideoutFlagEnabled { get; set; } = true;
@@ -9052,6 +9064,9 @@ namespace Armoury
             s.TourneyPayerChain = TourneyPayerChain;
             s.TourneyDebts = TourneyDebts;
             s.TourneySeagardCatchUp = TourneySeagardCatchUp;
+            s.TourneyFolkPurse = TourneyFolkPurse;
+            s.TourneyFolkPurseDays = TourneyFolkPurseDays;
+            s.TourneyFolkPurseMin = TourneyFolkPurseMin;
             s.HideoutFlagEnabled = HideoutFlagEnabled;
             s.HideoutFlagDays = HideoutFlagDays;
             s.HouseLeviesEnabled = HouseLeviesEnabled;
