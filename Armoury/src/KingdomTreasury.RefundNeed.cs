@@ -27,6 +27,8 @@ namespace Armoury
     /// Kaskada braku (skarbiec ponad zapas K5, zaliczka mieszczan L1, kredyt Banku 186), podzial Split, wyplata, liczniki CrownIncome - bez zmian: dostaja mniejszy
     /// nalezny. Renty 180 NIETKNIETE (nie byly czescia decyzji Jeffa) - uwaga: roznica zwrotu zostaje w reszcie wplywow dnia, z ktorej po W5/M1/M3/E3-P1 tej
     /// samej doby biora renty 180 wedlug lenn (CrownRents.Daily - LeftFor), wiec czesc wraca do rodow z lennami, takze bogatych. Regula dla rent - decyzja Jeffa.
+    /// f7-renty (decyzja Jeffa 18.10 ok. 07:28 PDT "Renty wedlug potrzeby ... to robimy"): renty 180 ta sama regula (klucz CrownRentsByNeed, CrownRents.Need.cs) -
+    /// NeedBand (wzor) i NeedOfClan (ta sama pamiec doby _rbn); czego rod nie dostanie, zostaje w skarbcu krolestwa.
     ///
     /// Klucz wylaczony (albo budzet 166 wylaczony) = pelny zwrot co do zlotowki jak dotad; linia "Korona: zwrot wedlug potrzeby (f6)" liczy wtedy skutek na sucho.
     /// Zloto nie powstaje i nie znika: mniej przelewu skarbiec -> kiesa platnika. Stan tylko w pamieci doby (bez zapisu); Reset czysci wszystko i pasmo gracza.
@@ -95,14 +97,41 @@ namespace Armoury
                 if (ok && R > 0 && !double.IsNaN(G) && !double.IsInfinity(G))
                 {
                     n.G = G; n.R = R;
-                    n.F = Math.Max(0.0, Math.Min(1.0, (2.0 * R - G) / R));
-                    n.Band = G <= R ? NbBelow : (G >= 2.0 * R ? NbAbove : NbMid);
-                    if (n.Band == NbAbove) n.F = 0;
-                    else if (n.Band == NbBelow) n.F = 1;
+                    double f; n.Band = NeedBand(G, R, out f); n.F = f;   // f7-renty: wzor w jednym miejscu (NeedBand) - ten sam dla zwrotu i rent
                 }
             }
             catch (Exception e) { n.F = 1; n.Band = NbNone; RbnStumble("Of", e); }
             return n;
+        }
+
+        /// <summary>f7-renty: JEDNA regula mnoznika potrzeby (zwrot f6 i renty f7): f = clamp((2R - G) / R, 0, 1); pasmo 0 ponizej R (f = 1), 1 R-2R (liniowo),
+        /// 2 ponad 2R (f = 0). R > 0 (wolajacy sprawdza). Te same liczby co dotad w RbnOf co do bitu.</summary>
+        internal static int NeedBand(double G, double R, out double f)
+        {
+            f = Math.Max(0.0, Math.Min(1.0, (2.0 * R - G) / R));
+            int band = G <= R ? NbBelow : (G >= 2.0 * R ? NbAbove : NbMid);
+            if (band == NbAbove) f = 0;
+            else if (band == NbBelow) f = 1;
+            return band;
+        }
+
+        /// <summary>f7-renty (CrownRents.Need.cs): mnoznik f, G i R rodu z TEJ SAMEJ pamieci doby co zwrot zoldu (RbnOf - budzet 166 z wczoraj: ChestOf / PendingChestOf,
+        /// te same wykluczenia: bez budzetu, dluznik i zajecie 168, Straz bez zoldu, najemnik; gracz w wojnie z PlayerCaps). Krok rent biegnie po zwrocie, wiec rod
+        /// policzony przy zwrocie ma te same liczby. Doba bez kroku zwrotu (Crown Wage Refund wylaczony) - pamiec doby od zera tutaj (liczniki f6 dzis i tak bez linii).
+        /// Zwraca pasmo: 0 ponizej R, 1 R-2R, 2 ponad 2R, 3 bez miary (f = 1). Nie rzuca.</summary>
+        internal static int NeedOfClan(Clan c, out double f, out double G, out double R)
+        {
+            f = 1; G = 0; R = 0;
+            try
+            {
+                if (c == null || Campaign.Current == null) return NbNone;
+                if (_rbnDay != (int)CampaignTime.Now.ToDays) RbnBegin();
+                var n = RbnOf(c);
+                if (n == null) return NbNone;
+                f = n.F; G = n.G; R = n.R;
+                return n.Band;
+            }
+            catch (Exception e) { RbnStumble("NeedOfClan", e); f = 1; G = 0; R = 0; return NbNone; }
         }
 
         /// <summary>WageRefund, krolestwo w wojnie, wiersz platnika (zold v po cieciach W5/W7/K3): pelny = (int)(v x pct), wedlug potrzeby = (int)(pelny x f).
@@ -187,7 +216,9 @@ namespace Armoury
                       .Append(", f ").Append(p.F.ToString("0.00", inv)).Append(", G ").Append(Math.Round(p.G).ToString("0", inv)).Append(", R ").Append(Math.Round(p.R).ToString("0", inv))
                       .Append(", pelny ").Append(p.Full).Append(", wedlug potrzeby ").Append(p.Need);
                 else sb.Append(" | rod gracza: bez zwrotu dzis");
-                sb.Append(" | renty 180 bez zmian (roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn)")
+                sb.Append(CrownRents.NeedOn   // f7-renty: renty 180 ta sama regula - czesc rodow bogatych zostaje w skarbcu (linia "Korona: renty wedlug potrzeby (f7)")
+                    ? " | renty 180 wedlug potrzeby (f7, ta sama regula; roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn x f, reszta w skarbcu)"
+                    : " | renty 180 bez zmian (roznica zwrotu zostaje w reszcie wplywow dnia - W5, M1, M3, dwor krola, potem renty wedlug lenn)")
                   .Append(" | zapas wojny korony (184, W5b, K5, DS, L5b-1, korona2) z pelnego zwrotu - jak przed f6")
                   .Append(" | potkniecia ").Append(_rbnStumbles).Append(" (sesja ").Append(_rbnStumblesSess).Append(").");
                 Log.Info(sb.ToString());

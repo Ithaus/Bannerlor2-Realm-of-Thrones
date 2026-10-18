@@ -526,7 +526,8 @@ namespace Armoury
                       .Append("; kontrola: gotowka M1 przy zoldzie w pulapie wlasnym ").Append(_raNotAtCap).Append(" (oczekiwane 0)")
                       // recenzja M1: skad wyplacona gotowka M1 (wagi lenn rent 180 tej doby) - tylko "bez potrzeby" to nowy pieniadz dla rodow z potrzeba
                       .Append("; skad (bez M1 poszloby w renty): rodom z potrzeba W5 ").Append(rNeed).Append(" (ta sama kiesa - zmiana etykiety), rodom bez potrzeby ").Append(rNo)
-                      .Append(" (przelew miedzy rodami), udzialy rodow bez warunku rent ").Append(rHeld).Append(" (zostalyby w skarbcu)")
+                      .Append(" (przelew miedzy rodami), udzialy rodow bez warunku rent ").Append(rHeld)
+                      .Append(CrownRents.NeedOn ? " (zostalyby w skarbcu; f7 - z czescia rent zatrzymana wedlug potrzeby rodu)" : " (zostalyby w skarbcu)")   // f7-renty: wylaczony - napis jak dotad
                       .Append(" | kontrola: gotowka rodom, ktorych zold druzyn miesci sie w pulapie wlasnym ").Append(_naNotAtCap).Append(" (oczekiwane 0)")
                       .Append(" | podniesienie pulapu druzyn ").Append(Math.Round(boost).ToString("0", WtInv)).Append(" u ").Append(boostN)
                       .Append(" rodow (gotowka + miejsce na krok werbunku ").Append(Math.Round(Math.Max(0, boost - paid)).ToString("0", WtInv)).Append(')')

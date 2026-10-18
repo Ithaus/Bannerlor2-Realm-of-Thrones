@@ -4080,6 +4080,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentHeldToServing { get; set; } = true;
 
+        [SettingPropertyBool("Crown Rents By Need", HintText = "the crown pays fief rents by need, by the same rule as the wage refund: a serving house whose family gold is below its war reserve gets its full rent, a house holding more than twice its war reserve gets none, and in between the rent falls evenly the richer the house is. What a house does not get stays in the realm's treasury for wars and hard times - it is never shared out to the other houses. Judged on the house's budget of the day before; your own house the same way, in war and in peace. Houses without a budget, in debt or under seizure keep the full rent (off = every serving house gets its full rent, as before)")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool CrownRentsByNeed { get; set; } = true;
+
         [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownPaysCallToWar { get; set; } = true;
@@ -8791,6 +8795,7 @@ namespace Armoury
             s.CrownRentServiceAfterFullDays = CrownRentServiceAfterFullDays;
             s.CrownRentServiceAtMeans = CrownRentServiceAtMeans;
             s.CrownRentHeldToServing = CrownRentHeldToServing;
+            s.CrownRentsByNeed = CrownRentsByNeed;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
             s.CallToWarPaysForWar = CallToWarPaysForWar;

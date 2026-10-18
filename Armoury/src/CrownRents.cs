@@ -60,7 +60,7 @@ namespace Armoury
     /// Platnik -> odbiorca: skarbiec (reszta wplywow dnia) -> glowa rodu (GiveGold w parze: skarbiec - x, glowa + x). Zapis: SaveText "arm_rent180"
     /// (sluzba rodow, normy zalog, doby przejecia twierdz, rody na miare srodkow).
     /// </summary>
-    internal static class CrownRents
+    internal static partial class CrownRents   // f7-renty: renty wedlug potrzeby rodu w CrownRents.Need.cs
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int Window = 60;          // doby wojny krolestwa, z ktorych liczy sie sluzba (projekt: "z ostatnich 60 dob")
@@ -115,6 +115,7 @@ namespace Armoury
         {
             ClearState(); _rows.Clear(); _dayInfo.Clear();
             ZeroLast(); _stumbles = 0; _err.Clear(); _importN = -1; _importBad = 0; _importOld = false; _playerNote = null; _playerWeekSum = 0; _playerWeekStart = -1;
+            NeedReset();   // f7-renty: stan doby, potkniecia sesji i pasmo renty gracza
         }
 
         /// <summary>Stan sluzby, norm i przejec twierdz (wylaczone 180 = stan sprzed paczki: nic nie liczymy i nic nie zapisujemy).</summary>
@@ -208,6 +209,7 @@ namespace Armoury
         {
             LastPool = LastPaid = LastHeld = LastHeldFail = LastRound = LastToServing = 0;
             LastClans = LastOk = LastFailGar = LastFailSvc = LastFailBoth = LastKingdoms = LastNoPool = 0;
+            LastKeptNeed = 0;   // f7-renty
         }
 
         private static void Stumble(string where, Exception e)
@@ -349,6 +351,7 @@ namespace Armoury
         internal static void Daily()
         {
             ZeroLast(); _rows.Clear(); _dayInfo.Clear();
+            NeedBegin();   // f7-renty: wiersze i liczniki pasm doby od zera (klucz, pomiar)
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             if (!On) { if (_svc.Count > 0 || _norm.Count > 0 || _since.Count > 0 || _owner.Count > 0 || _means.Count > 0) ClearState(); return; }   // recenzja C2: wylacznik = stan sprzed paczki (bez starej sluzby po wlaczeniu)
@@ -594,6 +597,8 @@ namespace Armoury
                         if (pay) LastKingdoms++; else LastNoPool += list.Count;
                         bool toServing = pay && s.CrownRentHeldToServing && sumOk > 0 && sumOk < sum - 1e-9;
                         double div = toServing ? sumOk : sum;
+                        long keptK = 0;                                        // f7-renty: udzialy rodow z warunkiem zatrzymane w skarbcu wedlug potrzeby rodu (nie do innych rodow)
+                        long wal0 = pay ? (long)k.KingdomBudgetWallet : 0;     // f7-renty: skarbiec przed wyplata rent (tozsamosc: ubylo = renty)
                         for (int i = 0; i < list.Count; i++)
                         {
                             var c = list[i];
@@ -601,6 +606,10 @@ namespace Armoury
                             bool ok = row.GarOk && row.SvcOk, paid = false;
                             long share = pay ? (long)(pool * wts[i] / (ok ? div : sum)) : 0;     // rod bez warunku: udzial wedlug wszystkich wag (do linii i CSV)
                             int x = (int)Math.Min(int.MaxValue, Math.Max(0L, share));
+                            // f7-renty (decyzja Jeffa 18.10): udzial rodu z warunkiem x mnoznik potrzeby f - ta sama regula co zwrot zoldu f6 (G i R z wczorajszego budzetu 166);
+                            // reszta (x0 - x) zostaje w skarbcu - nie wraca do puli i nie idzie do innych rodow. Klucz wylaczony - x bez zmian (pomiar na sucho)
+                            bool needRow = ok && x > 0;
+                            if (needRow) { int x0 = x; x = NeedCut(c, x0); keptK += x0 - x; }
                             if (ok && x > 0)
                             {
                                 try
@@ -616,6 +625,7 @@ namespace Armoury
                                 }
                                 catch (Exception e) { Stumble("Daily(wyplata)", e); }
                             }
+                            if (needRow) NeedPaid(c, paid ? x : 0, paid ? 0 : x);   // f7-renty: wyplacone wedlug pasma rodu (nieudana wyplata zostaje w skarbcu jak dotad)
                             if (!paid)
                             {
                                 row.Held = x;
@@ -635,10 +645,11 @@ namespace Armoury
                             }
                         }
                         if (!pay) continue;
+                        NeedWallet(wal0, (long)k.KingdomBudgetWallet);         // f7-renty: skarbiec przed / po wyplacie rent (ubylo = renty; zatrzymane zostaly w skarbcu)
                         CrownIncome.Spent(k, paidK);                           // renty schodza z reszty wplywow dnia; reszta (wstrzymane, zaokraglenia) zostaje w skarbcu
-                        long round = pool - paidK - heldK;                     // E5/F9: przy oddaniu udzialy rodow bez warunku siedza w paidK (toServK - ich wartosc wedlug wszystkich wag, poza rownaniem)
-                        day.Rent += paidK; day.RentHeld += pool - paidK;
-                        LastPool += pool; LastPaid += paidK; LastHeldFail += heldK; LastRound += round; LastHeld += pool - paidK; LastToServing += toServK;
+                        long round = pool - paidK - heldK - keptK;             // E5/F9: przy oddaniu udzialy rodow bez warunku siedza w paidK (toServK - ich wartosc wedlug wszystkich wag, poza rownaniem); f7: keptK osobno (klucz wylaczony - 0)
+                        day.Rent += paidK; day.RentHeld += pool - paidK;       // f7: wstrzymane w skarbcu obejmuja zatrzymane wedlug potrzeby (zostaja w skarbcu - bez Spent)
+                        LastPool += pool; LastPaid += paidK; LastHeldFail += heldK; LastRound += round; LastHeld += pool - paidK; LastToServing += toServK; LastKeptNeed += keptK;
                         perShare.Add(pool / sum);
                         det.Add(new KeyValuePair<long, string>(pool, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + paidK + "/" + pool + " (udzial " + (pool / sum).ToString("0", Inv) + ")"));
                     }
@@ -683,7 +694,8 @@ namespace Armoury
                     sb.Append("Renty korony (180): dzien ").Append(today)
                       .Append(" | krolestwa z renta ").Append(LastKingdoms).Append(", reszta wplywow dnia po zwrocie ").Append(LastPool)
                       .Append(" = renty ").Append(LastPaid).Append(" + wstrzymane w skarbcach ").Append(LastHeld)
-                      .Append(" (udzialy rodow bez warunku ").Append(LastHeldFail).Append(", zaokraglenia ").Append(LastRound).Append(')')
+                      .Append(" (udzialy rodow bez warunku ").Append(LastHeldFail).Append(", zaokraglenia ").Append(LastRound)
+                      .Append(_rnApply ? ", zatrzymane wedlug potrzeby rodu (f7) " + LastKeptNeed : "").Append(')')   // f7-renty: tylko przy czynnym kluczu (wylaczony - napis jak dotad)
                       .Append(" | E5/F9 udzialy rodow bez warunku oddane rodom z warunkiem tego krolestwa (Crown Rent Held To Serving): ")
                       .Append(s.CrownRentHeldToServing ? LastToServing + " (siedza w rentach)" : "wylaczone - zostaja w skarbcu")
                       .Append(" | rody z lennem ").Append(LastClans).Append(" (w krolestwach bez reszty po zwrocie - renta 0: ").Append(LastNoPool).Append("): z warunkiem ").Append(LastOk).Append(", bez warunku ").Append(LastClans - LastOk)
@@ -721,6 +733,7 @@ namespace Armoury
                     Log.Info(sb.ToString());
                     _importN = -1;
                 }
+                NeedLine(s, today);   // f7-renty: linia "Korona: renty wedlug potrzeby (f7)" (pasma, zatrzymane w skarbcach, tozsamosci) i komunikat gracza przy zmianie pasma
             }
             catch (Exception e) { Stumble("Daily", e); }
         }

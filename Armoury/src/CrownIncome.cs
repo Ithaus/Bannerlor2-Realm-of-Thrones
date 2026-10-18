@@ -479,7 +479,7 @@ namespace Armoury
                       .Append(", zwrot zoldu ").Append(refG).Append(" (nalezny ").Append(refD).Append(refD > 0 ? ", wyplacone " + (100.0 * refG / refD).ToString("0.0", Inv) + "%" : "")
                       .Append("; w tym z kredytu Banku (186) ").Append(loanIn).Append(DsTowns.FarmsLive || DsVillage.Live || dtre > 0 ? ", ze skarbca ponad zapas wojny (DS K5) " + dtre : "")
                       .Append(DsTowns.FarmsLive || dant > 0 ? ", z zaliczek mieszczan (DS L1) " + dant : "").Append(")")
-                      .Append(", renty (180) ").Append(rent).Append(" (wstrzymane w skarbcach - rody bez warunku i zaokraglenia ").Append(rentH).Append(CrownRents.On ? ")" : "; renty wylaczone)")
+                      .Append(", renty (180) ").Append(rent).Append(" (wstrzymane w skarbcach - rody bez warunku i zaokraglenia ").Append(rentH).Append(CrownRents.NeedNote165()).Append(CrownRents.On ? ")" : "; renty wylaczone)")   // f7-renty: dopisek tylko przy czynnym kluczu
                       .Append(", doplata do zoldu wedlug potrzeby (W5, przed rentami) ").Append(naid).Append(", doplata z reszty wplywow dnia przed rentami (M1) ").Append(naRent)
                       .Append(", chleb dla glodnych osad (M3, z reszty wplywow przed rentami) ").Append(bread)
                       .Append(", E3-G5 z zaworu miast do zapasu (Crown Keeps Valve Share ").Append(s.CrownKeepsValveShare ? "tak" : "nie - dzwignia awaryjna").Append(", z puli rent po M3) ").Append(vKept)
