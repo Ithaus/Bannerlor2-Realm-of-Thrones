@@ -29,6 +29,11 @@ namespace Armoury
     /// Klucz wylaczony (albo budzet 166 wylaczony) = renty co do zlotowki jak dotad; linia "Korona: renty wedlug potrzeby (f7)" liczy wtedy skutek na sucho.
     /// Stan tylko w pamieci doby (bez zapisu - nowe klucze SyncData niepotrzebne); Reset czysci wszystko i pasmo gracza. Kolumny budzet-rodow.csv (ostatnie -
     /// czytniki po nazwach): renta_f7_mnoznik, renta_f7_g, renta_f7_r, renta_f7_pasmo, renta_f7_pelna, renta_f7_wedlug_potrzeby.
+    /// Recenzja f7 (komunikaty): w wojnie pasmo zwrotu f6 i renty f7 liczy ten sam wiersz potrzeby, wiec przy kazdej zmianie pasma (i po kazdym wczytaniu) szly
+    /// dwa prawie jednakowe komunikaty tego samego dnia. Przy czynnym kluczu komunikat zwrotu idzie do kroku rent (QueueWageMsg): to samo pasmo renty tego dnia -
+    /// JEDEN wspolny komunikat, inaczej osobno (najpozniej na koncu CrownRents.Daily - NeedFlushWageMsg). Pasmo komunikatu (zwrot i renta) ma martwa strefe 5% R
+    /// przy progach R i 2R (MsgBand) - bez migania dzien po dniu; zloto bez zmian (f ciagle w R i 2R). Pole linii f7 'komunikat gracza' (checker NRN-9).
+    /// Klucz wylaczony - komunikat zwrotu f6 jak dotad co do znaku. Bez zapisu: po wczytaniu pierwszy komunikat pasma R-2R / ponad 2R wraca (raz, jeden).
     /// </summary>
     internal static partial class CrownRents
     {
@@ -45,11 +50,14 @@ namespace Armoury
         private static long _rnFail, _rnW0, _rnW1; private static int _rnWK;
         private static int _rnStumbles, _rnStumblesSess; private static bool _rnErr;
         private static int _rnPlayerBand = -1;              // pasmo renty gracza przy ostatnim kroku (komunikat tylko przy zmianie)
+        // recenzja f7 (dwa komunikaty jednego dnia): komunikat zwrotu f6 odlozony do kroku rent tej doby (QueueWageMsg) - to samo pasmo renty = jeden wspolny
+        private static int _rnWageMsgDay = int.MinValue, _rnWageMsgBand = -1; private static string _rnWageMsg;
+        private const double MsgDeadBand = 0.05;            // martwa strefa pasma komunikatu: 5% R przy progach R i 2R (bez migania komunikatow dzien po dniu)
         /// <summary>f7: udzialy rodow z warunkiem zatrzymane dzis w skarbcach wedlug potrzeby rodu (linia 180, linia f7, dopisek linii 165).</summary>
         internal static long LastKeptNeed;
 
         /// <summary>Reset (nowa kampania i kazde wczytanie): stan doby, potkniecia sesji i pasmo gracza.</summary>
-        private static void NeedReset() { _rn.Clear(); _rnDay = int.MinValue; NeedZero(); _rnStumblesSess = 0; _rnErr = false; _rnPlayerBand = -1; _rnApply = false; _rnMeasure = false; }
+        private static void NeedReset() { _rn.Clear(); _rnDay = int.MinValue; NeedZero(); _rnStumblesSess = 0; _rnErr = false; _rnPlayerBand = -1; _rnApply = false; _rnMeasure = false; _rnWageMsgDay = int.MinValue; _rnWageMsgBand = -1; _rnWageMsg = null; }
 
         private static void NeedZero()
         {
@@ -175,6 +183,47 @@ namespace Armoury
                 foreach (var kv in _rn) if (kv.Value != null && kv.Value.Counted && kv.Value.Need < kv.Value.Full) cut++;
                 string[] name = { "ponizej R (cala)", "R-2R (czesc, liniowo)", "ponad 2R (nic)", "bez miary (cala: bez budzetu, dluznik, zajecie, Straz bez zoldu, gracz bez pomiaru)" };
                 string[] shortName = { "ponizej R", "R-2R", "ponad 2R", "bez miary" };
+                // komunikat gracza - tylko przy zmianie pasma (klucz czynny, rod gracza z renta dzis); recenzja f7: pasmo komunikatu z martwa strefa (MsgBand),
+                // decyzja i wysylka przed linia (pole 'komunikat gracza' linii - checker NRN-9)
+                RnRow p;
+                var pc = Clan.PlayerClan;
+                string rentMsg = null; int rentBand = -1;
+                if (_rnApply && pc != null && _rn.TryGetValue(pc, out p) && p != null && p.Counted && p.Band != RnNone)
+                {
+                    int band = MsgBand(_rnPlayerBand, p.G, p.R, p.Band);
+                    if (band != _rnPlayerBand)
+                    {
+                        if (band == RnAbove)
+                            rentMsg = "The crown no longer pays your house its fief rents: your house holds more than twice its war reserve. Your share stays in the realm's treasury for wars and hard times.";
+                        else if (band == RnMid)
+                            rentMsg = "The crown now pays your house only part of its fief rents: your house holds more than its war reserve - the richer the house, the smaller the rent. The rest stays in the realm's treasury.";
+                        else if (_rnPlayerBand == RnMid || _rnPlayerBand == RnAbove)
+                            rentMsg = "The crown again pays your house its full fief rents: your house's gold is below its war reserve.";
+                        rentBand = band;
+                        _rnPlayerBand = band;
+                    }
+                }
+                // recenzja f7: zwrot (f6) i renta tego samego dnia w tym samym pasmie - JEDEN komunikat (w wojnie oba z tego samego wiersza potrzeby)
+                string bothMsg = null, wageMsg = _rnWageMsg;
+                int wageBand = _rnWageMsgBand, wageDay = _rnWageMsgDay;
+                _rnWageMsg = null; _rnWageMsgDay = int.MinValue; _rnWageMsgBand = -1;
+                if (rentMsg != null && wageMsg != null && wageDay == today && wageBand == rentBand)
+                {
+                    if (rentBand == RnAbove)
+                        bothMsg = "The crown no longer repays your wages nor pays your house its fief rents: your house holds more than twice its war reserve and pays for its own war. Your rent share stays in the realm's treasury for wars and hard times.";
+                    else if (rentBand == RnMid)
+                        bothMsg = "The crown now repays only part of your wages and pays your house only part of its fief rents: your house holds more than its war reserve - the richer the house, the smaller the share, and nothing above twice the reserve. The rest of the rent stays in the realm's treasury.";
+                    else
+                        bothMsg = "The crown again repays your wages and pays your house its fief rents in full: your house's gold is below its war reserve.";
+                    rentMsg = null; wageMsg = null;
+                }
+                string msgKind = bothMsg != null ? "wspolny (zwrot i renta), pasmo " + shortName[rentBand]
+                               : (wageMsg != null && rentMsg != null ? "osobno zwrot (pasmo " + (wageBand >= 0 && wageBand < 4 ? shortName[wageBand] : "?") + ") i renta (pasmo " + shortName[rentBand] + ")"
+                               : (wageMsg != null ? "zwrot, pasmo " + (wageBand >= 0 && wageBand < 4 ? shortName[wageBand] : "?")
+                               : (rentMsg != null ? "renta, pasmo " + shortName[rentBand] : "brak")));
+                if (wageMsg != null) Log.Player(wageMsg);   // wysylka przed linia - wyjatek w linii nie gubi komunikatu
+                if (rentMsg != null) Log.Player(rentMsg);
+                if (bothMsg != null) Log.Player(bothMsg);
                 if (s != null && s.LogEnabled)
                 {
                     var sb = new StringBuilder(1400);
@@ -201,24 +250,50 @@ namespace Armoury
                           .Append(", G ").Append(Math.Round(p0.G).ToString("0", inv)).Append(", R ").Append(Math.Round(p0.R).ToString("0", inv))
                           .Append(", pelna ").Append(p0.Full).Append(", wedlug potrzeby ").Append(p0.Need);
                     else sb.Append(" | rod gracza: bez renty dzis");
+                    sb.Append(" | komunikat gracza: ").Append(msgKind);   // recenzja f7: jeden komunikat na zmiane pasma (NRN-9)
                     sb.Append(" | potkniecia ").Append(_rnStumbles).Append(" (sesja ").Append(_rnStumblesSess).Append(").");
                     Log.Info(sb.ToString());
                 }
-                // komunikat gracza - tylko przy zmianie pasma (klucz czynny, rod gracza z renta dzis)
-                RnRow p;
-                var pc = Clan.PlayerClan;
-                if (_rnApply && pc != null && _rn.TryGetValue(pc, out p) && p != null && p.Counted && p.Band != RnNone && p.Band != _rnPlayerBand)
-                {
-                    if (p.Band == RnAbove)
-                        Log.Player("The crown no longer pays your house its fief rents: your house holds more than twice its war reserve. Your share stays in the realm's treasury for wars and hard times.");
-                    else if (p.Band == RnMid)
-                        Log.Player("The crown now pays your house only part of its fief rents: your house holds more than its war reserve - the richer the house, the smaller the rent. The rest stays in the realm's treasury.");
-                    else if (_rnPlayerBand == RnMid || _rnPlayerBand == RnAbove)
-                        Log.Player("The crown again pays your house its full fief rents: your house's gold is below its war reserve.");
-                    _rnPlayerBand = p.Band;
-                }
             }
             catch (Exception e) { NeedStumble("Line", e); }
+        }
+
+        /// <summary>Recenzja f7: pasmo komunikatu gracza (zwrot f6 i renta f7) z martwa strefa MsgDeadBand x R - progi R i 2R przesuniete od poprzedniego pasma
+        /// (z ponizej R do R-2R dopiero ponad 1.05 R, z powrotem dopiero ponizej 0.95 R; tak samo przy 2R). Tylko napis - zloto liczy f bez martwej strefy (f ciagle
+        /// w R i 2R). prev -1 (pierwszy krok sesji) - progi bez przesuniecia. raw - pasmo z NeedBand (bez miary - bez zmian). Nie rzuca.</summary>
+        internal static int MsgBand(int prev, double G, double R, int raw)
+        {
+            if (raw < RnBelow || raw > RnAbove || !(R > 0) || double.IsNaN(G) || double.IsInfinity(G)) return raw;
+            double m = MsgDeadBand * R, lo = R, hi = 2.0 * R;
+            if (prev == RnBelow) { lo = R + m; hi = 2.0 * R + m; }
+            else if (prev == RnMid) { lo = R - m; hi = 2.0 * R + m; }
+            else if (prev == RnAbove) { lo = R - m; hi = 2.0 * R - m; }
+            return G <= lo ? RnBelow : (G >= hi ? RnAbove : RnMid);
+        }
+
+        /// <summary>Recenzja f7 (KingdomTreasury.RbnLine przy czynnym kluczu f7): komunikat zwrotu zoldu gracza tej doby - wyslany w kroku rent (NeedLine: razem
+        /// z komunikatem renty w tym samym pasmie albo osobno), najpozniej na koncu CrownRents.Daily (NeedFlushWageMsg). Nie rzuca.</summary>
+        internal static void QueueWageMsg(int band, string text)
+        {
+            try
+            {
+                NeedFlushWageMsg();   // poprzedni nie wyslany (nie powinno sie zdarzyc) - najpierw on
+                _rnWageMsg = text; _rnWageMsgBand = band;
+                _rnWageMsgDay = Campaign.Current != null ? (int)CampaignTime.Now.ToDays : int.MinValue;
+            }
+            catch (Exception e) { NeedStumble("QueueWage", e); if (text != null) try { Log.Player(text); } catch { } }
+        }
+
+        /// <summary>Recenzja f7: odlozony komunikat zwrotu zoldu, jesli jeszcze nie wyslany (krok rent bez komunikatu renty, wyjatek przed NeedLine). Nie rzuca.</summary>
+        private static void NeedFlushWageMsg()
+        {
+            try
+            {
+                string t = _rnWageMsg;
+                _rnWageMsg = null; _rnWageMsgDay = int.MinValue; _rnWageMsgBand = -1;
+                if (t != null) Log.Player(t);
+            }
+            catch (Exception e) { NeedStumble("FlushWage", e); }
         }
 
         /// <summary>Kolumny budzet-rodow.csv (za zwrot_f6_* - czytniki po nazwach): renta wedlug potrzeby tej doby (rody z warunkiem i udzialem > 0).</summary>

@@ -736,6 +736,7 @@ namespace Armoury
                 NeedLine(s, today);   // f7-renty: linia "Korona: renty wedlug potrzeby (f7)" (pasma, zatrzymane w skarbcach, tozsamosci) i komunikat gracza przy zmianie pasma
             }
             catch (Exception e) { Stumble("Daily", e); }
+            NeedFlushWageMsg();   // recenzja f7: odlozony komunikat zwrotu f6 tej doby, jesli NeedLine go nie wyslal (wyjatek wyzej) - nie ginie (zwykle nic do wyslania)
         }
 
         /// <summary>Naglowek kolumn 180 w CSV ksiegi 169 (ostatnie kolumny - czytniki po nazwach). P3/W1 C: sluzba rodu dzis (0 nie, 1 armia, 2 oblezenie,

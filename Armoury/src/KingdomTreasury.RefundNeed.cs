@@ -29,6 +29,8 @@ namespace Armoury
     /// samej doby biora renty 180 wedlug lenn (CrownRents.Daily - LeftFor), wiec czesc wraca do rodow z lennami, takze bogatych. Regula dla rent - decyzja Jeffa.
     /// f7-renty (decyzja Jeffa 18.10 ok. 07:28 PDT "Renty wedlug potrzeby ... to robimy"): renty 180 ta sama regula (klucz CrownRentsByNeed, CrownRents.Need.cs) -
     /// NeedBand (wzor) i NeedOfClan (ta sama pamiec doby _rbn); czego rod nie dostanie, zostaje w skarbcu krolestwa.
+    /// Recenzja f7: przy czynnym kluczu f7 komunikat gracza o zwrocie idzie przez CrownRents.QueueWageMsg (jeden wspolny z komunikatem renty w tym samym pasmie)
+    /// i pasmo komunikatu ma martwa strefe 5% R (CrownRents.MsgBand); klucz f7 wylaczony - komunikat jak dotad.
     ///
     /// Klucz wylaczony (albo budzet 166 wylaczony) = pelny zwrot co do zlotowki jak dotad; linia "Korona: zwrot wedlug potrzeby (f6)" liczy wtedy skutek na sucho.
     /// Zloto nie powstaje i nie znika: mniej przelewu skarbiec -> kiesa platnika. Stan tylko w pamieci doby (bez zapisu); Reset czysci wszystko i pasmo gracza.
@@ -223,15 +225,25 @@ namespace Armoury
                   .Append(" | potkniecia ").Append(_rbnStumbles).Append(" (sesja ").Append(_rbnStumblesSess).Append(").");
                 Log.Info(sb.ToString());
                 // komunikat gracza - tylko przy zmianie pasma (klucz czynny, rod gracza z naleznym dzis)
-                if (_rbnApply && p != null && p.Counted && p.Band != NbNone && p.Band != _rbnPlayerBand)
+                // recenzja f7: przy czynnych rentach wedlug potrzeby (CrownRents.NeedOn) pasmo komunikatu ma martwa strefe (CrownRents.MsgBand - 5% R przy progach R
+                // i 2R), a komunikat idzie do kroku rent tej doby (CrownRents.QueueWageMsg): to samo pasmo renty tego dnia - JEDEN wspolny komunikat zamiast dwoch
+                // (w wojnie pasmo zwrotu i renty liczy ten sam wiersz RbnOf). Klucz f7 wylaczony - warunek, napisy i kolejnosc jak dotad co do znaku.
+                if (_rbnApply && p != null && p.Counted && p.Band != NbNone)
                 {
-                    if (p.Band == NbAbove)
-                        Log.Player("The crown no longer repays your wages: your house holds more than twice its war reserve and pays for its own war.");
-                    else if (p.Band == NbMid)
-                        Log.Player("The crown now repays only part of your wages: your house holds more than its war reserve - the richer the house, the smaller the share, and nothing above twice the reserve.");
-                    else if (_rbnPlayerBand == NbMid || _rbnPlayerBand == NbAbove)
-                        Log.Player("The crown again repays your wages in full: your house's gold is below its war reserve.");
-                    _rbnPlayerBand = p.Band;
+                    bool f7 = CrownRents.NeedOn;
+                    int band = f7 ? CrownRents.MsgBand(_rbnPlayerBand, p.G, p.R, p.Band) : p.Band;
+                    if (band != _rbnPlayerBand)
+                    {
+                        string msg = null;
+                        if (band == NbAbove)
+                            msg = "The crown no longer repays your wages: your house holds more than twice its war reserve and pays for its own war.";
+                        else if (band == NbMid)
+                            msg = "The crown now repays only part of your wages: your house holds more than its war reserve - the richer the house, the smaller the share, and nothing above twice the reserve.";
+                        else if (_rbnPlayerBand == NbMid || _rbnPlayerBand == NbAbove)
+                            msg = "The crown again repays your wages in full: your house's gold is below its war reserve.";
+                        if (msg != null) { if (f7) CrownRents.QueueWageMsg(band, msg); else Log.Player(msg); }
+                        _rbnPlayerBand = band;
+                    }
                 }
             }
             catch (Exception e) { RbnStumble("Line", e); }

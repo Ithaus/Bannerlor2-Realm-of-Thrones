@@ -1502,9 +1502,13 @@ Uzycie (Python 3, tylko odczyt):
                     = linia 180 i dopisek f7 linii 165 = zatrzymane; NRN-3 pasma: ponad 2R wedlug potrzeby 0 (przy kluczu wyplacone 0), ponizej R i bez miary = pelna, R-2R <=
                     pelna, wyplacone <= wedlug potrzeby; NRN-4 budzet-rodow.csv rod po rodzie (kolumny renta_f7_*): f = clamp((2R - G) / R), pasmo wedlug G i R, ponad 2R bez
                     renty, wedlug potrzeby = pelna x f, renta_180 <= wedlug potrzeby (na sucho <= pelna), suma rodow = linia f7 (CSV bez kolumn - INFO); NRN-5 renty wedlug pasm,
-                    zatrzymane w skarbcach na dobe i rodow z ucieta renta (INFO, srednia 28 dob); NRN-6 skarbce koron razem i zmiana na dobe z linii "Skarbce:" wobec zatrzymanych
+                    zatrzymane w skarbcach na dobe i rodow z ucieta renta (INFO, srednia 28 dob); NRN-5b (recenzja f7, sprzezenie D -> R -> f: renty i zwrot sa w D rodu)
+                    pasmo R-2R nie pustoszeje - przy >= 56 dobach z kluczem czynnym rodow R-2R i wedlug potrzeby / pelna w ostatnich 28 dobach >= 50% pierwszych 28 (NIE =
+                    propozycja dla Jeffa: R z D bez czesci korony; krocej - INFO); NRN-6 skarbce koron razem i zmiana na dobe z linii "Skarbce:" wobec zatrzymanych
                     (INFO); NRN-6b z --baza-doby: zmiana skarbcow na dobe i renty 180 bieg / baza (INFO - renty przed - renty po ~ zatrzymane); NRN-7 rod gracza: f z G i R
-                    wedlug pasma (doby z renta gracza, inaczej INFO); NRN-8 ERROR CrownRents (w tym CrownRents.Need) 0 i potkniecia f7 0; NRN-D skutek reguly na sucho z CSV
+                    wedlug pasma (doby z renta gracza, inaczej INFO); NRN-8 ERROR CrownRents (w tym CrownRents.Need) 0 i potkniecia f7 0; NRN-9 (recenzja f7) pole linii f7
+                    "komunikat gracza": zwrot f6 i renta f7 tego samego dnia w tym samym pasmie - jeden wspolny komunikat, dwa osobne w tym samym pasmie 0 (linia bez pola -
+                    INFO); NRN-D skutek reguly na sucho z CSV
                     (log sprzed paczki: G, R, renta_180, szczebel 168 - rod ze szczeblem dlugu bez miary; INFO). Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log
                     z --csv .../Modules/Armoury/Logs/2026-10-17_23-22-37/budzet-rodow.csv): linie f7 INFO, NRN-D z liczbami, bez wyjatku.
 --grupa nruda     : (noc 18.10, fala 5 paczka f5-ruda - ruda/zelazo pod KS; Armoury/src/StartCalibration.Ruda.cs, Bloomery.F5.cs, VillageTakings.F5WoodCredit; klucze
@@ -44650,6 +44654,8 @@ NRN_RX_ID = re.compile(r"\| reszta wplywow dnia po zwrocie (\d+) = renty (\d+) \
 NRN_RX_CUT = re.compile(r"\| rodow z ucieta renta (\d+)")
 NRN_RX_PL = re.compile(r"\| rod gracza: pasmo ([^,|]+), f ([\d.]+), G (-?\d+), R (\d+), pelna (\d+), wedlug potrzeby (\d+)")
 NRN_RX_ST = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.\s*$")
+NRN_RX_MSG = re.compile(r"\| komunikat gracza: ([^|]+?) \| potkniecia")   # recenzja f7: jeden komunikat gracza na zmiane pasma (NRN-9)
+NRN_RX_MSG2 = re.compile(r"^osobno zwrot \(pasmo ([^)]+)\) i renta \(pasmo ([^)]+)\)$")
 NRN_RX_165 = re.compile(r", renty \(180\) (\d+) \(wstrzymane w skarbcach - rody bez warunku i zaokraglenia (\d+)(?:; w tym zatrzymane wedlug potrzeby rodu \(f7\) (\d+))?")
 NRN_BANDS = ("ponizej R", "R-2R", "ponad 2R", "bez miary")
 
@@ -44680,6 +44686,7 @@ def _nrn_scan(logp):
                 c = NRN_RX_CUT.search(s); r["cut"] = int(c.group(1)) if c else None
                 c = NRN_RX_PL.search(s); r["pl"] = c.groups() if c else None
                 c = NRN_RX_ST.search(s); r["st"], r["stsess"] = (int(c.group(1)), int(c.group(2))) if c else (None, None)
+                c = NRN_RX_MSG.search(s); r["msg"] = c.group(1).strip() if c else None   # recenzja f7 (linia sprzed recenzji - None)
                 D["f7"][day] = r
                 continue
             if s.startswith(NRN_180):
@@ -44726,7 +44733,7 @@ def _nrn_csv(csvp):
 
 def nrenty_main(logp, bdp=None, csvp=None):
     """nrenty (18.10, paczka f7-renty): renty 180 wedlug potrzeby rodu - ta sama regula co zwrot zoldu f6 (CrownRents.Need.cs, klucz Crown Rents By Need).
-    Wejscie: log Armoury (strumieniowo), budzet-rodow.csv (--csv albo obok logu - csv_path_of), opcjonalnie --baza-doby <log bazy> (NRN-6b). Progi NRN-0..NRN-8 i NRN-D -
+    Wejscie: log Armoury (strumieniowo), budzet-rodow.csv (--csv albo obok logu - csv_path_of), opcjonalnie --baza-doby <log bazy> (NRN-6b). Progi NRN-0..NRN-9 i NRN-D -
     opis w naglowku pliku (--grupa nrenty). Log bez paczki: linie INFO, skutek na sucho z CSV (NRN-D), bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
@@ -44822,6 +44829,24 @@ def nrenty_main(logp, bdp=None, csvp=None):
                     "0", len(badp) == 0)
         else:
             rep.add("NRN-7: rod gracza", "bez renty gracza w dobach z linia f7 (autotest - gracz bez lenna)", "INFO", None)
+
+        # ---- NRN-9 (recenzja f7) komunikat gracza: zwrot f6 i renta f7 tego samego dnia w tym samym pasmie - jeden wspolny (nie dwa osobne)
+        msgs = [(d, F7[d].get("msg")) for d in fd if F7[d].get("msg") is not None]
+        if msgs:
+            kinds = {}
+            dup = []
+            for d, m in msgs:
+                k = m.split(",")[0].split(" (")[0]
+                kinds[k] = kinds.get(k, 0) + 1
+                mm = NRN_RX_MSG2.match(m)
+                if mm and mm.group(1).strip() == mm.group(2).strip():
+                    dup.append(d)
+            sent = sum(v for k, v in kinds.items() if k != "brak")
+            rep.add("NRN-9: komunikat gracza (recenzja f7) - zwrot i renta w tym samym pasmie tego dnia = jeden wspolny; martwa strefa 5% R (doby z komunikatem)",
+                    f"dob z polem {len(msgs)}, z komunikatem {sent} (" + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) + f"); dwa osobne w tym samym pasmie {len(dup)}"
+                    + (f" (doby {dup[:5]})" if dup else ""), "0", len(dup) == 0)
+        else:
+            rep.add("NRN-9: komunikat gracza", "linie f7 bez pola 'komunikat gracza' (log sprzed recenzji f7)", "INFO", None)
     else:
         rep.add("NRN-1..3, 7: linia f7 i tozsamosci", "brak linii f7 (log sprzed paczki)", "INFO", None)
 
@@ -44893,6 +44918,28 @@ def nrenty_main(logp, bdp=None, csvp=None):
                 + (f" ({100 * kp / fu:.1f}% pelnej)" if fu else "") + ("" if last["state"] == "on" else f" (na sucho - zatrzymane bylyby {fu - ne:.0f}/d)")
                 + (f"; rodow z ucieta renta {st.mean(cutm):.0f}" if cutm else ""),
                 "INFO (fin91 na sucho z CSV: 284 tys./d -> ok. 145 tys./d, zatrzymane ok. 139 tys./d; renty rosna z reszta wplywow dnia - NRN-6)", None)
+
+    # ---- NRN-5b (recenzja f7) sprzezenie D -> R -> f: renty i zwrot sa w D rodu, R = WarReserveDays x D, wiec ciecie renty obniza R i f jeszcze bardziej.
+    # Pasmo R-2R ("sredni dostaje czesc") nie moze sie wyludnic: pierwsze 28 dob z kluczem czynnym wobec ostatnich 28 (rodow i wedlug potrzeby / pelna).
+    fon = [d for d in fd if F7[d]["state"] == "on"]
+    if len(fon) >= 56:
+        a, z = fon[:28], fon[-28:]
+        def bstat(ww, i):
+            n = sum(F7[d]["bands"][i][0] for d in ww) / len(ww)
+            fu = sum(F7[d]["bands"][i][2] for d in ww)
+            ne = sum(F7[d]["bands"][i][3] for d in ww)
+            return n, (ne / fu if fu else None)
+        rows = [(bstat(a, i), bstat(z, i)) for i in range(4)]
+        (n0, q0), (n1, q1) = rows[1]
+        ok_n = n0 <= 0 or n1 >= 0.5 * n0
+        ok_q = q0 is None or q1 is None or q0 <= 0 or q1 >= 0.5 * q0
+        fq = lambda q: "-" if q is None else f"{q:.2f}"
+        rep.add("NRN-5b: sprzezenie D -> R -> f (recenzja f7) - pasmo R-2R nie pustoszeje: rodow i wedlug potrzeby / pelna w ostatnich 28 dobach >= 50% pierwszych 28 (klucz czynny)",
+                "; ".join(f"{NRN_BANDS[i]}: rodow {rows[i][0][0]:.0f} -> {rows[i][1][0]:.0f}, wedlug potrzeby / pelna {fq(rows[i][0][1])} -> {fq(rows[i][1][1])}" for i in range(4))
+                + f" (dob czynnych {len(fon)})",
+                ">= 50% / >= 50% (NIE = srodek pustoszeje - propozycja dla Jeffa: R z D bez czesci korony - zwrot i renty - albo z D sprzed f6/f7)", ok_n and ok_q)
+    else:
+        rep.add("NRN-5b: sprzezenie D -> R -> f (pasmo R-2R w czasie)", f"dob z kluczem czynnym {len(fon)} (< 56 - za krotko na trend)", "INFO", None)
 
     # ---- NRN-6 skarbce (suma "Skarbce:"): zmiana na dobe wobec zatrzymanych; z baza - porownanie
     def crown(DD):
