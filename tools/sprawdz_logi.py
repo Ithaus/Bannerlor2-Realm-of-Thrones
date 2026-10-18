@@ -940,7 +940,8 @@ Uzycie (Python 3, tylko odczyt):
                     albo INFO. Log bez paczki: INFO.
                     fix-ksiega (noc 17/18.10, klucz OreLedgerTownCraftsColumn): ZC1-8a kolumna "przetwory miast" kontroli (wsad rzemiosla miasta - przetwory ZC5 i 148 -
                     w ksiedze towarow i w ksiedze rudy) zgodna w kazdej dobie (0 dob z roznica; log bez kolumny - INFO), ZC1-8b diagnoza NIEZGODNA: ile dob roznica
-                    = sam wsad zelaza ZC5 w "linie" (stara DLL - INFO); INFO z przyczyna rynkowa: ZC1-4b aksamit (wyrob, wsad tkalni, jedwab mieszczan, receptura KS),
+                    = sam wsad zelaza ZC5 w "linie" (stara DLL - INFO); INFO z przyczyna: ZC1-4b aksamit (wyrob, wsad tkalni, jedwab mieszczan, receptura KS, stan
+                    reguly Silk To Weavers i udzial tkalni w jedwabiu - luka projektu, osobna paczka),
                     ZC1-9e miod pitny (zapas, produkcja, zuzycie wedlug ujscia), ZC1-16c jedwab (czesc z pol mieszczan KS bez wozu wsi, wozy szt./d i cena, polki miast).
 --grupa nbitwa    : (16.10, Jeff 'krzyk paniki zapetlony, ranni ida w moja strone, bija piescia' i 'wysoki tier traci zielony pasek'; galaz
                     w-toku/noc-bitwa, Armoury/src/RoutHold.cs, BattleWind.cs) python -I tools/sprawdz_logi.py --grupa nbitwa <Armoury-*.log> (strumieniowo).
@@ -34802,6 +34803,8 @@ NZ1_CTLN = re.compile(r"(?P<g>ruda|drewno) (?P<ok>ZGODNA|NIEZGODNA) \(wsie (\d+)
                       r"(?:, przetwory miast (?P<ca>\d+)/(?P<cb>\d+))?, zapas (\d+)/(\d+)")
 NZ1_ZC5IRON = re.compile(r"^Przetwory miast \(ZC5\): dzien (?P<day>-?\d+) .*?zelazo -> narzedzia \d+ szt\. \(wsad (?P<iron>\d+);")
 NZ1_VELREC = re.compile(r"velvet_weavery cotton->velvet (\d+):(\d+)")
+# fix-ksiega recenzja: stan reguly "rzemioslo pierwsze" jedwabiu (SilkToWeavers) z linii doby ZC1 - tak/nie, miast z zapasem, polka <= zapas
+NZ1_SILKON = re.compile(r"jedwab (tak|nie) - miast z zapasem (\d+), zapas \d+ szt\., polki \d+, polka <= zapas (\d+)")
 NZ1_K4F = re.compile(r"; jedzenie (\d+) z wlasnym limitem \d+, ponad limit (\d+)\)")
 NZ1_ND = re.compile(r"budzet mieszczan (\d+) d \(przy dzisiejszych polkach do (\d+) d\)")
 NZ1_RESZTA = re.compile(r"\+ reszta ([+-]?\d+) \[R\]")
@@ -34944,6 +34947,22 @@ def _nz1_sinkn(text, name):
     return int(m.group(1)) if m else 0
 
 
+def _nz1_silk_rule(D):
+    """fix-ksiega recenzja: stan reguly 'rzemioslo pierwsze' jedwabiu (Silk To Weavers) z ostatniej linii doby ZC1; brak linii - napis 'brak linii doby ZC1'."""
+    for s in reversed(D["days"]):
+        m = NZ1_SILKON.search(s)
+        if m:
+            if m.group(1) == "nie":
+                return "rzemioslo pierwsze jedwabiu (Silk To Weavers) nie - tkalnie i mieszczanie biora z tej samej polki bez kolejnosci"
+            return f"rzemioslo pierwsze jedwabiu (Silk To Weavers) tak - miast z zapasem {m.group(2)}, polka <= zapas {m.group(3)} (ostatnia doba)"
+    return "rzemioslo pierwsze jedwabiu - brak linii doby ZC1"
+
+
+def _nz1_share(a, b):
+    """Udzial a w (a + b) jako procent; oba 0 - '-'."""
+    return f"{a / (a + b):.0%}" if (a + b) > 0 else "-"
+
+
 def _nz1_market_info(rep, D):
     """fix-ksiega (noc 17/18.10): INFO z przyczyna rynkowa trzech progow ZC1 (aksamit, miod pitny, jedwab) - same liczby ksiegi towarow, bez progow."""
     goods = D["goods"]
@@ -34966,8 +34985,11 @@ def _nz1_market_info(rep, D):
     rep.add("ZC1-4b: aksamit - wyrob na dobe, jedwab tkalni i mieszczan (7 pierwszych / 28 ostatnich dob ksiegi)",
             f"aksamit {avg('velvet', vp, first):.1f} -> {avg('velvet', vp, last):.1f}/d; jedwab tkalni {avg('cotton', cons('linie warsztatow'), first):.1f} -> "
             f"{avg('cotton', cons('linie warsztatow'), last):.1f}/d, jedwab mieszczan {avg('cotton', cons('mieszczanie'), first):.1f} -> {avg('cotton', cons('mieszczanie'), last):.1f}/d; "
-            f"receptura tkalni przy KS {D['velrec'] or '- (gry)'} (jedwab:aksamit)",
-            "INFO (indeks < 10 nie doszedl w zadnym biegu od 16.10, takze bez KS: 10 tkalni; przy KS receptura wedlug wagi 6:5 zamiast 1:2 i 6 szt. jedwabiu naraz)", None)
+            f"receptura tkalni przy KS {D['velrec'] or '- (gry)'} (jedwab:aksamit); {_nz1_silk_rule(D)}; tkalnie dostaja "
+            f"{_nz1_share(avg('cotton', cons('linie warsztatow'), last), avg('cotton', cons('mieszczanie'), last))} jedwabiu zuzytego przez tkalnie i mieszczan (28 ostatnich dob)",
+            "INFO (luka projektu, nie blad ksiegi - osobna paczka: tkalnie przegrywaja jedwab z mieszczanami; przy Silk To Weavers wylaczonym (od 16.10) polka nie ma "
+            "kolejnosci, przy wlaczonym zapas tkalni na polce liczy sie do podazy, a wsad tkalni nie jest popytem ceny; przy KS receptura 6:5 i 6 szt. naraz; "
+            "indeks < 10 nie doszedl w zadnym biegu od 16.10, takze bez KS)", None)
     # miod pitny: zapas, produkcja, zuzycie wedlug ujscia
     mk = [d for d in ds if "mead" in goods[d]]
     if mk:
