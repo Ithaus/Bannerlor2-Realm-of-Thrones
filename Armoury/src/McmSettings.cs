@@ -5984,6 +5984,10 @@ namespace Armoury
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public bool DteConvoyPacksStayWithConvoy { get; set; } = true;
 
+        [SettingPropertyBool("Dte Convoy No Free Packs", HintText = "a lord's supply convoy (Dynamic Troop Equipment) no longer sets out with pack animals made out of thin air - neither the 17 pack horses DTE gave it to carry its 17 sacks of every food nor the pack animals the game gives every new caravan; the convoy does not trade, and its few pieces of gear are carried by its men. Works together with Dte Convoy No Free Food - while that food still rides along, so do the pack animals (off = as before: the pack animals appear from nothing and vanish with the convoy when it reaches the army)")]
+        [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
+        public bool DteConvoyNoFreePacks { get; set; } = true;
+
         [SettingPropertyInteger("Spare Horse Carry Kg", 20, 100, "0", HintText = "how many kilograms a spare horse carries when no footman or prisoner rides it (the game gives every spare horse 20; 20 = as in the game)")]
         [SettingPropertyGroup("Crafts, raw materials and horses (stage 6)")]
         public int SpareHorseCarryKg { get; set; } = 60;
@@ -8835,6 +8839,7 @@ namespace Armoury
             s.PackAnimalsFromMarket = PackAnimalsFromMarket;
             s.VillagerPacksFromHerd = VillagerPacksFromHerd;
             s.DteConvoyPacksStayWithConvoy = DteConvoyPacksStayWithConvoy;
+            s.DteConvoyNoFreePacks = DteConvoyNoFreePacks;
             s.SpareHorseCarryKg = SpareHorseCarryKg;
             s.BloomeryAtMine = BloomeryAtMine;
             s.BloomeryCartRange = BloomeryCartRange;

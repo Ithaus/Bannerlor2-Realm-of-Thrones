@@ -41,12 +41,29 @@ namespace Armoury
     {
         internal static bool HerdOn { get { var s = Settings.Current; return s != null && s.VillagerPacksFromHerd; } }
         internal static bool DteOn { get { var s = Settings.Current; return s != null && s.DteConvoyPacksStayWithConvoy; } }
+        /// <summary>fix-ksarm: klucz DteConvoyNoFreePacks - konwoj DTE bez jucznych z niczego (17 z AddReinforcementSupplies tu, juczne gry w PackMarket).</summary>
+        internal static bool NoFreePacksOn { get { var s = Settings.Current; return s != null && s.DteConvoyNoFreePacks; } }
+
+        /// <summary>fix-ksarm: klucze - konwoj DTE bez jucznych z niczego tylko razem z jedzeniem DTE zdjetym (DteConvoyNoFreeFood); przy jedzeniu DTE w taborze
+        /// (klucz NIE) juczne zostaja jak dotad - 17 x kazde jedzenie nie zmiesciloby sie w udzwigu ludzi.</summary>
+        internal static bool PacksOffKeys { get { return Live && NoFreePacksOn && GoodsPaths.DteOn; } }
+
+        /// <summary>fix-ksarm: konkretny konwoj (partia utworzona) - jak GoodsPaths.DteSupPost: jedzenie DTE schodzi tylko z konwoju, ktory nie je
+        /// (model jedzenia gry; karawana nie je). Konwoj, ktory je, zostaje z jedzeniem i z jucznymi (jak dotad, nazwane w ksiedze koni).</summary>
+        internal static bool PacksOff(MobileParty convoy)
+        {
+            if (!PacksOffKeys || convoy == null) return false;
+            var c = Campaign.Current;
+            var m = c != null && c.Models != null ? c.Models.MobilePartyFoodConsumptionModel : null;
+            return m != null && !m.DoesPartyConsumeFood(convoy);
+        }
         private static bool Live { get { var c = Campaign.Current; return c != null && c.GameStarted; } }
         private const int Cats = 5;
 
         // ------------------------------------------------------------ liczniki doby (linia "Juczne z niczego (m6b)")
         private static long _vNew, _vGiven, _vTaken, _vHerd, _vShort, _vStart, _vStartN, _vOff, _vOffN;
         private static long _dConv, _dDte, _dGame, _dUndone, _dKept, _bkN, _bk, _gone, _removed, _removedN;
+        private static long _dDteOff, _dGameOff;   // fix-ksarm (DteConvoyNoFreePacks): juczne DTE i juczne gry zdjete z nowego konwoju (nie z niczego - nie ma ich wcale)
         private static int _stumbles, _stumblesDay;
         private static readonly HashSet<string> _errSites = new HashSet<string>();
         private static string _hooks = "nie wpiete";
@@ -76,6 +93,7 @@ namespace Armoury
         {
             _vNew = _vGiven = _vTaken = _vHerd = _vShort = _vStart = _vStartN = _vOff = _vOffN = 0;
             _dConv = _dDte = _dGame = _dUndone = _dKept = _bkN = _bk = _gone = _removed = _removedN = 0;
+            _dDteOff = _dGameOff = 0;
             _stumblesDay = 0;
         }
 
@@ -166,24 +184,70 @@ namespace Armoury
         }
 
         // ================================================================ (b) konwoj DTE
-        /// <summary>Prefiks / postfiks DTE CutTheirSupplyBehavior.AddReinforcementSupplies(MobileParty): zapas drogi konwoju (17 sumpter_horse) - zrodlo nazwane.</summary>
-        public static void DteSupPre(MobileParty __0, out long[] __state)
+        /// <summary>Prefiks / postfiks DTE CutTheirSupplyBehavior.AddReinforcementSupplies(MobileParty): zapas drogi konwoju (17 sumpter_horse) - zrodlo nazwane.
+        /// fix-ksarm (klucz DteConvoyNoFreePacks): to, co metoda dopisala z koni (dekompilacja DTE 1.4.7: AddToCounts(sumpter_horse, 17) - jedyny kon w metodzie),
+        /// schodzi z konwoju w postfiksie - dopisek i zdjecie w tej samej ramce ticku miasta ksiegi towarow (netto 0, nie ma ich w "inne ticki dobowe").
+        /// Te 17 jucznych nioslo 17 sztuk kazdego jedzenia, ktore zdejmuje juz DteConvoyNoFreeFood (GoodsPaths.DteSupPost) - konwoj wiezie tylko sprzet
+        /// (do 26 sztuk, GetRandomGearItems), a udzwig ludzi (gra: 20 kg na zdrowego czlowieka, ok. 40 ludzi z AddExtraCultureTroops 25) go miesci.</summary>
+        public static void DteSupPre(MobileParty __0, out List<KeyValuePair<EquipmentElement, int>> __state)
         {
             __state = null;
-            try { if (__0 != null && __0.ItemRoster != null) __state = Horses(__0.ItemRoster); } catch (Exception e) { Stumble("DteSupPre", e); }
+            try { if (__0 != null && __0.ItemRoster != null) __state = HorseEls(__0.ItemRoster); } catch (Exception e) { Stumble("DteSupPre", e); }
         }
 
-        public static void DteSupPost(MobileParty __0, long[] __state)
+        public static void DteSupPost(MobileParty __0, List<KeyValuePair<EquipmentElement, int>> __state)
         {
-            if (__state == null || __0 == null) return;
+            if (__state == null || __0 == null || __0.ItemRoster == null) return;
             try
             {
-                var now = Horses(__0.ItemRoster);
+                var r = __0.ItemRoster;
+                bool off = PacksOff(__0);
                 _dConv++;
-                for (int c = 0; c < Cats; c++) { long d = now[c] - __state[c]; if (d > 0) { _srcDte[c] += d; _dDte += d; } }
+                var now = HorseEls(r);
+                foreach (var kv in now)
+                {
+                    int d = kv.Value - AmountOf(__state, kv.Key);
+                    if (d <= 0) continue;
+                    int c = HorseBook.Cat(kv.Key.Item);
+                    if (c < 0) continue;
+                    if (off)
+                    {
+                        int at = r.FindIndexOfElement(kv.Key);
+                        int have = at >= 0 ? r.GetElementNumber(at) : 0;
+                        int take = Math.Min(d, have);
+                        if (take > 0) { r.AddToCounts(kv.Key, -take); _dDteOff += take; }
+                        d -= take;
+                        if (d <= 0) continue;
+                    }
+                    _srcDte[c] += d; _dDte += d;   // klucz NIE (albo czego nie dalo sie zdjac) - zapas drogi z niczego, nazwany w ksiedze koni
+                }
             }
             catch (Exception e) { Stumble("DteSupPost", e); }
         }
+
+        /// <summary>Konie rosteru (HorseBook.Cat >= 0) - element i liczba sztuk.</summary>
+        private static List<KeyValuePair<EquipmentElement, int>> HorseEls(ItemRoster r)
+        {
+            var l = new List<KeyValuePair<EquipmentElement, int>>(2);
+            for (int i = 0; i < r.Count; i++)
+            {
+                var el = r.GetElementCopyAtIndex(i);
+                if (el.Amount <= 0 || HorseBook.Cat(el.EquipmentElement.Item) < 0) continue;
+                l.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, el.Amount));
+            }
+            return l;
+        }
+
+        private static int AmountOf(List<KeyValuePair<EquipmentElement, int>> l, EquipmentElement e)
+        {
+            int n = 0;
+            foreach (var kv in l)
+                if (ReferenceEquals(kv.Key.Item, e.Item) && ReferenceEquals(kv.Key.ItemModifier, e.ItemModifier)) n += kv.Value;
+            return n;
+        }
+
+        /// <summary>fix-ksarm: PackMarket (galaz konwoju DTE przy kluczu DteConvoyNoFreePacks) zdjal juczne gry z nowego konwoju - tylko licznik linii.</summary>
+        internal static void NoteDteGameOff(int n) { if (n > 0) _dGameOff += n; }
 
         /// <summary>PackMarket.CreatePost (galaz konwoju DTE): juczne karawany od gry, ktore zostaja konwojowi - zrodlo nazwane w ksiedze koni.</summary>
         internal static void NoteDteGame(List<KeyValuePair<EquipmentElement, int>> got)
@@ -363,7 +427,8 @@ namespace Armoury
             catch (Exception e) { parts.Add("RemoveParty: blad " + e.GetType().Name); Log.Error("PackSources.ApplyAll(RemoveParty)", e); }
             _hooks = string.Join(", ", parts.ToArray());
             Log.Info("PackSources (m6b): " + _hooks + "; klucze VillagerPacksFromHerd (teraz " + (HerdOn ? "TAK" : "NIE") + "), DteConvoyPacksStayWithConvoy (teraz " + (DteOn ? "TAK" : "NIE")
-                     + "), ksiega towarow przy RemoveParty FoodSourcesInLedger (teraz " + (GoodsLedger.SourcesOn ? "TAK" : "NIE") + ").");
+                     + "), DteConvoyNoFreePacks (fix-ksarm, teraz " + (NoFreePacksOn ? "TAK" : "NIE") + " - konwoj DTE bez jucznych z niczego: 17 z AddReinforcementSupplies i juczne gry)"
+                     + ", ksiega towarow przy RemoveParty FoodSourcesInLedger (teraz " + (GoodsLedger.SourcesOn ? "TAK" : "NIE") + ").");
         }
 
         /// <summary>Prefiks MobileParty.RemoveParty (First, tylko odczyt): konie (ksiega koni) i towar (ksiega towarow - tylko bez zdarzenia zniszczenia,
@@ -387,7 +452,9 @@ namespace Armoury
                      + ", ze stada wsi " + _vHerd + ", brak " + _vShort + " (dobiora ze stada wsi przy kolejnych wyjazdach z domu)"
                      + "; startowe " + _vStart + " z " + _vStartN + " jucznymi gry (stan wyjsciowy); przy wylaczonym kluczu " + _vOff + " z " + _vOffN + " (z niczego)"
                      + " | konwoje DTE (Dte Convoy Packs Stay With Convoy " + (DteOn ? "TAK" : "NIE") + "): zapas drogi " + _dConv + " konwojow, juczne DTE " + _dDte + " + gry " + _dGame
-                     + " (z niczego, odchodza z konwojem), kopia do zbrojowni celu zdjeta " + _dUndone + ", zostawiona " + _dKept
+                     + " (z niczego, odchodza z konwojem), zdjete przy tworzeniu (Dte Convoy No Free Packs " + (NoFreePacksOn ? "TAK" : "NIE") + ") DTE " + _dDteOff + " + gry " + _dGameOff
+                     + " (nie ma ich wcale - konwoj nie handluje, sprzet niosa ludzie)"
+                     + ", kopia do zbrojowni celu zdjeta " + _dUndone + ", zostawiona " + _dKept
                      + " | partie BK: zapas drogi " + _bkN + " partii, " + _bk + " koni i jucznych (z niczego, odchodza z partia)"
                      + " | konie przepadle przy RemoveParty: po zniszczeniu " + _gone + ", usuniete bez zniszczenia " + _removed + " (" + _removedN + " partii)"
                      + " | wpiecia: " + _hooks + " | potkniecia dzis " + _stumblesDay + " (razem " + _stumbles + ").");
