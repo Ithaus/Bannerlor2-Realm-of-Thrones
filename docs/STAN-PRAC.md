@@ -3038,3 +3038,5 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   potwierdzona - renty/zwrot wedlug potrzeby; armie -7% (108k vs 117k), nie gloduja (niezaplacony zold 0.03%), skarbce +17k/d (57.2 mln); NKA-1 diagnoza; NBD-2 to zachowanie gry).
   DO DECYZJI JEFFA (po WGRANIU 81): skarbiec krolestwa rosnie, armie -7% - czy skarbiec ma w wojnie doplacac takze srednim rodom (wieksze W5b)? welna Essos; dar BK herszta z niczego.
 - 12:45 PDT: SCALENIE6 (scalenie6.js): f13-doba (z f9) + f14 x4 + f10-uklad + f11-drogi do noc-ks4 8cd7b556, 3 recenzje + weryfikacja + poprawki.
+- 13:00 PDT: DECYZJA JEFFA 18.10 (verbatim): "takze srednim" - skarbiec krolestwa w czasie wojny doplaca do zoldu takze srednim rodom (pasmo R-2R), nie tylko biednym (pytanie: skarbce
+  +17k/d, armie -7% po rentach wedlug potrzeby; "na wojny i trudne czasy"). -> paczka **f15-skarbiec** (worktree zb/f15-skarbiec od 8cd7b556), scalic po scaleniu6, przed testem fin93.
