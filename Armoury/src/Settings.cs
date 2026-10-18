@@ -2276,6 +2276,12 @@ namespace Armoury
         // obrysu i pana (Village.Bound.OwnerClan) na drugim przednim (albo innym na ladzie); ten sam limit (najblizsze 80 wiosek, budowa 12 proporczykow na cwierc sekundy,
         // kazdy proporczyk liczony). Gospodarz = pan - jeden. Off = jeden proporczyk gospodarza jak dotad
         public bool VillageTwoPennants = true;             // a village kept for its lord by another house flies two pennants: the keeper's and, beside it, the lord's. Off = one pennant, the keeper's
+        // sw-herby (noc 17/18.10, STAN-PRAC ### 60 "limit tekstur herbow 160 ... po dlugim zwiedzaniu czesc wiosek pokazuje herb pana (w tescie 125)"): proporczyki wiosek
+        // na teksturach 512x512 (GetTableauTextureSmall gry - jak tarcze z herbem w misji; 1024 = 4 MiB, 512 = 1 MiB) z WLASNYM kluczem pamieci gry ("ArmPen_...",
+        // nikt inny go nie uzywa), a tekstury proporczykow dalekich od kamery (herb nieuzyty w tym ticku) zwalniane, gdy w pamieci jest ich ponad 128 - encje tych
+        // proporczykow zdjete raz (wroca przy kamerze); dzieki temu nie ma limitu 160 i herbu pana zamiast gospodarza (MapVillagePennants.cs). Off = stara droga
+        // (MobilePartyVisual.GetBannerOfCharacter, 1024x1024 do najblizszej misji, limit 100/160 herbow) dokladnie jak dotad
+        public bool VillagePennantSmallTexture = true;     // village pennants use small banner textures and free the textures of pennants far from the camera, so every village keeps its own house's banner however long you travel the map without a battle. Off = large textures kept until the next battle, and after long travel some villages show their lord's banner instead, as before
         // Jeff 16.10 ("niektore sa za blisko i za gesto", "mniej wiosek o 20% ... 20% wiecej ludzi w danej wiosce, ale zeby nie bylo identycznie"): uklad wiosek v5 -
         // ModuleData\arm_map_villages.tsv (1957 wiosek: 20% mniej, najpierw te najblizej sasiadki; osady wedlug miejsca i uid 6..36) i arm_map_village_lore.tsv z nowa
         // bramka; off = pliki v4 (arm_map_villages_v4.tsv, arm_map_village_lore_v4.tsv - 2446 wiosek po 16 osad). Wybor przy starcie sesji, przed ksiega wiosek; zapis z innym

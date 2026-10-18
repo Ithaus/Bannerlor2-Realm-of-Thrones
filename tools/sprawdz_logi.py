@@ -1108,6 +1108,15 @@ Uzycie (Python 3, tylko odczyt):
                     udzial < 10%), NPR-13 potkniecia i ERROR VillageHamlets 0, NPR-14 (recenzja) kolumny v5_* pliku v6 - crc = v5 68BB06AD (zapis v5 po uid bez pliku
                     _v5), NPR-15 (recenzja) crc ziemi KS z nakladka przysiolkow: inny niz plik, gdy nadpisane wiersze > 0, rowny plikowi bez nakladki (zapis KS przy innej
                     nakladce - droga 'inny plik ziemi'). Log bez linii paczki: INFO (stan ksiegi i lore jako odczyt), bez wyjatku.
+--grupa nherby    : (noc 17/18.10, paczka sw-herby, STAN-PRAC ### 60 "limit 160 tekstur herbow"; Armoury/src/MapVillagePennants.cs, klucz VillagePennantSmallTexture)
+                    python -I tools/sprawdz_logi.py --grupa nherby <Armoury-*.log> (strumieniowo). Linie "Proporczyki - tekstury (E7/W5): start / stan / przy zdjeciu".
+                    NHB-0 linie paczki, NHB-1 tryb (klucz tak, zwalnianie dalekich CZYNNE; klucz NIE - INFO), NHB-2 rozmiar tekstury z gry 512x512, NHB-3 tozsamosc ksiegi
+                    herbow (nowe - zwolnione - zapomniane - w pamieci = 0 w kazdej linii), NHB-4 klucze ArmPen_ w pamieci gry = ksiega (roznica 0), NHB-5 wiosek z herbem
+                    zastepczym (pana zamiast gospodarza) 0 i w kadrze 0, NHB-6 herbow w pamieci najwiecej <= 224, NHB-7 zwalnianie przy dlugiej podrozy (najwiecej
+                    w pamieci > 128 -> przebiegow i zwolnione > 0; krotsza albo zwalnianie BRAK - INFO), NHB-8 pamiec tekstur <= 256 MiB, NHB-9 przebieg
+                    zwalniania sr. <= 2 ms, NHB-10 herbow gry razem <= 1000, NHB-11 potkniecia
+                    i ERROR MapVillagesView.PennantTex* 0, NHB-12 nieprzyjete zamowienia 0, NHB-13 liczniki (INFO). Log sprzed paczki: INFO (stara linia - herb pana zamiast
+                    gospodarza jako INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -38305,6 +38314,171 @@ def nprzysiolki_main(logp):
     return 0
 
 
+NHB_HEAD = "Proporczyki - tekstury (E7/W5): "
+NHB_KEEP, NHB_HARD = 128, 224          # MapVillagePennants.cs: PenTexKeep, PenTexHard
+NHB_MIB_MAX = 256.0                    # pamiec tekstur proporczykow (stara droga: 160 x 4 MiB = 640 MiB)
+NHB_EVICT_MS = 2.0                     # sr. czas przebiegu zwalniania (jeden przebieg po wioskach, najwyzej 32 herby)
+NHB_GAME_CAP = 1000                    # BannerPersistentTextureCache: pojemnosc (ponad nia gra co klatke przeglada pamiec)
+
+
+def nherby_main(logp):
+    """nherby (noc 17/18.10, paczka sw-herby; Armoury/src/MapVillagePennants.cs, klucz VillagePennantSmallTexture): proporczyki wiosek na teksturach 512x512
+    z wlasnym kluczem pamieci gry (ArmPen_) i zwalnianie tekstur dalekich herbow ponad 128 w pamieci - koniec limitu 160 i herbu pana zamiast gospodarza
+    po dlugim zwiedzaniu bez misji (STAN-PRAC ### 60). Wejscie: log Armoury (strumieniowo). Linie "Proporczyki - tekstury (E7/W5): start | ..." (raz na mape),
+    "... stan | ..." (co 2 minuty przy zmianie) i "... przy zdjeciu | ..." (koniec mapy, wylacznik, zmiana klucza). NHB-0 linie paczki, NHB-1 tryb (klucz tak,
+    zwalnianie CZYNNE; klucz NIE - INFO), NHB-2 rozmiar tekstury odczytany z gry 512x512, NHB-3 tozsamosc ksiegi (nowe - zwolnione - zapomniane - w pamieci = 0
+    w kazdej linii), NHB-4 klucze ArmPen_ w pamieci gry = w pamieci ksiegi (roznica 0 - zwalnianie naprawde oddaje wezly), NHB-5 wiosek z herbem zastepczym
+    (pana zamiast gospodarza) 0 i teraz w kadrze 0 w kazdej linii, NHB-6 herbow w pamieci najwiecej <= siatka 224, NHB-7 zwalnianie czynne przy dlugiej
+    podrozy (najwiecej w pamieci > 128 -> przebiegow i zwolnione > 0; licznik nowe rosnie przez misje, wiec nie on; krotsza - INFO), NHB-8 pamiec
+    tekstur najwiecej <= 256 MiB, NHB-9 przebieg zwalniania sr. <= 2 ms, NHB-10 herbow
+    gry razem <= 1000 (pojemnosc pamieci trwalej gry), NHB-11 potkniecia 0 i linie "ERROR in MapVillagesView.PennantTex" 0, NHB-12 nieprzyjete zamowienia 0,
+    NHB-13 liczniki (INFO). Log sprzed paczki: NHB-0 INFO i stara linia "Proporczyki (E7/W5): w kadrze" (wiosek z herbem pana zamiast gospodarza) jako INFO."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NHB-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, rows, switches, old_rows = [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NHB_HEAD):
+                rest = s[len(NHB_HEAD):]
+                if rest.startswith("start"):
+                    starts.append(s)
+                elif rest.startswith("stan") or rest.startswith("przy zdjeciu"):
+                    rows.append(s)
+                elif rest.startswith("VillagePennantSmallTexture zmienione"):
+                    switches.append(s)
+            elif s.startswith("Proporczyki (E7/W5): w kadrze"):
+                old_rows.append(s)
+            elif s.startswith("ERROR in MapVillagesView.PennantTex"):
+                n_err += 1
+    print(f"plik: {logp} | linii startu tekstur {len(starts)}, stanu {len(rows)}, zmian klucza {len(switches)}, starych linii proporczykow {len(old_rows)}, ERROR {n_err}")
+
+    def g(pat, s, cast=int):
+        mm = re.search(pat, s)
+        return cast(mm.group(1)) if mm else None
+
+    old_cap = max([g(r"wiosek z herbem pana zamiast gospodarza (\d+)", s) or 0 for s in old_rows] or [0])
+    old_mem = max([g(r"herbow w pamieci \d+, najwiecej (\d+)", s) or 0 for s in old_rows] or [0])
+    if not starts and not rows:
+        rep.add("NHB-0: linie 'Proporczyki - tekstury (E7/W5)'", "brak w logu", "INFO (log sprzed paczki sw-herby albo bez proporczykow na mapie)", None)
+        if old_rows:
+            rep.add("NHB-5: wiosek z herbem pana zamiast gospodarza (stara linia proporczykow, najwiecej)", f"{old_cap} (herbow w pamieci najwiecej {old_mem}, limit 100/160)",
+                    "INFO (stara droga 1024x1024; po dlugim zwiedzaniu bez misji bylo 125)", None)
+        rep.show()
+        return 0
+    rep.add("NHB-0: linie paczki", f"start {len(starts)}, stan / przy zdjeciu {len(rows)}, zmiany klucza w MCM {len(switches)}",
+            "start przy kazdej mapie z proporczykami, linia stanu co 2 minuty przy zmianie i przy zdjeciu", True if (starts and rows) else None)
+    last = starts[-1] if starts else ""
+    if not last:
+        rep.add("NHB-1: tryb (ostatni start)", "brak linii startu", "VillagePennantSmallTexture tak, zwalnianie dalekich CZYNNE", None)
+    elif "VillagePennantSmallTexture NIE" in last:
+        rep.add("NHB-1: tryb (ostatni start)", "VillagePennantSmallTexture NIE - stara droga 1024x1024", "INFO (klucz wylaczony w MCM)", None)
+    else:
+        ok = "zwalnianie dalekich CZYNNE" in last
+        why = re.search(r"zwalnianie dalekich BRAK \(([^)]*)\)", last)
+        rep.add("NHB-1: tryb (ostatni start)", "male tekstury, zwalnianie " + ("CZYNNE" if ok else ("BRAK - " + why.group(1) if why else "?")),
+                "VillagePennantSmallTexture tak, zwalnianie dalekich CZYNNE", ok)
+    small = [s for s in rows if "VillagePennantSmallTexture tak" in s]
+    big = [s for s in rows if "VillagePennantSmallTexture NIE" in s]
+    if not small:
+        capb = max([g(r"herb zastepczy \(pana zamiast gospodarza\): wiosek (\d+)", s) or 0 for s in big] or [old_cap])
+        rep.add("NHB-2..12: linie stanu z malymi teksturami", f"brak (linii starej drogi {len(big)}, herb zastepczy wiosek najwiecej {capb})",
+                "INFO (klucz wylaczony - stara droga)", None)
+        rep.show()
+        return 0
+    smp = [re.search(r"\(gra: (\d+)x(\d+), (\d+) KiB\)", s) for s in small]
+    smp = [x for x in smp if x]
+    if smp:
+        w, h, kb = int(smp[-1].group(1)), int(smp[-1].group(2)), int(smp[-1].group(3))
+        rep.add("NHB-2: rozmiar tekstury proporczyka odczytany z gry", f"{w}x{h}, {kb} KiB", "512x512 (stara droga 1024x1024)", w <= 512 and h <= 512)
+    else:
+        rep.add("NHB-2: rozmiar tekstury proporczyka odczytany z gry", "nie odczytano (brak herbu w pamieci przy linii)", "512x512", None)
+    ids = [g(r"tozsamosc nowe - zwolnione - zapomniane - w pamieci = (-?\d+)", s) for s in small]
+    bad_id = [x for x in ids if x is None or x != 0]
+    rep.add("NHB-3: tozsamosc ksiegi herbow (nowe - zwolnione - zapomniane - w pamieci)", f"linii {len(ids)}, z roznica {len(bad_id)}" + (f" (np. {bad_id[0]})" if bad_id else ""),
+            "0 w kazdej linii", not bad_id)
+    dif = [re.search(r"\(roznica z ksiega (-?\d+|\?)\)", s) for s in small]
+    dif = [x.group(1) for x in dif if x]
+    known = [int(x) for x in dif if x != "?"]
+    if known:
+        bad = [x for x in known if x != 0]
+        rep.add("NHB-4: klucze ArmPen_ w pamieci gry wobec ksiegi (roznica)", f"linii {len(known)}, z roznica {len(bad)}" + (f" (np. {bad[0]})" if bad else ""),
+                "0 w kazdej linii (inaczej zwalnianie nie oddaje wezlow pamieci gry)", not bad)
+    else:
+        rep.add("NHB-4: klucze ArmPen_ w pamieci gry", "nie odczytano (brak refleksji)", "roznica 0", None)
+    caps = [(g(r"herb zastepczy \(pana zamiast gospodarza\): wiosek (\d+)", s), g(r"teraz w kadrze (\d+)", s)) for s in small]
+    cmax = max([c[0] or 0 for c in caps] or [0])
+    nmax = max([c[1] or 0 for c in caps] or [0])
+    rep.add("NHB-5: wiosek z herbem zastepczym (pana zamiast gospodarza) - najwiecej w linii, teraz w kadrze",
+            f"wiosek {cmax}, w kadrze najwiecej {nmax} (stara droga przed paczka: 125 po dlugim zwiedzaniu)", "0 / 0", cmax == 0 and nmax == 0)
+    held = [re.search(r"w pamieci (\d+) \(najwiecej (\d+), cel (\d+), siatka (\d+)\)", s) for s in small]
+    held = [x for x in held if x]
+    hmax = max([int(x.group(2)) for x in held] or [0])
+    hard = int(held[-1].group(4)) if held else NHB_HARD
+    keep = int(held[-1].group(3)) if held else NHB_KEEP
+    rep.add("NHB-6: herbow w pamieci najwiecej", f"{hmax} (cel {keep}, siatka {hard})", f"<= {hard} (siatka herbu pana nigdy nie siegnieta)", hmax <= hard if held else None)
+    new_max = max([g(r"herby: nowe (\d+)", s) or 0 for s in small] or [0])
+    freed = max([g(r", zwolnione (\d+) \(bez klucza", s) or 0 for s in small] or [0])
+    nonode = max([g(r"\(bez klucza w pamieci gry (\d+)\)", s) or 0 for s in small] or [0])
+    forgot = max([g(r"zapomniane po misji (\d+)", s) or 0 for s in small] or [0])
+    # po recenzji sw-herby: zwalnianie potrzebne tylko, gdy ksiega NAPRAWDE miala naraz ponad cel (najwiecej w pamieci > 128); licznik "nowe" rosnie przez
+    # cala mape, a po kazdej misji ksiega jest zapominana (ForceClearAllCache gry) - 2-3 bitwy po ~60 herbow daja nowe > 128 bez potrzeby zwalniania
+    act = [s for s in small if "| zwalnianie CZYNNE" in s]
+    hmax_act = max([int(x.group(2)) for x in (re.search(r"w pamieci (\d+) \(najwiecej (\d+), cel", s) for s in act) if x] or [0])
+    runs_act = max([g(r"zwalnianie CZYNNE, przebiegow (\d+)", s) or 0 for s in act] or [0])
+    if not act:
+        rep.add("NHB-7: zwalnianie przy dlugiej podrozy", f"brak linii ze zwalnianiem CZYNNE (herbow w pamieci najwiecej {hmax}, zwolnione {freed})",
+                "INFO (zwalnianie BRAK - patrz NHB-1)", None)
+    elif hmax_act > keep:
+        rep.add("NHB-7: zwalnianie przy dlugiej podrozy (herbow w pamieci naraz ponad cel)",
+                f"najwiecej w pamieci {hmax_act} > cel {keep}: przebiegow zwalniania {runs_act}, zwolnione {freed} (bez klucza w pamieci gry {nonode}); "
+                f"nowe {new_max}, zapomniane po misji {forgot}",
+                "przebiegow > 0 i zwolnione > 0", runs_act > 0 and freed > 0)
+    else:
+        rep.add("NHB-7: zwalnianie przy dlugiej podrozy",
+                f"herbow w pamieci najwiecej {hmax_act} <= cel {keep} (nowe {new_max}, zapomniane po misji {forgot}, zwolnione {freed})",
+                "INFO (ksiega nigdy ponad cel - zwalnianie niepotrzebne; autotest zdjec po wielu celach bez misji daje dluga podroz)", None)
+    mib = max([g(r"\(najwiecej ([0-9.]+) MiB\)", s, float) or 0.0 for s in small] or [0.0])
+    rep.add("NHB-8: pamiec tekstur proporczykow najwiecej", f"{mib:.1f} MiB (stara droga: do 160 x 4 MiB = 640 MiB)", f"<= {NHB_MIB_MAX:.0f} MiB", mib <= NHB_MIB_MAX)
+    runs = max([g(r"przebiegow (\d+)", s) or 0 for s in small] or [0])
+    ems = max([g(r"przebiegow \d+, sr\. ([0-9.]+) ms", s, float) or 0.0 for s in small] or [0.0])
+    if runs > 0:
+        rep.add("NHB-9: przebieg zwalniania sr. ms (najgorsza linia)", f"{ems:.3f} ms (przebiegow {runs})", f"<= {NHB_EVICT_MS} ms", ems <= NHB_EVICT_MS)
+    else:
+        rep.add("NHB-9: przebieg zwalniania", "przebiegow 0", "INFO (bez zwalniania w biegu)", None)
+    allc = [g(r"herbow gry razem (-?\d+)", s) for s in small]
+    allc = [x for x in allc if x is not None and x >= 0]
+    if allc:
+        rep.add("NHB-10: herbow w pamieci trwalej gry razem (najwiecej)", str(max(allc)), f"<= {NHB_GAME_CAP} (pojemnosc BannerPersistentTextureCache)", max(allc) <= NHB_GAME_CAP)
+    else:
+        rep.add("NHB-10: herbow w pamieci trwalej gry", "nie odczytano", f"<= {NHB_GAME_CAP}", None)
+    stum = max([g(r"\| potkniecia (\d+)\.$", s) or 0 for s in small] or [0])
+    rep.add("NHB-11: potkniecia tekstur (najwiecej w linii) i linie ERROR in MapVillagesView.PennantTex*", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
+    ref = max([g(r"nieprzyjete (\d+)", s) or 0 for s in small] or [0])
+    rep.add("NHB-12: zamowienia tekstur nieprzyjete przez pamiec gry", str(ref), "0", ref == 0)
+    s0 = small[-1]
+
+    def last_num(pat):
+        v = g(pat, s0)
+        return "?" if v is None else v
+    c_new, c_req, c_sh = last_num(r"herby: nowe (\d+)"), last_num(r"tekstury zamowione (\d+)"), last_num(r"wspolne (\d+)")
+    c_fr, c_fg, c_held = last_num(r", zwolnione (\d+) \(bez"), last_num(r"zapomniane po misji (\d+)"), last_num(r"w pamieci (\d+) \(najwiecej")
+    c_live, c_livem = last_num(r"encje: zywe (\d+)"), last_num(r"encje: zywe \d+ \(najwiecej (\d+)\)")
+    c_kill, c_reb, c_blk = last_num(r"zdjete przy zwalnianiu (\d+)"), last_num(r"przebudowane po zwolnieniu (\d+)"), last_num(r"zablokowane (\d+)")
+    rep.add("NHB-13: liczniki (ostatnia linia)",
+            f"nowe {c_new}, zamowione {c_req} (wspolne {c_sh}), zwolnione {c_fr}, zapomniane po misji {c_fg}, w pamieci {c_held}; "
+            f"encje zywe {c_live} (najwiecej {c_livem}), zdjete przy zwalnianiu {c_kill}, przebudowane po zwolnieniu {c_reb}, zablokowane {c_blk}; "
+            f"stara linia: herb pana zamiast gospodarza {old_cap}",
+            "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -38524,6 +38698,8 @@ def main(argv):
         return nuchodzcy_main(logp)   # nuchodzcy (noc 17/18.10, sw-uchodzcy): uchodzcy z najazdu w miescie - miejsca, przybyli = odeszli, powroty, kiesa, klasa biedoty, nikt dwa razy (RaidRefugees)
     if group == "nksarm" and logp:
         return nksarm_main(logp)   # nksarm (noc 17/18.10, paczka ks-arm): samo uzbrojenie KS, twarde bramki rozdz. 10, bramka krainy rozdz. 8, zrodla z niczego znane z nazwy (StartCalibration.Arm.cs)
+    if group == "nherby" and logp:
+        return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

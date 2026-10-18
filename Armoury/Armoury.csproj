@@ -16,6 +16,10 @@
          nie wystarczy). Z libs/, a gdy ich tam nie ma - wprost z katalogu modulu SandBox gry (patrz libs/README.md). -->
     <SandBoxLibs Condition="'$(SandBoxLibs)' == '' And Exists('$(GameLibs)/SandBox.View.dll')">$(GameLibs)</SandBoxLibs>
     <SandBoxLibs Condition="'$(SandBoxLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/SandBox/bin/Win64_Shipping_Client</SandBoxLibs>
+    <!-- sw-herby (noc 17/18.10): proporczyki wiosek na wlasnych teksturach herbow (BannerTextureCreationData, ThumbnailCacheManager) - TaleWorlds.MountAndBlade.View.dll
+         z modulu Native gry. Z libs/, a gdy jej tam nie ma - wprost z katalogu modulu Native gry (jak SandBox wyzej). -->
+    <NativeViewLibs Condition="'$(NativeViewLibs)' == '' And Exists('$(GameLibs)/TaleWorlds.MountAndBlade.View.dll')">$(GameLibs)</NativeViewLibs>
+    <NativeViewLibs Condition="'$(NativeViewLibs)' == ''">C:/Program Files (x86)/Steam/steamapps/common/Mount &amp; Blade II Bannerlord/Modules/Native/bin/Win64_Shipping_Client</NativeViewLibs>
   </PropertyGroup>
   <PropertyGroup Condition="'$(T10Dry)' == 'true'">
     <!-- T10 (uwaga krytyki 6): DLL "na sucho" do pierwszego autotestu - ksiega snu AI i powody nocnego marszu tylko w logu,
@@ -59,5 +63,6 @@
     <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection"><HintPath>$(GameLibs)/TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="SandBox"><HintPath>$(SandBoxLibs)/SandBox.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="SandBox.View"><HintPath>$(SandBoxLibs)/SandBox.View.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.View"><HintPath>$(NativeViewLibs)/TaleWorlds.MountAndBlade.View.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>
