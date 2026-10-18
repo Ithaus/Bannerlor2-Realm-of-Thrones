@@ -18,6 +18,25 @@ namespace Armoury
             return KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m == 0 ? 0 : 1);
         }
 
+        /// <summary>T9 (bit w bit, KS-H): popyt zaplacony (ZDp) i odbior 7 dob (ZOff7) calego wiersza miasta naraz - jedno szukanie miasta zamiast jednego na towar.
+        /// t - miasto, ti - indeks KS-H (KsFoodCarts.IndexOf), z[k] - pozycje koszyka, has[k] - towar w swiecie gry (bez - pole bez zmian, jak w Daily).</summary>
+        internal static void ZDpOffRow(Town t, int ti, int[] z, bool[] has, double[] dp, double[] off, int o0)
+        {
+            ZTown zt = null;
+            var map = _zt;
+            bool ok = t != null && t.Settlement != null && map.Count > 0 && map.TryGetValue(t.Settlement, out zt) && zt != null;
+            var o7 = _off7;
+            for (int k = 0; k < z.Length; k++)
+            {
+                if (!has[k]) continue;
+                int zz = z[k];
+                double v = 0.0;
+                if (ok && zz >= 0 && zz < ZN) { v = zt.Q[zz] + zt.QV[zz] + zt.Der[zz] + zt.One[zz]; if (!(v > 0) || double.IsNaN(v)) v = 0.0; }
+                dp[o0 + k] = v;
+                off[o0 + k] = ti >= 0 && o7 != null && ti * ZN + zz < o7.Length && zz >= 0 ? o7[ti * ZN + zz] : 0.0;
+            }
+        }
+
         /// <summary>H7: klucz Ks Corridors Credit czynny (z Ks Food Carts Consign) - korytarze Planu liczone modelem kredytu kupcow.</summary>
         private static bool SwCorridorsCredit { get { var s = Settings.Current; return s == null || (s.KsCorridorsCredit && s.KsFoodCartsConsign); } }
 

@@ -42,7 +42,8 @@ namespace Armoury
     ///    zwloka > 30 dni = bez nowych dostaw; wojna = rachunek przepada; zawrocony woz na kredyt - towar wraca na polke zrodla bez zwrotu (nic nie zaplacono), fracht stracony;
     ///    miejsce kredytu zrodla = 0.5 x kasa - (rachunki otwarte + wozy na kredyt w drodze: wartosc zrodla + fracht);
     ///  - H4 jedna cena celu (KsDestValue): wartosc n sztuk u celu (cena polki schodzi z kazda sztuka, najwyzej 3 x cena startu, x 0.97) w decyzji i w rachunku;
-    ///  - T9 (bit w bit): filtr typu przedmiotu w spisie polek, indeks ceny tylko dla zrodel z oferta i celow, pamiec wojny i dob doby; T9b (KsLotPricePow): cena lotu
+    ///  - T9 (bit w bit): filtr typu przedmiotu w spisie polek, popyt i odbior 7 dob wierszem miasta, indeks ceny tylko dla zrodel z oferta i celow, pamiec wojny
+    ///    i dob doby; T9b (KsLotPricePow): cena lotu
     ///    schodkami wzoru gry (dwie ceny gry - pierwsza i ostatnia sztuka - sprawdzaja wzor; inny wzor - trzy ceny jak dotad);
     ///  - linia: kredyt kupiecki (otwarte, nowe, zaplacone przy dostawie, splacone, starsze niz zwloka, przepadle), kontrole rachunkow i zlota, zablokowane z braku
     ///    pieniedzy wedlug towaru, glod pierwszy, Polnoc i Mur (battania, nightswatch, freefolk, skagosi).
@@ -485,8 +486,10 @@ namespace Armoury
                     long bill = 0;
                     if (cons && n > 0)
                     {
-                        try { bill = DestValueKey ? DestValueNow(c.Dst.Town, c.Z, it, n) : (long)Math.Floor(n * (double)DestUnit(c.Dst.Town, c.Z, it) * (1.0 - Margin)); }
+                        try { bill = DestValueKey ? DestValueNow(c.Dst.Town, c.Z, it, n) : 0; }
                         catch (Exception be) { Stumble("Arrivals.bill", be); bill = 0; }
+                        // bez klucza H4 albo bez ceny wzoru - cena polki celu x sztuki x 0.97 (towar nigdy za darmo)
+                        if (bill <= 0) { try { bill = (long)Math.Floor(n * (double)Math.Max(1, DestUnit(c.Dst.Town, c.Z, it)) * (1.0 - Margin)); } catch { bill = n; } }
                     }
                     // recenzja runda 3 (wazne): wynik kupca lotu - wartosc u celu (cena polki celu dzis) wobec zaplaty i frachtu
                     try
@@ -609,6 +612,7 @@ namespace Armoury
                 // T9 (bit w bit): spis polek tylko przedmiotow typow towarow KS-H (bron i zbroja bez slownika)
                 var types = new HashSet<ItemObject.ItemTypeEnum>();
                 for (int k = 0; k < NZ; k++) if (items[k] != null) types.Add(items[k].ItemType);
+                var has = new bool[NZ]; for (int k = 0; k < NZ; k++) has[k] = items[k] != null;
                 for (int i = 0; i < nt; i++)
                 {
                     var t = _t[i]; var st = _st[i];
@@ -629,9 +633,8 @@ namespace Armoury
                         a.Inc[o] = _inc[o];
                         if (items[k] == null) continue;                  // towar spoza swiata gry - bez popytu (zadnych lotow)
                         a.Ix[o] = double.NaN;                            // T9: indeks liczony w KsFoodCore przed pierwszym lotem tylko dla zrodel z oferta i celow (IxAt)
-                        a.Dp[o] = StartCalibration.ZDp(t, Z[k]);
-                        a.Off[o] = StartCalibration.ZOff7(st, Z[k]);
                     }
+                    StartCalibration.ZDpOffRow(t, i, Z, has, a.Dp, a.Off, i * NZ);   // T9: popyt i odbior 7 dob calego wiersza (bit w bit z ZDp / ZOff7)
                     long res = 0; try { res = Seal31.TownReserve(t); } catch { res = 0; }
                     a.Gold[i] = t.Gold; a.Res[i] = Math.Max(0, res);
                 }
