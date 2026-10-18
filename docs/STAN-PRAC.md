@@ -2970,3 +2970,6 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   odleglosc wioski od wioski; zajazdy nie obok wiosek (mozna spac w wiosce i wioskach pobocznych); droga poboczna prowadzi od drogi glownej, od krolewskiego traktu" -> paczka f10-uklad
   (uklad wiosek v7: min. odleglosc x2, rozproszenie na pusty lad okregu, ludzie okregu bez zmian; zajazdy z dala od wiosek, na rozstajach/przy traktach; migracja v6 -> v7 po uid;
   KS w zapisie Jeffa zacznie pomiar od nowa - inny plik ziemi).
+- 09:35 PDT: W TOKU (wszystko od 7ca98719 = WGRANIE 80): analiza Polnoc/Lannister wf_8990abef-633; f9-predkosc wf_da8d5c48-9fa (przyciski x1/x4/x8 + praca godzinna); f10-uklad
+  wf_687dd179-2c6 (wioski v7 odleglosc x2 + zajazdy z dala od wiosek); scalenie5 wf_7848c2da-a0b (fale 6 i 7 do noc-ks4; decyzja: limit band domyslnie x12, suwak w MCM).
+  DALEJ: scalic f9 + f10 (+ ewentualna poprawka z analizy Polnocy) -> test sciezki Jeffa 160 dob (z armoury-a7-wlacz.flag dla A7) -> 5 dob + bitwa -> WGRANIE 81.
