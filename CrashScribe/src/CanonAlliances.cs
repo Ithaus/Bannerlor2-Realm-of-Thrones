@@ -363,6 +363,16 @@ namespace CrashScribe
             string names = NF(f1) + " - " + NF(f2);
             if (Convert.ToBoolean(_pTriggered.GetValue(war, null))) { _rnDone = true; Scribe.Line("Sojusze kanonu (SK): dzien " + Day() + " - wojna ROT FIVE_KINGS_REACH_NORTH (" + names + ") juz wlaczona - bez zmian (" + src + ")."); return; }
             if (f1 == null || f2 == null || f1.IsEliminated || f2.IsEliminated) { _rnDone = true; Scribe.Line("Sojusze kanonu (SK): dzien " + Day() + " - wojna ROT FIVE_KINGS_REACH_NORTH (" + names + ") NIE wlaczona - krolestwo nie istnieje (" + src + ")."); return; }
+            // ta sama bramka co CatchUp: ROT wylacza te wojne tylko w OnTheRedWedding (robbAlive == false), wolanym raz - gdy gody trwaja albo
+            // juz byly (takze "never happened" z robbAlive == true), wlaczonej nikt by nie wylaczyl (wieczna wojna fabularna: EnforceWars po kazdym pokoju)
+            int rw = Fabula.EventState("RedWeddingEvent");
+            if (rw != 0)
+            {
+                if (rw > 0) _rnDone = true;   // gody trwaja/byly - rozstrzygniete; "nie widac" (-1) bez znacznika - nadrabianie w dobie sprobuje znowu (ma te sama bramke)
+                Scribe.Line("Sojusze kanonu (SK): dzien " + Day() + " - wojna ROT FIVE_KINGS_REACH_NORTH (" + names + ") NIE wlaczona - Krwawe Gody juz byly, trwaja albo stanu nie widac (RedWeddingEvent "
+                            + EvName(rw) + "), ROT by jej potem nie wylaczyl (" + src + ").");
+                return;
+            }
             _mTrigger.Invoke(war, new object[] { true });
             _rnDone = true;
             try { var txt = _fReachAllied != null ? _fReachAllied.GetValue(wars) as TextObject : null; if (txt != null && _pFlavor != null) _pFlavor.SetValue(war, txt, null); } catch { }
