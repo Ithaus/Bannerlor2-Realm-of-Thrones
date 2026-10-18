@@ -3024,3 +3024,7 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   v7 w grze: wioska-wioska min 6.75 / p10 10.26 / med 12.73, na ladzie 1518/1519; zajazdy 135, 0 przy wiosce; drogi boczne: 1033 drogi, 21077 decali postawione w 22.7 ms (1.1 us/decal).
   "bledy 23" = zwykle wyjatki startowe BKROTPatch/BK (w fin92 66). Wyglad drog: z 40 i 20 - kropkowane sciezki, z 10 - lancuch ceglastych prostokatow (sztuczne z bliska; do strojenia
   plikiem-przelacznikiem: gesciej, kolor, alfa). Zdjecia pokazane Jeffowi - czekam na jego ocene ukladu v7 i drog.
+- 12:05 PDT: DECYZJE JEFFA 18.10 (verbatim): "1. zostaw" (uklad wiosek v7 + zajazdy - wchodzi do WGRANIA 81; KS u Jeffa od nowa ~35 dob - powiedziane), "2. tak wygladz" (drogi
+  boczne - wygladzic wyglad, nowe zdjecia; domyslnie dalej NIE), "3. tak ale nie teraz, zapisz to na pozniej" (ROZLOZENIE GOSPODARKI DOBY na pierwsze godziny dnia - szczyt ~0.5 s -> ~0.1 s,
+  wyniki minimalnie inne; + EconomyAudit CrashScribe nie moze zmieniac stanu BK) -> DO ZROBIENIA PO WGRANIU 81, "4. zostawic x 12" (BanditLimitPerHideout 12, suwak 12-48 - juz tak).
+- 12:05 PDT: biegi zdjec drogi2: wariant A (ten sam material, Spacing 0.15, StampHalfLen 0.9, alfa 0.55, kolor FF7E7466) i B (mainmap_decal_mud_a, Spacing 0.2, alfa 0.7).
