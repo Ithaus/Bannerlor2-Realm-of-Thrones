@@ -27,6 +27,12 @@ namespace Armoury
             _done = true;
             // recenzja calosci (scalenie6): MapSpeedButtons = NIE przy starcie gry - wstawka i mixin w ogole nie rejestrowane (dotad zawsze; MCM tylko chowal przyciski,
             // wiec wstawka, ktora zle wyglada na pasku Jeffa, zostawala do nastepnej DLL). MCM wchodzi do Settings dopiero w sesji - tu plik MCM (ButtonsAtStart).
+            if (MapSpeed.BetterTimeActive)
+            {
+                State = "NIE rejestrowane - w grze jest modul Better Time (jego przyciski >> / >>> i klawisze 3/4 prowadza predkosc mapy; nasze przyciski, klawisze 4/5/6 i mnoznik co godzine wylaczone)";
+                Log.Info("Predkosc mapy (f9/f17): UIExtenderEx - " + State + ".");
+                return;
+            }
             string src;
             if (!ButtonsAtStart(out src))
             {

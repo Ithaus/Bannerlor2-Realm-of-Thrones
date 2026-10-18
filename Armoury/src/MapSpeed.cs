@@ -42,6 +42,32 @@ namespace Armoury
         private static int _btnSeen = -1;   // ostatnio widziany MapSpeedButtons w klatce paska (-1 = jeszcze zaden, 0 NIE, 1 TAK)
         internal static bool Hooked;
 
+        // f17 (18.10, Jeff: "better time wgraj ... tam sa strzalki, ustaw x1, x3 i x6"): gdy w grze jest modul Better Time (Id BetterTime), predkosc mapy
+        // prowadzi on (wlasne przyciski >> i >>> oraz klawisze 3/4 ustawiaja Campaign.SpeedUpMultiplier) - nasze przyciski, klawisze 4/5/6 i godzinne
+        // narzucanie mnoznika (MapClock.ApplySpeed) milkna, inaczej co godzine gry wracalby nasz x8 zamiast wybranego x3 / x6. Lista modulow z linii
+        // polecen gry (Utilities.GetModulesNames) - znana juz w OnSubModuleLoad, niezaleznie od kolejnosci ladowania. Raz na proces; blad = jak bez Better Time.
+        private static int _betterTime = -1;
+        internal static bool BetterTimeActive
+        {
+            get
+            {
+                if (_betterTime < 0)
+                {
+                    int r = 0;
+                    try
+                    {
+                        string[] mods = TaleWorlds.Engine.Utilities.GetModulesNames();
+                        if (mods != null)
+                            foreach (string m in mods)
+                                if (string.Equals(m, "BetterTime", StringComparison.OrdinalIgnoreCase)) { r = 1; break; }
+                    }
+                    catch { r = 0; }
+                    _betterTime = r;
+                }
+                return _betterTime == 1;
+            }
+        }
+
         internal static int FastOf(Settings s) { int v = s.MapSpeedFast; return v < 2 ? 2 : v > 16 ? 16 : v; }
         internal static int VeryFastOf(Settings s) { int v = s.MapSpeedVeryFast; return v < 2 ? 2 : v > 32 ? 32 : v; }
 
@@ -96,6 +122,7 @@ namespace Armoury
                 var s = Settings.Current;
                 var c = Campaign.Current;
                 if (s == null || c == null || __instance == null) return;
+                if (BetterTimeActive) return;   // f17: predkosc prowadzi Better Time - bez naszego mnoznika i klawiszy
                 int fast = FastOf(s), very = VeryFastOf(s);
                 int state = __instance.TimeFlowState;
                 if (MapSpeedProfile.On) MapSpeedProfile.Frame(BinOf(state, c.SpeedUpMultiplier, fast, very), t0);
