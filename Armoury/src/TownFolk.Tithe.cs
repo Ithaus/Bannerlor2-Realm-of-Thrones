@@ -223,7 +223,7 @@ namespace Armoury
                 Folk mf = null;
                 if (mk != null && mk.Town != null) _f.TryGetValue(mk, out mf);
                 if (mf == null || mf.Kind > 1 || (mf.Kind == 1 && !CastleLive) || build <= 0) { state = 2; return x; }
-                if (DaWorksOn) { state = 3; _daTiSept += build; DaSeptVillage(vil, mk, build); return x; }   // ds-akumulator: budowa septu zlecona (wykonanie po budowach doby) - material prawdziwy albo nic
+                if (DaWorksOn) { state = 3; DaSeptVillage(vil, mk, build); return x; }   // ds-akumulator: budowa septu zlecona (wykonanie po budowach doby) - material prawdziwy albo nic
                 int had = vil.Gold;
                 vil.ChangeGold(-(int)Math.Min(int.MaxValue, build));
                 long got = Math.Max(0, (long)had - vil.Gold);

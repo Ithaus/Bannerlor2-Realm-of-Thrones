@@ -153,7 +153,8 @@ namespace Armoury
             catch (Exception e) { DaStumble("DaWorksQueue", e); }
         }
 
-        private static long _daTiSept;   // budowa septow zlecona od ostatniej linii "Dziesiecina (E5/C3)" (lud miast w dobie ludu, wsie w dobie i przy wozie)
+        private static long _daTiSept;   // budowa septow zlecona od ostatniej linii "Dziesiecina (E5/C3)" (tylko drogi tej linii: lud miast i wsie bez dziesieciny przy wozie;
+                                         // wsie DS przy wozie - w linii DS "zostalo w kiesach" i w "Akumulator kies")
 
         /// <summary>Dopisek linii "Dziesiecina (E5/C3)": budowa septow zlecona od poprzedniej linii (klucz wylaczony i 0 - pusty, linia jak dotad); zeruje.</summary>
         private static string DaTitheNote()
@@ -194,9 +195,11 @@ namespace Armoury
                 var s = Settings.Current;
                 if (s == null || !DaWorksOn || OffMain()) { foreach (var o in q) { if (o.Sept) _dsNoMat += o.Amount; else _dwNoMat += o.Amount; } _dwDropped += q.Count; return; }
                 double kw = Math.Max(0, Math.Min(3.0, (double)s.DsWorksWagePerMaterial));
+                var items = BuildFunding.DsWorksItems();                    // przedmioty materialow raz na przebieg
+                var empty = new HashSet<Settlement>();                       // targi bez materialu w tym przebiegu - kolejne zlecenia bez czytania polki
                 foreach (var o in q)
                 {
-                    try { DaRunOne(o, o.Sept ? SeptWagePerMat : kw); }
+                    try { DaRunOne(o, o.Sept ? SeptWagePerMat : kw, items, empty); }
                     catch (Exception e) { DaStumble("DaWorksRun(zlecenie)", e); }
                 }
             }
@@ -204,7 +207,7 @@ namespace Armoury
             finally { _daTicks += Stopwatch.GetTimestamp() - t0; }
         }
 
-        private static void DaRunOne(DaOrder o, double k)
+        private static void DaRunOne(DaOrder o, double k, ItemObject[] items, HashSet<Settlement> empty)
         {
             var mk = o.Mk;
             Folk mf = null;
@@ -215,13 +218,15 @@ namespace Armoury
             if (budget < 2) { if (o.Sept) _dsNoMat += o.Amount; else _dwNoCoin += o.Amount; return; }
             double matBudget = Math.Floor(budget / (1.0 + k));
             int spent = 0, cap = 0;
-            if (matBudget >= 1)
+            if (matBudget >= 1 && !empty.Contains(mk))
             {
                 var pcs = new int[Math.Max(BuildFunding.DsWorksMatCount, 1)];
                 var gf = GoodsLedger.Begin(GoodsLedger.FBuild, mk);   // ksiega towarow: material budow na rynek osady targu
-                try { spent = BuildFunding.DsWorksBuy(mk, matBudget, pcs, out cap); }
+                bool none = false;
+                try { spent = BuildFunding.DsWorksBuy(mk, matBudget, items, pcs, out cap, out none); }
                 finally { GoodsLedger.End(gf); }
                 for (int i = 0; i < pcs.Length && i < _dwPcs.Length; i++) _dwPcs[i] += pcs[i];
+                if (none) empty.Add(mk);                                 // polka bez materialu ponad zapas - nastepne zlecenia tego targu bez czytania
             }
             _dwCap += cap;
             if (spent <= 0) { if (o.Sept) { _dsNoMat += o.Amount; _dsNoMatN++; } else { _dwNoMat += o.Amount; _dwNoMatN++; } return; }
@@ -420,7 +425,7 @@ namespace Armoury
                   .Append(", material z polek ").Append(_dwMat).Append(", rzemieslnicy miast ").Append(_dwWage).Append(", wsi z robota ").Append(_dwN)
                   .Append(", bez materialu (zostalo w kiesach wsi) ").Append(_dwNoMat).Append(" (").Append(_dwNoMatN).Append(" wsi; bez kiesy ludu targu ").Append(_dwNoMktN).Append(", bez zlota ").Append(_dwNoCoin)
                   .Append("), sufit ceny - material pominiety ").Append(_dwCap).Append(", zlecen porzuconych (zostaly u placacych) ").Append(_dwDropped)
-                  .Append("; sztuki ").Append(BuildFunding.DsWorksMatNames).Append(" ").Append(PcsText())
+                  .Append("; sztuki (roboty i septy) ").Append(BuildFunding.DsWorksMatNames).Append(" ").Append(PcsText())
                   .Append("; kontrola robot: z kies wsi - (do kas + do ludu) = ").Append(_dwVilOut - _dwCofIn - _dwFolkIn).Append(", material zaplacony - towar zdjety = ").Append(-_dwGap)
                   .Append(", zwrot do wsi (lud nie przyjal) ").Append(_dwRefund)
                   .Append(" | septy z dziesieciny (ta sama regula): zlecone ").Append(_dsQ).Append(" (").Append(_dsQN).Append("), material ").Append(_dsMat).Append(", rzemieslnicy ").Append(_dsWage)

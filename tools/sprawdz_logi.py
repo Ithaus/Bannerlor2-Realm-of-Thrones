@@ -7106,9 +7106,11 @@ def etap5_wsie(rep, lines, start, until):
         rep.add("W12-2: dziesiecina razem (sr28)", f"{tot / n:.0f}/d = wsie {tv / n:.0f} + lud miast {tt / n:.0f}; przez kaplanow {via / n:.0f} (jalmuzna {alms / n:.0f}, place septow {wage / n:.0f}, "
                 f"material {mat / n:.0f}, wsie bez targu {nomk / n:.0f}); bez kaplana {nop / n:.0f}", "INFO (rachunek z kopia-fin3: wsie ok. 14 tys./d, lud miast ok. 10 tys./d)", None)
         build = wage + mat
-        ok3 = via > 0 and abs(alms / via - 0.5) <= 0.005 and (build == 0 or abs(wage / build - 0.75) <= 0.005) and abs(alms + wage + mat + nomk - via) <= len(t28) * 2
+        dsq = s28(r"\(Ds Works Real Material\): zlecone (\d+)")   # ds-akumulator: budowa septow zlecona (material prawdziwy albo nic - wykonanie po budowach doby)
+        ok3 = via > 0 and abs(alms / via - 0.5) <= 0.005 and (build == 0 or abs(wage / build - 0.75) <= 0.005) and abs(alms + wage + mat + nomk + dsq - via) <= len(t28) * 2
         rep.add("W12-3: podzial przez kaplanow: jalmuzna 50%, z budowy place 75% / material 25%, suma = przez kaplanow (sr28)",
-                f"jalmuzna {alms / via * 100:.2f}%, place {wage / build * 100:.2f}% budowy, rozjazd sumy {alms + wage + mat + nomk - via}" if via > 0 and build > 0 else "brak przeplywu przez kaplanow",
+                (f"jalmuzna {alms / via * 100:.2f}%, place {wage / build * 100:.2f}% budowy, rozjazd sumy {alms + wage + mat + nomk + dsq - via}" if build > 0
+                 else f"jalmuzna {alms / via * 100:.2f}%, budowa septow zlecona (Ds Works Real Material) {dsq}, rozjazd sumy {alms + wage + mat + nomk + dsq - via}") if via > 0 else "brak przeplywu przez kaplanow",
                 "50% +-0.5 pp, 75% +-0.5 pp, rozjazd <= 2 zl na dobe", ok3 if via > 0 else False)
         # nalezne wsi wobec utargu okna (linia Utarg wsi (112) - ta sama doba ksiegi)
         ut = by_day(lines, "Utarg wsi (112): dzien")
@@ -33865,6 +33867,8 @@ def _nds_scan(path, full):
                     D["ksend"] = v
                 continue
             if s.startswith(NDS_AK):
+                if "(Ds Works Real Material) tak" in s:
+                    D["akworks"] = True
                 if day is not None:
                     mm = NDS_AKMED.search(s)
                     if mm:
@@ -34314,8 +34318,10 @@ def nds_main(logp, bdp=None, until=120):
         wk = [D["ds"][d]["works"] for d in win if "works" in D["ds"][d]]
         if wk:
             gd, wo, nw = sum(x[0] for x in wk) / n, sum(x[1] for x in wk) / n, sum(x[5] for x in wk) / n
+            rw = D.get("akworks", False)   # ds-akumulator: roboty gminy tylko z prawdziwym materialem - brak materialu = pieniadz zostaje we wsi (bramka kies wsi: NDS-3b, nakum NAKUM-5)
             rep.add("NDS-17: krok 5 - towar, roboty gminy, niewydane (recenzja 17.10: odplyw bez towaru)", f"na dobe: towar {gd:.0f}, roboty gminy {wo:.0f} (place {sum(x[3] for x in wk) / n:.0f} + material {sum(x[4] for x in wk) / n:.0f}), niewydane {nw:.0f}",
-                    "niewydane <= 10% kroku 5 (bez kiesy ludu w miescie targowym)", nw <= 0.10 * max(1.0, gd + wo + nw))
+                    "INFO przy Ds Works Real Material (niewydane = brak materialu na polkach - zostaje we wsi; kiesy wsi pilnuje NDS-3b)" if rw else "niewydane <= 10% kroku 5 (bez kiesy ludu w miescie targowym)",
+                    None if rw else nw <= 0.10 * max(1.0, gd + wo + nw))
         k5 = [D["ds"][d]["k5"] for d in win if "k5" in D["ds"][d]]
         if k5:
             rep.add("NDS-18: K5 przy samym F1 - brak zwrotu pokryty ze skarbca ponad zapas wojny (INFO; Bank w NDS-7c)", f"razem {sum(x[0] for x in k5):.0f} zl, krolestwo-dob {sum(x[1] for x in k5):.0f}", "INFO", None)
