@@ -1257,6 +1257,10 @@ Uzycie (Python 3, tylko odczyt):
                     ok. 81 z 558), NZW-4 linie rozpoznane, NZW-5 przebudowa: kiesy wsi - kasy i lud miast = 0 (NZW-5b material z polki / rzemieslnicy / droga dawna - INFO), NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 M wsi
                     (szacunek - INFO), NZW-8 koszt (doba <= 5 ms, ikony <= 300 ms), NZW-9 potkniecia i ERROR 0, NZW-10 etap 0 (proba W2: krok wolany, a - b = 0; W2 milknie
                     tylko we wsiach z planem zajec - liczba w linii W2), NZW-11 tabliczka i dymek wpiete. Log bez paczki: INFO, bez wyjatku.
+                    f4b-inwest (fin87: NZW-1 bawelna +27.6%, NZW-3 362 ikony pod KS): NZW-1 czyta PIERWSZA linie pomiaru (doba wlaczenia - n na towarach, klucz Side
+                    Village Craft Neutral Goods); NZW-1c poprawka n z pomiaru (klucz Side Village Craft Neutral Fix): linia "pomiar neutralnosci po poprawce (A6)" w 1%
+                    (bez poprawki - INFO); NZW-1d sposob liczenia n (towary / rece - INFO); NZW-3 ostatnia linia ikon (prog 40-130 bez zmian) z rozbiciem bez KS / pod KS;
+                    NZW-3b (INFO) ostatnia linia ikon bez KS (projekt TESTS 2 liczony dla zajec bez KS) i zmiany typ->ikona. Linie sprzed f4b - INFO, bez wyjatku.
 --grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
                     python -I tools/sprawdz_logi.py --grupa npo <Armoury-*.log> (strumieniowo). NPO-0 linia startu (klucz TAK, AI WYLACZONE, menu wpiete, opcje BEE 5/15/30
                     tys. ukryte, krok 112 wpiety), NPO-1 linie doby rozpoznane, NPO-2 wplacone = place + material (0), NPO-3 wyplacone = licznik pana + kiesa wsi, naruszenia 0,
@@ -40653,6 +40657,12 @@ NZW_NEUTRAL = re.compile(r"Zajecia wiosek \(ZW\): start neutralny \(A6\) doba (?
 # recenzja: kontrola neutralnosci na TOWARACH (wynik modelu wsi z planem przed / po kroku zajec, na koncu lancucha) - doba po wlaczeniu
 NZW_MEAS = re.compile(r"Zajecia wiosek \(ZW\): pomiar neutralnosci \(A6, TESTS 2\) doba (?P<day>-?\d+) \| wsi zmierzonych (?P<n>\d+), wywolan (?P<calls>\d+) \(bez konca lancucha (?P<nofin>\d+), bez mnoznika (?P<nomult>\d+)\), okregi z pracami pominiete (?P<works>\d+)"
                       r" \| (?P<types>[^|]*)\| najwieksza odchylka produkcji typu (?P<dev>[\d.]+)% \(prog 1%\) w (?P<worst>\S+) \| wobec swiata \(ksiega towarow doby (?P<led>[^)]*)\): najwieksza (?P<devw>[\d.]+)% w (?P<worstw>\S+)")
+# f4b-inwest: pomiar po poprawce n (Side Village Craft Neutral Fix), poprawka w linii pomiaru doby wlaczenia, sposob liczenia n (linia startu neutralnego), rozbicie ikon
+NZW_MEAS2 = re.compile(r"Zajecia wiosek \(ZW\): pomiar neutralnosci po poprawce \(A6\) doba (?P<day>-?\d+) \| wsi zmierzonych (?P<n>\d+), wywolan (?P<calls>\d+)"
+                       r".*?\| najwieksza odchylka produkcji typu (?P<dev>[\d.]+)% \(prog 1%\) w (?P<worst>\S+)")
+NZW_FIX = re.compile(r"poprawka n z pomiaru \(f4b, Side Village Craft Neutral Fix\): zajec poprawionych (?P<n>\d+)(?P<rest>[^|]*)")
+NZW_GOODS = re.compile(r"\| n na towarach \(f4b, Side Village Craft Neutral Goods\): (?P<note>.*)$")
+NZW_ICONKS = re.compile(r"\| inna niz typ: bez KS (?P<dn>\d+) z (?P<nn>\d+), pod KS (?P<dk>\d+) z (?P<nk>\d+) \| regula pod KS \(f4b, District Icon Part Crafts\): (?P<rule>[^|]*)\| zmiany typ->ikona: (?P<pairs>[^|]*)\|")
 NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|NIECZYNNE[^|]*) \| okregow z wioskami (?P<d>\d+) \(bez KS (?P<fall>\d+), pod KS (?P<ks>\d+)[^)]*\), wiosek (?P<sides>\d+) "
                      r".*?\| inne niz typ okregu (?P<other>\d+), w przebudowie (?P<trans>\d+), uprawy na sniegu \(inne niz typ okregu\) (?P<snow>\d+) "
                      r"\| zmiany: nacisk (?P<press>\d+), zaczete (?P<started>\d+), skonczone (?P<done>\d+),"
@@ -40680,7 +40690,9 @@ def nzw_main(logp):
     NZW-2 0 upraw na sniegu (wioski bez KS i pod KS), NZW-3 ikona inna niz typ wsi w 40-130 okregach (projekt: ok. 81 z 558), NZW-4 linie doby rozpoznane, NZW-5 kontrola
     pieniedzy przebudowy (kiesy wsi - kasy miast = 0), NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 krok zajec (M szacunek - INFO), NZW-8 koszt (doba <= 5 ms
     mediana, ikony <= 300 ms), NZW-9 potkniecia i ERROR paczki 0, NZW-10 etap 0 (proba W2): krok W2 wolany i a - b = 0 (W2 milknie tylko we wsiach z planem zajec;
-    gdy wszystkie wsie z rybakami maja plan - INFO), NZW-11 tabliczka ikony wpieta (INFO bez linii). Log bez paczki: INFO, bez wyjatku."""
+    gdy wszystkie wsie z rybakami maja plan - INFO), NZW-11 tabliczka ikony wpieta (INFO bez linii). Log bez paczki: INFO, bez wyjatku.
+    f4b-inwest: NZW-1 = PIERWSZA linia pomiaru (doba wlaczenia), NZW-1c poprawka n z pomiaru i linia "po poprawce" (w 1%; bez poprawki - INFO), NZW-1d sposob
+    liczenia n (INFO), NZW-3b ikony bez KS i zmiany typ->ikona (INFO)."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NZW-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -40688,6 +40700,7 @@ def nzw_main(logp):
         return 0
     starts, offs, neutral, days, bad, icons, bad_icons, wired, w2, w2p = [], [], [], [], [], [], [], [], [], []
     meas, deferred = [], []                 # recenzja: pomiar neutralnosci na towarach, neutralny start odlozony (bez pliku ziemi)
+    meas2, fixes, goods_notes = [], [], []  # f4b-inwest: pomiar po poprawce, poprawka n z pomiaru, sposob liczenia n (linia startu neutralnego)
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -40696,6 +40709,9 @@ def nzw_main(logp):
             if s.startswith(NZW_HEAD):
                 if s.startswith(NZW_HEAD + "start neutralny"):
                     mm = NZW_NEUTRAL.match(s)
+                    gm = NZW_GOODS.search(s)
+                    if gm:
+                        goods_notes.append(gm.group("note"))
                     if mm:
                         neutral.append(mm.groupdict())
                     else:
@@ -40713,14 +40729,26 @@ def nzw_main(logp):
                     (days.append(dict(mm.groupdict(), raw=s)) if mm else bad.append(s))
                 elif s.startswith(NZW_HEAD + "ikony dzien"):
                     mm = NZW_ICON.match(s)
-                    (icons.append(mm.groupdict()) if mm else bad_icons.append(s))
+                    if mm:
+                        g = mm.groupdict()
+                        km = NZW_ICONKS.search(s)
+                        g["split"] = km.groupdict() if km else None
+                        icons.append(g)
+                    else:
+                        bad_icons.append(s)
                 elif s.startswith(NZW_HEAD + "ikona okregu"):
                     mm = NZW_WIRED.match(s)
                     if mm:
                         wired.append(mm.group("w"))
+                elif s.startswith(NZW_HEAD + "pomiar neutralnosci po poprawce"):
+                    mm = NZW_MEAS2.match(s)
+                    (meas2.append(mm.groupdict()) if mm else bad.append(s))
                 elif s.startswith(NZW_HEAD + "pomiar neutralnosci"):
                     mm = NZW_MEAS.match(s)
                     (meas.append(mm.groupdict()) if mm else bad.append(s))
+                    fm = NZW_FIX.search(s)
+                    if fm:
+                        fixes.append(fm.groupdict())
                 elif s.startswith(NZW_HEAD + "neutralny start odlozony"):
                     deferred.append(s)
             elif s.startswith("Wioski wedlug rodzaju (210): dzien"):
@@ -40735,7 +40763,7 @@ def nzw_main(logp):
                 n_err += 1
     print(f"plik: {logp} | linii startu {len(starts)} (wylaczone {len(offs)}), neutralny start {len(neutral)}, doby {len(days)} (nierozpoznanych {len(bad)}), ikony {len(icons)} "
           f"(nierozpoznanych {len(bad_icons)}), W2 {len(w2)}")
-    if not starts and not offs and not days and not icons and not neutral and not bad and not bad_icons and not meas and not deferred and n_err == 0:
+    if not starts and not offs and not days and not icons and not neutral and not bad and not bad_icons and not meas and not meas2 and not deferred and n_err == 0:
         rep.add("NZW-0: linie 'Zajecia wiosek (ZW)'", "brak w logu", "INFO (log sprzed paczki inwest)", None)
         # etap 0 i tak: linia W2 z proba albo bez
         if w2:
@@ -40755,7 +40783,7 @@ def nzw_main(logp):
         rep.add("NZW-0: linia startu sesji", "brak (sa inne linie ZW)", "linia przy kazdym starcie sesji", False)
     # NZW-1 (recenzja: na towarach - wynik modelu wsi z planem przed / po kroku zajec, na koncu lancucha; rece sa rowne z definicji n)
     if meas:
-        g1 = meas[-1]
+        g1 = meas[0]                        # f4b-inwest: doba wlaczenia (pierwszy pomiar; linia po poprawce - NZW-1c)
         dev = float(g1["dev"])
         if int(g1["n"]) > 0:
             rep.add("NZW-1: neutralny start na towarach (produkcja typu we wsiach z planem, doba wlaczenia)",
@@ -40771,7 +40799,25 @@ def nzw_main(logp):
         rep.add("NZW-1: neutralny start", "brak linii", "INFO (n z zapisu - wlaczone w innej sesji - albo klucz wylaczony)", None)
     if neutral:
         devh = max(float(g["dev"]) for g in neutral)
-        rep.add("NZW-1b: rece swiata typu po x n / przed (z definicji n)", f"najwieksza odchylka {devh:.3f}% ({len(neutral)} linii, okregow {neutral[-1]['d']})", "INFO (tylko typy przyciete 0.5-2.0)", None)
+        rep.add("NZW-1b: rece swiata typu po x n / przed (z definicji n)", f"najwieksza odchylka {devh:.3f}% ({len(neutral)} linii, okregow {neutral[-1]['d']})", "INFO (tylko typy przyciete 0.5-2.0; przy n na towarach rece nie musza sie zgadzac)", None)
+    # f4b-inwest: NZW-1c poprawka n z pomiaru doby wlaczenia i pomiar po poprawce; NZW-1d sposob liczenia n
+    if fixes:
+        fx = fixes[0]
+        nfix = int(fx["n"])
+        if nfix > 0 and meas2:
+            d2 = float(meas2[0]["dev"])
+            rep.add("NZW-1c: poprawka n z pomiaru - produkcja typu po poprawce", f"zajec poprawionych {nfix}{fx['rest'][:160]}; po poprawce najwieksza odchylka {d2:.3f}% w {meas2[0]['worst']} (wsi {meas2[0]['n']})",
+                    f"<= {NZW_DEV_MAX:.0f}%", d2 <= NZW_DEV_MAX)
+        elif nfix > 0:
+            rep.add("NZW-1c: poprawka n z pomiaru", f"zajec poprawionych {nfix} - brak linii 'po poprawce'", "INFO (zapis/wczytanie przed doba nastepna)", None)
+        else:
+            rep.add("NZW-1c: poprawka n z pomiaru", f"zajec poprawionych 0{fx['rest'][:80]}", "INFO (wszystkie zajecia w 0.5% juz w dobie wlaczenia)", None)
+    elif meas:
+        rep.add("NZW-1c: poprawka n z pomiaru", "brak w linii pomiaru", "INFO (klucz Side Village Craft Neutral Fix wylaczony albo DLL sprzed f4b)", None)
+    if goods_notes:
+        rep.add("NZW-1d: n neutralnego startu - sposob liczenia", goods_notes[-1][:220], "INFO (TAK - n na towarach; WYLACZONE - n z rak jak inwest)", None)
+    elif neutral:
+        rep.add("NZW-1d: n neutralnego startu - sposob liczenia", "n z rak (linia bez dopisku f4b)", "INFO (DLL sprzed f4b)", None)
     # NZW-2
     snow_d = max([int(g["snow"]) for g in days] + [0])
     snow_k = max([int(g["snow"]) for g in icons] + [0])
@@ -40781,8 +40827,16 @@ def nzw_main(logp):
     if icons:
         diff = int(icons[-1]["diff"])
         ok3 = NZW_ICON_LO <= diff <= NZW_ICON_HI
-        rep.add("NZW-3: ikona okregu inna niz typ wsi gry", f"{diff} okregow z {icons[-1]['d']} (pod KS {icons[-1]['ks']}), zmienione {icons[-1]['chg']}, tabliczki poprawione {icons[-1]['upd']}",
+        sp = icons[-1].get("split")
+        extra = f"; bez KS {sp['dn']} z {sp['nn']}, pod KS {sp['dk']} z {sp['nk']} (regula pod KS: {sp['rule'].strip()[:50]})" if sp else ""
+        rep.add("NZW-3: ikona okregu inna niz typ wsi gry", f"{diff} okregow z {icons[-1]['d']} (pod KS {icons[-1]['ks']}), zmienione {icons[-1]['chg']}, tabliczki poprawione {icons[-1]['upd']}{extra}",
                 f"{NZW_ICON_LO}-{NZW_ICON_HI} (projekt ok. 81 z 558)", ok3)
+        # f4b-inwest: NZW-3b - ikony liczone bez KS (projekt TESTS 2 liczyl zajecia bez KS) i najczestsze zmiany typ->ikona ostatniej linii
+        pre = [g for g in icons if int(g["ks"]) == 0]
+        if pre or sp:
+            txt = (f"ostatnia linia bez KS: {pre[-1]['diff']} z {pre[-1]['d']} (doba {pre[-1]['day']})" if pre else "linii bez KS brak")
+            txt += (f"; zmiany typ->ikona (ostatnia linia): {sp['pairs'].strip()[:200]}" if sp else "")
+            rep.add("NZW-3b: ikony bez KS i zmiany typ->ikona", txt, "INFO (projekt 40-130 liczony dla zajec bez KS)", None)
     else:
         rep.add("NZW-3: ikona okregu", "brak linii 'ikony dzien'", "INFO (klucz District Icon From Sum wylaczony albo sesja bez doby)", None)
     # NZW-4

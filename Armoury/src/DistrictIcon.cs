@@ -29,6 +29,7 @@ namespace Armoury
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         internal static bool On { get { var s = Settings.Current; return s != null && s.DistrictIconFromSum; } }
+        private static bool PartCrafts { get { var s = Settings.Current; return s != null && s.DistrictIconPartCrafts; } }
 
         private sealed class Info { public int Day = -1; public int Craft = -1; public ItemObject Item; public string IconId; public string Mix = ""; public string Counts = ""; }
         private static readonly Dictionary<string, Info> _info = new Dictionary<string, Info>(StringComparer.Ordinal);
@@ -106,6 +107,8 @@ namespace Armoury
             _lastDay = today;
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             _diff = _changed = _districts = _ks = _snowKs = 0;
+            int diffKs = 0;
+            var pairs = new Dictionary<string, int>(StringComparer.Ordinal);   // f4b-inwest: zmiany typ -> ikona (do linii)
             var s = Settings.Current;
             float margin = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictIconMargin)) : 0.10f;
             var parts = new List<VillageCrafts.PartCraft>();
@@ -122,15 +125,29 @@ namespace Armoury
                     var ni = Compute(v, parts, old, margin, today);
                     _info[v.Settlement.StringId] = ni;
                     var gameIcon = v.VillageType.PrimaryProduction;
-                    if (ni.Item != null && !ReferenceEquals(ni.Item, gameIcon)) _diff++;
+                    if (ni.Item != null && !ReferenceEquals(ni.Item, gameIcon))
+                    {
+                        _diff++; if (ks) diffKs++;
+                        string pk = v.VillageType.StringId + "->" + (ni.Craft >= 0 && ni.Craft < KsTab.NC ? KsTab.Crafts[ni.Craft] : "?");
+                        int pc0; pairs.TryGetValue(pk, out pc0); pairs[pk] = pc0 + 1;
+                    }
                     if (old != null && old.Craft >= 0 && old.Craft != ni.Craft) _changed++;
                 }
                 catch (Exception e) { Stumble("Daily(okreg)", e); }
             }
             _updated += UpdateVms();
             _ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            // f4b-inwest: rozbicie ikon bez KS / pod KS i najczestsze zmiany typ -> ikona (diagnoza - czy zmienia sie tylko to, co okreg naprawde sprzedaje)
+            var pl = new List<KeyValuePair<string, int>>(pairs);
+            pl.Sort((a, b) => a.Value != b.Value ? b.Value.CompareTo(a.Value) : string.CompareOrdinal(a.Key, b.Key));
+            var ps = new StringBuilder();
+            for (int i = 0; i < pl.Count && i < 8; i++) { if (ps.Length > 0) ps.Append(", "); ps.Append(pl[i].Key).Append(' ').Append(pl[i].Value); }
             Log.Info(VillageCrafts.P + "ikony dzien " + today + " | okregow " + _districts + " (pod KS " + _ks + "), ikona inna niz typ wsi: " + _diff + " okregow (projekt: ok. 81 z 558, prog 40-130), zmienione od poprzedniego rachunku "
-                     + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv) + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
+                     + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv)
+                     + " | inna niz typ: bez KS " + (_diff - diffKs) + " z " + (_districts - _ks) + ", pod KS " + diffKs + " z " + _ks
+                     + " | regula pod KS (f4b, District Icon Part Crafts): " + (PartCrafts ? "wlasne zajecie czesci, tylko sprzedane" : "cala produkcja KS (jak dotad)")
+                     + " | zmiany typ->ikona: " + (ps.Length > 0 ? ps.ToString() : "-")
+                     + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
             _st = 0;
         }
 
@@ -167,8 +184,22 @@ namespace Armoury
         {
             var val = new double[KsTab.NC];
             var cnt = new int[KsTab.NC];
+            bool own = PartCrafts;
             foreach (var p in parts)
             {
+                // f4b-inwest (District Icon Part Crafts): pod KS czesc liczy tylko wlasne zajecie (wies gry - typ, wioska - zajecie ziemi) i tylko to, co z niego sprzedaje
+                // (projekt A9 "kazda wioska ma swoje zajecie" + F2 "ceny wozow"; Jeff: "towar, ktory daje okregowi najwiecej pieniedzy") - zboze zjedzone w okregu to nie pieniadz.
+                // Bez KS CraftVal to juz wlasne zajecie czesci (tylko jej zajecie i przebudowa) - bez zmian.
+                if (own && p.Ks)
+                {
+                    if (p.IconCraft >= 0 && p.IconCraft < KsTab.NC)
+                    {
+                        if (p.IconVal > 0) val[Fold(p.IconCraft)] += p.IconVal;
+                        cnt[Fold(p.IconCraft)]++;
+                    }
+                    else if (p.Craft >= 0) cnt[Fold(p.Craft)]++;
+                    continue;
+                }
                 for (int c = 0; c < KsTab.NC; c++) { double x = p.CraftVal[c]; if (x > 0) val[Fold(c)] += x; }
                 if (p.Craft >= 0) cnt[Fold(p.Craft)]++;
             }

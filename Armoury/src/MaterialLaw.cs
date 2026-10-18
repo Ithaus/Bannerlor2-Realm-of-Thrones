@@ -259,6 +259,45 @@ namespace Armoury
             catch { System.Threading.Interlocked.Increment(ref _silent); }   // inwest etap 0 (proba W2): ciche wyjatki lancucha tylko liczone (linia W2)
         }
         private static int _silent;
+
+        /// <summary>f4b-inwest (neutralny start zajec na towarach, klucz Side Village Craft Neutral Goods): mnoznik lancucha ProdPostfix MIEDZY krokiem zajec
+        /// (VillageCrafts.Base) a W2 (HamletKinds.Step) dla wsi i towaru - te same funkcje i ta sama kolejnosc co wyzej: wydobycie i las / ladunek, powtorzenia BK,
+        /// wielblady, rece za cena (E3-D1), ludzie P1, stawka typu (sol, futra - GoodsRates), rece spustoszenia E4/5, rece wojny E4/7, regulator towaru W3 (HorseStep -
+        /// konie poza zajeciami). side = krok po W2: towary uboczne ZC1 (marmur kopaln srebra, miod pitny drwali x (1 - przejscie)). Bez progow 0.001 i sum > 0 (roznica
+        /// ponizej 0.1%). Sufity dymarki i RockGold (zelazo, zloto) poza rachunkiem. Sam odczyt - bez skutkow ubocznych, nie rzuca (blad = 1). TRZYMAC W ZGODZIE Z ProdPostfix.</summary>
+        internal static float ChainFactor(Village village, ItemObject item, out float side)
+        {
+            side = 1f;
+            if (village == null || item == null) return 1f;
+            try
+            {
+                var s = Settings.Current;
+                string id = item.StringId ?? "";
+                float m = 1f;
+                if (On && s != null && id == "iron") m = s.MineOutputMultiplier * (s.MineOutputStep > 0f ? s.MineOutputStep : 1f);
+                else if (On && s != null && id == "hardwood") m = s.LumberOutputMultiplier;
+                m /= HistoricalPrices.CountScale(item);
+                if (!(m > 0f)) m = 1f;
+                m *= MineralOnce.Times(village, item);
+                m *= CamelLaw.HostFactor(village, item);
+                m *= VillageFruit.HostFactor(village, item);
+                float f, u, g;
+                if (VillageByPeople.KeyOn && VillageByPeople.TryFactor(village, out f, out u, out g)) m *= f;
+                var vt = village.VillageType;
+                if (vt != null) m *= GoodsRates.TypeRateFactor(vt.StringId, id);   // ten sam czynnik co GoodsRates.ProdStep (sol wsi solnych, futra trapperow)
+                m *= Devastation.YieldFactor(village);
+                m *= FreeHands.YieldFactor(village);
+                m *= HarvestValve.Factor(item);
+                if (vt != null && GoodsPaths.SideOn)
+                {
+                    float t = id == "marble" && vt.StringId == "silver_mine" ? GoodsPaths.SideT : (id == "mead" && vt.StringId == "lumberjack" ? GoodsPaths.MeadT : 0f);
+                    if (t > 0f) side = Math.Max(0f, 1f - t);
+                }
+                return m >= 0f && !float.IsNaN(m) && !float.IsInfinity(m) ? m : 1f;
+            }
+            catch { side = 1f; return 1f; }
+        }
+
         /// <summary>inwest etap 0: ciche wyjatki ProdPostfix od ostatniego odczytu (lancuch modelu przerwany - kroki po wyjatku nie biegly dla tego wywolania).</summary>
         internal static int TakeSilent() { return System.Threading.Interlocked.Exchange(ref _silent, 0); }
 

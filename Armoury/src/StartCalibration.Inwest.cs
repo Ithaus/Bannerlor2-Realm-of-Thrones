@@ -21,7 +21,29 @@ namespace Armoury
     {
         /// <summary>inwest: czesc okregu pod KS - wioska poboczna (Uid) albo wies gry (Main: 20 blokow razem). Craft - zajecie z najwiekszym udzialem rak,
         /// Mix - udzial rak wedlug zajecia (KsTab.NC), Kg - kg/d zajec czesci (bez zimy), Busy - przebudowa A7 w toku, Hands - rece czesci.</summary>
-        internal sealed class KsPartView { public string Uid; public bool Main; public int Craft = -1; public double[] Mix = new double[KsTab.NC]; public double Hands; public bool Busy; public double[] Kg = new double[ItemCount]; public double[] CraftVal = new double[KsTab.NC]; }
+        internal sealed class KsPartView { public string Uid; public bool Main; public int Craft = -1; public double[] Mix = new double[KsTab.NC]; public double Hands; public bool Busy; public double[] Kg = new double[ItemCount]; public double[] CraftVal = new double[KsTab.NC];
+            // f4b-inwest (District Icon Part Crafts): wlasne zajecie czesci do ikony (wies gry - typ okregu, wioska poboczna - zajecie jej ziemi) i kg/d jego towarow NA TARG
+            // (kg zajecia bloku x czesc sprzedana okregu - bez tego, co okreg zje sam); null - klucz wylaczony
+            public int IconCraft = -1; public double[] IconKg; }
+
+        /// <summary>f4b-inwest: kg jednej sztuki gry towaru dostawy KS (zwierzeta - kg tabeli KS, nie waga przedmiotu gry); 10 bez tabeli.</summary>
+        internal static double ItemKgOf(int i)
+        {
+            try { EnsureItems(); } catch { }
+            return _itemKg != null && i >= 0 && i < _itemKg.Length && _itemKg[i] > 0 ? _itemKg[i] : 10.0;
+        }
+
+        /// <summary>f4b-inwest: wlasne zajecie czesci okregu pod KS do ikony - wies gry: typ okregu (projekt A4); wioska poboczna: zajecie drogi bez KS (ziemia wioski, ta sama
+        /// tabela swiata), a bez niej zajecie startowe bloku z pliku ziemi KS; zajecie spoza tabeli - -1.</summary>
+        private static int IconCraftOf(LiveDist ld, LiveBlock lb, string type)
+        {
+            int c = -1;
+            if (lb.K.Main) { if (type != null) KsTab.CraftIndex.TryGetValue(type, out c); return c; }
+            string uid = lb.Uid ?? lb.K.Uid;
+            c = VillageCrafts.SideCraft(uid);
+            if (c < 0 && lb.K.Start != null) KsTab.CraftIndex.TryGetValue(lb.K.Start, out c);
+            return c;
+        }
 
         /// <summary>inwest: wies z zastosowanym KS (stan, klucz, okreg w stanie, kraina nie wrocona bramka) - opis i prace okregu licza z blokow KS.</summary>
         internal static bool KsDistrictLive(Village v)
@@ -96,6 +118,16 @@ namespace Armoury
                 string type = ld.K.Type;
                 var main = new KsPartView { Main = true };
                 var tmp = new double[ItemCount];
+                // f4b-inwest (District Icon Part Crafts): czesc sprzedana okregu na towar (targ / produkcja z ostatniego rachunku okregu; bez rachunku - calosc)
+                var sIc = Settings.Current;
+                bool icon = sIc != null && sIc.DistrictIconPartCrafts;
+                double[] sold = null;
+                if (icon)
+                {
+                    sold = new double[ItemCount];
+                    var res = ld.Res;
+                    for (int i = 0; i < ItemCount; i++) sold[i] = res != null && res.Prod[i] > 1e-9 ? Math.Max(0.0, Math.Min(1.0, res.MarketKg[i] / res.Prod[i])) : 1.0;
+                }
                 foreach (var lb in ld.B)
                 {
                     if (lb == null || lb.K == null || lb.C == null || lb.X == null) continue;
@@ -104,6 +136,7 @@ namespace Armoury
                     else { pv = new KsPartView { Uid = lb.Uid ?? lb.K.Uid, Main = false }; into.Add(pv); }
                     pv.Hands += lb.Hands;
                     if (lb.Target >= 0) pv.Busy = true;
+                    if (icon && pv.IconKg == null) { pv.IconKg = new double[ItemCount]; pv.IconCraft = IconCraftOf(ld, lb, type); }
                     for (int j = 0; j < lb.C.Length; j++)
                     {
                         int c = lb.C[j];
@@ -114,6 +147,9 @@ namespace Armoury
                         double val = 0;
                         for (int i = 0; i < ItemCount; i++) { if (tmp[i] <= 0) continue; pv.Kg[i] += tmp[i]; val += tmp[i] * ValKgItem(i); }
                         pv.CraftVal[c] += val;
+                        // f4b-inwest: towary wlasnego zajecia czesci (maslo bydla jak bydlo) - tylko czesc sprzedana
+                        if (icon && pv.IconCraft >= 0 && (c == pv.IconCraft || (c == KsTab.CCattleB && pv.IconCraft == KsTab.CCattle) || (c == KsTab.CCattle && pv.IconCraft == KsTab.CCattleB)))
+                            for (int i = 0; i < ItemCount; i++) if (tmp[i] > 0) pv.IconKg[i] += tmp[i] * sold[i];
                     }
                 }
                 into.Add(main);
