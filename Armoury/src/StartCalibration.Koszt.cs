@@ -109,8 +109,9 @@ namespace Armoury
         /// <summary>T4: poczatek uzycia (zakupy jednej wsi, budzet koszyka wsi) - klucz, watek glowny i wersja wejsc; false - rachunek bez pamieci (jak dotad).</summary>
         internal static bool T4Begin()
         {
+            if (_kMain < 0 || Environment.CurrentManagedThreadId != _kMain) return false;   // inny watek: bez pamieci i bez ruszania stanu pamieci watku glownego
             _t4On = false;
-            if (!SwCostFast || _kMain < 0 || Environment.CurrentManagedThreadId != _kMain) return false;
+            if (!SwCostFast) return false;
             int today = Today();
             var map = _zt; var plan = _plan; var grad = _grad;
             if (_t4SeenVer != _t4Ver || _t4Day != today || !ReferenceEquals(_t4Map, map) || !ReferenceEquals(_t4Plan, plan) || !ReferenceEquals(_t4Grad, grad))
@@ -123,12 +124,15 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>T4: pamiec czynna i ten watek to watek glowny (inny watek - nigdy pamiec, takze gdy glowny wlasnie ja wlaczyl).</summary>
+        private static bool T4Here() { return _t4On && Environment.CurrentManagedThreadId == _kMain; }
+
         private static double[] T4Row(int n) { var a = new double[n]; for (int i = 0; i < n; i++) a[i] = double.NaN; return a; }
 
         /// <summary>T4: KsCore.StartIndex(ZIds[z], P, m) z pamieci (bez pamieci - wprost).</summary>
         private static double T4StartIndex(int m, int z)
         {
-            if (!_t4On || z < 0 || z >= ZN) return KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m);
+            if (!T4Here() || z < 0 || z >= ZN) return KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m);
             var a = _t4Si[m == 0 ? 0 : 1];
             double v = a[z];
             if (double.IsNaN(v)) { v = KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m); a[z] = v; }
@@ -138,7 +142,7 @@ namespace Armoury
         /// <summary>T4: LandGradZ(mk, z) z pamieci (bez pamieci - wprost).</summary>
         private static double T4LandGrad(Settlement mk, int z)
         {
-            if (!_t4On || z < 0 || z >= ZN) return LandGradZ(mk, z);
+            if (!T4Here() || z < 0 || z >= ZN) return LandGradZ(mk, z);
             double[] a;
             if (mk == null) { a = _t4LgNull; if (a == null) { a = T4Row(ZN); _t4LgNull = a; } }
             else if (!_t4Lg.TryGetValue(mk, out a)) { a = T4Row(ZN); _t4Lg[mk] = a; }
@@ -150,7 +154,7 @@ namespace Armoury
         /// <summary>T4: wiersz pamieci progow drabiny 2 miasta t (po T4Begin, wazny do konca zakupow jednej wsi); null - bez pamieci.</summary>
         internal static double[] T4P2Row(Town t)
         {
-            if (!_t4On || t == null) return null;
+            if (!T4Here() || t == null) return null;
             double[] a; if (!_t4P2.TryGetValue(t, out a)) { a = T4Row(2 * ZN); _t4P2[t] = a; }
             return a;
         }
