@@ -54,6 +54,9 @@ namespace Armoury
         internal static bool BaseReady { get { return BaseOn && BkResolve(); } }
         /// <summary>perf-d2d3: ostatnie TownBase w tym watku doszlo do konca (lista pusta albo wszystkie pozycje) - kontrola pokrycia przy pominietym ciele BK.</summary>
         [ThreadStatic] internal static bool TownBaseOk;
+        /// <summary>perf-d2d3 (recenzja): PerfD2.TaxSkipPrefix pominal cialo BK w tym wywolaniu (ustawia prefiks, zdejmuje finalizer) - DueWage przed TownBase nie jest
+        /// swieza pensja BK (zostala z poprzedniego TownBase albo z podatku wsi BK), wiec nie idzie do sumy "wedlug zastapionego podatku BK".</summary>
+        [ThreadStatic] internal static bool BkBodySkipped;
         internal static bool PayOn { get { var s = Settings.Current; return s != null && s.CouncilWagesPaidToAll; } }
 
         // ------------------------------------------------------------ latki (zakladane w kampanii; zyja przez caly proces)
@@ -79,6 +82,7 @@ namespace Armoury
         private static Clan _pendClan; private static CampaignTime _pendTime;
         private static long _gapRest, _revCommon, _revLords, _revMiss, _revOff; private static int _gapClans, _revN, _blindClans;
         private static long _baseOld, _baseNew, _baseCalls, _baseRentCalls;   // Interlocked - podatek miasta bywa liczony z watkow AI
+        private static long _baseSkipCalls, _baseSkipNew;   // perf-d2d3 (recenzja): przeliczenia przy pominietym ciele BK - stara pensja BK nieznana (nie w _baseOld)
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -96,6 +100,7 @@ namespace Armoury
             _gapRest = _revCommon = _revLords = _revMiss = _revOff = 0; _gapClans = _revN = _blindClans = 0; _pend.Clear(); _pendClan = null;
             Interlocked.Exchange(ref _baseOld, 0); Interlocked.Exchange(ref _baseNew, 0);
             Interlocked.Exchange(ref _baseCalls, 0); Interlocked.Exchange(ref _baseRentCalls, 0);
+            Interlocked.Exchange(ref _baseSkipCalls, 0); Interlocked.Exchange(ref _baseSkipNew, 0);
             _stumbles = 0;
         }
 
@@ -299,7 +304,11 @@ namespace Armoury
                 TownBaseOk = true;   // perf-d2d3: petla do konca - kazda zajeta pozycja ze stawka > 0 (ten sam zbior co BK) ma DueWage z tej podstawy
                 Interlocked.Increment(ref _baseCalls);
                 if (pay > 0) Interlocked.Increment(ref _baseRentCalls);
-                Interlocked.Add(ref _baseOld, o); Interlocked.Add(ref _baseNew, n);
+                Interlocked.Add(ref _baseNew, n);
+                // perf-d2d3 (recenzja): przy pominietym ciele BK "o" to nie pensja BK (DueWage z poprzedniego zapisu) - poza suma starej pensji, osobny licznik;
+                // bez pominiecia (klucz wylaczony, probka R9, poza warunkiem) - jak dotad
+                if (BkBodySkipped) { Interlocked.Increment(ref _baseSkipCalls); Interlocked.Add(ref _baseSkipNew, n); }
+                else Interlocked.Add(ref _baseOld, o);
             }
             catch (Exception e) { Stumble("TownBase", e); }
         }
@@ -491,12 +500,22 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays;
                 bool pay = PayOn, bas = BaseOn;
                 long sumParts = _toCommon + _toLeaders + _toFamily + _toOtherLords + _toGone;
+                // perf-d2d3 (recenzja): liczniki podstawy czytane raz (podatek bywa liczony z watkow AI) - czesci w linii sumuja sie do calosci
+                long skC = Interlocked.Read(ref _baseSkipCalls), skN = Interlocked.Read(ref _baseSkipNew);
+                long bCalls = Interlocked.Read(ref _baseCalls), bNew = Interlocked.Read(ref _baseNew);
                 var sb = new StringBuilder(900);
                 sb.Append("Rada (3.5): dzien ").Append(day)
-                  .Append(" | podstawa (3.5a ").Append(bas ? "WL" : "WYL").Append("): przeliczenia pensji z miast i zamkow ").Append(Interlocked.Read(ref _baseCalls))
+                  .Append(" | podstawa (3.5a ").Append(bas ? "WL" : "WYL").Append("): przeliczenia pensji z miast i zamkow ").Append(bCalls)
                   .Append(" (z renta lub zaworem > 0: ").Append(Interlocked.Read(ref _baseRentCalls)).Append("; suma po wywolaniach: wedlug zastapionego podatku BK ")
-                  .Append(Interlocked.Read(ref _baseOld)).Append(" -> wedlug zachowanych linii i renty ").Append(Interlocked.Read(ref _baseNew))
-                  .Append("), rody bez miasta i zamku: wyzerowane stare pensje ").Append(_staleN).Append(" pozycji u ").Append(_staleClans).Append(" rodow (").Append(_staleGold).Append(" zl/dobe)")
+                  .Append(Interlocked.Read(ref _baseOld));
+                // perf-d2d3 (recenzja): czesc przeliczen bez ciala BK - stara pensja tylko z przeliczen z cialem BK (z para "wedlug renty" z tych samych przeliczen);
+                // suma "wedlug zachowanych linii i renty" dalej ze wszystkich (ta sama co bez paczki). Bez pominiec - linia jak dotad.
+                if (skC > 0)
+                    sb.Append(" (tylko ").Append(bCalls - skC).Append(" przeliczen z cialem BK; w nich wedlug renty ").Append(bNew - skN).Append(')');
+                sb.Append(" -> wedlug zachowanych linii i renty ").Append(bNew);
+                if (skC > 0)
+                    sb.Append("; cialo BK pominiete (perf-d2d3 PerfTownTaxSkipBk) w ").Append(skC).Append(" przeliczeniach - ich stara pensja BK nieliczona, wedlug renty ").Append(skN);
+                sb.Append("), rody bez miasta i zamku: wyzerowane stare pensje ").Append(_staleN).Append(" pozycji u ").Append(_staleClans).Append(" rodow (").Append(_staleGold).Append(" zl/dobe)")
                   .Append(" | wyplata (3.5b ").Append(pay ? "WL" : "WYL").Append("): naliczone platnikom ").Append(_charged).Append(" w ").Append(_chargedN)
                   .Append(" pozycjach u ").Append(_payerClans).Append(" rodow = nie-lordowie (placi BK) ").Append(_toCommon).Append(" [").Append(_commonN)
                   .Append("] + glowy innych rodow ").Append(_toLeaders).Append(" [").Append(_leadersN).Append("] + czlonkowie rodu platnika ").Append(_toFamily)

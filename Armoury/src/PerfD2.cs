@@ -321,6 +321,7 @@ namespace Armoury
         public static bool TaxSkipPrefix(Town __0, bool __1, ref TaleWorlds.CampaignSystem.ExplainedNumber __result, out TaxState __state)
         {
             __state = default(TaxState);
+            if (PopulationLaw.TaxDepth == 1) CouncilWages35.BkBodySkipped = false;   // recenzja: znacznik tylko dla wywolania zewnetrznego, zawsze od zera
             try
             {
                 Interlocked.Increment(ref _tCalls);
@@ -340,6 +341,7 @@ namespace Armoury
                 __state.Mode = 1; __state.T0 = sample ? Stopwatch.GetTimestamp() : 0L;
                 Interlocked.Increment(ref _tSkip);
                 __result = new TaleWorlds.CampaignSystem.ExplainedNumber(0f, __1, null);   // zastapi go TownTaxPostfix (renta)
+                CouncilWages35.BkBodySkipped = true;   // recenzja: TownBase nie liczy DueWage sprzed zapisu jako pensji BK (zdejmuje finalizer)
                 return false;
             }
             catch { __state = default(TaxState); return true; }
@@ -348,6 +350,7 @@ namespace Armoury
         /// <summary>Finalizer (po postfiksach): czy TownBase doszedl do konca (rada pokryta) i stoper probki. Nie zmienia wyjatku.</summary>
         public static void TaxSkipFinalizer(Exception __exception, TaxState __state)
         {
+            if (__state.Mode == 1) CouncilWages35.BkBodySkipped = false;   // recenzja: znacznik tylko na czas tego wywolania (po TownTaxPostfix)
             if (__state.Mode == 0) return;
             try
             {
