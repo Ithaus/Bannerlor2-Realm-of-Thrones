@@ -2080,6 +2080,10 @@ namespace Armoury
         [SettingPropertyGroup("Army purchases")]
         public bool GoodsLedgerEnabled { get; set; } = true;
 
+        [SettingPropertyBool("Ore Ledger Town Crafts Column", HintText = "the ore and wood ledger counts what town craftsmen take off the stall for their own crafts (tools from iron and the other town crafts) as its own entry, the same way the goods ledger does, so the two ledgers agree piece for piece - log only, changes nothing in the game; off = counted with the workshop lines as before")]
+        [SettingPropertyGroup("Army purchases")]
+        public bool OreLedgerTownCraftsColumn { get; set; } = true;
+
         [SettingPropertyBool("Circulation Ledger Enabled", HintText = "write the daily money circulation ledger: which named causes create or destroy gold in the world (notable caravan wages, sales commission, battlefield loot, Banner Kings and BetterEconomy spending, ship trade, prisoner sales, sieges, deaths), what clans paid and earned, the crown, the Iron Bank and the notables - log only, changes nothing in the game")]
         [SettingPropertyGroup("Army purchases")]
         public bool CirculationLedgerEnabled { get; set; } = true;
@@ -7899,6 +7903,7 @@ namespace Armoury
             s.GoodsLedgerTickAuthors = GoodsLedgerTickAuthors;
             s.A17DiagnosticLines = A17DiagnosticLines;
             s.GoodsLedgerEnabled = GoodsLedgerEnabled;
+            s.OreLedgerTownCraftsColumn = OreLedgerTownCraftsColumn;
             s.CirculationLedgerEnabled = CirculationLedgerEnabled;
             s.CirculationProbeEnabled = CirculationProbeEnabled;
             s.ClanIncomeBookEnabled = ClanIncomeBookEnabled;

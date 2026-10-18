@@ -273,12 +273,13 @@ namespace Armoury
                 int day = (int)CampaignTime.Now.ToDays;
                 if (act && _dayStamp != day) { Flush(); _dayStamp = day; }
                 var gf = GoodsLedger.Begin(GoodsLedger.FTownCraft, town);   // ksiega towarow (146): przerob tego miasta jako osobna pozycja (tylko licznik)
+                OreLedger.CraftEnter();   // fix-ksiega: ksiega rudy i drewna - wsad tego nawiasu (OnItemConsumed) to "przetwory miast", jak ramka FTownCraft (tylko licznik)
                 try
                 {
                     if (act) Work(town);
                     if (ks) StartCalibration.TownCraftsDay(town);
                 }
-                finally { GoodsLedger.End(gf); }
+                finally { OreLedger.CraftExit(); GoodsLedger.End(gf); }
             }
             catch (Exception e) { Stumble("OnDailyTickTown", e); }
         }
