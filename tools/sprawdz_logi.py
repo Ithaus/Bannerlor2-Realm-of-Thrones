@@ -1112,6 +1112,13 @@ Uzycie (Python 3, tylko odczyt):
                     plac ponad stawke (INFO; liczby decyzji - ostatnia decyzja kazdego miasta z KS, bo miasta maja wlasne 7-dobowe terminy), NKO-13 potkniecia 0, NKO-14 ERROR
                     paczki 0 (KsWageHands, StartCalibration.Zc4LadderCheap/CheapLine/P9Line, TownFolk.KsWageHands.*, SyncData.arm_ks_koszyk). NKO-5 po poprawce recenzji: drabina
                     w grze liczy kcal tylko z towaru na polce (kazdy szczebel najwyzej polka). Brak linii (log sprzed r4-koszyk) = INFO, nigdy wyjatek.
+                    f4-place-ludu (noc 17/18.10, klucze Ks Wage Hands Down, Ks Labour To Basket, Ks Labour Basket Households, Ks Labour Basket Hoard Rate; KsFolkWage.cs):
+                    NKO-10 przy dopisku "w dol (f4-place-ludu)" granice [podloga, sufit] (bez dopisku [1, sufit]), NKO-11 krok takze miast z lista "miasta < 1"; linia
+                    "Place W wedlug koszyka (f4-place-ludu)": NKO-15 linia kazdej doby od pierwszej (INFO bez linii), NKO-16 tozsamosc: place W z kas pelne = zaplacone + zostalo
+                    w kasach miast (kontrola 0 kazdej doby, (a) + (b) = zostalo +-1 zl) i place z nadwyzki R/P pelne = zaplacone + zostalo u R/P, NKO-17 kappa w [najnizej, 1],
+                    NKO-18 podloga przezycia - miast z kappa < 1 nie wiecej niz miast w pasmie + ponad pasmem + bez potrzeby W (miasto ponizej pasma ma pelna stawke),
+                    NKO-19 skutek (INFO): zostalo w kasach na dobe, kappa i zapas dni W (mediana) pierwsza / ostatnia doba, kasy miast z KS, NKO-20 czas linii (mediana)
+                    <= 1 ms i potkniecia 0. NKO-14 liczy tez ERROR KsFolkWage, TownFolk.F4HoardRate, TownFolk.KsFolkWage.*, SyncData.arm_ks_place.
 --grupa npolnoc   : (r4-polnoc, noc 17/18.10, Jeff 17.10 "Polnoc i za Murem - najpierw wyzywic siebie (hodowla, ryby, owies)"; Armoury/src/StartCalibration.Feed.cs,
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
                     NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
@@ -1169,6 +1176,12 @@ Uzycie (Python 3, tylko odczyt):
                     skrzynie wsi DS - INFO), NAKUM-4 lepszy stol przy KS (oferta otwarta i kupione > 0; bez KS INFO), NAKUM-5 kiesy wsi <= +0.2%/d (pieniadz robot zostaje we
                     wsi), NAKUM-6 jednorazowe korony do zapasu (INFO), NAKUM-7 kazdy posiadacz 'Pieniadz swiata' <= +30 tys./d w 28 dobach, NAKUM-8 czas <= 5 ms, NAKUM-9
                     potkniecia i ERROR 0. Log bez paczki: NAKUM-1/5/7 z linii niezaleznych, reszta INFO (pola dopisane po recenzji - brak pola = INFO, nie NIE).
+                    f4-place-ludu (noc 17/18.10; place W wedlug koszyka KS zamiast danin 3%/d; linia "Place W wedlug koszyka (f4-place-ludu)"): okno - ostatnie 28 dob, nie
+                    wczesniej niz 28 dob od pierwszej linii f4 (kappa schodzi 3%/d). NAKUM-10 kiesa W miast ('Kiesa ludu') - przyrost <= +15 tys./d (W stoi; fin86 przed
+                    danina ok. +200 tys./d), NAKUM-11 danina od skarbca klasy W ('Akumulator kies', pobrano W) - srednia <= 80 tys./d (fin86 189 tys./d: W trzyma dochod, nie
+                    danina), NAKUM-12 kasy miast z KS (linia f4) - przyrost <= max(60 tys./d, 0.5 x srednia "zostalo w kasach miast") (pieniadz plynie dalej: wyplata kupcom M6,
+                    firmy, skup), NAKUM-13 kiesa P miast - przyrost <= +30 tys./d (nowy akumulator u patrycjatu?; R - INFO). Bez linii f4 (log sprzed paczki, klucze
+                    wylaczone, bez KS) - NAKUM-10..13 INFO, bez wyjatku.
 --grupa nglod     : (noc 17/18.10, r4-glodbunt; Jeff "jak nie ma jedzenia to bedzie bunt; w interesie miasta lorda jest aby dowiesc jedzenie"; Armoury/src/KsHunger.cs,
                     KsLordFood.cs, StartCalibration.Glod.cs) python -I tools/sprawdz_logi.py --grupa nglod [--do-doby N] <Armoury-*.log> (strumieniowo). NGL-0 linie doby
                     "Glod miast (KS)" i "Pan miasta placi za dowoz (KS)" bez luk, NGL-1 latki (lojalnosc i bezpieczenstwo czynnego modelu, posilek), NGL-2 pomiar w miastach KS,
@@ -35985,7 +35998,20 @@ NKO_WG = re.compile(r"Place za brak rak \(r4-koszyk\): dzien (?P<day>-?\d+) \| k
                     r"doba: kasy miast zaplacily robocizne i doplate (?P<paid>-?\d+) zl, kiesy ludu przyjely (?P<recv>-?\d+) zl \(roznica (?P<diff>-?\d+)\), z tego ponad stawke \(place za brak rak\) "
                     r"(?P<ex>-?\d+) zl w (?P<exn>\d+) miastach \(miast z placami (?P<tn>\d+)\) \| potkniecia (?P<st>\d+)")
 NKO_ERR = ("ERROR in KsWageHands", "ERROR in StartCalibration.Zc4LadderCheap", "ERROR in StartCalibration.CheapLine", "ERROR in StartCalibration.P9Line",
-           "ERROR in TownFolk.KsWageHands", "ERROR in SyncData.arm_ks_koszyk")   # recenzja: opakowania TownFolk.Stumble (NotePaid, DayLine) i zapisu
+           "ERROR in TownFolk.KsWageHands", "ERROR in SyncData.arm_ks_koszyk",   # recenzja: opakowania TownFolk.Stumble (NotePaid, DayLine) i zapisu
+           "ERROR in KsFolkWage", "ERROR in TownFolk.KsFolkWage", "ERROR in TownFolk.F4HoardRate", "ERROR in SyncData.arm_ks_place")   # f4-place-ludu
+# f4-place-ludu: dopisek linii "Place za brak rak" (wskazniki ponizej 1) i linia "Place W wedlug koszyka"
+NKO_WGDN = re.compile(r"\| w dol \(f4-place-ludu\): klucz Ks Wage Hands Down (?P<key>TAK|NIE), podloga x(?P<fl>[\d.]+), tylko place W, miasta < 1: (?P<dn>\d+)(?: \((?P<list>[^)]*)\))?")
+NKO_F4 = re.compile(r"Place W wedlug koszyka \(f4-place-ludu\): dzien (?P<day>-?\d+) \| klucze: Ks Labour To Basket (?P<kb>TAK|NIE), Ks Wage Hands Down (?P<ka>TAK|NIE) \(podloga x(?P<fl>[\d.]+)\) "
+                    r"\| pasmo (?P<lo>[\d.]+)-(?P<hi>[\d.]+) dni koszyka KS, najnizej x(?P<mn>[\d.]+), krok (?P<st>[\d.]+)%/d, danina od skarbca W w tych miastach (?P<hr>[\d.]+)%/d \(Ds Hoard Due Rate (?P<dr>[\d.]+)%\) "
+                    r"\| miasta z regula (?P<n>\d+) \(b: (?P<nb>\d+)\): ponizej pasma \(pelna placa\) (?P<below>\d+), w pasmie (?P<inb>\d+), ponad pasmem (?P<above>\d+), bez potrzeby W \(pelna placa\) (?P<non>\d+) "
+                    r"\| \(a\) wskaznik < 1: miast (?P<na>\d+), podloga przezycia \(bez ciecia\) (?P<prot>\d+) "
+                    r"\| kappa min (?P<kmin>[\d.]+|-) / mediana (?P<kmed>[\d.]+|-) / max (?P<kmax>[\d.]+|-), miast z kappa < 1: (?P<klow>\d+) "
+                    r"\| zapas dni W \(koszyk KS\) mediana (?P<dmed>[\d.]+|-), kiesy W/R/P miast z regula (?P<kw>-?\d+)/(?P<kr>-?\d+)/(?P<kp>-?\d+) \(dni W/R/P (?P<dw>[\d.]+|-)/(?P<dr2>[\d.]+|-)/(?P<dp>[\d.]+|-)\) "
+                    r"\| doba: place W z kas pelne (?P<full>-?\d+) = zaplacone (?P<paid>-?\d+) \+ zostalo w kasach miast (?P<cut>-?\d+) \(kontrola pelne - zaplacone - zostalo = (?P<ctl>-?\d+)\), "
+                    r"z tego \(a\) wskaznik ponizej 1: (?P<ca>-?\d+), \(b\) stawka wedlug koszyka: (?P<cb>-?\d+); place z nadwyzki R/P dla W \(Ks Labour Basket Households (?P<kh>TAK|NIE)\) pelne (?P<sf>-?\d+) = "
+                    r"zaplacone (?P<sp>-?\d+) \+ zostalo u R/P \(na towar\) (?P<sc>-?\d+) \| kasy miast z KS razem (?P<gold>-?\d+) \(miast (?P<nt>\d+), ponad 1\.5 x zapas kupcow (?P<nover>\d+)\) "
+                    r"\| czas (?P<ms>[\d.]+) ms \| potkniecia (?P<stum>\d+)")
 
 
 def nkoszyk_main(logp, until=120):
@@ -35996,6 +36022,7 @@ def nkoszyk_main(logp, until=120):
         rep.show()
         return 0
     p9, ch, wg, errs = {}, {}, {}, 0
+    f4, f4bad = {}, 0                                            # f4-place-ludu: linia "Place W wedlug koszyka"
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -36022,7 +36049,19 @@ def nkoszyk_main(logp, until=120):
             if s.startswith("Place za brak rak (r4-koszyk): dzien "):
                 mm = NKO_WG.match(s)
                 if mm:
-                    wg[int(mm.group("day"))] = mm.groupdict()
+                    x = mm.groupdict()
+                    dn = NKO_WGDN.search(s)                     # f4-place-ludu: wskazniki ponizej 1 (dopisek; brak - log sprzed paczki albo klucz wylaczony)
+                    x["fl"] = float(dn.group("fl")) if dn else None
+                    x["dlist"] = (dn.group("list") or "") if dn else ""
+                    x["dn"] = int(dn.group("dn")) if dn else 0
+                    wg[int(mm.group("day"))] = x
+                continue
+            if s.startswith("Place W wedlug koszyka (f4-place-ludu): dzien "):
+                mm = NKO_F4.match(s)
+                if mm:
+                    f4[int(mm.group("day"))] = mm.groupdict()
+                else:
+                    f4bad += 1
                 continue
     # NKO-0 linie
     rep.add("NKO-0: linie paczki (P9 Planu, tanszy koszyk w grze, place za brak rak)",
@@ -36126,10 +36165,11 @@ def nkoszyk_main(logp, until=120):
             if int(x["diff"]) != 0 or int(x["paid"]) != int(x["recv"]):
                 badid.append(f"d{d} {x['paid']}/{x['recv']}")
             mx, mn, cap = float(x["mx"]), float(x["mn"]), float(x["max"])
-            if mn < 0.9995 or mx > cap + 0.0015:
-                badb.append(f"d{d} {mn:.3f}-{mx:.3f} (sufit {cap:.2f})")
+            lo_ = x["fl"] if x.get("fl") is not None else 1.0              # f4-place-ludu: przy dopisku "w dol" dolna granica = podloga
+            if mn < lo_ - 0.0005 or mx > cap + 0.0015:
+                badb.append(f"d{d} {mn:.3f}-{mx:.3f} (granice {lo_:.2f}-{cap:.2f})")
             cur = {}
-            for it in (x.get("list") or "").split(", "):
+            for it in ((x.get("list") or "").split(", ") + (x.get("dlist") or "").split(", ")):
                 q = it.rsplit(" ", 1)
                 if len(q) == 2:
                     try:
@@ -36147,7 +36187,9 @@ def nkoszyk_main(logp, until=120):
         last = wg[wd[-1]]
         rep.add("NKO-9: place - zaplacone z kas = przyjete w kiesach (kazda doba)", f"{len(wd)} dob, odstepstw {len(badid)}" + (f" ({', '.join(badid[:5])})" if badid else ""),
                 "roznica 0", len(badid) == 0)
-        rep.add("NKO-10: wskaznik plac w granicach [1, sufit]", f"{len(wd)} dob, poza {len(badb)}" + (f" ({', '.join(badb[:5])})" if badb else ""), "1.0 <= wskaznik <= sufit", len(badb) == 0)
+        rep.add("NKO-10: wskaznik plac w granicach [1, sufit] (f4-place-ludu: [podloga, sufit] przy dopisku 'w dol')", f"{len(wd)} dob, poza {len(badb)}" + (f" ({', '.join(badb[:5])})" if badb else "")
+                + (f"; dopisek 'w dol' w {sum(1 for d in wd if wg[d].get('fl') is not None)} dobach, miast < 1 ostatniej doby {wg[wd[-1]].get('dn', 0)}" if any(wg[d].get('fl') is not None for d in wd) else ""),
+                "podloga (1.0 bez dopisku) <= wskaznik <= sufit", len(badb) == 0)
         rep.add("NKO-11: krok wskaznika miasta miedzy dobami <= krok tygodnia", f"zmian ponad krok {len(badstep)}" + (f" ({', '.join(badstep[:5])})" if badstep else ""),
                 "<= krok (miasta z lista > 1)", len(badstep) == 0)
         rep.add("NKO-12: wskaznik plac wedlug miast (ostatnia doba)",
@@ -36157,7 +36199,47 @@ def nkoszyk_main(logp, until=120):
         rep.add("NKO-13: potkniecia linii plac", str(stum), "0", stum == 0)
     else:
         rep.add("NKO-9: place za brak rak", "BRAK linii 'Place za brak rak (r4-koszyk)'", "zaplacone = przyjete", None)
-    rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line, TownFolk.KsWageHands, SyncData.arm_ks_koszyk)", str(errs), "0", errs == 0)
+    # NKO-15..20 f4-place-ludu: linia "Place W wedlug koszyka"
+    fd = sorted(f4)
+    if fd:
+        gaps = [d for a, d in zip(fd, fd[1:]) if d - a > 1]
+        rep.add("NKO-15 (f4): linia 'Place W wedlug koszyka (f4-place-ludu)' kazdej doby", f"dob {len(fd)} ({fd[0]}-{fd[-1]}), luk {len(gaps)}, nierozpoznanych {f4bad}", "luk 0, nierozpoznane 0", not gaps and f4bad == 0)
+        bad16, bad17, bad18 = [], [], []
+        stum, ms = 0, []
+        for d in fd:
+            x = f4[d]
+            full, paid, cut, ctl, ca, cb = (int(x[k]) for k in ("full", "paid", "cut", "ctl", "ca", "cb"))
+            sf, sp, sc = int(x["sf"]), int(x["sp"]), int(x["sc"])
+            if ctl != 0 or full - paid - cut != 0 or abs(ca + cb - cut) > 1 or sf - sp - sc != 0 or cut < 0 or sc < 0:
+                bad16.append(f"d{d}")
+            mn = float(x["mn"])
+            try:
+                kmin, kmax = float(x["kmin"]), float(x["kmax"])
+                if kmin < mn - 0.0005 or kmax > 1.0005:
+                    bad17.append(f"d{d} {kmin:.3f}-{kmax:.3f}")
+            except ValueError:
+                pass
+            if int(x["klow"]) > int(x["inb"]) + int(x["above"]) + int(x["non"]):
+                bad18.append(f"d{d} {x['klow']} > {x['inb']}+{x['above']}+{x['non']}")
+            stum += int(x["stum"]); ms.append(float(x["ms"]))
+        rep.add("NKO-16 (f4): tozsamosc plac W - pelne = zaplacone + zostalo w kasach (kontrola 0, (a)+(b) = zostalo), place R/P dla W pelne = zaplacone + zostalo u R/P",
+                f"dob {len(fd)}, odstepstw {len(bad16)}" + (f" ({', '.join(bad16[:5])})" if bad16 else ""), "0 (nic z niczego, nic w nicosc)", not bad16)
+        rep.add("NKO-17 (f4): kappa w [najnizej, 1] kazdej doby", f"poza {len(bad17)}" + (f" ({', '.join(bad17[:5])})" if bad17 else ""), "0", not bad17)
+        rep.add("NKO-18 (f4): podloga przezycia - miast z kappa < 1 <= w pasmie + ponad pasmem + bez potrzeby W", f"dob ponad {len(bad18)}" + (f" ({', '.join(bad18[:3])})" if bad18 else ""),
+                "0 (miasto ponizej pasma ma pelna stawke)", not bad18)
+        a, b = f4[fd[0]], f4[fd[-1]]
+        cuts = [int(f4[d]["cut"]) for d in fd[-28:]]; fulls = [int(f4[d]["full"]) for d in fd[-28:]]
+        scs = [int(f4[d]["sc"]) for d in fd[-28:]]
+        rep.add("NKO-19 (f4): skutek (INFO) - ostatnie 28 dob: zostalo w kasach miast / pelne place W z kas, zostalo u R/P; kappa mediana, zapas dni W (mediana), kasy miast z KS",
+                f"zostalo w kasach {sum(cuts) / max(1, len(cuts)):.0f}/d z {sum(fulls) / max(1, len(fulls)):.0f}/d, u R/P {sum(scs) / max(1, len(scs)):.0f}/d; kappa {a['kmed']} -> {b['kmed']} "
+                f"(miast < 1: {a['klow']} -> {b['klow']}); dni W {a['dmed']} -> {b['dmed']} (W/R/P {b['dw']}/{b['dr2']}/{b['dp']}); kasy {int(a['gold']) / 1e6:.2f} -> {int(b['gold']) / 1e6:.2f} mln "
+                f"(ponad 1.5 x zapas {a['nover']} -> {b['nover']}); danina W {b['hr']}%/d (Ds Hoard Due Rate {b['dr']}%)", "INFO", None)
+        ms.sort()
+        rep.add("NKO-20 (f4): czas linii (mediana) i potkniecia", f"{ms[len(ms) // 2]:.2f} ms, potkniecia {stum}", "<= 1 ms, 0", ms[len(ms) // 2] <= 1.0 and stum == 0)
+    else:
+        rep.add("NKO-15 (f4): linia 'Place W wedlug koszyka (f4-place-ludu)'", "BRAK" + (f" (nierozpoznanych {f4bad})" if f4bad else ""),
+                "INFO (log sprzed f4-place-ludu, klucze wylaczone albo KS niezastosowany)", None if not f4bad else False)
+    rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line, TownFolk.KsWageHands, SyncData.arm_ks_koszyk; f4: KsFolkWage, F4HoardRate, arm_ks_place)", str(errs), "0", errs == 0)
     rep.show()
     return 0
 
@@ -36528,7 +36610,7 @@ NAK_TRANSIT = ("razem", "cla miast i zamkow", "podatek wsi", "portfele wezwan do
 def _nak_scan(path):
     """Jeden przebieg po logu: linia 'Akumulator kies', posiadacze 'Pieniadz swiata', 'Kiesa ludu' (W/R/P, podzamcze, zapas dni W), firmy F3 (doba ustalenia),
     'Zbytki ludu' (lepszy stol), linia 'KS: rampa' (bieg z KS), ERROR paczki."""
-    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None}
+    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None, "f4": {}}
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -36589,6 +36671,10 @@ def _nak_scan(path):
                     D["lx"][day] = (o, b or 0)
             elif not D["ks"] and s.startswith("KS: rampa dzien"):
                 D["ks"] = True
+            elif s.startswith("Place W wedlug koszyka (f4-place-ludu): dzien "):
+                mm = NKO_F4.match(s)                                 # f4-place-ludu (regex grupy nkoszyk)
+                if mm:
+                    D["f4"][int(mm.group("day"))] = mm.groupdict()
     return D
 
 
@@ -36789,6 +36875,40 @@ def nakum_main(logp, until=None):
                 "0 posiadaczy ponad prog (fin80: kiesy ludu miast +186 tys./d)", not offend)
     else:
         rep.add("NAKUM-7: posiadacze pieniadza", f"dob z 'Pieniadz swiata' {len(hw)}", "INFO (za malo dob)", None)
+    # NAKUM-10..13 f4-place-ludu (place W wedlug koszyka zamiast danin 3%/d): okno ostatnie 28 dob, nie wczesniej niz 28 dob od pierwszej linii f4
+    F4 = D["f4"]; fd = sorted(F4)
+    if fd and last - fd[0] >= 35:
+        w4 = [d for d in alld if max(fd[0] + 28, last - 27) <= d <= last]
+        kw4 = {d: v[0] for d, v in D["kl"].items()}
+        g10 = _nak_growth(kw4, w4)
+        if g10 is not None:
+            rep.add(f"NAKUM-10 (f4): kiesa W miast ('Kiesa ludu') - przyrost na dobe (doby {w4[0]}-{w4[-1]})", f"{g10:+.0f}/d; stan {kw4[[d for d in w4 if d in kw4][-1]] / 1e6:.2f} mln",
+                    "<= +15 000/d (W stoi bez danin 3%/d; fin86 przed danina ok. +200 tys./d)", g10 <= 15000)
+        else:
+            rep.add("NAKUM-10 (f4): kiesa W miast", "brak linii 'Kiesa ludu' w oknie", "INFO", None)
+        tw = [float(A[d]["take"][1]) for d in w4 if d in A and "take" in A[d]]
+        if tw:
+            mw = sum(tw) / len(tw)
+            rep.add("NAKUM-11 (f4): danina od skarbca klasy W ('Akumulator kies', pobrano W) - srednia w oknie", f"{mw:.0f}/d (danina W w miastach z regula {F4[fd[-1]]['hr']}%/d)",
+                    "<= 80 000/d (fin86 189 tys./d - W trzyma dochod, nie danina)", mw <= 80000)
+        else:
+            rep.add("NAKUM-11 (f4): danina od skarbca klasy W", "brak linii 'Akumulator kies' w oknie", "INFO", None)
+        gk = _nak_growth({d: int(F4[d]["gold"]) for d in fd}, [d for d in fd if d in w4])
+        cuts = [int(F4[d]["cut"]) for d in fd if d in w4]
+        if gk is not None and cuts:
+            mc = sum(cuts) / len(cuts); lim = max(60000.0, 0.5 * mc)
+            rep.add("NAKUM-12 (f4): kasy miast z KS (linia f4) - przyrost na dobe wobec 'zostalo w kasach miast'", f"{gk:+.0f}/d przy zostalo {mc:.0f}/d (ponad 1.5 x zapas kupcow: {F4[fd[-1]]['nover']} miast)",
+                    f"<= {lim:.0f}/d (max(60 tys., 0.5 x zostalo) - pieniadz plynie dalej: M6, firmy, skup)", gk <= lim)
+        else:
+            rep.add("NAKUM-12 (f4): kasy miast z KS", "za malo dob linii f4 w oknie", "INFO", None)
+        gp4 = _nak_growth({d: v[2] for d, v in D["kl"].items()}, w4); gr4 = _nak_growth({d: v[1] for d, v in D["kl"].items()}, w4)
+        if gp4 is not None:
+            rep.add("NAKUM-13 (f4): kiesa P miast - przyrost na dobe (R - INFO)", f"P {gp4:+.0f}/d, R {gr4:+.0f}/d", "P <= +30 000/d (bez nowego akumulatora u patrycjatu)", gp4 <= 30000)
+        else:
+            rep.add("NAKUM-13 (f4): kiesa P miast", "brak linii 'Kiesa ludu' w oknie", "INFO", None)
+    else:
+        rep.add("NAKUM-10..13 (f4): place W wedlug koszyka", f"linii f4 {len(fd)}" + (f" od doby {fd[0]} (za krotko - potrzeba 35 dob)" if fd else ""),
+                "INFO (log sprzed f4-place-ludu, klucze wylaczone albo KS niezastosowany)", None)
     # NAKUM-8 czas, NAKUM-9 potkniecia i ERROR
     if ad:
         tm = sorted(float(A[d]["time"][0]) for d in ad if "time" in A[d])
