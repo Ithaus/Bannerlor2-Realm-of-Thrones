@@ -7,7 +7,8 @@ namespace Armoury
 {
     /// <summary>
     /// f8-niewola - NIEWOLA ZA DLUGI (decyzja Jeffa 18.10 "6 tak"; projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 10: "niewola za dlugi w kulturach
-    /// z niewola, 1% na rok przy D < 0.8 bez zapasu"; klucz DebtSlavery, wymaga DailyLifeMeasure i DailyLifeEstates). Czesc przegladu tygodniowego ZC6
+    /// z niewola, 1% na rok przy D < 0.8 bez zapasu"; klucz DebtSlavery, wymaga DailyLifeMeasure, DailyLifeEstates i DailyLifeMobility - recenzja: bez ruchu ZC6 nie ma wyzwolen 0.5%/rok, wiec niewola
+    /// za dlugi szlaby tylko w jedna strone; przy wylaczonym ruchu stany stoja jak dotad). Czesc przegladu tygodniowego ZC6
     /// (DailyLife.Mobility.cs WeekOne - co dobe 1/7 miast i wsi): przejscie TDebtSl "biedni wolni -> niewolni" tej samej osady.
     ///  KTO: osada (miasto, wies) kultury z niewola, ktora zna pieniadz i dlug - pasma niewolnych SlaveBand / lista LosersFlee bez Zelaznych Wysp (sturgia: Westeros,
     ///   thralle z lupu, nie z dlugu) i bez Dothrakow (khuzait: lud bez pieniadza - dary zamiast handlu i dlugu; ta sama para wyjatkow co pasma miast Wolnych Miast w Bands);
@@ -17,6 +18,8 @@ namespace Armoury
     ///   reguly nie kreca sie w kolko); Dostatek stanu zrodlowego D < 0.8 (srednia 28 dob ZC0; przeglad po rozgrzewce 7 dob jak caly ZC6); zapas kiesy < 7 dni
     ///   zwyklego koszyka stanu (miasto - czesc kiesy W na glowe biedoty i chlopow miasta, wies - kiesa wsi; kiesa nieczynna - bez ruchu, licznik).
     ///  STAN ZRODLOWY: wies - chlopi; miasto - biedota (chlopi miasta 2% - pola mieszczan - bez zmian: maja te sama kiese W i ten sam Dostatek co biedota).
+    ///  UCHODZCY (recenzja): D biedoty miasta ma w mianowniku uchodzcow z najazdu (Guests - dziela zarobek klasy W kiesy ludu, DailyLife.Guests.cs; ten sam D co
+    ///   awans ZC6) - ciasnota naprawde obniza zarobek miejscowej biedoty; sami uchodzcy sa poza ksiega stanow, wiec nie wpadaja w niewole (wracaja do domu).
     ///  TEMPO: 1% na rok ludzi stanu zrodlowego = 0.01 x 7/364 na przeglad; w limicie ZC6 0.2% ludzi osady na tydzien (razem z awansem, spadkiem, wyzwoleniami)
     ///   i w granicach pasm (zrodlo >= 0.5 x pasmo, niewolni <= 1.5 x pasmo); ulamek milionowej deterministycznie (RoundPpm - wartosc oczekiwana zachowana).
     ///  LUDZIE: tylko przesuniecie udzialow ksiegi stanow (milionowe, suma 1 000 000) - nikt nie powstaje i nie ginie; ksiega ludzi bez zmian.
@@ -46,7 +49,7 @@ namespace Armoury
         private static readonly Dictionary<string, double> _dslCul = new Dictionary<string, double>(StringComparer.Ordinal);
         private static readonly Dictionary<string, double> _dslCulS = new Dictionary<string, double>(StringComparer.Ordinal);
 
-        internal static bool DebtSlOn { get { var s = Settings.Current; return EstatesOn && s.DebtSlavery; } }
+        internal static bool DebtSlOn { get { var s = Settings.Current; return MobOn && s.DebtSlavery; } }   // recenzja: z ruchem ZC6 (wyzwolenia - przeplyw w druga strone)
 
         /// <summary>Z ResetMobility (nowa sesja): liczniki niewoli za dlugi od nowa (stan kampanii - udzialy w arm_estates).</summary>
         private static void ResetDebtSl()
@@ -173,7 +176,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             Log.Info(PDS + "start sesji | klucz Debt Slavery " + (s != null && s.DebtSlavery ? "tak" : "WYLACZONE") + " (Daily Life Estates " + (s != null && s.DailyLifeEstates ? "tak" : "WYLACZONE")
-                     + ", Daily Life Measure " + (KeyOn ? "tak" : "WYLACZONE") + ")" + (DebtSlOn ? "" : " - nikt nie wpada w niewole za dlugi")
+                     + ", Daily Life Measure " + (KeyOn ? "tak" : "WYLACZONE") + ", Daily Life Mobility " + (s != null && s.DailyLifeMobility ? "tak" : "WYLACZONE") + ")"
+                     + (DebtSlOn ? "" : " - nikt nie wpada w niewole za dlugi")
                      + " | kultury: " + DslCultureList() + " (lista z niewola bez sturgia - Zelazne Wyspy, Westeros - i khuzait - Dothrakowie bez pieniadza)"
                      + " | zasada: " + F2(100 * DslRate) + "%/rok stanu zrodlowego (wies chlopi, miasto biedota) przy Dostatku < " + F2(DslD) + " i zapasie kiesy < " + F1(DslSavDays)
                      + " dni zwyklego koszyka -> niewolni tej samej osady; tylko pod KS i pod wladca z niewola; w limicie ZC6 0.2%/tydz. i granicach pasm"

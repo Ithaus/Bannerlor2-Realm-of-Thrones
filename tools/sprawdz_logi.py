@@ -1035,8 +1035,9 @@ Uzycie (Python 3, tylko odczyt):
 --grupa nniewola  : (18.10, paczka f8-niewola - decyzja Jeffa "6 tak": niewola za dlugi tylko w kulturach z niewola, 1%/rok przy Dostatku < 0.8 bez zapasu; projekt
                     docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 10; Armoury/src/DailyLife.Debt.cs, DailyLife.Mobility.cs przejscie TDebtSl, klucz Debt Slavery)
                     python -I tools/sprawdz_logi.py --grupa nniewola <Armoury-*.log> [--csv <katalog sesji>/stany-dostatek.csv] (strumieniowo; CSV obok logu, w Logs/<znacznik>/
-                    albo w Modules/Armoury/Logs gry). NNW-0 start sesji: klucz i lista kultur = ghiscari, lyseni, myrish, norvos, qartheen, qohorik, tyroshi, valyrian, volantine
-                    (bez sturgia - Zelazne Wyspy, Westeros - i khuzait - Dothrakowie bez pieniadza), NNW-0b linie nieczytelne 0, NNW-1 linia "Niewola za dlugi (f8): dzien N"
+                    albo w Modules/Armoury/Logs gry; klucz dziala tylko z Daily Life Mobility - wyzwolenia w druga strone). NNW-0 start sesji: klucz i lista
+                    kultur = ghiscari, lyseni, myrish, norvos, qartheen, qohorik, tyroshi, valyrian, volantine (bez sturgia - Zelazne Wyspy, Westeros - i khuzait -
+                    Dothrakowie bez pieniadza), NNW-0b linie nieczytelne 0, NNW-1 linia "Niewola za dlugi (f8): dzien N"
                     w kazdej dobie z linia "Awans (ZC6)" (przy kluczu), NNW-2 ruchy tylko w kulturach z niewola (poza lista 0, kultury w liniach z listy), NNW-3 tozsamosc ludzi
                     (z wolnych = do niewolnych +-0.15, suma udzialow osady = 1 000 000, kultury = razem, wsie + miasta = razem), NNW-4 tempo od wczytania <= 1.25%/rok biednych
                     (cel 1%; INFO przy < 50 000 ludzio-przegladow albo bez biednych - regula spi), NNW-5 pieniadze: kiesa W = wierzyciele R + P co do zlotowki, kontrola kies 0
@@ -35463,6 +35464,8 @@ def nzc2_main(logp, bdp=None, until=120):
                 zc6_moves = True
             elif s.startswith("Blizna wojny (ZC7): start sesji") and "Daily Life War Scar tak" in s:
                 zc6_moves = True   # ZC7 (16.10): blizna wojny przesuwa udzialy (ruina przy zlupieniu, rzemieslnicy wsi po najezdzie, powrot) - NZC2-6 INFO
+            elif s.startswith("Niewola za dlugi (f8): start sesji") and "klucz Debt Slavery tak" in s and "nikt nie wpada" not in s:
+                zc6_moves = True   # f8-niewola (18.10, recenzja): niewola za dlugi przesuwa udzialy (biedni wolni -> niewolni) - NZC2-6 INFO
     print(f"plik: {logp} | linii startu sesji {len(sess)}, doby Stany {len(days)} (nierozpoznanych {len(bad)}), zasiewow {len(seeds)}, zapisow {len(saves)}, "
           f"wczytan {len(loads)} (bez ksiegi stanow {len(loads_other)}), doby Zycie (ZC0) {len(zc0)}")
     if not sess and not days and not bad and not saves and not loads and not loads_other:
@@ -36061,7 +36064,7 @@ def nzc7_main(logp, bdp=None, until=120):
 NNW_HEAD = "Niewola za dlugi (f8): "
 NNW_CULT = ("ghiscari", "lyseni", "myrish", "norvos", "qartheen", "qohorik", "tyroshi", "valyrian", "volantine")
 NNW_START = re.compile(r"Niewola za dlugi \(f8\): start sesji \| klucz Debt Slavery (?P<k>tak|WYLACZONE) \(Daily Life Estates (?P<e>tak|WYLACZONE), "
-                       r"Daily Life Measure (?P<z>tak|WYLACZONE)\).*?\| kultury: (?P<cul>[a-z, ]+?) \(")
+                       r"Daily Life Measure (?P<z>tak|WYLACZONE)(?:, Daily Life Mobility (?P<mo>tak|WYLACZONE))?\).*?\| kultury: (?P<cul>[a-z, ]+?) \(")
 NNW_DAY = re.compile(r"Niewola za dlugi \(f8\): dzien (?P<day>-?\d+) \| klucz (?P<k>tak|nie) \| od ostatniej linii (?P<dd>\d+) dob: przegladow osad kultur z niewola (?P<seen>\d+) "
                      r"\(biednych (?P<poor>\d+); pominiete: bez KS (?P<noks>\d+), wladca bez niewoli (?P<fr>\d+), D >= [\d.]+ (?P<rich>\d+), zapas >= [\d.]+ dni (?P<sav>\d+), "
                      r"zapas nieznany (?P<nop>\d+), D nieznane (?P<nod>\d+), bez ludzi stanu (?P<empty>\d+)\) \| do niewoli (?P<mv>-?\d+|-) ludzi \(wsie chlopi (?P<v>-?\d+|-), "
@@ -36204,7 +36207,7 @@ def nniewola_main(logp, csvp=None):
                 continue
             if s.startswith(NNW_HEAD + "start sesji"):
                 ms_ = NNW_START.match(s)
-                starts.append(ms_.groupdict() if ms_ else {"k": "?", "e": "?", "z": "?", "cul": ""})
+                starts.append(ms_.groupdict() if ms_ else {"k": "?", "e": "?", "z": "?", "mo": "?", "cul": ""})
                 continue
             md = NNW_DAY.match(s)
             if not md:
@@ -36216,14 +36219,15 @@ def nniewola_main(logp, csvp=None):
                 d[k] = _nnw_val(mm.group(1), cast) if mm else None
             days[int(d["day"])] = d
     dd = sorted(days)
-    keyon = [x for x in starts if x.get("k") == "tak"]
+    # klucz czynny: Debt Slavery, Estates i Measure tak, a Daily Life Mobility tak albo linia sprzed recenzji (bez tego pola) - DebtSlOn wymaga ruchu ZC6
+    keyon = [x for x in starts if x.get("k") == "tak" and x.get("e") in ("tak", "?") and x.get("z") in ("tak", "?") and x.get("mo") in (None, "tak", "?")]
     print(f"plik: {logp} | linii startu {len(starts)} (klucz tak {len(keyon)}) | linii doby {len(dd)}" + (f" (dzien {dd[0]}-{dd[-1]})" if dd else "")
           + f" | nieczytelnych {len(bad)} | linii Awans (ZC6) {len(zc6days)} (z wpisem niewoli {len(zc6)}) | ERROR paczki {len(errs)}")
     # ---- NNW-0 start sesji: klucz i lista kultur
     if starts:
         cul_bad = [x.get("cul") for x in starts if tuple(sorted(c.strip() for c in (x.get("cul") or "").split(",") if c.strip())) != NNW_CULT]
         rep.add("NNW-0: start sesji (klucz Debt Slavery, kultury z niewola znajace pieniadz)",
-                f"linii {len(starts)}, klucz: {', '.join(sorted(set(x.get('k', '?') for x in starts)))}; lista kultur inna niz {len(NNW_CULT)} oczekiwanych w {len(cul_bad)}"
+                f"linii {len(starts)}, klucz: {', '.join(sorted(set(x.get('k', '?') for x in starts)))} (Daily Life Mobility: {', '.join(sorted(set(x.get('mo') or '-' for x in starts)))}); lista kultur inna niz {len(NNW_CULT)} oczekiwanych w {len(cul_bad)}"
                 + (f" (np. '{cul_bad[0]}')" if cul_bad else ""), f"lista = {', '.join(NNW_CULT)} (bez sturgia i khuzait)", len(cul_bad) == 0)
     else:
         rep.add("NNW-0: start sesji (klucz Debt Slavery)", "brak linii startu", "INFO (log sprzed paczki f8-niewola)", None)
