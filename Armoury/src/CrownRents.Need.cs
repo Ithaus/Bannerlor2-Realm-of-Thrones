@@ -32,7 +32,7 @@ namespace Armoury
     /// </summary>
     internal static partial class CrownRents
     {
-        internal static bool NeedOn { get { var s = Settings.Current; return s != null && s.CrownRentsByNeed && ClanBudget.On; } }
+        internal static bool NeedOn { get { var s = Settings.Current; return s != null && s.CrownRentsByNeed && ClanBudget.On && On; } }   // On: renty 180 czynne (napisy linii f6 / W5 tylko wtedy)
 
         private const int RnBelow = 0, RnMid = 1, RnAbove = 2, RnNone = 3;   // pasma jak f6: ponizej R, R-2R, ponad 2R, bez miary
         private sealed class RnRow { public double F = 1, G, R; public int Band = RnNone; public long Full, Need, Paid, Fail; public bool Counted; }
