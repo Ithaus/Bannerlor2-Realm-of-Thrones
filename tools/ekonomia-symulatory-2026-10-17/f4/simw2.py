@@ -1,3 +1,5 @@
+# UWAGA (recenzja 18.10): model OTWARTY - zwraca do W tylko phi = 18% zatrzymanego pieniadza, reszte (82%) gubi; nie liczyc z niego dochodu panow ani rownowagi W.
+# Model zamkniety (kasy, P, R, panowie, korona; ta sama baza fin86): simw3.py w tym katalogu.
 # f4-place-ludu: model kiesy W miast (suma) z fin86 (doby 109200-109235) - wersja z placami z nadwyzki R/P (Households)
 # dK = Oext + kap*Hh + kap*idx*E + phi*retained(lag) - base - alpha*(K-R) - hoardW
 def run(kmin=0.25, rate=0.01, down=True, hh=True, lo=15.0, hi=30.0, step=0.03, days=361, phi=0.18, lag=28, K0=14.0e6, base=275e3, alpha=0.0105):
