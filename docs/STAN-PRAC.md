@@ -2820,3 +2820,16 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   Jeffa nigdy nie ruszy. -> workflow wf_2d6c4a59-791 (zb/fix-ksarm od 100eaedf): znalezc i zamknac zrodlo koni jucznych (kod -> recenzja -> poprawki).
 - 22:55 PDT: test 5 dob + 1 bitwa dokladnych DLL (test/wgr77: Armoury d784e458, CrashScribe 5258adcd, RC/GT/FV bez zmian) przed WGRANIEM 77 (= 100eaedf; KS uzbroi sie i bedzie mierzyc,
   wlaczy sie dopiero po WGRANIU 78 z poprawka koni). at-wgr77-5dob-bitwa.out.txt.
+
+### 83. WGRANIE 77 (17.10 ok. 23:05 PDT = 18.10 08:05 CEST) - CALA NOC: KS runda 4 + swiat + uchodzcy + glod/bunt + akumulator + stare bledy - START TUTAJ
+W grze: `w-toku/noc-wgranie-77` = w-toku/noc-ks4 **100eaedf** (GitHub) | Armoury **d784e458** (bylo d84f7b66), CrashScribe **5258adcd** (bylo da755a8a); RC 7e0e462e, GT 035878c4,
+ForgeView 19aa052a bez zmian. Pliki danych: NOWE arm_ks_land.tsv (d619370a), arm_roadside_inns.tsv (cdf07098), arm_map_roads_geo.tsv (c278bc5d), arm_map_villages_v5.tsv + lore_v5
+(= stare v5); arm_map_villages.tsv + lore -> v6 (5ef12be9 / 2296f4b7, crc F5456602); CrashScribe.settings.xml 3ac7e6d4. Kopie *.bak-2026-10-17-wgranie77-przed i
+D:/Backup-Bannerlord/wgrane/2026-10-17-wgranie77-przed; zapis Jeffa zapisy-jeffa/IronmanjCg6MOpv28iN-2026-10-17-przed-wgraniem77.sav (md5 2ad40e43, Jeff nie gral od 06:05).
+Zgoda: Jeff 17.10 noc ("gra rano gotowa ze wszystkimi poprawkami", "wgral WSZYSTKO").
+Testy: fin83 (calosc z KS, 120 dob) 0 ERROR, nks 18/73; fin84 (gra Jeffa bez KS, 160 dob) 0 ERROR, prawie wszystkie grupy TAK; fin85 (samo uzbrojenie KS, 160 dob) 0 ERROR - KS uzbrojony,
+NIE wlaczony (bramka koni jucznych - poprawka fix-ksarm w toku -> WGRANIE 78); test dokladnych DLL 5 dob + bitwa: kod 0, ERROR 0, bitwa 0 bledow.
+CO JEFF ZOBACZY: zajazdy przy szlakach (nocleg, plotki), plotki w karczmach miast, +15% na drogach ROT, przysiolki na pustkowiach (uklad v6; zapis v5 przechodzi po uid), herby wiosek
+512x512, zbrojownia z ksiega wedlug modyfikatora, wydarzenia ROT z logiem skutkow; ekonomia: daniny od majatku ponad 3 x zapas (miasta i wsie, lagodny start), roboty gminy tylko z
+prawdziwego materialu, lepszy stol mieszczan, wykup wolnosci/awans/blizny wojny (ZC6/ZC7 TAK); KS: "KS: uzbrojony zapis" + 5 tygodni pomiaru (bez zmiany rynku do WGRANIA 78).
+DO SPRAWDZENIA U JEFFA (log pierwszej sesji): "KS: samo uzbrojenie", "Akumulator kies (ds-akumulator)", "Zajazdy", "Przysiolki", 0 ERROR.
