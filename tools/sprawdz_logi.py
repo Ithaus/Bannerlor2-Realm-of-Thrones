@@ -30768,7 +30768,8 @@ N2E_WOOD = re.compile(r"^Towary: dzien (\d+) - hardwood \(")
 N2E_PRICE = "Ceny surowcow: dzien "
 N2E_NOMAKER = ("garum", "Ink", "Dyes", "gems", "gold")
 N2E_ERR = ("ERROR in VillageFruit", "ERROR in MineralOnce.Eggs", "ERROR in NoMakerBudget", "ERROR in FibreToMarket", "ERROR in TownFolk.Firewood",
-           "ERROR in MarketCarts.SellPostfix", "ERROR in MarketCarts.SellPrefix", "ERROR in MarketCarts.Choose")
+           "ERROR in MarketCarts.SellPostfix", "ERROR in MarketCarts.SellPrefix", "ERROR in MarketCarts.Choose",
+           "ERROR in TownFolk.FwCart", "ERROR in TownFolk.FwField", "ERROR in TownFolk.Opal")   # f4-opal: pomiar dowozu w latce sprzedazy wozu i regula opalu pod KS
 
 
 def _n2e_gaps(days):
