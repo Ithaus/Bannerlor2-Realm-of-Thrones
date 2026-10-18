@@ -1269,6 +1269,14 @@ namespace Armoury
                   .Append(" (u celu - zaplacone przy dostawie - nowe), potkniecia kredytu ").Append(KsFoodCredit.TakeStumbles());
                 // scalenie r4-glodbunt + r4-kupcy: zalegle rachunki glodnych miast splacone przez ich panow (KsLordFood, tryb RACHUNKI) - w "splacone" wyzej i w zlocie (panowie -)
                 sb.Append(" | splacone przez panow miast (glod, zalegle rachunki) ").Append(KsFoodCredit.DLordRepaid).Append(" zl w ").Append(KsFoodCredit.DLordN).Append(" splatach, kasy zrodel przyjely ").Append(KsFoodCredit.GLordPaid).Append(" zl");
+                // f4 P5: wczesna splata panow (klucz Ks Lord Food Bills Early Share) - czesc "splacone przez panow" przed zwloka i wiek rachunkow (bez klucza - bez segmentu)
+                int eAge = KsLordFood.EarlyAge(Settings.Current);
+                if (eAge >= 0 && Settings.Current != null && Settings.Current.KsLordFundsFood)
+                {
+                    int oldAge; long older; KsFoodCredit.AgeStats(today, eAge, out oldAge, out older);
+                    sb.Append(", w tym przed zwloka (wczesna splata f4) ").Append(KsFoodCredit.DLordEarly).Append(" zl w ").Append(KsFoodCredit.DLordEarlyN).Append(" splatach")
+                      .Append("; najstarszy rachunek ").Append(oldAge).Append(" dni, rachunki starsze niz ").Append(eAge).Append(" dni ").Append(older).Append(" zl");
+                }
                 // recenzja r4-kupcy: wozy na kredyt w drodze - przed cofnieciem DLL ponizej r4-kupcy musza byc 0 (starsza DLL dowiozlaby je bez rachunku) i otwarte rachunki 0
                 long cN = 0, cPcs = 0, cVal = 0;
                 foreach (var c in _carts) { if (!c.Cons || c.N <= 0) continue; cN++; cPcs += c.N; cVal += Math.Max(0, c.Val); }

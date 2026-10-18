@@ -37,6 +37,8 @@ namespace Armoury
     ///    FoodBillsPay = KsFoodCredit.PayByLord (najstarsze najpierw, zloto prosto do kas zrodel z pomiarem; nieprzyjete wraca do pana). Tryb RACHUNKI tylko przy kluczu
     ///    Ks Food Carts Consign TAK (kredyt kupcow); przy NIE KS-H placi przy wysylce jak dotad - tryb DOPLATA KASY bez bezpiecznika (wozy kupione bez kredytu).
     ///    Kontrola linii: zloto panow (pomiar kiesy glowy) + kasy miast + wierzyciele (pomiar kas zrodel) = 0; ta sama splata w linii KS-H (splacone, panowie -).
+    ///  - f4 P5 (koncowy przeglad ekonomii 18.10): WCZESNA SPLATA (klucz Ks Lord Food Bills Early Share 0.67; 0 = jak wyzej bit w bit) - w trybie RACHUNKI pan splaca
+    ///    rachunki zywnosci KAZDEGO swojego miasta (nie tylko glodnego) starsze niz 2/3 zwloki, z tych samych granic (BeforeEarly).
     /// Zapis gry: nic (stan w nawiasie jednej doby; doplata wczoraj wedlug rodu - pamiec sesji). Linia doby "Pan miasta placi za dowoz (KS): dzien N".
     /// Wyjatki per miasto - licznik potkniec (CLAUDE.md 7); zaleglosc nawiasu (After nie zdazyl) zwracana na poczatku nastepnego Before.
     /// </summary>
@@ -75,8 +77,27 @@ namespace Armoury
         private static long _ticks;
         private static int _stumbles;
         private static readonly HashSet<string> _err = new HashSet<string>();
+        // f4 P5 (wczesna splata, klucz Ks Lord Food Bills Early Share): rachunki starsze niz prog wedlug miasta celu (kwota, doba najstarszego), kolejnosc miast doby;
+        // liczniki doby: prog (dni; -1 - tryb wylaczony), miasta syte z rachunkami ponad prog, z tego splacone przez pana, rachunki ponad prog (zl), splacone przez panow (zl)
+        private static readonly Dictionary<Settlement, long> _eSum = new Dictionary<Settlement, long>();
+        private static readonly Dictionary<Settlement, int> _eOld = new Dictionary<Settlement, int>();
+        private static readonly List<Town> _eList = new List<Town>();
+        private static readonly HashSet<Town> _eSeen = new HashSet<Town>();
+        private static int _eAge = -1, _eSated, _eSatedPaid;
+        private static long _eOpen, _ePaid;
 
         private static bool On(Settings s) { return s != null && s.KsLordFundsFood; }
+
+        /// <summary>f4 P5: udzial zwloki, po ktorym pan splaca rachunki zywnosci swojego miasta (0..1; 0 - tryb wylaczony, kod jak w f5fd0ae3).</summary>
+        internal static double EarlyShare(Settings s) { return s == null ? 0 : Math.Max(0.0, Math.Min(1.0, (double)s.KsLordFoodBillsEarlyShare)); }
+
+        /// <summary>f4 P5: prog wieku rachunku (dni) dla wczesnej splaty - floor(udzial x Ks Consign Overdue Days); -1 przy wylaczonym.</summary>
+        internal static int EarlyAge(Settings s)
+        {
+            double e = EarlyShare(s);
+            if (!(e > 0)) return -1;
+            return Math.Max(0, Math.Min(KsFoodCredit.OverdueDays, (int)Math.Floor(e * KsFoodCredit.OverdueDays + 1e-9)));
+        }
         private static int Today() { return (int)CampaignTime.Now.ToDays; }
 
         private static void Stumble(string where, Exception e)
@@ -121,6 +142,7 @@ namespace Armoury
             _dep = _ret = _lordPaid = _need = _spend = _dLords = _dTowns = _billsOpen = _billsPaid = _cut = 0; _billsRecv = 0;
             _nOff = _nMis = _nBookCut = 0; _book = _mis = 0;
             _clans.Clear(); _ksh = false; _bills = false; _creditOff = false; _ticks = 0;
+            _eAge = -1; _eSated = _eSatedPaid = 0; _eOpen = _ePaid = 0;
         }
 
         /// <summary>Doplata rodu `c` z biezacej doby doplat (0 - inna doba albo nic).</summary>
@@ -219,6 +241,7 @@ namespace Armoury
                 _bills = consign && FoodBillsOpen != null && FoodBillsPay != null;
                 _creditOff = !_bills && consign && CreditCode();             // kupcy na kredycie bez podlaczonych rachunkow - bez doplaty (linia: NIEPODLACZONY)
                 if (!_ksh || _creditOff) return;
+                if (_bills && EarlyShare(s) > 0) { BeforeEarly(s); return; }   // f4 P5: wczesna splata (nizej); 0 - tryb RACHUNKI jak w f5fd0ae3
                 KsHunger.Hungry(_hungry);
                 float wcd = Math.Max(1f, s.WarChestDays);
                 foreach (var kv in _hungry)
@@ -295,6 +318,79 @@ namespace Armoury
             finally { _ticks += Stopwatch.GetTimestamp() - t0; }
         }
 
+        /// <summary>
+        /// f4 P5 (koncowy przeglad ekonomii 18.10, uwaga 6: rachunki KS-H Qarth 143 tys. i Braavos 84 tys. rosna, a pan placil tylko za miasto glodne z rachunkiem juz
+        /// zaleglym - gdy rachunek przekroczy zwloke, dowoz staje i przychodzi nagly glod): WCZESNA SPLATA w trybie RACHUNKI. Ten sam mechanizm i te same granice co tryb
+        /// RACHUNKI w Before (glowa rodu wlasciciela, zloto ponad rezerwe wojny R i tempo skrzyni doby jak chleb M3, gracz nigdy, rod bez budzetu / dluznik / Straz nie),
+        /// tylko wczesniejszy prog i kazde miasto rodu: rachunki zywnosci miasta starsze niz floor(Ks Lord Food Bills Early Share x Ks Consign Overdue Days) dni (0.67 x 30
+        /// = 20), najstarsze najpierw (KsFoodCredit.PayByLordAge). Kolejnosc miast doby: najpierw glodne (kolejnosc KsHunger, jak dotad), potem syte - od najstarszego
+        /// rachunku, potem StringId (tempo rodu wspolne - PaidToday). Bez reguly dla krain. Zloto: glowa -> kasy zrodel (wierzyciele, pomiar), czego nie przyjma - wraca do
+        /// glowy; roszczenie maleje o tyle samo (kontrola linii: zloto panow + kasy miast + wierzyciele = 0, jak dotad). Miasto oblezone - nie (jak dotad).
+        /// </summary>
+        private static void BeforeEarly(Settings s)
+        {
+            int age = EarlyAge(s);
+            _eAge = age;
+            if (age < 0) return;
+            KsFoodCredit.OlderThanByDst(age, _eSum, _eOld);
+            KsHunger.Hungry(_hungry);
+            float wcd = Math.Max(1f, s.WarChestDays);
+            _eList.Clear(); _eSeen.Clear();
+            foreach (var kv in _hungry) if (kv.Key != null && _eSeen.Add(kv.Key)) _eList.Add(kv.Key);
+            int nHungry = _eList.Count;
+            var rest = new List<KeyValuePair<Settlement, int>>();
+            foreach (var kv in _eOld) { var t0 = kv.Key != null ? kv.Key.Town : null; if (t0 != null && !_eSeen.Contains(t0)) rest.Add(kv); }
+            rest.Sort((a, b) => a.Value != b.Value ? a.Value.CompareTo(b.Value) : string.CompareOrdinal(a.Key.StringId, b.Key.StringId));
+            foreach (var kv in rest) { _eList.Add(kv.Key.Town); _eSeen.Add(kv.Key.Town); }
+            foreach (var kv in _eSum) _eOpen += Math.Max(0, kv.Value);
+            for (int i = 0; i < _eList.Count; i++)
+            {
+                try
+                {
+                    var t = _eList[i]; var st = t != null ? t.Settlement : null;
+                    bool hungry = i < nHungry;
+                    if (st == null || st.IsUnderSiege) continue;
+                    if (hungry) _nH++; else _eSated++;
+                    long open; _eSum.TryGetValue(st, out open); open = Math.Max(0, open);
+                    _billsOpen += open;
+                    if (open <= 0) { _nNoBills++; continue; }                   // tylko miasto glodne bez rachunkow ponad prog
+                    if (hungry) _nNeed++;
+                    _need += open;
+                    var c = st.OwnerClan;
+                    var h = c != null ? c.Leader : null;
+                    if (c == null || h == null || !h.IsAlive) { _nNb++; continue; }
+                    if (c == Clan.PlayerClan || ReferenceEquals(h, Hero.MainHero)) { _nPl++; continue; }   // gracz nigdy (jak chleb M3)
+                    double G, R; bool war;
+                    if (!ClanBudget.ChestOf(c, out G, out R, out war)) { _nNb++; continue; }
+                    // ta sama granica co tryb RACHUNKI w Before (nawias doplaty pusty w tym trybie - outC i resC 0)
+                    long outC, resC; _out.TryGetValue(c, out outC); _resv.TryGetValue(c, out resC);
+                    long fam = ClanIncomeBook.FamilyGoldOf(c) + outC;
+                    double rate = TownFolk.BreadLordShare(s, war) * Math.Max(0, fam - R) / wcd - TownFolk.BreadLordToday(c) - TourneyPay.RepaidToday(c) - PaidToday(c) - resC;
+                    long cap = (long)Math.Floor(Math.Min(Math.Min(rate, fam - R - resC), (double)h.Gold));
+                    if (cap <= 0) { _nRoom++; continue; }
+                    long extra = Math.Min(cap, open);
+                    // glowa -> wierzyciele (PayByLordAge), reszta z powrotem do glowy
+                    int h0 = h.Gold; h.ChangeHeroGold(-(int)Math.Min(int.MaxValue, extra)); long took = h0 - h.Gold;
+                    CirculationWindows.NoteHeroGold(h, -took);
+                    long paidB = 0;
+                    try { paidB = KsFoodCredit.PayByLordAge(st, took, age); } catch (Exception ex) { Stumble("PayByLordAge", ex); paidB = 0; }
+                    paidB = Math.Max(0, Math.Min(took, paidB));
+                    long recv = paidB;
+                    long back = took - paidB;
+                    if (back > 0) { int h1 = h.Gold; h.ChangeHeroGold((int)back); long got = h.Gold - h1; CirculationWindows.NoteHeroGold(h, got); paidB = took - got; }
+                    _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv; _ePaid += paidB;
+                    if (paidB > 0)
+                    {
+                        _nPay++; NotePaid(c, paidB);
+                        if (!hungry) _eSatedPaid++;
+                        if (ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++;
+                        if (paidB > cap) _nOver++;
+                    }
+                }
+                catch (Exception e) { Stumble("BeforeEarly(miasto)", e); }
+            }
+        }
+
         /// <summary>Tuz po KsFoodCarts.Daily: rozliczenie nawiasu (kasa najpierw do swojego budzetu, pan reszte, niewydane wraca do pana) i linia doby.</summary>
         internal static void After()
         {
@@ -366,7 +462,13 @@ namespace Armoury
               .Append(" | ksiega kupcow KS-H: zaplacone kupcom przez te kasy ").Append(_book).Append(" zl (towar + fracht wozow kupionych dzis), od panow ").Append(_lordPaid - _billsPaid)
               .Append(" zl, udzial pana uciety ksiega ").Append(_nBookCut).Append(", kasa netto ponad ksiege ").Append(_nMis).Append(" miast (").Append(_mis).Append(" zl)")
               .Append(" | rachunki: otwarte ").Append(_billsOpen).Append(" zl, splacone przez panow ").Append(_billsPaid).Append(" zl, kasy zrodel (wierzyciele) przyjely ").Append(_billsRecv)
-              .Append(" zl (tylko rachunki zalegle - starsze niz ").Append(KsFoodCredit.OverdueDays).Append(" dni, blokuja dowoz; najstarsze najpierw)")
+              .Append(_eAge >= 0
+                  ? " zl (rachunki starsze niz " + _eAge.ToString(Inv) + " dni - wczesna splata f4, przed zwloka " + KsFoodCredit.OverdueDays.ToString(Inv) + " dni, ktora blokuje dowoz; takze miasta syte; najstarsze najpierw)"
+                  : " zl (tylko rachunki zalegle - starsze niz " + KsFoodCredit.OverdueDays.ToString(Inv) + " dni, blokuja dowoz; najstarsze najpierw)")
+              .Append(_eAge >= 0
+                  ? " | wczesna splata (f4, Ks Lord Food Bills Early Share " + EarlyShare(s).ToString("0.00", Inv) + "): prog " + _eAge.ToString(Inv) + " dni, miasta syte z rachunkami ponad prog "
+                    + _eSated.ToString(Inv) + " (pan splacil " + _eSatedPaid.ToString(Inv) + "), rachunki ponad prog " + _eOpen.ToString(Inv) + " zl, splacone przez panow " + _ePaid.ToString(Inv) + " zl"
+                  : "")
               .Append(" | kontrola: zloto panow ").Append(_dLords).Append(" + kasy miast ").Append(_dTowns).Append(" + wierzyciele ").Append(_billsRecv)
               .Append(" = ").Append(_dLords + _dTowns + _billsRecv).Append(" (oczekiwane 0), zaplacone - (wplacone - zwrocone + rachunki) = ").Append(_lordPaid - (_dep - _ret + _billsPaid))
               .Append(" | pan ponizej rezerwy wojny po zaplacie ").Append(_nBelow).Append(", ponad tempo skrzyni ").Append(_nOver)
