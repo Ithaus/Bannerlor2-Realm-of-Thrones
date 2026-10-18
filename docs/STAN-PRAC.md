@@ -3131,3 +3131,9 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
 - 15:25 PDT: f19-drogi GOTOWE (wf_65af1d03-cd5): MapSideRoads.All.cs (nowy klucz MapSideRoadsAllVillages TAK) - jedno pole Dijkstry z wielu zrodel (trakty, bramy miast/zamkow, drogi, wsie gry),
   kolejnosc Prima, laczki Beziera przy trakcie (~25 st., bez kikutow); podglad v7: 2450 drog, 30 500 jedn., 73 962 decali (odstep x2.72 - limit 80k), plan ~610 ms; wiosek ukladu BEZ DROGI 0
   (bylo 1109), 4 wsie gry na wyspach bez trasy. Podglady scratchpad img/1..6-*.png. Do zdjec w grze: tools/drogi/zdjecia-drogi-f19.json.
+- 15:45 PDT: f19-ekonomia-audyt GOTOWE (wf_743d7727-901; scratchpad audyt-wynik.txt): 4 audyty, potwierdzone 18 uwag. e1 8336967 (BK BuyGoods niszczyl ~240k zl co 91 dob - CourtShoppingPaysTown;
+  BK FinancialCompromise bez odbiorcy - GroupCompromisePaysGroup; linia bisekcji zaokraglen), e2 9250a6fa (KsCtlOwnSameFood - podwojne liczenie; KsCartsMinLotTrueDemand - glodne miasta a male
+  loty; drewno w wozach - tylko pomiar), e3 cb133e6f (pierwszy budzet po wczytaniu z D169 x2 -> StableDFirstDayFromSave; NeedReserveUncutSaved; gersuma jako jednorazowa KsFarmCatchUpOneOff),
+  e4 3bdb0e4c (napis A7 zamrozone, NAKUM-7 bez skarbcow wedlug Jeffa). Recenzje: e3 WAZNE (arm_stabled pierwszy zapis - srednia zanizona), e2/e4 drobne - do poprawek w scaleniu7.
+  DECYZJE DLA JEFFA: W5/W5b/M1 dla rodow > 2R (~48k/d; rada: ten sam f co renty), danina Wolnych Miast dla Dothrakow, "bez miary" f=1, Bank Zelazny akumulator, A7 / podaz jedzenia nie
+  reaguje na ceny po D+49, nadanie wojenne DS bez patrzenia na nadwyzke skarbca, spichlerze na 2 lata bez psucia.
