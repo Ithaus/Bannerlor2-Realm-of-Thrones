@@ -13,8 +13,9 @@ using TaleWorlds.MountAndBlade;
 namespace Armoury
 {
     /// <summary>
-    /// f5-bitwa (noc 17/18.10) - ZESTAW BITWY AUTOTESTU. Klucz AutotestBattleKit; dziala TYLKO w DLL autotestu CrashScribe (CrashScribe.Autotest.Active,
-    /// etap Battle) - w grze Jeffa typu CrashScribe.Autotest nie ma, wiec nic sie nie dzieje.
+    /// f5-bitwa (noc 17/18.10) - ZESTAW BITWY AUTOTESTU. Klucz AutotestBattleKit; dziala TYLKO w biegu autotestu CrashScribe (CrashScribe.Autotest.Active,
+    /// etap Battle). Recenzja: typ CrashScribe.Autotest bywa tez w zainstalowanym CrashScribe.dll - w grze Jeffa nieczynne trzyma flaga Active (ustawiana
+    /// tylko przy pliku autotest.json), nie brak typu.
     ///
     /// DOWOD (STAN-PRAC 55 z 16.10: "mocna druzyna przegrywa z bandytami, panika 53-58" - nikt nie sprawdzil): we WSZYSTKICH 15 bitwach autotestu
     /// od 16.10 18:25 do 18.10 04:04 (logi-testow) linia "Bitwa gracza (sklad7b-p, start): Twoich ludzi 59 - bez broni 59, bez zbroi 59, jezdzcy pieszo 59"
@@ -32,8 +33,17 @@ namespace Armoury
     /// (zestawy BattleEquipments po kolei na czlowieka - DTE wybiera wzorzec losowo, RandomBattleEquipment; bron, zbroja, kon i uprzaz - bez choragwi,
     /// legend i olbrzymow, jak GatherFallen; bez koni w bitwie morskiej) przez DTE ArmyArmory.AddItemToArmory (czarna lista DTE i prawo unikatow
     /// dzialaja - odmowy liczone). Plan "slaba" (AutotestBattle._kind = Weak - test przegranej i niewoli) bez zestawu. Po bitwie (MapEventEnded tej
-    /// bitwy, po GatherFallen; misja otwarta - pierwsza godzina) zdjete najwyzej tyle, ile dodano (najpierw egzemplarze bez stanu), ksiega gracza
-    /// przycieta (ReconcileStock), linia z tozsamoscia "dodane = zdjete + ubytek" (ubytek = straty bitwy: polegle konie, lup wroga przy przegranej).
+    /// bitwy, PO GatherFallen; misja otwarta - pierwsza godzina albo wjazd do osady PRZED MenPurse.OnEntered) zdjete najwyzej tyle, ile dodano
+    /// (najpierw egzemplarze bez stanu), ksiega gracza przycieta (ReconcileStock), linia z tozsamoscia "dodane = zdjete + ubytek".
+    /// KOLEJNOSC SLUCHACZY (recenzja 18.10, dekompilacja MbEvent: AddNonSerializedListener wstawia na poczatek listy, Invoke idzie od poczatku - sluchacz
+    /// dopisany POZNIEJ biegnie WCZESNIEJ): MapEventEnded zarejestrowany PRZED delegatem GatherFallen+WearKeep+AmmoRecovery (biegnie po nim - ksiega po
+    /// GatherFallen przycieta, odzyskana amunicja zestawu zdjeta); SettlementEntered zarejestrowany PO MenPurse.OnEntered i PO Orders+Stables+SaddleLaw
+    /// (biegnie przed nimi - nadwyzki zestawu nie ida na targ); HeroPrisonerTaken zarejestrowany PO CaptiveArmory.OnPrisonerTaken (biegnie przed nim).
+    /// POJMANIE GRACZA (recenzja): gra bierze gracza do niewoli w MapEvent.CaptureDefeatedPartyMembers (CalculateAndCommitMapEventResults, stan
+    /// ApplyResults spotkania) - PRZED FinalizeEvent i MapEventEnded; CaptiveArmory oddaje wtedy CALA zbrojownie zdobywcy. Zestaw schodzi wiec juz przy
+    /// HeroPrisonerTaken gracza (nic z testu nie trafia do swiata), a ksiega jest przycinana drugi raz w MapEventEnded po GatherFallen.
+    /// UBYTEK (recenzja): sztuki zniszczone w bitwie (polegle konie, wystrzelana amunicja). Gdy zbrojownia miala juz sztuki tego samego id (B > 0),
+    /// strata id dzielona proporcjonalnie: na zestaw dodane / (bylo + dodane) straty, reszta na sztuki gracza (osobna liczba w linii).
     /// Nic nie trafia do zapisu (stan statyczny, czyszczony z kazda kampania); bitwa testu jest przed pierwsza doba biegu, wiec ksiega uzbrojenia
     /// (ArmsBook - stan wyjsciowy w pierwszej dobie) i ksiega koni nie widza zestawu.
     /// Wyjatek na bitwe liczony (potkniecia), funkcji nie gasimy (CLAUDE.md 7).
@@ -54,6 +64,11 @@ namespace Armoury
         private static string _plan = "?";
         private static BattleSideEnum _side = BattleSideEnum.None;
         private static bool _pending;               // zestaw w zbrojowni, czeka na zdjecie
+        // recenzja 18.10: stan id przed dolozeniem (proporcja strat), bitwa do drugiego przyciecia ksiegi po GatherFallen (zdjecie przy pojmaniu),
+        // klucz misji ostatniej linii "pominiete" (raz na misje - DTE wola TryInitializeDistributors przy kazdym spawnie, poki nie zainicjuje)
+        private static readonly Dictionary<string, int> _before = new Dictionary<string, int>();
+        private static MapEvent _reconcileEvent;
+        private static object _skipKey;
 
         // ------------------------------------------------------------ latka (start gry)
 
@@ -89,6 +104,7 @@ namespace Armoury
         internal static void Reset()
         {
             _event = null; _added.Clear(); _addedTotal = 0; _plan = "?"; _side = BattleSideEnum.None; _pending = false;
+            _before.Clear(); _reconcileEvent = null; _skipKey = null;
         }
 
         // ------------------------------------------------------------ autotest CrashScribe
@@ -157,7 +173,18 @@ namespace Armoury
                 var main = MobileParty.MainParty;
                 var mb = __instance as MissionBehavior;
                 var mission = mb != null ? mb.Mission : null;
-                if (me == null || main == null || main.MemberRoster == null || mission == null) return;
+                if (me == null || main == null || main.MemberRoster == null || mission == null)
+                {
+                    // recenzja: w etapie bitew autotestu cichy powrot dawal w checkerze "stary uklad testu" zamiast NIE - linia raz na misje
+                    object key = (object)mission ?? "brak misji";
+                    if (!Equals(key, _skipKey))
+                    {
+                        _skipKey = key;
+                        Log.Info(P + "pominiete (etap bitew autotestu): " + (me == null ? "brak bitwy na mapie (PlayerMapEvent)" : mission == null ? "brak misji" : "brak druzyny gracza")
+                                 + " - bez zestawu w tej misji.");
+                    }
+                    return;
+                }
                 if (ReferenceEquals(me, _event)) return;                       // raz na bitwe
                 if (_pending) TakeBack("nowa bitwa przed zdjeciem poprzedniego zestawu", null);
                 _event = me;
@@ -215,7 +242,7 @@ namespace Armoury
             }
             var have = CountById(armory);
             int needTotal = 0, covered = 0, added = 0, refused = 0;
-            _added.Clear(); _addedTotal = 0;
+            _added.Clear(); _addedTotal = 0; _before.Clear();
             foreach (var kv in need)
             {
                 needTotal += kv.Value;
@@ -230,7 +257,7 @@ namespace Armoury
                 int got = Math.Max(0, Math.Min(want, CountOne(armory, kv.Key) - before));
                 added += got;
                 refused += want - got;
-                if (got > 0) { _added[kv.Key] = got; _addedTotal += got; }
+                if (got > 0) { _added[kv.Key] = got; _addedTotal += got; _before[kv.Key] = before; }
             }
             _plan = plan;
             _side = main.Party != null ? main.Party.Side : BattleSideEnum.None;
@@ -244,11 +271,20 @@ namespace Armoury
 
         // ------------------------------------------------------------ po bitwie
 
-        /// <summary>MapEventEnded (po GatherFallen): bitwa testu skonczona - zestaw zdjety; misja jeszcze otwarta - pierwsza godzina.</summary>
+        /// <summary>MapEventEnded (sluchacz zarejestrowany PRZED delegatem GatherFallen - biegnie PO nim): bitwa testu skonczona - zestaw zdjety; misja
+        /// jeszcze otwarta - pierwsza godzina. Zestaw zdjety wczesniej przy pojmaniu gracza - tu drugie przyciecie ksiegi (po GatherFallen).</summary>
         internal static void OnMapEventEnded(MapEvent me)
         {
             try
             {
+                if (me != null && _reconcileEvent != null && ReferenceEquals(me, _reconcileEvent))
+                {
+                    _reconcileEvent = null;
+                    try { ArmouryBehavior.ReconcileStock("autotest-bitwa po GatherFallen"); } catch (Exception e) { Stumble("ReconcileStock", e); }
+                    Log.Info(P + "ksiega gracza przycieta drugi raz po GatherFallen (zestaw zdjety wczesniej, przy pojmaniu); ReconcileStock nie tnie przy pustej zbrojowni"
+                             + " (po oddaniu jej zdobywcy) - wtedy przy nastepnym otwarciu zbrojowni albo w miescie.");
+                    return;
+                }
                 if (!_pending || me == null || !ReferenceEquals(me, _event)) return;
                 if (Mission.Current != null) { Log.Info(P + "koniec bitwy przy otwartej misji - zdjecie zestawu w pierwszej godzinie."); return; }
                 TakeBack("koniec bitwy", me);
@@ -259,8 +295,24 @@ namespace Armoury
         /// <summary>Godzina: zestaw czekajacy (koniec bitwy przy otwartej misji) zdjety, gdy misji juz nie ma.</summary>
         internal static void Hourly() { Due("pierwsza godzina po bitwie"); }
 
-        /// <summary>Wjazd druzyny gracza do osady: zestaw czekajacy zdjety PRZED sprzedaza nadwyzek ludzi (MenPurse.OnEntered).</summary>
+        /// <summary>Wjazd druzyny gracza do osady: zestaw czekajacy zdjety PRZED sprzedaza nadwyzek ludzi (MenPurse.OnEntered) - sluchacz zarejestrowany PO
+        /// MenPurse i Orders+Stables+SaddleLaw, wiec biegnie przed nimi.</summary>
         internal static void OnMainEntered() { Due("wjazd do osady przed sprzedaza nadwyzek"); }
+
+        /// <summary>HeroPrisonerTaken (sluchacz zarejestrowany PO CaptiveArmory - biegnie przed nim): pojmany gracz - zestaw zdjety, zanim CaptiveArmory
+        /// odda zbrojownie zdobywcy. Gra bierze gracza do niewoli przy rozliczeniu bitwy (CaptureDefeatedPartyMembers), PRZED MapEventEnded.</summary>
+        internal static void OnPrisonerTaken(PartyBase capturer, Hero prisoner)
+        {
+            try
+            {
+                if (!_pending || prisoner == null || prisoner != Hero.MainHero) return;
+                var me = _event;
+                bool open = Mission.Current != null;
+                TakeBack("pojmanie gracza, przed oddaniem zbrojowni zdobywcy" + (open ? ", misja otwarta" : ""), me);
+                _reconcileEvent = me;   // GatherFallen (MapEventEnded) ksieguje komplety poleglych i pojmanych pozniej - drugie przyciecie ksiegi
+            }
+            catch (Exception e) { Stumble("OnPrisonerTaken", e); }
+        }
 
         private static void Due(string why)
         {
@@ -278,15 +330,30 @@ namespace Armoury
         {
             _pending = false;
             var armory = QuartermasterLaw.DteArmory();
-            int removed = 0, lost = 0;
+            int removed = 0, lost = 0, ownLost = 0;
             if (armory != null)
             {
                 // kopia elementow, potem zdejmowanie - zmiana rostera w petli przesuwa indeksy
                 var els = new List<ItemRosterElement>();
                 for (int i = 0; i < armory.Count; i++) { var el = armory.GetElementCopyAtIndex(i); if (el.Amount > 0 && el.EquipmentElement.Item != null) els.Add(el); }
+                var nowById = CountById(armory);
                 foreach (var kv in _added)
                 {
-                    int left = kv.Value;
+                    // recenzja: strata id dzielona proporcjonalnie miedzy zestaw i sztuki gracza tego samego id (bylo B, dodane A, jest N):
+                    // strata = B + A - N; na zestaw round(strata x A / (B + A)), reszta na gracza; zdjete = A - strata zestawu (najwyzej N)
+                    int add = kv.Value, bef, now;
+                    _before.TryGetValue(kv.Key, out bef);
+                    nowById.TryGetValue(kv.Key, out now);
+                    int expect = bef + add, take = add;
+                    if (now < expect)
+                    {
+                        int loss = expect - now;
+                        int kitLoss = Math.Max(0, Math.Min(add, (int)Math.Round((double)loss * add / Math.Max(1, expect))));
+                        take = add - kitLoss;
+                        ownLost += Math.Max(0, Math.Min(bef, loss - kitLoss));
+                    }
+                    take = Math.Max(0, Math.Min(take, now));
+                    int left = take;
                     for (int pass = 0; pass < 2 && left > 0; pass++)
                         foreach (var el in els)
                         {
@@ -298,7 +365,7 @@ namespace Armoury
                             armory.AddToCounts(ee, -t);
                             left -= t; removed += t;
                         }
-                    lost += left;
+                    lost += add - (take - left);
                 }
             }
             else lost = _addedTotal;
@@ -317,10 +384,11 @@ namespace Armoury
             var sb = new StringBuilder(P);
             sb.Append("zestaw zdjety po bitwie (").Append(why).Append(") | plan ").Append(PlanName(_plan)).Append(" | wynik ").Append(result)
               .Append(" | dodane ").Append(_addedTotal).Append(" = zdjete ").Append(removed).Append(" + ubytek ").Append(lost)
-              .Append(" (straty bitwy: polegle konie, lup wroga przy przegranej) | tozsamosc ").Append(_addedTotal == removed + lost ? "TAK" : "NIE")
+              .Append(" (zniszczone w bitwie: polegle konie, wystrzelana amunicja) | strata sztuk gracza tego samego id (proporcja) ").Append(ownLost)
+              .Append(" | tozsamosc ").Append(_addedTotal == removed + lost ? "TAK" : "NIE")
               .Append(" | ksiega gracza przycieta (ReconcileStock) | potkniecia (sesja) ").Append(_stumbles).Append('.');
             Log.Info(sb.ToString());
-            _added.Clear(); _addedTotal = 0;
+            _added.Clear(); _addedTotal = 0; _before.Clear();
         }
 
         // ------------------------------------------------------------ pomocnicze

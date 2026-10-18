@@ -995,6 +995,11 @@ Uzycie (Python 3, tylko odczyt):
                     "stary uklad testu"), NBW-16 tozsamosc zestawu potrzeba = bylo + dodane + odmowy (odmowy <= 10% potrzeby), NBW-17 zestaw zdjety po
                     kazdej bitwie z zestawem i dodane = zdjete + ubytek, NBW-18 plan mocna = wygrana, NBW-19 srednia kara morale DTE (Underequipped) po
                     zestawie <= 5. Bez bitew w logu - INFO, bez wyjatku.
+                    Poprawki po recenzji (18.10): NBW-14b 'ERROR in AutotestBattleKit' = 0 (bez linii wpiecia i bledow - INFO); NBW-15 NIE, gdy latka
+                    wpieta z kluczem TAK, log z autotestu (linia 'Ciche logi (NW)' z 'tryb: autotest') albo wszyscy bez broni, a bitwa sklad7b-p nie ma
+                    linii zestawu ani 'plan slaba' (zestaw nie zadzialal: potkniecie, brak zbrojowni DTE, zmieniony CrashScribe); log gry bez autotestu -
+                    INFO 'zestaw nieczynny poza autotestem'. NBW-17 liczy tez zdjecie przy pojmaniu gracza (przed CaptiveArmory) i pokazuje strate sztuk
+                    gracza tego samego id (proporcja) - INFO w wierszu.
 --grupa nzc0      : (16.10, Jeff "codzienne zycie ludzi, Dostatek na mieszkanca, ilu chlopow, szlachty, mieszczan"; galaz w-toku/noc-zc0, Armoury/src/DailyLife*.cs;
                     projekt docs/PROJEKT-ZYCIE-CODZIENNE-2026-10-16.md rozdz. 14 ZC0) python -I tools/sprawdz_logi.py --grupa nzc0 <Armoury-*.log> [--baza-doby <log bazy>]
                     [--do-doby 120] (strumieniowo). NZC0-0 linia startu sesji, NZC0-1 linie "Zycie (ZC0)" i "Spizarnia (ZC)" kazdej doby (bez luk), NZC0-2 ksiega
@@ -33733,8 +33738,19 @@ F5_UNDER = re.compile(r"Underequipped \(E8/P3\): dzien (-?\d+), koniec misji \| 
                       r"2-10: (\d+), 12-20: (\d+), srednia kara ([\d.]+|-)")
 
 
+F5_OWN = re.compile(r"strata sztuk gracza tego samego id \(proporcja\) (\d+)")
+
+
 def nbw_f5_scan(s, ev):
     """f5-bitwa: jedna linia logu (bez znacznika czasu) -> zdarzenie w kolejnosci logu. True = linia rozpoznana."""
+    # recenzja 18.10: bledy paczki (Stumble / ApplyAll) i znacznik biegu autotestu (LogGate - ta sama flaga CrashScribe.Autotest.Active)
+    if s.startswith("ERROR in AutotestBattleKit"):
+        ev.append(("err", s[:200]))
+        return True
+    if s.startswith("Ciche logi (NW)"):
+        if "tryb: autotest" in s:
+            ev.append(("at",))
+        return False
     if s.startswith(F5_HEAD):
         m = F5_WIRE.match(s)
         if m:
@@ -33749,7 +33765,9 @@ def nbw_f5_scan(s, ev):
         m = F5_BACK.match(s)
         if m:
             g = m.groups()
-            ev.append(("back", dict(why=g[0], plan=g[1], result=g[2].strip(), added=int(g[3]), removed=int(g[4]), lost=int(g[5]))))
+            mo = F5_OWN.search(s)
+            ev.append(("back", dict(why=g[0], plan=g[1], result=g[2].strip(), added=int(g[3]), removed=int(g[4]), lost=int(g[5]),
+                                    own=int(mo.group(1)) if mo else 0)))
             return True
         ev.append(("other", s[len(F5_HEAD):][:160]))
         return True
@@ -33776,17 +33794,28 @@ def nbw_f5(rep, ev):
                 w[1].startswith("wpieta"))
     else:
         rep.add("NBW-14: zestaw bitwy autotestu - latka DTE (f5-bitwa)", "brak linii", "INFO (DLL sprzed f5-bitwa)", None)
-    # bitwy: linia sklad7b-p i Underequipped przypisane do ostatniego zestawu przed nimi (zestaw otwiera bitwe, zdjecie ja zamyka)
+    # recenzja 18.10: NBW-14b bledy paczki; zestaw oczekiwany = latka wpieta z kluczem TAK; bieg autotestu = znacznik LogGate
+    errs = [e[1] for e in ev if e[0] == "err"]
+    if wires or errs:
+        rep.add("NBW-14b: ERROR in AutotestBattleKit (potkniecia zestawu)", f"{len(errs)}" + (f"; pierwszy: {errs[0][:160]}" if errs else ""), "0", not errs)
+    else:
+        rep.add("NBW-14b: ERROR in AutotestBattleKit (potkniecia zestawu)", "brak linii wpiecia i bledow", "INFO (DLL sprzed f5-bitwa)", None)
+    expect_kit = bool(wires) and wires[-1][1].startswith("wpieta") and wires[-1][2] == "TAK"
+    at_run = any(e[0] == "at" for e in ev)
+    # bitwy: linia sklad7b-p i Underequipped przypisane do ostatniego zestawu (albo 'plan slaba') przed nimi (zestaw otwiera bitwe, zdjecie ja zamyka)
     battles, cur = [], None
     for e in ev:
         if e[0] == "stock":
-            cur = dict(stock=e[1], sklad=None, under=None, back=None)
+            cur = dict(stock=e[1], weak=False, sklad=None, under=None, back=None)
+            battles.append(cur)
+        elif e[0] == "other" and e[1].startswith("plan slaba"):
+            cur = dict(stock=None, weak=True, sklad=None, under=None, back=None)
             battles.append(cur)
         elif e[0] == "sklad":
             if cur is not None and cur["sklad"] is None and cur["back"] is None:
                 cur["sklad"] = e[1]
             else:
-                battles.append(dict(stock=None, sklad=e[1], under=None, back=None))
+                battles.append(dict(stock=None, weak=False, sklad=e[1], under=None, back=None))
                 cur = battles[-1]
         elif e[0] == "under":
             if cur is not None and cur["under"] is None:
@@ -33795,10 +33824,13 @@ def nbw_f5(rep, ev):
             if cur is not None and cur["stock"] is not None and cur["back"] is None:
                 cur["back"] = e[1]
             else:
-                battles.append(dict(stock=None, sklad=None, under=None, back=e[1]))
+                battles.append(dict(stock=None, weak=False, sklad=None, under=None, back=e[1]))
             cur = None
     kit = [b for b in battles if b["stock"] is not None]
-    old = [b for b in battles if b["stock"] is None and b["sklad"] is not None]
+    old = [b for b in battles if b["stock"] is None and not b["weak"] and b["sklad"] is not None]
+    allbare = sum(1 for b in old if b["sklad"][0] > 0 and b["sklad"][1] == b["sklad"][0])
+    # recenzja 18.10: bitwa bez zestawu przy wpietej latce z kluczem TAK w biegu autotestu (albo wszyscy bez broni) = zestaw nie zadzialal
+    failed = old if expect_kit and (at_run or allbare > 0) else []
     # NBW-15 uzbrojenie
     if kit:
         rows, bad = [], 0
@@ -33812,13 +33844,27 @@ def nbw_f5(rep, ev):
             ok = men > 0 and nw <= 0.10 * men
             bad += 0 if ok else 1
             rows.append(f"plan {b['stock']['plan']}: ludzi {men}, bez broni {nw}, bez zbroi {nb}, pieszo {nf}")
-        rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", "; ".join(rows)[:400], "bez broni <= 10% ludzi w kazdej bitwie z zestawem", bad == 0)
+        for b in failed:
+            sk = b["sklad"]
+            rows.append(f"BEZ ZESTAWU: ludzi {sk[0]}, bez broni {sk[1]}")
+        bad += len(failed)
+        rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", "; ".join(rows)[:400],
+                "bez broni <= 10% ludzi w kazdej bitwie z zestawem; bitwa bez zestawu przy wpietej latce w autotescie - NIE", bad == 0)
     elif old:
-        allbare = sum(1 for b in old if b["sklad"][0] > 0 and b["sklad"][1] == b["sklad"][0])
         sk = old[-1]["sklad"]
-        rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", f"bez zestawu: bitew {len(old)}, wszyscy bez broni w {allbare}; ostatnia: ludzi {sk[0]},"
-                f" bez broni {sk[1]}, bez zbroi {sk[2]}, pieszo {sk[3]}",
-                "INFO (stary uklad testu - druzyna testu bez broni, zbroi i koni = przyczyna przegranych z panika; f5-bitwa)", None)
+        txt = (f"bez zestawu: bitew {len(old)}, wszyscy bez broni w {allbare}; ostatnia: ludzi {sk[0]}, bez broni {sk[1]}, bez zbroi {sk[2]}, pieszo {sk[3]}"
+               + f" | latka wpieta z kluczem TAK: {'tak' if expect_kit else 'nie'}, bieg autotestu: {'tak' if at_run else 'nie'}")
+        notes = [e[1] for e in ev if e[0] == "other" and (e[1].startswith("pominiete") or e[1].startswith("brak zbrojowni"))]
+        if notes:
+            txt += f" | linie paczki: {notes[-1][:120]}"
+        if failed:
+            rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", txt,
+                    "zestaw w kazdej bitwie (plan mocna / odwrot) przy wpietej latce z kluczem TAK w autotescie - NIE: zestaw nie zadzialal", False)
+        elif expect_kit:
+            rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", txt, "INFO (log gry bez autotestu - zestaw nieczynny poza autotestem, poprawnie)", None)
+        else:
+            rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", txt,
+                    "INFO (stary uklad testu - druzyna testu bez broni, zbroi i koni = przyczyna przegranych z panika; f5-bitwa)", None)
     else:
         rep.add("NBW-15: ludzie uzbrojeni w bitwie autotestu z zestawem", "brak bitew gracza w logu", "INFO (test bez bitwy)", None)
     if not kit:
@@ -33843,6 +33889,7 @@ def nbw_f5(rep, ev):
     bbad = sum(1 for x in backs if x["added"] != x["removed"] + x["lost"])
     rep.add("NBW-17: zestaw zdjety po bitwie (dodane = zdjete + ubytek)", f"bitew z zestawem {len(withadd)}, zdjec {len(backs)}, brak zdjecia {len(miss)};"
             f" dodane {sum(x['added'] for x in backs)} = zdjete {sum(x['removed'] for x in backs)} + ubytek {sum(x['lost'] for x in backs)}; niezgodnych {bbad}"
+            f"; strata sztuk gracza tego samego id (proporcja) {sum(x.get('own', 0) for x in backs)}"
             + (f"; powody: {', '.join(sorted(set(x['why'] for x in backs)))}" if backs else ""),
             "zdjecie po kazdej bitwie z zestawem, tozsamosc w kazdym", not miss and bbad == 0)
     # NBW-18 wynik planu mocna
