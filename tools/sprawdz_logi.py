@@ -1272,6 +1272,14 @@ Uzycie (Python 3, tylko odczyt):
                     (MoneyLedger.Villages.cs, co 7 dob; plik z katalogu CSV obok logu albo z --csv <katalog>/budzet-rodow.csv; log sprzed f14-wsie - "brak pliku").
                     OKNO NDS-3: bez --do-doby - do konca logu (stan kies samego biegu, bez bazy); z --do-doby N - jak reszta grupy. Reszta grupy bez --do-doby zostaje przy
                     120 dobach (NDS-7b, NDS-9, NDS-11 porownuja z baza 120 dob - przy oknie 160 dob traca odniesienie bazy).
+                    f14-miary (18.10, decyzje Jeffa 18.10 "zwrot wedlug potrzeby" f6 i "renty wedlug potrzeby ... reszta zostaje w skarbcu krolestwa" f7): bramki z czescia
+                    wedlug potrzeby DODANA Z POWROTEM, surowe liczby INFO - NDS-7b: wplyw dnia + min(roznica zwrotu f6 tej doby, pojemnosc nadania wojennego DS tej doby =
+                    suma (g max - g teraz) x plon przy g=1 z ostatniej sesji krolestw w wojnie z wierszem w linii 'Daniny korony (DS)' - bez wyeliminowanych i "(pokoj)") -
+                    nadanie idzie za potrzeba korony, a potrzeba zawiera zwrot nalezny; przed pierwsza sesja 0 (NDS-7r surowy);
+                    NDS-9: D staly + srednia z dob zmierzonych (do 28, jak pierscien D) z roznicy zwrotu f6 i rent zatrzymanych f7 (te same kwoty co Need Reserve Uncut - gorna granica; NDS-9r surowy i dolna
+                    granica - tylko f7); obie bramki: TAK dopiero, gdy spelnia tez wartosc bez dodania (NDS-7b) / dolna granica (NDS-9), z dodaniem tak, bez niego nie -
+                    DECYZJA (brak moze byc w calosci skutkiem decyzji), z dodaniem nie - NIE; NDS-9c zalegly zold <= 2% (cel planu 166) z INFO: zold naliczony wobec bazy,
+                    pulap, zwolnieni, nowe partie wstrzymane, ponizej R.
 --grupa nakum     : (noc 17/18.10, paczka ds-akumulator; Jeff "czy nie ma stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac"; Armoury/src/TownFolk.DsAkum.cs) python -I
                     tools/sprawdz_logi.py --grupa nakum <Armoury-*.log> [--do-doby N] (strumieniowo). Okno: od firm F3 + 28 + 7 dob (bez F3 - ostatnie 28 dob). NAKUM-0 linia
                     'Akumulator kies' kazdej doby, NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy < +30 tys./d (1b R/P INFO, 1c zapas dni W koniec <= 1.1 x poczatek), NAKUM-2
@@ -1506,7 +1514,9 @@ Uzycie (Python 3, tylko odczyt):
                     KsLordFood.cs BeforeEarly, KsFoodCredit.cs, KsFoodCarts.cs Back / UnloadNearest; klucze Ds Farm Review Days, Ds Farm Arrears Review Terms, Ks Lord Food
                     Bills Early Share, Ks Food Carts Return Keeps Goods) python -I tools/sprawdz_logi.py --grupa nkasy <Armoury-*.log> (strumieniowo). NKA-0 linie i segmenty
                     paczki (INFO), NKA-1 zaleglosci firm DS (panom + koronie + z oszczednosci ludu): wzrost na dobe po pierwszym przegladzie <= max(10 tys., 0.5 x wzrost
-                    28 dob przed nim) - po >= 7 dobach od przegladu (krocej albo bez przegladu - INFO; pierwszy przeglad 91 dob po ustaleniu firm), NKA-2 zmiana sumy firm
+                    28 dob przed nim) - po >= 7 dobach od przegladu (krocej albo bez przegladu - INFO; pierwszy przeglad 91 dob po ustaleniu firm; f14-miary: w opisie liczba dni
+                    kwartalu od ustalenia firm do pierwszego przegladu wobec Ds Farm Arrears Review Terms - mniej = pierwszy przeglad nie mogl wymusic obnizki), NKA-1b (f14-miary,
+                    INFO) zaleglosci wedlug osad: miasta / zamki, raty z kasy niezaplacone w calosci, 5 najwiekszych (segment linii DS od f14-miary), NKA-2 zmiana sumy firm
                     (miasta + zamki + z oszczednosci ludu) w dobie przegladu <= 15.5% (Ds Farm Renew Max 0.15), NKA-2b kierunek kolejnych przegladow (oscylacja - INFO),
                     NKA-2c (recenzja f4) najwyzej jedna zmiana firmy na kwartal: "najkrotszy odstep przegladow tej samej osady" >= min(Ds Farm Review Days, 91) dob kazdej
                     doby z przegladem (segment bez odstepu - INFO) i liczba "w dol wymuszone" (INFO, tylko te, ktore obnizyly firme),
@@ -1625,7 +1635,8 @@ Uzycie (Python 3, tylko odczyt):
                     koszt doby w ms: rodzenie band, mysl AI godzinowa, AI taktyczne, tiki partii - bandy i inne partie, OutlawLaw.Daily; doba realna i ms/klatke) oraz "Wyrzutki:
                     dzien N" (band, narodziny, puste; znaczniki czasu = doba realna takze bez paczki). NBD-0 linie paczki (0 nieczytelnych), NBD-B bandy i doba realna z linii
                     Wyrzutki (INFO - baza fin86 Armoury-2026-10-17_23-22-37.log: 809 -> 942 band, 15.7 s/dobe, 16 urodzonych i 33 puste na dobe), NBD-1 latka celu zalozona,
-                    cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 band klanow z kryjowkami <= cel x 1.05, NBD-3 puste narodziny
+                    cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 band/cel bez narastania (mediana ostatnich 28 dob <= pierwszych 28 + 0.05
+                    i <= 1.15; f14-miary: gra sama trzyma bandy ponad cel - kryjowka przestaje byc zajeta, nowa kryjowka 4 bandy, herszt; NBD-2b skad nadwyzka - INFO), NBD-3 puste narodziny
                     przy celu podniesionym <= 5% urodzonych, NBD-4 bandy start -> koniec, pula, ludzie nowych band <= 'bandy nowe (ludzi)' z linii Wyrzutki, NBD-5 rodzenie band
                     <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande; ruch partii Campaign.RealTick i udzial band
                     liniowo wedlug liczby partii - INFO), NBD-7 z --baza-doby: doba realna tych samych
@@ -37548,6 +37559,9 @@ NDS_RX = {   # linia "Daniny wsi (DS): dzien N | ..." (DsVillage.Daily) - kazdy 
 
 
 NDS_AK = "Akumulator kies (ds-akumulator): "
+NDS_GRANT = re.compile(r"^(.*?) (przelaczenie|kwartal|po rampie|pokoj \d+ dob|nowa wojna \d+ dob): g ([\d.]+) -> ([\d.]+)(?: \(War Tax \+krok\))?"   # f14-miary (NDS-7b)
+                       r"(?:, potrzeba (-?\d+), zwykle wplywy (-?\d+), brak (-?\d+), plon nadania przy g=1 (-?\d+))?")
+NDS_GROW = re.compile(r"^(.*?): g ([\d.]+)( \(pokoj\))?, firmy ")   # poprawka recenzji f14-miary (NDS-7b): wiersz krolestwa w linii "Daniny korony (DS)" - g teraz, pokoj
 NDS_AKMED = re.compile(r"mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+|-)")
 _NDS_KSPLIT = re.compile(r", (?=[^,]*? -?\d+\+-?\d+(?: |,|$))")
 _NDS_KPART = re.compile(r"^(.*?) (-?\d+)\+(-?\d+)(?: |$)")
@@ -37593,7 +37607,10 @@ def _nds_scan(path, full):
     """Jeden przebieg po logu: linie DS i linie niezalezne (stare pobory, ksiegi, korona, Bank, kiesy wsi, koszt). full=False (baza) - tylko liczby odniesienia."""
     D = {"ds": {}, "dsbad": [], "start": [], "off": [], "n_err": 0, "err1": None, "inc": {}, "refund": {}, "bankkd": {}, "kd": {}, "D": {}, "takt": {}, "bank": {}, "bil": {},
          "vil": {}, "hv": {}, "vkor": {}, "w7v": {}, "extra": {}, "titheold": {}, "tithedsrest": {}, "ut": {}, "utbez": {}, "tw1": {}, "fee": {}, "firmy": {}, "zal": {}, "korona": {},
-         "incK": {}, "ksend": None, "akmed": {}}   # ds-akumulator: wplyw dnia na krolestwo (jednorazowe), koniec rampy KS (NDS-3a), mediany kiesa / skrzynia (NDS-3c)
+         "incK": {}, "ksend": None, "akmed": {},   # ds-akumulator: wplyw dnia na krolestwo (jednorazowe), koniec rampy KS (NDS-3a), mediany kiesa / skrzynia (NDS-3c)
+         "f6cut": {}, "f7kept": {}, "b166": {}, "bsuch": {},   # f14-miary: roznica zwrotu f6 i renty zatrzymane f7 (czynne), budzet 166 i linia na sucho (NDS-9c)
+         "gcap": {}, "gk": {}, "gm": 2.0}   # f14-miary (NDS-7b): pojemnosc nadania wojennego DS tej doby - suma (g max - g) x plon przy g=1 krolestw w wojnie z linii doby;
+                                            # gk - plon przy g=1 z ostatniej sesji krolestwa, gm - g max siatki
     if not path or not os.path.isfile(path):
         return D
     with open(path, encoding="utf-8", errors="replace") as fh:
@@ -37606,7 +37623,7 @@ def _nds_scan(path, full):
                     D["err1"] = D["err1"] or s[:200]
                 continue
             c0 = s[:1]
-            if c0 not in "DPKSUFRVA":
+            if c0 not in "DPKSUFRVAB":   # f14-miary: B - linie "Budzet rodow" (NDS-9c)
                 continue
             day = num(r"dzien (\d+)", s[:90])
             if D["ksend"] is None and s.startswith("KS: rampa dzien"):
@@ -37656,6 +37673,36 @@ def _nds_scan(path, full):
                     nk = len(re.findall(r"zwrot \d+/(\d+)", seg)); nb = len(re.findall(r"kredyt186 \+\d+", seg))
                     nk_due = sum(1 for x in re.findall(r"zwrot \d+/(\d+)", seg) if int(x) > 0)
                     D["bankkd"][day] = (nb, nk_due)
+            elif s.startswith("Korona: nadanie wojenne (DS)"):
+                # f14-miary (NDS-7b): nadanie wojenne (K2 - pomoc od sprzedazy, 184, dziesiata, W4) idzie za potrzeba korony; o ile wiecej mogloby zebrac przy wiekszej
+                # potrzebie (pelny zwrot) - najwyzej do g max: (g max - g) x plon przy g=1, krolestwo po krolestwie. Tu tylko plon przy g=1 z ostatniej sesji krolestwa
+                # (sesja pokoju - 0); poprawka recenzji: pojemnosc liczy linia doby "Daniny korony (DS)" - tylko krolestwa z wierszem tej doby (bez wyeliminowanych)
+                # i bez "(pokoj)" (koniec wojny przed sesja pokoju po Ds Session Days), g z tego wiersza - nie stan z ostatniej sesji, ktory trwal do konca logu
+                D["gm"] = num(r"siatka g co [\d.]+ do ([\d.]+)", s, float) or 2.0
+                i = s.find(") | ")
+                for seg in (s[i + 4:].rstrip(".").split(" ; ") if i > 0 else []):
+                    mm = NDS_GRANT.match(seg.strip())
+                    if mm:
+                        D["gk"][mm.group(1)] = float(mm.group(8)) if mm.group(8) else 0.0
+            elif s.startswith("Korona: zwrot wedlug potrzeby (f6)"):
+                # f14-miary (decyzja Jeffa 18.10 "zwrot wedlug potrzeby"): roznica zwrotu tylko przy czynnym kluczu ("; zwrot mniejszy o"; na sucho - "bylby mniejszy")
+                v = num(r"; zwrot mniejszy o (\d+)", s)
+                if v is not None:
+                    D["f6cut"][day] = v
+            elif s.startswith("Korona: renty wedlug potrzeby (f7)"):
+                # f14-miary (decyzja Jeffa 18.10 "renty wedlug potrzeby ... reszta zostaje w skarbcu krolestwa"): zatrzymane tylko przy czynnym kluczu (na sucho - "zatrzymane bylyby")
+                v = num(r"; zatrzymane w skarbcach (\d+) zl/d", s)
+                if v is not None:
+                    D["f7kept"][day] = v
+            elif s.startswith("Budzet rodow (166): dzien"):
+                # f14-miary NDS-9c: zold naliczony wobec pulapu, zwolnieni, nowe partie wstrzymane (czy renty wedlug potrzeby nie gloduja wojska)
+                cp = num(r"pulap zoldu razem (\d+), zold naliczony", s); wg = num(r"zold naliczony \(partie \+ zalogi \+ karawany\) (\d+)", s)
+                if cp is not None and wg is not None:
+                    D["b166"][day] = (wg, cp, num(r"zwolnieni: do wsi (\d+) ludzi", s) or 0, num(r"nowe partie wstrzymane (\d+)", s) or 0)
+            elif s.startswith("Budzet rodow (na sucho): dzien"):
+                br = num(r"ponizej rezerwy wojny R: (\d+) rodow", s); un = num(r"zalegly zold: (\d+) partii i zalog z \d+", s); pd = num(r"zalegly zold: \d+ partii i zalog z (\d+)", s)
+                if br is not None or un is not None:
+                    D["bsuch"][day] = (br, un, pd)
             elif s.startswith("D staly (169c)"):
                 v = num(r"90% -?\d+, razem (-?\d+)", s)
                 if v is not None:
@@ -37726,6 +37773,15 @@ def _nds_scan(path, full):
                 mm = re.search(r"\| zwrot (\d+)/(\d+) \([^)]*\), brak zwrotu pokryty: skarbiec ponad zapas (\d+), zaliczki mieszczan (\d+), Bank (\d+)", s)
                 if mm:
                     D["korona"][day] = tuple(int(x) for x in mm.groups())
+                if D["gk"]:   # f14-miary (NDS-7b, poprawka recenzji): pojemnosc nadania tej doby - krolestwa z wierszem, w wojnie, g teraz; przed pierwsza sesja - brak wpisu (0)
+                    i = s.find("| na krolestwo: ")
+                    if i > 0:
+                        cap = 0.0
+                        for row in s[i + len("| na krolestwo: "):].split(" ; "):
+                            mr = NDS_GROW.match(row.strip())
+                            if mr and not mr.group(3) and mr.group(1) in D["gk"]:
+                                cap += max(0.0, D["gm"] - float(mr.group(2))) * D["gk"][mr.group(1)]
+                        D["gcap"][day] = cap
     return D
 
 
@@ -38502,15 +38558,77 @@ def nds_main(logp, bdp=None, until=120, until3=None, csvp=None):
     D["D"] = _dadj(D["D"], wfD)
     if B is not None and B.get("D"):
         B["D"] = _dadj(B["D"], wfB)
+    # f14-miary (18.10, decyzje Jeffa 18.10: "zwrot wedlug potrzeby" (f6) i "renty wedlug potrzeby ... bogaty rod nie dostaje renty ... reszta zostaje w skarbcu
+    # krolestwa" (f7)): czesc wedlug potrzeby DODANA Z POWROTEM - bramki NDS-7b / NDS-9 mierza DS (daniny), nie skutek tych decyzji; surowe liczby - INFO (NDS-7r, NDS-9r).
+    #  - NDS-7b: wplyw dnia + pobor, ktorego korona nie zebrala, bo zwrot jest wedlug potrzeby: nadanie wojenne DS (K2 - 184, dziesiata M9, pomoc M7, W4) idzie za
+    #    POTRZEBA korony, a potrzeba zawiera zwrot nalezny (fin88 -> fin91: 184 -37 tys./d, M9 -26 tys./d przy roznicy zwrotu ok. 250 tys./d). Dodane tej doby =
+    #    min(roznica zwrotu f6, pojemnosc nadania tej doby: suma (g max - g teraz) x plon przy g=1 z ostatniej sesji krolestw w wojnie - wiersze linii 'Daniny korony
+    #    (DS)' bez "(pokoj)"; wyeliminowanych tam nie ma) - wiecej nadanie zebrac nie moze; przed
+    #    pierwsza sesja nadania (DS bez firm) 0 (stary pobor P1/184 nie zalezal od f6: fin91 -> fin92 w dobach 1-56 bez zmiany). Nadal GORNA granica (krok g najwyzej
+    #    0.5 na kwartal). Renty zatrzymane f7 sa juz we wplywie dnia (wplynely; zostaja w skarbcu i wracaja 1/450) - nic do dodania.
+    #  - NDS-9: D staly + srednia 28 dob (to samo okno co D staly) z roznicy zwrotu f6 i rent zatrzymanych f7 - te same kwoty, ktore gra dodaje z powrotem do D miary
+    #    potrzeby (Need Reserve Uncut, ClanIncomeBook.NeedCutAdd). To GORNA granica (roznica zwrotu f6 przechodzi tego samego dnia w reszte wplywow i w renty -
+    #    przy rentach bez udzialow wstrzymanych prawie cala); dolna granica (tylko renty zatrzymane f7) - INFO w NDS-9r. NIE na bramce = brak D, ktorego nie tlumaczy
+    #    nawet wszystko, co korona zatrzymala wedlug potrzeby (np. skutki wtorne: mniej wojska -> mniejszy pelny zwrot, wiecej W5 przed rentami).
+    #    Poprawka recenzji f14-miary: D staly to srednia z dob ZMIERZONYCH (ClanIncomeBook Ring.Avg dzieli przez Filled - pierscien od poczatku sesji, linia "krocej niz
+    #    28 dob"), wiec dodanie = srednia z tych samych dob: od pierwszej doby logu (pierwsza linia D albo f6/f7) do d, najwyzej 28 - nie suma / 28 (w pierwszych dobach
+    #    DS odniesienie bez bazy dostawalo k/28 dodania, a okno mierzone cale - fin92 bez bazy NDS-9 1.202 DECYZJA zamiast NIE). Okno pelne (ostatnie 28 dob) - bez zmian.
+    def _nadd(X, src):
+        if not X:
+            return {}
+        s0 = min(min(X), min(src)) if src else min(X)
+        out = {}
+        for d in sorted(X):
+            lo = max(d - 27, s0)
+            out[d] = X[d] + sum(src.get(x, 0) for x in range(lo, d + 1)) / float(d - lo + 1)
+        return out
+    def _needs(Z):
+        f6, f7 = Z.get("f6cut") or {}, Z.get("f7kept") or {}
+        return {d: f6.get(d, 0) + f7.get(d, 0) for d in set(f6) | set(f7)}, f7, f6
+    nD, kD, f6D = _needs(D)
+    def _gadd(Z, f6):
+        gc = Z.get("gcap") or {}
+        sd = sorted(gc)
+        out = {}
+        for d in sorted(set(f6)):
+            prev = [x for x in sd if x <= d]
+            if prev:
+                out[d] = min(f6[d], gc[prev[-1]])
+        return out
+    a6D = _gadd(D, f6D)
+    D["incN"] = {d: v + a6D.get(d, 0) for d, v in D["inc"].items()}
+    D["DN"] = _nadd(D["D"], nD); D["DK"] = _nadd(D["D"], kD)
+    if B is not None:
+        nB, kB, f6B = _needs(B)
+        if B.get("inc"):
+            a6B = _gadd(B, f6B)
+            B["incN"] = {d: v + a6B.get(d, 0) for d, v in B["inc"].items()}
+        if B.get("D"):
+            B["DN"] = _nadd(B["D"], nB); B["DK"] = _nadd(B["D"], kB)
+    have6 = sum(1 for d in win if d in f6D); have7 = sum(1 for d in win if d in kD)
+    raw7 = []
     for lab, sel, thr in (("rampa i obieg (doby DS 1-56)", [d for d in win if d - first + 1 <= 56], 0.85), ("po rampie (doby DS 57+)", [d for d in win if d - first + 1 > 56], 0.95)):
-        v = [D["inc"][d] for d in sel if d in D["inc"]]
+        v = [D["incN"][d] for d in sel if d in D["incN"]]
         if len(v) < 7:
             rep.add(f"NDS-7b: wplyw dnia korony + 1/450 - {lab}", f"dob {len(v)}", "INFO (za malo dob)", None)
             continue
-        ref, how = _nds_ref(B, D, "inc", sel)
+        ref, how = _nds_ref(B, D, "incN", sel)
         x = sum(v) / len(v)
-        rep.add(f"NDS-7b: wplyw dnia korony + 1/450 bez jednorazowych - {lab}", f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how})" if ref else f"{x:.0f} (odniesienia brak)",
-                f">= {thr:.2f} x odniesienia (projekt 14 NDS-7)", (x >= thr * ref) if ref else None)
+        vr = [D["inc"][d] for d in sel if d in D["inc"]]
+        xr = sum(vr) / len(vr)
+        refr, _h = _nds_ref(B, D, "inc", sel)
+        a6 = sum(a6D.get(d, 0) for d in sel if d in D["inc"]) / len(vr); r6 = sum(f6D.get(d, 0) for d in sel if d in D["inc"]) / len(vr)
+        raw7.append(f"{lab}: {xr:.0f} / {refr:.0f} = {xr / refr:.3f}" if refr else f"{lab}: {xr:.0f}")
+        rep.add(f"NDS-7b: wplyw dnia korony + 1/450 bez jednorazowych, z poborem DS niezebranym przez zwrot wedlug potrzeby (f6) dodanym z powrotem - {lab}",
+                (f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how}); dodane {a6:.0f}/d w {sum(1 for d in sel if d in a6D)} dobach (roznica zwrotu f6 {r6:.0f}/d,"
+                 f" najwyzej pojemnosc nadania DS)"
+                 + (f" (surowy {xr / refr:.3f} - NDS-7r)" if refr else "") if ref else f"{x:.0f} (odniesienia brak)"),
+                f">= {thr:.2f} x odniesienia (projekt 14 NDS-7; zwrot wedlug potrzeby - decyzja Jeffa 18.10: nadanie DS idzie za potrzeba korony; gorna granica - TAK dopiero, gdy i surowy"
+                f" spelnia; z dodaniem tak, surowy nie - DECYZJA)", ((x >= thr * ref) and (xr >= thr * refr)) if ref and refr else None,
+                decide=bool(ref and refr and x >= thr * ref and xr < thr * refr))
+    if raw7:
+        rep.add("NDS-7r: wplyw dnia korony + 1/450 bez jednorazowych - surowy, bez dodania (INFO)", "; ".join(raw7) + f" (doby z linia f6 czynna {have6})",
+                "INFO (bramka NDS-7b - z poborem DS niezebranym przez zwrot wedlug potrzeby, najwyzej pojemnosc nadania)", None)
     bk = [D["bankkd"][d] for d in win if d in D["bankkd"]]
     if bk:
         nb, nd_ = sum(x[0] for x in bk), sum(x[1] for x in bk)
@@ -38528,14 +38646,46 @@ def nds_main(logp, bdp=None, until=120, until3=None, csvp=None):
             cov = tr + an + bn
             rep.add("NDS-7d: F3 - brak zwrotu pokryty kaskada (skarbiec ponad zapas -> zaliczki mieszczan -> Bank)", f"zwrot {g}/{n_}; pokryte: skarbiec {tr}, zaliczki {an}, Bank {bn}"
                     + (f" (Bank {100 * bn / cov:.0f}%)" if cov else ""), "zwrot 100%; Bank <= 50% pokrycia", g >= n_ and (cov == 0 or bn <= 0.5 * cov))
-    # NDS-9 D staly
-    dv = [D["D"][d] for d in win[-28:] if d in D["D"]]
+    # NDS-9 D staly (f14-miary: z czescia wedlug potrzeby dodana z powrotem - opis przy NDS-7b; surowy i dolna granica - NDS-9r)
+    l28 = win[-28:]
+    dv = [D["DN"][d] for d in l28 if d in D["DN"]]
     if len(dv) >= 7:
-        ref, how = _nds_ref(B, D, "D", win[-28:])
+        ref, how = _nds_ref(B, D, "DN", l28)
         x = sum(dv) / len(dv)
-        rep.add("NDS-9: D staly rodow bez jednorazowych wplywow koron (ostatnie 28 dob)", f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how})" if ref else f"{x:.0f}", ">= 0.95 x odniesienia", (x >= 0.95 * ref) if ref else None)
+        xr = sum(D["D"][d] for d in l28 if d in D["D"]) / len(dv); xk = sum(D["DK"][d] for d in l28 if d in D["DK"]) / len(dv)
+        refr, _h = _nds_ref(B, D, "D", l28); refk, _h = _nds_ref(B, D, "DK", l28)
+        rep.add("NDS-9: D staly rodow bez jednorazowych, z czescia wedlug potrzeby dodana z powrotem (zwrot f6 + renty f7 - decyzje Jeffa 18.10; ostatnie 28 dob)",
+                (f"{x:.0f} / odniesienie {ref:.0f} = {x / ref:.3f} ({how}); dodane srednio {x - xr:.0f}/d (f6 w {sum(1 for d in l28 if d in f6D)}, f7 w {sum(1 for d in l28 if d in kD)} dobach)"
+                 if ref else f"{x:.0f}"),
+                ">= 0.95 x odniesienia (gorna granica: NIE = brak D, ktorego nie tlumaczy nic zatrzymanego wedlug potrzeby; TAK dopiero, gdy i dolna granica (NDS-9r) spelnia;"
+                " gorna tak, dolna nie - DECYZJA: brak moze byc w calosci skutkiem decyzji o zwrocie i rentach)", ((x >= 0.95 * ref) and (xk >= 0.95 * refk)) if ref and refk else None,
+                decide=bool(ref and refk and x >= 0.95 * ref and xk < 0.95 * refk))
+        rep.add("NDS-9r: D staly rodow bez jednorazowych - surowy i dolna granica (tylko renty zatrzymane f7) (INFO)",
+                (f"surowy {xr:.0f} / {refr:.0f} = {xr / refr:.3f}; z rentami zatrzymanymi f7 {xk:.0f} / {refk:.0f} = {xk / refk:.3f}" if refr and refk else f"surowy {xr:.0f}, z f7 {xk:.0f}")
+                + f" (doby z linia f6 czynna {have6}, f7 czynna {have7})",
+                "INFO (dolna granica: roznica zwrotu f6 przechodzi w renty tego samego dnia; prawda miedzy dolna a gorna)", None)
     else:
         rep.add("NDS-9: D staly rodow", f"dob {len(dv)}", "INFO", None)
+    # NDS-9c (f14-miary): czy czesc wedlug potrzeby nie gloduje wojska - zalegly zold (cel planu 166: najwyzej 2% partii i zalog), zold naliczony wobec bazy,
+    # pulap, zwolnieni i nowe partie wstrzymane, rody ponizej rezerwy wojny R (linie 'Budzet rodow (166)' i '(na sucho)')
+    bs = [D["bsuch"][d] for d in l28 if d in D["bsuch"] and D["bsuch"][d][1] is not None and D["bsuch"][d][2]]
+    bb = [D["b166"][d] for d in l28 if d in D["b166"]]
+    if bs and bb:
+        un = sum(x[1] for x in bs) / max(1, sum(x[2] for x in bs))
+        wg = sum(x[0] for x in bb) / len(bb); cp = sum(x[1] for x in bb) / len(bb)
+        rl = sum(x[2] for x in bb) / len(bb); hd = sum(x[3] for x in bb) / len(bb)
+        br = [x[0] for x in bs if x[0] is not None]
+        txt = (f"zalegly zold {100 * un:.2f}% partii i zalog; zold naliczony {wg:.0f}/d, pulap {cp:.0f}/d ({100 * wg / max(1.0, cp):.0f}%), zwolnieni {rl:.0f} ludzi/d, "
+               f"nowe partie wstrzymane {hd:.0f}/d, rody ponizej R {sum(br) / len(br) if br else 0:.0f}")
+        if B is not None and B.get("b166"):
+            b2 = [B["b166"][d] for d in l28 if d in B["b166"]]
+            s2 = [B["bsuch"][d] for d in l28 if d in B.get("bsuch", {}) and B["bsuch"][d][0] is not None]
+            if b2:
+                txt += (f" | baza w tych dobach: zold {sum(x[0] for x in b2) / len(b2):.0f}/d (bieg/baza {wg / max(1.0, sum(x[0] for x in b2) / len(b2)):.3f}), pulap "
+                        f"{sum(x[1] for x in b2) / len(b2):.0f}/d, zwolnieni {sum(x[2] for x in b2) / len(b2):.0f}/d, wstrzymane {sum(x[3] for x in b2) / len(b2):.0f}/d"
+                        + (f", ponizej R {sum(x[0] for x in s2) / len(s2):.0f}" if s2 else ""))
+        rep.add("NDS-9c: wojsko przy czesci wedlug potrzeby - zalegly zold (ostatnie 28 dob; zold, pulap, zwolnieni, wstrzymane, ponizej R - INFO)", txt,
+                "zalegly zold <= 2% (cel planu 166); reszta INFO (mniej D = nizszy pulap = mniej wojska - regula budzetu, nie glod)", un <= 0.02)
     rep.add("NDS-9b: nieoplacone partie", "brak miary w logu (linia budzetu rodow bez licznika)", "INFO", None)
     # NDS-10 Bank
     bd = [d for d in win if d in D["bank"]]
@@ -44621,6 +44771,9 @@ def _nka_scan(logp):
         "gap": re.compile(r"; najkrotszy odstep przegladow tej samej osady (\d+|-) dob \(limit: najwyzej jedna zmiana na (\d+) dob\)"),
         "ctl": re.compile(r"\| kontrola: platnicy - odbiorcy = " + i_),
         "stum": re.compile(r"\| potkniecia (\d+) \(w sesji"),
+        # f14-miary (NKA-1b): zaleglosci wedlug osad - miasta / zamki, raty niezaplacone w calosci tej doby, 5 najwiekszych
+        "byset": re.compile(r"\| zaleglosci wedlug osad \(f14-miary\): miasta (\d+) zl u (\d+) \(z zaleglosci >= raty (\d+)\), zamki (\d+) zl u (\d+) \(z zaleglosci >= raty (\d+)\); "
+                            r"raty z kasy niezaplacone w calosci dzis (\d+) \(miast (\d+)\) - podloga ([\d.]+) zapasu kupcow; najwieksze: ([^|]*?)\s*(?:\||\.$)"),
     }
     rx_ksh = {
         "credit": re.compile(r"\| kredyt kupiecki (TAK|NIE): otwarte " + i_ + r" zl"),
@@ -44748,6 +44901,13 @@ def nkasy_main(logp):
             lim = NKA_ARR_GROWTH_ABS if before is None else max(NKA_ARR_GROWTH_ABS, NKA_ARR_GROWTH_REL * before) if before > 0 else NKA_ARR_GROWTH_ABS
             val = (f"zaleglosci firm (panom + koronie + z oszczednosci ludu) na koniec {a_last} zl; wzrost przed pierwszym przegladem (28 dob) "
                    f"{'-' if before is None else f'{before:.0f}'} zl/d, po nim {'-' if after is None else f'{after:.0f}'} zl/d w {span} dobach (pierwszy przeglad doba {first_rev})")
+            # f14-miary: wymuszona obnizka (-Ds Farm Renew Max) wymaga zaleglosci >= raty w Ds Farm Arrears Review Terms dniach kwartalu z rzedu (doba podzielna przez 91) -
+            # ile takich dni bylo od ustalenia firm do pierwszego przegladu (mniej niz Terms = pierwszy przeglad nie mogl wymusic obnizki; przeglad zwykly - najwyzej -15%)
+            fix0 = gi(DS[first_rev], "farms", 0, -1) if "farms" in DS.get(first_rev, {}) else -1
+            terms = gi(DS[revd[-1]], "rev", 1, 0) if revd else 0
+            qn = sum(1 for d in range(fix0 + 1, first_rev + 1) if d % 91 == 0) if fix0 >= 0 else -1
+            if qn >= 0:
+                val += f"; dni kwartalu od ustalenia firm do pierwszego przegladu {qn} (wymuszona obnizka po {terms} z rzedu" + (" - w tym przegladzie niemozliwa)" if qn < terms else ")")
             if after is None or span < NKA_AFTER_MIN_DAYS:
                 rep.add("NKA-1: zaleglosci firm DS nie rosna po przegladzie kwartalnym", val, f"INFO (po przegladzie < {NKA_AFTER_MIN_DAYS} dob)", None)
             else:
@@ -44761,6 +44921,18 @@ def nkasy_main(logp):
                     "INFO (bez przegladu w logu)", None)
     else:
         rep.add("NKA-1: zaleglosci firm DS", "brak linii z firmami (DS przed ustaleniem firm albo wylaczone)", "INFO", None)
+    # ---- NKA-1b (f14-miary): kto zalega - miasta / zamki, raty niezaplacone w calosci (kasa przy podlodze), 5 najwiekszych (segment linii DS od f14-miary)
+    bsd = [d for d in dsd if "byset" in DS[d]]
+    if bsd:
+        b = DS[bsd[-1]]["byset"]
+        l28 = bsd[-28:]
+        sn = sum(int(DS[d]["byset"][6]) for d in l28) / len(l28); st_ = sum(int(DS[d]["byset"][7]) for d in l28) / len(l28)
+        rep.add("NKA-1b: zaleglosci firm wedlug osad (INFO)",
+                f"koniec (doba {bsd[-1]}): miasta {b[0]} zl u {b[1]} (>= raty {b[2]}), zamki {b[3]} zl u {b[4]} (>= raty {b[5]}); raty z kasy niezaplacone w calosci srednio "
+                f"{sn:.1f}/d (miast {st_:.1f}/d) w {len(l28)} dobach, podloga {b[8]} zapasu kupcow; najwieksze: {b[9][:400]}",
+                "INFO (kto zalega - do decyzji, czy przyczyna jest prawdziwa: firma ponad sily osady czy chwilowy brak przy podlodze)", None)
+    elif dsd:
+        rep.add("NKA-1b: zaleglosci firm wedlug osad", "brak segmentu (log sprzed f14-miary)", "INFO", None)
 
     # ---- NKA-2 przeglad: zmiana sumy firm w dobie przegladu w limicie +-Ds Farm Renew Max
     def tot_of(d):
@@ -47064,7 +47236,9 @@ NBD_SPAWN_MS = 30.0           # NBD-5: rodzenie band srednio <= 30 ms/dobe (z tw
 NBD_LINE_MS = 5.0             # NBD-5: czas linii doby <= 5 ms
 NBD_PCT_MAX = 10.0            # NBD-6: AI i tiki band <= 10% doby realnej (srednio)
 NBD_SDAY_RATIO = 1.15         # NBD-7: doba realna wobec biegu bazowego (te same doby gry) <= 1.15 x
-NBD_TARGET_TOL = 1.05         # NBD-2: band klanow z kryjowkami <= cel x 1.05 (BK InfestHieout dosypuje 8 band ponad limit gry)
+NBD_TARGET_TOL = 1.05         # NBD-2b (INFO, dawna bramka): band klanow z kryjowkami ponad cel x 1.05 - gra robi to sama (f14-miary: dekompilacja 1.4.8)
+NBD_RATIO_DRIFT = 0.05        # NBD-2 (f14-miary): mediana band/cel ostatnich 28 dob najwyzej o tyle ponad mediane pierwszych 28 (przeciek narodzin = narastanie)
+NBD_RATIO_MAX = 1.15          # NBD-2 (f14-miary): mediana band/cel ostatnich 28 dob najwyzej tyle (fin92, cel ROT: mediana 1.05, najwiecej 1.13 - zachowanie gry)
 
 
 def _nbd_f(v):
@@ -47191,12 +47365,51 @@ def nbandy_main(logp, bdp=None):
             "latka zalozona; w kazdej dobie z kluczem > ROT (i prawem wyrzutkow TAK) cel podniesiony, wokol teraz = limit - w srodku",
             (st_ok is not False) and not miss_raise and not bad_ar)
 
-    # NBD-2 bandy klanow z kryjowkami wobec celu
+    # NBD-2 bandy klanow z kryjowkami wobec celu (f14-miary 18.10: przepisane po dekompilacji 1.4.8 - "band <= cel x 1.05" mierzylo zachowanie gry, nie paczke).
+    # Gra sama trzyma bandy ponad cel: (1) cel = klany x Hideout.IsInfested, a IsInfested = >= NumberOfMinimumBanditPartiesInAHideoutToInfestIt (ROT 4) band W SRODKU
+    # kryjowki TERAZ - banda wychodzi na lowy, kryjowka przestaje byc zajeta, cel spada o 12, a nikt nie kasuje band (SpawnBanditsAroundHideout tylko dorabia do celu);
+    # (2) FillANewHideoutWithBandits (DailyTick) wsadza 4 bandy do nowej kryjowki bez patrzenia na cel (u nas przez bramke ludzi OutlawLaw.GateFill); (3) AddBossParty
+    # (kryjowka wypatrzona); (4) klany bez zajetej kryjowki maja bandy z innych drog (wildlings - nasze najazdy Wolnych Ludzi FreeFolkRaids z prawdziwych ludzi; sea_raiders).
+    # fin92 (cel ROT, latka bez skutku): band/cel 1.065 juz w pierwszej dobie z zapisu, mediana 1.05, najwiecej 1.13 - bez narastania. Paczka f8 zmienia tylko cel narodzin
+    # i miejsce narodzin - przeciek (narodziny ponad cel) bylby widoczny jako NARASTANIE band/cel w biegu. Bramka: mediana band/cel (klany z celem > 0 tej doby) w ostatnich
+    # 28 dobach <= mediana pierwszych 28 + NBD_RATIO_DRIFT i <= NBD_RATIO_MAX; nadwyzka klan po klanie (cel spadl / klan bez celu / ponad najwyzszy cel w biegu) - NBD-2b INFO.
+    cl_rx = re.compile(r"(\S+) (\d+)/(\d+)/(\d+)$")
+    def _cls(row):
+        out = {}
+        for part in (row.get("clanlist") or "").split(", "):
+            mm = cl_rx.match(part.strip())
+            if mm:
+                out[mm.group(1)] = (int(mm.group(2)), int(mm.group(3)), int(mm.group(4)))
+        return out
+    ratios, hist, dec = [], {}, None
+    for d in ld:
+        c = _cls(L[d])
+        b = sum(v[0] for v in c.values() if v[1] > 0); t = sum(v[1] for v in c.values() if v[1] > 0)
+        if t > 0:
+            ratios.append(b / t)
+        drop = zero = new_ = 0
+        for k, v in c.items():
+            h = hist.setdefault(k, []); h.append(v[1]); mx = max(h)   # bandy nie wygasaja - najwyzszy cel klanu w biegu
+            if v[1] == 0:
+                zero += v[0]
+            elif v[0] > v[1]:
+                e2 = max(0, v[0] - mx); new_ += e2; drop += v[0] - v[1] - e2
+        dec = (d, drop, zero, new_)
     over = [d for d in ld if int(L[d]["target"]) > 0 and int(L[d]["clanb"]) > NBD_TARGET_TOL * int(L[d]["target"])]
-    rep.add("NBD-2: band klanow z kryjowkami <= cel gry (zajete x limit)",
-            f"ponad cel x {NBD_TARGET_TOL} w {len(over)} z {len(ld)} dob" + (f" (np. d{over[0]}: {L[over[0]]['clanb']} / {L[over[0]]['target']})" if over else "")
-            + f"; koniec: band klanow {last['clanb']} / cel {last['target']} (stary {last['old']}), zajete {last['inf']}, band/cel {last['ratio']}",
-            f"0 dob ponad cel x {NBD_TARGET_TOL} (BK dosypuje ponad limit tylko w kryjowce bohatera-zboja)", len(over) == 0)
+    if len(ratios) >= 56:
+        m0, m1, mx_ = st.median(ratios[:28]), st.median(ratios[-28:]), max(ratios)
+        rep.add("NBD-2: band klanow z kryjowkami wobec celu gry - bez narastania (mediana band/cel, klany z celem > 0)",
+                f"pierwsze 28 dob {m0:.3f}, ostatnie 28 {m1:.3f} (zmiana {m1 - m0:+.3f}), najwiecej {mx_:.3f}; koniec: band klanow {last['clanb']} / cel {last['target']}"
+                f" (stary {last['old']}), zajete {last['inf']}",
+                f"ostatnie 28 <= pierwsze 28 + {NBD_RATIO_DRIFT} i <= {NBD_RATIO_MAX} (gra trzyma bandy ponad cel sama - NBD-2b; przeciek narodzin = narastanie)",
+                m1 <= m0 + NBD_RATIO_DRIFT and m1 <= NBD_RATIO_MAX)
+    else:
+        rep.add("NBD-2: band klanow z kryjowkami wobec celu gry - bez narastania", f"dob z celem {len(ratios)}", "INFO (za malo dob, >= 56)", None)
+    rep.add("NBD-2b: nadwyzka band ponad cel klan po klanie - skad (INFO)",
+            (f"koniec (d{dec[0]}): cel spadl (band <= najwyzszy cel klanu w biegu - kryjowka przestala byc zajeta, bandy zostaja) {dec[1]}, klany bez zajetej kryjowki"
+             f" {dec[2]}, ponad najwyzszy cel klanu w biegu (nowa kryjowka 4 bandy, herszt, bandy z zapisu) {dec[3]}" if dec else "brak listy klanow")
+            + f"; dawna miara: ponad cel x {NBD_TARGET_TOL} w {len(over)} z {len(ld)} dob",
+            "INFO (Hideout.IsInfested = >= 4 band w srodku teraz; FillANewHideoutWithBandits i AddBossParty bez celu; wildlings - FreeFolkRaids)", None)
 
     # NBD-3 puste narodziny przy celu podniesionym (wybor kryjowki z ludzmi)
     rd = [d for d in raised_days if L[d]["people"] == "TAK"]
