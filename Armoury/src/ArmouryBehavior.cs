@@ -2332,6 +2332,7 @@ namespace Armoury
             try { OreLedger.Daily(); } catch (Exception e) { Log.Error("OreLedger.Daily", e); } DayProfile.Lap("OreLedger.Daily");   // wpis 94: ksiega rudy (tylko log)
             try { GoodsLedger.Daily(); } catch (Exception e) { Log.Error("GoodsLedger.Daily", e); } DayProfile.Lap("GoodsLedger.Daily");   // paczka 146: ksiega towarow (tylko log) - zaraz po ksiedze rudy (kontrola tymi samymi liczbami)
             try { A17Diag.Daily(); } catch (Exception e) { Log.Error("A17Diag.Daily", e); }   // A17 (D1, D2): linie "Konie wedlug ramek" i "Ryby poza ramkami" (tylko log)
+            try { A17Fix.Daily(); } catch (Exception e) { Log.Error("A17Fix.Daily", e); }   // A17 F1-F5 (noc 17/18.10): linie "Konie partii BK", "Ryby z niczego", "Unikaty u band", "Wynik bitwy", "Stocznie"
             try { FreeSupplies.Daily(); } catch (Exception e) { Log.Error("FreeSupplies.Daily", e); } DayProfile.Lap("FreeSupplies.Daily");   // paczka 125: dosypka RBL zablokowana / przepuszczona (tylko log)
             try { RawNoRot.Daily(); } catch (Exception e) { Log.Error("RawNoRot.Daily", e); } DayProfile.Lap("RawNoRot.Daily");   // 174.3: linia "BK gnicie surowcow (174.3)" (tylko log)
             try { HarvestValve.Daily(); } catch (Exception e) { Log.Error("HarvestValve.Daily", e); } DayProfile.Lap("HarvestValve.Daily");   // E6/W3 (221): regulator wsi - start pomiaru, co 28 dob spis stosu i decyzja, linia "Regulator wsi (221)"

@@ -27,6 +27,9 @@ RANGES = {
     # SW-DROGI (noc 17/18.10): premia drogi ROT - kod przycina procent do 0..50 i margines do 0..2 jedn. (MapRoads.PctOf / MarginOf)
     'MapRoadSpeedPercent': (0, 50, "0"),
     'MapRoadMargin': (0.0, 2.0, "0.00"),
+    # A17 F5 (noc 17/18.10): stocznia z drewna i za place - pnie na 1000 wartosci kadluba (0..10), udzial plac w wartosci kadluba (kod przycina do 0..1)
+    'ShipyardTimberPer1000': (0.0, 10.0, "0.0"),
+    'ShipyardLabourShare': (0.0, 1.0, "0.00"),
     # T10 poprawka recenzji: prog dlugu snu w calych nocach (kod porownuje dlug calkowity) - suwak bez ulamkow w opisie
     'AiNightsAwakeInChase': (0.0, 4.0, "0"),
     # T10-R: noce forsownego marszu z rzedu (dlug konczy sie na 3, dalej liczy juz tylko seria) - 0 = bez limitu

@@ -848,8 +848,14 @@ namespace Armoury
                 case FKsH:         // KS-R3 KS-H: zakup z polki zrodla / przyjazd na polke celu - przewoz (towar w drodze to posiadacz "kupcy zywnosci w drodze"), bez ksiegowania
                     return;
                 case FFish:        // m6b (5): ryby zlowione przez lodzie rybackie NavalDLC (produkcja ludzi wsi rybackiej na morzu) - zrodlo
-                    foreach (var i in f.Touched) Book(i, GFish, null, f.Net[i]);
-                    return;
+                    {
+                        // recenzja stare-a17 (3): etykieta A17Fix w Info - "grupa|podpozycja" (ryby z niczego poza KS, polow zalogi - wlasne grupy, poza GFish = KsFishBoats
+                        // Planu KS) albo sama podpozycja lodzi; bez etykiety jak dotad
+                        string fg = GFish, fs = null, fl = f.Info as string;
+                        if (fl != null) { int bar = fl.IndexOf('|'); if (bar > 0) { fg = fl.Substring(0, bar); fs = bar + 1 < fl.Length ? fl.Substring(bar + 1) : null; } else fs = fl; }
+                        foreach (var i in f.Touched) Book(i, fg, fs, f.Net[i]);
+                        return;
+                    }
                 case FRaid:        // E7/R1 (235): magazyn wsi -> napastnik znosi sie do zera, reszta (-) = spalone w rabunku; zboze ze spichlerza okregu dla napastnikow (+)
                     foreach (var i in f.Touched) { long n = f.Net[i]; Book(i, GRaid, n > 0 ? "zboze ze spichlerza okregu dla napastnikow" : "spalone w rabunku", n); }
                     return;
@@ -1229,6 +1235,7 @@ namespace Armoury
             // E6/K1 (211, R14, SpoilsOfBrokenParties): tabor i konie zbrojowni rozbitej/rozwiazanej partii - do zwyciezcow albo na polke osady (PRZED licznikami
             // "przepadlo" i ArmsLeaks.NoteLost - licza juz tylko to, co zostalo: unikaty dla UniqueSpoils, sztuki nie-towarowe); nie rzuca
             try { HorseFate.Spoils(mp, destroyer); } catch (Exception e) { Stumble("OnPartyDestroyed(K1)", e); }
+            try { A17Fix.BkArrival(mp, destroyer); } catch (Exception e) { Stumble("OnPartyDestroyed(A17 F1)", e); }   // A17 F1: konie partii BK kasowanej bez niszczyciela na targ osady (PRZED licznikami "przepadlo")
             try
             {
                 if (mp == null || !On || !EnsureItems()) return;

@@ -230,6 +230,9 @@ namespace Armoury
                 // m6b (4): juczne nowego taboru wsi ze stada albo z targu (postfiks InitializeVillagerPartyProperties), juczne konwoju DTE bez kopii do zbrojowni,
                 // nazwane pozycje ksiegi koni (zapas drogi DTE i BK, konie przy RemoveParty) i towar partii usunietych bez zniszczenia (ksiega towarow, klucz FoodSourcesInLedger)
                 try { PackSources.ApplyAll(_harmony); } catch (Exception e) { Log.Error("PackSources.ApplyAll", e); }
+                // A17 (noc 17/18.10, stare zaleglosci): F1 konie partii BK bez daru z niczego, F2 ryby tylko z rak (KS) i polow zalogi w ksiedze, F4 wynik bitwy przerwany
+                // wyjatkiem (finalizer CalculateAndCommitMapEventResults), F5 stocznia z drewna i za place; F3 (unikaty u band) - w OutlawLaw.Equip
+                try { A17Fix.ApplyAll(_harmony); } catch (Exception e) { Log.Error("A17Fix.ApplyAll", e); }
                 // ZC1 (16.10, drogi towarow): tick produkcji wsi (wielorybnicy, miod lesny, marmur glinanek, wegiel drwali), konwoje DTE i karawany BK bez jedzenia z niczego
                 try { GoodsPaths.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GoodsPaths.ApplyAll", e); }
                 // m6b (6): kasy zaulkow - rozbicie zmiany kasy miast ponizej 1/4 zapasu kupcow na kanaly (tylko log)

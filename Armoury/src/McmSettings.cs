@@ -6192,6 +6192,42 @@ namespace Armoury
         [SettingPropertyGroup("Diagnostics (stage 8)")]
         public bool Stage8WorldLog { get; set; } = true;
 
+        [SettingPropertyBool("A17 Bk Party No Free Mounts", HintText = "Banner Kings parties (slave and food caravans, patrols, militia, estate retinues, free companies, travellers) no longer get spare horses and pack animals out of thin air when they set out, and the horses they do have go to the market of the settlement where they end their journey instead of vanishing with them. Off = as in Banner Kings")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17BkPartyNoFreeMounts { get; set; } = true;
+
+        [SettingPropertyBool("A17 Fish From Hands", HintText = "where the start calibration is in force, fish come only from the hands of fishing villages and fishing boats: the Night Raider governor perk no longer conjures fish into the town's villages and Banner Kings harbours no longer pull fish out of nowhere for coin that vanishes; a crew fishing at sea is booked as a catch. Off = as in the naval DLC and Banner Kings")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17FishFromHands { get; set; } = true;
+
+        [SettingPropertyBool("A17 Uniques Not Outlaw Kit", HintText = "outlaw bands no longer buy a renowned piece (Renly's armour, Lyanna's armour, a famous steed) from their fence, or take it from their own loot, to kit out a man they promote - the piece stayed lost inside the bandit for good; it now stays on the market or in the band's packs as loot. Off = bands may use renowned pieces, as before")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17UniquesNotOutlawKit { get; set; } = true;
+
+        [SettingPropertyBool("A17 Siege Commit Rescue", HintText = "when the game stumbles while settling the outcome of a battle (seen when a besieging host is beaten in a sally or under the walls), the victors still get their experience, renown, influence, morale and gold, and the stumble is written to the log; the wounded the game failed to take are captured as before. Off = the outcome stays half-settled, as before")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17SiegeCommitRescue { get; set; } = true;
+
+        [SettingPropertyBool("A17 Shipyard Builds From Timber", HintText = "a port's shipyard builds a new ship only while the port keeps fewer than it wants (two below its limit), only from timber on the town's market and only if the town's purse can pay the shipwrights from what it holds above the merchants' reserve - the wages go to the townsfolk; without timber or coin no ship is built. Off = shipyards make ships out of nothing up to their limit, as before")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17ShipyardBuildsFromTimber { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Shipyard Timber Per1000", 0.00f, 10.00f, "0.0", HintText = "logs of timber a shipyard uses for every 1,000 of a hull's worth (a plank counts as a fifth of a log) - a light boat worth 8,000 takes 8 logs, a heavy war galley worth 80,000 takes 80")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public float ShipyardTimberPer1000 { get; set; } = 1f;
+
+        [SettingPropertyFloatingInteger("Shipyard Labour Share", 0.00f, 1.00f, "0.00", HintText = "share of a hull's worth the town pays its shipwrights for building it (paid from the town's purse above the merchants' reserve to the townsfolk)")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public float ShipyardLabourShare { get; set; } = 0.1f;
+
+        [SettingPropertyBool("A17 Port Fish Pays Folk", HintText = "outside the start calibration, the coin a Banner Kings harbour town pays for its daily catch goes to the townsfolk as the fishermen's wages instead of vanishing (works together with the fish setting above); off = the coin vanishes, as in Banner Kings")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17PortFishPaysFolk { get; set; } = true;
+
+        [SettingPropertyBool("A17 Author Lines", HintText = "with the horse and fish diagnostics: also write which game or mod behaviour adds or removes horses and fish outside the known flows (read from the call stack, at most 2,000 times a day) - written to the log only, changes nothing in the game; off = not traced")]
+        [SettingPropertyGroup("Old loose ends (A17)")]
+        public bool A17AuthorLines { get; set; } = true;
+
         [SettingPropertyBool("Rbl Peace Needs Quiet", HintText = "Realistic Bannerlord's 'Extended Peace' prosperity bonus goes only to a town or castle that has seen no attack on itself or on any of its villages for 30 days (as Realistic Bannerlord means it); off = as before, when it reached almost every town and castle all through a war, because the game forgets the last attacker a day after the attack")]
         [SettingPropertyGroup("Signals from the long runs (A16)")]
         public bool RblPeaceNeedsQuiet { get; set; } = true;
@@ -8847,6 +8883,15 @@ namespace Armoury
             s.Stage8MeasureLog = Stage8MeasureLog;
             s.Stage8ProfileLog = Stage8ProfileLog;
             s.Stage8WorldLog = Stage8WorldLog;
+            s.A17BkPartyNoFreeMounts = A17BkPartyNoFreeMounts;
+            s.A17FishFromHands = A17FishFromHands;
+            s.A17UniquesNotOutlawKit = A17UniquesNotOutlawKit;
+            s.A17SiegeCommitRescue = A17SiegeCommitRescue;
+            s.A17ShipyardBuildsFromTimber = A17ShipyardBuildsFromTimber;
+            s.ShipyardTimberPer1000 = ShipyardTimberPer1000;
+            s.ShipyardLabourShare = ShipyardLabourShare;
+            s.A17PortFishPaysFolk = A17PortFishPaysFolk;
+            s.A17AuthorLines = A17AuthorLines;
             s.RblPeaceNeedsQuiet = RblPeaceNeedsQuiet;
             s.BkProsperityLayerOnce = BkProsperityLayerOnce;
             s.BkReturnsToOriginVillage = BkReturnsToOriginVillage;
