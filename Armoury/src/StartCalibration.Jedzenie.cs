@@ -18,43 +18,57 @@ namespace Armoury
     /// REGULA (klucz Ks Food Hands Follow Market, tylko KS zastosowany - RuleDaily; co 7 dob od D, pierwszy krok D+56 - po oknie sterowania rynku D+14..D+49):
     ///  1. Rynek (Westeros / Essos) i towar jedzenia KS (KsCore.Food: zboze, ryby, mieso z miesem wieloryba, ser, maslo, jaja, jablka, marchew, pomarancze, winogrona,
     ///     oliwki, daktyle, miod, sol) - ta sama miara co sterowanie rynku i ks-miasta-towary.csv: polki S (mapa ZC4, zt.Cnt), w drodze KS-H R, cel T = suma T* x popyt
-    ///     zaplacony miast (ZTstar x (Q + QV + Der + One)); zapas ZA 8 TYGODNI przy tempie ostatnich (do 4) krokow: S8 = S + 8 x tempo S, Z8 = S + R + 8 x tempo (S + R):
-    ///       BRAK     - Z8 &lt; 0.5 T (nawet z towarem w drodze rynek bedzie w braku);
-    ///       NADMIAR  - S8 &gt; 2 T i Z8 &gt; 2 T (towar bedzie lezal na polkach);
+    ///     zaplacony miast (ZTstar x (Q + QV + Der + One)); decyzja z DZISIEJSZEGO zapasu (jak zelazo f5-ruda i slowa Jeffa "ktorego brakuje na rynku"):
+    ///       BRAK     - S + R &lt; 0.5 T (nawet z towarem w drodze rynek jest w braku);
+    ///       NADMIAR  - S &gt; 2 T i S + R &gt; 2 T (towar lezy na polkach);
     ///       pasmo 0.5..2 T albo bez celu - bez zmian (histereza 0.5..2 T* - zadnego skakania w te i z powrotem).
-    ///     Rzut 8 tygodni (a nie sam dzisiejszy poziom) - pomiar offline na liczbach fin93: przy samym poziomie (z wstrzymaniem, gdy rynek "wychodzi sam") sol Essos i ryby
-    ///     Westeros przelatuja przez cale pasmo do zera w ok. 24 tygodnie i wracaja w gore (rece zostaja na poziomie ciecia, a zapas spada dalej - hustawka co pol roku);
-    ///     z rzutem zatrzymuja sie w pasmie (1-2 T*), bez przeskoku w gore / w dol w kolejnych krokach przy szumie polek 8% T* na tydzien. Ostroznie w obie strony: brak
-    ///     liczy towar w drodze, nadmiar wymaga polek i polek z droga. Tempo z pamieci sesji (4 ostatnie kroki); po wczytaniu - od zera (pierwszy krok: sam poziom).
+    ///     Poprawka po recenzji (18.10): dotad decyzja z zapasu RZUCONEGO 8 tygodni naprzod przy tempie 4 ostatnich krokow - to nie bylo "brakuje na rynku", a 91-dniowa
+    ///     zima (WinterBite: plon wsi -50% x gradient polnocy x kraina) w rzucie x8 dawala hustawke rak co roku. ZIMA: rece bez zmian (decyzje w linii tylko do wgladu) -
+    ///     zimowy brak to pora roku, nie brak rynku; model offline (fin93, zima -25/-50%, szum 8% T*/tydz.): bez pauzy kazda wersja (rzut 8 tyg., sam poziom, krotki rzut)
+    ///     hustala rece zajecia o 50-200% w roku, z pauza zimowa sam poziom 6-15% i 0-1.6 zmian kierunku w 3 lata (CHANGELOG f20-d4 - odstepstwo od "co 7 dni" do decyzji Jeffa).
     ///  2. Wynik zajecia na rynku (jedna tabela swiata P0): sum(wartosc kg x sygnal towaru) / sum(wartosc kg) po towarach jedzenia zajecia, ktore maja cel na rynku
     ///     (zywiec - czesc miesa z uboju, mieso wieloryba - mieso; welna, len, jedwab, futra, skory - bez sygnalu i bez glosu). -1..1. Stadniny (konie - lancuch gry) poza regula.
     ///  3. Blok (czesc okregu - jedna ziemia): rece przechodza TYLKO miedzy zajeciami bloku z udzialem >= 0.2% i ziemia, ktora na nie pozwala (L &gt; 0 - zajecia z par Planu
     ///     wlaczenia, tabela swiata): udzial zajecia x (1 + 0.05 x wynik), potem do tej samej sumy - zajecie z brakiem bierze do 5% rak wiecej, z nadmiarem oddaje do 5%,
     ///     reszta zajec bloku oddaje / bierze roznice. Zadne zajecie nie zmienia sie o wiecej niz 5% swoich rak na krok (najwyzej ok. 2.6% rak bloku - zawsze ponizej
     ///     5% rak okregu). Ziemia: zajeta ziemia bloku po zmianie nie ponad powierzchnie bloku x 1.02 (jak A7) - ruch skracany. Blok w przebudowie A7 i czesc z pracami
-    ///     okregu - bez zmian. Okreg w progu "najpierw wyzywic siebie" (Plan, KsResult.FeedShort, ten sam warunek co A7) - rece tylko miedzy zajeciami przy jedzeniu.
+    ///     okregu - bez zmian. Okreg w progu "najpierw wyzywic siebie" (Plan, KsResult.FeedShort, ten sam warunek co A7) - rece tylko miedzy zajeciami przy jedzeniu
+    ///     (takze regale: sol w takim okregu tylko w dol). Drzewa (winnica, gaj oliwny, sad cytrusowy, gaj daktylowy - te same co Tree() reguly A7): wiecej rak = wiecej ziemi
+    ///     pod drzewami OD RAZU (A7 sadzi drzewa 364 doby z kosztem) - klucz Ks Food Hands Grow Groves (TAK - rosna od razu jak inne zajecia; NIE - tylko oddaja rece).
     ///  4. Regale jedzenia (zloza soli, sol morska, gaje daktylowe - udzial rak bloku przy zlozu): BRAK x1.05, NADMIAR x0.95 (sufit jak RegaleCycle: suma rak przy zlozach
     ///     &lt;= polowa rak bloku poza domem, wzrost przycinany najwyzej do sumy sprzed kroku). Przy kluczu RegaleCycle (co 28 dob) nie rusza juz soli i daktyli po D+49
     ///     (jedna regula na jedno zjawisko - jak zelazo przy f5-ruda; przed D+49 regale jak dotad).
     /// Pieniadze i towar: bez przelewow - zmiana tylko podzialu rak bloku (produkcja z prawdziwych rak i ziemi). Bez regul krain (tylko caly rynek). A7 bez zmian.
-    /// Udzialy zajec i rece przy zlozach sa w zapisie KS (arm_ks) - bez nowego klucza zapisu. Linia "Jedzenie KS (f20-d4): dzien N" co 7 dob (tools/sprawdz_logi.py --grupa njedz).
+    /// Udzialy zajec i rece przy zlozach sa w zapisie KS (arm_ks) - bez nowego klucza zapisu; regula nie ma pamieci sesji (decyzja z dzisiejszych polek).
+    /// Linia "Jedzenie KS (f20-d4): dzien N" co 7 dob (tools/sprawdz_logi.py --grupa njedz).
     /// Klucz NIE - nic z tego (RegaleCycle jak dotad co do bitu).
     /// </summary>
     internal static partial class StartCalibration
     {
-        private const int F20Every = 7, F20Look = 8, F20Ring = 4;
+        private const int F20Every = 7;
         private const double F20Lo = 0.5, F20Hi = 2.0, F20Rate = 0.05, F20MaxRel = 0.05, F20MinX = 0.002, F20Group = 0.5;
         private const int F20DUp = 1, F20DDown = 2, F20DBand = 3, F20DNoT = 6;
 
-        private sealed class F20Snap { public int Day; public double[] Sum, Shelf; }
-        private static readonly List<F20Snap> _f20Snaps = new List<F20Snap>();     // pamiec sesji: polki rynku z ostatnich krokow (tempo do rzutu 8 tygodni)
         private static int[][] _f20Wg; private static double[][] _f20Ww;           // wagi wartosci towarow jedzenia zajecia (tabela swiata P0 x wartosc kg)
         private static int _f20Stum;
         private static bool _f20RegSkip;                                           // doba RuleDaily: RegaleCycle bez soli i daktyli (regula f20-d4 czynna)
 
         internal static bool F20On { get { var s = Settings.Current; return s != null && s.KsFoodHandsFollowMarket; } }
 
-        private static void F20Reset() { _f20Snaps.Clear(); _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; }
+        /// <summary>Recenzja f20-d4: drzewa (Tree() - winnica, gaj oliwny, sad cytrusowy, gaj daktylowy) biora rece od razu (TAK) albo tylko je oddaja (NIE - jak A7: drzewa 364 doby).</summary>
+        private static bool F20Groves { get { var s = Settings.Current; return s == null || s.KsFoodHandsGrowGroves; } }
+
+        private static void F20Reset() { _f20Wg = null; _f20Ww = null; _f20Stum = 0; _f20RegSkip = false; }
+
+        /// <summary>Recenzja f20-d4: dopisek linii "KS: produkcja" (F4FrozenText) po D+49 z kluczem - zajecia nie sa zamrozone (sprawdz_logi NF4-4 przyjmuje oba napisy).</summary>
+        private const string F20FrozenOff = "zajecia: regula A7 wylaczona (Start Calibration Switch Rule), rece jedzenia i soli co 7 dob za polkami rynku (f20-d4, Ks Food Hands Follow Market)";
+
+        /// <summary>Recenzja f20-d4: stan reguly w linii "A7 diagnoza" przy A7 wylaczonej (F4A7Old i F5Finish - ten sam napis; "regula: WYLACZONA" na poczatku jak dotad).</summary>
+        private static string F20A7OffText(bool f20)
+        {
+            return f20 ? "WYLACZONA - zajecia: rece jedzenia i soli co 7 dob za polkami rynku (f20-d4), reszta na Planie wlaczenia (sam pomiar nacisku)"
+                       : "WYLACZONA - zajecia zamrozone na Planie wlaczenia (sam pomiar nacisku)";
+        }
 
         /// <summary>Regula czynna (klucz, po oknie sterowania rynku D+49).</summary>
         private static bool F20Active(int today, int d0) { return d0 >= 0 && today > d0 + CtlEnd && F20On; }
@@ -96,17 +110,6 @@ namespace Armoury
                 wg[c] = lg.ToArray(); ww[c] = sv > 0 ? lv.ToArray() : lk.ToArray();
             }
             _f20Wg = wg; _f20Ww = ww;
-        }
-
-        /// <summary>Tempo zapasu (szt. na tydzien) z najstarszego kroku pamieci (do 4 krokow, najwyzej 35 dob wstecz); brak pamieci - 0.</summary>
-        private static void F20Slope(int i, int today, double sum, double shelf, out double slSum, out double slShelf)
-        {
-            slSum = 0; slShelf = 0;
-            F20Snap old = null;
-            foreach (var s in _f20Snaps) if (s != null && s.Day < today && today - s.Day <= 35 && (old == null || s.Day < old.Day)) old = s;
-            if (old == null || old.Sum == null || i >= old.Sum.Length) return;
-            double w = (today - old.Day) / 7.0; if (!(w > 0)) return;
-            slSum = (sum - old.Sum[i]) / w; slShelf = (shelf - old.Shelf[i]) / w;
         }
 
         /// <summary>Okreg w progu "najpierw wyzywic siebie" (ten sam warunek co A7 FeedKeeps): rece tylko miedzy zajeciami przy jedzeniu.</summary>
@@ -159,25 +162,21 @@ namespace Armoury
                 }
                 catch (Exception e) { _f20Stum++; Stumble("F20Week(miasto)", e); }
             }
-            var dec = new int[2 * NG]; var sig = new int[2 * NG]; var pS = new double[2 * NG]; var pZ = new double[2 * NG];
-            bool slope = false;
+            // recenzja: decyzja z DZISIEJSZEGO zapasu (jak zelazo f5-ruda: "ktorego brakuje na rynku"), bez rzutu naprzod; zima - rece bez zmian (decyzje tylko do wgladu)
+            bool winter = false; try { winter = WinterBite.WinterNow(); } catch { winter = false; }
+            bool groves = F20Groves;
+            var dec = new int[2 * NG]; var sig = new int[2 * NG];
             for (int m = 0; m < 2; m++)
                 foreach (int g in KsCore.Food)
                 {
                     int i = m * NG + g; double t = T[i];
                     if (!(t >= 1.0)) { dec[i] = F20DNoT; continue; }
-                    double sum = S[i] + R[i], a, b;
-                    F20Slope(i, today, sum, S[i], out a, out b);
-                    if (a != 0 || b != 0) slope = true;
-                    double z8 = sum + F20Look * a, s8 = S[i] + F20Look * b;           // zapas za 8 tygodni przy tempie ostatnich krokow (polki + droga, same polki)
-                    pZ[i] = z8; pS[i] = s8;
-                    if (z8 < F20Lo * t) dec[i] = F20DUp;
-                    else if (s8 > F20Hi * t && z8 > F20Hi * t) dec[i] = F20DDown;
+                    double sum = S[i] + R[i];
+                    if (sum < F20Lo * t) dec[i] = F20DUp;
+                    else if (S[i] > F20Hi * t && sum > F20Hi * t) dec[i] = F20DDown;
                     else dec[i] = F20DBand;
-                    sig[i] = dec[i] == F20DUp ? 1 : dec[i] == F20DDown ? -1 : 0;
+                    sig[i] = winter ? 0 : dec[i] == F20DUp ? 1 : dec[i] == F20DDown ? -1 : 0;
                 }
-            _f20Snaps.Add(new F20Snap { Day = today, Sum = AddArr(S, R), Shelf = (double[])S.Clone() });
-            while (_f20Snaps.Count > F20Ring) _f20Snaps.RemoveAt(0);
             // 2. wynik zajecia na rynku (-1..1): wartosc towarow jedzenia z celem x sygnal / wartosc towarow jedzenia z celem
             var sc = new double[2 * NC];
             for (int m = 0; m < 2; m++)
@@ -193,6 +192,7 @@ namespace Armoury
             var rg0 = new double[2 * NG]; var rg1 = new double[2 * NG]; var rUp = new int[2 * NG]; var rDn = new int[2 * NG];
             var mvM = new double[2];
             int nBlk = 0, nChg = 0, nFlat = 0, nSingle = 0, nBusy = 0, nLock = 0, nNoHands = 0, nLandCut = 0, nLandStop = 0, nGuard = 0, nRegCap = 0, nBack = 0, nDist = 0, nOver = 0;
+            int nWinter = 0, nTree = 0, nRegGuard = 0, nRegTree = 0;               // recenzja: bloki zima bez ruchu, drzewa bez wzrostu (klucz Grow Groves NIE), regale bez wzrostu
             double maxPct = 0; string maxId = "-";
             var cnt = new F20Count();
             foreach (var ld in _live.Values)
@@ -218,12 +218,13 @@ namespace Armoury
                         double moved = 0;
                         if (b.Target >= 0) nBusy++;                                               // przebudowa A7 - RegaleCycle i krok zelaza tez ja pomijaja
                         else if (!(b.Hands > 0) || b.K == null) nNoHands++;
+                        else if (winter) { nWinter++; F20RegHands(b, m, rg0, rg1); }             // recenzja: zima - rece bez zmian (zimowy brak to pora roku, nie brak rynku)
                         else
                         {
                             cnt.Clear();
-                            moved += F20Block(ld, b, m, type, guard, fh, sc, hc1, mvG, cnt);
-                            nChg += cnt.Chg; nFlat += cnt.Flat; nSingle += cnt.Single; nLock += cnt.Lock; nLandCut += cnt.LandCut; nLandStop += cnt.LandStop;
-                            moved += F20Regale(b, m, sig, rg0, rg1, rUp, rDn, mvG, ref nRegCap);
+                            moved += F20Block(ld, b, m, type, guard, groves, fh, sc, hc1, mvG, cnt);
+                            nChg += cnt.Chg; nFlat += cnt.Flat; nSingle += cnt.Single; nLock += cnt.Lock; nLandCut += cnt.LandCut; nLandStop += cnt.LandStop; nTree += cnt.Tree;
+                            moved += F20Regale(b, m, sig, guard, groves, rg0, rg1, rUp, rDn, mvG, ref nRegCap, ref nRegGuard, ref nRegTree);
                         }
                         if (cnt.Applied == 0) for (int j = 0; j < b.C.Length && j < b.X.Length; j++) hc1[m * NC + b.C[j]] += b.X[j] * fh;
                         cnt.Applied = 0;
@@ -245,10 +246,11 @@ namespace Armoury
             string[] mn = { "Westeros", "Essos" };
             var sb = new StringBuilder(6000);
             sb.Append("Jedzenie KS (f20-d4): dzien ").Append(today).Append(" | klucz Ks Food Hands Follow Market TAK, co ").Append(F20Every).Append(" dob od D ").Append(d0)
-              .Append(" po D+").Append(CtlEnd).Append(" (rece zajec jedzenia i soli za polkami calego rynku za ").Append(F20Look).Append(" tyg. przy tempie ostatnich krokow: BRAK - polki + w drodze < ")
+              .Append(" po D+").Append(CtlEnd).Append(" (rece zajec jedzenia i soli za dzisiejszymi polkami calego rynku: BRAK - polki + w drodze < ")
               .Append(F20Lo.ToString("0.0", inv)).Append(" T*, NADMIAR - polki i polki + w drodze > ").Append(F20Hi.ToString("0.0", inv))
               .Append(" T*; zajecie x(1 + ").Append(F20Rate.ToString("0.00", inv)).Append(" x wynik), najwyzej ").Append((100 * F20MaxRel).ToString("0", inv))
-              .Append("% rak zajecia na krok, tylko miedzy zajeciami ziemi bloku; tempo z ").Append(slope ? "pamieci krokow" : "braku pamieci (pierwszy krok sesji - sam poziom)").Append(")");
+              .Append("% rak zajecia na krok, tylko miedzy zajeciami ziemi bloku; drzewa biora rece ").Append(groves ? "TAK" : "NIE").Append(" (Ks Food Hands Grow Groves))")
+              .Append(" | zima: ").Append(winter ? "TAK - rece bez zmian (decyzje tylko do wgladu)" : "nie");
             for (int m = 0; m < 2; m++)
             {
                 sb.Append(" | ").Append(mn[m]).Append(" (miast ").Append(nTown[m]).Append("):");
@@ -258,7 +260,6 @@ namespace Armoury
                     int i = m * NG + g; if (T[i] < 1.0 && S[i] + R[i] < 1.0) continue;
                     sb.Append(f ? " " : "; ").Append(KsTab.Goods[g]).Append(' ').Append(S[i].ToString("0", inv)).Append('+').Append(R[i].ToString("0", inv)).Append('/').Append(T[i].ToString("0", inv))
                       .Append(" (").Append(T[i] >= 1 ? (S[i] / T[i]).ToString("0.00", inv) : "-").Append(' ').Append(T[i] >= 1 ? ((S[i] + R[i]) / T[i]).ToString("0.00", inv) : "-")
-                      .Append(", za ").Append(F20Look).Append(" tyg. ").Append(T[i] >= 1 ? (pS[i] / T[i]).ToString("0.00", inv) : "-").Append(' ').Append(T[i] >= 1 ? (pZ[i] / T[i]).ToString("0.00", inv) : "-")
                       .Append(") ").Append(F20DecText(dec[i]));
                     f = false;
                 }
@@ -272,7 +273,8 @@ namespace Armoury
             }
             sb.Append(" | bloki ").Append(nBlk).Append(": zmienione ").Append(nChg).Append(", rowny wynik ").Append(nFlat).Append(", jedno zajecie albo bez rak do przesuniecia ").Append(nSingle)
               .Append(", ziemia skrocila ").Append(nLandCut).Append(", ziemia zatrzymala ").Append(nLandStop).Append(", przebudowa A7 ").Append(nBusy).Append(", prace okregu ").Append(nLock)
-              .Append(", bez rachunku rak ").Append(nNoHands).Append("; okregi w progu najpierw wyzywic siebie ").Append(nGuard).Append(", krainy wrocone ").Append(nBack);
+              .Append(", bez rachunku rak ").Append(nNoHands).Append(", zima bez ruchu ").Append(nWinter).Append("; okregi w progu najpierw wyzywic siebie ").Append(nGuard).Append(", krainy wrocone ").Append(nBack)
+              .Append("; drzewa bez wzrostu (Grow Groves NIE) ").Append(nTree);
             // grupy zajec: w brak (wynik >= 0.5) i w nadmiarze (<= -0.5) - rece pola przed -> po (bez zmiany regale)
             for (int m = 0; m < 2; m++)
             {
@@ -304,7 +306,7 @@ namespace Armoury
             }
             sb.Append(" | regale jedzenia (wpisy w gore/w dol): sol Westeros ").Append(rUp[KsTab.GSalt]).Append('/').Append(rDn[KsTab.GSalt]).Append(", Essos ").Append(rUp[NG + KsTab.GSalt]).Append('/').Append(rDn[NG + KsTab.GSalt])
               .Append("; daktyle Westeros ").Append(rUp[KsTab.GDate]).Append('/').Append(rDn[KsTab.GDate]).Append(", Essos ").Append(rUp[NG + KsTab.GDate]).Append('/').Append(rDn[NG + KsTab.GDate])
-              .Append("; sufit bloku przycial wzrost ").Append(nRegCap)
+              .Append("; sufit bloku przycial wzrost ").Append(nRegCap).Append("; wzrost wstrzymany: sol w progu wyzywienia ").Append(nRegGuard).Append(", gaje daktylowe (Grow Groves NIE) ").Append(nRegTree)
               .Append("; rece przy soli Westeros ").Append(rg0[KsTab.GSalt].ToString("0", inv)).Append(" -> ").Append(rg1[KsTab.GSalt].ToString("0", inv))
               .Append(", Essos ").Append(rg0[NG + KsTab.GSalt].ToString("0", inv)).Append(" -> ").Append(rg1[NG + KsTab.GSalt].ToString("0", inv))
               .Append("; przy daktylach Westeros ").Append(rg0[KsTab.GDate].ToString("0", inv)).Append(" -> ").Append(rg1[KsTab.GDate].ToString("0", inv))
@@ -321,8 +323,8 @@ namespace Armoury
 
         private sealed class F20Count
         {
-            public int Chg, Flat, Single, Lock, LandCut, LandStop, Applied;
-            public void Clear() { Chg = Flat = Single = Lock = LandCut = LandStop = Applied = 0; }
+            public int Chg, Flat, Single, Lock, LandCut, LandStop, Applied, Tree;
+            public void Clear() { Chg = Flat = Single = Lock = LandCut = LandStop = Applied = Tree = 0; }
         }
 
         private static string F20DecText(int d)
@@ -336,32 +338,43 @@ namespace Armoury
             }
         }
 
-        private static double[] AddArr(double[] a, double[] b) { var r = new double[a.Length]; for (int i = 0; i < r.Length; i++) r[i] = a[i] + b[i]; return r; }
-
         /// <summary>Rece pola bloku miedzy jego zajeciami (replikator z krokiem 0.05, najwyzej 5% rak zajecia, ziemia bloku). Zwraca rece przesuniete (dodatnia czesc);
-        /// hc1 - rece pola wedlug zajecia po kroku (tylko gdy krok zmienil blok - cnt.Applied).</summary>
-        private static double F20Block(LiveDist ld, LiveBlock b, int m, string type, bool guard, double fh, double[] sc, double[] hc1, double[] mvG, F20Count cnt)
+        /// hc1 - rece pola wedlug zajecia po kroku (tylko gdy krok zmienil blok - cnt.Applied). groves false (klucz Ks Food Hands Grow Groves NIE): drzewo (Tree()), ktore by
+        /// zyskalo rece, wychodzi z kroku (udzial bez zmian) i replikator liczy sie od nowa bez niego - drzewa tylko oddaja rece (sadzenie drzew to A7, 364 doby).</summary>
+        private static double F20Block(LiveDist ld, LiveBlock b, int m, string type, bool guard, bool groves, double fh, double[] sc, double[] hc1, double[] mvG, F20Count cnt)
         {
             int n = Math.Min(b.C.Length, b.X.Length), NC = KsTab.NC;
             if (n < 2) { cnt.Single++; return 0; }
             if (KsWorksLock(ld, b)) { cnt.Lock++; return 0; }                       // inwest: czesc z pracami okregu nie zmienia zajecia (jak A7)
-            var part = new bool[n]; int np = 0; double xp = 0, ap = 0;
+            var part = new bool[n];
             for (int j = 0; j < n; j++)
             {
                 int c = b.C[j];
                 if (!(b.X[j] >= F20MinX) || F20Horse(c) || KsTab.IsRegale[c]) continue;
                 if (guard && !FoodCraft(c)) continue;                                // najpierw wyzywic siebie: rece tylko miedzy zajeciami przy jedzeniu
                 if (!(b.L(c, type) > 0)) continue;                                    // tylko zajecia, na ktore ziemia bloku pozwala (tabela swiata)
-                part[j] = true; np++; xp += b.X[j]; ap += b.X[j] * (1.0 + F20Rate * sc[m * NC + c]);
+                part[j] = true;
             }
-            if (np < 2 || !(xp > 0) || !(ap > 0)) { cnt.Single++; return 0; }
-            var d = new double[n]; double t = 1.0, big = 0;
-            for (int j = 0; j < n; j++)
+            var d = new double[n]; double t, big;
+            for (int pass = 0; ; pass++)
             {
-                if (!part[j]) continue;
-                d[j] = xp * b.X[j] * (1.0 + F20Rate * sc[m * NC + b.C[j]]) / ap - b.X[j];
-                double ad = Math.Abs(d[j]); if (ad > big) big = ad;
-                if (ad > 1e-12) t = Math.Min(t, F20MaxRel * b.X[j] / ad);
+                int np = 0; double xp = 0, ap = 0;
+                for (int j = 0; j < n; j++) { if (!part[j]) continue; np++; xp += b.X[j]; ap += b.X[j] * (1.0 + F20Rate * sc[m * NC + b.C[j]]); }
+                if (np < 2 || !(xp > 0) || !(ap > 0)) { cnt.Single++; return 0; }
+                t = 1.0; big = 0;
+                for (int j = 0; j < n; j++)
+                {
+                    d[j] = 0;
+                    if (!part[j]) continue;
+                    d[j] = xp * b.X[j] * (1.0 + F20Rate * sc[m * NC + b.C[j]]) / ap - b.X[j];
+                    double ad = Math.Abs(d[j]); if (ad > big) big = ad;
+                    if (ad > 1e-12) t = Math.Min(t, F20MaxRel * b.X[j] / ad);
+                }
+                // recenzja (klucz Ks Food Hands Grow Groves NIE): drzewo, ktore by zyskalo, zostaje przy swoim udziale - reszta bloku od nowa (najwyzej n przejsc)
+                bool drop = false;
+                if (!groves && pass < n)
+                    for (int j = 0; j < n; j++) if (part[j] && Tree(b.C[j]) && d[j] > 1e-12) { part[j] = false; drop = true; cnt.Tree++; }
+                if (!drop) break;
             }
             if (big < 1e-7) { cnt.Flat++; return 0; }
             // ziemia: zajeta ziemia bloku po zmianie nie ponad powierzchnie x 1.02 (jak A7), chyba ze juz byla ponad - wtedy nie rosnie
@@ -403,9 +416,24 @@ namespace Armoury
             return moved;
         }
 
+        /// <summary>Zima (recenzja): regale bez zmian - tylko rece przy soli i daktylach do linii (przed = po).</summary>
+        private static void F20RegHands(LiveBlock b, int m, double[] rg0, double[] rg1)
+        {
+            if (b.RC == null || b.RF == null) return;
+            int n = Math.Min(b.RC.Length, b.RF.Length), NG = KsTab.NG;
+            for (int j = 0; j < n; j++)
+            {
+                if (!F20RegCraft(b.RC[j])) continue;
+                int g = KsTab.RegGood(b.RC[j]); if (g < 0) continue;
+                double h = b.RF[j] * b.Hands; rg0[m * NG + g] += h; rg1[m * NG + g] += h;
+            }
+        }
+
         /// <summary>Regale jedzenia (sol, sol morska, daktyle): BRAK x1.05, NADMIAR x0.95; wzrost przycinany do sufitu bloku najwyzej do sumy sprzed kroku (jak f5-ruda).
-        /// Zwraca rece przesuniete (|zmiana| x rece bloku, dodatnia czesc - liczona raz).</summary>
-        private static double F20Regale(LiveBlock b, int m, int[] sig, double[] rg0, double[] rg1, int[] rUp, int[] rDn, double[] mvG, ref int nCap)
+        /// Zwraca rece przesuniete (|zmiana| x rece bloku, dodatnia czesc - liczona raz). Recenzja: okreg w progu "najpierw wyzywic siebie" (guard) - zloze bez jedzenia
+        /// (sol, sol morska - FoodCraft false) bez wzrostu (wzrost bralby rece z pol, takze z pol jedzenia); klucz Ks Food Hands Grow Groves NIE - gaj daktylowy (Tree()) bez wzrostu.</summary>
+        private static double F20Regale(LiveBlock b, int m, int[] sig, bool guard, bool groves, double[] rg0, double[] rg1, int[] rUp, int[] rDn, double[] mvG, ref int nCap,
+                                        ref int nGuardUp, ref int nTreeUp)
         {
             if (b.RC == null || b.RF == null) return 0;
             int n = Math.Min(b.RC.Length, b.RF.Length), NG = KsTab.NG;
@@ -418,6 +446,8 @@ namespace Armoury
                 int g = KsTab.RegGood(b.RC[j]); if (g < 0) continue;
                 rg0[m * NG + g] += b.RF[j] * b.Hands;
                 int s = sig[m * NG + g];
+                if (s > 0 && guard && !FoodCraft(b.RC[j])) { nGuardUp++; continue; }       // prog wyzywienia: sol nie bierze rak z pol
+                if (s > 0 && !groves && Tree(b.RC[j])) { nTreeUp++; continue; }           // drzewa bez wzrostu (Grow Groves NIE)
                 if (s > 0) { b.RF[j] = (float)(b.RF[j] * (1.0 + F20Rate)); inc[j] = b.RF[j] - old[j]; sumInc += inc[j]; rUp[m * NG + g]++; any = true; }
                 else if (s < 0) { b.RF[j] = (float)(b.RF[j] * (1.0 - F20Rate)); rDn[m * NG + g]++; any = true; }
             }

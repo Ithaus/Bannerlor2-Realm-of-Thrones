@@ -127,6 +127,7 @@ namespace Armoury
         private sealed class F5Job
         {
             public int Today, D0, PlanDay, St; public bool Rule, Step; public double Inert, MainMs;
+            public bool F20;                                   // recenzja f20-d4: regula jedzenia czynna tej doby (napis stanu zajec - liczony na watku glownym)
             public double[] P, One, Mv; public double[][] PxT = new double[2][], PxS = new double[2][], VPlan;
             public F5Var VG = new F5Var();
             public List<double> CurG = new List<double>(16000), BestG = new List<double>(16000), RatioG = new List<double>(16000);
@@ -158,7 +159,7 @@ namespace Armoury
         private static F5Job F5Prep(int today, int d0, bool rule, bool step, bool record)
         {
             long t0 = Stopwatch.GetTimestamp();
-            var job = new F5Job { Today = today, D0 = d0, Rule = rule, Step = step, St = _f4A7St, PlanDay = _planDay, Record = record };
+            var job = new F5Job { Today = today, D0 = d0, Rule = rule, Step = step, St = _f4A7St, PlanDay = _planDay, Record = record, F20 = F20Active(today, d0) };
             EnsureValues();
             job.Mv = _mv;
             var plan = _plan;
@@ -322,7 +323,7 @@ namespace Armoury
             var sb = new StringBuilder(3000);
             sb.Append(PK).Append("A7 diagnoza (f4-pomiary) dzien ").Append(today).Append(" | D ").Append(d0).Append(" (D+").Append(today - d0).Append(") ")
               .Append(job.Step ? "krok reguly A7" : "doba D (srednie cen gry sprzed polek startu)")
-              .Append(" | regula: ").Append(job.Rule ? "TAK (Start Calibration Switch Rule)" : "WYLACZONA - zajecia zamrozone na Planie wlaczenia (sam pomiar nacisku)")
+              .Append(" | regula: ").Append(job.Rule ? "TAK (Start Calibration Switch Rule)" : F20A7OffText(job.F20))   // recenzja f20-d4: ten sam napis co F4A7Old
               .Append(" | blokow ocenionych ").Append(fB.N).Append(" (pominiete: w przebudowie ").Append(job.InTrans).Append(", prace okregu ").Append(job.Locked).Append(", bez kandydatow ").Append(job.NoCand)
               .Append(", okregi krain wroconych ").Append(job.Back).Append(", bez cen miasta targowego ").Append(job.NoPx).Append(')');
             var buf = new double[Math.Max(1, Math.Max(curG.Count, Math.Max(bestG.Count, ratioG.Count)))];

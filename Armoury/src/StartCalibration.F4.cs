@@ -186,7 +186,7 @@ namespace Armoury
             var sb = new StringBuilder(3000);
             sb.Append(PK).Append("A7 diagnoza (f4-pomiary) dzien ").Append(today).Append(" | D ").Append(d0).Append(" (D+").Append(today - d0).Append(") ")
               .Append(step ? "krok reguly A7" : "doba D (srednie cen gry sprzed polek startu)")
-              .Append(" | regula: ").Append(rule ? "TAK (Start Calibration Switch Rule)" : "WYLACZONA - zajecia zamrozone na Planie wlaczenia (sam pomiar nacisku)")
+              .Append(" | regula: ").Append(rule ? "TAK (Start Calibration Switch Rule)" : F20A7OffText(F20Active(today, d0)))   // recenzja f20-d4: po D+49 z kluczem zajecia nie sa zamrozone
               .Append(" | blokow ocenionych ").Append(vB.N).Append(" (pominiete: w przebudowie ").Append(inTrans).Append(", prace okregu ").Append(locked).Append(", bez kandydatow ").Append(noCand)
               .Append(", okregi krain wroconych ").Append(back).Append(", bez cen miasta targowego ").Append(noPx).Append(')');
             sb.Append(" | ceny gry (srednia 28 dob miasta targowego): ocenionych ").Append(vG.N).Append(", dochod biezacy q10/med/q90 ").Append(Q3(curG))
@@ -281,8 +281,9 @@ namespace Armoury
         private static string F4FrozenText(bool rule)
         {
             if (!F4A7On || rule) return "";
-            int d0 = DDay;
-            return "zajecia zamrozone - regula A7 wylaczona (Start Calibration Switch Rule), " + (d0 >= 0 ? "D+" + (Today() - d0) + " dob" : "przed D") + " | ";
+            int d0 = DDay, td = Today();
+            // recenzja f20-d4: po D+49 z kluczem Ks Food Hands Follow Market rece zajec jedzenia i soli ida co 7 dob za polkami rynku - napis nie mowi juz "zamrozone"
+            return (F20Active(td, d0) ? F20FrozenOff : "zajecia zamrozone - regula A7 wylaczona (Start Calibration Switch Rule)") + ", " + (d0 >= 0 ? "D+" + (td - d0) + " dob" : "przed D") + " | ";
         }
 
         // ============================================================ regale wobec polki (klucz Measure Regale Shelf)
