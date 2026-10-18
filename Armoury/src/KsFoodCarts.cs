@@ -132,6 +132,7 @@ namespace Armoury
         private static bool[] _north;                 // [nt] miasto Polnocy, Muru albo za Murem (kultura battania, nightswatch, freefolk, wildlings, skagosi)
         private static bool _byDays, _daysSlow;       // tabela dob liczona regula H1 (wersja "T"); pierwsza doba naraz przekroczyla 20 ms - dalej 200 wywolan na dobe
         private static bool _consignNow;              // klucz Ks Food Carts Consign w tej dobie (Ship)
+        private static string _creditCtl = "-"; private static long _creditOpen;   // kontrola rachunkow doby (KsFoodCredit.EndDay) i otwarte na koniec doby
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static int _ranDay = -1;
 
@@ -695,7 +696,7 @@ namespace Armoury
                     foreach (var od in KsFoodCredit.OverdueDst(today)) { int i; if (od != null && _ix.TryGetValue(od, out i)) a.DstOverdue[i] = true; }
                 }
                 a.SampleAt = (s, t, k) => (Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u;
-                a.Sample = (s, k, n) => { long s0 = Stopwatch.GetTimestamp(); Sample(_t[s], items[k], Math.Min(n, SampleCap)); _dSampleTicks += Stopwatch.GetTimestamp() - s0; };
+                a.Sample = (s, k, n) => { long s0 = Stopwatch.GetTimestamp(); Sample(_t[s], items[k], Math.Min(n, SampleCap), pow); _dSampleTicks += Stopwatch.GetTimestamp() - s0; };
                 a.Ship = (s, t, k, n, cost, fr, sea, L) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
                 var stt = new KsFoodCore.Stats();
                 KsFoodCore.Decide(a, stt);
@@ -741,14 +742,14 @@ namespace Armoury
 
         /// <summary>KS-R4 r4-kupcy T9b (klucz Ks Lot Price Pow): cena lotu schodkami wzoru gry. Cena sztuki k = ceil(wartosc x czynnik bazowy(polka - k x wartosc sztuki)
         /// x (1 + kara handlu)) - czynnik bazowy z modelu gry (GetBasePriceFactor, wzor (D / (0.1 S + 0.04 V + 2))^0.6), kara raz. Dwie ceny gry (pierwsza i ostatnia sztuka)
-        /// sprawdzaja wzor; poziomy cen miedzy nimi z odwrotnosci wzoru (jeden Pow na poziom, granica poprawiana wzorem obok). Inny wzor (model moda), ponad 32 poziomy
+        /// sprawdzaja wzor; poziomy cen miedzy nimi z odwrotnosci wzoru (jeden Pow na poziom, granica poprawiana wzorem obok). Inny wzor (model moda), ponad 128 poziomow cen
         /// albo niezgodna granica - false (wolajacy liczy trzy ceny, jak dotad).</summary>
         private static bool LotPriceSteps(TaleWorlds.CampaignSystem.ComponentInterfaces.TradeItemPriceFactorModel model, ItemObject it, ItemCategory cat, float ins0, float sup, float dem, int wv, int n, Func<int, long> P, out long sum)
         {
             sum = 0;
             long p0 = P(0), pl = P(n - 1);
             if (pl == p0) { sum = p0 * (long)n; return true; }            // cena stala na calym locie (niemalejaca od p0 do pl)
-            if (pl < p0 || pl - p0 > 32) return false;
+            if (pl < p0 || pl - p0 > 128) return false;
             float pen = model.GetTradePenalty(it, null, null, false, ins0, sup, dem);
             float val = it.Value;
             Func<int, long> Q = k =>
@@ -759,30 +760,7 @@ namespace Armoury
                 return Math.Max(1, (int)Math.Ceiling(f));
             };
             if (Q(0) != p0 || Q(n - 1) != pl) return false;
-            double q = val * (1.0 + pen);
-            long tot = 0; int k0 = 0;
-            for (long L = p0; L < pl; L++)
-            {
-                // ostatnia sztuka z cena <= L: czynnik <= L / q  <=>  0.1 S + 0.04 V + 2 >= D / (L / q)^(1/0.6)  <=>  V >= (D / y^(1/0.6) - 0.1 S - 2) / 0.04
-                double y = L / q; int kL;
-                if (y <= 0) return false;
-                if (y >= 10.0) kL = n - 1;
-                else
-                {
-                    double vNeed = (dem / Math.Pow(y, 1.0 / 0.6) - 0.1 * sup - 2.0) / 0.04;
-                    double kk = (ins0 - vNeed) / wv;
-                    kL = kk >= n ? n - 1 : (kk < -1 ? -1 : (int)Math.Floor(kk));
-                }
-                if (kL < k0 - 1) kL = k0 - 1;
-                if (kL > n - 2) kL = n - 2;
-                int g = 0;
-                while (kL >= k0 && Q(kL) > L) { kL--; if (++g > 6) return false; }
-                while (kL + 1 <= n - 1 && Q(kL + 1) <= L) { kL++; if (++g > 6) return false; }
-                if (kL >= k0) { tot += L * (long)(kL - k0 + 1); k0 = kL + 1; }
-            }
-            tot += pl * (long)(n - k0);
-            sum = tot;
-            return true;
+            return KsFoodCore.LotSteps(p0, pl, n, val * (1.0 + pen), ins0, sup, dem, wv, Q, out sum);
         }
 
         /// <summary>KS-R4 r4-kupcy H4: wartosc n sztuk u celu po marzy - pamiec doby (cena pierwszej sztuki, polka wzoru, sufit) na (cel, towar), decyzja KsFoodCore.</summary>
@@ -829,11 +807,11 @@ namespace Armoury
             catch { return false; }
         }
 
-        private static void Sample(Town src, ItemObject it, int n)
+        private static void Sample(Town src, ItemObject it, int n, bool pow = false)
         {
             try
             {
-                long approx = LotPrice(src, it, n, false);
+                long approx = LotPrice(src, it, n, false, pow);   // KS-R4 r4-kupcy: probka sprawdza metode w uzyciu (T9b schodki albo trzy ceny)
                 long ex = LotPrice(src, it, n, true);
                 if (ex <= 0) return;
                 double e = Math.Abs(approx - ex) / (double)ex;
@@ -987,6 +965,8 @@ namespace Armoury
         internal static void Flush()
         {
             long now = InTransitPieces();
+            // KS-R4 r4-kupcy H6: kontrola rachunkow co dobe (takze w dobie bez linii - ciche logi), wynik do linii
+            try { _creditCtl = KsFoodCredit.EndDay(out _creditOpen); } catch (Exception e) { Stumble("CreditEndDay", e); _creditCtl = "-"; }
             try
             {
                 // srednie: dowiezione wedlug krain (28 dob), wyslane i doby wedlug rynku i pozycji (7 dob)
@@ -1075,7 +1055,7 @@ namespace Armoury
                 int today = Today();
                 long open, overdue, maxOwed; int bills, towns, odTowns; string top;
                 KsFoodCredit.Census(today, out open, out bills, out towns, out overdue, out odTowns, out maxOwed, out top);
-                string ctl = KsFoodCredit.TakeControl(open);
+                string ctl = _creditCtl;
                 long rest2 = KsFoodCredit.DBilled - KsFoodCredit.DPaidNow - KsFoodCredit.DNew;
                 sb.Append(" (wersja ").Append(_t != null ? DaysVer : "-").Append(_byDays ? ", statek wedlug dob" : ", statek gdy droga krotsza").Append(')');
                 sb.Append(" | kredyt kupiecki ").Append(ConsignKey ? "TAK" : "NIE").Append(": otwarte ").Append(open).Append(" zl (").Append(bills).Append(" rachunkow, ").Append(towns).Append(" miast")

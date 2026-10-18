@@ -219,9 +219,13 @@ namespace Armoury
             }
         }
 
-        /// <summary>Kontrola rachunkow doby (linia): otwarte wczoraj + nowe - splacone - przepadle - otwarte dzis; pierwsza doba po wczytaniu - "-".</summary>
-        internal static string TakeControl(long openNow)
+        /// <summary>Koniec doby (KsFoodCarts.Flush, co dobe - takze bez linii): kontrola rachunkow otwarte wczoraj + nowe - splacone - przepadle - otwarte dzis
+        /// (pierwsza doba po wczytaniu - "-"); otwarte dzis do nastepnej doby.</summary>
+        internal static string EndDay(out long openNow)
         {
+            Resolve();
+            openNow = 0;
+            foreach (var a in _acc.Values) foreach (var b in a.B) if (b.Left > 0) openNow += b.Left;
             string s = _openPrev < 0 ? "-" : (_openPrev + DNew - DRepaid - DForfeit - openNow).ToString(CultureInfo.InvariantCulture);
             _openPrev = openNow;
             return s;

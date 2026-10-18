@@ -380,6 +380,39 @@ namespace Armoury
             return Math.Max(sum, n);                       // najmniej 1 zl za sztuke (cena gry >= 1)
         }
 
+        /// <summary>T9b (czysty C#, test portu): suma cen n sztuk z polki zrodla przy cenie sztuki Q(k) = ceil(q x (D / (0.1 S + 0.04 max(0, V - k x wv) + 2))^0.6)
+        /// niemalejacej od p0 = Q(0) do pl = Q(n-1) (wolajacy sprawdza obie ceny gra). Poziomy cen L = p0 .. pl-1: ostatnia sztuka z cena <= L z odwrotnosci wzoru
+        /// (jeden Pow), granica poprawiana Q obok (najwyzej 6 krokow - inaczej false i wolajacy liczy trzy ceny).</summary>
+        internal static bool LotSteps(long p0, long pl, int n, double q, double ins0, double sup, double dem, int wv, Func<int, long> Q, out long sum)
+        {
+            sum = 0;
+            if (n <= 0 || wv <= 0 || !(q > 0)) return false;
+            if (pl == p0) { sum = p0 * (long)n; return true; }
+            if (pl < p0 || pl - p0 > 128) return false;
+            long tot = 0; int k0 = 0;
+            for (long L = p0; L < pl; L++)
+            {
+                // ostatnia sztuka z cena <= L: czynnik <= L / q  <=>  0.1 S + 0.04 V + 2 >= D / (L / q)^(1/0.6)  <=>  V >= (D / y^(1/0.6) - 0.1 S - 2) / 0.04
+                double y = L / q; int kL;
+                if (y >= 10.0) kL = n - 1;
+                else
+                {
+                    double vNeed = (dem / Math.Pow(y, 1.0 / 0.6) - 0.1 * sup - 2.0) / 0.04;
+                    double kk = (ins0 - vNeed) / wv;
+                    kL = double.IsNaN(kk) ? k0 - 1 : (kk >= n ? n - 1 : (kk < -1 ? -1 : (int)Math.Floor(kk)));
+                }
+                if (kL < k0 - 1) kL = k0 - 1;
+                if (kL > n - 2) kL = n - 2;
+                int g = 0;
+                while (kL >= k0 && Q(kL) > L) { kL--; if (++g > 6) return false; }
+                while (kL + 1 <= n - 1 && Q(kL + 1) <= L) { kL++; if (++g > 6) return false; }
+                if (kL >= k0) { tot += L * (long)(kL - k0 + 1); k0 = kL + 1; }
+            }
+            tot += pl * (long)(n - k0);
+            sum = tot;
+            return true;
+        }
+
         private static void ClearFar(Run r)
         {
             if (!r.A.FarAlways) return;
