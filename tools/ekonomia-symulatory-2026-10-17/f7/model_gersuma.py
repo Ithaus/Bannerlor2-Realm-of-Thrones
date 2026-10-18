@@ -3,7 +3,10 @@
 # udzial M6, ktory naprawde schodzi z kasy). Stara kasa = z CSV; nowa = stara - skumulowana gersuma + M6 niewyplacone przy mniejszej nadwyzce (sprzezenie). Firma bez zmian
 # (gersuma nie zmienia stawki), zaleglosci i oblezenia pominiete (rzadkie). Tylko narzedzie - nie czesc moda.
 # Uzycie: python -I model_gersuma.py <katalog CSV fin91> m6-fin91.csv [udzial 0.5] [dni firmy w progu 28] [okno przegladu 14] [domy najpierw 1] [minimum okna 1]
-#         [firma z ostatnich 7 dob 7] [rozlozona na okno 1]
+#         [firma z ostatnich 7 dob 7] [rozlozona na okno 1] [zwrot 0] [waga zwrotu doplyw|zapas]
+# Zwrot (recenzja f7, czulosc): czesc zaplaconej gersumy, ktora panowie i korony wydaja dalej i ktora wraca nastepnej doby do kas miast
+# (zakupy na targu itp.), rozdzielona wedlug dodatniego doplywu netto kupcow (doplyw) albo zapasu kupcow (zapas). Bez zwrotu (0) - przyblizenie
+# pierwszego rzedu: gersuma znika z kas na zawsze, wiec przyrost kas to DOLNA granica.
 import csv, sys, collections
 
 L = sys.argv[1]; M6 = sys.argv[2]
@@ -13,6 +16,16 @@ DAYS = int(sys.argv[5]) if len(sys.argv) > 5 else 14
 HOUSES = (sys.argv[6] if len(sys.argv) > 6 else '1') == '1'
 FW = int(sys.argv[8]) if len(sys.argv) > 8 else 7
 SPREAD = (sys.argv[9] if len(sys.argv) > 9 else '1') == '1'
+RET = float(sys.argv[10]) if len(sys.argv) > 10 else 0.0
+RETW = sys.argv[11] if len(sys.argv) > 11 else 'doplyw'
+retQ = [0.0]; retAll = [0.0]
+
+def retWeights(R):
+    # gdzie wraca wydana gersuma - udzial miasta w dodatnim doplywie netto kupcow (albo w zapasie kupcow) tej doby
+    key = 'doplyw_netto' if RETW == 'doplyw' else 'zapas_kupcow'
+    w = {t: max(0, int(r[key])) for t, r in R.items()}
+    s = sum(w.values())
+    return {t: v / s for t, v in w.items()} if s > 0 else {}
 cleft = collections.defaultdict(float); cper = collections.defaultdict(float); keepAt = {}
 MINW = (sys.argv[7] if len(sys.argv) > 7 else '1') == '1'
 smin = {}
@@ -48,6 +61,8 @@ paid = collections.defaultdict(float); paidDay = collections.defaultdict(float);
 hist = collections.defaultdict(list)        # lp+cr na dobe (firma - szacunek)
 for d in days:
     R = by[d]
+    give = retQ[0]; retQ[0] = 0.0
+    W = retWeights(R) if give > 0 else {}
     for t in towns:
         r = R.get(t)
         if r is None: continue
@@ -55,6 +70,7 @@ for d in days:
         hist[t].append(int(r['zawor_do_pana']) + int(r['do_korony']))
         if d <= FIX: continue
         ns = min(1.0, (d - FIX) / 28.0)
+        if W: g = give * W.get(t, 0.0); X[t] -= g; retAll[0] += g
         Cp = C - X[t]
         # sprzezenie M6: mniejsza nadwyzka - mniej M6 (zostaje w kasie)
         ef = e.get(d, 1.0)
@@ -87,6 +103,7 @@ for d in days:
         X[t] += pay; paid[t] += pay; paidDay[d] += pay
         if pay > 0: payN[d] += 1
         sg0[t] = Cp - pay; sgd[t] = d; smin[t] = Cp - pay
+    retQ[0] = RET * paidDay[d]
 
 def world(d, new):
     R = by[d]; tot = 0; over = 0; below = 0; b15 = 0
@@ -97,9 +114,12 @@ def world(d, new):
 
 # drugi przebieg - zapamietaj X na dobe
 X.clear(); sg0.clear(); sgd.clear(); paid.clear(); paidDay.clear(); payN.clear(); hist.clear(); cleft.clear(); cper.clear()
+retQ[0] = 0.0; retAll[0] = 0.0
 X_at = {}
 for d in days:
     R = by[d]
+    give = retQ[0]; retQ[0] = 0.0
+    W = retWeights(R) if give > 0 else {}
     for t in towns:
         r = R.get(t)
         if r is None: continue
@@ -107,6 +127,7 @@ for d in days:
         hist[t].append(int(r['zawor_do_pana']) + int(r['do_korony']))
         if d <= FIX: continue
         ns = min(1.0, (d - FIX) / 28.0)
+        if W: g = give * W.get(t, 0.0); X[t] -= g; retAll[0] += g
         Cp = C - X[t]
         ef = e.get(d, 1.0)
         dm = (max(0, C - 1.5 * res) - max(0, Cp - 1.5 * res)) / 28.0 * ef * ns
@@ -138,11 +159,12 @@ for d in days:
         X[t] += pay; paid[t] += pay; paidDay[d] += pay
         if pay > 0: payN[d] += 1
         sg0[t] = Cp - pay; sgd[t] = d; smin[t] = Cp - pay
+    retQ[0] = RET * paidDay[d]
     X_at[d] = dict(X)
 for d in days:
     X_at[d] = collections.defaultdict(float, X_at[d])
 
-print('share %.2f keepDays %.0f co %d dob, domy najpierw %s, minimum okna %s' % (SHARE, KD, DAYS, HOUSES, MINW))
+print('share %.2f keepDays %.0f co %d dob, domy najpierw %s, minimum okna %s, zwrot %.2f (%s)' % (SHARE, KD, DAYS, HOUSES, MINW, RET, RETW))
 print('doba   kasy_stare  kasy_nowe  ponad1.5_stare ponad1.5_nowe  ponizej_zapasu st/nw  <=1.5 st/nw  gersuma_dnia(n)')
 for d in days[::14] + [days[-1]]:
     a = world(d, False); b = world(d, True)
@@ -150,7 +172,7 @@ for d in days[::14] + [days[-1]]:
 d1 = days[-1]; d0 = d1 - 28
 ga = (world(d1, False)[0] - world(d0, False)[0]) / 28; gb = (world(d1, True)[0] - world(d0, True)[0]) / 28
 pw = sum(v for k, v in paidDay.items() if d0 < k <= d1) / 28
-print('przyrost kas swiata ostatnie 28 dob: stare %+.0f/d, nowe %+.0f/d; gersuma w oknie %.0f/d; gersuma razem %.0f' % (ga, gb, pw, sum(paid.values())))
+print('przyrost kas swiata ostatnie 28 dob: stare %+.0f/d, nowe %+.0f/d; gersuma w oknie %.0f/d; gersuma razem %.0f; wrocilo do kas %.0f' % (ga, gb, pw, sum(paid.values()), retAll[0]))
 bel_a = max(world(d, False)[2] for d in days if d > d1 - 28); bel_b = max(world(d, True)[2] for d in days if d > d1 - 28)
 print('ponizej zapasu (najwiecej w oknie): stare %d, nowe %d; na koniec %d / %d' % (bel_a, bel_b, world(d1, False)[2], world(d1, True)[2]))
 top = sorted(paid.items(), key=lambda kv: -kv[1])[:8]

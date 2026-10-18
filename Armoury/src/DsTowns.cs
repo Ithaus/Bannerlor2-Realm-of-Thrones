@@ -602,6 +602,9 @@ namespace Armoury
         /// po wczytaniu reszta gersumy przepada. Model odtworzeniowy na fin91 (tools/ekonomia-symulatory-2026-10-17/f7/model_gersuma.py: kasy-miast.csv + kiesa-obieg.csv +
         /// M6 z linii f5; ta sama regula co kod): kasy miast z KS ostatnie 28 dob +53.1 -> +5.0 tys./d, ponad 1.5 x zapas 13.22 -> 11.22 mln, miast ponizej zapasu w oknie
         /// najwiecej 10 -> 10, gersuma 59 tys./d w oknie (21 miast, 2.37 mln od ustalenia firm); udzial 1.0 - Tolos do 0.80 zapasu (dlatego domyslnie 0.5).
+        /// Recenzja f7: +5.0 tys./d to DOLNA granica - model bez powrotu gersumy do kas (panowie i korony wydaja ja dalej: zold -> markietani / zycie w miastach,
+        /// zakupy sprzetu). Czulosc modelu (zwrot nastepnej doby wedlug doplywu netto kupcow): zwrot 0.25 / 0.5 / 0.75 / 1.0 -> +16.6 / +28.4 / +40.6 / +53.0 tys./d,
+        /// miast ponizej zapasu w oknie 10 / 8 / 7 / 7 (przy zwrocie 1.0 suma kas sie nie zmienia - zapas przechodzi z bogatych miast do biednych).
         /// </summary>
         internal static bool CatchUpOn(Settings s) { return s != null && s.KsFarmCatchUp && s.KsFarmFollowsSurplus; }
 
