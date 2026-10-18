@@ -34,6 +34,7 @@ namespace Armoury
     ///    najbogatszego notabla; lenno zostaje. Po splacie - KW dopiero po 182 dobach.
     ///  - BEZ UMORZENIA: dlug wymarlego rodu na nowych panow jego wsi (takze gracza); bez wsi - "dlug bez platnika" w ksiedze.
     ///  - KAPITAL: Bank pozycza z kapitalu (posiadacz w "Pieniadz swiata"); zysk ponad IronBankCapital - do kasy Braavos po 1/180 dziennie (pod tarcza dworu).
+    ///    f20-d3: przy kluczu IronBankDividends ten krok nie biegnie - zysk zrealizowany ponad rezerwe co 28 dob do klucznikow i miasta Braavos (IronBank.Dividends.cs).
     ///  - PORTFELE GRY (GameWalletsNoAdvance): niezaplacony udzial rodu w portfelu najemnikow/trybutu/wezwania zostaje dlugiem krolestwa (portfel), nie
     ///    "zaplacony" z niczego i dopisany rodowi - zamyka zrodlo zaliczki gry (OBIEG-1).
     /// Gracz (PlayerSameLadder): ta sama ksiega i drabina; pozycza recznie w Braavos (w wojnie - KW); bez automatycznej splaty z jednorazowych (u gracza ksiega
@@ -661,24 +662,28 @@ namespace Armoury
                 catch (Exception e) { Stumble("Daily(rod)", e); }
             }
             // 3. zysk Banku ponad kapital startowy -> kasa Braavos (1/180 dziennie, pod tarcza dworu - regulator gry jej nie skasuje)
-            try
+            // f20-d3: przy kluczu IronBankDividends - nie (jedna regula na zjawisko: zysk zrealizowany ponad rezerwe co 28 dob, IronBank.DvDay); LastProfit zostaje 0
+            if (!IronBank.DividendsOn)
             {
-                double cap = IronBank.FreeCapital, base0 = Math.Max(0, s.IronBankCapital);
-                if (cap > base0)
+                try
                 {
-                    long x = (long)((cap - base0) / Math.Max(1f, s.BankProfitToBraavosDays));
-                    var br = Settlement.Find("town_EN5");
-                    if (x > 0 && br != null && br.Town != null)
+                    double cap = IronBank.FreeCapital, base0 = Math.Max(0, s.IronBankCapital);
+                    if (cap > base0)
                     {
-                        int ix = (int)Math.Min(int.MaxValue, x);
-                        IronBank.CapitalAdd(-ix);
-                        br.Town.ChangeGold(ix);
-                        SoldierPay.HoldCourt(br, ix);
-                        _dProfit += ix;
+                        long x = (long)((cap - base0) / Math.Max(1f, s.BankProfitToBraavosDays));
+                        var br = Settlement.Find("town_EN5");
+                        if (x > 0 && br != null && br.Town != null)
+                        {
+                            int ix = (int)Math.Min(int.MaxValue, x);
+                            IronBank.CapitalAdd(-ix);
+                            br.Town.ChangeGold(ix);
+                            SoldierPay.HoldCourt(br, ix);
+                            _dProfit += ix;
+                        }
                     }
                 }
+                catch (Exception e) { Stumble("Daily(zysk)", e); }
             }
-            catch (Exception e) { Stumble("Daily(zysk)", e); }
             // 4. porzadki: puste wpisy (bez dlugu, zaleglosci i zajecia; karencja KW po zajeciu minela)
             var drop = new List<string>();
             foreach (var kv in _l)
@@ -1212,6 +1217,7 @@ namespace Armoury
                         hd.Rate = hd.Principal > 1 ? (hd.Rate * hd.Principal + r * b) / (hd.Principal + b) : r;
                         if (hd.Principal < 1) hd.DueDay = today + Math.Max(7, IronBank.DaysPerYearNow() / 2);
                         hd.Principal += b;
+                        IronBank.MoveCost(id, heir, b, bank - bGiven + b);   // f20-d3: koszt pozyczki idzie z dlugiem (b z tego, co jeszcze zostalo; ostatni dziedzic - reszta)
                     }
                     var hl = Of(heir, true);
                     long cGiven = 0;

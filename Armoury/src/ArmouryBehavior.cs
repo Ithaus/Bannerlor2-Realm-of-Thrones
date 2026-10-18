@@ -1125,6 +1125,10 @@ namespace Armoury
             // brak klucza (stary zapis) = bez dlugow koron, sredni podatek od zera (7 dob pomiaru przed pierwszym kredytem)
             try { string cr = dataStore.IsSaving ? CrownBorrow.Export() : null; SaveText.Sync(dataStore, "arm_crown186", ref cr); if (dataStore.IsLoading) CrownBorrow.Import(cr); }
             catch (Exception e) { Log.Error("SyncData.arm_crown186", e); }
+            // f20-d3: zysk Banku do Braavos - koszt pozyczek rodow i koron, pula zysku, migawka kapitalu, pierscien pozyczek (rezerwa) - wlasny try;
+            // brak klucza (stary zapis, klucz wylaczony) = start od zera w pierwszej dobie (koszt = dzisiejszy dlug, pula 0)
+            try { string bd = dataStore.IsSaving ? IronBank.DvExport() : null; SaveText.Sync(dataStore, "arm_bankdiv", ref bd); if (dataStore.IsLoading) IronBank.DvImport(bd); }
+            catch (Exception e) { Log.Error("SyncData.arm_bankdiv", e); }
             // musztra: zapas cwiczebny gracza, maska godzin ruchu gracza, liczniki zuzycia i zlom czekajacy na kowali, flaga zasilenia autotestu - wlasny try;
             // Export tylko przy zapisie; brak klucza (stary zapis) = pusty zapas (linia "Musztra: start ... z zapisu: brak klucza")
             try { string dr = dataStore.IsSaving ? Drill.Export() : null; SaveText.Sync(dataStore, "arm_drill", ref dr); if (dataStore.IsLoading) Drill.Import(dr); }

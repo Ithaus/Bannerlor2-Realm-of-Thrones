@@ -236,6 +236,19 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>f20-d3 (IronBank.DvDay): dlug kazdego kredytu korony (id krolestwa -> kapital z odsetkami i oplatami). Tylko odczyt; false przy wyjatku (wolajacy
+        /// pomija wtedy rozliczenie doby - brak wpisu wzialby dlug za strate).</summary>
+        internal static bool PrincipalsInto(Dictionary<string, double> into)
+        {
+            try
+            {
+                into.Clear();
+                foreach (var kv in _loans) if (kv.Value != null && kv.Key != null) into[kv.Key] = Math.Max(0, kv.Value.Principal);
+                return true;
+            }
+            catch (Exception e) { Stumble("PrincipalsInto", e); return false; }
+        }
+
         /// <summary>E5/B2 (184): dlug korony krolestwa w Banku (0 - bez kredytu albo 186 bez wpisu). Tylko odczyt - potrzeba korony w KingdomTreasury.WarTaxDaily.</summary>
         internal static double DebtOf(Kingdom k)
         {
@@ -452,6 +465,7 @@ namespace Armoury
                         IronBank.CapitalAdd(-iy);
                         try { k.KingdomBudgetWallet += iy; }
                         catch { IronBank.CapitalAdd(iy); l.Principal -= iy + fe; l.Borrowed -= iy; l.DLent -= iy; throw; }   // recenzja 186: zloto wraca do Banku, dlug cofniety
+                        IronBank.NoteCrownLent(k.StringId, iy);   // f20-d3: koszt kredytu korony (kapital, ktory wyszedl) - splata ponad koszt to zysk Banku (nie rzuca)
                         got[k] = iy;
                         _dLent += iy; _dLentN++; _dFees += (long)Math.Round(fe);
                         var cd = CrownIncome.DayOf(k);

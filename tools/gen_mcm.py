@@ -72,6 +72,10 @@ RANGES = {
     'CrownLoanLimitDays': (0.0, 728.0, "0"),
     'CrownLoanRepayDays': (30.0, 728.0, "0"),
     'CrownLoanPoolDays': (1.0, 360.0, "0"),
+    # f20-d3: zysk Banku do Braavos - doby przycinane w kodzie do 1.. (wyplata) i 1..364 (pierscien rezerwy), udzial miasta do 0..1
+    'IronBankDividendDays': (1, 364, "0"),
+    'IronBankDividendTownShare': (0.0, 1.0, "0.00"),
+    'IronBankReserveLendDays': (1, 364, "0"),
     # E5/B2 (184): podatek wojenny ludu - pulapy przycinane w kodzie do 0..0.2, krok do 0..0.05, doby zapasu wojny do 0..728 (KingdomTreasury.WarTax)
     'WarTaxMax': (0.0, 0.1, "0.000"),
     'WarTaxMaxWithPolicy': (0.0, 0.2, "0.000"),

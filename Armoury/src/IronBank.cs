@@ -33,11 +33,13 @@ namespace Armoury
     /// i pozycza wrogom; gracz traci jednorazowo renome.
     /// KAPITAL BANKU: start IronBankCapital (5 mln); pozyczki go zmniejszaja, splaty z odsetkami
     /// zwiekszaja - pusty bank nie pozycza; dlug rodu wymarlego to strata Banku.
+    /// f20-d3 (IronBank.Dividends.cs, klucz IronBankDividends): zysk zrealizowany (odsetki i oplaty naprawde wplacone, po stratach) ponad
+    /// rezerwe - co 28 dob do klucznikow Braavos (glowy rodow krolestwa Braavos z lennem) i do miasta Braavos.
     /// GRACZ: w menu miasta Braavos (town_EN5) opcja "Visit the Iron Bank": pozyczka i splata.
     /// </summary>
-    internal static class IronBank
+    internal static partial class IronBank
     {
-        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; _famRates = 0; _famNoLoan = 0; _famSum = 0; _famRateSum = 0; _famRatesViaLoan = 0; _famToday.Clear(); ZeroLast(); }
+        internal static void Reset() { _debts.Clear(); _capital = -1; _lastDay = -1; _logged = 0; _famRates = 0; _famNoLoan = 0; _famSum = 0; _famRateSum = 0; _famRatesViaLoan = 0; _famToday.Clear(); ZeroLast(); DvReset(); }
 
         // paczka 169 (tylko log): liczby doby dla linii "Obieg" - zerowane TYLKO w Reset i w MoneyLedger.ClearLast169() (D20)
         internal static int LastLent, LastPaidN, LastMissed, LastDefaults;
@@ -123,7 +125,9 @@ namespace Armoury
         internal static int DaysPerYearNow() { return DaysPerYear(); }
         internal static double RateNow(Clan c) { return RateFor(c, Of(c, false)); }
         internal static double FreeCapital { get { EnsureCapital(); return _capital; } }
-        /// <summary>168: wplata do kapitalu Banku (splata, zajecie, wyprzedaz) albo wyplata z niego (ujemna - zysk do Braavos). Zloto rusza wolajacy.</summary>
+        /// <summary>168: wplata do kapitalu Banku (splata, zajecie, wyprzedaz) albo wyplata z niego (ujemna - zysk do Braavos). Zloto rusza wolajacy.
+        /// f20-d3: kazda zmiana kapitalu wchodzi do wplywow doby (DvDay liczy je ze zmiany kapitalu) - ujemna wolno wolac TYLKO z pozyczka zapisana
+        /// w NoteCrownLent (kredyt korony) albo ze starym krokiem zysku DebtLadder (wylaczonym przy IronBankDividends).</summary>
         internal static void CapitalAdd(double amount) { EnsureCapital(); _capital += amount; }
         internal static int FamilyCoverAll(Clan c, int need) { return FamilyCover(c, need, true); }
         internal static void NoteLadderLine(string line) { Note(line); }
@@ -150,6 +154,7 @@ namespace Armoury
                 if (!running) { d.Loans++; d.DueDay = (int)CampaignTime.Now.ToDays + Math.Max(7, DaysPerYear() / 2); }
                 c.Leader.ChangeHeroGold(amount);
                 _capital -= amount;
+                DvLent(c.StringId, amount);   // f20-d3: koszt pozyczki (kapital, ktory wyszedl) - splata ponad koszt to zysk Banku
                 CirculationWindows.NoteHeroGold(c.Leader, amount);
                 return amount;
             }
@@ -253,6 +258,7 @@ namespace Armoury
                 if (!running) d.DueDay = today + Math.Max(7, DaysPerYear() / 2);
                 c.Leader.ChangeHeroGold(amount);
                 _capital -= amount;
+                DvLent(c.StringId, amount);   // f20-d3: koszt pozyczki (kapital, ktory wyszedl) - splata ponad koszt to zysk Banku
                 CirculationWindows.NoteHeroGold(c.Leader, amount);   // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (tylko licznik)
                 Note("IronBank: " + c.Name + " pozycza " + amount + " (" + why + ") na " + (d.Rate * 100).ToString("0") + "% rocznie, dlug " + (int)d.Principal
                      + ", termin dzien " + d.DueDay + ", limit " + Limit(c) + ", kapital Banku " + (long)_capital + ".");
@@ -342,6 +348,7 @@ namespace Armoury
                 if (_lastDay == today) return;
                 _lastDay = today;
                 _logged = 0;
+                DvDay(today);   // f20-d3: zysk zrealizowany od wczoraj i wyplata do Braavos co IronBankDividendDays - przed drabina i kredytem dnia (nie rzuca)
                 _famRates = 0; _famNoLoan = 0; _famSum = 0; _famRateSum = 0; _famRatesViaLoan = 0; _famToday.Clear();   // T5: liczniki doby
                 int lent = 0, paid = 0, missed = 0, defaults = 0; long lentSum = 0, paidSum = 0;
                 // 168: drabina dlugu - pozyczka AI tylko jako kredyt wojenny (ClanBudget, w pulapie 166), raty, zaleglosci, zajecie i wyprzedaz w DebtLadder;

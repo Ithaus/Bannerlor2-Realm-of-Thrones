@@ -4188,9 +4188,25 @@ namespace Armoury
         [SettingPropertyGroup("Debts and the war credit (stage 2)")]
         public int CreditAfterSeizureDays { get; set; } = 182;
 
-        [SettingPropertyFloatingInteger("Bank Profit To Braavos Days", 0.00f, 720.00f, "0.00", HintText = "the Bank's capital above Iron Bank Capital flows into the purse of Braavos, one part in this many a day", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Bank Profit To Braavos Days", 0.00f, 720.00f, "0.00", HintText = "the Bank's capital above Iron Bank Capital flows into the purse of Braavos, one part in this many a day (not used while Iron Bank Dividends is on)", RequireRestart = false)]
         [SettingPropertyGroup("Debts and the war credit (stage 2)")]
         public float BankProfitToBraavosDays { get; set; } = 180f;
+
+        [SettingPropertyBool("Iron Bank Dividends", HintText = "every Iron Bank Dividend Days the Iron Bank pays out the profit it has really earned - the interest and fees its debtors have actually paid in, less what it lost on debts nobody will ever pay - but only as far as its vaults stay above its reserve: Bank Free Capital Floor or Crown Loan Bank Floor, whichever is higher, plus everything it lent to houses and crowns in the last Iron Bank Reserve Lend Days. The Bank's own capital is never paid out. Iron Bank Dividend Town Share of each payout goes into the city of Braavos as the keyholders' household spending (a part to the townsfolk who serve them, the rest to the merchants' coffer); the rest goes to the heads of the Braavosi houses holding a town or castle of Braavos (a town counts twice), you too if you are one of them. Replaces Bank Profit To Braavos Days. Off = the Bank keeps its interest and only its capital above Iron Bank Capital flows to Braavos, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public bool IronBankDividends { get; set; } = true;
+
+        [SettingPropertyInteger("Iron Bank Dividend Days", 1, 364, "0", HintText = "how often the Iron Bank pays out its profit to Braavos, in days (with Iron Bank Dividends)", RequireRestart = false)]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int IronBankDividendDays { get; set; } = 28;
+
+        [SettingPropertyFloatingInteger("Iron Bank Dividend Town Share", 0.00f, 1.00f, "0.00", HintText = "share of each Iron Bank payout that goes into the city of Braavos (its townsfolk and merchants' coffer); the rest goes to the heads of the Braavosi houses holding a town or castle (with Iron Bank Dividends)", RequireRestart = false)]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public float IronBankDividendTownShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Iron Bank Reserve Lend Days", 1, 364, "0", HintText = "the Bank's reserve counts everything it lent to houses and crowns in this many past days on top of its floors - it keeps that much for the lending to come before any profit is paid out (with Iron Bank Dividends)", RequireRestart = false)]
+        [SettingPropertyGroup("Debts and the war credit (stage 2)")]
+        public int IronBankReserveLendDays { get; set; } = 28;
 
         [SettingPropertyBool("Wage Debt To Men", HintText = "the debt the game writes to a house for wages it could not pay (debt to the crown) becomes a debt to the men of the parties whose pay was cut: it is paid off by the same instalments into their purses (a party gone - another party of the house, then the nearest town); the game no longer drains the head's purse to pay it in one go. Old crown debts are taken into the same ledger", RequireRestart = false)]
         [SettingPropertyGroup("Debts and the war credit (stage 2)")]
@@ -8963,6 +8979,10 @@ namespace Armoury
             s.SaleAfterZeroSeizeDays = SaleAfterZeroSeizeDays;
             s.CreditAfterSeizureDays = CreditAfterSeizureDays;
             s.BankProfitToBraavosDays = BankProfitToBraavosDays;
+            s.IronBankDividends = IronBankDividends;
+            s.IronBankDividendDays = IronBankDividendDays;
+            s.IronBankDividendTownShare = IronBankDividendTownShare;
+            s.IronBankReserveLendDays = IronBankReserveLendDays;
             s.WageDebtToMen = WageDebtToMen;
             s.GameWalletsNoAdvance = GameWalletsNoAdvance;
             s.PlayerSameLadder = PlayerSameLadder;
