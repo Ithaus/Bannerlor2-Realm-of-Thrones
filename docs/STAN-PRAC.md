@@ -2933,3 +2933,10 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
   wplywow (renty 180 biora ja tego samego dnia - DO DECYZJI JEFFA: renty wedlug potrzeby?). fin88 szacunek: zwrot 331.7 -> 179.9k/d (42 rody > 2R bez zwrotu).
   Scalone do noc-ks4 **7ca98719** (konflikt sprawdz_logi rozwiazany - nruda i nzwrot obie). 1940 ustawien.
 - 06:40 PDT: TEST fin91 = 7ca98719 z KsSwitchSignalRule=TAK (DLL testowa 7ffd0f95, zrodlo bez zmiany), armoury-ks-auto.flag (USUNAC!), 160 dob -> pomiar A7 w grze (na7), f6 (nzwrot), fala 5.
+- 07:20 PDT: TEST fin91 (7ca98719 + DLL testowa; Armoury-2026-10-18_06-29-09.log; wyniki scratchpad fin91/*.txt): kod 0, ERROR 0, zgony z glodu 0. TAK: nzw 22/22 (NZW-1 neutralny start 0.000%,
+  NZW-3 ikony 77), nzwrot 12/12 (105 rodow > 2R bez zwrotu, zwrot -77%, Bank ~0), nakum W 49.9 -> 30 dni (lud -17.6k/d), nuchodzcy, nmur, nglod, nkoszyk 30/30, na7 15/15, nperf, nzapis.
+  NIE: NOWY AKUMULATOR - kasy miast KS +57k/d (ponad 1.5 x zapas 1.95 -> 12.89 mln) - wstrzymane place zostaja u placacych; korona NDS-7b 0.727, D 0.767 (zwrot czescia D - skutek decyzji;
+  skarbce -43k/d, renty 180 284k/d), kopalnie bez wegla 93.8 lup/d (NOP-8/NRU-8), browary/garbarnie 47 -> 23 (NWAR-4b), kiesy wsi -0.381%/d.
+  UWAGA: A7 w tym biegu WYLACZONE mimo DLL testowej - zmiana domyslnej w Settings.cs bez gen_mcm (domyslne niesie McmSettings.cs!). Do testu z prawdziwymi zmianami: plik armoury-a7-wlacz.flag.
+  Pomiar A7: nacisk 11.7% blokow, trzymane >= 60 dob 6.9% (przed: 92%).
+- 07:22 PDT: test 5 dob + bitwa dokladnych DLL (test/wgr80: Armoury 7b9f9ad0 z 7ca98719) przed WGRANIEM 80. Decyzja Jeffa o rentach 180 (wedlug potrzeby?) - zapytana, brak odpowiedzi.
