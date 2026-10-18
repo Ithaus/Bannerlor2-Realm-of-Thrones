@@ -44,6 +44,7 @@ namespace Armoury
             public long TodayRansom;                                   // 178: okupy otrzymane (w Today; jednorazowe od prawdziwego platnika - 168 limit i splata kredytu)
             public long TodayShips;                                    // 3.1/3.3 (33) 181: wyplaty portow za statki (czesc TodayEvtSettl) - poza limitem KW (E2 R16 "limit bez statkow")
             public long TodayReaver;                                   // WW2 (wyspy-wolni): zelazna cena ponad s (czesc TodayEvtSettl), nabrzeze i dziesiecina korsarzy (KReaver) - kosz lupu na zalogi
+            public long TodayNeedCut;                                  // recenzja calosci 18.10: zwrot f6 i renty f7 zatrzymane wedlug potrzeby (NIE w Today) - pierscien miary potrzeby; tylko pamiec
             public long WageAccLord, WageAccGar, WageAccCar;          // w biezacym rozliczeniu rodu
             public int WageLastLord, WageLastGar, WageLastCar;        // z ostatniego pelnego rozliczenia rodu
             public bool HadTick;                                       // bylo choc jedno zmierzone rozliczenie
@@ -135,6 +136,20 @@ namespace Armoury
                 else if (kind == KReaver) { r.TodayReaver += amount; }   // WW2: kosz lupu na zalogi (przelew bez zdarzenia gry - nabrzeze, dziesiecina)
             }
             catch (Exception e) { Stumble("NoteInflow", e); }
+        }
+
+        /// <summary>Recenzja calosci 18.10 (f6 + f7, sprzezenie D -> R -> f): czesc zwrotu zoldu (f6) albo renty (f7), ktorej korona rodowi NIE dala wedlug potrzeby -
+        /// nie jest wplywem (Today bez zmian, D staly bez zmian); idzie do osobnego pierscienia 28 dob (NeedCutAdd), z ktorego miara potrzeby liczy R tak, jakby
+        /// zwrot i renty byly pelne. Tylko licznik; nie rzuca.</summary>
+        internal static void NoteNeedCut(Clan c, long amount)
+        {
+            try
+            {
+                if (!On || c == null || amount <= 0 || c.IsBanditFaction) return;
+                var r = Of(c);
+                if (r != null) r.TodayNeedCut += amount;
+            }
+            catch (Exception e) { Stumble("NoteNeedCut", e); }
         }
 
         /// <summary>WW2 (wyspy-wolni): czesc wplywu, ktory ksiega juz zobaczyla jako zdarzenie gry (przyrost zelaznej ceny ponad s - przelew kiesa wsi -> wodz,
@@ -369,6 +384,7 @@ namespace Armoury
                         r.TodayRansom = 0;   // 178
                         r.TodayShips = 0;   // 3.1/3.3 (33) 181
                         r.TodayReaver = 0;  // WW2 (wyspy-wolni)
+                        r.TodayNeedCut = 0; // recenzja calosci 18.10 (pierscien miary potrzeby - w StableClan wyzej)
                         r.D = DOf(r); r.G = g;
                         modelSum += (long)a; rentSum += b;
                         _today.Add(c);

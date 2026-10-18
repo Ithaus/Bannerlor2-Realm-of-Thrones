@@ -58,6 +58,7 @@ namespace Armoury
         private static readonly Dictionary<Settlement, Ring> _rTown = new Dictionary<Settlement, Ring>();    // cla i podatek miasta / zamku (wedlug wlasciciela)
         private static readonly Dictionary<Settlement, Ring> _rCastle = new Dictionary<Settlement, Ring>();  // 110: zawor zamku bez "wlasnych" (wedlug wlasciciela)
         private static readonly Dictionary<Clan, Ring> _rLoose = new Dictionary<Clan, Ring>();               // ziemia bez osady (nie do przypisania)
+        private static readonly Dictionary<Clan, Ring> _rNeedCut = new Dictionary<Clan, Ring>();             // recenzja calosci 18.10: zwrot f6 i renty f7 zatrzymane wedlug potrzeby (poza D)
         private static readonly Dictionary<Settlement, long> _ownPaid = new Dictionary<Settlement, long>();  // wplaty rodu do kasy wlasnej osady od ostatniego Daily
         private static readonly Dictionary<Settlement, long> _ownPaidOld = new Dictionary<Settlement, long>();  // E5 A2b: te same wplaty w zapasie CourtFull (tylko pomiar starej reguly)
         private static readonly Dictionary<Clan, long> _ownByClan = new Dictionary<Clan, long>();            // "wlasne" dzis (zawor oddal rodowi jego pieniadze)
@@ -98,6 +99,7 @@ namespace Armoury
         internal static void ResetStable()
         {
             _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownPaidOld.Clear(); _ownByClan.Clear(); _rCastle.Clear(); _ownCastleByClan.Clear();
+            _rNeedCut.Clear();   // recenzja calosci 18.10
             _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
             ZeroStableDay();
             LastTicksStableBegin = LastTicksStableClans = LastTicksStableLine = 0;
@@ -459,6 +461,10 @@ namespace Armoury
             PartRing pr;
             if (!_parts.TryGetValue(c, out pr)) { pr = new PartRing(); _parts[c] = pr; }
             pr.Push(_t);
+            // recenzja calosci 18.10: zatrzymane wedlug potrzeby (f6 / f7) - ten sam krok co czesci D (ten sam pierscien dob, Filled jak pr)
+            Ring nc;
+            if (!_rNeedCut.TryGetValue(c, out nc)) { nc = new Ring(); _rNeedCut[c] = nc; }
+            nc.Push(Math.Max(0L, r.TodayNeedCut));
             // cla i podatek miast: linia modelu rozdzielona na dzisiejsze lenna rodu wedlug wagi (podatek miasta + cla z licznika)
             long loose = 0;
             var fiefs = c.Fiefs;
@@ -540,6 +546,20 @@ namespace Armoury
         {
             try { StableParts p; return StableDOn && TryStable(c, out p) ? p.D : -1; }
             catch { return -1; }
+        }
+
+        /// <summary>Recenzja calosci 18.10 (f6 + f7): o ile D staly rodu bylby wyzszy, gdyby korona nie ciela zwrotu i rent wedlug potrzeby - suma pierscienia / 28
+        /// (to samo mieszanie co D w budzecie: dni zmierzone x srednia / 28, reszta z D z zapisu). 0 - brak pomiaru. Tylko odczyt; nie rzuca.</summary>
+        internal static double NeedCutAdd(Clan c)
+        {
+            try
+            {
+                Ring r;
+                if (c == null || !StableDOn || !_rNeedCut.TryGetValue(c, out r) || r.Filled <= 0) return 0;
+                long s = 0; for (int i = 0; i < Days; i++) s += r.V[i];
+                return Math.Max(0.0, (double)s / Days);
+            }
+            catch { return 0; }
         }
 
         /// <summary>165 (2.6): czesc "ziemia" D stalego (wsie, renty i zawory osad z dzisiejszych lenn, bez "wlasnych") albo -1 - podstawa powinnosci.</summary>

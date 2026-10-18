@@ -140,6 +140,7 @@ namespace Armoury
                 if (need < 0) need = 0;
                 if (need > x) need = x;
                 int b = n.Band;
+                if (_rnApply && need < x) ClanIncomeBook.NoteNeedCut(c, x - need);   // recenzja calosci 18.10: zatrzymane wedlug potrzeby - do miary R (nie do D)
                 _rnFull[b] += x; _rnNeed[b] += need;
                 n.Full += x; n.Need += need;
                 if (!n.Counted) { n.Counted = true; _rnN[b]++; _rnG[b] += Math.Max(0, n.G); }
@@ -243,6 +244,11 @@ namespace Armoury
                       .Append(" | reszta wplywow dnia po zwrocie ").Append(LastPool).Append(" = renty ").Append(LastPaid).Append(" + udzialy rodow bez warunku ").Append(LastHeldFail)
                       .Append(" + zatrzymane wedlug potrzeby ").Append(LastKeptNeed).Append(" + zaokraglenia ").Append(LastRound)
                       .Append(" | rodow z ucieta renta ").Append(cut);
+                    // recenzja calosci 18.10: R miary potrzeby (f6 i f7) z D z cieciami dodanymi z powrotem - ile rodow tej doby i o ile D (srednia 28 dob)
+                    int ncN = 0; double ncSum = 0;
+                    foreach (var kv in _rn) { if (kv.Key == null || kv.Value == null || !kv.Value.Counted) continue; double a = ClanIncomeBook.NeedCutAdd(kv.Key); if (a > 0) { ncN++; ncSum += a; } }
+                    sb.Append(" | R miary z D bez ciec f6/f7 (Need Reserve Uncut ").Append(s.NeedReserveUncut ? "tak" : "NIE").Append("): rodow z cieciem w 28 dobach ").Append(ncN)
+                      .Append(", dodane do D miary razem ").Append(Math.Round(ncSum).ToString("0", inv)).Append(" zl/d");
                     RnRow p0;
                     var pc0 = Clan.PlayerClan;
                     if (pc0 != null && _rn.TryGetValue(pc0, out p0) && p0 != null && p0.Counted)

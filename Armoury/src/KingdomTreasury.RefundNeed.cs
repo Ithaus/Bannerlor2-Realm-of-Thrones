@@ -39,7 +39,7 @@ namespace Armoury
     internal static partial class KingdomTreasury
     {
         private const int NbBelow = 0, NbMid = 1, NbAbove = 2, NbNone = 3;   // pasma: ponizej R, R-2R, ponad 2R, bez miary
-        private sealed class NeedRow { public double F = 1, G, R; public int Band = NbNone; public long Full, Need; public bool Counted; }
+        private sealed class NeedRow { public double F = 1, G, R; public int Band = NbNone; public long Full, Need; public bool Counted; public Clan C; }   // C - recenzja calosci 18.10 (ciecie do pierscienia miary)
         private static readonly Dictionary<Clan, NeedRow> _rbn = new Dictionary<Clan, NeedRow>();
         private static int _rbnDay = int.MinValue;
         private static bool _rbnApply, _rbnMeasure;            // klucz czynny przy ostatnim kroku / pomiar mozliwy (budzet 166 wlaczony)
@@ -82,19 +82,20 @@ namespace Armoury
             NeedRow n;
             if (c == null) return null;
             if (_rbn.TryGetValue(c, out n)) return n;
-            n = new NeedRow();
+            n = new NeedRow { C = c };
             _rbn[c] = n;
             if (!_rbnMeasure) return n;
             try
             {
                 double G, R; bool war;
-                bool ok = ClanBudget.ChestOf(c, out G, out R, out war) || ClanBudget.PendingChestOf(c, out G, out R, out war);
+                // recenzja calosci 18.10: R miary potrzeby (NeedChestOf - z D z cieciami f6/f7 dodanymi z powrotem; klucz Need Reserve Uncut wylaczony = ChestOf)
+                bool ok = ClanBudget.NeedChestOf(c, out G, out R, out war) || ClanBudget.PendingChestOf(c, out G, out R, out war);
                 // recenzja f6: rod gracza dluznik albo w zajeciu (168, z Player Same Ladder) - bez miary jak AI (ChestOf: b.Debtor / b.Seized) i W6b gracza
                 if (!ok && c == Clan.PlayerClan && !(DebtLadder.On && (DebtLadder.IsDebtor(c) || DebtLadder.IsSeized(c))))
                 {
                     double capW5, capW6, d;
                     ok = ClanBudget.PlayerCaps(c, out capW5, out capW6, out R, out d);   // W6b: ten sam wzor rezerwy co AI (gracz bez budzetu z wczoraj)
-                    if (ok) G = ClanIncomeBook.FamilyGoldOf(c);
+                    if (ok) { G = ClanIncomeBook.FamilyGoldOf(c); R = ClanBudget.NeedReserve(c, R, d); }   // recenzja calosci 18.10: R miary potrzeby jak AI
                 }
                 if (ok && R > 0 && !double.IsNaN(G) && !double.IsInfinity(G))
                 {
@@ -166,6 +167,7 @@ namespace Armoury
                     long f = Math.Max(0, full[i]);
                     long need = n == null || n.F >= 1.0 ? f : (long)(int)(f * n.F);   // ten sam wzor co RbnDue - suma pasm = nalezny linii zwrotu
                     _rbnFull[b] += f; _rbnNeed[b] += need; fsum += f;
+                    if (_rbnApply && n != null && n.C != null && need < f) ClanIncomeBook.NoteNeedCut(n.C, f - need);   // recenzja calosci 18.10: zatrzymane wedlug potrzeby - do miary R
                     if (n != null && f > 0)   // rod liczony w pasmie tylko z pelnym zwrotem > 0 (wiersz bez zoldu do zwrotu - poza licznikami i CSV)
                     {
                         n.Full += f; n.Need += need;

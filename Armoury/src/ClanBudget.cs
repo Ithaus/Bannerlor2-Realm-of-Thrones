@@ -70,6 +70,7 @@ namespace Armoury
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
             public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap; W7 - razem z podniesieniem z poboru stawki wojennej pana
             public double Loot;     // WW2 (wyspy-wolni): lup na zalogi - okno 28 dob zelaznej ceny i dziesieciny korsarzy (zl/d), JUZ doliczony do Cap i PartyCap (po zalogach i karawanach)
+            public double RNeed;    // recenzja calosci 18.10: R miary potrzeby (f6 zwrot / f7 renty) - z D z cieciami f6/f7 dodanymi z powrotem (NeedReserve); bez klucza = R
             public double AidCash;  // W5 (recenzja): w tym GOTOWKA korony tej doby - zold druzyn, ktorego rod nie placi sam (dwor i niewydany sprzet mu nie ustepuja); W7 - razem z gotowka poboru pana
         }
 
@@ -370,6 +371,38 @@ namespace Armoury
             catch (Exception e) { Stumble("ChestOf", e); return false; }
         }
 
+        /// <summary>Recenzja calosci 18.10 (f6-zwrot + f7-renty): G, R i wojna jak ChestOf (te same wykluczenia), ale R = R MIARY POTRZEBY (b.RNeed): z D, w ktorym
+        /// zwrot i renty zatrzymane wedlug potrzeby licza sie w pelni - ciecie nie obniza R i nastepnego f (sprzezenie D -> R -> f). Klucz Need Reserve Uncut
+        /// wylaczony - R jak ChestOf. Tylko odczyt (KingdomTreasury.RbnOf).</summary>
+        internal static bool NeedChestOf(Clan c, out double G, out double R, out bool war)
+        {
+            if (!ChestOf(c, out G, out R, out war)) return false;
+            try { var b = Of(c); if (NeedUncutOn && b != null && b.RNeed > R) R = b.RNeed; }
+            catch (Exception e) { Stumble("NeedChestOf", e); }
+            return true;
+        }
+
+        /// <summary>Recenzja calosci 18.10: klucz Need Reserve Uncut i miara potrzeby wlaczona (zwrot albo renty wedlug potrzeby).</summary>
+        private static bool NeedUncutOn { get { var s = Settings.Current; return s != null && s.NeedReserveUncut && (s.CrownRefundByNeed || s.CrownRentsByNeed); } }
+
+        /// <summary>Recenzja calosci 18.10: R miary potrzeby z R budzetu i D, ktorym liczono R (Ceiling): czesc "War Reserve Floor / War Reserve Days x D" policzona
+        /// z D + zatrzymane wedlug potrzeby (ClanIncomeBook.NeedCutAdd); czesc za doroslych bez zmian. Klucz wylaczony albo brak ciec - R. Nie rzuca.</summary>
+        internal static double NeedReserve(Clan c, double R, double D)
+        {
+            try
+            {
+                if (!NeedUncutOn || c == null) return R;
+                double add = ClanIncomeBook.NeedCutAdd(c);
+                if (!(add > 0)) return R;
+                var s = Settings.Current;
+                D = Math.Max(0, D);
+                double lo = Math.Max(Math.Max(0f, s.WarReserveFloor), Math.Max(0f, s.WarReserveDays) * D);
+                double hi = Math.Max(Math.Max(0f, s.WarReserveFloor), Math.Max(0f, s.WarReserveDays) * (D + add));
+                return R + Math.Max(0, hi - lo);
+            }
+            catch (Exception e) { Stumble("NeedReserve", e); return R; }
+        }
+
         /// <summary>TP (16.10, recenzja - TourneyPay.ClanSpare): budzet wlaczony, ale w tej sesji jeszcze nie policzony (Pending - do pierwszego ClanBudget.Daily
         /// po wczytaniu albo starcie kampanii): G, R i wojna rodu tym samym wzorem co budzet (Ceiling: max(War Reserve Floor; War Reserve Days x D) + War Reserve
         /// Per Adult x dorosli), D z zapisu budzetu (D wczorajszej doby) albo G/60 (start 166). Te same wykluczenia co ChestOf: rod bez budzetu (Eligible),
@@ -507,6 +540,7 @@ namespace Armoury
                 long G = ClanIncomeBook.FamilyGoldOf(c);
                 double D = PlayerD(c, s, G), f, chest;
                 Ceiling(D, LootFreeG(c, G), AtWar(c), AdultsOf(c), out reserve, out f, out chest);   // R jak w PlayerCaps (wojna i G nie zmieniaja R)
+                reserve = NeedReserve(c, reserve, D);   // recenzja calosci 18.10: R miary potrzeby - jak RbnOf (wolajacy: tylko renty f7 gracza w pokoju)
                 return reserve > 0;
             }
             catch (Exception e) { Stumble("PlayerReserve", e); return false; }
@@ -620,6 +654,7 @@ namespace Armoury
                         long Gc = LootFreeG(c, G);
                         b.Cap = Ceiling(b.D, Gc, b.War, b.Adults, out R, out f, out chest);
                         b.R = R; b.F = f;
+                        b.RNeed = NeedReserve(c, R, b.D);   // recenzja calosci 18.10: R miary potrzeby f6/f7 (budzet ponizej - R jak dotad)
                         bool merc = c.IsUnderMercenaryService;
                         double mcap = 0;
                         if (merc && !MercContract.CapOf(c, b.War, out mcap)) { b.Today = false; continue; }   // najemnik bez umowy (185) - bez budzetu

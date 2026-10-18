@@ -4084,6 +4084,10 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownRentsByNeed { get; set; } = true;
 
+        [SettingPropertyBool("Need Reserve Uncut", HintText = "with Crown Refund By Need or Crown Rents By Need: the war reserve by which the crown judges a house's need is reckoned from the house's steady income with the wage refund and the fief rents counted in full, as if nothing had been held back. Without it, holding back part of a middling house's refund and rents lowered its steady income, so its war reserve, so the next share again - month by month such a house slid to nothing although its gold never moved. Only this measure of need changes - the house's own budget, court, building and wage ceiling still follow what it really receives. Off = the reserve of need follows the income actually received, as before")]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool NeedReserveUncut { get; set; } = true;
+
         [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once")]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownPaysCallToWar { get; set; } = true;
@@ -8876,6 +8880,7 @@ namespace Armoury
             s.CrownRentServiceAtMeans = CrownRentServiceAtMeans;
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownRentsByNeed = CrownRentsByNeed;
+            s.NeedReserveUncut = NeedReserveUncut;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
             s.CallToWarPaysForWar = CallToWarPaysForWar;
