@@ -46,7 +46,7 @@ namespace Armoury
         internal const int TlW = 0, TlR = 1, TlP = 2, TlKasa = 3, TlCastle = 4, TlKinds = 5;
         private const double TlSrcShare = 0.5;   // jak korona2 (KlSrcShare): z kazdego zrodla najwyzej polowa nadwyzki na dobe
 
-        private sealed class TlSrc { public Folk F; public Town T; public int Kind; public double Ex; }
+        private sealed class TlSrc { public Folk F; public Town T; public int Kind; public double Ex; public double Up; }   // Up - kasa kupcow: o ile prog gersumy podniosl prog f8 (recenzja calosci 18.10 - licznik linii scalenia)
         private sealed class TlPlace { public Settlement St; public double Room, Avail, Limit, Debt; public readonly List<TlSrc> Src = new List<TlSrc>(); }
 
         private static readonly Dictionary<Clan, List<TlPlace>> _tlPlan = new Dictionary<Clan, List<TlPlace>>();   // plan doby: od TownLoanRoom do TownLoanLend (ten sam rod w petli 166)
@@ -145,8 +145,9 @@ namespace Armoury
                 if (t != null)
                 {
                     // scalenie f7/f8: jeden prog kasy z gersuma f7-kasy (miasto z KS przy Ks Farm Catch Up: prog gersumy + reszta gersumy do zaplaty; inaczej prog f8)
-                    double ex = TlOffer(t.Gold, DsTowns.CofferLoanFloor(t, TlCofferTimes(s) * TownPurse.Reserve(t)), tk != null ? tk[TlKasa] : 0);
-                    if (ex >= 1) { p.Avail += ex; p.Src.Add(new TlSrc { T = t, Kind = TlKasa, Ex = ex }); }
+                    double up;   // recenzja calosci 18.10: o ile prog gersumy podnosi prog f8 - do licznika linii dopiero przy prawdziwym zdjeciu z kasy (TlTake)
+                    double ex = TlOffer(t.Gold, DsTowns.CofferLoanFloor(t, TlCofferTimes(s) * TownPurse.Reserve(t), out up), tk != null ? tk[TlKasa] : 0);
+                    if (ex >= 1) { p.Avail += ex; p.Src.Add(new TlSrc { T = t, Kind = TlKasa, Ex = ex, Up = up }); }
                 }
             }
             else
@@ -178,6 +179,7 @@ namespace Armoury
                     if (outside && got > 0) MoneyLedger.Note169(MoneyLedger.N169Other, st, -(int)got, -1);
                     if (got > 0) { var tk = TlTakenOf(st, true); if (tk != null) tk[TlKasa] += got; }   // recenzja f8 (uwaga 2): pulap doby zrodla
                     if (got > 0) DsTowns.NoteCofferLoan(st, -got);   // scalenie f7/f8: pozyczka to nie spadek handlu kupcow (pomiar przyrostu przegladu wedlug nadwyzki)
+                    if (got > 0) DsTowns.NoteCofferFloorUsed(x.Up, false);   // recenzja calosci 18.10: linia scalenia liczy pozyczki z kasy przy progu gersumy, nie zapytania planu
                     return got;
                 }
                 if (x.F == null) return 0;

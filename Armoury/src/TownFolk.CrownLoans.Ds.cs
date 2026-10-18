@@ -116,7 +116,7 @@ namespace Armoury
                     var k = KlKingdom(kv.Key);
                     if (k == null || k.IsEliminated) { _kaLost += KlDebt(x); drop.Add(kv.Key); continue; }   // krolestwa nie ma - dlug przepada (zloto juz w obiegu)
                     double it = 0;
-                    foreach (var p in x.Parts) { double a = Math.Max(0, p.Left) * rate; p.Left += a; it += a; }
+                    foreach (var p in x.Parts) { double a = Math.Max(0, p.Left) * rate; p.Left += a; p.Acc += a; it += a; }   // Acc: recenzja calosci 18.10 (odsetki przed kapitalem)
                     x.Interest += it; _kaInt += it;
                     var d = CrownIncome.DayOf(k);
                     if (d != null && d.DsTreas <= 0 && d.DsAnt <= 0 && d.LoanIn <= 0)
@@ -178,7 +178,7 @@ namespace Armoury
                 KlPart q = null;
                 foreach (var r in x.Parts) if (r.St == p.St && r.Kind == p.Kind) { q = r; break; }
                 if (q == null) { q = new KlPart { St = p.St, Kind = p.Kind }; x.Parts.Add(q); }
-                q.Left += p.Left; moved += p.Left;
+                q.Left += p.Left; q.Acc += Math.Max(0.0, p.Acc); moved += p.Left;   // Acc: recenzja calosci 18.10
             }
             if (x.Parts.Count == 0) { _kl.Remove(id); return; }
             x.Lent += moved;

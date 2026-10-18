@@ -23,7 +23,9 @@ namespace Armoury
     ///    testu D (370 tys./d): 14.5 mln + 360 x (129.5 - 6.8 - 26.3 + 4.4 tys.) = ok. 51 mln = 23% zlota swiata; ponizej celu 22% czesc zmienna (972e6270) przyspiesza.
     ///  - (B) POZYCZKI KORON (CrownTownLoans, czynne z 165): krolestwo w wojnie (z innym krolestwem), ktorego skarbiec po dniu korony (po CrownIncome.End) jest
     ///    ponizej ZAPASU WOJNY (KingdomTreasury.WarReserveFor - ta sama liczba co 184 / W5b / L5b-1: wieksze z 500 000 i 60 dob sredniego naleznego zwrotu zoldu),
-    ///    pozycza brak z MIAST SWOJEGO KROLESTWA: kasa miasta ponad zapas kupcow (TownPurse.Spare) i kiesy mieszczan W / R / P ponad poziom normalny
+    ///    pozycza brak z MIAST SWOJEGO KROLESTWA: kasa miasta ponad zapas kupcow (recenzja calosci 18.10: DsTowns.CofferLoanFloor - w miescie z KS przy gersumie
+    ///    f7-kasy ponad prog gersumy i reszte gersumy, jak pozyczka miejska f8; przeplywy przez kase poza pomiarem przyrostu przegladu - DsTowns.NoteCofferLoan,
+    ///    odsetki zostaja zarobkiem kupcow) i kiesy mieszczan W / R / P ponad poziom normalny
     ///    (FolkHoardNormalTimes x zapas dni klasy - ten sam co podatek od nadwyzki); z kazdego zrodla najwyzej polowa nadwyzki na dobe, najpierw najwieksze;
     ///    bez miast oblezonych i miast rodu gracza. LIMIT: CrownTownLoanLimitDays (90) x sredni nasz wplyw dnia 165 (84 doby, od 7. doby pomiaru) + 50 000
     ///    za miasto krolestwa. ZLOTO POZYCZONE TO ZAPAS TRZYMANY: migawka 165 przesunieta (nie wplyw jutra), poza 1/360 zapasu (CrownIncome.Begin), poza
@@ -41,10 +43,12 @@ namespace Armoury
     /// </summary>
     internal static partial class TownFolk
     {
-        private sealed class KlPart { public string St = ""; public int Kind; public double Left; }   // Kind: 0 kasa miasta, 1 kiesa W, 2 kiesa R, 3 kiesa P
+        private sealed class KlPart { public string St = ""; public int Kind; public double Left; public double Acc; }   // Kind: 0 kasa miasta, 1 kiesa W, 2 kiesa R, 3 kiesa P; Acc - narosle
+        // a niesplacone odsetki w Left (recenzja calosci 18.10: splata najpierw odsetki, potem kapital - kapital do kasy kupcow poza pomiarem przyrostu DsTowns; tylko
+        // pamiec sesji, bez zapisu - po wczytaniu splata liczy sie jako kapital, az dojda nowe odsetki)
         private sealed class KlDebtK { public readonly List<KlPart> Parts = new List<KlPart>(); public int Missed; public double Lent, Repaid, Interest, Peak; public long DLent, DPaid; }
         private sealed class KlInc { public double Avg; public int N; }
-        private sealed class KlSrc { public Town T; public Folk F; public int Kind; public double Ex; }
+        private sealed class KlSrc { public Town T; public Folk F; public int Kind; public double Ex; public double Up; }   // Up - kasa: o ile prog gersumy podniosl prog (licznik linii scalenia)
 
         private static readonly Dictionary<string, KlDebtK> _kl = new Dictionary<string, KlDebtK>();     // id krolestwa -> dlug u miast i mieszczan
         private static readonly Dictionary<string, int> _klBan = new Dictionary<string, int>();          // id krolestwa -> doba konca zakazu po niesplacie
@@ -153,8 +157,13 @@ namespace Armoury
                 if (st == null || !st.IsTown) continue;
                 towns++;
                 if (st.IsUnderSiege || (Clan.PlayerClan != null && st.OwnerClan == Clan.PlayerClan)) continue;
-                double ex = KlSrcShare * TownPurse.Spare(t);
-                if (ex >= 1) { sum += ex; into.Add(new KlSrc { T = t, Kind = 0, Ex = ex }); }
+                // recenzja calosci 18.10 (jedna regula kasy kupcow z gersuma f7-kasy i pozyczka miejska f8): kasa ponad zapas kupcow, a w miescie z KS przy Ks Farm Catch Up
+                // ponad prog gersumy (1.5 x zapas + Keep Days firmy) i reszte gersumy do zaplaty (CLeft) - DsTowns.CofferLoanFloor; dotad TownPurse.Spare (1.0 x zapas) -
+                // korona pozyczala gersume winna panu i koronie, ktora potem przepadala w CatchUpPay. Miasto bez KS / bez firmy / gersuma wylaczona - jak dotad co do monety
+                double up;
+                double fl = DsTowns.CofferLoanFloor(t, TownPurse.Reserve(t), out up);
+                double ex = KlSrcShare * Math.Max(0.0, (double)t.Gold - fl);
+                if (ex >= 1) { sum += ex; into.Add(new KlSrc { T = t, Kind = 0, Ex = ex, Up = up }); }
                 Folk f;
                 if (!live || !_f.TryGetValue(st, out f) || f == null || f.Kind != 0) continue;
                 for (int c = 0; c < 3; c++)
@@ -180,7 +189,13 @@ namespace Armoury
                     int want = (int)Math.Min(amount, Math.Max(0, had));
                     if (want <= 0) return 0;
                     x.T.ChangeGold(-want);
-                    return Math.Max(0, had - x.T.Gold);
+                    long got = Math.Max(0, had - x.T.Gold);
+                    if (got > 0 && x.T.Settlement != null)
+                    {
+                        DsTowns.NoteCofferLoan(x.T.Settlement, -got, true);   // recenzja calosci 18.10: pozyczka korony to nie spadek handlu kupcow (pomiar przegladu wedlug nadwyzki)
+                        DsTowns.NoteCofferFloorUsed(x.Up, true);              // licznik linii scalenia: pozyczka z kasy przy progu gersumy
+                    }
+                    return got;
                 }
                 int c = x.Kind - 1;
                 long t = Math.Min(amount, Math.Max(0, PurseOf(x.F, c)));
@@ -195,7 +210,7 @@ namespace Armoury
         /// Wplata do wierzyciela: kiesa klasy (1-3; kiesa nieczynna albo miasto bez ludu - kasa miasta) albo kasa miasta (0). repay=false - zwrot zdjetego po wyjatku
         /// (ksiega kies z powrotem). Zwraca 1 - kiesa, 2 - kasa, 0 - nigdzie (wolajacy oddaje zloto skarbcowi - nic w nicosc).
         /// </summary>
-        private static int KlPut(Settlement st, int kind, long amount, bool repay)
+        private static int KlPut(Settlement st, int kind, long amount, bool repay, long ip = 0)
         {
             if (st == null || st.Town == null || amount <= 0) return 0;
             if (kind >= 1 && kind <= 3 && Live)
@@ -211,6 +226,9 @@ namespace Armoury
             }
             st.Town.ChangeGold((int)Math.Min(int.MaxValue, amount));
             if (repay) _klPaidKasa += amount;
+            // recenzja calosci 18.10: kapital splaty (bez odsetek ip - zarobek kupcow, jak w TownLoanRepay) i zwrot zdjetego po wyjatku to nie przyrost handlu kupcow -
+            // pomiar przegladu wedlug nadwyzki bez nich (dotad splata korony podnosila firme FL/FC i gersume z tej samej monety)
+            DsTowns.NoteCofferLoan(st, repay ? Math.Max(0, amount - Math.Max(0, ip)) : amount, true);
             return 2;
         }
 
@@ -239,11 +257,13 @@ namespace Armoury
                 long a = share[i];
                 if (a <= 0) continue;
                 var p = x.Parts[i];
+                long ia = Math.Min(a, (long)Math.Floor(Math.Max(0.0, p.Acc)));   // recenzja calosci 18.10: najpierw odsetki, potem kapital
                 int r = 0;
-                try { r = KlPut(Settlement.Find(p.St), p.Kind, a, true); }
+                try { r = KlPut(Settlement.Find(p.St), p.Kind, a, true, ia); }
                 catch (Exception e) { KlStumble("Repay(wplata)", e); r = 0; }
                 if (r == 0) continue;
                 p.Left -= a; x.Repaid += a; placed += a;
+                p.Acc = Math.Max(0.0, p.Acc - ia);
             }
             if (placed < took) k.KingdomBudgetWallet += (int)(took - placed);   // nic w nicosc: niewplacone wraca do skarbca, dlug tej czesci bez zmian
             return placed;
@@ -305,7 +325,7 @@ namespace Armoury
                             continue;
                         }
                         double it = 0;
-                        foreach (var p in x.Parts) { double a = Math.Max(0, p.Left) * rate; p.Left += a; it += a; }
+                        foreach (var p in x.Parts) { double a = Math.Max(0, p.Left) * rate; p.Left += a; p.Acc += a; it += a; }   // Acc: recenzja calosci 18.10
                         x.Interest += it; _klInt += it; total += it;
                         if (total > x.Peak) x.Peak = total;
                         bool war = KlAtWar(k);
@@ -408,7 +428,7 @@ namespace Armoury
                              + (s.FolkGuardCrownToReserve ? "tak" : "nie") + " (straznik obiegu " + (GuardOn ? "tak" : "nie") + ", cel udzialu koron "
                              + (100 * HdClamp(s.FolkGuardCrownTarget, 0, 0.5)).ToString("0.0", KlInv) + "%)"
                              + " | regula: krolestwo w wojnie ze skarbcem ponizej zapasu wojny (184 / W5b: max(500000, 60 dob naleznego zwrotu)) pozycza brak z miast krolestwa"
-                             + " (kasa ponad zapas kupcow, kiesy W / R / P ponad poziom normalny; z kazdego najwyzej " + (100 * KlSrcShare).ToString("0", KlInv)
+                             + " (kasa ponad zapas kupcow - w miescie z KS przy gersumie f7 ponad prog gersumy i reszte gersumy, kiesy W / R / P ponad poziom normalny; z kazdego najwyzej " + (100 * KlSrcShare).ToString("0", KlInv)
                              + "% nadwyzki na dobe, najpierw najwieksze; bez oblezonych i miast rodu gracza), limit " + KlLimitDays(s).ToString("0", KlInv)
                              + " dob sredniego naszego wplywu dnia + " + KlPerTown + " za miasto; " + (100 * KlRate(s)).ToString("0.#", KlInv) + "% rocznie; wojna - odsetki, pokoj -"
                              + " odsetki + 1/" + KlRepayDays + " najwiekszego dlugu (najwyzej " + (100 * KlIncomeShare).ToString("0", KlInv) + "% do wydania); zawsze 1/" + KlSurplusDays
