@@ -6,7 +6,7 @@
 # Wejscie (tylko odczyt): Armoury/ModuleData/arm_map_villages_v5.tsv i arm_map_village_lore_v5.tsv (uklad v5 bez zmian - stary uklad, jak _v4),
 #   Armoury/ModuleData/arm_ks_land.tsv (strefa klimatu wiersza S wioski - ta sama, co w KS), tools/wioski-v5/okregi_n_v4.tsv (regula L4),
 #   rastry mapy ROT (katalog a-teren: teren.npz, flora.npz, okregi.npz, drogi_raster.npz, osady.json - D:/Backup-Bannerlord/drogi-siec/a-teren)
-#   i sonda terenu z gry (geo-siatka.tsv: siatka 2 jedn., kolumna nawig - D:/Backup-Bannerlord/geo-dane-2026-10-16).
+#   i sonda terenu z gry (geo-siatka.tsv: siatka 2 jedn., kolumna nawig; geo-trasy-punkty.tsv: trasy AI miedzy twierdzami - D:/Backup-Bannerlord/geo-dane-2026-10-16).
 # Wyjscie: Armoury/ModuleData/arm_map_villages.tsv (v6), arm_map_village_lore.tsv (lore v6) i tools/wioski-v6/raport-v6.txt + przysiolki-v6.tsv.
 # Przebieg deterministyczny (te same wejscia = te same pliki).
 #
@@ -19,7 +19,7 @@
 #  2. Miejsce: ten sam okreg (raster okregow KS - okregi.npz label, ta sama ziemia co ha_okregu KS; ziemia poza rastrem - droga > 45 jedn. - do najblizszej
 #     wsi gry do 60 jedn., Voronoi), komorka 1 jedn. przejezdna w rastrze (walk; bagno, rzeka, nachylenie >= 0.35 i lad nieprzejezdny poza kwadratem 5x5,
 #     morze i gory - w ROT takze klify brzegu - poza 3x3) i w sondzie gry (nawig = tak w srodku i w 7 z 9 komorek 2 jedn.; brzeg rybakow 5 z 9);
-#     od wszystkich osad >= EMPTY (pustka), od miast >= 14, zamkow >= 10, wsi gry >= 8, kryjowek >= 5, innych wiosek i przysiolkow >= 9, od starego miejsca
+#     od wszystkich osad >= EMPTY (pustka), od miast >= 14, zamkow >= 10, wsi gry >= 8, kryjowek >= 5, drog i tras AI >= 4, innych wiosek i przysiolkow >= 9, od starego miejsca
 #     >= 10. Wybor: komorka najdalej od wszystkiego (pustka sie zapelnia; ponad 30 jedn. bez roznicy) z premia brzegu (rybacy). Okreg zostaje z co najmniej
 #     jedna wioska nie-przysiolkiem, najwyzej MAX_SHARE wiosek okregu idzie na pustkowie i tylko wtedy, gdy pozostale wioski przyjma zwolnione osady
 #     (sufit 36, L4). Przeniesien najwyzej TARGET_SHARE.
@@ -51,6 +51,7 @@ OUT_LIST = os.path.join(HERE, "przysiolki-v6.tsv")
 ap = argparse.ArgumentParser()
 ap.add_argument("--teren", default="D:/Backup-Bannerlord/drogi-siec/a-teren")
 ap.add_argument("--geo", default="D:/Backup-Bannerlord/geo-dane-2026-10-16/geo-siatka.tsv")
+ap.add_argument("--trasy", default="D:/Backup-Bannerlord/geo-dane-2026-10-16/geo-trasy-punkty.tsv")
 ap.add_argument("--dens", type=int, default=None)
 ap.add_argument("--empty", type=float, default=None)
 ap.add_argument("--side", type=float, default=None)
@@ -64,6 +65,7 @@ MAX_SHARE = 0.40       # najwyzej tyle wiosek okregu
 EMPTY = 11.0           # pustka: od kazdej osady (wioski, przysiolki, wsie gry, zamki, miasta) co najmniej tyle (sonda 16.10: pustki = ponad 12 jedn.)
 D_TOWN, D_CASTLE, D_MAIN, D_HIDE, D_SIDE = 14.0, 10.0, 8.0, 5.0, 9.0
 SLOPE_MAX = 0.35
+D_ROAD = 4.0           # od drogi (siec drog z rastra drogi_raster: malowane ROT + wyliczone) i od tras AI miedzy twierdzami (sonda; zajazdy stoja na trasach)
 MOVE_MIN = 10.0        # przysiolek co najmniej tyle od starego miejsca (inaczej to nie przeniesienie ze skupiska)
 VOR_MAX = 60.0         # ziemia poza rastrem okregow KS (droga > 45 jedn.): do najblizszej wsi gry, gdy blizej niz tyle (ten sam okreg - Voronoi)
 if A.dens is not None: DENS_MIN = A.dens
@@ -491,7 +493,22 @@ def main():
         vlab[y0:y1, x0:x1][upd] = vidx[o2["id"]]
     vor = (lab == -1) & (vlab >= 0)
     tlab[vor] = vlab[vor]
-    fixed_ok = (~badw) & (d_town >= D_TOWN) & (d_castle >= D_CASTLE) & (d_main >= D_MAIN) & (d_hide >= D_HIDE) & (tlab >= 0)
+    # z dala od drog i tras AI (przysiolek "far from any road"; zajazdy paczki sw-zajazdy stoja przy trasach - bez nakladania obrazkow)
+    DR = np.load(J("drogi_raster.npz"))
+    d_road = DR["d_road"].astype(np.float32)
+    route = []
+    with io.open(A.trasy, encoding="utf-8") as f:
+        f.readline()
+        for line in f:
+            c = line.split("	", 4)
+            try:
+                route.append((float(c[2]), float(c[3])))
+            except (IndexError, ValueError):
+                pass
+    d_route = np.full((H, W), 1e6, dtype=np.float32)
+    for (x, y) in route:
+        stamp(d_route, x, y, cap=D_ROAD + 2.0)
+    fixed_ok = (~badw) & (d_town >= D_TOWN) & (d_castle >= D_CASTLE) & (d_main >= D_MAIN) & (d_hide >= D_HIDE) & (tlab >= 0) & (d_road >= D_ROAD) & (d_route >= D_ROAD)
     d_fixed = np.minimum(np.minimum(d_town, d_castle), d_main)
 
     # ---------- gestosc i zachlanne przenoszenie
@@ -954,6 +971,8 @@ def main():
         min(hn), sorted(hn)[len(hn) // 2], min(rows[i]["_h"]["empty"] for i in moved), sorted(rows[i]["_h"]["empty"] for i in moved)[len(moved) // 2]))
     rep.append("przysiolki na ladzie: raster (walk, bagno/rzeka/nachylenie >= %.2f poza 5x5, morze/gory poza 3x3) %d/%d, sonda gry (nawig 3x3 po 2 jedn.) %d/%d" % (
         SLOPE_MAX, sum(1 for i in moved if not badw[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]), len(moved), sum(1 for i in moved if probe_ok(rows[i]["_h"]["x"], rows[i]["_h"]["y"])), len(moved)))
+    rep.append("od drog i tras AI: droga min %.1f, trasa AI min %.1f (prog %.0f jedn.; punktow tras %d)" % (
+        min(float(d_road[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]) for i in moved), min(float(d_route[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]) for i in moved), D_ROAD, len(route)))
     rep.append("odleglosci przysiolkow: od miast min %.1f (prog %.0f), zamkow %.1f (%.0f), wsi gry %.1f (%.0f), kryjowek %.1f (%.0f)" % (
         min(float(d_town[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]) for i in moved), D_TOWN, min(float(d_castle[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]) for i in moved), D_CASTLE,
         min(float(d_main[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]) for i in moved), D_MAIN, min(float(d_hide[rows[i]["_h"]["iy"], rows[i]["_h"]["ix"]]) for i in moved), D_HIDE))

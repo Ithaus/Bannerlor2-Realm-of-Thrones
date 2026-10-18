@@ -965,7 +965,7 @@ Uzycie (Python 3, tylko odczyt):
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
 --grupa nprzysiolki: (17/18.10, Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja"; paczka sw-przysiolki, Armoury/src/VillageHamlets.cs, uklad
                     wiosek v6 z tools/wioski-v6/v6_przysiolki.py) python -I tools/sprawdz_logi.py --grupa nprzysiolki <Armoury-*.log> (strumieniowo). NPR-0 linia
-                    "Przysiolki (sw-przysiolki): start sesji", NPR-1 uklad v6 wczytany (crc ukladu C8A773DD - plik generatora; klucz Village Layout V6 NIE = INFO), NPR-2 wiosek
+                    "Przysiolki (sw-przysiolki): start sesji", NPR-1 uklad v6 wczytany (crc ukladu F5456602 - plik generatora; klucz Village Layout V6 NIE = INFO), NPR-2 wiosek
                     i okregow jak v5 (okregow z inna liczba wiosek 0, uid spoza v5 0), NPR-3 ludzie okregow: suma osad wiosek okregu = v5 w kazdym okregu (wies gry bez zmian),
                     NPR-4 najblizsza sasiadka v6: mediana > v5, min >= 6.0, skupiska (>= 3 sasiadow w 10 jedn.) mniej niz v5, NPR-5 przysiolki na ladzie (sciana ladowa siatki
                     gry) = wszystkie, NPR-6 od miasta >= 12 i od zamku >= 9 jedn., NPR-7 ksiega wiosek na crc v6 i zapis innego ukladu przeniesiony po uid (plik _v5 / _v4),
@@ -35433,7 +35433,7 @@ def nks_main(logp, until=120, bdp=None):
 
 
 NPR_HEAD = "Przysiolki (sw-przysiolki): "
-NPR_CRC6 = "C8A773DD"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
+NPR_CRC6 = "F5456602"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
 NPR_CRC5 = "68BB06AD"
 
 

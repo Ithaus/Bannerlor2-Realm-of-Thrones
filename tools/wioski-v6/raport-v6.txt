@@ -1,21 +1,22 @@
 UKLAD v6 (tools/wioski-v6/v6_przysiolki.py) z arm_map_villages_v5.tsv
-wiosek pobocznych: v5 1957 -> v6 1957 (te same uid); przeniesionych na pustkowia (przysiolki) 238 = 12.2% (cel najwyzej 12.5%, gestosc >= 3 osad w 12 jedn.)
-pominieci kandydaci: okreg bez pustki 170, okreg - limit 40% 33, okreg - brak miejsca na osady (sufit 36 / L4) 12, okreg - ostatnia wioska 7
-okregow z przysiolkami 157 z 425; okregow o innej liczbie wiosek niz v5 0 (uid bez zmian); okregow o innej sumie osad wiosek niz v5 0; L4 zlamane przez v6 0
+wiosek pobocznych: v5 1957 -> v6 1957 (te same uid); przeniesionych na pustkowia (przysiolki) 215 = 11.0% (cel najwyzej 12.5%, gestosc >= 3 osad w 12 jedn.)
+pominieci kandydaci: okreg bez pustki 196, okreg - limit 40% 27, okreg bez ziemi 17, okreg - brak miejsca na osady (sufit 36 / L4) 11, okreg - ostatnia wioska 8
+okregow z przysiolkami 145 z 425; okregow o innej liczbie wiosek niz v5 0 (uid bez zmian); okregow o innej sumie osad wiosek niz v5 0; L4 zlamane przez v6 0
 osady wiosek swiata: v5 41316, v6 41316 (wies gry i ludzie okregu bez zmian - n okregu z ludzi gry)
-osady przysiolka: min 5, mediana 6, max 8, suma 1521 (ludzi przy 250: 380250); zwolnione dane innym wioskom okregu 2993, zostalo w przysiolkach (sufit 36 / L4) 0
-przesuniecie: min 9.9, mediana 29.8, max 72.8 jedn.; gestosc przenoszonych (osad w 12 jedn.): 3: 141, 4: 69, 5: 25, 6: 3
-najblizsza sasiadka (wioski poboczne): v5 min 6.13 / 10% 6.44 / mediana 8.36 / srednia 9.43; v6 min 6.13 / 10% 6.59 / mediana 9.81 / srednia 10.87
-skupiska (wiosek z >= 3 sasiadami w 10 jedn.): v5 165, v6 35; najwiecej sasiadow v5 5, v6 4; srednio v5 1.12, v6 0.69
-przysiolki: najblizsza sasiadka min 10.8 / mediana 15.0; pustka miejsca (od kazdej osady) min 11.0 / mediana 15.6 jedn.
-przysiolki na ladzie: raster (walk, bagno/rzeka/nachylenie >= 0.35 poza 5x5, morze/gory poza 3x3) 238/238, sonda gry (nawig 3x3 po 2 jedn.) 238/238
-odleglosci przysiolkow: od miast min 14.4 (prog 14), zamkow 11.9 (10), wsi gry 11.1 (8), kryjowek 5.0 (5)
-ziemia przysiolka: raster okregow KS 201, poza nim (droga > 45 jedn., najblizsza wies gry do 60 jedn.) 37
-zajecia przysiolkow: goatherds 97, shepherds 77, woodcutters 30, charcoal 15, trappers 10, fishers 9
-zajecie startowe KS (ks_start, tabela swiata): sheep_farm 174, lumberjack 45, trapper 10, fisherman 9
-miejsce (kind): hills 64, wilds 54, forest 50, steppe 34, desert 17, moor 10, coast 9; obrazek: farm 229, fishing 9
-kultura okregu: river 29, norvos 28, reach 25, battania 24, qohorik 15, pentoshi 14, myrish 14, volantine 14, ghiscari 14, vale 10, aserai 10, empire 9, vlandia 8, nord 7, lyseni 7, stormlands 6, tyroshi 3, dragonstone 1
-wioski z obrazkiem rybackim (HamletKinds poza KS): v5 319, v6 320
-nazwy: nowe (Westeros) 113, stare (Essos) 125; rycerz 'of <nazwa>' przemianowany 77
-crc ukladu (uid:osady; jak VillageBook): v5 68BB06AD, v6 C8A773DD
-lore v6: wierszy 1957 (wiosek v6 1957, bez lore 0, przysiolkow z nowym zajeciem 238), bramka layout_crc C8A773DD
+osady przysiolka: min 5, mediana 6, max 8, suma 1376 (ludzi przy 250: 344000); zwolnione dane innym wioskom okregu 2691, zostalo w przysiolkach (sufit 36 / L4) 0
+przesuniecie: min 9.9, mediana 29.2, max 70.7 jedn.; gestosc przenoszonych (osad w 12 jedn.): 3: 123, 4: 67, 5: 23, 6: 2
+najblizsza sasiadka (wioski poboczne): v5 min 6.13 / 10% 6.44 / mediana 8.36 / srednia 9.43; v6 min 6.13 / 10% 6.58 / mediana 9.50 / srednia 10.76
+skupiska (wiosek z >= 3 sasiadami w 10 jedn.): v5 165, v6 47; najwiecej sasiadow v5 5, v6 4; srednio v5 1.12, v6 0.73
+przysiolki: najblizsza sasiadka min 11.0 / mediana 15.0; pustka miejsca (od kazdej osady) min 11.0 / mediana 15.9 jedn.
+przysiolki na ladzie: raster (walk, bagno/rzeka/nachylenie >= 0.35 poza 5x5, morze/gory poza 3x3) 215/215, sonda gry (nawig 3x3 po 2 jedn.) 215/215
+od drog i tras AI: droga min 4.0, trasa AI min 4.0 (prog 4 jedn.; punktow tras 80526)
+odleglosci przysiolkow: od miast min 14.4 (prog 14), zamkow 12.4 (10), wsi gry 11.2 (8), kryjowek 5.0 (5)
+ziemia przysiolka: raster okregow KS 179, poza nim (droga > 45 jedn., najblizsza wies gry do 60 jedn.) 36
+zajecia przysiolkow: goatherds 90, shepherds 75, woodcutters 22, charcoal 13, trappers 10, fishers 5
+zajecie startowe KS (ks_start, tabela swiata): sheep_farm 165, lumberjack 35, trapper 10, fisherman 5
+miejsce (kind): hills 62, wilds 55, forest 41, steppe 28, desert 14, moor 10, coast 5; obrazek: farm 210, fishing 5
+kultura okregu: norvos 27, reach 24, battania 24, river 22, qohorik 15, volantine 14, ghiscari 13, pentoshi 12, myrish 12, vale 10, empire 9, aserai 7, vlandia 6, nord 6, lyseni 6, tyroshi 4, stormlands 3, dragonstone 1
+wioski z obrazkiem rybackim (HamletKinds poza KS): v5 319, v6 318
+nazwy: nowe (Westeros) 97, stare (Essos) 118; rycerz 'of <nazwa>' przemianowany 66
+crc ukladu (uid:osady; jak VillageBook): v5 68BB06AD, v6 F5456602
+lore v6: wierszy 1957 (wiosek v6 1957, bez lore 0, przysiolkow z nowym zajeciem 215), bramka layout_crc F5456602

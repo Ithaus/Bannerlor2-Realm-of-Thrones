@@ -12,7 +12,7 @@ namespace Armoury
     /// <summary>
     /// PRZYSIOLKI NA PUSTKOWIACH (paczka sw-przysiolki, noc 17/18.10; Jeff 16.10: "daj wioski w miejscach odludnych, tez jacys ludzie zyja - teraz masa natkanych wiosek
     /// i masa pustego miejsca"; STAN-PRAC ### 52 W2). Uklad wiosek v6 (ModuleData\arm_map_villages.tsv, generator tools/wioski-v6/v6_przysiolki.py; klucz VillageLayoutV6):
-    /// te same 1957 wiosek i uid co v5, 238 wiosek z najgestszych skupisk przeniesionych na pustkowia TEGO SAMEGO okregu jako przysiolki 5-8 osad, zwolnione osady do
+    /// te same 1957 wiosek i uid co v5, 215 wiosek z najgestszych skupisk przeniesionych na pustkowia TEGO SAMEGO okregu (z dala od drog i tras) jako przysiolki 5-8 osad, zwolnione osady do
     /// pozostalych wiosek okregu (suma osad wiosek okregu = v5, wiec wies gry i ludzie okregu bez zmian - ludzi nikt nie tworzy, n okregu idzie z ludzi gry).
     /// Ten plik NIE zmienia ksiegi wiosek ani widoku (one czytaja plik ukladu jak dotad); robi trzy rzeczy:
     ///  1. SessionStart - linia sprawdzenia ukladu (raz na sesje): crc, wiosek i okregow, porownanie z v5 (arm_map_villages_v5.tsv: liczba wiosek i suma osad na okreg),

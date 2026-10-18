@@ -2267,7 +2267,7 @@ namespace Armoury
         // najblizszych), rozlozony przy starcie sesji po MCM; uklad zapisu nieznany - sumy pustych osad okregu na nowe wioski, pamiec wojny pominieta (VillageBook, "inny uklad")
         public bool VillageLayoutV5 = true;                // a fifth fewer map villages, none crowded against its neighbour, and each of its own size - from about 1,500 souls in a farm by the fields to 9,000 at a crossroads; the people of a district stay the same. It takes effect when a campaign is loaded. Off = the earlier layout, 2,446 villages of about 4,000 souls each
         // sw-przysiolki (noc 17/18.10; Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja - teraz masa natkanych wiosek i masa pustego miejsca"): uklad
-        // wiosek v6 - ModuleData\arm_map_villages.tsv (1957 wiosek jak v5, te same uid; 238 wiosek z najgestszych skupisk przeniesionych na pustkowia TEGO SAMEGO okregu
+        // wiosek v6 - ModuleData\arm_map_villages.tsv (1957 wiosek jak v5, te same uid; 215 wiosek z najgestszych skupisk przeniesionych na pustkowia TEGO SAMEGO okregu
         // jako male przysiolki 5-8 osad: pasterze, kozy, drwale, weglarze, traperzy, rybacy; zwolnione osady do pozostalych wiosek okregu - suma osad okregu = v5,
         // wies gry i ludzie okregu bez zmian) + arm_map_village_lore.tsv v6; generator tools/wioski-v6/v6_przysiolki.py. Off = VillageLayoutV5 jak dotad (pliki _v5 / _v4).
         // Zapis v5 (crc 68BB06AD) przechodzi na v6 po uid (VillageBook.OldLayout - drugi plik ukladu _v5): puste osady, flagi i pamiec wojny ida za wioska do przysiolka
