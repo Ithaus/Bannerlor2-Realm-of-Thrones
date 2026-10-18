@@ -33,6 +33,9 @@ namespace Armoury
             if (ds.IsSaving)
             {
                 string v = value ?? "";
+                // zapis-d4: pomiar klucza (Save Size Log) i klucz z listy SaveSize ponad prog spakowany pod "<klucz>_z" (Save Compact) - true = zapisany;
+                // oba klucze MCM wylaczone = zawsze false, dalej stara droga co do bajtu
+                if (SaveSize.TrySave(ds, key, v)) return;
                 if (v.Length <= Part)
                 {
                     ds.SyncData(key, ref value);
@@ -51,6 +54,9 @@ namespace Armoury
                 List<string> parts = null;
                 ds.SyncData(key + PartsSuffix, ref parts);
                 value = parts != null && parts.Count > 0 ? string.Concat(parts) : head;
+                // zapis-d4: zapis z Save Compact - dane pod "<klucz>_z" (stary klucz ma ""); czytane zawsze, takze przy wylaczonym kluczu MCM; brak klucza = jak dotad
+                string z = SaveSize.TryLoad(ds, key);
+                if (z != null) value = z;
             }
         }
 
@@ -160,6 +166,7 @@ namespace Armoury
         /// <summary>Po wczytaniu kampanii: jedna linia, jesli ratunek cos uratowal.</summary>
         internal static void ReportAfterLoad()
         {
+            try { SaveSize.SessionLine(); } catch (Exception e) { Log.Error("SaveSize.SessionLine", e); }   // zapis-d4: linia "Zapis i logi (D4)" przy kazdym starcie sesji
             if (Rescued <= 0) return;
             Log.Info("Zapis: wczytany zapis mial " + Rescued + " napisow dluzszych niz 32767 B (najdluzszy " + Largest
                      + " B) - uratowane; nastepny zapis podzieli je na kawalki.");

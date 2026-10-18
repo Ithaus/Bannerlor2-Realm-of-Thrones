@@ -1237,6 +1237,18 @@ Uzycie (Python 3, tylko odczyt):
                     zwalniania sr. <= 2 ms, NHB-10 herbow gry razem <= 1000, NHB-11 potkniecia
                     i ERROR MapVillagesView.PennantTex* 0, NHB-12 nieprzyjete zamowienia 0, NHB-13 liczniki (INFO). Log sprzed paczki: INFO (stara linia - herb pana zamiast
                     gospodarza jako INFO), bez wyjatku.
+--grupa nzapis    : (noc 17/18.10, paczka zapis-d4, CO-ZOSTALO D4 "logi ciszej i rozmiar zapisu"; Armoury/src/SaveSize.cs, SaveText.cs, LogGate.cs - klucze Save Size Log,
+                    Save Compact, Save Compact Min Kb, Quiet Log More) python -I tools/sprawdz_logi.py --grupa nzapis <Armoury-*.log> (strumieniowo). Linie "Zapis i logi (D4)"
+                    (start sesji), "Zapis (D4)" (po kazdym zapisie gry), "Ciche logi (NW)", znacznik zapisu "Zbrojownie zalog (171): zapis - ". ZAP-0 linia startu (brak - INFO,
+                    log sprzed paczki), ZAP-1 stan kluczy (INFO), ZAP-2 linia "Zapis (D4)" przy kazdym zapisie gry (liczba >= znacznikow zapisu; bez zapisu - INFO),
+                    ZAP-3 probny odczyt spakowanych kluczy zgodny w kazdym zapisie (ok = proby, niezgodne 0; nic ponad prog - INFO), ZAP-4 nasze napisy do zapisu po
+                    spakowaniu <= 5120 KB (ostatni zapis; tekst przed spakowaniem INFO), ZAP-5 spakowanie >= x3.0, ZAP-6 czas pakowania <= 500 ms (najwiecej), ZAP-7 bledy:
+                    "ERROR in SaveSize"/"ERROR in SaveText" 0, potkniecia 0, "BLAD probnego odczytu" 0, ZAP-8 klucze spakowane wczytane z zapisu bez bledu (brak - INFO),
+                    ZAP-9 najwieksze klucze (INFO), ZAP-10 plik zapisu i czas zapisu (INFO), ZAP-Q0 ciche logi wiecej zgodne z trybem (autotest - "dzialaja: nie - pelne"),
+                    ZAP-Q1 tryb pelny: pominietych linii 0 w kazdej linii zapisu, ZAP-Q2 tryb gry: linie zestawu 2 rzadziej niz codziennie (INFO), ZAP-Q3 (recenzja) tryb
+                    pelny, bieg >= 14 dob: kazdy przedrostek ZAP_MORE z liniami w >= 80% dob (dob = linie "Profil doby"; rzadsza linia na liscie - NIE, bo filtr doby S+1
+                    gubi ja prawie zawsze; mniej dob - INFO). Save Compact domyslnie [wyl] (recenzja: cofniecie DLL) - ZAP-3/5 wtedy INFO. Log sprzed paczki
+                    (np. Armoury-2026-10-17_17-55-14.log): wiersze INFO / brak linii (ZAP-Q3 liczy sie i tam - lista wobec linii logu pelnego), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -40421,6 +40433,203 @@ def nherby_main(logp):
     return 0
 
 
+# ============================================================ zapis-d4 (noc 17/18.10, CO-ZOSTALO D4): rozmiar zapisu i cichsze logi - grupa nzapis
+# Armoury/src/SaveSize.cs (linie "Zapis (D4)" i "Zapis i logi (D4)"), SaveText.cs (pakowanie pod "<klucz>_z"), LogGate.cs (zestaw 2 cichych logow - lista ZAP_MORE
+# MUSI byc ta sama co LogGate.More; recenzja: bez linii o wlasnej rzadszej kadencji - "Skale ludzi wedlug krolestw (GL0)", "Zatkane wsie (przyklad)").
+ZAP_SESSION = "Zapis i logi (D4): "
+ZAP_SAVE = "Zapis (D4): "
+ZAP_SAVE_MARK = "Zbrojownie zalog (171): zapis - "   # linia GarrisonArmory.Export przy kazdym zapisie (nie linie wczytania "zapis zrobiony bez ..." / "zapis ma ...")
+ZAP_MORE = ("Kiesy rozbitych (3.2): dzien", "Wedrowcy BK - prawdziwy towar (36b): dzien", "Wedrowcy BK - towar (3.6): dzien", "Wedrowcy BK: dzien",
+            "Wozy w miastach: dzien", "Zaopatrzenie zamkow (171): dzien", "Spoils - klan najemnikow: dzien",
+            "Spoils - naprawa u kwatermistrza: dzien", "Spoils of War (128): dzien", "Dosypka z niczego (RealisticBannerlord): dzien", "Zold konnych (160",
+            "Las wsi (126): dzien", "Skale ludzi (GL0): dzien", "Balans krolestw (175): dzien",
+            "Zaopatrzenie BK - kara morale (W1): dzien", "Rzemieslnicy BK (147): dzien", "Morale AI (183d): dzien",
+            "ROT szczelnosc (3.7): dzien", "Rynek surowcow: zapasy na targach miast", "Rezerwa napraw AI - pamiec dopasowania (F6): dzien",
+            "Pule ochotnikow (171): dzien", "PodazPopyt: kupcy wywiezli", "Miasta bez strzal - powod (172): dzien", "Warsztaty wedlug krainy (E6/0",
+            "Drobne z niczego (3.10): dzien", "Konie rekrutow (160", "Ceny hurtu (09.10", "Stajnia AI (sklad7b-p): dzien", "Wierzchowce kanonu (208): dzien",
+            "Cwiczenia (171): dzien", "Kara za przegrana (D11-1): dzien", "Mineraly (dubel BK): dzien", "Papirus wedlug klimatu (T8): dzien",
+            "HouseLevies: dzien", "WPLYW: stan", "Karawany (kierunek): dzien", "Ludzie (regiony): dzien", "Dezercja AI (183): dzien",
+            "Zatkane wsie (wozy w drodze): dzien", "Spojnosc armii (AC wiek): dzien", "Ochotnicy (diagnoza):",
+            "Musztra (gracz): dzien", "Dowoz (wozy): dzien")
+# recenzja zapis-d4: w zestawie 2 tylko linie DZIENNE (filtr zna jedna dobe na N) - ZAP-Q3 na logu pelnym: kazdy przedrostek z liniami w >= tylu dobach
+ZAP_MIN_DAILY = 0.8
+ZAP_MAX_WRITTEN_KB = 5120.0
+ZAP_MIN_RATIO = 3.0
+ZAP_MAX_PACK_MS = 500.0
+
+
+def nzapis_main(logp):
+    """nzapis (noc 17/18.10, paczka zapis-d4): rozmiar naszych kluczy w zapisie (linia "Zapis (D4)" po kazdym zapisie gry), pakowanie dwoch najwiekszych kluczy
+    pod "<klucz>_z" z probnym odczytem (Save Compact), wczytanie spakowanych kluczy (linia startu "Zapis i logi (D4)") i zestaw 2 cichych logow (Quiet Log More).
+    Wejscie: log Armoury (strumieniowo). Progi ZAP-0..ZAP-10, ZAP-Q0..Q3 - opis w naglowku pliku (--grupa nzapis). Log bez linii paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("ZAP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    sessions, saves, marks, nw = [], [], 0, []
+    errs, bad_probe = [], 0
+    more_cnt = {p: 0 for p in ZAP_MORE}
+    more_days = {p: set() for p in ZAP_MORE}
+    more_di = {p: set() for p in ZAP_MORE}   # ZAP-Q3: indeks doby (ile linii "Profil doby" przed linia) - takze dla linii bez "dzien N"
+    prof_days = set()
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(ZAP_SESSION):
+                sessions.append(s)
+                continue
+            if s.startswith(ZAP_SAVE):
+                if s.startswith("Zapis (D4): BLAD probnego odczytu"):
+                    bad_probe += 1
+                else:
+                    saves.append(s)
+                continue
+            if s.startswith(ZAP_SAVE_MARK):
+                marks += 1
+                continue
+            if s.startswith("Ciche logi (NW)"):
+                nw.append(s)
+                continue
+            if s.startswith("ERROR in SaveSize") or s.startswith("ERROR in SaveText"):
+                errs.append(s[:160])
+                continue
+            if s.startswith("Profil doby (E8/0): dzien"):
+                d = num(r"dzien (\d+)", s)
+                if d is not None:
+                    prof_days.add(d)
+                continue
+            for p in ZAP_MORE:
+                if s.startswith(p):
+                    more_cnt[p] += 1
+                    more_di[p].add(len(prof_days))
+                    d = num(r"dzien (\d+)", s)
+                    if d is not None:
+                        more_days[p].add(d)
+                    break
+    print(f"plik: {logp} | linii startu D4 {len(sessions)}, zapisow D4 {len(saves)}, znacznikow zapisu {marks}, ERROR SaveSize/SaveText {len(errs)}, "
+          f"dob (Profil doby) {len(prof_days)}, linii zestawu 2 {sum(more_cnt.values())}")
+
+    def g(pat, s, cast=int):
+        mm = re.search(pat, s)
+        return cast(mm.group(1)) if mm else None
+
+    # ZAP-0 / ZAP-1 linia startu
+    st = sessions[-1] if sessions else None
+    if st is None:
+        rep.add("ZAP-0: linia startu 'Zapis i logi (D4)'", "brak linii", "INFO (log sprzed paczki zapis-d4)", None)
+    else:
+        rep.add("ZAP-0: linia startu 'Zapis i logi (D4)'", f"linii {len(sessions)}", "jest w kazdej sesji", True)
+        keys = re.findall(r"\((Save Size Log|Save Compact|Quiet Log More)\) (\[WL\]|\[wyl\])", st)
+        thr = g(r"od (\d+) KB", st)
+        rep.add("ZAP-1: stan kluczy (ostatnia sesja)", ", ".join(f"{k} {v}" for k, v in keys) + (f"; prog {thr} KB" if thr is not None else ""),
+                "INFO (domyslnie Save Size Log [WL], Save Compact [wyl] - recenzja, Quiet Log More [WL])", None)
+    log_on = st is not None and "(Save Size Log) [WL]" in st
+    # ZAP-2 linia przy kazdym zapisie
+    if not saves:
+        rep.add("ZAP-2: linia 'Zapis (D4)' przy zapisie gry", f"brak linii (znacznikow zapisu {marks})",
+                "INFO (log sprzed paczki, Save Size Log wylaczony albo sesja bez zapisu)" if (st is None or not log_on or marks == 0) else ">= 1 na zapis",
+                None if (st is None or not log_on or marks == 0) else False)
+    else:
+        rep.add("ZAP-2: linia 'Zapis (D4)' przy zapisie gry", f"linii {len(saves)}, znacznikow zapisu (zbrojownie zalog) {marks}",
+                ">= liczba znacznikow zapisu", len(saves) >= marks)
+    # ZAP-3 probny odczyt
+    tried = sum(g(r"proba odczytu \d+/(\d+)", s) or 0 for s in saves)
+    okp = sum(g(r"proba odczytu (\d+)/\d+", s) or 0 for s in saves)
+    badp = sum(g(r"\(niezgodne (\d+)\)", s) or 0 for s in saves) + bad_probe
+    if not saves:
+        rep.add("ZAP-3: probny odczyt spakowanych kluczy", "brak linii zapisu", "INFO", None)
+    elif tried == 0:
+        rep.add("ZAP-3: probny odczyt spakowanych kluczy", "nic nie spakowane (Save Compact wylaczony albo klucze ponizej progu)", "INFO", None)
+    else:
+        rep.add("ZAP-3: probny odczyt spakowanych kluczy (wszystkie zapisy)", f"zgodne {okp} z {tried}, niezgodne {badp}", "zgodne = proby, niezgodne 0",
+                okp == tried and badp == 0)
+    last = saves[-1] if saves else None
+    if last is not None:
+        raw = g(r"tekst razem ([0-9.]+) KB", last, float)
+        wr = g(r"do zapisu po spakowaniu ([0-9.]+) KB", last, float)
+        nk, nm, npk = g(r"kluczy SaveText (\d+)", last), g(r"kawalkami (\d+)", last), g(r"spakowanych (\d+)", last)
+        rep.add("ZAP-4: nasze napisy do zapisu po spakowaniu (ostatni zapis)", f"{wr} KB (tekst przed spakowaniem {raw} KB; kluczy {nk}, kawalkami {nm}, spakowanych {npk})",
+                f"<= {ZAP_MAX_WRITTEN_KB:.0f} KB", (wr <= ZAP_MAX_WRITTEN_KB) if wr is not None else None)
+        pz = re.search(r"spakowane ([0-9.]+) KB -> ([0-9.]+) KB", last)
+        if pz and float(pz.group(2)) > 0:
+            ratio = float(pz.group(1)) / float(pz.group(2))
+            rep.add("ZAP-5: spakowanie kluczy z listy (ostatni zapis)", f"{pz.group(1)} KB -> {pz.group(2)} KB (x{ratio:.1f})", f">= x{ZAP_MIN_RATIO:.1f}", ratio >= ZAP_MIN_RATIO)
+        else:
+            rep.add("ZAP-5: spakowanie kluczy z listy", "nic nie spakowane", "INFO", None)
+        mx = max((g(r"czas pakowania ([0-9.]+) ms", s, float) or 0.0) for s in saves)
+        rep.add("ZAP-6: czas pakowania i probnego odczytu (najwiecej w zapisie)", f"{mx:.1f} ms", f"<= {ZAP_MAX_PACK_MS:.0f} ms", mx <= ZAP_MAX_PACK_MS)
+    else:
+        for n in ("ZAP-4: nasze napisy do zapisu", "ZAP-5: spakowanie kluczy z listy", "ZAP-6: czas pakowania"):
+            rep.add(n, "brak linii 'Zapis (D4)'", "INFO", None)
+    # ZAP-7 bledy
+    stum = g(r"\| potkniecia (\d+)", last) if last is not None else None
+    if st is None and not saves and not errs:
+        rep.add("ZAP-7: bledy pomiaru i pakowania", "brak linii paczki", "INFO", None)
+    else:
+        rep.add("ZAP-7: bledy pomiaru i pakowania", f"ERROR in SaveSize/SaveText {len(errs)}, potkniecia (ostatni zapis) {stum if stum is not None else '-'}, "
+                f"BLAD probnego odczytu {bad_probe}" + (f"; pierwszy: {errs[0]}" if errs else ""), "0 / 0 / 0", not errs and (stum or 0) == 0 and bad_probe == 0)
+    # ZAP-8 wczytane spakowane
+    loaded = [s for s in sessions if "wczytane spakowane: brak" not in s]
+    if not loaded:
+        rep.add("ZAP-8: klucze spakowane wczytane z zapisu", "brak (zapis bez kluczy '_z' - np. autotest-F-d240)" if sessions else "brak linii startu",
+                "INFO (sprawdza bieg wczytujacy zapis zrobiony z Save Compact)", None)
+    else:
+        lb = sum(g(r"\(bledy (\d+)\)", s) or 0 for s in loaded)
+        txt = re.search(r"wczytane spakowane: (.*?) \(bledy", loaded[-1])
+        rep.add("ZAP-8: klucze spakowane wczytane z zapisu (bez bledu)", (txt.group(1) if txt else loaded[-1][:200]) + f" | bledy razem {lb}", "bledy 0 i kazdy klucz TAK",
+                lb == 0 and "BLAD" not in (txt.group(1) if txt else ""))
+    # ZAP-9 / ZAP-10 (INFO)
+    if last is not None:
+        kl = re.search(r"\| klucze KB malejaco: (.*)\.$", last)
+        top = ", ".join(kl.group(1).split(", ")[:12]) if kl else "-"
+        rep.add("ZAP-9: najwieksze klucze (ostatni zapis, KB tekstu; z = po spakowaniu)", top, "INFO", None)
+        fsz, fms, fco = g(r"\| plik ([^|]*?) \|", last, str), g(r"czas zapisu (\d+) ms", last), g(r"\| kolekcje: ([^|]*?) \|", last, str)
+        rep.add("ZAP-10: plik zapisu i czas zapisu (ostatni zapis)", f"plik {fsz}, czas zapisu {fms} ms, kolekcje: {fco}", "INFO", None)
+    else:
+        rep.add("ZAP-9/10: klucze, plik i czas zapisu", "brak linii 'Zapis (D4)'", "INFO", None)
+    # ZAP-Q0..Q2 ciche logi wiecej
+    mode = None
+    if nw:
+        mode = g(r"\| tryb: (.*?) \| dzialaja", nw[-1], str)
+    full = mode is None or mode.startswith("autotest - pelne") or mode.startswith("nie rozpoznany")
+    if st is None:
+        rep.add("ZAP-Q0: ciche logi wiecej wobec trybu", f"brak linii startu D4 (tryb NW: {mode})", "INFO", None)
+    else:
+        act = g(r"dzialaja: (tak|nie)", st, str)
+        more_on = "(Quiet Log More) [WL]" in st
+        want = "nie" if (full or not more_on) else "tak"
+        rep.add("ZAP-Q0: ciche logi wiecej wobec trybu", f"tryb NW: {mode}, klucz {'[WL]' if more_on else '[wyl]'}, dzialaja: {act}",
+                f"dzialaja: {want} (autotest i klucz [wyl] - nie, gra i profil z kluczem [WL] - tak)", act == want)
+    nd = max(1, len(prof_days))
+    seen = sum(1 for p in ZAP_MORE if more_cnt[p] > 0)
+    dropped = [g(r"pominietych linii od startu sesji (\d+)", s) or 0 for s in saves]
+    if full:
+        if saves:
+            rep.add("ZAP-Q1: tryb pelny - zadna linia zestawu 2 pominieta", f"pominietych w liniach zapisu {dropped}; linii zestawu 2 w logu {sum(more_cnt.values())} "
+                    f"({seen} z {len(ZAP_MORE)} przedrostkow, {nd} dob)", "0 w kazdej linii zapisu", all(x == 0 for x in dropped))
+        else:
+            rep.add("ZAP-Q1: tryb pelny - linie zestawu 2", f"linii {sum(more_cnt.values())} ({seen} z {len(ZAP_MORE)} przedrostkow, {nd} dob)", "INFO (bez linii zapisu D4)", None)
+        rep.add("ZAP-Q2: tryb gry - linie zestawu 2 rzadziej", "tryb pelny", "INFO", None)
+        # ZAP-Q3 (recenzja): lista zestawu 2 = tylko linie dzienne; linia z wlasna rzadsza kadencja (np. co 7 albo co 5 dob) w trybie gry ginelaby prawie zawsze
+        if nd >= 14 and seen > 0:
+            sparse = [f"{p} ({len(more_di[p])}/{nd})" for p in ZAP_MORE if more_cnt[p] > 0 and len(more_di[p]) < ZAP_MIN_DAILY * nd]
+            rep.add("ZAP-Q3: tryb pelny - kazdy przedrostek zestawu 2 jest dzienny", f"przedrostkow z liniami {seen} z {len(ZAP_MORE)}, rzadszych niz "
+                    f"{ZAP_MIN_DAILY:.0%} dob: {len(sparse)}" + (f" ({', '.join(sparse[:4])})" if sparse else ""), "0 (rzadsza linia nie moze byc w LogGate.More)", not sparse)
+        else:
+            rep.add("ZAP-Q3: tryb pelny - kazdy przedrostek zestawu 2 jest dzienny", f"dob {nd}, przedrostkow z liniami {seen}", "INFO (bieg < 14 dob albo brak linii)", None)
+    else:
+        rep.add("ZAP-Q1: tryb pelny", f"tryb {mode}", "INFO", None)
+        daily = [p for p in ZAP_MORE if len(more_days[p]) > 0.5 * nd and nd >= 14]
+        bind = st is not None and "(Quiet Log More) [WL]" in st and nd >= 14   # log sprzed paczki albo klucz wylaczony - linie codziennie jak dotad (INFO)
+        rep.add("ZAP-Q2: tryb gry - linie zestawu 2 nie codziennie", f"przedrostkow z linia w ponad polowie dob {len(daily)}" + (f" ({', '.join(daily[:5])})" if daily else "")
+                + f"; pominietych (ostatni zapis) {dropped[-1] if dropped else '-'}",
+                "0 (bieg >= 14 dob, Quiet Log More [WL])" if bind else "INFO (log sprzed paczki, klucz [wyl] albo bieg < 14 dob)", (not daily) if bind else None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -40652,6 +40861,8 @@ def main(argv):
         return nksarm_main(logp)   # nksarm (noc 17/18.10, paczka ks-arm): samo uzbrojenie KS, twarde bramki rozdz. 10, bramka krainy rozdz. 8, zrodla z niczego znane z nazwy (StartCalibration.Arm.cs)
     if group == "nherby" and logp:
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
+    if group == "nzapis" and logp:
+        return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

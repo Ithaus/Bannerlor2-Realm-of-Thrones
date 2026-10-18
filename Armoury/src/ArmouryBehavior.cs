@@ -998,6 +998,15 @@ namespace Armoury
                 if (_playerStock == null) _playerStock = new Dictionary<string,int>();
             }
             catch (Exception e) { Log.Error("SyncData", e); }
+            // zapis-d4: kolekcje zapisywane wprost przez gre (kontenery) - liczba wpisow do linii "Zapis (D4)"; tylko pomiar, wlasny try
+            if (dataStore.IsSaving)
+                try
+                {
+                    SaveSize.NoteList("arm_condition", _condition); SaveSize.NoteList("arm_projects", _projects); SaveSize.NoteDict("arm_player_stock", _playerStock);
+                    SaveSize.NoteList("arm_armory_wear", _armoryWear); SaveSize.NoteList("arm_orders", Orders.Board); SaveSize.NoteList("arm_order_cooldowns", Orders.Cooldowns);
+                    SaveSize.NoteList("arm_uniq_lore", UniqueLore); SaveSize.NoteList("arm_legends", Legends);
+                }
+                catch (Exception e) { Log.Error("SaveSize.Note", e); }
             // ZB-1 (noc 17/18.10): rozbicie ksiegi gracza na egzemplarze (id|mod -> ile) - wlasny try, PO arm_player_stock (przyciecie do ksiegi id); brak klucza
             // (stary zapis) = puste rozbicie i migracja przy pierwszym porzadku; starsza DLL klucz pomija; klucz ArmouryBookPerModifier wylaczony - zapis pusty
             try
@@ -1382,6 +1391,9 @@ namespace Armoury
             // zdjeta przed zapisem, przywrocona po nim i w pierwszej godzinie po wczytaniu; bez band najazdu - nic
             CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { FreeFolkRaids.BeforeSave(); } catch (Exception e) { Log.Error("FreeFolkRaids.BeforeSave", e); } });
             CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { FreeFolkRaids.SaveOver(); } catch (Exception e) { Log.Error("FreeFolkRaids.SaveOver", e); } });
+            // zapis-d4: pomiar kluczy zapisu - nowy pomiar przed zapisem, linia "Zapis (D4)" po nim (takze po nieudanym); tylko log
+            CampaignEvents.OnBeforeSaveEvent.AddNonSerializedListener(this, delegate { try { SaveSize.BeforeSave(); } catch (Exception e) { Log.Error("SaveSize.BeforeSave", e); } });
+            CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { SaveSize.SaveOver(ok, name); } catch (Exception e) { Log.Error("SaveSize.SaveOver", e); } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("FreeFolkRaids.OnPartyDestroyed", FreeFolkRaids.OnPartyDestroyed));   // fix-mur: kto rozbil bande najazdu (tylko linia "cel:"; bez band - nic)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("FreeFolkRaids.OnMapEventEnded", FreeFolkRaids.OnMapEventEnded));   // recenzja fix-mur: kto pobil bande w marszu (tylko linia "cel:"; bez band w marszu - nic)

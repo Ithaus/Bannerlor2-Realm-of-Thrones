@@ -24,6 +24,8 @@ RANGES = {
     'ShopKeepPieces': (0, 3, "0"),
     # NW O4 (noc 16.10): ciche logi - co ile dob pomiary tylko-log; kod przycina do 1..28 (LogGate.Every)
     'QuietLogEveryDays': (1, 28, "0"),
+    # zapis-d4 (noc 17/18.10): prog pakowania klucza w KB tekstu - kod przycina do 8..4096 (SaveSize.MinChars)
+    'SaveCompactMinKb': (8, 4096, "0"),
     # SW-DROGI (noc 17/18.10): premia drogi ROT - kod przycina procent do 0..50 i margines do 0..2 jedn. (MapRoads.PctOf / MarginOf)
     'MapRoadSpeedPercent': (0, 50, "0"),
     'MapRoadMargin': (0.0, 2.0, "0.00"),

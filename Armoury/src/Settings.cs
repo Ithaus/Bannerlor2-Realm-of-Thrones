@@ -1726,6 +1726,22 @@ namespace Armoury
         // w autotescie (CrashScribe.Autotest.Active bez pomiaru klatki) i przy nierozpoznanym trybie - codziennie; bledy, zdarzenia, linie logiki i Profil doby - zawsze
         public bool QuietLog = true;                       // quiet measurement logs: the diagnostic-only measurements (raw goods prices, terrain probes, castle-village market roads, who changes goods in daily ticks, the dry-run clan budget report) are taken on one day in every N instead of daily - errors, events and the daily profile are always written, automatic tests always write everything; off = every day
         public int QuietLogEveryDays = 7;                  // with quiet measurement logs: take the measurements on one day in this many (1 = every day, at most 28)
+        // zapis-d4 (noc 17/18.10, CO-ZOSTALO D4; LogGate.DropMore): zestaw 2 cichych logow - 43 dzienne linie, ktorych nie czyta zadne narzedzie progow
+        // (ok. 30 KB/dobe); tylko linie pisane CODZIENNIE (recenzja: linie z wlasna rzadsza kadencja - "Skale ludzi wedlug krolestw (GL0)" co 7 dob,
+        // "Zatkane wsie (przyklad)" co 5 dob - wypadly z listy, bo filtr doby S+1 gubil je prawie zawsze). Nowy klucz - nie ma go w Armoury.json Jeffa.
+        // Wylaczony = linie zestawu 2 codziennie jak dotad
+        public bool QuietLogMore = true;                   // with quiet measurement logs: 43 more daily diagnostic-only lines that no test tool reads (village woodlots, wandering Banner Kings parties, castle supplies, craftsmen, drill of the player, deserters, clogged villages and the like) are also written on one day in every N; errors and all lines the tests read stay daily, automatic tests always write everything (off = these lines every day, as before)
+
+        // --- Save files ---
+        // zapis-d4 (noc 17/18.10, CO-ZOSTALO D4; SaveSize.cs): pomiar kluczy przy zapisie (linia "Zapis (D4)") i pakowanie dwoch najwiekszych kluczy (arm_aiwear,
+        // arm_recruitkit) pod nowy klucz "_z". Wlasna grupa MCM - przelacznik Save Compact musi byc latwy do znalezienia przed cofnieciem DLL.
+        // Save Compact DOMYSLNIE WYLACZONY (recenzja): wgranie zbiorcze nocy 17/18.10 moze wymagac cofniecia DLL do .bak, a starszy DLL czyta "" pod spakowanymi
+        // kluczami (obicia AI znikaja = towar z niczego, komplety notabli znikaja = towar w nicosc; w Ironman bez zapisu do powrotu). Wlaczyc dopiero, gdy cofniecie
+        // ponizej tej paczki nie bedzie potrzebne (zysk ok. 0.2 MB pliku z 36.8 MB i ok. 3.5 MB napisow w pamieci). Wylaczony = zapis co do bajtu jak dotad;
+        // wczytanie zawsze czyta "_z", jesli jest w zapisie
+        public bool SaveSizeLog = true;                    // after every save the log gets one line with the size of every piece of Armoury data in the save, the size of the save file and how long saving took (off = no such line)
+        public bool SaveCompact = false;                   // off by default. The two largest pieces of Armoury data in the save - wear of the AI lords' gear and the kits that notables hold for their volunteers - are written compressed (about 6 times smaller in memory, a little smaller on disk); every compressed piece is read back and compared before it is written, and anything that does not match is written the old way. Saves made with it still load when it is off. Turn it on only once you no longer expect to go back to an older Armoury version: an older version does not read the compressed pieces (AI gear would count as unworn, notables would hold no kits). To go back anyway, turn it off and save first
+        public int SaveCompactMinKb = 64;                  // with Save Compact: only a piece of data larger than this many kilobytes of text is compressed (8 to 4096)
 
         // --- Armies of the realms (175) ---
         // paczka 175 (decyzje Jeffa 09.10): klucze czyta CrashScribe (Mends.ArmouryFloat - sprzet wedlug tieru, sklad, NorthHardy, DothrakiRiders)
