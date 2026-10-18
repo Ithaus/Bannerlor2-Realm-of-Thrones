@@ -6,6 +6,8 @@
 2. **Nowa ekonomia (kalibracja startu, "KS") wlaczy sie w Twoim zapisie sama.** Przy pierwszym wczytaniu zaczyna liczyc Twoj swiat (ok. 33 dni gry), potem w 14 dni lagodnie przestawia rynek. W tescie Twojej sciezki (160 dob) wlaczyla sie sama w 33. dniu, bez glodu i bez wstrzasu. Po drodze znalazlem i zamknalem ostatnie "nic z niczego", ktore ja blokowalo: konwoje zaopatrzenia moda DTE dostawaly ok. 28 koni jucznych dziennie znikad.
 3. Twoj zapis jest bezpieczny. Kopia: `D:\Backup-Bannerlord\zapisy-jeffa\IronmanjCg6MOpv28iN-2026-10-17-przed-wgraniem77.sav`, poprzednie pliki modow leza obok jako `*.bak-2026-10-17-wgranie77-przed`.
 
+**Instrukcja z wylacznikami MCM i tym, co zobaczysz w grze:** `docs/INSTRUKCJA-NOC-2026-10-18.md`.
+
 ## Co zobaczysz w grze
 
 **Swiat**
