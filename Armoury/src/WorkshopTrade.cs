@@ -111,6 +111,7 @@ namespace Armoury
             ArtisanInputs.Reset();   // 147: rzemieslnicy BK - te same latki cyklu i wyrobu, stan czyszczony razem
             WorkshopPace.Reset();    // E3-D2 (noc-ekonomia3 czesc 2): tempo linii - stan sesji
             WorkshopRetool.Reset();  // E3-D3: zmiany typu za cena - pamiec sesji (limit miasta 30 dob)
+            WorkshopFairScore.Reset();   // F4 (noc 17/18.10): pomiar wsadu regionu i pamiec ocen - stan sesji (pomiar wraca z zapisu arm_wsinput)
         }
 
         private static void ClearDay()
@@ -247,6 +248,56 @@ namespace Armoury
             float idx = s.WorkshopWageByTier && st != null ? TownWage.Index(st) : 1f;
             return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * idx / sum * BulkFactor(p);
         }
+
+        /// <summary>
+        /// F4 (noc 17/18.10, paczka f4-warsztaty): wynik JEDNEGO cyklu linii towarowej z wsadem typu `t` w miescie `town` wedlug dzisiejszych cen - ta sama regula co
+        /// prawdziwy cykl: prog gry (utarg wedle ceny sprzedazy miastu > wsad + place cyklu; bez plac cyklu - prog gry 200 / szybkosc), utarg wedle ceny, ktora placi BK
+        /// (cena miasta), przy cenie sprawiedliwej (Fair) najwyzej (wsad + place) x marza mistrza - jak FairCycle. Wsad i wyrob wedlug sztuki probnej kategorii (Sample,
+        /// jak Expected). false - linia nie rusza (prog gry, brak sztuki probnej, linia bez wsadu albo nie towarowa). Sam odczyt.
+        /// </summary>
+        internal static bool LineCycleAt(Town town, WorkshopType t, WorkshopType.Production p, out float net, out float inCost)
+        {
+            net = 0f; inCost = 0f;
+            if (town == null || t == null || p.Inputs == null || p.Inputs.Count == 0 || p.ConversionSpeed <= 0f || !IsTradeLine(p)) return false;
+            float inC = 0f;
+            foreach (var i in p.Inputs)
+            {
+                var it = Sample(i.Item1);
+                if (it == null) return false;
+                inC += (float)town.GetItemPrice(it, null, false) * Math.Max(0, i.Item2);
+            }
+            int sell = 0, credit = 0;
+            foreach (var o in p.Outputs)
+            {
+                var it = Sample(o.Item1);
+                if (it == null) return false;
+                sell += town.GetItemPrice(it, null, true) * o.Item2;
+                credit += town.GetItemPrice(it, null, false) * o.Item2;
+            }
+            inCost = inC;
+            float labour = CycleLabourAt(town.Settlement, t, p);
+            float gate = Batch ? labour : 200f / p.ConversionSpeed;
+            if (sell <= inC + gate) return false;
+            // cena sprawiedliwa: FairCycle bierze place cyklu takze bez WorkshopTradeBatchWages - tu tak samo
+            float capLab = Batch ? labour : LabourRaw(town.Settlement, t, p);
+            float pay = Fair ? (float)Math.Min(credit, Math.Ceiling((inC + capLab) * Margin)) : credit;
+            net = pay - inC - labour;
+            return true;
+        }
+
+        /// <summary>F4: place cyklu jak CycleLabourAt, ale bez warunku WorkshopTradeBatchWages (do sufitu ceny sprawiedliwej - jak FairCycle z CycleLabour).</summary>
+        private static float LabourRaw(Settlement st, WorkshopType t, WorkshopType.Production p)
+        {
+            if (t == null || t.IsHidden || !IsTradeLine(p)) return 0f;
+            float sum = TradeSpeed(t, TownFletchers.Active);
+            if (sum <= 0f) return 0f;
+            var s = Settings.Current;
+            float idx = s.WorkshopWageByTier && st != null ? TownWage.Index(st) : 1f;
+            return Math.Max(0f, s.WorkshopWorkers) * Math.Max(0f, s.WorkshopWagePerDay) * idx / sum * BulkFactor(p);
+        }
+
+        /// <summary>F4: utrzymanie warsztatu na dobe (to, co CloseDay odejmuje od wyniku doby) - zmierzony wynik + to = wynik przed utrzymaniem, jak ocena z cen.</summary>
+        internal static float UpkeepOf(Workshop w) { return w == null || Settings.Current == null ? 0f : UpkeepAt(w); }
 
         /// <summary>E3-D3: srednie wyniku warsztatu (miesiac, rok) i liczba dob w sredniej dla OBECNEGO typu; false - brak rachunku albo typ juz inny (sam odczyt).</summary>
         internal static bool RecOf(Workshop w, out float avg, out float slow, out int days)
@@ -1425,6 +1476,7 @@ namespace Armoury
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("SmallFixes8.Daily", SmallFixes8.Daily));               // E8/B (258): linia dnia "Kowadlo i drobne (E8/B)" (sam log)
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopPace.Daily", WorkshopPace.Daily));             // E3-D2 (noc-ekonomia3 czesc 2): linia "Tempo warsztatow (E3-D2)"
             CampaignEvents.DailyTickEvent.AddNonSerializedListener(this, DayProfile.Dx("WorkshopRetool.Daily", WorkshopRetool.Daily));         // E3-D3: krok "warsztat zmienia branze za cena" i jego linia
+            CampaignEvents.OnItemProducedEvent.AddNonSerializedListener(this, WorkshopFairScore.OnItemProduced);   // F4 (noc 17/18.10): wsad regionu - produkcja wsi i miast na dobe (tylko licznik, przy kluczu Workshop Retool Fair Score)
         }
 
         private void OnSessionLaunched(CampaignGameStarter starter)
@@ -1461,6 +1513,23 @@ namespace Armoury
                 if (dataStore.IsLoading) ArtisanInputs.ImportWool(wool);
             }
             catch (Exception e) { Log.Error("WorkshopTrade.SyncData(arm_wool_frac)", e); }
+            // F4 (noc 17/18.10, paczka f4-warsztaty): pomiar wsadu regionu (srednia produkcji wsi i miast na dobe wedlug miasta targowego) - wlasny try; przy wylaczonym kluczu
+            // nic nie zapisujemy (zapis jak dotad); stary zapis bez klucza = pomiar od zera (pierwszy tydzien bez zmian typu); starsza DLL klucza nie czyta
+            try
+            {
+                if (dataStore.IsSaving)
+                {
+                    string meas = WorkshopFairScore.Export();
+                    if (meas != null) SaveText.Sync(dataStore, "arm_wsinput", ref meas);
+                }
+                else if (dataStore.IsLoading)
+                {
+                    string meas = null;
+                    SaveText.Sync(dataStore, "arm_wsinput", ref meas);
+                    WorkshopFairScore.Import(meas);
+                }
+            }
+            catch (Exception e) { Log.Error("WorkshopTrade.SyncData(arm_wsinput)", e); }
         }
     }
 }

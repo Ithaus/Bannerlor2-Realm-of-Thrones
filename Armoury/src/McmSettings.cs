@@ -6780,6 +6780,10 @@ namespace Armoury
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool WorkshopRetoolByPrice { get; set; } = true;
 
+        [SettingPropertyBool("Workshop Retool Fair Score", HintText = "with Workshop Retool By Price (and No Town Mines): a trade is judged the way its workshop will really be paid - the town pays for a cycle's wares at most their raw goods and wages plus the master's margin - and only for as many cycles a day as the raw goods really made and lying in the market's region (the town and its neighbours within a few days) allow, shared among all the region's workshops that use them. Where the region already has workshops of that trade, what they really earned over at least 60 days caps the judgement, and each one already in the region counts a fifth less. The first week after loading an older save the rule only measures and changes nothing (off = the trade is judged by the middle price of its goods in the town, as before)")]
+        [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
+        public bool WorkshopRetoolFairScore { get; set; } = true;
+
         [SettingPropertyBool("Village Hands Follow Price", HintText = "the villagers move their hands to what is dear: where eggs, fruit or honey fetch far more in the village's market town than its other crops, the village yields up to twice as much of them (the square root of how many times dearer, between 1 and 2), and as much less of its other crops by worth at the usual price - the same hands, the same work, at most 15% less of the other crops and at most 5% less grain; timber and ore (iron, silver, salt, clay) are never cut, a village with nothing else to give keeps its yield (off = the usual yields, as before)")]
         [SettingPropertyGroup("Production follows price and people (night 16.10, part 3, second half)")]
         public bool VillageHandsFollowPrice { get; set; } = true;
@@ -9218,6 +9222,7 @@ namespace Armoury
             s.VillageClothHalfReserve = VillageClothHalfReserve;
             s.WorkshopPaceByMarket = WorkshopPaceByMarket;
             s.WorkshopRetoolByPrice = WorkshopRetoolByPrice;
+            s.WorkshopRetoolFairScore = WorkshopRetoolFairScore;
             s.VillageHandsFollowPrice = VillageHandsFollowPrice;
             s.CourtBuysGoods = CourtBuysGoods;
             s.CrownCourtGoods = CrownCourtGoods;

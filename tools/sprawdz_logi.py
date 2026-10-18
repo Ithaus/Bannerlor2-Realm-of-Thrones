@@ -710,6 +710,14 @@ Uzycie (Python 3, tylko odczyt):
                     bez wyjscia i stara miara - INFO; log bez pola rodzaju - INFO), NE3-5c na stracie porcjami <= 30% (+0.5 pkt) kazdej
                     doby, NE3-14c przy E3-T2 doplaty notabli do 5000 <= 1.1 x baza (kiesy karawan wobec bazy - INFO), NE3-25 linia E3-T2 (zysk karawan do wlascicieli:
                     w >= 95% dob, kontrola 0, oddane > 0); NE3-8 i NE3-9b bez zmian (korony, karawany <= baza + 0.3 pkt), NE3-14b nachylenie kies karawan <= 10 tys./d.
+                    F4 (noc 17/18.10): NE3-21 przy segmencie "ocena F4" w linii E3-D3 bez dolnej granicy 20 zmian (nowa ocena celowo przezbraja mniej - progi w nwar).
+--grupa nwar      : (noc 17/18.10, paczka f4-warsztaty - audyt ekonomii P4 "przezbrojenie liczy zysk ta sama cena i tym samym wsadem co prawdziwy cykl";
+                    Armoury/src/WorkshopFairScore.cs, NoTownMines.cs, WorkshopRetool.cs, klucz WorkshopRetoolFairScore) python -I tools/sprawdz_logi.py --grupa nwar
+                    <Armoury-*.log> [--baza-doby <log biegu z kluczem wylaczonym / sprzed paczki>] (strumieniowo). NWAR-0 start E3-D3 "ocena F4 ... tak", NWAR-1 linie
+                    doby z segmentem F4 rozpoznane, NWAR-2 zmiany typu <= 0.35/dobe, <= 3 na dobe, <= 1.25 x baza, NWAR-3 spodziewany vs rzeczywisty (przezbrojone >= 30 dob,
+                    K >= 3): rzeczywisty >= 0.2 x spodziewany, pracuje >= 50%, NWAR-4a srebro+aksamit koniec <= poczatek + 2, NWAR-4b browary+garbarnie+garncarze+len
+                    >= 0.5 x poczatku (albo >= -3), NWAR-5 potkniecia F4/E3-D3 i ERROR 0, NWAR-6 czas F4 mediana <= 5 ms (maks <= 50), NWAR-7 pomiar wsadu gotowy <= 9. linia
+                    i 0 zmian przed gotowoscia, NWAR-8 oceny (INFO), NWAR-9 stojace srebro/aksamit/towary codzienne (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -32068,6 +32076,259 @@ def _n3e_nd(s):
     return sum(int(m.group(1)) - int(m.group(2)) for m in N3E_PRICE_ND.finditer(s))
 
 
+# ============================================================ nwar (noc 17/18.10, paczka f4-warsztaty - audyt ekonomii P4): ocena typu warsztatu cena sprawiedliwa cyklu,
+# cykle z wsadu regionu, zmierzony wynik 60 dob, kara za dubel w regionie rynku (Armoury/src/WorkshopFairScore.cs, klucz WorkshopRetoolFairScore). Linia dnia
+# "Warsztaty za cena (E3-D3)" z segmentem "ocena F4"; "Warsztaty towarowe" - wynik wedlug typu (stary log: tylko INFO i liczby typow).
+NWAR_D3 = "Warsztaty za cena (E3-D3): dzien "
+NWAR_S_D3 = "Warsztaty za cena (E3-D3): start sesji"
+NWAR_WS = "Warsztaty towarowe: dzien "
+NWAR_ERR = ("ERROR in WorkshopFairScore", "ERROR in WorkshopRetool", "ERROR in NoTownMines", "ERROR in WorkshopTrade.SyncData(arm_wsinput)")
+NWAR_DAY = re.compile(r"^Warsztaty za cena \(E3-D3\): dzien (\d+) ")
+NWAR_CH = re.compile(r"\| zmiany (\d+)(?: \[([^\]]*)\])?")
+NWAR_ONE = re.compile(r"^(.*) (\S+) -> (\S+) \(wynik (-|-?[\d.]+) -> (-|-?[\d.]+) d/d")
+NWAR_SESS = re.compile(r"\| zmian w sesji (\d+)")
+NWAR_F4 = "| ocena F4 (Workshop Retool Fair Score):"
+NWAR_MEAS = re.compile(r"\| pomiar wsadu: dob (\d+) \(gotowy (tak|nie), od (\d+) dob\), miast (\d+), sztuk na dobe (\d+), dzis zdarzen (\d+)")
+NWAR_EVAL = re.compile(r"\| oceny dzis: zmierzone (\d+), szacunek (\d+), bez linii (\d+), odlozone \(pomiar w toku\) (\d+)")
+NWAR_EXP = re.compile(r"\| spodziewany vs rzeczywisty: przezbrojone w sesji (\d+), po >= (\d+) dobach (\d+): spodziewany srednio (-|-?[\d.]+) d/d, rzeczywisty srednio (-|-?[\d.]+) d/d"
+                      r" \(srednia miesiaca \+ utrzymanie\), pracuje (\d+) z (\d+), typ juz inny (\d+)")
+NWAR_TYPES = re.compile(r"\| typy \(swiat\): ([^|]+?) \| ")
+NWAR_N10 = re.compile(r"\| kopalnie BK w miastach \(N10\): wyborow z ocena F4 (\d+), bez typu z wynikiem F4 -> ocena z cen (\d+)")
+NWAR_TIME = re.compile(r"\| czas F4 ([\d.]+) ms")
+NWAR_STF4 = re.compile(r"\| potkniecia F4 (\d+) \(sesja (\d+)\)")
+NWAR_STEND = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
+NWAR_WSTYPE = re.compile(r"(\S+) (\d+) \(pracowalo (\d+), cykli (\d+), wynik ([+-]?\d+) = (-?[\d.]+) d na warsztat")
+NWAR_START_ON = "ocena F4 (Workshop Retool Fair Score) tak"
+NWAR_START_OFF = "ocena F4 (Workshop Retool Fair Score) nie"
+NWAR_DAILY_GOODS = ("brewery", "tannery", "pottery_shop", "linen_weavery")   # towary codzienne, ktore znikaly w fin86 (12 -> 3, 12 -> 2, 6 -> 1, 17 -> 8)
+NWAR_BAD_PICKS = ("silversmithy", "velvet_weavery")                          # przezbrojenia bez wsadu w fin86 (19 stoi, 0 cykli; aksamit 13, pracowal 1)
+
+
+def _nwar_types_from_f4(s):
+    m = NWAR_TYPES.search(s)
+    if not m:
+        return None
+    d = {}
+    for part in m.group(1).split(", "):
+        bits = part.rsplit(" ", 1)
+        if len(bits) == 2 and bits[1].isdigit():
+            d[bits[0]] = int(bits[1])
+    return d
+
+
+def _nwar_types_from_ws(s):
+    d = {}
+    for m in NWAR_WSTYPE.finditer(s):
+        d[m.group(1)] = (int(m.group(2)), int(m.group(3)), int(m.group(4)), float(m.group(6)))
+    return d
+
+
+def _nwar_read(logp):
+    """Strumieniowo: linie E3-D3 (doba -> tekst), starty E3-D3, 'Warsztaty towarowe' (doba -> tekst), liczba ERROR w miejscach paczki."""
+    d3, ws, starts = {}, {}, []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NWAR_D3):
+                mm = NWAR_DAY.match(s)
+                if mm:
+                    d3[int(mm.group(1))] = s
+            elif s.startswith(NWAR_S_D3):
+                starts.append(s)
+            elif s.startswith(NWAR_WS):
+                mm = re.match(r"^Warsztaty towarowe: dzien (\d+) ", s)
+                if mm:
+                    ws[int(mm.group(1))] = s
+            elif any(s.startswith(e) for e in NWAR_ERR):
+                n_err += 1
+    return d3, ws, starts, n_err
+
+
+def _nwar_rate(d3):
+    """Zmiany typu na dobe biegu (suma 'zmiany N' / liczba dob z linia) i najwiecej na dobe."""
+    if not d3:
+        return None, 0, 0
+    tot, mx = 0, 0
+    for x in d3:
+        a = NWAR_CH.search(d3[x])
+        if a:
+            n = int(a.group(1)); tot += n; mx = max(mx, n)
+    return tot / max(1, len(d3)), tot, mx
+
+
+def nwar_main(logp, bdp=None):
+    """nwar (noc 17/18.10, paczka f4-warsztaty; audyt ekonomii tej nocy, synteza P4 "Przezbrojenie warsztatow liczy zysk ta sama cena i tym samym wsadem co prawdziwy
+    cykl"; Armoury/src/WorkshopFairScore.cs, NoTownMines.cs, WorkshopRetool.cs, klucz WorkshopRetoolFairScore). Wejscie: log Armoury (strumieniowo), opcjonalnie
+    --baza-doby <log biegu bazowego> (bieg z kluczem wylaczonym albo sprzed paczki - porownanie liczby zmian i typow).
+    NWAR-0 linia startu E3-D3 z "ocena F4 ... tak" (nie / brak - INFO); NWAR-1 linie doby z segmentem F4 rozpoznane (pomiar, oceny, spodziewany vs rzeczywisty, typy, czas,
+    potkniecia - nierozpoznanych 0); NWAR-2 zmiany typu na dobe biegu <= 0.35 (fin86 bez F4: 0.31), najwiecej 3 na dobe, nie wiecej niz 1.25 x baza (z --baza-doby);
+    NWAR-3 spodziewany vs rzeczywisty (ostatnia linia, przezbrojone >= 30 dob, K >= 3): rzeczywisty srednio >= 0.2 x spodziewany i pracuje >= 50% (K < 3 - INFO;
+    stary log: probki zmian "wynik a -> b" i wynik typu z 'Warsztaty towarowe' - INFO); NWAR-4 typy swiata koniec wobec poczatku: browary + garbarnie + garncarze + tkalnie
+    lnu >= 0.5 x poczatek albo >= poczatek - 3 (NWAR-4b), kuznie srebra + tkalnie aksamitu <= poczatek + 2 (NWAR-4a; fin86 bez F4: 47 -> 14 i 20 -> 32); NWAR-5 potkniecia F4 i E3-D3
+    (sesja) 0, ERROR w miejscach paczki 0; NWAR-6 czas F4 mediana <= 5 ms, maks <= 50 ms; NWAR-7 pomiar wsadu gotowy najpozniej w 9. linii doby biegu i 0 zmian typu,
+    gdy pomiar niegotowy; NWAR-8 oceny (zmierzone / szacunek / bez linii / odlozone) - INFO; NWAR-9 stojace kuznie srebra i tkalnie aksamitu na koniec ('Warsztaty
+    towarowe', pracowalo / warsztatow) - INFO. Log bez paczki: INFO (NWAR-2/4 i tak liczone z linii E3-D3 i 'Warsztaty towarowe'), bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NWAR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    d3, ws, starts, n_err = _nwar_read(logp)
+    f4days = {x: s for x, s in d3.items() if NWAR_F4 in s}
+    print(f"plik: {logp} | linii E3-D3 {len(d3)} (z oceniona F4 {len(f4days)}), startow E3-D3 {len(starts)}, linii 'Warsztaty towarowe' {len(ws)}, ERROR paczki {n_err}")
+    if not d3 and not ws:
+        rep.add("NWAR-0: linie 'Warsztaty za cena (E3-D3)' i 'Warsztaty towarowe'", "brak w logu", "INFO (log bez paczek warsztatow)", None)
+        rep.show()
+        return 0
+    # NWAR-0 start
+    on = [s for s in starts if NWAR_START_ON in s]
+    off = [s for s in starts if NWAR_START_OFF in s]
+    if on:
+        st0 = on[-1]
+        mm = re.search(r"pomiar wsadu z zapisu ([^|]*?)(?: \||$)", st0)
+        rep.add("NWAR-0: start sesji E3-D3 - ocena F4 tak", f"startow z F4 {len(on)} z {len(starts)}" + (f"; pomiar z zapisu: {mm.group(1).strip()}" if mm else ""), "tak", True)
+    elif off:
+        rep.add("NWAR-0: start sesji E3-D3 - ocena F4", "nie (klucz Workshop Retool Fair Score wylaczony)", "INFO", None)
+    else:
+        rep.add("NWAR-0: start sesji E3-D3 - ocena F4", f"brak segmentu F4 w {len(starts)} liniach startu", "INFO (log sprzed paczki f4-warsztaty)", None)
+    # NWAR-1 rozpoznanie
+    parsed, badp = {}, []
+    for x in sorted(f4days):
+        s = f4days[x]
+        r = {"meas": NWAR_MEAS.search(s), "eval": NWAR_EVAL.search(s), "exp": NWAR_EXP.search(s), "types": _nwar_types_from_f4(s), "time": NWAR_TIME.search(s),
+             "stf4": NWAR_STF4.search(s), "stend": NWAR_STEND.search(s), "sess": NWAR_SESS.search(s), "ch": NWAR_CH.search(s)}
+        miss = [k for k, v in r.items() if v is None]
+        if miss:
+            badp.append((x, miss))
+        parsed[x] = r
+    if f4days:
+        rep.add("NWAR-1: linie doby E3-D3 z segmentem F4 rozpoznane", f"linii {len(f4days)}, nierozpoznanych {len(badp)}" + (f" (d{badp[0][0]}: brak {', '.join(badp[0][1])})" if badp else ""),
+                "nierozpoznanych 0", not badp)
+    else:
+        rep.add("NWAR-1: linie doby E3-D3 z segmentem F4", f"0 z {len(d3)}", "INFO (klucz wylaczony albo log sprzed paczki)", None)
+    # NWAR-2 liczba zmian typu
+    rate, tot, mx = _nwar_rate(d3)
+    base_rate = None
+    if bdp and os.path.isfile(bdp):
+        try:
+            bd3, _bws, _bst, _be = _nwar_read(bdp)
+            base_rate, _bt, _bm = _nwar_rate(bd3)
+        except Exception as e:   # baza nieczytelna - bez porownania
+            print(f"baza-doby: {bdp} nieczytelna ({e})")
+    if rate is not None:
+        ok2 = rate <= 0.35 and mx <= 3 and (base_rate is None or rate <= 1.25 * base_rate + 0.02)
+        rep.add("NWAR-2: zmiany typu warsztatu na dobe biegu (przezbrojenie nie masowo w druga strone)",
+                f"zmian {tot} w {len(d3)} dobach = {rate:.3f}/d, najwiecej na dobe {mx}" + (f"; baza {base_rate:.3f}/d" if base_rate is not None else ""),
+                "<= 0.35/d, <= 3 na dobe, <= 1.25 x baza (z --baza-doby)", ok2 if f4days else None)
+    else:
+        rep.add("NWAR-2: zmiany typu warsztatu", "brak linii E3-D3", "INFO", None)
+    # NWAR-3 spodziewany vs rzeczywisty
+    last_exp = None
+    for x in sorted(parsed, reverse=True):
+        if parsed[x]["exp"]:
+            last_exp = (x, parsed[x]["exp"]); break
+    if last_exp:
+        e = last_exp[1]
+        n_all, k = int(e.group(1)), int(e.group(3))
+        ev = None if e.group(4) == "-" else float(e.group(4))
+        av = None if e.group(5) == "-" else float(e.group(5))
+        work, kk, gone = int(e.group(6)), int(e.group(7)), int(e.group(8))
+        txt = f"d{last_exp[0]}: przezbrojone {n_all}, po >= {e.group(2)} dobach {k}: spodziewany {e.group(4)}, rzeczywisty {e.group(5)} d/d, pracuje {work} z {kk}, typ juz inny {gone}"
+        if k >= 3 and ev is not None and av is not None:
+            ok3 = (av >= 0.2 * ev if ev > 0 else True) and work >= 0.5 * kk
+            rep.add("NWAR-3: spodziewany vs rzeczywisty wynik przezbrojonych (>= 30 dob)", txt, "rzeczywisty >= 0.2 x spodziewany i pracuje >= 50% (K >= 3)", ok3)
+        else:
+            rep.add("NWAR-3: spodziewany vs rzeczywisty wynik przezbrojonych", txt, "INFO (mniej niz 3 przezbrojone po >= 30 dobach)", None)
+    else:
+        # stary log: spodziewane z probek zmian, rzeczywiste z 'Warsztaty towarowe' (wynik na warsztat typu docelowego, ostatnia linia)
+        exp_by = {}
+        for x in sorted(d3):
+            a = NWAR_CH.search(d3[x])
+            if a and a.group(2):
+                for one in a.group(2).split("; "):
+                    o = NWAR_ONE.match(one)
+                    if o and o.group(5) != "-":
+                        exp_by.setdefault(o.group(3), []).append(float(o.group(5)))
+        act = _nwar_types_from_ws(ws[max(ws)]) if ws else {}
+        parts = []
+        for t in sorted(exp_by, key=lambda t: -len(exp_by[t]))[:6]:
+            a = act.get(t)
+            parts.append(f"{t} x{len(exp_by[t])}: spodziewany {sum(exp_by[t]) / len(exp_by[t]):.1f}, rzeczywisty " + (f"{a[3]:.1f} d na warsztat (pracowalo {a[1]} z {a[0]})" if a else "-"))
+        rep.add("NWAR-3: spodziewany vs rzeczywisty (probki zmian i 'Warsztaty towarowe')", "; ".join(parts) if parts else "brak zmian typu", "INFO (log bez segmentu F4)", None)
+    # NWAR-4 typy swiata: poczatek i koniec
+    first = last = None
+    src = ""
+    f4t = [(x, parsed[x]["types"]) for x in sorted(parsed) if parsed[x]["types"]]
+    if len(f4t) >= 2:
+        first, last, src = f4t[0], f4t[-1], "segment F4 'typy (swiat)'"
+    else:
+        # pierwsza i ostatnia linia z rozliczeniem wedlug typu (pierwsza doba sesji bywa "brak rozliczen")
+        wst = [(x, {t: v[0] for t, v in _nwar_types_from_ws(ws[x]).items()}) for x in sorted(ws)]
+        wst = [w for w in wst if w[1]]
+        if len(wst) >= 2:
+            first, last, src = wst[0], wst[-1], "'Warsztaty towarowe' (rozliczone dzis wedlug typu)"
+    if first and last:
+        g0 = sum(first[1].get(t, 0) for t in NWAR_DAILY_GOODS); g1 = sum(last[1].get(t, 0) for t in NWAR_DAILY_GOODS)
+        b0 = sum(first[1].get(t, 0) for t in NWAR_BAD_PICKS); b1 = sum(last[1].get(t, 0) for t in NWAR_BAD_PICKS)
+        det = ", ".join(f"{t} {first[1].get(t, 0)} -> {last[1].get(t, 0)}" for t in NWAR_DAILY_GOODS + NWAR_BAD_PICKS + ("wool_weavery", "smithy", "bakery"))
+        rep.add("NWAR-4a: kuznie srebra + tkalnie aksamitu (cele bez wsadu w fin86) koniec wobec poczatku",
+                f"d{first[0]} -> d{last[0]} ({src}): {b0} -> {b1}; {det}", "<= poczatek + 2 (fin86 bez F4: 20 -> 32)", (b1 <= b0 + 2) if f4days else None)
+        rep.add("NWAR-4b: browary + garbarnie + garncarze + tkalnie lnu koniec wobec poczatku (nie znikaja)",
+                f"{g0} -> {g1}" + (f" ({g1 / g0:.2f} x)" if g0 > 0 else ""),
+                ">= 0.5 x poczatku albo >= poczatek - 3 (fin86 bez F4: 47 -> 14 = 0.30 x); NIE przy stojacych (bez zboza, piwo ponizej kosztu) - patrz NWAR-9 i NWAR-3",
+                (g1 >= 0.5 * g0 or g1 >= g0 - 3) if f4days else None)
+    else:
+        rep.add("NWAR-4: typy warsztatow swiata", "za malo linii (potrzeba 2)", "INFO", None)
+    # NWAR-5 potkniecia i ERROR
+    if f4days:
+        sf4 = max((int(parsed[x]["stf4"].group(2)) for x in parsed if parsed[x]["stf4"]), default=0)
+        sen = max((int(parsed[x]["stend"].group(2)) for x in parsed if parsed[x]["stend"]), default=0)
+        rep.add("NWAR-5: potkniecia F4 i E3-D3 (sesja), ERROR w miejscach paczki", f"F4 {sf4}, E3-D3 {sen}, ERROR {n_err}", "0 / 0 / 0", sf4 == 0 and sen == 0 and n_err == 0)
+    else:
+        rep.add("NWAR-5: ERROR w miejscach paczki", f"ERROR {n_err}", "INFO (log bez segmentu F4)", None if n_err == 0 else False)
+    # NWAR-6 czas
+    times = [float(parsed[x]["time"].group(1)) for x in sorted(parsed) if parsed[x]["time"]]
+    if times:
+        med = st.median(times); mxt = max(times)
+        rep.add("NWAR-6: czas F4 na dobe (pomiar, ocena, decyzje, linia)", f"mediana {med:.2f} ms, maks {mxt:.2f} ms ({len(times)} dob)", "mediana <= 5 ms, maks <= 50 ms", med <= 5.0 and mxt <= 50.0)
+    else:
+        rep.add("NWAR-6: czas F4", "brak", "INFO", None)
+    # NWAR-7 pomiar wsadu gotowy i bez zmian przed gotowoscia
+    if parsed:
+        ks = sorted(parsed)
+        ready_at = next((i for i, x in enumerate(ks) if parsed[x]["meas"] and parsed[x]["meas"].group(2) == "tak"), None)
+        early = sum(int(parsed[x]["ch"].group(1)) for x in ks if parsed[x]["meas"] and parsed[x]["meas"].group(2) == "nie" and parsed[x]["ch"])
+        lastm = parsed[ks[-1]]["meas"]
+        txt = (f"gotowy od {ready_at + 1}. linii doby" if ready_at is not None else "nigdy gotowy") + f", zmian przy niegotowym {early}" \
+              + (f"; koniec: dob {lastm.group(1)}, miast {lastm.group(4)}, sztuk na dobe {lastm.group(5)}" if lastm else "")
+        rep.add("NWAR-7: pomiar wsadu regionu gotowy (<= 9. linia) i bez zmian typu przed gotowoscia", txt, "<= 9 / 0", ready_at is not None and ready_at <= 8 and early == 0)
+    else:
+        rep.add("NWAR-7: pomiar wsadu regionu", "brak linii F4", "INFO", None)
+    # NWAR-8 oceny (INFO)
+    if parsed:
+        sums = [0, 0, 0, 0]
+        n10 = [0, 0]
+        for x in parsed:
+            e = parsed[x]["eval"]
+            if e:
+                for i in range(4):
+                    sums[i] += int(e.group(i + 1))
+            m10 = NWAR_N10.search(f4days[x])
+            if m10:
+                n10[0] += int(m10.group(1)); n10[1] += int(m10.group(2))
+        rep.add("NWAR-8: oceny typow w biegu", f"zmierzone {sums[0]}, szacunek {sums[1]}, bez linii {sums[2]}, odlozone (pomiar w toku) {sums[3]}; "
+                f"N10 kopalnie: wyborow z ocena F4 {n10[0]}, powrot do oceny z cen {n10[1]}", "INFO", None)
+    # NWAR-9 stojace srebro i aksamit (INFO)
+    if ws:
+        a = _nwar_types_from_ws(ws[max(ws)])
+        parts = [f"{t} pracowalo {a[t][1]} z {a[t][0]} (cykli {a[t][2]}, {a[t][3]:.1f} d na warsztat)" for t in NWAR_BAD_PICKS + NWAR_DAILY_GOODS if t in a]
+        rep.add("NWAR-9: stojace warsztaty srebra/aksamitu i towarow codziennych na koniec ('Warsztaty towarowe')", f"d{max(ws)}: " + ("; ".join(parts) if parts else "brak tych typow"), "INFO", None)
+    rep.show()
+    return 0
+
+
 # ============================================================ nekon3 czesc 2 (noc-ekonomia3 16.10: produkcja idzie za cena i ludzmi, panowie, korony i zolnierze kupuja)
 # Progi NE3-4, NE3-17..24 (+ NE3-0b, NE3-1c, NE3-15c2, NE3-16c2, NE3-18b, NE3-24b). Wolane z nekon3_main (ta sama grupa, ten sam raport).
 N3E_D2 = "Tempo warsztatow (E3-D2): dzien "
@@ -32380,10 +32641,13 @@ def _n3e_part2(rep, logp, bdp, D, W, days):
         twice = [t for t, ds in towns.items() if any(ds[i + 1] - ds[i] < 30 for i in range(len(ds) - 1))]
         dup3 = {x: num(N3E_D3_DUP.pattern, s, int, None) for x, s in P["d3"].items()}
         dup3 = [dup3[x] for x in sorted(dup3) if dup3[x] is not None]
-        rep.add("NE3-21: zmiany typu warsztatu za cena 20-120 w oknie, najwyzej 3 na dobe, zadne miasto 2 razy w 30 dobach (wahadlo); bankructwa z typem z cen i miasta z 3+ warsztatami jednego typu - INFO",
+        # F4 (noc 17/18.10, paczka f4-warsztaty): ocena cena sprawiedliwa i wsadem regionu celowo przezbraja mniej - bez dolnej granicy (progi liczby zmian w grupie nwar)
+        f4seg = any("| ocena F4 (Workshop Retool Fair Score):" in P["d3"][x] for x in P["d3"])
+        lo21 = 0 if f4seg else 20
+        rep.add("NE3-21: zmiany typu warsztatu za cena 20-120 w oknie (z ocena F4: 0-120), najwyzej 3 na dobe, zadne miasto 2 razy w 30 dobach (wahadlo); bankructwa z typem z cen i miasta z 3+ warsztatami jednego typu - INFO",
                 f"zmian {ch}, najwiecej na dobe {perday}, miast 2 razy w 30 dobach {len(twice)}" + (f" ({twice[0]})" if twice else "") + f"; bankructwa z typem z cen {bk}"
-                + (f"; miast z 3+ warsztatami jednego typu d1 {dup3[0]} -> koniec {dup3[-1]}" if dup3 else ""),
-                "20-120 / <= 3 / 0", 20 <= ch <= 120 and perday <= 3 and not twice)
+                + (f"; miast z 3+ warsztatami jednego typu d1 {dup3[0]} -> koniec {dup3[-1]}" if dup3 else "") + ("; ocena F4" if f4seg else ""),
+                f"{lo21}-120 / <= 3 / 0", lo21 <= ch <= 120 and perday <= 3 and not twice)
     else:
         rep.add("NE3-21: zmiany typu warsztatu", "brak linii E3-D3", "INFO (log bez czesci 2)", None)
     # ---- NE3-22 stojace warsztaty
@@ -41155,6 +41419,8 @@ def main(argv):
         return nekon2_main(logp)   # noc-ekonomia2 (16.10): jaja wsi rolniczych (BK), budzet kategorii bez producenta na zbytki, wlokno do miasta targowego, opal mieszczan
     if group == "nekon3" and logp:
         return nekon3_main(logp, bdp)   # noc-ekonomia3 (16.10, czesc 1): straznik z kapem, myto, czynsz gruntowy, danina markietanow, karawany tam, gdzie zysk, woz wsi z towarem
+    if group == "nwar" and logp:
+        return nwar_main(logp, bdp)   # nwar (noc 17/18.10, f4-warsztaty): ocena typu warsztatu cena sprawiedliwa cyklu, wsad regionu, zmierzony wynik 60 dob (WorkshopFairScore)
     if group == "nzlec" and logp:
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
     if group == "nturniej" and logp:

@@ -23,6 +23,9 @@ namespace Armoury
     /// (gra nie wola tej metody dla warsztatu gracza w toku). Obieg: zloto i towar bez zmian - inny typ warsztatu tej samej akcji gry.
     /// Recenzja (noc 16.10): typy, ktorym brak wsadu w okregu (bramka E6/M2 WorkshopInputs: linia towarowa bez surowca w slowniku gry i bez kontraktu), ida
     /// na koniec - wybrane tylko, gdy zaden typ z wsadem nie ma wyniku (inaczej np. tlocznia bez winnic stoi albo bankrutuje); licznik "typ bez wsadu odlozony".
+    /// F4 (noc 17/18.10, paczka f4-warsztaty, klucz WorkshopRetoolFairScore): ocena typu (Score) i wybor przy przezbrojeniu/bankructwie (WorkshopRetool) ida przez
+    /// WorkshopFairScore - cena sprawiedliwa cyklu zamiast ceny srodkowej sztuki kategorii (Price), cykle ograniczone wsadem regionu, zmierzony wynik 60 dob, kara za
+    /// dubel w regionie rynku. MarketScore, Price i BestByPrice zostaja bez zmian dla drogi z wylaczonym kluczem.
     /// </summary>
     internal static class NoTownMines
     {
@@ -36,7 +39,7 @@ namespace Armoury
 
         internal static bool On { get { var s = Settings.Current; return s != null && s.NoTownMines; } }
 
-        internal static void Reset() { _picks = _swaps = _kept = _stumbles = _gated = 0; _samples.Clear(); _sample.Clear(); _sampleBuilt = false; }
+        internal static void Reset() { _picks = _swaps = _kept = _stumbles = _gated = 0; _samples.Clear(); _sample.Clear(); _sampleBuilt = false; _f4Picks = _f4Fallback = 0; }
 
         /// <summary>Start sesji (PO HistoricalPrices.Apply): sztuki kategorii od nowa - wybory typu przy starcie nowej gry biegna przed cenami historycznymi.</summary>
         internal static void SessionStart() { _sample.Clear(); _sampleBuilt = false; }
@@ -127,8 +130,18 @@ namespace Armoury
             return town.MarketData.GetPrice(it, null, false, null);
         }
 
-        /// <summary>Wynik typu w tym miescie: najlepsza linia z wsadem (wyroby - wsad po cenach targu) x szybkosc; -1e9 - typ bez linii do policzenia.</summary>
-        private static float Score(Town town, WorkshopType t) { return MarketScore(town, t, false); }
+        /// <summary>Wynik typu w tym miescie: najlepsza linia z wsadem (wyroby - wsad po cenach targu) x szybkosc; -1e9 - typ bez linii do policzenia.
+        /// F4 (noc 17/18.10, klucz WorkshopRetoolFairScore): fair - ta sama ocena co przezbrojenie (WorkshopFairScore.Score: cena sprawiedliwa cyklu, cykle z wsadu
+        /// regionu, zmierzony wynik >= 60 dob); wolane z fair tylko po tygodniu pomiaru wsadu w kampanii (Best), start gry i pierwszy tydzien - jak dotad.</summary>
+        private static float Score(Town town, WorkshopType t, bool fair)
+        {
+            if (fair) return WorkshopFairScore.Score(town, t, null).Score;
+            return MarketScore(town, t, false);
+        }
+
+        /// <summary>F4: wybory N10 ocena F4 i powroty do oceny z cen (zaden typ bez wyniku F4 > 0 - kopalnia by zostala) - do linii E3-D3 (zeruje TakeF4).</summary>
+        private static int _f4Picks, _f4Fallback;
+        internal static void TakeF4(out int picks, out int fallback) { picks = _f4Picks; fallback = _f4Fallback; _f4Picks = _f4Fallback = 0; }
 
         /// <summary>
         /// Jedna regula wyboru typu z cen targu (N10 kopalnie; E3-D3 przezbrojenie i bankructwo): najlepsza linia z wsadem (wyroby - wsad po cenach targu) x szybkosc.
@@ -182,7 +195,21 @@ namespace Armoury
             return pick;
         }
 
+        /// <summary>N10: typ w miejsce kopalni. F4 (klucz WorkshopRetoolFairScore, pomiar wsadu gotowy): najpierw ocena F4; gdy zaden typ nie ma w niej wyniku > 0,
+        /// ocena z cen jak dotad - martwa kopalnia (0 cykli) jest gorsza od kazdego typu, wiec F4 nie zostawia jej czesciej niz dotad.</summary>
         private static WorkshopType Best(Town town, WorkshopType exclude, WorkshopType mines)
+        {
+            bool fair = WorkshopFairScore.Ready;
+            var pick = Pick(town, exclude, mines, fair);
+            if (fair)
+            {
+                _f4Picks++;
+                if (pick == null) { pick = Pick(town, exclude, mines, false); if (pick != null) _f4Fallback++; }
+            }
+            return pick;
+        }
+
+        private static WorkshopType Pick(Town town, WorkshopType exclude, WorkshopType mines, bool fair)
         {
             BuildSamples();
             var have = new HashSet<WorkshopType>();
@@ -193,7 +220,7 @@ namespace Armoury
             foreach (var t in WorkshopType.All)
             {
                 if (t == null || t.IsHidden || t == mines || t == exclude || t.StringId == MinesId) continue;
-                float sc = Score(town, t);
+                float sc = Score(town, t, fair);
                 if (!(sc > 0f)) continue;
                 int g = WorkshopInputs.InputMissing(t) ? 1 : 0;
                 if (!have.Contains(t) && (bestNew[g] == null || sc > sNew[g])) { bestNew[g] = t; sNew[g] = sc; }
