@@ -2801,3 +2801,10 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   wiosek + prace okregu, AI WYL.), perf-d2d3 (szybkosc naszych modow i cudzego kodu), zapis-d4 (rozmiar zapisu, cichsze logi).
 - 20:33 PDT: okno 5 h 81% (reset 21:20 PDT), tydzien 22% -> fala 3 (wf_ab683a3a-156) ZATRZYMANA po 1 min (worktree czyste); wznowic po resecie: Workflow scriptPath scratchpad/fala3.js
   (BASE 100eaedf). Test fin83 biegnie (gra nie zuzywa limitu).
+- 21:12 PDT: TEST fin83 (calosc 100eaedf z flaga KS, 120 dob, Armoury-2026-10-17_20-30-51.log, kopia logi-testow; wyniki grup: scratchpad fin83/*.txt): kod 0, ERROR 0, CrashScribe
+  22 (te same co zawsze), gra przywrocona. nks 18 z 73 NIE/ETAP (fin80: 22 z 53). TAK w calosci: nkoszyk, nzajazdy, nglod, ndrogi, nprzysiolki, nherby, nksarm, nzbroj, na12, na17,
+  nrot, nzc0, nzc2, nkarczmy. Kredyt KS-H: cel z zaleglym 0.4% (bylo: kasa celu za mala 37.8%), 2.44M szt.; wsie kupuja 87% (79%); ceny nizej, ale dalej 1.4-2.1x (ser 1.86, oliwki 1.54,
+  pomarancze 1.99, winogrona 2.12); akumulator miast +34.7k/d (prog 30k). NIE: koszt 5.49/17.1/2.73 ms (fala 3 ks-koszt), NKS-24 48/57 krain < 0.8, zrodlo bez miejsca kredytu 10.4%
+  (zboze), NKS-30e Plany niezbiezne (18 towarow), NMUR-6 Straz 0.895 (prog 0.90), NMUR-32 bandy nie dochodza do celu (0/13), RT-1/RT-5 (linia uchodzcow nierozpoznana - narzedzie),
+  ZC1-8 ksiega towarow vs ruda/drewno NIEZGODNA 52/119, ZC1 aksamit/miod pitny/jedwab, NDS-7b korona 0.869, NDS-9 D 0.875, NDS-11 takt 554 ms (baza 493), glowy rodow +46.5k/d.
+- 21:13 PDT: TEST fin84 = TA SAMA DLL (fin83) BEZ FLAG, 160 dob = SCIEZKA GRY JEFFA (KS samo sie uzbraja, pomiar, przelaczenie; uklad wiosek v6 z zapisu F) - test przed WGRANIEM 77.
