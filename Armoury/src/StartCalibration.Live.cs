@@ -582,10 +582,12 @@ namespace Armoury
             // rampa (beta podazy na towar i rynek, lambda popytu) - po stawkach jutra, przed polami mieszczan (plon pol x beta)
             try { RampDaily(today, mkByM); } catch (Exception e) { Stumble("RampDaily", e); }
             tq = T0Lap(T0Ramp, tq);
+            bool tf2 = SwTownFieldsEvery2;                       // ks-koszt T13 (klucz Ks Town Fields Every2, domyslnie NIE): plon pol mieszczan co 2. doba (Fnv), dzien bez dostawy - plon do ulamka
             foreach (var kv in tfList)
             {
                 try
                 {
+                    if (tf2 && T13Accrue(kv.Key, kv.Value, today)) continue;
                     int pcs; long paid; int unpaid;
                     DeliverTownFields(kv.Key, kv.Value, out pcs, out paid, out unpaid, tfMade);
                     tfPieces += pcs; tfPaid += paid; tfUnpaid += unpaid;

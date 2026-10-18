@@ -7340,6 +7340,10 @@ namespace Armoury
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool CrownWindfallToReserve { get; set; } = true;
 
+        [SettingPropertyBool("Ks Town Fields Every2", HintText = "with Start Calibration applied: the townsfolk's own fields bring their crop to the town stall every second day (two days' crop at once, each town on its own day, paid in full by the town purse as before) instead of every day - half the daily work, the same crop and money over time; off = every day")]
+        [SettingPropertyGroup("Start calibration: day cost (ks-koszt)")]
+        public bool KsTownFieldsEvery2 { get; set; } = false;
+
         [SettingPropertyBool("Ks Cost Fast", HintText = "with Start Calibration: the daily work of the calibration is done in quicker ways that give exactly the same results - the weekly plan's market totals are counted on the plan's own thread, prices, stall rows and price thresholds are looked up once a day instead of again for every village, and road distances from villages to nearby towns are remembered for the session; off = the old, slower way")]
         [SettingPropertyGroup("Start calibration: day cost (ks-koszt)")]
         public bool KsCostFast { get; set; } = true;
@@ -9178,6 +9182,7 @@ namespace Armoury
             s.DsHoardDueVillages = DsHoardDueVillages;
             s.FolkBetterTable = FolkBetterTable;
             s.CrownWindfallToReserve = CrownWindfallToReserve;
+            s.KsTownFieldsEvery2 = KsTownFieldsEvery2;
             s.KsCostFast = KsCostFast;
         }
 

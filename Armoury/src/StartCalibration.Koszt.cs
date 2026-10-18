@@ -26,7 +26,7 @@ namespace Armoury
         private static long T0Now() { return Stopwatch.GetTimestamp(); }
 
         /// <summary>T0: poczatek doby KS - pod-czasy od zera; watek glowny (pamieci T4 tylko na nim).</summary>
-        private static void T0Begin() { Array.Clear(_t0, 0, T0N); _t0Redo = 0; _t0Worker = false; _kMain = Environment.CurrentManagedThreadId; }
+        private static void T0Begin() { Array.Clear(_t0, 0, T0N); _t0Redo = 0; _t0Worker = false; _t13Skip = 0; _kMain = Environment.CurrentManagedThreadId; }
         private static int _kMain = -1;                     // watek glowny (doba KS) - pamieci ks-koszt tylko na nim; inny watek - rachunek bez pamieci (jak dotad)
 
         /// <summary>T0: czas od q do teraz do pola slot; zwraca teraz (nastepny odcinek).</summary>
@@ -56,7 +56,8 @@ namespace Armoury
               .Append(", polki_pliki ").Append(T0F(T0Shelf)).Append(", linie_logu ").Append(T0F(T0Lines)).Append(", inne_zastosowany ").Append(Math.Max(0.0, live - inner).ToString("0.00", Inv))
               .Append(" | odbior Planu ms: na_targ ").Append(T0F(T0CMk)).Append(" (watek roboczy ").Append(_t0Worker ? "TAK" : "NIE").Append("), lepszy_stol ").Append(T0F(T0CNeed))
               .Append(", linie_planu ").Append(Math.Max(0.0, T0Ms(_t0[T0CLines] - _t0[T0CMk])).ToString("0.00", Inv)).Append(", pliki_planu ").Append(T0F(T0CCsv))
-              .Append(" | reszta ").Append(Math.Max(0.0, totalMs - main - live).ToString("0.00", Inv)).Append(" ms | okregow przeliczonych ").Append(_t0Redo).Append('.');
+              .Append(" | reszta ").Append(Math.Max(0.0, totalMs - main - live).ToString("0.00", Inv)).Append(" ms | okregow przeliczonych ").Append(_t0Redo)
+              .Append(" | klucze: Ks Cost Fast ").Append(SwCostFast ? "TAK" : "NIE").Append(", Ks Town Fields Every2 ").Append(SwTownFieldsEvery2 ? "TAK (pola mieszczan bez dostawy dzis " + _t13Skip + ")" : "NIE").Append('.');
             return sb.ToString();
         }
 
@@ -171,6 +172,28 @@ namespace Armoury
             if (double.IsNaN(v)) { v = ZPass2Floor(t, z); row[ZN + z] = v; }
             return v;
         }
+
+        // ============================================================ T13: pola mieszczan co 2. doba (klucz Ks Town Fields Every2, domyslnie NIE - nie bit w bit)
+        private static bool SwTownFieldsEvery2 { get { var s = Settings.Current; return s != null && s.KsTownFieldsEvery2; } }
+
+        /// <summary>T13: doba bez dostawy pol mieszczan (parzystosc Fnv okregu i doby) - plon doby x beta do ulamka (Frac) jak w DeliverTownFields, bez sztuk na polce
+        /// i bez zaplaty; nastepnej doby dostawa dwoch dob naraz (kazda sztuka placona jak dotad). true - doba bez dostawy (wolajacy pomija DeliverTownFields).
+        /// Te same warunki co DeliverTownFields (miasto, polka, oblezenie - wtedy nic nie przybywa).</summary>
+        private static bool T13Accrue(LiveDist ld, DistResult res, int today)
+        {
+            if (((Fnv(ld.Id) + (uint)today) & 1u) == 0u) return false;     // doba dostawy
+            var town = ld.T;
+            if (town == null || town.Settlement == null || town.Settlement.ItemRoster == null || ld.St.IsUnderSiege) return true;
+            int m = ld.Market == 0 ? 0 : 1;
+            for (int i = 0; i < ItemCount; i++)
+            {
+                if (_items[i] == null) continue;
+                ld.Frac[i] += res.Market[i] * Beta(m, i);
+            }
+            _t13Skip++;
+            return true;
+        }
+        private static int _t13Skip;
 
         // ============================================================ T6: pozycja koszyka towaru KS (RampZ) z tablicy
         private static int[] _rampZTab;
