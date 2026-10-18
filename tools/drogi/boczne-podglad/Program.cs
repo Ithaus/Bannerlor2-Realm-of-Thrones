@@ -6,6 +6,7 @@
 // Uruchomienie z katalogu repo (dotnet 8):
 //   dotnet run -c Release --project tools/drogi/boczne-podglad -- [--uklad plik.tsv] [--osady settlements.xml] [--wyj katalog] [Klucz wartosc ...]
 //   klucze jak w pliku-przelaczniku autotestu (MaxHop 16, NearExtra 3 ...); wynik: <wyj>/roads.tsv, stamps.tsv, nodes.tsv, obst.tsv i linia planu.
+//   f19-drogi: domyslnie regula "kazda wioska ukladu" (AllVillages 1, jak klucz MapSideRoadsAllVillages w grze); AllVillages 0 = plan f11.
 // Obrazek: python -I tools/drogi/boczne-podglad/rysuj.py <wyj> <srodek x> <srodek y> <bok jedn.> <plik.png> [piksele na jedn.] (wymaga Pillow).
 using System;
 using System.Collections.Generic;
@@ -53,7 +54,14 @@ internal static class Podglad
             if (line.Length == 0 || line[0] == '#') continue;
             var c = line.Split('\t');
             int ix = cols.ContainsKey("x") ? cols["x"] : 3, iy = cols.ContainsKey("y") ? cols["y"] : 4, iu = cols.ContainsKey("uid") ? cols["uid"] : 9;
-            nodes.Add(new SideRoadPlan.Node { X = float.Parse(c[ix], inv), Y = float.Parse(c[iy], inv), Id = c[iu], Game = false });
+            var nd = new SideRoadPlan.Node { X = float.Parse(c[ix], inv), Y = float.Parse(c[iy], inv), Id = c[iu], Game = false };
+            // f19: nazwa i obrys obrazka (jak MapVillageRecord w grze: name, front_deg, half_len, half_wid)
+            if (cols.ContainsKey("name") && cols["name"] < c.Length) nd.Name = c[cols["name"]];
+            float fv;
+            if (cols.ContainsKey("front_deg") && cols["front_deg"] < c.Length && float.TryParse(c[cols["front_deg"]], NumberStyles.Float, inv, out fv)) nd.FrontDeg = fv;
+            if (cols.ContainsKey("half_len") && cols["half_len"] < c.Length && float.TryParse(c[cols["half_len"]], NumberStyles.Float, inv, out fv)) nd.Hl = fv;
+            if (cols.ContainsKey("half_wid") && cols["half_wid"] < c.Length && float.TryParse(c[cols["half_wid"]], NumberStyles.Float, inv, out fv)) nd.Hw = fv;
+            nodes.Add(nd);
         }
         int layoutN = nodes.Count;
         string sx = File.ReadAllText(osady);
@@ -66,7 +74,8 @@ internal static class Podglad
             string body = end > 0 ? sx.Substring(mm.Index, end - mm.Index) : "";
             float x = float.Parse(px.Groups[1].Value, inv), y = float.Parse(py.Groups[1].Value, inv);
             string id = Regex.Match(s, "\\sid=\"([^\"]+)\"").Groups[1].Value;
-            if (body.Contains("<Village")) nodes.Add(new SideRoadPlan.Node { X = x, Y = y, Id = id, Game = true });
+            string nm = Regex.Replace(Regex.Match(s, "\\sname=\"([^\"]+)\"").Groups[1].Value, "\\{=[^}]*\\}", "");   // f19: nazwa wsi gry do logu
+            if (body.Contains("<Village")) nodes.Add(new SideRoadPlan.Node { X = x, Y = y, Id = id, Game = true, Name = nm });
             else if (body.Contains("<Town")) obst.Add(new SideRoadPlan.Obstacle { X = x, Y = y });
         }
         Console.WriteLine("siatka " + g.Nx + " x " + g.Ny + " (lad " + g.Land + "), trakty: lamanych " + m.Lines + ", odcinkow " + m.Segments + "; wioski ukladu " + layoutN + " (" + uklad + "), wsie gry "
@@ -79,14 +88,25 @@ internal static class Podglad
             for (int k = 0; k < r.Roads.Count; k++)
             {
                 var rd = r.Roads[k];
-                for (int i = 0; i < rd.X.Length; i++) w.WriteLine(k + "\t" + i + "\t" + rd.X[i].ToString("0.###", inv) + "\t" + rd.Y[i].ToString("0.###", inv) + "\t" + rd.Join + "\t" + rd.Smooth + "\t" + rd.Pass);
+                for (int i = 0; i < rd.X.Length; i++) w.WriteLine(k + "\t" + i + "\t" + rd.X[i].ToString("0.###", inv) + "\t" + rd.Y[i].ToString("0.###", inv) + "\t" + rd.Join + "\t" + rd.Smooth + "\t" + rd.Pass + "\t" + rd.Node);
             }
         using (var w = new StreamWriter(Path.Combine(wyj, "stamps.tsv")))
             foreach (var s in r.Stamps)
                 w.WriteLine(s.X.ToString("0.###", inv) + "\t" + s.Y.ToString("0.###", inv) + "\t" + s.Yaw.ToString("0.###", inv) + "\t" + s.Across.ToString("0.###", inv) + "\t"
                             + s.Along.ToString("0.###", inv) + "\t" + s.Alpha.ToString("0.##", inv) + "\t" + s.Road);
+        // f19: stan wioski (SideRoadPlan.St*: 1 droga, 2 obrazek na farbie, 3 styk z siecia, 4 bez trasy, 5 wies gry przy trakcie, 6 wies gry z droga, 7 ostroga,
+        // 8 wies gry - wezel bez wlasnej drogi, 9 wies gry bez trasy, 10 ponad limit drog, 11 laczka przy trakcie); plan f11 - stan z drog planu (1 / 0)
+        var st = r.States;
+        if (st == null) { st = new byte[nodes.Count]; foreach (var rd in r.Roads) st[rd.Node] = 1; }
         using (var w = new StreamWriter(Path.Combine(wyj, "nodes.tsv")))
-            foreach (var n in nodes) w.WriteLine(n.X.ToString("0.###", inv) + "\t" + n.Y.ToString("0.###", inv) + "\t" + (n.Game ? 1 : 0) + "\t" + n.Id);
+            for (int k = 0; k < nodes.Count; k++)
+            {
+                var n = nodes[k];
+                w.WriteLine(n.X.ToString("0.###", inv) + "\t" + n.Y.ToString("0.###", inv) + "\t" + (n.Game ? 1 : 0) + "\t" + n.Id + "\t" + st[k] + "\t" + (n.Name ?? ""));
+            }
+        int noLane = 0;
+        for (int k = 0; k < nodes.Count; k++) if (!nodes[k].Game && st[k] != 1 && st[k] != 11) noLane++;
+        Console.WriteLine("wioski ukladu bez rysowanej drogi (kazdy powod): " + noLane);
         using (var w = new StreamWriter(Path.Combine(wyj, "obst.tsv")))
             foreach (var o in obst) w.WriteLine(o.X.ToString("0.###", inv) + "\t" + o.Y.ToString("0.###", inv));
         Console.WriteLine("wynik: " + Path.GetFullPath(wyj));
