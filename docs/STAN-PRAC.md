@@ -2771,3 +2771,6 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   pod KS do indeksu 1.5), CrownWindfallToReserve, nds NDS-3a/3c/7b/9 poprawione, grupa nakum, linia "Akumulator kies (ds-akumulator)". RYZYKO: bez wyjscia wydatkow we wsiach nadwyzka
   przeniesie sie do kies wsi (+100-130k/d bez KS); DsHoardDueVillages WYL. UWAGA ZASADA: DS F1/F3 (Jeff 17.10) zniosl "podatek od skarbca" jako pobor resztowy - DsHoardDue go
   przywraca jako tallage; do oceny po tescie (alternatywy: wyjscie wydatkow + ceny bez sufitu, dziesiata od ruchomosci tez w pokoju rzadziej, czynsz rosnacy z zamoznoscia wsi).
+- 18:40 PDT: TEST fin81 (n-ks4 4bfd840c = KS r4 cz. 1-5 + zajazdy/plotki, Armoury-2026-10-17_17-55-14.log, kopia logi-testow): kod 0, ERROR 0, flagi usuniete, gra przywrocona
+  (d84f7b66). nzajazdy 12/12 TAK (196 zajazdow, gestosc wedlug ludzi, nocleg zaplacony = odebrany, 0 potkniec, obrazek raz na mape). Srednio 20.1 s/dobe (fin80 16.0) - takt
+  naszych modow bez zmian (~0.57 s), prawdopodobnie obciazenie komputera przez budowy 14 agentow; sprawdzic w tescie koncowym.
