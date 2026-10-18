@@ -601,17 +601,19 @@ namespace Armoury
                 var pool = _fPool.GetValue(__instance) as IDictionary;
                 if (list == null || pool == null) return;
                 List<Piece> stock = null;
+                // ZB-5 (klucz GearFitRealmFootInHideoutSiege): w kryjowce i oblezeniu jezdziec walczy pieszo - kon z przydzialu DTE nie zawaza o broni (ArmouryZb.FootMission)
+                bool foot = mission != null && ArmouryZb.FootOn && ArmouryZb.FootMission(mission, mp);   // wypad/odsiecz: pieszo tylko strona Attacker
                 foreach (var a in list)
                 {
                     if (a == null) continue;
-                    try { FloorOne(__instance, a, pool, ref stock, count, main); }
+                    try { FloorOne(__instance, a, pool, ref stock, count, main, foot); }
                     catch (Exception e) { Stumble("FloorOne", e); }
                 }
             }
             catch (Exception e) { Stumble("FloorPostfix", e); }
         }
 
-        private static void FloorOne(object dist, object a, IDictionary pool, ref List<Piece> stock, bool count, bool main)
+        private static void FloorOne(object dist, object a, IDictionary pool, ref List<Piece> stock, bool count, bool main, bool foot)
         {
             var co = _getChar.Invoke(a, null) as CharacterObject;
             if (co == null || co.IsHero) return;
@@ -623,7 +625,7 @@ namespace Armoury
             if (slot < 0) { if (count) _dNoSlot++; return; }   // sloty zajete czyms innym (tarcze, kolczany bez luku) - bez zmian
             // jezdziec = kon w przydziale (DTE dal mu konia z puli); bez konia idzie pieszo - wtedy kazda bron
             var hs = eq[EquipmentIndex.Horse];
-            bool mounted = !hs.IsEmpty && hs.Item != null;
+            bool mounted = !hs.IsEmpty && hs.Item != null && !foot;   // ZB-5: w kryjowce i oblezeniu pieszo (klucz wylaczony - foot = false, jak dotad)
             if (stock == null) stock = Melee(pool);
             int pass;
             var pick = Best(co, stock, mounted, out pass);

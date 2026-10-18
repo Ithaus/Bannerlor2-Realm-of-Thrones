@@ -166,6 +166,29 @@ namespace Armoury
             return group != null && group.Length > 0 && !p.Barred && meets(group[0], p);
         }
 
+        /// <summary>ZB-3: rozne grupy z group[] w kolejnosci pierwszego wystapienia (pierwsza = group[0], najzdolniejsza) - liczone raz na plan nadwyzki.</summary>
+        internal static int[] DistinctGroups(int[] group)
+        {
+            var l = new List<int>();
+            if (group == null) return l.ToArray();
+            var seen = new HashSet<int>();
+            foreach (int g in group) if (seen.Add(g)) l.Add(g);
+            return l.ToArray();
+        }
+
+        /// <summary>ZB-3 (przeglad 16.10, klucz SurplusUsableAnyGroup): czy KTOKOLWIEK z ludzi tego typu udzwignie sztuke - kazda grupa po kolei (groups z DistinctGroups,
+        /// od najzdolniejszej). Usable pytal tylko group[0]: przy GearFit (siodlo, kultura) najzdolniejszy oddzial nie bierze sztuki, ktora inny oddzial nosi (bron
+        /// tylko z siodla, styl innej kultury), i ta szla do kupca jako "nikt nie udzwignie". saved - true, gdy pierwsza grupa nie udzwignela, a inna tak (licznik ZB).</summary>
+        internal static bool UsableAny(int[] groups, Func<int, Piece, bool> meets, Piece p, out bool saved)
+        {
+            saved = false;
+            if (groups == null || groups.Length == 0 || p.Barred) return false;
+            if (meets(groups[0], p)) return true;
+            for (int i = 1; i < groups.Length; i++)
+                if (meets(groups[i], p)) { saved = true; return true; }
+            return false;
+        }
+
         // ------------------------------------------------------------ ksiega gracza na egzemplarze
         /// <summary>Ksiega wkladow gracza (per id) rozdzielona na egzemplarze tego id: NAJGORSZE najpierw.</summary>
         internal static void AllocateOwn(List<Piece> pieces, Func<string, int> bookOf)
@@ -183,6 +206,37 @@ namespace Armoury
                 int left = Math.Max(0, bookOf(kv.Key));
                 foreach (var p in kv.Value) { p.Own = Math.Min(p.Total, left); left -= p.Own; }
             }
+        }
+
+        /// <summary>ZB-1 (przeglad 16.10, klucz ArmouryBookPerModifier): ksiega per id ROZBITA na egzemplarze (keyBookOf: klucz id|mod -&gt; ile sztuk gracza tego
+        /// egzemplarza). Najpierw kazdy egzemplarz dostaje swoja czesc z rozbicia (w granicach ksiegi id - przy niespojnosci od najgorszego, watpliwosc na korzysc
+        /// ludzi), potem reszta ksiegi id bez rozbicia (stary zapis, wklad bez egzemplarza - polegli, dawne wklady) jak dotad na NAJGORSZE egzemplarze.
+        /// keyBookOf == null - regula sprzed ZB-1 (AllocateOwn per id). Zwraca liczbe sztuk przypisanych z reszty (bez rozbicia) - do linii ZB.</summary>
+        internal static int AllocateOwn(List<Piece> pieces, Func<string, int> bookOf, Func<string, int> keyBookOf)
+        {
+            if (keyBookOf == null) { AllocateOwn(pieces, bookOf); return 0; }
+            int rest = 0;
+            var byId = new Dictionary<string, List<Piece>>();
+            foreach (var p in pieces)
+            {
+                List<Piece> l;
+                if (!byId.TryGetValue(p.Id, out l)) byId[p.Id] = l = new List<Piece>();
+                l.Add(p);
+            }
+            foreach (var kv in byId)
+            {
+                kv.Value.Sort(WorseFirst);
+                int left = Math.Max(0, bookOf(kv.Key));
+                foreach (var p in kv.Value) { p.Own = Math.Min(Math.Min(p.Total, Math.Max(0, keyBookOf(p.Key))), left); left -= p.Own; }
+                foreach (var p in kv.Value)
+                {
+                    if (left <= 0) break;
+                    int k = Math.Min(p.Total - p.Own, left);
+                    if (k <= 0) continue;
+                    p.Own += k; left -= k; rest += k;
+                }
+            }
+            return rest;
         }
 
         // ------------------------------------------------------------ B2: wymiana 1:1
