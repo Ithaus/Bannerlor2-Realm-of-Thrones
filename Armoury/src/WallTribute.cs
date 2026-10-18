@@ -32,7 +32,9 @@ namespace Armoury
     ///  - MIEJSCE (fix-mur, klucz WallTributeDistrictRoom): zadanie okregu Strazy (brak + uzupelnienie wszystkich jego wsi) ograniczone wolnym miejscem (do 98%
     ///    sufitu) spichlerzy tych wsi okregu, ktore zamawiaja (brak doby albo spichlerz ponizej celu), minus wozy w drodze do okregu - ta sama regula co rozladunek
     ///    (woz do tych wsi wedlug wolnego miejsca). Wies z pelnym spichlerzem je z wlasnego zapasu, a zboze okregu laduje u sasiada z miejscem (zapas okregu stoi);
-    ///    wies sama sie zywiaca z pelnym spichlerzem daniny nie przyjmuje (jej nadwyzka przelewa sie przez sufit Famine). Wylaczony - miejsce kazdej wsi osobno.
+    ///    wies sama sie zywiaca z pelnym spichlerzem daniny nie zamawia (jej nadwyzka przelewa sie przez sufit Famine). Rozladunek (recenzja fix-mur): najpierw wsie,
+    ///    ktore zamawiaja; reszte wozu (zamawiajace pelne albo dzis zadna nie zamawia - wozy wyslane, gdy jeszcze zamawialy) bierze stara regula (kazda wies okregu
+    ///    z miejscem do 98% sufitu), dopiero potem woz czeka u bram - filtr dzieli ladunek, nie decyduje o przyjeciu. Wylaczony - miejsce kazdej wsi osobno.
     /// KONTROLA (linia "Danina Muru (r4-mur)"): w drodze wczoraj + wyslane - zepsute - dostarczone - oddane dawcom = w drodze dzis; od poczatku kampanii (zapis):
     /// wyslane = dostarczone + zepsute + oddane dawcom + w drodze. Pokrycie Strazy: z pola (plon / ludzie) i z pola z dzisiejsza danina.
     /// Wylaczone (klucz albo KS) - nowych wozow nie ma, wozy w drodze dojezdzaja; bez wozow w drodze nic nie biegnie (stara sciezka bit w bit).
@@ -197,6 +199,7 @@ namespace Armoury
             _offLogged = false;
             double transitY = 0.0; foreach (var sh in _ships) transitY += sh.R;
             double spoiledD = 0.0, delivD = 0.0, backDelivD = 0.0, backStartD = 0.0, waitD = 0.0, shippedD = 0.0, unmet = 0.0, rotD = 0.0;
+            double spillD = 0.0;                                         // fix-mur (recenzja): z dostarczonych - reszta wozow do wsi bez zamowienia (stara regula), tylko do linii
             int lots = 0, arrivals = 0, waitN = 0, backN = 0, rotN = 0;
             double p = Math.Max(0.0, Math.Min(0.5, s.WallTributeSpoilPercentPerDay / 100.0));
             double target0 = Math.Max(0, s.WallTributeTargetDays);       // fix-mur: wies, ktora zamawia (brak albo spichlerz ponizej celu) - ta sama w Deliver i w zadaniu
@@ -221,7 +224,15 @@ namespace Armoury
                     {
                         if (dst != null && IsWatch(dst))
                         {
-                            double put = s.WallTributeDistrictRoom ? Deliver(dst, sh.R, target0) : Deliver(dst, sh.R);   // fix-mur: przy miejscu okregu tylko wsie, ktore zamowily
+                            double put;
+                            if (s.WallTributeDistrictRoom)
+                            {
+                                // fix-mur: najpierw wsie, ktore zamawiaja (wedlug wolnego miejsca); recenzja: reszta wozu - stara regula (kazda wies okregu z miejscem
+                                // do 98% sufitu), dopiero potem czekanie u bram - zboze z platnikiem nie gnije u bram, gdy spichlerze okregu maja miejsce
+                                put = Deliver(dst, sh.R, target0);
+                                if (sh.R - put > 1e-6) { double spill = Deliver(dst, sh.R - put); put += spill; spillD += spill; }
+                            }
+                            else put = Deliver(dst, sh.R);
                             sh.R -= put; delivD += put; _cIn += put;
                             if (sh.R > 1e-6) Wait(sh, put, today, ref waitD, ref waitN, ref rotD, ref rotN, ref spoiledD);   // spichlerze pelne - reszta czeka u bram do jutra
                         }
@@ -422,7 +433,8 @@ namespace Armoury
                   .Append(" racji/d, brak ").Append(F0(wGap)).Append("/d, spichlerze ").Append(F0(wFood)).Append(" racji = ").Append(F(wHome > 0 ? wFood / wHome : 0, "0.0")).Append(" dni");
                 sb.Append(" | zadanie ").Append(F0(wNeed)).Append(" racji (brak ").Append(F0(wGap)).Append(" + uzupelnienie ").Append(F0(wRefill)).Append(" - bez miejsca w spichlerzu ").Append(F0(wCut)).Append(')');
                 // fix-mur: skad brak miejsca - wsie przy suficie i wolne miejsce okregow (po odjeciu wozow w drodze); regula miejsca (okreg / kazda wies osobno)
-                sb.Append(" [miejsce: ").Append(s.WallTributeDistrictRoom ? "okreg" : "wies").Append(", wolne w okregach ").Append(F0(roomAll)).Append(" racji, wsi przy suficie ").Append(fullV).Append(']');
+                sb.Append(" [miejsce: ").Append(s.WallTributeDistrictRoom ? "okreg" : "wies").Append(", wolne w okregach ").Append(F0(roomAll)).Append(" racji, wsi przy suficie ").Append(fullV)
+                  .Append(", z dostarczonych do wsi bez zamowienia ").Append(F0(spillD)).Append(" racji]");
                 sb.Append(" | Polnoc: okregi ").Append(givers.Count).Append(" (z nadwyzka ").Append(gWith).Append("), nadwyzka ponad rezerwe ").Append(F0(gSurplus)).Append(" racji, oferta ").Append(F0(gOffer)).Append("/d");
                 sb.Append(" | wyslane ").Append(F0(shippedD)).Append(" racji (").Append(lots).Append(" wozow, ok. ").Append(F0(shippedD / RationsPerGrain)).Append(" szt. zboza), niedobor ").Append(F0(unmet));
                 sb.Append(" | przyjazdy ").Append(arrivals).Append(": dostarczone ").Append(F0(delivD)).Append(", zepsute ").Append(F(spoiledD, "0.0"))

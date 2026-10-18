@@ -1097,6 +1097,9 @@ Uzycie (Python 3, tylko odczyt):
                     Wolnych Ludzi <= 10% wyruszylych (zwykle 0) przy "swoi nie bija swoich: tak"; NMUR-34 zatrzymane w marszu wedlug strony (Straz / Polnoc / inni,
                     zawrocily rozbite, marsz ponad 30 dob) i odmowy ataku latki (INFO); NMUR-35 latka "swoi nie bija swoich" wpieta przy kluczu tak; NMUR-36 wspinaczka
                     przez Mur (klucz Free Folk Raid Climb Wall): warownie Strazy znalezione (> 0) przy kluczu tak, bandy i godziny ukrycia w biegu (INFO). Bez segmentu - INFO.
+                    Recenzja fix-mur: NMUR-13 dopisuje (INFO) reszte wozow wlozona stara regula do wsi bez zamowienia ("z dostarczonych do wsi bez zamowienia X racji");
+                    NMUR-33 liczy bandy zatrzymane w marszu przez Wolnych Ludzi = zginely z ich rak + zawrocily rozbite przez nich ("zawrocily rozbite N (pobili: Straz a,
+                    Polnoc b, Wolni Ludzie c, inni d)" - linia sprzed recenzji: tylko zginely), NMUR-34 pokazuje tez, kto pobil zawrocone.
                     ds-akumulator (18.10): NDS-3a/3b dryf kies wsi w oknie od konca rampy KS (koniec popytu) albo DS F1 (DayOn + 28) + 2 x 15 dob (za krotkie - ostatnie 30 dob),
                     NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
                     jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
@@ -38146,6 +38149,11 @@ def nmur_main(logp, until=120):
             pooled = all(x[3] for x in cut_rows)
             fv = [x[4] for x in cut_rows if x[4] is not None]
             extra = f", wsi przy suficie (ostatnia doba) {fv[-1]}" if fv else ""
+            # recenzja fix-mur: reszta wozow wlozona stara regula do wsi bez zamowienia (zamiast czekania u bram) - tylko informacja
+            sp = [fnum(r"z dostarczonych do wsi bez zamowienia " + F_, trib[x[0]]) for x in cut_rows]
+            sp = [x for x in sp if x is not None]
+            if sp:
+                extra += f", reszta wozow do wsi bez zamowienia {sum(sp) / len(sp):.0f} racji/d"
             rep.add("NMUR-13: zadanie Strazy obciete brakiem miejsca (bez miejsca / brak, 28 ostatnich dob)", f"{100.0 * share:.1f}% ({c_s / len(cut_rows):.0f} z {g_s / len(cut_rows):.0f} racji/d){extra}; miejsce: {'okreg' if pooled else 'wies (albo linia sprzed fix-mur)'}",
                     f"<= {100 * NMUR_CUT_MAX:.0f}% przy miejscu okregu (inaczej INFO)", (share <= NMUR_CUT_MAX) if pooled else None)
         else:
@@ -38227,10 +38235,14 @@ def nmur_main(logp, until=120):
         rep.add("NMUR-31: potkniecia najazdow (od wczytania)", stb, "0", stb == 0 if stb is not None else None)
         arr = [num(r"doszly dzis (\d+)", raid[d]) for d in rd]
         mcel = re.search(r"\| cel: doszly (\d+) z (\d+) band \(dzis \d+\), zatrzymane w marszu (\d+) \(zginely: Straz (\d+), Polnoc (\d+), Wolni Ludzie (\d+), inni (\d+); "
-                         r"zawrocily rozbite (\d+)\), marsz ponad \d+ dob (\d+), w marszu teraz (\d+), zginely po dojsciu lub w powrocie (\d+)", last)
+                         r"zawrocily rozbite (\d+)(?: \(pobili: Straz (\d+), Polnoc (\d+), Wolni Ludzie (\d+), inni (\d+)\))?\), marsz ponad \d+ dob (\d+), w marszu teraz (\d+), "
+                         r"zginely po dojsciu lub w powrocie (\d+)", last)
         if mcel:
             # fix-mur: licznik od poczatku (w zapisie) - doszly / zatrzymane i przez kogo
-            reached, ns_c, blk, kw, kn, kf, ko, turn, capm, mar, died = (int(mcel.group(i)) for i in range(1, 12))
+            reached, ns_c, blk, kw, kn, kf, ko, turn = (int(mcel.group(i)) for i in range(1, 9))
+            # recenzja fix-mur: kto pobil bandy zawrocone w marszu (grupy 9-12 - brak w linii sprzed recenzji)
+            tw, tn, tf, to_ = ((int(mcel.group(i)) if mcel.group(i) is not None else None) for i in range(9, 13))
+            capm, mar, died = (int(mcel.group(i)) for i in range(13, 16))
             # bandy sprzed fix-mur (wczytany zapis) licza sie w "wyruszylo", nie w wyniku - prog wedlug band z wynikiem
             known = reached + blk + capm                                       # bandy z wynikiem marszu (zginely po dojsciu - osobno, moga byc tez w "zawrocily")
             ok = (reached >= 1) if (known >= 3 and len(rd) >= 60) else None
@@ -38240,11 +38252,14 @@ def nmur_main(logp, until=120):
             veto = sum(num(r"odmowy ataku dzis (\d+)", raid[d]) or 0 for d in rd)
             if kin and kin.group(1) == "tak":
                 lim = NMUR_KIN_MAX * max(1, ns_c)
-                rep.add("NMUR-33: Wolni Ludzie nie bija wlasnych band najazdu (rozbite w marszu przez Wolnych Ludzi)", f"{kf} z {ns_c} wyruszylych band",
-                        f"<= {100 * NMUR_KIN_MAX:.0f}% wyruszylych (zwykle 0)", kf <= lim)
+                kff = kf + (tf or 0)                                           # zginely z rak Wolnych Ludzi + zawrocily pobite przez nich
+                rep.add("NMUR-33: Wolni Ludzie nie bija wlasnych band najazdu (zatrzymane w marszu przez Wolnych Ludzi)",
+                        f"{kff} z {ns_c} wyruszylych band (zginely {kf}, zawrocily pobite {tf if tf is not None else 'brak segmentu'})",
+                        f"<= {100 * NMUR_KIN_MAX:.0f}% wyruszylych (zwykle 0)", kff <= lim)
             else:
                 rep.add("NMUR-33: Wolni Ludzie nie bija wlasnych band najazdu", f"klucz Free Folk Raid Kin Peace: {kin.group(1) if kin else 'brak segmentu'}; rozbite przez Wolnych Ludzi {kf}", "INFO", None)
-            rep.add("NMUR-34: zatrzymane w marszu wedlug strony (od poczatku)", f"Straz {kw}, Polnoc {kn}, Wolni Ludzie {kf}, inni / bez bitwy {ko}; zawrocily rozbite {turn}; odmowy ataku latki w biegu {veto}",
+            tsd = f" (pobili: Straz {tw}, Polnoc {tn}, Wolni Ludzie {tf}, inni {to_})" if tw is not None else ""
+            rep.add("NMUR-34: zatrzymane w marszu wedlug strony (od poczatku)", f"zginely: Straz {kw}, Polnoc {kn}, Wolni Ludzie {kf}, inni / bez bitwy {ko}; zawrocily rozbite {turn}{tsd}; odmowy ataku latki w biegu {veto}",
                     "INFO (Straz i Polnoc to obrona Muru - zatrzymanie zgodne z ksiazkami)", None)
             clm = re.search(r"\| wspinaczka przez Mur: (tak|nie) \(pas (\d+) jedn\. od (\d+) warowni Strazy\)", last)
             if clm:

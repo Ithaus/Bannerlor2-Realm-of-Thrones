@@ -1384,6 +1384,7 @@ namespace Armoury
             CampaignEvents.OnSaveOverEvent.AddNonSerializedListener(this, delegate (bool ok, string name) { try { FreeFolkRaids.SaveOver(); } catch (Exception e) { Log.Error("FreeFolkRaids.SaveOver", e); } });
             CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("FreeFolkRaids.Hourly", delegate { try { FreeFolkRaids.Hourly(); } catch (Exception e) { Log.Error("FreeFolkRaids.Hourly", e); } }));
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, DayProfile.Destroyed("FreeFolkRaids.OnPartyDestroyed", FreeFolkRaids.OnPartyDestroyed));   // fix-mur: kto rozbil bande najazdu (tylko linia "cel:"; bez band - nic)
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("FreeFolkRaids.OnMapEventEnded", FreeFolkRaids.OnMapEventEnded));   // recenzja fix-mur: kto pobil bande w marszu (tylko linia "cel:"; bez band w marszu - nic)
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
