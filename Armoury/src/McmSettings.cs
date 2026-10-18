@@ -6988,6 +6988,10 @@ namespace Armoury
         [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
         public float KsConsignDepositShare { get; set; } = 0.5f;
 
+        [SettingPropertyBool("Ks Corridors War Cut", HintText = "with Ks Corridors Credit: the weekly plan does not count a land route on which every town with food to spare is at war with every town that needs it - the merchants cannot trade across the war - instead of taking the nearest pair of towns of the two lands that are at peace; off = as before")]
+        [SettingPropertyGroup("Food merchants: earnest money (KS round 5)")]
+        public bool KsCorridorsWarCut { get; set; } = true;
+
         [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: step by step over 60 days, up to about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool WhaleMeatFromWhalersOnly { get; set; } = true;
@@ -9094,6 +9098,7 @@ namespace Armoury
             s.KsLordFundsFood = KsLordFundsFood;
             s.KsConsignDeposit = KsConsignDeposit;
             s.KsConsignDepositShare = KsConsignDepositShare;
+            s.KsCorridorsWarCut = KsCorridorsWarCut;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;

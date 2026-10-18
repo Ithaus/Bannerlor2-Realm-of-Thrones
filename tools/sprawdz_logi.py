@@ -1031,6 +1031,14 @@ Uzycie (Python 3, tylko odczyt):
                     Recenzja r4-bkwies: NKS-26 INFO - zejscie spichlerzy wedlug krain (dopisek "wedlug krain (dni)": najwiekszy spadek w oknie, najnizszy zapas);
                     NKS-29b INFO - krok 5 DS z linii B1 (wsi ZC4: czesc listy wsi w kiesach; wsi do potrzeby: sol + narzedzia, odmowione, w kiesach, kategorie pokryte);
                     nds NDS-17 - skladnik "zostalo w kiesie (potrzeba pokryta)" poza progiem niewydanego, P5 plan - (towar + roboty + niewydane + w kiesie) INFO.
+                    KS-R5 ceny-r5 (noc 17/18.10, test fin83; KsFoodCore.cs, KsFoodCarts.cs, StartCalibration.Corridors.cs): NKS-24 dowoz KS-H do krainy = suma WSZYSTKICH
+                    korytarzy z czesci linii KS-H "dowoz do krain spoza krainy" (co 7 dob); log bez niej - suma listy korytarzy linii, ucietej do 120 pozycji (fin83: najmniejsza
+                    48 szt./d - dowoz zanizony; tekst mowi "UCIETA"); luki krain odciete wojna (Ks Corridors War Cut) - INFO. NKS-24b przyczyny braku dowozu (INFO: brak do T*
+                    zamowien bez lotu wedlug przyczyny - brak nadwyzki, poza zasiegiem, wojna, marza ceny, bez zysku, bez kredytu, cel z zaleglym, mala oferta; kraina celu
+                    x towar z importem Planu >= 50 szt./d najpierw). NKS-7g luka zapasu czy rozdzial (INFO z ks-miasta-towary.csv okna: polki / T*, przyciete do T* miasta,
+                    + w drodze KS-H przyciete, udzial zapasu ponad 1.25 T*; luka zapasu < 0.8, rozdzial > 20% zapasu ponad 1.25 T* przy medianie miast < 0.5 T*). NKS-16 od D:
+                    seria spadku kas miast rynku liczona od nowa od doby D (< 7 dob z rzedu); w rampie podazy A..D kupcy placa wsiom za zapas startu (fin83: Westeros 9 dob
+                    109111-109119 przy zapasie Westeros 35.7 -> 49.0 tys. szt. jedzenia + 28-30 tys. w drodze) - INFO.
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -1057,6 +1065,11 @@ Uzycie (Python 3, tylko odczyt):
                     <= 1.5 ms (jak NKS-28), NKU-13 stan do cofniecia DLL (INFO: wozy na kredyt w drodze i otwarte rachunki na koniec - cofniecie ponizej
                     r4-kupcy bez strat tylko przy 0 / 0). NKS-22 (grupa nks) od paczki: przy kredycie kupcow "kasa celu za mala" zastapione
                     "cel z zaleglym" <= 5% zamowionych; probka wyceny: srednia dobowych srednich <= 1%, najwiekszy blad <= 3%.
+                    KS-R5 ceny-r5 (noc 17/18.10; klucz Ks Consign Deposit): NKU-6 dopisek - sztuki odblokowane zadatkiem kupcow celu (prog bez zmian <= 10% zamowionych);
+                    NKU-14 zadatki kupcow celu (czesc linii KS-H "zadatki kupcow celu"): kontrola zadatkow reszta 0 w kazdej dobie (w drodze wczoraj + zaplacone przy wysylce -
+                    rozliczone = w drodze dzis), bez rozliczenia 0 zl; zaplacone, odblokowane, zaliczone przy dostawie, nadplata zwrocona, zwrot zawroconych, roszczenia celu -
+                    INFO. Zadatki sa w kontroli zlota NKU-2 (cel -, zrodla +; zwroty - pozycja "zwroty"), roszczenia celu w kontroli rachunkow NKU-1 (obok "nowe").
+                    Log bez czesci - INFO.
 --grupa nkoszyk   : (r4-koszyk, noc 17/18.10; Jeff 17.10 "Tanszy koszyk" i "Poprawka 2 - tak", STAN-PRAC ### 72 i ### 82, PLAN-KS-RUNDA4 rozdz. 4 P9; Armoury/src/KsCheapBasket.cs,
                     KsWageHands.cs; klucze Ks Cheap Basket, Ks Wage By Hands) python -I tools/sprawdz_logi.py --grupa nkoszyk <Armoury-*.log> [--do-doby 120] (strumieniowo).
                     NKO-0 linie paczki (INFO), NKO-1 (P9) klasy R i P miast - kcal jedzenia kupione >= 95% na obu rynkach (linia "KS: tanszy koszyk miast (P9)" ostatniego Planu),
@@ -36385,6 +36398,8 @@ NKS_P1ZL = re.compile(r"\| drabina 1 kupiona wartosc: Westeros (?P<w>-?\d+) zl, 
 NKS_BKV = re.compile(r"\| rynek wsi BK \([^)]*\): Westeros (?P<w>-?\d+) zl w (?P<wn>\d+) wsiach, Essos (?P<e>-?\d+) zl w (?P<en>\d+) wsiach")
 NKS_CORRFREE = re.compile(r"\| korytarze bez sufitu dowozu >= 20 szt\./d:(?P<body>[^|]*)")
 NKS_CORRNOOUT = re.compile(r"\| bez ujscia \([^)]*\): (?P<body>[^|]*)")
+# KS-R5 ceny-r5: luki krain H7 odciete wojna (kazde miasto eksportera z nadwyzka w wojnie z kazdym miastem importera z brakiem)
+NKS_CORRWAR = re.compile(r"\| luki odciete wojna \(KS-R5\): (?P<n>\d+)(?: \((?P<body>[^)]*)\))?")
 NKS_DAYTAB = re.compile(r"\| tabela dob KS-H (?P<t>[\d.]+) ms")
 NKS_SAVEKH = re.compile(r"KS: zapis arm_ks_kupcy doba (?P<day>-?\d+) \| (?P<kb>[\d.]+) KB")
 NKS_SAVER3 = re.compile(r"arm_ks_r3 \(stan rundy 3, osobny klucz\) (?P<kb>[\d.]+) KB, razem (?P<tot>[\d.]+) KB")
@@ -36451,6 +36466,9 @@ NKS_KSHMISS = re.compile(r"\| bez dowozu wedlug przyczyny \((?P<d>\d+) dob, [^)]
 NKS_KSHMISSIT = re.compile(r"(?P<l>[A-Za-z_]+) (?P<g>[A-Za-z_]+) (?P<s>\d+) \((?P<r>[^)]*)\)")
 NKS_MISSTOT = re.compile(r"([a-z][a-z ]*?) (\d+)(?:, |$)")
 NKS_MISSR = re.compile(r"([a-z][a-z ]*?) (\d+)(?: / |$)")
+# KS-R5 ceny-r5 (pomiar): reeksport (zrodlo, do ktorego ten sam towar jedzie KS-H) co dobe i krainy w obie strony (ten sam towar x>y i y>x) co 7 dob
+NKS_KSHREEX = re.compile(r"\| reeksport \(zrodlo czeka na ten sam towar KS-H w drodze do siebie\) (?P<p>\d+) szt\. w (?P<n>\d+) wozach")
+NKS_KSHBOTH = re.compile(r"\| krainy w obie strony \(srednia 28 dob, mniejszy kierunek, szt\./d\): razem (?P<tot>\d+)(?:; (?P<body>[^|]*))?")
 
 
 def nks_ksh_r5(s, rec):
@@ -36463,6 +36481,13 @@ def nks_ksh_r5(s, rec):
     m = NKS_KSHIMP.search(s)
     if m:
         rec["imp"] = {(it.group("l"), it.group("g")): float(it.group("x")) for it in NKS_KSHIMPIT.finditer(m.group("body"))}
+    m = NKS_KSHREEX.search(s)
+    if m:
+        rec["reex"] = int(m.group("p"))
+    m = NKS_KSHBOTH.search(s)
+    if m:
+        rec["both_tot"] = int(m.group("tot"))
+        rec["both_txt"] = (m.group("body") or "").strip()
     m = NKS_KSHMISS.search(s)
     if m:
         rec["miss_days"] = int(m.group("d"))
@@ -36699,8 +36724,14 @@ def nks_r5_rows(rep, logp, dd, w0, w1, ksh, corr):
             keys = sorted(by, key=lambda k: -sum(by[k].values()))
             pk = [k for k in keys if plan.get(k, 0.0) >= 50]
             txt = "; ".join(f"{k[0]} {k[1]} {sum(by[k].values())} (" + " / ".join(f"{r} {v}" for r, v in sorted(by[k].items(), key=lambda x: -x[1])) + ")" for k in (pk[:10] or keys[:10]))
+            # pomiar ceny-r5: reeksport (okno) i krainy w obie strony (ostatni tydzien okna)
+            rx = [d for d in sorted(ksh) if w0 <= d <= w1 and "reex" in ksh[d]]
+            rxs = sum(ksh[d]["reex"] for d in rx); bought = sum(int(ksh[d].get("bought") or 0) for d in rx)
+            bt = [d for d in wk if "both_tot" in ksh[d]]
+            extra = (f" | reeksport w oknie {rxs} szt. ({100.0 * rxs / max(1, bought):.1f}% kupionych KS-H)" if rx else "") + \
+                    (f" | krainy w obie strony (doba {bt[-1]}): razem {ksh[bt[-1]]['both_tot']} szt./d ({(ksh[bt[-1]].get('both_txt') or '-')[:300]})" if bt else "")
             rep.add("NKS-24b: przyczyny braku dowozu KS-H (brak do T* zamowien bez lotu, kraina celu x towar; ceny-r5)",
-                    f"tygodni {len(wk)} ({nd} dob), razem: " + ", ".join(f"{r} {v}" for r, v in sorted(tot.items(), key=lambda x: -x[1])) + f" | krainy z importem Planu >= 50 szt./d: {txt or '-'}",
+                    f"tygodni {len(wk)} ({nd} dob), razem: " + ", ".join(f"{r} {v}" for r, v in sorted(tot.items(), key=lambda x: -x[1])) + f" | krainy z importem Planu >= 50 szt./d: {txt or '-'}" + extra,
                     "INFO (brak nadwyzki = luka zapasu u zrodel, wojna/zasieg - mapa, marza/zysk - ceny, kredyt - NKU-6)", None)
         else:
             rep.add("NKS-24b: przyczyny braku dowozu KS-H", "brak czesci 'bez dowozu wedlug przyczyny' w liniach KS-H okna (log sprzed ceny-r5)", "INFO", None)
@@ -36951,7 +36982,8 @@ def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor,
         rep.add("NKS-24: dowoz do krain importerow (KS-H wobec przewozu Planu " + ("bez sufitu dowozu" if free else "(przed D)") + ", kraina x towar z importem >= 50 szt./d; K2)",
                 f"plan doba {pc[-1]}, dowoz doba {dc[-1]} ({imp_src}): krain-towarow {nl}, ponizej 0.8 {len(badl)}" + (f" ({', '.join(badl[:10])})" if badl else "")
                 + f" | korytarz po korytarzu >= 20 szt./d (INFO): ponizej 0.8 {len(bad)} z {nn}" + (f" ({', '.join(bad[:6])})" if bad else "")
-                + f" | bez ujscia (INFO): {(corr[pc[-1]].get('noout') or '-')[:200]} | kraina-tryb (INFO): {corr[pc[-1]].get('kraina') or '-'}",
+                + f" | bez ujscia (INFO): {(corr[pc[-1]].get('noout') or '-')[:200]} | kraina-tryb (INFO): {corr[pc[-1]].get('kraina') or '-'}"
+                + (f" | luki odciete wojna (INFO, KS-R5): {corr[pc[-1]]['warcut'][0]} ({corr[pc[-1]]['warcut'][1] or '-'})" if corr[pc[-1]].get('warcut') else ""),
                 ">= 0.8 dla kazdej krainy-importera x towar z importem Planu >= 50 szt./d", (len(badl) == 0) if nl else None)
     else:
         rep.add("NKS-24: korytarze planu", "brak linii 'KS: korytarze planu' albo korytarzy KS-H w oknie", ">= 0.8", None)
@@ -37347,6 +37379,9 @@ def nks_main(logp, until=120, bdp=None):
                         mo3 = NKS_CORRNOOUT.search(s)
                         if mo3:
                             dc["noout"] = mo3.group("body").strip()
+                        mw3 = NKS_CORRWAR.search(s)   # KS-R5 ceny-r5: luki H7 odciete wojna (Ks Corridors War Cut)
+                        if mw3:
+                            dc["warcut"] = (int(mw3.group("n")), (mw3.group("body") or "").strip())
                         corr[int(mm.group("day"))] = dc
                 elif s.startswith(NKS_K + "sterowanie rynku"):
                     mm = NKS_CTL.match(s)

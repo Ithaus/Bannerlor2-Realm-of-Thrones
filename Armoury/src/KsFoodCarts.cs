@@ -150,6 +150,7 @@ namespace Armoury
         // zaliczone na rachunek, nadplata zwrocona przez zrodlo, roszczenia celu (zrodlo bez kasy na zwrot), zwrot zadatku zawroconego wozu, bez rozliczenia (woz bez celu
         // i zrodla); zadatki w drodze wczoraj (kontrola: wczoraj + zaplacone - rozliczone = dzis)
         private static long _dDepPcs, _dDepGold, _dDepFreed, _dDepCred, _dDepOver, _dDepClaim, _dDepBack, _dDepLost, _dDepSettled; private static int _dDepLots;
+        private static long _dReexp; private static int _dReexpLots;   // KS-R5 (pomiar): wyslane ze zrodla, do ktorego ten sam towar jest w drodze (KS-H) - reeksport
         private static long _depPrev = -1;
         // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny [t * NZ + k) * NMiss + przyczyna], suma od ostatniej linii tygodnia, doby w sumie
         private static double[] _miss; private static int _missDays;
@@ -179,6 +180,7 @@ namespace Armoury
             _dConsPcs = _dConsVal = _gSrcFr = _dSrcCap = _dOverdue = _dFamOrd = _dFamGot = _dNorthShip = _dNorthArr = 0; _dConsLots = _dFamReq = _dFamReqK = 0;
             Array.Clear(_dPoorByZ, 0, NZ); _dNorthBy.Clear();
             _dDepPcs = _dDepGold = _dDepFreed = _dDepCred = _dDepOver = _dDepClaim = _dDepBack = _dDepLost = _dDepSettled = 0; _dDepLots = 0;
+            _dReexp = 0; _dReexpLots = 0;
             KsFoodCredit.ClearDay();
         }
 
@@ -1044,6 +1046,7 @@ namespace Armoury
             _dBought += n; _dGold += paidG; _dFreight += frPaid; _dByZ[k] += n;
             if (consign) { _dConsLots++; _dConsPcs += n; _dConsVal += cost; }
             if (depPaid > 0) { _dDepLots++; _dDepPcs += n; _dDepGold += depPaid; }
+            if (_inc != null && s * NZ + k < _inc.Length && _inc[s * NZ + k] > 0) { _dReexp += n; _dReexpLots++; }   // KS-R5 (pomiar): zrodlo samo czeka na ten towar
             if (_north != null && t < _north.Length && _north[t]) _dNorthShip += n;
             int m = _mk[t];
             _shipDay[m * NZ + k] += n; _shipDaysDay[m * NZ + k] += n * Math.Max(1f, L);
@@ -1260,7 +1263,8 @@ namespace Armoury
                   .Append(" zl (cel -> zrodlo), odblokowane ").Append(_dDepFreed).Append(" szt.; przy dostawie zaliczone ").Append(_dDepCred).Append(" zl, nadplata zwrocona ").Append(_dDepOver)
                   .Append(" zl; zwrot zawroconych ").Append(_dDepBack).Append(" zl; roszczenia celu ").Append(_dDepClaim).Append(" zl (zrodlo bez kasy na zwrot; rachunki ")
                   .Append(KsFoodCredit.DClaimN).Append("); bez rozliczenia ").Append(_dDepLost).Append(" zl | zadatki w drodze ").Append(depNow).Append(" zl w ").Append(depCarts)
-                  .Append(" wozach | kontrola zadatkow reszta ").Append(depCtl).Append(" (w drodze wczoraj + zaplacone - rozliczone - w drodze dzis)");
+                  .Append(" wozach | kontrola zadatkow reszta ").Append(depCtl).Append(" (w drodze wczoraj + zaplacone - rozliczone - w drodze dzis)")
+                  .Append(" | reeksport (zrodlo czeka na ten sam towar KS-H w drodze do siebie) ").Append(_dReexp).Append(" szt. w ").Append(_dReexpLots).Append(" wozach");
             }
             catch (Exception e) { Stumble("AppendR5", e); }
         }
@@ -1284,6 +1288,20 @@ namespace Armoury
                 int n = 0;
                 foreach (var kv in li) { if (kv.Value < 1.0) break; sb.Append(n == 0 ? " " : ", ").Append(kv.Key).Append(' ').Append(kv.Value.ToString("0", inv)); n++; }
                 if (n == 0) sb.Append(" -");
+                // KS-R5 (pomiar): krainy w obie strony - ten sam towar jedzie x>y i y>x (srednie 28 dob; mniejszy z dwoch kierunkow, szt./d)
+                var both = new List<KeyValuePair<string, double>>();
+                foreach (var kv in _delEma)
+                {
+                    var p = kv.Key.Split('|');
+                    if (p.Length != 3 || p[0] == p[1] || string.CompareOrdinal(p[0], p[1]) > 0) continue;
+                    double back; if (!_delEma.TryGetValue(p[1] + "|" + p[0] + "|" + p[2], out back)) continue;
+                    double mn = Math.Min(kv.Value, back); int g;
+                    if (mn >= 1.0 && int.TryParse(p[2], out g) && g >= 0 && g < KsTab.NG) both.Add(new KeyValuePair<string, double>(p[0] + "<>" + p[1] + " " + KsTab.Goods[g], mn));
+                }
+                both.Sort((a, b) => b.Value.CompareTo(a.Value));
+                double bothSum = 0; foreach (var kv in both) bothSum += kv.Value;
+                sb.Append(" | krainy w obie strony (srednia 28 dob, mniejszy kierunek, szt./d): razem ").Append(bothSum.ToString("0", inv));
+                for (int i = 0; i < both.Count && i < 30; i++) sb.Append(i == 0 ? "; " : ", ").Append(both[i].Key).Append(' ').Append(both[i].Value.ToString("0", inv));
                 // przyczyny braku dowozu (pomiar KsFoodCore.Miss)
                 var m = _miss; int NR = KsFoodCore.NMiss;
                 sb.Append(" | bez dowozu wedlug przyczyny (").Append(_missDays).Append(" dob, brak do T* szt.; kraina celu x towar):");
