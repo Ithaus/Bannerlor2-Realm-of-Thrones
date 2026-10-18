@@ -233,8 +233,23 @@ namespace Armoury
             long estates;
             if (!Whole112(__state, out estates)) return;     // okno nadpisane albo wyjatek - bez pomiaru wyplat majatkow niczego nie ruszamy
             CoalFirst(__state, estates);
+            F5WoodCredit(__state);                           // f5-ruda: kredyt kupcow na drewno dymarki - splata z przyrostu kiesy (koszt wytopu przed pracami okregu i danina DS)
             long works = WorksPay(__state);                  // inwest: wyplata prac okregu z licznika pana i kiesy wsi (po 112 i F4b, przed danina DS)
             DsDues(__state, works);
+        }
+
+        /// <summary>f5-ruda (klucz Bloomery Wood Credit; splata takze przy kluczu wylaczonym, gdy dlug jest): woz wrocil do wsi MACIERZYSTEJ - przyrost kiesy w oknie (BK + 112 +
+        /// zwrot F4b) splaca najpierw dlug za drewno dymarki u kupcow miasta handlowego (Bloomery.F5CreditAtCart: kiesa wsi -> kasa miasta-wierzyciela). Bez dlugu albo
+        /// woz w obcej wsi - nic. Wlasny try.</summary>
+        private static void F5WoodCredit(Entry st)
+        {
+            try
+            {
+                if (st == null || st.Here != null || st.Home == null) return;
+                long grown = (long)st.Home.Gold - st.HomeGold;
+                if (grown > 0) Bloomery.F5CreditAtCart(st.Home, grown);
+            }
+            catch (Exception e) { Stumble("VillageTakings.F5WoodCredit", e); }
         }
 
         /// <summary>

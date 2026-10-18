@@ -200,6 +200,8 @@ namespace Armoury
             if (d0 >= 0 && (step || today == d0) && F4A7On) { try { F4A7Diag(today, d0, rule, step); } catch (Exception e) { Stumble("F4A7Diag", e); } }
             bool f4reg = reg && F4RegOn;                                     // f4-pomiary (klucz Measure Regale Shelf): regale wobec polki - tylko liczniki
             if (f4reg) F4RegBegin();
+            // f5-ruda (klucz Ks Iron Hands Follow Market): rece przy zlozach zelaza co 7 dob od D za ruda rynku - przed wczesnym wyjsciem K4a (wlasny try)
+            if (F5IronDay(today, d0)) { try { F5IronWeek(today, d0); } catch (Exception e) { Stumble("F5IronWeek", e); } }
             double sigma = Math.Max(1, DailyLife.KsSigma);
             int active = 0;
             // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
@@ -334,6 +336,9 @@ namespace Armoury
             {
                 int g = KsTab.RegGood(b.RC[j]);
                 double ix = Px(px, g);
+                // f5-ruda (klucz Ks Iron Hands Follow Market): zelazo - krok co 7 dob za ruda rynku (StartCalibration.Ruda.cs); przed pomiarem f4 - linia "regale wobec polki"
+                // i licznik regali linii produkcji licza te same wpisy (NF4-5b)
+                if (F5IronSkip(b.RC[j])) { sum += b.RF[j]; continue; }
                 if (f4) { try { F4RegNote(b, j, g, ix, mt); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
                 if (ix > 1.2) { b.RF[j] *= 1.1f; _rUp++; }
                 else if (ix < 0.8) { b.RF[j] *= 0.9f; _rDown++; }

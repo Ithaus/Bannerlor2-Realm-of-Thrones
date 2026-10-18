@@ -3169,6 +3169,14 @@ namespace Armoury
         public bool MeasureCaravanTrade = true;            // log only: every 7 days the log gets the caravans' trading result - what they sold to and bought from towns, castles and villages, the wages they owe, the value of the goods in their packs, the notables' top-ups and the profit handed to their owners (off = no such line)
         public bool MeasureIronWoodFlow = true;            // log only: every 7 days the log gets where iron ore and hardwood went - stock by holder (town stalls, villages, village carts, merchant carts, caravans) and who used them up - and where the village carts carrying hardwood are heading, how long the wood has been on the road, and which towns have no firewood beyond their craftsmen's stock (off = no such lines)
 
+        // --- Iron ore under the start calibration (night 18.10) ---
+        // Paczka f5-ruda (noc 18.10, fala 5): pod KS ruda znika z ponad polowy miast (fin88: mediana indeksu 3.06, 57 miast bez rudy; bez KS 0.63 / 12). Pomiar
+        // fin88 wobec fin84 (bez KS) od wlaczenia: produkcja lup -32/d (dymarki bez wegla w zbankrutowanych kopalniach Essos + rece przy zlozach zamrozone na Planie
+        // wlaczenia, regale co 28 dob z progu indeksu miasta targowego - zalanego wlasna ruda), kucie narzedzi +30/d (receptura KS 4:5 wedlug wagi - zostaje).
+        // StartCalibration.Ruda.cs (rece przy zlozach zelaza za brakiem rudy rynku, co 7 dob), Bloomery.F5.cs (kredyt kupcow na drewno dymarki, zapis arm_f5_woodcredit).
+        public bool KsIronHandsFollowMarket = true;        // under the start calibration: once a week the hands at iron mines follow the iron of the whole market (Westeros or Essos) instead of the price at the mine's own market town - while the towns of the market hold less iron than their smiths' stock, mines whose bloomeries had wood get 5% more hands; above twice that stock, or at a mine whose bloomery stood without wood half the week, 5% fewer (the hands go back to the fields; never more than half the hands of a part of the district). Off = iron mines move with the price index every 28 days, as before
+        public bool BloomeryWoodCredit = true;             // under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, and only if the town's treasury can carry the debt; the village pays it back first from what its carts bring home (and a quarter of its purse each day), and a debt left unpaid for 60 days is lost by the merchants (no gold is made). Off = no new credit (debts already given are still paid back), as before
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

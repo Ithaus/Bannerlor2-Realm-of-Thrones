@@ -7660,6 +7660,14 @@ namespace Armoury
         [SettingPropertyGroup("Economy measurements (18.10)")]
         public bool MeasureIronWoodFlow { get; set; } = true;
 
+        [SettingPropertyBool("Ks Iron Hands Follow Market", HintText = "under the start calibration: once a week the hands at iron mines follow the iron of the whole market (Westeros or Essos) instead of the price at the mine's own market town - while the towns of the market hold less iron than their smiths' stock, mines whose bloomeries had wood get 5% more hands; above twice that stock, or at a mine whose bloomery stood without wood half the week, 5% fewer (the hands go back to the fields; never more than half the hands of a part of the district). Off = iron mines move with the price index every 28 days, as before")]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool KsIronHandsFollowMarket { get; set; } = true;
+
+        [SettingPropertyBool("Bloomery Wood Credit", HintText = "under the start calibration, with Bloomery At Mine: when a mining village has no gold for the wood of its bloomery, the merchants of its market town give the wood on credit - only while a bloom sells there for more than the wood it burns, up to 7 days of the bloomery's need, and only if the town's treasury can carry the debt; the village pays it back first from what its carts bring home (and a quarter of its purse each day), and a debt left unpaid for 60 days is lost by the merchants (no gold is made). Off = no new credit (debts already given are still paid back), as before")]
+        [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
+        public bool BloomeryWoodCredit { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9574,6 +9582,8 @@ namespace Armoury
             s.MeasureRegaleShelf = MeasureRegaleShelf;
             s.MeasureCaravanTrade = MeasureCaravanTrade;
             s.MeasureIronWoodFlow = MeasureIronWoodFlow;
+            s.KsIronHandsFollowMarket = KsIronHandsFollowMarket;
+            s.BloomeryWoodCredit = BloomeryWoodCredit;
         }
 
         internal static void Apply()

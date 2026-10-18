@@ -1127,6 +1127,9 @@ namespace Armoury
             // E6/R1 (214): wytop przy kopalni - flaga nowej kampanii, drewno w dymarkach i potrzeba doby kopalni - wlasny try; brak klucza (stary zapis) = ruda jak dotad
             try { string bl = dataStore.IsSaving ? Bloomery.Export() : null; SaveText.Sync(dataStore, "arm_e6_bloom", ref bl); if (dataStore.IsLoading) Bloomery.Import(bl); }
             catch (Exception e) { Log.Error("SyncData.arm_e6_bloom", e); }
+            // f5-ruda (noc 18.10): kredyt kupcow na drewno dymarek - wlasny try, PO arm_e6_bloom (Bloomery.Reset); brak klucza (stary zapis, Ironman Jeffa) = bez dlugow; starsza DLL klucza nie czyta
+            try { string fc = dataStore.IsSaving ? Bloomery.F5Export() : null; SaveText.Sync(dataStore, "arm_f5_woodcredit", ref fc); if (dataStore.IsLoading) Bloomery.F5Import(fc); }
+            catch (Exception e) { Log.Error("SyncData.arm_f5_woodcredit", e); }
             // E6/W3 (221): regulator wsi - mnozniki, kubelki produkcji i skasowanych, stosy na granicach kubelkow - wlasny try; brak klucza (stary zapis) = pomiar od pierwszej doby
             try { string hv = dataStore.IsSaving ? HarvestValve.Export() : null; SaveText.Sync(dataStore, "arm_harvestvalve", ref hv); if (dataStore.IsLoading) HarvestValve.Import(hv); }
             catch (Exception e) { Log.Error("SyncData.arm_harvestvalve", e); }

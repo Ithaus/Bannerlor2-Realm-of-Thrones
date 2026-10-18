@@ -62,7 +62,7 @@ namespace Armoury
     /// miasta z nadwyzka w zasiegu raz na dobe (drogi z pamieci), czas w linii.
     /// Wyjatki liczone per miejsce (pierwsze 3 do logu) - bez globalnych wylacznikow (CLAUDE.md 7).
     /// </summary>
-    internal static class Bloomery
+    internal static partial class Bloomery
     {
         private static readonly TextObject _txtNoCoal = new TextObject("{=!}Armoury: bloomery short of wood");
 
@@ -162,6 +162,7 @@ namespace Armoury
             _mines.Clear(); _byMarket = null; _pending = null;
             _carts.Clear(); _roads.Clear(); _dayOne = true; _shelfUse = null; _shelfDay.Clear(); _shelfN = 0;
             _mineNeed = null;   // f4-opal
+            F5Reset();          // f5-ruda: wytop 7 dob per kopalnia, kredyt kupcow na drewno (stan z zapisu arm_f5_woodcredit - Import po tym)
             NewDay(); _stumbles = 0; _cPrev = -1; _bPrev = -1;
         }
 
@@ -404,6 +405,7 @@ namespace Armoury
                 Mine m;
                 int bank = _mines.TryGetValue(village, out m) ? m.Bank : 0;
                 int cap = Math.Max(0, bank / wpb - _tvReserved);
+                F5Note(village, x, x > cap ? x - cap : 0f);   // f5-ruda: wytop 7 dob per kopalnia (model i lupy bez drewna) - tylko przy kluczu Ks Iron Hands Follow Market
                 if (x > cap)
                 {
                     _dUnwon += x - cap;
@@ -510,6 +512,7 @@ namespace Armoury
                     try
                     {
                         var v = kv.Key; var m = kv.Value;
+                        F5RepayPurse(v, m);       // f5-ruda: kredyt kupcow na drewno - splata z kiesy wsi (najwyzej 1/4) przed nowym zakupem; bez kredytu nic
                         int want = m.Want - m.Bank;
                         if (want <= 0 || v == null) continue;
                         m.Asked = want;           // F4b: pomiar doby (linia)
@@ -525,7 +528,7 @@ namespace Armoury
                         if (price > 0)
                         {
                             int afford = Math.Max(0, v.Gold) / price;
-                            if (afford < n) { _dShortGold += n - afford; m.NoGold += n - afford; n = afford; }
+                            if (afford < n) { _dShortGold += n - afford; m.NoGold += n - afford; F5Lend(v, m, mk, town, shelf, wood, price, n - afford); n = afford; }   // f5-ruda: brak zlota - drewno na kredyt kupcow (klucz Bloomery Wood Credit)
                         }
                         if (n <= 0) continue;
                         int paid = 0;
@@ -1167,6 +1170,7 @@ namespace Armoury
             // F4a: liczniki wozow i lupy niewytopione per kopalnia; stan "w drodze" do kontroli nastepnej doby
             _cCarts = 0; _cBought = 0; _cGold = 0; _cDaysSum = 0; _cArrCarts = 0; _cArr = 0; _cArrDays = 0; _cWait = 0; _cBack = 0; _cBackPcs = 0; _cRefund = 0; _cLost = 0;
             _cNoSurplus = 0; _cNoGold = 0; _cTicks = 0;
+            try { F5Roll(); } catch (Exception e) { Stumble("F5Roll", e); }   // f5-ruda: pierscien wytopu 7 dob i linia kredytu drewna - przed zerowaniem licznikow doby
             foreach (var m in _mines.Values) { m.Unwon = 0f; m.Asked = 0; m.Got = 0; m.NoGold = 0; m.Price = 0; }
             _cPrev = InTransit();
             // F4b: liczniki doby rachunku za drewno; stan "otwarty" do kontroli nastepnej doby
