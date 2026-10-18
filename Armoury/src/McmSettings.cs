@@ -5828,6 +5828,30 @@ namespace Armoury
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownTownLoanNoWriteOff { get; set; } = true;
 
+        [SettingPropertyBool("Town Loan", HintText = "a lord at war whose coin has run below his war reserve borrows first from the council of his own town or the folk of his own castle, before the Iron Bank: the labourers, craftsmen and merchant families lend what they hold above Town Loan Folk Reserve Times their reserve days, the merchants' coffer what it holds above Town Loan Coffer Reserve Times its stock (at most half of each in a day), the castle folk what they hold above their reserve. The debt to one place is at most Town Loan Rent Days of the rent that place pays him, at Town Loan Rate a year; the town and the Bank together lend him at most War Credit Max Share D of his steady income a day. He pays the interest out of his steady income and the debt from his windfalls (the Bank first) and after the peace by instalments, within All Instalments Max Share; whoever misses three instalments falls under the same arrears and seizure as with the Bank, and every coin of interest and debt goes back to the purses that lent it. You may borrow from your own town or castle in its menu. Replaces the lords' loans from their people (Folk Loans); with Town Loan Takes Folk Loans their old debts move here. Off = no new town loans (debts already owed are still paid back), as before")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownLoan { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Town Loan Rate", 0.00f, 0.50f, "0.00", HintText = "with Town Loan: the interest a year the town council or the castle folk earn on what their lord borrowed (0.10 = ten parts in a hundred a year - less than the Iron Bank asks)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownLoanRate { get; set; } = 0.10f;
+
+        [SettingPropertyFloatingInteger("Town Loan Rent Days", 0.00f, 364.00f, "0", HintText = "with Town Loan: the most a lord may owe the council of one town or the folk of one castle, in days of the rent that place pays him (average of the last 28 days)")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownLoanRentDays { get; set; } = 120f;
+
+        [SettingPropertyFloatingInteger("Town Loan Folk Reserve Times", 1.00f, 5.00f, "0.0", HintText = "with Town Loan: the townsfolk and castle folk lend only what they hold above this many times their reserve days (labourers and castle folk 10 days of their needs, craftsmen 21, merchant families 30); 1 = everything above their bread money")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownLoanFolkReserveTimes { get; set; } = 1.0f;
+
+        [SettingPropertyFloatingInteger("Town Loan Coffer Reserve Times", 1.00f, 5.00f, "0.0", HintText = "with Town Loan: the merchants' coffer of a town lends only what it holds above this many times the merchants' stock")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public float TownLoanCofferReserveTimes { get; set; } = 1.5f;
+
+        [SettingPropertyBool("Town Loan Takes Folk Loans", HintText = "with Town Loan and Folk Loans: the debts the lords already owe their people from the old Folk Loans move into the town loans (same purses, ten parts in a hundred a year, the instalments and arrears of the debt ladder instead of the write-off) - one rule for both. Every lord who owed his people becomes a debtor of the debt ladder at once. Off (default) = the old debts run on by the Folk Loans rules until they are paid; only new loans come from the councils")]
+        [SettingPropertyGroup("The townsfolk's purse")]
+        public bool TownLoanTakesFolkLoans { get; set; } = false;
+
         [SettingPropertyBool("Crown War Aid By Need", HintText = "in war the crown spends the day's war aid from the people's savings first on the wages of houses whose own wage ceiling cannot keep their field companies up to Crown War Aid Fill Target of their size, the weakest first; only what is left goes out as rents by fiefs. The crown pays only for men who stand in the companies today - a house that does not recruit gets nothing more - and the wages it pays this way are not repaid a second time. Only houses that hold fiefs and meet the crown's rent terms (garrisons and service); not the Night's Watch, not hired companies, and your house only with Scutage Player Clan. Needs Folk War Aid, Crown Rents and Clan Budget Enabled. Off = all the war aid goes out as before")]
         [SettingPropertyGroup("The townsfolk's purse")]
         public bool CrownWarAidByNeed { get; set; } = true;
@@ -9244,6 +9268,12 @@ namespace Armoury
             s.CrownTownLoanLimitDays = CrownTownLoanLimitDays;
             s.CrownTownLoanDefaultDays = CrownTownLoanDefaultDays;
             s.CrownTownLoanNoWriteOff = CrownTownLoanNoWriteOff;
+            s.TownLoan = TownLoan;
+            s.TownLoanRate = TownLoanRate;
+            s.TownLoanRentDays = TownLoanRentDays;
+            s.TownLoanFolkReserveTimes = TownLoanFolkReserveTimes;
+            s.TownLoanCofferReserveTimes = TownLoanCofferReserveTimes;
+            s.TownLoanTakesFolkLoans = TownLoanTakesFolkLoans;
             s.CrownWarAidByNeed = CrownWarAidByNeed;
             s.CrownWarAidFillTarget = CrownWarAidFillTarget;
             s.CrownWarAidRecruitStep = CrownWarAidRecruitStep;

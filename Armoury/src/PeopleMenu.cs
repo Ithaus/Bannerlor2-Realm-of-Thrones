@@ -169,6 +169,13 @@ namespace Armoury
                     }
                     catch (Exception e) { Log.Error("PeopleMenu.Savings", e); }
                 }
+                // f8-pozyczka (projekt R2 rozdz. 7): ile lud tej osady pozyczyl swojemu panu (i innym panom - dlug zostaje po utracie osady) - roszczenia KTown drabiny 168,
+                // tylko odczyt; bez dlugu wobec tej osady - bez zdania (okno jak dotad); wylacznik PeopleMenuShowsSavings
+                if (s1 != null && s1.PeopleMenuShowsSavings)
+                {
+                    try { string tl = TownFolk.TownLoanMenuLine(st); if (!string.IsNullOrEmpty(tl)) sb.Append(tl).Append('\n'); }
+                    catch (Exception e) { Log.Error("PeopleMenu.TownLoan", e); }
+                }
                 // P2 (lud buduje miasto): co lud tej osady wlozyl dzis w roboty swojego miasta (albo dlaczego nic) - liczby ostatniej doby (tylko odczyt)
                 if (s1 != null && s1.PeopleMenuShowsSavings)
                 {

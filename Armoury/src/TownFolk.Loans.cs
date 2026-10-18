@@ -124,6 +124,7 @@ namespace Armoury
             _lnSnap.Clear(); _lnTaxed.Clear(); _lnCredit.Clear(); _lnCreditToday.Clear(); _lnSnapDay = int.MinValue; N8SnapN = 0;   // N8 (noc 16.10): pamiec doby
             LoansWinZero(); LoansDayZero();
             _lnDebtPrev = double.NaN; _lnStumbleSess = 0;
+            ResetTownLoan();   // f8-pozyczka: pozyczki miejskie (TownFolk.TownLoan.cs) - plan, okno linii
         }
 
         private static void LoansWinZero()
@@ -229,6 +230,7 @@ namespace Armoury
         internal static double FolkLoanRoom(Clan c, double D, double G, double R, bool war)
         {
             if (!LoansOn || c == null || c == Clan.PlayerClan || c.Leader == null || c.Kingdom == null) return 0;
+            if (TownLoanOn) return 0;   // f8-pozyczka: przy pozyczce miejskiej nowe pozyczki od ludu tylko przez rady miast i zamkow (jedna regula; TownFolk.TownLoan.cs)
             try
             {
                 if (!war || !(D > 0) || G >= R) return 0;
@@ -260,6 +262,7 @@ namespace Armoury
         internal static int FolkLoanLend(Clan c, double amount)
         {
             if (!LoansOn || c == null || c.Leader == null || !(amount >= 1)) return 0;
+            if (TownLoanOn) return 0;   // f8-pozyczka: jedna regula (jak FolkLoanRoom)
             long got = 0;
             try
             {
@@ -366,9 +369,12 @@ namespace Armoury
             var s = Settings.Current;
             if (s == null || !s.FolkLoans) { _lineLoans = null; _lnDebtPrev = double.NaN; return; }
             double debtBefore = _lnDebtPrev;
+            double movedF8 = 0;   // f8-pozyczka: przeniesione do pozyczek miejskich w tej dobie (wedlug ksiegi obieg2)
             try
             {
                 int today = (int)CampaignTime.Now.ToDays;
+                // f8-pozyczka (Town Loan Takes Folk Loans): dlugi zywych rodow do ksiegi rad PRZED odsetkami tej doby (bez podwojnych odsetek); kontrola nizej - przeniesione
+                try { movedF8 = TlTakeOverFolk(); } catch (Exception e) { LnStumble("TakeOverFolk", e); }
                 double rate = LnRate(s) / YearDays, repShare = LnRepay(s);
                 int dflt = LnDefault(s);
                 var drop = new List<string>();
@@ -451,7 +457,7 @@ namespace Armoury
                 string ctl = "-";
                 if (!double.IsNaN(debtBefore))
                 {
-                    double diff = debt - (debtBefore + lentPrev + _lnInterest - _lnRepaid - _lnWrittenD - _lnLostD - _lnDust);
+                    double diff = debt - (debtBefore + lentPrev + _lnInterest - _lnRepaid - _lnWrittenD - _lnLostD - _lnDust - movedF8);   // f8: - przeniesione do rad
                     ctl = Math.Round(diff).ToString("0", LnInv);
                 }
                 _lnDebtPrev = debt;
@@ -469,7 +475,9 @@ namespace Armoury
                   .Append(_lnLost).Append(" (").Append(_lnLostN).Append(')')
                   .Append(" | dlug rodow u ludu ").Append(N0(debt)).Append(" (rodow ").Append(_ln.Count).Append(", osad ").Append(places.Count).Append(", najwiekszy ").Append(top).Append(' ').Append(N0(topD))
                   .Append("), zakazow ").Append(_lnBan.Count).Append(" | dlug rodow w Banku ").Append(N0(bank)).Append(" (rodow ").Append(bankN).Append(')')
-                  .Append(" | kontrola: dlug - (wczoraj + zawarte + odsetki - splacone - umorzone - przepadle) ").Append(ctl).Append(" (oczekiwane 0)")
+                  .Append(movedF8 > 0 ? " | przeniesione do pozyczek miejskich (f8, Town Loan Takes Folk Loans) " + N0(movedF8) + " zl" : "")
+                  .Append(TownLoanOn ? " | nowe pozyczki od ludu tylko przez rady miast i zamkow (f8, Town Loan)" : "")
+                  .Append(" | kontrola: dlug - (wczoraj + zawarte + odsetki - splacone - umorzone - przepadle) ").Append(ctl).Append(" (oczekiwane 0)")   // f8: liczba uwzglednia przeniesione (segment wyzej) - napis jak dotad
                   .Append(" | potkniecia ").Append(_lnStumbles).Append(" (sesja ").Append(_lnStumbleSess).Append(").");
                 _lineLoans = sb.ToString();
             }

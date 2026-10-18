@@ -571,6 +571,29 @@ namespace Armoury
             catch { return 0; }
         }
 
+        /// <summary>f8-pozyczka: renta, ktora osada placi swojemu panu dziennie - srednia 28 dob z pierscieni D stalego tej osady: renta / zawor miasta (bez "wlasnych"),
+        /// cla i podatek miasta / zamku, zawor zamku (ta sama "ziemia" co D staly rodu, tylko jednej osady). Bez D stalego - renta tej doby (PopulationLaw.RentOf;
+        /// zamek - CastlePurse.DuesOf). Podstawa limitu pozyczki miejskiej (TownLoanRentDays x renta). Nie rzuca, nie mniej niz 0.</summary>
+        internal static double SettlementRentAvg(Settlement st)
+        {
+            try
+            {
+                if (st == null) return 0;
+                if (StableDOn)
+                {
+                    double v = 0; Ring r;
+                    if (_rRent.TryGetValue(st, out r)) v += r.Avg();
+                    if (_rTown.TryGetValue(st, out r)) v += r.Avg();
+                    if (_rCastle.TryGetValue(st, out r)) v += r.Avg();
+                    return Math.Max(0, v);
+                }
+                long pay, avail;
+                if (st.IsCastle) CastlePurse.DuesOf(st, out pay, out avail); else PopulationLaw.RentOf(st, out pay, out avail);
+                return Math.Max(0, pay);
+            }
+            catch { return 0; }
+        }
+
         /// <summary>166: D staly, liczba zmierzonych dob (do mieszania z D z zapisu, gdy pomiar krotszy niz 28 dob) i srednia "jednorazowych" bez
         /// podwojnych (lup najezdzcow liczy sie do D - wyjatek lore W-1); false - brak pomiaru.</summary>
         internal static bool StableDWithDays(Clan c, out double d, out int days, out double once)

@@ -109,6 +109,7 @@ namespace Armoury
         {
             _cuRev = _cuDec = _cuNone = _cuNoGrow = _cuNoFarm = _cuPaidN = _cuShortN = _cuHouse = _cuArr = _cuRemit = _cuLow = _cuStum = 0;
             _cuDecAmt = _cuBills = 0; _cuPaidL = _cuPaidC = _cuTook = _cuShort = _cuNoLord = 0; _cuTicks = 0;
+            _tlFloorUp = _tlFloorN = _tlSgOut = _tlSgIn = 0; _tlSgN = 0;   // scalenie f7/f8: okno linii kasy kupcow
             _nDue = _nDueT = _remitSiege = _remitCap = _noLord = _distN = _forgN = _renewN = _renewUp = _renewDown = _aidRemit = _aidForgN = 0;
             _dueL = _dueC = _dueLf = _remit = _noLordAmt = _arrNew = _arrPaid = _forgiven = _aidArrNew = _aidLost = _aidForg = _movAssess = _movRemit = _movRamp = _movShort = _movLost = 0;
             _paidL = _paidC = _paidLf = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
@@ -615,6 +616,60 @@ namespace Armoury
         private static double CatchUpKeep(Farm f, int reserve, Settings s)
         {
             return OverReserve * Math.Max(0, reserve) + CatchUpKeepDays(s) * Math.Max(0, f.FL + f.FC) / YearDays;
+        }
+
+        // ------------------------------------------------------------ scalenie fal 6/7 (18.10): gersuma f7-kasy i pozyczka miejska f8-pozyczka na tej samej kasie kupcow
+        // Obie biora z kasy kupcow miasta ponad 1.5 x zapas kupcow. JEDNA KOLEJNOSC: gersuma postanowiona w przegladzie to zobowiazanie miasta wobec pana i korony -
+        // idzie pierwsza; pozyczka miejska nie pozycza reszty gersumy jeszcze do zaplaty (CLeft). JEDEN PROG: w miescie z KS przy Ks Farm Catch Up pozyczka bierze z kasy
+        // tylko ponad ten sam prog co gersuma (CatchUpKeep: 1.5 x zapas kupcow + Ks Farm Catch Up Keep Days firmy; wyzszy Town Loan Coffer Reserve Times - wyzszy).
+        // Miasto bez KS, bez firmy DS albo klucz gersumy wylaczony - prog pozyczki jak w f8 (Town Loan Coffer Reserve Times x zapas). Pomiar przyrostu przegladu wedlug
+        // nadwyzki (SG0) bez przeplywow pozyczki przez kase (pozyczone - mniej, splacony kapital - wiecej): splata nie wraca do pana drugi raz podwyzka firmy i gersuma,
+        // a pozyczka w oknie nie tlumi podwyzki za prawdziwy przyrost handlu (jak niezaplacona czesc gersumy w CatchUpPay). Odsetki licza sie jak zarobek kupcow.
+        private static long _tlFloorUp, _tlFloorN, _tlSgOut, _tlSgIn; private static int _tlSgN;   // okno linii (od linii do linii; ClearCounters)
+
+        /// <summary>Scalenie f7/f8: prog kasy kupcow, ponizej ktorego pozyczka miejska nie pozycza (loanFloor - prog f8). Nie rzuca.</summary>
+        internal static double CofferLoanFloor(Town t, double loanFloor)
+        {
+            try
+            {
+                var s = Settings.Current;
+                if (t == null || t.Settlement == null || t.Settlement.StringId == null || !CatchUpOn(s) || !StartCalibration.KsTownApplied(t)) return loanFloor;
+                Farm f;
+                if (!_farm.TryGetValue(t.Settlement.StringId, out f) || f == null || f.Fixed < 0) return loanFloor;
+                double fl = Math.Max(loanFloor, CatchUpKeep(f, TownPurse.Reserve(t), s)) + Math.Max(0, f.CLeft);
+                if (fl > loanFloor) { _tlFloorUp += (long)(fl - loanFloor); _tlFloorN++; }
+                return fl;
+            }
+            catch (Exception e) { Stumble("CofferLoanFloor", e); return loanFloor; }
+        }
+
+        /// <summary>Scalenie f7/f8: przeplyw pozyczki miejskiej przez kase kupcow osady st (delta: - pozyczone z kasy, + splacony kapital) - pomiar przyrostu przegladu
+        /// wedlug nadwyzki liczy sie bez niego. Zloto sie tu nie rusza. Nie rzuca.</summary>
+        internal static void NoteCofferLoan(Settlement st, long delta)
+        {
+            try
+            {
+                if (st == null || delta == 0 || st.StringId == null) return;
+                Farm f;
+                if (!_farm.TryGetValue(st.StringId, out f) || f == null || f.SG0 == long.MinValue) return;
+                f.SG0 += delta;
+                if (delta < 0) _tlSgOut -= delta; else _tlSgIn += delta;
+                _tlSgN++;
+            }
+            catch (Exception e) { Stumble("NoteCofferLoan", e); }
+        }
+
+        /// <summary>Scalenie f7/f8: linia "Kasy kupcow - gersuma i pozyczki miejskie (scalenie f7/f8): dzien N" - tylko gdy prog albo pomiar sie dzis zmienil.</summary>
+        private static void CofferLoanLine(int day)
+        {
+            try
+            {
+                if (_tlFloorN == 0 && _tlSgN == 0) return;
+                Log.Info("Kasy kupcow - gersuma i pozyczki miejskie (scalenie f7/f8): dzien " + day
+                         + " | prog pozyczki z kasy podniesiony do progu gersumy i reszty gersumy " + _tlFloorN + " razy (razem o " + _tlFloorUp + " zl)"
+                         + " | pomiar przyrostu przegladu wedlug nadwyzki bez pozyczek: pozyczone z kas " + _tlSgOut + " zl, splacony kapital do kas " + _tlSgIn + " zl (" + _tlSgN + " przeplywow).");
+            }
+            catch (Exception e) { Stumble("CofferLoanLine", e); }
         }
 
         /// <summary>Licznik powodu, dla ktorego miasto z KS nie ma dzis przegladu wedlug nadwyzki (tylko linia f7; ten sam warunek co SurplusReview).</summary>
@@ -1323,6 +1378,7 @@ namespace Armoury
                 sb.Append('.');
                 Log.Info(sb.ToString());
                 if (_fixDay >= 0 && CatchUpOn(s)) CatchUpLine(day, s);        // f7-kasy: linia gersumy (klucz wylaczony - bez linii)
+                CofferLoanLine(day);                                          // scalenie f7/f8: prog kasy dla pozyczki miejskiej i pomiar przyrostu bez pozyczek (tylko gdy cos sie zmienilo)
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ClearCounters(); }
