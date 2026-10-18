@@ -1264,6 +1264,21 @@ Uzycie (Python 3, tylko odczyt):
                     Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-po-test.flag, T0-T7: zakupy co do monety, ogien - stado przez HerdDriven jak w grze, odbudowa,
                     termin, wojna, zapis, uklad) NIE 0, NPO-7 koszt <= 5 ms, NPO-8 potkniecia i ERROR 0, NPO-9 ogien i stada (INFO), NPO-10 recenzja: powroty wozow bez drogi
                     produkcji (rampa KS, produkcja wsi niewpieta - bez wyplaty) i okregi ze zmienionym b (INFO). Bez prac i bez proby - INFO. Log bez paczki: INFO, bez wyjatku.
+--grupa nopal     : (noc 17/18.10, fala 4 paczka f4-opal - koncowy przeglad ekonomii 18.10 P2 "Opal"; Armoury/src/TownFolk.Opal.cs, TownFolk.Firewood.cs, StartCalibration.Opal.cs,
+                    CaravanBulk.TargetFor, Bloomery.MineShelfNeed, WinterTrial.LoadedSessionStart - klucze Firewood Ks Season, Firewood Ks Supply Cap, Firewood Ks Price Demand,
+                    Firewood Mine Wood Keep) python -I tools/sprawdz_logi.py --grupa nopal <Armoury-*.log> (strumieniowo). Linie "Opal pod KS (f4-opal)" (start sesji i doba),
+                    "Opal mieszczan (N2-E4)", "Ceny surowcow", "Zelazo (lupy) (214)", "Koszyk stanow (ZC4)", "Towary: dzien N - hardwood", "PROBA ZIMY TERAZ (autotest, f4-opal)".
+                    Okno konca biegu: ostatnie 28 dob pelnego KS (lambda >= 0.99). NOP-0 linia startu (klucze, proba zimy teraz; brak - INFO), NOP-1 linia doby w kazdej dobie
+                    N2-E4 CZYNNE (<= 1 brak, 0 nierozpoznanych), NOP-2 krok 1: czynnik pory czesci KS lato 0.50 / zima > 1 / wiosna-jesien 1.00, NOP-3 krok 2: kontrola linii
+                    (po limicie ponad limit 0; suma po limicie <= suma limitu, gdy wszystkie miasta maja dane), NOP-4 limit z dowozu zmierzonego w >= 80% miast ZC4 po 8 dobach sesji,
+                    latka sprzedazy wozu wpieta, NOP-5 'bez opalu' <= 35% chcianego (fin86 51%), NOP-6 mediana indeksu drewna <= 1.0 (ETAP < 1.47 = fin86 srednio 28 dob;
+                    bez KS 0.60), NOP-7 ruda: mediana indeksu <= 2.5 i miasta bez rudy <= 40 (ETAP lepiej niz fin86 3.96/54.6; bez KS 0.63/12; polowa spadku zelaza to koszyk
+                    narzedzi KS - osobno), NOP-8 'kopalnia bez wegla' <= 32 lup/d (ETAP < 40.1 fin86; bez KS 28.1), NOP-9 zima (czynnik > 1.2, 'bez opalu' <= 50%, kontrola 0; bieg bez zimy - INFO: PRZED
+                    WGRANIEM bieg z plikiem Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-zima-teraz.flag - pora ekonomii zima na sesje, tylko w pamieci),
+                    NOP-10 krok 3: zapas rzemiosla podniesiony o drewno dymarek wsi, gdy ich potrzeba ponad las > 0, NOP-11 potkniecia i ERROR 0, NOP-12 czas <= 5 ms
+                    najwiecej i <= 2 ms srednio, NOP-13 zapas drewna swiata (INFO), NOP-14 popyt ceny po regule: wpis w kazdym miescie ZC4, suma = czesc KS po limicie przy
+                    lambda >= 0.99, NOP-15 potrzeba w linii paczki = linia N2-E4. Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log): NOP-5..8 jako liczby bazowe
+                    (INFO), reszta brak linii (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -40448,6 +40463,305 @@ def nherby_main(logp):
     return 0
 
 
+# ============================================================ f4-opal (noc 17/18.10, fala 4; koncowy przeglad ekonomii 18.10 - P2 "Opal"): opal mieszczan pod KS - grupa nopal
+# Armoury/src/TownFolk.Opal.cs (linie "Opal pod KS (f4-opal): start sesji" i "...: dzien N"), TownFolk.Firewood.cs (linia N2-E4 - format bez zmian), StartCalibration.Opal.cs,
+# CaravanBulk.TargetFor (krok 3), Bloomery.MineShelfNeed, WinterTrial.LoadedSessionStart (plik armoury-zima-teraz.flag - linia "PROBA ZIMY TERAZ (autotest, f4-opal)").
+NOP_START = "Opal pod KS (f4-opal): start sesji"
+NOP_DAY = "Opal pod KS (f4-opal): dzien "
+NOP_D = re.compile(r"^Opal pod KS \(f4-opal\): dzien (\d+) \| klucze: pora (TAK|NIE), limit dowozu (TAK|NIE), popyt ceny (TAK|NIE), zapas dymarek (TAK|NIE) \| "
+                   r"pora: (ZIMA|lato|zima bez skutkow|wiosna albo jesien), czynnik czesci KS srednio (\S+) \| miasta ZC4 (\d+) \(lambda srednio (\S+)\) \| "
+                   r"czesc KS: opal x lambda (\S+), z pora (\S+), po limicie (\S+) \(obcieta (\S+) w (\d+) miastach\) \| "
+                   r"limit = dowoz - rzemioslo: dowoz (\S+) ladunkow/d \(zmierzony \d+ dob w (\d+) miastach, Plan w (\d+), bez danych (\d+)\), rzemioslo (\S+), limit (\S+) \| "
+                   r"potrzeba opalu razem (\S+) \(po zaokragleniu (\d+); czesc dzisiejsza \(1 - lambda\) (\S+)\) \| "
+                   r"popyt ceny drewna \(opal przy pelnej lambdzie\): (?:po regule (\S+) w (\d+) miastach|pelny \(klucz NIE\)) \| "
+                   r"zapas rzemiosla \+ drewno dymarek wsi: (?:\+(\d+) ladunkow w (\d+) miastach \(potrzeba dymarek ponad las (\S+) ladunkow/d\)|NIE) \| "
+                   r"dowoz zmierzony od ostatniej linii: wozy wsi (\d+), pola mieszczan (\d+) \(pierscienie pelne (\d+)/(\d+)([^)]*)\) \| "
+                   r"kontrola: po limicie ponad limit (\S+) \(0\), z pora - po limicie (\S+) >= 0 \| [^|]* \| czas (\S+) ms \| potkniecia (\d+)\.$")
+# indeksy grup NOP_D (groups() od 0)
+(NI_DAY, NI_SEA, NI_CAP, NI_PRICE, NI_KEEP, NI_PORA, NI_K, NI_TOWNS, NI_LAM, NI_FIRE, NI_KFULL, NI_KCUT, NI_CUT, NI_CAPPED, NI_D, NI_MEAS, NI_PLAN, NI_NONE, NI_U, NI_LIM,
+ NI_NEED, NI_WANT, NI_OLD, NI_EFF, NI_EFFN, NI_KX, NI_KXN, NI_MINE, NI_CARTS, NI_FIELDS, NI_RF, NI_RN, NI_TAIL, NI_OVER, NI_DIFF, NI_MS, NI_STUM) = range(37)
+NOP_N2E = re.compile(r"^Opal mieszczan \(N2-E4\): dzien (\d+) \| CZYNNE \| .*?\| pora: (ZIMA|lato|wiosna albo jesien|zima bez skutkow)[^|]*\| potrzeba (\S+) ladunkow "
+                     r"\(po zaokragleniu (\d+)\) \| kupione i spalone (\d+) ladunkow .*?\| bez opalu dzis (\d+) ladunkow")
+NOP_ZC4 = re.compile(r"^Koszyk stanow \(ZC4\): dzien (\d+) \| lambda Westeros (\S+) \(\d+ miast\), Essos (\S+) \(")
+NOP_PRICE = re.compile(r"^Ceny surowcow: dzien (\d+) - ")
+NOP_ORE = re.compile(r"ruda \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/([\d.]+)/[\d.]+, bez towaru (\d+) miast")
+NOP_WOOD = re.compile(r"drewno \(wartosc [^)]*\): indeks min/mediana/max [\d.]+/([\d.]+)/[\d.]+")
+NOP_IRON = re.compile(r"^Zelazo \(lupy\) \(214\): dzien (\d+) - .*?kopalnia bez wegla ([\d.]+) lup")
+NOP_TOW = re.compile(r"^Towary: dzien (\d+) - hardwood \([^)]*\): zapas (\d+)")
+NOP_ERR = ("ERROR in TownFolk.FwCart", "ERROR in TownFolk.FwField", "ERROR in TownFolk.Opal", "ERROR in TownFolk.FirewoodDaily", "ERROR in Bloomery.Daily(MineNeed)",
+           "ERROR in WinterTrial.LoadedSessionStart")
+NOP_WIN = 28                 # okno konca biegu: ostatnie 28 dob pelnego KS (lambda >= 0.99)
+NOP_SHORT_MAX = 0.35         # NOP-5: "bez opalu" najwyzej 35% chcianego (fin86: 51%)
+# bazy = srednie ostatnich 28 dob: fin86 (KS, Armoury-2026-10-17_23-22-37.log) i fin84 (bez KS, Armoury-2026-10-17_21-11-36.log)
+NOP_WOOD_MAX = 1.0           # NOP-6: mediana indeksu drewna (fin86 1.47; bez KS 0.60)
+NOP_WOOD_BASE = 1.47
+NOP_ORE_MAX, NOP_ORE_EMPTY_MAX = 2.5, 40       # NOP-7: ruda mediana indeksu / miasta bez rudy (fin86 3.96 / 54.6; bez KS 0.63 / 12)
+NOP_ORE_BASE, NOP_ORE_EMPTY_BASE = 3.96, 54.6
+NOP_COAL_MAX, NOP_COAL_BASE = 32.0, 40.1        # NOP-8: kopalnia bez wegla lup/d (fin86 40.1; bez KS 28.1)
+NOP_MS_MAX, NOP_MS_MEAN = 5.0, 2.0              # NOP-12: czas linii paczki
+
+
+def nopal_main(logp):
+    """nopal (noc 17/18.10, fala 4, paczka f4-opal): opal mieszczan pod KS - pora roku w czesci KS, limit dowozu drewna ponad rzemioslo, popyt ceny drewna po regule,
+    drewno dymarek wsi w zapasie rzemiosla; skutki: 'bez opalu', indeks drewna, ruda (mediana, miasta bez rudy), 'kopalnia bez wegla', zima (plik armoury-zima-teraz.flag).
+    Wejscie: log Armoury (strumieniowo). Progi NOP-0..NOP-15 - opis w naglowku pliku (--grupa nopal). Log bez linii paczki: liczby bazowe jako INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NOP-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, days, n2e, zc4, price, iron, tow, errs, trial = [], {}, {}, {}, {}, {}, {}, [], []
+    bad_lines = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NOP_DAY):
+                a = NOP_D.match(s)
+                if a:
+                    days[int(a.group(1))] = a.groups()
+                else:
+                    bad_lines += 1
+                continue
+            if s.startswith(NOP_START):
+                starts.append(s)
+                continue
+            if s.startswith("Opal mieszczan (N2-E4): dzien "):
+                a = NOP_N2E.match(s)
+                if a:
+                    n2e[int(a.group(1))] = (a.group(2), float(a.group(3)) if a.group(3) != "-" else 0.0, int(a.group(4)), int(a.group(5)), int(a.group(6)))
+                continue
+            if s.startswith("Koszyk stanow (ZC4): dzien "):
+                a = NOP_ZC4.match(s)
+                if a:
+                    try:
+                        zc4[int(a.group(1))] = min(float(a.group(2)), float(a.group(3)))
+                    except ValueError:
+                        pass
+                continue
+            if s.startswith("Ceny surowcow: dzien "):
+                a = NOP_PRICE.match(s)
+                if a:
+                    o, w = NOP_ORE.search(s), NOP_WOOD.search(s)
+                    price[int(a.group(1))] = (float(o.group(1)) if o else None, int(o.group(2)) if o else None, float(w.group(1)) if w else None)
+                continue
+            if s.startswith("Zelazo (lupy) (214): dzien "):
+                a = NOP_IRON.match(s)
+                if a:
+                    iron[int(a.group(1))] = float(a.group(2))
+                continue
+            if s.startswith("Towary: dzien ") and " - hardwood (" in s:
+                a = NOP_TOW.match(s)
+                if a:
+                    tow[int(a.group(1))] = int(a.group(2))
+                continue
+            if s.startswith("PROBA ZIMY TERAZ (autotest, f4-opal)"):
+                trial.append(s[:200])
+                continue
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in NOP_ERR):
+                errs.append(s[:160])
+    pkg = bool(starts) or bool(days)
+    print(f"plik: {logp} | linii startu f4-opal {len(starts)}, dob f4-opal {len(days)} (nierozpoznanych {bad_lines}), dob N2-E4 {len(n2e)}, ZC4 {len(zc4)}, cen surowcow {len(price)},"
+          f" zelaza {len(iron)}, PROBA ZIMY TERAZ {len(trial)}, ERROR {len(errs)}")
+    base_note = "" if pkg else " - log sprzed paczki: liczba bazowa (INFO)"
+
+    def ok_or_info(v):
+        return v if pkg else None
+
+    def mean(xs):
+        xs = [x for x in xs if x is not None]
+        return sum(xs) / len(xs) if xs else None
+
+    # dob pelnego KS: lambda >= 0.99 (linia paczki, inaczej linia ZC4); okno konca biegu - ostatnie NOP_WIN takich dob
+    full = sorted(d for d, g in days.items() if int(g[NI_TOWNS]) > 0 and float(g[NI_LAM]) >= 0.99) if days else sorted(d for d, l in zc4.items() if l >= 0.99)
+    win = full[-NOP_WIN:]
+    wnote = f"okno: ostatnie {len(win)} dob pelnego KS" + (f" ({win[0]}-{win[-1]})" if win else "")
+
+    # NOP-0 / NOP-1
+    if not starts:
+        rep.add("NOP-0: linia startu 'Opal pod KS (f4-opal)'", "brak linii", "INFO (log sprzed paczki f4-opal)", None)
+    else:
+        st0 = starts[-1]
+        keys = re.findall(r"\((Firewood Ks Season|Firewood Ks Supply Cap|Firewood Ks Price Demand|Firewood Mine Wood Keep)\) (TAK|NIE)", st0)
+        zt = re.search(r"proba zimy teraz \(plik [^)]*\): ([^|]*)", st0)
+        rep.add("NOP-0: linia startu 'Opal pod KS (f4-opal)'", f"linii {len(starts)}; " + ", ".join(f"{k} {v}" for k, v in keys) + (f"; proba zimy teraz: {zt.group(1).strip()}" if zt else ""),
+                "jest w kazdej sesji (domyslnie 4 x TAK)", True)
+    on_n2e = sorted(n2e)
+    all_off = bool(starts) and len(re.findall(r"\((?:Firewood Ks Season|Firewood Ks Supply Cap|Firewood Ks Price Demand|Firewood Mine Wood Keep)\) NIE", starts[-1])) == 4
+    if all_off:
+        rep.add("NOP-1: linia doby 'Opal pod KS (f4-opal): dzien N'", f"dob {len(days)} (wszystkie 4 klucze paczki NIE - linii doby nie ma, stara droga)", "INFO", None)
+    elif not days:
+        rep.add("NOP-1: linia doby 'Opal pod KS (f4-opal): dzien N'", f"brak linii (dob N2-E4 CZYNNE {len(on_n2e)})", "INFO (log sprzed paczki albo klucze paczki NIE)", None)
+    else:
+        miss = [d for d in on_n2e if d not in days]
+        rep.add("NOP-1: linia doby 'Opal pod KS (f4-opal): dzien N'", f"dob {len(days)}, nierozpoznanych {bad_lines}, dob N2-E4 CZYNNE bez linii paczki {len(miss)}",
+                "linia w kazdej dobie N2-E4 CZYNNE (<= 1 brak), 0 nierozpoznanych", len(miss) <= 1 and bad_lines == 0)
+
+    # NOP-2 krok 1: czynnik pory w czesci KS
+    if days:
+        def kof(g):
+            try:
+                return float(g[NI_K])
+            except ValueError:
+                return None
+        sea_on = [d for d, g in days.items() if g[NI_SEA] == "TAK" and int(g[NI_TOWNS]) > 0]
+        summ = [d for d in sea_on if days[d][NI_PORA] == "lato"]
+        wint = [d for d in sea_on if days[d][NI_PORA] == "ZIMA"]
+        mid = [d for d in sea_on if days[d][NI_PORA] in ("wiosna albo jesien", "zima bez skutkow")]
+        bad_s = [d for d in summ if kof(days[d]) is None or abs(kof(days[d]) - 0.5) > 0.01]
+        bad_w = [d for d in wint if kof(days[d]) is None or kof(days[d]) <= 1.0]
+        bad_m = [d for d in mid if kof(days[d]) is None or abs(kof(days[d]) - 1.0) > 0.01]
+        rep.add("NOP-2: krok 1 - czynnik pory w czesci KS (klucz pora TAK, miasta ZC4 > 0)",
+                f"lato {len(summ)} dob (zly czynnik {len(bad_s)}), zima {len(wint)} (czynnik <= 1: {len(bad_w)}), wiosna/jesien {len(mid)} (zly {len(bad_m)})"
+                + ("" if summ else "; lata w biegu nie ma - samo lato INFO"),
+                "lato 0.50, zima > 1, wiosna/jesien 1.00 w kazdej dobie", (not bad_s and not bad_w and not bad_m) if sea_on else None)
+    else:
+        rep.add("NOP-2: krok 1 - czynnik pory w czesci KS", "brak linii paczki", "INFO", None)
+
+    # NOP-3 krok 2: kontrola limitu
+    if days:
+        cap_d = [d for d, g in days.items() if g[NI_CAP] == "TAK" and int(g[NI_TOWNS]) > 0]
+        over = [d for d in cap_d if float(days[d][NI_OVER]) > 0.005 or float(days[d][NI_DIFF]) < -0.005]
+        sumbad = [d for d in cap_d if int(days[d][NI_NONE]) == 0 and float(days[d][NI_KCUT]) > float(days[d][NI_LIM]) + 0.05]
+        cut = sum(float(days[d][NI_CUT]) for d in cap_d)
+        rep.add("NOP-3: krok 2 - czesc KS po limicie <= limit (kontrola linii)",
+                f"dob z limitem {len(cap_d)}: kontrola zlamana {len(over)}, suma po limicie > suma limitu (bez miast bez danych) {len(sumbad)}; obcieto razem {cut:.0f} ladunkow",
+                "0 i 0", (not over and not sumbad) if cap_d else None)
+    else:
+        rep.add("NOP-3: krok 2 - czesc KS po limicie <= limit", "brak linii paczki", "INFO", None)
+
+    # NOP-4 zrodlo limitu: po 8 dobach sesji zmierzony dowoz w >= 80% miast ZC4; latka sprzedazy wozu wpieta
+    if days:
+        ds = sorted(d for d, g in days.items() if g[NI_CAP] == "TAK")
+        nolatch = [d for d in ds if "BRAK LATKI" in (days[d][NI_TAIL] or "")]
+        if len(ds) >= 9:
+            g = days[ds[-1]]
+            towns, meas = int(g[NI_TOWNS]), int(g[NI_MEAS])
+            rep.add("NOP-4: limit z dowozu zmierzonego (po 8 dobach sesji), latka sprzedazy wozu",
+                    f"ostatnia doba {ds[-1]}: zmierzony w {meas}, Plan w {g[NI_PLAN]}, bez danych {g[NI_NONE]} z {towns} miast ZC4; doby BRAK LATKI {len(nolatch)}",
+                    ">= 80% miast ZC4 zmierzone, BRAK LATKI 0", towns == 0 or (meas >= 0.8 * towns and not nolatch))
+        else:
+            rep.add("NOP-4: limit z dowozu zmierzonego", f"dob z limitem {len(ds)} (BRAK LATKI {len(nolatch)})", "INFO (za krotko - pierscien 7 dob)", None if not nolatch else False)
+    else:
+        rep.add("NOP-4: limit z dowozu zmierzonego", "brak linii paczki", "INFO", None)
+
+    # NOP-5 'bez opalu' (linia N2-E4) w oknie pelnego KS
+    wn = [d for d in win if d in n2e]
+    if wn:
+        want = sum(n2e[d][2] for d in wn)
+        short = sum(n2e[d][4] for d in wn)
+        bought = sum(n2e[d][3] for d in wn)
+        need = sum(n2e[d][1] for d in wn)
+        sh = short / want if want else 0.0
+        rep.add("NOP-5: 'bez opalu' / chciane (N2-E4)" + base_note, f"{100 * sh:.1f}% ({short}/{want}); potrzeba srednio {need / len(wn):.0f}/d, kupione {bought / len(wn):.0f}/d; {wnote}",
+                f"<= {100 * NOP_SHORT_MAX:.0f}% (fin86 49%, 28 dob)", ok_or_info(sh <= NOP_SHORT_MAX))
+    else:
+        rep.add("NOP-5: 'bez opalu' / chciane (N2-E4)", f"brak dob pelnego KS z linia N2-E4 ({wnote})", "INFO", None)
+
+    # NOP-6 indeks drewna, NOP-7 ruda
+    wp = [d for d in win if d in price]
+    if wp:
+        wood = mean(price[d][2] for d in wp)
+        ore = mean(price[d][0] for d in wp)
+        empty = mean(price[d][1] for d in wp)
+        if wood is not None:
+            rep.add("NOP-6: drewno - mediana indeksu (Ceny surowcow)" + base_note, f"{wood:.2f} (srednio {len(wp)} dob; {wnote})",
+                    f"<= {NOP_WOOD_MAX:.2f}; ETAP < {NOP_WOOD_BASE} (fin86, 28 dob); bez KS 0.60", ok_or_info(wood <= NOP_WOOD_MAX), etap=wood < NOP_WOOD_BASE)
+        else:
+            rep.add("NOP-6: drewno - mediana indeksu", "brak drewna w linii", "INFO", None)
+        if ore is not None and empty is not None:
+            ok7 = ore <= NOP_ORE_MAX and empty <= NOP_ORE_EMPTY_MAX
+            et7 = ore < NOP_ORE_BASE and empty < NOP_ORE_EMPTY_BASE
+            rep.add("NOP-7: ruda - mediana indeksu i miasta bez rudy" + base_note, f"mediana {ore:.2f}, bez towaru {empty:.1f} miast (srednio {len(wp)} dob)",
+                    f"<= {NOP_ORE_MAX} i <= {NOP_ORE_EMPTY_MAX} miast; ETAP lepiej niz fin86 ({NOP_ORE_BASE}/{NOP_ORE_EMPTY_BASE}) - polowa spadku zelaza to koszyk narzedzi KS (osobno)",
+                    ok_or_info(ok7), etap=et7)
+        else:
+            rep.add("NOP-7: ruda", "brak rudy w linii", "INFO", None)
+    else:
+        rep.add("NOP-6: drewno - mediana indeksu", f"brak linii 'Ceny surowcow' w oknie ({wnote})", "INFO", None)
+        rep.add("NOP-7: ruda - mediana indeksu i miasta bez rudy", f"brak linii 'Ceny surowcow' w oknie ({wnote})", "INFO", None)
+
+    # NOP-8 kopalnia bez wegla
+    wi = [d for d in win if d in iron]
+    if wi:
+        coal = sum(iron[d] for d in wi) / len(wi)
+        rep.add("NOP-8: 'kopalnia bez wegla' (Zelazo (lupy) (214))" + base_note, f"{coal:.1f} lup/d (srednio {len(wi)} dob)",
+                f"<= {NOP_COAL_MAX:.0f}; ETAP < {NOP_COAL_BASE} (fin86, 28 dob); bez KS 28.1", ok_or_info(coal <= NOP_COAL_MAX), etap=coal < NOP_COAL_BASE)
+    else:
+        rep.add("NOP-8: 'kopalnia bez wegla'", f"brak linii w oknie ({wnote})", "INFO", None)
+
+    # NOP-9 zima
+    wd = sorted(d for d, g in days.items() if g[NI_PORA] == "ZIMA" and int(g[NI_TOWNS]) > 0) if days else []
+    wd2 = sorted(d for d, g in n2e.items() if g[0] == "ZIMA")
+    if wd:
+        k = mean(float(days[d][NI_K]) for d in wd)
+        wantw = sum(n2e[d][2] for d in wd if d in n2e)
+        shortw = sum(n2e[d][4] for d in wd if d in n2e)
+        ctl = [d for d in wd if float(days[d][NI_OVER]) > 0.005]
+        shw = shortw / wantw if wantw else 0.0
+        rep.add("NOP-9: zima (proba zimy) - czynnik, limit, 'bez opalu'",
+                f"dob zimy {len(wd)}: czynnik czesci KS srednio {k:.2f}, 'bez opalu' {100 * shw:.1f}% ({shortw}/{wantw}), kontrola zlamana {len(ctl)}",
+                "czynnik > 1.2, 'bez opalu' <= 50%, kontrola 0", k > 1.2 and shw <= 0.5 and not ctl)
+    else:
+        rep.add("NOP-9: zima (proba zimy)", f"dob zimy w linii paczki 0 (N2-E4 zima {len(wd2)}; linii PROBA ZIMY TERAZ {len(trial)})",
+                "INFO - PRZED WGRANIEM bieg z plikiem Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-zima-teraz.flag (zima nigdy nie byla testowana)", None)
+
+    # NOP-10 krok 3: zapas dymarek
+    if days:
+        kd = [d for d, g in days.items() if g[NI_KEEP] == "TAK" and g[NI_KX] is not None]
+        need_d = [d for d in kd if float(days[d][NI_MINE]) > 0]
+        ext = [d for d in need_d if int(days[d][NI_KX]) > 0]
+        last = days[max(kd)] if kd else None
+        rep.add("NOP-10: krok 3 - zapas rzemiosla + drewno dymarek wsi",
+                f"dob z kluczem {len(kd)}, z potrzeba dymarek > 0 {len(need_d)}, z podniesionym zapasem {len(ext)}"
+                + (f"; ostatnia: +{last[NI_KX]} ladunkow w {last[NI_KXN]} miastach (potrzeba {last[NI_MINE]}/d)" if last else ""),
+                "zapas podniesiony w >= 1 dobie, gdy potrzeba dymarek ponad las > 0 (brak potrzeby - INFO)", (len(ext) > 0) if need_d else None)
+    else:
+        rep.add("NOP-10: krok 3 - zapas dymarek", "brak linii paczki", "INFO", None)
+
+    # NOP-11 potkniecia i ERROR
+    stum = max((int(g[NI_STUM]) for g in days.values()), default=0)
+    rep.add("NOP-11: potkniecia paczki i ERROR (TownFolk.FwCart*/FwField*/Opal*/FirewoodDaily, Bloomery.Daily(MineNeed), WinterTrial.LoadedSessionStart)",
+            f"potkniecia (najwiecej) {stum}, ERROR {len(errs)}" + (f" np. {errs[0]}" if errs else ""), "0 i 0", (stum == 0 and not errs) if pkg else (not errs or None))
+
+    # NOP-12 czas
+    if days:
+        ms = [float(g[NI_MS]) for g in days.values()]
+        rep.add("NOP-12: czas linii paczki (doba opalu + linia)", f"najwiecej {max(ms):.1f} ms, srednio {sum(ms) / len(ms):.2f} ms ({len(ms)} dob)",
+                f"<= {NOP_MS_MAX} ms najwiecej, <= {NOP_MS_MEAN} ms srednio", max(ms) <= NOP_MS_MAX and sum(ms) / len(ms) <= NOP_MS_MEAN)
+    else:
+        rep.add("NOP-12: czas linii paczki", "brak linii paczki", "INFO", None)
+
+    # NOP-13 zapas drewna swiata (INFO - towar bez odbiorcy?)
+    wt = [d for d in win if d in tow]
+    if len(wt) >= 2:
+        dd = wt[-1] - wt[0]
+        rep.add("NOP-13: zapas drewna swiata (Towary: hardwood)", f"{tow[wt[0]]} -> {tow[wt[-1]]} ({(tow[wt[-1]] - tow[wt[0]]) / max(1, dd):+.0f}/d w {dd} dobach)",
+                "INFO (fin86 ostatnie 40 dob +418/d; mniej opalu latem = wiecej drewna na polkach - budowy, dymarki i karawany)", None)
+    else:
+        rep.add("NOP-13: zapas drewna swiata", "brak linii 'Towary: dzien N - hardwood' w oknie", "INFO", None)
+
+    # NOP-14 popyt ceny po regule (lambda >= 0.99: suma = czesc KS po limicie)
+    if days:
+        pd = [d for d in full if d in days and days[d][NI_PRICE] == "TAK" and days[d][NI_EFF] is not None]
+        bad = [d for d in pd if int(days[d][NI_EFFN]) != int(days[d][NI_TOWNS]) or abs(float(days[d][NI_EFF]) - float(days[d][NI_KCUT])) > 0.01 * float(days[d][NI_KCUT]) + 1.0]
+        rep.add("NOP-14: popyt ceny drewna po regule (klucz popyt ceny TAK, lambda >= 0.99)",
+                f"dob {len(pd)}, niezgodnych {len(bad)}" + (f" (np. d{bad[0]}: po regule {days[bad[0]][NI_EFF]} w {days[bad[0]][NI_EFFN]} z {days[bad[0]][NI_TOWNS]}, po limicie {days[bad[0]][NI_KCUT]})" if bad else ""),
+                "kazde miasto ZC4 ma wpis, suma = czesc KS po limicie (1% + 1)", (not bad) if pd else None)
+    else:
+        rep.add("NOP-14: popyt ceny drewna po regule", "brak linii paczki", "INFO", None)
+
+    # NOP-15 potrzeba: linia paczki = linia N2-E4 tej samej doby
+    if days:
+        both = [d for d in days if d in n2e]
+        bad = [d for d in both if abs(float(days[d][NI_NEED]) - n2e[d][1]) > 0.011 or int(days[d][NI_WANT]) != n2e[d][2]]
+        rep.add("NOP-15: potrzeba opalu - linia paczki = linia N2-E4", f"dob {len(both)}, niezgodnych {len(bad)}", "0", (not bad) if both else None)
+    else:
+        rep.add("NOP-15: potrzeba opalu - linia paczki = linia N2-E4", "brak linii paczki", "INFO", None)
+    rep.show()
+    return 0
+
+
 # ============================================================ zapis-d4 (noc 17/18.10, CO-ZOSTALO D4): rozmiar zapisu i cichsze logi - grupa nzapis
 # Armoury/src/SaveSize.cs (linie "Zapis (D4)" i "Zapis i logi (D4)"), SaveText.cs (pakowanie pod "<klucz>_z"), LogGate.cs (zestaw 2 cichych logow - lista ZAP_MORE
 # MUSI byc ta sama co LogGate.More; recenzja: bez linii o wlasnej rzadszej kadencji - "Skale ludzi wedlug krolestw (GL0)", "Zatkane wsie (przyklad)").
@@ -41207,6 +41521,8 @@ def main(argv):
         return npo_main(logp)   # npo (noc 17/18.10, inwest): prace okregu gracza - pieniadze zakupu i wyplat, pula, oczekiwane, proba autotestu (DistrictWorks)
     if group == "nherby" and logp:
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
+    if group == "nopal" and logp:
+        return nopal_main(logp)   # nopal (noc 17/18.10, fala 4 f4-opal): opal mieszczan pod KS - pora roku, limit dowozu drewna, popyt ceny, zapas dymarek; drewno, ruda, kopalnia bez wegla, zima
     if group == "nzapis" and logp:
         return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
     if group != "etap2" or not logp:

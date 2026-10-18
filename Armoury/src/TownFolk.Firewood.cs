@@ -49,6 +49,7 @@ namespace Armoury
                      + " | potrzeba " + FwPer1000.ToString("0.00", Inv) + " ladunku (100 kg) na 1000 glow kiesy ludu na dobe, latem x" + FwSummer.ToString("0.0", Inv) + ", w zimie ROT x (1 + czynnik krainy x gradient polnocy - jak kazdy skutek zimy: wiekszosc Westeros ok. x1.75-2.25, cieple x1.3-1.5, Wyspy Letnie x1)"
                      + " | tylko drewno ponad zapas rzemiosla miasta (CaravanBulk.TargetFor) i ponad " + ShelfKeep + " szt.; placi kiesa ludu ponad jutrzejszy koszyk, akcyza do gminy, reszta do kasy miasta"
                      + " | kiesa ludu " + (LiveKey ? "czynna" : "NIECZYNNA - brak platnika") + " | potkniecia 0.");
+            try { OpalSessionStart(); } catch (Exception e) { _fwStumbles++; Stumble("OpalSessionStart", e); }   // f4-opal: pamiec paczki od nowa, linia startu, proba zimy teraz (autotest)
         }
 
         /// <summary>
@@ -66,6 +67,7 @@ namespace Armoury
                 if (!s.TownFolkFirewood || !Live)
                 {
                     string why = !s.TownFolkFirewood ? "WYLACZONE (Town Folk Firewood = off)" : "NIECZYNNE (kiesa ludu nieczynna - brak platnika)";
+                    OpalIdle();   // f4-opal: pierscien dowozu od nowa, popyt ceny drewna bez reguly paczki
                     if (_fwState != why)
                     {
                         _fwState = why;
@@ -91,6 +93,7 @@ namespace Armoury
                     catch { summer = false; winterOff = false; }
                 }
                 var el = new EquipmentElement(wood, null, null, false);
+                var op = OpalBegin();   // f4-opal: null - zaden klucz paczki nie czynny (stara droga co do bitu)
                 int towns = 0, noCal = 0, waitShelf = 0, waitPurse = 0, part = 0, winterTowns = 0;
                 double heads = 0, need = 0, realmSum = 0;
                 long want = 0, bought = 0, gold = 0, excise = 0, short0 = 0, kept = 0;
@@ -102,6 +105,7 @@ namespace Armoury
                     {
                         var town = f.St != null ? f.St.Town : null;
                         if (town == null || !town.IsTown) continue;
+                        if (op != null) OpalRoll(op, f.St);   // f4-opal: probka pierscienia dowozu drewna (kazde miasto, takze bez potrzeby)
                         if (!f.Cal) { noCal++; continue; }
                         towns++;
                         // glowy kiesy ludu - te same co konie robocze (glowy BK x skala ludzi rynku; po dzisiejszej dobie ludu - jej skala)
@@ -115,7 +119,15 @@ namespace Armoury
                             k = 1.0 + rf; realmSum += rf; winterTowns++;
                         }
                         double x = people / 1000.0 * FwPer1000 * k;
-                        x = StartCalibration.Zc4Firewood(town, x, winter ? k : 1.0);   // ZC4 (KS etap 2): (1 - lambda) x dzis + lambda x 1.5 kg na osobe (tabela KS) x zima (recenzja 16.10); poza ZC4 - bez zmian
+                        // f4-opal krok 1 (Firewood Ks Season): do czesci KS czynnik pory zawsze (latem FwSummer) - jedna regula pory dla obu drog; klucz wylaczony - jak dotad (tylko zima)
+                        double kz = op != null && op.Season ? k : (winter ? k : 1.0);
+                        if (op == null)
+                            x = StartCalibration.Zc4Firewood(town, x, kz);   // ZC4 (KS etap 2): (1 - lambda) x dzis + lambda x 1.5 kg na osobe (tabela KS) x zima (recenzja 16.10); poza ZC4 - bez zmian
+                        else
+                        {
+                            x = OpalNeed(op, town, x, kz);                   // f4-opal krok 2: czesc KS najwyzej do dowozu drewna ponad rzemioslo (klucz Firewood Ks Supply Cap); poza ZC4 - bez zmian
+                            OpalKeepNote(op, town, wood);                    // f4-opal krok 3: zapas rzemiosla + drewno dymarek wsi (tylko licznik linii)
+                        }
                         need += x;
                         int n = MBRandom.RoundRandomized((float)x);
                         if (n <= 0) continue;
@@ -170,6 +182,7 @@ namespace Armoury
                   .Append(" | poza regula: miasta nieskalibrowane ").Append(noCal)
                   .Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.0", Inv)).Append(" ms | potkniecia ").Append(_fwStumbles).Append('.');
                 Log.Info(sb.ToString());
+                OpalEnd(op, day, winter, summer, winterOff, need, want);   // f4-opal: popyt ceny drewna, linia "Opal pod KS (f4-opal)"
             }
             catch (Exception e) { _fwStumbles++; Stumble("FirewoodDaily", e); }
         }

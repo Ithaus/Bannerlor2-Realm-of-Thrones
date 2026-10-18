@@ -65,6 +65,8 @@ namespace Armoury
 
         private static MethodInfo _sell;
         private static bool _wired;                          // latka sprzedazy wpieta (czesc 3 i skreslanie wiesci przy wjezdzie)
+        /// <summary>f4-opal: latka sprzedazy wozu wpieta - bez niej pomiar dowozu drewna (TownFolk.FwCartPost) nie biegnie, limit opalu bierze Plan.</summary>
+        internal static bool SellWired { get { return _wired; } }
         private static int _bkRule = -1;                     // -1 nie sprawdzone; 1 = sprzedaz w miescie robi BK SellGoodsPatch (zwierzeta: 0.5 x ludzie + 2), 0 = gra
         private static readonly HashSet<string> _errSites = new HashSet<string>();
 
@@ -686,6 +688,7 @@ namespace Armoury
                 Forget(__1);
                 FibreToMarket.SellBegin(__0, __1);                                      // N2-E3: woz skierowany do miasta targowego - migawka wlokna i sakwy (licznik)
                 TownToll.CartBegin(__1);                                                // E3-G3: sakwa wozu przed sprzedaza (myto od utargu netto - w postfiksie)
+                TownFolk.FwCartPre(__0, __1);                                           // f4-opal: drewno w jukach przed sprzedaza w miescie (dowoz drewna - licznik)
                 var s = Settings.Current;
                 var town = __0 != null ? __0.Town : null;
                 if (s == null || !s.VillageCartFairPrice || town == null) return;
@@ -710,6 +713,7 @@ namespace Armoury
         public static void SellPostfix(Settlement __0, MobileParty __1, Snap __state)
         {
             SellPostfixCore(__0, __1, __state);
+            TownFolk.FwCartPost(__0, __1);                                              // f4-opal: sprzedane drewno (przed zakupami wsi przez woz - CartBuys)
             FibreToMarket.SellEnd(__0, __1);                                            // N2-E3: po zwrocie nadplaty - sprzedane wlokno i utarg wozu skierowanego (licznik)
             TownToll.CartEnd(__0, __1);                                                 // E3-G3: myto targowe od utargu netto wozu (po zwrocie nadplaty 119)
             TownFolk.CartBuys(__0, __1);                                                // E3-W1: wies kupuje przez swoj woz w miescie sprzedazy to, czego nie bylo w miescie targowym

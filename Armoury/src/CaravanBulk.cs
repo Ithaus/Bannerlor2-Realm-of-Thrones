@@ -325,7 +325,56 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0;
-            foreach (var g in _goods) if (g.Item == item) return Target(town, g, s);
+            foreach (var g in _goods) if (g.Item == item) return MineKeepOn(town, g, s) ? Math.Max(g.Floor, (int)Math.Ceiling(Math.Max(0, s.CaravanBulkStockDays) * UseMines(town, g, s))) : Target(town, g, s);
+            return 0;
+        }
+
+        // ---- f4-opal krok 3 (noc 17/18.10, klucz FirewoodMineWoodKeep; opis - TownFolk.Opal.cs): zapas rzemiosla miasta (TargetFor - prog budow i opalu mieszczan) liczy
+        // drewno dymarek wsi handlujacych w tym miescie: potrzeba ponad las okregu (Bloomery.MineShelfNeed), gdy wieksza od tego, co dymarki zdolaly kupic (ShelfUse - srednia
+        // zakupow, przy pustej polce zanizona). Tylko drewno, tylko przy wytopie przy kopalni i BloomeryWoodDemand (wtedy ShelfUse jest czlonem dymarek w Use), tylko miasta
+        // z koszykiem ZC4 (KS zastosowany). Zapas docelowy karawan, prog nadwyzki i cena (Target, Keep, Usage) - bez zmian.
+
+        private static bool MineKeepOn(Town town, Good g, Settings s)
+        {
+            return g.Ix == WoodIx && s.FirewoodMineWoodKeep && s.BloomeryWoodDemand && Bloomery.On && StartCalibration.Zc4FireTown(town);
+        }
+
+        /// <summary>f4-opal krok 3: zuzycie dobowe z drewnem dymarek wedlug potrzeby - Use, w ktorym czlon dymarek (ShelfUse) zastapiony przez max(ShelfUse, potrzeba ponad las).</summary>
+        private static float UseMines(Town town, Good g, Settings s)
+        {
+            float u = Use(town, g, s);
+            float su = Bloomery.ShelfUse(town), mn = Bloomery.MineShelfNeed(town);
+            return mn > su ? u + (mn - su) : u;
+        }
+
+        /// <summary>f4-opal krok 2: dobowe zuzycie drewna przez rzemioslo miasta (ladunki/d; to samo, z czego TargetFor liczy zapas rzemiosla - z krokiem 3, gdy czynny) -
+        /// limit opalu mieszczan = dowoz minus to. 0 - zamek, przedmioty niewczytane.</summary>
+        internal static float CraftWoodUse(Town town)
+        {
+            var s = Settings.Current;
+            if (s == null || town == null || !town.IsTown || !Ready()) return 0f;
+            foreach (var g in _goods)
+            {
+                if (g.Ix != WoodIx) continue;
+                return MineKeepOn(town, g, s) ? UseMines(town, g, s) : Use(town, g, s);
+            }
+            return 0f;
+        }
+
+        /// <summary>f4-opal krok 3 (tylko do linii): o ile TargetFor drewna przewyzsza zapas bez kroku 3 (ladunki) i potrzeba dymarek ponad las w tym miescie (ladunki/d).</summary>
+        internal static int MineKeepExtra(Town town, ItemObject item, out float need)
+        {
+            need = 0f;
+            var s = Settings.Current;
+            if (s == null || town == null || item == null || !town.IsTown || !Ready()) return 0;
+            foreach (var g in _goods)
+            {
+                if (g.Item != item) continue;
+                if (!MineKeepOn(town, g, s)) return 0;
+                need = Bloomery.MineShelfNeed(town);
+                int nu = Math.Max(g.Floor, (int)Math.Ceiling(Math.Max(0, s.CaravanBulkStockDays) * UseMines(town, g, s)));
+                return Math.Max(0, nu - Target(town, g, s));
+            }
             return 0;
         }
 

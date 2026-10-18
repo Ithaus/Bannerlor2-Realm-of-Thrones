@@ -774,6 +774,7 @@ namespace Armoury
                     if (ok <= 0) continue;
                     town.Settlement.ItemRoster.AddToCounts(it, ok);
                     pieces += ok; paid += got; made[i] += ok;
+                    if (i == KsDeliver.IWood) TownFolk.FwFieldArrive(town.Settlement, ok);   // f4-opal: drewno z pol mieszczan - dowoz tego miasta (tylko licznik)
                 }
             }
             catch (Exception e) { Stumble("DeliverTownFields", e); }

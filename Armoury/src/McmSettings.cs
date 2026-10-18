@@ -6724,6 +6724,22 @@ namespace Armoury
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool TownFolkFirewood { get; set; } = true;
 
+        [SettingPropertyBool("Firewood Ks Season", HintText = "with Town Folk Firewood under the start calibration (the townsfolk's basket of the estates): the season counts the same way as without it - in summer the townsfolk burn half (cooking only), in winter more by the bite of winter - instead of the full winter-and-spring measure all summer long (off = summer burns as much as spring, as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool FirewoodKsSeason { get; set; } = true;
+
+        [SettingPropertyBool("Firewood Ks Supply Cap", HintText = "with Town Folk Firewood under the start calibration: the townsfolk want only as much firewood as the villages really bring to their town's market (the wood sold there by village carts and grown on the townsfolk's own fields, the last 7 days; in the first 7 days after loading - the plan of the districts), beyond what the town's smiths, bloomeries and workshops use each day - their wish grows only with the wood that truly comes (off = the full measure of a kilo and a half a head whether the wood comes or not, as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool FirewoodKsSupplyCap { get; set; } = true;
+
+        [SettingPropertyBool("Firewood Ks Price Demand", HintText = "with Town Folk Firewood under the start calibration: the price of wood in a town counts the same firewood the townsfolk really want (by season and by the wood that comes, as above), not the full measure of a kilo and a half a head - wood is no longer dear only because of fires nobody can feed (off = the full measure in the price, as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool FirewoodKsPriceDemand { get; set; } = true;
+
+        [SettingPropertyBool("Firewood Mine Wood Keep", HintText = "with Bloomery At Mine under the start calibration: the stock of wood a town keeps for its own craftsmen, below which neither firewood nor building works take any, counts the wood the bloomeries of the mines trading at this town need beyond the woods of their district, and not only what they managed to buy - the townsfolk's fires and the builders no longer take the mines' charcoal (off = only what the bloomeries bought, as before)")]
+        [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
+        public bool FirewoodMineWoodKeep { get; set; } = true;
+
         [SettingPropertyFloatingInteger("Folk Guard Normal Share Max", 0.000f, 0.200f, "0.000", HintText = "with Folk Circulation Guard: when the steward of the realm's coin decides whether the hoard tax should rise or fall, the common folk's normal savings count as at most this part of all the gold in the world (0.064 = 6.4%). New goods to buy raise the folk's normal savings, and without this limit the steward grew lenient while their purses kept swelling. What each class pays is still counted above its own normal level (0 = no limit, as before)")]
         [SettingPropertyGroup("Trade pays its way (night 16.10, part 3)")]
         public float FolkGuardNormalShareMax { get; set; } = 0.064f;
@@ -9204,6 +9220,10 @@ namespace Armoury
             s.NoMakerBudgetToLuxury = NoMakerBudgetToLuxury;
             s.VillageFibreToMarket = VillageFibreToMarket;
             s.TownFolkFirewood = TownFolkFirewood;
+            s.FirewoodKsSeason = FirewoodKsSeason;
+            s.FirewoodKsSupplyCap = FirewoodKsSupplyCap;
+            s.FirewoodKsPriceDemand = FirewoodKsPriceDemand;
+            s.FirewoodMineWoodKeep = FirewoodMineWoodKeep;
             s.FolkGuardNormalShareMax = FolkGuardNormalShareMax;
             s.FolkGuardShareFuse = FolkGuardShareFuse;
             s.CrownKeepsValveShare = CrownKeepsValveShare;
