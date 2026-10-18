@@ -340,6 +340,23 @@ namespace Armoury
             // sie nic, co zmienia zold (rezerwy i sakiewka - same odczyty). Probka 1/64 liczy drugi raz i porownuje (PerfD2.WageHit)
             if (_wMemoOn && ReferenceEquals(mp, _wMemoP))
             {
+                // f4b-perf (PerfSutlerWageExact): pamiec tylko dla zoldu pewnego - bez bohatera poza wodzem (BK losuje zaokraglenie ich zoldu, MBRandom) i bez
+                // losowania przy pierwszym liczeniu (straznik generatora gry); zold niepewny - kazdy odczyt liczony jak dotad (te same losowania co bez pamieci)
+                if (_wMemoX)
+                {
+                    if (_wMemoHas)
+                    {
+                        bool drop;
+                        int v = PerfD2.WageHitExact(mp, _wMemoV, out drop);
+                        if (drop) { _wMemoHas = false; _wMemoNo = true; }
+                        return v;
+                    }
+                    if (_wMemoNo) return PerfD2.WageNoMemo(mp);
+                    bool keep;
+                    int w = PerfD2.WageFirst(mp, out keep);
+                    if (keep) { _wMemoV = w; _wMemoHas = true; } else _wMemoNo = true;
+                    return w;
+                }
                 if (_wMemoHas) return PerfD2.WageHit(mp, _wMemoV);
                 _wMemoV = WageRaw(mp); _wMemoHas = true;
                 return _wMemoV;
@@ -352,12 +369,13 @@ namespace Armoury
         [ThreadStatic] private static bool _wMemoOn, _wMemoHas;
         [ThreadStatic] private static MobileParty _wMemoP;
         [ThreadStatic] private static int _wMemoV;
+        [ThreadStatic] private static bool _wMemoX, _wMemoNo;   // f4b-perf: PerfSutlerWageExact w tym zakresie; zold tej partii niepewny - bez pamieci do konca zakresu
 
         /// <summary>perf-d2d3: poczatek zakresu jednej partii markietanow (Sutlers.Daily wokol One) - przy PerfSutlerWageOnce zold tej partii liczony raz.</summary>
-        internal static void WageMemoBegin(MobileParty mp) { _wMemoOn = PerfD2.SutlerWageOn; _wMemoP = mp; _wMemoHas = false; }
+        internal static void WageMemoBegin(MobileParty mp) { _wMemoOn = PerfD2.SutlerWageOn; _wMemoP = mp; _wMemoHas = false; _wMemoX = _wMemoOn && PerfD2.SutlerExactOn; _wMemoNo = false; }
 
         /// <summary>perf-d2d3: koniec zakresu (zawsze w finally) - poza nim zold liczony jak dotad przy kazdym odczycie.</summary>
-        internal static void WageMemoEnd() { _wMemoOn = false; _wMemoP = null; _wMemoHas = false; }
+        internal static void WageMemoEnd() { _wMemoOn = false; _wMemoP = null; _wMemoHas = false; _wMemoX = false; _wMemoNo = false; }
 
         /// <summary>
         /// KA (16.10, karczmy - TownInns.cs; Jeff "ludzie sami placa za siebie i za swoje konie, dostaja zold"): nocleg ludzi w karczmie z ich sakiewki.

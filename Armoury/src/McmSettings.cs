@@ -6220,6 +6220,14 @@ namespace Armoury
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfTownTaxFastHooks { get; set; } = true;
 
+        [SettingPropertyBool("Perf Sutler Wage Exact", HintText = "with Perf Sutler Wage Once, the wage is kept only for bands whose wage comes out the same every time it is worked out: a band carrying companions or kin besides its leader (Banner Kings rounds their pay up or down by a dice roll each time) or one whose wage rolled any dice is worked out at every step, as without the shortcut - the same coin and the same dice as before the shortcut; off = every band's wage is kept after the first count, even when it rolled dice")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool PerfSutlerWageExact { get; set; } = true;
+
+        [SettingPropertyBool("Perf Probe Each Place", HintText = "the spot checks of the faster town tax (Perf Town Tax Fast Hooks: every 64th time the old slow way is worked out beside it and compared) are counted for each of its places on its own - the lines somebody really pays, the notables' lines, the owners' lines and the council wages; before, one shared count always landed on the council wages and the other three were never checked. Checks only - the tax is the same; off = one shared count, as before")]
+        [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
+        public bool PerfProbeEachPlace { get; set; } = true;
+
         [SettingPropertyBool("State Hygiene Enabled", HintText = "starting or loading a campaign clears what the mod still remembered from the previous one in the same game run (hideout search, camp, AI stable purchases, crossing guard), and a single hiccup no longer switches the long seasons or a waiting hideout search off for the whole session. Off = as before")]
         [SettingPropertyGroup("A clean slate between campaigns (stage 8)")]
         public bool StateHygieneEnabled { get; set; } = true;
@@ -9078,6 +9086,8 @@ namespace Armoury
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;
             s.PerfTownTaxFastHooks = PerfTownTaxFastHooks;
+            s.PerfSutlerWageExact = PerfSutlerWageExact;
+            s.PerfProbeEachPlace = PerfProbeEachPlace;
             s.StateHygieneEnabled = StateHygieneEnabled;
             s.MidDayLoadKeepsDay = MidDayLoadKeepsDay;
             s.Stage8MeasureLog = Stage8MeasureLog;

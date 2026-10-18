@@ -259,7 +259,7 @@ namespace Armoury
                 // perf-d2d3 (PerfTownTaxFastHooks): te same odczyty i zapisy BK przez delegaty (PerfFast); co 64. wywolanie (PerfD2.FastProbe) najpierw liczy
                 // stawki obiema drogami (sam odczyt) i porownuje - rozjazd: zapis wedlug starej drogi (licznik w linii "Szybkosc doby")
                 bool fast = PerfD2.FastHooksOn;
-                bool probe = fast && PerfD2.FastProbe();
+                bool probe = fast && PerfD2.FastProbe(PerfD2.FBase);
                 var list = fast ? PositionsOfFast(owner) : PositionsOf(owner);
                 if (probe) { var l2 = PositionsOf(owner); if (!ReferenceEquals(l2, list)) { PerfD2.FastSame(PerfD2.FBase, false); list = l2; probe = false; fast = false; } }
                 if (list == null || list.Count == 0) { TownBaseOk = list != null; return; }
