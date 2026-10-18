@@ -37410,9 +37410,17 @@ def nzc1_main(logp, bdp=None):
         else:
             rep.add("ZC1-18: reszta bilansu pieniadza swiata [R] (srednia dob)", f"{mn:+.0f}", "INFO (z --baza-doby: wobec bazy)", None)
     # ZC1-19 deski: mieszczanie po pelnym przejsciu
-    pd_ = [s for s in days if (_nz1_ramp(s, "deski") or 0.0) >= 0.999]
-    if pd_:
-        dd = [int(NZ1_DAY.search(s).group(1)) for s in pd_]
+    # f14-ksiega: linia "Towary (ZC1): dzien D" podaje przejscie JUTRA (GoodsPaths.Daily: day = Today() - 1, a Ramp(k) liczy od Today()), a mieszczanie doby D
+    # kupowali w tickach miast doby D (FolkFactor = 1 - Ramp przy Today() = D) - przejscie w mocy w dobie D stoi w linii doby D-1. Dotad doba D z linia D = 1.00
+    # liczyla sie jako pelna, choc mieszczanie mieli jeszcze 1/60 budzetu desek (fin92 d109135: mieszczanie 1 deska przy przejsciu 59/60).
+    rp_ = {}
+    for s in days:
+        md_ = NZ1_DAY.search(s)
+        rv_ = _nz1_ramp(s, "deski")
+        if md_ and rv_ is not None:
+            rp_[int(md_.group(1))] = rv_
+    dd = sorted(d for d in rp_ if rp_.get(d - 1, 0.0) >= 0.999)
+    if dd:
         folk = []
         for d in dd:
             g = goods.get(d, {}).get("planks")
