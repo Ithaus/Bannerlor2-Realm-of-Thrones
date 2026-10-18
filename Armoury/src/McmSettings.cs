@@ -4948,6 +4948,10 @@ namespace Armoury
         [SettingPropertyGroup("Save files")]
         public int SaveCompactMinKb { get; set; } = 64;
 
+        [SettingPropertyBool("Save Size Log File", HintText = "with Save Size Log: the line written after every save also tells roughly how much of the save FILE the Armoury data takes (the game compresses the whole save; the same compression is measured in memory, a few tens of milliseconds per save). Measurement only - nothing in the save changes (off = no such part in the line)")]
+        [SettingPropertyGroup("Save files")]
+        public bool SaveSizeLogFile { get; set; } = true;
+
         [SettingPropertyBool("Army175 Measure", HintText = "measurement only, nothing in the game changes: a daily log line of AI horse upgrades (made, refused or cut for lack of a horse, horses into armouries, purchases, where riders come from) and a line per battle and per day on the balance of the kingdoms (battles won against the odds, assaults, fortresses taken and lost, men in the field), with csv files in the session's log folder. Takes effect at once")]
         [SettingPropertyGroup("Armies of the realms (175)")]
         public bool Army175Measure { get; set; } = true;
@@ -6896,6 +6900,10 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsBkPortsInLedger { get; set; } = true;
 
+        [SettingPropertyBool("Ks Arm Mature From Use", HintText = "with Start Calibration Auto Arm: the 7 days of finished weekly plan the calibration waits before it starts by itself are counted from the first day that finished plan is actually in use, not from the last day of the data it was made from - so it starts at the earliest 28 + 7 days after it armed itself, as announced when it arms (off = 2 days earlier, as before)")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool KsArmMatureFromUse { get; set; } = true;
+
         [SettingPropertyBool("Ks Food Carts", HintText = "with the calibration applied: a town short of food buys grain, fish, meat, cheese, salt and the other foods in a town of the same market that has more than it needs, and the cart goes for as many days as the road (by sea a ship is four times faster and much cheaper than a cart). The buying town pays the selling town for every piece and the carters of the seller's villages (by sea - its dock hands) for the haul, only when the merchants gain on it, and never below half of the town merchants' reserve. Fish, meat, fruit and the other perishables go at most 7 days and lose a little on the way; off = no new food carts (carts on the road still arrive)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsFoodCarts { get; set; } = true;
@@ -8760,6 +8768,7 @@ namespace Armoury
             s.SaveSizeLog = SaveSizeLog;
             s.SaveCompact = SaveCompact;
             s.SaveCompactMinKb = SaveCompactMinKb;
+            s.SaveSizeLogFile = SaveSizeLogFile;
             s.Army175Measure = Army175Measure;
             s.NorthHomeEdgePercent = NorthHomeEdgePercent;
             s.NorthHardyWeaponBonus = NorthHardyWeaponBonus;
@@ -9247,6 +9256,7 @@ namespace Armoury
             s.StartCalibrationAutoArmAutotest = StartCalibrationAutoArmAutotest;
             s.KsPatrolGrainFromTown = KsPatrolGrainFromTown;
             s.KsBkPortsInLedger = KsBkPortsInLedger;
+            s.KsArmMatureFromUse = KsArmMatureFromUse;
             s.KsFoodCarts = KsFoodCarts;
             s.KsFoodCartsConsign = KsFoodCartsConsign;
             s.KsConsignFloorShare = KsConsignFloorShare;

@@ -1204,7 +1204,9 @@ Uzycie (Python 3, tylko odczyt):
                     twarde bramki rozdz. 10, bramka krainy rozdz. 8, ryby z niczego perku Night Raider) python -I tools/sprawdz_logi.py --grupa nksarm <Armoury-*.log>
                     (strumieniowo; te same wiersze NKS-ARM-* dopisuje grupa nks). ARM-0 linia startu (klucz Auto Arm, droga gra / autotest z plikiem
                     armoury-ks-auto.flag), ARM-1 latka ryb z perku wpieta, ARM-2 samo uzbrojenie (linia "KS: uzbrojony zapis doba N (samo"), ARM-3 nic przed pomiarem:
-                    wlaczenie najwczesniej 28 + 7 dob po uzbrojeniu (samo; reczne/autotest - INFO), ARM-4 bramki przy wlaczeniu (7/7 pelnych dob, zrodla bez nazwy
+                    wlaczenie najwczesniej 28 + 7 = 35 dob po uzbrojeniu (samo; reczne/autotest - INFO; f4b-zapis: prog wedlug znacznika w linii startu "7 dob dojrzalego
+                    Planu (Ks Arm Mature From Use) TAK" - 35, "NIE" - stara regula 33 (7 dob od doby danych Planu), bez znacznika - log sprzed poprawki, prog projektu 35;
+                    ten sam prog NKS-11 w grupie nks), ARM-4 bramki przy wlaczeniu (7/7 pelnych dob, zrodla bez nazwy
                     i RemoveParty jedzenia <= 2 szt./d), ARM-5 zrodla bez nazwy z ksiegi towarow (inne ticki dobowe) w 7 dobach przed wlaczeniem <= 2 szt./d na towar
                     (5b: ryby "bez nazwy" od uzbrojenia - perk nazwany w ksiedze - INFO), ARM-6 linie pomiaru (INFO: ostatni WYNIK), ARM-7 linia bramki krainy w >= 90% dob
                     po wlaczeniu (w grze co 7 dob - INFO), ARM-8 czas bramki krainy mediana <= 1 ms, ARM-9 powroty krain i glod z winy KS (INFO; w tescie 120 dob przy
@@ -1242,7 +1244,10 @@ Uzycie (Python 3, tylko odczyt):
                     (start sesji), "Zapis (D4)" (po kazdym zapisie gry), "Ciche logi (NW)", znacznik zapisu "Zbrojownie zalog (171): zapis - ". ZAP-0 linia startu (brak - INFO,
                     log sprzed paczki), ZAP-1 stan kluczy (INFO), ZAP-2 linia "Zapis (D4)" przy kazdym zapisie gry (liczba >= znacznikow zapisu; bez zapisu - INFO),
                     ZAP-3 probny odczyt spakowanych kluczy zgodny w kazdym zapisie (ok = proby, niezgodne 0; nic ponad prog - INFO), ZAP-4 nasze napisy do zapisu po
-                    spakowaniu <= 5120 KB (ostatni zapis; tekst przed spakowaniem INFO), ZAP-5 spakowanie >= x3.0, ZAP-6 czas pakowania <= 500 ms (najwiecej), ZAP-7 bledy:
+                    spakowaniu <= 5120 KB przy Save Compact [WL]; przy [wyl] (domyslnie - bezpieczne cofniecie DLL) tekst <= 9216 KB (f4b-zapis: straznik wzrostu, bieg d720
+                    7.7 MB; 5 MB bez pakowania nieosiagalne), ZAP-4b (f4b-zapis) nasze napisy W PLIKU zapisu (odcinek "w pliku (deflate Fastest jak gra) ok. X KB" linii
+                    zapisu, klucz Save Size Log File) <= 2560 KB (fin83: 1.73 MB = 4.7% pliku 36.8 MB; bez odcinka - szacunek tekst/4.2 INFO), ZAP-4c czas pomiaru pliku
+                    <= 250 ms (najwiecej), ZAP-5 spakowanie >= x3.0, ZAP-6 czas pakowania <= 500 ms (najwiecej), ZAP-7 bledy:
                     "ERROR in SaveSize"/"ERROR in SaveText" 0, potkniecia 0, "BLAD probnego odczytu" 0, ZAP-8 klucze spakowane wczytane z zapisu bez bledu (brak - INFO),
                     ZAP-9 najwieksze klucze (INFO), ZAP-10 plik zapisu i czas zapisu (INFO), ZAP-Q0 ciche logi wiecej zgodne z trybem (autotest - "dzialaja: nie - pelne"),
                     ZAP-Q1 tryb pelny: pominietych linii 0 w kazdej linii zapisu, ZAP-Q2 tryb gry: linie zestawu 2 rzadziej niz codziennie (INFO), ZAP-Q3 (recenzja) tryb
@@ -37775,6 +37780,7 @@ def nks_main(logp, until=120, bdp=None):
     starts, plans, perr, bil, prod_days, days_ms, money, prices, errs = [], [], 0, {}, set(), [], [], [], 0
     on_day, on_src, on_ema, arm_day, conf_day = None, None, None, None, None
     on_auto = False    # ks-arm: wlaczenie samo po pomiarze (Start Calibration Auto Arm)
+    arm_mfu = None     # f4b-zapis: klucz Ks Arm Mature From Use z linii startu ks-arm ("TAK" / "NIE"; None - log sprzed f4b-zapis)
     ramp_a, ramp_d, ramp_e, ramp_lam_end, ramp_lam = None, None, None, None, {}
     shelf_day, shelf_txt, start_px = None, None, {}
     zc4_days, zc4_stum, zc4_v, zc4_hook, zc4_aff, zc4_purse = set(), 0, {}, {}, {}, {}
@@ -38092,6 +38098,10 @@ def nks_main(logp, until=120, bdp=None):
                     mm = NKS_CONF.match(s)
                     if mm and conf_day is None:
                         conf_day = int(mm.group("day"))
+                elif s.startswith(KA_START):
+                    mfu = KA_MFU.search(s)   # f4b-zapis: 7 dob dojrzalego Planu od doby uzycia (TAK) albo od doby danych Planu (NIE, stara regula)
+                    if mfu:
+                        arm_mfu = mfu.group("k")
                 elif s.startswith(NKS_K + "rampa dzien"):
                     mm = NKS_RAMP.match(s)
                     if mm:
@@ -38587,9 +38597,10 @@ def nks_main(logp, until=120, bdp=None):
         if on_src == "autotest":
             rep.add("NKS-11: wlaczenie (autotest albo uzbrojenie w zapisie)", f"autotest doba {on_day}", "autotest; w grze: uzbrojony -> potwierdzone (Confirm w grze odrzucany do bramki krainy)", True)
         elif on_auto:
-            ok11 = arm_day is not None and on_day is not None and on_day - arm_day >= 35
-            rep.add("NKS-11: wlaczenie (samo po pomiarze, ks-arm)", f"uzbrojony {arm_day}, wlaczone {on_day}" + (f" ({on_day - arm_day} dob)" if arm_day is not None and on_day is not None else ""),
-                    "samo uzbrojenie -> pomiar >= 28 + 7 dob -> wlaczenie", ok11)
+            need11, note11 = ka_need_days(arm_mfu)   # f4b-zapis: prog wedlug klucza Ks Arm Mature From Use (TAK 35, NIE - stara regula 33, log sprzed paczki 35)
+            ok11 = arm_day is not None and on_day is not None and on_day - arm_day >= need11
+            rep.add("NKS-11: wlaczenie (samo po pomiarze, ks-arm)", f"uzbrojony {arm_day}, wlaczone {on_day}" + (f" ({on_day - arm_day} dob)" if arm_day is not None and on_day is not None else "") + f"; {note11}",
+                    f"samo uzbrojenie -> pomiar >= {need11} dob -> wlaczenie", ok11)
         else:
             ok11 = arm_day is not None and conf_day is not None and conf_day > arm_day
             rep.add("NKS-11: wlaczenie (autotest albo uzbrojenie w zapisie)", f"uzbrojony {arm_day}, potwierdzone {conf_day}, wlaczone {on_day}", "uzbrojony -> potwierdzone (doba pozniej)", ok11)
@@ -39731,6 +39742,22 @@ def nuchodzcy_main(logp):
 
 # ------------------------------------------------------------ ks-arm (noc 17/18.10): samo uzbrojenie KS, twarde bramki, bramka krainy
 KA_START = "KS: samo uzbrojenie (ks-arm) start sesji"
+# f4b-zapis (fin86/fin87 ARM-3 "33 doby, prog 35"): projekt ks-arm = 28 dob ksiegi towarow, potem 7 dob dojrzalego Planu (linia uzbrojenia: "najwczesniej doba
+# uzbrojenia + 35"); kod liczyl 7 dob od doby DANYCH Planu (start na watku w dobie T z doba T-1, uzycie od T+1) - 33 doby. Klucz Ks Arm Mature From Use (TAK) liczy
+# od pierwszej doby uzycia - 35. Znacznik w linii startu ks-arm: "(Ks Arm Mature From Use) TAK" / "NIE"; bez znacznika = log sprzed poprawki (prog projektu 35).
+KA_MFU = re.compile(r"7 dob dojrzalego Planu \(Ks Arm Mature From Use\) (?P<k>TAK|NIE)")
+KA_NEED_DAYS = 35          # projekt ks-arm: 28 dob ksiegi + 7 dob uzycia dojrzalego Planu
+KA_NEED_DAYS_OLD = 33      # klucz Ks Arm Mature From Use NIE: stara regula (7 dob od doby danych Planu = 2 doby mniej)
+
+
+def ka_need_days(mfu):
+    """f4b-zapis: prog dob od samego uzbrojenia do samego wlaczenia wedlug klucza Ks Arm Mature From Use z linii startu ks-arm -> (prog, opis)."""
+    if mfu == "TAK":
+        return KA_NEED_DAYS, "klucz Ks Arm Mature From Use TAK: 28 dob ksiegi + 7 dob uzycia dojrzalego Planu"
+    if mfu == "NIE":
+        return KA_NEED_DAYS_OLD, "klucz Ks Arm Mature From Use NIE: stara regula - 7 dob od doby danych Planu (2 doby mniej niz projekt)"
+    return KA_NEED_DAYS, ("log sprzed f4b-zapis (bez znacznika klucza Ks Arm Mature From Use): kod liczyl 7 dob od doby danych Planu - wlaczenie 2 doby przed koncem "
+                          "pomiaru wedlug projektu; poprawka: klucz Ks Arm Mature From Use")
 KA_ARM = re.compile(r"KS: uzbrojony zapis doba (?P<day>-?\d+) \(samo")
 KA_WAIT = re.compile(r"KS: pomiar przed wlaczeniem dzien (?P<day>-?\d+)")
 KA_AUTO = re.compile(r"KS: samo wlaczenie doba (?P<day>-?\d+)")
@@ -39899,8 +39926,15 @@ def nksarm_rows(rep, D, pfx="ARM"):
     else:
         rep.add(f"{pfx}-2: samo uzbrojenie", f"doba {arm}" if arm is not None else "brak (droga nieczynna albo log sprzed paczki)", "INFO", None)
     if on is not None and D["on_auto"]:
-        ok3 = arm is not None and on - arm >= 35
-        rep.add(f"{pfx}-3: nic przed koncem pomiaru (wlaczenie samo >= 28 + 7 dob po uzbrojeniu)", f"uzbrojony {arm}, wlaczone {on}" + (f" ({on - arm} dob)" if arm is not None else ""), ">= 35 dob", ok3)
+        mfu = None   # f4b-zapis: znacznik klucza Ks Arm Mature From Use z linii startu ks-arm (ostatnia linia ze znacznikiem)
+        for s0_ in D["start"]:
+            mm_ = KA_MFU.search(s0_)
+            if mm_:
+                mfu = mm_.group("k")
+        need3, note3 = ka_need_days(mfu)
+        ok3 = arm is not None and on - arm >= need3
+        rep.add(f"{pfx}-3: nic przed koncem pomiaru (wlaczenie samo >= 28 + 7 dob po uzbrojeniu)", f"uzbrojony {arm}, wlaczone {on}" + (f" ({on - arm} dob)" if arm is not None else "") + f"; {note3}",
+                f">= {need3} dob", ok3)
     elif on is not None:
         rep.add(f"{pfx}-3: wlaczenie", f"doba {on} ({D['on_src']}, nie samo)", "INFO (autotest plikiem armoury-ks-wlacz.flag albo Confirm)", None)
     else:
@@ -40469,6 +40503,15 @@ ZAP_MORE = ("Kiesy rozbitych (3.2): dzien", "Wedrowcy BK - prawdziwy towar (36b)
 # recenzja zapis-d4: w zestawie 2 tylko linie DZIENNE (filtr zna jedna dobe na N) - ZAP-Q3 na logu pelnym: kazdy przedrostek z liniami w >= tylu dobach
 ZAP_MIN_DAILY = 0.8
 ZAP_MAX_WRITTEN_KB = 5120.0
+# f4b-zapis (fin87 ZAP-4 NIE: 7567 KB przy Save Compact [wyl]): 5120 KB to prog dla zapisu Z pakowaniem (oczekiwane ok. 3.9 MB). Bez pakowania (domyslnie - cofniecie
+# DLL ponizej WGRANIA z czytnikiem "_z" gubiloby obicia AI i komplety notabli) 5 MB jest nieosiagalne: 4.2 MB to dwa klucze, ktorych starsza DLL nie przeczyta
+# w innym zapisie niz dzis, a reszta kluczy nie ma historii ani martwych wpisow (przeglad f4b-zapis). Prog bez pakowania = straznik wzrostu: bieg 6-letni d720
+# 7.7 MB tekstu, fin87 d400 7567 KB -> 9216 KB (+20% nad d720). Waga w PLIKU (gra pakuje zapis deflate Fastest): fin83 7.37 MB tekstu = 1.73 MB pliku z 36.8 MB
+# (4.7%); prog 2560 KB (ok. 7% pliku 35-37 MB). Pomiar pliku: odcinek "w pliku (deflate Fastest jak gra)" linii "Zapis (D4)" (klucz Save Size Log File).
+ZAP_MAX_RAW_KB_NOPACK = 9216.0
+ZAP_MAX_FILE_KB = 2560.0
+ZAP_FILE_RATIO_EST = 4.2      # tekst / plik na naszych napisach (fin83: x4.22, proba .NET Framework) - szacunek dla logow bez odcinka pliku
+ZAP_MAX_FILE_MS = 250.0       # czas pomiaru pliku na zapis (fin83 na .NET Framework: 35 ms dla 7.3 MB)
 ZAP_MIN_RATIO = 3.0
 ZAP_MAX_PACK_MS = 500.0
 
@@ -40565,8 +40608,32 @@ def nzapis_main(logp):
         raw = g(r"tekst razem ([0-9.]+) KB", last, float)
         wr = g(r"do zapisu po spakowaniu ([0-9.]+) KB", last, float)
         nk, nm, npk = g(r"kluczy SaveText (\d+)", last), g(r"kawalkami (\d+)", last), g(r"spakowanych (\d+)", last)
-        rep.add("ZAP-4: nasze napisy do zapisu po spakowaniu (ostatni zapis)", f"{wr} KB (tekst przed spakowaniem {raw} KB; kluczy {nk}, kawalkami {nm}, spakowanych {npk})",
-                f"<= {ZAP_MAX_WRITTEN_KB:.0f} KB", (wr <= ZAP_MAX_WRITTEN_KB) if wr is not None else None)
+        # f4b-zapis: prog wedlug Save Compact w linii zapisu - [WL] 5120 KB po spakowaniu (projekt zapis-d4), [wyl] (domyslnie, bezpieczne cofniecie DLL) straznik wzrostu tekstu
+        pk_on = "Save Compact [WL]" in last
+        thr4 = ZAP_MAX_WRITTEN_KB if pk_on else ZAP_MAX_RAW_KB_NOPACK
+        rep.add("ZAP-4: nasze napisy do zapisu po spakowaniu (ostatni zapis)", f"{wr} KB (tekst przed spakowaniem {raw} KB; kluczy {nk}, kawalkami {nm}, spakowanych {npk}; "
+                f"Save Compact {'[WL]' if pk_on else '[wyl]'})",
+                f"<= {thr4:.0f} KB" + ("" if pk_on else f" przy Save Compact [wyl] (straznik wzrostu: d720 7.7 MB; z pakowaniem <= {ZAP_MAX_WRITTEN_KB:.0f} KB)"),
+                (wr <= thr4) if wr is not None else None)
+        # f4b-zapis ZAP-4b: nasze napisy W PLIKU zapisu (deflate Fastest jak gra) - odcinek linii przy kluczu Save Size Log File; bez odcinka - szacunek tekst / 4.2 (INFO)
+        fz = re.search(r"w pliku \(deflate Fastest jak gra\) ok\. ([0-9.]+) KB", last)
+        fpct = g(r"KB, x[0-9.]+\) = ([0-9.]+)% pliku", last, float)
+        fms_all = [g(r"w pliku \(deflate Fastest jak gra\)[^|]*?pomiar (\d+) ms", s_) for s_ in saves]
+        fms_all = [x for x in fms_all if x is not None]
+        if fz:
+            fkb = float(fz.group(1))
+            rep.add("ZAP-4b: nasze napisy w PLIKU zapisu (deflate Fastest jak gra, ostatni zapis)", f"{fkb:.1f} KB" + (f" = {fpct:.1f}% pliku" if fpct is not None else "")
+                    + (f" (tekst {wr} KB, x{wr / fkb:.2f})" if wr and fkb > 0 else ""), f"<= {ZAP_MAX_FILE_KB:.0f} KB (ok. 7% pliku 35-37 MB)", fkb <= ZAP_MAX_FILE_KB)
+            rep.add("ZAP-4c: czas pomiaru pliku (najwiecej w zapisie)", f"{max(fms_all) if fms_all else '-'} ms ({len(fms_all)} zapisow)", f"<= {ZAP_MAX_FILE_MS:.0f} ms",
+                    (max(fms_all) <= ZAP_MAX_FILE_MS) if fms_all else None)
+        elif "w pliku (deflate Fastest jak gra): BLAD" in last:
+            rep.add("ZAP-4b: nasze napisy w PLIKU zapisu", "BLAD pomiaru (zapis gry bez zmian)", "pomiar bez bledu", False)
+            rep.add("ZAP-4c: czas pomiaru pliku", "-", "INFO", None)
+        else:
+            est = (wr / ZAP_FILE_RATIO_EST) if wr is not None else None
+            rep.add("ZAP-4b: nasze napisy w PLIKU zapisu", "brak odcinka 'w pliku' (log sprzed f4b-zapis albo Save Size Log File wylaczony)"
+                    + (f"; szacunek tekst / {ZAP_FILE_RATIO_EST}: ok. {est:.0f} KB" if est is not None else ""), f"INFO (prog z odcinkiem: <= {ZAP_MAX_FILE_KB:.0f} KB)", None)
+            rep.add("ZAP-4c: czas pomiaru pliku", "brak odcinka", "INFO", None)
         pz = re.search(r"spakowane ([0-9.]+) KB -> ([0-9.]+) KB", last)
         if pz and float(pz.group(2)) > 0:
             ratio = float(pz.group(1)) / float(pz.group(2))
