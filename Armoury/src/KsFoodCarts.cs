@@ -168,6 +168,7 @@ namespace Armoury
             _dConsPcs = _dConsVal = _gSrcFr = _dSrcCap = _dOverdue = _dFamOrd = _dFamGot = _dNorthShip = _dNorthArr = 0; _dConsLots = _dFamReq = _dFamReqK = 0;
             Array.Clear(_dPoorByZ, 0, NZ); _dNorthBy.Clear();
             KsFoodCredit.ClearDay();
+            KsCostKsh.Clear();                                  // ks-koszt: pod-czasy KS-H od nowa (doba bez linii)
         }
 
         /// <summary>Recenzja runda 3 (drobne): czas tabeli dob (MapDistanceModel) od ostatniego odczytu (ms) i liczba wywolan - linia doby KS, NKS-9b; zeruje.</summary>
@@ -494,6 +495,7 @@ namespace Armoury
             if (_ranDay != today) { _ranDay = today; }
             if (_carts.Count == 0) return;
             EnsureTowns();
+            long tArr = Stopwatch.GetTimestamp(); KsCostKsh.ArrCarts += _carts.Count;   // ks-koszt: pod-czas przyjazdow (linia kosztu KS-H)
             var done = new List<Cart>();
             foreach (var c in _carts)
             {
@@ -582,6 +584,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("Arrivals", e); }
             }
             foreach (var c in done) _carts.Remove(c);
+            KsCostKsh.Arr += Stopwatch.GetTimestamp() - tArr;
         }
 
         /// <summary>Powrot wozu: towar na polke zrodla, zwrot zaplaty z kasy zrodla do kasy celu (najwyzej kasa zrodla), frachtu nie.
@@ -658,13 +661,25 @@ namespace Armoury
                 var types = new HashSet<ItemObject.ItemTypeEnum>();
                 for (int k = 0; k < NZ; k++) if (items[k] != null) types.Add(items[k].ItemType);
                 var has = new bool[NZ]; for (int k = 0; k < NZ; k++) has[k] = items[k] != null;
+                // ks-koszt (klucz Ks Cost Fast): ten sam filtr typu tablica bool, kopia wiersza tylko dla przedmiotow typow KS-H (bit w bit)
+                bool[] tmask = null;
+                if (StartCalibration.SwCostFast) { int mx = 0; foreach (var ty in types) if ((int)ty > mx) mx = (int)ty; tmask = new bool[mx + 1]; foreach (var ty in types) if ((int)ty >= 0) tmask[(int)ty] = true; }
                 for (int i = 0; i < nt; i++)
                 {
                     var t = _t[i]; var st = _st[i];
                     a.Siege[i] = st.IsUnderSiege || StartCalibration.LandBackOf(st);   // ks-arm: miasto krainy wroconej (bramka krainy) - ani zrodlo, ani cel KS-H
                     a.Review[i] = (Fnv(st.StringId) & 1u) == (uint)(today & 1);
                     var ro = st.ItemRoster;
-                    if (ro != null)
+                    if (ro != null && tmask != null)
+                        for (int r = 0; r < ro.Count; r++)
+                        {
+                            var eit = ro.GetItemAtIndex(r);
+                            if (eit == null) continue;
+                            int ty = (int)eit.ItemType; if (ty < 0 || ty >= tmask.Length || !tmask[ty]) continue;
+                            var el = ro.GetElementCopyAtIndex(r); int k;
+                            if (el.Amount > 0 && el.EquipmentElement.ItemModifier == null && ixOf.TryGetValue(eit, out k)) a.Sh[i * NZ + k] += el.Amount;
+                        }
+                    else if (ro != null)
                         for (int r = 0; r < ro.Count; r++)
                         {
                             var el = ro.GetElementCopyAtIndex(r); int k;
@@ -707,6 +722,13 @@ namespace Armoury
                 bool pow = LotPowKey;
                 a.LotPrice = (s, k, n) => LotPrice(_t[s], items[k], n, false, pow);
                 a.DestUnit = (t, k) => DestUnit(_t[t], k, items[k]);
+                bool kt = KsCostKsh.On;                                   // ks-koszt: probka 1/8 czasu wywolan do linii kosztu KS-H (te same wyniki)
+                if (kt)
+                {
+                    var lp0 = a.LotPrice; var ix0 = a.IxAt;
+                    a.LotPrice = (s, k, n) => { if (!KsCostKsh.SampleNow(ref KsCostKsh.LotN)) return lp0(s, k, n); long q0 = Stopwatch.GetTimestamp(); long v = lp0(s, k, n); KsCostKsh.LotT += 8 * (Stopwatch.GetTimestamp() - q0); return v; };
+                    if (ix0 != null) a.IxAt = (t, k) => { if (!KsCostKsh.SampleNow(ref KsCostKsh.IxN)) return ix0(t, k); long q0 = Stopwatch.GetTimestamp(); double v = ix0(t, k); KsCostKsh.IxT += 8 * (Stopwatch.GetTimestamp() - q0); return v; };
+                }
                 // KS-R4 r4-kupcy: H2, H3, kolejka wedlug potrzeby, glod pierwszy, H4 jedna cena celu, H5 kredyt kupcow (miejsce kredytu zrodla, cele z zaleglym)
                 var s0 = Settings.Current;
                 a.FarAlways = s0 == null || s0.KsFarAlways;
@@ -722,6 +744,7 @@ namespace Armoury
                 {
                     var dv = new double[nt * NZ * 4]; var dvOk = new sbyte[nt * NZ];
                     a.DestValue = (t, k, j0, n) => DestValueDay(t, k, items[k], j0, n, dv, dvOk);
+                    if (kt) { var dv0 = a.DestValue; a.DestValue = (t, k, j0, n) => { if (!KsCostKsh.SampleNow(ref KsCostKsh.DvN)) return dv0(t, k, j0, n); long q0 = Stopwatch.GetTimestamp(); long v = dv0(t, k, j0, n); KsCostKsh.DvT += 8 * (Stopwatch.GetTimestamp() - q0); return v; }; }
                 }
                 _consignNow = ConsignKey;
                 a.Consign = _consignNow;
@@ -746,8 +769,11 @@ namespace Armoury
                 a.SampleAt = (s, t, k) => (Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u;
                 a.Sample = (s, k, n) => { long s0 = Stopwatch.GetTimestamp(); Sample(_t[s], items[k], Math.Min(n, SampleCap), pow); _dSampleTicks += Stopwatch.GetTimestamp() - s0; };
                 a.Ship = (s, t, k, n, cost, fr, sea, L) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
+                if (kt) { var sh0 = a.Ship; a.Ship = (s, t, k, n, cost, fr, sea, L) => { if (!KsCostKsh.SampleNow(ref KsCostKsh.ShipN)) return sh0(s, t, k, n, cost, fr, sea, L); long q0 = Stopwatch.GetTimestamp(); int v = sh0(s, t, k, n, cost, fr, sea, L); KsCostKsh.ShipT += 8 * (Stopwatch.GetTimestamp() - q0); return v; }; }
                 var stt = new KsFoodCore.Stats();
+                long tDec = Stopwatch.GetTimestamp(); KsCostKsh.Setup += tDec - t0;   // ks-koszt: wstep doby (spis polek, popyt, kasy, kredyt)
                 KsFoodCore.Decide(a, stt);
+                KsCostKsh.Decide += Stopwatch.GetTimestamp() - tDec;
                 _dOrdered += stt.Ordered; _dPoor += stt.Poor; _dNoProfit += stt.NoProfit; _dFar += stt.Far; _dRes += stt.ResLots; _dResGold += stt.ResGold;
                 _dCofShort.AddRange(stt.CofShort);
                 _dSrcCap += stt.SrcCap; _dOverdue += stt.Overdue; _dFamReq += stt.FamineReq; _dFamReqK += stt.FamineReqK; _dFamOrd += stt.FamineOrd; _dFamGot += stt.FamineGot;
@@ -756,7 +782,9 @@ namespace Armoury
             catch (Exception e) { Stumble("Daily", e); }
             finally
             {
+                long tPay = Stopwatch.GetTimestamp();
                 try { PayCarters(pendFreight); } catch (Exception e) { Stumble("PayCarters", e); }
+                KsCostKsh.Pay += Stopwatch.GetTimestamp() - tPay;
                 _dTicks += Stopwatch.GetTimestamp() - t0 - (_dSampleTicks - sample0);   // probka wyceny poza czasem doby (osobny czas w linii)
             }
         }
@@ -1090,6 +1118,7 @@ namespace Armoury
                     }
                 }
                 Log.Info(sb.ToString());
+                if (active) { try { Log.Info(KsCostKsh.Line(Today() - 1, _dTicks * 1000.0 / Stopwatch.Frequency)); } catch { } }   // ks-koszt: pod-czasy KS-H (tylko log)
             }
             catch (Exception e) { Log.Error("KsFoodCarts.Flush", e); }
             _prevTransit = now;

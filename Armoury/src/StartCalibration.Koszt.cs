@@ -306,6 +306,39 @@ namespace Armoury
         }
     }
 
+    /// <summary>
+    /// ks-koszt (T0 dla KS-H): pod-czasy kupcow zywnosci KS-H (KsFoodCarts) - przyjazdy, wstep doby (spis polek, popyt, kasy), decyzje KsFoodCore (w nich - probka 1/8
+    /// wywolan: cena lotu, wartosc u celu, indeks ceny, wysylka), fracht wsi. Linia "Kupcy zywnosci (KS-H) koszt dzien N" po linii doby KS-H (tylko log; tylko przy liniach).
+    /// </summary>
+    internal static class KsCostKsh
+    {
+        internal static long Arr, Setup, Decide, Pay;              // tiki Stopwatch od ostatniej linii
+        internal static long LotT, DvT, IxT, ShipT;               // tiki probek (x 8)
+        internal static int LotN, DvN, IxN, ShipN, ArrCarts;      // wywolania
+        internal static bool On { get { return LogGate.Lines; } }
+
+        /// <summary>Czas wywolania z probka co 8. (tiki x 8); n - licznik wywolan.</summary>
+        internal static bool SampleNow(ref int n) { return (++n & 7) == 0; }
+
+        internal static string Line(int day, double dayMs)
+        {
+            double f = 1000.0 / Stopwatch.Frequency;
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            double dec = Decide * f, inner = (LotT + DvT + IxT + ShipT) * f;
+            var sb = new StringBuilder(500);
+            sb.Append("Kupcy zywnosci (KS-H) koszt dzien ").Append(day).Append(" | czas doby ").Append(dayMs.ToString("0.00", inv)).Append(" ms (NKS-28)")
+              .Append(" | pod-czasy ms: wstep ").Append((Setup * f).ToString("0.00", inv)).Append(", decyzje ").Append(dec.ToString("0.00", inv))
+              .Append(" (probka 1/8: ceny_lotow ").Append((LotT * f).ToString("0.00", inv)).Append(" w ").Append(LotN).Append(", wartosc_u_celu ").Append((DvT * f).ToString("0.00", inv)).Append(" w ").Append(DvN)
+              .Append(", indeks_ceny ").Append((IxT * f).ToString("0.00", inv)).Append(" w ").Append(IxN).Append(", wysylka ").Append((ShipT * f).ToString("0.00", inv)).Append(" w ").Append(ShipN)
+              .Append(", reszta_decyzji ").Append(Math.Max(0.0, dec - inner).ToString("0.00", inv)).Append("), fracht_wsi ").Append((Pay * f).ToString("0.00", inv))
+              .Append(" | poza czasem doby: przyjazdy ").Append((Arr * f).ToString("0.00", inv)).Append(" ms (wozow ").Append(ArrCarts).Append(").");
+            Clear();
+            return sb.ToString();
+        }
+
+        internal static void Clear() { Arr = Setup = Decide = Pay = LotT = DvT = IxT = ShipT = 0; LotN = DvN = IxN = ShipN = ArrCarts = 0; }
+    }
+
     internal sealed partial class KsResult
     {
         // ks-koszt T1: sumy "na targ" odbioru Planu policzone na watku roboczym (null - odbior liczy je na watku glownym, jak dotad)
