@@ -1446,7 +1446,8 @@ Uzycie (Python 3, tylko odczyt):
                     NF4-7c koszt okna <= 35 ms i potkniecia 0, NF4-8 surowiec z polek (ruda, drewno): "bez wyjasnienia" okna (zapas swiata - (produkcja - zuzycie)
                     ksiegi towarow) = 0 w kazdym oknie (ksiega domyka sie co dobe; recenzja: dawna "kontrola" linii jest 0 z definicji - zapas = suma posiadaczy - wiec
                     teraz tylko NF4-8c INFO: arytmetyka linii, inna niz 0 tylko przy rozjezdzie tablicy posiadaczy), NF4-8b odplyw z polek i kto zdejmuje (INFO),
-                    NF4-8d (f14-ksiega) autorzy zmian drewna i rudy poza ramkami (linia A17 D5) w dobach z "bez wyjasnienia" ksiegi dziennej (INFO),
+                    NF4-8d (f14-ksiega) autorzy zmian drewna i rudy poza ramkami (linia A17 D5), netto D5 i roznice posiadaczy ksiegi wobec doby
+                    poprzedniej w dobach z "bez wyjasnienia" ksiegi dziennej (INFO),
                     NF4-9 drewno w wozach: przebieg po taborach = posiadacz "wozy" ksiegi towarow (w 1%), NF4-9b/9c dokad, ile dob, miasta bez opalu i przyczyna, przerwy
                     ksiegi towarow (INFO), NF4-10 diagnoza A7 <= 200 ms i potkniecia 0, NF4-10b drewno w wozach <= 5 ms/d i potkniecia 0, NF4-11 "ERROR in
                     StartCalibration.F4 / F4Pomiary. / MoneyLedger.F4 / VillageCrafts.F4" 0. NF4-5c pokazuje tez wpisy soli i daktyli bez celu z braku mapy koszyka ZC4
@@ -44685,6 +44686,10 @@ NF4_SUR = "Surowiec z polek (f4-pomiary): dzien"
 NF4_WOOD = "Drewno w wozach wsi (f4-pomiary): dzien"
 NF4_D5 = "Surowiec poza ramkami - autorzy (A17 D5, f14-ksiega): dzien"   # f14-ksiega: drewno i ruda poza ramkami wedlug autora (A17Diag D5)
 NF4_DAYU = re.compile(r"^Towary: dzien (-?\d+) - (hardwood|iron) \(.*?\| bez wyjasnienia ([+-]?\d+) \|")
+# f14-ksiega (recenzja): posiadacze ksiegi dziennej drewna/rudy - roznice doby wycieku wobec doby poprzedniej (wozy surowcow i wozy sa poza podsluchem D5 albo maja wlasne linie)
+NF4_DAYH = re.compile(r"^Towary: dzien (-?\d+) - (hardwood|iron) \(.*\| posiadacze \[([^\]]*)\]")
+NF4_D5NET = re.compile(r"razem netto na rosterach z mapy \(autorzy \+ pojedyncze\): drewno ([+-]?\d+), ruda ([+-]?\d+)")
+NF4_D5TMP = re.compile(r"rostery spoza mapy \([^)]*\): drewno ([+-]?\d+), ruda ([+-]?\d+)")
 NF4_ZW = "nacisk ZW (f4-pomiary"
 NF4_FROZEN = "zajecia zamrozone - regula A7 wylaczona"
 NF4_ERR = ("ERROR in StartCalibration.F4", "ERROR in F4Pomiary.", "ERROR in MoneyLedger.F4", "ERROR in VillageCrafts.F4")   # recenzja: F4ZwNote pisze przez VillageCrafts.Stumble
@@ -44742,6 +44747,7 @@ def nf4_main(logp):
         return 0
     a7, a7bad, reg, car, sur, wood, zw = [], 0, [], [], [], [], []
     d5, dayu = {}, []    # f14-ksiega: linie D5 (dzien -> tekst) i doby ksiegi z "bez wyjasnienia" drewna/rudy != 0 (dzien, towar, liczba)
+    hold5 = {}           # f14-ksiega (recenzja): (dzien, towar) -> {posiadacz: zapas} z linii "Towary:" drewna/rudy
     prod = {}            # dzien linii produkcji KS -> (przegladow ponad progiem, klucz, regale w gore, w dol, czy dopisek zamrozone)
     errs = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -44770,6 +44776,14 @@ def nf4_main(logp):
                 mu = NF4_DAYU.match(s)
                 if mu and int(mu.group(3)) != 0:
                     dayu.append((int(mu.group(1)), mu.group(2), int(mu.group(3))))
+                mh5 = NF4_DAYH.match(s)
+                if mh5:
+                    hv5 = {}
+                    for e5 in mh5.group(3).split(", "):
+                        k5, _, v5 = e5.rpartition(" ")
+                        if k5 and v5.lstrip("-").isdigit():
+                            hv5[k5] = int(v5)
+                    hold5[(int(mh5.group(1)), mh5.group(2))] = hv5
             elif s.startswith("KS: produkcja (zastosowane) dzien"):
                 dd = num(r"dzien (-?\d+)", s)
                 ma = NKS_A7.search(s)
@@ -44939,19 +44953,35 @@ def nf4_main(logp):
                     "INFO (kto zdejmuje z polek poza ksiega KS)", None)
     else:
         rep.add("NF4-8: surowiec z polek", "brak linii", "INFO (ksiega towarow wylaczona, okno 7 dob albo klucz Measure Iron Wood Flow wylaczony)", None)
-    # NF4-8d (f14-ksiega): autorzy zmian drewna i rudy poza ramkami (A17 D5) w dobach, w ktorych ksiega dzienna ma "bez wyjasnienia" drewna albo rudy
-    if d5:
-        if dayu:
-            parts = []
-            for (dd5, it5, u5) in dayu[:3]:
-                t5 = d5.get(dd5)
-                seg = re.search(r"\(tylko netto != 0, najwyzej \d+\): ([^|]*)\|", t5) if t5 else None
-                uni = re.search(r"\| pojedyncze sztuki wedlug posiadacza \([^)]*\): ([^|]*)\|", t5) if t5 else None
-                parts.append(f"d{dd5} {it5} {u5:+d}: autorzy {(seg.group(1).strip() if seg else 'brak linii D5 tej doby')[:260]}; pojedyncze {(uni.group(1).strip() if uni else '-')[:120]}")
-            rep.add("NF4-8d: drewno i ruda poza ramkami - autorzy (A17 D5) w dobach z bez wyjasnienia", f"linii D5 {len(d5)}, dob z bez wyjasnienia drewna/rudy {len(dayu)}: " + " || ".join(parts),
-                    "INFO (kto zdejmuje albo doklada poza ramkami w tej dobie - szukanie przyczyny NF4-8)", None)
-        else:
-            rep.add("NF4-8d: drewno i ruda poza ramkami - autorzy (A17 D5)", f"linii D5 {len(d5)}, dob z bez wyjasnienia drewna/rudy 0", "INFO", None)
+    # NF4-8d (f14-ksiega): autorzy zmian drewna i rudy poza ramkami (A17 D5) w dobach, w ktorych ksiega dzienna ma "bez wyjasnienia" drewna albo rudy.
+    # Recenzja f14-ksiega: takze netto D5 tej doby (rostery z mapy i spoza mapy) i roznice posiadaczy ksiegi wobec doby poprzedniej - przy netto D5 = 0 sprawca siedzi
+    # poza podsluchem AddToCounts (wozy surowcow MaterialCarts, roster zmieniony bez AddToCounts, rozjazd spisu posiadaczy) - porownac z liniami przeplywu tych posiadaczy.
+    if dayu:
+        parts = []
+        for (dd5, it5, u5) in dayu[:3]:
+            t5 = d5.get(dd5)
+            k5 = 1 if it5 == "iron" else 0
+            if t5:
+                seg = re.search(r"\(tylko netto != 0, najwyzej \d+\): ([^|]*)\|", t5)
+                uni = re.search(r"\| pojedyncze sztuki wedlug posiadacza \([^)]*\): ([^|]*)\|", t5)
+                mn5, mt5 = NF4_D5NET.search(t5), NF4_D5TMP.search(t5)
+                d5txt = (f"autorzy {(seg.group(1).strip() if seg else '-')[:260]}; pojedyncze {(uni.group(1).strip() if uni else '-')[:120]}; "
+                         f"netto D5 {mn5.group(1 + k5) if mn5 else '?'} (spoza mapy {mt5.group(1 + k5) if mt5 else '?'})")
+            else:
+                d5txt = "brak linii D5 tej doby"
+            h1, h0 = hold5.get((dd5, it5)), hold5.get((dd5 - 1, it5))
+            if h1 is not None and h0 is not None:
+                hd5 = [(k, h1.get(k, 0) - h0.get(k, 0)) for k in list(h0) + [k for k in h1 if k not in h0]]
+                htxt = ", ".join(f"{k} {v:+d}" for k, v in hd5 if v != 0) or "bez zmian"
+            else:
+                htxt = "brak linii doby poprzedniej"
+            parts.append(f"d{dd5} {it5} {u5:+d}: {d5txt}; posiadacze wobec d{dd5 - 1}: {htxt}")
+        rep.add("NF4-8d: drewno i ruda poza ramkami - autorzy (A17 D5) i posiadacze w dobach z bez wyjasnienia",
+                f"linii D5 {len(d5)}, dob z bez wyjasnienia drewna/rudy {len(dayu)}: " + " || ".join(parts),
+                "INFO (kto zdejmuje albo doklada poza ramkami w tej dobie - szukanie przyczyny NF4-8; netto D5 = 0 - sprawca poza podsluchem, patrz posiadacze)"
+                + ("" if d5 else "; linii D5 brak - log sprzed f14-ksiega albo klucze A17DiagnosticLines / A17AuthorLines wylaczone"), None)
+    elif d5:
+        rep.add("NF4-8d: drewno i ruda poza ramkami - autorzy (A17 D5)", f"linii D5 {len(d5)}, dob z bez wyjasnienia drewna/rudy 0", "INFO", None)
     else:
         rep.add("NF4-8d: drewno i ruda poza ramkami - autorzy (A17 D5)", "brak linii", "INFO (log sprzed f14-ksiega albo klucze A17DiagnosticLines / A17AuthorLines wylaczone)", None)
     # NF4-9: drewno w wozach - przebieg po taborach = posiadacz "wozy" ksiegi; przyczyny braku opalu
