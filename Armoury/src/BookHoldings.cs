@@ -1,0 +1,914 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
+
+namespace Armoury
+{
+    /// <summary>
+    /// f19-kanon-b (noc 18.10) - JEDNORAZOWE PRZYWROCENIE WLOSCI Z KSIAZKI w trwajacym zapisie (Ironman Jeffa, dzien ~109056). Jeff 18.10: "czy mozesz w savie
+    /// przywrocic kazdej ze stron posiadlosci jakie powinni miec, czyli oddac wlosci tak jak to wygladalo w ksiazce"; "naprawa tych wydarzen i cofniecie polnocy".
+    /// Decyzja prowadzacego (analiza-kanon.json, tabela czesci 4): 8 twierdz - King's Landing (+ Red Keep - blizniak ROT) do Joffreya, Sharp Point / Stonedance /
+    /// Sweetport / Cape Wrath / Fellwood do lennikow Stannisa, Starfall do Daynow; Harrenhal zostaje u Boltona; Essos nietkniete. Do tego zwrot 1 125 434 zl, ktore
+    /// Polnoc wziela ze skarbca Korony przy zdobyciu Przystani (L5b-1, Armoury-2026-10-18_13-50-06.log l.1636, dzien 109046) - przelew zamkniety, tyle, ile jest.
+    ///
+    /// KIEDY: klucz BookHoldingsRestore (domyslnie TAK), raz na zapis - flaga w zapisie "arm_book_holdings" (BookHoldingsBehavior). Nowa kampania (OnNewGameCreated)
+    /// dostaje flage "new" od razu: startuje z wlosci ROT, wiec nie ma czego przywracac (zdobycze w niej sa juz gra, nie bledem). Brak klucza w zapisie = zapis sprzed
+    /// paczki - przywrocenie czeka na pierwsza godzine gry, w ktorej kampania jest gotowa, a partia gracza stoi na mapie: nie w osadzie, nie w menu, nie w spotkaniu,
+    /// nie w bitwie ani oblezeniu, nie w rozmowie, nie w armii, nie w niewoli, stan gry = mapa (PartyDiplomaticHandlerCampaignBehavior.CheckSettlementSuitabilityForParties
+    /// wola GameMenu.SwitchToMenu, gdy gracz siedzi w osadzie albo w armii w niej - pulapka CTD z CLAUDE.md 7; spotkanie przy wsi napadanej - ActivateGameMenu).
+    /// Inaczej czeka do kolejnej godziny (linia "czeka" raz na dobe). Nigdy GameMenu.SwitchToMenu.
+    ///
+    /// JAK (dla kazdej osady z tabeli, kazda we wlasnym try - potkniecia liczone, 3 wyjatki na tej samej osadzie = pominieta, bez globalnego wylacznika):
+    ///  (b) warunki: osada istnieje; rod docelowy zywy, nie wyeliminowany, glowa zywa i wolna, rod w oczekiwanym krolestwie; obecny pan inny niz docelowy, ma glowe
+    ///      rodu (ROT/Diplomacy/NavalDLC/ClanVariables czytaja oldOwner.Clan bez sprawdzenia) i nie jest graczem; brak oblezenia, bitwy w osadzie, w zalodze,
+    ///      w jej wsiach i w promieniu 5 jedn. od bramy. Warunki trwale (rod, krolestwo, gracz) - osada pominieta na stale; chwilowe - ponowna proba co godzine,
+    ///      po 30 dobach czekania - pominieta ("czekanie").
+    ///  (c) przed zmiana pana, dla osady i jej blizniaka ROT: bohaterowie bez druzyny, ktorych gra wzielaby do niewoli (PrisonerCaptureCampaignBehavior.HandleSettlementHeroes
+    ///      - ten sam warunek SettlementHeroCaptureCommonCondition, liczony wobec frakcji NOWEGO pana: nie gracz, nie wedrowiec, nie notabl, nie jeniec, zywy, frakcja
+    ///      w wojnie z nowym panem) - TeleportHeroAction.ApplyImmediateTeleportToSettlement do najblizszej twierdzy wlasnej frakcji (nieoblezonej, spoza zmiany),
+    ///      bez niej - najblizszej nie wrogiej; zarzadca najpierw zdjety (ChangeGovernorAction.RemoveGovernorOf). Zlapany Robb w lochu Joffreya psulby Krwawe Gody.
+    ///      Zaloga starego pana (szeregowi, ranni razem z nimi) - do najblizszych partii lordow i zalog krolestwa starego pana do ich wolnego miejsca (limit gry),
+    ///      reszta do druzyny glowy starego rodu, bez niej do najblizszego odbiorcy ponad limit (model dezercji zdejmie nadmiar, OverflowHome W4c odesle go do wsi - jak kazde przepelnienie);
+    ///      zadnego odbiorcy - osada czeka. Ludzie prawdziwi: nic nie powstaje, nic nie znika; ksiega ludzi (PeopleBook.Take/Give, "zaloga->partia") i sprzet
+    ///      ze zbrojowni zalogi (GarrisonArmory.KitsWithMen - ta sama regula co nowa druzyna z zalogi) ida z ludzmi. Gracz i jego partie nigdy nie sa odbiorca.
+    ///      Zwykli jency w lochu - zostaja przy osadzie (jency osady; ChangeOwnerOfSettlementAction ich nie rusza), linia podaje ich liczbe; bohaterow strony nowego
+    ///      pana wypuszcza sama gra (PrisonerReleaseCampaignBehavior.OnSettlementOwnerChanged).
+    ///  (d) ChangeOwnerOfSettlementAction.ApplyByDefault(glowa rodu docelowego, osada) - NIE BySiege (niszczy zaloge, kary relacji i wplywu, ekspansjonizm Diplomacy,
+    ///      nasze L5b-1 / KingdomBalance / WarLedger / Rumours / SmallGold / CitySack), NIE ByGift / ByBarter (BKTitleBehavior przenosi wtedy tytuly). Default: bez
+    ///      glosowania o lenno (openToClaim false), decyzje o tej osadzie gra usuwa sama, kolejka budow czyszczona, zarzadca zdjety. King's Landing tylko jako
+    ///      miasto - Red Keep przenosi ROT (ROTOthersCampaignBehavior.OnSettlementOwnerChanged, ApplyByDefault(newOwner, RedKeep), gdy frakcje sie roznia); potem
+    ///      sprawdzamy pana Red Keep i dopiero wtedy ewentualnie zmieniamy go sami.
+    ///      Strategic Campaign AI (StrategicAiState.MarkLostClaim) zapisuje kazda utracona twierdze jako "roszczenie" krolestwa starego pana (cel wojny ReclaimLostFief,
+    ///      x1.65 i x1.65 do celu oblezenia) - nasza korekta kroniki to nie strata w wojnie: wpis roszczenia krolestwa starego pana wraca do stanu sprzed zmiany
+    ///      (refleksja na StrategicAiState.LostSettlementClaimByFaction; brak typu - linia, bez skutku).
+    ///  (e) po oddaniu King's Landing (wiersz z promieniem): partie lordow krolestwa starego pana w promieniu 60 jedn. od bramy (armia z wodzem w promieniu - cala,
+    ///      takze partie idace do niej; samodzielne partie rodu gracza - nie) - do najblizszej wlasnej twierdzy poza promieniem (Position = brama, SetMoveGoToSettlement - wzor Mends/Harrenhal z CrashScribe); partie na morzu pomijane. Warunek liczony
+    ///      PRZED zmiana: zadna z nich nie jest w bitwie ani oblezeniu, inaczej King's Landing czeka (jednorazowa korekta fabuly, zeby miasto nie padlo znow za godzine).
+    ///  (f) zwrot skarbca (wiersz King's Landing, tylko gdy pan zmienil sie wlasnie teraz ze stolicy krolestwa "battania"): min(1 125 434, skarbiec Polnocy) ze skarbca
+    ///      Polnocy do skarbca krolestwa nowego pana; zdjete = dopisane (kontrola w linii); migawka korony 165 przesunieta u obu stron (CrownIncome.ShiftSnapshot - jak
+    ///      L5b-1: to nie "wplyw dnia" ani "ujemny wplyw"). Raz na zapis (stan w zapisie).
+    ///  (g) pusta zaloga nowego pana - zadnych ludzi z niczego: zostaje werbunkowi korony i naszym regulom zalog (linia podaje zaloge po zmianie).
+    ///  (h) wiadomosc dla gracza po angielsku raz na partie zmian (zwykle jedna: wszystko w pierwszej godzinie).
+    ///  (i) linia na osade + linia konca; Essos nietkniete (nie ma go w tabeli); idempotentne - flaga w zapisie, osada juz u rodu docelowego = "bez zmian".
+    /// </summary>
+    internal static class BookHoldings
+    {
+        private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+        private const string Prefix = "Wlosci z kronik (f19-kanon-b): ";
+        private const string Ver = "bh1";
+        private const int GiveUpDays = 30;          // tyle dob czekania na warunki chwilowe - potem osada pominieta ("czekanie")
+        private const int MaxRowErrors = 3;         // wyjatki na jednej osadzie - potem pominieta ("blad"); nic nie gasnie globalnie
+        private const float BattleNear = 5f;        // bitwa w tym promieniu od bramy = osada czeka
+
+        /// <summary>Wiersz tabeli: osada -> rod docelowy (i krolestwo, w ktorym rod ma byc), blizniak ROT, promien korekty fabuly, zwrot skarbca.</summary>
+        private sealed class Row
+        {
+            internal readonly string Id, Clan, Kingdom, Twin, RefundFrom;
+            internal readonly float ClearRadius;
+            internal readonly long Refund;
+            internal Row(string id, string clan, string kingdom, string twin = null, float clearRadius = 0f, string refundFrom = null, long refund = 0)
+            { Id = id; Clan = clan; Kingdom = kingdom; Twin = twin; ClearRadius = clearRadius; RefundFrom = refundFrom; Refund = refund; }
+        }
+
+        // tabela z analizy (wlasciciele startu ROT: ROT-Map/ModuleData/settlements.xml; rody: ROT-Content/ModuleData/spclans.xml; id osad: ROT.Misc.ROTSettlements)
+        private static readonly Row[] Rows =
+        {
+            new Row("town_EW4", "clan_nord_1", "vlandia", "ROT_castle61", 60f, "battania", 1125434),   // King's Landing (+ Red Keep) -> Baratheon, Joffrey; zwrot L5b-1
+            new Row("ROT_town31", "ROTclan_15", "dragonstone"),            // Sharp Point -> bar Emmon
+            new Row("castle_EW5", "ROTclan_53", "dragonstone"),            // Stonedance -> Massey (RenlyDeathEvent 112-145: Buckler odszedlby z nim do Korony)
+            new Row("castle_EW8", "ROTclan_138", "dragonstone"),           // Sweetport -> Sunglass
+            new Row("ROT_castle18", "clan_empire_west_9", "dragonstone"),  // Cape Wrath -> Seaworth
+            new Row("ROT_castle17", "ROTclan_17", "dragonstone"),          // Fellwood -> Fell
+            new Row("ROT_town9", "clan_sturgia_4", "aserai"),              // Starfall -> Dayne
+        };
+
+        // ------------------------------------------------------------ stan w zapisie
+        private static string _state = "";          // "" - czeka (zapis sprzed paczki), "done" - zrobione, "new" - kampania zaczeta z paczka
+        private static readonly Dictionary<string, string> _res = new Dictionary<string, string>(StringComparer.Ordinal);   // osada -> wynik koncowy
+        private static string _refund = "";          // "" - nie bylo, "done:kwota", "none:powod"
+        private static int _firstDay = -1;           // doba pierwszej proby (licznik czekania)
+        private static int _doneDay = -1;
+
+        // ------------------------------------------------------------ sesja (tylko pamiec)
+        private static int _stumbles;
+        private static readonly Dictionary<string, int> _rowErr = new Dictionary<string, int>(StringComparer.Ordinal);
+        private static readonly HashSet<string> _errSites = new HashSet<string>(StringComparer.Ordinal);
+        private static int _waitLogDay = -1;
+        private static string _waitLogText;
+        private static readonly List<string> _batchDone = new List<string>();      // osady zmienione w tej godzinie (wiadomosc)
+        private static readonly List<string> _batchMoved = new List<string>();     // korekta fabuly w tej godzinie (wiadomosc)
+        private static long _batchRefund;
+        private static string _batchRefundText;
+
+        internal static bool On { get { var s = Settings.Current; return s != null && s.BookHoldingsRestore; } }
+
+        internal static void Reset()
+        {
+            _state = ""; _res.Clear(); _refund = ""; _firstDay = -1; _doneDay = -1;
+            _stumbles = 0; _rowErr.Clear(); _errSites.Clear(); _waitLogDay = -1; _waitLogText = null;
+            _batchDone.Clear(); _batchMoved.Clear(); _batchRefund = 0; _batchRefundText = null;
+        }
+
+        private static void Stumble(string where, Exception e)
+        {
+            _stumbles++;
+            try { if (_errSites.Add(where)) Log.Error("BookHoldings." + where, e); } catch { }
+        }
+
+        private static string Nm(Settlement s) { try { return s != null && s.Name != null ? s.Name.ToString() : "-"; } catch { return "?"; } }
+        private static string Nm(IFaction f) { try { return f != null && f.Name != null ? f.Name.ToString() : "-"; } catch { return "?"; } }
+        private static string Nm(Hero h) { try { return h != null && h.Name != null ? h.Name.ToString() : "-"; } catch { return "?"; } }
+        private static string Nm(MobileParty mp)
+        {
+            try { return mp == null ? "-" : (mp.LeaderHero != null ? mp.LeaderHero.Name.ToString() : (mp.Name != null ? mp.Name.ToString() : mp.StringId)); }
+            catch { return "?"; }
+        }
+
+        // ------------------------------------------------------------ zapis
+        internal static string Export()
+        {
+            var sb = new StringBuilder(256);
+            sb.Append(Ver).Append('|').Append(_state).Append('|');
+            bool first = true;
+            foreach (var kv in _res) { if (!first) sb.Append(';'); first = false; sb.Append(kv.Key).Append('=').Append(kv.Value); }
+            sb.Append('|').Append(_refund).Append('|').Append(_firstDay.ToString(Inv)).Append('|').Append(_doneDay.ToString(Inv));
+            return sb.ToString();
+        }
+
+        /// <summary>Brak klucza (zapis sprzed paczki) = czeka. Napis nieczytelny = "done" (ostroznie: klucz byl, wiec przywrocenie najpewniej juz bieglo).</summary>
+        internal static void Import(string v)
+        {
+            Reset();
+            if (string.IsNullOrEmpty(v)) return;
+            try
+            {
+                var p = v.Split('|');
+                if (p.Length < 6 || p[0] != Ver) { _state = "done"; Log.Info(Prefix + "zapis w nieznanym formacie (\"" + (v.Length > 80 ? v.Substring(0, 80) : v) + "\") - uznane za zrobione, nic nie zmieniam."); return; }
+                _state = p[1] == "done" || p[1] == "new" ? p[1] : "";
+                if (p[2].Length > 0)
+                    foreach (var e in p[2].Split(';'))
+                    {
+                        int i = e.IndexOf('=');
+                        if (i > 0) _res[e.Substring(0, i)] = e.Substring(i + 1);
+                    }
+                _refund = p[3];
+                int d;
+                _firstDay = int.TryParse(p[4], NumberStyles.Integer, Inv, out d) ? d : -1;
+                _doneDay = int.TryParse(p[5], NumberStyles.Integer, Inv, out d) ? d : -1;
+            }
+            catch (Exception e) { _state = "done"; Stumble("Import", e); }
+        }
+
+        /// <summary>Nowa kampania: wlosci startu ROT - nic do przywracania (flaga od razu).</summary>
+        internal static void OnNewGame() { _state = "new"; }
+
+        internal static void SessionStart()
+        {
+            try
+            {
+                string st = _state == "new" ? "nowa kampania z ta paczka - nic do przywracania"
+                          : _state == "done" ? "zrobione (dzien " + _doneDay + ": " + ResText() + ", zwrot skarbca " + (_refund.Length > 0 ? _refund : "-") + ")"
+                          : "czeka (zapis sprzed paczki) - ruszy w pierwszej godzinie na mapie" + (_res.Count > 0 ? "; juz rozstrzygniete: " + ResText() : "");
+                Log.Info(Prefix + "start sesji | klucz Book Holdings Restore " + (On ? "TAK" : "NIE") + " | stan zapisu: " + st + ".");
+            }
+            catch (Exception e) { Stumble("SessionStart", e); }
+        }
+
+        private static string ResText()
+        {
+            if (_res.Count == 0) return "-";
+            var sb = new StringBuilder(200);
+            foreach (var kv in _res) { if (sb.Length > 0) sb.Append(", "); sb.Append(kv.Key).Append(' ').Append(kv.Value); }
+            return sb.ToString();
+        }
+
+        // ------------------------------------------------------------ gotowosc: gracz na mapie
+        private static bool PlayerOnMap(out string why)
+        {
+            why = null;
+            var c = Campaign.Current;
+            if (c == null || !c.GameStarted) { why = "kampania nie gotowa"; return false; }
+            var ms = Game.Current != null && Game.Current.GameStateManager != null ? Game.Current.GameStateManager.ActiveState as MapState : null;
+            if (ms == null) { why = "stan gry to nie mapa"; return false; }
+            var me = Hero.MainHero; var mp = MobileParty.MainParty;
+            if (me == null || mp == null || !me.IsAlive) { why = "brak gracza"; return false; }
+            if (me.IsPrisoner || PlayerCaptivity.IsCaptive) { why = "gracz w niewoli"; return false; }
+            if (mp.CurrentSettlement != null) { why = "gracz w osadzie (" + Nm(mp.CurrentSettlement) + ")"; return false; }
+            if (mp.MapEvent != null) { why = "gracz w bitwie"; return false; }
+            if (mp.SiegeEvent != null || mp.BesiegerCamp != null || mp.BesiegedSettlement != null) { why = "gracz w oblezeniu"; return false; }
+            if (mp.Army != null) { why = "gracz w armii"; return false; }
+            if (PlayerEncounter.Current != null) { why = "spotkanie w toku"; return false; }
+            if (c.CurrentMenuContext != null) { why = "menu otwarte"; return false; }
+            var cm = c.ConversationManager;
+            if (cm != null && (cm.IsConversationInProgress || cm.IsConversationFlowActive)) { why = "rozmowa w toku"; return false; }
+            return true;
+        }
+
+        // ------------------------------------------------------------ godzina
+        /// <summary>HourlyTickEvent (BookHoldingsBehavior). Przy kluczu i stanie "czeka" - proba przywrocenia; nie rzuca.</summary>
+        internal static void Hourly()
+        {
+            if (_state.Length > 0 || !On) return;
+            try
+            {
+                int day = (int)CampaignTime.Now.ToDays;
+                string why;
+                if (!PlayerOnMap(out why)) { WaitLog(day, why); return; }
+                if (_firstDay < 0) _firstDay = day;
+                _batchDone.Clear(); _batchMoved.Clear(); _batchRefund = 0; _batchRefundText = null;
+                var waits = new List<string>();
+                foreach (var row in Rows)
+                {
+                    if (_res.ContainsKey(row.Id)) continue;
+                    string wait = null, res = null;
+                    try { res = TryRow(row, day, out wait); }
+                    catch (Exception e)
+                    {
+                        Stumble("TryRow(" + row.Id + ")", e);
+                        int n; _rowErr.TryGetValue(row.Id, out n); _rowErr[row.Id] = ++n;
+                        if (n >= MaxRowErrors) { res = "blad"; Log.Info(Prefix + "dzien " + day + " | " + row.Id + " - " + n + " wyjatki z rzedu, osada pominieta (blad w logu wyzej)."); }
+                        else wait = "wyjatek " + n + "/" + MaxRowErrors;
+                    }
+                    if (res != null) _res[row.Id] = res;
+                    else if (wait != null) waits.Add(row.Id + ": " + wait);
+                }
+                Notify();
+                if (waits.Count == 0) { Finish(day, false); return; }
+                if (day - _firstDay >= GiveUpDays)
+                {
+                    foreach (var row in Rows) if (!_res.ContainsKey(row.Id)) _res[row.Id] = "czekanie";
+                    Log.Info(Prefix + "dzien " + day + " | po " + (day - _firstDay) + " dobach czekania pominiete: " + string.Join("; ", waits.ToArray()) + ".");
+                    Finish(day, true);
+                    return;
+                }
+                WaitLog(day, string.Join("; ", waits.ToArray()));
+            }
+            catch (Exception e) { Stumble("Hourly", e); }
+        }
+
+        private static void WaitLog(int day, string why)
+        {
+            try
+            {
+                if (day == _waitLogDay && why == _waitLogText) return;
+                if (day == _waitLogDay && _waitLogText != null && why != null && why.StartsWith("gracz", StringComparison.Ordinal) && _waitLogText.StartsWith("gracz", StringComparison.Ordinal)) return;
+                _waitLogDay = day; _waitLogText = why;
+                Log.Info(Prefix + "czeka - dzien " + day + " | " + why + " (ponowna proba co godzine; po " + GiveUpDays + " dobach czekania na osade - pominieta).");
+            }
+            catch { }
+        }
+
+        private static void Finish(int day, bool gaveUp)
+        {
+            _state = "done"; _doneDay = day;
+            int ok = 0, same = 0, skip = 0;
+            foreach (var kv in _res) { if (kv.Value.StartsWith("ok", StringComparison.Ordinal)) ok++; else if (kv.Value == "bez-zmian") same++; else skip++; }
+            Log.Info(Prefix + "KONIEC - dzien " + day + " | zmienione " + ok + ", juz u rodu docelowego " + same + ", pominiete " + skip + (gaveUp ? " (w tym po czekaniu)" : "")
+                     + " z " + Rows.Length + " | " + ResText() + " | zwrot skarbca: " + (_refund.Length > 0 ? _refund : "nie dotyczy") + " | potkniecia " + _stumbles
+                     + " | flaga w zapisie: zrobione (nie powtorzy sie).");
+        }
+
+        // ------------------------------------------------------------ osada
+        private static Clan FindClan(string id)
+        {
+            foreach (var c in Clan.All) if (c != null && c.StringId == id) return c;
+            return null;
+        }
+
+        private static Kingdom FindKingdom(string id)
+        {
+            foreach (var k in Kingdom.All) if (k != null && k.StringId == id) return k;
+            return null;
+        }
+
+        /// <summary>Warunki chwilowe miejsca: oblezenie, bitwa w osadzie / zalodze / wsiach / przy bramie. null = wolne.</summary>
+        private static string SiteBusy(Settlement st)
+        {
+            if (st.IsUnderSiege || st.SiegeEvent != null) return Nm(st) + " oblegana";
+            if (st.Party != null && st.Party.MapEvent != null) return "bitwa w " + Nm(st);
+            var g = st.Town != null ? st.Town.GarrisonParty : null;
+            if (g != null && (g.MapEvent != null || g.SiegeEvent != null)) return "zaloga " + Nm(st) + " w bitwie";
+            foreach (var v in st.BoundVillages)
+                if (v != null && v.Settlement != null && (v.Settlement.IsUnderRaid || (v.Settlement.Party != null && v.Settlement.Party.MapEvent != null))) return "bitwa we wsi " + Nm(v.Settlement);
+            var mem = Campaign.Current.MapEventManager;
+            if (mem != null && mem.MapEvents != null)
+            {
+                var gate = st.GatePosition.ToVec2();
+                foreach (var me in mem.MapEvents)
+                    if (me != null && !me.IsFinalized && me.Position.ToVec2().Distance(gate) <= BattleNear) return "bitwa przy " + Nm(st);
+            }
+            return null;
+        }
+
+        /// <summary>Jedna osada z tabeli. Zwraca wynik koncowy albo null (wtedy `wait` - powod czekania).</summary>
+        private static string TryRow(Row row, int day, out string wait)
+        {
+            wait = null;
+            var st = Settlement.Find(row.Id);
+            if (st == null || !st.IsFortification || st.Town == null) { LogSkip(day, row, null, "osady nie ma w swiecie"); return "brak-osady"; }
+            var clan = FindClan(row.Clan);
+            if (clan == null || clan.IsEliminated) { LogSkip(day, row, st, "rodu " + row.Clan + " nie ma albo wyeliminowany"); return "brak-rodu"; }
+            var leader = clan.Leader;
+            if (leader == null || !leader.IsAlive) { LogSkip(day, row, st, "rod " + clan.Name + " bez zywej glowy"); return "brak-glowy"; }
+            if (clan.Kingdom == null || clan.Kingdom.StringId != row.Kingdom)
+            { LogSkip(day, row, st, "rod " + clan.Name + " nie w krolestwie " + row.Kingdom + " (jest w " + (clan.Kingdom != null ? clan.Kingdom.StringId : "-") + ")"); return "inne-krolestwo"; }
+            if (clan == Clan.PlayerClan) { LogSkip(day, row, st, "rod docelowy to rod gracza"); return "gracz"; }
+            IFaction newF = clan.MapFaction;
+            Settlement twin = row.Twin != null ? Settlement.Find(row.Twin) : null;
+            if (twin != null && (!twin.IsFortification || twin.Town == null)) twin = null;
+            // osada zmienia pana, gdy nie jest u rodu docelowego; blizniak ROT - gdy jest poza krolestwem docelowym (wtedy ROT przenosi go razem z miastem:
+            // ROTOthersCampaignBehavior - RedKeep.MapFaction != KingsLanding.MapFaction; blizniak u innego rodu tego samego krolestwa zostaje, jak u ROT)
+            bool stNeeds = st.OwnerClan != clan;
+            bool twinNeeds = twin != null && twin.MapFaction != newF;
+            if (!stNeeds && !twinNeeds) { LogSkip(day, row, st, "juz u rodu " + clan.Name + (twin != null ? " (blizniak " + Nm(twin) + " w krolestwie " + Nm(newF) + ")" : "")); return "bez-zmian"; }
+            var sites = new List<Settlement>(2);
+            if (stNeeds) sites.Add(st);
+            if (twinNeeds) sites.Add(twin);
+            foreach (var s in sites)
+                if (s.OwnerClan == Clan.PlayerClan) { LogSkip(day, row, st, Nm(s) + " nalezy do gracza - nie zabieram"); return "gracz"; }
+            foreach (var s in sites)
+            {
+                // ROT, Diplomacy, NavalDLC i ClanVariables czytaja oldOwner.Clan bez sprawdzenia - stary pan musi miec glowe rodu
+                if (s.OwnerClan == null || s.OwnerClan.Leader == null || s.MapFaction == null) { wait = Nm(s) + ": stary pan bez glowy rodu"; return null; }
+                string b = SiteBusy(s);
+                if (b != null) { wait = b; return null; }
+            }
+            if (leader.IsPrisoner) { wait = "glowa rodu " + Nm(leader) + " w niewoli"; return null; }
+            var main = stNeeds ? st : twin;
+            IFaction oldF = main.MapFaction;
+
+            // (e) warunek korekty fabuly PRZED zmiana: partie krolestwa starego pana w promieniu nie moga byc w bitwie ani oblezeniu
+            bool clear = stNeeds && row.ClearRadius > 0f;
+            if (clear)
+            {
+                string busy;
+                RadiusGroups(st, oldF, row.ClearRadius, true, out busy);
+                if (busy != null) { wait = busy; return null; }
+            }
+
+            // (c) plan: bohaterowie i odbiorcy zalog - wszystko sprawdzone, zanim cokolwiek ruszy
+            var heroPlan = new List<KeyValuePair<Hero, Settlement>>();
+            foreach (var s in sites)
+                foreach (var h in new List<Hero>(s.HeroesWithoutParty))
+                {
+                    if (!WouldBeCaptured(h, newF)) continue;
+                    var dest = NearestRefuge(h, s, sites);
+                    if (dest == null) { wait = "brak dokad wyprowadzic " + Nm(h); return null; }
+                    heroPlan.Add(new KeyValuePair<Hero, Settlement>(h, dest));
+                }
+            var recips = new Dictionary<Settlement, List<MobileParty>>();
+            var heads = new Dictionary<Settlement, MobileParty>();
+            foreach (var s in sites)
+            {
+                int men = Men(s.Town.GarrisonParty);
+                if (men <= 0) continue;
+                var l = Recipients(s, s.MapFaction, sites);
+                var hp = HeadParty(s.OwnerClan);
+                if (l.Count == 0 && hp == null) { wait = "brak odbiorcy zalogi " + Nm(s) + " (" + men + " ludzi) w " + Nm(s.MapFaction); return null; }
+                recips[s] = l; heads[s] = hp;
+            }
+
+            // --- od tej chwili zmiana ---
+            var sb = new StringBuilder(1500);
+            sb.Append(Prefix).Append("dzien ").Append(day).Append(" | ").Append(Nm(st)).Append(" (").Append(st.StringId).Append(')');
+            foreach (var s in sites)
+                sb.Append(" | ").Append(Nm(s)).Append(": ").Append(s.OwnerClan.Name).Append(" (").Append(Nm(s.MapFaction)).Append(") -> ").Append(clan.Name).Append(" (").Append(Nm(newF)).Append(')');
+            sb.Append(", glowa rodu ").Append(Nm(leader));
+
+            // bohaterowie bez druzyny
+            int movedH = 0;
+            var hs = new StringBuilder();
+            foreach (var kv in heroPlan)
+            {
+                var h = kv.Key;
+                try
+                {
+                    if (h.GovernorOf != null) ChangeGovernorAction.RemoveGovernorOf(h);
+                    TeleportHeroAction.ApplyImmediateTeleportToSettlement(h, kv.Value);
+                    movedH++;
+                    if (hs.Length > 0) hs.Append(", ");
+                    hs.Append(Nm(h)).Append(" -> ").Append(Nm(kv.Value));
+                }
+                catch (Exception e) { Stumble("Hero(" + row.Id + ")", e); }
+            }
+            sb.Append(" | bohaterowie bez druzyny wyprowadzeni ").Append(movedH).Append(movedH > 0 ? " [" + hs + "]" : "");
+
+            // zalogi starego pana
+            foreach (var s in sites)
+            {
+                var g = s.Town.GarrisonParty;
+                int n0 = Men(g);
+                sb.Append(" | zaloga ").Append(Nm(s)).Append(' ').Append(n0);
+                List<MobileParty> l;
+                if (n0 <= 0 || !recips.TryGetValue(s, out l)) continue;
+                sb.Append(" -> ").Append(MoveGarrison(s, g, l, heads[s], row.Id)).Append(", zostalo ").Append(Men(g));
+            }
+
+            // jency w lochu (zostaja przy osadzie)
+            foreach (var s in sites)
+            {
+                int reg = 0, her = 0;
+                try
+                {
+                    var pr = s.Party != null ? s.Party.PrisonRoster : null;
+                    if (pr != null) for (int i = 0; i < pr.Count; i++) { var c = pr.GetCharacterAtIndex(i); if (c == null) continue; if (c.IsHero) her++; else reg += pr.GetElementNumber(i); }
+                }
+                catch (Exception e) { Stumble("Prison(" + row.Id + ")", e); }
+                sb.Append(" | loch ").Append(Nm(s)).Append(": zwykli ").Append(reg).Append(", bohaterowie ").Append(her);
+            }
+            sb.Append(" (zwykli zostaja przy osadzie; bohaterow strony nowego pana wypuszcza gra)");
+
+            // roszczenia Strategic Campaign AI krolestw starych panow - migawka przed zmiana
+            var sca = ScaClaims();
+            var scaK = new List<Kingdom>(2); var scaHad = new List<bool>(2); var scaPrev = new List<string>(2);
+            foreach (var s in sites)
+            {
+                var k = s.MapFaction as Kingdom;
+                if (k == null || scaK.Contains(k)) continue;
+                bool had; string prev;
+                ScaSnap(sca, k, out had, out prev);
+                scaK.Add(k); scaHad.Add(had); scaPrev.Add(prev);
+            }
+
+            // (d) zmiana pana: osada (blizniak przenosi ROT), potem kontrola blizniaka
+            bool stOk = !stNeeds, twinOk = !twinNeeds;
+            if (stNeeds)
+            {
+                // wlasny try: wyjatek cudzego nasluchu (zdarzenie biegnie po ustawieniu pana) nie moze zgubic krokow po zmianie - o sukcesie mowi pan osady
+                try { ChangeOwnerOfSettlementAction.ApplyByDefault(leader, st); }
+                catch (Exception e) { Stumble("ApplyByDefault(" + row.Id + ")", e); sb.Append(" | WYJATEK w zdarzeniu zmiany pana (log wyzej)"); }
+                stOk = st.OwnerClan == clan;
+                if (stOk) _batchDone.Add(st.StringId);
+            }
+            if (twinNeeds)
+            {
+                if (twin.MapFaction == newF) sb.Append(" | blizniak ").Append(Nm(twin)).Append(": przeniesiony przez ROT, pan ").Append(twin.OwnerClan != null ? twin.OwnerClan.Name.ToString() : "-");
+                else
+                {
+                    try { ChangeOwnerOfSettlementAction.ApplyByDefault(leader, twin); }
+                    catch (Exception e) { Stumble("ApplyByDefault(" + row.Twin + ")", e); sb.Append(" | WYJATEK w zdarzeniu zmiany pana blizniaka (log wyzej)"); }
+                    sb.Append(" | blizniak ").Append(Nm(twin)).Append(": ROT nie przeniosl - zmieniony przez nas, pan ").Append(twin.OwnerClan != null ? twin.OwnerClan.Name.ToString() : "-");
+                }
+                twinOk = twin.MapFaction == newF;
+                if (twinOk) _batchDone.Add(twin.StringId);
+            }
+            for (int i = 0; i < scaK.Count; i++) ScaRestore(sca, scaK[i], scaHad[i], scaPrev[i], sb);
+
+            foreach (var s in sites)
+                sb.Append(" | po zmianie ").Append(Nm(s)).Append(": pan ").Append(s.OwnerClan != null ? s.OwnerClan.Name.ToString() : "-")
+                  .Append(", zaloga ").Append(Men(s.Town.GarrisonParty)).Append(" (pusta zostaje werbunkowi pana - bez ludzi z niczego), milicja ").Append((int)s.Militia);
+
+            if (stNeeds && stOk)
+            {
+                // (e) korekta fabuly
+                if (clear)
+                {
+                    try { sb.Append(" | ").Append(ClearRadius(st, oldF, row.ClearRadius, sites)); }
+                    catch (Exception e) { Stumble("ClearRadius(" + row.Id + ")", e); sb.Append(" | korekta fabuly: BLAD (log wyzej)"); }
+                }
+                // (f) zwrot skarbca - raz na zapis
+                if (row.Refund > 0 && _refund.Length == 0)
+                {
+                    try { sb.Append(" | ").Append(RefundTreasury(row, oldF as Kingdom, clan.Kingdom)); }
+                    catch (Exception e) { Stumble("Refund(" + row.Id + ")", e); sb.Append(" | zwrot skarbca: BLAD (log wyzej)"); }
+                }
+            }
+            if (!stOk || !twinOk)
+            {
+                sb.Append(" | ZMIANA NIE WESZLA w calosci (").Append(Nm(st)).Append(" pan ").Append(st.OwnerClan != null ? st.OwnerClan.Name.ToString() : "-");
+                if (twin != null) sb.Append(", ").Append(Nm(twin)).Append(" pan ").Append(twin.OwnerClan != null ? twin.OwnerClan.Name.ToString() : "-");
+                sb.Append(") - ponowna proba za godzine.");
+                Log.Info(sb.ToString());
+                wait = "zmiana pana nie weszla w calosci";
+                return null;
+            }
+            sb.Append('.');
+            Log.Info(sb.ToString());
+            return "ok:" + day.ToString(Inv);
+        }
+
+        private static void LogSkip(int day, Row row, Settlement st, string why)
+        {
+            Log.Info(Prefix + "dzien " + day + " | " + (st != null ? Nm(st) + " (" + row.Id + ")" : row.Id) + " - " + why + "; bez zmian.");
+        }
+
+        private static int Men(MobileParty mp)
+        {
+            if (mp == null || mp.MemberRoster == null) return 0;
+            int n = 0;
+            var r = mp.MemberRoster;
+            for (int i = 0; i < r.Count; i++) { var c = r.GetCharacterAtIndex(i); if (c != null && !c.IsHero) n += r.GetElementNumber(i); }
+            return n;
+        }
+
+        // ------------------------------------------------------------ (c) bohaterowie
+        /// <summary>Ten sam warunek co PrisonerCaptureCampaignBehavior.SettlementHeroCaptureCommonCondition, liczony wobec frakcji NOWEGO pana.</summary>
+        private static bool WouldBeCaptured(Hero h, IFaction newF)
+        {
+            return h != null && h != Hero.MainHero && !h.IsWanderer && !h.IsNotable && h.HeroState != Hero.CharacterStates.Prisoner
+                   && h.HeroState != Hero.CharacterStates.Dead && h.MapFaction != null && h.CurrentSettlement != null && h.MapFaction.IsAtWarWith(newF);
+        }
+
+        /// <summary>Najblizsza twierdza wlasnej frakcji bohatera (nieoblegana, spoza zmiany); bez niej - najblizsza nie wroga.</summary>
+        private static Settlement NearestRefuge(Hero h, Settlement from, List<Settlement> exclude)
+        {
+            var p = from.GatePosition.ToVec2();
+            Settlement own = null, neutral = null; float od = float.MaxValue, nd = float.MaxValue;
+            foreach (var s in Settlement.All)
+            {
+                if (s == null || !s.IsFortification || s.Town == null || exclude.Contains(s) || s.IsUnderSiege || s.MapFaction == null) continue;
+                float d = s.GatePosition.ToVec2().Distance(p);
+                if (s.MapFaction == h.MapFaction) { if (d < od) { od = d; own = s; } }
+                else if (!s.MapFaction.IsAtWarWith(h.MapFaction) && d < nd) { nd = d; neutral = s; }
+            }
+            return own ?? neutral;
+        }
+
+        // ------------------------------------------------------------ (c) zaloga
+        private static bool RecipientOk(MobileParty mp)
+        {
+            return mp != null && mp.IsActive && !mp.IsMainParty && !mp.IsDisbanding && mp.MapEvent == null && mp.SiegeEvent == null && mp.BesiegerCamp == null
+                   && !mp.IsCurrentlyAtSea && mp.ActualClan != Clan.PlayerClan && mp.MemberRoster != null && mp.Party != null;
+        }
+
+        /// <summary>Partie lordow i zalogi frakcji starego pana (bez miejsc zmiany i bez gracza), od najblizszej osady.</summary>
+        private static List<MobileParty> Recipients(Settlement st, IFaction oldF, List<Settlement> sites)
+        {
+            var p = st.GatePosition.ToVec2();
+            var list = new List<KeyValuePair<float, MobileParty>>();
+            foreach (var w in oldF.WarPartyComponents)
+            {
+                var mp = w != null ? w.MobileParty : null;
+                if (!RecipientOk(mp) || !mp.IsLordParty) continue;        // partia w osadzie zmiany tez - gra wyprowadzi ja przy zmianie pana, ludzie ida z nia
+                list.Add(new KeyValuePair<float, MobileParty>(mp.Position.ToVec2().Distance(p), mp));
+            }
+            foreach (var s in oldF.Settlements)
+            {
+                if (s == null || !s.IsFortification || s.Town == null || sites.Contains(s) || s.IsUnderSiege || s.OwnerClan == Clan.PlayerClan) continue;
+                var g = s.Town.GarrisonParty;
+                if (!RecipientOk(g)) continue;
+                list.Add(new KeyValuePair<float, MobileParty>(s.GatePosition.ToVec2().Distance(p), g));
+            }
+            list.Sort((a, b) => a.Key.CompareTo(b.Key));
+            var res = new List<MobileParty>(list.Count);
+            foreach (var kv in list) res.Add(kv.Value);
+            return res;
+        }
+
+        /// <summary>Druzyna glowy rodu starego pana (odbiorca reszty ponad wolne miejsca) - tylko gdy glowa ja prowadzi.</summary>
+        private static MobileParty HeadParty(Clan oldClan)
+        {
+            var h = oldClan != null ? oldClan.Leader : null;
+            var mp = h != null ? h.PartyBelongedTo : null;
+            return RecipientOk(mp) && mp.LeaderHero == h ? mp : null;
+        }
+
+        private static int Free(MobileParty mp)
+        {
+            try { return Math.Max(0, mp.Party.PartySizeLimit - mp.MemberRoster.TotalManCount); } catch { return 0; }
+        }
+
+        /// <summary>Szeregowi zalogi do odbiorcow: najpierw wolne miejsca od najblizszego, reszta - druzyna glowy starego rodu, bez niej najblizszy odbiorca
+        /// (ponad limit). Ksiega ludzi i sprzet zbrojowni ida z ludzmi. Zwraca opis do linii.</summary>
+        private static string MoveGarrison(Settlement s, MobileParty g, List<MobileParty> recips, MobileParty headParty, string rowId)
+        {
+            var parts = new List<string>();
+            int left = Men(g), over = 0;
+            foreach (var r in recips)
+            {
+                if (left <= 0) break;
+                int f = Free(r);
+                if (f <= 0) continue;
+                int m = MoveMen(s, g, r, Math.Min(f, left), rowId);
+                if (m > 0) { parts.Add(Nm(r) + (r.IsGarrison ? " (zaloga)" : "") + " " + m); left -= m; }
+            }
+            if (left > 0)
+            {
+                var last = headParty ?? (recips.Count > 0 ? recips[0] : null);
+                if (last != null)
+                {
+                    int m = MoveMen(s, g, last, left, rowId);
+                    if (m > 0) { parts.Add(Nm(last) + (last.IsGarrison ? " (zaloga)" : "") + " " + m + " ponad limit"); left -= m; over += m; }
+                }
+            }
+            return (parts.Count > 0 ? "[" + string.Join(", ", parts.ToArray()) + "]" : "[nikt]") + (over > 0 ? ", ponad limit razem " + over : "");
+        }
+
+        /// <summary>Do `max` szeregowych (ranni proporcjonalnie w kazdym stosie) z zalogi `g` do `to`. Zwraca przeniesionych.</summary>
+        private static int MoveMen(Settlement s, MobileParty g, MobileParty to, int max, string rowId)
+        {
+            if (max <= 0 || g == null || to == null) return 0;
+            var fr = g.MemberRoster;
+            var moved = new Dictionary<CharacterObject, int>();
+            var wounded = new Dictionary<CharacterObject, int>();
+            int left = max;
+            for (int i = fr.Count - 1; i >= 0 && left > 0; i--)
+            {
+                var c = fr.GetCharacterAtIndex(i);
+                if (c == null || c.IsHero) continue;
+                int n = fr.GetElementNumber(i), w = fr.GetElementWoundedNumber(i);
+                if (n <= 0) continue;
+                int k = Math.Min(n, left);
+                int wk = n > 0 ? (int)Math.Round((double)k * w / n) : 0;
+                wk = Math.Max(0, Math.Min(wk, Math.Min(w, k)));
+                if (k - wk > n - w) wk = k - (n - w);                 // zdrowych nie wiecej niz jest
+                int v;
+                moved.TryGetValue(c, out v); moved[c] = v + k;
+                wounded.TryGetValue(c, out v); wounded[c] = v + wk;
+                left -= k;
+            }
+            int total = 0;
+            foreach (var kv in moved)
+            {
+                int wk; wounded.TryGetValue(kv.Key, out wk);
+                fr.AddToCounts(kv.Key, -kv.Value, false, -wk);
+                to.MemberRoster.AddToCounts(kv.Key, kv.Value, false, wk);
+                total += kv.Value;
+            }
+            if (total <= 0) return 0;
+            try { PeopleBook.Give(to.MemberRoster, PeopleBook.Take(fr, total, PeopleBook.FFromGarrison), to.IsGarrison ? PeopleBook.FToGarrison : PeopleBook.FFromGarrison); }
+            catch (Exception e) { Stumble("PeopleBook(" + rowId + ")", e); }
+            try { GarrisonArmory.KitsWithMen(g, to, s, moved); }
+            catch (Exception e) { Stumble("Kits(" + rowId + ")", e); }
+            return total;
+        }
+
+        // ------------------------------------------------------------ (e) korekta fabuly: partie starego krolestwa przy osadzie
+        private static bool LandParty(MobileParty mp) { return mp != null && mp.IsActive && !mp.IsMainParty && !mp.IsDisbanding; }
+
+        /// <summary>Grupa do przeniesienia: wodz (pierwszy na liscie) i reszta. Armia z wodzem w promieniu - cala (wszystkie partie armii, takze idace do niej);
+        /// partia armii z wodzem poza promieniem, nieprzypieta - sama (idzie dalej do swojej armii).</summary>
+        private sealed class Group { internal MobileParty Lead; internal bool WholeArmy; internal readonly List<MobileParty> All = new List<MobileParty>(); }
+
+        /// <summary>Grupy partii lordow frakcji `f` w promieniu `r` od bramy. `busy` - ktos z nich w bitwie albo oblezeniu (wtedy osada czeka).</summary>
+        private static List<Group> RadiusGroups(Settlement st, IFaction f, float r, bool stopOnBusy, out string busy)
+        {
+            busy = null;
+            var p = st.GatePosition.ToVec2();
+            var groups = new List<Group>();
+            var seenArmies = new HashSet<Army>();
+            foreach (var w in f.WarPartyComponents)
+            {
+                var mp = w != null ? w.MobileParty : null;
+                if (!LandParty(mp) || !mp.IsLordParty) continue;
+                if (mp.Position.ToVec2().Distance(p) > r) continue;
+                var grp = new Group();
+                var army = mp.Army;
+                var lead = army != null ? army.LeaderParty : null;
+                if (army != null && lead != null && lead != mp && lead.Position.ToVec2().Distance(p) > r)
+                {
+                    if (mp.AttachedTo != null) continue;                  // przypieta stoi przy wodzu - tu nie trafi
+                    grp.Lead = mp; grp.All.Add(mp);
+                }
+                else if (army != null && lead != null)
+                {
+                    if (!seenArmies.Add(army)) continue;
+                    if (lead.IsMainParty) continue;                       // armia gracza - nie ruszamy (gracz w armii i tak czeka)
+                    grp.Lead = lead; grp.WholeArmy = true;
+                    if (LandParty(lead)) grp.All.Add(lead);
+                    foreach (var a in army.Parties) if (a != lead && LandParty(a)) grp.All.Add(a);
+                }
+                else
+                {
+                    if (mp.ActualClan == Clan.PlayerClan) continue;           // samodzielna partia rodu gracza - nie ruszamy (w armii AI idzie z armia)
+                    grp.Lead = mp; grp.All.Add(mp);
+                }
+                bool b = false;
+                foreach (var a in grp.All)
+                    if (a.MapEvent != null || a.SiegeEvent != null || a.BesiegerCamp != null || a.BesiegedSettlement != null)
+                    {
+                        b = true;
+                        if (busy == null) busy = "partia " + Nm(a) + " (" + Nm(f) + ") przy " + Nm(st) + " w bitwie albo oblezeniu";
+                        if (stopOnBusy) return groups;
+                        break;
+                    }
+                if (!b && grp.All.Count > 0) groups.Add(grp);
+            }
+            return groups;
+        }
+
+        /// <summary>Najblizsza twierdza frakcji `f` poza promieniem korekty (nieoblegana, bez bitwy, spoza zmiany).</summary>
+        private static Settlement Fallback(Vec2 from, Vec2 center, IFaction f, float r, List<Settlement> sites)
+        {
+            Settlement best = null; float bd = float.MaxValue;
+            foreach (var s in f.Settlements)
+            {
+                if (s == null || !s.IsFortification || s.Town == null || sites.Contains(s) || s.IsUnderSiege || (s.Party != null && s.Party.MapEvent != null)) continue;
+                var gp = s.GatePosition.ToVec2();
+                if (gp.Distance(center) <= r) continue;
+                float d = gp.Distance(from);
+                if (d < bd) { bd = d; best = s; }
+            }
+            return best;
+        }
+
+        private static void Teleport(MobileParty mp, Settlement dest)
+        {
+            if (mp.CurrentSettlement != null && (mp.Army == null || mp.Army.LeaderParty == mp || mp.AttachedTo == null)) LeaveSettlementAction.ApplyForParty(mp);
+            if (mp.IsTransitionInProgress) mp.CancelNavigationTransition();
+            mp.Position = dest.GatePosition;
+        }
+
+        /// <summary>Po zmianie pana: grupy z promienia (liczone od nowa - gra wyprowadzila partie z osady) do najblizszej wlasnej twierdzy poza promieniem.</summary>
+        private static string ClearRadius(Settlement st, IFaction f, float r, List<Settlement> sites)
+        {
+            string busy;
+            var groups = RadiusGroups(st, f, r, false, out busy);                 // po zmianie: grupa w bitwie zostaje, reszta idzie
+            var center = st.GatePosition.ToVec2();
+            int nGroups = 0, nParties = 0, nMen = 0, nSea = 0, nNoDest = 0;
+            var names = new List<string>();
+            var dests = new List<string>();
+            foreach (var grp in groups)
+            {
+                var lead = grp.Lead;
+                if (lead == null || lead.IsCurrentlyAtSea) { nSea += grp.All.Count; continue; }
+                var dest = Fallback(lead.Position.ToVec2(), center, f, r, sites);
+                if (dest == null) { nNoDest += grp.All.Count; continue; }
+                int men = 0, moved = 0;
+                foreach (var a in grp.All)                                // wodz pierwszy: jego wyjscie z osady zabiera przypietych
+                {
+                    if (a.IsCurrentlyAtSea) { nSea++; continue; }
+                    try { Teleport(a, dest); moved++; men += a.MemberRoster != null ? a.MemberRoster.TotalManCount : 0; }
+                    catch (Exception e) { Stumble("Teleport", e); }
+                }
+                if (moved == 0) continue;
+                if (lead.Army == null || lead.Army.LeaderParty == lead)     // partia idaca do swojej armii - jej cel zostaje (armia)
+                    try { lead.SetMoveGoToSettlement(dest, MobileParty.NavigationType.Default, false); } catch (Exception e) { Stumble("Teleport.Go", e); }
+                nGroups++; nParties += moved; nMen += men;
+                names.Add((grp.WholeArmy ? "armia " : "") + Nm(lead) + " (" + moved + " partii, " + men + " ludzi) -> " + Nm(dest));
+                if (!dests.Contains(Nm(dest))) dests.Add(Nm(dest));
+            }
+            if (nParties > 0)
+                _batchMoved.Add("The forces of " + Nm(f) + " near " + Nm(st) + " fall back to " + Join(dests));
+            return "korekta fabuly (promien " + r.ToString("0", Inv) + "): przeniesione grupy " + nGroups + ", partie " + nParties + ", ludzie " + nMen
+                   + (names.Count > 0 ? " [" + string.Join("; ", names.ToArray()) + "]" : "") + (nSea > 0 ? ", na morzu pominiete " + nSea : "")
+                   + (nNoDest > 0 ? ", bez twierdzy poza promieniem " + nNoDest : "") + (busy != null ? ", zostaly (bitwa albo oblezenie po zmianie): " + busy : "");
+        }
+
+        // ------------------------------------------------------------ (f) zwrot skarbca
+        private static string RefundTreasury(Row row, Kingdom from, Kingdom to)
+        {
+            if (from == null || to == null || from == to) { _refund = "none:brak-krolestw"; return "zwrot skarbca: nie dotyczy (krolestwo starego albo nowego pana nieczytelne)"; }
+            if (from.StringId != row.RefundFrom) { _refund = "none:" + from.StringId; return "zwrot skarbca: nie dotyczy (stary pan z " + from.StringId + ", nie " + row.RefundFrom + ")"; }
+            long w0 = from.KingdomBudgetWallet, v0 = to.KingdomBudgetWallet;
+            long take = Math.Max(0, Math.Min(row.Refund, w0));
+            take = Math.Min(take, Math.Max(0, (long)int.MaxValue - Math.Max(0, v0)));   // skarbiec odbiorcy to int
+            long moved = 0, got = 0;
+            if (take > 0)
+            {
+                from.KingdomBudgetWallet -= (int)take;                 // najpierw platnik, potem odbiorca: odbiorca dostaje dokladnie to, co zeszlo
+                moved = w0 - from.KingdomBudgetWallet;
+                to.KingdomBudgetWallet += (int)moved;
+                got = (long)to.KingdomBudgetWallet - v0;
+                CrownIncome.ShiftSnapshot(to, got);                    // 165: zwrot skarbu, nie wplyw dnia
+                CrownIncome.ShiftSnapshot(from, -moved);               // 165: ubytek skarbu, nie "ujemny wplyw"
+            }
+            _refund = "done:" + moved.ToString(Inv);
+            if (moved > 0) { _batchRefund = moved; _batchRefundText = Nm(from) + " pays back " + moved.ToString("N0", Inv) + " denars to the royal treasury of " + Nm(to); }
+            return "zwrot skarbca (L5b-1, dzien 109046): nalezne " + row.Refund + ", z " + Nm(from) + " (" + from.StringId + ") " + w0 + " -> " + from.KingdomBudgetWallet
+                   + " do " + Nm(to) + " (" + to.StringId + ") " + v0 + " -> " + to.KingdomBudgetWallet + " | zdjete " + moved + " - dopisane " + got + " = " + (moved - got)
+                   + (moved < row.Refund ? " (skarbiec platnika nie starczyl - oddane tyle, ile bylo)" : "") + ", migawka 165 przesunieta u obu stron";
+        }
+
+        // ------------------------------------------------------------ Strategic Campaign AI: roszczenie krolestwa starego pana
+        private static bool _scaTried;
+        private static FieldInfo _scaField;
+
+        private static IDictionary ScaClaims()
+        {
+            try
+            {
+                if (!_scaTried)
+                {
+                    _scaTried = true;
+                    var t = QuartermasterLaw.FindType("StrategicCampaignAI145.StrategicAiState");
+                    _scaField = t != null ? t.GetField("LostSettlementClaimByFaction", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static) : null;
+                }
+                return _scaField != null ? _scaField.GetValue(null) as IDictionary : null;
+            }
+            catch (Exception e) { Stumble("ScaClaims", e); return null; }
+        }
+
+        private static void ScaSnap(IDictionary d, IFaction f, out bool had, out string prev)
+        {
+            had = false; prev = null;
+            try
+            {
+                var k = f as Kingdom;
+                if (d == null || k == null) return;
+                had = d.Contains(k.StringId);
+                prev = had ? d[k.StringId] as string : null;
+            }
+            catch (Exception e) { Stumble("ScaSnap", e); }
+        }
+
+        private static void ScaRestore(IDictionary d, IFaction f, bool had, string prev, StringBuilder sb)
+        {
+            try
+            {
+                var k = f as Kingdom;
+                if (k == null) return;
+                if (d == null) { sb.Append(" | Strategic Campaign AI: brak (roszczenie nieruszane)"); return; }
+                string now = d.Contains(k.StringId) ? d[k.StringId] as string : null;
+                if (had) d[k.StringId] = prev; else if (d.Contains(k.StringId)) d.Remove(k.StringId);
+                sb.Append(" | roszczenie Strategic Campaign AI ").Append(Nm(k)).Append(": ").Append(now ?? "-").Append(" -> ").Append(had ? (prev ?? "-") : "brak").Append(" (jak przed zmiana)");
+            }
+            catch (Exception e) { Stumble("ScaRestore", e); }
+        }
+
+        // ------------------------------------------------------------ (h) wiadomosc dla gracza
+        private static string Join(List<string> xs)
+        {
+            if (xs.Count == 0) return "";
+            if (xs.Count == 1) return xs[0];
+            return string.Join(", ", xs.GetRange(0, xs.Count - 1).ToArray()) + " and " + xs[xs.Count - 1];
+        }
+
+        /// <summary>Po godzinie ze zmianami: "The chronicles are set right: ..." - osady wedlug krolestwa nowego pana, korekta fabuly i zwrot skarbca.</summary>
+        private static void Notify()
+        {
+            try
+            {
+                if (_batchDone.Count == 0 && _batchRefund <= 0) return;
+                // grupy wedlug krolestwa docelowego (kolejnosc tabeli); blizniak (Red Keep) idzie z miastem - nazwy tylko osad z tabeli
+                var order = new List<string>();
+                var byK = new Dictionary<string, List<Row>>(StringComparer.Ordinal);
+                foreach (var row in Rows)
+                {
+                    if (!_batchDone.Contains(row.Id) && (row.Twin == null || !_batchDone.Contains(row.Twin))) continue;
+                    List<Row> l;
+                    if (!byK.TryGetValue(row.Kingdom, out l)) { l = new List<Row>(); byK[row.Kingdom] = l; order.Add(row.Kingdom); }
+                    l.Add(row);
+                }
+                var parts = new List<string>();
+                foreach (var kid in order)
+                {
+                    var rows = byK[kid];
+                    var names = new List<string>();
+                    var clans = new HashSet<string>(StringComparer.Ordinal);
+                    foreach (var row in rows)
+                    {
+                        if (_batchDone.Contains(row.Id)) names.Add(Nm(Settlement.Find(row.Id)));
+                        if (row.Twin != null && _batchDone.Contains(row.Twin)) names.Add(Nm(Settlement.Find(row.Twin)));
+                        clans.Add(row.Clan);
+                    }
+                    var k = FindKingdom(kid);
+                    Hero ruler = k != null ? k.Leader : null;
+                    string owner;
+                    if (clans.Count == 1)
+                    {
+                        var c = FindClan(rows[0].Clan);
+                        owner = c != null && ruler != null && c.Leader == ruler ? Nm(ruler) : "House " + (c != null ? c.Name.ToString() : rows[0].Clan);
+                    }
+                    else owner = ruler != null ? "the bannermen of " + Nm(ruler) : "the lords of " + Nm(k);
+                    parts.Add(Join(names) + (names.Count > 1 ? " return to " : " returns to ") + owner);
+                }
+                var msg = new StringBuilder("The chronicles are set right: ");
+                msg.Append(parts.Count > 0 ? string.Join("; ", parts.ToArray()) : "the realms keep their lands").Append('.');
+                foreach (var m in _batchMoved) msg.Append(' ').Append(m).Append('.');
+                if (_batchRefundText != null) msg.Append(' ').Append(_batchRefundText).Append('.');
+                Log.Player(msg.ToString());
+                Log.Info(Prefix + "wiadomosc dla gracza: \"" + msg + "\"");
+            }
+            catch (Exception e) { Stumble("Notify", e); }
+        }
+    }
+
+    /// <summary>f19-kanon-b: flaga przywrocenia wlosci w zapisie (arm_book_holdings), proba co godzine, nowa kampania = nic do przywracania.</summary>
+    internal sealed class BookHoldingsBehavior : CampaignBehaviorBase
+    {
+        public BookHoldingsBehavior() { BookHoldings.Reset(); }
+
+        public override void RegisterEvents()
+        {
+            CampaignEvents.OnNewGameCreatedEvent.AddNonSerializedListener(this, _ => BookHoldings.OnNewGame());
+            CampaignEvents.OnSessionLaunchedEvent.AddNonSerializedListener(this, _ => BookHoldings.SessionStart());
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, BookHoldings.Hourly);
+        }
+
+        public override void SyncData(IDataStore dataStore)
+        {
+            try
+            {
+                string v = dataStore.IsSaving ? BookHoldings.Export() : null;
+                SaveText.Sync(dataStore, "arm_book_holdings", ref v);
+                if (dataStore.IsLoading) BookHoldings.Import(v);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_book_holdings", e); }
+        }
+    }
+}

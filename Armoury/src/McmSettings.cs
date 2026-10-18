@@ -7916,6 +7916,10 @@ namespace Armoury
         [SettingPropertyGroup("Bandit numbers (night 18.10)")]
         public bool BanditCostLog { get; set; } = true;
 
+        [SettingPropertyBool("Book Holdings Restore", HintText = "once per save, in the first hour the party is out on the map, set the realms back as the chronicles have them at this point of the war: King's Landing and the Red Keep return to King Joffrey, the five castles Renly took from Stannis (Sharp Point, Stonedance, Sweetport, Cape Wrath, Fellwood) return to Stannis's bannermen and Starfall to House Dayne; lords of the old side who sit there are sent to their own keeps, the old garrisons march to their own lords (no men are made or lost), the northern host near King's Landing falls back to its own fortress, and the North pays back the 1,125,434 denars it carried off from the royal treasury. Harrenhal stays with the Boltons and Essos is left as it is. Does nothing in a campaign started with this version; off = nothing changes")]
+        [SettingPropertyGroup("Book holdings (night 18.10)")]
+        public bool BookHoldingsRestore { get; set; } = true;
+
         public void ApplyTo(Settings s)
         {
             s.TidyBannerKingsArmourList = TidyBannerKingsArmourList;
@@ -9894,6 +9898,7 @@ namespace Armoury
             s.BanditLimitPerHideout = BanditLimitPerHideout;
             s.BanditBirthsWherePeople = BanditBirthsWherePeople;
             s.BanditCostLog = BanditCostLog;
+            s.BookHoldingsRestore = BookHoldingsRestore;
         }
 
         internal static void Apply()
