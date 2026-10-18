@@ -48,7 +48,9 @@ namespace Armoury
             // D korona -> rody tej samej doby
             long dRef = V("zwrot zoldu", () => KingdomTreasury.LastRefundGiven), dRent = V("renty 180", () => CrownRents.LastPaid), dW5 = V("W5", () => KingdomTreasury.LastNeedAid);
             long dW5b = V("W5b", () => KingdomTreasury.LastCrownSurplusAid), dW6 = V("W6", () => KingdomTreasury.LastScutageOut), dM1 = V("M1", () => KingdomTreasury.LastNeedAidRent);
-            long D = dRef + dRent + dW5 + dW5b + dW6 + dM1;
+            bool w5cOn = (Settings.Current != null && Settings.Current.CrownWarAidMiddle) || KingdomTreasury.LastMidAid != 0;   // f15: klucz wylaczony i 0 - linia jak dotad
+            long dW5c = w5cOn ? V("W5c", () => KingdomTreasury.LastMidAid) : 0;   // f15: skarbiec dla srednich (skarbce ponad zapas wojny -> glowy rodow)
+            long D = dRef + dRent + dW5 + dW5b + dW6 + dM1 + dW5c;
             // E rody -> dwor
             long E = V("sprzet niewydany -> dwor", () => CourtFull.LastPaid);
             // uspione poza suma (mechanizmy dzis bez ruchu): chleb M3, pozyczki koron od miast, dosypka regulatora kas miast
@@ -68,7 +70,7 @@ namespace Armoury
               .Append(" | C kasy osad -> panowie i korony ").Append(C).Append(" (zawor miast ").Append(cTown).Append(", zawor zamkow ").Append(cCastle).Append(", danina wojenna z kas ").Append(cWar)
               .Append(", korona z utargu wsi ").Append(cVill).Append(')')
               .Append(" | D korona -> rody tej samej doby ").Append(D).Append(" (zwrot zoldu ").Append(dRef).Append(", renty 180 ").Append(dRent).Append(", W5 ").Append(dW5).Append(", W5b ").Append(dW5b)
-              .Append(", W6 ").Append(dW6).Append(", M1 ").Append(dM1).Append(')')
+              .Append(", W6 ").Append(dW6).Append(", M1 ").Append(dM1).Append(w5cOn ? ", W5c " + dW5c : "").Append(')')
               .Append(" | E rody -> dwor (sprzet niewydany) ").Append(E)
               .Append(" | F naturalne z obrotu (E3, poza suma) ").Append(F).Append(" (z ludu i wsi ").Append(fFolk).Append(": czynsz gruntowy z kies W/R ").Append(fRent)
               .Append(", danina markietanow zamiast do kies wsi ").Append(fSut).Append(", myto wozow wsi - utarg wsi przed 112 ").Append(fCart).Append("; z kies karawan - wlasciciele ").Append(fCar)

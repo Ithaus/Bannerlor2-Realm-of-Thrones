@@ -53,6 +53,7 @@ namespace Armoury
             public long WarAid;           // P1 (obieg kiesy ludu): danina z oszczednosci ludu od wczorajszego zamkniecia korony (kiesy ludu -> skarbiec) - w Own
             public long NeedAid;          // W5: doplata do zoldu wedlug potrzeby wyplacona tej doby (skarbiec -> glowy rodow; po zwrocie zoldu, przed rentami 180)
             public long CrownAid;         // W5b regula 2: doplata W5 wyplacona tej doby ze skarbca PONAD ZAPAS WOJNY (skarbiec -> glowy rodow; po szczeblu daniny, przed tarczowym); POZA wplywami dnia (Spend / Left) - z zapasu
+            public long MidAid;           // f15 W5c: skarbiec dla srednich - f x brak zoldu ponad W5 do pelnego limitu ze skarbca PONAD ZAPAS WOJNY (skarbiec -> glowy rodow); POZA wplywami dnia - z zapasu, jak W5b
             public long Bread;            // M3 (pieniadze roku 2): chleb dla glodnych osad krolestwa z reszty wplywow dnia przed rentami (TownFolk.BreadCrown; skarbiec -> kiesy ludu)
             public long KingOut;          // L1 (pieniadze roku 2): czesc RepOut - raty okupow krolow (178, dlug Kind 'k'); reszta RepOut to reparacje
             public long NeedAidRent;      // M1 (pieniadze roku 2): doplata W5 z reszty wplywow dnia przed rentami (KingdomTreasury.RentAid.cs) - obok NeedAid (szczebel daniny), nie w nim
@@ -428,6 +429,7 @@ namespace Armoury
                 long naid = 0;   // W5: doplata do zoldu wedlug potrzeby
                 long scIn = 0, scOut = 0;   // W6: tarczowe (pobrane i wyplacone tej samej doby)
                 long cAid = 0;   // W5b regula 2: doplata W5 ze skarbcow ponad zapas wojny (poza wplywami dnia)
+                long mAid = 0;   // f15 W5c: skarbiec dla srednich (poza wplywami dnia)
                 long vKept = 0; int vKeptN = 0; double vR = 0;   // E3-G5
                 long court = 0; int courtN = 0;   // E3-P1 (b)
                 var parts = new List<KeyValuePair<long, string>>();
@@ -436,11 +438,11 @@ namespace Armoury
                     var k = kv.Key; var d = kv.Value;
                     meas += d.Measured; own += d.Own; oth += d.Other; rel += d.Release; spend += d.Spend; gift += d.GiftOut; giftIn += d.GiftIn; repO += d.RepOut; repI += d.RepIn;
                     con += d.Contract; refD += d.RefundDue; refG += d.RefundGiven; left += Math.Max(0, d.Left); rent += d.Rent; rentH += d.RentHeld; ctw += d.CallToWar;
-                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; dmov += d.DsMov; dtre += d.DsTreas; dant += d.DsAnt; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid;
+                    loanIn += d.LoanIn; loanOut += d.LoanOut; wtax += d.WarTax; waid += d.WarAid; dmov += d.DsMov; dtre += d.DsTreas; dant += d.DsAnt; naid += d.NeedAid; naRent += d.NeedAidRent; bread += d.Bread; kingO += d.KingOut; scIn += d.ScutIn; scOut += d.ScutOut; cAid += d.CrownAid; mAid += d.MidAid;
                     if (d.ValveKept > 0) { vKept += d.ValveKept; vKeptN++; vR = Math.Max(vR, d.ValveR); }
                     if (d.Court > 0) { court += d.Court; courtN++; }
                     if (!d.Snap) noSnap++;
-                    if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0 && d.ScutIn <= 0 && d.CrownAid <= 0) continue;
+                    if (d.Spend <= 0 && d.RepIn <= 0 && d.GiftIn <= 0 && d.LoanIn <= 0 && d.ScutIn <= 0 && d.CrownAid <= 0 && d.MidAid <= 0) continue;
                     parts.Add(new KeyValuePair<long, string>(d.Spend, (k.Name != null ? k.Name.ToString() : k.StringId) + " " + d.Measured + "+" + d.Release + (d.WarTax > 0 ? " (184 " + d.WarTax + ")" : "") + (d.WarAid > 0 ? " (danina P1 " + d.WarAid + ")" : "")
                               + (d.LoanOut > 0 ? " rata186 -" + d.LoanOut : "") + (d.LoanIn > 0 ? " kredyt186 +" + d.LoanIn : "")
                               + (d.GiftOut > 0 ? " dar -" + d.GiftOut : "") + (d.GiftIn > 0 ? " dar +" + d.GiftIn : "") + (d.RepOut > 0 ? " rata -" + d.RepOut : "") + (d.RepIn > 0 ? " rata +" + d.RepIn : "")
@@ -450,6 +452,7 @@ namespace Armoury
                               + (d.Bread > 0 ? " chleb M3 " + d.Bread : "")
                               + (d.ScutIn > 0 || d.ScutOut > 0 ? " tarczowe W6 +" + d.ScutIn + " -" + d.ScutOut : "")
                               + (d.CrownAid > 0 ? " ze skarbca W5b -" + d.CrownAid : "")
+                              + (d.MidAid > 0 ? " dla srednich W5c -" + d.MidAid : "")
                               + (d.Windfall > 0 ? " jednoraz. do zapasu " + d.Windfall : "")));
                 }
                 parts.Sort((x, y) => y.Key.CompareTo(x.Key));
@@ -488,6 +491,7 @@ namespace Armoury
                       .Append(", E3-P1 dwor krolewski - towar z polki stolicy z puli rent (Crown Court Goods ").Append(s.CrownCourtGoods ? "tak" : "nie").Append(") ").Append(court).Append(" (krolestw ").Append(courtN).Append(')')
                       .Append(", tarczowe (W6, poza wplywami dnia): pobrane od rodow do skarbcow ").Append(scIn).Append(", wyplacone tej samej doby rodom z doplata W5 ").Append(scOut)
                       .Append(", doplata ze skarbcow ponad zapas wojny (W5b, poza wplywami dnia - z zapasu) ").Append(cAid)
+                      .Append(s.CrownWarAidMiddle || mAid > 0 ? ", skarbiec dla srednich (W5c f15, poza wplywami dnia - z zapasu) " + mAid : "")   // f15: klucz wylaczony i 0 - napis jak dotad
                       .Append(", skarbce zdobytych stolic (L5b-1, poza wplywami dnia - migawka przesunieta): ze skarbcow przegranych ").Append(CapitalTreasury.LastTaken)
                       .Append(" do skarbcow zdobywcow ").Append(CapitalTreasury.LastToCrowns).Append(" i kies glow rodow bez krolestwa ").Append(CapitalTreasury.LastToHeads)
                       .Append(" | zostalo z wplywow dnia w skarbcach ").Append(left)

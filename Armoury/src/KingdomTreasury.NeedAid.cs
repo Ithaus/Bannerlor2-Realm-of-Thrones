@@ -96,6 +96,7 @@ namespace Armoury
             ScutageReset();   // W6: stan doby tarczowego (drugie zrodlo garnka) czyszczony razem z W5
             CrownSurplusReset();   // W5b regula 2: stan doby skarbca ponad zapas wojny czyszczony razem z W5
             LordLevyReset();       // W7: plan doby, gotowka wczoraj i sumy tygodnia stawki wojennej pana czyszczone razem z W5
+            MidAidReset();         // f15 W5c: stan doby skarbca dla srednich czyszczony razem z W5
         }
 
         private static void NaClearMeasure()
@@ -118,6 +119,7 @@ namespace Armoury
             NaClearMeasure();
             ScClearDay();     // W6: platnicy, podstawy i gotowka tarczowego poprzedniej doby
             CsClearDay();     // W5b regula 2: gotowka ze skarbca ponad zapas wojny i kontrole poprzedniej doby
+            McClearDay();     // f15 W5c: gotowka, przydzialy i kontrole skarbca dla srednich poprzedniej doby
         }
 
         private static double NaTarget(Settings s) { return WtClamp(s.CrownWarAidFillTarget, 0, 1); }
@@ -185,6 +187,7 @@ namespace Armoury
                 row.Known = !ClanBudget.Pending;   // W5b: pierwsza doba sesji - budzet 166 jeszcze nie policzony, potrzeba nieznana (to nie jest "potrzeba 0")
                 float avgWage = Math.Max(1f, Campaign.Current.AverageWage);
                 var cand = new List<NaClan>();
+                var all = new List<NaClan>();   // f15 W5c: wszystkie rody ocenione przez W5 (takze bez potrzeby przy celu W5) - kandydaci skarbca dla srednich
                 for (int i = 0; i < list.Count && i < ok.Length; i++)
                 {
                     var c = list[i];
@@ -204,6 +207,7 @@ namespace Armoury
                         if (!NaParties(c, out limit, out men, out wage)) { if (pl) _plWhy = "bez czynnej druzyny"; continue; }   // bez czynnej druzyny (niewola, brak dowodcy, rod rycerza 179)
                         var x = new NaClan { C = c, Pc0 = pc0, W = wage, M = men, L = limit, P = men >= 20 && wage > 0 ? (double)wage / men : avgWage * CrownGifts.GoldWageShare(c), Pl = pl };   // WW-J: rod bez ludzi - srednia gry x czesc w zlocie
                         row.Cand++;
+                        all.Add(x);
                         double need = NaCost(x, target);
                         if (pl) PlNote(x, need);                                                 // W6b: do linii - zold, ludzie, limit i potrzeba gracza
                         if (!(need > 0)) continue;                                               // rod stac na cel z wlasnego pulapu - bez doplaty
@@ -228,7 +232,13 @@ namespace Armoury
                 // recenzja (blad 3): bez reszty wplywow (LeftFor = 0 - zwrot zjadl wplywy, kredyt 186) RentAidStep nie biegnie - brak po W6 jest "bez platnika";
                 // dotad RentAll zostawalo false i linia liczyla go do "z platnikiem" (falszywe NIE w R2-1b). RentAidStep ustawia je na nowo, gdy biegnie.
                 row.RentAll = RentAidOn && !m1;
-                if (cand.Count == 0 || (row.Pot <= 0 && crown <= 0 && (sc == null || sc.Due <= 0) && !m1)) return 0;
+                if (cand.Count == 0 || (row.Pot <= 0 && crown <= 0 && (sc == null || sc.Due <= 0) && !m1))
+                {
+                    // f15 W5c: szczeble W5 nie maja co robic (zaden rod nie potrzebuje W5 albo brak zrodel) - skarbiec dla srednich liczy swoje (poziom W5 0; bez puli W5b
+                    // budzet W5c jest 0, gdy nadwyzka skarbca nie starcza na 1 zl tempa - wtedy nic)
+                    MidAidStep(k, all, cand, row, 0, step, 0, crown, today);
+                    return 0;
+                }
                 // poziom wyrownania: najwyzszy f <= cel, przy ktorym suma kosztow miesci sie w garnku (koszt rosnie z f; przy f = 0 jest 0)
                 double level = target;
                 if (row.Need > row.Pot)
@@ -302,6 +312,9 @@ namespace Armoury
                     lvl = RentAidStep(k, cand, row, sc != null ? sc.Room : 0, paidK, lvl, target, step, today, out paidR);
                     row.Uncov = Math.Max(0, row.UncovPre - row.Rent);
                 }
+                // f15 W5c (CrownWarAidMiddle): PO wszystkich szczeblach W5 - skarbiec ponad zapas wojny placi f x brak zoldu ponad W5 do pelnego limitu (gotowka ze skarbca,
+                // poza wplywami dnia - jak W5b; wlasny try i ksiegowanie). paidK - gotowka szczebla daniny jeszcze w reszcie wplywow dnia (kontrola zapasu)
+                MidAidStep(k, all, cand, row, lvl, step, paidK, crown, today);
                 LvPlan(k, row.Name, cand, lvl);   // W7: poziom wyrownania po ostatnim szczeblu W5 (danina, skarbiec, tarczowe, M1)
             }
             catch (Exception e) { NaStumble("NeedAidKingdom", e); }
@@ -438,7 +451,7 @@ namespace Armoury
         // ------------------------------------------------------------ doba: linia "Doplata wedlug potrzeby (W5)" - z ArmouryBehavior, zaraz po rentach 180
         internal static void NeedAidDay()
         {
-            LastNeedAid = 0; LastCrownSurplusAid = 0; LastNeedAidRent = 0;
+            LastNeedAid = 0; LastCrownSurplusAid = 0; LastNeedAidRent = 0; LastMidAid = 0;
             var s = Settings.Current;
             if (s == null || Campaign.Current == null) return;
             int today = (int)CampaignTime.Now.ToDays;
@@ -538,10 +551,12 @@ namespace Armoury
                       .Append(" -> dzis ").Append(NaPct(_naOldMenNow, _naOldLimNow)).Append(", ludzi ").Append(_naOldMen0).Append(" -> ").Append(_naOldMenNow)
                       .Append(" | zold oplacony wczorajsza doplata poza podstawa zwrotu 70% (dzis) ").Append(_naCut).Append(" (wpisow platnikow ").Append(_naCutN).Append(')')
                       .Append(PlSeg(today, false))                                      // W6b: " | gracz: ..." (warunki 1-3, pulap wlasny, dostal / zaplacil)
+                      .Append(MidAidSeg())                                              // f15 W5c: gotowka skarbca dla srednich (czesc kolumny doplata_w5) - przed "na krolestwo"
                       .Append(" | na krolestwo: ").Append(txt.Count > 0 ? string.Join(" ; ", txt.ToArray()) : "-")
                       .Append(" | potkniecia ").Append(_naStumbles).Append('.');
                     Log.Info(sb.ToString());
                 }
+                MidAidDay(s, today);   // f15 W5c: linia "Skarbiec dla srednich (W5c)", LastMidAid i komunikat gracza (wlasny try; takze bez logu)
             }
             catch (Exception e) { NaStumble("NeedAidDay", e); }
             finally { _naStumbles = 0; _naCut = 0; _naCutN = 0; _csStumbles = 0; }

@@ -61,7 +61,7 @@ namespace Armoury
         {
             string gid = null;
             try { gid = Campaign.Current != null ? Campaign.Current.UniqueGameId : null; } catch { gid = null; }
-            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = _plToldLevyDay = int.MinValue; }
+            if (!string.Equals(gid, _plToldGame, StringComparison.Ordinal)) { _plToldGame = gid; _plToldScutDay = _plToldAidDay = _plToldLevyDay = _plToldMidDay = int.MinValue; }   // recenzja f15: + W5c
             if (last != int.MinValue && Math.Abs((long)today - last) < PlToldEvery) return false;
             last = today;
             return true;
@@ -206,7 +206,7 @@ namespace Armoury
                                + (100 * (s != null ? ScRate(s) : 0.25)).ToString("0", WtInv) + "% of the wages he spares, and the crown gives it the same day to the lords who cannot pay their men. "
                                + "It is taken only from coin above your war reserve and only while the crown's war aid still falls short. Field more men and you pay less.");
                 }
-                if (got > 0 && PlTellDue(ref _plToldAidDay, today))
+                if (got - MidAidCashOf(c) > 0 && PlTellDue(ref _plToldAidDay, today))   // f15: sama gotowka W5c ma wlasne wyjasnienie (MidAidDay) - to jest wyjasnienie W5 (cel 60%)
                 {
                     Log.Player("War aid: in war the crown helps pay the wages of vassals whose lands cannot keep their companies at "
                                + (100 * (s != null ? NaTarget(s) : 0.6)).ToString("0", WtInv) + "% of their size. It pays only for men already in your companies, and only while you keep the crown's terms for rents (garrisons and service).");
