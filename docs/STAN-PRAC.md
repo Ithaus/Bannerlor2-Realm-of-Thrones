@@ -2880,3 +2880,9 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   ab50e3a4 (przeglad firm DS co 91 dob w obie strony, w dol od razu przy zaleglosciach; pan splaca rachunki zywnosci wczesniej; zawrocony woz nie niszczy towaru), f4-pomiary c361458a
   (tylko pomiary: A7, regale, karawany, zelazo/drewno), f4-place-ludu a30493d2 (place w dol do 0.6 przy wolnych rekach, zarobek W do koszyka KS 15-30 dni). Galezie na GitHub.
   Jeff nie gra (02:02 PDT, zapis z 06:05). Okno 5 h 76% - scalenie po resecie 02:20.
+- 02:20 PDT: FALA 4b GOTOWA (wf_639d1725-f6f, 4/4 build rc 0; scratchpad fala4b-wynik.json): f4b-glod 47bbff8c - 163 zgony to NIE regresja: mieszczanie Sharp Point w dwoch oblezeniach z rzedu
+  (Stormlands 109118-109138, Renly 109139-109157), checker przypisal je "poza oblezeniami"; poprawiony sam pomiar (Famine.Cause.cs, segment w linii Spichlerze, NKS-15/15b); f4b-inwest 9bb6488b
+  (neutralny start na towarach z modelu gry - premie budynkow tylko dla towarow wlasnego typu wsi; ikony okregu z czesci zajec), f4b-perf fa04a947 (losowy zold towarzyszy BK - pamiec tylko bez
+  bohaterow i bez losowania), f4b-zapis aca97840 (nasze napisy = 4.7% pliku zapisu, nowe klucze nocy 2.3%; ARM-3: KS wlacza sie po 28 + 7 = 35 dobach, klucz KsArmMatureFromUse).
+- 02:21 PDT: workflow wf_29205654-862 (scalenie3: 11 galezi fali 4 + 4b do w-toku/noc-ks4 od f5fd0ae3, 3 recenzje calosci + weryfikacja + poprawki) -> test sciezki Jeffa 160 dob ->
+  5 dob + bitwa -> WGRANIE 79 (gdy Jeff nie gra).
