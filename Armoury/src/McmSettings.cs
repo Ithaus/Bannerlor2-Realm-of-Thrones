@@ -3988,7 +3988,7 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public int MercMinServiceDays { get; set; } = 28;
 
-        [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts", RequireRestart = false)]
+        [SettingPropertyBool("Crown Gifts", HintText = "with Crown Current Income: the North feeds the Night's Watch and (with Gift Free Cities To Dothraki) the Free Cities pay the Dothraki - each day a share of the giver's daily income goes through the receiving crown to its houses the same day, by fixed weights (the Watch: a stronghold 1, a village a quarter, a house without a fief half; the Dothraki: equal for every house of the khalasar) - never by the number of men. It counts towards their steady income. Off = no gifts", RequireRestart = false)]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownGifts { get; set; } = true;
 
@@ -4032,7 +4032,11 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float GiftWatchFoodPerMan { get; set; } = 1.0f;
 
-        [SettingPropertyFloatingInteger("Gift Free Cities To Dothraki Share", 0.00f, 1.00f, "0.00", HintText = "share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); 0.15 since the 120-day test, where the Dothraki at war fell more than a quarter below their old numbers (0.10 before)", RequireRestart = false)]
+        [SettingPropertyBool("Gift Free Cities To Dothraki", HintText = "the Free Cities (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath) pay the Dothraki a tribute: each day Gift Free Cities To Dothraki Share of every Free City's daily income goes to the houses of the khalasar, equal for every house (needs Crown Gifts). Off by default: the Dothraki live on what they take - loot, ransoms and raids - and each Free City keeps that share of its daily income for its own houses and treasury. The gifts of Westeros to the Night's Watch are not touched. Takes effect from the next day", RequireRestart = false)]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool GiftFreeCitiesToDothraki { get; set; } = false;
+
+        [SettingPropertyFloatingInteger("Gift Free Cities To Dothraki Share", 0.00f, 1.00f, "0.00", HintText = "with Gift Free Cities To Dothraki: share of each Free City's daily income given to the Dothraki (Braavos, Volantis, Pentos, Myr, Lys, Tyrosh, Norvos, Qohor, Lorath); 0.15 since the 120-day test, where the Dothraki at war fell more than a quarter below their old numbers (0.10 before)", RequireRestart = false)]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public float GiftFreeCitiesToDothrakiShare { get; set; } = 0.15f;
 
@@ -8963,6 +8967,7 @@ namespace Armoury
             s.GiftWatchDragonstone = GiftWatchDragonstone;
             s.GiftWatchNeedDays = GiftWatchNeedDays;
             s.GiftWatchFoodPerMan = GiftWatchFoodPerMan;
+            s.GiftFreeCitiesToDothraki = GiftFreeCitiesToDothraki;
             s.GiftFreeCitiesToDothrakiShare = GiftFreeCitiesToDothrakiShare;
             s.WatchUnpaid = WatchUnpaid;
             s.CrownRents = CrownRents;

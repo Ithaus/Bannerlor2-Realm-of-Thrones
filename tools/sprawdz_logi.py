@@ -1684,6 +1684,16 @@ Uzycie (Python 3, tylko odczyt):
                     koszt +100 band w s/dobe (INFO). Log sprzed paczki: NBD-B z liczbami, reszta INFO, bez wyjatku. NBD-7/NBD-10 podaja klucze obu biegow (limit, cel
                     podniesiony, narodziny przy ludziach); gdy biegi roznia sie Bandit Births Where People, NBD-10 ostrzega, ze wzrost band to limit + miejsce narodzin
                     (czysty limit: noga z kluczem 24 i Bandit Births Where People NIE wobec nogi 24 + TAK i bazy 12).
+--grupa ndothraki : (18.10, paczka f20-d2 - decyzja Jeffa "2.c": danina Wolnych Miast dla Dothrakow wylaczona calkiem, Dothrakowie zyja z lupow, okupow i najazdow;
+                    Armoury/src/CrownGifts.cs, NOWY klucz Gift Free Cities To Dothraki, domyslnie NIE; udzial Gift Free Cities To Dothraki Share dziala tylko przy kluczu)
+                    python -I tools/sprawdz_logi.py --grupa ndothraki <Armoury-*.log> [--csv budzet-rodow.csv] (strumieniowo; bez --csv budzet-rodow.csv obok logu). Linia
+                    "Dary koron (182): dzien N" z wpisem "(rowno na rod; danina f20-d2 GiftFreeCitiesToDothraki NIE - off)" (przy TAK: "TAK, udzial x"). NDT-0 linie 182
+                    rozpoznane (nierozpoznanych 0), NDT-1 w kazdej dobie z kluczem NIE: Wolne Miasta -> Dothrakowie 0 zl do 0 rodow, bez wpisow Wolnych Miast w szczegolach
+                    i "i Dothrakow 0" w linii Obieg tej doby (klucz TAK albo log sprzed paczki - danina srednio na dobe, INFO), NDT-2 pieniadz darow zamkniety: zeszlo = doszlo
+                    + zostalo (zaokraglenia), doszlo = Straz + Dothrakowie, linia Obieg = linia 182 (takze log sprzed paczki), NDT-3 dary Westeros -> Straz (galaz bez zmian;
+                    INFO), NDT-4 ERROR CrownGifts i potkniecia 0, NDT-5 rody krolestwa Dothrakow w budzet-rodow.csv - D, czesc "korona", kiesy, ludzie, W5 pierwsze / ostatnie
+                    28 dob (INFO - skutek braku daniny). Log sprzed paczki (np. fin93 Armoury-2026-10-18_12-18-40.log): NDT-1 jako liczba bazowa (INFO), reszta z liczbami,
+                    bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -48267,6 +48277,192 @@ def nbandy_main(logp, bdp=None):
     return 0
 
 
+# ------------------------------------------------------------ f20-d2 (decyzja Jeffa 18.10 "2.c"): grupa ndothraki - danina Wolnych Miast dla Dothrakow wylaczona
+# Armoury/src/CrownGifts.cs: galaz Wolne Miasta -> Dothrakowie tylko przy NOWYM kluczu GiftFreeCitiesToDothraki (domyslnie NIE); galaz Westeros -> Straz bez zmian.
+# Linia "Dary koron (182): dzien N" niesie wpis klucza "(rowno na rod; danina f20-d2 GiftFreeCitiesToDothraki NIE - off)"; log sprzed paczki - bez wpisu (INFO).
+NDT_DAY = "Dary koron (182): dzien "
+NDT_L = re.compile(r"Dary koron \(182\): dzien (\d+) \| Westeros -> Straz (\d+) zl do (\d+) rodow .*?- dar (TAK|NIE)\) \| Wolne Miasta -> Dothrakowie (\d+) zl do (\d+) rodow"
+                   r" \(rowno na rod(?:; danina f20-d2 GiftFreeCitiesToDothraki (TAK, udzial ([\d.]+)|NIE - off))?\) \| ze skarbcow dawcow zeszlo (\d+), do rodow doszlo (\d+),"
+                   r" w skarbcach odbiorcow zostalo \(zaokraglenia\) (\d+) \| szczegoly: (.*?) \| Straz bez zoldu \(WatchUnpaid\): (TAK|NIE)(?: \| potkniecia (\d+))?\.$")
+NDT_SAV = re.compile(r"oszczednosci Strazy (\d+) wobec (\d+) dob kosztow po (\d+)")
+NDT_OB = re.compile(r"dary \(182\) skarbce dawcow -> glowy rodow Strazy (\d+) i Dothrakow (\d+) \(ze skarbcow dawcow (\d+), reszta w skarbcach odbiorcow (\d+)\)")
+NDT_NAME = re.compile(r"Dary koron \(182\): krolestwa - .*?Dothrakowie \(khuzait\) (.+?), Wolne Miasta (\d+) z (\d+)")
+NDT_WIN = 28
+
+
+def _ndt_csv(cp, kname):
+    """budzet-rodow.csv: rody krolestwa Dothrakow na dobe -> [rodow, D, d_korona, G, ludzi partii + zalog, doplata_w5] (sumy). Brak pliku / kolumn = (None, powod)."""
+    if not cp or not os.path.isfile(cp):
+        return None, f"brak CSV {cp}"
+    need = ("dzien_gry", "krolestwo", "D", "d_korona", "G", "ludzi_partie", "ludzi_zalogi", "doplata_w5")
+    agg = {}
+
+    def fl(v):
+        try:
+            return float(v)
+        except ValueError:
+            return 0.0
+    with open(cp, encoding="utf-8", errors="replace", newline="") as fh:
+        r = csv.reader(fh, delimiter=";")
+        hdr = next(r, None) or []
+        idx = {h: i for i, h in enumerate(hdr)}
+        miss = [c for c in need if c not in idx]
+        if miss:
+            return None, f"CSV bez kolumn {', '.join(miss)}"
+        top = max(idx[c] for c in need)
+        for row in r:
+            if len(row) <= top or row[idx["krolestwo"]] != kname:
+                continue
+            try:
+                d = int(row[idx["dzien_gry"]])
+            except ValueError:
+                continue
+            a = agg.setdefault(d, [0, 0.0, 0.0, 0.0, 0.0, 0.0])
+            a[0] += 1
+            a[1] += fl(row[idx["D"]])
+            a[2] += fl(row[idx["d_korona"]])
+            a[3] += fl(row[idx["G"]])
+            a[4] += fl(row[idx["ludzi_partie"]]) + fl(row[idx["ludzi_zalogi"]])
+            a[5] += fl(row[idx["doplata_w5"]])
+    return agg, None
+
+
+def ndothraki_main(logp, csvp=None):
+    """ndothraki (18.10, paczka f20-d2 - decyzja Jeffa "2.c": danina Wolnych Miast dla Dothrakow wylaczona calkiem; Dothrakowie zyja z lupow, okupow i najazdow).
+    Wejscie: log Armoury (strumieniowo), opcjonalnie --csv budzet-rodow.csv (bez - obok logu, csv_path_of). Progi NDT-0..NDT-5 - opis w naglowku pliku
+    (--grupa ndothraki). Log sprzed paczki: danina jako liczba bazowa (INFO), tozsamosc pieniadza darow i bledy - z liczbami, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NDT-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    days, obs, errs = {}, [], []
+    bad, name, cities, pend = 0, None, None, None
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NDT_DAY):
+                a = NDT_L.match(s)
+                if not a:
+                    bad += 1
+                    continue
+                d = int(a.group(1))
+                det = a.group(12)
+                parts = [] if det == "-" else det.split(", ")
+                sv = NDT_SAV.search(s)
+                days[d] = {"wg": int(a.group(2)), "wc": int(a.group(3)), "wdar": a.group(4), "dg": int(a.group(5)), "dc": int(a.group(6)),
+                           "key": None if a.group(7) is None else ("TAK" if a.group(7).startswith("TAK") else "NIE"), "share": a.group(8),
+                           "out": int(a.group(9)), "inn": int(a.group(10)), "kept": int(a.group(11)),
+                           "fc": [p for p in parts if " -> " not in p], "wd": [p for p in parts if " -> " in p],
+                           "stum": int(a.group(14) or 0), "sav": tuple(int(x) for x in sv.groups()) if sv else None}
+                pend = d   # linia Obieg tej samej doby idzie PO linii 182 (te same CrownGifts.Last*, zerowane po Obiegu)
+                continue
+            if s.startswith("Dary koron (182): krolestwa"):
+                a = NDT_NAME.search(s)
+                if a:
+                    name, cities = a.group(1), (int(a.group(2)), int(a.group(3)))
+                continue
+            if s.startswith("Obieg: dzien "):
+                a = NDT_OB.search(s)
+                if a and pend is not None:
+                    obs.append((pend,) + tuple(int(x) for x in a.groups()))
+                    pend = None
+                continue
+            if s.startswith("ERROR in CrownGifts"):
+                errs.append(s[:160])
+    ld = sorted(days)
+    keyed = [d for d in ld if days[d]["key"] is not None]
+    off = [d for d in keyed if days[d]["key"] == "NIE"]
+    on = [d for d in keyed if days[d]["key"] == "TAK"]
+    offs = set(off)
+    print(f"plik: {logp} | linii 'Dary koron (182): dzien' {len(ld)} (nierozpoznanych {bad}), z wpisem klucza f20-d2 {len(keyed)} (NIE {len(off)}, TAK {len(on)}),"
+          f" par z linia Obieg {len(obs)}, ERROR CrownGifts {len(errs)}")
+
+    # NDT-0 linie
+    rep.add("NDT-0: linie 'Dary koron (182): dzien N' rozpoznane",
+            f"linii {len(ld)}, nierozpoznanych {bad}; z wpisem klucza f20-d2 {len(keyed)} (NIE {len(off)}, TAK {len(on)}); Dothrakowie w linii startu: {name or '-'}"
+            + (f", Wolne Miasta {cities[0]} z {cities[1]}" if cities else ""),
+            "nierozpoznanych 0 (brak linii - INFO: Crown Gifts / Crown Current Income wylaczone albo log bez LogEnabled)", (bad == 0) if (ld or bad) else None)
+
+    # NDT-1 regula paczki: przy kluczu NIE Wolne Miasta nic nie daja Dothrakom
+    if off:
+        vg = [d for d in off if days[d]["dg"] != 0 or days[d]["dc"] != 0]
+        vf = [d for d in off if days[d]["fc"]]
+        ob_off = [o for o in obs if o[0] in offs]
+        vo = [o for o in ob_off if o[2] != 0]
+        rep.add("NDT-1: danina Wolnych Miast dla Dothrakow wylaczona (f20-d2, klucz Gift Free Cities To Dothraki NIE)",
+                f"dob z kluczem NIE {len(off)} ({off[0]}-{off[-1]}): Dothrakowie zl > 0 albo rodow > 0 w {len(vg)}, wpisy Wolnych Miast w szczegolach w {len(vf)},"
+                f" Obieg 'i Dothrakow' > 0 w {len(vo)} z {len(ob_off)}" + (f"; doby z kluczem TAK {len(on)} (przelaczony w biegu)" if on else "")
+                + (f" (np. dzien {(vg + vf)[0]}: {days[(vg + vf)[0]]['dg']} zl, {days[(vg + vf)[0]]['fc'][:3]})" if vg or vf else ""),
+                "w kazdej dobie z kluczem NIE: Wolne Miasta -> Dothrakowie 0 zl do 0 rodow, bez wpisow Wolnych Miast w szczegolach, Obieg 'i Dothrakow 0'",
+                not vg and not vf and not vo)
+    elif on:
+        avg = sum(days[d]["dg"] for d in on) / len(on)
+        rep.add("NDT-1: danina Wolnych Miast dla Dothrakow (f20-d2)",
+                f"klucz Gift Free Cities To Dothraki TAK we wszystkich {len(on)} dobach (udzial {days[on[-1]]['share']}): danina srednio {avg:.0f} zl/d",
+                "INFO - klucz wlaczony w MCM (domyslnie NIE); prog tylko w dobach z kluczem NIE", None)
+    elif ld:
+        t = ld[-NDT_WIN:]
+        avg = sum(days[d]["dg"] for d in ld) / len(ld)
+        avg28 = sum(days[d]["dg"] for d in t) / len(t)
+        cl = sum(days[d]["dc"] for d in t) / len(t)
+        fcn = sum(len(days[d]["fc"]) for d in t) / len(t)
+        rep.add("NDT-1: danina Wolnych Miast dla Dothrakow (f20-d2)",
+                f"log sprzed paczki (bez wpisu klucza): danina srednio {avg:.0f} zl/d ({len(ld)} dob), ostatnie {len(t)} dob {avg28:.0f} zl/d do {cl:.1f} rodow"
+                f" od {fcn:.1f} Wolnych Miast",
+                "INFO - liczba bazowa; po paczce (klucz NIE) 0 zl/d", None)
+    else:
+        rep.add("NDT-1: danina Wolnych Miast dla Dothrakow (f20-d2)", "brak linii 'Dary koron (182): dzien'", "INFO", None)
+
+    # NDT-2 tozsamosc pieniadza darow (jak przed paczka - galaz Strazy i reszta z zaokraglen)
+    v2 = [d for d in ld if days[d]["out"] != days[d]["inn"] + days[d]["kept"] or days[d]["inn"] != days[d]["wg"] + days[d]["dg"]]
+    vob = [o for o in obs if o[0] in days and (o[1] != days[o[0]]["wg"] or o[2] != days[o[0]]["dg"] or o[3] != days[o[0]]["out"] or o[4] != days[o[0]]["kept"])]
+    rep.add("NDT-2: pieniadz darow zamkniety (zeszlo ze skarbcow dawcow = doszlo do rodow + zostalo w skarbcach odbiorcow; doszlo = Straz + Dothrakowie; Obieg = linia 182)",
+            f"dob {len(ld)}, roznych {len(v2)}" + (f" (np. dzien {v2[0]})" if v2 else "") + f"; par z linia Obieg {len(obs)}, roznych {len(vob)}"
+            + (f" (np. dzien {vob[0][0]})" if vob else ""),
+            "0 roznic", (not v2 and not vob) if ld else None)
+
+    # NDT-3 galaz Strazy bez zmian (INFO)
+    if ld:
+        tak = [d for d in ld if days[d]["wdar"] == "TAK"]
+        tw = sum(days[d]["wg"] for d in ld)
+        sv = next((days[d]["sav"] for d in reversed(ld) if days[d]["sav"]), None)
+        donors = max((len(days[d]["wd"]) for d in tak), default=0)
+        rep.add("NDT-3: dary Westeros -> Nocna Straz (galaz bez zmian w f20-d2)",
+                f"dob z darem TAK {len(tak)} z {len(ld)}, razem {tw} zl ({tw / len(ld):.0f} zl/d), dawcow w dobie najwiecej {donors}"
+                + (f"; oszczednosci Strazy na koniec {sv[0]} wobec {sv[1]} dob x {sv[2]} zl kosztu" if sv else ""),
+                "INFO - test potrzeby Strazy (Gift Watch Need Days) i procenty dawcow bez zmian", None)
+    else:
+        rep.add("NDT-3: dary Westeros -> Nocna Straz", "brak linii", "INFO", None)
+
+    # NDT-4 bledy
+    stum = max((days[d]["stum"] for d in ld), default=0)
+    rep.add("NDT-4: ERROR CrownGifts i potkniecia (linia 182)", f"ERROR {len(errs)}" + (f" (np. {errs[0]})" if errs else "") + f", potkniecia (najwiecej w linii) {stum}",
+            "0 i 0", not errs and stum == 0)
+
+    # NDT-5 skutek dla rodow Dothrakow (budzet-rodow.csv; INFO): czesc "korona" D bez daniny, D, ludzie, W5
+    kname = name or "Dothraki Horde"
+    cp = csvp or csv_path_of(logp)
+    agg, why = _ndt_csv(cp, kname)
+    if agg:
+        cd = sorted(agg)
+        a0, a1 = cd[:NDT_WIN], cd[-NDT_WIN:]
+
+        def av(ds, i):
+            return sum(agg[d][i] for d in ds) / len(ds)
+        rep.add(f"NDT-5: rody {kname} w budzet-rodow.csv - pierwsze / ostatnie {NDT_WIN} dob (sumy na dobe)",
+                f"rodow {av(a0, 0):.1f} / {av(a1, 0):.1f}; D {av(a0, 1):.0f} / {av(a1, 1):.0f}, w tym korona {av(a0, 2):.0f} / {av(a1, 2):.0f}; kiesy G {av(a0, 3):.0f} / {av(a1, 3):.0f};"
+                f" ludzi {av(a0, 4):.0f} / {av(a1, 4):.0f}; doplata W5 {av(a0, 5):.0f} / {av(a1, 5):.0f} (doby {cd[0]}-{cd[-1]})",
+                "INFO - po paczce czesc 'korona' D Dothrakow bez daniny (fin93 przed paczka: danina 15.0 tys. zl/d = ok. 59% czesci korona i 22% D rodow krolestwa,"
+                " kiesy G 4.0 -> 4.6 mln); D trzyma lup z najazdow (W-1), okupy i ziemie; pulap 166 idzie za D (0.60 D w wojnie + 0.8 (G - R)/45 przy G > R) -"
+                " mniej daniny = mniejsze wojsko albo pozyczka (Jeff 12.10: bez sztucznych doplat)", None)
+    else:
+        rep.add(f"NDT-5: rody {kname} w budzet-rodow.csv", why or "brak wierszy krolestwa", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -48534,6 +48730,8 @@ def main(argv):
         return nbandy_main(logp, bdp)   # nbandy (noc 18.10, f8-bandy): limit band ROT x2 z ludzi puli wyrzutkow, puste narodziny, koszt AI band, doba realna wobec bazy (BanditLimit)
     if group == "nboczne" and logp:
         return nboczne_main(logp)   # nboczne (18.10, paczka f11-drogi): boczne drogi do dalszych wiosek - plan, decale, czas, klatki, potkniecia (MapSideRoads.cs)
+    if group == "ndothraki" and logp:
+        return ndothraki_main(logp, csvp)   # ndothraki (18.10, paczka f20-d2): danina Wolnych Miast dla Dothrakow wylaczona (klucz Gift Free Cities To Dothraki NIE), dary Strazy bez zmian (CrownGifts.cs)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
