@@ -14,9 +14,10 @@ namespace Armoury
     ///  - P7 (Ks Price Restart): srednie cen miast od nowa w dobie konca rampy popytu (D+14) - okno odbioru D+22..D+49 mierzy ceny KS; co 7 dob linia cen chwilowych
     ///    (mediana ostatniego odczytu miast - NKS-7d).
     ///  - P4 (Ks Gap Margin, wymaga Ks Market Control): od Planu wlaczenia do D+28 czynnik popytu targu jedzenia z LUKI ZAPASU polek miast:
-    ///    f = 1 + (T* x popyt zaplacony - polki - w drodze) / (28 x popyt zaplacony), 1.00-1.25 (Plan wlaczenia od razu, potem najwyzej 7% na Plan); czynnik > 1
-    ///    (luka albo sterowanie) wchodzi do Planu jako PRAWDZIWY popyt krain miast (popyt na zapas polek) - rownowaga stawia rece przy tym towarze, miasta za niego placa;
-    ///    gasnie, gdy polki dojda do celu. Bez towaru z niczego: produkcja z rak i ziemi, zakup za monete miast (wozy wsi, KS-H).
+    ///    f = 1 + (T* x popyt zaplacony - polki - w drodze) / (28 x popyt zaplacony), 1.00-1.25 (Plan wlaczenia od razu, potem najwyzej 7% na Plan) - zamiast marginesu
+    ///    1.03 (ShelfMargin) dla jedzenia; czynnik dziala w KROKU 8 (popyt targu x f w nadwyzce rynku - rece z pracy domowej, poprawka G; sufit kroku 8 1.25 przy kluczu),
+    ///    nie w popycie rownowagi (recenzja: popyt na zapas w rownowadze Planu wlaczenia przechylal zajecia na stale - bloki gry buduje tylko Plan wlaczenia, a regula
+    ///    zmiany zajec jest wylaczona); gasnie, gdy polki dojda do celu. Bez towaru z niczego: produkcja z rak i ziemi, zakup za monete miast (wozy wsi, KS-H).
     ///  - C1-C3 (Ks Ctl Per Town; granice C3 przy Ks Gap Margin): brak zaplaconego popytu w sterowaniu liczony miasto po miescie (miasta z polka < 0.5 T*: popyt zaplacony -
     ///    odbior 7 dob, srednia 28 dob), nie przez polki calego rynku; bez ciecia, gdy ponad 25% popytu zaplaconego towaru stoi przy polkach < 0.5 T*; granice
     ///    0.85-1.25 (luka +-25%) do D+28, potem sufit schodzi do 1.10 najwyzej 7% na Plan (luka +-5%).
@@ -24,8 +25,10 @@ namespace Armoury
     ///  - P3 (Ks Made7 Derived, wymaga Ks Real Offtake): wsad przetworow ZC5 w popycie ceny miasta = min(wyrob x f, srednia 7 dob wyrobu pary + brak do 4 dni zbytu / 7).
     ///  - P8 (Ks Cloth Demand): kolumna ksiegi KsCloth (odziez wojska, warsztaty zbrojne, naprawy kowali) w popycie 1:1 plotna, sukna i skory Planu.
     ///  - P10 (pomiar): "bez rynku" w linii "KS: rynki" rozdzielone na "wies je swoje" (wedlug rynku wsi) i stracone w drodze KS-H.
-    ///  - SOL (Ks Surplus Skips Basket): krok 5 wsi DS przy koszyku ZC4 nie kupuje soli i narzedzi ponad koszyk (TownFolk.DsSurplus), zakup w ramce ksiegi rynku miasta.
-    /// Zapis: osobny klucz arm_ks_r4c (doba restartu cen, czynnik popytu targu bez przyciecia 1.10, srednia braku miast) - starsza DLL go pomija, stary zapis bez klucza dziala.
+    ///  - SOL (Ks Surplus Skips Basket): krok 5 wsi DS przy koszyku ZC4 nie kupuje listy wsi (sol, narzedzia, plotno, garnki, piwo - wszystkie piec sa w koszyku ZC4
+    ///    z limitem potrzeby i cena; TownFolk.DsSurplus), zakupy wsi bez koszyka ZC4 w ramce ksiegi rynku miasta.
+    /// Zapis: osobny klucz arm_ks_r4c (doba restartu cen i koniec rampy, dla ktorego byl, czynnik popytu targu bez przyciecia 1.10, srednia braku miast) - starsza DLL
+    /// go pomija, stary zapis bez klucza dziala.
     /// </summary>
     internal static partial class StartCalibration
     {
@@ -43,6 +46,7 @@ namespace Armoury
         private const int R4cSaveMax = 16 * 1024;                       // straznik rozmiaru arm_ks_r4c
 
         private static int _pxRestartDay = -1;                          // P7: doba restartu srednich cen (-1 - jeszcze nie; zerowane w RuleReset)
+        private static int _pxRestartEnd = -1;                          // P7: koniec rampy popytu (D+14), dla ktorego byl restart - Redo przesuwa D, restart od nowa
         private static readonly double[] _ut28 = new double[2 * KsTab.NG]; // C1: srednia 28 dob braku miast z polka < 0.5 T* (szt./d)
         private static readonly double[] _lowSh = new double[2 * KsTab.NG];// C2: czesc popytu zaplaconego przy polkach < 0.5 T* (ostatnia doba)
         private static string _gapLine;                                  // P4: linia "KS: luka zapasu" Planu w toku
@@ -60,20 +64,21 @@ namespace Armoury
 
         private static void R4cReset()
         {
-            _pxRestartDay = -1; Array.Clear(_ut28, 0, _ut28.Length); Array.Clear(_lowSh, 0, _lowSh.Length); _gapLine = null; _glutHeld.Clear(); _c2Held.Clear();
+            _pxRestartDay = -1; _pxRestartEnd = -1; Array.Clear(_ut28, 0, _ut28.Length); Array.Clear(_lowSh, 0, _lowSh.Length); _gapLine = null; _glutHeld.Clear(); _c2Held.Clear();
             _skipZl = 0; _skipN = 0; _skipBk = 0; _skipBkN = 0; _r4cTicks = 0; _r4cDays = 0; _r4cPending = null; _r4cKeep = null;
             _kMade7.Clear(); _kMade7N.Clear(); Array.Clear(_m7Der, 0, _m7Der.Length); Array.Clear(_m7Der0, 0, _m7Der0.Length); _m7Day = -1;
         }
 
         // ============================================================ P7: srednie cen od D+14 i ceny chwilowe
-        /// <summary>LiveDaily (po polkach startu): restart srednich cen miast w dobie konca rampy popytu (D+14), raz na wlaczenie.</summary>
+        /// <summary>LiveDaily (po polkach startu): restart srednich cen miast w dobie konca rampy popytu (D+14), raz na koniec rampy - po Undo -> Redo (RampRestart przesuwa D)
+        /// od nowa w nowym D+14, jak srednie zuzycia sterowania (ControlDaily, _cRestart).</summary>
         private static void R4cPriceRestart(int today)
         {
-            if (!SwPriceRestart || _pxRestartDay >= 0 || !_shelvesDone || DDay < 0) return;
+            if (!SwPriceRestart || !_shelvesDone || DDay < 0) return;
             int end = DDay + (RampDemand - RampSupply);
-            if (today < end) return;
+            if (_pxRestartEnd == end || today < end) return;
             RulePxReset();
-            _pxRestartDay = today;
+            _pxRestartDay = today; _pxRestartEnd = end;
             Log.Info(PK + "srednie cen miast od nowa doba " + today + " (koniec rampy popytu D+" + (RampDemand - RampSupply) + ", D " + DDay + "; klucz Ks Price Restart) - linia 'ceny miast'"
                      + " w oknie odbioru D+22..D+49 mierzy ceny po rampie, nie ceny sprzed KS i z rampy; A7 i regale licza od tej doby na nowej sredniej.");
         }
@@ -201,9 +206,8 @@ namespace Armoury
                     {
                         int i = m * NG + g;
                         KsItem it; double kg = inp.Items.TryGetValue(KsTab.Goods[g], out it) && it != null && it.Kg > 0 ? it.Kg : 10.0;
-                        double ga = _plan.GapAdd != null && i < _plan.GapAdd.Length ? _plan.GapAdd[i] : 0.0;
                         double e = _plan.Eaten != null && i < _plan.Eaten.Length ? _plan.Eaten[i] : 0.0;
-                        dp[i] = Math.Max(0.0, _plan.D[i] - e - ga) / (sig * kg);
+                        dp[i] = Math.Max(0.0, _plan.D[i] - e) / (sig * kg);
                         int zp = GoodZ(g);
                         hs[i] = (zp >= 0 ? ZTstar(m, zp) : ShelfDays(1.0)) * dp[i];
                     }
@@ -240,112 +244,42 @@ namespace Armoury
             return -1;
         }
 
-        /// <summary>R3PlanInputs (po MarketControl): czynnik > 1 jedzenia jako popyt krain miast w rownowadze Planu (kg/d) - (czynnik - 1) x (popyt - zjedzone w okregach)
-        /// poprzedniego Planu, wedlug luki polek miast krainy (stan zastosowany), inaczej popytu zaplaconego, inaczej ludzi miast. Linia: ile t/d na rynek.</summary>
+        /// <summary>R3PlanInputs (po MarketControl): sufit czynnika kroku 8 1.25 (klucz Ks Gap Margin; bez klucza 1.10 - jak dotad). Luka zapasu P4 i granice C3 dzialaja
+        /// TYLKO w kroku 8 (popyt targu x f w nadwyzce rynku - rece z pracy domowej, poprawka G okregow), nie w popycie rownowagi: zajecia Planu wlaczenia (jedyny Plan,
+        /// z ktorego powstaja bloki gry) nie przechylaja sie na stale na luke polek, a korytarze i gradient krain licza ten sam popyt co dotad. Linia: popyt na zapas polek
+        /// w kroku 8 (t/d = (f - 1) x (popyt - zjedzone w okregach) poprzedniego Planu).</summary>
         private static void R4cGapInputs(KsInput inp, int day)
         {
-            inp.GapEq = false; inp.GapLand = null;
-            if (!SwGapMargin || inp.MarketFactor == null || _plan == null || _plan.Error != null || _plan.D == null) return;
+            inp.MarketFactorMax = 1.10;
+            if (inp.MarketFactor == null) _gapLine = null;               // bez klucza Ks Market Control - bez linii luki (MarketControl wraca bez czyszczenia)
+            if (!SwGapMargin || inp.MarketFactor == null) return;
+            inp.MarketFactorMax = GapMaxF;
+            if (_gapLine == null || _plan == null || _plan.Error != null || _plan.D == null) return;
             int NG = KsTab.NG;
             var mf = inp.MarketFactor;
-            var lmk = LandMajority(inp);
-            var add = new Dictionary<string, double[]>(StringComparer.Ordinal);
-            var inj = new double[2 * NG];
-            bool map = _state == StateApplied && _zt.Count > 0;
-            var w = new Dictionary<string, double>(StringComparer.Ordinal);
-            for (int m = 0; m < 2; m++)
-                foreach (int g in KsCore.Food)
-                {
-                    int i = m * NG + g;
-                    if (i >= mf.Length || !(mf[i] > 1.0005)) continue;
-                    double e = _plan.Eaten != null && i < _plan.Eaten.Length ? _plan.Eaten[i] : 0.0;
-                    double ga = _plan.GapAdd != null && i < _plan.GapAdd.Length ? _plan.GapAdd[i] : 0.0;
-                    double dkg = (Math.Min(GapMaxF, mf[i]) - 1.0) * Math.Max(0.0, _plan.D[i] - e - ga);
-                    if (!(dkg > 0) || double.IsNaN(dkg)) continue;
-                    w.Clear(); double W = 0;
-                    for (int pass = 0; pass < 3 && !(W > 0); pass++)
-                    {
-                        w.Clear(); W = 0;
-                        if (pass < 2 && map)
-                        {
-                            foreach (var zt in _zt.Values)
-                            {
-                                if (zt == null || zt.St == null || (zt.Market == 0 ? 0 : 1) != m) continue;
-                                string l = TownLandOf(zt.St); int lm; if (!lmk.TryGetValue(l, out lm) || lm != m) continue;
-                                double v = 0;
-                                for (int z = 0; z < ZN; z++)
-                                {
-                                    if (CtlGood(z) != g) continue;
-                                    double d = zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z];
-                                    if (!(d > 0) || double.IsNaN(d)) continue;
-                                    if (pass == 0) { int inc = 0; try { inc = KsFoodCarts.Incoming(zt.St, z); } catch { inc = 0; } v += Math.Max(0.0, ZTstar(m, z) * d - zt.Cnt[z] - inc); }
-                                    else v += d;
-                                }
-                                if (v > 0) { double o; w.TryGetValue(l, out o); w[l] = o + v; W += v; }
-                            }
-                        }
-                        else if (pass == 2)
-                        {
-                            foreach (var t in inp.Towns)
-                            {
-                                if (t == null || (t.Market == 0 ? 0 : 1) != m || !(t.People > 0)) continue;
-                                string l = t.Land ?? "?"; int lm; if (!lmk.TryGetValue(l, out lm) || lm != m) continue;
-                                double o; w.TryGetValue(l, out o); w[l] = o + t.People; W += t.People;
-                            }
-                        }
-                    }
-                    if (!(W > 0)) continue;
-                    foreach (var kv in w)
-                    {
-                        double[] a; if (!add.TryGetValue(kv.Key, out a)) { a = new double[NG]; add[kv.Key] = a; }
-                        a[g] += dkg * kv.Value / W;
-                    }
-                    inj[i] = dkg;
-                }
-            if (add.Count == 0) return;
-            inp.GapLand = add; inp.GapEq = true;
-            var sb = new StringBuilder(_gapLine ?? (PK + "luka zapasu (P4) doba " + day + " | po oknie luki - sterowanie rynku > 1"), 2400);
-            sb.Append(" | popyt na zapas polek w rownowadze Planu (t/d = (czynnik - 1) x (popyt - zjedzone w okregach) poprzedniego Planu; rece i ziemia, zaplata miast):");
             double sig = Math.Max(1, DailyLife.KsSigma);
+            var sb = new StringBuilder(_gapLine.TrimEnd('.'), 2400);
+            sb.Append(" | popyt na zapas polek w kroku 8 (t/d = (f - 1) x (popyt - zjedzone w okregach) poprzedniego Planu; rece z pracy domowej, zaplata miast; nie w rownowadze):");
+            int n = 0;
             for (int m = 0; m < 2; m++)
             {
                 sb.Append(m == 0 ? " Westeros" : " | Essos");
                 bool first = true;
                 foreach (int g in KsCore.Food)
                 {
-                    int i = m * NG + g; if (!(inj[i] > 0)) continue;
+                    int i = m * NG + g;
+                    if (i >= mf.Length || !(mf[i] > 1.0005) || i >= _plan.D.Length) continue;
+                    double e = _plan.Eaten != null && i < _plan.Eaten.Length ? _plan.Eaten[i] : 0.0;
+                    double dkg = (Math.Min(GapMaxF, mf[i]) - 1.0) * Math.Max(0.0, _plan.D[i] - e);
+                    if (!(dkg > 0) || double.IsNaN(dkg)) continue;
                     KsItem it; double kg = inp.Items.TryGetValue(KsTab.Goods[g], out it) && it != null && it.Kg > 0 ? it.Kg : 10.0;
-                    sb.Append(first ? " " : ", ").Append(KsTab.Goods[g]).Append(' ').Append((inj[i] / 1000.0).ToString("0.0", Inv)).Append(" (").Append(F0(inj[i] / (sig * kg))).Append(" szt./d)");
-                    first = false;
+                    sb.Append(first ? " " : ", ").Append(KsTab.Goods[g]).Append(' ').Append((dkg / 1000.0).ToString("0.0", Inv)).Append(" (").Append(F0(dkg / (sig * kg))).Append(" szt./d)");
+                    first = false; n++;
                 }
                 if (first) sb.Append(" -");
             }
-            sb.Append(" | krain z popytem na zapas ").Append(add.Count).Append('.');
+            sb.Append(" | towarow z f > 1: ").Append(n).Append(" (sufit kroku 8 ").Append(GapMaxF.ToString("0.00", Inv)).Append(").");
             _gapLine = sb.ToString();
-        }
-
-        /// <summary>Rynek wiekszosci ludzi krainy (jak KsCore.Prepare: okregi, potem miasta; remis - pierwszy rynek krainy).</summary>
-        private static Dictionary<string, int> LandMajority(KsInput inp)
-        {
-            var lm = new Dictionary<string, double[]>(StringComparer.Ordinal);
-            Action<KsSettlement> add = s =>
-            {
-                string l = s.Land ?? "?";
-                double[] a; if (!lm.TryGetValue(l, out a)) { a = new double[3]; a[2] = -1; lm[l] = a; }
-                int m = s.Market == 0 ? 0 : 1;
-                a[m] += s.People;
-                if (a[2] < 0) a[2] = m;
-            };
-            foreach (var d in inp.Districts) add(d);
-            foreach (var t in inp.Towns) add(t);
-            var r = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (var kv in lm)
-            {
-                int first = (int)kv.Value[2], best = first;
-                for (int m = 0; m < 2; m++) if (kv.Value[m] > kv.Value[best]) best = m;
-                r[kv.Key] = best;
-            }
-            return r;
         }
 
         // ============================================================ P6: nadmiar krainy tylko przy pelnych polkach rynku
@@ -433,7 +367,8 @@ namespace Armoury
         }
 
         // ============================================================ SOL: krok 5 DS
-        /// <summary>TownFolk.DsSurplus: wies z koszykiem ZC4 nie kupila soli i narzedzi ponad koszyk (zl budzetu kroku 5 dalej - roboty gminy / kiesa).</summary>
+        /// <summary>TownFolk.DsSurplus: wies z koszykiem ZC4 nie kupila listy wsi (sol, narzedzia, plotno, garnki, piwo - wszystkie w koszyku ZC4; zl budzetu kroku 5 dalej -
+        /// roboty gminy / kiesa).</summary>
         internal static void R4cNoteSurplusSkip(long zl) { if (zl <= 0) return; _skipZl += zl; _skipN++; }
         /// <summary>TownFolk.DsSurplus: zakup listy wsi w kroku 5 z ramka ksiegi rynku miasta targowego (wies bez koszyka ZC4).</summary>
         internal static void R4cNoteSurplusFramed(long zl) { if (zl <= 0) return; _skipBk += zl; _skipBkN++; }
@@ -441,7 +376,7 @@ namespace Armoury
         internal static bool R4cSkipBasket(bool zc4) { return zc4 && SwSurplusSkip && SwPaidFirst && Applied; }
 
         // ============================================================ linia co 7 dob
-        /// <summary>Linia "KS: ceny r4 dzien N" (co 7 dob, stan zastosowany): restart cen, brak miast (C1), polki puste (C2), wsad ZC5 (P3), krok 5 wsi (sol), koszt.</summary>
+        /// <summary>Linia "KS: ceny r4 dzien N" (co 7 dob, stan zastosowany): restart cen, brak miast (C1), polki puste (C2), wsad ZC5 (P3), krok 5 wsi (lista wsi), koszt.</summary>
         private static string R4cLine(int day)
         {
             if (_state != StateApplied || !(SwPriceRestart || SwGapMargin || SwCtlPerTown || SwLandGlutGuard || SwMade7 || SwClothDemand || SwSurplusSkip)) return null;
@@ -474,7 +409,7 @@ namespace Armoury
                 }
                 sb.Append(" (miast ze srednia 7 dob ").Append(CountMade7()).Append(")");
             }
-            sb.Append(" | krok 5 wsi DS: pominiete sol i narzedzia ponad koszyk ZC4 ").Append(_skipZl).Append(" zl w ").Append(_skipN).Append(" zakupach (zostaje w budzecie kroku 5 - roboty gminy albo kiesa wsi; nic nie znika)")
+            sb.Append(" | krok 5 wsi DS: pominieta lista wsi (sol, narzedzia, plotno, garnki, piwo - w koszyku ZC4) ").Append(_skipZl).Append(" zl w ").Append(_skipN).Append(" zakupach (zostaje w budzecie kroku 5 - roboty gminy albo kiesa wsi; nic nie znika)")
               .Append(", zakupy listy z ramka rynku ").Append(_skipBk).Append(" zl (").Append(_skipBkN).Append(")");
             sb.Append(" | koszt C1 ").Append(_r4cDays > 0 ? (_r4cTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency / _r4cDays).ToString("0.000", Inv) : "-").Append(" ms/d.");
             _skipZl = 0; _skipN = 0; _skipBk = 0; _skipBkN = 0; _r4cTicks = 0; _r4cDays = 0;
@@ -484,7 +419,8 @@ namespace Armoury
         private static int CountMade7() { int n = 0; foreach (var kv in _kMade7N) if (kv.Value >= 4) n++; return n; }
 
         // ============================================================ zapis arm_ks_r4c
-        /// <summary>Stan paczki r4-ceny: V=1, P=doba restartu cen, F=czynnik popytu targu (bez przyciecia 1.10 pola M w arm_ks_r3), U=srednia braku miast (C1).</summary>
+        /// <summary>Stan paczki r4-ceny: V=1, P=doba restartu cen, E=koniec rampy popytu tego restartu, F=czynnik popytu targu (bez przyciecia 1.10 pola M w arm_ks_r3),
+        /// U=srednia braku miast (C1).</summary>
         internal static string ExportR4c()
         {
             try
@@ -494,6 +430,7 @@ namespace Armoury
                 var sb = new StringBuilder(2048);
                 sb.Append("V=1\n");
                 sb.Append("P=").Append(_pxRestartDay).Append('\n');
+                sb.Append("E=").Append(_pxRestartEnd).Append('\n');
                 if (_mf != null) { sb.Append("F="); for (int i = 0; i < _mf.Length; i++) { if (i > 0) sb.Append(','); sb.Append(_mf[i].ToString("0.####", Inv)); } sb.Append('\n'); }
                 sb.Append("U=").Append(_cN);
                 for (int i = 0; i < _ut28.Length; i++) if (_ut28[i] > 0.05) sb.Append(',').Append(i).Append(':').Append(_ut28[i].ToString("0.#", Inv));
@@ -515,9 +452,10 @@ namespace Armoury
             if (_state != StateApplied) return;
             if (x == null || x.Length > R4cSaveMax)
             {
-                if (DDay >= 0 && Today() > DDay + (RampDemand - RampSupply)) _pxRestartDay = DDay + (RampDemand - RampSupply);
+                if (DDay >= 0 && Today() > DDay + (RampDemand - RampSupply)) _pxRestartDay = _pxRestartEnd = DDay + (RampDemand - RampSupply);
                 return;
             }
+            bool hasE = false;
             foreach (var line in x.Split('\n'))
             {
                 if (line.Length < 2 || line[1] != '=') continue;
@@ -527,6 +465,7 @@ namespace Armoury
                     switch (line[0])
                     {
                         case 'P': { int d; if (int.TryParse(v, NumberStyles.Integer, Inv, out d)) _pxRestartDay = d; break; }
+                        case 'E': { int d; if (int.TryParse(v, NumberStyles.Integer, Inv, out d)) { _pxRestartEnd = d; hasE = true; } break; }
                         case 'F':
                             {
                                 var p = v.Split(','); if (p.Length != 2 * KsTab.NG) break;
@@ -549,6 +488,8 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("R4cResolve(" + line[0] + ")", e); }
             }
+            // zapis bez pola E (wersja paczki przed recenzja): restart juz byl - dla dzisiejszego konca rampy (bez drugiego zerowania srednich po wczytaniu)
+            if (!hasE && _pxRestartDay >= 0 && DDay >= 0) _pxRestartEnd = DDay + (RampDemand - RampSupply);
         }
     }
 }

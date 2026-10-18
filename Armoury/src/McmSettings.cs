@@ -6940,7 +6940,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
 
-        [SettingPropertyBool("Ks Gap Margin", HintText = "with Start Calibration applied (needs Ks Market Control): from the plan that switches the calibration on until four weeks after the start shelves, the villages send to market up to a quarter more of each food whose town stalls hold less than their starting stock - real hands grow it and the towns buy it - until the stalls are full; off = 3% more of everything")]
+        [SettingPropertyBool("Ks Gap Margin", HintText = "with Start Calibration applied (needs Ks Market Control): from the plan that switches the calibration on until four weeks after the start shelves, the plan counts up to a quarter more market demand for each food whose town stalls hold less than their starting stock, so villages take hands off home work and grow more for the market (the towns buy it) until the stalls are full; the village works themselves are not reset for it, so nothing is overgrown once the stalls are full; off = 3% more of everything")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsGapMargin { get; set; } = true;
 
@@ -6960,7 +6960,7 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsClothDemand { get; set; } = true;
 
-        [SettingPropertyBool("Ks Surplus Skips Basket", HintText = "with Start Calibration applied and Dues Medieval: a village buying its daily basket at the stalls does not spend its surplus on more salt and tools than its basket needs (that stripped the stalls of salt down to five pieces at any price); the surplus goes to finer goods, communal works or stays in the purse, and what it still buys is booked to its market town; off = as before")]
+        [SettingPropertyBool("Ks Surplus Skips Basket", HintText = "with Start Calibration applied and Dues Medieval: a village buying its daily basket at the stalls does not spend its surplus again on the village list (salt, tools, linen, pots and beer) - its basket already buys all five as far as it needs them and at a fair price, and the extra buying stripped the stalls of salt down to five pieces at any price; what is left after finer goods goes to communal works or stays in the purse, and a village without that basket books what it buys to its market town; off = as before")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsSurplusSkipsBasket { get; set; } = true;
 

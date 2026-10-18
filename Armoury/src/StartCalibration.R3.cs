@@ -283,8 +283,7 @@ namespace Armoury
                 {
                     int i = m * KsTab.NG + g;
                     KsItem it; double kg = inp.Items.TryGetValue(KsTab.Goods[g], out it) && it != null && it.Kg > 0 ? it.Kg : 10.0;
-                    double dm = Math.Max(0.0, _plan.D[i] - (_plan.Eaten != null && i < _plan.Eaten.Length ? _plan.Eaten[i] : 0.0)
-                                         - (_plan.GapAdd != null && i < _plan.GapAdd.Length ? _plan.GapAdd[i] : 0.0)) / (sig * kg);   // KS r4: bez popytu na zapas polek (P4)
+                    double dm = Math.Max(0.0, _plan.D[i] - (_plan.Eaten != null && i < _plan.Eaten.Length ? _plan.Eaten[i] : 0.0)) / (sig * kg);
                     // KS-R3 (port symulatora 17.10, runda 1): brak zaplaconego popytu liczy sie tylko, dopoki polki rynku sa ponizej celu (h < hs) - przy polkach ponad celem
                     // brak na pustych straganach to rozwoz (KS-H), nie rece: dotad brak z miast bez zboza trzymal podaz zboza Essos przy nadmiarze polek (S/C 1.14 w oknie)
                     double uf = hs[i] > 0 ? Math.Max(0.0, Math.Min(1.0, 1.0 - h[i] / hs[i])) : 1.0;
@@ -464,7 +463,7 @@ namespace Armoury
             var gp = _plan != null && _plan.Error == null && _plan.Grad != null ? _plan.Grad : _grad;
             if (gp != null) { inp.GradPrev = new Dictionary<string, double[]>(StringComparer.Ordinal); foreach (var kv in gp) if (kv.Value != null) inp.GradPrev[kv.Key] = (double[])kv.Value.Clone(); }
             inp.MarketFactor = MarketControl(day, inp);
-            try { R4cGapInputs(inp, day); } catch (Exception e) { Stumble("R4cGapInputs", e); }   // KS r4 P4 (r4-ceny, Ks Gap Margin): czynnik > 1 jako popyt na zapas polek w rownowadze
+            try { R4cGapInputs(inp, day); } catch (Exception e) { Stumble("R4cGapInputs", e); }   // KS r4 P4 (r4-ceny, Ks Gap Margin): sufit czynnika kroku 8 1.25 (popyt na zapas tylko w kroku 8)
             if (_landCut.Count > 0) { inp.LandCut = new Dictionary<string, double[]>(StringComparer.Ordinal); foreach (var kv in _landCut) inp.LandCut[kv.Key] = (double[])kv.Value.Clone(); }
             if (_landGlut.Count > 0) { inp.LandGlut = new Dictionary<string, bool[]>(StringComparer.Ordinal); foreach (var kv in _landGlut) inp.LandGlut[kv.Key] = (bool[])kv.Value.Clone(); }
             // odbior panow i dworow w miescie (P3) w kg Planu na dobe wedlug towaru jedzenia

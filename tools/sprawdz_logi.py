@@ -953,14 +953,14 @@ Uzycie (Python 3, tylko odczyt):
                     zaplaconego z Planu i budzet / wplyw netto 0.85-1.05, NKS-22 kupcy zywnosci KS-H, NKS-23 polki zboza miast (ks-miasta.csv), NKS-23b reszta towarow
                     rdzenia (ks-miasta-towary.csv), NKS-24 korytarze planu wobec dowozu, NKS-25 wies je swoje, NKS-26 podloga spichlerza, NKS-27 sterowanie rynku,
                     NKS-28 czas KS-H; ETAP = prog niespelniony, ale nie gorzej niz runda 3 (NKS_R3: autotest 2026-10-17_01-15-30).
-                    KS-R4 ceny (17/18.10, paczka r4-ceny, PLAN-KS-RUNDA4 rozdz. 4/7/8/11; StartCalibration.R4c.cs): NKS-3 NA TARG z popytem na zapas polek (luka
-                    zapasu P4 i czynnik sterowania > 1) W popycie Planu - bez dzielenia przez f (linia bez popytu na zapas: NA TARG / f), NKS-3g luka zapasu P4 (INFO:
-                    czynniki f i t/d popytu na zapas Planu wlaczenia), NKS-5/5e/6 zuzycie rynku + "wies je swoje" tego rynku (segment "bez rynku z tego" linii
+                    KS-R4 ceny (17/18.10, paczka r4-ceny, PLAN-KS-RUNDA4 rozdz. 4/7/8/11; StartCalibration.R4c.cs): NKS-3 towar z luka zapasu P4 (f > 1) w pasmie
+                    0.95-1.05 x f (popyt na zapas polek tylko w kroku 8 - rece z pracy domowej, nie w rownowadze), NKS-3g luka zapasu P4 (INFO: czynniki f, t/d popytu
+                    na zapas w kroku 8 i pokrycie luki NA TARG / f Planu wlaczenia), NKS-5/5e/6 zuzycie rynku + "wies je swoje" tego rynku (segment "bez rynku z tego" linii
                     "KS: rynki" - produkcja tych towarow liczona na rynku wsi), NKS-5u bez rynku MINUS wies je swoje i stracone w drodze KS-H <= 2% (obie czesci - INFO),
                     NKS-7r restart srednich cen w D+14 (INFO), NKS-7d ceny chwilowe przy D+49 w pasmie ceny startu +-0.3 (INFO), NKS-24 (K2) dowoz do KRAINY importera
                     >= 0.8 przewozu Planu bez sufitu dowozu dla kazdej krainy x towar z importem >= 50 szt./d (korytarz po korytarzu i krainy bez ujscia - INFO),
                     NKS-27 skok czynnika z tolerancja 0.001 (C3: do D+28 czynnik do 1.25, potem sufit schodzi do 1.10 najwyzej 7% na Plan), NKS-30 linia paczki
-                    "KS: ceny r4" (klucze, krok 5 wsi: pominiete sol i narzedzia - INFO).
+                    "KS: ceny r4" (klucze, krok 5 wsi: pominieta lista wsi przy koszyku ZC4 - INFO).
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -34303,11 +34303,11 @@ NKS_PXNOW = re.compile(r"KS: ceny chwilowe dzien (?P<day>-?\d+) ")
 NKS_PXNOWIT = re.compile(r"(?P<g>[A-Za-z_]+) (?P<x>[\d.]+)")
 NKS_GAPL = re.compile(r"KS: luka zapasu \(P4\) doba (?P<day>-?\d+) ")
 NKS_GAPF = re.compile(r"(?P<g>[A-Za-z_]+) f(?P<f>[\d.]+) \(")
-NKS_GAPINJ = re.compile(r"\| popyt na zapas polek w rownowadze Planu \(.*?\):(?P<body>.*?)\| krain z popytem")
+NKS_GAPINJ = re.compile(r"\| popyt na zapas polek w (?:kroku 8|rownowadze Planu) \(.*?\):(?P<body>.*?)\| (?:towarow z f|krain z popytem)")
 NKS_GAPINJIT = re.compile(r"(?P<g>[A-Za-z_]+) (?P<t>[\d.]+) \((?P<p>\d+) szt\./d\)")
 NKS_PXRST = re.compile(r"KS: srednie cen miast od nowa doba (?P<day>-?\d+) ")
 NKS_R4C = re.compile(r"KS: ceny r4 dzien (?P<day>-?\d+) ")
-NKS_R4CSKIP = re.compile(r"pominiete sol i narzedzia ponad koszyk ZC4 (?P<zl>\d+) zl w (?P<n>\d+) zakupach")
+NKS_R4CSKIP = re.compile(r"(?:pominiete sol i narzedzia ponad koszyk ZC4|pominieta lista wsi \([^)]*\)) (?P<zl>\d+) zl w (?P<n>\d+) zakupach")
 NKS_FLOOR = re.compile(r"KS: podloga spichlerza dzien (?P<day>-?\d+) \| wsi z podloga (?P<on>\d+) z (?P<n>\d+) \([^)]*\), kcal podlogi (?P<kf>[\d.]+|-)% potrzeby wsi, powroty (?P<back>\d+)")
 NKS_OWN = re.compile(r"KS: wies je swoje dzien (?P<day>-?\d+) \| wsi (?P<v>\d+), szt\. (?P<p>\d+), kcal (?P<k>[\d.]+|-)% koszyka.*?wsi > 30% koszyka 14 dob z rzedu: (?P<s>\d+)")
 NKS_P1 = re.compile(r"\| drabina 1 \(zaplacone z Planu\): chciane (?P<w>-?\d+) szt\., bez towaru (?P<ng>-?\d+) \([^)]*\), bez kiesy (?P<nm>-?\d+)")
@@ -35021,9 +35021,12 @@ def nks_main(logp, until=120, bdp=None):
         lastd = max([d for d in cand if on_day is None or d <= on_day] or cand)
         bad, exc, n = [], [], 0
         on_mkt = any((lastd, mk) in bilm for mk in ("Westeros", "Essos"))
-        # KS-R4 P4 (r4-ceny): luka zapasu - popyt na zapas polek W popycie Planu (linia z "popyt na zapas polek") - NA TARG bez zmian; bez niego NA TARG / f
+        # KS-R4 P4 (r4-ceny, po recenzji): luka zapasu dziala w kroku 8 (popyt targu x f - rece z pracy domowej), nie w popycie rownowagi - rownowaga jak dotad
+        # (NA TARG ok. 1), krok 8 doklada tyle, ile pozwala praca domowa ponad wlasny koszyk; towar z f > 1: pasmo 0.95 - 1.05 x f (od rownowagi do pelnej luki),
+        # pokrycie luki NA TARG / f - NKS-3g (INFO)
         g3 = gapl.get(lastd) or {}
-        fdiv = g3.get("f", {}) if g3 and not g3.get("inj") else {}
+        fdiv = g3.get("f", {}) if g3 else {}
+        gcov = []
         for mk in ("Westeros", "Essos"):
             qm = bilm.get((lastd, mk), {})
             for g, (q, dt) in sorted(bil.get((lastd, mk), {}).items()):
@@ -35031,25 +35034,27 @@ def nks_main(logp, until=120, bdp=None):
                 if g in qm:
                     q = qm[g]            # recenzja 17.10 (wazne): bilans NA TARG - zjedzone w okregach po obu stronach chowa brak na targu
                 fk = fdiv.get((0 if mk == "Westeros" else 1, g))
-                if fk and fk > 0:
-                    q = q / fk
+                hi3 = 1.05 * fk if fk and fk > 1.005 else 1.05
                 if dt < 50:
                     continue
+                if fk and fk > 1.005:
+                    gcov.append(f"{mk[0]} {g} f{fk:.3f} NA TARG {q:.2f} (pokrycie luki {q / fk:.2f})")
                 if g in NKS_EXC:
-                    if q < 0.95 or q > 1.05:
+                    if q < 0.95 or q > hi3:
                         exc.append(f"{mk} {g} {q:.2f}")
                     continue
                 n += 1
-                if q < 0.95 or q > 1.05:
-                    bad.append(f"{mk} {g} {q:.2f}")
+                if q < 0.95 or q > hi3:
+                    bad.append(f"{mk} {g} {q:.2f}" + (f" (f {fk:.2f})" if hi3 > 1.05 else ""))
         rep.add("NKS-3: bilans Planu " + ("NA TARG ((podaz - zjedzone w okregach) / (popyt - zjedzone))" if on_mkt else "(podaz / popyt - log sprzed 17.10)") + " (towary rak, popyt >= 50 t/d)",
-                f"plan doba {lastd}: towarow {n}, poza pasmem {len(bad)}" + (f" ({', '.join(bad)})" if bad else ""), "kazdy w 0.95-1.05", len(bad) == 0)
+                f"plan doba {lastd}: towarow {n}, poza pasmem {len(bad)}" + (f" ({', '.join(bad)})" if bad else ""), "kazdy w 0.95-1.05 (towar z luka zapasu P4: 0.95-1.05 x f)", len(bad) == 0)
         rep.add("NKS-3b: wyjatki projektu poza pasmem (Plan)", ", ".join(exc) if exc else "brak", "INFO (marchew, jablka, futra, miod, przyprawy, tran, kiel, jaja, skory)", None)
         if g3:
             fs = [f"{('W', 'E')[k]} {g} f{v:.3f}" for (k, g), v in sorted(g3.get("f", {}).items()) if v > 1.005]
             ins = [f"{('W', 'E')[k]} {g} {v:.1f} t/d" for (k, g), v in sorted(g3.get("inj", {}).items())]
             rep.add("NKS-3g: luka zapasu P4 Planu wlaczenia (r4-ceny, INFO)", f"plan doba {lastd}: czynniki > 1 {len(fs)}" + (f" ({', '.join(fs[:14])})" if fs else "")
-                    + f"; popyt na zapas polek w popycie Planu: " + (", ".join(ins[:14]) if ins else "brak (NA TARG / f)"), "INFO (popyt na zapas polek gasnie przy polkach celu, najpozniej D+28)", None)
+                    + f"; popyt na zapas polek w kroku 8: " + (", ".join(ins[:14]) if ins else "brak") + "; pokrycie luki w Planie (NA TARG / f): " + (", ".join(gcov[:14]) if gcov else "-"),
+                    "INFO (krok 8 - rece z pracy domowej ponad wlasny koszyk; popyt na zapas gasnie przy polkach celu, najpozniej D+28)", None)
         else:
             rep.add("NKS-3g: luka zapasu P4", "brak linii 'KS: luka zapasu' przy Planie wlaczenia (log sprzed r4-ceny albo klucz Ks Gap Margin wylaczony)", "INFO", None)
     else:
@@ -35285,8 +35290,8 @@ def nks_main(logp, until=120, bdp=None):
             rd = sorted(r4c)
             zl30 = sum(r4c[d][0] for d in rd if w0 <= d <= w1 + 7); n30 = sum(r4c[d][1] for d in rd if w0 <= d <= w1 + 7)
             kl = re.search(r"\| klucze: ([^|]*)", r4c[rd[-1]][2])
-            rep.add("NKS-30: paczka r4-ceny (linia 'KS: ceny r4' co 7 dob)", f"linii {len(rd)}; klucze: {kl.group(1).strip() if kl else '-'}; krok 5 wsi DS w oknie: pominiete sol i narzedzia {zl30} zl w {n30} zakupach",
-                    "INFO (bez zakupow soli ponad koszyk ZC4 - sol z polek dla koszyka)", None)
+            rep.add("NKS-30: paczka r4-ceny (linia 'KS: ceny r4' co 7 dob)", f"linii {len(rd)}; klucze: {kl.group(1).strip() if kl else '-'}; krok 5 wsi DS w oknie: pominieta lista wsi (sol, narzedzia, plotno, garnki, piwo) {zl30} zl w {n30} zakupach",
+                    "INFO (wies z koszykiem ZC4 bez drugiego zakupu listy wsi w kroku 5 - sol z polek dla koszyka)", None)
         else:
             rep.add("NKS-30: paczka r4-ceny", "brak linii 'KS: ceny r4' (log sprzed r4-ceny)", "INFO", None)
         # NKS-8 pieniadze

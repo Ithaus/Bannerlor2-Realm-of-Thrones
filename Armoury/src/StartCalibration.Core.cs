@@ -55,10 +55,9 @@ namespace Armoury
         public Dictionary<string, bool[]> LandGlut;                   // kraina -> [NG] nadmiar krainy rosnacy (potrojna waga w poprawce G '+')
         public double[] MarketFactor;                                 // [NM * NG] czynnik popytu targu (P4; null - MarketMargin dla wszystkich)
         public Dictionary<string, double[]> TownOne;                  // miasto -> [NG] kg/d prawdziwego odbioru panow i dworow w miescie (P3 - popyt miasta reguly zasiegu)
-        // KS r4 (paczka r4-ceny, klucz Ks Gap Margin): czynnik popytu targu > 1 (luka zapasu P4, sterowanie C1-C3) jako PRAWDZIWY popyt w rownowadze - kraina -> [NG] kg/d
-        // dopisane do popytu krainy (miasta kupuja na zapas polek, rece robia to w rownowadze); krok 8 liczy wtedy czynnik najwyzej 1 (reszta juz w popycie). null - jak dotad
-        public bool GapEq;
-        public Dictionary<string, double[]> GapLand;
+        // KS r4 (paczka r4-ceny, klucz Ks Gap Margin): sufit czynnika popytu targu w kroku 8 (luka zapasu P4 i granice C3 do 1.25); bez klucza 1.10 - jak dotad.
+        // Czynnik dziala tylko w kroku 8 (rece z pracy domowej - poprawka G), nie w popycie rownowagi (zajecia Planu wlaczenia bez trwalego przechylu na luke polek)
+        public double MarketFactorMax = 1.10;
         // KS r4 (r4-ceny P8, klucz Ks Cloth Demand): 1:1 plotna, sukna i skory takze z odziezy wojska, warsztatow zbrojnych i napraw kowali (kolumna ksiegi KsCloth)
         public bool ClothDemand;
     }
@@ -147,7 +146,6 @@ namespace Armoury
         public string CorrLine, CsvPlan, CsvBudgets;                   // C2: tekst linii korytarzy i plikow ks-plan.csv / ks-budzety.csv z watku roboczego
         public int CsvPlanRows, CsvBudgetRows;
         public double[] MarketFactor;                                  // czynnik popytu targu uzyty w kroku 8
-        public double[] GapAdd;                                        // KS r4 (r4-ceny, Ks Gap Margin): [m * NG + g] kg/d dopisane do popytu rynku (luka zapasu / sterowanie > 1); null - brak
     }
 
     /// <summary>KS-R3 krok 5: przewoz Planu na korytarzu krain (szt. gry na dobe).</summary>
@@ -673,7 +671,6 @@ namespace Armoury
             foreach (var t in x.In.Towns) add(t);
             double sigma = x.In.Sigma;
             x.Dm = new double[NM * KsTab.NG];
-            double[] gadd = null;                                      // KS r4: popyt na zapas polek wedlug rynku (linia, sterowanie)
             foreach (var l in x.Lands)
             {
                 double sh = x.LPop[l] / x.WPop;
@@ -716,18 +713,10 @@ namespace Armoury
                 KsItem sil; if (x.In.SilverTownDirect && x.In.Items.TryGetValue("silver", out sil) && sil != null) D[KsTab.GSilver] += Math.Max(0.0, sil.Town) * sigma * sil.Kg * sh;
                 D[KsTab.GHorse] += KsTab.HorseGameDay * sigma * sh;
                 if (KsTab.GarumLands.Contains(l)) { D[KsTab.GFish] += KsTab.Garum * 2.0 / KsTab.GarumLands.Count; D[KsTab.GSalt] += KsTab.Garum * 0.4 / KsTab.GarumLands.Count; }
-                int mk; if (!x.LandMk.TryGetValue(l, out mk)) mk = 0;
-                // KS r4 (r4-ceny, Ks Gap Margin): popyt na zapas polek miast tej krainy (luka zapasu P4 / sterowanie > 1) - prawdziwy popyt rownowagi
-                double[] ga;
-                if (x.In.GapLand != null && x.In.GapLand.TryGetValue(l, out ga) && ga != null)
-                {
-                    if (gadd == null) gadd = new double[NM * KsTab.NG];
-                    for (int g = 0; g < KsTab.NG && g < ga.Length; g++) if (ga[g] > 0 && !double.IsNaN(ga[g]) && !double.IsInfinity(ga[g])) { D[g] += ga[g]; gadd[mk * KsTab.NG + g] += ga[g]; }
-                }
                 x.DL[l] = D;
+                int mk; if (!x.LandMk.TryGetValue(l, out mk)) mk = 0;
                 for (int g = 0; g < KsTab.NG; g++) x.Dm[mk * KsTab.NG + g] += D[g];
             }
-            if (x.In.GapLand != null) x.R.GapAdd = gadd;
         }
 
         // ============================================================ 3. regale (rece przy zlozu ida za popytem przy cenie 1; pula = strefa krainy)
@@ -1231,12 +1220,11 @@ namespace Armoury
             M.Margin = margin;
             // KS-R3 P4: czynnik popytu targu na towar (sterowanie rynku po D+14, 0.85-1.10); bez niego - margines dla wszystkich (jak dotad)
             var mfac = new double[NGm];
+            // KS r4 (r4-ceny, klucz Ks Gap Margin): sufit czynnika 1.25 (luka zapasu P4, granice C3 do D+28) - popyt na zapas polek tylko tu (rece z pracy domowej), nie w rownowadze
+            double fMax = inp.MarketFactorMax > 1.10 && inp.MarketFactorMax <= 1.25 ? inp.MarketFactorMax : 1.10;
             for (int i = 0; i < NGm; i++)
             {
-                double f = inp.MarketFactor != null && i < inp.MarketFactor.Length && inp.MarketFactor[i] > 0 && !double.IsNaN(inp.MarketFactor[i]) ? Math.Max(0.85, Math.Min(1.10, inp.MarketFactor[i])) : margin;
-                // KS r4 (r4-ceny, Ks Gap Margin): czynnik > 1 towaru z popytem na zapas polek jest juz w popycie rownowagi (GapLand) - krok 8 najwyzej 1 (bez drugiego liczenia);
-                // ciecia < 1 i towary bez dopisanego popytu - jak dotad
-                if (inp.GapEq && inp.MarketFactor != null && R.GapAdd != null && i < R.GapAdd.Length && R.GapAdd[i] > 0) f = Math.Min(1.0, f);
+                double f = inp.MarketFactor != null && i < inp.MarketFactor.Length && inp.MarketFactor[i] > 0 && !double.IsNaN(inp.MarketFactor[i]) ? Math.Max(0.85, Math.Min(fMax, inp.MarketFactor[i])) : margin;
                 mfac[i] = f;
                 int m = i / KsTab.NG;
                 if (x.Dm[i] > 1.0 && !KsTab.RegGoodMask[i % KsTab.NG]) { if (f < M.MfMin[m]) M.MfMin[m] = f; if (f > M.MfMax[m]) M.MfMax[m] = f; }
