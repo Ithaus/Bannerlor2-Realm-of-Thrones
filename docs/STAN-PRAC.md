@@ -3059,3 +3059,5 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   ladzie); NF4-8 zelazo -56 (d109138); NSK-3 mieso -11 (d109162). Glod 0, odsiecz 100%, przysiolki/zajazdy v7 TAK (poza NPR-16).
 - 14:05 PDT: TEST fin94 = 10beef63 (f15 W5c) w toku (test/fin94, at-fin94-f15.out.txt, ks-auto.flag - USUNAC!). Workflow f16-fin93 (wf_6598e0b6-c3e): f16-akum, f16-ks, f16-ksiega,
   f16-drobne od 10beef63 (diagnoza + kod + recenzja). Recenzja scalenia f15: wf_90c50428-80e.
+- 14:20 PDT: JEFF 18.10 (verbatim) o wzroscie skarbcow (+33k/d), zamkow i glow rodow: "to nie jest blad jesli tak wynika z ekonomii i nie ma doplat z niczego to tak jest".
+  -> NAKUM-7 dla skarbcow krolestw = pomiar, nie warunek wgrania; warunek: zloto swiata zamkniete (bez zrodel z niczego) i posiadacz ma ujscia (skarbiec - wojna W5/W5b/W5c).
