@@ -222,7 +222,8 @@ namespace Armoury
         /// <summary>Konstruktor ArmouryBehavior: stan jednej kampanii nie przecieka do drugiej.</summary>
         internal static void Reset()
         {
-            MapVillageData.ResetChoice();                   // Jeff 16.10: uklad v5 / v4 wybierany od nowa przy pierwszym odczycie tej kampanii (VillageLayoutV5)
+            MapVillageData.ResetChoice();                   // Jeff 16.10: uklad v5 / v4 wybierany od nowa przy pierwszym odczycie tej kampanii (VillageLayoutV5; sw-przysiolki: v6 - VillageLayoutV6)
+            VillageHamlets.Reset();                         // sw-przysiolki: stan sesji przysiolkow (linia startu, liczniki; nakladka ziemi KS zdejmowana przy nastepnym starcie KS)
             lock (Gate) { _d.Clear(); _byUid.Clear(); _byV.Clear(); _news.Clear(); _nBurned = _nNewsLost = _nMemNew = _savedM = 0; }
             LookTouchAll();                                 // E7/W4: stare okregi puszczone, widok czyta wszystko od nowa
             _pending = null; _resolved = _resolveTried = false; _firstDay = true; _offSeen = _offLogged = false; _pSet = false; _p = 250;
@@ -286,10 +287,13 @@ namespace Armoury
 
         /// <summary>Crc ukladu z uid i osad wierszy w kolejnosci pliku ("uid:osady;" - ten sam napis co "L:" zapisu i naglowek layout_crc lore) - niezalezne od CRLF/LF,
         /// komentarzy i kolumn samego widoku.</summary>
-        private static uint LayoutCrcOf(MapVillageFile f)
+        private static uint LayoutCrcOf(MapVillageFile f) { return LayoutCrcOf(f.Records); }
+
+        /// <summary>sw-przysiolki (recenzja): to samo dla listy wierszy (uklad v5 z kolumn v5_* pliku v6 - MapVillageData.V5Of).</summary>
+        private static uint LayoutCrcOf(List<MapVillageRecord> recs)
         {
-            var sb = new StringBuilder(f.Records.Count * 40);
-            foreach (var r in f.Records) sb.Append(r.Uid).Append(':').Append(r.Settlements.ToString(Inv)).Append(';');
+            var sb = new StringBuilder(recs.Count * 40);
+            foreach (var r in recs) sb.Append(r.Uid).Append(':').Append(r.Settlements.ToString(Inv)).Append(';');
             return MapVillageData.Crc32(Encoding.UTF8.GetBytes(sb.ToString()));
         }
 
@@ -305,7 +309,7 @@ namespace Armoury
         private static Dictionary<string, OldDist> OldLayout(uint crc, out string name)
         {
             name = null;
-            foreach (var cand in new[] { MapVillageData.FileNameV4, MapVillageData.FileName })
+            foreach (var cand in new[] { MapVillageData.FileNameV4, MapVillageData.FileNameV5, MapVillageData.FileName })   // sw-przysiolki: zapis v5 na v6 (i odwrotnie) po uid
             {
                 if (string.Equals(cand, _fileName, StringComparison.Ordinal)) continue;
                 try
@@ -314,20 +318,39 @@ namespace Armoury
                     if (path == null || !System.IO.File.Exists(path)) continue;
                     var f = MapVillageData.Parse(Encoding.UTF8.GetString(System.IO.File.ReadAllBytes(path)));
                     if (f.MissingColumns.Length > 0 || f.Records.Count == 0 || LayoutCrcOf(f) != crc) continue;
-                    var map = new Dictionary<string, OldDist>(StringComparer.Ordinal);
-                    foreach (var kv in MapVillageData.ByDistrict(f.Records))
-                    {
-                        int n = kv.Value.Count;
-                        var od = new OldDist { Uid = new string[n], X = new float[n], Y = new float[n], F = new double[n + 1] };
-                        for (int i = 0; i < n; i++) { var r = kv.Value[i]; od.Uid[i] = r.Uid; od.X[i] = r.X; od.Y[i] = r.Y; od.F[i] = Math.Max(1, r.Settlements); }
-                        map[kv.Key] = od;
-                    }
                     name = cand;
-                    return map;
+                    return OldMap(f.Records);
                 }
                 catch (Exception e) { Stumble("VillageBook.OldLayout", e); }
             }
+            // sw-przysiolki (recenzja): zaden plik modulu nie ma crc zapisu - plik ukladu tej sesji (v6) niesie wiersz v5 kazdej wioski (kolumny v5_*): zapis v5 po uid
+            // takze wtedy, gdy wgranie nie przenioslo arm_map_villages_v5.tsv (dotad: sumy okregow, flagi spalonych i pamiec wojny tracone)
+            try
+            {
+                var cur = _file;
+                var v5 = cur != null ? MapVillageData.V5Of(cur.Records) : null;
+                if (v5 != null && LayoutCrcOf(v5) == crc)
+                {
+                    name = (_fileName ?? MapVillageData.FileName) + " (kolumny v5_*)";
+                    return OldMap(v5);
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.OldLayout(v5_*)", e); }
             return null;
+        }
+
+        /// <summary>Okregi ukladu zapisu z wierszy (ByDistrict: order, potem id - jak Build przy zapisie). Wydzielone z OldLayout (sw-przysiolki, recenzja) bez zmian.</summary>
+        private static Dictionary<string, OldDist> OldMap(List<MapVillageRecord> recs)
+        {
+            var map = new Dictionary<string, OldDist>(StringComparer.Ordinal);
+            foreach (var kv in MapVillageData.ByDistrict(recs))
+            {
+                int n = kv.Value.Count;
+                var od = new OldDist { Uid = new string[n], X = new float[n], Y = new float[n], F = new double[n + 1] };
+                for (int i = 0; i < n; i++) { var r = kv.Value[i]; od.Uid[i] = r.Uid; od.X[i] = r.X; od.Y[i] = r.Y; od.F[i] = Math.Max(1, r.Settlements); }
+                map[kv.Key] = od;
+            }
+            return map;
         }
 
         private static Dist Build(Settlement st, List<MapVillageRecord> recs)
@@ -1960,6 +1983,62 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>sw-przysiolki (v6): wiersze pliku ukladu tej sesji z kolumna hamlet (przysiolki na pustkowiach) - nakladka ziemi KS (VillageHamlets.OverlayKs) i linia
+        /// sprawdzenia. Pusta lista - plik bez przysiolkow (v5, v4) albo nie wczytany. Tylko odczyt, bez Gate (_file podmieniany tylko w Resolve, jak Layout).</summary>
+        internal static List<MapVillageRecord> HamletRecords()
+        {
+            var outl = new List<MapVillageRecord>();
+            var f = _file;
+            if (f == null) return outl;
+            foreach (var r in f.Records) if (!string.IsNullOrEmpty(r.Hamlet)) outl.Add(r);
+            return outl;
+        }
+
+        /// <summary>sw-przysiolki: wszystkie wiersze pliku ukladu tej sesji (linia sprawdzenia - wioski okregow, najblizsza sasiadka); null - plik nie wczytany.</summary>
+        internal static List<MapVillageRecord> LayoutRecords() { var f = _file; return f != null ? f.Records : null; }
+
+        /// <summary>sw-przysiolki: nazwa wczytanego pliku ukladu ("" - brak).</summary>
+        internal static string LayoutFile { get { return _file != null ? (_fileName ?? "") : ""; } }
+
+        /// <summary>sw-przysiolki (tygodniowa linia przysiolkow): ludzie w domu przysiolkow (uid z listy) oraz wszystkich wiosek pobocznych i wsi gry - te same
+        /// osady i ten sam podzial co dymek i menu (DOM okregu x (osady - puste) / (n - puste)). false - ksiega nieczynna. Pod Gate, nie rzuca.</summary>
+        internal static bool HamletPeople(HashSet<string> hamlets, out double hHome, out double hSet, out double sideHome, out double mainHome, out int hBurned, out int dists)
+        {
+            hHome = hSet = sideHome = mainHome = 0.0; hBurned = 0; dists = 0;
+            if (hamlets == null || !Active) return false;
+            try
+            {
+                lock (Gate)
+                {
+                    foreach (var d in _d.Values)
+                    {
+                        try
+                        {
+                            if (d.W == 0 || !d.NSet || d.Nw == null) continue;
+                            var sn = SnapOf(d);
+                            bool any = false;
+                            for (int w = 0; w <= d.W; w++)
+                            {
+                                double h, away;
+                                People(d, sn, w, out h, out away);
+                                if (w == d.W) { mainHome += h; continue; }
+                                sideHome += h;
+                                if (d.Uid[w] != null && hamlets.Contains(d.Uid[w]))
+                                {
+                                    any = true; hHome += h; hSet += d.Nw[w];
+                                    if (BurnedAt(d, w)) hBurned++;
+                                }
+                            }
+                            if (any) dists++;
+                        }
+                        catch (Exception e) { Stumble("VillageBook.HamletPeople(okreg)", e); }
+                    }
+                    return true;
+                }
+            }
+            catch (Exception e) { Stumble("VillageBook.HamletPeople", e); return false; }
+        }
+
         /// <summary>GL-5 (P5, dymek lore wsi lnianej): czy przysiolek ma obrazek rybacki (kolumna model = fishing pliku wiosek). false - ksiega bez ukladu, nieznany uid.</summary>
         internal static bool FishingHamlet(string uid)
         {
@@ -2375,6 +2454,13 @@ namespace Armoury
                 case "lake": return VillageTexts.Make(VillageTexts.PlaceLake).ToString();
                 case "coast": return VillageTexts.Make(VillageTexts.PlaceCoast).ToString();
                 case "field": return VillageTexts.Make(VillageTexts.PlaceField).ToString();
+                // sw-przysiolki (v6): miejsca przysiolkow na pustkowiach
+                case "hills": return VillageTexts.Make(VillageTexts.PlaceHills).ToString();
+                case "forest": return VillageTexts.Make(VillageTexts.PlaceForest).ToString();
+                case "steppe": return VillageTexts.Make(VillageTexts.PlaceSteppe).ToString();
+                case "moor": return VillageTexts.Make(VillageTexts.PlaceMoor).ToString();
+                case "desert": return VillageTexts.Make(VillageTexts.PlaceDesert).ToString();
+                case "wilds": return VillageTexts.Make(VillageTexts.PlaceWilds).ToString();
                 default: return "";
             }
         }

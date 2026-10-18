@@ -63,6 +63,13 @@ namespace Armoury.Villages
         public const string PlaceLake = "{=arm_place_lake}by the lake";
         public const string PlaceCoast = "{=arm_place_coast}on the coast";
         public const string PlaceField = "{=arm_place_field}among the fields";
+        // sw-przysiolki (v6, dopisane recznie): miejsca przysiolkow na pustkowiach (kolumna kind ukladu)
+        public const string PlaceHills = "{=arm_place_hills}in the hills";
+        public const string PlaceForest = "{=arm_place_forest}deep in the forest";
+        public const string PlaceSteppe = "{=arm_place_steppe}out on the steppe";
+        public const string PlaceMoor = "{=arm_place_moor}on the cold moor";
+        public const string PlaceDesert = "{=arm_place_desert}by a lonely well";
+        public const string PlaceWilds = "{=arm_place_wilds}in the wilds";
         public const string RaidRide = "{=arm_raid_ride}Your men ride out to {VILLAGE}. Burning its next settlement ({PEOPLE} souls) will take about {DAYS} days.";
         public const string RaidWait = "{=arm_raid_wait}{VILLAGE} - settlement {K}, about {X} days left";
         public const string RaidStepTitle = "{=arm_raid_step_title}{VILLAGE} burns";

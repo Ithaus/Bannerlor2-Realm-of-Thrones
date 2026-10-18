@@ -1097,6 +1097,17 @@ Uzycie (Python 3, tylko odczyt):
                     miast - nazwane szt.; INFO), ARM-13 strata spichlerzy krain pod KS od wlaczenia (najwieksza wobec progu Ks Land Gate Loss Days; NIE, gdy powrot "spichlerz krainy spada" nastapil
                     przy stracie ponizej progu i zapasie ponad prog zapasu bez pliku armoury-ks-bramka.flag), ARM-14 druga proba krain (Start Calibration off/on - INFO).
                     Log sprzed paczki: wiersze INFO "brak linii".
+--grupa nprzysiolki: (17/18.10, Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja"; paczka sw-przysiolki, Armoury/src/VillageHamlets.cs, uklad
+                    wiosek v6 z tools/wioski-v6/v6_przysiolki.py) python -I tools/sprawdz_logi.py --grupa nprzysiolki <Armoury-*.log> (strumieniowo). NPR-0 linia
+                    "Przysiolki (sw-przysiolki): start sesji", NPR-1 uklad v6 wczytany (crc ukladu F5456602 - plik generatora; klucz Village Layout V6 NIE = INFO), NPR-2 wiosek
+                    i okregow jak v5 (okregow z inna liczba wiosek 0, uid spoza v5 0), NPR-3 ludzie okregow: suma osad wiosek okregu = v5 w kazdym okregu (wies gry bez zmian),
+                    NPR-4 najblizsza sasiadka v6: mediana > v5, min >= 6.0, skupiska (>= 3 sasiadow w 10 jedn.) mniej niz v5, NPR-5 przysiolki na ladzie (sciana ladowa siatki
+                    gry) = wszystkie, NPR-6 od miasta >= 12 i od zamku >= 9 jedn., NPR-7 ksiega wiosek na crc v6 i zapis innego ukladu przeniesiony po uid (plik _v5 / _v4),
+                    NPR-8 lore v6 (bramka zgodna, bez lore 0), NPR-9 widok (uklad v6, odrzucone wiersze 0), NPR-10 KS: uklad wiosek tej sesji zgodny z plikiem ziemi (uid),
+                    NPR-11 nakladka ziemi KS (nadpisane wiersze S = przysiolki; brak pliku ziemi / klucz NIE - INFO), NPR-12 linia co 7 dob (ludzie w domu przysiolkow > 0,
+                    udzial < 10%), NPR-13 potkniecia i ERROR VillageHamlets 0, NPR-14 (recenzja) kolumny v5_* pliku v6 - crc = v5 68BB06AD (zapis v5 po uid bez pliku
+                    _v5), NPR-15 (recenzja) crc ziemi KS z nakladka przysiolkow: inny niz plik, gdy nadpisane wiersze > 0, rowny plikowi bez nakladki (zapis KS przy innej
+                    nakladce - droga 'inny plik ziemi'). Log bez linii paczki: INFO (stan ksiegi i lore jako odczyt), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -38098,6 +38109,202 @@ def nksarm_main(logp):
     return 0
 
 
+NPR_HEAD = "Przysiolki (sw-przysiolki): "
+NPR_CRC6 = "F5456602"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
+NPR_CRC5 = "68BB06AD"
+
+
+def nprzysiolki_main(logp):
+    """nprzysiolki (17/18.10, paczka sw-przysiolki; Armoury/src/VillageHamlets.cs, MapVillagesView.cs MapVillageData, VillageBook.cs, MapVillageLore.cs):
+    uklad wiosek v6 - przysiolki na pustkowiach tego samego okregu, ludzie okregu bez zmian. Wejscie: log Armoury (strumieniowo). Opis progow w __doc__ (NPR-0..15)."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NPR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    starts, ks_lines, weeks, book, lore, view, ks_start = [], [], [], [], [], [], []
+    ks_crc = []                # recenzja: "KS crc ziemi" (crc ziemi KS z nakladka przysiolkow)
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            t = m.group(2) if m else ln.rstrip("\n")
+            if t.startswith(NPR_HEAD):
+                if t.startswith(NPR_HEAD + "start sesji"):
+                    starts.append(t)
+                elif t.startswith(NPR_HEAD + "KS ziemia przysiolkow"):
+                    ks_lines.append(t)
+                elif t.startswith(NPR_HEAD + "dzien "):
+                    weeks.append(t)
+                elif t.startswith(NPR_HEAD + "KS crc ziemi"):
+                    ks_crc.append(t)
+            elif t.startswith("Ksiega wiosek (E4/11): start sesji"):
+                book.append(t)
+            elif t.startswith("Dymek wioski (E7/W2): start"):
+                lore.append(t)
+            elif t.startswith("Wioski: plik "):
+                view.append(t)
+            elif t.startswith("Kalibracja startu (KS): start sesji"):
+                ks_start.append(t)
+            elif "VillageHamlets" in t and ("ERROR" in t or "Exception" in t):
+                n_err += 1
+    print(f"plik: {logp} | linii startu {len(starts)}, KS ziemia {len(ks_lines)}, co 7 dob {len(weeks)}, ksiega {len(book)}, lore {len(lore)}, widok {len(view)}, KS start {len(ks_start)}, KS crc ziemi {len(ks_crc)}")
+
+    def g(rx, txt, cast=str):
+        mm = re.search(rx, txt or "")
+        if not mm:
+            return None
+        try:
+            return cast(mm.group(1))
+        except (TypeError, ValueError):
+            return None
+
+    if not starts:
+        rep.add("NPR-0: linia 'Przysiolki (sw-przysiolki): start sesji'", "brak w logu", "INFO (log sprzed paczki sw-przysiolki)", None)
+        if book:
+            rep.add("NPR-7: ksiega wiosek - crc ukladu (odczyt)", (g(r"crc ukladu ([0-9A-F]{8})", book[-1]) or "?") + " | " + book[-1][:220], "INFO", None)
+        if lore:
+            rep.add("NPR-8: lore (odczyt)", lore[-1][:200], "INFO", None)
+        rep.add("NPR-13: ERROR VillageHamlets", str(n_err), "0", n_err == 0)
+        rep.show()
+        return 0
+    s0 = starts[-1]
+    ver = g(r"start sesji \| uklad v(\d)", s0, int)
+    crc = g(r"crc ukladu ([0-9A-F]{8}|BRAK)", s0)
+    key_off = "Village Layout V6 NIE" in s0
+    rep.add("NPR-0: linia startu przysiolkow", f"sesji {len(starts)}; " + s0[len(NPR_HEAD):][:200], "linia przy kazdym starcie sesji", True)
+    if key_off:
+        rep.add("NPR-1: uklad v6 wczytany", f"uklad v{ver}, crc {crc} (klucz Village Layout V6 NIE)", "INFO (klucz wylaczony - uklad v5/v4)", None)
+    else:
+        rep.add("NPR-1: uklad v6 wczytany (crc ukladu)", f"uklad v{ver}, crc {crc}", f"v6 i crc {NPR_CRC6} (plik generatora)", ver == 6 and crc == NPR_CRC6)
+    nw6 = g(r"\| wiosek (\d+), przysiolkow", s0, int)
+    nham = g(r"przysiolkow (\d+) \(z ziemia KS", s0, int)
+    nks = g(r"\(z ziemia KS (\d+)\)", s0, int)
+    nd6 = g(r"okregow z wioskami (\d+)", s0, int)
+    nw5 = g(r"\): wiosek (\d+), okregow (\d+)", s0, int)
+    nd5 = g(r"\): wiosek \d+, okregow (\d+)", s0, int)
+    dn = g(r"okregow z inna liczba wiosek (\d+)", s0, int)
+    ds = g(r"z inna suma osad (\d+)", s0, int)
+    um = g(r"uid spoza v5 (\d+)", s0, int)
+    o6 = g(r"osad wiosek v6 (\d+)", s0, int)
+    o5 = g(r"osad wiosek v6 \d+ / v5 (\d+)", s0, int)
+    if nw5 is None:
+        rep.add("NPR-2: wiosek i okregow jak v5", f"bez porownania z v5 ({'klucz wylaczony' if key_off else 'brak pliku _v5 albo uklad nie v6'}): wiosek {nw6}, okregow {nd6}", "INFO", None if key_off else False)
+        rep.add("NPR-3: suma osad wiosek okregu = v5", "bez porownania", "INFO", None if key_off else False)
+    else:
+        rep.add("NPR-2: wiosek i okregow jak v5", f"wiosek v6 {nw6} / v5 {nw5}, okregow v6 {nd6} / v5 {nd5}, okregow z inna liczba wiosek {dn}, uid spoza v5 {um}",
+                "rowne, 0, 0", nw6 == nw5 and nd6 == nd5 and dn == 0 and um == 0)
+        rep.add("NPR-3: ludzie okregow - suma osad wiosek kazdego okregu = v5", f"okregow z inna suma osad {ds}, osad wiosek v6 {o6} / v5 {o5}", "0 i rowne (wies gry i ludzie okregu bez zmian)",
+                ds == 0 and o6 is not None and o6 == o5)
+    mn6 = g(r"najblizsza sasiadka v\d min ([\d.]+)", s0, float)
+    md6 = g(r"najblizsza sasiadka v\d min [\d.]+ p10 [\d.]+ med ([\d.]+)", s0, float)
+    md5 = g(r", v5 min [\d.]+ p10 [\d.]+ med ([\d.]+)", s0, float)
+    cr6 = g(r"skupiska \(>=3 sasiadow w 10 jedn\.\) v6 (\d+)", s0, int)
+    cr5 = g(r"skupiska \(>=3 sasiadow w 10 jedn\.\) v6 \d+, v5 (\d+)", s0, int)
+    if md5 is None or cr6 is None:
+        rep.add("NPR-4: najblizsza sasiadka i skupiska", f"min {mn6}, mediana {md6} (bez v5)", "INFO", None if key_off else False)
+    else:
+        rep.add("NPR-4: najblizsza sasiadka i skupiska (v6 wobec v5)", f"mediana v6 {md6} / v5 {md5}, min v6 {mn6}, skupiska v6 {cr6} / v5 {cr5}", "mediana > v5, min >= 6.0, skupiska < v5",
+                md6 > md5 and mn6 >= 6.0 and cr6 < cr5)
+    land = g(r"przysiolki na ladzie (\d+|\?)/", s0)
+    lall = g(r"przysiolki na ladzie (?:\d+|\?)/(\d+)", s0, int)
+    nomesh = g(r"poza siatka (\d+)", s0, int) or 0
+    if lall is None:
+        rep.add("NPR-5: przysiolki na ladzie", "brak przysiolkow w ukladzie tej sesji", "INFO", None if key_off else False)
+    else:
+        rep.add("NPR-5: przysiolki na ladzie (sciana ladowa siatki gry)", f"{land}/{lall}, poza siatka {nomesh}", "wszystkie", land == str(lall) and nomesh == 0)
+        dt = g(r"od miasta min ([\d.]+)", s0, float)
+        dc = g(r"od zamku min ([\d.]+)", s0, float)
+        rep.add("NPR-6: przysiolki z dala od warowni", f"od miasta min {dt}, od zamku min {dc}", "miasto >= 12, zamek >= 9 jedn.", dt is not None and dc is not None and dt >= 12.0 and dc >= 9.0)
+    if book:
+        b0 = book[-1]
+        bcrc = g(r"crc ukladu ([0-9A-F]{8})", b0)
+        same = "uklad zgodny" in b0
+        mapped = g(r"uklad inny \(crc zapisu ([0-9A-F]{8}) = (arm_map_villages[_v45]*\.tsv)", b0)
+        unknown = "uklad zapisu nieznany" in b0
+        newc = "brak klucza arm_district" in b0
+        how = "zgodny" if same else ("przeniesiony po uid z " + (g(r"= (arm_map_villages[_v45]*\.tsv)", b0) or "?") if mapped else ("NIEZNANY - sumy okregow" if unknown else ("nowa kampania" if newc else "?")))
+        if mapped and "(kolumny v5_*)" in b0:
+            how += " (kolumny v5_* - bez pliku _v5 w module)"
+        rep.add("NPR-7: ksiega wiosek - crc v6 i zapis", f"crc ukladu ksiegi {bcrc}, zapis: {how}", f"crc = linia startu ({crc}); zapis zgodny, po uid albo nowa kampania",
+                bcrc == crc and (same or mapped is not None or newc))
+    else:
+        rep.add("NPR-7: ksiega wiosek", "brak linii 'Ksiega wiosek (E4/11): start sesji'", "linia przy starcie sesji", False)
+    if lore:
+        l0 = lore[-1]
+        ln_ = g(r"lore (\d+)/\d+", l0, int)
+        la = g(r"lore \d+/(\d+)", l0, int)
+        lc = g(r"bramka ([0-9A-F]{8}) zgodna", l0)
+        miss = g(r"bez lore (\d+)", l0, int)
+        rep.add("NPR-8: lore v6 (bramka i pokrycie)", f"lore {ln_}/{la}, bramka {lc}, bez lore {miss}, plik {g(r'plik (arm_map_village_lore[_v45]*\.tsv)', l0)}", f"bramka = {crc}, bez lore 0",
+                lc == crc and miss == 0 and ln_ == la)
+    else:
+        rep.add("NPR-8: lore", "brak linii 'Dymek wioski (E7/W2): start'", "linia przy starcie sesji", False)
+    if view:
+        v0 = view[-1]
+        vv = g(r"uklad v(\d)\)", v0, int)
+        bad = g(r"odrzucone wiersze (\d+)", v0, int)
+        rep.add("NPR-9: widok wiosek na mapie", f"uklad v{vv}, odrzucone wiersze {bad}, wiosek {g(r'; wiosek (\d+) w', v0)}", "uklad jak linia startu, odrzucone 0", vv == ver and bad == 0)
+    else:
+        rep.add("NPR-9: widok wiosek", "brak linii 'Wioski: plik' (widok mapy nie wczytany w tym logu)", "INFO", None)
+    if ks_start:
+        k0 = ks_start[-1]
+        ok = "uklad wiosek tej sesji zgodny z plikiem" in k0
+        nofile = "BRAK pliku arm_ks_land.tsv" in k0
+        rep.add("NPR-10: KS - uklad wiosek zgodny z plikiem ziemi (uid)", "zgodny" if ok else ("brak pliku ziemi" if nofile else "NIEZGODNY"), "zgodny (inaczej KS blokuje wlaczenie)",
+                None if nofile else ok)
+    else:
+        rep.add("NPR-10: KS start sesji", "brak linii", "INFO", None)
+    if ks_lines:
+        k1 = ks_lines[-1]
+        kn = g(r"nadpisane wiersze S ziemi (\d+)", k1, int)
+        kh = g(r"uklad v\d: przysiolkow (\d+)", k1, int)
+        kmiss = g(r"bez wiersza w pliku ziemi (\d+)", k1, int)
+        info = kn is None
+        rep.add("NPR-11: nakladka ziemi KS na przysiolki", k1[len(NPR_HEAD):][:220], "nadpisane = przysiolki, bez wiersza 0 (brak pliku / klucz NIE / inny uklad - INFO)",
+                None if info else (kn == kh and kmiss == 0))
+    else:
+        rep.add("NPR-11: nakladka ziemi KS", "brak linii 'KS ziemia przysiolkow'", "linia przy starcie KS", False)
+    if weeks:
+        hh = [g(r"ludzie w domu: przysiolki ([\d.]+)", w, float) for w in weeks]
+        sh = [g(r"udzial przysiolkow w ludziach okregow ([\d.]+)%", w, float) for w in weeks]
+        hh2 = [x for x in hh if x is not None]
+        sh2 = [x for x in sh if x is not None]
+        burned = [g(r"spalone przysiolki (\d+)", w, int) for w in weeks]
+        ms = [g(r"czas ([\d.]+) ms", w, float) for w in weeks]
+        ms2 = [x for x in ms if x is not None]
+        if hh2:
+            rep.add("NPR-12: linia co 7 dob - ludzie przysiolkow", f"linii {len(weeks)}, ludzie w domu przysiolkow ostatnio {hh2[-1]:.0f} (min {min(hh2):.0f}), udzial {sh2[-1] if sh2 else '?'}%, "
+                    f"spalone ostatnio {burned[-1]}, czas max {max(ms2) if ms2 else '?'} ms", "ludzie > 0, udzial < 10%, czas <= 50 ms", min(hh2) > 0 and (not sh2 or max(sh2) < 10.0) and (not ms2 or max(ms2) <= 50.0))
+        else:
+            rep.add("NPR-12: linia co 7 dob", f"linii {len(weeks)} bez liczb ludzi: {weeks[-1][len(NPR_HEAD):][:160]}", "ludzie > 0", None if key_off else False)
+    else:
+        rep.add("NPR-12: linia co 7 dob", "brak (bieg krotszy niz pierwsza doba?)", "linia co 7 dob", False)
+    stum = [g(r"potkniecia (\d+)", x, int) for x in starts + weeks]
+    stum = [x for x in stum if x is not None]
+    rep.add("NPR-13: potkniecia i ERROR VillageHamlets", f"potkniecia max {max(stum) if stum else 0}, ERROR {n_err}", "0 i 0", (not stum or max(stum) == 0) and n_err == 0)
+    # recenzja (sw-przysiolki): wiersz v5 w pliku v6 i crc ziemi KS z nakladka
+    c5e = g(r"kolumny v5_\* \(zapis v5 po uid bez pliku _v5\): crc ([0-9A-F]{8}|BRAK)", s0)
+    if c5e is None:
+        rep.add("NPR-14: kolumny v5_* pliku v6", "brak w linii startu (log sprzed recenzji albo uklad nie v6)", "INFO", None)
+    else:
+        rep.add("NPR-14: kolumny v5_* pliku v6 (zapis v5 po uid bez pliku _v5)", f"crc {c5e}", f"= v5 {NPR_CRC5}", None if key_off else c5e == NPR_CRC5)
+    if ks_crc:
+        kc = ks_crc[-1]
+        eff = g(r"crc ziemi KS tej sesji ([0-9A-F]{8})", kc)
+        filec = g(r"plik ([0-9A-F]{8})", kc)
+        withov = "z nakladka przysiolkow" in kc
+        kn2 = g(r"nadpisane wiersze S ziemi (\d+)", ks_lines[-1], int) if ks_lines else None
+        want_ov = kn2 is not None and kn2 > 0
+        rep.add("NPR-15: crc ziemi KS z nakladka przysiolkow", f"crc {eff}, plik {filec}, nakladka {'TAK' if withov else 'NIE'}, nadpisane wiersze {kn2 if kn2 is not None else 0}",
+                "nakladka -> crc inny niz plik; bez nakladki -> crc = plik", eff is not None and filec is not None and (withov == want_ov) and ((eff != filec) == withov))
+    else:
+        rep.add("NPR-15: crc ziemi KS", "brak linii 'KS crc ziemi' (brak pliku ziemi albo log sprzed recenzji)", "INFO", None)
+    rep.add("NPR-I: zajecia przysiolkow (odczyt)", g(r"\| zajecia: ([^|]+)", s0) or "-", "INFO", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -38301,6 +38508,8 @@ def main(argv):
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group == "nkoszyk" and logp:
         return nkoszyk_main(logp, until_arg)   # nkoszyk (r4-koszyk, noc 17/18.10): tanszy koszyk P9 (Plan i gra), place za brak rak (KsCheapBasket.cs, KsWageHands.cs)
+    if group == "nprzysiolki" and logp:
+        return nprzysiolki_main(logp)   # nprzysiolki (17/18.10, sw-przysiolki): uklad wiosek v6 - przysiolki na pustkowiach, ludzie okregow jak v5, ksiega / lore / widok / KS (VillageHamlets.cs)
     if group == "nds" and logp:
         return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
     if group == "npolnoc" and logp:
