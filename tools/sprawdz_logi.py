@@ -1155,7 +1155,7 @@ Uzycie (Python 3, tylko odczyt):
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
                     rampie = 0 (linia DS i linie niezalezne: obieg2, Przeplywy osad, W7, Kiesa ludu, rynek BK tylko z kroku 5), NDS-2 ksiegi (kontrola DS 0, przyczyny kies wsi,
-                    112 bez odbiorcy, reszta bilansu swiata, firmy F3 i zaliczki L1), NDS-3 kiesy wsi (dryf -0.2..+0.2%/d ostatnich 60 dob, mediana >= 0.9 startu, < 1000 zl
+                    112 bez odbiorcy, reszta bilansu swiata, firmy F3 i zaliczki L1), NDS-3 kiesy wsi (dryf -0.2..+0.2%/d - MNK ostatnich 26 dob okna, f14-wsie; mediana kiesa / skrzynia >= 0.9, < 1000 zl
                     <= 15%, <= 3% zlota swiata - bez zlewu pieniadza we wsiach), NDS-6 zaleglosci czynszu (ponad 91 rat <= 10% wsi, razem <= 30 dni, zebrane >= 95%), NDS-7 korona
                     (zwrot 100% kazdej doby, wplyw dnia >= 0.85 / 0.95 odniesienia w rampie / po niej, krolestwo-doby z Bankiem <= 15%, F3: kaskada pokrycia), NDS-9 D staly
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
@@ -1264,6 +1264,10 @@ Uzycie (Python 3, tylko odczyt):
                     ds-akumulator (18.10): NDS-3a/3b dryf kies wsi w oknie od konca rampy KS (koniec popytu) albo DS F1 (DayOn + 28) + 2 x 15 dob (za krotkie - ostatnie 30 dob),
                     NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
                     jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
+                    f14-wsie (18.10): NDS-3a/3b = nachylenie MNK stanu kies wsi z OSTATNICH 26 dob okna (nie wczesniej niz koniec rampy + 2 x 15) - stan ustalony; dawny
+                    pomiar od konca rampy do konca okna (dwa konce) - NDS-3a0 INFO (przejscie: kiesy schodza z nadwyzki rampy KS ze stala ok. 55-70 dob, nie 15). NDS-3f INFO
+                    rownowaga z blokow 14 dob od konca rampy (dryf = a + b x kiesa; odplyw krancowy, stala zejscia, S* wobec startu i skrzyni swiata; >= 5 blokow), NDS-3g INFO
+                    trend wsi z kiesa < 1000 zl od konca rampy. Bieg dluzszy niz 120 dob: --do-doby <dlugosc biegu> (domyslne 120 tnie okno - stan ustalony na koncu biegu).
 --grupa nakum     : (noc 17/18.10, paczka ds-akumulator; Jeff "czy nie ma stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac"; Armoury/src/TownFolk.DsAkum.cs) python -I
                     tools/sprawdz_logi.py --grupa nakum <Armoury-*.log> [--do-doby N] (strumieniowo). Okno: od firm F3 + 28 + 7 dob (bez F3 - ostatnie 28 dob). NAKUM-0 linia
                     'Akumulator kies' kazdej doby, NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy < +30 tys./d (1b R/P INFO, 1c zapas dni W koniec <= 1.1 x poczatek), NAKUM-2
@@ -38199,12 +38203,56 @@ def nds_main(logp, bdp=None, until=120):
         if len(tail) < 14:
             tail = vd[-30:]
             how3 = "ostatnie 30 dob (okno od konca rampy za krotkie)"
-        a, b = D["vil"][tail[0]]["stan"], D["vil"][tail[-1]]["stan"]
-        n = max(1, tail[-1] - tail[0])
-        drift = (b - a) / n / max(1.0, (a + b) / 2)
-        rep.add(f"NDS-3a: kiesy wsi - dryf {len(tail)} dob {how3} (dol)", f"{a / 1e6:.2f} -> {b / 1e6:.2f} mln = {100 * drift:+.3f}%/d", ">= -0.2%/d (projekt 14)", drift >= -0.002)
-        rep.add(f"NDS-3b: kiesy wsi - dryf {len(tail)} dob {how3} (gora: wies bez towaru nie moze chomikowac wolnego pieniadza)", f"{100 * drift:+.3f}%/d",
+        # f14-wsie (18.10, fin92 NDS-3a -0.466%/d): kiesy wsi po rampie KS nie odplywaja, tylko schodza z nadwyzki zebranej w rampie (DS F1 zdjal stare pobory od doby 1,
+        # koszyk wsi ZC4 rusza dopiero z rampa KS: fin92 0 zl/d do 109124, 115 tys./d od 109140; kiesy 3.70 -> 7.46 mln). Zejscie ma stala ok. 55-70 dob, nie 15:
+        # krok 5 planuje (kiesa - skrzynia) / 15 dziennie, ale wydaje z tego ok. 1/5 (niewydane - brak towaru i materialu, potrzeba pokryta), a danina od skarbca wsi
+        # 3%/d bierze tylko ponad 3 x skrzynia - krancowy odplyw z kiesy ok. 1.5-1.8%/d (bloki 14 dob fin91/fin92). Okno od konca rampy + 2 x 15 dob mierzylo wiec
+        # przejscie, nie stan ustalony. Teraz: dryf = nachylenie MNK stanu z OSTATNICH 26 dob okna (nie wczesniej niz w0_) - stan ustalony na koncu biegu; jedna doba
+        # (np. +74 tys. w ostatniej dobie fin92) nie przestawia wyniku, jak przy dwoch koncach. Pomiar od w0_ do konca (dotychczasowy) - NDS-3a0 (INFO, przejscie).
+        a0, b0 = D["vil"][tail[0]]["stan"], D["vil"][tail[-1]]["stan"]
+        drift0 = (b0 - a0) / max(1, tail[-1] - tail[0]) / max(1.0, (a0 + b0) / 2)
+        how0 = how3
+        if len(tail) > 26:
+            tail = tail[-26:]
+            how3 = f"ostatnie 26 dob okna {tail[0]}-{tail[-1]} (stan ustalony; " + (f"okno od doby {w0_})" if w0_ is not None and tail[0] >= w0_ else "z ostatnich 30 dob)")
+        xs3 = tail; ys3 = [D["vil"][d]["stan"] for d in xs3]
+        mx3, my3 = sum(xs3) / len(xs3), sum(ys3) / len(ys3)
+        sxx3 = sum((x - mx3) ** 2 for x in xs3)
+        slope3 = (sum((x - mx3) * (y - my3) for x, y in zip(xs3, ys3)) / sxx3) if sxx3 > 0 else 0.0
+        drift = slope3 / max(1.0, my3)
+        a, b = ys3[0], ys3[-1]
+        rep.add(f"NDS-3a0: kiesy wsi - dryf {len([d for d in vd if w0_ is not None and d >= w0_]) or len(tail)} dob {how0} - przejscie po rampie (dwa konce)",
+                f"{a0 / 1e6:.2f} -> {b0 / 1e6:.2f} mln = {100 * drift0:+.3f}%/d", "INFO (zejscie nadwyzki z rampy KS - stan ustalony w NDS-3a)", None)
+        rep.add(f"NDS-3a: kiesy wsi - dryf {how3} (dol)", f"{a / 1e6:.2f} -> {b / 1e6:.2f} mln, nachylenie MNK {slope3:+.0f}/d = {100 * drift:+.3f}%/d",
+                ">= -0.2%/d (projekt 14; MNK z 26 dob)", drift >= -0.002)
+        rep.add(f"NDS-3b: kiesy wsi - dryf {how3} (gora: wies bez towaru nie moze chomikowac wolnego pieniadza)", f"{100 * drift:+.3f}%/d",
                 "<= +0.2%/d (projekt 9.3: kiesy plaskie po skrzyni; model 17.10 bez KS: +1.1..+1.3%/d)", drift <= 0.002)
+        # f14-wsie: rownowaga kies wsi - bloki 14 dob od konca rampy (max(KS, DS F1)): dryf bloku = a + b x sredni stan; b < 0 - odplyw rosnie z kiesa (powrot do
+        # rownowagi), S* = -a/b, stala zejscia 1/(-b). Szacunek (wplywy wsi zmieniaja sie z wojna) - INFO; mniej niz 5 blokow - za krotko na szacunek.
+        r0_ = max(ends) if ends else None
+        post3 = [d for d in vd if r0_ is not None and d >= r0_]
+        bl3 = [post3[i:i + 14] for i in range(0, len(post3) - 13, 14)]
+        bl3 = [x for x in bl3 if x[-1] - x[0] == 13]
+        pts3 = [(sum(D["vil"][d]["stan"] for d in x) / 14.0, (D["vil"][x[-1]]["stan"] - D["vil"][x[0]]["stan"]) / 13.0) for x in bl3]
+        st0 = D["vil"][vd[0]]["stan"]
+        if len(pts3) >= 5:
+            pmx, pmy = sum(p[0] for p in pts3) / len(pts3), sum(p[1] for p in pts3) / len(pts3)
+            psxx = sum((p[0] - pmx) ** 2 for p in pts3)
+            pb = (sum((p[0] - pmx) * (p[1] - pmy) for p in pts3) / psxx) if psxx > 0 else 0.0
+            pa = pmy - pb * pmx
+            chs = [R(d, "chest", 2) for d in vd[-7:] if d in D["ds"] and "chest" in D["ds"][d]]
+            blt = "; ".join(f"{p[0] / 1e6:.2f} mln {p[1]:+.0f}/d" for p in pts3)
+            if pb < 0:
+                sst = -pa / pb
+                rep.add(f"NDS-3f: kiesy wsi - rownowaga (bloki 14 dob od konca rampy {r0_}: dryf = a + b x kiesa)",
+                        f"odplyw krancowy {-100 * pb:.2f}%/d (stala zejscia {-1 / pb:.0f} dob), S* {sst / 1e6:.2f} mln = {sst / max(1.0, st0):.2f} x start ({st0 / 1e6:.2f})"
+                        + (f", skrzynia swiata {sum(chs) / len(chs) / 1e6:.2f} mln" if chs else "") + f" | bloki: {blt}",
+                        "INFO (szacunek; b < 0 = kiesy wracaja do rownowagi, nie odplywaja do zera)", None)
+            else:
+                rep.add(f"NDS-3f: kiesy wsi - rownowaga (bloki 14 dob od konca rampy {r0_})", f"b {pb:+.5f} >= 0 - brak powrotu do rownowagi w blokach | bloki: {blt}",
+                        "INFO (b >= 0: dryf nie maleje z kiesa - szukac odplywu niezaleznego od kiesy)", None)
+        else:
+            rep.add("NDS-3f: kiesy wsi - rownowaga (bloki 14 dob od konca rampy)", f"blokow {len(pts3)} (od doby {r0_})", "INFO (za krotko - >= 5 blokow)", None)
         # ds-akumulator: mediana kiesy wobec mediany SKRZYNI (projekt DS: kiesa dazy do skrzyni + 15 x nadwyzka), nie wobec startu (normy sprzed DS)
         am = [D["akmed"][d] for d in vd[-7:] if d in D["akmed"]]
         if am:
@@ -38225,6 +38273,11 @@ def nds_main(logp, bdp=None, until=120):
         if lo:
             x = sum(lo) / len(lo)
             rep.add("NDS-3d: wsi z kiesa < 1000 zl (7 ostatnich dob)", f"{100 * x:.1f}%", "<= 15%", x <= 0.15)
+            # f14-wsie: ogon biednych wsi rosnie przy plaskiej sumie (fin91: 11 -> 79 wsi przy kiesach 5.04 mln) - rozklad, nie suma; trend od konca rampy (INFO)
+            lo0 = [D["vil"][d]["lo"] / max(1, D["vil"][d].get("n") or 571) for d in vd if r0_ is not None and r0_ <= d < r0_ + 7 and D["vil"][d].get("lo") is not None]
+            if lo0:
+                rep.add("NDS-3g: wsi z kiesa < 1000 zl - trend od konca rampy (7 dob od konca rampy -> 7 ostatnich dob)",
+                        f"{100 * sum(lo0) / len(lo0):.1f}% -> {100 * x:.1f}%", "INFO (rozklad kies: wsie z utargiem ponizej koszyka i czynszu schodza do zera, bogate placa danine od skarbca)", None)
         sh = [D["vil"][d]["stan"] / D["vil"][d]["world"] for d in vd[-7:] if D["vil"][d].get("world")]
         sh0 = [D["vil"][d]["stan"] / D["vil"][d]["world"] for d in vd[:7] if D["vil"][d].get("world")]
         if sh:
