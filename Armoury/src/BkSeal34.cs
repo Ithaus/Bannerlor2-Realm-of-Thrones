@@ -121,6 +121,8 @@ namespace Armoury
             // (jedzenie kupuje drabina ZC4 i liczy kcal; dotad rynek BK bral 1 sztuke kazdego jedzenia, ktore znikalo bez kcal - ok. 14% wplywu do kies wsi w rundzie 3)
             double ksBud = 0; bool ks = false;
             try { ks = StartCalibration.SwPaidFirst && StartCalibration.Zc4BasketBudget(village, out ksBud); if (!ks) ksBud = 0; } catch { ks = false; ksBud = 0; }
+            // r4-bkwies (KS runda 4 B1, klucz Ks Bk Village Needs; Jeff 17.10 "ok"): wies DS albo wies KS z koszykiem ZC4 - rynek wedlug potrzeb, tylko z nadwyzki ponad skrzynie
+            if ((ds || ks) && VillNeeds.BkOn) { RunVillageNeeds(st, village, town, made, ds, ks, ksBud, budget, fresh); return; }
             long ksRoom = ks ? (long)village.Gold - (long)Math.Ceiling(7.0 * Math.Max(0.0, ksBud)) : long.MaxValue;
             if (ks) budget = (int)Math.Max(0, Math.Min(budget, ksRoom));
             var roster = town.Owner.ItemRoster;
@@ -152,6 +154,104 @@ namespace Armoury
             }
             if (any) _vVillages++;
             if (ds) DsVillage.NoteBkSpent(st, dsSpent, dsOld, fresh);   // fresh - nowy budzet niewydany w tym ticku (jutro P5 / roboty gminy)
+        }
+
+        private const int NeedShelfKeep = 5;   // r4-bkwies: potrzeby wsi tylko ponad 5 ostatnich sztuk polki (dla ludu miasta - jak TownFolk.ShelfKeep)
+
+        /// <summary>
+        /// r4-bkwies (KS runda 4 B1-B4, klucz Ks Bk Village Needs; Jeff 17.10 "ok"): rynek wsi BK dla wsi DS i wsi KS z koszykiem ZC4 WEDLUG POTRZEB zamiast "po sztuce
+        /// kazdego towaru z nadwyzka podazy miasta":
+        ///  - potrzeby (sol, narzedzia albo zelazo kowala, len, sukno, garnki) - najwyzej do zapasu potrzeb wsi (VillNeeds.Room: ludzie x potrzeba dnia x dni zapasu),
+        ///    tylko ponad 5 ostatnich sztuk polki (lud miasta), bez warunku nadwyzki podazy miasta (wies kupuje to, czego potrzebuje);
+        ///  - zbytki (wino, przyprawy, klejnoty, aksamit, futra) - tylko wies bogata (kiesa >= Ks Bk Rich Chests skrzyn), po 1 sztuce kategorii, tylko z nadwyzka podazy (jak BK);
+        ///  - wies z koszykiem ZC4: bez jedzenia i bez towarow koszyka (kupuje je drabina z limitem potrzeby i ceny - jedna zasada na jedno zjawisko); zostaja zbytki spoza
+        ///    koszyka (klejnoty, aksamit);
+        ///  - PRAWDZIWY budzet dnia, maleje z kazdym zakupem: wies DS - (1 - rampa) x 5% kiesy (stary pulap jako budzet dnia, po rampie 0) + odlozona czesc kroku 5
+        ///    (fresh); wies KS bez DS - 5% kiesy; kazdy zakup tylko z kiesy ponad skrzynie (DsVillage.Chest; przy KS najmniej 7 dob budzetu koszyka) - kiesa po zakupie
+        ///    nigdy ponizej skrzyni;
+        ///  - ksiegowanie: DS - DsVillage.NoteBkSpent (niewydany fresh jutro do P5, jak dotad); KS bez DS - KsVilOut; wies z koszykiem - linia ZC4 (NKS-29);
+        ///  - ramka ksiegi towarow FFolkVill na rynek miasta Bound (zakupy wsi w miescie). Kiesa wsi -> kasa Bound dokladnie tyle, ile zeszlo z kiesy (kontrola w linii).
+        /// </summary>
+        private static void RunVillageNeeds(Settlement st, Village village, Town town, HashSet<ItemObject> made, bool ds, bool ks, double ksBud, int oldCap, int fresh)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            var md = town.MarketData;
+            double chest = Math.Max(0.0, DsVillage.Chest(village));
+            long floor = (long)Math.Ceiling(chest);
+            if (ks) floor = Math.Max(floor, (long)Math.Ceiling(7.0 * Math.Max(0.0, ksBud)));
+            bool rich = chest >= 1 && village.Gold >= VillNeeds.RichChests * chest;
+            double oldLeft = Math.Max(0, oldCap);                    // DS: (1 - rampa) x 5% kiesy; KS bez DS: 5% kiesy - budzet dnia (nie na sztuke)
+            int freshLeft = ds ? Math.Max(0, fresh) : 0;
+            double budget = oldLeft + freshLeft;
+            VillNeeds.BkTick(ds, ks, budget, rich);
+            var roster = town.Owner.ItemRoster;
+            long dsSpent = 0, dsOld = 0; bool any = false, anyLux = false;
+            HashSet<ItemCategory> luxDone = null;
+            var gf = GoodsLedger.Begin(GoodsLedger.FFolkVill, town.Settlement);
+            try
+            {
+                for (int i = roster.Count - 1; i >= 0; i--)
+                {
+                    if (budget < 1) break;
+                    if (i >= roster.Count) continue;
+                    var e = roster.GetElementCopyAtIndex(i);
+                    var el = e.EquipmentElement;
+                    var item = el.Item;
+                    if (item == null || item.ItemCategory == null || e.Amount <= 0 || made.Contains(item)) continue;   // BK: wies nie kupuje tego, co sama wytwarza
+                    double kgPc; int g = VillNeeds.GroupOf(item, out kgPc);
+                    bool lux = g < 0 && VillNeeds.IsLux(item);
+                    if (g < 0 && !lux) continue;                                                   // poza potrzebami i zbytkami - nic
+                    if (ks && (g >= 0 || StartCalibration.ZBasketCat(item.ItemCategory))) { VillNeeds.BkSkipBasket(); continue; }   // koszyk ZC4 kupuje drabina
+                    if (lux && (!rich || (luxDone != null && luxDone.Contains(item.ItemCategory)))) continue;
+                    int n;
+                    if (lux)
+                    {
+                        var cd = md.GetCategoryData(item.ItemCategory);
+                        if (cd.Supply <= cd.Demand) continue;                                      // zbytek tylko z nadwyzki podazy miasta (jak BK)
+                        n = 1;
+                    }
+                    else
+                    {
+                        int have = e.Amount - NeedShelfKeep;
+                        if (have <= 0) continue;
+                        int room = VillNeeds.Room(village, item);
+                        if (room <= 0) { VillNeeds.BkRefused(1); continue; }                       // zapas potrzeb w domu pelny
+                        n = Math.Min(room, have);
+                    }
+                    int price = md.GetPrice(el, null, false, null);
+                    if (price <= 0) continue;
+                    int byBudget = (int)Math.Min(int.MaxValue, Math.Floor(budget / price));
+                    if (byBudget <= 0) { VillNeeds.BkPoor(); continue; }
+                    long roomGold = (long)village.Gold - floor;                                    // tylko z kiesy ponad skrzynie
+                    int byChest = roomGold > 0 ? (int)Math.Min(int.MaxValue, roomGold / price) : 0;
+                    if (byChest <= 0) { VillNeeds.BkChestStop(); continue; }
+                    n = Math.Min(n, Math.Min(byBudget, byChest));
+                    if (n <= 0) continue;
+                    int had = village.Gold;
+                    village.ChangeGold(-n * price);
+                    int got = had - village.Gold;
+                    if (got <= 0) continue;
+                    int tg = town.Gold;
+                    town.ChangeGold(got);
+                    long gotIn = (long)town.Gold - tg;
+                    roster.AddToCounts(el, -n);
+                    budget -= got; any = true;
+                    _vBuys += n; _vPaid += got;
+                    if (town.IsCastle) _vCastle += got;
+                    VillNeeds.BkBought(village, item, g, n, got, gotIn, ks && StartCalibration.ZFoodCat(item.ItemCategory));
+                    if (lux) { if (luxDone == null) luxDone = new HashSet<ItemCategory>(); luxDone.Add(item.ItemCategory); anyLux = true; }
+                    try { if (ks) StartCalibration.NoteBkVillageMarket(village, got); if (ks && !ds) StartCalibration.KsVilOut(st, got); } catch { }
+                    if (ds) { double fo = Math.Min(oldLeft, got); oldLeft -= fo; dsOld += (long)Math.Round(fo); freshLeft = (int)Math.Max(0.0, freshLeft - (got - fo)); dsSpent += got; }
+                }
+            }
+            finally
+            {
+                GoodsLedger.End(gf);
+                if (any) { _vVillages++; VillNeeds.BkMargin((long)village.Gold - (long)Math.Ceiling(chest)); }
+                if (anyLux) VillNeeds.BkLuxVillage();
+                if (ds) DsVillage.NoteBkSpent(st, dsSpent, dsOld, freshLeft);   // fresh niewydany - jutro do czesci P5 kroku 5 (jak dotad)
+                VillNeeds.BkTime(System.Diagnostics.Stopwatch.GetTimestamp() - t0);
+            }
         }
 
         private static object Marketplace()
@@ -359,7 +459,11 @@ namespace Armoury
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily", e); }
-            finally { ClearDay(); }
+            finally
+            {
+                try { VillNeeds.Daily(); } catch (Exception e) { Stumble("VillNeeds.Daily", e); }   // r4-bkwies: linia "Potrzeby wsi (B1)" (rynek BK wedlug potrzeb, krok 5, skrzynia)
+                ClearDay();
+            }
         }
 
         // ------------------------------------------------------------ wpiecie

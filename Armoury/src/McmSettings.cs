@@ -6824,6 +6824,38 @@ namespace Armoury
         [SettingPropertyGroup("Medieval dues: villages (DS F1, 17.10)")]
         public int DsRentArrearsPayDays { get; set; } = 28;
 
+        [SettingPropertyBool("Ks Bk Village Needs", HintText = "the Banner Kings village market of a village under the medieval dues or the start calibration buys what villagers really need - salt, tools (or iron for the smith), linen, woollen cloth and pots - and only as much as they use (Village Need Cover Days at most in the house); wine, spices, jewellery, velvet and furs only when the village is rich (Ks Bk Rich Chests); it pays only from what the purse holds beyond its chest for a black day, from a real daily budget that shrinks with every purchase (no longer one piece of everything the town has too much of, at 5 percent of the purse for each piece); a village buying its basket from the calibration plan buys no food and none of its basket goods there (the basket already buys them). Off = as before")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public bool KsBkVillageNeeds { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Bk Rich Chests", 1.00f, 20.00f, "0.0", HintText = "with Ks Bk Village Needs: a village counts as rich, and may buy wine, spices, jewellery, velvet and furs at its Banner Kings market, when its purse holds at least this many chests for a black day")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public float KsBkRichChests { get; set; } = 3.0f;
+
+        [SettingPropertyInteger("Village Need Cover Days", 1, 91, "0", HintText = "with Ks Bk Village Needs or Ds Surplus Need Limit: a village keeps at most this many days of its salt, tools, linen, woollen cloth and pots in the house (by what its people use each day: a pinch of salt a day, a tool worn out in a year, a shirt and a pot every year or two) - it buys more of them beyond its daily shopping only when the house runs below that")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public int VillageNeedCoverDays { get; set; } = 7;
+
+        [SettingPropertyBool("Ks Surplus Skips Basket", HintText = "with the start calibration: a village that buys its basket from the plan spends what lies beyond its chest on the finer goods of its market town and on communal works, no longer on more salt, tools, linen, pots and ale than its basket needs (the basket already buys them - one rule for one thing). Off = as before")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public bool KsSurplusSkipsBasket { get; set; } = true;
+
+        [SettingPropertyBool("Ds Surplus Need Limit", HintText = "with Dues Medieval: a village without the calibration basket spends what lies beyond its chest on salt and tools only up to what its people use (Village Need Cover Days), no longer stripping the market stall to the last five sacks at any price; the coin it does not spend on them stays in its purse. Off = as before")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public bool DsSurplusNeedLimit { get; set; } = true;
+
+        [SettingPropertyBool("Ds Surplus Ledger Frame", HintText = "with Dues Medieval: the salt and tools a village buys from what lies beyond its chest are counted in the goods ledger as bought in its market town (until now as bought 'nowhere', so the start calibration saw too little salt eaten in the markets and too much salt left over). Changes the count only. Off = as before")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public bool DsSurplusLedgerFrame { get; set; } = true;
+
+        [SettingPropertyBool("Ks Chest Paid Basket", HintText = "with the start calibration: a village's chest for a black day is three weeks of the basket the plan pays for (plus its rent), instead of three weeks of the old daily shopping list - the village keeps what it really has to spend each day. Off = as before")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public bool KsChestPaidBasket { get; set; } = true;
+
+        [SettingPropertyInteger("Ks Granary Emergency Days", 0, 364, "0", HintText = "with Ks Granary No Floor: only when a village's granary has fallen below this many days of food does it get the game's harvest formula as a floor again (food from nothing, counted in the log as an emergency) - a hungry village eats its store down first (0 = never)")]
+        [SettingPropertyGroup("Village needs and the Banner Kings village market (KS round 4, 17.10)")]
+        public int KsGranaryEmergencyDays { get; set; } = 60;
+
         [SettingPropertyBool("Ds Towns", HintText = "towns, castles and the crown pay as they did in the Middle Ages: after Ds Farm Measure Days of watching what the town and castle purses give up today, each town and castle owes its lord and its king a fixed farm (paid every week); the daily valve, the war aid from the people's savings, the hoard tax on the people and the purses, the war levy on town purses and the lords' war levy on the people stop; in war the realm grants the king a war grant each quarter (aids on sales, a tax on earnings, a tenth of movables, double customs, a larger vassal aid), and a king short of money for the wage refunds spends his treasure above the war reserve, then borrows from his burghers against the grant, and only then from the Iron Bank (needs Town Folk Live and Crown Current Income; off = the old rules from the next day)")]
         [SettingPropertyGroup("Medieval dues: towns, castles and crown (DS F3, 17.10)")]
         public bool DsTowns { get; set; } = true;
@@ -8641,6 +8673,14 @@ namespace Armoury
             s.DsRampDays = DsRampDays;
             s.DsCommunalWorks = DsCommunalWorks;
             s.DsRentArrearsPayDays = DsRentArrearsPayDays;
+            s.KsBkVillageNeeds = KsBkVillageNeeds;
+            s.KsBkRichChests = KsBkRichChests;
+            s.VillageNeedCoverDays = VillageNeedCoverDays;
+            s.KsSurplusSkipsBasket = KsSurplusSkipsBasket;
+            s.DsSurplusNeedLimit = DsSurplusNeedLimit;
+            s.DsSurplusLedgerFrame = DsSurplusLedgerFrame;
+            s.KsChestPaidBasket = KsChestPaidBasket;
+            s.KsGranaryEmergencyDays = KsGranaryEmergencyDays;
             s.DsTowns = DsTowns;
             s.KsRealRecipes = KsRealRecipes;
             s.KsGranaryNoFloor = KsGranaryNoFloor;

@@ -239,6 +239,7 @@ namespace Armoury
         {
             int days = ChestDays(Settings.Current);
             if (days <= 0) return 0;
+            nv = VillNeeds.ChestBasket(st, nv);        // r4-bkwies (B2/M9, klucz Ks Chest Paid Basket): przy KS koszyk dnia = koszyk zaplacony z Planu (x lambda); inaczej bez zmian
             double r = Math.Max(0, rentBeforeDecree) * Decree(st);
             double c = days * (Math.Max(0, nv) + r);
             return double.IsNaN(c) || double.IsInfinity(c) ? 0 : c;
@@ -446,7 +447,7 @@ namespace Armoury
                 {
                     // 2. rata zaleglosci tylko z kiesy ponad koszyk dnia (TownFolk.Villages kupuje go po czynszu)
                     double nv, r1;
-                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, nv) : 0;
+                    double basket = TownFolk.DsVillageDay(st, out nv, out r1) ? Math.Max(0, VillNeeds.ChestBasket(st, nv)) : 0;   // r4-bkwies (M9): przy KS koszyk z Planu
                     int pd = ArrPayDays(s);
                     double inst = pd > 0 ? Math.Max(Math.Max(1.0, d), owed / pd) : owed;
                     double room = g - payDay - basket;

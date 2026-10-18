@@ -226,21 +226,29 @@ namespace Armoury
         }
 
         /// <summary>Famine.Daily: plon spichlerza wsi zastosowanej = max(racje KS z czesci domowej okregu, wzor dzis) - podloga (KS nikogo nie zaglodzi).</summary>
-        internal static int _granNoFloor;   // KS r4: doby wsi bez podlogi (klucz Ks Granary No Floor)
-        internal static double GranaryFloor(Village v, double harvest)
+        internal static int _granNoFloor;   // KS r4: doby wsi bez podlogi (klucz Ks Granary No Floor) - zerowane co dobe z innymi (r4-bkwies, GranDayClose)
+        internal static double GranaryFloor(Village v, double harvest) { return GranaryFloor(v, harvest, -1, -1); }
+
+        /// <summary>r4-bkwies (G1): jak wyzej; `people` - ludzie spichlerza (Famine), `barnFood` - zapas spichlerza (osobodni) przed plonem doby; -1 - nieznane (bez podlogi awaryjnej).</summary>
+        internal static double GranaryFloor(Village v, double harvest, double people, double barnFood)
         {
             if (v == null || _state != StateApplied || !KeyOn) return harvest;
             try
             {
                 var st = v.Settlement; LiveDist ld;
                 if (st == null || st.StringId == null || !_live.TryGetValue(st.StringId, out ld) || !(ld.Rations >= 0)) return harvest;
+                GranNote(st, people, barnFood);                    // r4-bkwies: potrzeba i zapas spichlerzy wsi KS (tylko licznik linii podlogi)
                 if (ld.Rations > harvest) { _granKsAbove++; return ld.Rations; }
+                var s0 = Settings.Current;
+                bool noFloor = s0 == null || s0.KsGranaryNoFloor;
+                // r4-bkwies (PLAN-KS-RUNDA4 G1, klucz Ks Granary Emergency Days): przy Ks Granary No Floor wzor gry wraca tylko AWARYJNIE - spichlerz ponizej N dni jedzenia;
+                // to jedzenie z niczego, wiec liczone osobno ("z niczego (awaryjnie)" w linii podlogi, bramka NKS-26)
+                if (noFloor && GranEmergency(people, barnFood)) { GranEm(harvest - ld.Rations); return harvest; }
                 // KS-R3 G6 (klucz Ks Granary Release): podloga zdjeta (14 dob z rzedu wies kupila i zjadla, co trzeba) - racje KS (z kupionym i zjedzonym z magazynu)
                 if (!FloorOn(v)) { _granReleased++; return ld.Rations; }
                 // KS runda 4 (fin78: podloga w 99% wsi, kcal podlogi 5.5% potrzeby): klucz Ks Granary No Floor - bez wzoru gry (jedzenie z niczego); wies je racje z wlasnej
                 // pracy, kupione i z magazynu, a brak schodzi z zapasu spichlerza (ok. 2 lata) - glod widac powoli, jak w prawdziwym przednowku
-                var s0 = Settings.Current;
-                if (s0 == null || s0.KsGranaryNoFloor) { _granNoFloor++; return ld.Rations; }
+                if (noFloor) { _granNoFloor++; return ld.Rations; }
                 _granFloorUp++;
                 return harvest;
             }
@@ -475,6 +483,7 @@ namespace Armoury
             double ownKcal = 0, kcalNeed = 0;
             int granUp = _granFloorUp, granAbove = _granKsAbove, granRel = _granReleased;          // Famine.Daily biegnie wczesniej w tej samej dobie
             _granFloorUp = _granKsAbove = _granReleased = 0;
+            GranDayClose(granUp, granAbove, granRel);      // r4-bkwies: liczniki spichlerza doby do linii podlogi (FloorDaily); bez podlogi i awaryjne zerowane co dobe
             var regionHands = new Dictionary<string, double>(StringComparer.Ordinal);
             var tfList = new List<KeyValuePair<LiveDist, DistResult>>();
             bool full = _liveFull; _liveFull = false;

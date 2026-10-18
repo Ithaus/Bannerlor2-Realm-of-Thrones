@@ -953,6 +953,12 @@ Uzycie (Python 3, tylko odczyt):
                     zaplaconego z Planu i budzet / wplyw netto 0.85-1.05, NKS-22 kupcy zywnosci KS-H, NKS-23 polki zboza miast (ks-miasta.csv), NKS-23b reszta towarow
                     rdzenia (ks-miasta-towary.csv), NKS-24 korytarze planu wobec dowozu, NKS-25 wies je swoje, NKS-26 podloga spichlerza, NKS-27 sterowanie rynku,
                     NKS-28 czas KS-H; ETAP = prog niespelniony, ale nie gorzej niz runda 3 (NKS_R3: autotest 2026-10-17_01-15-30).
+                    KS-R4 r4-bkwies (17.10, PLAN-KS-RUNDA4 rozdz. 5 G1, 6 B4, 11; VillNeeds.cs, linia "Potrzeby wsi (B1)" i dopisek linii podlogi):
+                    NKS-26 przy Ks Granary No Floor TAK - podloga DANA (wzor gry) 0 w kazdej dobie okna D+22..D+49, podloga awaryjna (spichlerz < N dni,
+                    z niczego) <= 2% wsi i <= 0.5% kcal potrzeby; stan G6, kcal braku z zapasu spichlerza i zapas spichlerzy - INFO (NKS-8c, NKS-15); bez dopisku -
+                    jak dotad. NKS-29 przy linii B1 z rynkiem BK wedlug potrzeb TAK - kiesa po zakupie BK nigdy ponizej skrzyni, bez jedzenia u wsi z koszykiem ZC4,
+                    kontrola kiesy - kasy 0 w kazdej dobie okna, udzial rynku BK w wplywie do kies <= 10% w ostatnich 28 dobach; log z DS bez linii B1 - INFO;
+                    bez DS - jak dotad (<= 2%).
 --grupa nds       : (17.10, Jeff "daniny, oplaty i logika musi byc taka jak byla w sredniowieczu ... system dynamiczny"; projekt docs/PROJEKT-DANINY-SREDNIOWIECZNE-2026-10-17.md
                     rozdz. 14 grupa nds; galaz w-toku/noc-ds, Armoury/src/DsVillage.cs, DsTowns.cs, DsSeason.cs) python -I tools/sprawdz_logi.py --grupa nds <Armoury-*.log>
                     [--baza-doby <log biegu bez DS z tego samego zapisu>] [--do-doby 120] (strumieniowo). NDS-0 linie "Daniny wsi (DS)" kazdej doby, NDS-1 stare pobory wsi po
@@ -34288,7 +34294,20 @@ NKS_CORRCUT = re.compile(r"\| ciecie nadmiaru krain:(?P<body>[^|]*)")
 NKS_CORRGR = re.compile(r"\| gradient max (?P<g>[\d.]+) \(zmiana ostatniej rundy (?P<d>[\d.]+)%")
 NKS_CTL = re.compile(r"KS: sterowanie rynku doba (?P<day>-?\d+) ")
 NKS_CTLIT = re.compile(r"(?P<g>[A-Za-z_]+) (?P<c>-?\d+)/(?P<u>-?\d+)/(?P<d>-?\d+) x(?P<k>[\d.]+)")
-NKS_FLOOR = re.compile(r"KS: podloga spichlerza dzien (?P<day>-?\d+) \| wsi z podloga (?P<on>\d+) z (?P<n>\d+) \([^)]*\), kcal podlogi (?P<kf>[\d.]+|-)% potrzeby wsi, powroty (?P<back>\d+)")
+NKS_FLOOR = re.compile(r"KS: podloga spichlerza dzien (?P<day>-?\d+) \| wsi z podloga (?P<on>\d+) z (?P<n>\d+) \([^)]*\), kcal (?:podlogi|braku \(z zapasu spichlerza\)) (?P<kf>[\d.]+|-)% potrzeby wsi, powroty (?P<back>\d+)")
+# r4-bkwies (17.10): dopisek linii podlogi - podloga DANA (wzor gry), bez podlogi (brak z zapasu spichlerza), awaryjna (z niczego, spichlerz < N dni), zapas spichlerzy wsi KS
+NKS_FLOOR2 = re.compile(r"\| klucz Ks Granary No Floor (?P<key>TAK|NIE): podloga dana \(wzor gry\) (?P<up>\d+) wsi, bez podlogi \(brak z zapasu spichlerza\) (?P<nf>\d+) wsi, "
+                        r"racje KS ponad wzor (?P<ab>\d+) wsi, podloga zdjeta \(KS-R3\) (?P<rel>\d+) wsi; z niczego \(awaryjnie, spichlerz < (?P<ed>\d+) dni\) (?P<em>\d+) wsi, "
+                        r"(?P<ef>\d+) osobodni \((?P<ep>[\d.]+|-)% potrzeby wsi KS\); zapas spichlerzy wsi KS: Westeros (?P<bw>\d+|-) dni, Essos (?P<be>\d+|-) dni")
+# r4-bkwies: podloga dana z linii produkcji (log sprzed dopisku - INFO)
+NKS_PRODFLOOR = re.compile(r"\| spichlerz: racje KS ponad wzor dzis w (?P<ab>\d+) wsiach, podloga \(wzor dzis\) w (?P<up>\d+), podloga zdjeta \(KS-R3\) w (?P<rel>\d+)")
+# r4-bkwies: linia "Potrzeby wsi (B1)" (VillNeeds.Daily) - rynek wsi BK wedlug potrzeb, krok 5 DS, skrzynia z koszyka Planu
+NKS_VN = re.compile(r"Potrzeby wsi \(B1\): dzien (?P<day>-?\d+) \| klucze: rynek BK wedlug potrzeb (?P<bk>TAK|NIE), krok 5 bez koszyka ZC4 (?P<skip>TAK|NIE), krok 5 do potrzeby (?P<lim>TAK|NIE)")
+NKS_VNBK = re.compile(r"kiesy wsi -> kasy (?P<s>\d+) zl = potrzeby (?P<nz>\d+) zl \+ zbytki (?P<lz>\d+) zl;.*?jedzenie kupione u wsi ZC4 (?P<food>\d+); kiesa ponizej skrzyni po zakupie (?P<viol>\d+); "
+                      r"najmniejszy zapas ponad skrzynie (?P<mm>-?\d+|-) zl; kontrola kiesy wsi - kasy = (?P<ctl>-?\d+)")
+NKS_VNS5 = re.compile(r"\| krok 5 \(DS\): wsi z koszykiem ZC4 bez listy wsi (?P<skn>\d+) \(budzet dalej do robot gminy (?P<skz>\d+) zl\), wsi do potrzeby (?P<ln>\d+): sol (?P<salt>\d+) "
+                      r"\+ narzedzia (?P<tools>\d+) szt\. za (?P<lzl>\d+) zl, ponad potrzebe odmowione (?P<ref>\d+) szt\., zostalo w kiesach (?P<keep>\d+) zl")
+NKS_DSDAY = re.compile(r"Daniny wsi \(DS\): dzien (?P<day>-?\d+) \|")
 NKS_OWN = re.compile(r"KS: wies je swoje dzien (?P<day>-?\d+) \| wsi (?P<v>\d+), szt\. (?P<p>\d+), kcal (?P<k>[\d.]+|-)% koszyka.*?wsi > 30% koszyka 14 dob z rzedu: (?P<s>\d+)")
 NKS_P1 = re.compile(r"\| drabina 1 \(zaplacone z Planu\): chciane (?P<w>-?\d+) szt\., bez towaru (?P<ng>-?\d+) \([^)]*\), bez kiesy (?P<nm>-?\d+)")
 NKS_PLANUNC = re.compile(r"\| (?P<mk>Westeros|Essos): wsie \d+ .*?KS-R3: kcal zastepcze 8b (?P<sub>[\d.-]+)%, Plan bez pokrycia (?P<unc>[\d.-]+)%")
@@ -34330,12 +34349,13 @@ NKS_CONF = re.compile(r"KS: potwierdzone doba (?P<day>-?\d+)")
 NKS_ONSRC = re.compile(r"KS: WLACZONE doba (?P<day>-?\d+) \((?P<src>autotest|gra)")
 
 
-def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor, own, zc4_k8, start_px):
+def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor, own, zc4_k8, start_px, floor2=None, prodfloor=None):
     """KS-R3 (17.10, "kupcy i krainy"; StartCalibration.Corridors.cs, KsFoodCarts.cs, StartCalibration.R3.cs): NKS-22 kupcy zywnosci KS-H (linia co dobe od A, reszta towaru
     i zlota 0, zawrocone <= 1% szt., kasa celu za mala <= 5% zamowionych, probka wyceny <= 1%, potkniecia 0), NKS-23 polki zboza miast (ks-miasta.csv: bez zboza < 0.5 dnia
     <= 5% miast, < 2 dni <= 10%, q90 <= 3 x T*, zadne > 30 dni poza krainami bez ujscia), NKS-23b reszta towarow rdzenia (ks-miasta-towary.csv: popyt zaplacony w miastach
     z polka < 0.5 T* <= 10%), NKS-24 korytarze (dowiezione / Plan >= 0.8 na kazdym korytarzu >= 20 szt./d; kraina-tryb - INFO), NKS-25 wies je swoje (<= 8% kcal koszyka na
-    rynku, INFO ponad 5%; zadna wies > 30% przez 14 dob), NKS-26 podloga spichlerza (wsi z podloga <= 20% w D+49, kcal podlogi <= 2% potrzeby; zgony - NKS-15), NKS-27
+    rynku, INFO ponad 5%; zadna wies > 30% przez 14 dob), NKS-26 podloga spichlerza (wsi z podloga <= 20% w D+49, kcal podlogi <= 2% potrzeby; zgony - NKS-15;
+    r4-bkwies: przy Ks Granary No Floor TAK - podloga dana 0 w kazdej dobie okna, awaryjna <= 2% wsi i <= 0.5% kcal, brak z zapasu spichlerza - INFO), NKS-27
     sterowanie rynku (|czynnik - 1| <= 0.10 w D+49, zmiana <= 7% na Plan)."""
     # NKS-22
     kw = {d: k for d, k in ksh.items() if d >= a}
@@ -34497,18 +34517,48 @@ def nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor,
     else:
         rep.add("NKS-25: wies je swoje", "brak liczb 'z magazynu' w linii ZC4", "<= 8%", None)
     # NKS-26 podloga spichlerza
-    fw = [(d, v) for d, v in sorted(floor.items()) if d <= dd + 49]
-    if fw:
-        d, v = fw[-1]
-        sh = v[0] / max(1, v[1])
-        try:
-            kf = float(v[2])
-        except ValueError:
-            kf = None
-        rep.add("NKS-26: podloga spichlerza (G6)", f"doba {d}: wsi z podloga {v[0]} z {v[1]} ({100 * sh:.0f}%), kcal podlogi {v[2]}% potrzeby, powroty {v[3]}",
-                "wsi z podloga <= 20% w D+49, kcal podlogi <= 2% potrzeby (zgony - NKS-15)", (sh <= 0.20 and kf is not None and kf <= 2.0) if d >= dd + 42 else None)
+    # r4-bkwies (PLAN-KS-RUNDA4 G1 i rozdz. 11; diagnoza fin80 temat "ceny" pkt 5): przy kluczu Ks Granary No Floor TAK (dopisek linii podlogi) bramka = podloga DANA (wzor
+    # gry) 0 w kazdej dobie okna D+22..D+49 i podloga awaryjna (spichlerz < N dni - jedzenie z niczego) <= 2% wsi (max doby) i <= 0.5% kcal potrzeby (srednia okna);
+    # "wsi z podloga" (STAN licznika G6) i kcal braku (schodzi z zapasu spichlerza) - INFO powiazane z NKS-8c i NKS-15; zapas spichlerzy wsi KS wedlug rynku - INFO.
+    # Bez dopisku (log sprzed r4-bkwies) albo klucz NIE - bramka jak dotad (stan <= 20% w D+49, kcal <= 2%), z podloga dana z linii produkcji jako INFO.
+    f2w = {d: v for d, v in (floor2 or {}).items() if w0 <= d <= w1}
+    if f2w and any(v.get("key") == "TAK" for v in f2w.values()):
+        days26 = sorted(f2w)
+        up_bad = [d for d in days26 if int(f2w[d]["up"]) > 0]
+        em_sh = [int(f2w[d]["em"]) / max(1, floor[d][1] if d in floor else 1) for d in days26]
+        em_max = max(em_sh) if em_sh else 0.0
+        eps = []
+        for d in days26:
+            try:
+                eps.append(float(f2w[d]["ep"]))
+            except (TypeError, ValueError):
+                pass
+        ep_mean = sum(eps) / len(eps) if eps else None
+        nf26 = [int(f2w[d]["nf"]) for d in days26]
+        short = [floor[d][2] for d in days26 if d in floor]
+        b0, b1 = f2w[days26[0]], f2w[days26[-1]]
+        ok26 = not up_bad and em_max <= 0.02 and (ep_mean is None or ep_mean <= 0.5)
+        rep.add("NKS-26: spichlerz bez darmowej podlogi (G1, Ks Granary No Floor TAK)",
+                f"doby {days26[0]}..{days26[-1]} ({len(days26)}): podloga dana (wzor gry) > 0 w {len(up_bad)} dobach" + (f" ({up_bad[:6]})" if up_bad else "")
+                + f"; awaryjna (z niczego, spichlerz < {b1['ed']} dni): wsi max {100 * em_max:.1f}%, kcal srednio {('%.3f' % ep_mean) if ep_mean is not None else '-'}% potrzeby"
+                + f"; bez podlogi (brak z zapasu spichlerza) srednio {sum(nf26) / max(1, len(nf26)):.0f} wsi/dobe; INFO: kcal braku {short[0] if short else '-'} -> {short[-1] if short else '-'}% potrzeby"
+                + f" (NKS-8c, NKS-15), zapas spichlerzy wsi KS Westeros {b0['bw']} -> {b1['bw']} dni, Essos {b0['be']} -> {b1['be']} dni",
+                "podloga dana 0 w kazdej dobie okna; awaryjna <= 2% wsi i <= 0.5% kcal (brak i zapas spichlerzy - INFO)", ok26)
     else:
-        rep.add("NKS-26: podloga spichlerza", "brak linii 'KS: podloga spichlerza'", "<= 20% wsi", None)
+        fw = [(d, v) for d, v in sorted(floor.items()) if d <= dd + 49]
+        pfw = [prodfloor[d] for d in (prodfloor or {}) if w0 <= d <= w1]
+        ptxt = (f"; INFO: podloga dana (linia produkcji, okno) max {max(pfw)} wsi, dob z podloga dana {sum(1 for x in pfw if x > 0)} z {len(pfw)}" if pfw else "")
+        if fw:
+            d, v = fw[-1]
+            sh = v[0] / max(1, v[1])
+            try:
+                kf = float(v[2])
+            except ValueError:
+                kf = None
+            rep.add("NKS-26: podloga spichlerza (G6)", f"doba {d}: wsi z podloga {v[0]} z {v[1]} ({100 * sh:.0f}%), kcal podlogi {v[2]}% potrzeby, powroty {v[3]}" + ptxt,
+                    "wsi z podloga <= 20% w D+49, kcal podlogi <= 2% potrzeby (zgony - NKS-15)", (sh <= 0.20 and kf is not None and kf <= 2.0) if d >= dd + 42 else None)
+        else:
+            rep.add("NKS-26: podloga spichlerza", "brak linii 'KS: podloga spichlerza'" + ptxt, "<= 20% wsi", None)
     # NKS-27 sterowanie rynku
     cw = [d for d in sorted(ctl) if d <= dd + 49 and ctl[d]]
     if cw:
@@ -34598,6 +34648,10 @@ def nks_main(logp, until=120, bdp=None):
     corr = {}          # doba Planu -> {"big": {(a, b, towar): szt./d}, "kraina": tekst, "cut": tekst, "g": (gmax, zmiana)}
     ctl = {}           # doba Planu -> {towar: (zuzycie, brak, podaz, czynnik)}
     floor = {}         # doba -> (z podloga, wsi, kcal %, powroty)
+    floor2 = {}        # r4-bkwies: doba -> dopisek linii podlogi (podloga dana, bez podlogi, awaryjna, zapas spichlerzy)
+    prodfloor = {}     # r4-bkwies: doba -> podloga (wzor dzis) z linii produkcji
+    vneeds = {}        # r4-bkwies: doba -> linia "Potrzeby wsi (B1)"
+    ds_days = set()    # r4-bkwies: doby z linia "Daniny wsi (DS)"
     own = {}           # doba -> (wsi, szt., kcal %, wsi > 30% 14 dob)
     p1 = {}            # doba -> (chciane, bez towaru, bez kiesy) drabina 1 wsi
     p1mk = {}          # recenzja rundy 3: doba -> {rynek: (chciane, bez towaru, bez kiesy)}
@@ -34701,6 +34755,23 @@ def nks_main(logp, until=120, bdp=None):
                     mb = re.search(r"biedota (-?[\d.]+)", mm.group("dest"))
                     zc0[int(mm.group("day"))] = (mm.group("peas"), mb.group(1) if mb else "-", int(mm.group("dn")), int(mm.group("dall")))
                 continue
+            if s.startswith("Potrzeby wsi (B1): dzien "):
+                mm = NKS_VN.match(s)
+                if mm:
+                    rec = {"bk": mm.group("bk"), "skip": mm.group("skip"), "lim": mm.group("lim")}
+                    mb = NKS_VNBK.search(s)
+                    if mb:
+                        rec.update(mb.groupdict())
+                    m5 = NKS_VNS5.search(s)
+                    if m5:
+                        rec.update(m5.groupdict())
+                    vneeds[int(mm.group("day"))] = rec
+                continue
+            if s.startswith("Daniny wsi (DS): dzien "):
+                mm = NKS_DSDAY.match(s)
+                if mm:
+                    ds_days.add(int(mm.group("day")))
+                continue
             if s.startswith(NKS_P):
                 if s.startswith(NKS_P + "start sesji"):
                     starts.append(s)
@@ -34799,6 +34870,9 @@ def nks_main(logp, until=120, bdp=None):
                     mm = NKS_FLOOR.match(s)
                     if mm:
                         floor[int(mm.group("day"))] = (int(mm.group("on")), int(mm.group("n")), mm.group("kf"), int(mm.group("back")))
+                        mf2 = NKS_FLOOR2.search(s)
+                        if mf2:
+                            floor2[int(mm.group("day"))] = mf2.groupdict()
                 elif s.startswith(NKS_K + "wies je swoje"):
                     mm = NKS_OWN.match(s)
                     if mm:
@@ -34868,6 +34942,9 @@ def nks_main(logp, until=120, bdp=None):
                         mv = NKS_PRODV.search(s)
                         if mv:
                             villages[d] = int(mv.group("v"))
+                        mpf = NKS_PRODFLOOR.search(s)
+                        if mpf:
+                            prodfloor[d] = int(mpf.group("up"))
                     ms2 = NKS_PRODST.search(s)
                     if ms2:
                         stum_hooks = max(stum_hooks, int(ms2.group("h")))
@@ -35281,7 +35358,36 @@ def nks_main(logp, until=120, bdp=None):
             rep.add("NKS-13b: drabina 1 wsi wedlug rynku", "brak liczb 'drabina 1 wedlug rynku' w linii ZC4", "<= 5%", None)
         # NKS-29 (recenzja rundy 3, wazne): rynek wsi BK u wsi z koszykiem ZC4 <= 2% wplywu do kies wsi na rynku
         bw = [d for d in bkv if w0 <= d <= w1]
-        if bw and k8w:
+        # r4-bkwies (PLAN-KS-RUNDA4 B4 i rozdz. 11 - przeformulowane dla DS): przy linii "Potrzeby wsi (B1)" z kluczem rynku BK wedlug potrzeb TAK - kiesa po zakupie BK
+        # nigdy ponizej skrzyni (0 w kazdej dobie okna), bez jedzenia u wsi z koszykiem ZC4 (0), kontrola kiesy wsi - kasy 0; udzial rynku BK wsi z koszykiem w wplywie
+        # do kies wsi - INFO, prog <= 10% w ostatnich 28 dobach (DS: rynek BK to wydatek z nadwyzki - 2% klocilo sie z DS). Log z DS bez tej linii - sam udzial (INFO).
+        vnw = {d: v for d, v in vneeds.items() if w0 <= d <= w1 and v.get("bk") == "TAK"}
+        bl28 = sorted(bkv)[-28:] if bkv else []
+        sh28, ok28 = [], True
+        for mk in ("Westeros", "Essos"):
+            bz = sum(bkv[d][mk] for d in bl28); inf = sum(int(zc4_k8[d][mk]["i"]) for d in bl28 if d in zc4_k8 and mk in zc4_k8[d])
+            if inf <= 0:
+                continue
+            sh28.append(f"{mk} {bz} zl / wplyw {inf} zl ({100.0 * bz / inf:.2f}%)")
+            if bz > 0.10 * inf:
+                ok28 = False
+        sh28_txt = ("udzial w ostatnich 28 dobach (" + (f"doby {bl28[0]}..{bl28[-1]}" if bl28 else "-") + "): " + ("; ".join(sh28) if sh28 else "brak liczb"))
+        if vnw:
+            dv = sorted(vnw)
+            miss_bk = [d for d in dv if vnw[d].get("viol") is None]
+            viol = [d for d in dv if vnw[d].get("viol") not in (None, "0")]
+            food = [d for d in dv if vnw[d].get("food") not in (None, "0")]
+            ctlb = [d for d in dv if vnw[d].get("ctl") not in (None, "0")]
+            nz = sum(int(vnw[d].get("nz") or 0) for d in dv); lz = sum(int(vnw[d].get("lz") or 0) for d in dv); sz = sum(int(vnw[d].get("s") or 0) for d in dv)
+            ok29 = not miss_bk and not viol and not food and not ctlb and (ok28 if sh28 else True)
+            rep.add("NKS-29: rynek wsi BK wedlug potrzeb (B4: tylko ponad skrzynie, bez jedzenia u wsi z koszykiem ZC4)",
+                    f"doby {dv[0]}..{dv[-1]} ({len(dv)}): kiesa ponizej skrzyni po zakupie w {len(viol)} dobach, jedzenie u wsi ZC4 w {len(food)}, kontrola kiesy - kasy != 0 w {len(ctlb)}"
+                    + (f", bez liczb {len(miss_bk)}" if miss_bk else "") + f"; kiesy wsi -> kasy {sz} zl = potrzeby {nz} + zbytki {lz}; {sh28_txt}",
+                    "kiesa po zakupie >= skrzynia i bez jedzenia u wsi ZC4 w kazdej dobie, kontrola 0; udzial rynku BK <= 10% wplywu do kies (ostatnie 28 dob)", ok29)
+        elif ds_days and bl28 and k8w:
+            rep.add("NKS-29: rynek wsi BK (DS bez linii 'Potrzeby wsi (B1)' - log sprzed r4-bkwies)", sh28_txt + "; kiesa po zakupie wobec skrzyni: brak liczb",
+                    "udzial <= 10% wplywu do kies (ostatnie 28 dob) i kiesa po zakupie >= skrzynia - INFO bez linii B1", None)
+        elif bw and k8w:
             txt29, ok29 = [], True
             for mk in ("Westeros", "Essos"):
                 bz = sum(bkv[d][mk] for d in bw); inf = sum(int(zc4_k8[d][mk]["i"]) for d in k8w if mk in zc4_k8[d])
@@ -35367,7 +35473,7 @@ def nks_main(logp, until=120, bdp=None):
                     "arm_ks + arm_ks_r3 <= 150 KB, arm_ks_kupcy <= 64 KB", tot <= 150.0 and kh <= 64.0)
         else:
             rep.add("NKS-20: rozmiar arm_ks", "brak linii 'KS: zapis arm_ks' (bez zapisu w stanie zastosowanym)", "<= 150 KB", None)
-        nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor, own, zc4_k8, start_px)
+        nks_r3_rows(rep, logp, a, dd, w0, w1, lastp, ksh, ksh_cor, corr, ctl, floor, own, zc4_k8, start_px, floor2=floor2, prodfloor=prodfloor)
     # NKS-9 koszt
     if days_ms:
         # KS-R3: mediana tylko dob ZASTOSOWANYCH (od wlaczenia) i q95 <= 15 ms; doby Planu - INFO w tekscie
