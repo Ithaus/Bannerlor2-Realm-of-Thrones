@@ -157,7 +157,7 @@ namespace Armoury
                             if (h != Hero.MainHero) ClanIncomeBook.NoteInflow(h, (int)got, ClanIncomeBook.KRansom);   // jednorazowy wplyw od prawdziwego platnika
                             pGot = h == Hero.MainHero;
                         }
-                        else { IronBank.CapitalAdd(ir); got = ir; }
+                        else { IronBank.CapitalAdd(ir); IronBank.NoteCapitalNoProfit(ir); got = ir; }   // f20-d3 (recenzja): kapital wlasny Banku, nie zysk do Braavos
                     }
                 }
                 long w1 = k.KingdomBudgetWallet;
