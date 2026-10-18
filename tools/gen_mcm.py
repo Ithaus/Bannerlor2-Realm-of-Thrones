@@ -365,6 +365,14 @@ RANGES = {
     # r4-koszyk (17.10 noc): place za brak rak - zgodnie z przycieciem w kodzie (KsWageHands: krok 0..10%, sufit 1..2)
     'KsWageHandsStepPercent': (0.0, 10.0, "0.0"),
     'KsWageHandsMax': (1.0, 2.0, "0.00"),
+    # f4-place-ludu (noc 17/18.10): place W wedlug koszyka - zgodnie z przycieciem w kodzie (KsWageHands.Floor 0.3..1; KsFolkWage: dni 1..240 / 480, udzial 0..1,
+    # krok 0.1..50%/d; stawka danin 0..0.1)
+    'KsWageHandsFloor': (0.3, 1.0, "0.00"),
+    'KsLabourBasketLowDays': (1.0, 120.0, "0"),
+    'KsLabourBasketHighDays': (2.0, 240.0, "0"),
+    'KsLabourBasketMin': (0.0, 1.0, "0.00"),
+    'KsLabourBasketStepPercent': (0.5, 20.0, "0.0"),
+    'KsLabourBasketHoardRate': (0.0, 0.1, "0.000"),
     # r4-mur (17.10): danina zbozowa Muru i najazdy Wolnych Ludzi - zgodnie z przycieciem w kodzie (WallTribute: udzial 0..100%, psucie 0..50%/d; FreeFolkRaids: szansa 0..1, band 0..64)
     'WallTributeTargetDays': (0, 728, "0"),
     'WallTributeRefillDays': (1, 364, "0"),

@@ -118,6 +118,7 @@ namespace Armoury
                 double pre = aidCred + credit + farm;
                 double baseX = Math.Max(0, aid) + credit + farm;   // nadwyzka sprzed daniny tej doby = room + baseX (bez klucza baseX = pre)
                 double rate = dsDue ? DaRateNow(s) : HoardRateNow(s);
+                if (dsDue) rate = F4HoardRate(f, c, s, rate);   // f4-place-ludu (c): klasa W miasta z placa wedlug koszyka - rzadki tallage (Ks Labour Basket Hoard Rate); inaczej bez zmiany
                 double due = rate * (room + baseX) - pre;   // stawka od nadwyzki sprzed daniny; danina tej doby sie wlicza (obieg2: stawka straznika)
                 long purse0 = Math.Max(0, PurseOf(f, c));
                 HoardNote(s, room, Math.Max(0, aid), credit, purse0, due >= 1 ? Math.Min((long)Math.Floor(Math.Min(due, room)), purse0) : 0);   // N7 / N8: liczniki porownania

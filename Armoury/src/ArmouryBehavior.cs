@@ -1209,6 +1209,10 @@ namespace Armoury
             // wlasny try; brak klucza (stary zapis, Ironman Jeffa) = wskazniki 1 i bez dokupionej podstawy do pierwszego Planu; starszy DLL ignoruje klucz
             try { string kk = dataStore.IsSaving ? KsWageHands.ExportAll() : null; SaveText.Sync(dataStore, "arm_ks_koszyk", ref kk); if (dataStore.IsLoading) KsWageHands.ImportAll(kk); }
             catch (Exception e) { Log.Error("SyncData.arm_ks_koszyk", e); }
+            // f4-place-ludu (noc 17/18.10): wskazniki plac ponizej 1 (Ks Wage Hands Down) i stawka plac W wedlug koszyka (kappa, Ks Labour To Basket) - "f4|miasto:wskaznik,...|miasto:kappa,...";
+            // PO arm_ks_koszyk (nadpisuje 1 z tamtego klucza); pisany tylko z danymi (wszystko 1 - bez klucza, zapis jak dotad); wlasny try, straznik rozmiaru; brak klucza (stary zapis, Ironman Jeffa) = wskazniki >= 1 i kappa 1; starsza DLL ignoruje klucz
+            try { string kp = dataStore.IsSaving ? KsFolkWage.ExportAll() : null; if (!dataStore.IsSaving || kp != null) SaveText.Sync(dataStore, "arm_ks_place", ref kp); if (dataStore.IsLoading) KsFolkWage.ImportAll(kp); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_place", e); }
             // inwest (noc 17/18.10): zajecia wiosek pobocznych drogi bez KS (arm_crafts: n neutralnego startu, zajecia zmienione, przebudowy, rece regionu w sezonie) i prace okregu
             // (arm_works: wiersze prac, utarg okregow, przelacznik odbudowy); wlasny try, brak klucza (stary zapis, Ironman Jeffa) = pusto, starsza DLL ignoruje klucze
             try { string zw = dataStore.IsSaving ? VillageCrafts.Export() : null; SaveText.Sync(dataStore, "arm_crafts", ref zw); if (dataStore.IsLoading) VillageCrafts.Import(zw); }

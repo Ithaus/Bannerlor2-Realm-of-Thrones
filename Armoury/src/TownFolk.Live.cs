@@ -794,6 +794,7 @@ namespace Armoury
             }
             try { DsVillage.DecreeMemo(StartCalibration.SwCostFast); Villages(d); } catch (Exception e) { Stumble("Villages", e); } finally { DsVillage.DecreeMemo(false); }   // ks-koszt: dekret pana raz na wies w petli
             try { KsWageHands.DayLine(day); } catch (Exception e) { Stumble("KsWageHands.DayLine", e); }   // r4-koszyk: linia "Place za brak rak" (po miastach)
+            try { KsFolkWage.DayLine(day); } catch (Exception e) { Stumble("KsFolkWage.DayLine", e); }     // f4-place-ludu: linia "Place W wedlug koszyka" (bez kluczy i bez KS - nic)
             try { LadderDay(day, d); } catch (Exception e) { Stumble("LadderDay", e); }   // P3-P5: linia "Zbytki ludu (P3-P5)"
             try { HungerLine(day, lw); } catch (Exception e) { Stumble("HungerLine", e); }   // E5/C2: po kotwicach doby (licznik glodu)
             try { HoardDay(day); } catch (Exception e) { HoardStumble("HoardDay", e); }   // kiesa2: linia doby i liczby dla "Obieg" (po miastach i zamkach)
@@ -942,6 +943,23 @@ namespace Armoury
             // plac za brak rak, KsWageHands) - zloto z kasy do kies W i R, najwyzej stan kasy (to samo przyciecie nizej); bez klucza i poza KS - 1 (jak dotad)
             double hwF = KsWageHands.Day(st, _liveDay);
             if (hwF > 1.0) { lab *= hwF; skupLab *= hwF; top *= hwF; }
+            // f4-place-ludu (KsFolkWage): czynnik plac WYROBNIKOW W tej doby - (a) wskaznik plac ponizej 1 przy duzej liczbie wolnych rak (Ks Wage Hands Down), (b) stawka wedlug
+            // koszyka KS (Ks Labour To Basket: kiesa W w dniach koszyka ponad pasmo - nizsza stawka); podloga przezycia w KsFolkWage. Tnie tylko czesc W robocizny i doplaty -
+            // czesc R bez zmiany; czego kasa nie placi, zostaje w kasie (nic nie schodzi). Czynnik 1 (klucze wylaczone, miasto bez KS, podloga) - droga co do monety jak dotad
+            double f4A = 1.0, f4B = 1.0;
+            double f4W = KsFolkWage.WFactor(st, hwF, f.KW, f.Need[0], f.KR, f.KP, f.Need[1], f.Need[2], out f4A, out f4B);
+            double f4H = KsFolkWage.HouseholdsOn ? f4B : 1.0;                    // (b) takze place z nadwyzki R/P dla W (krok 5) - klucz Ks Labour Basket Households
+            bool f4Split = f4W < 1.0 - 1e-9;
+            double f4LabW = 0, f4LabR = 0, f4TopW = 0, f4TopR = 0, f4LabFW = 0, f4TopFW = 0, f4TopSw = 0.7;
+            if (f4Split)
+            {
+                double sw, sr0, sp0;
+                SplitOf(ELabour, out sw, out sr0, out sp0); f4LabW = sw * lab * f4W; f4LabR = lab - sw * lab; f4LabFW = sw * lab;
+                SplitOf(ETopUp, out f4TopSw, out sr0, out sp0); f4TopW = f4TopSw * top * f4W; f4TopR = top - f4TopSw * top; f4TopFW = f4TopSw * top;
+                double lab0 = lab;
+                lab = f4LabW + f4LabR; top = f4TopW + f4TopR;
+                if (lab0 > 0) skupLab *= lab / lab0;
+            }
             d.BaseFolk += fp; d.BaseVill += f.VillWin; d.BaseLife += (1 - svc) * life; d.BaseCourt += (1 - cs) * court; d.BaseSale += sale; d.BaseCar += car; d.BaseGm += f.GmMatWin;
             // DS F3 (M7): sprzedaz WLASNA kasy w oknie - recenzja 17.10: bez czesci uslug ludu z zycia (svc) i ludu z dworu (cs), ktore ida prosto do kies ludu (te same liczby co
             // BaseLife / BaseCourt podstawy robocizny), plus sprzedaz, zaplata ludu i wsie - podstawa pomocy od sprzedazy (kasa nie placi od pieniedzy, ktorych nie dostala)
@@ -953,13 +971,17 @@ namespace Armoury
             if (all > gold && all > 0) { k = gold / all; d.Cut++; }
             bool hwOn = KsWageHands.On && StartCalibration.KsTownApplied(town);   // r4-koszyk: tozsamosc plac (kasa -> kiesy) w miastach z KS - tylko odczyt
             long hwG0 = hwOn ? town.Gold : 0, hwK0 = hwOn ? f.KW + f.KR + f.KP : 0;
-            d.LabT += FromCoffer(f, (long)(lab * k), ELabour);
+            long f4GW1 = 0, f4GW2 = 0;                                           // f4-place-ludu (recenzja): czesc W, ktora NAPRAWDE zeszla z kasy (FromCofferWR) - do tozsamosci linii
+            d.LabT += f4Split ? FromCofferWR(f, (long)(f4LabW * k), (long)(f4LabR * k), ELabour, out f4GW1) : FromCoffer(f, (long)(lab * k), ELabour);   // f4-place-ludu: czesc W x czynnik
             long hwG1 = hwOn ? town.Gold : 0, hwK1 = hwOn ? f.KW + f.KR + f.KP : 0;
             if (skupLab > 0) d.LabS += (long)(skupLab * k);              // 11c: czesc robocizny od skupu (po przycieciu do kasy) - do linii
             d.TurnT += FromCoffer(f, (long)(turn * k), ETurn);
             long hwG2 = hwOn ? town.Gold : 0, hwK2 = hwOn ? f.KW + f.KR + f.KP : 0;
-            long topPaid = FromCoffer(f, (long)(top * k), ETopUp);
+            long topPaid = f4Split ? FromCofferWR(f, (long)(f4TopW * k), (long)(f4TopR * k), ETopUp, out f4GW2) : FromCoffer(f, (long)(top * k), ETopUp);   // f4-place-ludu: czesc W x czynnik
             d.TopT += topPaid;
+            // f4-place-ludu (recenzja): pelne = czesc W przy czynniku 1, wedlug reguly = przelew zlecony kasie, zaplacone = czesc W, ktora zeszla z kasy (to samo przyciecie
+            // do kasy k i to samo zaokraglenie w dol co przelew) - kontrola linii pelne - zaplacone - zostalo = zlecone - zeszlo (0, gdy kasa zaplacila cale zlecenie)
+            if (f4Split) { try { KsFolkWage.NoteCoffer((long)(f4LabFW * k) + (long)(f4TopFW * k), (long)(f4LabW * k) + (long)(f4TopW * k), f4GW1 + f4GW2, f4A, f4B); } catch (Exception e) { Stumble("KsFolkWage.NoteCoffer", e); } }
             if (hwOn) { try { KsWageHands.NotePaid((hwG0 - hwG1) + (hwG2 - town.Gold), (hwK1 - hwK0) + (f.KW + f.KR + f.KP - hwK2), hwF); } catch (Exception e) { Stumble("KsWageHands.NotePaid", e); } }
             // N4 (FolkCraftWageOnSale, tylko licznik linii NE): doplata zaplacona i wedlug starej reguly (wartosc wykonana w oknie, to samo przyciecie do kasy)
             try
@@ -967,7 +989,8 @@ namespace Armoury
                 N4TopUp += topPaid;
                 if (CraftSaleOn)
                 {
-                    double topOld = Math.Max(0, Unit(s.TownFolkCraftWageShare) * CsMadeOf(st) - f.Win[KCraftPaid]) * hwF, allOld = lab + turn + topOld;   // r4-koszyk: ten sam wskaznik plac
+                    double f4TopMul = f4Split ? (f4TopSw * f4W + 1.0 - f4TopSw) * (hwF > 1.0 ? hwF : 1.0) : Math.Max(1.0, hwF);   // f4-place-ludu: ten sam czynnik doplaty co wyzej (wskaznik < 1 bez ciecia - podloga przezycia - doplata zaplacona x1; bez f4 hwF >= 1 - jak dotad)
+                    double topOld = Math.Max(0, Unit(s.TownFolkCraftWageShare) * CsMadeOf(st) - f.Win[KCraftPaid]) * f4TopMul, allOld = lab + turn + topOld;   // r4-koszyk: ten sam wskaznik plac
                     N4TopUpOld += (long)(topOld * (allOld > gold && allOld > 0 ? gold / allOld : 1));
                 }
                 else N4TopUpOld += topPaid;
@@ -1030,7 +1053,13 @@ namespace Armoury
             if (f.Need[1] > 0)
             {
                 double ov = f.KR - RdR * f.Need[1];
-                if (ov > 0) { long a1 = PayAid(f, 1, KingdomTreasury.WtR, ov, d); ov -= a1; ov -= PayHoard(f, 1, 1, ov, a1, RdR); long lv = (long)(sr * ov), wp = (long)(SurpWage * lv); long moved = Move(f, 1, 0, wp); d.SurpWage += moved; f.Offer[1] = lv - moved; }
+                if (ov > 0)
+                {
+                    long a1 = PayAid(f, 1, KingdomTreasury.WtR, ov, d); ov -= a1; ov -= PayHoard(f, 1, 1, ov, a1, RdR); long lv = (long)(sr * ov), wp = (long)(SurpWage * lv);
+                    long wpW = f4H < 1.0 - 1e-9 ? (long)(wp * f4H) : wp;           // f4-place-ludu (b): place W wedlug koszyka - reszta zostaje w kiesie R (oferta P3 liczy sie od nadwyzki)
+                    long moved = Move(f, 1, 0, wpW); d.SurpWage += moved; f.Offer[1] = lv - moved;
+                    if (wpW < wp) KsFolkWage.NoteSurplus(wp, moved);
+                }
             }
             if (f.Need[2] > 0)
             {
@@ -1040,8 +1069,11 @@ namespace Armoury
                     long a2 = PayAid(f, 2, KingdomTreasury.WtP, ov, d); ov -= a2;
                     ov -= PayHoard(f, 2, 2, ov, a2, RdP);
                     long lv = (long)(sr * ov), wp = (long)(SurpWage * lv), toW = (long)(wp * 0.6);
-                    long moved = Move(f, 2, 0, toW) + Move(f, 2, 1, wp - toW);
+                    long toW4 = f4H < 1.0 - 1e-9 ? (long)(toW * f4H) : toW;         // f4-place-ludu (b): czesc W wedlug koszyka - reszta zostaje w kiesie P (oferta P3 liczy sie od nadwyzki)
+                    long movW = Move(f, 2, 0, toW4);
+                    long moved = movW + Move(f, 2, 1, wp - toW);
                     d.SurpWage += moved; f.Offer[2] = lv - moved;
+                    if (toW4 < toW) KsFolkWage.NoteSurplus(toW, movW);
                 }
             }
             LadderOffers(f);                                           // P3 (zbytki): oferta na liste dostatku 1/60 nadwyzki po daninie; place R/P wyzej bez zmian
