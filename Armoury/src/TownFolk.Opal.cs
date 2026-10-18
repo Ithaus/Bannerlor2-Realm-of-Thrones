@@ -18,7 +18,9 @@ namespace Armoury
     /// potrzeba szla do popytu ceny drewna (Zc4Demand), a zapas rzemiosla (CaravanBulk.TargetFor) liczyl tylko drewno, ktore dymarki zdolaly kupic.
     /// Regula (jedna dla kazdego miasta z koszykiem ZC4; poza ZC4 nic sie nie zmienia):
     ///  (1) FirewoodKsSeason - do czesci KS idzie czynnik pory zawsze: lato FwSummer, zima 1 + kraina x polnoc (jak dotad), wiosna/jesien i "zima bez skutkow" 1.
-    ///  (2) FirewoodKsSupplyCap - czesc KS potrzeby = min(lambda x opal x pora, limit), limit = max(0, dowoz drewna na targ miasta - dobowe zuzycie rzemiosla miasta).
+    ///  (2) FirewoodKsSupplyCap - czesc KS potrzeby = min(lambda x opal x pora, limit), limit = max(0, dowoz drewna na targ miasta - dobowe zuzycie rzemiosla miasta)
+    ///      + 1/7 drewna, ktore juz lezy na polce ponad zapas rzemiosla (ten sam prog co zakup: TargetFor, ShelfKeep - zapas z lata ma odbiorce w zimie; przeglad:
+    ///      "albo polka ponad zapas rzemiosla").
     ///      Dowoz: drewno sprzedane w tym miescie przez wozy wsi (MarketCarts, latka sprzedazy wozu - roznica jukow przed i po) + drewno z pol mieszczan KS
     ///      (DeliverTownFields) - srednia 7 pelnych dob; dopoki pierscien nie ma 7 dob (po wczytaniu, po wlaczeniu klucza) - Plan: stawki KS wsi z tym miastem
     ///      targowym (TradeBound, inaczej Bound) i pola mieszczan x beta rampy (StartCalibration.OpalPlanWood). Zuzycie rzemiosla: CaravanBulk.CraftWoodUse (to samo,
@@ -57,7 +59,7 @@ namespace Armoury
             public Dictionary<Settlement, double> Plan;    // dowoz wedlug Planu (zapas na pierwsze doby pierscienia)
             public Dictionary<Settlement, float> Eff = new Dictionary<Settlement, float>();
             public int Towns, Capped, SrcMeas, SrcPlan, SrcNone, KeepTowns;
-            public double KFull, KCut, CapSum, DSum, USum, LamSum, KSum, EffSum, FireSum, OldPart, Over, KeepExtra, MineNeed;
+            public double KFull, KCut, CapSum, DSum, USum, StockSum, LamSum, KSum, EffSum, FireSum, OldPart, Over, KeepExtra, MineNeed;
             public long T0;
         }
 
@@ -180,8 +182,21 @@ namespace Armoury
                 {
                     double u = 0;
                     try { u = Math.Max(0f, CaravanBulk.CraftWoodUse(town)); } catch (Exception e) { _opStumbles++; Stumble("OpalNeed(rzemioslo)", e); }
-                    double cap = Math.Max(0.0, d - u);
-                    op.DSum += d; op.USum += u; op.CapSum += cap;
+                    // drewno, ktore juz lezy na polce ponad zapas rzemiosla (ten sam prog co zakup - TargetFor, ShelfKeep) - 1/7 na dobe: zapas z lata i jesieni ma odbiorce
+                    // w zimie, a nadwyzka nie lezy bez konca (w stanie ustalonym polka = zapas rzemiosla i ten czlon to 0)
+                    double stock = 0;
+                    try
+                    {
+                        var shelf = st.ItemRoster; var w = FwWood();
+                        if (shelf != null && w != null)
+                        {
+                            int have = shelf.GetItemNumber(w), keep = Math.Max(ShelfKeep, CaravanBulk.TargetFor(town, w));
+                            if (have > keep) stock = (have - keep) / (double)FwWin;
+                        }
+                    }
+                    catch (Exception e) { _opStumbles++; Stumble("OpalNeed(polka)", e); }
+                    double cap = Math.Max(0.0, d - u) + stock;
+                    op.DSum += d; op.USum += u; op.StockSum += stock; op.CapSum += cap;
                     if (cut > cap) { cut = cap; op.Capped++; }
                     if (cut > cap + 1e-6) op.Over += cut - cap;   // kontrola (nie powinno sie zdarzyc)
                 }
@@ -226,8 +241,9 @@ namespace Armoury
                   .Append(" | miasta ZC4 ").Append(op.Towns).Append(" (lambda srednio ").Append(op.Towns > 0 ? (op.LamSum / op.Towns).ToString("0.00", Inv) : "-").Append(")")
                   .Append(" | czesc KS: opal x lambda ").Append(F2(op.FireSum)).Append(", z pora ").Append(F2(op.KFull)).Append(", po limicie ").Append(F2(op.KCut))
                   .Append(" (obcieta ").Append(F2(op.KFull - op.KCut)).Append(" w ").Append(op.Capped).Append(" miastach)")
-                  .Append(" | limit = dowoz - rzemioslo: dowoz ").Append(F2(op.DSum)).Append(" ladunkow/d (zmierzony ").Append(FwWin).Append(" dob w ").Append(op.SrcMeas)
-                  .Append(" miastach, Plan w ").Append(op.SrcPlan).Append(", bez danych ").Append(op.SrcNone).Append("), rzemioslo ").Append(F2(op.USum)).Append(", limit ").Append(F2(op.CapSum))
+                  .Append(" | limit = dowoz - rzemioslo + polka ponad zapas rzemiosla / ").Append(FwWin).Append(": dowoz ").Append(F2(op.DSum)).Append(" ladunkow/d (zmierzony ").Append(FwWin).Append(" dob w ").Append(op.SrcMeas)
+                  .Append(" miastach, Plan w ").Append(op.SrcPlan).Append(", bez danych ").Append(op.SrcNone).Append("), rzemioslo ").Append(F2(op.USum)).Append(", polka ponad zapas / ").Append(FwWin).Append(' ').Append(F2(op.StockSum))
+                  .Append(", limit ").Append(F2(op.CapSum))
                   .Append(" | potrzeba opalu razem ").Append(F2(needAll)).Append(" (po zaokragleniu ").Append(want).Append("; czesc dzisiejsza (1 - lambda) ").Append(F2(op.OldPart)).Append(")")
                   .Append(" | popyt ceny drewna (opal przy pelnej lambdzie): ").Append(op.Price ? "po regule " + F2(op.EffSum) + " w " + op.Eff.Count + " miastach" : "pelny (klucz NIE)")
                   .Append(" | zapas rzemiosla + drewno dymarek wsi: ").Append(op.Keep ? "+" + N0(op.KeepExtra) + " ladunkow w " + op.KeepTowns + " miastach (potrzeba dymarek ponad las " + F2(op.MineNeed) + " ladunkow/d)" : "NIE")

@@ -6728,7 +6728,7 @@ namespace Armoury
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool FirewoodKsSeason { get; set; } = true;
 
-        [SettingPropertyBool("Firewood Ks Supply Cap", HintText = "with Town Folk Firewood under the start calibration: the townsfolk want only as much firewood as the villages really bring to their town's market (the wood sold there by village carts and grown on the townsfolk's own fields, the last 7 days; in the first 7 days after loading - the plan of the districts), beyond what the town's smiths, bloomeries and workshops use each day - their wish grows only with the wood that truly comes (off = the full measure of a kilo and a half a head whether the wood comes or not, as before)")]
+        [SettingPropertyBool("Firewood Ks Supply Cap", HintText = "with Town Folk Firewood under the start calibration: the townsfolk want only as much firewood as the villages really bring to their town's market (the wood sold there by village carts and grown on the townsfolk's own fields, the last 7 days; in the first 7 days after loading - the plan of the districts), beyond what the town's smiths, bloomeries and workshops use each day, plus a seventh of the wood already lying on the stall above the craftsmen's stock - their wish grows only with the wood that truly comes (off = the full measure of a kilo and a half a head whether the wood comes or not, as before)")]
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool FirewoodKsSupplyCap { get; set; } = true;
 
