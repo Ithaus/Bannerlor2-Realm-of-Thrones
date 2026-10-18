@@ -35969,6 +35969,8 @@ NAK_RX = {
     "m9": re.compile(r"dziesiata M9 wliczona jako srednia doby raty (\d+), raty M9 zdjete dzis (\d+)"),
     "shelf": re.compile(r"zmiana polek targow \(sztuki zdjete, zmierzone na polce\) (\d+), kontrola sztuk: zakup - zmiana polek = (-?\d+) \(zlecen z rozjazdem albo bez odczytu polki (\d+)\)"),
     "chest": re.compile(r"przyciete do kiesy ponad skrzynie wsi DS \(zostalo w kiesach\) (\d+) \((\d+) zlecen\)"),
+    # recenzja calosci (noc 17/18.10): miekki start daniny od skarbca wsi (Ds Hoard Due Villages) - stawka doby i rampa wsi od doby wlaczenia
+    "vramp": re.compile(r"\(Ds Hoard Due Villages\) (?:tak|nie): stawka ([\d.]+)%/d \(rampa wsi ([\d.]+) od doby (-?\d+)\)"),
 }
 NAK_TRANSIT = ("razem", "cla miast i zamkow", "podatek wsi", "portfele wezwan do wojny (168)", "gracz", "wedrowcy", "inni", "inne")
 
@@ -36196,6 +36198,23 @@ def nakum_main(logp, until=None):
                 "<= +0.2%/d (nie nowy akumulator we wsiach; dzwignia: Ds Hoard Due Villages - decyzja Jeffa)", dr <= 0.002)
     else:
         rep.add("NAKUM-5: kiesy wsi", "za malo dob z 'Pieniadz swiata'", "INFO", None)
+    # NAKUM-5c (recenzja calosci): danina od skarbca wsi - miekki start (rampa od doby wlaczenia klucza, bez jednorazowego poboru od narosnietych kies wsi)
+    vrd = [d for d in sorted(A) if "vramp" in A[d] and "vdue" in A[d] and A[d]["vdue"][0] == "tak"]
+    if vrd:
+        st_ = sorted({int(A[d]["vramp"][2]) for d in vrd})
+        d0 = vrd[0]
+        tk0 = int(A[d0]["vdue"][1])
+        # stawka doby = stawka docelowa x rampa wsi: rampa 0 - stawka 0; iloraz stawka / rampa staly (stawka nie skacze przed koncem rampy)
+        z0 = [d for d in vrd if float(A[d]["vramp"][1]) <= 0.0 and float(A[d]["vramp"][0]) > 0.0]
+        q = [float(A[d]["vramp"][0]) / float(A[d]["vramp"][1]) for d in vrd if float(A[d]["vramp"][1]) >= 0.25]   # od 0.25 - zaokraglenie stawki w logu (0.01%) ponizej 2% ilorazu
+        qok = not q or max(q) <= 1.05 * min(q) + 0.01
+        tkw = [int(A[d]["vdue"][1]) for d in vrd]
+        rep.add("NAKUM-5c: danina od skarbca wsi - miekki start (stawka = stawka docelowa x rampa wsi; pierwsza doba z kluczem - 0)",
+                f"rampa wsi od doby {', '.join(str(x) for x in st_)}; pierwsza doba w logu {d0}: rampa {A[d0]['vramp'][1]}, stawka {A[d0]['vramp'][0]}%/d, pobrano {tk0}; "
+                f"srednio {sum(tkw) / len(tkw):.0f}/d, max {max(tkw)}; stawka przy rampie 0: {len(z0)} dob, stawka / rampa {min(q) if q else 0:.2f}..{max(q) if q else 0:.2f}%",
+                "rampa 0 - stawka 0, stawka / rampa stala (bez skoku)", not z0 and qok)
+    else:
+        rep.add("NAKUM-5c: danina od skarbca wsi - miekki start", "klucz wylaczony albo log sprzed recenzji calosci (brak pola 'rampa wsi')", "INFO", None)
     # NAKUM-6 jednorazowe korony
     if ad:
         wf = [(d, float(A[d]["wf"][1]), int(A[d]["wf"][2])) for d in ad if "wf" in A[d]]
@@ -38488,6 +38507,9 @@ NRT_DAY = re.compile(
     r" \| przydzialy: nowe (?P<asg>\d+) \(wlasne krolestwo (?P<same>\d+), niewrogie (?P<friend>\d+)\), bez miasta w promieniu (?P<rad>\d+) (?P<notown>\d+) kont"
     r" \(zostaja w regionie " + _nrt_n("rup") + r" ludzi\), zamkniete (?P<closed>\d+), miasta w zasiegu nie moga przyjac (?P<nohost>\d+) kont \(" + _nrt_n("nohostp")
     + r" ludzi\), czekaja na zwrot naleznych (?P<owait>\d+) kont"
+    # recenzja calosci (noc 17/18.10): dobowy limit przyjec nowych kont (Raid Refugees Town Intake) - pole opcjonalne (log sprzed recenzji bez niego)
+    r"(?: \| dobowy limit przyjec \(Raid Refugees Town Intake [\d.]+% ludzi miasta, pierwsze konto doby zawsze\): przyjeci w nowych kontach " + _nrt_n("inp")
+    + r", czekaja na kolejne doby (?P<spn>\d+) kont \(" + _nrt_n("spp") + r" ludzi, miast (?P<spt>\d+)\))?"
     r" \| kiesa W miast \(saldo uchodzcow\): wczoraj " + _nrt_i("b0") + r" \+ przyniesione z kies wsi " + _nrt_i("bin") + r" \+ udzial glow w zmianie kiesy W " + _nrt_i("bsh")
     + r" \+ doplata ludu miasta " + _nrt_i("bsub") + r" - przyciete do kiesy W " + _nrt_i("btrim") + r" - z powracajacymi " + _nrt_i("bmv") + r" = " + _nrt_i("b1")
     + r" \(kontrola " + _nrt_i("bchk") + r"\)"
@@ -38648,6 +38670,16 @@ def nuchodzcy_main(logp):
             f"glod miasta {tot('d2'):.1f}), pojmani {tot('capt'):.0f}, podloga 10 {tot('floor'):.0f}, do regionu {tot('leave'):.0f}; przydzialy {sum(i(g, 'asg') for g in days)} "
             f"(wlasne {sum(i(g, 'same') for g in days)}, niewrogie {sum(i(g, 'friend') for g in days)}), bez miasta w promieniu (konto-doby) {sum(i(g, 'notown') for g in days)}; "
             f"powrot wstrzymany oblezeniem (konto-doby) {sum(i(g, 'hold') for g in days)}; komunikatow gracza {len(msgs)}", "INFO", None)
+    # RT-11b (recenzja calosci): dobowy limit przyjec nowych kont - zaleglosc rozlozona na kolejne doby, bez jednej doby z cala fala
+    lim = [g for g in days if g.get("spn") is not None]
+    if lim:
+        top = max(lim, key=lambda g: f(g, "inp"))
+        wait_days = [g for g in lim if i(g, "spn") > 0]
+        rep.add("RT-11b: dobowy limit przyjec nowych kont (INFO)",
+                f"przyjeci w nowych kontach {sum(f(g, 'inp') for g in lim):.0f} (najwiecej w dobie {top['day']}: {f(top, 'inp'):.0f}); dob z czekajacymi {len(wait_days)}"
+                f" (konto-doby {sum(i(g, 'spn') for g in lim)}; ostatnia doba: czeka {lim[-1]['spn']} kont, {f(lim[-1], 'spp'):.0f} ludzi)", "INFO", None)
+    else:
+        rep.add("RT-11b: dobowy limit przyjec nowych kont", "log sprzed recenzji calosci (brak pola)", "INFO", None)
     rep.add("RT-12: kiesa (INFO)", f"przyniesione z kies wsi {sum(i(g, 'bin') for g in days)}, odniesione {gave}, udzial glow w zmianie kiesy W {sum(i(g, 'bsh') for g in days)}, "
             f"doplata ludu miasta {sum(i(g, 'bsub') for g in days)}, przyciete (saldo {sum(i(g, 'btrim') for g in days)}, nalezne {sum(i(g, 'otrim') for g in days)}); "
             f"saldo na koniec {last['b1']}, czeka {last['bwait']}; kiesa ludu: {last['live']}", "INFO", None)

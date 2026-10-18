@@ -419,6 +419,7 @@ namespace Armoury
             //    zbudowana w tej sesji - pierwsza doba po wczytaniu, doba jak Undo): obecni zostaja, nowych przydzialow nie ma
             var hostOk = new HashSet<string>(StringComparer.Ordinal);
             var hostUnknown = new HashSet<string>(StringComparer.Ordinal);
+            var hostPeople = new Dictionary<string, double>(StringComparer.Ordinal);   // recenzja calosci: ludzie miasta zdolnego przyjac (dobowy limit przyjec nowych kont)
             int townsAll = 0, townsPurse = 0, townsZc4 = 0, townsZc4Unknown = 0;
             foreach (var t in Town.AllTowns)
             {
@@ -432,7 +433,12 @@ namespace Armoury
                     int zc = StartCalibration.Zc4Host(ts);
                     if (purse) townsPurse++;
                     if (zc > 0) townsZc4++; else if (zc < 0) townsZc4Unknown++;
-                    if (purse && zc > 0) hostOk.Add(ts.StringId);
+                    if (purse && zc > 0)
+                    {
+                        hostOk.Add(ts.StringId);
+                        double pp = 0.0; try { pp = PopulationLaw.PeopleOf(ts); } catch { pp = 0.0; }
+                        hostPeople[ts.StringId] = pp > 0.0 && !double.IsInfinity(pp) ? pp : 0.0;
+                    }
                     else if (purse && zc < 0) hostUnknown.Add(ts.StringId);
                 }
                 catch (Exception e) { Stumble("Daily(miasta)", e); }
@@ -443,8 +449,9 @@ namespace Armoury
 
             double t0People = 0.0;
             long bal0 = 0, bIn = 0, bOut = 0, bShort = 0, bShare = 0, bSub = 0, bTrim = 0, bTrimOwed = 0;
-            int nAssign = 0, nNoTown = 0, nSame = 0, nFriend = 0, nCleared = 0, nOver = 0, nLeftHost = 0, nLeftWar = 0, nNoHost = 0, nWaitOwed = 0;
-            double ruPeople = 0.0, leftPeople = 0.0, noHostPeople = 0.0;
+            int nAssign = 0, nNoTown = 0, nSame = 0, nFriend = 0, nCleared = 0, nOver = 0, nLeftHost = 0, nLeftWar = 0, nNoHost = 0, nWaitOwed = 0, nSpread = 0;
+            double ruPeople = 0.0, leftPeople = 0.0, noHostPeople = 0.0, spreadPeople = 0.0, intakePeople = 0.0;
+            var spreadTowns = new HashSet<string>(StringComparer.Ordinal);
             var shortTowns = new HashSet<string>();
             long owedMovedTrack, owedPrev;
             lock (Gate) { owedMovedTrack = _dOwedMoved; owedPrev = _owedCarry; foreach (var a in _acc.Values) { bal0 += a.Bal; } }
@@ -614,9 +621,15 @@ namespace Armoury
             }
 
             // 4. przydzial miasta kontom z ludzmi z najazdu bez miasta (tylko miasta, ktore moga przyjac - krok 0)
+            //    Recenzja calosci (noc 17/18.10): miasto przyjmuje nowe konta najwyzej do RaidRefugeesTownIntake x jego ludzie na dobe (pierwsze konto doby zawsze) - reszta
+            //    czeka w regionie (jedza ze spichlerzy jak dotad) na kolejne doby. Bez tego w dobie, w ktorej miasta pierwszy raz moga przyjac (ZC4 pelny: >= 63 doby po
+            //    uzbrojeniu KS u Jeffa), caly zaleglosc swiata (fin80: 167 tys. poza domem) szla do miast jednego dnia razem z czescia kies wsi i przeliczeniem popytu ZC4.
+            //    W zwyklej dobie (kilka nowych kont) limit nie dziala; ludzie dopisani kontu, ktore juz ma miasto (Track - uderzenie), ida bez limitu jak dotad.
             var snapList = new List<KeyValuePair<string, double>>();
             PeopleBook.RefugeesSnapshot(snapList);
             float rad = Math.Max(0f, s.RaidRefugeesTownRadius);
+            float intake = Math.Max(0f, Math.Min(1f, s.RaidRefugeesTownIntake));
+            var taken = new Dictionary<string, double>(StringComparer.Ordinal);       // id miasta -> ludzie nowych kont przyjeci dzis
             foreach (var kv in snapList)
             {
                 try
@@ -638,6 +651,15 @@ namespace Armoury
                         if (seen > 0) { nNoHost++; noHostPeople += raid; } else { nNoTown++; ruPeople += raid; }
                         continue;
                     }
+                    if (intake > 0f)
+                    {
+                        double used, tp;
+                        taken.TryGetValue(town.StringId, out used);
+                        hostPeople.TryGetValue(town.StringId, out tp);
+                        if (used > 0.0 && used + raid > intake * tp) { nSpread++; spreadPeople += raid; spreadTowns.Add(town.StringId); continue; }
+                        taken[town.StringId] = used + raid;
+                    }
+                    intakePeople += raid;
                     lock (Gate)
                     {
                         if (!_acc.TryGetValue(kv.Key, out a)) _acc[kv.Key] = a = new Acc();
@@ -744,6 +766,8 @@ namespace Armoury
                     sb.Append(" | przydzialy: nowe ").Append(nAssign).Append(" (wlasne krolestwo ").Append(nSame).Append(", niewrogie ").Append(nFriend).Append("), bez miasta w promieniu ")
                       .Append(F0(rad)).Append(' ').Append(nNoTown).Append(" kont (zostaja w regionie ").Append(F1(ruPeople)).Append(" ludzi), zamkniete ").Append(nCleared)
                       .Append(", miasta w zasiegu nie moga przyjac ").Append(nNoHost).Append(" kont (").Append(F1(noHostPeople)).Append(" ludzi), czekaja na zwrot naleznych ").Append(nWaitOwed).Append(" kont");
+                    sb.Append(" | dobowy limit przyjec (Raid Refugees Town Intake ").Append((100.0 * intake).ToString("0.0#", Inv)).Append("% ludzi miasta, pierwsze konto doby zawsze): przyjeci w nowych kontach ")
+                      .Append(F1(intakePeople)).Append(", czekaja na kolejne doby ").Append(nSpread).Append(" kont (").Append(F1(spreadPeople)).Append(" ludzi, miast ").Append(spreadTowns.Count).Append(')');
                     sb.Append(" | kiesa W miast (saldo uchodzcow): wczoraj ").Append(bal0).Append(" + przyniesione z kies wsi ").Append(bIn).Append(" + udzial glow w zmianie kiesy W ").Append(bShare)
                       .Append(" + doplata ludu miasta ").Append(bSub).Append(" - przyciete do kiesy W ").Append(bTrim).Append(" - z powracajacymi ").Append(owedMoved).Append(" = ").Append(balNow)
                       .Append(" (kontrola ").Append(balCheck).Append(')');
@@ -921,7 +945,8 @@ namespace Armoury
             var towns = new HashSet<string>();
             foreach (var kv in l) { bal += kv.Value.Bal; owed += kv.Value.Owed; ppl += kv.Value.N; if (kv.Value.Town != null) towns.Add(kv.Value.Town); }
             Log.Info(P + "start sesji | klucze: Raid Refugees To Towns tak, promien " + F0(s.RaidRefugeesTownRadius) + ", kiesa z wsi x" + Math.Max(0f, Math.Min(1f, s.RaidRefugeesPurseShare)).ToString("0.00", Inv)
-                     + ", komunikat od " + s.RaidRefugeesMessageMin + " | spustoszenie " + (Devastation.On ? "CZYNNE" : "nieczynne") + ", spichlerze " + (Famine.On ? "CZYNNE" : "nieczynne")
+                     + ", komunikat od " + s.RaidRefugeesMessageMin + ", dobowy limit przyjec nowych kont " + (100.0 * Math.Max(0f, Math.Min(1f, s.RaidRefugeesTownIntake))).ToString("0.0#", Inv)
+                     + "% ludzi miasta (0 = bez limitu) | spustoszenie " + (Devastation.On ? "CZYNNE" : "nieczynne") + ", spichlerze " + (Famine.On ? "CZYNNE" : "nieczynne")
                      + ", kiesa ludu " + (TownFolk.LiveKey ? "czynna" : "NIECZYNNA") + ", KS " + (StartCalibration.Applied ? "zastosowany" : "NIEZASTOSOWANY")
                      + " (miasto przyjmuje tylko przy kiesie ludu i pelnym koszyku stanow ZC4 - inaczej uchodzcy zostaja w regionie jak dotad)"
                      + " | z zapisu: kont " + n + " (miast " + towns.Count + ", ludzi przy ostatnim rozliczeniu " + F1(ppl) + ", saldo " + bal + " zl, nalezne " + owed + " zl).");

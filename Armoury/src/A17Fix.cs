@@ -278,7 +278,8 @@ namespace Armoury
             try
             {
                 if (!FishOn || __0 == null) return true;
-                if (StartCalibration.Applied) { _fPortBlocked++; return false; }
+                // recenzja calosci: miasto krainy wroconej przez bramke krainy (ks-arm) - porty BK jak dzis (pomiar, ramka, zloto do kiesy ludu), jak A17 wsi (AppliedFor)
+                if (StartCalibration.Applied && !StartCalibration.LandBackOf(__0.Settlement)) { _fPortBlocked++; return false; }
                 var f = Fish;
                 if (f != null && __0.Settlement != null && __0.Settlement.ItemRoster != null)
                 {

@@ -3132,6 +3132,10 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public int RaidRefugeesMessageMin { get; set; } = 500;
 
+        [SettingPropertyFloatingInteger("Raid Refugees Town Intake", 0.000f, 0.200f, "0.000", HintText = "how many new raid refugees a town takes in a day, as a share of its own people (0.01 = one in a hundred); the people of the first village that comes to it in a day are always taken in, the rest wait in their own land and come on the following days, so that refugees who gathered over a whole season do not all move into the towns on the one day the towns first can take them in. People driven from a village whose refugees already live in the town join them at once. 0 = no limit (all on one day)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float RaidRefugeesTownIntake { get; set; } = 0.01f;
+
         [SettingPropertyBool("People Origin Enabled", HintText = "every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleOriginEnabled { get; set; } = true;
@@ -7324,7 +7328,7 @@ namespace Armoury
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public float DsWorksWagePerMaterial { get; set; } = 0.5f;
 
-        [SettingPropertyBool("Ds Hoard Due Villages", HintText = "with Ds Works Real Material: a village that finds neither goods nor material for what it means to spend beyond its chest also pays its lord the Ds Hoard Due Rate a day of what its purse holds above three times its chest (two thirds to the lord, the rest to its town or castle) - one rule for hoards in towns and villages. Off = village purses are never taxed on their savings, as the medieval dues of the villages first had it")]
+        [SettingPropertyBool("Ds Hoard Due Villages", HintText = "with Ds Works Real Material: a village that finds neither goods nor material for what it means to spend beyond its chest also pays its lord the Ds Hoard Due Rate a day of what its purse holds above three times its chest (two thirds to the lord, the rest to its town or castle) - one rule for hoards in towns and villages. The rate comes in step by step over Ds Ramp Days from the first day this is on, so village purses that grew while it was off are not taxed at the full rate on the first day. Off = village purses are never taxed on their savings, as the medieval dues of the villages first had it")]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool DsHoardDueVillages { get; set; } = true;
 
@@ -8118,6 +8122,7 @@ namespace Armoury
             s.RaidRefugeesTownRadius = RaidRefugeesTownRadius;
             s.RaidRefugeesPurseShare = RaidRefugeesPurseShare;
             s.RaidRefugeesMessageMin = RaidRefugeesMessageMin;
+            s.RaidRefugeesTownIntake = RaidRefugeesTownIntake;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;

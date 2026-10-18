@@ -63,12 +63,13 @@ namespace Armoury
 
         // ---- rampa klucza DsHoardDue (zapis arm_dsakum) i rata M9 tej klasy z PayAid (dla PayHoard tej samej klasy)
         private static int _daStart = -1;                // doba poczatku rampy daniny od skarbca ludu; -1 - klucz jeszcze nie czynny przy firmach F3
+        private static int _dvStart = -1;                // recenzja calosci (noc 17/18.10): doba poczatku rampy daniny od skarbca WSI (DsHoardDueVillages); -1 - klucz jeszcze nie widziany
         private static Folk _daM9F; private static int _daM9C = -1; private static long _daM9T;
 
         private static void DaReset()
         {
             _daQ.Clear(); DaZero(); _daStSess = 0; _daErr.Clear(); _daTiSept = 0; _daBtIds = null;
-            _daStart = -1; _daM9F = null; _daM9C = -1; _daM9T = 0;   // zapis arm_dsakum wczytuje ImportDsAkum po konstruktorze
+            _daStart = -1; _dvStart = -1; _daM9F = null; _daM9C = -1; _daM9T = 0;   // zapis arm_dsakum wczytuje ImportDsAkum po konstruktorze
         }
 
         private static void DaZero()
@@ -129,25 +130,49 @@ namespace Armoury
             return double.IsNaN(v) ? 0 : (v < 0 ? 0 : (v > 1 ? 1 : v));
         }
 
-        /// <summary>Zapis (arm_dsakum): "1|doba poczatku rampy klucza".</summary>
+        /// <summary>
+        /// Recenzja calosci (noc 17/18.10) - miekki start daniny od skarbca WSI (DsHoardDueVillages), ten sam co u miast (DaObserve / DaKeyShare): pierwsza doba z kluczem
+        /// i robotami gminy z prawdziwym materialem (DaWorksOn) ustala poczatek rampy; stawka rosnie od zera przez DsRampDays. Bez tego zapis, w ktorym kiesy wsi rosly bez
+        /// daniny (gra Jeffa: DS F1+F3, fin82 8.9 -> 13.5 mln), oddalby od pierwszej doby pelne 3%/d calego narosnietego skarbca panom i kasom osad. Wolane z DaDaily
+        /// i z DaVillageDue (pierwsza doba lapana niezaleznie od kolejnosci w dobie - tego dnia czesc nowej stawki = 0).
+        /// </summary>
+        private static void DvObserve()
+        {
+            if (_dvStart >= 0) return;
+            _dvStart = (int)CampaignTime.Now.ToDays;
+        }
+
+        /// <summary>Rampa daniny od skarbca wsi 0..1: od _dvStart przez DsRampDays (0 = od razu 1); klucz jeszcze nie widziany - 0.</summary>
+        private static double DvKeyShare(Settings s)
+        {
+            if (_dvStart < 0 || s == null) return 0;
+            int days = Math.Max(0, Math.Min(364, s.DsRampDays));
+            if (days <= 0) return 1;
+            double v = ((int)CampaignTime.Now.ToDays - _dvStart) / (double)days;
+            return double.IsNaN(v) ? 0 : (v < 0 ? 0 : (v > 1 ? 1 : v));
+        }
+
+        /// <summary>Zapis (arm_dsakum): "1|doba poczatku rampy klucza miast|doba poczatku rampy daniny wsi" (starsza DLL czyta tylko pole 2 - zgodne wstecz).</summary>
         internal static string ExportDsAkum()
         {
-            try { return "1|" + _daStart.ToString(Inv); }
+            try { return "1|" + _daStart.ToString(Inv) + "|" + _dvStart.ToString(Inv); }
             catch (Exception e) { DaStumble("ExportDsAkum", e); return null; }
         }
 
-        /// <summary>Wczytanie (arm_dsakum): brak klucza (stary zapis, Ironman Jeffa), pusty, za dlugi albo zly - -1 (rampa klucza od pierwszej doby z kluczem przy firmach).</summary>
+        /// <summary>Wczytanie (arm_dsakum): brak klucza (stary zapis, Ironman Jeffa), pusty, za dlugi albo zly - -1 (rampa klucza od pierwszej doby z kluczem przy firmach);
+        /// zapis bez trzeciego pola (sprzed recenzji calosci) - rampa daniny wsi od pierwszej doby z kluczem po wczytaniu.</summary>
         internal static void ImportDsAkum(string v)
         {
             try
             {
-                _daStart = -1;
+                _daStart = -1; _dvStart = -1;
                 if (string.IsNullOrEmpty(v) || v.Length > 64) return;
                 var a = v.Split('|');
                 int d;
                 if (a.Length >= 2 && a[0] == "1" && int.TryParse(a[1], System.Globalization.NumberStyles.Integer, Inv, out d) && d >= -1) _daStart = d;
+                if (a.Length >= 3 && a[0] == "1" && int.TryParse(a[2], System.Globalization.NumberStyles.Integer, Inv, out d) && d >= -1) _dvStart = d;
             }
-            catch (Exception e) { _daStart = -1; DaStumble("ImportDsAkum", e); }
+            catch (Exception e) { _daStart = -1; _dvStart = -1; DaStumble("ImportDsAkum", e); }
         }
 
         /// <summary>PayAid (TownFolk.Savings.cs): rata M9 zdjeta dzis z klasy `c` (czesc `aid`) - PayHoard tej samej klasy liczy zamiast niej srednia doby raty.</summary>
@@ -421,8 +446,11 @@ namespace Armoury
                 _dvRoom += room;
                 var bound = vil.Bound;
                 if (vil.VillageState != Village.VillageStates.Normal || bound == null || bound.Town == null) return;
+                DvObserve();                                                // recenzja calosci: miekki start (pierwsza doba z kluczem - czesc nowej stawki 0)
+                double rate = HdClamp(s.DsHoardDueRate, 0, 0.1) * DvKeyShare(s);
+                if (!(rate > 0)) return;
                 long credit = LnCreditFor(st);
-                double due = HdClamp(s.DsHoardDueRate, 0, 0.1) * (room + credit) - credit;
+                double due = rate * (room + credit) - credit;
                 long x = due >= 1 ? (long)Math.Floor(Math.Min(due, room)) : 0;
                 x = Math.Min(x, (long)gold);
                 if (x <= 0) return;
@@ -504,6 +532,9 @@ namespace Armoury
                 // tego samego dnia (DaDaily po DsTowns.Daily), niezaleznie od logu
                 if (s != null && !s.DsHoardDue) _daStart = -1;
                 else if (s != null && Campaign.Current != null && DaDueOn) DaObserve();
+                // recenzja calosci: danina od skarbca wsi - klucz wylaczony: rampa od nowa przy nastepnym wlaczeniu; czynny (z robotami gminy) - poczatek rampy dzis
+                if (s != null && !s.DsHoardDueVillages) _dvStart = -1;
+                else if (s != null && Campaign.Current != null && DaWorksOn) DvObserve();
                 if (s == null || Campaign.Current == null || !s.LogEnabled) { DaZero(); return; }
                 bool any = s.DsHoardDue || s.DsWorksRealMaterial || s.FolkBetterTable || s.CrownWindfallToReserve || s.DsHoardDueVillages;
                 if (!any || !Live) { DaZero(); return; }
@@ -541,7 +572,9 @@ namespace Armoury
                   .Append(" | septy z dziesieciny (ta sama regula): zlecone ").Append(_dsQ).Append(" (").Append(_dsQN).Append("), material ").Append(_dsMat).Append(", rzemieslnicy ").Append(_dsWage)
                   .Append(" (zlecen wykonanych ").Append(_dsN).Append(": lud miast ").Append(_dsTownN).Append(", wsie ").Append(_dsVilN).Append("), bez materialu (zostalo u placacych) ").Append(_dsNoMat)
                   .Append("; kontrola septow: od placacych - (do kas + do ludu) = ").Append(_dsPayOut - _dsCofIn - _dsFolkIn).Append(", material zaplacony - koszt zdjetego towaru = ").Append(-_dsGap)
-                  .Append(" | danina od skarbca wsi (Ds Hoard Due Villages) ").Append(s.DsHoardDueVillages ? "tak" : "nie").Append(": wsi bez materialu na polowe zlecenia robot ").Append(_dvSeen)
+                  .Append(" | danina od skarbca wsi (Ds Hoard Due Villages) ").Append(s.DsHoardDueVillages ? "tak" : "nie").Append(": stawka ")
+                  .Append((100 * HdClamp(s.DsHoardDueRate, 0, 0.1) * DvKeyShare(s)).ToString("0.00", inv)).Append("%/d (rampa wsi ").Append(DvKeyShare(s).ToString("0.000", inv))
+                  .Append(" od doby ").Append(_dvStart).Append("), wsi bez materialu na polowe zlecenia robot ").Append(_dvSeen)
                   .Append(", ponad poziom normalny (").Append(HoardTimes(s).ToString("0.0#", inv)).Append(" x skrzynia) ").Append(N0(_dvRoom)).Append(", pobrano ").Append(_dvTake)
                   .Append(" (").Append(_dvN).Append(" wsi) = do panow ").Append(_dvLord).Append(" + do kas osad ").Append(_dvCoffer).Append(", wstrzymane w oblezeniu ").Append(_dvHeld)
                   .Append("; kontrola: pobrano - panom - kasom = ").Append(_dvTake - _dvLord - _dvCoffer)

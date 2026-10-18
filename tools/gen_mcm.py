@@ -374,6 +374,7 @@ RANGES = {
     'RaidRefugeesTownRadius': (0.0, 1000.0, "0"),
     'RaidRefugeesPurseShare': (0.0, 1.0, "0.00"),
     'RaidRefugeesMessageMin': (0, 10000, "0"),
+    'RaidRefugeesTownIntake': (0.0, 0.2, "0.000"),   # recenzja calosci: dobowy limit przyjec nowych kont (udzial ludzi miasta; 0 = bez limitu)
 }
 
 def gen(module_dir, ns, display):
