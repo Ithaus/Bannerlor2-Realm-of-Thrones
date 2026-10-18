@@ -31,6 +31,8 @@ namespace Armoury
     ///    DepShare x wartosc lotu u siebie (ta sama wartosc co w decyzji i w rachunku, H4), najwyzej wolna kasa celu ponad podloge (DstFree - zadatki doby); zrodlo niesie
     ///    na kredyt tylko reszte (towar + fracht - zadatek). Lot, ktory miesci sie bez zadatku - bez zmian (bit w bit). Sredniowieczny kontrakt zbozowy: zadatek / zaliczka
     ///    kupca miasta kupujacego (czesto polowa ceny przy umowie, reszta przy dostawie) - kapital obu stron, zaden pieniadz z niczego;
+    ///    recenzja ceny-r5: lot za duzy takze z zadatkiem ciety wobec zadatku malejacego z lotem (DepCut), nigdy mniej niz ciecie r4-kupcy bez zadatku; wolna kasa celu
+    ///    takze TERAZ (DstFreeNow), miejsce kredytu zrodla liczone od zadatku naprawde zaplaconego (DepPaidLast);
     ///  - Miss (pomiar, bez zmiany decyzji): brak do T* (szt.) zamowien bez zadnego lotu wedlug przyczyny - brak nadwyzki u zrodel, poza zasiegiem, wojna, marza ceny,
     ///    bez zysku kupca, bez kredytu, cel z zaleglym, za maly lot (NKS-24b: dlaczego kraina importera nie dostaje przewozu Planu).
     /// </summary>
@@ -72,6 +74,12 @@ namespace Armoury
             public double[] DstFree;                           // [nt] wolna kasa celu ponad podloge kredytu (zl) - granica zadatkow doby
             public Func<int, int, int, int, long, long, bool, float, long, int> ShipDep;   // (zrodlo, cel, k, n, koszt, fracht, morze, doby, zadatek) - wyslane sztuki
             public double[] Miss;                              // [(t * NK + k) * NMiss + przyczyna] brak do T* zamowien bez lotu (szt.; null - bez pomiaru)
+            // recenzja ceny-r5: wolna kasa celu ponad podloge TERAZ (zl; kasa celu rusza sie w ciagu doby - fracht i zadatki, gdy cel jest tez zrodlem; null - tylko DstFree
+            // minus zadatki doby) i zadatek naprawde zaplacony w ostatnim ShipDep (zl; null - zadatek planu x wyslane / zamowione)
+            public Func<int, double> DstFreeNow;
+            public Func<long> DepPaidLast;
+            // recenzja ceny-r5 (pomiar NKS-7g, bez zmiany decyzji): oferta zrodel na poczatku doby i niesprzedana na koniec [t * NK + k] (szt., dodawane; null - bez pomiaru)
+            public double[] Offer0, OfferLeft;
         }
 
         // KS-R5 ceny-r5: przyczyny zamowien bez lotu (Miss) - kolejnosc = etap, do ktorego doszlo najlepsze zrodlo
@@ -192,6 +200,9 @@ namespace Armoury
             }
             var r = new Run { A = a, St = st, Dz = dz, DzB = dzB, Sh = sh, Offer = offer, Budget = budget, BudgetShort = budgetShort, Spent = spent, ShortSeen = shortSeen, SrcSpent = new double[nt], FarMark = new bool[nt], FamSeen = new bool[nt] };
             if (a.Deposit && a.Consign) r.DepSpent = new double[nt];
+            // recenzja ceny-r5 (pomiar NKS-7g): oferta zrodel przed zakupami doby - na koniec doby ile z niej zostalo niesprzedane
+            bool offM = a.Offer0 != null && a.OfferLeft != null && a.Offer0.Length == offer.Length && a.OfferLeft.Length == offer.Length;
+            if (offM) for (int o = 0; o < offer.Length; o++) a.Offer0[o] += offer[o];
             if (!a.ByNeed)
             {
                 var dst = new List<int>(nt);
@@ -241,6 +252,7 @@ namespace Armoury
                 });
                 foreach (var q in req) Serve(r, q.T, q.K, q.Fam);
             }
+            if (offM) for (int o = 0; o < offer.Length; o++) a.OfferLeft[o] += Math.Max(0.0, offer[o]);
         }
 
         /// <summary>Glod: towar glodu (zboze, ryby, mieso) i polka z droga ponizej 0.5 T* x Dz.</summary>
@@ -359,29 +371,35 @@ namespace Armoury
                 double avail = a.Consign ? (a.SrcRoom != null && s < a.SrcRoom.Length ? a.SrcRoom[s] : 0.0) - r.SrcSpent[s]
                                          : (shortStall && a.Staple[k] ? r.BudgetShort[t] : r.Budget[t]) - r.Spent[t];
                 long dep = 0; long nNoDep = -1;
-                if (cost + fr > avail && depOn && destUnit > 0)
+                bool cut = cost + fr > avail;
+                if (cut && depOn && destUnit > 0)
                 {
-                    // KS-R5 zadatek: zrodlo bez miejsca na caly lot - kupcy celu placa zadatek (udzial wartosci lotu u celu, najwyzej wolna kasa celu ponad podloge minus zadatki
-                    // doby); zrodlo niesie na kredyt tylko towar + fracht - zadatek. Lot za duzy takze z zadatkiem - ciety do miejsca kredytu + zadatku (zadatek rosnie z lotem)
+                    // KS-R5 zadatek: zrodlo bez miejsca na caly lot - kupcy celu placa zadatek (udzial wartosci lotu u celu, najwyzej wolna kasa celu ponad podloge: DstFree minus
+                    // zadatki doby, najwyzej kasa celu teraz); zrodlo niesie na kredyt tylko towar + fracht - zadatek.
+                    // Recenzja ceny-r5 (wazne): lot za duzy takze z zadatkiem - ciety wobec zadatku, ktory MALEJE z lotem (DepCut; dotad ciecie do "miejsce + zadatek calego lotu"
+                    // prawie zawsze odrzucalo lot); gdy lot z zadatkiem nie wyjdzie wiekszy niz ciecie r4-kupcy bez zadatku - ciecie r4-kupcy (zadatek 0), nigdy mniej niz bez klucza.
+                    double minLot = Math.Max(5.0, 0.5 * d);
                     int nf0 = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
-                    nNoDep = nf0 < Math.Max(5.0, 0.5 * d) ? 0 : nf0;   // tyle pojechaloby bez zadatku (r4-kupcy) - "odblokowane" w linii
+                    nNoDep = nf0 < minLot ? 0 : nf0;   // tyle pojechaloby bez zadatku (r4-kupcy) - "odblokowane" w linii
                     double dfree = Math.Max(0.0, a.DstFree[t] - r.DepSpent[t]);
-                    dep = (long)Math.Floor(Math.Min(a.DepShare * Val(a, t, k, j0, n, destUnit), dfree));
-                    if (dep < 0) dep = 0;
-                    if (cost + fr - dep > avail)
+                    if (a.DstFreeNow != null) dfree = Math.Min(dfree, Math.Max(0.0, a.DstFreeNow(t)));
+                    dep = DepOf(a, t, k, j0, n, destUnit, dfree);
+                    if (dep > 0 && cost + fr - dep <= avail) cut = false;               // caly lot z zadatkiem
+                    else if (dep > 0)
                     {
                         srcHit = true;
-                        double room = Math.Max(0.0, avail) + dep;
-                        int nf = cost + fr > 0 && room > 0 ? (int)Math.Floor(n * Math.Min(1.0, room / (cost + fr))) : 0;
-                        if (nf < Math.Max(5.0, 0.5 * d)) continue;
-                        n = nf;
-                        cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
-                        dep = (long)Math.Floor(Math.Min(a.DepShare * Val(a, t, k, j0, n, destUnit), dfree));
-                        if (dep < 0) dep = 0;
-                        if (cost + fr - dep > avail + 1) continue;
+                        int nd = DepCut(a, s, t, k, j0, n, cost, fr, tau, L, destUnit, avail, dfree, minLot);
+                        if (nd > 0 && nd > nf0)
+                        {
+                            n = nd; cost = a.LotPrice(s, k, n); fr = (long)Math.Round(cost * tau * L);
+                            dep = DepOf(a, t, k, j0, n, destUnit, dfree);
+                            cut = false;
+                        }
+                        else dep = 0;                                                    // ciecie r4-kupcy nizej (bez zadatku)
                     }
+                    else dep = 0;
                 }
-                else if (cost + fr > avail)
+                if (cut)
                 {
                     int nf = cost + fr > 0 && avail > 0 ? (int)Math.Floor(n * avail / (double)(cost + fr)) : 0;
                     if (a.Consign) srcHit = true; else poorHit = true;
@@ -405,12 +423,16 @@ namespace Armoury
                 offer[s * NK + k] -= got; sh[s * NK + k] -= got; Hc += got;
                 if (dep > 0)
                 {
-                    // zadatek wedlug sztuk naprawde wyslanych (gra tnie lot do polki zrodla - tak samo tnie zadatek)
-                    double depGot = n > 0 ? dep * Math.Min(1.0, got / (double)n) : 0.0;
+                    // zadatek wedlug sztuk naprawde wyslanych (gra tnie lot do polki zrodla - tak samo tnie zadatek); recenzja ceny-r5: w grze zadatek NAPRAWDE zaplacony
+                    // (DepPaidLast - kasa celu przy wysylce), miejsce kredytu zrodla liczone od niego (bez przekroczenia, gdy kasa celu dala mniej niz plan)
+                    double depGot = a.DepPaidLast != null ? Math.Max(0L, a.DepPaidLast()) : (n > 0 ? dep * Math.Min(1.0, got / (double)n) : 0.0);
                     r.DepSpent[t] += depGot;
                     r.SrcSpent[s] += Math.Max(0.0, cost + fr - depGot);
-                    st.DepLots++; st.DepPcs += got; st.DepGold += (long)Math.Round(depGot);
-                    if (nNoDep >= 0 && got > nNoDep) st.DepFreed += got - nNoDep;
+                    if (depGot > 0)
+                    {
+                        st.DepLots++; st.DepPcs += got; st.DepGold += (long)Math.Round(depGot);
+                        if (nNoDep >= 0 && got > nNoDep) st.DepFreed += got - nNoDep;
+                    }
                 }
                 else if (a.Consign) r.SrcSpent[s] += cost + fr; else r.Spent[t] += cost + fr;
             }
@@ -425,6 +447,41 @@ namespace Armoury
                 if (fam) { st.FamineOrd += ord0; st.FamineGot += got0; }
             }
             ClearFar(r);
+        }
+
+        /// <summary>KS-R5 ceny-r5: zadatek kupcow celu za n sztuk - DepShare x wartosc lotu u celu (Val), najwyzej wolna kasa celu dfree (zl, w dol do calych).</summary>
+        private static long DepOf(In a, int t, int k, int j0, int n, int destUnit, double dfree)
+        {
+            if (n <= 0 || !(dfree > 0)) return 0;
+            long dp = (long)Math.Floor(Math.Min(a.DepShare * Val(a, t, k, j0, n, destUnit), dfree));
+            return dp < 0 ? 0 : dp;
+        }
+
+        /// <summary>Recenzja ceny-r5 (wazne): najwiekszy lot m &lt;= n z zadatkiem, ktory miesci sie w miejscu kredytu zrodla: koszt(m) + fracht(m) - zadatek(m) &lt;= miejsce + 1,
+        /// gdzie zadatek(m) = min(DepShare x Val(m), dfree) maleje z lotem. Oszacowanie liniowe z cen sztuki lotu n: f(m) = cu m - min(vu m, dfree) (cu - koszt i fracht na sztuke,
+        /// vu - zadatek na sztuke); gdy zadatek dochodzi do sufitu dfree, zanim f dojdzie do miejsca - m = (miejsce + dfree) / cu, inaczej m = miejsce / (cu - vu). Mniejszy lot
+        /// ma tansza sztuke u zrodla i drozsza u celu - oszacowanie ostrozne; sprawdzenie dokladne (LotPrice, Val), najwyzej 3 przejscia od nowa z cen mniejszego lotu.
+        /// 0 - zaden lot z zadatkiem nie miesci sie powyzej najmniejszego lotu.</summary>
+        private static int DepCut(In a, int s, int t, int k, int j0, int n, long cost, long fr, double tau, float L, int destUnit, double avail, double dfree, double minLot)
+        {
+            double av = Math.Max(0.0, avail);
+            int nt = n; long c = cost, f = fr;
+            for (int it = 0; it < 3; it++)
+            {
+                double C = c + f;
+                if (!(C > 0) || nt <= 0) return 0;
+                double cu = C / nt, vu = a.DepShare * Val(a, t, k, j0, nt, destUnit) / (double)nt;
+                double m;
+                if (vu > 0 && dfree > 0 && cu * (dfree / vu) - dfree <= av) m = (av + dfree) / cu;   // zadatek na suficie wolnej kasy celu
+                else m = cu > vu ? av / (cu - vu) : nt;                                              // zadatek rosnie z lotem
+                int nn = (int)Math.Floor(Math.Min((double)nt, m));
+                if (it > 0 && nn >= nt) nn = nt - 1;                                                 // postep: kazde przejscie mniejszy lot
+                if (nn < minLot || nn <= 0) return 0;
+                long c2 = a.LotPrice(s, k, nn), f2 = (long)Math.Round(c2 * tau * L);
+                if (c2 + f2 - DepOf(a, t, k, j0, nn, destUnit, dfree) <= avail + 1) return nn;
+                nt = nn; c = c2; f = f2;
+            }
+            return 0;
         }
 
         /// <summary>Wartosc n sztuk u celu po marzy: H4 (DestValue, za j0 sztukami wczesniejszych lotow doby) albo runda 3 - n x cena polki celu x 0.97 (bez j0, bit w bit).</summary>

@@ -150,11 +150,14 @@ namespace Armoury
         // zaliczone na rachunek, nadplata zwrocona przez zrodlo, roszczenia celu (zrodlo bez kasy na zwrot), zwrot zadatku zawroconego wozu, bez rozliczenia (woz bez celu
         // i zrodla); zadatki w drodze wczoraj (kontrola: wczoraj + zaplacone - rozliczone = dzis)
         private static long _dDepPcs, _dDepGold, _dDepFreed, _dDepCred, _dDepOver, _dDepClaim, _dDepBack, _dDepLost, _dDepSettled; private static int _dDepLots;
-        private static long _dReexp; private static int _dReexpLots;
-        private static long _dDepShort;                               // KS-R5: zadatek planu rdzenia ponad to, co kasa celu miala ponad podloge przy wysylce (reszte niesie kredyt zrodla)   // KS-R5 (pomiar): wyslane ze zrodla, do ktorego ten sam towar jest w drodze (KS-H) - reeksport
+        private static long _dReexp; private static int _dReexpLots;   // KS-R5 (pomiar): wyslane ze zrodla, do ktorego ten sam towar jest w drodze (KS-H) - reeksport
+        private static long _dDepShort;                               // KS-R5: zadatek planu rdzenia ponad to, co kasa celu miala ponad podloge przy wysylce (reszte niesie kredyt zrodla)
         private static long _depPrev = -1;
+        private static long _lastDepPaid;                             // recenzja ceny-r5: zadatek zaplacony w ostatnim Ship (KsFoodCore.In.DepPaidLast - miejsce kredytu zrodla)
         // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny [t * NZ + k) * NMiss + przyczyna], suma od ostatniej linii tygodnia, doby w sumie
         private static double[] _miss; private static int _missDays;
+        // recenzja ceny-r5 (pomiar NKS-7g): oferta zrodel na poczatku doby i niesprzedana na koniec [t * NZ + k] - suma od ostatniej linii tygodnia (doby jak _missDays)
+        private static double[] _off0, _offLeft;
         private static readonly HashSet<string> _err = new HashSet<string>();
         private static int _ranDay = -1;
 
@@ -167,7 +170,7 @@ namespace Armoury
             Array.Clear(_shipDay, 0, _shipDay.Length); Array.Clear(_shipDaysDay, 0, _shipDaysDay.Length);
             ClearDay(); _err.Clear(); _ranDay = -1;
             _north = null; _byDays = false; _daysSlow = false; _consignNow = false;
-            _depPrev = -1; _miss = null; _missDays = 0;
+            _depPrev = -1; _miss = null; _missDays = 0; _off0 = null; _offLeft = null;
             KsFoodCredit.Reset();
         }
 
@@ -822,11 +825,17 @@ namespace Armoury
                         a.DstFree = new double[nt];
                         for (int i = 0; i < nt; i++) a.DstFree[i] = KsFoodCredit.FreeAbove((long)a.Gold[i], (long)a.Res[i]);
                         a.ShipDep = (s, t, k, n, cost, fr, sea, L, dep) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight, dep);
+                        // recenzja ceny-r5: wolna kasa celu TERAZ (ta sama podloga co Ship - FreeOf) i zadatek naprawde zaplacony w ostatnim Ship
+                        a.DstFreeNow = t => KsFoodCredit.FreeOf(_t[t]);
+                        a.DepPaidLast = () => _lastDepPaid;
                     }
                 }
                 // KS-R5 ceny-r5 (pomiar NKS-24b): brak do T* zamowien bez lotu wedlug przyczyny - suma do linii tygodnia (bez zmiany decyzji)
                 if (_miss == null || _miss.Length != nt * NZ * KsFoodCore.NMiss) { _miss = new double[nt * NZ * KsFoodCore.NMiss]; _missDays = 0; }
                 a.Miss = _miss; _missDays++;
+                // recenzja ceny-r5 (pomiar NKS-7g): oferta zrodel i niesprzedana - czy nadwyzka eksporterow nie znajduje kupca (rozdzial), czy to tylko zapas roboczy
+                if (_off0 == null || _off0.Length != nt * NZ || _offLeft == null || _offLeft.Length != nt * NZ) { _off0 = new double[nt * NZ]; _offLeft = new double[nt * NZ]; }
+                a.Offer0 = _off0; a.OfferLeft = _offLeft;
                 a.SampleAt = (s, t, k) => (Fnv(_st[s].StringId + _st[t].StringId) + (uint)today + (uint)k) % 64u == 0u;
                 a.Sample = (s, k, n) => { long s0 = Stopwatch.GetTimestamp(); Sample(_t[s], items[k], Math.Min(n, SampleCap), pow); _dSampleTicks += Stopwatch.GetTimestamp() - s0; };
                 a.Ship = (s, t, k, n, cost, fr, sea, L) => Ship(s, t, k, items[k], n, cost, fr, sea, L, today, pendFreight);
@@ -962,6 +971,7 @@ namespace Armoury
             var ro = src.ItemRoster;
             bool consign = _consignNow;                          // KS-R4 r4-kupcy H5: woz na kredyt - cel nie placi przy wyjezdzie, fracht placi zrodlo
             if (!consign) dep = 0;                               // KS-R5: zadatek tylko przy kredycie kupcow
+            _lastDepPaid = 0;                                    // recenzja ceny-r5: zadatek tego wywolania (0 przy kazdym wczesnym wyjsciu)
             if (ro == null || (consign ? srcT.Gold < fr : dstT.Gold < cost + fr)) return 0;
             // recenzja runda 3 (drobne): sztuki bez modyfikatora (jak polka w Daily), cena i fracht za sztuki naprawde zdjete z polki
             var el = new EquipmentElement(it, null, null, false);
@@ -994,6 +1004,7 @@ namespace Armoury
                     else depPaid = 0;
                 }
                 if (depPaid < dep) _dDepShort += dep - depPaid;
+                _lastDepPaid = depPaid;
             }
             if (!consign)
             {
@@ -1304,6 +1315,7 @@ namespace Armoury
                 double bothSum = 0; foreach (var kv in both) bothSum += kv.Value;
                 sb.Append(" | krainy w obie strony (srednia 28 dob, mniejszy kierunek, szt./d): razem ").Append(bothSum.ToString("0", inv));
                 for (int i = 0; i < both.Count && i < 30; i++) sb.Append(i == 0 ? "; " : ", ").Append(both[i].Key).Append(' ').Append(both[i].Value.ToString("0", inv));
+                AppendOfferLeft(sb, inv);
                 // przyczyny braku dowozu (pomiar KsFoodCore.Miss)
                 var m = _miss; int NR = KsFoodCore.NMiss;
                 sb.Append(" | bez dowozu wedlug przyczyny (").Append(_missDays).Append(" dob, brak do T* szt.; kraina celu x towar):");
@@ -1342,7 +1354,51 @@ namespace Armoury
             catch (Exception e) { Stumble("AppendR5Week", e); }
         }
 
-        private static void ClearMiss() { if (_miss != null) Array.Clear(_miss, 0, _miss.Length); _missDays = 0; }
+        /// <summary>Recenzja ceny-r5 (pomiar NKS-7g, co 7 dob): oferta zrodel niesprzedana wedlug krainy zrodla i towaru (szt./d, srednia dob od ostatniej linii tygodnia;
+        /// niesprzedane / oferowane, miasto z najwieksza niesprzedana oferta). Duza niesprzedana oferta przy brakach w innych miastach rynku = rozdzial (towar jest,
+        /// kupcy go nie wioza: zasieg, marza, wojna, kredyt - przyczyny w "bez dowozu wedlug przyczyny"); mala = zapas roboczy eksportera (polowa / 2/3 nadwyzki na dobe).</summary>
+        private static void AppendOfferLeft(StringBuilder sb, CultureInfo inv)
+        {
+            sb.Append(" | oferta zrodel niesprzedana (").Append(_missDays).Append(" dob, srednia szt./d; kraina zrodla x towar: niesprzedane / oferowane, miasto z najwieksza):");
+            var o0 = _off0; var ol = _offLeft;
+            if (o0 == null || ol == null || _t == null || o0.Length != _nt * NZ || ol.Length != _nt * NZ || _missDays <= 0) { sb.Append(" -"); return; }
+            double dn = _missDays;
+            var by = new Dictionary<string, double[]>(StringComparer.Ordinal);
+            var top = new Dictionary<string, KeyValuePair<int, double>>(StringComparer.Ordinal);
+            double tl = 0, t0 = 0;
+            for (int t = 0; t < _nt; t++)
+            {
+                string land; try { land = StartCalibration.TownLandOf(_st[t]); } catch { land = null; }
+                if (string.IsNullOrEmpty(land)) land = "?";
+                for (int k = 0; k < NZ; k++)
+                {
+                    int o = t * NZ + k; double x0 = o0[o], xl = ol[o];
+                    if (!(x0 > 0)) continue;
+                    string key = land + " " + (PlanG[k] >= 0 ? KsTab.Goods[PlanG[k]] : KsBasket.Ids[Z[k]]);
+                    double[] v; if (!by.TryGetValue(key, out v)) { v = new double[2]; by[key] = v; }
+                    v[0] += xl; v[1] += x0; tl += xl; t0 += x0;
+                    KeyValuePair<int, double> tp; if (!top.TryGetValue(key, out tp) || xl > tp.Value) top[key] = new KeyValuePair<int, double>(t, xl);
+                }
+            }
+            sb.Append(" razem ").Append((tl / dn).ToString("0", inv)).Append(" / ").Append((t0 / dn).ToString("0", inv));
+            var li = new List<KeyValuePair<string, double[]>>(by);
+            li.Sort((x, y) => y.Value[0].CompareTo(x.Value[0]));
+            int q = 0;
+            foreach (var kv in li)
+            {
+                if (q >= 30 || kv.Value[0] / dn < 1.0) break;
+                KeyValuePair<int, double> tp; string tn = top.TryGetValue(kv.Key, out tp) && tp.Key >= 0 && tp.Key < _nt ? _st[tp.Key].StringId : "?";
+                sb.Append(q == 0 ? "; " : ", ").Append(kv.Key).Append(' ').Append((kv.Value[0] / dn).ToString("0", inv)).Append('/').Append((kv.Value[1] / dn).ToString("0", inv)).Append(" (").Append(tn).Append(')');
+                q++;
+            }
+        }
+
+        private static void ClearMiss()
+        {
+            if (_miss != null) Array.Clear(_miss, 0, _miss.Length); _missDays = 0;
+            if (_off0 != null) Array.Clear(_off0, 0, _off0.Length);
+            if (_offLeft != null) Array.Clear(_offLeft, 0, _offLeft.Length);
+        }
 
         // ------------------------------------------------------------ zapis wozow (arm_ks_kupcy): zrodlo|cel|towar|ile|doba zakupu|termin|zaplacone|fracht|morze~
         internal static string Export()

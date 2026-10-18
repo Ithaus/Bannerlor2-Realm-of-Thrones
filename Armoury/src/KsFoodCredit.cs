@@ -20,11 +20,13 @@ namespace Armoury
     /// (stary zapis) = brak rachunkow; starsza DLL klucza nie czyta. Recenzja r4-kupcy: 64 KB to limit MIEKKI - po scaleniu zostaje jeden wpis (ok. 40 znakow) na pare
     /// (zrodlo, cel) z rachunkiem; par nie da sie scalic bez utraty odbiorcy splaty, wiec ponad ok. 1600 par zapis zostaje wiekszy (SaveText dzieli go na paczki) i linia
     /// zapisu mowi "NADAL PONAD 64 KB" (NKU-10 NIE). Gorna granica: pary miast tego samego rynku, w praktyce do 20 zrodel na miasto (12 najblizszych + 8 dalszych).
+    /// KS-R5 ceny-r5 (recenzja): roszczenia z zadatkow kupcow celu (OpenClaim) na OSOBNYCH kontach pary (Claim, wpis zapisu z 5. polem "z"): splacane w PayDaily
+    /// jak rachunki i przepadaja przy wojnie, ale nie blokuja dowozu do dluznika (OverdueDst) i nie placi ich pan glodnego miasta (OverdueOf / PayByLord).
     /// </summary>
     internal static class KsFoodCredit
     {
         private sealed class Bill { internal long Left; internal int Day; }
-        private sealed class Acct { internal Settlement Src, Dst; internal readonly List<Bill> B = new List<Bill>(8); }
+        private sealed class Acct { internal Settlement Src, Dst; internal bool Claim; internal readonly List<Bill> B = new List<Bill>(8); }   // recenzja ceny-r5: Claim - roszczenie z zadatku (osobne konto pary)
 
         private const int MaxEntries = 8, SaveCapChars = 64 * 1024;
         private const string Ver = "kk1";
@@ -66,6 +68,8 @@ namespace Armoury
 
         private static int Today() { return (int)CampaignTime.Now.ToDays; }
         private static string Key(Settlement s, Settlement d) { return s.StringId + "|" + d.StringId; }
+        /// <summary>Recenzja ceny-r5: konto roszczen z zadatkow (wierzyciel = cel, ktory zaplacil zadatek, dluznik = zrodlo) - osobne od rachunkow za jedzenie tej pary.</summary>
+        private static string ClaimKey(Settlement creditor, Settlement debtor) { return "z|" + creditor.StringId + "|" + debtor.StringId; }
 
         internal static bool Any { get { Resolve(); return _acc.Count > 0; } }
 
@@ -88,13 +92,15 @@ namespace Armoury
         internal static long FreeOf(Town t) { return Free(t); }
 
         /// <summary>KS-R5 ceny-r5 (zadatek): roszczenie wierzyciela `creditor` (miasto celu, ktore zaplacilo zadatek) wobec dluznika `debtor` (miasto zrodla bez kasy na zwrot
-        /// nadplaty albo zadatku zawroconego wozu) - rachunek jak kazdy (splata od najstarszego ponad podloge, zwloka, wojna = przepada); zloto sie nie rusza.</summary>
+        /// nadplaty albo zadatku zawroconego wozu) - splata jak rachunek (od najstarszego z kasy ponad podloge w PayDaily, wojna = przepada); zloto sie nie rusza.
+        /// Recenzja ceny-r5: osobne konto (Claim) - zwrot zadatku to nie rachunek za jedzenie: NIE blokuje dowozu do dluznika (OverdueDst) i NIE placi go pan glodnego
+        /// miasta (OverdueOf / PayByLord - pan placi za jedzenie dowiezione do swojego miasta, a dluznik roszczenia jedzenia za nie nie dostal).</summary>
         internal static void OpenClaim(Settlement creditor, Settlement debtor, long x, int today)
         {
             Resolve();
             if (x <= 0 || creditor == null || debtor == null || creditor == debtor) return;
-            Acct a; string k = Key(creditor, debtor);
-            if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = creditor, Dst = debtor }; _acc[k] = a; }
+            Acct a; string k = ClaimKey(creditor, debtor);
+            if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = creditor, Dst = debtor, Claim = true }; _acc[k] = a; }
             var last = a.B.Count > 0 ? a.B[a.B.Count - 1] : null;
             if (last != null && (last.Day == today || a.B.Count >= MaxEntries)) last.Left += x;
             else a.B.Add(new Bill { Left = x, Day = today });
@@ -211,7 +217,7 @@ namespace Armoury
             int today = Today(), od = OverdueDays; long s = 0;
             foreach (var a in _acc.Values)
             {
-                if (a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
+                if (a.Claim || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow
                 foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) s += b.Left;
             }
             return s;
@@ -231,7 +237,7 @@ namespace Armoury
                 var l = new List<KeyValuePair<Acct, Bill>>();
                 foreach (var a in _acc.Values)
                 {
-                    if (a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
+                    if (a.Claim || a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;   // recenzja ceny-r5: bez roszczen z zadatkow
                     foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) l.Add(new KeyValuePair<Acct, Bill>(a, b));
                 }
                 if (l.Count == 0) return 0;
@@ -278,7 +284,7 @@ namespace Armoury
             var h = new HashSet<Settlement>(); int od = OverdueDays;
             foreach (var a in _acc.Values)
             {
-                if (a.Dst == null) continue;
+                if (a.Dst == null || a.Claim) continue;                 // recenzja ceny-r5: roszczenie z zadatku nie blokuje dowozu do dluznika
                 foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) { h.Add(a.Dst); break; }
             }
             return h;
@@ -296,7 +302,7 @@ namespace Armoury
                     if (b.Left <= 0) continue;
                     open += b.Left; bills++;
                     long v; dsts.TryGetValue(a.Dst, out v); dsts[a.Dst] = v + b.Left;
-                    if (today - b.Day > odd) { overdue += b.Left; od.Add(a.Dst); }
+                    if (today - b.Day > odd && !a.Claim) { overdue += b.Left; od.Add(a.Dst); }   // recenzja ceny-r5: zalegle = blokujace dowoz (bez roszczen z zadatkow)
                 }
             towns = dsts.Count; overdueTowns = od.Count;
             var top = new List<KeyValuePair<Settlement, long>>(dsts);
@@ -353,11 +359,12 @@ namespace Armoury
                 {
                     long sum = 0; int day = int.MaxValue;
                     foreach (var b in a.B) { if (b.Left <= 0) continue; sum += b.Left; day = Math.Min(day, b.Day); }
-                    if (sum > 0) sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(sum).Append('~').Append(day);
+                    if (sum > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(sum).Append('~').Append(day); if (a.Claim) sb.Append("~z"); }
                     continue;
                 }
+                // recenzja ceny-r5: roszczenie z zadatku - 5. pole "z" (starsza DLL czyta 4 pola i bierze je za zwykly rachunek pary - tak jak przed recenzja)
                 foreach (var b in a.B)
-                    if (b.Left > 0) sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(b.Left).Append('~').Append(b.Day);
+                    if (b.Left > 0) { sb.Append('|').Append(a.Src.StringId).Append('~').Append(a.Dst.StringId).Append('~').Append(b.Left).Append('~').Append(b.Day); if (a.Claim) sb.Append("~z"); }
             }
             return sb.ToString();
         }
@@ -384,8 +391,9 @@ namespace Armoury
                         Settlement src = null, dst = null;
                         try { src = om.GetObject<Settlement>(q[0]); dst = om.GetObject<Settlement>(q[1]); } catch { }
                         if (src == null || dst == null) { bad++; continue; }
-                        Acct a; string k = Key(src, dst);
-                        if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = src, Dst = dst }; _acc[k] = a; }
+                        bool claim = q.Length >= 5 && q[4] == "z";     // recenzja ceny-r5: roszczenie z zadatku (brak pola - rachunek za jedzenie, stary zapis)
+                        Acct a; string k = claim ? ClaimKey(src, dst) : Key(src, dst);
+                        if (!_acc.TryGetValue(k, out a)) { a = new Acct { Src = src, Dst = dst, Claim = claim }; _acc[k] = a; }
                         if (a.B.Count >= MaxEntries) a.B[a.B.Count - 1].Left += left; else a.B.Add(new Bill { Left = left, Day = day });
                         ok++; sum += left;
                     }
