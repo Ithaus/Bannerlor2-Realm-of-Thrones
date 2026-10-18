@@ -2833,3 +2833,7 @@ CO JEFF ZOBACZY: zajazdy przy szlakach (nocleg, plotki), plotki w karczmach mias
 512x512, zbrojownia z ksiega wedlug modyfikatora, wydarzenia ROT z logiem skutkow; ekonomia: daniny od majatku ponad 3 x zapas (miasta i wsie, lagodny start), roboty gminy tylko z
 prawdziwego materialu, lepszy stol mieszczan, wykup wolnosci/awans/blizny wojny (ZC6/ZC7 TAK); KS: "KS: uzbrojony zapis" + 5 tygodni pomiaru (bez zmiany rynku do WGRANIA 78).
 DO SPRAWDZENIA U JEFFA (log pierwszej sesji): "KS: samo uzbrojenie", "Akumulator kies (ds-akumulator)", "Zajazdy", "Przysiolki", 0 ERROR.
+- 23:35 PDT: fix-ksarm GOTOWY (wf_2d6c4a59-791): w-toku/fix-ksarm c9f806d0 (od 100eaedf). Zrodlo koni jucznych z niczego = konwoje zaopatrzenia DTE (CutTheirSupplyBehavior.SpawnReinforcementCaravan:
+  gra daje 0.5 x ludzi jucznych w InitializeCaravanOnCreation, DTE AddReinforcementSupplies +17 sumpter_horse; RemoveParty przy dojezdzie) - fin85 179 konwojow, 4593 koni = ok. 28.5/d.
+  Klucz DteConvoyNoFreePacks (TAK, razem z DteConvoyNoFreeFood): konwoj DTE bez jucznych z niczego. Symulacja: KS wlaczylby sie ok. doby 109109 (33 dni po uzbrojeniu). nksarm ARM-15a/b/c.
+  Armoury f02b7c5d. TEST fin86 = fin83 + ta DLL, armoury-ks-auto.flag (USUNAC!), 160 dob, at-fin86-autoarm2.out.txt -> jesli KS sie wlaczy i 0 ERROR: test 5 dob + bitwa, WGRANIE 78.
