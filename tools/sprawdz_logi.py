@@ -1663,8 +1663,10 @@ Uzycie (Python 3, tylko odczyt):
                     koszt doby w ms: rodzenie band, mysl AI godzinowa, AI taktyczne, tiki partii - bandy i inne partie, OutlawLaw.Daily; doba realna i ms/klatke) oraz "Wyrzutki:
                     dzien N" (band, narodziny, puste; znaczniki czasu = doba realna takze bez paczki). NBD-0 linie paczki (0 nieczytelnych), NBD-B bandy i doba realna z linii
                     Wyrzutki (INFO - baza fin86 Armoury-2026-10-17_23-22-37.log: 809 -> 942 band, 15.7 s/dobe, 16 urodzonych i 33 puste na dobe), NBD-1 latka celu zalozona,
-                    cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 band/cel bez narastania (mediana ostatnich 28 dob <= pierwszych 28 + 0.05
-                    i <= 1.15; f14-miary: gra sama trzyma bandy ponad cel - kryjowka przestaje byc zajeta, nowa kryjowka 4 bandy, herszt; NBD-2b skad nadwyzka - INFO), NBD-3 puste narodziny
+                    cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 (f16-drobne: tylko nasze drogi) bandy wobec najwyzszego celu
+                    gry klanu w biegu (albo band z zapisu) - mediana ostatnich 28 dob <= 1.05 i <= pierwszych 28 + 0.05 (narodziny ponad cel = przeciek latki celu albo bramek)
+                    i 'wokol teraz' = wokol ROT w kazdej dobie bez podniesienia; band/cel gry (dawne NBD-2 f14-miary, rosnie od spadku celu - kryjowka przestaje byc zajeta,
+                    bandy zostaja; nowa kryjowka 4 bandy, herszt) i skad nadwyzka - NBD-2b INFO, NBD-3 puste narodziny
                     przy celu podniesionym <= 5% urodzonych, NBD-4 bandy start -> koniec, pula, ludzie nowych band <= 'bandy nowe (ludzi)' z linii Wyrzutki, NBD-5 rodzenie band
                     <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande; ruch partii Campaign.RealTick i udzial band
                     liniowo wedlug liczby partii - INFO), NBD-7 z --baza-doby: doba realna tych samych
@@ -43308,7 +43310,7 @@ def nskory_main(logp):
 NPR_HEAD = "Przysiolki (sw-przysiolki): "
 NPR_CRC6 = "F5456602"      # crc ukladu v6 z tools/wioski-v6/raport-v6.txt (uid:osady; - jak VillageBook)
 NPR_CRC5 = "68BB06AD"
-NPR_CRC7 = "5F9875B1"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt (recenzja 18.10: ziemia okregu + pas, bez wiosek w glebi ziemi obcej)
+NPR_CRC7 = "3D776223"      # f10-uklad: crc ukladu v7 z tools/wioski-v7/raport-v7.txt (recenzja 18.10: ziemia okregu + pas, bez wiosek w glebi ziemi obcej); f16-drobne: bez brodu (Fording) pod wioska - 5F9875B1 -> 3D776223
 NPR_V7_MIN_D = 6.0         # f10-uklad (recenzja): naglowek min_distance = prawdziwe minimum pliku (wioska-wioska i wioska-wies gry) - nie ciasniej niz v6 (wioska-wies gry 6.00)
 NPR_V7_TARGET = 12.26      # f10-uklad: odleglosc docelowa = 2 x v6 6.13 (naglowek target_distance): wioska-wioska mediana >= docelowa, 10% >= 0.8 x docelowa
 NPR_INN_FAR = 12.26        # f10-uklad (recenzja): zajazd >= odleglosc docelowa od wioski i wsi gry (RoadsideInns.FarVillage, zajazdy_gen.py MIN_VIL)
@@ -47772,6 +47774,9 @@ NBD_SDAY_RATIO = 1.15         # NBD-7: doba realna wobec biegu bazowego (te same
 NBD_TARGET_TOL = 1.05         # NBD-2b (INFO, dawna bramka): band klanow z kryjowkami ponad cel x 1.05 - gra robi to sama (f14-miary: dekompilacja 1.4.8)
 NBD_RATIO_DRIFT = 0.05        # NBD-2 (f14-miary): mediana band/cel ostatnich 28 dob najwyzej o tyle ponad mediane pierwszych 28 (przeciek narodzin = narastanie)
 NBD_RATIO_MAX = 1.15          # NBD-2 (f14-miary): mediana band/cel ostatnich 28 dob najwyzej tyle (fin92, cel ROT: mediana 1.05, najwiecej 1.13 - zachowanie gry)
+                              # f16-drobne: band/cel gry (NBD_RATIO_*) tylko INFO w NBD-2b - rosnie od spadku celu gry (Hideout.IsInfested), nie od naszych narodzin
+NBD_LEAK_MAX = 1.05           # NBD-2 (f16-drobne): mediana band / najwyzszy cel gry klanu w biegu (albo bandy z zapisu) w ostatnich 28 dobach najwyzej tyle ...
+NBD_LEAK_DRIFT = 0.05         # ... i najwyzej o tyle ponad mediane pierwszych 28 (fin92 0.976 -> 0.976, fin93 0.974 -> 1.005; przeciek narodzin ponad cel = wzrost ponad 1)
 
 
 def _nbd_f(v):
@@ -47906,6 +47911,14 @@ def nbandy_main(logp, bdp=None):
     # fin92 (cel ROT, latka bez skutku): band/cel 1.065 juz w pierwszej dobie z zapisu, mediana 1.05, najwiecej 1.13 - bez narastania. Paczka f8 zmienia tylko cel narodzin
     # i miejsce narodzin - przeciek (narodziny ponad cel) bylby widoczny jako NARASTANIE band/cel w biegu. Bramka: mediana band/cel (klany z celem > 0 tej doby) w ostatnich
     # 28 dobach <= mediana pierwszych 28 + NBD_RATIO_DRIFT i <= NBD_RATIO_MAX; nadwyzka klan po klanie (cel spadl / klan bez celu / ponad najwyzszy cel w biegu) - NBD-2b INFO.
+    # f16-drobne (18.10, fin93 0.996 -> 1.107 przy limicie 12): band/cel gry rosnie od SPADKU CELU, nie od narodzin - desert_bandits cel 68 -> 52 i yiti_bandits 60 -> 41
+    # (srednio, pierwsze / ostatnie 28 dob) przy bandach 64 -> 67 i 60 -> 58, sea_raiders wchodza do miary dopiero z zajeta kryjowka (34 / 24); zajete kryjowki w biegu
+    # rosna (39.7 -> 42.9), wszystkie 415 narodzin przez SpawnBanditParty w luce celu (gra: round((zajete x 12 - bandy klanu) x 0.1)), 'wokol teraz 6' = ROT w 161 dobach.
+    # Nasz kod nie tworzy band klanow z kryjowkami (OutlawLaw / BanditLimit tylko odmawiaja proby gry; jedyna nasza banda z niczego to najazd FreeFolkRaids - klan wildlings,
+    # w biegu bez zajetej kryjowki), wiec band/cel gry zostaje INFO (NBD-2b), a NBD-2 mierzy to, co moze byc nasze: (a) bandy wobec NAJWYZSZEGO celu, jaki gra sama
+    # postawila klanowi w biegu (albo band z zapisu) - gra dorabia tylko do celu i nie kasuje band, wiec ponad ten poziom wychodza tylko narodziny ponad cel (przeciek
+    # latki celu albo bramek) oraz drobne drogi gry / BK bez celu (herszt w wypatrzonej kryjowce, bohater-zboj BK, 4 bandy nowej kryjowki); (b) cel bez naszej zmiany:
+    # 'wokol teraz' = wokol ROT w kazdej dobie bez podniesienia. fin92: 0.976 -> 0.976 (najwiecej 1.010), fin93: 0.974 -> 1.005 (najwiecej 1.011).
     cl_rx = re.compile(r"(\S+) (\d+)/(\d+)/(\d+)$")
     def _cls(row):
         out = {}
@@ -47914,33 +47927,56 @@ def nbandy_main(logp, bdp=None):
             if mm:
                 out[mm.group(1)] = (int(mm.group(2)), int(mm.group(3)), int(mm.group(4)))
         return out
-    ratios, hist, dec = [], {}, None
+    ratios, ratios_ns, leak, hist, dec = [], [], [], {}, None
+    cstart = _cls(L[ld[0]])
     for d in ld:
         c = _cls(L[d])
         b = sum(v[0] for v in c.values() if v[1] > 0); t = sum(v[1] for v in c.values() if v[1] > 0)
         if t > 0:
             ratios.append(b / t)
+        bn = sum(v[0] for k, v in c.items() if v[1] > 0 and k != "sea_raiders"); tn = sum(v[1] for k, v in c.items() if v[1] > 0 and k != "sea_raiders")
+        if tn > 0:
+            ratios_ns.append(bn / tn)
         drop = zero = new_ = 0
+        lb = lt = 0
         for k, v in c.items():
             h = hist.setdefault(k, []); h.append(v[1]); mx = max(h)   # bandy nie wygasaja - najwyzszy cel klanu w biegu
             if v[1] == 0:
                 zero += v[0]
             elif v[0] > v[1]:
                 e2 = max(0, v[0] - mx); new_ += e2; drop += v[0] - v[1] - e2
+            if mx > 0:                                                 # f16: klan z celem w biegu (wildlings bez zajetej kryjowki - poza miara, sufit FreeFolkRaids)
+                lb += v[0]; lt += max(mx, cstart.get(k, (0, 0, 0))[0])
+        if lt > 0:
+            leak.append(lb / lt)
         dec = (d, drop, zero, new_)
     over = [d for d in ld if int(L[d]["target"]) > 0 and int(L[d]["clanb"]) > NBD_TARGET_TOL * int(L[d]["target"])]
+    nr_days = [d for d in ld if L[d]["raised"] != "TAK"]
+    bad_get = [d for d in nr_days if int(L[d]["around"]) != int(L[d]["around0"])]
+    if len(leak) >= 56:
+        k0, k1, kx = st.median(leak[:28]), st.median(leak[-28:]), max(leak)
+        rep.add("NBD-2: bandy klanow z kryjowkami ponad najwyzszy cel gry w biegu (narodziny ponad cel - nasze drogi) i cel bez naszej zmiany",
+                f"band / najwyzszy cel klanu w biegu (albo bandy z zapisu): pierwsze 28 dob {k0:.3f}, ostatnie 28 {k1:.3f} (zmiana {k1 - k0:+.3f}), najwiecej {kx:.3f};"
+                f" 'wokol teraz' = wokol ROT w {len(nr_days) - len(bad_get)} z {len(nr_days)} dob bez podniesienia" + (f" (inaczej np. {bad_get[:5]})" if bad_get else ""),
+                f"ostatnie 28 <= {NBD_LEAK_MAX} i <= pierwsze 28 + {NBD_LEAK_DRIFT}; 'wokol teraz' = wokol ROT w kazdej dobie bez podniesienia (band/cel gry - NBD-2b INFO:"
+                " kryjowka przestaje byc zajeta, cel spada, bandy zostaja - zachowanie gry)",
+                k1 <= NBD_LEAK_MAX and k1 <= k0 + NBD_LEAK_DRIFT and not bad_get)
+    else:
+        rep.add("NBD-2: bandy klanow z kryjowkami ponad najwyzszy cel gry w biegu", f"dob z celem {len(leak)}", "INFO (za malo dob, >= 56)", None)
     if len(ratios) >= 56:
         m0, m1, mx_ = st.median(ratios[:28]), st.median(ratios[-28:]), max(ratios)
-        rep.add("NBD-2: band klanow z kryjowkami wobec celu gry - bez narastania (mediana band/cel, klany z celem > 0)",
-                f"pierwsze 28 dob {m0:.3f}, ostatnie 28 {m1:.3f} (zmiana {m1 - m0:+.3f}), najwiecej {mx_:.3f}; koniec: band klanow {last['clanb']} / cel {last['target']}"
-                f" (stary {last['old']}), zajete {last['inf']}",
-                f"ostatnie 28 <= pierwsze 28 + {NBD_RATIO_DRIFT} i <= {NBD_RATIO_MAX} (gra trzyma bandy ponad cel sama - NBD-2b; przeciek narodzin = narastanie)",
-                m1 <= m0 + NBD_RATIO_DRIFT and m1 <= NBD_RATIO_MAX)
+        n0, n1 = (st.median(ratios_ns[:28]), st.median(ratios_ns[-28:])) if len(ratios_ns) >= 56 else (None, None)
+        i0 = sum(int(L[d]["inf"]) for d in ld[:28]) / 28.0; i1 = sum(int(L[d]["inf"]) for d in ld[-28:]) / 28.0
+        ratio_txt = (f"band/cel gry (dawne NBD-2, f14-miary): pierwsze 28 {m0:.3f}, ostatnie 28 {m1:.3f} (zmiana {m1 - m0:+.3f}), najwiecej {mx_:.3f}"
+                     + (f"; bez sea_raiders {n0:.3f} -> {n1:.3f}" if n0 is not None else "") + f"; zajete kryjowki srednio {i0:.1f} -> {i1:.1f}"
+                     + f"; koniec: band klanow {last['clanb']} / cel {last['target']} (stary {last['old']}), zajete {last['inf']}"
+                     + f" (dawny prog: ostatnie 28 <= pierwsze 28 + {NBD_RATIO_DRIFT} i <= {NBD_RATIO_MAX} - {'spelniony' if (m1 <= m0 + NBD_RATIO_DRIFT and m1 <= NBD_RATIO_MAX) else 'niespelniony'}) | ")
     else:
-        rep.add("NBD-2: band klanow z kryjowkami wobec celu gry - bez narastania", f"dob z celem {len(ratios)}", "INFO (za malo dob, >= 56)", None)
-    rep.add("NBD-2b: nadwyzka band ponad cel klan po klanie - skad (INFO)",
-            (f"koniec (d{dec[0]}): cel spadl (band <= najwyzszy cel klanu w biegu - kryjowka przestala byc zajeta, bandy zostaja) {dec[1]}, klany bez zajetej kryjowki"
-             f" {dec[2]}, ponad najwyzszy cel klanu w biegu (nowa kryjowka 4 bandy, herszt, bandy z zapisu) {dec[3]}" if dec else "brak listy klanow")
+        ratio_txt = f"band/cel gry: dob z celem {len(ratios)} | "
+    rep.add("NBD-2b: band/cel gry i nadwyzka band ponad cel klan po klanie - skad (INFO)",
+            ratio_txt
+            + (f"koniec (d{dec[0]}): cel spadl (band <= najwyzszy cel klanu w biegu - kryjowka przestala byc zajeta, bandy zostaja) {dec[1]}, klany bez zajetej kryjowki"
+               f" {dec[2]}, ponad najwyzszy cel klanu w biegu (nowa kryjowka 4 bandy, herszt, bandy z zapisu) {dec[3]}" if dec else "brak listy klanow")
             + f"; dawna miara: ponad cel x {NBD_TARGET_TOL} w {len(over)} z {len(ld)} dob",
             "INFO (Hideout.IsInfested = >= 4 band w srodku teraz; FillANewHideoutWithBandits i AddBossParty bez celu; wildlings - FreeFolkRaids)", None)
 

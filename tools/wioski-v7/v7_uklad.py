@@ -25,7 +25,8 @@
 #  1. Odleglosc docelowa D = 2 x najmniejsza odleglosc wioska-wioska ukladu v6 (6.13 -> 12.26 jedn.) - miedzy kazdymi dwiema wioskami pobocznymi i miedzy wioska
 #     poboczna a wsia gry (v6: 6.00). Wsie gry stoja tam, gdzie postawila je gra (pary wies gry - wies gry ponizej D zostaja - dane ROT).
 #  2. Miejsce pod wioske: lad przejezdny w rastrze (bez bagna, rzeki, stromizny >= 0.35, morza i ladu nieprzejezdnego w kwadracie 3x3; gora - w ROT takze
-#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9), od miasta >= 12, zamku >= 9 (jak v6), kryjowki >= 5,
+#     sciany rzek i klify brzegu - tylko sama komorka) i w sondzie gry (nawig 7 z 9 komorek 2 jedn.; brzeg 5 z 9; f16-drobne: komorka sondy na brodzie - teren
+#     Fording - nie liczy sie jako lad, bo gra (IsLandGroup) nie stawia na nim wioski), od miasta >= 12, zamku >= 9 (jak v6), kryjowki >= 5,
 #     poza malowana droga (>= 1.5 jedn. od jej srodka), >= min_village planu zajazdow (12.26) od budynku i postoju.
 #     Ziemia okregu (recenzja 18.10, Jeff: "zeby to wygladalo naturalnie, a nie jak blad") = komorki, ktorych najblizsza wies gry (sonda gry, kolumna wies_gry) to
 #     wies gry okregu, do 60 jedn. (v6: najdalej 60.0), ten sam lad; komorka pogranicza (kultura albo krolestwo ziemi inne niz przy wsi gry) - z kara jak pas.
@@ -611,13 +612,15 @@ def main():
     cul_code, kin_code = {}, {}
     with io.open(A.geo, encoding="utf-8") as f:
         ghd = f.readline().rstrip("\r\n").split("\t")
-        i_w, i_c, i_k = ghd.index("wies_gry"), ghd.index("kultura"), ghd.index("krolestwo")
+        i_w, i_c, i_k, i_t = ghd.index("wies_gry"), ghd.index("kultura"), ghd.index("krolestwo"), ghd.index("teren")
         for line in f:
             c = line.rstrip("\r\n").split("\t")
             if c[2] == "tak":
                 xi, yi = int(c[0]) // 2, int(c[1]) // 2
                 if 0 <= yi < nav.shape[0] and 0 <= xi < nav.shape[1]:
-                    nav[yi, xi] = True
+                    # f16-drobne: brod (Fording) jest przejezdny dla partii (nawig tak), ale nie jest ladem pod budynek - gra (MapVillageData.IsLandGroup,
+                    # linia ukladu v7 "na ladzie") liczy tylko Plain/Desert/Snow/Forest/Steppe/RuralArea/Swamp/Dune/Beach; ziemia okregu (gvid) jak dotad
+                    nav[yi, xi] = c[i_t] != "Fording"
                     if c[i_w] != "-":
                         gvid[yi, xi] = vidx.get(c[i_w], -2)
                         gcul[yi, xi] = cul_code.setdefault(c[i_c], len(cul_code))

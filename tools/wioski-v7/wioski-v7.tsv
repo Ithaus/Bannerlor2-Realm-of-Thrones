@@ -781,11 +781,11 @@ castle_village_EN8_1#78f1f282	castle_village_EN8_1	river	Oxstone	Oxstone	field	-
 castle_village_EN8_2#8c70f187	castle_village_EN8_2	river	Wendtree	Wendtree	field	-	lumberjack	wheat_farm	village	trawa	368.77	503.24	364.22	496.21	8.4	32	26	fb-relax
 castle_village_EN8_2#c5776153	castle_village_EN8_2	river	Knight's Mill	Knight's Mill	river	-	wheat_farm	wheat_farm	mill	trawa	379.69	513.10	383.68	517.68	6.1	23	32	fb-relax
 castle_village_EN8_2#8c46468d	castle_village_EN8_2	river	Seven Willows	Seven Willows	field	-	lumberjack	wheat_farm	village	trawa	370.56	518.70	388.51	487.50	36.0	28	25	fb
-castle_village_EN9_1#5feb065a	castle_village_EN9_1	stormlands	Hart's Rest	Hart's Rest	forest	-	wheat_farm	wheat_farm	village	las	624.77	352.50	611.46	349.45	13.7	31	24	own
-castle_village_EN9_1#f2d9e895	castle_village_EN9_1	stormlands	Knight's Wood	Knight's Wood	field	-	wheat_farm	wheat_farm	windmill	trawa	631.85	352.62	625.77	354.76	6.5	30	31	own
+castle_village_EN9_1#5feb065a	castle_village_EN9_1	stormlands	Hart's Rest	Hart's Rest	field	-	wheat_farm	wheat_farm	windmill	trawa	624.77	352.50	614.33	351.33	10.5	31	24	own
+castle_village_EN9_1#f2d9e895	castle_village_EN9_1	stormlands	Knight's Wood	Knight's Wood	field	-	wheat_farm	wheat_farm	windmill	trawa	631.85	352.62	626.61	355.61	6.0	30	31	own
 castle_village_EN9_1#81b95a08	castle_village_EN9_1	stormlands	Misty Cove	Misty Cove	coast	-	iron_mine	iron_mine	village	las	604.22	375.47	603.43	375.43	0.8	25	31	own
-castle_village_EN9_2#91390709	castle_village_EN9_2	stormlands	Drowned Wood	Drowned Wood	coast	-	fisherman	fisherman	fishing	trawa	638.00	323.10	635.37	315.37	8.2	29	29	fb-relax
-castle_village_EN9_2#1de9bfa4	castle_village_EN9_2	stormlands	Shellhaven	Shellhaven	field	-	wheat_farm	wheat_farm	village	trawa	647.85	324.56	635.67	342.67	21.8	22	22	own
+castle_village_EN9_2#91390709	castle_village_EN9_2	stormlands	Drowned Wood	Drowned Wood	field	-	fisherman	wheat_farm	granary	trawa	638.00	323.10	631.62	343.62	21.5	29	27	own
+castle_village_EN9_2#1de9bfa4	castle_village_EN9_2	stormlands	Shellhaven	Shellhaven	field	-	wheat_farm	wheat_farm	village	trawa	647.85	324.56	647.21	342.20	17.7	22	24	own
 castle_village_ES1_1#110ee744	castle_village_ES1_1	pentoshi	Illytyra	Illytyra	forest	-	wheat_farm	wheat_farm	farm	las	971.77	479.50	918.63	467.63	54.4	26	13	own
 castle_village_ES1_1#b689e011	castle_village_ES1_1	pentoshi	Vatis	Vatis	forest	-	wheat_farm	wheat_farm	farm	las	961.68	470.92	934.37	457.37	30.5	21	16	own
 castle_village_ES1_1#6f9a7756	castle_village_ES1_1	pentoshi	Luviro	Luviro	forest	-	wheat_farm	wheat_farm	farm	las	973.35	471.99	953.73	480.73	21.5	24	18	own
@@ -1362,7 +1362,7 @@ village_EW3_2#12320db2	village_EW3_2	stormlands	Hollowstone	Hollowstone	coast	-	
 village_EW3_2#d34da429	village_EW3_2	stormlands	Little Glade	Little Glade	forest	-	europe_horse_ranch	europe_horse_ranch	village	las	599.09	291.45	610.48	289.47	11.6	23	20	relax
 village_EW3_4#079780c8	village_EW3_4	stormlands	Fawnbrook	Fawnbrook	field	-	wheat_farm	wheat_farm	village	trawa	605.50	300.92	610.31	320.30	20.0	32	28	own
 village_EW3_4#55cb674c	village_EW3_4	stormlands	Rockton	Rockton	hills	-	wheat_farm	wheat_farm	village	trawa	610.71	323.41	608.43	334.43	11.3	36	23	fb-relax
-village_EW3_4#162b7404	village_EW3_4	stormlands	Windley	Windley	river	-	wheat_farm	wheat_farm	mill	las	614.96	305.14	624.40	320.40	17.9	19	36	relax
+village_EW3_4#162b7404	village_EW3_4	stormlands	Windley	Windley	river	-	wheat_farm	wheat_farm	mill	trawa	614.96	305.14	629.63	315.63	18.0	19	36	relax
 village_EW4_1#7a922c1a	village_EW4_1	crownlands	Brownwick	Brownwick	field	-	wheat_farm	wheat_farm	farm	trawa	492.50	413.67	496.78	406.78	8.1	15	17	own
 village_EW4_1#6dadd7e3	village_EW4_1	crownlands	Briarhollow	Briarhollow	forest	-	wheat_farm	wheat_farm	farm	las	486.79	420.10	472.55	418.55	14.3	17	15	own
 village_EW4_1#6c0149e8	village_EW4_1	crownlands	Haypool	Haypool	river	-	wheat_farm	wheat_farm	village	las	480.72	404.71	470.59	405.59	10.2	20	20	own
