@@ -963,6 +963,16 @@ Uzycie (Python 3, tylko odczyt):
                     >= 0.95 odniesienia, NDS-10 Bank (wzrost dlugu koron, kapital >= 2 mln), NDS-11 takt doby wobec bazy, NDS-12 potkniecia i ERROR 0, NDS-13 rampa wedlug wzoru
                     i jedna DayOn, NDS-14 daniny przy wozie wobec linii 112 (oddane, dziesiecina 5%, W4 <= 0.15, W4 w wplywie dnia), NDS-15 czynsz = oplaty stale w "Prawa panskie",
                     NDS-4/5/8 KS - INFO (galaz bez KS), NDS-16 przeplywy - INFO. Odniesienie bez --baza-doby: pierwsze doby DS biegu (rampa < 0.25). Log bez DS: "brak linii".
+                    ds-akumulator (18.10): NDS-3a/3b dryf kies wsi w oknie od konca rampy KS (koniec popytu) albo DS F1 (DayOn + 28) + 2 x 15 dob (za krotkie - ostatnie 30 dob),
+                    NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
+                    jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
+--grupa nakum     : (noc 17/18.10, paczka ds-akumulator; Jeff "czy nie ma stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac"; Armoury/src/TownFolk.DsAkum.cs) python -I
+                    tools/sprawdz_logi.py --grupa nakum <Armoury-*.log> [--do-doby N] (strumieniowo). Okno: od firm F3 + 28 + 7 dob (bez F3 - ostatnie 28 dob). NAKUM-0 linia
+                    'Akumulator kies' kazdej doby, NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy < +30 tys./d (1b R/P INFO, 1c zapas dni W koniec <= 1.1 x poczatek), NAKUM-2
+                    danina od skarbca ludu (pobrano = panom + kasom, korona 0; > 0 po rampie), NAKUM-3 roboty gminy i septy (z kies = do kas + do ludu, material zaplacony = towar
+                    zdjety, rzemieslnicy <= k x material), NAKUM-4 lepszy stol przy KS (oferta otwarta i kupione > 0; bez KS INFO), NAKUM-5 kiesy wsi <= +0.2%/d (pieniadz robot
+                    zostaje we wsi), NAKUM-6 jednorazowe korony do zapasu (INFO), NAKUM-7 kazdy posiadacz 'Pieniadz swiata' <= +30 tys./d w 28 dobach, NAKUM-8 czas <= 5 ms,
+                    NAKUM-9 potkniecia i ERROR 0. Log bez paczki: NAKUM-1/5/7 z linii niezaleznych, reszta INFO.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -34316,6 +34326,263 @@ def nds_main(logp, bdp=None, until=120):
     return 0
 
 
+# ------------------------------------------------------------ nakum (noc 17/18.10, paczka ds-akumulator: kiesy, ktore tylko rosna; Armoury/src/TownFolk.DsAkum.cs)
+NAK_HEAD = "Akumulator kies (ds-akumulator): dzien "
+NAK_ERR = ("ERROR in TownFolk.DsAkum.", "ERROR in BuildFunding.Folk.DsWorksBuy", "ERROR in TownFolk.DaWorksRun", "ERROR in TownFolk.DaDaily", "ERROR in CrownIncome.WindfallOf",
+           "ERROR in DsTowns.FolkFarmPerDay", "ERROR in DsVillage.AkNote", "ERROR in DsVillage.AkMedians")
+NAK_RX = {
+    "due": re.compile(r"\| danina od skarbca ludu \(Ds Hoard Due\) (tak|nie), firmy F3 (tak|nie), stawka ([\d.]+)%/d"),
+    "pre": re.compile(r"wliczone jako zaplacone: dziesiata M9 i danina tej doby (-?\d+) \+ czesc firmy z oszczednosci ludu (-?\d+)"),
+    "take": re.compile(r"\| pobrano (\d+) \(W (\d+) / R (\d+) / P (\d+) / podzamcza (\d+); klaso-osad (\d+)\) = do panow (\d+) \+ do kas osad (\d+) \+ do korony (\d+); "
+                       r"kontrola danina: pobrano - panom - kasom - koronie = (-?\d+)"),
+    "works": re.compile(r"\| roboty gminy z prawdziwym materialem \(Ds Works Real Material\) (tak|nie), rzemieslnicy najwyzej ([\d.]+) x material: zlecone (\d+) \((\d+) wsi\), "
+                        r"material z polek (\d+), rzemieslnicy miast (\d+), wsi z robota (\d+), bez materialu \(zostalo w kiesach wsi\) (\d+)"),
+    "wctl": re.compile(r"kontrola robot: z kies wsi - \(do kas \+ do ludu\) = (-?\d+), material zaplacony - towar zdjety = (-?\d+)"),
+    "sept": re.compile(r"\| septy z dziesieciny \(ta sama regula\): zlecone (\d+) \((\d+)\), material (\d+), rzemieslnicy (\d+) .*?bez materialu \(zostalo u placacych\) (\d+); "
+                       r"kontrola septow: od placacych - \(do kas \+ do ludu\) = (-?\d+), material zaplacony - towar zdjety = (-?\d+)"),
+    "vdue": re.compile(r"\| danina od skarbca wsi \(Ds Hoard Due Villages\) (tak|nie): .*?pobrano (\d+) \((\d+) wsi\) = do panow (\d+) \+ do kas osad (\d+).*?kontrola: pobrano - panom - kasom = (-?\d+)"),
+    "bt": re.compile(r"\| lepszy stol z oszczednosci \(Folk Better Table\) (tak|nie): oferta otwarta (\d+) \((\d+)\), ponad cena graniczna P4 \(zostalo w kiesie\) (\d+) \((\d+)\)"),
+    "wf": re.compile(r"\| jednorazowe 'inne' korony do zapasu \(Crown Windfall To Reserve\) (tak|nie): (\d+) \((\d+) krolestw\)"),
+    "purse": re.compile(r"\| kiesy: ludu miast W (-?\d+) / R (-?\d+) / P (-?\d+), podzamcza (-?\d+), wsi (-?\d+)"),
+    "med": re.compile(r"mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+|-)"),
+    "time": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)"),
+}
+NAK_TRANSIT = ("razem", "cla miast i zamkow", "podatek wsi", "portfele wezwan do wojny (168)", "gracz", "wedrowcy", "inni", "inne")
+
+
+def _nak_scan(path):
+    """Jeden przebieg po logu: linia 'Akumulator kies', posiadacze 'Pieniadz swiata', 'Kiesa ludu' (W/R/P, podzamcze, zapas dni W), firmy F3 (doba ustalenia),
+    'Zbytki ludu' (lepszy stol), linia 'KS: rampa' (bieg z KS), ERROR paczki."""
+    D = {"ak": {}, "akbad": 0, "hold": {}, "kl": {}, "fix": None, "lx": {}, "ks": False, "n_err": 0, "err1": None}
+    if not path or not os.path.isfile(path):
+        return D
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith("ERROR in "):
+                if any(s.startswith(e) for e in NAK_ERR):
+                    D["n_err"] += 1
+                    D["err1"] = D["err1"] or s[:200]
+                continue
+            c0 = s[:1]
+            if c0 not in "AKPFZ":
+                continue
+            if s.startswith(NAK_HEAD):
+                day = num(r"dzien (\d+)", s[:60])
+                if day is None:
+                    continue
+                r = {}
+                for key, rx in NAK_RX.items():
+                    mm = rx.search(s)
+                    if mm:
+                        r[key] = mm.groups()
+                if "take" in r and "purse" in r:
+                    D["ak"][day] = r
+                else:
+                    D["akbad"] += 1
+            elif s.startswith("Pieniadz swiata: dzien"):
+                day = num(r"dzien (\d+)", s[:40])
+                if day is None:
+                    continue
+                body = s.split("Wszystko [P]")[0]
+                h = {}
+                for seg in body.split("|")[1:]:
+                    seg = seg.strip()
+                    if ":" in seg:
+                        seg = seg.split(":", 1)[1]
+                    for part in seg.split(","):
+                        mm = re.match(r"\s*(.*?) (-?\d+)(?: \([-+]?\d+\))?\.?$", part.strip())
+                        if mm:
+                            h[mm.group(1).strip()] = int(mm.group(2))
+                D["hold"][day] = h
+            elif s.startswith("Kiesa ludu: dzien"):
+                day = num(r"dzien (\d+)", s[:40])
+                mm = re.search(r"\| kiesy (\d+) \(W (\d+) / R (\d+) / P (\d+)\)", s)
+                if day is not None and mm:
+                    c = num(r"podzamcze \d+: ludzie \d+, kiesa (\d+)", s) or 0
+                    dw = num(r"zapas dni W ([\d.]+)", s, float)
+                    D["kl"][day] = (int(mm.group(2)), int(mm.group(3)), int(mm.group(4)), c, dw)
+            elif s.startswith("Firmy miast i zamkow (DS)"):
+                v = num(r"firmy od doby (-?\d+)", s)
+                if v is not None and v >= 0:
+                    D["fix"] = v
+            elif s.startswith("Zbytki ludu (P3-P5): dzien"):
+                day = num(r"dzien (\d+)", s[:40])
+                o = num(r"lepszy stol (\d+), dom", s); b = num(r"kupione z oferty \d+ zl \([\d.]+%; grupy: [^)]*?lepszy stol (\d+)", s)
+                if day is not None and o is not None:
+                    D["lx"][day] = (o, b or 0)
+            elif not D["ks"] and s.startswith("KS: rampa dzien"):
+                D["ks"] = True
+    return D
+
+
+def _nak_growth(series, days):
+    """Przyrost na dobe szeregu {doba: wartosc} miedzy pierwsza a ostatnia doba listy `days` (None przy < 2 dobach)."""
+    d = [x for x in days if x in series]
+    if len(d) < 2:
+        return None
+    return (series[d[-1]] - series[d[0]]) / max(1, d[-1] - d[0])
+
+
+def nakum_main(logp, until=None):
+    """nakum (noc 17/18.10, paczka ds-akumulator; Armoury/src/TownFolk.DsAkum.cs, TownFolk.Hoard.cs, TownFolk.Tithe.cs, CrownIncome.cs, BuildFunding.DsWorks.cs;
+    diagnoza docs/DIAGNOZA-FIN80-2026-10-17.md "dochod" i "kiesy"). Wejscie: log Armoury (strumieniowo). Okno "po rampie F3": od doby ustalenia firm + 28 (rampa) + 7
+    do konca biegu; bez firm F3 - ostatnie 28 dob.
+    NAKUM-0 linia 'Akumulator kies' kazdej doby; NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy - przyrost swiata < +30 tys./d w oknie (baza bez DS +11 tys./d,
+    fin76/78/80 +186..195 tys./d), 1b R i P osobno (INFO), 1c zapas dni W nie rosnie (koniec <= 1.1 x poczatek okna); NAKUM-2 danina od skarbca ludu (Ds Hoard Due):
+    kontrola pobrano = panom + kasom + koronie (korona 0) kazdej doby, pobrano > 0 po rampie; NAKUM-3 roboty gminy i septy (Ds Works Real Material): kontrole
+    z kies wsi = do kas + do ludu, material zaplacony = towar zdjety (0 kazdej doby), rzemieslnicy <= k x material; NAKUM-4 lepszy stol z oszczednosci przy KS
+    (oferta otwarta > 0 i 'lepszy stol' kupione > 0; bez KS - INFO); NAKUM-5 kiesy wsi w oknie - dryf <= +0.2%/d (pieniadz robot zostaje we wsi: nowy akumulator?);
+    NAKUM-6 jednorazowe 'inne' korony do zapasu (INFO); NAKUM-7 kazdy posiadacz z 'Pieniadz swiata' (bez licznikow w drodze) - przyrost ostatnich 28 dob <= +30 tys./d;
+    NAKUM-8 czas linii (mediana) <= 5 ms; NAKUM-9 potkniecia i ERROR paczki 0. Log bez paczki: wiersze z linii niezaleznych licza sie dalej (NAKUM-1, 5, 7), reszta
+    "brak linii" (INFO), nigdy wyjatek."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NAKUM-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = _nak_scan(logp)
+    hd = sorted(D["hold"]); kd = sorted(D["kl"]); ad = sorted(D["ak"])
+    alld = sorted(set(hd) | set(kd))
+    if not alld:
+        rep.add("NAKUM-0: linie 'Pieniadz swiata' / 'Kiesa ludu'", "brak linii", "INFO (log bez ksiegi pieniadza)", None)
+        rep.show()
+        return 0
+    first, last = alld[0], alld[-1]
+    if until:
+        last = min(last, first + until - 1)
+    fix = D["fix"]
+    w0 = fix + 28 + 7 if fix is not None else None
+    if w0 is None or last - w0 < 14:
+        w0 = max(first, last - 27)
+        how = "ostatnie 28 dob" + (" (okno po rampie F3 za krotkie)" if fix is not None else " (bez firm F3)")
+    else:
+        how = f"od doby {w0} (firmy F3 od {fix} + rampa 28 + 7)"
+    win = [d for d in alld if w0 <= d <= last]
+    print(f"plik: {logp} | dob {len(alld)} ({first}-{alld[-1]}), linii 'Akumulator kies' {len(ad)} (nierozpoznanych {D['akbad']}), firmy F3 od {fix}, KS {'tak' if D['ks'] else 'nie'} | okno {how}")
+    # NAKUM-0
+    aw = [d for d in ad if first < d <= last]
+    if ad:
+        gaps = [d for a, d in zip(aw, aw[1:]) if d - a > 1]
+        rep.add("NAKUM-0: linia 'Akumulator kies (ds-akumulator)' kazdej doby", f"dob {len(aw)}, luk {len(gaps)}, nierozpoznanych {D['akbad']}", "luk 0, nierozpoznane 0", not gaps and D["akbad"] == 0)
+    else:
+        rep.add("NAKUM-0: linia 'Akumulator kies (ds-akumulator)'", "brak linii", "INFO (log sprzed paczki albo klucze wylaczone)", None)
+    # NAKUM-1 kiesy ludu
+    folk = {d: v[0] + v[1] + v[2] + v[3] for d, v in D["kl"].items()}
+    g = _nak_growth(folk, win)
+    if g is not None:
+        gw = _nak_growth({d: v[0] for d, v in D["kl"].items()}, win)
+        gc = _nak_growth({d: v[3] for d, v in D["kl"].items()}, win)
+        rep.add(f"NAKUM-1a: kiesy ludu miast (W+R+P) i podzamczy - przyrost na dobe ({how})", f"{g:+.0f}/d (W {gw:+.0f}, podzamcza {gc:+.0f}); stan {folk[[d for d in win if d in folk][-1]] / 1e6:.2f} mln",
+                "< +30 000/d (baza bez DS +11 tys./d; fin76/78/80 +186..195 tys./d)", g < 30000)
+        gr = _nak_growth({d: v[1] for d, v in D["kl"].items()}, win); gp = _nak_growth({d: v[2] for d, v in D["kl"].items()}, win)
+        rep.add("NAKUM-1b: kiesy R i P osobno (INFO)", f"R {gr:+.0f}/d, P {gp:+.0f}/d", "INFO", None)
+        dws = [(d, D["kl"][d][4]) for d in win if d in D["kl"] and D["kl"][d][4] is not None]
+        if len(dws) >= 2:
+            a_, b_ = dws[0][1], dws[-1][1]
+            rep.add("NAKUM-1c: zapas dni W (Kiesa ludu) - koniec okna wobec poczatku", f"{a_:.1f} -> {b_:.1f} dob", "koniec <= 1.1 x poczatek (lud przestaje tylko zbierac)", b_ <= 1.1 * a_ + 0.5)
+    else:
+        rep.add("NAKUM-1: kiesy ludu", "brak linii 'Kiesa ludu' w oknie", "INFO", None)
+    A = D["ak"]
+    aw2 = [d for d in ad if d in win]
+    G = lambda d, k, i, cast=float: cast(A[d][k][i]) if k in A[d] else None
+    # NAKUM-2 danina od skarbca ludu
+    if ad:
+        bad = [(d, G(d, "take", 9)) for d in ad if "take" in A[d] and (G(d, "take", 9) != 0 or G(d, "take", 8) != 0)]
+        on = [d for d in aw2 if "due" in A[d] and A[d]["due"][0] == "tak" and A[d]["due"][1] == "tak"]
+        tk = sum(G(d, "take", 0) for d in on) / max(1, len(on)) if on else 0.0
+        rep.add("NAKUM-2a: danina od skarbca ludu - pobrano = do panow + do kas osad (korona 0) kazdej doby", f"dob {len(ad)}, z rozjazdem albo korona > 0: {len(bad)}" + (f" (dzien {bad[0][0]})" if bad else ""),
+                "0", not bad)
+        if on:
+            lo = sum(G(d, "take", 6) for d in on) / len(on); co = sum(G(d, "take", 7) for d in on) / len(on)
+            pa = sum(G(d, "pre", 0) for d in on if "pre" in A[d]) / len(on); pf = sum(G(d, "pre", 1) for d in on if "pre" in A[d]) / len(on)
+            rep.add("NAKUM-2b: danina od skarbca ludu w oknie (klucz tak, firmy F3)", f"pobrano {tk:.0f}/d (panom {lo:.0f}, kasom osad {co:.0f}); wliczone jako zaplacone: M9 i danina tej doby {pa:.0f}/d, czesc firmy z oszczednosci {pf:.0f}/d",
+                    "> 0 (kiesy ludu ponad poziom normalny placa)", tk > 0)
+        else:
+            rep.add("NAKUM-2b: danina od skarbca ludu w oknie", "klucz wylaczony albo bez firm F3 w oknie", "INFO", None)
+    else:
+        rep.add("NAKUM-2: danina od skarbca ludu", "brak linii", "INFO", None)
+    # NAKUM-3 roboty gminy i septy
+    if ad:
+        wb = [(d, G(d, "wctl", 0), G(d, "wctl", 1)) for d in ad if "wctl" in A[d] and (G(d, "wctl", 0) != 0 or G(d, "wctl", 1) != 0)]
+        sb_ = [(d, G(d, "sept", 5), G(d, "sept", 6)) for d in ad if "sept" in A[d] and (G(d, "sept", 5) != 0 or G(d, "sept", 6) != 0)]
+        rep.add("NAKUM-3a: roboty gminy i septy - z kies placacych = do kas + do ludu, material zaplacony = towar zdjety (kazdej doby)",
+                f"dob z rozjazdem: roboty {len(wb)}, septy {len(sb_)}" + (f" (roboty dzien {wb[0][0]}: {wb[0][1]:.0f} / {wb[0][2]:.0f})" if wb else "") + (f" (septy dzien {sb_[0][0]}: {sb_[0][1]:.0f} / {sb_[0][2]:.0f})" if sb_ else ""),
+                "0 / 0", not wb and not sb_)
+        over = [(d, G(d, "works", 5), G(d, "works", 4), G(d, "works", 1)) for d in ad if "works" in A[d] and G(d, "works", 5) > G(d, "works", 1) * G(d, "works", 4) + 1]
+        rep.add("NAKUM-3b: rzemieslnicy robot gminy <= k x material (kazdej doby)", f"dob ponad {len(over)}" + (f" (dzien {over[0][0]}: {over[0][1]:.0f} > {over[0][3]} x {over[0][2]:.0f})" if over else ""), "0", not over)
+        n_ = max(1, len(aw2))
+        if aw2:
+            q = sum(G(d, "works", 2) or 0 for d in aw2) / n_; mt = sum(G(d, "works", 4) or 0 for d in aw2) / n_; wg = sum(G(d, "works", 5) or 0 for d in aw2) / n_
+            nm = sum(G(d, "works", 7) or 0 for d in aw2) / n_
+            sq = sum(G(d, "sept", 0) or 0 for d in aw2) / n_; sm = sum(G(d, "sept", 2) or 0 for d in aw2) / n_; sw = sum(G(d, "sept", 3) or 0 for d in aw2) / n_
+            rep.add("NAKUM-3c: roboty gminy i septy na dobe w oknie (INFO)", f"roboty: zlecone {q:.0f}, material {mt:.0f}, rzemieslnicy {wg:.0f}, bez materialu (we wsiach) {nm:.0f}; septy: zlecone {sq:.0f}, material {sm:.0f}, rzemieslnicy {sw:.0f}",
+                    "INFO (dawniej roboty: 3/4 place ludu + 1/4 'material' bez towaru)", None)
+    else:
+        rep.add("NAKUM-3: roboty gminy i septy", "brak linii", "INFO", None)
+    # NAKUM-4 lepszy stol
+    lxw = [D["lx"][d] for d in win if d in D["lx"]]
+    btw = [d for d in aw2 if "bt" in A[d]]
+    bto = sum(float(A[d]["bt"][1]) for d in btw) / max(1, len(btw)) if btw else 0.0
+    btc = sum(float(A[d]["bt"][3]) for d in btw) / max(1, len(btw)) if btw else 0.0
+    lxo = sum(x[0] for x in lxw) / max(1, len(lxw)) if lxw else 0.0
+    lxb = sum(x[1] for x in lxw) / max(1, len(lxw)) if lxw else 0.0
+    if D["ks"] and btw:
+        rep.add("NAKUM-4: lepszy stol z oszczednosci przy KS (oferta otwarta, 'Zbytki ludu' lepszy stol oferta / kupione)", f"otwarta {bto:.0f}/d, ponad cena graniczna {btc:.0f}/d; lepszy stol: oferta {lxo:.0f}/d, kupione {lxb:.0f}/d",
+                "otwarta > 0 i kupione > 0 (fin80: lepszy stol 0)", bto > 0 and lxb > 0)
+    else:
+        rep.add("NAKUM-4: lepszy stol z oszczednosci", f"KS {'tak' if D['ks'] else 'nie'}, linia {'tak' if btw else 'nie'}; 'Zbytki ludu' lepszy stol: oferta {lxo:.0f}/d, kupione {lxb:.0f}/d",
+                "INFO (bez KS sciezka bez zmian; bez linii paczki - INFO)", None)
+    # NAKUM-5 kiesy wsi
+    vs = {d: h.get("kiesy wsi") for d, h in D["hold"].items() if h.get("kiesy wsi") is not None}
+    vw = [d for d in win if d in vs]
+    if len(vw) >= 7:
+        a_, b_ = vs[vw[0]], vs[vw[-1]]
+        dr = (b_ - a_) / max(1, vw[-1] - vw[0]) / max(1.0, (a_ + b_) / 2)
+        rep.add(f"NAKUM-5: kiesy wsi w oknie - dryf (pieniadz robot gminy zostaje we wsi)", f"{a_ / 1e6:.2f} -> {b_ / 1e6:.2f} mln = {100 * dr:+.3f}%/d ({(b_ - a_) / max(1, vw[-1] - vw[0]):+.0f}/d)",
+                "<= +0.2%/d (nie nowy akumulator we wsiach; dzwignia: Ds Hoard Due Villages - decyzja Jeffa)", dr <= 0.002)
+    else:
+        rep.add("NAKUM-5: kiesy wsi", "za malo dob z 'Pieniadz swiata'", "INFO", None)
+    # NAKUM-6 jednorazowe korony
+    if ad:
+        wf = [(d, float(A[d]["wf"][1]), int(A[d]["wf"][2])) for d in ad if "wf" in A[d]]
+        rep.add("NAKUM-6: jednorazowe 'inne' korony do zapasu (Crown Windfall To Reserve)", f"{sum(x[1] for x in wf):.0f} zl w {sum(1 for x in wf if x[1] > 0)} dobach (krolestwo-dob {sum(x[2] for x in wf)})",
+                "INFO (rozchodzi sie 1/450 zapasu; NDS-7w liczy to samo z linii 165)", None)
+    # NAKUM-7 posiadacze
+    hw = [d for d in hd if first <= d <= last]
+    if len(hw) >= 14:
+        t1 = hw[-1]; t0 = [d for d in hw if d >= t1 - 28][0]
+        rows = []
+        for k, v in D["hold"][t1].items():
+            if k in NAK_TRANSIT:
+                continue
+            v0 = D["hold"][t0].get(k)
+            if v0 is None:
+                continue
+            rows.append((k, (v - v0) / max(1, t1 - t0), v))
+        rows.sort(key=lambda x: -x[1])
+        offend = [x for x in rows if x[1] > 30000]
+        rep.add(f"NAKUM-7: zaden posiadacz pieniadza nie rosnie > +30 tys./d (doby {t0}-{t1}, 'Pieniadz swiata')",
+                ", ".join(f"{k} {g_:+.0f}/d" for k, g_, _ in rows[:6]) + (f" | ponad prog: {', '.join(k for k, _, _ in offend)}" if offend else ""),
+                "0 posiadaczy ponad prog (fin80: kiesy ludu miast +186 tys./d)", not offend)
+    else:
+        rep.add("NAKUM-7: posiadacze pieniadza", f"dob z 'Pieniadz swiata' {len(hw)}", "INFO (za malo dob)", None)
+    # NAKUM-8 czas, NAKUM-9 potkniecia i ERROR
+    if ad:
+        tm = sorted(float(A[d]["time"][0]) for d in ad if "time" in A[d])
+        if tm:
+            med = tm[len(tm) // 2]
+            rep.add("NAKUM-8: czas paczki w dobie (danina, zlecenia robot i septow - mediana)", f"{med:.2f} ms (najwiecej {tm[-1]:.2f} ms)", "<= 5 ms", med <= 5.0)
+        stum = [int(A[d]["time"][1]) for d in ad if "time" in A[d]]
+        rep.add("NAKUM-9: potkniecia paczki (suma dob) i ERROR (TownFolk.DsAkum, DsWorksBuy, WindfallOf, FolkFarmPerDay, DsVillage.Ak*)", f"potkniecia {sum(stum)}, ERROR {D['n_err']}" + (f" ({D['err1']})" if D["err1"] else ""),
+                "0 / 0", sum(stum) == 0 and D["n_err"] == 0)
+    else:
+        rep.add("NAKUM-9: ERROR paczki", f"ERROR {D['n_err']}" + (f" ({D['err1']})" if D["err1"] else ""), "0", D["n_err"] == 0)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ nks (16.10, kalibracja startu KS - etap 1 rdzen, etap 2, poprawki po recenzji; projekt docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14)
 NKS_P = "Kalibracja startu (KS): "
 NKS_K = "KS: "
@@ -35712,6 +35979,8 @@ def main(argv):
         return nks_main(logp, until_arg, bdp)   # nks (16.10, kalibracja startu KS): Plan, bilans, wlaczenie, podaz/zuzycie na rynek, zapasy, ceny, pieniadze, glod, kasy kupcow, Dostatek, A7, koszt, zapis (StartCalibration*.cs); --baza-doby <log bazy>
     if group == "nds" and logp:
         return nds_main(logp, bdp, until_arg)   # nds (17.10, DANINY SREDNIOWIECZNE F1 + korona): stare pobory wsi po rampie, ksiegi, kiesy wsi, zaleglosci, zwrot zoldu, Bank (DsVillage.cs)
+    if group == "nakum" and logp:
+        return nakum_main(logp, until_arg if "--do-doby" in args else None)   # nakum (noc 17/18.10, ds-akumulator): kiesy, ktore tylko rosna - danina od skarbca ludu, roboty z prawdziwym materialem, lepszy stol, jednorazowe korony
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
