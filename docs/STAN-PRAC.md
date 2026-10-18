@@ -3107,3 +3107,7 @@ rozlozenie gospodarki doby (Jeff: pozniej).
   2026-10-18-po-sesji-81b): ERROR 0, KS ponownie uzbrojony od zera w dobie wczytania 109044 (dziala). Jeff (verbatim): "mozesz wgrac kolejne poprawki zamknalem gre ... nie podoba mi sie ze Robb
   zdobyl polnoc: i jakim prawem ma sojusz Dorzecze ze Stannisem ... czy mozesz w savie przywrocic kazdej ze stron posiadlosci jakie powinni miec ... jak w ksiazce ... i sprawdz armie".
   -> analiza wf_568b42ee-ac1 (wlosci / sojusze / armie, tylko odczyt); test 5 dob + bitwa wgr82t (noc-ks4 5086a630, Armoury aa1c01dc) przed WGRANIEM 82 (+ f18-mcm po scaleniu).
+
+### 88. NOC 18/19.10 - PRACA NOCNA (Jeff wraca rano ok. 12 h) - START TUTAJ
+Zadania Jeffa doslownie i kolejnosc: docs/PLAN-NOC-2026-10-18.md (gospodarka dostrojona, cofniecie Polnocy + wydarzenia, Stannis bez sojuszu z Dorzeczem, audyt i poprawki gospodarki,
+droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
