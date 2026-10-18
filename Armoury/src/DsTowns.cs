@@ -537,13 +537,18 @@ namespace Armoury
                     // domy najpierw: R albo P miasta ponizej dolnej granicy pasma - nadwyzka kupcow idzie do nich wyplata kupcom M6 (pelna stawka), firma bez podwyzki (model
                     // simlud: biedne R/P 35 miast Essos d160 8.3 zamiast 5.6 dnia koszyka); pomiar od nowa
                     if (KsFolkIncome.HousesFirst(st)) { f.SG0 = long.MinValue; f.SGDay = -1; KsFolkIncome.NoteHousesHeld(); if (cu) _cuHouse++; continue; }
-                    if (f.SG0 == long.MinValue || f.SGDay < 0) { f.SG0 = g; f.SGDay = today; f.SMin = g; continue; }
+                    if (f.SG0 == long.MinValue || f.SGDay < 0)
+                    {
+                        long pend = cu ? Math.Max(0, f.CLeft) : 0;              // f7-kasy: reszta gersumy jeszcze wyjdzie z kasy - pomiar przyrostu od kasy po niej (klucz wylaczony - 0, jak dotad)
+                        f.SG0 = g - pend; f.SGDay = today; f.SMin = g; continue;
+                    }
                     if (g < f.SMin) f.SMin = g;                                  // f7-kasy: najmniejsza kasa okna (zapas, ktory przelezal caly pomiar)
                     int span = today - f.SGDay;
                     if (span < days) continue;
-                    double grow = (g - f.SG0) / (double)span;
+                    long pendNow = cu ? Math.Max(0, f.CLeft) : 0;                // f7-kasy: reszta gersumy (zwykle 0 - rozlozona na okno) to nie przyrost kupcow; klucz wylaczony - 0
+                    double grow = (g - pendNow - f.SG0) / (double)span;
                     long smin = f.SMin;
-                    f.SG0 = g; f.SGDay = today; f.SMin = g;                      // przyrost od tej doby (bez liczenia drugi raz)
+                    f.SG0 = g - pendNow; f.SGDay = today; f.SMin = g;            // przyrost od tej doby (bez liczenia drugi raz)
                     double F = f.FL + f.FC;
                     if (cu) _cuRev++;
                     if (!(grow > 0) || !(F > 0)) { if (cu) { if (!(F > 0)) _cuNoFarm++; else _cuNoGrow++; } continue; }
@@ -594,9 +599,9 @@ namespace Armoury
         /// prog w tej chwili; czesc doby, ktorej kasa nie ma (albo oblezenie, utrata KS, bez zywego pana), przepada - nigdy zaleglosc. Drogi jak rata firmy (kasa -> pan
         /// RentToday, kasa -> skarbiec CrownToday / ksiega MTownCrown; DsNoteFarm - pobrane z kasy, doplyw netto kupcow bez zmiany) - rowny strumien, bez jednodniowego skoku
         /// w D stalym rodow i w rentach korony. Pomiar przyrostu nastepnego okna od kasy po gersumie (bez liczenia jej jako spadku). Pamiec sesji (jak pomiar przyrostu f5):
-        /// po wczytaniu reszta gersumy przepada. Model odtworzeniowy na fin91 (scratchpad f7kasy-gersuma/model.py: kasy-miast.csv + kiesa-obieg.csv + M6 z linii f5, wariant
-        /// rozlozony): kasy swiata ostatnie 28 dob +53.1 -> +11.1 tys./d, ponad 1.5 x zapas 13.2 -> 11.5 mln, miast ponizej zapasu w oknie najwiecej 10 -> 10, gersuma ok.
-        /// 52 tys./d w oknie (21 miast).
+        /// po wczytaniu reszta gersumy przepada. Model odtworzeniowy na fin91 (tools/ekonomia-symulatory-2026-10-17/f7/model_gersuma.py: kasy-miast.csv + kiesa-obieg.csv +
+        /// M6 z linii f5; ta sama regula co kod): kasy miast z KS ostatnie 28 dob +53.1 -> +5.0 tys./d, ponad 1.5 x zapas 13.22 -> 11.22 mln, miast ponizej zapasu w oknie
+        /// najwiecej 10 -> 10, gersuma 59 tys./d w oknie (21 miast, 2.37 mln od ustalenia firm); udzial 1.0 - Tolos do 0.80 zapasu (dlatego domyslnie 0.5).
         /// </summary>
         internal static bool CatchUpOn(Settings s) { return s != null && s.KsFarmCatchUp && s.KsFarmFollowsSurplus; }
 
@@ -636,7 +641,7 @@ namespace Armoury
                 if (amt <= 0) { _cuNone++; return; }
                 f.CLeft = Math.Max(0, f.CLeft) + amt;
                 f.CPer = (f.CLeft + Math.Max(1, days) - 1) / Math.Max(1, days);   // w gore - cala gersuma w oknie przegladu
-                f.SG0 = g - f.CLeft; f.SMin = g - f.CLeft;                  // nastepne okno mierzy kupcow od kasy po gersumie
+                f.SG0 = g - f.CLeft;                                        // nastepne okno mierzy przyrost kupcow od kasy po gersumie (SMin - prawdziwa kasa, ta spadnie o raty)
                 _cuDec++; _cuDecAmt += amt; _cuBills += bills;
             }
             catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpDecide", e); }
@@ -679,8 +684,7 @@ namespace Armoury
                 if (unpaid > 0)
                 {
                     _cuShort += unpaid; _cuShortN++;
-                    if (f.SG0 != long.MinValue) f.SG0 += unpaid;                // pomiar przyrostu jak przy kasie bez tej czesci gersumy (zloto zostalo w kasie)
-                    if (f.SMin != long.MaxValue) f.SMin += unpaid;
+                    if (f.SG0 != long.MinValue) f.SG0 += unpaid;                // pomiar przyrostu jak przy kasie bez tej czesci gersumy (zloto zostalo w kasie; SMin to prawdziwa kasa - bez poprawki)
                 }
             }
         }
