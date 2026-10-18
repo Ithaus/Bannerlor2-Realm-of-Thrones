@@ -3114,3 +3114,6 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
 - 14:50 PDT: w toku: test 5 dob + bitwa wgr82t (b1ygy6m3m) -> WGRANIE 82; f18-mcm (wf_0e0e0567-597, poprawki); analiza kanon/Polnoc (wf_568b42ee-ac1); f19-drogi (wf_65af1d03-cd5,
   zb/f19-drogi od 5086a630: droga do kazdej wioski, nowy klucz); f19-ekonomia-audyt (wf_743d7727-901: 4 audyty pieniadz/towary/kolejnosc/realizm -> weryfikacja -> poprawki w zb/f19-e1..e4
   od 5086a630 -> recenzja). Po analizie: f19-kanon (przywrocenie wlosci + sojusz Stannis-Dorzecze).
+- 15:00 PDT: **WGRANIE 82** = noc-ks4 5086a630 (Armoury **aa1c01dc**; reszta jak 81b) po tescie 5 dob + bitwa (Armoury-2026-10-18_14-18-10.log: kod 0, ERROR 0, bitwa WYGRANA, misje
+  sprawdzone, latka "karawany gry wpiete"). Kopie *.bak-2026-10-18-wgranie82-przed + D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie82-przed. Galaz w-toku/noc-wgranie-82.
+  = 81b + f16-akum (NKA-1 nadwyzka netto rat), f16-ksiega (zrzut karawany gry na polke), f16-ks/f16-drobne (checker), pomiar f9 przy Better Time. f18-mcm jeszcze nie (w toku).
