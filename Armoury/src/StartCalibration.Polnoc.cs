@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Armoury
 {
@@ -37,22 +38,41 @@ namespace Armoury
             return s != null && s.KsSelfFeedOwnFoodOnly;
         }
 
-        /// <summary>Linia wyzywienia krain z wyniku Planu (tekst z KsCore - ten sam w harnessie).</summary>
+        /// <summary>feed-swiat: klucze Ks Self Feed Staples / Ks Self Feed Slow / Ks Plan Markets Clear do wejscia Planu i cieply start z poprzedniego Planu (udzial progu
+        /// blokow, narzut niedoboru towarow dla mieszczan). Bez zapisu: pierwszy Plan po wczytaniu - bez kroku progu i bez narzutu (krok 8 dochodzi do niego w swoich 10 rundach).</summary>
+        private static void FeedSwiatInput(KsInput inp)
+        {
+            var s = Settings.Current;
+            if (inp == null || s == null) return;
+            inp.SelfFeedStaple = s.KsSelfFeedStaples;
+            inp.FeedStep = s.KsSelfFeedSlow ? KsCore.ClearStep : 0.0;          // ten sam krok 7% co sterownik rynku
+            inp.MarketsClear = s.KsPlanMarketsClear;
+            var pr = _plan;
+            if (pr == null || pr.Error != null) return;
+            if (inp.FeedStep > 0 && pr.FloorLam != null) inp.WarmFloor = new Dictionary<string, double>(pr.FloorLam, StringComparer.Ordinal);
+            if (inp.MarketsClear && pr.MarketsClear && pr.Mu != null && pr.Mu.Length == 2 * KsTab.NG) inp.WarmMu = (double[])pr.Mu.Clone();
+        }
+
+        /// <summary>Linia wyzywienia krain z wyniku Planu (tekst z KsCore - ten sam w harnessie); feed-swiat: linia rynkow Planu (narzut niedoboru, rownowagi).</summary>
         private static void FeedLineLog(KsResult r)
         {
             if (r == null || r.Error != null) return;
             string t = KsCore.FeedLine(r, _wDay);
             if (t != null) Log.Info(t);
+            string c = KsCore.ClearLine(r, _wDay);
+            if (c != null) Log.Info(c);
         }
 
-        /// <summary>Zajecie daje jedzenie (towar z kcal albo zywiec) - z tabeli swiata.</summary>
+        /// <summary>Zajecie daje jedzenie (towar z kcal albo zywiec) - z tabeli swiata. feed-swiat (Ks Self Feed Staples): jedzenie podstawowe (zboze, ryby, mieso, ser,
+        /// maslo) albo zywiec - jak prog Planu (winnica, gaj oliwny, sad - zajecie na targ).</summary>
         private static bool FoodCraft(int c)
         {
             if (c < 0 || c >= KsTab.NC) return false;
+            var s = Settings.Current; bool st = s != null && s.KsSelfFeedStaples;
             foreach (var kv in KsTab.P0[c])
             {
                 int g = kv.Key;
-                if (KsTab.FoodKcal[g] > 0 || g == KsTab.GCow || g == KsTab.GHog || g == KsTab.GSheep || g == KsTab.GWhaleMeat) return true;
+                if ((st ? KsCore.Staple(g) : KsTab.FoodKcal[g] > 0) || g == KsTab.GCow || g == KsTab.GHog || g == KsTab.GSheep || g == KsTab.GWhaleMeat) return true;
             }
             return false;
         }

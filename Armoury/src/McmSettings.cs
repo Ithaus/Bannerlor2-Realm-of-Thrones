@@ -6944,17 +6944,29 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationTownCrafts { get; set; } = true;
 
-        [SettingPropertyBool("Ks Self Feed First", HintText = "with Start Calibration: in the cold lands (the North, beyond the Wall, the Night's Watch lands, Skagos, the Iron Islands, Ib) a village whose people go hungry first puts its hands to the food work that feeds the most mouths per hand on its own land - barley and oats, the byre, sheep and goats, fishing, the hunt - until its own people are fed, as far as its land and hands allow; only the hands left over follow the market (furs, wool, timber). A village that buys more food with its furs than its land would grow (after its lord's and the crown's share) keeps its trappers. What is still missing comes by cart and ship, as tribute to the Wall, or not at all. Off = every hand follows the price")]
+        [SettingPropertyBool("Ks Self Feed First", HintText = "with Start Calibration: in every land (with Ks Self Feed Everywhere; off = only the cold lands - the North, beyond the Wall, the Night's Watch lands, Skagos, the Iron Islands, Ib) a village whose people go hungry first puts its hands to the food work that feeds the most mouths per hand on its own land - barley and oats, the byre, sheep and goats, fishing, the hunt - until its own people are fed, as far as its land and hands allow; only the hands left over follow the market (furs, wool, timber). A village that buys more food with its furs than its land would grow (after its lord's and the crown's share) keeps its trappers. What is still missing comes by cart and ship, as tribute to the Wall, or not at all. Off = every hand follows the price")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsSelfFeedFirst { get; set; } = true;
 
-        [SettingPropertyBool("Ks Self Feed Everywhere", HintText = "with Ks Self Feed First: the same rule for every village in the world, not only in the cold lands (a silk, flax or horse village grows its own bread first); off = villages of the warm lands sell their crop and buy their bread at market")]
+        [SettingPropertyBool("Ks Self Feed Everywhere", HintText = "with Ks Self Feed First: the same rule for every village in the world, not only in the cold lands (a silk, flax or horse village that cannot buy its bread grows its own bread first); off = only the villages of the cold lands, the villages of the warm lands sell their crop and buy their bread at market")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
-        public bool KsSelfFeedEverywhere { get; set; } = false;
+        public bool KsSelfFeedEverywhere { get; set; } = true;
 
         [SettingPropertyBool("Ks Self Feed Own Food Only", HintText = "with Ks Self Feed First: the rule word for word - a hungry village of the cold lands counts only the food it grows itself and puts its hands to food first, even where its furs, wool or flax would buy more grain than its fields give (in the plan: more of the Free Folk fed from their own herds, but the North, the Iron Islands and Ib a little hungrier and less meat at market); off = a village counts what its goods buy after its lord's, the church's and the crown's share, and keeps its trappers where they feed more mouths")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsSelfFeedOwnFoodOnly { get; set; } = false;
+
+        [SettingPropertyBool("Ks Self Feed Staples", HintText = "with Ks Self Feed First: a village counts only the food its people live on - bread grain, fish, meat, cheese and butter - as feeding it; its olives, grapes, oranges, apples, honey and eggs it sells like furs, and the bread it buys is reckoned at the usual price of its land (a village of olive groves or vineyards that cannot buy its bread puts hands to grain, fish or herds, not to more olives). Off = every food counts, at the plan's price of grain")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsSelfFeedStaples { get; set; } = true;
+
+        [SettingPropertyBool("Ks Self Feed Slow", HintText = "with Ks Self Feed First: from one weekly plan to the next the share of a village's hands that the rule moves to food changes by at most 7 in 100, both ways (the first plan after loading a save - without this limit), so a village does not jump from the market to its fields and back every week. Off = the full move in every plan")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsSelfFeedSlow { get; set; } = true;
+
+        [SettingPropertyBool("Ks Plan Markets Clear", HintText = "with Start Calibration: the weekly plan settles each market - when a market as a whole has fewer hands than its townsfolk pay for and the villages have no more home work to give up, the goods it lacks grow dearer for the townsfolk (at most 7 in 100 per round of the plan, at most three times the usual price) and they buy less of them or cheaper food, the poor first, until what they pay for is what the hands make; the purses themselves stay as they are (no coin is made or lost). The plan also takes smaller price steps for a good whose price keeps swinging back and forth. Off = as before")]
+        [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
+        public bool KsPlanMarketsClear { get; set; } = true;
 
         [SettingPropertyBool("Ks Cold Land", HintText = "with Start Calibration: the one table of what a worker makes on his land gets real yields for cold land - barley and oats on snowy ground at about a third of a lowland harvest, dairy cattle kept in the byre on hay through the winter, hardy sheep and goats, rich salmon rivers and lakes - and a hunter in the cold lands needs fifteen square kilometres of wild land, because game is only as plentiful as the land (the Free Folk cannot all live by the hunt; hunters of the warm lands as before). Off = the old table")]
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
@@ -9078,6 +9090,9 @@ namespace Armoury
             s.KsSelfFeedFirst = KsSelfFeedFirst;
             s.KsSelfFeedEverywhere = KsSelfFeedEverywhere;
             s.KsSelfFeedOwnFoodOnly = KsSelfFeedOwnFoodOnly;
+            s.KsSelfFeedStaples = KsSelfFeedStaples;
+            s.KsSelfFeedSlow = KsSelfFeedSlow;
+            s.KsPlanMarketsClear = KsPlanMarketsClear;
             s.KsColdLand = KsColdLand;
             s.KsHungerUnrest = KsHungerUnrest;
             s.KsHungerLoyaltyMax = KsHungerLoyaltyMax;

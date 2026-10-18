@@ -1000,7 +1000,8 @@ Uzycie (Python 3, tylko odczyt):
                     (towary rak z miesem; 5b wyjatki +-10% Planu; 5e pierwszy tydzien po rampie D+14..D+21; 5u zuzycie bez rynku <= 2%; 5c przetwory, 5w swiat,
                     5d 28 dob po wlaczeniu - INFO), NKS-3 NA TARG ((podaz - zjedzone w okregach) / (popyt - zjedzone), recenzja 17.10), NKS-3c pieniadze
                     Planu (krok 8: R i P >= 95% - od r4-koszyk wedlug P9: kcal JEDZENIA z linii "KS: tanszy koszyk miast (P9)", rzeczy INFO; log bez linii P9 - wartosc koszyka; punkt
-                    staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru), NKS-6 zapasy miast rynku +-2%
+                    staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru; feed-swiat: R/P ponizej 95% kcal na rynku z towarami z narzutem niedoboru w linii "KS: rynki
+                    Planu (feed-swiat)" tego Planu - DECYZJA zamiast NIE: rece rynku tego jedzenia nie urodza), NKS-6 zapasy miast rynku +-2%
                     zuzycia na dobe, NKS-7 ceny na rynek: mediana linii okna w pasmie ceny startu +-0.3 (7b sufit/podloga <= 20% miast, 7c nachylenie <= 0.5%/d), NKS-8
                     pieniadze (KS 0; 8b swiat wobec bazy +-0.5%; 8c koszyk niekupiony z braku pieniedzy: miasta <= 5%, wsie - kcal bez pokrycia (niekupione i nie robione
                     w domu) <= 5%; 8d reszta - INFO; 8e utarg wozow i podatek panow przed wlaczeniem i w oknie - INFO), NKS-7e kontrola wczesna D+7, NKS-9 doba KS <= 3 ms (9b z hakami ZC4/ZC5
@@ -1078,6 +1079,14 @@ Uzycie (Python 3, tylko odczyt):
                     bazy + 2), NKS-30f bilans NA TARG jedzenia (INFO, wiaze NKS-3), NKS-30g A7 przy progu (INFO), NKS-30h Plan bez pokrycia wedlug krainy (INFO),
                     NKS-30i rece przesuniete (INFO), NKS-30j ziemia: prog nie bierze ziemi ponad 0.98 powierzchni bloku (przyrost <= 1e-6 powierzchni; bloki ponad
                     granica przed/po progu i okregi z ruchem ucietym ziemia - w wierszu). Brak linii - INFO. Opcja --baza-doby <log bez r4-polnoc>: jak NKS-30e.
+                    feed-swiat (noc 17/18.10, Jeff: "zadnej reguly dla jednego regionu"; StartCalibration.Clear.cs, klucze Ks Self Feed Everywhere / Staples / Slow,
+                    Ks Plan Markets Clear; linia Planu "KS: rynki Planu (feed-swiat)" i dopisek "krok progu (feed-swiat)" linii wyzywienia krain): NKS-30k linia rynkow
+                    przy kazdym Planie z "rynek musi sie oczyscic TAK", NKS-30l pieniadz: wydane miast <= budzet + 1 zl na obu rynkach w kazdym Planie (zadna moneta
+                    z niczego), NKS-30m narzut niedoboru w [1, 3] i nadwyzka targu po kroku 8 - mediana Planow po pierwszym >= -2% popytu targu na obu rynkach
+                    (harness: Essos -6.5% -> -1.3%), NKS-30n Plany zbiezne - mediana towarow niezbieznych (Westeros + Essos) Planow po pierwszym <= 6 (harness swiat +
+                    klucze scalenia: przed 20, po 3-4; gra fin83 18), NKS-30o krok progu - najwiekszy wzrost udzialu progu bloku wobec poprzedniego Planu <= 0.07
+                    (spadek INFO - rynek sam stawia rece przy jedzeniu albo brak rak do trzymania), NKS-30p zakres progu (swiat / strefy zimne, jedzenie podstawowe)
+                    - INFO, NKS-30q towary z narzutem, W/R/P zaplacone, krok ceny zmniejszony (ostatni Plan) - INFO. Brak linii feed-swiat (log sprzed paczki) - INFO.
 --grupa nmur      : (17.10, decyzja Jeffa "dowoz jak w ksiazkach" - STAN-PRAC ### 72; galaz w-toku/r4-mur, Armoury/src/WallTribute.cs, FreeFolkRaids.cs, klucze Wall Grain
                     Tribute i Free Folk Hunger Raids) python -I tools/sprawdz_logi.py --grupa nmur <Armoury-*.log> (strumieniowo). DANINA ZBOZOWA MURU (linia "Danina Muru
                     (r4-mur)"): NMUR-1 linia czynna kazdej doby, NMUR-2 kontrola drogi (w drodze wczoraj + wyslane - zepsute - dostarczone - oddane dawcom = w drodze dzis,
@@ -36963,6 +36972,7 @@ def nks_main(logp, until=120, bdp=None):
     ut112 = {}         # doba -> (oddane, pan)
     money8 = {}       # doba Planu -> {rynek: dict} (linia "KS: pieniadze planu (krok 8)")
     p9 = {}            # r4-koszyk (P9): doba Planu -> (klucz, {rynek: {klasa: dict}})
+    clr8 = {}          # feed-swiat: doba Planu -> {rynek: towary z narzutem niedoboru} (linia "KS: rynki Planu (feed-swiat)")
     zc5 = {}
     ksh = {}           # KS-R3: doba -> liczby linii KS-H
     ksh_cor = {}       # doba -> {(a, b, towar): szt./d dowiezione (srednia 28 dob)}
@@ -37160,6 +37170,10 @@ def nks_main(logp, until=120, bdp=None):
                     r9 = p9_parse(s)
                     if r9:
                         p9[r9[0]] = (r9[1], r9[2])
+                elif s.startswith(NKS_K + "rynki Planu (feed-swiat)"):
+                    dcl = num(r"plan doba (\d+)", s)
+                    if dcl is not None:
+                        clr8[dcl] = {mkc: (num(mkc + r": [^|]*?towary z narzutem (\d+)", s) or 0) for mkc in ("Westeros", "Essos")}
                 elif s.startswith(NKS_K + "pieniadze planu"):
                     mm = NKS_MONEY8.match(s)
                     if mm:
@@ -37471,8 +37485,13 @@ def nks_main(logp, until=120, bdp=None):
                         + (f", P9 kcal jedzenia/rzeczy (INFO) {g9}" if c9 else ""))
         rule9 = ("P9: klasy R i P - kcal jedzenia >= 95% (rzeczy INFO; linia 'KS: tanszy koszyk miast (P9)' doby " + str(d9) + (", klucz Ks Cheap Basket " + v9[0] if v9 else "") + ")"
                  if v9 else "klasy R i P >= 95% koszyka przy cenach startu (log bez linii P9 - dawna regula)")
-        rep.add("NKS-3c: pieniadze Planu (krok 8; projekt 9, 11.1; P9)", f"plan doba {d8}: " + "; ".join(inf8) + (f" | poza progiem: {', '.join(bad8)}" if bad8 else ""),
-                rule9 + ", punkt staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru", len(bad8) == 0)
+        # feed-swiat (Ks Plan Markets Clear): klasa R/P ponizej 95% kcal na rynku, ktoremu brakuje rak (towary z narzutem niedoboru w tym Planie) - rece rynku nie
+        # urodza tego jedzenia; Plan mowi to wprost zamiast niezbieznosci (dotad: P9 na papierze, rynek bez rownowagi, ceny w grze 1.4-2 x) - DECYZJA (Jeff), nie NIE
+        c8 = clr8.get(d8) or {}
+        dec8 = bool(bad8) and all(("kcal jedzenia" in b8) and (c8.get(b8.split(" ")[0]) or 0) > 0 for b8 in bad8)
+        rep.add("NKS-3c: pieniadze Planu (krok 8; projekt 9, 11.1; P9)", f"plan doba {d8}: " + "; ".join(inf8) + (f" | poza progiem: {', '.join(bad8)}" if bad8 else "")
+                + (" | feed-swiat: rynek bez rak - towary z narzutem niedoboru " + ", ".join(f"{k} {v}" for k, v in c8.items()) + " (biedni kupuja mniej, rece rynku tego nie urodza)" if dec8 else ""),
+                rule9 + ", punkt staly zbiezny na obu rynkach, Plan wlaczenia z pomiaru", len(bad8) == 0, decide=dec8)
     else:
         rep.add("NKS-3c: pieniadze Planu (krok 8)", "brak linii 'KS: pieniadze planu' (log sprzed poprawki po autotescie 16.10)", "R i P >= 95%, punkt staly zbiezny", None)
 
@@ -40324,6 +40343,67 @@ def npolnoc_med(plans):
     return sorted(cnt)[len(cnt) // 2], len(cnt)
 
 
+def npolnoc_feedswiat(rep, feed, clr, plans):
+    """feed-swiat (noc 17/18.10): NKS-30k..q - rynki Planu (narzut niedoboru dla mieszczan, krok ceny towaru), krok progu, zakres progu. Brak linii - INFO."""
+    if not clr:
+        rep.add("NKS-30k: linia 'KS: rynki Planu (feed-swiat)'", "brak linii (log sprzed feed-swiat)", "linia przy kazdym Planie, rynek musi sie oczyscic TAK", None)
+    else:
+        last = clr[-1]
+        n_on = sum(1 for c in clr if c["on"])
+        rep.add("NKS-30k: linia 'KS: rynki Planu (feed-swiat)'", f"{len(clr)} Planow (doby {clr[0]['day']}-{last['day']}), rynek musi sie oczyscic TAK w {n_on}"
+                + (f"; rownowagi ostatniego Planu {last['eqn']}, zbiezne {last['eqc']}" if last.get("eqn") is not None else ""),
+                "linia przy kazdym Planie, klucz Ks Plan Markets Clear TAK", n_on == len(clr) and (not plans or len(clr) >= len(plans)))
+        bad, nmk = [], 0
+        for c in clr:
+            for mk, v in c["mk"].items():
+                if v.get("spent") is None or v.get("bud") is None:
+                    continue
+                nmk += 1
+                if v["spent"] > v["bud"] + 1.0:
+                    bad.append(f"doba {c['day']} {mk} wydane {v['spent']:.0f} > budzet {v['bud']:.0f}")
+        rep.add("NKS-30l: pieniadz miast w Planie (wydane <= budzet, kazdy Plan i rynek)", f"par Plan x rynek {nmk}, ponad budzet {len(bad)}" + (f" ({'; '.join(bad[:4])})" if bad else ""),
+                "wydane <= budzet + 1 zl (narzut niedoboru zmienia ceny, nie pieniadze - zadna moneta z niczego)", (len(bad) == 0) if nmk else None)
+        on = [c for c in clr if c["on"]]
+        if on:
+            mu_bad = [f"doba {c['day']} {mk} {g} x{x:.3f}" for c in on for mk, v in c["mk"].items() for g, x in v.get("mus", []) if not (1.0 - 1e-9 <= x <= 3.0 + 1e-6)]
+            meds, txt = [], []
+            for mk in ("Westeros", "Essos"):
+                xs = [c["mk"][mk]["ex1"] for c in on[1:] if mk in c["mk"] and c["mk"][mk].get("ex1") is not None] or [c["mk"][mk]["ex1"] for c in on if mk in c["mk"] and c["mk"][mk].get("ex1") is not None]
+                x0 = [c["mk"][mk]["ex0"] for c in on[1:] if mk in c["mk"] and c["mk"][mk].get("ex0") is not None]
+                if xs:
+                    md = sorted(xs)[len(xs) // 2]
+                    meds.append(md)
+                    txt.append(f"{mk} {(sorted(x0)[len(x0) // 2] if x0 else float('nan')):.1f}% -> {md:.1f}%")
+            rep.add("NKS-30m: narzut niedoboru i nadwyzka targu po kroku 8 (mediana Planow po pierwszym)", "; ".join(txt) + (f"; narzut poza [1, 3]: {', '.join(mu_bad[:4])}" if mu_bad else ""),
+                    ">= -2% popytu targu na obu rynkach, narzut w [1, 3] (harness: Essos -6.5% -> -1.3%)", (all(m >= -2.0 for m in meds) and not mu_bad) if meds else None)
+            opn = [sum((c["mk"].get(mk) or {}).get("open") or 0 for mk in ("Westeros", "Essos")) for c in on]
+            o1 = opn[1:] or opn
+            med = sorted(o1)[len(o1) // 2]
+            rep.add("NKS-30n: Plany zbiezne przy Ks Plan Markets Clear (towary niezbiezne W + E, mediana Planow po pierwszym)", f"mediana {med} (Planow {len(o1)}; " + ", ".join(str(v) for v in opn[-8:]) + ")",
+                    "<= 6 (harness swiat + klucze scalenia: przed 20, po 3-4; gra fin83 18)", med <= 6)
+        else:
+            rep.add("NKS-30m: narzut niedoboru", "klucz Ks Plan Markets Clear WYLACZONY", "INFO", None)
+            rep.add("NKS-30n: Plany zbiezne przy Ks Plan Markets Clear", "klucz WYLACZONY - zbieznosc jak dotad (NKS-30e)", "INFO", None)
+        lm = last["mk"]
+        rep.add("NKS-30q: rynki ostatniego Planu (towary z narzutem, W/R/P zaplacone, krok ceny zmniejszony)",
+                "; ".join(f"{mk}: narzut {v.get('nmu')}" + (f" ({' '.join(f'{g} x{x:.2f}' for g, x in v.get('mus', [])[:8])})" if v.get("mus") else "")
+                          + f", W/R/P {v.get('wrp')}%, krok ceny zmniejszony {v.get('eta')}" for mk, v in lm.items()) or "-",
+                "INFO (narzut = drozyzna dla mieszczan przy niedoborze rak rynku; R/P placa mniej koszyka - NKS-3c P9)", None)
+    ss = [f for f in feed if f.get("sup") is not None]
+    if ss:
+        mx = max(f["sup"] for f in ss)
+        st = ss[-1].get("sstep") or 0.07
+        mdn = max((f.get("sdown") or 0.0) for f in ss)
+        rep.add("NKS-30o: krok progu na Plan (najwiekszy wzrost udzialu progu bloku wobec poprzedniego Planu)", f"{mx:.4f} (Planow {len(ss)}; najwiekszy spadek {mdn:.4f} - INFO)",
+                f"<= {st:.2f} (Ks Self Feed Slow)", mx <= st + 1e-4)
+    else:
+        rep.add("NKS-30o: krok progu na Plan", "brak dopisku 'krok progu (feed-swiat)' (log sprzed paczki albo Ks Self Feed Slow WYLACZONY)", "INFO", None)
+    if feed:
+        sf = feed[-1]["sf"]
+        rep.add("NKS-30p: zakres progu najpierw wyzywic siebie (ostatni Plan)", sf,
+                "INFO (feed-swiat: wszystkie okregi wsi, jedzenie podstawowe; WYLACZONY Everywhere - strefy zimne jak dotad)", None)
+
+
 def npolnoc_main(logp, bdp=None):
     """npolnoc (r4-polnoc, noc 17/18.10; Armoury/src/StartCalibration.Feed.cs, Tables.cs, Polnoc.cs; klucze Ks Self Feed First, Ks Self Feed Everywhere, Ks Cold Land):
     [--baza-doby <log biegu bez r4-polnoc>] NKS-30-0 linie "KS: wyzywienie krain" przy Planach (klucze TAK), NKS-30a Polnoc kraina (kcal wlasne) >= 0.85,
@@ -40337,6 +40417,7 @@ def npolnoc_main(logp, bdp=None):
         rep.show()
         return 0
     feed, plans, bil, a7, unc = [], {}, {}, [], None
+    clr = []                                                    # feed-swiat: linie "KS: rynki Planu (feed-swiat)"
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
             m = TS.match(ln.rstrip("\n"))
@@ -40362,7 +40443,26 @@ def npolnoc_main(logp, bdp=None):
                                  moved=num(r"rece przesuniete do jedzenia ([\d.]+)% rak pola wsi swiata", s, float, None),
                                  linc=num(r"najwiekszy przyrost ziemi z progu ponad granice ([-+\d.Ee]+)", s, float, None),
                                  ov0=num(r"ponad 0\.98 przed progiem (\d+)", s), ov1=num(r"przed progiem \d+, po progu (\d+)", s),
-                                 lcut=num(r"okregi z ruchem progu ucietym ziemia (\d+)", s)))
+                                 lcut=num(r"okregi z ruchem progu ucietym ziemia (\d+)", s),
+                                 sup=num(r"najwiekszy wzrost udzialu progu bloku wobec poprzedniego Planu ([-\d.Ee+]+)", s, float, None),
+                                 sdown=num(r"najwiekszy spadek ([-\d.Ee+]+)", s, float, None),
+                                 sstep=num(r"\(<= krok ([\d.]+)\)", s, float, None)))
+                continue
+            if s.startswith("KS: rynki Planu (feed-swiat)"):
+                c = dict(day=num(r"plan doba (\d+)", s), on=" rynek musi sie oczyscic TAK" in s, eqn=num(r"\| rownowagi (\d+), zbiezne", s),
+                         eqc=num(r"\| rownowagi \d+, zbiezne (\d+)", s), mk={})
+                for part in s.split(" | "):
+                    for mk in ("Westeros", "Essos"):
+                        if not part.startswith(mk + ":"):
+                            continue
+                        mus = re.findall(r"([A-Za-z_]+) x([\d.]+)", re.search(r"towary z narzutem \d+(?: \(([^)]*)\))?", part).group(1) or "") if re.search(r"towary z narzutem \d+", part) else []
+                        c["mk"][mk] = dict(ex0=num(r"nadwyzka targu / popyt targu ([-\d.]+)%", part, float, None),
+                                           ex1=num(r"nadwyzka targu / popyt targu [-\d.]+% -> ([-\d.]+)%", part, float, None),
+                                           nmu=num(r"towary z narzutem (\d+)", part), mus=[(g, float(v)) for g, v in mus],
+                                           spent=num(r"wydane ([\d.]+) zl/d", part, float, None), bud=num(r"<= budzet ([\d.]+) zl/d", part, float, None),
+                                           wrp=num(r"W/R/P zaplacone ([-\d./]+)%", part, str, None), eta=num(r"krok ceny zmniejszony (\d+)", part),
+                                           open=num(r"towary niezbiezne (\d+)", part))
+                clr.append(c)
                 continue
             if s.startswith("Kalibracja startu (KS): plan doba "):
                 d = num(r"plan doba (\d+)", s)
@@ -40425,7 +40525,7 @@ def npolnoc_main(logp, bdp=None):
         rep.add("NKS-30d: tozsamosc rak (najwieksze odchylenie sumy udzialow bloku od 1)", f"{dev:.1e}" if dev is not None else "brak liczby",
                 "<= 1e-6 (prog przesuwa tylko rece bloku - nic z niczego)", (dev <= 1e-6) if dev is not None else None)
         rep.add("NKS-30i: rece przesuniete do jedzenia (swiat, ostatni Plan)", f"{last['moved']:.2f}% rak pola wsi swiata" if last["moved"] is not None else "brak liczby",
-                "INFO (Everywhere wylaczony: tylko krainy zimne)", None)
+                "INFO (" + ("zakres: wszystkie okregi wsi - feed-swiat" if last["sf"].startswith("TAK (wszystkie") else "zakres: okregi wsi stref zimnych") + ")", None)
         linc = last.get("linc")
         incs = [f["linc"] for f in feed if f.get("linc") is not None]
         rep.add("NKS-30j: ziemia - prog nie bierze ziemi ponad 0.98 powierzchni bloku (najwiekszy przyrost, wszystkie Plany)",
@@ -40450,6 +40550,7 @@ def npolnoc_main(logp, bdp=None):
                     "INFO - wiaze NKS-3 (--grupa nks); futra: Polnoc przy jedzeniu zamiast przy futrach - uczciwy rynek", None)
     else:
         rep.add("NKS-30e: Plany zbiezne", "brak linii 'Kalibracja startu (KS): plan doba'", "<= 10 (z --baza-doby: baza + 2)", None)
+    npolnoc_feedswiat(rep, feed, clr, plans)
     rep.add("NKS-30g: A7 przy progu - zmiany z jedzenia na zajecie tylko na targ wstrzymane", f"{sum(a7)} (linii {len(a7)})" if a7 else "brak linii (KS nie zastosowany albo log sprzed r4-polnoc)",
             "INFO (regula A7 domyslnie wylaczona - sam pomiar)", None)
     rep.add("NKS-30h: Plan bez pokrycia wedlug krainy (krok 8, ostatni Plan)", unc if unc else "brak linii", "INFO - koszyk wsi niezaplacony i nie robiony w domu", None)
