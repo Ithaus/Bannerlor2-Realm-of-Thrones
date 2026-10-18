@@ -2981,3 +2981,11 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   wykrwawilo ja 108982-109019; Polnoc 12.0k + Dorzecze ~7.5k vs Korona 8.2k; w sesji 0 bitew Polnoc-Korona, Robb oblega KL od 109029, mury 82%), NIE ekonomia (Korona 7.47 mln, zold 40%
   pulapu; f6 hamuje bardziej Polnoc: pulap 111k -> 91k). Do sprawdzenia: (1) regula odsieczy OB5 (BesiegedReliefCapitalForce 2.0 - wymagane 24.2k, zebrane 11.2k; druzyny stoja pod
   murami zamiast werbowac?), (2) ryzyko zdobycia KL przed fabula "KingsLanding". -> paczka f12-odsiecz.
+- 09:21 PDT: f12-odsiecz (wf_5ad65418-f90) GOTOWE na w-toku/f12-odsiecz cfd32705 (od 7ca98719, build rc 0). Diagnoza POTWIERDZONA w kodzie gry 1.4.8 i w logu Jeffa:
+  OB5 podbija ocene obrony ponad kazda inna (tez wizyte w osadzie), zwalnia dopiero przy zebranej >= Need (2.0 x oboz dla stolicy), a gra atakuje oboz dopiero przy 1.2 x;
+  lordowie krolestw werbuja TYLKO w osadzie -> Korona pod KP stoi (11.2k z 14.8k progu gry), werbunek w regionach Korony 70/d -> 3.5/d (Westerlands 549 -> 46), "pominiete z glodu" 5 -> 44.
+  To samo u Dragonstone (Stonedance zdobyty mimo 33 druzyn), Dorne (Starfall), Targaryen Aegon (Tolos). Poprawka: klucz BesiegedReliefOnlyWhenReachable (TAK) - gdy zasieg krolestwa
+  < min(Need, 1.2 x oboz), OB5 nie podbija tego oblezenia (lordowie wracaja do ocen gry: werbunek, jedzenie, osiagalna odsiecz); pierwsze 13 h po starcie/wczytaniu stara droga.
+  Recenzja: 2 drobne (armia zbierajaca sie > 24 h wypadala z zasiegu; licznik zwolnionych) - poprawione. KL: wydarzenie ROT "KingsLanding" to nagroda GRACZA (KP + Red Keep u rodu gracza),
+  zdobycie KP przez Polnoc go nie psuje; ryzyko fabularne niskie - pominiety bylby tylko Czarny Nurt (rozrusznik oznacza Stuck po 6 dniach). Ochrony fabuly NIE robie (Jeff nie prosil).
+  -> do scalenia razem z f9/f10/f11.
