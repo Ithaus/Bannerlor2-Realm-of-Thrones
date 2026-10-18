@@ -570,6 +570,7 @@ namespace Armoury
               .Append(", tarczowe do korony (W6) ").Append(KingdomTreasury.LastScutageIn)   // W6: glowy rodow z wolnym pulapem -> skarbce (ta sama kwota co po stronie korony)
               .Append(", sprzet i werbunek -")
               .Append(", splaty pozyczek od ludu (obieg2) glowy rodow -> kiesy ludu i wsi ").Append(TownFolk.LastLoanRepaid)   // obieg2 (3b): przelew miedzy posiadaczami
+              .Append(TownFolk.LastTownRepaid != 0 ? ", splaty pozyczek miejskich (f8) glowy rodow -> kiesy ludu, kasy kupcow, podzamcza i kasy osad " + TownFolk.LastTownRepaid : "")   // f8-pozyczka: przelew miedzy posiadaczami (bez pozyczek - napis jak dotad)
               .Append(" | rody dostaly [P]: renta wsi ").Append(PopulationLaw.DayVillageRent).Append(", zawor miast ").Append(PopulationLaw.DayTownRent)
               .Append(", zawor zamkow ").Append(CastlePurse.LastLordPaid)
               .Append(", zwrot zoldu od korony ").Append(KingdomTreasury.LastRefundGiven).Append(" (nalezny ").Append(KingdomTreasury.LastRefundDue).Append(')')
@@ -588,6 +589,7 @@ namespace Armoury
               .Append(", podatek od nadwyzki ludu (kiesa2) kiesy ludu -> glowy rodow ").Append(TownFolk.LastHoardLord)   // kiesa2: przelew miedzy posiadaczami (kiesa ludu -> glowa)
               .Append(", podatek od nadwyzki wsi (obieg2) kiesy wsi -> glowy rodow ").Append(TownFolk.LastVillHoardLord)   // obieg2 (1): przelew miedzy posiadaczami
               .Append(", pozyczki od ludu (obieg2) kiesy ludu i wsi -> glowy rodow ").Append(TownFolk.LastLoanLent)   // obieg2 (3b): wyplaty ClanBudget tej doby
+              .Append(TownFolk.LastTownLent != 0 ? ", pozyczki miejskie (f8) kiesy ludu, kasy kupcow i podzamcza -> glowy rodow " + TownFolk.LastTownLent : "")   // f8-pozyczka: wyplaty ClanBudget tej doby i gracza z menu (bez pozyczek - napis jak dotad)
               .Append(", zelazna cena z nabrzeza (WW1) kiesy ludu -> wodzowie najezdzcow ").Append(ReaverLaw.DayWaterfront)   // WW1: przelew miedzy posiadaczami (kiesa ludu -> glowa)
               .Append(", dziesiecina korsarzy (WW4) kiesy band -> glowy rodow panow portow Wysp ").Append(OutlawLaw.LastHarbourTithe)   // WW4: przelew miedzy posiadaczami
               .Append(", zapomoga ").Append(ml ? M[CW.MSupport].ToString(Inv) : "-")

@@ -66,6 +66,7 @@ namespace Armoury
             // 168: pulap bez kredytu wojennego, miejsce KW w pulapie i wyplata dnia; dluznik (dwor -50%, budowy 0); zajecie (D bez dochodu wsi)
             public double CapNoKw, KwRoom, SeizedLand; public long KwLent; public bool Debtor, Seized;
             public double FolkRoom; public long FolkLent;   // obieg2 (3b): miejsce pozyczki od ludu w pulapie i wyplata dnia (TownFolk.Loans.cs) - jak KW, przed Bankiem
+            public double TownRoom; public long TownLent;   // f8-pozyczka: miejsce pozyczki miejskiej w pulapie i wyplata dnia (TownFolk.TownLoan.cs) - drugi wierzyciel KW, przed Bankiem
             public double Lapsed;   // E5/A2 (162): przeterminowany dzis przydzial sprzetu do wplaty dworu (CourtFull.Lapse -> Take -> Paid)
             public double Aid;      // W5: przydzial korony tej doby (doplata do zoldu wedlug potrzeby: gotowka + miejsce na krok werbunku) - JUZ doliczony do Cap i PartyCap; W7 - razem z podniesieniem z poboru stawki wojennej pana
             public double Loot;     // WW2 (wyspy-wolni): lup na zalogi - okno 28 dob zelaznej ceny i dziesieciny korsarzy (zl/d), JUZ doliczony do Cap i PartyCap (po zalogach i karawanach)
@@ -406,7 +407,7 @@ namespace Armoury
             {
                 var b = Of(c);
                 if (b == null || b.Zero || !b.War || c.IsUnderMercenaryService || b.Debtor || b.Seized) return false;
-                partyCap = Math.Max(0, b.PartyCap - b.Aid - b.CourtRoom - b.KwRoom - b.FolkRoom);   // obieg2: bez miejsca pozyczki od ludu (jak KW)
+                partyCap = Math.Max(0, b.PartyCap - b.Aid - b.CourtRoom - b.KwRoom - b.FolkRoom - b.TownRoom);   // obieg2: bez miejsca pozyczki od ludu (jak KW); f8: bez miejsca pozyczki miejskiej (0 bez klucza)
                 reserve = b.R;
                 return true;
             }
@@ -718,15 +719,35 @@ namespace Armoury
                             }
                             catch (Exception e) { Stumble("FolkLoan", e); }
                         }
+                        // f8-pozyczka (decyzja Jeffa 18.10 "2. tak"): POZYCZKA MIEJSKA - ten sam kredyt wojenny z drugim wierzycielem przed Bankiem: rada wlasnego miasta /
+                        // ludzie wlasnego zamku (TownFolk.TownLoan.cs; warunki KW bez Banku). Miejsce najwyzej WarCreditMaxShareD x D RAZEM z Bankiem (KW nizej dostaje reszte
+                        // udzialu), wyplata - brak do zoldu ponad pulap bez kredytu; KW Banku dostaje reszte braku. Klucz TownLoan wylaczony - 0 i budzet co do zlotowki jak dotad
+                        b.TownRoom = 0; b.TownLent = 0;
+                        double townLent = 0;
+                        if (!merc && !b.Zero && TownFolk.TownLoanOn)
+                        {
+                            try
+                            {
+                                double tr = TownFolk.TownLoanRoom(c, b.D, b.G, b.R, b.War, b.Household);
+                                if (tr > 0)
+                                {
+                                    b.TownRoom = tr; b.Cap += tr;
+                                    double gapT = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent;
+                                    if (gapT >= 1) { townLent = TownFolk.TownLoanLend(c, Math.Min(gapT, tr)); b.TownLent = (long)townLent; }
+                                }
+                            }
+                            catch (Exception e) { Stumble("TownLoan", e); }
+                        }
                         if (DebtLadder.On && !merc && !b.Zero)
                         {
                             try
                             {
                                 double kw = DebtLadder.WarCreditRoom(c, b.D, b.G, b.R, b.War, b.Household);
+                                if (kw > 0 && b.TownRoom > 0) kw = Math.Min(kw, Math.Max(0, Math.Max(0f, Math.Min(1f, s.WarCreditMaxShareD)) * b.D - b.TownRoom));   // f8: udzial dnia razem z rada
                                 if (kw > 0)
                                 {
                                     b.KwRoom = kw; b.Cap += kw; _dKwRoom += (long)kw; _dKwRoomN++;
-                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad); obieg2: bez czesci pozyczonej od ludu (0 - jak dotad)
+                                    double gap = (b.WPar + b.WGar + b.WCar) - b.CapNoKw - lootNow - folkLent - townLent;   // WW2: bez czesci oplaconej lupem (lootNow 0 - jak dotad); obieg2: bez czesci pozyczonej od ludu (0 - jak dotad); f8: bez czesci pozyczonej od rady (0 - jak dotad)
                                     if (gap >= 1)
                                     {
                                         int lent = DebtLadder.LendWar(c, (int)Math.Min(gap, kw));

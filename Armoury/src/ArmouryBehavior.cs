@@ -1106,6 +1106,11 @@ namespace Armoury
             // wlasny try; brak klucza (stary zapis) = pusta ksiega drabiny (dlug Banku zostaje w arm_ironbank; bankruci Banku przechodza w zajecie pierwszego dnia)
             try { string dl = dataStore.IsSaving ? DebtLadder.Export() : null; SaveText.Sync(dataStore, "arm_debt168", ref dl); if (dataStore.IsLoading) DebtLadder.Import(dl); }
             catch (Exception e) { Log.Error("SyncData.arm_debt168", e); }
+            // f8-pozyczka: pozyczki miejskie (roszczenia KTown drabiny 168 - wierzyciel rada osady, udzialy kies ludu i kasy kupcow) - wlasny try, PO arm_debt168
+            // (DebtLadder.Import czysci ksiege), straznik rozmiaru (4000 roszczen, 600 000 znakow); brak klucza (stary zapis, Ironman Jeffa) = brak pozyczek miejskich;
+            // starsza DLL klucza nie czyta (roszczenia KTown nie ida do arm_debt168)
+            try { string tl = dataStore.IsSaving ? DebtLadder.ExportTown() : null; SaveText.Sync(dataStore, "arm_townloan", ref tl); if (dataStore.IsLoading) DebtLadder.ImportTown(tl); }
+            catch (Exception e) { Log.Error("SyncData.arm_townloan", e); }
             // 168 dodatek: porozumienia wezwania do wojny placone przez korone (reszta ceny, czesc dnia) - wlasny try; brak klucza = brak porozumien w toku
             // (dlug portfela wezwania sprzed paczki skreslany pierwszego dnia - wezwany dostal go juz od gry)
             // 178: srednie wplywow koron (okup krola), wielcy jency u koron zdobywcow, nagrody zdobywcow do wyplaty, zaleglosci 1/9 - wlasny try; brak klucza = puste
@@ -2058,6 +2063,7 @@ namespace Armoury
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
+            try { TownFolk.TownLoanMenus(starter); } catch (Exception e) { Log.Error("TownFolk.TownLoanMenus", e); }   // f8-pozyczka: "Borrow from the town council" / "Repay ..." w menu wlasnego miasta i zamku
             try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
             try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }   // inwest: "Invest in the district's works" za "Look over the district" (village, village_looted)
             try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
@@ -2500,6 +2506,7 @@ namespace Armoury
             try { CourtGoods.Daily(); } catch (Exception e) { Log.Error("CourtGoods.Daily", e); } DayProfile.Lap("CourtGoods.Daily");   // E3-P1 (noc-ekonomia3 czesc 2): linia "Dwor - towar z polki (E3-P1)" - po dworach pana (ClanBudget) i krola (CrownRents) tej doby
             try { VetPurse.Line(); } catch (Exception e) { Log.Error("VetPurse.Line", e); } DayProfile.Lap("VetPurse.Line");   // E5/B6 (201): linia "Weterani - pieniadze (E5/B6)" - ta sama doba co 166 (zloto nie rusza)
             try { DebtLadder.Report(); } catch (Exception e) { Log.Error("DebtLadder.Report", e); } DayProfile.Lap("DebtLadder.Report");   // 168: linia "Dlugi (168)" - po budzecie (kredyt wojenny dnia); zloto nie rusza
+            try { TownFolk.TownLoanLine(); } catch (Exception e) { Log.Error("TownFolk.TownLoanLine", e); } DayProfile.Lap("TownFolk.TownLoanLine");   // f8-pozyczka: linia "Pozyczki miejskie (f8)" - po 168 (pozyczki dnia z 166); zloto nie rusza
             try { MoneyLedger.Mark(MoneyLedger.MBudget); } catch { }
             // TP (16.10, recenzja): splata dlugow osad wobec gracza (kasa osady, gospodarz, panujacy) i linia "Turniej-platnik (TP): dzien N" - PO ClanBudget.Daily,
             // zeby rody placily z budzetu 166 TEJ doby (takze pierwsza polnoc po wczytaniu); PO Mark(MBudget) - przelewy kas osad w "pozostale moduly ticku", nie w budzecie

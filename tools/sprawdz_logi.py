@@ -1508,6 +1508,20 @@ Uzycie (Python 3, tylko odczyt):
                     (fin88 0.55: lancuch gry w mieszance rampy liczyl dubel BK raz - 163 wobec 296; ETAP > 0.55), linie "Mineraly w rampie KS (f5-ruda)" (INFO).
                     Bazy: fin88 Armoury-2026-10-18_03-13-38.log (ac03aa25 = WGRANIE 79), fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin88):
                     NRU-7..10 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
+--grupa npozyczka : (18.10, paczka f8-pozyczka - decyzja Jeffa "2. tak" (10% rocznie): POZYCZKA MIEJSKA - pan w wojnie bez pieniedzy na zold pozycza najpierw od rady wlasnego
+                    miasta / ludzi wlasnego zamku, drugi wierzyciel kredytu wojennego 168 przed Bankiem; Armoury/src/TownFolk.TownLoan.cs, DebtLadder.cs (roszczenie KTown, zapis arm_townloan),
+                    ClanBudget.cs, TownFolk.Loans.cs (przejecie obieg2); klucze Town Loan, Town Loan Rate, Town Loan Rent Days, Town Loan Folk Reserve Times, Town Loan Coffer Reserve Times,
+                    Town Loan Takes Folk Loans) python -I tools/sprawdz_logi.py --grupa npozyczka <Armoury-*.log> [--baza-doby <log bazy>] (strumieniowo). Linie "Pozyczki miejskie (f8):
+                    dzien N" (okno od linii do linii), "... start sesji", "... przejecie dlugow obieg2", "Dlugi (168): dzien N", "Pozyczki od ludu (obieg2): dzien N". NPZ-0 linie paczki (INFO;
+                    nieczytelne 0), NPZ-D1 drabina 168: rody z suma rat ponad 15% D 0 kazdej doby, NPZ-D2 "bez odbiorcy" 0, NPZ-D3 potkniecia linii 168 0 (wiersze D - takze log sprzed
+                    paczki), NPZ-1 linia doby w kazdej dobie 168 od pierwszej, NPZ-2 zawarte (AI + gracz) = zdjete ze zrodel = W + R + P + kasy kupcow + podzamcza (co do zlotowki), NPZ-3
+                    splacone = do wierzycieli (kiesy, kasy kupcow, podzamcza, kiesy wsi, kasy osad) + zapasowe kasy miast, odsetki <= splacone, NPZ-4 kontrola ksiegi rad = 0 kazdej doby,
+                    NPZ-5 dlug po pozyczce ponad limitem renty 0 (NPZ-5b dlug / limit - INFO), NPZ-6 odsetki narosle / (dlug wczoraj + przeniesione) x stopa / dni roku <= 1.02 (28 dob),
+                    NPZ-7 rody w zaleglosci z dlugiem wobec rad <= 3 naraz (projekt R2 prog 12; zajecie INFO), NPZ-8 dlug wobec rad na koniec <= 6 mln, NPZ-9 kredyt wojenny Banku
+                    (srednia 28 dob, linia 168 "wyplacone") <= baza + 500 zl/d przy --baza-doby (bez bazy INFO), NPZ-10 jedna regula: nowe pozyczki obieg2 0 w dobach z Town Loan
+                    (pierwsza doba pominieta), NPZ-11 przejecie obieg2 - przeniesione w linii f8 = w linii obieg2 (+- liczba czesci), NPZ-12 przeplywy i NPZ-12b zapasowi odbiorcy (INFO),
+                    NPZ-13 potkniecia i ERROR paczki 0, NPZ-14 czas <= 1 ms srednio i <= 5 ms najwiecej, NPZ-15 klucz (INFO). Log sprzed paczki (np. fin86 Armoury-2026-10-17_23-22-37.log):
+                    NPZ-D1..D3 z liczbami, kredyt wojenny Banku i obieg2 jako liczby bazowe (INFO), reszta INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -44929,6 +44943,284 @@ def nruda_main(logp):
     return 0
 
 
+# ============================================================ npozyczka (18.10, paczka f8-pozyczka - decyzja Jeffa "2. tak": pozyczka miejska - rada wlasnego miasta /
+# ludzie wlasnego zamku drugim wierzycielem kredytu wojennego 168 przed Bankiem; Armoury/src/TownFolk.TownLoan.cs, DebtLadder.cs KTown, ClanBudget.cs, TownFolk.Loans.cs)
+NPZ_LINE = "Pozyczki miejskie (f8): dzien "
+NPZ_START = "Pozyczki miejskie (f8): start sesji"
+NPZ_MOVE = "Pozyczki miejskie (f8): przejecie dlugow obieg2"
+NPZ_168 = "Dlugi (168): dzien "
+NPZ_O2 = "Pozyczki od ludu (obieg2): dzien "
+NPZ_RX = re.compile(
+    r"\| Town Loan (tak|nie), ([\d.]+)% rocznie, limit (\d+) dni renty osady"
+    r" \| zawarte \(AI, 166\) (\d+) zl u (\d+) rodow, gracz (\d+) zl \((\d+)\); zdjete ze zrodel (\d+) \(kiesy W (\d+) / R (\d+) / P (\d+), kasy kupcow (\d+), podzamcza (\d+)\)"
+    r" \| kandydaci \(wojna, kiesa rodziny ponizej rezerwy\) (\d+), z miejscem (\d+) \((-?\d+|-) zl\); bez pozyczki: zakaz po niesplacie obieg2 (\d+),"
+    r" zaleglosc / zajecie / czarna ksiega Banku (\d+), po zajeciu (\d+), D nie pokrywa kosztow stalych (\d+), limit renty (\d+), osady bez nadwyzki (\d+)"
+    r" \| odsetki narosle (\d+) \(rok (\d+) dni\)"
+    r" \| splacone (\d+) \(w tym odsetki (\d+); z jednorazowych (\d+), raty z D (\d+), reczne gracza (\d+), zajecie i wyprzedaz (\d+)\)"
+    r" -> do wierzycieli (\d+) \(kiesy W (\d+) / R (\d+) / P (\d+), kasy kupcow (\d+), podzamcza (\d+), kiesy wsi \(z obieg2\) (\d+), kasy osad \(kiesa nieczynna\) (\d+)\),"
+    r" zapasowe kasy miast (\d+)"
+    r" \| dlug wobec rad (\d+) \(rodow (\d+), roszczen (\d+), osad (\d+); rody w zaleglosci (\d+), w zajeciu (\d+)\), dlug / limit najwyzej ([\d.]+)"
+    r" \(roszczen wobec osad rodu (\d+), ponad limitem (\d+)\), po pozyczce ponad limitem (\d+) \(oczekiwane 0\)"
+    r" \| przeniesione z obieg2 (\d+) zl \(rodow (\d+), czesci (\d+)\)"
+    r" \| bez platnika \(rod wymarly bez wsi\) (\d+)"
+    r" \| kredyt wojenny Banku dzis (\d+) zl u (\d+) rodow \(rady \+ Bank (\d+)\)"
+    r" \| kontrola: dlug - \(wczoraj \+ zawarte \+ przeniesione \+ odsetki - splacone - bez platnika\) (-?\d+|-) \(oczekiwane 0\)"
+    r" \| czas ([\d.]+) ms \| potkniecia (\d+) \(sesja (\d+)\)\.")
+NPZ_KEYS = ("on", "rate", "rdays", "lent", "lentn", "plent", "pn", "src", "sW", "sR", "sP", "sK", "sC",
+            "cand", "roomn", "room", "bban", "blad", "bseize", "bd", "blim", "bnosrc",
+            "int", "year", "paid", "paidint", "ploot", "pinst", "pman", "pseize",
+            "rep", "rW", "rR", "rP", "rK", "rC", "rV", "rO", "spare",
+            "debt", "dclans", "dclaims", "dplaces", "arrear", "seized", "worst", "owned", "over", "overafter",
+            "moved", "movedn", "movedp", "orph", "kw", "kwn", "both", "ctl", "ms", "st", "stsess")
+NPZ_RX_15 = re.compile(r"suma rat ponad (\d+)% D: (\d+) rodow \(kontrola - 0\)")
+NPZ_RX_NOREC = re.compile(r"bez odbiorcy (\d+) \(prog 0\)")
+NPZ_RX_KW = re.compile(r"KW \(166, dzis\): miejsce w pulapie u (\d+) rodow \((\d+) zl\), wyplacone (\d+) zl u (\d+) rodow")
+NPZ_RX_168ST = re.compile(r"\| potkniecia (\d+)\.")
+NPZ_RX_O2L = re.compile(r"zawarte w dobie (-?\d+) \([^)]*\): (\d+) zl u (\d+) rodow")
+NPZ_RX_O2MV = re.compile(r"przeniesione do pozyczek miejskich \(f8, Town Loan Takes Folk Loans\) (\d+) zl")
+NPZ_RX_O2DEBT = re.compile(r"\| dlug rodow u ludu (\d+|-) \(rodow (\d+)")
+NPZ_ERR = ("TownFolk.TownLoan", "DebtLadder.Deliver(rada)", "DebtLadder.ExportTown", "DebtLadder.ImportTown", "DebtLadder.PlayerRepayTown", "SyncData.arm_townloan",
+           "TownFolk.Loans.TakeOverFolk")
+NPZ_DEBT_MAX = 6000000      # projekt R2 / K3, prog 12: dlug wobec miast <= 6 mln
+NPZ_ARREAR_MAX = 3          # projekt R2 / K3, prog 12: zaleglosci z tego tytulu <= 3 rody naraz
+
+
+def _npz_scan(logp):
+    """npozyczka: strumieniowo linia doby paczki, start sesji, przejecie obieg2, "Dlugi (168)", "Pozyczki od ludu (obieg2)" i bledy paczki."""
+    D = {"day": {}, "bad": [], "start": [], "move": [], "d168": {}, "o2": {}, "err": []}
+    if not logp or not os.path.isfile(logp):
+        return D
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith("ERROR in "):
+                if any(k in s for k in NPZ_ERR):
+                    D["err"].append(s[:200])
+                continue
+            if s.startswith(NPZ_LINE):
+                day = num(r"dzien (\d+)", s)
+                mm = NPZ_RX.search(s)
+                if day is None or not mm:
+                    D["bad"].append(s[:200]); continue
+                r = {}
+                for k, v in zip(NPZ_KEYS, mm.groups()):
+                    if k == "on":
+                        r[k] = v == "tak"
+                    elif v == "-":
+                        r[k] = None
+                    elif "." in v:
+                        r[k] = float(v)
+                    else:
+                        r[k] = int(v)
+                D["day"][day] = r
+                continue
+            if s.startswith(NPZ_START):
+                D["start"].append(s[:400]); continue
+            if s.startswith(NPZ_MOVE):
+                D["move"].append(s[:300]); continue
+            if s.startswith(NPZ_168):
+                day = num(r"dzien (\d+)", s)
+                if day is None:
+                    continue
+                a = NPZ_RX_15.search(s); b = NPZ_RX_NOREC.search(s); k = NPZ_RX_KW.search(s); st = NPZ_RX_168ST.search(s)
+                D["d168"][day] = {"over15": int(a.group(2)) if a else None, "norec": int(b.group(1)) if b else None,
+                                  "kw": int(k.group(3)) if k else None, "kwn": int(k.group(4)) if k else None, "kwroom": int(k.group(2)) if k else None,
+                                  "st": int(st.group(1)) if st else 0}
+                continue
+            if s.startswith(NPZ_O2):
+                day = num(r"dzien (\d+)", s)
+                if day is None:
+                    continue
+                a = NPZ_RX_O2L.search(s); mv = NPZ_RX_O2MV.search(s); dd = NPZ_RX_O2DEBT.search(s)
+                D["o2"][day] = {"lent": int(a.group(2)) if a else None, "moved": int(mv.group(1)) if mv else 0,
+                                "town": "nowe pozyczki od ludu tylko przez rady" in s,
+                                "debt": (int(dd.group(1)) if dd and dd.group(1) != "-" else None)}
+                continue
+    return D
+
+
+def _npz_tail(days, n=28):
+    return days[-n:] if len(days) > n else days
+
+
+def npozyczka_main(logp, bdp=None):
+    """npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska (TownFolk.TownLoan.cs, roszczenia KTown drabiny 168, klucze Town Loan / Town Loan Rate / Town Loan Rent Days /
+    Town Loan Folk Reserve Times / Town Loan Coffer Reserve Times / Town Loan Takes Folk Loans). Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log bazy> (NPZ-9:
+    kredyt wojenny Banku nizszy niz w bazie). Progi NPZ-0..NPZ-15 i NPZ-D1..D3 - opis w naglowku pliku (--grupa npozyczka). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NPZ-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = _npz_scan(logp)
+    T, L168, O2 = D["day"], D["d168"], D["o2"]
+    td = sorted(T)
+    on_days = [d for d in td if T[d]["on"]]
+    print(f"plik: {logp} | linii paczki {len(td)} (Town Loan tak {len(on_days)}; nieczytelnych {len(D['bad'])}) | start sesji {len(D['start'])} | przejecie obieg2 {len(D['move'])}"
+          f" | linii 168 {len(L168)} | linii obieg2 {len(O2)}")
+    rep.add("NPZ-0: linie paczki f8-pozyczka (start sesji, linia doby, przejecie obieg2)",
+            f"start sesji {len(D['start'])}, linii doby {len(td)} (Town Loan tak {len(on_days)}), przejecie obieg2 {len(D['move'])}, nieczytelnych {len(D['bad'])}"
+            + (f" (np. {D['bad'][0][:120]})" if D["bad"] else ""),
+            "INFO (brak linii = log sprzed paczki albo klucz wylaczony i pusta ksiega rad: progi paczki INFO)", None)
+    if D["bad"]:
+        rep.add("NPZ-0b: linie doby nieczytelne", f"{len(D['bad'])}", "0", False)
+
+    # ---- NPZ-D: wiersze drabiny 168 (dla calego biegu - takze bez paczki)
+    d168 = sorted(L168)
+    if d168:
+        o15 = [d for d in d168 if L168[d]["over15"]]
+        rep.add("NPZ-D1: drabina 168 - suma rat rodu ponad AllInstalmentsMaxShare D (kontrola linii 'Dlugi (168)')", f"rodo-dob ponad {sum(L168[d]['over15'] or 0 for d in d168)}"
+                f" w {len(o15)} z {len(d168)} dob" + (f" (doby {o15[:6]})" if o15 else ""), "0 (raty rad w tym samym pulapie 15% D co Bank i inne roszczenia)", len(o15) == 0)
+        nr = [d for d in d168 if L168[d]["norec"]]
+        rep.add("NPZ-D2: drabina 168 - bez odbiorcy (zloto rat bez wierzyciela)", f"{sum(L168[d]['norec'] or 0 for d in d168)} zl w {len(nr)} dobach", "0", len(nr) == 0)
+        s168 = [d for d in d168 if L168[d]["st"]]
+        rep.add("NPZ-D3: drabina 168 - potkniecia w linii 'Dlugi (168)'", f"{len(s168)} dob z potknieciami" + (f" (doby {s168[:6]})" if s168 else ""), "0", len(s168) == 0)
+    else:
+        rep.add("NPZ-D1..D3: drabina 168", "brak linii 'Dlugi (168)'", "INFO", None)
+
+    if not td:
+        # log sprzed paczki: kredyt wojenny Banku i obieg2 jako liczby bazowe
+        kd = _npz_tail(d168)
+        kw = [L168[d]["kw"] for d in kd if L168[d]["kw"] is not None]
+        o2d = _npz_tail(sorted(O2))
+        o2l = [O2[d]["lent"] for d in o2d if O2[d]["lent"] is not None]
+        rep.add("NPZ-1..15: linia 'Pozyczki miejskie (f8)'", "brak (log sprzed paczki)", "INFO", None)
+        rep.add("NPZ-9: kredyt wojenny Banku (liczba bazowa, srednia 28 dob)", f"{(sum(kw) / len(kw)) if kw else 0:.0f} zl/d ({len(kw)} dob); pozyczki od ludu obieg2"
+                f" {(sum(o2l) / len(o2l)) if o2l else 0:.0f} zl/d", "INFO (baza do --baza-doby biegu z paczka)", None)
+        if D["err"]:
+            rep.add("NPZ-13: ERROR paczki", f"{len(D['err'])} (np. {D['err'][0][:120]})", "0", False)
+        rep.show()
+        return 0
+
+    # ---- NPZ-1 linia w kazdej dobie od pierwszej
+    first, last = td[0], td[-1]
+    miss = [d for d in range(first, last + 1) if d not in T and d in L168]
+    rep.add("NPZ-1: linia doby paczki w kazdej dobie 'Dlugi (168)' od pierwszej", f"brak w {len(miss)} dobach" + (f" (doby {miss[:6]})" if miss else "") + f"; doby {first}-{last}",
+            "0", len(miss) == 0)
+
+    # ---- NPZ-2 tozsamosc zawarte = zdjete ze zrodel (co do zlotowki)
+    b2 = [d for d in td if T[d]["src"] != T[d]["lent"] + T[d]["plent"] or T[d]["src"] != T[d]["sW"] + T[d]["sR"] + T[d]["sP"] + T[d]["sK"] + T[d]["sC"]]
+    rep.add("NPZ-2: zawarte (AI + gracz) = zdjete ze zrodel = kiesy W + R + P + kasy kupcow + podzamcza (nic z niczego)", f"niezgodne {len(b2)} z {len(td)} dob"
+            + (f" (doby {b2[:6]})" if b2 else ""), "0 (co do zlotowki)", len(b2) == 0)
+
+    # ---- NPZ-3 tozsamosc splacone = do wierzycieli + zapasowe
+    b3 = []
+    for d in td:
+        r = T[d]
+        parts = r["rW"] + r["rR"] + r["rP"] + r["rK"] + r["rC"] + r["rV"] + r["rO"]
+        if r["rep"] != parts or r["paid"] != r["rep"] + r["spare"] or r["paidint"] > r["paid"]:
+            b3.append(d)
+    rep.add("NPZ-3: splacone = do wierzycieli (kiesy, kasy kupcow, podzamcza, kiesy wsi, kasy osad) + zapasowe kasy miast; odsetki <= splacone", f"niezgodne {len(b3)} z {len(td)} dob"
+            + (f" (doby {b3[:6]})" if b3 else ""), "0 (co do zlotowki)", len(b3) == 0)
+
+    # ---- NPZ-4 kontrola dlugu
+    ctl = [d for d in td if T[d]["ctl"] is not None]
+    b4 = [d for d in ctl if T[d]["ctl"] != 0]
+    rep.add("NPZ-4: kontrola ksiegi rad: dlug - (wczoraj + zawarte + przeniesione + odsetki - splacone - bez platnika)", f"niezerowe {len(b4)} z {len(ctl)} dob"
+            + (f" (doby {b4[:6]}: {[T[d]['ctl'] for d in b4[:6]]})" if b4 else ""), "0 (kazda doba)", len(b4) == 0 if ctl else None)
+
+    # ---- NPZ-5 limit renty
+    b5 = [d for d in td if T[d]["overafter"]]
+    rep.add("NPZ-5: po pozyczce dlug wobec osady ponad TownLoanRentDays x renta osady", f"{sum(T[d]['overafter'] for d in td)} w {len(b5)} dobach", "0", len(b5) == 0)
+    wd = _npz_tail(td)
+    rep.add("NPZ-5b: dlug / limit (najwyzej, roszczenia wobec osad rodu; ponad limitem po spadku renty albo z przejecia obieg2)",
+            f"ostatnia doba {T[last]['worst']:.3f} (ponad limitem {T[last]['over']} z {T[last]['owned']} roszczen), najwyzej w biegu {max(T[d]['worst'] for d in td):.3f}",
+            "INFO (nowe pozyczki tylko do limitu - NPZ-5)", None)
+
+    # ---- NPZ-6 odsetki wobec stopy (bez odsetek z niczego)
+    exp_sum = 0.0; got_sum = 0
+    for i in range(1, len(wd)):
+        d0, d = wd[i - 1], wd[i]
+        r = T[d]
+        if r["year"] <= 0:
+            continue
+        exp_sum += (T[d0]["debt"] + r["moved"]) * r["rate"] / 100.0 / r["year"]
+        got_sum += r["int"]
+    if exp_sum >= 100:
+        ratio = got_sum / exp_sum
+        rep.add("NPZ-6: odsetki narosle / (dlug wczoraj + przeniesione) x stopa / dni roku (28 dob)", f"{got_sum} / {exp_sum:.0f} = {ratio:.3f}",
+                "<= 1.02 (bez odsetek z niczego; ponizej 1 - roszczenia w zajeciu bez odsetek i dlug splacony przed naliczeniem)", ratio <= 1.02)
+    else:
+        rep.add("NPZ-6: odsetki wobec stopy", f"oczekiwane {exp_sum:.0f} zl w oknie", "INFO (za maly dlug)", None)
+
+    # ---- NPZ-7 zwloka (drabina 168)
+    b7 = [d for d in td if T[d]["arrear"] > NPZ_ARREAR_MAX]
+    rep.add(f"NPZ-7: rody w zaleglosci z dlugiem wobec rad (naraz)", f"najwiecej {max(T[d]['arrear'] for d in td)}, ponad {NPZ_ARREAR_MAX} w {len(b7)} dobach"
+            + (f" (doby {b7[:6]})" if b7 else "") + f"; w zajeciu najwiecej {max(T[d]['seized'] for d in td)} (ostatnia doba {T[last]['seized']})",
+            f"<= {NPZ_ARREAR_MAX} (projekt R2 prog 12); zajecie - INFO", len(b7) == 0)
+
+    # ---- NPZ-8 dlug wobec rad
+    rep.add("NPZ-8: dlug wobec rad na koniec biegu", f"{T[last]['debt']} zl u {T[last]['dclans']} rodow ({T[last]['dclaims']} roszczen, {T[last]['dplaces']} osad);"
+            f" najwyzej w biegu {max(T[d]['debt'] for d in td)}", f"<= {NPZ_DEBT_MAX} (projekt R2 prog 12)", T[last]["debt"] <= NPZ_DEBT_MAX)
+
+    # ---- NPZ-9 kredyt wojenny Banku nizszy
+    kd = [d for d in _npz_tail(d168) if L168[d]["kw"] is not None]
+    kw_avg = sum(L168[d]["kw"] for d in kd) / len(kd) if kd else 0
+    town_avg = sum(T[d]["lent"] for d in wd) / len(wd) if wd else 0
+    base_kw = None
+    if bdp and os.path.isfile(bdp):
+        B = _npz_scan(bdp)
+        bk = [d for d in _npz_tail(sorted(B["d168"])) if B["d168"][d]["kw"] is not None]
+        if bk:
+            base_kw = sum(B["d168"][d]["kw"] for d in bk) / len(bk)
+    if base_kw is not None:
+        rep.add("NPZ-9: kredyt wojenny Banku (srednia 28 dob) wobec biegu bazowego (--baza-doby)", f"{kw_avg:.0f} zl/d (baza {base_kw:.0f}); rady {town_avg:.0f} zl/d",
+                "<= baza + 500 zl/d (rada pierwszym wierzycielem - Bank dostaje reszte)", kw_avg <= base_kw + 500)
+    else:
+        rep.add("NPZ-9: kredyt wojenny Banku i pozyczki rad (srednia 28 dob)", f"Bank {kw_avg:.0f} zl/d, rady {town_avg:.0f} zl/d (rady + Bank {kw_avg + town_avg:.0f})",
+                "INFO (z --baza-doby: Bank <= baza + 500)", None)
+
+    # ---- NPZ-10 jedna regula: obieg2 bez nowych pozyczek przy Town Loan
+    od = [d for d in sorted(O2) if d in T and T[d]["on"] and O2[d]["lent"] is not None]
+    od = od[1:] if len(od) > 1 else []
+    b10 = [d for d in od if O2[d]["lent"] > 0]
+    rep.add("NPZ-10: jedna regula - nowe pozyczki od ludu (obieg2) w dobach z Town Loan", f"{sum(O2[d]['lent'] for d in b10)} zl w {len(b10)} z {len(od)} dob"
+            + (f" (doby {b10[:6]})" if b10 else ""), "0 (pierwsza doba sesji pominieta)", len(b10) == 0 if od else None)
+
+    # ---- NPZ-11 przejecie obieg2
+    mv = [d for d in td if T[d]["moved"] > 0]
+    if mv:
+        b11 = []
+        for d in mv:
+            o = O2.get(d)
+            if o is None or abs(o["moved"] - T[d]["moved"]) > T[d]["movedp"] + 1:
+                b11.append(d)
+        o2after = [O2[d]["debt"] for d in sorted(O2) if d >= mv[0] and O2[d]["debt"] is not None]
+        rep.add("NPZ-11: przejecie obieg2 - przeniesione w ksiedze rad = przeniesione w linii obieg2 (+- czesci)", f"doby przejecia {mv[:4]}, przeniesione {sum(T[d]['moved'] for d in mv)} zl"
+                f" (rodow {sum(T[d]['movedn'] for d in mv)}), niezgodne {len(b11)}; dlug obieg2 po przejeciu {o2after[-1] if o2after else '-'}",
+                "0 niezgodnych (dlug obieg2 po przejeciu - tylko rody wymarle tej doby: INFO)", len(b11) == 0)
+    else:
+        rep.add("NPZ-11: przejecie obieg2", "brak przejecia w logu", "INFO (Town Loan Takes Folk Loans wylaczony albo obieg2 bez dlugow)", None)
+
+    # ---- NPZ-12 przeplywy (INFO)
+    def avg(k):
+        return sum(T[d][k] for d in wd) / len(wd) if wd else 0
+    rep.add("NPZ-12: pozyczki rad (srednia 28 dob)", f"zawarte {avg('lent'):.0f} zl/d (gracz {avg('plent'):.0f}), splacone {avg('paid'):.0f} (odsetki {avg('paidint'):.0f}; z jednorazowych"
+            f" {avg('ploot'):.0f}, raty z D {avg('pinst'):.0f}, zajecie {avg('pseize'):.0f}), odsetki narosle {avg('int'):.0f}; do wierzycieli: kiesy W {avg('rW'):.0f} / R {avg('rR'):.0f}"
+            f" / P {avg('rP'):.0f}, kasy kupcow {avg('rK'):.0f}, podzamcza {avg('rC'):.0f}, kiesy wsi {avg('rV'):.0f}; zrodla: W {avg('sW'):.0f} / R {avg('sR'):.0f} / P {avg('sP'):.0f},"
+            f" kasy kupcow {avg('sK'):.0f}, podzamcza {avg('sC'):.0f}; kandydaci {avg('cand'):.1f}, z miejscem {avg('roomn'):.1f}, bez nadwyzki {avg('bnosrc'):.1f},"
+            f" limit {avg('blim'):.1f}, zaleglosc {avg('blad'):.1f}", "INFO", None)
+    rep.add("NPZ-12b: zapasowi odbiorcy (osada nie istnieje) i bez platnika", f"zapasowe kasy miast {sum(T[d]['spare'] for d in td)} zl, bez platnika {sum(T[d]['orph'] for d in td)} zl,"
+            f" kasy osad (kiesa nieczynna) {sum(T[d]['rO'] for d in td)} zl", "INFO (nic w nicosc - zloto idzie do kas)", None)
+
+    # ---- NPZ-13 bledy i potkniecia
+    st = [d for d in td if T[d]["st"]]
+    rep.add("NPZ-13: potkniecia linii paczki i ERROR paczki", f"doby z potknieciami {len(st)}" + (f" (doby {st[:6]})" if st else "") + f", ERROR {len(D['err'])}"
+            + (f" (np. {D['err'][0][:120]})" if D["err"] else ""), "0 / 0", len(st) == 0 and not D["err"])
+
+    # ---- NPZ-14 czas
+    ms = [T[d]["ms"] for d in td]
+    rep.add("NPZ-14: czas paczki na dobe (pozyczki 166 + linia)", f"srednio {sum(ms) / len(ms):.3f} ms, najwiecej {max(ms):.3f} ms", "<= 1 ms srednio i <= 5 ms najwiecej",
+            sum(ms) / len(ms) <= 1.0 and max(ms) <= 5.0)
+
+    # ---- NPZ-15 klucz
+    rep.add("NPZ-15: klucz Town Loan w dobach linii", f"tak {len(on_days)} z {len(td)} dob, stopa {T[last]['rate']}%, limit {T[last]['rdays']} dni renty",
+            "INFO (domyslnie tak, 10%, 120 dni)", None)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -45182,6 +45474,8 @@ def main(argv):
         return nf4_main(logp)   # nf4 (noc 17/18.10, f4-pomiary): diagnoza A7 i zajecia zamrozone, regale wobec polki, nacisk ZW, wynik handlowy karawan, zelazo i drewno z polek, drewno w wozach (same pomiary)
     if group == "nzwrot" and logp:
         return nzwrot_main(logp, bdp, csvp)   # nzwrot (18.10, paczka f6-zwrot): zwrot zoldu wedlug potrzeby rodu, sprzet niewydany tylko za towar niezywnosciowy (KingdomTreasury.RefundNeed, CourtFull.Goods)
+    if group == "npozyczka" and logp:
+        return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
