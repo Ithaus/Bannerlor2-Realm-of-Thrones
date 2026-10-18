@@ -630,7 +630,13 @@ namespace Armoury
             {
                 var meta = MetaAll();
                 var bef = new Dictionary<ItemObject, double>(); var aft = new Dictionary<ItemObject, double>();
-                int vil = 0, calls = 0, noFinal = 0, noMult = 0, works = 0;
+                int vil = 0, calls = 0, noFinal = 0, noMult = 0, works = 0, partial = 0;
+                // f4b-inwest (Side Village Craft Neutral Goods): wies z dopiskami spoza listy typu, ktorej zaden dopisek nie mial wywolania modelu w dobie pomiaru (tick
+                // produkcji przed OnDailyTick doby wlaczenia - potem tylko magazyn wsi pyta o towary typu), daje pomiar tylko towarow typu - bez dopiskow "po" bylo za malo.
+                // Taka wies poza pomiarem w calosci (ten sam zbior wsi przed i po).
+                var sM = Settings.Current;
+                bool whole = sM != null && sM.SideVillageCraftNeutralGoods;
+                var plansM = _plans;
                 var w2 = _measW2; double w2g = 0;                              // recenzja calosci: W2 dnia wczesniej - zboze x (1 - u), ryby + u x zboze (tyle samo sztuk; W2 to ostatni krok)
                 ItemObject grainIt = null, fishIt = null;
                 try { grainIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("grain"); fishIt = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemObject>("fish"); } catch { }
@@ -639,6 +645,7 @@ namespace Armoury
                     foreach (var kv in _meas)
                     {
                         if (DistrictWorks.HasWorks(kv.Key)) { works++; continue; }
+                        if (whole && !WholeMeasured(kv.Key, kv.Value, plansM)) { partial++; continue; }
                         vil++;
                         double uw = 0; if (w2 != null && grainIt != null && fishIt != null) w2.TryGetValue(kv.Key, out uw);
                         foreach (var x in kv.Value)
@@ -696,6 +703,7 @@ namespace Armoury
                 sb.Append(" | najwieksza odchylka produkcji typu ").Append((100 * Math.Abs(worst)).ToString("0.000", Inv)).Append("% (prog 1%) w ").Append(worstT)
                   .Append(" | wobec swiata (ksiega towarow doby ").Append(ledOk ? day.ToString(Inv) : "BRAK").Append("): najwieksza ").Append((100 * Math.Abs(worstW)).ToString("0.000", Inv)).Append("% w ").Append(worstWT)
                   .Append(" | towar: najwieksza zmiana ").Append((100 * wi).ToString("+0.0;-0.0;0.0", Inv)).Append("% (").Append(wit).Append(") | W2 (zboze -> ryby) dnia wczesniej w 'przed' (recenzja calosci) - zajecia go zastepuja");
+                if (whole) sb.Append(" | wsi poza pomiarem - dopiski bez wywolania w dobie pomiaru (tick przed wlaczeniem, f4b): ").Append(partial);
                 // f4b-inwest: jednorazowa poprawka n z pomiaru doby wlaczenia (klucz Side Village Craft Neutral Fix)
                 var s0 = Settings.Current;
                 if (!round2)
@@ -759,6 +767,22 @@ namespace Armoury
             if (changed > 0) _n = n;
             return "zajec poprawionych " + changed + (notes.Count > 0 ? ": " + string.Join(", ", notes.ToArray()) : " (wszystkie w 0.5%)") + (changed > 0 ? " - plany od nowa w tej dobie, pomiar po poprawce w linii doby nastepnej" : "")
                    + (owner == null ? " (wlasciciel towaru z typow - bez rachunku na towarach)" : "");
+        }
+
+        /// <summary>f4b-inwest: wies zmierzona w calosci - jej plan nie ma dopiskow spoza listy typu albo choc jeden z nich mial wywolanie modelu (z koncem lancucha)
+        /// w dobie pomiaru. Pod Gate.</summary>
+        private static bool WholeMeasured(Village v, Dictionary<ItemObject, float[]> got, Dictionary<Village, Plan> plans)
+        {
+            Plan pl;
+            if (plans == null || !plans.TryGetValue(v, out pl) || pl == null || pl.Add == null || pl.TypeGoods == null) return true;
+            bool need = false;
+            foreach (var ad in pl.Add)
+            {
+                if (!(ad.Value > 0f) || pl.TypeGoods.Contains(ad.Key)) continue;
+                need = true;
+                float[] a; if (got.TryGetValue(ad.Key, out a) && a[2] >= 0f) return true;
+            }
+            return !need;
         }
 
         private static int OwnerByMeta(ItemObject it, CraftMeta[] meta)

@@ -40661,6 +40661,7 @@ NZW_MEAS = re.compile(r"Zajecia wiosek \(ZW\): pomiar neutralnosci \(A6, TESTS 2
 NZW_MEAS2 = re.compile(r"Zajecia wiosek \(ZW\): pomiar neutralnosci po poprawce \(A6\) doba (?P<day>-?\d+) \| wsi zmierzonych (?P<n>\d+), wywolan (?P<calls>\d+)"
                        r".*?\| najwieksza odchylka produkcji typu (?P<dev>[\d.]+)% \(prog 1%\) w (?P<worst>\S+)")
 NZW_FIX = re.compile(r"poprawka n z pomiaru \(f4b, Side Village Craft Neutral Fix\): zajec poprawionych (?P<n>\d+)(?P<rest>[^|]*)")
+NZW_PARTIAL = re.compile(r"wsi poza pomiarem - dopiski bez wywolania w dobie pomiaru \(tick przed wlaczeniem, f4b\): (?P<n>\d+)")
 NZW_GOODS = re.compile(r"\| n na towarach \(f4b, Side Village Craft Neutral Goods\): (?P<note>.*)$")
 NZW_ICONKS = re.compile(r"\| inna niz typ: bez KS (?P<dn>\d+) z (?P<nn>\d+), pod KS (?P<dk>\d+) z (?P<nk>\d+) \| regula pod KS \(f4b, District Icon Part Crafts\): (?P<rule>[^|]*)\| zmiany typ->ikona: (?P<pairs>[^|]*)\|")
 NZW_DAY = re.compile(r"Zajecia wiosek \(ZW\): dzien (?P<day>-?\d+) \| (?P<state>CZYNNE|NIECZYNNE[^|]*) \| okregow z wioskami (?P<d>\d+) \(bez KS (?P<fall>\d+), pod KS (?P<ks>\d+)[^)]*\), wiosek (?P<sides>\d+) "
@@ -40745,7 +40746,13 @@ def nzw_main(logp):
                     (meas2.append(mm.groupdict()) if mm else bad.append(s))
                 elif s.startswith(NZW_HEAD + "pomiar neutralnosci"):
                     mm = NZW_MEAS.match(s)
-                    (meas.append(mm.groupdict()) if mm else bad.append(s))
+                    if mm:
+                        g = mm.groupdict()
+                        pm = NZW_PARTIAL.search(s)
+                        g["partial"] = pm.group("n") if pm else None
+                        meas.append(g)
+                    else:
+                        bad.append(s)
                     fm = NZW_FIX.search(s)
                     if fm:
                         fixes.append(fm.groupdict())
@@ -40788,7 +40795,8 @@ def nzw_main(logp):
         if int(g1["n"]) > 0:
             rep.add("NZW-1: neutralny start na towarach (produkcja typu we wsiach z planem, doba wlaczenia)",
                     f"najwieksza odchylka {dev:.3f}% w {g1['worst']} (wsi {g1['n']}, wywolan {g1['calls']}, bez konca lancucha {g1['nofin']}, bez mnoznika {g1['nomult']}); "
-                    f"wobec swiata (ksiega {g1['led']}) {float(g1['devw']):.3f}% w {g1['worstw']}", f"<= {NZW_DEV_MAX:.0f}% (projekt TESTS 2)", dev <= NZW_DEV_MAX)
+                    f"wobec swiata (ksiega {g1['led']}) {float(g1['devw']):.3f}% w {g1['worstw']}"
+                    + (f"; wsi poza pomiarem (tick przed wlaczeniem) {g1['partial']}" if g1.get("partial") is not None else ""), f"<= {NZW_DEV_MAX:.0f}% (projekt TESTS 2)", dev <= NZW_DEV_MAX)
         else:
             rep.add("NZW-1: neutralny start na towarach", "pomiar bez wsi z planem", "INFO (wszystkie okregi pod KS albo sesja bez ticku produkcji po wlaczeniu)", None)
     elif deferred:
