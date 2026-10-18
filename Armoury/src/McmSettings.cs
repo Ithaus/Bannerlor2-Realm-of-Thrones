@@ -680,6 +680,30 @@ namespace Armoury
         [SettingPropertyGroup("The finished piece")]
         public bool PlayerMenSellSpareHorses { get; set; } = true;
 
+        [SettingPropertyBool("Armoury Book Per Modifier", HintText = "the book of YOUR kit in the troop armoury remembers each piece with its condition (Fine, Rusty...), not only its kind: with two copies of the same item in different condition you keep exactly the copy you put in at every sorting, instead of the worse one. Old entries keep the copies you hold now (off = the book counts kinds only and your share falls on the worst copies, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool ArmouryBookPerModifier { get; set; } = true;
+
+        [SettingPropertyBool("Armoury List Spare Horses When Kept", HintText = "with Armoury Shows Only Yours on and Player Men Sell Spare Horses off, the men's spare horses stay listed in the troop armoury - take one and you pay them the merchant's price on closing (off = they are hidden and never sold either, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool ArmouryListSpareHorsesWhenKept { get; set; } = true;
+
+        [SettingPropertyBool("Surplus Usable Any Group", HintText = "when the men (yours, AI lords' and garrisons') pick what to sell or use up in drill, a spare piece counts as usable if ANY troop of theirs can use it, not only their best troop - a piece only riders, or only another people, can use is no longer dumped as 'nobody can use it' (off = only the most skilled troop is asked, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool SurplusUsableAnyGroup { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Store Sub No Legends", HintText = "with Gear Fit Realm From Stores: when a soldier's foreign piece is swapped for one from the battle stores, the swap never hands out a legendary weapon, nor giant's gear to anyone but giants (off = as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool GearFitStoreSubNoLegends { get; set; } = true;
+
+        [SettingPropertyBool("Gear Fit Realm Foot In Hideout Siege", HintText = "in hideouts and sieges riders fight on foot: the battle stores (foreign-piece swap and the weapon floor) no longer refuse them long bows, pikes and other weapons that cannot be used from the saddle just because Dynamic Troop Equipment gave them a horse there (off = judged by that horse, as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool GearFitRealmFootInHideoutSiege { get; set; } = true;
+
+        [SettingPropertyBool("Night Prompt Skip When Rested", HintText = "the 'Night Falls - make camp?' question (and 'always make camp at nightfall') is not raised when your men have already slept their daily hours, e.g. after you slept in the menu - marching on costs them no sleep then (off = asked as before)")]
+        [SettingPropertyGroup("The finished piece")]
+        public bool NightPromptSkipWhenRested { get; set; } = true;
+
         [SettingPropertyBool("Garrison Kit Menu", HintText = "'Hand kit to the garrison' in the menu of your towns and castles: drop kit on the garrison - they take what fills empty hands or beats their own and give you their worse pieces back; the rest comes back to you")]
         [SettingPropertyGroup("The finished piece")]
         public bool GarrisonKitMenu { get; set; } = true;
@@ -7105,6 +7129,12 @@ namespace Armoury
             s.ArmouryShowsOnlyYours = ArmouryShowsOnlyYours;
             s.SwapReturnsTheirOldKit = SwapReturnsTheirOldKit;
             s.PlayerMenSellSpareHorses = PlayerMenSellSpareHorses;
+            s.ArmouryBookPerModifier = ArmouryBookPerModifier;
+            s.ArmouryListSpareHorsesWhenKept = ArmouryListSpareHorsesWhenKept;
+            s.SurplusUsableAnyGroup = SurplusUsableAnyGroup;
+            s.GearFitStoreSubNoLegends = GearFitStoreSubNoLegends;
+            s.GearFitRealmFootInHideoutSiege = GearFitRealmFootInHideoutSiege;
+            s.NightPromptSkipWhenRested = NightPromptSkipWhenRested;
             s.GarrisonKitMenu = GarrisonKitMenu;
             s.GarrisonArmoryInBattle = GarrisonArmoryInBattle;
             s.GarrisonFightsWithArmoryOnly = GarrisonFightsWithArmoryOnly;

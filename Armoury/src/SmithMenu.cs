@@ -1710,6 +1710,17 @@ namespace Armoury
             return true;
         }
 
+        /// <summary>ZB-1 (klucz ArmouryBookPerModifier): to samo ze stanem sztuki - wklad trafia do rozbicia ksiegi na egzemplarze (wylaczony - per id, jak dotad).</summary>
+        private static bool OrderIsYours(EquipmentElement el, int k)
+        {
+            if (el.Item == null) return false;
+            if (!ArmouryBehavior.BookModOn()) return OrderIsYours(el.Item.StringId, k);
+            var s = Settings.Current;
+            if (s == null || !s.QuartermasterSwapOneForOne || !s.ArmouryProtectUsed || string.IsNullOrEmpty(el.Item.StringId) || k <= 0) return false;
+            ArmouryBehavior.StockDepositKey(el, k);
+            return true;
+        }
+
         private const string OrderYoursNote = " The men take what they lack when the quartermaster next settles the stores; worse kit they hand back for it is yours.";
 
         private static void DoOrderKit(ItemObject item, int n, int total)
@@ -1736,7 +1747,7 @@ namespace Armoury
                 st.ItemRoster.AddToCounts(item, -k);
                 Pay.ToSettlement(pay);
                 armory.AddToCounts(item, k);
-                bool yours = OrderIsYours(item.StringId, k);   // K1 (B4): zaplaciles - to Twoj wklad, rozliczy go wymiana 1:1
+                bool yours = OrderIsYours(new EquipmentElement(item), k);   // K1 (B4): zaplaciles - to Twoj wklad, rozliczy go wymiana 1:1 (ZB-1: egzemplarz bez stanu - tak lezy na regale)
                 Log.Player(k + " x " + item.Name + " delivered to the " + (yours ? "armoury as your pieces" : "men's racks") + " for " + pay + " gold" + (k < n ? " - the market had no more." : ".")
                            + (yours ? OrderYoursNote : ""));
                 if (yours) QuartermasterEscrow.ShoutIfNoUse(item);   // K1 (przeglad, B4): nikt nie udzwignie - mowimy od razu (zostaje Twoja)
@@ -2024,7 +2035,7 @@ namespace Armoury
                 Pay.ToSettlement(total);
                 foreach (var p in picks) { st.ItemRoster.AddToCounts(p.El, -1); armory.AddToCounts(p.El, 1); }   // dostawa: dopiero teraz z polki na regaly
                 bool yours = false;
-                foreach (var p in picks) if (p.El.Item != null && OrderIsYours(p.El.Item.StringId, 1)) yours = true;   // K1 (B4)
+                foreach (var p in picks) if (p.El.Item != null && OrderIsYours(p.El, 1)) yours = true;   // K1 (B4); ZB-1: ze stanem sztuki z polki
                 int unmet = shortPurse ? lackOnShelf : n - k;   // za drogo to nie brak towaru (jak u lordow, wpis 81); E8/B: brak na polce liczy sie takze przy pustej kiesie
                 if (shortPurse && unmet > 0) SmallFixes8.NoteOrderLack(unmet);
                 NoteOrderUnmet(st, type, tier, unmet);

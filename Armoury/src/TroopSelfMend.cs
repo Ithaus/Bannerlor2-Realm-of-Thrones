@@ -80,9 +80,23 @@ namespace Armoury
                     return string.CompareOrdinal(ma != null ? ma.StringId ?? "" : "", mb != null ? mb.StringId ?? "" : "");
                 });
                 int left = ArmouryBehavior.StockOf(kv.Key);
-                foreach (var el in l)
+                // ZB-1 (klucz ArmouryBookPerModifier): czesc gracza jak w SwapMath.AllocateOwn z rozbiciem - najpierw rozbicie ksiegi tego egzemplarza (w granicach
+                // ksiegi id, od najgorszego), potem reszta ksiegi id na najgorsze; wylaczony - jak dotad (cala ksiega id na najgorsze)
+                int[] ownOf = null;
+                if (ArmouryBehavior.BookModOn())
                 {
-                    int own = Math.Min(el.Amount, Math.Max(0, left)); left -= own;
+                    ownOf = new int[l.Count];
+                    for (int i = 0; i < l.Count; i++)
+                    {
+                        int k = Math.Min(Math.Min(l[i].Amount, Math.Max(0, ArmouryBehavior.StockOfKey(QuartermasterLaw.KeyOf(l[i].EquipmentElement)))), Math.Max(0, left));
+                        ownOf[i] = k; left -= k;
+                    }
+                }
+                for (int i = 0; i < l.Count; i++)
+                {
+                    var el = l[i];
+                    int own0 = ownOf != null ? ownOf[i] : 0;
+                    int own = own0 + Math.Min(el.Amount - own0, Math.Max(0, left)); left -= own - own0;
                     int men = el.Amount - own;
                     if (men > 0 && Mendable(el)) worn.Add(new ItemRosterElement(el.EquipmentElement, men));
                 }

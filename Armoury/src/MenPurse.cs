@@ -482,7 +482,8 @@ namespace Armoury
             // w miejsce gorszej), inaczej ludzie sprzedawaliby lepsza sztuke, ktora nosza, bo "noszona" byla gorsza sztuka gracza
             if (s.QuartermasterSwapOneForOne) SwapMath.FitBest(men, troops.Count, meets, pieces);
             else SwapMath.Fit(men, troops.Count, meets, pieces);
-            if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) return null;
+            // ZB-3 (klucz SurplusUsableAnyGroup): "ktos udzwignie" - kazda grupa ludzi, nie tylko najzdolniejsza (wylaczony - SwapMath.Usable, jak dotad)
+            if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, ArmouryZb.SurplusUsable(men, meets, false)) <= 0) return null;
             pieces.Sort(SwapMath.WorseFirst);
             return pieces;
         }
@@ -638,7 +639,8 @@ namespace Armoury
             int[] men; Func<int, SwapMath.Piece, bool> meets;
             var pieces = AiFitted(arm, roster, type, out men, out meets);   // E6/N1: dopasowanie wydzielone (to samo czyta AiWornByMen) - bez zmiany dzialania
             if (pieces == null) return null;
-            if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, p => SwapMath.Usable(men, meets, p)) <= 0) return null;
+            // ZB-3 (klucz SurplusUsableAnyGroup): jak u gracza - kazda grupa (lordowie AI i zalogi; musztra AI czyta ten sam plan)
+            if (SwapMath.SurplusPlan(pieces, men.Length, s.SurplusKeepPercent, ArmouryZb.SurplusUsable(men, meets, true)) <= 0) return null;
             pieces.Sort(SwapMath.WorseFirst);
             return pieces;
         }

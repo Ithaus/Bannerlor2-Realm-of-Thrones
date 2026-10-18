@@ -291,8 +291,294 @@ namespace Armoury
                 v -= n;
                 if (v <= 0) self._playerStock.Remove(id); else self._playerStock[id] = v;
                 StockVersion++;
+                if (!ClipHold && BookModOn()) ClipMod(id);   // ZB-1: suma rozbicia id nigdy ponad ksiege id (klucz wylaczony - bez zmian; porzadek ustawia rozbicie sam - ClipHold)
             }
             catch { }
+        }
+
+        // ===== ZB-1 (noc 17/18.10, przeglad 16.10 - STAN-PRAC 46; klucz ArmouryBookPerModifier): ROZBICIE KSIEGI NA EGZEMPLARZE =====
+        // Ksiega wkladow (_playerStock) jest per id, a SwapMath.AllocateOwn kladl czesc gracza na NAJGORSZE egzemplarze id: przy dwoch egzemplarzach tego samego
+        // id z innym modyfikatorem gracz przy nastepnym porzadku dostawal gorszy (jego "Fine X" nienoszony, obok zwykly X z zapasu ludzi - po porzadku jego czescia
+        // byl zwykly X, a "Fine X" przechodzil na ludzi). Teraz obok sumy per id (zostaje: jedyny zapis dla starszej DLL i odczyt wszystkich "czy gracz ma cos
+        // z tego id") jest rozbicie: klucz id|mod -> ile sztuk gracza TEGO egzemplarza. Niezmiennik: suma rozbicia id <= ksiega id; reszta ksiegi id bez rozbicia
+        // (stary zapis, wklad bez egzemplarza - polegli) idzie jak dotad na najgorsze egzemplarze. Porzadek (QuartermasterLaw.PurgeUnusable) ustawia rozbicie
+        // na czesc gracza z dopasowania (Target) - stary zapis migruje przy pierwszym porzadku dokladnie do tego, co gracz ma teraz (bez zmiany wlasnosci).
+        // Zapis: nowy klucz arm_player_stock_mod ("1|id|mod=n;..."); stary zapis bez klucza - puste rozbicie; starsza DLL klucz pomija. Same etykiety wlasnosci -
+        // zadna sztuka ani moneta nie powstaje ani nie znika (ksiega per id zmienia sie dokladnie tak jak dotad).
+        private Dictionary<string, int> _playerStockMod = new Dictionary<string, int>();
+        internal static bool ClipHold;          // porzadek (PurgeUnusable) w trakcie zmian ksiegi per id - rozbicie ustawi BookSetSplit, bez przycinania po drodze
+        private int _bookModSeen = -1;          // stan klucza przy ostatnim odczycie: -1 nieznany (po wczytaniu / nowej grze), 0 wylaczony, 1 wlaczony
+        private bool _bookModMigrate;           // wczytany zapis bez klucza arm_player_stock_mod - pierwszy porzadek z rozbiciem to migracja (linia raz)
+        private const int BookModMaxKeys = 20000;   // straz rozmiaru zapisu (realnie dziesiatki-setki)
+
+        /// <summary>ZB-1: magazyn DTE po wczytaniu jest jeszcze bez stanow (save DTE gubi modyfikatory) - rozbicie nie moze sie wtedy dopasowywac do polek.</summary>
+        internal static bool WearRestorePending { get { var self = Instance; return self != null && self._wearRestorePending; } }
+
+        /// <summary>ZB-1: czy ksiega jest rozbita na egzemplarze (klucz ArmouryBookPerModifier). Przelaczenie klucza w trakcie gry czysci rozbicie (przy wylaczonym
+        /// nie bylo prowadzone) - przy najblizszym porzadku migracja z ksiegi per id, jak ze starego zapisu.</summary>
+        internal static bool BookModOn()
+        {
+            var s = Settings.Current;
+            bool on = s != null && s.ArmouryBookPerModifier;
+            var self = Instance;
+            if (self == null) return on;
+            int v = on ? 1 : 0;
+            if (self._bookModSeen != v)
+            {
+                if (self._bookModSeen >= 0 && self._playerStockMod.Count > 0)
+                {
+                    ArmouryZb.NoteModeReset(self._playerStockMod.Count);
+                    self._playerStockMod.Clear();
+                    if (on) self._bookModMigrate = true;
+                }
+                else if (self._bookModSeen >= 0 && on) self._bookModMigrate = true;
+                self._bookModSeen = v;
+            }
+            return on;
+        }
+
+        /// <summary>ZB-1: czesc gracza egzemplarza (klucz id|mod) z rozbicia.</summary>
+        internal static int StockOfKey(string key)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || string.IsNullOrEmpty(key)) return 0;
+                int v; return self._playerStockMod.TryGetValue(key, out v) ? v : 0;
+            }
+            catch { return 0; }
+        }
+
+        private static string IdOfKey(string key) { int i = key != null ? key.IndexOf('|') : -1; return i >= 0 ? key.Substring(0, i) : (key ?? ""); }
+
+        /// <summary>ZB-1: reszta ksiegi id bez rozbicia (najgorsze egzemplarze, jak dotad).</summary>
+        internal static int StockRestOf(string id)
+        {
+            try
+            {
+                var self = Instance;
+                if (self == null || string.IsNullOrEmpty(id)) return 0;
+                int book; self._playerStock.TryGetValue(id, out book);
+                return Math.Max(0, book - ModSumOf(self, id));
+            }
+            catch { return 0; }
+        }
+
+        private static int ModSumOf(ArmouryBehavior self, string id)
+        {
+            int sum = 0; string pre = id + "|";
+            foreach (var kv in self._playerStockMod) if (kv.Key.StartsWith(pre, StringComparison.Ordinal)) sum += kv.Value;
+            return sum;
+        }
+
+        /// <summary>ZB-1: wklad gracza ZE STANEM (ekran zbrojowni, ksiega musztry, zamowienie u kowala) - ksiega per id jak StockDeposit, a przy kluczu takze rozbicie.</summary>
+        internal static void StockDepositKey(EquipmentElement el, int n)
+        {
+            try
+            {
+                var it = el.Item;
+                if (it == null || string.IsNullOrEmpty(it.StringId) || n <= 0) return;
+                StockDeposit(it.StringId, n);
+                if (!BookModOn()) return;
+                var self = Instance;
+                if (self == null) return;
+                string key = QuartermasterLaw.KeyOf(el);
+                int v; self._playerStockMod.TryGetValue(key, out v); self._playerStockMod[key] = v + n;
+                ArmouryZb.NoteKeyMove(n, true);
+            }
+            catch (Exception e) { ArmouryZb.Stumble("StockDepositKey", e); }
+        }
+
+        /// <summary>ZB-1: wyjecie sztuki gracza ZE STANEM - najpierw z rozbicia tego egzemplarza, potem ksiega per id (z przycieciem rozbicia do ksiegi).</summary>
+        internal static void StockWithdrawKey(EquipmentElement el, int n)
+        {
+            try
+            {
+                var it = el.Item;
+                if (it == null || string.IsNullOrEmpty(it.StringId) || n <= 0) return;
+                var self = Instance;
+                if (self != null && BookModOn())
+                {
+                    string key = QuartermasterLaw.KeyOf(el);
+                    int v; self._playerStockMod.TryGetValue(key, out v);
+                    int cut = Math.Min(v, n);
+                    if (v - cut > 0) self._playerStockMod[key] = v - cut; else self._playerStockMod.Remove(key);
+                    ArmouryZb.NoteKeyMove(n, false);
+                }
+                StockWithdraw(it.StringId, n);
+            }
+            catch (Exception e) { ArmouryZb.Stumble("StockWithdrawKey", e); }
+        }
+
+        /// <summary>ZB-1: suma rozbicia id ponad ksiege id (przyciecie ksiegi, wyjecie spoza rozbicia) - zdejmujemy roszczenia od NAJGORSZEGO egzemplarza
+        /// (wrak, potem nizsza jakosc); zdjete sztuki to te, ktore gracz stracil. Zwraca zdjete.</summary>
+        private static int ClipMod(string id)
+        {
+            var self = Instance;
+            if (self == null || string.IsNullOrEmpty(id) || self._playerStockMod.Count == 0) return 0;
+            int book; self._playerStock.TryGetValue(id, out book);
+            string pre = id + "|";
+            var keys = new List<string>();
+            int sum = 0;
+            foreach (var kv in self._playerStockMod) if (kv.Key.StartsWith(pre, StringComparison.Ordinal)) { keys.Add(kv.Key); sum += kv.Value; }
+            int over = sum - Math.Max(0, book);
+            if (over <= 0) return 0;
+            keys.Sort((a, b) =>
+            {
+                float qa, qb; bool wa = ModWreck(a.Substring(pre.Length), out qa), wb = ModWreck(b.Substring(pre.Length), out qb);
+                int d = (wb ? 1 : 0).CompareTo(wa ? 1 : 0); if (d != 0) return d;
+                d = qa.CompareTo(qb); if (d != 0) return d;
+                return string.CompareOrdinal(a, b);
+            });
+            int cut = 0;
+            foreach (var k in keys)
+            {
+                if (over <= 0) break;
+                int v = self._playerStockMod[k];
+                int c = Math.Min(v, over);
+                if (v - c > 0) self._playerStockMod[k] = v - c; else self._playerStockMod.Remove(k);
+                over -= c; cut += c;
+            }
+            ArmouryZb.NoteClip(cut);
+            return cut;
+        }
+
+        /// <summary>ZB-1: wrak i jakosc (PriceMultiplier) modyfikatora po id; "" - bez modyfikatora (1.0). Blad odczytu - jak bez modyfikatora.</summary>
+        private static bool ModWreck(string modId, out float q)
+        {
+            q = 1f;
+            if (string.IsNullOrEmpty(modId)) return false;
+            try
+            {
+                var m = TaleWorlds.ObjectSystem.MBObjectManager.Instance.GetObject<ItemModifier>(modId);
+                if (m == null) return false;
+                q = m.PriceMultiplier;
+                return LootPrices.IsWreck(m);
+            }
+            catch { return false; }
+        }
+
+        /// <summary>ZB-1: porzadek (PurgeUnusable) - rozbicie id z tych egzemplarzy = czesc gracza z dopasowania (Target); klucze tych id spoza listy (egzemplarza
+        /// juz nie ma na polce) znikaja. Ksiege per id porzadek zmienil chwile wczesniej o sume (Target - Own), wiec suma Target <= ksiega id. Zwraca sume Target.</summary>
+        internal static int BookSetSplit(List<SwapMath.Piece> pieces)
+        {
+            var self = Instance;
+            if (self == null || pieces == null || pieces.Count == 0) return 0;
+            var ids = new HashSet<string>();
+            foreach (var p in pieces) ids.Add(p.Id ?? "");
+            foreach (var k in new List<string>(self._playerStockMod.Keys))
+                if (ids.Contains(IdOfKey(k))) self._playerStockMod.Remove(k);
+            int sum = 0;
+            foreach (var p in pieces)
+            {
+                if (p.Target <= 0) continue;
+                int v; self._playerStockMod.TryGetValue(p.Key, out v);
+                self._playerStockMod[p.Key] = v + p.Target;
+                sum += p.Target;
+            }
+            foreach (var id in ids) ClipMod(id);
+            return sum;
+        }
+
+        /// <summary>ZB-1: czy wczytany zapis nie mial rozbicia (migracja przy pierwszym porzadku) - zdejmuje flage.</summary>
+        internal static bool TakeBookMigrate() { var self = Instance; if (self == null || !self._bookModMigrate) return false; self._bookModMigrate = false; return true; }
+
+        /// <summary>ZB-1: stan do linii doby - ksiega per id (id, szt.), rozbicie (klucze, szt. w granicach ksiegi), reszta bez rozbicia, rozbicie ponad ksiege.</summary>
+        internal static void BookModStats(out int ids, out int pcs, out int keys, out int modPcs, out int rest, out int over)
+        {
+            ids = 0; pcs = 0; keys = 0; modPcs = 0; rest = 0; over = 0;
+            var self = Instance;
+            if (self == null) return;
+            var sumBy = new Dictionary<string, int>();
+            foreach (var kv in self._playerStockMod) { keys++; int v; sumBy.TryGetValue(IdOfKey(kv.Key), out v); sumBy[IdOfKey(kv.Key)] = v + kv.Value; }
+            foreach (var kv in self._playerStock)
+            {
+                if (kv.Value <= 0) continue;
+                ids++; pcs += kv.Value;
+                int m; sumBy.TryGetValue(kv.Key, out m);
+                modPcs += Math.Min(m, kv.Value); rest += Math.Max(0, kv.Value - m); over += Math.Max(0, m - kv.Value);
+            }
+            foreach (var kv in sumBy) if (!self._playerStock.ContainsKey(kv.Key)) over += kv.Value;
+        }
+
+        /// <summary>ZB-1: kopia rozbicia na czas sesji ekranu (Reset/Cancel ekranu cofa ja razem z ksiega per id).</summary>
+        internal static Dictionary<string, int> StockModSnapshot()
+        {
+            try { var self = Instance; return self != null ? new Dictionary<string, int>(self._playerStockMod) : null; }
+            catch { return null; }
+        }
+
+        internal static void StockModRestore(Dictionary<string, int> snap)
+        {
+            try { var self = Instance; if (self == null || snap == null) return; self._playerStockMod = new Dictionary<string, int>(snap); }
+            catch { }
+        }
+
+        /// <summary>ZB-1: zapis rozbicia "1|id|mod=n;..." (klucz wylaczony albo puste - ""); straz rozmiaru BookModMaxKeys.</summary>
+        private string ExportStockMod()
+        {
+            if (!BookModOn() || _playerStockMod.Count == 0) return "";
+            if (_playerStockMod.Count > BookModMaxKeys)
+            {
+                Log.Info("Zbrojownia (ZB-1): rozbicie ksiegi ma " + _playerStockMod.Count + " kluczy (> " + BookModMaxKeys + ") - nie zapisane, po wczytaniu migracja z ksiegi per id.");
+                return "";
+            }
+            var sb = new System.Text.StringBuilder("1|");
+            bool first = true;
+            foreach (var kv in _playerStockMod)
+            {
+                if (kv.Value <= 0 || string.IsNullOrEmpty(kv.Key) || kv.Key.IndexOf(';') >= 0 || kv.Key.IndexOf('=') >= 0) continue;
+                if (!first) sb.Append(';');
+                sb.Append(kv.Key).Append('=').Append(kv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                first = false;
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>ZB-1: odczyt rozbicia. null/"" - stary zapis albo klucz byl wylaczony (migracja przy pierwszym porzadku); inny format albo za duzy - pominiety
+        /// (tez migracja). Rozbicie przyciete do ksiegi per id wczytanej wczesniej (arm_player_stock).</summary>
+        private void ImportStockMod(string data)
+        {
+            _playerStockMod = new Dictionary<string, int>();
+            _bookModSeen = -1;
+            if (string.IsNullOrEmpty(data)) { _bookModMigrate = true; return; }
+            if (!data.StartsWith("1|", StringComparison.Ordinal) || data.Length > 4000000)
+            {
+                _bookModMigrate = true;
+                Log.Info("Zbrojownia (ZB-1): zapis rozbicia ksiegi w nieznanym formacie albo za duzy (" + data.Length + " znakow) - pominiety, migracja z ksiegi per id.");
+                return;
+            }
+            int bad = 0;
+            foreach (var part in data.Substring(2).Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                int eq = part.LastIndexOf('=');
+                int n;
+                if (eq <= 0 || part.IndexOf('|') <= 0 || !int.TryParse(part.Substring(eq + 1), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out n) || n <= 0)
+                { bad++; continue; }
+                if (_playerStockMod.Count >= BookModMaxKeys) { bad++; continue; }
+                string key = part.Substring(0, eq);
+                int v; _playerStockMod.TryGetValue(key, out v); _playerStockMod[key] = v + n;
+            }
+            // przyciecie do ksiegi per id (bez jakosci modyfikatora - przy wczytaniu tylko niespojny zapis; od klucza o najwiekszej czesci)
+            var byId = new Dictionary<string, List<string>>();
+            foreach (var k in _playerStockMod.Keys) { List<string> l; string id = IdOfKey(k); if (!byId.TryGetValue(id, out l)) byId[id] = l = new List<string>(); l.Add(k); }
+            int cut = 0;
+            foreach (var kv in byId)
+            {
+                int book; if (_playerStock == null || !_playerStock.TryGetValue(kv.Key, out book)) book = 0;
+                int sum = 0; foreach (var k in kv.Value) sum += _playerStockMod[k];
+                int over = sum - Math.Max(0, book);
+                if (over <= 0) continue;
+                kv.Value.Sort(string.CompareOrdinal);
+                foreach (var k in kv.Value)
+                {
+                    if (over <= 0) break;
+                    int v = _playerStockMod[k]; int c = Math.Min(v, over);
+                    if (v - c > 0) _playerStockMod[k] = v - c; else _playerStockMod.Remove(k);
+                    over -= c; cut += c;
+                }
+            }
+            if (bad > 0 || cut > 0) Log.Info("Zbrojownia (ZB-1): wczytane rozbicie ksiegi - kluczy " + _playerStockMod.Count + ", wpisy bledne " + bad + ", przyciete do ksiegi per id " + cut + " szt.");
         }
 
         /// <summary>Kopia ksiegi wkladow (na czas sesji ekranu zbrojowni -
@@ -373,6 +659,32 @@ namespace Armoury
                     int v; shelf.TryGetValue(it.StringId, out v);
                     shelf[it.StringId] = v + el.Amount;
                 }
+                // ZB-1: rozbicie na egzemplarze przyciete do polek PER EGZEMPLARZ (zuzyty, naprawiony albo zabrany egzemplarz zmienil klucz) - nadmiar wraca do reszty
+                // ksiegi id (najgorsze egzemplarze); nie przy magazynie jeszcze bez stanow po wczytaniu (TryRestoreArmoryWear w toku)
+                int ghostKey = 0;
+                if (self._playerStockMod.Count > 0 && BookModOn() && !self._wearRestorePending)
+                {
+                    try
+                    {
+                        var shelfKey = new Dictionary<string, int>();
+                        for (int i = 0; i < armory.Count; i++)
+                        {
+                            var el = armory.GetElementCopyAtIndex(i);
+                            if (el.EquipmentElement.Item == null || el.Amount <= 0) continue;
+                            string k = QuartermasterLaw.KeyOf(el.EquipmentElement);
+                            int v; shelfKey.TryGetValue(k, out v); shelfKey[k] = v + el.Amount;
+                        }
+                        foreach (var k in new List<string>(self._playerStockMod.Keys))
+                        {
+                            int mine = self._playerStockMod[k];
+                            int have; shelfKey.TryGetValue(k, out have);
+                            if (mine <= have) continue;
+                            ghostKey += mine - have;
+                            if (have <= 0) self._playerStockMod.Remove(k); else self._playerStockMod[k] = have;
+                        }
+                    }
+                    catch (Exception e) { ArmouryZb.Stumble("ReconcileStock.Mod", e); }
+                }
                 int ghost = 0;
                 var ids = new List<string>(self._playerStock.Keys);
                 foreach (var id in ids)
@@ -383,10 +695,17 @@ namespace Armoury
                     ghost += book - have;
                     if (have <= 0) self._playerStock.Remove(id); else self._playerStock[id] = have;
                     StockVersion++;
+                    if (self._playerStockMod.Count > 0 && BookModOn()) ClipMod(id);   // ZB-1: niezmiennik rozbicie <= ksiega id
                 }
                 if (ghost > 0)
                     Log.Info("ReconcileStock(" + why + "): ksiega gracza przycieta o " + ghost
                              + " szt. ducha (ubytki z polek poza ekranem zbrojowni).");
+                if (ghostKey > 0)
+                {
+                    ArmouryZb.NoteGhostKey(ghostKey);
+                    Log.Info("ReconcileStock(" + why + "): rozbicie ksiegi na egzemplarze (ZB-1) przyciete o " + ghostKey
+                             + " szt. (egzemplarza o tym stanie nie ma na polkach - zostaja w ksiedze id na najgorszych egzemplarzach).");
+                }
             }
             catch (Exception e) { Log.Error("ReconcileStock", e); }
         }
@@ -642,6 +961,15 @@ namespace Armoury
                 if (_playerStock == null) _playerStock = new Dictionary<string,int>();
             }
             catch (Exception e) { Log.Error("SyncData", e); }
+            // ZB-1 (noc 17/18.10): rozbicie ksiegi gracza na egzemplarze (id|mod -> ile) - wlasny try, PO arm_player_stock (przyciecie do ksiegi id); brak klucza
+            // (stary zapis) = puste rozbicie i migracja przy pierwszym porzadku; starsza DLL klucz pomija; klucz ArmouryBookPerModifier wylaczony - zapis pusty
+            try
+            {
+                string bm = dataStore.IsSaving ? ExportStockMod() : null;
+                SaveText.Sync(dataStore, "arm_player_stock_mod", ref bm);
+                if (dataStore.IsLoading) ImportStockMod(bm);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_player_stock_mod", e); }
             // paczka 169: dochod staly rodow D (pierscien 28 dob, klucz Clan.StringId) - osobny try, dane tylko do logu (166/168 dopiero beda ich uzywac);
             // brak klucza (stary zapis) = pusta ksiega, start D = G/60 w pierwszym Daily
             try
@@ -1508,6 +1836,7 @@ namespace Armoury
             try { NightEcon.SessionStart(); } catch (Exception e) { Log.Error("NightEcon.SessionStart", e); }   // noc 16.10 (N2, N3, P8a, N9, N10, N11, N12): linie "Noc-ekonomia (NE): start sesji" - PO HistoricalPrices.Apply i SmithWood.SessionStart
             try { SmithWood.SessionStart(); } catch (Exception e) { Log.Error("SmithWood.SessionStart", e); }   // Jeff 15.10: drewno w kuzni w kg - latki na czynny model kosztow i SpendMaterials
             try { PlayerArmoryView.SessionStart(); } catch (Exception e) { Log.Error("PlayerArmoryView.SessionStart", e); }   // Jeff 15.10 (a/b/c): zbrojownia gracza - czyje co jest; linia "Zbrojownia gracza (15.10): start sesji" (PO McmSettings.Apply)
+            try { ArmouryZb.SessionStart(); } catch (Exception e) { Log.Error("ArmouryZb.SessionStart", e); }   // ZB (noc 17/18.10, przeglad 16.10): linia "Zbrojownia gracza (ZB): start sesji" - klucze ZB-1..ZB-6 i samosprawdzenie ksiegi per modyfikator (PO McmSettings.Apply)
             try { GearFit.SessionStart(); } catch (Exception e) { Log.Error("GearFit.SessionStart", e); }   // GearFit (po recenzji): filtr kompletu t1 DTE dopiero od startu sesji (OnGameLoaded DTE biegnie przed prawami CrashScribe), pamiec wzorcow od nowa
             try { ArmyCohesionYear.SessionStart(); } catch (Exception e) { Log.Error("ArmyCohesionYear.SessionStart", e); }   // AC (Jeff 14.10): spojnosc armii x 84 / rok - postfiks na metode czynnego modelu armii (raz na proces), linia "Spojnosc armii (AC): start sesji"
             try { MissionTeams.SessionStart(); } catch (Exception e) { Log.Error("MissionTeams.SessionStart", e); }   // NM (noc 15/16.10): straznik druzyn w misji i ucieczka rannych tylko w bitwie - linia "Druzyny w misji (NM): start sesji" (PO McmSettings.Apply), liczniki sesji od zera
@@ -1834,6 +2163,7 @@ namespace Armoury
             try { QuestPay8.Daily(); } catch (Exception e) { Log.Error("QuestPay8.Daily", e); } DayProfile.Lap("QuestPay8.Daily");   // E8/D1 (256): linia "Nagrody zadan (E8/D1)" i porzadek w slowniku kwot zamrozonych
             try { PlayerFees8.Daily(); } catch (Exception e) { Log.Error("PlayerFees8.Daily", e); } DayProfile.Lap("PlayerFees8.Daily");   // E8/D2 (257): linia "Wydatki gracza (E8/D2)" - tylko log
             try { MenUpgrade.Touch(); } catch (Exception e) { Log.Error("MenUpgrade.Touch", e); } DayProfile.Lap("MenUpgrade.Touch");   // K1: linia "Dozbrajanie: dzien" (poprzednia doba, codziennie)
+            try { ArmouryZb.Daily(); } catch (Exception e) { Log.Error("ArmouryZb.Daily", e); } DayProfile.Lap("ArmouryZb.Daily");   // ZB (noc 17/18.10): linia "Zbrojownia gracza (ZB): dzien N" - ksiega per modyfikator, konie zapasu, nadwyzki kazdej grupy, pytanie o nocleg (tylko log)
             try { PlagueWatch.DailyReport(); } catch (Exception e) { Log.Error("PlagueWatch", e); } DayProfile.Lap("PlagueWatch.DailyReport");
             try { InfluenceWatch.DailyReport(); } catch (Exception e) { Log.Error("InfluenceWatch", e); } DayProfile.Lap("InfluenceWatch.DailyReport");
             try { WesterosClimate.Daily(); } catch (Exception e) { Log.Error("WesterosClimate.Daily", e); } DayProfile.Lap("WesterosClimate.Daily");   // biale kruki: koniec pory roku

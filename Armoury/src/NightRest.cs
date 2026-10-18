@@ -236,6 +236,22 @@ namespace Armoury
                     ? InCamp(h) && Mod24(CampEnd - h) >= 2 && _promptNight != nightId
                     : h == CampStart && _promptDay != (int)CampaignTime.Now.ToDays;
                 bool promptNow = false;
+                // ZB-6 (przeglad 16.10, klucz NightPromptSkipWhenRested): ludzie juz sie wyspali tej doby (np. sen w menu skonczony w godzinach obozu - pobudka
+                // o 3:00 i ruch kolumny dawaly zaraz "Night Falls - make camp?"): odpoczynek doby bez braku odlozonego >= NeededHours (baza + odsetki dlugu - ten sam
+                // prog co splata od reki CreditRest), wiec marsz nie zrobi dlugu o swicie (SettleNight) i nie ma czego odsypiac - ani pytania, ani obozu z rozkazu
+                // "always make camp"; noc odhaczona (raz na noc, jak pytanie), linia logu i licznik ZB
+                if (promptHour && CampStart != CampEnd && movedH && s.NightPromptSkipWhenRested && _restTonight - Math.Max(0f, _dawnOwed) >= NeededHours()
+                    && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped && !captive
+                    && mp.CurrentSettlement == null && mp.MapEvent == null && mp.AttachedTo == null && !mp.IsCurrentlyAtSea
+                    && PlayerEncounter.Current == null && !enl)
+                {
+                    _promptDay = (int)CampaignTime.Now.ToDays;
+                    _promptNight = nightId;
+                    promptHour = false;
+                    ArmouryZb.NotePromptSkip();
+                    Log.Info("Nocleg: gracz - zmierzch o " + h + ":00, kolumna w marszu, ale odpoczynek doby " + F1(_restTonight) + " h (bez braku " + F1(Math.Max(0f, _dawnOwed))
+                             + " h) >= potrzeba " + F1(NeededHours()) + " h (dlug " + Debt + ") - bez pytania o nocleg (ZB-6, Night Prompt Skip When Rested), noc " + nightId + ".");
+                }
                 if (promptHour && CampStart != CampEnd && movedH
                     && s.NightfallPromptEnabled && CampPromptMode != 2 && !_sleeping && !PlayerCamped
                     && !captive

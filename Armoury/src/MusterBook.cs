@@ -384,7 +384,8 @@ namespace Armoury
                                 {
                                     var store2 = QuartermasterLaw.DteArmory();
                                     if (store2 != null) store2.AddToCounts(ee, 1);
-                                    ArmouryBehavior.StockDeposit(ee.Item.StringId, 1);   // wklad gracza
+                                    if (ArmouryBehavior.BookModOn()) ArmouryBehavior.StockDepositKey(ee, 1);   // ZB-1: wklad gracza ze stanem
+                                    else ArmouryBehavior.StockDeposit(ee.Item.StringId, 1);   // wklad gracza
                                     beq[ws] = new EquipmentElement(null);
                                     self._pins[key] = ee.Item.StringId;
                                     Log.Player(ee.Item.Name + " goes from your back to the company stores - "
@@ -407,17 +408,19 @@ namespace Armoury
                                 if (bags2 != null && store != null)
                                 {
                                     int moved = 0;
+                                    bool keyBook = ArmouryBehavior.BookModOn();
                                     for (int i = bags2.Count - 1; i >= 0; i--)
                                     {
                                         var el = bags2.GetElementCopyAtIndex(i);
                                         if (el.EquipmentElement.Item != it || el.Amount <= 0) continue;
                                         store.AddToCounts(el.EquipmentElement, el.Amount);
                                         bags2.AddToCounts(el.EquipmentElement, -el.Amount);
+                                        if (keyBook) ArmouryBehavior.StockDepositKey(el.EquipmentElement, el.Amount);   // ZB-1: wklad gracza ze stanem (per egzemplarz)
                                         moved += el.Amount;
                                     }
                                     if (moved > 0)
                                     {
-                                        ArmouryBehavior.StockDeposit(it.StringId, moved);   // wklad gracza - moze cofnac
+                                        if (!keyBook) ArmouryBehavior.StockDeposit(it.StringId, moved);   // wklad gracza - moze cofnac (ZB-1: przy rozbiciu juz zaksiegowane per egzemplarz)
                                         Log.Player(moved + " x " + it.Name + " moved from your baggage to the company stores.", true);
                                     }
                                 }

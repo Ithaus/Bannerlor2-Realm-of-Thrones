@@ -445,9 +445,13 @@ namespace Armoury
                 if (it == null || el.Amount <= 0 || it.ItemType != type || !CountsAsKit(it, type)) continue;
                 list.Add(PieceOf(el.EquipmentElement, el.Amount));
             }
-            if (own) SwapMath.AllocateOwn(list, ArmouryBehavior.StockOf);
+            // ZB-1 (klucz ArmouryBookPerModifier): najpierw rozbicie ksiegi na egzemplarze (id|mod), reszta ksiegi id jak dotad na najgorsze; wylaczony - per id
+            if (own) _lastOwnRest = SwapMath.AllocateOwn(list, ArmouryBehavior.StockOf, ArmouryBehavior.BookModOn() ? (Func<string, int>)ArmouryBehavior.StockOfKey : null);
             return list;
         }
+
+        // ZB-1: ile sztuk ostatni KitPieces(own) przypisal z reszty ksiegi id (bez rozbicia) - czyta PurgeUnusable zaraz po FitFor (linia ZB, migracja)
+        private static int _lastOwnRest;
 
         /// <summary>K1: ludzie rostera, ktorzy wedlug wzorca nosza ten typ (amunicja: tyle stosow, ile slotow wzorca - jak WornFor),
         /// jako grupy po oddziale; men = indeksy grup, od najwyzszego skilla (skill pierwszej sztuki ze skillem - jak dotad FitFor).</summary>
@@ -593,6 +597,8 @@ namespace Armoury
                 int wornKinds = 0, backKinds = 0;
                 var dep = new SwapMath.DepositTally();   // K1c: wklady tej sesji - co ludzie wzieli, co zostalo i dlaczego, co przeszlo za ich gorszy egzemplarz
                 var split = new Dictionary<string, int[]>();   // klucz id|mod -> [noszone, czesc gracza, razem]
+                // ZB-1: porzadek z rozbiciem ksiegi (linia ZB) i migracja starego zapisu - sztuki z reszty ksiegi id bez rozbicia, id z czescia gracza
+                bool zbRun = false; int zbMigPcs = 0; var zbMigIds = new HashSet<string>();
                 // 16.09: rozkazy z ksiegi musztry do logu - dotad nie bylo po nich sladu
                 var pinnedWorn = new List<string>();
                 int pinnedKept = 0;
@@ -667,6 +673,14 @@ namespace Armoury
                             else if (net < 0 && !pinnedWorn.Contains(id2)) pinnedWorn.Add(id2);
                         }
                     }
+                    // ZB-1 (klucz ArmouryBookPerModifier): ksiega per id zmienia sie jak dotad (suma korekt), a rozbicie na egzemplarze dostaje DOKLADNIE czesc gracza
+                    // z dopasowania (Target) - przy nastepnym porzadku Own = Target tego samego egzemplarza (bez ping-pongu i bez zsuwania na gorszy). Nie przy magazynie
+                    // jeszcze bez stanow po wczytaniu (TryRestoreArmoryWear w toku) - wtedy samo per id, jak przed paczka
+                    bool perKey = ArmouryBehavior.BookModOn() && !ArmouryBehavior.WearRestorePending;
+                    int ownRest = _lastOwnRest;
+                    if (perKey) ArmouryBehavior.ClipHold = true;
+                    try
+                    {
                     foreach (var kv in perId)
                     {
                         if (kv.Value > 0)
@@ -684,6 +698,19 @@ namespace Armoury
                             if (takenNames.Count < 4) takenNames.Add((-kv.Value) + "x " + nameOf[kv.Key]);
                         }
                     }
+                    }
+                    finally { ArmouryBehavior.ClipHold = false; }
+                    if (perKey && f.Pieces.Count > 0)
+                    {
+                        try
+                        {
+                            if (!zbRun) { zbRun = true; ArmouryZb.NotePurgeRun(); }
+                            int set = ArmouryBehavior.BookSetSplit(f.Pieces);
+                            ArmouryZb.NotePurge(set, ownRest);
+                            if (ownRest > 0) { zbMigPcs += ownRest; foreach (var p in f.Pieces) if (p.Own > 0) zbMigIds.Add(p.Id); }
+                        }
+                        catch (Exception ez) { ArmouryZb.Stumble("PurgeUnusable.BookSetSplit", ez); }
+                    }
                     if (here > 0 || taken > 0)
                     {
                         perType.Add(type + " +" + here + "/-" + taken);
@@ -697,6 +724,7 @@ namespace Armoury
                     }
                 }
                 _lastSplit = split; _lastX = sX; _xUnseen += sX;
+                if (zbRun && ArmouryBehavior.TakeBookMigrate()) ArmouryZb.NoteMigration(zbMigIds.Count, zbMigPcs);   // ZB-1: raz po wczytaniu zapisu bez rozbicia
                 if (pinnedWorn.Count > 0 || pinnedKept > 0)
                     Log.Info("Kwatermistrz: rozkazy - noszone z rozkazem na stan wojska: "
                              + (pinnedWorn.Count > 0 ? string.Join(", ", pinnedWorn.ToArray()) : "(brak)")
@@ -1129,7 +1157,8 @@ namespace Armoury
                         free = Math.Min(n, Math.Max(0, ArmouryBehavior.StockOf(it.StringId)));
                     }
                     MenPurse.NoteBuy(el, n - free);
-                    ArmouryBehavior.StockWithdraw(it.StringId, free);
+                    if (ArmouryBehavior.BookModOn()) ArmouryBehavior.StockWithdrawKey(el, free);   // ZB-1: z rozbicia TEGO egzemplarza, potem ksiega per id
+                    else ArmouryBehavior.StockWithdraw(it.StringId, free);
                     // wycofanie wkladu w TEJ samej sesji ekranu kasuje tez
                     // jego wpis w rejestrze wymian - inaczej przy zamknieciu
                     // kwatermistrz rozliczy wklad, ktorego juz nie ma
@@ -1141,7 +1170,8 @@ namespace Armoury
                     int undo = MenPurse.CancelBuy(transferCommand.ElementToTransfer.EquipmentElement, n);
                     n -= undo;
                     if (n <= 0) return;
-                    ArmouryBehavior.StockDeposit(it.StringId, n);
+                    if (ArmouryBehavior.BookModOn()) ArmouryBehavior.StockDepositKey(transferCommand.ElementToTransfer.EquipmentElement, n);   // ZB-1: wklad ze stanem
+                    else ArmouryBehavior.StockDeposit(it.StringId, n);
                     QuartermasterEscrow.AddFree(KeyOf(transferCommand.ElementToTransfer.EquipmentElement), n, IsKitItem(it));   // K1: odlozony wklad mozna zabrac z powrotem za darmo
                     // wklad zapisany do WYMIANY BARTEROWEJ (rozliczy sie
                     // przy zamknieciu ekranu - Jeff: "wrzucam t6 luki,
@@ -1253,6 +1283,7 @@ namespace Armoury
         private static bool _screenOpen;
         // migawka ksiegi z otwarcia - Reset/Cancel ekranu cofa do niej
         private static Dictionary<string, int> _stockAtOpen;
+        private static Dictionary<string, int> _stockModAtOpen;   // ZB-1: migawka rozbicia ksiegi na egzemplarze
 
         internal static void HoldPrefix() { HoldReserve(); }
 
@@ -1337,6 +1368,7 @@ namespace Armoury
                 catch { }
                 _screenOpen = true;
                 _stockAtOpen = ArmouryBehavior.StockSnapshot();
+                _stockModAtOpen = ArmouryBehavior.StockModSnapshot();   // ZB-1: rozbicie cofa sie razem z ksiega przy Reset/Cancel ekranu
                 ClearPending();   // swieza sesja ekranu = swiezy rejestr wymian
                 var needs = QuartermasterLaw.CountNeeds();
 
@@ -1387,6 +1419,13 @@ namespace Armoury
                         visOwn += kv.Value[1]; visSpare += Math.Max(0, kv.Value[2] - kv.Value[0] - kv.Value[1]);
                     }
                 var allowance = new Dictionary<string, int>();
+                // ZB-2 (klucz ArmouryListSpareHorsesWhenKept): przy widoku "tylko Twoje" i bez sprzedazy koni (PlayerMenSellSpareHorses wylaczone) konie zapasu ludzi
+                // zostaja na liscie (jak przy widoku pelnym: chowamy tylko noszone, zapas do kupienia od ludzi) - inaczej nikt ich nie widzi i nikt nie sprzedaje
+                bool horseKeep = onlyYours && ArmouryZb.HorsesListedOn;
+                int horseSpareVis = 0;
+                // ZB-1: sztuki spoza podzialu (poza kitem albo porzadek wylaczony) - najpierw rozbicie ksiegi tego egzemplarza, potem reszta ksiegi id (wylaczony - per id)
+                bool keyBook = ArmouryBehavior.BookModOn();
+                var keyAllow = keyBook ? new Dictionary<string, int>() : null;
                 for (int i = armory.Count - 1; i >= 0; i--)
                 {
                     var el = armory[i];
@@ -1394,9 +1433,22 @@ namespace Armoury
                     if (it == null || el.Amount <= 0) continue;
                     int hide;
                     string key = QuartermasterLaw.KeyOf(el.EquipmentElement);
+                    bool horseHere = false;
                     if (split != null && usedLeft.ContainsKey(key))
                     {
-                        hide = PlayerArmoryView.HideOf(onlyYours, el.Amount, key, usedLeft, ownLeft);   // wylaczone - tylko noszone, jak dotad
+                        horseHere = horseKeep && it.ItemType == ItemObject.ItemTypeEnum.Horse;
+                        hide = PlayerArmoryView.HideOf(onlyYours && !horseHere, el.Amount, key, usedLeft, ownLeft);   // wylaczone - tylko noszone, jak dotad
+                    }
+                    else if (keyBook)
+                    {
+                        string id = it.StringId ?? "";
+                        int kLeft, rLeft;
+                        if (!keyAllow.TryGetValue(key, out kLeft)) kLeft = ArmouryBehavior.StockOfKey(key);
+                        if (!allowance.TryGetValue(id, out rLeft)) rLeft = ArmouryBehavior.StockRestOf(id);
+                        int vk = Math.Min(el.Amount, Math.Max(0, kLeft));
+                        int vr = Math.Min(el.Amount - vk, Math.Max(0, rLeft));
+                        keyAllow[key] = kLeft - vk; allowance[id] = rLeft - vr;
+                        hide = el.Amount - vk - vr;
                     }
                     else
                     {
@@ -1407,7 +1459,15 @@ namespace Armoury
                         allowance[id] = allowLeft - visible;
                         hide = el.Amount - visible;
                     }
-                    if (onlyYours && QuartermasterLaw.IsKitItem(it)) listedKit += el.Amount - Math.Max(0, hide);
+                    if (horseHere)
+                    {
+                        // niezmiennik widoku liczy tylko Twoja czesc; zapas ludzi na liscie - osobno (do komunikatu i linii ZB)
+                        int vis = el.Amount - Math.Max(0, hide);
+                        int[] sv; int ownK = split.TryGetValue(key, out sv) ? sv[1] : 0;
+                        int ownVis = Math.Min(vis, Math.Max(0, ownK));
+                        listedKit += ownVis; horseSpareVis += vis - ownVis;
+                    }
+                    else if (onlyYours && QuartermasterLaw.IsKitItem(it)) listedKit += el.Amount - Math.Max(0, hide);
                     if (hide <= 0) continue;
                     armory.AddToCounts(el.EquipmentElement, -hide);
                     _held.Add(new KeyValuePair<EquipmentElement, int>(el.EquipmentElement, hide));
@@ -1418,6 +1478,11 @@ namespace Armoury
                 // Jeff 15.10 (a): niezmiennik widoku - na liscie dokladnie Twoje sztuki kitu (inaczej podzial nie objal jakiegos egzemplarza)
                 if (onlyYours && listedKit != visOwn)
                     Log.Info("Wymiana: NIEZMIENNIK - widok tylko Twoje: na liscie " + listedKit + " szt. kitu przy Twoich " + visOwn + ".");
+                if (horseKeep)
+                {
+                    ArmouryZb.NoteHorses(horseSpareVis);   // ZB-2: licznik linii doby
+                    if (horseSpareVis > 0) Log.Info("Wymiana: ZB-2 - konie zapasu ludzi na liscie: " + horseSpareVis + " (ludzie nie sprzedaja koni - Player Men Sell Spare Horses wylaczone; zakup od ludzi przy zamknieciu).");
+                }
                 if (swapMsg)
                 {
                     Log.Info("Wymiana: ekran zbrojowni - widoczne sztuki gracza " + visOwn + " (w tym zwroty z wymiany od ostatniego otwarcia " + xBack + "), zapas ludzi " + visSpare
@@ -1425,7 +1490,8 @@ namespace Armoury
                     if (visOwn + visSpare > 0)
                         InformationManager.DisplayMessage(new InformationMessage(onlyYours
                             ? "QM: listed - " + visOwn + " pcs, all yours and free to take" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "")
-                              + ". The men's own kit is not listed - what they wear and " + visSpare + " spare pcs from their share of the spoils; they sell the spare in the next town."
+                              + ". The men's own kit is not listed - what they wear and " + (visSpare - horseSpareVis) + " spare pcs from their share of the spoils; they sell the spare in the next town."
+                              + (horseSpareVis > 0 ? " Their " + horseSpareVis + " spare horses are listed, as they do not sell horses - take one and you pay them the merchant's price on closing." : "")
                             : "QM: free to take - " + visOwn + " pcs that are yours" + (xBack > 0 ? " (" + xBack + " of them handed back in exchange)" : "") + "; the men's spare ("
                               + visSpare + " pcs) is theirs - take it and you pay them the merchant's price on closing.", Colors.Yellow));
                 }
@@ -1602,6 +1668,7 @@ namespace Armoury
             {
                 if (!_screenOpen) return;
                 ArmouryBehavior.StockRestore(_stockAtOpen);
+                if (_stockModAtOpen != null) ArmouryBehavior.StockModRestore(_stockModAtOpen);   // ZB-1
                 ClearPending();
                 MenPurse.ClearBuys();
                 if (_freeOn && _freeAtOpen != null)   // K1: darmowe sztuki gracza jak przy otwarciu
