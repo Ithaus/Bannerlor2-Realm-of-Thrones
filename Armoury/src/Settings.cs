@@ -2977,6 +2977,7 @@ namespace Armoury
         // WallTribute.cs, FreeFolkRaids.cs. Nowe klucze - nie ma ich w Armoury.json Jeffa; wylaczone = kod jak przed fix-mur.
         public bool WallTributeDistrictRoom = true;        // with Wall Grain Tribute: a Watch castle stores the tribute in whichever of its villages' granaries has room - the same way the carts unload - so a village whose own granary is full eats from it while the grain goes to its neighbours; off = each village orders only what fits in its own granary
         public bool FreeFolkRaidKinPeace = true;           // with Free Folk Hunger Raids: the Free Folk do not attack their own hungry raiders (and the raiders leave Free Folk parties alone) on the way to the Wall - only the Night's Watch and the North stand in their way; off = the raiders are outlaws to everyone, their own lords included
+        public bool FreeFolkRaidClimbWall = true;          // with Free Folk Hunger Raids: a raiding band climbs the Wall away from the manned towers, as in the books - while it crosses the belt under the Wall near a Night's Watch castle no other party spots it; below the Wall, in the Gift, the Watch and the North can catch it again; off = the band walks past the Watch's gates in plain sight
 
         // --- Money that cannot be spent (18.10) ---
         // Paczka ds-akumulator (noc 17/18.10; Jeff: "czy nie ma jakiegos stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac i na koniec wchlona cala kase"; diagnoza

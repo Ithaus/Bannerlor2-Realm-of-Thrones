@@ -1095,7 +1095,8 @@ Uzycie (Python 3, tylko odczyt):
                     miejsca (bez miejsca / brak, 28 ostatnich dob czynnych) <= 5% przy "[miejsce: okreg" w linii (inaczej INFO - fin83 14.7%); NMUR-32 bierze licznik
                     "cel: doszly A z B band" z ostatniej linii (od wersji fix-mur, przezywa zapis), inaczej sume "doszly dzis"; NMUR-33 bandy rozbite w marszu przez
                     Wolnych Ludzi <= 10% wyruszylych (zwykle 0) przy "swoi nie bija swoich: tak"; NMUR-34 zatrzymane w marszu wedlug strony (Straz / Polnoc / inni,
-                    zawrocily rozbite, marsz ponad 30 dob) i odmowy ataku latki (INFO); NMUR-35 latka "swoi nie bija swoich" wpieta przy kluczu tak. Bez segmentu - INFO.
+                    zawrocily rozbite, marsz ponad 30 dob) i odmowy ataku latki (INFO); NMUR-35 latka "swoi nie bija swoich" wpieta przy kluczu tak; NMUR-36 wspinaczka
+                    przez Mur (klucz Free Folk Raid Climb Wall): warownie Strazy znalezione (> 0) przy kluczu tak, bandy i godziny ukrycia w biegu (INFO). Bez segmentu - INFO.
                     ds-akumulator (18.10): NDS-3a/3b dryf kies wsi w oknie od konca rampy KS (koniec popytu) albo DS F1 (DayOn + 28) + 2 x 15 dob (za krotkie - ostatnie 30 dob),
                     NDS-3c mediana kiesa / skrzynia wsi DS >= 0.9 (linia 'Akumulator kies'; starszy log - mediana kiesy / srednia skrzynia z linii DS), NDS-7b i NDS-9 bez
                     jednorazowych wplywow krolestw (wplyw dnia krolestwa > 3 x max(mediana 28 dob, doba poprzednia); D staly minus srednia jednorazowych z 28 dob; NDS-7w INFO).
@@ -38245,6 +38246,15 @@ def nmur_main(logp, until=120):
                 rep.add("NMUR-33: Wolni Ludzie nie bija wlasnych band najazdu", f"klucz Free Folk Raid Kin Peace: {kin.group(1) if kin else 'brak segmentu'}; rozbite przez Wolnych Ludzi {kf}", "INFO", None)
             rep.add("NMUR-34: zatrzymane w marszu wedlug strony (od poczatku)", f"Straz {kw}, Polnoc {kn}, Wolni Ludzie {kf}, inni / bez bitwy {ko}; zawrocily rozbite {turn}; odmowy ataku latki w biegu {veto}",
                     "INFO (Straz i Polnoc to obrona Muru - zatrzymanie zgodne z ksiazkami)", None)
+            clm = re.search(r"\| wspinaczka przez Mur: (tak|nie) \(pas (\d+) jedn\. od (\d+) warowni Strazy\)", last)
+            if clm:
+                cb = sum(num(r"wspinaczka przez Mur: \S+ \(pas \d+ jedn\. od \d+ warowni Strazy\), dzis band ukrytych (\d+)", raid[d]) or 0 for d in rd)
+                ch = sum(num(r"godzin ukrycia (\d+)", raid[d]) or 0 for d in rd)
+                nf = int(clm.group(3))
+                rep.add("NMUR-36: wspinaczka przez Mur (banda w marszu w pasie pod Murem ukryta przed AI)", f"klucz {clm.group(1)}, warowni Strazy {nf}, pas {clm.group(2)} jedn.; w biegu band-dob ukrycia {cb}, godzin {ch}",
+                        "warownie > 0 przy kluczu tak i bandach w biegu (liczby - INFO)", (nf > 0) if (clm.group(1) == "tak" and ns_c > 0) else None)
+            else:
+                rep.add("NMUR-36: wspinaczka przez Mur", "brak segmentu", "INFO", None)
             if kin:
                 hook_ok = kin.group(2).strip() == "wpieta"
                 rep.add("NMUR-35: latka 'swoi nie bija swoich' wpieta (DefaultMobilePartyAIModel.ShouldConsiderAttacking)", f"klucz {kin.group(1)}, latka {kin.group(2).strip()}",

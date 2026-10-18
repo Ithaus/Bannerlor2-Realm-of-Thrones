@@ -7320,6 +7320,10 @@ namespace Armoury
         [SettingPropertyGroup("The Wall: fixes after the first test (fix-mur, 18.10)")]
         public bool FreeFolkRaidKinPeace { get; set; } = true;
 
+        [SettingPropertyBool("Free Folk Raid Climb Wall", HintText = "with Free Folk Hunger Raids: a raiding band climbs the Wall away from the manned towers, as in the books - while it crosses the belt under the Wall near a Night's Watch castle no other party spots it; below the Wall, in the Gift, the Watch and the North can catch it again; off = the band walks past the Watch's gates in plain sight")]
+        [SettingPropertyGroup("The Wall: fixes after the first test (fix-mur, 18.10)")]
+        public bool FreeFolkRaidClimbWall { get; set; } = true;
+
         [SettingPropertyBool("Ds Hoard Due", HintText = "with Ds Towns: once the farms are set, the lord again takes a share each day of what the townsfolk and the castle folk hold above their normal level (three times their reserve days) - a tallage on movables, paid in peace and in war, as medieval lords tallaged their burgesses. What the people already paid that day (the tenth of movables, the war aid) and the part of the town's farm raised from their savings count as paid, so the same savings are never taken twice; two thirds go to the lord, the rest to the town or castle purse, nothing to the crown. Without it the labourers' purses only grew (off = no hoard tax once the farms are set, as before)")]
         [SettingPropertyGroup("Money that cannot be spent (18.10)")]
         public bool DsHoardDue { get; set; } = true;
@@ -9177,6 +9181,7 @@ namespace Armoury
             s.FreeFolkRaidDailyChance = FreeFolkRaidDailyChance;
             s.WallTributeDistrictRoom = WallTributeDistrictRoom;
             s.FreeFolkRaidKinPeace = FreeFolkRaidKinPeace;
+            s.FreeFolkRaidClimbWall = FreeFolkRaidClimbWall;
             s.DsHoardDue = DsHoardDue;
             s.DsHoardDueRate = DsHoardDueRate;
             s.DsWorksRealMaterial = DsWorksRealMaterial;

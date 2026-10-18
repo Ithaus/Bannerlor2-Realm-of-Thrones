@@ -64,6 +64,8 @@ namespace Armoury
         private const float ArriveDist = 4f;              // jednostki mapy od bramy wsi zrodla = w domu
         private const int ReturnMaxDays = 30;             // najdluzsza droga powrotu - potem banda rozwiazana tam, gdzie stoi (ludzie i tak do puli okregu zrodla); tez najdluzszy marsz do celu
         private const float MarchArrive = 6f;             // jednostki mapy od bramy wsi celu = banda doszla (wymarsz -> patrol)
+        private const float ClimbBelt = 12f;              // fix-mur: pas Muru - jednostki mapy od bramy warowni Strazy; banda w marszu w pasie jest niewidoczna dla AI (wspinaczka)
+        private const float ClimbHideHours = 1.5f;        // fix-mur: ukrycie odnawiane co godzine (zapis gry niesie najwyzej tyle - starszy DLL widzi bande po 1.5 h)
         private const double StoreFloor = 0.5;            // waga zapasu przy pelnym spichlerzu
         private const double LowDays = 180.0;             // dni spichlerza, ponizej ktorych waga zapasu = 1
         private const int TargetNearest = 8;              // cel losowany z tylu najblizszych (droga) wsi Strazy / Polnocy
@@ -91,6 +93,11 @@ namespace Armoury
         private static volatile bool _kinOn;              // klucz FreeFolkRaidKinPeace i co najmniej jedna banda w migawce
         private static bool _kinDirty;                    // po wczytaniu - migawka w pierwszej godzinie (Hourly)
         private static int _kinVeto, _kinVetoAll;         // odmowy ataku: od ostatniej doby (Interlocked - watki AI) / od wczytania
+        // fix-mur: wspinaczka przez Mur - bramy warowni Strazy (pamiec na dobe) i liczniki doby (godziny ukrycia, bandy ukryte)
+        private static readonly List<Vec2> _wallForts = new List<Vec2>();
+        private static int _wallFortsDay = int.MinValue;
+        private static int _climbHours;
+        private static readonly HashSet<string> _climbBands = new HashSet<string>(StringComparer.Ordinal);
         private static string _kinHook = "nie wpieta";
         // fix-mur: wynik marszu od poczatku (osobny klucz zapisu arm_mur_cel): doszly do celu, marsz ponad ReturnMaxDays, zginely w marszu z rak Strazy / Polnocy /
         // Wolnych Ludzi / innych (bez bitwy, inne frakcje), zawrocily rozbite w marszu, zginely po dojsciu albo w powrocie
@@ -107,6 +114,7 @@ namespace Armoury
             _cStarted = _cReturned = _cLost = _cGained = _cTrim = _cLeft = 0; _nStarted = _nReturned = _nLost = 0; _cFromHome = _cFromPool = _cHomeLeft = 0.0; _cGold = _cItems = 0;
             _stumbles = 0; _errSites.Clear(); _offLogged = false; _clan = null; _clanTried = false; _refreeze = false; _thawed = 0;
             _kin = new HashSet<MobileParty>(); _kinOn = false; _kinDirty = false; _kinVeto = 0; _kinVetoAll = 0;
+            _wallForts.Clear(); _wallFortsDay = int.MinValue; _climbHours = 0; _climbBands.Clear();
             _nReached = _nMarchCap = _nKillW = _nKillN = _nKillF = _nKillO = _nTurnMarch = _nDiedAfter = 0;
         }
 
@@ -296,6 +304,11 @@ namespace Armoury
         /// <summary>CampaignEvents.HourlyTickEvent: po wczytaniu (Import z bandami w marszu / powrocie) flaga i rozkaz wracaja w pierwszej godzinie. Inaczej nic.</summary>
         internal static void Hourly()
         {
+            if (_raids.Count > 0)
+            {
+                // fix-mur: wspinaczka przez Mur (klucz FreeFolkRaidClimbWall) - banda w marszu pod Murem ukryta przed AI na najblizsze 1.5 h
+                try { Climb(); } catch (Exception e) { Stumble("Hourly(Mur)", e); }
+            }
             if (_kinDirty)
             {
                 // fix-mur: po wczytaniu - bandy najazdu w migawce latki AI "swoi nie bija swoich" (zanim lordowie Wolnych Ludzi zdaza je zaatakowac)
@@ -568,6 +581,8 @@ namespace Armoury
 
             try { RebuildKin(s); } catch (Exception e) { Stumble("Daily(swoi)", e); }   // fix-mur: bandy najazdu (takze nowa) w migawce latki AI
             int veto = Interlocked.Exchange(ref _kinVeto, 0); _kinVetoAll += veto;
+            int climbN = _climbBands.Count, climbH = _climbHours; _climbBands.Clear(); _climbHours = 0;   // fix-mur: wspinaczka - liczniki doby do linii
+            if (s.FreeFolkRaidClimbWall) { try { WallForts(today); } catch (Exception e) { Stumble("Daily(warownie)", e); } }
             if (!s.LogEnabled) return;
             try
             {
@@ -601,6 +616,8 @@ namespace Armoury
                   .Append(", w marszu teraz ").Append(march).Append(", zginely po dojsciu lub w powrocie ").Append(_nDiedAfter);
                 sb.Append(" | swoi nie bija swoich: ").Append(s.FreeFolkRaidKinPeace ? "tak" : "nie").Append(" (latka ").Append(_kinHook).Append(", band w migawce ").Append(_kin.Count)
                   .Append("), odmowy ataku dzis ").Append(veto).Append(" (od wczytania ").Append(_kinVetoAll).Append(')');
+                sb.Append(" | wspinaczka przez Mur: ").Append(s.FreeFolkRaidClimbWall ? "tak" : "nie").Append(" (pas ").Append(ClimbBelt.ToString("0", Inv)).Append(" jedn. od ")
+                  .Append(_wallForts.Count).Append(" warowni Strazy), dzis band ukrytych ").Append(climbN).Append(", godzin ukrycia ").Append(climbH);
                 sb.Append(" | potkniecia ").Append(_stumbles);
                 sb.Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms.");
                 Log.Info(sb.ToString());
@@ -642,6 +659,52 @@ namespace Armoury
                 Interlocked.Increment(ref _kinVeto);
             }
             catch { }
+        }
+
+        /// <summary>fix-mur (klucz FreeFolkRaidClimbWall; HourlyTickEvent): "wildlingowie wspinaja sie na Mur z dala od obsadzonych wiez" - siatka ladu ROT przepuszcza
+        /// przez Mur tylko przy warowniach Strazy (bandy fin83 ginely "w regionie The Wall" z rak Rasta i Karla Tannera), wiec banda W MARSZU (faza 2) w pasie ClimbBelt
+        /// jednostek od bramy warowni Strazy jest ukryta przed AI (MobileParty.IgnoreForHours - GetBestInitiativeBehavior i CanPartyInteract pomijaja ja; gracz widzi
+        /// i moze ja zaatakowac). Pod Murem i w Darze Straz i Polnoc dalej ja lapia. Bez band w marszu - nic; w bitwie - bez zmian.</summary>
+        private static void Climb()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.FreeFolkRaidClimbWall || Campaign.Current == null) return;
+            WallForts((int)CampaignTime.Now.ToDays);
+            if (_wallForts.Count == 0) return;
+            Dictionary<string, MobileParty> map = null;
+            foreach (var r in _raids)
+            {
+                try
+                {
+                    if (r.Phase != 2) continue;
+                    var mp = PartyOf(r, ref map);
+                    if (mp == null || mp.MapEvent != null || mp.SiegeEvent != null) continue;
+                    var pos = mp.GetPosition2D;
+                    bool near = false;
+                    foreach (var g in _wallForts) if (pos.Distance(g) <= ClimbBelt) { near = true; break; }
+                    if (!near) continue;
+                    mp.IgnoreForHours(ClimbHideHours);
+                    _climbHours++; _climbBands.Add(r.Id);
+                }
+                catch (Exception e) { Stumble("Climb(banda)", e); }
+            }
+        }
+
+        /// <summary>fix-mur: bramy warowni (miast i zamkow) frakcji Strazy - pamiec na dobe (zdobyta warownia wypada nastepnego dnia).</summary>
+        private static void WallForts(int today)
+        {
+            if (_wallFortsDay == today) return;
+            _wallFortsDay = today; _wallForts.Clear();
+            foreach (var st in Settlement.All)
+            {
+                try
+                {
+                    if (st == null || !st.IsFortification) continue;
+                    var f = st.MapFaction;
+                    if (f != null && f.StringId == CrownGifts.WatchId) _wallForts.Add(st.GatePosition.ToVec2());
+                }
+                catch (Exception e) { Stumble("WallForts", e); }
+            }
         }
 
         private static void RebuildKin(Settings s)
