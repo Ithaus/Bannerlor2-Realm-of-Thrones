@@ -481,7 +481,12 @@ namespace Armoury
             var v = src.Village;
             try
             {
-                if (mp.IsPartyTradeActive && mp.PartyTradeGold > 0) { gold = mp.PartyTradeGold; v.ChangeGold(mp.PartyTradeGold); mp.PartyTradeGold = 0; }
+                if (mp.IsPartyTradeActive && mp.PartyTradeGold > 0)
+                {
+                    gold = mp.PartyTradeGold;
+                    v.ChangeGold(mp.PartyTradeGold); mp.PartyTradeGold = 0;
+                    MoneyLedger.Note169(MoneyLedger.N169PurseGone, src, (int)gold);   // kiesa wsi poza GiveGoldAction - "sakiewki rozbitych partii" w "Przeplywy osad (przyczyny)" (tylko licznik)
+                }
             }
             catch (Exception e) { Stumble("Home(zloto)", e); }
             try
