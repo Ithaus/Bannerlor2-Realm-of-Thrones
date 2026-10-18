@@ -1059,7 +1059,8 @@ Uzycie (Python 3, tylko odczyt):
                     lojalnosc), NGL-5 bunt nie z niczego (nowe bunty z lojalnoscia wczoraj > 25 = 0), NGL-6 zloto panow zamkniete (panowie + kasy + wierzyciele = 0,
                     zaplacone = wplacone - zwrocone + rachunki), NGL-6b rezerwa wojny / tempo skrzyni / zaleglosc nawiasu 0, NGL-6c (recenzja) od panow <= ksiega kupcow KS-H
                     (zaplacone przez kasy celu za wozy kupione dzis) i <= wydatek kasy netto, kasa netto ponad ksiege 0 miast, NGL-6d tryb pana zgodny z kodem kupcow (kredyt
-                    r4-kupcy bez podlaczonych rachunkow = NIE), NGL-6e (recenzja) doplata tylko w dobie przegladu celu KS-H (INFO: miasta poza nia), NGL-7 INFO doplaty,
+                    r4-kupcy bez podlaczonych rachunkow = NIE), NGL-6e (recenzja) doplata tylko w dobie przegladu celu KS-H (INFO: miasta poza nia), NGL-6f (scalenie z r4-kupcy: rachunki
+                    podlaczone) zalegle rachunki splacone przez panow - linia pana = linia KS-H 'splacone przez panow miast' i = przyjete przez kasy zrodel, NGL-7 INFO doplaty,
                     NGL-1b (recenzja) mianownik spichlerza = stale czynnego modelu jedzenia zgodne ze wzorem Famine.cs (40, 20),
                     NGL-8 ERROR i potkniecia 0, NGL-9 koszt <= 1 ms (mediana). Log bez paczki: "brak linii" (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -37067,8 +37068,11 @@ def nmur_main(logp, until=120):
 
 def _nglod_scan(logp):
     """r4-glodbunt: linie 'Glod miast (KS)' (start sesji i doba) i 'Pan miasta placi za dowoz (KS)' (doba), bledy KsHunger / KsLordFood - strumieniowo."""
-    D = {"start": [], "h": {}, "hbad": [], "l": {}, "lbad": [], "err": 0, "err1": ""}
+    D = {"start": [], "h": {}, "hbad": [], "l": {}, "lbad": [], "err": 0, "err1": "", "kshl": {}}
     fnum = r"(-?\d+(?:\.\d+)?)"
+    # scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): zalegle rachunki splacone przez panow - czesc linii KS-H i czlon "wierzyciele" linii pana (opcjonalne, NGL-6f)
+    rx_kshl = re.compile(r"Kupcy zywnosci \(KS-H\) dzien (-?\d+) .*?\| splacone przez panow miast \(glod, zalegle rachunki\) (-?\d+) zl w (\d+) splatach, kasy zrodel przyjely (-?\d+) zl")
+    rx_recv = re.compile(r"kasy zrodel \(wierzyciele\) przyjely (-?\d+) zl")
     ph = {
         "keys": re.compile(r"klucze: Ks Hunger Unrest (tak|nie), Ks Lord Funds Food (tak|nie), kalibracja (zastosowana|NIE zastosowana)"),
         "hooks": re.compile(r"latki: lojalnosc (wpieta|BRAK), bezpieczenstwo (wpiete|BRAK), posilek (wpiety|BRAK)"),
@@ -37103,6 +37107,11 @@ def _nglod_scan(logp):
                 if not D["err1"]:
                     D["err1"] = ln.strip()[:160]
                 continue
+            if "Kupcy zywnosci (KS-H) dzien " in ln and "splacone przez panow miast" in ln:
+                mk = rx_kshl.search(ln)
+                if mk:
+                    D["kshl"][int(mk.group(1))] = (int(mk.group(2)), int(mk.group(3)), int(mk.group(4)))
+                continue
             if "Glod miast (KS): " in ln:
                 if "Glod miast (KS): start sesji" in ln:
                     D["start"].append(ln.strip())
@@ -37129,6 +37138,9 @@ def _nglod_scan(logp):
                         rec[k] = mm.groups()
                 if len(rec) < len(pl):
                     D["lbad"].append(ln.strip()[:200])
+                mr = rx_recv.search(ln)
+                if mr:
+                    rec["recv"] = (mr.group(1),)
                 D["l"][d] = rec
     return D
 
@@ -37266,6 +37278,22 @@ def nglod_main(logp, until=100000):
         rep.add("NGL-6d: tryb pana zgodny z kodem kupcow (po scaleniu r4-kupcy: rachunki podlaczone - FoodBillsOpen / FoodBillsPay)",
                 f"dob z trybem KREDYT KUPCOW NIEPODLACZONY {len(unw)} z {len(ld)}" + (f" ({L[unw[0]]['key'][1][:120]})" if unw else ""),
                 "0 (inaczej pan nie placi wcale - podlaczyc rachunki przy scaleniu)", not unw)
+        # NGL-6f (scalenie r4-glodbunt + r4-kupcy): zalegle rachunki splacone przez panow - linia pana (splacone, przyjete przez kasy zrodel) = linia KS-H tej samej doby
+        # (KS-H pisze dzien o 1 mniejszy niz linia pana w tym samym wywolaniu - przesuniecie dobrane z danych: -1 albo 0)
+        bl = {d: (g(L[d], "bills", 1, int, 0), g(L[d], "recv", 0, int, 0) if "recv" in L[d] else None) for d in ld if "bills" in L[d]}
+        K = D["kshl"]
+        if K and bl:
+            best = max((-1, 0), key=lambda o: sum(1 for d in bl if d + o in K))
+            pairs = [(d, bl[d][0], K[d + best][0]) for d in bl if d + best in K]
+            badf = [x for x in pairs if x[1] != x[2]]
+            badr = [d for d in bl if bl[d][1] is not None and bl[d][1] != bl[d][0]]
+            rep.add("NGL-6f: zalegle rachunki splacone przez panow - linia pana = linia KS-H (splacone przez panow miast) i = przyjete przez kasy zrodel",
+                    f"dob sparowanych {len(pairs)} (przesuniecie {best}), roznych {len(badf)}" + (f" (dzien {badf[0][0]}: pan {badf[0][1]}, KS-H {badf[0][2]})" if badf else "")
+                    + f"; przyjete != splacone {len(badr)}; razem splacone przez panow {sum(x[1] for x in pairs)} zl w {sum(K[d][1] for d in K)} splatach (KS-H)",
+                    "0 i 0", (not badf and not badr) if pairs else None)
+        else:
+            rep.add("NGL-6f: zalegle rachunki splacone przez panow (linia pana = linia KS-H)", "brak czesci 'splacone przez panow miast' w liniach KS-H albo linii pana",
+                    "INFO (log sprzed scalenia r4-glodbunt + r4-kupcy albo KS-H bez kredytu)", None)
         act = [d for d in ld if g(L[d], "gold", 2, int, 0) > 0]
         rep.add("NGL-7: doplaty panow (INFO)",
                 f"dob z doplata {len(act)} z {len(ld)}; miasto-doby glodne {sum(g(L[d], 'cnt', 0, int, 0) for d in ld if 'cnt' in L[d])}, kasa sama starcza "

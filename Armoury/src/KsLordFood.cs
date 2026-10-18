@@ -33,6 +33,10 @@ namespace Armoury
     ///  - TRYB "RACHUNKI KUPCOW" (po scaleniu z r4-kupcy - kredyt kupcow: zaplata przy dostawie, reszta rachunkiem): gdy ustawione FoodBillsOpen i FoodBillsPay, Before splaca
     ///    otwarte rachunki zywnosci glodnego miasta z kiesy pana (najwyzej tempo i rachunki; FoodBillsPay oddaje wierzycielom i zwraca kwote zaplacona, reszta wraca do pana),
     ///    bez doplaty kasy. Scalenie: patrz docs/noc-1718/r4-glodbunt-CHANGELOG.md.
+    ///    PODLACZONE przy scaleniu nocy 17/18.10: FoodBillsOpen = KsFoodCredit.OverdueOf (rachunki ZALEGLE - starsze niz Ks Consign Overdue Days, te blokuja nowe dostawy),
+    ///    FoodBillsPay = KsFoodCredit.PayByLord (najstarsze najpierw, zloto prosto do kas zrodel z pomiarem; nieprzyjete wraca do pana). Tryb RACHUNKI tylko przy kluczu
+    ///    Ks Food Carts Consign TAK (kredyt kupcow); przy NIE KS-H placi przy wysylce jak dotad - tryb DOPLATA KASY bez bezpiecznika (wozy kupione bez kredytu).
+    ///    Kontrola linii: zloto panow (pomiar kiesy glowy) + kasy miast + wierzyciele (pomiar kas zrodel) = 0; ta sama splata w linii KS-H (splacone, panowie -).
     /// Zapis gry: nic (stan w nawiasie jednej doby; doplata wczoraj wedlug rodu - pamiec sesji). Linia doby "Pan miasta placi za dowoz (KS): dzien N".
     /// Wyjatki per miasto - licznik potkniec (CLAUDE.md 7); zaleglosc nawiasu (After nie zdazyl) zwracana na poczatku nastepnego Before.
     /// </summary>
@@ -42,9 +46,9 @@ namespace Armoury
         private const double WeekDays = 7.0;
 
         /// <summary>r4-kupcy (scalenie): otwarte rachunki zywnosci miasta u kupcow KS-H (zl; 0 - brak). Razem z FoodBillsPay wlacza tryb RACHUNKI zamiast doplaty kasy.</summary>
-        internal static Func<Settlement, long> FoodBillsOpen = null;
+        internal static Func<Settlement, long> FoodBillsOpen = KsFoodCredit.OverdueOf;          // scalenie nocy 17/18.10: zalegle rachunki miasta (r4-kupcy)
         /// <summary>r4-kupcy (scalenie): splata rachunkow zywnosci miasta (najstarsze najpierw) z pieniedzy JUZ zdjetych platnikowi - przelew do wierzycieli; zwraca zaplacone (0..x).</summary>
-        internal static Func<Settlement, long, long> FoodBillsPay = null;
+        internal static Func<Settlement, long, long> FoodBillsPay = KsFoodCredit.PayByLord;     // scalenie nocy 17/18.10: splata od najstarszego do kas zrodel
 
         private sealed class Dep { public Town T; public Hero H; public Clan C; public long X, G0, Cap; public double Own0; public int Day; }
         private static readonly List<Dep> _open = new List<Dep>();
@@ -57,6 +61,7 @@ namespace Armoury
         // liczniki doby (linia)
         private static int _dDay = int.MinValue, _nH, _nOk, _nGap0, _nNeed, _nPay, _nPl, _nNb, _nRoom, _nNoBills, _nBelow, _nOver, _nCut, _nStale;
         private static long _dep, _ret, _lordPaid, _need, _spend, _dLords, _dTowns, _billsOpen, _billsPaid, _cut;
+        private static long _billsRecv;                                     // scalenie: zloto przyjete przez kasy zrodel (pomiar w KsFoodCredit.PayByLord) - kontrola linii
         // recenzja: doba poza przegladem celu KS-H (bez wplaty), ksiega kupcow (zaplacone przez kasy z wplata), kasa netto ponad ksiege (miasta, zl), udzial pana uciety ksiega
         private static int _nOff, _nMis, _nBookCut;
         private static long _book, _mis;
@@ -113,7 +118,7 @@ namespace Armoury
         private static void ClearDay()
         {
             _nH = _nOk = _nGap0 = _nNeed = _nPay = _nPl = _nNb = _nRoom = _nNoBills = _nBelow = _nOver = _nCut = _nStale = 0;
-            _dep = _ret = _lordPaid = _need = _spend = _dLords = _dTowns = _billsOpen = _billsPaid = _cut = 0;
+            _dep = _ret = _lordPaid = _need = _spend = _dLords = _dTowns = _billsOpen = _billsPaid = _cut = 0; _billsRecv = 0;
             _nOff = _nMis = _nBookCut = 0; _book = _mis = 0;
             _clans.Clear(); _ksh = false; _bills = false; _creditOff = false; _ticks = 0;
         }
@@ -209,8 +214,10 @@ namespace Armoury
             {
                 if (!On(s) || Campaign.Current == null) return;
                 _ksh = KsFoodCarts.SwitchOn && StartCalibration.Applied && StartCalibration.RampDayA >= 0 && day >= StartCalibration.RampDayA;
-                _bills = FoodBillsOpen != null && FoodBillsPay != null;
-                _creditOff = !_bills && CreditCode();                        // kupcy na kredycie bez podlaczonych rachunkow - bez doplaty (linia: NIEPODLACZONY)
+                // scalenie: RACHUNKI przy kredycie kupcow (Ks Food Carts Consign TAK); przy NIE wozy jada za gotowke przy wysylce - tryb DOPLATA jak w paczce
+                bool consign = KsFoodCarts.ConsignOn;
+                _bills = consign && FoodBillsOpen != null && FoodBillsPay != null;
+                _creditOff = !_bills && consign && CreditCode();             // kupcy na kredycie bez podlaczonych rachunkow - bez doplaty (linia: NIEPODLACZONY)
                 if (!_ksh || _creditOff) return;
                 KsHunger.Hungry(_hungry);
                 float wcd = Math.Max(1f, s.WarChestDays);
@@ -264,9 +271,10 @@ namespace Armoury
                             long paidB = 0;
                             try { paidB = FoodBillsPay(st, took); } catch (Exception ex) { Stumble("FoodBillsPay", ex); paidB = 0; }
                             paidB = Math.Max(0, Math.Min(took, paidB));
+                            long recv = paidB;                                      // scalenie: przyjete przez kasy zrodel (pomiar PayByLord) - drugi czlon kontroli
                             long back = took - paidB;
                             if (back > 0) { int h1 = h.Gold; h.ChangeHeroGold((int)back); long got = h.Gold - h1; CirculationWindows.NoteHeroGold(h, got); paidB = took - got; }
-                            _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB;
+                            _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv;
                             if (paidB > 0) { _nPay++; NotePaid(c, paidB); if (ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++; if (paidB > cap) _nOver++; }
                             continue;
                         }
@@ -357,9 +365,10 @@ namespace Armoury
               .Append(", od panow ").Append(_lordPaid - _billsPaid)
               .Append(" | ksiega kupcow KS-H: zaplacone kupcom przez te kasy ").Append(_book).Append(" zl (towar + fracht wozow kupionych dzis), od panow ").Append(_lordPaid - _billsPaid)
               .Append(" zl, udzial pana uciety ksiega ").Append(_nBookCut).Append(", kasa netto ponad ksiege ").Append(_nMis).Append(" miast (").Append(_mis).Append(" zl)")
-              .Append(" | rachunki: otwarte ").Append(_billsOpen).Append(" zl, splacone przez panow ").Append(_billsPaid).Append(" zl")
-              .Append(" | kontrola: zloto panow ").Append(_dLords).Append(" + kasy miast ").Append(_dTowns).Append(" + wierzyciele ").Append(_billsPaid)
-              .Append(" = ").Append(_dLords + _dTowns + _billsPaid).Append(" (oczekiwane 0), zaplacone - (wplacone - zwrocone + rachunki) = ").Append(_lordPaid - (_dep - _ret + _billsPaid))
+              .Append(" | rachunki: otwarte ").Append(_billsOpen).Append(" zl, splacone przez panow ").Append(_billsPaid).Append(" zl, kasy zrodel (wierzyciele) przyjely ").Append(_billsRecv)
+              .Append(" zl (tylko rachunki zalegle - starsze niz ").Append(KsFoodCredit.OverdueDays).Append(" dni, blokuja dowoz; najstarsze najpierw)")
+              .Append(" | kontrola: zloto panow ").Append(_dLords).Append(" + kasy miast ").Append(_dTowns).Append(" + wierzyciele ").Append(_billsRecv)
+              .Append(" = ").Append(_dLords + _dTowns + _billsRecv).Append(" (oczekiwane 0), zaplacone - (wplacone - zwrocone + rachunki) = ").Append(_lordPaid - (_dep - _ret + _billsPaid))
               .Append(" | pan ponizej rezerwy wojny po zaplacie ").Append(_nBelow).Append(", ponad tempo skrzyni ").Append(_nOver)
               .Append(", zwrot uciety (kasa za mala) ").Append(_nCut).Append(" (").Append(_cut).Append(" zl), zaleglosc nawiasu ").Append(_nStale)
               .Append(" | czas ").Append((_ticks * 1000.0 / Stopwatch.Frequency).ToString("0.000", Inv)).Append(" ms | potkniecia ").Append(_stumbles).Append('.');

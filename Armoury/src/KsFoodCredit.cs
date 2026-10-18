@@ -34,6 +34,9 @@ namespace Armoury
         internal static long DNew, DPaidNow, DBilled, DRepaid, DForfeit; internal static int DNewN, DForfeitN, DDeliv;
         internal static long GDstPaid, GSrcGot;            // zloto doby: cel zaplacil / zrodla dostaly (przy dostawie + splaty)
         internal static long ForfeitTotal; internal static int ForfeitTotalN;
+        // scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): doba - zalegle rachunki splacone przez panow glodnych miast (KsLordFood tryb RACHUNKI; w DRepaid tez),
+        // zloto od panow przyjete przez kasy zrodel (w GSrcGot tez - kontrola zlota linii KS-H: cel - panowie + zrodla), splat (miasto-doby)
+        internal static long DLordRepaid, GLordPaid; internal static int DLordN;
         private static long _openPrev = -1;
         private static int _stum; private static readonly HashSet<string> _err = new HashSet<string>();
 
@@ -46,6 +49,7 @@ namespace Armoury
         internal static void ClearDay()
         {
             DNew = DPaidNow = DBilled = DRepaid = DForfeit = 0; DNewN = DForfeitN = DDeliv = 0; GDstPaid = GSrcGot = 0;
+            DLordRepaid = GLordPaid = 0; DLordN = 0;
         }
 
         internal static int TakeStumbles() { int n = _stum; _stum = 0; return n; }
@@ -166,6 +170,67 @@ namespace Armoury
                 foreach (var k in gone) _acc.Remove(k);
             }
             catch (Exception e) { Stumble("PayDaily", e); }
+        }
+
+        // ------------------------------------------------------------ scalenie r4-glodbunt + r4-kupcy (noc 17/18.10): pan glodnego miasta splaca zalegle rachunki
+        // KsLordFood (tryb RACHUNKI, klucz Ks Lord Funds Food, kredyt kupcow Ks Food Carts Consign TAK): Before - po splatach miast (PayDaily) i dostawach (Arrivals),
+        // przed decyzja wozow - glodne miasto, ktorego rachunki sa starsze niz zwloka (te blokuja nowe dostawy - DstOverdue), dostaje splate od glowy rodu wlasciciela:
+        // tylko zloto ponad rezerwe wojny i najwyzej tempo skrzyni doby (te same granice co chleb M3 - KsLordFood). Splata od najstarszego, zloto prosto do kas zrodel
+        // (wierzycieli), z pomiarem; czego kasy zrodel nie przyjma, wraca do pana. Rachunki splacone przez pana licza sie do "splacone" linii KS-H (kontrola rachunkow)
+        // i do zlota linii KS-H (panowie -, zrodla +). Nic z niczego: zloto glowa -> kasy zrodel, roszczenie maleje o tyle samo.
+
+        /// <summary>KsLordFood.FoodBillsOpen: zalegle rachunki zywnosci miasta `dst` jako celu (zl) - starsze niz zwloka (KsConsignOverdueDays); 0 - brak.</summary>
+        internal static long OverdueOf(Settlement dst)
+        {
+            Resolve();
+            if (dst == null || _acc.Count == 0) return 0;
+            int today = Today(), od = OverdueDays; long s = 0;
+            foreach (var a in _acc.Values)
+            {
+                if (a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
+                foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) s += b.Left;
+            }
+            return s;
+        }
+
+        /// <summary>KsLordFood.FoodBillsPay: splata zaleglych rachunkow `dst` (najstarsze najpierw; ta sama doba - wedlug StringId zrodla, jak PayDaily) kwota `x` JUZ
+        /// zdjeta panu - przelew do kas zrodel z pomiarem obu stron; zwraca to, co kasy zrodel przyjely (0..x; reszta wraca do pana). Wyjatek w srodku - zwraca to, co juz
+        /// przeszlo (bez zwrotu panu pieniedzy, ktore dostal wierzyciel).</summary>
+        internal static long PayByLord(Settlement dst, long x)
+        {
+            Resolve();
+            if (dst == null || x <= 0 || _acc.Count == 0) return 0;
+            long paid = 0;
+            try
+            {
+                int today = Today(), od = OverdueDays;
+                var l = new List<KeyValuePair<Acct, Bill>>();
+                foreach (var a in _acc.Values)
+                {
+                    if (a.Dst != dst || a.Src == null || a.Src.Town == null || a.Dst.Town == null || AtWar(a.Src, a.Dst)) continue;
+                    foreach (var b in a.B) if (b.Left > 0 && today - b.Day > od) l.Add(new KeyValuePair<Acct, Bill>(a, b));
+                }
+                if (l.Count == 0) return 0;
+                l.Sort((p, q) => p.Value.Day != q.Value.Day ? p.Value.Day.CompareTo(q.Value.Day) : string.CompareOrdinal(p.Key.Src.StringId, q.Key.Src.StringId));
+                long left = x;
+                foreach (var p in l)
+                {
+                    if (left <= 0) break;
+                    var b = p.Value; var st = p.Key.Src.Town;
+                    int ask = (int)Math.Min(int.MaxValue, Math.Min(left, b.Left));
+                    if (ask <= 0) continue;
+                    int s0 = st.Gold; st.ChangeGold(ask); long rec = Math.Max(0L, (long)st.Gold - s0);   // kasa zrodla bez miejsca (int) - reszta wraca do pana
+                    if (rec <= 0) continue;
+                    b.Left -= rec; left -= rec; paid += rec;
+                    DRepaid += rec; DLordRepaid += rec; GLordPaid += rec; GSrcGot += rec;
+                }
+                if (paid > 0) DLordN++;
+                var gone = new List<string>();
+                foreach (var kv in _acc) { if (kv.Value.Dst != dst) continue; kv.Value.B.RemoveAll(b => b.Left <= 0); if (kv.Value.B.Count == 0) gone.Add(kv.Key); }
+                foreach (var k in gone) _acc.Remove(k);
+            }
+            catch (Exception e) { Stumble("PayByLord", e); }
+            return paid;
         }
 
         /// <summary>Rachunki otwarte wedlug zrodla (zl) - narazenie zrodla (KsFoodCarts.Daily, miejsce kredytu).</summary>

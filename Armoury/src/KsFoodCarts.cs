@@ -82,6 +82,8 @@ namespace Armoury
         // KS-R4 r4-kupcy: klucze (brak ustawien - domyslne TAK)
         private static bool ShipByDaysKey { get { var s = Settings.Current; return s == null || s.KsShipByDays; } }
         private static bool ConsignKey { get { var s = Settings.Current; return s == null || s.KsFoodCartsConsign; } }
+        /// <summary>Scalenie r4-glodbunt + r4-kupcy: klucz kredytu kupcow (KsLordFood - tryb RACHUNKI przy TAK, DOPLATA KASY przy NIE - zaplata przy wysylce jak dotad).</summary>
+        internal static bool ConsignOn { get { return ConsignKey; } }
         private static bool DestValueKey { get { var s = Settings.Current; return s == null || s.KsDestValue; } }
         private static bool LotPowKey { get { var s = Settings.Current; return s == null || s.KsLotPricePow; } }
         /// <summary>Miejsce kredytu zrodla: najwyzej ten udzial kasy zrodla w towarze w drodze, frachcie i rachunkach (0..1).</summary>
@@ -478,7 +480,7 @@ namespace Armoury
             into.Clear();
             foreach (var c in _carts)
             {
-                if (c == null || c.Dst == null || c.DayBought != today) continue;
+                if (c == null || c.Dst == null || c.DayBought != today || c.Cons) continue;   // scalenie: woz na kredyt - kasa celu nic nie zaplacila przy wysylce (fracht placi zrodlo)
                 long v; into.TryGetValue(c.Dst, out v); into[c.Dst] = v + Math.Max(0, c.Paid) + Math.Max(0, c.Freight);
             }
         }
@@ -1051,11 +1053,11 @@ namespace Armoury
                     // recenzja runda 3 (drobne): bez odrzuconych przy zaladunku (nie weszly do drogi); psucie i strata zawroconych - ujscia ksiegi towarow
                     long rest = _prevTransit + _dBought - _dArr - _dBackPcs - _dLost - _dSpoil - _dRetLost - now;
                     // KS-R4 r4-kupcy H6: zloto z kredytem - fracht ze zrodel (furmani i zalogi), cel placi zrodlu przy dostawie i w splatach
-                    long gold = -_gDst + _gSrc + _gCarters + _gCrews + (_gRefDst - _gRefSrc) - _gSrcFr - KsFoodCredit.GDstPaid + KsFoodCredit.GSrcGot;
+                    long gold = -_gDst + _gSrc + _gCarters + _gCrews + (_gRefDst - _gRefSrc) - _gSrcFr - KsFoodCredit.GDstPaid - KsFoodCredit.GLordPaid + KsFoodCredit.GSrcGot;   // scalenie r4-glodbunt: panowie splacaja zalegle rachunki
                     sb.Append(" | kontrola towaru reszta ").Append(rest).Append(" (bez celu ").Append(_dLost).Append(", psucie w drodze ").Append(_dSpoil).Append(", zawrocone bez zwrotu zaplaty ").Append(_dRetLost)
                       .Append("; odrzucone przy zaladunku ").Append(_dDrop).Append(" - nie weszly do drogi), zlota reszta ").Append(gold)
                       .Append(" (cel -").Append(_gDst).Append(", zrodla +").Append(_gSrc).Append(", furmani +").Append(_gCarters).Append(", zalogi +").Append(_gCrews).Append(", zwroty ").Append(_gRefDst).Append('/').Append(_gRefSrc)
-                      .Append(", fracht ze zrodel -").Append(_gSrcFr).Append(", rachunki cel -").Append(KsFoodCredit.GDstPaid).Append(" / zrodla +").Append(KsFoodCredit.GSrcGot).Append(')');
+                      .Append(", fracht ze zrodel -").Append(_gSrcFr).Append(", rachunki cel -").Append(KsFoodCredit.GDstPaid).Append(" / panowie miast -").Append(KsFoodCredit.GLordPaid).Append(" / zrodla +").Append(KsFoodCredit.GSrcGot).Append(')');
                 }
                 else sb.Append(" | kontrola od nastepnej doby");
                 // KS-R3 runda 2 symulatora: loty z dalszych miast i z zapasu kupcow (przed "probka" - regex NKS-22 bez zmian)
@@ -1113,6 +1115,8 @@ namespace Armoury
                   .Append(" wozach (wartosc zrodla ").Append(_dConsVal).Append(" zl, fracht ze zrodel ").Append(_gSrcFr).Append(" zl), zablokowane: zrodlo bez miejsca ").Append(_dSrcCap).Append(" szt., cel z zaleglym ")
                   .Append(_dOverdue).Append(" szt. | kontrola kredytu reszta ").Append(ctl).Append(" (otwarte wczoraj + nowe - splacone - przepadle - otwarte dzis), u celu reszta ").Append(rest2)
                   .Append(" (u celu - zaplacone przy dostawie - nowe), potkniecia kredytu ").Append(KsFoodCredit.TakeStumbles());
+                // scalenie r4-glodbunt + r4-kupcy: zalegle rachunki glodnych miast splacone przez ich panow (KsLordFood, tryb RACHUNKI) - w "splacone" wyzej i w zlocie (panowie -)
+                sb.Append(" | splacone przez panow miast (glod, zalegle rachunki) ").Append(KsFoodCredit.DLordRepaid).Append(" zl w ").Append(KsFoodCredit.DLordN).Append(" splatach, kasy zrodel przyjely ").Append(KsFoodCredit.GLordPaid).Append(" zl");
                 // recenzja r4-kupcy: wozy na kredyt w drodze - przed cofnieciem DLL ponizej r4-kupcy musza byc 0 (starsza DLL dowiozlaby je bez rachunku) i otwarte rachunki 0
                 long cN = 0, cPcs = 0, cVal = 0;
                 foreach (var c in _carts) { if (!c.Cons || c.N <= 0) continue; cN++; cPcs += c.N; cVal += Math.Max(0, c.Val); }
