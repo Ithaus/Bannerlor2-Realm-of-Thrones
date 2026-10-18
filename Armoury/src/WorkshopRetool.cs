@@ -120,7 +120,8 @@ namespace Armoury
             if (s == null || Campaign.Current == null) { ZeroDay(); return; }
             if (!_startDone) SessionStart();
             int today = (int)CampaignTime.Now.ToDays;
-            // F4 (noc 17/18.10, klucz WorkshopRetoolFairScore): dzisiejsza produkcja wsadu do sredniej (przed decyzjami; wylaczony klucz - tylko czysci licznik), czas reguly do linii
+            // F4 (noc 17/18.10, klucz WorkshopRetoolFairScore): dzisiejsza produkcja wsadu do sredniej (przed decyzjami; wylaczony klucz - tylko czysci licznik); czas calego
+            // kroku E3-D3 do linii tylko dla informacji - "czas F4" liczy sama regula (recenzja: tu siedzi tez akcja gry przezbrojenia i przebieg kandydatow)
             bool f4 = WorkshopFairScore.On;
             long f4t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             WorkshopFairScore.DayFold();
@@ -228,8 +229,8 @@ namespace Armoury
                 if (f4)
                 {
                     if (_dBankWarm > 0) sb2.Append(" | bankructwa w tygodniu pomiaru wsadu (wybor gry zostal) ").Append(_dBankWarm);
-                    double f4ms = (System.Diagnostics.Stopwatch.GetTimestamp() - f4t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-                    sb2.Append(WorkshopFairScore.DayText(today, f4ms));
+                    double stepMs = (System.Diagnostics.Stopwatch.GetTimestamp() - f4t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                    sb2.Append(WorkshopFairScore.DayText(today, stepMs));
                 }
                 sb2.Append(" | potkniecia ").Append(_dStumbles).Append(" (sesja ").Append(_sessStumbles).Append(").");
                 Log.Info(sb2.ToString());

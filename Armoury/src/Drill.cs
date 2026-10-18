@@ -970,6 +970,7 @@ namespace Armoury
             try { st.ItemRoster.AddToCounts(ore, n); }
             finally { GoodsLedger.End(gf); }
             OreLedger.NoteDrillScrap(ore, n);
+            WorkshopFairScore.NoteProduced(st, ore, n, WorkshopFairScore.SrcScrap);   // F4 (recenzja): zlom z cwiczen na polce miasta do pomiaru wsadu regionu - bez zdarzenia gry
             int pay = unit * n;
             st.Town.ChangeGold(-pay);
             MoneyLedger.Note169(MoneyLedger.N169Surplus, st, -pay);   // paczka 169: linia kas (tylko licznik)

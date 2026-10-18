@@ -485,6 +485,7 @@ namespace Armoury
                     }
                     finally { GoodsLedger.End(f); }
                     if (n > 0) OreLedger.NoteIngotIron(_iron, n);
+                    if (n > 0) WorkshopFairScore.NoteProduced(t.Settlement, _iron, n, WorkshopFairScore.SrcScrap);   // F4 (recenzja): zelazo z przekutych sztab do pomiaru wsadu regionu (zamek - pominiety) - bez zdarzenia gry
                     _dIngotTowns++; _dIngotPcs += pcs; _dIngotValue += val; _dIngotIron += n;
                 }
                 catch (Exception e) { Stumble("Ingots(osada)", e); }

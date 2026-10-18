@@ -195,11 +195,12 @@ namespace Armoury
             return pick;
         }
 
-        /// <summary>N10: typ w miejsce kopalni. F4 (klucz WorkshopRetoolFairScore, pomiar wsadu gotowy): najpierw ocena F4; gdy zaden typ nie ma w niej wyniku > 0,
-        /// ocena z cen jak dotad - martwa kopalnia (0 cykli) jest gorsza od kazdego typu, wiec F4 nie zostawia jej czesciej niz dotad.</summary>
+        /// <summary>N10: typ w miejsce kopalni. F4 (klucz WorkshopRetoolFairScore razem z WorkshopRetoolByPrice - jak mowi podpowiedz MCM, pomiar wsadu gotowy): najpierw
+        /// ocena F4; gdy zaden typ nie ma w niej wyniku > 0, ocena z cen jak dotad - martwa kopalnia (0 cykli) jest gorsza od kazdego typu, wiec F4 nie zostawia jej
+        /// czesciej niz dotad. Recenzja (drobne): przy wylaczonym Workshop Retool By Price podmiana kopalni ocenia z cen jak dotad (pomiar wsadu i tak biegnie).</summary>
         private static WorkshopType Best(Town town, WorkshopType exclude, WorkshopType mines)
         {
-            bool fair = WorkshopFairScore.Ready;
+            bool fair = WorkshopRetool.On && WorkshopFairScore.Ready;
             var pick = Pick(town, exclude, mines, fair);
             if (fair)
             {

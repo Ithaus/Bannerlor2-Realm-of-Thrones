@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -25,7 +27,9 @@ namespace Armoury
     ///     wsad dzielony miedzy linie typu; warsztat, ktory sie przezbraja, z kapitalem ponizej ceny wsadu linii - ta linia nie rusza (CanNotableWorkshopProduceThisCycle);
     ///  3. wsad regionu naprawde dostepny = srednia produkcja 28 dob x f + polka / 30 dob, f = min(1, polka / 7 dob produkcji) - produkcja, ktora zostaje na rynku
     ///     (przy pustych polkach biora ja inni: lud, wojsko, karawany); produkcja ze zdarzenia gry OnItemProduced (wies -> jej miasto targowe, warsztaty i rzemioslo
-    ///     miasta -> miasto; wies KS i bez KS - te same zdarzenia BK/gry); miasta w promieniu 150 jedn. mapy (mediana 4 innych miast ROT);
+    ///     miasta -> miasto; wies KS i bez KS - te same zdarzenia BK/gry) oraz z drog Armoury, ktore dopisuja surowiec osadzie BEZ zdarzenia (NoteProduced, recenzja:
+    ///     pola mieszczan KS StartCalibration.DeliverTownFields, las wsi VillageWoodlot, zlom i sztaby -> zelazo ArmsScrap / Drill / GoodsPaths.Ingots); miasta w promieniu 150 jedn. mapy
+    ///     (mediana 4 innych miast ROT);
     ///  4. typ, ktory w regionie juz stoi i ma warsztaty z >= 60 dobami rachunku: wynik = min(zmierzony wynik roku tych warsztatow + utrzymanie, szacunek z p. 1-3);
     ///     typ obecny warsztatu przezbrajanego - jego wlasny zmierzony wynik (WorkshopTrade.Rec: srednia roku, >= 60 dob) + utrzymanie;
     ///  5. kara za dubel: x0.8 za kazdy warsztat tego typu w REGIONIE rynku (dotad w miescie); bramka wsadu w okregu (HasInput) bez zmian.
@@ -83,6 +87,14 @@ namespace Armoury
         // ------------------------------------------------------------ liczniki doby i pamiec przezbrojen sesji
         private static int _dMeas, _dEst, _dNone, _dWarm, _dStumbles, _sessStumbles;
         private static long _dEvents;
+        // recenzja (wazne): surowiec dopisany osadzie przez Armoury BEZ zdarzenia gry OnItemProduced (sztuki kategorii wsadu dzis, wedlug drogi)
+        internal const int SrcTownFields = 0, SrcWoodlot = 1, SrcScrap = 2;
+        private static readonly long[] _dDirect = new long[3];
+        // recenzja (drobne): czas SAMEJ reguly F4 (pomiar doby, oceny, wybory - takze przy bankructwie i N10 miedzy liniami dnia), nie calego kroku E3-D3
+        private static long _dTicks;
+        [ThreadStatic] private static int _depth;
+        private static long Tin() { return _depth++ == 0 ? Stopwatch.GetTimestamp() : 0L; }
+        private static void Tout(long t0) { if (--_depth <= 0) { _depth = 0; if (t0 != 0L) Interlocked.Add(ref _dTicks, Stopwatch.GetTimestamp() - t0); } }
         private sealed class Track { public Workshop W; public WorkshopType To; public int Day; public float Exp; }
         private static readonly List<Track> _tracks = new List<Track>();
 
@@ -100,7 +112,7 @@ namespace Armoury
         }
 
         /// <summary>Zerowanie licznikow doby (po linii "Warsztaty za cena (E3-D3)").</summary>
-        internal static void EndDay() { _dMeas = _dEst = _dNone = _dWarm = _dStumbles = 0; _dEvents = 0; }
+        internal static void EndDay() { _dMeas = _dEst = _dNone = _dWarm = _dStumbles = 0; _dEvents = 0; lock (Gate) { _dDirect[0] = _dDirect[1] = _dDirect[2] = 0; } Interlocked.Exchange(ref _dTicks, 0L); }
 
         private static void Stumble(string where, Exception e)
         {
@@ -146,7 +158,19 @@ namespace Armoury
         /// <summary>CampaignEvents.OnItemProducedEvent (WorkshopTradeBehavior): sztuki dopisane osadzie - wies liczy sie do swojego miasta targowego (TradeBound, inaczej
         /// Bound), miasto do siebie; tylko kategorie wsadu warsztatow widocznych. Gra (VillageGoodProductionCampaignBehavior) i BK (TickGoodProductionPatch) wolaja to
         /// zdarzenie przy produkcji kazdej wsi - wies KS i wies poza KS tak samo. Sam licznik.</summary>
-        internal static void OnItemProduced(ItemObject item, Settlement st, int n)
+        internal static void OnItemProduced(ItemObject item, Settlement st, int n) { Count(item, st, n, -1); }
+
+        /// <summary>
+        /// Recenzja (wazne): surowiec, ktory Armoury dopisuje osadzie BEZ zdarzenia gry OnItemProduced - ten sam licznik co zdarzenie (wies -> miasto targowe, miasto ->
+        /// miasto, tylko kategorie wsadu). Nie wolamy zdarzenia gry: sluchaja go TownFolk, Stage6Measure, VillageByPeople, OreLedger i liczylyby drugi raz. Drogi:
+        /// SrcTownFields - pola mieszczan KS na polke miasta (StartCalibration.DeliverTownFields: zboze, welna, len, bawelna, skory ... - dotad ok. 19% surowca doby
+        /// na drodze KS poza pomiarem, fin86 d109235 9 420 szt.), SrcWoodlot - drewno lasu wsi do magazynu wsi (VillageWoodlot.TickPostfix, bez czesci prosto do dymarki),
+        /// SrcScrap - zelazo ze zlomu i sztab na polce miasta (ArmsScrap: nadmiar broni miasta na zlom, Drill.SellScrap: zlom z cwiczen odkupiony przez kowali,
+        /// GoodsPaths.Ingots: sztaby przekute na zelazo) - ta sama sztuka zelaza, co z kopalni, do kuzni. Sam licznik, nie rzuca.
+        /// </summary>
+        internal static void NoteProduced(Settlement st, ItemObject item, int n, int src) { Count(item, st, n, src < 0 || src > 2 ? 0 : src); }
+
+        private static void Count(ItemObject item, Settlement st, int n, int src)
         {
             if (n <= 0 || item == null || st == null || !On) return;
             try
@@ -162,15 +186,16 @@ namespace Armoury
                     Dictionary<ItemCategory, int> d;
                     if (!_cur.TryGetValue(mk.StringId, out d)) { d = new Dictionary<ItemCategory, int>(); _cur[mk.StringId] = d; }
                     int x; d.TryGetValue(c, out x); d[c] = x + n;
-                    _dEvents += n;
+                    if (src < 0) _dEvents += n; else _dDirect[src] += n;
                 }
             }
-            catch (Exception e) { Stumble("OnItemProduced", e); }
+            catch (Exception e) { Stumble(src < 0 ? "OnItemProduced" : "NoteProduced", e); }
         }
 
         /// <summary>Raz na dobe (z WorkshopRetool.Daily, przed decyzjami): dzisiejsza produkcja do sredniej 28 dob. Pierwsza doba sesji (niepelna) odrzucona.</summary>
         internal static void DayFold()
         {
+            long t0 = Tin();
             try
             {
                 Dictionary<string, Dictionary<ItemCategory, int>> cur;
@@ -200,6 +225,7 @@ namespace Armoury
                 Invalidate();
             }
             catch (Exception e) { Stumble("DayFold", e); }
+            finally { Tout(t0); }
         }
 
         // ------------------------------------------------------------ zapis
@@ -441,6 +467,7 @@ namespace Armoury
         {
             var q = new Quote();
             if (town == null || t == null) return q;
+            long t0 = Tin();
             try
             {
                 TD td;
@@ -454,6 +481,7 @@ namespace Armoury
                 else { q.Score = q.Estimate; if (q.Estimate > NoScore) _dEst++; else _dNone++; }
             }
             catch (Exception e) { Stumble("Score", e); q.Score = NoScore; }
+            finally { Tout(t0); }
             return q;
         }
 
@@ -461,7 +489,9 @@ namespace Armoury
         internal static float OwnScore(Workshop w)
         {
             float m;
-            return MeasuredOf(w, out m) ? m : NoScore;
+            long t0 = Tin();
+            try { return MeasuredOf(w, out m) ? m : NoScore; }
+            finally { Tout(t0); }
         }
 
         /// <summary>
@@ -469,6 +499,13 @@ namespace Armoury
         /// wynik dodatni x 0.8 za kazdy warsztat tego typu w REGIONIE rynku (bez `self`). null - zaden typ z wynikiem > 0. raw - wynik przed kara (spodziewany wynik doby).
         /// </summary>
         internal static WorkshopType Best(Town town, WorkshopType exclude, IDictionary<ItemCategory, float> dict, Workshop self, out float score, out Quote quote)
+        {
+            long t0 = Tin();
+            try { return BestCore(town, exclude, dict, self, out score, out quote); }
+            finally { Tout(t0); }
+        }
+
+        private static WorkshopType BestCore(Town town, WorkshopType exclude, IDictionary<ItemCategory, float> dict, Workshop self, out float score, out Quote quote)
         {
             score = NoScore; quote = null;
             WorkshopType pick = null;
@@ -527,10 +564,12 @@ namespace Armoury
                    + (_loadedDays >= 0 ? _loadedDays + " dob, miast " + _loadedTowns : "brak (pierwsze " + WarmDays + " dob tylko pomiar)");
         }
 
-        /// <summary>Czesc linii dnia E3-D3 (klucz wlaczony): regula, pomiar, oceny doby, spodziewany vs rzeczywisty, typy swiata, czas.</summary>
-        internal static string DayText(int today, double ms)
+        /// <summary>Czesc linii dnia E3-D3 (klucz wlaczony): regula, pomiar, oceny doby, spodziewany vs rzeczywisty, typy swiata, czas. `stepMs` - caly krok E3-D3 dzis
+        /// (z akcja gry przezbrojenia) - tylko do informacji; "czas F4" = sama regula (DayFold, oceny i wybory od ostatniej linii, ta czesc linii).</summary>
+        internal static string DayText(int today, double stepMs)
         {
             var sb = new StringBuilder(900);
+            long t0 = Stopwatch.GetTimestamp();
             try
             {
                 int towns = 0; double units = 0;
@@ -540,7 +579,9 @@ namespace Armoury
                   .Append(" dob, dzielone miedzy warsztaty regionu z tym wsadem), zmierzony wynik >= ")
                   .Append(MeasuredDays).Append(" dob jako sufit, kara x").Append(DupKeep.ToString("0.0", Inv)).Append(" za warsztat tego typu w regionie")
                   .Append(" | pomiar wsadu: dob ").Append(_days).Append(" (gotowy ").Append(_days >= WarmDays ? "tak" : "nie").Append(", od ").Append(WarmDays).Append(" dob), miast ").Append(towns)
-                  .Append(", sztuk na dobe ").Append(units.ToString("0", Inv)).Append(", dzis zdarzen ").Append(_dEvents)
+                  .Append(", sztuk na dobe ").Append(units.ToString("0", Inv)).Append(", dzis zdarzen ").Append(_dEvents);
+                long dTf, dWl, dSc; lock (Gate) { dTf = _dDirect[SrcTownFields]; dWl = _dDirect[SrcWoodlot]; dSc = _dDirect[SrcScrap]; }
+                sb.Append(", bez zdarzenia gry (Armoury) pola mieszczan KS ").Append(dTf).Append(", las wsi ").Append(dWl).Append(", zlom i sztaby -> zelazo ").Append(dSc)
                   .Append(_loadedDays >= 0 ? ", z zapisu " + _loadedDays + " dob" : ", z zapisu brak").Append(_saveCut > 0 ? ", zapis uciety " + _saveCut + " razy" : "")
                   .Append(" | oceny dzis: zmierzone ").Append(_dMeas).Append(", szacunek ").Append(_dEst).Append(", bez linii ").Append(_dNone).Append(", odlozone (pomiar w toku) ").Append(_dWarm);
                 int n10, n10f; NoTownMines.TakeF4(out n10, out n10f);
@@ -577,8 +618,10 @@ namespace Armoury
                 }
                 var parts = new List<string>();
                 foreach (var kv in cnt) parts.Add(kv.Key + " " + kv.Value);
+                double ms = (Interlocked.Read(ref _dTicks) + (Stopwatch.GetTimestamp() - t0)) * 1000.0 / Stopwatch.Frequency;
                 sb.Append(" | typy (swiat): ").Append(parts.Count > 0 ? string.Join(", ", parts.ToArray()) : "-")
-                  .Append(" | czas F4 ").Append(ms.ToString("0.00", Inv)).Append(" ms | obieg bez zmian: zmienia sie tylko wybor typu (sprzet notable -> kasa miasta jak dotad)")
+                  .Append(" | czas F4 ").Append(ms.ToString("0.00", Inv)).Append(" ms (pomiar, oceny i wybory od ostatniej linii, ta linia; caly krok E3-D3 z akcja gry ")
+                  .Append(stepMs.ToString("0.00", Inv)).Append(" ms) | obieg bez zmian: zmienia sie tylko wybor typu (sprzet notable -> kasa miasta jak dotad)")
                   .Append(" | potkniecia F4 ").Append(_dStumbles).Append(" (sesja ").Append(_sessStumbles).Append(')');
             }
             catch (Exception e) { Stumble("DayText", e); }

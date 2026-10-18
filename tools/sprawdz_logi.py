@@ -716,8 +716,11 @@ Uzycie (Python 3, tylko odczyt):
                     <Armoury-*.log> [--baza-doby <log biegu z kluczem wylaczonym / sprzed paczki>] (strumieniowo). NWAR-0 start E3-D3 "ocena F4 ... tak", NWAR-1 linie
                     doby z segmentem F4 rozpoznane, NWAR-2 zmiany typu <= 0.35/dobe, <= 3 na dobe, <= 1.25 x baza, NWAR-3 spodziewany vs rzeczywisty (przezbrojone >= 30 dob,
                     K >= 3): rzeczywisty >= 0.2 x spodziewany, pracuje >= 50%, NWAR-4a srebro+aksamit koniec <= poczatek + 2, NWAR-4b browary+garbarnie+garncarze+len
-                    >= 0.5 x poczatku (albo >= -3), NWAR-5 potkniecia F4/E3-D3 i ERROR 0, NWAR-6 czas F4 mediana <= 5 ms (maks <= 50), NWAR-7 pomiar wsadu gotowy <= 9. linia
-                    i 0 zmian przed gotowoscia, NWAR-8 oceny (INFO), NWAR-9 stojace srebro/aksamit/towary codzienne (INFO). Log bez paczki: INFO, bez wyjatku.
+                    >= 0.5 x poczatku (albo >= -3), NWAR-5 potkniecia F4/E3-D3 i ERROR 0, NWAR-6 czas F4 mediana <= 5 ms (maks <= 50; sama regula - po recenzji bez akcji
+                    gry przezbrojenia, caly krok E3-D3 w nawiasie INFO), NWAR-7 pomiar wsadu gotowy <= 9. linia i 0 zmian przed gotowoscia, NWAR-8 oceny (INFO), NWAR-9
+                    stojace srebro/aksamit/towary codzienne (INFO), NWAR-10 (recenzja) surowiec bez zdarzenia gry w pomiarze: przy polach mieszczan KS ("KS: produkcja
+                    (zastosowane)" ... "na polki N szt." > 0 w dobach F4) suma "pola mieszczan KS" w linii F4 > 0 i <= 1.05 x N + najwieksza doba (las wsi, zlom - INFO).
+                    Log bez paczki: INFO, bez wyjatku.
 --grupa nsprzet   : (noc 15/16.10, Jeff 15.10 "rekrutuje ludzi, maja uzbrojenie, ktorego nie moga uzywac ... walcza piesciami"; galaz w-toku/noc-sprzet,
                     Armoury/src/GearFit.cs) python -I tools/sprawdz_logi.py --grupa nsprzet [--crashscribe <session-*.log>] [--baza-doby <Armoury-*.log sprzed>]
                     <Armoury-*.log> (strumieniowo). NS-0 linia startu (klucze tak, wpiecia DTE i RealmWard tak), NS-1 wzorce ponad umiejetnosc 0 (DECYZJA),
@@ -32095,6 +32098,10 @@ NWAR_EXP = re.compile(r"\| spodziewany vs rzeczywisty: przezbrojone w sesji (\d+
 NWAR_TYPES = re.compile(r"\| typy \(swiat\): ([^|]+?) \| ")
 NWAR_N10 = re.compile(r"\| kopalnie BK w miastach \(N10\): wyborow z ocena F4 (\d+), bez typu z wynikiem F4 -> ocena z cen (\d+)")
 NWAR_TIME = re.compile(r"\| czas F4 ([\d.]+) ms")
+NWAR_STEP = re.compile(r"caly krok E3-D3 z akcja gry ([\d.]+) ms\)")   # recenzja: czas calego kroku E3-D3 (INFO; "czas F4" to sama regula)
+NWAR_DIRECT = re.compile(r", bez zdarzenia gry \(Armoury\) pola mieszczan KS (\d+), las wsi (\d+), zlom i sztaby -> zelazo (\d+)")   # recenzja: NoteProduced
+NWAR_KS = re.compile(r"^KS: produkcja \(zastosowane\) dzien (\d+) ")
+NWAR_KS_TF = re.compile(r"\| pola mieszczan: na polki (\d+) szt\.")
 NWAR_STF4 = re.compile(r"\| potkniecia F4 (\d+) \(sesja (\d+)\)")
 NWAR_STEND = re.compile(r"\| potkniecia (\d+) \(sesja (\d+)\)\.$")
 NWAR_WSTYPE = re.compile(r"(\S+) (\d+) \(pracowalo (\d+), cykli (\d+), wynik ([+-]?\d+) = (-?[\d.]+) d na warsztat")
@@ -32123,8 +32130,9 @@ def _nwar_types_from_ws(s):
     return d
 
 
-def _nwar_read(logp):
-    """Strumieniowo: linie E3-D3 (doba -> tekst), starty E3-D3, 'Warsztaty towarowe' (doba -> tekst), liczba ERROR w miejscach paczki."""
+def _nwar_read(logp, ks=None):
+    """Strumieniowo: linie E3-D3 (doba -> tekst), starty E3-D3, 'Warsztaty towarowe' (doba -> tekst), liczba ERROR w miejscach paczki; `ks` (slownik, opcjonalnie) -
+    doba KS -> sztuki pol mieszczan na polki (linia "KS: produkcja (zastosowane)", NWAR-10)."""
     d3, ws, starts = {}, {}, []
     n_err = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -32143,6 +32151,11 @@ def _nwar_read(logp):
                     ws[int(mm.group(1))] = s
             elif any(s.startswith(e) for e in NWAR_ERR):
                 n_err += 1
+            elif ks is not None and s.startswith("KS: produkcja (zastosowane) dzien "):
+                mm = NWAR_KS.match(s)
+                mt = NWAR_KS_TF.search(s) if mm else None
+                if mt:
+                    ks[int(mm.group(1))] = int(mt.group(1))
     return d3, ws, starts, n_err
 
 
@@ -32169,13 +32182,16 @@ def nwar_main(logp, bdp=None):
     lnu >= 0.5 x poczatek albo >= poczatek - 3 (NWAR-4b), kuznie srebra + tkalnie aksamitu <= poczatek + 2 (NWAR-4a; fin86 bez F4: 47 -> 14 i 20 -> 32); NWAR-5 potkniecia F4 i E3-D3
     (sesja) 0, ERROR w miejscach paczki 0; NWAR-6 czas F4 mediana <= 5 ms, maks <= 50 ms; NWAR-7 pomiar wsadu gotowy najpozniej w 9. linii doby biegu i 0 zmian typu,
     gdy pomiar niegotowy; NWAR-8 oceny (zmierzone / szacunek / bez linii / odlozone) - INFO; NWAR-9 stojace kuznie srebra i tkalnie aksamitu na koniec ('Warsztaty
-    towarowe', pracowalo / warsztatow) - INFO. Log bez paczki: INFO (NWAR-2/4 i tak liczone z linii E3-D3 i 'Warsztaty towarowe'), bez wyjatku."""
+    towarowe', pracowalo / warsztatow) - INFO; NWAR-10 (recenzja) surowiec dopisany przez Armoury bez zdarzenia gry w pomiarze wsadu: przy polach mieszczan KS
+    (suma "na polki N szt." w dobach linii F4 > 0) suma "pola mieszczan KS" z linii F4 > 0 i <= 1.05 x N + najwieksza doba N (kategorie wsadu to czesc plonu);
+    las wsi i zlom/sztaby - INFO. Log bez paczki: INFO (NWAR-2/4 i tak liczone z linii E3-D3 i 'Warsztaty towarowe'), bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("NWAR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
         rep.show()
         return 0
-    d3, ws, starts, n_err = _nwar_read(logp)
+    ksf = {}
+    d3, ws, starts, n_err = _nwar_read(logp, ksf)
     f4days = {x: s for x, s in d3.items() if NWAR_F4 in s}
     print(f"plik: {logp} | linii E3-D3 {len(d3)} (z oceniona F4 {len(f4days)}), startow E3-D3 {len(starts)}, linii 'Warsztaty towarowe' {len(ws)}, ERROR paczki {n_err}")
     if not d3 and not ws:
@@ -32292,7 +32308,9 @@ def nwar_main(logp, bdp=None):
     times = [float(parsed[x]["time"].group(1)) for x in sorted(parsed) if parsed[x]["time"]]
     if times:
         med = st.median(times); mxt = max(times)
-        rep.add("NWAR-6: czas F4 na dobe (pomiar, ocena, decyzje, linia)", f"mediana {med:.2f} ms, maks {mxt:.2f} ms ({len(times)} dob)", "mediana <= 5 ms, maks <= 50 ms", med <= 5.0 and mxt <= 50.0)
+        steps = [float(m.group(1)) for m in (NWAR_STEP.search(f4days[x]) for x in sorted(parsed)) if m]
+        stxt = f"; caly krok E3-D3 (z akcja gry, INFO) mediana {st.median(steps):.2f} ms, maks {max(steps):.2f} ms" if steps else "; bez czasu calego kroku (DLL sprzed recenzji: czas F4 = caly krok)"
+        rep.add("NWAR-6: czas F4 na dobe (pomiar, ocena, decyzje, linia)", f"mediana {med:.2f} ms, maks {mxt:.2f} ms ({len(times)} dob){stxt}", "mediana <= 5 ms, maks <= 50 ms", med <= 5.0 and mxt <= 50.0)
     else:
         rep.add("NWAR-6: czas F4", "brak", "INFO", None)
     # NWAR-7 pomiar wsadu gotowy i bez zmian przed gotowoscia
@@ -32325,6 +32343,24 @@ def nwar_main(logp, bdp=None):
         a = _nwar_types_from_ws(ws[max(ws)])
         parts = [f"{t} pracowalo {a[t][1]} z {a[t][0]} (cykli {a[t][2]}, {a[t][3]:.1f} d na warsztat)" for t in NWAR_BAD_PICKS + NWAR_DAILY_GOODS if t in a]
         rep.add("NWAR-9: stojace warsztaty srebra/aksamitu i towarow codziennych na koniec ('Warsztaty towarowe')", f"d{max(ws)}: " + ("; ".join(parts) if parts else "brak tych typow"), "INFO", None)
+    # NWAR-10 (recenzja): surowiec dopisany przez Armoury bez zdarzenia gry (pola mieszczan KS, las wsi, zlom i sztaby) w pomiarze wsadu
+    dirs = [(x, NWAR_DIRECT.search(f4days[x])) for x in sorted(f4days)]
+    dirs = [(x, m) for x, m in dirs if m]
+    if not f4days:
+        rep.add("NWAR-10: surowiec bez zdarzenia gry w pomiarze wsadu", "brak linii F4", "INFO", None)
+    elif not dirs:
+        rep.add("NWAR-10: surowiec bez zdarzenia gry w pomiarze wsadu", f"linie F4 bez segmentu 'bez zdarzenia gry' ({len(f4days)})", "INFO (DLL sprzed recenzji F4)", None)
+    else:
+        a = sum(int(m.group(1)) for _x, m in dirs); b = sum(int(m.group(2)) for _x, m in dirs); c = sum(int(m.group(3)) for _x, m in dirs)
+        lo, hi = dirs[0][0], dirs[-1][0]
+        ksn = [v for d, v in ksf.items() if lo - 1 <= d <= hi + 1]
+        n_tf = sum(ksn); mx_tf = max(ksn) if ksn else 0
+        txt = f"d{lo}-d{hi} ({len(dirs)} linii F4): pola mieszczan KS {a} szt. (KS na polki w tych dobach {n_tf}" + (f", {a / n_tf:.2f} x" if n_tf > 0 else "")
+        txt += f"), las wsi {b}, zlom i sztaby -> zelazo {c}"
+        if n_tf > 0:
+            rep.add("NWAR-10: pola mieszczan KS w pomiarze wsadu F4 (bez zdarzenia gry)", txt, "> 0 i <= 1.05 x KS + najwieksza doba (kategorie wsadu to czesc plonu)", 0 < a <= 1.05 * n_tf + mx_tf)
+        else:
+            rep.add("NWAR-10: surowiec bez zdarzenia gry w pomiarze wsadu", txt, "INFO (bez pol mieszczan KS w dobach F4 - droga bez KS)", None)
     rep.show()
     return 0
 
