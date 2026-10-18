@@ -3000,3 +3000,12 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
 - 09:55 PDT: f11-drogi GOTOWE (wf_2770bede-551) w-toku/f11-drogi **a27ae6d1**: drogi boczne kalkomaniami (jak piana NavalDLC; material mainmap_decal_undervillage ROT), tylko do dalszych
   wiosek (blisko traktu - bez drogi; < 4 j. - bez), Dijkstra po ladzie, laczenie w siec, MapSideRoads domyslnie NIE; plik arm_map_side_roads_grid.tsv (dopisac do wgraj/bieg!); zdjecia:
   armoury-drogi-boczne.flag + -PhotosFile tools/drogi/zdjecia-drogi-boczne.json + -ExtraAdd grid. Koszt klatki 14-20k kalkomanii nieznany (NBC-6 w biegu zdjec).
+- 10:18 PDT: TEST fin92 (8cd7b556; Armoury-2026-10-18_09-33-39.log + CSV w D:/Backup-Bannerlord/logi-testow; wyniki scratchpad fin92/*.txt): kod 0, ERROR 0, zapisy Jeffa nietkniete,
+  w grze z powrotem WGRANIE 80 (7b9f9ad0), flagi usuniete. TAK: nakum 39/39 (AKUMULATOR KAS MIAST USUNIETY: NAKUM-12 +57k -> -37k/d, NAKUM-22 +68k -> -32k/d, zaden posiadacz > +30k/d:
+  skarbce +17k, glowy rodow +14.8k), nwegiel 15/15 (kopalnie bez wegla 93.8 -> 19.5 lup/d), nrenty 12/12, npozyczka 24/24, nniewola 13/13 (0 ruchow - brak biednych w progu), nturniej
+  19/19 (118 sakiewek), odsiecz 10/10 (100%, stolice zdobyte 0; "BEZ SZANS" dziala), nglod, nmur, npolnoc, nkoszyk, nzw, nperf, nzapis, nzwrot.
+  NIE (nowe wobec fin91): NF4-8 hardwood -51 bez wyjasnienia (1 okno), NSK-3 meat +3 (1 doba), ZC1-19 deski u mieszczan (1 doba), NKS-3 Essos wool 1.08, NKS-27 Essos fish 0.886,
+  NWAR-15 klin skora/skory 0.51 -> 0.34 (lepiej niz bez paczki 0.25), NBD-2 bandy ponad cel x1.05 (BK?). Gorzej: NDS-3a kiesy wsi -0.466%/d (fin91 -0.381), NDS-9 D staly 0.517
+  (fin91 0.767 - skutek rent wedlug potrzeby?), NDS-7b 0.804/0.693. Lepiej, ale NIE: NKA-1 zaleglosci firm 1.03 mln -> 627k (+10.9k/d po przegladzie). Bez zmian: NKU-12, NDS-11 takt doby 566 ms.
+- 10:30 PDT: workflow f14-fin92 (wf_83181c62-398): 4 paczki od 8cd7b556 - f14-ksiega (NF4-8/NSK-3/ZC1-19), f14-wsie (NDS-3a odplyw kies wsi), f14-rynek (NWAR-15 + NKS-3/27 Essos),
+  f14-miary (NDS-9/7b po decyzji o rentach - sprawdzic armie; NKA-1; NBD-2). Rownolegle: f10-uklad (wf_ca258789-6e9), f13-doba (wf_de2e2ab7-36e).
