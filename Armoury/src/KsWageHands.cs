@@ -20,6 +20,10 @@ namespace Armoury
     /// to mniej w kasie kupcow i wiecej w kiesach W i R (tozsamosc w linii: zaplacone z kas = przyjete w kiesach). Przetwory ZC5 licza w koszcie pracy ta sama placa
     /// (drozsza praca - mniej par sie oplaca). Warsztaty gry, rzemioslo 148 i naprawy - bez zmian (inne sciezki, poza KS).
     /// Zapis: arm_ks_koszyk (miasto:wskaznik:doba decyzji). Linia "Place za brak rak (r4-koszyk): dzien N" co dobe.
+    /// f4-place-ludu (klucz Ks Wage Hands Down, KsFolkWage.cs): przy duzej liczbie wolnych rak wskaznik schodzi dalej PONIZEJ 1 tym samym krokiem, najwyzej do Ks Wage Hands
+    /// Floor - druga strona tej samej reguly. Wskaznik ponizej 1 tnie tylko czesc W robocizny i doplaty (TownFolk.TownLive krok 2; podloga przezycia - KsFolkWage.WFactor);
+    /// Factor (koszt pracy przetworow ZC5 - rece rzemieslnikow) zostaje >= 1. Wskazniki ponizej 1 w osobnym kluczu zapisu arm_ks_place (arm_ks_koszyk jak dotad >= 1).
+    /// Klucz wylaczony - podloga 1, co do liczby jak dotad.
     /// </summary>
     internal static class KsWageHands
     {
@@ -39,11 +43,17 @@ namespace Armoury
         internal static bool On { get { var s = Settings.Current; return s != null && s.KsWageByHands; } }
         private static double Step { get { var s = Settings.Current; return s != null ? Math.Max(0.0, Math.Min(0.10, s.KsWageHandsStepPercent / 100.0)) : 0.03; } }
         private static double Max { get { var s = Settings.Current; return s != null ? Math.Max(1.0, Math.Min(2.0, s.KsWageHandsMax)) : 1.3; } }
+        /// <summary>f4-place-ludu (a): wskaznik moze zejsc ponizej 1 (klucze Ks Wage By Hands i Ks Wage Hands Down).</summary>
+        internal static bool DownOn { get { var s = Settings.Current; return s != null && s.KsWageByHands && s.KsWageHandsDown; } }
+        /// <summary>f4-place-ludu (a): podloga wskaznika - Ks Wage Hands Floor (0.3..1) przy kluczu Ks Wage Hands Down, inaczej 1 (jak dotad).</summary>
+        private static double Floor { get { var s = Settings.Current; return s != null && s.KsWageHandsDown ? Math.Max(0.3, Math.Min(1.0, (double)s.KsWageHandsFloor)) : 1.0; } }
+        internal static double FloorNow { get { return Floor; } }
 
         internal static void Reset()
         {
             _w.Clear(); _dPaid = _dRecv = 0; _dExtra = 0; _dTowns = _dUp = 0; _stum = 0; _err.Clear();
             _decDay = -1;
+            KsFolkWage.Reset();   // f4-place-ludu: kappa plac W (zapis arm_ks_place)
         }
 
         private static void Stumble(string where, Exception e)
@@ -73,7 +83,7 @@ namespace Armoury
                 if (!_w.TryGetValue(st.StringId, out w)) { w = new W { Last = day, State = 3 }; _w[st.StringId] = w; }
                 else if (w.Last < 0 || day < w.Last) w.Last = day;                       // wczytany zapis z innej doby / pierwsza doba po wczytaniu
                 else if (day - w.Last >= 7) { Decide(st, w, day); w.Last = day; }
-                return Math.Max(1.0, Math.Min(Max, w.Idx));
+                return Math.Max(Floor, Math.Min(Max, w.Idx));                            // f4-place-ludu (a): ponizej 1 tylko przy Ks Wage Hands Down (inaczej podloga 1)
             }
             catch (Exception e) { Stumble("Day", e); return 1.0; }
         }
@@ -87,9 +97,9 @@ namespace Armoury
             bool byFree = fh && a >= f, byCraft = craft && use >= 0.9;
             bool shortH = byFree || byCraft;
             bool slack = !shortH && (!fh || (f - a) >= 0.5 * f) && (!craft || use < 0.5);
-            double step = Step, max = Max, idx = Math.Max(1.0, Math.Min(max, w.Idx));
+            double step = Step, max = Max, fl = Floor, idx = Math.Max(fl, Math.Min(max, w.Idx));   // f4-place-ludu (a): podloga Ks Wage Hands Floor albo 1 (jak dotad)
             if (shortH) idx = Math.Min(max, idx * (1.0 + step));
-            else if (slack) idx = Math.Max(1.0, idx / (1.0 + step));
+            else if (slack) idx = Math.Max(fl, idx / (1.0 + step));
             w.Idx = (float)idx; w.State = (byte)(shortH ? 1 : slack ? 2 : 0);
             w.A = fh ? (float)a : -1f; w.F = fh ? (float)f : -1f; w.Use = craft ? (float)use : -1f; w.ByFree = byFree; w.ByCraft = byCraft;
             w.Avail = w.Used = 0;
@@ -124,6 +134,7 @@ namespace Armoury
             {
                 if (_w.Count == 0 && _dTowns == 0) return;                               // bez KS zastosowanego (gra Jeffa bez KS) - bez linii
                 var ix = new List<KeyValuePair<string, float>>();
+                float flF = (float)Floor;                                                   // f4-place-ludu (a): podloga wskaznika (bez klucza Ks Wage Hands Down - 1, jak dotad)
                 int n = 0, nShort = 0, nShortFree = 0, nShortCraft = 0, nSlack = 0, nHold = 0, nNone = 0;
                 foreach (var kv in _w)
                 {
@@ -135,7 +146,7 @@ namespace Armoury
                     else if (w0.State == 2) nSlack++;
                     else if (w0.State == 0) nHold++;
                     else nNone++;
-                    ix.Add(new KeyValuePair<string, float>(st.Name != null ? st.Name.ToString().Replace(';', ',').Replace('|', '/') : kv.Key, Math.Max(1f, kv.Value.Idx)));
+                    ix.Add(new KeyValuePair<string, float>(st.Name != null ? st.Name.ToString().Replace(';', ',').Replace('|', '/') : kv.Key, Math.Max(flF, kv.Value.Idx)));
                 }
                 ix.Sort((x, y) => y.Value.CompareTo(x.Value));
                 var vals = new List<float>(); foreach (var kv in ix) vals.Add(kv.Value);
@@ -159,7 +170,22 @@ namespace Armoury
                 }
                 sb.Append(" | doba: kasy miast zaplacily robocizne i doplate ").Append(_dPaid).Append(" zl, kiesy ludu przyjely ").Append(_dRecv).Append(" zl (roznica ").Append(_dPaid - _dRecv)
                   .Append("), z tego ponad stawke (place za brak rak) ").Append(Math.Round(_dExtra).ToString("0", Inv)).Append(" zl w ").Append(_dUp).Append(" miastach (miast z placami ").Append(_dTowns).Append(')')
-                  .Append(" | potkniecia ").Append(_stum).Append('.');
+                  .Append(" | potkniecia ").Append(_stum);
+                // f4-place-ludu (a): wskazniki ponizej 1 (tylko przy kluczu Ks Wage Hands Down - inaczej linia jak dotad); 12 najnizszych miast - krok miedzy dobami (NKO-11)
+                var sNow = Settings.Current;
+                if (sNow != null && sNow.KsWageHandsDown)
+                {
+                    int dn = 0; foreach (var v in vals) if (v < 0.9995f) dn++;
+                    sb.Append(" | w dol (f4-place-ludu): klucz Ks Wage Hands Down TAK, podloga x").Append(flF.ToString("0.00", Inv)).Append(", tylko place W, miasta < 1: ").Append(dn);
+                    if (dn > 0)
+                    {
+                        sb.Append(" (");
+                        int k = 0;
+                        for (int i = ix.Count - 1; i >= 0 && k < 12; i--) { var kv = ix[i]; if (kv.Value >= 0.9995f) break; sb.Append(k == 0 ? "" : ", ").Append(kv.Key).Append(' ').Append(kv.Value.ToString("0.000", Inv)); k++; }
+                        sb.Append(')');
+                    }
+                }
+                sb.Append('.');
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("DayLine", e); }
@@ -211,6 +237,38 @@ namespace Armoury
             var p = s.Split('|');
             try { Import(p.Length > 1 ? p[1] : null); } catch (Exception e) { _w.Clear(); Stumble("Import", e); }
             try { StartCalibration.ImportCheap(p.Length > 2 ? p[2] : null); } catch (Exception e) { Stumble("ImportCheap", e); }
+        }
+
+        // ------------------------------------------------------------ f4-place-ludu (a): wskazniki ponizej 1 w osobnym kluczu arm_ks_place (KsFolkWage.ExportAll / ImportAll)
+        /// <summary>"miasto:wskaznik,..." - tylko wskaznik ponizej 1 (arm_ks_koszyk trzyma te miasta z wartoscia 1 - starsza DLL wczyta 1).</summary>
+        internal static string ExportDown()
+        {
+            var sb = new StringBuilder();
+            foreach (var kv in _w)
+            {
+                if (string.IsNullOrEmpty(kv.Key) || kv.Key.IndexOfAny(new[] { ':', ',', '|' }) >= 0 || kv.Value == null || !(kv.Value.Idx < 0.99995f)) continue;
+                if (sb.Length > 0) sb.Append(',');
+                sb.Append(kv.Key).Append(':').Append(Math.Max(0.3f, kv.Value.Idx).ToString("0.####", Inv));
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Odczyt PO arm_ks_koszyk (Import): wskaznik ponizej 1 nadpisuje 1 z arm_ks_koszyk; zly wpis - pomijany; straznik rozmiaru (4000 miast, wskaznik 0.3..1).</summary>
+        internal static void ImportDown(string s)
+        {
+            if (string.IsNullOrEmpty(s) || s.Length > 200000) return;
+            int n = 0;
+            foreach (var ent in s.Split(','))
+            {
+                if (n >= 4000) break;
+                var f = ent.Split(':');
+                float v;
+                if (f.Length != 2 || f[0].Length == 0 || !float.TryParse(f[1], NumberStyles.Float, Inv, out v) || !(v >= 0.3f && v < 1f)) continue;
+                W w;
+                if (_w.TryGetValue(f[0], out w) && w != null) w.Idx = v;
+                else _w[f[0]] = new W { Idx = v, Last = -1, State = 3 };   // bez doby decyzji - pierwsza doba po wczytaniu ustawi termin (Day)
+                n++;
+            }
         }
     }
 }

@@ -7312,6 +7312,42 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: cheaper basket and wages by hands (r4-koszyk)")]
         public float KsWageHandsMax { get; set; } = 1.3f;
 
+        [SettingPropertyBool("Ks Wage Hands Down", HintText = "with Ks Wage By Hands: where hands are plentiful (the region keeps many free men and the town's food crafts stand half idle) the labourers' wage level keeps falling each week by the same step below the usual wage, down to Ks Wage Hands Floor - the other side of the same rule: the merchants pay the labourers less and keep the difference. Craftsmen's pay is not cut, and labourers with less than Ks Labour Basket Low Days of their basket saved are always paid at least the usual wage. Off = wages never fall below the usual wage")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public bool KsWageHandsDown { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Wage Hands Floor", 0.30f, 1.00f, "0.00", HintText = "with Ks Wage Hands Down: the lowest wage level plentiful hands can bring for the labourers (times the usual wage of the town)")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public float KsWageHandsFloor { get; set; } = 0.6f;
+
+        [SettingPropertyBool("Ks Labour To Basket", HintText = "with Start Calibration applied: the town sets the labourers' wage by what their basket costs on its market, as medieval towns set wages by the price of bread. While the labourers hold no more than Ks Labour Basket Low Days of their basket in savings they get the full rate; the more they hold above that, the lower the rate the merchants, the masters and the wealthy households pay them, down to Ks Labour Basket Min of the rate at Ks Labour Basket High Days. The employers keep what they do not pay - nothing comes from nothing. Off = the labourers get the full rate however much they hold")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public bool KsLabourToBasket { get; set; } = true;
+
+        [SettingPropertyBool("Ks Labour Basket Households", HintText = "with Ks Labour To Basket: the craftsmen and patricians who pay labourers from their savings above their reserve pay them at the same assessed rate as the merchants do, and keep the rest for their own spending (off = they pay labourers the full rate)")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public bool KsLabourBasketHouseholds { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Labour Basket Low Days", 1.00f, 120.00f, "0", HintText = "with Ks Labour To Basket: up to this many days of their basket in savings the labourers get the full rate (and below it no wage cut of any kind applies)")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public float KsLabourBasketLowDays { get; set; } = 15f;
+
+        [SettingPropertyFloatingInteger("Ks Labour Basket High Days", 2.00f, 240.00f, "0", HintText = "with Ks Labour To Basket: at this many days of their basket in savings and above, the labourers get Ks Labour Basket Min of the full rate")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public float KsLabourBasketHighDays { get; set; } = 30f;
+
+        [SettingPropertyFloatingInteger("Ks Labour Basket Min", 0.00f, 1.00f, "0.00", HintText = "with Ks Labour To Basket: the lowest share of the full rate the labourers get when they hold Ks Labour Basket High Days of their basket or more")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public float KsLabourBasketMin { get; set; } = 0.25f;
+
+        [SettingPropertyFloatingInteger("Ks Labour Basket Step Percent", 0.50f, 20.00f, "0.0", HintText = "with Ks Labour To Basket: how much the labourers' rate may change in one day (percent of the full rate), so a cheaper basket does not cut wages overnight")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public float KsLabourBasketStepPercent { get; set; } = 3f;
+
+        [SettingPropertyFloatingInteger("Ks Labour Basket Hoard Rate", 0.000f, 0.100f, "0.000", HintText = "with Ks Labour To Basket and Ds Hoard Due: in a town where the labourers' wage follows their basket, the lord's tallage on the labourers' hoard above their normal level is this share a day (never more than Ds Hoard Due Rate) - an occasional tallage, since the wage no longer fills their purses. Craftsmen, patricians, castle folk and villages pay Ds Hoard Due Rate as before")]
+        [SettingPropertyGroup("Start calibration: labourers' wages follow their basket (f4-place-ludu)")]
+        public float KsLabourBasketHoardRate { get; set; } = 0.01f;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -9351,6 +9387,15 @@ namespace Armoury
             s.KsWageByHands = KsWageByHands;
             s.KsWageHandsStepPercent = KsWageHandsStepPercent;
             s.KsWageHandsMax = KsWageHandsMax;
+            s.KsWageHandsDown = KsWageHandsDown;
+            s.KsWageHandsFloor = KsWageHandsFloor;
+            s.KsLabourToBasket = KsLabourToBasket;
+            s.KsLabourBasketHouseholds = KsLabourBasketHouseholds;
+            s.KsLabourBasketLowDays = KsLabourBasketLowDays;
+            s.KsLabourBasketHighDays = KsLabourBasketHighDays;
+            s.KsLabourBasketMin = KsLabourBasketMin;
+            s.KsLabourBasketStepPercent = KsLabourBasketStepPercent;
+            s.KsLabourBasketHoardRate = KsLabourBasketHoardRate;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;
