@@ -2495,8 +2495,11 @@ namespace Armoury
         internal static void MapFramePostfix()
         {
             try { OnTick(0f); } catch { }
-            try { TentFrameWork(); } catch (Exception e) { Log.Error("NightRest.TentFrameWork", e); }   // f9-predkosc: namioty AI po kilka na klatke (MapSpeedPerf)
+            try { TentFrameWork(); }   // f9-predkosc: namioty AI po kilka na klatke (MapSpeedPerf)
+            catch (Exception e) { _tentWorkStumbles++; if (_tentWorkStumbles <= 3 || _tentWorkStumbles % 1000 == 0) Log.Error("NightRest.TentFrameWork (potkniecie " + _tentWorkStumbles + ")", e); }
         }
+
+        private static int _tentWorkStumbles;   // f9-predkosc: potkniecia pracy namiotow w klatce - log dlawiony (co klatke nie zalewa logu), funkcja dziala dalej
 
         internal static void ApplyAll(Harmony harmony)
         {
