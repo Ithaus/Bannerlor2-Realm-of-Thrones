@@ -223,11 +223,13 @@ namespace Armoury
                     // E8/B (258): ile sztuk nalezy sie z tego wywolania - tyle, ile cykli (welna z uboju: 1 + pelne sztuki z licznika osady);
                     // BK dopisal wiecej - nadwyzka zdjeta jak dotad, mniej - brakujace dopisane za zaplata kasy miasta z nadwyzki (Byproduct)
                     bool by = ByOn;
-                    if (added < _cycles) { _bCalls++; _bLost += _cycles - added; }   // tyle sztuk gubi stara regula (liczone zawsze - dwie drogi w linii)
                     // f4-ksiega-i-skory: skora z linii uboju przy recepturach KS i kluczu Ks Hides By Table - cel wywolania z licznika osady (cykle x skory na wywolanie
                     // z tabeli swiata, ulamek w pamieci osady); -1 = nie ta regula (stara droga bez zmian)
                     int hideT = KsHides.ArtisanTarget(w.Settlement, _p.Outputs, _item, _cycles);
                     hideCall = hideT >= 0;
+                    // tyle sztuk gubi stara regula (liczone zawsze - dwie drogi w linii E8/B); f4 (recenzja): wywolanie skory pod regula tabeli swiata nie - tam
+                    // nalezy sie liczba z licznika osady, nie liczba cykli, a brak wobec niej liczy linia KS-S
+                    if (!hideCall && added < _cycles) { _bCalls++; _bLost += _cycles - added; }
                     int target = hideCall ? hideT : (by ? ByTarget(w.Settlement) : _cycles);
                     remove = Math.Min(added - target, Plain(roster, _item));
                     if (remove > 0)

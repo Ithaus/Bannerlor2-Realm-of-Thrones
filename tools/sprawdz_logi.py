@@ -1276,7 +1276,9 @@ Uzycie (Python 3, tylko odczyt):
                     zaokraglenia) |roznica| <= 0.01 w kazdej linii, NSK-8 skory rzemieslnikow z linii KS-S (pelne - brak BK bez dopisania) / ksiega w 0.97-1.03 (NSK-8b sumy
                     - INFO), NSK-9 zapas skor surowych w czasie receptur KS (INFO; garbarze stoja - osobna sprawa, bez gnicia skor), NSK-10 ERROR KsHides / KsRecipes /
                     zapis arm_hide_frac i potkniecia 0, NSK-11 skory z uboju w miastach na dobe (INFO). Bez linii paczki (log sprzed paczki, klucz NIE) - progi NSK-2/4/5
-                    jako INFO z liczbami (fin86: 2 i 4 pokazuja stary blad), bez wyjatku.
+                    jako INFO z liczbami (fin86: 2 i 4 pokazuja stary blad), bez wyjatku. Recenzja f4: linia "KS: receptury jedzenia - nowa kampania w tym samym
+                    procesie" konczy doby receptur KS jak "PRZYWROCONE" (NSK-0 liczy je osobno); NSK-12 rzeznicy - zdjete pozycje skory i ich wartosc, obnizka progu
+                    zysku gry wedlug tabeli ((pozycje gry - skory na cykl) x cena, bez licznika osady), nieudane cykle linii uboju ze skora z kazdej przyczyny (INFO).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -40108,6 +40110,7 @@ def nksarm_main(logp):
 # wedlug tabeli swiata; Armoury/src/KsRecipes.cs, KsHides.cs, ArtisanInputs.cs)
 NSK_REC = "KS: receptury jedzenia wedlug wagi"
 NSK_RESTORE = "KS: receptury jedzenia PRZYWROCONE do gry"
+NSK_CRESET = "KS: receptury jedzenia - nowa kampania w tym samym procesie"   # recenzja f4: stan KsRecipes od nowa przy nowej kampanii (jak przywrocenie)
 NSK_HIDEREC = "KS: skory z uboju w miescie wedlug tabeli swiata"
 NSK_DAY = "Skory z uboju (KS-S): dzien "
 NSK_WIRE = "Skory z uboju (KS-S): latka listy wyrobow"
@@ -40126,6 +40129,10 @@ NSK_DAYRX = re.compile(r"^Skory z uboju \(KS-S\): dzien (?P<day>-?\d+) \| Ks Hid
                        r".*?\(roznica (?P<diff>-?[\d.]+)\)"
                        r".*?brak sztuk BK wobec celu (?P<short>\d+) szt\. \(dopisane E8/B (?P<by>\d+), niesprzedane (?P<uns>\d+), bez E8/B (?P<noby>\d+)\)"
                        r".*?\| potkniecia (?P<st>\d+)\.")
+# recenzja f4: rzeznicy w linii KS-S - zdjete pozycje (i ich wartosc), obnizka progu zysku gry wedlug tabeli, nieudane cykle linii uboju ze skora
+# (stara etykieta "cykli bez skutku po liczeniu skor" tez czytana - log syntetyczny sprzed recenzji)
+NSK_SHOPRX = re.compile(r"\| rzeznicy: pozycji skory zdjetych z listy wyrobow (?P<cut>\d+)(?: warte (?P<val>\d+) zl)?.*?utarg cyklu w progu zysku mniej (?P<inc>\d+) zl"
+                        r".*?(?:nieudanych cykli linii uboju ze skora|cykli bez skutku po liczeniu skor) (?P<fail>\d+)")
 NSK_LIVE = {"cow": 0, "hog": 1, "sheep": 2}
 NSK_TABLE = (1.6, 0.6, 0.4)   # skory na sztuke zywca z tabeli swiata (KsTab.HideOfLive x mieso z receptury wagowej / MeatOfLive)
 
@@ -40133,7 +40140,7 @@ NSK_TABLE = (1.6, 0.6, 0.4)   # skory na sztuke zywca z tabeli swiata (KsTab.Hid
 def nskory_scan(logp):
     """Jedno przejscie po logu: stan receptur KS (wlaczenie / przywrocenie), linia tabeli skor, linie doby KS-S i linie ksiegi towarow (skory, mieso, piwo,
     zywiec) zebrane w czasie receptur KS. Brak pliku - pusty slownik (wiersze INFO)."""
-    D = {"rec_on": [], "restore": 0, "hiderec": None, "wire": None, "days": [], "err": 0,
+    D = {"rec_on": [], "restore": 0, "creset": 0, "hiderec": None, "wire": None, "days": [], "err": 0,
          "goods": {}, "first_ledger": None, "on": False, "skip": None}
     if not logp or not os.path.isfile(logp):
         return D
@@ -40179,7 +40186,12 @@ def nskory_scan(logp):
                 continue
             if s.startswith(NSK_DAY):
                 mm = NSK_DAYRX.match(s)
-                D["days"].append(mm.groupdict() if mm else {"bad": s[:160]})
+                row = mm.groupdict() if mm else {"bad": s[:160]}
+                if mm:
+                    ms = NSK_SHOPRX.search(s)
+                    if ms:
+                        row["shop"] = (int(ms.group("cut")), int(ms.group("val") or 0), int(ms.group("inc")), int(ms.group("fail")))
+                D["days"].append(row)
                 continue
             if s.startswith(NSK_WIRE):
                 D["wire"] = s
@@ -40191,6 +40203,10 @@ def nskory_scan(logp):
                 continue
             if s.startswith(NSK_RESTORE):
                 D["restore"] += 1
+                D["on"] = False
+                continue
+            if s.startswith(NSK_CRESET):
+                D["creset"] += 1   # nowa kampania w tym samym procesie - receptury KS od nowa (jak przywrocenie)
                 D["on"] = False
                 continue
             if s.startswith(NSK_HIDEREC):
@@ -40212,8 +40228,8 @@ def nskory_rows(rep, D, pfx="NSK"):
         rep.add(f"{pfx}-0: receptury KS (linia 'KS: receptury jedzenia wedlug wagi')", "brak linii - KS nie zastosowany w tym logu albo Ks Real Recipes NIE",
                 "INFO (reszta wierszy bez danych)", None)
     else:
-        rep.add(f"{pfx}-0: receptury KS - wlaczenia / przywrocenia", f"wlaczen {len(D['rec_on'])}, przywrocen {D['restore']}; dob ksiegi po wlaczeniu (bez pierwszej) {len(days)}",
-                "INFO", None)
+        rep.add(f"{pfx}-0: receptury KS - wlaczenia / przywrocenia", f"wlaczen {len(D['rec_on'])}, przywrocen {D['restore']}, nowych kampanii w procesie {D.get('creset', 0)}; "
+                f"dob ksiegi po wlaczeniu (bez pierwszej) {len(days)}", "INFO", None)
     hr = D.get("hiderec")
     if hr:
         mp = NSK_PERHEAD.search(hr)
@@ -40305,6 +40321,16 @@ def nskory_rows(rep, D, pfx="NSK"):
         sh = sum(int(x["short"]) for x in dl)
         uns = sum(int(x["uns"]) + int(x["noby"]) for x in dl)
         rep.add(f"{pfx}-8b: linia KS-S - nalezne / pelne / brak BK bez dopisania (suma)", f"{due:.1f} / {whole} / {uns} (brak wobec celu {sh})", "INFO", None)
+        # 12 (recenzja f4): rzeznicy - prog zysku gry obnizony o oczekiwanie z tabeli (nie o sztuki zdjete), nieudane cykle linii uboju ze skora (kazda przyczyna gry)
+        shp = [x["shop"] for x in dl if "shop" in x]
+        if shp:
+            sc = sum(x[0] for x in shp); sv = sum(x[1] for x in shp); si = sum(x[2] for x in shp); sf = sum(x[3] for x in shp)
+            ncyc = sum(int(x["nb"]) for x in dl if "shop" in x)
+            rep.add(f"{pfx}-12: rzeznicy w linii KS-S - zdjete pozycje skory / ich wartosc / obnizka progu zysku (tabela) / nieudane cykle linii",
+                    f"{sc} / {sv} zl / {si} zl / {sf} (udanych cykli {ncyc}" + (f", nieudane {sf / (sf + ncyc):.0%}" if sf + ncyc > 0 else "") + ")",
+                    "INFO (obnizka progu = (pozycje gry - skory na cykl) x cena, niezalezna od licznika osady; nieudane - prog, kapital albo kasa miasta)", None)
+        else:
+            rep.add(f"{pfx}-12: rzeznicy w linii KS-S", "brak pola rzeznikow w liniach", "INFO", None)
     stum = sum(int(x["st"]) for x in dl)
     rep.add(f"{pfx}-10: ERROR KsHides / KsRecipes / zapis arm_hide_frac i potkniecia linii KS-S", f"ERROR {D.get('err', 0)}, potkniecia {stum}", "0", D.get("err", 0) == 0 and stum == 0)
 

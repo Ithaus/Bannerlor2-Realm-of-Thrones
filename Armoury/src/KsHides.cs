@@ -24,8 +24,9 @@ namespace Armoury
     ///  - rzemieslnicy BK ("artisans", ArtisanInputs.OutPost): cel wywolania = pelne sztuki z licznika po dopisaniu (cykle x skora na wywolanie); nadwyzka BK
     ///    zdjeta z polki ze zwrotem zaplaty BK do kasy miasta (ta sama droga co kazda sztuka bez wsadu), brak - Byproduct E8/B (kasa miasta placi tylko z nadwyzki);
     ///  - warsztaty nieukryte (rzeznik BK, takze gracza) - postfiks WorkshopsCampaignBehavior.GetItemsToProduce: z listy wyrobow cyklu zdjete pozycje skory ponad
-    ///    pelne sztuki licznika (utarg cyklu w progu zysku gry mniejszy o ich cene - sztuki nie powstaja, nikt za nie nie placi); licznik zapisany dopiero po udanym
-    ///    cyklu (WorkshopTrade.CyclePostfix -> CycleEnd), cena sprawiedliwa liczy udzial z prawdziwej liczby sztuk (CutFor).
+    ///    pelne sztuki licznika (sztuki nie powstaja, nikt za nie nie placi); utarg cyklu w progu zysku gry mniejszy o oczekiwanie z tabeli (pozycje gry - skory
+    ///    na cykl) x cena skory, niezalezne od licznika (recenzja); licznik zapisany dopiero po udanym cyklu (WorkshopTrade.CyclePostfix -> CycleEnd), cena
+    ///    sprawiedliwa liczy udzial z prawdziwej liczby sztuk (CutFor).
     /// Tozsamosc towaru (linia doby "Skory z uboju (KS-S)"): nalezne wedlug tabeli = pelne sztuki + przyrost licznikow osad + zaokraglenia (roznica 0). Zloto:
     /// zwrot BK miedzy kapitalem rzemieslnikow i kasa miasta (roznica 0), u rzeznikow zadne zloto sie nie rusza. Bez gnicia skor (decyzja Jeffa nie zapadla).
     /// Poza regula (KS niezastosowany, klucz wylaczony) - stara droga co do linii: ArtisanTarget zwraca -1, ItemsPost nic nie zmienia.
@@ -45,7 +46,7 @@ namespace Armoury
         private static float _pOld;
         private static double _pDue, _pRest;
         private static int _pKind, _pKeep, _pCut;
-        private static long _pIncome;
+        private static long _pIncome, _pCutVal;   // obnizka progu zysku gry (oczekiwanie z tabeli) i wartosc pozycji zdjetych w tym cyklu (log)
 
         // liczniki doby (linia "Skory z uboju (KS-S)")
         private static readonly double[] _dDue = new double[3];
@@ -53,17 +54,20 @@ namespace Armoury
         private static int _dArtCalls, _dArtWhole, _dArtCut, _dArtShort, _dArtShortBy, _dArtShortUnsold;
         private static long _dArtRefund;
         private static int _dShopCycles, _dShopWhole, _dShopCut, _dShopFail, _dStumbles;
-        private static long _dShopIncome;
+        private static long _dShopIncome, _dShopCutVal;
         private static readonly HashSet<string> _errOnce = new HashSet<string>();
         private static string _wire = "nie wpieta";
 
-        /// <summary>Nowa gra / wczytanie (z ArtisanInputs.Reset, czyli z konstruktora ArmouryBehavior) - liczniki osad oddaje SyncData (arm_hide_frac).</summary>
+        /// <summary>Nowa gra / wczytanie (z ArtisanInputs.Reset, czyli z konstruktora ArmouryBehavior) - liczniki osad oddaje SyncData (arm_hide_frac).
+        /// Recenzja: stan receptur KS (KsRecipes, statyczny na proces) od nowa - nowa kampania ma nowe obiekty typow warsztatow (MBObjectManager.Init przy kazdej
+        /// grze), a stary stan zostawial regule skor "czynna" na listach poprzedniej kampanii i blokowal wlaczenie receptur KS do konca sesji.</summary>
         internal static void Reset()
         {
             _frac.Clear();
             _pW = null; _pKey = null;
             _errOnce.Clear();
             ClearDay();
+            KsRecipes.CampaignReset();   // wlasny try; przy kluczach paczki NIE i bez stanu reguly skor - nic (stara droga KsRecipes co do linii)
         }
 
         private static void ClearDay()
@@ -73,7 +77,7 @@ namespace Armoury
             _dArtCalls = _dArtWhole = _dArtCut = _dArtShort = _dArtShortBy = _dArtShortUnsold = 0;
             _dArtRefund = 0;
             _dShopCycles = _dShopWhole = _dShopCut = _dShopFail = 0;
-            _dShopIncome = 0;
+            _dShopIncome = _dShopCutVal = 0;
             _dStumbles = 0;
         }
 
@@ -133,9 +137,10 @@ namespace Armoury
 
         // ------------------------------------------------------------ warsztaty nieukryte (rzeznik BK): postfiks GetItemsToProduce
         /// <summary>Postfiks WorkshopsCampaignBehavior.GetItemsToProduce: w linii uboju pod regula zostaje tyle pozycji skory, ile pelnych sztuk z licznika osady po
-        /// dopisaniu skor tego cyklu (skory na cykl z tabeli); reszta zdjeta z listy (od konca), utarg cyklu (income - prog zysku gry) mniejszy o ich cene sprzedazy
-        /// (ta sama wycena co gra: Town.GetItemPrice(sztuka, null, true)). Licznik osady zapisuje dopiero CycleEnd po udanym cyklu. Ukryci rzemieslnicy - nie tu
-        /// (ArtisanInputs, cel z liczby cykli). Nie rzuca.</summary>
+        /// dopisaniu skor tego cyklu (skory na cykl z tabeli); reszta zdjeta z listy (od konca). Utarg cyklu (income - prog zysku gry i kasa miasta) mniejszy o
+        /// OCZEKIWANIE z tabeli: (pozycje skory gry - skory na cykl) x cena skory (ta sama wycena co gra: Town.GetItemPrice(sztuka, null, true)) - nie o cene
+        /// sztuk zdjetych w tym cyklu (recenzja: prog zalezny od licznika osady, ktory po cyklu bez skutku stoi, mogl zatrzymac linie z cienka marza na stale).
+        /// Licznik osady zapisuje dopiero CycleEnd po udanym cyklu. Ukryci rzemieslnicy - nie tu (ArtisanInputs, cel z liczby cykli). Nie rzuca.</summary>
         public static void ItemsPost(WorkshopType.Production production, Workshop workshop, List<EquipmentElement> __result, ref int income)
         {
             _pW = null;   // cykl bez CyclePostfix (wyjatek w oryginale) - stary stan przepada, licznik bez zmian
@@ -148,7 +153,14 @@ namespace Armoury
                 var town = st != null ? st.Town : null;
                 if (town == null) return;
                 int pos = 0;
-                for (int i = 0; i < __result.Count; i++) if (IsHide(__result[i])) pos++;
+                long priceSum = 0;   // cena wszystkich pozycji skory z listy gry (te same sztuki, ktore gra wliczyla w income)
+                for (int i = 0; i < __result.Count; i++)
+                {
+                    if (!IsHide(__result[i])) continue;
+                    pos++;
+                    try { priceSum += town.GetItemPrice(__result[i], null, true); }
+                    catch (Exception e) { Stumble("KsHides.ItemsPost(cena)", e); }
+                }
                 if (pos == 0) return;
                 float f0;
                 _frac.TryGetValue(st.StringId, out f0);
@@ -158,18 +170,19 @@ namespace Armoury
                 if (whole < 0) whole = 0;
                 int keep = Math.Min(whole, pos);
                 int cut = 0;
-                long lost = 0;
                 for (int i = __result.Count - 1; i >= 0 && pos - cut > keep; i--)
                 {
                     if (!IsHide(__result[i])) continue;
-                    try { lost += town.GetItemPrice(__result[i], null, true); }
-                    catch (Exception e) { Stumble("KsHides.ItemsPost(cena)", e); }
                     __result.RemoveAt(i);
                     cut++;
                 }
-                if (lost > 0) income = (int)Math.Max(int.MinValue, (long)income - lost);
+                // prog zysku gry: oczekiwana strata z tabeli (pozycje gry - skory na cykl) x srednia cena skory - stala dla linii przy danej cenie, bez licznika osady
+                double avg = (double)priceSum / pos;
+                long expLoss = (long)Math.Round(Math.Max(0.0, pos - (double)h.PerCycle) * avg, MidpointRounding.AwayFromZero);
+                if (expLoss > 0) income = (int)Math.Max(int.MinValue, (long)income - expLoss);
                 _pW = workshop; _pKey = st.StringId; _pOld = f0; _pDue = h.PerCycle; _pRest = acc - (pos - cut); _pKind = h.Kind;
-                _pKeep = pos - cut; _pCut = cut; _pIncome = lost;
+                _pKeep = pos - cut; _pCut = cut; _pIncome = expLoss;
+                _pCutVal = (long)Math.Round(cut * avg, MidpointRounding.AwayFromZero);
             }
             catch (Exception e) { _pW = null; Stumble("KsHides.ItemsPost", e); }
         }
@@ -191,13 +204,13 @@ namespace Armoury
             try
             {
                 if (!ReferenceEquals(_pW, w)) return;
-                if (!ok) { _dShopFail++; return; }
+                if (!ok) { _dShopFail++; return; }   // cykl nieudany z dowolnej przyczyny gry (prog zysku, kapital, kasa miasta) - licznik bez zmian
                 float stored = _pRest < Min ? 0f : (float)Math.Min(_pRest, MaxFrac);
                 if (stored <= 0f) _frac.Remove(_pKey); else _frac[_pKey] = stored;
                 _dFracDelta += stored - _pOld;
                 _dRound += _pRest - stored;
                 _dDue[_pKind] += _pDue;
-                _dShopCycles++; _dShopWhole += _pKeep; _dShopCut += _pCut; _dShopIncome += _pIncome;
+                _dShopCycles++; _dShopWhole += _pKeep; _dShopCut += _pCut; _dShopIncome += _pIncome; _dShopCutVal += _pCutVal;
             }
             catch (Exception e) { Stumble("KsHides.CycleEnd", e); }
             finally { _pW = null; _pKey = null; }
@@ -292,8 +305,10 @@ namespace Armoury
                   .Append(" zl (kapital rzemieslnikow -").Append(_dArtRefund).Append(", kasy miast +").Append(_dArtRefund).Append(", roznica 0)")
                   .Append("; brak sztuk BK wobec celu ").Append(_dArtShort).Append(" szt. (dopisane E8/B ").Append(_dArtShortBy)
                   .Append(", niesprzedane ").Append(_dArtShortUnsold).Append(", bez E8/B ").Append(Math.Max(0, _dArtShort - _dArtShortBy - _dArtShortUnsold)).Append(")")
-                  .Append(" | rzeznicy: pozycji skory zdjetych z listy wyrobow ").Append(_dShopCut).Append(" (sztuki nie powstaly - zloto 0), utarg cyklu w progu zysku mniej ")
-                  .Append(_dShopIncome).Append(" zl, cykli bez skutku po liczeniu skor ").Append(_dShopFail)
+                  .Append(" | rzeznicy: pozycji skory zdjetych z listy wyrobow ").Append(_dShopCut).Append(" warte ").Append(_dShopCutVal)
+                  .Append(" zl (sztuki nie powstaly - zloto 0), utarg cyklu w progu zysku mniej ").Append(_dShopIncome)
+                  .Append(" zl (oczekiwanie z tabeli: pozycje gry - skory na cykl), nieudanych cykli linii uboju ze skora ").Append(_dShopFail)
+                  .Append(" (prog zysku gry, kapital albo kasa miasta - licznik bez zmian)")
                   .Append(" | latka rzeznikow ").Append(_wire)
                   .Append(" | potkniecia ").Append(_dStumbles).Append('.');
                 Log.Info(sb.ToString());

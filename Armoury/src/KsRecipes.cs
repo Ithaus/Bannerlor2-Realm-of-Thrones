@@ -182,6 +182,33 @@ namespace Armoury
             }
         }
 
+        /// <summary>f4 (recenzja): nowa gra / wczytanie w tym samym procesie (KsHides.Reset z konstruktora ArmouryBehavior). Gra tworzy nowe obiekty typow warsztatow
+        /// przy kazdej kampanii (Game.CreateGame / LoadSaveGame -> MBObjectManager.Init), a _on, _orig i _hideLines sa statyczne: stary stan zostawial HidesActive
+        /// i Active "czynne" na listach poprzedniej kampanii (linia KS-S [WL] z zerami, YieldOf 1 przy recepturach gry), a Ensure wychodzil na "if (_on) return"
+        /// i receptur KS (z linii skor) nie wlaczal w nowej kampanii do konca sesji. Przy kluczu paczki (Ks Hides By Table albo Ks Ledger Current Recipes) albo
+        /// pozostalym stanie reguly skor - stan od nowa: liczby oddane listom poprzedniej kampanii (gdyby te same obiekty zostaly - receptury gry), _orig pusty,
+        /// regula skor nieczynna do pierwszej doby z KS (Ensure). Klucze NIE i bez stanu skor - nic (stara droga co do linii). Nie rzuca.</summary>
+        internal static void CampaignReset()
+        {
+            try
+            {
+                bool hideState = _hidesApplied || _hideLines.Count > 0;
+                if (!(HidesKeyOn || LedgerKeyOn || hideState)) return;
+                int n = _orig.Count, hl = _hideLines.Count;
+                bool was = _on;
+                foreach (var o in _orig) Set(o.L, o.Index, o.Count);
+                _orig.Clear(); _on = false;
+                _hidesApplied = false; _hideLines.Clear();
+                if (n > 0 || was || hl > 0)
+                    Log.Info("KS: receptury jedzenia - nowa kampania w tym samym procesie (klucze Ks Hides By Table / Ks Ledger Current Recipes): stan regul od nowa - "
+                             + n + " liczb oddanych listom poprzedniej kampanii, linii skor " + hl + "; receptury KS i skory z uboju wroca przy pierwszej dobie z KS zastosowanym.");
+            }
+            catch (Exception e)
+            {
+                if (!_errLogged) { _errLogged = true; Log.Error("KsRecipes.CampaignReset", e); }
+            }
+        }
+
         /// <summary>f4: przywraca receptury gry (wszystkie zmienione liczby), czysci linie skor; why - dopisek do linii logu ("" = linia jak dotad).</summary>
         private static void Restore(string why)
         {
