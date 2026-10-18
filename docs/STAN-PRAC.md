@@ -2751,3 +2751,12 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
 - 17:30 PDT: workflow wf_a0c1cd77-ae0 (fala 2b, zb/ds-akumulator od efbbf0dc): DsHoardDue (tallage od skarbca ludu ponad norme, pre = M9 + FLf), DsWorksRealMaterial (roboty gminy
   wlasnymi rekami, tylko prawdziwy material z polki; takze material septow), FolkBetterTable (W z oszczednosci kupuje lepszy stol), CrownWindfallToReserve, poprawki pomiaru nds,
   przeglad innych akumulatorow. Po scaleniu fali 1: sol w kroku 5 (ramka ksiegi + bez kategorii koszyka ZC4 + limit potrzeby), KsCloth w Planie, linia NKS-26, KS-H budzet wedlug potrzeby.
+- 17:50 PDT: FALA 1 (wf_666681e9-1fe) PRAWIE PUSTA: 8 z 10 agentow odmowilo kodu - wzieli ostatnia wiadomosc Jeffa ("wyjasnij mi tanszy koszyk") za zakres zadania. Zrobione tylko
+  sw-zajazdy (zajazdy przy szlakach + noclegi do kiesy wsi + plotki z prawdziwego stanu swiata, takze w miescie; 3023 linii, recenzja + poprawki) -> scalone do w-toku/noc-ks4
+  4bfd840c (+ recenzja calosci: nocleg pod kluczem RoadsideInns, nie na ziemiach wroga). Inwentarz listy 14.10 gotowy (scratchpad inwentarz.json): 25 zrobione, 17 otwarte, 13 czesciowe,
+  6 decyzji; nowe paczki z niego: ks-arm (KS w zapisie Jeffa - bez tego KS nic nie zmieni u Jeffa!), zbrojownia (ksiega per modyfikator + 5), stare-a12, stare-a17, rot-wydarzenia (Joffrey).
+  LEKCJA: prompt agenta workflow musi zawierac doslowne polecenie Jeffa (blok AUTHORIZATION), inaczej agent bierze ostatnia wiadomosc czatu za zakres.
+- 17:55 PDT: workflow wf_d6583ac4-35d (fala 1b): 8 paczek fali 1 od nowa (z blokiem AUTHORIZATION i dopiskami z diagnozy fin80: r4-kupcy budzet wedlug potrzeby, r4-bkwies sol w kroku 5
+  + linia NKS-26, r4-ceny P7 w D+14 + KsCloth, r4-koszyk bez regul jednej krainy) + 5 nowych (ks-arm, zbrojownia, stare-a12, stare-a17, rot-wydarzenia). Skrypty testu/wgrania
+  (test/ i tools/autotest-2026-10-17/): kazdy Armoury/ModuleData/arm_*.tsv z drzewa idzie do gry (zajazdy, drogi geo, uklad v6).
+- 18:00 PDT: test fin81 = n-ks4 4bfd840c (KS r4 cz. 1-5 + zajazdy/plotki), Armoury 90e1e80c, 120 dob bez bitwy, flaga armoury-ks-wlacz.flag UTWORZONA (USUNAC!), at-fin81-zajazdy.out.txt.
