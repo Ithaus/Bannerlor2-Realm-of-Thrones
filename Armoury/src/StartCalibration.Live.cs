@@ -775,6 +775,7 @@ namespace Armoury
                     town.Settlement.ItemRoster.AddToCounts(it, ok);
                     WorkshopFairScore.NoteProduced(town.Settlement, it, ok, WorkshopFairScore.SrcTownFields);   // F4 (recenzja): plon pol mieszczan do pomiaru wsadu regionu - bez zdarzenia gry (sam licznik, przy kluczu Workshop Retool Fair Score)
                     pieces += ok; paid += got; made[i] += ok;
+                    if (i == KsDeliver.IWood) TownFolk.FwFieldArrive(town.Settlement, ok);   // f4-opal: drewno z pol mieszczan - dowoz tego miasta (tylko licznik)
                 }
             }
             catch (Exception e) { Stumble("DeliverTownFields", e); }

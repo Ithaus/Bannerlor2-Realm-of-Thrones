@@ -489,7 +489,7 @@ namespace Armoury
                     foreach (int z in zs)
                     {
                         var it = _zItems[z]; if (it == null) continue;
-                        double q = zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z] + (z == ZWood ? zt.Fire : 0.0);
+                        double q = zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z] + (z == ZWood ? FireForPrice(zt) : 0.0);   // f4-opal: opal po regule paczki (klucz Firewood Ks Price Demand), inaczej pelny jak dotad
                         v += q * Math.Max(1, it.Value);
                         if (ZAdd(z)) add = true;
                     }

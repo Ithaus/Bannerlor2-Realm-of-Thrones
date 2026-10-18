@@ -53,7 +53,13 @@ namespace Armoury
         // sie dopiero w ok. 1. dobie - wartosc z Settings.Current juz by wtedy nie zyla. Reset (konstruktor ArmouryBehavior) = kazda kampania od nowa.
         private static int _trialSummerLeft = -1, _trialFirstAutumn = -1;
 
-        internal static void Reset() { _segs.Clear(); _initBroken = false; _trialSummerLeft = -1; _trialFirstAutumn = -1; _initStumbles = 0; _initRetries = 0; _initLast = null; }
+        internal static void Reset() { _segs.Clear(); _initBroken = false; _trialSummerLeft = -1; _trialFirstAutumn = -1; _initStumbles = 0; _initRetries = 0; _initLast = null; _forceWinter = false; }
+
+        // f4-opal (noc 17/18.10): PROBA ZIMY TERAZ (autotest na wczytanym zapisie - WinterTrial.LoadedSessionStart, plik armoury-zima-teraz.flag): pora EKONOMII = zima na
+        // te sesje, tylko w pamieci (odcinki por roku, zapis i pora nieba bez zmian). Bez pliku - false (zero zmian). Reset - kazda kampania od nowa.
+        private static bool _forceWinter;
+        internal static void ForceEconWinter(bool on) { _forceWinter = on; }
+        internal static bool EconWinterForced { get { return _forceWinter && EconOn; } }
 
         /// <summary>E8/S (246): stan startu klimatu do linii "Porzadek stanu (E8/S)" - potkniecia Ready() w tej kampanii, ponowienia, czy pory roku czynne.</summary>
         internal static void HygieneState(out int stumbles, out int retries, out bool live)
@@ -247,6 +253,7 @@ namespace Armoury
 
         private static CampaignTime.Seasons Season(ref CampaignTime t, bool econ)
         {
+            if (econ && _forceWinter && EconOn) return CampaignTime.Seasons.Winter;   // f4-opal: proba zimy teraz (autotest)
             if (!Live(econ)) return VanillaSeason(ref t);
             return (CampaignTime.Seasons)SegAt(t.ToDays).Season;
         }
@@ -262,6 +269,7 @@ namespace Armoury
         /// "IEEERemainder(x,1)" to postep w porze, "x % 4" to postep w roku.</summary>
         private static double Seasons(ref CampaignTime t, bool econ)
         {
+            if (econ && _forceWinter && EconOn) return 3.5;   // f4-opal: proba zimy teraz (autotest) - srodek zimy
             if (!Live(econ)) return t.ToSeasons;
             double d = t.ToDays;
             var g = SegAt(d);
@@ -284,6 +292,7 @@ namespace Armoury
         // BetterEconomy.Core.SeasonClock (21-dniowe pory BEE; enum w tej samej kolejnosci co vanilla)
         public static int BeeSeason()
         {
+            if (_forceWinter && EconOn) return 3;   // f4-opal: proba zimy teraz (autotest)
             try { if (Live(true)) return SegAt(NowDays()).Season; } catch { }
             try { int n = (int)CampaignTime.Now.ToDays / 21 % 4; return n < 0 ? n + 4 : n; } catch { return 1; }
         }

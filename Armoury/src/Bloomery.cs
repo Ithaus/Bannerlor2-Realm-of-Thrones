@@ -129,6 +129,8 @@ namespace Armoury
         // F4a (R1-7b): drewno naprawde kupione przez dymarki z polki miasta handlowego kopalni - srednia ok. 14 dob. Slownik podmieniany w calosci raz na
         // dobe (czytaja go latki cen przez CaravanBulk.Use)
         private static volatile Dictionary<Town, float> _shelfUse;
+        // f4-opal krok 3 (klucz FirewoodMineWoodKeep): potrzeba dymarek ponad las okregu wedlug miasta handlowego kopalni (ladunki/d) - raz na dobe, podmieniany w calosci
+        private static volatile Dictionary<Town, float> _mineNeed;
         private static readonly Dictionary<Town, int> _shelfDay = new Dictionary<Town, int>();
         private static int _shelfN;
         private static Dictionary<Settlement, List<Village>> _byMarket;
@@ -159,6 +161,7 @@ namespace Armoury
             _regime = RUnknown; _fresh = false;
             _mines.Clear(); _byMarket = null; _pending = null;
             _carts.Clear(); _roads.Clear(); _dayOne = true; _shelfUse = null; _shelfDay.Clear(); _shelfN = 0;
+            _mineNeed = null;   // f4-opal
             NewDay(); _stumbles = 0; _cPrev = -1; _bPrev = -1;
         }
 
@@ -560,6 +563,7 @@ namespace Armoury
                 // F4b: koniec doby zakupow drewna (kroki b i c) - rachunek ponad zakupy ostatnich 14 dob wygasa; klucz wylaczony - rachunki do zera
                 foreach (var m in _mines.Values) _bCut += m.RollBill(coal);
                 try { RollShelfUse(full); } catch (Exception e) { Stumble("Daily(ShelfUse)", e); }
+                try { RollMineNeed(); } catch (Exception e) { Stumble("Daily(MineNeed)", e); }   // f4-opal krok 3
             }
             catch (Exception e) { Stumble("Daily", e); }
         }
@@ -912,6 +916,47 @@ namespace Armoury
         {
             var d = _shelfUse; float v;
             return d != null && town != null && d.TryGetValue(town, out v) ? v : 0f;
+        }
+
+        /// <summary>f4-opal krok 3: drewno, ktorego dymarki kopaln handlujacych w tym miescie (TradeBound) potrzebuja ponad las okregu (ladunki/d; ta sama miara co linia
+        /// "kiesy kopaln": potrzeba doby - min(srednia lasu 7 dob, potrzeba)) - czyta CaravanBulk.TargetFor przy kluczu FirewoodMineWoodKeep. 0 - brak kopalni albo klucz wylaczony.</summary>
+        internal static float MineShelfNeed(Town town)
+        {
+            var d = _mineNeed; float v;
+            return d != null && town != null && d.TryGetValue(town, out v) ? v : 0f;
+        }
+
+        /// <summary>f4-opal (recenzja - Plan opalu bez drewna dymarek): suma potrzeb doby dymarek kopaln z tym miastem handlowym (TradeBound) - najwiecej, ile lasu wsi
+        /// okregu FromWoodlot zdejmuje na dymarki, zanim woz pojedzie (ladunki/d). Czyta StartCalibration.OpalPlanWood raz na dobe (watek gry). 0 - wytop wylaczony.</summary>
+        internal static float WoodlotWant(Settlement market)
+        {
+            if (!_applied || market == null) return 0f;
+            if (_pending != null) ResolvePending();
+            var list = MinesOf(market);
+            if (list == null) return 0f;
+            float w = 0f;
+            foreach (var mv in list) { Mine m; if (mv != null && _mines.TryGetValue(mv, out m) && m.Want > 0) w += m.Want; }
+            return w;
+        }
+
+        private static void RollMineNeed()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.FirewoodMineWoodKeep) { _mineNeed = null; return; }
+            var nu = new Dictionary<Town, float>();
+            foreach (var kv in _mines)
+            {
+                var v = kv.Key; var m = kv.Value;
+                // recenzja: kopalnia bez pelnej doby lasu w pamieci (pierwsze Daily po wczytaniu - LocN 0, ForAvg 0) pomijana - inaczej przez dobe cala potrzeba
+                // dymarek bez lasu okregu podnosilaby zapas rzemiosla (x CaravanBulkStockDays) i zabierala drewno budowom i opalowi; tak jak ShelfUse (doba niepelna)
+                if (v == null || m == null || m.Want <= 0 || m.LocN <= 0) continue;
+                var mk = v.TradeBound; var town = mk != null ? mk.Town : null;
+                if (town == null) continue;
+                float need = m.Want - Math.Min(m.ForAvg, m.Want);
+                if (!(need > 0f)) continue;
+                float o; nu.TryGetValue(town, out o); nu[town] = o + need;
+            }
+            _mineNeed = nu;
         }
 
         private static void NoteShelf(Town town, int n)
