@@ -440,6 +440,66 @@ RANGES = {
     'MapSpeedVeryFast': (2, 32, "0"),
 }
 
+# f18-mcm (Jeff 18.10: "jak wlaczylem drogi gra wyszla do pulpitu"): MCM v5 ma RequireRestart = true DOMYSLNIE (BaseSettingPropertyAttribute), a ModOptionsVM
+# przy zmianie takiego pola pokazuje "Game Needs to Restart" i na "Yes" wola Utilities.QuitGame() (Cancel = zmiany nie zapisane). Generator nie ustawial
+# RequireRestart, wiec KAZDA zmiana w MCM wylaczala gre. Teraz kazde pole dostaje RequireRestart = false, poza krotka lista ponizej.
+# Jak wartosc wchodzi do gry (zdekompilowane MCM: suwak zmienia wlasciwosc obiektu McmSettings.Instance od razu, Done zapisuje plik bez pytania o restart):
+#  - Armoury: McmSettings.Apply przepisuje MCM do Settings.Current w OnGameStart, w OnSessionLaunched i CO GODZINE GRY (ArmouryBehavior, sluchacz HourlyTick) -
+#    odczyty w trakcie gry widza zmiane najpozniej po godzinie gry;
+#  - RealisticCaptivity i GrandTourney: McmSettings.Apply TYLKO w OnGameStart - kazda zmiana wchodzi po wczytaniu zapisu (patrz APPLY_ON_LOAD_ONLY);
+#  - odczyty przy starcie procesu (OnSubModuleLoad / OnBeforeInitialModuleScreenSetAsRoot) widza Settings.Current z Armoury.settings.xml, NIE z MCM -
+#    restart gry nie wnosi wartosci z MCM, wiec takie pola restartu nie wymagaja (i tak go nie uzywaja); wyjatek: pole czytane wprost z pliku MCM przy starcie.
+# Audyt (f18-mcm, analiza IL wszystkich pieciu DLL: odczyty pol Settings i McmSettings, graf wywolan, korzenie PROC/SESS/RUN) - szczegoly w
+# docs/noc-1718/f18-mcm-CHANGELOG.md.
+
+# pola, ktore naprawde wymagaja restartu gry (zostaja RequireRestart = true): modul -> {klucz: dlaczego}
+RESTART_KEYS = {
+    'Armoury': {
+        # MapSpeedUi.Register (OnSubModuleLoad) czyta "MapSpeedButtons" WPROST z pliku Armoury.json MCM i od tego zalezy rejestracja UIExtenderEx
+        # (wstawka MapBar + mixin MapTimeControlVM) - raz na proces; przyciski dochodza/znikaja z paska dopiero po ponownym uruchomieniu gry
+        # (chowanie przyciskow i klawisze 4/5/6 dzialaja od razu - opis w Settings.cs juz to mowi)
+        'MapSpeedButtons': 'rejestracja UIExtenderEx przy starcie procesu z pliku MCM',
+    },
+}
+
+# pola czytane TYLKO przy starcie sesji kampanii (OnGameStart / OnSessionLaunched / OnNewGameCreated / RegisterEvents i to, co z nich wolane) - wystarczy
+# wczytac zapis: RequireRestart = false i dopisek " (takes effect after loading a save)" w opisie, o ile opis juz o tym nie mowi (ALREADY_SAID)
+SESSION_KEYS = {
+    'Armoury': {
+        'LootPriceFollowsCondition',    # LootPrices.Apply (OnSessionLaunched)
+        'RichQualityModifiers',         # QualityRich.Enrich (OnSessionLaunched)
+        'TroopSkillAutoFit',            # TroopFit.Run (LegendaryLaw, start sesji) - opis: "audited on load"
+        # MaterialLaw.Apply (OnSessionLaunched, zaraz po McmSettings.Apply) - wartosci sztab
+        'CharcoalValue', 'CrudeIronValue', 'WroughtIronValue', 'IronValue', 'SteelValue', 'FineSteelValue', 'CastleSteelValue',
+        'StartStockInLoads',            # StartStock.Run - nowa kampania (opis juz mowi)
+        'ColdStartMarketDays', 'ColdStartTierUp', 'ColdStartLegacyHands',   # ColdStart.Markets - nowa kampania (opisy juz mowia)
+        # HistoricalPrices.Apply / XbowPrice.Build / BulkUnit (OnSessionLaunched) - cennik raz na sesje
+        'HistCharcoalPerKg', 'HistBulkUnitFactor', 'HistTradeGoods', 'HistLivestockPrices', 'HistHidesPerKg', 'HistFlaxPerKg', 'HistHorsePrices',
+        'XbowPriceVsBow', 'HistDemandFromDefinition', 'HistMixedCategoryShelf', 'BulkUnitPerCampaign',
+        'BkWorkshopInputsFix',          # WorkshopInputsFix.Apply (OnSessionLaunched)
+        'VillageClimateFix',            # VillageClimate.Apply / GoodsRates.Apply (OnSessionLaunched)
+        'FlaxVillagesWithoutClimateFix',  # GoodsRates.Apply
+        'VineOliveByClimate',           # VineOlive (nowa kampania - opis juz mowi)
+        'BloomeryAtMine',               # Bloomery.CanApply (nowa kampania - opis juz mowi)
+        'WorkshopRecipesByValue',       # WorkshopRecipes.Apply
+        'SlaughterKeepsHides',          # SlaughterHides.Apply
+        'MidDayLoadKeepsDay',           # DayHeld.SessionStart
+        'CombatAiRealistic',            # CombatAiLevel.Apply (OnSessionLaunched)
+        'CharcoalWeightKg',             # FixCharcoalWeight (OnSessionLaunched)
+        # CrashScribe (Army175Gear przy wczytaniu, klucze przez Mends.ArmouryFloat) - opisy juz mowia "takes effect on the next load"
+        'Army175IronbornFoot', 'Army175NorthFoot', 'Army175VolantisNorvos', 'Army175MinorLore',
+    },
+}
+
+# moduly, w ktorych McmSettings.Apply idzie TYLKO w SubModuleMain.OnGameStart (bez sluchacza godziny jak w Armoury) - kazde ich pole wchodzi
+# po wczytaniu zapisu; dopisek do kazdego opisu (do zdjecia, gdy modul dostanie Apply co godzine)
+APPLY_ON_LOAD_ONLY = {'RealisticCaptivity', 'GrandTourney'}
+
+LOAD_SUFFIX = " (takes effect after loading a save)"
+# opis juz mowi, kiedy zmiana wchodzi (wczytanie, start sesji, nowa kampania, restart) - bez dopisku
+ALREADY_SAID = re.compile(r"next load|on load\b|after load|loading a save|is (next )?loaded|when a (game|save|campaign) (is )?(next )?(loaded|loads|starts)"
+                          r"|starts or loads|at session start|new campaigns? only|of a new campaign|with a new campaign|restart", re.I)
+
 def gen(module_dir, ns, display):
     src = open(os.path.join(module_dir,'src','Settings.cs'), encoding='utf-8').read()
     group = "General"
@@ -456,6 +516,15 @@ def gen(module_dir, ns, display):
         typ, name, default, hint = m.group(1), m.group(2), m.group(3).strip(), (m.group(4) or "").strip()
         if name in ("Current",): continue
         props.append((typ, name, default, hint, group))
+
+    # f18-mcm: literowka w tabelach = blad generatora, nie cicha zmiana zachowania
+    names = set(p[1] for p in props)
+    restart = RESTART_KEYS.get(ns, {})
+    session = SESSION_KEYS.get(ns, set())
+    bad = sorted((set(restart) | session) - names)
+    if bad:
+        sys.exit("gen_mcm: %s - klucze z RESTART_KEYS/SESSION_KEYS nieobecne w Settings.cs: %s" % (ns, ", ".join(bad)))
+    n_restart = n_suffix = n_said = 0
 
     out = []
     out.append("using MCM.Abstractions.Attributes;")
@@ -475,25 +544,36 @@ def gen(module_dir, ns, display):
     for typ, name, default, hint, grp in props:
         label = re.sub(r'(?<!^)(?=[A-Z])', ' ', name)
         hint_txt = hint.replace('"', "'")
+        # f18-mcm: restart tylko dla RESTART_KEYS; pola wchodzace po wczytaniu zapisu - dopisek, jesli opis jeszcze o tym nie mowi
+        rr = "true" if name in restart else "false"
+        if name in restart:
+            n_restart += 1
+        elif ns in APPLY_ON_LOAD_ONLY or name in session:
+            if ALREADY_SAID.search(hint_txt):
+                n_said += 1
+            else:
+                hint_txt = (hint_txt + LOAD_SUFFIX).strip()
+                n_suffix += 1
+        tail = 'HintText = "%s", RequireRestart = %s' % (hint_txt, rr)
         if typ != "bool" and name in RANGES:
             lo, hi, fmt = RANGES[name]
             if typ == "int":
-                attr = '        [SettingPropertyInteger("%s", %d, %d, "%s", HintText = "%s")]' % (label, lo, hi, fmt, hint_txt)
+                attr = '        [SettingPropertyInteger("%s", %d, %d, "%s", %s)]' % (label, lo, hi, fmt, tail)
             else:
                 dec = len(fmt.split('.')[1]) if '.' in fmt else 2
-                attr = '        [SettingPropertyFloatingInteger("%s", %.*ff, %.*ff, "%s", HintText = "%s")]' % (label, max(2, dec), lo, max(2, dec), hi, fmt, hint_txt)
+                attr = '        [SettingPropertyFloatingInteger("%s", %.*ff, %.*ff, "%s", %s)]' % (label, max(2, dec), lo, max(2, dec), hi, fmt, tail)
         elif typ == "bool":
-            attr = '        [SettingPropertyBool("%s", HintText = "%s")]' % (label, hint_txt)
+            attr = '        [SettingPropertyBool("%s", %s)]' % (label, tail)
         elif typ == "int":
             d = int(float(default))
             lo = min(0, d*3) if d < 0 else 0
             hi = max(10, abs(d)*4) if d >= 0 else 0
-            attr = '        [SettingPropertyInteger("%s", %d, %d, "0", HintText = "%s")]' % (label, lo, hi, hint_txt)
+            attr = '        [SettingPropertyInteger("%s", %d, %d, "0", %s)]' % (label, lo, hi, tail)
         else:
             d = float(default.rstrip('f'))
             lo = 0.0
             hi = max(1.0, d*4) if d > 0 else 1.0
-            attr = '        [SettingPropertyFloatingInteger("%s", %.2ff, %.2ff, "0.00", HintText = "%s")]' % (label, lo, hi, hint_txt)
+            attr = '        [SettingPropertyFloatingInteger("%s", %.2ff, %.2ff, "0.00", %s)]' % (label, lo, hi, tail)
         out.append(attr)
         out.append('        [SettingPropertyGroup("%s")]' % grp)
         out.append('        public %s %s { get; set; } = %s;' % (typ, name, default))
@@ -513,7 +593,7 @@ def gen(module_dir, ns, display):
     out.append("}")
     path = os.path.join(module_dir,'src','McmSettings.cs')
     open(path,'w',encoding='utf-8').write("\n".join(out))
-    print("%s: %d ustawien -> %s" % (ns, len(props), path))
+    print("%s: %d ustawien -> %s (restart: %d, dopisek 'after loading a save': %d, opis juz mowi: %d)" % (ns, len(props), path, n_restart, n_suffix, n_said))
 
 # sciezki wzgledem korzenia repo - skrypt wolac z katalogu glownego
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
