@@ -34,6 +34,7 @@ $v5tree = (Test-Path -LiteralPath $lay -PathType Leaf) -and ((Get-Content -Liter
 if ($v5tree) { $rel += 'Armoury\ModuleData\arm_map_villages_v4.tsv'; $rel += 'Armoury\ModuleData\arm_map_village_lore_v4.tsv' }
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_houses_canon.tsv')) { $rel += 'Armoury\ModuleData\arm_houses_canon.tsv' }   # 16.10 herby kanon (noc-herby)
 if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv')) { $rel += 'Armoury\ModuleData\arm_ks_land.tsv' }   # 16.10 KS kalibracja startu
+if (Test-Path -LiteralPath (Join-Path $Tree 'Armoury\ModuleData\arm_map_roads_geo.tsv')) { $rel += 'Armoury\ModuleData\arm_map_roads_geo.tsv' }   # 17/18.10 sw-drogi: drogi ROT (+15% predkosci, MapRoads)
 $ef = @()
 foreach ($r in $rel) {
     $src = Join-Path $Tree $r

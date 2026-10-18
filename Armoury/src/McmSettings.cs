@@ -1760,6 +1760,18 @@ namespace Armoury
         [SettingPropertyGroup("The marching column")]
         public float MarchPackAllowance { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Map Road Speed Bonus", HintText = "on the painted roads of the Realm of Thrones map every land party - yours, the lords', caravans, villagers, bandits - travels faster by Map Road Speed Percent: the speed tooltip shows a 'Road' line and the marching-column cap is raised by the same share, so the bonus is not lost under it; ships at sea are not affected. The roads come from the map's own road paint (file arm_map_roads_geo.tsv in the module's ModuleData folder). Off = no road bonus, as before")]
+        [SettingPropertyGroup("The marching column")]
+        public bool MapRoadSpeedBonus { get; set; } = true;
+
+        [SettingPropertyInteger("Map Road Speed Percent", 0, 50, "0", HintText = "how much faster a land party travels on a road, in percent of its speed (15 = +15%; at most 50)")]
+        [SettingPropertyGroup("The marching column")]
+        public int MapRoadSpeedPercent { get; set; } = 15;
+
+        [SettingPropertyFloatingInteger("Map Road Margin", 0.00f, 2.00f, "0.00", HintText = "how far beyond the painted edge of a road (in map units) a party still counts as on it - the road paint is coarse and party paths never follow it exactly (0.4 = about two kilometres; at most 2)")]
+        [SettingPropertyGroup("The marching column")]
+        public float MapRoadMargin { get; set; } = 0.40f;
+
         [SettingPropertyBool("Material Law Enabled", HintText = "charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal")]
         [SettingPropertyGroup("Smithing materials")]
         public bool MaterialLawEnabled { get; set; } = true;
@@ -7375,6 +7387,9 @@ namespace Armoury
             s.MarchFootRiderPace = MarchFootRiderPace;
             s.MarchRiderPace = MarchRiderPace;
             s.MarchPackAllowance = MarchPackAllowance;
+            s.MapRoadSpeedBonus = MapRoadSpeedBonus;
+            s.MapRoadSpeedPercent = MapRoadSpeedPercent;
+            s.MapRoadMargin = MapRoadMargin;
             s.MaterialLawEnabled = MaterialLawEnabled;
             s.RealRefiningEnabled = RealRefiningEnabled;
             s.BloomeryCharcoalPerOre = BloomeryCharcoalPerOre;

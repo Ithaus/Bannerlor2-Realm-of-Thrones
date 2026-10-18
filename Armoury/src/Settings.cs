@@ -593,6 +593,11 @@ namespace Armoury
         public float MarchFootRiderPace = 5.0f;            // map speed cap when footmen ride spare horses - a man in the saddle is not a horseman born
         public float MarchRiderPace = 6.5f;                // map speed cap for a clean column of riders - every man horsed, no train
         public float MarchPackAllowance = 0.25f;           // this many pack animals PER MAN count as field supply, not a train (0.25 = a mule per four men rides free)
+        // SW-DROGI (noc 17/18.10, Jeff "szybsze poruszanie po drogach"): drogi ROT z farby terenu (plik ModuleData/arm_map_roads_geo.tsv, MapRoads.cs) -
+        // partia ladowa na drodze +MapRoadSpeedPercent% w latce MarchPace (wpis "Road", sufit kolumny w gore o ten sam procent), latka pamieci predkosci gry
+        public bool MapRoadSpeedBonus = true;              // on the painted roads of the Realm of Thrones map every land party - yours, the lords', caravans, villagers, bandits - travels faster by Map Road Speed Percent: the speed tooltip shows a 'Road' line and the marching-column cap is raised by the same share, so the bonus is not lost under it; ships at sea are not affected. The roads come from the map's own road paint (file arm_map_roads_geo.tsv in the module's ModuleData folder). Off = no road bonus, as before
+        public int MapRoadSpeedPercent = 15;               // how much faster a land party travels on a road, in percent of its speed (15 = +15%; at most 50)
+        public float MapRoadMargin = 0.40f;                // how far beyond the painted edge of a road (in map units) a party still counts as on it - the road paint is coarse and party paths never follow it exactly (0.4 = about two kilometres; at most 2)
 
         // --- Smithing materials ---
         public bool MaterialLawEnabled = true;             // charcoal and iron bars get honest prices and honest smelting: a load of wood gives a few sacks of charcoal, a bloomery eats charcoal by the sackful, each finer grade of steel loses metal

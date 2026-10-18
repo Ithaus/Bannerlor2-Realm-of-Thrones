@@ -933,6 +933,13 @@ Uzycie (Python 3, tylko odczyt):
                     kupcy -10-20% w miescie, NZC7-3 po najezdzie D okregu -30-60% w 7 dob (epizody z trafionymi >= 20%; same male najazdy - DECYZJA), NZC7-4 >= 50%
                     powrotu w rok bez wojny (krotszy bieg - INFO), NZC7-5 obieg zamkniety (kontrola kies 0), NZC7-6 potkniecia i ERROR 0, NZC7-7..12 INFO. Razem
                     z --grupa nzc6 (granice pasm, limit 0.2%), nzc2 (zapis v4 + wczytanie) i nzc0 (czas bloku).
+--grupa ndrogi    : (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, plik
+                    Armoury/ModuleData/arm_map_roads_geo.tsv) python -I tools/sprawdz_logi.py --grupa ndrogi <Armoury-*.log> (strumieniowo). NDR-0 start sesji: plik drog
+                    wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa ROT zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid
+                    wpieta; NDR-2 linie "Drogi (DR): dzien N" rozpoznane; NDR-3 udzial partio-godzin AI w ruchu na drodze 1-25% (symulacja tras AI sondy: 4.9%); NDR-4 premia
+                    liczona i przeliczenia wymuszone zmiana drogi > 0; NDR-5 audyt AI na drodze: premia rzeczywista = premia +-1.5 pp, wpis Road, zjedzona przez sufit <= 5%,
+                    pamiec gry zgodna >= 80%; NDR-6 gracz na drodze: premia w calosci i wynik <= LimitMax, "Audyt predkosci" z Road bez "Maximum" < -0.01; NDR-7 koszt (spis
+                    <= 5 ms/dobe, postfiks pamieci <= 2 us/wywolanie); NDR-8 potkniecia i ERROR 0; NDR-9 rozbicie wedlug rodzaju (INFO). Log bez paczki: INFO, bez wyjatku.
 --grupa nks       : (16.10, Jeff "produkcja tylko z prawdziwych rak i ziemi, start zbilansowany"; galaz w-toku/noc-ks, Armoury/src/StartCalibration*.cs; projekt
                     docs/PROJEKT-KALIBRACJA-STARTU-2026-10-16.md rozdz. 11-14; poprawki po recenzji 16.10) python -I tools/sprawdz_logi.py --grupa nks <Armoury-*.log>
                     [--baza-doby <Armoury-*.log bazy>] (strumieniowo). NKS-0 start sesji, NKS-1 Plany bez bledu, NKS-1b Plan wlaczenia z ksiega >= 28 dob, NKS-2 czas Planu
@@ -32198,6 +32205,226 @@ def nturniej_main(logp):
     return 0
 
 
+# ------------------------------------------------------------ ndrogi (noc 17/18.10, Jeff "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs)
+NDR_HEAD = "Drogi (DR): "
+NDR_START = re.compile(r"Drogi \(DR\): start sesji - klucz MapRoadSpeedBonus tak, premia (?P<pct>-?\d+)% \(przyciete (?P<pctc>\d+)%\), margines (?P<m>\d+\.\d+) jedn\. "
+                       r"\| (?P<note>.*?) \| latka pamieci predkosci (?P<hook>.*?) \| wczytanie (?P<ms>\d+\.\d) ms \| premia (?P<on>CZYNNA.*?|NIECZYNNA)\.$")
+NDR_FILE = re.compile(r"plik arm_map_roads_geo\.tsv v(?P<v>\d+): lamanych (?P<l>\d+), punktow (?P<p>\d+), odcinkow (?P<s>\d+), dlugosc (?P<len>\d+\.\d) jedn\., "
+                      r"zle wiersze (?P<bad>\d+); (?P<terr>[^|]*)")
+NDR_DAY = re.compile(r"Drogi \(DR\): dzien (?P<day>-?\d+) \| klucz MapRoadSpeedBonus tak, premia (?P<pct>\d+)%, margines (?P<m>\d+\.\d+) \| plik (?P<file>[^|]*) "
+                     r"\| partio-godziny w ruchu na ladzie \(AI, godzin spisu (?P<h>\d+)\): (?P<tot>\d+), na drodze (?P<on>\d+) \([^)]*\) "
+                     r"\| rody (?P<l1>\d+)/(?P<l0>\d+) \([^)]*\), karawany (?P<c1>\d+)/(?P<c0>\d+) \([^)]*\), wozy wsi (?P<v1>\d+)/(?P<v0>\d+) \([^)]*\), "
+                     r"bandy (?P<b1>\d+)/(?P<b0>\d+) \([^)]*\), inne (?P<o1>\d+)/(?P<o0>\d+) \([^)]*\) "
+                     r"\| gracz godzin w ruchu (?P<ph>\d+), na drodze (?P<pon>\d+) "
+                     r"\| liczenia predkosci \(ok\.\) (?P<sc>\d+), z premia drogi (?P<so>\d+) \([^)]*\), przeliczenia wymuszone zmiana drogi \(ok\.\) (?P<flips>\d+), "
+                     r"latka pamieci (?P<hook>wpieta|NIE) "
+                     r"\| (?P<audit>audyt[^|]*?) "
+                     r"\| (?P<player>gracz:[^|]*?) "
+                     r"\| koszt: spis (?P<cms>\d+\.\d+) ms/dobe, postfiks pamieci (?P<cus>\d+\.\d+) us/wywolanie \(probka (?P<cn>\d+), wywolan ok\. (?P<cc>\d+)\) "
+                     r"\| potkniecia dzis (?P<st>\d+) \(od wczytania (?P<sta>\d+)\), w predkosci dzis (?P<pst>\d+) \(od wczytania (?P<psta>\d+)\)")
+NDR_AUDIT = re.compile(r"audyt AI na drodze: kandydatow (?P<cand>\d+); probek (?P<n>\d+), premia rzeczywista sr\. (?P<avg>-?\d+\.\d+|-)% \(min (?P<mn>-?\d+\.\d+|-), "
+                       r"maks (?P<mx>-?\d+\.\d+|-)\), bez wpisu Road (?P<noline>\d+), zjedzona przez sufit (?P<eaten>\d+), na suficie LimitMax (?P<cap>\d+), "
+                       r"pamiec gry zgodna (?P<cok>\d+)/(?P<cn>\d+)")
+NDR_PLAYER = re.compile(r"gracz: na drodze (?P<on>tak|nie) \(od krawedzi farby (?P<ed>[^ ]+) jedn\.\), bez premii (?P<r0>\d+\.\d+), z premia (?P<r1>\d+\.\d+), "
+                        r"LimitMax (?P<lim>\d+\.\d+|brak), wpis Road (?P<line>tak|nie), pamiec gry (?P<cache>\d+\.\d+)")
+NDR_SPEED_AUDIT = re.compile(r"Audyt predkosci \(dzien (?P<day>-?\d+), teren [^)]*\): (?P<body>.*) => (?P<res>-?\d+\.\d+)$")
+NDR_ERR = ("ERROR in MapRoads.",)
+
+
+def ndrogi_main(logp):
+    """ndrogi (noc 17/18.10, Jeff 16.10 lista pkt 4 i 17.10 "szybsze poruszanie po drogach"; galaz w-toku/sw-drogi, Armoury/src/MapRoads.cs, klucze MapRoadSpeedBonus /
+    MapRoadSpeedPercent / MapRoadMargin): partia ladowa na drodze ROT (plik ModuleData/arm_map_roads_geo.tsv) +15% predkosci w latce MarchPace (wpis "Road", sufit kolumny
+    w gore o ten sam procent), postfiks pamieci predkosci gry. Wejscie: log Armoury (strumieniowo).
+    NDR-0 start sesji: plik wczytany (lamanych >= 300, punktow >= 10 000, zle wiersze 0, mapa zgodna), premia CZYNNA; NDR-1 latka pamieci predkosci wpieta (linia przy starcie
+    gry i w linii sesji); NDR-2 linie doby rozpoznane; NDR-3 udzial partio-godzin AI w ruchu na drodze 1-25% (symulacja na trasach AI sondy przy marginesie 0.4: 4.9%);
+    NDR-4 premia naprawde liczona (liczenia z premia > 0, gdy partio-godziny na drodze > 0) i przeliczenia wymuszone zmiana drogi > 0 (latka pamieci dziala);
+    NDR-5 audyt AI na drodze: premia rzeczywista sr. = premia +-1.5 pp, bez wpisu Road 0, zjedzona przez sufit <= 5% probek, pamiec gry zgodna >= 80%;
+    NDR-6 gracz na drodze: z premia / bez premii = 1 + premia +-1.5 pp i wynik <= LimitMax; linie "Audyt predkosci" z wpisem Road bez linii "Maximum" < -0.01 (premia
+    zjedzona przez sufit - uwaga recenzji karczm 16.10); NDR-7 koszt: spis mediana <= 5 ms/dobe, postfiks pamieci mediana <= 2 us/wywolanie; NDR-8 potkniecia i ERROR
+    in MapRoads.* 0; NDR-9 rozbicie wedlug rodzaju partii (INFO). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NDR-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    hooks, starts, starts_off, days, bad, audits = [], [], [], [], [], []
+    n_err = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\n"))
+            s = m.group(2) if m else ln.rstrip("\n")
+            if s.startswith(NDR_HEAD):
+                if s.startswith(NDR_HEAD + "latka pamieci predkosci") or s.startswith(NDR_HEAD + "premia drog wylaczona przy starcie gry") or s.startswith(NDR_HEAD + "BRAK metody"):
+                    hooks.append(s)
+                elif s.startswith(NDR_HEAD + "start sesji - premia drog WYLACZONA"):
+                    starts_off.append(s)
+                elif s.startswith(NDR_HEAD + "start sesji"):
+                    mm = NDR_START.match(s)
+                    if mm:
+                        starts.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+                elif s.startswith(NDR_HEAD + "dzien "):
+                    mm = NDR_DAY.match(s)
+                    if mm:
+                        days.append(mm.groupdict())
+                    else:
+                        bad.append(s)
+            elif s.startswith("Audyt predkosci (dzien "):
+                mm = NDR_SPEED_AUDIT.match(s)
+                if mm:
+                    audits.append(mm.groupdict())
+            elif s.startswith(NDR_ERR):
+                n_err += 1
+    print(f"plik: {logp} | linii latki {len(hooks)}, startu sesji {len(starts)} (wylaczona {len(starts_off)}), doby {len(days)} (nierozpoznanych {len(bad)}), "
+          f"audytow predkosci gracza {len(audits)}")
+    if not hooks and not starts and not starts_off and not days and not bad:
+        rep.add("NDR-0: linie 'Drogi (DR)'", "brak w logu", "INFO (log sprzed paczki sw-drogi)", None)
+        rep.show()
+        return 0
+    # NDR-0
+    if starts:
+        st0 = starts[-1]
+        fm = NDR_FILE.search(st0["note"])
+        if fm:
+            ok = (int(fm["l"]) >= 300 and int(fm["p"]) >= 10000 and int(fm["bad"]) == 0 and "INNEJ MAPY" not in st0["note"] and st0["on"].startswith("CZYNNA"))
+            rep.add("NDR-0: start sesji - plik drog wczytany, premia czynna", f"v{fm['v']}: lamanych {fm['l']}, punktow {fm['p']}, odcinkow {fm['s']}, dlugosc {fm['len']}, "
+                    f"zle wiersze {fm['bad']}; {fm['terr'].strip()}; premia {st0['pct']}%, margines {st0['m']}; {st0['on']}; wczytanie {st0['ms']} ms",
+                    "lamanych >= 300, punktow >= 10000, zle wiersze 0, mapa zgodna, CZYNNA", ok)
+        else:
+            rep.add("NDR-0: start sesji - plik drog", st0["note"][:220], "plik wczytany", False)
+    elif starts_off:
+        rep.add("NDR-0: start sesji", "premia drog WYLACZONA (MapRoadSpeedBonus)", "INFO (klucz wylaczony)", None)
+    else:
+        rep.add("NDR-0: start sesji", "brak linii startu sesji" + (f" (nierozpoznana: {bad[0][:160]})" if bad else ""), "linia przy kazdym starcie sesji", False if bad else None)
+    # NDR-1
+    hook_ok = None
+    hook_txt = []
+    if hooks:
+        h1 = hooks[-1]
+        if h1.startswith(NDR_HEAD + "premia drog wylaczona przy starcie gry"):
+            hook_ok = None   # klucz wylaczony przy starcie gry - latka swiadomie niewpieta
+        else:
+            hook_ok = h1.startswith(NDR_HEAD + "latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid wpieta")
+        hook_txt.append(h1[len(NDR_HEAD):][:120])
+    if starts:
+        h2 = starts[-1]["hook"]
+        hook_txt.append("sesja: " + h2)
+        if not (hooks and hook_ok is None):
+            hook_ok = (hook_ok if hook_ok is not None else True) and h2 == "wpieta"
+    rep.add("NDR-1: latka pamieci predkosci MobileParty.IsLastSpeedCacheInvalid", "; ".join(hook_txt) if hook_txt else "brak linii",
+            "wpieta (start gry i sesja)", hook_ok)
+    # NDR-2
+    rep.add("NDR-2: linie doby rozpoznane", f"doby {len(days)}, nierozpoznane {len(bad)}" + (f" (np. {bad[0][:200]})" if bad else ""),
+            "nierozpoznane 0", (not bad) if (days or bad) else None)
+    if not days:
+        rep.add("NDR-3..8: linie doby", "brak linii doby", "INFO (sesja krotsza niz doba albo klucz wylaczony)", None)
+        rep.show()
+        return 0
+
+    def tot(k):
+        return sum(int(g[k]) for g in days)
+    pct = int(days[-1]["pct"])
+    # NDR-3
+    t_all, t_on = tot("tot"), tot("on")
+    share = 100.0 * t_on / t_all if t_all else None
+    rep.add("NDR-3: udzial partio-godzin AI w ruchu na drodze (suma dob)", f"{t_on}/{t_all} = " + (f"{share:.2f}%" if share is not None else "-")
+            + f" (godzin spisu {tot('h')}, dob {len(days)})", "1-25% (symulacja tras AI sondy przy marginesie 0.4: 4.9%)",
+            (1.0 <= share <= 25.0) if share is not None else None)
+    # NDR-4
+    sc, so, flips = tot("sc"), tot("so"), tot("flips")
+    ok4 = None
+    if t_on > 0:
+        ok4 = so > 0 and flips > 0
+    rep.add("NDR-4: premia liczona i pamiec predkosci przeliczana przy zmianie drogi", f"liczenia predkosci (ok.) {sc}, z premia {so} ("
+            + (f"{100.0 * so / sc:.1f}%" if sc else "-") + f"), przeliczenia wymuszone {flips}", "z premia > 0 i przeliczenia > 0 (gdy partio-godziny na drodze > 0)", ok4)
+    # NDR-5
+    an = acand = anl = aeat = acap = acok = acn = 0
+    asum = 0.0
+    amn, amx = None, None
+    bad_a = 0
+    for g in days:
+        if g["audit"].startswith("audyt: brak"):
+            continue   # siatka nieczynna albo brak modelu - powod w linii (NDR-0)
+        am = NDR_AUDIT.search(g["audit"])
+        if not am:
+            bad_a += 1
+            continue
+        n = int(am["n"])
+        acand += int(am["cand"])
+        an += n
+        if n > 0 and am["avg"] != "-":
+            asum += float(am["avg"]) * n
+            mn, mx = float(am["mn"]), float(am["mx"])
+            amn = mn if amn is None else min(amn, mn)
+            amx = mx if amx is None else max(amx, mx)
+        anl += int(am["noline"])
+        aeat += int(am["eaten"])
+        acap += int(am["cap"])
+        acok += int(am["cok"])
+        acn += int(am["cn"])
+    if an > 0:
+        avg = asum / an
+        ok5 = abs(avg - pct) <= 1.5 and anl == 0 and aeat <= 0.05 * an and (acn == 0 or acok >= 0.8 * acn)
+        rep.add("NDR-5: audyt AI na drodze (premia rzeczywista, wpis Road, sufit, pamiec gry)",
+                f"probek {an} (kandydatow suma {acand}), premia sr. {avg:.2f}% (min {amn:.2f}, maks {amx:.2f}), bez wpisu Road {anl}, zjedzona przez sufit {aeat}, "
+                f"na suficie LimitMax {acap}, pamiec gry zgodna {acok}/{acn}" + (f"; segment audytu nierozpoznany w {bad_a} dobach" if bad_a else ""),
+                f"premia {pct} +-1.5 pp, bez wpisu Road 0, zjedzona <= 5% probek, pamiec gry zgodna >= 80%", ok5)
+    else:
+        rep.add("NDR-5: audyt AI na drodze", f"probek 0 (kandydatow {acand})" + (f"; segment nierozpoznany w {bad_a} dobach" if bad_a else ""),
+                "INFO (brak partii AI na drodze w chwili audytu)", None if not bad_a else False)
+    # NDR-6
+    pl_on, pl_bad = 0, []
+    for g in days:
+        pm = NDR_PLAYER.search(g["player"])
+        if not pm or pm["on"] != "tak":
+            continue
+        pl_on += 1
+        r0, r1 = float(pm["r0"]), float(pm["r1"])
+        ratio = (r1 / r0 - 1.0) * 100.0 if r0 > 0 else 0.0
+        over = pm["lim"] != "brak" and r1 > float(pm["lim"]) + 0.002
+        if abs(ratio - pct) > 1.5 or over or pm["line"] != "tak":
+            pl_bad.append(f"dzien {g['day']}: {r0} -> {r1} ({ratio:.1f}%), LimitMax {pm['lim']}, Road {pm['line']}")
+    eaten_lines = []
+    road_lines = 0
+    for a in audits:
+        body = a["body"]
+        if re.search(r"(^|\| )Road \+", body):
+            road_lines += 1
+            mx = re.search(r"(^|\| )Maximum (-\d+\.\d+)", body)
+            if mx and float(mx.group(2)) < -0.01:
+                eaten_lines.append(f"dzien {a['day']}: Maximum {mx.group(2)}")
+    if pl_on or road_lines:
+        rep.add("NDR-6: gracz na drodze - premia w calosci, wynik w sufit (audyt doby i 'Audyt predkosci')",
+                f"doby gracza na drodze {pl_on}, poza progiem {len(pl_bad)}" + (f" (np. {pl_bad[0]})" if pl_bad else "")
+                + f"; linie 'Audyt predkosci' z Road {road_lines}, z 'Maximum' < -0.01: {len(eaten_lines)}" + (f" ({eaten_lines[0]})" if eaten_lines else ""),
+                f"z premia / bez = 1 + {pct}% +-1.5 pp, wynik <= LimitMax, wpis Road; Maximum 0", not pl_bad and not eaten_lines)
+    else:
+        rep.add("NDR-6: gracz na drodze", "gracz nie byl na drodze w chwili audytu (autotest stoi w miejscu)", "INFO", None)
+    # NDR-7
+    cms = sorted(float(g["cms"]) for g in days)
+    cus = sorted(float(g["cus"]) for g in days if int(g["cn"]) > 0)
+    med_ms = cms[len(cms) // 2] if cms else None
+    med_us = cus[len(cus) // 2] if cus else None
+    ok7 = (med_ms is None or med_ms <= 5.0) and (med_us is None or med_us <= 2.0)
+    rep.add("NDR-7: koszt (spis godzinny, postfiks pamieci predkosci)", f"spis mediana {med_ms if med_ms is not None else '-'} ms/dobe (maks {cms[-1] if cms else '-'}), "
+            f"postfiks mediana {med_us if med_us is not None else '-'} us/wywolanie (maks {cus[-1] if cus else '-'}; wywolan ok. {tot('cc')})",
+            "spis <= 5 ms/dobe, postfiks <= 2 us/wywolanie", ok7)
+    # NDR-8
+    st, pst = tot("st"), tot("pst")
+    rep.add("NDR-8: potkniecia (watek glowny i predkosc) i ERROR in MapRoads.*", f"potkniecia {st}, w predkosci {pst}, ERROR {n_err}", "0 / 0 / 0",
+            st == 0 and pst == 0 and n_err == 0)
+    # NDR-9
+    def sh(a, b):
+        return f"{100.0 * a / b:.1f}%" if b else "-"
+    rep.add("NDR-9: partio-godziny na drodze wedlug rodzaju (suma dob)",
+            f"rody {tot('l1')}/{tot('l0')} ({sh(tot('l1'), tot('l0'))}), karawany {tot('c1')}/{tot('c0')} ({sh(tot('c1'), tot('c0'))}), "
+            f"wozy wsi {tot('v1')}/{tot('v0')} ({sh(tot('v1'), tot('v0'))}), bandy {tot('b1')}/{tot('b0')} ({sh(tot('b1'), tot('b0'))}), "
+            f"inne {tot('o1')}/{tot('o0')} ({sh(tot('o1'), tot('o0'))}); gracz godzin w ruchu {tot('ph')}, na drodze {tot('pon')}", "INFO", None)
+    rep.show()
+    return 0
+
+
 # ------------------------------------------------------------ nkarczmy (16.10, Jeff "w miescie moge spac tylko w karczmie, daj do wyboru trzy jakosci"; Armoury/src/TownInns.cs)
 NKA_HEAD = "Karczmy (KA): "
 NKA_DAY = re.compile(r"Karczmy \(KA\): dzien (?P<day>-?\d+) \| klucze: Town Inns (?P<k1>tak|WYLACZONE), Town Inn Price Bonus (?P<k2>tak|WYLACZONE), Night Rest (?P<k3>tak|WYLACZONE) "
@@ -35602,6 +35829,8 @@ def main(argv):
         return nzlec_main(logp)   # nzlec (16.10, Jeff "jak ktos nie ma kasy to jak moze ofertowac kucie mieczy??"): zlecenie kowalskie tylko od zleceniodawcy z nagroda w kiesie (CraftOrdersPurse)
     if group == "nturniej" and logp:
         return nturniej_main(logp)   # nturniej (16.10, Jeff "miasto nie moglo zaplacic mi 1300"): lancuch platnikow nagrody turnieju i dlugi osad wobec gracza (TourneyPay)
+    if group == "ndrogi" and logp:
+        return ndrogi_main(logp)   # ndrogi (noc 17/18.10, Jeff "szybsze poruszanie po drogach"): +15% na drogach ROT, plik drog, latka pamieci predkosci, audyt premii i sufitu (MapRoads)
     if group == "nbitwa" and logp:
         return nbitwa_main(logp)   # nbitwa (16.10, bitwa czesc 1): zlamani raz na bitwe (RoutHold), cel ucieczki z sektorow, postura szeregowych wedlug tieru
     if group == "nkarczmy" and logp:

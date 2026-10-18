@@ -36,6 +36,8 @@ $kl = Join-Path $Tree 'Armoury\ModuleData\arm_ks_land.tsv'   # 16.10 KS kalibrac
 if (Test-Path -LiteralPath $kl -PathType Leaf) { $items += [pscustomobject]@{ name = 'Armoury\ModuleData\arm_ks_land.tsv'; src = $kl; dst = (Join-Path $GameDir 'Modules\Armoury\ModuleData\arm_ks_land.tsv'); dll = $false } }
 $hc = Join-Path $Tree 'Armoury\ModuleData\arm_houses_canon.tsv'
 if (Test-Path -LiteralPath $hc -PathType Leaf) { $items += [pscustomobject]@{ name = 'Armoury\ModuleData\arm_houses_canon.tsv'; src = $hc; dst = (Join-Path $GameDir 'Modules\Armoury\ModuleData\arm_houses_canon.tsv'); dll = $false } }
+$rg = Join-Path $Tree 'Armoury\ModuleData\arm_map_roads_geo.tsv'   # 17/18.10 sw-drogi: drogi ROT (+15% predkosci, MapRoads) - idzie z DLL, gdy jest w drzewie
+if (Test-Path -LiteralPath $rg -PathType Leaf) { $items += [pscustomobject]@{ name = 'Armoury\ModuleData\arm_map_roads_geo.tsv'; src = $rg; dst = (Join-Path $GameDir 'Modules\Armoury\ModuleData\arm_map_roads_geo.tsv'); dll = $false } }
 foreach ($i in $items) {
     if (-not (Test-Path -LiteralPath $i.src -PathType Leaf)) { Write-Host ("STOP: brak zrodla " + $i.src); exit 2 }
     if ((Get-Item -LiteralPath $i.src).Length -eq 0) { Write-Host ("STOP: zrodlo puste " + $i.src); exit 2 }

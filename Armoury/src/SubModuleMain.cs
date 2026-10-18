@@ -235,6 +235,8 @@ namespace Armoury
                 // m6b (6): kasy zaulkow - rozbicie zmiany kasy miast ponizej 1/4 zapasu kupcow na kanaly (tylko log)
                 try { AlleyProbe.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AlleyProbe.ApplyAll", e); }
                 MarchPace.ApplyAll(_harmony);
+                // SW-DROGI (noc 17/18.10): premia drogi ROT jedzie w latce MarchPace; tu tylko postfiks pamieci predkosci gry (MobileParty.IsLastSpeedCacheInvalid)
+                try { MapRoads.ApplyAll(_harmony); } catch (Exception e) { Log.Error("MapRoads.ApplyAll", e); }
                 TerrainEase.ApplyAll(_harmony);
                 // NightRest PO MarchPace: kara snu ma ciac REALNA predkosc
                 // kolumny (po suficie marszu), nie teoretyczna baze

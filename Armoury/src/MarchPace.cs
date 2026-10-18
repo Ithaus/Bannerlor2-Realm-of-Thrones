@@ -83,8 +83,17 @@ namespace Armoury
         /// <summary>
         /// Postfix (Priority.Last) na KAZDY CalculateFinalSpeed w grze.
         /// Pozycyjne __0, bo nadpisania w modach zmieniaja nazwy parametrow.
+        /// SW-DROGI (noc 17/18.10): po suficie kolumny premia drogi ROT (MapRoads.SpeedRoad - wszystkie partie ladowe, takze karawany i wozy wsi,
+        /// ktore kolumna pomija; ten sam poziom lancucha - SpeedDepth). Klucz MapRoadSpeedBonus wylaczony = SpeedRoad wychodzi od razu (jak przed zmiana).
         /// </summary>
         public static void SpeedPostfix(MobileParty __0, ref ExplainedNumber __result)
+        {
+            ColumnPostfix(__0, ref __result);
+            MapRoads.SpeedRoad(__0, ref __result);
+        }
+
+        /// <summary>Kolumna marszowa (tresc dawnego SpeedPostfix bez zmian).</summary>
+        private static void ColumnPostfix(MobileParty __0, ref ExplainedNumber __result)
         {
             long tk = 0;
             try
@@ -154,7 +163,9 @@ namespace Armoury
             try
             {
                 var c = Settings.Current;
-                if (c == null || !c.MarchPaceEnabled) { Log.Info("MarchPace: wylaczony."); return; }
+                // SW-DROGI: ta sama latka niesie premie drogi (MapRoads.SpeedRoad) - wpinana takze przy wylaczonej kolumnie, gdy MapRoadSpeedBonus wlaczony
+                // (kolumna sprawdza wtedy swoj klucz w ColumnPostfix i wychodzi); oba klucze wylaczone = jak przed zmiana
+                if (c == null || (!c.MarchPaceEnabled && !c.MapRoadSpeedBonus)) { Log.Info("MarchPace: wylaczony."); return; }
 
                 var post = new HarmonyMethod(typeof(MarchPace).GetMethod("SpeedPostfix",
                     BindingFlags.Public | BindingFlags.Static)) { priority = Priority.Last };
@@ -179,7 +190,8 @@ namespace Armoury
                         catch { }
                     }
                 }
-                Log.Info("MarchPace: kolumna marszowa wpieta w " + done + " modeli predkosci.");
+                if (c.MarchPaceEnabled) Log.Info("MarchPace: kolumna marszowa wpieta w " + done + " modeli predkosci.");
+                else Log.Info("MarchPace: kolumna wylaczona - latka wpieta w " + done + " modeli predkosci tylko dla premii drog (MapRoadSpeedBonus).");
             }
             catch (Exception e) { Log.Error("MarchPace.ApplyAll", e); }
         }
