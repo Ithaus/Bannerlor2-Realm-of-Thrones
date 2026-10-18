@@ -42575,7 +42575,7 @@ def nopal_main(logp):
     if wi:
         coal = sum(iron[d] for d in wi) / len(wi)
         rep.add("NOP-8: 'kopalnia bez wegla' (Zelazo (lupy) (214))" + base_note, f"{coal:.1f} lup/d (srednio {len(wi)} dob)",
-                f"<= {NOP_COAL_MAX} (bez KS); ETAP <= {NOP_COAL_BASE} (fin87, 28 dob)", ok_or_info(coal <= NOP_COAL_MAX), etap=coal <= NOP_COAL_BASE)
+                f"<= {NOP_COAL_MAX} (bez KS); ETAP <= {NOP_COAL_BASE} (fin87, 28 dob); od f7-wegiel (klucz Bloomery Colliers) tylko rece bezczynne - weglarze w --grupa nwegiel", ok_or_info(coal <= NOP_COAL_MAX), etap=coal <= NOP_COAL_BASE)
     else:
         rep.add("NOP-8: 'kopalnia bez wegla'", f"brak linii w oknie ({wnote})", "INFO", None)
 
@@ -44878,7 +44878,7 @@ def nruda_main(logp):
     if wi:
         coal = sum(wi) / len(wi)
         rep.add("NRU-8: 'kopalnia bez wegla' (= NOP-8)" + base_note, f"{coal:.1f} lup/d (srednio {len(wi)} dob)",
-                f"<= {NRU_COAL_MAX} (bez KS); ETAP < {NRU_COAL_BASE} (fin88)", ok_or_info(coal <= NRU_COAL_MAX), etap=coal < NRU_COAL_BASE)
+                f"<= {NRU_COAL_MAX} (bez KS); ETAP < {NRU_COAL_BASE} (fin88); od f7-wegiel (klucz Bloomery Colliers) tylko rece bezczynne - weglarze w --grupa nwegiel", ok_or_info(coal <= NRU_COAL_MAX), etap=coal < NRU_COAL_BASE)
     else:
         rep.add("NRU-8: 'kopalnia bez wegla' (= NOP-8)", f"brak linii w oknie ({wnote})", "INFO", None)
     # NRU-9 zapas rudy w miastach i swiata, NRU-10 lupy wsi
