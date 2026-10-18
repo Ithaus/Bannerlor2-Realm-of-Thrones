@@ -417,7 +417,8 @@ namespace Armoury
         /// ostatniego przegladu (przy Ds Farm Review Days 91 zawsze we wlasna dobe; dotad przeglad we wlasna dobe i drugi w najblizszy dzien kwartalu dawaly do -27,75%
         /// w 1..90 dob). Firma pana, korony i czesc z oszczednosci ludu w tym samym stosunku (jak Renew). Zloto sie nie rusza - zmienia sie tylko nalezna rata (zamknieta
         /// ekonomia: platnik i odbiorca bez zmian, kontrola linii "platnicy - odbiorcy" jak dotad). ATerms bez zerowania (zajecie DsFarmDistraintTerms liczy dalej jak dotad).
-        /// Kazda osada we wlasnym try, potkniecia liczone.
+        /// Kazda osada we wlasnym try, potkniecia liczone. Recenzja calosci 18.10: doplyw netto (TownPurse.NetOf) liczy jedzenie miasta zaplacone przez pana (KsLordFood -
+        /// rachunki KS-H, wczesna splata, doplata) jak wydatek kasy - pomoc pana nie podnosi firmy (inaczej stale przelewanie pan -> korona przez miasto).
         /// </summary>
         private static void Review(int today, Settings s, int qd)
         {

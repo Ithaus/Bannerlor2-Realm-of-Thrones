@@ -231,7 +231,8 @@ namespace Armoury
                 sb.Append("Place W wedlug koszyka (f4-place-ludu): dzien ").Append(day)
                   .Append(" | klucze: Ks Labour To Basket ").Append(On ? "TAK" : "NIE").Append(", Ks Wage Hands Down ").Append(KsWageHands.DownOn ? "TAK" : "NIE")
                   .Append(" (podloga x").Append(KsWageHands.FloorNow.ToString("0.00", Inv)).Append("; klucz ").Append(s.KsWageHandsDown ? "TAK" : "NIE")
-                  .Append(", przeglad firm DS co kwartal - Ds Farm Review Days ").Append(frd >= 0 ? frd.ToString(Inv) : "brak klucza (bez P5)").Append(")")
+                  .Append(", przeglad firm DS co kwartal - Ds Farm Review Days ").Append(frd >= 0 ? frd.ToString(Inv) : "brak klucza (bez P5)")
+                  .Append(", firmy DS ustalone ").Append(DsTowns.FarmsLive ? "TAK" : "NIE").Append(")")   // recenzja calosci 18.10: (a) tylko przy zywym przegladzie firm
                   .Append(" | pasmo ").Append(Lo.ToString("0", Inv)).Append('-').Append(Hi.ToString("0", Inv)).Append(" dni koszyka KS, najnizej x").Append(Min.ToString("0.00", Inv))
                   .Append(", krok ").Append((100 * Step).ToString("0.0", Inv)).Append("%/d, danina od skarbca W w tych miastach ").Append((100 * hr).ToString("0.00", Inv))
                   .Append("%/d (dzis srednio ").Append(F(100 * hrNow, "0.00")).Append("%, schodzi razem z kappa; Ds Hoard Due Rate ")

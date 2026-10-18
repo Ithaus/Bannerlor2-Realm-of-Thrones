@@ -25,7 +25,8 @@ namespace Armoury
     /// Factor (koszt pracy przetworow ZC5 - rece rzemieslnikow) zostaje >= 1. Wskazniki ponizej 1 w osobnym kluczu zapisu arm_ks_place (arm_ks_koszyk jak dotad >= 1).
     /// Klucz wylaczony - podloga 1, co do liczby jak dotad. Recenzja 18.10: (1) w dol ponizej 1 tylko RAZEM z przegladem firm DS co kwartal (paczka P5, klucz Ds Farm
     /// Review Days > 0 - werdykt przegladu ekonomii: inaczej zloto przejdzie do kupcow i zostanie w kasach); po scaleniu fali 4 pole czytane wprost (przed scaleniem - refleksja)
-    /// (wtedy (a) nieczynne, podloga 1); (2) ponizej 1 tylko przy DOWODZIE wolnych rak (dane regionu sa i f - a >= f/2; przetwory, jesli miasto je ma, zajete < 50%);
+    /// (wtedy (a) nieczynne, podloga 1); recenzja calosci 18.10 - takze tylko przy ustalonych firmach DS (DsTowns.FarmsLive: Ds Towns czynne i po oknie pomiaru firm), bo tylko
+    /// wtedy biegnie przeglad (DsTowns.Renew -> Review); (2) ponizej 1 tylko przy DOWODZIE wolnych rak (dane regionu sa i f - a >= f/2; przetwory, jesli miasto je ma, zajete < 50%);
     /// brak danych (FreeHands nieczynny, region bez komorki, prog ~1, miasto bez przetworow) - wskaznik wraca do 1 z obu stron, nigdy nie schodzi ponizej 1.
     /// </summary>
     internal static class KsWageHands
@@ -50,7 +51,9 @@ namespace Armoury
         internal static bool DownOn { get { var s = Settings.Current; return s != null && s.KsWageByHands && DownKey(s); } }
         /// <summary>f4-place-ludu (a): podloga wskaznika - Ks Wage Hands Floor (0.3..1) przy kluczu Ks Wage Hands Down i przegladzie firm DS co kwartal, inaczej 1 (jak dotad).</summary>
         private static double Floor { get { var s = Settings.Current; return s != null && DownKey(s) ? Math.Max(0.3, Math.Min(1.0, (double)s.KsWageHandsFloor)) : 1.0; } }
-        private static bool DownKey(Settings s) { return s.KsWageHandsDown && FarmReviewDays(s) > 0; }
+        // recenzja calosci 18.10: (a) czynne tylko przy ZYWYM przegladzie firm - DsTowns.FarmsLive (firmy ustalone i DS miast czynne); sama liczba z MCM (Ds Farm Review
+        // Days > 0) nie wystarcza: w oknie pomiaru firm, przy Ds Towns wylaczonym albo przed ustaleniem firm Review nie biegnie i uciete place zostalyby w kasach miast
+        private static bool DownKey(Settings s) { return s.KsWageHandsDown && FarmReviewDays(s) > 0 && DsTowns.FarmsLive; }
         // recenzja 18.10: pole Ds Farm Review Days paczki P5 (f4-kasy-miast-i-kupcy-z). Scalenie fali 4 (noc 17/18.10): P5 jest w tej samej DLL - odczyt wprost z pola
         // zamiast refleksji (zmiana nazwy albo typu pola psuje build, a nie wylacza (a) po cichu - CLAUDE.md 7); wartosc ta sama co przez refleksje (surowe pole)
         /// <summary>Ds Farm Review Days (przeglad firm DS co kwartal, paczka P5); -1 - brak ustawien.</summary>
@@ -194,7 +197,8 @@ namespace Armoury
                     int dn = 0; foreach (var v in vals) if (v < 0.9995f) dn++;
                     int frd = FarmReviewDays(sNow);
                     sb.Append(" | w dol (f4-place-ludu): klucz Ks Wage Hands Down TAK, czynne ").Append(DownKey(sNow) ? "TAK" : "NIE")
-                      .Append(" (przeglad firm DS co kwartal - Ds Farm Review Days ").Append(frd >= 0 ? frd.ToString(Inv) : "brak klucza (bez P5)").Append(")")
+                      .Append(" (przeglad firm DS co kwartal - Ds Farm Review Days ").Append(frd >= 0 ? frd.ToString(Inv) : "brak klucza (bez P5)")
+                      .Append(", firmy DS ustalone ").Append(DsTowns.FarmsLive ? "TAK" : "NIE").Append(")")   // recenzja calosci 18.10: czemu (a) nieczynne
                       .Append(", podloga x").Append(flF.ToString("0.00", Inv)).Append(", tylko place W, miasta < 1: ").Append(dn);
                     if (dn > 0)
                     {

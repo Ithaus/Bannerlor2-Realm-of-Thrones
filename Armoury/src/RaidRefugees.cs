@@ -50,6 +50,9 @@ namespace Armoury
     /// x limit, wieksze - czesc (reszta czeka, konto ma juz miasto). Ubytek (smierc, powrot, pojmani) schodzi najpierw z czekajacych; przyjeci ida za nim w dol
     /// (Cap = ludzie w miescie po rozliczeniu), wiec dopiski uderzen nie wchodza do miasta bez limitu. Zapis bez nowego klucza: przyjeci = ludzie przy ostatnim
     /// rozliczeniu (N, juz w "arm_raidref"). Klucz wylaczony - Cap pomijany, krok 4 i linia jak przed paczka (co do bitu).
+    /// Recenzja calosci 18.10: wylaczenie klucza w trakcie (albo wczytanie zapisu z kluczem wylaczonym) NIE wpuszcza czekajacych jednego dnia - konta z przyjetymi dalej
+    /// trzymaja granice, czekajacy wchodza dobowym limitem Raid Refugees Town Intake bez progu pierwszego konta (Step4Drain, segment linii "czekajacy po wylaczeniu
+    /// odmierzania"), a konto, z ktorego nikt nie czeka, wraca do starej reguly (Cap = NaN). Konta bez przyjetych - co do bitu jak przed paczka.
     /// </summary>
     internal static class RaidRefugees
     {
@@ -115,6 +118,11 @@ namespace Armoury
         // f4-uchodzcy (odmierzanie przybyc): uchodzcy dopisani przez uderzenia kontom z miastem, ktorzy CZEKAJA w regionie (doba; bez zapisu) i okno 7 dob przybylych
         // na miasto (id miasta -> przybyli w dobach day % 7; tylko linia i narzedzie - bez zapisu, po wczytaniu buduje sie od nowa)
         private static double _hitWait;
+        // recenzja calosci 18.10 (klucz RaidRefugeesIntakeMeter wylaczony w trakcie albo zapis wczytany z kluczem wylaczonym): konta z przyjetymi (Cap) dalej trzymaja
+        // granice "w miescie najwyzej przyjeci" - czekajacy wchodza dobowym limitem Raid Refugees Town Intake bez progu pierwszego konta (Step4Drain); Cap = NaN dopiero,
+        // gdy nikt z konta juz nie czeka (krok 2 Daily). Bez tego wylaczenie klucza wpuszczalo wszystkich czekajacych jednego dnia (jak Sharp Point 9 -> 73 tys.).
+        // _held - sa konta z przyjetymi (koniec Daily, wczytanie, Reset/Off); bez zapisu
+        private static bool _held;
         // recenzja f4 (uwaga 3): tablica miasta ma 14 miejsc - [0..6] przybyli w dobie day % 7, [7..13] ludzie miasta tej doby (ten sam mianownik co limit przyjec tej
         // doby), wiec okno 7 dob porownuje sie ze srednia ludzi miasta z dob przybyc (spadek ludzi w tygodniu - oblezenie, glod - nie daje falszywego przekroczenia)
         private static readonly Dictionary<string, double[]> _win7 = new Dictionary<string, double[]>(StringComparer.Ordinal);
@@ -138,6 +146,9 @@ namespace Armoury
             get { var s = Settings.Current; return s != null && s.RaidRefugeesIntakeMeter && s.RaidRefugeesToTowns && Devastation.On; }
         }
 
+        /// <summary>Recenzja calosci 18.10: granica przyjetych obowiazuje - klucz odmierzania albo dobieranie czekajacych po jego wylaczeniu (konta z Cap).</summary>
+        private static bool Hold { get { return Meter || (_held && On); } }
+
         /// <summary>PeopleBook.Reset (konstruktor ArmouryBehavior): stan jednej kampanii nie przecieka do drugiej (zapis wczytuje Import po konstruktorze).</summary>
         internal static void Reset()
         {
@@ -147,6 +158,7 @@ namespace Armoury
             _famHas = false; _famDay = -1; _zcHas = false; _zcDay = -1; _sgHas = false; _sgDay = -1;
             _sessionLogged = _offLogged = false; _firstShare = true;
             _sIn = _sOut = _sShort = _sNet = 0; _sStart = long.MinValue; _tYesterday = double.NaN;
+            _held = false;                                                       // recenzja calosci 18.10
         }
 
         private static void NewDay()
@@ -204,11 +216,13 @@ namespace Armoury
             return r > 1e-9 && !double.IsInfinity(r) ? r : 0.0;
         }
 
-        /// <summary>Ludzie konta w miescie: czesc z najazdu, a przy odmierzaniu (f4-uchodzcy) najwyzej przyjeci konta (cap; NaN - bez granicy). Klucz wylaczony - jak dotad.</summary>
+        /// <summary>Ludzie konta w miescie: czesc z najazdu, a przy odmierzaniu (f4-uchodzcy) najwyzej przyjeci konta (cap; NaN - bez granicy). Klucz wylaczony - jak dotad.
+        /// Recenzja calosci 18.10: granica obowiazuje przy kazdym cap roznym od NaN, takze po wylaczeniu klucza (dobieranie czekajacych - Step4Drain); konta bez
+        /// przyjetych (klucz nigdy nie wlaczony) maja NaN - co do bitu jak dotad.</summary>
         private static double Derived(Village v, double cap)
         {
             double r = Raw(v);
-            if (!(r > 0.0) || double.IsNaN(cap) || !Meter) return r;
+            if (!(r > 0.0) || double.IsNaN(cap)) return r;
             return Math.Min(r, Math.Max(0.0, cap));
         }
 
@@ -235,7 +249,7 @@ namespace Armoury
             if (_n == 0 || v == null) return 0.0;
             try
             {
-                if (!Meter) return 0.0;
+                if (!On) return 0.0;                                             // recenzja calosci 18.10: takze dobieranie po wylaczeniu klucza (cap != NaN)
                 string id = IdOf(v);
                 if (id == null) return 0.0;
                 double cap;
@@ -253,7 +267,7 @@ namespace Armoury
         /// goscie = czesc z glodu - dokladnie 1 (jak dotad).</summary>
         internal static double GuestFamShare(double famB, double guests)
         {
-            if (double.IsNaN(famB) || !(guests > famB) || !Meter) return 1.0;
+            if (double.IsNaN(famB) || !(guests > famB) || !Hold) return 1.0;   // recenzja calosci 18.10: takze dobieranie po wylaczeniu klucza
             double q = famB > 0.0 ? famB / guests : 0.0;
             return q < 0.0 ? 0.0 : (q > 1.0 ? 1.0 : q);
         }
@@ -337,7 +351,7 @@ namespace Armoury
                     // glod oblezonego miasta pobytu (Famine: zmarli = obecni w miescie x stopa; expected = zmarli) - cali z miasta; smierc w drodze (Devastation, ta sama
                     // stopa dla calego konta; expected = zmarli) - przyjeci w tej samej proporcji co konto. Powrot, podloga 10 i pojmani schodza najpierw z czekajacych
                     // (najblizej domu / swiezo trafieni). Klucz wylaczony - nic (Cap NaN)
-                    if (expected > 0.0 && !double.IsInfinity(expected) && !double.IsNaN(a0.Cap) && (cause == CStarve || cause == CDied) && Meter)
+                    if (expected > 0.0 && !double.IsInfinity(expected) && !double.IsNaN(a0.Cap) && (cause == CStarve || cause == CDied))   // recenzja calosci: cap != NaN - takze dobieranie
                     {
                         if (cause == CStarve) a0.Cap = Math.Max(0.0, a0.Cap - expected);
                         else if (awDied + expected > 0.0) a0.Cap = Math.Max(0.0, a0.Cap * (awDied / (awDied + expected)));
@@ -352,7 +366,7 @@ namespace Armoury
                     if (cause == CArrive && expected > 0.0 && !double.IsInfinity(expected))
                     {
                         // f4-uchodzcy: przy odmierzaniu dopisani kontu z przyjetymi czekaja w regionie (do miasta tylko przez przyjecie w Daily) - osobny licznik
-                        if (!double.IsNaN(a.Cap) && Meter) _hitWait += expected;
+                        if (!double.IsNaN(a.Cap)) _hitWait += expected;          // recenzja calosci 18.10: takze dobieranie po wylaczeniu klucza
                         else _depHit += expected;   // niezalezny licznik: uchodzcy dopisani kontu z miastem (Devastated)
                     }
                     Apply(a, id, now, cause);
@@ -365,7 +379,7 @@ namespace Armoury
         private static void Apply(Acc a, string id, double now, int cause)
         {
             // f4-uchodzcy (odmierzanie): przyjeci ida za ubytkiem ludzi w miescie (now <= Cap) - kto odszedl z miasta, tego miejsce nie czeka na dopiski uderzen
-            if (!double.IsNaN(a.Cap) && a.Cap > now && Meter) a.Cap = Math.Max(0.0, now);
+            if (!double.IsNaN(a.Cap) && a.Cap > now) a.Cap = Math.Max(0.0, now);   // recenzja calosci 18.10: cap != NaN - takze dobieranie po wylaczeniu klucza
             double d = now - a.N;
             if (Math.Abs(d) < 1e-9) { a.N = now; return; }
             double before = a.N;
@@ -640,6 +654,8 @@ namespace Armoury
                     var v = townId != null ? VillageOf(a, kv.Key) : null;
                     var town = TownOf(townId);
                     double now = v != null && town != null ? Derived(v, cap0) : 0.0;
+                    // recenzja calosci 18.10: klucz wylaczony, konto z przyjetymi - czesc z najazdu (czy ktos jeszcze czeka na wpuszczenie)
+                    double rawD = !meter && !double.IsNaN(cap0) && v != null && town != null ? Raw(v) : double.NaN;
                     int why = 0;
                     if (v != null && town != null)
                     {
@@ -667,7 +683,13 @@ namespace Armoury
                         if (Math.Abs(d) > 1e-9) { if (d > 0) _in[COther] += d; else _out[COther] += -d; a.N = now; if (a.ArrPend > now) a.ArrPend = now; }
                         // f4-uchodzcy: przyjeci = ludzie w miescie po uzgodnieniu (pierwsza doba odmierzania albo konto sprzed klucza - obecni zostaja, dopiski czekaja);
                         // klucz wylaczony - bez granicy (NaN), ponowne wlaczenie zaczyna od obecnych
-                        if (meter) { if (double.IsNaN(a.Cap) || a.Cap > a.N) a.Cap = a.N; } else a.Cap = double.NaN;
+                        if (meter) { if (double.IsNaN(a.Cap) || a.Cap > a.N) a.Cap = a.N; }
+                        else if (!double.IsNaN(a.Cap))
+                        {
+                            // recenzja calosci 18.10: klucz wylaczony - przyjeci trzymaja granice, dopoki ktos z konta czeka (dobieranie Step4Drain dobowym limitem);
+                            // nikt nie czeka - stara regula od tej doby (NaN). Konta bez przyjetych (NaN) - jak dotad
+                            if (double.IsNaN(rawD) || rawD <= a.N + 1e-6) a.Cap = double.NaN; else if (a.Cap > a.N) a.Cap = a.N;
+                        }
                         if (v.Settlement != null && now > PeopleBook.RefugeesOf(v) + 1e-6) nOver++;
                         if (why != 0)
                         {
@@ -745,6 +767,14 @@ namespace Armoury
             // f4-uchodzcy (klucz RaidRefugeesIntakeMeter): odmierzanie przybyc - wspolny licznik dobowy miasta dla czekajacych kont z miastem, nowych kont i dopiskow Track;
             // pierwsze konto doby w calosci tylko w progu RaidRefugeesIntakeFirstMult x limit (Step4Meter). Klucz wylaczony - petla nizej jak przed paczka (co do bitu)
             var mt = meter ? new MeterDay() : null;
+            // recenzja calosci 18.10: klucz wylaczony, a sa konta z przyjetymi (wylaczony w trakcie albo zapis wczytany z kluczem wylaczonym) - czekajacy wchodza tym samym
+            // dobowym limitem (Raid Refugees Town Intake, wspolny licznik miasta z nowymi kontami nizej), bez progu pierwszego konta; potem petla jak przed paczka
+            DrainDay dr = null;
+            if (mt == null && HeldAny())
+            {
+                dr = new DrainDay();
+                try { Step4Drain(intake, hostOk, hostPeople, taken, dr); } catch (Exception e) { Stumble("Daily(dobieranie)", e); }
+            }
             if (mt != null)
             {
                 try { Step4Meter(today, snapList, rad, intake, s.RaidRefugeesIntakeFirstMult, hostOk, hostPeople, mt); } catch (Exception e) { Stumble("Daily(odmierzanie)", e); }
@@ -841,7 +871,7 @@ namespace Armoury
             // f4-uchodzcy: czekajacy na wpuszczenie do przydzielonego miasta (czesc z najazdu ponad przyjetych - sa w regionie) i okno 7 dob przybylych na miasto
             double waitW = 0.0; int waitWAcc = 0; var waitWTowns = new HashSet<string>(StringComparer.Ordinal);
             var arrDay = new Dictionary<string, double>(StringComparer.Ordinal);
-            if (meter)
+            if (meter || dr != null)                                           // recenzja calosci 18.10: takze dobieranie po wylaczeniu klucza
             {
                 foreach (var kv in accs)
                 {
@@ -858,8 +888,11 @@ namespace Armoury
                     }
                     catch (Exception e) { Stumble("Daily(czekajacy-migawka)", e); }
                 }
-                lock (Gate) foreach (var kv in _arrTown) arrDay[kv.Key] = kv.Value;
-                try { Win7Note(day, arrDay, hostPeople); } catch (Exception e) { Stumble("Daily(okno7)", e); }
+                if (meter)
+                {
+                    lock (Gate) foreach (var kv in _arrTown) arrDay[kv.Key] = kv.Value;
+                    try { Win7Note(day, arrDay, hostPeople); } catch (Exception e) { Stumble("Daily(okno7)", e); }
+                }
             }
             lock (Gate)
             {
@@ -915,6 +948,14 @@ namespace Armoury
                     sb.Append(" | dobowy limit przyjec (Raid Refugees Town Intake ").Append((100.0 * intake).ToString("0.0#", Inv)).Append("% ludzi miasta, pierwsze konto doby zawsze): przyjeci w nowych kontach ")
                       .Append(F1(intakePeople)).Append(", czekaja na kolejne doby ").Append(nSpread).Append(" kont (").Append(F1(spreadPeople)).Append(" ludzi, miast ").Append(spreadTowns.Count).Append(')');
                     else MeterSegment(sb, s, intake, mt, arrDay, hostPeople, waitW, waitWAcc, waitWTowns.Count);   // f4-uchodzcy: odmierzanie przybyc
+                    if (mt == null && dr != null)
+                    {
+                        // recenzja calosci 18.10: dobieranie czekajacych po wylaczeniu klucza (segment tylko przy kontach z przyjetymi - inaczej linia jak przed paczka)
+                        double hwD; lock (Gate) hwD = _hitWait;
+                        sb.Append(" | czekajacy po wylaczeniu odmierzania (Raid Refugees Intake Meter NIE - wchodza dobowym limitem, bez progu pierwszego konta): wpuszczeni dzis ")
+                          .Append(F1(dr.Adm)).Append(" (kont ").Append(dr.NAdm).Append("), czekaja jeszcze ").Append(F1(waitW)).Append(" (kont ").Append(waitWAcc).Append(", miast ")
+                          .Append(waitWTowns.Count).Append("; dopisani dzis przez uderzenia ").Append(F1(hwD)).Append(')');
+                    }
                     sb.Append(" | kiesa W miast (saldo uchodzcow): wczoraj ").Append(bal0).Append(" + przyniesione z kies wsi ").Append(bIn).Append(" + udzial glow w zmianie kiesy W ").Append(bShare)
                       .Append(" + doplata ludu miasta ").Append(bSub).Append(" - przyciete do kiesy W ").Append(bTrim).Append(" - z powracajacymi ").Append(owedMoved).Append(" = ").Append(balNow)
                       .Append(" (kontrola ").Append(balCheck).Append(')');
@@ -966,6 +1007,7 @@ namespace Armoury
                 catch (Exception e) { Stumble("Daily(linia)", e); }
             }
             _tYesterday = tNow;
+            try { _held = HeldAny(); } catch (Exception e) { Stumble("Daily(przyjeci)", e); }   // recenzja calosci 18.10: konta z przyjetymi (dobieranie po wylaczeniu klucza)
             _stumbles = 0; _famHas = false; _sgHas = false;
             NewDay();
         }
@@ -1094,6 +1136,61 @@ namespace Armoury
                     Settle(a, kv.Key, v, CAssign);
                 }
                 catch (Exception e) { Stumble("Daily(przydzial)", e); }
+            }
+        }
+
+        /// <summary>Recenzja calosci 18.10: sa konta z miastem i z przyjetymi (Cap != NaN). Pod Gate.</summary>
+        private static bool HeldAny()
+        {
+            lock (Gate) foreach (var a in _acc.Values) if (a.Town != null && !double.IsNaN(a.Cap)) return true;
+            return false;
+        }
+
+        /// <summary>Recenzja calosci 18.10: liczniki dobierania czekajacych po wylaczeniu klucza (doba; linia RT).</summary>
+        private sealed class DrainDay { public double Adm; public int NAdm; }
+
+        /// <summary>
+        /// Recenzja calosci 18.10 - krok 4 przy kluczu RaidRefugeesIntakeMeter WYLACZONYM, gdy sa konta z przyjetymi (klucz wylaczony w trakcie gry albo zapis wczytany
+        /// z kluczem wylaczonym): czekajacy tych kont (czesc z najazdu ponad przyjetych) wchodza do przydzielonego miasta dobowym limitem Raid Refugees Town Intake x ludzie
+        /// miasta - ten sam licznik dobowy miasta (taken), z ktorego stara petla nizej przyjmuje nowe konta (jeden limit na miasto); BEZ progu pierwszego konta (inaczej
+        /// najwieksze konto weszloby cale jednego dnia - to, przed czym paczka chronila). Kolejnosc jak w odmierzaniu: doba przydzialu, potem id; miasto oblezone albo bez
+        /// pelnego ZC4 - czekaja. Konto, z ktorego nikt juz nie czeka, wraca do starej reguly w kroku 2 (Cap = NaN). intake 0 - bez limitu (wszyscy od razu, jak stara regula).
+        /// Wyjatki per konto liczone (Stumble).
+        /// </summary>
+        private static void Step4Drain(float intake, HashSet<string> hostOk, Dictionary<string, double> hostPeople, Dictionary<string, double> taken, DrainDay m)
+        {
+            var wl = new List<KeyValuePair<string, Acc>>();
+            lock (Gate) foreach (var kv in _acc) if (kv.Value.Town != null && !double.IsNaN(kv.Value.Cap)) wl.Add(kv);
+            wl.Sort((x, y) => { int c = x.Value.Since.CompareTo(y.Value.Since); return c != 0 ? c : string.CompareOrdinal(x.Key, y.Key); });
+            foreach (var kv in wl)
+            {
+                try
+                {
+                    var a = kv.Value; string tid; double cap;
+                    lock (Gate) { tid = a.Town; cap = a.Cap; }
+                    if (tid == null || double.IsNaN(cap) || !hostOk.Contains(tid)) continue;   // ZC4 nieznany - obecni zostaja, nikt nowy nie wchodzi
+                    var v = VillageOf(a, kv.Key);
+                    var town = TownOf(tid);
+                    if (v == null || town == null || town.IsUnderSiege) continue;              // do oblezonego miasta nikt nie wchodzi
+                    double raw = Raw(v), inT = Math.Min(raw, Math.Max(0.0, cap));
+                    double want = raw - inT;
+                    if (!(want > 1e-6)) continue;
+                    double x = want;
+                    if (intake > 0f)
+                    {
+                        double tp, u;
+                        hostPeople.TryGetValue(tid, out tp);
+                        taken.TryGetValue(tid, out u);
+                        x = Math.Min(want, Math.Max(0.0, intake * Math.Max(0.0, tp) - u));
+                    }
+                    if (!(x > 1e-9) || x < Math.Min(1.0, want)) continue;                      // miasto pelne na dzis - czekaja
+                    lock (Gate) a.Cap = inT + x;
+                    double u2; taken.TryGetValue(tid, out u2); taken[tid] = u2 + x;
+                    m.Adm += x; m.NAdm++;
+                    lock (Gate) _depAssign += x;
+                    Settle(a, kv.Key, v, CAssign);
+                }
+                catch (Exception e) { Stumble("Daily(dobieranie)", e); }
             }
         }
 
@@ -1297,6 +1394,7 @@ namespace Armoury
             if (s.LogEnabled) Log.Info(P + "dzien " + day + " | WYLACZONE w trakcie (" + (!s.RaidRefugeesToTowns ? "Raid Refugees To Towns w MCM" : "spustoszenie nieczynne") + ") - konta z miastem " + n
                                        + ": saldo do kies wsi " + back + " zl z " + accs + " kont, brak w kiesach W " + shortG + "; uchodzcy wracaja do swoich regionow (jedza ze spichlerzy jak dotad).");
             _offLogged = true; _firstShare = true; _tYesterday = double.NaN;
+            _held = false;                                                       // recenzja calosci 18.10: konta wyczyszczone
             NewDay();
         }
 
@@ -1382,7 +1480,9 @@ namespace Armoury
             _sStart = long.MinValue; _firstShare = true; _tYesterday = double.NaN;
             if (string.IsNullOrEmpty(data)) return;
             // f4-uchodzcy: same klucze (latki spustoszenia moga jeszcze nie byc wpiete przy wczytaniu - Meter liczy je w grze; Cap bez nich i tak nieczytany)
-            bool meterAtLoad = false; try { var sl = Settings.Current; meterAtLoad = sl != null && sl.RaidRefugeesIntakeMeter && sl.RaidRefugeesToTowns; } catch { meterAtLoad = false; }
+            // recenzja calosci 18.10: przyjeci = N takze przy kluczu odmierzania wylaczonym (RT czynne) - czekajacy z sesji z kluczem wchodza wtedy dobowym limitem (Step4Drain),
+            // a nie wszyscy pierwszego dnia; konto, z ktorego nikt nie czeka (zapis bez odmierzania: czesc z najazdu = N), wraca do starej reguly w pierwszym kroku 2
+            bool rtAtLoad = false; try { var sl = Settings.Current; rtAtLoad = sl != null && sl.RaidRefugeesToTowns; } catch { rtAtLoad = false; }
             try
             {
                 var parts = data.Split('|');
@@ -1409,8 +1509,8 @@ namespace Armoury
                             if (a.Town == null && f.Length >= 7 && f[6].Length > 0) a.OwedTown = f[6];
                             a.NSnap = a.N;
                             // f4-uchodzcy: przyjeci = ludzie przy ostatnim rozliczeniu (bez nowego pola w zapisie: przy odmierzaniu po kazdym rozliczeniu Cap = N);
-                            // zapis sprzed klucza - obecni zostaja, dopiski czekaja. Klucz wylaczony - NaN (bez granicy, jak dotad)
-                            if (a.Town != null && meterAtLoad) a.Cap = a.N;
+                            // zapis sprzed klucza - obecni zostaja, dopiski czekaja. Recenzja calosci 18.10: klucz wylaczony - tez N (dobieranie, wyzej); RT wylaczone - NaN
+                            if (a.Town != null && rtAtLoad) a.Cap = a.N;
                             lock (Gate) _acc[item.Substring(0, eq)] = a;
                         }
                     }
@@ -1431,8 +1531,10 @@ namespace Armoury
                     // stan "wczoraj" linii doby i sesji z zapisu (Track miedzy wczytaniem a pierwsza doba juz rusza konta): ludzie w miastach, saldo, nalezne powracajacym
                     // (recenzja, drobne 5: nalezne z zapisu "czekaja" - pozycja "czekalo" linii, nie "z powracajacymi")
                     double t = 0; long b = 0, o = 0;
-                    foreach (var a in _acc.Values) { if (a.Town != null) t += a.N; b += a.Bal; o += a.Owed; }
+                    bool held = false;
+                    foreach (var a in _acc.Values) { if (a.Town != null) { t += a.N; if (!double.IsNaN(a.Cap)) held = true; } b += a.Bal; o += a.Owed; }
                     _tYesterday = t; _sStart = b + o; _owedCarry = o; _dOwedMoved = 0;
+                    _held = held;                                                // recenzja calosci 18.10
                 }
                 _firstShare = false;      // migawki kies z zapisu - udzial liczy sie od pierwszej doby
             }

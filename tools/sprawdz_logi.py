@@ -1142,6 +1142,8 @@ Uzycie (Python 3, tylko odczyt):
                     <= 1 ms i potkniecia 0. NKO-14 liczy tez ERROR KsFolkWage, TownFolk.F4HoardRate, TownFolk.KsFolkWage.*, SyncData.arm_ks_place.
                     Recenzja f4 (18.10): "zaplacone" w NKO-16 to czesc W, ktora naprawde zeszla z kas (FromCofferWR), wiec kontrola = zlecone - zeszlo moze sie nie zgodzic;
                     dopisek "w dol" mowi "czynne TAK/NIE (przeglad firm DS co kwartal - Ds Farm Review Days N)" - (a) czynne tylko z P5 (bez niego podloga x1.00).
+                    Recenzja calosci 18.10: oba dopiski maja tez "firmy DS ustalone TAK/NIE" (DsTowns.FarmsLive) - NKO-21: (a) czynne tylko przy ustalonych firmach
+                    (Ds Towns czynne i po oknie pomiaru - inaczej przeglad kwartalny nie biegnie); log bez pola = INFO.
 --grupa npolnoc   : (r4-polnoc, noc 17/18.10, Jeff 17.10 "Polnoc i za Murem - najpierw wyzywic siebie (hodowla, ryby, owies)"; Armoury/src/StartCalibration.Feed.cs,
                     Tables.cs (zimna ziemia), Polnoc.cs) python -I tools/sprawdz_logi.py --grupa npolnoc <Armoury-*.log> (strumieniowo). Linia Planu "KS: wyzywienie krain":
                     NKS-30-0 linie przy Planach i klucze Ks Self Feed First / Ks Cold Land TAK, NKS-30a Polnoc (battania) kraina >= 0.85 (kraina = (produkcja okregow
@@ -1254,6 +1256,8 @@ Uzycie (Python 3, tylko odczyt):
                     (przybyli, przyjeci w czesci, w progu pierwszego konta, czekajacy na koniec), RT-17f wzrost ludzi miasta w 7 dob z ks-miasta.csv (tygodniowe wiersze,
                     od pierwszej doby z odmierzaniem: najwiekszy wzrost <= 8 x M x limit + 3 pkt % - jedna doba zapasu na opoznienie migawki KS; bez odmierzania albo bez CSV
                     - INFO z najwiekszym wzrostem, np. fin86 Sharp Point x6.9). Log bez segmentu (klucz wylaczony, log sprzed paczki): RT-17 INFO, bez wyjatku.
+                    Recenzja calosci 18.10: RT-17g - klucz wylaczony w trakcie (albo zapis wczytany z kluczem wylaczonym): segment "czekajacy po wylaczeniu odmierzania",
+                    czekajacy w regionie i bez przeprowadzki jako "inne" (bez segmentu INFO).
 --grupa nksarm    : (noc 17/18.10, paczka ks-arm, Jeff "ma byc gra rano ... z poprawnie dzialajaca ekonomia"; Armoury/src/StartCalibration.Arm.cs - samo uzbrojenie KS,
                     twarde bramki rozdz. 10, bramka krainy rozdz. 8, ryby z niczego perku Night Raider) python -I tools/sprawdz_logi.py --grupa nksarm <Armoury-*.log>
                     (strumieniowo; te same wiersze NKS-ARM-* dopisuje grupa nks). ARM-0 linia startu (klucz Auto Arm, droga gra / autotest z plikiem
@@ -36564,10 +36568,11 @@ NKO_ERR = ("ERROR in KsWageHands", "ERROR in StartCalibration.Zc4LadderCheap", "
            "ERROR in TownFolk.KsWageHands", "ERROR in SyncData.arm_ks_koszyk",   # recenzja: opakowania TownFolk.Stumble (NotePaid, DayLine) i zapisu
            "ERROR in KsFolkWage", "ERROR in TownFolk.KsFolkWage", "ERROR in TownFolk.F4HoardRate", "ERROR in SyncData.arm_ks_place")   # f4-place-ludu
 # f4-place-ludu: dopisek linii "Place za brak rak" (wskazniki ponizej 1) i linia "Place W wedlug koszyka"
-NKO_WGDN = re.compile(r"\| w dol \(f4-place-ludu\): klucz Ks Wage Hands Down (?P<key>TAK|NIE)(?:, czynne (?P<act>TAK|NIE) \(przeglad firm DS co kwartal - Ds Farm Review Days (?:\d+|brak klucza \(bez P5\))\))?, "
+NKO_WGDN = re.compile(r"\| w dol \(f4-place-ludu\): klucz Ks Wage Hands Down (?P<key>TAK|NIE)(?:, czynne (?P<act>TAK|NIE) \(przeglad firm DS co kwartal - Ds Farm Review Days (?:\d+|brak klucza \(bez P5\))"
+                      r"(?:, firmy DS ustalone (?P<flive>TAK|NIE))?\))?, "   # recenzja calosci 18.10: 'firmy DS ustalone' (DsTowns.FarmsLive) - pole opcjonalne
                       r"podloga x(?P<fl>[\d.]+), tylko place W, miasta < 1: (?P<dn>\d+)(?: \((?P<list>[^)]*)\))?")   # recenzja f4: 'czynne' (P5) - stara linia bez pola tez pasuje
 NKO_F4 = re.compile(r"Place W wedlug koszyka \(f4-place-ludu\): dzien (?P<day>-?\d+) \| klucze: Ks Labour To Basket (?P<kb>TAK|NIE), Ks Wage Hands Down (?P<ka>TAK|NIE) \(podloga x(?P<fl>[\d.]+)"
-                    r"(?:; klucz (?P<kakey>TAK|NIE), przeglad firm DS co kwartal - Ds Farm Review Days (?P<frd>\d+|brak klucza \(bez P5\)))?\) "
+                    r"(?:; klucz (?P<kakey>TAK|NIE), przeglad firm DS co kwartal - Ds Farm Review Days (?P<frd>\d+|brak klucza \(bez P5\))(?:, firmy DS ustalone (?P<flive>TAK|NIE))?)?\) "
                     r"\| pasmo (?P<lo>[\d.]+)-(?P<hi>[\d.]+) dni koszyka KS, najnizej x(?P<mn>[\d.]+), krok (?P<st>[\d.]+)%/d, danina od skarbca W w tych miastach (?P<hr>[\d.]+)%/d "
                     r"\((?:dzis srednio (?P<hrd>[\d.]+|-)%, schodzi razem z kappa; )?Ds Hoard Due Rate (?P<dr>[\d.]+)%\) "
                     r"\| miasta z regula (?P<n>\d+) \(b: (?P<nb>\d+)\): ponizej pasma \(pelna placa\) (?P<below>\d+), w pasmie (?P<inb>\d+), ponad pasmem (?P<above>\d+), bez potrzeby W \(pelna placa\) (?P<non>\d+) "
@@ -36621,6 +36626,8 @@ def nkoszyk_main(logp, until=120):
                     x["fl"] = float(dn.group("fl")) if dn else None
                     x["dlist"] = (dn.group("list") or "") if dn else ""
                     x["dn"] = int(dn.group("dn")) if dn else 0
+                    x["dact"] = dn.group("act") if dn else None         # recenzja calosci 18.10: (a) czynne / firmy DS ustalone (NKO-21)
+                    x["dlive"] = dn.group("flive") if dn else None
                     wg[int(mm.group("day"))] = x
                 continue
             if s.startswith("Place W wedlug koszyka (f4-place-ludu): dzien "):
@@ -36806,6 +36813,30 @@ def nkoszyk_main(logp, until=120):
     else:
         rep.add("NKO-15 (f4): linia 'Place W wedlug koszyka (f4-place-ludu)'", "BRAK" + (f" (nierozpoznanych {f4bad})" if f4bad else ""),
                 "INFO (log sprzed f4-place-ludu, klucze wylaczone albo KS niezastosowany)", None if not f4bad else False)
+    # NKO-21 (recenzja calosci 18.10): place W w dol (a) czynne tylko przy zywym przegladzie firm DS - "czynne TAK" / "Ks Wage Hands Down TAK" tylko przy "firmy DS ustalone TAK"
+    n21, bad21, live21 = 0, [], 0
+    for d in sorted(wg):
+        x = wg[d]
+        if x.get("dlive") is None or x.get("dact") is None:
+            continue
+        n21 += 1
+        live21 += x["dlive"] == "TAK"
+        if x["dact"] == "TAK" and x["dlive"] != "TAK":
+            bad21.append(f"d{d} place za brak rak")
+    for d in fd:
+        x = f4[d]
+        if x.get("flive") is None:
+            continue
+        n21 += 1
+        if x.get("ka") == "TAK" and x["flive"] != "TAK":
+            bad21.append(f"d{d} place W wedlug koszyka")
+    if n21:
+        rep.add("NKO-21 (recenzja calosci): place W w dol (a) czynne tylko przy ustalonych firmach DS (przeglad kwartalny zywy)",
+                f"linii z polem {n21}, dob z firmami ustalonymi (place za brak rak) {live21}, czynne bez firm {len(bad21)}" + (f" ({', '.join(bad21[:5])})" if bad21 else ""),
+                "0", not bad21)
+    else:
+        rep.add("NKO-21 (recenzja calosci): place W w dol (a) tylko przy ustalonych firmach DS", "BRAK pola 'firmy DS ustalone'",
+                "INFO (log sprzed recenzji calosci, klucz Ks Wage Hands Down wylaczony albo KS niezastosowany)", None)
     rep.add("NKO-14: ERROR paczki (KsWageHands, Zc4LadderCheap, CheapLine, P9Line, TownFolk.KsWageHands, SyncData.arm_ks_koszyk; f4: KsFolkWage, F4HoardRate, arm_ks_place)", str(errs), "0", errs == 0)
     rep.show()
     return 0
@@ -40280,6 +40311,9 @@ NRT_DAY = re.compile(
     # recenzja calosci (noc 17/18.10): dobowy limit przyjec nowych kont (Raid Refugees Town Intake) - pole opcjonalne (log sprzed recenzji bez niego)
     r"(?: \| dobowy limit przyjec \(Raid Refugees Town Intake [\d.]+% ludzi miasta, pierwsze konto doby zawsze\): przyjeci w nowych kontach " + _nrt_n("inp")
     + r", czekaja na kolejne doby (?P<spn>\d+) kont \(" + _nrt_n("spp") + r" ludzi, miast (?P<spt>\d+)\))?"
+    # recenzja calosci 18.10: dobieranie czekajacych po wylaczeniu klucza RaidRefugeesIntakeMeter (pole opcjonalne - tylko przy kontach z przyjetymi)
+    r"(?: \| czekajacy po wylaczeniu odmierzania \(Raid Refugees Intake Meter NIE - wchodza dobowym limitem, bez progu pierwszego konta\): wpuszczeni dzis " + _nrt_n("dradm")
+    + r" \(kont (?P<dran>\d+)\), czekaja jeszcze " + _nrt_n("drwait") + r" \(kont (?P<drwacc>\d+), miast (?P<drwt>\d+); dopisani dzis przez uderzenia " + _nrt_n("drhit") + r"\))?"
     # f4-uchodzcy (klucz RaidRefugeesIntakeMeter): odmierzanie przybyc - zamiast segmentu "dobowy limit przyjec" (pole opcjonalne: log bez klucza albo sprzed paczki)
     r"(?: \| odmierzanie przybyc \(Raid Refugees Intake Meter, limit (?P<mlim>[\d.]+)% ludzi miasta na dobe dla wszystkich kont i dopiskow uderzen, pierwsze konto doby"
     r" w calosci do x(?P<mfm>[\d.]+)\): przybyli dzis " + _nrt_n("marr") + r" = przed przydzialem " + _nrt_n("mbef") + r" \+ z czekajacych " + _nrt_n("mwadm")
@@ -40565,6 +40599,7 @@ def nuchodzcy_main(logp):
             f"doby z migawka {len(sg)}; w murach jedza z Food najwiecej {max((f(g, 'sgp') for g in sg), default=0):.0f} ludzi, zmarli z glodu miasta {sum(f(g, 'sgd') for g in sg):.1f}",
             "INFO (jedza z Food jak schronieni, gloduja z mieszczanami)", None)
     nrt_meter_rows(rep, days, logp)      # f4-uchodzcy: odmierzanie przybyc (RT-17)
+    nrt_drain_rows(rep, days)            # recenzja calosci 18.10: dobieranie czekajacych po wylaczeniu klucza (RT-17g)
     rep.show()
     return 0
 
@@ -40609,6 +40644,32 @@ def nrt_ks_town_growth(logp, from_day):
                 out.append(((p1 - p0) / p0, nm, d0, p0, d1, p1))
     out.sort(reverse=True)
     return p, out
+
+
+def nrt_drain_rows(rep, days):
+    """Recenzja calosci 18.10 (RT-17g): klucz RaidRefugeesIntakeMeter wylaczony w trakcie albo zapis wczytany z kluczem wylaczonym - czekajacy wchodza dobowym limitem
+    (segment "czekajacy po wylaczeniu odmierzania"). Test: czekajacy sa w regionie (<= "w regionach" + 0.5) i doba z segmentem nie wpuszcza nikogo jako "inne"
+    (|inne| <= 0.5 + 0.1% ludzi w miastach - przeprowadzka jednego dnia bylaby tu widoczna). Bez segmentu - INFO."""
+    def fv(g, k):
+        v = g.get(k)
+        try:
+            return float(v) if v not in (None, "") else None
+        except ValueError:
+            return None
+    dd = [g for g in days if g.get("dradm") is not None]
+    if not dd:
+        rep.add("RT-17g: dobieranie czekajacych po wylaczeniu odmierzania", "brak segmentu (klucz wlaczony, nigdy nie wlaczony albo log sprzed recenzji calosci)", "INFO", None)
+        return
+    bad = []
+    for g in dd:
+        w, r, o, t1 = fv(g, "drwait"), fv(g, "reg"), fv(g, "other"), fv(g, "t1")
+        if (w is not None and r is not None and w > r + 0.5) or (o is not None and abs(o) > 0.5 + 0.001 * (t1 or 0.0)):
+            bad.append(g)
+    last = dd[-1]
+    rep.add("RT-17g: dobieranie czekajacych po wylaczeniu odmierzania (czekajacy w regionie, bez przeprowadzki jako 'inne')",
+            f"doby z segmentem {len(dd)} ({dd[0]['day']}-{last['day']}), niespojne {len(bad)}" + (f" (np. dzien {bad[0]['day']}: czekaja {bad[0]['drwait']}, regiony {bad[0]['reg']}, inne {bad[0]['other']})" if bad else "")
+            + f"; wpuszczeni razem {sum(fv(g, 'dradm') or 0.0 for g in dd):.0f}, na koniec czekaja {last['drwait']} ({last['drwacc']} kont, {last['drwt']} miast)",
+            "czekaja <= w regionach + 0.5, |inne| <= 0.5 + 0.1% kazdej doby", not bad)
 
 
 def nrt_meter_rows(rep, days, logp):

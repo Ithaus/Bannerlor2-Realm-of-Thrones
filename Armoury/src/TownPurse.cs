@@ -104,6 +104,9 @@ namespace Armoury
         private static readonly Dictionary<Town, long> _takeWin = new Dictionary<Town, long>();         // pobrane z kasy w oknie blok-blok (zawor + podatki)
         private static readonly Dictionary<Town, long> _trimWin = new Dictionary<Town, long>();         // dar startowy zdjety w oknie
         private static readonly Dictionary<Town, long> _mintWin = new Dictionary<Town, long>();         // z niczego w oknie (dosypka trybu 1, "zakupy" przy wylaczonym R1)
+        // recenzja calosci 18.10: jedzenie miasta zaplacone w oknie przez pana (KsLordFood: rachunki zywnosci KS-H, wczesna splata, doplata do zakupow KS-H) - w doplywie
+        // netto liczone jak wydatek kasy (inaczej przeglad firm DS czytal pomoc pana jako zysk kupcow i podnosil firme - stale przelewanie pan -> korona przez miasto)
+        private static readonly Dictionary<Town, long> _lordFoodWin = new Dictionary<Town, long>();
         private static readonly Dictionary<Town, long> _takeLast = new Dictionary<Town, long>(), _netLast = new Dictionary<Town, long>();
         private static readonly long[] _ringTake = new long[RingDays], _ringNet = new long[RingDays];
         private static int _ringHead, _ringFilled;
@@ -122,7 +125,7 @@ namespace Armoury
             _consTown = null; _regDue = null; _consGold = 0;
             _bkResolved = false; _bkLimit = null; _bkInstance = null; _bkModel = null;   // BK tworzy konfiguracje od nowa przy kazdej grze
             ClearTicks(); ClearValve(); CrownToday.Clear();
-            _streak.Clear(); _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _takeLast.Clear(); _netLast.Clear();
+            _streak.Clear(); _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _takeLast.Clear(); _netLast.Clear();
             ClearRing();
             ZeroLast();
         }
@@ -543,6 +546,19 @@ namespace Armoury
             catch { net = 0; return false; }
         }
 
+        /// <summary>Recenzja calosci 18.10: pan zaplacil za jedzenie miasta (KsLordFood - rachunki zywnosci KS-H wprost wierzycielom, wczesna splata f4, doplata do zakupow
+        /// KS-H, ktora zostala w kasie) - w doplywie netto kupcow tej kasy (okno blok-blok, NetOf -> przeglad firm DS) liczone jak wydatek kasy na to jedzenie: jedna regula
+        /// "doplyw netto = to, co kupcy zarobili sami". Tylko licznik - zloto sie nie rusza; linia udzialu zysku kupcow i kolumna doplyw_netto (INFO) licza ten sam doplyw.</summary>
+        internal static void NoteLordFood(Settlement st, long x)
+        {
+            try
+            {
+                if (x <= 0 || st == null || !st.IsTown || st.Town == null || !On) return;
+                Add(_lordFoodWin, st.Town, x);
+            }
+            catch (Exception e) { Stumble("TownPurse.NoteLordFood", e); }
+        }
+
         /// <summary>Licznik pobran z kasy miasta poza zaworem (danina, clo z kasy, mennica, Crown Duty, War Tax, Road Tolls) - udzial zysku kupcow (tylko liczba).</summary>
         internal static void NoteTake(Settlement st, int x)
         {
@@ -573,7 +589,7 @@ namespace Armoury
             if (s == null || Campaign.Current == null) return;
             if (!On)
             {
-                _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _takeLast.Clear(); _netLast.Clear(); _streak.Clear();
+                _goldAtBlock.Clear(); _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear(); _takeLast.Clear(); _netLast.Clear(); _streak.Clear();
                 ClearRing();
                 return;
             }
@@ -613,7 +629,7 @@ namespace Armoury
                     long g = t.Gold, g0;
                     if (_goldAtBlock.TryGetValue(t, out g0))
                     {
-                        long tk = Get(_takeWin, t), n = (g - g0) + tk + Get(_trimWin, t) - Get(_mintWin, t);
+                        long tk = Get(_takeWin, t), n = (g - g0) + tk + Get(_trimWin, t) - Get(_mintWin, t) - Get(_lordFoodWin, t);   // recenzja calosci: minus jedzenie od pana
                         take += tk; net += n; towns++;
                         _takeLast[t] = tk; _netLast[t] = n;
                     }
@@ -621,7 +637,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("TownPurse.CloseWindow(" + st.StringId + ")", e); }
             }
-            _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear();
+            _takeWin.Clear(); _trimWin.Clear(); _mintWin.Clear(); _lordFoodWin.Clear();
             LastShareOk = towns > 0;
             if (LastShareOk)
             {

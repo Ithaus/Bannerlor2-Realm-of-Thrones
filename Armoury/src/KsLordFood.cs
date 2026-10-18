@@ -299,6 +299,7 @@ namespace Armoury
                             if (back > 0) { int h1 = h.Gold; h.ChangeHeroGold((int)back); long got = h.Gold - h1; CirculationWindows.NoteHeroGold(h, got); paidB = took - got; }
                             _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv;
                             if (paidB > 0) { _nPay++; NotePaid(c, paidB); if (ClanIncomeBook.FamilyGoldOf(c) < R) _nBelow++; if (paidB > cap) _nOver++; }
+                            if (paidB > 0) TownPurse.NoteLordFood(st, paidB);         // recenzja calosci 18.10: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
                             continue;
                         }
                         // tryb DOPLATA: najmniejsza wplata, przy ktorej budzet KS-H kasy rosnie o e (reszta wraca po zakupach)
@@ -379,6 +380,7 @@ namespace Armoury
                     long back = took - paidB;
                     if (back > 0) { int h1 = h.Gold; h.ChangeHeroGold((int)back); long got = h.Gold - h1; CirculationWindows.NoteHeroGold(h, got); paidB = took - got; }
                     _dLords -= paidB; _billsPaid += paidB; _lordPaid += paidB; _billsRecv += recv; _ePaid += paidB;
+                    if (paidB > 0) TownPurse.NoteLordFood(st, paidB);                 // recenzja calosci 18.10: w doplywie netto miasta jak wydatek kasy (przeglad firm DS)
                     if (paidB > 0)
                     {
                         _nPay++; NotePaid(c, paidB);
@@ -423,6 +425,7 @@ namespace Armoury
                     if (back < r) { _nCut++; _cut += r - back; }                     // kasa miasta za mala na pelny zwrot - pan zaplacil o tyle wiecej (licznik)
                     long paid = d.X - back;
                     _ret += back; _lordPaid += paid; _spend += spent;
+                    if (paid > 0 && d.T != null) TownPurse.NoteLordFood(d.T.Settlement, paid);   // recenzja calosci 18.10: doplata pana, ktora zostala w kasie - jak wyzej
                     if (paid > 0)
                     {
                         _nPay++; NotePaid(d.C, paid);
