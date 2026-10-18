@@ -2926,3 +2926,10 @@ w logu "pomiar reguly zajec"), neutralny start specjalizacji wiosek, decyzja Jef
   poprawione: placa rzemieslnikow od wsi ta sama regula co od innych placacych - nieprzyjeta czesc do kasy miasta, nie z powrotem do wsi; ZW pod KS tym samym przelacznikiem co A7). 1938 ustawien.
   KsSwitchSignalRule = NIE (recenzja f5-a7: do pomiaru w grze), SideVillageCrafts i DistrictIconFromSum = TAK (f5-zajecia). Odrzucone: SurplusReview z zapasu (model: gorzej).
   Plan: f6-zwrot (w toku) -> scalic -> test sciezki Jeffa 160 dob z DLL testowa KsSwitchSignalRule=TAK (pomiar A7 w grze) -> decyzja domyslnej -> 5 dob + bitwa -> WGRANIE 80.
+- 06:30 PDT: TEST ROCZNY fin90 (WGRANIE 79, 364 dob sciezki Jeffa, Armoury-2026-10-18_04-41-44.log): kod 0, ERROR 0, KS sam, nks 19/102, nksarm/nglod/nmur/npolnoc/nkoszyk/nskory/
+  nzajazdy 0 NIE. Przez rok: W 78.7 -> 128.1 dni (lud +49k/d), zaleglosci firm DS 8.9 mln na koniec (NKA-1), glowy rodow +54.6k/d, korona 0.880, D 0.905 - fala 5 (f5-lud) i f6 to adresuja.
+- 06:35 PDT: f6-zwrot GOTOWY (wf_dfddc2e8-52f): CrownRefundByNeed (f = clamp((2R-G)/R,0,1) po W5/W7/K3, G/R z ClanBudget.ChestOf wczoraj; gracz tez) + LapsedGearBuysGoods (niewydany
+  przydzial sprzetu tylko za towar z polki siedziby, reszta u rodu); recenzja: zapas wojny korony liczony z pelnego zwrotu (bez zmian), linia f6 mowi uczciwie, ze roznica zostaje w reszcie
+  wplywow (renty 180 biora ja tego samego dnia - DO DECYZJI JEFFA: renty wedlug potrzeby?). fin88 szacunek: zwrot 331.7 -> 179.9k/d (42 rody > 2R bez zwrotu).
+  Scalone do noc-ks4 **7ca98719** (konflikt sprawdz_logi rozwiazany - nruda i nzwrot obie). 1940 ustawien.
+- 06:40 PDT: TEST fin91 = 7ca98719 z KsSwitchSignalRule=TAK (DLL testowa 7ffd0f95, zrodlo bez zmiany), armoury-ks-auto.flag (USUNAC!), 160 dob -> pomiar A7 w grze (na7), f6 (nzwrot), fala 5.
