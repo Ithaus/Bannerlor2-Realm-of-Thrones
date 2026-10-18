@@ -97,14 +97,23 @@ namespace Armoury
             return bed + (r.WakeMin > 0 ? " - nobody stirs before dawn." : ".");
         }
 
-        /// <summary>Menu zajazdu: zajazd tu i teraz przyjmuje goscia (te same warunki co karczma miasta, plus zajazd przy partii i wies nie rabowana).</summary>
+        /// <summary>Menu zajazdu: zajazd tu i teraz przyjmuje goscia (te same warunki co karczma miasta, plus zajazd przy partii i wies nie rabowana).
+        /// Recenzja calosci 17/18.10: klucz RoadsideInns wylaczony - bez noclegu (zapis wczytany w srodku menu zajazdu wracal z czynnymi opcjami; plotki juz tak mialy,
+        /// zostaje "Ride on"); wies okregu we wojnie z gracza frakcja - bez noclegu (jak karczma wrogiego miasta, do ktorego gra nie wpuszcza; pieniadze nie ida do wroga).</summary>
         private static bool RoadAllowed(RoadsideInns.Inn inn, out string why)
         {
             why = null;
             var mp = MobileParty.MainParty;
             if (inn == null || inn.Village == null || mp == null || Hero.MainHero == null) { why = "There is no bed to be had here."; return false; }
+            if (!RoadsideInns.On) { why = "Roadside inns are switched off (game options)."; return false; }
             if (!On) { why = "Lodgings need Town Inns and Night Rest (game options)."; return false; }
             if (!RoadsideInns.AtInn(inn)) { why = "You are not at the inn."; return false; }
+            try
+            {
+                var vf = inn.Village.MapFaction; var pf = Hero.MainHero.MapFaction;
+                if (vf != null && pf != null && FactionManager.IsAtWarAgainstFaction(vf, pf)) { why = "The keeper bars the door to the enemies of his lord."; return false; }
+            }
+            catch { }
             if (mp.MapEvent != null) { why = "Not in the middle of a fight."; return false; }
             if (Campaign.Current != null && Campaign.Current.IsMainHeroDisguised) { why = "In disguise you cannot bring your company to an inn."; return false; }
             if (NightRest.EnlistedNow) { why = "In service your lord decides where the men sleep."; return false; }

@@ -18,7 +18,8 @@ namespace Armoury
     ///  0. przy wozie (VillageTakings.EnterPostfix, po 112 i F4b - zloto ledwo weszlo do kiesy): udzial pana i majatki (W1, bez zmian), dziesiecina 5% oddanego utargu
     ///     (W2: polowa jalmuzna zostaje w kiesie, polowa septy - place ludu i material miasta targowego; TownFolk.TitheVillageAtCart), udzial korony g/10 czesci wsi po
     ///     dziesiecinie (W4: g = 1 w wojnie, 1.5 z polityka War Tax, 0 w pokoju; wies spladrowana, miasto targowe/zamek oblezone albo glod - 0) -> skarbiec, wplyw dnia
-    ///     (LeviesToday przy najblizszym KingdomTreasury.Levies), DailyLife.NoteVillageLevy; to samo g/10 od czesci wsi z markietanow (Sutlers.One - WarShareSutlers);
+    ///     (LeviesToday przy najblizszym KingdomTreasury.Levies), DailyLife.NoteVillageLevy; to samo g/10 od czesci wsi z markietanow (Sutlers.One - WarShareSutlers;
+    ///     bez NoteVillageLevy - ZC0 nie liczy tego wplywu do kiesy, recenzja calosci 17/18.10);
     ///  1. czynsz staly (W3, PopulationLaw - przed TownFolk.Daily) placony pierwszy: rata dnia + zaleglosc, najwyzej kiesa; brak - ksiega zaleglosci (DsRentArrears);
     ///     spladrowanie (wies), oblezenie miasta targowego, glod - rata dnia darowana; zaleglosc ponad DsRentForgiveDays rat - darowana ("decasus", licznik);
     ///  2. koszyk dnia (stara lista, buy1 - bez zmian); 3. zaleglosc koszyka wozem (E3-W1, bez zmian);
@@ -285,8 +286,10 @@ namespace Armoury
         }
 
         /// <summary>Wies -> skarbiec korony (udzial W4): ChangeGold wsi, potem skarbiec DOKLADNIE tyle, ile zeszlo z kiesy. Zwraca zdjete z kiesy; `received` - przyrost
-        /// skarbca (zmierzony; kontrola linii).</summary>
-        private static long ToCrown(Village v, Kingdom k, long want, out long received)
+        /// skarbca (zmierzony; kontrola linii). `zc` = zglos do Dostatku ZC0 jako danine wsi (DailyLife.NoteVillageLevy). Recenzja calosci 17/18.10: udzial korony od
+        /// czesci wsi markietanow i od noclegu w zajezdzie (WarShareSutlers) - BEZ zgloszenia: ZC0 nie widzi tych wplywow do kiesy wsi (gotowka wsi ZC0 = tylko okno
+        /// powrotu taboru, NoteVillageReturn), wiec odejmowal sam udzial od niewidzianego dochodu (zubozenie zamiast wplywu). Udzial przy wozie - jak dotad (utarg brutto w oknie).</summary>
+        private static long ToCrown(Village v, Kingdom k, long want, out long received, bool zc = true)
         {
             received = 0;
             if (v == null || k == null || want <= 0) return 0;
@@ -299,7 +302,7 @@ namespace Armoury
             try { int w0 = k.KingdomBudgetWallet; k.KingdomBudgetWallet += (int)got; received = (long)k.KingdomBudgetWallet - w0; }
             catch (Exception e) { v.ChangeGold((int)got); Stumble("ToCrown(skarbiec)", e); received = 0; return 0; }   // wyjatek przy wplacie - zloto wraca do wsi (nic w nicosc)
             Pend(k, got);
-            try { DailyLife.NoteVillageLevy(v.Settlement, (int)got); } catch { }   // ZC0: zloto korony z kiesy wsi do Dostatku (jak danina, tylko licznik)
+            if (zc) { try { DailyLife.NoteVillageLevy(v.Settlement, (int)got); } catch { } }   // ZC0: zloto korony z kiesy wsi do Dostatku (jak danina, tylko licznik)
             return got;
         }
 
@@ -390,7 +393,7 @@ namespace Armoury
                 if (remit) { _sRemit++; return 0; }
                 long want = (long)Math.Floor(purse * g * WarShare(Settings.Current) * Ramp);
                 long wIn;
-                long got = ToCrown(v, k, Math.Min(want, purse), out wIn);
+                long got = ToCrown(v, k, Math.Min(want, purse), out wIn, false);   // recenzja calosci: bez NoteVillageLevy (ZC0 nie widzi tego wplywu do kiesy)
                 if (got > 0) { _sN++; _sCrown += got; _payOut += got; _payIn += wIn; }
                 if (got > 0 && inn) { _iN++; _iCrown += got; }
                 return (int)got;

@@ -1,5 +1,28 @@
 # DZIENNIK ZMIAN
 
+## 2026-10-17/18 (noc, Recenzja calosci scalenia noc-ks4: nocleg w zajezdzie pod kluczem RoadsideInns i nie na ziemiach wroga; udzial korony od markietanow i zajazdow poza Dostatkiem ZC0)
+
+**Mod:** Armoury (`TownInns.Road.cs`, `DsVillage.cs`) | **Galaz:** `w-toku/noc-ks4` | **Tor:** S (bez gry; build Armoury kod 0; checker `nzajazdy` / `nkarczmy` / `nks` / `nds` / `nzc0` na logu 15-37-31 bez wyjatkow - log sprzed tych zmian, niczego nie potwierdza) | **Klucze:** bez nowych (Settings bez zmian, gen_mcm niepotrzebny) | **Zapis:** bez zmian.
+
+**Problem (recenzja calosci po scaleniu, nie objaw u gracza):**
+1. Nocleg w zajezdzie dzialal przy wylaczonym `RoadsideInns`, gdy zapis wczytano w srodku menu `arm_roadinn` (opcje czynne, pieniadze szly).
+2. Zajazd na ziemiach krolestwa we wojnie z graczem przyjmowal nocleg: zaplata do kiesy wsi wroga, podatek jego pana, udzial korony DS do skarbca wroga (obieg zamkniety, ale inaczej niz karczma miasta - do wrogiego miasta gra nie wpuszcza).
+3. ZC0 (Dostatek): udzial korony DS od czesci wsi markietanow i od noclegu w zajezdzie szedl do `DailyLife.NoteVillageLevy` (odjety od gotowki wsi), a samego wplywu tych pieniedzy do kiesy wsi ZC0 nie widzi (gotowka wsi ZC0 = tylko okno powrotu taboru, `NoteVillageReturn`). Wies przy obozie wojska albo zajezdzie w krolestwie we wojnie wychodzila w ZC0 biedniejsza, choc dostala pieniadze (Dostatek -> awans/spadek ZC6, zawsze w te sama strone). Skala na logu 15-37-31 (NDS-16): udzial korony od markietanow sr. 4313 zl/d przy "danina wojenna wsi" ZC0 ok. 54-66 tys./d.
+
+**Przyczyna:** `TownInns.RoadAllowed` sprawdzal tylko `TownInns.On` (plotki w zajezdzie juz sprawdzaja `RoadsideInns.On`) i nie patrzyl na frakcje wsi okregu. `DsVillage.ToCrown` zglaszal do ZC0 kazdy udzial korony, takze od wplywow, ktorych ZC0 nie liczy - asymetria byla juz przy markietanach, zajazdy skopiowaly ja jako "ta sama regula".
+
+**Zmiana:**
+- `RoadAllowed`: klucz `RoadsideInns` wylaczony -> "Roadside inns are switched off (game options)."; wies okregu we wojnie z frakcja gracza (`FactionManager.IsAtWarAgainstFaction`) -> "The keeper bars the door to the enemies of his lord." Opcje noclegu nieczynne z podpowiedzia; "Ride on" i plotki bez zmian.
+- `DsVillage.ToCrown(..., bool zc = true)`; `WarShareSutlers` (markietani i zajazdy) wola z `zc = false` - udzial korony bez `NoteVillageLevy`. Udzial przy wozie (`DuesAtCart` - utarg brutto w oknie) i danina z oszczednosci (`KingdomTreasury.Levies`) jak dotad. Zloto, skarbce i liczniki DS (NDS-14e, "w tym zajazdy") bez zmian - zmienia sie tylko licznik ZC0 "danina wojenna wsi".
+
+**Ryzyko / co sprawdzic:**
+- Kontrola calosci w kodzie: `RoadAllowed` wolaja tylko `RoadQCondition` i `RoadCommit`; sen juz oplacony (`Rest.RoadUid`) nietkniety; `ToCrown(Village)` wolaja tylko `DuesAtCart` (domyslnie zglasza) i `WarShareSutlers`; zadna bramka `sprawdz_logi.py` nie porownuje "danina wojenna wsi" ZC0 z linia DS (grep).
+- W logu: ZC0 "danina wojenna wsi" nizsza o udzial korony markietanow i zajazdow (tylko w wojnie i w rampie DS), D wsi przy obozach nieco wyzsze; linia "Daniny wsi (DS)" bez zmian.
+- Do decyzji Jeffa: (a) czy ZC0 ma liczyc wplyw do kiesy wsi od markietanow i zajazdow jako dochod wsi (ok. 40 tys. zl/d na ok. 190 wsi przy 86 tys./d z taborow - duza zmiana Dostatku i awansow ZC6, dlatego nie zrobiona przy okazji); (b) czy zajazd na ziemiach wroga ma byc zamkniety (teraz zamkniety; wies spalona - przyjmuje jak dotad).
+- NIE zrobione (poza ta galezia): `tools/autotest-2026-10-17/bieg-bitwa.ps1` i `wgraj-v5.ps1` sa tylko w glownym repo (e3890e7c), nie na `w-toku/noc-ks4`, i nie kopiuja `Armoury/ModuleData/arm_roadside_inns.tsv`. Przy scaleniu do glownego repo dopisac warunkowe kopiowanie (wzor `arm_ks_land.tsv`, w `wgraj-v5.ps1` z `dll = $false`); do tego czasu autotest z `-ExtraAdd 'Armoury\ModuleData\arm_roadside_inns.tsv=<drzewo>\Armoury\ModuleData\arm_roadside_inns.tsv'`, wgranie - plik recznie (bez niego zajazdow nie ma, ZJ-1 nie przejdzie).
+
+**Status:** DO SPRAWDZENIA.
+
 ## 2026-10-17/18 (noc, sw-zajazdy: zajazdy przy szlakach - budynek na mapie, wejscie, nocleg za pieniadze do kiesy wsi, plotki z prawdziwego stanu swiata, takze w karczmie miasta)
 
 **Scalenie:** `w-toku/sw-zajazdy` -> `w-toku/noc-ks4` (commit scalenia f1637625, build Armoury kod 0). Zrodlo wpisu: `docs/noc-1718/sw-zajazdy-CHANGELOG.md`.
