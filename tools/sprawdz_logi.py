@@ -1412,7 +1412,9 @@ Uzycie (Python 3, tylko odczyt):
                     NRU-6 kredyt: otwarty na koniec <= 200000 zl i przepadle (wojna) <= 20% udzielonego, NRU-7 = NOP-7 ruda: mediana indeksu <= 2.5 i miasta bez rudy <= 40 (ETAP lepiej
                     niz fin88 3.06/57.2; bez KS 0.63/12), NRU-8 = NOP-8 'kopalnia bez wegla' <= 28.1 lup/d (bez KS; ETAP < 45.4 fin88), NRU-9 zapas rudy na polkach miast
                     >= 1700 srednio okna i zapas swiata >= -5/d (ETAP > 1185 fin88; bez KS 5059), NRU-10 lupy wsi >= 255/d (ETAP > 248 fin88; bez KS 271), NRU-11 potkniecia
-                    i ERROR 0, NRU-12 czas kroku <= 5 ms, NRU-13 zuzycie zelaza (warsztaty zbrojne, linie narzedzi - receptura KS 4:5 wedlug wagi) i popyt Planu (INFO).
+                    i ERROR 0, NRU-12 czas kroku <= 5 ms, NRU-13 zuzycie zelaza (warsztaty zbrojne, linie narzedzi - receptura KS 4:5 wedlug wagi) i popyt Planu (INFO),
+                    NRU-14 rampa KS (klucz Ks Ramp Mineral Times): najnizsza srednia 3 dob modelu lup w rampie (A..koniec popytu) >= 0.85 x srednia 7 dob przed A
+                    (fin88 0.55: lancuch gry w mieszance rampy liczyl dubel BK raz - 163 wobec 296; ETAP > 0.55), linie "Mineraly w rampie KS (f5-ruda)" (INFO).
                     Bazy: fin88 Armoury-2026-10-18_03-13-38.log (ac03aa25 = WGRANIE 79), fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin88):
                     NRU-7..10 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -43379,6 +43381,10 @@ NRU_C = re.compile(r"^Ruda kredyt drewna \(f5-ruda\): dzien (\d+) \| klucz Bloom
 NRU_IRON = re.compile(r"^Zelazo \(lupy\) \(214\): dzien (\d+) - wsie dopisaly (\d+) lup .*?kopalnia bez wegla ([\d.]+) lup")
 NRU_ISTOCK = re.compile(r"zuzycie: warsztaty zbrojne (\d+), linie towarowe \(narzedzia\) (\d+).*?zapas: miasta (\d+) \([-+]?\d+\).*?razem (\d+) \(")
 NRU_PLAN = re.compile(r"iron/(Westeros|Essos) popyt ([\d.]+) t/d")
+NRU_MODEL = re.compile(r"model ([\d.]+) w \d+ wsiach")
+NRU_RAMP = re.compile(r"^KS: rampa dzien (\d+) \| doba rampy \d+ \(A (\d+), D (\d+), koniec popytu (\d+)\)")
+NRU_RAMPMIN = 0.85                                # NRU-14: model lup w rampie KS (srednia 3 dob, najnizsza) wobec 7 dob przed A (fin88 0.55: 163 wobec 296, fin86 0.54)
+NRU_RAMPMIN_BASE = 0.55
 NRU_ERR = ("ERROR in StartCalibration.F5IronWeek", "ERROR in Bloomery.F5", "ERROR in VillageTakings.F5WoodCredit", "ERROR in SyncData.arm_f5_woodcredit")
 NRU_WIN = 28
 NRU_ORE_MAX, NRU_ORE_EMPTY_MAX = 2.5, 40          # NRU-7 = NOP-7 (fin88 3.06 / 57.2; bez KS 0.63 / 12)
@@ -43402,6 +43408,7 @@ def nruda_main(logp):
         rep.show()
         return 0
     weeks, creds, zc4, price, iron, istock, plan, errs = {}, {}, {}, {}, {}, {}, {}, []
+    imodel, ramp, rampl = {}, None, 0
     bad_w = bad_c = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -43441,9 +43448,20 @@ def nruda_main(logp):
                 if a:
                     d = int(a.group(1))
                     iron[d] = (int(a.group(2)), float(a.group(3)))
+                    mm = NRU_MODEL.search(s)
+                    if mm:
+                        imodel[d] = float(mm.group(1))
                     b = NRU_ISTOCK.search(s)
                     if b:
                         istock[d] = (int(b.group(1)), int(b.group(2)), int(b.group(3)), int(b.group(4)))
+                continue
+            if s.startswith("KS: rampa dzien "):
+                a = NRU_RAMP.match(s)
+                if a and ramp is None:
+                    ramp = (int(a.group(2)), int(a.group(3)), int(a.group(4)))
+                continue
+            if s.startswith("Mineraly w rampie KS (f5-ruda): dzien "):
+                rampl += 1
                 continue
             if "iron/Westeros popyt" in s or "iron/Essos popyt" in s:
                 dm = re.search(r"plan doba (\d+)", s)
@@ -43588,6 +43606,24 @@ def nruda_main(logp):
     rep.add("NRU-11: potkniecia paczki i ERROR (StartCalibration.F5IronWeek, Bloomery.F5*, VillageTakings.F5WoodCredit, SyncData.arm_f5_woodcredit)",
             f"ERROR {len(errs)}, potkniecia kroku {st_w}, kredytu (sesja, najwiecej) {st_c}" + (f" ({errs[0]})" if errs else ""), "0",
             (not errs and st_w == 0 and st_c == 0) if pkg or errs else None)
+    # NRU-14 rampa KS: model lup (lancuch gry w mieszance) bez spadku o polowe - dubel BK w Times (klucz Ks Ramp Mineral Times)
+    if ramp and imodel:
+        A, Dd, E = ramp
+        pre = [imodel[d] for d in range(A - 7, A) if d in imodel]
+        days = [d for d in range(A + 1, E + 1) if d in imodel]
+        if pre and len(days) >= 3:
+            p0 = sum(pre) / len(pre)
+            mav = [(days[i], sum(imodel[x] for x in days[i - 2:i + 1]) / 3.0) for i in range(2, len(days))]
+            dmin, vmin = min(mav, key=lambda t: t[1])
+            r = vmin / p0 if p0 > 0 else 0.0
+            rep.add("NRU-14: model lup w rampie KS (najnizsza srednia 3 dob) wobec 7 dob przed A" + base_note,
+                    f"{vmin:.0f} wobec {p0:.0f} ({r:.2f}, doba {dmin}; rampa A {A}, D {Dd}, koniec {E}); linii 'Mineraly w rampie KS (f5-ruda)' {rampl}",
+                    f">= {NRU_RAMPMIN} (fin88 {NRU_RAMPMIN_BASE}: 163 wobec 296 - lancuch gry w rampie z mineralem raz); ETAP > {NRU_RAMPMIN_BASE}",
+                    ok_or_info(r >= NRU_RAMPMIN), etap=r > NRU_RAMPMIN_BASE)
+        else:
+            rep.add("NRU-14: model lup w rampie KS", f"za malo dob (przed A {len(pre)}, w rampie {len(days)})", "INFO (bieg wczytany po rampie)", None)
+    else:
+        rep.add("NRU-14: model lup w rampie KS", "brak linii rampy albo zelaza", "INFO (KS niezastosowany w biegu)", None)
     if weeks:
         ms = [float(g[NW_MS]) for g in weeks.values()]
         rep.add("NRU-12: czas kroku tygodniowego", f"najwiecej {max(ms):.1f} ms, srednio {sum(ms) / len(ms):.2f} ms ({len(ms)} krokow)", f"<= {NRU_MS_MAX} ms", max(ms) <= NRU_MS_MAX)

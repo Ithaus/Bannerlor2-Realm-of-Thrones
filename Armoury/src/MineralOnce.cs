@@ -65,7 +65,7 @@ namespace Armoury
 
         internal static void Reset()
         {
-            lock (Gate) { _seen.Clear(); _dup.Clear(); _lists = 0; _removed = 0; _stumbles = 0; _papyrusOff.Clear(); _cropStumbles = 0; _hotKnown = -1; }
+            lock (Gate) { _seen.Clear(); _dup.Clear(); _lists = 0; _removed = 0; _stumbles = 0; _papyrusOff.Clear(); _cropStumbles = 0; _hotKnown = -1; _rampDupV.Clear(); _rampDupN = 0; }
         }
 
         private static bool IsPapyrus(ItemObject it)
@@ -172,11 +172,21 @@ namespace Armoury
                     catch (Exception mex) { CamelLaw.Forget(v); int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.CamelLaw", mex); }
                 }
                 bool ksv = false;
+                Dictionary<ItemObject, int> ksDup = null;   // f5-ruda (klucz Ks Ramp Mineral Times): powtorzenia towarow KS zdjete przez ListStep - do mnoznika Times jak powtorzenia petli nizej
                 if (ks)
                 {
                     // KS: wies zastosowana - towary KS ze stawka > 0 na liscie (brakujace z waga 0), jaja BK i krok W2 pominiete (KS liczy jaja i ryby sam); potkniecie - lista jak dotad
                     // KS etap 2 (rampa podazy): w rampie jaja BK i W2 zostaja (czesc gry stawki, BlendStep miesza) - pomijane dopiero przy pelnej stawce KS (FullFor)
-                    try { var kl = StartCalibration.ListStep(v, list); if (kl != null) { list = kl; if (StartCalibration.FullFor(v)) { ksv = true; HamletKinds.Forget(v); VillageFruit.ForgetEgg(v); } } }
+                    try
+                    {
+                        var before = list;
+                        var kl = StartCalibration.ListStep(v, list);
+                        if (kl != null)
+                        {
+                            if (mineral && RampTimesOn) { try { ksDup = KsDupCounts(v, before, kl); } catch { ksDup = null; } }
+                            list = kl; if (StartCalibration.FullFor(v)) { ksv = true; HamletKinds.Forget(v); VillageFruit.ForgetEgg(v); }
+                        }
+                    }
                     catch (Exception kex) { int ck; lock (Gate) ck = ++_cropStumbles; if (ck <= 3) Log.Error("MineralOnce.KS", kex); }
                 }
                 if (eggs && !ksv)
@@ -189,7 +199,7 @@ namespace Armoury
                 if (!mineral) { __result = ksv ? list : VillageCrafts.ListStep(v, HamletKinds.ListStep(v, list)); return; }   // inwest: zajecia wiosek (droga bez KS) - towary innych zajec z waga 0 na koncu         // E6/W2: ostatni krok listy (sam lapie swoje potkniecia); KS - bez W2
                 int n = list.Count;
                 List<(ItemObject, float)> res = null;      // nowa lista dopiero przy pierwszym powtorzeniu - zwykla wies kosztuje tylko odczyt osady (ok. 0.1 mikrosekundy)
-                Dictionary<ItemObject, int> extra = null;  // przedmiot -> ile powtorzen zdjeto w tym zlozeniu listy
+                Dictionary<ItemObject, int> extra = ksDup; // przedmiot -> ile powtorzen zdjeto w tym zlozeniu listy (f5-ruda: z powtorzeniami towarow KS zdjetymi przez ListStep)
                 for (int i = 0; i < n; i++)
                 {
                     var e = list[i];
@@ -234,6 +244,40 @@ namespace Armoury
             }
         }
 
+        // ------------------------------------------------------------ f5-ruda (noc 18.10): dubel BK w rampie KS
+        // StartCalibration.ListStep (wies z KS zastosowanym) zdejmuje powtorzenia towarow KS z listy BK PRZED petla powtorzen nizej, wiec petla nie widziala dubla
+        // rudy (soli, gliny, srebra), _dup wsi znikal i Times() oddawal 1. Przy pelnej stawce KS bez skutku (ProdStep zwraca stawke KS przed mnoznikiem Times), ale
+        // w RAMPIE (beta < 1: wynik = (1 - beta) x lancuch gry + beta x KS) lancuch gry dawal POLOWE mineralu: fin88 109113 model rudy 183 = 0.79 x 145 + 0.21 x 294
+        // (przed wlaczeniem 290) - jednorazowo ok. 1500 lup mniej w 30 dobach rampy. Klucz Ks Ramp Mineral Times: powtorzenia zdjete przez ListStep ida do mnoznika
+        // Times tak samo jak powtorzenia petli (wydobycie lancucha gry bez zmian - jak bez KS). Klucz NIE - jak dotad.
+        private static bool RampTimesOn { get { var s = Settings.Current; return s != null && s.KsRampMineralTimes; } }
+        private static readonly HashSet<Village> _rampDupV = new HashSet<Village>();   // wsie w rampie (bez pelnej stawki KS) z dublem oddanym mnoznikiem - od ostatniej linii
+        private static int _rampDupN;
+
+        /// <summary>f5-ruda: powtorzenia przedmiotow listy `before` (BK po filtrach), ktore ListStep zdjal (jest ich mniej w `after`) - przedmiot -> ile zdjeto; null - brak.</summary>
+        private static Dictionary<ItemObject, int> KsDupCounts(Village v, List<(ItemObject, float)> before, List<(ItemObject, float)> after)
+        {
+            if (before == null || after == null || ReferenceEquals(before, after)) return null;
+            Dictionary<ItemObject, int> res = null;
+            int n = before.Count;
+            for (int i = 0; i < n; i++)
+            {
+                var it = before[i].Item1;
+                if (it == null) continue;
+                bool firstSeen = true;
+                for (int j = 0; j < i; j++) if (ReferenceEquals(before[j].Item1, it)) { firstSeen = false; break; }
+                if (!firstSeen) continue;                                        // kazdy przedmiot raz (przy pierwszym wystapieniu)
+                int cb = 0; for (int j = i; j < n; j++) if (ReferenceEquals(before[j].Item1, it)) cb++;
+                if (cb < 2) continue;
+                int ca = 0; foreach (var e in after) if (ReferenceEquals(e.Item1, it)) ca++;
+                if (ca < 1 || ca >= cb) continue;
+                if (res == null) res = new Dictionary<ItemObject, int>();
+                res[it] = cb - ca;
+            }
+            if (res != null && !StartCalibration.FullFor(v)) lock (Gate) { if (_rampDupV.Add(v)) _rampDupN++; }
+            return res;
+        }
+
         private static void Note(object data, ItemObject item)
         {
             lock (Gate)
@@ -271,6 +315,11 @@ namespace Armoury
                 _seen.Clear(); _lists = 0; _removed = 0;
             }
             Log.Info("Mineraly (dubel BK): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - " + what);
+            // f5-ruda (klucz Ks Ramp Mineral Times): osobna linia tylko w rampie KS (wsie bez pelnej stawki KS z dublem BK oddanym mnoznikiem Times)
+            int rampN; lock (Gate) { rampN = _rampDupN; _rampDupN = 0; _rampDupV.Clear(); }
+            if (rampN > 0)
+                Log.Info("Mineraly w rampie KS (f5-ruda): dzien " + ((int)CampaignTime.Now.ToDays - 1) + " - wsi w rampie z dublem BK oddanym mnoznikiem modelu " + rampN
+                         + " (lancuch gry w mieszance rampy liczy mineral tyle razy, ile BK go wpisal - jak bez KS; klucz Ks Ramp Mineral Times TAK).");
             // T8: osobna linia filtra klimatu upraw (nie doklejamy do linii mineralow - parsery czytaja jej poczatek)
             string crop;
             lock (Gate)
