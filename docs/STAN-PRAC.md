@@ -2741,3 +2741,13 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
 - 17:10 PDT: workflow wf_278cdd52-962 (noc-1718-fala2a): sw-uchodzcy (RaidRefugeesToTowns: uchodzcy z najazdu do najblizszego miasta, biedota, rece, kiesa z wsi i z powrotem)
   i r4-glodbunt (KsHungerUnrest: glod miasta -> linia "Hunger" w czynnym modelu lojalnosci/bezpieczenstwa -> bunt mechanizmem gry/BK; KsLordFundsFood: pan miasta placi za dowoz
   z zlota ponad rezerwe wojny); worktree zb/sw-uchodzcy, zb/r4-glodbunt (od efbbf0dc); scalenie po fali 1.
+- 17:25 PDT: DIAGNOZA fin80 (wf_2165d530-0b5) -> docs/DIAGNOZA-FIN80-2026-10-17.md. (1) AKUMULATOR w kiesach ludu miast W przy DS F3 (TAKZE W GRZE JEFFA - WGRANIE 76):
+  +186k/d (baza +11k), zapas dni W 46 -> 180; po rampie F3 wylaczone P1, kiesa2, straznik obiegu, a zamienniki nie rosna z oszczednosciami; roboty gminy wsi placa W i licza
+  "material" bez towaru (lamie "nic z niczego"); W nie ma na co wydac (Zc4OfferFactor zeruje "lepszy stol"). D staly 0.865 to glownie jednorazowe wplywy (fin78 Dorne 1.6M) + ten akumulator,
+  NIE KsRecipes. (2) SOL: krok 5 wsi DS (DsSurplus, TownFolk.Live.cs:1276) kupuje sol i narzedzia bez limitu potrzeby i bez ramki ksiegi - zdziera polki do 5 szt., drugi raz to samo co koszyk ZC4.
+  (3) Ceny 2-3x: rozdzial KS-H (budzet celu wydawany w stalej kolejnosci towarow - zboze i ryby pierwsze), luka zapasu z D (polki 15-40% celu), artefakt P7 (zerowanie w D, nie D+14).
+  (4) Welna/len: Plan nie liczy odziezy wojska i warsztatow zbrojnych (GArmyCloth, GArms). (5) NKS-26 liczy STAN podlogi, nie podloge dana (dana = 0 we wszystkich dobach).
+  (6) Kiesy wsi: po uskoku startu koszyka plaskie/rosnace (+0.11%/d ostatnie 30 dob) - NDS-3a lapie uskok.
+- 17:30 PDT: workflow wf_a0c1cd77-ae0 (fala 2b, zb/ds-akumulator od efbbf0dc): DsHoardDue (tallage od skarbca ludu ponad norme, pre = M9 + FLf), DsWorksRealMaterial (roboty gminy
+  wlasnymi rekami, tylko prawdziwy material z polki; takze material septow), FolkBetterTable (W z oszczednosci kupuje lepszy stol), CrownWindfallToReserve, poprawki pomiaru nds,
+  przeglad innych akumulatorow. Po scaleniu fali 1: sol w kroku 5 (ramka ksiegi + bez kategorii koszyka ZC4 + limit potrzeby), KsCloth w Planie, linia NKS-26, KS-H budzet wedlug potrzeby.
