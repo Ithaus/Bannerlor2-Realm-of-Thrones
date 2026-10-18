@@ -3046,3 +3046,9 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
   Do wgrania: Armoury.dll, CrashScribe.dll (f13), Armoury/SubModule.xml (f9), dane: arm_map_villages(_v6).tsv, arm_map_village_lore(_v6).tsv, arm_roadside_inns(_v6).tsv,
   arm_map_side_roads_grid.tsv. CrashScribe-at do testow: test/CrashScribe-at-81.dll (zb/cs-at81 = c5933072 + at1-cs-bitwa.diff, md5 0533872b).
   Czekam na f15-skarbiec (wf_ff6ec6ed-262) -> scalic -> test fin93 (160 dob, ks-auto) -> 5 dob + bitwa -> WGRANIE 81.
+- 13:40 PDT: TEST fin93 = c5933072 (test/fin93, CsAt test/CrashScribe-at-81.dll), armoury-ks-auto.flag (USUNAC!), 160 dob, at-fin93-scal6.out.txt - w toku od 12:18 (czas lokalny gry).
+- 13:40 PDT: f15-skarbiec GOTOWE (wf_ff6ec6ed-262) b6a026cf: W5c (CrownWarAidMiddle) - skarbiec w wojnie doplaca f x brak zoldu ponad W5 do pelnego limitu (f jak f6/f7; dluznicy Banku
+  mierzeni z G/R - recenzja), budzet 1/30 nadwyzki skarbca - pula W5b, tylko za ludzi w druzynach + miejsce w pulapie na werbunek; grupa checkera nsrednim (nazwa nskarbiec zajeta).
+  WAZNE ODKRYCIE: W5 juz dzis placi srednim (~79k/d) i tez BOGATYM ponad 2R (~37k/d + 11k/d W5b) - W5 patrzy na pulap, nie na bogactwo; wojsko ogranicza cel 60% limitu druzyn
+  i hamulce werbunku, nie pieniadze. Szacunek W5c: skarbce w wojnie +17k -> ok. +12k/d na starcie; wojsko 0..+2.5k. DO DECYZJI JEFFA: W5 dla rodow ponad 2R (wbrew "bogaty nic")?
+  Scalone do noc-ks4 **10beef63** (konflikt checkera nboczne/nsrednim - oba; 1975 ustawien, build rc 0). Recenzja scalenia: wf_90c50428-80e.
