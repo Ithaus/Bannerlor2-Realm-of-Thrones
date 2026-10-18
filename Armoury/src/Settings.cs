@@ -3101,6 +3101,16 @@ namespace Armoury
         public int KsFarmSurplusReviewDays = 14;           // with Ks Farm Follows Surplus: how many days the town's purse is watched before its farm is raised by what the purse grew (7 at the least)
         public float KsFarmSurplusReviewMax = 0.25f;       // with Ks Farm Follows Surplus: the largest raise of a town's farm at one such review (share of the farm)
 
+        // --- Town purses: the farm catches up with the merchants' idle coin (18.10) ---
+        // Paczka f7-kasy (noc 17/18.10; fin91 Armoury-2026-10-18_06-29-09.log: kasy miast z KS +52.6 tys./d (NAKUM-7), ponad 1.5 x zapas kupcow 1.95 -> 12.89 mln (NAKUM-16)
+        // mimo podwyzek firm +67.5 mln zl/rok - przeglad wedlug nadwyzki (f5-lud) podnosi firme najwyzej o 25% na 14 dob i bierze tylko przyrost, wiec zapas zgromadzony
+        // w oknie pomiaru zostaje w kasie (Lhazosh: firma 1.6 tys./d przy przyroscie 18.6 tys./d). GERSUMA (oplata przy odnowie dzierzawy - sredniowieczna "entry fine"
+        // przy podniesieniu firmy miasta): w przegladzie wedlug nadwyzki miasto placi RAZ panu i koronie (w stosunku firm) czesc zapasu, ktory przelezal w kasie cale okno
+        // ponad zapas kupcow i miesiac firmy - stawka roczna bez zmian. Tylko miasta z KS i firmami DS; klucz wylaczony = kod co do monety jak dotad. DsTowns.cs.
+        public bool KsFarmCatchUp = true;                  // with Ks Farm Follows Surplus: when a town's farm is reviewed for its merchants' surplus and the purse kept growing, the town also pays once - to its lord and the crown, in the shares of its farm - Ks Farm Catch Up Share of the coin that lay in the purse the whole review period above one and a half times the merchants' working coin plus Ks Farm Catch Up Keep Days of the farm (open food bills of the town are counted first). Like an entry fine when a farm is renewed at a higher rate: the yearly farm itself is not raised by it, so a good season does not become a lasting due. Not in towns whose craftsmen or patricians are short, not under siege, not with unpaid farm. Off = the merchants' surplus stays in the purse, as before
+        public float KsFarmCatchUpShare = 0.5f;            // with Ks Farm Catch Up: the share of the idle coin above the merchants' keep that the town pays at one such review (the rest stays for the next review)
+        public int KsFarmCatchUpKeepDays = 28;             // with Ks Farm Catch Up: how many days of its farm a town's merchants always keep in the purse above one and a half times their working coin, out of reach of the catch-up
+
         // --- Start calibration, round 4: prices and market steering ---
         // KS runda 4: ceny i sterowanie rynku (paczka r4-ceny, noc 17/18.10; PLAN-KS-RUNDA4 rozdz. 4 P3-P10, rozdz. 7 C1-C3).
         // Wszystko dziala tylko przy zastosowanej kalibracji startu (Plan KS); wylaczony klucz = zachowanie sprzed paczki. Kod: StartCalibration.R4c.cs.

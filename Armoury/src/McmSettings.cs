@@ -7480,6 +7480,18 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration: every town class earns by its basket (18.10)")]
         public float KsFarmSurplusReviewMax { get; set; } = 0.25f;
 
+        [SettingPropertyBool("Ks Farm Catch Up", HintText = "with Ks Farm Follows Surplus: when a town's farm is reviewed for its merchants' surplus and the purse kept growing, the town also pays once - to its lord and the crown, in the shares of its farm - Ks Farm Catch Up Share of the coin that lay in the purse the whole review period above one and a half times the merchants' working coin plus Ks Farm Catch Up Keep Days of the farm (open food bills of the town are counted first). Like an entry fine when a farm is renewed at a higher rate: the yearly farm itself is not raised by it, so a good season does not become a lasting due. Not in towns whose craftsmen or patricians are short, not under siege, not with unpaid farm. Off = the merchants' surplus stays in the purse, as before")]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool KsFarmCatchUp { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Farm Catch Up Share", 0.05f, 1.00f, "0.00", HintText = "with Ks Farm Catch Up: the share of the idle coin above the merchants' keep that the town pays at one such review (the rest stays for the next review)")]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public float KsFarmCatchUpShare { get; set; } = 0.5f;
+
+        [SettingPropertyInteger("Ks Farm Catch Up Keep Days", 0, 182, "0", HintText = "with Ks Farm Catch Up: how many days of its farm a town's merchants always keep in the purse above one and a half times their working coin, out of reach of the catch-up")]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public int KsFarmCatchUpKeepDays { get; set; } = 28;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves")]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -9641,6 +9653,9 @@ namespace Armoury
             s.KsFarmFollowsSurplus = KsFarmFollowsSurplus;
             s.KsFarmSurplusReviewDays = KsFarmSurplusReviewDays;
             s.KsFarmSurplusReviewMax = KsFarmSurplusReviewMax;
+            s.KsFarmCatchUp = KsFarmCatchUp;
+            s.KsFarmCatchUpShare = KsFarmCatchUpShare;
+            s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;

@@ -71,6 +71,8 @@ namespace Armoury
             public double Sales; public int SalesDay = -1;         // podstawa M7 z doby ludu
             public long SG0 = long.MinValue; public int SGDay = -1;  // f5-lud (Ks Farm Follows Surplus): kasa miasta na poczatku pomiaru przyrostu i doba (sesja)
             public bool SRaised;                                   // recenzja f5 (uwaga 2): podwyzka wedlug nadwyzki od ostatniego przegladu zwyklego (sesja; tylko licznik pily)
+            public long SMin = long.MaxValue;                      // f7-kasy (Ks Farm Catch Up): najmniejsza kasa od poczatku pomiaru przyrostu (sesja) - zapas, ktory przelezal cale okno
+            public long CPend; public int CPDay = -1;              // f7-kasy: gersuma postanowiona w przegladzie wedlug nadwyzki (DayStart) i jej doba - placi TownDay tej samej doby (sesja)
         }
 
         // ------------------------------------------------------------ stan (zapis arm_daniny_miasta)
@@ -97,9 +99,16 @@ namespace Armoury
         // przegladu (tylko przy Ds Farm Review Days > kwartal) i najkrotszy odstep miedzy przegladami tej samej osady (kontrola limitu: najwyzej jedna zmiana na kwartal)
         private static int _revArrN, _revHeld, _revSame, _revEarly, _revMinGap = int.MaxValue;
         private static double _revUpAmt, _revDownAmt;
+        // f7-kasy (Ks Farm Catch Up): gersuma z zapasu kas - doba (od linii do linii) i sesja
+        private static int _cuRev, _cuDec, _cuNone, _cuNoGrow, _cuNoFarm, _cuPaidN, _cuShortN, _cuHouse, _cuArr, _cuRemit, _cuLow, _cuStum, _cuStumSess, _cuNS;
+        private static double _cuDecAmt, _cuBills;
+        private static long _cuPaidL, _cuPaidC, _cuTook, _cuShort, _cuNoLord, _cuPaidLS, _cuPaidCS;
+        private static long _cuTicks;
 
         private static void ClearCounters()
         {
+            _cuRev = _cuDec = _cuNone = _cuNoGrow = _cuNoFarm = _cuPaidN = _cuShortN = _cuHouse = _cuArr = _cuRemit = _cuLow = _cuStum = 0;
+            _cuDecAmt = _cuBills = 0; _cuPaidL = _cuPaidC = _cuTook = _cuShort = _cuNoLord = 0; _cuTicks = 0;
             _nDue = _nDueT = _remitSiege = _remitCap = _noLord = _distN = _forgN = _renewN = _renewUp = _renewDown = _aidRemit = _aidForgN = 0;
             _dueL = _dueC = _dueLf = _remit = _noLordAmt = _arrNew = _arrPaid = _forgiven = _aidArrNew = _aidLost = _aidForg = _movAssess = _movRemit = _movRamp = _movShort = _movLost = 0;
             _paidL = _paidC = _paidLf = _distL = _distC = _drawT = _drawC = _aidPaid = _aidArrPaid = _movPaid = 0;
@@ -113,6 +122,7 @@ namespace Armoury
         {
             _dayOn = -1; _fixDay = -1; _mDays = 0; _worldShare = double.NaN; _farm.Clear();
             SwitchDue = false; _stumblesSess = 0; _err.Clear(); _events.Clear(); _aidPend.Clear(); _waitLogged = false; _atFlag = -1;
+            _cuStumSess = 0; _cuNS = 0; _cuPaidLS = _cuPaidCS = 0;   // f7-kasy: sesja
             ClearCounters();
         }
 
@@ -506,8 +516,10 @@ namespace Armoury
             if (_renewN > 0) return;                                             // dzis byl przeglad zwykly (Review / Renew) - podwyzki dzien pozniej (jedna zmiana firm na dobe; NKA-2)
             int days = Math.Max(7, Math.Min(91, s.KsFarmSurplusReviewDays));
             double mx = Math.Max(0.0, Math.Min(1.0, (double)s.KsFarmSurplusReviewMax));
+            bool cu = CatchUpOn(s);                                              // f7-kasy: gersuma z zapasu (klucz wylaczony - petla co do monety jak dotad)
             foreach (var f in _farm.Values)
             {
+                long cu0 = cu ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 try
                 {
                     var st = f.St;
@@ -517,23 +529,31 @@ namespace Armoury
                     long g = t.Gold;
                     double inst = (f.FL + f.FC + f.FLf) / Weeks;
                     bool arrears = f.AL + f.AC + f.ALf >= Math.Max(1.0, inst);
-                    if (g <= OverReserve * TownPurse.Reserve(t) || RemitOf(st) != 0 || arrears) { f.SG0 = long.MinValue; f.SGDay = -1; continue; }
+                    if (g <= OverReserve * TownPurse.Reserve(t) || RemitOf(st) != 0 || arrears)
+                    {
+                        if (cu) CatchUpWhy(st, t, g, arrears);                   // f7-kasy: tylko licznik powodu (linia)
+                        f.SG0 = long.MinValue; f.SGDay = -1; continue;
+                    }
                     // domy najpierw: R albo P miasta ponizej dolnej granicy pasma - nadwyzka kupcow idzie do nich wyplata kupcom M6 (pelna stawka), firma bez podwyzki (model
                     // simlud: biedne R/P 35 miast Essos d160 8.3 zamiast 5.6 dnia koszyka); pomiar od nowa
-                    if (KsFolkIncome.HousesFirst(st)) { f.SG0 = long.MinValue; f.SGDay = -1; KsFolkIncome.NoteHousesHeld(); continue; }
-                    if (f.SG0 == long.MinValue || f.SGDay < 0) { f.SG0 = g; f.SGDay = today; continue; }
+                    if (KsFolkIncome.HousesFirst(st)) { f.SG0 = long.MinValue; f.SGDay = -1; KsFolkIncome.NoteHousesHeld(); if (cu) _cuHouse++; continue; }
+                    if (f.SG0 == long.MinValue || f.SGDay < 0) { f.SG0 = g; f.SGDay = today; f.SMin = g; continue; }
+                    if (g < f.SMin) f.SMin = g;                                  // f7-kasy: najmniejsza kasa okna (zapas, ktory przelezal caly pomiar)
                     int span = today - f.SGDay;
                     if (span < days) continue;
                     double grow = (g - f.SG0) / (double)span;
-                    f.SG0 = g; f.SGDay = today;                                  // przyrost od tej doby (bez liczenia drugi raz)
+                    long smin = f.SMin;
+                    f.SG0 = g; f.SGDay = today; f.SMin = g;                      // przyrost od tej doby (bez liczenia drugi raz)
                     double F = f.FL + f.FC;
-                    if (!(grow > 0) || !(F > 0)) continue;
+                    if (cu) _cuRev++;
+                    if (!(grow > 0) || !(F > 0)) { if (cu) { if (!(F > 0)) _cuNoFarm++; else _cuNoGrow++; } continue; }
                     double add = Math.Min(grow * YearDays, mx * F);
-                    if (!(add > 0)) continue;
+                    if (!(add > 0)) { if (cu) CatchUpDecide(f, st, t, g, smin, s, today); continue; }   // f7-kasy: gersuma takze przy podwyzce 0 (Ks Farm Surplus Review Max 0)
                     double r = (F + add) / F;
                     f.FL *= r; f.FC *= r;
                     KsFolkIncome.NoteRaise(add);
                     f.SRaised = true;
+                    if (cu) CatchUpDecide(f, st, t, g, smin, s, today);          // f7-kasy: gersuma z zapasu okna wobec firmy PO podwyzce (miesiac nowej firmy zostaje w kasie)
                     // recenzja f5 (uwaga 2): JEDNA MIARA dla obu przegladow - udzial firmy w doplywie netto kupcow (Share) idzie za podwyzka. Podwyzka nie zmienia doplywu
                     // netto (= zmiana kasy + pobory: przyrost kasy przechodzi w raty firmy), wiec przy starym Share przeglad zwykly (cel Share x doplyw netto x 364) cofalby ja
                     // w najblizszy kwartal, gdy kasa zejdzie do progu 1.5 x zapas (SurplusHolds juz nie trzyma), a 14 dob pozniej ta regula podnosilaby znowu - pila firm
@@ -549,7 +569,166 @@ namespace Armoury
                     }
                 }
                 catch (Exception e) { Stumble("SurplusReview", e); }
+                finally { if (cu) _cuTicks += System.Diagnostics.Stopwatch.GetTimestamp() - cu0; }
             }
+        }
+
+        // ============================================================ f7-kasy: gersuma - firma dogania zapas kupcow (Ks Farm Catch Up)
+        /// <summary>
+        /// f7-kasy (noc 17/18.10; fin91 Armoury-2026-10-18_06-29-09.log, nakum: kasy miast z KS +52.6 tys./d - NAKUM-7, +57 tys./d przy 'zostalo w kasach' 205.7 tys./d -
+        /// NAKUM-12, ponad 1.5 x zapas kupcow 1.95 -> 12.89 mln - NAKUM-16, lud + kasy +68.4 tys./d mimo podwyzek firm +67.5 mln zl/rok - NAKUM-22). Przyczyna (kasy-miast.csv
+        /// fin91, ostatnie 28 dob): przyrost +74 tys./d siedzi w 47 miastach z KS ponad 1.5 x zapas, bez zaleglosci i bez "domy najpierw" (10.4 mln zapasu); przeglad wedlug
+        /// nadwyzki (SurplusReview, f5-lud) podnosi firme najwyzej o 25% na 14 dob od firmy z dnia ustalenia, a po KS doplyw netto kupcow jest wielokrotnie wiekszy (Lhazosh:
+        /// firma 1.6 tys./d, doplyw 33.9 tys./d, przyrost kasy 18.6 tys./d - 11 przegladow do dogonienia) i bierze tylko PRZYROST - zapas zgromadzony w kazdym oknie zostaje
+        /// w kasie na zawsze (wyplata kupcom M6 1/28 dziennie tnie go kappa P/R - P/R ponad pasmem, zostalo w kasach 298 tys./d).
+        /// Sprawdzone ujscia (dlaczego nie one): pozyczki koron od miast (TownFolk.CrownLoans) - tylko krolestwo w wojnie ze skarbcem ponizej zapasu wojny (fin91: 26-27 w wojnie,
+        /// 0-2 ponizej zapasu, dlug koron u miast 0.84 mln); pozyczki od ludu (TownFolk.Loans) - z kies W / podzamczy / wsi, nie z kas, dla rodow ponizej rezerwy w wojnie;
+        /// kupcy zywnosci KS-H i budowy - pieniadz przechodzi z kasy do innej kasy albo przez place ludu (kappa) i towar z polki z powrotem do kas (suma kas swiata bez zmiany).
+        /// Zostaje firma (pan i korona) - jak w zamysle f5-lud ("czego lud nie przyjal, idzie firma do panow i korony").
+        /// REGULA (gersuma = oplata przy odnowie dzierzawy po wyzszej stawce, "entry fine"): w przegladzie wedlug nadwyzki (ta sama chwila, te same warunki: KS, kasa ponad
+        /// 1.5 x zapas, bez oblezenia / zdobycia / zaleglosci, nie "domy najpierw", przyrost kasy &gt; 0, firma &gt; 0) miasto placi RAZ panu i koronie (w stosunku FL : FC,
+        /// rod bez krolestwa - calosc panu) Ks Farm Catch Up Share z: najmniejsza kasa okna pomiaru (zapas, ktory przelezal caly okres - nie chwilowy szczyt sprzedazy) minus
+        /// otwarte rachunki zywnosci miasta (dlugi kupcow najpierw) minus PROG = 1.5 x zapas kupcow + Ks Farm Catch Up Keep Days x firma z kasy (po podwyzce) / 364. Stawka
+        /// roczna bez zmian (odrzucona w recenzji fali 5 "firma z zapasu" robila z jednorazowego zapasu staly pobor - 74/97 miast ponizej zapasu w modelu). Zaplata w TownDay
+        /// tej samej doby (te same drogi co rata firmy: kasa -> pan RentToday, kasa -> skarbiec CrownToday / ksiega MTownCrown; DsNoteFarm - pobrane z kasy, doplyw netto bez
+        /// zmiany), najwyzej do kasy ponad prog w chwili zaplaty; reszta przepada (nigdy zaleglosc). Pomiar przyrostu nastepnego okna od kasy PO gersumie (bez liczenia jej
+        /// jako spadku). Model odtworzeniowy na fin91 (scratchpad f7/model.py: kasy-miast.csv + kiesa-obieg.csv + M6 z linii f5): kasy swiata ostatnie 28 dob +53.1 -> +8.4
+        /// tys./d, ponad 1.5 x zapas 13.2 -> 11.0 mln, miast ponizej zapasu w oknie najwiecej 10 -> 10, gersuma ok. 58 tys./d w oknie (22 miasta).
+        /// </summary>
+        internal static bool CatchUpOn(Settings s) { return s != null && s.KsFarmCatchUp && s.KsFarmFollowsSurplus; }
+
+        private static double CatchUpShare(Settings s) { double v = s.KsFarmCatchUpShare; return double.IsNaN(v) ? 0.5 : Math.Max(0.05, Math.Min(1.0, v)); }
+        private static int CatchUpKeepDays(Settings s) { return Math.Max(0, Math.Min(182, s.KsFarmCatchUpKeepDays)); }
+
+        /// <summary>Prog gersumy: 1.5 x zapas kupcow + Ks Farm Catch Up Keep Days x firma z kasy (pan + korona) na dobe - tego kupcy nie oddaja nigdy.</summary>
+        private static double CatchUpKeep(Farm f, int reserve, Settings s)
+        {
+            return OverReserve * Math.Max(0, reserve) + CatchUpKeepDays(s) * Math.Max(0, f.FL + f.FC) / YearDays;
+        }
+
+        /// <summary>Licznik powodu, dla ktorego miasto z KS nie ma dzis przegladu wedlug nadwyzki (tylko linia f7; ten sam warunek co SurplusReview).</summary>
+        private static void CatchUpWhy(Settlement st, Town t, long g, bool arrears)
+        {
+            try
+            {
+                if (g <= OverReserve * TownPurse.Reserve(t)) _cuLow++;
+                else if (RemitOf(st) != 0) _cuRemit++;
+                else if (arrears) _cuArr++;
+            }
+            catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpWhy", e); }
+        }
+
+        /// <summary>SurplusReview (po podwyzce): gersuma postanowiona na dzis - Ks Farm Catch Up Share z (najmniejsza kasa okna - rachunki zywnosci - prog). Pomiar przyrostu
+        /// nastepnego okna od kasy po gersumie. Zloto sie tu nie rusza (placi TownDay tej doby).</summary>
+        private static void CatchUpDecide(Farm f, Settlement st, Town t, long g, long smin, Settings s, int today)
+        {
+            try
+            {
+                f.CPend = 0; f.CPDay = -1;
+                double keep = CatchUpKeep(f, TownPurse.Reserve(t), s);
+                double bills = 0;
+                try { bills = Math.Max(0, KsFoodCredit.OlderThanOf(st, -1)); } catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUp(rachunki)", e); }
+                double baseIdle = Math.Min((double)smin, (double)g) - bills - keep;
+                if (!(baseIdle >= 1)) { _cuNone++; return; }
+                long amt = (long)Math.Floor(CatchUpShare(s) * baseIdle);
+                if (amt <= 0) { _cuNone++; return; }
+                f.CPend = amt; f.CPDay = today;
+                f.SG0 = g - amt; f.SMin = g - amt;                          // nastepne okno mierzy kupcow od kasy po gersumie
+                _cuDec++; _cuDecAmt += amt; _cuBills += bills;
+            }
+            catch (Exception e) { f.CPend = 0; f.CPDay = -1; _cuStum++; _cuStumSess++; Stumble("CatchUpDecide", e); }
+        }
+
+        /// <summary>TownDay (po racie firmy, przed M6): zaplata gersumy postanowionej dzis - kasa ponad prog -> pan i skarbiec w stosunku firm; czego nie da sie zaplacic (kasa
+        /// spadla ponizej progu, oblezenie, bez zywego pana), przepada - nigdy zaleglosc; pomiar przyrostu poprawiony o niezaplacone. Zwraca nic; lordPay / crownFarm rosna
+        /// o zaplacone (wolajacy: DsNoteFarm i RentToday / CrownToday jak rata firmy).</summary>
+        private static void CatchUpPay(Settlement st, Town t, Farm f, int reserve, Settings s, Kingdom k, ref int lordPay, ref int crownFarm)
+        {
+            long want = f.CPend; int day = f.CPDay;
+            f.CPend = 0; f.CPDay = -1;
+            if (want <= 0) return;
+            long got = 0;
+            try
+            {
+                if (day != Today || !CatchUpOn(s) || RemitOf(st) != 0) return;
+                var clan = st.OwnerClan;
+                var lord = clan != null ? clan.Leader : null;
+                if (lord == null || !lord.IsAlive) { _cuNoLord += want; return; }
+                long avail = Math.Max(0L, (long)Math.Floor(t.Gold - CatchUpKeep(f, reserve, s)));
+                long pay = Math.Min(want, avail);
+                if (pay <= 0) return;
+                double F = f.FL + f.FC;
+                long pL = k == null || !(F > 0) ? pay : (long)Math.Floor(pay * f.FL / F), pC = pay - pL;
+                long gL = pL > 0 ? ToLord(st, t, lord, pL) : 0;
+                long gC = pC > 0 && k != null ? ToCrown(t, k, pC) : 0;
+                got = gL + gC;
+                lordPay = (int)Math.Min(int.MaxValue, (long)lordPay + gL); crownFarm = (int)Math.Min(int.MaxValue, (long)crownFarm + gC);
+                _cuPaidL += gL; _cuPaidC += gC; _cuTook += got; _cuPaidLS += gL; _cuPaidCS += gC;
+                if (got > 0) { _cuPaidN++; _cuNS++; }
+            }
+            catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpPay", e); }
+            finally
+            {
+                long unpaid = Math.Max(0, want - got);
+                if (unpaid > 0)
+                {
+                    _cuShort += unpaid; _cuShortN++;
+                    if (f.SG0 != long.MinValue) f.SG0 += unpaid;                // pomiar przyrostu jak przy kasie bez gersumy (zloto zostalo w kasie)
+                    if (f.SMin != long.MaxValue) f.SMin += unpaid;
+                }
+            }
+        }
+
+        /// <summary>DsTowns.Daily: linia "Gersuma kas miast (f7-kasy): dzien N" - tozsamosci zlota (zdjete z kas = panom + koronie), kasy miast z KS (razem, ponad 1.5 x
+        /// zapas, ponad prog gersumy, ponizej zapasu kupcow), powody bez przegladu, sesja, czas, potkniecia. Tylko przy kluczu i firmach DS.</summary>
+        private static void CatchUpLine(int day, Settings s)
+        {
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            try
+            {
+                long gold = 0, res = 0, over15 = 0, overKeep = 0; int n = 0, nOver = 0, nKeep = 0, nBelow = 0, nPend = 0;
+                foreach (var f in _farm.Values)
+                {
+                    try
+                    {
+                        var st = f.St;
+                        if (st == null || !st.IsTown || st.Town == null) continue;
+                        var t = st.Town;
+                        if (!StartCalibration.KsTownApplied(t)) continue;
+                        int r = TownPurse.Reserve(t);
+                        long g = t.Gold;
+                        n++; gold += g; res += r;
+                        double o = g - OverReserve * r;
+                        if (o > 0) { over15 += (long)o; nOver++; }
+                        double ok = g - CatchUpKeep(f, r, s);
+                        if (ok > 0) { overKeep += (long)ok; nKeep++; }
+                        if (g < r) nBelow++;
+                        if (f.CPend > 0) nPend++;
+                    }
+                    catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpLine(miasto)", e); }
+                }
+                _cuTicks += System.Diagnostics.Stopwatch.GetTimestamp() - t0;
+                double ms = _cuTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+                var sb = new StringBuilder(900);
+                sb.Append("Gersuma kas miast (f7-kasy): dzien ").Append(day)
+                  .Append(" | klucz Ks Farm Catch Up TAK (udzial ").Append(CatchUpShare(s).ToString("0.00", Inv)).Append(", prog 1.5 x zapas kupcow + ").Append(CatchUpKeepDays(s))
+                  .Append(" dob firmy z kasy; co ").Append(Math.Max(7, Math.Min(91, s.KsFarmSurplusReviewDays))).Append(" dob, z przegladem wedlug nadwyzki)")
+                  .Append(" | przeglady dzis ").Append(_cuRev).Append(": gersuma postanowiona ").Append(_cuDec).Append(" (").Append(N0(_cuDecAmt)).Append(" zl; rachunki zywnosci odjete ")
+                  .Append(N0(_cuBills)).Append("), zapas okna do progu ").Append(_cuNone).Append(", kasa bez przyrostu ").Append(_cuNoGrow).Append(", bez firmy ").Append(_cuNoFarm)
+                  .Append(" | bez przegladu (miasto-doby): kasa do 1.5 x zapas ").Append(_cuLow).Append(", oblezenie / zdobycie ").Append(_cuRemit).Append(", zaleglosci firmy ").Append(_cuArr)
+                  .Append(", domy najpierw (R/P ponizej pasma) ").Append(_cuHouse)
+                  .Append(" | zaplacone dzis: zdjete z kas ").Append(_cuTook).Append(" = panom ").Append(_cuPaidL).Append(" + koronie ").Append(_cuPaidC)
+                  .Append(" (kontrola zdjete - panom - koronie = ").Append(_cuTook - _cuPaidL - _cuPaidC).Append("; miast ").Append(_cuPaidN).Append(")")
+                  .Append(", nie zaplacone (kasa ponizej progu w chwili zaplaty, oblezenie, bez zywego pana) ").Append(_cuShort).Append(" (").Append(_cuShortN).Append("; bez zywego pana ").Append(_cuNoLord).Append(")")
+                  .Append(", czeka na zaplate ").Append(nPend)
+                  .Append(" | od startu sesji: panom ").Append(_cuPaidLS).Append(", koronie ").Append(_cuPaidCS).Append(" (gersum ").Append(_cuNS).Append(")")
+                  .Append(" | miasta z KS ").Append(n).Append(": kasy razem ").Append(gold).Append(", zapas kupcow razem ").Append(res)
+                  .Append(", ponad 1.5 x zapas ").Append(over15).Append(" (").Append(nOver).Append(" miast), ponad prog gersumy ").Append(overKeep).Append(" (").Append(nKeep).Append(" miast)")
+                  .Append(", ponizej zapasu kupcow ").Append(nBelow).Append(" miast")
+                  .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms | potkniecia ").Append(_cuStum).Append(" (sesja ").Append(_cuStumSess).Append(").");
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { _cuStum++; _cuStumSess++; Stumble("CatchUpLine", e); }
         }
 
         // ============================================================ okno pomiaru (stare zasady)
@@ -712,6 +891,12 @@ namespace Armoury
                 spare = (long)t.Gold - reserve;
                 Kingdom k;
                 Pay(st, t, f, reserve, s, true, out lordPay, out crownFarm, out crownMov, out crownAid, out k);
+                if (f.CPend > 0)                                             // f7-kasy: gersuma postanowiona dzis w przegladzie wedlug nadwyzki - ta sama droga co rata firmy
+                {
+                    long cu0 = System.Diagnostics.Stopwatch.GetTimestamp();
+                    CatchUpPay(st, t, f, reserve, s, k, ref lordPay, ref crownFarm);
+                    _cuTicks += System.Diagnostics.Stopwatch.GetTimestamp() - cu0;
+                }
                 if (lordPay > 0 || crownFarm > 0) TownPurse.DsNoteFarm(st, lordPay, crownFarm, k);
                 if (crownMov > 0) TownPurse.NoteTake(st, crownMov);
                 if (crownAid > 0) { TownPurse.NoteTake(st, crownAid); try { TownFolk.NoteTake(st, crownAid, TownFolk.TLevy); } catch { } }
@@ -1122,6 +1307,7 @@ namespace Armoury
                 if (_stumbles > 0) sb.Append(" | potkniecia ").Append(_stumbles).Append(" (w sesji ").Append(_stumblesSess).Append(")");
                 sb.Append('.');
                 Log.Info(sb.ToString());
+                if (_fixDay >= 0 && CatchUpOn(s)) CatchUpLine(day, s);        // f7-kasy: linia gersumy (klucz wylaczony - bez linii)
             }
             catch (Exception e) { Stumble("Daily", e); }
             finally { ClearCounters(); }
