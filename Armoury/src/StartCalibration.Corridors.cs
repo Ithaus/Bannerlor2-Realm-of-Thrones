@@ -357,6 +357,10 @@ namespace Armoury
                 foreach (int g in Food) { double e = DL[l * NG + g] - SL[l * NG + g]; if (e > 0) { defSh[l * NG + g] = e * zlG[mk * NG + g]; tot += defSh[l * NG + g]; } }
                 foreach (int g in Food) defSh[l * NG + g] = tot > 0 ? defSh[l * NG + g] / tot : 0.0;
             }
+            // KS-R4 r4-kupcy H7 (= K1): korytarze z modelem kredytu kupcow (klucze Ks Corridors Credit + Ks Food Carts Consign) - importer placi przy dostawie z kasy ponad
+            // polowe zapasu (15% x max(0, kasa 28 dob - 0.5 x zapas) na dobe, miasta krainy), eksporter niesie towar na kredyt (0.5 x kasa 28 dob 3 miast z nadwyzka / (doby + 3),
+            // dzielone na towary wedlug wartosci nadwyzki), doby luku = srednia wedlug braku miast importera najlepszych dob do 3 miast eksportera z nadwyzka (tabela KS-H)
+            var cr = CreditPrep(x, prod, rest, wpop, SL, DL, zlG);
             // problem przewozu
             R.LandFlow.Clear(); R.LandFlowFree.Clear(); R.Kraina.Clear(); R.NoOutlet.Clear();
             Array.Clear(x.FlowPcs, 0, x.FlowPcs.Length); Array.Clear(x.FlowDays, 0, x.FlowDays.Length); Array.Clear(x.FlowSea, 0, x.FlowSea.Length);
@@ -384,9 +388,10 @@ namespace Armoury
                     for (int i = 0; i < n; i++)
                     {
                         int l = nodes[i];
-                        double capN = zl > 0 ? defSh[l * NG + g] * CorrCofferDay * gold[l] / zl : 0.0;
+                        double capN = zl > 0 ? defSh[l * NG + g] * (cr != null ? cr.ImpCap[l] : CorrCofferDay * gold[l]) / zl : 0.0;
                         exM[i] = ex[i] < 0 ? -Math.Min(-ex[i], Math.Max(0.0, capN)) : ex[i];
                     }
+                    if (cr != null) CreditNodes(x, cr, nodes, g);
                     // luki (zrodlo -> cel): doby bramy, przepustowosc (przed D - polowa udzialu kasy importera na towar w drodze; po D - dowoz KS-H)
                     var cost = new double[n * n]; var cap = new double[n * n]; var capM = new double[n * n];
                     for (int i = 0; i < n; i++)
@@ -396,8 +401,10 @@ namespace Armoury
                             if (i == j || ex[i] <= 0 || ex[j] >= 0) continue;
                             int li = nodes[i], lj = nodes[j], k = li * nl + lj;
                             float dd = x.GwDays[k];
+                            if (cr != null) { float ld; bool ls; if (CreditLink(x, cr, i, j, out ld, out ls)) { dd = ld; cr.ArcSea[i * n + j] = ls; cr.ArcSet[i * n + j] = true; } }
                             if (!(dd >= 0f) || dd > lim) continue;
                             double cm = zl > 0 ? defSh[lj * NG + g] * 0.5 * gold[lj] / (zl * Math.Max(1.0, dd)) : 0.0, c = cm;
+                            if (cr != null && cr.Src[i].Length > 0) { cm = zl > 0 ? cr.SupSh[li * NG + g] * cr.ExpGold[i] / (zl * (Math.Max(1.0, dd) + CreditPayDays)) : 0.0; c = cm; }
                             if (inp.AfterD)
                             {
                                 double del = 0;
@@ -407,6 +414,17 @@ namespace Armoury
                             cost[i * n + j] = Math.Max(1.0, dd);
                             if (c > 0) cap[i * n + j] = c;
                             if (cm > 0) capM[i * n + j] = cm;
+                        }
+                    if (cr != null)
+                        for (int i = 0; i < n; i++)
+                        {
+                            // H7: eksporter niesie na kredyt najwyzej udzial towaru x 0.5 x kasa 3 miast z nadwyzka / (najkrotsze doby luku + 3) na dobe (wezel, nie luk)
+                            if (!(ex[i] > 0) || cr.Src[i].Length == 0) continue;
+                            double dmin = double.MaxValue;
+                            for (int j = 0; j < n; j++) { double cc = cost[i * n + j]; if (cc > 0 && cc < dmin) dmin = cc; }
+                            if (dmin == double.MaxValue) continue;
+                            double capE = zl > 0 ? cr.SupSh[nodes[i] * NG + g] * cr.ExpGold[i] / (zl * (dmin + CreditPayDays)) : 0.0;
+                            exM[i] = Math.Min(ex[i], Math.Max(0.0, capE));
                         }
                     var flow = KsCorridors.Transport(n, inp.AfterD ? ex : exM, cost, cap);
                     if (inp.AfterD)
@@ -418,7 +436,7 @@ namespace Armoury
                             {
                                 double f = free[i * n + j]; if (!(f > 1e-9)) continue;
                                 int li = nodes[i], lj = nodes[j];
-                                R.LandFlowFree.Add(new KsFlow { From = x.Lands[li], To = x.Lands[lj], G = g, M = m, Pcs = f / kgp, Days = cost[i * n + j], Sea = x.GwSea[li * nl + lj] });
+                                R.LandFlowFree.Add(new KsFlow { From = x.Lands[li], To = x.Lands[lj], G = g, M = m, Pcs = f / kgp, Days = cost[i * n + j], Sea = cr != null && cr.ArcSet[i * n + j] ? cr.ArcSea[i * n + j] : x.GwSea[li * nl + lj] });
                             }
                     }
                     bool noGrad = side || p[m * NG + g] <= 2.0 * PLo;
@@ -431,7 +449,7 @@ namespace Armoury
                             if (!(f > 1e-9)) continue;
                             int li = nodes[i], lj = nodes[j], k = li * nl + lj;
                             double dd = cost[i * n + j];
-                            bool sea = x.GwSea[k];
+                            bool sea = cr != null && cr.ArcSet[i * n + j] ? cr.ArcSea[i * n + j] : x.GwSea[k];
                             inF[j] += f; inT[j] += f * (sea ? CorrTauSea : CorrTauLand) * dd; outF[i] += f;
                             int o = m * NG + g;
                             x.FlowPcs[o] += f / kgp; x.FlowDays[o] += f / kgp * dd; if (sea) x.FlowSea[o] += f / kgp;
@@ -590,7 +608,7 @@ namespace Armoury
                     for (int i = 0; i < n; i++)
                     {
                         int tj = nodes[i];
-                        double capN = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? tsh[tj * NG + g] * CorrCofferDay * Math.Max(0.0, inp.TownGold28[tj]) / zl : double.PositiveInfinity;
+                        double capN = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? tsh[tj * NG + g] * CorrCofferDay * CreditGold(inp, tj) / zl : double.PositiveInfinity;
                         exM[i] = ex[i] < 0 ? -Math.Min(-ex[i], capN) : ex[i];
                     }
                     var cost = new double[n * n]; var cap = new double[n * n];
@@ -605,6 +623,9 @@ namespace Armoury
                             if (!(dd >= 0f) || dd > CorrPerishDays) continue;
                             if (inp.TownWar != null && inp.TownWar[ti * nt + tj]) continue;
                             double c = inp.TownGold28 != null && tj < inp.TownGold28.Length && zl > 0 ? tsh[tj * NG + g] * 0.5 * Math.Max(0.0, inp.TownGold28[tj]) / (zl * Math.Max(1.0, dd)) : 1e12;
+                            // KS-R4 r4-kupcy H7: eksporter niesie towar na kredyt - 0.5 x kasa 28 dob miasta z nadwyzka / (doby + 3), dzielone na psujace sie wedlug wartosci nadwyzki
+                            if (CreditOn(inp) && inp.TownGold28 != null && ti < inp.TownGold28.Length && zl > 0)
+                                c = TownSupShare(sup, dem, ti, g, NG) * 0.5 * Math.Max(0.0, inp.TownGold28[ti]) / (zl * (Math.Max(1.0, dd) + 3.0));
                             if (!(c > 0)) continue;
                             cost[k] = Math.Max(1.0, dd); cap[k] = c;
                         }
@@ -766,6 +787,137 @@ namespace Armoury
             }
         }
 
+        // ------------------------------------------------------------ KS-R4 r4-kupcy H7 (= K1): korytarze z modelem kredytu kupcow
+        internal const double CreditFloorShare = 0.5, CreditExpShare = 0.5, CreditPayDays = 3.0; internal const int CreditTopSrc = 3;
+
+        private sealed class CreditCtx
+        {
+            public double[] ImpCap;                     // [nl] zl/d: 15% x max(0, kasa 28 dob - 0.5 x zapas) miast krainy
+            public double[] TSup, TDem;                 // [nt * NG] podaz okregow miasta i popyt miasta z okregami (jedzenie)
+            public double[] SupSh;                      // [nl * NG] udzial towaru w wartosci nadwyzki krainy
+            public List<int>[] TownsOf;                 // [nl] miasta krainy
+            public int[][] Src; public int[][] Dst; public double[][] DstW; public double[] ExpGold;   // [wezel] miasta z nadwyzka (top 3), z brakiem (waga), 0.5 x kasa top 3
+            public bool[] ArcSea, ArcSet;               // [n * n] luk: morzem, ustawiony z kredytu
+        }
+
+        private static bool CreditOn(KsInput inp)
+        {
+            int nt = inp.Towns != null ? inp.Towns.Count : 0;
+            return inp.CorrCredit && nt > 0 && inp.TownRes != null && inp.TownRes.Length == nt && inp.TownGold28 != null && inp.TownGold28.Length >= nt && inp.TownDays != null && inp.TownDays.Length == nt * nt;
+        }
+
+        /// <summary>H7: kasa miasta, z ktorej placi przy dostawie (bez H7 - kasa 28 dob, jak dotad): max(0, kasa 28 dob - 0.5 x zapas kupcow).</summary>
+        private static double CreditGold(KsInput inp, int t)
+        {
+            double g28 = inp.TownGold28 != null && t < inp.TownGold28.Length ? Math.Max(0.0, inp.TownGold28[t]) : 0.0;
+            if (!CreditOn(inp)) return g28;
+            return Math.Max(0.0, g28 - CreditFloorShare * Math.Max(0.0, inp.TownRes[t]));
+        }
+
+        /// <summary>H7: udzial towaru psujacego sie g w wartosci nadwyzki miasta (bez cen - wedlug ilosci kg; tylko psujace sie z nadwyzka).</summary>
+        private static double TownSupShare(double[] sup, double[] dem, int t, int g, int NG)
+        {
+            double e = sup[t * NG + g] - dem[t * NG + g]; if (!(e > 0)) return 0.0;
+            double tot = 0; foreach (int h in Food) { if (!PerishG[h]) continue; double x = sup[t * NG + h] - dem[t * NG + h]; if (x > 0) tot += x; }
+            return tot > 0 ? e / tot : 0.0;
+        }
+
+        /// <summary>H7: przygotowanie kroku 5 z kredytem - przepustowosc importerow, podaz i popyt jedzenia miast, udzialy nadwyzki krain. Bez H7 - null (jak dotad).</summary>
+        private static CreditCtx CreditPrep(Ctx x, Dictionary<string, double[]> prod, double[] rest, double wpop, double[] SL, double[] DL, double[] zlG)
+        {
+            var inp = x.In;
+            if (!CreditOn(inp)) return null;
+            int nl = x.NL, nt = inp.Towns.Count, NG = KsTab.NG;
+            var c = new CreditCtx { ImpCap = new double[nl], TSup = new double[nt * NG], TDem = new double[nt * NG], SupSh = new double[nl * NG], TownsOf = new List<int>[nl] };
+            for (int l = 0; l < nl; l++) c.TownsOf[l] = new List<int>();
+            for (int t = 0; t < nt; t++)
+            {
+                int l = x.TownLand[t]; if (l < 0) continue;
+                c.TownsOf[l].Add(t);
+                c.ImpCap[l] += CorrCofferDay * CreditGold(inp, t);
+            }
+            var tmp = new double[NG];
+            foreach (var d in x.D)
+            {
+                int t = d.CorrTown; if (t < 0 || t >= nt) continue;
+                double[] a;
+                if (prod.TryGetValue(d.Id, out a)) foreach (int g in Food) c.TSup[t * NG + g] += a[g];
+                Array.Clear(tmp, 0, NG);
+                CivilGoods(d.Need, tmp);
+                foreach (int g in Food) c.TDem[t * NG + g] += tmp[g] + rest[g] * d.People / wpop;
+            }
+            for (int t = 0; t < nt; t++)
+            {
+                var ts = inp.Towns[t];
+                Array.Clear(tmp, 0, NG);
+                CivilGoods(ts.Need, tmp);
+                TownOneAdd(x, ts.Id, tmp);
+                foreach (int g in Food) c.TDem[t * NG + g] += tmp[g] + rest[g] * ts.People / wpop;
+            }
+            for (int l = 0; l < nl; l++)
+            {
+                int mk; if (!x.LandMk.TryGetValue(x.Lands[l], out mk)) mk = 0;
+                double tot = 0;
+                foreach (int g in Food) { double e = SL[l * NG + g] - DL[l * NG + g]; if (e > 0) { c.SupSh[l * NG + g] = e * zlG[mk * NG + g]; tot += c.SupSh[l * NG + g]; } }
+                foreach (int g in Food) c.SupSh[l * NG + g] = tot > 0 ? c.SupSh[l * NG + g] / tot : 0.0;
+            }
+            return c;
+        }
+
+        /// <summary>H7: wezly problemu przewozu towaru g - miasta krainy z nadwyzka (3 najwieksze) i z brakiem (waga = brak; bez braku w zadnym miescie - popyt), kasa eksportera.</summary>
+        private static void CreditNodes(Ctx x, CreditCtx c, List<int> nodes, int g)
+        {
+            var inp = x.In; int n = nodes.Count, NG = KsTab.NG;
+            c.Src = new int[n][]; c.Dst = new int[n][]; c.DstW = new double[n][]; c.ExpGold = new double[n];
+            c.ArcSea = new bool[n * n]; c.ArcSet = new bool[n * n];
+            var sl = new List<KeyValuePair<double, int>>(); var dl = new List<KeyValuePair<double, int>>();
+            for (int i = 0; i < n; i++)
+            {
+                sl.Clear(); dl.Clear();
+                foreach (int t in c.TownsOf[nodes[i]])
+                {
+                    double e = c.TSup[t * NG + g] - c.TDem[t * NG + g];
+                    if (e > 1e-9) sl.Add(new KeyValuePair<double, int>(e, t)); else if (e < -1e-9) dl.Add(new KeyValuePair<double, int>(-e, t));
+                }
+                sl.Sort((a, b) => a.Key != b.Key ? b.Key.CompareTo(a.Key) : a.Value.CompareTo(b.Value));
+                var src = new int[Math.Min(CreditTopSrc, sl.Count)];
+                double eg = 0;
+                for (int k = 0; k < src.Length; k++) { src[k] = sl[k].Value; eg += CreditExpShare * Math.Max(0.0, inp.TownGold28[src[k]]); }
+                c.Src[i] = src; c.ExpGold[i] = eg;
+                if (dl.Count == 0) foreach (int t in c.TownsOf[nodes[i]]) { double dm = c.TDem[t * NG + g]; if (dm > 1e-9) dl.Add(new KeyValuePair<double, int>(dm, t)); }
+                c.Dst[i] = new int[dl.Count]; c.DstW[i] = new double[dl.Count];
+                for (int k = 0; k < dl.Count; k++) { c.Dst[i][k] = dl[k].Value; c.DstW[i][k] = dl[k].Key; }
+            }
+        }
+
+        /// <summary>H7: doby luku i -> j = srednia (waga - brak miasta importera) najlepszych dob z 3 miast eksportera z nadwyzka (tabela KS-H, bez wojny); morzem, gdy wiekszosc wagi
+        /// jedzie statkiem. Brak miast albo drogi - false (brama krain, jak dotad).</summary>
+        private static bool CreditLink(Ctx x, CreditCtx c, int i, int j, out float days, out bool sea)
+        {
+            days = -1f; sea = false;
+            var inp = x.In; int nt = inp.Towns.Count;
+            var src = c.Src != null ? c.Src[i] : null; var dst = c.Dst != null ? c.Dst[j] : null;
+            if (src == null || src.Length == 0 || dst == null || dst.Length == 0) return false;
+            double sw = 0, sd = 0, ss = 0;
+            for (int q = 0; q < dst.Length; q++)
+            {
+                int tj = dst[q]; float best = -1f; bool bs = false;
+                foreach (int ti in src)
+                {
+                    float d = inp.TownDays[ti * nt + tj];
+                    if (!(d >= 0f)) continue;
+                    if (inp.TownWar != null && inp.TownWar[ti * nt + tj]) continue;
+                    if (best < 0f || d < best) { best = d; bs = inp.TownSea != null && inp.TownSea[ti * nt + tj]; }
+                }
+                if (best < 0f) continue;
+                double w = c.DstW[j][q];
+                sw += w; sd += w * best; if (bs) ss += w;
+            }
+            if (!(sw > 0)) return false;
+            days = (float)(sd / sw); sea = ss >= 0.5 * sw;
+            return true;
+        }
+
         /// <summary>Linia "KS: korytarze planu" (tekst z watku roboczego; dobe Planu wstawia watek glowny w miejsce {DOBA}): przewoz na rynek i towar (szt./d,
         /// srednio dob, morzem %), korytarze >= 20 szt./d (kraina zrodla > kraina celu), kraina-tryb, psujace sie bez zrodla, gradient najwiekszy, czas.</summary>
         private static void CorridorLine(Ctx x)
@@ -774,6 +926,7 @@ namespace Armoury
             var sb = new StringBuilder(6000);
             sb.Append("KS: korytarze planu doba {DOBA} | gradient krainy ").Append(x.In.Corridors ? "TAK" : "NIE (klucz Ks Land Gradient)").Append(", regula zasiegu ").Append(x.In.Reach ? "TAK" : "NIE")
               .Append(", przepustowosc ").Append(x.In.AfterD ? "po D (1.2 x dowoz KS-H, najmniej 20 szt./d)" : "przed D (budzet kasy importera: 15% kasy 28 dob na dobe, polowa kasy na towar w drodze, dzielony wedlug wartosci braku)")
+              .Append(CreditOn(x.In) ? ", kredyt kupcow (H7): importer 15% kasy 28 dob ponad 0.5 x zapas na dobe, eksporter 0.5 x kasa 28 dob 3 miast z nadwyzka / (doby + 3), doby od miast z brakiem do 3 miast z nadwyzka" : "")
               .Append(", popyt krain zaplacony (po kroku 8), tau lad ").Append(CorrTauLand.ToString("0.000", inv)).Append(" morze ").Append(CorrTauSea.ToString("0.0000", inv)).Append("/d").Append(", rund kroku 5 ").Append(R.CorrRounds)
               .Append(", czas ").Append(R.CorrMs.ToString("0", inv)).Append(" ms");
             for (int m = 0; m < NM; m++)
