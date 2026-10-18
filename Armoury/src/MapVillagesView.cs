@@ -96,6 +96,10 @@ namespace Armoury
         // przechodzi na v6 po uid z samego pliku ukladu, bez arm_map_villages_v5.tsv w module (VillageBook.OldLayout, MapVillageData.V5Of)
         public int V5Order = -1, V5Settlements = -1;
         public float V5X = -1f, V5Y = -1f;
+        // f10-uklad (uklad v7): wiersz tej wioski w ukladzie v6 (kolumny v6_order / v6_x / v6_y / v6_settlements pliku v7; V6Settlements -1 = brak) - zapis v6 Jeffa
+        // przechodzi na v7 po uid z samego pliku ukladu, bez arm_map_villages_v6.tsv w module (VillageBook.OldLayout, MapVillageData.V6Of)
+        public int V6Order = -1, V6Settlements = -1;
+        public float V6X = -1f, V6Y = -1f;
     }
 
     /// <summary>Wynik wczytania pliku: wiersze, naglowek, odrzucone wiersze z powodami.</summary>
@@ -110,6 +114,7 @@ namespace Armoury
         public int BadRows;
         public int LevelClamped;          // poziom spoza 1..3 przyciety (wiersz zostaje)
         public string MissingColumns = ""; // brak wymaganej kolumny w naglowku = caly plik odrzucony
+        public float MinDist = -1f;       // f10-uklad: naglowek "# min_distance: <jedn.>" (uklad v7 - odleglosc minimalna wioska-wioska generatora); -1 = brak
         public bool HasModelColumn;       // v4: naglowek ma kolumne "model" (bez niej kazda wioska = village)
         public readonly int[] ModelCounts = new int[MapVillageData.ModelCount];   // wiersze wedlug rodzaju obrazka
         public int ModelUnknown;          // nieznana wartosc w kolumnie "model" (obrazek village)
@@ -149,16 +154,17 @@ namespace Armoury
     /// <summary>Czyste funkcje danych wiosek (bez gry): wczytanie, CRC, lancuch ognia, obrys, przerzedzenie, os domow.</summary>
     internal static class MapVillageData
     {
-        internal const string FileName = "arm_map_villages.tsv";              // sw-przysiolki: uklad v6 (przysiolki na pustkowiach; dotad v5 - Jeff 16.10: 20% mniej wiosek, osady wedlug miejsca)
-        internal const string FileNameV5 = "arm_map_villages_v5.tsv";         // sw-przysiolki: uklad v5 (1957 wiosek) - klucz VillageLayoutV6 = false (i VillageLayoutV5 = true)
-        internal const string FileNameV4 = "arm_map_villages_v4.tsv";         // uklad v4 (2446 wiosek po ok. 16 osad) - klucze VillageLayoutV6 = false i VillageLayoutV5 = false
+        internal const string FileName = "arm_map_villages.tsv";              // f10-uklad: uklad v7 (wioski po calym ladzie okregu, odleglosc minimalna 2 x v6; dotad v6 - przysiolki)
+        internal const string FileNameV6 = "arm_map_villages_v6.tsv";         // f10-uklad: uklad v6 (przysiolki na pustkowiach) - klucz VillageLayoutV7 = false (i VillageLayoutV6 = true)
+        internal const string FileNameV5 = "arm_map_villages_v5.tsv";         // sw-przysiolki: uklad v5 (1957 wiosek) - klucze VillageLayoutV7 / V6 = false (i VillageLayoutV5 = true)
+        internal const string FileNameV4 = "arm_map_villages_v4.tsv";         // uklad v4 (2446 wiosek po ok. 16 osad) - klucze VillageLayoutV7 / V6 / V5 = false
         internal const int CheckNoCrc = 0, CheckMatch = 1, CheckMismatch = 2;
 
         // Jeff 16.10 (VillageLayoutV5): wybor ukladu RAZ NA SESJE - pierwszy odczyt pliku w sesji (VillageBook.Resolve albo widok mapy, kto pierwszy) czyta klucz z MCM
         // (McmSettings.Apply idzie dopiero po Resolve w OnSessionLaunched, wiec Settings.Current moze byc jeszcze z pliku ustawien); ksiega, widok i lore biora ten sam
         // plik do konca sesji (zmiana klucza w trakcie - od nastepnego wczytania). ResetChoice - VillageBook.Reset (konstruktor ArmouryBehavior, kazda kampania).
         private static bool _chosen, _v5 = true;
-        private static int _ver = 6;                // sw-przysiolki: uklad tej sesji 6 / 5 / 4
+        private static int _ver = 7;                // sw-przysiolki: uklad tej sesji 6 / 5 / 4; f10-uklad: 7
         private static string _choiceNote = "";
 
         internal static void ResetChoice() { _chosen = false; _choiceNote = ""; }
@@ -169,14 +175,14 @@ namespace Armoury
         /// <summary>Uklad v5 albo nowszy w tej sesji (wybor przy pierwszym odczycie) - false tylko przy v4. sw-przysiolki: v6 tez "nie v4".</summary>
         internal static bool LayoutV5 { get { EnsureChosen(); return _v5; } }
 
-        /// <summary>sw-przysiolki: numer ukladu tej sesji - 6 (przysiolki), 5 albo 4.</summary>
+        /// <summary>sw-przysiolki: numer ukladu tej sesji - 6 (przysiolki), 5 albo 4; f10-uklad: 7 (wioski po calym ladzie okregu).</summary>
         internal static int LayoutVersion { get { EnsureChosen(); return _ver; } }
 
-        /// <summary>Nazwa pliku ukladu tej sesji (v6, v5 albo v4).</summary>
+        /// <summary>Nazwa pliku ukladu tej sesji (v7, v6, v5 albo v4).</summary>
         internal static string LayoutFileName { get { return FileOfVersion(LayoutVersion); } }
 
-        /// <summary>sw-przysiolki: plik ukladu danej wersji (6 - arm_map_villages.tsv, 5 - _v5, 4 - _v4).</summary>
-        internal static string FileOfVersion(int v) { return v >= 6 ? FileName : (v == 5 ? FileNameV5 : FileNameV4); }
+        /// <summary>sw-przysiolki: plik ukladu danej wersji (f10-uklad: 7 - arm_map_villages.tsv, 6 - _v6, 5 - _v5, 4 - _v4).</summary>
+        internal static string FileOfVersion(int v) { return v >= 7 ? FileName : (v == 6 ? FileNameV6 : (v == 5 ? FileNameV5 : FileNameV4)); }
 
         private static void EnsureChosen()
         {
@@ -188,16 +194,19 @@ namespace Armoury
             // sw-przysiolki: klucz VillageLayoutV6 (domyslnie TAK) wybiera v6; wylaczony - jak dotad VillageLayoutV5 (v5 albo v4)
             bool v6 = s == null || s.VillageLayoutV6;
             try { v6 = McmLayoutV6(v6); } catch { }
-            int want = v6 ? 6 : (v ? 5 : 4);
+            // f10-uklad: klucz VillageLayoutV7 (domyslnie TAK) wybiera v7; wylaczony - jak dotad VillageLayoutV6 / V5 (v6, v5 albo v4)
+            bool v7 = s == null || s.VillageLayoutV7;
+            try { v7 = McmLayoutV7(v7); } catch { }
+            int want = v7 ? 7 : (v6 ? 6 : (v ? 5 : 4));
             int ver = want;
             // wgranie bez pliku wybranego ukladu - inny uklad zamiast braku wiosek (najpierw starszy, potem nowszy); lore idzie za ukladem (bramka crc i tak pilnuje).
-            // Wgranie sprzed v6 (arm_map_villages.tsv = v5, bez _v5) przy kluczu v6 wylaczonym: v5 z arm_map_villages.tsv - ksiega i lore rozpoznaja uklad po crc.
+            // Wgranie sprzed v7 (arm_map_villages.tsv = v6, bez _v6) przy kluczu v7 wylaczonym: v6 z arm_map_villages.tsv - ksiega i lore rozpoznaja uklad po crc.
             if (!ModuleFileExists(FileOfVersion(want)))
             {
-                int[] order = want == 6 ? new[] { 5, 4 } : (want == 5 ? new[] { 6, 4 } : new[] { 5, 6 });
+                int[] order = want == 7 ? new[] { 6, 5, 4 } : (want == 6 ? new[] { 7, 5, 4 } : (want == 5 ? new[] { 6, 7, 4 } : new[] { 5, 6, 7 }));
                 foreach (int o in order) if (ModuleFileExists(FileOfVersion(o))) { ver = o; break; }
                 if (ver != want)
-                    _choiceNote = "BRAK pliku " + FileOfVersion(want) + " - uklad v" + ver + " mimo kluczy Village Layout V6 " + (v6 ? "TAK" : "NIE") + " / V5 " + (v ? "TAK" : "NIE");
+                    _choiceNote = "BRAK pliku " + FileOfVersion(want) + " - uklad v" + ver + " mimo kluczy Village Layout V7 " + (v7 ? "TAK" : "NIE") + " / V6 " + (v6 ? "TAK" : "NIE") + " / V5 " + (v ? "TAK" : "NIE");
             }
             _ver = ver;
             _v5 = ver >= 5;
@@ -230,11 +239,19 @@ namespace Armoury
             catch { return dflt; }
         }
 
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        private static bool McmLayoutV7(bool dflt)
+        {
+            try { var i = McmSettings.Instance; return i != null ? i.VillageLayoutV7 : dflt; }
+            catch { return dflt; }
+        }
+
         private static readonly string[] Required = { "id", "village_id", "name", "x", "y", "settlements", "order", "level", "front_deg" };
         // kolumny pliku v2 / wedlug ludnosci (generator: naglowek "#id\tvillage_id\t...") - gdy naglowka brak, takie pozycje
         private static readonly string[] DefaultColumns = { "id", "village_id", "name", "x", "y", "road_deg", "settlements", "order", "kind", "uid",
             "class", "side", "level", "road_dist", "toward_village", "neighbors", "front_deg", "half_len", "half_wid", "face", "model" };
         private static readonly Regex CrcRx = new Regex(@"scene_xml_crc\s*[:=]\s*(0x[0-9A-Fa-f]+|[0-9]+)", RegexOptions.CultureInvariant);
+        private static readonly Regex MinDistRx = new Regex(@"^\s*min_distance\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*$", RegexOptions.CultureInvariant);   // f10-uklad
 
         /// <summary>Wczytuje tresc pliku. Wiersz z bledem jest odrzucany (z powodem), reszta zostaje.</summary>
         internal static MapVillageFile Parse(string text)
@@ -274,6 +291,13 @@ namespace Armoury
                             ? uint.TryParse(v.Substring(2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out crc)
                             : uint.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out crc);
                         if (ok) { f.HasSceneCrc = true; f.SceneCrc = crc; }
+                        continue;
+                    }
+                    var md = MinDistRx.Match(body);
+                    if (md.Success)
+                    {
+                        float mdv;
+                        if (float.TryParse(md.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out mdv) && mdv > 0f && mdv < 1000f) f.MinDist = mdv;
                         continue;
                     }
                     if (f.Title.Length == 0) f.Title = body.Trim();
@@ -362,6 +386,15 @@ namespace Armoury
                     r.V5Order = vo; r.V5Settlements = vs; r.V5X = vx; r.V5Y = vy;
                 }
             }
+            // f10-uklad: wiersz v6 (kolumny opcjonalne, jak v5_*)
+            {
+                int vo, vs; float vx, vy;
+                if (Int(Get(c, col, "v6_order"), out vo) && Int(Get(c, col, "v6_settlements"), out vs) && Num(Get(c, col, "v6_x"), out vx) && Num(Get(c, col, "v6_y"), out vy)
+                    && vo >= 0 && vs >= 1 && vx >= 0f && vy >= 0f && vx <= 100000f && vy <= 100000f)
+                {
+                    r.V6Order = vo; r.V6Settlements = vs; r.V6X = vx; r.V6Y = vy;
+                }
+            }
             return null;
         }
 
@@ -378,6 +411,24 @@ namespace Armoury
                 {
                     Id = r.Id, VillageId = r.VillageId, Uid = r.Uid, Name = r.Name, Line = r.Line,
                     X = r.V5X, Y = r.V5Y, Settlements = r.V5Settlements, Order = r.V5Order
+                });
+            }
+            return outl;
+        }
+
+        /// <summary>f10-uklad: uklad v6 odtworzony z kolumn v6_* pliku v7 - jak V5Of (kolejnosc pliku = kolejnosc v6, wiec crc "uid:osady;" = crc v6 F5456602).
+        /// null - choc jeden wiersz bez kolumn v6_* (plik v6 / v5 / v4 albo plik reczny).</summary>
+        internal static List<MapVillageRecord> V6Of(List<MapVillageRecord> recs)
+        {
+            if (recs == null || recs.Count == 0) return null;
+            var outl = new List<MapVillageRecord>(recs.Count);
+            foreach (var r in recs)
+            {
+                if (r == null || r.V6Settlements < 1) return null;
+                outl.Add(new MapVillageRecord
+                {
+                    Id = r.Id, VillageId = r.VillageId, Uid = r.Uid, Name = r.Name, Line = r.Line,
+                    X = r.V6X, Y = r.V6Y, Settlements = r.V6Settlements, Order = r.V6Order
                 });
             }
             return outl;

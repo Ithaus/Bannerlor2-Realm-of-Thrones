@@ -27,6 +27,10 @@ namespace Armoury
     /// Zajecie przysiolka poza KS: tylko opis (lore i nazwa) - produkcje wsi gry licza modele gry / BK; obrazek "fishing" rybakow wchodzi w HamletKinds (ryby zamiast czesci
     /// zboza okregu - zamknieta tozsamosc zboze zdjete = ryby dodane, jak dla kazdej wioski rybackiej). Wyjatki liczone per miejsce (potkniecia, pierwszy blad do logu),
     /// bez globalnych wylacznikow. Nic w zapisie gry (stan przysiolkow to stan ksiegi wiosek po uid).
+    /// f10-uklad (18.10, Jeff: "zwieksz dwukrotnie minimalna odleglosc wioski od wioski", "wykorzystaj mase terenu"): uklad v7 (tools/wioski-v7/v7_uklad.py, klucz
+    /// VillageLayoutV7) - linia startu porownuje z ukladem poprzednim (v7 z v6: plik _v6 albo kolumny v6_*; v6 z v5 jak dotad), druga linia "uklad v7 (f10-uklad)"
+    /// liczy odleglosc minimalna (naglowek pliku min_distance) wioska-wioska i wioska-wies gry, przeniesione wobec v6 na ladzie; nakladka KS bierze kazdy wiersz
+    /// z ziemia w kolumnach ks_* (v7: kazda przeniesiona wioska; v6: przysiolki - te same wiersze co dotad).
     /// </summary>
     internal static class VillageHamlets
     {
@@ -95,26 +99,32 @@ namespace Armoury
                 foreach (var r in hams) if (!string.IsNullOrEmpty(r.KsStart)) withKs++;
                 var by6 = MapVillageData.ByDistrict(recs);
                 sb.Append(" | wiosek ").Append(recs.Count).Append(", przysiolkow ").Append(hams.Count).Append(" (z ziemia KS ").Append(withKs).Append("), okregow z wioskami ").Append(by6.Count);
-                // porownanie z v5 (tylko przy v6 - plik _v5 modulu)
+                // porownanie z ukladem poprzednim: v6 z v5 (plik _v5 modulu); f10-uklad: v7 z v6 (plik _v6) - zmienna v5 = "uklad poprzedni" (nazwa jak dotad)
+                int pv = ver >= 7 ? 6 : 5;
+                string pfile = pv == 6 ? MapVillageData.FileNameV6 : MapVillageData.FileNameV5;
                 List<MapVillageRecord> v5 = null;
                 if (ver >= 6)
                 {
                     try
                     {
-                        string p5 = MapVillageData.DataPathFor(MapVillageData.FileNameV5);
+                        string p5 = MapVillageData.DataPathFor(pfile);
                         if (p5 != null && System.IO.File.Exists(p5))
                         {
                             var f5 = MapVillageData.Parse(System.IO.File.ReadAllText(p5, Encoding.UTF8));
                             if (f5.MissingColumns.Length == 0 && f5.Records.Count > 0) v5 = f5.Records;
                         }
                     }
-                    catch (Exception e) { Stumble("VillageHamlets.SessionStart(v5)", e); }
+                    catch (Exception e) { Stumble("VillageHamlets.SessionStart(v" + pv + ")", e); }
                 }
                 // recenzja: wiersz v5 kazdej wioski w samym pliku v6 (kolumny v5_*) - ksiega przenosi nim zapis v5 po uid bez pliku _v5; tu jego crc (= v5) i zapas porownania
-                List<MapVillageRecord> v5e = null;
+                // f10-uklad: plik v7 niesie tez wiersz v6 (kolumny v6_*) - zapis v6 Jeffa po uid bez pliku _v6
+                List<MapVillageRecord> v5e = null, v6e = null;
                 if (ver >= 6) { try { v5e = MapVillageData.V5Of(recs); } catch (Exception e) { Stumble("VillageHamlets.SessionStart(v5_*)", e); } }
-                string v5src = MapVillageData.FileNameV5;
-                if (v5 == null && v5e != null) { v5 = v5e; v5src = "kolumny v5_* pliku ukladu"; }
+                if (ver >= 7) { try { v6e = MapVillageData.V6Of(recs); } catch (Exception e) { Stumble("VillageHamlets.SessionStart(v6_*)", e); } }
+                string v5src = pfile;
+                var pcols = pv == 6 ? v6e : v5e;
+                if (v5 == null && pcols != null) { v5 = pcols; v5src = "kolumny v" + pv + "_* pliku ukladu"; }
+                _prev = v5;
                 if (v5 != null)
                 {
                     var by5 = MapVillageData.ByDistrict(v5);
@@ -135,12 +145,13 @@ namespace Armoury
                     }
                     var u5 = new HashSet<string>(StringComparer.Ordinal); foreach (var r in v5) u5.Add(r.Uid);
                     int uidMiss = 0; foreach (var r in recs) if (!u5.Contains(r.Uid)) uidMiss++;
-                    sb.Append(" | v5 (").Append(v5src).Append(" crc ").Append(CrcOf(v5).ToString("X8")).Append("): wiosek ").Append(v5.Count).Append(", okregow ").Append(by5.Count)
-                      .Append(", okregow z inna liczba wiosek ").Append(diffN).Append(", z inna suma osad ").Append(diffS).Append(", uid spoza v5 ").Append(uidMiss)
-                      .Append(", osad wiosek v6 ").Append(s6).Append(" / v5 ").Append(s5);
+                    sb.Append(" | v").Append(pv).Append(" (").Append(v5src).Append(" crc ").Append(CrcOf(v5).ToString("X8")).Append("): wiosek ").Append(v5.Count).Append(", okregow ").Append(by5.Count)
+                      .Append(", okregow z inna liczba wiosek ").Append(diffN).Append(", z inna suma osad ").Append(diffS).Append(", uid spoza v").Append(pv).Append(' ').Append(uidMiss)
+                      .Append(", osad wiosek v").Append(ver).Append(' ').Append(s6).Append(" / v").Append(pv).Append(' ').Append(s5);
                 }
-                else sb.Append(ver >= 6 ? " | v5: BRAK pliku " + MapVillageData.FileNameV5 + " (bez porownania)" : " | v5: uklad tej sesji v" + ver + " (bez porownania)");
+                else sb.Append(ver >= 6 ? " | v" + pv + ": BRAK pliku " + pfile + " (bez porownania)" : " | v5: uklad tej sesji v" + ver + " (bez porownania)");
                 if (ver >= 6) sb.Append(" | kolumny v5_* (zapis v5 po uid bez pliku _v5): crc ").Append(v5e != null ? CrcOf(v5e).ToString("X8") : "BRAK");
+                if (ver >= 7) sb.Append(" | kolumny v6_* (zapis v6 po uid bez pliku _v6): crc ").Append(v6e != null ? CrcOf(v6e).ToString("X8") : "BRAK");
                 // najblizsza sasiadka i skupiska
                 double mn, p10, med; int crowd;
                 NearStats(recs, out mn, out p10, out med, out crowd);
@@ -149,8 +160,8 @@ namespace Armoury
                 {
                     double mn5, p105, med5; int crowd5;
                     NearStats(v5, out mn5, out p105, out med5, out crowd5);
-                    sb.Append(", v5 min ").Append(F(mn5, "0.00")).Append(" p10 ").Append(F(p105, "0.00")).Append(" med ").Append(F(med5, "0.00"))
-                      .Append(" | skupiska (>=3 sasiadow w 10 jedn.) v6 ").Append(crowd).Append(", v5 ").Append(crowd5);
+                    sb.Append(", v").Append(pv).Append(" min ").Append(F(mn5, "0.00")).Append(" p10 ").Append(F(p105, "0.00")).Append(" med ").Append(F(med5, "0.00"))
+                      .Append(" | skupiska (>=3 sasiadow w 10 jedn.) v").Append(ver).Append(' ').Append(crowd).Append(", v").Append(pv).Append(' ').Append(crowd5);
                 }
                 else sb.Append(" | skupiska (>=3 sasiadow w 10 jedn.) ").Append(crowd);
                 // przysiolki na ladzie (siatka gry) i odleglosci od warowni
@@ -194,11 +205,144 @@ namespace Armoury
                     foreach (var kv in occ) { sb.Append(first ? "" : ", ").Append(kv.Key).Append(' ').Append(kv.Value); first = false; }
                 }
                 var s = Settings.Current;
-                sb.Append(" | klucze Village Layout V6 ").Append(s == null || s.VillageLayoutV6 ? "TAK" : "NIE").Append(", Village Hamlet Ks Land ").Append(s == null || s.VillageHamletKsLand ? "TAK" : "NIE")
+                sb.Append(" | klucze Village Layout V7 ").Append(s == null || s.VillageLayoutV7 ? "TAK" : "NIE")
+                  .Append(", Village Layout V6 ").Append(s == null || s.VillageLayoutV6 ? "TAK" : "NIE").Append(", Village Hamlet Ks Land ").Append(s == null || s.VillageHamletKsLand ? "TAK" : "NIE")
                   .Append(" | potkniecia ").Append(_stumbles).Append(" | czas ").Append(F(sw.Elapsed.TotalMilliseconds, "0")).Append(" ms.");
                 Log.Info(sb.ToString());
+                if (ver >= 7) V7Line(recs, _prev);
             }
             catch (Exception e) { Stumble("VillageHamlets.SessionStart", e); }
+        }
+
+        private static List<MapVillageRecord> _prev;   // uklad poprzedni tej sesji (linia startu) - tylko do linii v7, zerowany po niej
+
+        /// <summary>f10-uklad: linia ukladu v7 (raz na sesje, po linii startu): odleglosc minimalna z naglowka pliku (min_distance generatora = 2 x v6), wioska-wioska
+        /// i wioska-wies gry (min, p10, mediana, wiosek ponizej odleglosci), pary wsi gry ponizej (dane gry), przeniesione wobec v6 (polozenie z pliku _v6 albo kolumn
+        /// v6_*): ile, przesuniecie, na ladzie wedlug siatki gry, od miast i zamkow; wiersze z ziemia KS (ks_*). Nie rzuca.</summary>
+        private static void V7Line(List<MapVillageRecord> recs, List<MapVillageRecord> prev)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                float dmin = VillageBook.LayoutMinDist;
+                var side = new List<Vec2>(recs.Count);
+                foreach (var r in recs) side.Add(new Vec2(r.X, r.Y));
+                var mains = new List<Vec2>(); var towns = new List<Vec2>(); var castles = new List<Vec2>();
+                var seenV = new HashSet<Village>();
+                foreach (var st in Settlement.All)
+                {
+                    try
+                    {
+                        if (st == null) continue;
+                        if (st.IsVillage) { if (st.Village != null && seenV.Add(st.Village)) mains.Add(st.GetPosition2D); }
+                        else if (st.IsTown) towns.Add(st.GetPosition2D);
+                        else if (st.IsCastle) castles.Add(st.GetPosition2D);
+                    }
+                    catch (Exception e) { Stumble("VillageHamlets.V7Line(osada)", e); }
+                }
+                double[] ss = Nearest(side, side, true), sm = Nearest(side, mains, false), mm = Nearest(mains, mains, true);
+                double dd = dmin > 0f ? dmin : 0.0;
+                int ssBelow = 0, smBelow = 0, mmBelow = 0;
+                foreach (var v in ss) if (dd > 0 && v < dd - 1e-3) ssBelow++;
+                foreach (var v in sm) if (dd > 0 && v < dd - 1e-3) smBelow++;
+                foreach (var v in mm) if (dd > 0 && v < dd - 1e-3) mmBelow++;
+                var sb = new StringBuilder(768);
+                sb.Append(P).Append("uklad v7 (f10-uklad) | odleglosc minimalna ").Append(dmin > 0f ? F(dmin, "0.00") + " (naglowek pliku)" : "BRAK naglowka min_distance")
+                  .Append(" | wioska-wioska ").Append(Stat(ss)).Append(", wiosek ponizej odleglosci ").Append(ssBelow)
+                  .Append(" | wioska-wies gry ").Append(Stat(sm)).Append(", wiosek ponizej odleglosci ").Append(smBelow)
+                  .Append(" | wsie gry ponizej odleglosci (dane gry) ").Append(mmBelow).Append(" z ").Append(mains.Count);
+                if (prev != null && prev.Count == recs.Count)
+                {
+                    var byUid = new Dictionary<string, MapVillageRecord>(StringComparer.Ordinal);
+                    foreach (var r in prev) byUid[r.Uid] = r;
+                    var shifts = new List<double>();
+                    int land = 0, noMesh = 0, moved = 0;
+                    double dTown = double.MaxValue, dCastle = double.MaxValue;
+                    var ms = Campaign.Current != null ? Campaign.Current.MapSceneWrapper : null;
+                    foreach (var r in recs)
+                    {
+                        MapVillageRecord o;
+                        if (!byUid.TryGetValue(r.Uid, out o)) continue;
+                        double sh = Math.Sqrt((r.X - o.X) * (r.X - o.X) + (r.Y - o.Y) * (r.Y - o.Y));
+                        if (sh < 0.5) continue;
+                        moved++; shifts.Add(sh);
+                        try
+                        {
+                            if (ms != null)
+                            {
+                                var cv = new CampaignVec2(new Vec2(r.X, r.Y), true);
+                                PathFaceRecord f = ms.GetFaceIndex(in cv);
+                                if (!f.IsValid()) noMesh++;
+                                else if (MapVillageData.IsLandGroup(f.FaceGroupIndex)) land++;
+                            }
+                        }
+                        catch (Exception e) { Stumble("VillageHamlets.V7Line(lad)", e); }
+                        foreach (var t in towns) { double d = Math.Sqrt((t.x - r.X) * (t.x - r.X) + (t.y - r.Y) * (t.y - r.Y)); if (d < dTown) dTown = d; }
+                        foreach (var c in castles) { double d = Math.Sqrt((c.x - r.X) * (c.x - r.X) + (c.y - r.Y) * (c.y - r.Y)); if (d < dCastle) dCastle = d; }
+                    }
+                    shifts.Sort();
+                    sb.Append(" | przeniesione wobec v6 ").Append(moved).Append(" z ").Append(recs.Count)
+                      .Append(" (przesuniecie mediana ").Append(shifts.Count > 0 ? F(shifts[shifts.Count / 2], "0.0") : "-").Append(", max ").Append(shifts.Count > 0 ? F(shifts[shifts.Count - 1], "0.0") : "-")
+                      .Append("), na ladzie ").Append(ms != null ? land.ToString(Inv) : "?").Append('/').Append(moved).Append(" (sciana ladowa siatki gry").Append(noMesh > 0 ? ", poza siatka " + noMesh : "")
+                      .Append("), od miasta min ").Append(moved > 0 && towns.Count > 0 ? F(dTown, "0.0") : "-").Append(", od zamku min ").Append(moved > 0 && castles.Count > 0 ? F(dCastle, "0.0") : "-");
+                }
+                else sb.Append(" | przeniesione wobec v6: bez ukladu v6 (brak pliku _v6 i kolumn v6_*)");
+                int ksn = 0;
+                foreach (var r in recs) if (!string.IsNullOrEmpty(r.KsStart)) ksn++;
+                sb.Append(" | wiosek z ziemia KS (ks_*) ").Append(ksn).Append(" | potkniecia ").Append(_stumbles).Append(" | czas ").Append(F(sw.Elapsed.TotalMilliseconds, "0")).Append(" ms.");
+                Log.Info(sb.ToString());
+            }
+            catch (Exception e) { Stumble("VillageHamlets.V7Line", e); }
+            finally { _prev = null; }
+        }
+
+        private static string Stat(double[] a)
+        {
+            if (a == null || a.Length == 0) return "-";
+            var s = (double[])a.Clone();
+            Array.Sort(s);
+            int n = s.Length;
+            double med = n % 2 == 1 ? s[n / 2] : 0.5 * (s[n / 2 - 1] + s[n / 2]);
+            return "min " + F(s[0], "0.00") + " p10 " + F(s[n / 10], "0.00") + " med " + F(med, "0.00");
+        }
+
+        /// <summary>f10-uklad: odleglosc kazdego punktu a do najblizszego punktu b (self - te same listy, bez siebie); siatka 16 jedn., pierscienie do 40.</summary>
+        private static double[] Nearest(List<Vec2> a, List<Vec2> b, bool self)
+        {
+            var outd = new double[a.Count];
+            if (a.Count == 0 || b.Count == 0) return outd;
+            const double cell = 16.0;
+            var grid = new Dictionary<long, List<int>>();
+            for (int j = 0; j < b.Count; j++)
+            {
+                long k = ((long)Math.Floor(b[j].x / cell) << 32) ^ (long)(uint)(int)Math.Floor(b[j].y / cell);
+                List<int> l; if (!grid.TryGetValue(k, out l)) grid[k] = l = new List<int>();
+                l.Add(j);
+            }
+            for (int i = 0; i < a.Count; i++)
+            {
+                double x = a[i].x, y = a[i].y, best = double.MaxValue;
+                int gx = (int)Math.Floor(x / cell), gy = (int)Math.Floor(y / cell);
+                for (int rr = 0; rr <= 40; rr++)
+                {
+                    for (int ix = gx - rr; ix <= gx + rr; ix++)
+                        for (int iy = gy - rr; iy <= gy + rr; iy++)
+                        {
+                            if (rr > 0 && ix > gx - rr && ix < gx + rr && iy > gy - rr && iy < gy + rr) continue;
+                            List<int> l;
+                            if (!grid.TryGetValue(((long)ix << 32) ^ (long)(uint)iy, out l)) continue;
+                            foreach (int j in l)
+                            {
+                                if (self && j == i) continue;
+                                double d = Math.Sqrt((b[j].x - x) * (b[j].x - x) + (b[j].y - y) * (b[j].y - y));
+                                if (d < best) best = d;
+                            }
+                        }
+                    if (best <= rr * cell) break;
+                }
+                outd[i] = best == double.MaxValue ? 1e6 : best;
+            }
+            return outd;
         }
 
         /// <summary>Crc ukladu "uid:osady;" w kolejnosci pliku - ten sam napis co VillageBook.LayoutCrcOf i generator.</summary>
@@ -306,12 +450,14 @@ namespace Armoury
                 var s = Settings.Current;
                 bool key = s == null || s.VillageHamletKsLand;
                 int ver = MapVillageData.LayoutVersion;
-                var hams = VillageBook.HamletRecords();
+                var hamsAll = VillageBook.HamletRecords();
+                // f10-uklad: kazdy wiersz z ziemia w kolumnach ks_* (v7 - kazda przeniesiona wioska i przysiolki v6, ktore zostaly; v6 - przysiolki, jak dotad)
+                var hams = VillageBook.KsLandRecords();
                 string why = null;
                 if (vil == null) why = "brak pliku ziemi KS - nic";
                 else if (!key) why = "klucz Village Hamlet Ks Land NIE - przysiolki w KS na ziemi starego miejsca wioski (wiersze pliku)";
                 else if (ver < 6) why = "uklad v" + ver + " - wiersze pliku ziemi bez zmian";
-                else if (hams.Count == 0) why = "uklad bez przysiolkow (kolumna hamlet) - wiersze pliku ziemi bez zmian";
+                else if (hams.Count == 0) why = "uklad bez ziemi KS w kolumnach ks_* - wiersze pliku ziemi bez zmian";
                 if (why != null)
                 {
                     _ksNote = why + (restored > 0 ? " (przywrocone " + restored + " wierszy z poprzedniej sesji)" : "");
@@ -320,9 +466,9 @@ namespace Armoury
                 }
                 var byUid = new Dictionary<string, MapVillageRecord>(StringComparer.Ordinal);
                 int noLand = 0, badTerr = 0, badCraft = 0, badDist = 0;
+                foreach (var r in hamsAll) if (string.IsNullOrEmpty(r.KsStart)) noLand++;      // przysiolek bez ziemi KS w ukladzie (zly wiersz ks_*)
                 foreach (var r in hams)
                 {
-                    if (string.IsNullOrEmpty(r.KsStart)) { noLand++; continue; }
                     if (!Terrs.Contains(r.KsTerr)) { badTerr++; continue; }
                     if (!KsTab.CraftIndex.ContainsKey(r.KsStart)) { badCraft++; continue; }
                     byUid[r.Uid] = r;
@@ -353,7 +499,8 @@ namespace Armoury
                 }
                 _ksRows = matched.Count;
                 var sb = new StringBuilder(512);
-                sb.Append("uklad v").Append(ver).Append(": przysiolkow ").Append(hams.Count).Append(", nadpisane wiersze S ziemi ").Append(_ksRows)
+                sb.Append("uklad v").Append(ver).Append(": przysiolkow ").Append(hamsAll.Count).Append(", wiosek z ziemia w ukladzie (ks_*) ").Append(hams.Count)
+                  .Append(", nadpisane wiersze S ziemi ").Append(_ksRows)
                   .Append(" (zajecie startowe: ");
                 bool first = true;
                 foreach (var kv in byStart) { sb.Append(first ? "" : ", ").Append(kv.Key).Append(' ').Append(kv.Value); first = false; }

@@ -28,10 +28,11 @@ namespace Armoury
     /// </summary>
     internal static class MapVillageLore
     {
-        internal const string FileName = "arm_map_village_lore.tsv";            // sw-przysiolki: lore ukladu v6 (bramka = crc ukladu v6; dotad v5)
-        internal const string FileNameV5 = "arm_map_village_lore_v5.tsv";       // sw-przysiolki: lore ukladu v5 (VillageLayoutV6 = false)
-        internal const string FileNameV4 = "arm_map_village_lore_v4.tsv";       // Jeff 16.10: lore ukladu v4 (VillageLayoutV6 = false i VillageLayoutV5 = false)
-        private static string LoreFileName { get { int v = MapVillageData.LayoutVersion; return v >= 6 ? FileName : (v == 5 ? FileNameV5 : FileNameV4); } }
+        internal const string FileName = "arm_map_village_lore.tsv";            // f10-uklad: lore ukladu v7 (bramka = crc ukladu v7; dotad v6)
+        internal const string FileNameV6 = "arm_map_village_lore_v6.tsv";       // f10-uklad: lore ukladu v6 (VillageLayoutV7 = false)
+        internal const string FileNameV5 = "arm_map_village_lore_v5.tsv";       // sw-przysiolki: lore ukladu v5 (VillageLayoutV7 / V6 = false)
+        internal const string FileNameV4 = "arm_map_village_lore_v4.tsv";       // Jeff 16.10: lore ukladu v4 (VillageLayoutV7 / V6 / V5 = false)
+        private static string LoreFileName { get { int v = MapVillageData.LayoutVersion; return v >= 7 ? FileName : (v == 6 ? FileNameV6 : (v == 5 ? FileNameV5 : FileNameV4)); } }
         private static string _loreUsed;                                         // sw-przysiolki: plik lore naprawde wczytany (zapas po bramce - nizej)
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private static readonly string[] NoIds = new string[0];
@@ -136,7 +137,7 @@ namespace Armoury
                 // sw-przysiolki: plik ukladu wybrany zapasem (wgranie bez pliku wybranego ukladu) albo lore innego ukladu - pierwszy plik lore modulu z bramka = crc ukladu ksiegi
                 if (text == null || HeadCrc(text) != crc)
                 {
-                    foreach (var alt in new[] { FileName, FileNameV5, FileNameV4 })
+                    foreach (var alt in new[] { FileName, FileNameV6, FileNameV5, FileNameV4 })
                     {
                         if (alt == name) continue;
                         string ap = MapVillageTooltip.ModulePath("ModuleData", alt);
