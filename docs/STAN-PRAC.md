@@ -3140,3 +3140,9 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
 - 16:00 PDT: DECYZJE JEFFA 18.10 (verbatim "1.b 2.c 3. a 4. b"): (1) W5/W5b/M1 wedlug potrzeby (ten sam f co zwrot/renty); (2) danina Wolnych Miast dla Dothrakow WYLACZONA; (3) zysk Banku
   Zelaznego ponad zapas do wlascicieli w Braavos (wydaja w Braavos); (4) podaz jedzenia i soli za cena - regula jak KsIronHandsFollowMarket (co 7 dob <= 5% rak), A7 pozniej. -> paczki f20-d1..d4
   (zb/f20-d1..d4 od 6478f861). Wszystko pod NOWYMI kluczami (plik MCM Jeffa ma wszystkie stare klucze).
+- 16:30 PDT: f19-kanon GOTOWE (wf_449079c2-612): kanon-a 8db24562 (CrashScribe: KRONIKA + SOJUSZE, CanonAlliances - postfiks DefaultAllianceModel.CanMakeAlliance (Westeros: battania+riverlands,
+  stormlands+empire_w do smierci Renly'ego (lord_1_9), vlandia+empire_w po; Stannis/Straz brak; gracz wylaczony), zerwanie niekanonicznych sojuszy po wczytaniu, Reach vs North przez
+  ROT FIVE_KINGS_REACH_NORTH po OnRenlysDeath, E1 PovertyPeaceSkipOneOff); kanon-b 36c1d275 (Armoury BookHoldings.cs, klucz BookHoldingsRestore, zapis arm_book_holdings: KL -> clan_nord_1
+  (Red Keep blizniak), Sharp Point/Stonedance/Sweetport/Cape Wrath/Fellwood -> rody Stannisa, Starfall -> Dayne; tylko na mapie, zaloga starego pana do partii jego krolestwa (albo do domu),
+  bohaterowie bez druzyny teleport do swoich twierdz, partie Polnocy w promieniu 60 od KL pod Harrenhal, zwrot 1 125 434 Koronie; E1 nie liczy zwrotu jako biedy). Konflikt do scalenia:
+  oba ruszaja CrashScribe PovertyPeace. Czekam na f20-decyzje (wf_0b2cd3b7-0f7), potem scalenie7 (scalenie7.js).
