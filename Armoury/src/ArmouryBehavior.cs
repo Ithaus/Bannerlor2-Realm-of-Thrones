@@ -486,6 +486,15 @@ namespace Armoury
                 if (dataStore.IsLoading) DsTowns.Import(miasta);
             }
             catch (Exception e) { Log.Error("SyncData.arm_daniny_miasta", e); }
+            // ds-akumulator (recenzja, miekki start DsHoardDue): doba poczatku rampy daniny od skarbca ludu - wlasny try; brak klucza (stary zapis, Ironman Jeffa) = -1: rampa od
+            // pierwszej doby z kluczem przy firmach F3 (klucz od ustalenia firm - rampa F3 co do doby); starszy DLL ignoruje klucz (wtedy danina i tak nie biegnie)
+            try
+            {
+                string dsakum = dataStore.IsSaving ? TownFolk.ExportDsAkum() : null;
+                SaveText.Sync(dataStore, "arm_dsakum", ref dsakum);
+                if (dataStore.IsLoading) TownFolk.ImportDsAkum(dsakum);
+            }
+            catch (Exception e) { Log.Error("SyncData.arm_dsakum", e); }
             // unikaty ROT: kopie startowe zdjete raz na kampanie (wpis 62) - 177-2: we wlasnym try (krytyka 177 pkt 6: zgubiona flaga = druga
             // czystka startowa; od 177 omija ona stal valyrianska, ale inne unikaty sprzedane na polke zdjelaby znowu)
             try

@@ -969,10 +969,12 @@ Uzycie (Python 3, tylko odczyt):
 --grupa nakum     : (noc 17/18.10, paczka ds-akumulator; Jeff "czy nie ma stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac"; Armoury/src/TownFolk.DsAkum.cs) python -I
                     tools/sprawdz_logi.py --grupa nakum <Armoury-*.log> [--do-doby N] (strumieniowo). Okno: od firm F3 + 28 + 7 dob (bez F3 - ostatnie 28 dob). NAKUM-0 linia
                     'Akumulator kies' kazdej doby, NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy < +30 tys./d (1b R/P INFO, 1c zapas dni W koniec <= 1.1 x poczatek), NAKUM-2
-                    danina od skarbca ludu (pobrano = panom + kasom, korona 0; > 0 po rampie), NAKUM-3 roboty gminy i septy (z kies = do kas + do ludu, material zaplacony = towar
-                    zdjety, rzemieslnicy <= k x material), NAKUM-4 lepszy stol przy KS (oferta otwarta i kupione > 0; bez KS INFO), NAKUM-5 kiesy wsi <= +0.2%/d (pieniadz robot
-                    zostaje we wsi), NAKUM-6 jednorazowe korony do zapasu (INFO), NAKUM-7 kazdy posiadacz 'Pieniadz swiata' <= +30 tys./d w 28 dobach, NAKUM-8 czas <= 5 ms,
-                    NAKUM-9 potkniecia i ERROR 0. Log bez paczki: NAKUM-1/5/7 z linii niezaleznych, reszta INFO.
+                    danina od skarbca ludu (pobrano = panom + kasom, korona 0; > 0 po rampie; 2c bez skoku: najwiekszy wzrost pobranego doba do doby <= max(60 tys., 0.5 x
+                    srednia), rampa klucza od doby ustalenia firm albo od wlaczenia - miekki start), NAKUM-3 roboty gminy i septy (z kies = do kas + do ludu, material zaplacony =
+                    koszt zdjetego towaru, rzemieslnicy <= k x material; 3d sztuki zakupu = zmiana polek targow zmierzona osobno, zlecen z rozjazdem 0; 3e przyciete do kiesy ponad
+                    skrzynie wsi DS - INFO), NAKUM-4 lepszy stol przy KS (oferta otwarta i kupione > 0; bez KS INFO), NAKUM-5 kiesy wsi <= +0.2%/d (pieniadz robot zostaje we
+                    wsi), NAKUM-6 jednorazowe korony do zapasu (INFO), NAKUM-7 kazdy posiadacz 'Pieniadz swiata' <= +30 tys./d w 28 dobach, NAKUM-8 czas <= 5 ms, NAKUM-9
+                    potkniecia i ERROR 0. Log bez paczki: NAKUM-1/5/7 z linii niezaleznych, reszta INFO (pola dopisane po recenzji - brak pola = INFO, nie NIE).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -34343,15 +34345,20 @@ NAK_RX = {
                        r"kontrola danina: pobrano - panom - kasom - koronie = (-?\d+)"),
     "works": re.compile(r"\| roboty gminy z prawdziwym materialem \(Ds Works Real Material\) (tak|nie), rzemieslnicy najwyzej ([\d.]+) x material: zlecone (\d+) \((\d+) wsi\), "
                         r"material z polek (\d+), rzemieslnicy miast (\d+), wsi z robota (\d+), bez materialu \(zostalo w kiesach wsi\) (\d+)"),
-    "wctl": re.compile(r"kontrola robot: z kies wsi - \(do kas \+ do ludu\) = (-?\d+), material zaplacony - towar zdjety = (-?\d+)"),
+    "wctl": re.compile(r"kontrola robot: z kies wsi - \(do kas \+ do ludu\) = (-?\d+), material zaplacony - (?:towar zdjety|koszt zdjetego towaru) = (-?\d+)"),
     "sept": re.compile(r"\| septy z dziesieciny \(ta sama regula\): zlecone (\d+) \((\d+)\), material (\d+), rzemieslnicy (\d+) .*?bez materialu \(zostalo u placacych\) (\d+); "
-                       r"kontrola septow: od placacych - \(do kas \+ do ludu\) = (-?\d+), material zaplacony - towar zdjety = (-?\d+)"),
+                       r"kontrola septow: od placacych - \(do kas \+ do ludu\) = (-?\d+), material zaplacony - (?:towar zdjety|koszt zdjetego towaru) = (-?\d+)"),
     "vdue": re.compile(r"\| danina od skarbca wsi \(Ds Hoard Due Villages\) (tak|nie): .*?pobrano (\d+) \((\d+) wsi\) = do panow (\d+) \+ do kas osad (\d+).*?kontrola: pobrano - panom - kasom = (-?\d+)"),
     "bt": re.compile(r"\| lepszy stol z oszczednosci \(Folk Better Table\) (tak|nie): oferta otwarta (\d+) \((\d+)\), ponad cena graniczna P4 \(zostalo w kiesie\) (\d+) \((\d+)\)"),
     "wf": re.compile(r"\| jednorazowe 'inne' korony do zapasu \(Crown Windfall To Reserve\) (tak|nie): (\d+) \((\d+) krolestw\)"),
     "purse": re.compile(r"\| kiesy: ludu miast W (-?\d+) / R (-?\d+) / P (-?\d+), podzamcza (-?\d+), wsi (-?\d+)"),
     "med": re.compile(r"mediana kiesy (\d+), mediana skrzyni (\d+), mediana kiesa / skrzynia ([\d.]+|-)"),
     "time": re.compile(r"\| czas ([\d.]+) ms \| potkniecia (\d+)"),
+    # recenzja (18.10): rampa klucza Ds Hoard Due (miekki start), M9 jako srednia doby raty, kontrola sztuk na polce, zlecenia wsi DS przyciete do kiesy ponad skrzynie
+    "keyramp": re.compile(r"rampa klucza ([\d.]+) od doby (-?\d+)\)"),
+    "m9": re.compile(r"dziesiata M9 wliczona jako srednia doby raty (\d+), raty M9 zdjete dzis (\d+)"),
+    "shelf": re.compile(r"zmiana polek targow \(sztuki zdjete, zmierzone na polce\) (\d+), kontrola sztuk: zakup - zmiana polek = (-?\d+) \(zlecen z rozjazdem albo bez odczytu polki (\d+)\)"),
+    "chest": re.compile(r"przyciete do kiesy ponad skrzynie wsi DS \(zostalo w kiesach\) (\d+) \((\d+) zlecen\)"),
 }
 NAK_TRANSIT = ("razem", "cla miast i zamkow", "podatek wsi", "portfele wezwan do wojny (168)", "gracz", "wedrowcy", "inni", "inne")
 
@@ -34438,7 +34445,9 @@ def nakum_main(logp, until=None):
     NAKUM-0 linia 'Akumulator kies' kazdej doby; NAKUM-1a kiesy ludu miast (W+R+P) i podzamczy - przyrost swiata < +30 tys./d w oknie (baza bez DS +11 tys./d,
     fin76/78/80 +186..195 tys./d), 1b R i P osobno (INFO), 1c zapas dni W nie rosnie (koniec <= 1.1 x poczatek okna); NAKUM-2 danina od skarbca ludu (Ds Hoard Due):
     kontrola pobrano = panom + kasom + koronie (korona 0) kazdej doby, pobrano > 0 po rampie; NAKUM-3 roboty gminy i septy (Ds Works Real Material): kontrole
-    z kies wsi = do kas + do ludu, material zaplacony = towar zdjety (0 kazdej doby), rzemieslnicy <= k x material; NAKUM-4 lepszy stol z oszczednosci przy KS
+    z kies wsi = do kas + do ludu, material zaplacony = koszt zdjetego towaru (0 kazdej doby), rzemieslnicy <= k x material, 3d sztuki zakupu = zmiana polek targow
+    zmierzona osobno (recenzja 18.10: kontrola niezalezna od ShelfBuy.Take), 3e przyciete do kiesy ponad skrzynie (INFO); NAKUM-2c bez skoku poboru (miekki start klucza);
+    NAKUM-4 lepszy stol z oszczednosci przy KS
     (oferta otwarta > 0 i 'lepszy stol' kupione > 0; bez KS - INFO); NAKUM-5 kiesy wsi w oknie - dryf <= +0.2%/d (pieniadz robot zostaje we wsi: nowy akumulator?);
     NAKUM-6 jednorazowe 'inne' korony do zapasu (INFO); NAKUM-7 kazdy posiadacz z 'Pieniadz swiata' (bez licznikow w drodze) - przyrost ostatnich 28 dob <= +30 tys./d;
     NAKUM-8 czas linii (mediana) <= 5 ms; NAKUM-9 potkniecia i ERROR paczki 0. Log bez paczki: wiersze z linii niezaleznych licza sie dalej (NAKUM-1, 5, 7), reszta
@@ -34503,17 +34512,31 @@ def nakum_main(logp, until=None):
         if on:
             lo = sum(G(d, "take", 6) for d in on) / len(on); co = sum(G(d, "take", 7) for d in on) / len(on)
             pa = sum(G(d, "pre", 0) for d in on if "pre" in A[d]) / len(on); pf = sum(G(d, "pre", 1) for d in on if "pre" in A[d]) / len(on)
-            rep.add("NAKUM-2b: danina od skarbca ludu w oknie (klucz tak, firmy F3)", f"pobrano {tk:.0f}/d (panom {lo:.0f}, kasom osad {co:.0f}); wliczone jako zaplacone: M9 i danina tej doby {pa:.0f}/d, czesc firmy z oszczednosci {pf:.0f}/d",
+            m9w = [d for d in on if "m9" in A[d]]
+            m9t = (f" (w tym M9 srednia doby raty {sum(G(d, 'm9', 0) for d in m9w) / len(m9w):.0f}/d, raty M9 zdjete {sum(G(d, 'm9', 1) for d in m9w) / len(m9w):.0f}/d)" if m9w else "")
+            rep.add("NAKUM-2b: danina od skarbca ludu w oknie (klucz tak, firmy F3)", f"pobrano {tk:.0f}/d (panom {lo:.0f}, kasom osad {co:.0f}); wliczone jako zaplacone: M9 i danina tej doby {pa:.0f}/d{m9t}, czesc firmy z oszczednosci {pf:.0f}/d",
                     "> 0 (kiesy ludu ponad poziom normalny placa)", tk > 0)
         else:
             rep.add("NAKUM-2b: danina od skarbca ludu w oknie", "klucz wylaczony albo bez firm F3 w oknie", "INFO", None)
+        # NAKUM-2c (recenzja 18.10): miekki start - bez skoku poboru z doby na dobe (klucz wlaczony po rampie F3 od nagromadzonego skarbca: pelna stawka pierwszego dnia)
+        tks = [(d, G(d, "take", 0)) for d in ad if "take" in A[d]]
+        kr = [(d, float(A[d]["keyramp"][0]), int(A[d]["keyramp"][1])) for d in ad if "keyramp" in A[d]]
+        st_ = sorted(set(x[2] for x in kr if x[2] >= 0))
+        if len(tks) >= 2:
+            jumps = [(b[0], b[1] - a[1]) for a, b in zip(tks, tks[1:]) if b[0] - a[0] == 1]
+            jm = max(jumps, key=lambda x: x[1]) if jumps else (None, 0.0)
+            avg = sum(x[1] for x in tks) / len(tks)
+            lim = max(60000.0, 0.5 * avg)
+            rmp = (f"; rampa klucza od doby {', '.join(str(x) for x in st_)} (firmy F3 od {fix})" if st_ else ("; rampa klucza: brak pola (log sprzed recenzji)" if not kr else "; rampa klucza: klucz nie czynny"))
+            rep.add("NAKUM-2c: danina od skarbca ludu bez skoku (najwiekszy wzrost 'pobrano' doba do doby; miekki start klucza)",
+                    f"{jm[1]:+.0f} (dzien {jm[0]}), srednia {avg:.0f}/d" + rmp, f"<= max(60 000, 0.5 x srednia) = {lim:.0f}", jm[1] <= lim)
     else:
         rep.add("NAKUM-2: danina od skarbca ludu", "brak linii", "INFO", None)
     # NAKUM-3 roboty gminy i septy
     if ad:
         wb = [(d, G(d, "wctl", 0), G(d, "wctl", 1)) for d in ad if "wctl" in A[d] and (G(d, "wctl", 0) != 0 or G(d, "wctl", 1) != 0)]
         sb_ = [(d, G(d, "sept", 5), G(d, "sept", 6)) for d in ad if "sept" in A[d] and (G(d, "sept", 5) != 0 or G(d, "sept", 6) != 0)]
-        rep.add("NAKUM-3a: roboty gminy i septy - z kies placacych = do kas + do ludu, material zaplacony = towar zdjety (kazdej doby)",
+        rep.add("NAKUM-3a: roboty gminy i septy - z kies placacych = do kas + do ludu, material zaplacony = koszt zdjetego towaru (kazdej doby)",
                 f"dob z rozjazdem: roboty {len(wb)}, septy {len(sb_)}" + (f" (roboty dzien {wb[0][0]}: {wb[0][1]:.0f} / {wb[0][2]:.0f})" if wb else "") + (f" (septy dzien {sb_[0][0]}: {sb_[0][1]:.0f} / {sb_[0][2]:.0f})" if sb_ else ""),
                 "0 / 0", not wb and not sb_)
         over = [(d, G(d, "works", 5), G(d, "works", 4), G(d, "works", 1)) for d in ad if "works" in A[d] and G(d, "works", 5) > G(d, "works", 1) * G(d, "works", 4) + 1]
@@ -34525,6 +34548,19 @@ def nakum_main(logp, until=None):
             sq = sum(G(d, "sept", 0) or 0 for d in aw2) / n_; sm = sum(G(d, "sept", 2) or 0 for d in aw2) / n_; sw = sum(G(d, "sept", 3) or 0 for d in aw2) / n_
             rep.add("NAKUM-3c: roboty gminy i septy na dobe w oknie (INFO)", f"roboty: zlecone {q:.0f}, material {mt:.0f}, rzemieslnicy {wg:.0f}, bez materialu (we wsiach) {nm:.0f}; septy: zlecone {sq:.0f}, material {sm:.0f}, rzemieslnicy {sw:.0f}",
                     "INFO (dawniej roboty: 3/4 place ludu + 1/4 'material' bez towaru)", None)
+        # NAKUM-3d (recenzja 18.10): sztuki zakupu = zmiana polek targow zmierzona osobno (kontrola niezalezna od ShelfBuy.Take i od zaplaty)
+        shd = [d for d in ad if "shelf" in A[d]]
+        if shd:
+            sbad = [(d, G(d, "shelf", 1), G(d, "shelf", 2)) for d in shd if G(d, "shelf", 1) != 0 or G(d, "shelf", 2) != 0]
+            rep.add("NAKUM-3d: material robot i septow - sztuki zakupu = zmiana polek targow (kazdej doby)",
+                    f"dob {len(shd)}, sztuk zdjetych {sum(G(d, 'shelf', 0) for d in shd):.0f}, dob z rozjazdem {len(sbad)}" + (f" (dzien {sbad[0][0]}: roznica {sbad[0][1]:.0f}, zlecen {sbad[0][2]:.0f})" if sbad else ""),
+                    "0 dob z rozjazdem", not sbad)
+            chd = [d for d in aw2 if "chest" in A[d]]
+            if chd:
+                rep.add("NAKUM-3e: zlecenia wsi DS przyciete do kiesy ponad skrzynie (septy z wozow; INFO)",
+                        f"{sum(G(d, 'chest', 0) for d in chd) / len(chd):.0f}/d ({sum(G(d, 'chest', 1) for d in chd) / len(chd):.1f} zlecen/d) - zostalo w kiesach wsi", "INFO", None)
+        else:
+            rep.add("NAKUM-3d: sztuki zakupu = zmiana polek targow", "brak pola (log sprzed recenzji 18.10)", "INFO", None)
     else:
         rep.add("NAKUM-3: roboty gminy i septy", "brak linii", "INFO", None)
     # NAKUM-4 lepszy stol

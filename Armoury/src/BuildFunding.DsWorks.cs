@@ -11,7 +11,8 @@ namespace Armoury
     /// zostaje 5 sztuk (wsie i warsztaty), drewno - nie mniej niz 50 i zapas rzemiosla miasta (K1), sufit ceny materialu (BuildMaterialPriceCap przy FolkBuildsTown), sztuki
     /// do 5 zl w wozach po 10. Wolane PO budowach pana i ludu tej doby (TownFolk.DaWorksRun) - zlecenia wsi nie zabieraja materialu budowom pana. Sam towar: sztuki zdjete
     /// (ShelfBuy.Take), zwraca koszt - zaplate kasie targu robi wolajacy (zloto platnika -> kasa). Liczniki sztuk wedlug MatIds w `pieces`. Koszt: polka czytana raz na
-    /// material i zlecenie (dalej odejmowane sztuki zdjete), przedmioty z DsWorksItems (raz na przebieg). Nie rzuca.
+    /// material i zlecenie (dalej odejmowane sztuki zdjete), przedmioty z DsWorksItems (raz na przebieg). Recenzja: `shelfDrop` - sztuki, o ile polka targu zmalala
+    /// (stan przed zakupem minus stan po nim, tylko materialy kupione w tym wywolaniu) - kontrola niezalezna od liczby sztuk z ShelfBuy.Take; -1 - polka nie przeczytana. Nie rzuca.
     /// </summary>
     internal static partial class BuildFunding
     {
@@ -28,22 +29,25 @@ namespace Armoury
             return a;
         }
 
-        internal static int DsWorksBuy(Settlement market, double budget, ItemObject[] items, int[] pieces, out int capSkip, out bool none)
+        internal static int DsWorksBuy(Settlement market, double budget, ItemObject[] items, int[] pieces, out int capSkip, out bool none, out int shelfDrop)
         {
-            capSkip = 0; none = false;   // none - na polce nie ma zadnego materialu ponad zapas (wolajacy pomija ten targ do konca przebiegu)
+            capSkip = 0; none = false; shelfDrop = 0;   // none - na polce nie ma zadnego materialu ponad zapas (wolajacy pomija ten targ do konca przebiegu)
             int spent = 0;   // poza try: wyjatek po zdjeciu sztuk zwraca to, co juz zeszlo z polki (wolajacy za to placi - nic w nicosc)
+            int[] raw = null, took = null;   // recenzja: stan polki przed zakupem i sztuki zakupu wedlug materialu (kontrola zmiany polki w finally)
             try
             {
                 if (market == null || market.Town == null || market.ItemRoster == null || budget < 1 || items == null || items.Length < MatIds.Length
                     || pieces == null || pieces.Length < MatIds.Length) return 0;
                 var roster = market.ItemRoster;
                 var haves = new int[MatIds.Length];
+                raw = new int[MatIds.Length]; took = new int[MatIds.Length];
                 bool any = false;
                 for (int k = 0; k < MatIds.Length; k++)
                 {
                     var it = items[k];
                     if (it == null) continue;
                     int have = roster.GetItemNumber(it);
+                    raw[k] = have;
                     if (have <= 0) continue;
                     if (MatIds[k] == "tools") have -= ToolsKeep;
                     else if (MatIds[k] == "hardwood") have -= Math.Max(WoodKeep, WoodHold(market, it, true));
@@ -78,12 +82,32 @@ namespace Armoury
                         if (n <= 0) continue;
                         OreLedger.NoteBuild(it, n);   // ksiega rudy i drewna: pozycja "budowy" (tylko licznik)
                         haves[k] = have - n;
-                        pieces[k] += n; spent += cost;
+                        pieces[k] += n; took[k] += n; spent += cost;
                         if (spent >= budget) break;
                     }
                 return spent;
             }
             catch (Exception e) { FolkStumble("DsWorksBuy", e); return spent; }
+            finally { shelfDrop = DsWorksShelfDrop(market, items, raw, took); }
+        }
+
+        /// <summary>Recenzja (kontrola sztuk): o ile sztuk zmalala polka targu w materialach kupionych w tym wywolaniu (stan przed - stan teraz); bez zakupu 0, blad odczytu -1.</summary>
+        private static int DsWorksShelfDrop(Settlement market, ItemObject[] items, int[] raw, int[] took)
+        {
+            if (raw == null || took == null) return 0;
+            try
+            {
+                var roster = market != null ? market.ItemRoster : null;
+                int drop = 0;
+                for (int k = 0; k < took.Length && k < raw.Length && k < items.Length; k++)
+                {
+                    if (took[k] <= 0 || items[k] == null) continue;
+                    if (roster == null) return -1;
+                    drop += raw[k] - roster.GetItemNumber(items[k]);
+                }
+                return drop;
+            }
+            catch (Exception e) { FolkStumble("DsWorksShelfDrop", e); return -1; }
         }
     }
 }

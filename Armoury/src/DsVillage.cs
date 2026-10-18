@@ -350,7 +350,9 @@ namespace Armoury
                     {
                         double rate = g * WarShare(Settings.Current) * Ramp;
                         long baseC = Math.Max(0, part - tithe);
-                        long want = Math.Min((long)Math.Floor(baseC * rate), Math.Max(0, part - tOut));   // najwyzej to, co z czesci wsi zostalo w kiesie
+                        // ds-akumulator (recenzja): budowa septu zlecona przy wozie (DsWorksRealMaterial - zloto czeka w kiesie do wykonania) liczy sie jak juz wydana
+                        long queued = state == 3 && TownFolk.DaWorksOn ? Math.Max(0, tithe - alms) : 0;
+                        long want = Math.Min((long)Math.Floor(baseC * rate), Math.Max(0, part - tOut - queued));   // najwyzej to, co z czesci wsi zostalo w kiesie
                         long wIn;
                         crown = ToCrown(home, k, want, out wIn);
                         _cCrown += crown; _payOut += crown; _payIn += wIn;
