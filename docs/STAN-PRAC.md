@@ -2956,3 +2956,6 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
 - 08:10 PDT 18.10: JEFF GRA (WGRANIE 80, Armoury 7b9f9ad0): "chce teraz pograc, rob wszystko w tle, jak skoncze gre to dam ci znac i zaczniesz wgrywac i robic swoje testy" -> ZADNYCH testow
   i wgran do jego sygnalu. W tle: fala 6 (wf_a61661c1-43f) i fala 7 (wf_e82bf741-4cc) - tylko kod. Po jego grze: kopia logow sesji Jeffa (D:/Backup-Bannerlord/logi-jeffa/2026-10-18) i
   zapisu, sprawdzenie logu (KS: samo uzbrojenie, ERROR), potem scalenie, test, WGRANIE 81.
+- 08:45 PDT: FALA 6 GOTOWA (wf_a61661c1-43f, 4/4 build rc 0; scratchpad fala6-wynik.json): f7-renty 3e695188 (CrownRentsByNeed - ten sam f co zwrot, reszta zostaje w skarbcu; szacunek fin91:
+  renty 283.6k -> 144.5k/d, w skarbcach ~139k/d; grupa nrenty), f7-kasy (KsFarmCatchUp - "gersuma": jednorazowe doplaty firmy z zapasu kasy ponad 1.5 x zapas, polowa, 28 dni; model fin91:
+  kasy przestaja rosnac), f7-wegiel, f7-browary. Galezie na GitHub. Jeff gra - scalenie (kod) po fali 7, testy po jego sygnale.
