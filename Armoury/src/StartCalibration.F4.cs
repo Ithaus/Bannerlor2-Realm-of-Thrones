@@ -172,7 +172,7 @@ namespace Armoury
             if (P != null)
             {
                 sb.Append(" | przy cenach startu (cien Planu doby ").Append(_planDay).Append(" w 0.7-1.5)"); F4VarText(sb, ": ", vT); sb.Append(", na podlodze ").Append(vT.Floor);
-                sb.Append(" | regula przy cenach cienia Planu"); F4VarText(sb, ": ", vS1); sb.Append(", na podlodze ").Append(vS1.Floor);
+                sb.Append(" | regula przy cenach cienia Planu (zywiec po cenie cienia zwierzecia, konie 0 - Plan liczy zywiec jako mieso i skory, konie z wartoscia)"); F4VarText(sb, ": ", vS1); sb.Append(", na podlodze ").Append(vS1.Floor);
                 if (vPlan != null)
                 {
                     sb.Append(" | wzor Planu przy cenach cienia (bez gradientu krain)"); F4VarText(sb, ": ", vS2);

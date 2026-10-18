@@ -53,6 +53,7 @@ namespace Armoury
             _regionMoved.Clear(); _regionSeason = -1; _rFeed = 0;
             _rPress = _rMaxHeld = _rStarted = _rDone = _rStall = _rBudget = _rBusy = _rUp = _rDown = _rActive = _rCancel = _rWould = _rLand = _rLandStall = 0; _rPaid = 0; _rWinStarted = 0;
             _pxRestartDay = -1; _pxRestartEnd = -1;               // KS r4 P7 (r4-ceny): restart srednich cen od nowa przy wlaczeniu
+            _f4A7Day = -1;                                        // f4-pomiary: doba ostatniej diagnozy A7 (nowa kampania / wczytanie)
         }
 
         /// <summary>Doba D (po polkach startu): srednie cen miast od zera - A7 i regale licza od D na cenach po rampie (recenzja 16.10).</summary>
