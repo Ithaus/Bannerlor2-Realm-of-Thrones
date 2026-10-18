@@ -34,6 +34,13 @@ Nie commituj ich — `.gitignore` je pomija (to wlasnosc TaleWorlds i autorow mo
 Gdy ich tu nie ma, `Armoury.csproj` bierze je wprost z katalogu modulu SandBox gry
 (wlasciwosc `SandBoxLibs`, domyslnie `C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/SandBox/bin/Win64_Shipping_Client`).
 
+## Z `Modules\Native\bin\Win64_Shipping_Client\` (Armoury: tekstury proporczykow wiosek, sw-herby)
+
+    TaleWorlds.MountAndBlade.View.dll
+
+Gdy jej tu nie ma, `Armoury.csproj` bierze ja wprost z katalogu modulu Native gry
+(wlasciwosc `NativeViewLibs`, domyslnie `C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/Native/bin/Win64_Shipping_Client`).
+
 ## Szybciej
 
 Zamiast kopiowac, wskaz katalogi wprost przy budowaniu:

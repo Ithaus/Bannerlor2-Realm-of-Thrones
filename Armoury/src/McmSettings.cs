@@ -6068,6 +6068,10 @@ namespace Armoury
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageTwoPennants { get; set; } = true;
 
+        [SettingPropertyBool("Village Pennant Small Texture", HintText = "village pennants use small banner textures and free the textures of pennants far from the camera, so every village keeps its own house's banner however long you travel the map without a battle. Off = large textures kept until the next battle, and after long travel some villages show their lord's banner instead, as before")]
+        [SettingPropertyGroup("The map and its crossings (stage 7)")]
+        public bool VillagePennantSmallTexture { get; set; } = true;
+
         [SettingPropertyBool("Village Layout V5", HintText = "a fifth fewer map villages, none crowded against its neighbour, and each of its own size - from about 1,500 souls in a farm by the fields to 9,000 at a crossroads; the people of a district stay the same. It takes effect when a campaign is loaded. Off = the earlier layout, 2,446 villages of about 4,000 souls each")]
         [SettingPropertyGroup("The map and its crossings (stage 7)")]
         public bool VillageLayoutV5 { get; set; } = true;
@@ -8452,6 +8456,7 @@ namespace Armoury
             s.VillageBannerPerHolder = VillageBannerPerHolder;
             s.VillageCanonHouses = VillageCanonHouses;
             s.VillageTwoPennants = VillageTwoPennants;
+            s.VillagePennantSmallTexture = VillagePennantSmallTexture;
             s.VillageLayoutV5 = VillageLayoutV5;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.StateHygieneEnabled = StateHygieneEnabled;
