@@ -68,6 +68,78 @@ namespace Armoury
         private static bool LogOn { get { var s = Settings.Current; return s != null && s.SaveSizeLog; } }
         private static bool PackOn { get { var s = Settings.Current; return s != null && s.SaveCompact; } }
 
+        // ---------------------------------------------------------------- f4b-zapis: nasze napisy W PLIKU (klucz Save Size Log File, tylko przy Save Size Log)
+        // Gra pakuje caly zapis deflate "Fastest" (FileDriver/GameData) - te same napisy, ktore ida do zapisu (tekst klucza albo lista "_z"), przez DeflateStream
+        // Fastest do licznika bajtow: wynik = ok. ile nasze dane zajmuja w pliku. Bez kopii w pamieci (kawalki po 16 tys. znakow do bufora 48 KB, ponizej LOH).
+        private static bool FileOn { get { var s = Settings.Current; return s != null && s.SaveSizeLog && s.SaveSizeLogFile; } }
+        private const int FeedChars = 16 * 1024;
+        private static CountStream _fcount;
+        private static DeflateStream _fz;
+        private static byte[] _fbuf;
+        private static long _fticks, _fbytes = -1;
+
+        /// <summary>Strumien, ktory tylko liczy zapisane bajty (wyjscie deflate pomiaru pliku).</summary>
+        private sealed class CountStream : Stream
+        {
+            internal long Count;
+            public override bool CanRead { get { return false; } }
+            public override bool CanSeek { get { return false; } }
+            public override bool CanWrite { get { return true; } }
+            public override long Length { get { return Count; } }
+            public override long Position { get { return Count; } set { throw new NotSupportedException(); } }
+            public override void Flush() { }
+            public override int Read(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+            public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+            public override void SetLength(long value) { throw new NotSupportedException(); }
+            public override void Write(byte[] buffer, int offset, int count) { Count += count; }
+        }
+
+        private static void FileReset()
+        {
+            try { if (_fz != null) _fz.Dispose(); } catch { }
+            _fz = null; _fcount = null; _fticks = 0; _fbytes = -1;
+        }
+
+        /// <summary>Napis, ktory idzie do zapisu, do pomiaru pliku (UTF-8 kawalkami, bez dzielenia pary zastepczej).</summary>
+        private static void FileFeed(string v)
+        {
+            if (string.IsNullOrEmpty(v) || _fbytes == -2) return;
+            long t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                if (_fz == null)
+                {
+                    _fcount = new CountStream();
+                    _fz = new DeflateStream(_fcount, CompressionLevel.Fastest, true);
+                }
+                if (_fbuf == null) _fbuf = new byte[FeedChars * 3 + 8];
+                int i = 0;
+                while (i < v.Length)
+                {
+                    int n = Math.Min(FeedChars, v.Length - i);
+                    if (n < v.Length - i && char.IsHighSurrogate(v[i + n - 1])) n--;
+                    int b = Utf8.GetBytes(v, i, n, _fbuf, 0);
+                    _fz.Write(_fbuf, 0, b);
+                    i += n;
+                }
+            }
+            catch (Exception e) { Stumble("FileFeed", e); FileReset(); _fbytes = -2; }   // -2 = pomiar tego zapisu przerwany (linia mowi "blad"), zapis gry bez zmian
+            _fticks += Stopwatch.GetTimestamp() - t0;
+        }
+
+        /// <summary>Koniec pomiaru pliku (OnSaveOver): bajty deflate albo -1 (brak pomiaru) / -2 (blad).</summary>
+        private static long FileFinish()
+        {
+            if (_fbytes == -2) return -2;
+            if (_fz == null) return -1;
+            long t0 = Stopwatch.GetTimestamp();
+            try { _fz.Dispose(); _fbytes = _fcount != null ? _fcount.Count : -1; }
+            catch (Exception e) { Stumble("FileFinish", e); _fbytes = -2; }
+            _fticks += Stopwatch.GetTimestamp() - t0;
+            _fz = null; _fcount = null;
+            return _fbytes;
+        }
+
         internal static int MinChars
         {
             get
@@ -98,6 +170,7 @@ namespace Armoury
             _rows.Clear(); _coll.Clear();
             _packTicks = 0; _packTried = _packOk = _packBad = 0;
             _saveStart = Stopwatch.GetTimestamp();
+            FileReset();   // f4b-zapis: nowy pomiar pliku
         }
 
         /// <summary>
@@ -146,6 +219,12 @@ namespace Armoury
                 }
             }
             catch (Exception e) { Stumble("Pack(" + key + ")", e); z = null; }
+            // f4b-zapis: do pomiaru pliku to, co naprawde idzie do zapisu (tekst klucza albo lista "_z"); FileFeed lapie swoje wyjatki - zapis bez zmian
+            if (measure && FileOn)
+            {
+                if (z == null) FileFeed(v);
+                else for (int i = 0; i < z.Count; i++) FileFeed(z[i]);
+            }
             if (z == null) return false;
             // od tej chwili bez powrotu: "" pod starym kluczem (starszy DLL czyta pusty stan), dane pod nowym kluczem "_z"
             string head = "";
@@ -185,10 +264,12 @@ namespace Armoury
             try
             {
                 _saves++;
+                if (FileOn) FileFinish();   // f4b-zapis: bajty deflate Fastest naszych napisow (przed linia)
                 if (LogOn && (_rows.Count > 0 || _coll.Count > 0)) Log.Info(Line(ok, name));
             }
             catch (Exception e) { Stumble("SaveOver", e); }
             _rows.Clear(); _coll.Clear(); _saveStart = 0;
+            FileReset();   // f4b-zapis
         }
 
         private static string Kb(long b) { return (b / 1024.0).ToString("0.0", Inv); }
@@ -223,6 +304,7 @@ namespace Armoury
             sb.Append(" | kolekcje: ").Append(_coll.Count > 0 ? string.Join(", ", _coll.ToArray()) : "-");
             sb.Append(" | plik ").Append(FileText(name));
             if (_saveStart > 0) sb.Append(" | czas zapisu ").Append(((Stopwatch.GetTimestamp() - _saveStart) * 1000.0 / Stopwatch.Frequency).ToString("0", Inv)).Append(" ms");
+            if (FileOn) sb.Append(FileSegment(name, written));   // f4b-zapis: nasze napisy w pliku (klucz Save Size Log File; wylaczony - linia jak dotad)
             sb.Append(" | ciche logi wiecej (D4): pominietych linii od startu sesji ").Append(LogGate.MoreDropped);
             sb.Append(" | zapisow w sesji ").Append(_saves).Append(" | potkniecia ").Append(_stumbles);
             sb.Append(" | klucze KB malejaco: ");
@@ -249,6 +331,36 @@ namespace Armoury
                 return (f.Length / 1048576.0).ToString("0.00", Inv) + " MB" + (fresh ? "" : " (plik sprzed zapisu)");
             }
             catch { return "?"; }
+        }
+
+        /// <summary>f4b-zapis: odcinek linii "Zapis (D4)" - ile nasze napisy zajmuja w pliku (deflate Fastest jak gra), udzial w pliku zapisu i czas pomiaru.
+        /// Tozsamosc: tekst do zapisu (UTF-8) / bajty w pliku = stopien pakowania gry na naszych danych.</summary>
+        private static string FileSegment(string name, long written)
+        {
+            string ms = (_fticks * 1000.0 / Stopwatch.Frequency).ToString("0", Inv);
+            if (_fbytes == -2) return " | w pliku (deflate Fastest jak gra): BLAD pomiaru (zapis bez zmian), pomiar " + ms + " ms";
+            if (_fbytes < 0) return " | w pliku (deflate Fastest jak gra): brak pomiaru";
+            var sb = new StringBuilder(160);
+            sb.Append(" | w pliku (deflate Fastest jak gra) ok. ").Append(Kb(_fbytes)).Append(" KB");
+            if (_fbytes > 0) sb.Append(" (tekst do zapisu ").Append(Kb(written)).Append(" KB, x").Append((written / (double)_fbytes).ToString("0.0", Inv)).Append(')');
+            long fl = FileLen(name);
+            if (fl > 0) sb.Append(" = ").Append((100.0 * _fbytes / fl).ToString("0.0", Inv)).Append("% pliku");
+            sb.Append(", pomiar ").Append(ms).Append(" ms");
+            return sb.ToString();
+        }
+
+        /// <summary>f4b-zapis: dlugosc pliku zapisu w bajtach, tylko swiezy plik (zapisany w ostatnich 120 s); inaczej -1. Jak FileText - samo FileInfo.</summary>
+        private static long FileLen(string name)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(name)) return -1;
+                var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var f = new FileInfo(Path.Combine(Path.Combine(Path.Combine(docs, "Mount and Blade II Bannerlord"), "Game Saves"), name + ".sav"));
+                if (!f.Exists || (DateTime.Now - f.LastWriteTime).TotalSeconds >= 120) return -1;
+                return f.Length;
+            }
+            catch { return -1; }
         }
 
         // ================================================================ wczytanie

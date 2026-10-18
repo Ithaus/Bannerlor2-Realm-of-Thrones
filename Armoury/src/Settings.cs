@@ -1742,6 +1742,12 @@ namespace Armoury
         public bool SaveSizeLog = true;                    // after every save the log gets one line with the size of every piece of Armoury data in the save, the size of the save file and how long saving took (off = no such line)
         public bool SaveCompact = false;                   // off by default. The two largest pieces of Armoury data in the save - wear of the AI lords' gear and the kits that notables hold for their volunteers - are written compressed (about 6 times smaller in memory, a little smaller on disk); every compressed piece is read back and compared before it is written, and anything that does not match is written the old way. Saves made with it still load when it is off. Turn it on only once you no longer expect to go back to an older Armoury version: an older version does not read the compressed pieces (AI gear would count as unworn, notables would hold no kits). To go back anyway, turn it off and save first
         public int SaveCompactMinKb = 64;                  // with Save Compact: only a piece of data larger than this many kilobytes of text is compressed (8 to 4096)
+        // f4b-zapis (noc 17/18.10, fin87 ZAP-4 "nasze napisy zapisu 7567 KB > 5120 KB"): ile nasze napisy zajmuja W PLIKU zapisu. Gra pakuje caly zapis deflate
+        // "Fastest" (TaleWorlds.SaveSystem FileDriver/GameData), wiec 7.4-7.6 MB naszego tekstu to ok. 1.75-1.8 MB pliku (ok. 5% z 35-37 MB; rozbior fin83).
+        // Pomiar: te same napisy (albo lista "_z" przy Save Compact) przez DeflateStream Fastest do licznika bajtow - bez kopii w pamieci, kawalkami po 16 tys.
+        // znakow; dopisek w linii "Zapis (D4)" ("w pliku (deflate Fastest jak gra) ok. X KB = Y% pliku, pomiar T ms"). Tylko pomiar - zapis bez zmian.
+        // Wylaczony = linia "Zapis (D4)" co do bajtu jak dotad.
+        public bool SaveSizeLogFile = true;                // with Save Size Log: the line written after every save also tells roughly how much of the save FILE the Armoury data takes (the game compresses the whole save; the same compression is measured in memory, a few tens of milliseconds per save). Measurement only - nothing in the save changes (off = no such part in the line)
 
         // --- Armies of the realms (175) ---
         // paczka 175 (decyzje Jeffa 09.10): klucze czyta CrashScribe (Mends.ArmouryFloat - sprzet wedlug tieru, sklad, NorthHardy, DothrakiRiders)
@@ -2836,6 +2842,12 @@ namespace Armoury
         // recenzja ks-arm: porty BK miast (BKBuildingsBehavior.RunPorts - ryby z pracy dzierzawcow i rzemieslnikow miasta za zloto jego kasy) szly w ksiedze towarow do
         // "inne ticki dobowe" (fin78 od doby 109140: 21-22 szt./d) - twarda bramka (3) nie przeszlaby nigdy. Tylko nazwa w ksiedze (grupa "zrodla znane z nazwy (KS)").
         public bool KsBkPortsInLedger = true;              // with Start Calibration: the fish that Banner Kings' town ports and harbours catch each day (paid from the town's gold) are written in the goods ledger under their own name instead of 'daily ticks of unknown origin', so the safeguard before the calibration starts counts only goods that truly come from nowhere. Ledger only - nothing in the game changes. Off = as before
+        // f4b-zapis (noc 17/18.10, fin86/fin87 ARM-3 "uzbrojony 109076, wlaczone 109109 - 33 doby, prog 35"): projekt ks-arm to "28 dob ksiegi towarow, potem 7 dob od
+        // pierwszego dojrzalego Planu", a linia uzbrojenia obiecuje "najwczesniej doba uzbrojenia + 28 + 7". Kod liczyl 7 dob od DOBY DANYCH Planu (_planDay = doba
+        // poprzednia przy starcie Planu na watku w dobie T; Plan wchodzi do uzycia w T+1), wiec dwie z siedmiu dob byly przed uzyciem dojrzalego Planu - wlaczenie 2 doby
+        // przed koncem pomiaru. Klucz: 7 dob od pierwszej doby UZYCIA dojrzalego Planu (StartCalibration.Arm.cs, _matureUse; zapis: trzecie pole wiersza "A=" w arm_ks_arm,
+        // starsza DLL czyta tylko dwa pierwsze). Wylaczony = stara regula co do doby (33 doby po uzbrojeniu w fin86/fin87).
+        public bool KsArmMatureFromUse = true;             // with Start Calibration Auto Arm: the 7 days of finished weekly plan the calibration waits before it starts by itself are counted from the first day that finished plan is actually in use, not from the last day of the data it was made from - so it starts at the earliest 28 + 7 days after it armed itself, as announced when it arms (off = 2 days earlier, as before)
         // KS-R3 (17.10, "kupcy i krainy" - runda 3 po autotescie 120 dob): dziesiec klawiszy rundy 3, wszystkie domyslnie TAK, dzialaja tylko przy zastosowanej kalibracji
         // (wylaczony = zachowanie rundy 3 tej czesci); liczby sa stalymi w kodzie (Jeff nie jest pytany o parametry). Progi: sprawdz_logi --grupa nks (NKS-22..29).
         // Recenzja rundy 3 (wazne): wszystkie wylaczone = kod 336aeee5 (runda 2) z dwiema zmianami KOSZTU bez klucza: C1 - potrzeby i koszyk klas miasta co 7 dob na zmiane
