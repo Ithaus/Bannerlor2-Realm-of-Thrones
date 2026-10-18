@@ -289,7 +289,7 @@ namespace Armoury
                                     + "zostaja w zapisie bez skutku (ponowne wlaczenie = nowe okno pomiaru), dziesiata od ruchomosci niezebrana przepada, zaliczki mieszczan -> zwykly dlug korona2");
                         try { TownFolk.AntAllToNormal(); } catch (Exception e) { Stumble("DayStart(zaliczki)", e); }
                         try { DsSeason.Off(); } catch (Exception e) { Stumble("DayStart(nadania)", e); }
-                        foreach (var f in _farm.Values) { f.ML = f.MC = f.MLf = f.SW = f.LW = 0; f.MovLeft = 0; f.MovPer = 0; f.MovCur = 0; f.MovK = null; f.MovSerial = -1; f.AidArr = 0; f.AidK = null; f.AidCarry = 0; }
+                        foreach (var f in _farm.Values) { f.ML = f.MC = f.MLf = f.SW = f.LW = 0; f.MovLeft = 0; f.MovPer = 0; f.MovCur = 0; f.MovK = null; f.MovSerial = -1; f.AidArr = 0; f.AidK = null; f.AidCarry = 0; f.CLeft = 0; f.CPer = 0; }   // f7-kasy: reszta gersumy przepada przy wylaczeniu F3
                         _aidPend.Clear();
                     }
                     _dayOn = -1; _fixDay = -1; _mDays = 0; SwitchDue = false; _waitLogged = false;
@@ -648,7 +648,7 @@ namespace Armoury
         }
 
         /// <summary>TownDay (po racie firmy, przed M6): czesc doby gersumy - kasa ponad prog -> pan i skarbiec w stosunku firm; czego nie da sie zaplacic (kasa ponizej
-        /// progu, oblezenie / zdobycie, utrata KS, klucz wylaczony, bez zywego pana), przepada - nigdy zaleglosc; pomiar przyrostu poprawiony o niezaplacone. lordPay /
+        /// progu, oblezenie / zdobycie, utrata KS, R/P ponizej pasma - domy najpierw, klucz wylaczony, bez zywego pana), przepada - nigdy zaleglosc; pomiar przyrostu poprawiony o niezaplacone. lordPay /
         /// crownFarm rosna o zaplacone (wolajacy: DsNoteFarm i RentToday / CrownToday jak rata firmy).</summary>
         private static void CatchUpPay(Settlement st, Town t, Farm f, int reserve, Settings s, Kingdom k, ref int lordPay, ref int crownFarm)
         {
@@ -659,7 +659,7 @@ namespace Armoury
             long got = 0;
             try
             {
-                if (!CatchUpOn(s) || RemitOf(st) != 0 || !StartCalibration.KsTownApplied(t)) return;
+                if (!CatchUpOn(s) || RemitOf(st) != 0 || !StartCalibration.KsTownApplied(t) || KsFolkIncome.HousesFirst(st)) return;   // domy najpierw: R/P zbiedniali - nadwyzka do ich domow (M6), nie panu
                 var clan = st.OwnerClan;
                 var lord = clan != null ? clan.Leader : null;
                 if (lord == null || !lord.IsAlive) { _cuNoLord += want; return; }
@@ -731,7 +731,7 @@ namespace Armoury
                   .Append(", domy najpierw (R/P ponizej pasma) ").Append(_cuHouse)
                   .Append(" | zaplacone dzis: zdjete z kas ").Append(_cuTook).Append(" = panom ").Append(_cuPaidL).Append(" + koronie ").Append(_cuPaidC)
                   .Append(" (kontrola zdjete - panom - koronie = ").Append(_cuTook - _cuPaidL - _cuPaidC).Append("; miast ").Append(_cuPaidN).Append(")")
-                  .Append(", przepadlo (kasa ponizej progu w chwili zaplaty, oblezenie, bez KS, bez zywego pana) ").Append(_cuShort).Append(" (").Append(_cuShortN).Append("; bez zywego pana ").Append(_cuNoLord).Append(")")
+                  .Append(", przepadlo (kasa ponizej progu w chwili zaplaty, oblezenie, bez KS, domy najpierw, bez zywego pana) ").Append(_cuShort).Append(" (").Append(_cuShortN).Append("; bez zywego pana ").Append(_cuNoLord).Append(")")
                   .Append(", do zaplaty w kolejnych dobach ").Append(left).Append(" zl (").Append(nLeft).Append(" miast)")
                   .Append(" | od startu sesji: panom ").Append(_cuPaidLS).Append(", koronie ").Append(_cuPaidCS).Append(" (czesci gersum ").Append(_cuNS).Append(")")
                   .Append(" | miasta z KS ").Append(n).Append(": kasy razem ").Append(gold).Append(", zapas kupcow razem ").Append(res)
