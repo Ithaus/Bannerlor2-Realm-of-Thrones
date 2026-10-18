@@ -50,7 +50,7 @@ namespace Armoury
     /// (konto UCHODZCY obsluguje E4/5). Wylaczone: spichlerze zamrozone, nikt nie umiera z glodu, uchodzcy z glodu wracaja w rok od dnia wylaczenia.
     /// Wyjatki per wies / konto / warownia liczone (potkniecia, pierwszy blad miejsca do logu) - bez globalnych wylacznikow (CLAUDE.md 7).
     /// </summary>
-    internal static class Famine
+    internal static partial class Famine
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
         private const int NoDraw = 364;                 // U27: warownia bez ubytku = 364 dni (w medianie)
@@ -936,6 +936,7 @@ namespace Armoury
             double deadTown = 0, deadShelter = 0, shelterFood = 0, deadTownRef = 0; int starvingAll = 0, starvingAi = 0, townDeathsN = 0;   // sw-uchodzcy: deadTownRef - uchodzcy z najazdu w miescie pobytu
             foreach (var kv in shelterUnits) shelterFood += kv.Value;
             var starvingNames = new List<string>();
+            var townCause = new TownCauseTally();                                // f4b-glod: przyczyna zgonow mieszczan (tylko pomiar - Famine.Cause.cs)
             foreach (var node in nodeById.Values)
             {
                 try
@@ -962,6 +963,7 @@ namespace Armoury
                             {
                                 deadTown += got; townDeathsN++;
                                 lock (Gate) { double t0s; _townStarved.TryGetValue(node.StringId, out t0s); _townStarved[node.StringId] = t0s + got; }
+                                TownCauseAdd(townCause, node, today, got, su, cons);   // f4b-glod: oblezona / po najezdzie / bez przyczyny (nie rzuca)
                             }
                         }
                     }
@@ -1077,6 +1079,7 @@ namespace Armoury
                 if (townRef.Count > 0) sb.Append("; Food liczy tez uchodzcow z najazdu w oblezonych miastach pobytu: ").Append(F0(townRefPeople)).Append(" w ").Append(townRef.Count).Append(" miastach");
                 sb.Append(" | warownie przy Food 0: ").Append(starvingAll).Append(" (AI ").Append(starvingAi).Append(')');
                 if (starvingNames.Count > 0) sb.Append(" - ").Append(string.Join(", ", starvingNames.ToArray()));
+                TownCausePart(sb, townCause, deadTown, deadShelter + deadTownRef);   // f4b-glod: zgony mieszczan wedlug przyczyny (oblezenie / najazd / bez przyczyny)
                 StockPart(sb, nodeById, regs, shelter, qWorld, day, e46);
                 sb.Append(" | zima: ").Append(winterDay > 0 ? "TAK, doba zimy " + winterDay : "NIE").Append(", pierwsza doba glodu warowni AI w tej zimie: ").Append(_firstStarve >= 0 ? _firstStarve.ToString(Inv) : "-");
                 if (lostAcc > 0) sb.Append(" | konta uchodzcow bez wsi z przelicznikiem ").Append(lostAcc);
