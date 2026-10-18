@@ -248,7 +248,7 @@ namespace Armoury
         // StartCalibration.ListStep (wies z KS zastosowanym) zdejmuje powtorzenia towarow KS z listy BK PRZED petla powtorzen nizej, wiec petla nie widziala dubla
         // rudy (soli, gliny, srebra), _dup wsi znikal i Times() oddawal 1. Przy pelnej stawce KS bez skutku (ProdStep zwraca stawke KS przed mnoznikiem Times), ale
         // w RAMPIE (beta < 1: wynik = (1 - beta) x lancuch gry + beta x KS) lancuch gry dawal POLOWE mineralu: fin88 109113 model rudy 183 = 0.79 x 145 + 0.21 x 294
-        // (przed wlaczeniem 290) - jednorazowo ok. 1500 lup mniej w 30 dobach rampy. Klucz Ks Ramp Mineral Times: powtorzenia zdjete przez ListStep ida do mnoznika
+        // (przed wlaczeniem 290) - jednorazowo ok. 1000 lup mniej w 14 dobach rampy mineralow (A..D, beta 0.07-1). Klucz Ks Ramp Mineral Times: powtorzenia zdjete przez ListStep ida do mnoznika
         // Times tak samo jak powtorzenia petli (wydobycie lancucha gry bez zmian - jak bez KS). Klucz NIE - jak dotad.
         private static bool RampTimesOn { get { var s = Settings.Current; return s != null && s.KsRampMineralTimes; } }
         private static readonly HashSet<Village> _rampDupV = new HashSet<Village>();   // wsie w rampie (bez pelnej stawki KS) z dublem oddanym mnoznikiem - od ostatniej linii

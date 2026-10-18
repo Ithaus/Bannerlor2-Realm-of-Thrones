@@ -7668,7 +7668,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool BloomeryWoodCredit { get; set; } = true;
 
-        [SettingPropertyBool("Ks Ramp Mineral Times", HintText = "under the start calibration, during its ramp (the weeks when the old and the calibrated output are blended): the game's share of a mining village's ore, salt, clay and silver counts the mineral as many times as Banner Kings lists it, as outside the calibration - until now the calibration's list dropped the double entry first and the game half of the blend gave half the ore (about 1500 iron blooms lost once). Off = as before")]
+        [SettingPropertyBool("Ks Ramp Mineral Times", HintText = "under the start calibration, during its ramp (the weeks when the old and the calibrated output are blended): the game's share of a mining village's ore, salt, clay and silver counts the mineral as many times as Banner Kings lists it, as outside the calibration - until now the calibration's list dropped the double entry first and the game half of the blend gave half the ore (about a thousand iron blooms lost once). Off = as before")]
         [SettingPropertyGroup("Iron ore under the start calibration (night 18.10)")]
         public bool KsRampMineralTimes { get; set; } = true;
 
