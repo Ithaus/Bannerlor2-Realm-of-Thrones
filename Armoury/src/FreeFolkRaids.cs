@@ -4,8 +4,12 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameComponents;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
@@ -42,8 +46,16 @@ namespace Armoury
     ///    Flaga "bez nowych decyzji" (MobilePartyAi.DoNotMakeNewDecisions to [SaveableProperty(11)] - idzie do zapisu gry) NIE trafia do zapisu: OnBeforeSave ja zdejmuje,
     ///    OnSaveOver przywraca, po wczytaniu wraca w pierwszej godzinie (Hourly) - recenzja r4-mur: banda bez wpisu w arm_mur_najazdy (starszy DLL po cofnieciu,
     ///    straznik rozmiaru, blad odczytu) nie stoi zamrozona na zawsze u bram, tylko zostaje zwykla banda.
+    ///  - SWOI NIE BIJA SWOICH (fix-mur, klucz FreeFolkRaidKinPeace; fin83 NMUR-32 "doszly 0 z 13": bitwy.log - 10 band rozbili lordowie Wolnych Ludzi na ich wlasnej
+    ///    ziemi (Varamyr Sixskins, Tormund, Torvi, Frenya, Ookpik, Great Walrus), 3 - Straz u Muru (Rast, Karl Tanner); droga ladowa byla - "bez drogi 0", pamiec drog gry
+    ///    = SandBoxNavigationCache.GetPathDistanceBetweenAIFaces po siatce ladu): banda najazdu nalezy do klanu bandyckiego, ktory gra trzyma w wojnie z kazdym
+    ///    krolestwem, wiec AI lordow Wolnych Ludzi (MobilePartyAi -> GetBestInitiativeBehavior -> ShouldConsiderAttacking) rzucala sie na nia jak na obcych zbojow.
+    ///    Postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking: partia frakcji Wolnych Ludzi nie atakuje bandy najazdu, a banda najazdu - partii Wolnych Ludzi
+    ///    (NavalDLC wola ten model jako BaseModel). Straz i Polnoc dalej ich lapia (zatrzymane u Muru - linia "cel:"). Wylaczony klucz albo brak band - wynik gry bez zmian.
     /// KONTROLA (linia "Najazdy Wolnych Ludzi (r4-mur)"): od poczatku wyruszylo + przybyli = wrocili + straty + przyciete + puszczone bez zarzadu + w polu;
-    /// wyruszylo = z puli + z domow.
+    /// wyruszylo = z puli + z domow. Cel (fix-mur, od wczytania wersji fix-mur): doszly + zatrzymane w marszu (zginely: Straz / Polnoc / Wolni Ludzie / inni;
+    /// zawrocily rozbite) + marsz ponad 30 dob + w marszu teraz <= wyruszylo (reszta: puszczone bez zarzadu w marszu i bandy wyslane przed fix-mur); "zginely po
+    /// dojsciu lub w powrocie" osobno (banda zawrocona rozbita, ktora potem zginie, jest w obu).
     /// Wylaczone (klucz albo KS) - nowych band nie ma, bandy w polu wracaja do domu; bez band w polu nic nie biegnie.
     /// </summary>
     internal static class FreeFolkRaids
@@ -53,6 +65,8 @@ namespace Armoury
         private const float ArriveDist = 4f;              // jednostki mapy od bramy wsi zrodla = w domu
         private const int ReturnMaxDays = 30;             // najdluzsza droga powrotu - potem banda rozwiazana tam, gdzie stoi (ludzie i tak do puli okregu zrodla); tez najdluzszy marsz do celu
         private const float MarchArrive = 6f;             // jednostki mapy od bramy wsi celu = banda doszla (wymarsz -> patrol)
+        private const float ClimbBelt = 12f;              // fix-mur: pas Muru - jednostki mapy od bramy warowni Strazy; banda w marszu w pasie jest niewidoczna dla AI (wspinaczka)
+        private const float ClimbHideHours = 1.5f;        // fix-mur: ukrycie odnawiane co godzine (zapis gry niesie najwyzej tyle - starszy DLL widzi bande po 1.5 h)
         private const double StoreFloor = 0.5;            // waga zapasu przy pelnym spichlerzu
         private const double LowDays = 180.0;             // dni spichlerza, ponizej ktorych waga zapasu = 1
         private const int TargetNearest = 8;              // cel losowany z tylu najblizszych (droga) wsi Strazy / Polnocy
@@ -62,7 +76,9 @@ namespace Armoury
 
         // Phase: 0 = najazd (patrol wokol wsi celu, AI gry), 1 = powrot (idz do bramy wsi zrodla, bez nowych decyzji), 2 = wymarsz (idz do bramy wsi celu, bez nowych decyzji).
         // Day: doba wymarszu (faza 2), od dojscia do celu - doba poczatku najazdu (faza 0). P - partia (bez zapisu; po wczytaniu z MobileParty.AllBanditParties).
-        private sealed class Raid { public string Id, Src, Region, Target; public int Day, Men0, Phase, BackDay, Last; public MobileParty P; }
+        // Killer - strona, ktora zniszczyla bande (MobilePartyDestroyed); Hit - strona, ktora ostatnio pobila bande w marszu (MapEventEnded); obie w zapisie arm_mur_cel
+        // (recenzja fix-mur: zapis miedzy zdarzeniem a doba nie gubi strony)
+        private sealed class Raid { public string Id, Src, Region, Target; public int Day, Men0, Phase, BackDay, Last; public MobileParty P; public string Killer, Hit; }
         private static readonly List<Raid> _raids = new List<Raid>();
         private static readonly HashSet<MobileParty> _owned = new HashSet<MobileParty>();
         // od poczatku kampanii (w zapisie)
@@ -75,6 +91,21 @@ namespace Armoury
         private static Clan _clan; private static bool _clanTried;
         private static bool _refreeze;                    // po wczytaniu: flaga "bez nowych decyzji" band w marszu / powrocie do przywrocenia w pierwszej godzinie (Hourly)
         private static int _thawed;                       // ile band zdjal OnBeforeSave (OnSaveOver przywraca)
+        // fix-mur: swoi nie bija swoich - migawka band najazdu dla latki AI (czytana z watkow AI; nigdy nie zmieniana po publikacji - podmieniana w calosci)
+        private static volatile HashSet<MobileParty> _kin = new HashSet<MobileParty>();
+        private static volatile bool _kinOn;              // klucz FreeFolkRaidKinPeace i co najmniej jedna banda w migawce
+        private static bool _kinDirty;                    // po wczytaniu - migawka w pierwszej godzinie (Hourly)
+        private static int _kinVeto, _kinVetoAll;         // odmowy ataku: od ostatniej doby (Interlocked - watki AI) / od wczytania
+        // fix-mur: wspinaczka przez Mur - bramy warowni Strazy (pamiec na dobe) i liczniki doby (godziny ukrycia, bandy ukryte)
+        private static readonly List<Vec2> _wallForts = new List<Vec2>();
+        private static int _wallFortsDay = int.MinValue;
+        private static int _climbHours;
+        private static readonly HashSet<string> _climbBands = new HashSet<string>(StringComparer.Ordinal);
+        private static string _kinHook = "nie wpieta";
+        // fix-mur: wynik marszu od poczatku (osobny klucz zapisu arm_mur_cel): doszly do celu, marsz ponad ReturnMaxDays, zginely w marszu z rak Strazy / Polnocy /
+        // Wolnych Ludzi / innych (bez bitwy, inne frakcje), zawrocily rozbite w marszu, zginely po dojsciu albo w powrocie
+        private static int _nReached, _nMarchCap, _nKillW, _nKillN, _nKillF, _nKillO, _nTurnMarch, _nDiedAfter;
+        private static int _nTurnW, _nTurnN, _nTurnF, _nTurnO;           // recenzja fix-mur: zawrocily rozbite w marszu - kto pobil (ostatnia przegrana bitwa w marszu)
 
         internal static bool KeyOn { get { var s = Settings.Current; return s != null && s.FreeFolkHungerRaids; } }
 
@@ -86,6 +117,10 @@ namespace Armoury
             _raids.Clear(); _owned.Clear();
             _cStarted = _cReturned = _cLost = _cGained = _cTrim = _cLeft = 0; _nStarted = _nReturned = _nLost = 0; _cFromHome = _cFromPool = _cHomeLeft = 0.0; _cGold = _cItems = 0;
             _stumbles = 0; _errSites.Clear(); _offLogged = false; _clan = null; _clanTried = false; _refreeze = false; _thawed = 0;
+            _kin = new HashSet<MobileParty>(); _kinOn = false; _kinDirty = false; _kinVeto = 0; _kinVetoAll = 0;
+            _wallForts.Clear(); _wallFortsDay = int.MinValue; _climbHours = 0; _climbBands.Clear();
+            _nReached = _nMarchCap = _nKillW = _nKillN = _nKillF = _nKillO = _nTurnMarch = _nDiedAfter = 0;
+            _nTurnW = _nTurnN = _nTurnF = _nTurnO = 0;
         }
 
         private static void Stumble(string where, Exception e)
@@ -129,6 +164,9 @@ namespace Armoury
         {
             _raids.Clear(); _owned.Clear();
             _cStarted = _cReturned = _cLost = _cGained = _cTrim = _cLeft = 0; _nStarted = _nReturned = _nLost = 0; _cFromHome = _cFromPool = _cHomeLeft = 0.0; _cGold = _cItems = 0;
+            _nReached = _nMarchCap = _nKillW = _nKillN = _nKillF = _nKillO = _nTurnMarch = _nDiedAfter = 0;
+            _nTurnW = _nTurnN = _nTurnF = _nTurnO = 0;
+            _kin = new HashSet<MobileParty>(); _kinOn = false; _kinDirty = false;
             if (string.IsNullOrEmpty(s)) return;
             if (s.Length > MaxImportChars) { try { Log.Info("Najazdy Wolnych Ludzi (r4-mur): zapis ponad " + MaxImportChars + " znakow - pominiety (bandy zostaja zwyklymi bandami)."); } catch { } return; }
             try
@@ -154,6 +192,61 @@ namespace Armoury
             }
             catch (Exception e) { Stumble("Import", e); _raids.Clear(); }
             _refreeze = _raids.Any(r => r.Phase != 0);       // zapis nie niesie flagi "bez nowych decyzji" (BeforeSave) - wraca w pierwszej godzinie (Hourly)
+            _kinDirty = _raids.Count > 0;                      // fix-mur: migawka band dla latki AI w pierwszej godzinie (partie znane dopiero po wczytaniu)
+        }
+
+        // ------------------------------------------------------------ zapis wyniku marszu (fix-mur, arm_mur_cel - wola ArmouryBehavior.SyncData PO arm_mur_najazdy)
+        // "1|doszly;marsz ponad;zginely w marszu: Straz;Polnoc;Wolni Ludzie;inni;zawrocily rozbite;zginely po dojsciu[;zawrocily: Straz;Polnoc;Wolni Ludzie;inni]
+        //  [|id,zabojca,pobila;...]" (pusty - same zera; brak klucza - zera). Recenzja fix-mur: pola 8-11 i trzecia czesc (strona zniszczenia / ostatniej przegranej
+        // bitwy band jeszcze na liscie - zdarzenie w ciagu doby, liczone przy nastepnej dobie) opcjonalne; brak - zera / bez strony. Kody stron: w, n, f, o ("-" - brak).
+        internal static string ExportGoal()
+        {
+            try
+            {
+                var pend = new StringBuilder();
+                int np = 0;
+                foreach (var r in _raids)
+                {
+                    if ((r.Killer == null && r.Hit == null) || BadId(r.Id)) continue;
+                    if (++np > MaxEntries) break;
+                    if (pend.Length > 0) pend.Append(';');
+                    pend.Append(r.Id).Append(',').Append(r.Killer ?? "-").Append(',').Append(r.Hit ?? "-");
+                }
+                if (_nReached + _nMarchCap + _nKillW + _nKillN + _nKillF + _nKillO + _nTurnMarch + _nDiedAfter + _nTurnW + _nTurnN + _nTurnF + _nTurnO <= 0 && pend.Length == 0) return "";
+                return "1|" + string.Join(";", new[] { _nReached, _nMarchCap, _nKillW, _nKillN, _nKillF, _nKillO, _nTurnMarch, _nDiedAfter, _nTurnW, _nTurnN, _nTurnF, _nTurnO }.Select(x => x.ToString(Inv)))
+                       + (pend.Length > 0 ? "|" + pend.ToString() : "");
+            }
+            catch (Exception e) { Stumble("ExportGoal", e); return ""; }
+        }
+
+        private static string Side(string code) { return code == "w" || code == "n" || code == "f" || code == "o" ? code : null; }
+
+        internal static void ImportGoal(string s)
+        {
+            _nReached = _nMarchCap = _nKillW = _nKillN = _nKillF = _nKillO = _nTurnMarch = _nDiedAfter = 0;
+            _nTurnW = _nTurnN = _nTurnF = _nTurnO = 0;
+            if (string.IsNullOrEmpty(s) || s.Length > 8000) return;                         // straznik rozmiaru (12 liczb + najwyzej MaxEntries band ze strona)
+            try
+            {
+                var p = s.Split('|');
+                if (p.Length < 2 || p[0] != "1") return;                                    // inny format - od zera
+                var c = p[1].Split(';');
+                _nReached = (int)Math.Min(int.MaxValue, L(c, 0)); _nMarchCap = (int)Math.Min(int.MaxValue, L(c, 1)); _nKillW = (int)Math.Min(int.MaxValue, L(c, 2));
+                _nKillN = (int)Math.Min(int.MaxValue, L(c, 3)); _nKillF = (int)Math.Min(int.MaxValue, L(c, 4)); _nKillO = (int)Math.Min(int.MaxValue, L(c, 5));
+                _nTurnMarch = (int)Math.Min(int.MaxValue, L(c, 6)); _nDiedAfter = (int)Math.Min(int.MaxValue, L(c, 7));
+                _nTurnW = (int)Math.Min(int.MaxValue, L(c, 8)); _nTurnN = (int)Math.Min(int.MaxValue, L(c, 9));
+                _nTurnF = (int)Math.Min(int.MaxValue, L(c, 10)); _nTurnO = (int)Math.Min(int.MaxValue, L(c, 11));
+                // recenzja fix-mur: strona zniszczenia / ostatniej przegranej bitwy band na liscie (arm_mur_najazdy wczytany wczesniej - ArmouryBehavior.SyncData)
+                if (p.Length > 2 && p[2].Length > 0 && _raids.Count > 0)
+                    foreach (var item in p[2].Split(';'))
+                    {
+                        var a = item.Split(',');
+                        if (a.Length < 3 || BadId(a[0])) continue;
+                        foreach (var r in _raids)
+                            if (r.Id == a[0]) { r.Killer = Side(a[1]); r.Hit = Side(a[2]); break; }
+                    }
+            }
+            catch (Exception e) { Stumble("ImportGoal", e); }
         }
 
         private static long L(string[] a, int i) { long x; return a != null && i < a.Length && long.TryParse(a[i], NumberStyles.Integer, Inv, out x) && x > 0 ? x : 0; }
@@ -243,6 +336,18 @@ namespace Armoury
         /// <summary>CampaignEvents.HourlyTickEvent: po wczytaniu (Import z bandami w marszu / powrocie) flaga i rozkaz wracaja w pierwszej godzinie. Inaczej nic.</summary>
         internal static void Hourly()
         {
+            if (_raids.Count > 0)
+            {
+                // fix-mur: wspinaczka przez Mur (klucz FreeFolkRaidClimbWall) - banda w marszu pod Murem ukryta przed AI na najblizsze 1.5 h
+                try { Climb(); } catch (Exception e) { Stumble("Hourly(Mur)", e); }
+            }
+            if (_kinDirty)
+            {
+                // fix-mur: po wczytaniu - bandy najazdu w migawce latki AI "swoi nie bija swoich" (zanim lordowie Wolnych Ludzi zdaza je zaatakowac)
+                _kinDirty = false;
+                try { Dictionary<string, MobileParty> map = null; foreach (var r in _raids) PartyOf(r, ref map); RebuildKin(Settings.Current); }
+                catch (Exception e) { Stumble("Hourly(swoi)", e); }
+            }
             if (!_refreeze) return;
             _refreeze = false;
             Refreeze();
@@ -282,6 +387,7 @@ namespace Armoury
             if (!on && _raids.Count == 0)
             {
                 _owned.Clear();
+                if (_kinOn || _kin.Count > 0) { _kin = new HashSet<MobileParty>(); _kinOn = false; }   // fix-mur: bez band - latka AI bez pracy
                 if (!_offLogged && s.LogEnabled)
                 {
                     _offLogged = true;
@@ -306,6 +412,13 @@ namespace Armoury
                     if (!map.TryGetValue(r.Id, out mp) || mp == null || !mp.IsActive)
                     {
                         _cLost += r.Last; dLostMen += r.Last; dLostN++; _nLost++;
+                        // fix-mur: kto zatrzymal bande (zdarzenie zniszczenia: strona zwyciezcy; brak - inni / bez bitwy)
+                        if (r.Phase == 2)
+                        {
+                            var k = r.Killer ?? r.Hit;                                 // recenzja fix-mur: brak zdarzenia zniszczenia - strona ostatniej przegranej bitwy
+                            if (k == "w") _nKillW++; else if (k == "n") _nKillN++; else if (k == "f") _nKillF++; else _nKillO++;
+                        }
+                        else _nDiedAfter++;
                         _raids.Remove(r);
                         continue;
                     }
@@ -337,7 +450,8 @@ namespace Armoury
                         if (beatenM)
                         {
                             Freeze(mp, src.GatePosition, true);
-                            r.Phase = 1; r.BackDay = today; dTurn++;
+                            r.Phase = 1; r.BackDay = today; dTurn++; _nTurnMarch++;      // fix-mur: zatrzymana w marszu (rozbita, wraca)
+                            if (r.Hit == "w") _nTurnW++; else if (r.Hit == "n") _nTurnN++; else if (r.Hit == "f") _nTurnF++; else _nTurnO++;   // recenzja: kto pobil (MapEventEnded)
                             continue;
                         }
                         bool arrived = tgt != null && mp.GetPosition2D.Distance(tgt.GatePosition.ToVec2()) <= MarchArrive;
@@ -347,7 +461,7 @@ namespace Armoury
                             if (tgt != null) mp.SetMovePatrolAroundSettlement(tgt, MobileParty.NavigationType.Default, false);
                             else mp.Ai.RethinkAtNextHourlyTick = true;
                             r.Phase = 0; r.Day = today;                               // doby najazdu od dojscia do celu
-                            if (arrived) dArrive++; else dMarchCap++;                 // marsz ponad ReturnMaxDays (albo cel zniknal) - patrol tam, gdzie stoi (AI band gry)
+                            if (arrived) { dArrive++; _nReached++; } else { dMarchCap++; _nMarchCap++; }   // marsz ponad ReturnMaxDays (albo cel zniknal) - patrol tam, gdzie stoi (AI band gry)
                         }
                         else Freeze(mp, tgt.GatePosition, false);                     // flaga i rozkaz (po wczytaniu / zapisie / bitwie)
                         continue;
@@ -499,6 +613,10 @@ namespace Armoury
                 }
             }
 
+            try { RebuildKin(s); } catch (Exception e) { Stumble("Daily(swoi)", e); }   // fix-mur: bandy najazdu (takze nowa) w migawce latki AI
+            int veto = Interlocked.Exchange(ref _kinVeto, 0); _kinVetoAll += veto;
+            int climbN = _climbBands.Count, climbH = _climbHours; _climbBands.Clear(); _climbHours = 0;   // fix-mur: wspinaczka - liczniki doby do linii
+            if (s.FreeFolkRaidClimbWall) { try { WallForts(today); } catch (Exception e) { Stumble("Daily(warownie)", e); } }
             if (!s.LogEnabled) return;
             try
             {
@@ -524,11 +642,168 @@ namespace Armoury
                   .Append(" (reszta ").Append(F(_cStarted - _cFromPool - _cFromHome, "0.0")).Append("); zabrani z domow, a zostali w puli ").Append(F(_cHomeLeft, "0.0"));
                 sb.Append(" | band: wyruszylo ").Append(_nStarted).Append(", wrocilo ").Append(_nReturned).Append(", zginelo ").Append(_nLost).Append("; lup do wsi ").Append(_cGold).Append(" zl, ").Append(_cItems).Append(" szt.");
                 sb.Append(" | bez drogi ").Append(noRoad).Append(", za malo ludzi ").Append(tooFew);
+                // fix-mur: wynik marszu od poczatku (doszly / zatrzymane i przez kogo / marsz ponad 30 dob) i latka "swoi nie bija swoich"
+                int blocked = _nKillW + _nKillN + _nKillF + _nKillO + _nTurnMarch;
+                sb.Append(" | cel: doszly ").Append(_nReached).Append(" z ").Append(_nStarted).Append(" band (dzis ").Append(dArrive).Append("), zatrzymane w marszu ").Append(blocked)
+                  .Append(" (zginely: Straz ").Append(_nKillW).Append(", Polnoc ").Append(_nKillN).Append(", Wolni Ludzie ").Append(_nKillF).Append(", inni ").Append(_nKillO)
+                  .Append("; zawrocily rozbite ").Append(_nTurnMarch).Append(" (pobili: Straz ").Append(_nTurnW).Append(", Polnoc ").Append(_nTurnN).Append(", Wolni Ludzie ").Append(_nTurnF)
+                  .Append(", inni ").Append(_nTurnO).Append(")), marsz ponad ").Append(ReturnMaxDays).Append(" dob ").Append(_nMarchCap)
+                  .Append(", w marszu teraz ").Append(march).Append(", zginely po dojsciu lub w powrocie ").Append(_nDiedAfter);
+                sb.Append(" | swoi nie bija swoich: ").Append(s.FreeFolkRaidKinPeace ? "tak" : "nie").Append(" (latka ").Append(_kinHook).Append(", band w migawce ").Append(_kin.Count)
+                  .Append("), odmowy ataku dzis ").Append(veto).Append(" (od wczytania ").Append(_kinVetoAll).Append(')');
+                sb.Append(" | wspinaczka przez Mur: ").Append(s.FreeFolkRaidClimbWall ? "tak" : "nie").Append(" (pas ").Append(ClimbBelt.ToString("0", Inv)).Append(" jedn. od ")
+                  .Append(_wallForts.Count).Append(" warowni Strazy), dzis band ukrytych ").Append(climbN).Append(", godzin ukrycia ").Append(climbH);
                 sb.Append(" | potkniecia ").Append(_stumbles);
                 sb.Append(" | czas ").Append(((Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency).ToString("0.00", Inv)).Append(" ms.");
                 Log.Info(sb.ToString());
             }
             catch (Exception e) { Stumble("Daily(linia)", e); }
+        }
+
+        // ------------------------------------------------------------ fix-mur: swoi nie bija swoich (latka AI) i kto zatrzymal bande
+        /// <summary>SubModuleMain (menu glowne, jak inne latki): postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking (metoda zadeklarowana w tej klasie -
+        /// AccessTools.DeclaredMethod; klasa bez pol statycznych - bez konstruktora statycznego przy kompilacji latki). Czynny modelem jest NavalDLCMobilePartyAIModel,
+        /// ktory wola BaseModel.ShouldConsiderAttacking (dekompilacja NavalDLC) - latka dziala dla obu. Zadna inna paczka ani mod tej metody nie latka.</summary>
+        internal static void ApplyAll(Harmony h)
+        {
+            try
+            {
+                var m = AccessTools.DeclaredMethod(typeof(DefaultMobilePartyAIModel), "ShouldConsiderAttacking", new[] { typeof(MobileParty), typeof(MobileParty) });
+                if (m != null) { h.Patch(m, postfix: new HarmonyMethod(typeof(FreeFolkRaids), nameof(KinPost)) { priority = Priority.Last }); _kinHook = "wpieta"; }
+                else _kinHook = "BRAK ShouldConsiderAttacking";
+            }
+            catch (Exception e) { _kinHook = "blad " + e.GetType().Name; Log.Error("FreeFolkRaids.ApplyAll", e); }
+            try { Log.Info("Najazdy Wolnych Ludzi (fix-mur): latka 'Wolni Ludzie nie bija wlasnych band najazdu' " + _kinHook + " (postfiks DefaultMobilePartyAIModel.ShouldConsiderAttacking; dziala przy kluczu Free Folk Raid Kin Peace i bandach najazdu w polu)."); } catch { }
+        }
+
+        /// <summary>Postfiks ShouldConsiderAttacking (watki AI): partia frakcji Wolnych Ludzi nie atakuje bandy najazdu i banda najazdu nie atakuje partii Wolnych Ludzi.
+        /// Tylko odczyt niezmiennej migawki (_kin); poza nia - wynik gry bez zmian. Nie rzuca.</summary>
+        public static void KinPost(MobileParty party, MobileParty targetParty, ref bool __result)
+        {
+            if (!__result || !_kinOn) return;
+            try
+            {
+                var k = _kin;
+                if (k == null || k.Count == 0 || party == null || targetParty == null) return;
+                bool tIn = k.Contains(targetParty), pIn = k.Contains(party);
+                if (tIn == pIn) return;                                    // zadna albo obie (ten sam klan - i tak nie wrogowie)
+                var other = tIn ? party : targetParty;
+                var f = other.MapFaction;
+                if (f == null || f.StringId != CrownGifts.FreeFolkId) return;
+                __result = false;
+                Interlocked.Increment(ref _kinVeto);
+            }
+            catch { }
+        }
+
+        /// <summary>fix-mur (klucz FreeFolkRaidClimbWall; HourlyTickEvent): "wildlingowie wspinaja sie na Mur z dala od obsadzonych wiez" - siatka ladu ROT przepuszcza
+        /// przez Mur tylko przy warowniach Strazy (bandy fin83 ginely "w regionie The Wall" z rak Rasta i Karla Tannera), wiec banda W MARSZU (faza 2) w pasie ClimbBelt
+        /// jednostek od bramy warowni Strazy jest ukryta przed AI (MobileParty.IgnoreForHours - GetBestInitiativeBehavior i CanPartyInteract pomijaja ja; gracz widzi
+        /// i moze ja zaatakowac). Pod Murem i w Darze Straz i Polnoc dalej ja lapia. Bez band w marszu - nic; w bitwie - bez zmian.</summary>
+        private static void Climb()
+        {
+            var s = Settings.Current;
+            if (s == null || !s.FreeFolkRaidClimbWall || Campaign.Current == null) return;
+            WallForts((int)CampaignTime.Now.ToDays);
+            if (_wallForts.Count == 0) return;
+            Dictionary<string, MobileParty> map = null;
+            foreach (var r in _raids)
+            {
+                try
+                {
+                    if (r.Phase != 2) continue;
+                    var mp = PartyOf(r, ref map);
+                    if (mp == null || mp.MapEvent != null || mp.SiegeEvent != null) continue;
+                    var pos = mp.GetPosition2D;
+                    bool near = false;
+                    foreach (var g in _wallForts) if (pos.Distance(g) <= ClimbBelt) { near = true; break; }
+                    if (!near) continue;
+                    mp.IgnoreForHours(ClimbHideHours);
+                    _climbHours++; _climbBands.Add(r.Id);
+                }
+                catch (Exception e) { Stumble("Climb(banda)", e); }
+            }
+        }
+
+        /// <summary>fix-mur: bramy warowni (miast i zamkow) frakcji Strazy - pamiec na dobe (zdobyta warownia wypada nastepnego dnia).</summary>
+        private static void WallForts(int today)
+        {
+            if (_wallFortsDay == today) return;
+            _wallFortsDay = today; _wallForts.Clear();
+            foreach (var st in Settlement.All)
+            {
+                try
+                {
+                    if (st == null || !st.IsFortification) continue;
+                    var f = st.MapFaction;
+                    if (f != null && f.StringId == CrownGifts.WatchId) _wallForts.Add(st.GatePosition.ToVec2());
+                }
+                catch (Exception e) { Stumble("WallForts", e); }
+            }
+        }
+
+        private static void RebuildKin(Settings s)
+        {
+            bool on = s != null && s.FreeFolkRaidKinPeace;
+            var set = new HashSet<MobileParty>();
+            if (on) foreach (var r in _raids) if (r.P != null && r.P.IsActive) set.Add(r.P);
+            _kin = set;                                                     // publikacja calej migawki (watki AI czytaja stara albo nowa - nigdy w trakcie zmiany)
+            _kinOn = on && set.Count > 0;
+        }
+
+        /// <summary>CampaignEvents.MobilePartyDestroyed: kto rozbil bande najazdu (strona zwyciezcy - MapEventSide.HandleMapEventEndForPartyInternal wola
+        /// DestroyPartyAction.Apply(lider strony przeciwnej, banda)). Tylko zapis strony do linii "cel:"; bez band - nic.</summary>
+        internal static void OnPartyDestroyed(MobileParty party, PartyBase destroyer)
+        {
+            if (_raids.Count == 0 || party == null) return;
+            try
+            {
+                foreach (var r in _raids)
+                {
+                    if (r.P != party && (r.Id == null || r.Id != party.StringId)) continue;
+                    var f = destroyer != null ? destroyer.MapFaction : null;
+                    r.Killer = f == null ? "o" : f.StringId == CrownGifts.WatchId ? "w" : f.StringId == CrownGifts.NorthId ? "n" : f.StringId == CrownGifts.FreeFolkId ? "f" : "o";
+                    break;
+                }
+            }
+            catch (Exception e) { Stumble("OnPartyDestroyed", e); }
+        }
+
+        /// <summary>Recenzja fix-mur (CampaignEvents.MapEventEnded - nasluchy biegna przed HandleMapEventEnd, strony bitwy jeszcze pelne): banda najazdu W MARSZU
+        /// (faza 2) po stronie przegranej - zapis strony zwyciezcy (lider strony wygranej) jako "pobila" (r.Hit). Daily liczy z niej "zawrocily rozbite (pobili: ...)",
+        /// a gdy brak zdarzenia zniszczenia - strone zabojcy. Bitwa bez zwyciezcy (odwrot) - bez zmian. Tylko linia "cel:"; bez band w marszu - nic.</summary>
+        internal static void OnMapEventEnded(MapEvent me)
+        {
+            if (_raids.Count == 0 || me == null) return;
+            try
+            {
+                bool any = false;
+                foreach (var r in _raids) if (r.Phase == 2) { any = true; break; }
+                if (!any) return;
+                var win = me.WinningSide;
+                if (win == BattleSideEnum.None) return;
+                var lose = win == BattleSideEnum.Attacker ? me.DefenderSide : me.AttackerSide;
+                if (lose == null || lose.Parties == null) return;
+                string code = null;
+                foreach (var mep in lose.Parties)
+                {
+                    var mp = mep != null && mep.Party != null ? mep.Party.MobileParty : null;
+                    if (mp == null) continue;
+                    foreach (var r in _raids)
+                    {
+                        if (r.Phase != 2 || (r.P != mp && (r.Id == null || r.Id != mp.StringId))) continue;
+                        if (code == null)
+                        {
+                            var lead = me.GetLeaderParty(win);
+                            var f = lead != null ? lead.MapFaction : null;
+                            code = f == null ? "o" : f.StringId == CrownGifts.WatchId ? "w" : f.StringId == CrownGifts.NorthId ? "n" : f.StringId == CrownGifts.FreeFolkId ? "f" : "o";
+                        }
+                        r.Hit = code;
+                        break;
+                    }
+                }
+            }
+            catch (Exception e) { Stumble("OnMapEventEnded", e); }
         }
 
         /// <summary>Cel najazdu: wies Strazy albo Polnocy (stan Normal) z droga ladowa od wsi zrodla - z TargetPrefilter najblizszych w linii prostej TargetNearest

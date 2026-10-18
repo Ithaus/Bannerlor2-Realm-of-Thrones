@@ -283,6 +283,7 @@ namespace Armoury
                 try { CaravanGoods.ApplyAll(_harmony); } catch (Exception e) { Log.Error("CaravanGoods.ApplyAll", e); }   // noc-ekonomia3 (E3-T1, E3-G3): ksiega kosztu karawan i myto karawan na SellItemsAction.ApplyInternal, blokada odkupienia BK
                 try { VillageFruit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("VillageFruit.ApplyAll", e); }   // poprawka po recenzji noc-ekonomia2 16.10: magazyn wsi + 5 dob owocow, miodu i jaj z listy BK (GetWarehouseCapacity)
                 try { StartCalibration.ApplyAll(_harmony); } catch (Exception e) { Log.Error("StartCalibration.ApplyAll", e); }   // KS (kalibracja startu): wies zastosowana bez zywnosci wsi gry z niczego (TickFoodProduction)
+                try { FreeFolkRaids.ApplyAll(_harmony); } catch (Exception e) { Log.Error("FreeFolkRaids.ApplyAll", e); }   // fix-mur: Wolni Ludzie nie bija wlasnych band najazdu (postfiks ShouldConsiderAttacking; klucz Free Folk Raid Kin Peace)
                 SkillsDecide.ApplyAll(_harmony);
                 MusterOut.ApplyAll(_harmony);
                 CraftPopup.ApplyAll(_harmony);

@@ -3004,6 +3004,14 @@ namespace Armoury
         public int FreeFolkRaidDays = 30;                  // with Free Folk Hunger Raids: how many days a band raids in the south before it turns home (a band that lost more than half of its men turns home at once)
         public float FreeFolkRaidDailyChance = 0.5f;       // with Free Folk Hunger Raids: the chance a day that a new band sets out when the Free Folk are as hungry as they can be; it falls with their hunger (half as hungry - half the chance)
 
+        // --- The Wall: fixes after the first test (fix-mur, 18.10) ---
+        // Test fin83 (Armoury-2026-10-17_20-30-51): NMUR-6 pokrycie Strazy 0.895 - 80% braku to "bez miejsca w spichlerzu" (wies z pelnym spichlerzem obcinala zadanie
+        // o udzial wozow calego okregu); NMUR-32 "doszly 0 z 13" - bitwy.log: 10 band rozbili lordowie Wolnych Ludzi na wlasnej ziemi, 3 - Straz u Muru.
+        // WallTribute.cs, FreeFolkRaids.cs. Nowe klucze - nie ma ich w Armoury.json Jeffa; wylaczone = kod jak przed fix-mur.
+        public bool WallTributeDistrictRoom = true;        // with Wall Grain Tribute: a Watch castle stores the tribute in whichever of its villages' granaries has room - the same way the carts unload - so a village whose own granary is full eats from it while the grain goes to its neighbours; off = each village orders only what fits in its own granary
+        public bool FreeFolkRaidKinPeace = true;           // with Free Folk Hunger Raids: the Free Folk do not attack their own hungry raiders (and the raiders leave Free Folk parties alone) on the way to the Wall - only the Night's Watch and the North stand in their way; off = the raiders are outlaws to everyone, their own lords included
+        public bool FreeFolkRaidClimbWall = true;          // with Free Folk Hunger Raids: a raiding band climbs the Wall away from the manned towers, as in the books - while it crosses the belt under the Wall near a Night's Watch castle no other party spots it; below the Wall, in the Gift, the Watch and the North can catch it again; off = the band walks past the Watch's gates in plain sight
+
         // --- Money that cannot be spent (18.10) ---
         // Paczka ds-akumulator (noc 17/18.10; Jeff: "czy nie ma jakiegos stanu ludzi, ktorzy zarabiaja, ale nie moga wydawac i na koniec wchlona cala kase"; diagnoza
         // docs/DIAGNOZA-FIN80-2026-10-17.md "dochod" i "kiesy"; TownFolk.DsAkum.cs). Kazdy klucz osobno; wylaczone = kod co do monety jak dotad. Nowe klucze - nie ma ich
