@@ -805,11 +805,11 @@ namespace Armoury
         // ------------------------------------------------------------ KS-R4 r4-kupcy H7 (= K1): korytarze z modelem kredytu kupcow
         internal const double CreditFloorShare = 0.5, CreditExpShare = 0.5, CreditPayDays = 3.0; internal const int CreditTopSrc = 3;
 
-        /// <summary>KS-R5 ceny-r5 (klucz Ks Consign Deposit): zadatek kupcow importera przy wysylce (udzial wartosci lotu) - kredyt eksportera niesie tylko reszte, wiec
-        /// ta sama kasa eksportera unosi 1 / (1 - udzial) wiecej towaru w drodze (udzial najwyzej 0.9); bez zadatku (CorrDepShare 0) - 1 (H7 bit w bit).</summary>
         // KS-R5 ceny-r5: luki odciete wojna w ostatniej rundzie kroku 5 (linia korytarzy)
         private sealed partial class Ctx { public int WarCutN; public readonly List<string> WarCutL = new List<string>(); }
 
+        /// <summary>KS-R5 ceny-r5 (klucz Ks Consign Deposit): zadatek kupcow importera przy wysylce (udzial wartosci lotu) - kredyt eksportera niesie tylko reszte, wiec
+        /// ta sama kasa eksportera unosi 1 / (1 - udzial) wiecej towaru w drodze (udzial najwyzej 0.9); bez zadatku (CorrDepShare 0) - 1 (H7 bit w bit).</summary>
         private static double DepK(KsInput inp)
         {
             double s = inp != null ? inp.CorrDepShare : 0.0;
