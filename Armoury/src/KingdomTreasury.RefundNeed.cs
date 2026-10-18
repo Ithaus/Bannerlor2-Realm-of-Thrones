@@ -89,7 +89,8 @@ namespace Armoury
             {
                 double G, R; bool war;
                 // recenzja calosci 18.10: R miary potrzeby (NeedChestOf - z D z cieciami f6/f7 dodanymi z powrotem; klucz Need Reserve Uncut wylaczony = ChestOf)
-                bool ok = ClanBudget.NeedChestOf(c, out G, out R, out war) || ClanBudget.PendingChestOf(c, out G, out R, out war);
+                // f19-e3: pierwsza doba sesji tak samo (PendingNeedChestOf - R przez NeedReserve z D z zapisu; klucz Need Reserve Uncut Saved wylaczony = PendingChestOf)
+                bool ok = ClanBudget.NeedChestOf(c, out G, out R, out war) || ClanBudget.PendingNeedChestOf(c, out G, out R, out war);
                 // recenzja f6: rod gracza dluznik albo w zajeciu (168, z Player Same Ladder) - bez miary jak AI (ChestOf: b.Debtor / b.Seized) i W6b gracza
                 if (!ok && c == Clan.PlayerClan && !(DebtLadder.On && (DebtLadder.IsDebtor(c) || DebtLadder.IsSeized(c))))
                 {

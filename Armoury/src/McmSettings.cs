@@ -4088,6 +4088,14 @@ namespace Armoury
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool NeedReserveUncut { get; set; } = true;
 
+        [SettingPropertyBool("Stable D First Day From Save", HintText = "on the first day after loading a save, a house's steady income, the income its debt instalments are measured against, its credit limit at the Iron Bank and its dues to the crown are taken from what the save remembers of the day before. Before, the first day after every load fell back on the house's raw daily income (about twice its steady income), so for that one day wage ceilings, court shares and war credit from the Bank were inflated, and the next day's refund and rents by need were judged on that. Off = the first day after loading uses the raw income, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool StableDFirstDayFromSave { get; set; } = true;
+
+        [SettingPropertyBool("Need Reserve Uncut Saved", HintText = "with Need Reserve Uncut: what the crown held back from each house by need is remembered in the save, so after loading the war reserve of need goes on where it was instead of rebuilding from nothing over four weeks - the days not yet seen in this session count with the remembered average, and on the first day after loading the reserve of need is reckoned the same way. Off = after every load the reserve of need rebuilds from nothing over 28 days, as before", RequireRestart = false)]
+        [SettingPropertyGroup("The crown's income (stage 2)")]
+        public bool NeedReserveUncutSaved { get; set; } = true;
+
         [SettingPropertyBool("Crown Pays Call To War", HintText = "with Crown Current Income: the price of calling an ally into a war is paid by the calling crown out of its daily income, a day's part at a time over the ally's term of service (after the gifts, reparations and mercenary contracts, before the wage refunds) - the houses of the realm pay nothing towards it, you neither. The ally's houses get only what the crown has really paid. When the crown cannot pay a day's part, the agreement ends and the ally leaves that war (peace between the ally and the enemy). Off = the game's way: the houses pay their share and the ally is paid in full at once", RequireRestart = false)]
         [SettingPropertyGroup("The crown's income (stage 2)")]
         public bool CrownPaysCallToWar { get; set; } = true;
@@ -7600,6 +7608,10 @@ namespace Armoury
         [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
         public int KsFarmCatchUpKeepDays { get; set; } = 28;
 
+        [SettingPropertyBool("Ks Farm Catch Up One Off", HintText = "with Ks Farm Catch Up: the catch-up a town pays its lord and crown is counted as a one-off payment, not as steady income from the land: it no longer raises the lord's steady income (and with it his war reserve, wage ceiling, court, dues and credit limit) for the following weeks, and the crown does not count it among its usual income when it asks its lords and towns for a war grant. The coin paid is the same. Off = the catch-up is counted like the town's yearly farm, as before", RequireRestart = false)]
+        [SettingPropertyGroup("Town purses: the farm catches up with the merchants' idle coin (18.10)")]
+        public bool KsFarmCatchUpOneOff { get; set; } = true;
+
         [SettingPropertyBool("Ks Price Restart", HintText = "with Start Calibration applied: the towns' 28-day price averages start again when the new basket demand has fully come in (two weeks after the start shelves), so the weeks after measure the new market and not the old prices; a line with today's prices is written every week; off = the averages start only at the start shelves", RequireRestart = false)]
         [SettingPropertyGroup("Start calibration, round 4: prices and market steering")]
         public bool KsPriceRestart { get; set; } = true;
@@ -8937,6 +8949,8 @@ namespace Armoury
             s.CrownRentHeldToServing = CrownRentHeldToServing;
             s.CrownRentsByNeed = CrownRentsByNeed;
             s.NeedReserveUncut = NeedReserveUncut;
+            s.StableDFirstDayFromSave = StableDFirstDayFromSave;
+            s.NeedReserveUncutSaved = NeedReserveUncutSaved;
             s.CrownPaysCallToWar = CrownPaysCallToWar;
             s.CallToWarBreakRestoresWallet = CallToWarBreakRestoresWallet;
             s.CallToWarPaysForWar = CallToWarPaysForWar;
@@ -9815,6 +9829,7 @@ namespace Armoury
             s.KsFarmCatchUp = KsFarmCatchUp;
             s.KsFarmCatchUpShare = KsFarmCatchUpShare;
             s.KsFarmCatchUpKeepDays = KsFarmCatchUpKeepDays;
+            s.KsFarmCatchUpOneOff = KsFarmCatchUpOneOff;
             s.KsPriceRestart = KsPriceRestart;
             s.KsGapMargin = KsGapMargin;
             s.KsCtlPerTown = KsCtlPerTown;

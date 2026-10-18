@@ -191,10 +191,12 @@ namespace Armoury
             return owed / l.SeizeEma > Math.Max(1, s.SaleForecastDays);
         }
 
-        /// <summary>D rodu do rat: D budzetu 166 (wczoraj), inaczej D staly, inaczej D169; nie mniej niz 0.</summary>
+        /// <summary>D rodu do rat: D budzetu 166 (wczoraj), inaczej (f19-e3: pierwsza doba po wczytaniu, przed pierwszym budzetem sesji) D z zapisu budzetu, inaczej D staly,
+        /// inaczej D169; nie mniej niz 0.</summary>
         internal static double DebtD(Clan c)
         {
             double d = ClanBudget.DLast(c);
+            if (d < 0) d = ClanBudget.SavedD(c);   // f19-e3: dotad D169 (ok. 2 x D staly) przez pierwsza dobe po kazdym wczytaniu - raty i okup z zawyzonego D
             if (d < 0) d = ClanIncomeBook.StableD(c);
             if (d < 0) d = ClanIncomeBook.StableIncome(c);
             return Math.Max(0, d);
@@ -214,6 +216,7 @@ namespace Armoury
                 float trust = d != null ? (d.Defaulted ? 0f : d.Trust) : 1f;
                 if (trust <= 0f) return 0;
                 double land = ClanIncomeBook.StableLand(c);
+                if (land < 0) land = ClanIncomeBook.SavedLand(c);   // f19-e3: pierwsza doba po wczytaniu - ziemia z zapisu (dotad caly D169 - limit kilka razy za duzy)
                 if (land < 0) land = Math.Max(0, ClanIncomeBook.StableIncome(c));   // bez D stalego - D169 (jak linia "Dlugi (na sucho)")
                 int towns = 0, castles = 0;
                 var fiefs = c.Fiefs;

@@ -59,6 +59,7 @@ namespace Armoury
         /// <summary>162m: danina wojenna zdjeta dzis z kasy miasta (tarcza dworu schodzi, gdy zloto wychodzi z kasy).</summary>
         internal static readonly Dictionary<TaleWorlds.CampaignSystem.Settlements.Settlement, int> TownLevyToday = new Dictionary<TaleWorlds.CampaignSystem.Settlements.Settlement, int>();
         private static int _duesLand, _duesOld;   // 165: rody z podstawa "ziemia" D stalego / ze stara podstawa (brak pomiaru)
+        private static int _duesSaved;            // f19-e3: rody z podstawa "ziemia" z zapisu (pierwsza doba po wczytaniu - pomiaru jeszcze nie ma)
 
         internal static void Daily()
         {
@@ -68,7 +69,7 @@ namespace Armoury
             try
             {
                 long total = 0; int payers = 0; int playerPaid = 0, skipped = 0, modelErr = 0;
-                _duesLand = _duesOld = 0;
+                _duesLand = _duesOld = 0; _duesSaved = 0;
                 bool land = CrownIncome.On && s.CrownDuesFromLand;   // 165 (2.6): podstawa powinnosci = czesc "ziemia" D stalego (korona nie bierze 3% z wlasnych wyplat)
                 var model = TaleWorlds.CampaignSystem.Campaign.Current.Models.ClanFinanceModel;
                 foreach (var c in TaleWorlds.CampaignSystem.Clan.All)
@@ -89,7 +90,12 @@ namespace Armoury
                         if (land)
                         {
                             double l = ClanIncomeBook.StableLand(c);
-                            if (l >= 0) { income = (float)l; _duesLand++; } else _duesOld++;   // brak pomiaru D stalego - stara podstawa
+                            if (l >= 0) { income = (float)l; _duesLand++; }
+                            else
+                            {
+                                l = ClanIncomeBook.SavedLand(c);   // f19-e3: pierwsza doba po wczytaniu - ziemia z zapisu (ta sama, ktora powinnosci wziely w dobie przed zapisem)
+                                if (l >= 0) { income = (float)l; _duesSaved++; } else _duesOld++;   // brak pomiaru D stalego - stara podstawa
+                            }
                         }
                         if (income <= 0f) continue;
                         bool war = false;
@@ -115,7 +121,8 @@ namespace Armoury
                          + (playerPaid > 0 ? " (rod gracza " + playerPaid + ")" : "")
                          + "; potkniecia " + (skipped + modelErr) + " (rodow pominietych przez blad " + skipped + ", blad modelu dochodu - podstawa z samych rent " + modelErr
                          + "; od startu sesji " + (_duesSkippedSess + _duesModelErrSess) + ")"
-                         + (land ? "; podstawa (165): czesc ziemia D stalego u " + _duesLand + " rodow, stara (dochod modelu + renty - brak pomiaru D stalego) u " + _duesOld : "") + ".");
+                         + (land ? "; podstawa (165): czesc ziemia D stalego u " + _duesLand + " rodow, stara (dochod modelu + renty - brak pomiaru D stalego) u " + _duesOld
+                            + (_duesSaved > 0 ? ", ziemia z zapisu (f19-e3, pierwsza doba po wczytaniu) u " + _duesSaved : "") : "") + ".");
             }
             catch (Exception e) { Log.Error("KingdomTreasury.Daily", e); }
         }
