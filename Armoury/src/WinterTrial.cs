@@ -30,7 +30,8 @@ namespace Armoury
 
         // f4-opal (noc 17/18.10; koncowy przeglad ekonomii 18.10: "zima nigdy nie byla testowana - test z wymuszona zima przed wgraniem"): PROBA ZIMY TERAZ - autotest
         // laduje zapis (autotest-F-d240), wiec plik armoury-proba-zimy.flag (tylko nowa kampania) nie dziala. Plik "armoury-zima-teraz.flag" w tym samym katalogu: przy
-        // starcie KAZDEJ sesji (nowa gra i wczytanie; TownFolk.FirewoodSessionStart z OnSessionLaunched) pora EKONOMII = zima na te sesje (WesterosClimate.ForceEconWinter -
+        // starcie KAZDEJ sesji autotestu (nowa gra i wczytanie; TownFolk.FirewoodSessionStart z OnSessionLaunched; recenzja: tylko przy CrashScribe.Autotest.Active - w grze
+        // bez autotestu plik nic nie robi) pora EKONOMII = zima na te sesje (WesterosClimate.ForceEconWinter -
         // tylko w pamieci: odcinki por roku w zapisie, pora nieba i pogoda bez zmian; WinterBite, opal mieszczan, KS, BetterEconomy i inne latki pory ekonomii widza zime).
         // Bez pliku - nic (false). Plik zostaje (usuwa go skrypt testu); NIGDY w grze Jeffa.
         internal const string NowFlagName = "armoury-zima-teraz.flag";
@@ -44,6 +45,16 @@ namespace Armoury
                 var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                 path = Path.Combine(Path.Combine(Path.Combine(docs, "Mount and Blade II Bannerlord"), "CrashScribe"), NowFlagName);
                 if (!File.Exists(path)) { WesterosClimate.ForceEconWinter(false); return "NIE (brak pliku)"; }
+                // recenzja: tylko w autotescie (CrashScribe.Autotest.Active - LogGate.Mode 1 albo 2, jak pliki KS armoury-ks-wlacz.flag i armoury-ks-auto.flag). Plik
+                // zapomniany w katalogu CrashScribe nie zrobi wiecznej zimy ekonomii w zapisie Jeffa (DLL CrashScribe Jeffa nie ma typu Autotest - tryb 0).
+                int mode = LogGate.Mode;
+                if (mode != 1 && mode != 2)
+                {
+                    WesterosClimate.ForceEconWinter(false);
+                    Log.Info("PROBA ZIMY TERAZ (autotest, f4-opal): plik-przelacznik " + path + " jest, ale to nie autotest (tryb " + mode + ") - bez skutku, pora ekonomii wedlug klimatu."
+                             + " Plik mozna usunac.");
+                    return "plik jest, ale to nie autotest - bez skutku";
+                }
                 var s = Settings.Current;
                 if (s == null || !s.ClimateEnabled || !s.ClimateDrivesEconomy)
                 {

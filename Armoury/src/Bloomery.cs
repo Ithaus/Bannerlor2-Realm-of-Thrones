@@ -926,6 +926,19 @@ namespace Armoury
             return d != null && town != null && d.TryGetValue(town, out v) ? v : 0f;
         }
 
+        /// <summary>f4-opal (recenzja - Plan opalu bez drewna dymarek): suma potrzeb doby dymarek kopaln z tym miastem handlowym (TradeBound) - najwiecej, ile lasu wsi
+        /// okregu FromWoodlot zdejmuje na dymarki, zanim woz pojedzie (ladunki/d). Czyta StartCalibration.OpalPlanWood raz na dobe (watek gry). 0 - wytop wylaczony.</summary>
+        internal static float WoodlotWant(Settlement market)
+        {
+            if (!_applied || market == null) return 0f;
+            if (_pending != null) ResolvePending();
+            var list = MinesOf(market);
+            if (list == null) return 0f;
+            float w = 0f;
+            foreach (var mv in list) { Mine m; if (mv != null && _mines.TryGetValue(mv, out m) && m.Want > 0) w += m.Want; }
+            return w;
+        }
+
         private static void RollMineNeed()
         {
             var s = Settings.Current;
@@ -934,7 +947,9 @@ namespace Armoury
             foreach (var kv in _mines)
             {
                 var v = kv.Key; var m = kv.Value;
-                if (v == null || m == null || m.Want <= 0) continue;
+                // recenzja: kopalnia bez pelnej doby lasu w pamieci (pierwsze Daily po wczytaniu - LocN 0, ForAvg 0) pomijana - inaczej przez dobe cala potrzeba
+                // dymarek bez lasu okregu podnosilaby zapas rzemiosla (x CaravanBulkStockDays) i zabierala drewno budowom i opalowi; tak jak ShelfUse (doba niepelna)
+                if (v == null || m == null || m.Want <= 0 || m.LocN <= 0) continue;
                 var mk = v.TradeBound; var town = mk != null ? mk.Town : null;
                 if (town == null) continue;
                 float need = m.Want - Math.Min(m.ForAvg, m.Want);

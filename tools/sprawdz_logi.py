@@ -1276,8 +1276,10 @@ Uzycie (Python 3, tylko odczyt):
                     narzedzi KS - osobno), NOP-8 'kopalnia bez wegla' <= 28.1 lup/d = bez KS (ETAP <= 29.8 fin87), NOP-9 zima (czynnik > 1.2, 'bez opalu' <= 50%, kontrola 0; bieg bez zimy - INFO: PRZED
                     WGRANIEM bieg z plikiem Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-zima-teraz.flag - pora ekonomii zima na sesje, tylko w pamieci),
                     NOP-10 krok 3: zapas rzemiosla podniesiony o drewno dymarek wsi, gdy ich potrzeba ponad las > 0, NOP-11 potkniecia i ERROR 0, NOP-12 czas <= 5 ms
-                    najwiecej i <= 2 ms srednio, NOP-13 zapas drewna swiata (INFO), NOP-14 popyt ceny po regule: wpis w kazdym miescie ZC4, suma = czesc KS po limicie przy
-                    lambda >= 0.99, NOP-15 potrzeba w linii paczki = linia N2-E4. Bazy: fin87 Armoury-2026-10-18_00-26-23.log (f5fd0ae3), fin86 Armoury-2026-10-17_23-22-37.log,
+                    najwiecej i <= 2 ms srednio, NOP-13 zapas drewna swiata (INFO), NOP-14 popyt ceny z pora roku (recenzja: bez limitu dowozu): wpis w kazdym miescie ZC4,
+                    suma = czesc KS z pora przy lambda >= 0.99 (2% + 1), NOP-15 potrzeba w linii paczki = linia N2-E4, NOP-16 (recenzja) Plan wobec zmierzonego dowozu
+                    w miastach z pelnym pierscieniem i doby "pierscien + Plan" (brakujace doby pierscienia z Planu - bez skoku limitu w 8. dobie; INFO); NOP-0 pokazuje tez,
+                    czy plik zimy dzialal (recenzja: tylko w autotescie - w grze "nie autotest - bez skutku"). Bazy: fin87 Armoury-2026-10-18_00-26-23.log (f5fd0ae3), fin86 Armoury-2026-10-17_23-22-37.log,
                     fin84 Armoury-2026-10-17_21-11-36.log (bez KS). Log sprzed paczki (fin86, fin87): NOP-5..8 jako liczby bazowe
                     (INFO), reszta brak linii (INFO), bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
@@ -40473,16 +40475,19 @@ NOP_DAY = "Opal pod KS (f4-opal): dzien "
 NOP_D = re.compile(r"^Opal pod KS \(f4-opal\): dzien (\d+) \| klucze: pora (TAK|NIE), limit dowozu (TAK|NIE), popyt ceny (TAK|NIE), zapas dymarek (TAK|NIE) \| "
                    r"pora: (ZIMA|lato|zima bez skutkow|wiosna albo jesien), czynnik czesci KS srednio (\S+) \| miasta ZC4 (\d+) \(lambda srednio (\S+)\) \| "
                    r"czesc KS: opal x lambda (\S+), z pora (\S+), po limicie (\S+) \(obcieta (\S+) w (\d+) miastach\) \| "
-                   r"limit = dowoz - rzemioslo \+ polka ponad zapas rzemiosla / \d+: dowoz (\S+) ladunkow/d \(zmierzony \d+ dob w (\d+) miastach, Plan w (\d+), bez danych (\d+)\), rzemioslo (\S+), "
+                   r"limit = dowoz - rzemioslo \+ polka ponad zapas rzemiosla / \d+: dowoz (\S+) ladunkow/d \(zmierzony \d+ dob w (\d+) miastach, (?:pierscien \+ Plan w (\d+), )?Plan w (\d+), bez danych (\d+)\), rzemioslo (\S+), "
                    r"polka ponad zapas / \d+ (\S+), limit (\S+) \| "
+                   r"(?:Plan wobec pomiaru \(miasta z pelnym pierscieniem\): Plan (\S+), zmierzony (\S+) ladunkow/d w (\d+) miastach \| )?"
                    r"potrzeba opalu razem (\S+) \(po zaokragleniu (\d+); czesc dzisiejsza \(1 - lambda\) (\S+)\) \| "
-                   r"popyt ceny drewna \(opal przy pelnej lambdzie\): (?:po regule (\S+) w (\d+) miastach|pelny \(klucz NIE\)) \| "
+                   r"popyt ceny drewna \(opal przy pelnej lambdzie\): (?:(?:po regule|z pora roku) (\S+) w (\d+) miastach(?: \(bez limitu dowozu\))?|pelny \(klucz NIE\)) \| "
                    r"zapas rzemiosla \+ drewno dymarek wsi: (?:\+(\d+) ladunkow w (\d+) miastach \(potrzeba dymarek ponad las (\S+) ladunkow/d\)|NIE) \| "
                    r"dowoz zmierzony od ostatniej linii: wozy wsi (\d+), pola mieszczan (\d+) \(pierscienie pelne (\d+)/(\d+)([^)]*)\) \| "
                    r"kontrola: po limicie ponad limit (\S+) \(0\), z pora - po limicie (\S+) >= 0 \| [^|]* \| czas (\S+) ms \| potkniecia (\d+)\.$")
 # indeksy grup NOP_D (groups() od 0)
-(NI_DAY, NI_SEA, NI_CAP, NI_PRICE, NI_KEEP, NI_PORA, NI_K, NI_TOWNS, NI_LAM, NI_FIRE, NI_KFULL, NI_KCUT, NI_CUT, NI_CAPPED, NI_D, NI_MEAS, NI_PLAN, NI_NONE, NI_U, NI_STOCK,
- NI_LIM, NI_NEED, NI_WANT, NI_OLD, NI_EFF, NI_EFFN, NI_KX, NI_KXN, NI_MINE, NI_CARTS, NI_FIELDS, NI_RF, NI_RN, NI_TAIL, NI_OVER, NI_DIFF, NI_MS, NI_STUM) = range(38)
+# recenzja f4-opal: NI_MIX (pierscien + Plan - brakujace doby z Planu), NI_PVP/NI_PVM/NI_PVN (Plan wobec pomiaru w miastach z pelnym pierscieniem) - opcjonalne
+(NI_DAY, NI_SEA, NI_CAP, NI_PRICE, NI_KEEP, NI_PORA, NI_K, NI_TOWNS, NI_LAM, NI_FIRE, NI_KFULL, NI_KCUT, NI_CUT, NI_CAPPED, NI_D, NI_MEAS, NI_MIX, NI_PLAN, NI_NONE, NI_U, NI_STOCK,
+ NI_LIM, NI_PVP, NI_PVM, NI_PVN, NI_NEED, NI_WANT, NI_OLD, NI_EFF, NI_EFFN, NI_KX, NI_KXN, NI_MINE, NI_CARTS, NI_FIELDS, NI_RF, NI_RN, NI_TAIL, NI_OVER, NI_DIFF, NI_MS,
+ NI_STUM) = range(42)
 NOP_N2E = re.compile(r"^Opal mieszczan \(N2-E4\): dzien (\d+) \| CZYNNE \| .*?\| pora: (ZIMA|lato|wiosna albo jesien|zima bez skutkow)[^|]*\| potrzeba (\S+) ladunkow "
                      r"\(po zaokragleniu (\d+)\) \| kupione i spalone (\d+) ladunkow .*?\| bez opalu dzis (\d+) ladunkow")
 NOP_ZC4 = re.compile(r"^Koszyk stanow \(ZC4\): dzien (\d+) \| lambda Westeros (\S+) \(\d+ miast\), Essos (\S+) \(")
@@ -40642,7 +40647,7 @@ def nopal_main(logp):
             g = days[ds[-1]]
             towns, meas = int(g[NI_TOWNS]), int(g[NI_MEAS])
             rep.add("NOP-4: limit z dowozu zmierzonego (po 8 dobach sesji), latka sprzedazy wozu",
-                    f"ostatnia doba {ds[-1]}: zmierzony w {meas}, Plan w {g[NI_PLAN]}, bez danych {g[NI_NONE]} z {towns} miast ZC4; doby BRAK LATKI {len(nolatch)}",
+                    f"ostatnia doba {ds[-1]}: zmierzony w {meas}, pierscien + Plan w {g[NI_MIX] or '-'}, Plan w {g[NI_PLAN]}, bez danych {g[NI_NONE]} z {towns} miast ZC4; doby BRAK LATKI {len(nolatch)}",
                     ">= 80% miast ZC4 zmierzone, BRAK LATKI 0", towns == 0 or (meas >= 0.8 * towns and not nolatch))
         else:
             rep.add("NOP-4: limit z dowozu zmierzonego", f"dob z limitem {len(ds)} (BRAK LATKI {len(nolatch)})", "INFO (za krotko - pierscien 7 dob)", None if not nolatch else False)
@@ -40745,15 +40750,15 @@ def nopal_main(logp):
     else:
         rep.add("NOP-13: zapas drewna swiata", "brak linii 'Towary: dzien N - hardwood' w oknie", "INFO", None)
 
-    # NOP-14 popyt ceny po regule (lambda >= 0.99: suma = czesc KS po limicie)
+    # NOP-14 popyt ceny z pora roku (recenzja: BEZ limitu dowozu; lambda >= 0.99: suma = czesc KS z pora, 'z pora' = suma lambda x opal x pora)
     if days:
         pd = [d for d in full if d in days and days[d][NI_PRICE] == "TAK" and days[d][NI_EFF] is not None]
-        bad = [d for d in pd if int(days[d][NI_EFFN]) != int(days[d][NI_TOWNS]) or abs(float(days[d][NI_EFF]) - float(days[d][NI_KCUT])) > 0.01 * float(days[d][NI_KCUT]) + 1.0]
-        rep.add("NOP-14: popyt ceny drewna po regule (klucz popyt ceny TAK, lambda >= 0.99)",
-                f"dob {len(pd)}, niezgodnych {len(bad)}" + (f" (np. d{bad[0]}: po regule {days[bad[0]][NI_EFF]} w {days[bad[0]][NI_EFFN]} z {days[bad[0]][NI_TOWNS]}, po limicie {days[bad[0]][NI_KCUT]})" if bad else ""),
-                "kazde miasto ZC4 ma wpis, suma = czesc KS po limicie (1% + 1)", (not bad) if pd else None)
+        bad = [d for d in pd if int(days[d][NI_EFFN]) != int(days[d][NI_TOWNS]) or abs(float(days[d][NI_EFF]) - float(days[d][NI_KFULL])) > 0.02 * float(days[d][NI_KFULL]) + 1.0]
+        rep.add("NOP-14: popyt ceny drewna z pora roku, bez limitu dowozu (klucz popyt ceny TAK, lambda >= 0.99)",
+                f"dob {len(pd)}, niezgodnych {len(bad)}" + (f" (np. d{bad[0]}: popyt ceny {days[bad[0]][NI_EFF]} w {days[bad[0]][NI_EFFN]} z {days[bad[0]][NI_TOWNS]}, czesc KS z pora {days[bad[0]][NI_KFULL]})" if bad else ""),
+                "kazde miasto ZC4 ma wpis, suma = czesc KS z pora (2% + 1; nie po limicie - popyt ceny nie idzie za dowozem)", (not bad) if pd else None)
     else:
-        rep.add("NOP-14: popyt ceny drewna po regule", "brak linii paczki", "INFO", None)
+        rep.add("NOP-14: popyt ceny drewna z pora roku", "brak linii paczki", "INFO", None)
 
     # NOP-15 potrzeba: linia paczki = linia N2-E4 tej samej doby
     if days:
@@ -40762,6 +40767,18 @@ def nopal_main(logp):
         rep.add("NOP-15: potrzeba opalu - linia paczki = linia N2-E4", f"dob {len(both)}, niezgodnych {len(bad)}", "0", (not bad) if both else None)
     else:
         rep.add("NOP-15: potrzeba opalu - linia paczki = linia N2-E4", "brak linii paczki", "INFO", None)
+
+    # NOP-16 (recenzja): Plan wobec zmierzonego dowozu w miastach z pelnym pierscieniem i doby z pierscieniem + Planem (brakujace doby z Planu - bez skoku w 8. dobie)
+    pv = sorted(d for d, g in days.items() if g[NI_PVN] is not None and int(g[NI_PVN]) > 0) if days else []
+    mixd = sorted(d for d, g in days.items() if g[NI_MIX] is not None and int(g[NI_MIX]) > 0) if days else []
+    if pv:
+        pp = sum(float(days[d][NI_PVP]) for d in pv) / len(pv)
+        pm = sum(float(days[d][NI_PVM]) for d in pv) / len(pv)
+        rep.add("NOP-16: Plan wobec zmierzonego dowozu (miasta z pelnym pierscieniem)",
+                f"srednio {len(pv)} dob: Plan {pp:.0f}, zmierzony {pm:.0f} ladunkow/d (Plan / pomiar {pp / pm:.2f})" if pm > 0 else f"srednio {len(pv)} dob: Plan {pp:.0f}, zmierzony 0",
+                f"INFO (duza roznica = pierwsze doby po wczytaniu z innym limitem; doby z pierscieniem + Planem {len(mixd)})", None)
+    else:
+        rep.add("NOP-16: Plan wobec zmierzonego dowozu", f"brak dob z pelnym pierscieniem w linii (doby z pierscieniem + Planem {len(mixd)})", "INFO", None)
     rep.show()
     return 0
 

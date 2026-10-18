@@ -6,7 +6,7 @@ namespace Armoury
 {
     /// <summary>
     /// f4-opal (noc 17/18.10, fala 4; opis regul - TownFolk.Opal.cs): odczyty KS dla opalu mieszczan. Tylko odczyt opublikowanej pamieci (mapa koszyka ZC4, stawki wsi,
-    /// okregi) - nic tu nie zmienia produkcji, cen ani towaru. Popyt ceny drewna (Zc4Demand) bierze opal po regule paczki przez FireForPrice.
+    /// okregi) - nic tu nie zmienia produkcji, cen ani towaru. Popyt ceny drewna (Zc4Demand) bierze opal x czynnik pory przez FireForPrice.
     /// </summary>
     internal static partial class StartCalibration
     {
@@ -28,24 +28,42 @@ namespace Armoury
             return ZTownOf(town, out zt);
         }
 
-        /// <summary>f4-opal krok 2 (zapas, dopoki pierscien zmierzonego dowozu nie ma 7 pelnych dob): drewno na targ miasta wedlug Planu, ladunki/d - stawki KS wsi
-        /// (przeplyw na targ okregu = produkcja - zjedzone w okregu) z tym miastem targowym (TradeBound, inaczej Bound - jak koszyk wsi ZC4) i pola mieszczan, kazde
-        /// x beta rampy podazy (to samo, co DeliverTownFields i BlendStep dokladaja do stawki). Pusty slownik - poza stanem zastosowanym albo przed pierwsza doba KS.</summary>
+        /// <summary>f4-opal krok 2 (doby, ktorych pierscien zmierzonego dowozu jeszcze nie ma - po wczytaniu, po wlaczeniu klucza): drewno na targ miasta wedlug Planu,
+        /// ladunki/d. Recenzja (podaz Planu bez lasu wsi, z drewnem dymarek, bez stanu wsi): (a) stawki KS wsi (przeplyw na targ okregu = produkcja - zjedzone w okregu)
+        /// x beta rampy - tylko wies Normal z miastem handlowym (TradeBound), bo ProdStep daje 0 wsi najezdzanej, spladrowanej i bez targu; (b) las wsi
+        /// (VillageWoodlot.KsPiecesPerDay - podaz spoza tabeli, jak w Planie KS; sama sprawdza wies Normal i las czynny) do TradeBound, inaczej Bound, minus to, co z lasu
+        /// zdejmuja dymarki kopaln okregu, zanim woz pojedzie (Bloomery.FromWoodlot: najwyzej suma potrzeb doby kopaln tego miasta handlowego - Bloomery.WoodlotWant);
+        /// (c) pola mieszczan x beta (to samo, co DeliverTownFields). Czesc gry w rampie (1 - beta) poza Planem (rampa trwa krotko, pierscien ja zmierzy).
+        /// Pusty slownik - poza stanem zastosowanym albo przed pierwsza doba KS. Raz na dobe opalu (watek gry).</summary>
         internal static Dictionary<Settlement, double> OpalPlanWood()
         {
             var res = new Dictionary<Settlement, double>();
             if (_state != StateApplied || !KeyOn) return res;
             const int iw = KsDeliver.IWood;
             var rates = _rates;
+            var lot = new Dictionary<Settlement, double>();   // las wsi wedlug miasta (przed dymarkami)
             foreach (var kv in rates)
             {
                 var v = kv.Key; var r = kv.Value;
-                if (v == null || r == null || r.A == null || iw >= r.A.Length) continue;
-                var mk = v.TradeBound ?? v.Bound;
+                if (v == null || r == null) continue;
+                var tb = v.TradeBound;
+                if (r.A != null && iw < r.A.Length && tb != null && tb.Town != null && tb.Town.IsTown && v.VillageState == Village.VillageStates.Normal)
+                {
+                    double x = r.A[iw] * Beta(r.M, iw);
+                    if (x > 0 && !double.IsInfinity(x)) { double o; res.TryGetValue(tb, out o); res[tb] = o + x; }
+                }
+                var mk = tb ?? v.Bound;
                 if (mk == null || mk.Town == null || !mk.Town.IsTown) continue;
-                double x = r.A[iw] * Beta(r.M, iw);
-                if (!(x > 0) || double.IsInfinity(x)) continue;
-                double o; res.TryGetValue(mk, out o); res[mk] = o + x;
+                double w = VillageWoodlot.KsPiecesPerDay(v);
+                if (w > 0 && !double.IsInfinity(w)) { double o; lot.TryGetValue(mk, out o); lot[mk] = o + w; }
+            }
+            foreach (var kv in lot)
+            {
+                double take = 0;
+                try { take = Math.Min(kv.Value, Math.Max(0f, Bloomery.WoodlotWant(kv.Key))); } catch { take = 0; }
+                double x = kv.Value - take;
+                if (!(x > 0)) continue;
+                double o; res.TryGetValue(kv.Key, out o); res[kv.Key] = o + x;
             }
             foreach (var ld in _live.Values)
             {
@@ -59,7 +77,8 @@ namespace Armoury
         }
 
         /// <summary>Zc4Demand (popyt ceny, moze isc z watkow AI): opal miasta w popycie ceny drewna (ladunki/d przy pelnej lambdzie) - przy kluczu Firewood Ks Price Demand
-        /// opal po regule paczki z ostatniej doby opalu (pora roku i dowoz), inaczej (albo bez wpisu) pelny opal koszyka jak dotad.</summary>
+        /// opal x czynnik pory z ostatniej doby opalu (BEZ limitu dowozu - recenzja: popyt ceny rowny dowozowi kasowalby sygnal niedoboru), inaczej (albo bez wpisu)
+        /// pelny opal koszyka jak dotad.</summary>
         private static double FireForPrice(ZTown zt)
         {
             var s = Settings.Current;

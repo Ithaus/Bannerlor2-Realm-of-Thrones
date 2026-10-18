@@ -6728,11 +6728,11 @@ namespace Armoury
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool FirewoodKsSeason { get; set; } = true;
 
-        [SettingPropertyBool("Firewood Ks Supply Cap", HintText = "with Town Folk Firewood under the start calibration: the townsfolk want only as much firewood as the villages really bring to their town's market (the wood sold there by village carts and grown on the townsfolk's own fields, the last 7 days; in the first 7 days after loading - the plan of the districts), beyond what the town's smiths, bloomeries and workshops use each day, plus a seventh of the wood already lying on the stall above the craftsmen's stock - their wish grows only with the wood that truly comes (off = the full measure of a kilo and a half a head whether the wood comes or not, as before)")]
+        [SettingPropertyBool("Firewood Ks Supply Cap", HintText = "with Town Folk Firewood under the start calibration: the townsfolk want only as much firewood as the villages really bring to their town's market (the wood sold there by village carts and grown on the townsfolk's own fields, the last 7 days; days not yet seen after loading are filled from the plan of the districts), beyond what the town's smiths, bloomeries and workshops use each day, plus a seventh of the wood already lying on the stall above the craftsmen's stock - their wish grows only with the wood that truly comes (off = the full measure of a kilo and a half a head whether the wood comes or not, as before)")]
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool FirewoodKsSupplyCap { get; set; } = true;
 
-        [SettingPropertyBool("Firewood Ks Price Demand", HintText = "with Town Folk Firewood under the start calibration: the price of wood in a town counts the same firewood the townsfolk really want (by season and by the wood that comes, as above), not the full measure of a kilo and a half a head - wood is no longer dear only because of fires nobody can feed (off = the full measure in the price, as before)")]
+        [SettingPropertyBool("Firewood Ks Price Demand", HintText = "with Town Folk Firewood under the start calibration: the price of wood in a town counts the townsfolk's firewood by the season - half in summer, more in winter by the bite of winter - instead of the same full measure all year; it does not follow the wood that comes, so a town short of wood still pays well for it and draws the carts (off = the full measure in the price all year, as before)")]
         [SettingPropertyGroup("Goods for the townsfolk (night 16.10, part 2)")]
         public bool FirewoodKsPriceDemand { get; set; } = true;
 

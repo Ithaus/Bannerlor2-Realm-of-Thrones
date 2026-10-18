@@ -22,11 +22,15 @@ namespace Armoury
     ///      + 1/7 drewna, ktore juz lezy na polce ponad zapas rzemiosla (ten sam prog co zakup: TargetFor, ShelfKeep - zapas z lata ma odbiorce w zimie; przeglad:
     ///      "albo polka ponad zapas rzemiosla").
     ///      Dowoz: drewno sprzedane w tym miescie przez wozy wsi (MarketCarts, latka sprzedazy wozu - roznica jukow przed i po) + drewno z pol mieszczan KS
-    ///      (DeliverTownFields) - srednia 7 pelnych dob; dopoki pierscien nie ma 7 dob (po wczytaniu, po wlaczeniu klucza) - Plan: stawki KS wsi z tym miastem
-    ///      targowym (TradeBound, inaczej Bound) i pola mieszczan x beta rampy (StartCalibration.OpalPlanWood). Zuzycie rzemiosla: CaravanBulk.CraftWoodUse (to samo,
+    ///      (DeliverTownFields) - srednia 7 pelnych dob; doby, ktorych pierscien jeszcze nie ma (po wczytaniu, po wlaczeniu klucza), bierze z Planu (recenzja: bez
+    ///      skoku limitu w 8. dobie - kazda pelna doba zastepuje 1/7 Planu pomiarem): Plan = stawki KS wsi z tym miastem handlowym (TradeBound - bez niego i we wsi
+    ///      najezdzanej/spladrowanej produkcja 0, jak ProdStep) x beta rampy + las wsi (VillageWoodlot.KsPiecesPerDay - podaz spoza tabeli) minus to, co z lasu
+    ///      zdejmuja dymarki kopaln okregu (Bloomery.WoodlotWant), + pola mieszczan x beta (StartCalibration.OpalPlanWood). Zuzycie rzemiosla: CaravanBulk.CraftWoodUse (to samo,
     ///      z czego miasto liczy zapas rzemiosla - kowale, dymarki, warsztaty, deski, domy; z krokiem 3). Popyt rosnie tylko razem z prawdziwa podaza drewna, tak jak
     ///      wsad przetworow ZC5 tylko z tego, co przetwory naprawde robia (R4cMade7) - rzemioslo ma pierwszenstwo jak przy zakupie (zapas rzemiosla pierwszy).
-    ///  (3) FirewoodKsPriceDemand - popyt ceny drewna (StartCalibration.Zc4Demand) liczy opal po regule (1)-(2) zamiast pelnej potrzeby (_fwEff - przy pelnej lambdzie).
+    ///  (3) FirewoodKsPriceDemand - popyt ceny drewna (StartCalibration.Zc4Demand) liczy opal z pora roku (1) - opal x czynnik pory, przy pelnej lambdzie (_fwEff) - zamiast
+    ///      stalej pelnej potrzeby; BEZ limitu dowozu (2): recenzja - popyt ceny rowny dowozowi kasowalby sygnal niedoboru tam, gdzie drewna brak (woz wsi wybiera miasto
+    ///      wedlug wartosci ladunku - MarketCarts), wiec cena pokazuje prawdziwa potrzebe ludu wedlug pory, a limit tnie tylko zakup.
     ///  (4) FirewoodMineWoodKeep (CaravanBulk.TargetFor) - zapas rzemiosla miasta liczy drewno dymarek wsi handlujacych w tym miescie: potrzeba ponad las okregu
     ///      (Bloomery.MineShelfNeed) zamiast tego, co zdolaly kupic (ShelfUse), gdy wieksza.
     /// Pieniadze i towar: zadnego nowego przelewu ani ruchu towaru - paczka zmienia tylko ILE lud chce (zakup opalu, zaplata i spalenie - linia N2-E4 bez zmian formatu).
@@ -40,12 +44,13 @@ namespace Armoury
         {
             public readonly float[] D = new float[FwWin]; public int N, At;
             public void Push(float v) { D[At] = v; At = (At + 1) % FwWin; if (N < FwWin) N++; }
-            public double Mean() { if (N <= 0) return 0.0; double a = 0; for (int i = 0; i < N; i++) a += D[i]; return a / N; }
+            public double Sum() { double a = 0; for (int i = 0; i < N; i++) a += D[i]; return a; }
+            public double Mean() { return N <= 0 ? 0.0 : Sum() / N; }
         }
         private static readonly Dictionary<Settlement, FwRing> _fwRing = new Dictionary<Settlement, FwRing>();
         private static readonly Dictionary<Settlement, float> _fwDay = new Dictionary<Settlement, float>();   // dowoz od ostatniej doby opalu (wozy wsi + pola mieszczan)
         private static bool _fwPartial = true;             // pierwsza doba opalu w sesji (albo po przerwie) - niepelna, bez probki
-        private static volatile Dictionary<Settlement, float> _fwEff = new Dictionary<Settlement, float>();   // popyt ceny: opal KS po regule (ladunki/d przy pelnej lambdzie)
+        private static volatile Dictionary<Settlement, float> _fwEff = new Dictionary<Settlement, float>();   // popyt ceny: opal KS x czynnik pory (ladunki/d przy pelnej lambdzie)
         [ThreadStatic] private static MobileParty _fwCart;
         [ThreadStatic] private static int _fwCart0;
         private static long _fwCartPcs, _fwFieldPcs;       // dowoz zmierzony od ostatniej linii (tylko licznik)
@@ -56,10 +61,10 @@ namespace Armoury
         private sealed class OpalDay
         {
             public bool Season, Cap, Price, Keep, Full, Wired;
-            public Dictionary<Settlement, double> Plan;    // dowoz wedlug Planu (zapas na pierwsze doby pierscienia)
+            public Dictionary<Settlement, double> Plan;    // dowoz wedlug Planu (doby, ktorych pierscien jeszcze nie ma)
             public Dictionary<Settlement, float> Eff = new Dictionary<Settlement, float>();
-            public int Towns, Capped, SrcMeas, SrcPlan, SrcNone, KeepTowns;
-            public double KFull, KCut, CapSum, DSum, USum, StockSum, LamSum, KSum, EffSum, FireSum, OldPart, Over, KeepExtra, MineNeed;
+            public int Towns, Capped, SrcMeas, SrcMix, SrcPlan, SrcNone, KeepTowns, PlanVsN;
+            public double KFull, KCut, CapSum, DSum, USum, StockSum, LamSum, KSum, EffSum, FireSum, OldPart, Over, KeepExtra, MineNeed, PlanVsPlan, PlanVsMeas;
             public long T0;
         }
 
@@ -78,7 +83,7 @@ namespace Armoury
             Log.Info("Opal pod KS (f4-opal): start sesji | klucze: pora roku (Firewood Ks Season) " + Yn(s != null && s.FirewoodKsSeason)
                      + ", limit dowozu (Firewood Ks Supply Cap) " + Yn(s != null && s.FirewoodKsSupplyCap) + ", popyt ceny (Firewood Ks Price Demand) " + Yn(s != null && s.FirewoodKsPriceDemand)
                      + ", zapas dymarek (Firewood Mine Wood Keep) " + Yn(s != null && s.FirewoodMineWoodKeep) + " | opal " + (s != null && s.TownFolkFirewood ? "TAK" : "NIE (Town Folk Firewood - paczka bez skutku)")
-                     + " | tylko miasta z koszykiem ZC4 (KS zastosowany, lambda > 0); dowoz = wozy wsi + pola mieszczan, srednia " + FwWin + " pelnych dob (do tego czasu Plan)"
+                     + " | tylko miasta z koszykiem ZC4 (KS zastosowany, lambda > 0); dowoz = wozy wsi + pola mieszczan, srednia " + FwWin + " pelnych dob (brakujace doby pierscienia z Planu: stawki KS wsi + las wsi - dymarki + pola mieszczan)"
                      + " | proba zimy teraz (plik " + WinterTrial.NowFlagName + "): " + winterNow + " | potkniecia 0.");
         }
 
@@ -125,7 +130,7 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------ doba opalu (z FirewoodDaily)
-        /// <summary>Poczatek doby opalu: null, gdy zaden klucz paczki nie czynny (stara droga co do bitu); przy limicie - Plan na zapas pierscienia.</summary>
+        /// <summary>Poczatek doby opalu: null, gdy zaden klucz paczki nie czynny (stara droga co do bitu); przy limicie - Plan (brakujace doby pierscienia i porownanie z pomiarem w linii).</summary>
         private static OpalDay OpalBegin()
         {
             var s = Settings.Current;
@@ -173,10 +178,18 @@ namespace Armoury
             if (op.Cap)
             {
                 var st = town.Settlement;
-                double d = double.NaN;
-                FwRing r;
-                if (op.Wired && _fwRing.TryGetValue(st, out r) && r.N >= FwWin) { d = r.Mean(); op.SrcMeas++; }
-                else if (op.Plan != null && op.Plan.Count > 0) { double pd; op.Plan.TryGetValue(st, out pd); d = Math.Max(0.0, pd); op.SrcPlan++; }
+                double d = double.NaN, pd = double.NaN;
+                if (op.Plan != null && op.Plan.Count > 0) { double x; op.Plan.TryGetValue(st, out x); pd = Math.Max(0.0, x); }
+                FwRing r = null;
+                bool ring = op.Wired && _fwRing.TryGetValue(st, out r) && r != null && r.N > 0;
+                if (ring && r.N >= FwWin)
+                {
+                    d = r.Mean(); op.SrcMeas++;
+                    if (!double.IsNaN(pd)) { op.PlanVsPlan += pd; op.PlanVsMeas += d; op.PlanVsN++; }   // do linii: Plan wobec pomiaru (czy Plan trafia)
+                }
+                else if (ring && !double.IsNaN(pd)) { d = (r.Sum() + (FwWin - r.N) * pd) / FwWin; op.SrcMix++; }   // recenzja: brakujace doby z Planu - bez skoku w 8. dobie
+                else if (ring) { d = r.Mean(); op.SrcMix++; }
+                else if (!double.IsNaN(pd)) { d = pd; op.SrcPlan++; }
                 else op.SrcNone++;
                 if (!double.IsNaN(d))
                 {
@@ -204,7 +217,9 @@ namespace Armoury
             op.KFull += full; op.KCut += cut; op.OldPart += (1 - lam) * old;
             if (op.Price)
             {
-                double eff = lam > 0 ? cut / lam : fire * k;
+                // recenzja: popyt ceny = opal x czynnik pory (przy pelnej lambdzie - Zc4Demand mnozy przez lambde), BEZ limitu dowozu - inaczej popyt rowny dowozowi
+                // kasowalby sygnal niedoboru w miastach, do ktorych drewna nie wozi nikt (cena spada, woz wsi wybiera inne miasto - petla)
+                double eff = fire * k;
                 if (!double.IsNaN(eff) && !double.IsInfinity(eff) && eff >= 0) { op.Eff[town.Settlement] = (float)eff; op.EffSum += eff; }
             }
             return (1 - lam) * old + cut;
@@ -242,10 +257,11 @@ namespace Armoury
                   .Append(" | czesc KS: opal x lambda ").Append(F2(op.FireSum)).Append(", z pora ").Append(F2(op.KFull)).Append(", po limicie ").Append(F2(op.KCut))
                   .Append(" (obcieta ").Append(F2(op.KFull - op.KCut)).Append(" w ").Append(op.Capped).Append(" miastach)")
                   .Append(" | limit = dowoz - rzemioslo + polka ponad zapas rzemiosla / ").Append(FwWin).Append(": dowoz ").Append(F2(op.DSum)).Append(" ladunkow/d (zmierzony ").Append(FwWin).Append(" dob w ").Append(op.SrcMeas)
-                  .Append(" miastach, Plan w ").Append(op.SrcPlan).Append(", bez danych ").Append(op.SrcNone).Append("), rzemioslo ").Append(F2(op.USum)).Append(", polka ponad zapas / ").Append(FwWin).Append(' ').Append(F2(op.StockSum))
+                  .Append(" miastach, pierscien + Plan w ").Append(op.SrcMix).Append(", Plan w ").Append(op.SrcPlan).Append(", bez danych ").Append(op.SrcNone).Append("), rzemioslo ").Append(F2(op.USum)).Append(", polka ponad zapas / ").Append(FwWin).Append(' ').Append(F2(op.StockSum))
                   .Append(", limit ").Append(F2(op.CapSum))
+                  .Append(" | Plan wobec pomiaru (miasta z pelnym pierscieniem): Plan ").Append(F2(op.PlanVsPlan)).Append(", zmierzony ").Append(F2(op.PlanVsMeas)).Append(" ladunkow/d w ").Append(op.PlanVsN).Append(" miastach")
                   .Append(" | potrzeba opalu razem ").Append(F2(needAll)).Append(" (po zaokragleniu ").Append(want).Append("; czesc dzisiejsza (1 - lambda) ").Append(F2(op.OldPart)).Append(")")
-                  .Append(" | popyt ceny drewna (opal przy pelnej lambdzie): ").Append(op.Price ? "po regule " + F2(op.EffSum) + " w " + op.Eff.Count + " miastach" : "pelny (klucz NIE)")
+                  .Append(" | popyt ceny drewna (opal przy pelnej lambdzie): ").Append(op.Price ? "z pora roku " + F2(op.EffSum) + " w " + op.Eff.Count + " miastach (bez limitu dowozu)" : "pelny (klucz NIE)")
                   .Append(" | zapas rzemiosla + drewno dymarek wsi: ").Append(op.Keep ? "+" + N0(op.KeepExtra) + " ladunkow w " + op.KeepTowns + " miastach (potrzeba dymarek ponad las " + F2(op.MineNeed) + " ladunkow/d)" : "NIE")
                   .Append(" | dowoz zmierzony od ostatniej linii: wozy wsi ").Append(_fwCartPcs).Append(", pola mieszczan ").Append(_fwFieldPcs).Append(" (pierscienie pelne ").Append(ringFull).Append('/').Append(_fwRing.Count)
                   .Append(op.Cap && !op.Full ? ", doba niepelna - bez probki" : "").Append(op.Cap && !op.Wired ? ", BRAK LATKI sprzedazy wozu - limit z Planu" : "").Append(")")
@@ -258,8 +274,8 @@ namespace Armoury
             _fwCartPcs = 0; _fwFieldPcs = 0;
         }
 
-        /// <summary>StartCalibration.Zc4Demand (popyt ceny, moze isc z watkow AI - sam odczyt slownika podmienianego w calosci): opal KS miasta po regule paczki
-        /// (ladunki/d przy pelnej lambdzie); false - brak (klucz wylaczony, miasto spoza doby opalu) - popyt ceny jak dotad.</summary>
+        /// <summary>StartCalibration.Zc4Demand (popyt ceny, moze isc z watkow AI - sam odczyt slownika podmienianego w calosci): opal KS miasta x czynnik pory
+        /// (ladunki/d przy pelnej lambdzie, bez limitu dowozu); false - brak (klucz wylaczony, miasto spoza doby opalu) - popyt ceny jak dotad.</summary>
         internal static bool FwEffOf(Settlement st, out double eff)
         {
             eff = 0;
