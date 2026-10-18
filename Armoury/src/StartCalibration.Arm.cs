@@ -42,6 +42,7 @@ namespace Armoury
         private static bool HardGatesKey { get { var s = Settings.Current; return s != null && s.KsHardGates; } }
         private static int ReserveDaysKey { get { var s = Settings.Current; int d = s != null ? s.KsLandGateReserveDays : 364; return d < 0 ? 0 : (d > 728 ? 728 : d); } }
         private static bool NoPerkFishKey { get { var s = Settings.Current; return s != null && s.KsNoFishFromPerk; } }
+        private static bool AutoTestKey { get { var s = Settings.Current; return s != null && s.StartCalibrationAutoArmAutotest; } }
 
         internal const string AutoFlagName = "armoury-ks-auto.flag";        // autotest: droga samego uzbrojenia (jak w grze Jeffa) zamiast wlaczenia przy pierwszym Planie
         internal const string GateTestFlagName = "armoury-ks-bramka.flag";  // autotest: bramka krainy bez progu zapasu (doslownie projekt 16.10) - proba mechanizmu powrotu
@@ -71,7 +72,7 @@ namespace Armoury
         private static readonly Dictionary<string, long[]> _gateTmp = new Dictionary<string, long[]>(StringComparer.Ordinal);
         private static readonly Dictionary<Village, double> _gPrev = new Dictionary<Village, double>();       // spichlerz wsi wczoraj (bramka krainy)
         private static readonly Dictionary<Village, float[]> _gHarv = new Dictionary<Village, float[]>();     // [wzor gry, racje KS] z Famine.Daily tej doby
-        private static int _perkFishSkip, _autoFlagDay = int.MinValue; private static bool _autoFlagVal;
+        private static int _perkFishSkip, _autoFlagDay = int.MinValue, _gPrevDay = int.MinValue; private static bool _autoFlagVal;
         private static bool _perkPatched;
         private static bool _autoApplying;
 
@@ -80,7 +81,7 @@ namespace Armoury
             _autoArm = false; _matureSince = -1; _back.Clear(); _backSet = new HashSet<Settlement>(); _drawStreak.Clear(); _gateRing.Clear();
             _armPending = null; _armKeep = null; _loadDay = int.MinValue; _gateLastDay = -1; _armExportLogged = -1; _armStum = 0; _gateStumDay = 0;
             _emaRestored = false; _whyCodes = null; _whyDay = int.MinValue; _gateTmp.Clear(); _gPrev.Clear(); _gHarv.Clear(); _perkFishSkip = 0;
-            _autoFlagDay = int.MinValue; _autoFlagVal = false; _autoApplying = false;
+            _autoFlagDay = int.MinValue; _autoFlagVal = false; _autoApplying = false; _gPrevDay = int.MinValue;
         }
 
         private static string CampaignId()
@@ -109,12 +110,16 @@ namespace Armoury
             try { return System.IO.File.Exists(FlagPath(GateTestFlagName)); } catch { return false; }
         }
 
-        /// <summary>Droga samego uzbrojenia: klucz Start Calibration Auto Arm i zwykla gra; w autotescie tylko z plikiem armoury-ks-auto.flag (inne autotesty bez zmian).</summary>
+        /// <summary>Droga samego uzbrojenia: klucz Start Calibration Auto Arm i zwykla gra; w autotescie tylko z plikiem armoury-ks-auto.flag albo kluczem
+        /// Start Calibration Auto Arm Autotest (inne autotesty bez zmian).</summary>
         private static bool AutoPathOn()
         {
             if (!AutoArmKey) return false;
-            return !AutotestMode() || AutoFlag();
+            return !AutotestMode() || AutoTestOn();
         }
+
+        /// <summary>Autotest: droga samego uzbrojenia zamowiona plikiem armoury-ks-auto.flag albo kluczem Start Calibration Auto Arm Autotest.</summary>
+        private static bool AutoTestOn() { return AutoTestKey || AutoFlag(); }
 
         private static void ConsumeAutoFlag()
         {
@@ -244,7 +249,7 @@ namespace Armoury
                     return;
                 }
                 _state = StateArmed; _armDay = today; _armHash = PlanHash(_plan); _armLandCrc = _landCrc; _campaign = gid; _autoArm = true; _matureSince = -1;
-                Log.Info(PK + "uzbrojony zapis doba " + today + " (samo - klucz Start Calibration Auto Arm" + (AutotestMode() ? "; autotest: plik " + AutoFlagName : "") + ") | kampania " + (gid.Length > 0 ? gid : "-")
+                Log.Info(PK + "uzbrojony zapis doba " + today + " (samo - klucz Start Calibration Auto Arm" + (AutotestMode() ? "; autotest: " + (AutoTestKey ? "klucz Start Calibration Auto Arm Autotest" : "plik " + AutoFlagName) : "") + ") | kampania " + (gid.Length > 0 ? gid : "-")
                          + ", plik ziemi " + _landCrc.ToString("X8") + " | pomiar: srednia ksiegi towarow " + Math.Min(_emaDays, MinLedgerDays) + "/" + MinLedgerDays + " dob" + (_emaRestored ? " (z zapisu)" : "")
                          + ", potem " + GateDays + " dob dojrzalego Planu, Plan z pomiarem pieniedzy, bramki gry i twarde bramki rozdz. 10 - wlaczenie samo, najwczesniej doba " + (today + MinLedgerDays + GateDays)
                          + " | do wlaczenia nic w grze sie nie zmienia (poza rybami z niczego perku Night Raider - Ks No Fish From Perk) | wylacznik: Start Calibration = off albo Start Calibration Auto Arm = off.");
@@ -332,6 +337,8 @@ namespace Armoury
             long t0 = Stopwatch.GetTimestamp();
             int day = today - 1;
             bool famine = Famine.On;
+            if (_gPrevDay != today - 1) _gPrev.Clear();          // przerwa (Undo, wylaczony klucz) - spadek liczony tylko z doby na dobe
+            _gPrevDay = today;
             var agg = new Dictionary<string, LandAgg>(StringComparer.Ordinal);
             var seen = new HashSet<Village>();
             int stum = 0;
@@ -400,7 +407,7 @@ namespace Armoury
                     ret.Add(new KeyValuePair<string, string>(kv.Key, "spichlerz krainy spada " + (100 * draw).ToString("0.0", Inv) + "% potrzeby na dobe " + st + " dob z rzedu (zapas " + days.ToString("0", Inv) + " dni"
                                                                     + (test ? ", proba bez progu zapasu - plik " + GateTestFlagName : (reserve > 0 ? " ponizej progu " + reserve + " dni" : "")) + "; racje KS krainy " + a.K.ToString("0", Inv) + " ponizej wzoru gry " + a.F.ToString("0", Inv) + ")"));
             }
-            foreach (var r in ret) { try { LandReturn(r.Key, today, r.Value); } catch (Exception e) { _armStum++; Stumble("LandReturn", e); } }
+            foreach (var r in ret) { try { LandReturn(r.Key, today, r.Value, r.Value.StartsWith("glod", StringComparison.Ordinal)); } catch (Exception e) { _armStum++; Stumble("LandReturn", e); } }
             double ms = (Stopwatch.GetTimestamp() - t0) * 1000.0 / Stopwatch.Frequency;
             if (!LogGate.Lines && ret.Count == 0) return;
             top.Sort((x, y) => y.Key.CompareTo(x.Key));
@@ -414,7 +421,7 @@ namespace Armoury
         }
 
         /// <summary>Powrot krainy: zapisany, zbior osad przebudowany, stawki wsi, koszyk ZC4 wsi i miasta tej krainy zdjete od razu (kopie slownikow) - od jutra jak dzis.</summary>
-        private static void LandReturn(string land, int today, string why)
+        private static void LandReturn(string land, int today, string why, bool hunger)
         {
             if (land == null || _back.ContainsKey(land)) return;
             _back[land] = new LandBack { Day = today, Why = why };
@@ -439,7 +446,7 @@ namespace Armoury
             Log.Info(PK + "powrot krainy " + land + " doba " + today + " - " + why + " | od jutra ta kraina wraca do dzisiejszych zasad: stawki i zywnosc wsi gry, spichlerz ze wzoru gry, koszyk i popyt ZC4, przetwory ZC5, kupcy KS-H i B2 bez KS;"
                      + " reszta swiata dalej z KS (receptury warsztatow Ks Real Recipes - jedna tabela swiata - zostaja) | wsi " + nv + ", miast z mapy ZC4 zdjetych " + nt + ", stawek wsi zdjetych " + drop.Count
                      + " | pieniadze: przelewow 0 zl, towar: 0 szt. (wozy KS-H juz w drodze dojezdzaja i rozliczaja sie jak dotad) | druga proba tylko nowym wlaczeniem.");
-            Tell(LandName(land) + ": villages went hungry under the new reckoning, so this land returns to the old ways from tomorrow; the rest of the realm keeps the new reckoning.");
+            Tell(LandName(land) + (hunger ? ": villages went hungry under the new reckoning" : ": the granaries are running low under the new reckoning") + ", so this land returns to the old ways from tomorrow; the rest of the realm keeps the new reckoning.");
         }
 
         private static void RebuildBackSet()
@@ -479,7 +486,7 @@ namespace Armoury
             }
             RebuildBackSet();
             var s = Settings.Current;
-            Log.Info(PK + "samo uzbrojenie (ks-arm) start sesji | klucz Start Calibration Auto Arm " + (AutoArmKey ? "TAK" : "NIE") + ", droga " + (AutoPathOn() ? (AutotestMode() ? "autotest (plik " + AutoFlagName + ")" : "gra") : (AutoArmKey ? "nieczynna (autotest bez pliku " + AutoFlagName + ")" : "nieczynna"))
+            Log.Info(PK + "samo uzbrojenie (ks-arm) start sesji | klucz Start Calibration Auto Arm " + (AutoArmKey ? "TAK" : "NIE") + ", droga " + (AutoPathOn() ? (AutotestMode() ? "autotest (" + (AutoTestKey ? "klucz Start Calibration Auto Arm Autotest" : "plik " + AutoFlagName) + ")" : "gra") : (AutoArmKey ? "nieczynna (autotest bez pliku " + AutoFlagName + " i bez klucza Start Calibration Auto Arm Autotest)" : "nieczynna"))
                      + " | stan " + StateText() + (_autoArm ? " (samo)" : "") + " | arm_ks_arm: " + note
                      + " | srednia ksiegi towarow " + _emaDays + " dob" + (_emaRestored ? " (z zapisu; pierwsza doba sesji pominieta)" : "") + ", dojrzaly Plan od doby " + _matureSince + ", pelnych dob bramek " + _gateRing.Count
                      + " | bramka krainy " + (LandGateKey ? "TAK (zapas ponizej " + ReserveDaysKey + " dni)" : "NIE") + ", wrocone krainy " + _back.Count + " (osad " + _backSet.Count + ")"

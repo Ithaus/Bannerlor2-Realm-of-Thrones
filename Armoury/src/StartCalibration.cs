@@ -424,7 +424,7 @@ namespace Armoury
         {
             var s = Settings.Current;
             if (s == null || !AutotestMode() || !(s.StartCalibrationAutotestApply || ApplyFlag())) return false;
-            if (AutoArmKey && AutoFlag()) return false;          // ks-arm: autotest z plikiem armoury-ks-auto.flag - droga samego uzbrojenia (jak w grze), nie wlaczenie przy pierwszym Planie
+            if (AutoArmKey && AutoTestOn()) return false;        // ks-arm: autotest z plikiem armoury-ks-auto.flag (albo kluczem Auto Arm Autotest) - droga samego uzbrojenia (jak w grze), nie wlaczenie przy pierwszym Planie
             uint lay;
             return LayoutMatches(out lay) && DailyLife.KeyOn;
         }

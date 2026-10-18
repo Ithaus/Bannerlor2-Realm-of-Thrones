@@ -6672,11 +6672,11 @@ namespace Armoury
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationAutotestApply { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan, land file) and this switch turns itself off again, so another save is never touched. Needs a plan built on 28 days of the goods ledger in this session, Daily Life Measure, Bk Recipe Yield By Workshop and Whale Meat From Whalers Only, and not in winter. Nothing in the game changes yet")]
+        [SettingPropertyBool("Start Calibration Arm This Save", HintText = "Step 1 of 2 (Ironman safe): marks THIS save for the start calibration. The next day the save remembers it (campaign id, day, plan, land file) and this switch turns itself off again, so another save is never touched. Needs a plan built on 28 days of the goods ledger in this session, Daily Life Measure, Bk Recipe Yield By Workshop and Whale Meat From Whalers Only, and not in winter unless Ks Land Gate is on. Nothing in the game changes yet")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationArmThisSave { get; set; } = false;
 
-        [SettingPropertyBool("Start Calibration Confirm", HintText = "Step 2 of 2: on a save marked with Arm This Save (a later day, the same plan and land file) and after at least 7 days of weekly plans on it, the calibration starts the next day: for 14 days the villages move from today's output to what their hands make on their land, then the people's daily basket comes to the market over 14 days, and the stalls get their starting prices. Not yet in a campaign: until the famine safeguards are finished this switch only reports and turns itself off. Cannot undo goods already made and sold, nor gold that changed hands in trade. To undo later switch Start Calibration off (from the next day output and demand are as before)")]
+        [SettingPropertyBool("Start Calibration Confirm", HintText = "Step 2 of 2: on a save marked with Arm This Save (a later day, the same plan and land file) and after at least 7 days of weekly plans on it, the calibration starts the next day: for 14 days the villages move from today's output to what their hands make on their land, then the people's daily basket comes to the market over 14 days, and the stalls get their starting prices. In a campaign it also needs the famine gate (Ks Land Gate) and the hard safeguards (Ks Hard Gates); with Start Calibration Auto Arm the save starts by itself and this switch is not needed. Cannot undo goods already made and sold, nor gold that changed hands in trade. To undo later switch Start Calibration off (from the next day output and demand are as before)")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool StartCalibrationConfirm { get; set; } = false;
 
@@ -6699,6 +6699,10 @@ namespace Armoury
         [SettingPropertyBool("Ks No Fish From Perk", HintText = "with the start calibration armed or applied: the Night Raider perk of a town's governor (War Sails) no longer conjures fish each day for every village trading with that town (about 100 to 150 fish a day across the world, from no boat and no fisherman) - fish come only from fishermen's hands. Off = as before")]
         [SettingPropertyGroup("Start calibration (KS)")]
         public bool KsNoFishFromPerk { get; set; } = true;
+
+        [SettingPropertyBool("Start Calibration Auto Arm Autotest", HintText = "FOR THE AUTOTEST ONLY: while the CrashScribe autotest runs, the calibration takes the same self-arming path as a normal campaign (Start Calibration Auto Arm: arm on the first day, survey, safeguards, then start by itself) instead of starting at the first finished plan; the same as the file armoury-ks-auto.flag. In a normal game it does nothing")]
+        [SettingPropertyGroup("Start calibration (KS)")]
+        public bool StartCalibrationAutoArmAutotest { get; set; } = false;
 
         [SettingPropertyBool("Ks Food Carts", HintText = "with the calibration applied: a town short of food buys grain, fish, meat, cheese, salt and the other foods in a town of the same market that has more than it needs, and the cart goes for as many days as the road (by sea a ship is four times faster and much cheaper than a cart). The buying town pays the selling town for every piece and the carters of the seller's villages (by sea - its dock hands) for the haul, only when the merchants gain on it, and never below half of the town merchants' reserve. Fish, meat, fruit and the other perishables go at most 7 days and lose a little on the way; off = no new food carts (carts on the road still arrive)")]
         [SettingPropertyGroup("Start calibration (KS)")]
@@ -8630,6 +8634,7 @@ namespace Armoury
             s.KsLandGateReserveDays = KsLandGateReserveDays;
             s.KsHardGates = KsHardGates;
             s.KsNoFishFromPerk = KsNoFishFromPerk;
+            s.StartCalibrationAutoArmAutotest = StartCalibrationAutoArmAutotest;
             s.KsFoodCarts = KsFoodCarts;
             s.KsLandGradient = KsLandGradient;
             s.KsAlphaNet = KsAlphaNet;
