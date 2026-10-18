@@ -2949,3 +2949,7 @@ WYL. - sam pomiar, nacisk 11.7%); ruda za rynkiem; koszt KS bez szczytow; bitwa 
 Testy: fin91 (sciezka Jeffa 160 dob) 0 ERROR, zgony 0; 5 dob + bitwa: kod 0, ERROR 0, bitwa WYGRANA (paniki 17).
 OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browary/garbarnie znikaja (NWAR-4b), korona 0.73 / D 0.77, kiesy wsi -0.38%/d; A7 do testu z armoury-a7-wlacz.flag.
 - DECYZJA JEFFA 18.10 ok. 07:28 PDT: "Renty wedlug potrzeby ... to robimy" (ta sama zasada co zwrot: bogaty bez renty, sredni czesc, biedny calosc; reszta zostaje w skarbcu krolestwa).
+- DECYZJE JEFFA 18.10 ok. 08:00 PDT (po wyjasnieniu pomyslow F1-F4, ZC8, bandy): 2. POZYCZKA MIEJSKA - TAK (10% rocznie, pan pozycza od rady wlasnego miasta przed Bankiem, limit 120 dni
+  renty, splata z D i lupow, drabina 168 przy zwloce; tez gracz z menu); 4. SAKIEWKA TURNIEJOWA OD MIESZCZAN - TAK; 6. NIEWOLA ZA DLUGI - TAK (tylko kultury z niewola, 1%/rok przy
+  Dostatku < 0.8 bez zapasu); 7. LIMIT BAND ROT - (b) WYZEJ, ok. 2200 (zajete kryjowki x 24), z pomiarem spowolnienia (Jeff pytal "o ile spowolni"); 1. kasy miast z dlugami, 3. karta
+  miejska, 5. duchowni - NIE.
