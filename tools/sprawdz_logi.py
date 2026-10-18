@@ -1267,10 +1267,14 @@ Uzycie (Python 3, tylko odczyt):
                     z kluczem Switch Rule WYL - bez dopisku 0, NF4-5 regale wobec polki: sumy linii (wpisy = gora + dol + bez zmiany = polka < T* + > 2T* + pomiedzy + bez celu)
                     - niezgodnych 0, NF4-5b gora/dol = licznik regali linii produkcji - rozne 0, NF4-5c ostatni cykl (INFO), NF4-6 nacisk ZW w linii "Zajecia wiosek (ZW)":
                     nad progiem <= ocenionych - niezgodnych 0 (NF4-6b INFO), NF4-7/7b karawany: handel (sprzedaz - zakup), zold zaplacony, handel - zold, z towarem w jukach,
-                    doplaty, zysk do wlascicieli, reszta (INFO), NF4-7c koszt okna <= 35 ms i potkniecia 0, NF4-8 surowiec z polek (ruda, drewno): kontrola tozsamosci
-                    "polki - ksiega = bez wyjasnienia - zmiana pozostalych posiadaczy" = 0, NF4-8b odplyw z polek i kto zdejmuje (INFO), NF4-9 drewno w wozach: przebieg po
-                    taborach = posiadacz "wozy" ksiegi towarow (w 1%), NF4-9b/9c dokad, ile dob, miasta bez opalu i przyczyna (INFO), NF4-10 diagnoza A7 <= 200 ms
-                    i potkniecia 0, NF4-10b drewno w wozach <= 5 ms/d i potkniecia 0, NF4-11 "ERROR in StartCalibration.F4 / F4Pomiary. / MoneyLedger.F4" 0. Grupy nks
+                    doplaty, zysk do wlascicieli, reszta (INFO; recenzja: zold zaplacony rozbity na z kas karawan / z kies notabli, zold z kas karawan poza reszta),
+                    NF4-7c koszt okna <= 35 ms i potkniecia 0, NF4-8 surowiec z polek (ruda, drewno): "bez wyjasnienia" okna (zapas swiata - (produkcja - zuzycie)
+                    ksiegi towarow) = 0 w kazdym oknie (ksiega domyka sie co dobe; recenzja: dawna "kontrola" linii jest 0 z definicji - zapas = suma posiadaczy - wiec
+                    teraz tylko NF4-8c INFO: arytmetyka linii, inna niz 0 tylko przy rozjezdzie tablicy posiadaczy), NF4-8b odplyw z polek i kto zdejmuje (INFO),
+                    NF4-9 drewno w wozach: przebieg po taborach = posiadacz "wozy" ksiegi towarow (w 1%), NF4-9b/9c dokad, ile dob, miasta bez opalu i przyczyna, przerwy
+                    ksiegi towarow (INFO), NF4-10 diagnoza A7 <= 200 ms i potkniecia 0, NF4-10b drewno w wozach <= 5 ms/d i potkniecia 0, NF4-11 "ERROR in
+                    StartCalibration.F4 / F4Pomiary. / MoneyLedger.F4 / VillageCrafts.F4" 0. NF4-5c pokazuje tez wpisy soli i daktyli bez celu z braku mapy koszyka ZC4
+                    (pierwsza doba po wczytaniu - to nie "towar bez celu"). Grupy nks
                     (NKS-19c) i nzw (NZW-12) pokazuja to samo krotko (INFO). Log bez paczki (np. Armoury-2026-10-17_23-22-37.log): INFO / brak linii, bez wyjatku.
 --grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
                     python -I tools/sprawdz_logi.py --grupa npo <Armoury-*.log> (strumieniowo). NPO-0 linia startu (klucz TAK, AI WYLACZONE, menu wpiete, opcje BEE 5/15/30
@@ -41011,7 +41015,7 @@ NF4_SUR = "Surowiec z polek (f4-pomiary): dzien"
 NF4_WOOD = "Drewno w wozach wsi (f4-pomiary): dzien"
 NF4_ZW = "nacisk ZW (f4-pomiary"
 NF4_FROZEN = "zajecia zamrozone - regula A7 wylaczona"
-NF4_ERR = ("ERROR in StartCalibration.F4", "ERROR in F4Pomiary.", "ERROR in MoneyLedger.F4")
+NF4_ERR = ("ERROR in StartCalibration.F4", "ERROR in F4Pomiary.", "ERROR in MoneyLedger.F4", "ERROR in VillageCrafts.F4")   # recenzja: F4ZwNote pisze przez VillageCrafts.Stumble
 NF4_PRESS = r"nacisk \(>= x[\d.]+\) (\d+) blokow \(([\d.-]+)%\)"
 NF4_A7_MS_MAX = 200.0        # diagnoza A7 - jeden przebieg po blokach raz na 7 dob (ms)
 NF4_WOOD_MS_MAX = 5.0        # drewno w wozach - ms na dobe (przebieg po taborach, wsiach i miastach)
@@ -41147,7 +41151,7 @@ def nf4_main(logp):
                     len(missing) == 0 if off else None)
     # NF4-5: regale wobec polki - sumy i zgodnosc z licznikiem regali linii produkcji
     if reg:
-        okc, badc, cross, crossbad, last = 0, 0, 0, 0, None
+        okc, badc, cross, crossbad, last, lastreg = 0, 0, 0, 0, None, None
         for s in reg:
             m = re.search(r"razem: wpisow (\d+), w gore (\d+), w dol (\d+), bez zmiany (-?\d+); polka < T\* (\d+), > 2T\* (\d+), pomiedzy (\d+), bez celu (\d+); w gore przy polce > 2T\* (\d+), "
                           r"w dol przy polce < T\* (\d+); zgodne z polka [^)]*\) (\d+) z (\d+) wpisow z celem", s)
@@ -41164,14 +41168,16 @@ def nf4_main(logp):
                 cross += 1
                 if prod[dd - 1][2] != v[1] or prod[dd - 1][3] != v[2]:
                     crossbad += 1
-            last = (dd, v)
+            last = (dd, v); lastreg = s
         rep.add("NF4-5: regale wobec polki - sumy linii (wpisy = gora + dol + bez zmiany = polka < T* + > 2T* + pomiedzy + bez celu)", f"linii {len(reg)}, zgodnych {okc}, niezgodnych {badc}", "niezgodnych 0", badc == 0)
         if cross:
             rep.add("NF4-5b: regale - w gore / w dol = licznik regali linii produkcji", f"dob {cross}, rozne {crossbad}", "rozne 0", crossbad == 0)
         if last:
             dd, v = last
-            rep.add("NF4-5c: regale wobec polki (ostatni cykl)", f"dzien {dd}: wpisow {v[0]}, w gore {v[1]}, w dol {v[2]}; polka < T* {v[4]}, > 2T* {v[5]}, bez celu {v[7]}; w gore przy pelnej {v[8]}, w dol przy pustej {v[9]}; "
-                    f"zgodne z polka {v[10]} z {v[11]} wpisow z celem", "INFO (prog z polki zamiast bezwzglednego indeksu - decyzja po pomiarze)", None)
+            nomap = num(r"w tym bez celu z braku mapy koszyka ZC4 \([^)]*\) (\d+)", lastreg, int) if lastreg else None
+            rep.add("NF4-5c: regale wobec polki (ostatni cykl)", f"dzien {dd}: wpisow {v[0]}, w gore {v[1]}, w dol {v[2]}; polka < T* {v[4]}, > 2T* {v[5]}, bez celu {v[7]}"
+                    + (f" (w tym z braku mapy koszyka ZC4 {nomap})" if nomap is not None else "") + f"; w gore przy pelnej {v[8]}, w dol przy pustej {v[9]}; "
+                    f"zgodne z polka {v[10]} z {v[11]} wpisow z celem", "INFO (prog z polki zamiast bezwzglednego indeksu - decyzja po pomiarze; bez celu z braku mapy ZC4 - pierwsza doba po wczytaniu, nie brak celu)", None)
     else:
         rep.add("NF4-5: regale wobec polki", "brak linii", "INFO (cykl regali co 28 dob od D albo klucz Measure Regale Shelf wylaczony)", None)
     # NF4-6: ZW - nacisk i przejscia (droga bez KS)
@@ -41200,10 +41206,12 @@ def nf4_main(logp):
         top = g(r"doplaty notabli do 5000 ([+-]?\d+) ")
         own = g(r"zysk do wlascicieli \(E3-T2\) ([+-]?\d+) ")
         rest = g(r"\+ reszta ([+-]?\d+) ")
+        wcar = g(r", w tym z kas karawan (-?\d+) \(")   # recenzja: zold z kas karawan (O02 + E3/4) - brak w liniach sprzed recenzji
+        wnot = g(r"\), z kies notabli (-?\d+) \(")
         ms = [num(r"\| czas ([\d.]+) ms", s, float) or 0.0 for s in car]
         sts = sum(num(r"potkniecia (\d+)\.$", s, int, 0) or 0 for s in car)
         rep.add("NF4-7: karawany - wynik handlowy (ostatnie okno, na dobe)", f"handel (sprzedaz - zakup) {trade}, zold zaplacony {paid}, handel - zold {tw}, z towarem w jukach {twg}; doplaty notabli {top}, zysk do wlascicieli {own}, "
-                f"reszta okna {rest}", "INFO (przeglad: strata karawan to marza handlu czy zold - decyzja po pomiarze)", None)
+                f"reszta okna {rest}" + (f"; zold zaplacony z kas karawan {wcar}, z kies notabli {wnot}" if wcar is not None else ""), "INFO (przeglad: strata karawan to marza handlu czy zold - decyzja po pomiarze)", None)
         allt = [num(r"-> wynik handlu ([+-]?\d+) ", s, int) for s in car]
         allw = [num(r"\| wynik handlu - zold zaplacony ([+-]?\d+) ", s, int) for s in car]
         allt = [x for x in allt if x is not None]; allw = [x for x in allw if x is not None]
@@ -41212,19 +41220,30 @@ def nf4_main(logp):
         rep.add("NF4-7c: karawany - koszt i potkniecia", f"czas okna najwyzej {max(ms):.2f} ms, potkniecia {sts}", f"<= {NF4_CAR_MS_MAX:.0f} ms, potkniecia 0", max(ms) <= NF4_CAR_MS_MAX and sts == 0)
     else:
         rep.add("NF4-7: karawany - wynik handlowy", "brak linii", "INFO (okno 7 dob albo klucz Measure Caravan Trade wylaczony)", None)
-    # NF4-8: surowiec z polek - tozsamosc ksiegi (kontrola 0) i odplyw z polek
+    # NF4-8: surowiec z polek - "bez wyjasnienia" okna = 0 (ksiega towarow domyka sie co dobe) i odplyw z polek
+    # recenzja: "kontrola" linii = suma zmian posiadaczy - zmiana zapasu = 0 z definicji (zapas = suma posiadaczy), wiec tylko INFO (NF4-8c); prog na "bez wyjasnienia"
     if sur:
-        badk, nk, lasts = 0, 0, {}
+        badu, nu, badk, nk, lasts, worst = 0, 0, 0, 0, {}, None
         for s in sur:
-            k = num(r"\(kontrola ([+-]?\d+)\)", s, int)
             item = num(r"dzien -?\d+ - (\w+) \|", s, str)
-            if k is None:
-                continue
-            nk += 1
-            if k != 0:
-                badk += 1
-            lasts[item] = s
-        rep.add("NF4-8: surowiec z polek - polki - ksiega = bez wyjasnienia - zmiana pozostalych posiadaczy (kontrola)", f"linii {nk}, kontrola != 0: {badk}", "0 (tozsamosc ksiegi towarow)", badk == 0 if nk else None)
+            u = num(r"\+ bez wyjasnienia ([+-]?\d+)\)", s, int)
+            k = num(r"\(kontrola (?:arytmetyki linii )?([+-]?\d+)\)", s, int)
+            if u is not None:
+                nu += 1
+                if u != 0:
+                    badu += 1
+                    if worst is None or abs(u) > abs(worst[1]):
+                        worst = (item, u, num(r"dzien (-?\d+)", s))
+            if k is not None:
+                nk += 1
+                if k != 0:
+                    badk += 1
+            if u is not None or k is not None:
+                lasts[item] = s
+        rep.add("NF4-8: surowiec z polek - bez wyjasnienia okna (zapas swiata - (produkcja - zuzycie) ksiegi towarow)", f"okien {nu}, bez wyjasnienia != 0: {badu}"
+                + (f" (najwiecej {worst[0]} {worst[1]:+d}, dzien {worst[2]})" if worst else ""), "0 (ksiega towarow domyka sie co dobe)", badu == 0 if nu else None)
+        rep.add("NF4-8c: surowiec z polek - arytmetyka linii (polki - ksiega = bez wyjasnienia - zmiana pozostalych posiadaczy)", f"linii {nk}, rozne od 0: {badk}",
+                "INFO (0 z definicji: zapas swiata = suma posiadaczy; inne niz 0 - rozjazd tablicy posiadaczy i ich nazw)", None)
         for item, s in sorted(lasts.items()):
             gap = num(r"polki - ksiega ([+-]?\d+)", s, int); u = num(r"= bez wyjasnienia ([+-]?\d+) - zmiana", s, int)
             oth = re.search(r"\| pozostali posiadacze \(koniec okna, zmiana\): ([^|]*)", s)
@@ -41247,7 +41266,9 @@ def nf4_main(logp):
         rep.add("NF4-9: drewno w wozach - przebieg po taborach = posiadacz 'wozy' ksiegi towarow", f"linii {nw}, rozne ponad 1%: {badw}", "0", badw == 0 if nw else None)
         s = wood[-1]
         st = re.search(r"\| stan: ([^|]*)", s); ag = re.search(r"\| wiek ladunku ([^|]*)", s); ok = re.search(r"\| okno: ([^|]*)", s); df = re.search(r"\| miasta bez opalu ([^|]*)", s)
-        rep.add("NF4-9b: drewno w wozach (ostatnie okno) - dokad i ile dob", f"stan: {(st.group(1).strip() if st else '-')[:260]}; wiek {(ag.group(1).strip() if ag else '-')[:160]}; {(ok.group(1).strip() if ok else '-')[:220]}", "INFO", None)
+        gaps = num(r"przerwy ksiegi towarow w sesji \([^)]*\) (\d+)", s, int)   # recenzja: doba ksiegi pominieta - okno od nowa (brak w liniach sprzed recenzji)
+        rep.add("NF4-9b: drewno w wozach (ostatnie okno) - dokad i ile dob", f"stan: {(st.group(1).strip() if st else '-')[:260]}; wiek {(ag.group(1).strip() if ag else '-')[:160]}; {(ok.group(1).strip() if ok else '-')[:220]}"
+                + (f"; przerwy ksiegi towarow w sesji {gaps}" if gaps is not None else ""), "INFO", None)
         rep.add("NF4-9c: miasta bez opalu - przyczyna (ostatnie okno)", (df.group(1).strip() if df else "-")[:420], "INFO (czemu drewno nie trafia do miast z pusta polka ponad zapas rzemiosla)", None)
         wms = [num(r"\(([\d.]+) ms/d\)", x, float) or 0.0 for x in wood]
         wst = [num(r"potkniecia (\d+) \(sesja", x, int) or 0 for x in wood]
@@ -41261,7 +41282,7 @@ def nf4_main(logp):
         rep.add("NF4-10: diagnoza A7 - koszt i potkniecia", f"najwyzej {max(ms) if ms else 0:.1f} ms (mediana {st_median(ms):.1f}), potkniecia {st}", f"<= {NF4_A7_MS_MAX:.0f} ms, potkniecia 0",
                 (max(ms) if ms else 0) <= NF4_A7_MS_MAX and st == 0)
     # NF4-11: bledy paczki
-    rep.add("NF4-11: ERROR paczki (StartCalibration.F4, F4Pomiary, MoneyLedger.F4)", str(errs), "0", errs == 0)
+    rep.add("NF4-11: ERROR paczki (StartCalibration.F4, F4Pomiary, MoneyLedger.F4, VillageCrafts.F4)", str(errs), "0", errs == 0)
     rep.show()
     return 0
 

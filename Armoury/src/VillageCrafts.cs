@@ -225,6 +225,7 @@ namespace Armoury
                 _meta = null; _metaFor = null;
                 _worksOnly = 0; _w2Skip = 0; _measDay = -1; _meas.Clear(); _deferLogged = false;
                 _tally.Clear(); _w2Note = ""; _measW2 = null;
+                F4ZwClear();                                   // recenzja f4-pomiary: nacisk ZW od zera po wczytaniu / nowej kampanii (bez licznikow poprzedniej sesji)
             }
         }
 

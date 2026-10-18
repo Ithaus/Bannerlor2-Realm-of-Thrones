@@ -258,13 +258,16 @@ namespace Armoury
         private static readonly int[,] _f4Reg = new int[KsTab.NG, 10];       // [towar, 0 wpisy, 1 w gore, 2 w dol, 3 polka < T*, 4 > 2T*, 5 pomiedzy, 6 bez celu, 7 w gore przy > 2T*, 8 w dol przy < T*, 9 zgodne z polka]
         private static readonly double[] _f4RegHands = new double[KsTab.NG];
         private static int _f4RegSt;
+        private static int _f4RegNoMap;                                       // recenzja: wpisy soli i daktyli "bez celu", bo mapy koszyka ZC4 jeszcze nie ma (pierwsza doba po wczytaniu)
 
         private static void F4RegBegin()
         {
-            _f4Shelf.Clear(); Array.Clear(_f4Reg, 0, _f4Reg.Length); Array.Clear(_f4RegHands, 0, _f4RegHands.Length); _f4RegSt = 0;
+            _f4Shelf.Clear(); Array.Clear(_f4Reg, 0, _f4Reg.Length); Array.Clear(_f4RegHands, 0, _f4RegHands.Length); _f4RegSt = 0; _f4RegNoMap = 0;
         }
 
-        /// <summary>Stan polki miasta targowego dla towaru regale g: 0 polka &lt; T*, 1 pomiedzy, 2 polka &gt; 2 T*, 3 bez celu (pamiec cyklu).</summary>
+        /// <summary>Stan polki miasta targowego dla towaru regale g: 0 polka &lt; T*, 1 pomiedzy, 2 polka &gt; 2 T*, 3 bez celu, 4 bez celu z braku mapy koszyka ZC4
+        /// (sol i daktyle w pierwszej dobie po wczytaniu - RuleDaily biegnie przed Zc4Build, a mapa nie jest w zapisie; w innych dobach mapa z wczoraj = mapa na dzis,
+        /// ta sama, z ktorej korzysta reszta KS w ciagu doby) (pamiec cyklu).</summary>
         private static int F4ShelfState(Town mt, int g)
         {
             if (mt == null || g < 0 || g >= KsTab.NG) return 3;
@@ -279,7 +282,9 @@ namespace Armoury
                 if (it != null && mt.Settlement != null && mt.Settlement.ItemRoster != null)
                 {
                     double T = 0;
-                    if (g == KsTab.GSalt) T = ZStallTarget(mt, ZSalt);
+                    bool zc = g == KsTab.GSalt || g == KsTab.GDate;
+                    if (zc && _zt.Count == 0) r = 4;                                  // recenzja: brak mapy ZC4 - osobny licznik (nie "towar bez celu")
+                    else if (g == KsTab.GSalt) T = ZStallTarget(mt, ZSalt);
                     else if (g == KsTab.GDate) T = ZStallTarget(mt, ZDate);
                     else if (g == KsTab.GIron || g == KsTab.GWood) T = CaravanBulk.TargetFor(mt, it);
                     if (T > 0.5)
@@ -299,6 +304,7 @@ namespace Armoury
         {
             if (g < 0 || g >= KsTab.NG) return;
             int st = F4ShelfState(mt, g);
+            if (st == 4) { _f4RegNoMap++; st = 3; }                              // w sumach linii - "bez celu" (sumy bez zmian), osobno w dopisku
             bool up = ix > 1.2, down = !up && ix < 0.8;
             _f4Reg[g, 0]++;
             if (up) _f4Reg[g, 1]++; else if (down) _f4Reg[g, 2]++;
@@ -320,6 +326,7 @@ namespace Armoury
               .Append(" | razem: wpisow ").Append(t[0]).Append(", w gore ").Append(t[1]).Append(", w dol ").Append(t[2]).Append(", bez zmiany ").Append(t[0] - t[1] - t[2])
               .Append("; polka < T* ").Append(t[3]).Append(", > 2T* ").Append(t[4]).Append(", pomiedzy ").Append(t[5]).Append(", bez celu ").Append(t[6])
               .Append("; w gore przy polce > 2T* ").Append(t[7]).Append(", w dol przy polce < T* ").Append(t[8]).Append("; zgodne z polka (w gore przy < T*, w dol przy > 2T*, bez zmiany pomiedzy) ").Append(t[9]).Append(" z ").Append(withT).Append(" wpisow z celem")
+              .Append("; w tym bez celu z braku mapy koszyka ZC4 (sol i daktyle, pierwsza doba po wczytaniu) ").Append(_f4RegNoMap)
               .Append(" | wedlug towaru (wpisow gora/dol, polka <T*/>2T*/pomiedzy/bez celu, w gore przy pelnej, w dol przy pustej, rece przy zlozu):");
             bool first = true;
             for (int g = 0; g < KsTab.NG; g++)

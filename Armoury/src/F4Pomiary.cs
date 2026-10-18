@@ -19,12 +19,16 @@ namespace Armoury
     ///      zapas swiata na poczatku i koncu okna = produkcja - zuzycie + bez wyjasnienia (tozsamosc ksiegi); polki miast wobec ksiegi: zmiana polek - (produkcja -
     ///      zuzycie) = bez wyjasnienia - zmiana pozostalych posiadaczy (wsie, wozy wsi, wozy surowcow, karawany, lordowie ...) - czyli dokad towar odplywa z polek,
     ///      choc ksiega KS widzi nadwyzke; zuzycie wedlug ujscia (kto zdejmuje z polek) i produkcja wedlug zrodla w sumie okna, przewoz wozami i karawanami.
+    ///      Recenzja (noc 17/18.10): "kontrola" w nawiasie to tylko arytmetyka linii (zapas swiata = suma posiadaczy, wiec wychodzi 0 z definicji; inna niz 0 tylko przy
+    ///      rozjezdzie tablicy posiadaczy i ich nazw) - prawdziwa miara to "bez wyjasnienia" okna (ksiega towarow domyka sie co dobe: 0; checker NF4-8).
     ///  (2) "Drewno stoi w wozach (37 tys.), a 56 miast nie ma opalu - czemu nie dojezdza?" Linia "Drewno w wozach wsi (f4-pomiary)" co 7 dob: przebieg raz na dobe po
     ///      taborach wsi (MobileParty.AllVillagerParties): drewno w wozach wedlug stanu (w drodze do miasta / zamku / domu, stoi we wsi, w miescie), wiek ladunku (doby od
     ///      zaladunku, od wczytania), dostawy do miast w oknie (spadek drewna w wozie przypisany ostatnio odwiedzonej osadzie), miasta bez opalu (polka nie wyzej niz
     ///      zapas rzemiosla - ten sam prog co opal mieszczan: max(5, CaravanBulk.TargetFor)) z przyczyna: woz w drodze, dowieziono a rzemioslo zabralo, brak wsi z drewnem
     ///      w targu; drewno na polkach ponad zapas rzemiosla wedlug rynku.
     /// Stan tylko w pamieci (bez zapisu): po wczytaniu okno i wiek ladunku od nowa. Koszt: przebieg po taborach, miastach i wsiach raz na dobe (zegar w linii).
+    /// Recenzja: doba ksiegi towarow pominieta (ksiega wylaczona i wlaczona, blad doby) - okno, "wczoraj" posiadaczy i pamiec wozow od nowa (inaczej zmiana zapasu z wielu
+    /// dob weszlaby w "bez wyjasnienia" jednej doby, a spadek w wozie z wielu dob w dostawy jednej); licznik "przerwy ksiegi" w linii drewna.
     /// </summary>
     internal static class F4Pomiary
     {
@@ -37,6 +41,7 @@ namespace Armoury
         private static ItemObject _iron, _wood;
         private static int _st, _stDay;
         private static readonly HashSet<string> _err = new HashSet<string>();
+        private static int _itemDay = -1, _endDay = -1, _gaps;   // recenzja: ostatnia doba ksiegi towarow widziana przez LedgerItem i LedgerDayEnd, przerwy w sesji
 
         // ------------------------------------------------------------ (1) przeplyw z ksiegi towarow
         private sealed class Flow
@@ -78,6 +83,29 @@ namespace Armoury
             _wag = new Dictionary<MobileParty, Wag>();
             ClearWin();
             _init = false; _st = 0; _err.Clear();
+            _itemDay = _endDay = -1; _gaps = 0;
+        }
+
+        /// <summary>Recenzja: LedgerItem - pierwsza wizyta doby; doba pominieta (ksiega towarow wylaczona albo blad doby) = przeplywy od nowa (stan poczatkowy dzis).</summary>
+        private static void ItemDay(int day)
+        {
+            if (day == _itemDay) return;
+            if (_itemDay >= 0 && day != _itemDay + 1)
+                foreach (var f in _flow) { f.Clear(); f.HoldPrev = null; f.StockPrev = -1; }
+            _itemDay = day;
+        }
+
+        /// <summary>Recenzja: LedgerDayEnd - doba pominieta = pamiec wozow i okno od nowa (dzisiejszy przebieg to stan poczatkowy, jak po wczytaniu).</summary>
+        private static void EndDay(int day)
+        {
+            if (_endDay >= 0 && day != _endDay + 1)
+            {
+                _wag = new Dictionary<MobileParty, Wag>();
+                ClearWin();
+                _init = false; _gaps++;
+                foreach (var f in _flow) f.Clear();   // okno przeplywow od jutra razem z oknem wozow ("wczoraj" posiadaczy = dzisiejszy stan z LedgerItem; bez dzisiejszej doby)
+            }
+            _endDay = day;
         }
 
         private static void ClearWin()
@@ -104,6 +132,7 @@ namespace Armoury
             {
                 EnsureCampaign();
                 if (!EnsureItems()) return;
+                ItemDay(day);   // recenzja: doba ksiegi pominieta - przeplywy od nowa
                 int k = ReferenceEquals(it, _iron) ? 0 : ReferenceEquals(it, _wood) ? 1 : -1;
                 if (k < 0 || hold == null) return;
                 var f = _flow[k];
@@ -138,6 +167,7 @@ namespace Armoury
             {
                 EnsureCampaign();
                 if (!EnsureItems()) return;
+                EndDay(day);    // recenzja: doba ksiegi pominieta - pamiec wozow i okno od nowa
                 bool first = !_init;
                 _init = true;
                 if (!first && _winDays == 0) _winFirst = day;
@@ -212,7 +242,7 @@ namespace Armoury
             long gap = dt - (f.P - f.C);
             sb.Append(" | polki miast ").Append(town >= 0 ? f.Hold0[town] : 0).Append(" -> ").Append(town >= 0 ? f.Hold1[town] : 0).Append(" (zmiana ").Append(S(dt)).Append(')')
               .Append("; ksiega (produkcja - zuzycie) ").Append(S(f.P - f.C)).Append("; polki - ksiega ").Append(S(gap)).Append(" = bez wyjasnienia ").Append(S(f.U))
-              .Append(" - zmiana pozostalych posiadaczy ").Append(S(others)).Append(" (kontrola ").Append(S(gap - (f.U - others))).Append(')')
+              .Append(" - zmiana pozostalych posiadaczy ").Append(S(others)).Append(" (kontrola arytmetyki linii ").Append(S(gap - (f.U - others))).Append(')')   // recenzja: 0 z definicji (zapas = suma posiadaczy) - miara to "bez wyjasnienia"
               .Append(" | pozostali posiadacze (koniec okna, zmiana): ").Append(oth.Length > 0 ? oth.ToString() : "-");
             sb.Append(" | zuzycie wedlug ujscia (suma okna, kto zdejmuje): ").Append(Top(f.Sink, 12)).Append(" | najwieksze pozycje: ").Append(Top(f.SinkSub, 6))
               .Append(" | produkcja wedlug zrodla: ").Append(Top(f.Src, 8))
@@ -322,7 +352,8 @@ namespace Armoury
             for (int i = 0; i < worst.Count && i < 5; i++) sb.Append(i > 0 ? "; " : "").Append(worst[i].Value);
             if (worst.Count == 0) sb.Append('-');
             sb.Append(" | ruda w wozach wsi ").Append(ironWag).Append(" (").Append(nIron).Append(" wozow, w drodze do miast ").Append(ironToTown).Append("), zeszlo z wozow w miastach w oknie ").Append(_ironSoldTown)
-              .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms (").Append((ms / Math.Max(1, _winDays)).ToString("0.00", Inv)).Append(" ms/d), potkniecia ").Append(_stDay).Append(" (sesja ").Append(_st).Append(").");
+              .Append(" | czas ").Append(ms.ToString("0.00", Inv)).Append(" ms (").Append((ms / Math.Max(1, _winDays)).ToString("0.00", Inv)).Append(" ms/d), potkniecia ").Append(_stDay).Append(" (sesja ").Append(_st).Append(")")
+              .Append(", przerwy ksiegi towarow w sesji (okno i pamiec wozow od nowa) ").Append(_gaps).Append('.');
             return sb.ToString();
         }
 
