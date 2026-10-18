@@ -19,7 +19,9 @@ namespace Armoury
         {
             try
             {
-                if (Settings.Current.VolunteerRegenPercent >= 100) { Log.Info("SlowMuster: 100% - vanilla tempo, patch spi."); return; }
+                // f18-mcm (recenzja): latka zakladana ZAWSZE - dotad przy 100 (domyslne) z Armoury.settings.xml nie wchodzila i suwak MCM
+                // (VolunteerRegenPercent) nic nie zmienial, nawet po restarcie (start procesu nie czyta MCM). SlowPostfix czyta klucz na zywo
+                // (McmSettings.Apply co godzine gry) i przy 100 wychodzi bez zmiany wyniku - przy domyslnych tempo jak dotad.
                 var t = Type.GetType("BannerKings.Models.Vanilla.BKVolunteerModel, BannerKings");
                 string who = "BannerKings";
                 if (t == null)
@@ -30,8 +32,9 @@ namespace Armoury
                 var m = t != null ? AccessTools.Method(t, "GetDailyVolunteerProductionProbability") : null;
                 if (m == null) { Log.Info("SlowMuster: nie znalazlem modelu ochotnikow - patch spi."); return; }
                 harmony.Patch(m, postfix: new HarmonyMethod(typeof(SlowMuster), "SlowPostfix"));
-                Log.Info("SlowMuster: zaciag ochotnikow zwolniony do " + Settings.Current.VolunteerRegenPercent
-                         + "% dziennej szansy (model: " + who + ").");
+                int pct = Settings.Current.VolunteerRegenPercent;
+                Log.Info("SlowMuster: latka wpieta (model: " + who + "), klucz VolunteerRegenPercent na zywo - przy starcie " + pct + "%"
+                         + (pct >= 100 ? " (vanilla tempo, postfiks nic nie zmienia)." : " dziennej szansy."));
             }
             catch (Exception e) { Log.Error("SlowMuster.ApplyAll", e); }
         }

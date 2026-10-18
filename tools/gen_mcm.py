@@ -488,8 +488,43 @@ SESSION_KEYS = {
         'CharcoalWeightKg',             # FixCharcoalWeight (OnSessionLaunched)
         # CrashScribe (Army175Gear przy wczytaniu, klucze przez Mends.ArmouryFloat) - opisy juz mowia "takes effect on the next load"
         'Army175IronbornFoot', 'Army175NorthFoot', 'Army175VolantisNorvos', 'Army175MinorLore',
+        # f18-mcm, poprawka po recenzji:
+        'DesertionLawEnabled',          # TierDesertionModel.Install (OnGameStart, po McmSettings.Apply) dodaje model tylko przy kluczu; model klucza juz nie czyta
+        'BkProsperityLayerOnce',        # LayerOnce.Sync tylko z A16Signals.OnSessionLaunched (Unpatch / Patch postfiksu BK raz na sesje)
+        'FoodModelChain',               # FoodChain.Build - stan raz na kampanie (_st wedlug Campaign.Current); opis mowi "after loading a save" (dotad: "Restart the game")
     },
 }
+
+# f18-mcm, poprawka po recenzji: ceny historyczne - HistoricalPrices.Apply (OnSessionLaunched) ustawia ItemObject.Value kazdej broni i zbroi raz na sesje
+# (z HistCost), a blokada cen (_target, ValueSetPrefix / Recheck) trzyma te wartosc do wczytania. Te klucze czytaja jednak takze miejsca NA ZYWO
+# (dniowka mistrza WageFor -> TownWage / Qohor / zlecenia, dni roboty HistDays -> ForgeClock / WorkshopLaw, robota naprawy MakingLabor, cena surowca
+# warsztatu WorkshopLaw.MatPrice, wycena nowo wykutych PriceOne / PriceDesign) - stad osobny dopisek: przeliczenie cen przedmiotow juz istniejacych
+# po wczytaniu, reszta po godzinie gry (Apply co godzine). Klucze czytane wylacznie w Apply (HistCharcoalPerKg, HistHidesPerKg, HistFlaxPerKg) sa w SESSION_KEYS.
+PRICE_KEYS = {
+    'Armoury': {
+        # MetalPerKg -> HistMaterial (sztaby wedlug gatunku)
+        'HistCrudeIronPerKg', 'HistWroughtIronPerKg', 'HistIronPerKg', 'HistSteelPerKg', 'HistFineSteelPerKg', 'HistCastleSteelPerKg',
+        # HistMaterial / FuelPerMetalKg / Apply (surowce) i WorkshopLaw.MatPrice
+        'HistIronOrePerKg', 'HistWoodPerKg', 'HistLeatherPerKg', 'HistLinenPerKg', 'HistSpecialFactor',
+        # WageFor / HistCostOf / HistDays
+        'HistMasterWageT1', 'HistMasterWagePerTier', 'HistProfitPercent', 'HistAmmoLaborMultiplier', 'HistBowLaborMultiplier', 'HistThrownOwnDays',
+        # Apply / PriceOne / PriceDesign - unikaty imienne
+        'HistUniquePrestige',
+    },
+}
+PRICE_SUFFIX = " (prices of items already in the world are recalculated after loading a save)"
+
+# f18-mcm, poprawka po recenzji: klucze czytane TYLKO przy starcie procesu (ApplyAll w OnBeforeInitialModuleScreenSetAsRoot, z Armoury.settings.xml albo
+# domyslnych z kodu), bez odczytu na zywo w latkach - przelacznik MCM nie zmienia nic, takze po restarcie (start procesu nie czyta MCM); RequireRestart = true
+# nic by nie dal. Uczciwy dopisek w opisie zamiast obietnicy restartu.
+STARTUP_KEYS = {
+    'Armoury': {
+        # BattleWind.ApplyAll: latki staminy i tickow RBMAI.Stance oraz BattleWind.Active tylko przy kluczu; Active czyta FieldCraft (stary liniowy bonus
+        # Endurance przy !Active) - odczyt na zywo wymagalby zmian w BattleWind i FieldCraft naraz (podwojny bonus), wiec bez zmiany kodu
+        'BattleStaminaEnabled',
+    },
+}
+STARTUP_SUFFIX = " (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)"
 
 # moduly, w ktorych McmSettings.Apply idzie TYLKO w SubModuleMain.OnGameStart (bez sluchacza godziny jak w Armoury) - kazde ich pole wchodzi
 # po wczytaniu zapisu; dopisek do kazdego opisu (do zdjecia, gdy modul dostanie Apply co godzine)
@@ -521,10 +556,17 @@ def gen(module_dir, ns, display):
     names = set(p[1] for p in props)
     restart = RESTART_KEYS.get(ns, {})
     session = SESSION_KEYS.get(ns, set())
-    bad = sorted((set(restart) | session) - names)
+    price = PRICE_KEYS.get(ns, set())
+    startup = STARTUP_KEYS.get(ns, set())
+    bad = sorted((set(restart) | session | price | startup) - names)
     if bad:
-        sys.exit("gen_mcm: %s - klucze z RESTART_KEYS/SESSION_KEYS nieobecne w Settings.cs: %s" % (ns, ", ".join(bad)))
-    n_restart = n_suffix = n_said = 0
+        sys.exit("gen_mcm: %s - klucze z RESTART_KEYS/SESSION_KEYS/PRICE_KEYS/STARTUP_KEYS nieobecne w Settings.cs: %s" % (ns, ", ".join(bad)))
+    # klucz w dwoch tabelach = sprzeczny opis
+    tables = [set(restart), session, price, startup]
+    dup = sorted(k for i, a in enumerate(tables) for b in tables[i + 1:] for k in a & b)
+    if dup:
+        sys.exit("gen_mcm: %s - klucze w wiecej niz jednej tabeli (RESTART/SESSION/PRICE/STARTUP): %s" % (ns, ", ".join(dup)))
+    n_restart = n_suffix = n_said = n_price = n_startup = 0
 
     out = []
     out.append("using MCM.Abstractions.Attributes;")
@@ -548,6 +590,17 @@ def gen(module_dir, ns, display):
         rr = "true" if name in restart else "false"
         if name in restart:
             n_restart += 1
+        elif name in startup:
+            # f18-mcm (recenzja): odczyt tylko przy starcie procesu - dopisek zawsze (zaden opis tego nie mowi)
+            hint_txt = (hint_txt + STARTUP_SUFFIX).strip()
+            n_startup += 1
+        elif name in price and ns not in APPLY_ON_LOAD_ONLY:
+            # f18-mcm (recenzja): ceny przedmiotow juz istniejacych po wczytaniu, reszta na zywo
+            if ALREADY_SAID.search(hint_txt):
+                n_said += 1
+            else:
+                hint_txt = (hint_txt + PRICE_SUFFIX).strip()
+                n_price += 1
         elif ns in APPLY_ON_LOAD_ONLY or name in session:
             if ALREADY_SAID.search(hint_txt):
                 n_said += 1
@@ -593,7 +646,8 @@ def gen(module_dir, ns, display):
     out.append("}")
     path = os.path.join(module_dir,'src','McmSettings.cs')
     open(path,'w',encoding='utf-8').write("\n".join(out))
-    print("%s: %d ustawien -> %s (restart: %d, dopisek 'after loading a save': %d, opis juz mowi: %d)" % (ns, len(props), path, n_restart, n_suffix, n_said))
+    print("%s: %d ustawien -> %s (restart: %d, dopisek 'after loading a save': %d, dopisek cen: %d, dopisek 'read once at game start': %d, opis juz mowi: %d)"
+          % (ns, len(props), path, n_restart, n_suffix, n_price, n_startup, n_said))
 
 # sciezki wzgledem korzenia repo - skrypt wolac z katalogu glownego
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

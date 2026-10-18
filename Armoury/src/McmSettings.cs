@@ -540,7 +540,7 @@ namespace Armoury
         [SettingPropertyGroup("The lean quartermasters")]
         public int FoodConsumptionCutPercent { get; set; } = 40;
 
-        [SettingPropertyBool("Food Model Chain", HintText = "one chain of party food rules: Realistic Bannerlord keeps its seasons and weather, and beneath it the rules of the other mods run again - the Others do not eat (Realm of Thrones), parties eat 20% less at sea (War Sails), Banner Kings perks and animal feed in desert and snow count, and Banner Kings' own parties (travellers, estates, free companies, retinues) do not eat, as Banner Kings intends - each rule counted once, winter and rations once. Restart the game after changing it (off = Realistic Bannerlord alone, as before)", RequireRestart = false)]
+        [SettingPropertyBool("Food Model Chain", HintText = "one chain of party food rules: Realistic Bannerlord keeps its seasons and weather, and beneath it the rules of the other mods run again - the Others do not eat (Realm of Thrones), parties eat 20% less at sea (War Sails), Banner Kings perks and animal feed in desert and snow count, and Banner Kings' own parties (travellers, estates, free companies, retinues) do not eat, as Banner Kings intends - each rule counted once, winter and rations once. Takes effect after loading a save (off = Realistic Bannerlord alone, as before)", RequireRestart = false)]
         [SettingPropertyGroup("The lean quartermasters")]
         public bool FoodModelChain { get; set; } = true;
 
@@ -972,7 +972,7 @@ namespace Armoury
         [SettingPropertyGroup("Plague shield")]
         public int PlagueShieldLogEvery { get; set; } = 20;
 
-        [SettingPropertyBool("Desertion Law Enabled", HintText = "men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at decent morale loses no one; pay and party-size desertion stay as in vanilla", RequireRestart = false)]
+        [SettingPropertyBool("Desertion Law Enabled", HintText = "men desert only when party morale falls below THEIR tier's threshold (vanilla: below 10 for everyone); a fed and paid party at decent morale loses no one; pay and party-size desertion stay as in vanilla (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Desertion")]
         public bool DesertionLawEnabled { get; set; } = true;
 
@@ -1144,7 +1144,7 @@ namespace Armoury
         [SettingPropertyGroup("Flesh and wind")]
         public float FatigueFreeArmorKg { get; set; } = 0f;
 
-        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant", RequireRestart = false)]
+        [SettingPropertyBool("Battle Stamina Enabled", HintText = "heroes: Endurance reshapes RBM battle stamina and posture - pools double every few points, breath returns fast but winded men pant (read once at game start from ModuleData/Armoury.settings.xml - changing it here has no effect)", RequireRestart = false)]
         [SettingPropertyGroup("Flesh and wind")]
         public bool BattleStaminaEnabled { get; set; } = true;
 
@@ -2528,11 +2528,11 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistoricalPricesEnabled { get; set; } = true;
 
-        [SettingPropertyFloatingInteger("Hist Iron Ore Per Kg", 0.00f, 1.00f, "0.00", HintText = "iron ore, pence per kg (England c.1300, estimate)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Iron Ore Per Kg", 0.00f, 1.00f, "0.00", HintText = "iron ore, pence per kg (England c.1300, estimate) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistIronOrePerKg { get; set; } = 0.075f;
 
-        [SettingPropertyFloatingInteger("Hist Wood Per Kg", 0.00f, 1.00f, "0.00", HintText = "timber and firewood, pence per kg (Clark/Rogers)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Wood Per Kg", 0.00f, 1.00f, "0.00", HintText = "timber and firewood, pence per kg (Clark/Rogers) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistWoodPerKg { get; set; } = 0.035f;
 
@@ -2540,51 +2540,51 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistCharcoalPerKg { get; set; } = 0.07f;
 
-        [SettingPropertyFloatingInteger("Hist Crude Iron Per Kg", 0.00f, 5.60f, "0.00", HintText = "crude bloom iron, pence per kg (Tudeley bloom 3s 4d)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Crude Iron Per Kg", 0.00f, 5.60f, "0.00", HintText = "crude bloom iron, pence per kg (Tudeley bloom 3s 4d) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistCrudeIronPerKg { get; set; } = 1.4f;
 
-        [SettingPropertyFloatingInteger("Hist Wrought Iron Per Kg", 0.00f, 10.00f, "0.00", HintText = "wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Wrought Iron Per Kg", 0.00f, 10.00f, "0.00", HintText = "wrought bar iron, pence per kg (Clark/Rogers 1300-49: 1.15 d a pound) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistWroughtIronPerKg { get; set; } = 2.5f;
 
-        [SettingPropertyFloatingInteger("Hist Iron Per Kg", 0.00f, 14.00f, "0.00", HintText = "refined iron, pence per kg", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Iron Per Kg", 0.00f, 14.00f, "0.00", HintText = "refined iron, pence per kg (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistIronPerKg { get; set; } = 3.5f;
 
-        [SettingPropertyFloatingInteger("Hist Steel Per Kg", 0.00f, 24.00f, "0.00", HintText = "steel, pence per kg (estimate)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Steel Per Kg", 0.00f, 24.00f, "0.00", HintText = "steel, pence per kg (estimate) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistSteelPerKg { get; set; } = 6f;
 
-        [SettingPropertyFloatingInteger("Hist Fine Steel Per Kg", 0.00f, 32.00f, "0.00", HintText = "fine steel, pence per kg (estimate)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Fine Steel Per Kg", 0.00f, 32.00f, "0.00", HintText = "fine steel, pence per kg (estimate) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistFineSteelPerKg { get; set; } = 8f;
 
-        [SettingPropertyFloatingInteger("Hist Castle Steel Per Kg", 0.00f, 48.00f, "0.00", HintText = "castle-forged steel, pence per kg (fine steel plus a fifth of the metal lost and double charcoal)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Castle Steel Per Kg", 0.00f, 48.00f, "0.00", HintText = "castle-forged steel, pence per kg (fine steel plus a fifth of the metal lost and double charcoal) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistCastleSteelPerKg { get; set; } = 12f;
 
-        [SettingPropertyFloatingInteger("Hist Leather Per Kg", 0.00f, 16.00f, "0.00", HintText = "tanned leather, pence per kg", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Leather Per Kg", 0.00f, 16.00f, "0.00", HintText = "tanned leather, pence per kg (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistLeatherPerKg { get; set; } = 4f;
 
-        [SettingPropertyFloatingInteger("Hist Linen Per Kg", 0.00f, 40.00f, "0.00", HintText = "linen and canvas for padding, pence per kg", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Linen Per Kg", 0.00f, 40.00f, "0.00", HintText = "linen and canvas for padding, pence per kg (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistLinenPerKg { get; set; } = 10f;
 
-        [SettingPropertyFloatingInteger("Hist Special Factor", 0.00f, 1.00f, "0.00", HintText = "horn, sinew and glue of bows, against the old game-scale bill", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Special Factor", 0.00f, 1.00f, "0.00", HintText = "horn, sinew and glue of bows, against the old game-scale bill (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistSpecialFactor { get; set; } = 0.1f;
 
-        [SettingPropertyFloatingInteger("Hist Master Wage T1", 0.00f, 12.00f, "0.00", HintText = "a smith's day of work on plain gear, pence (a craftsman earned about 3 d a day)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Master Wage T1", 0.00f, 12.00f, "0.00", HintText = "a smith's day of work on plain gear, pence (a craftsman earned about 3 d a day) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistMasterWageT1 { get; set; } = 3f;
 
-        [SettingPropertyFloatingInteger("Hist Master Wage Per Tier", 0.00f, 6.00f, "0.00", HintText = "each tier above the first adds this to the master's day (a master armourer of fine harness about 10 d)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Master Wage Per Tier", 0.00f, 6.00f, "0.00", HintText = "each tier above the first adds this to the master's day (a master armourer of fine harness about 10 d) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistMasterWagePerTier { get; set; } = 1.5f;
 
-        [SettingPropertyFloatingInteger("Hist Profit Percent", 0.00f, 100.00f, "0.00", HintText = "the maker's profit on top of material and labour", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Profit Percent", 0.00f, 100.00f, "0.00", HintText = "the maker's profit on top of material and labour (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistProfitPercent { get; set; } = 25f;
 
@@ -2592,7 +2592,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float TownWageRefProsperity { get; set; } = 4800f;
 
-        [SettingPropertyFloatingInteger("Hist Ammo Labor Multiplier", 0.00f, 32.00f, "0.00", HintText = "fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Ammo Labor Multiplier", 0.00f, 32.00f, "0.00", HintText = "fletcher and arrowsmith work on a stack of arrows or bolts (a sheaf of 24 cost about 15 d) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistAmmoLaborMultiplier { get; set; } = 8f;
 
@@ -2600,7 +2600,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistTournamentScale { get; set; } = 4f;
 
-        [SettingPropertyFloatingInteger("Hist Unique Prestige", 0.00f, 16.00f, "0.00", HintText = "named pieces of the great houses cost this many times their making", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Unique Prestige", 0.00f, 16.00f, "0.00", HintText = "named pieces of the great houses cost this many times their making (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistUniquePrestige { get; set; } = 4f;
 
@@ -2624,7 +2624,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public float HistFlaxPerKg { get; set; } = 2f;
 
-        [SettingPropertyFloatingInteger("Hist Bow Labor Multiplier", 0.00f, 4.00f, "0.00", HintText = "a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d)", RequireRestart = false)]
+        [SettingPropertyFloatingInteger("Hist Bow Labor Multiplier", 0.00f, 4.00f, "0.00", HintText = "a bowyer's days on a bow, against the smith's model (a war longbow cost 12-18 d) (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public float HistBowLaborMultiplier { get; set; } = 1.0f;
 
@@ -2640,7 +2640,7 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool HistBowDaysNew { get; set; } = true;
 
-        [SettingPropertyBool("Hist Thrown Own Days", HintText = "javelins, throwing axes and throwing knives are priced by their own days of work; before, they also carried the eightfold fletcher's work of a sheaf of arrows", RequireRestart = false)]
+        [SettingPropertyBool("Hist Thrown Own Days", HintText = "javelins, throwing axes and throwing knives are priced by their own days of work; before, they also carried the eightfold fletcher's work of a sheaf of arrows (prices of items already in the world are recalculated after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Iron Bank")]
         public bool HistThrownOwnDays { get; set; } = true;
 
@@ -6392,7 +6392,7 @@ namespace Armoury
         [SettingPropertyGroup("Signals from the long runs (A16)")]
         public bool RblPeaceNeedsQuiet { get; set; } = true;
 
-        [SettingPropertyBool("Bk Prosperity Layer Once", HintText = "Banner Kings' prosperity layer (its population, stability and food deltas and its prosperity growth multiplier) counts once instead of twice when Realistic Bannerlord's prosperity model is in play (off = as before: twice, which slows prosperity growth more than Banner Kings means)", RequireRestart = false)]
+        [SettingPropertyBool("Bk Prosperity Layer Once", HintText = "Banner Kings' prosperity layer (its population, stability and food deltas and its prosperity growth multiplier) counts once instead of twice when Realistic Bannerlord's prosperity model is in play (off = as before: twice, which slows prosperity growth more than Banner Kings means) (takes effect after loading a save)", RequireRestart = false)]
         [SettingPropertyGroup("Signals from the long runs (A16)")]
         public bool BkProsperityLayerOnce { get; set; } = false;
 
