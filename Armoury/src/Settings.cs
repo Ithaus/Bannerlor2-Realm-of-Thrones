@@ -3084,6 +3084,15 @@ namespace Armoury
         public int DistrictWorksAiReserveFlat = 20000;     // with District Works Ai: ... plus this much gold, before he invests
         public float DistrictWorksAiWorldPace = 0.005f;    // with District Works Ai: all AI works together at most this share of the world's yearly village production every 28 days
 
+        // --- Economy measurements (18.10) ---
+        // Paczka f4-pomiary (noc 17/18.10, koncowy przeglad ekonomii, pakiet P6): SAME POMIARY - zadna liczba gry sie nie zmienia. Diagnoza reguly zmiany zajec A7 pod KS
+        // i regale wobec polki (StartCalibration.F4.cs), nacisk zajec wiosek bez KS (VillageCrafts.cs), wynik handlowy karawan (MoneyLedger.F4.cs), zelazo i drewno
+        // z polek oraz drewno w wozach wsi (F4Pomiary.cs). Wylaczony klucz = jego linii nie ma, kod jak przed paczka. Bez zapisu (stan pomiaru od wczytania).
+        public bool MeasureCraftRule = true;               // log only, nothing in the game changes: once a week, and on the day the start calibration fills the stalls, the log gets a diagnosis of the rule that would let village parts change their work under the start calibration - how many parts would want to change at today's prices, at base prices and at the calibration's own prices, the ten most wanted changes with their hands, and a plain note that works are frozen while that rule is off; side villages outside the calibration get the same numbers in their daily line (off = no such lines)
+        public bool MeasureRegaleShelf = true;             // log only: every 28 days, when the hands at mines, salt pans, quarries and woods move with prices, the log also counts how many of those moves agree with the market town's stall (stall below its target - more hands, above twice the target - fewer hands) (off = no such line)
+        public bool MeasureCaravanTrade = true;            // log only: every 7 days the log gets the caravans' trading result - what they sold to and bought from towns, castles and villages, the wages they owe, the value of the goods in their packs, the notables' top-ups and the profit handed to their owners (off = no such line)
+        public bool MeasureIronWoodFlow = true;            // log only: every 7 days the log gets where iron ore and hardwood went - stock by holder (town stalls, villages, village carts, merchant carts, caravans) and who used them up - and where the village carts carrying hardwood are heading, how long the wood has been on the road, and which towns have no firewood beyond their craftsmen's stock (off = no such lines)
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

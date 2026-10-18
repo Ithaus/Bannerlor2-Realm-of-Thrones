@@ -228,8 +228,13 @@ namespace Armoury
         {
             if (!SwMarketControl) { _ctlLine = null; _landGlut.Clear(); return null; }      // bez klucza - margines popytu targu jak runda 3 (MarketMargin)
             _mfStage = null; _gapLine = null;
-            // recenzja runda 3 (wazne): planista tylko w oknie startu - po D+49 czynnik wraca do 1 przez 2 Plany (rece przesuwa dalej regula zysku i ceny), ciecie nadmiaru krain
-            // tez schodzi do 1; bez tego co tydzien rece pracy domowej i koszyki szlyby za sterowaniem bez kosztu i czasu zmiany (decyzja Jeffa 16.10 - zmiana powoli i z kosztem)
+            // recenzja runda 3 (wazne): planista tylko w oknie startu - po D+49 czynnik wraca do 1 przez 2 Plany, ciecie nadmiaru krain tez schodzi do 1; bez tego co tydzien
+            // rece pracy domowej i koszyki szlyby za sterowaniem bez kosztu i czasu zmiany (decyzja Jeffa 16.10 - zmiana powoli i z kosztem).
+            // f4-pomiary (noc 17/18.10, przeglad ekonomii): po D+49 rece zajec przesuwa TYLKO regula A7 (StartCalibration.Rule.cs), a ta dziala jedynie z kluczem
+            // Start Calibration Switch Rule - domyslnie WYLACZONYM od recenzji 16.10. Przy kluczu wylaczonym zajecia wiosek pod KS zostaja na Planie wlaczenia (Plan po
+            // wlaczeniu zmienia juz tylko lepszy stol i prace domowa, najwyzej 0.02 rak na Plan); podaz reaguje wtedy tylko cenami i rozwozem KS-H, nie rekami. Nacisk A7
+            // i jego diagnoze pokazuja linie "KS: produkcja" (zajecia zamrozone) i "KS: A7 diagnoza (f4-pomiary)". Napis linii ponizej ("dalej regula zysku i ceny") zostaje
+            // bez zmian (paczka f4 zmienia tu tylko komentarz) - opisuje stan z kluczem wlaczonym.
             bool after = _state == StateApplied && DDay >= 0 && day > DDay + CtlEnd;
             bool ctl = !after && _state == StateApplied && DDay >= 0 && day >= DDay + 14 && _cRestart >= 0 && _cN >= CtlMinDays && _plan != null && _plan.Error == null && _plan.D != null;
             var mf = new double[2 * KsTab.NG];

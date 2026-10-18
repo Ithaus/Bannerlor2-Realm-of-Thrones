@@ -195,6 +195,10 @@ namespace Armoury
             int d0 = DDay;                                                    // recenzja 16.10: A7 i regale od D (nie od wlaczenia)
             bool step = d0 >= 0 && today > d0 && (today - d0) % StepDays == 0;
             bool reg = d0 >= 0 && today > d0 && (today - d0) % RegCycle == 0;
+            // f4-pomiary (klucz Measure Craft Rule): diagnoza A7 w dobie kroku i w dobie D - sam odczyt, przed petla reguly (niczego nie zmienia)
+            if (d0 >= 0 && (step || today == d0) && F4A7On) { try { F4A7Diag(today, d0, rule, step); } catch (Exception e) { Stumble("F4A7Diag", e); } }
+            bool f4reg = reg && F4RegOn;                                     // f4-pomiary (klucz Measure Regale Shelf): regale wobec polki - tylko liczniki
+            if (f4reg) F4RegBegin();
             double sigma = Math.Max(1, DailyLife.KsSigma);
             int active = 0;
             // ks-koszt T2 (klucz Ks Cost Fast): wartosc towarow zajecia przy indeksach miasta (suma w Income) raz na miasto i zajecie w dobie kroku - ta sama petla, ta sama kolejnosc
@@ -221,7 +225,7 @@ namespace Armoury
                     {
                         if (b == null || b.K == null || b.C == null) continue;
                         if (b.Target >= 0) { Progress(ld, b, today, mt); active++; continue; }
-                        if (reg && b.RC != null) RegaleCycle(b, px);
+                        if (reg && b.RC != null) RegaleCycle(b, px, f4reg ? mt : null, f4reg);
                         if (KsWorksLock(ld, b)) { b.Held = 0; continue; }   // inwest: czesc z pracami okregu nie zmienia zajecia (projekt A7)
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
                         int ci = 0; for (int i = 1; i < b.X.Length; i++) if (b.X[i] > b.X[ci]) ci = i;
@@ -258,6 +262,7 @@ namespace Armoury
                 }
                 catch (Exception e) { Stumble("RuleDaily(okreg)", e); }
             }
+            if (f4reg) { try { F4RegLine(today); } catch (Exception e) { Stumble("F4RegLine", e); } }
             _rActive = active;
             _k4Live = _live; _k4Clean = active == 0 && K4NoTransition();   // ks-koszt T10 (K4a): pelny przeglad bez przebudowy w toku (w zadnym bloku - takze okregow pominietych)
         }
@@ -321,13 +326,14 @@ namespace Armoury
             }
         }
 
-        private static void RegaleCycle(LiveBlock b, double[] px)
+        private static void RegaleCycle(LiveBlock b, double[] px, Town mt, bool f4)
         {
             double sum = 0;
             for (int j = 0; j < b.RC.Length; j++)
             {
                 int g = KsTab.RegGood(b.RC[j]);
                 double ix = Px(px, g);
+                if (f4) { try { F4RegNote(b, j, g, ix, mt); } catch (Exception e) { Stumble("F4RegNote", e); } }   // f4-pomiary: polka wobec celu obok progu (tylko liczniki)
                 if (ix > 1.2) { b.RF[j] *= 1.1f; _rUp++; }
                 else if (ix < 0.8) { b.RF[j] *= 0.9f; _rDown++; }
                 sum += b.RF[j];
@@ -402,7 +408,8 @@ namespace Armoury
         {
             var s = Settings.Current;
             bool rule = s != null && s.StartCalibrationSwitchRule;
-            var sb = new StringBuilder(700);
+            var sb = new StringBuilder(800);
+            sb.Append(F4FrozenText(rule));                              // f4-pomiary (klucz Measure Craft Rule): jawny stan "zajecia zamrozone" (pusty napis przy kluczu wylaczonym)
             sb.Append("nacisk A7 na zmiane (co ").Append(StepDays).Append(" dob od D ").Append(DDay).Append(", inne zajecie >= x").Append(SwitchRatio.ToString("0.00", Inv)).Append("): przegladow ponad progiem ").Append(_rPress)
               .Append(", najdluzej ").Append(_rMaxHeld).Append(" dob, po ").Append(HoldDays).Append(" dobach (zmiana bylaby, klucz ").Append(rule ? "TAK" : "WYLACZONY - sam pomiar").Append(") ").Append(_rWould)
               .Append(" | zmiany zajec: zaczete ").Append(_rStarted).Append(" (od D razem ").Append(_rWinStarted).Append("), w toku ").Append(_rActive).Append(", skonczone ").Append(_rDone)

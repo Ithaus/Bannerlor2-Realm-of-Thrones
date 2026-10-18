@@ -1257,6 +1257,21 @@ Uzycie (Python 3, tylko odczyt):
                     ok. 81 z 558), NZW-4 linie rozpoznane, NZW-5 przebudowa: kiesy wsi - kasy i lud miast = 0 (NZW-5b material z polki / rzemieslnicy / droga dawna - INFO), NZW-6 tempo zmian bez KS <= 1% wiosek na 7 dob, NZW-7 M wsi
                     (szacunek - INFO), NZW-8 koszt (doba <= 5 ms, ikony <= 300 ms), NZW-9 potkniecia i ERROR 0, NZW-10 etap 0 (proba W2: krok wolany, a - b = 0; W2 milknie
                     tylko we wsiach z planem zajec - liczba w linii W2), NZW-11 tabliczka i dymek wpiete. Log bez paczki: INFO, bez wyjatku.
+--grupa nf4       : (noc 17/18.10, paczka f4-pomiary - koncowy przeglad ekonomii 18.10, pakiet P6: SAME POMIARY, zero zmian zachowania; Armoury/src/StartCalibration.F4.cs,
+                    MoneyLedger.F4.cs, F4Pomiary.cs, VillageCrafts.cs - klucze Measure Craft Rule, Measure Regale Shelf, Measure Caravan Trade, Measure Iron Wood Flow)
+                    python -I tools/sprawdz_logi.py --grupa nf4 <Armoury-*.log> (strumieniowo). NF4-0 linie paczki (brak - INFO, log sprzed paczki), NF4-1 diagnoza A7
+                    ("KS: A7 diagnoza (f4-pomiary)") w kazdej dobie kroku A7 od D (doba linii produkcji + 1, (doba - D) % 7 = 0) - brak 0, NF4-2 nacisk przy cenach gry =
+                    licznik reguly "przegladow ponad progiem" linii produkcji doby kroku (ta sama funkcja i te same bloki) - rozne 0, NF4-3/3b/3c wynik diagnozy (nacisk
+                    przy cenach gry / indeksie 1 / cenach startu / regule i wzorze Planu przy cenach cienia, zgodnosc z wyborem Planu, sklad dochodu, top 10 przejsc - INFO:
+                    nacisk przy cenach startu albo wzorze Planu wysoki = blad w Income, nie w cenach gry), NF4-4 dopisek "zajecia zamrozone" w kazdej linii KS produkcja
+                    z kluczem Switch Rule WYL - bez dopisku 0, NF4-5 regale wobec polki: sumy linii (wpisy = gora + dol + bez zmiany = polka < T* + > 2T* + pomiedzy + bez celu)
+                    - niezgodnych 0, NF4-5b gora/dol = licznik regali linii produkcji - rozne 0, NF4-5c ostatni cykl (INFO), NF4-6 nacisk ZW w linii "Zajecia wiosek (ZW)":
+                    nad progiem <= ocenionych - niezgodnych 0 (NF4-6b INFO), NF4-7/7b karawany: handel (sprzedaz - zakup), zold zaplacony, handel - zold, z towarem w jukach,
+                    doplaty, zysk do wlascicieli, reszta (INFO), NF4-7c koszt okna <= 35 ms i potkniecia 0, NF4-8 surowiec z polek (ruda, drewno): kontrola tozsamosci
+                    "polki - ksiega = bez wyjasnienia - zmiana pozostalych posiadaczy" = 0, NF4-8b odplyw z polek i kto zdejmuje (INFO), NF4-9 drewno w wozach: przebieg po
+                    taborach = posiadacz "wozy" ksiegi towarow (w 1%), NF4-9b/9c dokad, ile dob, miasta bez opalu i przyczyna (INFO), NF4-10 diagnoza A7 <= 200 ms
+                    i potkniecia 0, NF4-10b drewno w wozach <= 5 ms/d i potkniecia 0, NF4-11 "ERROR in StartCalibration.F4 / F4Pomiary. / MoneyLedger.F4" 0. Grupy nks
+                    (NKS-19c) i nzw (NZW-12) pokazuja to samo krotko (INFO). Log bez paczki (np. Armoury-2026-10-17_23-22-37.log): INFO / brak linii, bez wyjatku.
 --grupa npo       : (noc 17/18.10, paczka inwest - prace okregu gracza, AI WYLACZONE - Jeff 16.10; Armoury/src/DistrictWorks*.cs; projekt TESTS 1 i 3)
                     python -I tools/sprawdz_logi.py --grupa npo <Armoury-*.log> (strumieniowo). NPO-0 linia startu (klucz TAK, AI WYLACZONE, menu wpiete, opcje BEE 5/15/30
                     tys. ukryte, krok 112 wpiety), NPO-1 linie doby rozpoznane, NPO-2 wplacone = place + material (0), NPO-3 wyplacone = licznik pana + kiesa wsi, naruszenia 0,
@@ -37813,6 +37828,7 @@ def nks_main(logp, until=120, bdp=None):
     px_restart = None  # KS-R4 P7: doba restartu srednich cen
     r4c = {}           # KS-R4: dzien -> (zl pominiete w kroku 5, zakupow, linia)
     saves, cof, a7, villages, fam, zc0, rest = [], {}, {}, {}, {}, {}, {}
+    f4a7 = []   # f4-pomiary (NKS-19c): linie "KS: A7 diagnoza (f4-pomiary)"
     stum_sess = 0
     stum_hooks = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -38113,6 +38129,8 @@ def nks_main(logp, until=120, bdp=None):
                                         start_px[(k, p[0])] = float(p[1])
                                     except ValueError:
                                         pass
+                elif s.startswith(NF4_A7):
+                    f4a7.append(s)   # f4-pomiary (NKS-19c)
                 elif s.startswith(NKS_K + "produkcja (zastosowane)"):
                     mm = NKS_PROD.match(s)
                     if mm:
@@ -38810,6 +38828,13 @@ def nks_main(logp, until=120, bdp=None):
             rep.add("NKS-19b: prawdziwe zmiany A7 w oknie", f"zaczete {started} przy {nv} wsiach ({(100.0 * started / nv) if nv else 0:.2f}%)", "<= 1% wiosek", (started <= 0.01 * nv) if nv else None)
         else:
             rep.add("NKS-19: A7", "brak liczb nacisku w linii produkcji", "INFO", None)
+        # NKS-19c (f4-pomiary): jawny stan zajec i diagnoza A7 (szczegoly i progi - --grupa nf4)
+        if f4a7:
+            dz = nf4_parse_a7(f4a7[-1])
+            if dz:
+                fz = lambda v: f"{v[0]} ({v[1]}%)" if v else "-"
+                rep.add("NKS-19c: A7 diagnoza (f4-pomiary, ostatnia)", f"dzien {dz['day']} (D+{dz['k']}), regula {'WYLACZONA - zajecia zamrozone' if dz['rule_off'] else 'TAK'}; nacisk ceny gry {fz(dz['G'])}, "
+                        f"indeks 1 {fz(dz['B'])}, ceny startu {fz(dz['T'])}, wzor Planu {fz(dz['S2'])}", "INFO (progi - --grupa nf4)", None)
         # NKS-20 rozmiar arm_ks
         if saves:
             mx = max(saves, key=lambda x: x[1])
@@ -40852,6 +40877,12 @@ def nzw_main(logp):
     if wired:
         w = wired[-1]
         rep.add("NZW-11: ikona - tabliczka i dymek wpiete", w[:200], "tabliczka (AddPrimaryProductionIcon) i dymek", "tabliczka (AddPrimaryProductionIcon)" in w and "dymek" in w)
+    # NZW-12 (f4-pomiary): nacisk reguly ZW i przejscia "z -> na" (droga bez KS; progi - --grupa nf4)
+    zf = [g["raw"] for g in days if "nacisk ZW (f4-pomiary" in g.get("raw", "")]
+    zn = [x for x in zf if not re.search(r"nacisk ZW \(f4-pomiary[^)]*\): ocenionych 0,", x)]
+    if zf:
+        z = (zn or zf)[-1]
+        rep.add("NZW-12: nacisk ZW (f4-pomiary, ostatni krok z ocena)", z[z.index("nacisk ZW"):].split(" | ")[0][:400], "INFO (progi - --grupa nf4)", None)
     rep.show()
     return 0
 
@@ -40970,6 +41001,272 @@ def npo_main(logp):
     rep.add("NPO-8: potkniecia i ERROR paczki", f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
     rep.show()
     return 0
+
+
+# ============================================================ nf4 (noc 17/18.10, paczka f4-pomiary - koncowy przeglad ekonomii, pakiet P6: SAME POMIARY)
+NF4_A7 = "KS: A7 diagnoza (f4-pomiary) dzien"
+NF4_REG = "KS: regale wobec polki (f4-pomiary) dzien"
+NF4_CAR = "Karawany - wynik handlowy (f4-pomiary): dzien"
+NF4_SUR = "Surowiec z polek (f4-pomiary): dzien"
+NF4_WOOD = "Drewno w wozach wsi (f4-pomiary): dzien"
+NF4_ZW = "nacisk ZW (f4-pomiary"
+NF4_FROZEN = "zajecia zamrozone - regula A7 wylaczona"
+NF4_ERR = ("ERROR in StartCalibration.F4", "ERROR in F4Pomiary.", "ERROR in MoneyLedger.F4")
+NF4_PRESS = r"nacisk \(>= x[\d.]+\) (\d+) blokow \(([\d.-]+)%\)"
+NF4_A7_MS_MAX = 200.0        # diagnoza A7 - jeden przebieg po blokach raz na 7 dob (ms)
+NF4_WOOD_MS_MAX = 5.0        # drewno w wozach - ms na dobe (przebieg po taborach, wsiach i miastach)
+NF4_CAR_MS_MAX = 35.0        # wynik handlowy karawan - ms na okno 7 dob (przebieg po karawanach raz na dobe)
+
+
+def nf4_parse_a7(s):
+    """Linia "KS: A7 diagnoza (f4-pomiary)" -> slownik liczb (brak pola = None)."""
+    d = {"raw": s}
+    m = re.search(r"dzien (-?\d+) \| D (-?\d+) \(D\+(-?\d+)\) (krok reguly A7|doba D)", s)
+    if not m:
+        return None
+    d["day"], d["d0"], d["k"], d["step"] = int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4).startswith("krok")
+    d["rule_off"] = "regula: WYLACZONA" in s
+    d["n"] = num(r"blokow ocenionych (\d+)", s)
+
+    def press(prefix):
+        mm = re.search(re.escape(prefix) + r"[^|]*?" + NF4_PRESS, s)
+        return (int(mm.group(1)), mm.group(2)) if mm else None
+    d["G"] = press("| ceny gry")
+    d["Gn"] = num(r"\| ceny gry [^:]*: ocenionych (\d+)", s)
+    d["Gfloor"] = num(r"\| ceny gry [^|]*na podlodze 0\.02 (\d+)", s)
+    mq = re.search(r"dochod biezacy q10/med/q90 ([-\d./]+)", s)
+    d["Gq"] = mq.group(1) if mq else None
+    d["ratio"] = (num(r"iloraz najlepsze/max\(0\.02, biezace\) med ([\d.]+)", s, float), num(r"iloraz najlepsze/max\(0\.02, biezace\) med [\d.]+ q90 ([\d.]+)", s, float))
+    d["B"] = press("| przy indeksie 1")
+    d["T"] = press("| przy cenach startu")
+    d["S1"] = press("| regula przy cenach cienia Planu")
+    d["S2"] = press("| wzor Planu przy cenach cienia")
+    m2 = re.search(r"wybor Planu z premia mapy x[\d.]+ (\d+) z (\d+)", s)
+    d["agree"] = (int(m2.group(1)), int(m2.group(2))) if m2 else None
+    m3 = re.search(r"\| przejscia \(ceny gry, top 10, blokow/rak\): ([^|]*)", s)
+    d["top"] = m3.group(1).strip() if m3 else "-"
+    m4 = re.search(r"\| sklad dochodu [^:]*: biezace L\*v (-?\d+), koszt K (-?\d+), renta (-?\d+); najlepsze inne L\*v (-?\d+), koszt K (-?\d+), renta (-?\d+)", s)
+    d["sklad"] = tuple(int(x) for x in m4.groups()) if m4 else None
+    d["ms"] = num(r"\| czas ([\d.]+) ms, potkniecia \d+\.$", s, float)
+    d["st"] = num(r"\| czas [\d.]+ ms, potkniecia (\d+)\.$", s)
+    return d
+
+
+def nf4_main(logp):
+    """nf4 (noc 17/18.10, paczka f4-pomiary - koncowy przeglad ekonomii, pakiet P6; SAME POMIARY, zadna liczba gry sie nie zmienia). Wejscie: log Armoury (strumieniowo).
+    Linie: "KS: A7 diagnoza (f4-pomiary)", "KS: regale wobec polki (f4-pomiary)", dopisek "zajecia zamrozone" w "KS: produkcja", dopisek "nacisk ZW (f4-pomiary" w linii
+    "Zajecia wiosek (ZW)", "Karawany - wynik handlowy (f4-pomiary)", "Surowiec z polek (f4-pomiary)", "Drewno w wozach wsi (f4-pomiary)". Progi NF4-0..NF4-11 - opis w naglowku
+    pliku (--grupa nf4). Log bez paczki: INFO, bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NF4-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    a7, a7bad, reg, car, sur, wood, zw = [], 0, [], [], [], [], []
+    prod = {}            # dzien linii produkcji KS -> (przegladow ponad progiem, klucz, regale w gore, w dol, czy dopisek zamrozone)
+    errs = 0
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            m = TS.match(ln.rstrip("\r\n"))
+            s = m.group(2) if m else ln.rstrip("\r\n")
+            if s.startswith(NF4_A7):
+                d = nf4_parse_a7(s)
+                if d:
+                    a7.append(d)
+                else:
+                    a7bad += 1
+            elif s.startswith(NF4_REG):
+                reg.append(s)
+            elif s.startswith(NF4_CAR):
+                car.append(s)
+            elif s.startswith(NF4_SUR):
+                sur.append(s)
+            elif s.startswith(NF4_WOOD):
+                wood.append(s)
+            elif s.startswith("KS: produkcja (zastosowane) dzien"):
+                dd = num(r"dzien (-?\d+)", s)
+                ma = NKS_A7.search(s)
+                if dd is not None and ma:
+                    ru = num(r"rece przy zlozu w gore (\d+)", s); rd = num(r"rece przy zlozu w gore \d+, w dol (\d+)", s)
+                    prod[dd] = (int(ma.group("p")), ma.group("k"), ru, rd, NF4_FROZEN in s)
+            elif s.startswith("Zajecia wiosek (ZW): dzien") and NF4_ZW in s:
+                zw.append(s)
+            elif s.startswith(NF4_ERR):
+                errs += 1
+    print(f"plik: {logp} | A7 diagnoza {len(a7)} (nierozpoznanych {a7bad}), regale {len(reg)}, linii KS produkcja z A7 {len(prod)}, ZW z dopiskiem {len(zw)}, "
+          f"karawany {len(car)}, surowiec {len(sur)}, drewno w wozach {len(wood)}, ERROR {errs}")
+    any_f4 = a7 or reg or car or sur or wood or zw or a7bad
+    if not any_f4:
+        rep.add("NF4-0: linie paczki f4-pomiary", "brak w logu", "INFO (log sprzed paczki f4-pomiary albo klucze Measure ... wylaczone)", None)
+        if prod:
+            last = max(prod)
+            rep.add("NF4-4: stan zajec pod KS (log sprzed paczki)", f"klucz Switch Rule {prod[last][1]}, przegladow ponad progiem {prod[last][0]} (dzien {last})", "INFO", None)
+        rep.show()
+        return 0
+    rep.add("NF4-0: linie paczki f4-pomiary", f"A7 {len(a7)}, regale {len(reg)}, ZW {len(zw)}, karawany {len(car)}, surowiec {len(sur)}, drewno {len(wood)}", "INFO", None)
+    # NF4-1: diagnoza w kazdej dobie kroku A7 od D (doba linii produkcji = doba kroku - 1)
+    if a7:
+        d0 = a7[-1]["d0"]
+        steps = [d for d in prod if d + 1 > d0 and (d + 1 - d0) % 7 == 0]
+        got = {d["day"] for d in a7 if d["step"]}
+        miss = [d + 1 for d in steps if d + 1 not in got]
+        rep.add("NF4-1: diagnoza A7 w kazdej dobie kroku (co 7 dob od D)", f"krokow w logu (z linia produkcji) {len(steps)}, diagnoz {len(got)}, brak {len(miss)}" + (f" ({miss[:5]})" if miss else "")
+                + f"; doba D {'TAK' if any(not d['step'] for d in a7) else 'brak (wczytanie po D)'}", "brak 0", len(miss) == 0 if steps else None)
+    else:
+        rep.add("NF4-1: diagnoza A7", "brak linii" + (f" (nierozpoznanych {a7bad})" if a7bad else ""), "INFO (KS nie zastosowany albo klucz Measure Craft Rule wylaczony)", None if not a7bad else False)
+    # NF4-2: nacisk przy cenach gry = licznik reguly (ta sama funkcja, te same bloki)
+    pairs = [(d["day"], d["G"][0], prod[d["day"] - 1][0]) for d in a7 if d["step"] and d["G"] and (d["day"] - 1) in prod]
+    if pairs:
+        bad = [p for p in pairs if p[1] != p[2]]
+        rep.add("NF4-2: nacisk przy cenach gry = licznik reguly A7 (przegladow ponad progiem)", f"dob {len(pairs)}, rozne {len(bad)}" + (f" (np. dzien {bad[0][0]}: {bad[0][1]} wobec {bad[0][2]})" if bad else f" (ostatni {pairs[-1][1]})"),
+                "rozne 0 (diagnoza liczy dokladnie to co regula)", len(bad) == 0)
+    else:
+        rep.add("NF4-2: nacisk przy cenach gry = licznik reguly", "brak par (diagnoza i linia produkcji tej samej doby)", "INFO", None)
+    # NF4-3: diagnoza - wynik (INFO): czy przy cenach startu regula zgadza sie z Planem
+    if a7:
+        d = [x for x in a7 if x["step"]][-1] if any(x["step"] for x in a7) else a7[-1]
+
+        def pct(v):
+            return f"{v[0]} ({v[1]}%)" if v else "-"
+        txt = (f"dzien {d['day']} (D+{d['k']}): blokow {d['n']}; nacisk - ceny gry {pct(d['G'])}, indeks 1 {pct(d['B'])}, ceny startu {pct(d['T'])}, regula przy cenach cienia {pct(d['S1'])}, "
+               f"wzor Planu przy cenach cienia {pct(d['S2'])}" + (f", biezace = wybor Planu {d['agree'][0]} z {d['agree'][1]}" if d["agree"] else "")
+               + (f"; iloraz med {d['ratio'][0]} q90 {d['ratio'][1]}" if d["ratio"][0] is not None else "") + f"; na podlodze 0.02 (ceny gry) {d['Gfloor']}"
+               + (f"; sklad biezace L*v/K/renta {d['sklad'][0]}/{d['sklad'][1]}/{d['sklad'][2]}, najlepsze {d['sklad'][3]}/{d['sklad'][4]}/{d['sklad'][5]}" if d["sklad"] else ""))
+        rep.add("NF4-3: diagnoza A7 (przeglad: czy przy cenach startu regula zgadza sie z Planem)", txt, "INFO (nacisk przy cenach startu / wzorze Planu wysoki = blad w Income, nie w cenach)", None)
+        rep.add("NF4-3b: przejscia A7 (ceny gry, top 10, blokow/rak)", d["top"][:400], "INFO", None)
+        first = a7[0]
+        if first is not d:
+            rep.add("NF4-3c: pierwsza diagnoza w logu", f"dzien {first['day']} (D+{first['k']}, {'krok' if first['step'] else 'doba D'}): nacisk ceny gry {pct(first['G'])}, ceny startu {pct(first['T'])}, wzor Planu {pct(first['S2'])}", "INFO", None)
+    # NF4-4: jawny stan "zajecia zamrozone" w linii produkcji KS przy kluczu Switch Rule wylaczonym
+    if prod:
+        off = [dd for dd, v in prod.items() if v[1] == "WYLACZONY"]
+        if a7 or zw or reg:
+            missing = [dd for dd in off if not prod[dd][4]]
+            rep.add("NF4-4: 'zajecia zamrozone' w linii KS produkcja (Switch Rule wylaczony)", f"linii z kluczem WYL {len(off)}, bez dopisku {len(missing)}", "bez dopisku 0 (klucz Measure Craft Rule)",
+                    len(missing) == 0 if off else None)
+    # NF4-5: regale wobec polki - sumy i zgodnosc z licznikiem regali linii produkcji
+    if reg:
+        okc, badc, cross, crossbad, last = 0, 0, 0, 0, None
+        for s in reg:
+            m = re.search(r"razem: wpisow (\d+), w gore (\d+), w dol (\d+), bez zmiany (-?\d+); polka < T\* (\d+), > 2T\* (\d+), pomiedzy (\d+), bez celu (\d+); w gore przy polce > 2T\* (\d+), "
+                          r"w dol przy polce < T\* (\d+); zgodne z polka [^)]*\) (\d+) z (\d+) wpisow z celem", s)
+            if not m:
+                badc += 1
+                continue
+            v = [int(x) for x in m.groups()]
+            if v[0] == v[1] + v[2] + v[3] and v[0] == v[4] + v[5] + v[6] + v[7] and v[11] == v[4] + v[5] + v[6]:
+                okc += 1
+            else:
+                badc += 1
+            dd = num(r"dzien (-?\d+)", s)
+            if dd is not None and (dd - 1) in prod and prod[dd - 1][2] is not None:
+                cross += 1
+                if prod[dd - 1][2] != v[1] or prod[dd - 1][3] != v[2]:
+                    crossbad += 1
+            last = (dd, v)
+        rep.add("NF4-5: regale wobec polki - sumy linii (wpisy = gora + dol + bez zmiany = polka < T* + > 2T* + pomiedzy + bez celu)", f"linii {len(reg)}, zgodnych {okc}, niezgodnych {badc}", "niezgodnych 0", badc == 0)
+        if cross:
+            rep.add("NF4-5b: regale - w gore / w dol = licznik regali linii produkcji", f"dob {cross}, rozne {crossbad}", "rozne 0", crossbad == 0)
+        if last:
+            dd, v = last
+            rep.add("NF4-5c: regale wobec polki (ostatni cykl)", f"dzien {dd}: wpisow {v[0]}, w gore {v[1]}, w dol {v[2]}; polka < T* {v[4]}, > 2T* {v[5]}, bez celu {v[7]}; w gore przy pelnej {v[8]}, w dol przy pustej {v[9]}; "
+                    f"zgodne z polka {v[10]} z {v[11]} wpisow z celem", "INFO (prog z polki zamiast bezwzglednego indeksu - decyzja po pomiarze)", None)
+    else:
+        rep.add("NF4-5: regale wobec polki", "brak linii", "INFO (cykl regali co 28 dob od D albo klucz Measure Regale Shelf wylaczony)", None)
+    # NF4-6: ZW - nacisk i przejscia (droga bez KS)
+    if zw:
+        badz, lastn = 0, None
+        for s in zw:
+            m = re.search(r"nacisk ZW \(f4-pomiary[^)]*\): ocenionych (\d+).*?nad progiem x[\d.]+ (\d+) wiosek", s)
+            if not m:
+                badz += 1
+                continue
+            n, p = int(m.group(1)), int(m.group(2))
+            if p > n:
+                badz += 1
+            if n > 0:
+                lastn = s[s.index("nacisk ZW"):].split(" | ")[0][:400]
+        rep.add("NF4-6: nacisk ZW w linii 'Zajecia wiosek (ZW)' (nad progiem <= ocenionych)", f"linii {len(zw)}, niezgodnych {badz}", "niezgodnych 0", badz == 0)
+        rep.add("NF4-6b: nacisk ZW (ostatni krok z wioskami bez KS)", lastn or "zadnej oceny (wszystkie okregi pod KS albo bez kroku)", "INFO", None)
+    # NF4-7: karawany - wynik handlowy
+    if car:
+        lastc = car[-1]
+        g = lambda pat: num(pat, lastc, int)
+        trade = g(r"-> wynik handlu ([+-]?\d+) ")
+        paid = g(r"zaplacony (\d+) \(")
+        tw = g(r"\| wynik handlu - zold zaplacony ([+-]?\d+) ")
+        twg = g(r"z towarem w jukach \(handel \+ zmiana towaru - zold\) ([+-]?\d+) ")
+        top = g(r"doplaty notabli do 5000 ([+-]?\d+) ")
+        own = g(r"zysk do wlascicieli \(E3-T2\) ([+-]?\d+) ")
+        rest = g(r"\+ reszta ([+-]?\d+) ")
+        ms = [num(r"\| czas ([\d.]+) ms", s, float) or 0.0 for s in car]
+        sts = sum(num(r"potkniecia (\d+)\.$", s, int, 0) or 0 for s in car)
+        rep.add("NF4-7: karawany - wynik handlowy (ostatnie okno, na dobe)", f"handel (sprzedaz - zakup) {trade}, zold zaplacony {paid}, handel - zold {tw}, z towarem w jukach {twg}; doplaty notabli {top}, zysk do wlascicieli {own}, "
+                f"reszta okna {rest}", "INFO (przeglad: strata karawan to marza handlu czy zold - decyzja po pomiarze)", None)
+        allt = [num(r"-> wynik handlu ([+-]?\d+) ", s, int) for s in car]
+        allw = [num(r"\| wynik handlu - zold zaplacony ([+-]?\d+) ", s, int) for s in car]
+        allt = [x for x in allt if x is not None]; allw = [x for x in allw if x is not None]
+        if allt:
+            rep.add("NF4-7b: karawany - srednia wszystkich okien (na dobe)", f"okien {len(allt)}: handel {sum(allt) / len(allt):+.0f}, handel - zold {sum(allw) / max(1, len(allw)):+.0f}", "INFO", None)
+        rep.add("NF4-7c: karawany - koszt i potkniecia", f"czas okna najwyzej {max(ms):.2f} ms, potkniecia {sts}", f"<= {NF4_CAR_MS_MAX:.0f} ms, potkniecia 0", max(ms) <= NF4_CAR_MS_MAX and sts == 0)
+    else:
+        rep.add("NF4-7: karawany - wynik handlowy", "brak linii", "INFO (okno 7 dob albo klucz Measure Caravan Trade wylaczony)", None)
+    # NF4-8: surowiec z polek - tozsamosc ksiegi (kontrola 0) i odplyw z polek
+    if sur:
+        badk, nk, lasts = 0, 0, {}
+        for s in sur:
+            k = num(r"\(kontrola ([+-]?\d+)\)", s, int)
+            item = num(r"dzien -?\d+ - (\w+) \|", s, str)
+            if k is None:
+                continue
+            nk += 1
+            if k != 0:
+                badk += 1
+            lasts[item] = s
+        rep.add("NF4-8: surowiec z polek - polki - ksiega = bez wyjasnienia - zmiana pozostalych posiadaczy (kontrola)", f"linii {nk}, kontrola != 0: {badk}", "0 (tozsamosc ksiegi towarow)", badk == 0 if nk else None)
+        for item, s in sorted(lasts.items()):
+            gap = num(r"polki - ksiega ([+-]?\d+)", s, int); u = num(r"= bez wyjasnienia ([+-]?\d+) - zmiana", s, int)
+            oth = re.search(r"\| pozostali posiadacze \(koniec okna, zmiana\): ([^|]*)", s)
+            sink = re.search(r"\| zuzycie wedlug ujscia \(suma okna, kto zdejmuje\): ([^|]*)", s)
+            rep.add(f"NF4-8b: {item} - odplyw z polek (ostatnie okno)", f"polki - ksiega {gap} (bez wyjasnienia {u}); posiadacze: {(oth.group(1).strip() if oth else '-')[:200]}; zuzycie: {(sink.group(1).strip() if sink else '-')[:220]}",
+                    "INFO (kto zdejmuje z polek poza ksiega KS)", None)
+    else:
+        rep.add("NF4-8: surowiec z polek", "brak linii", "INFO (ksiega towarow wylaczona, okno 7 dob albo klucz Measure Iron Wood Flow wylaczony)", None)
+    # NF4-9: drewno w wozach - przebieg po taborach = posiadacz "wozy" ksiegi; przyczyny braku opalu
+    if wood:
+        badw, nw = 0, 0
+        for s in wood:
+            mine = num(r"drewna w wozach (\d+) \(ksiega: wozy (-?\d+)", s, int)
+            led = num(r"drewna w wozach \d+ \(ksiega: wozy (-?\d+)", s, int)
+            if mine is None or led is None or led < 0:
+                continue
+            nw += 1
+            if abs(mine - led) > max(5, 0.01 * max(mine, led)):
+                badw += 1
+        rep.add("NF4-9: drewno w wozach - przebieg po taborach = posiadacz 'wozy' ksiegi towarow", f"linii {nw}, rozne ponad 1%: {badw}", "0", badw == 0 if nw else None)
+        s = wood[-1]
+        st = re.search(r"\| stan: ([^|]*)", s); ag = re.search(r"\| wiek ladunku ([^|]*)", s); ok = re.search(r"\| okno: ([^|]*)", s); df = re.search(r"\| miasta bez opalu ([^|]*)", s)
+        rep.add("NF4-9b: drewno w wozach (ostatnie okno) - dokad i ile dob", f"stan: {(st.group(1).strip() if st else '-')[:260]}; wiek {(ag.group(1).strip() if ag else '-')[:160]}; {(ok.group(1).strip() if ok else '-')[:220]}", "INFO", None)
+        rep.add("NF4-9c: miasta bez opalu - przyczyna (ostatnie okno)", (df.group(1).strip() if df else "-")[:420], "INFO (czemu drewno nie trafia do miast z pusta polka ponad zapas rzemiosla)", None)
+        wms = [num(r"\(([\d.]+) ms/d\)", x, float) or 0.0 for x in wood]
+        wst = [num(r"potkniecia (\d+) \(sesja", x, int) or 0 for x in wood]
+        rep.add("NF4-10b: drewno w wozach - koszt i potkniecia", f"najwyzej {max(wms):.2f} ms/d, potkniecia {sum(wst)}", f"<= {NF4_WOOD_MS_MAX:.0f} ms/d, potkniecia 0", max(wms) <= NF4_WOOD_MS_MAX and sum(wst) == 0)
+    else:
+        rep.add("NF4-9: drewno w wozach", "brak linii", "INFO (ksiega towarow wylaczona, okno 7 dob albo klucz Measure Iron Wood Flow wylaczony)", None)
+    # NF4-10: koszt diagnozy A7 i potkniecia
+    if a7:
+        ms = [d["ms"] for d in a7 if d["ms"] is not None]
+        st = sum(d["st"] or 0 for d in a7)
+        rep.add("NF4-10: diagnoza A7 - koszt i potkniecia", f"najwyzej {max(ms) if ms else 0:.1f} ms (mediana {st_median(ms):.1f}), potkniecia {st}", f"<= {NF4_A7_MS_MAX:.0f} ms, potkniecia 0",
+                (max(ms) if ms else 0) <= NF4_A7_MS_MAX and st == 0)
+    # NF4-11: bledy paczki
+    rep.add("NF4-11: ERROR paczki (StartCalibration.F4, F4Pomiary, MoneyLedger.F4)", str(errs), "0", errs == 0)
+    rep.show()
+    return 0
+
+
+def st_median(v):
+    return st.median(v) if v else 0.0
 
 
 def main(argv):
@@ -41209,6 +41506,8 @@ def main(argv):
         return nherby_main(logp)   # nherby (noc 17/18.10, sw-herby): proporczyki wiosek na teksturach 512x512 z kluczem ArmPen_, zwalnianie dalekich, herb zastepczy 0 (MapVillagePennants.cs)
     if group == "nzapis" and logp:
         return nzapis_main(logp)   # nzapis (noc 17/18.10, zapis-d4): rozmiar kluczy w zapisie, pakowanie arm_aiwear / arm_recruitkit pod "_z", ciche logi wiecej (SaveSize.cs, LogGate.cs)
+    if group == "nf4" and logp:
+        return nf4_main(logp)   # nf4 (noc 17/18.10, f4-pomiary): diagnoza A7 i zajecia zamrozone, regale wobec polki, nacisk ZW, wynik handlowy karawan, zelazo i drewno z polek, drewno w wozach (same pomiary)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2
