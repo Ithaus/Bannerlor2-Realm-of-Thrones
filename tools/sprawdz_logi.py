@@ -41115,7 +41115,8 @@ def nf4_main(logp):
     else:
         rep.add("NF4-1: diagnoza A7", "brak linii" + (f" (nierozpoznanych {a7bad})" if a7bad else ""), "INFO (KS nie zastosowany albo klucz Measure Craft Rule wylaczony)", None if not a7bad else False)
     # NF4-2: nacisk przy cenach gry = licznik reguly (ta sama funkcja, te same bloki)
-    pairs = [(d["day"], d["G"][0], prod[d["day"] - 1][0]) for d in a7 if d["step"] and d["G"] and (d["day"] - 1) in prod]
+    # tylko doby z linia produkcji takze dzien wczesniej (licznik reguly z jednej doby - ciche logi w grze pisza linie co N dob i licznik zbiera kilka krokow)
+    pairs = [(d["day"], d["G"][0], prod[d["day"] - 1][0]) for d in a7 if d["step"] and d["G"] and (d["day"] - 1) in prod and (d["day"] - 2) in prod]
     if pairs:
         bad = [p for p in pairs if p[1] != p[2]]
         rep.add("NF4-2: nacisk przy cenach gry = licznik reguly A7 (przegladow ponad progiem)", f"dob {len(pairs)}, rozne {len(bad)}" + (f" (np. dzien {bad[0][0]}: {bad[0][1]} wobec {bad[0][2]})" if bad else f" (ostatni {pairs[-1][1]})"),
@@ -41159,7 +41160,7 @@ def nf4_main(logp):
             else:
                 badc += 1
             dd = num(r"dzien (-?\d+)", s)
-            if dd is not None and (dd - 1) in prod and prod[dd - 1][2] is not None:
+            if dd is not None and (dd - 1) in prod and (dd - 2) in prod and prod[dd - 1][2] is not None:
                 cross += 1
                 if prod[dd - 1][2] != v[1] or prod[dd - 1][3] != v[2]:
                     crossbad += 1
