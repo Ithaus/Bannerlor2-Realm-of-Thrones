@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -9,9 +10,22 @@ namespace CrashScribe
     /// <summary>Gdzie bylismy, kiedy sie posypalo. Bez tego raport jest polowa raportu.</summary>
     internal static class GameState
     {
+        // f13-doba (Armoury, klucz DayTickSmooth): watek zapisu logu Armoury w tle (Armoury Log.EnsureWorker) nazywa sie tak. Blad IO na nim (plik logu
+        // zablokowany przez antywirusa / indeksator, pelny dysk) budzi FirstChanceException na TYM watku, a Report wola Describe - odczyt obiektow gry
+        // (Campaign, Hero, Settlement, MobileParty, TextObject.ToString z MBTextManager) poza watkiem gry w trakcie jego pracy. Na tym jednym watku stan gry
+        // pomijamy (reszta raportu - slad, winni - bez zmian). Watek pracuje tylko przy wlaczonym DayTickSmooth, wiec klucz wylaczony = stara droga.
+        // Inne watki bez zmian: Watchdog czyta stan ze swojego watku celowo (watek gry stoi). Nazwy nie zmieniac bez Armoury Log.cs.
+        internal const string ArmouryLogThread = "Armoury log";
+
         internal static string Describe()
         {
             var sb = new StringBuilder();
+            try
+            {
+                var t = Thread.CurrentThread;
+                if (t != null && t.Name == ArmouryLogThread) return "  (Armoury log writer thread - game state not read off the game thread)";
+            }
+            catch { }
             try
             {
                 var c = Campaign.Current;

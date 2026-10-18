@@ -164,6 +164,7 @@ namespace Armoury
                             try { AppDomain.CurrentDomain.ProcessExit += delegate { DrainNow(); }; } catch { }
                             try { AppDomain.CurrentDomain.UnhandledException += delegate { DrainNow(); }; } catch { }
                         }
+                        // nazwe "Armoury log" sprawdza CrashScribe GameState.Describe: blad IO tego watku (FirstChance -> Scribe.Report) nie czyta stanu gry poza watkiem gry
                         var nt = new Thread(QLoop) { IsBackground = true, Name = "Armoury log" };
                         nt.Start();
                         if (t != null) Interlocked.Increment(ref _sRestarts);
