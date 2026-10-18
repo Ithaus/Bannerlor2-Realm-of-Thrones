@@ -818,6 +818,10 @@ namespace Armoury
             // "od dawna", wiesci od zera; starsza DLL klucza nie czyta. Klucz wylaczony - "" (nic). Reset przed SyncData (konstruktor)
             try { string pl = dataStore.IsSaving ? Rumours.Export() : null; SaveText.Sync(dataStore, "arm_rumours", ref pl); if (dataStore.IsLoading) Rumours.Import(pl); }
             catch (Exception e) { Log.Error("SyncData.arm_rumours", e); }
+            // KS r4 (r4-ceny): stan cen i sterowania rynku (doba restartu srednich cen, czynnik popytu targu do 1.25, brak miast C1) - osobny klucz, starsza DLL go pomija;
+            // brak klucza (stary zapis) = stan od zera (po D+14 srednie cen uznane za juz zerowane)
+            try { string k4 = dataStore.IsSaving ? StartCalibration.ExportR4c() : null; SaveText.Sync(dataStore, "arm_ks_r4c", ref k4); if (dataStore.IsLoading) StartCalibration.ImportR4c(k4); }
+            catch (Exception e) { Log.Error("SyncData.arm_ks_r4c", e); }
         }
 
         public override void RegisterEvents()

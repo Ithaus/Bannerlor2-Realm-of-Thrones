@@ -56,10 +56,15 @@ namespace Armoury
         public Dictionary<string, bool[]> LandGlut;                   // kraina -> [NG] nadmiar krainy rosnacy (potrojna waga w poprawce G '+')
         public double[] MarketFactor;                                 // [NM * NG] czynnik popytu targu (P4; null - MarketMargin dla wszystkich)
         public Dictionary<string, double[]> TownOne;                  // miasto -> [NG] kg/d prawdziwego odbioru panow i dworow w miescie (P3 - popyt miasta reguly zasiegu)
+        // KS r4 (paczka r4-ceny, klucz Ks Gap Margin): sufit czynnika popytu targu w kroku 8 (luka zapasu P4 i granice C3 do 1.25); bez klucza 1.10 - jak dotad.
+        // Czynnik dziala tylko w kroku 8 (rece z pracy domowej - poprawka G), nie w popycie rownowagi (zajecia Planu wlaczenia bez trwalego przechylu na luke polek)
+        public double MarketFactorMax = 1.10;
+        // KS r4 (r4-ceny P8, klucz Ks Cloth Demand): 1:1 plotna, sukna i skory takze z odziezy wojska, warsztatow zbrojnych i napraw kowali (kolumna ksiegi KsCloth)
+        public bool ClothDemand;
     }
 
     /// <summary>Towar gry: kg sztuki, wartosc, zuzycie dnia w sztukach (wojsko, zamki, dwory, budowy, warsztaty, razem, mieszczanie).</summary>
-    internal sealed class KsItem { public double Kg, Val, Army, Cast, Court, Bud, Ws, Cons, Town; }
+    internal sealed class KsItem { public double Kg, Val, Army, Cast, Court, Bud, Ws, Cons, Town, Cloth; }   // Cloth: KS r4 P8 - odziez wojska + warsztaty zbrojne + naprawy kowali (szt./d)
 
     /// <summary>Osada do popytu: kraina (kultura z kalibracji), rynek 0 Westeros / 1 Essos, ludzie, potrzeby [NN] w kg (napoje l) na dobe.</summary>
     internal class KsSettlement
@@ -647,6 +652,9 @@ namespace Armoury
             double pcs = it.Army + it.Cast + it.Court;
             if (id == "hardwood" || id == "clay" || id == "limestone" || id == "marble" || id == "tools" || id == "planks") pcs += it.Bud;
             if (id == "iron" || id == "hardwood" || id == "silver") pcs += it.Ws;
+            // KS r4 P8 (klucz Ks Cloth Demand): plotno, sukno i skora - takze odziez wojska (150), warsztaty zbrojne i naprawy kowali (135); rzemioslo miasta (148) bierze len,
+            // welne i skory na plotno/sukno/skore - jest juz we wsadzie tych wyrobow (x LinenFlax / FeltWool / LeatherHide), wiec nie dopisane drugi raz
+            if (x.In.ClothDemand && (id == "linen" || id == "felt" || id == "leather")) pcs += Math.Max(0.0, it.Cloth);
             return pcs * x.In.Sigma * it.Kg;
         }
 
@@ -1213,9 +1221,11 @@ namespace Armoury
             M.Margin = margin;
             // KS-R3 P4: czynnik popytu targu na towar (sterowanie rynku po D+14, 0.85-1.10); bez niego - margines dla wszystkich (jak dotad)
             var mfac = new double[NGm];
+            // KS r4 (r4-ceny, klucz Ks Gap Margin): sufit czynnika 1.25 (luka zapasu P4, granice C3 do D+28) - popyt na zapas polek tylko tu (rece z pracy domowej), nie w rownowadze
+            double fMax = inp.MarketFactorMax > 1.10 && inp.MarketFactorMax <= 1.25 ? inp.MarketFactorMax : 1.10;
             for (int i = 0; i < NGm; i++)
             {
-                double f = inp.MarketFactor != null && i < inp.MarketFactor.Length && inp.MarketFactor[i] > 0 && !double.IsNaN(inp.MarketFactor[i]) ? Math.Max(0.85, Math.Min(1.10, inp.MarketFactor[i])) : margin;
+                double f = inp.MarketFactor != null && i < inp.MarketFactor.Length && inp.MarketFactor[i] > 0 && !double.IsNaN(inp.MarketFactor[i]) ? Math.Max(0.85, Math.Min(fMax, inp.MarketFactor[i])) : margin;
                 mfac[i] = f;
                 int m = i / KsTab.NG;
                 if (x.Dm[i] > 1.0 && !KsTab.RegGoodMask[i % KsTab.NG]) { if (f < M.MfMin[m]) M.MfMin[m] = f; if (f > M.MfMax[m]) M.MfMax[m] = f; }

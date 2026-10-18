@@ -93,6 +93,7 @@ namespace Armoury
             CraftsReset();
             MoneyReset();
             R3Reset();
+            R4cReset();                                           // KS r4 (r4-ceny): ceny i sterowanie rynku
         }
 
         private static void Stumble(string where, Exception e)
@@ -278,6 +279,7 @@ namespace Armoury
             {
                 EnsureLand();
                 ResolvePending();
+                try { R4cResolve(); } catch (Exception e) { Stumble("R4cResolve", e); }   // KS r4 (r4-ceny): stan arm_ks_r4c (po arm_ks i arm_ks_r3)
                 if (_state == StateApplied) ResolveLive();
                 uint lay; bool lm = LandReady && LayoutMatches(out lay);
                 var s = Settings.Current;
@@ -377,6 +379,7 @@ namespace Armoury
                              + " | tabela dob KS-H " + dMs.ToString("0.00", Inv) + " ms (" + dCalls + " wywolan drogi, " + KsFoodCarts.DaysPairsDone + "/" + KsFoodCarts.DaysPairs + " par)"
                              + " | potkniecia dzis " + _stumblesDay + " (sesja " + _stumbles + ").");
                     if (day % 7 == 0) { try { Log.Info(PriceLine(day)); } catch (Exception e) { Stumble("PriceLine", e); } }
+                    if (day % 7 == 0) { try { string pn = PriceNowLine(day); if (pn != null) Log.Info(pn); string rl = R4cLine(day); if (rl != null) Log.Info(rl); } catch (Exception e) { Stumble("R4cLines", e); } }   // KS r4 (r4-ceny): ceny chwilowe (NKS-7d), linia paczki
                     try { string ml = MarketLine(); if (ml != null) Log.Info(ml); } catch (Exception e) { Stumble("MarketLine", e); }
                 }
             }

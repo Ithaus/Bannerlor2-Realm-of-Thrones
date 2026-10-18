@@ -218,6 +218,7 @@ namespace Armoury
             for (int i = 0; i < c.Length; i++) c[i] = Math.Max(0.0, c[i] - _p2Mk[i]);       // bez drabiny 2 wsi (jednorazowe wydawanie oszczednosci)
             Array.Clear(_p2Mk, 0, _p2Mk.Length);
             for (int i = 0; i < c.Length; i++) { _c28[i] = _cN <= 1 ? c[i] : _c28[i] + (c[i] - _c28[i]) * w; _u28[i] = _cN <= 1 ? u[i] : _u28[i] + (u[i] - _u28[i]) * w; }
+            try { R4cUnmetDaily(w, _cN <= 1); } catch (Exception e) { Stumble("R4cUnmetDaily", e); }   // KS r4 C1 (r4-ceny, klucz Ks Ctl Per Town): brak miasto po miescie
         }
 
         /// <summary>Czynnik popytu targu na Plan (BuildInput): do D+14 - 1.03 (polki); od D+14 (klucz Ks Market Control) k = (zuzycie + brak) x (1 + luka) / popyt targu Planu,
@@ -226,7 +227,7 @@ namespace Armoury
         private static double[] MarketControl(int day, KsInput inp)
         {
             if (!SwMarketControl) { _ctlLine = null; _landGlut.Clear(); return null; }      // bez klucza - margines popytu targu jak runda 3 (MarketMargin)
-            _mfStage = null;
+            _mfStage = null; _gapLine = null;
             // recenzja runda 3 (wazne): planista tylko w oknie startu - po D+49 czynnik wraca do 1 przez 2 Plany (rece przesuwa dalej regula zysku i ceny), ciecie nadmiaru krain
             // tez schodzi do 1; bez tego co tydzien rece pracy domowej i koszyki szlyby za sterowaniem bez kosztu i czasu zmiany (decyzja Jeffa 16.10 - zmiana powoli i z kosztem)
             bool after = _state == StateApplied && DDay >= 0 && day > DDay + CtlEnd;
@@ -234,7 +235,8 @@ namespace Armoury
             var mf = new double[2 * KsTab.NG];
             var sb = new StringBuilder(1500);
             sb.Append(PK).Append("sterowanie rynku doba ").Append(day).Append(ctl ? " | czynnik popytu targu z zuzycia i braku (" + Math.Min(28, _cN) + " dob od konca rampy " + _cRestart + ")"
-                : after ? " | po D+" + CtlEnd + ": koniec sterowania - czynnik wraca do 1 (2 Plany), dalej regula zysku i ceny" : " | do D+14 + " + CtlMinDays + " dob pelnej lambdy albo bez klucza Ks Market Control: czynnik 1.03 (polki startu)");
+                : after ? " | po D+" + CtlEnd + ": koniec sterowania - czynnik wraca do 1 (2 Plany), dalej regula zysku i ceny" : " | do D+14 + " + CtlMinDays + " dob pelnej lambdy albo bez klucza Ks Market Control: czynnik 1.03 (polki startu)"
+                  + (R4cGapPhase(day) ? "; klucz Ks Gap Margin - jedzenie z luki zapasu polek (linia 'KS: luka zapasu')" : ""));
             for (int i = 0; i < mf.Length; i++) mf[i] = ShelfMargin;
             if (after)
             {
@@ -250,7 +252,12 @@ namespace Armoury
                 _ctlLine = sb.Append('.').ToString();
                 return mf;
             }
-            if (!ctl) { _ctlLine = sb.Append('.').ToString(); LandGlutWeekly(day, false); return mf; }
+            if (!ctl)
+            {
+                // KS r4 P4 (r4-ceny, klucz Ks Gap Margin): przed sterowaniem czynnik jedzenia z luki zapasu polek miast (Plan wlaczenia od razu, potem najwyzej 7% na Plan)
+                if (R4cGapPhase(day)) { try { R4cGapFactors(day, inp, mf); } catch (Exception e) { Stumble("R4cGapFactors", e); } }
+                _ctlLine = sb.Append('.').ToString(); LandGlutWeekly(day, false); return mf;
+            }
             var basis = _mf;
             if (basis == null) { basis = new double[2 * KsTab.NG]; for (int i = 0; i < basis.Length; i++) basis[i] = ShelfMargin; }
             var stage = (double[])basis.Clone();
@@ -265,6 +272,7 @@ namespace Armoury
                     int g = CtlGood(z); if (g < 0) continue;
                     hs[m * KsTab.NG + g] += ZTstar(m, z) * (zt.Q[z] + zt.QV[z] + zt.Der[z] + zt.One[z]);
                     h[m * KsTab.NG + g] += zt.Cnt[z];
+                    if (SwGapMargin) { int inc = 0; try { inc = KsFoodCarts.Incoming(zt.St, z); } catch { inc = 0; } h[m * KsTab.NG + g] += Math.Max(0, inc); }   // KS r4 P4: towar w drodze dojdzie na polki
                 }
             }
             double sig = Math.Max(1, DailyLife.KsSigma);
@@ -280,23 +288,30 @@ namespace Armoury
                     // brak na pustych straganach to rozwoz (KS-H), nie rece: dotad brak z miast bez zboza trzymal podaz zboza Essos przy nadmiarze polek (S/C 1.14 w oknie)
                     double uf = hs[i] > 0 ? Math.Max(0.0, Math.Min(1.0, 1.0 - h[i] / hs[i])) : 1.0;
                     double cu = _c28[i] + _u28[i] * uf;
+                    if (SwCtlPerTown) cu = _c28[i] + _ut28[i];          // KS r4 C1 (r4-ceny): brak w miastach z polka < 0.5 T* (miasto po miescie), nie przez polki calego rynku
                     double k = basis[i];
+                    double gMax = CtlGap, hi = 1.10;
+                    R4cBounds(day, basis[i], ref gMax, ref hi);           // KS r4 C3 (Ks Gap Margin): do D+28 luka +-25% i sufit 1.25, potem sufit schodzi do 1.10 krokiem
                     if (dm > 1.0 && cu > 1.0)
                     {
-                        double gap = Math.Max(-CtlGap, Math.Min(CtlGap, (hs[i] - h[i]) / (28.0 * cu)));
+                        double gap = Math.Max(-gMax, Math.Min(gMax, (hs[i] - h[i]) / (28.0 * cu)));
                         double tgt = cu * (1.0 + gap) / dm;
                         k = Math.Max(basis[i] * (1.0 - CtlStep), Math.Min(basis[i] * (1.0 + CtlStep), tgt));
-                        k = Math.Max(0.85, Math.Min(1.10, k));
+                        // KS r4 C2 (Ks Ctl Per Town): ponad 25% popytu zaplaconego przy polkach < 0.5 T* - bez ciecia (rozwoz, nie rece)
+                        if (k < basis[i] && R4cNoCut(i)) { k = basis[i]; if (_c2Held.Count < 30) _c2Held.Add((m == 0 ? "W " : "E ") + KsTab.Goods[g] + " " + (100 * _lowSh[i]).ToString("0", Inv) + "%"); }
+                        k = Math.Max(0.85, Math.Min(hi, k));
                     }
+                    else if (SwGapMargin) k = Math.Max(0.85, Math.Min(hi, k));   // KS r4 C3: sufit takze dla towaru bez liczb (czynnik z luki P4 nie zostaje 1.25 po D+28)
                     stage[i] = k; mf[i] = k;
-                    sb.Append(' ').Append(KsTab.Goods[g]).Append(' ').Append(F0(_c28[i])).Append('/').Append(F0(_u28[i])).Append('/').Append(F0(dm)).Append(" x").Append(k.ToString("0.000", Inv));
+                    sb.Append(' ').Append(KsTab.Goods[g]).Append(' ').Append(F0(_c28[i])).Append('/').Append(F0(SwCtlPerTown ? _ut28[i] : _u28[i])).Append('/').Append(F0(dm)).Append(" x").Append(k.ToString("0.000", Inv));
                 }
             }
             sb.Append(" (towar: zuzycie bez drabiny 2 wsi / brak / podaz targu Planu szt./d, czynnik)");
+            sb.Append(R4cCtlNote(day));                            // KS r4 (r4-ceny): C1-C3
             _mfStage = stage;                                  // do _mf przy Planie bez bledu (PlanCollect)
             LandGlutWeekly(day, true);
             int nc = 0; foreach (var kv in _landCut) foreach (var v in kv.Value) if (v < 0.999) nc++;
-            sb.Append(" | nadmiar krain: ciecie ").Append(nc).Append(" (kraina x towar).");
+            sb.Append(" | nadmiar krain: ciecie ").Append(nc).Append(" (kraina x towar)").Append(R4cGlutNote()).Append('.');
             _ctlLine = sb.ToString();
             return mf;
         }
@@ -323,6 +338,8 @@ namespace Armoury
             }
             if (!on) return;
             var sh = new Dictionary<string, double[]>(StringComparer.Ordinal); var tg = new Dictionary<string, double[]>(StringComparer.Ordinal);
+            var lmk = new Dictionary<string, int>(StringComparer.Ordinal);                     // KS r4 P6: rynek krainy (miasta krainy)
+            double[] med = null; try { if (SwLandGlutGuard) med = R4cMedRatio(); } catch (Exception e) { Stumble("R4cMedRatio", e); }
             foreach (var zt in _zt.Values)
             {
                 if (zt == null || zt.St == null) continue;
@@ -330,6 +347,7 @@ namespace Armoury
                 double[] a, b;
                 if (!sh.TryGetValue(l, out a)) { a = new double[KsTab.NG]; sh[l] = a; b = new double[KsTab.NG]; tg[l] = b; } else b = tg[l];
                 int m = zt.Market == 0 ? 0 : 1;
+                if (!lmk.ContainsKey(l)) lmk[l] = m;
                 for (int z = 0; z < ZN; z++)
                 {
                     int g = CtlGood(z); if (g < 0) continue;
@@ -345,7 +363,12 @@ namespace Armoury
                 foreach (int g in KsCore.Food)
                 {
                     double s = kv.Value[g], target = t[g];
-                    if (target > 1.0 && s > 2.0 * target + 50 && prev != null && s > prev[g]) { glut[g] = true; any = true; cut[g] = Math.Max(0.5, cut[g] * 0.9); }
+                    int lm0; lmk.TryGetValue(kv.Key, out lm0);
+                    if (target > 1.0 && s > 2.0 * target + 50 && prev != null && s > prev[g])
+                    {
+                        // KS r4 P6 (r4-ceny, klucz Ks Land Glut Guard): ciecie tylko, gdy mediana miast rynku ma polke celu - inaczej nadmiar to rozwoz (bez ciecia)
+                        if (!R4cGlutHeld(kv.Key, lm0, g, med)) { glut[g] = true; any = true; cut[g] = Math.Max(0.5, cut[g] * 0.9); }
+                    }
                     else if (target > 1.0 && s < 1.5 * target && cut[g] < 1.0) cut[g] = Math.Min(1.0, cut[g] / 0.9);
                     if (cut[g] < 0.999) anyCut = true;
                 }
@@ -441,6 +464,7 @@ namespace Armoury
             var gp = _plan != null && _plan.Error == null && _plan.Grad != null ? _plan.Grad : _grad;
             if (gp != null) { inp.GradPrev = new Dictionary<string, double[]>(StringComparer.Ordinal); foreach (var kv in gp) if (kv.Value != null) inp.GradPrev[kv.Key] = (double[])kv.Value.Clone(); }
             inp.MarketFactor = MarketControl(day, inp);
+            try { R4cGapInputs(inp, day); } catch (Exception e) { Stumble("R4cGapInputs", e); }   // KS r4 P4 (r4-ceny, Ks Gap Margin): sufit czynnika kroku 8 1.25 (popyt na zapas tylko w kroku 8)
             if (_landCut.Count > 0) { inp.LandCut = new Dictionary<string, double[]>(StringComparer.Ordinal); foreach (var kv in _landCut) inp.LandCut[kv.Key] = (double[])kv.Value.Clone(); }
             if (_landGlut.Count > 0) { inp.LandGlut = new Dictionary<string, bool[]>(StringComparer.Ordinal); foreach (var kv in _landGlut) inp.LandGlut[kv.Key] = (bool[])kv.Value.Clone(); }
             // odbior panow i dworow w miescie (P3) w kg Planu na dobe wedlug towaru jedzenia
