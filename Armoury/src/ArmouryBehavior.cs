@@ -1909,9 +1909,9 @@ namespace Armoury
             try { DailyLife.MobilitySessionStart(); } catch (Exception e) { Log.Error("DailyLife.MobilitySessionStart", e); }   // ZC6 (16.10): postfiks dobrobytu na czynnym modelu (raz na metode) i linia "Awans (ZC6): start sesji"
             try { DailyLife.WarSessionStart(); } catch (Exception e) { Log.Error("DailyLife.WarSessionStart", e); }   // ZC7 (16.10): linia "Blizna wojny (ZC7): start sesji" - klucz, dlug blizny z zapisu
             try { StartCalibration.SessionStart(); } catch (Exception e) { Log.Error("StartCalibration.SessionStart", e); }   // KS (kalibracja startu): plik ziemi, stan z zapisu (arm_ks), linia "Kalibracja startu (KS): start sesji" - PO VillageBook.Resolve i McmSettings.Apply
-            try { KsFoodCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("KsFoodCarts.ResolvePending", e); }
-            try { VillageCrafts.SessionStart(); } catch (Exception e) { Log.Error("VillageCrafts.SessionStart", e); }
-            try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby   // inwest: linia "Zajecia wiosek (ZW): start" - PO VillageBook.Resolve i StartCalibration.SessionStart (plik ziemi KS z nakladka v6)   // KS-R3 G1: wozy KS-H w drodze z zapisu
+            try { KsFoodCarts.ResolvePending("wczytanie"); } catch (Exception e) { Log.Error("KsFoodCarts.ResolvePending", e); }   // KS-R3 G1: wozy KS-H w drodze z zapisu
+            try { VillageCrafts.SessionStart(); } catch (Exception e) { Log.Error("VillageCrafts.SessionStart", e); }   // inwest: linia "Zajecia wiosek (ZW): start" - PO VillageBook.Resolve i StartCalibration.SessionStart (plik ziemi KS z nakladka v6)
+            try { DistrictWorks.SessionStart(); } catch (Exception e) { Log.Error("DistrictWorks.SessionStart", e); }   // inwest: prace okregu z zapisu i dodatek czesci przed pierwszym rachunkiem KS doby
             try { TownInns.SessionStart(); } catch (Exception e) { Log.Error("TownInns.SessionStart", e); }   // KA (16.10): linia "Karczmy (KA): start sesji" - klucze, latki, stan noclegu z zapisu
             try { RoadsideInns.SessionStart(); } catch (Exception e) { Log.Error("RoadsideInns.SessionStart", e); }   // sw-zajazdy: linia "Zajazdy (ZJ): start sesji" - plik, zajazdy wedlug ludzi, najblizszy sasiad
             try { Rumours.SessionStart(); } catch (Exception e) { Log.Error("Rumours.SessionStart", e); }   // sw-zajazdy: linia "Plotki (PL): start sesji" - klucz, ksiega z zapisu
@@ -2006,8 +2006,8 @@ namespace Armoury
             try { IronBank.AddMenus(starter); } catch (Exception e) { Log.Error("IronBank.AddMenus", e); }
             try { GarrisonKit.AddMenus(starter); } catch (Exception e) { Log.Error("GarrisonKit.AddMenus", e); }   // K1 (B6): "Hand kit to the garrison"
             try { PeopleMenu.AddMenus(starter); } catch (Exception e) { Log.Error("PeopleMenu.AddMenus", e); }     // E4/7 (U21): "People of this land" - okno ksiegi ludzi regionu
-            try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }
-            try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }   // inwest: "Invest in the district's works" za "Look over the district" (village, village_looted)   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
+            try { DistrictMenu.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictMenu.AddMenus", e); }   // E7/W3 (234): "Look over the district" - okno wiosek okregu z herbami (za "People of this land")
+            try { DistrictWorks.AddMenus(starter); } catch (Exception e) { Log.Error("DistrictWorks.AddMenus", e); }   // inwest: "Invest in the district's works" za "Look over the district" (village, village_looted)
             try { DailyLife.AddMenus(starter); } catch (Exception e) { Log.Error("DailyLife.AddMenus", e); }   // ZC2 (16.10): "Realm ledger" w menu miasta i zamku - stany i Dostatek krolestwa, regionow i swiata (ShowInquiry)
             try { QohorMasters.AddMenus(starter); } catch (Exception e) { Log.Error("QohorMasters.AddMenus", e); }   // 177-3: mistrzowie Qohoru - przekuwanie stali valyrianskiej
             try { SmithMenu.Add(starter); Log.Info("Menu kowala dodane."); }
