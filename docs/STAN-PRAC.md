@@ -2808,3 +2808,5 @@ DALEJ: KS runda 4 (PLAN-KS-RUNDA4 + STAN-PRAC 72) na bazie WGRANIA 76 (scalic no
   (zboze), NKS-30e Plany niezbiezne (18 towarow), NMUR-6 Straz 0.895 (prog 0.90), NMUR-32 bandy nie dochodza do celu (0/13), RT-1/RT-5 (linia uchodzcow nierozpoznana - narzedzie),
   ZC1-8 ksiega towarow vs ruda/drewno NIEZGODNA 52/119, ZC1 aksamit/miod pitny/jedwab, NDS-7b korona 0.869, NDS-9 D 0.875, NDS-11 takt 554 ms (baza 493), glowy rodow +46.5k/d.
 - 21:13 PDT: TEST fin84 = TA SAMA DLL (fin83) BEZ FLAG, 160 dob = SCIEZKA GRY JEFFA (KS samo sie uzbraja, pomiar, przelaczenie; uklad wiosek v6 z zapisu F) - test przed WGRANIEM 77.
+- 21:23 PDT: okno 5 h zresetowane (0%, tydzien 22%). Workflow wf_1aec7e98-75c (fala 3, 9 paczek od 100eaedf): feed-swiat (+ zbieznosc Planu NKS-30e), ks-koszt, inwest, perf-d2d3,
+  zapis-d4, fix-uchodzcy (RT-1/RT-5), fix-mur (NMUR-6/32), fix-ksiega (ZC1-8 + aksamit/miod/jedwab), ceny-r5 (zrodla bez miejsca kredytu, NKS-24, ceny 1.4-2x).
