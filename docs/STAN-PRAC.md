@@ -2860,3 +2860,5 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
   KsSelfFeedEverywhere). OTWARTE (do raportu/kolejnej rundy): pod KS zajecia zamrozone na Planie wlaczenia (StartCalibrationSwitchRule WYL. od 16.10) - brak dostosowania produkcji do cen.
   Build: Armoury 4d4e6f66; CrashScribe bez zmian zrodla (do gry zostaje 5258adcd).
 - 00:30 PDT: TEST fin87 = f5fd0ae3 (Armoury 4d4e6f66) z armoury-ks-auto.flag (USUNAC!), 160 dob - sciezka gry Jeffa z fala 3 -> jesli OK: 5 dob + bitwa, WGRANIE 79 (tylko gdy Jeff nie gra).
+- 00:35 PDT: workflow wf_b945ad59-1e6 (przeglad-ekonomii-koncowy, tylko odczyt; prosba Jeffa "na koniec przejrzyj logike i sens wszystkiego"): 5 soczewek (pieniadz/akumulatory, towary,
+  dynamika - zamrozone zajecia pod KS, realizm/jedna regula, gracz/grywalnosc) na f5fd0ae3 + logach fin83/84/86 -> weryfikacja -> synteza z paczkami poprawek (fala 4) i decyzjami Jeffa.
