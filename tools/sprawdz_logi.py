@@ -969,9 +969,12 @@ Uzycie (Python 3, tylko odczyt):
                     ruch konta bez rozliczenia "inne" <= max(0.5, 0.1%)), RT-3 przybyli do miast = odeszli z regionu (niezalezny licznik uderzen i przydzialu, <= max(1, 1%)),
                     RT-4 uchodzcy wedlug miejsca (konto = miasta + regiony +-0.2; konta z miastem ponad konto 0), RT-5 nikt dwa razy ze spichlerzami (goscie regionow + w murach
                     + w miastach + konta bez wsi = konto, <= max(1, 0.01%)), RT-6 zmiana klasy biedoty miast = obecni uchodzcy (ZC dopisuje dokladnie obecnych), RT-7 kiesa
-                    (kontrola salda 0, z powracajacymi = odniesione + brak + czeka, sesja: saldo = poczatek + przyniesione + netto w miescie - odniesione - brak), RT-8 brak
-                    w kiesie W przy powrocie <= 1%, RT-9 potkniecia i ERROR paczki 0, RT-10 czas <= 5 ms/d, RT-11..13 ruch, kiesa, miejsca (INFO). Log bez paczki albo z kluczem
-                    wylaczonym: INFO, bez wyjatku.
+                    (kontrola salda 0; nalezne: czekalo + z powracajacymi - przyciete = odniesione + bez pokrycia + czeka, kontrola 0; sesja: saldo i nalezne = poczatek
+                    + przyniesione + netto w miescie - odniesione - bez pokrycia = saldo + czeka), RT-8 bez pokrycia przy zwrocie <= 1%, RT-9 potkniecia i ERROR paczki 0,
+                    RT-10 czas <= 5 ms/d, RT-11..13 ruch, kiesa, miejsca (INFO); recenzja: RT-14 ujscie jedzenia (uchodzcy w miescie liczeni w potrzebie targu ZC4: |liczeni
+                    - dopisani| <= prog przeliczenia, dopisani = uchodzcy ZC tej doby, doby z ludzmi w miastach bez przeliczenia ZC4 <= 1), RT-15 miasta zdolne przyjac (kiesa
+                    ludu + pelny koszyk ZC4; bez KS 0 - uchodzcy w regionie jak dotad; INFO), RT-16 oblezone miasta pobytu (w murach jedza z Food, zmarli z glodu miasta; INFO).
+                    Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku.
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -35456,6 +35459,8 @@ NRT_DAY = re.compile(
     r"Uchodzcy do miast \(RT\): dzien " + _nrt_i("day") + r" \| CZYNNE"
     r" \| konto UCHODZCY " + _nrt_n("led") + r" = w miastach " + _nrt_n("town") + r" \+ w regionach " + _nrt_n("reg")
     + r" \(kont z miastem (?P<acc>\d+), miast (?P<ntown>\d+); konta z miastem ponad konto (?P<over>\d+)\)"
+    r" \| miasta zdolne przyjac (?P<hok>\d+) z (?P<hall>\d+) \(kiesa ludu czynna i skalibrowana (?P<hpurse>\d+), koszyk stanow ZC4 pelny (?P<hzc4>\d+), ZC4 nieznany (?P<hunk>\d+)"
+    r" - dob z rzedu (?P<hrun>\d+)\)"
     r" \| w miastach: wczoraj " + _nrt_n("t0") + r" \+ przybyli " + _nrt_n("arr") + r" \(z uderzen " + _nrt_n("a1") + r", z regionu " + _nrt_n("a2")
     + r"\) - wrocili " + _nrt_n("home") + r" - zmarli " + _nrt_n("dead") + r" \(w drodze " + _nrt_n("d1") + r", glod miasta " + _nrt_n("d2")
     + r"\) - pojmani " + _nrt_n("capt") + r" - podloga 10 " + _nrt_n("floor") + r" - do regionu " + _nrt_n("leave")
@@ -35463,24 +35468,34 @@ NRT_DAY = re.compile(
     r" \| przybyli " + _nrt_n("arr2") + r" = odeszli z regionu do miast " + _nrt_n("dep") + r" \(dopisani przez uderzenia " + _nrt_n("dhit")
     + r", czesc z najazdu przy przydziale " + _nrt_n("dasg") + r"; roznica " + _nrt_s("ddiff") + r"\)"
     r" \| powrot wstrzymany oblezeniem miasta pobytu (?P<hold>\d+) kont \(" + _nrt_n("holdp") + r" ludzi\)"
+    r" \| do regionu z miasta, ktore nie moze ich juz przyjac: bez kiesy ludu lub koszyka ZC4 (?P<lhost>\d+) kont, w wojnie z ich krolestwem (?P<lwar>\d+) kont \("
+    + _nrt_n("lppl") + r" ludzi\)"
     r" \| przydzialy: nowe (?P<asg>\d+) \(wlasne krolestwo (?P<same>\d+), niewrogie (?P<friend>\d+)\), bez miasta w promieniu (?P<rad>\d+) (?P<notown>\d+) kont"
-    r" \(zostaja w regionie " + _nrt_n("rup") + r" ludzi\), zamkniete (?P<closed>\d+)"
+    r" \(zostaja w regionie " + _nrt_n("rup") + r" ludzi\), zamkniete (?P<closed>\d+), miasta w zasiegu nie moga przyjac (?P<nohost>\d+) kont \(" + _nrt_n("nohostp")
+    + r" ludzi\), czekaja na zwrot naleznych (?P<owait>\d+) kont"
     r" \| kiesa W miast \(saldo uchodzcow\): wczoraj " + _nrt_i("b0") + r" \+ przyniesione z kies wsi " + _nrt_i("bin") + r" \+ udzial glow w zmianie kiesy W " + _nrt_i("bsh")
     + r" \+ doplata ludu miasta " + _nrt_i("bsub") + r" - przyciete do kiesy W " + _nrt_i("btrim") + r" - z powracajacymi " + _nrt_i("bmv") + r" = " + _nrt_i("b1")
     + r" \(kontrola " + _nrt_i("bchk") + r"\)"
-    r" \| z powracajacymi " + _nrt_i("bmv2") + r" = odniesione do kies wsi " + _nrt_i("bout") + r" \+ brak w kiesie W " + _nrt_i("bshort")
-    + r" \(miast (?P<bshortn>\d+)\) \+ czeka " + _nrt_i("bwait")
-    + r" \| od wczytania: saldo na poczatku " + _nrt_i("s0") + r", przyniesione " + _nrt_i("sin") + r", odniesione " + _nrt_i("sout") + r", brak " + _nrt_i("sshort")
-    + r", netto w miescie " + _nrt_i("snet") + r", saldo " + _nrt_i("s1") + r" \(wydane netto w miastach " + _nrt_i("sspent") + r"\)"
+    r" \| nalezne powracajacym: czekalo " + _nrt_i("oprev") + r" \+ z powracajacymi " + _nrt_i("bmv2") + r" - przyciete do kiesy W " + _nrt_i("otrim")
+    + r" = odniesione do kies wsi " + _nrt_i("bout") + r" \+ bez pokrycia " + _nrt_i("bshort") + r" \(miast (?P<bshortn>\d+)\) \+ czeka " + _nrt_i("bwait")
+    + r" \(kont (?P<bwaitn>\d+), miast (?P<bwaitt>\d+); kontrola " + _nrt_i("ochk") + r"\)"
+    + r" \| od wczytania: saldo i nalezne na poczatku " + _nrt_i("s0") + r", przyniesione " + _nrt_i("sin") + r", odniesione " + _nrt_i("sout") + r", bez pokrycia " + _nrt_i("sshort")
+    + r", netto w miescie " + _nrt_i("snet") + r", saldo i nalezne " + _nrt_i("s1") + r" \(wydane netto w miastach " + _nrt_i("sspent") + r"\)"
     r" \| kiesa ludu (?P<live>czynna|NIECZYNNA - kiesa zostaje we wsi)"
     r"(?: \| spichlerze \(E4/6\): w regionach " + _nrt_n("fg") + r" \+ w murach " + _nrt_n("fs") + r" \+ w miastach " + _nrt_n("ft") + r" \+ konta bez wsi " + _nrt_n("fl")
     + r" = " + _nrt_n("fsum") + r" wobec konta " + _nrt_n("fled") + r" \(roznica " + _nrt_s("fdiff") + r"\)| \| spichlerze \(E4/6\): brak migawki tej doby)"
+    r"(?: \| oblezone miasta pobytu: w murach jedza z Food " + _nrt_n("sgp") + r" ludzi w (?P<sgt>\d+) miastach, zmarli z glodu miasta " + _nrt_n("sgd")
+    + r"| \| oblezone miasta pobytu: brak migawki tej doby)"
     r"(?: \| ZC \(doba " + _nrt_i("zd") + r"\): biedota miast " + _nrt_n("zl") + r" \+ uchodzcy " + _nrt_n("zg") + r" = " + _nrt_n("zs")
     + r" \(obecni w miastach wtedy " + _nrt_n("zp") + r", miast (?P<zt>\d+), roznica " + _nrt_s("zdiff") + r"\)| \| ZC: brak migawki)"
+    r"(?: \| potrzeba targu ZC4 \(doba " + _nrt_i("kd") + r"\): uchodzcy liczeni w potrzebie miast " + _nrt_n("kx") + r" wobec dopisanych do biedoty " + _nrt_n("ky")
+    + r" \(miast (?P<kn>\d+); roznica " + _nrt_s("kdiff") + r", prog " + _nrt_n("kthr") + r"; przeliczenia od zmiany uchodzcow (?P<kredo>\d+)\) - jedza z targu, placi kiesa W"
+    + r"| \| potrzeba targu ZC4: brak przeliczenia)"
     r"(?: \| najwiecej w: (?P<top>.*?))?"
     r" \| potkniecia (?P<st>\d+) \(razem (?P<sta>\d+)\) \| czas " + _nrt_n("ms") + r" ms\.$")
 NRT_ERR = ("ERROR in RaidRefugees.", "ERROR in SyncData.arm_raidref", "ERROR in DailyLife.TownGuests", "ERROR in Famine.TownKeep", "ERROR in Famine.Daily(RT",
-           "ERROR in TownFolk.Refugee", "ERROR in PeopleMenu.RaidRefugees", "ERROR in DailyLife.RaidRefugees")
+           "ERROR in TownFolk.Refugee", "ERROR in PeopleMenu.RaidRefugees", "ERROR in DailyLife.RaidRefugees", "ERROR in StartCalibration.Zc4Build(RT)",
+           "ERROR in DailyLife.View.WarViewText(RT)")
 
 
 def nuchodzcy_main(logp):
@@ -35490,9 +35505,12 @@ def nuchodzcy_main(logp):
     kazdej doby), RT-3 przybyli = odeszli z regionu do miast (niezalezny licznik uderzen i przydzialu; |roznica| <= max(1, 1% przybylych)), RT-4 uchodzcy wedlug
     miejsca (konto = miasta + regiony +-0.2, konta z miastem ponad konto 0), RT-5 nikt dwa razy - spichlerze (goscie regionow + w murach + w miastach + konta bez wsi
     = konto, |roznica| <= max(1, 0.01% konta)), RT-6 zmiana klasy biedoty miast = obecni uchodzcy (uchodzcy dopisani przez ZC = obecni w miastach w tej chwili,
-    |roznica| <= max(0.5, 0.01%)), RT-7 kiesa (saldo: kontrola 0 kazdej doby; z powracajacymi = odniesione + brak + czeka; sesja: saldo = poczatek + przyniesione
-    + netto w miescie - odniesione - brak), RT-8 brak w kiesie W przy zwrocie <= 1% oddanego, RT-9 potkniecia i ERROR paczki 0, RT-10 czas <= 5 ms/d srednio,
-    RT-11..13 ruch, kiesa i miejsca (INFO). Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku."""
+    |roznica| <= max(0.5, 0.01%)), RT-7 kiesa (saldo: kontrola 0 kazdej doby; nalezne: czekalo + z powracajacymi - przyciete = odniesione + bez pokrycia + czeka,
+    kontrola 0; sesja: saldo i nalezne = poczatek + przyniesione + netto w miescie - odniesione - bez pokrycia = saldo + czeka), RT-8 bez pokrycia przy zwrocie <= 1%
+    oddanego, RT-9 potkniecia i ERROR paczki 0, RT-10 czas <= 5 ms/d srednio, RT-11..13 ruch, kiesa i miejsca (INFO), RT-14 ujscie jedzenia (recenzja: uchodzcy
+    w miescie jedza z targu - liczeni w potrzebie koszyka ZC4: |liczeni - dopisani| <= prog przeliczenia; dopisani = uchodzcy ZC tej samej doby; doby z ludzmi
+    w miastach bez przeliczenia ZC4 <= 1), RT-15 miasta zdolne przyjac (kiesa ludu + pelny ZC4; bez KS - 0 miast, uchodzcy zostaja w regionie jak dotad - INFO),
+    RT-16 oblezone miasta pobytu (w murach jedza z Food, zmarli z glodu miasta - INFO). Log bez paczki albo z kluczem wylaczonym: INFO, bez wyjatku."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("RT-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -35585,23 +35603,25 @@ def nuchodzcy_main(logp):
                 "|dopisani - obecni| <= max(0.5, 0.01%) kazdej doby", not zb)
     else:
         rep.add("RT-6: klasa biedoty miast (ZC)", "brak migawki ZC w liniach", "INFO (Daily Life wylaczone albo pierwsza doba)", None)
-    # RT-7 kiesa
+    # RT-7 kiesa (saldo, nalezne, sesja)
     bchk = [g for g in days if i(g, "bchk") != 0]
-    bmv = [g for g in days if i(g, "bmv") != i(g, "bmv2") or i(g, "bmv2") != i(g, "bout") + i(g, "bshort") + i(g, "bwait")]
-    ses = [g for g in days if abs(i(g, "s1") - (i(g, "s0") + i(g, "sin") + i(g, "snet") - i(g, "sout") - i(g, "sshort"))) > 1 or i(g, "s1") != i(g, "b1")]
-    rep.add("RT-7: kiesa - saldo uchodzcow (wies -> saldo -> wydane w miescie, reszta z powrotem)",
-            f"doby z kontrola salda != 0: {len(bchk)}; z powracajacymi != odniesione + brak + czeka: {len(bmv)}; sesja niespojna: {len(ses)}"
-            + (f" (np. dzien {(bchk or bmv or ses)[0]['day']})" if bchk or bmv or ses else ""),
-            "0 / 0 / 0 (saldo = poczatek + przyniesione + netto w miescie - odniesione - brak)", not bchk and not bmv and not ses)
+    owd = [g for g in days if i(g, "ochk") != 0 or i(g, "bmv") != i(g, "bmv2")
+           or i(g, "bwait") != i(g, "oprev") + i(g, "bmv2") - i(g, "otrim") - i(g, "bout") - i(g, "bshort")]
+    ses = [g for g in days if abs(i(g, "s1") - (i(g, "s0") + i(g, "sin") + i(g, "snet") - i(g, "sout") - i(g, "sshort"))) > 1 or i(g, "s1") != i(g, "b1") + i(g, "bwait")]
+    rep.add("RT-7: kiesa - saldo uchodzcow i nalezne powracajacym (wies -> saldo -> wydane w miescie, reszta z powrotem)",
+            f"doby z kontrola salda != 0: {len(bchk)}; nalezne niespojne: {len(owd)}; sesja niespojna: {len(ses)}"
+            + (f" (np. dzien {(bchk or owd or ses)[0]['day']})" if bchk or owd or ses else ""),
+            "0 / 0 / 0 (nalezne: czekalo + z powracajacymi - przyciete = odniesione + bez pokrycia + czeka; sesja: saldo i nalezne = poczatek + przyniesione + netto - odniesione"
+            " - bez pokrycia = saldo + czeka)", not bchk and not owd and not ses)
     gave = sum(i(g, "bout") for g in days)
     short = sum(i(g, "bshort") for g in days)
     if gave + short > 0:
-        rep.add("RT-8: brak w kiesie W przy powrocie (saldo bez pokrycia)", f"oddane {gave}, brak {short} ({100.0 * short / (gave + short):.2f}%)", "<= 1% nalezne",
-                short <= 0.01 * (gave + short))
+        rep.add("RT-8: bez pokrycia przy zwrocie (wies albo miasto zniknely, kiesa ludu nieczynna)", f"oddane {gave}, bez pokrycia {short} ({100.0 * short / (gave + short):.2f}%);"
+                f" czeka na koniec {last['bwait']} zl w {last['bwaitn']} kontach", "<= 1% naleznych", short <= 0.01 * (gave + short))
     else:
-        rep.add("RT-8: brak w kiesie W przy powrocie", "nikt nie wrocil z saldem", "INFO", None)
+        rep.add("RT-8: bez pokrycia przy zwrocie", "nikt nie wrocil z saldem", "INFO", None)
     stum = sum(i(g, "st") for g in days)
-    rep.add("RT-9: potkniecia (suma dob) i ERROR paczki (RaidRefugees.*, SyncData.arm_raidref, DailyLife.TownGuests, Famine RT, TownFolk.Refugee*, PeopleMenu)",
+    rep.add("RT-9: potkniecia (suma dob) i ERROR paczki (RaidRefugees.*, SyncData.arm_raidref, DailyLife.TownGuests, Famine RT, TownFolk.Refugee*, PeopleMenu, Zc4Build RT, widok)",
             f"potkniecia {stum}, ERROR {n_err}", "0 / 0", stum == 0 and n_err == 0)
     ms = [f(g, "ms") for g in days]
     rep.add("RT-10: czas linii (koszt doby paczki)", f"srednio {sum(ms) / len(ms):.2f} ms/d, max {max(ms):.2f}", "<= 5 ms/d srednio", sum(ms) / len(ms) <= 5.0)
@@ -35614,9 +35634,34 @@ def nuchodzcy_main(logp):
             f"(wlasne {sum(i(g, 'same') for g in days)}, niewrogie {sum(i(g, 'friend') for g in days)}), bez miasta w promieniu (konto-doby) {sum(i(g, 'notown') for g in days)}; "
             f"powrot wstrzymany oblezeniem (konto-doby) {sum(i(g, 'hold') for g in days)}; komunikatow gracza {len(msgs)}", "INFO", None)
     rep.add("RT-12: kiesa (INFO)", f"przyniesione z kies wsi {sum(i(g, 'bin') for g in days)}, odniesione {gave}, udzial glow w zmianie kiesy W {sum(i(g, 'bsh') for g in days)}, "
-            f"doplata ludu miasta {sum(i(g, 'bsub') for g in days)}, przyciete {sum(i(g, 'btrim') for g in days)}; saldo na koniec {last['b1']}; kiesa ludu: {last['live']}", "INFO", None)
+            f"doplata ludu miasta {sum(i(g, 'bsub') for g in days)}, przyciete (saldo {sum(i(g, 'btrim') for g in days)}, nalezne {sum(i(g, 'otrim') for g in days)}); "
+            f"saldo na koniec {last['b1']}, czeka {last['bwait']}; kiesa ludu: {last['live']}", "INFO", None)
     rep.add("RT-13: miejsca (INFO, ostatnia doba)", f"dzien {last['day']}: w miastach {last['town']} ({last['acc']} kont, {last['ntown']} miast), w regionach {last['reg']}; "
             f"najwiecej w: {(last.get('top') or '-')[:220]}", "INFO", None)
+    # RT-14 ujscie jedzenia - uchodzcy w miescie liczeni w potrzebie koszyka ZC4 miasta (recenzja: bez tego w miescie nie jedli nic)
+    kz = [g for g in days if g.get("kdiff") is not None]
+    with_town = [g for g in days if f(g, "town") > 0.5]
+    no_sink = [g for g in with_town if g.get("kdiff") is None]
+    if kz or with_town:
+        kb = [g for g in kz if abs(f(g, "kdiff")) > f(g, "kthr") + 0.5]
+        kzc = [g for g in kz if g.get("zd") is not None and g.get("zd") == g.get("kd")
+               and abs(f(g, "ky") - f(g, "zg")) > max(1.0, 0.001 * abs(f(g, "zg")))]
+        lk = kz[-1] if kz else None
+        rep.add("RT-14: ujscie jedzenia - uchodzcy w miescie w potrzebie targu ZC4 (liczeni = dopisani +- prog; dopisani = uchodzcy ZC tej doby)",
+                f"doby z przeliczeniem {len(kz)}: ponad prog {len(kb)}, dopisani != ZC {len(kzc)}; doby z ludzmi w miastach bez przeliczenia ZC4 {len(no_sink)} z {len(with_town)}"
+                + (f"; ostatnia: liczeni {lk['kx']} wobec dopisanych {lk['ky']} w {lk['kn']} miastach, przeliczen od zmiany {sum(i(g, 'kredo') for g in kz)}" if lk else ""),
+                "0 / 0 / <= 1 doba", not kb and not kzc and len(no_sink) <= 1)
+    else:
+        rep.add("RT-14: ujscie jedzenia (potrzeba targu ZC4)", "nikt w miastach", "INFO (bez KS albo bez najazdow - uchodzcy w regionie jak dotad)", None)
+    rep.add("RT-15: miasta zdolne przyjac (INFO, ostatnia doba)",
+            f"dzien {last['day']}: {last['hok']} z {last['hall']} (kiesa ludu {last['hpurse']}, ZC4 pelny {last['hzc4']}, ZC4 nieznany {last['hunk']}); "
+            f"odeslani do regionu (konto-doby): bez kiesy/ZC4 {sum(i(g, 'lhost') for g in days)}, wojna {sum(i(g, 'lwar') for g in days)} ({tot('lppl'):.0f} ludzi); "
+            f"miasta w zasiegu nie moga przyjac (konto-doby) {sum(i(g, 'nohost') for g in days)}; czekaja na zwrot (konto-doby) {sum(i(g, 'owait') for g in days)}",
+            "INFO (bez KS - 0 miast: uchodzcy zostaja w regionie jak dotad)", None)
+    sg = [g for g in days if g.get("sgp") is not None]
+    rep.add("RT-16: oblezone miasta pobytu (INFO)",
+            f"doby z migawka {len(sg)}; w murach jedza z Food najwiecej {max((f(g, 'sgp') for g in sg), default=0):.0f} ludzi, zmarli z glodu miasta {sum(f(g, 'sgd') for g in sg):.1f}",
+            "INFO (jedza z Food jak schronieni, gloduja z mieszczanami)", None)
     rep.show()
     return 0
 

@@ -65,6 +65,23 @@ namespace Armoury
             catch (Exception e) { Stumble("RefugeeW", e); hpp = 0; nativeW = 0; kw = 0; return false; }
         }
 
+        /// <summary>Recenzja (drobne 5): kiesa W miasta istnieje (kiesa ludu czynna, miasto w kiesie ludu - takze nieskalibrowane) i jej stan - pokrycie salda i naleznych
+        /// uchodzcow (RaidRefugees). false - kiesa nieczynna albo miasta brak (nalezne bez pokrycia).</summary>
+        internal static bool RefugeePurse(Settlement town, out long kw)
+        {
+            kw = 0;
+            try
+            {
+                if (town == null || !town.IsTown || !Live || OffMain()) return false;
+                EnsureImported();
+                Folk f;
+                if (!_f.TryGetValue(town, out f) || f == null || f.Kind != 0) return false;
+                kw = f.KW;
+                return true;
+            }
+            catch (Exception e) { Stumble("RefugeePurse", e); kw = 0; return false; }
+        }
+
         /// <summary>Przybyli uchodzcy: kiesa wsi `vil` -> kiesa W miasta `town`, najwyzej `want` i stan kiesy wsi. Zwraca przelane (0 - kiesa nieczynna, miasto
         /// nieskalibrowane, wyjatek - nic nie schodzi).</summary>
         internal static long RefugeePurseIn(Settlement town, Village vil, long want)

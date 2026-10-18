@@ -263,6 +263,9 @@ namespace Armoury
                     bool oil = DailyLife.OilProf(r.ProfId), north = DailyLife.NorthFur(r.ProfId);
                     ZTown pz0 = null;
                     bool redo = zFull || !prevMap.TryGetValue(r.St, out pz0) || pz0 == null || ((Fnv(r.St.StringId) + (uint)today) % 7u) == 0u;
+                    // sw-uchodzcy (recenzja, RaidRefugeesToTowns): uchodzcy z najazdu w miescie zmienili sie od ostatniego przeliczenia potrzeby - potrzeba miasta od nowa
+                    // (jedza z targu od jutra, bez 7 dob opoznienia; odeszli - nikt za nich nie kupuje). Klucz wylaczony / nikt - redo co do bitu jak dotad
+                    try { redo = RaidRefugees.Zc4Redo(r.St, r.Guests, r.L, redo); } catch (Exception e) { Stumble("Zc4Build(RT)", e); }
                     if (!redo)
                     {
                         // KS-R3 C1: potrzeby i koszyk klas z poprzedniej mapy (ludzie i stany zmieniaja sie powoli; ceny, polka i wiersze - codziennie nizej)
@@ -768,6 +771,19 @@ namespace Armoury
             for (int c = 0; c < 3; c++) cls[c] = zt.Cls[c];
             lam = zt.Lam;
             return true;
+        }
+
+        /// <summary>sw-uchodzcy (recenzja): 1 - miasto ma PELNY koszyk stanow ZC4 (stan zastosowany KS, miasto w mapie koszyka, lambda 1) - jego lud kupuje z targu wedlug potrzeby
+        /// ludzi stanow (KsSnapshot), wiec uchodzcy z najazdu dopisani do biedoty jedza naprawde (popyt prawdziwy); 0 - poza ZC4 (KS niezastosowany, klucz wylaczony, miasta
+        /// nie ma w mapie, rampa); -1 - nie wiadomo (stan zastosowany, mapa koszyka jeszcze nie zbudowana w tej sesji albo doba jak Undo). Tylko odczyt.</summary>
+        internal static int Zc4Host(Settlement st)
+        {
+            if (st == null || st.Town == null || _state != StateApplied || !KeyOn) return 0;
+            var map = _zt;
+            if (map.Count == 0) return -1;
+            ZTown zt;
+            if (!map.TryGetValue(st, out zt) || zt == null) return 0;
+            return zt.Lam >= 0.999 ? 1 : 0;
         }
 
         /// <summary>TownFolk.AddOffer / LadderOffer: czesc oferty nadwyzki ludu do kategorii c - kategorie koszyka x (1 - lambda) (koszyk stanow juz ma lepszy stol bogatych;

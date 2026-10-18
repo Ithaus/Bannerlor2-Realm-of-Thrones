@@ -783,8 +783,34 @@ namespace Armoury
                 if (q > 0.0) shelterUnits[kv.Key] = kv.Value / q;
                 shelterPeople += kv.Value;
             }
+            // sw-uchodzcy (recenzja, wazne 2; RaidRefugeesToTowns): uchodzcy z najazdu mieszkajacy w OBLEZONYM miescie pobytu siedza w jego murach jak schronieni - jedza z jego
+            // Food ta sama stopa (ludzie / Q) i licza sie w spozyciu przy Food 0 (cons ponizej). Jedna regula dla wszystkich uchodzcow w murach oblezonej warowni. Slownik shelter
+            // (schronieni regionu - linia, CSV) bez zmian; klucz wylaczony, nikt albo FamineSiegeShelter wylaczone - nic (co do liczby jak dotad)
+            var townRef = new Dictionary<Town, double>();
+            double townRefPeople = 0;
+            if (shelterOn)
+            {
+                try
+                {
+                    var hp = new Dictionary<Settlement, double>();
+                    RaidRefugees.HostsPresent(hp);
+                    foreach (var kv in hp)
+                    {
+                        var ht = kv.Key.Town;
+                        if (ht == null || !kv.Key.IsUnderSiege || !(kv.Value > 0.0)) continue;
+                        double v0; townRef.TryGetValue(ht, out v0); townRef[ht] = v0 + kv.Value;
+                    }
+                }
+                catch (Exception e) { Stumble("Famine.Daily(RT w murach)", e); }
+                foreach (var kv in townRef)
+                {
+                    double q = QOf(kv.Key, qWorld);
+                    if (q > 0.0) { double u0; shelterUnits.TryGetValue(kv.Key, out u0); shelterUnits[kv.Key] = u0 + kv.Value / q; }
+                    townRefPeople += kv.Value;
+                }
+            }
             lock (Gate) { _shelterUnits.Clear(); foreach (var kv in shelterUnits) _shelterUnits[kv.Key] = kv.Value; _shelterN = _shelterUnits.Count; }
-            double deadTown = 0, deadShelter = 0, shelterFood = 0; int starvingAll = 0, starvingAi = 0, townDeathsN = 0;
+            double deadTown = 0, deadShelter = 0, shelterFood = 0, deadTownRef = 0; int starvingAll = 0, starvingAi = 0, townDeathsN = 0;   // sw-uchodzcy: deadTownRef - uchodzcy z najazdu w miescie pobytu
             foreach (var kv in shelterUnits) shelterFood += kv.Value;
             var starvingNames = new List<string>();
             foreach (var node in nodeById.Values)
@@ -825,8 +851,10 @@ namespace Armoury
                         if (got > 0.0) { deadShelter += got; lock (Gate) g.Acc.B.Starved += got; Touch(e46, g.Acc); }
                     }
                     // sw-uchodzcy (RaidRefugeesToTowns): uchodzcy z najazdu mieszkajacy w tym miescie gloduja razem z mieszczanami (ta sama stopa co TownDie); czesc z glodu
-                    // ich kont bez zmian. Linia "Uchodzcy do miast (RT)" (glod miasta) - linia spichlerzy bez zmian formatu
-                    if (node.IsTown)
+                    // ich kont bez zmian. Linia "Uchodzcy do miast (RT)" (glod miasta) - linia spichlerzy bez zmian formatu. Recenzja (wazne 2): oblezone miasto i FamineSiegeShelter -
+                    // ta sama para co u schronionych: jedza z Food oblezonego miasta (shelterUnits wyzej, townRef) i gloduja przy Food 0; poza oblezeniem jedza z targu (ZC4), Food
+                    // nie ruszaja i nie gina z jego braku
+                    if (node.IsTown && shelterOn && node.IsUnderSiege)
                     {
                         foreach (var rv in RaidRefugees.VillagesIn(node))
                         {
@@ -839,6 +867,7 @@ namespace Armoury
                                 double famB = rx != null ? TownKeepBefore(rx) : double.NaN;
                                 double got = PeopleBook.RefugeesDie(rv, inT * rate);
                                 if (!(got > 0.0)) continue;
+                                deadTownRef += got;                                          // recenzja (drobne 3): w linii spichlerzy i w sumie sesji
                                 if (rx != null) { TownKeepAfter(rx, famB, 0.0); lock (Gate) rx.B.Starved += got; Touch(e46, rx); }
                                 RaidRefugees.Track(rv, RaidRefugees.CStarve);
                             }
@@ -855,8 +884,9 @@ namespace Armoury
             double famOutPeople = 0; int famOutV = 0, waitFood = 0;
             CleanAccounts(vils, today, s, stays, e46, ref famOutPeople, ref famOutV, ref waitFood);
 
-            _sessDead += deadHosts + deadRef + deadTown + deadShelter;
+            _sessDead += deadHosts + deadRef + deadTown + deadShelter + deadTownRef;
             _sessFled += fled;
+            try { RaidRefugees.NoteSiege(townRefPeople, townRef.Count, deadTownRef); } catch (Exception e) { Stumble("Famine.Daily(RT oblezenie)", e); }   // sw-uchodzcy: linia RT
 
             // 9. komunikat gracza: glod w jego wlasnym regionie (raz na glod)
             try { WarnPlayer(regs, T); } catch (Exception e) { Stumble("Famine.WarnPlayer", e); }
@@ -900,7 +930,10 @@ namespace Armoury
                 sb.Append(" | okregi glodne ").Append(hungryV).Append(": oblezone ").Append(hSiege).Append(", spustoszone ").Append(hDev).Append(", tylko zima ").Append(hWinter)
                   .Append(", bez przyczyny ").Append(hNone);
                 sb.Append(" | zmarli z glodu: gospodarze ").Append(F(deadHosts, "0.##")).Append(", uchodzcy ").Append(F(deadRef, "0.##")).Append(", mieszczanie ").Append(F(deadTown, "0.##"))
-                  .Append(" (miast ").Append(townDeathsN).Append("), schronieni w murach ").Append(F(deadShelter, "0.##")).Append("; od wczytania ").Append(F0(_sessDead));
+                  .Append(" (miast ").Append(townDeathsN).Append("), schronieni w murach ").Append(F(deadShelter, "0.##"));
+                // sw-uchodzcy (recenzja, drobne 3): uchodzcy z najazdu mieszkajacy w glodujacym miescie pobytu (tylko gdy byli - format bez paczki co do znaku jak dotad)
+                if (deadTownRef > 0.0) sb.Append(", uchodzcy z najazdu w miastach pobytu ").Append(F(deadTownRef, "0.##"));
+                sb.Append("; od wczytania ").Append(F0(_sessDead));
                 double allVil = 0, allTown = 0, allFled = 0;
                 lock (Gate) { foreach (var b in _barns.Values) { allVil += b.Starved; allFled += b.Fled; } foreach (var t in _townStarved.Values) allTown += t; }
                 sb.Append("; od poczatku kampanii (zapis): ze wsi ").Append(F0(allVil)).Append(" (gospodarze i ich uchodzcy), z miast ").Append(F0(allTown))
@@ -917,6 +950,8 @@ namespace Armoury
                 }
                 sb.Append(" | w murach oblezonych warowni ").Append(F0(shelterPeople)).Append(" uchodzcow w ").Append(shelter.Count).Append(" warowniach (Food -").Append(F(shelterFood, "0.0"))
                   .Append("/d)").Append(shelterOn ? "" : (s.FamineSiegeShelter ? " [latka nie wpieta]" : " [WYLACZONE w MCM]"));
+                // sw-uchodzcy (recenzja, wazne 2): Food powyzej liczy tez uchodzcow z najazdu mieszkajacych w oblezonych miastach pobytu (tylko gdy sa)
+                if (townRef.Count > 0) sb.Append("; Food liczy tez uchodzcow z najazdu w oblezonych miastach pobytu: ").Append(F0(townRefPeople)).Append(" w ").Append(townRef.Count).Append(" miastach");
                 sb.Append(" | warownie przy Food 0: ").Append(starvingAll).Append(" (AI ").Append(starvingAi).Append(')');
                 if (starvingNames.Count > 0) sb.Append(" - ").Append(string.Join(", ", starvingNames.ToArray()));
                 StockPart(sb, nodeById, regs, shelter, qWorld, day, e46);
