@@ -889,7 +889,8 @@ namespace Armoury
                     double d = g.Away * DeathRate(g.R.URef, T, dmax) / yd;
                     double famB = d > 0.0 ? TownKeepBefore(g.Acc) : double.NaN;     // sw-uchodzcy: konto z czescia w miescie - gloduja goscie regionu (czesc z glodu), nie miasto
                     double got = d > 0.0 ? PeopleBook.RefugeesDie(g.Acc.V, d) : 0.0;
-                    if (got > 0.0) TownKeepAfter(g.Acc, famB, -got);
+                    // f4-uchodzcy (RaidRefugeesIntakeMeter): goscie konta z miastem = czesc z glodu + czekajacy na wpuszczenie - zgony z obu po rowno (bez odmierzania x1, jak dotad)
+                    if (got > 0.0) TownKeepAfter(g.Acc, famB, -got * RaidRefugees.GuestFamShare(famB, g.Away));
                     if (got > 0.0) { deadRef += got; lock (Gate) g.Acc.B.Starved += got; g.R.Dead += got; Touch(e46, g.Acc); }
                     if (fleeOn) TryRelocate(g, today, regs, nodeById, s, ref moves, ref noRefuge, ref blocked);
                 }
@@ -970,7 +971,7 @@ namespace Armoury
                         if (g.Shelter != t || !(g.Away > 0.0)) continue;
                         double famB = TownKeepBefore(g.Acc);                         // sw-uchodzcy: schronieni (czesc z glodu) gloduja bez ruszania czesci w miescie
                         double got = PeopleBook.RefugeesDie(g.Acc.V, g.Away * rate);
-                        if (got > 0.0) TownKeepAfter(g.Acc, famB, -got);
+                        if (got > 0.0) TownKeepAfter(g.Acc, famB, -got * RaidRefugees.GuestFamShare(famB, g.Away));   // f4-uchodzcy: jak wyzej (czekajacy w murach regionu)
                         if (got > 0.0) { deadShelter += got; lock (Gate) g.Acc.B.Starved += got; Touch(e46, g.Acc); }
                     }
                     // sw-uchodzcy (RaidRefugeesToTowns): uchodzcy z najazdu mieszkajacy w tym miescie gloduja razem z mieszczanami (ta sama stopa co TownDie); czesc z glodu
@@ -992,7 +993,7 @@ namespace Armoury
                                 if (!(got > 0.0)) continue;
                                 deadTownRef += got;                                          // recenzja (drobne 3): w linii spichlerzy i w sumie sesji
                                 if (rx != null) { TownKeepAfter(rx, famB, 0.0); lock (Gate) rx.B.Starved += got; Touch(e46, rx); }
-                                RaidRefugees.Track(rv, RaidRefugees.CStarve);
+                                RaidRefugees.Track(rv, RaidRefugees.CStarve, got);   // f4-uchodzcy: zmarli w miescie zdejmuja przyjetych (odmierzanie; bez niego jak dotad)
                             }
                             catch (Exception e) { Stumble("Famine.Daily(RT glod miasta)", e); }
                         }

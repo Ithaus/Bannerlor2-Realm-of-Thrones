@@ -379,6 +379,7 @@ RANGES = {
     'RaidRefugeesPurseShare': (0.0, 1.0, "0.00"),
     'RaidRefugeesMessageMin': (0, 10000, "0"),
     'RaidRefugeesTownIntake': (0.0, 0.2, "0.000"),   # recenzja calosci: dobowy limit przyjec nowych kont (udzial ludzi miasta; 0 = bez limitu)
+    'RaidRefugeesIntakeFirstMult': (1.0, 10.0, "0.0"),   # f4-uchodzcy: pierwsze konto doby w calosci do M x dobowy limit (przyciete w kodzie do >= 1)
     # inwest (noc 17/18.10): zajecia wiosek i prace okregu - zgodnie z przycieciem w kodzie (VillageCrafts.Rule: prog >= 1, doby >= 7, udzial regionu 0..1;
     # DistrictIcon 0..1; DistrictWorks: udzial 0..1, dodatek 0..2, lata sprzetu 0.1..10, doby >= 1 / >= 0; DistrictWorksAi: zwrot 0.01..2, udzial 0..1, tempo 0..0.1)
     'SideVillageCraftSwitch': (1.0, 3.0, "0.00"),

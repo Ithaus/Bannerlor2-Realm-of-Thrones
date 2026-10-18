@@ -3144,6 +3144,14 @@ namespace Armoury
         [SettingPropertyGroup("Iron Bank")]
         public bool FamineSharedVillageRefugees { get; set; } = true;
 
+        [SettingPropertyBool("Raid Refugees Intake Meter", HintText = "raid refugees move into a town no faster than Raid Refugees Town Intake a day, counting everyone who comes that day: the people of new villages, the rest of a village that came only in part, and the people newly driven from a village whose refugees already live there. A village whose people do not all fit comes in part and the rest wait in their own land (eating from its granaries) and follow on the next days, the longest waiting first; the first village that comes to a town in a day is taken in whole only when it is no larger than Raid Refugees Intake First Mult times the daily intake. Those waiting go home first when their land is quiet again, and a siege of the town keeps in its walls only those already inside. Off = the first village of a day always comes in whole and newly driven people join their kin in the town at once (as before)")]
+        [SettingPropertyGroup("Iron Bank")]
+        public bool RaidRefugeesIntakeMeter { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Raid Refugees Intake First Mult", 1.00f, 10.00f, "0.0", HintText = "the first village that comes to a town in a day is taken in whole when its people are at most this many times the town's daily intake (2 = twice Raid Refugees Town Intake); a larger village comes in parts over the following days. Works only with Raid Refugees Intake Meter")]
+        [SettingPropertyGroup("Iron Bank")]
+        public float RaidRefugeesIntakeFirstMult { get; set; } = 2f;
+
         [SettingPropertyBool("People Origin Enabled", HintText = "every soldier and captive remembers the land he came from: men who die are lost to that land for good, men who come home go back to its villages, and the people book of each land counts its men at home, under arms, held captive and fallen. Off = soldiers have no homeland, as before")]
         [SettingPropertyGroup("Iron Bank")]
         public bool PeopleOriginEnabled { get; set; } = true;
@@ -8309,6 +8317,8 @@ namespace Armoury
             s.RaidRefugeesMessageMin = RaidRefugeesMessageMin;
             s.RaidRefugeesTownIntake = RaidRefugeesTownIntake;
             s.FamineSharedVillageRefugees = FamineSharedVillageRefugees;
+            s.RaidRefugeesIntakeMeter = RaidRefugeesIntakeMeter;
+            s.RaidRefugeesIntakeFirstMult = RaidRefugeesIntakeFirstMult;
             s.PeopleOriginEnabled = PeopleOriginEnabled;
             s.LevyFromVillages = LevyFromVillages;
             s.PressUntakenGoHome = PressUntakenGoHome;

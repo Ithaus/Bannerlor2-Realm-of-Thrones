@@ -1200,6 +1200,14 @@ Uzycie (Python 3, tylko odczyt):
                     obiektem Village). RT-5c (klucz FamineSharedVillageRefugees - konta tych wsi karmione ze spichlerzy regionu pobytu jak kazde konto; segment linii
                     Spichlerze "wsie wspolne ROT (dwie osady, jeden obiekt Village): wsi W, konta K karmione ze spichlerzy - goscie G + w miastach T ludzi"): konta bez wsi
                     0 kazdej doby z kluczem (Famine bez "konta uchodzcow bez wsi z przelicznikiem", RT "konta bez wsi" 0); bez segmentu (klucz wylaczony, stary log) - INFO.
+                    f4-uchodzcy (noc 17/18.10, przeglad koncowy ekonomii P3; klucz RaidRefugeesIntakeMeter - odmierzanie przybyc; fin86: Sharp Point 9 tys. -> 73 tys. ludzi
+                    w tydzien, 50,7 tys. przeprowadzek jednego dnia): segment linii doby "odmierzanie przybyc (...)" zamiast "dobowy limit przyjec" (pole opcjonalne).
+                    RT-17a tozsamosc przybylych (przybyli dzis = przed przydzialem + z czekajacych + w nowych kontach, |roznica| <= 0.5; = "przybyli" linii, <= max(0.5, 0.1%)),
+                    RT-17b dobowy limit miasta (najwiecej wobec limitu dzis <= prog pierwszego konta xM + 0.02 kazdej doby; limit 0 = bez limitu - INFO), RT-17c okno 7 dob
+                    (najwiecej przybylych w 7 dob <= 7 x M x limit + 0.05 pkt %), RT-17d czekajacy przydzieleni miastu sa w regionie (<= "w regionach" + 0.5), RT-17e INFO
+                    (przybyli, przyjeci w czesci, w progu pierwszego konta, czekajacy na koniec), RT-17f wzrost ludzi miasta w 7 dob z ks-miasta.csv (tygodniowe wiersze,
+                    od pierwszej doby z odmierzaniem: najwiekszy wzrost <= 8 x M x limit + 3 pkt % - jedna doba zapasu na opoznienie migawki KS; bez odmierzania albo bez CSV
+                    - INFO z najwiekszym wzrostem, np. fin86 Sharp Point x6.9). Log bez segmentu (klucz wylaczony, log sprzed paczki): RT-17 INFO, bez wyjatku.
 --grupa nksarm    : (noc 17/18.10, paczka ks-arm, Jeff "ma byc gra rano ... z poprawnie dzialajaca ekonomia"; Armoury/src/StartCalibration.Arm.cs - samo uzbrojenie KS,
                     twarde bramki rozdz. 10, bramka krainy rozdz. 8, ryby z niczego perku Night Raider) python -I tools/sprawdz_logi.py --grupa nksarm <Armoury-*.log>
                     (strumieniowo; te same wiersze NKS-ARM-* dopisuje grupa nks). ARM-0 linia startu (klucz Auto Arm, droga gra / autotest z plikiem
@@ -39454,6 +39462,14 @@ NRT_DAY = re.compile(
     # recenzja calosci (noc 17/18.10): dobowy limit przyjec nowych kont (Raid Refugees Town Intake) - pole opcjonalne (log sprzed recenzji bez niego)
     r"(?: \| dobowy limit przyjec \(Raid Refugees Town Intake [\d.]+% ludzi miasta, pierwsze konto doby zawsze\): przyjeci w nowych kontach " + _nrt_n("inp")
     + r", czekaja na kolejne doby (?P<spn>\d+) kont \(" + _nrt_n("spp") + r" ludzi, miast (?P<spt>\d+)\))?"
+    # f4-uchodzcy (klucz RaidRefugeesIntakeMeter): odmierzanie przybyc - zamiast segmentu "dobowy limit przyjec" (pole opcjonalne: log bez klucza albo sprzed paczki)
+    r"(?: \| odmierzanie przybyc \(Raid Refugees Intake Meter, limit (?P<mlim>[\d.]+)% ludzi miasta na dobe dla wszystkich kont i dopiskow uderzen, pierwsze konto doby"
+    r" w calosci do x(?P<mfm>[\d.]+)\): przybyli dzis " + _nrt_n("marr") + r" = przed przydzialem " + _nrt_n("mbef") + r" \+ z czekajacych " + _nrt_n("mwadm")
+    + r" \(kont (?P<mwn>\d+)\) \+ w nowych kontach " + _nrt_n("mnew") + r" \(kont (?P<mnn>\d+), w czesci (?P<mpart>\d+) - reszta czeka " + _nrt_n("mprest")
+    + r"\); w progu pierwszego konta (?P<mfirst>\d+) \(ponad limit " + _nrt_n("mfover") + r"\); czekaja przydzieleni miastu " + _nrt_n("mwait")
+    + r" \(kont (?P<mwacc>\d+), miast (?P<mwt>\d+); dopisani dzis przez uderzenia " + _nrt_n("mhit") + r"\), czekaja bez miasta (?P<mspn>\d+) kont \("
+    + _nrt_n("mspp") + r" ludzi, miast (?P<mspt>\d+)\); najwiecej wobec limitu dzis (?P<mxt>.*?) " + _nrt_n("mxa") + r" / " + _nrt_n("mxl") + r" \(x" + _nrt_n("mxr")
+    + r"\); 7 dob najwiecej (?P<m7t>.*?) " + _nrt_n("m7a") + r" = " + _nrt_n("m7p") + r"% ludzi miasta \(prog " + _nrt_n("m7thr") + r"%\))?"
     r" \| kiesa W miast \(saldo uchodzcow\): wczoraj " + _nrt_i("b0") + r" \+ przyniesione z kies wsi " + _nrt_i("bin") + r" \+ udzial glow w zmianie kiesy W " + _nrt_i("bsh")
     + r" \+ doplata ludu miasta " + _nrt_i("bsub") + r" - przyciete do kiesy W " + _nrt_i("btrim") + r" - z powracajacymi " + _nrt_i("bmv") + r" = " + _nrt_i("b1")
     + r" \(kontrola " + _nrt_i("bchk") + r"\)"
@@ -39502,7 +39518,8 @@ def nuchodzcy_main(logp):
     fix-uchodzcy: RT-1 znak roznicy opcjonalny (stare "0" bez znaku); RT-5 nowy pomiar (konta bez wsi tylko poza miastem, pole "bez czesci w miastach") scisle,
     stary pomiar - roznica w [-prog, konta bez wsi + prog]; RT-5b INFO konta bez wsi poza miastem / w miastach; RT-5c (klucz FamineSharedVillageRefugees, segment
     "wsie wspolne ROT" linii Spichlerze): konta bez wsi 0 kazdej doby z kluczem (Famine "konta uchodzcow bez wsi z przelicznikiem" brak, RT "konta bez wsi" 0);
-    bez segmentu - INFO."""
+    bez segmentu - INFO.
+    f4-uchodzcy (klucz RaidRefugeesIntakeMeter): RT-17a..f - odmierzanie przybyc (nrt_meter_rows; segment "odmierzanie przybyc" zamiast "dobowy limit przyjec")."""
     rep = Report()
     if not logp or not os.path.isfile(logp):
         rep.add("RT-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
@@ -39694,6 +39711,8 @@ def nuchodzcy_main(logp):
         rep.add("RT-11b: dobowy limit przyjec nowych kont (INFO)",
                 f"przyjeci w nowych kontach {sum(f(g, 'inp') for g in lim):.0f} (najwiecej w dobie {top['day']}: {f(top, 'inp'):.0f}); dob z czekajacymi {len(wait_days)}"
                 f" (konto-doby {sum(i(g, 'spn') for g in lim)}; ostatnia doba: czeka {lim[-1]['spn']} kont, {f(lim[-1], 'spp'):.0f} ludzi)", "INFO", None)
+    elif any(g.get("marr") is not None for g in days):
+        rep.add("RT-11b: dobowy limit przyjec nowych kont", "odmierzanie przybyc (klucz Raid Refugees Intake Meter) - segment 'odmierzanie przybyc', wiersze RT-17", "INFO", None)
     else:
         rep.add("RT-11b: dobowy limit przyjec nowych kont", "log sprzed recenzji calosci (brak pola)", "INFO", None)
     rep.add("RT-12: kiesa (INFO)", f"przyniesione z kies wsi {sum(i(g, 'bin') for g in days)}, odniesione {gave}, udzial glow w zmianie kiesy W {sum(i(g, 'bsh') for g in days)}, "
@@ -39725,8 +39744,141 @@ def nuchodzcy_main(logp):
     rep.add("RT-16: oblezone miasta pobytu (INFO)",
             f"doby z migawka {len(sg)}; w murach jedza z Food najwiecej {max((f(g, 'sgp') for g in sg), default=0):.0f} ludzi, zmarli z glodu miasta {sum(f(g, 'sgd') for g in sg):.1f}",
             "INFO (jedza z Food jak schronieni, gloduja z mieszczanami)", None)
+    nrt_meter_rows(rep, days, logp)      # f4-uchodzcy: odmierzanie przybyc (RT-17)
     rep.show()
     return 0
+
+
+def nrt_ks_town_growth(logp, from_day):
+    """f4-uchodzcy (RT-17f): najwiekszy wzrost ludzi miasta miedzy kolejnymi tygodniowymi wierszami ks-miasta.csv (kolumna 'ludzie' - ludzie miasta z uchodzcami
+    w miescie, migawka KS). from_day - tylko pary wierszy, ktorych wczesniejszy wiersz jest >= tej doby (None - wszystkie). Zwraca (sciezka, [(wzrost, miasto, dzien0,
+    ludzie0, dzien1, ludzie1)] malejaco) albo (sciezka, None), gdy pliku nie ma. Bez wyjatku na zlym wierszu."""
+    p = session_file_find(logp, "ks-miasta.csv")
+    if not os.path.isfile(p):
+        # uklad gry: CSV sesji w katalogu modulu (log skopiowany do archiwum bez katalogu CSV) - tylko odczyt
+        stem = os.path.splitext(os.path.basename(logp))[0].replace("Armoury-", "")
+        q = os.path.join("C:/Program Files (x86)/Steam/steamapps/common/Mount & Blade II Bannerlord/Modules/Armoury/Logs", stem, "ks-miasta.csv")
+        if os.path.isfile(q):
+            p = q
+        else:
+            return p, None
+    by_town = {}
+    try:
+        with open(p, encoding="utf-8", errors="replace") as fh:
+            hdr = None
+            for ln in fh:
+                fl = ln.rstrip("\n").split(";")
+                if hdr is None:
+                    hdr = fl
+                    continue
+                r = dict(zip(hdr, fl))
+                try:
+                    dy, tid, ppl = int(r["dzien"]), r["miasto_id"], float(r["ludzie"])
+                except (KeyError, ValueError):
+                    continue
+                by_town.setdefault(tid, []).append((dy, ppl, r.get("miasto", tid)))
+    except OSError:
+        return p, None
+    out = []
+    for tid, rows in by_town.items():
+        rows.sort()
+        for (d0, p0, nm), (d1, p1, _) in zip(rows, rows[1:]):
+            if from_day is not None and d0 < from_day:
+                continue
+            if p0 > 0 and 0 < d1 - d0 <= 8:
+                out.append(((p1 - p0) / p0, nm, d0, p0, d1, p1))
+    out.sort(reverse=True)
+    return p, out
+
+
+def nrt_meter_rows(rep, days, logp):
+    """f4-uchodzcy (klucz RaidRefugeesIntakeMeter): wiersze RT-17 grupy nuchodzcy - odmierzanie przybyc uchodzcow do miast (segment linii doby "odmierzanie przybyc").
+    RT-17a tozsamosc przybylych, RT-17b dobowy limit miasta (<= xM pierwszego konta), RT-17c okno 7 dob (<= 7 x M x limit), RT-17d czekajacy w regionie, RT-17e INFO,
+    RT-17f wzrost ludzi miasta w 7 dob z ks-miasta.csv. Bez segmentu - INFO (i RT-17f z najwiekszym wzrostem jako stan bez odmierzania)."""
+    def fv(g, k):
+        v = g.get(k)
+        try:
+            return float(v) if v not in (None, "") else None
+        except ValueError:
+            return None
+    md = [g for g in days if g.get("marr") is not None]
+    if not md:
+        rep.add("RT-17: odmierzanie przybyc (klucz Raid Refugees Intake Meter)", "brak segmentu 'odmierzanie przybyc' w liniach doby",
+                "INFO (klucz wylaczony albo log sprzed f4-uchodzcy - pierwsze konto doby zawsze, dopiski bez limitu)", None)
+        cp, gr = nrt_ks_town_growth(logp, None)
+        if gr is None:
+            rep.add("RT-17f: wzrost ludzi miasta w 7 dob (ks-miasta.csv)", f"brak pliku {cp}", "INFO", None)
+        elif gr:
+            t = gr[0]
+            rep.add("RT-17f: wzrost ludzi miasta w 7 dob (ks-miasta.csv, bez odmierzania)",
+                    f"najwiekszy: {t[1]} {t[3]:.0f} (doba {t[2]}) -> {t[5]:.0f} (doba {t[4]}) = x{1 + t[0]:.2f}; par z wzrostem > 20%: {sum(1 for x in gr if x[0] > 0.2)}",
+                    "INFO (stan bez odmierzania; z kluczem prog 8 x M x limit + 3 pkt %)", None)
+        else:
+            rep.add("RT-17f: wzrost ludzi miasta w 7 dob (ks-miasta.csv)", "brak par tygodniowych wierszy", "INFO", None)
+        return
+    # RT-17a tozsamosc
+    bad_a = []
+    for g in md:
+        arr, bef, wadm, new, line_arr = fv(g, "marr"), fv(g, "mbef"), fv(g, "mwadm"), fv(g, "mnew"), fv(g, "arr")
+        if None in (arr, bef, wadm, new):
+            bad_a.append(g)
+            continue
+        if abs(arr - bef - wadm - new) > 0.5 + 1e-4 * arr or (line_arr is not None and abs(arr - line_arr) > max(0.5, 0.001 * abs(line_arr))):
+            bad_a.append(g)
+    rep.add("RT-17a: odmierzanie - przybyli dzis = przed przydzialem + z czekajacych + w nowych kontach = 'przybyli' linii",
+            f"doby z segmentem {len(md)}, niespojne {len(bad_a)}" + (f" (np. dzien {bad_a[0]['day']}: {bad_a[0]['marr']} wobec {bad_a[0]['mbef']} + {bad_a[0]['mwadm']}"
+                                                                    f" + {bad_a[0]['mnew']}, linia {bad_a[0]['arr']})" if bad_a else ""),
+            "|roznica| <= 0.5 (i <= max(0.5, 0.1%) wobec 'przybyli') kazdej doby", not bad_a)
+    # RT-17b dobowy limit miasta
+    lim_days = [g for g in md if (fv(g, "mlim") or 0.0) > 0.0]
+    if lim_days:
+        bad_b = [g for g in lim_days if fv(g, "mxr") is not None and fv(g, "mxr") > (fv(g, "mfm") or 1.0) + 0.02]
+        top = max(lim_days, key=lambda g: fv(g, "mxr") or 0.0)
+        rep.add("RT-17b: odmierzanie - dobowy limit miasta (najwiecej wobec limitu dzis)",
+                f"doby z limitem {len(lim_days)}, ponad prog {len(bad_b)}" + (f" (np. dzien {bad_b[0]['day']}: {bad_b[0]['mxt']} {bad_b[0]['mxa']} / {bad_b[0]['mxl']})" if bad_b else "")
+                + f"; najwiecej: dzien {top['day']} {top['mxt']} {top['mxa']} / {top['mxl']} (x{top['mxr']}, prog pierwszego konta x{top['mfm']})",
+                "najwiecej wobec limitu <= xM pierwszego konta + 0.02 kazdej doby (fin86 bez odmierzania: Sharp Point 2788 przy limicie 90)", not bad_b)
+        # RT-17c okno 7 dob
+        bad_c = [g for g in lim_days if fv(g, "m7p") is not None and fv(g, "m7p") > (fv(g, "m7thr") or 0.0) + 0.05]
+        top7 = max(lim_days, key=lambda g: fv(g, "m7p") or 0.0)
+        rep.add("RT-17c: odmierzanie - przybyli w 7 dob wobec ludzi miasta",
+                f"doby ponad prog {len(bad_c)}" + (f" (np. dzien {bad_c[0]['day']}: {bad_c[0]['m7t']} {bad_c[0]['m7p']}% przy progu {bad_c[0]['m7thr']}%)" if bad_c else "")
+                + f"; najwiecej: dzien {top7['day']} {top7['m7t']} {top7['m7a']} = {top7['m7p']}% (prog {top7['m7thr']}%)",
+                "<= 7 x M x limit + 0.05 pkt % kazdej doby", not bad_c)
+    else:
+        rep.add("RT-17b/c: odmierzanie - dobowy limit miasta", "limit 0 (Raid Refugees Town Intake = 0 - bez limitu)", "INFO", None)
+    # RT-17d czekajacy przydzieleni miastu sa w regionie
+    bad_d = [g for g in md if fv(g, "mwait") is not None and fv(g, "reg") is not None and fv(g, "mwait") > fv(g, "reg") + 0.5]
+    rep.add("RT-17d: odmierzanie - czekajacy przydzieleni miastu sa w regionie (jedza ze spichlerzy)",
+            f"doby niespojne {len(bad_d)}" + (f" (np. dzien {bad_d[0]['day']}: czekaja {bad_d[0]['mwait']} przy regionach {bad_d[0]['reg']})" if bad_d else "")
+            + f"; ostatnia doba {md[-1]['day']}: czekaja {md[-1]['mwait']} ({md[-1]['mwacc']} kont, {md[-1]['mwt']} miast), w regionach {md[-1]['reg']}",
+            "czekaja <= w regionach + 0.5 kazdej doby", not bad_d)
+    # RT-17e INFO
+    tot_arr = sum(fv(g, "marr") or 0.0 for g in md)
+    top_day = max(md, key=lambda g: fv(g, "marr") or 0.0)
+    rep.add("RT-17e: odmierzanie - ruch (INFO, suma dob z segmentem)",
+            f"przybyli {tot_arr:.0f} (z czekajacych {sum(fv(g, 'mwadm') or 0.0 for g in md):.0f}, w nowych kontach {sum(fv(g, 'mnew') or 0.0 for g in md):.0f}, przed przydzialem "
+            f"{sum(fv(g, 'mbef') or 0.0 for g in md):.0f}); najwiecej w dobie {top_day['day']}: {top_day['marr']}; konta przyjete w czesci (konto-doby) {sum(int(g['mpart']) for g in md)}, "
+            f"w progu pierwszego konta {sum(int(g['mfirst']) for g in md)} (ponad limit {sum(fv(g, 'mfover') or 0.0 for g in md):.0f}); dopisani przez uderzenia do czekajacych "
+            f"{sum(fv(g, 'mhit') or 0.0 for g in md):.0f}; na koniec czekaja przydzieleni {md[-1]['mwait']}, bez miasta {md[-1]['mspn']} kont ({md[-1]['mspp']} ludzi)",
+            "INFO (fin86 bez odmierzania: 50746 jednego dnia, 151351 w tydzien)", None)
+    # RT-17f wzrost ludzi miasta w 7 dob z ks-miasta.csv - od pierwszej doby z odmierzaniem
+    d0 = int(md[0]["day"])
+    cp, gr = nrt_ks_town_growth(logp, d0)
+    if gr is None:
+        rep.add("RT-17f: wzrost ludzi miasta w 7 dob (ks-miasta.csv)", f"brak pliku {cp}", "INFO", None)
+    elif not gr:
+        rep.add("RT-17f: wzrost ludzi miasta w 7 dob (ks-miasta.csv)", f"brak par tygodniowych wierszy od doby {d0}", "INFO", None)
+    else:
+        mfm = fv(md[-1], "mfm") or 2.0
+        mlim = (fv(md[-1], "mlim") or 0.0) / 100.0
+        thr = 8.0 * mfm * mlim + 0.03 if mlim > 0 else None
+        t = gr[0]
+        rep.add("RT-17f: wzrost ludzi miasta w 7 dob (ks-miasta.csv, od pierwszej doby z odmierzaniem)",
+                f"najwiekszy: {t[1]} {t[3]:.0f} (doba {t[2]}) -> {t[5]:.0f} (doba {t[4]}) = {100 * t[0]:+.1f}%; par ponad prog "
+                f"{sum(1 for x in gr if thr is not None and x[0] > thr)} z {len(gr)}",
+                (f"<= 8 x M x limit + 3 pkt % = {100 * thr:.1f}%" if thr is not None else "INFO (limit 0)") + " (fin86 bez odmierzania: Sharp Point x6.9)",
+                (t[0] <= thr) if thr is not None else None)
 
 
 # ------------------------------------------------------------ ks-arm (noc 17/18.10): samo uzbrojenie KS, twarde bramki, bramka krainy
