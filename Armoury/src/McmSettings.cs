@@ -1328,6 +1328,10 @@ namespace Armoury
         [SettingPropertyGroup("The master's parry")]
         public bool AutoParryMirrorSides { get; set; } = true;
 
+        [SettingPropertyBool("Autotest Battle Kit", HintText = "test runs only (the CrashScribe automatic test, switched on by its autotest.json file) - no effect in your game: before a test battle the test company's men get the missing pieces of their own troop kit into the company stores, as recruits bring theirs, so the battle test fights armed; after the battle the same pieces are taken away again. Off = test men fight with whatever the stores hold, as before")]
+        [SettingPropertyGroup("Automatic test only")]
+        public bool AutotestBattleKit { get; set; } = true;
+
         [SettingPropertyBool("Cavalry Needs Mounts", HintText = "upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; the horse goes into the new rider's armoury, for the AI just as for you (AI Upgrade Horse To Armory; always with Troops Fight With Own Kit Only)")]
         [SettingPropertyGroup("A knight needs a horse")]
         public bool CavalryNeedsMounts { get; set; } = true;
@@ -8091,6 +8095,7 @@ namespace Armoury
             s.AutoParryFullDiff = AutoParryFullDiff;
             s.AutoParryTwoHandedOnly = AutoParryTwoHandedOnly;
             s.AutoParryMirrorSides = AutoParryMirrorSides;
+            s.AutotestBattleKit = AutotestBattleKit;
             s.CavalryNeedsMounts = CavalryNeedsMounts;
             s.WarHorseFromTier = WarHorseFromTier;
             s.NobleHorseFromTier = NobleHorseFromTier;

@@ -76,6 +76,7 @@ namespace Armoury
                 SmithAudit.ApplyAll(_harmony);
                 QuartermasterLaw.ApplyAll(_harmony);
                 try { GarrisonKit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("GarrisonKit.ApplyAll", e); }   // K1 (A10): zaloga w bitwie gracza walczy sprzetem ze swojej zbrojowni (latka DTE)
+                try { AutotestBattleKit.ApplyAll(_harmony); } catch (Exception e) { Log.Error("AutotestBattleKit.ApplyAll", e); }   // f5-bitwa: zestaw bitwy autotestu (tylko DLL autotestu CrashScribe)
                 MarketGlut.ApplyAll(_harmony);
                 SupplyDemand.ApplyAll(_harmony); // prawo podazy i popytu dla uzbrojenia - PO MarketGlut (Jeff 04.10)
                 MaterialLaw.ApplyAll(_harmony);  // surowce: przetopy, XP przetopu, wydobycie (Jeff 04.10)

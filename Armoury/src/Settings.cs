@@ -451,6 +451,13 @@ namespace Armoury
         public bool AutoParryTwoHandedOnly = true;         // the master's parry works only with two-handed blades (off = any melee weapon)
         public bool AutoParryMirrorSides = true;           // side swings block mirror-wise (his left = your right) - flip if blocks feel wrong-sided
 
+        // --- Automatic test only ---
+        // recenzja 18.10: klucz testowy we wlasnej grupie MCM (nie w 'The master's parry') - nic nie robi poza biegiem autotestu CrashScribe
+        // f5-bitwa (noc 17/18.10): AutotestBattleKit.cs - w bitwach autotestu druzyna gracza (34 ludzi zapisu testu + 25 czempionow dolozonych bez kompletu)
+        // walczyla bez broni, zbroi i koni (pusta zbrojownia DTE + TroopsFightWithOwnKitOnly; kara morale DTE 20 kazdemu) - przegrywala z bandytami. Tylko DLL
+        // autotestu CrashScribe: brakujace sztuki wzorcow do zbrojowni przed bitwa (plan mocna i odwrot), po bitwie zdjete. W grze nieczynne. Linia 'Bitwa autotestu (f5-bitwa)'
+        public bool AutotestBattleKit = true;              // test runs only (the CrashScribe automatic test, switched on by its autotest.json file) - no effect in your game: before a test battle the test company's men get the missing pieces of their own troop kit into the company stores, as recruits bring theirs, so the battle test fights armed; after the battle the same pieces are taken away again. Off = test men fight with whatever the stores hold, as before
+
         // --- A knight needs a horse ---
         public bool CavalryNeedsMounts = true;             // upgrading a man into a MOUNTED troop takes a mount from the party inventory - yours and the AI's alike, one horse per man; the horse goes into the new rider's armoury, for the AI just as for you (AI Upgrade Horse To Armory; always with Troops Fight With Own Kit Only)
         public int WarHorseFromTier = 4;                   // from this tier the upgrade demands a proper WAR horse

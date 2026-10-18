@@ -731,6 +731,9 @@ namespace Armoury
         // wspolnej linii konstruktora, ktora dopisuja inne paczki)
         private readonly bool _inwestReset = InwestReset();
         private static bool InwestReset() { try { VillageCrafts.Reset(); DistrictIcon.Reset(); DistrictWorks.Reset(); } catch (Exception e) { Log.Error("InwestReset", e); } return true; }
+        // f5-bitwa (noc 17/18.10): zestaw bitwy autotestu - stan poprzedniej kampanii od zera (osobna linia, jak inwest)
+        private readonly bool _f5BitwaReset = F5BitwaReset();
+        private static bool F5BitwaReset() { try { AutotestBattleKit.Reset(); } catch (Exception e) { Log.Error("F5BitwaReset", e); } return true; }
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -1432,9 +1435,13 @@ namespace Armoury
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("ArmouryBehavior.OnMapEventEnded", OnMapEventEnded));
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("HorseFate.OnMapEventEnded", HorseFate.OnMapEventEnded));   // E6/K1 (211): zwyciezcy i ich wklad dla pokonanych (dobytek rozbitych - przed HandleMapEventEnd)
             CampaignEvents.MapEventStarted.AddNonSerializedListener(this, OnMapEventStarted);
+            // f5-bitwa (noc 17/18.10; recenzja 18.10 - MbEvent: dopisany wczesniej = wolany pozniej): zestaw bitwy autotestu zdjety PO delegacie
+            // GatherFallen+WearKeep+AmmoRecovery (rejestracja PRZED nim), ksiega przycieta ReconcileStock; misja otwarta - pierwsza godzina; tylko autotest
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("AutotestBattleKit.OnMapEventEnded", AutotestBattleKit.OnMapEventEnded));
             // polegli oddaja rynsztunek na wozy zaraz po bitwie
             CampaignEvents.MapEventEnded.AddNonSerializedListener(this, DayProfile.MapEnd("GatherFallen+WearKeep+AmmoRecovery",
                 delegate (MapEvent me) { try { if (me != null && me.IsPlayerMapEvent) GatherFallen(); } catch { } try { if (me != null && me.IsPlayerMapEvent) WearKeep.AfterBattle(); } catch { } try { if (me != null && me.IsPlayerMapEvent) AmmoRecovery.AfterBattle(); } catch { } }));
+            CampaignEvents.HourlyTickEvent.AddNonSerializedListener(this, DayProfile.Hr("AutotestBattleKit.Hourly", AutotestBattleKit.Hourly));
             CampaignEvents.OnNewItemCraftedEvent.AddNonSerializedListener(this, OnNewItemCrafted);
             // DEPOZYT KWATERMISTRZA NIE MA PRAWA WEJSC DO SAVE'A: schowane
             // na czas ekranu zbrojowni sztuki zyja poza rosterem - zapis gry
@@ -1447,6 +1454,8 @@ namespace Armoury
             CampaignEvents.OnPrisonerTakenEvent.AddNonSerializedListener(this, OnPrisonerTaken);
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, UniqueSpoils.OnPrisonerTaken);
             CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, CaptiveArmory.OnPrisonerTaken);   // C4 (Jeff 14.10): pojmany gracz - zbrojownia DTE do zdobywcy, jak u lorda AI
+            // f5-bitwa (recenzja 18.10): pojmany gracz - zestaw bitwy autotestu zdjety PRZED CaptiveArmory (rejestracja PO nim = wolanie przed nim); tylko autotest
+            CampaignEvents.HeroPrisonerTaken.AddNonSerializedListener(this, AutotestBattleKit.OnPrisonerTaken);
             CrownRents.RegisterEvents(this);    // 180 (C3): bitwy, rabunki i szturmy z wrogiem o kazdej porze doby - pomiar sluzby (tylko liczniki do ticku)
             WarFront.RegisterEvents(this);      // N5-E: te same zdarzenia z miejscem - warownie przy froncie (budowle cywilne z dala od frontu)
             Ransom178.RegisterEvents(this);     // 178: wielki jeniec przy pojmaniu przechodzi na korone zdobywcy (nagroda 1/10)
@@ -1482,6 +1491,9 @@ namespace Armoury
                     try { SaddleLaw.OnSettlementEntered(mp, st); } catch { }   // E8/H (271): uprzaz z taboru do zbrojowni do zapasu siodel - po Stajni, przed sprzedaza nadwyzek i zakupami sprzetu
                     try { if (mp == MobileParty.MainParty) ElephantQuarantine.Sweep(st); } catch { }
                 }));
+            // f5-bitwa (recenzja 18.10 - MbEvent: dopisany pozniej = wolany wczesniej): zestaw bitwy autotestu czekajacy na zdjecie schodzi PRZED
+            // Orders+Stables+SaddleLaw i PRZED sprzedaza nadwyzek ludzi (MenPurse.OnEntered) - rejestracja PO nich; tylko autotest
+            CampaignEvents.SettlementEntered.AddNonSerializedListener(this, delegate (MobileParty p, Settlement st, Hero h) { try { if (p != null && p.IsMainParty) AutotestBattleKit.OnMainEntered(); } catch { } });
             CampaignEvents.DailyTickSettlementEvent.AddNonSerializedListener(this, DayProfile.TownDay("ElephantQuarantine+TroopSelfMend.Run",
                 delegate (Settlement st)
                 {
