@@ -81,6 +81,7 @@ namespace Armoury
         private static long _dRentC, _dOwnC;   // 110: zawor zamkow i jego "wlasne" (swiat, dzis)
         private static long _dCrownRent;        // 180: renty korony (swiat, dzis)
         private static long _dGers;             // f19-e3: gersuma f7-kasy panom (swiat, dzis) - poza "ziemia", w "jednorazowych"
+        private static long _dGersRent;         // recenzja calosci 18/19.10: czesc rent korony z gersumy korony (swiat, dzis) - poza "korona", w "jednorazowych"
         private static long _dVd, _dWd, _dRentV, _dRentT, _dOwn, _dPol, _dSup, _dRefund, _dMint, _dMerc, _dShop, _dCarPar, _dFamily, _dOther, _dOnce, _dDouble, _dInflow, _dVdCalc;
         private static int _dVdOff, _dLooseN, _dClans;
         // "inne z modelu" rozbite (przeglad 169c): znane linie spoza D, wplyw bez opisu (m.in. "za tier" gry - Add bez nazwy), nierozpoznane (modul)
@@ -105,7 +106,7 @@ namespace Armoury
         internal static void ResetStable()
         {
             _parts.Clear(); _rVTax.Clear(); _rRent.Clear(); _rTown.Clear(); _rLoose.Clear(); _ownPaid.Clear(); _ownPaidOld.Clear(); _ownByClan.Clear(); _rCastle.Clear(); _ownCastleByClan.Clear();
-            _gersByClan.Clear(); _dGers = 0;   // f19-e3
+            _gersByClan.Clear(); _dGers = 0; _dGersRent = 0;   // f19-e3; recenzja calosci 18/19.10
             _rNeedCut.Clear();   // recenzja calosci 18.10
             _stSaved.Clear(); _stImportN = -1; _stImportBad = 0;   // f19-e3
             _villagesOf.Clear(); _vTaxOf.Clear(); _cutToday.Clear(); _cutBlind.Clear(); _bankrupt.Clear(); _bankruptBlind.Clear(); _unknown.Clear(); DayEstates = 0;
@@ -117,7 +118,7 @@ namespace Armoury
 
         private static void ZeroStableDay()
         {
-            _dRentC = _dOwnC = 0; _dCrownRent = 0; _dGers = 0;
+            _dRentC = _dOwnC = 0; _dCrownRent = 0; _dGers = 0; _dGersRent = 0;
             _dVd = _dWd = _dRentV = _dRentT = _dOwn = _dPol = _dSup = _dRefund = _dMint = _dMerc = _dShop = _dCarPar = _dFamily = _dOther = _dOnce = _dDouble = _dInflow = _dVdCalc = 0;
             _dVdOff = _dLooseN = _dClans = 0;
             _dKnown = _dUnlisted = _dUnrec = _dUnrecAbs = 0;
@@ -461,18 +462,21 @@ namespace Armoury
             // f19-e3: gersuma f7-kasy pana tej doby (z renty miast, po "wlasnych") - z "ziemi" do "jednorazowych"; suma czesci bez zmian (0 bez klucza)
             long gersC; _gersByClan.TryGetValue(c, out gersC);
             gersC = Math.Max(0L, Math.Min(gersC, rentT - ownT));
+            // recenzja calosci 18/19.10 (ta sama zasada po stronie korony): czesc renty korony 180 z gersumy korony tej doby (CrownRents -> NoteRentGers) - z "korony"
+            // do "jednorazowych"; suma czesci bez zmian (0 bez klucza Ks Farm Catch Up One Off)
+            long rentG = Math.Max(0L, Math.Min(r.TodayRentGers, r.TodayRent));
             _t[QLand] = vd + wd + rent - own - gersC;
             _t[QOwn] = own;
-            _t[QCrown] = pol + sup + r.TodayRefund + r.TodayCrown + r.TodayRent;   // 180: renta korony w czesci "korona" (raz - poza jednorazowymi)
+            _t[QCrown] = pol + sup + r.TodayRefund + r.TodayCrown + r.TodayRent - rentG;   // 180: renta korony w czesci "korona" (raz - poza jednorazowymi); bez czesci z gersumy korony
             _t[QContract] = merc + r.TodayContract;   // 185: kontrakt najemnika od korony (gra dla AI - 0)
             _t[QAssets] = shop + carpar - family;
-            _t[QOnce] = once + gersC;
+            _t[QOnce] = once + gersC + rentG;
             _t[QOther] = other;
             _t[QFamily] = family;
             _t[QInflow] = a + rent + r.Today;
             _t[QDouble] = Math.Min(Math.Max(0L, once), r.TodayEstates);
             _t[QReaver] = Math.Min(Math.Max(0L, once - _t[QDouble]), Math.Max(0L, r.TodayReaver));   // WW2 (wyspy-wolni): lup na zalogi w jednorazowych (nigdy wiecej niz one)
-            _t[QGers] = gersC;   // f19-e3: "w tym" jednorazowych (QDouble i QReaver licza sie z jednorazowych zdarzen - bez gersumy)
+            _t[QGers] = gersC + rentG;   // f19-e3: "w tym" jednorazowych (QDouble i QReaver licza sie z jednorazowych zdarzen - bez gersumy); recenzja calosci: + renty z gersumy korony
             PartRing pr;
             if (!_parts.TryGetValue(c, out pr)) { pr = new PartRing(); _parts[c] = pr; }
             pr.Push(_t);
@@ -518,6 +522,7 @@ namespace Armoury
             _dVd += vd; _dWd += wd; _dRentV += Math.Max(0, rentV); _dRentT += rentT; _dOwn += ownT; _dRentC += rentC; _dOwnC += ownC; _dPol += pol; _dSup += sup; _dRefund += r.TodayRefund; _dMint += r.TodayCrown;
             _dCrownRent += r.TodayRent;   // 180
             _dGers += gersC;              // f19-e3
+            _dGersRent += rentG;          // recenzja calosci 18/19.10
             _dMerc += merc; _dShop += shop; _dCarPar += carpar; _dFamily += family; _dOther += other; _dOnce += once; _dDouble += _t[QDouble]; _dInflow += _t[QInflow]; _dClans++;
         }
 
@@ -849,7 +854,8 @@ namespace Armoury
               .Append(", majatek ").Append(N0(sAssets))
               .Append(" | poza D: wlasne ").Append(N0(sOwn)).Append(", jednorazowe ").Append(N0(sOnce)).Append(" (w tym podwojne - majatki BK ").Append(N0(sDouble)).Append("), inne z modelu ").Append(N0(sOther))
               .Append(", przelewy w rodzie ").Append(N0(sFam)).Append(", zajete w D3 - (168)")
-              .Append(sGers > 0 || _dGers > 0 ? "; gersuma kas miast panom (f19-e3, w jednorazowych, nie w ziemi) " + N0(sGers) + " (dzis " + _dGers + ")" : "")   // f19-e3
+              .Append(sGers > 0 || _dGers > 0 || _dGersRent > 0 ? "; gersuma kas miast panom (f19-e3, w jednorazowych, nie w ziemi) " + N0(sGers) + " (dzis " + _dGers + ")"
+                      + ", w tym czesc rent korony z gersumy korony (nie w koronie) dzis " + _dGersRent : "")   // f19-e3; recenzja calosci 18/19.10
               .Append(" | kontrola zamkniecia (z budowy - inne z modelu to reszta; tylko blad ksiegowania): ")
               .Append(N0(sParts)).Append(" wobec ").Append(N0(sInflow)).Append(" - roznica ").Append(closure.ToString("0.00", inv)).Append("%")
               .Append(" | dzis (swiat): linie modelu - podatek wsi ").Append(_dVd).Append(" (wedlug wsi BK ").Append(_dVdCalc).Append(", roznica u ").Append(_dVdOff).Append(" rodow), cla i podatek miast ").Append(_dWd)

@@ -622,6 +622,7 @@ namespace Armoury
                                     if (c == Clan.PlayerClan) playerPaid += x;
                                     CirculationWindows.NoteHeroGold(h, x);         // paczka 169b: glowa poza swiatem - zloto wyszlo ze swiata (tylko licznik)
                                     ClanIncomeBook.NoteInflow(h, x, ClanIncomeBook.KRent);   // D rodu: czesc "korona" (renta)
+                                    ClanIncomeBook.NoteRentGers(h, CrownIncome.GersShareOf(k, x));   // recenzja calosci 18/19.10: czesc z gersumy korony - w D stalym jednorazowa (0 bez klucza)
                                 }
                                 catch (Exception e) { Stumble("Daily(wyplata)", e); }
                             }

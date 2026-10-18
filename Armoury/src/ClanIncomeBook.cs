@@ -41,6 +41,7 @@ namespace Armoury
             public long TodayEstates;                                  // 169c: w tym wyplaty majatkow BK widziane jako zdarzenie (podwojne) - tylko pamiec
             public long TodayContract;                                 // 185: kontrakt najemnika od korony (w Today; czesc "kontrakt" D stalego, nie jednorazowe)
             public long TodayRent;                                     // 180: renta korony (w Today; czesc "korona" D stalego, nie jednorazowe)
+            public long TodayRentGers;                                 // recenzja calosci 18/19.10 (klucz Ks Farm Catch Up One Off): "w tym" TodayRent - czesc renty z gersumy korony tej doby (jednorazowa w D stalym); tylko pamiec
             public long TodayRansom;                                   // 178: okupy otrzymane (w Today; jednorazowe od prawdziwego platnika - 168 limit i splata kredytu)
             public long TodayShips;                                    // 3.1/3.3 (33) 181: wyplaty portow za statki (czesc TodayEvtSettl) - poza limitem KW (E2 R16 "limit bez statkow")
             public long TodayReaver;                                   // WW2 (wyspy-wolni): zelazna cena ponad s (czesc TodayEvtSettl), nabrzeze i dziesiecina korsarzy (KReaver) - kosz lupu na zalogi
@@ -150,6 +151,22 @@ namespace Armoury
                 if (r != null) r.TodayNeedCut += amount;
             }
             catch (Exception e) { Stumble("NoteNeedCut", e); }
+        }
+
+        /// <summary>Recenzja calosci 18/19.10 (klucz Ks Farm Catch Up One Off - ta sama zasada co gersuma pana, f19-e3): czesc renty korony 180 (juz w TodayRent przez
+        /// NoteInflow KRent), ktora pochodzi z gersumy korony tej doby (CrownIncome.GersShareOf) - tylko znacznik "w tym" (Today i TodayRent bez zmian); StableClan
+        /// przenosi ja z czesci "korona" do "jednorazowych" (QGers). Nie rzuca.</summary>
+        internal static void NoteRentGers(Hero h, long amount)
+        {
+            try
+            {
+                if (!On || h == null || amount <= 0) return;
+                var c = h.Clan;
+                if (c == null || c.IsBanditFaction) return;
+                var r = Of(c);
+                if (r != null) r.TodayRentGers += amount;
+            }
+            catch (Exception e) { Stumble("NoteRentGers", e); }
         }
 
         /// <summary>WW2 (wyspy-wolni): czesc wplywu, ktory ksiega juz zobaczyla jako zdarzenie gry (przyrost zelaznej ceny ponad s - przelew kiesa wsi -> wodz,
@@ -381,6 +398,7 @@ namespace Armoury
                         r.Evt = r.TodayEvtNone + r.TodayEvtSettl + r.TodayEvtOther;
                         if (sd) { try { StableClan(c, r, en, haveEn, (long)a, b); } catch (Exception e) { Stumble("StableClan", e); } }   // 169c: przed zerowaniem Today*
                         r.Today = r.TodayRefund = r.TodayCrown = r.TodayEvtNone = r.TodayEvtSettl = r.TodayEvtOther = r.TodayThird = r.TodayEstates = r.TodayContract = r.TodayRent = 0;
+                        r.TodayRentGers = 0;   // recenzja calosci 18/19.10 (razem z TodayRent)
                         r.TodayRansom = 0;   // 178
                         r.TodayShips = 0;   // 3.1/3.3 (33) 181
                         r.TodayReaver = 0;  // WW2 (wyspy-wolni)

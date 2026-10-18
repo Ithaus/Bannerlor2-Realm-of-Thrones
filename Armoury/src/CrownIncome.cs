@@ -184,6 +184,27 @@ namespace Armoury
         /// <summary>Ile z wplywow dnia krolestwo moze jeszcze wydac (0 poza 165).</summary>
         internal static long LeftFor(Kingdom k) { var d = DayOf(k); return d != null ? Math.Max(0, Math.Min(d.Left, (long)k.KingdomBudgetWallet)) : 0; }
 
+        /// <summary>Recenzja calosci 18/19.10 (klucz Ks Farm Catch Up One Off - ta sama zasada co gersuma pana, f19-e3): czesc kwoty `x` wyplaconej dzis z wplywow
+        /// dnia krolestwa (renta 180), ktora pochodzi z gersumy korony tej doby - udzial gersumy (DsTowns.GersumaCrownOf, w TownPurse.CrownToday, wiec w Own) w zrodlach
+        /// doby z Begin: Own + "inne" bez jednorazowych do zapasu (Windfall) + 1/N zapasu (Release). Proporcja jak w puli - zloto jest jedno. 0 bez klucza, bez gersumy
+        /// i bez doby korony. Tylko liczba (znacznik D stalego rodu); nie rzuca.</summary>
+        internal static long GersShareOf(Kingdom k, long x)
+        {
+            try
+            {
+                if (x <= 0) return 0;
+                long g = DsTowns.GersumaCrownOf(k);
+                if (g <= 0) return 0;
+                var d = DayOf(k);
+                if (d == null) return 0;
+                g = Math.Min(g, Math.Max(0L, d.Own));
+                double src = Math.Max(0L, d.Own) + Math.Max(0L, d.Other - d.Windfall) + Math.Max(0L, d.Release);
+                if (g <= 0 || src <= 0) return 0;
+                return Math.Max(0L, Math.Min(x, (long)Math.Round(x * Math.Min(1.0, g / src))));
+            }
+            catch (Exception e) { Stumble("GersShareOf", e); return 0; }
+        }
+
         /// <summary>
         /// E3-G5 (klucz CrownKeepsValveShare, DOMYSLNIE WYLACZONY - dzwignia awaryjna; uwagi recenzji 1 i 2: w Begin cielo by caly dzien korony, takze zwrot zoldu,
         /// i dublowalo regulator czesci korony straznika 5 x brak do 22%): CrownRents.Daily po M3, tuz przed podzialem rent - gdy wczorajszy udzial koron

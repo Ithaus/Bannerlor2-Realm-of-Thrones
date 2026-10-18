@@ -76,6 +76,7 @@ namespace Armoury
         private const int GiveUpDays = 30;          // tyle dob czekania na warunki chwilowe - potem osada pominieta ("czekanie")
         private const int MaxRowErrors = 3;         // wyjatki na jednej osadzie - potem pominieta ("blad"); nic nie gasnie globalnie
         private const float BattleNear = 5f;        // bitwa w tym promieniu od bramy = osada czeka
+        private const float ThreatRadius = 40f;     // recenzja calosci 18/19.10: promien pomiaru sil przy przywroconej twierdzy (tylko log; wiersz z wiekszym promieniem korekty - jego promien)
 
         /// <summary>Wiersz tabeli: osada -> rod docelowy (i krolestwo, w ktorym rod ma byc), blizniak ROT, promien korekty fabuly, zwrot skarbca.</summary>
         private sealed class Row
@@ -505,6 +506,13 @@ namespace Armoury
                     catch (Exception e) { Stumble("Refund(" + row.Id + ")", e); sb.Append(" | zwrot skarbca: BLAD (log wyzej)"); }
                 }
             }
+            // recenzja calosci 18/19.10 (tylko pomiar, decyzja Jeffa w CHANGELOG): zaloga nowego pana jest pusta (g), a korekta fabuly (e) jest tylko pod KL i tylko wobec
+            // krolestwa starego pana - linia mowi, jakie sily wrogow nowego pana (wszystkie krolestwa w wojnie z nim) i jakie jego wlasne stoja przy bramie po zmianie
+            if (st.MapFaction == newF)
+            {
+                try { sb.Append(" | ").Append(Threat(st, newF, Math.Max(ThreatRadius, row.ClearRadius))); }
+                catch (Exception e) { Stumble("Threat(" + row.Id + ")", e); }
+            }
             if (!stOk || !twinOk)
             {
                 sb.Append(" | ZMIANA NIE WESZLA w calosci (").Append(Nm(st)).Append(" pan ").Append(st.OwnerClan != null ? st.OwnerClan.Name.ToString() : "-");
@@ -814,6 +822,40 @@ namespace Armoury
             return "korekta fabuly (promien " + r.ToString("0", Inv) + "): przeniesione grupy " + nGroups + ", partie " + nParties + ", ludzie " + nMen
                    + (names.Count > 0 ? " [" + string.Join("; ", names.ToArray()) + "]" : "") + (nSea > 0 ? ", na morzu pominiete " + nSea : "")
                    + (nNoDest > 0 ? ", bez twierdzy poza promieniem " + nNoDest : "") + (busy != null ? ", zostaly (bitwa albo oblezenie po zmianie): " + busy : "");
+        }
+
+        // ------------------------------------------------------------ pomiar: sily przy bramie po zmianie (recenzja calosci 18/19.10, tylko log)
+        /// <summary>Partie lordow na ladzie w promieniu `r` od bramy: krolestw w wojnie z nowym panem (wrogowie - ryzyko odbicia twierdzy z pusta zaloga) i krolestwa
+        /// nowego pana (wlasne); ludzie zdrowi. Najwieksza wroga grupa: armia (partie tej samej armii w promieniu razem) albo samodzielna partia. Nic nie zmienia.</summary>
+        private static string Threat(Settlement st, IFaction newF, float r)
+        {
+            var p = st.GatePosition.ToVec2();
+            int eP = 0, eM = 0, oP = 0, oM = 0;
+            var groups = new Dictionary<object, int>();
+            var names = new Dictionary<object, string>();
+            foreach (var k in Kingdom.All)
+            {
+                if (k == null || k.IsEliminated) continue;
+                bool own = (IFaction)k == newF;
+                if (!own && !k.IsAtWarWith(newF)) continue;
+                foreach (var w in k.WarPartyComponents)
+                {
+                    var mp = w != null ? w.MobileParty : null;
+                    if (!LandParty(mp) || !mp.IsLordParty || mp.IsCurrentlyAtSea) continue;
+                    if (mp.Position.ToVec2().Distance(p) > r) continue;
+                    int men = mp.MemberRoster != null ? mp.MemberRoster.TotalHealthyCount : 0;
+                    if (own) { oP++; oM += men; continue; }
+                    eP++; eM += men;
+                    object key = mp.Army != null ? (object)mp.Army : mp;
+                    int g0; groups.TryGetValue(key, out g0); groups[key] = g0 + men;
+                    if (!names.ContainsKey(key))
+                        names[key] = (mp.Army != null ? "armia " + Nm(mp.Army.LeaderParty) : Nm(mp)) + " (" + Nm(k) + ")";
+                }
+            }
+            string big = "-"; int bigM = -1;
+            foreach (var kv in groups) if (kv.Value > bigM) { bigM = kv.Value; big = names[kv.Key] + " " + kv.Value + " ludzi"; }
+            return "sily w promieniu " + r.ToString("0", Inv) + " po zmianie (tylko pomiar - ryzyko odbicia pustej twierdzy): wrogowie " + Nm(newF) + " " + eP + " partii lordow, "
+                   + eM + " ludzi zdrowych (najwieksza grupa: " + big + "), wlasne partie " + Nm(newF) + " " + oP + ", " + oM + " ludzi";
         }
 
         // ------------------------------------------------------------ (f) zwrot skarbca

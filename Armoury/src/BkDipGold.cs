@@ -108,6 +108,7 @@ namespace Armoury
         private static int _kN, _kNoRecvN, _kOffN, _kFallsN;
         private static long _sPaid, _sToTown, _sPlayer, _sOff;                  // f19-e1 (5)
         private static int _sCalls, _sN, _sOffN, _sBroke;
+        private static int _sDrained;                                          // recenzja calosci 18/19.10: budzet BK doszedl do 0 (kiesa glowy wyczerpana) - dalsze pozycje BK bez limitu
         private static long _cPaid, _cPlayer, _cLeader, _cMembers, _cSeat, _cKept, _cOff, _cToPlayer;   // f19-e1 (6)
         private static int _cN, _cMembersN, _cSeatN, _cKeptN, _cOffN, _cNoLeaderN;
         private static int _overflow, _stumbles;
@@ -132,7 +133,7 @@ namespace Armoury
             _pkValue = _pkOff = _pkPaid = 0; _pkLeft = _pkUnits = _pkOffN = _pkSold = _pkNoFence = 0;
             _fHostPaid = _fTownGot = _fCut = _fOff = 0; _fN = _fCutN = _fOffN = 0;
             _kDue = _kPaid = _kPlayer = _kNoRecv = _kOff = 0; _kN = _kNoRecvN = _kOffN = _kFallsN = 0;
-            _sPaid = _sToTown = _sPlayer = _sOff = 0; _sCalls = _sN = _sOffN = _sBroke = 0;
+            _sPaid = _sToTown = _sPlayer = _sOff = 0; _sCalls = _sN = _sOffN = _sBroke = 0; _sDrained = 0;
             _cPaid = _cPlayer = _cLeader = _cMembers = _cSeat = _cKept = _cOff = _cToPlayer = 0; _cN = _cMembersN = _cSeatN = _cKeptN = _cOffN = _cNoLeaderN = 0;
             _overflow = 0;
         }
@@ -422,6 +423,11 @@ namespace Armoury
                 _sCalls++;
                 if (__state.G0 <= 0) _sBroke++;                            // BK: budzet = kiesa glowy, przy 0 bez limitu - towar schodzi, zaplata obcieta do 0 (tylko licznik)
                 long paid = (long)__state.G0 - __state.H.Gold;
+                // recenzja calosci 18/19.10 (decyzja 3 f19-e1): CourtGrace podaje budzet = kiesa glowy (G0), a BuyGoods ogranicza zakup tylko przy budget > 0 i odejmuje
+                // pelne ceny (int) - budzet dochodzi do DOKLADNIE 0, gdy kiesa jest wielokrotnoscia ceny ograniczajacego lotu; od tej chwili kolejne pozycje ida bez limitu,
+                // a ChangeHeroGold(-suma) obcina kiese do 0 (Hero.Gold = Max(0, v)). Zaplacone == G0 przy G0 > 0 <=> budzet doszedl do 0 (inaczej suma = G0 - reszta budzetu < G0):
+                // towar ponad zaplate MOZLIWY (BK nie mowi, ile kupil po zerze). Tylko licznik - obok _sBroke (G0 <= 0) do pomiaru decyzji 3
+                if (__state.G0 > 0 && paid == __state.G0 && __state.H.Gold == 0) _sDrained++;
                 if (paid <= 0) return;                                     // nic nie kupil (albo kiesa pusta - BK obcina zaplate do 0)
                 _sN++; _sPaid += paid;
                 if (__state.H == Hero.MainHero) _sPlayer += paid;
@@ -650,7 +656,8 @@ namespace Armoury
                 if (_kOffN > 0) sb.Append("; w nicosc jak dotad ").Append(_kOff).Append(" (").Append(_kOffN).Append(')');
                 // f19-e1 (5, 6): po paktach, przed kontrola (zadna fraza wierszy E5/A8 sprawdzarki nie powtarza sie tu - "bez odbiorcy (klucz wylaczony)" zamiast "w nicosc jak dotad")
                 sb.Append(" | zakupy dworu BK (BuyGoods)").Append(CourtShopOn ? "" : " WYLACZONE (Court Shopping Pays Town)").Append(": wywolan ").Append(_sCalls)
-                  .Append(", glowy rodow zaplacily ").Append(_sPaid).Append(" (").Append(_sN).Append(" zakupow; gracz ").Append(_sPlayer).Append(") -> do kas miast targu ").Append(_sToTown).Append("; wywolan przy pustej kiesie glowy (BK bierze towar bez zaplaty - tylko licznik) ").Append(_sBroke);
+                  .Append(", glowy rodow zaplacily ").Append(_sPaid).Append(" (").Append(_sN).Append(" zakupow; gracz ").Append(_sPlayer).Append(") -> do kas miast targu ").Append(_sToTown).Append("; wywolan przy pustej kiesie glowy (BK bierze towar bez zaplaty - tylko licznik) ").Append(_sBroke)
+                  .Append(", wywolan z kiesa glowy wyczerpana do 0 (budzet BK doszedl do 0 - dalsze pozycje bez limitu, towar ponad zaplate mozliwy - tylko licznik) ").Append(_sDrained);
                 if (_sOffN > 0) sb.Append(", bez odbiorcy (klucz wylaczony) ").Append(_sOff).Append(" (").Append(_sOffN).Append(')');
                 sb.Append(" | ugoda z grupa interesu BK (FinancialCompromise)").Append(CompromiseOn ? "" : " WYLACZONE (Group Compromise Pays Group)").Append(": ").Append(_cN)
                   .Append(", platnicy zaplacili ").Append(_cPaid).Append(" (gracz ").Append(_cPlayer).Append(") -> przywodcom grup ").Append(_cLeader).Append(", czlonkom ").Append(_cMembers)
