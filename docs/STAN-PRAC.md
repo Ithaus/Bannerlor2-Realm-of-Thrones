@@ -2862,3 +2862,10 @@ DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur
 - 00:30 PDT: TEST fin87 = f5fd0ae3 (Armoury 4d4e6f66) z armoury-ks-auto.flag (USUNAC!), 160 dob - sciezka gry Jeffa z fala 3 -> jesli OK: 5 dob + bitwa, WGRANIE 79 (tylko gdy Jeff nie gra).
 - 00:35 PDT: workflow wf_b945ad59-1e6 (przeglad-ekonomii-koncowy, tylko odczyt; prosba Jeffa "na koniec przejrzyj logike i sens wszystkiego"): 5 soczewek (pieniadz/akumulatory, towary,
   dynamika - zamrozone zajecia pod KS, realizm/jedna regula, gracz/grywalnosc) na f5fd0ae3 + logach fin83/84/86 -> weryfikacja -> synteza z paczkami poprawek (fala 4) i decyzjami Jeffa.
+- 01:00 PDT: KONCOWY PRZEGLAD EKONOMII (wf_b945ad59-1e6) -> docs/PRZEGLAD-EKONOMII-2026-10-18.md: 22 potwierdzone uwagi. Ekonomia szczelna (zloto swiata -0.23% w 160 dob, ksiega
+  towarow zamknieta), problem = kierunek przeplywow: (1) zwrot zoldu 70% takze rodom > 2R (63 rody, 37 mln, ok. 90-96k/d; skarbce koron -65..-80k/d) - DECYZJA JEFFA (odwolanie 15.10);
+  (2) akumulator W (103 dni zapasu, zarabia 1.75x wydatkow, trzyma go tylko danina 3%/d) - przyczyna: tanszy koszyk KS przy tym samym zarobku; (3) pod KS zajecia zamrozone (A7 WYL.,
+  92% blokow "chce" zmiany - najpierw pomiar); (4) opal x29 pod KS, ruda znika z polowy miast; (5) uchodzcy: Sharp Point 9k -> 73k w tydzien; (6) przezbrojenie warsztatow zawyza zysk 25-600x;
+  (7) firmy DS miast; (8) skory, sol, drewno bez odbiorcy; karawany traca.
+- 01:05 PDT: workflow wf_72bdc183-328 (fala 4, worktree zb/<nazwa> od f5fd0ae3): f4-ksiega-i-skory, f4-opal, f4-uchodzcy, f4-warsztaty, f4-kasy-miast-i-kupcy-z, f4-pomiary (A7 pomiar,
+  regale, karawany, drewno), f4-place-ludu (symetryczne place + zarobek W do koszyka KS, potem nizsza danina). Bez rzeczy "po decyzji Jeffa".
