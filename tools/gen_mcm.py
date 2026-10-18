@@ -433,6 +433,8 @@ RANGES = {
     'DistrictWorksAiWorldPace': (0.0, 0.1, "0.000"),
     # f5-a7 (noc 17/18.10): pasmo odchylenia rynku w sygnale A7 - kod przycina do 0..0.5 (StartCalibration.A7sBand)
     'KsSwitchMarketBand': (0.0, 0.5, "0.00"),
+    # f8-bandy (noc 18.10, decyzja Jeffa "7. b"): limit band na zajeta kryjowke - kod przycina do 48, a <= 12 (ROT) to cel gry bez zmian (BanditLimit.RaisedTarget)
+    'BanditLimitPerHideout': (12, 48, "0"),
 }
 
 def gen(module_dir, ns, display):

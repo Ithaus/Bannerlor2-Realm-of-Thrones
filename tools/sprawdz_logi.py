@@ -1609,6 +1609,20 @@ Uzycie (Python 3, tylko odczyt):
                     NWE-11 kopalnie KS bez danych (rece blokow 0 - doba po wczytaniu albo wlaczeniu; poza pierscieniem f5-ruda) i r liczone w ticku (INFO), NWE-12 krok
                     tygodniowy f5-ruda: wpisy bez wzrostu tylko przez rece weglarzy ("w tym przez rece weglarzy f7-wegiel N" - do wzrostu rece weglarzy licza sie jak brak
                     drewna; INFO, obserwowac razem z NRU-3 i nglod w krainach gorniczych).
+--grupa nbandy    : (noc 18.10, paczka f8-bandy - decyzja Jeffa "7. b ale o ile spowolni to gre gdy damy 2200 band?"; Armoury/src/BanditLimit.cs, klucze Bandit Limit Per Hideout
+                    (domyslnie 24 zamiast 12 ROT), Bandit Births Where People, Bandit Cost Log) python -I tools/sprawdz_logi.py --grupa nbandy <Armoury-*.log> [--baza-doby <log bazy>]
+                    (strumieniowo). Linie "Bandy i limit (f8-bandy): start sesji" i "...: dzien N" (bandy wobec celu klan po klanie, narodziny wedlug strefy starego celu,
+                    koszt doby w ms: rodzenie band, mysl AI godzinowa, AI taktyczne, tiki partii - bandy i inne partie, OutlawLaw.Daily; doba realna i ms/klatke) oraz "Wyrzutki:
+                    dzien N" (band, narodziny, puste; znaczniki czasu = doba realna takze bez paczki). NBD-0 linie paczki (0 nieczytelnych), NBD-B bandy i doba realna z linii
+                    Wyrzutki (INFO - baza fin86 Armoury-2026-10-17_23-22-37.log: 809 -> 942 band, 15.7 s/dobe, 16 urodzonych i 33 puste na dobe), NBD-1 latka celu zalozona,
+                    cel podniesiony w kazdej dobie przy kluczu > ROT i 'wokol teraz' = limit - w srodku, NBD-2 band klanow z kryjowkami <= cel x 1.05, NBD-3 puste narodziny
+                    przy celu podniesionym <= 5% urodzonych, NBD-4 bandy start -> koniec, pula, ludzie nowych band <= 'bandy nowe (ludzi)' z linii Wyrzutki, NBD-5 rodzenie band
+                    <= 30 ms/d srednio i linia <= 5 ms, NBD-6 AI i tiki band <= 10% doby realnej (INFO-liczby: ms/d, us na bande; ruch partii Campaign.RealTick i udzial band
+                    liniowo wedlug liczby partii - INFO), NBD-7 z --baza-doby: doba realna tych samych
+                    dob gry <= 1.15 x bazy (bez bazy INFO), NBD-8 ERROR BanditLimit i potkniecia 0, NBD-9 stopery z wywolaniami (0 = latka nie weszla), NBD-10 z --baza-doby:
+                    koszt +100 band w s/dobe (INFO). Log sprzed paczki: NBD-B z liczbami, reszta INFO, bez wyjatku. NBD-7/NBD-10 podaja klucze obu biegow (limit, cel
+                    podniesiony, narodziny przy ludziach); gdy biegi roznia sie Bandit Births Where People, NBD-10 ostrzega, ze wzrost band to limit + miejsce narodzin
+                    (czysty limit: noga z kluczem 24 i Bandit Births Where People NIE wobec nogi 24 + TAK i bazy 12).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -46733,6 +46747,291 @@ def nwegiel_main(logp):
     return 0
 
 
+# ============================================================ f8-bandy (noc 18.10, decyzja Jeffa "7. b ale o ile spowolni to gre gdy damy 2200 band?") - grupa nbandy
+# Armoury/src/BanditLimit.cs: linia startu "Bandy i limit (f8-bandy): start sesji" i linia doby "Bandy i limit (f8-bandy): dzien N" (limit band ROT na zajeta kryjowke
+# x2 przez postfiks gettera "wokol" czynnego modelu, narodziny tylko przy kryjowce z ludzmi w puli wyrzutkow, koszt AI band i doba realna). Linia "Wyrzutki: dzien N"
+# (OutlawLaw) - band, ludzi, narodziny i puste; jej znaczniki czasu daja doba realna takze w logu sprzed paczki (baza: fin86 Armoury-2026-10-17_23-22-37.log,
+# 809 -> 942 band w 161 dobach, 15.7 s/dobe; test 4-letni 2026-10-14: 320 -> 1130 band przy 13-19 s/dobe - bez widocznego trendu od liczby band).
+NBD_DAY = "Bandy i limit (f8-bandy): dzien "
+NBD_START = "Bandy i limit (f8-bandy): start sesji"
+NBD_L = re.compile(
+    r"^Bandy i limit \(f8-bandy\): dzien (\d+) \| limit na kryjowke (\d+) \(ROT (-?\d+) = (-?\d+) wokol \+ (-?\d+) w srodku; wokol teraz (-?\d+)\), "
+    r"cel podniesiony (TAK|NIE[^,]*), narodziny tylko przy kryjowce z ludzmi (TAK|NIE)[^|]*\| "
+    r"band (\d+) \(klanow z kryjowkami (\d+), lupiezcow (\d+), inne (\d+)\), ludzi (\d+), pula wyrzutkow (-?\d+), partii swiata (\d+) \| "
+    r"kryjowki zajete (\d+) z (\d+): klany z kryjowkami (\d+) - zajete (\d+), cel (\d+) \(stary (\d+)\), band klanow (\d+), ponad stary cel (\d+), band/cel (\S+) \| "
+    r"klany \(band/cel/zajete\): (.*?) \| "
+    r"narodziny dzis: prob po bramkach OutlawLaw (-?\d+), ponizej starego celu (\d+) \(kryjowka z ludzmi (\d+), odmowione - brak ludzi przy kryjowkach klanu (\d+)\), "
+    r"ponad stary cel (\d+) \(kryjowka z ludzmi (\d+), odmowione - brak ludzi przy kryjowkach klanu (\d+)\), urodzone (\d+) "
+    r"\(puste: ponizej starego celu (\d+), ponad stary cel (\d+); ludzi: ponizej (\d+), ponad (\d+); bez sladu partii (\d+)\) \| "
+    r"koszt doby \(ms\): rodzenie band (\S+) / (\d+) wywolan; mysl AI godzinowa: bandy (\S+) / (\d+) \(inne partie (\S+) / (\d+)\); "
+    r"AI taktyczne: bandy (\S+) / (\d+) \(inne (\S+) / (\d+)\); tik godziny partii: bandy (\S+) \(inne (\S+)\); tik doby partii: bandy (\S+) \(inne (\S+)\); "
+    r"OutlawLaw\.Daily (\S+); ruch partii \(Campaign\.RealTick, wszystkie partie\) (\S+) / (\d+) klatek, udzial band wedlug liczby partii ~(\S+) \| razem bandy (\S+) ms \(inne partie (\S+) ms\), na bande (\S+) us, (\S+?)%? doby realnej \| "
+    r"doba realnie (\S+)(?: s| \(pierwsza linia sesji\)), klatek (\S+), (\S+) ms/klatke \(z pauzami gracza\) \| pieniadze i towar: [^|]*\| pomiar: [^|]*\| "
+    r"potkniecia dzis (\d+) \(sesja (\d+)\) \| czas linii (\S+) ms\.$")
+NBD_F = ("day", "limit", "rot", "around0", "inside", "around", "raised", "people",
+         "bands", "bhide", "bloot", "bother", "men", "pool", "parties",
+         "infall", "hideouts", "clans", "inf", "target", "old", "clanb", "over", "ratio",
+         "clanlist",
+         "tries", "below", "bpick", "bref", "extra", "xpick", "xref", "born", "eb", "ex", "menb", "menx", "nf",
+         "spawn", "spawnn", "thinkb", "thinkbn", "thinko", "thinkon", "tacb", "tacbn", "taco", "tacon", "hourb", "houro", "dayb", "dayo",
+         "outlaw", "real", "realn", "realband", "bandms", "otherms", "perband", "pct", "wall", "frames", "msframe", "stum", "stums", "linems")
+NBD_W = re.compile(r"^Wyrzutki: dzien (\d+) .*?bandy nowe (\d+) \((\d+) ludzi\), odmowione (\d+), puste usuniete (\d+).*?\| band (\d+), ludzi (\d+)")
+NBD_ERR = ("ERROR in BanditLimit",)
+NBD_EMPTY_MAX = 0.05          # NBD-3: puste narodziny przy celu podniesionym <= 5% urodzonych (dzis ok. 2/3 prob - 33 puste/d przy 16 urodzonych)
+NBD_SPAWN_MS = 30.0           # NBD-5: rodzenie band srednio <= 30 ms/dobe (z tworzeniem partii i sluchaczami)
+NBD_LINE_MS = 5.0             # NBD-5: czas linii doby <= 5 ms
+NBD_PCT_MAX = 10.0            # NBD-6: AI i tiki band <= 10% doby realnej (srednio)
+NBD_SDAY_RATIO = 1.15         # NBD-7: doba realna wobec biegu bazowego (te same doby gry) <= 1.15 x
+NBD_TARGET_TOL = 1.05         # NBD-2: band klanow z kryjowkami <= cel x 1.05 (BK InfestHieout dosypuje 8 band ponad limit gry)
+
+
+def _nbd_f(v):
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _nbd_sday(rows):
+    """[(sekunda doby zegara, dzien gry)] -> lista sekund na dobe gry (tylko kolejne doby, bez przerw > 10 min)."""
+    out = []
+    for a, b in zip(rows, rows[1:]):
+        dt = b[0] - a[0]
+        if dt < 0:
+            dt += 86400
+        if b[1] - a[1] == 1 and 0 < dt < 600:
+            out.append((b[1], dt))
+    return out
+
+
+def _nbd_scan(logp):
+    D = {"days": {}, "bad": [], "start": [], "w": {}, "wts": [], "errs": []}
+    with open(logp, encoding="utf-8", errors="replace") as fh:
+        for ln in fh:
+            ln = ln.rstrip("\r\n")
+            m = TS.match(ln)
+            s = m.group(2) if m else ln
+            if s.startswith(NBD_DAY):
+                a = NBD_L.match(s)
+                if a:
+                    D["days"][int(a.group(1))] = dict(zip(NBD_F, a.groups()))
+                else:
+                    D["bad"].append(s[:200])
+                continue
+            if s.startswith(NBD_START):
+                D["start"].append(s)
+                continue
+            if s.startswith("Wyrzutki: dzien "):
+                a = NBD_W.match(s)
+                if a:
+                    d = int(a.group(1))
+                    D["w"][d] = tuple(int(x) for x in a.groups()[1:])
+                    if m:
+                        hh, mm, ss = (int(x) for x in m.group(1).split(":"))
+                        D["wts"].append((hh * 3600 + mm * 60 + ss, d))
+                continue
+            if s.startswith("ERROR in ") and any(s.startswith(e) for e in NBD_ERR):
+                D["errs"].append(s[:160])
+    return D
+
+
+def _nbd_legs(D):
+    """Recenzja (pomiar A/B): opis biegu z kluczy paczki - limit i narodziny przy ludziach z linii doby (ostatnia), inaczej z linii startu; log bez paczki = 'bez paczki'.
+    Przy celu podniesionym klucz Bandit Births Where People zmienia tez miejsce narodzin (obie strefy), wiec roznica band wobec bazy miesza dwie zmiany."""
+    L = D["days"]
+    if L:
+        l = L[max(L)]
+        return f"limit {l['limit']}, cel podniesiony {'TAK' if l['raised'] == 'TAK' else 'NIE'}, narodziny przy ludziach {l['people']}", l["raised"] == "TAK" and l["people"] == "TAK"
+    for s in reversed(D["start"]):
+        a = re.search(r"Bandit Limit Per Hideout (\d+), Bandit Births Where People (TAK|NIE)", s)
+        if a:
+            return f"limit {a.group(1)}, narodziny przy ludziach {a.group(2)} (z linii startu, bez linii doby)", None
+    return "bez paczki (cel ROT, wybor kryjowki gry)", False
+
+
+def nbandy_main(logp, bdp=None):
+    """nbandy (noc 18.10, paczka f8-bandy): limit band ROT na zajeta kryjowke (klucz Bandit Limit Per Hideout, domyslnie 24 zamiast 12), narodziny tylko przy kryjowce
+    z ludzmi (Bandit Births Where People), koszt AI band i doba realna (Bandit Cost Log). Wejscie: log Armoury (strumieniowo), opcjonalnie --baza-doby <log biegu bazowego>
+    (NBD-7: doba realna tych samych dob gry). Progi NBD-0..NBD-10 - opis w naglowku pliku (--grupa nbandy). Log bez paczki: liczby bazowe z linii Wyrzutki (INFO), bez wyjatku."""
+    rep = Report()
+    if not logp or not os.path.isfile(logp):
+        rep.add("NBD-0: log Armoury", f"brak pliku {logp}", "podaj <Armoury-*.log>", None)
+        rep.show()
+        return 0
+    D = _nbd_scan(logp)
+    L, W = D["days"], D["w"]
+    ld, wd = sorted(L), sorted(W)
+    pkg = bool(ld)
+    sday = _nbd_sday(D["wts"])
+    print(f"plik: {logp} | linii doby f8-bandy {len(ld)} (nieczytelnych {len(D['bad'])}), linii startu {len(D['start'])} | linii Wyrzutki {len(wd)}"
+          f" | ERROR BanditLimit {len(D['errs'])}")
+
+    # NBD-0 linie paczki
+    rep.add("NBD-0: linie 'Bandy i limit (f8-bandy)' (start sesji i doba)",
+            f"doby {len(ld)}" + (f" ({ld[0]}-{ld[-1]})" if ld else "") + f", start sesji {len(D['start'])}, nieczytelnych {len(D['bad'])}"
+            + (f" (np. {D['bad'][0][:140]})" if D["bad"] else ""),
+            "linia w kazdej dobie przy Bandit Cost Log TAK, 0 nieczytelnych; brak - INFO (log sprzed paczki albo klucz NIE)", (len(D["bad"]) == 0) if pkg else None)
+
+    # liczby bazowe z linii Wyrzutki (takze log sprzed paczki)
+    if wd:
+        w0, w1 = W[wd[0]], W[wd[-1]]
+        born = sum(W[d][0] for d in wd) / len(wd)
+        empt = sum(W[d][3] for d in wd) / len(wd)
+        ss = [x[1] for x in sday]
+        sd = (sum(ss) / len(ss)) if ss else None
+        rep.add("NBD-B: bandy i doba realna z linii 'Wyrzutki' (baza / ten bieg)",
+                f"doby {wd[0]}-{wd[-1]}: band {w0[4]} -> {w1[4]}, ludzi {w0[5]} -> {w1[5]}; narodziny {born:.1f}/d, puste usuniete {empt:.1f}/d (udzial pustych w probach "
+                f"{(100.0 * empt / max(1e-9, born + empt)):.0f}%); doba realna {sd:.2f} s srednio ({len(ss)} dob)" if sd is not None else
+                f"doby {wd[0]}-{wd[-1]}: band {w0[4]} -> {w1[4]}, ludzi {w0[5]} -> {w1[5]}; narodziny {born:.1f}/d, puste {empt:.1f}/d; doba realna - (brak znacznikow)",
+                "INFO (fin86 bez paczki: 809 -> 942 band, 15.7 s/dobe, 16 urodzonych i 33 puste na dobe)", None)
+
+    if not pkg:
+        rep.add("NBD-1..NBD-10: progi paczki", "brak linii doby f8-bandy", "INFO - log sprzed paczki albo Bandit Cost Log NIE", None)
+        if D["errs"]:
+            rep.add("NBD-8: ERROR BanditLimit", f"{len(D['errs'])} (np. {D['errs'][0]})", "0", False)
+        rep.show()
+        return 0
+
+    first, last = L[ld[0]], L[ld[-1]]
+    lim, rot = int(last["limit"]), int(last["rot"])
+    raised_days = [d for d in ld if L[d]["raised"] == "TAK"]
+    raised = bool(raised_days)
+
+    # NBD-1 latka celu: start sesji (zalozona), cel podniesiony przy kluczu > ROT, wokol teraz = limit - w srodku
+    st_ok = all("latka celu: zalozona" in s for s in D["start"]) if D["start"] else None
+    bad_ar = [d for d in raised_days if int(L[d]["around"]) != min(48, int(L[d]["limit"])) - int(L[d]["inside"])]
+    want_days = [d for d in ld if int(L[d]["limit"]) > int(L[d]["rot"])]                      # doby z kluczem ponad ROT (klucz mozna zmienic w trakcie gry)
+    miss_raise = [d for d in want_days if L[d]["raised"] != "TAK" and "prawo wyrzutkow wylaczone" not in L[d]["raised"]]
+    rep.add("NBD-1: latka celu (getter 'wokol' czynnego modelu) i cel podniesiony",
+            f"start sesji: {'latka zalozona' if st_ok else ('BRAK latki' if st_ok is False else 'brak linii startu')}; klucz na koniec {lim} wobec ROT {rot}; cel podniesiony w {len(raised_days)} z {len(ld)} dob"
+            f" (doby z kluczem > ROT {len(want_days)}, w tym bez podniesienia przy prawie wyrzutkow {len(miss_raise)}" + (f" {miss_raise[:5]}" if miss_raise else "") + ");"
+            f" 'wokol teraz' rozne od limit - w srodku w {len(bad_ar)} dobach podniesionych" + (f" ({bad_ar[:5]})" if bad_ar else ""),
+            "latka zalozona; w kazdej dobie z kluczem > ROT (i prawem wyrzutkow TAK) cel podniesiony, wokol teraz = limit - w srodku",
+            (st_ok is not False) and not miss_raise and not bad_ar)
+
+    # NBD-2 bandy klanow z kryjowkami wobec celu
+    over = [d for d in ld if int(L[d]["target"]) > 0 and int(L[d]["clanb"]) > NBD_TARGET_TOL * int(L[d]["target"])]
+    rep.add("NBD-2: band klanow z kryjowkami <= cel gry (zajete x limit)",
+            f"ponad cel x {NBD_TARGET_TOL} w {len(over)} z {len(ld)} dob" + (f" (np. d{over[0]}: {L[over[0]]['clanb']} / {L[over[0]]['target']})" if over else "")
+            + f"; koniec: band klanow {last['clanb']} / cel {last['target']} (stary {last['old']}), zajete {last['inf']}, band/cel {last['ratio']}",
+            f"0 dob ponad cel x {NBD_TARGET_TOL} (BK dosypuje ponad limit tylko w kryjowce bohatera-zboja)", len(over) == 0)
+
+    # NBD-3 puste narodziny przy celu podniesionym (wybor kryjowki z ludzmi)
+    rd = [d for d in raised_days if L[d]["people"] == "TAK"]
+    if rd:
+        born = sum(int(L[d]["born"]) for d in rd)
+        emp = sum(int(L[d]["eb"]) + int(L[d]["ex"]) for d in rd)
+        refd = sum(int(L[d]["bref"]) + int(L[d]["xref"]) for d in rd)
+        pick = sum(int(L[d]["bpick"]) + int(L[d]["xpick"]) for d in rd)
+        share = emp / born if born else 0.0
+        rep.add("NBD-3: puste narodziny przy celu podniesionym (narodziny tylko przy kryjowce z ludzmi)",
+                f"urodzone {born} w {len(rd)} dobach, puste {emp} ({100.0 * share:.1f}%); proby z kryjowka z ludzmi {pick}, odmowione bez ludzi {refd}",
+                f"puste <= {100 * NBD_EMPTY_MAX:.0f}% urodzonych (bez paczki ok. 67% prob konczy sie pusta banda)", share <= NBD_EMPTY_MAX)
+    else:
+        rep.add("NBD-3: puste narodziny przy celu podniesionym", "brak dob z celem podniesionym i wyborem kryjowki z ludzmi", "INFO", None)
+
+    # NBD-4 wzrost band i ludzie z puli
+    born_men = sum(int(L[d]["menb"]) + int(L[d]["menx"]) for d in ld)
+    wborn_men = sum(W[d][1] for d in ld if d in W)
+    rep.add("NBD-4: bandy w biegu (start -> koniec) i ludzie nowych band",
+            f"band {first['bands']} -> {last['bands']} (klanow z kryjowkami {first['bhide']} -> {last['bhide']}), ponad stary cel {first['over']} -> {last['over']}, ludzi {first['men']} -> {last['men']},"
+            f" pula wyrzutkow {first['pool']} -> {last['pool']}; ludzie nowych band klanow z kryjowkami {born_men} wobec 'Wyrzutki: bandy nowe (ludzi)' {wborn_men} w tych dobach",
+            "INFO - cel 24 to nie liczba band: band przybywa tylko z puli wyrzutkow (dezerterzy, rozbici, biedni); ludzie z linii f8 <= ludzie z linii Wyrzutki (inne narodziny: lupiezcy, BK)",
+            (born_men <= wborn_men) if wborn_men else None)
+
+    # NBD-5 koszt naszego kodu
+    sp = [_nbd_f(L[d]["spawn"]) for d in ld if _nbd_f(L[d]["spawn"]) is not None]
+    lm = [_nbd_f(L[d]["linems"]) for d in ld if _nbd_f(L[d]["linems"]) is not None]
+    ol = [_nbd_f(L[d]["outlaw"]) for d in ld if _nbd_f(L[d]["outlaw"]) is not None]
+    spa = sum(sp) / len(sp) if sp else 0.0
+    lma = max(lm) if lm else 0.0
+    rep.add("NBD-5: koszt rodzenia band (SpawnBanditsAroundHideout z tworzeniem partii) i linii doby",
+            f"rodzenie srednio {spa:.1f} ms/d (najwiecej {max(sp) if sp else 0:.1f}), linia najwiecej {lma:.2f} ms; OutlawLaw.Daily srednio {(sum(ol) / len(ol)) if ol else -1:.1f} ms (INFO)",
+            f"rodzenie <= {NBD_SPAWN_MS:.0f} ms/d srednio, linia <= {NBD_LINE_MS:.0f} ms", spa <= NBD_SPAWN_MS and lma <= NBD_LINE_MS)
+
+    # NBD-6 koszt AI i tikow band wobec doby realnej
+    full = [d for d in ld if _nbd_f(L[d]["wall"]) is not None]
+    if full:
+        pct = [_nbd_f(L[d]["pct"]) for d in full if _nbd_f(L[d]["pct"]) is not None]
+        bm = sum(_nbd_f(L[d]["bandms"]) or 0 for d in full) / len(full)
+        om = sum(_nbd_f(L[d]["otherms"]) or 0 for d in full) / len(full)
+        pb = sum(_nbd_f(L[d]["perband"]) or 0 for d in full) / len(full)
+        tb = sum(_nbd_f(L[d]["tacb"]) or 0 for d in full) / len(full)
+        hb = sum(_nbd_f(L[d]["thinkb"]) or 0 for d in full) / len(full)
+        pa = sum(pct) / len(pct) if pct else 0.0
+        rl = sum(_nbd_f(L[d]["real"]) or 0 for d in full) / len(full)
+        rb = sum(_nbd_f(L[d]["realband"]) or 0 for d in full) / len(full)
+        wl = sum(_nbd_f(L[d]["wall"]) or 0 for d in full) / len(full)
+        rep.add("NBD-6: AI i tiki band (mysl godzinowa, taktyczne, tiki partii, rodzenie) wobec doby realnej",
+                f"bandy {bm:.0f} ms/d ({pb:.0f} us na bande; mysl {hb:.0f}, taktyczne {tb:.0f}), inne partie {om:.0f} ms/d; {pa:.2f}% doby realnej srednio"
+                f" | ruch partii (Campaign.RealTick) {rl:.0f} ms/d = {(100.0 * rl / (wl * 1000.0)) if wl else 0:.1f}% doby, udzial band liniowo ~{rb:.0f} ms/d (INFO)",
+                f"<= {NBD_PCT_MAX:.0f}% doby realnej (ruch po mapie - stoper calego RealTick bez podzialu, INFO; obraz i UI - tylko NBD-7)", pa <= NBD_PCT_MAX)
+    else:
+        rep.add("NBD-6: AI i tiki band wobec doby realnej", "brak pelnych dob (jedna linia sesji)", "INFO", None)
+
+    # NBD-7 doba realna wobec biegu bazowego (te same doby gry)
+    own = {d: s for d, s in sday}
+    for d in full:
+        v = _nbd_f(L[d]["wall"])
+        if v is not None:
+            own[d] = v
+    if bdp and os.path.isfile(bdp):
+        B = _nbd_scan(bdp)
+        bs = {d: s for d, s in _nbd_sday(B["wts"])}
+        for d, l in B["days"].items():
+            v = _nbd_f(l["wall"])
+            if v is not None:
+                bs[d] = v
+        common = sorted(set(own) & set(bs))
+        if common:
+            a = sum(own[d] for d in common) / len(common)
+            b = sum(bs[d] for d in common) / len(common)
+            r = a / b if b else 0.0
+            bw = B["w"]
+            ba = [bw[d][4] for d in common if d in bw]
+            ta = [W[d][4] for d in common if d in W]
+            db = (sum(ta) / len(ta) - sum(ba) / len(ba)) if ba and ta else 0.0
+            per100 = ((a - b) / db * 100.0) if db > 1 else None
+            leg_t, mix_t = _nbd_legs(D)
+            leg_b, mix_b = _nbd_legs(B)
+            rep.add("NBD-7: doba realna wobec biegu bazowego (te same doby gry)",
+                    f"{a:.2f} s wobec {b:.2f} s ({len(common)} dob) = {r:.3f} x; band srednio {sum(ta) / max(1, len(ta)):.0f} wobec {sum(ba) / max(1, len(ba)):.0f}"
+                    + (f"; na +100 band {per100:+.2f} s/dobe" if per100 is not None else "") + f" | ten bieg: {leg_t}; baza: {leg_b}",
+                    f"<= {NBD_SDAY_RATIO} x (szum biegu ok. +-10%: fin86-fin91 15.4-17.3 s przy tym samym kodzie)", r <= NBD_SDAY_RATIO)
+            # recenzja: przy narodzinach przy ludziach TAK (cel podniesiony) dodatkowe bandy sa skutkiem limitu I nowego miejsca narodzin (takze ponizej starego celu)
+            mixed = bool(mix_t) != bool(mix_b)
+            both_raised = "cel podniesiony TAK" in leg_t and "cel podniesiony TAK" in leg_b
+            note = ""
+            if mixed and both_raised:
+                note = " | UWAGA: oba biegi z celem podniesionym, roznia sie tylko miejscem narodzin (Bandit Births Where People) - roznica band to skutek wyboru kryjowki z ludzmi"
+            elif mixed:
+                note = (" | UWAGA: biegi roznia sie tez miejscem narodzin (Bandit Births Where People) - wzrost band to limit + narodziny przy ludziach, nie sam limit;"
+                        " czysty limit: trzecia noga z kluczem 24 i Bandit Births Where People NIE")
+            rep.add("NBD-10: koszt +100 band (z porownania z baza)",
+                    (f"{per100:+.2f} s na dobe gry" if per100 is not None else "roznica band < 1 - brak oszacowania") + note,
+                    "INFO (szacunek z kodu przed testem: 0.05-0.3 s na +100 band; test 4-letni bez widocznego trendu; koszt na bande - NBD-6 us na bande)", None)
+        else:
+            rep.add("NBD-7: doba realna wobec biegu bazowego", "brak wspolnych dob gry", "INFO", None)
+    else:
+        ss = [own[d] for d in sorted(own)]
+        rep.add("NBD-7: doba realna (bez --baza-doby)", f"{(sum(ss) / len(ss)) if ss else 0:.2f} s srednio ({len(ss)} dob)" + (f"; koniec {last['wall']} s, {last['msframe']} ms/klatke" if full else ""),
+                "INFO - podaj --baza-doby <log biegu bazowego tych samych dob> (np. fin86 Armoury-2026-10-17_23-22-37.log)", None)
+
+    # NBD-8 bledy i potkniecia
+    stum = sum(int(L[d]["stum"]) for d in ld)
+    rep.add("NBD-8: ERROR BanditLimit i potkniecia", f"ERROR {len(D['errs'])}" + (f" (np. {D['errs'][0]})" if D["errs"] else "") + f", potkniecia {stum}",
+            "0 i 0", not D["errs"] and stum == 0)
+
+    # NBD-9 stopery wpiete (wywolania > 0)
+    zero = [k for k, n in (("mysl AI", "thinkbn"), ("taktyczne", "tacbn"), ("ruch partii (RealTick)", "realn")) if full and sum(int(L[d][n]) for d in full) == 0]
+    st_miss = [s.split("BRAK:")[1].split("|")[0].strip() for s in D["start"] if "stopery:" in s and "BRAK:" in s.split("stopery:")[1].split("|")[0]]
+    rep.add("NBD-9: stopery kosztu band wpiete i licza",
+            f"bez wywolan w pelnych dobach: {', '.join(zero) if zero else 'zadne'}; BRAK w linii startu: {st_miss[0] if st_miss else 'nic'}",
+            "kazdy stoper z wywolaniami (0 = metoda wkompilowana albo latka nie weszla)", not zero and not st_miss)
+    rep.show()
+    return 0
+
+
 def main(argv):
     args = argv[1:]
     group, logp, base_in, base_out, csvp, start_arg = None, None, None, None, None, None
@@ -46994,6 +47293,8 @@ def main(argv):
         return nrenty_main(logp, bdp, csvp)   # nrenty (18.10, paczka f7-renty): renty 180 wedlug potrzeby rodu - ta sama regula co zwrot f6, reszta w skarbcu (CrownRents.Need.cs)
     if group == "npozyczka" and logp:
         return npozyczka_main(logp, bdp)   # npozyczka (18.10, paczka f8-pozyczka): pozyczka miejska - rada wlasnej osady przed Bankiem (TownFolk.TownLoan, DebtLadder KTown), drabina 168
+    if group == "nbandy" and logp:
+        return nbandy_main(logp, bdp)   # nbandy (noc 18.10, f8-bandy): limit band ROT x2 z ludzi puli wyrzutkow, puste narodziny, koszt AI band, doba realna wobec bazy (BanditLimit)
     if group != "etap2" or not logp:
         print(__doc__)
         return 2

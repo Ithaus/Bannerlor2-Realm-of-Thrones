@@ -3294,6 +3294,15 @@ namespace Armoury
         // drwal P0 x przydatnosc lasu bloku), bez zlota i bez towaru z niczego. Bloomery.F7.cs, StartCalibration.F7CollierRatio.
         public bool BloomeryColliers = true;               // under the start calibration, with Bloomery At Mine: when a mine's bloomery has too little wood for the day's ore, the miners who would stand idle burn charcoal instead - they cut the district's own wood (the world's woodcutter output times how fit the mine's land is for timber: 0 in deserts and on the steppe) and char it for the bloomery. The mine smelts fewer blooms than with bought wood (part of its hands make charcoal), but no hands stand idle and no gold changes hands; bought, forest and credited wood still come first. Off = idle hands, as before
 
+        // --- Bandit numbers (night 18.10) ---
+        // Paczka f8-bandy (decyzja Jeffa 18.10 "7. b ale o ile spowolni to gre gdy damy 2200 band?"; STAN-PRAC ### 43 i ### 86): cel band gry ROT = zajete kryjowki
+        // x (6 wokol + 6 w srodku) = 12 na kryjowke (ROTBanditDensityModel, BanditSpawnCampaignBehavior.SpawnBanditsAroundHideout) - plateau 1100-1150 band w tescie
+        // 4-letnim. BanditLimit.cs: postfiks gettera "wokol" czynnego modelu (DeclaredPropertyGetter), w srodku kryjowki bez zmian; przy celu podniesionym kazda banda tylko przy
+        // kryjowce z ludzmi w puli wyrzutkow (bez pustych narodzin); linia doby "Bandy i limit (f8-bandy)" z kosztem AI band i doba realna (tools/sprawdz_logi.py --grupa nbandy).
+        public int BanditLimitPerHideout = 24;             // most bandit bands the game keeps for each hideout their clan holds - the bands roaming around it plus those inside; Realm of Thrones keeps 12 (6 around, 6 inside). The extra bands roam around the hideout (the hideout fight stays as it was) and are still born only from real outlaws - deserters, routed soldiers, the hungry and the burnt out - so where there are no such men no band forms. Works only with Outlaw Law Enabled; 12 = Realm of Thrones' own limit
+        public bool BanditBirthsWherePeople = true;        // with Bandit Limit Per Hideout above Realm of Thrones' own: every band the game raises for a clan with hideouts is born at one of the clan's hideouts whose land has outlaws enough for a band (chosen the way the game chooses), never as an empty band that is removed at once; where none of the clan's hideouts has such men, no band is born. Off = the game picks the hideout as before, and births where no men are come out empty and are removed
+        public bool BanditCostLog = true;                  // writes one daily line with the bandit bands against their limit, the bands born that day, the time their AI and our work on them take each day, and the real seconds a game day took (diagnostics only; the timers are set when a campaign starts or loads)
+
         public static void Load(string moduleDataDir)
         {
             var file = Path.Combine(moduleDataDir, "Armoury.settings.xml");

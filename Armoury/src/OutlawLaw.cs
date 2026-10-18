@@ -281,6 +281,26 @@ namespace Armoury
         internal static float PoolIn(Settlement region) { return region != null ? Count(region) : 0f; }
         /// <summary>E4/3: konto WYRZUTKI ksiegi ludzi (PeopleBook) - cala pula (z wightami starych zapisow, jak linia "Wyrzutki:").</summary>
         internal static float PoolTotal() { return Total(); }
+        /// <summary>f8-bandy (BanditLimit, narodziny przy celu podniesionym): ludzie, ktorych RosterPostfix moze dac nowej bandzie z kryjowki `home` - ten sam region
+        /// (RegionOf domu bandy) i ci sami sasiedzi co Draw, bez starych wightow. Recenzja: liczone jak Draw - kazda pozycja puli (region x klucz) w dol do
+        /// calych ludzi (Draw bierze (int)Math.Floor(d[key])), wiec pula rozbita na ulamki (np. 8 kluczy po 0.9) nie przechodzi, a Draw dalby 0 (pusta banda).
+        /// Bramka GateClan zostaje na Avail (sumie ulamkow) - stara droga bez zmian. Prawo wyrzutkow wylaczone albo brak domu = -1.</summary>
+        internal static float AvailFor(Settlement home)
+        {
+            if (!On || home == null) return -1f;
+            Seed();
+            var region = RegionOf(home);
+            if (region == null) return 0f;
+            int n = 0;
+            foreach (var r in Near(region))
+            {
+                Dictionary<string, float> d;
+                if (!_pool.TryGetValue(r.StringId, out d)) continue;
+                foreach (var kv in d)
+                    if (kv.Value >= 1f && !SkipUndeadKey(kv.Key)) n += (int)Math.Floor(kv.Value);   // jak Draw: zolnierze bez wightow i prosci (Commoner)
+            }
+            return n;
+        }
 
         /// <summary>3.10 (Leaks310, partia herszta kryjowki): czy RosterPostfix da nowej bandzie z `home` choc jednego czlowieka - ten sam
         /// region co RosterPostfix i te same regiony co Draw (region + sasiedzi), pozycja puli >= 1. Prawo wyrzutkow wylaczone = tak.</summary>
