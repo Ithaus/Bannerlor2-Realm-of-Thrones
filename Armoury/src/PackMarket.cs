@@ -33,6 +33,10 @@ namespace Armoury
     ///     SellGoodsInternal :1147) przed postfiksem CreatePost; galaz morska w CreatePost zostaje jako bezpiecznik. Karawany startowe (isInitialSpawn, przed GameStarted) -
     ///     jak w grze (stan wyjsciowy ksiegi koni). Juczny przechodzi z polki do taboru - przeniesienie w "Konie (E6/0)" (suma bez zmian), zloto z kasy karawany
     ///     do kasy miasta. Poza K5: BK GiveMounts/GivePackAnimals (3.11 - osobna paczka) i ladunek konwoju DTE (AddReinforcementSupplies: 17 jucznych i zywnosc; juczne gry konwoju zostaja).
+    ///     fix-ksarm (noc 17/18.10, klucz DteConvoyNoFreePacks): konwoj DTE - juczne gry ZDJETE jak u kazdej nowej karawany, bez zakupu: konwoj nie handluje
+    ///     (kapital 0, CaravanCapital), a jego ladunek (do 26 sztuk sprzetu po zdjeciu jedzenia DTE przez DteConvoyNoFreeFood) niosa ludzie (20 kg na zdrowego
+    ///     czlowieka, ok. 40 ludzi); 17 jucznych DTE zdejmuje PackSources.DteSupPost. Dotad konwoj mial 17 + ok. 7 jucznych z niczego, ktore u celu znikaly
+    ///     w RemoveParty (DTE CleanupCaravan) - fin85: 4 593 szt. w 161 dobach, jedyny towar ponad 2 szt./d w twardej bramce KS "zrodla bez nazwy".
     /// (b) Zapasowe konie lordow = zapas Stables.Reserve z E6/K2 (osobnego klucza nie ma - to bylaby trzecia definicja zapasu); jedza jak kazdy kon (pasza K0).
     /// (c) Udzwig: gra daje 20 kg za kazdego luzaka (NumberOfMounts, "Spare Mounts", G DefaultInventoryCapacityModel.cs:78). Konie partii (luzaki + wolne konie
     ///     zbrojowni przy SpareHorsesCarryFootmen) niosa najpierw piechure, potem jencow (kolejnosc MarchPace.Cap), reszta niesie juki; udzwig w modelu gry maja tylko
@@ -70,6 +74,7 @@ namespace Armoury
         // liczniki doby
         private static long _calls, _new, _given, _removed, _target, _bought, _paid, _short, _start, _startN, _off, _offN, _orphan, _orphanN;
         private static long _full, _part, _none, _naval, _navalN, _zeroCap, _noTown, _emptyShelf, _dte, _dteN;
+        private static long _dteK, _dteKN, _dteKOff, _dteKNaval;   // fix-ksarm (DteConvoyNoFreePacks): konwoje DTE bez jucznych gry - konwojow, juczne gry, zdjete, w tym morskie
         // A16 (ROZPOZNANIE-A16 poz. 11, tylko pomiar): brak przy zakupie wedlug przyczyny konca zakupu - polka (zadnego jucznego na polce), budzet (najtansze juczne
         // drozsze niz reszta 1/2 kapitalu albo ShelfBuy nie dal sztuki w budzecie), limit petli (8 rodzajow); karawany i sztuki
         private static long _wShelfK, _wShelfN, _wBudgetK, _wBudgetN, _wLoopK, _wLoopN;
@@ -89,6 +94,7 @@ namespace Armoury
         {
             _calls = _new = _given = _removed = _target = _bought = _paid = _short = _start = _startN = _off = _offN = _orphan = _orphanN = 0;
             _full = _part = _none = _naval = _navalN = _zeroCap = _noTown = _emptyShelf = _dte = _dteN = 0;
+            _dteK = _dteKN = _dteKOff = _dteKNaval = 0;
             _wShelfK = _wShelfN = _wBudgetK = _wBudgetN = _wLoopK = _wLoopN = 0;
             _stumblesDay = 0;
         }
@@ -100,6 +106,14 @@ namespace Armoury
         }
 
         private static bool IsPack(ItemObject it) { return it != null && it.ItemCategory == DefaultItemCategories.PackAnimal && it.HorseComponent != null; }
+
+        /// <summary>fix-ksarm (recenzja): PackSources.PacksOff dla swiezego konwoju DTE w InitPost; wyjatek modelu jedzenia = potkniecie i "nie zdejmuj tu"
+        /// (konwoj idzie do _pend, CreatePost sprawdza PacksOff jeszcze raz) - bez globalnego wylacznika.</summary>
+        private static bool DteOff(MobileParty p)
+        {
+            try { return PackSources.PacksOff(p); }
+            catch (Exception e) { Stumble("InitPost.PacksOff", e); return false; }
+        }
 
         // ------------------------------------------------------------ (a) juczne nowej karawany
 
@@ -125,7 +139,12 @@ namespace Armoury
                 // ladowej oddaje juczne bez progu), czyli PRZED postfiksem CreatePost - ten zdejmowal tylko reszte (120 dob: 325 sztuk z niczego na polkach
                 // miast portowych). Liczniki jak w CreatePost (_new - morskie sa w "nowe karawany", prog K5-5); partia nie idzie do _pend.
                 // Live: karawany startowe jak w grze; wylaczony klucz i konwoj DTE - do _pend, rozlicza je CreatePost jak dotad.
-                if (Live && On && !__0.HasLandNavigationCapability && !CaravanCapital.InDteConvoy())
+                // fix-ksarm: konwoj DTE morski przy kluczu DteConvoyNoFreePacks - tak samo od razu (bez sprzedazy jucznych z niczego miastu startu), liczony w konwojach DTE.
+                // Recenzja: ta sama regula co CreatePost i PackSources.DteSupPost - PacksOff(konwoj) = klucze i konwoj nie je (nie same klucze). Model jedzenia w tej
+                // chwili odpowiada jak pozniej: OnMobilePartySetOnCreation ustawil juz komponent karawany (IsCaravan) i ActualClan (ROT IsWhiteWalker), Default:
+                // !IsCaravan, BK/NavalDLC/BEE przepuszczaja. Wyjatek modelu (DteOff) - konwoj do _pend, rozstrzyga CreatePost jak przy konwoju, ktory je.
+                bool dte = CaravanCapital.InDteConvoy();
+                if (Live && !__0.HasLandNavigationCapability && (dte ? DteOff(__0) : On))
                 {
                     int added = 0, taken = 0;
                     foreach (var kv in got)
@@ -136,7 +155,9 @@ namespace Armoury
                         int take = Math.Min(kv.Value, have);
                         if (take > 0) { r.AddToCounts(kv.Key, -take); taken += take; }
                     }
-                    _calls++; _new++; _given += added; _removed += taken; _naval++; _navalN += added;
+                    _calls++;
+                    if (dte) { _dteK++; _dteKN += added; _dteKOff += taken; _dteKNaval++; PackSources.NoteDteGameOff(taken); }
+                    else { _new++; _given += added; _removed += taken; _naval++; _navalN += added; }
                     return;
                 }
                 _pend[__0] = got;
@@ -157,6 +178,25 @@ namespace Armoury
                 foreach (var kv in got) added += kv.Value;
                 _calls++;
                 if (!Live || __3) { _start++; _startN += added; return; }   // karawany startowe - jak w grze (stan wyjsciowy)
+                // fix-ksarm (klucz DteConvoyNoFreePacks, niezalezny od PackAnimalsFromMarket; razem z DteConvoyNoFreeFood i konwojem, ktory nie je - PackSources.PacksOff):
+                // konwoj DTE - juczne gry zdjete, bez zakupu (konwoj nie handluje - kapital 0 z CaravanCapital; sprzet niosa ludzie). Zdjecie w ramce ticku miasta
+                // ksiegi towarow, w ktorej gra je dopisala (netto 0).
+                if (CaravanCapital.InDteConvoy() && PackSources.PacksOff(__result))
+                {
+                    var rd = __result.ItemRoster;
+                    int off = 0;
+                    foreach (var kv in got)
+                    {
+                        int at = rd.FindIndexOfElement(kv.Key);
+                        int have = at >= 0 ? rd.GetElementNumber(at) : 0;
+                        int take = Math.Min(kv.Value, have);
+                        if (take > 0) { rd.AddToCounts(kv.Key, -take); off += take; }
+                    }
+                    _dteK++; _dteKN += added; _dteKOff += off;
+                    if (!__result.HasLandNavigationCapability) _dteKNaval++;
+                    PackSources.NoteDteGameOff(off);
+                    return;
+                }
                 if (!On) { _off++; _offN += added; return; }
                 // konwoj DTE (CaravanCapital: kapital 0, nie handluje) - juczne gry zostaja: bez nich ladunek DTE (17 z kazdej zywnosci, 17 jucznych) przeciazalby konwoj,
                 // a caly ladunek konwoju jest z niczego po stronie DTE (poza K5)
@@ -372,7 +412,9 @@ namespace Armoury
                      + ", z niczego " + left + " (gra dala " + _given + ", zdjete " + _removed + "; poza CreateCaravanParty " + _orphan + " partii, " + _orphanN + " sztuk)"
                      + ", brak " + _short + " (kapital 0 przy tworzeniu - karawany gracza " + _zeroCap + "; nie miasto albo oblezone " + _noTown + "; polka bez jucznych w budzecie " + _emptyShelf
                      + "; dokupi gra przy handlu z targu; A16 - koniec zakupu z brakiem: polka bez jucznych " + _wShelfK + " karawan " + _wShelfN + " szt., budzet 1/2 kapitalu " + _wBudgetK
-                     + " karawan " + _wBudgetN + " szt., limit petli " + _wLoopK + " karawan " + _wLoopN + " szt.) | morskie " + _naval + " (zdjete " + _navalN + " bez zakupu) | konwoje DTE " + _dte + " - juczne gry zostaja " + _dteN + " (poza K5)"
+                     + " karawan " + _wBudgetN + " szt., limit petli " + _wLoopK + " karawan " + _wLoopN + " szt.) | morskie " + _naval + " (zdjete " + _navalN + " bez zakupu) | konwoje DTE " + (_dte + _dteK) + " - juczne gry zostaja " + _dteN + " (poza K5)"
+                     + " (Dte Convoy No Free Packs " + (PackSources.NoFreePacksOn ? "TAK" : "NIE") + ": konwojow bez jucznych gry " + _dteK + ", juczne gry " + _dteKN + " zdjete " + _dteKOff + " bez zakupu, w tym morskie " + _dteKNaval
+                     + " - konwoj nie handluje, sprzet niosa ludzie; przy kluczu NIE juczne zostaja z niczego " + _dte + " konwojow)"
                      + " | udzwig (Spare Horse Carry Kg " + s.SpareHorseCarryKg + "): luzakow pod jukami " + under + " (+" + extra + " kg = " + (under * extra).ToString(inv) + " kg, partii " + parties + ")"
                      + ", pod piechurem albo jencem " + foot + " (20 kg gry)" + (k0 ? "" : " - bez wolnych koni zbrojowni (K0 wylaczone)")
                      + " | poza K5: BK GiveMounts/GivePackAnimals (3.11), ladunek konwojow DTE | wpiecia: " + _hooks

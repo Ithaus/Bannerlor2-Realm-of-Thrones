@@ -1138,6 +1138,10 @@ Uzycie (Python 3, tylko odczyt):
                     bramki 0. Recenzja ks-arm: ARM-12 zrodla z niczego znane z nazwy przed wlaczeniem (ryby z perku Night Raider, zboze patroli miast, ryby portow BK
                     miast - nazwane szt.; INFO), ARM-13 strata spichlerzy krain pod KS od wlaczenia (najwieksza wobec progu Ks Land Gate Loss Days; NIE, gdy powrot "spichlerz krainy spada" nastapil
                     przy stracie ponizej progu i zapasie ponad prog zapasu bez pliku armoury-ks-bramka.flag), ARM-14 druga proba krain (Start Calibration off/on - INFO).
+                    fix-ksarm (juczne z niczego konwojow DTE, klucz Dte Convoy No Free Packs): ARM-15a konwoje DTE bez jucznych z niczego (linia m6b: zostalo 0,
+                    zdjete > 0), ARM-15b juczne "inne ticki dobowe" ksiegi koni w tickach miast (konwoje DTE: srednia i srednia 7 dob <= 2 szt./d; cala kategoria
+                    juczne - suma towarow z tickami partii - INFO, bramka na towar to ARM-15c), ARM-15c twarde bramki - zrodla bez nazwy
+                    w ostatniej linii pomiaru 7/7 bez towaru ponad 2 szt./d (samo wlaczenie = TAK). Bez klucza w linii PackSources (log sprzed poprawki) - INFO z liczbami.
                     Log sprzed paczki: wiersze INFO "brak linii".
 --grupa nprzysiolki: (17/18.10, Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja"; paczka sw-przysiolki, Armoury/src/VillageHamlets.cs, uklad
                     wiosek v6 z tools/wioski-v6/v6_przysiolki.py) python -I tools/sprawdz_logi.py --grupa nprzysiolki <Armoury-*.log> (strumieniowo). NPR-0 linia
@@ -38737,13 +38741,23 @@ KA_NAMED_G = re.compile(r"zboze patroli miast \(Ks Patrol Grain From Town\) nazw
 KA_NAMED_P = re.compile(r"ryby portow BK miast \(Ks Bk Ports In Ledger\) nazwane (?P<n>\d+) szt\.")
 KA_BACK_LOSS = re.compile(r"zapas (?P<days>\d+) dni, strata pod KS (?P<loss>[\d.]+) dni(?P<rest>[^;]*)")
 KA_RETRY = re.compile(r"KS: druga proba krain doba (?P<day>-?\d+) .*?wracaja do KS (?P<n>\d+)")
+# fix-ksarm (noc 17/18.10): juczne z niczego konwojow DTE (jedyny towar ponad 2 szt./d w twardej bramce fin85 - sumpter_horse 12-59 szt./d)
+KA_PS_START = "PackSources (m6b):"
+KA_PS_KEY = re.compile(r"DteConvoyNoFreePacks \(fix-ksarm, teraz (?P<k>TAK|NIE)")
+KA_M6B = re.compile(r"Juczne z niczego \(m6b\): dzien (?P<day>-?\d+) .*?zapas drogi (?P<conv>\d+) konwojow, juczne DTE (?P<dte>\d+) \+ gry (?P<game>\d+)")
+KA_M6B_OFF = re.compile(r"zdjete przy tworzeniu \(Dte Convoy No Free Packs (?P<k>TAK|NIE)\) DTE (?P<dte>\d+) \+ gry (?P<game>\d+)")
+KA_HCAP = re.compile(r"Towary \(konie jako kapital, ZC1\): dzien (?P<day>-?\d+) ")
+KA_HPACK = re.compile(r"\| juczne: rodzajow \d+, zapas \d+ \([-+]?\d+\), wartosc \d+ zl, produkcja \d+ \[(?P<src>.*?)\], zuzycie")
+KA_TICK_PARTS = re.compile(r"inne ticki dobowe (\d+) \(([^)]*)\)")
+KA_OVER = re.compile(r"zrodla bez nazwy max [\d.]+ szt\./d \([^)]*\) \[ponad \d+/d: (?P<over>[^\]]*)\]")
 
 
 def nksarm_scan(logp):
     """Jedno przejscie po logu: linie paczki ks-arm i zrodla 'inne ticki dobowe' ksiegi towarow (dzien -> towar -> szt.)."""
     D = {"start": [], "perk": [], "arm": None, "waits": [], "auto": None, "auto_txt": None, "on": None, "on_src": None, "on_auto": False,
          "lg": [], "back": [], "save": [], "err": 0, "ticks": {}, "first_day": None, "last_day": None,
-         "loss": [], "named_f": None, "named_g": None, "named_p": None, "retry": []}
+         "loss": [], "named_f": None, "named_g": None, "named_p": None, "retry": [],
+         "ps_key": None, "m6b": [], "hpack": {}}
     if not logp or not os.path.isfile(logp):
         return D
     with open(logp, encoding="utf-8", errors="replace") as fh:
@@ -38769,6 +38783,30 @@ def nksarm_scan(logp):
                 continue
             if s.startswith(KA_PERK):
                 D["perk"].append(s)
+                continue
+            # fix-ksarm: klucz DteConvoyNoFreePacks (linia startu PackSources), linia doby m6b (konwoje DTE), juczne "inne ticki dobowe" ksiegi koni
+            if s.startswith(KA_PS_START):
+                mk = KA_PS_KEY.search(s)
+                D["ps_key"] = mk.group("k") if mk else D["ps_key"]
+                continue
+            if s.startswith("Juczne z niczego (m6b): dzien "):
+                mm = KA_M6B.match(s)
+                if mm:
+                    mo = KA_M6B_OFF.search(s)
+                    D["m6b"].append((int(mm.group("day")), int(mm.group("conv")), int(mm.group("dte")), int(mm.group("game")),
+                                     int(mo.group("dte")) if mo else None, int(mo.group("game")) if mo else None, mo.group("k") if mo else None))
+                continue
+            if s.startswith("Towary (konie jako kapital, ZC1): dzien "):
+                mm = KA_HCAP.match(s)
+                mp_ = KA_HPACK.search(s) if mm else None
+                if mm and mp_:
+                    tot_, town_ = 0, 0
+                    mt = KA_TICK_PARTS.search(mp_.group("src"))
+                    if mt:
+                        tot_ = int(mt.group(1))
+                        mtown = re.search(r"miasta (\d+)", mt.group(2))
+                        town_ = int(mtown.group(1)) if mtown else 0
+                    D["hpack"][int(mm.group("day"))] = (tot_, town_)
                 continue
             if not s.startswith("KS: "):
                 continue
@@ -38953,6 +38991,74 @@ def nksarm_rows(rep, D, pfx="ARM"):
     else:
         rep.add(f"{pfx}-13: strata spichlerzy krain pod KS", "brak liczb w liniach bramki krainy (log sprzed recenzji ks-arm albo bez wlaczenia)", "INFO", None)
     rep.add(f"{pfx}-14: druga proba krain (Start Calibration off i znow on)", f"{len(D['retry'])} razy" + (" (" + "; ".join(f"doba {d}: krain {n}" for d, n in D["retry"][:5]) + ")" if D["retry"] else ""), "INFO", None)
+    nksarm_packs_rows(rep, D, pfx)
+
+
+def nksarm_packs_rows(rep, D, pfx="ARM"):
+    """fix-ksarm (noc 17/18.10): juczne z niczego konwojow DTE - zrodlo, ktore trzymalo twarda bramke KS (fin85: 'zrodla bez nazwy ponad 2 szt./d
+    (sumpter_horse 12-59)' w kazdej linii pomiaru, 4 593 szt. w 161 dobach = 17 z DTE AddReinforcementSupplies + ok. 7 jucznych karawany od gry na konwoj).
+    ARM-15a konwoje DTE bez jucznych z niczego (linia m6b: zostalo z niczego DTE + gry = 0, zdjete > 0), ARM-15b juczne 'inne ticki dobowe' w tickach miast
+    (ksiega koni, czesc "miasta" = konwoje DTE: srednia i najwieksza srednia 7 dob <= 2 szt./d; cala kategoria z tickami partii - INFO, bo to suma kilku
+    towarow, a bramka KS liczy na towar - o bramce ARM-15c), ARM-15c twarde bramki - zrodla bez nazwy w ostatniej linii pomiaru z 7/7 dobami
+    (bez towaru ponad 2 szt./d; samo wlaczenie = bramki przeszly). Log sprzed poprawki (bez klucza DteConvoyNoFreePacks w linii PackSources) - INFO z liczbami."""
+    key_on = D.get("ps_key") == "TAK"
+    fixed = D.get("ps_key") is not None
+    m6 = D.get("m6b") or []
+    if m6:
+        conv = sum(x[1] for x in m6)
+        left = sum(x[2] + x[3] for x in m6)
+        offd = sum(x[4] or 0 for x in m6)
+        offg = sum(x[5] or 0 for x in m6)
+        txt = f"{len(m6)} dob: konwojow {conv}, juczne z niczego zostalo {left} (DTE {sum(x[2] for x in m6)} + gry {sum(x[3] for x in m6)})"
+        txt += f", zdjete przy tworzeniu DTE {offd} + gry {offg}" if fixed else " (log sprzed fix-ksarm - konwoj mial 17 + ok. 7 jucznych z niczego)"
+        rep.add(f"{pfx}-15a: konwoje DTE bez jucznych z niczego (klucz Dte Convoy No Free Packs {D.get('ps_key') or '-'})", txt,
+                "zostalo 0 przy kluczu TAK (konwoje sa - zdjete > 0)" if key_on else "INFO (klucz NIE albo log sprzed poprawki)",
+                (left == 0 and (conv == 0 or offd + offg > 0)) if key_on else None)
+    else:
+        rep.add(f"{pfx}-15a: konwoje DTE bez jucznych z niczego", "brak linii 'Juczne z niczego (m6b)'", "INFO", None)
+    hp = D.get("hpack") or {}
+    days = sorted(hp)[1:]   # pierwsza doba sesji bez wczoraj - jak pierscien bramki
+    if days:
+        town = [hp[d][1] for d in days]
+        tot = [hp[d][0] for d in days]
+
+        def best7(xs):
+            b = 0.0
+            for i in range(len(days)):
+                w = [xs[j] for j in range(len(days)) if days[i] - 6 <= days[j] <= days[i]]
+                if len(w) == 7:
+                    b = max(b, sum(w) / 7.0)
+            return b
+        # recenzja fix-ksarm: TAK/NIE tylko z czesci "miasta" (ramka ticku miasta = konwoje DTE, zrodlo zamykane przez paczke); kategoria juczne razem z tickami
+        # partii (suma kilku towarow: sumpter_horse, mule, pack_camel...) - tylko INFO, bo bramka KS liczy 2 szt./d NA TOWAR (o bramce rozstrzyga ARM-15c)
+        best_t, best_a = best7(town), best7(tot)
+        rep.add(f"{pfx}-15b: juczne 'inne ticki dobowe' w tickach miast (ksiega towarow, linia konie jako kapital)",
+                f"{len(days)} dob: w tickach miast srednio {sum(town) / len(days):.2f} szt./d (suma {sum(town)}), najwieksza srednia 7 dob {best_t:.2f} szt./d"
+                f" | INFO cala kategoria juczne (wszystkie ticki, suma towarow): srednio {sum(tot) / len(days):.2f} szt./d, najwieksza srednia 7 dob {best_a:.2f}",
+                "czesc 'miasta' (konwoje DTE) <= 2 szt./d przy kluczu TAK - suma kategorii, nie bramka na towar (bramka: ARM-15c); "
+                "fin85 przed poprawka: miasta 28.9/d, srednia 7 dob do 59.4" if key_on else "INFO",
+                (best_t <= 2.0 and sum(town) / len(days) <= 2.0) if key_on else None)
+    else:
+        rep.add(f"{pfx}-15b: juczne 'inne ticki dobowe'", "brak linii 'Towary (konie jako kapital, ZC1)' (ksiega koni wylaczona albo log sprzed ZC1)", "INFO", None)
+    if D.get("auto") is not None:
+        rep.add(f"{pfx}-15c: twarde bramki - zrodla bez nazwy", f"samo wlaczenie doba {D['auto']} (wszystkie bramki TAK)", "bramki przeszly", True)
+        return
+    full = None
+    for d, ln in D.get("waits") or []:
+        mg = KA_GATES.search(ln)
+        if mg and int(mg.group("n")) >= int(mg.group("need")):
+            full = (d, ln, mg)
+    if full is None:
+        rep.add(f"{pfx}-15c: twarde bramki - zrodla bez nazwy", "brak linii pomiaru z pelnym pierscieniem 7/7 (pomiar za krotki albo log bez KS)", "INFO", None)
+        return
+    d, ln, mg = full
+    mo = KA_OVER.search(ln)
+    over = mo.group("over") if mo else ""
+    wy = ln[ln.find("WYNIK"):][:160] if "WYNIK" in ln else ""
+    rep.add(f"{pfx}-15c: twarde bramki - zrodla bez nazwy (ostatnia linia pomiaru 7/7, dzien {d})",
+            f"max {mg.group('u')} szt./d ({mg.group('ui')})" + (f", ponad 2/d: {over}" if over else ", zaden towar ponad 2/d") + (f" | {wy}" if wy else ""),
+            "zaden towar ponad 2 szt./d przy kluczu TAK (fin85 przed poprawka: sumpter_horse 17.1)" if key_on else "INFO (log sprzed poprawki albo klucz NIE)",
+            (not over) if key_on else None)
 
 
 def nksarm_main(logp):
