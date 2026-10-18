@@ -3156,3 +3156,6 @@ droga do KAZDEJ wioski pobocznej). Raport rano: docs/RAPORT-NOC-2026-10-19.md.
   (McmSettings RequireRestart), CrashScribe/ModuleData/CrashScribe.settings.xml (4 nowe klucze).
 - 17:55 PDT: scalenie8 (wf_c1920bb1-cb5: f20-d1..d4 na e32c2ea0) + paczka f21-zaloga (zb/f21-zaloga od e32c2ea0): przywrocone twierdze z pusta zaloga zostalyby odbite od razu - zaloga z
   partii krolestwa nowego pana (prawdziwi ludzie, nic z niczego).
+- 18:20 PDT: f21-zaloga GOTOWE (wf_29d79f73-e6a) cf7ffeb0: BookHoldingsGarrison (TAK) - po zmianie pana przywrocona twierdza dostaje zaloge z partii krolestwa nowego pana (najpierw jego rodu,
+  od najblizszej; dawca zostawia >= max(20, 50%); bez gracza/najemnikow/partii w bitwie); cel min(miasto 400 / zamek 200, limit, cel gry); ludzie + ksiega ludzi + sprzet przenoszeni, nic z
+  niczego; linia "obsada ..." z BRAK do celu. Ryzyko: Stannis ma ~2.6k w polu - Sharp Point + 4 zamki wezma do polowy. Do scalenia po scaleniu8.
