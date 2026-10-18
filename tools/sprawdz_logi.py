@@ -1139,7 +1139,8 @@ Uzycie (Python 3, tylko odczyt):
                     miast - nazwane szt.; INFO), ARM-13 strata spichlerzy krain pod KS od wlaczenia (najwieksza wobec progu Ks Land Gate Loss Days; NIE, gdy powrot "spichlerz krainy spada" nastapil
                     przy stracie ponizej progu i zapasie ponad prog zapasu bez pliku armoury-ks-bramka.flag), ARM-14 druga proba krain (Start Calibration off/on - INFO).
                     fix-ksarm (juczne z niczego konwojow DTE, klucz Dte Convoy No Free Packs): ARM-15a konwoje DTE bez jucznych z niczego (linia m6b: zostalo 0,
-                    zdjete > 0), ARM-15b juczne "inne ticki dobowe" ksiegi koni (w tickach miast i srednia 7 dob <= 2 szt./d), ARM-15c twarde bramki - zrodla bez nazwy
+                    zdjete > 0), ARM-15b juczne "inne ticki dobowe" ksiegi koni w tickach miast (konwoje DTE: srednia i srednia 7 dob <= 2 szt./d; cala kategoria
+                    juczne - suma towarow z tickami partii - INFO, bramka na towar to ARM-15c), ARM-15c twarde bramki - zrodla bez nazwy
                     w ostatniej linii pomiaru 7/7 bez towaru ponad 2 szt./d (samo wlaczenie = TAK). Bez klucza w linii PackSources (log sprzed poprawki) - INFO z liczbami.
                     Log sprzed paczki: wiersze INFO "brak linii".
 --grupa nprzysiolki: (17/18.10, Jeff 16.10 "daj wioski w miejscach odludnych, tez jacys ludzie zyja"; paczka sw-przysiolki, Armoury/src/VillageHamlets.cs, uklad
@@ -38997,7 +38998,8 @@ def nksarm_packs_rows(rep, D, pfx="ARM"):
     """fix-ksarm (noc 17/18.10): juczne z niczego konwojow DTE - zrodlo, ktore trzymalo twarda bramke KS (fin85: 'zrodla bez nazwy ponad 2 szt./d
     (sumpter_horse 12-59)' w kazdej linii pomiaru, 4 593 szt. w 161 dobach = 17 z DTE AddReinforcementSupplies + ok. 7 jucznych karawany od gry na konwoj).
     ARM-15a konwoje DTE bez jucznych z niczego (linia m6b: zostalo z niczego DTE + gry = 0, zdjete > 0), ARM-15b juczne 'inne ticki dobowe' w tickach miast
-    (ksiega koni, srednia i najwieksza srednia 7 dob <= 2 szt./d), ARM-15c twarde bramki - zrodla bez nazwy w ostatniej linii pomiaru z 7/7 dobami
+    (ksiega koni, czesc "miasta" = konwoje DTE: srednia i najwieksza srednia 7 dob <= 2 szt./d; cala kategoria z tickami partii - INFO, bo to suma kilku
+    towarow, a bramka KS liczy na towar - o bramce ARM-15c), ARM-15c twarde bramki - zrodla bez nazwy w ostatniej linii pomiaru z 7/7 dobami
     (bez towaru ponad 2 szt./d; samo wlaczenie = bramki przeszly). Log sprzed poprawki (bez klucza DteConvoyNoFreePacks w linii PackSources) - INFO z liczbami."""
     key_on = D.get("ps_key") == "TAK"
     fixed = D.get("ps_key") is not None
@@ -39019,15 +39021,23 @@ def nksarm_packs_rows(rep, D, pfx="ARM"):
     if days:
         town = [hp[d][1] for d in days]
         tot = [hp[d][0] for d in days]
-        best = 0.0
-        for i in range(len(days)):
-            w = [tot[j] for j in range(len(days)) if days[i] - 6 <= days[j] <= days[i]]
-            if len(w) == 7:
-                best = max(best, sum(w) / 7.0)
-        rep.add(f"{pfx}-15b: juczne 'inne ticki dobowe' (ksiega towarow, linia konie jako kapital)",
-                f"{len(days)} dob: w tickach miast srednio {sum(town) / len(days):.2f} szt./d (suma {sum(town)}), wszystkie srednio {sum(tot) / len(days):.2f} szt./d, "
-                f"najwieksza srednia 7 dob {best:.2f} szt./d", "<= 2 szt./d przy kluczu TAK (fin85 przed poprawka: miasta 28.5/d, srednia 7 dob do 59.4)" if key_on else "INFO",
-                (best <= 2.0 and sum(town) / len(days) <= 2.0) if key_on else None)
+
+        def best7(xs):
+            b = 0.0
+            for i in range(len(days)):
+                w = [xs[j] for j in range(len(days)) if days[i] - 6 <= days[j] <= days[i]]
+                if len(w) == 7:
+                    b = max(b, sum(w) / 7.0)
+            return b
+        # recenzja fix-ksarm: TAK/NIE tylko z czesci "miasta" (ramka ticku miasta = konwoje DTE, zrodlo zamykane przez paczke); kategoria juczne razem z tickami
+        # partii (suma kilku towarow: sumpter_horse, mule, pack_camel...) - tylko INFO, bo bramka KS liczy 2 szt./d NA TOWAR (o bramce rozstrzyga ARM-15c)
+        best_t, best_a = best7(town), best7(tot)
+        rep.add(f"{pfx}-15b: juczne 'inne ticki dobowe' w tickach miast (ksiega towarow, linia konie jako kapital)",
+                f"{len(days)} dob: w tickach miast srednio {sum(town) / len(days):.2f} szt./d (suma {sum(town)}), najwieksza srednia 7 dob {best_t:.2f} szt./d"
+                f" | INFO cala kategoria juczne (wszystkie ticki, suma towarow): srednio {sum(tot) / len(days):.2f} szt./d, najwieksza srednia 7 dob {best_a:.2f}",
+                "czesc 'miasta' (konwoje DTE) <= 2 szt./d przy kluczu TAK - suma kategorii, nie bramka na towar (bramka: ARM-15c); "
+                "fin85 przed poprawka: miasta 28.9/d, srednia 7 dob do 59.4" if key_on else "INFO",
+                (best_t <= 2.0 and sum(town) / len(days) <= 2.0) if key_on else None)
     else:
         rep.add(f"{pfx}-15b: juczne 'inne ticki dobowe'", "brak linii 'Towary (konie jako kapital, ZC1)' (ksiega koni wylaczona albo log sprzed ZC1)", "INFO", None)
     if D.get("auto") is not None:

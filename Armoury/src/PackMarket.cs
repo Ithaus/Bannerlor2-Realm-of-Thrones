@@ -107,6 +107,14 @@ namespace Armoury
 
         private static bool IsPack(ItemObject it) { return it != null && it.ItemCategory == DefaultItemCategories.PackAnimal && it.HorseComponent != null; }
 
+        /// <summary>fix-ksarm (recenzja): PackSources.PacksOff dla swiezego konwoju DTE w InitPost; wyjatek modelu jedzenia = potkniecie i "nie zdejmuj tu"
+        /// (konwoj idzie do _pend, CreatePost sprawdza PacksOff jeszcze raz) - bez globalnego wylacznika.</summary>
+        private static bool DteOff(MobileParty p)
+        {
+            try { return PackSources.PacksOff(p); }
+            catch (Exception e) { Stumble("InitPost.PacksOff", e); return false; }
+        }
+
         // ------------------------------------------------------------ (a) juczne nowej karawany
 
         /// <summary>Postfiks InitializationArgs.InitializeCaravanOnCreation: zwierzeta juczne, ktore gra dodala swiezej karawanie (bez ladunku z CreateCaravanParty).</summary>
@@ -131,9 +139,12 @@ namespace Armoury
                 // ladowej oddaje juczne bez progu), czyli PRZED postfiksem CreatePost - ten zdejmowal tylko reszte (120 dob: 325 sztuk z niczego na polkach
                 // miast portowych). Liczniki jak w CreatePost (_new - morskie sa w "nowe karawany", prog K5-5); partia nie idzie do _pend.
                 // Live: karawany startowe jak w grze; wylaczony klucz i konwoj DTE - do _pend, rozlicza je CreatePost jak dotad.
-                // fix-ksarm: konwoj DTE morski przy kluczu DteConvoyNoFreePacks - tak samo od razu (bez sprzedazy jucznych z niczego miastu startu), liczony w konwojach DTE
+                // fix-ksarm: konwoj DTE morski przy kluczu DteConvoyNoFreePacks - tak samo od razu (bez sprzedazy jucznych z niczego miastu startu), liczony w konwojach DTE.
+                // Recenzja: ta sama regula co CreatePost i PackSources.DteSupPost - PacksOff(konwoj) = klucze i konwoj nie je (nie same klucze). Model jedzenia w tej
+                // chwili odpowiada jak pozniej: OnMobilePartySetOnCreation ustawil juz komponent karawany (IsCaravan) i ActualClan (ROT IsWhiteWalker), Default:
+                // !IsCaravan, BK/NavalDLC/BEE przepuszczaja. Wyjatek modelu (DteOff) - konwoj do _pend, rozstrzyga CreatePost jak przy konwoju, ktory je.
                 bool dte = CaravanCapital.InDteConvoy();
-                if (Live && !__0.HasLandNavigationCapability && (dte ? PackSources.PacksOffKeys : On))
+                if (Live && !__0.HasLandNavigationCapability && (dte ? DteOff(__0) : On))
                 {
                     int added = 0, taken = 0;
                     foreach (var kv in got)
