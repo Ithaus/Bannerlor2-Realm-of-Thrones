@@ -2,6 +2,7 @@
 # rysuj.py - obrazek planu bocznych drog (f11-drogi) z wyniku podgladu (tools/drogi/boczne-podglad, Program.cs) - sama geometria, nie wyglad z gry:
 # siatka ladu (rownina / step / pustynia / las / brod, ciemniej = bardziej stromo; granatowe = bez drogi ladem: morze, gory ROT, woda), trakty ROT (szare,
 # szerokosc farby), stemple bocznych drog (brazowe elipsy), wioski ukladu (biale), wsie gry (czerwone), miasta i zamki (czarne).
+# f19: wioska ukladu bez drogi - fioletowy pierscien, obrazek na farbie traktu - zolta, styk z siecia - blekitna, wies gry tylko jako wezel - ciemny pierscien.
 # Uruchomienie z katalogu repo: python -I tools/drogi/boczne-podglad/rysuj.py <wynik> <srodek x> <srodek y> <bok jedn.> <plik.png> [piksele na jedn., 12]
 import math, os, sys
 from PIL import Image, ImageDraw
@@ -53,12 +54,24 @@ def main():
             lx, ly = math.cos(t) * al * 0.85, math.sin(t) * ac * 0.85
             poly.append(P(x + lx * math.cos(yaw) - ly * math.sin(yaw), y + lx * math.sin(yaw) + ly * math.cos(yaw)))
         dr.polygon(poly, fill=(170, 95, 30, int(170 * alpha)))
+    # f19: kolumna 5 = stan wioski (SideRoadPlan.St*); wioska ukladu BEZ drogi - fioletowy pierscien (obrazki przed / po), na farbie traktu - zolta,
+    # styk z siecia - blekitna; wies gry bez wlasnej drogi (tylko wezel) - czerwona z ciemnym pierscieniem
     for l in open(os.path.join(d, 'nodes.tsv')):
-        x, y, gm, _ = l.rstrip('\n').split('\t')
-        x, y = float(x), float(y)
+        c = l.rstrip('\r\n').split('\t')
+        x, y, gm = float(c[0]), float(c[1]), c[2]
+        stv = int(c[4]) if len(c) > 4 and c[4].isdigit() else -1
         if x0 < x < x0 + size and y0 < y < y0 + size:
             a, r = P(x, y), (4 if gm == '0' else 6)
-            dr.ellipse([a[0] - r, a[1] - r, a[0] + r, a[1] + r], fill=(255, 255, 255) if gm == '0' else (220, 40, 40), outline=(0, 0, 0))
+            if gm == '0':
+                if stv in (0, 4, 10):
+                    R = 11
+                    dr.ellipse([a[0] - R, a[1] - R, a[0] + R, a[1] + R], outline=(230, 0, 230), width=3)
+                fill = {2: (250, 230, 40), 3: (90, 220, 255)}.get(stv, (255, 255, 255))
+            else:
+                fill = (220, 40, 40)
+                if stv == 8:
+                    dr.ellipse([a[0] - 9, a[1] - 9, a[0] + 9, a[1] + 9], outline=(90, 0, 0), width=2)
+            dr.ellipse([a[0] - r, a[1] - r, a[0] + r, a[1] + r], fill=fill, outline=(0, 0, 0))
     for l in open(os.path.join(d, 'obst.tsv')):
         x, y = map(float, l.split('\t'))
         if x0 < x < x0 + size and y0 < y < y0 + size:

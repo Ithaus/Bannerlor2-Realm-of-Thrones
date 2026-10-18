@@ -1,0 +1,14 @@
+{
+  "_opis": "f19-drogi: cele zdjec reguly 'kazda wioska ukladu' (klucz MapSideRoadsAllVillages) dla autotestu (tools/autotest-2026-10-17/bieg-bitwa.ps1 -PhotosFile tools/drogi/zdjecia-drogi-f19.json). Przed biegiem plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-drogi-boczne.flag (wzor tools/drogi/armoury-drogi-boczne.flag.wzor; regula f19 domyslnie, AllVillages=0 = plan f11) - drogi boczne tylko na ten bieg; po biegu plik usunac. Cele: miejsca, gdzie plan f11 nie dawal zadnej drogi (podglad tools/drogi/boczne-podglad na ukladzie v7, 18.10): las Polnocy przy Last Hearth, srodek Dorzecza na zachod od Harrenhal, Reach na wschod od Highgarden, step Essos na zachod od rzeki, Essos na pn. od Norvos, laczki pod katem przy trakcie (zblizenie).",
+  "run": "zdjecia-drogi-f19",
+  "photos": [
+    { "name": "f19-polnoc-las",   "x": 520,  "y": 1010 },
+    { "name": "f19-dorzecze",     "x": 430,  "y": 480 },
+    { "name": "f19-reach",        "x": 270,  "y": 275 },
+    { "name": "f19-essos-step",   "x": 1250, "y": 335 },
+    { "name": "f19-essos-norvos", "x": 1070, "y": 360 },
+    { "name": "f19-laczki",       "x": 447,  "y": 495 }
+  ],
+  "photo_shots": "10,20,40",
+  "photo_hours": "9-15"
+}

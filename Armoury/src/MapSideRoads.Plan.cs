@@ -22,6 +22,10 @@
 //    materialu), drobny rozrzut (obrot, szerokosc, dlugosc, przesuniecie w bok) z ziarna drogi - bez powtarzalnego wzoru; przy wiosce wezej i bladziej
 //    (wyjscie spod domow), przy trakcie rozszerzenie (wlot w farbe traktu).
 // Wszystko z ziarna (Seed + numer wioski) - ten sam uklad daje te same drogi przy kazdym wczytaniu. Nic nie idzie do zapisu gry.
+//
+// f19-drogi (Jeff 18.10 wieczorem: "kazda wioska powinna miec droge do siebie"): przy AllVillages = 1 (klucz MapSideRoadsAllVillages, domyslnie TAK) plan
+// liczy MapSideRoads.All.cs (BuildAll) - kazda wioska ukladu dostaje droge, siec rosnie od traktow, wsi gry, miast i zamkow; ponizsze zasady "blisko traktu =
+// bez drogi", MaxHop i MaxNet dotycza tylko AllVillages = 0 (plan f11 bez zmian). Wspolne: siatka, trakty, koszt komorki, ksztalt (Shape), stemple.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -30,7 +34,7 @@ using System.Text;
 
 namespace Armoury
 {
-    internal static class SideRoadPlan
+    internal static partial class SideRoadPlan
     {
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -49,9 +53,20 @@ namespace Armoury
             public float StampHalfLen = 0.9f;     // pol-dlugosc stempla wzdluz drogi (bylo 0.6 - z bliska lancuch prostokatow)
             public float Spacing = 0.15f;         // odstep stempli (gesto - kazdy punkt drogi pod ok. 12 stemplami, ciagly pas; bylo 0.5)
             public float Meander = 0.3f;          // amplituda wicia (jedn.)
-            public int MaxRoads = 1500;           // bezpieczniki
-            public int MaxStamps = 80000;         // (v7: ok. 69.5k stempli, stawianie 75 ms raz na mape) wiecej stempli niz tyle - rzadziej i dluzsze (ta sama zakladka), nigdy urwana droga
+            public int MaxRoads = 4000;           // bezpieczniki (f19: kazda wioska ukladu - ok. 2.3k drog; plan f11 mial ok. 1k, bylo 1500)
+            public int MaxStamps = 80000;         // (v7: ok. 69.5k stempli, stawianie 75 ms raz na mape) wiecej stempli niz tyle - rzadziej (f19: najpierw sam odstep), nigdy urwana droga
             public int Seed = 1811;
+            // f19-drogi: regula "kazda wioska ukladu ma droge" (MapSideRoads.All.cs); 0 = plan f11 (blisko traktu bez drogi, MaxHop, MaxNet)
+            public int AllVillages = 1;           // w grze z klucza MapSideRoadsAllVillages (MapSideRoads.Start), plik-przelacznik autotestu moze nadpisac
+            public float GameLinkMax = 30f;       // wies gry dalej od traktu: wlasna droga do sieci, gdy koszt trasy <= tyle (dalej - zostaje wezlem dla swoich wiosek)
+            public float OnPaintPad = 0.3f;       // obrazek wioski NA farbie traktu: krawedz farby blizej niz obrys wioski + tyle - bez drogi
+            public float MergeK = 1.4f;           // laczka przy trakcie: wlot przesuniety wzdluz traktu o MergeK x odleglosc w bok (kat ok. 35 st., nie prostopadla kreska)
+            public float MergeEdge = 8f;          // laczka takze dla wioski dalej niz "blisko traktu", do tylu jedn. od farby (gdy wies gry / brama nie sa blizej)
+            public float MinLenAll = 1.2f;        // droga krotsza niz tyle = wioska styka sie z siecia (obrazek przykrywa), bez rysowania
+            public float HubR = 0.8f;             // wies gry jako wezel sieci: droga konczy sie w tym promieniu od srodka (dociagnieta do srodka)
+            public float SpacingOnlyMax = 2.4f;   // ponad MaxStamps: najpierw sam odstep stempli (do x tyle - zakladka >= 5 stempli), dopiero potem tez dlugosc stempla
+            public float HubLinkMax = 250f;       // faza C: wies gry bez polaczenia (z drogami swoich wiosek) dolaczona do sieci z traktem, gdy koszt <= tyle (praktycznie kazda z trasa po ladzie;
+                                                  // najdluzsza droga v7 61 jedn.; prog tylko przeciw drodze przez pol kontynentu)
 
             internal void Clamp()
             {
@@ -59,13 +74,20 @@ namespace Armoury
                 MaxHop = Cl(MaxHop, 2f, 40f); MaxNet = Cl(MaxNet, MaxHop, 120f); MinLen = Cl(MinLen, 0f, 10f);
                 RouteStep = Cl(RouteStep, 0.5f, 2f); ObstR = Cl(ObstR, 0f, 6f); VillageAvoidR = Cl(VillageAvoidR, 0f, 3f);
                 Width = Cl(Width, 0.15f, 2f); StampHalfLen = Cl(StampHalfLen, 0.15f, 2f); Spacing = Cl(Spacing, 0.1f, 2f); Meander = Cl(Meander, 0f, 1f);
-                if (MaxRoads < 0) MaxRoads = 0; if (MaxRoads > 5000) MaxRoads = 5000;
+                if (MaxRoads < 0) MaxRoads = 0; if (MaxRoads > 6000) MaxRoads = 6000;
                 if (MaxStamps < 0) MaxStamps = 0; if (MaxStamps > 100000) MaxStamps = 100000;
+                AllVillages = AllVillages != 0 ? 1 : 0;
+                GameLinkMax = Cl(GameLinkMax, 0f, 200f); OnPaintPad = Cl(OnPaintPad, 0f, 3f); MergeK = Cl(MergeK, 0.6f, 3f); MergeEdge = Cl(MergeEdge, 0f, 10f); MinLenAll = Cl(MinLenAll, 0f, 6f);
+                HubR = Cl(HubR, 0.75f, 3f); SpacingOnlyMax = Cl(SpacingOnlyMax, 1f, 4f); HubLinkMax = Cl(HubLinkMax, 0f, 1000f);
             }
 
             internal string Text()
             {
-                return "blisko traktu <= " + F2(NearHalfFactor) + " x pol-szer. + " + F2(NearExtra) + ", skok <= " + F2(MaxHop) + ", od traktu <= " + F2(MaxNet)
+                string t = AllVillages == 1
+                    ? "regula f19 KAZDA WIOSKA UKLADU (wsie gry, miasta, zamki = wezly sieci; laczka przy trakcie pod katem x" + F2(MergeK) + " do " + F2(MergeEdge) + " od farby, obrazek na farbie traktu + " + F2(OnPaintPad)
+                      + " bez drogi, styk z siecia < " + F2(MinLenAll) + ", wies gry wlasna droga przy koszcie <= " + F2(GameLinkMax) + ", wezel wsi gry " + F2(HubR) + ", dolaczenie wezla <= " + F2(HubLinkMax) + ", ponad limit najpierw odstep do x" + F2(SpacingOnlyMax) + "), "
+                    : "regula f11 (tylko dalsze wioski), ";
+                return t + "blisko traktu <= " + F2(NearHalfFactor) + " x pol-szer. + " + F2(NearExtra) + ", skok <= " + F2(MaxHop) + ", od traktu <= " + F2(MaxNet)
                        + ", krotsza niz " + F2(MinLen) + " bez rysowania, krata " + F2(RouteStep) + ", miasta/zamki " + F2(ObstR) + ", szerokosc " + F2(Width)
                        + ", stempel " + F2(StampHalfLen) + " co " + F2(Spacing) + ", wicie " + F2(Meander);
             }
@@ -149,6 +171,7 @@ namespace Armoury
         internal sealed class MainRoads
         {
             public float[] Ax, Ay, Dx, Dy, InvL2, Half;
+            public int[] LineOf;             // f19: lamana odcinka (kolejne odcinki tej samej lamanej sa polaczone - chodzenie wzdluz traktu)
             public int Segments, Lines, Points, BadRows, Version;
             public long TerrainSize;
             public string Md5 = "-";
@@ -162,7 +185,14 @@ namespace Armoury
             /// <summary>Najblizszy odcinek w promieniu maxR: odleglosc od osi (centr), pol-szerokosc i punkt na osi; false - brak w zasiegu.</summary>
             internal bool Nearest(float x, float y, float maxR, out float centr, out float half, out float px, out float py)
             {
-                centr = float.MaxValue; half = 0f; px = py = 0f;
+                int seg;
+                return NearestSeg(x, y, maxR, out centr, out half, out px, out py, out seg);
+            }
+
+            /// <summary>Jak Nearest, z numerem odcinka (f19: kierunek traktu i chodzenie wzdluz lamanej).</summary>
+            internal bool NearestSeg(float x, float y, float maxR, out float centr, out float half, out float px, out float py, out int seg)
+            {
+                centr = float.MaxValue; half = 0f; px = py = 0f; seg = -1;
                 if (Segments == 0) return false;
                 int r = (int)Math.Ceiling(maxR / Bucket);
                 int cx = (int)Math.Floor((x - X0) / Bucket), cy = (int)Math.Floor((y - Y0) / Bucket);
@@ -180,7 +210,7 @@ namespace Armoury
                             if (t < 0f) t = 0f; else if (t > 1f) t = 1f;
                             float ex = qx - t * Dx[s], ey = qy - t * Dy[s];
                             float d2 = ex * ex + ey * ey;
-                            if (d2 < best) { best = d2; any = true; half = Half[s]; px = Ax[s] + t * Dx[s]; py = Ay[s] + t * Dy[s]; }
+                            if (d2 < best) { best = d2; any = true; half = Half[s]; px = Ax[s] + t * Dx[s]; py = Ay[s] + t * Dy[s]; seg = s; }
                         }
                     }
                 if (any) centr = (float)Math.Sqrt(best);
@@ -216,10 +246,12 @@ namespace Armoury
                 catch { m.BadRows++; }
             }
             var sa = new List<int>(xs.Count);
-            for (int i = 0; i < xs.Count; i++) { if (i == 0 || ids[i] != ids[i - 1]) { m.Lines++; continue; } sa.Add(i); }
+            var sl = new List<int>(xs.Count);
+            for (int i = 0; i < xs.Count; i++) { if (i == 0 || ids[i] != ids[i - 1]) { m.Lines++; continue; } sa.Add(i); sl.Add(m.Lines - 1); }
             int n = sa.Count;
             m.Points = xs.Count; m.Segments = n;
             m.Ax = new float[n]; m.Ay = new float[n]; m.Dx = new float[n]; m.Dy = new float[n]; m.InvL2 = new float[n]; m.Half = new float[n];
+            m.LineOf = sl.ToArray();
             float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
             for (int k = 0; k < n; k++)
             {
@@ -269,6 +301,10 @@ namespace Armoury
             public float X, Y;
             public string Id;        // uid wioski albo StringId wsi gry (log)
             public bool Game;        // wies gry (nie wioska z ukladu)
+            // f19: obrys obrazka wioski ukladu (MapVillageRecord: HalfLen wzdluz ulicy = lokalna X, HalfWid = lokalna Y, FrontDeg = obrot) - "obrazek na farbie
+            // traktu"; 0 = nieznany (obrys 1 jedn.); nazwa do logu (wioski bez trasy po ladzie wymienione z nazwy)
+            public float Hl, Hw, FrontDeg;
+            public string Name;
         }
 
         internal struct Obstacle { public float X, Y; }
@@ -279,10 +315,11 @@ namespace Armoury
             public int Node;                 // indeks wioski
             public float[] X, Y;             // os drogi co ok. 0.25 jedn. od wioski (0) do wlotu (ostatni)
             public float Length;
-            public int Join;                 // 0 trakt, 1 inna boczna droga
+            public int Join;                 // 0 trakt, 1 inna boczna droga; f19: 2 wies gry (wezel), 3 brama miasta / zamku (pierscien ObstR)
             public int Parent = -1;          // droga, do ktorej dochodzi (Join 1)
-            public float NetAtJoin;          // odleglosc wlotu od traktu po sieci
-            public int Pass;                 // 1 albo 2 (drugi przebieg)
+            public int Hub = -1;             // f19: wies gry, do ktorej dochodzi (Join 2) - indeks wezla
+            public float NetAtJoin;          // odleglosc wlotu od traktu po sieci (f19: 0 - regula nie liczy sieci od traktu)
+            public int Pass;                 // 1 albo 2 (drugi przebieg); f19: 0 laczka przy trakcie, 1 wies gry, 2 wioska ukladu, 3 dolaczenie wezla wsi gry
             public byte Smooth;              // 0 splajn z wiciem, 1 splajn, 2 Chaikin wezlow, 3 Chaikin bez sprawdzianu
         }
 
@@ -300,11 +337,24 @@ namespace Armoury
             public int[] SmoothKinds = new int[4];
             public long Expanded;
             public double Length, Ms, MaxRoadMs;
-            public float StampScale = 1f;        // odstep i pol-dlugosc stempli x tyle, gdy siec przekracza MaxStamps
+            public float StampScale = 1f;        // odstep i pol-dlugosc stempli x tyle, gdy siec przekracza MaxStamps (f19: tylko pol-dlugosc)
+            public float SpaceScale = 1f;        // odstep stempli x tyle (f11: = StampScale; f19: najpierw sam odstep do SpacingOnlyMax)
             public float MaxRoadLen;
+            // f19-drogi (regula kazdej wioski ukladu, BuildAll)
+            public bool All;
+            public int LayoutNodes, OnPaint, Merged, MergeFail, Routed, AtNet, NoRouteLayout, CapLayout;
+            public int GameNear, GameLinked, GameStub, GameOverCap, GameNoRoute, JoinHub, JoinFort, EndOdd, PathBroken;
+            public int HubJoined, HubTouch, HubLocal, HubLonely;
+            public readonly List<string> NoRouteNames = new List<string>();
+            public readonly List<string> LonelyNames = new List<string>();   // wsie gry bez zadnej drogi (faza C) - z nazwy
+            public byte[] States;                // stan kazdej wioski (SideRoadPlan.St*; podglad poza gra), null przy planie f11
+            public int LatNx, LatNy;
+            public long Relax;
+            public double LatMs, ShapeMs;
 
             internal string Text()
             {
+                if (All) return TextAll();
                 var sb = new StringBuilder();
                 sb.Append("wiosek ").Append(Nodes).Append(" (w tym wsi gry ").Append(GameNodes).Append("): blisko traktu bez drogi ").Append(Near)
                   .Append(", dalszych ").Append(Far).Append(" -> drog ").Append(Roads.Count).Append(" (do traktu ").Append(JoinMain).Append(", do innej bocznej ").Append(JoinSide)
@@ -315,6 +365,40 @@ namespace Armoury
                   .Append(", wygladzenie: splajn z wiciem ").Append(SmoothKinds[0]).Append(", splajn ").Append(SmoothKinds[1]).Append(", Chaikin ").Append(SmoothKinds[2]).Append(", Chaikin bez sprawdzianu ").Append(SmoothKinds[3])
                   .Append(" | stempli ").Append(Stamps.Count).Append(" (odstep x").Append(StampScale.ToString("0.00", Inv)).Append(", ponad limit ").Append(CapStamps).Append(")")
                   .Append(" | wezlow trasy ").Append(Expanded).Append(", czas ").Append(Ms.ToString("0", Inv)).Append(" ms (najdluzsza droga ").Append(MaxRoadMs.ToString("0.0", Inv)).Append(" ms)");
+                return sb.ToString();
+            }
+
+            /// <summary>Linia planu f19 (te same kawalki "-> drog N", "| dlugosc X jedn.", "| stempli N" co f11 - sprawdz_logi nboczne).</summary>
+            internal string TextAll()
+            {
+                var sb = new StringBuilder();
+                int without = NoRouteLayout + CapLayout;
+                sb.Append("regula f19 (kazda wioska ukladu) | wiosek ukladu ").Append(LayoutNodes).Append(": obrazek na farbie traktu (bez drogi) ").Append(OnPaint)
+                  .Append(", laczka pod katem przy trakcie ").Append(Merged).Append(" (nieudana - trasa ").Append(MergeFail).Append(")")
+                  .Append(", trasa do sieci ").Append(Routed).Append(", styk z siecia ").Append(AtNet)
+                  .Append(", WIOSEK UKLADU BEZ DROGI ").Append(without).Append(" (bez trasy po ladzie ").Append(NoRouteLayout).Append(", ponad limit drog ").Append(CapLayout).Append(")");
+                if (NoRouteNames.Count > 0)
+                {
+                    sb.Append(" [");
+                    int k = Math.Min(NoRouteNames.Count, 40);
+                    for (int i = 0; i < k; i++) { if (i > 0) sb.Append(", "); sb.Append(NoRouteNames[i]); }
+                    if (NoRouteNames.Count > k) sb.Append(", ... +").Append(NoRouteNames.Count - k);
+                    sb.Append("]");
+                }
+                sb.Append(" | wsie gry ").Append(GameNodes).Append(": blisko traktu bez drogi ").Append(GameNear).Append(", wlasna droga ").Append(GameLinked)
+                  .Append(", ostroga ").Append(GameStub).Append(", dalej niz prog (wezel dla swoich wiosek) ").Append(GameOverCap).Append(", bez trasy ").Append(GameNoRoute)
+                  .Append("; wezly bez traktu (faza C): dolaczone droga ").Append(HubJoined).Append(", tuz przy sieci ").Append(HubTouch).Append(", siec lokalna (dalej niz prog) ")
+                  .Append(HubLocal).Append(", WSIE GRY BEZ ZADNEJ DROGI ").Append(HubLonely)
+                  .Append(LonelyNames.Count > 0 ? " [" + string.Join(", ", LonelyNames.GetRange(0, Math.Min(20, LonelyNames.Count)).ToArray()) + (LonelyNames.Count > 20 ? ", ..." : "") + "]" : "")
+                  .Append(" | -> drog ").Append(Roads.Count).Append(" (do traktu ").Append(JoinMain).Append(", do innej bocznej ").Append(JoinSide).Append(", do wsi gry ").Append(JoinHub)
+                  .Append(", do bramy miasta / zamku ").Append(JoinFort).Append(")")
+                  .Append(" | dlugosc ").Append(Length.ToString("0.0", Inv)).Append(" jedn. (najdluzsza ").Append(MaxRoadLen.ToString("0.0", Inv)).Append(")")
+                  .Append(", wygladzenie: splajn z wiciem ").Append(SmoothKinds[0]).Append(", splajn ").Append(SmoothKinds[1]).Append(", Chaikin ").Append(SmoothKinds[2]).Append(", Chaikin bez sprawdzianu ").Append(SmoothKinds[3])
+                  .Append(" | stempli ").Append(Stamps.Count).Append(" (odstep x").Append(SpaceScale.ToString("0.00", Inv)).Append(", dlugosc stempla x").Append(StampScale.ToString("0.00", Inv))
+                  .Append(", ponad limit ").Append(CapStamps).Append(")")
+                  .Append(" | krata ").Append(LatNx).Append(" x ").Append(LatNy).Append(", relaksacji ").Append(Relax).Append(", krata ").Append(LatMs.ToString("0", Inv)).Append(" ms, ksztalt ")
+                  .Append(ShapeMs.ToString("0", Inv)).Append(" ms, czas ").Append(Ms.ToString("0", Inv)).Append(" ms");
+                if (EndOdd > 0 || PathBroken > 0) sb.Append(" | potkniecia planu: koniec trasy bez celu ").Append(EndOdd).Append(", zerwana trasa ").Append(PathBroken);
                 return sb.ToString();
             }
         }
@@ -400,6 +484,9 @@ namespace Armoury
             public int Gen;
             public int[] Heap; public int HeapN;
             public long Expanded;
+            // f19: koniec drogi przy wsi gry / bramie - punkty w tym promieniu od konca przejezdne jak przy wiosce startu (wies gry bywa na probce '.' przy
+            // brzegu); 0 = brak (plan f11 - bez zmian)
+            public float EndX, EndY, EndR2;
         }
 
         private static long BKey(float x, float y) { return ((long)(int)Math.Floor(x / 4f) << 32) ^ (uint)(int)Math.Floor(y / 4f); }
@@ -415,9 +502,10 @@ namespace Armoury
         /// <summary>Plan calej sieci (watek roboczy albo poza gra): czysta funkcja wejsc i parametrow.</summary>
         internal static Result Build(LandGrid g, MainRoads m, List<Node> nodes, List<Obstacle> obst, Params p)
         {
+            p.Clamp();
+            if (p.AllVillages == 1) return BuildAll(g, m, nodes, obst, p);   // f19-drogi: kazda wioska ukladu (MapSideRoads.All.cs)
             var sw = Stopwatch.StartNew();
             var res = new Result();
-            p.Clamp();
             var cx = new Ctx { G = g, M = m, P = p, Nodes = nodes, Obst = obst };
             for (int i = 0; i < obst.Count; i++) BAdd(cx.ObstB, obst[i].X, obst[i].Y, i);
             for (int i = 0; i < nodes.Count; i++) BAdd(cx.NodeB, nodes[i].X, nodes[i].Y, i);
@@ -468,6 +556,7 @@ namespace Armoury
             foreach (var rd in res.Roads) { res.Length += rd.Length; if (rd.Length > res.MaxRoadLen) res.MaxRoadLen = rd.Length; }
             double need = res.Length / p.Spacing, room = p.MaxStamps - 1.2 * res.Roads.Count;   // + ok. 1 stempel na droge (poczatek przy wiosce)
             if (p.MaxStamps > 0 && need > room) res.StampScale = room > 0.25 * p.MaxStamps ? (float)(need / room * 1.03) : (float)(need / (0.25 * p.MaxStamps));
+            res.SpaceScale = res.StampScale;   // f11: odstep i pol-dlugosc razem (jak dotad)
             for (int r = 0; r < res.Roads.Count; r++) Stamps(res.Roads[r], r, p, res);
             res.Expanded = cx.Expanded;
             res.Ms = sw.Elapsed.TotalMilliseconds;
@@ -630,6 +719,7 @@ namespace Armoury
             if (c <= 0f)
             {
                 if (nearStart) c = 2f;
+                else if (cx.EndR2 > 0f && (x - cx.EndX) * (x - cx.EndX) + (y - cx.EndY) * (y - cx.EndY) <= cx.EndR2) return 2f;   // f19: koniec przy wsi gry / bramie
                 else
                 {
                     // pas farby traktu jest ladem (probka 2 jedn. przy brzegu / rzece bywa '.') - wezel na trakcie przejezdny
@@ -707,6 +797,8 @@ namespace Armoury
         }
 
         // ------------------------------------------------------------------ ksztalt drogi
+        private const int ShortcutWindow = 48;
+
         /// <summary>Wezly kraty -> skroty -> splajn -> wicie; sprawdzian przejezdnosci po kazdym kroku (punkt co ok. 0.25 jedn. na ladzie wedlug siatki,
         /// z wyjatkiem 1.5 jedn. przy wiosce i pasa traktu). Zwraca rodzaj wygladzenia (0 splajn z wiciem, 1 splajn, 2 Chaikin wezlow, 3 Chaikin bez sprawdzianu).</summary>
         private static byte Shape(Ctx cx, List<float> xs, List<float> ys, List<float> cost, int ni, uint seed, out float[] rx, out float[] ry)
@@ -718,7 +810,8 @@ namespace Armoury
             while (a < n - 1)
             {
                 int best = a + 1;
-                for (int j = n - 1; j > a + 1; j--)
+                // skrot najwyzej ShortcutWindow wezlow naprzod (f19: drogi do 60+ jedn. - bez okna koszt n^2 x dlugosc; drogi f11 <= ok. 30 wezlow - bez zmian)
+                for (int j = Math.Min(n - 1, a + ShortcutWindow); j > a + 1; j--)
                 {
                     if (Straight(cx, xs[a], ys[a], xs[j], ys[j], nd.X, nd.Y, ni, (cost[Math.Min(j, cost.Count - 1)] - cost[a]) * 1.05f + 0.05f)) { best = j; break; }
                 }
@@ -902,15 +995,17 @@ namespace Armoury
                 float tv = s < 1.2f ? 0.7f + 0.3f * (s / 1.2f) : 1f;                         // przy wiosce wezej
                 float rest = L - s;
                 float fl = rd.Join == 0 && rest < 0.9f ? 1f + 0.3f * (1f - rest / 0.9f) : 1f; // wlot w farbe traktu szerzej
+                if (rd.Join >= 2 && rest < 1.2f) tv *= 0.7f + 0.3f * (rest / 1.2f);          // f19: koniec przy wsi gry / bramie - wezej (jak wyjscie spod domow)
                 float across = half * tv * fl * (0.92f + 0.16f * Rnd(ref seed));
                 float along = p.StampHalfLen * res.StampScale * (0.9f + 0.2f * Rnd(ref seed));
                 float alpha = s < 1.0f ? 0.55f + 0.45f * s : 1f;
+                if (rd.Join >= 2 && rest < 1.0f) alpha *= 0.55f + 0.45f * rest;              // f19: i bladziej
                 float side = (Rnd(ref seed) - 0.5f) * 0.06f;
                 float l = (float)Math.Sqrt(dx * dx + dy * dy);
                 if (l > 1e-5f) { x += -dy / l * side; y += dx / l * side; }
                 yaw += (Rnd(ref seed) - 0.5f) * 0.16f;
                 res.Stamps.Add(new Stamp { X = x, Y = y, Yaw = yaw, Across = across, Along = along, Alpha = alpha, Road = ri });
-                s += p.Spacing * res.StampScale * (0.9f + 0.2f * Rnd(ref seed));
+                s += p.Spacing * res.SpaceScale * (0.9f + 0.2f * Rnd(ref seed));
             }
         }
 

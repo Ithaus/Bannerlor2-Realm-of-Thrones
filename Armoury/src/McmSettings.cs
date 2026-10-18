@@ -6300,9 +6300,13 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
-        [SettingPropertyBool("Map Side Roads", HintText = "dirt lanes on the campaign map lead from the main painted roads to the villages that lie farther away - a village close to a main road gets no lane of its own, villages behind it join its lane, and the lanes wind along the land around water, mountains and towns. Visual only - lanes do not change speed or routes. Turned on, the lanes appear on the map within a few seconds; turned off, they are taken away. Off = no lanes are drawn")]
+        [SettingPropertyBool("Map Side Roads", HintText = "dirt lanes on the campaign map lead from the main painted roads to the villages that lie farther away - a village close to a main road gets no lane of its own, villages behind it join its lane, and the lanes wind along the land around water, mountains and towns. With Map Side Roads All Villages on, every village gets a lane - see that option. Visual only - lanes do not change speed or routes. Turned on, the lanes appear on the map within a few seconds; turned off, they are taken away. Off = no lanes are drawn")]
         [SettingPropertyGroup("Side roads to far villages")]
         public bool MapSideRoads { get; set; } = false;
+
+        [SettingPropertyBool("Map Side Roads All Villages", HintText = "with Map Side Roads on, every village of the map gets a lane of its own, however deep in a forest or a plain it lies: lanes lead from the main roads, the towns, the castles and the game's own villages, a village behind another joins its lane, and a village close to a main road gets a short lane that leaves the road at a gentle angle - only a village standing right on the road paint has none. Changed on the map, the lanes are drawn anew within a few seconds. Off = lanes lead only to the villages that lie farther from a main road, as before")]
+        [SettingPropertyGroup("Side roads to far villages")]
+        public bool MapSideRoadsAllVillages { get; set; } = true;
 
         [SettingPropertyBool("Perf Valyrian Census", HintText = "the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before")]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
@@ -9491,6 +9495,7 @@ namespace Armoury
             s.VillageHamletKsLand = VillageHamletKsLand;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
             s.MapSideRoads = MapSideRoads;
+            s.MapSideRoadsAllVillages = MapSideRoadsAllVillages;
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;

@@ -1558,6 +1558,9 @@ Uzycie (Python 3, tylko odczyt):
                     (N > 0, N >= 80% M - reszta nad woda / brodem / mostem, zle 0, potkniecia 0); NBC-4 czas planu na watku z puli <= 5000 ms i wejscia na watku glownym
                     <= 50 ms; NBC-5 stawianie: najdluzszy tick <= 15 ms (bieg zdjec bez budzetu - INFO); NBC-6 klatki z drogami widocznymi / schowanymi (INFO - koszt
                     rysowania); NBC-7 potkniecia (najwiecej w linii pomiaru) i linie "ERROR in MapSideRoads*" 0; NBC-8 miejsca z najgestsza siecia (INFO - cele zdjec).
+                    f19-drogi (Jeff 18.10 wieczorem: "kazda wioska powinna miec droge do siebie"; klucz Map Side Roads All Villages, MapSideRoads.All.cs): NBC-9 plan
+                    "regula f19": wioski ukladu bez drogi = tylko bez trasy po ladzie (ponad limit drog 0; nazwy w linii planu - INFO), stemple ponad limit 0 (droga nigdy
+                    urwana), potkniecia planu (koniec trasy bez celu, zerwana trasa) 0; wsie gry bez zadnej drogi - INFO z nazwami. Plan f11 (klucz NIE) - NBC-9 INFO.
 --grupa nzwrot    : (18.10, paczka f6-zwrot - decyzja Jeffa "tak, zwrot wedlug potrzeby"; koncowy przeglad ekonomii 18.10, uwagi "Korona zwraca 70% zoldu takze
                     najbogatszym rodom" i "Niewydany przydzial sprzetu panow idzie do kas siedzib bez towaru"; Armoury/src/KingdomTreasury.RefundNeed.cs, KingdomTreasury.cs
                     WageRefund, CourtFull.Goods, CourtGoods.Gear, ClanBudget.Court - klucze Crown Refund By Need, Lapsed Gear Buys Goods) python -I tools/sprawdz_logi.py
@@ -46563,6 +46566,23 @@ def nboczne_main(logp):
             rep.add("NBC-4: czas planu (watek z puli) i wejscia (watek glowny)", f"plan {work:.0f} ms, wejscie {main:.1f} ms", "plan <= 5000 ms, wejscie <= 50 ms",
                     0 <= work <= 5000 and 0 <= main <= 50)
             rep.add("NBC-2b: rozklad wiosek (ostatni plan)", pl[len(NBC_HEAD) + len("plan - "):][:420], "INFO", None)
+            # f19-drogi: regula "kazda wioska ukladu" (klucz MapSideRoadsAllVillages)
+            if "regula f19" in pl:
+                m9 = re.search(r"WIOSEK UKLADU BEZ DROGI (\d+) \(bez trasy po ladzie (\d+), ponad limit drog (\d+)\)", pl)
+                cap9 = num(r"ponad limit (\d+)\) \| krata", pl, int, -1)
+                odd9 = re.search(r"potkniecia planu: koniec trasy bez celu (\d+), zerwana trasa (\d+)", pl)
+                lone9 = re.search(r"WSIE GRY BEZ ZADNEJ DROGI (\d+)( \[[^\]]*\])?", pl)
+                if m9:
+                    without, noroute, capr = (int(x) for x in m9.groups())
+                    st9 = (int(odd9.group(1)) + int(odd9.group(2))) if odd9 else 0
+                    rep.add("NBC-9: regula f19 - kazda wioska ukladu ma droge",
+                            f"bez drogi {without} (bez trasy po ladzie {noroute}, ponad limit drog {capr}); stemple ponad limit {cap9}; potkniecia planu {st9}",
+                            "bez drogi tylko bez trasy po ladzie, ponad limit 0, potkniecia 0", without == noroute and capr == 0 and cap9 == 0 and st9 == 0)
+                    rep.add("NBC-9b: wsie gry bez zadnej drogi (f19)", (lone9.group(1) + (lone9.group(2) or "")) if lone9 else "-", "INFO (wyspy bez osady / bez trasy po ladzie)", None)
+                else:
+                    rep.add("NBC-9: regula f19 - linia planu", pl[len(NBC_HEAD):][:200], "format linii f19", False)
+            else:
+                rep.add("NBC-9: regula f19", "plan f11 (klucz Map Side Roads All Villages = NIE albo log sprzed f19)", "INFO", None)
         else:
             rep.add("NBC-2: plan", ("NIEUDANY: " + fails[-1][len(NBC_HEAD):][:200]) if fails else "brak linii 'plan - ' (widok mapy sie nie zarejestrowal?)", "linia planu po wejsciu na mape", False)
         if built:

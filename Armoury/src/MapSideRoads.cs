@@ -20,7 +20,11 @@
 // linia przy starcie sesji. Autotest: plik Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-drogi-boczne.flag (tylko w trybie autotestu CrashScribe,
 // LogGate 1 / 2 - nigdy w grze Jeffa) wlacza drogi na ten bieg; jego tresc (linie klucz=wartosc, opcjonalnie) zmienia parametry planu i wyglad do zdjec bez
 // przebudowy DLL: NearExtra, NearHalfFactor, MaxHop, MaxNet, MinLen, Width, StampHalfLen, Spacing, Meander, ObstR, VillageAvoidR, MaxRoads, MaxStamps, Seed,
-// material=..., factor=FF918976, alpha=0..1, hide=wysokosc kamery, argument=a,b,c,d (atlas materialu).
+// material=..., factor=FF918976, alpha=0..1, hide=wysokosc kamery, argument=a,b,c,d (atlas materialu); f19: AllVillages (1/0 - nadpisuje klucz), GameLinkMax,
+// HubLinkMax, OnPaintPad, MergeK, MergeEdge, MinLenAll, HubR, SpacingOnlyMax.
+// f19-drogi (Jeff 18.10 wieczorem: "kazda wioska powinna miec droge do siebie"): klucz MapSideRoadsAllVillages (DOMYSLNIE TAK) - plan MapSideRoads.All.cs: kazda
+// wioska ukladu dostaje droge (siec od traktow, miast, zamkow i wsi gry, kolejnosc jak u Prima, laczka pod katem przy trakcie); NIE = plan f11. Wejscie to samo
+// (+ obrys obrazka i nazwa wioski z ukladu); przelaczenie klucza na mapie = decale zdjete i plan od nowa (raz na zmiane).
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -75,6 +79,9 @@ namespace Armoury
 
         internal static bool Key { get { var s = Settings.Current; return s != null && s.MapSideRoads; } }
 
+        /// <summary>f19-drogi: klucz MapSideRoadsAllVillages (kazda wioska ukladu ma droge; NIE = plan f11). Bez ustawien - TAK (domyslna klucza).</summary>
+        internal static bool KeyAll { get { var s = Settings.Current; return s == null || s.MapSideRoadsAllVillages; } }
+
         /// <summary>Drogi boczne czynne: klucz MCM albo plik-przelacznik autotestu (tylko w kampanii).</summary>
         internal static bool On { get { return Key || AutotestFlag; } }
 
@@ -121,7 +128,7 @@ namespace Armoury
                 Log.Info(P + "wylaczone (klucz MapSideRoads = NIE, bez pliku-przelacznika autotestu) - widok bocznych drog sie nie laduje, nic nie stawiam.");
                 return;
             }
-            var p = new SideRoadPlan.Params();
+            var p = new SideRoadPlan.Params { AllVillages = KeyAll ? 1 : 0 };   // f19: regula z klucza (plik-przelacznik autotestu moze nadpisac)
             var look = new Look();
             string note = ApplyFlag(p, look);
             p.Clamp();
@@ -188,6 +195,7 @@ namespace Armoury
             public double MainMs, WorkMs;
             public bool HasLayout;
             public uint LayoutCrc;
+            public bool KeyAll;                 // f19: klucz MapSideRoadsAllVillages przy starcie planu (zmiana na mapie - plan od nowa)
             public SideRoadPlan.Params Params;
             public Look Look;
         }
@@ -196,7 +204,8 @@ namespace Armoury
         /// wlaczonych wioskach na mapie (MapVillagesEnabled - bez obrazkow droga prowadzilaby donikad).</summary>
         internal static Job Start()
         {
-            var job = new Job { Params = new SideRoadPlan.Params(), Look = new Look() };
+            var job = new Job { Params = new SideRoadPlan.Params(), Look = new Look(), KeyAll = KeyAll };
+            job.Params.AllVillages = job.KeyAll ? 1 : 0;   // f19: regula z klucza; plik-przelacznik autotestu (ApplyFlag, AllVillages=0/1) moze nadpisac
             var sw = System.Diagnostics.Stopwatch.StartNew();
             string fl = ApplyFlag(job.Params, job.Look);
             job.Params.Clamp();
@@ -216,7 +225,8 @@ namespace Armoury
                     foreach (var r in recs)
                     {
                         if (r == null || float.IsNaN(r.X) || float.IsNaN(r.Y)) { bad++; continue; }
-                        nodes.Add(new SideRoadPlan.Node { X = r.X, Y = r.Y, Id = r.Uid ?? "", Game = false });
+                        // f19: obrys obrazka (obrazek na farbie traktu = bez drogi) i nazwa (wioski bez trasy po ladzie w logu z nazwy)
+                        nodes.Add(new SideRoadPlan.Node { X = r.X, Y = r.Y, Id = r.Uid ?? "", Game = false, Hl = r.HalfLen, Hw = r.HalfWid, FrontDeg = r.FrontDeg, Name = r.Name ?? "" });
                         layoutN++;
                     }
                     layoutNote = "wioski ukladu " + layoutN + " (" + VillageBook.LayoutFile + ", crc " + crc.ToString("X8", Inv) + ")";
@@ -234,7 +244,7 @@ namespace Armoury
                     {
                         if (!seen.Add(st.Village)) continue;                 // ROT podaje dwie wsie dwa razy (jak VillageBook.Resolve)
                         Vec2 v = st.GetPosition2D;
-                        nodes.Add(new SideRoadPlan.Node { X = v.x, Y = v.y, Id = st.StringId ?? "", Game = true });
+                        nodes.Add(new SideRoadPlan.Node { X = v.x, Y = v.y, Id = st.StringId ?? "", Game = true, Name = RawName(st.Name) });   // f19: nazwa do logu
                         gameN++;
                     }
                     else if (st.IsTown || st.IsCastle)
@@ -260,6 +270,15 @@ namespace Armoury
                 Work(job, nodes, obst, gridPath, mainPath, terrain);
             }
             return job;
+        }
+
+        /// <summary>f19: nazwa osady do logu bez przetwarzania tekstu gry (surowe TextObject.Value bez "{=id}") - tanio na watku glownym (ok. 570 wsi gry).</summary>
+        private static string RawName(TaleWorlds.Localization.TextObject t)
+        {
+            string v = t != null ? t.Value : null;
+            if (string.IsNullOrEmpty(v)) return "";
+            if (v.StartsWith("{=", StringComparison.Ordinal)) { int e = v.IndexOf('}'); if (e > 0) v = v.Substring(e + 1); }
+            return v;
         }
 
         private static void Work(Job job, List<SideRoadPlan.Node> nodes, List<SideRoadPlan.Obstacle> obst, string gridPath, string mainPath, string terrain)
@@ -623,7 +642,18 @@ namespace Armoury
         private void CheckLayout()
         {
             var j = _job;
-            if (j == null || !j.HasLayout) return;
+            if (j == null) return;
+            bool keyAll = MapSideRoads.KeyAll;
+            if (keyAll != j.KeyAll)
+            {
+                // f19: klucz MapSideRoadsAllVillages przelaczony na mapie - raz na zmiane (plik-przelacznik autotestu porownywany nie jest: nadpisuje tylko regule planu)
+                int n0 = RemoveAll();
+                _replans++;
+                Log.Info(MapSideRoads.P + "regula 'kazda wioska' (klucz MapSideRoadsAllVillages) zmieniona na " + (keyAll ? "TAK" : "NIE") + " - zdjete decale " + n0 + ", plan od nowa.");
+                _job = null; _built = false; _next = 0; _visKnown = false; _waited = 0f;
+                return;
+            }
+            if (!j.HasLayout) return;
             uint crc;
             if (!VillageBook.LayoutCrcNow(out crc) || crc == j.LayoutCrc) return;
             int n = RemoveAll();

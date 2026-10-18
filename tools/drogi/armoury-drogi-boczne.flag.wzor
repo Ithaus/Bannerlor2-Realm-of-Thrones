@@ -19,7 +19,17 @@
 # MinLen=4
 # ObstR=2.2
 # VillageAvoidR=0.8
-# MaxRoads=1500
+# MaxRoads=4000
 # MaxStamps=80000
 # Seed=1811
+# f19-drogi (regula "kazda wioska ukladu"; w grze z klucza MapSideRoadsAllVillages, tu nadpisanie na bieg):
+# AllVillages=1
+# GameLinkMax=30
+# HubLinkMax=250
+# OnPaintPad=0.3
+# MergeK=1.4
+# MergeEdge=8
+# MinLenAll=1.2
+# HubR=0.8
+# SpacingOnlyMax=2.4
 # Inne materialy do porownania (mapa ma je w zasobach): mainmap_decal_mud_a, decal_city_ground, decal_battania_path_a (atlas sciezki dobiera sie sam).
