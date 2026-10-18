@@ -3040,3 +3040,9 @@ OTWARTE: akumulator kas miast KS (+57k/d), kopalnie bez wegla 93.8 lup/d, browar
 - 12:45 PDT: SCALENIE6 (scalenie6.js): f13-doba (z f9) + f14 x4 + f10-uklad + f11-drogi do noc-ks4 8cd7b556, 3 recenzje + weryfikacja + poprawki.
 - 13:00 PDT: DECYZJA JEFFA 18.10 (verbatim): "takze srednim" - skarbiec krolestwa w czasie wojny doplaca do zoldu takze srednim rodom (pasmo R-2R), nie tylko biednym (pytanie: skarbce
   +17k/d, armie -7% po rentach wedlug potrzeby; "na wojny i trudne czasy"). -> paczka **f15-skarbiec** (worktree zb/f15-skarbiec od 8cd7b556), scalic po scaleniu6, przed testem fin93.
+- 13:20 PDT: SCALENIE6 GOTOWE (wf_04f10675-f76): noc-ks4 **c5933072** = 8cd7b556 + f13-doba (z f9) + f14 x4 + f10-uklad + f11-drogi (wygladzone) + recenzja calosci (5 poprawionych:
+  namioty f9 bez warunku _camping; VillageCrafts.LayoutCheck - nowy neutralny start przy zmianie ukladu (v7 w grze Jeffa); KS: przy innym crc ziemi PONOWNE UZBROJENIE OD ZERA (bez tego
+  KS u Jeffa wlaczylby sie ~11 dni po wczytaniu na starej mierze); przyciski predkosci nierejestrowane przy kluczu NIE; przerwany nocleg w zajezdzie v6 - zwrot i komunikat). 1973 ustawien.
+  Do wgrania: Armoury.dll, CrashScribe.dll (f13), Armoury/SubModule.xml (f9), dane: arm_map_villages(_v6).tsv, arm_map_village_lore(_v6).tsv, arm_roadside_inns(_v6).tsv,
+  arm_map_side_roads_grid.tsv. CrashScribe-at do testow: test/CrashScribe-at-81.dll (zb/cs-at81 = c5933072 + at1-cs-bitwa.diff, md5 0533872b).
+  Czekam na f15-skarbiec (wf_ff6ec6ed-262) -> scalic -> test fin93 (160 dob, ks-auto) -> 5 dob + bitwa -> WGRANIE 81.
