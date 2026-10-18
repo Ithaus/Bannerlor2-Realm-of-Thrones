@@ -7538,7 +7538,7 @@ namespace Armoury
 
         [SettingPropertyBool("Side Village Crafts", HintText = "each side village of a district works at its own craft - fishing hamlets fish, mill and granary villages grow grain, the others what their land, water and climate suit best (no olives, vines or grain in the snow); the district makes the sum of all its villages. With Start Calibration applied this comes from the start calibration itself; this setting governs villages outside it. On the first day the world makes as much of every good as the day before (the change only shifts which villages make what). Off = the district makes only the goods of its game village's type, as before")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
-        public bool SideVillageCrafts { get; set; } = false;
+        public bool SideVillageCrafts { get; set; } = true;
 
         [SettingPropertyFloatingInteger("Side Village Craft Switch", 1.00f, 3.00f, "0.00", HintText = "with Side Village Crafts: a side village turns to another craft only when that craft would earn at least this many times its present one at its market town (land suitability x prices)")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
@@ -7562,7 +7562,7 @@ namespace Armoury
 
         [SettingPropertyBool("District Icon From Sum", HintText = "the main village's map icon shows the good of the craft that earns the whole district (main village and side villages) the most money; the settlement tooltip lists the district's goods. Off = the icon of the game village's type, as before")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
-        public bool DistrictIconFromSum { get; set; } = false;
+        public bool DistrictIconFromSum { get; set; } = true;
 
         [SettingPropertyFloatingInteger("District Icon Margin", 0.00f, 1.00f, "0.00", HintText = "with District Icon From Sum: the icon changes only when another craft earns the district this much more than the shown one (0.10 = 10%)")]
         [SettingPropertyGroup("District works and side-village crafts (18.10)")]
@@ -7643,6 +7643,22 @@ namespace Armoury
         [SettingPropertyBool("District Icon Part Crafts", HintText = "with District Icon From Sum and Start Calibration applied: each part of a district counts only its own craft - the main village its game type, each side village the craft of its land - valued at what that part sells of it at its market town (food the district eats itself is not money). Without it the whole calibrated output counted, home-grown bread and all, and over half the icons turned to grain or timber. Off = the whole calibrated output, as before")]
         [SettingPropertyGroup("District crafts: neutral start and icon (18.10)")]
         public bool DistrictIconPartCrafts { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Craft Neutral Per Good", HintText = "with Side Village Crafts: the first-day balance is kept for every good on its own, not only for every craft as a whole - a craft that makes several goods (grain farms also raise some cattle, sheep, pigs and papyrus; cattle farms make butter, cheese and eggs) keeps each of them at the day before's world total. Off = one balance per craft, as before")]
+        [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
+        public bool SideVillageCraftNeutralPerGood { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Craft Measure Now", HintText = "with Side Village Crafts: on the first day, right after the side villages take up their crafts, every village's output of every good is checked at once against the day before, and any good still off by more than half a percent is set right before the day's harvest - nothing waits for the next day and no village is left out of the check. Off = the check runs the next day on the villages the game happened to tick, as before")]
+        [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
+        public bool SideVillageCraftMeasureNow { get; set; } = true;
+
+        [SettingPropertyBool("Side Village Craft Crop Filter", HintText = "with Side Village Crafts: goods a side village's craft adds to its district obey the crop climate filter - a grain-farming hamlet outside the hot south grows no papyrus, just like the grain farms there. Off = the craft's papyrus grows wherever the hamlet is, as before")]
+        [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
+        public bool SideVillageCraftCropFilter { get; set; } = true;
+
+        [SettingPropertyBool("District Icon Craft Value", HintText = "with District Icon From Sum and Start Calibration applied: the icon follows the same rule as without the calibration - each part counts the craft of its land (the main village its game type), valued by the people at home, the craft's rates and the market town's prices - so the icon changes only where another craft of the district's own villages truly earns more (about 80 districts), not wherever the calibration grows bread for the village itself. Off = by District Icon Part Crafts, as before")]
+        [SettingPropertyGroup("District crafts: every good neutral, icon by crafts (18.10)")]
+        public bool DistrictIconCraftValue { get; set; } = true;
 
         [SettingPropertyBool("Measure Craft Rule", HintText = "log only, nothing in the game changes: once a week, and on the day the start calibration fills the stalls, the log gets a diagnosis of the rule that would let village parts change their work under the start calibration - how many parts would want to change at today's prices, at base prices and at the calibration's own prices, the ten most wanted changes with their hands, and a plain note that works are frozen while that rule is off; side villages outside the calibration get the same numbers in their daily line (off = no such lines)")]
         [SettingPropertyGroup("Economy measurements (18.10)")]
@@ -9570,6 +9586,10 @@ namespace Armoury
             s.SideVillageCraftNeutralFix = SideVillageCraftNeutralFix;
             s.SideVillageCraftAddsWinter = SideVillageCraftAddsWinter;
             s.DistrictIconPartCrafts = DistrictIconPartCrafts;
+            s.SideVillageCraftNeutralPerGood = SideVillageCraftNeutralPerGood;
+            s.SideVillageCraftMeasureNow = SideVillageCraftMeasureNow;
+            s.SideVillageCraftCropFilter = SideVillageCraftCropFilter;
+            s.DistrictIconCraftValue = DistrictIconCraftValue;
             s.MeasureCraftRule = MeasureCraftRule;
             s.MeasureRegaleShelf = MeasureRegaleShelf;
             s.MeasureCaravanTrade = MeasureCaravanTrade;

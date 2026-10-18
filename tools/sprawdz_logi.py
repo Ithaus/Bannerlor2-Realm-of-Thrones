@@ -1329,6 +1329,12 @@ Uzycie (Python 3, tylko odczyt):
                     NZW-3b (INFO) ostatnia linia ikon bez KS (projekt TESTS 2 liczony dla zajec bez KS) i zmiany typ->ikona. Linie sprzed f4b - INFO, bez wyjatku.
                     Recenzja f4b: NZW-1e poprawka n jako uklad liniowy (wynik "po" = czesc bez n + czesci skalowane n zajec) - luka rozbicia <= 0.1%, przewidywana
                     odchylka po poprawce w opisie; NZW-3b dopisuje ikony inne niz typ przy wartosci typu 0 (bez progu zmiany - do decyzji o progu 40-130 pod KS).
+                    f5-zajecia (fin88: NZW-1 13.3% daktyle, NZW-3 177 pod KS; klucze Side Village Craft Neutral Per Good / Measure Now / Crop Filter, District Icon Craft
+                    Value): przy pomiarze pelnym linia "pomiar neutralnosci (A6, TESTS 2)" jest pisana W DOBIE WLACZENIA, po poprawce (stan, z ktorym swiat produkuje te
+                    dobe) - NZW-1 czyta ja jak dotad (<= 1%); NZW-1c pokazuje "przed poprawka" i poprawke na towarach (INFO); NZW-1e - tozsamosc n na towar i przewidywana
+                    odchylka (INFO); NZW-1f kazdy TOWAR (sztuki przed -> po, produkcja >= 1 szt./d) w 1% (prog); NZW-1g pomiar pelny: wywolan modelu > 0 i wsi poza
+                    pomiarem 0 (prog). NZW-3 bez zmian (40-130, ostatnia linia ikon); NZW-3b dopisuje regule F17 pod KS i licznik reguly f4b (sprzedaz KS) dla porownania.
+                    Logi sprzed f5 (fin86, fin88) - NZW-1f/1g INFO, bez wyjatku.
 --grupa nf4       : (noc 17/18.10, paczka f4-pomiary - koncowy przeglad ekonomii 18.10, pakiet P6: SAME POMIARY, zero zmian zachowania; Armoury/src/StartCalibration.F4.cs,
                     MoneyLedger.F4.cs, F4Pomiary.cs, VillageCrafts.cs - klucze Measure Craft Rule, Measure Regale Shelf, Measure Caravan Trade, Measure Iron Wood Flow)
                     python -I tools/sprawdz_logi.py --grupa nf4 <Armoury-*.log> (strumieniowo). NF4-0 linie paczki (brak - INFO, log sprzed paczki), NF4-1 diagnoza A7
@@ -42374,6 +42380,14 @@ NZW_WIRED = re.compile(r"Zajecia wiosek \(ZW\): ikona okregu - wpiete: (?P<w>.*)
 NZW_W2 = re.compile(r"Wioski wedlug rodzaju \(210\): dzien (?P<day>-?\d+) \| (?P<state>[^|]*) \| okregow z rybakami (?P<n>\d+) .*?zboza -(?P<a>[\d.]+), ryb \+(?P<b>[\d.]+), kontrola a - b = (?P<ab>-?[\d.]+)")
 NZW_W2P = re.compile(r"proba W2 \(inwest etap 0\): wywolania kroku zboza (?P<g>\d+), ryb (?P<f>\d+), wsi bez u (?P<nu>\d+), przy kroku nieczynnym (?P<off>\d+), ciche wyjatki modelu \(MaterialLaw\) (?P<silent>\d+)")
 NZW_ERR = ("ERROR in VillageCrafts.", "ERROR in DistrictIcon.", "ERROR in SyncData.arm_crafts", "ERROR in StartCalibration.WorksKs", "ERROR in StartCalibration.KsPartsOf", "ERROR in StartCalibration.SideRows")
+# f5-zajecia: pomiar pelny w dobie wlaczenia (stan po poprawce), odchylka kazdego towaru, przed poprawka, poprawka n na towar, ikona F17 pod KS
+NZW_F5 = re.compile(r"\| pomiar pelny w dobie wlaczenia \(f5, Side Village Craft Measure Now\): wywolan modelu (?P<c0>\d+) \+ (?P<c1>\d+) \(wsi pytanych (?P<asked>\d+)\), wsi poza pomiarem (?P<part>\d+), n (?P<mode>na towar|zajecia), plany od nowa (?P<plans>\d+)"
+                    r", przed poprawka: najwieksza odchylka produkcji typu (?P<dev0>[\d.]+)% w (?P<t0>\S+), towar (?P<g0>[\d.]+)% w (?P<gt0>\S+) \(ponad 1%: (?P<go0>\d+)\), koszt (?P<ms>[\d.]+) ms")
+NZW_F5G = re.compile(r"\| towary \(f5\): najwieksza odchylka (?P<dev>[\d.]+)% w (?P<g>\S+), towarow (?P<n>\d+) \(produkcja przed >= 1 szt\./d\), ponad 1%: (?P<over>\d+)(?P<rest>[^|]*)")
+NZW_F5FIX = re.compile(r"\| poprawka n z pomiaru \(f5(?P<kind>[^)]*)\): (?P<text>[^|]*)")
+NZW_F5PRED = re.compile(r"przewidywana odchylka po poprawce (?P<pred>[\d.]+)% w (?P<pt>[^\s;,]+?)\.?(?:$|[\s;,])")
+NZW_F5ICON = re.compile(r"\| ikona F17 pod KS \(f5\): regula f4b \(sprzedaz KS\) dla porownania - inna niz typ pod KS (?P<alt>\d+|-)")
+NZW_DEVG_MAX = 1.0                      # f5: kazdy towar w 1% w dobie wlaczenia (zadanie f5: "within 1% for every good")
 NZW_ICON_LO, NZW_ICON_HI = 40, 130      # projekt TESTS 2: ikona inna niz typ w 40-130 okregach (oczekiwane 81 z 558)
 NZW_DEV_MAX = 1.0                       # projekt TESTS 2: w dobie wlaczenia swiat kazdego typu w 1%
 NZW_MS_MAX = 5.0                        # koszt doby zajec (ms, mediana)
@@ -42435,6 +42449,8 @@ def nzw_main(logp):
                         g["split"] = km.groupdict() if km else None
                         zm = NZW_ICONZ.search(s)
                         g["zero"] = zm.groupdict() if zm else None
+                        fi = NZW_F5ICON.search(s)
+                        g["f5icon"] = fi.group("alt") if fi else None    # f5-zajecia: ikona F17 pod KS, licznik reguly f4b dla porownania
                         icons.append(g)
                     else:
                         bad_icons.append(s)
@@ -42451,6 +42467,13 @@ def nzw_main(logp):
                         g = mm.groupdict()
                         pm = NZW_PARTIAL.search(s)
                         g["partial"] = pm.group("n") if pm else None
+                        # f5-zajecia: pomiar pelny w dobie wlaczenia, towary, poprawka n na towar
+                        f5m = NZW_F5.search(s)
+                        g["f5"] = f5m.groupdict() if f5m else None
+                        f5g = NZW_F5G.search(s)
+                        g["f5g"] = f5g.groupdict() if f5g else None
+                        f5f = NZW_F5FIX.search(s)
+                        g["f5fix"] = f5f.groupdict() if f5f else None
                         meas.append(g)
                     else:
                         bad.append(s)
@@ -42509,8 +42532,34 @@ def nzw_main(logp):
     if neutral:
         devh = max(float(g["dev"]) for g in neutral)
         rep.add("NZW-1b: rece swiata typu po x n / przed (z definicji n)", f"najwieksza odchylka {devh:.3f}% ({len(neutral)} linii, okregow {neutral[-1]['d']})", "INFO (tylko typy przyciete 0.5-2.0; przy n na towarach rece nie musza sie zgadzac)", None)
+    # f5-zajecia: pomiar pelny w dobie wlaczenia - linia pomiaru to stan PO poprawce; NZW-1c / 1e / 1f / 1g z dopiskow f5 (inaczej - jak f4b ponizej)
+    f5 = meas[0].get("f5") if meas else None
+    if f5:
+        fx5 = meas[0].get("f5fix")
+        ftxt = fx5["text"].strip() if fx5 else "brak dopisku poprawki"
+        rep.add("NZW-1c: poprawka n z pomiaru (f5, pomiar pelny w dobie wlaczenia)",
+                f"przed poprawka: produkcja typu {float(f5['dev0']):.3f}% w {f5['t0']}, towar {float(f5['g0']):.3f}% w {f5['gt0']} (ponad 1%: {f5['go0']}); po poprawce (NZW-1) {float(meas[0]['dev']):.3f}%; "
+                f"n {f5['mode']}; {ftxt[:200]}", "INFO (doba wlaczenia produkuje juz z poprawionym n - prog w NZW-1 i NZW-1f)", None)
+        pm5 = NZW_F5PRED.search(ftxt)
+        if pm5:
+            rep.add("NZW-1e: poprawka n (f5) - przewidywana odchylka po poprawce", f"{pm5.group('pred')}% w {pm5.group('pt')} (n na towar: po = bez n + skalowana n towaru, dokladnie liniowe)",
+                    "INFO (przewidywana > 1% tylko przy przycieciu r 0.5-2.0 albo n 0.2-5.0)", None)
+        g5 = meas[0].get("f5g")
+        if g5:
+            dg = float(g5["dev"])
+            rep.add("NZW-1f: kazdy towar w dobie wlaczenia (f5, sztuki przed -> po)", f"najwieksza odchylka {dg:.3f}% w {g5['g']}, towarow {g5['n']}, ponad 1%: {g5['over']}{g5['rest'][:160]}",
+                    f"<= {NZW_DEVG_MAX:.0f}% (zadanie f5: kazdy towar)", dg <= NZW_DEVG_MAX)
+        else:
+            rep.add("NZW-1f: kazdy towar w dobie wlaczenia", "brak dopisku 'towary (f5)'", "INFO", None)
+        c0, part = int(f5["c0"]), int(f5["part"])
+        rep.add("NZW-1g: pomiar pelny w dobie wlaczenia (f5) - wsi i wywolania", f"wywolan modelu {f5['c0']} + {f5['c1']} (wsi pytanych {f5['asked']}), wsi poza pomiarem {part}, plany od nowa {f5['plans']}, koszt {f5['ms']} ms",
+                "wywolan > 0 i wsi poza pomiarem 0", c0 > 0 and part == 0)
+    elif meas:
+        rep.add("NZW-1f: kazdy towar w dobie wlaczenia", "pomiar bez dopisku f5 (ticki gry doby nastepnej)", "INFO (DLL sprzed f5 albo Side Village Craft Measure Now wylaczony)", None)
     # f4b-inwest: NZW-1c poprawka n z pomiaru doby wlaczenia i pomiar po poprawce; NZW-1d sposob liczenia n
-    if fixes:
+    if f5:
+        pass
+    elif fixes:
         fx = fixes[0]
         nfix = int(fx["n"])
         if nfix > 0 and meas2:
@@ -42524,7 +42573,7 @@ def nzw_main(logp):
     elif meas:
         rep.add("NZW-1c: poprawka n z pomiaru", "brak w linii pomiaru", "INFO (klucz Side Village Craft Neutral Fix wylaczony albo DLL sprzed f4b)", None)
     # f4b recenzja: NZW-1e - uklad liniowy poprawki (wynik "po" = czesc bez n + czesci skalowane n zajec; luka to tozsamosc rozbicia) i przewidywana odchylka po poprawce
-    if fixes:
+    if fixes and not f5:
         lm = NZW_FIXLIN.search(fixes[0]["rest"])
         if lm:
             gap = float(lm.group("gap"))
@@ -42557,6 +42606,8 @@ def nzw_main(logp):
             txt += (f"; zmiany typ->ikona (ostatnia linia): {sp['pairs'].strip()[:200]}" if sp else "")
             zr = icons[-1].get("zero")
             txt += (f"; inna niz typ przy wartosci typu 0 (bez progu zmiany): bez KS {zr['zn']}, pod KS {zr['zk']}" if zr else "")
+            f5i = icons[-1].get("f5icon")
+            txt += (f"; f5: regula F17 pod KS (District Icon Craft Value), regula f4b (sprzedaz KS) dalaby pod KS {f5i}" if f5i is not None else "")
             rep.add("NZW-3b: ikony bez KS i zmiany typ->ikona", txt, "INFO (projekt 40-130 liczony dla zajec bez KS)", None)
     else:
         rep.add("NZW-3: ikona okregu", "brak linii 'ikony dzien'", "INFO (klucz District Icon From Sum wylaczony albo sesja bez doby)", None)

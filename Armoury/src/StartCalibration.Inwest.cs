@@ -121,6 +121,7 @@ namespace Armoury
                 // f4b-inwest (District Icon Part Crafts): czesc sprzedana okregu na towar (targ / produkcja z ostatniego rachunku okregu; bez rachunku - calosc)
                 var sIc = Settings.Current;
                 bool icon = sIc != null && sIc.DistrictIconPartCrafts;
+                bool f17 = sIc != null && sIc.DistrictIconCraftValue;     // f5-zajecia: samo zajecie ziemi czesci (IconCraft) do ikony F17 - bez kg sprzedazy
                 double[] sold = null;
                 if (icon)
                 {
@@ -137,6 +138,7 @@ namespace Armoury
                     pv.Hands += lb.Hands;
                     if (lb.Target >= 0) pv.Busy = true;
                     if (icon && pv.IconKg == null) { pv.IconKg = new double[ItemCount]; pv.IconCraft = IconCraftOf(ld, lb, type); }
+                    else if (!icon && f17 && pv.IconCraft < 0) pv.IconCraft = IconCraftOf(ld, lb, type);   // f5-zajecia (District Icon Craft Value)
                     for (int j = 0; j < lb.C.Length; j++)
                     {
                         int c = lb.C[j];

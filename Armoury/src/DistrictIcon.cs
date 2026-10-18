@@ -112,6 +112,8 @@ namespace Armoury
             var pairs = new Dictionary<string, int>(StringComparer.Ordinal);   // f4b-inwest: zmiany typ -> ikona (do linii)
             var s = Settings.Current;
             float margin = s != null ? Math.Max(0f, Math.Min(1f, s.DistrictIconMargin)) : 0.10f;
+            bool f17 = VillageCrafts.CraftIconKey, alt = f17 && PartCrafts;    // f5-zajecia: F17 pod KS; regula f4b liczona obok tylko do porownania (linia)
+            int diffAlt = 0;
             var parts = new List<VillageCrafts.PartCraft>();
             foreach (var v in Village.All)
             {
@@ -134,6 +136,11 @@ namespace Armoury
                         int pc0; pairs.TryGetValue(pk, out pc0); pairs[pk] = pc0 + 1;
                     }
                     if (old != null && old.Craft >= 0 && old.Craft != ni.Craft) _changed++;
+                    if (alt && ks)
+                    {
+                        var na = Compute(v, parts, null, margin, today, true);   // f5: regula f4b (sprzedaz KS, bez pamieci poprzedniej ikony) - tylko licznik
+                        if (na.Item != null && !ReferenceEquals(na.Item, gameIcon)) diffAlt++;
+                    }
                 }
                 catch (Exception e) { Stumble("Daily(okreg)", e); }
             }
@@ -147,8 +154,10 @@ namespace Armoury
             Log.Info(VillageCrafts.P + "ikony dzien " + today + " | okregow " + _districts + " (pod KS " + _ks + "), ikona inna niz typ wsi: " + _diff + " okregow (projekt: ok. 81 z 558, prog 40-130), zmienione od poprzedniego rachunku "
                      + _changed + ", tabliczki poprawione w sesji " + _updated + " | uprawy na sniegu pod KS (wioski) " + _snowKs + " | prog zmiany x" + (1 + margin).ToString("0.00", Inv)
                      + " | inna niz typ: bez KS " + (_diff - diffKs) + " z " + (_districts - _ks) + ", pod KS " + diffKs + " z " + _ks
-                     + " | regula pod KS (f4b, District Icon Part Crafts): " + (PartCrafts ? "wlasne zajecie czesci, tylko sprzedane" : "cala produkcja KS (jak dotad)")
+                     + " | regula pod KS (f4b, District Icon Part Crafts): " + (f17 ? "F17 projektu (f5, District Icon Craft Value) - zajecie ziemi czesci x ludzie w domu x stawki x cena miasta targowego, jak bez KS"
+                                                                                      : (PartCrafts ? "wlasne zajecie czesci, tylko sprzedane" : "cala produkcja KS (jak dotad)"))
                      + " | zmiany typ->ikona: " + (ps.Length > 0 ? ps.ToString() : "-")
+                     + (f17 ? " | ikona F17 pod KS (f5): regula f4b (sprzedaz KS) dla porownania - inna niz typ pod KS " + (alt ? diffAlt.ToString(Inv) : "- (District Icon Part Crafts wylaczony)") : "")
                      + " | inna niz typ przy wartosci typu 0 (f4b recenzja - bez progu x" + (1 + margin).ToString("0.00", Inv) + "): bez KS " + zeroNo + ", pod KS " + zeroKs
                      + " | wpiete: " + _wiredText + " | koszt " + _ms.ToString("0.0", Inv) + " ms | potkniecia " + _st + " (sesja " + _stAll + ").");
             _st = 0;
@@ -183,21 +192,25 @@ namespace Armoury
         /// <summary>Do linii ZW: stan ikon (ostatni rachunek).</summary>
         internal static string DayText() { return On ? "okregow " + _districts + ", inna niz typ " + _diff + ", zmienione " + _changed : "WYLACZONA (District Icon From Sum)"; }
 
-        private static Info Compute(Village v, List<VillageCrafts.PartCraft> parts, Info old, float margin, int today)
+        private static Info Compute(Village v, List<VillageCrafts.PartCraft> parts, Info old, float margin, int today, bool alt = false)
         {
             var val = new double[KsTab.NC];
             var cnt = new int[KsTab.NC];
             bool own = PartCrafts;
+            bool f17 = VillageCrafts.CraftIconKey;                            // f5-zajecia (District Icon Craft Value): IconVal pod KS = F17 projektu (PartsOf)
             foreach (var p in parts)
             {
                 // f4b-inwest (District Icon Part Crafts): pod KS czesc liczy tylko wlasne zajecie (wies gry - typ, wioska - zajecie ziemi) i tylko to, co z niego sprzedaje
                 // (projekt A9 "kazda wioska ma swoje zajecie" + F2 "ceny wozow"; Jeff: "towar, ktory daje okregowi najwiecej pieniedzy") - zboze zjedzone w okregu to nie pieniadz.
                 // Bez KS CraftVal to juz wlasne zajecie czesci (tylko jej zajecie i przebudowa) - bez zmian.
-                if (own && p.Ks)
+                // f5-zajecia: przy District Icon Craft Value ta sama galaz z wartoscia F17 (zajecie ziemi czesci x ludzie w domu x stawki x cena); alt - wartosc f4b
+                // (sprzedaz KS) zachowana w IconValKs, tylko do porownania w linii ikon
+                if ((own || f17) && p.Ks)
                 {
+                    double iv = alt ? p.IconValKs : p.IconVal;
                     if (p.IconCraft >= 0 && p.IconCraft < KsTab.NC)
                     {
-                        if (p.IconVal > 0) val[Fold(p.IconCraft)] += p.IconVal;
+                        if (iv > 0) val[Fold(p.IconCraft)] += iv;
                         cnt[Fold(p.IconCraft)]++;
                     }
                     else if (p.Craft >= 0) cnt[Fold(p.Craft)]++;

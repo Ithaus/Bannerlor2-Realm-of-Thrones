@@ -1217,6 +1217,10 @@ namespace Armoury
             // (arm_works: wiersze prac, utarg okregow, przelacznik odbudowy); wlasny try, brak klucza (stary zapis, Ironman Jeffa) = pusto, starsza DLL ignoruje klucze
             try { string zw = dataStore.IsSaving ? VillageCrafts.Export() : null; SaveText.Sync(dataStore, "arm_crafts", ref zw); if (dataStore.IsLoading) VillageCrafts.Import(zw); }
             catch (Exception e) { Log.Error("SyncData.arm_crafts", e); }
+            // f5-zajecia (noc 17/18.10): n na towar neutralnego startu zajec (Side Village Craft Neutral Per Good) - "zg1|towar=n|..."; PO arm_crafts; pisany tylko z danymi
+            // (bez n na towar - klucza nie ma, zapis jak dotad); wlasny try, straznik rozmiaru 64 KB; brak klucza (stary zapis, Ironman Jeffa) = n zajecia; starsza DLL ignoruje klucz
+            try { string zg = dataStore.IsSaving ? VillageCrafts.ExportGoods() : null; if (!dataStore.IsSaving || zg != null) SaveText.Sync(dataStore, "arm_crafts_g", ref zg); if (dataStore.IsLoading) VillageCrafts.ImportGoods(zg); }
+            catch (Exception e) { Log.Error("SyncData.arm_crafts_g", e); }
             try { string po = dataStore.IsSaving ? DistrictWorks.Export() : null; SaveText.Sync(dataStore, "arm_works", ref po); if (dataStore.IsLoading) DistrictWorks.Import(po); }
             catch (Exception e) { Log.Error("SyncData.arm_works", e); }
         }
