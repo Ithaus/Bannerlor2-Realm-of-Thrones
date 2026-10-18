@@ -6228,6 +6228,10 @@ namespace Armoury
         [SettingPropertyGroup("Map roads (test)")]
         public bool MapRoadsProbeEnabled { get; set; } = false;
 
+        [SettingPropertyBool("Map Side Roads", HintText = "dirt lanes on the campaign map lead from the main painted roads to the villages that lie farther away - a village close to a main road gets no lane of its own, villages behind it join its lane, and the lanes wind along the land around water, mountains and towns. Visual only - lanes do not change speed or routes. Turned on, the lanes appear on the map within a few seconds; turned off, they are taken away. Off = no lanes are drawn")]
+        [SettingPropertyGroup("Side roads to far villages")]
+        public bool MapSideRoads { get; set; } = false;
+
         [SettingPropertyBool("Perf Valyrian Census", HintText = "the daily count of Valyrian steel skips heroes and baggage that hold no Valyrian blade before building the description of where a blade lies - the same count and the same blades, found much faster; off = every hero, party and market is described first, as before")]
         [SettingPropertyGroup("Speed of the day (night 17/18.10)")]
         public bool PerfValyrianCensus { get; set; } = true;
@@ -9328,6 +9332,7 @@ namespace Armoury
             s.VillageLayoutV6 = VillageLayoutV6;
             s.VillageHamletKsLand = VillageHamletKsLand;
             s.MapRoadsProbeEnabled = MapRoadsProbeEnabled;
+            s.MapSideRoads = MapSideRoads;
             s.PerfValyrianCensus = PerfValyrianCensus;
             s.PerfTownTaxSkipBk = PerfTownTaxSkipBk;
             s.PerfSutlerWageOnce = PerfSutlerWageOnce;

@@ -1991,6 +1991,7 @@ namespace Armoury
             try { TownFolk.FirewoodSessionStart(); } catch (Exception e) { Log.Error("TownFolk.FirewoodSessionStart", e); }   // noc 16.10 (N2-E4): opal mieszczan - linia startu
             try { MapRoadsProbe.SessionStart(); } catch (Exception e) { Log.Error("MapRoadsProbe.SessionStart", e); }   // E7/D0 (239): linia "MapRoadsProbe: wylaczona" / "wlaczona" - PO McmSettings.Apply (wczesniej klucz z Armoury.settings.xml, nie z MCM)
             try { MapRoads.SessionStart(); } catch (Exception e) { Log.Error("MapRoads.SessionStart", e); }   // SW-DROGI (noc 17/18.10): plik drog ROT do siatki, pamiec partii od zera, linia "Drogi (DR): start sesji" - PO McmSettings.Apply
+            try { MapSideRoads.SessionStart(); } catch (Exception e) { Log.Error("MapSideRoads.SessionStart", e); }   // f11-drogi: linia "Drogi boczne (f11): wylaczone / wlaczone" i plik-przelacznik autotestu od nowa - PO McmSettings.Apply
             try { PrisonerLaw.SessionLine(); } catch (Exception e) { Log.Error("PrisonerLaw.SessionLine", e); }   // I1b: krainy z niewola (warownie, krolestwa H3) - tylko log
             try { VillageWoodlot.Calibrate(true); } catch (Exception e) { Log.Error("VillageWoodlot.Calibrate", e); }   // T8: stala lasu wedlug klimatu PO zmianie typow (drwale)
             try { Stables.BuildRiderMap(); } catch (Exception e) { Log.Error("Stables.BuildRiderMap", e); }

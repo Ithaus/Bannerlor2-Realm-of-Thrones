@@ -1,0 +1,25 @@
+# f11-drogi: plik-przelacznik autotestu bocznych drog. Skopiuj jako
+#   Documents\Mount and Blade II Bannerlord\CrashScribe\armoury-drogi-boczne.flag
+# Dziala TYLKO w trybie autotestu CrashScribe (LogGate 1 / 2) - w grze Jeffa nic nie robi. Pusty plik (albo same komentarze) = drogi boczne
+# wlaczone na ten bieg z parametrami domyslnymi. Po biegu zdjec plik usunac.
+# Linie klucz=wartosc zmieniaja plan i wyglad bez przebudowy DLL (odkomentuj). Ponizej wartosci domyslne:
+# material=mainmap_decal_undervillage
+# factor=FF918976
+# alpha=1
+# hide=110
+# argument=1,1,0,0
+# Width=0.55
+# StampHalfLen=0.6
+# Spacing=0.5
+# Meander=0.3
+# NearExtra=3.5
+# NearHalfFactor=1.5
+# MaxHop=14
+# MaxNet=40
+# MinLen=4
+# ObstR=2.2
+# VillageAvoidR=0.8
+# MaxRoads=1500
+# MaxStamps=24000
+# Seed=1811
+# Inne materialy do porownania (mapa ma je w zasobach): mainmap_decal_mud_a, decal_city_ground, decal_battania_path_a (atlas sciezki dobiera sie sam).

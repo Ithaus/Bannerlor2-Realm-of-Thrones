@@ -1,0 +1,14 @@
+{
+  "_opis": "f11-drogi: cele zdjec bocznych drog dla autotestu (tools/autotest-2026-10-17/bieg-bitwa.ps1 -PhotosFile tools/drogi/zdjecia-drogi-boczne.json). Przed biegiem plik Documents/Mount and Blade II Bannerlord/CrashScribe/armoury-drogi-boczne.flag (wzor tools/drogi/armoury-drogi-boczne.flag.wzor) - drogi boczne wlaczone tylko na ten bieg (tylko w trybie autotestu); po biegu plik usunac. Cele: kwadraty 28 x 28 jedn. z najgestsza siecia jednoczesnie w ukladzie v6 i v7 (podglad tools/drogi/boczne-podglad, 18.10): polnoc (na pd.-wsch. od Winterfell), dorzecze (Seagard - Bliznieta), Reach (miedzy Highgarden a Ashford), korona (na pn. od Krolewskiej Przystani), zachod (Westerlands), dolina (Gulltown). Linia logu 'Drogi boczne (f11): miejsca z najgestsza siecia' podaje miejsca dla ukladu w grze (inny uklad - podmienic x, y).",
+  "run": "zdjecia-drogi-boczne",
+  "photos": [
+    { "name": "boczne-polnoc",   "x": 458, "y": 782 },
+    { "name": "boczne-dorzecze", "x": 358, "y": 574 },
+    { "name": "boczne-reach",    "x": 346, "y": 234 },
+    { "name": "boczne-korona",   "x": 518, "y": 474 },
+    { "name": "boczne-zachod",   "x": 270, "y": 334 },
+    { "name": "boczne-dolina",   "x": 670, "y": 566 }
+  ],
+  "photo_shots": "10,20,40",
+  "photo_hours": "9-15"
+}

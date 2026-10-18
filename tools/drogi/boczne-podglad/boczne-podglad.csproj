@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- f11-drogi: podglad planu bocznych drog poza gra - ten sam plik planu co mod (Armoury/src/MapSideRoads.Plan.cs, bez typow gry).
+       Jak uruchomic - naglowek Program.cs. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="../../../Armoury/src/MapSideRoads.Plan.cs" />
+  </ItemGroup>
+</Project>
