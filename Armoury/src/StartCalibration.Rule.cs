@@ -238,6 +238,9 @@ namespace Armoury
                     {
                         if (b == null || b.K == null || b.C == null) continue;
                         if (b.Target >= 0) { Progress(ld, b, today, mt); active++; continue; }
+                        // f5-a7 (klucz Ks Switch Signal): doba bez kroku i bez regali przy przebudowach w toku - blok bez Held nie ma tu nic do zrobienia (blokada prac zeruje
+                        // tylko Held > 0); wynik ten sam, bez sprawdzania blokady prac dla ~15 tys. blokow co dobe
+                        if (sig && !step && !reg && b.Held <= 0) continue;
                         if (reg && b.RC != null) RegaleCycle(b, px, f4reg ? mt : null, f4reg);
                         if (KsWorksLock(ld, b)) { b.Held = 0; continue; }   // inwest: czesc z pracami okregu nie zmienia zajecia (projekt A7)
                         if (!step || b.Cand == null || b.Cand.Count < 2) continue;
