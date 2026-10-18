@@ -598,7 +598,8 @@ namespace Armoury
                         b.Household = (b.War ? s.HouseholdShareWar : s.HouseholdSharePeace) * b.D * shareF;
                         // recenzja M3: chleb, ktory pan zaplacil dzis za swoje glodne miasto (TownFolk.BreadRest - przed budzetem doby), schodzi ze skrzyni sprzetu tej doby -
                         // w wojnie pan w sumie nie szybciej niz skrzynia (G - R) / WarChestDays (0.8 zold + 0.2 sprzet); klucz BreadForThePoor wylaczony - 0, jak dotad
-                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && Gc > R ? Math.Max(0, 0.2 * (Gc - R) / Math.Max(1f, s.WarChestDays) - TownFolk.BreadLordToday(c)) : 0);
+                        // r4-glodbunt: tak samo doplata pana do dowozu zywnosci (KsLordFood, kupcy KS-H biegna po budzecie doby - doplata z ostatniej doby); klucz KsLordFundsFood wylaczony - 0
+                        b.Gear = (b.War ? s.GearShareWar : s.GearSharePeace) * b.D * shareF + (b.War && Gc > R ? Math.Max(0, 0.2 * (Gc - R) / Math.Max(1f, s.WarChestDays) - TownFolk.BreadLordToday(c) - KsLordFood.RecentPaid(c)) : 0);
                         // recenzja C1 (W5): budowy takze w wojnie (odstepstwo od tabeli 166 "0") - Jeff 05.10 "w wojnie 0, chyba ze mury - tak"; BuildFunding
                         // w wojnie i tak odcina budowy cywilne, wiec wojenny przydzial idzie tylko na mury, wieze i koszary. Dopelnienie ponad 120 D - tylko w pokoju.
                         b.Build = Math.Max(0f, s.BuildIncomeShare) * b.D * shareF;

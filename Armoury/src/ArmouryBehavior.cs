@@ -1594,6 +1594,7 @@ namespace Armoury
             try { ClanBudget.EnsureHooks(); } catch (Exception e) { Log.Error("ClanBudget.EnsureHooks", e); }
             try { OverflowHome.EnsureHooks(); } catch (Exception e) { Log.Error("OverflowHome.EnsureHooks", e); }   // W4c: przepelnienie partii i zalog do domu (okno dezercji gry w kampanii)
             try { FolkAidLoyalty.EnsureHooks(); } catch (Exception e) { Log.Error("FolkAidLoyalty.EnsureHooks", e); }   // P1b: kara lojalnosci za danine - postfiks na czynny model lojalnosci (BK ma pola statyczne z GameTexts - tylko w kampanii)
+            try { KsHunger.EnsureHooks(); } catch (Exception e) { Log.Error("KsHunger.EnsureHooks", e); }   // r4-glodbunt: glod miast KS -> "Hunger" w czynnych modelach lojalnosci i bezpieczenstwa (w kampanii), pomiar posilku; stan sesji glodu i KsLordFood od nowa
             try { GentryService.EnsureHooks(); } catch (Exception e) { Log.Error("GentryService.EnsureHooks", e); }   // 179: wezwanie rycerza i rozwiazanie jego partii (BK), zakupy majatkow BK w przydziale sprzetu 166
             try { Ransom178.EnsureHooks(); } catch (Exception e) { Log.Error("Ransom178.EnsureHooks", e); }   // 178: okupy wedlug majatku, kurier, posrednik, 1/9 lupu - latki w kampanii
             try { RotLeaks37.EnsureHooks(); } catch (Exception e) { Log.Error("RotLeaks37.EnsureHooks", e); }   // 3.7: podmiana rekruta ROT i rebelia bez zlota z niczego (transpilery raz na proces)

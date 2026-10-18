@@ -6796,6 +6796,26 @@ namespace Armoury
         [SettingPropertyGroup("KS round 4: feed yourself first and the yields of cold land (night 17/18.10)")]
         public bool KsColdLand { get; set; } = true;
 
+        [SettingPropertyBool("Ks Hunger Unrest", HintText = "with the calibration applied: when a town's market holds less food than its townsfolk eat in a day (any food counts - the hungry eat the cheaper food first) or the town's granary is empty, the shortfall shows as Hunger in the town's loyalty and security, in proportion to the share of the people left unfed - a starving town drifts towards revolt by the game's own rules. The game's own penalty for an empty granary is not counted twice, and the 'well fed' bonus does not apply while people go hungry. Off = only the game's own food rules")]
+        [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
+        public bool KsHungerUnrest { get; set; } = true;
+
+        [SettingPropertyFloatingInteger("Ks Hunger Loyalty Max", 0.00f, 16.00f, "0.00", HintText = "with Ks Hunger Unrest: loyalty a town loses in a day when none of its people can eat (4 = about forty points lower in the long run, since the game draws loyalty back towards 50 by a tenth of the distance each day); less in proportion to the share left unfed")]
+        [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
+        public float KsHungerLoyaltyMax { get; set; } = 4f;
+
+        [SettingPropertyFloatingInteger("Ks Hunger Security Max", 0.00f, 8.00f, "0.00", HintText = "with Ks Hunger Unrest: security a town loses in a day when none of its people can eat; less in proportion to the share left unfed")]
+        [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
+        public float KsHungerSecurityMax { get; set; } = 2f;
+
+        [SettingPropertyFloatingInteger("Ks Hunger Tolerance", 0.00f, 1.00f, "0.00", HintText = "with Ks Hunger Unrest or Ks Lord Funds Food: the share of the people's food a market may lack before anyone counts as hungry (0.1 = up to a tenth missing is made up in kitchens and gardens); above it the penalty grows in proportion")]
+        [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
+        public float KsHungerTolerance { get; set; } = 0.1f;
+
+        [SettingPropertyBool("Ks Lord Funds Food", HintText = "with the calibration applied: when a town goes hungry and its purse cannot pay the food merchants, the lord of the town pays them for the food they bring - from his gold above his war reserve and only from the part of his war chest that does not go to wages (the same pace as the bread for the poor), so he never spends faster than his war chest. The lord's coin goes only to what the merchants really deliver; the town's purse pays its own share first. Your own purse is never used. Off = the town pays alone, as before")]
+        [SettingPropertyGroup("Hunger and the town lord (KS round 4)")]
+        public bool KsLordFundsFood { get; set; } = true;
+
         [SettingPropertyBool("Whale Meat From Whalers Only", HintText = "slaughter in town workshops (the hidden craftsmen and the butchers) yields meat, not whale meat - until now half of all the meat in the world was whale meat cut from pigs, cows and sheep, even in towns far from any sea. Whale meat now comes only from the whalers' villages: step by step over 60 days, up to about a third of what their boats bring in is whale meat instead of fish (off = as before)")]
         [SettingPropertyGroup("Goods paths (ZC1, 16.10)")]
         public bool WhaleMeatFromWhalersOnly { get; set; } = true;
@@ -8854,6 +8874,11 @@ namespace Armoury
             s.KsSelfFeedEverywhere = KsSelfFeedEverywhere;
             s.KsSelfFeedOwnFoodOnly = KsSelfFeedOwnFoodOnly;
             s.KsColdLand = KsColdLand;
+            s.KsHungerUnrest = KsHungerUnrest;
+            s.KsHungerLoyaltyMax = KsHungerLoyaltyMax;
+            s.KsHungerSecurityMax = KsHungerSecurityMax;
+            s.KsHungerTolerance = KsHungerTolerance;
+            s.KsLordFundsFood = KsLordFundsFood;
             s.WhaleMeatFromWhalersOnly = WhaleMeatFromWhalersOnly;
             s.BkRecipeYieldByWorkshop = BkRecipeYieldByWorkshop;
             s.SilkToWeavers = SilkToWeavers;

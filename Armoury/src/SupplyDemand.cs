@@ -571,7 +571,11 @@ namespace Armoury
             // KS-R3 G1: kupcy zywnosci (KS-H) - dostawy i zakupy jedzenia PRZED wywozem broni; wlasna pozycja "Przeplywy osad" (MKsH) w oknie MTrade
             try { MoneyLedger.Mark(MoneyLedger.MTrade); } catch { }
             try { KsFoodCarts.Arrivals(); } catch (Exception e) { Log.Error("KsFoodCarts.Arrivals", e); }
+            // r4-glodbunt: glod miast doby (KsHunger.Daily) i pan miasta placi za dowoz - nawias wokol zakupow KS-H (Before: doplata kasy glodnego miasta z kiesy pana,
+            // After: kasa placi najpierw do swojego budzetu, pan reszte, niewydane wraca do pana od razu); klucze wylaczone - tylko pomiar/linia, zloto nie rusza
+            try { KsLordFood.Before(); } catch (Exception e) { Log.Error("KsLordFood.Before", e); }
             try { KsFoodCarts.Daily(); } catch (Exception e) { Log.Error("KsFoodCarts.Daily", e); }
+            try { KsLordFood.After(); } catch (Exception e) { Log.Error("KsLordFood.After", e); }
             try { MoneyLedger.Mark(MoneyLedger.MKsH); } catch { }
             int pc = DayProfile.Caller; DayProfile.Caller = DayProfile.CExport;   // E8/0 (242): wolajacy cen - wywoz kupcow (tylko pomiar)
             try { DailyTradeCore(); }
