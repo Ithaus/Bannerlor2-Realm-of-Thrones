@@ -195,7 +195,7 @@ namespace Armoury
             catch (Exception e) { _aroundWhy = "blad: " + e.Message; Stumble("HookAround", e); }
         }
 
-        // ------------------------------------------------------------ narodziny ponad stary cel tylko przy kryjowce z ludzmi
+        // ------------------------------------------------------------ narodziny przy celu podniesionym tylko przy kryjowce z ludzmi
         private static bool IsHideoutClan(Clan c)
         {
             // jak BanditSpawnCampaignBehavior.IsBanditFaction (prywatna statyczna): klan band z kryjowkami, bez piratow morskich
