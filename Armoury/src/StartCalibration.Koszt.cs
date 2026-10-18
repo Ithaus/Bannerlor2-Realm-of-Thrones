@@ -227,7 +227,7 @@ namespace Armoury
 
         /// <summary>T7: spis polki miasta do mapy koszyka - ten sam wynik co petla w Zc4Build (pierwszy wiersz bez modyfikatora kazdej pozycji, ilosc), kopia wiersza tylko
         /// dla przedmiotow typu pozycji koszyka (GetItemAtIndex bez kopii).</summary>
-        private static void T7Scan(TaleWorlds.CampaignSystem.Roster.ItemRoster ro, ZTown zt, int[] cnt, bool[] types)
+        private static void T7Scan(TaleWorlds.CampaignSystem.Roster.ItemRoster ro, int[] ixOut, int[] cnt, bool[] types)
         {
             int n = ro.Count;
             for (int k = 0; k < n; k++)
@@ -237,8 +237,19 @@ namespace Armoury
                 int ty = (int)ei.ItemType;
                 if (ty < 0 || ty >= types.Length || !types[ty]) continue;          // nie jest kluczem _zIx (typ spoza pozycji koszyka)
                 var el = ro.GetElementCopyAtIndex(k); int zi;
-                if (el.EquipmentElement.ItemModifier != null || !_zIx.TryGetValue(ei, out zi) || zt.Ix[zi] >= 0) continue;
-                zt.Ix[zi] = k; cnt[zi] = el.Amount;
+                if (el.EquipmentElement.ItemModifier != null || !_zIx.TryGetValue(ei, out zi) || ixOut[zi] >= 0) continue;
+                ixOut[zi] = k; cnt[zi] = el.Amount;
+            }
+        }
+
+        /// <summary>Kontrola T7: petla spisu polki z Zc4Build bez zmian (do porownania).</summary>
+        private static void T7ScanOld(TaleWorlds.CampaignSystem.Roster.ItemRoster ro, int[] ixOut, int[] cnt)
+        {
+            for (int k = 0; k < ro.Count; k++)
+            {
+                var el = ro.GetElementCopyAtIndex(k); var ei = el.EquipmentElement.Item; int zi;
+                if (ei == null || el.EquipmentElement.ItemModifier != null || !_zIx.TryGetValue(ei, out zi) || ixOut[zi] >= 0) continue;
+                ixOut[zi] = k; cnt[zi] = el.Amount;
             }
         }
 
@@ -310,7 +321,9 @@ namespace Armoury
                 if (_ro.Count != _cnt) { _ix.Clear(); _cnt = _ro.Count; }
                 int i;
                 if (!_ix.TryGetValue(it, out i)) { i = _ro.FindIndexOfItem(it); _ix[it] = i; }
-                return i >= 0 ? _ro.GetElementNumber(i) : 0;
+                int v = i >= 0 ? _ro.GetElementNumber(i) : 0;
+                if ((++_kcSampleN & 63) == 0) { if (_ro.GetItemNumber(it) == v) _kcOk++; else _kcBad++; }   // kontrola (probka 1/64): to samo co GetItemNumber
+                return v;
             }
 
             internal void Add(ItemObject it, int n)
@@ -326,6 +339,129 @@ namespace Armoury
         {
             ZTown zt;
             return ZTownOf(t, out zt) ? zt : null;
+        }
+    }
+
+    internal static partial class StartCalibration
+    {
+        // ============================================================ kontrola szybkich drog (tylko odczyt; co 7 dob, poza czasem doby KS)
+        private static int _kcSampleN, _kcOk, _kcBad;              // T8: probka 1/64 ilosci polki przetworow wobec GetItemNumber
+        private static string _t1Check = "-";                      // T1: porownanie sum "na targ" (watek roboczy / glowny) - raz na proces
+        private static bool _t1Checked;
+
+        private static bool SameD(double a, double b) { return BitConverter.DoubleToInt64Bits(a) == BitConverter.DoubleToInt64Bits(b); }
+
+        /// <summary>T1: pierwszy odbior Planu z sumami z watku roboczego (raz na proces) - te same sumy policzone na watku glownym, porownanie co do bitu.</summary>
+        private static void T1Check(KsResult r, KsInput inp)
+        {
+            if (_t1Checked || r == null || r.NtMk == null || inp == null || !LogGate.Lines) return;
+            _t1Checked = true;
+            try
+            {
+                var mk = new double[ItemCount]; var tf = new double[ItemCount]; var own = new double[ItemCount]; double kcal = 0, need = 0; int nd = 0;
+                var live = BuildLive(r, inp, false);
+                foreach (var ld in live)
+                {
+                    var res = ComputeDistrict(ld, false, null);
+                    if (res == null) continue;
+                    nd++;
+                    for (int i = 0; i < ItemCount; i++) { if (ld.TF) tf[i] += res.Market[i]; else { mk[i] += res.Market[i]; own[i] += res.Own[i]; } }
+                    kcal += res.OwnKcal; need += res.KcalNeed;
+                }
+                int ok = 0, bad = 0;
+                for (int i = 0; i < ItemCount; i++) { if (SameD(mk[i], r.NtMk[i])) ok++; else bad++; if (SameD(tf[i], r.NtTf[i])) ok++; else bad++; if (SameD(own[i], r.NtOwn[i])) ok++; else bad++; }
+                if (SameD(kcal, r.NtKcal)) ok++; else bad++;
+                if (SameD(need, r.NtNeed)) ok++; else bad++;
+                if (nd == r.NtNd) ok++; else bad++;
+                _t1Check = ok + "/" + bad + " (Plan doby " + _wDay + ")";
+            }
+            catch (Exception e) { _t1Check = "blad " + e.GetType().Name; }
+        }
+
+        /// <summary>Kontrola co 7 dob (stan zastosowany, linie, klucz Ks Cost Fast): szybkie drogi wobec starych na tych samych danych - tylko odczyt (pamieci T4 i tak licza
+        /// te same funkcje). Linia "KS: koszt - kontrola szybkich drog dzien N" (zgodne/rozne; NKS-9k: rozne = 0).</summary>
+        private static void KCheck(int today, int day)
+        {
+            if (!SwCostFast || _state != StateApplied || !LogGate.Lines || (today % 7) != 3) return;
+            try
+            {
+                int a1 = 0, b1 = 0, a2 = 0, b2 = 0, a3 = 0, b3 = 0, a4 = 0, b4 = 0, a5 = 0, b5 = 0, a6 = 0, b6 = 0, a7 = 0, b7 = 0;
+                var types = T7Types(); var map = _zt;
+                Zc4EnsureMap();
+                T4Begin();
+                foreach (var zt in map.Values)
+                {
+                    var ro = zt != null && zt.St != null ? zt.St.ItemRoster : null;
+                    if (ro == null) continue;
+                    // T10: ilosci pozycji jednym przegladem
+                    var sc = ShelfFirst(ro);
+                    for (int z = 0; z < ZN; z++) { var it = _zItems[z]; if (it == null) continue; if (CountZ(ro, z, sc) == ro.GetItemNumber(it)) a1++; else b1++; }
+                    // T7: spis polki
+                    if (types != null)
+                    {
+                        var i1 = new int[ZN]; var i2 = new int[ZN]; var c1 = new int[ZN]; var c2 = new int[ZN];
+                        for (int z = 0; z < ZN; z++) { i1[z] = -1; i2[z] = -1; }
+                        T7Scan(ro, i1, c1, types); T7ScanOld(ro, i2, c2);
+                        for (int z = 0; z < ZN; z++) { if (i1[z] == i2[z] && c1[z] == c2[z]) a2++; else b2++; }
+                    }
+                    // T4: progi drabiny 2
+                    if (zt.T != null)
+                    {
+                        var row = T4P2Row(zt.T);
+                        foreach (int z in ZLadder)
+                        {
+                            if (SameD(ZPass2PriceT4(zt.T, z, row), ZPass2Price(zt.T, z))) a3++; else b3++;
+                            if (SameD(ZPass2FloorT4(zt.T, z, row), ZPass2Floor(zt.T, z))) a3++; else b3++;
+                        }
+                    }
+                }
+                // T4: budzet koszyka wsi (pamiec doby wobec wprost)
+                foreach (var kv in _zvp)
+                {
+                    var v = kv.Key; var q = kv.Value; if (v == null || q == null) continue;
+                    int m = MarketOfSettlement(v.Settlement); if (m < 0) m = 0;
+                    Settlement mk = null; try { mk = TradeTownOf(v); } catch { mk = null; }
+                    double bf = 0, bs = 0;
+                    for (int z = 0; z < ZN && z < q.Length; z++)
+                    {
+                        var it = _zItems[z]; if (it == null || !(q[z] > 0)) continue;
+                        bf += q[z] * Math.Max(1, it.Value) * T4StartIndex(m, z) * T4LandGrad(mk, z);
+                        bs += q[z] * Math.Max(1, it.Value) * KsCore.StartIndex(ZIds[z], _plan != null ? _plan.P : null, m) * LandGradZ(mk, z);
+                    }
+                    if (SameD(bf, bs)) a4++; else b4++;
+                }
+                // T3: drogi wies -> miasto z pamieci sesji wobec gry
+                TownFolk.KsNtCheck(300, out a5, out b5);
+                // T2: dochod zajecia z wiersza miasta wobec Income (probka okregow)
+                int nd = 0;
+                EnsureValues();
+                foreach (var ld in _live.Values)
+                {
+                    if (nd >= 150) break;
+                    if (ld == null || ld.TF || ld.V == null || ld.K == null || ld.B == null) continue;
+                    var mt = ld.V.TradeBound != null ? ld.V.TradeBound.Town : (ld.V.Bound != null ? ld.V.Bound.Town : null);
+                    double[] px; if (mt == null || !_px.TryGetValue(mt, out px)) continue;
+                    var vRow = new double[KsTab.NC]; for (int c0 = 0; c0 < vRow.Length; c0++) vRow[c0] = double.NaN;
+                    nd++;
+                    foreach (var b in ld.B)
+                    {
+                        if (b == null || b.K == null || b.C == null || b.Cand == null) continue;
+                        foreach (int c in b.Cand) { if (SameD(IncomeV(b, ld.K.Type, c, px, vRow), Income(b, ld.K.Type, c, px))) a6++; else b6++; }
+                    }
+                }
+                // T1: sumy "na targ" ostatniego Planu z watku roboczego wobec watku glownego (raz na proces)
+                T1Check(_plan, _planIn);
+                // T6: pozycja koszyka towaru z tablicy
+                var rz = RampZTab();
+                for (int i = 0; i < ItemCount; i++) { if (rz[i] == RampZ(i)) a7++; else b7++; }
+                int ok = a1 + a2 + a3 + a4 + a5 + a6 + a7 + _kcOk, bad = b1 + b2 + b3 + b4 + b5 + b6 + b7 + _kcBad;
+                Log.Info(PK + "koszt - kontrola szybkich drog dzien " + day + " | zgodne " + ok + ", rozne " + bad + " (zgodne/rozne: ilosci polki T10 " + a1 + "/" + b1 + ", spis polek T7 " + a2 + "/" + b2
+                         + ", progi drabiny 2 T4 " + a3 + "/" + b3 + ", budzet koszyka wsi T4 " + a4 + "/" + b4 + ", drogi wies-miasto T3 " + a5 + "/" + b5 + ", regula A7 T2 " + a6 + "/" + b6
+                         + ", pozycje rampy T6 " + a7 + "/" + b7 + ", przetwory T8 (probka 1/64 od ostatniej kontroli) " + _kcOk + "/" + _kcBad + ") | na targ Planu T1 (raz na proces) " + _t1Check
+                         + " | tylko odczyt - szybkie drogi wobec starych na tych samych danych.");
+                _kcOk = _kcBad = 0;
+            }
+            catch (Exception e) { Stumble("KCheck", e); }
         }
     }
 

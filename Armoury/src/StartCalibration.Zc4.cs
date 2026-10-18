@@ -307,7 +307,7 @@ namespace Armoury
                     // indeksy wierszy polki (zakupy wsi bez szukania liniowego - recenzja kosztu) i ilosc towaru
                     var ro = r.St.ItemRoster; var cnt = new int[ZN];
                     for (int z = 0; z < ZN; z++) zt.Ix[z] = -1;
-                    if (ro != null && t7 != null) T7Scan(ro, zt, cnt, t7);   // ks-koszt T7: ten sam wynik, bez kopii wierszy broni i zbroi
+                    if (ro != null && t7 != null) T7Scan(ro, zt.Ix, cnt, t7);   // ks-koszt T7: ten sam wynik, bez kopii wierszy broni i zbroi
                     else if (ro != null)
                         for (int k = 0; k < ro.Count; k++)
                         {

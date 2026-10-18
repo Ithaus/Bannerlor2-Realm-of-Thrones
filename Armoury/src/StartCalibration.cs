@@ -404,6 +404,7 @@ namespace Armoury
                              + " | tabela dob KS-H " + dMs.ToString("0.00", Inv) + " ms (" + dCalls + " wywolan drogi, " + KsFoodCarts.DaysPairsDone + "/" + KsFoodCarts.DaysPairs + " par)"
                              + " | potkniecia dzis " + _stumblesDay + " (sesja " + _stumbles + ").");
                     try { Log.Info(T0Line(day, ms)); } catch (Exception e) { Stumble("T0Line", e); }   // ks-koszt T0: pod-czasy doby KS (tylko log)
+                    KCheck(today, day);                                // ks-koszt: kontrola szybkich drog co 7 dob (tylko odczyt, poza czasem doby KS)
                     if (day % 7 == 0) { try { Log.Info(PriceLine(day)); } catch (Exception e) { Stumble("PriceLine", e); } }
                     if (day % 7 == 0) { try { string pn = PriceNowLine(day); if (pn != null) Log.Info(pn); string rl = R4cLine(day); if (rl != null) Log.Info(rl); } catch (Exception e) { Stumble("R4cLines", e); } }   // KS r4 (r4-ceny): ceny chwilowe (NKS-7d), linia paczki
                     try { string ml = MarketLine(); if (ml != null) Log.Info(ml); } catch (Exception e) { Stumble("MarketLine", e); }

@@ -570,6 +570,27 @@ namespace Armoury
         /// <summary>Nowa sesja (TownFolk.Reset): pamiec miast obok i ulamki koszyka wsi od nowa.</summary>
         private static void KsReset() { _nearTowns.Clear(); _nearDay = -1; _zcCarry.Clear(); _zcCarry2.Clear(); _ntDist.Clear(); }
         private static readonly Dictionary<Village, Dictionary<Settlement, float>> _ntDist = new Dictionary<Village, Dictionary<Settlement, float>>();   // ks-koszt T3: droga wies -> miasto (sesja)
+
+        /// <summary>ks-koszt (kontrola T3): najwyzej max par z pamieci drog wies -> miasto wobec ponownego pytania gry (tylko odczyt; blad zapytania - pominiety).</summary>
+        internal static void KsNtCheck(int max, out int ok, out int bad)
+        {
+            ok = 0; bad = 0;
+            TaleWorlds.CampaignSystem.ComponentInterfaces.MapDistanceModel dm = null;
+            try { dm = TaleWorlds.CampaignSystem.Campaign.Current.Models.MapDistanceModel; } catch { dm = null; }
+            if (dm == null) return;
+            int n = 0;
+            foreach (var kv in _ntDist)
+            {
+                if (kv.Key == null || kv.Key.Settlement == null || kv.Value == null) continue;
+                foreach (var e in kv.Value)
+                {
+                    if (n++ >= max) return;
+                    float rd;
+                    try { rd = dm.GetDistance(kv.Key.Settlement, e.Key, false, false, TaleWorlds.CampaignSystem.Party.MobileParty.NavigationType.Default); } catch { continue; }
+                    if (BitConverter.ToInt32(BitConverter.GetBytes(rd), 0) == BitConverter.ToInt32(BitConverter.GetBytes(e.Value), 0)) ok++; else bad++;
+                }
+            }
+        }
         private static long _zcBrewV;
     }
 }
