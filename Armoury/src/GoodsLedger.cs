@@ -158,11 +158,14 @@ namespace Armoury
             public readonly long[] MkP = new long[3], MkC = new long[3], MkS = new long[2];
             // KS r4 P10 (r4-ceny, pomiar NKS-5u): "wies je swoje" (G3, z magazynu wsi - poza targiem, w MkC[2]) wedlug rynku wsi - linia "KS: rynki" rozdziela "bez rynku"
             public readonly long[] MkOwn = new long[2];
+            // f14-ksiega (recenzja): zrodlo z niczego nazwane, ale przy KS NIE zamykane (dar BK herszta) - czesc z otwartej ramki (dotad "inne ticki dobowe"),
+            // dalej liczona do bramki KS (3) w KsNote; tylko licznik
+            public long GateOpen;
 
             public void NewDay()
             {
                 Src.Clear(); Sink.Clear(); Array.Clear(Tr, 0, Tr.Length); Array.Clear(Hold, 0, Hold.Length);
-                Extra = 0; WagonUnits = 0; WagonGold = 0;
+                Extra = 0; WagonUnits = 0; WagonGold = 0; GateOpen = 0;
                 Array.Clear(MkP, 0, 3); Array.Clear(MkC, 0, 3); Array.Clear(MkOwn, 0, 2);
             }
         }
@@ -1149,23 +1152,36 @@ namespace Armoury
 
         // ks-arm (recenzja, noc 17/18.10): zrodla znane z nazwy dla twardej bramki KS (projekt rozdz. 10 pkt 3 - "inne ticki dobowe" maja byc tylko zrodlami nieznanymi):
         // ryby z perku Night Raider (NavalDLC), zboze nowych druzyn patrolowych miast, ryby portow BK miast - wlasna grupa (poza SrcOrder - drukowana po "inne ticki"),
-        // nie wchodzi do liczb Planu KS (KsNote) ani do bramki (KsGateTake liczy tylko GTick)
+        // nie wchodzi do liczb Planu KS (KsNote) ani do bramki (KsGateTake liczy tylko GTick) - poza zrodlami OTWARTYMI (NoteKnownOpenSource, Acc.GateOpen)
         internal const string GKnown = "zrodla znane z nazwy (KS)";
 
         /// <summary>ks-arm: jak NoteSource (przyrost zdjety z otwartej ramki, zeby nie poszedl do "inne ticki"), ale grupa GKnown i bez klucza FoodSourcesInLedger
         /// (decyduja klucze KS wolajacego). Nie rzuca.</summary>
-        internal static void NoteKnownSource(ItemObject it, int n, string sub)
+        internal static void NoteKnownSource(ItemObject it, int n, string sub) { KnownCore(it, n, sub, false, "NoteKnownSource"); }
+
+        /// <summary>f14-ksiega (recenzja): jak NoteKnownSource, ale dla zrodla z niczego, ktorego KS przy wlaczeniu NIE zamyka (dar BK dla bandy herszta - zostaje do
+        /// decyzji Jeffa). Czesc zdjeta z otwartej ramki dotad szla do "inne ticki dobowe", czyli do bramki KS (3) - liczy sie tam dalej (Acc.GateOpen -> _ksGate),
+        /// choc w linii towaru ma nazwe: bramka widzi to samo co przed nazwaniem (moment wlaczenia KS bez zmian). Zwraca true, gdy przyrost byl w otwartej ramce. Nie rzuca.</summary>
+        internal static bool NoteKnownOpenSource(ItemObject it, int n, string sub) { return KnownCore(it, n, sub, true, "NoteKnownOpenSource"); }
+
+        private static bool KnownCore(ItemObject it, int n, string sub, bool open, string site)
         {
             try
             {
-                if (n == 0 || it == null || !On || !EnsureItems()) return;
+                if (n == 0 || it == null || !On || !EnsureItems()) return false;
                 int i;
-                if (!_idx.TryGetValue(it, out i)) return;
+                if (!_idx.TryGetValue(it, out i)) return false;
                 var f = _top;
-                if (f != null && Environment.CurrentManagedThreadId == f.Thread) { f.Touch(i); f.Net[i] -= n; }
+                bool inFrame = f != null && Environment.CurrentManagedThreadId == f.Thread;
+                if (inFrame)
+                {
+                    f.Touch(i); f.Net[i] -= n;
+                    if (open && n > 0 && _acc != null) _acc[i].GateOpen += n;   // f14-ksiega: dawna czesc "inne ticki dobowe" - dalej w bramce KS (3)
+                }
                 Book(i, GKnown, sub, n);
+                return inFrame;
             }
-            catch (Exception e) { Stumble("NoteKnownSource", e); }
+            catch (Exception e) { Stumble(site, e); return false; }
         }
 
         /// <summary>m6b (5): MobileParty.RemoveParty bez zdarzenia zniszczenia (konwoje DTE - CutTheirSupplyBehavior.CleanupCaravan): roster znika bez sladu
@@ -1308,7 +1324,7 @@ namespace Armoury
             v[KsCons] = cons; v[KsTown] = Group(a.Sink, GTown); v[KsStockTown] = a.Hold[HTown]; v[KsWoodlot] = Group(a.Src, GWoodlot); v[KsFishBoats] = Group(a.Src, GFish);
             v[KsCloth] = Group(a.Sink, GArmyCloth) + Group(a.Sink, GArms) + Group(a.Sink, GMend);
             _ksDay[it.StringId] = v;
-            long gt = Group(a.Src, GTick), gr = Group(a.Sink, GRemoved);   // ks-arm: twarde bramki KS (projekt rozdz. 10 pkt 2-3)
+            long gt = Group(a.Src, GTick) + a.GateOpen, gr = Group(a.Sink, GRemoved);   // ks-arm: twarde bramki KS (projekt rozdz. 10 pkt 2-3); f14-ksiega: + zrodla otwarte z ramek
             if (gt > 0 || gr > 0) _ksGate[it.StringId] = new[] { gt, gr };
             // KS r4 P10 (r4-ceny): [8..10] - wies je swoje W/E (czesc "bez rynku" z magazynu wsi) i stracone w drodze KS-H (czesc "bez rynku"); [0..7] bez zmian
             if (_ksMkOn) _ksMk[it.StringId] = new[] { a.MkP[0], a.MkP[1], a.MkP[2], a.MkC[0], a.MkC[1], a.MkC[2], a.MkS[0], a.MkS[1], a.MkOwn[0], a.MkOwn[1], Group(a.Sink, GKsLost) };

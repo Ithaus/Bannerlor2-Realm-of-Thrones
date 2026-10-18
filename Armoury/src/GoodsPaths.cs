@@ -173,6 +173,7 @@ namespace Armoury
             _meadBaseToday = _meadBaseY = 0; _meadTownToday = 0; _meadTownY = 0;
             _looked = false; _whale = _meat = _fish = _honey = _mead = _marble = _coal = _wood = _iron = _clay = _lime = _grain = null; _clayCat = _limeCat = null; _ingots = null;
             _stumbles = 0; _errSites.Clear(); _foodTargets.Clear(); _need.Clear(); _needDay = -1; _saltMk = null;
+            _sHeroNamed = _sHeroGate = 0;   // f14-ksiega (recenzja): dar herszta - liczniki sesji
             DayReset();
         }
 
@@ -666,11 +667,16 @@ namespace Armoury
 
         // f14-ksiega (noc 18.10; fin92 Armoury-2026-10-18_09-33-39.log): dar BK dla bandy herszta (BanditHeroComponent.CreateParty i ConsiderLeaveHideout ->
         // BannerKingsComponent.GiveFood) - gra bez zmian (pomiar E8/P3, decyzja "dar zostaje" - bez zywnosci herszt BK nie wychodzi na rabunek), ale ksiega towarow
-        // dostaje nazwane zrodlo (GoodsLedger.NoteKnownSource): przy zalozeniu partii (DailyTickClan, poza ramkami) dar szedl dotad do "bez wyjasnienia"
+        // dostaje nazwane zrodlo (GoodsLedger.NoteKnownOpenSource - grupa "zrodla znane z nazwy (KS)"): przy zalozeniu partii (DailyTickClan, poza ramkami) dar szedl dotad do "bez wyjasnienia"
         // (d109176 +15, d109213 +429 = "GiveFood 1 razy, 429 szt." linii E5/A8), w ticku partii (ramka) - do "inne ticki dobowe". Rodzaj -2 = tylko ksiega.
         private const int KHeroLedger = -2;
         private const string HeroFoodSub = "dar BK dla bandy herszta (GiveFood) - z niczego";
         private static long _dHeroLedger;   // sztuki daru herszta nazwane w ksiedze (doba) - tylko licznik
+        // f14-ksiega (recenzja): dar herszta przy KS zastosowanym NIE jest zamykany (do decyzji Jeffa) - linia twardych bramek KS (StartCalibration.HardGates) pokazuje go
+        // jako zrodlo z niczego otwarte; sesja: sztuk nazwanych i sztuk z ticku partii (ramka - liczone dalej do bramki zrodel bez nazwy, GoodsLedger.NoteKnownOpenSource)
+        private static long _sHeroNamed, _sHeroGate;
+        internal static long HeroFoodNamed { get { return _sHeroNamed; } }
+        internal static long HeroFoodGate { get { return _sHeroGate; } }
 
         private static bool BanditHero(MobileParty mp)
         {
@@ -731,8 +737,10 @@ namespace Armoury
             catch (Exception e) { Stumble("BkGiveFoodPost", e); }
         }
 
-        /// <summary>f14-ksiega: jedzenie, ktore GiveFood dopisal bandzie herszta (teraz - wtedy, gdy dodatnie) - nazwane zrodlo ksiegi towarow (NoteKnownSource zdejmuje
-        /// przyrost z otwartej ramki, wiec w ticku partii nie idzie juz do "inne ticki dobowe"). Juki bez zmian. Nie rzuca (wolajacy w try).</summary>
+        /// <summary>f14-ksiega: jedzenie, ktore GiveFood dopisal bandzie herszta (teraz - wtedy, gdy dodatnie) - nazwane zrodlo ksiegi towarow (zdjete z otwartej ramki,
+        /// wiec w ticku partii nie idzie juz do "inne ticki dobowe"). Recenzja: dar NIE jest zamykany przy KS zastosowanym, wiec czesc z ramki (ConsiderLeaveHideout w ticku
+        /// partii) liczy sie dalej do bramki KS zrodel bez nazwy jak przed nazwaniem (NoteKnownOpenSource), a linia bramek pokazuje dar jako otwarty. Juki bez zmian.
+        /// Nie rzuca (wolajacy w try).</summary>
         private static void NoteHeroFood(ItemRoster r, Dictionary<ItemObject, int> was)
         {
             foreach (var kv in FoodOf(r))
@@ -740,8 +748,9 @@ namespace Armoury
                 int w; was.TryGetValue(kv.Key, out w);
                 int d = kv.Value - w;
                 if (d <= 0) continue;
-                GoodsLedger.NoteKnownSource(kv.Key, d, HeroFoodSub);
-                _dHeroLedger += d;
+                bool inFrame = GoodsLedger.NoteKnownOpenSource(kv.Key, d, HeroFoodSub);
+                _dHeroLedger += d; _sHeroNamed += d;
+                if (inFrame) _sHeroGate += d;
             }
         }
 
