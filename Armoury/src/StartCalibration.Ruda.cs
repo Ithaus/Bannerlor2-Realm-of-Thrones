@@ -82,6 +82,7 @@ namespace Armoury
             for (int m = 0; m < 2; m++) dec[m] = T[m] <= 0 ? 2 : S[m] < T[m] ? 1 : S[m] > 2 * T[m] ? -1 : 0;
             // 2. bloki z zelazem
             int nIn = 0, nUp = 0, nDnFull = 0, nDnStarv = 0, nPart = 0, nBand = 0, nNoT = 0, nNoData = 0, nCap = 0, nBusy = 0;
+            int nColl = 0;                                         // f7-wegiel (recenzja): wpisy bez wzrostu tylko przez rece weglarzy (bez drewna < 10%, z weglarzami >= 10%)
             int nBlk = 0, nAtCap0 = 0, nOver = 0;                  // recenzja: bloki z zelazem, na suficie przed krokiem, nad sufitem bez wzrostu zelaza (bez przyciecia)
             var h0 = new double[2]; var h1 = new double[2]; var hMid = new double[2]; var hAt0 = new double[2];
             double capIron = 0, capOther = 0;                      // rece zdjete sufitem po wzroscie: zelazu (z zamiaru) i innym zlozom bloku (oddane zelazu)
@@ -95,6 +96,10 @@ namespace Armoury
                     // pola mieszczan: zelazo bez dymarki (bez wegla) - bez wzrostu (jak brak danych wytopu), w dol tylko przy rynku pelnym; fin88: zelaza z pol mieszczan 0
                     float starv = -1f, model7; int days;
                     if (!ld.TF && ld.V != null) starv = Bloomery.F5Starved(ld.V, out model7, out days);
+                    // f7-wegiel (recenzja): do WZROSTU rece weglarzy licza sie jak brak drewna (kopalnia w duzej czesci weglarnia nie rosnie z rekami); zjazd przy >= 50% - samo starv.
+                    // Klucz Bloomery Colliers NIE (rece weglarzy 0) - starvG == starv co do bitu
+                    float starvG = starv;
+                    if (starv >= 0f && ld.V != null) starvG = Bloomery.F7StarvedGrow(ld.V, starv);
                     foreach (var b in ld.B)
                     {
                         if (b == null || b.RC == null || b.RF == null) continue;
@@ -119,8 +124,8 @@ namespace Armoury
                                 else if (dec[m] == 1)
                                 {
                                     if (starv == -1f) nNoData++;
-                                    else if (starv < F5StarvUp) { f = F5Up; nUp++; }   // -2 (bez dymarki) albo < 10% bez drewna
-                                    else nPart++;
+                                    else if (starvG < F5StarvUp) { f = F5Up; nUp++; }   // -2 (bez dymarki) albo < 10% bez drewna (f7: z rekami weglarzy)
+                                    else { nPart++; if (starv < F5StarvUp) nColl++; }
                                 }
                                 else nBand++;
                                 if (f != 1f) b.RF[j] *= f;
@@ -181,7 +186,7 @@ namespace Armoury
                   .Append(dec[m] == 1 ? "BRAK (w gore)" : dec[m] == -1 ? "PELNY (w dol)" : dec[m] == 0 ? "PASMO (bez zmian)" : "BEZ CELU (bez zmian)");
             }
             sb.Append(" | wpisow zelaza ").Append(nIn).Append(": w gore ").Append(nUp).Append(", w dol (rynek pelny) ").Append(nDnFull).Append(", w dol (dymarka bez drewna) ").Append(nDnStarv)
-              .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
+              .Append(", bez zmian: dymarka czesciowo bez drewna ").Append(nPart).Append(Bloomery.F7On ? " (w tym przez rece weglarzy f7-wegiel " + nColl + ")" : "").Append(", bez danych wytopu ").Append(nNoData).Append(", pasmo ").Append(nBand).Append(", bez celu ").Append(nNoT)
               .Append("; bloki przyciete sufitem ").Append(nCap).Append(", w przebudowie (pominiete) ").Append(nBusy);
             // recenzja: czy sufit bloku (suma rak przy zlozach <= 0.5 x rece poza domem) wiaze zelazo
             double hAll0 = h0[0] + h0[1], hAt = hAt0[0] + hAt0[1];

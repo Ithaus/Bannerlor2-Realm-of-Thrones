@@ -407,10 +407,10 @@ namespace Armoury
                 int bank = _mines.TryGetValue(village, out m) ? m.Bank : 0;
                 int cap = Math.Max(0, bank / wpb - _tvReserved);
                 float coll = 0f;   // f7-wegiel: rece weglarzy (lupy modelu)
-                bool f7 = F7On;
-                if (x > cap && m != null && f7) cap = F7Colliers(village, m, x, cap, wpb, out coll);   // f7-wegiel: bezczynne rece pala wegiel z lasu okregu (klucz Bloomery Colliers)
+                bool f7 = F7On, f7nd = false;   // f7nd (recenzja): kopalnia KS bez danych (rece blokow 0 - doba po wczytaniu) - tick poza pierscieniem f5-ruda
+                if (x > cap && m != null && f7) cap = F7Colliers(village, m, x, cap, wpb, out coll, out f7nd);   // f7-wegiel: bezczynne rece pala wegiel z lasu okregu (klucz Bloomery Colliers)
                 float idle = x > cap ? Math.Max(0f, x - cap - coll) : 0f;   // klucz NIE: x - cap jak dotad
-                F5Note(village, x, idle);   // f5-ruda: wytop 7 dob per kopalnia (model i lupy bez drewna) - tylko przy kluczu Ks Iron Hands Follow Market (f7: bez rak weglarzy)
+                if (!f7nd) F5Note(village, x, idle, coll);   // f5-ruda: wytop 7 dob per kopalnia (model i lupy bez drewna) - tylko przy kluczu Ks Iron Hands Follow Market (f7: rece weglarzy osobno - do wzrostu jak brak drewna)
                 if (f7) F7Note(x, x > cap ? cap : x, idle);
                 if (x > cap)
                 {

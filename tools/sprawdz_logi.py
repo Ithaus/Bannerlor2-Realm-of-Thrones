@@ -1519,6 +1519,10 @@ Uzycie (Python 3, tylko odczyt):
                     najwyzej 29%), NWE-6 kopalnie KS bez lasu - bez wegla (INFO; fin91 Bir Seif 11.4, Sunmine 11.1, Tylemos 3.9 lup/d), NWE-7 lupy dzieki weglarzom (INFO;
                     szacunek +51/d), NWE-8 potkniecia i ERROR 0, NWE-9 czas doby <= 2 ms, NWE-10 kredyt drewna f5-ruda na koniec (INFO; fin91 otwarty 17596 zl).
                     Baza: fin91 Armoury-2026-10-18_06-29-09.log (7ca98719 = WGRANIE 80). Log sprzed paczki: NWE-3/4 jako liczby bazowe (INFO), reszta brak linii (INFO), bez wyjatku.
+                    Recenzja: NWE-3b niewytopione razem = bez wegla + rece weglarzy (INFO - ta sama miara co 'kopalnia bez wegla' przed paczka; R1-7 w etap5 liczy odtad tak samo),
+                    NWE-11 kopalnie KS bez danych (rece blokow 0 - doba po wczytaniu albo wlaczeniu; poza pierscieniem f5-ruda) i r liczone w ticku (INFO), NWE-12 krok
+                    tygodniowy f5-ruda: wpisy bez wzrostu tylko przez rece weglarzy ("w tym przez rece weglarzy f7-wegiel N" - do wzrostu rece weglarzy licza sie jak brak
+                    drewna; INFO, obserwowac razem z NRU-3 i nglod w krainach gorniczych).
 Wynik: tabela TAK / NIE / ETAP / DECYZJA / INFO z liczbami; brak linii w logu = "brak linii" (INFO), nigdy wyjatek. DECYZJA (B-4): prog projektu
 niespelniony z przyczyny, ktorej krok nie usuwa (opis w wierszu) - nie TAK i nie INFO, liczony osobno.
 Doba N = N-ta doba kampanii (dzien z linii - start + 1). Krolestwa biedne z lore (Q4a): Iron Islands, Dragonstone, Sarnor.
@@ -5676,19 +5680,26 @@ def etap5_r1(rep, lines, start, until):
     rep.add("R1-6: lupy bez drewna w dymarce (suma okna)", str(over), "0", over == 0)
     # narzedzie progow zb58 (TRIAZ R1-7 pkt 9): swiatu brakuje drewna do pelnej potrzeby dymarek az do pierwszej decyzji regulatora drewna (d56), wiec
     # 5% jest wiazace w d61-until; d8-60 (od pierwszej doby kopalni bez drewna) - INFO. Okno krotsze niz d61 - sam wiersz INFO.
+    # recenzja f7-wegiel: od paczki f7-wegiel (klucz Bloomery Colliers) 'kopalnia bez wegla' liczy tylko rece bezczynne; rece weglarzy (wstawka "weglarze
+    # (f7-wegiel)" linii zelaza) tez nie wydobyly rudy - niewytopione = bez wegla + rece weglarzy, zeby prog mierzyl to samo zjawisko co przed paczka
     def coal(ds):
         made = tot(r"lupy z tickow kopalni (\d+)", ds)
         unwon = tot(r"kopalnia bez wegla ([\d.]+) lup", ds, float)
-        return made, unwon, 100.0 * unwon / max(1.0, made + unwon)
+        coll = tot(r"; weglarze \(f7-wegiel\): drewno z lasu okregu \d+ ladunkow, rece ([\d.]+) lup", ds, float)
+        unwon += coll
+        return made, unwon, 100.0 * unwon / max(1.0, made + unwon), coll
     w61 = [x for x in days if x >= 61]
     w8 = [x for x in days if 8 <= x <= 60]
     if w61:
-        made, unwon, share = coal(w61)
-        rep.add("R1-7: kopalnia bez wegla wobec lup (d61-until)", f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)", "<= 5%", share <= 5.0)
+        made, unwon, share, coll = coal(w61)
+        rep.add("R1-7: kopalnia bez wegla wobec lup (d61-until)", f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)"
+                + (f"; w tym rece weglarzy f7-wegiel {coll:.0f}" if coll > 0 else ""),
+                "<= 5% (od f7-wegiel: bez wegla + rece weglarzy)", share <= 5.0)
     if w8:
-        made, unwon, share = coal(w8)
+        made, unwon, share, coll = coal(w8)
         rep.add("R1-7a: kopalnia bez wegla wobec lup (d8-60, przed pierwsza decyzja regulatora drewna)",
-                f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)", "INFO (prog <= 5% wiazacy w d61-until)", None)
+                f"{unwon:.0f} lup niewytopionych przy {made} wytopionych ({share:.1f}%)" + (f"; w tym rece weglarzy f7-wegiel {coll:.0f}" if coll > 0 else ""),
+                "INFO (prog <= 5% wiazacy w d61-until; od f7-wegiel: bez wegla + rece weglarzy)", None)
     etap5_r1_stock(rep, lines, start, until, rows)
     stu = tot(r"potkniecia dzis (\d+) \(od wczytania", days)
     rep.add("R1-11: potkniecia Bloomery (suma okna)", str(stu), "0", stu == 0)
@@ -44639,7 +44650,7 @@ NRU_WEEK = "Ruda KS (f5-ruda): dzien "
 NRU_W = re.compile(r"^Ruda KS \(f5-ruda\): dzien (\d+) \| klucz Ks Iron Hands Follow Market TAK, co (\d+) dob od D (-?\d+) \([^)]*\) \| "
                    r"Westeros: polki (\d+) / cel (\d+) \(([^)]*)\), brak (\d+) w (\d+) miastach, bez rudy (\d+) z (\d+) miast -> (BRAK|PELNY|PASMO|BEZ CELU)[^|]*\| "
                    r"Essos: polki (\d+) / cel (\d+) \(([^)]*)\), brak (\d+) w (\d+) miastach, bez rudy (\d+) z (\d+) miast -> (BRAK|PELNY|PASMO|BEZ CELU)[^|]*\| "
-                   r"wpisow zelaza (\d+): w gore (\d+), w dol \(rynek pelny\) (\d+), w dol \(dymarka bez drewna\) (\d+), bez zmian: dymarka czesciowo bez drewna (\d+), "
+                   r"wpisow zelaza (\d+): w gore (\d+), w dol \(rynek pelny\) (\d+), w dol \(dymarka bez drewna\) (\d+), bez zmian: dymarka czesciowo bez drewna (\d+)(?: \(w tym przez rece weglarzy f7-wegiel \d+\))?, "
                    r"bez danych wytopu (\d+), pasmo (\d+), bez celu (\d+); bloki przyciete sufitem (\d+), w przebudowie \(pominiete\) (\d+) \| "
                    r"sufit bloku \([^)]*\): blokow z zelazem (\d+), na suficie przed krokiem (\d+) \(rece przy zelazie (\d+) = (\d+)% rak zelaza\), "
                    r"przyciete po wzroscie (\d+) \(zelazo -(\d+) rak z zamiaru, inne zloza -(\d+) rak -> do zelaza\), nad sufitem bez wzrostu \([^)]*\) (\d+) \| "
@@ -44955,6 +44966,10 @@ NWE_L = re.compile(r"^Weglarze kopaln \(f7-wegiel\): dzien (\d+) \| klucz Bloome
 NWE_SEG = re.compile(r"; weglarze \(f7-wegiel\): drewno z lasu okregu (\d+) ladunkow, rece ([\d.]+) lup \(ok\. (\d+) ludzi\), wytopione dzieki nim ([\d.]+) lup, "
                      r"kopalnie bez lasu bez wegla ([\d.]+) lup")
 NWE_ERR = ("ERROR in Bloomery.F7", "ERROR in StartCalibration.F7CollierRatio")
+# recenzja: kopalnie KS bez danych (doba po wczytaniu) w linii doby; krok tygodniowy f5-ruda - wpisy bez wzrostu przez rece weglarzy
+NWE_ND = re.compile(r"\| bez danych KS \([^)]*\): bez wegla ([\d.]+) lup w (\d+) kopalniach \(poza pierscieniem f5-ruda\); r liczone w ticku: prob (\d+), z danymi (\d+)")
+NWE_F5W = re.compile(r"^Ruda KS \(f5-ruda\): dzien (\d+) .*?wpisow zelaza (\d+): w gore (\d+), w dol \(rynek pelny\) (\d+), w dol \(dymarka bez drewna\) (\d+), "
+                     r"bez zmian: dymarka czesciowo bez drewna (\d+)(?: \(w tym przez rece weglarzy f7-wegiel (\d+)\))?")
 NWE_WIN = 28
 NWE_COAL_MAX, NWE_COAL_BASE = 28.1, 93.8          # NWE-3: 'kopalnia bez wegla' lup/d (= NOP-8 / NRU-8; bez KS 28.1, fin91 93.8 - baza paczki, fin88 45.4)
 NWE_PROD_MIN, NWE_PROD_BASE = 390, 362            # NWE-4: lupy wsi na dobe (fin91 362 srednio 28 dob; szacunek po weglarzach na fin91 413)
@@ -44973,6 +44988,7 @@ def nwegiel_main(logp):
         rep.show()
         return 0
     days, segs, zc4, iron, creds, errs = {}, {}, {}, {}, {}, []
+    nds, f5w = {}, {}
     bad = 0
     with open(logp, encoding="utf-8", errors="replace") as fh:
         for ln in fh:
@@ -44982,8 +44998,16 @@ def nwegiel_main(logp):
                 a = NWE_L.match(s)
                 if a:
                     days[int(a.group(1))] = a.groups()
+                    g = NWE_ND.search(s)
+                    if g:
+                        nds[int(a.group(1))] = g.groups()
                 else:
                     bad += 1
+                continue
+            if s.startswith("Ruda KS (f5-ruda): dzien "):
+                a = NWE_F5W.match(s)
+                if a:
+                    f5w[int(a.group(1))] = a.groups()
                 continue
             if s.startswith("Koszyk stanow (ZC4): dzien "):
                 a = NOP_ZC4.match(s)
@@ -45049,6 +45073,11 @@ def nwegiel_main(logp):
         prod = sum(iron[d][0] for d in win if d in iron) / len(wi)
         rep.add("NWE-4: lupy wsi na dobe (Zelazo (lupy) 'wsie dopisaly')" + base_note, f"{prod:.0f}/d (srednio {len(wi)} dob)",
                 f">= {NWE_PROD_MIN} (szacunek po weglarzach na fin91 413); ETAP > {NWE_PROD_BASE} (fin91); bez KS 271", ok_or_info(prod >= NWE_PROD_MIN), etap=prod > NWE_PROD_BASE)
+        # recenzja: niewytopione razem (bez wegla + rece weglarzy) - ta sama miara co 'kopalnia bez wegla' przed paczka (rece weglarzy tez nie wydobyly rudy)
+        wc = [float(segs[d][1]) for d in win if d in iron and d in segs]
+        cs = sum(wc) / len(wi)
+        rep.add("NWE-3b: niewytopione razem = bez wegla + rece weglarzy (miara sprzed paczki; INFO)", f"{coal + cs:.1f} lup/d (bez wegla {coal:.1f} + weglarze {cs:.1f}; wstawek {len(wc)} z {len(wi)} dob)",
+                f"INFO (fin91 {NWE_COAL_BASE} bez weglarzy; bez KS {NWE_COAL_MAX}; szacunek po weglarzach na fin91 ok. 42)", None)
     else:
         rep.add("NWE-3: 'kopalnia bez wegla'", f"brak linii zelaza w oknie ({wnote})", "INFO", None)
         rep.add("NWE-4: lupy wsi na dobe", f"brak linii zelaza w oknie ({wnote})", "INFO", None)
@@ -45072,6 +45101,27 @@ def nwegiel_main(logp):
         rep.add("NWE-5: rece weglarzy wobec modelu", f"brak linii w oknie ({wnote})", "INFO", None)
         rep.add("NWE-6: kopalnie KS bez lasu", "brak linii", "INFO", None)
         rep.add("NWE-7: lupy wytopione dzieki weglarzom", "brak linii", "INFO", None)
+    # recenzja: NWE-11 kopalnie KS bez danych (doba po wczytaniu / wlaczeniu), NWE-12 krok f5-ruda - wpisy bez wzrostu przez rece weglarzy
+    if nds:
+        ndd = [d for d, g in sorted(nds.items()) if float(g[0]) > 0]
+        tl = sum(int(g[2]) for g in nds.values())
+        tok = sum(int(g[3]) for g in nds.values())
+        rep.add("NWE-11: kopalnie KS bez danych (rece blokow 0 - doba po wczytaniu albo wlaczeniu; poza pierscieniem f5-ruda) i r liczone w ticku (INFO)",
+                f"dob z brakiem danych {len(ndd)} z {len(nds)}" + (f" ({ndd[:5]}; razem {sum(float(nds[d][0]) for d in ndd):.1f} lup)" if ndd else "")
+                + f"; r w ticku: prob {tl}, z danymi {tok}", "INFO (po wczytaniu najwyzej 1-2 doby; wiecej - KS bez stanow ZC albo okreg bez rak przy zelazie)", None)
+    else:
+        rep.add("NWE-11: kopalnie KS bez danych", "brak wstawki w linii (log sprzed recenzji albo bez linii)", "INFO", None)
+    wk = sorted(f5w)
+    wkc = [d for d in wk if f5w[d][6] is not None]
+    if wk:
+        g = f5w[wk[-1]]
+        hold = sum(int(f5w[d][6]) for d in wkc)
+        rep.add("NWE-12: krok tygodniowy f5-ruda - wpisy bez wzrostu tylko przez rece weglarzy (INFO)",
+                f"krokow {len(wk)} (z dopiskiem f7 {len(wkc)}), wstrzymane przez weglarzy razem {hold}; ostatni d{wk[-1]}: w gore {g[2]}, czesciowo {g[5]}"
+                + (f" (w tym weglarze {g[6]})" if g[6] is not None else "") + f", w dol (dymarka bez drewna) {g[4]}, w dol (rynek pelny) {g[3]} z {g[1]} wpisow",
+                "INFO (do wzrostu rece weglarzy jak brak drewna; obserwowac z NRU-3 i nglod w krainach gorniczych)", None)
+    else:
+        rep.add("NWE-12: krok tygodniowy f5-ruda", "brak linii 'Ruda KS (f5-ruda)'", "INFO", None)
     # NWE-8 potkniecia i ERROR, NWE-9 czas
     st_d = sum(int(g[NWE_STUMD]) for g in days.values())
     st_s = max((int(g[NWE_STUMS]) for g in days.values()), default=0)

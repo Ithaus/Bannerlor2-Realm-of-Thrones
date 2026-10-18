@@ -37,13 +37,23 @@ namespace Armoury
     /// rece (lupy modelu) = wytopione + weglarze + bezczynne; drewno dymarek: wczoraj + las + targ + kredyt + wozy + weglarze - spalone = dzis (reszta 0).
     /// Klucz NIE - Cap co do bitu jak dotad (bez weglarzy, "kopalnia bez wegla" = model - sufit). Bez zapisu (r liczone co dobe z KS; drewno w dymarce jak dotad w arm_e6_bloom).
     /// Wyjatki liczone (pierwsze 3 w logu), bez globalnych wylacznikow.
+    ///
+    /// Recenzja (noc 18.10): (1) hamulec f5-ruda - krok tygodniowy F5IronWeek daje rece (x1.05) tylko kopalni, ktorej dymarka miala drewno; rece weglarzy licza sie
+    /// do tej decyzji jak brak drewna (pierscien F5Ring.C, F7GrowShare): kopalnia w duzej czesci weglarnia nie rosnie z rekami (z kazdej dodanej lupy rak tylko r / (5 + r)
+    /// to lupy), a zjazd x0.95 przy >= 50% zostaje na samych rekach bezczynnych (weglarze pracuja - kopalnia nie oddaje rak polu za to, ze pali wlasny wegiel);
+    /// 10-50% - bez zmian. (2) doba po wczytaniu / wlaczeniu KS: rece blokow KS (b.Hands) liczy StartCalibration.Daily PO Bloomery.Daily, a ticki wsi (DailyTickSettlement)
+    /// sa rozlozone po dobie - r kopalni bez danych liczone leniwie w jej ticku (raz na dobe, F7Lazy); kopalnia KS dalej bez danych (rece blokow 0) - tick poza
+    /// pierscieniem f5-ruda (bez falszywego "pelnego braku drewna" w oknie 7 dob) i osobny licznik w linii.
     /// </summary>
     internal static partial class Bloomery
     {
-        private sealed class F7Mine { public float R, Hpb, LumberL; public bool Ks; }
+        private sealed class F7Mine { public float R, Hpb, LumberL; public bool Ks; public int Try = -1; }   // Try - doba ostatniego leniwego liczenia r (F7Lazy)
         private static readonly Dictionary<Village, F7Mine> _f7 = new Dictionary<Village, F7Mine>();
         // liczniki doby (linia) - zerowane w F7Roll (poczatek NewDay, przed zerowaniem licznikow dymarek, ktore czyta tozsamosc drewna)
         private static int _f7Wood, _f7Stum, _f7StumDay, _f7WithForest, _f7NoForest;
+        private static int _f7LazyN, _f7LazyOk;          // recenzja: leniwe liczenie r w ticku (kopalnia KS bez danych) - proby / z danymi
+        private static float _f7NoData;                  // recenzja: lupy modelu ponad drewno kopalni KS bez danych (rece blokow 0) - poza pierscieniem f5-ruda
+        private static readonly HashSet<Village> _f7NoDataV = new HashSet<Village>();
         private static float _f7Coll, _f7Gain, _f7NoLand, _f7Model, _f7Fired, _f7Idle, _f7People, _f7ForestL;
         private static long _f7BankPrev = -1, _f7Ticks, _f7RefreshTicks;
         private static readonly HashSet<Village> _f7NoLandV = new HashSet<Village>();
@@ -54,8 +64,9 @@ namespace Armoury
 
         private static void F7Reset()
         {
-            _f7.Clear(); _f7NoLandV.Clear(); _f7Day.Clear();
+            _f7.Clear(); _f7NoLandV.Clear(); _f7Day.Clear(); _f7NoDataV.Clear();
             _f7Wood = _f7Stum = _f7StumDay = _f7WithForest = _f7NoForest = 0;
+            _f7LazyN = _f7LazyOk = 0; _f7NoData = 0f;
             _f7Coll = _f7Gain = _f7NoLand = _f7Model = _f7Fired = _f7Idle = _f7People = _f7ForestL = 0f;
             _f7BankPrev = -1; _f7Ticks = 0; _f7RefreshTicks = 0;
         }
@@ -95,17 +106,20 @@ namespace Armoury
 
         /// <summary>Cap (tick produkcji kopalni v, watek gry): drewna w dymarce starcza na `cap` lup przy modelu `x` (x > cap). Bezczynne rece pala wegiel z lasu okregu:
         /// zwraca nowy sufit y (>= cap); coll - rece weglarzy w lupach modelu. Drewno weglarzy dopisane do dymarki DOPIERO po calym rachunku (wyjatek - bez zmian).</summary>
-        private static int F7Colliers(Village v, Mine m, float x, int cap, int wpb, out float coll)
+        private static int F7Colliers(Village v, Mine m, float x, int cap, int wpb, out float coll, out bool noData)
         {
-            coll = 0f;
+            coll = 0f; noData = false;
             long t0 = Stopwatch.GetTimestamp();
             try
             {
                 F7Mine f;
-                if (v == null || m == null || wpb <= 0 || !_f7.TryGetValue(v, out f) || f == null) return cap;
+                if (v == null || m == null || wpb <= 0) return cap;
+                if (!_f7.TryGetValue(v, out f) || f == null || !(f.Hpb > 0f)) f = F7Lazy(v, f);   // recenzja: bez danych (wczytanie, wlaczenie) - r w ticku, raz na dobe
+                if (f == null) return cap;
                 if (!(f.R > 0f))
                 {
-                    if (f.Ks && f.Hpb > 0f) { _f7NoLand += x - cap; _f7NoLandV.Add(v); }   // kopalnia KS bez lasu (pustynia, step) - jak dotad; bez danych KS - nie liczona
+                    if (f.Ks && f.Hpb > 0f) { _f7NoLand += x - cap; _f7NoLandV.Add(v); }   // kopalnia KS bez lasu (pustynia, step) - jak dotad
+                    else if (f.Ks) { noData = true; _f7NoData += x - cap; _f7NoDataV.Add(v); }   // KS bez danych (rece blokow 0) - poza pierscieniem f5-ruda, osobny licznik
                     return cap;
                 }
                 int avail = Math.Max(0, m.Bank - _tvReserved * wpb);
@@ -128,6 +142,43 @@ namespace Armoury
             }
             catch (Exception e) { F7Stumble("Colliers", e); coll = 0f; return cap; }
             finally { _f7Ticks += Stopwatch.GetTimestamp() - t0; }
+        }
+
+        /// <summary>Recenzja (F7Colliers, tick wsi v - watek gry): r kopalni bez wpisu albo bez danych KS (Hpb 0) - najwyzej raz na dobe na kopalnie (Try). Po wczytaniu
+        /// i w dobie wlaczenia rece blokow liczy StartCalibration.Daily dopiero po Bloomery.Daily (F7Refresh widzi 0), a ticki wsi sa rozlozone po dobie - pierwszy tick
+        /// po StartCalibration.Daily ma juz dane. Wyjatek - wpis bez zmian (licznik w F7Colliers).</summary>
+        private static F7Mine F7Lazy(Village v, F7Mine f)
+        {
+            int today = Today5;
+            if (f != null && f.Try == today) return f;
+            if (f == null) { f = new F7Mine(); _f7[v] = f; }
+            f.Try = today;
+            float hpb = 0f, ll = 0f;
+            f.Ks = StartCalibration.AppliedFor(v);
+            f.R = f.Ks ? StartCalibration.F7CollierRatio(v, out hpb, out ll) : 0f;
+            f.Hpb = hpb; f.LumberL = ll;
+            if (f.Ks) { _f7LazyN++; if (f.Hpb > 0f) _f7LazyOk++; }
+            return f;
+        }
+
+        /// <summary>F5Sums i StartCalibration.F5IronWeek (przez F7StarvedGrow): czesc modelu 7 dob BEZ drewna kupionego / z lasu / kredytu / wozow - bez drewna (f)
+        /// + rece weglarzy - do decyzji o WZROSCIE rak (prog 10%). Klucz NIE albo bez weglarzy w oknie - f co do bitu.</summary>
+        private static float F7GrowShare(F5Ring r, float f)
+        {
+            if (r == null) return f;
+            float sc = r.SumC, sm = r.SumM;
+            if (!(sc > 0f) || !(sm > 0.01f)) return f;
+            return Math.Max(0f, Math.Min(1f, (r.SumU + sc) / sm));
+        }
+
+        /// <summary>StartCalibration.F5IronWeek (recenzja f7-wegiel): starv z F5Starved (bez drewna) -> czesc do decyzji o WZROSCIE (bez drewna + rece weglarzy).
+        /// starv < 0 (brak danych, bez dymarki) - bez zmian.</summary>
+        internal static float F7StarvedGrow(Village v, float starv)
+        {
+            if (!(starv >= 0f) || v == null) return starv;
+            F5Ring r;
+            if (!_f5ring.TryGetValue(v, out r) || r == null || r.N <= 0) return starv;
+            return F7GrowShare(r, starv);
         }
 
         /// <summary>Cap (klucz TAK): rachunek rak doby wszystkich kopaln w lupach modelu - model = wytopione (do sufitu) + weglarze (F7Colliers) + bezczynne.</summary>
@@ -190,6 +241,8 @@ namespace Armoury
                           .Append(a[0].ToString("0", inv)).Append(" ladunkow, rece ").Append(a[1].ToString("0.0", inv)).Append(" lup, +").Append(a[2].ToString("0", inv)).Append(" lup, las x")
                           .Append(f != null ? f.LumberL.ToString("0.00", inv) : "?").Append(", r ").Append(f != null ? f.R.ToString("0.0", inv) : "?");
                     }
+                    sb.Append(" | bez danych KS (rece blokow jeszcze nie policzone - doba po wczytaniu albo wlaczeniu): bez wegla ").Append(_f7NoData.ToString("0.0", inv))
+                      .Append(" lup w ").Append(_f7NoDataV.Count).Append(" kopalniach (poza pierscieniem f5-ruda); r liczone w ticku: prob ").Append(_f7LazyN).Append(", z danymi ").Append(_f7LazyOk);
                     sb.Append(" | kopalnie KS: z lasem ").Append(_f7WithForest).Append(" (las srednio x").Append(_f7ForestL.ToString("0.00", inv)).Append("), bez lasu ").Append(_f7NoForest)
                       .Append(" | czas ").Append((_f7Ticks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv)).Append(" ms (odswiezenie ")
                       .Append((_f7RefreshTicks * 1000.0 / Stopwatch.Frequency).ToString("0.00", inv)).Append(" ms)")
@@ -205,6 +258,7 @@ namespace Armoury
                 _f7Coll = _f7Gain = _f7NoLand = _f7Model = _f7Fired = _f7Idle = _f7People = 0f;
                 _f7Ticks = 0; _f7RefreshTicks = 0;
                 _f7NoLandV.Clear(); _f7Day.Clear();
+                _f7NoData = 0f; _f7NoDataV.Clear(); _f7LazyN = _f7LazyOk = 0;
             }
         }
     }
