@@ -2847,3 +2847,10 @@ DO SPRAWDZENIA U JEFFA (log pierwszej sesji): "KS: samo uzbrojenie", "Akumulator
   i SAM WLACZYL (109109, po 33 dobach; nksarm ARM-3 oczekuje >= 35 - kod liczy 28 dob ksiegi i 7 dob dojrzalego Planu na zakladke; do poprawy progu), twarde bramki TAK (bez nazwy max 0.6 camel),
   konwoje DTE: 192, juczne z niczego 0. Po wlaczeniu: zgony z glodu 0, zwrot zoldu 100%, nmur 0 NIE, nglod 0 NIE, RT-2 TAK, wsie kupuja 89%, nks 21 z 77, nds 4 NIE, powroty krain 0.
 - 00:13 PDT: test 5 dob + bitwa dokladnych DLL WGRANIA 78 (test/wgr78: Armoury f02b7c5d, reszta jak 77), drzewo zb/fix-ksarm c9f806d0.
+
+### 84. WGRANIE 78 (18.10 ok. 00:17 PDT = 09:17 CEST) - KS SAM SIE WLACZY W ZAPISIE JEFFA (konwoje DTE bez jucznych z niczego) - START TUTAJ
+W grze: `w-toku/noc-wgranie-78` = w-toku/fix-ksarm **c9f806d0** (= 100eaedf + DteConvoyNoFreePacks; GitHub) | Armoury **f02b7c5d** (bylo d784e458); reszta i pliki danych jak WGRANIE 77.
+Kopie *.bak-2026-10-18-wgranie78-przed i D:/Backup-Bannerlord/wgrane/2026-10-18-wgranie78-przed; zapis Jeffa jak przed 77 (md5 2ad40e43, kopia ...-przed-wgraniem77.sav).
+Testy: fin86 (sciezka Jeffa, 160 dob): KS uzbrojony 109076, wlaczony sam 109109, zgony z glodu 0, zwrot 100%, 0 ERROR; 5 dob + bitwa: kod 0, ERROR 0, bitwa 0 bledow.
+W grze Jeffa: przy pierwszym wczytaniu "KS: uzbrojony zapis doba N (samo)", ok. 33 dni pomiaru, potem "KS: samo wlaczenie" i rampa 14 dni.
+DALEJ: scalenie2 (fala 3: feed-swiat, ks-koszt, ceny-r5, fix-ksiega/uchodzcy/mur, perf, zapis, inwest) -> test -> WGRANIE 79 (tylko jesli Jeff nie gra).
